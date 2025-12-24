@@ -7,7 +7,7 @@
   <style>
     body { font-family: system-ui, -apple-system, "Segoe UI", Arial; margin: 16px; }
     h1 { margin: 0 0 12px; }
-    .row { display: grid; grid-template-columns: 420px 1fr; gap: 16px; align-items: start; }
+    .row { display: grid; grid-template-columns: 380px 1fr; gap: 16px; align-items: start; }
     .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     label { font-size: 12px; color: #333; display: block; margin-bottom: 4px; }
@@ -17,31 +17,32 @@
     .btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
     .note { font-size: 12px; color: #555; line-height: 1.4; }
     .warn { color: #a00; font-weight: 600; }
-    #svgWrap { border: 1px solid #ddd; border-radius: 10px; padding: 8px; }
+    #svgWrap { border: 1px solid #ddd; border-radius: 10px; padding: 8px; background: #fff; }
+    #svgWrap svg { max-width: 100%; height: auto; display: block; }
+    #partsWrap svg { max-width: 100%; height: auto; display: block; }
     #log { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   </style>
 </head>
 <body>
-  <h1>四連桿快速原型（MVP）→ 桿件 → GRBL G-code</h1>
   <div class="row">
     <div class="card">
       <h3>① 四連桿參數（mm）</h3>
       <div class="grid">
         <div>
-          <label>Ground a</label>
+          <label><span style="color:#666; font-weight:bold;">Ground a</span> (O2-O4)</label>
           <input id="a" type="number" min="10" max="250" step="1" value="120" />
         </div>
         <div>
-          <label>Input b</label>
+          <label><span style="color:#e74c3c; font-weight:bold;">Input b</span> (O2-A)</label>
           <input id="b" type="number" min="10" max="250" step="1" value="60" />
         </div>
         <div>
-          <label>Coupler c</label>
+          <label><span style="color:#3498db; font-weight:bold;">Coupler c</span> (A-B)</label>
           <input id="c" type="number" min="10" max="250" step="1" value="110" />
         </div>
         <div>
-          <label>Output d</label>
+          <label><span style="color:#27ae60; font-weight:bold;">Output d</span> (B-O4)</label>
           <input id="d" type="number" min="10" max="250" step="1" value="80" />
         </div>
       </div>
@@ -59,6 +60,57 @@
         <div>
           <label>輸入角 θ（度）</label>
           <input id="theta" type="number" min="-180" max="180" step="1" value="30" />
+        </div>
+        <div>
+          <label>模擬圖範圍（mm）</label>
+          <input id="viewRange" type="number" min="100" max="1000" step="10" value="400" />
+        </div>
+        <div>
+          <label>
+            <input type="checkbox" id="showGrid" checked /> 顯示格線
+          </label>
+        </div>
+      </div>
+
+      <div style="height:10px"></div>
+      <h3>② - B Input b 驅動設定（馬達/舵機）</h3>
+      <div class="grid">
+        <div style="grid-column: 1 / -1;">
+          <label>Input b 驅動類型（控制紅色輸入桿）</label>
+          <select id="motorType">
+            <option value="motor360">🔄 馬達（360° 全旋轉）</option>
+            <option value="servo180">↔️ 舵機（0° ~ 180°）</option>
+            <option value="servo270">↔️ 舵機（-135° ~ 135°）</option>
+            <option value="custom">⚙️ 自訂範圍</option>
+          </select>
+        </div>
+        <div>
+          <label>θ 起始角度（度）</label>
+          <input id="sweepStart" type="number" min="-180" max="180" step="1" value="-180" />
+        </div>
+        <div>
+          <label>θ 結束角度（度）</label>
+          <input id="sweepEnd" type="number" min="-180" max="180" step="1" value="180" />
+        </div>
+        <div>
+          <label>θ 掃描間隔（度）</label>
+          <input id="sweepStep" type="number" min="1" max="10" step="1" value="1" />
+        </div>
+        <div>
+          <label>
+            <input type="checkbox" id="showTrajectory" checked /> 疊加軌跡到2D圖
+          </label>
+        </div>
+      </div>
+      <div class="grid" style="margin-top:8px;">
+        <div>
+          <label>動畫速度（RPM）</label>
+          <input id="animSpeed" type="number" min="1" max="120" step="1" value="10" />
+        </div>
+        <div style="display:flex; align-items:flex-end; gap:4px;">
+          <button id="btnPlayAnim" style="flex:1; background:#27ae60; color:white; border:none;">▶ 播放</button>
+          <button id="btnPauseAnim" style="flex:1; background:#f39c12; color:white; border:none;" disabled>⏸ 暫停</button>
+          <button id="btnStopAnim" style="flex:1; background:#e74c3c; color:white; border:none;" disabled>⏹ 停止</button>
         </div>
       </div>
 
@@ -129,7 +181,6 @@
       </div>
 
       <div class="btnrow">
-        <button class="primary" id="btnUpdate">更新模擬 / 預覽</button>
         <button id="btnGen">生成 G-code（4 根桿件）</button>
       </div>
 
@@ -147,11 +198,15 @@
 
     <div>
       <div class="card">
-        <h3>2D 模擬（四連桿）</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 style="margin:0;">2D 模擬（四連桿）</h3>
+          <button class="primary" id="btnUpdate">更新模擬 / 預覽</button>
+        </div>
         <div id="svgWrap"></div>
         <div class="note" style="margin-top:8px;">
           顯示：O2（左固定點）、O4（右固定點）、A（input 端）、B（coupler/output 端）。<br/>
-          若幾何無解，會提示「此角度不可行」。
+          若幾何無解，會提示「此角度不可行」。<br/>
+          <strong style="color:#e74c3c;">紅色桿 = Input b（由馬達/舵機驅動）</strong>
         </div>
       </div>
 

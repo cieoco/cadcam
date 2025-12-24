@@ -4,6 +4,19 @@
 
 const $ = (id) => document.getElementById(id);
 
+// Global trajectory data storage
+let currentTrajectoryData = null;
+
+// Animation state
+let animationState = {
+  isPlaying: false,
+  intervalId: null,
+  currentTheta: 0,
+  direction: 1, // 1 for forward, -1 for backward
+  rangeStart: -180,
+  rangeEnd: 180
+};
+
 function log(msg) {
   $("log").textContent = msg;
 }
@@ -233,42 +246,216 @@ function svgEl(tag, attrs = {}) {
   return el;
 }
 
-function renderFourbar(sol) {
-  const W = 520, H = 320;
-  const pad = 30;
-
-  const pts = [sol.O2, sol.O4, sol.A, sol.B];
-  const xs = pts.map(p => p.x);
-  const ys = pts.map(p => p.y);
-
-  const minX = Math.min(...xs), maxX = Math.max(...xs);
-  const minY = Math.min(...ys), maxY = Math.max(...ys);
-
-  const spanX = Math.max(1e-6, maxX - minX);
-  const spanY = Math.max(1e-6, maxY - minY);
-
-  const scale = Math.min((W - 2*pad)/spanX, (H - 2*pad)/spanY);
-
-  function tx(p) { return pad + (p.x - minX) * scale; }
-  function ty(p) { return H - (pad + (p.y - minY) * scale); } // flip Y for screen
+function renderFourbar(sol, thetaDeg, trajectoryData = null) {
+  const W = 800, H = 600;
+  const pad = 50;
+  
+  // Get view range from user input
+  const viewRange = Number($("viewRange").value) || 400;
+  const showGrid = $("showGrid").checked;
+  
+  // Fixed center: place ground link (O2-O4) horizontally centered
+  // O2 and O4 are on the x-axis in model space, center them in view
+  const groundCenterX = (sol.O2.x + sol.O4.x) / 2;
+  const groundCenterY = (sol.O2.y + sol.O4.y) / 2;
+  
+  // Scale based on view range
+  const scale = Math.min((W - 2*pad), (H - 2*pad)) / viewRange;
+  
+  // Transform: translate model center to screen center, then scale
+  function tx(p) { 
+    return (W / 2) + (p.x - groundCenterX) * scale; 
+  }
+  function ty(p) { 
+    return (H / 2) - (p.y - groundCenterY) * scale; // flip Y for screen
+  }
 
   const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+  
+  // Add background
+  svg.appendChild(svgEl("rect", {
+    x: 0, y: 0, width: W, height: H,
+    fill: "#fafafa"
+  }));
+  
+  // Draw grid if enabled
+  if (showGrid) {
+    const gridStep = 50; // mm
+    const gridColor = "#e0e0e0";
+    
+    // Vertical lines
+    for (let x = -viewRange/2; x <= viewRange/2; x += gridStep) {
+      const screenX = tx({ x: groundCenterX + x, y: 0 });
+      svg.appendChild(svgEl("line", {
+        x1: screenX, y1: 0, x2: screenX, y2: H,
+        stroke: gridColor, "stroke-width": x === 0 ? 1.5 : 0.5
+      }));
+    }
+    
+    // Horizontal lines
+    for (let y = -viewRange/2; y <= viewRange/2; y += gridStep) {
+      const screenY = ty({ x: 0, y: groundCenterY + y });
+      svg.appendChild(svgEl("line", {
+        x1: 0, y1: screenY, x2: W, y2: screenY,
+        stroke: gridColor, "stroke-width": y === 0 ? 1.5 : 0.5
+      }));
+    }
+    
+    // Grid labels
+    const labelStep = 100; // mm
+    for (let x = -viewRange/2; x <= viewRange/2; x += labelStep) {
+      if (x === 0) continue;
+      const screenX = tx({ x: groundCenterX + x, y: 0 });
+      const label = svgEl("text", {
+        x: screenX, y: H/2 + 15,
+        fill: "#999", "font-size": 9, "text-anchor": "middle"
+      });
+      label.textContent = `${x}`;
+      svg.appendChild(label);
+    }
+    for (let y = -viewRange/2; y <= viewRange/2; y += labelStep) {
+      if (y === 0) continue;
+      const screenY = ty({ x: 0, y: groundCenterY + y });
+      const label = svgEl("text", {
+        x: W/2 + 15, y: screenY + 3,
+        fill: "#999", "font-size": 9, "text-anchor": "start"
+      });
+      label.textContent = `${y}`;
+      svg.appendChild(label);
+    }
+  }
 
-  // Links: O2-A, A-B, B-O4, O2-O4
+  // ========== Draw trajectory first (background layer) ==========
+  if (trajectoryData) {
+    const { results, validRanges, invalidRanges } = trajectoryData;
+    
+    // Draw B point trajectory as polyline
+    const validBPoints = results.filter(r => r.isValid && r.B).map(r => r.B);
+    if (validBPoints.length > 1) {
+      const points = validBPoints.map(b => `${tx(b)},${ty(b)}`).join(" ");
+      
+      svg.appendChild(svgEl("polyline", {
+        points,
+        fill: "none",
+        stroke: "#0066cc",
+        "stroke-width": 2,
+        "stroke-opacity": 0.4,
+        "stroke-linejoin": "round",
+      }));
+      
+      // Mark trajectory points
+      const step = Math.max(1, Math.floor(validBPoints.length / 12));
+      validBPoints.forEach((b, idx) => {
+        if (idx % step === 0) {
+          svg.appendChild(svgEl("circle", {
+            cx: tx(b), cy: ty(b),
+            r: 2, fill: "#0066cc", opacity: 0.5
+          }));
+        }
+      });
+      
+      // Mark start and end of trajectory
+      const firstB = validBPoints[0];
+      const lastB = validBPoints[validBPoints.length - 1];
+      
+      svg.appendChild(svgEl("circle", {
+        cx: tx(firstB), cy: ty(firstB),
+        r: 4, fill: "#00aa00", stroke: "#fff", "stroke-width": 1.5
+      }));
+      
+      svg.appendChild(svgEl("circle", {
+        cx: tx(lastB), cy: ty(lastB),
+        r: 4, fill: "#cc0000", stroke: "#fff", "stroke-width": 1.5
+      }));
+    }
+    
+    // Draw invalid ranges indicator (small legend)
+    if (invalidRanges.length > 0) {
+      const legendY = 15;
+      const legend = svgEl("text", { x: 10, y: legendY, fill: "#a00", "font-size": 10, opacity: 0.7 });
+      legend.textContent = `✗ 不可行區間：${invalidRanges.length}個`;
+      svg.appendChild(legend);
+    }
+  }
+
+  // ========== Draw current linkage state (foreground layer) ==========
+  
+  // Draw reference line (horizontal from O2) for theta angle
+  const refLineEnd = { x: sol.O2.x + Math.abs(sol.A.x - sol.O2.x) + 20, y: sol.O2.y };
+  svg.appendChild(svgEl("line", {
+    x1: tx(sol.O2), y1: ty(sol.O2),
+    x2: tx(refLineEnd), y2: ty(refLineEnd),
+    stroke: "#999", "stroke-width": 1, "stroke-dasharray": "4,2"
+  }));
+
+  // Draw theta angle arc
+  const arcRadius = 30; // pixels
+  const theta = deg2rad(thetaDeg);
+  const startAngle = 0; // reference is horizontal
+  const endAngle = -theta; // negative because screen Y is flipped
+  
+  const arcPath = describeArc(tx(sol.O2), ty(sol.O2), arcRadius, 
+                              startAngle * 180 / Math.PI, 
+                              endAngle * 180 / Math.PI);
+  
+  svg.appendChild(svgEl("path", {
+    d: arcPath,
+    fill: "none",
+    stroke: "#ff6600",
+    "stroke-width": 2
+  }));
+
+  // Theta label
+  const labelAngle = -theta / 2; // middle of arc
+  const labelRadius = arcRadius + 15;
+  const labelX = tx(sol.O2) + labelRadius * Math.cos(labelAngle);
+  const labelY = ty(sol.O2) + labelRadius * Math.sin(labelAngle);
+  
+  const thetaLabel = svgEl("text", {
+    x: labelX, y: labelY,
+    fill: "#ff6600",
+    "font-size": 13,
+    "font-weight": "bold",
+    "text-anchor": "middle"
+  });
+  thetaLabel.textContent = `θ=${thetaDeg}°`;
+  svg.appendChild(thetaLabel);
+
+  // Links with colors: O2-A (input/b), A-B (coupler/c), B-O4 (output/d), O2-O4 (ground/a)
   const links = [
-    [sol.O2, sol.A],
-    [sol.A, sol.B],
-    [sol.B, sol.O4],
-    [sol.O2, sol.O4],
+    { p1: sol.O2, p2: sol.A, color: "#e74c3c", label: "b" },   // Input (red)
+    { p1: sol.A, p2: sol.B, color: "#3498db", label: "c" },    // Coupler (blue)
+    { p1: sol.B, p2: sol.O4, color: "#27ae60", label: "d" },   // Output (green)
+    { p1: sol.O2, p2: sol.O4, color: "#666", label: "a" },     // Ground (gray)
   ];
-  for (const [p, q] of links) {
+  for (const link of links) {
     svg.appendChild(svgEl("line", {
-      x1: tx(p), y1: ty(p), x2: tx(q), y2: ty(q),
-      stroke: "#111", "stroke-width": 2
+      x1: tx(link.p1), y1: ty(link.p1), x2: tx(link.p2), y2: ty(link.p2),
+      stroke: link.color, "stroke-width": 3
     }));
+    
+    // Add link length label at midpoint
+    const midX = (tx(link.p1) + tx(link.p2)) / 2;
+    const midY = (ty(link.p1) + ty(link.p2)) / 2;
+    const labelBg = svgEl("rect", {
+      x: midX - 10, y: midY - 8,
+      width: 20, height: 14,
+      fill: "#fff", opacity: 0.8
+    });
+    svg.appendChild(labelBg);
+    const linkLabel = svgEl("text", {
+      x: midX, y: midY + 4,
+      fill: link.color,
+      "font-size": 11,
+      "font-weight": "bold",
+      "text-anchor": "middle"
+    });
+    linkLabel.textContent = link.label;
+    svg.appendChild(linkLabel);
   }
 
   // Joints
+  const pts = [sol.O2, sol.O4, sol.A, sol.B];
   const jointStyle = { fill: "#fff", stroke: "#111", "stroke-width": 2 };
   for (const p of pts) {
     svg.appendChild(svgEl("circle", { cx: tx(p), cy: ty(p), r: 6, ...jointStyle }));
@@ -283,12 +470,41 @@ function renderFourbar(sol) {
     t.textContent = name;
     svg.appendChild(t);
   }
+  
+  // Highlight current B point if trajectory is shown
+  if (trajectoryData) {
+    svg.appendChild(svgEl("circle", {
+      cx: tx(sol.B), cy: ty(sol.B),
+      r: 8, fill: "none", stroke: "#ff00ff", "stroke-width": 2
+    }));
+  }
 
   return svg;
 }
 
+// Helper function to describe an SVG arc
+function describeArc(x, y, radius, startAngle, endAngle) {
+  const start = polarToCartesian(x, y, radius, endAngle);
+  const end = polarToCartesian(x, y, radius, startAngle);
+  const largeArcFlag = Math.abs(endAngle - startAngle) <= 180 ? "0" : "1";
+  const sweepFlag = endAngle > startAngle ? "0" : "1";
+  
+  return [
+    "M", start.x, start.y,
+    "A", radius, radius, 0, largeArcFlag, sweepFlag, end.x, end.y
+  ].join(" ");
+}
+
+function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
+  const angleInRadians = (angleInDegrees) * Math.PI / 180.0;
+  return {
+    x: centerX + (radius * Math.cos(angleInRadians)),
+    y: centerY + (radius * Math.sin(angleInRadians))
+  };
+}
+
 function renderPartsLayout(parts, workX, workY) {
-  const W = 520, H = 320, pad = 10;
+  const W = 800, H = 450, pad = 10;
   const scale = Math.min((W - 2*pad)/workX, (H - 2*pad)/workY);
 
   function tx(x) { return pad + x * scale; }
@@ -326,6 +542,129 @@ function renderPartsLayout(parts, workX, workY) {
   }
 
   return svg;
+}
+
+// ---------- Animation Control ----------
+function startAnimation() {
+  if (animationState.isPlaying) return;
+  
+  const motorType = $("motorType").value;
+  const speed = Number($("animSpeed").value); // RPM
+  
+  // Set range based on motor type
+  switch(motorType) {
+    case "motor360":
+      animationState.rangeStart = -180;
+      animationState.rangeEnd = 180;
+      break;
+    case "servo180":
+      animationState.rangeStart = 0;
+      animationState.rangeEnd = 180;
+      break;
+    case "servo270":
+      animationState.rangeStart = -135;
+      animationState.rangeEnd = 135;
+      break;
+    case "custom":
+      animationState.rangeStart = Number($("sweepStart").value);
+      animationState.rangeEnd = Number($("sweepEnd").value);
+      break;
+  }
+  
+  // Initialize theta to start position
+  const currentTheta = Number($("theta").value);
+  if (currentTheta < animationState.rangeStart || currentTheta > animationState.rangeEnd) {
+    animationState.currentTheta = animationState.rangeStart;
+  } else {
+    animationState.currentTheta = currentTheta;
+  }
+  
+  animationState.direction = 1;
+  animationState.isPlaying = true;
+  
+  // Calculate interval: RPM -> degrees per frame (60fps target)
+  // degrees_per_second = RPM * 360 / 60
+  // degrees_per_frame = degrees_per_second / 60
+  const degreesPerSecond = (speed * 360) / 60;
+  const frameRate = 30; // frames per second
+  const degreesPerFrame = degreesPerSecond / frameRate;
+  const interval = 1000 / frameRate; // ms per frame
+  
+  animationState.intervalId = setInterval(() => {
+    animateFrame(degreesPerFrame);
+  }, interval);
+  
+  // Update UI
+  $("btnPlayAnim").disabled = true;
+  $("btnPauseAnim").disabled = false;
+  $("btnStopAnim").disabled = false;
+  
+  log(`動畫播放中... (${speed} RPM)`);
+}
+
+function pauseAnimation() {
+  if (!animationState.isPlaying) return;
+  
+  clearInterval(animationState.intervalId);
+  animationState.isPlaying = false;
+  
+  // Update UI
+  $("btnPlayAnim").disabled = false;
+  $("btnPauseAnim").disabled = true;
+  $("btnStopAnim").disabled = false;
+  
+  log(`動畫已暫停於 θ=${fmt(animationState.currentTheta)}°`);
+}
+
+function stopAnimation() {
+  if (animationState.intervalId) {
+    clearInterval(animationState.intervalId);
+  }
+  
+  animationState.isPlaying = false;
+  animationState.currentTheta = animationState.rangeStart;
+  
+  // Reset to start position
+  $("theta").value = animationState.rangeStart;
+  updatePreview();
+  
+  // Update UI
+  $("btnPlayAnim").disabled = false;
+  $("btnPauseAnim").disabled = true;
+  $("btnStopAnim").disabled = true;
+  
+  log(`動畫已停止`);
+}
+
+function animateFrame(degreesPerFrame) {
+  const { rangeStart, rangeEnd } = animationState;
+  const motorType = $("motorType").value;
+  
+  // Update theta
+  animationState.currentTheta += degreesPerFrame * animationState.direction;
+  
+  // Handle boundary conditions
+  if (motorType === "motor360") {
+    // Continuous rotation - wrap around
+    if (animationState.currentTheta > rangeEnd) {
+      animationState.currentTheta = rangeStart + (animationState.currentTheta - rangeEnd);
+    } else if (animationState.currentTheta < rangeStart) {
+      animationState.currentTheta = rangeEnd - (rangeStart - animationState.currentTheta);
+    }
+  } else {
+    // Servo - bounce back
+    if (animationState.currentTheta >= rangeEnd) {
+      animationState.currentTheta = rangeEnd;
+      animationState.direction = -1;
+    } else if (animationState.currentTheta <= rangeStart) {
+      animationState.currentTheta = rangeStart;
+      animationState.direction = 1;
+    }
+  }
+  
+  // Update UI
+  $("theta").value = Math.round(animationState.currentTheta);
+  updatePreview();
 }
 
 // ---------- Download helpers ----------
@@ -412,7 +751,8 @@ function updatePreview() {
       return;
     }
 
-    svgWrap.appendChild(renderFourbar(sol));
+    // Render with trajectory overlay if available
+    svgWrap.appendChild(renderFourbar(sol, mech.thetaDeg, currentTrajectoryData));
 
     const parts = generateParts(partSpec);
     $("partsWrap").innerHTML = "";
@@ -475,9 +815,315 @@ function generateGcodes() {
   }
 }
 
+// ---------- Theta Sweep Analysis ----------
+function sweepThetaAnalysis() {
+  try {
+    const { mech, partSpec, mfg } = readInputs();
+    validateConfig(mech, partSpec, mfg);
+
+    const sweepStart = Number($("sweepStart").value);
+    const sweepEnd = Number($("sweepEnd").value);
+    const sweepStep = Number($("sweepStep").value);
+    const showTrajectory = $("showTrajectory").checked;
+    const motorType = $("motorType").value;
+    
+    // Get motor type description
+    const motorTypeText = $("motorType").selectedOptions[0].textContent;
+
+    if (sweepStart >= sweepEnd) {
+      throw new Error("起始角度必須小於結束角度");
+    }
+    if (sweepStep <= 0) {
+      throw new Error("掃描間隔必須大於 0");
+    }
+
+    const results = [];
+    const validRanges = [];
+    const invalidRanges = [];
+    let currentValid = null;
+    let currentInvalid = null;
+
+    // Sweep theta
+    for (let theta = sweepStart; theta <= sweepEnd; theta += sweepStep) {
+      const sol = solveFourBar({ ...mech, thetaDeg: theta });
+      const isValid = sol !== null;
+
+      results.push({
+        theta,
+        isValid,
+        B: isValid ? sol.B : null,
+      });
+
+      // Track ranges
+      if (isValid) {
+        if (currentInvalid) {
+          invalidRanges.push(currentInvalid);
+          currentInvalid = null;
+        }
+        if (!currentValid) {
+          currentValid = { start: theta, end: theta };
+        } else {
+          currentValid.end = theta;
+        }
+      } else {
+        if (currentValid) {
+          validRanges.push(currentValid);
+          currentValid = null;
+        }
+        if (!currentInvalid) {
+          currentInvalid = { start: theta, end: theta };
+        } else {
+          currentInvalid.end = theta;
+        }
+      }
+    }
+
+    // Close final range
+    if (currentValid) validRanges.push(currentValid);
+    if (currentInvalid) invalidRanges.push(currentInvalid);
+
+    // Store trajectory data globally
+    const validBPoints = results.filter(r => r.isValid && r.B).map(r => r.B);
+    currentTrajectoryData = {
+      results,
+      validRanges,
+      invalidRanges,
+      validBPoints,
+      motorType: motorTypeText
+    };
+
+    // Display results
+    displaySweepResults(results, validRanges, invalidRanges, showTrajectory, partSpec, motorTypeText);
+    
+    // Update main 2D simulation to show trajectory overlay
+    updatePreview();
+
+    log(
+      `【${motorTypeText}】\n` +
+      `θ 掃描完成：${sweepStart}° → ${sweepEnd}°（每 ${sweepStep}°）\n` +
+      `可行區間 ${validRanges.length} 個，不可行區間 ${invalidRanges.length} 個\n` +
+      `軌跡已疊加在 2D 模擬圖上`
+    );
+  } catch (e) {
+    log(`錯誤：${e.message}`);
+    $("sweepResult").innerHTML = "";
+    $("trajectoryWrap").innerHTML = "";
+  }
+}
+
+function displaySweepResults(results, validRanges, invalidRanges, showTrajectory, partSpec, motorTypeText) {
+  // Text summary
+  const resultDiv = $("sweepResult");
+  resultDiv.innerHTML = "";
+
+  const summary = document.createElement("div");
+  summary.innerHTML = `<strong>【${motorTypeText || '掃描分析'}】結果：</strong><br/>`;
+  
+  if (validRanges.length > 0) {
+    summary.innerHTML += `<span style="color:#080;">✓ 可行角度區間（${validRanges.length} 個）：</span><br/>`;
+    for (const r of validRanges) {
+      summary.innerHTML += `<span style="color:#080; margin-left:16px;">• ${fmt(r.start)}° → ${fmt(r.end)}° （範圍：${fmt(r.end - r.start)}°）</span><br/>`;
+    }
+  } else {
+    summary.innerHTML += `<span style="color:#a00;">✗ 無可行角度區間</span><br/>`;
+  }
+
+  if (invalidRanges.length > 0) {
+    summary.innerHTML += `<span style="color:#a00;">✗ 不可行角度區間（${invalidRanges.length} 個）：</span><br/>`;
+    for (const r of invalidRanges) {
+      summary.innerHTML += `<span style="color:#a00; margin-left:16px;">• ${fmt(r.start)}° → ${fmt(r.end)}° （範圍：${fmt(r.end - r.start)}°）</span><br/>`;
+    }
+  }
+
+  // Calculate B point trajectory statistics
+  const validBPoints = results.filter(r => r.isValid && r.B).map(r => r.B);
+  if (validBPoints.length > 0) {
+    const bxs = validBPoints.map(b => b.x);
+    const bys = validBPoints.map(b => b.y);
+    const minBx = Math.min(...bxs);
+    const maxBx = Math.max(...bxs);
+    const minBy = Math.min(...bys);
+    const maxBy = Math.max(...bys);
+    const rangeX = maxBx - minBx;
+    const rangeY = maxBy - minBy;
+    const totalRange = Math.hypot(rangeX, rangeY);
+
+    summary.innerHTML += `<br/><strong>B 點軌跡範圍：</strong><br/>`;
+    summary.innerHTML += `X: ${fmt(minBx)} → ${fmt(maxBx)} mm （行程：${fmt(rangeX)} mm）<br/>`;
+    summary.innerHTML += `Y: ${fmt(minBy)} → ${fmt(maxBy)} mm （行程：${fmt(rangeY)} mm）<br/>`;
+    summary.innerHTML += `總行程：${fmt(totalRange)} mm<br/>`;
+  }
+
+  resultDiv.appendChild(summary);
+
+  // Trajectory visualization
+  if (showTrajectory) {
+    const trajectoryDiv = $("trajectoryWrap");
+    trajectoryDiv.innerHTML = "";
+    const trajSvg = renderTrajectory(results, validRanges, invalidRanges);
+    if (trajSvg) {
+      trajectoryDiv.appendChild(trajSvg);
+    }
+  } else {
+    $("trajectoryWrap").innerHTML = "";
+  }
+}
+
+function renderTrajectory(results, validRanges, invalidRanges) {
+  const W = 800, H = 600, pad = 50;
+
+  // Collect all valid B points
+  const validBPoints = results.filter(r => r.isValid && r.B).map(r => r.B);
+  if (validBPoints.length === 0) {
+    const msg = document.createElement("div");
+    msg.textContent = "無可行解，無法繪製軌跡";
+    msg.style.color = "#a00";
+    return msg;
+  }
+
+  const xs = validBPoints.map(b => b.x);
+  const ys = validBPoints.map(b => b.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  const spanX = Math.max(1e-6, maxX - minX);
+  const spanY = Math.max(1e-6, maxY - minY);
+
+  const scale = Math.min((W - 2*pad)/spanX, (H - 2*pad)/spanY);
+
+  function tx(x) { return pad + (x - minX) * scale; }
+  function ty(y) { return H - (pad + (y - minY) * scale); }
+
+  const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+
+  // Add title
+  const title = svgEl("text", { x: W/2, y: 20, fill: "#111", "font-size": 14, "text-anchor": "middle", "font-weight": "bold" });
+  title.textContent = "B 點軌跡曲線";
+  svg.appendChild(title);
+
+  // Draw trajectory as polyline
+  const points = results
+    .filter(r => r.isValid && r.B)
+    .map(r => `${tx(r.B.x)},${ty(r.B.y)}`)
+    .join(" ");
+
+  if (points) {
+    svg.appendChild(svgEl("polyline", {
+      points,
+      fill: "none",
+      stroke: "#0066cc",
+      "stroke-width": 2,
+      "stroke-linejoin": "round",
+    }));
+
+    // Mark start and end points
+    const firstValid = results.find(r => r.isValid && r.B);
+    const lastValid = [...results].reverse().find(r => r.isValid && r.B);
+
+    if (firstValid && firstValid.B) {
+      svg.appendChild(svgEl("circle", {
+        cx: tx(firstValid.B.x), cy: ty(firstValid.B.y),
+        r: 5, fill: "#00aa00", stroke: "#fff", "stroke-width": 2
+      }));
+      const startLabel = svgEl("text", { 
+        x: tx(firstValid.B.x) + 10, y: ty(firstValid.B.y) - 10, 
+        fill: "#00aa00", "font-size": 11, "font-weight": "bold" 
+      });
+      startLabel.textContent = `起點 (θ=${fmt(firstValid.theta)}°)`;
+      svg.appendChild(startLabel);
+    }
+
+    if (lastValid && lastValid.B) {
+      svg.appendChild(svgEl("circle", {
+        cx: tx(lastValid.B.x), cy: ty(lastValid.B.y),
+        r: 5, fill: "#cc0000", stroke: "#fff", "stroke-width": 2
+      }));
+      const endLabel = svgEl("text", { 
+        x: tx(lastValid.B.x) + 10, y: ty(lastValid.B.y) + 15, 
+        fill: "#cc0000", "font-size": 11, "font-weight": "bold" 
+      });
+      endLabel.textContent = `終點 (θ=${fmt(lastValid.theta)}°)`;
+      svg.appendChild(endLabel);
+    }
+
+    // Mark some intermediate points
+    const step = Math.max(1, Math.floor(validBPoints.length / 8));
+    results.filter(r => r.isValid && r.B).forEach((r, idx) => {
+      if (idx % step === 0 && idx !== 0) {
+        svg.appendChild(svgEl("circle", {
+          cx: tx(r.B.x), cy: ty(r.B.y),
+          r: 3, fill: "#0066cc", stroke: "#fff", "stroke-width": 1
+        }));
+      }
+    });
+  }
+
+  // Draw axes
+  svg.appendChild(svgEl("line", {
+    x1: pad, y1: ty(0), x2: W - pad, y2: ty(0),
+    stroke: "#ccc", "stroke-width": 1, "stroke-dasharray": "4,2"
+  }));
+  svg.appendChild(svgEl("line", {
+    x1: tx(0), y1: pad, x2: tx(0), y2: H - pad,
+    stroke: "#ccc", "stroke-width": 1, "stroke-dasharray": "4,2"
+  }));
+
+  // Add legend for invalid ranges
+  if (invalidRanges.length > 0) {
+    const legendY = H - 10;
+    const legend = svgEl("text", { x: 10, y: legendY, fill: "#a00", "font-size": 11 });
+    legend.textContent = `不可行區間：${invalidRanges.map(r => `${fmt(r.start)}°~${fmt(r.end)}°`).join(", ")}`;
+    svg.appendChild(legend);
+  }
+
+  return svg;
+}
+
 // Wire UI
 $("btnUpdate").addEventListener("click", updatePreview);
 $("btnGen").addEventListener("click", generateGcodes);
+
+// Animation controls
+$("btnPlayAnim").addEventListener("click", startAnimation);
+$("btnPauseAnim").addEventListener("click", pauseAnimation);
+$("btnStopAnim").addEventListener("click", stopAnimation);
+
+// Motor type selector
+$("motorType").addEventListener("change", (e) => {
+  const type = e.target.value;
+  const sweepStart = $("sweepStart");
+  const sweepEnd = $("sweepEnd");
+  
+  switch(type) {
+    case "motor360":
+      sweepStart.value = -180;
+      sweepEnd.value = 180;
+      sweepStart.disabled = true;
+      sweepEnd.disabled = true;
+      break;
+    case "servo180":
+      sweepStart.value = 0;
+      sweepEnd.value = 180;
+      sweepStart.disabled = true;
+      sweepEnd.disabled = true;
+      break;
+    case "servo270":
+      sweepStart.value = -135;
+      sweepEnd.value = 135;
+      sweepStart.disabled = true;
+      sweepEnd.disabled = true;
+      break;
+    case "custom":
+      sweepStart.disabled = false;
+      sweepEnd.disabled = false;
+      break;
+  }
+});
+
+// Initialize motor type settings
+$("motorType").dispatchEvent(new Event("change"));
 
 // Auto update on load
 updatePreview();
