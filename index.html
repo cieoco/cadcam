@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>4-Bar Linkage → Parts → GRBL G-code (MVP)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Arial; margin: 16px; }
+    h1 { margin: 0 0 12px; }
+    .row { display: grid; grid-template-columns: 420px 1fr; gap: 16px; align-items: start; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    label { font-size: 12px; color: #333; display: block; margin-bottom: 4px; }
+    input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 8px; }
+    button { padding: 10px 12px; border-radius: 10px; border: 1px solid #bbb; cursor: pointer; }
+    button.primary { border-color: #333; }
+    .btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .note { font-size: 12px; color: #555; line-height: 1.4; }
+    .warn { color: #a00; font-weight: 600; }
+    #svgWrap { border: 1px solid #ddd; border-radius: 10px; padding: 8px; }
+    #log { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <h1>四連桿快速原型（MVP）→ 桿件 → GRBL G-code</h1>
+  <div class="row">
+    <div class="card">
+      <h3>① 四連桿參數（mm）</h3>
+      <div class="grid">
+        <div>
+          <label>Ground a</label>
+          <input id="a" type="number" min="10" max="250" step="1" value="120" />
+        </div>
+        <div>
+          <label>Input b</label>
+          <input id="b" type="number" min="10" max="250" step="1" value="60" />
+        </div>
+        <div>
+          <label>Coupler c</label>
+          <input id="c" type="number" min="10" max="250" step="1" value="110" />
+        </div>
+        <div>
+          <label>Output d</label>
+          <input id="d" type="number" min="10" max="250" step="1" value="80" />
+        </div>
+      </div>
+
+      <div style="height:10px"></div>
+      <h3>② 模擬設定</h3>
+      <div class="grid">
+        <div>
+          <label>解型態（open/crossed）</label>
+          <select id="assembly">
+            <option value="open">open（常見）</option>
+            <option value="crossed">crossed（交叉）</option>
+          </select>
+        </div>
+        <div>
+          <label>輸入角 θ（度）</label>
+          <input id="theta" type="number" min="-180" max="180" step="1" value="30" />
+        </div>
+      </div>
+
+      <div style="height:10px"></div>
+      <h3>③ 桿件外形（直桿）</h3>
+      <div class="grid">
+        <div>
+          <label>桿件寬 W（mm）</label>
+          <input id="barW" type="number" min="6" max="40" step="1" value="15" />
+        </div>
+        <div>
+          <label>端到孔中心邊距 margin（mm）</label>
+          <input id="margin" type="number" min="4" max="20" step="0.5" value="7" />
+        </div>
+        <div>
+          <label>孔徑（mm）</label>
+          <input id="holeD" type="number" min="2.5" max="8" step="0.1" value="3.2" />
+        </div>
+        <div>
+          <label>零件間距 spacing（mm）</label>
+          <input id="spacing" type="number" min="2" max="20" step="1" value="8" />
+        </div>
+      </div>
+
+      <div style="height:10px"></div>
+      <h3>④ 加工設定（GRBL / 木板安全值）</h3>
+      <div class="grid">
+        <div>
+          <label>工作範圍 X（mm）</label>
+          <input id="workX" type="number" value="300" />
+        </div>
+        <div>
+          <label>工作範圍 Y（mm）</label>
+          <input id="workY" type="number" value="180" />
+        </div>
+        <div>
+          <label>刀徑（mm）</label>
+          <input id="toolD" type="number" min="0.5" max="10" step="0.1" value="3.0" />
+        </div>
+        <div>
+          <label>材料厚度 T（mm）</label>
+          <input id="thickness" type="number" min="1" max="30" step="0.1" value="3.0" />
+        </div>
+        <div>
+          <label>穿透餘量（mm）</label>
+          <input id="overcut" type="number" min="0" max="2" step="0.1" value="0.5" />
+        </div>
+        <div>
+          <label>每層下刀 stepdown（mm）</label>
+          <input id="stepdown" type="number" min="0.1" max="5" step="0.1" value="0.5" />
+        </div>
+        <div>
+          <label>SAFE_Z（mm）</label>
+          <input id="safeZ" type="number" min="1" max="30" step="0.5" value="5" />
+        </div>
+        <div>
+          <label>Feed XY（mm/min）</label>
+          <input id="feedXY" type="number" min="50" max="3000" step="10" value="400" />
+        </div>
+        <div>
+          <label>Feed Z（mm/min）</label>
+          <input id="feedZ" type="number" min="30" max="2000" step="10" value="100" />
+        </div>
+        <div>
+          <label>主軸 S（可空白）</label>
+          <input id="spindle" type="number" min="1000" max="30000" step="100" placeholder="例如 12000（不填則不輸出 M3/M5）" />
+        </div>
+      </div>
+
+      <div class="btnrow">
+        <button class="primary" id="btnUpdate">更新模擬 / 預覽</button>
+        <button id="btnGen">生成 G-code（4 根桿件）</button>
+      </div>
+
+      <div style="height:10px"></div>
+      <div class="note">
+        <div class="warn">注意：v0.1 不含 tabs。外形切完零件可能鬆脫，請用雙面膠/壓板固定。</div>
+        <div>預設：G21 / G90 / SAFE_Z 先抬刀、先鑽孔後外形、多層 stepdown。</div>
+      </div>
+
+      <div style="height:10px"></div>
+      <h3>輸出 / 訊息</h3>
+      <div id="log" class="card" style="padding:10px; background:#fafafa;"></div>
+      <div class="btnrow" id="dlButtons"></div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h3>2D 模擬（四連桿）</h3>
+        <div id="svgWrap"></div>
+        <div class="note" style="margin-top:8px;">
+          顯示：O2（左固定點）、O4（右固定點）、A（input 端）、B（coupler/output 端）。<br/>
+          若幾何無解，會提示「此角度不可行」。
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3>零件排版預覽（在 3018 工作範圍內）</h3>
+        <div id="partsWrap"></div>
+        <div class="note" style="margin-top:8px;">
+          這裡是把 4 根直桿擺在同一張工作區（0..X, 0..Y），每根各自輸出一份 G-code（坐標一致）。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
