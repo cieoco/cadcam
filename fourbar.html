@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-Hant">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>4-Bar Linkage → Parts → GRBL G-code (Modular)</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body>
+  <div
+    style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; margin: -16px -16px 16px -16px;">
+    <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <a href="index.html"
+          style="color: white; text-decoration: none; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">←</span>
+          <span>返回機構選單</span>
+        </a>
+      </div>
+      <h2 style="color: white; margin: 0;">🔗 四連桿機構設計</h2>
+      <div style="width: 100px;"></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="card">
+      <h3>① 四連桿參數（mm）</h3>
+      <div class="grid">
+        <div>
+          <label><span style="color:#666; font-weight:bold;">Ground a</span> (O2-O4)</label>
+          <input id="a" type="number" min="10" max="250" step="1" value="120" />
+        </div>
+        <div>
+          <label><span style="color:#e74c3c; font-weight:bold;">Input b</span> (O2-A)</label>
+          <input id="b" type="number" min="10" max="250" step="1" value="60" />
+        </div>
+        <div>
+          <label><span style="color:#3498db; font-weight:bold;">Coupler c</span> (A-B)</label>
+          <input id="c" type="number" min="10" max="250" step="1" value="110" />
+        </div>
+        <div>
+          <label><span style="color:#27ae60; font-weight:bold;">Output d</span> (B-O4)</label>
+          <input id="d" type="number" min="10" max="250" step="1" value="80" />
+        </div>
+      </div>
+
+      <div style="height:10px"></div>
+      <h3>② 模擬設定</h3>
+      <div class="grid">
+        <div>
+          <label>解型態（open/crossed）</label>
+          <select id="assembly">
+            <option value="open">open（常見）</option>
+            <option value="crossed">crossed（交叉）</option>
+          </select>
+        </div>
+        <div>
+          <label>輸入角 θ（度）</label>
+          <input id="theta" type="number" min="-180" max="180" step="1" value="30" />
+        </div>
+        <div>
+          <label>模擬圖範圍（mm）</label>
+          <input id="viewRange" type="number" min="100" max="1000" step="10" value="400" />
+        </div>
+        <div>
+          <label>
+            <input type="checkbox" id="showGrid" checked /> 顯示格線
+          </label>
+        </div>
+      </div>
+
+      <div style="height:10px"></div>
+      <h3>② - B Input b 驅動設定（馬達/舵機）</h3>
+      <div class="grid">
+        <div style="grid-column: 1 / -1;">
+          <label>Input b 驅動類型（控制紅色輸入桿）</label>
+          <select id="motorType">
+            <option value="motor360">🔄 馬達（360° 全旋轉）</option>
+            <option value="servo180">↔️ 舵機（0° ~ 180°）</option>
+            <option value="servo270">↔️ 舵機（-135° ~ 135°）</option>
+            <option value="custom">⚙️ 自訂範圍</option>
+          </select>
+        </div>
+        <div>
+          <label>θ 起始角度（度）</label>
+          <input id="sweepStart" type="number" min="-180" max="180" step="1" value="-180" />
+        </div>
+        <div>
+          <label>θ 結束角度（度）</label>
+          <input id="sweepEnd" type="number" min="-180" max="180" step="1" value="180" />
+        </div>
+        <div>
+          <label>θ 掃描間隔（度）</label>
+          <input id="sweepStep" type="number" min="1" max="10" step="1" value="1" />
+        </div>
+        <div>
+          <label>
+            <input type="checkbox" id="showTrajectory" checked /> 疊加軌跡到2D圖
+          </label>
+        </div>
+      </div>
+      <div class="grid" style="margin-top:8px;">
+        <div>
+          <label>動畫速度（RPM）</label>
+          <input id="animSpeed" type="number" min="1" max="120" step="1" value="10" />
+        </div>
+        <div class="flex-end">
+          <button id="btnPlayAnim" class="btn-play" style="flex:1;">▶ 播放</button>
+          <button id="btnPauseAnim" class="btn-pause" style="flex:1;" disabled>⏸ 暫停</button>
+          <button id="btnStopAnim" class="btn-stop" style="flex:1;" disabled>⏹ 停止</button>
+        </div>
+      </div>
+
+      <div style="height:10px"></div>
+      <h3>③ 桿件外形（直桿）</h3>
+      <div class="grid">
+        <div>
+          <label>桿件寬 W（mm）</label>
+          <input id="barW" type="number" min="6" max="40" step="1" value="15" />
+        </div>
+        <div>
+          <label>端到孔中心邊距 margin（mm）</label>
+          <input id="margin" type="number" min="4" max="20" step="0.5" value="7" />
+        </div>
+        <div>
+          <label>孔徑（mm）</label>
+          <input id="holeD" type="number" min="2.5" max="8" step="0.1" value="3.2" />
+        </div>
+        <div>
+          <label>零件間距 spacing（mm）</label>
+          <input id="spacing" type="number" min="2" max="20" step="1" value="8" />
+        </div>
+      </div>
+
+      <div style="height:10px"></div>
+      <h3>④ 加工設定（GRBL / 木板安全值）</h3>
+      <div class="grid">
+        <div>
+          <label>工作範圍 X（mm）</label>
+          <input id="workX" type="number" value="300" />
+        </div>
+        <div>
+          <label>工作範圍 Y（mm）</label>
+          <input id="workY" type="number" value="180" />
+        </div>
+        <div>
+          <label>刀徑（mm）</label>
+          <input id="toolD" type="number" min="0.5" max="10" step="0.1" value="3.0" />
+        </div>
+        <div>
+          <label>材料厚度 T（mm）</label>
+          <input id="thickness" type="number" min="1" max="30" step="0.1" value="3.0" />
+        </div>
+        <div>
+          <label>穿透餘量（mm）</label>
+          <input id="overcut" type="number" min="0" max="2" step="0.1" value="0.5" />
+        </div>
+        <div>
+          <label>每層下刀 stepdown（mm）</label>
+          <input id="stepdown" type="number" min="0.1" max="5" step="0.1" value="0.5" />
+        </div>
+        <div>
+          <label>SAFE_Z（mm）</label>
+          <input id="safeZ" type="number" min="1" max="30" step="0.5" value="5" />
+        </div>
+        <div>
+          <label>Feed XY（mm/min）</label>
+          <input id="feedXY" type="number" min="50" max="3000" step="10" value="400" />
+        </div>
+        <div>
+          <label>Feed Z（mm/min）</label>
+          <input id="feedZ" type="number" min="30" max="2000" step="10" value="100" />
+        </div>
+        <div>
+          <label>主軸 S（可空白）</label>
+          <input id="spindle" type="number" min="1000" max="30000" step="100" placeholder="例如 12000（不填則不輸出 M3/M5）" />
+        </div>
+      </div>
+
+      <div class="btnrow">
+        <button id="btnGen">生成 G-code（4 根桿件）</button>
+      </div>
+
+      <div style="height:10px"></div>
+      <div class="note">
+        <div class="warn">注意：v0.1 不含 tabs。外形切完零件可能鬆脫，請用雙面膠/壓板固定。</div>
+        <div>預設：G21 / G90 / SAFE_Z 先抬刀、先鑽孔後外形、多層 stepdown。</div>
+      </div>
+
+      <div style="height:10px"></div>
+      <h3>輸出 / 訊息</h3>
+      <div id="log" class="card" style="padding:10px; background:#fafafa;"></div>
+      <div class="btnrow" id="dlButtons"></div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 style="margin:0;">2D 模擬（四連桿）</h3>
+          <button class="primary" id="btnUpdate">更新模擬 / 預覽</button>
+        </div>
+        <div id="svgWrap"></div>
+        <div class="note" style="margin-top:8px;">
+          顯示：O2（左固定點）、O4（右固定點）、A（input 端）、B（coupler/output 端）。<br />
+          若幾何無解，會提示「此角度不可行」。<br />
+          <strong style="color:#e74c3c;">紅色桿 = Input b（由馬達/舵機驅動）</strong>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3>零件排版預覽（在 3018 工作範圍內）</h3>
+        <div id="partsWrap"></div>
+        <div class="note" style="margin-top:8px;">
+          這裡是把 4 根直桿擺在同一張工作區（0..X, 0..Y），每根各自輸出一份 G-code（坐標一致）。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+
+</html>

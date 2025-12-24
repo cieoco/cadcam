@@ -1,0 +1,209 @@
+/* 4-Bar Linkage CAD/CAM - Styles */
+
+/* Base Styles */
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Arial;
+  margin: 16px;
+}
+
+h1 {
+  margin: 0 0 12px;
+}
+
+h3 {
+  margin: 12px 0 8px;
+}
+
+/* Layout */
+.row {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.card {
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Form Elements */
+label {
+  font-size: 12px;
+  color: #333;
+  display: block;
+  margin-bottom: 4px;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+button {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #bbb;
+  cursor: pointer;
+  background: #fff;
+}
+
+button:hover {
+  background: #f5f5f5;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.primary {
+  border-color: #333;
+  background: #333;
+  color: #fff;
+}
+
+button.primary:hover {
+  background: #555;
+}
+
+.btnrow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+/* Text Styles */
+.note {
+  font-size: 12px;
+  color: #555;
+  line-height: 1.4;
+}
+
+.warn {
+  color: #a00;
+  font-weight: 600;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* SVG Containers */
+#svgWrap {
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 8px;
+  background: #fff;
+}
+
+#svgWrap svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+#partsWrap svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Log Output */
+#log {
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: #fafafa;
+  padding: 10px;
+  border-radius: 8px;
+  min-height: 60px;
+}
+
+/* Animation Controls */
+.anim-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.anim-controls button {
+  flex: 1;
+  border: none;
+  color: white;
+}
+
+.btn-play {
+  background: #27ae60;
+}
+
+.btn-play:hover:not(:disabled) {
+  background: #229954;
+}
+
+.btn-pause {
+  background: #f39c12;
+}
+
+.btn-pause:hover:not(:disabled) {
+  background: #e67e22;
+}
+
+.btn-stop {
+  background: #e74c3c;
+}
+
+.btn-stop:hover:not(:disabled) {
+  background: #c0392b;
+}
+
+/* Color Coding */
+.color-ground {
+  color: #666;
+  font-weight: bold;
+}
+
+.color-input {
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+.color-coupler {
+  color: #3498db;
+  font-weight: bold;
+}
+
+.color-output {
+  color: #27ae60;
+  font-weight: bold;
+}
+
+/* Utility Classes */
+.spacer-sm {
+  height: 10px;
+}
+
+.spacer-md {
+  height: 16px;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.flex-end {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
