@@ -14,6 +14,48 @@ h3 {
   margin: 12px 0 8px;
 }
 
+/* Common Navigation Header */
+.nav-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 15px;
+  margin: -16px -16px 16px -16px;
+}
+
+.nav-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.nav-back {
+  color: white;
+  text-decoration: none;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-title {
+  color: white;
+  margin: 0;
+  font-size: 18px;
+}
+
+@media (max-width: 600px) {
+  .nav-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .nav-title {
+    font-size: 16px;
+  }
+}
+
 /* Layout */
 .row {
   display: grid;
@@ -22,16 +64,29 @@ h3 {
   align-items: start;
 }
 
+@media (max-width: 900px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .card {
   border: 1px solid #ddd;
   border-radius: 10px;
   padding: 12px;
+  background: white;
 }
 
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Form Elements */

@@ -101,6 +101,32 @@
             }
         }
 
+        @media (max-width: 600px) {
+            .wrap {
+                padding: 12px 10px 30px;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .brand h1 {
+                font-size: 18px;
+            }
+
+            .chip {
+                flex: 1 1 140px;
+                min-width: 140px;
+                padding: 10px;
+            }
+
+            .kv {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .card {
             background: linear-gradient(180deg, rgba(255, 255, 255, .05) 0%, rgba(255, 255, 255, .02) 100%);
             border: 1px solid rgba(255, 255, 255, .08);
@@ -327,6 +353,7 @@
             transform: none;
         }
 
+        .leftCol,
         .rightCol {
             display: flex;
             flex-direction: column;
@@ -410,65 +437,92 @@
                 <h1>機構快速原型工具</h1>
                 <p>先定運動 → 選機構 → 選致動器 → 最後才做工程粗估與加工（GRBL / 3018）。</p>
             </div>
-            <div class="pill">
-                Target: <b>GRBL</b> · Work: <b>3018 (300×180)</b> · Mode: <b>Prototype</b>
-            </div>
+
         </header>
 
         <div class="grid">
-            <!-- LEFT: Wizard -->
-            <div class="card">
-                <div class="hd">
-                    <h2>首頁導引</h2>
-                    <div class="step"><span class="mono">v0.1</span> · 四連桿已可用</div>
+            <!-- LEFT COLUMN -->
+            <div class="leftCol">
+                <!-- LEFT TOP: Wizard -->
+                <div class="card">
+                    <div class="hd">
+                        <h2>首頁導引</h2>
+                        <div class="step"><span class="mono">v0.1</span> · 四連桿已可用</div>
+                    </div>
+                    <div class="bd">
+                        <!-- Step 1 -->
+                        <div class="hint">
+                            <strong>Step 1｜先選「運動型態」</strong><br />
+                            工程原則：先定運動型態，比先選馬達更重要，避免「能動但方向不對」。
+                        </div>
+
+                        <div class="chips" id="motionChips">
+                            <div class="chip" data-motion="swing">
+                                <div class="t">🟦 擺動</div>
+                                <div class="d">末端需要轉/擺角（夾爪、擺臂、抬升）</div>
+                            </div>
+                            <div class="chip" data-motion="linear">
+                                <div class="t">🟩 直線</div>
+                                <div class="d">末端需要推/拉（推桿、滑塊、直線行程）</div>
+                            </div>
+                            <div class="chip" data-motion="recip">
+                                <div class="t">🟨 往復</div>
+                                <div class="d">來回週期動作（送料、打擊、往復推拉）</div>
+                            </div>
+                            <div class="chip" data-motion="translate">
+                                <div class="t">🟥 平移</div>
+                                <div class="d">整體平移/XY（滑台、升降平台、定位搬移）</div>
+                            </div>
+                        </div>
+
+                        <!-- Step 2 & 3 & 4 (Integrated) -->
+                        <div style="height:14px"></div>
+                        <div class="hint">
+                            <strong>Step 2｜推薦機構、選致動器、最後快速預覽</strong><br />
+                            系統會依運動型態給予候選，並引導你完成初步決策。
+                        </div>
+
+                        <div class="rec" id="mechRecs"></div>
+                        <div class="smallGrid" id="actuatorBox" style="margin-top:14px;"></div>
+
+                        <div id="ctaContainer"
+                            style="margin-top:20px; display: flex; flex-direction: column; gap: 12px;">
+                            <!-- 按鈕會在這裡動態生成 -->
+                        </div>
+                    </div>
                 </div>
-                <div class="bd">
-                    <!-- Step 1 -->
-                    <div class="hint">
-                        <strong>Step 1｜先選「運動型態」</strong><br />
-                        工程原則：先定運動型態，比先選馬達更重要，避免「能動但方向不對」。
+
+                <!-- LEFT BOTTOM: Quick Access to Completed Mechanisms -->
+                <div class="card">
+                    <div class="hd">
+                        <h2>快速進入工具</h2>
+                        <div class="step">Direct Link</div>
                     </div>
-
-                    <div class="chips" id="motionChips">
-                        <div class="chip" data-motion="swing">
-                            <div class="t">🟦 擺動</div>
-                            <div class="d">末端需要轉/擺角（夾爪、擺臂、抬升）</div>
+                    <div class="bd">
+                        <div class="hint" style="margin-bottom: 12px;">
+                            如果你已經知道要用什麼機構，可以直接從這裡進入：
                         </div>
-                        <div class="chip" data-motion="linear">
-                            <div class="t">🟩 直線</div>
-                            <div class="d">末端需要推/拉（推桿、滑塊、直線行程）</div>
-                        </div>
-                        <div class="chip" data-motion="recip">
-                            <div class="t">🟨 往復</div>
-                            <div class="d">來回週期動作（送料、打擊、往復推拉）</div>
-                        </div>
-                        <div class="chip" data-motion="translate">
-                            <div class="t">🟥 平移</div>
-                            <div class="d">整體平移/XY（滑台、升降平台、定位搬移）</div>
+                        <div class="actions" style="gap: 12px;">
+                            <a href="./fourbar.html" class="btn primary"
+                                style="flex: 1; justify-content: center; padding: 14px;">
+                                🔗 四連桿機構 (4-Bar)
+                            </a>
+                            <a href="./mechanism.html?type=crankslider" class="btn primary"
+                                style="flex: 1; justify-content: center; padding: 14px;">
+                                ↔️ 曲柄滑塊 (Crank-Slider)
+                            </a>
+                            <a href="./mechanism.html?type=rackpinion" class="btn primary"
+                                style="flex: 1; justify-content: center; padding: 14px;">
+                                ⚙️ 齒條齒輪 (Rack-Pinion)
+                            </a>
                         </div>
                     </div>
-
-                    <!-- Step 2 & 3 & 4 (Integrated) -->
-                    <div style="height:14px"></div>
-                    <div class="hint">
-                        <strong>Step 2｜推薦機構、選致動器、最後快速預覽</strong><br />
-                        系統會依運動型態給予候選，並引導你完成初步決策。
-                    </div>
-
-                    <div class="rec" id="mechRecs"></div>
-                    <div class="smallGrid" id="actuatorBox" style="margin-top:14px;"></div>
-
-                    <div id="ctaContainer" style="margin-top:20px; display: flex; flex-direction: column; gap: 12px;">
-                        <!-- 按鈕會在這裡動態生成 -->
-                    </div>
-
-                    <button class="btn ghost" id="resetBtn" style="margin-top: 14px;">↺ 重設選擇</button>
-
                 </div>
             </div>
 
-            <!-- RIGHT: Engineering quick notes -->
+            <!-- RIGHT COLUMN -->
             <div class="rightCol">
+                <!-- RIGHT TOP: Engineering quick notes -->
                 <div class="card">
                     <div class="hd">
                         <h2>工程提示（首頁常駐）</h2>
@@ -484,6 +538,7 @@
                     </div>
                 </div>
 
+                <!-- RIGHT BOTTOM: Sanity Meter -->
                 <div class="card">
                     <div class="hd">
                         <h2>粗估儀表（Sanity Meter）</h2>
@@ -846,7 +901,7 @@
             });
         });
 
-        document.getElementById("resetBtn").addEventListener("click", resetAll);
+
 
         // Initialize
         resetAll();
