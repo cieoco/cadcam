@@ -5,6 +5,7 @@ import { svgEl, $ } from '../utils.js';
 
 const holeSizeCache = new Map();
 const slotWidthCache = new Map();
+const fixedHoleSizeCache = new Map();
 
 function normalizeCoord(value) {
     if (!Number.isFinite(value)) return '';
@@ -79,11 +80,17 @@ export function renderBar(sol, theta, trajectory, viewParams) {
     // ?ºä?å¾¹å??·é?ï¼Œæ??‘å¯ä»¥æ? margin å­”ä?è¦–ç‚º?Œå¯ç·¨è¼¯?ç?ï¼Œæ??…çµ¦å®ƒå€‘å–®?¨ç??ƒæ•¸??
     // ?¨æ­¤?‘å€‘ç¶­?å›ºå®šå?ä½¿ç”¨?¨å? Dï¼Œä?é¡å?å­”å¼·?¶é?å®šã€?
 
-    const holes = [
-        { x: margin, y: W / 2, d: currentBrushD, fixed: true, id: 'FIX_L' },
-        { x: L - margin, y: W / 2, d: currentBrushD, fixed: true, id: 'FIX_R' }
-    ];
+    const leftKey = holeKey(margin, W / 2);
+    const rightKey = holeKey(L - margin, W / 2);
+    const leftD = fixedHoleSizeCache.has(leftKey) ? fixedHoleSizeCache.get(leftKey) : currentBrushD;
+    const rightD = fixedHoleSizeCache.has(rightKey) ? fixedHoleSizeCache.get(rightKey) : currentBrushD;
+    if (!fixedHoleSizeCache.has(leftKey)) fixedHoleSizeCache.set(leftKey, leftD);
+    if (!fixedHoleSizeCache.has(rightKey)) fixedHoleSizeCache.set(rightKey, rightD);
 
+    const holes = [
+        { x: margin, y: W / 2, d: leftD, fixed: true, id: 'FIX_L' },
+        { x: L - margin, y: W / 2, d: rightD, fixed: true, id: 'FIX_R' }
+    ];
     if (extraHolesInput) {
     const parts = extraHolesInput.split(';');
 

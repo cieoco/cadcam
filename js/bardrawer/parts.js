@@ -1,13 +1,21 @@
 /**
  * Bar Drawer Parts Generator - Support for Holes and Slots with Individual Diameters
  */
+const fixedHoleSizeCache = new Map();
+
+function fixedHoleD(x, y, fallbackD) {
+    const key = `${x.toFixed(3).replace(/\.?0+$/, '')},${y.toFixed(3).replace(/\.?0+$/, '')}`;
+    if (!fixedHoleSizeCache.has(key)) fixedHoleSizeCache.set(key, fallbackD);
+    return fixedHoleSizeCache.get(key);
+}
+
 export function generateBarParts(params) {
     const { barL, barW, holeD, margin, extraHoles, extraSlots, barStyle } = params;
 
     // 1. 基礎孔位 (兩端對稱孔使用全域孔徑)
     const holes = [
-        { x: margin, y: barW / 2, d: holeD },
-        { x: barL - margin, y: barW / 2, d: holeD }
+        { x: margin, y: barW / 2, d: fixedHoleD(margin, barW / 2, holeD) },
+        { x: barL - margin, y: barW / 2, d: fixedHoleD(barL - margin, barW / 2, holeD) }
     ];
 
     if (extraHoles) {
