@@ -12,34 +12,35 @@ import { $ } from './utils.js';
 export function readInputs() {
     // 四連桿機構參數
     const mech = {
-        a: Number($("a").value),           // Ground link
-        b: Number($("b").value),           // Input link
-        c: Number($("c").value),           // Coupler link
-        d: Number($("d").value),           // Output link
-        thetaDeg: Number($("theta").value), // Input angle
-        assembly: $("assembly").value,     // open/crossed
+        a: Number($("a")?.value || 120),           // Ground link
+        b: Number($("b")?.value || 60),            // Input link
+        c: Number($("c")?.value || 110),           // Coupler link
+        d: Number($("d")?.value || 80),            // Output link
+        thetaDeg: Number($("theta")?.value || 30), // Input angle
+        assembly: $("assembly")?.value || "open", // open/crossed
     };
 
     // 零件規格參數
     const partSpec = {
-        barW: Number($("barW").value),     // 桿件寬度
-        margin: Number($("margin").value), // 端到孔邊距
-        holeD: Number($("holeD").value),   // 孔徑
-        spacing: Number($("spacing").value), // 零件間距
-        workX: Number($("workX").value),   // 工作範圍 X
-        workY: Number($("workY").value),   // 工作範圍 Y
+        barW: Number($("barW")?.value || 15),     // 桿件寬度
+        margin: Number($("margin")?.value || 7),  // 端到孔邊距
+        holeD: Number($("holeD")?.value || 3.2),  // 孔徑
+        spacing: Number($("spacing")?.value || 8), // 零件間距
+        workX: Number($("workX")?.value || 300),  // 工作範圍 X
+        workY: Number($("workY")?.value || 180),  // 工作範圍 Y
     };
 
     // 加工參數
-    const spindleRaw = $("spindle").value.trim();
+    const spindleEl = $("spindle");
+    const spindleRaw = spindleEl ? spindleEl.value.trim() : "";
     const mfg = {
-        toolD: Number($("toolD").value),       // 刀徑
-        thickness: Number($("thickness").value), // 材料厚度
-        overcut: Number($("overcut").value),   // 穿透餘量
-        stepdown: Number($("stepdown").value), // 每層下刀深度
-        safeZ: Number($("safeZ").value),       // 安全高度
-        feedXY: Number($("feedXY").value),     // XY 進給速度
-        feedZ: Number($("feedZ").value),       // Z 進給速度
+        toolD: Number($("toolD")?.value || 3.0),       // 刀徑
+        thickness: Number($("thickness")?.value || 3.0), // 材料厚度
+        overcut: Number($("overcut")?.value || 0.5),   // 穿透餘量
+        stepdown: Number($("stepdown")?.value || 0.5), // 每層下刀深度
+        safeZ: Number($("safeZ")?.value || 5),         // 安全高度
+        feedXY: Number($("feedXY")?.value || 400),     // XY 進給速度
+        feedZ: Number($("feedZ")?.value || 100),       // Z 進給速度
         spindle: spindleRaw === "" ? NaN : Number(spindleRaw), // 主軸轉速
     };
 

@@ -4,410 +4,904 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>機構設計輔助系統 - Mechanism Design Assistant</title>
+    <title>機構快速原型工具（MVP）</title>
     <style>
+        :root {
+            --bg: #0b0c10;
+            --card: #12141a;
+            --card2: #0f1117;
+            --text: #e9ecf1;
+            --muted: #a8b0c0;
+            --line: #2a2f3a;
+            --ok: #19c37d;
+            --warn: #ffcc00;
+            --bad: #ff4d4d;
+            --btn: #1f2430;
+            --btn2: #1a1f2a;
+            --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+            --radius: 16px;
+        }
+
         * {
-            margin: 0;
-            padding: 0;
             box-sizing: border-box;
         }
 
         body {
-            font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            margin: 0;
+            color: var(--text);
+            background: radial-gradient(1200px 800px at 20% 10%, #14172b 0%, var(--bg) 55%);
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans TC", "PingFang TC";
         }
 
-        .container {
-            max-width: 1200px;
+        a {
+            color: inherit;
+        }
+
+        .wrap {
+            max-width: 1100px;
             margin: 0 auto;
+            padding: 22px 18px 46px;
         }
 
         header {
-            text-align: center;
-            color: white;
-            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 10px 2px 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, .06);
         }
 
-        h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        .brand {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
 
-        .subtitle {
-            font-size: 1.1rem;
-            opacity: 0.9;
+        .brand h1 {
+            margin: 0;
+            font-size: 20px;
+            letter-spacing: .2px;
         }
 
-        .workflow {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 40px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        .brand p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.35;
         }
 
-        .workflow h2 {
-            color: #667eea;
-            margin-bottom: 20px;
-            font-size: 1.5rem;
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border: 1px solid rgba(255, 255, 255, .10);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .04);
+            font-size: 12px;
+            color: var(--muted);
         }
 
-        .steps {
+        .pill b {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
+            grid-template-columns: 1.2fr .8fr;
+            gap: 16px;
+            margin-top: 18px;
         }
 
-        .step {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            position: relative;
+        @media (max-width: 980px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
         }
 
-        .step-number {
-            display: inline-block;
-            width: 30px;
-            height: 30px;
-            background: #667eea;
-            color: white;
-            border-radius: 50%;
-            line-height: 30px;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-
-        .step h3 {
-            font-size: 1rem;
-            color: #333;
-            margin-bottom: 8px;
-        }
-
-        .step p {
-            font-size: 0.85rem;
-            color: #666;
-        }
-
-        .mechanisms {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 20px;
-        }
-
-        .mechanism-card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
-            cursor: pointer;
-            text-decoration: none;
-            color: inherit;
-            display: block;
-            position: relative;
+        .card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, .05) 0%, rgba(255, 255, 255, .02) 100%);
+            border: 1px solid rgba(255, 255, 255, .08);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
             overflow: hidden;
         }
 
-        .mechanism-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 5px;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            transform: scaleX(0);
-            transition: transform 0.3s ease;
-        }
-
-        .mechanism-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-
-        .mechanism-card:hover::before {
-            transform: scaleX(1);
-        }
-
-        .mechanism-card.completed {
-            border: 2px solid #27ae60;
-        }
-
-        .mechanism-card.in-progress {
-            border: 2px solid #f39c12;
-        }
-
-        .mechanism-card.planned {
-            border: 2px solid #95a5a6;
-            opacity: 0.7;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: bold;
-            margin-bottom: 15px;
-        }
-
-        .status-badge.completed {
-            background: #27ae60;
-            color: white;
-        }
-
-        .status-badge.in-progress {
-            background: #f39c12;
-            color: white;
-        }
-
-        .status-badge.planned {
-            background: #95a5a6;
-            color: white;
-        }
-
-        .mechanism-icon {
-            font-size: 3rem;
-            margin-bottom: 15px;
-            display: block;
-        }
-
-        .mechanism-card h3 {
-            font-size: 1.3rem;
-            margin-bottom: 10px;
-            color: #333;
-        }
-
-        .mechanism-card p {
-            color: #666;
-            font-size: 0.9rem;
-            line-height: 1.5;
-            margin-bottom: 15px;
-        }
-
-        .features {
+        .card .hd {
+            padding: 14px 16px;
             display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: rgba(0, 0, 0, .18);
+            border-bottom: 1px solid rgba(255, 255, 255, .07);
+        }
+
+        .card .hd h2 {
+            margin: 0;
+            font-size: 14px;
+            letter-spacing: .2px;
+        }
+
+        .card .hd .step {
+            font-size: 12px;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .card .bd {
+            padding: 14px 16px 16px;
+        }
+
+        .hint {
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, .10);
+            background: rgba(0, 0, 0, .18);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        .hint strong {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .chips {
+            display: flex;
+            gap: 10px;
             flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .chip {
+            flex: 1 1 180px;
+            padding: 12px 12px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, .10);
+            background: rgba(0, 0, 0, .12);
+            cursor: pointer;
+            user-select: none;
+            transition: transform .08s ease, border-color .12s ease, background .12s ease;
+            min-width: 180px;
+        }
+
+        .chip:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255, 255, 255, .20);
+        }
+
+        .chip.active {
+            border-color: rgba(25, 195, 125, .6);
+            background: rgba(25, 195, 125, .10);
+        }
+
+        .chip .t {
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
             gap: 8px;
-            margin-top: 15px;
         }
 
-        .feature-tag {
-            background: #f0f0f0;
-            padding: 4px 10px;
-            border-radius: 5px;
-            font-size: 0.75rem;
-            color: #555;
+        .chip .d {
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.35;
         }
 
-        .use-cases {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #eee;
+        .mini {
+            font-size: 12px;
+            color: var(--muted);
         }
 
-        .use-cases h4 {
-            font-size: 0.85rem;
-            color: #667eea;
-            margin-bottom: 8px;
+        .list {
+            margin: 10px 0 0;
+            padding: 0 0 0 16px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5;
         }
 
-        .use-cases ul {
-            list-style: none;
-            font-size: 0.8rem;
-            color: #666;
+        .list b {
+            color: var(--text);
+            font-weight: 600;
         }
 
-        .use-cases li::before {
-            content: "→ ";
-            color: #667eea;
+        .rec {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 12px;
         }
 
-        footer {
-            text-align: center;
-            color: white;
-            margin-top: 40px;
-            opacity: 0.8;
+        .recCard {
+            padding: 12px 12px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, .10);
+            background: rgba(0, 0, 0, .12);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .recTop {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .recTop .name {
+            font-weight: 800;
+            font-size: 13px;
+            letter-spacing: .1px;
+        }
+
+        .badge {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, .12);
+            color: var(--muted);
+            background: rgba(255, 255, 255, .04);
+            white-space: nowrap;
+        }
+
+        .recCard .why {
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        .kv {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .kv .box {
+            padding: 10px 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, .08);
+            background: rgba(0, 0, 0, .12);
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        .kv .box strong {
+            color: var(--text);
+            font-weight: 700;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .btn {
+            appearance: none;
+            border: 1px solid rgba(255, 255, 255, .12);
+            background: var(--btn);
+            color: var(--text);
+            padding: 10px 12px;
+            border-radius: 14px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 12px;
+            transition: transform .08s ease, border-color .12s ease, background .12s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255, 255, 255, .22);
+        }
+
+        .btn.primary {
+            background: rgba(25, 195, 125, .14);
+            border-color: rgba(25, 195, 125, .55);
+        }
+
+        .btn.ghost {
+            background: var(--btn2);
+        }
+
+        .btn:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .rightCol {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .meter {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .meterRow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .bar {
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .08);
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, .08);
+        }
+
+        .bar>div {
+            height: 100%;
+            width: 0%;
+            background: rgba(25, 195, 125, .9);
+            transition: width .2s ease;
+        }
+
+        .tag {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .footer {
+            margin-top: 18px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+            border-top: 1px solid rgba(255, 255, 255, .06);
+            padding-top: 14px;
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }
+
+        .callout {
+            padding: 12px 12px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, .10);
+            background: rgba(0, 0, 0, .16);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .callout strong {
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        .smallGrid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-top: 10px;
         }
     </style>
 </head>
 
 <body>
-    <div class="container">
+    <div class="wrap">
         <header>
-            <h1>🔧 機構設計輔助系統</h1>
-            <p class="subtitle">Mechanism Design Assistant - 從需求到 G-code 一站式解決方案</p>
+            <div class="brand">
+                <h1>機構快速原型工具（MVP）</h1>
+                <p>先定運動 → 選機構 → 選致動器 → 最後才做工程粗估與加工（GRBL / 3018）。</p>
+            </div>
+            <div class="pill">
+                Target: <b>GRBL</b> · Work: <b>3018 (300×180)</b> · Mode: <b>Prototype</b>
+            </div>
         </header>
 
-        <div class="workflow">
-            <h2>📐 設計流程</h2>
-            <div class="steps">
-                <div class="step">
-                    <span class="step-number">1</span>
-                    <h3>運動需求</h3>
-                    <p>擺動 / 直線 / 往復 / 平移</p>
+        <div class="grid">
+            <!-- LEFT: Wizard -->
+            <div class="card">
+                <div class="hd">
+                    <h2>Step 1 → 2 → 3 → 4（首頁導引）</h2>
+                    <div class="step"><span class="mono">v0.1</span> · 四連桿已可用</div>
                 </div>
-                <div class="step">
-                    <span class="step-number">2</span>
-                    <h3>選擇機構</h3>
-                    <p>四連桿 / 曲柄滑塊 / 凸輪...</p>
+                <div class="bd">
+                    <!-- Step 1 -->
+                    <div class="hint">
+                        <strong>Step 1｜先選「運動型態」</strong><br />
+                        工程原則：先定運動型態，比先選馬達更重要，避免「能動但方向不對」。
+                    </div>
+
+                    <div class="chips" id="motionChips">
+                        <div class="chip" data-motion="swing">
+                            <div class="t">🟦 擺動</div>
+                            <div class="d">末端需要轉/擺角（夾爪、擺臂、抬升）</div>
+                        </div>
+                        <div class="chip" data-motion="linear">
+                            <div class="t">🟩 直線</div>
+                            <div class="d">末端需要推/拉（推桿、滑塊、直線行程）</div>
+                        </div>
+                        <div class="chip" data-motion="recip">
+                            <div class="t">🟨 往復</div>
+                            <div class="d">來回週期動作（送料、打擊、往復推拉）</div>
+                        </div>
+                        <div class="chip" data-motion="translate">
+                            <div class="t">🟥 平移</div>
+                            <div class="d">整體平移/XY（滑台、升降平台、定位搬移）</div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div style="height:14px"></div>
+                    <div class="hint">
+                        <strong>Step 2｜推薦「最自然的機構」</strong><br />
+                        系統會依運動型態給 1–3 個候選。第一版先把「桿件化」做強：好算、好切、好改。
+                    </div>
+
+                    <div class="rec" id="mechRecs"></div>
+
+                    <!-- Step 3 -->
+                    <div style="height:14px"></div>
+                    <div class="hint">
+                        <strong>Step 3｜再選致動器（決策樹）</strong><br />
+                        先判斷「連續控制 vs 兩段式」，再看「要定位角度/位置嗎」，最後才談快/穩。
+                    </div>
+
+                    <div class="smallGrid" id="actuatorBox"></div>
+
+                    <!-- Step 4 -->
+                    <div style="height:14px"></div>
+                    <div class="hint">
+                        <strong>Step 4｜最後才做工程粗估（Sanity Check）</strong><br />
+                        這裡不是做完整 CAE，而是做「防呆」：幾何順不順、行程合理不合理、加工是否安全。
+                    </div>
+
+                    <div class="kv">
+                        <div class="box">
+                            <strong>尺寸 / 行程檢查</strong>
+                            看軌跡是否超出工作範圍、是否有死點、是否對應到你要的行程。
+                        </div>
+                        <div class="box">
+                            <strong>加工安全檢查</strong>
+                            GRBL：G21/G90、SAFE_Z、先孔後外形、stepdown 分層；v0.1 不含 tabs（需固定工件）。
+                        </div>
+                    </div>
+
+                    <div class="actions" style="margin-top:12px;">
+                        <!-- IMPORTANT:
+              - If you already have the old 4-bar page as docs/index.html, rename it to docs/fourbar.html
+              - Keep app.js same, and update that file's <script src="./app.js"> reference.
+            -->
+                        <a class="btn primary" id="goFourbar" href="./fourbar.html" aria-disabled="true">🚀 進入四連桿 2D 模擬
+                            → 生成 G-code</a>
+                        <button class="btn ghost" id="resetBtn">↺ 重設選擇</button>
+                        <a class="btn" href="./README.html" style="display:none;">📄 使用說明</a>
+                    </div>
+
+                    <div style="height:10px"></div>
+                    <div class="callout">
+                        <strong>部署提醒</strong>：你現在要「全放 GitHub Pages」是可行的。<br />
+                        你只需要把原本的四連桿工具頁改名成 <span class="mono">fourbar.html</span>，這個首頁用 <span
+                            class="mono">index.html</span>。
+                    </div>
                 </div>
-                <div class="step">
-                    <span class="step-number">3</span>
-                    <h3>驅動方式</h3>
-                    <p>馬達 / 舵機 / 氣壓</p>
+            </div>
+
+            <!-- RIGHT: Engineering quick notes -->
+            <div class="rightCol">
+                <div class="card">
+                    <div class="hd">
+                        <h2>工程提示（首頁常駐）</h2>
+                        <div class="step">Prototype-first</div>
+                    </div>
+                    <div class="bd">
+                        <ul class="list">
+                            <li><b>先讓幾何順</b>（不卡、行程合理）再談控制（PID/速度）。</li>
+                            <li>原型階段重點是 <b>可預期、可重複</b>：少選項、少魔法、先把流程跑通。</li>
+                            <li>木板加工：先保守（<b>stepdown 0.5mm</b>、SAFE_Z 5mm、先孔後外形）。</li>
+                            <li>v0.1 不含 tabs：外形切完會掉件，請用雙面膠/壓板固定。</li>
+                        </ul>
+                    </div>
                 </div>
-                <div class="step">
-                    <span class="step-number">4</span>
-                    <h3>參數計算</h3>
-                    <p>力矩 / 速度 / 尺寸</p>
+
+                <div class="card">
+                    <div class="hd">
+                        <h2>粗估儀表（Sanity Meter）</h2>
+                        <div class="step">越高越安心</div>
+                    </div>
+                    <div class="bd meter">
+                        <div class="meterRow">
+                            <div class="tag">幾何可行性（是否容易組起來）</div>
+                            <div class="tag" id="mGeomTxt">—</div>
+                        </div>
+                        <div class="bar">
+                            <div id="mGeom"></div>
+                        </div>
+
+                        <div class="meterRow" style="margin-top:6px;">
+                            <div class="tag">可加工性（桿件化 / 2.5D）</div>
+                            <div class="tag" id="mCamTxt">—</div>
+                        </div>
+                        <div class="bar">
+                            <div id="mCam"></div>
+                        </div>
+
+                        <div class="meterRow" style="margin-top:6px;">
+                            <div class="tag">致動匹配（控制難度）</div>
+                            <div class="tag" id="mActTxt">—</div>
+                        </div>
+                        <div class="bar">
+                            <div id="mAct"></div>
+                        </div>
+
+                        <div class="callout" style="margin-top:10px;">
+                            <strong>說明</strong>：這些不是精算，而是「先把方向走對」的工程防呆。<br />
+                            之後你可以在機構頁面再加入扭矩/速度的簡易估算。
+                        </div>
+                    </div>
                 </div>
-                <div class="step">
-                    <span class="step-number">5</span>
-                    <h3>生成加工</h3>
-                    <p>2D 模擬 / G-code 輸出</p>
+
+                <div class="card">
+                    <div class="hd">
+                        <h2>下一步擴充路線（建議）</h2>
+                        <div class="step">v0.2+</div>
+                    </div>
+                    <div class="bd">
+                        <ul class="list">
+                            <li><b>曲柄滑塊</b>（直線/往復的最佳第二機構）</li>
+                            <li>θ sweep：顯示可行角度區間 + 軌跡 polyline</li>
+                            <li>輸出：加 <b>tabs</b> / 孔內插擴孔（hole pocket）</li>
+                            <li>零件：孔陣列、長槽、L 型桿</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <h2 style="color: white; margin-bottom: 20px; text-align: center;">選擇機構類型</h2>
-
-        <div class="mechanisms">
-            <!-- 四連桿機構 - 已完成 -->
-            <a href="fourbar.html" class="mechanism-card completed">
-                <span class="status-badge completed">✓ 已完成</span>
-                <span class="mechanism-icon">🔗</span>
-                <h3>四連桿機構</h3>
-                <p>Four-Bar Linkage - 最常見的平面連桿機構，可實現複雜的運動軌跡</p>
-                <div class="features">
-                    <span class="feature-tag">擺動輸出</span>
-                    <span class="feature-tag">軌跡控制</span>
-                    <span class="feature-tag">馬達/舵機</span>
-                </div>
-                <div class="use-cases">
-                    <h4>適用場景：</h4>
-                    <ul>
-                        <li>機械手臂關節</li>
-                        <li>擺動夾爪</li>
-                        <li>往復運動機構</li>
-                    </ul>
-                </div>
-            </a>
-
-            <!-- 曲柄滑塊機構 - 規劃中 -->
-            <div class="mechanism-card planned">
-                <span class="status-badge planned">📋 規劃中</span>
-                <span class="mechanism-icon">↔️</span>
-                <h3>曲柄滑塊機構</h3>
-                <p>Slider-Crank - 旋轉運動轉換為直線往復運動</p>
-                <div class="features">
-                    <span class="feature-tag">直線往復</span>
-                    <span class="feature-tag">力放大</span>
-                    <span class="feature-tag">馬達驅動</span>
-                </div>
-                <div class="use-cases">
-                    <h4>適用場景：</h4>
-                    <ul>
-                        <li>活塞運動</li>
-                        <li>打孔機構</li>
-                        <li>推拉裝置</li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- 平行四邊形機構 - 規劃中 -->
-            <div class="mechanism-card planned">
-                <span class="status-badge planned">📋 規劃中</span>
-                <span class="mechanism-icon">▱</span>
-                <h3>平行四邊形機構</h3>
-                <p>Parallelogram - 保持平台水平的平移機構</p>
-                <div class="features">
-                    <span class="feature-tag">平行平移</span>
-                    <span class="feature-tag">姿態保持</span>
-                    <span class="feature-tag">舵機/氣壓</span>
-                </div>
-                <div class="use-cases">
-                    <h4>適用場景：</h4>
-                    <ul>
-                        <li>升降平台</li>
-                        <li>平行夾爪</li>
-                        <li>繪圖機構</li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Toggle 夾爪機構 - 規劃中 -->
-            <div class="mechanism-card planned">
-                <span class="status-badge planned">📋 規劃中</span>
-                <span class="mechanism-icon">✂️</span>
-                <h3>Toggle 夾爪機構</h3>
-                <p>Toggle Gripper - 死點鎖定的強力夾持機構</p>
-                <div class="features">
-                    <span class="feature-tag">力放大</span>
-                    <span class="feature-tag">自鎖定</span>
-                    <span class="feature-tag">舵機/氣壓</span>
-                </div>
-                <div class="use-cases">
-                    <h4>適用場景：</h4>
-                    <ul>
-                        <li>機械夾爪</li>
-                        <li>夾緊裝置</li>
-                        <li>鎖定機構</li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- 凸輪機構 - 規劃中 -->
-            <div class="mechanism-card planned">
-                <span class="status-badge planned">📋 規劃中</span>
-                <span class="mechanism-icon">⚙️</span>
-                <h3>凸輪機構</h3>
-                <p>Cam Mechanism - 精確控制運動曲線</p>
-                <div class="features">
-                    <span class="feature-tag">精確軌跡</span>
-                    <span class="feature-tag">高速運動</span>
-                    <span class="feature-tag">馬達驅動</span>
-                </div>
-                <div class="use-cases">
-                    <h4>適用場景：</h4>
-                    <ul>
-                        <li>自動化生產線</li>
-                        <li>精密定位</li>
-                        <li>週期性運動</li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- 齒輪齒條機構 - 規劃中 -->
-            <div class="mechanism-card planned">
-                <span class="status-badge planned">📋 規劃中</span>
-                <span class="mechanism-icon">⚙️↔️</span>
-                <h3>齒輪齒條機構</h3>
-                <p>Rack and Pinion - 旋轉轉直線的精確傳動</p>
-                <div class="features">
-                    <span class="feature-tag">精確直線</span>
-                    <span class="feature-tag">大行程</span>
-                    <span class="feature-tag">馬達驅動</span>
-                </div>
-                <div class="use-cases">
-                    <h4>適用場景：</h4>
-                    <ul>
-                        <li>線性滑台</li>
-                        <li>轉向機構</li>
-                        <li>CNC 軸向</li>
-                    </ul>
-                </div>
-            </div>
+        <div class="footer">
+            <div><span class="mono">GRBL</span> 建議：輸出固定包含 <span class="mono">G21/G90/G17/G94</span>，所有 XY 移動前先回 <span
+                    class="mono">SAFE_Z</span>，先孔後外形，外形分層 stepdown。</div>
         </div>
-
-        <footer>
-            <p>© 2025 機構設計輔助系統 | 從概念到製造的完整解決方案</p>
-        </footer>
     </div>
+
+    <script>
+        // Homepage wizard logic (static-site friendly)
+        const state = {
+            motion: null,   // swing | linear | recip | translate
+            mech: null,     // fourbar | crankslider | parallelogram | rackpinion | leadscrew | cam
+            act: null      // motor | servo | pneumatic | stepper
+        };
+
+        const motionChips = document.querySelectorAll("#motionChips .chip");
+        const mechRecs = document.getElementById("mechRecs");
+        const actuatorBox = document.getElementById("actuatorBox");
+        const goFourbar = document.getElementById("goFourbar");
+
+        // meters
+        const mGeom = document.getElementById("mGeom");
+        const mCam = document.getElementById("mCam");
+        const mAct = document.getElementById("mAct");
+        const mGeomTxt = document.getElementById("mGeomTxt");
+        const mCamTxt = document.getElementById("mCamTxt");
+        const mActTxt = document.getElementById("mActTxt");
+
+        function setMeter(el, txtEl, val) {
+            const v = Math.max(0, Math.min(100, val));
+            el.style.width = v + "%";
+            txtEl.textContent = v === 0 ? "—" : (v + "%");
+        }
+
+        function resetAll() {
+            state.motion = null;
+            state.mech = null;
+            state.act = null;
+            motionChips.forEach(c => c.classList.remove("active"));
+            mechRecs.innerHTML = "";
+            actuatorBox.innerHTML = "";
+            goFourbar.setAttribute("aria-disabled", "true");
+            goFourbar.classList.remove("primary");
+            goFourbar.classList.add("ghost");
+            goFourbar.style.pointerEvents = "none";
+            // meters
+            setMeter(mGeom, mGeomTxt, 0);
+            setMeter(mCam, mCamTxt, 0);
+            setMeter(mAct, mActTxt, 0);
+        }
+
+        function mechCard({ id, name, badge, why, pros, cons, cta, href, enabled = true }) {
+            const div = document.createElement("div");
+            div.className = "recCard";
+            div.dataset.mech = id;
+
+            div.innerHTML = `
+        <div class="recTop">
+          <div class="name">${name}</div>
+          <div class="badge">${badge}</div>
+        </div>
+        <div class="why">${why}</div>
+        <div class="kv">
+          <div class="box"><strong>適合</strong>${pros.map(x => `• ${x}`).join("<br/>")}</div>
+          <div class="box"><strong>風險</strong>${cons.map(x => `• ${x}`).join("<br/>")}</div>
+        </div>
+        <div class="actions">
+          <a class="btn ${enabled ? "primary" : ""}" href="${enabled ? href : "#"}" ${enabled ? "" : "onclick='return false;'"}>
+            ${cta}
+          </a>
+          <button class="btn ghost" data-pick="${id}">選這個機構</button>
+        </div>
+      `;
+            return div;
+        }
+
+        function renderRecommendations() {
+            mechRecs.innerHTML = "";
+            actuatorBox.innerHTML = "";
+            state.mech = null;
+            state.act = null;
+
+            if (!state.motion) return;
+
+            // Recommendations map
+            const recs = [];
+            if (state.motion === "swing") {
+                recs.push({
+                    id: "fourbar",
+                    name: "四連桿（4-bar）",
+                    badge: "桿件化 ★★★★★",
+                    why: "旋轉輸入 → 擺動輸出；結構穩、好算、好切、原型效率最高（你目前已完成）。",
+                    pros: ["夾爪/擺臂/抬升常見", "2D 模擬最直覺", "桿件 CNC 切割最友善"],
+                    cons: ["不是每個角度都可行（需可行區間）", "open/crossed 需鎖定解"],
+                    cta: "進入四連桿工具",
+                    href: "./mechanism.html?type=fourbar",
+                    enabled: true
+                });
+                recs.push({
+                    id: "parallelogram",
+                    name: "平行四邊形連桿",
+                    badge: "姿態保持 ★★★★☆",
+                    why: "末端姿態保持（抬升但不翻轉），很適合相機平台/平行夾爪。",
+                    pros: ["末端姿態穩定", "桿件化容易"],
+                    cons: ["需要多桿件/間隙要注意", "行程受限於幾何比例"],
+                    cta: "（下一版）",
+                    href: "#",
+                    enabled: false
+                });
+            } else if (state.motion === "linear") {
+                recs.push({
+                    id: "crankslider",
+                    name: "曲柄滑塊（Crank-Slider）",
+                    badge: "直線行程 ★★★★★",
+                    why: "旋轉 → 直線；行程明確、死點好理解，極適合快速原型。",
+                    pros: ["直線推拉最自然", "參數少、好教"],
+                    cons: ["死點附近力/速度特性差", "側向力與導向要注意"],
+                    cta: "（下一版）",
+                    href: "#",
+                    enabled: false
+                });
+                recs.push({
+                    id: "rackpinion",
+                    name: "齒條齒輪（Rack & Pinion）",
+                    badge: "長行程 ★★★★☆",
+                    why: "行程可長、效率高，適合滑台/升降。",
+                    pros: ["速度快", "行程可擴展"],
+                    cons: ["加工與齒形精度要求", "背隙與定位要處理"],
+                    cta: "（進階）",
+                    href: "#",
+                    enabled: false
+                });
+            } else if (state.motion === "recip") {
+                recs.push({
+                    id: "crankslider",
+                    name: "曲柄滑塊（Crank-Slider）",
+                    badge: "往復最佳 ★★★★★",
+                    why: "天生往復；最少零件就能做出週期推拉。",
+                    pros: ["最簡單往復", "容易做出節奏"],
+                    cons: ["死點效應", "需要導軌避免偏載"],
+                    cta: "（下一版）",
+                    href: "#",
+                    enabled: false
+                });
+                recs.push({
+                    id: "cam",
+                    name: "凸輪（Cam）",
+                    badge: "節奏固定 ★★★☆☆",
+                    why: "想要固定節奏的動作（送料/分度）可以考慮凸輪。",
+                    pros: ["節奏可設計", "重複性高"],
+                    cons: ["輪廓設計與加工較複雜", "不太適合第一版原型"],
+                    cta: "（進階）",
+                    href: "#",
+                    enabled: false
+                });
+            } else if (state.motion === "translate") {
+                recs.push({
+                    id: "leadscrew",
+                    name: "螺桿滑台（Lead Screw）",
+                    badge: "定位穩 ★★★★☆",
+                    why: "定位好、相對好控制；適合需要準度的平移。",
+                    pros: ["定位容易", "控制簡單"],
+                    cons: ["速度較慢", "長行程效率差"],
+                    cta: "（進階）",
+                    href: "#",
+                    enabled: false
+                });
+                recs.push({
+                    id: "belt",
+                    name: "皮帶滑台（Belt Drive）",
+                    badge: "速度快 ★★★★☆",
+                    why: "速度快、行程長；適合大行程平移。",
+                    pros: ["速度高", "行程長"],
+                    cons: ["定位/彈性需補償", "結構張力要顧"],
+                    cta: "（進階）",
+                    href: "#",
+                    enabled: false
+                });
+            }
+
+            recs.forEach(r => mechRecs.appendChild(mechCard(r)));
+
+            // Listen pick buttons
+            mechRecs.querySelectorAll("button[data-pick]").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    state.mech = btn.dataset.pick;
+                    renderActuatorDecision();
+                    updateMeters();
+                    updatePrimaryCTA();
+                    // highlight selected
+                    mechRecs.querySelectorAll(".recCard").forEach(c => c.style.borderColor = "rgba(255,255,255,.10)");
+                    const picked = mechRecs.querySelector(`.recCard[data-mech="${state.mech}"]`);
+                    if (picked) picked.style.borderColor = "rgba(25,195,125,.55)";
+                });
+            });
+
+            updateMeters();
+            updatePrimaryCTA();
+        }
+
+        function renderActuatorDecision() {
+            actuatorBox.innerHTML = "";
+            if (!state.motion) return;
+
+            // Simple decision UI: 3 questions collapsed into quick picks
+            const div = document.createElement("div");
+            div.className = "recCard";
+            div.innerHTML = `
+        <div class="recTop">
+          <div class="name">致動器選擇（快速決策）</div>
+          <div class="badge">先可控，再變強</div>
+        </div>
+        <div class="why">
+          先選控制型態：<b>連續可控</b>（定位/變速）或 <b>兩段式</b>（推到底/放開）。
+          再看你要的是角度定位、位置定位、還是純力量/速度。
+        </div>
+        <div class="chips" style="margin-top:8px;">
+          <div class="chip" data-act="servo">
+            <div class="t">🧩 舵機</div>
+            <div class="d">最直覺角度定位；適合教學關節、夾爪驅動</div>
+          </div>
+          <div class="chip" data-act="motor">
+            <div class="t">⚙️ DC 減速馬達</div>
+            <div class="d">速度/力量彈性大；適合連續動作（需回授更穩）</div>
+          </div>
+          <div class="chip" data-act="stepper">
+            <div class="t">🟦 步進馬達</div>
+            <div class="d">定位穩、控制簡單；速度較保守，適合滑台/慢速機構</div>
+          </div>
+          <div class="chip" data-act="pneumatic">
+            <div class="t">🟨 氣壓</div>
+            <div class="d">兩段式、力大；適合快速夾緊/推料（控制是 ON/OFF）</div>
+          </div>
+        </div>
+        <div class="callout" style="margin-top:10px;">
+          <strong>工程提醒</strong>：原型先選「可預期」的致動器。越強越容易撞壞機構；先把幾何與行程做順。
+        </div>
+      `;
+            actuatorBox.appendChild(div);
+
+            // wire chips
+            actuatorBox.querySelectorAll(".chip").forEach(ch => {
+                ch.addEventListener("click", () => {
+                    actuatorBox.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+                    ch.classList.add("active");
+                    state.act = ch.dataset.act;
+                    updateMeters();
+                });
+            });
+        }
+
+        function updatePrimaryCTA() {
+            // enable going to fourbar only when motion chosen and recommended mech is fourbar OR user picked fourbar
+            const ok = (state.motion === "swing") && (state.mech === "fourbar" || state.mech === null);
+            // If user hasn't picked a mech yet but motion is swing, still allow the fourbar tool
+            const allow = (state.motion === "swing");
+            if (allow) {
+                goFourbar.style.pointerEvents = "auto";
+                goFourbar.setAttribute("aria-disabled", "false");
+                goFourbar.classList.add("primary");
+                goFourbar.classList.remove("ghost");
+            } else {
+                goFourbar.style.pointerEvents = "none";
+                goFourbar.setAttribute("aria-disabled", "true");
+                goFourbar.classList.remove("primary");
+                goFourbar.classList.add("ghost");
+            }
+        }
+
+        function updateMeters() {
+            // quick heuristics, not physics
+            let geom = 0, cam = 0, act = 0;
+
+            if (!state.motion) {
+                setMeter(mGeom, mGeomTxt, 0);
+                setMeter(mCam, mCamTxt, 0);
+                setMeter(mAct, mActTxt, 0);
+                return;
+            }
+
+            // geometry feasibility
+            if (state.motion === "swing") geom = 85;
+            if (state.motion === "linear") geom = 75;
+            if (state.motion === "recip") geom = 70;
+            if (state.motion === "translate") geom = 65;
+
+            // CAM friendliness (prototype)
+            if (state.motion === "swing") cam = 90;       // link-based
+            if (state.motion === "linear") cam = 85;      // crank-slider link parts
+            if (state.motion === "recip") cam = 80;
+            if (state.motion === "translate") cam = 70;   // more rails/belts etc.
+
+            // actuator match (control difficulty)
+            // servo easiest for swing; stepper decent for translate; pneumatic is simple but limited
+            if (!state.act) act = 0;
+            else if (state.act === "servo") act = (state.motion === "swing") ? 90 : 70;
+            else if (state.act === "motor") act = 75;
+            else if (state.act === "stepper") act = (state.motion === "translate") ? 85 : 75;
+            else if (state.act === "pneumatic") act = 70;
+
+            // if user chose a specific mechanism, tweak a bit
+            if (state.mech === "fourbar") { geom = 88; cam = 92; }
+            if (state.mech === "crankslider") { geom = 78; cam = 88; }
+            if (state.mech === "cam") { geom = 70; cam = 55; }
+
+            setMeter(mGeom, mGeomTxt, geom);
+            setMeter(mCam, mCamTxt, cam);
+            setMeter(mAct, mActTxt, act);
+        }
+
+        // Motion chip click
+        motionChips.forEach(ch => {
+            ch.addEventListener("click", () => {
+                motionChips.forEach(c => c.classList.remove("active"));
+                ch.classList.add("active");
+                state.motion = ch.dataset.motion;
+                renderRecommendations();
+                renderActuatorDecision();
+                updateMeters();
+                updatePrimaryCTA();
+            });
+        });
+
+        document.getElementById("resetBtn").addEventListener("click", resetAll);
+
+        // Initialize
+        resetAll();
+    </script>
 </body>
 
 </html>

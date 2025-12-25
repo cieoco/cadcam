@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title id="pageTitle">機構模擬工具</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <style>
+        /* Template-specific styles */
+        .nav-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px;
+            margin: -16px -16px 16px -16px;
+        }
+
+        .nav-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-back {
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-title {
+            color: white;
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .mechanism-icon {
+            font-size: 24px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation Header -->
+    <div class="nav-header">
+        <div class="nav-content">
+            <div>
+                <a href="index.html" class="nav-back">
+                    <span style="font-size: 20px;">←</span>
+                    <span>返回機構選單</span>
+                </a>
+            </div>
+            <h2 class="nav-title">
+                <span class="mechanism-icon" id="mechIcon">🔗</span>
+                <span id="mechName">機構設計</span>
+            </h2>
+            <div style="width: 100px;"></div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left Panel: Parameters -->
+        <div class="card">
+            <!-- Mechanism-specific parameters will be injected here -->
+            <div id="parametersPanel"></div>
+
+            <!-- Common: Animation Controls -->
+            <div style="height:10px"></div>
+            <h3>② 動畫控制</h3>
+            <div class="grid">
+                <div>
+                    <label>動畫速度（RPM）</label>
+                    <input id="animSpeed" type="number" min="1" max="120" step="1" value="10" />
+                </div>
+                <div class="flex-end">
+                    <button id="btnPlayAnim" class="btn-play" style="flex:1;">▶ 播放</button>
+                    <button id="btnPauseAnim" class="btn-pause" style="flex:1;" disabled>⏸ 暫停</button>
+                    <button id="btnStopAnim" class="btn-stop" style="flex:1;" disabled>⏹ 停止</button>
+                </div>
+            </div>
+
+            <!-- Common: Part Specifications -->
+            <div style="height:10px"></div>
+            <h3>③ 桿件外形</h3>
+            <div id="partSpecsPanel"></div>
+
+            <!-- Common: Machining Parameters -->
+            <div style="height:10px"></div>
+            <h3>④ 加工設定（GRBL / 3018）</h3>
+            <div class="grid">
+                <div>
+                    <label>工作範圍 X（mm）</label>
+                    <input id="workX" type="number" value="300" />
+                </div>
+                <div>
+                    <label>工作範圍 Y（mm）</label>
+                    <input id="workY" type="number" value="180" />
+                </div>
+                <div>
+                    <label>刀徑（mm）</label>
+                    <input id="toolD" type="number" min="0.5" max="10" step="0.1" value="3.0" />
+                </div>
+                <div>
+                    <label>材料厚度 T（mm）</label>
+                    <input id="thickness" type="number" min="1" max="30" step="0.1" value="3.0" />
+                </div>
+                <div>
+                    <label>穿透餘量（mm）</label>
+                    <input id="overcut" type="number" min="0" max="2" step="0.1" value="0.5" />
+                </div>
+                <div>
+                    <label>每層下刀 stepdown（mm）</label>
+                    <input id="stepdown" type="number" min="0.1" max="5" step="0.1" value="0.5" />
+                </div>
+                <div>
+                    <label>SAFE_Z（mm）</label>
+                    <input id="safeZ" type="number" min="1" max="30" step="0.5" value="5" />
+                </div>
+                <div>
+                    <label>Feed XY（mm/min）</label>
+                    <input id="feedXY" type="number" min="50" max="3000" step="10" value="400" />
+                </div>
+                <div>
+                    <label>Feed Z（mm/min）</label>
+                    <input id="feedZ" type="number" min="30" max="2000" step="10" value="100" />
+                </div>
+                <div>
+                    <label>主軸 S（可空白）</label>
+                    <input id="spindle" type="number" min="1000" max="30000" step="100" placeholder="例如 12000" />
+                </div>
+            </div>
+
+            <div class="btnrow">
+                <button id="btnGen">生成 G-code</button>
+            </div>
+
+            <div style="height:10px"></div>
+            <div class="note">
+                <div class="warn">注意：v0.1 不含 tabs。外形切完零件可能鬆脫，請用雙面膠/壓板固定。</div>
+                <div>預設：G21 / G90 / SAFE_Z 先抬刀、先鑽孔後外形、多層 stepdown。</div>
+            </div>
+
+            <div style="height:10px"></div>
+            <h3>輸出 / 訊息</h3>
+            <div id="log" class="card" style="padding:10px; background:#fafafa;"></div>
+            <div class="btnrow" id="dlButtons"></div>
+        </div>
+
+        <!-- Right Panel: Visualization -->
+        <div>
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin:0;">2D 模擬</h3>
+                    <button class="primary" id="btnUpdate">更新模擬 / 預覽</button>
+                </div>
+                <div id="svgWrap"></div>
+                <div class="note" style="margin-top:8px;" id="simNotes">
+                    <!-- Mechanism-specific notes -->
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:16px;">
+                <h3>零件排版預覽</h3>
+                <div id="partsWrap"></div>
+                <div class="note" style="margin-top:8px;">
+                    零件排版在工作區（0..X, 0..Y），每根各自輸出一份 G-code。
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mechanism-specific script will be loaded dynamically -->
+    <script type="module" id="mechanismScript"></script>
+</body>
+
+</html>

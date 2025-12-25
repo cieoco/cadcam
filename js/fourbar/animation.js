@@ -164,10 +164,15 @@ function animateFrame(degreesPerFrame, motorType, updateCallback) {
  * 設定馬達類型變更處理
  */
 export function setupMotorTypeHandler() {
-    $("motorType").addEventListener("change", (e) => {
+    const motorType = $("motorType");
+    if (!motorType) return;
+
+    motorType.addEventListener("change", (e) => {
         const type = e.target.value;
         const sweepStart = $("sweepStart");
         const sweepEnd = $("sweepEnd");
+
+        if (!sweepStart || !sweepEnd) return;
 
         switch (type) {
             case "motor360":
@@ -196,5 +201,5 @@ export function setupMotorTypeHandler() {
     });
 
     // 初始化
-    $("motorType").dispatchEvent(new Event("change"));
+    motorType.dispatchEvent(new Event("change"));
 }
