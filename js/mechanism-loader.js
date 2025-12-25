@@ -3,7 +3,7 @@
  * 通用機構頁面載入器
  */
 
-import { getMechanismFromURL, generateParameterHTML } from './mechanism-config.js';
+import { getMechanismFromURL, generateParameterHTML, MECHANISMS } from './mechanism-config.js';
 import { setupUIHandlers } from './ui/controls.js';
 
 /**
@@ -18,6 +18,27 @@ async function initMechanismPage() {
   document.getElementById('pageTitle').textContent = `${mech.name} - 機構模擬工具`;
   document.getElementById('mechIcon').textContent = mech.icon;
   document.getElementById('mechName').textContent = mech.name;
+
+  // 建立機構選擇器
+  const selectorContainer = document.getElementById('mechSelectorContainer');
+  if (selectorContainer) {
+    let selectHTML = '<select id="mechTypeSelector" style="padding: 6px 12px; font-size: 14px; border-radius: 4px; border: 1px solid #ccc; background-color: white; cursor: pointer;">';
+    for (const key in MECHANISMS) {
+      const m = MECHANISMS[key];
+      const isSelected = m.id === mech.id ? 'selected' : '';
+      selectHTML += `<option value="${m.id}" ${isSelected}>${m.icon} ${m.name}</option>`;
+    }
+    selectHTML += '</select>';
+    selectorContainer.innerHTML = selectHTML;
+
+    // 監聽切換事件
+    document.getElementById('mechTypeSelector').addEventListener('change', (e) => {
+      const newType = e.target.value;
+      const url = new URL(window.location);
+      url.searchParams.set('type', newType);
+      window.location.href = url.toString();
+    });
+  }
 
   // 生成參數輸入面板
   const parametersPanel = document.getElementById('parametersPanel');
