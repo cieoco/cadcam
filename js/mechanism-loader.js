@@ -67,7 +67,8 @@ async function initMechanismPage() {
       config: mech
     };
 
-    // 設定 UI 處理器
+    // 設定 UI 處理器 - 延遲執行確保所有元素就緒
+    await new Promise(resolve => setTimeout(resolve, 150));
     setupUIHandlers();
 
     console.log('Mechanism modules loaded successfully');

@@ -105,61 +105,43 @@ export function createRackPath({
     module,
     pressureAngle = 20
 }) {
-    const m = module;
-    const L = length;
-    const H = height; // 被高
-    const alpha = (pressureAngle * Math.PI) / 180;
+    const m = Number(module) || 2;
+    const L = Number(length) || 200;
+    const H = Number(height) || 20;
+    const alpha = (Number(pressureAngle) * Math.PI) / 180;
 
     const pitch = Math.PI * m;
     const addendum = m;
     const dedendum = 1.25 * m;
+    const dx = addendum * Math.tan(alpha);
 
     const points = [];
 
-    // 齒條從 x = -L/2 到 L/2
-    // 節線在 y = 0
-    // 所以頂部齒尖在 y = addendum，齒底部在 y = -dedendum
-    // 總高度還包含背高 H，所以底部在 y = -dedendum - H
-
-    // 1. 產生齒部 (Top)
+    // 從左到右產生齒形
     const numTeeth = Math.ceil(L / pitch) + 2;
-    const startX = - (numTeeth * pitch) / 2;
+    const startX = -L / 2 - pitch;
 
     for (let i = 0; i < numTeeth; i++) {
-        const xOuter = startX + i * pitch;
-
-        // 基本梯形齒形：
-        // 齒頂寬 = p/2 - 2 * addendum * tan(alpha)
-        const topWidth = (pitch / 2) - 2 * addendum * Math.tan(alpha);
-
-        const p1 = { x: xOuter - pitch / 4 - addendum * Math.tan(alpha), y: addendum };
-        const p2 = { x: xOuter + pitch / 4 + addendum * Math.tan(alpha), y: addendum }; // 這裡算錯了，重修
+        const x = startX + i * pitch;
+        
+        // 每個齒的四個關鍵點（逆時針）
+        points.push({ x: x - pitch / 4 - dx, y: -dedendum });
+        points.push({ x: x - pitch / 4 + dx, y: addendum });
+        points.push({ x: x + pitch / 4 - dx, y: addendum });
+        points.push({ x: x + pitch / 4 + dx, y: -dedendum });
     }
 
-    // 重新實作簡易版本：直接輸出頂點
-    const gearPoints = [];
-    const halfP = pitch / 2;
-    const dx = addendum * Math.tan(alpha);
+    // 只保留在範圍內的點
+    const filtered = points.filter(p => p.x >= -L / 2 - 10 && p.x <= L / 2 + 10);
 
-    for (let x = -L / 2 - pitch; x <= L / 2 + pitch; x += pitch) {
-        // 梯形齒關鍵點：
-        // 1. 齒根左 (x - p/4 - dx, -dedendum)
-        // 2. 齒頂左 (x - p/4 + dx, addendum)
-        // 3. 齒頂右 (x + p/4 - dx, addendum)
-        // 4. 齒根右 (x + p/4 + dx, -dedendum)
-
-        gearPoints.push({ x: x - pitch / 4 - dx, y: -dedendum });
-        gearPoints.push({ x: x - pitch / 4 + dx, y: addendum });
-        gearPoints.push({ x: x + pitch / 4 - dx, y: addendum });
-        gearPoints.push({ x: x + pitch / 4 + dx, y: -dedendum });
+    // 閉合底部
+    if (filtered.length > 0) {
+        const rightMost = Math.max(...filtered.map(p => p.x));
+        const leftMost = Math.min(...filtered.map(p => p.x));
+        
+        filtered.push({ x: rightMost, y: -dedendum - H });
+        filtered.push({ x: leftMost, y: -dedendum - H });
     }
 
-    // 過濾超出長度的點並閉合基座
-    const finalPoints = gearPoints.filter(p => p.x >= -L / 2 && p.x <= L / 2);
-
-    // 加上基座四個角
-    finalPoints.push({ x: L / 2, y: -dedendum - H });
-    finalPoints.push({ x: -L / 2, y: -dedendum - H });
-
-    return finalPoints;
+    return filtered;
 }

@@ -238,6 +238,8 @@ function displaySweepResults(results, validRanges, invalidRanges, showTrajectory
  * 設定所有 UI 事件處理器
  */
 export function setupUIHandlers() {
+    console.log('Setting up UI handlers...');
+    
     // 按鈕綁定
     const btnUpdate = $("btnUpdate");
     if (btnUpdate) btnUpdate.onclick = updatePreview;
@@ -262,6 +264,16 @@ export function setupUIHandlers() {
         setupMotorTypeHandler();
     }
 
-    // 初始渲染
-    updatePreview();
+    // 初始渲染 - 立即執行
+    console.log('Calling initial updatePreview...');
+    try {
+        updatePreview();
+    } catch (e) {
+        console.error('Initial preview failed:', e);
+        // 如果失敗，再試一次
+        setTimeout(() => {
+            console.log('Retrying updatePreview...');
+            updatePreview();
+        }, 200);
+    }
 }

@@ -9,7 +9,7 @@ import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
 export function renderRackPinion(sol, thetaDeg, trajectoryData = null, viewParams = {}) {
     const W = 800, H = 600;
     const pad = 100;
-    const viewRange = viewParams.viewRange || 400;
+    const viewRange = Number(viewParams.viewRange) || 400;
     const scale = Math.min(W - 2 * pad, H - 2 * pad) / viewRange;
 
     // 座標轉換 (中心點 X=0 為齒輪嚙合點)
@@ -21,8 +21,8 @@ export function renderRackPinion(sol, thetaDeg, trajectoryData = null, viewParam
 
     const { isValid, pinion, rack } = sol;
     const { pitchRadius: R, m, N } = pinion;
-    const L = rack.length;
-    const disp = rack.displacement;
+    const L = Number(rack.length) || 200;
+    const disp = Number(rack.displacement) || 0;
 
     // 1. 繪製導軌
     svg.appendChild(svgEl("line", {
@@ -30,47 +30,61 @@ export function renderRackPinion(sol, thetaDeg, trajectoryData = null, viewParam
     }));
 
     // 2. 齒條 (Rack) - 同步平移
-    // createRackPath 產生的齒條中心在 0，範圍 [-L/2, L/2]
-    // 我們需要將它左移 L/2 到 [0, L]，然後加上位移 disp
     const rackPts = createRackPath({ length: L, height: 20, module: m });
-    const rackPointsStr = rackPts.map(p => `${tx(p.x + L / 2 - disp)},${ty(p.y)}`).join(' ');
+    
+    // 確保有有效的點
+    if (rackPts && rackPts.length > 0) {
+        const rackPointsStr = rackPts
+            .map(p => {
+                const px = p.x - disp;
+                const py = p.y;
+                return `${tx(px)},${ty(py)}`;
+            })
+            .filter(s => !s.includes('NaN'))
+            .join(' ');
 
-    svg.appendChild(svgEl("polygon", {
-        points: rackPointsStr,
-        fill: isValid ? "#3498db22" : "#e74c3c11",
-        stroke: isValid ? "#3498db" : "#e74c3c",
-        "stroke-width": 1.5
-    }));
+        if (rackPointsStr) {
+            svg.appendChild(svgEl("polygon", {
+                points: rackPointsStr,
+                fill: isValid ? "#3498db22" : "#e74c3c11",
+                stroke: isValid ? "#3498db" : "#e74c3c",
+                "stroke-width": 1.5
+            }));
+        }
+    }
 
     // 3. 齒輪 (Pinion) - 同步旋轉
     const gearPts = createGearPath({ teeth: N, module: m });
 
-    // 咬合角度校正：
-    // 1. 標準齒輪底部是 angle=-PI/2。
-    // 2. 隨 thetaDeg 旋轉。
-    // 3. 增加一個小偏移使齒尖剛好落入齒條槽。
-    const offsetAng = -Math.PI / 2; // 指向下方
-    const phaseShift = Math.PI / N; // 旋轉半個齒距來對齊
-    const ang = -(thetaDeg * Math.PI / 180) + offsetAng + phaseShift;
+    if (gearPts && gearPts.length > 0) {
+        const offsetAng = -Math.PI / 2;
+        const phaseShift = Math.PI / N;
+        const ang = -(Number(thetaDeg) * Math.PI / 180) + offsetAng + phaseShift;
 
-    const rotatedGearPts = gearPts.map(p => ({
-        x: p.x * Math.cos(ang) - p.y * Math.sin(ang),
-        y: p.x * Math.sin(ang) + p.y * Math.cos(ang)
-    }));
+        const rotatedGearPts = gearPts.map(p => ({
+            x: p.x * Math.cos(ang) - p.y * Math.sin(ang),
+            y: p.x * Math.sin(ang) + p.y * Math.cos(ang)
+        }));
 
-    const gearPointsStr = rotatedGearPts.map(p => `${tx(p.x)},${ty(p.y + R)}`).join(' ');
+        const gearPointsStr = rotatedGearPts
+            .map(p => `${tx(p.x)},${ty(p.y + R)}`)
+            .filter(s => !s.includes('NaN'))
+            .join(' ');
 
-    svg.appendChild(svgEl("polygon", {
-        points: gearPointsStr,
-        fill: "#e74c3c22",
-        stroke: "#e74c3c",
-        "stroke-width": 1.5
-    }));
+        if (gearPointsStr) {
+            svg.appendChild(svgEl("polygon", {
+                points: gearPointsStr,
+                fill: "#e74c3c22",
+                stroke: "#e74c3c",
+                "stroke-width": 1.5
+            }));
+        }
+    }
 
     // 軸心
     const gearCenter = { x: tx(0), y: ty(R) };
     svg.appendChild(svgEl("circle", {
-        cx: gearCenter.x, cy: gearCenter.y, r: 5 * scale / (W / 400),
+        cx: gearCenter.x, cy: gearCenter.y, r: 5,
         fill: "#fff", stroke: "#111", "stroke-width": 1
     }));
 
@@ -83,7 +97,7 @@ export function renderRackPinion(sol, thetaDeg, trajectoryData = null, viewParam
 
     const info = svgEl("text", { x: 20, y: 30, fill: "#333", "font-size": 13, "font-family": "monospace" });
     const travelDir = disp > 0 ? ">>>" : "<<<";
-    info.textContent = `Pinion: Fixed | Travel: ${(-disp).toFixed(1)}mm ${travelDir}`;
+    info.textContent = `Pinion: Fixed | Travel: ${fmt(-disp)}mm ${travelDir}`;
     svg.appendChild(info);
 
     return svg;
