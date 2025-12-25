@@ -484,23 +484,6 @@
                         </div>
                     </div>
 
-                    <div class="actions" style="margin-top:12px;">
-                        <!-- IMPORTANT:
-              - If you already have the old 4-bar page as docs/index.html, rename it to docs/fourbar.html
-              - Keep app.js same, and update that file's <script src="./app.js"> reference.
-            -->
-                        <a class="btn primary" id="goFourbar" href="./fourbar.html" aria-disabled="true">🚀 進入四連桿 2D 模擬
-                            → 生成 G-code</a>
-                        <button class="btn ghost" id="resetBtn">↺ 重設選擇</button>
-                        <a class="btn" href="./README.html" style="display:none;">📄 使用說明</a>
-                    </div>
-
-                    <div style="height:10px"></div>
-                    <div class="callout">
-                        <strong>部署提醒</strong>：你現在要「全放 GitHub Pages」是可行的。<br />
-                        你只需要把原本的四連桿工具頁改名成 <span class="mono">fourbar.html</span>，這個首頁用 <span
-                            class="mono">index.html</span>。
-                    </div>
                 </div>
             </div>
 
@@ -558,20 +541,7 @@
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="hd">
-                        <h2>下一步擴充路線（建議）</h2>
-                        <div class="step">v0.2+</div>
-                    </div>
-                    <div class="bd">
-                        <ul class="list">
-                            <li><b>曲柄滑塊</b>（直線/往復的最佳第二機構）</li>
-                            <li>θ sweep：顯示可行角度區間 + 軌跡 polyline</li>
-                            <li>輸出：加 <b>tabs</b> / 孔內插擴孔（hole pocket）</li>
-                            <li>零件：孔陣列、長槽、L 型桿</li>
-                        </ul>
-                    </div>
-                </div>
+
             </div>
         </div>
 
@@ -671,17 +641,6 @@
                     cta: "進入四連桿工具",
                     href: "./mechanism.html?type=fourbar",
                     enabled: true
-                });
-                recs.push({
-                    id: "parallelogram",
-                    name: "平行四邊形連桿",
-                    badge: "姿態保持 ★★★★☆",
-                    why: "末端姿態保持（抬升但不翻轉），很適合相機平台/平行夾爪。",
-                    pros: ["末端姿態穩定", "桿件化容易"],
-                    cons: ["需要多桿件/間隙要注意", "行程受限於幾何比例"],
-                    cta: "（下一版）",
-                    href: "#",
-                    enabled: false
                 });
             } else if (state.motion === "linear") {
                 recs.push({
