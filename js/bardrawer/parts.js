@@ -15,7 +15,7 @@ export function generateBarParts(params) {
             const c = p.split(',').map(s => parseFloat(s.trim()));
             if (c.length >= 2 && !isNaN(c[0]) && !isNaN(c[1])) {
                 // 如果座標中有第三個值則為該孔獨立直徑，否則回退到全局直徑
-                const d = c.length >= 3 ? c[2] : holeD;
+                const d = c.length >= 3 && !isNaN(c[2]) ? c[2] : holeD;
                 holes.push({ x: c[0], y: c[1], d: d });
             }
         });
@@ -50,7 +50,7 @@ export function generateBarParts(params) {
             rect: { x: xCursor, y: yCursor, w: barL, h: barW },
             // 這裡需要注意：目前 G-code 生成器對單一零件的 holes 陣列通常預設它是同一種大小
             // 如果 G-code 生成器不支援個別孔徑，我們至少在資料結構上準備好
-            holes: holes.map(h => ({ x: xCursor + h.x, y: yCursor + h.y })),
+            holes: holes.map(h => ({ x: xCursor + h.x, y: yCursor + h.y, d: h.d })),
             slots: slots.map(s => ({
                 x: xCursor + s.x,
                 y: yCursor + s.y,

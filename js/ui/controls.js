@@ -256,6 +256,16 @@ export function setupUIHandlers() {
     const btnStop = $("btnStopAnim");
     if (btnStop) btnStop.onclick = () => stopAnimation(updatePreview);
 
+    const viewRange = $("viewRange");
+    if (viewRange) {
+        viewRange.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                updatePreview();
+            }
+        });
+    }
+
     // 某些機構可能有特定的 handler
     const mods = getActiveModules();
     if (mods && mods.solver.setupMotorTypeHandler) {

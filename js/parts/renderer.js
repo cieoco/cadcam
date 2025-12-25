@@ -89,11 +89,12 @@ export function renderPartsLayout(parts, workX, workY) {
 
         // 孔洞
         for (const h of p.holes) {
+            const holeD = Number.isFinite(h.d) ? h.d : p.holeD;
             svg.appendChild(
                 svgEl("circle", {
                     cx: tx(h.x),
                     cy: ty(h.y),
-                    r: (p.holeD / 2) * scale,
+                    r: (holeD / 2) * scale,
                     fill: "none",
                     stroke: "#111",
                     "stroke-width": 1,

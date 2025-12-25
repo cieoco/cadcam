@@ -437,7 +437,7 @@
         <header>
             <div class="brand">
                 <h1>機構快速原型工具</h1>
-                <p>先定運動 → 選機構 → 選致動器 → 最後才做工程粗估與加工（GRBL / 3018）。</p>
+                <p>先定運動 → 選機構 → 選致動器 → 最後才做工程粗估與加工</p>
             </div>
 
         </header>
@@ -648,8 +648,7 @@
         <div class="actions">
           <a class="btn ${enabled ? "primary" : ""}" href="${enabled ? href : "#"}" ${enabled ? "" : "onclick='return false;'"}>
             ${cta}
-          </a>
-          <button class="btn ghost" data-pick="${id}">選這個機構</button>
+          </a>          
         </div>
       `;
             return div;
@@ -674,7 +673,7 @@
                     pros: ["夾爪/擺臂/抬升常見", "2D 模擬最直覺", "桿件 CNC 切割最友善"],
                     cons: ["不是每個角度都可行（需可行區間）", "open/crossed 需鎖定解"],
                     cta: "進入四連桿工具",
-                    href: "./fourbar.html",
+                    href: "./mechanism.html?type=fourbar",
                     enabled: true
                 });
             } else if (state.motion === "linear") {

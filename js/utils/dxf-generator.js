@@ -61,7 +61,8 @@ export function buildDXF(parts) {
 
         // 孔洞
         for (const hole of p.holes) {
-            addCircle(lines, hole.x, hole.y, p.holeD / 2);
+            const holeD = Number.isFinite(hole.d) ? hole.d : p.holeD;
+            addCircle(lines, hole.x, hole.y, holeD / 2);
         }
     }
 
