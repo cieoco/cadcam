@@ -4,6 +4,8 @@
  */
 
 import { DRIVE_COMPONENTS, getDriveOptions } from './motor-data.js';
+import { JANSEN_TOPOLOGY as JANSEN_TOPOLOGY_DEFAULT } from './jansen/topology.js'; // Import default value
+
 
 export const MECHANISMS = {
     fourbar: {
@@ -519,6 +521,71 @@ export const MECHANISMS = {
         partsFn: 'generateRackPinionParts'
     },
 
+    multilink: {
+        id: 'multilink',
+        name: '多連桿機構模擬 (Multilink)',
+        icon: '🕸️',
+        description: '通用多連桿模擬器 - 可自定義拓撲結構',
+
+        parameters: [
+            // Drive
+            { id: 'theta', label: '曲柄角度 θ', type: 'number', min: -360, max: 360, step: 1, default: 0, unit: '度' },
+            { id: 'motorType', label: '驅動元件', type: 'select', options: getDriveOptions(), default: 'tt_motor' },
+
+            // Topology Editor
+            {
+                id: 'topology',
+                label: '拓撲結構定義 (JSON)',
+                type: 'textarea',
+                rows: 15,
+                default: JSON.stringify(JANSEN_TOPOLOGY_DEFAULT, null, 2)
+            },
+
+            // Geometry (Holy Numbers)
+            { id: 'm', label: 'm (Crank)', type: 'number', min: 10, max: 100, default: 15, unit: 'mm', color: '#e74c3c' },
+            { id: 'j', label: 'j (Crank-Upper)', type: 'number', min: 30, max: 100, default: 50, unit: 'mm' },
+            { id: 'b', label: 'b (Fixed-Upper)', type: 'number', min: 30, max: 100, default: 41.5, unit: 'mm' },
+            { id: 'k', label: 'k (Crank-Lower)', type: 'number', min: 30, max: 100, default: 61.9, unit: 'mm' },
+            { id: 'c', label: 'c (Fixed-Lower)', type: 'number', min: 30, max: 100, default: 39.3, unit: 'mm' },
+
+            { id: 'e', label: 'e (Upper-Shoulder)', type: 'number', min: 30, max: 100, default: 55.8, unit: 'mm' },
+            { id: 'd', label: 'd (Lower-Shoulder)', type: 'number', min: 30, max: 100, default: 40.1, unit: 'mm' },
+
+            { id: 'f', label: 'f (Upper-Corner)', type: 'number', min: 30, max: 100, default: 39.4, unit: 'mm' },
+            { id: 'a_len', label: 'a (Corner-Shoulder)', type: 'number', min: 30, max: 100, default: 38, unit: 'mm' },
+
+            { id: 'h', label: 'h (Corner-Foot)', type: 'number', min: 30, max: 100, default: 65.7, unit: 'mm' },
+            { id: 'i', label: 'i (Lower-Foot)', type: 'number', min: 30, max: 100, default: 49, unit: 'mm' },
+
+            // Sweep
+            { id: 'sweepStart', label: '起始角度', type: 'number', min: -360, max: 360, default: -360 },
+            { id: 'sweepEnd', label: '結束角度', type: 'number', min: -360, max: 360, default: 360 },
+            { id: 'sweepStep', label: '掃描間隔', type: 'number', min: 1, max: 10, default: 2 },
+            { id: 'showTrajectory', label: '顯示軌跡 (Foot)', type: 'checkbox', default: true }
+        ],
+
+        partSpecs: [
+            { id: 'barW', label: '連桿寬度', type: 'number', min: 5, max: 30, default: 12, unit: 'mm' },
+            { id: 'margin', label: '孔邊距', type: 'number', min: 3, max: 15, default: 6, unit: 'mm' },
+            { id: 'holeD', label: '孔徑', type: 'number', min: 2, max: 10, default: 3.2, unit: 'mm' },
+            { id: 'spacing', label: '排版間距', type: 'number', min: 2, max: 20, default: 5, unit: 'mm' }
+        ],
+
+        simNotes: `
+            <strong>🦀 仿生獸機構 (Strandbeest Leg)</strong><br/>
+            基於 Theo Jansen 的神聖數據 (Holy Numbers)。<br/>
+            這是一個單自由度機構，由 11 根連桿組成，能將旋轉運動轉換為類似動物行走的步態。<br/>
+            軌跡點為腳底 (P5)。
+        `,
+
+        solverModule: './jansen/solver.js',
+        solveFn: 'solveJansen',
+        visualizationModule: './jansen/visualization.js',
+        renderFn: 'renderJansen',
+        partsModule: './jansen/parts.js',
+        partsFn: 'generateJansenParts'
+    },
+
     bardrawer: {
         id: 'bardrawer',
         name: '桿件繪圖工具',
@@ -626,6 +693,8 @@ export function generateParameterHTML(params) {
                     html += `<option value="${opt.value}" ${selected}>${opt.label}</option>`;
                 }
                 html += `</select>`;
+            } else if (param.type === 'textarea') {
+                html += `<textarea id="${param.id}" rows="${param.rows || 10}" style="width:100%; font-family:monospace; font-size:12px; white-space:pre;">${param.default || ''}</textarea>`;
             } else {
                 html += `<input id="${param.id}" type="${param.type}" `;
                 if (param.min !== undefined) html += `min="${param.min}" `;

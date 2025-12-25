@@ -45,6 +45,7 @@ async function initMechanismPage() {
   parametersPanel.innerHTML = `
     <h3>① ${mech.name}參數</h3>
     ${generateParameterHTML(mech.parameters)}
+    <div id="dynamicParamsContainer"></div>
     
     <div style="height:10px"></div>
     <h3>模擬設定</h3>

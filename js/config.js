@@ -43,6 +43,7 @@ export function readInputs() {
         // 通用
         thetaDeg: Number($("theta")?.value || 0),
         motorType: $("motorType")?.value || "",
+        topology: $("topology")?.value || "", // Multilink JSON
     };
 
     // 零件規格參數

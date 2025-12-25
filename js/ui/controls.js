@@ -22,6 +22,85 @@ function getActiveModules() {
 }
 
 /**
+ * 處理動態參數生成
+ */
+function updateDynamicParams() {
+    const topoEl = document.getElementById('topology');
+    const container = document.getElementById('dynamicParamsContainer');
+    if (!topoEl || !container) return;
+
+    let jsonStr = topoEl.value;
+    let topology;
+    try {
+        topology = JSON.parse(jsonStr);
+    } catch (e) {
+        // JSON 無效時不更新參數 UI，避免打字時頻繁跳動
+        return;
+    }
+
+    // 1. 掃描所有使用的變數名稱 (以 _param 結尾)
+    const vars = new Set();
+    const scan = (obj) => {
+        if (!obj || typeof obj !== 'object') return;
+        for (const k in obj) {
+            if (k.endsWith('_param') && typeof obj[k] === 'string') {
+                vars.add(obj[k]);
+            } else if (typeof obj[k] === 'object') {
+                scan(obj[k]);
+            }
+        }
+    };
+    scan(topology);
+
+    // 2. 移除已經沒用到的動態參數 (注意：不要移除 mechanism-config 定義的靜態參數)
+    const existingDynamic = container.querySelectorAll('.dynamic-param-wrapper');
+    existingDynamic.forEach(div => {
+        const id = div.dataset.varId;
+        if (!vars.has(id)) {
+            div.remove();
+        } else {
+            vars.delete(id); // 已存在，從待新增清單移除
+        }
+    });
+
+    // 3. 新增缺少的參數
+    vars.forEach(varName => {
+        // 檢查是否已存在於主面板 (靜態定義)
+        if (document.getElementById(varName)) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'dynamic-param-wrapper';
+        wrapper.dataset.varId = varName;
+        wrapper.style.marginBottom = '8px';
+
+        wrapper.innerHTML = `
+            <label style="display:block; font-size:12px; color:#555;">${varName} (mm)</label>
+            <div style="display:flex; align-items:center;">
+                <input type="number" id="${varName}" value="50" step="0.1" style="flex:1; padding:4px;" class="dynamic-input">
+                <input type="range" id="${varName}_range" value="50" min="10" max="200" step="1" style="flex:1; margin-left:8px;">
+            </div>
+        `;
+        container.appendChild(wrapper);
+
+        // 綁定聯動
+        const numInput = wrapper.querySelector('input[type="number"]');
+        const rangeInput = wrapper.querySelector('input[type="range"]');
+
+        numInput.oninput = () => {
+            rangeInput.value = numInput.value;
+            // 重要：一定要觸發 updatePreview
+            if (window.updatePreviewDebounced) window.updatePreviewDebounced();
+            else updatePreview();
+        };
+        rangeInput.oninput = () => {
+            numInput.value = rangeInput.value;
+            if (window.updatePreviewDebounced) window.updatePreviewDebounced();
+            else updatePreview();
+        };
+    });
+}
+
+/**
  * 更新預覽
  */
 export function updatePreview() {
@@ -29,9 +108,22 @@ export function updatePreview() {
         const mods = getActiveModules();
         if (!mods) return; // 還沒載入完
 
-        const { mech, partSpec, mfg } = readInputs();
+        const { mech, partSpec, mfg } = readInputs(); // 這會讀取 document.getElementById 的值，包含動態生成的
+        // readInputs 可能只讀取 config 定義的參數。我們需要把動態參數補進 mech。
+
+        // 補充讀取 dynamicParams
+        const dynContainer = document.getElementById('dynamicParamsContainer');
+        if (dynContainer) {
+            const inputs = dynContainer.querySelectorAll('input[type="number"]');
+            inputs.forEach(inp => {
+                mech[inp.id] = parseFloat(inp.value) || 0;
+            });
+        }
+
         const viewParams = readViewParams();
         viewParams.motorType = mech.motorType;
+        viewParams.topology = mech.topology; // 傳遞拓撲字串供視覺化使用
+
         validateConfig(mech, partSpec, mfg);
 
         // 使用動態模組的求解器
@@ -94,6 +186,15 @@ export function generateGcodes() {
         if (!mods) return;
 
         const { mech, partSpec, mfg } = readInputs();
+        // 補充 dynamic params logic duplicated (should factor out but simplicity for now)
+        const dynContainer = document.getElementById('dynamicParamsContainer');
+        if (dynContainer) {
+            const inputs = dynContainer.querySelectorAll('input[type="number"]');
+            inputs.forEach(inp => {
+                mech[inp.id] = parseFloat(inp.value) || 0;
+            });
+        }
+
         validateConfig(mech, partSpec, mfg);
 
         // 確保目前參數是有解的
@@ -158,6 +259,15 @@ export function performSweepAnalysis() {
         if (!mods) return;
 
         const { mech, partSpec, mfg } = readInputs();
+        // Dynamic params injection
+        const dynContainer = document.getElementById('dynamicParamsContainer');
+        if (dynContainer) {
+            const inputs = dynContainer.querySelectorAll('input[type="number"]');
+            inputs.forEach(inp => {
+                mech[inp.id] = parseFloat(inp.value) || 0;
+            });
+        }
+
         validateConfig(mech, partSpec, mfg);
 
         const sweepParams = readSweepParams();
@@ -230,9 +340,6 @@ function displaySweepResults(results, validRanges, invalidRanges, showTrajectory
     if (stats) {
         html += `<br/><strong>軌跡行程：</strong> X: ${fmt(stats.rangeX)} mm, Y: ${fmt(stats.rangeY)} mm<br/>`;
     }
-
-    // 注意：原本的 controls.js 有處理 trajectoryWrap，但模板中可能沒有單獨的 DIV
-    // 這裡我們主要靠 updatePreview 疊加渲染
 }
 
 /**
@@ -265,6 +372,19 @@ export function setupUIHandlers() {
                 updatePreview();
             }
         });
+    }
+
+    // Dynamic params listener
+    const topologyArea = document.getElementById('topology');
+    if (topologyArea) {
+        topologyArea.addEventListener('input', () => {
+            updateDynamicParams();
+            // Don't auto-update preview on every char, might be valid logic but invalid values
+            // Let the user adjust params or click update.
+            // But if the topology structure is valid, we could try.
+        });
+        // Initial scan
+        updateDynamicParams();
     }
 
     // 某些機構可能有特定的 handler
