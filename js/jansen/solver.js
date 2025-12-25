@@ -2,7 +2,7 @@
  * Jansen Mechanism - Uses Generic Multilink Solver
  */
 
-import { solveTopology, sweepTopology, calculateTrajectoryStats as calcStats } from '../multilink/solver.js';
+import { solveTopology, sweepTopology, calculateTrajectoryStats } from '../multilink/solver.js';
 import { JANSEN_TOPOLOGY } from './topology.js';
 
 export function solveJansen(params) {
@@ -28,18 +28,4 @@ export function sweepTheta(params, startDeg, endDeg, stepDeg) {
     return sweepTopology(topology, params, startDeg, endDeg, stepDeg);
 }
 
-export function calculateTrajectoryStats(results) {
-    const validPoints = results.filter(r => r.isValid && r.B).map(r => r.B);
-    if (validPoints.length === 0) return null;
-
-    const xs = validPoints.map(p => p.x);
-    const ys = validPoints.map(p => p.y);
-    const minX = Math.min(...xs), maxX = Math.max(...xs);
-    const minY = Math.min(...ys), maxY = Math.max(...ys);
-
-    return {
-        rangeX: maxX - minX,
-        rangeY: maxY - minY,
-        totalRange: Math.hypot(maxX - minX, maxY - minY)
-    };
-}
+export { calculateTrajectoryStats };

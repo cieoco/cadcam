@@ -19,7 +19,7 @@ export function renderFourbar(sol, thetaDeg, trajectoryData = null, viewParams =
         H = 600;
     const pad = 50;
 
-    const viewRange = viewParams.viewRange || 400;
+    const viewRange = viewParams.viewRange || 800;
     const showGrid = viewParams.showGrid !== false;
 
     // 固定中心：將 ground link (O2-O4) 水平置中

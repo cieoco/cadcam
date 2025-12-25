@@ -25,7 +25,8 @@ export const MECHANISMS = {
                 step: 1,
                 default: 120,
                 unit: 'mm',
-                color: '#666'
+                color: '#666',
+                isDynamic: true
             },
             {
                 id: 'b',
@@ -36,7 +37,8 @@ export const MECHANISMS = {
                 step: 1,
                 default: 60,
                 unit: 'mm',
-                color: '#e74c3c'
+                color: '#e74c3c',
+                isDynamic: true
             },
             {
                 id: 'c',
@@ -47,7 +49,8 @@ export const MECHANISMS = {
                 step: 1,
                 default: 110,
                 unit: 'mm',
-                color: '#3498db'
+                color: '#3498db',
+                isDynamic: true
             },
             {
                 id: 'd',
@@ -58,7 +61,8 @@ export const MECHANISMS = {
                 step: 1,
                 default: 80,
                 unit: 'mm',
-                color: '#27ae60'
+                color: '#27ae60',
+                isDynamic: true
             },
             {
                 id: 'assembly',
@@ -211,7 +215,8 @@ export const MECHANISMS = {
                 step: 1,
                 default: 30,
                 unit: 'mm',
-                color: '#e74c3c'
+                color: '#e74c3c',
+                isDynamic: true
             },
             {
                 id: 'rodLength',
@@ -222,7 +227,8 @@ export const MECHANISMS = {
                 step: 1,
                 default: 100,
                 unit: 'mm',
-                color: '#3498db'
+                color: '#3498db',
+                isDynamic: true
             },
             {
                 id: 'theta',
@@ -382,7 +388,8 @@ export const MECHANISMS = {
                 step: 1,
                 default: 20,
                 unit: '齒',
-                color: '#e74c3c'
+                color: '#e74c3c',
+                isDynamic: true
             },
             {
                 id: 'module',
@@ -393,7 +400,8 @@ export const MECHANISMS = {
                 step: 0.1,
                 default: 2,
                 unit: 'mm',
-                color: '#3498db'
+                color: '#3498db',
+                isDynamic: true
             },
             {
                 id: 'theta',
@@ -528,9 +536,14 @@ export const MECHANISMS = {
         description: '通用多連桿模擬器 - 可自定義拓撲結構',
 
         parameters: [
-            // Drive
-            { id: 'theta', label: '曲柄角度 θ', type: 'number', min: -360, max: 360, step: 1, default: 0, unit: '度' },
-            { id: 'motorType', label: '驅動元件', type: 'select', options: getDriveOptions(), default: 'tt_motor' },
+            // Wizard Container
+            {
+                id: 'wizardPlaceholder',
+                label: '✨ 機構建構精靈 (Wizard)',
+                type: 'custom',
+                fullWidth: true,
+                render: () => '<div id="wizardContainer"></div>'
+            },
 
             // Topology Editor
             {
@@ -538,30 +551,19 @@ export const MECHANISMS = {
                 label: '拓撲結構定義 (JSON)',
                 type: 'textarea',
                 rows: 15,
+                fullWidth: true,
                 default: JSON.stringify(JANSEN_TOPOLOGY_DEFAULT, null, 2)
             },
 
-            // Geometry (Holy Numbers)
-            { id: 'm', label: 'm (Crank)', type: 'number', min: 10, max: 100, default: 15, unit: 'mm', color: '#e74c3c' },
-            { id: 'j', label: 'j (Crank-Upper)', type: 'number', min: 30, max: 100, default: 50, unit: 'mm' },
-            { id: 'b', label: 'b (Fixed-Upper)', type: 'number', min: 30, max: 100, default: 41.5, unit: 'mm' },
-            { id: 'k', label: 'k (Crank-Lower)', type: 'number', min: 30, max: 100, default: 61.9, unit: 'mm' },
-            { id: 'c', label: 'c (Fixed-Lower)', type: 'number', min: 30, max: 100, default: 39.3, unit: 'mm' },
-
-            { id: 'e', label: 'e (Upper-Shoulder)', type: 'number', min: 30, max: 100, default: 55.8, unit: 'mm' },
-            { id: 'd', label: 'd (Lower-Shoulder)', type: 'number', min: 30, max: 100, default: 40.1, unit: 'mm' },
-
-            { id: 'f', label: 'f (Upper-Corner)', type: 'number', min: 30, max: 100, default: 39.4, unit: 'mm' },
-            { id: 'a_len', label: 'a (Corner-Shoulder)', type: 'number', min: 30, max: 100, default: 38, unit: 'mm' },
-
-            { id: 'h', label: 'h (Corner-Foot)', type: 'number', min: 30, max: 100, default: 65.7, unit: 'mm' },
-            { id: 'i', label: 'i (Lower-Foot)', type: 'number', min: 30, max: 100, default: 49, unit: 'mm' },
+            // Drive
+            { id: 'theta', label: '曲柄角度 θ', type: 'number', min: -360, max: 360, step: 1, default: 0, unit: '度' },
+            { id: 'motorType', label: '驅動元件', type: 'select', options: getDriveOptions(), default: 'tt_motor' },
 
             // Sweep
             { id: 'sweepStart', label: '起始角度', type: 'number', min: -360, max: 360, default: -360 },
             { id: 'sweepEnd', label: '結束角度', type: 'number', min: -360, max: 360, default: 360 },
             { id: 'sweepStep', label: '掃描間隔', type: 'number', min: 1, max: 10, default: 2 },
-            { id: 'showTrajectory', label: '顯示軌跡 (Foot)', type: 'checkbox', default: true }
+            { id: 'showTrajectory', label: '顯示軌跡', type: 'checkbox', default: true }
         ],
 
         partSpecs: [
@@ -572,10 +574,11 @@ export const MECHANISMS = {
         ],
 
         simNotes: `
-            <strong>🦀 仿生獸機構 (Strandbeest Leg)</strong><br/>
-            基於 Theo Jansen 的神聖數據 (Holy Numbers)。<br/>
-            這是一個單自由度機構，由 11 根連桿組成，能將旋轉運動轉換為類似動物行走的步態。<br/>
-            軌跡點為腳底 (P5)。
+            <strong>🦀 多連桿機構模擬 (Strandbeest Leg)</strong><br/>
+            可以自定義多連桿機構的拓撲結構（節點與連桿關係）。<br/>
+            拓撲結構格式請參考預設值。<br/>
+            軌跡點為腳底（P5）。
+        
         `,
 
         solverModule: './jansen/solver.js',
@@ -593,8 +596,8 @@ export const MECHANISMS = {
         description: 'Bar Drawer - 自定義桿件與孔位',
         hideAnimation: true,
         parameters: [
-            { id: 'barL', label: '桿件長度 L', type: 'number', min: 10, max: 500, default: 100, unit: 'mm' },
-            { id: 'barW', label: '桿件寬度 W', type: 'number', min: 5, max: 100, default: 20, unit: 'mm' },
+            { id: 'barL', label: '桿件長度 L', type: 'number', min: 10, max: 500, default: 100, unit: 'mm', isDynamic: true },
+            { id: 'barW', label: '桿件寬度 W', type: 'number', min: 5, max: 100, default: 20, unit: 'mm', isDynamic: true },
             { id: 'holeD', label: '🎨 當前畫筆大小 (孔徑/槽寬)', type: 'number', min: 1, max: 20, step: 0.1, default: 3.2, unit: 'mm' },
             { id: 'margin', label: '孔邊距 (margin)', type: 'number', min: 2, max: 50, default: 10, unit: 'mm' },
             { id: 'extraHoles', label: '額外孔位 (x1,y1;...)', type: 'text', default: '', color: '#3498db' },
@@ -674,7 +677,8 @@ export function generateParameterHTML(params) {
             html += `<label for="${param.id}">${param.label}</label>`;
             html += `</div>`;
         } else {
-            html += '<div>';
+            const fullWidth = param.fullWidth ? 'grid-column: 1 / -1;' : '';
+            html += `<div style="${fullWidth}">`;
             html += `<label>`;
             if (param.color) {
                 html += `<span style="color:${param.color}; font-weight:bold;">${param.label}</span>`;
@@ -695,6 +699,8 @@ export function generateParameterHTML(params) {
                 html += `</select>`;
             } else if (param.type === 'textarea') {
                 html += `<textarea id="${param.id}" rows="${param.rows || 10}" style="width:100%; font-family:monospace; font-size:12px; white-space:pre;">${param.default || ''}</textarea>`;
+            } else if (param.type === 'custom') {
+                html += param.render();
             } else {
                 html += `<input id="${param.id}" type="${param.type}" `;
                 if (param.min !== undefined) html += `min="${param.min}" `;

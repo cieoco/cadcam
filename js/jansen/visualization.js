@@ -28,7 +28,7 @@ export function renderJansen(sol, thetaDeg, trajectoryData = null, viewParams = 
     }
 
     const W = 800, H = 600;
-    const viewRange = viewParams.viewRange || 400;
+    const viewRange = viewParams.viewRange || 800;
     const pad = 50;
 
     // Scale setup

@@ -75,12 +75,15 @@ export function solveTopology(topology, params) {
             else if (step.type === 'dyad') {
                 const p1 = points[step.p1];
                 const p2 = points[step.p2];
+                if (!p1 || !p2) {
+                    return { isValid: false, errorStep: step.id, errorType: 'missing_points' };
+                }
                 const r1 = getVal(step, 'r1');
                 const r2 = getVal(step, 'r2');
 
                 const pt = solveIntersection(p1, r1, p2, r2, step.sign);
                 if (!pt) {
-                    return { isValid: false, errorStep: step.id };
+                    return { isValid: false, errorStep: step.id, errorType: 'no_intersection' };
                 }
                 points[step.id] = pt;
             }
@@ -135,4 +138,23 @@ export function sweepTopology(topology, params, startDeg, endDeg, stepDeg) {
     if (currentInvalid) invalidRanges.push(currentInvalid);
 
     return { results, validRanges, invalidRanges };
+}
+
+/**
+ * 計算軌跡統計資料
+ */
+export function calculateTrajectoryStats(results) {
+    const validPoints = results.filter(r => r.isValid && r.B).map(r => r.B);
+    if (validPoints.length === 0) return null;
+
+    const xs = validPoints.map(p => p.x);
+    const ys = validPoints.map(p => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+
+    return {
+        rangeX: maxX - minX,
+        rangeY: maxY - minY,
+        totalRange: Math.hypot(maxX - minX, maxY - minY)
+    };
 }

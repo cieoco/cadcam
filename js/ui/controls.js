@@ -25,78 +25,105 @@ function getActiveModules() {
  * 處理動態參數生成
  */
 function updateDynamicParams() {
-    const topoEl = document.getElementById('topology');
     const container = document.getElementById('dynamicParamsContainer');
-    if (!topoEl || !container) return;
+    if (!container) return;
 
-    let jsonStr = topoEl.value;
-    let topology;
-    try {
-        topology = JSON.parse(jsonStr);
-    } catch (e) {
-        // JSON 無效時不更新參數 UI，避免打字時頻繁跳動
-        return;
+    const mods = getActiveModules();
+    const vars = new Map(); // Map of varId -> { label, min, max, step, default }
+
+    // 1. 從 Mechanism Config 獲取標記為 isDynamic 的參數
+    if (mods && mods.config && mods.config.parameters) {
+        mods.config.parameters.forEach(p => {
+            if (p.isDynamic) {
+                vars.set(p.id, {
+                    label: p.label,
+                    min: p.min ?? 0,
+                    max: p.max ?? 300,
+                    step: p.step ?? 0.1,
+                    default: p.default ?? 50
+                });
+            }
+        });
     }
 
-    // 1. 掃描所有使用的變數名稱 (以 _param 結尾)
-    const vars = new Set();
-    const scan = (obj) => {
-        if (!obj || typeof obj !== 'object') return;
-        for (const k in obj) {
-            if (k.endsWith('_param') && typeof obj[k] === 'string') {
-                vars.add(obj[k]);
-            } else if (typeof obj[k] === 'object') {
-                scan(obj[k]);
-            }
+    // 2. 從 Topology JSON 掃描變數 (相容 Multilink)
+    const topoEl = document.getElementById('topology');
+    if (topoEl) {
+        let topology;
+        try {
+            topology = JSON.parse(topoEl.value);
+            const scan = (obj) => {
+                if (!obj || typeof obj !== 'object') return;
+                for (const k in obj) {
+                    if (k.endsWith('_param') && typeof obj[k] === 'string') {
+                        const varName = obj[k];
+                        if (!vars.has(varName)) {
+                            vars.set(varName, {
+                                label: varName,
+                                min: 0,
+                                max: 300,
+                                step: 0.5,
+                                default: 50
+                            });
+                        }
+                    } else if (typeof obj[k] === 'object') {
+                        scan(obj[k]);
+                    }
+                }
+            };
+            scan(topology);
+        } catch (e) {
+            // JSON 無效時不更新拓撲變數，但保留 Config 變數
         }
-    };
-    scan(topology);
+    }
 
-    // 2. 移除已經沒用到的動態參數 (注意：不要移除 mechanism-config 定義的靜態參數)
+    // 3. 移除已經沒用到的動態參數
     const existingDynamic = container.querySelectorAll('.dynamic-param-wrapper');
     existingDynamic.forEach(div => {
         const id = div.dataset.varId;
         if (!vars.has(id)) {
             div.remove();
-        } else {
-            vars.delete(id); // 已存在，從待新增清單移除
         }
     });
 
-    // 3. 新增缺少的參數
-    vars.forEach(varName => {
-        // 檢查是否已存在於主面板 (靜態定義)
-        if (document.getElementById(varName)) return;
+    // 4. 更新或新增參數
+    vars.forEach((info, varId) => {
+        let wrapper = container.querySelector(`.dynamic-param-wrapper[data-var-id="${varId}"]`);
 
-        const wrapper = document.createElement('div');
-        wrapper.className = 'dynamic-param-wrapper';
-        wrapper.dataset.varId = varName;
-        wrapper.style.marginBottom = '8px';
+        if (!wrapper) {
+            wrapper = document.createElement('div');
+            wrapper.className = 'dynamic-param-wrapper';
+            wrapper.dataset.varId = varId;
+            wrapper.style.marginBottom = '8px';
+            wrapper.style.padding = '4px 8px';
+            wrapper.style.background = '#fff';
+            wrapper.style.border = '1px solid #eee';
+            wrapper.style.borderRadius = '4px';
 
-        wrapper.innerHTML = `
-            <label style="display:block; font-size:12px; color:#555;">${varName} (mm)</label>
-            <div style="display:flex; align-items:center;">
-                <input type="number" id="${varName}" value="50" step="0.1" style="flex:1; padding:4px;" class="dynamic-input">
-                <input type="range" id="${varName}_range" value="50" min="10" max="200" step="1" style="flex:1; margin-left:8px;">
-            </div>
-        `;
-        container.appendChild(wrapper);
+            wrapper.innerHTML = `
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <label style="width:60px; font-size:11px; font-weight:bold; color:#2c3e50; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${info.label}">${info.label}</label>
+                    <input type="number" id="${varId}" value="${info.default}" step="${info.step}" style="width:55px; padding:2px; font-size:11px; border:1px solid #ddd; border-radius:3px;" class="dynamic-input">
+                    <input type="range" id="${varId}_range" value="${info.default}" min="${info.min}" max="${info.max}" step="${info.step}" style="flex:1; height:14px; margin:0; cursor:pointer;">
+                </div>
+            `;
+            container.appendChild(wrapper);
 
-        // 綁定聯動
-        const numInput = wrapper.querySelector('input[type="number"]');
-        const rangeInput = wrapper.querySelector('input[type="range"]');
+            // 綁定聯動
+            const numInput = wrapper.querySelector('input[type="number"]');
+            const rangeInput = wrapper.querySelector('input[type="range"]');
 
-        numInput.oninput = () => {
-            rangeInput.value = numInput.value;
-            // 重要：一定要觸發 updatePreview
-            if (window.updatePreviewDebounced) window.updatePreviewDebounced();
-            else updatePreview();
-        };
-        rangeInput.oninput = () => {
-            numInput.value = rangeInput.value;
-            if (window.updatePreviewDebounced) window.updatePreviewDebounced();
-            else updatePreview();
-        };
+            numInput.oninput = () => {
+                rangeInput.value = numInput.value;
+                if (window.updatePreviewDebounced) window.updatePreviewDebounced();
+                else updatePreview();
+            };
+            rangeInput.oninput = () => {
+                numInput.value = rangeInput.value;
+                if (window.updatePreviewDebounced) window.updatePreviewDebounced();
+                else updatePreview();
+            };
+        }
     });
 }
 
@@ -379,13 +406,11 @@ export function setupUIHandlers() {
     if (topologyArea) {
         topologyArea.addEventListener('input', () => {
             updateDynamicParams();
-            // Don't auto-update preview on every char, might be valid logic but invalid values
-            // Let the user adjust params or click update.
-            // But if the topology structure is valid, we could try.
         });
-        // Initial scan
-        updateDynamicParams();
     }
+
+    // Initial scan for all mechanisms
+    updateDynamicParams();
 
     // 某些機構可能有特定的 handler
     const mods = getActiveModules();

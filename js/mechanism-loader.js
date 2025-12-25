@@ -4,7 +4,8 @@
  */
 
 import { getMechanismFromURL, generateParameterHTML, MECHANISMS } from './mechanism-config.js';
-import { setupUIHandlers } from './ui/controls.js';
+import { setupUIHandlers, updatePreview } from './ui/controls.js';
+import { MechanismWizard } from './ui/wizard.js';
 
 /**
  * 初始化機構頁面
@@ -44,15 +45,17 @@ async function initMechanismPage() {
   const parametersPanel = document.getElementById('parametersPanel');
   parametersPanel.innerHTML = `
     <h3>① ${mech.name}參數</h3>
-    ${generateParameterHTML(mech.parameters)}
-    <div id="dynamicParamsContainer"></div>
+    ${(() => {
+      const staticParams = mech.parameters.filter(p => !p.isDynamic);
+      return generateParameterHTML(staticParams);
+    })()}
     
     <div style="height:10px"></div>
     <h3>模擬設定</h3>
     <div class="grid">
       <div>
         <label>模擬圖範圍（mm）</label>
-        <input id="viewRange" type="number" min="100" max="1000" step="10" value="400" />
+        <input id="viewRange" type="number" min="100" max="1000" step="10" value="800" />
       </div>
       <div>
         <label>
@@ -106,6 +109,33 @@ async function initMechanismPage() {
     // 設定 UI 處理器 - 延遲執行確保所有元素就緒
     await new Promise(resolve => setTimeout(resolve, 150));
     setupUIHandlers();
+
+    // 初始化精靈 (如果存在)
+    const wizardContainer = document.getElementById('wizardContainer');
+    if (wizardContainer) {
+      const wizard = new MechanismWizard('wizardContainer', (newTopo) => {
+        const topoArea = document.getElementById('topology');
+        if (topoArea) {
+          topoArea.value = JSON.stringify(newTopo, null, 2);
+          // 觸發輸入事件以更新動態參數
+          topoArea.dispatchEvent(new Event('input'));
+          // 更新預覽
+          updatePreview();
+        }
+      });
+      window.wizard = wizard; // 供內嵌 HTML 調用
+
+      const topoArea = document.getElementById('topology');
+      if (topoArea && topoArea.value) {
+        try {
+          wizard.init(JSON.parse(topoArea.value));
+        } catch (e) {
+          wizard.init();
+        }
+      } else {
+        wizard.init();
+      }
+    }
 
     console.log('Mechanism modules loaded successfully');
   } catch (error) {

@@ -125,10 +125,20 @@
         <div>
             <div class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                    <h3 style="margin:0;">2D 模擬</h3>
+                    <h3 style="margin:0;">2D 模擬與參數調整</h3>
                     <button class="primary" id="btnUpdate">更新模擬 / 預覽</button>
                 </div>
-                <div id="svgWrap"></div>
+                <div style="display:flex; gap: 16px;">
+                    <div id="svgWrap" style="flex: 1; min-width: 0;"></div>
+                    <div id="rightParamsPanel"
+                        style="width: 450px; background: #fcfcfc; border-left: 1px solid #eee; padding: 10px; border-radius: 0 8px 8px 0; display: flex; flex-direction: column; gap: 10px;">
+                        <h4
+                            style="margin: 0; font-size: 14px; color: #555; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                            📏 桿件長度動態調整</h4>
+                        <div id="dynamicParamsContainer"
+                            style="overflow-y: auto; max-height: 500px; padding-right: 5px;"></div>
+                    </div>
+                </div>
                 <div class="note" style="margin-top:8px;" id="simNotes"></div>
             </div>
 
