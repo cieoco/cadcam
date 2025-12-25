@@ -31,12 +31,32 @@ export function buildDXF(parts) {
             // 兩個半圓 (DXF ARC: 0=右, 90=上, 180=左, 270=下)
             addArc(lines, x + r, y + r, r, 90, 270); // 左側半圓
             addArc(lines, x + w - r, y + r, r, 270, 90); // 右側半圓
+        } else if (p.barStyle === 'path' && p.points) {
+            // 任意封閉路徑 (齒輪/齒條齒形)
+            const pts = p.points;
+            for (let i = 0; i < pts.length; i++) {
+                const p1 = pts[i];
+                const p2 = pts[(i + 1) % pts.length];
+                addLine(lines, p1.x, p1.y, p2.x, p2.y);
+            }
         } else {
             // 直角矩形
             addLine(lines, x, y, x + w, y);
             addLine(lines, x + w, y, x + w, y + h);
             addLine(lines, x + w, y + h, x, y + h);
             addLine(lines, x, y + h, x, y);
+        }
+
+        // 導軌槽
+        if (p.slots) {
+            for (const s of p.slots) {
+                const { x, y, w, h } = s;
+                const r = h / 2;
+                addLine(lines, x + r, y, x + w - r, y);
+                addLine(lines, x + r, y + h, x + w - r, y + h);
+                addArc(lines, x + r, y + r, r, 90, 270);
+                addArc(lines, x + w - r, y + r, r, 270, 90);
+            }
         }
 
         // 孔洞

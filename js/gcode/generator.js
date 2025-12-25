@@ -10,6 +10,7 @@ import {
     profileRectOps,
     profileRoundedRectOps,
     profileCircleOps,
+    profilePathOps,
 } from './operations.js';
 
 /**
@@ -28,11 +29,25 @@ export function buildPartGcode(part, mfg) {
     lines.push(...gcodeHeader({ safeZ, spindle }));
 
     // 註解說明
-    const labelL = part.L !== undefined ? `L=${part.L.toFixed(2)}mm` : `W=${part.width}, H=${part.height || part.diameter}`;
+    let labelL = part.L !== undefined ? `L=${part.L.toFixed(2)}mm` : `W=${part.width}, H=${part.height || part.diameter}`;
+    if (part.barStyle === 'path' && part.points) labelL += ` (Points: ${part.points.length})`;
     lines.push(`(Part: ${part.id}, ${labelL}, style=${part.barStyle || 'rect'})`);
 
     // 1. 鑽孔
     lines.push(...drillOps({ holes: part.holes, safeZ, drillZ, feedZ }));
+
+    // 1.5 導軌槽 (Slots)
+    if (part.slots) {
+        lines.push("(Profile internal slots)");
+        for (const slot of part.slots) {
+            lines.push(
+                ...profileRoundedRectOps({
+                    rect: slot,
+                    safeZ, cutDepth, stepdown, feedXY, feedZ
+                })
+            );
+        }
+    }
 
     // 2. 外形切割
     if (part.barStyle === 'disk') {
@@ -48,6 +63,13 @@ export function buildPartGcode(part, mfg) {
     } else if (part.barStyle === 'rounded') {
         lines.push(
             ...profileRoundedRectOps({ rect: part.rect, safeZ, cutDepth, stepdown, feedXY, feedZ })
+        );
+    } else if (part.barStyle === 'path' && part.points) {
+        lines.push(
+            ...profilePathOps({
+                points: part.points,
+                safeZ, cutDepth, stepdown, feedXY, feedZ
+            })
         );
     } else {
         lines.push(

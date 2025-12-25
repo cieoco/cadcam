@@ -635,9 +635,9 @@
                     why: "行程可長、效率高，適合滑台/升降。",
                     pros: ["速度快", "行程可擴展"],
                     cons: ["加工與齒形精度要求", "背隙與定位要處理"],
-                    cta: "（進階）",
-                    href: "#",
-                    enabled: false
+                    cta: "進入齒條齒輪工具",
+                    href: "./mechanism.html?type=rackpinion",
+                    enabled: true
                 });
             } else if (state.motion === "recip") {
                 recs.push({
@@ -765,7 +765,7 @@
                 'rackpinion': '齒條齒輪工具'
             };
 
-            const isImplemented = state.mech === 'fourbar' || state.mech === 'crankslider';
+            const isImplemented = ['fourbar', 'crankslider', 'rackpinion'].includes(state.mech);
             const btn = document.createElement("a");
             btn.className = `btn ${isImplemented ? 'primary' : 'ghost'}`;
             btn.style.padding = "16px";

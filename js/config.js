@@ -23,8 +23,12 @@ export function readInputs() {
         crankRadius: Number($("crankRadius")?.value || 30),
         rodLength: Number($("rodLength")?.value || 100),
 
+        // 齒條齒輪
+        pinionTeeth: Number($("pinionTeeth")?.value || 20),
+        module: Number($("module")?.value || 2),
+
         // 通用
-        thetaDeg: Number($("theta")?.value || 30),
+        thetaDeg: Number($("theta")?.value || 0),
     };
 
     // 零件規格參數
@@ -42,6 +46,12 @@ export function readInputs() {
         rodWidth: Number($("rodWidth")?.value || 15),
         sliderWidth: Number($("sliderWidth")?.value || 30),
         sliderHeight: Number($("sliderHeight")?.value || 20),
+
+        // 齒條規格
+        rackLength: Number($("rackLength")?.value || 200),
+        rackHeight: Number($("rackHeight")?.value || 15),
+        rackHoleType: $("rackHoleType")?.value || "circle",
+        rackSlotL: Number($("rackSlotL")?.value || 20),
     };
 
     // 加工參數

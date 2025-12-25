@@ -57,6 +57,17 @@ export function renderPartsLayout(parts, workX, workY) {
                     "stroke-width": 1.5,
                 })
             );
+        } else if (p.barStyle === 'path' && p.points) {
+            // 繪製任意多邊形路徑
+            const pointsStr = p.points.map(pt => `${tx(pt.x)},${ty(pt.y)}`).join(' ');
+            svg.appendChild(
+                svgEl("polygon", {
+                    points: pointsStr,
+                    fill: p.color ? `${p.color}15` : "rgba(0,0,0,0.03)",
+                    stroke: p.color || "#111",
+                    "stroke-width": 1.5,
+                })
+            );
         } else {
             const rectAttrs = {
                 x: tx(r.x),
@@ -88,6 +99,25 @@ export function renderPartsLayout(parts, workX, workY) {
                     "stroke-width": 1,
                 })
             );
+        }
+
+        // 導軌槽 (Slots)
+        if (p.slots) {
+            for (const s of p.slots) {
+                svg.appendChild(
+                    svgEl("rect", {
+                        x: tx(s.x),
+                        y: ty(s.y + s.h),
+                        width: s.w * scale,
+                        height: s.h * scale,
+                        rx: (s.h / 2) * scale,
+                        ry: (s.h / 2) * scale,
+                        fill: "none",
+                        stroke: "#111",
+                        "stroke-width": 1,
+                    })
+                );
+            }
         }
 
         // 標籤

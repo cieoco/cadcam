@@ -210,3 +210,59 @@ export function profileCircleOps({
 
     return lines;
 }
+
+/**
+ * 任意點陣列路徑切割操作 (多層)
+ * @param {Object} params - 參數
+ * @param {Array<{x, y}>} params.points - 封閉路徑的點陣列
+ * @param {number} params.safeZ - 安全高度
+ * @param {number} params.cutDepth - 總切深
+ * @param {number} params.stepdown - 每層下刀
+ * @param {number} params.feedXY - XY 進給
+ * @param {number} params.feedZ - Z 進給
+ */
+export function profilePathOps({
+    points,
+    safeZ,
+    cutDepth,
+    stepdown,
+    feedXY,
+    feedZ
+}) {
+    if (!points || points.length < 2) return [];
+
+    const lines = [];
+    lines.push("(Profile arbitrary path)");
+
+    const zLevels = [];
+    const total = Math.abs(cutDepth);
+    const sd = Math.abs(stepdown);
+    const n = Math.max(1, Math.ceil(total / sd));
+    for (let i = 1; i <= n; i++) {
+        zLevels.push(-Math.min(i * sd, total));
+    }
+
+    const startX = points[0].x;
+    const startY = points[0].y;
+
+    for (const z of zLevels) {
+        lines.push(`G0 Z${fmt(safeZ)}`);
+        lines.push(`G0 X${fmt(startX)} Y${fmt(startY)}`);
+        lines.push(`G1 Z${fmt(z)} F${fmt(feedZ)}`);
+
+        // 沿點陣列移動
+        for (let j = 1; j < points.length; j++) {
+            lines.push(`G1 X${fmt(points[j].x)} Y${fmt(points[j].y)} F${fmt(feedXY)}`);
+        }
+
+        // 確保路徑閉合：回到起點
+        const lastP = points[points.length - 1];
+        if (lastP.x !== startX || lastP.y !== startY) {
+            lines.push(`G1 X${fmt(startX)} Y${fmt(startY)} F${fmt(feedXY)}`);
+        }
+
+        lines.push(`G0 Z${fmt(safeZ)}`);
+    }
+
+    return lines;
+}

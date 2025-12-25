@@ -370,6 +370,164 @@ export const MECHANISMS = {
         renderFn: 'renderSliderCrank',
         partsModule: './slider-crank/parts.js',
         partsFn: 'generateSliderCrankParts'
+    },
+
+    rackpinion: {
+        id: 'rackpinion',
+        name: '齒條齒輪機構',
+        icon: '⚙️',
+        description: 'Rack and Pinion - 旋轉與直線精準轉換',
+
+        parameters: [
+            {
+                id: 'pinionTeeth',
+                label: '齒輪齒數 N',
+                type: 'number',
+                min: 8,
+                max: 60,
+                step: 1,
+                default: 20,
+                unit: '齒',
+                color: '#e74c3c'
+            },
+            {
+                id: 'module',
+                label: '模數 m',
+                type: 'number',
+                min: 0.5,
+                max: 10,
+                step: 0.1,
+                default: 2,
+                unit: 'mm',
+                color: '#3498db'
+            },
+            {
+                id: 'theta',
+                label: '齒輪旋轉 θ',
+                type: 'number',
+                min: -720,
+                max: 720,
+                step: 1,
+                default: 0,
+                unit: '度'
+            },
+            {
+                id: 'motorType',
+                label: '驅動類型',
+                type: 'select',
+                options: [
+                    { value: 'motor360', label: '🔄 馬達（連續）' },
+                    { value: 'custom', label: '⚙️ 自訂範圍' }
+                ],
+                default: 'motor360'
+            },
+            {
+                id: 'sweepStart',
+                label: '起始角度',
+                type: 'number',
+                min: -720,
+                max: 720,
+                step: 1,
+                default: -360,
+                unit: '度'
+            },
+            {
+                id: 'sweepEnd',
+                label: '結束角度',
+                type: 'number',
+                min: -720,
+                max: 720,
+                step: 1,
+                default: 360,
+                unit: '度'
+            },
+            {
+                id: 'sweepStep',
+                label: '掃描間隔',
+                type: 'number',
+                min: 1,
+                max: 10,
+                step: 1,
+                default: 1,
+                unit: '度'
+            }
+        ],
+
+        partSpecs: [
+            {
+                id: 'rackLength',
+                label: '齒條總長',
+                type: 'number',
+                min: 50,
+                max: 400,
+                step: 1,
+                default: 200,
+                unit: 'mm'
+            },
+            {
+                id: 'rackHeight',
+                label: '齒條背高',
+                type: 'number',
+                min: 10,
+                max: 40,
+                step: 1,
+                default: 15,
+                unit: 'mm'
+            },
+            {
+                id: 'holeD',
+                label: '連接孔徑',
+                type: 'number',
+                min: 2,
+                max: 20,
+                step: 0.1,
+                default: 5,
+                unit: 'mm'
+            },
+            {
+                id: 'margin',
+                label: '端到孔中心邊距',
+                type: 'number',
+                min: 4,
+                max: 40,
+                step: 0.5,
+                default: 10,
+                unit: 'mm'
+            },
+            {
+                id: 'rackHoleType',
+                label: '齒條連接型式',
+                type: 'select',
+                options: [
+                    { value: 'circle', label: '⭕ 圓形孔' },
+                    { value: 'slot', label: '💊 導軌長槽' }
+                ],
+                default: 'circle'
+            },
+            {
+                id: 'rackSlotL',
+                label: '導軌槽長度',
+                type: 'number',
+                min: 5,
+                max: 50,
+                step: 1,
+                default: 20,
+                unit: 'mm'
+            }
+        ],
+
+        simNotes: `
+      顯示：齒輪（紅色）、齒條（藍色）。<br/>
+      節圓直徑 D = m × N。<br/>
+      齒條位移 = θ(rad) × D / 2。
+    `,
+
+        solverModule: './rack-pinion/solver.js',
+        solveFn: 'solveRackPinion',
+        visualizationModule: './rack-pinion/visualization.js',
+        renderFn: 'renderRackPinion',
+        partsModule: './rack-pinion/parts.js',
+        partsFn: 'generateRackPinionParts'
     }
 };
 
