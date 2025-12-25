@@ -60,15 +60,16 @@
 
         .brand h1 {
             margin: 0;
-            font-size: 20px;
-            letter-spacing: .2px;
+            font-size: 28px;
+            letter-spacing: .5px;
+            font-weight: 800;
         }
 
         .brand p {
             margin: 0;
             color: var(--muted);
-            font-size: 13px;
-            line-height: 1.35;
+            font-size: 16px;
+            line-height: 1.5;
         }
 
         .pill {
@@ -147,12 +148,13 @@
 
         .card .hd h2 {
             margin: 0;
-            font-size: 14px;
+            font-size: 20px;
             letter-spacing: .2px;
+            font-weight: 700;
         }
 
         .card .hd .step {
-            font-size: 12px;
+            font-size: 14px;
             color: var(--muted);
             display: flex;
             align-items: center;
@@ -164,13 +166,13 @@
         }
 
         .hint {
-            padding: 10px 12px;
+            padding: 12px 16px;
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, .10);
             background: rgba(0, 0, 0, .18);
             color: var(--muted);
-            font-size: 12px;
-            line-height: 1.45;
+            font-size: 14px;
+            line-height: 1.6;
         }
 
         .hint strong {
@@ -208,18 +210,18 @@
         }
 
         .chip .t {
-            font-size: 13px;
+            font-size: 16px;
             font-weight: 700;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
             gap: 8px;
         }
 
         .chip .d {
-            font-size: 12px;
+            font-size: 14px;
             color: var(--muted);
-            line-height: 1.35;
+            line-height: 1.45;
         }
 
         .mini {
@@ -229,10 +231,10 @@
 
         .list {
             margin: 10px 0 0;
-            padding: 0 0 0 16px;
+            padding: 0 0 0 20px;
             color: var(--muted);
-            font-size: 12px;
-            line-height: 1.5;
+            font-size: 14px;
+            line-height: 1.6;
         }
 
         .list b {
@@ -266,7 +268,7 @@
 
         .recTop .name {
             font-weight: 800;
-            font-size: 13px;
+            font-size: 18px;
             letter-spacing: .1px;
         }
 
@@ -281,9 +283,9 @@
         }
 
         .recCard .why {
-            font-size: 12px;
+            font-size: 15px;
             color: var(--muted);
-            line-height: 1.45;
+            line-height: 1.5;
         }
 
         .kv {
@@ -293,13 +295,13 @@
         }
 
         .kv .box {
-            padding: 10px 10px;
+            padding: 12px;
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, .08);
             background: rgba(0, 0, 0, .12);
-            font-size: 12px;
+            font-size: 14px;
             color: var(--muted);
-            line-height: 1.45;
+            line-height: 1.5;
         }
 
         .kv .box strong {
@@ -321,11 +323,11 @@
             border: 1px solid rgba(255, 255, 255, .12);
             background: var(--btn);
             color: var(--text);
-            padding: 10px 12px;
+            padding: 12px 20px;
             border-radius: 14px;
             cursor: pointer;
             font-weight: 700;
-            font-size: 12px;
+            font-size: 16px;
             transition: transform .08s ease, border-color .12s ease, background .12s ease;
             text-decoration: none;
             display: inline-flex;
@@ -389,7 +391,7 @@
         }
 
         .tag {
-            font-size: 12px;
+            font-size: 14px;
             color: var(--muted);
         }
 
@@ -407,13 +409,13 @@
         }
 
         .callout {
-            padding: 12px 12px;
+            padding: 14px 16px;
             border-radius: 14px;
             border: 1px solid rgba(255, 255, 255, .10);
             background: rgba(0, 0, 0, .16);
             color: var(--muted);
-            font-size: 12px;
-            line-height: 1.5;
+            font-size: 14px;
+            line-height: 1.6;
         }
 
         .callout strong {
@@ -503,7 +505,7 @@
                             如果你已經知道要用什麼機構，可以直接從這裡進入：
                         </div>
                         <div class="actions" style="gap: 12px;">
-                            <a href="./fourbar.html" class="btn primary"
+                            <a href="./mechanism.html?type=fourbar" class="btn primary"
                                 style="flex: 1; justify-content: center; padding: 14px;">
                                 🔗 四連桿機構 (4-Bar)
                             </a>
@@ -514,6 +516,10 @@
                             <a href="./mechanism.html?type=rackpinion" class="btn primary"
                                 style="flex: 1; justify-content: center; padding: 14px;">
                                 ⚙️ 齒條齒輪 (Rack-Pinion)
+                            </a>
+                            <a href="./mechanism.html?type=bardrawer" class="btn primary"
+                                style="flex: 1; justify-content: center; padding: 14px; background: rgba(52, 152, 219, 0.14); border-color: rgba(52, 152, 219, 0.55);">
+                                ✏️ 桿件繪製工具 (Bar Drawer)
                             </a>
                         </div>
                     </div>
@@ -668,7 +674,7 @@
                     pros: ["夾爪/擺臂/抬升常見", "2D 模擬最直覺", "桿件 CNC 切割最友善"],
                     cons: ["不是每個角度都可行（需可行區間）", "open/crossed 需鎖定解"],
                     cta: "進入四連桿工具",
-                    href: "./mechanism.html?type=fourbar",
+                    href: "./fourbar.html",
                     enabled: true
                 });
             } else if (state.motion === "linear") {

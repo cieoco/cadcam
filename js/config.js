@@ -27,6 +27,19 @@ export function readInputs() {
         pinionTeeth: Number($("pinionTeeth")?.value || 20),
         module: Number($("module")?.value || 2),
 
+        // 桿件繪圖
+        barL: Number($("barL")?.value || 100),
+        barW: Number($("barW")?.value || 20),
+        holeD: Number($("holeD")?.value || 3.2),
+        margin: Number($("margin")?.value || 10),
+        extraHoles: $("extraHoles")?.value || "",
+        barStyle: $("barStyle")?.value || "rounded",
+        gridInterval: Number($("gridInterval")?.value || 10),
+        snapToGrid: $("snapToGrid")?.checked || false,
+        drawMode: $("drawMode")?.value || "hole",
+        slotL: Number($("slotL")?.value || 20),
+        extraSlots: $("extraSlots")?.value || "",
+
         // 通用
         thetaDeg: Number($("theta")?.value || 0),
     };

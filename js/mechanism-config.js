@@ -528,6 +528,70 @@ export const MECHANISMS = {
         renderFn: 'renderRackPinion',
         partsModule: './rack-pinion/parts.js',
         partsFn: 'generateRackPinionParts'
+    },
+
+    bardrawer: {
+        id: 'bardrawer',
+        name: '桿件繪圖工具',
+        icon: '✏️',
+        description: 'Bar Drawer - 自定義桿件與孔位',
+        hideAnimation: true,
+        parameters: [
+            { id: 'barL', label: '桿件長度 L', type: 'number', min: 10, max: 500, default: 100, unit: 'mm' },
+            { id: 'barW', label: '桿件寬度 W', type: 'number', min: 5, max: 100, default: 20, unit: 'mm' },
+            { id: 'holeD', label: '🎨 當前畫筆大小 (孔徑/槽寬)', type: 'number', min: 1, max: 20, step: 0.1, default: 3.2, unit: 'mm' },
+            { id: 'margin', label: '孔邊距 (margin)', type: 'number', min: 2, max: 50, default: 10, unit: 'mm' },
+            { id: 'extraHoles', label: '額外孔位 (x1,y1;...)', type: 'text', default: '', color: '#3498db' },
+            {
+                id: 'drawMode',
+                label: '🎯 繪製模式',
+                type: 'select',
+                options: [
+                    { value: 'hole', label: '⭕ 螺絲孔 (Hole)' },
+                    { value: 'slot', label: '💊 導軌槽 (Slot)' }
+                ],
+                default: 'hole'
+            },
+            { id: 'slotL', label: '預設槽長度', type: 'number', min: 5, max: 100, default: 20, unit: 'mm' },
+            { id: 'extraSlots', label: '額外長槽 (x,y,L;...)', type: 'text', default: '', color: '#27ae60' },
+            {
+                id: 'gridInterval',
+                label: '輔助格線間隔',
+                type: 'select',
+                options: [
+                    { value: '5', label: '5 mm' },
+                    { value: '10', label: '10 mm (預設)' },
+                    { value: '20', label: '20 mm' }
+                ],
+                default: '10'
+            },
+            { id: 'snapToGrid', label: '自動對齊格線 (Snap)', type: 'checkbox', default: true }
+        ],
+        partSpecs: [
+            {
+                id: 'barStyle',
+                label: '桿件樣式',
+                type: 'select',
+                options: [
+                    { value: 'rect', label: '⬛ 直角矩形' },
+                    { value: 'rounded', label: '💊 圓角矩形 (全圓角)' }
+                ],
+                default: 'rounded'
+            }
+        ],
+        simNotes: `
+            <strong>💡 互動繪圖指南：</strong><br/>
+            1. <b>切換模式</b>：從左側設定「繪製模式」為螺絲孔或導軌槽。<br/>
+            2. <b>點擊桿件</b>：在預覽圖點擊即可新增對應元件。<br/>
+            3. <b>移除元件</b>：點擊已存在的「藍色」額外孔或「綠色」導軌槽即可將其刪除。<br/>
+            4. <b>自動對齊</b>：建議開啟 Snap 功能以便對齊整數位置。
+        `,
+        solverModule: './bardrawer/solver.js',
+        solveFn: 'solveBar',
+        visualizationModule: './bardrawer/visualization.js',
+        renderFn: 'renderBar',
+        partsModule: './bardrawer/parts.js',
+        partsFn: 'generateBarParts'
     }
 };
 
@@ -547,38 +611,42 @@ export function generateParameterHTML(params) {
     let html = '<div class="grid">';
 
     for (const param of params) {
-        html += '<div>';
-        html += `<label>`;
-        if (param.color) {
-            html += `<span style="color:${param.color}; font-weight:bold;">${param.label}</span>`;
-        } else {
-            html += param.label;
-        }
-        if (param.unit) {
-            html += ` (${param.unit})`;
-        }
-        html += `</label>`;
-
-        if (param.type === 'select') {
-            html += `<select id="${param.id}">`;
-            for (const opt of param.options) {
-                const selected = opt.value === param.default ? 'selected' : '';
-                html += `<option value="${opt.value}" ${selected}>${opt.label}</option>`;
-            }
-            html += `</select>`;
-        } else if (param.type === 'checkbox') {
+        if (param.type === 'checkbox') {
             const checked = param.default ? 'checked' : '';
+            html += `<div class="checkbox-row">`;
             html += `<input id="${param.id}" type="checkbox" ${checked} />`;
+            html += `<label for="${param.id}">${param.label}</label>`;
+            html += `</div>`;
         } else {
-            html += `<input id="${param.id}" type="${param.type}" `;
-            if (param.min !== undefined) html += `min="${param.min}" `;
-            if (param.max !== undefined) html += `max="${param.max}" `;
-            if (param.step !== undefined) html += `step="${param.step}" `;
-            if (param.default !== undefined) html += `value="${param.default}" `;
-            html += `/>`;
-        }
+            html += '<div>';
+            html += `<label>`;
+            if (param.color) {
+                html += `<span style="color:${param.color}; font-weight:bold;">${param.label}</span>`;
+            } else {
+                html += param.label;
+            }
+            if (param.unit) {
+                html += ` (${param.unit})`;
+            }
+            html += `</label>`;
 
-        html += '</div>';
+            if (param.type === 'select') {
+                html += `<select id="${param.id}">`;
+                for (const opt of param.options) {
+                    const selected = opt.value === param.default ? 'selected' : '';
+                    html += `<option value="${opt.value}" ${selected}>${opt.label}</option>`;
+                }
+                html += `</select>`;
+            } else {
+                html += `<input id="${param.id}" type="${param.type}" `;
+                if (param.min !== undefined) html += `min="${param.min}" `;
+                if (param.max !== undefined) html += `max="${param.max}" `;
+                if (param.step !== undefined) html += `step="${param.step}" `;
+                if (param.default !== undefined) html += `value="${param.default}" `;
+                html += `/>`;
+            }
+            html += '</div>';
+        }
     }
 
     html += '</div>';

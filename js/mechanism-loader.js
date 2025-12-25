@@ -47,6 +47,20 @@ async function initMechanismPage() {
   // 設定模擬說明
   document.getElementById('simNotes').innerHTML = mech.simNotes;
 
+  // 如果設定為隱藏動畫，則尋找並隱藏動畫控制區域
+  if (mech.hideAnimation) {
+    const headings = document.querySelectorAll('h3');
+    for (const h3 of headings) {
+      if (h3.textContent.includes('動畫控制')) {
+        h3.style.display = 'none';
+        // 隱藏接下來的控制網格
+        if (h3.nextElementSibling && (h3.nextElementSibling.classList.contains('grid') || h3.nextElementSibling.classList.contains('anim-controls'))) {
+          h3.nextElementSibling.style.display = 'none';
+        }
+      }
+    }
+  }
+
   // 動態載入機構特定的模組
   try {
     const t = Date.now();
