@@ -17,17 +17,17 @@ function holeKey(x, y) {
 }
 
 export function renderBar(sol, theta, trajectory, viewParams) {
-    // 1. ?��??��??�數
+    // 1. ???箇??
     const L = Number(sol.barL) || 100;
     const W = Number(sol.barW) || 20;
-    const currentBrushD = Number(sol.holeD) || 3.2; // 作為?�繪製�??�設大�?
+    const currentBrushD = Number(sol.holeD) || 3.2; // 雿?啁鼓鋆賜??身憭批?
     const margin = Number(sol.margin) || 10;
 
-    // ?��?設�?
+    // ?潛?閮剖?
     const gridInt = Number(sol.gridInterval) || 10;
     const snap = sol.snapToGrid === true;
 
-    // 2. ?��?標竿設�?
+    // 2. ?怠?璅姪閮剖?
     const SVG_W = 800;
     const SVG_H = 600;
     const viewRange = Number(viewParams.viewRange) || 400;
@@ -45,7 +45,7 @@ export function renderBar(sol, theta, trajectory, viewParams) {
         id: 'barSvg'
     });
 
-    // 3. ?�景?��?
+    // 3. ??潛?
     if (showGrid) {
         const gridGroup = svgEl('g', { stroke: '#e9ecef', 'stroke-width': 0.5 });
         const startVal = Math.floor(-viewRange / 2 / gridInt) * gridInt;
@@ -59,26 +59,26 @@ export function renderBar(sol, theta, trajectory, viewParams) {
         svg.appendChild(gridGroup);
     }
 
-    // 4. 桿件主�?
+    // 4. 獢蹂辣銝駁?
     const r = sol.barStyle === 'rounded' ? (W / 2) * scale : 0;
     svg.appendChild(svgEl('rect', {
         x: tx(0), y: ty(0), width: L * scale, height: W * scale,
         rx: r, ry: r, fill: 'rgba(52, 152, 219, 0.15)', stroke: '#2c3e50', 'stroke-width': 1.5
     }));
 
-    // 5. 標註說�?
+    // 5. 璅酉隤芣?
     const labelStyle = 'font-size: 13px; fill: #7f8c8d; font-family: sans-serif; font-weight: bold; pointer-events: none;';
     svg.appendChild(svgEl('text', { x: tx(0), y: ty(0) - 12, style: labelStyle, 'text-anchor': 'middle' })).textContent = "0";
     svg.appendChild(svgEl('text', { x: tx(L), y: ty(0) - 12, style: labelStyle, 'text-anchor': 'middle' })).textContent = L.toFixed(0);
 
-    // 6. 渲�?孔�? (?�援完全?��?尺寸)
+    // 6. 皜脫?摮? (?舀摰?函?撠箏站)
     const extraHolesInput = sol.extraHoles || "";
-    // ?��?孔�?：�??��?始渲?�就不�???globalHoleD ?��?，�??��?簡�?，�??��?讓�??�獨立顯�?
-    // 如�??��??��?孔�??��?，可以在?�裡寫死?��? params ?�入
-    // ?��??�輯：固定�?位�?使用 currentBrushD，除?��??��??��?對固定�??��???
-    // 但使?�者�??��??��???�通常?��?額�?孔�???
-    // ?��?徹�??��?，�??�可以�? margin 孔�?視為?�可編輯?��?，�??�給它們單?��??�數??
-    // ?�此?�們維?�固定�?使用?��? D，�?額�?孔強?��?定�?
+    // ?箏?摮?嚗??血?憪葡?停銝???globalHoleD ?寡?嚗??箔?蝪∪?嚗???霈??蝡＊蝷?
+    // 憒??唾??箏?摮??函?嚗隞亙?ㄐ撖急香?? params ?喳
+    // ?桀??摩嚗摰?雿?雿輻 currentBrushD嚗?????仿?撠摰?????
+    // 雿蝙?刻??啁?????虜?舀?憿?摮???
+    // ?箔?敺孵??琿?嚗??隞交? margin 摮?閬?蝺刻摩??嚗??策摰?函????
+    // ?冽迨?雁?摰?雿輻?典? D嚗?憿?摮撥?園?摰?
 
     const leftKey = holeKey(margin, W / 2);
     const rightKey = holeKey(L - margin, W / 2);
@@ -126,8 +126,8 @@ export function renderBar(sol, theta, trajectory, viewParams) {
         svg.appendChild(hGroup);
     });
 
-    // 7. 渲�?導�?�?(?�援完全?��?寬度)
-    // ?�樣?��?輯適?�於�?
+    // 7. 皜脫?撠?瑽?(?舀摰?函?撖砍漲)
+    // ?見??頛舫?冽瑽?
     const extraSlotsInput = sol.extraSlots || "";
     const slots = [];
     if (extraSlotsInput) {
@@ -164,7 +164,7 @@ export function renderBar(sol, theta, trajectory, viewParams) {
         svg.appendChild(sGroup);
     });
 
-    // 8. 座�??��???
+    // 8. 摨扳?????
     const cursorLabel = svgEl('text', { x: 0, y: 0, style: 'font-size: 13px; fill: #e67e22; font-family: monospace; font-weight: bold; pointer-events: none; visibility: hidden; filter: drop-shadow(0 0 2px white);', id: 'cursor-label' });
     svg.appendChild(cursorLabel);
 
@@ -186,7 +186,9 @@ export function renderBar(sol, theta, trajectory, viewParams) {
 
         if (bx >= 0 && bx <= L && by >= 0 && by <= W) {
             cursorLabel.style.visibility = 'visible'; cursorLabel.setAttribute('x', lx + 12); cursorLabel.setAttribute('y', ly - 12);
-            const modeName = currentMode === 'hole' ? `?��? ?${currentD} 孔` : `?��? W:${currentD} 槽`;
+            const modeName = currentMode === 'hole'
+                ? `新增 ⌀${currentD} 孔`
+                : `新增 W:${currentD} 槽`;
             cursorLabel.textContent = `${modeName}: (${bx}, ${by})`;
         } else { cursorLabel.style.visibility = 'hidden'; }
     };
@@ -208,7 +210,7 @@ function addElement(mode, x, y, len, d) {
     const id = mode === 'hole' ? 'extraHoles' : 'extraSlots';
     const input = $(id); if (!input) return;
     let val = input.value.trim();
-    // 強�^��?�>�?�尺寸寫?��?串�?實現?O�?結�??
+    // 撘瑕^嗅???偕撖詨神?亙?銝莎?撖衣?O?蝯??
     const newData = mode === 'hole' ? `${x},${y},${d}` : `${x},${y},${len},${d}`;
     input.value = val ? `${val}; ${newData}` : newData;
     $('btnUpdate').click();
@@ -228,9 +230,8 @@ function removeElement(mode, rawString) {
         }
     }
     let parts = input.value.split(';').map(p => p.trim()).filter(p => p !== '');
-    // ?�接比�??��?字串?��??�除，�??�精�?
+    // ?湔瘥???摮葡?脰??芷嚗??箇移蝣?
     parts = parts.filter(p => p !== raw);
     input.value = parts.join('; ');
     $('btnUpdate').click();
 }
-

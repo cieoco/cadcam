@@ -79,6 +79,7 @@ export function readInputs() {
         feedXY: Number($("feedXY")?.value || 400),     // XY 進給速度
         feedZ: Number($("feedZ")?.value || 100),       // Z 進給速度
         spindle: spindleRaw === "" ? NaN : Number(spindleRaw), // 主軸轉速
+        holeMode: $("holeMode")?.value || "drill",
     };
 
     return { mech, partSpec, mfg };
@@ -115,7 +116,7 @@ export function validateConfig(mech, partSpec, mfg) {
     }
 
     // 檢查孔徑必須大於刀徑
-    if (partSpec.holeD <= mfg.toolD) {
+    if (mfg.holeMode === "mill" && partSpec.holeD <= mfg.toolD) {
         throw new Error(
             `孔徑 holeD(${partSpec.holeD}) 需大於刀徑 toolD(${mfg.toolD})`
         );

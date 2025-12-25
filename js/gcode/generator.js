@@ -20,7 +20,7 @@ import {
  * @returns {string} G-code 文字
  */
 export function buildPartGcode(part, mfg) {
-    const { safeZ, feedXY, feedZ, thickness, overcut, stepdown, spindle } = mfg;
+    const { safeZ, feedXY, feedZ, thickness, overcut, stepdown, spindle, holeMode } = mfg;
 
     const cutDepth = -(thickness + overcut); // 負值
     const drillZ = cutDepth; // 鑽孔深度與切深相同
@@ -33,8 +33,27 @@ export function buildPartGcode(part, mfg) {
     if (part.barStyle === 'path' && part.points) labelL += ` (Points: ${part.points.length})`;
     lines.push(`(Part: ${part.id}, ${labelL}, style=${part.barStyle || 'rect'})`);
 
-    // 1. 鑽孔
-    lines.push(...drillOps({ holes: part.holes, safeZ, drillZ, feedZ }));
+    // 1. 孔加工
+    if (holeMode === "mill") {
+        lines.push("(Mill holes)");
+        for (const h of part.holes) {
+            const holeD = Number.isFinite(h.d) ? h.d : part.holeD;
+            lines.push(
+                ...profileCircleOps({
+                    cx: h.x,
+                    cy: h.y,
+                    diameter: holeD,
+                    safeZ,
+                    cutDepth,
+                    stepdown,
+                    feedXY,
+                    feedZ,
+                })
+            );
+        }
+    } else {
+        lines.push(...drillOps({ holes: part.holes, safeZ, drillZ, feedZ }));
+    }
 
     // 1.5 導軌槽 (Slots)
     if (part.slots) {
@@ -116,6 +135,7 @@ export function generateMachiningInfo(mfg, partCount) {
     info.push(`- 刀徑：${mfg.toolD.toFixed(2)} mm`);
     info.push(`- XY 進給：${mfg.feedXY.toFixed(0)} mm/min`);
     info.push(`- Z 進給：${mfg.feedZ.toFixed(0)} mm/min`);
+    info.push(`- 孔加工：${mfg.holeMode === "mill" ? "銑內徑" : "鑽中心點"}`);
     if (Number.isFinite(mfg.spindle) && mfg.spindle > 0) {
         info.push(`- 主軸轉速：${mfg.spindle.toFixed(0)} RPM`);
     }
