@@ -9,6 +9,7 @@ import {
     drillOps,
     profileRectOps,
     profileRoundedRectOps,
+    profileCircleOps,
 } from './operations.js';
 
 /**
@@ -25,11 +26,26 @@ export function buildPartGcode(part, mfg) {
 
     const lines = [];
     lines.push(...gcodeHeader({ safeZ, spindle }));
-    lines.push(`(Part: ${part.id}, link L=${part.L.toFixed(3)}mm, style=${part.barStyle || 'rect'})`);
+
+    // 註解說明
+    const labelL = part.L !== undefined ? `L=${part.L.toFixed(2)}mm` : `W=${part.width}, H=${part.height || part.diameter}`;
+    lines.push(`(Part: ${part.id}, ${labelL}, style=${part.barStyle || 'rect'})`);
+
+    // 1. 鑽孔
     lines.push(...drillOps({ holes: part.holes, safeZ, drillZ, feedZ }));
 
-    // 根據樣式選擇切割路徑
-    if (part.barStyle === 'rounded') {
+    // 2. 外形切割
+    if (part.barStyle === 'disk') {
+        const cx = part.rect ? (part.rect.x + part.rect.w / 2) : 0;
+        const cy = part.rect ? (part.rect.y + part.rect.h / 2) : 0;
+        lines.push(
+            ...profileCircleOps({
+                cx, cy,
+                diameter: part.diameter,
+                safeZ, cutDepth, stepdown, feedXY, feedZ
+            })
+        );
+    } else if (part.barStyle === 'rounded') {
         lines.push(
             ...profileRoundedRectOps({ rect: part.rect, safeZ, cutDepth, stepdown, feedXY, feedZ })
         );

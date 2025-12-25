@@ -229,23 +229,71 @@ export const MECHANISMS = {
                 id: 'theta',
                 label: '曲柄角度 θ',
                 type: 'number',
-                min: 0,
-                max: 360,
+                min: -180,
+                max: 180,
                 step: 1,
-                default: 0,
+                default: 30,
                 unit: '度'
+            },
+            {
+                id: 'motorType',
+                label: '驅動類型',
+                type: 'select',
+                options: [
+                    { value: 'motor360', label: '🔄 馬達（360°）' },
+                    { value: 'servo180', label: '↔️ 舵機（180°）' },
+                    { value: 'servo270', label: '↔️ 舵機（270°）' },
+                    { value: 'custom', label: '⚙️ 自訂範圍' }
+                ],
+                default: 'motor360'
+            },
+            {
+                id: 'sweepStart',
+                label: '起始角度',
+                type: 'number',
+                min: -180,
+                max: 180,
+                step: 1,
+                default: -180,
+                unit: '度'
+            },
+            {
+                id: 'sweepEnd',
+                label: '結束角度',
+                type: 'number',
+                min: -180,
+                max: 180,
+                step: 1,
+                default: 180,
+                unit: '度'
+            },
+            {
+                id: 'sweepStep',
+                label: '掃描間隔',
+                type: 'number',
+                min: 1,
+                max: 10,
+                step: 1,
+                default: 1,
+                unit: '度'
+            },
+            {
+                id: 'showTrajectory',
+                label: '顯示軌跡',
+                type: 'checkbox',
+                default: true
             }
         ],
 
         partSpecs: [
             {
-                id: 'crankDiameter',
-                label: '曲柄盤直徑',
+                id: 'crankWidth',
+                label: '曲柄寬度',
                 type: 'number',
-                min: 40,
-                max: 150,
+                min: 10,
+                max: 40,
                 step: 1,
-                default: 80,
+                default: 15,
                 unit: 'mm'
             },
             {
@@ -262,21 +310,51 @@ export const MECHANISMS = {
                 id: 'sliderWidth',
                 label: '滑塊寬度',
                 type: 'number',
-                min: 30,
+                min: 20,
                 max: 80,
                 step: 1,
-                default: 40,
+                default: 30,
                 unit: 'mm'
             },
             {
                 id: 'sliderHeight',
                 label: '滑塊高度',
                 type: 'number',
-                min: 20,
+                min: 15,
                 max: 60,
                 step: 1,
-                default: 30,
+                default: 20,
                 unit: 'mm'
+            },
+            {
+                id: 'holeD',
+                label: '孔徑',
+                type: 'number',
+                min: 2.5,
+                max: 8,
+                step: 0.1,
+                default: 3.2,
+                unit: 'mm'
+            },
+            {
+                id: 'margin',
+                label: '端到孔中心邊距',
+                type: 'number',
+                min: 4,
+                max: 20,
+                step: 0.5,
+                default: 7,
+                unit: 'mm'
+            },
+            {
+                id: 'barStyle',
+                label: '桿件樣式',
+                type: 'select',
+                options: [
+                    { value: 'rect', label: '⬛ 直角矩形/圓盤' },
+                    { value: 'rounded', label: '💊 圓角矩形/圓盤' }
+                ],
+                default: 'rounded'
             }
         ],
 

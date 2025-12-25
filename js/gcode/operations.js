@@ -171,9 +171,42 @@ export function profileRoundedRectOps({
 }
 
 /**
- * 圓形外形切割操作（多層）- 預留給未來擴展
+ * 圓形外形切割操作（多層）
  */
-export function profileCircleOps(params) {
-    // TODO: 實作圓形切割
-    return ["(Circle profile - not implemented yet)"];
+export function profileCircleOps({
+    cx,
+    cy,
+    diameter,
+    safeZ,
+    cutDepth,
+    stepdown,
+    feedXY,
+    feedZ,
+}) {
+    const lines = [];
+    lines.push("(Profile circle)");
+    const r = diameter / 2;
+
+    const zLevels = [];
+    const total = Math.abs(cutDepth);
+    const sd = Math.abs(stepdown);
+    const n = Math.max(1, Math.ceil(total / sd));
+    for (let i = 1; i <= n; i++) {
+        zLevels.push(-Math.min(i * sd, total));
+    }
+
+    for (const z of zLevels) {
+        lines.push(`G0 Z${fmt(safeZ)}`);
+        // 起點：圓的最右側 (cx + r, cy)
+        lines.push(`G0 X${fmt(cx + r)} Y${fmt(cy)}`);
+        lines.push(`G1 Z${fmt(z)} F${fmt(feedZ)}`);
+
+        // 使用 G3 逆時針繞一整圈
+        // 起點 (cx + r, cy), 切回 (cx + r, cy), 中心偏移 I=-r, J=0
+        lines.push(`G3 X${fmt(cx + r)} Y${fmt(cy)} I${fmt(-r)} J${fmt(0)} F${fmt(feedXY)}`);
+
+        lines.push(`G0 Z${fmt(safeZ)}`);
+    }
+
+    return lines;
 }

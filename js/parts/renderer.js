@@ -45,22 +45,36 @@ export function renderPartsLayout(parts, workX, workY) {
         const r = p.rect;
 
         // 繪製外框
-        const rectAttrs = {
-            x: tx(r.x),
-            y: ty(r.y + r.h),
-            width: r.w * scale,
-            height: r.h * scale,
-            fill: p.color ? `${p.color}15` : "rgba(0,0,0,0.03)",
-            stroke: p.color || "#111",
-            "stroke-width": 1.5,
-        };
+        if (p.barStyle === 'disk') {
+            const r = p.rect;
+            svg.appendChild(
+                svgEl("circle", {
+                    cx: tx(r.x + r.w / 2),
+                    cy: ty(r.y + r.h / 2),
+                    r: (p.diameter / 2) * scale,
+                    fill: p.color ? `${p.color}15` : "rgba(0,0,0,0.03)",
+                    stroke: p.color || "#111",
+                    "stroke-width": 1.5,
+                })
+            );
+        } else {
+            const rectAttrs = {
+                x: tx(r.x),
+                y: ty(r.y + r.h),
+                width: r.w * scale,
+                height: r.h * scale,
+                fill: p.color ? `${p.color}15` : "rgba(0,0,0,0.03)",
+                stroke: p.color || "#111",
+                "stroke-width": 1.5,
+            };
 
-        if (p.barStyle === 'rounded') {
-            rectAttrs.rx = (r.h / 2) * scale;
-            rectAttrs.ry = (r.h / 2) * scale;
+            if (p.barStyle === 'rounded') {
+                rectAttrs.rx = (r.h / 2) * scale;
+                rectAttrs.ry = (r.h / 2) * scale;
+            }
+
+            svg.appendChild(svgEl("rect", rectAttrs));
         }
-
-        svg.appendChild(svgEl("rect", rectAttrs));
 
         // 孔洞
         for (const h of p.holes) {

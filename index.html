@@ -624,9 +624,9 @@
                     why: "旋轉 → 直線；行程明確、死點好理解，極適合快速原型。",
                     pros: ["直線推拉最自然", "參數少、好教"],
                     cons: ["死點附近力/速度特性差", "側向力與導向要注意"],
-                    cta: "（下一版）",
-                    href: "#",
-                    enabled: false
+                    cta: "進入曲柄滑塊工具",
+                    href: "./mechanism.html?type=crankslider",
+                    enabled: true
                 });
                 recs.push({
                     id: "rackpinion",
@@ -647,9 +647,9 @@
                     why: "天生往復；最少零件就能做出週期推拉。",
                     pros: ["最簡單往復", "容易做出節奏"],
                     cons: ["死點效應", "需要導軌避免偏載"],
-                    cta: "（下一版）",
-                    href: "#",
-                    enabled: false
+                    cta: "進入曲柄滑塊工具",
+                    href: "./mechanism.html?type=crankslider",
+                    enabled: true
                 });
                 recs.push({
                     id: "cam",
@@ -765,7 +765,7 @@
                 'rackpinion': '齒條齒輪工具'
             };
 
-            const isImplemented = state.mech === 'fourbar';
+            const isImplemented = state.mech === 'fourbar' || state.mech === 'crankslider';
             const btn = document.createElement("a");
             btn.className = `btn ${isImplemented ? 'primary' : 'ghost'}`;
             btn.style.padding = "16px";

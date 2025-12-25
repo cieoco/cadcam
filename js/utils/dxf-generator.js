@@ -17,7 +17,10 @@ export function buildDXF(parts) {
     for (const p of parts) {
         const { x, y, w, h } = p.rect;
 
-        if (p.barStyle === 'rounded') {
+        if (p.barStyle === 'disk') {
+            // 圓形
+            addCircle(lines, x + w / 2, y + h / 2, p.diameter / 2);
+        } else if (p.barStyle === 'rounded') {
             // 圓角矩形 (全圓角)：由兩條直線和兩個半圓組成
             const r = h / 2;
 

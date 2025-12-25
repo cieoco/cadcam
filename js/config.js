@@ -10,14 +10,21 @@ import { $ } from './utils.js';
  * @returns {{mech: Object, partSpec: Object, mfg: Object}}
  */
 export function readInputs() {
-    // 四連桿機構參數
+    // 讀取所有可能的機構參數
     const mech = {
-        a: Number($("a")?.value || 120),           // Ground link
-        b: Number($("b")?.value || 60),            // Input link
-        c: Number($("c")?.value || 110),           // Coupler link
-        d: Number($("d")?.value || 80),            // Output link
-        thetaDeg: Number($("theta")?.value || 30), // Input angle
-        assembly: $("assembly")?.value || "open", // open/crossed
+        // 四連桿
+        a: Number($("a")?.value || 120),
+        b: Number($("b")?.value || 60),
+        c: Number($("c")?.value || 110),
+        d: Number($("d")?.value || 80),
+        assembly: $("assembly")?.value || "open",
+
+        // 曲柄滑塊
+        crankRadius: Number($("crankRadius")?.value || 30),
+        rodLength: Number($("rodLength")?.value || 100),
+
+        // 通用
+        thetaDeg: Number($("theta")?.value || 30),
     };
 
     // 零件規格參數
@@ -29,6 +36,12 @@ export function readInputs() {
         barStyle: $("barStyle")?.value || "rounded", // 桿件樣式
         workX: Number($("workX")?.value || 300),  // 工作範圍 X
         workY: Number($("workY")?.value || 180),  // 工作範圍 Y
+
+        // 曲柄滑塊規格
+        crankWidth: Number($("crankWidth")?.value || 15),
+        rodWidth: Number($("rodWidth")?.value || 15),
+        sliderWidth: Number($("sliderWidth")?.value || 30),
+        sliderHeight: Number($("sliderHeight")?.value || 20),
     };
 
     // 加工參數
@@ -56,17 +69,8 @@ export function readInputs() {
  * @throws {Error} 參數無效時拋出錯誤
  */
 export function validateConfig(mech, partSpec, mfg) {
-    // 檢查所有必要數值參數
-    const nums = [
-        ["a", mech.a],
-        ["b", mech.b],
-        ["c", mech.c],
-        ["d", mech.d],
-        ["barW", partSpec.barW],
-        ["margin", partSpec.margin],
-        ["holeD", partSpec.holeD],
-        ["workX", partSpec.workX],
-        ["workY", partSpec.workY],
+    // 檢查加工參數 (必填)
+    const mfgNums = [
         ["toolD", mfg.toolD],
         ["thickness", mfg.thickness],
         ["overcut", mfg.overcut],
@@ -76,16 +80,21 @@ export function validateConfig(mech, partSpec, mfg) {
         ["feedZ", mfg.feedZ],
     ];
 
-    for (const [k, v] of nums) {
+    for (const [k, v] of mfgNums) {
         if (!Number.isFinite(v) || v <= 0) {
-            throw new Error(`參數 ${k} 無效：${v}`);
+            throw new Error(`加工參數 ${k} 無效：${v}`);
         }
+    }
+
+    // 檢查零件基礎參數
+    if (!Number.isFinite(partSpec.holeD) || partSpec.holeD <= 0) {
+        throw new Error(`孔徑 holeD 無效`);
     }
 
     // 檢查孔徑必須大於刀徑
     if (partSpec.holeD <= mfg.toolD) {
         throw new Error(
-            `孔徑 holeD(${partSpec.holeD}) 需大於刀徑 toolD(${mfg.toolD})（MVP 先不做內插擴孔）`
+            `孔徑 holeD(${partSpec.holeD}) 需大於刀徑 toolD(${mfg.toolD})`
         );
     }
 
@@ -97,35 +106,32 @@ export function validateConfig(mech, partSpec, mfg) {
 
 /**
  * 讀取動畫掃描參數
- * @returns {{sweepStart: number, sweepEnd: number, sweepStep: number, showTrajectory: boolean, motorType: string}}
  */
 export function readSweepParams() {
     return {
-        sweepStart: Number($("sweepStart").value),
-        sweepEnd: Number($("sweepEnd").value),
-        sweepStep: Number($("sweepStep").value),
-        showTrajectory: $("showTrajectory").checked,
-        motorType: $("motorType").value,
+        sweepStart: Number($("sweepStart")?.value || -180),
+        sweepEnd: Number($("sweepEnd")?.value || 180),
+        sweepStep: Number($("sweepStep")?.value || 1),
+        showTrajectory: $("showTrajectory")?.checked || false,
+        motorType: $("motorType")?.value || "motor360",
     };
 }
 
 /**
  * 讀取視圖參數
- * @returns {{viewRange: number, showGrid: boolean}}
  */
 export function readViewParams() {
     return {
-        viewRange: Number($("viewRange").value) || 400,
-        showGrid: $("showGrid").checked,
+        viewRange: Number($("viewRange")?.value) || 400,
+        showGrid: $("showGrid")?.checked || false,
     };
 }
 
 /**
  * 讀取動畫速度參數
- * @returns {{speed: number}}
  */
 export function readAnimSpeed() {
     return {
-        speed: Number($("animSpeed").value), // RPM
+        speed: Number($("animSpeed")?.value || 30), // RPM
     };
 }
