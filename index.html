@@ -448,41 +448,21 @@
                         </div>
                     </div>
 
-                    <!-- Step 2 -->
+                    <!-- Step 2 & 3 & 4 (Integrated) -->
                     <div style="height:14px"></div>
                     <div class="hint">
-                        <strong>Step 2｜推薦「最自然的機構」</strong><br />
-                        系統會依運動型態給 1–3 個候選。第一版先把「桿件化」做強：好算、好切、好改。
+                        <strong>Step 2｜推薦機構、選致動器、最後快速預覽</strong><br />
+                        系統會依運動型態給予候選，並引導你完成初步決策。
                     </div>
 
                     <div class="rec" id="mechRecs"></div>
+                    <div class="smallGrid" id="actuatorBox" style="margin-top:14px;"></div>
 
-                    <!-- Step 3 -->
-                    <div style="height:14px"></div>
-                    <div class="hint">
-                        <strong>Step 3｜再選致動器（決策樹）</strong><br />
-                        先判斷「連續控制 vs 兩段式」，再看「要定位角度/位置嗎」，最後才談快/穩。
+                    <div id="ctaContainer" style="margin-top:20px; display: flex; flex-direction: column; gap: 12px;">
+                        <!-- 按鈕會在這裡動態生成 -->
                     </div>
 
-                    <div class="smallGrid" id="actuatorBox"></div>
-
-                    <!-- Step 4 -->
-                    <div style="height:14px"></div>
-                    <div class="hint">
-                        <strong>Step 4｜最後才做工程粗估（Sanity Check）</strong><br />
-                        這裡不是做完整 CAE，而是做「防呆」：幾何順不順、行程合理不合理、加工是否安全。
-                    </div>
-
-                    <div class="kv">
-                        <div class="box">
-                            <strong>尺寸 / 行程檢查</strong>
-                            看軌跡是否超出工作範圍、是否有死點、是否對應到你要的行程。
-                        </div>
-                        <div class="box">
-                            <strong>加工安全檢查</strong>
-                            GRBL：G21/G90、SAFE_Z、先孔後外形、stepdown 分層；v0.1 不含 tabs（需固定工件）。
-                        </div>
-                    </div>
+                    <button class="btn ghost" id="resetBtn" style="margin-top: 14px;">↺ 重設選擇</button>
 
                 </div>
             </div>
@@ -545,10 +525,7 @@
             </div>
         </div>
 
-        <div class="footer">
-            <div><span class="mono">GRBL</span> 建議：輸出固定包含 <span class="mono">G21/G90/G17/G94</span>，所有 XY 移動前先回 <span
-                    class="mono">SAFE_Z</span>，先孔後外形，外形分層 stepdown。</div>
-        </div>
+
     </div>
 
     <script>
@@ -562,7 +539,7 @@
         const motionChips = document.querySelectorAll("#motionChips .chip");
         const mechRecs = document.getElementById("mechRecs");
         const actuatorBox = document.getElementById("actuatorBox");
-        const goFourbar = document.getElementById("goFourbar");
+        const ctaContainer = document.getElementById("ctaContainer");
 
         // meters
         const mGeom = document.getElementById("mGeom");
@@ -585,10 +562,7 @@
             motionChips.forEach(c => c.classList.remove("active"));
             mechRecs.innerHTML = "";
             actuatorBox.innerHTML = "";
-            goFourbar.setAttribute("aria-disabled", "true");
-            goFourbar.classList.remove("primary");
-            goFourbar.classList.add("ghost");
-            goFourbar.style.pointerEvents = "none";
+            ctaContainer.innerHTML = "";
             // meters
             setMeter(mGeom, mGeomTxt, 0);
             setMeter(mCam, mCamTxt, 0);
@@ -735,40 +709,34 @@
 
         function renderActuatorDecision() {
             actuatorBox.innerHTML = "";
-            if (!state.motion) return;
+            if (!state.motion || !state.mech) return;
 
             // Simple decision UI: 3 questions collapsed into quick picks
             const div = document.createElement("div");
             div.className = "recCard";
+            div.style.borderStyle = "dashed";
             div.innerHTML = `
         <div class="recTop">
-          <div class="name">致動器選擇（快速決策）</div>
-          <div class="badge">先可控，再變強</div>
-        </div>
-        <div class="why">
-          先選控制型態：<b>連續可控</b>（定位/變速）或 <b>兩段式</b>（推到底/放開）。
-          再看你要的是角度定位、位置定位、還是純力量/速度。
+          <div class="name">致動器選擇（與 ${state.mech === 'fourbar' ? '四連桿' : '機構'} 匹配）</div>
+          <div class="badge">快速決策</div>
         </div>
         <div class="chips" style="margin-top:8px;">
           <div class="chip" data-act="servo">
             <div class="t">🧩 舵機</div>
-            <div class="d">最直覺角度定位；適合教學關節、夾爪驅動</div>
+            <div class="d">最直覺角度定位</div>
           </div>
           <div class="chip" data-act="motor">
             <div class="t">⚙️ DC 減速馬達</div>
-            <div class="d">速度/力量彈性大；適合連續動作（需回授更穩）</div>
+            <div class="d">速度/力量彈性大</div>
           </div>
           <div class="chip" data-act="stepper">
             <div class="t">🟦 步進馬達</div>
-            <div class="d">定位穩、控制簡單；速度較保守，適合滑台/慢速機構</div>
+            <div class="d">定位穩、控制簡單</div>
           </div>
           <div class="chip" data-act="pneumatic">
             <div class="t">🟨 氣壓</div>
-            <div class="d">兩段式、力大；適合快速夾緊/推料（控制是 ON/OFF）</div>
+            <div class="d">兩段式、力大</div>
           </div>
-        </div>
-        <div class="callout" style="margin-top:10px;">
-          <strong>工程提醒</strong>：原型先選「可預期」的致動器。越強越容易撞壞機構；先把幾何與行程做順。
         </div>
       `;
             actuatorBox.appendChild(div);
@@ -780,25 +748,47 @@
                     ch.classList.add("active");
                     state.act = ch.dataset.act;
                     updateMeters();
+                    updatePrimaryCTA();
                 });
             });
+
+            updatePrimaryCTA();
         }
 
         function updatePrimaryCTA() {
-            // enable going to fourbar only when motion chosen and recommended mech is fourbar OR user picked fourbar
-            const ok = (state.motion === "swing") && (state.mech === "fourbar" || state.mech === null);
-            // If user hasn't picked a mech yet but motion is swing, still allow the fourbar tool
-            const allow = (state.motion === "swing");
-            if (allow) {
-                goFourbar.style.pointerEvents = "auto";
-                goFourbar.setAttribute("aria-disabled", "false");
-                goFourbar.classList.add("primary");
-                goFourbar.classList.remove("ghost");
+            ctaContainer.innerHTML = "";
+            if (!state.motion || !state.mech) return;
+
+            const nameMap = {
+                'fourbar': '四連桿工具',
+                'crankslider': '曲柄滑塊工具',
+                'rackpinion': '齒條齒輪工具'
+            };
+
+            const isImplemented = state.mech === 'fourbar';
+            const btn = document.createElement("a");
+            btn.className = `btn ${isImplemented ? 'primary' : 'ghost'}`;
+            btn.style.padding = "16px";
+            btn.style.fontSize = "14px";
+            btn.style.justifyContent = "center";
+
+            if (isImplemented) {
+                btn.href = `./mechanism.html?type=${state.mech}`;
+                btn.innerHTML = `🚀 確認決策，進入 ${nameMap[state.mech]} 模擬 →`;
             } else {
-                goFourbar.style.pointerEvents = "none";
-                goFourbar.setAttribute("aria-disabled", "true");
-                goFourbar.classList.remove("primary");
-                goFourbar.classList.add("ghost");
+                btn.href = "#";
+                btn.onclick = (e) => { e.preventDefault(); alert("此機構實作中，敬請期待下一步更新。"); };
+                btn.innerHTML = `⌛ ${nameMap[state.mech] || '此機構'} 實作中，敬請期待`;
+            }
+
+            ctaContainer.appendChild(btn);
+
+            if (isImplemented) {
+                const hint = document.createElement("div");
+                hint.className = "hint";
+                hint.style.textAlign = "center";
+                hint.innerHTML = "點擊上方按鈕即可進入 2D 模擬並生成 CNC 用 G-code。";
+                ctaContainer.appendChild(hint);
             }
         }
 
