@@ -31,6 +31,7 @@ export function generateParts({
     margin,
     holeD,
     spacing,
+    barStyle = 'rect',
     workX,
     workY,
 }) {
@@ -88,6 +89,7 @@ export function generateParts({
             rect: { x: x0, y: y0, w, h },
             holes: [hole1, hole2],
             holeD,
+            barStyle,
         });
 
         xCursor += w + spacing;

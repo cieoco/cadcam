@@ -167,6 +167,16 @@ export const MECHANISMS = {
                 step: 1,
                 default: 8,
                 unit: 'mm'
+            },
+            {
+                id: 'barStyle',
+                label: '桿件樣式',
+                type: 'select',
+                options: [
+                    { value: 'rect', label: '⬛ 直角矩形' },
+                    { value: 'rounded', label: '💊 圓角矩形 (全圓角)' }
+                ],
+                default: 'rounded'
             }
         ],
 

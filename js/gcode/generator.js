@@ -8,6 +8,7 @@ import {
     gcodeFooter,
     drillOps,
     profileRectOps,
+    profileRoundedRectOps,
 } from './operations.js';
 
 /**
@@ -24,11 +25,20 @@ export function buildPartGcode(part, mfg) {
 
     const lines = [];
     lines.push(...gcodeHeader({ safeZ, spindle }));
-    lines.push(`(Part: ${part.id}, link L=${part.L.toFixed(3)}mm)`);
+    lines.push(`(Part: ${part.id}, link L=${part.L.toFixed(3)}mm, style=${part.barStyle || 'rect'})`);
     lines.push(...drillOps({ holes: part.holes, safeZ, drillZ, feedZ }));
-    lines.push(
-        ...profileRectOps({ rect: part.rect, safeZ, cutDepth, stepdown, feedXY, feedZ })
-    );
+
+    // 根據樣式選擇切割路徑
+    if (part.barStyle === 'rounded') {
+        lines.push(
+            ...profileRoundedRectOps({ rect: part.rect, safeZ, cutDepth, stepdown, feedXY, feedZ })
+        );
+    } else {
+        lines.push(
+            ...profileRectOps({ rect: part.rect, safeZ, cutDepth, stepdown, feedXY, feedZ })
+        );
+    }
+
     lines.push(...gcodeFooter({ safeZ, spindle }));
     return lines.join("\n") + "\n";
 }

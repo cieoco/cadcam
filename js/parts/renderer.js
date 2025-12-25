@@ -44,18 +44,23 @@ export function renderPartsLayout(parts, workX, workY) {
     for (const p of parts) {
         const r = p.rect;
 
-        // 矩形外框
-        svg.appendChild(
-            svgEl("rect", {
-                x: tx(r.x),
-                y: ty(r.y + r.h),
-                width: r.w * scale,
-                height: r.h * scale,
-                fill: p.color ? `${p.color}10` : "rgba(0,0,0,0.03)",
-                stroke: p.color || "#111",
-                "stroke-width": 1.5,
-            })
-        );
+        // 繪製外框
+        const rectAttrs = {
+            x: tx(r.x),
+            y: ty(r.y + r.h),
+            width: r.w * scale,
+            height: r.h * scale,
+            fill: p.color ? `${p.color}15` : "rgba(0,0,0,0.03)",
+            stroke: p.color || "#111",
+            "stroke-width": 1.5,
+        };
+
+        if (p.barStyle === 'rounded') {
+            rectAttrs.rx = (r.h / 2) * scale;
+            rectAttrs.ry = (r.h / 2) * scale;
+        }
+
+        svg.appendChild(svgEl("rect", rectAttrs));
 
         // 孔洞
         for (const h of p.holes) {

@@ -26,6 +26,7 @@ export function readInputs() {
         margin: Number($("margin")?.value || 7),  // 端到孔邊距
         holeD: Number($("holeD")?.value || 3.2),  // 孔徑
         spacing: Number($("spacing")?.value || 8), // 零件間距
+        barStyle: $("barStyle")?.value || "rounded", // 桿件樣式
         workX: Number($("workX")?.value || 300),  // 工作範圍 X
         workY: Number($("workY")?.value || 180),  // 工作範圍 Y
     };

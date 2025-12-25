@@ -122,9 +122,56 @@ export function profileRectOps({
 }
 
 /**
+ * 圓角矩形外形切割（多層）
+ */
+export function profileRoundedRectOps({
+    rect,
+    safeZ,
+    cutDepth,
+    stepdown,
+    feedXY,
+    feedZ,
+}) {
+    const lines = [];
+    lines.push("(Profile rounded rectangle)");
+    const { x: x0, y: y0, w, h } = rect;
+    const r = h / 2;
+    const x1 = x0 + w;
+    const y1 = y0 + h;
+
+    const zLevels = [];
+    const total = Math.abs(cutDepth);
+    const sd = Math.abs(stepdown);
+    const n = Math.max(1, Math.ceil(total / sd));
+    for (let i = 1; i <= n; i++) {
+        zLevels.push(-Math.min(i * sd, total));
+    }
+
+    for (const z of zLevels) {
+        lines.push(`G0 Z${fmt(safeZ)}`);
+        // 起點：底部直線的開始
+        lines.push(`G0 X${fmt(x0 + r)} Y${fmt(y0)}`);
+        lines.push(`G1 Z${fmt(z)} F${fmt(feedZ)}`);
+
+        // 1. 底部直線
+        lines.push(`G1 X${fmt(x1 - r)} Y${fmt(y0)} F${fmt(feedXY)}`);
+        // 2. 右側半圓 (G3 CCW, I,J 為起點到中心的位移)
+        // 起點 (x1-r, y0), 中心 (x1-r, y0+r) -> I=0, J=r
+        lines.push(`G3 X${fmt(x1 - r)} Y${fmt(y1)} I${fmt(0)} J${fmt(r)} F${fmt(feedXY)}`);
+        // 3. 頂部直線
+        lines.push(`G1 X${fmt(x0 + r)} Y${fmt(y1)} F${fmt(feedXY)}`);
+        // 4. 左側半圓
+        // 起點 (x0+r, y1), 中心 (x0+r, y0+r) -> I=0, J=-r
+        lines.push(`G3 X${fmt(x0 + r)} Y${fmt(y0)} I${fmt(0)} J${fmt(-r)} F${fmt(feedXY)}`);
+
+        lines.push(`G0 Z${fmt(safeZ)}`);
+    }
+
+    return lines;
+}
+
+/**
  * 圓形外形切割操作（多層）- 預留給未來擴展
- * @param {Object} params - 參數
- * @returns {Array<string>} G-code 行陣列
  */
 export function profileCircleOps(params) {
     // TODO: 實作圓形切割

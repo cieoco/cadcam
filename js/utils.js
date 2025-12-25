@@ -75,8 +75,42 @@ export function downloadText(filename, text) {
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+
+  // 延遲移除與釋放，避免 Chrome 在下載尚未啟動前就銷毀 URL 導致檔名變成 UUID
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+}
+
+/**
+ * 下載 ZIP 壓縮檔
+ * @param {string} zipName - 壓縮檔名稱
+ * @param {Array<{name: string, text: string}>} files - 檔案列表
+ */
+export async function downloadZip(zipName, files) {
+  if (typeof JSZip === 'undefined') {
+    alert("JSZip 函式庫尚未載入，請確認 mechanism.html 已引入 JSZip。");
+    return;
+  }
+
+  const zip = new JSZip();
+  for (const f of files) {
+    zip.file(f.name, f.text);
+  }
+
+  const content = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(content);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = zipName;
+  document.body.appendChild(a);
+  a.click();
+
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
 }
 
 /**

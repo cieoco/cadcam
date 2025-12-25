@@ -3,13 +3,14 @@
  * UI 控制模組 - 處理所有使用者介面互動
  */
 
-import { $, log, downloadText, fmt } from '../utils.js';
+import { $, log, downloadText, downloadZip, fmt } from '../utils.js';
 import { readInputs, validateConfig, readSweepParams, readViewParams } from '../config.js';
 import { solveFourBar, sweepTheta, calculateTrajectoryStats } from '../fourbar/solver.js';
 import { startAnimation, pauseAnimation, stopAnimation, setupMotorTypeHandler } from '../fourbar/animation.js';
 import { generateParts } from '../parts/generator.js';
 import { renderPartsLayout, renderTrajectory } from '../parts/renderer.js';
 import { buildAllGcodes, generateMachiningInfo } from '../gcode/generator.js';
+import { buildDXF } from '../utils/dxf-generator.js';
 import { renderFourbar } from './visualization.js';
 
 // 全域軌跡資料
@@ -109,6 +110,8 @@ export function generateGcodes() {
         // 建立下載按鈕
         const dl = $("dlButtons");
         dl.innerHTML = "";
+
+        // 1. 各零件 G-code 下載
         for (const f of files) {
             const btn = document.createElement("button");
             btn.textContent = `下載 ${f.name}`;
@@ -116,6 +119,26 @@ export function generateGcodes() {
             btn.onclick = () => downloadText(f.name, f.text);
             dl.appendChild(btn);
         }
+
+        // 2. 所有零件 DXF 下載 (CAD 匯出)
+        const dxfText = buildDXF(parts);
+        const dxfBtn = document.createElement("button");
+        dxfBtn.textContent = `匯出 DXF (所有零件)`;
+        dxfBtn.className = "btn-download";
+        dxfBtn.style.backgroundColor = "#6a1b9a"; // 特殊顏色標註 DXF
+        dxfBtn.onclick = () => downloadText("linkage_parts.dxf", dxfText);
+        dl.appendChild(dxfBtn);
+
+        // 3. 一鍵打包 ZIP
+        const zipBtn = document.createElement("button");
+        zipBtn.textContent = `📦 打包下載所有元件 (ZIP)`;
+        zipBtn.className = "btn-download";
+        zipBtn.style.backgroundColor = "#2e7d32"; // 綠色標註
+        zipBtn.onclick = () => {
+            const allFiles = [...files, { name: "linkage_parts.dxf", text: dxfText }];
+            downloadZip("mechanism_cnc_files.zip", allFiles);
+        };
+        dl.appendChild(zipBtn);
 
         const machiningInfo = generateMachiningInfo(mfg, parts.length);
         log($("log").textContent + "\n\n" + machiningInfo + "\n\n已完成 G-code 生成。");
