@@ -3,6 +3,8 @@
  * 機構配置系統 - 定義每種機構的特定參數和行為
  */
 
+import { DRIVE_COMPONENTS, getDriveOptions } from './motor-data.js';
+
 export const MECHANISMS = {
     fourbar: {
         id: 'fourbar',
@@ -78,15 +80,10 @@ export const MECHANISMS = {
             },
             {
                 id: 'motorType',
-                label: '驅動類型',
+                label: '驅動元件',
                 type: 'select',
-                options: [
-                    { value: 'motor360', label: '🔄 馬達（360°）' },
-                    { value: 'servo180', label: '↔️ 舵機（180°）' },
-                    { value: 'servo270', label: '↔️ 舵機（270°）' },
-                    { value: 'custom', label: '⚙️ 自訂範圍' }
-                ],
-                default: 'motor360'
+                options: getDriveOptions(),
+                default: 'tt_motor'
             },
             {
                 id: 'sweepStart',
@@ -237,15 +234,10 @@ export const MECHANISMS = {
             },
             {
                 id: 'motorType',
-                label: '驅動類型',
+                label: '驅動元件',
                 type: 'select',
-                options: [
-                    { value: 'motor360', label: '🔄 馬達（360°）' },
-                    { value: 'servo180', label: '↔️ 舵機（180°）' },
-                    { value: 'servo270', label: '↔️ 舵機（270°）' },
-                    { value: 'custom', label: '⚙️ 自訂範圍' }
-                ],
-                default: 'motor360'
+                options: getDriveOptions(),
+                default: 'tt_motor'
             },
             {
                 id: 'sweepStart',
@@ -413,13 +405,10 @@ export const MECHANISMS = {
             },
             {
                 id: 'motorType',
-                label: '驅動類型',
+                label: '驅動元件',
                 type: 'select',
-                options: [
-                    { value: 'motor360', label: '🔄 馬達（連續）' },
-                    { value: 'custom', label: '⚙️ 自訂範圍' }
-                ],
-                default: 'motor360'
+                options: getDriveOptions(),
+                default: 'tt_motor'
             },
             {
                 id: 'sweepStart',

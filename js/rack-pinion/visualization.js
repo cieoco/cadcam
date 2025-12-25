@@ -3,8 +3,9 @@
  * 齒條齒輪視覺化 (同步運動修正版)
  */
 
-import { svgEl, fmt } from '../utils.js';
+import { svgEl, fmt, drawGridCompatible } from '../utils.js';
 import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
+import { createDriveComponent } from '../motor-data.js';
 
 export function renderRackPinion(sol, thetaDeg, trajectoryData = null, viewParams = {}) {
     const W = 800, H = 600;
@@ -17,12 +18,23 @@ export function renderRackPinion(sol, thetaDeg, trajectoryData = null, viewParam
     const ty = (y) => H / 2 - y * scale;
 
     const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+    const showGrid = viewParams.showGrid !== false;
     svg.appendChild(svgEl("rect", { width: W, height: H, fill: "#fafafa" }));
+
+    if (showGrid) {
+        drawGridCompatible(svg, W, H, viewRange, 0, 0, tx, ty);
+    }
 
     const { isValid, pinion, rack } = sol;
     const { pitchRadius: R, m, N } = pinion;
     const L = Number(rack.length) || 200;
     const disp = Number(rack.displacement) || 0;
+
+    // 繪製驅動元件 (Background)
+    if (viewParams.motorType) {
+        const motorEl = createDriveComponent(viewParams.motorType, tx(0), ty(R), scale);
+        if (motorEl) svg.appendChild(motorEl);
+    }
 
     // 1. 繪製導軌
     svg.appendChild(svgEl("line", {
@@ -31,7 +43,7 @@ export function renderRackPinion(sol, thetaDeg, trajectoryData = null, viewParam
 
     // 2. 齒條 (Rack) - 同步平移
     const rackPts = createRackPath({ length: L, height: 20, module: m });
-    
+
     // 確保有有效的點
     if (rackPts && rackPts.length > 0) {
         const rackPointsStr = rackPts

@@ -31,6 +31,7 @@ export function updatePreview() {
 
         const { mech, partSpec, mfg } = readInputs();
         const viewParams = readViewParams();
+        viewParams.motorType = mech.motorType;
         validateConfig(mech, partSpec, mfg);
 
         // 使用動態模組的求解器
@@ -239,7 +240,7 @@ function displaySweepResults(results, validRanges, invalidRanges, showTrajectory
  */
 export function setupUIHandlers() {
     console.log('Setting up UI handlers...');
-    
+
     // 按鈕綁定
     const btnUpdate = $("btnUpdate");
     if (btnUpdate) btnUpdate.onclick = updatePreview;

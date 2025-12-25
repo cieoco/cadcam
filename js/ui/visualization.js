@@ -3,7 +3,8 @@
  * 視覺化模組 - 四連桿機構的 SVG 渲染
  */
 
-import { svgEl, describeArc, deg2rad } from '../utils.js';
+import { svgEl, describeArc, deg2rad, drawGridCompatible } from '../utils.js';
+import { createDriveComponent } from '../motor-data.js';
 
 /**
  * 渲染四連桿機構
@@ -51,7 +52,7 @@ export function renderFourbar(sol, thetaDeg, trajectoryData = null, viewParams =
 
     // 繪製格線
     if (showGrid) {
-        drawGrid(svg, W, H, viewRange, groundCenterX, groundCenterY, tx, ty);
+        drawGridCompatible(svg, W, H, viewRange, groundCenterX, groundCenterY, tx, ty);
     }
 
     // 繪製軌跡（背景層）
@@ -60,7 +61,7 @@ export function renderFourbar(sol, thetaDeg, trajectoryData = null, viewParams =
     }
 
     // 繪製當前連桿狀態（前景層）
-    drawLinkage(svg, sol, thetaDeg, tx, ty);
+    drawLinkage(svg, sol, thetaDeg, tx, ty, viewParams.motorType, scale);
 
     // 高亮當前 B 點
     if (trajectoryData) {
@@ -79,72 +80,7 @@ export function renderFourbar(sol, thetaDeg, trajectoryData = null, viewParams =
     return svg;
 }
 
-/**
- * 繪製格線
- */
-function drawGrid(svg, W, H, viewRange, groundCenterX, groundCenterY, tx, ty) {
-    const gridStep = 50; // mm
-    const gridColor = "#e0e0e0";
 
-    // 垂直線
-    for (let x = -viewRange / 2; x <= viewRange / 2; x += gridStep) {
-        const screenX = tx({ x: groundCenterX + x, y: 0 });
-        svg.appendChild(
-            svgEl("line", {
-                x1: screenX,
-                y1: 0,
-                x2: screenX,
-                y2: H,
-                stroke: gridColor,
-                "stroke-width": x === 0 ? 1.5 : 0.5,
-            })
-        );
-    }
-
-    // 水平線
-    for (let y = -viewRange / 2; y <= viewRange / 2; y += gridStep) {
-        const screenY = ty({ x: 0, y: groundCenterY + y });
-        svg.appendChild(
-            svgEl("line", {
-                x1: 0,
-                y1: screenY,
-                x2: W,
-                y2: screenY,
-                stroke: gridColor,
-                "stroke-width": y === 0 ? 1.5 : 0.5,
-            })
-        );
-    }
-
-    // 格線標籤
-    const labelStep = 100; // mm
-    for (let x = -viewRange / 2; x <= viewRange / 2; x += labelStep) {
-        if (x === 0) continue;
-        const screenX = tx({ x: groundCenterX + x, y: 0 });
-        const label = svgEl("text", {
-            x: screenX,
-            y: H / 2 + 15,
-            fill: "#999",
-            "font-size": 9,
-            "text-anchor": "middle",
-        });
-        label.textContent = `${x}`;
-        svg.appendChild(label);
-    }
-    for (let y = -viewRange / 2; y <= viewRange / 2; y += labelStep) {
-        if (y === 0) continue;
-        const screenY = ty({ x: 0, y: groundCenterY + y });
-        const label = svgEl("text", {
-            x: W / 2 + 15,
-            y: screenY + 3,
-            fill: "#999",
-            "font-size": 9,
-            "text-anchor": "start",
-        });
-        label.textContent = `${y}`;
-        svg.appendChild(label);
-    }
-}
 
 /**
  * 繪製軌跡
@@ -229,7 +165,15 @@ function drawTrajectory(svg, trajectoryData, tx, ty) {
 /**
  * 繪製連桿機構
  */
-function drawLinkage(svg, sol, thetaDeg, tx, ty) {
+function drawLinkage(svg, sol, thetaDeg, tx, ty, motorType, scale) {
+    // 繪製驅動元件 (Background of linkage)
+    if (motorType) {
+        // 四連桿 input is O2
+        const motorEl = createDriveComponent(motorType, tx(sol.O2), ty(sol.O2), scale);
+        if (motorEl) {
+            svg.appendChild(motorEl);
+        }
+    }
     // 繪製參考線（水平線，用於顯示 theta 角度）
     const refLineEnd = {
         x: sol.O2.x + Math.abs(sol.A.x - sol.O2.x) + 20,

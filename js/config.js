@@ -42,6 +42,7 @@ export function readInputs() {
 
         // 通用
         thetaDeg: Number($("theta")?.value || 0),
+        motorType: $("motorType")?.value || "",
     };
 
     // 零件規格參數

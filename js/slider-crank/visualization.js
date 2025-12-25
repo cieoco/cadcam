@@ -3,7 +3,8 @@
  * 曲柄滑塊機構視覺化模組
  */
 
-import { svgEl, fmt } from '../utils.js';
+import { svgEl, fmt, drawGridCompatible } from '../utils.js';
+import { createDriveComponent } from '../motor-data.js';
 
 /**
  * 渲染曲柄滑塊機構
@@ -24,9 +25,15 @@ export function renderSliderCrank(sol, thetaDeg, trajectoryData = null, viewPara
     const ty = (p) => H / 2 - p.y * scale;
 
     const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+    const showGrid = viewParams.showGrid !== false;
 
     // 背景
     svg.appendChild(svgEl("rect", { width: W, height: H, fill: "#fafafa" }));
+
+    // 格線
+    if (showGrid) {
+        drawGridCompatible(svg, W, H, viewRange, 0, 0, tx, ty);
+    }
 
     if (!sol || !sol.isValid) {
         const msg = svgEl("text", { x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: '#999' });
@@ -36,6 +43,12 @@ export function renderSliderCrank(sol, thetaDeg, trajectoryData = null, viewPara
     }
 
     const { O, A, B } = sol.points;
+
+    // 繪製驅動元件 (Background)
+    if (viewParams.motorType) {
+        const motorEl = createDriveComponent(viewParams.motorType, tx(O), ty(O), scale);
+        if (motorEl) svg.appendChild(motorEl);
+    }
 
     // 1. 繪製導軌
     svg.appendChild(svgEl('line', {
