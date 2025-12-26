@@ -32,7 +32,7 @@ export function renderSliderCrank(sol, thetaDeg, trajectoryData = null, viewPara
 
     // 格線
     if (showGrid) {
-        drawGridCompatible(svg, W, H, viewRange, 0, 0, tx, ty);
+        drawGridCompatible(svg, W, H, viewRange, 0, 0, tx, ty, viewParams.gridStep);
     }
 
     if (!sol || !sol.isValid) {

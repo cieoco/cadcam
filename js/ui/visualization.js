@@ -52,7 +52,7 @@ export function renderFourbar(sol, thetaDeg, trajectoryData = null, viewParams =
 
     // 繪製格線
     if (showGrid) {
-        drawGridCompatible(svg, W, H, viewRange, groundCenterX, groundCenterY, tx, ty);
+        drawGridCompatible(svg, W, H, viewRange, groundCenterX, groundCenterY, tx, ty, viewParams.gridStep);
     }
 
     // 繪製軌跡（背景層）

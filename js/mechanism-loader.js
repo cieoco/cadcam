@@ -52,10 +52,17 @@ async function initMechanismPage() {
     
     <div style="height:10px"></div>
     <h3>模擬設定</h3>
+    <input id="viewRange" type="number" min="100" max="1000" step="10" value="800" style="display:none" />
     <div class="grid">
       <div>
-        <label>模擬圖範圍（mm）</label>
-        <input id="viewRange" type="number" min="100" max="1000" step="10" value="800" />
+        <label>格線解析度（mm）</label>
+        <select id="gridStep">
+          <option value="5">5</option>
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
       </div>
       <div>
         <label>

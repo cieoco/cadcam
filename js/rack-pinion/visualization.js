@@ -22,7 +22,7 @@ export function renderRackPinion(sol, thetaDeg, trajectoryData = null, viewParam
     svg.appendChild(svgEl("rect", { width: W, height: H, fill: "#fafafa" }));
 
     if (showGrid) {
-        drawGridCompatible(svg, W, H, viewRange, 0, 0, tx, ty);
+        drawGridCompatible(svg, W, H, viewRange, 0, 0, tx, ty, viewParams.gridStep);
     }
 
     const { isValid, pinion, rack } = sol;

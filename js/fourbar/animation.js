@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Animation Controller
  * 動畫控制器
  */
@@ -16,6 +16,13 @@ export const animationState = {
     rangeStart: -180,
     rangeEnd: 180,
 };
+
+function syncThetaValue(value) {
+    const thetaInput = $("theta");
+    if (!thetaInput) return;
+    thetaInput.value = value;
+    thetaInput.dispatchEvent(new Event("input", { bubbles: true }));
+}
 
 /**
  * 開始動畫
@@ -60,6 +67,7 @@ export function startAnimation(updateCallback) {
 
     animationState.direction = 1;
     animationState.isPlaying = true;
+    syncThetaValue(Math.round(animationState.currentTheta));
 
     // 計算動畫間隔
     // degrees_per_second = RPM * 360 / 60
@@ -111,7 +119,7 @@ export function stopAnimation(updateCallback) {
     animationState.currentTheta = animationState.rangeStart;
 
     // 重置到起始位置
-    $("theta").value = animationState.rangeStart;
+    syncThetaValue(animationState.rangeStart);
     if (updateCallback) updateCallback();
 
     // 更新 UI
@@ -156,7 +164,7 @@ function animateFrame(degreesPerFrame, motorType, updateCallback) {
     }
 
     // 更新 UI
-    $("theta").value = Math.round(animationState.currentTheta);
+    syncThetaValue(Math.round(animationState.currentTheta));
     if (updateCallback) updateCallback();
 }
 

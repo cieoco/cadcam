@@ -680,6 +680,15 @@ export function generateParameterHTML(params) {
     let html = '<div class="grid">';
 
     for (const param of params) {
+        if (param.id === 'theta') {
+            html += `<input id="theta" type="number" style="display:none" `;
+            if (param.min !== undefined) html += `min="${param.min}" `;
+            if (param.max !== undefined) html += `max="${param.max}" `;
+            if (param.step !== undefined) html += `step="${param.step}" `;
+            if (param.default !== undefined) html += `value="${param.default}" `;
+            html += `/>`;
+            continue;
+        }
         if (param.type === 'checkbox') {
             const checked = param.default ? 'checked' : '';
             html += `<div class="checkbox-row">`;

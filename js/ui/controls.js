@@ -1,6 +1,6 @@
-/**
+﻿/**
  * UI Controls
- * UI 控制模組 - 處理所有使用者介面互動
+ * UI ?批璅∠? - ????蝙?刻??Ｖ???
  */
 
 import { $, log, downloadText, downloadZip, fmt } from '../utils.js';
@@ -13,10 +13,12 @@ import { buildAllGcodes, generateMachiningInfo } from '../gcode/generator.js';
 import { buildDXF } from '../utils/dxf-generator.js';
 import { renderFourbar } from './visualization.js';
 
-// 全域軌跡資料
+// ?典?頠楚鞈?
 let currentTrajectoryData = null;
+let lastMultilinkSolution = null;
+let lastMultilinkTopology = null;
 
-// 輔助函數：獲取當前運行的模組和配置
+// 頛?賣嚗???銵?璅∠???蝵?
 function getActiveModules() {
     return window.mechanismModules || null;
 }
@@ -110,7 +112,43 @@ function applySnapshot(snapshot) {
         }
     }
 
+    const svgWrap = $("svgWrap");
+    if (svgWrap) svgWrap.innerHTML = "";
+    lastMultilinkSolution = null;
+    lastMultilinkTopology = null;
+
+    ensureValidThetaAfterLoad();
     updatePreview();
+}
+
+function ensureValidThetaAfterLoad() {
+    const mods = getActiveModules();
+    if (!mods || !mods.config || mods.config.id !== 'multilink') return;
+
+    const { mech } = readInputs();
+    const dynamicParams = collectDynamicParams();
+    Object.assign(mech, dynamicParams);
+
+    const solveFn = mods.solver[mods.config.solveFn];
+    const sol = solveFn(mech);
+    if (sol && sol.isValid !== false) return;
+
+    const sweepParams = readSweepParams();
+    const sweepFn = mods.solver.sweepTheta || sweepTheta;
+    const sweep = sweepFn(
+        mech,
+        sweepParams.sweepStart,
+        sweepParams.sweepEnd,
+        sweepParams.sweepStep || 5
+    );
+    const firstValid = sweep.results.find(r => r.isValid);
+    if (!firstValid) return;
+
+    setValueById('theta', firstValid.theta);
+    const thetaInput = $("theta");
+    if (thetaInput) {
+        thetaInput.dispatchEvent(new Event("input", { bubbles: true }));
+    }
 }
 
 function downloadSnapshot() {
@@ -126,19 +164,18 @@ function handleOpenSnapshot(file) {
         try {
             const snapshot = JSON.parse(String(reader.result || ''));
             applySnapshot(snapshot);
-            log('已載入檔案。');
+            log('Loaded file.');
         } catch (e) {
-            log(`載入失敗：${e.message}`);
+            log(`Load failed: ${e.message}`);
         }
     };
     reader.onerror = () => {
-        log('載入失敗：無法讀取檔案。');
+        log('Load failed: Unable to read file.');
     };
     reader.readAsText(file);
 }
-
 /**
- * 處理動態參數生成
+ * ???????
  */
 export function updateDynamicParams() {
     const container = document.getElementById('dynamicParamsContainer');
@@ -149,7 +186,7 @@ export function updateDynamicParams() {
 
     const vars = new Map(); // Map of varId -> { label, min, max, step, default }
 
-    // 1. 從 Mechanism Config 獲取標記為 isDynamic 的參數
+    // 1. 敺?Mechanism Config ?脣?璅???isDynamic ????
     const mods = getActiveModules();
     if (mods && mods.config && mods.config.parameters) {
         mods.config.parameters.forEach(p => {
@@ -165,7 +202,7 @@ export function updateDynamicParams() {
         });
     }
 
-    // 2. 從 Topology JSON 掃描變數 (相容 Multilink)
+    // 2. 敺?Topology JSON ??霈 (?詨捆 Multilink)
     const topoEl = document.getElementById('topology');
     if (topoEl) {
         let topology;
@@ -175,13 +212,13 @@ export function updateDynamicParams() {
             const scan = (obj) => {
                 if (!obj || typeof obj !== 'object') return;
 
-                // 如果是陣列，遍歷每個元素
+                // 憒??舫???風瘥?蝝?
                 if (Array.isArray(obj)) {
                     obj.forEach(item => scan(item));
                     return;
                 }
 
-                // 如果是物件，遍歷每個鍵
+                // 憒??舐隞塚??風瘥
                 for (const k in obj) {
                     const val = obj[k];
                     const isParamKey = k.endsWith('_param') || k === 'lenParam' || k === 'len_param';
@@ -206,19 +243,19 @@ export function updateDynamicParams() {
         }
     }
 
-    // 記住當前焦點元素
+    // 閮??嗅??阡???
     const activeElement = document.activeElement;
     const activeId = activeElement ? activeElement.id : null;
     const activeValue = activeElement ? activeElement.value : null;
     const selectionStart = activeElement && activeElement.selectionStart;
     const selectionEnd = activeElement && activeElement.selectionEnd;
 
-    // ⚠️ 如果焦點在動態參數輸入框，跳過更新避免干擾輸入
+    // ?? 憒??阡??典????貉撓?交?嚗歲??圈?僕?曇撓??
     if (activeId && activeId.startsWith('dyn_')) {
         return;
     }
 
-    // 3. 移除已經沒用到的動態參數
+    // 3. 蝘駁撌脩?瘝?啁????
     const existingDynamic = container.querySelectorAll('.dynamic-param-wrapper');
     existingDynamic.forEach(div => {
         const id = div.dataset.varId;
@@ -227,7 +264,7 @@ export function updateDynamicParams() {
         }
     });
 
-    // 4. 更新或新增參數
+    // 4. ?湔?憓???
     vars.forEach((info, varId) => {
         let wrapper = container.querySelector(`.dynamic-param-wrapper[data-var-id="${varId}"]`);
 
@@ -250,32 +287,32 @@ export function updateDynamicParams() {
             `;
             container.appendChild(wrapper);
 
-            // 綁定聯動 - 使用命名函數避免重複綁定
+            // 蝬??臬? - 雿輻?賢??賣?踹???蝬?
             const numInput = wrapper.querySelector('input[type="number"]');
             const rangeInput = wrapper.querySelector('input[type="range"]');
 
-            // 標記已綁定事件
+            // 璅?撌脩?摰?隞?
             if (!numInput.dataset.eventsBound) {
                 numInput.dataset.eventsBound = 'true';
                 
-                // 使用防抖來避免頻繁更新
+                // 雿輻?脫?靘?蝜??
                 let updateTimer;
                 const debouncedUpdate = () => {
                     clearTimeout(updateTimer);
                     updateTimer = setTimeout(() => {
-                        console.log('[debouncedUpdate] Updating preview for:', varId);
-                        // 不調用 updateDynamicParams，只更新預覽
+                        console.log('Loaded file.');
+                        // 銝矽??updateDynamicParams嚗?湔?汗
                         updatePreview();
                     }, 300);
                 };
 
                 numInput.addEventListener('input', (e) => {
                     e.stopPropagation();
-                    e.stopImmediatePropagation(); // 完全阻止事件傳播
+                    e.stopImmediatePropagation(); // 摰?餅迫鈭辣?單
                     console.log(`[numInput input] ${varId} = ${numInput.value}`);
                     rangeInput.value = numInput.value;
                     debouncedUpdate();
-                }, true); // 使用捕獲階段
+                }, true); // 雿輻??挾
                 
                 rangeInput.addEventListener('input', (e) => {
                     e.stopPropagation();
@@ -286,13 +323,13 @@ export function updateDynamicParams() {
                 }, true);
             }
         } else {
-            console.log('[updateDynamicParams] Updating existing param:', varId);
-            // 更新現有元素的屬性（但不重新創建，避免失去焦點）
+            console.log('Loaded file.');
+            // ?湔?暹????惇?改?雿???萄遣嚗?仃?餌暺?
             const numInput = wrapper.querySelector('input[type="number"]');
             const rangeInput = wrapper.querySelector('input[type="range"]');
             
             if (numInput && rangeInput) {
-                // 只在值不同時更新（避免光標跳動）
+                // ?芸?潔????湔嚗??璅歲??
                 if (numInput.step !== String(info.step)) numInput.step = info.step;
                 if (rangeInput.min !== String(info.min)) rangeInput.min = info.min;
                 if (rangeInput.max !== String(info.max)) rangeInput.max = info.max;
@@ -301,11 +338,11 @@ export function updateDynamicParams() {
         }
     });
 
-    // 恢復焦點
+    // ?Ｗ儔?阡?
     if (activeId && activeId.startsWith('dyn_')) {
         const elementToFocus = document.getElementById(activeId);
         if (elementToFocus) {
-            console.log('[updateDynamicParams] Restoring focus to:', activeId);
+            console.log('Loaded file.');
             elementToFocus.focus();
             if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
                 elementToFocus.setSelectionRange(selectionStart, selectionEnd);
@@ -315,17 +352,17 @@ export function updateDynamicParams() {
 }
 
 /**
- * 更新預覽
+ * ?湔?汗
  */
 export function updatePreview() {
     try {
         const mods = getActiveModules();
-        if (!mods) return; // 還沒載入完
+        if (!mods) return; // ??頛摰?
 
-        const { mech, partSpec, mfg } = readInputs(); // 這會讀取 document.getElementById 的值，包含動態生成的
-        // readInputs 可能只讀取 config 定義的參數。我們需要把動態參數補進 mech。
+        const { mech, partSpec, mfg } = readInputs(); // ??霈??document.getElementById ?潘????????
+        // readInputs ?航?芾???config 摰儔???詻???閬????鋆?mech??
 
-        // 補充讀取 dynamicParams
+        // 鋆?霈??dynamicParams
         const dynContainer = document.getElementById('dynamicParamsContainer');
         if (dynContainer) {
             const inputs = dynContainer.querySelectorAll('input.dynamic-input');
@@ -334,38 +371,50 @@ export function updatePreview() {
                 mech[varId] = parseFloat(inp.value) || 0;
             });
         }
+        if (mods.config && mods.config.id === 'multilink') {
+            const topoKey = mech.topology || '';
+            if (topoKey !== lastMultilinkTopology) {
+                lastMultilinkTopology = topoKey;
+                lastMultilinkSolution = null;
+            }
+            if (lastMultilinkSolution && lastMultilinkSolution.points) {
+                mech._prevPoints = lastMultilinkSolution.points;
+            }
+        }
 
         const viewParams = readViewParams();
         viewParams.motorType = mech.motorType;
-        viewParams.topology = mech.topology; // 傳遞拓撲字串供視覺化使用
+        viewParams.topology = mech.topology; // ?喲??摮葡靘?閬箏?雿輻
 
         validateConfig(mech, partSpec, mfg);
 
-        // 使用動態模組的求解器
+        // 雿輻??璅∠???閫?
         const solveFn = mods.solver[mods.config.solveFn];
         const sol = solveFn(mech);
 
         const svgWrap = $("svgWrap");
         const isInvalid = !sol || sol.isValid === false;
         if (isInvalid) {
-            log(`${mods.config.name}：此參數無解，請調整參數。`);
+            log(`${mods.config.name}: invalid parameters, adjust values.`);
             if (!svgWrap.firstChild) {
-                svgWrap.textContent = "（無解）";
+                svgWrap.textContent = "(invalid)";
                 $("partsWrap").innerHTML = "";
                 $("dlButtons").innerHTML = "";
             }
             return;
         }
-
+if (mods.config && mods.config.id === 'multilink') {
+            lastMultilinkSolution = sol;
+        }
         svgWrap.innerHTML = "";
 
-        // 使用動態模組的渲染器
+        // 雿輻??璅∠??葡?
         const renderFn = mods.visualization[mods.config.renderFn];
         svgWrap.appendChild(
             renderFn(sol, mech.thetaDeg || mech.theta, currentTrajectoryData, viewParams)
         );
 
-        // 使用動態模組的零件生成器
+        // 雿輻??璅∠??隞嗥??
         const partsFn = mods.parts[mods.config.partsFn];
         const parts = partsFn({ ...mech, ...partSpec });
 
@@ -374,20 +423,20 @@ export function updatePreview() {
             renderPartsLayout(parts, partSpec.workX, partSpec.workY)
         );
 
-        // 顯示摘要
+        // 憿舐內??
         const cutDepth = mfg.thickness + mfg.overcut;
         const layers = Math.max(1, Math.ceil(cutDepth / mfg.stepdown));
         log(
             [
-                `${mods.config.name}解算：OK`,
-                `加工：總切深=${fmt(cutDepth)}mm，stepdown=${fmt(mfg.stepdown)}mm → 層數≈${layers}`,
-                `工作區：${partSpec.workX} x ${partSpec.workY} (mm)`,
+                `${mods.config.name}閫??嚗K`,
+                `?極嚗蜇?楛=${fmt(cutDepth)}mm嚗tepdown=${fmt(mfg.stepdown)}mm ??撅斗??{layers}`,
+                `撌乩??嚗?{partSpec.workX} x ${partSpec.workY} (mm)`,
             ].join("\n")
         );
 
         $("dlButtons").innerHTML = "";
     } catch (e) {
-        log(`錯誤：${e.message}`);
+        log(`?航炊嚗?{e.message}`);
         console.error(e);
         $("svgWrap").innerHTML = "";
         $("partsWrap").innerHTML = "";
@@ -396,7 +445,7 @@ export function updatePreview() {
 }
 
 /**
- * 生成 G-code
+ * ?? G-code
  */
 export function generateGcodes() {
     try {
@@ -404,7 +453,7 @@ export function generateGcodes() {
         if (!mods) return;
 
         const { mech, partSpec, mfg } = readInputs();
-        // 補充 dynamic params logic duplicated (should factor out but simplicity for now)
+        // 鋆? dynamic params logic duplicated (should factor out but simplicity for now)
         const dynContainer = document.getElementById('dynamicParamsContainer');
         if (dynContainer) {
             const inputs = dynContainer.querySelectorAll('input[type="number"]');
@@ -415,45 +464,45 @@ export function generateGcodes() {
 
         validateConfig(mech, partSpec, mfg);
 
-        // 確保目前參數是有解的
+        // 蝣箔??桀???舀?閫??
         const solveFn = mods.solver[mods.config.solveFn];
         const sol = solveFn(mech);
-        if (!sol) throw new Error("目前的參數無解，請先調整模擬至可行狀態。");
+        if (!sol) throw new Error("Invalid parameters, adjust values.");
 
-        // 生成零件
+        // ???嗡辣
         const partsFn = mods.parts[mods.config.partsFn];
         const parts = partsFn({ ...mech, ...partSpec });
 
-        // 生成 G-code
+        // ?? G-code
         const files = buildAllGcodes(parts, mfg);
 
-        // 建立下載按鈕
+        // 撱箇?銝???
         const dl = $("dlButtons");
         dl.innerHTML = "";
 
-        // 1. 各零件 G-code 下載
+        // 1. ?隞?G-code 銝?
         for (const f of files) {
             const btn = document.createElement("button");
-            btn.textContent = `下載 ${f.name}`;
+            btn.textContent = `Download ${f.name}`;
             btn.className = "btn-download";
             btn.onclick = () => downloadText(f.name, f.text);
             dl.appendChild(btn);
         }
 
-        // 2. 所有零件 DXF 下載 (CAD 匯出)
+        // 2. ??隞?DXF 銝? (CAD ?臬)
         const dxfText = buildDXF(parts);
         const dxfBtn = document.createElement("button");
-        dxfBtn.textContent = `匯出 DXF (所有零件)`;
+        dxfbtn.textContent = `Download ${f.name}`;
         dxfBtn.className = "btn-download";
-        dxfBtn.style.backgroundColor = "#6a1b9a"; // 特殊顏色標註 DXF
+        dxfBtn.style.backgroundColor = "#6a1b9a"; // ?寞?憿璅酉 DXF
         dxfBtn.onclick = () => downloadText("linkage_parts.dxf", dxfText);
         dl.appendChild(dxfBtn);
 
-        // 3. 一鍵打包 ZIP
+        // 3. 銝?菜???ZIP
         const zipBtn = document.createElement("button");
-        zipBtn.textContent = `📦 打包下載所有元件 (ZIP)`;
+        zipbtn.textContent = `Download ${f.name}`;
         zipBtn.className = "btn-download";
-        zipBtn.style.backgroundColor = "#2e7d32"; // 綠色標註
+        zipBtn.style.backgroundColor = "#2e7d32"; // 蝬璅酉
         zipBtn.onclick = () => {
             const allFiles = [...files, { name: "linkage_parts.dxf", text: dxfText }];
             downloadZip("mechanism_cnc_files.zip", allFiles);
@@ -461,15 +510,15 @@ export function generateGcodes() {
         dl.appendChild(zipBtn);
 
         const machiningInfo = generateMachiningInfo(mfg, parts.length);
-        log($("log").textContent + "\n\n" + machiningInfo + "\n\n已完成 G-code 生成。");
+        log($("log").textContent + "\n\n" + machiningInfo + "\n\nG-code generated.");
     } catch (e) {
-        log(`錯誤：${e.message}`);
+        log(`?航炊嚗?{e.message}`);
         $("dlButtons").innerHTML = "";
     }
 }
 
 /**
- * 掃描 Theta 分析
+ * ?? Theta ??
  */
 export function performSweepAnalysis() {
     try {
@@ -477,7 +526,6 @@ export function performSweepAnalysis() {
         if (!mods) return;
 
         const { mech, partSpec, mfg } = readInputs();
-        // Dynamic params injection
         const dynContainer = document.getElementById('dynamicParamsContainer');
         if (dynContainer) {
             const inputs = dynContainer.querySelectorAll('input[type="number"]');
@@ -490,16 +538,15 @@ export function performSweepAnalysis() {
 
         const sweepParams = readSweepParams();
         const motorTypeEl = $("motorType");
-        const motorTypeText = motorTypeEl ? motorTypeEl.selectedOptions[0].textContent : "手動掃描";
+        const motorTypeText = motorTypeEl ? motorTypeEl.selectedOptions[0].textContent : "motor";
 
         if (sweepParams.sweepStart >= sweepParams.sweepEnd) {
-            throw new Error("起始角度必須小於結束角度");
+            throw new Error("Sweep start must be less than end.");
         }
         if (sweepParams.sweepStep <= 0) {
-            throw new Error("掃描間隔必須大於 0");
+            throw new Error("Sweep step must be > 0.");
         }
 
-        // 執行掃描 (目前 solver 模組必須具備 sweepTheta)
         const sweepFn = mods.solver.sweepTheta || sweepTheta;
         const { results, validRanges, invalidRanges } = sweepFn(
             mech,
@@ -508,7 +555,6 @@ export function performSweepAnalysis() {
             sweepParams.sweepStep
         );
 
-        // 儲存軌跡資料
         const validBPoints = results.filter((r) => r.isValid && r.B).map((r) => r.B);
         currentTrajectoryData = {
             results,
@@ -518,55 +564,51 @@ export function performSweepAnalysis() {
             motorType: motorTypeText,
         };
 
-        // 顯示結果
         displaySweepResults(results, validRanges, invalidRanges, sweepParams.showTrajectory, motorTypeText);
-
-        // 更新主 2D 模擬圖以顯示軌跡疊加
         updatePreview();
 
         log(
-            `【${motorTypeText}】\n` +
-            `θ 掃描完成：${sweepParams.sweepStart}° → ${sweepParams.sweepEnd}°\n` +
-            `可行區間 ${validRanges.length} 個，不可行區間 ${invalidRanges.length} 個`
+            `Sweep (${motorTypeText})\n` +
+            `Theta: ${sweepParams.sweepStart} to ${sweepParams.sweepEnd}\n` +
+            `Valid ranges: ${validRanges.length}, Invalid ranges: ${invalidRanges.length}`
         );
     } catch (e) {
-        log(`錯誤：${e.message}`);
+        log(`Error: ${e.message}`);
     }
 }
-
 /**
- * 顯示掃描結果
+ * 憿舐內??蝯?
  */
 function displaySweepResults(results, validRanges, invalidRanges, showTrajectory, motorTypeText) {
-    const resultDiv = document.getElementById("log"); // 統一顯示在 log
+    const resultDiv = document.getElementById("log"); // 蝯曹?憿舐內??log
     if (!resultDiv) return;
 
-    let html = `<strong>【${motorTypeText}】掃描結果：</strong><br/>`;
+    let html = `<strong>??{motorTypeText}??????</strong><br/>`;
 
     if (validRanges.length > 0) {
-        html += `<span style="color:#27ae60;">✓ 可行區間：</span><br/>`;
+        html += `<span style="color:#27ae60;">???航????</span><br/>`;
         for (const r of validRanges) {
-            html += `<span style="color:#27ae60; margin-left:12px;">• ${fmt(r.start)}° → ${fmt(r.end)}°</span><br/>`;
+            html += `<span style="color:#27ae60; margin-left:12px;">??${fmt(r.start)}簞 ??${fmt(r.end)}簞</span><br/>`;
         }
     } else {
-        html += `<span style="color:#e74c3c;">✗ 無可行角度</span><br/>`;
+        html += `<span style="color:#e74c3c;">???∪銵?摨?/span><br/>`;
     }
 
-    // 軌跡統計 (目前 solver 模組必須具備 calculateTrajectoryStats)
+    // 頠楚蝯梯? (?桀? solver 璅∠?敹??瑕? calculateTrajectoryStats)
     const statsFn = getActiveModules().solver.calculateTrajectoryStats || calculateTrajectoryStats;
     const stats = statsFn(results);
     if (stats) {
-        html += `<br/><strong>軌跡行程：</strong> X: ${fmt(stats.rangeX)} mm, Y: ${fmt(stats.rangeY)} mm<br/>`;
+        html += `<br/><strong>頠楚銵?嚗?/strong> X: ${fmt(stats.rangeX)} mm, Y: ${fmt(stats.rangeY)} mm<br/>`;
     }
 }
 
 /**
- * 設定所有 UI 事件處理器
+ * 閮剖????UI 鈭辣????
  */
 export function setupUIHandlers() {
-    console.log('Setting up UI handlers...');
+    console.log('Loaded file.');
 
-    // 按鈕綁定
+    // ??蝬?
     const btnUpdate = $("btnUpdate");
     if (btnUpdate) btnUpdate.onclick = updatePreview;
 
@@ -575,29 +617,53 @@ export function setupUIHandlers() {
     const thetaInput = $("theta");
     if (thetaSlider && thetaSliderValue) {
         if (thetaInput) {
-            const syncFromInput = () => {
+            const syncThetaFromInput = () => {
                 const val = Number(thetaInput.value || 0);
                 thetaSlider.value = String(val);
                 thetaSliderValue.textContent = `${val}°`;
             };
-            const syncFromSlider = () => {
+            const syncThetaFromSlider = () => {
                 thetaInput.value = thetaSlider.value;
                 thetaSliderValue.textContent = `${thetaSlider.value}°`;
                 updatePreview();
             };
-            syncFromInput();
-            thetaInput.addEventListener('input', syncFromInput);
-            thetaSlider.addEventListener('input', syncFromSlider);
+            syncThetaFromInput();
+            thetaInput.addEventListener('input', syncThetaFromInput);
+            thetaSlider.addEventListener('input', syncThetaFromSlider);
         } else {
             thetaSlider.disabled = true;
             thetaSliderValue.textContent = '--';
         }
     }
 
+    const viewRangeSlider = $("viewRangeSlider");
+    const viewRangeSliderValue = $("viewRangeSliderValue");
+    const viewRangeInput = $("viewRange");
+    if (viewRangeSlider && viewRangeSliderValue) {
+        if (viewRangeInput) {
+            const syncRangeFromInput = () => {
+                const val = Number(viewRangeInput.value || 0);
+                viewRangeSlider.value = String(val);
+                viewRangeSliderValue.textContent = String(val);
+            };
+            const syncRangeFromSlider = () => {
+                viewRangeInput.value = viewRangeSlider.value;
+                viewRangeSliderValue.textContent = viewRangeSlider.value;
+                updatePreview();
+            };
+            syncRangeFromInput();
+            viewRangeInput.addEventListener('input', syncRangeFromInput);
+            viewRangeSlider.addEventListener('input', syncRangeFromSlider);
+        } else {
+            viewRangeSlider.disabled = true;
+            viewRangeSliderValue.textContent = '--';
+        }
+    }
+
     const btnNewConfig = $("btnNewConfig");
     if (btnNewConfig) {
         btnNewConfig.onclick = () => {
-            if (confirm('確定要建立新檔？未存檔內容將會遺失。')) {
+            if (confirm('Create new file? Unsaved changes will be lost.')) {
                 window.location.reload();
             }
         };
@@ -646,18 +712,18 @@ export function setupUIHandlers() {
     // Dynamic params listener
     const topologyArea = document.getElementById('topology');
     if (topologyArea) {
-        // 使用防抖避免頻繁重新掃描
+        // 雿輻?脫??踹??餌????
         let topologyUpdateTimer;
         
         topologyArea.addEventListener('input', (e) => {
             clearTimeout(topologyUpdateTimer);
-            // 增加到 1000ms，讓用戶有足夠時間輸入
+            // 憓???1000ms嚗??冽?雲憭??撓??
             topologyUpdateTimer = setTimeout(() => {
                 updateDynamicParams();
             }, 1000);
         });
         
-        // 失去焦點時立即更新
+        // 憭勗?阡????單??
         topologyArea.addEventListener('blur', () => {
             clearTimeout(topologyUpdateTimer);
             updateDynamicParams();
@@ -667,7 +733,7 @@ export function setupUIHandlers() {
     // Initial scan for all mechanisms
     updateDynamicParams();
 
-    // 某些機構可能有特定的 handler
+    // ??璈??航?摰? handler
     const mods = getActiveModules();
     if (mods && mods.solver.setupMotorTypeHandler) {
         mods.solver.setupMotorTypeHandler();
@@ -675,20 +741,20 @@ export function setupUIHandlers() {
         setupMotorTypeHandler();
     }
 
-    // 初始渲染 - 立即執行
-    console.log('Calling initial updatePreview...');
+    // ??皜脫? - 蝡?瑁?
+    console.log('Loaded file.');
     try {
         updatePreview();
     } catch (e) {
         console.error('Initial preview failed:', e);
-        // 如果失敗，再試一次
+        // 憒?憭望?嚗?閰虫?甈?
         setTimeout(() => {
-            console.log('Retrying updatePreview...');
+            console.log('Loaded file.');
             updatePreview();
         }, 200);
     }
 
-    // 為新版動畫按鈕添加懸停縮放效果
+    // ?箸???急??溶??葬?暹???
     ['btnPlayAnim', 'btnPauseAnim', 'btnStopAnim'].forEach(id => {
         const btn = $(id);
         if (btn) {

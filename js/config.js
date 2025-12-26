@@ -149,6 +149,7 @@ export function readSweepParams() {
 export function readViewParams() {
     return {
         viewRange: Number($("viewRange")?.value) || 400,
+        gridStep: Number($("gridStep")?.value) || 50,
         showGrid: $("showGrid")?.checked || false,
     };
 }

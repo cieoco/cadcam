@@ -12,12 +12,12 @@ import { deg2rad } from '../utils.js';
 /**
  * 兩圓交點 (Dyad Solver)
  */
-function solveIntersection(p1, r1, p2, r2, sign) {
+function solveIntersectionOptions(p1, r1, p2, r2) {
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     const d = Math.hypot(dx, dy);
 
-    if (d > r1 + r2 || d < Math.abs(r1 - r2) || d === 0) return null;
+    if (d > r1 + r2 || d < Math.abs(r1 - r2) || d === 0) return [];
 
     const a_dist = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
     const h = Math.sqrt(Math.max(0, r1 * r1 - a_dist * a_dist));
@@ -28,10 +28,9 @@ function solveIntersection(p1, r1, p2, r2, sign) {
     const rx = -dy * (h / d);
     const ry = dx * (h / d);
 
-    return {
-        x: x2 + sign * rx,
-        y: y2 + sign * ry
-    };
+    const pPlus = { x: x2 + rx, y: y2 + ry };
+    const pMinus = { x: x2 - rx, y: y2 - ry };
+    return [pPlus, pMinus];
 }
 
 /**
@@ -128,12 +127,21 @@ export function solveTopology(topologyOrParams, params) {
                 }
                 const r1 = getVal(step, 'r1');
                 const r2 = getVal(step, 'r2');
-
-                const pt = solveIntersection(p1, r1, p2, r2, step.sign);
-                if (!pt) {
+                const options = solveIntersectionOptions(p1, r1, p2, r2);
+                if (!options.length) {
                     return { isValid: false, errorStep: step.id, errorType: 'no_intersection' };
                 }
-                points[step.id] = pt;
+                let chosen = null;
+                const prevPoints = actualParams && actualParams._prevPoints;
+                const prev = prevPoints ? prevPoints[step.id] : null;
+                if (prev) {
+                    const d0 = Math.hypot(options[0].x - prev.x, options[0].y - prev.y);
+                    const d1 = Math.hypot(options[1].x - prev.x, options[1].y - prev.y);
+                    chosen = d0 <= d1 ? options[0] : options[1];
+                } else {
+                    chosen = step.sign === -1 ? options[1] : options[0];
+                }
+                points[step.id] = chosen;
             }
         } catch (e) {
             console.error("Solver Error at step", step.id, e);
@@ -160,9 +168,10 @@ export function sweepTopology(topology, params, startDeg, endDeg, stepDeg) {
     const invalidRanges = [];
     let currentValid = null;
     let currentInvalid = null;
+    let prevPoints = null;
 
     for (let th = startDeg; th <= endDeg; th += stepDeg) {
-        const sol = solveTopology(topology, { ...params, thetaDeg: th });
+        const sol = solveTopology(topology, { ...params, thetaDeg: th, _prevPoints: prevPoints });
         const isValid = sol.isValid;
 
         results.push({
@@ -173,6 +182,7 @@ export function sweepTopology(topology, params, startDeg, endDeg, stepDeg) {
         });
 
         if (isValid) {
+            prevPoints = sol.points;
             if (currentInvalid) { invalidRanges.push(currentInvalid); currentInvalid = null; }
             if (!currentValid) currentValid = { start: th, end: th };
             else currentValid.end = th;

@@ -181,12 +181,12 @@ export function describeArc(x, y, radius, startAngle, endAngle) {
  * @param {Function} tx - X 座標轉換函數 (Model -> Screen)
  * @param {Function} ty - Y 座標轉換函數 (Model -> Screen)
  */
-export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty) {
-  const gridStep = 50; // mm
+export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridStep = 50) {
+  const step = Number.isFinite(gridStep) && gridStep > 0 ? gridStep : 50;
   const gridColor = "#e0e0e0";
 
   // 垂直線
-  for (let x = -viewRange / 2; x <= viewRange / 2; x += gridStep) {
+  for (let x = -viewRange / 2; x <= viewRange / 2; x += step) {
     // Assume tx is linear: tx(val) = tx(0) + val * scale
     // We can just calculate screenX for model X relative to origin.
     // Or if tx() accepts absolute model coordinates, we need to know the origin in model space.
@@ -241,7 +241,7 @@ export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty) {
   }
 
   // 水平線
-  for (let y = -viewRange / 2; y <= viewRange / 2; y += gridStep) {
+  for (let y = -viewRange / 2; y <= viewRange / 2; y += step) {
     const modelY = originY + y;
     const screenY = ty(modelY); // Note: ty usually handles Y-flip
 
@@ -256,7 +256,7 @@ export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty) {
   }
 
   // Labels
-  const labelStep = 100;
+  const labelStep = Math.max(step * 2, 50);
   for (let x = -viewRange / 2; x <= viewRange / 2; x += labelStep) {
     if (x === 0) continue;
     const modelX = originX + x;
@@ -292,7 +292,7 @@ export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty) {
  * We need to standardize or handle both.
  * Let's make a wrapper or check type.
  */
-export function drawGridCompatible(svg, W, H, viewRange, centerModelX, centerModelY, tx, ty) {
+export function drawGridCompatible(svg, W, H, viewRange, centerModelX, centerModelY, tx, ty, gridStep) {
   // Wrapper to handle tx/ty differences
   const safeTx = (val) => {
     try {
@@ -313,5 +313,5 @@ export function drawGridCompatible(svg, W, H, viewRange, centerModelX, centerMod
     }
   };
 
-  drawGrid(svg, W, H, viewRange, centerModelX, centerModelY, safeTx, safeTy);
+  drawGrid(svg, W, H, viewRange, centerModelX, centerModelY, safeTx, safeTy, gridStep);
 }

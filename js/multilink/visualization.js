@@ -148,7 +148,7 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
 
     // Grid
     if (viewParams.showGrid !== false) {
-        drawGridCompatible(svg, W, H, viewRange, 0, 0, tx, ty);
+        drawGridCompatible(svg, W, H, viewRange, 0, 0, tx, ty, viewParams.gridStep);
     }
 
     if (!sol || !sol.isValid) {
