@@ -21,6 +21,122 @@ function getActiveModules() {
     return window.mechanismModules || null;
 }
 
+function collectDynamicParams() {
+    const dynContainer = document.getElementById('dynamicParamsContainer');
+    if (!dynContainer) return {};
+    const inputs = dynContainer.querySelectorAll('input.dynamic-input');
+    const params = {};
+    inputs.forEach(inp => {
+        const varId = inp.dataset.varId || inp.id.replace('dyn_', '');
+        const num = parseFloat(inp.value);
+        params[varId] = Number.isFinite(num) ? num : 0;
+    });
+    return params;
+}
+
+function setValueById(id, value) {
+    const el = document.getElementById(id);
+    if (!el || value === undefined || value === null) return;
+    if (el.type === 'checkbox') {
+        el.checked = Boolean(value);
+        return;
+    }
+    el.value = value;
+}
+
+function normalizeTopologyValue(value) {
+    if (value === undefined || value === null) return value;
+    if (typeof value === 'string') return value;
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch (e) {
+        return String(value);
+    }
+}
+
+function buildSnapshot() {
+    const mods = getActiveModules();
+    const { mech, partSpec, mfg } = readInputs();
+    const dynamicParams = collectDynamicParams();
+
+    return {
+        version: 1,
+        mechType: mods && mods.config ? mods.config.id : null,
+        createdAt: new Date().toISOString(),
+        data: {
+            mech: { ...mech, ...dynamicParams },
+            partSpec,
+            mfg,
+            viewParams: readViewParams(),
+            dynamicParams
+        }
+    };
+}
+
+function applySnapshot(snapshot) {
+    if (!snapshot) return;
+    const payload = snapshot.data || snapshot;
+    const mech = payload.mech || {};
+    const partSpec = payload.partSpec || {};
+    const mfg = payload.mfg || {};
+    const viewParams = payload.viewParams || {};
+    const dynamicParams = payload.dynamicParams || {};
+
+    const topologyValue = normalizeTopologyValue(mech.topology);
+    if (topologyValue !== undefined) {
+        setValueById('topology', topologyValue);
+    }
+
+    Object.keys(mech).forEach((key) => {
+        if (key === 'topology') return;
+        setValueById(key, mech[key]);
+    });
+    Object.keys(partSpec).forEach((key) => setValueById(key, partSpec[key]));
+    Object.keys(mfg).forEach((key) => setValueById(key, mfg[key]));
+    Object.keys(viewParams).forEach((key) => setValueById(key, viewParams[key]));
+
+    updateDynamicParams();
+
+    Object.keys(dynamicParams).forEach((key) => {
+        setValueById(`dyn_${key}`, dynamicParams[key]);
+        setValueById(`dyn_${key}_range`, dynamicParams[key]);
+    });
+
+    if (window.wizard && topologyValue) {
+        try {
+            window.wizard.init(JSON.parse(topologyValue));
+        } catch (e) {
+            console.warn('[applySnapshot] Failed to init wizard from topology', e);
+        }
+    }
+
+    updatePreview();
+}
+
+function downloadSnapshot() {
+    const snapshot = buildSnapshot();
+    const fileName = `${snapshot.mechType || 'mechanism'}_${Date.now()}.json`;
+    downloadText(fileName, JSON.stringify(snapshot, null, 2));
+}
+
+function handleOpenSnapshot(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            const snapshot = JSON.parse(String(reader.result || ''));
+            applySnapshot(snapshot);
+            log('已載入檔案。');
+        } catch (e) {
+            log(`載入失敗：${e.message}`);
+        }
+    };
+    reader.onerror = () => {
+        log('載入失敗：無法讀取檔案。');
+    };
+    reader.readAsText(file);
+}
+
 /**
  * 處理動態參數生成
  */
@@ -230,15 +346,18 @@ export function updatePreview() {
         const sol = solveFn(mech);
 
         const svgWrap = $("svgWrap");
-        svgWrap.innerHTML = "";
-
-        if (!sol) {
-            log(`${mods.config.name}：此角度不可行。請調整參數。`);
-            svgWrap.textContent = "（無解）";
-            $("partsWrap").innerHTML = "";
-            $("dlButtons").innerHTML = "";
+        const isInvalid = !sol || sol.isValid === false;
+        if (isInvalid) {
+            log(`${mods.config.name}：此參數無解，請調整參數。`);
+            if (!svgWrap.firstChild) {
+                svgWrap.textContent = "（無解）";
+                $("partsWrap").innerHTML = "";
+                $("dlButtons").innerHTML = "";
+            }
             return;
         }
+
+        svgWrap.innerHTML = "";
 
         // 使用動態模組的渲染器
         const renderFn = mods.visualization[mods.config.renderFn];
@@ -450,6 +569,57 @@ export function setupUIHandlers() {
     // 按鈕綁定
     const btnUpdate = $("btnUpdate");
     if (btnUpdate) btnUpdate.onclick = updatePreview;
+
+    const thetaSlider = $("thetaSlider");
+    const thetaSliderValue = $("thetaSliderValue");
+    const thetaInput = $("theta");
+    if (thetaSlider && thetaSliderValue) {
+        if (thetaInput) {
+            const syncFromInput = () => {
+                const val = Number(thetaInput.value || 0);
+                thetaSlider.value = String(val);
+                thetaSliderValue.textContent = `${val}°`;
+            };
+            const syncFromSlider = () => {
+                thetaInput.value = thetaSlider.value;
+                thetaSliderValue.textContent = `${thetaSlider.value}°`;
+                updatePreview();
+            };
+            syncFromInput();
+            thetaInput.addEventListener('input', syncFromInput);
+            thetaSlider.addEventListener('input', syncFromSlider);
+        } else {
+            thetaSlider.disabled = true;
+            thetaSliderValue.textContent = '--';
+        }
+    }
+
+    const btnNewConfig = $("btnNewConfig");
+    if (btnNewConfig) {
+        btnNewConfig.onclick = () => {
+            if (confirm('確定要建立新檔？未存檔內容將會遺失。')) {
+                window.location.reload();
+            }
+        };
+    }
+
+    const btnOpenConfig = $("btnOpenConfig");
+    const fileInput = $("configFileInput");
+    if (btnOpenConfig && fileInput) {
+        btnOpenConfig.onclick = () => {
+            fileInput.value = '';
+            fileInput.click();
+        };
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files && fileInput.files[0];
+            handleOpenSnapshot(file);
+        });
+    }
+
+    const btnSaveConfig = $("btnSaveConfig");
+    if (btnSaveConfig) {
+        btnSaveConfig.onclick = downloadSnapshot;
+    }
 
     const btnGen = $("btnGen");
     if (btnGen) btnGen.onclick = generateGcodes;

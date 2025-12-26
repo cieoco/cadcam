@@ -334,7 +334,9 @@ export class MechanismWizard {
             const comp = this.components[this.selectedComponentIndex];
             if (!comp[pointKey]) comp[pointKey] = { id: '', type: 'floating', x: 0, y: 0 };
             comp[pointKey][prop] = val;
-            this.render(); // 點位屬性變更可能影響其他點的選擇，所以全量重繪
+            if (prop === 'type') {
+                this.render();
+            }
         }
     }
 
