@@ -76,7 +76,7 @@ export function solveTopology(topologyOrParams, params) {
 
         // Try 'len_param' or 'r1_param'
         const paramName = step[key + '_param'];
-        if (paramName && params[paramName] !== undefined) return Number(params[paramName]);
+        if (paramName && actualParams[paramName] !== undefined) return Number(actualParams[paramName]);
 
         return 100; // 預設長度改為 100，避免 0 導致無解
     };
@@ -85,7 +85,30 @@ export function solveTopology(topologyOrParams, params) {
     for (const step of topology.steps) {
         try {
             if (step.type === 'ground') {
-                points[step.id] = { x: step.x, y: step.y };
+                // 支援參數化的固定點座標
+                // 支援三種模式：
+                // 1. 直接座標：x: 100, y: 50
+                // 2. 參數座標：x_param: "L1", y_param: "H1"
+                // 3. 偏移座標：x_param: "L1", x_offset: 0 → x = 0 + L1
+                let x, y;
+                
+                if (step.x_param) {
+                    const paramValue = actualParams[step.x_param] || 100;
+                    const offset = step.x_offset || 0;
+                    x = offset + paramValue;
+                } else {
+                    x = step.x || 0;
+                }
+                
+                if (step.y_param) {
+                    const paramValue = actualParams[step.y_param] || 100;
+                    const offset = step.y_offset || 0;
+                    y = offset + paramValue;
+                } else {
+                    y = step.y || 0;
+                }
+                
+                points[step.id] = { x: Number(x), y: Number(y) };
             }
             else if (step.type === 'input_crank') {
                 const center = points[step.center];

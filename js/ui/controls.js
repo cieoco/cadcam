@@ -26,12 +26,15 @@ function getActiveModules() {
  */
 export function updateDynamicParams() {
     const container = document.getElementById('dynamicParamsContainer');
-    if (!container) return;
+    if (!container) {
+        console.warn('[updateDynamicParams] Container not found!');
+        return;
+    }
 
-    const mods = getActiveModules();
     const vars = new Map(); // Map of varId -> { label, min, max, step, default }
 
     // 1. 從 Mechanism Config 獲取標記為 isDynamic 的參數
+    const mods = getActiveModules();
     if (mods && mods.config && mods.config.parameters) {
         mods.config.parameters.forEach(p => {
             if (p.isDynamic) {
@@ -52,7 +55,6 @@ export function updateDynamicParams() {
         let topology;
         try {
             topology = JSON.parse(topoEl.value);
-            console.log('Scanning topology for dynamic params...', topology);
 
             const scan = (obj) => {
                 if (!obj || typeof obj !== 'object') return;
@@ -69,13 +71,12 @@ export function updateDynamicParams() {
                     const isParamKey = k.endsWith('_param') || k === 'lenParam' || k === 'len_param';
                     if (isParamKey && typeof val === 'string') {
                         if (val && !vars.has(val)) {
-                            console.log('Found dynamic param:', val, 'from key:', k);
                             vars.set(val, {
                                 label: val,
                                 min: 0,
                                 max: 500,
                                 step: 0.5,
-                                default: 100 // 改為 100 作為預設
+                                default: 100
                             });
                         }
                     } else if (val && typeof val === 'object') {
@@ -85,8 +86,20 @@ export function updateDynamicParams() {
             };
             scan(topology);
         } catch (e) {
-            console.warn('Topology JSON parse failed in updateDynamicParams', e);
+            console.warn('[updateDynamicParams] Topology JSON parse failed', e);
         }
+    }
+
+    // 記住當前焦點元素
+    const activeElement = document.activeElement;
+    const activeId = activeElement ? activeElement.id : null;
+    const activeValue = activeElement ? activeElement.value : null;
+    const selectionStart = activeElement && activeElement.selectionStart;
+    const selectionEnd = activeElement && activeElement.selectionEnd;
+
+    // ⚠️ 如果焦點在動態參數輸入框，跳過更新避免干擾輸入
+    if (activeId && activeId.startsWith('dyn_')) {
+        return;
     }
 
     // 3. 移除已經沒用到的動態參數
@@ -115,28 +128,74 @@ export function updateDynamicParams() {
             wrapper.innerHTML = `
                 <div style="display:flex; align-items:center; gap:6px;">
                     <label style="width:60px; font-size:11px; font-weight:bold; color:#2c3e50; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${info.label}">${info.label}</label>
-                    <input type="number" id="dyn_${varId}" value="${info.default}" step="${info.step}" style="width:55px; padding:2px; font-size:11px; border:1px solid #ddd; border-radius:3px;" class="dynamic-input">
+                    <input type="number" id="dyn_${varId}" value="${info.default}" step="${info.step}" style="width:55px; padding:2px; font-size:11px; border:1px solid #ddd; border-radius:3px;" class="dynamic-input" data-var-id="${varId}">
                     <input type="range" id="dyn_${varId}_range" value="${info.default}" min="${info.min}" max="${info.max}" step="${info.step}" style="flex:1; height:14px; margin:0; cursor:pointer;">
                 </div>
             `;
             container.appendChild(wrapper);
 
-            // 綁定聯動
+            // 綁定聯動 - 使用命名函數避免重複綁定
             const numInput = wrapper.querySelector('input[type="number"]');
             const rangeInput = wrapper.querySelector('input[type="range"]');
 
-            numInput.oninput = () => {
-                rangeInput.value = numInput.value;
-                if (window.updatePreviewDebounced) window.updatePreviewDebounced();
-                else updatePreview();
-            };
-            rangeInput.oninput = () => {
-                numInput.value = rangeInput.value;
-                if (window.updatePreviewDebounced) window.updatePreviewDebounced();
-                else updatePreview();
-            };
+            // 標記已綁定事件
+            if (!numInput.dataset.eventsBound) {
+                numInput.dataset.eventsBound = 'true';
+                
+                // 使用防抖來避免頻繁更新
+                let updateTimer;
+                const debouncedUpdate = () => {
+                    clearTimeout(updateTimer);
+                    updateTimer = setTimeout(() => {
+                        console.log('[debouncedUpdate] Updating preview for:', varId);
+                        // 不調用 updateDynamicParams，只更新預覽
+                        updatePreview();
+                    }, 300);
+                };
+
+                numInput.addEventListener('input', (e) => {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation(); // 完全阻止事件傳播
+                    console.log(`[numInput input] ${varId} = ${numInput.value}`);
+                    rangeInput.value = numInput.value;
+                    debouncedUpdate();
+                }, true); // 使用捕獲階段
+                
+                rangeInput.addEventListener('input', (e) => {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    console.log(`[rangeInput input] ${varId} = ${rangeInput.value}`);
+                    numInput.value = rangeInput.value;
+                    debouncedUpdate();
+                }, true);
+            }
+        } else {
+            console.log('[updateDynamicParams] Updating existing param:', varId);
+            // 更新現有元素的屬性（但不重新創建，避免失去焦點）
+            const numInput = wrapper.querySelector('input[type="number"]');
+            const rangeInput = wrapper.querySelector('input[type="range"]');
+            
+            if (numInput && rangeInput) {
+                // 只在值不同時更新（避免光標跳動）
+                if (numInput.step !== String(info.step)) numInput.step = info.step;
+                if (rangeInput.min !== String(info.min)) rangeInput.min = info.min;
+                if (rangeInput.max !== String(info.max)) rangeInput.max = info.max;
+                if (rangeInput.step !== String(info.step)) rangeInput.step = info.step;
+            }
         }
     });
+
+    // 恢復焦點
+    if (activeId && activeId.startsWith('dyn_')) {
+        const elementToFocus = document.getElementById(activeId);
+        if (elementToFocus) {
+            console.log('[updateDynamicParams] Restoring focus to:', activeId);
+            elementToFocus.focus();
+            if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
+                elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+            }
+        }
+    }
 }
 
 /**
@@ -417,7 +476,20 @@ export function setupUIHandlers() {
     // Dynamic params listener
     const topologyArea = document.getElementById('topology');
     if (topologyArea) {
-        topologyArea.addEventListener('input', () => {
+        // 使用防抖避免頻繁重新掃描
+        let topologyUpdateTimer;
+        
+        topologyArea.addEventListener('input', (e) => {
+            clearTimeout(topologyUpdateTimer);
+            // 增加到 1000ms，讓用戶有足夠時間輸入
+            topologyUpdateTimer = setTimeout(() => {
+                updateDynamicParams();
+            }, 1000);
+        });
+        
+        // 失去焦點時立即更新
+        topologyArea.addEventListener('blur', () => {
+            clearTimeout(topologyUpdateTimer);
             updateDynamicParams();
         });
     }

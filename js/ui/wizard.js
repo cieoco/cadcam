@@ -257,8 +257,8 @@ export class MechanismWizard {
 
                 ${pt.type === 'fixed' ? `
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-                        <input type="number" value="${pt.x || 0}" placeholder="X" oninput="window.wizard.updatePointProp('${pointKey}', 'x', parseFloat(this.value))" style="padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
-                        <input type="number" value="${pt.y || 0}" placeholder="Y" oninput="window.wizard.updatePointProp('${pointKey}', 'y', parseFloat(this.value))" style="padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
+                        <input type="text" value="${pt.x || 0}" placeholder="X" oninput="window.wizard.updatePointProp('${pointKey}', 'x', this.value)" style="padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
+                        <input type="text" value="${pt.y || 0}" placeholder="Y" oninput="window.wizard.updatePointProp('${pointKey}', 'y', this.value)" style="padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
                     </div>
                 ` : ''}
             </div>
@@ -459,19 +459,117 @@ export class MechanismWizard {
         const polygons = [];
         const joints = new Set();
         const parts = [];
-        const groundPoints = new Map(); // id -> {x, y}
+        const groundPoints = new Map(); // id -> {x, y, component, role}
+        const barComponents = new Map(); // 儲存 bar component 資訊
 
-        // 1. Collect all Fixed points as Grounds
+        // 1. 先收集所有 bar component，判斷哪些點應該參數化
+        this.components.forEach(c => {
+            if (c.type === 'bar' && !c.isInput && c.lenParam) {
+                // 這是一個有參數的固定桿
+                barComponents.set(c.id, c);
+            }
+        });
+
+        // 2. Collect all Fixed points as Grounds
         this.components.forEach(c => {
             ['p1', 'p2', 'p3'].forEach(k => {
                 if (c[k] && c[k].type === 'fixed' && c[k].id) {
-                    groundPoints.set(c[k].id, { x: c[k].x || 0, y: c[k].y || 0 });
+                    if (!groundPoints.has(c[k].id)) {
+                        groundPoints.set(c[k].id, { 
+                            x: c[k].x || 0, 
+                            y: c[k].y || 0,
+                            component: c,
+                            role: k  // 記錄是 p1 還是 p2
+                        });
+                    }
                 }
             });
         });
 
-        groundPoints.forEach((pos, id) => {
-            steps.push({ id, type: 'ground', x: pos.x, y: pos.y });
+        // 3. 處理 ground points，智能判斷是否需要參數化
+        groundPoints.forEach((info, id) => {
+            const step = { id, type: 'ground' };
+            const pos = info;
+            const comp = info.component;
+
+            // 🎯 關鍵邏輯：如果這個點屬於一個有 lenParam 的 bar，且是 p2（第二個點）
+            // 則根據 p1 和 p2 的初始座標計算角度，並使用參數化座標
+            if (comp.type === 'bar' && comp.lenParam && info.role === 'p2' && comp.p1) {
+                const p1 = comp.p1;
+                const p2 = comp.p2;
+                
+                // 計算初始角度
+                const dx = parseFloat(p2.x) - parseFloat(p1.x);
+                const dy = parseFloat(p2.y) - parseFloat(p1.y);
+                const angle = Math.atan2(dy, dx);
+                const initialLength = Math.sqrt(dx * dx + dy * dy);
+                
+                console.log(`[Wizard] Bar ${comp.id}: p1=(${p1.x},${p1.y}), p2=(${p2.x},${p2.y}), angle=${angle}, len=${initialLength}`);
+                
+                // 使用極座標：x = p1.x + L * cos(angle), y = p1.y + L * sin(angle)
+                // 但我們需要更簡單的方式...
+                
+                // 如果是水平桿（dy ≈ 0）
+                if (Math.abs(dy) < 0.01) {
+                    const p1X = parseFloat(p1.x);
+                    const p1Y = parseFloat(p1.y);
+                    
+                    if (dx > 0) {
+                        // 向右延伸
+                        step.x_param = comp.lenParam;
+                        step.x_offset = p1X;  // x = p1.x + lenParam
+                        step.y = p1Y;
+                    } else {
+                        // 向左延伸
+                        step.x_param = `-${comp.lenParam}`;
+                        step.x_offset = p1X;
+                        step.y = p1Y;
+                    }
+                }
+                // 如果是垂直桿（dx ≈ 0）
+                else if (Math.abs(dx) < 0.01) {
+                    const p1X = parseFloat(p1.x);
+                    const p1Y = parseFloat(p1.y);
+                    
+                    step.x = p1X;
+                    if (dy > 0) {
+                        // 向上延伸
+                        step.y_param = comp.lenParam;
+                        step.y_offset = p1Y;
+                    } else {
+                        // 向下延伸
+                        step.y_param = `-${comp.lenParam}`;
+                        step.y_offset = p1Y;
+                    }
+                }
+                // 斜向桿 - 使用參數化（但需要 solver 支援）
+                else {
+                    // 暫時：直接用參數當作 x，保持簡單
+                    const p1X = parseFloat(p1.x) || 0;
+                    step.x_param = comp.lenParam;
+                    step.x_offset = p1X;
+                    step.y = parseFloat(p2.y);
+                }
+            } else {
+                // 一般的固定點，直接用座標
+                if (typeof pos.x === 'number') {
+                    step.x = pos.x;
+                } else if (!isNaN(parseFloat(pos.x))) {
+                    step.x = parseFloat(pos.x);
+                } else {
+                    step.x_param = pos.x;
+                }
+
+                if (typeof pos.y === 'number') {
+                    step.y = pos.y;
+                } else if (!isNaN(parseFloat(pos.y))) {
+                    step.y = parseFloat(pos.y);
+                } else {
+                    step.y_param = pos.y;
+                }
+            }
+
+            steps.push(step);
             joints.add(id);
         });
 

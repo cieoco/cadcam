@@ -4,7 +4,6 @@
  */
 
 import { DRIVE_COMPONENTS, getDriveOptions } from './motor-data.js';
-// import { JANSEN_TOPOLOGY as JANSEN_TOPOLOGY_DEFAULT } from './jansen/topology.js'; // Removed default pre-load
 
 
 export const MECHANISMS = {
@@ -553,9 +552,15 @@ export const MECHANISMS = {
                 rows: 15,
                 fullWidth: true,
                 default: JSON.stringify({
-                    steps: [],
+                    steps: [
+                        { id: 'O', type: 'ground', x: 0, y: 0 }
+                    ],
                     tracePoint: '',
-                    visualization: { links: [], polygons: [], joints: [] },
+                    visualization: {
+                        links: [],
+                        polygons: [],
+                        joints: ['O']
+                    },
                     parts: []
                 }, null, 2)
             },
@@ -586,12 +591,12 @@ export const MECHANISMS = {
         
         `,
 
-        solverModule: './multilink/solver.js',
-        solveFn: 'solveTopology',
-        visualizationModule: './multilink/visualization.js',
-        renderFn: 'renderMultilink',
-        partsModule: './multilink/parts.js',
-        partsFn: 'generateMultilinkParts'
+        solverModule: './jansen/solver.js',
+        solveFn: 'solveJansen',
+        visualizationModule: './jansen/visualization.js',
+        renderFn: 'renderJansen',
+        partsModule: './jansen/parts.js',
+        partsFn: 'generateJansenParts'
     },
 
     bardrawer: {
@@ -656,150 +661,6 @@ export const MECHANISMS = {
         renderFn: 'renderBar',
         partsModule: './bardrawer/parts.js',
         partsFn: 'generateBarParts'
-    },
-
-    parallelogram: {
-        id: 'parallelogram',
-        name: '平行四邊形機構',
-        icon: '▱',
-        description: 'Parallelogram Linkage - 平行平移、同步運動',
-
-        parameters: [
-            {
-                id: 'a',
-                label: '長邊 a (Ground/Coupler)',
-                type: 'number',
-                min: 20,
-                max: 400,
-                step: 1,
-                default: 200,
-                unit: 'mm',
-                color: '#3498db',
-                isDynamic: true
-            },
-            {
-                id: 'b',
-                label: '短邊 b (Input/Output)',
-                type: 'number',
-                min: 10,
-                max: 300,
-                step: 1,
-                default: 100,
-                unit: 'mm',
-                color: '#e74c3c',
-                isDynamic: true
-            },
-            {
-                id: 'theta',
-                label: '輸入角 θ',
-                type: 'number',
-                min: -180,
-                max: 180,
-                step: 1,
-                default: 60,
-                unit: '度'
-            },
-            {
-                id: 'motorType',
-                label: '驅動元件',
-                type: 'select',
-                options: getDriveOptions(),
-                default: 'tt_motor'
-            },
-            {
-                id: 'sweepStart',
-                label: '起始角度',
-                type: 'number',
-                min: -180,
-                max: 180,
-                step: 1,
-                default: -180,
-                unit: '度'
-            },
-            {
-                id: 'sweepEnd',
-                label: '結束角度',
-                type: 'number',
-                min: -180,
-                max: 180,
-                step: 1,
-                default: 180,
-                unit: '度'
-            },
-            {
-                id: 'sweepStep',
-                label: '掃描間隔',
-                type: 'number',
-                min: 1,
-                max: 10,
-                step: 1,
-                default: 2,
-                unit: '度'
-            },
-            {
-                id: 'showTrajectory',
-                label: '顯示軌跡',
-                type: 'checkbox',
-                default: true
-            }
-        ],
-
-        partSpecs: [
-            {
-                id: 'barW',
-                label: '桿件寬 W',
-                type: 'number',
-                min: 6,
-                max: 40,
-                step: 1,
-                default: 15,
-                unit: 'mm'
-            },
-            {
-                id: 'margin',
-                label: '端到孔中心邊距',
-                type: 'number',
-                min: 4,
-                max: 20,
-                step: 0.5,
-                default: 7,
-                unit: 'mm'
-            },
-            {
-                id: 'holeD',
-                label: '孔徑',
-                type: 'number',
-                min: 2.5,
-                max: 8,
-                step: 0.1,
-                default: 3.2,
-                unit: 'mm'
-            },
-            {
-                id: 'barStyle',
-                label: '桿件樣式',
-                type: 'select',
-                options: [
-                    { value: 'rect', label: '⬛ 直角矩形' },
-                    { value: 'rounded', label: '💊 圓角矩形 (全圓角)' }
-                ],
-                default: 'rounded'
-            }
-        ],
-
-        simNotes: `
-            <strong>▱ 平行四邊形機構</strong><br/>
-            特點：Coupler 桿（上方藍色桿）在運動過程中始終保持水平。<br/>
-            適用於：升降平台、平行夾爪、同步連動機構。<br/>
-            <strong style="color:#e74c3c;">紅色桿 = 輸入桿 b</strong>
-        `,
-
-        solverModule: './parallelogram/solver.js',
-        solveFn: 'solveParallelogram',
-        visualizationModule: './parallelogram/visualization.js',
-        renderFn: 'renderParallelogram',
-        partsModule: './parallelogram/parts.js',
-        partsFn: 'generateParallelogramParts'
     }
 };
 
