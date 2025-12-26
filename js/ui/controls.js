@@ -403,8 +403,35 @@ export function updatePreview() {
             }
             return;
         }
-if (mods.config && mods.config.id === 'multilink') {
+        if (mods.config && mods.config.id === 'multilink') {
             lastMultilinkSolution = sol;
+            
+            // Auto-sweep for trajectory if showTrajectory is enabled
+            const showTrajectory = $("showTrajectory")?.checked;
+            if (showTrajectory) {
+                const sweepParams = readSweepParams();
+                const sweepFn = mods.solver.sweepTopology || mods.solver.sweepTheta;
+                if (sweepFn) {
+                    let sweepResult;
+                    if (mods.solver.sweepTopology) {
+                        let topology = mech.topology;
+                        if (typeof topology === 'string') {
+                            try { topology = JSON.parse(topology); } catch (e) {}
+                        }
+                        sweepResult = sweepFn(topology, mech, sweepParams.sweepStart, sweepParams.sweepEnd, sweepParams.sweepStep);
+                    } else {
+                        sweepResult = sweepFn(mech, sweepParams.sweepStart, sweepParams.sweepEnd, sweepParams.sweepStep);
+                    }
+                    currentTrajectoryData = {
+                        results: sweepResult.results,
+                        validRanges: sweepResult.validRanges,
+                        invalidRanges: sweepResult.invalidRanges,
+                        validBPoints: sweepResult.results.filter((r) => r.isValid && r.B).map((r) => r.B)
+                    };
+                }
+            } else {
+                currentTrajectoryData = null;
+            }
         }
         svgWrap.innerHTML = "";
 

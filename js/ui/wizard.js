@@ -49,11 +49,10 @@ export class MechanismWizard {
                         </h4>
                         <button id="btnWizardReset" style="background: #fff; border: 1px solid #ff7675; color: #ff7675; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;">🗑️ 重置</button>
                     </div>
-                    <select id="templateSelect" style="font-size: 10px; padding: 1px 3px; border-radius: 4px; border: 1px solid #ccc; max-width: 100px;">
+                    <select id="templateSelect" style="font-size: 10px; padding: 1px 3px; border-radius: 4px; border: 1px solid #ccc; max-width: 150px;">
                         <option value="">-- 範本 --</option>
-                        <option value="JANSEN">Jansen</option>
-                        <option value="KLANN">Klann</option>
-                        <option value="HOEKEN">Hoeken</option>
+                        <option value="CRANK_ROCKER">曲柄搖桿</option>
+                        <option value="CHEBYSHEV">直線機構</option>
                     </select>
                 </div>
                 
@@ -695,32 +694,64 @@ export class MechanismWizard {
         if (confirm(`載入 ${name} 範本將會覆蓋目前所有桿件，確定嗎？`)) {
             this.components = [];
 
-            if (name === 'JANSEN') {
+            if (name === 'CRANK_ROCKER') {
+                // 曲柄搖桿機構 (Crank-Rocker) - 可360度連續旋轉
+                // 滿足 Grashof 條件：s + l ≤ p + q
+                // 桿長: a=40, b=80, c=60, d=80 → 40+80 ≤ 60+80 ✓
                 this.components = [
+                    // 1. 輸入曲柄 (Input Crank) - 最短桿，可360度旋轉
                     {
-                        type: 'bar', id: 'Crank', color: '#e74c3c', isInput: true, lenParam: 'm',
+                        type: 'bar', id: 'Crank', color: '#e74c3c', isInput: true, lenParam: 'a',
                         p1: { id: 'O2', type: 'fixed', x: 0, y: 0 },
                         p2: { id: 'A', type: 'floating' }
                     },
+                    // 2. 連桿 (Coupler Link)
                     {
-                        type: 'triangle', id: 'Tri1', color: '#3498db', r1Param: 'j', r2Param: 'k', sign: -1,
+                        type: 'bar', id: 'Coupler', color: '#3498db', lenParam: 'b',
                         p1: { id: 'A', type: 'existing' },
-                        p2: { id: 'O4', type: 'fixed', x: 38, y: -7.8 },
-                        p3: { id: 'P1', type: 'floating' }
+                        p2: { id: 'B', type: 'floating' }
+                    },
+                    // 3. 輸出搖桿 (Output Rocker) - 擺動輸出
+                    {
+                        type: 'bar', id: 'Rocker', color: '#27ae60', lenParam: 'd',
+                        p1: { id: 'O4', type: 'fixed', x: 60, y: 0 },
+                        p2: { id: 'B', type: 'existing' }
+                    },
+                    // 4. 底座 (Ground Link)
+                    {
+                        type: 'bar', id: 'Ground', color: '#95a5a6', lenParam: 'c',
+                        p1: { id: 'O2', type: 'existing' },
+                        p2: { id: 'O4', type: 'existing' }
                     }
                 ];
-            } else if (name === 'HOEKEN') {
+            } else if (name === 'CHEBYSHEV') {
+                // Chebyshev 直線機構 - 產生近似直線運動
+                // 經典桿長比例: a:b:c:d = 1:2.5:4:2.5
+                // 追蹤點在連桿 B 上會產生近似直線
                 this.components = [
+                    // 1. 驅動曲柄
                     {
-                        type: 'bar', id: 'Crank', color: '#e74c3c', isInput: true, lenParam: 'm',
+                        type: 'bar', id: 'Crank', color: '#e74c3c', isInput: true, lenParam: 'a',
                         p1: { id: 'O2', type: 'fixed', x: 0, y: 0 },
                         p2: { id: 'A', type: 'floating' }
                     },
+                    // 2. 主連桿
                     {
-                        type: 'triangle', id: 'Tri1', color: '#27ae60', r1Param: 'L1', r2Param: 'L2', sign: 1,
+                        type: 'bar', id: 'Coupler', color: '#3498db', lenParam: 'b',
                         p1: { id: 'A', type: 'existing' },
-                        p2: { id: 'O4', type: 'fixed', x: 100, y: 0 },
-                        p3: { id: 'P1', type: 'floating' }
+                        p2: { id: 'B', type: 'floating' }
+                    },
+                    // 3. 搖桿 (與主連桿等長)
+                    {
+                        type: 'bar', id: 'Rocker', color: '#27ae60', lenParam: 'd',
+                        p1: { id: 'O4', type: 'fixed', x: 80, y: 0 },
+                        p2: { id: 'B', type: 'existing' }
+                    },
+                    // 4. 底座
+                    {
+                        type: 'bar', id: 'Ground', color: '#95a5a6', lenParam: 'c',
+                        p1: { id: 'O2', type: 'existing' },
+                        p2: { id: 'O4', type: 'existing' }
                     }
                 ];
             }

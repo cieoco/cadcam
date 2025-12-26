@@ -161,14 +161,29 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
 
     // 1. Draw Trajectory
     if (trajectoryData && trajectoryData.results) {
-        const pts = trajectoryData.results
-            .filter(r => r.isValid && r.B)
-            .map(r => `${tx(r.B)},${ty(r.B)}`)
-            .join(' ');
-        if (pts) {
-            svg.appendChild(svgEl('polyline', {
-                points: pts, fill: 'none', stroke: '#9b59b6', 'stroke-width': 2, 'stroke-opacity': 0.4
-            }));
+        let traceId = topology.tracePoint;
+        if (!traceId) {
+            const firstValid = trajectoryData.results.find(r => r.isValid && r.points);
+            if (firstValid && firstValid.points) {
+                if (firstValid.points.B) traceId = 'B';
+                else if (firstValid.points.b) traceId = 'b';
+                else {
+                    const ids = Object.keys(firstValid.points);
+                    traceId = ids.length ? ids[ids.length - 1] : null;
+                }
+            }
+        }
+
+        if (traceId) {
+            const pts = trajectoryData.results
+                .filter(r => r.isValid && r.points && r.points[traceId])
+                .map(r => `${tx(r.points[traceId])},${ty(r.points[traceId])}`)
+                .join(' ');
+            if (pts) {
+                svg.appendChild(svgEl('polyline', {
+                    points: pts, fill: 'none', stroke: '#9b59b6', 'stroke-width': 2, 'stroke-opacity': 0.6
+                }));
+            }
         }
     }
 
