@@ -1,6 +1,6 @@
 /**
- * Mechanism Wizard UI
- * 機構小幫手 - 引導式建構多連桿機構
+ * Mechanism Wizard UI (Component-Based)
+ * 機構小幫手 - 組件式建構多連桿機構
  */
 
 import { $ } from '../utils.js';
@@ -11,18 +11,27 @@ export class MechanismWizard {
     constructor(containerId, onUpdate) {
         this.container = $(containerId);
         this.onUpdate = onUpdate;
+
+        // 組件化資料結構
+        this.components = []; // { type: 'ground'|'bar'|'triangle', id, ...props }
+        this.selectedComponentIndex = -1;
+
+        // 最終生成的拓撲 (供 Solver 使用)
         this.topology = {
             steps: [],
             tracePoint: '',
             visualization: { links: [], polygons: [], joints: [] },
             parts: []
         };
-        this.currentStep = 1; // 1: Ground, 2: Input, 3: Dyads, 4: Trace
     }
 
     init(initialTopology) {
-        if (initialTopology) {
-            this.topology = JSON.parse(JSON.stringify(initialTopology));
+        // 嘗試從拓撲中恢復組件資料 (如果存在)
+        if (initialTopology && initialTopology._wizard_data) {
+            this.components = JSON.parse(JSON.stringify(initialTopology._wizard_data));
+        } else if (initialTopology && initialTopology.steps && initialTopology.steps.length > 0) {
+            // 如果沒有組件資料但有拓撲，嘗試做簡單轉換 (選填，目前先清空)
+            this.components = [];
         }
         this.render();
     }
@@ -30,20 +39,65 @@ export class MechanismWizard {
     render() {
         if (!this.container) return;
 
+        // 在右側面板中，我們將高度調整為自動，並優化佈局
         this.container.innerHTML = `
-            <div class="wizard-card" style="border: 1px solid #e0e0e0; padding: 20px; border-radius: 12px; background: #ffffff; margin-top: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
-                    <h4 style="margin: 0; color: #2c3e50; font-size: 16px;">🛠️ 機構建構精靈</h4>
-                    <div style="font-size: 12px; font-weight: bold; color: #3498db; background: #ebf5fb; padding: 2px 8px; border-radius: 10px;">步驟 ${this.currentStep} / 4</div>
+            <div class="wizard-card" style="border: 1px solid #e0e0e0; border-radius: 12px; background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden; display: flex; flex-direction: column; height: 600px; font-family: system-ui, -apple-system, sans-serif; margin-bottom: 15px;">
+                <!-- Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: #f8f9fa; border-bottom: 1px solid #eee;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <h4 style="margin: 0; color: #2c3e50; font-size: 14px; display: flex; align-items: center; gap: 5px;">
+                            <span style="font-size: 16px;">🛠️</span> 機構設計器
+                        </h4>
+                        <button id="btnWizardReset" style="background: #fff; border: 1px solid #ff7675; color: #ff7675; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;">🗑️ 重置</button>
+                    </div>
+                    <select id="templateSelect" style="font-size: 10px; padding: 1px 3px; border-radius: 4px; border: 1px solid #ccc; max-width: 100px;">
+                        <option value="">-- 範本 --</option>
+                        <option value="JANSEN">Jansen</option>
+                        <option value="KLANN">Klann</option>
+                        <option value="HOEKEN">Hoeken</option>
+                    </select>
                 </div>
                 
-                <div id="wizardStepContent" style="min-height: 200px;">
-                    ${this.renderStepContent()}
+                <!-- Add Buttons (Top of Right Panel) -->
+                <div style="padding: 10px; background: #fff; border-bottom: 1px solid #f0f0f0; display: flex; gap: 6px;">
+                    <button id="btnAddGround" style="flex: 1; background: #444; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                        <span>📍</span> 固定點
+                    </button>
+                    <button id="btnAddBar" style="flex: 1; background: #3498db; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                        <span>📏</span> 二孔桿
+                    </button>
+                    <button id="btnAddTriangle" style="flex: 1; background: #27ae60; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                        <span>📐</span> 三角桿
+                    </button>
                 </div>
 
-                <div style="margin-top: 25px; display: flex; justify-content: space-between; gap: 10px;">
-                    <button id="btnWizardPrev" class="btn-secondary" style="flex: 1; padding: 8px;" ${this.currentStep === 1 ? 'disabled' : ''}>上一步</button>
-                    <button id="btnWizardNext" class="btn-primary" style="flex: 1; padding: 8px;">${this.currentStep === 4 ? '完成並關閉' : '下一步'}</button>
+                <!-- Main Content (Two Columns) -->
+                <div style="display: flex; flex: 1; overflow: hidden;">
+                    <!-- Left: Component List -->
+                    <div style="width: 140px; border-right: 1px solid #eee; display: flex; flex-direction: column; background: #fcfcfc;">
+                        <div id="componentList" style="flex: 1; overflow-y: auto; padding: 5px;">
+                            ${this.renderComponentList()}
+                        </div>
+                    </div>
+
+                    <!-- Right: Property Editor -->
+                    <div id="propertyEditor" style="flex: 1; padding: 15px; overflow-y: auto; background: #fff;">
+                        ${this.renderPropertyEditor()}
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div style="padding: 8px 15px; background: #f8f9fa; border-top: 1px solid #eee; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <label style="font-size: 11px; color: #555;">追蹤點：</label>
+                            <select id="tracePointSelect" style="font-size: 11px; padding: 2px 5px; border-radius: 4px; border: 1px solid #ccc;">
+                                <option value="">-- 無 --</option>
+                                ${this.getAllPointIds().map(p => `<option value="${p}" ${this.topology.tracePoint === p ? 'selected' : ''}>${p}</option>`).join('')}
+                            </select>
+                        </div>
+                        <button id="btnWizardApply" class="btn-primary" style="padding: 5px 15px; font-size: 12px; font-weight: bold; border-radius: 4px;">🚀 套用更新</button>
+                    </div>
                 </div>
             </div>
         `;
@@ -51,295 +105,366 @@ export class MechanismWizard {
         this.attachEvents();
     }
 
-    renderStepContent() {
-        switch (this.currentStep) {
-            case 1: return this.renderGroundStep();
-            case 2: return this.renderInputStep();
-            case 3: return this.renderDyadStep();
-            case 4: return this.renderTraceStep();
-            default: return '';
+    renderComponentList() {
+        if (this.components.length === 0) {
+            return `<div style="text-align: center; color: #999; font-size: 10px; margin-top: 20px;">尚無組件</div>`;
         }
-    }
 
-    renderGroundStep() {
-        const grounds = this.topology.steps.filter(s => s.type === 'ground');
-        return `
-            <div style="margin-bottom: 20px; padding: 12px; background: #f0f7ff; border-radius: 8px; border: 1px dashed #3498db;">
-                <label style="font-size: 13px; font-weight: bold; color: #2980b9; display: block; margin-bottom: 8px;">🚀 快速開始：載入範本</label>
-                <select id="templateSelect" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #bdc3c7;">
-                    <option value="">-- 選擇經典機構範本 --</option>
-                    <option value="JANSEN">Jansen (仿生獸)</option>
-                    <option value="KLANN">Klann (六連桿步進)</option>
-                    <option value="HOEKEN">Hoeken (直線機構)</option>
-                </select>
-            </div>
-            <p style="font-size: 14px; color: #34495e; margin-bottom: 15px;"><strong>第一步：定義固定點 (Ground)</strong><br/><span style="font-size: 12px; color: #7f8c8d;">設定機構在空間中不動的支點。</span></p>
-            <div id="groundList" style="display: flex; flex-direction: column; gap: 10px;">
-                ${grounds.map((g, i) => `
-                    <div style="display: grid; grid-template-columns: 1fr 1.5fr 1.5fr auto; gap: 8px; align-items: center; background: #f8f9fa; padding: 8px; border-radius: 6px;">
-                        <input type="text" value="${g.id}" placeholder="ID" style="width: 100%; padding: 4px;" onchange="window.wizard.updatePointId('ground', ${i}, this.value)">
-                        <div style="display: flex; align-items: center; gap: 4px;">
-                            <span style="font-size: 12px; color: #999;">X</span>
-                            <input type="number" value="${g.x}" style="width: 100%; padding: 4px;" onchange="window.wizard.updatePointCoord('ground', ${i}, 'x', this.value)">
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 4px;">
-                            <span style="font-size: 12px; color: #999;">Y</span>
-                            <input type="number" value="${g.y}" style="width: 100%; padding: 4px;" onchange="window.wizard.updatePointCoord('ground', ${i}, 'y', this.value)">
-                        </div>
-                        <button onclick="window.wizard.removePoint('ground', ${i})" style="padding: 4px 8px; background: #ff7675; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
-                    </div>
-                `).join('')}
-            </div>
-            <button id="btnAddGround" style="margin-top: 15px; width: 100%; padding: 8px; font-size: 13px; background: #fff; border: 1px solid #3498db; color: #3498db; border-radius: 6px; cursor: pointer;">+ 新增固定點</button>
-        `;
-    }
+        return this.components.map((c, i) => {
+            const isSelected = this.selectedComponentIndex === i;
+            const icon = c.type === 'ground' ? '📍' : (c.type === 'bar' ? '📏' : '📐');
+            const color = c.color || '#333';
 
-    renderInputStep() {
-        const grounds = this.topology.steps.filter(s => s.type === 'ground');
-        const input = this.topology.steps.find(s => s.type === 'input_crank');
-        return `
-            <p style="font-size: 14px; color: #34495e; margin-bottom: 15px;"><strong>第二步：定義輸入曲柄 (Input)</strong><br/><span style="font-size: 12px; color: #7f8c8d;">設定由馬達帶動旋轉的桿件。</span></p>
-            <div style="display: flex; flex-direction: column; gap: 15px; background: #f8f9fa; padding: 15px; border-radius: 8px;">
-                <div>
-                    <label style="display: block; font-size: 12px; color: #666; margin-bottom: 4px;">曲柄節點名稱</label>
-                    <input type="text" id="inputCrankId" value="${input ? input.id : 'P0'}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            return `
+                <div class="comp-item" onclick="window.wizard.selectComponent(${i})" style="
+                    padding: 6px 8px; 
+                    margin-bottom: 4px; 
+                    border-radius: 6px; 
+                    cursor: pointer; 
+                    display: flex; 
+                    align-items: center; 
+                    gap: 6px;
+                    font-size: 11px;
+                    background: ${isSelected ? '#e3f2fd' : '#fff'};
+                    border: 1px solid ${isSelected ? '#3498db' : '#eee'};
+                    transition: all 0.2s;
+                ">
+                    <span style="font-size: 12px;">${icon}</span>
+                    <span style="flex: 1; font-weight: ${isSelected ? 'bold' : 'normal'}; color: ${isSelected ? '#2980b9' : '#34495e'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        ${c.id || (c.type + (i + 1))}
+                    </span>
+                    <div style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; border: 1px solid rgba(0,0,0,0.1);"></div>
                 </div>
-                <div>
-                    <label style="display: block; font-size: 12px; color: #666; margin-bottom: 4px;">旋轉中心 (從固定點選擇)</label>
-                    <select id="inputCrankCenter" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                        ${grounds.map(g => `<option value="${g.id}" ${input && input.center === g.id ? 'selected' : ''}>${g.id}</option>`).join('')}
+            `;
+        }).join('');
+    }
+
+    renderPropertyEditor() {
+        const comp = this.components[this.selectedComponentIndex];
+        if (!comp) {
+            return `
+                <div style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #bdc3c7; text-align: center;">
+                    <div style="font-size: 40px; margin-bottom: 10px; opacity: 0.5;">👆</div>
+                    <div style="font-size: 12px; font-weight: bold;">請點擊上方按鈕</div>
+                </div>
+            `;
+        }
+
+        const points = this.getAllPointIds();
+        const icon = comp.type === 'ground' ? '📍' : (comp.type === 'bar' ? '📏' : '📐');
+
+        let html = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #f8f9fa;">
+                <h5 style="margin: 0; font-size: 14px; color: #2c3e50; display: flex; align-items: center; gap: 5px;">
+                    ${icon} 編輯
+                </h5>
+                <button onclick="window.wizard.removeSelected()" style="background: #fff; border: 1px solid #ff7675; color: #ff7675; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;">刪除</button>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div class="form-group">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">名稱 (ID)</label>
+                    <input type="text" value="${comp.id || ''}" oninput="window.wizard.updateCompProp('id', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                </div>
+                <div class="form-group">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">顏色</label>
+                    <input type="color" value="${comp.color || '#3498db'}" oninput="window.wizard.updateCompProp('color', this.value)" style="width: 100%; height: 30px; padding: 2px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                </div>
+        `;
+
+        if (comp.type === 'ground') {
+            html += `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">X (mm)</label>
+                        <input type="number" value="${comp.x || 0}" oninput="window.wizard.updateCompProp('x', parseFloat(this.value))" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">Y (mm)</label>
+                        <input type="number" value="${comp.y || 0}" oninput="window.wizard.updateCompProp('y', parseFloat(this.value))" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                    </div>
+                </div>
+            `;
+        } else if (comp.type === 'bar') {
+            html += `
+                <div class="form-group">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">連接點 1 (起點)</label>
+                    <select onchange="window.wizard.updateCompProp('p1', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
+                        <option value="">-- 選擇 --</option>
+                        ${points.map(p => `<option value="${p}" ${comp.p1 === p ? 'selected' : ''}>${p}</option>`).join('')}
                     </select>
                 </div>
-                <div>
-                    <label style="display: block; font-size: 12px; color: #666; margin-bottom: 4px;">桿長參數名稱 (如 m, r)</label>
-                    <input type="text" id="inputCrankLenParam" value="${input ? input.len_param : 'm'}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                <div class="form-group">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">連接點 2 (終點)</label>
+                    <input type="text" value="${comp.p2 || ''}" placeholder="例如 P1" oninput="window.wizard.updateCompProp('p2', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
                 </div>
-            </div>
-        `;
-    }
-
-    renderDyadStep() {
-        const points = this.topology.steps.map(s => s.id);
-        const dyads = this.topology.steps.filter(s => s.type === 'dyad');
-        return `
-            <p style="font-size: 14px; color: #34495e; margin-bottom: 15px;"><strong>第三步：建立二連桿組 (Dyads)</strong><br/><span style="font-size: 12px; color: #7f8c8d;">利用兩個已知點與兩段長度確定一個新點。</span></p>
-            <div id="dyadList" style="display: flex; flex-direction: column; gap: 12px;">
-                ${dyads.map((d, i) => `
-                    <div style="border: 1px solid #e0e0e0; padding: 12px; background: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="font-weight: bold; color: #2c3e50;">節點:</span>
-                                <input type="text" value="${d.id}" style="width: 50px; padding: 2px 5px; border: 1px solid #ddd; border-radius: 4px;" onchange="window.wizard.updateDyadId(${i}, this.value)">
-                            </div>
-                            <button onclick="window.wizard.removePoint('dyad', ${i})" style="background: #ff7675; color: white; border: none; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">刪除</button>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px;">
-                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                <span style="color: #888;">連接點 1</span>
-                                <select style="padding: 4px; border-radius: 4px; border: 1px solid #ddd;" onchange="window.wizard.updateDyadParam(${i}, 'p1', this.value)">
-                                    ${points.filter(p => p !== d.id).map(p => `<option value="${p}" ${d.p1 === p ? 'selected' : ''}>${p}</option>`).join('')}
-                                </select>
-                                <span style="color: #888; margin-top: 4px;">桿長參數 1</span>
-                                <input type="text" value="${d.r1_param}" style="padding: 4px; border-radius: 4px; border: 1px solid #ddd;" onchange="window.wizard.updateDyadParam(${i}, 'r1_param', this.value)">
-                            </div>
-                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                <span style="color: #888;">連接點 2</span>
-                                <select style="padding: 4px; border-radius: 4px; border: 1px solid #ddd;" onchange="window.wizard.updateDyadParam(${i}, 'p2', this.value)">
-                                    ${points.filter(p => p !== d.id).map(p => `<option value="${p}" ${d.p2 === p ? 'selected' : ''}>${p}</option>`).join('')}
-                                </select>
-                                <span style="color: #888; margin-top: 4px;">桿長參數 2</span>
-                                <input type="text" value="${d.r2_param}" style="padding: 4px; border-radius: 4px; border: 1px solid #ddd;" onchange="window.wizard.updateDyadParam(${i}, 'r2_param', this.value)">
-                            </div>
-                        </div>
-                        <div style="margin-top: 8px; display: flex; align-items: center; gap: 10px; font-size: 12px; color: #666;">
-                            <span>幾何解方向:</span>
-                            <select style="padding: 2px 5px; border-radius: 4px; border: 1px solid #ddd;" onchange="window.wizard.updateDyadParam(${i}, 'sign', parseInt(this.value))">
-                                <option value="1" ${d.sign === 1 ? 'selected' : ''}>正向 (+1)</option>
-                                <option value="-1" ${d.sign === -1 ? 'selected' : ''}>反向 (-1)</option>
-                            </select>
-                        </div>
+                <div class="form-group">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">桿長參數</label>
+                    <input type="text" value="${comp.lenParam || 'L'}" oninput="window.wizard.updateCompProp('lenParam', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #2c3e50; cursor: pointer; padding: 6px; background: #f8f9fa; border-radius: 4px;">
+                        <input type="checkbox" ${comp.isInput ? 'checked' : ''} onchange="window.wizard.updateCompProp('isInput', this.checked)" style="width: 14px; height: 14px;"> 馬達驅動
+                    </label>
+                </div>
+            `;
+        } else if (comp.type === 'triangle') {
+            html += `
+                <div class="form-group">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">基準點 1</label>
+                    <select onchange="window.wizard.updateCompProp('p1', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
+                        <option value="">-- 選擇 --</option>
+                        ${points.map(p => `<option value="${p}" ${comp.p1 === p ? 'selected' : ''}>${p}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">基準點 2</label>
+                    <select onchange="window.wizard.updateCompProp('p2', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
+                        <option value="">-- 選擇 --</option>
+                        ${points.map(p => `<option value="${p}" ${comp.p2 === p ? 'selected' : ''}>${p}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">頂點名稱</label>
+                    <input type="text" value="${comp.p3 || ''}" placeholder="例如 P2" oninput="window.wizard.updateCompProp('p3', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">邊長 1</label>
+                        <input type="text" value="${comp.r1Param || 'L1'}" oninput="window.wizard.updateCompProp('r1Param', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
                     </div>
-                `).join('')}
-            </div>
-            <button id="btnAddDyad" style="margin-top: 15px; width: 100%; padding: 10px; font-size: 13px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer; box-shadow: 0 2px 4px rgba(52, 152, 219, 0.2);">+ 新增節點 (Dyad)</button>
-        `;
-    }
+                    <div class="form-group">
+                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">邊長 2</label>
+                        <input type="text" value="${comp.r2Param || 'L2'}" oninput="window.wizard.updateCompProp('r2Param', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">解方向</label>
+                    <select onchange="window.wizard.updateCompProp('sign', parseInt(this.value))" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
+                        <option value="1" ${comp.sign === 1 ? 'selected' : ''}>正向 (+1)</option>
+                        <option value="-1" ${comp.sign === -1 ? 'selected' : ''}>反向 (-1)</option>
+                    </select>
+                </div>
+            `;
+        }
 
-    renderTraceStep() {
-        const points = this.topology.steps.map(s => s.id);
-        return `
-            <p style="font-size: 14px; color: #34495e;"><strong>第四步：設定追蹤點 (Trace)</strong><br/>選擇要觀察運動軌跡的點。</p>
-            <select id="tracePointSelect" style="width: 100%; padding: 8px;">
-                ${points.map(p => `<option value="${p}" ${this.topology.tracePoint === p ? 'selected' : ''}>${p}</option>`).join('')}
-            </select>
-            <p style="font-size: 12px; color: #7f8c8d; margin-top: 10px;">完成後，系統會自動生成視覺化連桿與零件清單。</p>
-        `;
+        html += `</div>`;
+        return html;
     }
 
     attachEvents() {
-        const btnNext = $('btnWizardNext');
-        const btnPrev = $('btnWizardPrev');
         const btnAddGround = $('btnAddGround');
-        const btnAddDyad = $('btnAddDyad');
-
-        if (btnNext) btnNext.onclick = () => this.nextStep();
-        if (btnPrev) btnPrev.onclick = () => this.prevStep();
-        if (btnAddGround) btnAddGround.onclick = () => this.addGround();
-        if (btnAddDyad) btnAddDyad.onclick = () => this.addDyad();
-
+        const btnAddBar = $('btnAddBar');
+        const btnAddTriangle = $('btnAddTriangle');
+        const btnReset = $('btnWizardReset');
+        const btnApply = $('btnWizardApply');
         const templateSelect = $('templateSelect');
+        const traceSelect = $('tracePointSelect');
+
+        if (btnAddGround) btnAddGround.onclick = () => this.addComponent('ground');
+        if (btnAddBar) btnAddBar.onclick = () => this.addComponent('bar');
+        if (btnAddTriangle) btnAddTriangle.onclick = () => this.addComponent('triangle');
+        if (btnReset) btnReset.onclick = () => this.reset();
+        if (btnApply) btnApply.onclick = () => this.syncTopology();
+
         if (templateSelect) {
-            templateSelect.onchange = (e) => this.loadTemplate(e.target.value);
-        }
-
-        // Input step specific
-        if (this.currentStep === 2) {
-            const idInput = $('inputCrankId');
-            const centerSelect = $('inputCrankCenter');
-            const lenInput = $('inputCrankLenParam');
-
-            const updateInput = () => {
-                let input = this.topology.steps.find(s => s.type === 'input_crank');
-                if (!input) {
-                    input = { type: 'input_crank' };
-                    this.topology.steps.push(input);
-                }
-                input.id = idInput.value;
-                input.center = centerSelect.value;
-                input.len_param = lenInput.value;
-                this.syncTopology();
+            templateSelect.onchange = (e) => {
+                if (e.target.value) this.loadTemplate(e.target.value);
+                e.target.value = ''; // 重置選擇器
             };
-
-            idInput.onchange = updateInput;
-            centerSelect.onchange = updateInput;
-            lenInput.onchange = updateInput;
         }
 
-        // Trace step specific
-        if (this.currentStep === 4) {
-            const select = $('tracePointSelect');
-            select.onchange = () => {
-                this.topology.tracePoint = select.value;
-                this.syncTopology();
+        if (traceSelect) {
+            traceSelect.onchange = (e) => {
+                this.topology.tracePoint = e.target.value;
             };
         }
     }
 
-    nextStep() {
-        if (this.currentStep < 4) {
-            this.currentStep++;
-            this.render();
-        } else {
-            this.finish();
-        }
-    }
+    addComponent(type) {
+        const count = this.components.filter(c => c.type === type).length + 1;
+        const id = type === 'ground' ? `O${count * 2}` : (type === 'bar' ? `Link${count}` : `Tri${count}`);
+        const newComp = { type, id, color: type === 'ground' ? '#666' : (type === 'bar' ? '#3498db' : '#27ae60') };
 
-    prevStep() {
-        if (this.currentStep > 1) {
-            this.currentStep--;
-            this.render();
+        if (type === 'ground') {
+            newComp.x = 0;
+            newComp.y = 0;
+        } else if (type === 'bar') {
+            newComp.p1 = '';
+            newComp.p2 = '';
+            newComp.lenParam = 'L' + (this.components.length + 1);
+            newComp.isInput = false;
+        } else if (type === 'triangle') {
+            newComp.p1 = '';
+            newComp.p2 = '';
+            newComp.p3 = '';
+            newComp.r1Param = 'R1_' + (this.components.length + 1);
+            newComp.r2Param = 'R2_' + (this.components.length + 1);
+            newComp.sign = 1;
         }
-    }
 
-    addGround() {
-        const id = `O${this.topology.steps.filter(s => s.type === 'ground').length + 1}`;
-        this.topology.steps.push({ id, type: 'ground', x: 0, y: 0 });
+        this.components.push(newComp);
+        this.selectedComponentIndex = this.components.length - 1;
         this.render();
-        this.syncTopology();
     }
 
-    addDyad() {
-        const id = `P${this.topology.steps.filter(s => s.type !== 'ground').length}`;
-        const points = this.topology.steps.map(s => s.id);
-        this.topology.steps.push({
-            id,
-            type: 'dyad',
-            p1: points[0] || '',
-            r1_param: 'L1',
-            p2: points[1] || '',
-            r2_param: 'L2',
-            sign: 1
+    selectComponent(index) {
+        this.selectedComponentIndex = index;
+        this.render();
+    }
+
+    updateCompProp(prop, val) {
+        if (this.selectedComponentIndex >= 0) {
+            this.components[this.selectedComponentIndex][prop] = val;
+            // 局部更新列表名稱
+            const list = $('componentList');
+            if (list) list.innerHTML = this.renderComponentList();
+        }
+    }
+
+    removeSelected() {
+        if (this.selectedComponentIndex >= 0) {
+            this.components.splice(this.selectedComponentIndex, 1);
+            this.selectedComponentIndex = -1;
+            this.render();
+        }
+    }
+
+    getAllPointIds() {
+        const ids = new Set();
+        this.components.forEach(c => {
+            if (c.type === 'ground') ids.add(c.id);
+            if (c.type === 'bar' && c.p2) ids.add(c.p2);
+            if (c.type === 'triangle' && c.p3) ids.add(c.p3);
         });
-        this.render();
-        this.syncTopology();
+        return Array.from(ids);
     }
 
-    removePoint(type, index) {
-        const filteredSteps = this.topology.steps.filter(s => s.type === type);
-        const stepToRemove = filteredSteps[index];
-        this.topology.steps = this.topology.steps.filter(s => s !== stepToRemove);
-        this.render();
-        this.syncTopology();
-    }
-
-    updatePointId(type, index, val) {
-        const filteredSteps = this.topology.steps.filter(s => s.type === type);
-        filteredSteps[index].id = val;
-        this.syncTopology();
-    }
-
-    updatePointCoord(type, index, axis, val) {
-        const filteredSteps = this.topology.steps.filter(s => s.type === type);
-        filteredSteps[index][axis] = parseFloat(val);
-        this.syncTopology();
-    }
-
-    updateDyadId(index, val) {
-        const dyads = this.topology.steps.filter(s => s.type === 'dyad');
-        dyads[index].id = val;
-        this.syncTopology();
-    }
-
-    updateDyadParam(index, key, val) {
-        const dyads = this.topology.steps.filter(s => s.type === 'dyad');
-        dyads[index][key] = val;
-        this.syncTopology();
+    reset() {
+        if (confirm('確定要清除所有組件嗎？')) {
+            this.components = [];
+            this.selectedComponentIndex = -1;
+            this.render();
+            this.syncTopology();
+        }
     }
 
     syncTopology() {
-        // 自動生成視覺化與零件 (簡單邏輯)
-        this.autoGenerateVizAndParts();
-
+        this.compileTopology();
         if (this.onUpdate) {
             this.onUpdate(this.topology);
         }
     }
 
-    autoGenerateVizAndParts() {
-        const links = [];
-        const joints = [];
+    /**
+     * 將組件編譯為 Solver 拓撲
+     */
+    compileTopology() {
+        const steps = [];
+        const polygons = [];
+        const joints = new Set();
         const parts = [];
 
-        for (const step of this.topology.steps) {
-            joints.push(step.id);
-            if (step.type === 'input_crank') {
-                links.push({ p1: step.center, p2: step.id, style: 'crank', color: '#e74c3c' });
-                parts.push({ id: `Crank(${step.len_param})`, type: 'bar', len_param: step.len_param, color: '#e74c3c' });
-            } else if (step.type === 'dyad') {
-                links.push({ p1: step.p1, p2: step.id, color: '#34495e' });
-                links.push({ p1: step.p2, p2: step.id, color: '#34495e' });
-                parts.push({ id: `Link(${step.r1_param})`, type: 'bar', len_param: step.r1_param });
-                parts.push({ id: `Link(${step.r2_param})`, type: 'bar', len_param: step.r2_param });
+        // 1. 處理固定點
+        this.components.filter(c => c.type === 'ground').forEach(c => {
+            steps.push({ id: c.id, type: 'ground', x: c.x, y: c.y });
+            joints.add(c.id);
+        });
+
+        // 2. 處理輸入桿 (Input Crank)
+        this.components.filter(c => c.type === 'bar' && c.isInput).forEach(c => {
+            if (c.p1 && c.p2) {
+                steps.push({ id: c.p2, type: 'input_crank', center: c.p1, len_param: c.lenParam });
+                joints.add(c.p1);
+                joints.add(c.p2);
+                parts.push({ id: `Crank(${c.lenParam})`, type: 'bar', len_param: c.lenParam, color: c.color });
             }
+        });
+
+        // 3. 處理三角桿 (Triangle) -> 對應 Dyad Step
+        this.components.filter(c => c.type === 'triangle').forEach(c => {
+            if (c.p1 && c.p2 && c.p3) {
+                steps.push({
+                    id: c.p3,
+                    type: 'dyad',
+                    p1: c.p1,
+                    r1_param: c.r1Param,
+                    p2: c.p2,
+                    r2_param: c.r2Param,
+                    sign: c.sign || 1
+                });
+
+                polygons.push({
+                    points: [c.p1, c.p2, c.p3],
+                    color: c.color,
+                    alpha: 0.3
+                });
+
+                joints.add(c.p1);
+                joints.add(c.p2);
+                joints.add(c.p3);
+
+                parts.push({ id: `Tri_Edge1(${c.r1Param})`, type: 'bar', len_param: c.r1Param, color: c.color });
+                parts.push({ id: `Tri_Edge2(${c.r2Param})`, type: 'bar', len_param: c.r2Param, color: c.color });
+            }
+        });
+
+        // 4. 處理普通二孔桿 (Bar) -> 僅用於視覺化與零件生成
+        this.components.filter(c => c.type === 'bar' && !c.isInput).forEach(c => {
+            if (c.p1 && c.p2) {
+                joints.add(c.p1);
+                joints.add(c.p2);
+                parts.push({ id: `Link(${c.lenParam})`, type: 'bar', len_param: c.lenParam, color: c.color });
+            }
+        });
+
+        // 5. 生成視覺化連桿 (Links)
+        const finalLinks = [];
+        this.components.forEach(c => {
+            if (c.type === 'bar' && c.p1 && c.p2) {
+                finalLinks.push({ p1: c.p1, p2: c.p2, style: c.isInput ? 'crank' : 'normal', color: c.color });
+            } else if (c.type === 'triangle' && c.p1 && c.p2 && c.p3) {
+                finalLinks.push({ p1: c.p1, p2: c.p3, color: c.color });
+                finalLinks.push({ p1: c.p2, p2: c.p3, color: c.color });
+                finalLinks.push({ p1: c.p1, p2: c.p2, color: c.color, dash: [2, 2] }); // 底邊虛線
+            }
+        });
+
+        // 預設追蹤點 (如果沒設，選最後一個點)
+        if (!this.topology.tracePoint || !joints.has(this.topology.tracePoint)) {
+            this.topology.tracePoint = Array.from(joints).pop() || '';
         }
 
-        this.topology.visualization = { links, polygons: [], joints };
-        this.topology.parts = parts;
-    }
-
-    finish() {
-        alert('機構建構完成！您可以繼續在參數面板調整細節。');
+        this.topology = {
+            steps,
+            tracePoint: this.topology.tracePoint,
+            visualization: { links: finalLinks, polygons, joints: Array.from(joints) },
+            parts,
+            _wizard_data: this.components // 儲存原始組件資料以便恢復
+        };
     }
 
     loadTemplate(name) {
-        if (!name) return;
-        let topo;
-        if (name === 'JANSEN') topo = JANSEN_TOPOLOGY;
-        else if (name === 'KLANN') topo = Templates.KLANN_TOPOLOGY;
-        else if (name === 'HOEKEN') topo = Templates.HOEKEN_TOPOLOGY;
+        if (confirm(`載入 ${name} 範本將會覆蓋目前所有組件，確定嗎？`)) {
+            this.components = [];
 
-        if (topo) {
-            this.topology = JSON.parse(JSON.stringify(topo));
+            if (name === 'JANSEN') {
+                this.components = [
+                    { type: 'ground', id: 'O2', x: 0, y: 0, color: '#666' },
+                    { type: 'ground', id: 'O4', x: 38, y: -7.8, color: '#666' },
+                    { type: 'bar', id: 'Crank', p1: 'O2', p2: 'A', lenParam: 'm', isInput: true, color: '#e74c3c' },
+                    { type: 'triangle', id: 'Tri1', p1: 'A', p2: 'O4', p3: 'P1', r1Param: 'j', r2Param: 'k', sign: -1, color: '#3498db' }
+                ];
+            } else if (name === 'HOEKEN') {
+                this.components = [
+                    { type: 'ground', id: 'O2', x: 0, y: 0, color: '#666' },
+                    { type: 'ground', id: 'O4', x: 100, y: 0, color: '#666' },
+                    { type: 'bar', id: 'Crank', p1: 'O2', p2: 'A', lenParam: 'm', isInput: true, color: '#e74c3c' },
+                    { type: 'triangle', id: 'Tri1', p1: 'A', p2: 'O4', p3: 'P1', r1Param: 'L1', r2Param: 'L2', sign: 1, color: '#27ae60' }
+                ];
+            }
+
+            this.selectedComponentIndex = -1;
             this.render();
             this.syncTopology();
         }

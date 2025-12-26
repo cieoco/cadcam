@@ -539,7 +539,7 @@ export const MECHANISMS = {
             // Wizard Container
             {
                 id: 'wizardPlaceholder',
-                label: '✨ 機構建構精靈 (Wizard)',
+                label: '✨ 機構設計器 (Wizard)',
                 type: 'custom',
                 fullWidth: true,
                 render: () => '<div id="wizardContainer"></div>'
