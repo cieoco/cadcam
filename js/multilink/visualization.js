@@ -117,3 +117,73 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
         }
     }
 }
+
+/**
+ * Generic Multilink Renderer Wrapper
+ * 通用多連桿渲染包裝器 - 負責建立 SVG、格線與呼叫核心渲染引擎
+ */
+export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams = {}) {
+    let topology = { steps: [], visualization: { links: [], polygons: [], joints: [] } };
+    if (viewParams.topology) {
+        try {
+            topology = JSON.parse(viewParams.topology);
+        } catch (e) {
+            console.warn("Viz: Invalid Topology JSON");
+        }
+    }
+
+    const W = 800, H = 600;
+    const viewRange = viewParams.viewRange || 800;
+    const pad = 50;
+
+    // Scale setup
+    const scale = Math.min(W - 2 * pad, H - 2 * pad) / viewRange;
+    const tx = (p) => W / 2 + p.x * scale;
+    const ty = (p) => H / 2 - p.y * scale;
+
+    const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+
+    // Background
+    svg.appendChild(svgEl("rect", { width: W, height: H, fill: "#fafafa" }));
+
+    // Grid
+    if (viewParams.showGrid !== false) {
+        drawGridCompatible(svg, W, H, viewRange, 0, 0, tx, ty);
+    }
+
+    if (!sol || !sol.isValid) {
+        const errorText = sol && sol.errorStep ? `Error at ${sol.errorStep}` : "Invalid Geometry";
+        svg.appendChild(svgEl("text", {
+            x: W / 2, y: H / 2, "text-anchor": "middle", fill: "#999", "font-size": "14px"
+        })).textContent = `此參數無解 (${errorText})`;
+        return svg;
+    }
+
+    // 1. Draw Trajectory
+    if (trajectoryData && trajectoryData.results) {
+        const pts = trajectoryData.results
+            .filter(r => r.isValid && r.B)
+            .map(r => `${tx(r.B)},${ty(r.B)}`)
+            .join(' ');
+        if (pts) {
+            svg.appendChild(svgEl('polyline', {
+                points: pts, fill: 'none', stroke: '#9b59b6', 'stroke-width': 2, 'stroke-opacity': 0.4
+            }));
+        }
+    }
+
+    // 2. Drive Component
+    if (viewParams.motorType && topology.steps) {
+        const crankStep = topology.steps.find(s => s.type === 'input_crank');
+        const O_id = crankStep ? crankStep.center : 'O';
+        const O = sol.points[O_id] || { x: 0, y: 0 };
+
+        const motor = createDriveComponent(viewParams.motorType, tx(O), ty(O), scale);
+        if (motor) svg.appendChild(motor);
+    }
+
+    // 3. Render Topology using Generic Engine
+    renderTopology(svg, topology, sol, viewParams, scale, tx, ty);
+
+    return svg;
+}

@@ -24,7 +24,7 @@ function getActiveModules() {
 /**
  * 處理動態參數生成
  */
-function updateDynamicParams() {
+export function updateDynamicParams() {
     const container = document.getElementById('dynamicParamsContainer');
     if (!container) return;
 
@@ -66,7 +66,8 @@ function updateDynamicParams() {
                 // 如果是物件，遍歷每個鍵
                 for (const k in obj) {
                     const val = obj[k];
-                    if (k.endsWith('_param') && typeof val === 'string') {
+                    const isParamKey = k.endsWith('_param') || k === 'lenParam' || k === 'len_param';
+                    if (isParamKey && typeof val === 'string') {
                         if (val && !vars.has(val)) {
                             console.log('Found dynamic param:', val, 'from key:', k);
                             vars.set(val, {
@@ -74,7 +75,7 @@ function updateDynamicParams() {
                                 min: 0,
                                 max: 500,
                                 step: 0.5,
-                                default: 50
+                                default: 100 // 改為 100 作為預設
                             });
                         }
                     } else if (val && typeof val === 'object') {

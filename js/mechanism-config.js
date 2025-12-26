@@ -4,7 +4,7 @@
  */
 
 import { DRIVE_COMPONENTS, getDriveOptions } from './motor-data.js';
-import { JANSEN_TOPOLOGY as JANSEN_TOPOLOGY_DEFAULT } from './jansen/topology.js'; // Import default value
+// import { JANSEN_TOPOLOGY as JANSEN_TOPOLOGY_DEFAULT } from './jansen/topology.js'; // Removed default pre-load
 
 
 export const MECHANISMS = {
@@ -552,7 +552,12 @@ export const MECHANISMS = {
                 type: 'textarea',
                 rows: 15,
                 fullWidth: true,
-                default: JSON.stringify(JANSEN_TOPOLOGY_DEFAULT, null, 2)
+                default: JSON.stringify({
+                    steps: [],
+                    tracePoint: '',
+                    visualization: { links: [], polygons: [], joints: [] },
+                    parts: []
+                }, null, 2)
             },
 
             // Drive
@@ -581,12 +586,12 @@ export const MECHANISMS = {
         
         `,
 
-        solverModule: './jansen/solver.js',
-        solveFn: 'solveJansen',
-        visualizationModule: './jansen/visualization.js',
-        renderFn: 'renderJansen',
-        partsModule: './jansen/parts.js',
-        partsFn: 'generateJansenParts'
+        solverModule: './multilink/solver.js',
+        solveFn: 'solveTopology',
+        visualizationModule: './multilink/visualization.js',
+        renderFn: 'renderMultilink',
+        partsModule: './multilink/parts.js',
+        partsFn: 'generateMultilinkParts'
     },
 
     bardrawer: {

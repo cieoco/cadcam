@@ -4,6 +4,7 @@
  */
 
 import { $ } from '../utils.js';
+import { updateDynamicParams } from './controls.js';
 import * as Templates from '../multilink/templates.js';
 import { JANSEN_TOPOLOGY } from '../jansen/topology.js';
 
@@ -233,7 +234,7 @@ export class MechanismWizard {
 
     renderPointEditor(comp, pointKey) {
         const pt = comp[pointKey] || { id: '', type: 'floating', x: 0, y: 0 };
-        const existingPoints = this.getAllPointIds().filter(id => id !== pt.id);
+        const existingPoints = this.getAllPointIds();
 
         return `
             <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -445,6 +446,8 @@ export class MechanismWizard {
         if (this.onUpdate) {
             this.onUpdate(this.topology);
         }
+        // 觸發動態參數更新
+        updateDynamicParams();
     }
 
     /**

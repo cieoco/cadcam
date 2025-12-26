@@ -36,12 +36,37 @@ function solveIntersection(p1, r1, p2, r2, sign) {
 
 /**
  * 通用求解函數
- * @param {Object} topology - 機構定義
- * @param {Object} params - 當前參數 (包含角度、桿長)
+ * @param {Object|string} topologyOrParams - 機構定義或參數物件
+ * @param {Object} [params] - 當前參數 (如果第一個參數是拓撲)
  */
-export function solveTopology(topology, params) {
+export function solveTopology(topologyOrParams, params) {
+    let topology, actualParams;
+
+    // 支援兩種呼叫方式：
+    // 1. solveTopology(topology, params)
+    // 2. solveTopology(params) -> 其中 params.topology 是 JSON 字串或物件
+    if (params) {
+        topology = topologyOrParams;
+        actualParams = params;
+    } else {
+        actualParams = topologyOrParams || {};
+        topology = actualParams.topology;
+        if (typeof topology === 'string') {
+            try {
+                topology = JSON.parse(topology);
+            } catch (e) {
+                console.error("Solver: Invalid Topology JSON", e);
+                return { isValid: false, errorType: 'invalid_topology' };
+            }
+        }
+    }
+
+    if (!topology || !topology.steps) {
+        return { isValid: true, points: {}, B: undefined }; // 空拓撲也是有效的
+    }
+
     const points = {};
-    const theta = deg2rad(params.thetaDeg || 0);
+    const theta = deg2rad(actualParams.thetaDeg || actualParams.theta || 0);
 
     // Helper to get value: either direct number or from params
     const getVal = (step, key) => {
@@ -53,7 +78,7 @@ export function solveTopology(topology, params) {
         const paramName = step[key + '_param'];
         if (paramName && params[paramName] !== undefined) return Number(params[paramName]);
 
-        return 0;
+        return 100; // 預設長度改為 100，避免 0 導致無解
     };
 
     // 1. 處理所有步驟
