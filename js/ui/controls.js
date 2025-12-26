@@ -52,28 +52,39 @@ function updateDynamicParams() {
         let topology;
         try {
             topology = JSON.parse(topoEl.value);
+            console.log('Scanning topology for dynamic params...', topology);
+
             const scan = (obj) => {
                 if (!obj || typeof obj !== 'object') return;
+
+                // 如果是陣列，遍歷每個元素
+                if (Array.isArray(obj)) {
+                    obj.forEach(item => scan(item));
+                    return;
+                }
+
+                // 如果是物件，遍歷每個鍵
                 for (const k in obj) {
-                    if (k.endsWith('_param') && typeof obj[k] === 'string') {
-                        const varName = obj[k];
-                        if (!vars.has(varName)) {
-                            vars.set(varName, {
-                                label: varName,
+                    const val = obj[k];
+                    if (k.endsWith('_param') && typeof val === 'string') {
+                        if (val && !vars.has(val)) {
+                            console.log('Found dynamic param:', val, 'from key:', k);
+                            vars.set(val, {
+                                label: val,
                                 min: 0,
-                                max: 300,
+                                max: 500,
                                 step: 0.5,
                                 default: 50
                             });
                         }
-                    } else if (typeof obj[k] === 'object') {
-                        scan(obj[k]);
+                    } else if (val && typeof val === 'object') {
+                        scan(val);
                     }
                 }
             };
             scan(topology);
         } catch (e) {
-            // JSON 無效時不更新拓撲變數，但保留 Config 變數
+            console.warn('Topology JSON parse failed in updateDynamicParams', e);
         }
     }
 
@@ -103,8 +114,8 @@ function updateDynamicParams() {
             wrapper.innerHTML = `
                 <div style="display:flex; align-items:center; gap:6px;">
                     <label style="width:60px; font-size:11px; font-weight:bold; color:#2c3e50; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${info.label}">${info.label}</label>
-                    <input type="number" id="${varId}" value="${info.default}" step="${info.step}" style="width:55px; padding:2px; font-size:11px; border:1px solid #ddd; border-radius:3px;" class="dynamic-input">
-                    <input type="range" id="${varId}_range" value="${info.default}" min="${info.min}" max="${info.max}" step="${info.step}" style="flex:1; height:14px; margin:0; cursor:pointer;">
+                    <input type="number" id="dyn_${varId}" value="${info.default}" step="${info.step}" style="width:55px; padding:2px; font-size:11px; border:1px solid #ddd; border-radius:3px;" class="dynamic-input">
+                    <input type="range" id="dyn_${varId}_range" value="${info.default}" min="${info.min}" max="${info.max}" step="${info.step}" style="flex:1; height:14px; margin:0; cursor:pointer;">
                 </div>
             `;
             container.appendChild(wrapper);
@@ -141,9 +152,10 @@ export function updatePreview() {
         // 補充讀取 dynamicParams
         const dynContainer = document.getElementById('dynamicParamsContainer');
         if (dynContainer) {
-            const inputs = dynContainer.querySelectorAll('input[type="number"]');
+            const inputs = dynContainer.querySelectorAll('input.dynamic-input');
             inputs.forEach(inp => {
-                mech[inp.id] = parseFloat(inp.value) || 0;
+                const varId = inp.id.replace('dyn_', '');
+                mech[varId] = parseFloat(inp.value) || 0;
             });
         }
 
@@ -432,4 +444,13 @@ export function setupUIHandlers() {
             updatePreview();
         }, 200);
     }
+
+    // 為新版動畫按鈕添加懸停縮放效果
+    ['btnPlayAnim', 'btnPauseAnim', 'btnStopAnim'].forEach(id => {
+        const btn = $(id);
+        if (btn) {
+            btn.addEventListener('mouseenter', () => { if (!btn.disabled) btn.style.transform = 'scale(1.05)'; });
+            btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
+        }
+    });
 }

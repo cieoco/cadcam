@@ -517,6 +517,10 @@
                                 style="flex: 1; justify-content: center; padding: 14px;">
                                 ⚙️ 齒條齒輪 (Rack-Pinion)
                             </a>
+                            <a href="./mechanism.html?type=parallelogram" class="btn primary"
+                                style="flex: 1; justify-content: center; padding: 14px;">
+                                ▱ 平行四邊形 (Parallelogram)
+                            </a>
                             <a href="./mechanism.html?type=bardrawer" class="btn primary"
                                 style="flex: 1; justify-content: center; padding: 14px; background: rgba(52, 152, 219, 0.14); border-color: rgba(52, 152, 219, 0.55);">
                                 ✏️ 桿件繪製工具 (Bar Drawer)
@@ -724,6 +728,17 @@
                 });
             } else if (state.motion === "translate") {
                 recs.push({
+                    id: "parallelogram",
+                    name: "平行四邊形（Parallelogram）",
+                    badge: "平移同步 ★★★★★",
+                    why: "對邊始終平行；最適合需要保持水平/垂直平移的平台。",
+                    pros: ["Coupler 始終平行", "結構穩定", "計算簡單"],
+                    cons: ["活動範圍受限", "需注意死點（共線）"],
+                    cta: "進入平行四邊形工具",
+                    href: "./mechanism.html?type=parallelogram",
+                    enabled: true
+                });
+                recs.push({
                     id: "leadscrew",
                     name: "螺桿滑台（Lead Screw）",
                     badge: "定位穩 ★★★★☆",
@@ -822,10 +837,11 @@
             const nameMap = {
                 'fourbar': '四連桿工具',
                 'crankslider': '曲柄滑塊工具',
-                'rackpinion': '齒條齒輪工具'
+                'rackpinion': '齒條齒輪工具',
+                'parallelogram': '平行四邊形工具'
             };
 
-            const isImplemented = ['fourbar', 'crankslider', 'rackpinion'].includes(state.mech);
+            const isImplemented = ['fourbar', 'crankslider', 'rackpinion', 'parallelogram'].includes(state.mech);
             const btn = document.createElement("a");
             btn.className = `btn ${isImplemented ? 'primary' : 'ghost'}`;
             btn.style.padding = "16px";
@@ -886,6 +902,7 @@
             // if user chose a specific mechanism, tweak a bit
             if (state.mech === "fourbar") { geom = 88; cam = 92; }
             if (state.mech === "crankslider") { geom = 78; cam = 88; }
+            if (state.mech === "parallelogram") { geom = 95; cam = 95; }
             if (state.mech === "cam") { geom = 70; cam = 55; }
 
             setMeter(mGeom, mGeomTxt, geom);
