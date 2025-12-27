@@ -43,12 +43,18 @@ async function initMechanismPage() {
 
   // 生成參數輸入面板
   const parametersPanel = document.getElementById('parametersPanel');
+  
+  // 分離出驅動相關參數
+  const driveParams = mech.parameters.filter(p => !p.isDynamic && (p.id === 'motorType' || p.id === 'motorRotation'));
+  const mechanismParams = mech.parameters.filter(p => !p.isDynamic && p.id !== 'motorType' && p.id !== 'motorRotation');
+  
   parametersPanel.innerHTML = `
     <h3>① ${mech.name}參數</h3>
-    ${(() => {
-      const staticParams = mech.parameters.filter(p => !p.isDynamic);
-      return generateParameterHTML(staticParams);
-    })()}
+    ${generateParameterHTML(mechanismParams)}
+    
+    <div style="height:10px"></div>
+    <h3>🔌 驅動設定</h3>
+    ${generateParameterHTML(driveParams)}
     
     <div style="height:10px"></div>
     <h3>模擬設定</h3>
