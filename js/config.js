@@ -43,6 +43,7 @@ export function readInputs() {
         // 通用
         thetaDeg: Number($("theta")?.value || 0),
         motorType: $("motorType")?.value || "",
+        motorRotation: Number($("motorRotation")?.value || 0),
         topology: $("topology")?.value || "", // Multilink JSON
     };
 

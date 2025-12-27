@@ -145,15 +145,16 @@ export function getDriveOptions() {
  * @param {number} centerX - 中心 X (軸心) (Screen Coords)
  * @param {number} centerY - 中心 Y (軸心) (Screen Coords)
  * @param {number} scale - 縮放比例 (Pixels per Unit)
+ * @param {number} rotationDeg - 旋轉角度（度）
  * @returns {SVGElement|null} SVG Group 元素
  */
-export function createDriveComponent(componentId, centerX, centerY, scale = 1.0) {
+export function createDriveComponent(componentId, centerX, centerY, scale = 1.0, rotationDeg = 0) {
     const component = DRIVE_COMPONENTS[componentId];
     if (!component || !component.shape) return null;
 
     const shape = component.shape;
     const g = svgEl('g', {
-        transform: `translate(${centerX}, ${centerY}) scale(${scale})`
+        transform: `translate(${centerX}, ${centerY}) rotate(${rotationDeg}) scale(${scale})`
     });
 
     // Apply group opacity

@@ -193,7 +193,8 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
         const O_id = crankStep ? crankStep.center : 'O';
         const O = sol.points[O_id] || { x: 0, y: 0 };
 
-        const motor = createDriveComponent(viewParams.motorType, tx(O), ty(O), scale);
+        const motorRotation = viewParams.motorRotation || 0;
+        const motor = createDriveComponent(viewParams.motorType, tx(O), ty(O), scale, motorRotation);
         if (motor) svg.appendChild(motor);
     }
 

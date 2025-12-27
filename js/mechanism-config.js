@@ -91,6 +91,16 @@ export const MECHANISMS = {
                 default: 'tt_motor'
             },
             {
+                id: 'motorRotation',
+                label: '驅動元件旋轉角度',
+                type: 'number',
+                min: -180,
+                max: 180,
+                step: 5,
+                default: 0,
+                unit: '度'
+            },
+            {
                 id: 'sweepStart',
                 label: '起始角度',
                 type: 'number',
@@ -245,6 +255,24 @@ export const MECHANISMS = {
                 type: 'select',
                 options: getDriveOptions(),
                 default: 'tt_motor'
+            },
+            {                id: 'motorRotation',
+                label: '驅動元件旋轉角度',
+                type: 'number',
+                min: -180,
+                max: 180,
+                step: 5,
+                default: 0,
+                unit: '度'
+            },
+            {                id: 'motorRotation',
+                label: '驅動元件旋轉角度',
+                type: 'number',
+                min: -180,
+                max: 180,
+                step: 5,
+                default: 0,
+                unit: '度'
             },
             {
                 id: 'sweepStart',
@@ -419,8 +447,16 @@ export const MECHANISMS = {
                 options: getDriveOptions(),
                 default: 'tt_motor'
             },
-            {
-                id: 'sweepStart',
+            {                id: 'motorRotation',
+                label: '驅動元件旋轉角度',
+                type: 'number',
+                min: -180,
+                max: 180,
+                step: 5,
+                default: 0,
+                unit: '度'
+            },
+            {                id: 'sweepStart',
                 label: '起始角度',
                 type: 'number',
                 min: -720,
@@ -568,6 +604,7 @@ export const MECHANISMS = {
             // Drive
             { id: 'theta', label: '曲柄角度 θ', type: 'number', min: -360, max: 360, step: 1, default: 0, unit: '度' },
             { id: 'motorType', label: '驅動元件', type: 'select', options: getDriveOptions(), default: 'tt_motor' },
+            { id: 'motorRotation', label: '驅動元件旋轉角度', type: 'number', min: -180, max: 180, step: 5, default: 0, unit: '度' },
 
             // Sweep
             { id: 'sweepStart', label: '起始角度', type: 'number', min: -360, max: 360, default: -360 },

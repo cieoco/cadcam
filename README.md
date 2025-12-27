@@ -27,7 +27,6 @@
 cadcam/
 ├── index.html                  # 機構選單首頁
 ├── mechanism.html              # 統一的機構模擬頁面
-├── mechanism-template.html     # 機構頁面範本
 ├── app.js                      # 舊版程式碼（備份）
 ├── README.md                   # 專案說明文件
 ├── ROADMAP.md                  # 開發路線圖

@@ -384,7 +384,8 @@ export function updatePreview() {
 
         const viewParams = readViewParams();
         viewParams.motorType = mech.motorType;
-        viewParams.topology = mech.topology; // ?喲??摮葡靘?閬箏?雿輻
+        viewParams.motorRotation = mech.motorRotation || 0;
+        viewParams.topology = mech.topology; // ?喲??摮葡靘?閬箏?雿輻
 
         validateConfig(mech, partSpec, mfg);
 
@@ -759,7 +760,16 @@ export function setupUIHandlers() {
 
     // Initial scan for all mechanisms
     updateDynamicParams();
-
+    // 為所有參數輸入框添加 change 事件監聽器（自動更新預覽）
+    const paramInputs = document.querySelectorAll('#parametersPanel input, #parametersPanel select, #partSpecsPanel input, #partSpecsPanel select');
+    paramInputs.forEach(input => {
+        // 跳過已經有特殊處理的元素
+        if (input.id === 'theta' || input.id === 'viewRange' || input.id === 'topology') return;
+        
+        input.addEventListener('change', () => {
+            updatePreview();
+        });
+    });
     // ??璈??航?摰? handler
     const mods = getActiveModules();
     if (mods && mods.solver.setupMotorTypeHandler) {

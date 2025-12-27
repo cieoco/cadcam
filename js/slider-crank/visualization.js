@@ -46,7 +46,8 @@ export function renderSliderCrank(sol, thetaDeg, trajectoryData = null, viewPara
 
     // 繪製驅動元件 (Background)
     if (viewParams.motorType) {
-        const motorEl = createDriveComponent(viewParams.motorType, tx(O), ty(O), scale);
+        const motorRotation = viewParams.motorRotation || 0;
+        const motorEl = createDriveComponent(viewParams.motorType, tx(O), ty(O), scale, motorRotation);
         if (motorEl) svg.appendChild(motorEl);
     }
 

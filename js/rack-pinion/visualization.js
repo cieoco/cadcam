@@ -32,7 +32,8 @@ export function renderRackPinion(sol, thetaDeg, trajectoryData = null, viewParam
 
     // 繪製驅動元件 (Background)
     if (viewParams.motorType) {
-        const motorEl = createDriveComponent(viewParams.motorType, tx(0), ty(R), scale);
+        const motorRotation = viewParams.motorRotation || 0;
+        const motorEl = createDriveComponent(viewParams.motorType, tx(0), ty(R), scale, motorRotation);
         if (motorEl) svg.appendChild(motorEl);
     }
 

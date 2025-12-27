@@ -61,7 +61,8 @@ export function renderFourbar(sol, thetaDeg, trajectoryData = null, viewParams =
     }
 
     // 繪製當前連桿狀態（前景層）
-    drawLinkage(svg, sol, thetaDeg, tx, ty, viewParams.motorType, scale);
+    const motorRotation = viewParams.motorRotation || 0;
+    drawLinkage(svg, sol, thetaDeg, tx, ty, viewParams.motorType, scale, motorRotation);
 
     // 高亮當前 B 點
     if (trajectoryData) {
@@ -165,11 +166,11 @@ function drawTrajectory(svg, trajectoryData, tx, ty) {
 /**
  * 繪製連桿機構
  */
-function drawLinkage(svg, sol, thetaDeg, tx, ty, motorType, scale) {
+function drawLinkage(svg, sol, thetaDeg, tx, ty, motorType, scale, motorRotation = 0) {
     // 繪製驅動元件 (Background of linkage)
     if (motorType) {
         // 四連桿 input is O2
-        const motorEl = createDriveComponent(motorType, tx(sol.O2), ty(sol.O2), scale);
+        const motorEl = createDriveComponent(motorType, tx(sol.O2), ty(sol.O2), scale, motorRotation);
         if (motorEl) {
             svg.appendChild(motorEl);
         }
