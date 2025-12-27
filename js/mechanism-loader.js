@@ -465,7 +465,9 @@ function setupLinkClickHandler() {
   function getWorldCoords(clientX, clientY) {
     const svg = svgWrap.querySelector('svg');
     const rect = svg.getBoundingClientRect();
-    const W = 800, H = 600; // Standard dimension used in viz
+    const vb = svg.viewBox && svg.viewBox.baseVal ? svg.viewBox.baseVal : null;
+    const W = vb && vb.width ? vb.width : rect.width;
+    const H = vb && vb.height ? vb.height : rect.height;
     // In visualization.js: scale = min(W-2pad, H-2pad) / viewRange
     // We need to read viewRange from UI
     const viewRange = parseFloat(document.getElementById('viewRange').value) || 800;
@@ -476,8 +478,12 @@ function setupLinkClickHandler() {
     // Mouse relative to SVG element (viewBox 0 0 W H)
     // We need to account that the SVG might be scaled via CSS (width:100%)
 
-    const relX = (clientX - rect.left) * (W / rect.width);
-    const relY = (clientY - rect.top) * (H / rect.height);
+    const scaleToViewBox = Math.min(rect.width / W, rect.height / H);
+    const offsetX = (rect.width - W * scaleToViewBox) / 2;
+    const offsetY = (rect.height - H * scaleToViewBox) / 2;
+
+    const relX = (clientX - rect.left - offsetX) / scaleToViewBox;
+    const relY = (clientY - rect.top - offsetY) / scaleToViewBox;
 
     const originX = W / 2;
     const originY = H / 2;
@@ -658,7 +664,9 @@ function setupLinkClickHandler() {
       const svg = svgWrap.querySelector('svg');
       // ... get scale ...
       const viewRange = parseFloat(document.getElementById('viewRange').value) || 800;
-      const W = 800, H = 600;
+      const vb = svg.viewBox && svg.viewBox.baseVal ? svg.viewBox.baseVal : null;
+      const W = vb && vb.width ? vb.width : svg.clientWidth;
+      const H = vb && vb.height ? vb.height : svg.clientHeight;
       const pad = 50;
       const scale = Math.min(W - 2 * pad, H - 2 * pad) / viewRange;
 

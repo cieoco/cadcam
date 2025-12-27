@@ -68,8 +68,14 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
                 // No, we dispatch a custom event that bubbles.
 
                 const rect = svg.getBoundingClientRect();
-                const clickX = e.clientX - rect.left;
-                const clickY = e.clientY - rect.top;
+                const vb = svg.viewBox && svg.viewBox.baseVal ? svg.viewBox.baseVal : null;
+                const vbW = vb && vb.width ? vb.width : rect.width;
+                const vbH = vb && vb.height ? vb.height : rect.height;
+                const scaleToViewBox = Math.min(rect.width / vbW, rect.height / vbH);
+                const offsetX = (rect.width - vbW * scaleToViewBox) / 2;
+                const offsetY = (rect.height - vbH * scaleToViewBox) / 2;
+                const clickX = (e.clientX - rect.left - offsetX) / scaleToViewBox;
+                const clickY = (e.clientY - rect.top - offsetY) / scaleToViewBox;
 
                 // Inverse transform to world coordinates
                 // We use (0,0) transforming to find origin offset
