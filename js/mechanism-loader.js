@@ -44,16 +44,17 @@ async function initMechanismPage() {
   // 生成參數輸入面板
   const parametersPanel = document.getElementById('parametersPanel');
   
-  // 分離出驅動相關參數
-  const driveParams = mech.parameters.filter(p => !p.isDynamic && (p.id === 'motorType' || p.id === 'motorRotation'));
-  const mechanismParams = mech.parameters.filter(p => !p.isDynamic && p.id !== 'motorType' && p.id !== 'motorRotation');
+  // 分離出驅動相關參數（包含掃描設定）
+  const driveRelatedIds = ['motorType', 'motorRotation', 'sweepStart', 'sweepEnd', 'sweepStep', 'showTrajectory'];
+  const driveParams = mech.parameters.filter(p => !p.isDynamic && driveRelatedIds.includes(p.id));
+  const mechanismParams = mech.parameters.filter(p => !p.isDynamic && !driveRelatedIds.includes(p.id));
   
   parametersPanel.innerHTML = `
-    <h3>① ${mech.name}參數</h3>
+    <h3>${mech.name}參數</h3>
     ${generateParameterHTML(mechanismParams)}
     
     <div style="height:10px"></div>
-    <h3>🔌 驅動設定</h3>
+    <h3>🔌 驅動與掃描設定</h3>
     ${generateParameterHTML(driveParams)}
     
     <div style="height:10px"></div>

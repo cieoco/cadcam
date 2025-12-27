@@ -655,9 +655,37 @@ export function setupUIHandlers() {
                 thetaSliderValue.textContent = `${thetaSlider.value}°`;
                 updatePreview();
             };
+            
+            // 同步掃描範圍到 theta slider
+            const updateThetaSliderRange = () => {
+                const sweepStart = $("sweepStart");
+                const sweepEnd = $("sweepEnd");
+                const thetaSliderMin = $("thetaSliderMin");
+                const thetaSliderMax = $("thetaSliderMax");
+                
+                if (sweepStart && sweepEnd) {
+                    const minVal = Number(sweepStart.value || -360);
+                    const maxVal = Number(sweepEnd.value || 360);
+                    thetaSlider.min = String(minVal);
+                    thetaSlider.max = String(maxVal);
+                    
+                    // 更新顯示的範圍標籤
+                    if (thetaSliderMin) thetaSliderMin.textContent = `${minVal}°`;
+                    if (thetaSliderMax) thetaSliderMax.textContent = `${maxVal}°`;
+                }
+            };
+            
             syncThetaFromInput();
+            updateThetaSliderRange();
+            
             thetaInput.addEventListener('input', syncThetaFromInput);
             thetaSlider.addEventListener('input', syncThetaFromSlider);
+            
+            // 監聽掃描範圍改變
+            const sweepStart = $("sweepStart");
+            const sweepEnd = $("sweepEnd");
+            if (sweepStart) sweepStart.addEventListener('change', updateThetaSliderRange);
+            if (sweepEnd) sweepEnd.addEventListener('change', updateThetaSliderRange);
         } else {
             thetaSlider.disabled = true;
             thetaSliderValue.textContent = '--';
