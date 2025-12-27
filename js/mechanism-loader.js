@@ -8,6 +8,41 @@ import { setupUIHandlers, updatePreview } from './ui/controls.js';
 import { downloadText, downloadZip, log, calcAdaptiveGridStep } from './utils.js';
 import { MechanismWizard } from './ui/wizard.js';
 
+const topologyHistory = [];
+
+function pushTopologyHistory() {
+  const topoArea = document.getElementById('topology');
+  if (!topoArea) return;
+  const current = topoArea.value || '';
+  if (!current) return;
+  const last = topologyHistory[topologyHistory.length - 1];
+  if (last !== current) {
+    topologyHistory.push(current);
+  }
+  refreshUndoButtonState();
+}
+
+function applyTopologyValue(value) {
+  const topoArea = document.getElementById('topology');
+  if (!topoArea) return;
+  topoArea.value = value;
+  topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+  updatePreview();
+}
+
+function undoTopology() {
+  if (!topologyHistory.length) return;
+  const previous = topologyHistory.pop();
+  applyTopologyValue(previous);
+  refreshUndoButtonState();
+}
+
+function refreshUndoButtonState() {
+  const btn = document.getElementById('btnUndo');
+  if (!btn) return;
+  btn.disabled = topologyHistory.length === 0;
+}
+
 /**
  * 初始化機構頁面
  */
@@ -131,9 +166,13 @@ async function initMechanismPage() {
       const wizard = new MechanismWizard('wizardContainer', (newTopo) => {
         const topoArea = document.getElementById('topology');
         if (topoArea) {
-          topoArea.value = JSON.stringify(newTopo, null, 2);
+          const nextValue = JSON.stringify(newTopo, null, 2);
+          if (topoArea.value !== nextValue) {
+            pushTopologyHistory();
+          }
+          topoArea.value = nextValue;
           // 觸發輸入事件以更新動態參數
-          topoArea.dispatchEvent(new Event('input'));
+          topoArea.dispatchEvent(new Event('input', { bubbles: true }));
           // 更新預覽
           updatePreview();
         }
@@ -181,33 +220,40 @@ function setupLinkClickHandler() {
   let drawState = 'IDLE';
   let drawP1 = null; // { id, x, y, isNew }
   let ghostLine = null;
+  let lastPointer = { x: 0, y: 0 };
 
   // Helper to find the H3 title element
   function getTitleElement() {
-    // Look for h3 with specific text
     const h3s = document.querySelectorAll('h3');
     for (let h3 of h3s) {
-      if (h3.textContent.trim().includes('2D 模擬與參數調整')) {
+      if (h3.textContent.includes('2D')) {
         return h3;
+      }
+    }
+    const wrap = document.getElementById('svgWrap');
+    if (wrap) {
+      const card = wrap.closest('.card');
+      if (card) {
+        return card.querySelector('h3');
       }
     }
     return null;
   }
 
-
-  const titleEl = getTitleElement();
+const titleEl = getTitleElement();
+  const titleParent = titleEl ? titleEl.parentNode : null;
 
   // Add "Add Point" Button
   let addPointBtn = document.getElementById('btnAddPoint');
-  if (!addPointBtn && titleEl) {
+  if (!addPointBtn && titleEl && titleParent) {
     addPointBtn = document.createElement('button');
     addPointBtn.id = 'btnAddPoint';
-    addPointBtn.innerHTML = '📍 新增點位';
+    addPointBtn.innerHTML = '新增點位';
     addPointBtn.style.marginLeft = '15px'; // Space from title
     addPointBtn.style.border = '1px solid #aaa';
 
     // Insert after title
-    titleEl.parentNode.insertBefore(addPointBtn, titleEl.nextSibling);
+    titleParent.insertBefore(addPointBtn, titleEl.nextSibling);
 
     addPointBtn.onclick = () => {
       if (drawState === 'IDLE') {
@@ -221,42 +267,61 @@ function setupLinkClickHandler() {
     };
   }
 
-  // Add "Delete" Button
-  let delBtn = document.getElementById('btnDelete');
-  if (!delBtn && titleEl) {
-    delBtn = document.createElement('button');
-    delBtn.id = 'btnDelete';
-    delBtn.innerHTML = '🗑️ 刪除';
-    delBtn.style.marginLeft = '10px';
-    delBtn.style.border = '1px solid #aaa';
+  // Add "Select" Button
+  let selectBtn = document.getElementById('btnSelect');
+  if (!selectBtn && titleEl && titleParent) {
+    selectBtn = document.createElement('button');
+    selectBtn.id = 'btnSelect';
+    selectBtn.innerHTML = '選取';
+    selectBtn.style.marginLeft = '10px';
+    selectBtn.style.border = '1px solid #aaa';
 
-    // Insert after addPointBtn if exists, else title
     const refNode = addPointBtn || titleEl;
-    refNode.parentNode.insertBefore(delBtn, refNode.nextSibling);
+    refNode.parentNode.insertBefore(selectBtn, refNode.nextSibling);
 
-    delBtn.onclick = () => {
+    selectBtn.onclick = () => {
       if (drawState === 'IDLE') {
-        drawState = 'DELETE';
-        delBtn.style.background = '#ff7675'; // Reddish
-        delBtn.textContent = '點擊刪除...';
-        document.getElementById('svgWrap').style.cursor = 'not-allowed'; // Or custom eraser cursor
+        drawState = 'SELECT';
+        selectBtn.style.background = '#dfe6e9';
+        selectBtn.textContent = '選取...';
+        document.getElementById('svgWrap').style.cursor = 'pointer';
       } else {
         resetDrawState();
       }
     };
   }
 
+  // Add "Undo" Button
+  let undoBtn = document.getElementById('btnUndo');
+  if (!undoBtn && titleEl && titleParent) {
+    undoBtn = document.createElement('button');
+    undoBtn.id = 'btnUndo';
+    undoBtn.innerHTML = '回復上一步';
+    undoBtn.style.marginLeft = '10px';
+    undoBtn.style.border = '1px solid #aaa';
+    undoBtn.disabled = true;
+
+    const refNode = selectBtn || addPointBtn || titleEl;
+    refNode.parentNode.insertBefore(undoBtn, refNode.nextSibling);
+
+    undoBtn.onclick = () => {
+      undoTopology();
+    };
+  }
+
+  refreshUndoButtonState();
+
   // Add Toolbar Button for Drawing if not exists
   let drawBtn = document.getElementById('btnDrawLink');
-  if (!drawBtn && titleEl) {
+  if (!drawBtn && titleEl && titleParent) {
     drawBtn = document.createElement('button');
     drawBtn.id = 'btnDrawLink';
-    drawBtn.innerHTML = '✏️ 畫桿件';
+    drawBtn.innerHTML = '畫桿件';
     drawBtn.style.marginLeft = '10px'; // Space from previous btn
     drawBtn.style.border = '1px solid #aaa';
 
-    // Insert after Delete button if exists
-    const refNode = delBtn || addPointBtn || titleEl;
+    // Insert after Select button if exists
+    const refNode = selectBtn || addPointBtn || titleEl;
     refNode.parentNode.insertBefore(drawBtn, refNode.nextSibling);
 
     drawBtn.onclick = () => {
@@ -278,22 +343,22 @@ function setupLinkClickHandler() {
 
   // Zen Mode Button
   let zenBtn = document.getElementById('btnZenMode');
-  if (!zenBtn && titleEl) {
+  if (!zenBtn && titleEl && titleParent) {
     zenBtn = document.createElement('button');
     zenBtn.id = 'btnZenMode';
-    zenBtn.innerHTML = '⛶ 全螢幕';
+    zenBtn.innerHTML = '全螢幕';
     zenBtn.style.marginLeft = '10px';
     zenBtn.style.border = '1px solid #aaa';
 
     // Insert after draw button (which is nextSibling of title now)
     // Actually, drawBtn is inserted. So titleEl.nextSibling is drawBtn.
     // Insert after drawBtn.
-    titleEl.parentNode.insertBefore(zenBtn, drawBtn.nextSibling);
+    titleParent.insertBefore(zenBtn, drawBtn.nextSibling);
 
     zenBtn.onclick = () => {
       document.body.classList.toggle('zen-mode');
       const isZen = document.body.classList.contains('zen-mode');
-      zenBtn.innerHTML = isZen ? '↙ 恢復' : '⛶ 全螢幕';
+      zenBtn.innerHTML = isZen ? '恢復' : '全螢幕';
       zenBtn.style.background = isZen ? '#fab1a0' : '';
 
       // Force redraw/resize
@@ -308,25 +373,84 @@ function setupLinkClickHandler() {
     drawP1 = null;
     if (drawBtn) {
       drawBtn.style.background = '';
-      drawBtn.textContent = '✏️ 畫桿件';
+      drawBtn.textContent = '畫桿件';
     }
     if (addPointBtn) {
       addPointBtn.style.background = '';
-      addPointBtn.textContent = '📍 新增點位';
+      addPointBtn.textContent = '新增點位';
     }
-    if (delBtn) {
-      delBtn.style.background = '';
-      delBtn.textContent = '🗑️ 刪除';
+    if (selectBtn) {
+      selectBtn.style.background = '';
+      selectBtn.textContent = '選取';
     }
     if (ghostLine) {
       ghostLine.remove();
       ghostLine = null;
     }
+    hideContextMenu();
     document.getElementById('svgWrap').style.cursor = 'default';
     console.log('[Draw] Canceled');
   }
 
-  function updateGhostLine() {
+  let contextMenu = null;
+
+  function ensureContextMenu() {
+    if (contextMenu) return contextMenu;
+    contextMenu = document.createElement('div');
+    contextMenu.id = 'contextMenu';
+    contextMenu.style.position = 'fixed';
+    contextMenu.style.background = '#fff';
+    contextMenu.style.border = '1px solid #ccc';
+    contextMenu.style.borderRadius = '6px';
+    contextMenu.style.boxShadow = '0 6px 16px rgba(0,0,0,0.15)';
+    contextMenu.style.padding = '6px 0';
+    contextMenu.style.zIndex = '9999';
+    contextMenu.style.minWidth = '140px';
+    contextMenu.style.fontSize = '14px';
+    contextMenu.style.display = 'none';
+    document.body.appendChild(contextMenu);
+    return contextMenu;
+  }
+
+  function showContextMenu(items, clientX, clientY) {
+    const menu = ensureContextMenu();
+    menu.innerHTML = '';
+    items.forEach((item) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = item.label;
+      btn.style.display = 'block';
+      btn.style.width = '100%';
+      btn.style.padding = '8px 12px';
+      btn.style.border = '0';
+      btn.style.background = 'transparent';
+      btn.style.textAlign = 'left';
+      btn.style.cursor = 'pointer';
+      btn.onmouseenter = () => { btn.style.background = '#f1f2f6'; };
+      btn.onmouseleave = () => { btn.style.background = 'transparent'; };
+      btn.onclick = () => {
+        hideContextMenu();
+        item.action();
+      };
+      menu.appendChild(btn);
+    });
+    menu.style.display = 'block';
+    const rect = menu.getBoundingClientRect();
+    const pad = 8;
+    const maxX = window.innerWidth - rect.width - pad;
+    const maxY = window.innerHeight - rect.height - pad;
+    const left = Math.min(clientX, maxX);
+    const top = Math.min(clientY, maxY);
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+  }
+
+  function hideContextMenu() {
+    if (!contextMenu) return;
+    contextMenu.style.display = 'none';
+  }
+
+function updateGhostLine() {
     if (!ghostLine) {
       const svg = svgWrap.querySelector('svg');
       if (!svg) return;
@@ -503,15 +627,19 @@ function setupLinkClickHandler() {
     svgWrap.removeEventListener('mousemove', svgWrap._moveHandler);
   }
 
-  // 1. Link Click Handler (Delete Link)
+  // 1. Link Click Handler (Select Link)
   svgWrap._linkClickHandler = (e) => {
-    if (drawState === 'DELETE') {
+    if (drawState === 'SELECT') {
       e.stopPropagation();
-      const detail = e.detail; // { id, ... }
-      if (confirm(`確定要刪除連桿 ${detail.id} 嗎？`)) {
-        removeFromTopology(detail.id);
-      }
-      // resetDrawState(); // Keep delete mode active
+      const detail = e.detail || {};
+      const id = detail.id;
+      const items = [
+        { label: '刪除桿件', action: () => id && removeFromTopology(id) },
+        { label: '取消', action: () => {} }
+      ];
+      const clientX = typeof e.clientX === 'number' ? e.clientX : lastPointer.x;
+      const clientY = typeof e.clientY === 'number' ? e.clientY : lastPointer.y;
+      showContextMenu(items, clientX, clientY);
       return;
     }
 
@@ -527,6 +655,7 @@ function setupLinkClickHandler() {
 
     try {
       // ... existing "Add Hole" logic ...
+      pushTopologyHistory();
       const topology = JSON.parse(topoArea.value);
       if (!topology.steps) topology.steps = [];
 
@@ -565,27 +694,36 @@ function setupLinkClickHandler() {
       if (wizard) { try { wizard.init(topology); } catch (e) { } }
 
       const log = document.getElementById('log');
-      if (log) log.textContent = `已新增孔位 ${newId} 於連接桿 ${detail.p1}-${detail.p2}`;
+      if (log) log.textContent = `已新增孔位 ${newId} 於連桿 ${detail.p1}-${detail.p2}`;
 
     } catch (err) {
       console.error('Failed to add hole:', err);
     }
   };
 
-  // 2. Joint Click Handler (Select Point or Delete)
+    // 2. Joint Click Handler (Select Point)
   svgWrap._jointClickHandler = (e) => {
     if (drawState === 'IDLE') return;
+
+    if (drawState === 'SELECT') {
+      e.stopPropagation();
+      const detail = e.detail || {};
+      const id = detail.id;
+      const label = id && String(id).startsWith('H') ? '刪除孔位' : '刪除關節';
+      const items = [
+        { label, action: () => id && removeFromTopology(id) },
+        { label: '取消', action: () => {} }
+      ];
+      const clientX = typeof e.clientX === 'number' ? e.clientX : lastPointer.x;
+      const clientY = typeof e.clientY === 'number' ? e.clientY : lastPointer.y;
+      showContextMenu(items, clientX, clientY);
+      return;
+    }
+
     e.stopPropagation(); // Handled
 
     const detail = e.detail; // { id, x, y }
     console.log('[Draw] Clicked Joint:', detail);
-
-    if (drawState === 'DELETE') {
-      if (confirm(`確定要刪除點 ${detail.id} 及其連接的桿件嗎？`)) {
-        removeFromTopology(detail.id);
-      }
-      return;
-    }
 
     if (drawState === 'WAIT_P1') {
       drawP1 = { id: detail.id, isNew: false, x: detail.x, y: detail.y };
@@ -598,9 +736,14 @@ function setupLinkClickHandler() {
     }
   };
 
-  // 3. Background Click Handler (Select Free Point)
+    // 3. Background Click Handler (Select Free Point)
   svgWrap._bgClickHandler = (e) => {
     if (drawState === 'IDLE') return;
+
+    if (drawState === 'SELECT') {
+      hideContextMenu();
+      return;
+    }
 
     // Ensure we are clicking on SVG (not on a button or something)
     // Note: 'click' bubbles from Joint too, but Joint stops Prop if matched?
@@ -637,8 +780,10 @@ function setupLinkClickHandler() {
     }
   }
 
+
   // 4. Mouse Move (Ghost Line + Tooltip)
   svgWrap._moveHandler = (e) => {
+    lastPointer = { x: e.clientX, y: e.clientY };
     // Always track coords for tooltip
     const coords = getWorldCoords(e.clientX, e.clientY);
     const snapped = getSnappedCoords(coords.x, coords.y);
@@ -708,6 +853,7 @@ function setupLinkClickHandler() {
   function addPointToTopology(x, y) {
     const topoArea = document.getElementById('topology');
     if (!topoArea) return;
+    pushTopologyHistory();
     try {
       const topology = JSON.parse(topoArea.value);
       if (!topology.steps) topology.steps = [];
@@ -738,15 +884,18 @@ function setupLinkClickHandler() {
       if (window.wizard) { try { window.wizard.init(topology); } catch (e) { } }
 
       const log = document.getElementById('log');
-      if (log) log.textContent = `已新增固定點 ${newId} (${x}, ${y})`;
+      if (log) log.textContent = `已新增點位 ${newId} (${x}, ${y})`;
     } catch (e) {
       console.error(e);
     }
   }
 
   function removeFromTopology(targetId) {
+    if (!targetId) return;
+    const targetStr = String(targetId);
     const topoArea = document.getElementById('topology');
     if (!topoArea) return;
+    pushTopologyHistory();
     try {
       let topology = JSON.parse(topoArea.value);
       if (!topology.steps) return;
@@ -754,16 +903,16 @@ function setupLinkClickHandler() {
       // Filter out the target step
       const initialLen = topology.steps.length;
       // If target is a Point, we must also remove Bars that reference this Point
-      let idsToRemove = [targetId];
+      let idsToRemove = [targetStr];
 
       // If we deleted a point, check for connected bars
-      const isPoint = targetId.startsWith('O') || targetId.startsWith('H') || targetId.startsWith('P') || targetId.startsWith('J');
+      const isPoint = targetStr.startsWith('O') || targetStr.startsWith('H') || targetStr.startsWith('P') || targetStr.startsWith('J');
       // Simple heuristic: if it looks like a point ID
 
       if (isPoint) {
         // Find all bars that use this point as p1 or p2
         const ConnectedBars = topology.steps.filter(s =>
-          s.type === 'bar' && (s.p1 === targetId || s.p2 === targetId)
+          s.type === 'bar' && (s.p1 === targetStr || s.p2 === targetStr)
         );
         ConnectedBars.forEach(b => idsToRemove.push(b.id));
       }

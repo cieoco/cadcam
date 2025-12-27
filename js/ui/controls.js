@@ -390,9 +390,13 @@ export function updatePreview() {
         // Force update dimensions from actual container
         const sw = document.getElementById("svgWrap");
         if (sw) {
-            // Use clientWidth/Height directly
-            viewParams.width = sw.clientWidth || 800;
-            viewParams.height = sw.clientHeight || 600;
+            const styles = getComputedStyle(sw);
+            const padX = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+            const padY = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+            const innerW = sw.clientWidth - (Number.isFinite(padX) ? padX : 0);
+            const innerH = sw.clientHeight - (Number.isFinite(padY) ? padY : 0);
+            viewParams.width = Math.max(0, innerW) || 800;
+            viewParams.height = Math.max(0, innerH) || 600;
         }
 
         validateConfig(mech, partSpec, mfg);
