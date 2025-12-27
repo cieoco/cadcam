@@ -291,6 +291,60 @@ export class MechanismWizard {
         }
     }
 
+    /**
+     * API: 供畫布互動呼叫，建立連桿
+     * @param {Object} p1Data - { id, x, y, isNew }
+     * @param {Object} p2Data - { id, x, y, isNew }
+     */
+    addLinkFromCanvas(p1Data, p2Data) {
+        const count = this.components.filter(c => c.type === 'bar').length + 1;
+        const id = `Link${count}`;
+
+        const newComp = {
+            type: 'bar',
+            id,
+            color: '#3498db',
+            lenParam: 'L' + (this.components.length + 1),
+            isInput: false
+        };
+
+        // 設定 P1
+        if (p1Data.isNew) {
+            // 空白處 -> Fixed Ground
+            newComp.p1 = { id: `O${this.components.length * 2 + 1}`, type: 'fixed', x: Math.round(p1Data.x), y: Math.round(p1Data.y) };
+        } else {
+            // 現有點 -> Existing
+            newComp.p1 = { id: p1Data.id, type: 'existing', x: 0, y: 0 };
+        }
+
+        // 設定 P2
+        if (p2Data.isNew) {
+            // 空白處 -> Fixed Ground
+            // 如果 P1 也是 Ground，這就是一根固定的棒子(沒有意義但合法)
+            // 如果 P1 是 Existing，P2 是 Ground，這是一根接地桿
+            newComp.p2 = { id: `O${this.components.length * 2 + 2}`, type: 'fixed', x: Math.round(p2Data.x), y: Math.round(p2Data.y) };
+            newComp.color = '#7f8c8d'; // Ground Link color
+        } else {
+            // P2 是現有點 -> Existing
+            newComp.p2 = { id: p2Data.id, type: 'existing', x: 0, y: 0 };
+        }
+
+        // 自動判斷是否為 Input (如果是第一個建立的 Ground -> Existing)
+        // 或是簡單規則：若連接 Ground 和 Floating/New，或許是 Input?
+        // 這裡先保持預設為 False，讓使用者自己勾選 "馬達驅動"
+        // 但如果只有單邊接 Ground，通常可以當 Input
+        if ((newComp.p1.type === 'fixed' && newComp.p2.type !== 'fixed') ||
+            (newComp.p1.type !== 'fixed' && newComp.p2.type === 'fixed')) {
+            // 可能是 Input，標記一下顏色，但不強制設為 True (避免破壞邏輯)
+            newComp.color = '#e74c3c';
+        }
+
+        this.components.push(newComp);
+        this.selectedComponentIndex = this.components.length - 1;
+        this.render();
+        this.syncTopology();
+    }
+
     addComponent(type) {
         const count = this.components.filter(c => c.type === type).length + 1;
         const id = type === 'bar' ? `Link${count}` : `Tri${count}`;
@@ -476,8 +530,8 @@ export class MechanismWizard {
             ['p1', 'p2', 'p3'].forEach(k => {
                 if (c[k] && c[k].type === 'fixed' && c[k].id) {
                     if (!groundPoints.has(c[k].id)) {
-                        groundPoints.set(c[k].id, { 
-                            x: c[k].x || 0, 
+                        groundPoints.set(c[k].id, {
+                            x: c[k].x || 0,
                             y: c[k].y || 0,
                             component: c,
                             role: k  // 記錄是 p1 還是 p2
@@ -498,23 +552,23 @@ export class MechanismWizard {
             if (comp.type === 'bar' && comp.lenParam && info.role === 'p2' && comp.p1) {
                 const p1 = comp.p1;
                 const p2 = comp.p2;
-                
+
                 // 計算初始角度
                 const dx = parseFloat(p2.x) - parseFloat(p1.x);
                 const dy = parseFloat(p2.y) - parseFloat(p1.y);
                 const angle = Math.atan2(dy, dx);
                 const initialLength = Math.sqrt(dx * dx + dy * dy);
-                
+
                 console.log(`[Wizard] Bar ${comp.id}: p1=(${p1.x},${p1.y}), p2=(${p2.x},${p2.y}), angle=${angle}, len=${initialLength}`);
-                
+
                 // 使用極座標：x = p1.x + L * cos(angle), y = p1.y + L * sin(angle)
                 // 但我們需要更簡單的方式...
-                
+
                 // 如果是水平桿（dy ≈ 0）
                 if (Math.abs(dy) < 0.01) {
                     const p1X = parseFloat(p1.x);
                     const p1Y = parseFloat(p1.y);
-                    
+
                     if (dx > 0) {
                         // 向右延伸
                         step.x_param = comp.lenParam;
@@ -531,7 +585,7 @@ export class MechanismWizard {
                 else if (Math.abs(dx) < 0.01) {
                     const p1X = parseFloat(p1.x);
                     const p1Y = parseFloat(p1.y);
-                    
+
                     step.x = p1X;
                     if (dy > 0) {
                         // 向上延伸

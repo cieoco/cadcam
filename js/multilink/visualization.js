@@ -54,9 +54,60 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
                 attrs['stroke-width'] = link.width || 2;
             }
 
-            svg.appendChild(svgEl('line', attrs));
+            // Enhance with interactivity attributes
+            attrs['data-link-p1'] = link.p1;
+            attrs['data-link-p2'] = link.p2;
+            attrs['class'] = 'mechanism-link';
+            attrs['style'] = (attrs['style'] || '') + '; cursor: crosshair; pointer-events: stroke;';
+
+            const lineEl = svgEl('line', attrs);
+
+            // Add click interaction
+            lineEl.addEventListener('click', (e) => {
+                // Prevent bubbling if needed, but we want it to bubble to wrapper? 
+                // No, we dispatch a custom event that bubbles.
+
+                const rect = svg.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+
+                // Inverse transform to world coordinates
+                // We use (0,0) transforming to find origin offset
+                const originX = tx({ x: 0, y: 0 });
+                const originY = ty({ x: 0, y: 0 });
+
+                const worldX = (clickX - originX) / scale;
+                // ty = H/2 - y*scale => y = (H/2 - ty)/scale = (originY - clickY)/scale
+                const worldY = (originY - clickY) / scale;
+
+                const event = new CustomEvent('mechanism-link-click', {
+                    bubbles: true,
+                    detail: {
+                        p1: link.p1,
+                        p2: link.p2,
+                        p1Val: pts[link.p1],
+                        p2Val: pts[link.p2],
+                        x: worldX,
+                        y: worldY
+                    }
+                });
+                lineEl.dispatchEvent(event);
+            });
+
+            svg.appendChild(lineEl);
         }
     }
+
+    // Add styles for the link hover effect
+    const styleEl = svgEl('style', {});
+    styleEl.textContent = `
+        .mechanism-link:hover {
+            stroke-opacity: 0.8;
+            stroke-width: 6px !important;
+            transition: stroke-width 0.1s;
+        }
+    `;
+    svg.appendChild(styleEl);
 
     // 3. Joints & Labels
     if (joints) {
@@ -87,6 +138,34 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
                 // Add white halo for readability
                 text.style.textShadow = '1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff';
                 svg.appendChild(text);
+
+                // Added: Interaction Target (Large invisible circle)
+                const hitTarget = svgEl('circle', {
+                    cx: tx(p), cy: ty(p),
+                    r: 10,
+                    fill: 'transparent',
+                    stroke: 'none',
+                    style: 'cursor: pointer; pointer-events: all;'
+                });
+                hitTarget.setAttribute('data-joint-id', jId);
+                hitTarget.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent canvas click
+                    const event = new CustomEvent('mechanism-joint-click', {
+                        bubbles: true,
+                        detail: {
+                            id: jId,
+                            x: p.x,
+                            y: p.y
+                        }
+                    });
+                    hitTarget.dispatchEvent(event);
+                });
+                // Add hover effect via JS or CSS class
+                hitTarget.addEventListener('mouseenter', () => {
+                    // Find the visible circle and highlight it?
+                    // Simplified: just change cursor
+                });
+                svg.appendChild(hitTarget);
             }
         }
     }

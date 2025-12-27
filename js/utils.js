@@ -181,8 +181,25 @@ export function describeArc(x, y, radius, startAngle, endAngle) {
  * @param {Function} tx - X 座標轉換函數 (Model -> Screen)
  * @param {Function} ty - Y 座標轉換函數 (Model -> Screen)
  */
-export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridStep = 50) {
-  const step = Number.isFinite(gridStep) && gridStep > 0 ? gridStep : 50;
+export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridStep = 'auto') {
+  let step = 50;
+
+  if (gridStep === 'auto' || !gridStep) {
+    // Adaptive Grid Step
+    // Target: roughly 10-20 divisions
+    const roughStep = viewRange / 15;
+    // Snap to nice intervals: 1, 2, 5, 10, 20, 50, 100, 200...
+    const power = Math.pow(10, Math.floor(Math.log10(roughStep)));
+    const base = roughStep / power;
+
+    if (base < 1.5) step = 1 * power;
+    else if (base < 3.5) step = 2 * power;
+    else if (base < 7.5) step = 5 * power;
+    else step = 10 * power;
+  } else {
+    step = Number(gridStep);
+  }
+
   const gridColor = "#e0e0e0";
 
   // 垂直線
