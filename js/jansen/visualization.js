@@ -27,7 +27,8 @@ export function renderJansen(sol, thetaDeg, trajectoryData = null, viewParams = 
         }
     }
 
-    const W = 800, H = 600;
+    const W = viewParams.width || 800;
+    const H = viewParams.height || 600;
     const viewRange = viewParams.viewRange || 800;
     const pad = 50;
 
@@ -36,7 +37,13 @@ export function renderJansen(sol, thetaDeg, trajectoryData = null, viewParams = 
     const tx = (p) => W / 2 + p.x * scale;
     const ty = (p) => H / 2 - p.y * scale;
 
-    const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+    const svg = svgEl("svg", {
+        width: "100%",
+        height: "100%",
+        viewBox: `0 0 ${W} ${H}`,
+        preserveAspectRatio: "xMidYMid meet",
+        style: "display:block; width:100%; height:100%;"
+    });
 
     // Background
     svg.appendChild(svgEl("rect", { width: W, height: H, fill: "#fafafa" }));

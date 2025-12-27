@@ -5,6 +5,7 @@
 
 import { getMechanismFromURL, generateParameterHTML, MECHANISMS } from './mechanism-config.js';
 import { setupUIHandlers, updatePreview } from './ui/controls.js';
+import { downloadText, downloadZip, log, calcAdaptiveGridStep } from './utils.js';
 import { MechanismWizard } from './ui/wizard.js';
 
 /**
@@ -181,22 +182,82 @@ function setupLinkClickHandler() {
   let drawP1 = null; // { id, x, y, isNew }
   let ghostLine = null;
 
+  // Helper to find the H3 title element
+  function getTitleElement() {
+    // Look for h3 with specific text
+    const h3s = document.querySelectorAll('h3');
+    for (let h3 of h3s) {
+      if (h3.textContent.trim().includes('2D 模擬與參數調整')) {
+        return h3;
+      }
+    }
+    return null;
+  }
+
+
+  const titleEl = getTitleElement();
+
+  // Add "Add Point" Button
+  let addPointBtn = document.getElementById('btnAddPoint');
+  if (!addPointBtn && titleEl) {
+    addPointBtn = document.createElement('button');
+    addPointBtn.id = 'btnAddPoint';
+    addPointBtn.innerHTML = '📍 新增點位';
+    addPointBtn.style.marginLeft = '15px'; // Space from title
+    addPointBtn.style.border = '1px solid #aaa';
+
+    // Insert after title
+    titleEl.parentNode.insertBefore(addPointBtn, titleEl.nextSibling);
+
+    addPointBtn.onclick = () => {
+      if (drawState === 'IDLE') {
+        drawState = 'ADD_POINT';
+        addPointBtn.style.background = '#ffeaa7';
+        addPointBtn.textContent = '點擊新增...';
+        document.getElementById('svgWrap').style.cursor = 'crosshair';
+      } else {
+        resetDrawState();
+      }
+    };
+  }
+
+  // Add "Delete" Button
+  let delBtn = document.getElementById('btnDelete');
+  if (!delBtn && titleEl) {
+    delBtn = document.createElement('button');
+    delBtn.id = 'btnDelete';
+    delBtn.innerHTML = '🗑️ 刪除';
+    delBtn.style.marginLeft = '10px';
+    delBtn.style.border = '1px solid #aaa';
+
+    // Insert after addPointBtn if exists, else title
+    const refNode = addPointBtn || titleEl;
+    refNode.parentNode.insertBefore(delBtn, refNode.nextSibling);
+
+    delBtn.onclick = () => {
+      if (drawState === 'IDLE') {
+        drawState = 'DELETE';
+        delBtn.style.background = '#ff7675'; // Reddish
+        delBtn.textContent = '點擊刪除...';
+        document.getElementById('svgWrap').style.cursor = 'not-allowed'; // Or custom eraser cursor
+      } else {
+        resetDrawState();
+      }
+    };
+  }
+
   // Add Toolbar Button for Drawing if not exists
-  const btnRow = document.querySelector('.btnrow'); // Find a place to insert
-  // Or insert into the nav-header nearby mech selector?
-  // Let's reuse the logic in initMechanismPage to add button? 
-  // Actually easier to add it dynamically here if it doesn't exist.
-  // Ideally user adds it in HTML, but we are doing it via JS.
   let drawBtn = document.getElementById('btnDrawLink');
-  if (!drawBtn) {
-    // Insert into the "2D 模擬與參數調整" header area
-    const headerDiv = document.querySelector('#btnUpdate').parentNode;
+  if (!drawBtn && titleEl) {
     drawBtn = document.createElement('button');
     drawBtn.id = 'btnDrawLink';
     drawBtn.innerHTML = '✏️ 畫桿件';
-    drawBtn.style.marginLeft = '10px';
+    drawBtn.style.marginLeft = '10px'; // Space from previous btn
     drawBtn.style.border = '1px solid #aaa';
-    headerDiv.insertBefore(drawBtn, document.getElementById('btnUpdate'));
+
+    // Insert after Delete button if exists
+    const refNode = delBtn || addPointBtn || titleEl;
+    refNode.parentNode.insertBefore(drawBtn, refNode.nextSibling);
 
     drawBtn.onclick = () => {
       if (drawState === 'IDLE') {
@@ -204,9 +265,41 @@ function setupLinkClickHandler() {
         drawBtn.style.background = '#ffeaa7';
         drawBtn.textContent = '選取起點...';
         document.getElementById('svgWrap').style.cursor = 'crosshair';
+
+        // Auto Enter Zen Mode? Optional.
+        if (!document.body.classList.contains('zen-mode')) {
+          // Check if user wants auto-zen? For now, manual.
+        }
       } else {
         resetDrawState();
       }
+    };
+  }
+
+  // Zen Mode Button
+  let zenBtn = document.getElementById('btnZenMode');
+  if (!zenBtn && titleEl) {
+    zenBtn = document.createElement('button');
+    zenBtn.id = 'btnZenMode';
+    zenBtn.innerHTML = '⛶ 全螢幕';
+    zenBtn.style.marginLeft = '10px';
+    zenBtn.style.border = '1px solid #aaa';
+
+    // Insert after draw button (which is nextSibling of title now)
+    // Actually, drawBtn is inserted. So titleEl.nextSibling is drawBtn.
+    // Insert after drawBtn.
+    titleEl.parentNode.insertBefore(zenBtn, drawBtn.nextSibling);
+
+    zenBtn.onclick = () => {
+      document.body.classList.toggle('zen-mode');
+      const isZen = document.body.classList.contains('zen-mode');
+      zenBtn.innerHTML = isZen ? '↙ 恢復' : '⛶ 全螢幕';
+      zenBtn.style.background = isZen ? '#fab1a0' : '';
+
+      // Force redraw/resize
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 100);
     };
   }
 
@@ -216,6 +309,14 @@ function setupLinkClickHandler() {
     if (drawBtn) {
       drawBtn.style.background = '';
       drawBtn.textContent = '✏️ 畫桿件';
+    }
+    if (addPointBtn) {
+      addPointBtn.style.background = '';
+      addPointBtn.textContent = '📍 新增點位';
+    }
+    if (delBtn) {
+      delBtn.style.background = '';
+      delBtn.textContent = '🗑️ 刪除';
     }
     if (ghostLine) {
       ghostLine.remove();
@@ -239,6 +340,42 @@ function setupLinkClickHandler() {
     // ... (rest of logic moved to _moveHandler)
   }
 
+  // --- Fixed Grid Label Logic ---
+  let gridLabel = document.getElementById('gridInfoLabel');
+  if (!gridLabel) {
+    gridLabel = document.createElement('div');
+    gridLabel.id = 'gridInfoLabel';
+    gridLabel.style.position = 'absolute';
+    gridLabel.style.top = '10px';
+    gridLabel.style.right = '10px';
+    gridLabel.style.backgroundColor = 'rgba(255, 255, 255, 0.6)'; // Semi-transparent
+    gridLabel.style.padding = '4px 8px';
+    gridLabel.style.borderRadius = '4px';
+    gridLabel.style.fontSize = '12px';
+    gridLabel.style.fontFamily = 'monospace';
+    gridLabel.style.pointerEvents = 'none';
+    gridLabel.style.color = '#333';
+    gridLabel.style.zIndex = '500';
+
+    if (getComputedStyle(svgWrap).position === 'static') {
+      svgWrap.style.position = 'relative';
+    }
+    svgWrap.appendChild(gridLabel);
+  }
+
+  function updateFixedGridLabel() {
+    const viewRange = parseFloat(document.getElementById('viewRange').value) || 800;
+    const step = calcAdaptiveGridStep(viewRange);
+    if (gridLabel) gridLabel.textContent = `Grid: ${step}`;
+  }
+
+  // Initial & Listeners for Grid Label
+  updateFixedGridLabel();
+  const vrInput = document.getElementById('viewRange');
+  if (vrInput) {
+    vrInput.addEventListener('input', updateFixedGridLabel);
+  }
+
   // --- Coordinate & Snap Logic ---
   let coordTooltip = null;
   let currentSnapPoint = null; // { x, y, type: 'joint'|'grid' }
@@ -247,13 +384,15 @@ function setupLinkClickHandler() {
     if (!coordTooltip) {
       coordTooltip = document.createElement('div');
       coordTooltip.style.position = 'fixed';
-      coordTooltip.style.background = 'rgba(0, 0, 0, 0.7)';
-      coordTooltip.style.color = 'white';
-      coordTooltip.style.padding = '4px 8px';
-      coordTooltip.style.borderRadius = '4px';
+      coordTooltip.style.background = 'rgba(0, 0, 0, 0.8)';
+      coordTooltip.style.color = '#fff'; // White text
+      coordTooltip.style.padding = '6px 10px';
+      coordTooltip.style.borderRadius = '6px';
       coordTooltip.style.fontSize = '12px';
+      coordTooltip.style.fontFamily = 'monospace';
       coordTooltip.style.pointerEvents = 'none';
       coordTooltip.style.zIndex = '1000';
+      coordTooltip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
       document.body.appendChild(coordTooltip);
     }
 
@@ -263,37 +402,31 @@ function setupLinkClickHandler() {
     }
 
     coordTooltip.style.display = 'block';
+    // Offset from cursor
     coordTooltip.style.left = (clientX + 15) + 'px';
     coordTooltip.style.top = (clientY + 15) + 'px';
 
-    let text = `X: ${worldX.toFixed(1)}, Y: ${worldY.toFixed(1)}`;
+    let text = `X: ${worldX}, Y: ${worldY}`; // Already Integers
+
+    // Status Indicator
+    let status = '';
     if (type === 'joint') {
       coordTooltip.style.border = '1px solid #3498db';
-      text += ' (Joint)';
+      status = ' <span style="color:#3498db">● JOINT</span>';
     } else if (type === 'grid') {
       coordTooltip.style.border = '1px solid #2ecc71';
-      text += ' (Grid)';
+      status = ' <span style="color:#2ecc71"># GRID</span>';
     } else {
-      coordTooltip.style.border = 'none';
+      coordTooltip.style.border = '1px solid #7f8c8d';
     }
-    coordTooltip.textContent = text;
+
+    coordTooltip.innerHTML = text + status;
   }
 
   function getSnappedCoords(rawX, rawY) {
     // 1. Grid Snap
-    // Re-calculate adaptive step (duplicate logic from utils for now, or just use fixed 10/50 etc from UI?)
-    // Let's read from UI if possible, or recalculate.
-    // Or simpler: Read the gridStep from local storage or assume auto?
-    // Let's implement auto-calculation same as utils.js
     const viewRange = parseFloat(document.getElementById('viewRange').value) || 800;
-    let step = 50;
-    const roughStep = viewRange / 15;
-    const power = Math.pow(10, Math.floor(Math.log10(roughStep)));
-    const base = roughStep / power;
-    if (base < 1.5) step = 1 * power;
-    else if (base < 3.5) step = 2 * power;
-    else if (base < 7.5) step = 5 * power;
-    else step = 10 * power;
+    const step = calcAdaptiveGridStep(viewRange);
 
     const snapX = Math.round(rawX / step) * step;
     const snapY = Math.round(rawY / step) * step;
@@ -364,8 +497,19 @@ function setupLinkClickHandler() {
     svgWrap.removeEventListener('mousemove', svgWrap._moveHandler);
   }
 
-  // 1. Link Click Handler (Add Hole)
+  // 1. Link Click Handler (Delete Link)
   svgWrap._linkClickHandler = (e) => {
+    if (drawState === 'DELETE') {
+      e.stopPropagation();
+      const detail = e.detail; // { id, ... }
+      if (confirm(`確定要刪除連桿 ${detail.id} 嗎？`)) {
+        removeFromTopology(detail.id);
+      }
+      // resetDrawState(); // Keep delete mode active
+      return;
+    }
+
+    // Existing logic for hole creation...
     if (drawState !== 'IDLE') return; // Don't add hole if drawing bar
     const detail = e.detail;
     if (!detail || !detail.p1Val || !detail.p2Val) return;
@@ -422,13 +566,20 @@ function setupLinkClickHandler() {
     }
   };
 
-  // 2. Joint Click Handler (Select Point)
+  // 2. Joint Click Handler (Select Point or Delete)
   svgWrap._jointClickHandler = (e) => {
     if (drawState === 'IDLE') return;
     e.stopPropagation(); // Handled
 
     const detail = e.detail; // { id, x, y }
     console.log('[Draw] Clicked Joint:', detail);
+
+    if (drawState === 'DELETE') {
+      if (confirm(`確定要刪除點 ${detail.id} 及其連接的桿件嗎？`)) {
+        removeFromTopology(detail.id);
+      }
+      return;
+    }
 
     if (drawState === 'WAIT_P1') {
       drawP1 = { id: detail.id, isNew: false, x: detail.x, y: detail.y };
@@ -455,18 +606,25 @@ function setupLinkClickHandler() {
 
     const coords = getWorldCoords(e.clientX, e.clientY);
 
-    // Use snapped coords if available
-    let finalX = coords.x;
-    let finalY = coords.y;
+    // Use snapped coords if available, otherwise FORCE INTEGER ROUNDING for raw coords
+    let finalX = Math.round(coords.x);
+    let finalY = Math.round(coords.y);
+
     if (currentSnapPoint && currentSnapPoint.type !== 'raw') {
-      finalX = currentSnapPoint.x;
-      finalY = currentSnapPoint.y;
+      finalX = Math.round(currentSnapPoint.x);
+      finalY = Math.round(currentSnapPoint.y);
     }
 
-    if (drawState === 'WAIT_P1') {
+    if (drawState === 'ADD_POINT') {
+      addPointToTopology(finalX, finalY);
+      // Don't reset state immediately? User might want to add multiple points.
+      // Let's keep it active.
+      // resetDrawState();
+      // Just show a small visual feedback? Log?
+    } else if (drawState === 'WAIT_P1') {
       drawP1 = { id: null, isNew: true, x: finalX, y: finalY };
       drawState = 'WAIT_P2';
-      drawBtn.textContent = `P1: (${finalX.toFixed(0)},${finalY.toFixed(0)}) -> 選取終點...`;
+      drawBtn.textContent = `P1: (${finalX},${finalY}) -> 選取終點...`;
     } else if (drawState === 'WAIT_P2') {
       const drawP2 = { id: null, isNew: true, x: finalX, y: finalY };
       finishDraw(drawP1, drawP2);
@@ -475,37 +633,45 @@ function setupLinkClickHandler() {
 
   // 4. Mouse Move (Ghost Line + Tooltip)
   svgWrap._moveHandler = (e) => {
-    if (drawState !== 'WAIT_P2' || !drawP1) return;
-
+    // Always track coords for tooltip
     const coords = getWorldCoords(e.clientX, e.clientY);
     const snapped = getSnappedCoords(coords.x, coords.y);
-
     currentSnapPoint = snapped;
 
-    updateCoordTooltip(true, e.clientX, e.clientY, snapped.x, snapped.y, snapped.type);
+    // Determine Display/Logic Coords (Always Integer)
+    let displayX = Math.round(coords.x);
+    let displayY = Math.round(coords.y);
+
+    if (snapped.type !== 'raw') {
+      displayX = Math.round(snapped.x);
+      displayY = Math.round(snapped.y);
+    }
+
+    updateCoordTooltip(true, e.clientX, e.clientY, displayX, displayY, snapped.type);
+
+    if (drawState !== 'WAIT_P2' || !drawP1) return;
 
     updateGhostLine();
     if (ghostLine) {
-      // Need to transform P1 world to SVG
-      // x = (W/2) + worldX * scale
+      // ... ghost line update logic using displayX/displayY or snapped ...
+      // Need to re-calc svg coords for ghost line end
       const svg = svgWrap.querySelector('svg');
-      const rect = svg.getBoundingClientRect();
-      const W = 800, H = 600;
+      // ... get scale ...
       const viewRange = parseFloat(document.getElementById('viewRange').value) || 800;
+      const W = 800, H = 600;
       const pad = 50;
       const scale = Math.min(W - 2 * pad, H - 2 * pad) / viewRange;
 
       const p1SvgX = (W / 2) + drawP1.x * scale;
       const p1SvgY = (H / 2) - drawP1.y * scale;
 
-      // Allow snapping for ghost line too
-      const targetX = (W / 2) + snapped.x * scale;
-      const targetY = (H / 2) - snapped.y * scale;
+      const targetSvgX = (W / 2) + displayX * scale;
+      const targetSvgY = (H / 2) - displayY * scale;
 
       ghostLine.setAttribute('x1', p1SvgX);
       ghostLine.setAttribute('y1', p1SvgY);
-      ghostLine.setAttribute('x2', targetX);
-      ghostLine.setAttribute('y2', targetY);
+      ghostLine.setAttribute('x2', targetSvgX);
+      ghostLine.setAttribute('y2', targetSvgY);
     }
   }
 
@@ -514,10 +680,104 @@ function setupLinkClickHandler() {
 
   function finishDraw(p1, p2) {
     console.log('[Draw] Finish:', p1, p2);
+
+    // Force integer coordinates for new points
+    if (p1 && p1.isNew) {
+      p1.x = Math.round(p1.x);
+      p1.y = Math.round(p1.y);
+    }
+    if (p2 && p2.isNew) {
+      p2.x = Math.round(p2.x);
+      p2.y = Math.round(p2.y);
+    }
+
     if (window.wizard) {
       window.wizard.addLinkFromCanvas(p1, p2);
     }
     resetDrawState();
+  }
+
+  function addPointToTopology(x, y) {
+    const topoArea = document.getElementById('topology');
+    if (!topoArea) return;
+    try {
+      const topology = JSON.parse(topoArea.value);
+      if (!topology.steps) topology.steps = [];
+
+      // Generate ID
+      let idx = 1;
+      // Find max O index
+      // Or just find next available O{n}
+      while (topology.steps.find(s => s.id === `O${idx}`)) idx++;
+      const newId = `O${idx}`;
+
+      topology.steps.push({
+        id: newId,
+        type: 'ground',
+        x: x,
+        y: y
+      });
+
+      // Visual joints
+      if (!topology.visualization) topology.visualization = {};
+      if (!topology.visualization.joints) topology.visualization.joints = [];
+      topology.visualization.joints.push(newId);
+
+      const newJson = JSON.stringify(topology, null, 2);
+      topoArea.value = newJson;
+      topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+
+      if (window.wizard) { try { window.wizard.init(topology); } catch (e) { } }
+
+      const log = document.getElementById('log');
+      if (log) log.textContent = `已新增固定點 ${newId} (${x}, ${y})`;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function removeFromTopology(targetId) {
+    const topoArea = document.getElementById('topology');
+    if (!topoArea) return;
+    try {
+      let topology = JSON.parse(topoArea.value);
+      if (!topology.steps) return;
+
+      // Filter out the target step
+      const initialLen = topology.steps.length;
+      // If target is a Point, we must also remove Bars that reference this Point
+      let idsToRemove = [targetId];
+
+      // If we deleted a point, check for connected bars
+      const isPoint = targetId.startsWith('O') || targetId.startsWith('H') || targetId.startsWith('P') || targetId.startsWith('J');
+      // Simple heuristic: if it looks like a point ID
+
+      if (isPoint) {
+        // Find all bars that use this point as p1 or p2
+        const ConnectedBars = topology.steps.filter(s =>
+          s.type === 'bar' && (s.p1 === targetId || s.p2 === targetId)
+        );
+        ConnectedBars.forEach(b => idsToRemove.push(b.id));
+      }
+
+      topology.steps = topology.steps.filter(s => !idsToRemove.includes(s.id));
+
+      // Cleanup visualization list
+      if (topology.visualization && topology.visualization.joints) {
+        topology.visualization.joints = topology.visualization.joints.filter(id => !idsToRemove.includes(id));
+      }
+
+      const newJson = JSON.stringify(topology, null, 2);
+      topoArea.value = newJson;
+      topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+
+      if (window.wizard) { try { window.wizard.init(topology); } catch (e) { } }
+
+      const log = document.getElementById('log');
+      if (log) log.textContent = `已刪除物件: ${idsToRemove.join(', ')}`;
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   svgWrap.addEventListener('mechanism-link-click', svgWrap._linkClickHandler);
@@ -549,6 +809,9 @@ function setupLinkClickHandler() {
 
     // Update Input
     viewRangeInput.value = Math.round(currentRange);
+
+    // Update Fixed Label
+    updateFixedGridLabel();
 
     // Update Slider if exists
     const slider = document.getElementById('viewRangeSlider');

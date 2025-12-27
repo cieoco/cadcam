@@ -181,133 +181,132 @@ export function describeArc(x, y, radius, startAngle, endAngle) {
  * @param {Function} tx - X 座標轉換函數 (Model -> Screen)
  * @param {Function} ty - Y 座標轉換函數 (Model -> Screen)
  */
+export function calcAdaptiveGridStep(viewRange) {
+  // Adaptive Grid Step
+  // Target: roughly 30-40 divisions for finer control
+  const roughStep = viewRange / 30;
+  // Snap to nice intervals: 1, 2, 5, 10, 20, 50, 100, 200...
+  const power = Math.pow(10, Math.floor(Math.log10(roughStep)));
+  const base = roughStep / power;
+
+  if (base < 1.5) return 1 * power;
+  else if (base < 3.5) return 2 * power;
+  else if (base < 7.5) return 5 * power;
+  else return 10 * power;
+}
+
 export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridStep = 'auto') {
   let step = 50;
-
   if (gridStep === 'auto' || !gridStep) {
-    // Adaptive Grid Step
-    // Target: roughly 10-20 divisions
-    const roughStep = viewRange / 15;
-    // Snap to nice intervals: 1, 2, 5, 10, 20, 50, 100, 200...
-    const power = Math.pow(10, Math.floor(Math.log10(roughStep)));
-    const base = roughStep / power;
+    // Calculate effective range for adaptive step
+    // Probe scale
+    let scale = 1;
+    try {
+      // Probe scale using tx
+      // Assuming linear: tx(val) = offset + val * scale
+      const x0 = tx(0);
+      const x1 = tx(100);
+      if (Number.isFinite(x0) && Number.isFinite(x1)) {
+        scale = Math.abs(x1 - x0) / 100;
+      }
+    } catch (e) { }
 
-    if (base < 1.5) step = 1 * power;
-    else if (base < 3.5) step = 2 * power;
-    else if (base < 7.5) step = 5 * power;
-    else step = 10 * power;
+    const effectiveViewRange = Math.min(W, H) / (scale || 1);
+    step = calcAdaptiveGridStep(effectiveViewRange);
   } else {
     step = Number(gridStep);
   }
 
+  // Calculate Scale again for usage
+  let scale = 1;
+  try {
+    const x0 = tx(0);
+    const x1 = tx(100);
+    if (Number.isFinite(x0) && Number.isFinite(x1)) {
+      scale = Math.abs(x1 - x0) / 100;
+    }
+  } catch (e) { }
+  if (!scale) scale = 1;
+
+  // Determine Visible Model Bounds
+  const screenOriginX = tx(0); // Screen X where Model X=0
+  const screenOriginY = ty(0); // Screen Y where Model Y=0 (assuming Y=0 is ground)
+
+  // Inverse mapping:
+  // screenX = screenOriginX + modelX * scale
+  // => modelX = (screenX - screenOriginX) / scale
+  const minModelX = (0 - screenOriginX) / scale;
+  const maxModelX = (W - screenOriginX) / scale;
+
+  // screenY = screenOriginY - modelY * scale (Y-up convention)
+  // => modelY = (screenOriginY - screenY) / scale
+  // Screen Top (0) -> High Model Y
+  // Screen Bottom (H) -> Low Model Y
+  const modelYAtTop = (screenOriginY - 0) / scale;
+  const modelYAtBottom = (screenOriginY - H) / scale;
+
+  const minModelY = Math.min(modelYAtTop, modelYAtBottom);
+  const maxModelY = Math.max(modelYAtTop, modelYAtBottom);
+
+  // Snap Start to Step
+  const startX = Math.floor(minModelX / step) * step;
+  const startY = Math.floor(minModelY / step) * step;
+
   const gridColor = "#e0e0e0";
 
-  // 垂直線
-  for (let x = -viewRange / 2; x <= viewRange / 2; x += step) {
-    // Assume tx is linear: tx(val) = tx(0) + val * scale
-    // We can just calculate screenX for model X relative to origin.
-    // Or if tx() accepts absolute model coordinates, we need to know the origin in model space.
-    // Usually origin in model space is (0,0) or (groundCenterX, groundCenterY).
-    // Let's assume tx/ty handle the conversion and we pass model coordinates relative to the "center" of view.
-    // But tx/ty implementation differs per module.
-    // However, if we assume tx(0) is the center, we might need to adjust.
+  // Draw Vertical Lines (iterate X)
+  for (let x = startX; x <= maxModelX + step; x += step) {
+    const screenX = tx(x + originX); // Apply origin offset if needed. usually originX is 0 in new visualizer
+    // Actually originX passed to this function is usually "centerModelX".
+    // But wait, our inverse math assumed x relative to 0. 
+    // If the caller passes originX != 0, it means the grid is shifted.
+    // In multlink/viz, originX is passed as 0. So x is absolute coordinate.
 
-    // Simpler approach: Calculate model coordinates.
-    // In fourbar: tx(p) = W/2 + (p.x - groundCenterX) * scale.
-    // So we iterate x offset from groundCenterX.
+    if (screenX < -1 || screenX > W + 1) continue;
 
-    // Wait, to be generic, we might just loop through model coordinates around the "focus point".
-    // Let's rely on tx/ty to map model coordinates.
-    // But we need to know WHAT model coordinates to draw.
-    // Usually, [-viewRange/2, viewRange/2] relative to the mechanism center.
+    svg.appendChild(svgEl("line", {
+      x1: screenX, y1: 0, x2: screenX, y2: H,
+      stroke: gridColor, "stroke-width": Math.abs(x) < step / 10 ? 1.5 : 0.5
+    }));
 
-    // Let's try to map model x from (center - viewRange/2) to (center + viewRange/2)
-    // We don't know the center in model space here easily unless passed.
-    // BUT, tx(0) or tx(groundCenterX) is usually the screen center W/2.
-    // Let's assume the caller configures tx/ty such that the "interest point" is centered.
-    // We just need to find the inverse of tx/ty to know the bounds? No that's hard.
+    // Labels (Top/Bottom)
+    if (Math.abs(x) > step / 10) {
+      const lblTop = svgEl("text", { x: screenX, y: 12, fill: "#999", "font-size": 9, "text-anchor": "middle" });
+      lblTop.textContent = Math.round(x);
+      svg.appendChild(lblTop);
 
-    // Alternative: Pass the model center to this function?
-    // In fourbar visualization: groundCenterX is passed.
-    // In slider-crank: O is (0,0).
-    // In rack-pinion: (0,0) is center.
-
-    // So we can define "centerModelX" and "centerModelY" parameters?
-    // Or just let the caller handle the range iteration? No, that duplicates loop code.
-
-    // Let's assume the grid should be centered at 'origin in model space' (0,0) or specific point.
-    // The previous implementation in fourbar passed `groundCenterX`.
-    // Let's adopt that pattern: `centerModelX`, `centerModelY`.
-
-    // Re-signature: drawGrid(svg, W, H, viewRange, centerModelX, centerModelY, tx, ty)
-
-    const modelX = originX + x; // x is offset from center
-    const screenX = tx(modelX);
-
-    // Check bounds (optional, but SVG clips anyway usually)
-    if (screenX < 0 || screenX > W) continue;
-
-    svg.appendChild(
-      svgEl("line", {
-        x1: screenX, y1: 0, x2: screenX, y2: H,
-        stroke: gridColor, "stroke-width": modelX === 0 ? 1.5 : 0.5, // Highlight X=0 if possible? No, highlight when modelX matches absolute 0? 
-        // In fourbar code: x===0 (loop variable) meant the center line.
-        // Let's stick to x===0 being the center line of the VIEW.
-      })
-    );
+      const lblBot = svgEl("text", { x: screenX, y: H - 6, fill: "#999", "font-size": 9, "text-anchor": "middle" });
+      lblBot.textContent = Math.round(x);
+      svg.appendChild(lblBot);
+    }
   }
 
-  // 水平線
-  for (let y = -viewRange / 2; y <= viewRange / 2; y += step) {
-    const modelY = originY + y;
-    const screenY = ty(modelY); // Note: ty usually handles Y-flip
+  // Draw Horizontal Lines (iterate Y)
+  for (let y = startY; y <= maxModelY + step; y += step) {
+    const screenY = ty(y + originY);
 
-    if (screenY < 0 || screenY > H) continue;
+    if (screenY < -1 || screenY > H + 1) continue;
 
-    svg.appendChild(
-      svgEl("line", {
-        x1: 0, y1: screenY, x2: W, y2: screenY,
-        stroke: gridColor, "stroke-width": y === 0 ? 1.5 : 0.5,
-      })
-    );
-  }
+    svg.appendChild(svgEl("line", {
+      x1: 0, y1: screenY, x2: W, y2: screenY,
+      stroke: gridColor, "stroke-width": Math.abs(y) < step / 10 ? 1.5 : 0.5
+    }));
 
-  // Labels
-  const labelStep = Math.max(step * 2, 50);
-  for (let x = -viewRange / 2; x <= viewRange / 2; x += labelStep) {
-    if (x === 0) continue;
-    const modelX = originX + x;
-    const screenX = tx(modelX);
-    const label = svgEl("text", {
-      x: screenX, y: H / 2 + 15,
-      fill: "#999", "font-size": 9, "text-anchor": "middle"
-    });
-    label.textContent = `${Math.round(x)}`; // Show offset from center
-    svg.appendChild(label);
-  }
-  for (let y = -viewRange / 2; y <= viewRange / 2; y += labelStep) {
-    if (y === 0) continue;
-    const modelY = originY + y;
-    const screenY = ty(modelY);
-    const label = svgEl("text", {
-      x: W / 2 + 15, y: screenY + 3,
-      fill: "#999", "font-size": 9, "text-anchor": "start"
-    });
-    label.textContent = `${Math.round(y)}`;
-    svg.appendChild(label);
+    // Labels (Left/Right)
+    if (Math.abs(y) > step / 10) {
+      const lblLeft = svgEl("text", { x: 6, y: screenY + 3, fill: "#999", "font-size": 9, "text-anchor": "start" });
+      lblLeft.textContent = Math.round(y);
+      svg.appendChild(lblLeft);
+
+      const lblRight = svgEl("text", { x: W - 6, y: screenY + 3, fill: "#999", "font-size": 9, "text-anchor": "end" });
+      lblRight.textContent = Math.round(y);
+      svg.appendChild(lblRight);
+    }
   }
 }
 
 /**
  * Helper to update grid drawing in a standard way
- * Requires the tx function to accept a simple number (coord) or {x,y} object depending on implementation.
- * Actually, standard tx/ty in this project seem to take {x,y} point or just number?
- * Fourbar: tx(p) -> p.x
- * SliderCrank: tx(p) -> p.x but definition `const tx = (p) => ...`
- * RackPinion: tx(x) -> x (number)
- * 
- * We need to standardize or handle both.
- * Let's make a wrapper or check type.
  */
 export function drawGridCompatible(svg, W, H, viewRange, centerModelX, centerModelY, tx, ty, gridStep) {
   // Wrapper to handle tx/ty differences

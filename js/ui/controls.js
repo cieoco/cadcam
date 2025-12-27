@@ -294,7 +294,7 @@ export function updateDynamicParams() {
             // 璅?撌脩?摰?隞?
             if (!numInput.dataset.eventsBound) {
                 numInput.dataset.eventsBound = 'true';
-                
+
                 // 雿輻?脫?靘?蝜??
                 let updateTimer;
                 const debouncedUpdate = () => {
@@ -313,7 +313,7 @@ export function updateDynamicParams() {
                     rangeInput.value = numInput.value;
                     debouncedUpdate();
                 }, true); // 雿輻??挾
-                
+
                 rangeInput.addEventListener('input', (e) => {
                     e.stopPropagation();
                     e.stopImmediatePropagation();
@@ -327,7 +327,7 @@ export function updateDynamicParams() {
             // ?湔?暹????惇?改?雿???萄遣嚗?仃?餌暺?
             const numInput = wrapper.querySelector('input[type="number"]');
             const rangeInput = wrapper.querySelector('input[type="range"]');
-            
+
             if (numInput && rangeInput) {
                 // ?芸?潔????湔嚗??璅歲??
                 if (numInput.step !== String(info.step)) numInput.step = info.step;
@@ -385,7 +385,15 @@ export function updatePreview() {
         const viewParams = readViewParams();
         viewParams.motorType = mech.motorType;
         viewParams.motorRotation = mech.motorRotation || 0;
-        viewParams.topology = mech.topology; // ?喲??摮葡靘?閬箏?雿輻
+        viewParams.topology = mech.topology;
+
+        // Force update dimensions from actual container
+        const sw = document.getElementById("svgWrap");
+        if (sw) {
+            // Use clientWidth/Height directly
+            viewParams.width = sw.clientWidth || 800;
+            viewParams.height = sw.clientHeight || 600;
+        }
 
         validateConfig(mech, partSpec, mfg);
 
@@ -406,7 +414,7 @@ export function updatePreview() {
         }
         if (mods.config && mods.config.id === 'multilink') {
             lastMultilinkSolution = sol;
-            
+
             // Auto-sweep for trajectory if showTrajectory is enabled
             const showTrajectory = $("showTrajectory")?.checked;
             if (showTrajectory) {
@@ -417,7 +425,7 @@ export function updatePreview() {
                     if (mods.solver.sweepTopology) {
                         let topology = mech.topology;
                         if (typeof topology === 'string') {
-                            try { topology = JSON.parse(topology); } catch (e) {}
+                            try { topology = JSON.parse(topology); } catch (e) { }
                         }
                         sweepResult = sweepFn(topology, mech, sweepParams.sweepStart, sweepParams.sweepEnd, sweepParams.sweepStep);
                     } else {
@@ -655,32 +663,32 @@ export function setupUIHandlers() {
                 thetaSliderValue.textContent = `${thetaSlider.value}°`;
                 updatePreview();
             };
-            
+
             // 同步掃描範圍到 theta slider
             const updateThetaSliderRange = () => {
                 const sweepStart = $("sweepStart");
                 const sweepEnd = $("sweepEnd");
                 const thetaSliderMin = $("thetaSliderMin");
                 const thetaSliderMax = $("thetaSliderMax");
-                
+
                 if (sweepStart && sweepEnd) {
                     const minVal = Number(sweepStart.value || -360);
                     const maxVal = Number(sweepEnd.value || 360);
                     thetaSlider.min = String(minVal);
                     thetaSlider.max = String(maxVal);
-                    
+
                     // 更新顯示的範圍標籤
                     if (thetaSliderMin) thetaSliderMin.textContent = `${minVal}°`;
                     if (thetaSliderMax) thetaSliderMax.textContent = `${maxVal}°`;
                 }
             };
-            
+
             syncThetaFromInput();
             updateThetaSliderRange();
-            
+
             thetaInput.addEventListener('input', syncThetaFromInput);
             thetaSlider.addEventListener('input', syncThetaFromSlider);
-            
+
             // 監聽掃描範圍改變
             const sweepStart = $("sweepStart");
             const sweepEnd = $("sweepEnd");
@@ -770,7 +778,7 @@ export function setupUIHandlers() {
     if (topologyArea) {
         // 雿輻?脫??踹??餌????
         let topologyUpdateTimer;
-        
+
         topologyArea.addEventListener('input', (e) => {
             clearTimeout(topologyUpdateTimer);
             // 憓???1000ms嚗??冽?雲憭??撓??
@@ -778,7 +786,7 @@ export function setupUIHandlers() {
                 updateDynamicParams();
             }, 1000);
         });
-        
+
         // 憭勗?阡????單??
         topologyArea.addEventListener('blur', () => {
             clearTimeout(topologyUpdateTimer);
@@ -793,7 +801,7 @@ export function setupUIHandlers() {
     paramInputs.forEach(input => {
         // 跳過已經有特殊處理的元素
         if (input.id === 'theta' || input.id === 'viewRange' || input.id === 'topology') return;
-        
+
         input.addEventListener('change', () => {
             updatePreview();
         });
@@ -826,5 +834,14 @@ export function setupUIHandlers() {
             btn.addEventListener('mouseenter', () => { if (!btn.disabled) btn.style.transform = 'scale(1.05)'; });
             btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
         }
+    });
+
+    // Resize Observer / Window Resize
+    window.addEventListener('resize', () => {
+        // Debounce slightly
+        clearTimeout(window._resizeTimer);
+        window._resizeTimer = setTimeout(() => {
+            updatePreview();
+        }, 100);
     });
 }

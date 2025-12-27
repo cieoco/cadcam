@@ -211,23 +211,41 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
         }
     }
 
-    const W = 800, H = 600;
+    const W = viewParams.width || 800;
+    const H = viewParams.height || 600;
     const viewRange = viewParams.viewRange || 800;
     const pad = 50;
 
     // Scale setup
+    // Scale is based on the logic: viewRange fits into the smaller dimension of the screen
+    // This keeps the "Zoom Level" consistent regardless of aspect ratio
     const scale = Math.min(W - 2 * pad, H - 2 * pad) / viewRange;
+
+    // Center logic: (0,0) is at center of screen
     const tx = (p) => W / 2 + p.x * scale;
     const ty = (p) => H / 2 - p.y * scale;
 
-    const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+    const svg = svgEl("svg", {
+        width: "100%",
+        height: "100%",
+        viewBox: `0 0 ${W} ${H}`,
+        preserveAspectRatio: "xMidYMid meet",
+        style: "display:block; width:100%; height:100%;"
+    });
 
     // Background
     svg.appendChild(svgEl("rect", { width: W, height: H, fill: "#fafafa" }));
 
     // Grid
     if (viewParams.showGrid !== false) {
-        drawGridCompatible(svg, W, H, viewRange, 0, 0, tx, ty, viewParams.gridStep);
+        // We want the grid to cover the WHOLE area
+        // viewRange only specifies the "min visible size".
+        // Calculate effective range for grid spanning
+        // Max dimension / scale gives the model units needed to cover screen
+        const maxDim = Math.max(W, H);
+        const gridRange = maxDim / scale;
+
+        drawGridCompatible(svg, W, H, gridRange * 1.2, 0, 0, tx, ty, viewParams.gridStep);
     }
 
     if (!sol || !sol.isValid) {
