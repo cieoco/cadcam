@@ -240,7 +240,7 @@ function setupLinkClickHandler() {
     return null;
   }
 
-const titleEl = getTitleElement();
+  const titleEl = getTitleElement();
   const titleParent = titleEl ? titleEl.parentNode : null;
 
   // Add "Add Point" Button
@@ -450,7 +450,7 @@ const titleEl = getTitleElement();
     contextMenu.style.display = 'none';
   }
 
-function updateGhostLine() {
+  function updateGhostLine() {
     if (!ghostLine) {
       const svg = svgWrap.querySelector('svg');
       if (!svg) return;
@@ -634,12 +634,10 @@ function updateGhostLine() {
       const detail = e.detail || {};
       const id = detail.id;
       const items = [
-        { label: '刪除桿件', action: () => id && removeFromTopology(id) },
-        { label: '取消', action: () => {} }
+        { label: '刪除桿件', action: () => id && removeFromTopology(id) }
       ];
-      const clientX = typeof e.clientX === 'number' ? e.clientX : lastPointer.x;
-      const clientY = typeof e.clientY === 'number' ? e.clientY : lastPointer.y;
-      showContextMenu(items, clientX, clientY);
+      openPropertySheet(items, `桿件 ${id || ''} 屬性`, id);
+
       return;
     }
 
@@ -701,7 +699,7 @@ function updateGhostLine() {
     }
   };
 
-    // 2. Joint Click Handler (Select Point)
+  // 2. Joint Click Handler (Select Point)
   svgWrap._jointClickHandler = (e) => {
     if (drawState === 'IDLE') return;
 
@@ -711,12 +709,10 @@ function updateGhostLine() {
       const id = detail.id;
       const label = id && String(id).startsWith('H') ? '刪除孔位' : '刪除關節';
       const items = [
-        { label, action: () => id && removeFromTopology(id) },
-        { label: '取消', action: () => {} }
+        { label, action: () => id && removeFromTopology(id) }
       ];
-      const clientX = typeof e.clientX === 'number' ? e.clientX : lastPointer.x;
-      const clientY = typeof e.clientY === 'number' ? e.clientY : lastPointer.y;
-      showContextMenu(items, clientX, clientY);
+      openPropertySheet(items, `節點 ${id || ''} 屬性`, id);
+
       return;
     }
 
@@ -736,7 +732,7 @@ function updateGhostLine() {
     }
   };
 
-    // 3. Background Click Handler (Select Free Point)
+  // 3. Background Click Handler (Select Free Point)
   svgWrap._bgClickHandler = (e) => {
     if (drawState === 'IDLE') return;
 
@@ -986,3 +982,553 @@ function updateGhostLine() {
     if (btnUpdate) btnUpdate.click(); // Reuse existing update flow
   }, { passive: false });
 }
+
+/**
+ * Property Sheet Logic (Mobile/Overlay)
+ */
+function openPropertySheet(items, title, selectedId) {
+  const sheet = document.getElementById('propertySheet');
+  const sheetContent = document.getElementById('sheetContent');
+  if (!sheet || !sheetContent) return;
+
+  const hasInputCrank = (topology) =>
+    Boolean(topology && Array.isArray(topology.steps) && topology.steps.some(s => s.type === 'input_crank'));
+
+  // 1. Update Title
+  const header = sheet.querySelector('.sheet-header h4');
+  if (header) header.textContent = title || '屬性';
+
+  // 2. Configure Delete Button
+  const btnDelete = document.getElementById('btnDeleteLink');
+
+  // Find delete action
+  const delItem = items.find(i => i.label && i.label.includes('刪除'));
+  if (btnDelete) {
+    if (delItem) {
+      btnDelete.style.display = 'block';
+      const newBtn = btnDelete.cloneNode(true);
+      btnDelete.parentNode.replaceChild(newBtn, btnDelete);
+      newBtn.onclick = () => {
+        if (confirm(`確定要${delItem.label}?`)) {
+          delItem.action();
+          closePropertySheet();
+        }
+      };
+    } else {
+      btnDelete.style.display = 'none';
+    }
+  }
+
+  // 3. Populate Content (Dynamic Controls)
+  const emptyMsg = document.getElementById('emptyPropMsg');
+  if (emptyMsg) emptyMsg.style.display = 'none';
+
+  // Clear previous dynamic controls (Keep emptyMsg)
+  Array.from(sheetContent.children).forEach(child => {
+    if (child.id !== 'emptyPropMsg') child.remove();
+  });
+
+  // 檢查並設定角度滑桿的顯示狀態
+  const topoAreaCheck = document.getElementById('topology');
+  if (topoAreaCheck && topoAreaCheck.value) {
+    try {
+      const topologyCheck = JSON.parse(topoAreaCheck.value);
+      const thetaContainer = document.getElementById('thetaSliderContainer');
+      if (thetaContainer) {
+        // 如果有設定 input，顯示角度滑桿；否則隱藏
+        thetaContainer.style.display = hasInputCrank(topologyCheck) ? 'block' : 'none';
+      }
+    } catch (e) { }
+  }
+
+  // Attempt to find relevant param from ID (e.g. link-g-B -> g)
+  if (typeof selectedId === 'string' && selectedId.startsWith('link-')) {
+    const parts = selectedId.split('-'); // format: link-[param]-[id]
+    if (parts.length >= 3) {
+      const paramName = parts[1];
+      const originalInput = document.getElementById(`dyn_${paramName}`);
+      const originalWrapper = originalInput ? originalInput.closest('.dynamic-param-wrapper') : null;
+
+      if (originalWrapper) {
+        // Clone the wrapper to show in the sheet
+        const clone = originalWrapper.cloneNode(true);
+        // Adjust labels for mobile? No, keeping consistent.
+        clone.style.marginBottom = '0';
+        sheetContent.appendChild(clone);
+
+        // Sync Logic
+        const origNum = originalWrapper.querySelector('input[type="number"]');
+        const origRange = originalWrapper.querySelector('input[type="range"]');
+        const cloneNum = clone.querySelector('input[type="number"]');
+        const cloneRange = clone.querySelector('input[type="range"]');
+
+        const triggerOriginal = () => {
+          if (origNum) {
+            // Dispatch input events to trigger updates
+            origNum.dispatchEvent(new Event('input', { bubbles: true }));
+            // Also trigger change if needed
+            origNum.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        };
+
+        if (cloneNum && origNum) {
+          cloneNum.id = ''; // Remove ID to avoid duplications
+          cloneNum.value = origNum.value;
+          cloneNum.oninput = (e) => {
+            origNum.value = e.target.value;
+            if (origRange) origRange.value = e.target.value;
+            if (cloneRange) cloneRange.value = e.target.value;
+            triggerOriginal();
+          };
+        }
+        if (cloneRange && origRange) {
+          cloneRange.id = ''; // Remove ID
+          cloneRange.value = origRange.value;
+          cloneRange.oninput = (e) => {
+            origRange.value = e.target.value;
+            if (origNum) origNum.value = e.target.value;
+            if (cloneNum) cloneNum.value = e.target.value;
+            triggerOriginal();
+          };
+        }
+      } else {
+        if (emptyMsg) {
+          emptyMsg.textContent = "此物件無可調整參數";
+          emptyMsg.style.display = 'block';
+        }
+      }
+    }
+
+  } else if (typeof selectedId === 'string' && (selectedId.startsWith('O') || selectedId.startsWith('P') || selectedId.startsWith('J'))) {
+    // Handle Point Attributes (Ground Points primarily)
+    const topoArea = document.getElementById('topology');
+    let found = false;
+    if (topoArea && topoArea.value) {
+      try {
+        const topology = JSON.parse(topoArea.value);
+        if (topology.steps) {
+          const step = topology.steps.find(s => s.id === selectedId);
+
+          if (step) {
+            found = true;
+
+            // 1. Point Type Selector (Fixed vs Floating/Joint)
+            const typeWrapper = document.createElement('div');
+            typeWrapper.className = 'dynamic-param-wrapper';
+            typeWrapper.style.marginBottom = '8px';
+            typeWrapper.style.padding = '4px 8px';
+            typeWrapper.style.background = '#fff';
+            typeWrapper.style.border = '1px solid #eee';
+            typeWrapper.style.borderRadius = '4px';
+
+            const currentType = step.type === 'input_crank' ? 'joint' : (step.type || 'joint'); // default to joint if missing
+
+            typeWrapper.innerHTML = `
+                  <div style="display:flex; align-items:center; gap:6px;">
+                      <label style="width:60px; font-weight:bold; color:#2c3e50;">類型</label>
+                      <select style="flex:1; padding:4px; border:1px solid #ddd; border-radius:3px;">
+                          <option value="ground" ${currentType === 'ground' ? 'selected' : ''}>固定點 (Ground)</option>
+                          <option value="joint" ${currentType === 'joint' ? 'selected' : ''}>浮動點 (Joint)</option>
+                      </select>
+                  </div>
+                `;
+
+            const select = typeWrapper.querySelector('select');
+            select.onchange = (e) => {
+              const newType = e.target.value;
+              const oldType = step.type;
+
+              if (newType === 'ground' && oldType !== 'ground') {
+                // 切換到固定點：需要設定 x, y 座標
+                step.type = 'ground';
+
+                // 如果沒有 x, y，設定預設值或保留現有值
+                if (step.x === undefined) step.x = 0;
+                if (step.y === undefined) step.y = 0;
+
+                // 移除 drive 相關屬性
+                delete step.base;
+                delete step.len_param;
+                delete step.angle_param;
+                delete step.x_param;
+                delete step.y_param;
+                delete step.x_offset;
+                delete step.y_offset;
+                delete step.center;
+                delete step.phase_offset;
+                delete step.len_param;
+
+              } else if (newType !== 'ground' && oldType === 'ground') {
+                // 切換到浮動點：警告使用者
+                if (!confirm('將固定點改為浮動點可能會導致機構無法求解。\n\n浮動點需要透過連桿約束來定義位置。\n\n確定要繼續嗎？')) {
+                  select.value = oldType; // 恢復原值
+                  return;
+                }
+
+                step.type = 'joint';
+
+                delete step.center;
+                delete step.phase_offset;
+                delete step.len_param;
+
+                // 保留 x, y 作為參考，但這些值在求解時會被忽略
+                // 實際位置會由連桿約束計算
+              }
+
+              const newJson = JSON.stringify(topology, null, 2);
+              topoArea.value = newJson;
+              topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+              // Re-open/Refresh sheet to show/hide coordinates?
+              setTimeout(() => openPropertySheet(items, title, selectedId), 50);
+            };
+            sheetContent.appendChild(typeWrapper);
+
+            // 2. Coordinate Inputs (Only if Ground/Fixed)
+            // 2. Coordinate Inputs (Only if Ground/Fixed)
+            if (currentType === 'ground') {
+              const createCoordInput = (label, axis, val) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'dynamic-param-wrapper';
+                wrapper.style.marginBottom = '8px';
+                wrapper.style.padding = '4px 8px';
+                wrapper.style.background = '#fff';
+                wrapper.style.border = '1px solid #eee';
+                wrapper.style.borderRadius = '4px';
+
+                wrapper.innerHTML = `
+                      <div style="display:flex; align-items:center; gap:6px;">
+                          <label style="width:20px; font-weight:bold; color:#2c3e50;">${label}</label>
+                          <input type="number" value="${val}" style="flex:1; padding:4px; border:1px solid #ddd; border-radius:3px;" />
+                      </div>
+                    `;
+
+                const inp = wrapper.querySelector('input');
+                inp.oninput = (e) => {
+                  const newVal = parseFloat(e.target.value);
+                  if (!isNaN(newVal)) {
+                    step[axis] = newVal;
+                    // Update Topology
+                    const newJson = JSON.stringify(topology, null, 2);
+                    topoArea.value = newJson;
+                    topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+                  }
+                };
+
+                return wrapper;
+              };
+
+              sheetContent.appendChild(createCoordInput('X', 'x', step.x));
+              sheetContent.appendChild(createCoordInput('Y', 'y', step.y));
+            }
+
+            // 3. Trace Point Toggle (For any point)
+            const traceWrapper = document.createElement('div');
+            traceWrapper.className = 'dynamic-param-wrapper';
+            traceWrapper.style.marginBottom = '8px';
+            traceWrapper.style.padding = '4px 8px';
+            traceWrapper.style.background = '#fff'; // Distinct background?
+            traceWrapper.style.border = '1px solid #eee';
+            traceWrapper.style.borderRadius = '4px';
+
+            // Check if currently traced
+            const isTraced = topology.visualization &&
+              topology.visualization.trace &&
+              topology.visualization.trace.includes(selectedId);
+
+            traceWrapper.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px;">
+                     <input type="checkbox" id="chkTrace" ${isTraced ? 'checked' : ''} style="width:18px; height:18px;">
+                     <label for="chkTrace" style="font-weight:bold; color:#2c3e50; cursor:pointer;">開啟軌跡追蹤 (Trace)</label>
+                </div>
+            `;
+
+            const chk = traceWrapper.querySelector('input');
+            chk.onchange = (e) => {
+              if (!topology.visualization) topology.visualization = {};
+              if (!topology.visualization.trace) topology.visualization.trace = [];
+
+              if (e.target.checked) {
+                if (!topology.visualization.trace.includes(selectedId)) {
+                  topology.visualization.trace.push(selectedId);
+                }
+              } else {
+                topology.visualization.trace = topology.visualization.trace.filter(id => id !== selectedId);
+              }
+
+              const newJson = JSON.stringify(topology, null, 2);
+              topoArea.value = newJson;
+              topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+            };
+
+            sheetContent.appendChild(traceWrapper);
+
+            // 4. Motor/Input Toggle (Drive Point)
+            const motorWrapper = document.createElement('div');
+            motorWrapper.className = 'dynamic-param-wrapper';
+            motorWrapper.style.marginTop = '8px';
+            motorWrapper.style.padding = '4px 8px';
+            motorWrapper.style.background = '#fff8e1'; // Highlight motor
+            motorWrapper.style.border = '1px solid #ffe0b2';
+            motorWrapper.style.borderRadius = '4px';
+
+            const isCenterPoint = step.type === 'ground';
+            const centers = [];
+            const driveTargets = [];
+            const centerIds = new Set();
+            const targetIds = new Set();
+            const linkMap = new Map(); // key: otherId, value: [{ id, lenParam }]
+            const wizardData = topology._wizard_data || [];
+
+            const addConnection = (otherId, otherType, lenParam, linkId) => {
+              if (!otherId) return;
+              if (!targetIds.has(otherId)) {
+                driveTargets.push({ id: otherId, type: otherType || 'joint' });
+                targetIds.add(otherId);
+              }
+              if (otherType === 'fixed' && !centerIds.has(otherId)) {
+                centers.push({ id: otherId });
+                centerIds.add(otherId);
+              }
+              if (!linkMap.has(otherId)) linkMap.set(otherId, []);
+              if (linkId || lenParam) {
+                linkMap.get(otherId).push({ id: linkId || otherId, lenParam });
+              }
+            };
+
+            wizardData.forEach(w => {
+              if (w.type !== 'bar') return;
+              const a = w.p1;
+              const b = w.p2;
+              if (!a || !b) return;
+              const isASelected = a.id === selectedId;
+              const isBSelected = b.id === selectedId;
+              if (!isASelected && !isBSelected) return;
+              const other = isASelected ? b : a;
+              addConnection(other.id, other.type, w.lenParam, w.id);
+            });
+
+            if (wizardData.length === 0 && topology.visualization && topology.visualization.links) {
+              topology.visualization.links.forEach(link => {
+                if (link.p1 !== selectedId && link.p2 !== selectedId) return;
+                const otherId = link.p1 === selectedId ? link.p2 : link.p1;
+                const otherStep = topology.steps ? topology.steps.find(s => s.id === otherId) : null;
+                const otherType = otherStep ? (otherStep.type === 'ground' ? 'fixed' : 'joint') : 'joint';
+                addConnection(otherId, otherType, null, null);
+              });
+            }
+
+            const drivenStep = isCenterPoint && topology.steps
+              ? topology.steps.find(s => s.type === 'input_crank' && s.center === selectedId)
+              : null;
+            const isInputCrank = isCenterPoint ? Boolean(drivenStep) : (step.type === 'input_crank');
+
+            const targetLabel = isCenterPoint ? '\u9a45\u52d5\u7aef' : '\u4e2d\u5fc3';
+            const targetOptions = isCenterPoint ? driveTargets : centers;
+            const placeholder = isCenterPoint ? '(\u9700\u8981\u9023\u63a5\u7684\u7bc0\u9ede)' : '(\u9700\u8981\u56fa\u5b9a\u9ede)';
+
+            motorWrapper.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                     <input type="checkbox" id="chkMotor" ${isInputCrank ? 'checked' : ''} style="width:18px; height:18px;">
+                     <label for="chkMotor" style="font-weight:bold; color:#d35400; cursor:pointer;">\u8a2d\u70ba\u9a45\u52d5\u99ac\u9054 (Input)</label>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+                     <label style="width:60px; font-weight:bold; color:#2c3e50;">${targetLabel}</label>
+                     <select id="motorCenterSelect" style="flex:1; padding:4px; border:1px solid #ddd; border-radius:3px;">
+                         ${targetOptions.length ? targetOptions.map(c => `<option value="${c.id}" ${(drivenStep && drivenStep.id === c.id) || (step.center === c.id) ? 'selected' : ''}>${c.id}</option>`).join('') : `<option value="">${placeholder}</option>`}
+                     </select>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                     <label style="width:60px; font-weight:bold; color:#2c3e50;">\u9a45\u52d5\u687f\u4ef6</label>
+                     <select id="motorLinkSelect" style="flex:1; padding:4px; border:1px solid #ddd; border-radius:3px;"></select>
+                </div>
+            `;
+
+            const motorChk = motorWrapper.querySelector('#chkMotor');
+            const targetSelect = motorWrapper.querySelector('#motorCenterSelect');
+            const linkSelect = motorWrapper.querySelector('#motorLinkSelect');
+            if (targetSelect && targetOptions.length === 0) {
+              targetSelect.disabled = true;
+            }
+
+            const updateLinkOptions = () => {
+              if (!linkSelect) return;
+              const targetId = targetSelect ? targetSelect.value : '';
+              const links = linkMap.get(targetId) || [];
+              linkSelect.innerHTML = '';
+              if (!targetId || links.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = '(\u9700\u8981\u5c0d\u61c9\u7684\u687f\u4ef6)';
+                linkSelect.appendChild(opt);
+                linkSelect.disabled = true;
+                return;
+              }
+              links.forEach((l) => {
+                const opt = document.createElement('option');
+                opt.value = l.id || '';
+                opt.textContent = l.id || targetId;
+                if (drivenStep && drivenStep.len_param && l.lenParam === drivenStep.len_param) {
+                  opt.selected = true;
+                }
+                if (step.len_param && l.lenParam === step.len_param) {
+                  opt.selected = true;
+                }
+                linkSelect.appendChild(opt);
+              });
+                          };
+
+            updateLinkOptions();
+
+            const ensureInputStepOrder = (targetStep) => {
+              if (!topology.steps || topology.steps.includes(targetStep)) return;
+              let insertAt = topology.steps.findIndex(s => s.type === 'dyad');
+              if (insertAt === -1) insertAt = topology.steps.length;
+              topology.steps.splice(insertAt, 0, targetStep);
+            };
+
+            const getSelectedLinkParam = () => {
+              const targetId = targetSelect ? targetSelect.value : '';
+              const links = linkMap.get(targetId) || [];
+              if (!links.length) return null;
+              const selectedId = linkSelect ? linkSelect.value : '';
+              const link = links.find(l => l.id === selectedId) || links[0];
+              return link.lenParam || null;
+            };
+
+            const applyMotor = () => {
+              const targetId = targetSelect ? targetSelect.value : '';
+              if (!targetId) {
+                motorChk.checked = false;
+                alert(isCenterPoint
+                  ? '\u7121\u6cd5\u8a2d\u5b9a\u9a45\u52d5\uff1a\u8acb\u5148\u9078\u64c7\u9023\u63a5\u7684\u7bc0\u9ede\u4f5c\u70ba\u9a45\u52d5\u7aef\u3002'
+                  : '\u7121\u6cd5\u8a2d\u5b9a\u9a45\u52d5\uff1a\u8acb\u5148\u9078\u64c7\u56fa\u5b9a\u9ede\u4f5c\u70ba\u4e2d\u5fc3\u3002');
+                return;
+              }
+              const lenParam = getSelectedLinkParam();
+              if (!lenParam) {
+                alert('\u8acb\u9078\u64c7\u4e00\u652f\u9a45\u52d5\u687f\u4ef6\u4f5c\u70ba\u534a\u5f91\u3002');
+                motorChk.checked = false;
+                return;
+              }
+
+              if (isCenterPoint) {
+                let targetStep = topology.steps ? topology.steps.find(s => s.id === targetId) : null;
+                if (!targetStep) {
+                  targetStep = { id: targetId, type: 'joint' };
+                  ensureInputStepOrder(targetStep);
+                }
+                if (targetStep.type === 'ground') {
+                  if (!confirm('\u5c07\u56fa\u5b9a\u9ede\u6539\u70ba\u9a45\u52d5\u9ede\uff0c\u4f4d\u7f6e\u5c07\u7531\u9a45\u52d5\u53c3\u6578\u8a08\u7b97\u3002\n\n\u78ba\u5b9a\u7e7c\u7e8c\uff1f')) {
+                    motorChk.checked = false;
+                    return;
+                  }
+                }
+                targetStep.type = 'input_crank';
+                targetStep.center = selectedId;
+                targetStep.len_param = lenParam;
+                delete targetStep.x;
+                delete targetStep.y;
+                delete targetStep.phase_offset;
+              } else {
+                step.type = 'input_crank';
+                step.center = targetId;
+                step.len_param = lenParam;
+                delete step.x;
+                delete step.y;
+                delete step.phase_offset;
+              }
+            };
+
+            const clearMotor = () => {
+              const targetId = targetSelect ? targetSelect.value : '';
+              if (isCenterPoint) {
+                const targetStep = topology.steps ? topology.steps.find(s => s.id === targetId) : null;
+                if (targetStep && targetStep.type === 'input_crank' && targetStep.center === selectedId) {
+                  targetStep.type = 'joint';
+                  delete targetStep.center;
+                  delete targetStep.len_param;
+                  delete targetStep.phase_offset;
+                }
+              } else {
+                step.type = 'joint';
+                delete step.center;
+                delete step.len_param;
+                delete step.phase_offset;
+              }
+            };
+
+            motorChk.onchange = (e) => {
+              if (e.target.checked) {
+                applyMotor();
+              } else {
+                clearMotor();
+              }
+
+              if (!topology.params) topology.params = {};
+              if (topology.params.theta === undefined) topology.params.theta = 0;
+
+              const thetaContainer = document.getElementById('thetaSliderContainer');
+              if (thetaContainer) thetaContainer.style.display = hasInputCrank(topology) ? 'block' : 'none';
+
+              const newJson = JSON.stringify(topology, null, 2);
+              topoArea.value = newJson;
+              topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+              setTimeout(() => openPropertySheet(items, title, selectedId), 100);
+            };
+
+            if (targetSelect) {
+              targetSelect.onchange = () => {
+                updateLinkOptions();
+                if (motorChk.checked) {
+                  applyMotor();
+                  const newJson = JSON.stringify(topology, null, 2);
+                  topoArea.value = newJson;
+                  topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+                  setTimeout(() => openPropertySheet(items, title, selectedId), 100);
+                }
+              };
+            }
+
+            if (linkSelect) {
+              linkSelect.onchange = () => {
+                if (motorChk.checked) {
+                  applyMotor();
+                  const newJson = JSON.stringify(topology, null, 2);
+                  topoArea.value = newJson;
+                  topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+                  setTimeout(() => openPropertySheet(items, title, selectedId), 100);
+                }
+              };
+            }
+
+            sheetContent.appendChild(motorWrapper);
+          }
+        }
+      } catch (e) { console.error(e); }
+    }
+
+    if (!found) {
+      if (emptyMsg) {
+        emptyMsg.textContent = `節點 ${selectedId} 無可編輯屬性`;
+        emptyMsg.style.display = 'block';
+      }
+    }
+  } else {
+    if (emptyMsg) {
+      emptyMsg.textContent = `節點 ${selectedId}`;
+      emptyMsg.style.display = 'block';
+    }
+  }
+
+  // 4. Show Sheet
+  sheet.style.display = 'flex';
+  setTimeout(() => sheet.classList.add('open'), 10);
+}
+
+function closePropertySheet() {
+  const sheet = document.getElementById('propertySheet');
+  if (!sheet) return;
+  sheet.classList.remove('open');
+  setTimeout(() => sheet.style.display = 'none', 300);
+}
+

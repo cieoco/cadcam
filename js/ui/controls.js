@@ -380,6 +380,17 @@ export function updatePreview() {
             if (lastMultilinkSolution && lastMultilinkSolution.points) {
                 mech._prevPoints = lastMultilinkSolution.points;
             }
+
+            const thetaContainer = $("thetaSliderContainer");
+            if (thetaContainer) {
+                let topology = mech.topology;
+                if (typeof topology === 'string') {
+                    try { topology = JSON.parse(topology); } catch (e) { topology = null; }
+                }
+                const hasInput = topology && Array.isArray(topology.steps) &&
+                    topology.steps.some(s => s.type === 'input_crank');
+                thetaContainer.style.display = hasInput ? 'block' : 'none';
+            }
         }
 
         const viewParams = readViewParams();

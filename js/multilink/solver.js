@@ -65,7 +65,105 @@ export function solveTopology(topologyOrParams, params) {
     }
 
     const points = {};
+const autoDyadFromLinks = (topo) => {
+    if (!topo || !topo.steps) return topo;
+    const steps = topo.steps.slice();
+    const barLinks = [];
+    const lenParamByLinkId = new Map();
+    if (Array.isArray(topo._wizard_data)) {
+        topo._wizard_data.forEach(w => {
+            if (w.type === 'bar' && w.id && w.lenParam) {
+                lenParamByLinkId.set(w.id, w.lenParam);
+            }
+        });
+    }
+
+
+    const vis = topo.visualization;
+    if (vis && Array.isArray(vis.links)) {
+        vis.links.forEach(l => {
+            if (!l.p1 || !l.p2) return;
+            const mapped = lenParamByLinkId.get(l.id);
+            barLinks.push({ p1: l.p1, p2: l.p2, len_param: l.len_param || l.lenParam || mapped || l.id });
+        });
+    }
+
+    if (Array.isArray(topo._wizard_data)) {
+        topo._wizard_data.forEach(w => {
+            if (w.type !== 'bar') return;
+            if (w.p1?.id && w.p2?.id) {
+                barLinks.push({ p1: w.p1.id, p2: w.p2.id, len_param: w.lenParam });
+            }
+        });
+    }
+
+    if (Array.isArray(topo.parts)) {
+        topo.parts.forEach(p => {
+            if (p.type !== 'bar') return;
+            if (p.p1 && p.p2) {
+                barLinks.push({ p1: p.p1, p2: p.p2, len_param: p.len_param || p.lenParam || p.id });
+            }
+        });
+    }
+
+    const solved = new Set();
+    steps.forEach(s => {
+        if (s.type === 'ground') solved.add(s.id);
+        if (s.type === 'input_crank') {
+            if (s.center) solved.add(s.center);
+            solved.add(s.id);
+        }
+    });
+
+    let changed = true;
+    while (changed) {
+        changed = false;
+        const connections = new Map(); // pointId -> Array of { neighborId, lenParam }
+
+        barLinks.forEach(l => {
+            if (!l.p1 || !l.p2) return;
+            const id1 = l.p1;
+            const id2 = l.p2;
+            if (solved.has(id1)) {
+                if (!connections.has(id2)) connections.set(id2, []);
+                connections.get(id2).push({ neighborId: id1, lenParam: l.len_param || l.lenParam });
+            }
+            if (solved.has(id2)) {
+                if (!connections.has(id1)) connections.set(id1, []);
+                connections.get(id1).push({ neighborId: id2, lenParam: l.len_param || l.lenParam });
+            }
+        });
+
+        connections.forEach((conns, pointId) => {
+            if (solved.has(pointId)) return;
+            if (conns.length < 2) return;
+            const c1 = conns[0];
+            const c2 = conns[1];
+            const step = {
+                id: pointId,
+                type: 'dyad',
+                p1: c1.neighborId,
+                r1_param: c1.lenParam,
+                p2: c2.neighborId,
+                r2_param: c2.lenParam,
+                sign: 1
+            };
+
+topology = autoDyadFromLinks(topology);
+
     const theta = deg2rad(actualParams.thetaDeg || actualParams.theta || 0);
+
+
+            steps.push(step);
+            stepMap.set(pointId, step);
+            solved.add(pointId);
+            changed = true;
+        });
+    }
+
+    return { ...topo, steps };
+};
+
 
     // Helper to get value: either direct number or from params
     const getVal = (step, key) => {

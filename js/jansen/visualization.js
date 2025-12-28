@@ -74,17 +74,16 @@ export function renderJansen(sol, thetaDeg, trajectoryData = null, viewParams = 
         }
     }
 
-    // 2. Drive Component
-    // Try to find input crank center.
+    // 2. Drive Component (only when input_crank exists)
     if (viewParams.motorType) {
-        // Find 'input_crank' step
         const crankStep = topology.steps.find(s => s.type === 'input_crank');
-        const O_id = crankStep ? crankStep.center : 'O';
-        const O = sol.points[O_id] || { x: 0, y: 0 };
-
-        const motorRotation = viewParams.motorRotation || 0;
-        const motor = createDriveComponent(viewParams.motorType, tx(O), ty(O), scale, motorRotation);
-        if (motor) svg.appendChild(motor);
+        if (crankStep) {
+            const O_id = crankStep.center || 'O';
+            const O = sol.points[O_id] || { x: 0, y: 0 };
+            const motorRotation = viewParams.motorRotation || 0;
+            const motor = createDriveComponent(viewParams.motorType, tx(O), ty(O), scale, motorRotation);
+            if (motor) svg.appendChild(motor);
+        }
     }
 
     // 3. Render Topology using Generic Engine

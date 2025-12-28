@@ -32,8 +32,14 @@
         </div>
     </div>
 
+    <!-- Toggle & Tools Header (Mobile Only) -->
+    <div class="mobile-only" style="padding: 0 16px 16px 16px; display: none;">
+        <button id="btnToggleSettings" class="primary" style="margin-bottom: 10px;">⚙️ 設定與參數</button>
+    </div>
+
     <div class="row">
-        <div class="card">
+        <!-- Left Panel -->
+        <div class="card" id="leftPanel" style="min-width: 380px; max-width: 380px;">
             <div id="parametersPanel"></div>
 
             <div style="height:10px"></div>
@@ -106,45 +112,76 @@
             <h3>輸出 / 訊息</h3>
             <div id="log" class="card" style="padding:10px; background:#fafafa;"></div>
             <div class="btnrow" id="dlButtons"></div>
+
+            <div class="card" style="margin-top:16px;">
+                <h3>零件排版預覽</h3>
+                <div id="partsWrap"></div>
+                <div class="note" style="margin-top:8px;">
+                    零件排版在工作區（0..X, 0..Y），每根各自輸出一份 G-code。
+                </div>
+            </div>
         </div>
 
-        <div>
-            <div class="card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                    <h3 style="margin:0;">2D 模擬與參數調整</h3>
+        <!-- Main Content (Sim + Right Panel) -->
+        <div style="flex: 1; min-width: 0;">
+            <div class="card"
+                style="height: 100%; display: flex; flex-direction: column; padding: 0; overflow: hidden; min-height: 800px;">
+
+                <!-- Toolbar -->
+                <div
+                    style="padding: 12px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="margin:0; border:none; font-size: 16px;">2D 模擬與參數調整</h3>
                     <div style="display:flex; gap:8px; align-items:center;">
-                        <button id="btnNewConfig">新檔</button>
-                        <button id="btnOpenConfig">開啟</button>
-                        <button id="btnSaveConfig">存檔</button>
-                        <button class="primary" id="btnUpdate">更新模擬 / 預覽</button>
+                        <button id="btnNewConfig" style="padding: 6px 12px; font-size: 14px;">新檔</button>
+                        <button id="btnOpenConfig" style="padding: 6px 12px; font-size: 14px;">開啟</button>
+                        <button id="btnSaveConfig" style="padding: 6px 12px; font-size: 14px;">存檔</button>
+                        <button class="primary" id="btnUpdate" style="padding: 6px 12px; font-size: 14px;">更新 /
+                            預覽</button>
                     </div>
                 </div>
                 <input id="configFileInput" type="file" accept="application/json,.json" style="display:none" />
-                <div style="display:flex; gap: 16px;">
-                    <div
-                        style="flex: 1; min-width: 0; min-height: 600px; position: relative; background: #fff; border-radius: 8px; border: 1px solid #eee; overflow: hidden;">
-                        <div id="svgWrap" style="width: 100%; height: 100%; display: flex; justify-content: center;">
+
+                <!-- Split View: Sim + Right Panel -->
+                <div style="display:flex; flex:1; overflow:hidden;">
+
+                    <!-- Sim Area -->
+                    <div style="position: relative; flex: 1; overflow: hidden; background: #fff;">
+                        <div id="svgWrap"
+                            style="width: 100%; height: 100%; display: flex; justify-content: center; border: none;">
                         </div>
-                        <div style="position:absolute; top:10px; left:10px; padding:6px 10px; background:transparent;">
-                            <div style="display:flex; align-items:center; gap:8px;">
-                                <label for="thetaSlider" style="font-size:12px; color:#555; white-space:nowrap; font-weight:600;">θ</label>
-                                <input id="thetaSlider" type="range" min="-360" max="360" step="1" value="0" style="width:200px;" />
-                                <span id="thetaSliderValue" style="font-size:12px; color:#333; font-weight:600; min-width:40px; text-align:center;">0°</span>
+
+                        <!-- Overlay Controls -->
+                        <div id="thetaSliderContainer"
+                            style="position:absolute; top:10px; left:10px; padding:6px 10px; background:transparent; pointer-events: none; display: none;">
+                            <div style="display:flex; align-items:center; gap:8px; pointer-events: auto;">
+                                <label for="thetaSlider"
+                                    style="font-size:12px; color:#555; white-space:nowrap; font-weight:600;">θ</label>
+                                <input id="thetaSlider" type="range" min="-360" max="360" step="1" value="0"
+                                    style="width:200px;" />
+                                <span id="thetaSliderValue"
+                                    style="font-size:12px; color:#333; font-weight:600; min-width:40px; text-align:center;">0°</span>
                             </div>
-                            <div style="display:flex; justify-content:space-between; margin-top:2px; padding-left:24px; width:200px;">
+                            <div
+                                style="display:flex; justify-content:space-between; margin-top:2px; padding-left:24px; width:200px;">
                                 <span id="thetaSliderMin" style="font-size:10px; color:#999;">-360°</span>
                                 <span id="thetaSliderMax" style="font-size:10px; color:#999;">360°</span>
                             </div>
                         </div>
-                        <div style="position:absolute; top:10px; right:10px; display:flex; align-items:center; gap:6px; padding:4px 8px; background:transparent;">
-                            <label for="viewRangeSlider" style="font-size:12px; color:#555; white-space:nowrap;">Range</label>
-                            <input id="viewRangeSlider" type="range" min="100" max="1000" step="10" value="800" style="width:160px;" />
-                            <span id="viewRangeSliderValue" style="font-size:12px; color:#333; min-width:48px; text-align:right;">800</span>
+                        <div
+                            style="position:absolute; top:10px; right:10px; display:flex; align-items:center; gap:6px; padding:4px 8px; background:transparent; pointer-events: none;">
+                            <div style="pointer-events: auto;">
+                                <label for="viewRangeSlider"
+                                    style="font-size:12px; color:#555; white-space:nowrap;">Range</label>
+                                <input id="viewRangeSlider" type="range" min="100" max="1000" step="10" value="800"
+                                    style="width:160px;" />
+                                <span id="viewRangeSliderValue"
+                                    style="font-size:12px; color:#333; min-width:48px; text-align:right;">800</span>
+                            </div>
                         </div>
 
-                        <!-- 🎬 動畫控制面板 (Glassmorphism) -->
+                        <!-- Animation Controls -->
                         <div id="animControlPanel"
-                            style="position: absolute; bottom: 15px; right: 15px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); padding: 12px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.3); z-index: 100; display: flex; flex-direction: column; gap: 8px; min-width: 240px;">
+                            style="position: absolute; bottom: 30px; right: 15px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); padding: 12px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.3); z-index: 100; display: flex; flex-direction: column; gap: 8px; min-width: 200px;">
                             <div
                                 style="font-size: 12px; font-weight: bold; color: #666; margin-bottom: 2px; display: flex; align-items: center; gap: 4px;">
                                 <span>🎬</span> 動畫控制
@@ -152,19 +189,13 @@
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <div style="display: flex; gap: 6px;">
                                     <button id="btnPlayAnim" class="btn-play"
-                                        style="width: 42px; height: 36px; border-radius: 8px; border: none; background: #2ecc71; color: white; font-weight: bold; cursor: pointer; transition: transform 0.1s; display: flex; align-items: center; justify-content: center;">
-                                        <span>▶</span>
-                                    </button>
+                                        style="width: 42px; height: 36px; border-radius: 8px; border: none; background: #2ecc71; color: white; font-weight: bold; cursor: pointer;">▶</button>
                                     <button id="btnPauseAnim" class="btn-pause"
-                                        style="width: 42px; height: 36px; border-radius: 8px; border: none; background: #f1c40f; color: white; font-weight: bold; cursor: pointer; transition: transform 0.1s; display: flex; align-items: center; justify-content: center;"
-                                        disabled>
-                                        <span>⏸</span>
-                                    </button>
+                                        style="width: 42px; height: 36px; border-radius: 8px; border: none; background: #f1c40f; color: white; font-weight: bold; cursor: pointer;"
+                                        disabled>⏸</button>
                                     <button id="btnStopAnim" class="btn-stop"
-                                        style="width: 42px; height: 36px; border-radius: 8px; border: none; background: #e74c3c; color: white; font-weight: bold; cursor: pointer; transition: transform 0.1s; display: flex; align-items: center; justify-content: center;"
-                                        disabled>
-                                        <span>⏹</span>
-                                    </button>
+                                        style="width: 42px; height: 36px; border-radius: 8px; border: none; background: #e74c3c; color: white; font-weight: bold; cursor: pointer;"
+                                        disabled>⏹</button>
                                 </div>
                                 <div
                                     style="display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.03); padding: 6px 8px; border-radius: 8px;">
@@ -175,32 +206,60 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="note"
+                            style="position: absolute; bottom: 10px; width: 100%; text-align: center; pointer-events: none;"
+                            id="simNotes"></div>
                     </div>
+
+                    <!-- Right Panel (Dynamic Params) -->
                     <div id="rightParamsPanel"
-                        style="width: 450px; background: #fcfcfc; border-left: 1px solid #eee; padding: 10px; border-radius: 0 8px 8px 0; display: flex; flex-direction: column; gap: 10px;">
+                        style="width: 350px; background: #fcfcfc; border-left: 1px solid #eee; padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow-y:auto;">
                         <h4
                             style="margin: 0; font-size: 14px; color: #555; border-bottom: 1px solid #eee; padding-bottom: 5px;">
                             📏 桿件長度動態調整</h4>
-                        <div id="dynamicParamsContainer"
-                            style="overflow-y: auto; max-height: 500px; padding-right: 5px;"></div>
+                        <div id="dynamicParamsContainer"></div>
                     </div>
                 </div>
-                <div class="note" style="margin-top:8px;" id="simNotes"></div>
             </div>
+        </div>
+    </div>
 
-            <div class="card" style="margin-top:16px;">
-                <h3>零件排版預覽</h3>
-                <div id="partsWrap"></div>
-                <div class="note" style="margin-top:8px;">
-                    零件排版在工作區（0..X, 0..Y），每根各自輸出一份 G-code。
-                </div>
+    <!-- Property Bottom Sheet (Overlay for Zen Mode / Selection) -->
+    <div id="propertySheet" class="bottom-sheet" style="display: none;">
+        <div class="sheet-header">
+            <h4 style="margin:0;">📏 桿件屬性</h4>
+            <button id="btnCloseProp"
+                style="font-size:24px; cursor:pointer; background:transparent; border:none;  margin-left: auto;">✕</button>
+        </div>
+
+        <div id="sheetContent" style="padding: 10px; max-height: 250px; overflow-y: auto;">
+            <div style="color: #666; font-size:14px; text-align:center; padding: 20px;" id="emptyPropMsg">
+                選取物件以編輯
             </div>
+            <!-- Dynamic Controls will be injected here -->
+        </div>
+
+        <div class="sheet-actions"
+            style="padding: 10px; border-top: 1px solid #eee; display: flex; justify-content: space-between;">
+            <button id="btnDeleteLink"
+                style="background: #e74c3c; color: white; padding: 10px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; display: none;">🗑️
+                刪除物件</button>
+            <button id="btnApplyProp" class="primary"
+                style="padding: 10px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">關閉</button>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script type="module">
         import(`./js/mechanism-loader.js?t=${Date.now()}`);
+
+        document.getElementById('btnCloseProp').onclick = function () {
+            const sheet = document.getElementById('propertySheet');
+            sheet.classList.remove('open');
+            setTimeout(() => { sheet.style.display = 'none'; }, 300);
+        };
+
+        document.getElementById('btnApplyProp').onclick = document.getElementById('btnCloseProp').onclick;
     </script>
 </body>
 

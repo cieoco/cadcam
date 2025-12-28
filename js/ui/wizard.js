@@ -314,7 +314,7 @@ export class MechanismWizard {
             newComp.p1 = { id: `O${this.components.length * 2 + 1}`, type: 'fixed', x: Math.round(p1Data.x), y: Math.round(p1Data.y) };
         } else {
             // 現有點 -> Existing
-            newComp.p1 = { id: p1Data.id, type: 'existing', x: 0, y: 0 };
+            newComp.p1 = { id: p1Data.id, type: 'existing', x: Math.round(Number(p1Data.x) || 0), y: Math.round(Number(p1Data.y) || 0) };
         }
 
         // 設定 P2
@@ -326,7 +326,7 @@ export class MechanismWizard {
             newComp.color = '#7f8c8d'; // Ground Link color
         } else {
             // P2 是現有點 -> Existing
-            newComp.p2 = { id: p2Data.id, type: 'existing', x: 0, y: 0 };
+            newComp.p2 = { id: p2Data.id, type: 'existing', x: Math.round(Number(p2Data.x) || 0), y: Math.round(Number(p2Data.y) || 0) };
         }
 
         // 自動判斷是否為 Input (如果是第一個建立的 Ground -> Existing)
@@ -423,7 +423,7 @@ export class MechanismWizard {
             });
         });
 
-        // 2. Iteratively solve for Crank, Triangle, and Auto-Dyad points
+        // 2. Iteratively solve for Crank, Triangle, and Auto points
         let changed = true;
         while (changed) {
             changed = false;
@@ -464,7 +464,7 @@ export class MechanismWizard {
                 }
             });
 
-            // Auto-Dyad Detection: if a floating point is connected to TWO solved points
+            // Auto Detection: if a floating point is connected to TWO solved points
             pointConnections.forEach((neighbors, pointId) => {
                 if (!solved.has(pointId) && neighbors.size >= 2) {
                     solved.add(pointId);
@@ -665,50 +665,6 @@ export class MechanismWizard {
                 parts.push({ id: `Tri_Edge2(${c.r2Param})`, type: 'bar', len_param: c.r2Param, color: c.color });
             }
         });
-
-        // 4. 自動偵測兩根桿件形成的 Dyad
-        // 找出所有尚未透過 Triangle 定義，但連接了兩根桿件到已求解點的浮動點
-        const solvedBySteps = new Set(steps.map(s => s.id));
-        const floatingPointConnections = new Map(); // pointId -> Array of { neighborId, lenParam }
-
-        this.components.forEach(c => {
-            if (c.type === 'bar' && !c.isInput) {
-                const id1 = c.p1?.id;
-                const id2 = c.p2?.id;
-                if (id1 && id2) {
-                    if (solvedPoints.has(id1)) {
-                        if (!floatingPointConnections.has(id2)) floatingPointConnections.set(id2, []);
-                        floatingPointConnections.get(id2).push({ neighborId: id1, lenParam: c.lenParam });
-                    }
-                    if (solvedPoints.has(id2)) {
-                        if (!floatingPointConnections.has(id1)) floatingPointConnections.set(id1, []);
-                        floatingPointConnections.get(id1).push({ neighborId: id2, lenParam: c.lenParam });
-                    }
-                }
-            }
-        });
-
-        floatingPointConnections.forEach((conns, pointId) => {
-            if (!solvedBySteps.has(pointId) && conns.length >= 2) {
-                // 找到前兩個連接點作為 Dyad 的基準
-                const c1 = conns[0];
-                const c2 = conns[1];
-                steps.push({
-                    id: pointId,
-                    type: 'dyad',
-                    p1: c1.neighborId,
-                    r1_param: c1.lenParam,
-                    p2: c2.neighborId,
-                    r2_param: c2.lenParam,
-                    sign: 1 // 預設正向
-                });
-                solvedBySteps.add(pointId);
-                joints.add(pointId);
-                joints.add(c1.neighborId);
-                joints.add(c2.neighborId);
-            }
-        });
-
         // 5. 處理普通二孔桿 (Bar) -> 僅用於視覺化與零件生成
         this.components.filter(c => c.type === 'bar' && !c.isInput).forEach(c => {
             if (c.p1?.id && c.p2?.id && solvedPoints.has(c.p1.id) && solvedPoints.has(c.p2.id)) {
@@ -735,11 +691,53 @@ export class MechanismWizard {
             this.topology.tracePoint = Array.from(joints).pop() || '';
         }
 
+        // 🎯 自動生成 params 物件
+        const params = {};
+
+        // ? components ???????????
+                const pointCoords = new Map();
+        this.components.forEach(c => {
+            ['p1', 'p2', 'p3'].forEach(k => {
+                if (c[k] && c[k].id) {
+                    const x = Number(c[k].x);
+                    const y = Number(c[k].y);
+                    if (Number.isFinite(x) && Number.isFinite(y)) {
+                        pointCoords.set(c[k].id, { x, y });
+                    }
+                }
+            });
+        });
+
+        // ? components ???????????
+        this.components.forEach(c => {
+            if (c.type === 'bar' && c.lenParam && c.p1 && c.p2) {
+                const p1 = pointCoords.get(c.p1.id);
+                const p2 = pointCoords.get(c.p2.id);
+                if (p1 && p2) {
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const length = Math.round(Math.sqrt(dx * dx + dy * dy));
+                    params[c.lenParam] = length;
+                } else if (params[c.lenParam] === undefined) {
+                    params[c.lenParam] = 100;
+                }
+            } else if (c.type === 'triangle') {
+                // Triangle ??????????????????????????
+                if (c.r1Param) params[c.r1Param] = 100;
+                if (c.r2Param) params[c.r2Param] = 100;
+            }
+        });
+
+
+        // 確保 theta 參數存在（用於驅動馬達）
+        if (!params.theta) params.theta = 0;
+
         this.topology = {
             steps,
             tracePoint: this.topology.tracePoint,
             visualization: { links: finalLinks, polygons, joints: Array.from(joints) },
             parts,
+            params,  // ← 加入 params
             _wizard_data: this.components // 儲存原始組件資料以便恢復
         };
     }
