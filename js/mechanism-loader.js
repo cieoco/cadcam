@@ -1011,6 +1011,39 @@ function openPropertySheet(items, title, selectedId) {
     if (child.id !== 'emptyPropMsg') child.remove();
   });
 
+  // 🌟 特殊模式偵測：如果 items 包含多個帶有 action 的項目（且不僅僅是刪除），
+  // 則切換為「選單模式」，直接渲染按鈕列表。
+  const menuItems = items.filter(i => i.action && (!i.label || !i.label.includes('刪除')));
+  if (menuItems.length > 0) {
+    const menuContainer = document.createElement('div');
+    menuContainer.style.display = 'flex';
+    menuContainer.style.flexDirection = 'column';
+    menuContainer.style.gap = '10px';
+    menuContainer.style.padding = '10px 0';
+
+    menuItems.forEach(item => {
+      const btn = document.createElement('button');
+      btn.textContent = item.label;
+      btn.className = 'btn-secondary'; // 使用現有樣式
+      btn.style.width = '100%';
+      btn.style.textAlign = 'left';
+      btn.style.padding = '12px';
+      btn.onclick = () => {
+        item.action();
+        // 如果是導航行為則不關閉，否則關閉
+        if (!item.keepOpen) closePropertySheet();
+      };
+      menuContainer.appendChild(btn);
+    });
+    sheetContent.appendChild(menuContainer);
+
+    // 顯示 Sheet
+    sheet.classList.add('active');
+    const overlay = document.getElementById('sheetOverlay');
+    if (overlay) overlay.classList.add('active');
+    return; // ⛔️ 結束函式，不執行後面的屬性編輯器邏輯
+  }
+
   const topoArea = document.getElementById('topology');
 
   if (typeof selectedId === 'string' && selectedId.startsWith('link-')) {
@@ -1120,41 +1153,59 @@ function openPropertySheet(items, title, selectedId) {
         };
 
         behaviorWrapper.querySelector('#btnSetMotor').onclick = () => {
-          // 智慧馬達邏輯：選取的點作為「中心軸 (Center)」，其鄰居作為「轉動端 (Crank)」
           const wizardData = topology._wizard_data || [];
           const connections = wizardData.filter(w => w.type === 'bar' && (w.p1.id === selectedId || w.p2.id === selectedId));
 
-          if (connections.length > 0) {
-            // 1. 將本點設為地 (馬達外殼/軸心)
-            step.type = 'ground';
-            const detail = items.find(i => i.id === selectedId) || {};
-            step.x = step.x ?? (detail.x || 0);
-            step.y = step.y ?? (detail.y || 0);
-            delete step.center; delete step.len_param;
+          if (connections.length === 0) {
+            alert('馬達點必須連接至少一根連桿！');
+            return;
+          }
 
-            // 2. 尋找其中一條連桿作為動力的曲柄
-            // 優先找還沒被設定為地的點
-            const link = connections.find(w => {
-              const otherId = (w.p1.id === selectedId ? w.p2.id : w.p1.id);
-              return !topology.steps.find(s => s.id === otherId && s.type === 'ground');
-            }) || connections[0];
+          // 定義馬達設定邏輯 (封裝以便重複使用)
+          const setMotorLogic = (targetLink) => {
+            // 1. 設定本點為固定 (Fixed) (透過 Wizard Data 修改)
+            const targetWizardLink = wizardData.find(w => w.id === targetLink.id);
+            if (!targetWizardLink) return;
 
-            const gearId = (link.p1.id === selectedId ? link.p2.id : link.p1.id);
+            const myPointProp = (targetWizardLink.p1.id === selectedId) ? 'p1' : 'p2';
+            const otherPointProp = (targetWizardLink.p1.id === selectedId) ? 'p2' : 'p1';
 
-            // 3. 更新鄰居點的屬性為 input_crank
-            topology.steps = (topology.steps || []).filter(s => s.id !== gearId);
-            topology.steps.push({
-              id: gearId,
-              type: 'input_crank',
-              center: selectedId,
-              len_param: link.lenParam
+            // 更新所有連接此點的桿件端點屬性為 fixed (物理連結)
+            connections.forEach(conn => {
+              if (conn.p1.id === selectedId) conn.p1.type = 'fixed';
+              if (conn.p2.id === selectedId) conn.p2.type = 'fixed';
+              conn.isInput = false; // 先清除所有 Input 標記
             });
 
-            alert(`已將 ${selectedId} 設為馬達輸出軸 (固定)，${gearId} 將繞其旋轉。`);
-            saveAndRefresh();
-          } else {
-            alert('馬達點必須連接至少一根連桿！');
+            // 2. 設定選定的桿件為 Input Crank
+            targetWizardLink.isInput = true;
+
+            // 3. 設定另一端為 Floating (因為它必須繞著馬達轉)
+            targetWizardLink[otherPointProp].type = 'floating';
+
+            // 立即儲存並刷新
+            if (window.wizard) {
+              window.wizard.components = wizardData;
+              window.wizard.syncTopology();
+              alert(`已將 ${selectedId} 設為馬達轉軸，並指定 ${targetLink.id} 為驅動曲柄 (L=${targetWizardLink.lenParam})。`);
+            }
+          };
+
+          // 如果只有一條連桿，直接設定
+          if (connections.length === 1) {
+            setMotorLogic(connections[0]);
+            return;
           }
+
+          // 如果有多條，顯示選單讓使用者選擇「哪一條是用來轉的？」
+          const linkItems = connections.map(link => ({
+            label: `使用 ${link.id} (L=${link.lenParam || '?'}) 作為曲柄`,
+            action: () => setMotorLogic(link)
+          }));
+
+          linkItems.push({ label: '❌ 取消', action: () => openPropertySheet(items, title, selectedId) }); // 返回上一層
+
+          openPropertySheet(linkItems, `請選擇連接 ${selectedId} 的驅動連桿`, selectedId);
         };
 
         sheetContent.appendChild(behaviorWrapper);

@@ -273,10 +273,18 @@ export function solveTopology(topologyOrParams, params) {
     // 獲取追蹤點
     const B = points[topology.tracePoint];
 
-    // Check if ALL mentioned points are solved. If not, it's a partial solution.
-    // In "LEGO mode", we consider partial solutions as "valid" for rendering.
+    // 嚴格驗證機制：檢查所有關鍵步驟是否都有解
+    // 如果有 Dyad 或 Crank 解不出來 (undefined/NaN)，則視為機構卡死
+    let allResolved = true;
+    for (const s of topology.steps) {
+        if ((s.type === 'dyad' || s.type === 'input_crank') && !points[s.id]) {
+            allResolved = false;
+            break;
+        }
+    }
+
     return {
-        isValid: true,
+        isValid: allResolved,
         points,
         B
     };

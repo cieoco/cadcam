@@ -38,7 +38,7 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
             const p1 = pts[link.p1];
             const p2 = pts[link.p2];
             if (!p1 || !p2) {
-                console.warn(`Viz: Missing point for link ${link.p1}-${link.p2}`, { p1, p2 });
+                // console.warn(`Viz: Missing point for link ${link.p1}-${link.p2}`, { p1, p2 });
                 continue;
             }
 

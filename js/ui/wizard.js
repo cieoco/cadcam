@@ -634,8 +634,8 @@ export class MechanismWizard {
                         steps.push({
                             id: jId,
                             type: 'dyad',
-                            p1: p1Id, len_param: b1.lenParam,
-                            p2: p2Id, len_param: b2.lenParam,
+                            p1: p1Id, r1_param: b1.lenParam,
+                            p2: p2Id, r2_param: b2.lenParam,
                             sign: 1 // 這裡方向可能需要智慧判定，暫設 1
                         });
                         joints.add(jId);

@@ -78,7 +78,11 @@ export function startAnimation(updateCallback) {
     const interval = 1000 / frameRate; // ms per frame
 
     animationState.intervalId = setInterval(() => {
-        animateFrame(degreesPerFrame, motorType, updateCallback);
+        // 1. 執行更新並獲取結果 (預期 updateCallback 回傳 solver 結果)
+        const result = updateCallback ? updateCallback() : null;
+
+        // 2. 傳入結果給 animateFrame 判斷是否撞牆
+        animateFrame(degreesPerFrame, motorType, result);
     }, interval);
 
     // 更新 UI
@@ -134,17 +138,29 @@ export function stopAnimation(updateCallback) {
  * 動畫幀更新
  * @param {number} degreesPerFrame - 每幀角度變化
  * @param {string} motorType - 馬達類型
- * @param {Function} updateCallback - 更新回調函數
+ * @param {Object} lastResult - 上一幀的計算結果 (用於碰撞檢測)
  */
-function animateFrame(degreesPerFrame, motorType, updateCallback) {
+function animateFrame(degreesPerFrame, motorType, lastResult) {
     const { rangeStart, rangeEnd } = animationState;
 
-    // 更新 theta
-    animationState.currentTheta += degreesPerFrame * animationState.direction;
+    // 🌟 死點偵測 (Dead Point Detection) 🌟
+    // 如果上一幀計算結果顯示「機構無解 (isValid: false)」，表示撞牆了
+    if (lastResult && lastResult.isValid === false) {
+        // 反轉方向 (Ping-Pong)
+        animationState.direction *= -1;
+
+        // 退回一步，避免卡死在牆裡
+        animationState.currentTheta += degreesPerFrame * animationState.direction * 2;
+
+        console.log("撞到機構極限，自動反轉！");
+    } else {
+        // 正常前進
+        animationState.currentTheta += degreesPerFrame * animationState.direction;
+    }
 
     // 處理邊界條件
     if (motorType === "motor360") {
-        // 連續旋轉 - 循環
+        // 連續旋轉 - 循環 (除非撞牆反彈模式被激活)
         if (animationState.currentTheta > rangeEnd) {
             animationState.currentTheta =
                 rangeStart + (animationState.currentTheta - rangeEnd);
@@ -163,9 +179,11 @@ function animateFrame(degreesPerFrame, motorType, updateCallback) {
         }
     }
 
-    // 更新 UI
+    // 更新 UI (注意：updateCallback 由 loop 呼叫，這裡只負責通知 UI input 值改變，觸發渲染)
+    // 但在 loop 中我們是先 call updateCallback (畫上一幀結果) -> 再 call animateFrame (算下一幀位置)
+    // 為了讓畫面動起來，必須觸發 UI 事件。
+    // 所以這裡其實只是更新 input.value，真正觸發渲染的是 control.js 監聽 input 事件
     syncThetaValue(Math.round(animationState.currentTheta));
-    if (updateCallback) updateCallback();
 }
 
 /**
