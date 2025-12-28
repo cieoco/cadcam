@@ -15,12 +15,14 @@ import { createDriveComponent } from '../motor-data.js';
  * @returns {SVGElement}
  */
 export function renderFourbar(sol, thetaDeg, trajectoryData = null, viewParams = {}) {
-    const W = 800,
-        H = 600;
+    const W = viewParams.width || 800;
+    const H = viewParams.height || 600;
     const pad = 50;
 
     const viewRange = viewParams.viewRange || 800;
     const showGrid = viewParams.showGrid !== false;
+    const panX = viewParams.panX || 0;
+    const panY = viewParams.panY || 0;
 
     // 固定中心：將 ground link (O2-O4) 水平置中
     const groundCenterX = (sol.O2.x + sol.O4.x) / 2;
@@ -37,7 +39,13 @@ export function renderFourbar(sol, thetaDeg, trajectoryData = null, viewParams =
         return H / 2 - (p.y - groundCenterY) * scale; // 翻轉 Y 軸
     }
 
-    const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+    const svg = svgEl("svg", {
+        width: "100%",
+        height: "100%",
+        viewBox: `${-panX} ${-panY} ${W} ${H}`,
+        preserveAspectRatio: "xMidYMid meet",
+        style: "display:block; width:100%; height:100%;"
+    });
 
     // 背景
     svg.appendChild(

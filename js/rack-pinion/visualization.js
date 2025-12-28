@@ -8,16 +8,25 @@ import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
 import { createDriveComponent } from '../motor-data.js';
 
 export function renderRackPinion(sol, thetaDeg, trajectoryData = null, viewParams = {}) {
-    const W = 800, H = 600;
+    const W = viewParams.width || 800;
+    const H = viewParams.height || 600;
     const pad = 100;
     const viewRange = Number(viewParams.viewRange) || 400;
     const scale = Math.min(W - 2 * pad, H - 2 * pad) / viewRange;
+    const panX = viewParams.panX || 0;
+    const panY = viewParams.panY || 0;
 
     // 座標轉換 (中心點 X=0 為齒輪嚙合點)
     const tx = (x) => W / 2 + x * scale;
     const ty = (y) => H / 2 - y * scale;
 
-    const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+    const svg = svgEl("svg", {
+        width: "100%",
+        height: "100%",
+        viewBox: `${-panX} ${-panY} ${W} ${H}`,
+        preserveAspectRatio: "xMidYMid meet",
+        style: "display:block; width:100%; height:100%;"
+    });
     const showGrid = viewParams.showGrid !== false;
     svg.appendChild(svgEl("rect", { width: W, height: H, fill: "#fafafa" }));
 

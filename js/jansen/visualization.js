@@ -37,10 +37,13 @@ export function renderJansen(sol, thetaDeg, trajectoryData = null, viewParams = 
     const tx = (p) => W / 2 + p.x * scale;
     const ty = (p) => H / 2 - p.y * scale;
 
+    const panX = viewParams.panX || 0;
+    const panY = viewParams.panY || 0;
+
     const svg = svgEl("svg", {
         width: "100%",
         height: "100%",
-        viewBox: `0 0 ${W} ${H}`,
+        viewBox: `${-panX} ${-panY} ${W} ${H}`,
         preserveAspectRatio: "xMidYMid meet",
         style: "display:block; width:100%; height:100%;"
     });

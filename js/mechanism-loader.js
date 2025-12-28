@@ -95,7 +95,7 @@ async function initMechanismPage() {
     
     <div style="height:10px"></div>
     <h3>模擬設定</h3>
-    <input id="viewRange" type="number" min="100" max="1000" step="10" value="800" style="display:none" />
+    <input id="viewRange" type="number" min="50" max="2000" step="10" value="800" style="display:none" />
     <div class="grid">
       <div>
         <label>格線解析度（mm）</label>
@@ -305,6 +305,37 @@ function setupLinkClickHandler() {
       // Future re-renders (e.g., param change) will pick up window.mechanismViewOffset via renderMultilink.
     }
   });
+
+  // 4. Mouse Wheel Zoom
+  svgWrap.addEventListener('wheel', (e) => {
+    e.preventDefault();
+
+    const viewRangeInput = document.getElementById('viewRange');
+    const viewRangeSlider = document.getElementById('viewRangeSlider');
+    if (!viewRangeInput || !viewRangeSlider) return;
+
+    let currentRange = parseFloat(viewRangeInput.value) || 800;
+
+    // Zoom factor: 1.1 for zoom out, 0.9 for zoom in
+    const factor = e.deltaY > 0 ? 1.1 : 0.9;
+    let newRange = currentRange * factor;
+
+    // Constrain range (similar to slider min/max but can be slightly more flexible)
+    newRange = Math.max(50, Math.min(2000, newRange));
+
+    if (newRange !== currentRange) {
+      viewRangeInput.value = Math.round(newRange);
+      viewRangeSlider.value = Math.round(newRange);
+
+      // Update Label
+      const label = document.getElementById('viewRangeSliderValue');
+      if (label) label.textContent = Math.round(newRange);
+
+      // Trigger re-render
+      updatePreview();
+      updateFixedGridLabel();
+    }
+  }, { passive: false });
 
 
   // --- State Machine for Drawing ---
