@@ -368,7 +368,7 @@ function setupLinkClickHandler() {
     };
   }
 
-  function resetDrawState() {
+  function resetDrawState(isCancel = true) {
     drawState = 'IDLE';
     drawP1 = null;
     if (drawBtn) {
@@ -389,7 +389,7 @@ function setupLinkClickHandler() {
     }
     hideContextMenu();
     document.getElementById('svgWrap').style.cursor = 'default';
-    console.log('[Draw] Canceled');
+    if (isCancel) console.log('[Draw] Canceled');
   }
 
   let contextMenu = null;
@@ -588,6 +588,7 @@ function setupLinkClickHandler() {
   // --- Recalculate Transforms (Duplicate logic from Visualization for interactivity) ---
   function getWorldCoords(clientX, clientY) {
     const svg = svgWrap.querySelector('svg');
+    if (!svg) return null;
     const rect = svg.getBoundingClientRect();
     const vb = svg.viewBox && svg.viewBox.baseVal ? svg.viewBox.baseVal : null;
     const W = vb && vb.width ? vb.width : rect.width;
@@ -750,6 +751,7 @@ function setupLinkClickHandler() {
     // So this _bgClickHandler (native 'click') will NOT fire if joint is clicked. Correct.
 
     const coords = getWorldCoords(e.clientX, e.clientY);
+    if (!coords) return;
 
     // Use snapped coords if available, otherwise FORCE INTEGER ROUNDING for raw coords
     let finalX = Math.round(coords.x);
@@ -782,6 +784,10 @@ function setupLinkClickHandler() {
     lastPointer = { x: e.clientX, y: e.clientY };
     // Always track coords for tooltip
     const coords = getWorldCoords(e.clientX, e.clientY);
+    if (!coords) {
+      updateCoordTooltip(false);
+      return;
+    }
     const snapped = getSnappedCoords(coords.x, coords.y);
     currentSnapPoint = snapped;
 
@@ -843,7 +849,7 @@ function setupLinkClickHandler() {
     if (window.wizard) {
       window.wizard.addLinkFromCanvas(p1, p2);
     }
-    resetDrawState();
+    resetDrawState(false);
   }
 
   function addPointToTopology(x, y) {
@@ -996,12 +1002,10 @@ function openPropertySheet(items, title, selectedId) {
 
   // 1. Update Title
   const header = sheet.querySelector('.sheet-header h4');
-  if (header) header.textContent = title || '屬性';
+  if (header) header.textContent = title || '屬性控制';
 
   // 2. Configure Delete Button
   const btnDelete = document.getElementById('btnDeleteLink');
-
-  // Find delete action
   const delItem = items.find(i => i.label && i.label.includes('刪除'));
   if (btnDelete) {
     if (delItem) {
@@ -1019,61 +1023,39 @@ function openPropertySheet(items, title, selectedId) {
     }
   }
 
-  // 3. Populate Content (Dynamic Controls)
+  // 3. Populate Content
   const emptyMsg = document.getElementById('emptyPropMsg');
   if (emptyMsg) emptyMsg.style.display = 'none';
 
-  // Clear previous dynamic controls (Keep emptyMsg)
   Array.from(sheetContent.children).forEach(child => {
     if (child.id !== 'emptyPropMsg') child.remove();
   });
 
-  // 檢查並設定角度滑桿的顯示狀態
-  const topoAreaCheck = document.getElementById('topology');
-  if (topoAreaCheck && topoAreaCheck.value) {
-    try {
-      const topologyCheck = JSON.parse(topoAreaCheck.value);
-      const thetaContainer = document.getElementById('thetaSliderContainer');
-      if (thetaContainer) {
-        // 如果有設定 input，顯示角度滑桿；否則隱藏
-        thetaContainer.style.display = hasInputCrank(topologyCheck) ? 'block' : 'none';
-      }
-    } catch (e) { }
-  }
+  const topoArea = document.getElementById('topology');
 
-  // Attempt to find relevant param from ID (e.g. link-g-B -> g)
   if (typeof selectedId === 'string' && selectedId.startsWith('link-')) {
-    const parts = selectedId.split('-'); // format: link-[param]-[id]
+    // --- 桿件/參數 處理 ---
+    const parts = selectedId.split('-');
     if (parts.length >= 3) {
       const paramName = parts[1];
       const originalInput = document.getElementById(`dyn_${paramName}`);
       const originalWrapper = originalInput ? originalInput.closest('.dynamic-param-wrapper') : null;
-
       if (originalWrapper) {
-        // Clone the wrapper to show in the sheet
         const clone = originalWrapper.cloneNode(true);
-        // Adjust labels for mobile? No, keeping consistent.
         clone.style.marginBottom = '0';
         sheetContent.appendChild(clone);
-
-        // Sync Logic
         const origNum = originalWrapper.querySelector('input[type="number"]');
         const origRange = originalWrapper.querySelector('input[type="range"]');
         const cloneNum = clone.querySelector('input[type="number"]');
         const cloneRange = clone.querySelector('input[type="range"]');
-
         const triggerOriginal = () => {
           if (origNum) {
-            // Dispatch input events to trigger updates
             origNum.dispatchEvent(new Event('input', { bubbles: true }));
-            // Also trigger change if needed
             origNum.dispatchEvent(new Event('change', { bubbles: true }));
           }
         };
-
         if (cloneNum && origNum) {
-          cloneNum.id = ''; // Remove ID to avoid duplications
-          cloneNum.value = origNum.value;
+          cloneNum.id = ''; cloneNum.value = origNum.value;
           cloneNum.oninput = (e) => {
             origNum.value = e.target.value;
             if (origRange) origRange.value = e.target.value;
@@ -1082,8 +1064,7 @@ function openPropertySheet(items, title, selectedId) {
           };
         }
         if (cloneRange && origRange) {
-          cloneRange.id = ''; // Remove ID
-          cloneRange.value = origRange.value;
+          cloneRange.id = ''; cloneRange.value = origRange.value;
           cloneRange.oninput = (e) => {
             origRange.value = e.target.value;
             if (origNum) origNum.value = e.target.value;
@@ -1091,427 +1072,147 @@ function openPropertySheet(items, title, selectedId) {
             triggerOriginal();
           };
         }
-      } else {
-        if (emptyMsg) {
-          emptyMsg.textContent = "此物件無可調整參數";
-          emptyMsg.style.display = 'block';
-        }
       }
     }
-
   } else if (typeof selectedId === 'string' && (selectedId.startsWith('O') || selectedId.startsWith('P') || selectedId.startsWith('J'))) {
-    // Handle Point Attributes (Ground Points primarily)
-    const topoArea = document.getElementById('topology');
-    let found = false;
+    // --- 🎨 節點行為設定 (LEGO 邏輯) ---
     if (topoArea && topoArea.value) {
       try {
         const topology = JSON.parse(topoArea.value);
-        if (topology.steps) {
-          const step = topology.steps.find(s => s.id === selectedId);
+        if (!topology.steps) topology.steps = [];
+        let step = topology.steps.find(s => s.id === selectedId);
+        if (!step) step = { id: selectedId, type: 'joint' };
 
-          if (step) {
-            found = true;
+        const behaviorWrapper = document.createElement('div');
+        behaviorWrapper.className = 'dynamic-param-wrapper';
+        behaviorWrapper.style.padding = '10px';
+        behaviorWrapper.style.background = '#f1f2f6';
+        behaviorWrapper.style.border = '1px solid #dfe4ea';
+        behaviorWrapper.style.borderRadius = '8px';
 
-            // 1. Point Type Selector (Fixed vs Floating/Joint)
-            const typeWrapper = document.createElement('div');
-            typeWrapper.className = 'dynamic-param-wrapper';
-            typeWrapper.style.marginBottom = '8px';
-            typeWrapper.style.padding = '4px 8px';
-            typeWrapper.style.background = '#fff';
-            typeWrapper.style.border = '1px solid #eee';
-            typeWrapper.style.borderRadius = '4px';
+        const currentType = step.type || 'joint';
+        behaviorWrapper.innerHTML = `
+          <div style="font-weight:bold; margin-bottom:10px; color:#2f3542; font-size:14px; display:flex; align-items:center; gap:5px;">
+             <span>⚙️</span> 節點角色設定
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+             <button id="btnSetGround" title="固定在地的支點" style="padding:10px 5px; cursor:pointer; font-weight:bold; font-size:12px; background:${currentType === 'ground' ? '#2f3542' : '#ffffff'}; color:${currentType === 'ground' ? '#fff' : '#2f3542'}; border:2px solid #2f3542; border-radius:6px; transition:all 0.2s;">固定 (地)</button>
+             <button id="btnSetMotor" title="由馬達驅動的旋轉臂端點" style="padding:10px 5px; cursor:pointer; font-weight:bold; font-size:12px; background:${currentType === 'input_crank' ? '#e67e22' : '#ffffff'}; color:${currentType === 'input_crank' ? '#fff' : '#e67e22'}; border:2px solid #e67e22; border-radius:6px; transition:all 0.2s;">馬達 (轉)</button>
+             <button id="btnSetJoint" title="隨桿件運動的自由關節" style="padding:10px 5px; cursor:pointer; font-weight:bold; font-size:12px; background:${currentType === 'joint' ? '#3742fa' : '#ffffff'}; color:${currentType === 'joint' ? '#fff' : '#3742fa'}; border:2px solid #3742fa; border-radius:6px; transition:all 0.2s;">浮動 (點)</button>
+          </div>
+        `;
 
-            const currentType = step.type === 'input_crank' ? 'joint' : (step.type || 'joint'); // default to joint if missing
+        const saveAndRefresh = () => {
+          // 1. 同步到 steps (先移除舊的，再加入新的，避免重複)
+          topology.steps = (topology.steps || []).filter(s => s.id !== selectedId);
+          topology.steps.push(step);
 
-            typeWrapper.innerHTML = `
-                  <div style="display:flex; align-items:center; gap:6px;">
-                      <label style="width:60px; font-weight:bold; color:#2c3e50;">類型</label>
-                      <select style="flex:1; padding:4px; border:1px solid #ddd; border-radius:3px;">
-                          <option value="ground" ${currentType === 'ground' ? 'selected' : ''}>固定點 (Ground)</option>
-                          <option value="joint" ${currentType === 'joint' ? 'selected' : ''}>浮動點 (Joint)</option>
-                      </select>
-                  </div>
-                `;
+          // 2. 同步到 _wizard_data (讓小幫手 UI 也更新)
+          if (topology._wizard_data && Array.isArray(topology._wizard_data)) {
+            topology._wizard_data.forEach(w => {
+              const types = { 'ground': 'fixed', 'input_crank': 'input', 'joint': 'joint' };
+              const wizardType = types[step.type] || 'joint';
+              if (w.p1 && w.p1.id === selectedId) w.p1.type = wizardType;
+              if (w.p2 && w.p2.id === selectedId) w.p2.type = wizardType;
+              if (w.p3 && w.p3.id === selectedId) w.p3.type = wizardType;
+            });
+          }
 
-            const select = typeWrapper.querySelector('select');
-            select.onchange = (e) => {
-              const newType = e.target.value;
-              const oldType = step.type;
+          topoArea.value = JSON.stringify(topology, null, 2);
+          topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+          if (window.wizard) window.wizard.init(topology);
+          setTimeout(() => openPropertySheet(items, title, selectedId), 100);
+        };
 
-              if (newType === 'ground' && oldType !== 'ground') {
-                // 切換到固定點：需要設定 x, y 座標
-                step.type = 'ground';
+        behaviorWrapper.querySelector('#btnSetGround').onclick = () => {
+          step.type = 'ground';
+          const detail = items.find(i => i.id === selectedId) || {};
+          step.x = step.x ?? (detail.x || 0);
+          step.y = step.y ?? (detail.y || 0);
+          delete step.center; delete step.len_param;
+          saveAndRefresh();
+        };
 
-                // 如果沒有 x, y，設定預設值或保留現有值
-                if (step.x === undefined) step.x = 0;
-                if (step.y === undefined) step.y = 0;
+        behaviorWrapper.querySelector('#btnSetJoint').onclick = () => {
+          step.type = 'joint';
+          delete step.x; delete step.y; delete step.center; delete step.len_param;
+          saveAndRefresh();
+        };
 
-                // 移除 drive 相關屬性
-                delete step.base;
-                delete step.len_param;
-                delete step.angle_param;
-                delete step.x_param;
-                delete step.y_param;
-                delete step.x_offset;
-                delete step.y_offset;
-                delete step.center;
-                delete step.phase_offset;
-                delete step.len_param;
+        behaviorWrapper.querySelector('#btnSetMotor').onclick = () => {
+          // 智慧馬達邏輯：選取的點作為「中心軸 (Center)」，其鄰居作為「轉動端 (Crank)」
+          const wizardData = topology._wizard_data || [];
+          const connections = wizardData.filter(w => w.type === 'bar' && (w.p1.id === selectedId || w.p2.id === selectedId));
 
-              } else if (newType !== 'ground' && oldType === 'ground') {
-                // 切換到浮動點：警告使用者
-                if (!confirm('將固定點改為浮動點可能會導致機構無法求解。\n\n浮動點需要透過連桿約束來定義位置。\n\n確定要繼續嗎？')) {
-                  select.value = oldType; // 恢復原值
-                  return;
-                }
+          if (connections.length > 0) {
+            // 1. 將本點設為地 (馬達外殼/軸心)
+            step.type = 'ground';
+            const detail = items.find(i => i.id === selectedId) || {};
+            step.x = step.x ?? (detail.x || 0);
+            step.y = step.y ?? (detail.y || 0);
+            delete step.center; delete step.len_param;
 
-                step.type = 'joint';
+            // 2. 尋找其中一條連桿作為動力的曲柄
+            // 優先找還沒被設定為地的點
+            const link = connections.find(w => {
+              const otherId = (w.p1.id === selectedId ? w.p2.id : w.p1.id);
+              return !topology.steps.find(s => s.id === otherId && s.type === 'ground');
+            }) || connections[0];
 
-                delete step.center;
-                delete step.phase_offset;
-                delete step.len_param;
+            const gearId = (link.p1.id === selectedId ? link.p2.id : link.p1.id);
 
-                // 保留 x, y 作為參考，但這些值在求解時會被忽略
-                // 實際位置會由連桿約束計算
-              }
-
-              const newJson = JSON.stringify(topology, null, 2);
-              topoArea.value = newJson;
-              topoArea.dispatchEvent(new Event('input', { bubbles: true }));
-              // Re-open/Refresh sheet to show/hide coordinates?
-              setTimeout(() => openPropertySheet(items, title, selectedId), 50);
-            };
-            sheetContent.appendChild(typeWrapper);
-
-            // 2. Coordinate Inputs (Only if Ground/Fixed)
-            // 2. Coordinate Inputs (Only if Ground/Fixed)
-            if (currentType === 'ground') {
-              const createCoordInput = (label, axis, val) => {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'dynamic-param-wrapper';
-                wrapper.style.marginBottom = '8px';
-                wrapper.style.padding = '4px 8px';
-                wrapper.style.background = '#fff';
-                wrapper.style.border = '1px solid #eee';
-                wrapper.style.borderRadius = '4px';
-
-                wrapper.innerHTML = `
-                      <div style="display:flex; align-items:center; gap:6px;">
-                          <label style="width:20px; font-weight:bold; color:#2c3e50;">${label}</label>
-                          <input type="number" value="${val}" style="flex:1; padding:4px; border:1px solid #ddd; border-radius:3px;" />
-                      </div>
-                    `;
-
-                const inp = wrapper.querySelector('input');
-                inp.oninput = (e) => {
-                  const newVal = parseFloat(e.target.value);
-                  if (!isNaN(newVal)) {
-                    step[axis] = newVal;
-                    // Update Topology
-                    const newJson = JSON.stringify(topology, null, 2);
-                    topoArea.value = newJson;
-                    topoArea.dispatchEvent(new Event('input', { bubbles: true }));
-                  }
-                };
-
-                return wrapper;
-              };
-
-              sheetContent.appendChild(createCoordInput('X', 'x', step.x));
-              sheetContent.appendChild(createCoordInput('Y', 'y', step.y));
-            }
-
-            // 3. Trace Point Toggle (For any point)
-            const traceWrapper = document.createElement('div');
-            traceWrapper.className = 'dynamic-param-wrapper';
-            traceWrapper.style.marginBottom = '8px';
-            traceWrapper.style.padding = '4px 8px';
-            traceWrapper.style.background = '#fff'; // Distinct background?
-            traceWrapper.style.border = '1px solid #eee';
-            traceWrapper.style.borderRadius = '4px';
-
-            // Check if currently traced
-            const isTraced = topology.visualization &&
-              topology.visualization.trace &&
-              topology.visualization.trace.includes(selectedId);
-
-            traceWrapper.innerHTML = `
-                <div style="display:flex; align-items:center; gap:8px;">
-                     <input type="checkbox" id="chkTrace" ${isTraced ? 'checked' : ''} style="width:18px; height:18px;">
-                     <label for="chkTrace" style="font-weight:bold; color:#2c3e50; cursor:pointer;">開啟軌跡追蹤 (Trace)</label>
-                </div>
-            `;
-
-            const chk = traceWrapper.querySelector('input');
-            chk.onchange = (e) => {
-              if (!topology.visualization) topology.visualization = {};
-              if (!topology.visualization.trace) topology.visualization.trace = [];
-
-              if (e.target.checked) {
-                if (!topology.visualization.trace.includes(selectedId)) {
-                  topology.visualization.trace.push(selectedId);
-                }
-              } else {
-                topology.visualization.trace = topology.visualization.trace.filter(id => id !== selectedId);
-              }
-
-              const newJson = JSON.stringify(topology, null, 2);
-              topoArea.value = newJson;
-              topoArea.dispatchEvent(new Event('input', { bubbles: true }));
-            };
-
-            sheetContent.appendChild(traceWrapper);
-
-            // 4. Motor/Input Toggle (Drive Point)
-            const motorWrapper = document.createElement('div');
-            motorWrapper.className = 'dynamic-param-wrapper';
-            motorWrapper.style.marginTop = '8px';
-            motorWrapper.style.padding = '4px 8px';
-            motorWrapper.style.background = '#fff8e1'; // Highlight motor
-            motorWrapper.style.border = '1px solid #ffe0b2';
-            motorWrapper.style.borderRadius = '4px';
-
-            const isCenterPoint = step.type === 'ground';
-            const centers = [];
-            const driveTargets = [];
-            const centerIds = new Set();
-            const targetIds = new Set();
-            const linkMap = new Map(); // key: otherId, value: [{ id, lenParam }]
-            const wizardData = topology._wizard_data || [];
-
-            const addConnection = (otherId, otherType, lenParam, linkId) => {
-              if (!otherId) return;
-              if (!targetIds.has(otherId)) {
-                driveTargets.push({ id: otherId, type: otherType || 'joint' });
-                targetIds.add(otherId);
-              }
-              if (otherType === 'fixed' && !centerIds.has(otherId)) {
-                centers.push({ id: otherId });
-                centerIds.add(otherId);
-              }
-              if (!linkMap.has(otherId)) linkMap.set(otherId, []);
-              if (linkId || lenParam) {
-                linkMap.get(otherId).push({ id: linkId || otherId, lenParam });
-              }
-            };
-
-            wizardData.forEach(w => {
-              if (w.type !== 'bar') return;
-              const a = w.p1;
-              const b = w.p2;
-              if (!a || !b) return;
-              const isASelected = a.id === selectedId;
-              const isBSelected = b.id === selectedId;
-              if (!isASelected && !isBSelected) return;
-              const other = isASelected ? b : a;
-              addConnection(other.id, other.type, w.lenParam, w.id);
+            // 3. 更新鄰居點的屬性為 input_crank
+            topology.steps = (topology.steps || []).filter(s => s.id !== gearId);
+            topology.steps.push({
+              id: gearId,
+              type: 'input_crank',
+              center: selectedId,
+              len_param: link.lenParam
             });
 
-            if (wizardData.length === 0 && topology.visualization && topology.visualization.links) {
-              topology.visualization.links.forEach(link => {
-                if (link.p1 !== selectedId && link.p2 !== selectedId) return;
-                const otherId = link.p1 === selectedId ? link.p2 : link.p1;
-                const otherStep = topology.steps ? topology.steps.find(s => s.id === otherId) : null;
-                const otherType = otherStep ? (otherStep.type === 'ground' ? 'fixed' : 'joint') : 'joint';
-                addConnection(otherId, otherType, null, null);
-              });
-            }
-
-            const drivenStep = isCenterPoint && topology.steps
-              ? topology.steps.find(s => s.type === 'input_crank' && s.center === selectedId)
-              : null;
-            const isInputCrank = isCenterPoint ? Boolean(drivenStep) : (step.type === 'input_crank');
-
-            const targetLabel = isCenterPoint ? '\u9a45\u52d5\u7aef' : '\u4e2d\u5fc3';
-            const targetOptions = isCenterPoint ? driveTargets : centers;
-            const placeholder = isCenterPoint ? '(\u9700\u8981\u9023\u63a5\u7684\u7bc0\u9ede)' : '(\u9700\u8981\u56fa\u5b9a\u9ede)';
-
-            motorWrapper.innerHTML = `
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-                     <input type="checkbox" id="chkMotor" ${isInputCrank ? 'checked' : ''} style="width:18px; height:18px;">
-                     <label for="chkMotor" style="font-weight:bold; color:#d35400; cursor:pointer;">\u8a2d\u70ba\u9a45\u52d5\u99ac\u9054 (Input)</label>
-                </div>
-                <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
-                     <label style="width:60px; font-weight:bold; color:#2c3e50;">${targetLabel}</label>
-                     <select id="motorCenterSelect" style="flex:1; padding:4px; border:1px solid #ddd; border-radius:3px;">
-                         ${targetOptions.length ? targetOptions.map(c => `<option value="${c.id}" ${(drivenStep && drivenStep.id === c.id) || (step.center === c.id) ? 'selected' : ''}>${c.id}</option>`).join('') : `<option value="">${placeholder}</option>`}
-                     </select>
-                </div>
-                <div style="display:flex; align-items:center; gap:6px;">
-                     <label style="width:60px; font-weight:bold; color:#2c3e50;">\u9a45\u52d5\u687f\u4ef6</label>
-                     <select id="motorLinkSelect" style="flex:1; padding:4px; border:1px solid #ddd; border-radius:3px;"></select>
-                </div>
-            `;
-
-            const motorChk = motorWrapper.querySelector('#chkMotor');
-            const targetSelect = motorWrapper.querySelector('#motorCenterSelect');
-            const linkSelect = motorWrapper.querySelector('#motorLinkSelect');
-            if (targetSelect && targetOptions.length === 0) {
-              targetSelect.disabled = true;
-            }
-
-            const updateLinkOptions = () => {
-              if (!linkSelect) return;
-              const targetId = targetSelect ? targetSelect.value : '';
-              const links = linkMap.get(targetId) || [];
-              linkSelect.innerHTML = '';
-              if (!targetId || links.length === 0) {
-                const opt = document.createElement('option');
-                opt.value = '';
-                opt.textContent = '(\u9700\u8981\u5c0d\u61c9\u7684\u687f\u4ef6)';
-                linkSelect.appendChild(opt);
-                linkSelect.disabled = true;
-                return;
-              }
-              links.forEach((l) => {
-                const opt = document.createElement('option');
-                opt.value = l.id || '';
-                opt.textContent = l.id || targetId;
-                if (drivenStep && drivenStep.len_param && l.lenParam === drivenStep.len_param) {
-                  opt.selected = true;
-                }
-                if (step.len_param && l.lenParam === step.len_param) {
-                  opt.selected = true;
-                }
-                linkSelect.appendChild(opt);
-              });
-                          };
-
-            updateLinkOptions();
-
-            const ensureInputStepOrder = (targetStep) => {
-              if (!topology.steps || topology.steps.includes(targetStep)) return;
-              let insertAt = topology.steps.findIndex(s => s.type === 'dyad');
-              if (insertAt === -1) insertAt = topology.steps.length;
-              topology.steps.splice(insertAt, 0, targetStep);
-            };
-
-            const getSelectedLinkParam = () => {
-              const targetId = targetSelect ? targetSelect.value : '';
-              const links = linkMap.get(targetId) || [];
-              if (!links.length) return null;
-              const selectedId = linkSelect ? linkSelect.value : '';
-              const link = links.find(l => l.id === selectedId) || links[0];
-              return link.lenParam || null;
-            };
-
-            const applyMotor = () => {
-              const targetId = targetSelect ? targetSelect.value : '';
-              if (!targetId) {
-                motorChk.checked = false;
-                alert(isCenterPoint
-                  ? '\u7121\u6cd5\u8a2d\u5b9a\u9a45\u52d5\uff1a\u8acb\u5148\u9078\u64c7\u9023\u63a5\u7684\u7bc0\u9ede\u4f5c\u70ba\u9a45\u52d5\u7aef\u3002'
-                  : '\u7121\u6cd5\u8a2d\u5b9a\u9a45\u52d5\uff1a\u8acb\u5148\u9078\u64c7\u56fa\u5b9a\u9ede\u4f5c\u70ba\u4e2d\u5fc3\u3002');
-                return;
-              }
-              const lenParam = getSelectedLinkParam();
-              if (!lenParam) {
-                alert('\u8acb\u9078\u64c7\u4e00\u652f\u9a45\u52d5\u687f\u4ef6\u4f5c\u70ba\u534a\u5f91\u3002');
-                motorChk.checked = false;
-                return;
-              }
-
-              if (isCenterPoint) {
-                let targetStep = topology.steps ? topology.steps.find(s => s.id === targetId) : null;
-                if (!targetStep) {
-                  targetStep = { id: targetId, type: 'joint' };
-                  ensureInputStepOrder(targetStep);
-                }
-                if (targetStep.type === 'ground') {
-                  if (!confirm('\u5c07\u56fa\u5b9a\u9ede\u6539\u70ba\u9a45\u52d5\u9ede\uff0c\u4f4d\u7f6e\u5c07\u7531\u9a45\u52d5\u53c3\u6578\u8a08\u7b97\u3002\n\n\u78ba\u5b9a\u7e7c\u7e8c\uff1f')) {
-                    motorChk.checked = false;
-                    return;
-                  }
-                }
-                targetStep.type = 'input_crank';
-                targetStep.center = selectedId;
-                targetStep.len_param = lenParam;
-                delete targetStep.x;
-                delete targetStep.y;
-                delete targetStep.phase_offset;
-              } else {
-                step.type = 'input_crank';
-                step.center = targetId;
-                step.len_param = lenParam;
-                delete step.x;
-                delete step.y;
-                delete step.phase_offset;
-              }
-            };
-
-            const clearMotor = () => {
-              const targetId = targetSelect ? targetSelect.value : '';
-              if (isCenterPoint) {
-                const targetStep = topology.steps ? topology.steps.find(s => s.id === targetId) : null;
-                if (targetStep && targetStep.type === 'input_crank' && targetStep.center === selectedId) {
-                  targetStep.type = 'joint';
-                  delete targetStep.center;
-                  delete targetStep.len_param;
-                  delete targetStep.phase_offset;
-                }
-              } else {
-                step.type = 'joint';
-                delete step.center;
-                delete step.len_param;
-                delete step.phase_offset;
-              }
-            };
-
-            motorChk.onchange = (e) => {
-              if (e.target.checked) {
-                applyMotor();
-              } else {
-                clearMotor();
-              }
-
-              if (!topology.params) topology.params = {};
-              if (topology.params.theta === undefined) topology.params.theta = 0;
-
-              const thetaContainer = document.getElementById('thetaSliderContainer');
-              if (thetaContainer) thetaContainer.style.display = hasInputCrank(topology) ? 'block' : 'none';
-
-              const newJson = JSON.stringify(topology, null, 2);
-              topoArea.value = newJson;
-              topoArea.dispatchEvent(new Event('input', { bubbles: true }));
-              setTimeout(() => openPropertySheet(items, title, selectedId), 100);
-            };
-
-            if (targetSelect) {
-              targetSelect.onchange = () => {
-                updateLinkOptions();
-                if (motorChk.checked) {
-                  applyMotor();
-                  const newJson = JSON.stringify(topology, null, 2);
-                  topoArea.value = newJson;
-                  topoArea.dispatchEvent(new Event('input', { bubbles: true }));
-                  setTimeout(() => openPropertySheet(items, title, selectedId), 100);
-                }
-              };
-            }
-
-            if (linkSelect) {
-              linkSelect.onchange = () => {
-                if (motorChk.checked) {
-                  applyMotor();
-                  const newJson = JSON.stringify(topology, null, 2);
-                  topoArea.value = newJson;
-                  topoArea.dispatchEvent(new Event('input', { bubbles: true }));
-                  setTimeout(() => openPropertySheet(items, title, selectedId), 100);
-                }
-              };
-            }
-
-            sheetContent.appendChild(motorWrapper);
+            alert(`已將 ${selectedId} 設為馬達輸出軸 (固定)，${gearId} 將繞其旋轉。`);
+            saveAndRefresh();
+          } else {
+            alert('馬達點必須連接至少一根連桿！');
           }
-        }
-      } catch (e) { console.error(e); }
-    }
+        };
 
-    if (!found) {
-      if (emptyMsg) {
-        emptyMsg.textContent = `節點 ${selectedId} 無可編輯屬性`;
-        emptyMsg.style.display = 'block';
-      }
+        sheetContent.appendChild(behaviorWrapper);
+        if (currentType === 'ground') {
+          const coordGroup = document.createElement('div');
+          coordGroup.style.display = 'flex'; coordGroup.style.gap = '8px'; coordGroup.style.marginTop = '8px';
+          ['x', 'y'].forEach(axis => {
+            const wrapper = document.createElement('div');
+            wrapper.style.flex = '1'; wrapper.style.padding = '6px';
+            wrapper.style.background = '#fff'; wrapper.style.border = '1px solid #ddd'; wrapper.style.borderRadius = '6px';
+            wrapper.innerHTML = `<div style="display:flex; align-items:center; gap:6px;"><span style="font-weight:bold; color:#747d8c;">${axis.toUpperCase()}</span><input type="number" value="${Math.round(step[axis])}" style="width:100%; border:0; outline:none; font-family:monospace; font-size:14px;" /></div>`;
+            wrapper.querySelector('input').onchange = (e) => {
+              step[axis] = parseFloat(e.target.value) || 0;
+              topoArea.value = JSON.stringify(topology, null, 2);
+              topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+            };
+            coordGroup.appendChild(wrapper);
+          });
+          sheetContent.appendChild(coordGroup);
+        }
+
+        const featureBox = document.createElement('div');
+        featureBox.style.marginTop = '12px'; featureBox.style.padding = '8px'; featureBox.style.background = '#fff'; featureBox.style.border = '1px solid #eee'; featureBox.style.borderRadius = '8px';
+        const isTraced = topology.visualization?.trace?.includes(selectedId);
+        const traceDiv = document.createElement('div');
+        traceDiv.innerHTML = `<label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-weight:bold; padding:4px 0;"><input type="checkbox" ${isTraced ? 'checked' : ''} style="width:20px; height:20px;"> 追蹤路徑 (Trace)</label>`;
+        traceDiv.querySelector('input').onchange = (e) => {
+          if (!topology.visualization) topology.visualization = {};
+          if (!topology.visualization.trace) topology.visualization.trace = [];
+          if (e.target.checked) { if (!topology.visualization.trace.includes(selectedId)) topology.visualization.trace.push(selectedId); }
+          else { topology.visualization.trace = topology.visualization.trace.filter(id => id !== selectedId); }
+          topoArea.value = JSON.stringify(topology, null, 2);
+          topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        featureBox.appendChild(traceDiv);
+        sheetContent.appendChild(featureBox);
+
+      } catch (e) { console.error('Sheet populate error:', e); }
     }
   } else {
     if (emptyMsg) {

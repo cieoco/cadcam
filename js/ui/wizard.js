@@ -310,8 +310,14 @@ export class MechanismWizard {
 
         // 設定 P1
         if (p1Data.isNew) {
-            // 空白處 -> Fixed Ground
-            newComp.p1 = { id: `O${this.components.length * 2 + 1}`, type: 'fixed', x: Math.round(p1Data.x), y: Math.round(p1Data.y) };
+            // 第一根桿件的第一個點預設為固定，之後的新點預設為浮動
+            const isFirst = this.components.length === 0;
+            newComp.p1 = {
+                id: `P${this.components.length * 2 + 1}`,
+                type: isFirst ? 'fixed' : 'floating',
+                x: Math.round(p1Data.x),
+                y: Math.round(p1Data.y)
+            };
         } else {
             // 現有點 -> Existing
             newComp.p1 = { id: p1Data.id, type: 'existing', x: Math.round(Number(p1Data.x) || 0), y: Math.round(Number(p1Data.y) || 0) };
@@ -319,24 +325,24 @@ export class MechanismWizard {
 
         // 設定 P2
         if (p2Data.isNew) {
-            // 空白處 -> Fixed Ground
-            // 如果 P1 也是 Ground，這就是一根固定的棒子(沒有意義但合法)
-            // 如果 P1 是 Existing，P2 是 Ground，這是一根接地桿
-            newComp.p2 = { id: `O${this.components.length * 2 + 2}`, type: 'fixed', x: Math.round(p2Data.x), y: Math.round(p2Data.y) };
-            newComp.color = '#7f8c8d'; // Ground Link color
+            // 新點預設為浮動關節 (Lego 邏輯)
+            newComp.p2 = {
+                id: `P${this.components.length * 2 + 2}`,
+                type: 'floating',
+                x: Math.round(p2Data.x),
+                y: Math.round(p2Data.y)
+            };
+            newComp.color = '#3498db';
         } else {
             // P2 是現有點 -> Existing
             newComp.p2 = { id: p2Data.id, type: 'existing', x: Math.round(Number(p2Data.x) || 0), y: Math.round(Number(p2Data.y) || 0) };
         }
 
-        // 自動判斷是否為 Input (如果是第一個建立的 Ground -> Existing)
-        // 或是簡單規則：若連接 Ground 和 Floating/New，或許是 Input?
-        // 這裡先保持預設為 False，讓使用者自己勾選 "馬達驅動"
-        // 但如果只有單邊接 Ground，通常可以當 Input
-        if ((newComp.p1.type === 'fixed' && newComp.p2.type !== 'fixed') ||
-            (newComp.p1.type !== 'fixed' && newComp.p2.type === 'fixed')) {
-            // 可能是 Input，標記一下顏色，但不強制設為 True (避免破壞邏輯)
-            newComp.color = '#e74c3c';
+        // 自動判斷顏色
+        if (newComp.p1.type === 'existing' && newComp.p2.type === 'existing') {
+            newComp.color = '#9b59b6'; // 連結兩個現有點的桿件 (閉環)
+        } else if (newComp.p1.type === 'fixed' || newComp.p2.type === 'fixed') {
+            newComp.color = '#e74c3c'; // 接地桿件 (潛在馬達桿)
         }
 
         this.components.push(newComp);
@@ -413,23 +419,34 @@ export class MechanismWizard {
 
     getSolvedPointIds() {
         const solved = new Set();
+        const allPoints = new Map(); // id -> type ('fixed' | 'floating' | 'existing')
 
-        // 1. Collect all Fixed points
+        // 1. 彙整所有點位的類型資訊
         this.components.forEach(c => {
             ['p1', 'p2', 'p3'].forEach(k => {
-                if (c[k] && c[k].type === 'fixed' && c[k].id) {
-                    solved.add(c[k].id);
+                const pt = c[k];
+                if (pt && pt.id) {
+                    const currentType = allPoints.get(pt.id);
+                    // 優先級：fixed > floating > existing
+                    if (pt.type === 'fixed') allPoints.set(pt.id, 'fixed');
+                    else if (pt.type === 'floating' && currentType !== 'fixed') allPoints.set(pt.id, 'floating');
+                    else if (!allPoints.has(pt.id)) allPoints.set(pt.id, 'existing');
                 }
             });
         });
 
-        // 2. Iteratively solve for Crank, Triangle, and Auto points
+        // 2. 初始已解點為所有 fixed 點
+        allPoints.forEach((type, id) => {
+            if (type === 'fixed') solved.add(id);
+        });
+
+        // 3. 迭代求解其餘點位
         let changed = true;
         while (changed) {
             changed = false;
 
-            // Build a map of point connections for auto-dyad detection
-            const pointConnections = new Map(); // pointId -> Set of solved neighbor pointIds
+            // 建立連桿連接地圖
+            const pointConnections = new Map();
             this.components.forEach(c => {
                 if (c.type === 'bar' && !c.isInput) {
                     const id1 = c.p1?.id;
@@ -449,13 +466,11 @@ export class MechanismWizard {
 
             this.components.forEach(c => {
                 if (c.type === 'bar' && c.isInput) {
-                    // Crank: if p1 is solved, p2 is solved
                     if (c.p1?.id && c.p2?.id && solved.has(c.p1.id) && !solved.has(c.p2.id)) {
                         solved.add(c.p2.id);
                         changed = true;
                     }
                 } else if (c.type === 'triangle') {
-                    // Triangle: if p1 and p2 are solved, p3 is solved
                     if (c.p1?.id && c.p2?.id && c.p3?.id &&
                         solved.has(c.p1.id) && solved.has(c.p2.id) && !solved.has(c.p3.id)) {
                         solved.add(c.p3.id);
@@ -464,7 +479,7 @@ export class MechanismWizard {
                 }
             });
 
-            // Auto Detection: if a floating point is connected to TWO solved points
+            // 自動偵測 (Dyad): 若一個非固定點連接到兩個已解點
             pointConnections.forEach((neighbors, pointId) => {
                 if (!solved.has(pointId) && neighbors.size >= 2) {
                     solved.add(pointId);
@@ -525,107 +540,61 @@ export class MechanismWizard {
             }
         });
 
-        // 2. Collect all Fixed points as Grounds
+        // 2. 彙整所有點位的類型資訊，並判斷 Ground Points
+        const allPointsMap = new Map(); // id -> { type, x, y, component, role }
+
         this.components.forEach(c => {
             ['p1', 'p2', 'p3'].forEach(k => {
-                if (c[k] && c[k].type === 'fixed' && c[k].id) {
-                    if (!groundPoints.has(c[k].id)) {
-                        groundPoints.set(c[k].id, {
-                            x: c[k].x || 0,
-                            y: c[k].y || 0,
-                            component: c,
-                            role: k  // 記錄是 p1 還是 p2
-                        });
-                    }
+                const pt = c[k];
+                if (!pt || !pt.id) return;
+
+                const existing = allPointsMap.get(pt.id);
+                // 優先級：fixed > floating > existing
+                if (!existing || pt.type === 'fixed' || (pt.type === 'floating' && existing.type === 'existing')) {
+                    allPointsMap.set(pt.id, {
+                        type: pt.type,
+                        x: pt.x,
+                        y: pt.y,
+                        component: c,
+                        role: k
+                    });
                 }
             });
         });
 
-        // 3. 處理 ground points，智能判斷是否需要參數化
-        groundPoints.forEach((info, id) => {
-            const step = { id, type: 'ground' };
-            const pos = info;
-            const comp = info.component;
+        // 3. 處理 Ground Points (所有被判定為 fixed 的點，或孤立的 existing 點)
+        allPointsMap.forEach((info, id) => {
+            if (info.type === 'fixed') {
+                const step = { id, type: 'ground' };
+                const comp = info.component;
 
-            // 🎯 關鍵邏輯：如果這個點屬於一個有 lenParam 的 bar，且是 p2（第二個點）
-            // 則根據 p1 和 p2 的初始座標計算角度，並使用參數化座標
-            if (comp.type === 'bar' && comp.lenParam && info.role === 'p2' && comp.p1) {
-                const p1 = comp.p1;
-                const p2 = comp.p2;
+                // 🎯 關鍵邏輯：處理參數化連桿的第二個接地點 (p2)
+                if (comp.type === 'bar' && comp.lenParam && info.role === 'p2' && comp.p1) {
+                    const p1 = comp.p1;
+                    const p2 = comp.p2;
+                    const dx = parseFloat(p2.x) - parseFloat(p1.x);
+                    const dy = parseFloat(p2.y) - parseFloat(p1.y);
 
-                // 計算初始角度
-                const dx = parseFloat(p2.x) - parseFloat(p1.x);
-                const dy = parseFloat(p2.y) - parseFloat(p1.y);
-                const angle = Math.atan2(dy, dx);
-                const initialLength = Math.sqrt(dx * dx + dy * dy);
-
-                console.log(`[Wizard] Bar ${comp.id}: p1=(${p1.x},${p1.y}), p2=(${p2.x},${p2.y}), angle=${angle}, len=${initialLength}`);
-
-                // 使用極座標：x = p1.x + L * cos(angle), y = p1.y + L * sin(angle)
-                // 但我們需要更簡單的方式...
-
-                // 如果是水平桿（dy ≈ 0）
-                if (Math.abs(dy) < 0.01) {
-                    const p1X = parseFloat(p1.x);
-                    const p1Y = parseFloat(p1.y);
-
-                    if (dx > 0) {
-                        // 向右延伸
-                        step.x_param = comp.lenParam;
-                        step.x_offset = p1X;  // x = p1.x + lenParam
-                        step.y = p1Y;
+                    if (Math.abs(dy) < 0.01) {
+                        step.x_param = dx > 0 ? comp.lenParam : `-${comp.lenParam}`;
+                        step.x_offset = parseFloat(p1.x);
+                        step.y = parseFloat(p1.y);
+                    } else if (Math.abs(dx) < 0.01) {
+                        step.x = parseFloat(p1.x);
+                        step.y_param = dy > 0 ? comp.lenParam : `-${comp.lenParam}`;
+                        step.y_offset = parseFloat(p1.y);
                     } else {
-                        // 向左延伸
-                        step.x_param = `-${comp.lenParam}`;
-                        step.x_offset = p1X;
-                        step.y = p1Y;
+                        step.x = parseFloat(p2.x);
+                        step.y = parseFloat(p2.y);
                     }
-                }
-                // 如果是垂直桿（dx ≈ 0）
-                else if (Math.abs(dx) < 0.01) {
-                    const p1X = parseFloat(p1.x);
-                    const p1Y = parseFloat(p1.y);
-
-                    step.x = p1X;
-                    if (dy > 0) {
-                        // 向上延伸
-                        step.y_param = comp.lenParam;
-                        step.y_offset = p1Y;
-                    } else {
-                        // 向下延伸
-                        step.y_param = `-${comp.lenParam}`;
-                        step.y_offset = p1Y;
-                    }
-                }
-                // 斜向桿 - 使用參數化（但需要 solver 支援）
-                else {
-                    // 暫時：直接用參數當作 x，保持簡單
-                    const p1X = parseFloat(p1.x) || 0;
-                    step.x_param = comp.lenParam;
-                    step.x_offset = p1X;
-                    step.y = parseFloat(p2.y);
-                }
-            } else {
-                // 一般的固定點，直接用座標
-                if (typeof pos.x === 'number') {
-                    step.x = pos.x;
-                } else if (!isNaN(parseFloat(pos.x))) {
-                    step.x = parseFloat(pos.x);
                 } else {
-                    step.x_param = pos.x;
+                    step.x = parseFloat(info.x) || 0;
+                    step.y = parseFloat(info.y) || 0;
                 }
 
-                if (typeof pos.y === 'number') {
-                    step.y = pos.y;
-                } else if (!isNaN(parseFloat(pos.y))) {
-                    step.y = parseFloat(pos.y);
-                } else {
-                    step.y_param = pos.y;
-                }
+                steps.push(step);
+                joints.add(id);
             }
-
-            steps.push(step);
-            joints.add(id);
         });
 
         // 2. 處理輸入桿 (Input Crank)
@@ -665,24 +634,46 @@ export class MechanismWizard {
                 parts.push({ id: `Tri_Edge2(${c.r2Param})`, type: 'bar', len_param: c.r2Param, color: c.color });
             }
         });
-        // 5. 處理普通二孔桿 (Bar) -> 僅用於視覺化與零件生成
-        this.components.filter(c => c.type === 'bar' && !c.isInput).forEach(c => {
-            if (c.p1?.id && c.p2?.id && solvedPoints.has(c.p1.id) && solvedPoints.has(c.p2.id)) {
-                joints.add(c.p1.id);
-                joints.add(c.p2.id);
-                parts.push({ id: `Link(${c.lenParam})`, type: 'bar', len_param: c.lenParam, color: c.color });
+        // 5. 處理所有點位，確保未解點也能顯示 (為 LEGO 模式優化)
+        allPointsMap.forEach((info, id) => {
+            // 如果這個點還沒出現在 steps 裡 (不是 ground, input_crank, dyad)，就加一個 joint step
+            if (!steps.find(s => s.id === id)) {
+                steps.push({
+                    id,
+                    type: 'joint',
+                    x: Number(info.x) || 0,
+                    y: Number(info.y) || 0
+                });
+            }
+            joints.add(id);
+        });
+
+        // 6. 生成視覺化連桿 (Links) - 移除 solvedPoints 限制，讓繪圖即時顯示
+        const finalLinks = [];
+        this.components.forEach(c => {
+            if (c.type === 'bar' && c.p1?.id && c.p2?.id) {
+                finalLinks.push({
+                    id: c.id,
+                    p1: c.p1.id,
+                    p2: c.p2.id,
+                    style: c.isInput ? 'crank' : 'normal',
+                    color: c.color,
+                    lenParam: c.lenParam // 傳給 solver 自動推導使用
+                });
+            } else if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
+                finalLinks.push({ id: c.id, p1: c.p1.id, p2: c.p3.id, color: c.color });
+                finalLinks.push({ p1: c.p2.id, p2: c.p3.id, color: c.color });
+                finalLinks.push({ p1: c.p1.id, p2: c.p2.id, color: c.color, style: 'dashed' });
             }
         });
 
-        // 6. 生成視覺化連桿 (Links)
-        const finalLinks = [];
+        // 7. 生成零件表
         this.components.forEach(c => {
-            if (c.type === 'bar' && c.p1?.id && c.p2?.id && solvedPoints.has(c.p1.id) && solvedPoints.has(c.p2.id)) {
-                finalLinks.push({ id: c.id, p1: c.p1.id, p2: c.p2.id, style: c.isInput ? 'crank' : 'normal', color: c.color });
-            } else if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id && solvedPoints.has(c.p1.id) && solvedPoints.has(c.p2.id)) {
-                finalLinks.push({ id: c.id, p1: c.p1.id, p2: c.p3.id, color: c.color });
-                finalLinks.push({ p1: c.p2.id, p2: c.p3.id, color: c.color });
-                finalLinks.push({ p1: c.p1.id, p2: c.p2.id, color: c.color, style: 'dashed' }); // 底邊虛線
+            if (c.type === 'bar') {
+                parts.push({ id: `${c.id}(${c.lenParam})`, type: 'bar', len_param: c.lenParam, color: c.color });
+            } else if (c.type === 'triangle') {
+                parts.push({ id: `Tri_${c.id}_E1`, type: 'bar', len_param: c.r1Param, color: c.color });
+                parts.push({ id: `Tri_${c.id}_E2`, type: 'bar', len_param: c.r2Param, color: c.color });
             }
         });
 
@@ -694,11 +685,13 @@ export class MechanismWizard {
         // 🎯 自動生成 params 物件
         const params = {};
 
-        // ? components ???????????
-                const pointCoords = new Map();
+        // 從組件中收集點位座標，優先使用 fixed 點的座標
+        const pointCoords = new Map();
+
+        // 第一輪：收集所有明確定義座標的點 (fixed)
         this.components.forEach(c => {
             ['p1', 'p2', 'p3'].forEach(k => {
-                if (c[k] && c[k].id) {
+                if (c[k] && c[k].id && c[k].type === 'fixed') {
                     const x = Number(c[k].x);
                     const y = Number(c[k].y);
                     if (Number.isFinite(x) && Number.isFinite(y)) {
@@ -708,7 +701,20 @@ export class MechanismWizard {
             });
         });
 
-        // ? components ???????????
+        // 第二輪：收集其他點位（如 floating 或 existing 的初始座標）
+        this.components.forEach(c => {
+            ['p1', 'p2', 'p3'].forEach(k => {
+                if (c[k] && c[k].id && !pointCoords.has(c[k].id)) {
+                    const x = Number(c[k].x);
+                    const y = Number(c[k].y);
+                    if (Number.isFinite(x) && Number.isFinite(y)) {
+                        pointCoords.set(c[k].id, { x, y });
+                    }
+                }
+            });
+        });
+
+        // 根據座標計算連桿初始長度並填入 params
         this.components.forEach(c => {
             if (c.type === 'bar' && c.lenParam && c.p1 && c.p2) {
                 const p1 = pointCoords.get(c.p1.id);
@@ -722,9 +728,9 @@ export class MechanismWizard {
                     params[c.lenParam] = 100;
                 }
             } else if (c.type === 'triangle') {
-                // Triangle ??????????????????????????
-                if (c.r1Param) params[c.r1Param] = 100;
-                if (c.r2Param) params[c.r2Param] = 100;
+                // 三角桿邊長目前預設為 100，或可擴充為從點位計算
+                if (c.r1Param && params[c.r1Param] === undefined) params[c.r1Param] = 100;
+                if (c.r2Param && params[c.r2Param] === undefined) params[c.r2Param] = 100;
             }
         });
 

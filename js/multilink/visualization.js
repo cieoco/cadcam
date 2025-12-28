@@ -7,6 +7,7 @@ import { createDriveComponent } from '../motor-data.js';
 export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
     if (!sol || !sol.isValid) return;
 
+    if (!topology || !topology.visualization) return;
     const { links, polygons, joints } = topology.visualization;
     const pts = sol.points;
 
@@ -57,6 +58,7 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
             // Enhance with interactivity attributes
             attrs['data-link-p1'] = link.p1;
             attrs['data-link-p2'] = link.p2;
+            attrs['id'] = link.id;
             attrs['class'] = 'mechanism-link';
             attrs['style'] = (attrs['style'] || '') + '; cursor: crosshair; pointer-events: stroke;';
 
@@ -64,9 +66,6 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
 
             // Add click interaction
             lineEl.addEventListener('click', (e) => {
-                // Prevent bubbling if needed, but we want it to bubble to wrapper? 
-                // No, we dispatch a custom event that bubbles.
-
                 const rect = svg.getBoundingClientRect();
                 const vb = svg.viewBox && svg.viewBox.baseVal ? svg.viewBox.baseVal : null;
                 const vbW = vb && vb.width ? vb.width : rect.width;
@@ -77,18 +76,15 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
                 const clickX = (e.clientX - rect.left - offsetX) / scaleToViewBox;
                 const clickY = (e.clientY - rect.top - offsetY) / scaleToViewBox;
 
-                // Inverse transform to world coordinates
-                // We use (0,0) transforming to find origin offset
                 const originX = tx({ x: 0, y: 0 });
                 const originY = ty({ x: 0, y: 0 });
-
                 const worldX = (clickX - originX) / scale;
-                // ty = H/2 - y*scale => y = (H/2 - ty)/scale = (originY - clickY)/scale
                 const worldY = (originY - clickY) / scale;
 
                 const event = new CustomEvent('mechanism-link-click', {
                     bubbles: true,
                     detail: {
+                        id: link.id,
                         p1: link.p1,
                         p2: link.p2,
                         p1Val: pts[link.p1],
@@ -104,74 +100,75 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
         }
     }
 
-    // Add styles for the link hover effect
-    const styleEl = svgEl('style', {});
-    styleEl.textContent = `
-        .mechanism-link:hover {
-            stroke-opacity: 0.8;
-            stroke-width: 6px !important;
-            transition: stroke-width 0.1s;
-        }
-    `;
-    svg.appendChild(styleEl);
-
     // 3. Joints & Labels
     if (joints) {
         for (const jId of joints) {
             const p = pts[jId];
             if (p) {
+                // Find point type from steps
+                const step = (topology.steps || []).find(s => s.id === jId);
+                const type = step ? step.type : 'joint';
+
+                let fill = '#fff';
+                let stroke = '#2c3e50';
+                let radius = 4;
+                let strokeWidth = 1.5;
+
+                if (type === 'ground') {
+                    fill = '#2c3e50'; // Solid dark for ground
+                    radius = 5.5;
+                } else if (type === 'input_crank') {
+                    fill = '#e74c3c'; // Red for motor/crank
+                    stroke = '#c0392b';
+                    radius = 5.5;
+                } else if (jId && jId.startsWith('H')) {
+                    fill = '#f1c40f'; // Yellow for holes
+                }
+
                 // Joint Circle
                 svg.appendChild(svgEl('circle', {
                     cx: tx(p), cy: ty(p),
-                    r: 4,
-                    fill: '#fff',
-                    stroke: '#2c3e50',
-                    'stroke-width': 1.5
+                    r: radius,
+                    fill: fill,
+                    stroke: stroke,
+                    'stroke-width': strokeWidth,
+                    class: 'mechanism-joint'
                 }));
 
-                // Point ID Label
-                const text = svgEl('text', {
-                    x: tx(p) + 6,
-                    y: ty(p) - 6,
-                    fill: '#2c3e50',
-                    'font-size': '10px',
-                    'font-weight': 'bold',
-                    'font-family': 'monospace',
-                    'pointer-events': 'none'
-                });
-                text.textContent = jId;
-
-                // Add white halo for readability
-                text.style.textShadow = '1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff';
-                svg.appendChild(text);
-
-                // Added: Interaction Target (Large invisible circle)
+                // Interaction Target (Large invisible circle for easier clicking)
                 const hitTarget = svgEl('circle', {
                     cx: tx(p), cy: ty(p),
-                    r: 10,
+                    r: 12,
                     fill: 'transparent',
                     stroke: 'none',
                     style: 'cursor: pointer; pointer-events: all;'
                 });
                 hitTarget.setAttribute('data-joint-id', jId);
                 hitTarget.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Prevent canvas click
+                    e.stopPropagation();
                     const event = new CustomEvent('mechanism-joint-click', {
                         bubbles: true,
-                        detail: {
-                            id: jId,
-                            x: p.x,
-                            y: p.y
-                        }
+                        detail: { id: jId, x: p.x, y: p.y }
                     });
                     hitTarget.dispatchEvent(event);
                 });
-                // Add hover effect via JS or CSS class
-                hitTarget.addEventListener('mouseenter', () => {
-                    // Find the visible circle and highlight it?
-                    // Simplified: just change cursor
-                });
                 svg.appendChild(hitTarget);
+
+                // Point ID Label (Only for non-hole points)
+                if (!jId.startsWith('H')) {
+                    const text = svgEl('text', {
+                        x: tx(p) + 8,
+                        y: ty(p) - 8,
+                        fill: '#2c3e50',
+                        'font-size': '10px',
+                        'font-weight': 'bold',
+                        'font-family': 'monospace',
+                        'pointer-events': 'none'
+                    });
+                    text.textContent = jId;
+                    text.style.textShadow = '1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff';
+                    svg.appendChild(text);
+                }
             }
         }
     }
@@ -188,7 +185,7 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
 
                 const text = svgEl('text', {
                     x: midX,
-                    y: midY - 5,
+                    y: midY - 6,
                     fill: link.color || '#666',
                     'font-size': '9px',
                     'font-family': 'sans-serif',
@@ -205,7 +202,6 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
 
 /**
  * Generic Multilink Renderer Wrapper
- * 通用多連桿渲染包裝器 - 負責建立 SVG、格線與呼叫核心渲染引擎
  */
 export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams = {}) {
     let topology = { steps: [], visualization: { links: [], polygons: [], joints: [] } };
@@ -222,12 +218,7 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
     const viewRange = viewParams.viewRange || 800;
     const pad = 50;
 
-    // Scale setup
-    // Scale is based on the logic: viewRange fits into the smaller dimension of the screen
-    // This keeps the "Zoom Level" consistent regardless of aspect ratio
     const scale = Math.min(W - 2 * pad, H - 2 * pad) / viewRange;
-
-    // Center logic: (0,0) is at center of screen
     const tx = (p) => W / 2 + p.x * scale;
     const ty = (p) => H / 2 - p.y * scale;
 
@@ -239,18 +230,21 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
         style: "display:block; width:100%; height:100%;"
     });
 
+    // Styles
+    const styleEl = svgEl('style', {});
+    styleEl.textContent = `
+        .mechanism-link:hover { stroke-opacity: 0.8; stroke-width: 6px !important; transition: stroke-width 0.1s; }
+        .mechanism-joint:hover { stroke-width: 3px; }
+    `;
+    svg.appendChild(styleEl);
+
     // Background
     svg.appendChild(svgEl("rect", { width: W, height: H, fill: "#fafafa" }));
 
     // Grid
     if (viewParams.showGrid !== false) {
-        // We want the grid to cover the WHOLE area
-        // viewRange only specifies the "min visible size".
-        // Calculate effective range for grid spanning
-        // Max dimension / scale gives the model units needed to cover screen
         const maxDim = Math.max(W, H);
         const gridRange = maxDim / scale;
-
         drawGridCompatible(svg, W, H, gridRange * 1.2, 0, 0, tx, ty, viewParams.gridStep);
     }
 
@@ -268,12 +262,8 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
         if (!traceId) {
             const firstValid = trajectoryData.results.find(r => r.isValid && r.points);
             if (firstValid && firstValid.points) {
-                if (firstValid.points.B) traceId = 'B';
-                else if (firstValid.points.b) traceId = 'b';
-                else {
-                    const ids = Object.keys(firstValid.points);
-                    traceId = ids.length ? ids[ids.length - 1] : null;
-                }
+                const ids = Object.keys(firstValid.points);
+                traceId = ids.length ? ids[ids.length - 1] : null;
             }
         }
 
@@ -290,11 +280,11 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
         }
     }
 
-    // 2. Drive Component (only when input_crank exists)
+    // 2. Drive Component
     if (viewParams.motorType && topology.steps) {
         const crankStep = topology.steps.find(s => s.type === 'input_crank');
         if (crankStep) {
-            const O_id = crankStep.center || 'O';
+            const O_id = crankStep.center || 'O1';
             const O = sol.points[O_id] || { x: 0, y: 0 };
             const motorRotation = viewParams.motorRotation || 0;
             const motor = createDriveComponent(viewParams.motorType, tx(O), ty(O), scale, motorRotation);
@@ -302,7 +292,7 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
         }
     }
 
-    // 3. Render Topology using Generic Engine
+    // 3. Render Topology
     renderTopology(svg, topology, sol, viewParams, scale, tx, ty);
 
     return svg;
