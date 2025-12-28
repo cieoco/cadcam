@@ -1,0 +1,71 @@
+{
+  "steps": [],
+  "tracePoint": "P1",
+  "visualization": {
+    "links": [],
+    "polygons": [],
+    "joints": []
+  },
+  "parts": [],
+  "params": {
+    "theta": 90,
+    "R": 50,
+    "L": 100
+  },
+  "_wizard_data": [
+    {
+      "type": "bar",
+      "id": "Crank",
+      "color": "#e74c3c",
+      "p1": {
+        "id": "O",
+        "type": "fixed",
+        "x": 0,
+        "y": 0
+      },
+      "p2": {
+        "id": "P0",
+        "type": "floating",
+        "x": 0,
+        "y": 50
+      },
+      "lenParam": "R",
+      "isInput": true,
+      "phaseOffset": 90
+    },
+    {
+      "type": "bar",
+      "id": "Link1",
+      "color": "#3498db",
+      "p1": {
+        "id": "P0",
+        "type": "existing"
+      },
+      "p2": {
+        "id": "P1",
+        "type": "floating",
+        "x": 100,
+        "y": 50
+      },
+      "lenParam": "L",
+      "isInput": false
+    },
+    {
+      "type": "bar",
+      "id": "Link2",
+      "color": "#e74c3c",
+      "p1": {
+        "id": "F",
+        "type": "fixed",
+        "x": 100,
+        "y": 0
+      },
+      "p2": {
+        "id": "P1",
+        "type": "existing"
+      },
+      "lenParam": "R",
+      "isInput": false
+    }
+  ]
+}

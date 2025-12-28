@@ -6,7 +6,7 @@
 import { $ } from '../utils.js';
 import { updateDynamicParams } from './controls.js';
 import * as Templates from '../multilink/templates.js';
-import { JANSEN_TOPOLOGY } from '../jansen/topology.js';
+import { EXAMPLE_TEMPLATES } from '../examples/index.js';
 
 export class MechanismWizard {
     constructor(containerId, onUpdate) {
@@ -32,15 +32,16 @@ export class MechanismWizard {
     render() {
         if (!this.container) return;
 
+        const optionsHtml = EXAMPLE_TEMPLATES.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+
         this.container.innerHTML = `
             <div class="wizard-header" style="padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-radius: 8px 8px 0 0;">
                 <h4 style="margin: 0; font-size: 14px; color: #34495e; display: flex; align-items: center; gap: 5px;">
                     🛠️ 機構設計器 <button id="btnWizardReset" style="font-size: 10px; padding: 2px 6px; cursor: pointer; background: #fff; border: 1px solid #ddd; border-radius: 4px; color: #e74c3c;">🗑️ 重置</button>
                 </h4>
                 <select id="templateSelect" style="font-size: 11px; padding: 2px 4px; border-radius: 4px; border: 1px solid #ddd;">
-                    <option value="">-- 範本 --</option>
-                    <option value="jansen">Theo Jansen 仿生獸</option>
-                    <option value="square">四連桿 (平行)</option>
+                    <option value="">-- 載入範本 --</option>
+                    ${optionsHtml}
                 </select>
             </div>
             
@@ -697,14 +698,25 @@ export class MechanismWizard {
         };
     }
 
-    loadTemplate(name) {
-        let topo = null;
-        if (name === 'jansen') topo = JANSEN_TOPOLOGY;
-        if (topo) {
-            this.components = JSON.parse(JSON.stringify(topo._wizard_data || []));
-            this.topology = JSON.parse(JSON.stringify(topo));
-            this.render();
-            this.syncTopology();
+    async loadTemplate(id) {
+        const template = EXAMPLE_TEMPLATES.find(t => t.id === id);
+        if (!template) return;
+
+        try {
+            const resp = await fetch(template.file);
+            if (!resp.ok) throw new Error(`Failed to load template: ${resp.statusText}`);
+            const topo = await resp.json();
+
+            if (topo) {
+                // Deep copy to avoid reference issues
+                this.components = JSON.parse(JSON.stringify(topo._wizard_data || []));
+                this.topology = JSON.parse(JSON.stringify(topo));
+                this.render();
+                this.syncTopology();
+            }
+        } catch (e) {
+            console.error('Template Load Error:', e);
+            alert('無法載入範本，請檢查檔案是否存在。');
         }
     }
 }
