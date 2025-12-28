@@ -1,0 +1,96 @@
+{
+    "steps": [],
+    "tracePoint": "FingerTip",
+    "visualization": {
+        "links": [],
+        "polygons": [],
+        "joints": []
+    },
+    "parts": [],
+    "params": {
+        "theta": 45,
+        "L_Crank": 20,
+        "L_Coupler": 45,
+        "L_FingerBase": 30,
+        "L_FingerTip": 60,
+        "L_FingerSide": 70
+    },
+    "_wizard_data": [
+        {
+            "type": "bar",
+            "id": "Crank",
+            "color": "#e74c3c",
+            "p1": {
+                "id": "O",
+                "type": "fixed",
+                "x": 0,
+                "y": 0
+            },
+            "p2": {
+                "id": "P0",
+                "type": "floating",
+                "x": 14,
+                "y": 14
+            },
+            "lenParam": "L_Crank",
+            "isInput": true,
+            "phaseOffset": 45
+        },
+        {
+            "type": "bar",
+            "id": "Coupler",
+            "color": "#3498db",
+            "p1": {
+                "id": "P0",
+                "type": "existing"
+            },
+            "p2": {
+                "id": "P1",
+                "type": "floating",
+                "x": 50,
+                "y": 30
+            },
+            "lenParam": "L_Coupler",
+            "isInput": false
+        },
+        {
+            "type": "bar",
+            "id": "FingerMain",
+            "color": "#27ae60",
+            "p1": {
+                "id": "F",
+                "type": "fixed",
+                "x": 50,
+                "y": 0
+            },
+            "p2": {
+                "id": "P1",
+                "type": "existing"
+            },
+            "lenParam": "L_FingerBase",
+            "isInput": false
+        },
+        {
+            "type": "triangle",
+            "id": "FingerShape",
+            "color": "#27ae60",
+            "p1": {
+                "id": "F",
+                "type": "existing"
+            },
+            "p2": {
+                "id": "P1",
+                "type": "existing"
+            },
+            "p3": {
+                "id": "FingerTip",
+                "type": "floating",
+                "x": 90,
+                "y": 15
+            },
+            "r1Param": "L_FingerSide",
+            "r2Param": "L_FingerTip",
+            "sign": 1
+        }
+    ]
+}

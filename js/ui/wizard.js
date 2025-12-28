@@ -586,29 +586,6 @@ export class MechanismWizard {
             }
         });
 
-        // 3. Dyad 步驟 (Triangle) & Nested Holes
-        this.components.forEach(c => {
-            if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
-                steps.push({
-                    id: c.p3.id, type: 'dyad', p1: c.p1.id, p2: c.p2.id,
-                    r1_param: c.r1Param, r2_param: c.r2Param, sign: c.sign || 1
-                });
-                polygons.push({ points: [c.p1.id, c.p2.id, c.p3.id], color: c.color, alpha: 0.3 });
-                joints.add(c.p3.id);
-            }
-
-            // 🌟 處理桿件內部的孔位
-            if (c.type === 'bar' && c.holes) {
-                c.holes.forEach(h => {
-                    steps.push({
-                        id: h.id, type: 'point_on_link', p1: c.p1.id, p2: c.p2.id,
-                        dist_param: h.distParam
-                    });
-                    joints.add(h.id);
-                });
-            }
-        });
-
         // 🎯 智慧連桿自動解法 (Auto-Dyad Inference)
         // 針對那些只是普通 Bar 連接而成的關節點，自動產生 dyad 步
         const bars = this.components.filter(c => c.type === 'bar' && !c.isInput);
@@ -642,6 +619,29 @@ export class MechanismWizard {
                         joints.add(jId);
                     }
                 }
+            }
+        });
+
+        // 3. Dyad 步驟 (Triangle) & Nested Holes
+        this.components.forEach(c => {
+            if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
+                steps.push({
+                    id: c.p3.id, type: 'dyad', p1: c.p1.id, p2: c.p2.id,
+                    r1_param: c.r1Param, r2_param: c.r2Param, sign: c.sign || 1
+                });
+                polygons.push({ points: [c.p1.id, c.p2.id, c.p3.id], color: c.color, alpha: 0.3 });
+                joints.add(c.p3.id);
+            }
+
+            // 🌟 處理桿件內部的孔位
+            if (c.type === 'bar' && c.holes) {
+                c.holes.forEach(h => {
+                    steps.push({
+                        id: h.id, type: 'point_on_link', p1: c.p1.id, p2: c.p2.id,
+                        dist_param: h.distParam
+                    });
+                    joints.add(h.id);
+                });
             }
         });
 
