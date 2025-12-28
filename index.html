@@ -449,7 +449,7 @@
                 <div class="card">
                     <div class="hd">
                         <h2>首頁導引</h2>
-                        <div class="step"><span class="mono">v0.2</span> </div>
+                        <div class="step"><span class="mono">v3.1</span> </div>
                     </div>
                     <div class="bd">
                         <!-- Step 1 -->
@@ -682,6 +682,17 @@
                     cons: ["不是每個角度都可行（需可行區間）", "open/crossed 需鎖定解"],
                     cta: "進入四連桿工具",
                     href: "./mechanism.html?type=fourbar",
+                    enabled: true
+                });
+                recs.push({
+                    id: "multilink",
+                    name: "多連桿精靈 (Multilink Wizard)",
+                    badge: "自由度高 ★★★★★",
+                    why: "當標準四連桿無法滿足時（如夾爪、仿生腿、複雜軌跡），請使用此工具。",
+                    pros: ["互動式組裝", "內建夾爪/滑塊範本", "可設計任意連桿"],
+                    cons: ["設計難度較高", "需注意干涉"],
+                    cta: "進入多連桿設計",
+                    href: "./mechanism.html?type=multilink",
                     enabled: true
                 });
             } else if (state.motion === "linear") {
