@@ -256,7 +256,8 @@ export const MECHANISMS = {
                 options: getDriveOptions(),
                 default: 'tt_motor'
             },
-            {                id: 'motorRotation',
+            {
+                id: 'motorRotation',
                 label: '驅動元件旋轉角度',
                 type: 'number',
                 min: -180,
@@ -265,7 +266,8 @@ export const MECHANISMS = {
                 default: 0,
                 unit: '度'
             },
-            {                id: 'motorRotation',
+            {
+                id: 'motorRotation',
                 label: '驅動元件旋轉角度',
                 type: 'number',
                 min: -180,
@@ -447,7 +449,8 @@ export const MECHANISMS = {
                 options: getDriveOptions(),
                 default: 'tt_motor'
             },
-            {                id: 'motorRotation',
+            {
+                id: 'motorRotation',
                 label: '驅動元件旋轉角度',
                 type: 'number',
                 min: -180,
@@ -456,7 +459,8 @@ export const MECHANISMS = {
                 default: 0,
                 unit: '度'
             },
-            {                id: 'sweepStart',
+            {
+                id: 'sweepStart',
                 label: '起始角度',
                 type: 'number',
                 min: -720,
@@ -620,13 +624,7 @@ export const MECHANISMS = {
             { id: 'spacing', label: '排版間距', type: 'number', min: 2, max: 20, default: 5, unit: 'mm' }
         ],
 
-        simNotes: `
-            <strong>🦀 多連桿機構模擬 (Strandbeest Leg)</strong><br/>
-            可以自定義多連桿機構的拓撲結構（節點與連桿關係）。<br/>
-            拓撲結構格式請參考預設值。<br/>
-            軌跡點為腳底（P5）。
-        
-        `,
+        simNotes: ``,
 
         solverModule: './jansen/solver.js',
         solveFn: 'solveJansen',

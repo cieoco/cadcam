@@ -113,13 +113,6 @@
             <div id="log" class="card" style="padding:10px; background:#fafafa;"></div>
             <div class="btnrow" id="dlButtons"></div>
 
-            <div class="card" style="margin-top:16px;">
-                <h3>零件排版預覽</h3>
-                <div id="partsWrap"></div>
-                <div class="note" style="margin-top:8px;">
-                    零件排版在工作區（0..X, 0..Y），每根各自輸出一份 G-code。
-                </div>
-            </div>
         </div>
 
         <!-- Main Content (Sim + Right Panel) -->
@@ -145,70 +138,90 @@
                 <div style="display:flex; flex:1; overflow:hidden;">
 
                     <!-- Sim Area -->
-                    <div style="position: relative; flex: 1; overflow: hidden; background: #fff;">
-                        <div id="svgWrap"
-                            style="width: 100%; height: 100%; display: flex; justify-content: center; border: none;">
-                        </div>
+                    <div style="flex: 1; overflow: hidden; background: #fff; display: flex; flex-direction: column;">
+                        <div style="position: relative; flex: 1; overflow: hidden;">
+                            <div id="svgWrap"
+                                style="width: 100%; height: 100%; display: flex; justify-content: center; border: none;">
+                            </div>
 
-                        <!-- Overlay Controls -->
-                        <div id="thetaSliderContainer"
-                            style="position:absolute; top:10px; left:10px; padding:6px 10px; background:transparent; pointer-events: none; display: none;">
-                            <div style="display:flex; align-items:center; gap:8px; pointer-events: auto;">
-                                <label for="thetaSlider"
-                                    style="font-size:12px; color:#555; white-space:nowrap; font-weight:600;">θ</label>
-                                <input id="thetaSlider" type="range" min="-360" max="360" step="1" value="0"
-                                    style="width:200px;" />
-                                <span id="thetaSliderValue"
-                                    style="font-size:12px; color:#333; font-weight:600; min-width:40px; text-align:center;">0°</span>
-                            </div>
-                            <div
-                                style="display:flex; justify-content:space-between; margin-top:2px; padding-left:24px; width:200px;">
-                                <span id="thetaSliderMin" style="font-size:10px; color:#999;">-360°</span>
-                                <span id="thetaSliderMax" style="font-size:10px; color:#999;">360°</span>
-                            </div>
-                        </div>
-                        <div
-                            style="position:absolute; top:10px; right:10px; display:flex; align-items:center; gap:6px; padding:4px 8px; background:transparent; pointer-events: none;">
-                            <div style="pointer-events: auto;">
-                                <label for="viewRangeSlider"
-                                    style="font-size:12px; color:#555; white-space:nowrap;">Range</label>
-                                <input id="viewRangeSlider" type="range" min="100" max="1000" step="10" value="800"
-                                    style="width:160px;" />
-                                <span id="viewRangeSliderValue"
-                                    style="font-size:12px; color:#333; min-width:48px; text-align:right;">800</span>
-                            </div>
-                        </div>
-
-                        <!-- Animation Controls -->
-                        <div id="animControlPanel"
-                            style="position: absolute; bottom: 30px; right: 15px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); padding: 12px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.3); z-index: 100; display: flex; flex-direction: column; gap: 8px; min-width: 200px;">
-                            <div
-                                style="font-size: 12px; font-weight: bold; color: #666; margin-bottom: 2px; display: flex; align-items: center; gap: 4px;">
-                                <span>🎬</span> 動畫控制
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <div style="display: flex; gap: 6px;">
-                                    <button id="btnPlayAnim" class="btn-play"
-                                        style="width: 42px; height: 36px; border-radius: 8px; border: none; background: #2ecc71; color: white; font-weight: bold; cursor: pointer;">▶</button>
-                                    <button id="btnPauseAnim" class="btn-pause"
-                                        style="width: 42px; height: 36px; border-radius: 8px; border: none; background: #f1c40f; color: white; font-weight: bold; cursor: pointer;"
-                                        disabled>⏸</button>
-                                    <button id="btnStopAnim" class="btn-stop"
-                                        style="width: 42px; height: 36px; border-radius: 8px; border: none; background: #e74c3c; color: white; font-weight: bold; cursor: pointer;"
-                                        disabled>⏹</button>
+                            <!-- Overlay Controls -->
+                            <div id="thetaSliderContainer"
+                                style="position:absolute; top:10px; left:10px; padding:6px 10px; background:transparent; pointer-events: none; display: none;">
+                                <div style="display:flex; align-items:center; gap:8px; pointer-events: auto;">
+                                    <label for="thetaSlider"
+                                        style="font-size:12px; color:#555; white-space:nowrap; font-weight:600;">θ</label>
+                                    <input id="thetaSlider" type="range" min="-360" max="360" step="1" value="0"
+                                        style="width:200px;" />
+                                    <span id="thetaSliderValue"
+                                        style="font-size:12px; color:#333; font-weight:600; min-width:40px; text-align:center;">0°</span>
                                 </div>
                                 <div
-                                    style="display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.03); padding: 6px 8px; border-radius: 8px;">
-                                    <label style="font-size: 12px; color: #444; white-space: nowrap;">速度</label>
-                                    <input id="animSpeed" type="number" min="1" max="120" step="1" value="10"
-                                        style="width: 54px; border: none; background: transparent; font-weight: bold; color: #2c3e50; outline: none;" />
-                                    <span style="font-size: 11px; color: #666;">RPM</span>
+                                    style="display:flex; justify-content:space-between; margin-top:2px; padding-left:24px; width:200px;">
+                                    <span id="thetaSliderMin" style="font-size:10px; color:#999;">-360°</span>
+                                    <span id="thetaSliderMax" style="font-size:10px; color:#999;">360°</span>
+                                </div>
+                            </div>
+                            <div
+                                style="position:absolute; top:10px; right:10px; display:flex; align-items:center; gap:6px; padding:4px 8px; background:transparent; pointer-events: none;">
+                                <div style="pointer-events: auto;">
+                                    <label for="viewRangeSlider"
+                                        style="font-size:12px; color:#555; white-space:nowrap;">Range</label>
+                                    <input id="viewRangeSlider" type="range" min="100" max="1000" step="10" value="800"
+                                        style="width:160px;" />
+                                    <span id="viewRangeSliderValue"
+                                        style="font-size:12px; color:#333; min-width:48px; text-align:right;">800</span>
+                                </div>
+                            </div>
+
+                            <!-- Animation Controls -->
+                            <div id="animControlPanel"
+                                style="position: absolute; bottom: 30px; right: 15px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); padding: 12px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.3); z-index: 100; display: flex; flex-direction: column; gap: 8px; min-width: 200px;">
+                                <div
+                                    style="font-size: 12px; font-weight: bold; color: #666; margin-bottom: 2px; display: flex; align-items: center; gap: 4px;">
+                                    <span>🎬</span> 動畫控制
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="display: flex; gap: 6px;">
+                                        <button id="btnPlayAnim" class="btn-play"
+                                            style="width: 42px; height: 36px; border-radius: 8px; border: none; background: #2ecc71; color: white; font-weight: bold; cursor: pointer;">▶</button>
+                                        <button id="btnPauseAnim" class="btn-pause"
+                                            style="width: 42px; height: 36px; border-radius: 8px; border: none; background: #f1c40f; color: white; font-weight: bold; cursor: pointer;"
+                                            disabled>⏸</button>
+                                        <button id="btnStopAnim" class="btn-stop"
+                                            style="width: 42px; height: 36px; border-radius: 8px; border: none; background: #e74c3c; color: white; font-weight: bold; cursor: pointer;"
+                                            disabled>⏹</button>
+                                    </div>
+                                    <div
+                                        style="display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.03); padding: 6px 8px; border-radius: 8px;">
+                                        <label style="font-size: 12px; color: #444; white-space: nowrap;">速度</label>
+                                        <input id="animSpeed" type="number" min="1" max="120" step="1" value="10"
+                                            style="width: 54px; border: none; background: transparent; font-weight: bold; color: #2c3e50; outline: none;" />
+                                        <span style="font-size: 11px; color: #666;">RPM</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="note"
+                                style="position: absolute; bottom: 10px; width: 100%; text-align: center; pointer-events: none;"
+                                id="simNotes"></div>
+                        </div>
+
+                        <!-- Parts Preview Panel (Bottom) -->
+                        <div
+                            style="height: 300px; background: #fafafa; border-top: 1px solid #ddd; display: flex; flex-direction: column;">
+                            <h4
+                                style="margin:0; padding: 8px 12px; font-size: 14px; color: #555; background: #f1f2f6; border-bottom: 1px solid #eee;">
+                                🧩 零件排版預覽
+                            </h4>
+                            <div
+                                style="flex: 1; overflow: hidden; padding: 10px; position: relative; display: flex; justify-content: center; align-items: center;">
+                                <div id="partsWrap"
+                                    style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;">
+                                </div>
+                                <div class="note" style="margin-top:8px;">
+                                    零件排版在工作區（0..X, 0..Y），每根各自輸出一份 G-code。
                                 </div>
                             </div>
                         </div>
-                        <div class="note"
-                            style="position: absolute; bottom: 10px; width: 100%; text-align: center; pointer-events: none;"
-                            id="simNotes"></div>
                     </div>
 
                     <!-- Right Panel (Dynamic Params) -->

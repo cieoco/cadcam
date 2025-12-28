@@ -25,7 +25,11 @@ export function renderPartsLayout(parts, workX, workY) {
         return H - (pad + y * scale);
     }
 
-    const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+    const svg = svgEl("svg", {
+        width: "100%",
+        height: "100%",
+        viewBox: `0 0 ${W} ${H}`
+    });
 
     // 工作區邊框
     svg.appendChild(
