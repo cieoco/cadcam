@@ -417,18 +417,44 @@ export function updatePreview() {
         validateConfig(mech, partSpec, mfg);
 
         const solveFn = mods.solver[mods.config.solveFn];
-        const sol = solveFn(mech);
+        let sol = solveFn(mech);
 
         const svgWrap = $("svgWrap");
         const isInvalid = !sol || sol.isValid === false;
+
+        // 🌟 阻力模式 (Resistance Mode) 🌟
+        // 當使用者拖曳滑桿碰到死點時，強制回彈
         if (isInvalid) {
-            log(`${mods.config.name}: invalid parameters, adjust values.`);
-            if (!svgWrap.firstChild) {
-                svgWrap.textContent = "(invalid)";
-                $("partsWrap").innerHTML = "";
-                $("dlButtons").innerHTML = "";
+            if (lastMultilinkSolution && lastMultilinkSolution.isValid) {
+                // 1. 還原解 (凍結畫面)
+                // sol = lastMultilinkSolution; // 為了安全起見，我們不直接替換 sol 變數，而是下面直接用舊的 sol 畫圖
+
+                // 2. 還原滑桿數值 (產生阻力感)
+                const thetaInput = $("theta");
+                if (thetaInput && lastMultilinkSolution.inputTheta !== undefined) {
+                    thetaInput.value = lastMultilinkSolution.inputTheta;
+                    // 注意：這裡不觸發 event，避免無窮迴圈
+                }
+
+                // 繼續執行，用舊的有效解來繪圖
+                sol = lastMultilinkSolution;
+                log(`${mods.config.name}: limit reached, holding position.`);
+            } else {
+                // 如果連一個有效解都沒有 (剛載入就是壞的)，那就只好顯示錯誤
+                log(`${mods.config.name}: invalid parameters, adjust values.`);
+                if (!svgWrap.firstChild) {
+                    svgWrap.textContent = "(invalid)";
+                    $("partsWrap").innerHTML = "";
+                    $("dlButtons").innerHTML = "";
+                }
+                return;
             }
-            return;
+        } else {
+            // 如果是有效解，記住它，以此作為下一次的回退點
+            if (mods.config && mods.config.id === 'multilink') {
+                sol.inputTheta = mech.theta; // 記錄對應的輸入角度
+                lastMultilinkSolution = sol;
+            }
         }
 
         if (mods.config && mods.config.id === 'multilink') {
