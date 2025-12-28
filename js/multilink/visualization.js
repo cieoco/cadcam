@@ -219,13 +219,19 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
     const pad = 50;
 
     const scale = Math.max(0.01, Math.min(W - 2 * pad, H - 2 * pad) / viewRange);
+    // Pan Logic: We shift the ViewBox (Camera), not the objects (World)
+    // But wait, existing code used object shift. Let's switch to ViewBox shift for consistency with mouse drag.
+    // If Pan is +100 (Right), Camera moves Left (-100).
+    const panX = viewParams.panX || 0;
+    const panY = viewParams.panY || 0;
+
     const tx = (p) => W / 2 + p.x * scale;
     const ty = (p) => H / 2 - p.y * scale;
 
     const svg = svgEl("svg", {
         width: "100%",
         height: "100%",
-        viewBox: `0 0 ${W} ${H}`,
+        viewBox: `${-panX} ${-panY} ${W} ${H}`,
         preserveAspectRatio: "xMidYMid meet",
         style: "display:block; width:100%; height:100%;"
     });
@@ -239,13 +245,14 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
     svg.appendChild(styleEl);
 
     // Background
-    svg.appendChild(svgEl("rect", { width: W, height: H, fill: "#fafafa" }));
+    // Background (Make it huge to cover pan area)
+    svg.appendChild(svgEl("rect", { x: -50000, y: -50000, width: 100000, height: 100000, fill: "#fafafa" }));
 
     // Grid
     if (viewParams.showGrid !== false) {
-        const maxDim = Math.max(W, H);
-        const gridRange = maxDim / scale;
-        drawGridCompatible(svg, W, H, gridRange * 1.2, 0, 0, tx, ty, viewParams.gridStep);
+        // Grid Range: Make it huge to cover panning
+        const gridRange = 20000; // Covers +/- 10000 units
+        drawGridCompatible(svg, W, H, gridRange * 1.2, 0, 0, tx, ty, viewParams.gridStep, panX, panY);
     }
 
     if (!sol || !sol.isValid) {

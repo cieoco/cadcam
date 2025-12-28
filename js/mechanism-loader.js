@@ -227,7 +227,85 @@ if (document.readyState === 'loading') {
  */
 function setupLinkClickHandler() {
   const svgWrap = document.getElementById('svgWrap');
-  if (!svgWrap) return;
+  // 🌟 全域視圖偏移量 (Pan Offset)
+  if (!window.mechanismViewOffset) window.mechanismViewOffset = { x: 0, y: 0 };
+
+  // Pan State
+  let isPanning = false;
+  let panStart = { x: 0, y: 0 };
+  let initialPanOffset = { x: 0, y: 0 };
+  let lastMiddleClickTime = 0;
+  let lastMiddleClickX = 0;
+  let lastMiddleClickY = 0;
+
+  // 1. Middle Mouse Button Pan (Mousedown)
+  svgWrap.addEventListener('mousedown', (e) => {
+    if (e.button === 1) { // Middle Button
+      e.preventDefault();
+
+      // Double Click Detection (Reset View)
+      const now = Date.now();
+      const dist = Math.abs(e.clientX - lastMiddleClickX) + Math.abs(e.clientY - lastMiddleClickY);
+
+      if (now - lastMiddleClickTime < 300 && dist < 10) {
+        console.log('[View] Reset to Center');
+        window.mechanismViewOffset = { x: 0, y: 0 };
+        const btnUpdate = document.getElementById('btnUpdate');
+        if (btnUpdate) btnUpdate.click();
+        return;
+      }
+      lastMiddleClickTime = now;
+      lastMiddleClickX = e.clientX;
+      lastMiddleClickY = e.clientY;
+
+      // Start Pan
+      isPanning = true;
+      panStart = { x: e.clientX, y: e.clientY };
+      initialPanOffset = { ...window.mechanismViewOffset };
+      svgWrap.style.cursor = 'grabbing';
+    }
+  });
+
+  // 2. Mouse Move (Unified Handler for Pan)
+  window.addEventListener('mousemove', (e) => {
+    if (!isPanning) return;
+    e.preventDefault();
+
+    const dx = e.clientX - panStart.x;
+    const dy = e.clientY - panStart.y;
+
+    const currentPanX = initialPanOffset.x + dx;
+    const currentPanY = initialPanOffset.y + dy;
+
+    const svg = svgWrap.querySelector('svg');
+    if (svg && svg.viewBox && svg.viewBox.baseVal) {
+      const vb = svg.viewBox.baseVal;
+      // Shift ViewBox: Camera moves opposite to Pan
+      // ViewBox Origin = -(PanOffset)
+      if (typeof vb.width === 'number') {
+        svg.setAttribute('viewBox', `${-currentPanX} ${-currentPanY} ${vb.width} ${vb.height}`);
+      }
+    }
+  });
+
+  // 3. Mouse Up (Commit Pan)
+  window.addEventListener('mouseup', (e) => {
+    if (isPanning && e.button === 1) {
+      isPanning = false;
+      svgWrap.style.cursor = '';
+
+      const dx = e.clientX - panStart.x;
+      const dy = e.clientY - panStart.y;
+
+      // Commit to Global State
+      window.mechanismViewOffset.x = initialPanOffset.x + dx;
+      window.mechanismViewOffset.y = initialPanOffset.y + dy;
+
+      // ⛔️ No Re-render needed! The SVG viewBox is already in the correct state.
+      // Future re-renders (e.g., param change) will pick up window.mechanismViewOffset via renderMultilink.
+    }
+  });
+
 
   // --- State Machine for Drawing ---
   // State: IDLE, DRAWING_P1 (Waiting for P2), 
@@ -925,29 +1003,42 @@ function setupLinkClickHandler() {
   svgWrap.addEventListener('mousemove', svgWrap._moveHandler);
 
   // 5. Mouse Wheel Zoom Handler
+  // 5. Mouse Wheel Zoom Handler (Center-Invariant)
   svgWrap.addEventListener('wheel', (e) => {
     e.preventDefault();
     const viewRangeInput = document.getElementById('viewRange');
     if (!viewRangeInput) return;
 
-    let currentRange = parseFloat(viewRangeInput.value) || 800;
-    // Sensitivity: 1 tick = 100px? Or proportional?
-    // Let's use proportional for smoother zoom
+    let oldRange = parseFloat(viewRangeInput.value) || 800;
     const zoomFactor = 1.1;
+    let newRange = oldRange;
 
     if (e.deltaY < 0) {
       // Zoom In -> Decrease Range
-      currentRange /= zoomFactor;
+      newRange /= zoomFactor;
     } else {
       // Zoom Out -> Increase Range
-      currentRange *= zoomFactor;
+      newRange *= zoomFactor;
     }
 
     // Clamp values
-    currentRange = Math.max(50, Math.min(5000, currentRange));
+    newRange = Math.max(50, Math.min(5000, newRange));
+
+    // 🌟 Center-Invariant Zoom Logic 🌟
+    // Calculate Zoom Ratio (How much the world scaled up/down)
+    // Scale is inversely proportional to Range.
+    // If Range gets smaller (Zoom In), Scale gets bigger.
+    // Ratio = ScaleNew / ScaleOld = OldRange / NewRange
+    const ratio = oldRange / newRange;
+
+    // Adjust Pan Offset to keep the center stationary
+    if (window.mechanismViewOffset) {
+      window.mechanismViewOffset.x *= ratio;
+      window.mechanismViewOffset.y *= ratio;
+    }
 
     // Update Input
-    viewRangeInput.value = Math.round(currentRange);
+    viewRangeInput.value = Math.round(newRange);
 
     // Update Fixed Label
     updateFixedGridLabel();
@@ -956,16 +1047,15 @@ function setupLinkClickHandler() {
     const slider = document.getElementById('viewRangeSlider');
     const sliderVal = document.getElementById('viewRangeSliderValue');
     if (slider) {
-      // Ensure slider range covers this value?
       const max = parseFloat(slider.max);
-      if (currentRange > max) slider.max = currentRange;
-      slider.value = Math.round(currentRange);
-      if (sliderVal) sliderVal.textContent = Math.round(currentRange);
+      if (newRange > max) slider.max = newRange;
+      slider.value = Math.round(newRange);
+      if (sliderVal) sliderVal.textContent = Math.round(newRange);
     }
 
     // Trigger Update
     const btnUpdate = document.getElementById('btnUpdate');
-    if (btnUpdate) btnUpdate.click(); // Reuse existing update flow
+    if (btnUpdate) btnUpdate.click();
   }, { passive: false });
 }
 

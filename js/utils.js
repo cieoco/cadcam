@@ -195,7 +195,7 @@ export function calcAdaptiveGridStep(viewRange) {
   else return 10 * power;
 }
 
-export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridStep = 'auto') {
+export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridStep = 'auto', panX = 0, panY = 0) {
   let step = 50;
   if (gridStep === 'auto' || !gridStep) {
     // Calculate effective range for adaptive step
@@ -228,22 +228,18 @@ export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridSte
   } catch (e) { }
   if (!scale) scale = 1;
 
-  // Determine Visible Model Bounds
-  const screenOriginX = tx(0); // Screen X where Model X=0
-  const screenOriginY = ty(0); // Screen Y where Model Y=0 (assuming Y=0 is ground)
+  // Determine Visible Model Bounds (Extended for Pan)
+  const screenOriginX = tx(0);
+  const screenOriginY = ty(0);
 
-  // Inverse mapping:
-  // screenX = screenOriginX + modelX * scale
-  // => modelX = (screenX - screenOriginX) / scale
-  const minModelX = (0 - screenOriginX) / scale;
-  const maxModelX = (W - screenOriginX) / scale;
+  // Extend screen range virtually to cover large pans
+  const INF = 100000;
 
-  // screenY = screenOriginY - modelY * scale (Y-up convention)
-  // => modelY = (screenOriginY - screenY) / scale
-  // Screen Top (0) -> High Model Y
-  // Screen Bottom (H) -> Low Model Y
-  const modelYAtTop = (screenOriginY - 0) / scale;
-  const modelYAtBottom = (screenOriginY - H) / scale;
+  const minModelX = (-INF - screenOriginX) / scale;
+  const maxModelX = (INF - screenOriginX) / scale;
+
+  const modelYAtTop = (screenOriginY - (-INF)) / scale;
+  const modelYAtBottom = (screenOriginY - INF) / scale;
 
   const minModelY = Math.min(modelYAtTop, modelYAtBottom);
   const maxModelY = Math.max(modelYAtTop, modelYAtBottom);
@@ -251,6 +247,12 @@ export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridSte
   // Snap Start to Step
   const startX = Math.floor(minModelX / step) * step;
   const startY = Math.floor(minModelY / step) * step;
+
+  // Visible Viewport Bounds for Sticky Labels
+  const visTop = -panY;
+  const visBottom = -panY + H;
+  const visLeft = -panX;
+  const visRight = -panX + W;
 
   const gridColor = "#e0e0e0";
 
@@ -262,22 +264,23 @@ export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridSte
     // If the caller passes originX != 0, it means the grid is shifted.
     // In multlink/viz, originX is passed as 0. So x is absolute coordinate.
 
-    if (screenX < -1 || screenX > W + 1) continue;
 
     svg.appendChild(svgEl("line", {
-      x1: screenX, y1: 0, x2: screenX, y2: H,
+      x1: screenX, y1: -50000, x2: screenX, y2: 50000,
       stroke: gridColor, "stroke-width": Math.abs(x) < step / 10 ? 1.5 : 0.5
     }));
 
-    // Labels (Top/Bottom)
+    // Labels (Top/Bottom) with Sticky Logic
     if (Math.abs(x) > step / 10) {
-      const lblTop = svgEl("text", { x: screenX, y: 12, fill: "#999", "font-size": 9, "text-anchor": "middle" });
-      lblTop.textContent = Math.round(x);
-      svg.appendChild(lblTop);
+      if (screenX >= visLeft && screenX <= visRight) {
+        const lblTop = svgEl("text", { x: screenX, y: visTop + 12, fill: "#999", "font-size": 9, "text-anchor": "middle" });
+        lblTop.textContent = Math.round(x);
+        svg.appendChild(lblTop);
 
-      const lblBot = svgEl("text", { x: screenX, y: H - 6, fill: "#999", "font-size": 9, "text-anchor": "middle" });
-      lblBot.textContent = Math.round(x);
-      svg.appendChild(lblBot);
+        const lblBot = svgEl("text", { x: screenX, y: visBottom - 6, fill: "#999", "font-size": 9, "text-anchor": "middle" });
+        lblBot.textContent = Math.round(x);
+        svg.appendChild(lblBot);
+      }
     }
   }
 
@@ -285,22 +288,23 @@ export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridSte
   for (let y = startY; y <= maxModelY + step; y += step) {
     const screenY = ty(y + originY);
 
-    if (screenY < -1 || screenY > H + 1) continue;
 
     svg.appendChild(svgEl("line", {
-      x1: 0, y1: screenY, x2: W, y2: screenY,
+      x1: -50000, y1: screenY, x2: 50000, y2: screenY,
       stroke: gridColor, "stroke-width": Math.abs(y) < step / 10 ? 1.5 : 0.5
     }));
 
-    // Labels (Left/Right)
+    // Labels (Left/Right) with Sticky Logic
     if (Math.abs(y) > step / 10) {
-      const lblLeft = svgEl("text", { x: 6, y: screenY + 3, fill: "#999", "font-size": 9, "text-anchor": "start" });
-      lblLeft.textContent = Math.round(y);
-      svg.appendChild(lblLeft);
+      if (screenY >= visTop && screenY <= visBottom) {
+        const lblLeft = svgEl("text", { x: visLeft + 6, y: screenY + 3, fill: "#999", "font-size": 9, "text-anchor": "start" });
+        lblLeft.textContent = Math.round(y);
+        svg.appendChild(lblLeft);
 
-      const lblRight = svgEl("text", { x: W - 6, y: screenY + 3, fill: "#999", "font-size": 9, "text-anchor": "end" });
-      lblRight.textContent = Math.round(y);
-      svg.appendChild(lblRight);
+        const lblRight = svgEl("text", { x: visRight - 6, y: screenY + 3, fill: "#999", "font-size": 9, "text-anchor": "end" });
+        lblRight.textContent = Math.round(y);
+        svg.appendChild(lblRight);
+      }
     }
   }
 }

@@ -402,6 +402,10 @@ export function updatePreview() {
         viewParams.motorType = mech.motorType;
         viewParams.motorRotation = mech.motorRotation || 0;
         viewParams.topology = mech.topology;
+        if (window.mechanismViewOffset) {
+            viewParams.panX = window.mechanismViewOffset.x;
+            viewParams.panY = window.mechanismViewOffset.y;
+        }
 
         const sw = document.getElementById("svgWrap");
         if (sw) {
