@@ -220,15 +220,18 @@ export function updateDynamicParams() {
 
                 for (const k in obj) {
                     const val = obj[k];
-                    const isParamKey = k.endsWith('_param') || k === 'lenParam' || k === 'len_param';
+                    // 擴展掃描關鍵字，包含孔位的 r1Param, r2Param 以及新的 distParam
+                    const isParamKey = k.endsWith('_param') || k === 'lenParam' || k === 'len_param' || k === 'r1Param' || k === 'r2Param' || k === 'distParam' || k === 'dist_param';
                     if (isParamKey && typeof val === 'string') {
                         if (val && !vars.has(val)) {
+                            // 🌟 修正：優先使用 topology.params 裡面的實測數值，而非死板的 100
+                            const actualVal = (topology.params && topology.params[val] !== undefined) ? topology.params[val] : 100;
                             vars.set(val, {
                                 label: val,
                                 min: 0,
                                 max: 500,
                                 step: 0.5,
-                                default: 100
+                                default: actualVal
                             });
                         }
                     } else if (val && typeof val === 'object') {
@@ -237,6 +240,22 @@ export function updateDynamicParams() {
                 }
             };
             scan(topology);
+
+            // 3. 補強：掃描 params 物件中的所有鍵 (確保 Wizard 定義的 r1, r2 也能變成滑桿)
+            if (topology.params) {
+                Object.keys(topology.params).forEach(k => {
+                    if (k === 'theta' || k === 'thetaDeg') return;
+                    if (!vars.has(k)) {
+                        vars.set(k, {
+                            label: k,
+                            min: 0,
+                            max: 500,
+                            step: 1,
+                            default: topology.params[k] || 100
+                        });
+                    }
+                });
+            }
         } catch (e) {
             console.warn('[updateDynamicParams] Topology JSON parse failed', e);
         }

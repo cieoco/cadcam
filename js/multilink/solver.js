@@ -240,6 +240,25 @@ export function solveTopology(topologyOrParams, params) {
                 }
                 points[step.id] = chosen;
             }
+            else if (step.type === 'point_on_link') {
+                const p1 = points[step.p1];
+                const p2 = points[step.p2];
+                if (!p1 || !p2) continue;
+
+                const dist = getVal(step, 'dist');
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const L = Math.hypot(dx, dy);
+
+                if (L > 0) {
+                    points[step.id] = {
+                        x: p1.x + (dx / L) * dist,
+                        y: p1.y + (dy / L) * dist
+                    };
+                } else {
+                    points[step.id] = { ...p1 };
+                }
+            }
             else if (step.type === 'joint') {
                 // Static point (typically for visualization of unsolved parts)
                 if (points[step.id] === undefined) {

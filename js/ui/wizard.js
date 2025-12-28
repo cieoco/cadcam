@@ -16,22 +16,15 @@ export class MechanismWizard {
         // 組件化資料結構
         this.components = []; // { type: 'bar'|'triangle', id, ...props }
         this.selectedComponentIndex = -1;
+        this.topology = { steps: [], visualization: { links: [], polygons: [], joints: [] }, parts: [] };
 
-        // 最終生成的拓撲 (供 Solver 使用)
-        this.topology = {
-            steps: [],
-            tracePoint: '',
-            visualization: { links: [], polygons: [], joints: [] },
-            parts: []
-        };
+        this.init();
     }
 
     init(initialTopology) {
-        // 嘗試從拓撲中恢復組件資料 (如果存在)
         if (initialTopology && initialTopology._wizard_data) {
-            this.components = JSON.parse(JSON.stringify(initialTopology._wizard_data));
-        } else {
-            this.components = [];
+            this.components = initialTopology._wizard_data;
+            this.topology = initialTopology;
         }
         this.render();
     }
@@ -40,60 +33,49 @@ export class MechanismWizard {
         if (!this.container) return;
 
         this.container.innerHTML = `
-            <div class="wizard-card" style="border: 1px solid #e0e0e0; border-radius: 12px; background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden; display: flex; flex-direction: column; height: 600px; font-family: system-ui, -apple-system, sans-serif; margin-bottom: 15px;">
-                <!-- Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: #f8f9fa; border-bottom: 1px solid #eee;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <h4 style="margin: 0; color: #2c3e50; font-size: 14px; display: flex; align-items: center; gap: 5px;">
-                            <span style="font-size: 16px;">🛠️</span> 機構設計器
-                        </h4>
-                        <button id="btnWizardReset" style="background: #fff; border: 1px solid #ff7675; color: #ff7675; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;">🗑️ 重置</button>
-                    </div>
-                    <select id="templateSelect" style="font-size: 10px; padding: 1px 3px; border-radius: 4px; border: 1px solid #ccc; max-width: 150px;">
-                        <option value="">-- 範本 --</option>
-                        <option value="CRANK_ROCKER">曲柄搖桿</option>
-                        <option value="CHEBYSHEV">直線機構</option>
+            <div class="wizard-header" style="padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-radius: 8px 8px 0 0;">
+                <h4 style="margin: 0; font-size: 14px; color: #34495e; display: flex; align-items: center; gap: 5px;">
+                    🛠️ 機構設計器 <button id="btnWizardReset" style="font-size: 10px; padding: 2px 6px; cursor: pointer; background: #fff; border: 1px solid #ddd; border-radius: 4px; color: #e74c3c;">🗑️ 重置</button>
+                </h4>
+                <select id="templateSelect" style="font-size: 11px; padding: 2px 4px; border-radius: 4px; border: 1px solid #ddd;">
+                    <option value="">-- 範本 --</option>
+                    <option value="jansen">Theo Jansen 仿生獸</option>
+                    <option value="square">四連桿 (平行)</option>
+                </select>
+            </div>
+            
+            <div style="display: flex; gap: 10px; padding: 10px; background: #fff;">
+                <button id="btnAddBar" style="flex: 1; padding: 8px; background: #3498db; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                    📏 新增二孔桿
+                </button>
+                <button id="btnAddTriangle" style="flex: 1; padding: 8px; background: #27ae60; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                    📐 新增三角桿
+                </button>
+            </div>
+
+            <div class="wizard-content" style="display: grid; grid-template-columns: 120px 1fr; gap: 10px; height: 350px; overflow: hidden; padding: 0 10px 10px 10px;">
+                <!-- 左側：組件列表 -->
+                <div id="componentList" style="border: 1px solid #eee; border-radius: 8px; padding: 5px; overflow-y: auto; background: #fdfdfd;">
+                    ${this.renderComponentList()}
+                </div>
+
+                <!-- 右側：屬性編輯器 -->
+                <div id="propertyEditor" style="border: 1px solid #eee; border-radius: 8px; padding: 12px; overflow-y: auto; background: #fff; box-shadow: inset 0 0 5px rgba(0,0,0,0.02);">
+                    ${this.renderPropertyEditor()}
+                </div>
+            </div>
+
+            <div class="wizard-footer" style="padding: 10px; border-top: 1px solid #eee; display: flex; gap: 10px; align-items: center; background: #f8f9fa; border-radius: 0 0 8px 8px;">
+                <div style="flex: 1; font-size: 11px; color: #7f8c8d;">
+                    追蹤點: 
+                    <select id="tracePointSelect" style="font-size: 11px; padding: 2px; border-radius: 4px; border: 1px solid #ddd; max-width: 60px;">
+                        <option value="">--</option>
+                        ${this.getAllPointIds().map(id => `<option value="${id}" ${this.topology.tracePoint === id ? 'selected' : ''}>${id}</option>`).join('')}
                     </select>
                 </div>
-                
-                <!-- Add Buttons (Top of Right Panel) -->
-                <div style="padding: 10px; background: #fff; border-bottom: 1px solid #f0f0f0; display: flex; gap: 6px;">
-                    <button id="btnAddBar" style="flex: 1; background: #3498db; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 4px;">
-                        <span>📏</span> 新增二孔桿
-                    </button>
-                    <button id="btnAddTriangle" style="flex: 1; background: #27ae60; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 4px;">
-                        <span>📐</span> 新增三角桿
-                    </button>
-                </div>
-
-                <!-- Main Content (Two Columns) -->
-                <div style="display: flex; flex: 1; overflow: hidden;">
-                    <!-- Left: Component List -->
-                    <div style="width: 140px; border-right: 1px solid #eee; display: flex; flex-direction: column; background: #fcfcfc;">
-                        <div id="componentList" style="flex: 1; overflow-y: auto; padding: 5px;">
-                            ${this.renderComponentList()}
-                        </div>
-                    </div>
-
-                    <!-- Right: Property Editor -->
-                    <div id="propertyEditor" style="flex: 1; padding: 15px; overflow-y: auto; background: #fff;">
-                        ${this.renderPropertyEditor()}
-                    </div>
-                </div>
-
-                <!-- Footer -->
-                <div style="padding: 8px 15px; background: #f8f9fa; border-top: 1px solid #eee; display: flex; flex-direction: column; gap: 8px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div style="display: flex; align-items: center; gap: 5px;">
-                            <label style="font-size: 11px; color: #555;">追蹤點：</label>
-                            <select id="tracePointSelect" style="font-size: 11px; padding: 2px 5px; border-radius: 4px; border: 1px solid #ccc;">
-                                <option value="">-- 無 --</option>
-                                ${this.getAllPointIds().map(p => `<option value="${p}" ${this.topology.tracePoint === p ? 'selected' : ''}>${p}</option>`).join('')}
-                            </select>
-                        </div>
-                        <button id="btnWizardApply" class="btn-primary" style="padding: 5px 15px; font-size: 12px; font-weight: bold; border-radius: 4px;">🚀 套用更新</button>
-                    </div>
-                </div>
+                <button id="btnWizardApply" style="padding: 8px 20px; background: #2c3e50; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    更新 / 預覽
+                </button>
             </div>
         `;
 
@@ -110,7 +92,7 @@ export class MechanismWizard {
         return this.components.map((c, i) => {
             const isSelected = this.selectedComponentIndex === i;
             const isSolved = this.isComponentSolved(c, solvedPoints);
-            const icon = c.type === 'bar' ? '📏' : '📐';
+            const icon = c.type === 'bar' ? '📏' : (c.type === 'triangle' ? '📐' : '⚪');
             const color = c.color || '#333';
 
             return `
@@ -132,7 +114,7 @@ export class MechanismWizard {
                     <span style="flex: 1; font-weight: ${isSelected ? 'bold' : 'normal'}; color: ${isSelected ? '#2980b9' : '#34495e'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         ${c.id || (c.type + (i + 1))}
                     </span>
-                    ${!isSolved ? '<span title="此桿件目前無法求解（點位未定義或斷開）" style="color: #ff7675; font-size: 10px;">⚠️</span>' : ''}
+                    ${!isSolved ? '<span title="此桿件目前無法求解" style="color: #ff7675; font-size: 10px;">⚠️</span>' : ''}
                     <div style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; border: 1px solid rgba(0,0,0,0.1);"></div>
                 </div>
             `;
@@ -150,27 +132,29 @@ export class MechanismWizard {
             `;
         }
 
-        const icon = comp.type === 'bar' ? '📏' : '📐';
+        const icon = comp.type === 'bar' ? '📏' : (comp.type === 'triangle' ? '📐' : '⚪');
         const solvedPoints = this.getSolvedPointIds();
         const isSolved = this.isComponentSolved(comp, solvedPoints);
 
         let html = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #f8f9fa;">
                 <h5 style="margin: 0; font-size: 14px; color: #2c3e50; display: flex; align-items: center; gap: 5px;">
-                    ${icon} 編輯桿件 ${!isSolved ? '<span style="color: #ff7675; font-size: 12px;">(⚠️ 未求解)</span>' : ''}
+                    ${icon} 編輯 ${comp.type === 'hole' ? '孔位' : '桿件'} ${!isSolved ? '<span style="color: #ff7675; font-size: 12px;">(⚠️ 未求解)</span>' : ''}
                 </h5>
                 <button onclick="window.wizard.removeSelected()" style="background: #fff; border: 1px solid #ff7675; color: #ff7675; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;">刪除</button>
             </div>
             
             <div style="display: flex; flex-direction: column; gap: 12px;">
                 <div class="form-group">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">桿件名稱 (ID)</label>
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">名稱 (ID)</label>
                     <input type="text" value="${comp.id || ''}" oninput="window.wizard.updateCompProp('id', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
                 </div>
+                ${comp.type !== 'hole' ? `
                 <div class="form-group">
                     <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">顏色</label>
                     <input type="color" value="${comp.color || '#3498db'}" oninput="window.wizard.updateCompProp('color', this.value)" style="width: 100%; height: 30px; padding: 2px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
                 </div>
+                ` : ''}
         `;
 
         if (comp.type === 'bar') {
@@ -192,15 +176,37 @@ export class MechanismWizard {
                         <input type="checkbox" ${comp.isInput ? 'checked' : ''} onchange="window.wizard.updateCompProp('isInput', this.checked)" style="width: 14px; height: 14px;"> 馬達驅動
                     </label>
                 </div>
+
+                <!-- 🌟 巢狀孔位管理區區塊 -->
+                <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #eee;">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px;">📍 桿件孔位管理</label>
+                    <div id="nestedHoleList" style="display: flex; flex-direction: column; gap: 8px;">
+                        ${(comp.holes || []).map((h, hIdx) => `
+                            <div style="background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                    <span style="font-size: 11px; font-weight: bold; color: #34495e;">孔位 ${h.id}</span>
+                                    <button onclick="window.wizard.removeNestedHole('${comp.id}', '${h.id}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px;">✕ 刪除</button>
+                                </div>
+                                <div class="form-group" style="margin:0;">
+                                    <label style="display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;">距離 P1 參數名</label>
+                                    <input type="text" value="${h.distParam || ''}" 
+                                        oninput="window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'distParam', this.value)" 
+                                        style="width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;">
+                                </div>
+                            </div>
+                        `).join('')}
+                        ${!(comp.holes && comp.holes.length) ? '<div style="font-size: 10px; color: #bdc3c7; text-align: center; padding: 10px; border: 1px dashed #eee; border-radius: 6px;">在畫面上點擊桿件即可加孔</div>' : ''}
+                    </div>
+                </div>
             `;
         } else if (comp.type === 'triangle') {
             html += `
                 <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">基準點 1 (P1)</label>
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">端點 1 (P1)</label>
                     ${this.renderPointEditor(comp, 'p1')}
                 </div>
                 <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">基準點 2 (P2)</label>
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">端點 2 (P2)</label>
                     ${this.renderPointEditor(comp, 'p2')}
                 </div>
                 <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
@@ -238,7 +244,7 @@ export class MechanismWizard {
         return `
             <div style="display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; gap: 5px; align-items: center;">
-                    <select onchange="window.wizard.updatePointProp('${pointKey}', 'type', this.value)" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
+                    <select onchange="window.wizard.updatePointProp('${pointKey}', 'type', this.value)" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px; background: #fff;">
                         <option value="fixed" ${pt.type === 'fixed' ? 'selected' : ''}>📍 固定 (Fixed)</option>
                         <option value="existing" ${pt.type === 'existing' ? 'selected' : ''}>🔗 現有 (Existing)</option>
                         <option value="floating" ${pt.type === 'floating' ? 'selected' : ''}>☁️ 浮動 (Floating)</option>
@@ -246,18 +252,18 @@ export class MechanismWizard {
                 </div>
 
                 ${pt.type === 'existing' ? `
-                    <select onchange="window.wizard.updatePointProp('${pointKey}', 'id', this.value)" style="width: 100%; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
+                    <select onchange="window.wizard.updatePointProp('${pointKey}', 'id', this.value)" style="width: 100%; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px; background: #fff;">
                         <option value="">-- 選擇點位 --</option>
                         ${existingPoints.map(id => `<option value="${id}" ${pt.id === id ? 'selected' : ''}>${id}</option>`).join('')}
                     </select>
                 ` : `
-                    <input type="text" value="${pt.id || ''}" placeholder="點位名稱 (如 O2)" oninput="window.wizard.updatePointProp('${pointKey}', 'id', this.value)" style="width: 100%; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
+                    <input type="text" value="${pt.id || ''}" placeholder="點位名稱" oninput="window.wizard.updatePointProp('${pointKey}', 'id', this.value)" style="width: 100%; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
                 `}
 
                 ${pt.type === 'fixed' ? `
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-                        <input type="text" value="${pt.x || 0}" placeholder="X" oninput="window.wizard.updatePointProp('${pointKey}', 'x', this.value)" style="padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
-                        <input type="text" value="${pt.y || 0}" placeholder="Y" oninput="window.wizard.updatePointProp('${pointKey}', 'y', this.value)" style="padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
+                        <input type="number" value="${pt.x || 0}" placeholder="X" oninput="window.wizard.updatePointProp('${pointKey}', 'x', this.value)" style="padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
+                        <input type="number" value="${pt.y || 0}" placeholder="Y" oninput="window.wizard.updatePointProp('${pointKey}', 'y', this.value)" style="padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
                     </div>
                 ` : ''}
             </div>
@@ -270,91 +276,108 @@ export class MechanismWizard {
         const btnReset = $('btnWizardReset');
         const btnApply = $('btnWizardApply');
         const templateSelect = $('templateSelect');
-        const traceSelect = $('tracePointSelect');
 
         if (btnAddBar) btnAddBar.onclick = () => this.addComponent('bar');
         if (btnAddTriangle) btnAddTriangle.onclick = () => this.addComponent('triangle');
         if (btnReset) btnReset.onclick = () => this.reset();
         if (btnApply) btnApply.onclick = () => this.syncTopology();
 
-        if (templateSelect) {
-            templateSelect.onchange = (e) => {
-                if (e.target.value) this.loadTemplate(e.target.value);
-                e.target.value = ''; // 重置選擇器
-            };
-        }
+        if (templateSelect) templateSelect.onchange = (e) => {
+            if (e.target.value) this.loadTemplate(e.target.value);
+        };
 
-        if (traceSelect) {
-            traceSelect.onchange = (e) => {
-                this.topology.tracePoint = e.target.value;
-            };
-        }
+        const traceSelect = $('tracePointSelect');
+        if (traceSelect) traceSelect.onchange = (e) => {
+            this.topology.tracePoint = e.target.value;
+            this.syncTopology();
+        };
     }
 
-    /**
-     * API: 供畫布互動呼叫，建立連桿
-     * @param {Object} p1Data - { id, x, y, isNew }
-     * @param {Object} p2Data - { id, x, y, isNew }
-     */
     addLinkFromCanvas(p1Data, p2Data) {
-        const count = this.components.filter(c => c.type === 'bar').length + 1;
+        console.log('[Wizard] Adding link from canvas:', p1Data, p2Data);
+
+        // 1. 確保點位有 ID (如果是畫布點擊產生的新點可能沒 ID)
+        const allPointIds = this.getAllPointIds();
+        let nextP = 1;
+        const getNextPId = () => {
+            while (allPointIds.includes(`P${nextP}`)) nextP++;
+            const id = `P${nextP}`;
+            allPointIds.push(id);
+            return id;
+        };
+
+        if (!p1Data.id) p1Data.id = getNextPId();
+        if (!p2Data.id) p2Data.id = getNextPId();
+
+        // 2. 生成連桿 ID
+        let count = 1;
+        while (this.components.find(c => c.id === `Link${count}`)) count++;
         const id = `Link${count}`;
 
-        const newComp = {
-            type: 'bar',
-            id,
-            color: '#3498db',
-            lenParam: 'L' + (this.components.length + 1),
+        const newBar = {
+            type: 'bar', id, color: '#3498db',
+            p1: { id: p1Data.id, type: p1Data.isNew ? 'floating' : 'existing', x: p1Data.x, y: p1Data.y },
+            p2: { id: p2Data.id, type: p2Data.isNew ? 'floating' : 'existing', x: p2Data.x, y: p2Data.y },
+            lenParam: `L${count}`,
             isInput: false
         };
 
-        // 設定 P1
-        if (p1Data.isNew) {
-            // 第一根桿件的第一個點預設為固定，之後的新點預設為浮動
-            const isFirst = this.components.length === 0;
-            newComp.p1 = {
-                id: `P${this.components.length * 2 + 1}`,
-                type: isFirst ? 'fixed' : 'floating',
-                x: Math.round(p1Data.x),
-                y: Math.round(p1Data.y)
-            };
-        } else {
-            // 現有點 -> Existing
-            newComp.p1 = { id: p1Data.id, type: 'existing', x: Math.round(Number(p1Data.x) || 0), y: Math.round(Number(p1Data.y) || 0) };
+        // 🎯 核心修正：如果是第一根桿件，且 P1 是起始點 (不管是新點還是既有的 O 點)，將其設為固定點
+        if (this.components.length === 0) {
+            newBar.p1.type = 'fixed';
+            newBar.isInput = true;
+
+            // 🌟 核心修正：計算繪製時的角度偏移，防止自動「變平」
+            const dx = p2Data.x - p1Data.x;
+            const dy = p2Data.y - p1Data.y;
+            const rad = Math.atan2(dy, dx);
+            newBar.phaseOffset = Math.round((rad * 180) / Math.PI); // 轉為角度存入
+
+            if (p1Data.id === 'O') {
+                newBar.p1.x = 0;
+                newBar.p1.y = 0;
+            }
         }
 
-        // 設定 P2
-        if (p2Data.isNew) {
-            // 新點預設為浮動關節 (Lego 邏輯)
-            newComp.p2 = {
-                id: `P${this.components.length * 2 + 2}`,
-                type: 'floating',
-                x: Math.round(p2Data.x),
-                y: Math.round(p2Data.y)
-            };
-            newComp.color = '#3498db';
-        } else {
-            // P2 是現有點 -> Existing
-            newComp.p2 = { id: p2Data.id, type: 'existing', x: Math.round(Number(p2Data.x) || 0), y: Math.round(Number(p2Data.y) || 0) };
+        this.components.push(newBar);
+
+        // 🌟 核心修正：每當畫出新桿件，確保長度參數立刻被重新計算，不被舊值 100 蓋過
+        if (this.topology.params) {
+            delete this.topology.params[newBar.lenParam];
         }
 
-        // 自動判斷顏色
-        if (newComp.p1.type === 'existing' && newComp.p2.type === 'existing') {
-            newComp.color = '#9b59b6'; // 連結兩個現有點的桿件 (閉環)
-        } else if (newComp.p1.type === 'fixed' || newComp.p2.type === 'fixed') {
-            newComp.color = '#e74c3c'; // 接地桿件 (潛在馬達桿)
-        }
-
-        this.components.push(newComp);
         this.selectedComponentIndex = this.components.length - 1;
+        this.render();
+        this.syncTopology();
+    }
+
+    addHoleFromCanvas(linkId, p1Id, p2Id, r1, r2, x, y) {
+        const bar = this.components.find(c => c.id === linkId);
+        if (!bar) return;
+
+        if (!bar.holes) bar.holes = [];
+        const holeCount = this.components.reduce((acc, c) => acc + (c.holes ? c.holes.length : 0), 0) + 1;
+        const holeId = 'H' + holeCount;
+
+        const newHole = {
+            id: holeId,
+            distParam: holeId + '_dist',
+        };
+
+        bar.holes.push(newHole);
+
+        // 初始化參數
+        if (!this.topology.params) this.topology.params = {};
+        this.topology.params[newHole.distParam] = Math.round(r1);
+
         this.render();
         this.syncTopology();
     }
 
     addComponent(type) {
         const count = this.components.filter(c => c.type === type).length + 1;
-        const id = type === 'bar' ? `Link${count}` : `Tri${count}`;
-        const newComp = { type, id, color: type === 'bar' ? '#3498db' : '#27ae60' };
+        let id = type === 'bar' ? `Link${count}` : (type === 'triangle' ? `Tri${count}` : `H${count}`);
+        const newComp = { type, id, color: type === 'bar' ? '#3498db' : (type === 'triangle' ? '#27ae60' : '#2d3436') };
 
         if (type === 'bar') {
             newComp.p1 = { id: '', type: 'fixed', x: 0, y: 0 };
@@ -368,6 +391,12 @@ export class MechanismWizard {
             newComp.r1Param = 'R1_' + (this.components.length + 1);
             newComp.r2Param = 'R2_' + (this.components.length + 1);
             newComp.sign = 1;
+        } else if (type === 'hole') {
+            newComp.p1 = { id: '', type: 'existing' };
+            newComp.p2 = { id: '', type: 'existing' };
+            newComp.r1Param = id + '_r1';
+            newComp.r2Param = id + '_r2';
+            newComp.sign = -1;
         }
 
         this.components.push(newComp);
@@ -393,9 +422,7 @@ export class MechanismWizard {
             const comp = this.components[this.selectedComponentIndex];
             if (!comp[pointKey]) comp[pointKey] = { id: '', type: 'floating', x: 0, y: 0 };
             comp[pointKey][prop] = val;
-            if (prop === 'type') {
-                this.render();
-            }
+            if (prop === 'type') this.render();
         }
     }
 
@@ -404,85 +431,77 @@ export class MechanismWizard {
             this.components.splice(this.selectedComponentIndex, 1);
             this.selectedComponentIndex = -1;
             this.render();
+            this.syncTopology();
         }
     }
 
     getAllPointIds() {
         const ids = new Set();
         this.components.forEach(c => {
-            if (c.p1 && c.p1.id) ids.add(c.p1.id);
-            if (c.p2 && c.p2.id) ids.add(c.p2.id);
-            if (c.p3 && c.p3.id) ids.add(c.p3.id);
+            ['p1', 'p2', 'p3'].forEach(k => {
+                if (c[k] && c[k].id) ids.add(c[k].id);
+            });
         });
-        return Array.from(ids);
+        return Array.from(ids).sort();
+    }
+
+    updateNestedHoleProp(linkId, holeIdx, prop, val) {
+        const bar = this.components.find(c => c.id === linkId);
+        if (bar && bar.holes && bar.holes[holeIdx]) {
+            bar.holes[holeIdx][prop] = val;
+            this.syncTopology();
+        }
+    }
+
+    removeNestedHole(linkId, holeId) {
+        const bar = this.components.find(c => c.id === linkId);
+        if (bar && bar.holes) {
+            bar.holes = bar.holes.filter(h => h.id !== holeId);
+            this.render();
+            this.syncTopology();
+        }
     }
 
     getSolvedPointIds() {
         const solved = new Set();
-        const allPoints = new Map(); // id -> type ('fixed' | 'floating' | 'existing')
-
-        // 1. 彙整所有點位的類型資訊
+        // 1. 固定點
         this.components.forEach(c => {
             ['p1', 'p2', 'p3'].forEach(k => {
-                const pt = c[k];
-                if (pt && pt.id) {
-                    const currentType = allPoints.get(pt.id);
-                    // 優先級：fixed > floating > existing
-                    if (pt.type === 'fixed') allPoints.set(pt.id, 'fixed');
-                    else if (pt.type === 'floating' && currentType !== 'fixed') allPoints.set(pt.id, 'floating');
-                    else if (!allPoints.has(pt.id)) allPoints.set(pt.id, 'existing');
-                }
+                if (c[k] && c[k].type === 'fixed' && c[k].id) solved.add(c[k].id);
             });
         });
 
-        // 2. 初始已解點為所有 fixed 點
-        allPoints.forEach((type, id) => {
-            if (type === 'fixed') solved.add(id);
-        });
-
-        // 3. 迭代求解其餘點位
+        // 2. 迭代求解其餘點 (含馬達與智慧連桿推導)
         let changed = true;
         while (changed) {
             changed = false;
-
-            // 建立連桿連接地圖
-            const pointConnections = new Map();
             this.components.forEach(c => {
-                if (c.type === 'bar' && !c.isInput) {
-                    const id1 = c.p1?.id;
-                    const id2 = c.p2?.id;
-                    if (id1 && id2) {
-                        if (solved.has(id1)) {
-                            if (!pointConnections.has(id2)) pointConnections.set(id2, new Set());
-                            pointConnections.get(id2).add(id1);
-                        }
-                        if (solved.has(id2)) {
-                            if (!pointConnections.has(id1)) pointConnections.set(id1, new Set());
-                            pointConnections.get(id1).add(id2);
-                        }
-                    }
-                }
-            });
-
-            this.components.forEach(c => {
+                // 馬達帶動
                 if (c.type === 'bar' && c.isInput) {
-                    if (c.p1?.id && c.p2?.id && solved.has(c.p1.id) && !solved.has(c.p2.id)) {
-                        solved.add(c.p2.id);
-                        changed = true;
+                    if (c.p1?.id && solved.has(c.p1.id) && c.p2?.id && !solved.has(c.p2.id)) {
+                        solved.add(c.p2.id); changed = true;
                     }
-                } else if (c.type === 'triangle') {
-                    if (c.p1?.id && c.p2?.id && c.p3?.id &&
-                        solved.has(c.p1.id) && solved.has(c.p2.id) && !solved.has(c.p3.id)) {
-                        solved.add(c.p3.id);
-                        changed = true;
+                }
+                // 三角形或孔位
+                if (c.type === 'triangle' || c.type === 'hole') {
+                    const p3Id = c.type === 'triangle' ? c.p3?.id : c.id;
+                    if (c.p1?.id && c.p2?.id && p3Id && solved.has(c.p1.id) && solved.has(c.p2.id) && !solved.has(p3Id)) {
+                        solved.add(p3Id); changed = true;
                     }
                 }
             });
 
-            // 自動偵測 (Dyad): 若一個非固定點連接到兩個已解點
-            pointConnections.forEach((neighbors, pointId) => {
-                if (!solved.has(pointId) && neighbors.size >= 2) {
-                    solved.add(pointId);
+            // 智慧連桿推導：任何點若連帶著兩根「另一端已解」的桿件，則該點已解
+            const allPointIds = this.getAllPointIds();
+            allPointIds.forEach(jId => {
+                if (solved.has(jId)) return;
+                const relatedBars = this.components.filter(c => c.type === 'bar' && !c.isInput && (c.p1.id === jId || c.p2.id === jId));
+                const solvableConnections = relatedBars.filter(b => {
+                    const otherId = (b.p1.id === jId ? b.p2.id : b.p1.id);
+                    return solved.has(otherId);
+                });
+                if (solvableConnections.length >= 2) {
+                    solved.add(jId);
                     changed = true;
                 }
             });
@@ -492,20 +511,18 @@ export class MechanismWizard {
 
     isComponentSolved(comp, solvedPoints) {
         if (comp.type === 'bar') {
-            if (comp.isInput) return comp.p1?.id && solvedPoints.has(comp.p1.id);
-            // A non-input bar is "solved" if both its points are eventually solved
-            return comp.p1?.id && comp.p2?.id && solvedPoints.has(comp.p1.id) && solvedPoints.has(comp.p2.id);
-        }
-        if (comp.type === 'triangle') {
-            return comp.p1?.id && comp.p2?.id && solvedPoints.has(comp.p1.id) && solvedPoints.has(comp.p2.id);
+            return solvedPoints.has(comp.p1.id) && solvedPoints.has(comp.p2.id);
+        } else if (comp.type === 'triangle') {
+            return solvedPoints.has(comp.p1.id) && solvedPoints.has(comp.p2.id) && solvedPoints.has(comp.p3?.id);
         }
         return false;
     }
 
     reset() {
-        if (confirm('確定要清除所有桿件嗎？')) {
+        if (confirm('確定要重置所有設計嗎？')) {
             this.components = [];
             this.selectedComponentIndex = -1;
+            this.topology.params = { theta: 0 }; // 🌟 徹底清空參數
             this.render();
             this.syncTopology();
         }
@@ -513,308 +530,179 @@ export class MechanismWizard {
 
     syncTopology() {
         this.compileTopology();
-        if (this.onUpdate) {
-            this.onUpdate(this.topology);
-        }
-        // 觸發動態參數更新
-        updateDynamicParams();
+        if (this.onUpdate) this.onUpdate(this.topology);
     }
 
-    /**
-     * 將組件編譯為 Solver 拓撲
-     */
     compileTopology() {
-        const solvedPoints = this.getSolvedPointIds();
         const steps = [];
-        const polygons = [];
-        const joints = new Set();
+        const visualization = { links: [], polygons: [], joints: [] };
         const parts = [];
-        const groundPoints = new Map(); // id -> {x, y, component, role}
-        const barComponents = new Map(); // 儲存 bar component 資訊
+        const params = this.topology.params || { theta: 0 };
+        const joints = new Set();
+        const polygons = [];
+        const solvedPoints = this.getSolvedPointIds();
+        const allPointsMap = new Map();
 
-        // 1. 先收集所有 bar component，判斷哪些點應該參數化
-        this.components.forEach(c => {
-            if (c.type === 'bar' && !c.isInput && c.lenParam) {
-                // 這是一個有參數的固定桿
-                barComponents.set(c.id, c);
-            }
-        });
-
-        // 2. 彙整所有點位的類型資訊，並判斷 Ground Points
-        const allPointsMap = new Map(); // id -> { type, x, y, component, role }
-
+        // 收集座標與屬性 (智慧合併：fixed/input 優先權高於 existing)
         this.components.forEach(c => {
             ['p1', 'p2', 'p3'].forEach(k => {
-                const pt = c[k];
-                if (!pt || !pt.id) return;
+                if (c[k] && c[k].id) {
+                    const existing = allPointsMap.get(c[k].id);
+                    // 只有當新屬性更「強」(例如 fixed) 或者舊屬性是空的/existing 時，才更新
+                    const isStronger = (c[k].type === 'fixed' || (c[k].type === 'input' && (!existing || existing.type !== 'fixed')));
+                    const isEmpty = !existing || existing.type === 'existing';
 
-                const existing = allPointsMap.get(pt.id);
-                // 優先級：fixed > floating > existing
-                if (!existing || pt.type === 'fixed' || (pt.type === 'floating' && existing.type === 'existing')) {
-                    allPointsMap.set(pt.id, {
-                        type: pt.type,
-                        x: pt.x,
-                        y: pt.y,
-                        component: c,
-                        role: k
-                    });
+                    if (isStronger || isEmpty || (c[k].x !== undefined && existing?.x === undefined)) {
+                        allPointsMap.set(c[k].id, {
+                            x: c[k].x ?? existing?.x,
+                            y: c[k].y ?? existing?.y,
+                            type: (isStronger ? c[k].type : (existing?.type || c[k].type))
+                        });
+                    }
                 }
             });
         });
 
-        // 3. 處理 Ground Points (所有被判定為 fixed 的點，或孤立的 existing 點)
+        // 1. Ground 步驟
         allPointsMap.forEach((info, id) => {
             if (info.type === 'fixed') {
-                const step = { id, type: 'ground' };
-                const comp = info.component;
-
-                // 🎯 關鍵邏輯：處理參數化連桿的第二個接地點 (p2)
-                if (comp.type === 'bar' && comp.lenParam && info.role === 'p2' && comp.p1) {
-                    const p1 = comp.p1;
-                    const p2 = comp.p2;
-                    const dx = parseFloat(p2.x) - parseFloat(p1.x);
-                    const dy = parseFloat(p2.y) - parseFloat(p1.y);
-
-                    if (Math.abs(dy) < 0.01) {
-                        step.x_param = dx > 0 ? comp.lenParam : `-${comp.lenParam}`;
-                        step.x_offset = parseFloat(p1.x);
-                        step.y = parseFloat(p1.y);
-                    } else if (Math.abs(dx) < 0.01) {
-                        step.x = parseFloat(p1.x);
-                        step.y_param = dy > 0 ? comp.lenParam : `-${comp.lenParam}`;
-                        step.y_offset = parseFloat(p1.y);
-                    } else {
-                        step.x = parseFloat(p2.x);
-                        step.y = parseFloat(p2.y);
-                    }
-                } else {
-                    step.x = parseFloat(info.x) || 0;
-                    step.y = parseFloat(info.y) || 0;
-                }
-
-                steps.push(step);
+                steps.push({ id, type: 'ground', x: parseFloat(info.x) || 0, y: parseFloat(info.y) || 0 });
                 joints.add(id);
             }
         });
 
-        // 2. 處理輸入桿 (Input Crank)
+        // 2. Input Crank 步驟
         this.components.filter(c => c.type === 'bar' && c.isInput).forEach(c => {
             if (c.p1?.id && c.p2?.id && solvedPoints.has(c.p1.id)) {
-                steps.push({ id: c.p2.id, type: 'input_crank', center: c.p1.id, len_param: c.lenParam });
-                joints.add(c.p1.id);
+                steps.push({
+                    id: c.p2.id,
+                    type: 'input_crank',
+                    center: c.p1.id,
+                    len_param: c.lenParam,
+                    phase_offset: c.phaseOffset || 0 // 🌟 帶入角度偏移
+                });
                 joints.add(c.p2.id);
-                parts.push({ id: `Crank(${c.lenParam})`, type: 'bar', len_param: c.lenParam, color: c.color });
             }
         });
 
-        // 3. 處理三角桿 (Triangle) -> 對應 Dyad Step
-        this.components.filter(c => c.type === 'triangle').forEach(c => {
-            if (c.p1?.id && c.p2?.id && c.p3?.id && solvedPoints.has(c.p1.id) && solvedPoints.has(c.p2.id)) {
+        // 3. Dyad 步驟 (Triangle) & Nested Holes
+        this.components.forEach(c => {
+            if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
                 steps.push({
-                    id: c.p3.id,
-                    type: 'dyad',
-                    p1: c.p1.id,
-                    r1_param: c.r1Param,
-                    p2: c.p2.id,
-                    r2_param: c.r2Param,
-                    sign: c.sign || 1
+                    id: c.p3.id, type: 'dyad', p1: c.p1.id, p2: c.p2.id,
+                    r1_param: c.r1Param, r2_param: c.r2Param, sign: c.sign || 1
                 });
-
-                polygons.push({
-                    points: [c.p1.id, c.p2.id, c.p3.id],
-                    color: c.color,
-                    alpha: 0.3
-                });
-
-                joints.add(c.p1.id);
-                joints.add(c.p2.id);
+                polygons.push({ points: [c.p1.id, c.p2.id, c.p3.id], color: c.color, alpha: 0.3 });
                 joints.add(c.p3.id);
-
-                parts.push({ id: `Tri_Edge1(${c.r1Param})`, type: 'bar', len_param: c.r1Param, color: c.color });
-                parts.push({ id: `Tri_Edge2(${c.r2Param})`, type: 'bar', len_param: c.r2Param, color: c.color });
             }
-        });
-        // 5. 處理所有點位，確保未解點也能顯示 (為 LEGO 模式優化)
-        allPointsMap.forEach((info, id) => {
-            // 如果這個點還沒出現在 steps 裡 (不是 ground, input_crank, dyad)，就加一個 joint step
-            if (!steps.find(s => s.id === id)) {
-                steps.push({
-                    id,
-                    type: 'joint',
-                    x: Number(info.x) || 0,
-                    y: Number(info.y) || 0
+
+            // 🌟 處理桿件內部的孔位
+            if (c.type === 'bar' && c.holes) {
+                c.holes.forEach(h => {
+                    steps.push({
+                        id: h.id, type: 'point_on_link', p1: c.p1.id, p2: c.p2.id,
+                        dist_param: h.distParam
+                    });
+                    joints.add(h.id);
                 });
             }
-            joints.add(id);
         });
 
-        // 6. 生成視覺化連桿 (Links) - 移除 solvedPoints 限制，讓繪圖即時顯示
-        const finalLinks = [];
+        // 🎯 智慧連桿自動解法 (Auto-Dyad Inference)
+        // 針對那些只是普通 Bar 連接而成的關節點，自動產生 dyad 步
+        const bars = this.components.filter(c => c.type === 'bar' && !c.isInput);
+        const unsolvedJoints = Array.from(allPointsMap.keys()).filter(id => !steps.find(s => s.id === id));
+
+        unsolvedJoints.forEach(jId => {
+            // 找連到這個點的所有桿件
+            const relatedBars = bars.filter(b => b.p1.id === jId || b.p2.id === jId);
+            if (relatedBars.length >= 2) {
+                // 如果有至少兩根連桿的另一端是已解的，這就是一個 Dyad
+                const solvableConnections = relatedBars.filter(b => {
+                    const otherId = (b.p1.id === jId ? b.p2.id : b.p1.id);
+                    return steps.find(s => s.id === otherId);
+                });
+
+                if (solvableConnections.length >= 2) {
+                    const b1 = solvableConnections[0];
+                    const b2 = solvableConnections[1];
+                    const p1Id = (b1.p1.id === jId ? b1.p2.id : b1.p1.id);
+                    const p2Id = (b2.p1.id === jId ? b2.p2.id : b2.p1.id);
+
+                    // 檢查是否已經有這個 Dyad 了
+                    if (!steps.find(s => s.id === jId)) {
+                        steps.push({
+                            id: jId,
+                            type: 'dyad',
+                            p1: p1Id, len_param: b1.lenParam,
+                            p2: p2Id, len_param: b2.lenParam,
+                            sign: 1 // 這裡方向可能需要智慧判定，暫設 1
+                        });
+                        joints.add(jId);
+                    }
+                }
+            }
+        });
+
+        // 4. 其他點位 (靜態顯示)
+        // 🌟 修正：只顯示確實被組件使用的點，不顯示暫存產生的雜點
+        allPointsMap.forEach((info, id) => {
+            const isUsed = Array.from(joints).includes(id) ||
+                this.components.some(c => (c.p1?.id === id || c.p2?.id === id || c.p3?.id === id));
+
+            if (isUsed && !steps.find(s => s.id === id)) {
+                steps.push({ id, type: 'joint', x: Number(info.x) || 0, y: Number(info.y) || 0 });
+                joints.add(id);
+            }
+        });
+
+        // 5. Links 視覺化
         this.components.forEach(c => {
             if (c.type === 'bar' && c.p1?.id && c.p2?.id) {
-                finalLinks.push({
-                    id: c.id,
-                    p1: c.p1.id,
-                    p2: c.p2.id,
-                    style: c.isInput ? 'crank' : 'normal',
-                    color: c.color,
-                    lenParam: c.lenParam // 傳給 solver 自動推導使用
-                });
+                visualization.links.push({ id: c.id, p1: c.p1.id, p2: c.p2.id, color: c.color, style: c.isInput ? 'crank' : 'normal', lenParam: c.lenParam });
             } else if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
-                finalLinks.push({ id: c.id, p1: c.p1.id, p2: c.p3.id, color: c.color });
-                finalLinks.push({ p1: c.p2.id, p2: c.p3.id, color: c.color });
-                finalLinks.push({ p1: c.p1.id, p2: c.p2.id, color: c.color, style: 'dashed' });
+                visualization.links.push({ p1: c.p1.id, p2: c.p3.id, color: c.color });
+                visualization.links.push({ p1: c.p2.id, p2: c.p3.id, color: c.color });
+                visualization.links.push({ p1: c.p1.id, p2: c.p2.id, color: c.color, style: 'dashed' });
             }
         });
 
-        // 7. 生成零件表
+        // 6. 參數收集
         this.components.forEach(c => {
             if (c.type === 'bar') {
-                parts.push({ id: `${c.id}(${c.lenParam})`, type: 'bar', len_param: c.lenParam, color: c.color });
-            } else if (c.type === 'triangle') {
-                parts.push({ id: `Tri_${c.id}_E1`, type: 'bar', len_param: c.r1Param, color: c.color });
-                parts.push({ id: `Tri_${c.id}_E2`, type: 'bar', len_param: c.r2Param, color: c.color });
-            }
-        });
-
-        // 預設追蹤點 (如果沒設，選最後一個點)
-        if (!this.topology.tracePoint || !joints.has(this.topology.tracePoint)) {
-            this.topology.tracePoint = Array.from(joints).pop() || '';
-        }
-
-        // 🎯 自動生成 params 物件
-        const params = {};
-
-        // 從組件中收集點位座標，優先使用 fixed 點的座標
-        const pointCoords = new Map();
-
-        // 第一輪：收集所有明確定義座標的點 (fixed)
-        this.components.forEach(c => {
-            ['p1', 'p2', 'p3'].forEach(k => {
-                if (c[k] && c[k].id && c[k].type === 'fixed') {
-                    const x = Number(c[k].x);
-                    const y = Number(c[k].y);
-                    if (Number.isFinite(x) && Number.isFinite(y)) {
-                        pointCoords.set(c[k].id, { x, y });
-                    }
+                if (c.lenParam && params[c.lenParam] === undefined) {
+                    const p1 = allPointsMap.get(c.p1.id);
+                    const p2 = allPointsMap.get(c.p2.id);
+                    params[c.lenParam] = (p1 && p2) ? Math.round(Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2)) : 100;
                 }
-            });
-        });
-
-        // 第二輪：收集其他點位（如 floating 或 existing 的初始座標）
-        this.components.forEach(c => {
-            ['p1', 'p2', 'p3'].forEach(k => {
-                if (c[k] && c[k].id && !pointCoords.has(c[k].id)) {
-                    const x = Number(c[k].x);
-                    const y = Number(c[k].y);
-                    if (Number.isFinite(x) && Number.isFinite(y)) {
-                        pointCoords.set(c[k].id, { x, y });
-                    }
-                }
-            });
-        });
-
-        // 根據座標計算連桿初始長度並填入 params
-        this.components.forEach(c => {
-            if (c.type === 'bar' && c.lenParam && c.p1 && c.p2) {
-                const p1 = pointCoords.get(c.p1.id);
-                const p2 = pointCoords.get(c.p2.id);
-                if (p1 && p2) {
-                    const dx = p2.x - p1.x;
-                    const dy = p2.y - p1.y;
-                    const length = Math.round(Math.sqrt(dx * dx + dy * dy));
-                    params[c.lenParam] = length;
-                } else if (params[c.lenParam] === undefined) {
-                    params[c.lenParam] = 100;
+                // 收集巢狀孔位參數
+                if (c.holes) {
+                    c.holes.forEach(h => {
+                        if (params[h.distParam] === undefined) params[h.distParam] = 50;
+                    });
                 }
             } else if (c.type === 'triangle') {
-                // 三角桿邊長目前預設為 100，或可擴充為從點位計算
                 if (c.r1Param && params[c.r1Param] === undefined) params[c.r1Param] = 100;
                 if (c.r2Param && params[c.r2Param] === undefined) params[c.r2Param] = 100;
             }
         });
 
-
-        // 確保 theta 參數存在（用於驅動馬達）
-        if (!params.theta) params.theta = 0;
-
         this.topology = {
             steps,
-            tracePoint: this.topology.tracePoint,
-            visualization: { links: finalLinks, polygons, joints: Array.from(joints) },
-            parts,
-            params,  // ← 加入 params
-            _wizard_data: this.components // 儲存原始組件資料以便恢復
+            tracePoint: this.topology.tracePoint || Array.from(joints)[0] || '',
+            visualization: { links: visualization.links, polygons, joints: Array.from(joints) },
+            parts: this.components.filter(c => c.type === 'bar').map(c => ({ id: `${c.id}(${c.lenParam})`, type: 'bar', len_param: c.lenParam, color: c.color })),
+            params,
+            _wizard_data: this.components
         };
     }
 
     loadTemplate(name) {
-        if (confirm(`載入 ${name} 範本將會覆蓋目前所有桿件，確定嗎？`)) {
-            this.components = [];
-
-            if (name === 'CRANK_ROCKER') {
-                // 曲柄搖桿機構 (Crank-Rocker) - 可360度連續旋轉
-                // 滿足 Grashof 條件：s + l ≤ p + q
-                // 桿長: a=40, b=80, c=60, d=80 → 40+80 ≤ 60+80 ✓
-                this.components = [
-                    // 1. 輸入曲柄 (Input Crank) - 最短桿，可360度旋轉
-                    {
-                        type: 'bar', id: 'Crank', color: '#e74c3c', isInput: true, lenParam: 'a',
-                        p1: { id: 'O2', type: 'fixed', x: 0, y: 0 },
-                        p2: { id: 'A', type: 'floating' }
-                    },
-                    // 2. 連桿 (Coupler Link)
-                    {
-                        type: 'bar', id: 'Coupler', color: '#3498db', lenParam: 'b',
-                        p1: { id: 'A', type: 'existing' },
-                        p2: { id: 'B', type: 'floating' }
-                    },
-                    // 3. 輸出搖桿 (Output Rocker) - 擺動輸出
-                    {
-                        type: 'bar', id: 'Rocker', color: '#27ae60', lenParam: 'd',
-                        p1: { id: 'O4', type: 'fixed', x: 60, y: 0 },
-                        p2: { id: 'B', type: 'existing' }
-                    },
-                    // 4. 底座 (Ground Link)
-                    {
-                        type: 'bar', id: 'Ground', color: '#95a5a6', lenParam: 'c',
-                        p1: { id: 'O2', type: 'existing' },
-                        p2: { id: 'O4', type: 'existing' }
-                    }
-                ];
-            } else if (name === 'CHEBYSHEV') {
-                // Chebyshev 直線機構 - 產生近似直線運動
-                // 經典桿長比例: a:b:c:d = 1:2.5:4:2.5
-                // 追蹤點在連桿 B 上會產生近似直線
-                this.components = [
-                    // 1. 驅動曲柄
-                    {
-                        type: 'bar', id: 'Crank', color: '#e74c3c', isInput: true, lenParam: 'a',
-                        p1: { id: 'O2', type: 'fixed', x: 0, y: 0 },
-                        p2: { id: 'A', type: 'floating' }
-                    },
-                    // 2. 主連桿
-                    {
-                        type: 'bar', id: 'Coupler', color: '#3498db', lenParam: 'b',
-                        p1: { id: 'A', type: 'existing' },
-                        p2: { id: 'B', type: 'floating' }
-                    },
-                    // 3. 搖桿 (與主連桿等長)
-                    {
-                        type: 'bar', id: 'Rocker', color: '#27ae60', lenParam: 'd',
-                        p1: { id: 'O4', type: 'fixed', x: 80, y: 0 },
-                        p2: { id: 'B', type: 'existing' }
-                    },
-                    // 4. 底座
-                    {
-                        type: 'bar', id: 'Ground', color: '#95a5a6', lenParam: 'c',
-                        p1: { id: 'O2', type: 'existing' },
-                        p2: { id: 'O4', type: 'existing' }
-                    }
-                ];
-            }
-
-            this.selectedComponentIndex = -1;
+        let topo = null;
+        if (name === 'jansen') topo = JANSEN_TOPOLOGY;
+        if (topo) {
+            this.components = JSON.parse(JSON.stringify(topo._wizard_data || []));
+            this.topology = JSON.parse(JSON.stringify(topo));
             this.render();
             this.syncTopology();
         }

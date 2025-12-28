@@ -194,12 +194,26 @@ async function initMechanismPage() {
     }
 
     console.log('Mechanism modules loaded successfully');
+
+    // 🌟 核心修正：主動觸發第一次預覽繪圖，確保畫面不留白
+    setTimeout(() => {
+      updatePreview();
+    }, 200);
+
   } catch (error) {
     console.error('Failed to load mechanism modules:', error);
     document.getElementById('log').textContent =
-      `錯誤：無法載入 ${mech.name} 模組。\n${error.message}\n\n此機構可能尚未實作。`;
+      `錯誤：無法載入 ${mech.name}模組。\n${error.message}\n\n此機構可能尚未實作。`;
   }
 }
+
+// 🌟 核心修正：監聽視窗縮放，自動調整畫布大小
+window.addEventListener('resize', () => {
+  if (window._resizeTimer) clearTimeout(window._resizeTimer);
+  window._resizeTimer = setTimeout(() => {
+    updatePreview();
+  }, 150);
+});
 
 // DOM 載入完成後初始化
 if (document.readyState === 'loading') {
@@ -628,77 +642,43 @@ function setupLinkClickHandler() {
     svgWrap.removeEventListener('mousemove', svgWrap._moveHandler);
   }
 
-  // 1. Link Click Handler (Select Link)
+  // 1. Link Click Handler (Select/Snap Link)
   svgWrap._linkClickHandler = (e) => {
-    if (drawState === 'SELECT') {
-      e.stopPropagation();
-      const detail = e.detail || {};
-      const id = detail.id;
-      const items = [
-        { label: '刪除桿件', action: () => id && removeFromTopology(id) }
-      ];
-      openPropertySheet(items, `桿件 ${id || ''} 屬性`, id);
+    e.preventDefault();
+    e.stopPropagation(); // 停止冒泡，防止觸發 _bgClickHandler 產生 O 點
 
+    const detail = e.detail || {};
+    const id = detail.id;
+    const wizard = window.wizard;
+
+    if (drawState === 'SELECT') {
+      const items = [{ label: '刪除桿件', action: () => id && removeFromTopology(id) }];
+      openPropertySheet(items, `桿件 ${id || ''} 屬性`, id);
       return;
     }
 
-    // Existing logic for hole creation...
-    if (drawState !== 'IDLE') return; // Don't add hole if drawing bar
-    const detail = e.detail;
-    if (!detail || !detail.p1Val || !detail.p2Val) return;
+    // --- 智慧加孔邏輯 (對接 Wizard) ---
+    if (!wizard || !detail.p1Val || !detail.p2Val) return;
 
-    const topoArea = document.getElementById('topology');
-    if (!topoArea) return;
+    // 1. 計算座標與初始距離
+    const r1 = Math.round(Math.sqrt(Math.pow(detail.x - detail.p1Val.x, 2) + Math.pow(detail.y - detail.p1Val.y, 2)));
+    const r2 = Math.round(Math.sqrt(Math.pow(detail.x - detail.p2Val.x, 2) + Math.pow(detail.y - detail.p2Val.y, 2)));
 
-    const wizard = window.wizard;
+    // 2. 呼叫 Wizard API 建立孔位 (這會自動處理參數、清單同步、與右側滑桿產出)
+    pushTopologyHistory();
+    wizard.addHoleFromCanvas(id, detail.p1, detail.p2, r1, r2, detail.x, detail.y);
 
-    try {
-      // ... existing "Add Hole" logic ...
-      pushTopologyHistory();
-      const topology = JSON.parse(topoArea.value);
-      if (!topology.steps) topology.steps = [];
+    // 🌟 修正：加孔後立即結束繪圖狀態，防止產生「幽靈雜點」
+    drawState = 'IDLE';
+    drawP1 = null;
+    drawBtn.textContent = '點擊新增...';
+    drawBtn.classList.remove('active');
 
-      const dx1 = detail.x - detail.p1Val.x;
-      const dy1 = detail.y - detail.p1Val.y;
-      const r1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
-      const dx2 = detail.x - detail.p2Val.x;
-      const dy2 = detail.y - detail.p2Val.y;
-      const r2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-
-      const v1x = detail.p2Val.x - detail.p1Val.x;
-      const v1y = detail.p2Val.y - detail.p1Val.y;
-      const v2x = detail.x - detail.p1Val.x;
-      const v2y = detail.y - detail.p1Val.y;
-      const cross = v1x * v2y - v1y * v2x;
-      const sign = cross >= 0 ? 1 : -1;
-
-      let idx = 1;
-      while (topology.steps.find(s => s.id === `H${idx}`)) idx++;
-      const newId = `H${idx}`;
-
-      const safeR1 = parseFloat(r1.toFixed(1));
-      const safeR2 = parseFloat(r2.toFixed(1));
-
-      topology.steps.push({
-        id: newId, type: 'dyad', p1: detail.p1, p2: detail.p2, r1_val: safeR1, r2_val: safeR2, sign: sign
-      });
-
-      if (!topology.visualization) topology.visualization = {};
-      if (!topology.visualization.joints) topology.visualization.joints = [];
-      if (!topology.visualization.joints.includes(newId)) topology.visualization.joints.push(newId);
-
-      const newJson = JSON.stringify(topology, null, 2);
-      topoArea.value = newJson;
-      topoArea.dispatchEvent(new Event('input', { bubbles: true }));
-      if (wizard) { try { wizard.init(topology); } catch (e) { } }
-
-      const log = document.getElementById('log');
-      if (log) log.textContent = `已新增孔位 ${newId} 於連桿 ${detail.p1}-${detail.p2}`;
-
-    } catch (err) {
-      console.error('Failed to add hole:', err);
-    }
+    // 隱藏屬性面板 (如果有的話)
+    hideContextMenu();
   };
+
+
 
   // 2. Joint Click Handler (Select Point)
   svgWrap._jointClickHandler = (e) => {
@@ -1178,6 +1158,39 @@ function openPropertySheet(items, title, selectedId) {
         };
 
         sheetContent.appendChild(behaviorWrapper);
+
+        // --- 孔位專屬：剛體距離調整 (Rigid Body Offsets) ---
+        if (currentType === 'dyad') {
+          const dyadGroup = document.createElement('div');
+          dyadGroup.style.marginTop = '15px';
+          dyadGroup.style.padding = '10px';
+          dyadGroup.style.background = '#f1f2f6';
+          dyadGroup.style.borderRadius = '8px';
+          dyadGroup.innerHTML = `
+            <div style="font-weight:bold; margin-bottom:8px; font-size:13px; color:#57606f;">📏 孔位定位 (相對於端點 ${step.p1} 與 ${step.p2})</div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                <div style="background:#fff; padding:6px; border-radius:6px; border:1px solid #ddd;">
+                    <div style="font-size:11px; color:#a4b0be; font-weight:bold;">距 ${step.p1}</div>
+                    <input type="number" id="inR1" value="${step.r1_val || 0}" style="width:100%; border:0; outline:none; font-family:monospace; font-weight:bold;" />
+                </div>
+                <div style="background:#fff; padding:6px; border-radius:6px; border:1px solid #ddd;">
+                    <div style="font-size:11px; color:#a4b0be; font-weight:bold;">距 ${step.p2}</div>
+                    <input type="number" id="inR2" value="${step.r2_val || 0}" style="width:100%; border:0; outline:none; font-family:monospace; font-weight:bold;" />
+                </div>
+            </div>
+            <div style="margin-top:8px; font-size:11px; color:#747d8c;">* 調整數值可讓孔位沿桿件滑動 (或偏離桿件形成三角架)。</div>
+          `;
+          dyadGroup.querySelector('#inR1').onchange = (e) => {
+            step.r1_val = parseFloat(e.target.value) || 0;
+            saveAndRefresh();
+          };
+          dyadGroup.querySelector('#inR2').onchange = (e) => {
+            step.r2_val = parseFloat(e.target.value) || 0;
+            saveAndRefresh();
+          };
+          sheetContent.appendChild(dyadGroup);
+        }
+
         if (currentType === 'ground') {
           const coordGroup = document.createElement('div');
           coordGroup.style.display = 'flex'; coordGroup.style.gap = '8px'; coordGroup.style.marginTop = '8px';

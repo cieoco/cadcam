@@ -218,7 +218,7 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
     const viewRange = viewParams.viewRange || 800;
     const pad = 50;
 
-    const scale = Math.min(W - 2 * pad, H - 2 * pad) / viewRange;
+    const scale = Math.max(0.01, Math.min(W - 2 * pad, H - 2 * pad) / viewRange);
     const tx = (p) => W / 2 + p.x * scale;
     const ty = (p) => H / 2 - p.y * scale;
 
