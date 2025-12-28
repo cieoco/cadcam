@@ -13,6 +13,11 @@ export const EXAMPLE_TEMPLATES = [
         id: 'gripper',
         name: '夾爪機構 (Gripper)',
         file: './js/examples/gripper.json'
+    },
+    {
+        id: 'crank-slider',
+        name: '曲柄滑塊 (模擬)',
+        file: './js/examples/crank-slider.json'
     }
     // 您可以在這裡新增更多範本，例如：
     // { id: 'jansen', name: 'Theo Jansen 仿生獸', file: './js/examples/jansen.json' }

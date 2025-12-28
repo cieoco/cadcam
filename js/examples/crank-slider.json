@@ -1,0 +1,72 @@
+{
+    "steps": [],
+    "tracePoint": "P1",
+    "visualization": {
+        "links": [],
+        "polygons": [],
+        "joints": []
+    },
+    "parts": [],
+    "params": {
+        "theta": 0,
+        "L_Crank": 30,
+        "L_ConRod": 80,
+        "L_SliderGuide": 5000
+    },
+    "_wizard_data": [
+        {
+            "type": "bar",
+            "id": "Crank",
+            "color": "#e74c3c",
+            "p1": {
+                "id": "O",
+                "type": "fixed",
+                "x": 0,
+                "y": 0
+            },
+            "p2": {
+                "id": "P0",
+                "type": "floating",
+                "x": 0,
+                "y": 30
+            },
+            "lenParam": "L_Crank",
+            "isInput": true,
+            "phaseOffset": 90
+        },
+        {
+            "type": "bar",
+            "id": "ConRod",
+            "color": "#3498db",
+            "p1": {
+                "id": "P0",
+                "type": "existing"
+            },
+            "p2": {
+                "id": "P1",
+                "type": "floating",
+                "x": 80,
+                "y": 0
+            },
+            "lenParam": "L_ConRod",
+            "isInput": false
+        },
+        {
+            "type": "bar",
+            "id": "SliderGuide",
+            "color": "#bdc3c7",
+            "p1": {
+                "id": "Sky",
+                "type": "fixed",
+                "x": 0,
+                "y": 5000
+            },
+            "p2": {
+                "id": "P1",
+                "type": "existing"
+            },
+            "lenParam": "L_SliderGuide",
+            "isInput": false
+        }
+    ]
+}
