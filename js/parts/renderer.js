@@ -50,6 +50,12 @@ export function renderPartsLayout(parts, workX, workY) {
 
         // 優先使用 Outline (Tangent Hull)
         if (p.outline && p.outline.length >= 2) {
+            const validOutline = p.outline.every(c =>
+                Number.isFinite(c.x) && Number.isFinite(c.y) && Number.isFinite(c.r) && c.r > 0
+            );
+            if (!validOutline) {
+                continue;
+            }
             console.log('Rendering outline for', p.id, p.outline);
             const pathData = computeTangentHullPath(p.outline, tx, ty, scale);
             console.log('Path data:', pathData);
