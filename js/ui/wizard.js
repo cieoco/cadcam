@@ -94,7 +94,7 @@ export class MechanismWizard {
         return this.components.map((c, i) => {
             const isSelected = this.selectedComponentIndex === i;
             const isSolved = this.isComponentSolved(c, solvedPoints);
-            const icon = c.type === 'bar' ? '📏' : (c.type === 'triangle' ? '📐' : '⚪');
+            const icon = c.type === 'bar' ? '📏' : (c.type === 'triangle' ? '📐' : (c.type === 'slider' ? 'S' : '⚪'));
             const color = c.color || '#333';
 
             return `
@@ -134,7 +134,12 @@ export class MechanismWizard {
             `;
         }
 
-        const icon = comp.type === 'bar' ? '📏' : (comp.type === 'triangle' ? '📐' : '⚪');
+        const icon = comp.type === 'bar' ? '📏' : (comp.type === 'triangle' ? '📐' : (comp.type === 'slider' ? 'S' : '⚪'));
+        const driver = comp.type === 'slider'
+            ? (comp.driverId
+                ? this.components.find(c => c.id === comp.driverId && c.type === 'bar')
+                : this.components.find(c => c.type === 'bar' && c.lenParam && (c.p1?.id === comp.p3?.id || c.p2?.id === comp.p3?.id)))
+            : null;
         const solvedPoints = this.getSolvedPointIds();
         const isSolved = this.isComponentSolved(comp, solvedPoints);
 
@@ -177,6 +182,12 @@ export class MechanismWizard {
                     <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #2c3e50; cursor: pointer; padding: 6px; background: #f8f9fa; border-radius: 4px;">
                         <input type="checkbox" ${comp.isInput ? 'checked' : ''} onchange="window.wizard.updateCompProp('isInput', this.checked)" style="width: 14px; height: 14px;"> 馬達驅動
                     </label>
+                </div>
+
+                <div class="form-group">
+                    <button onclick="window.wizard.convertSelectedBarToSlider()" style="width: 100%; padding: 8px; background: #8e44ad; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
+                        Convert to Slider
+                    </button>
                 </div>
 
                 <!-- 🌟 巢狀孔位管理區區塊 -->
@@ -260,6 +271,12 @@ export class MechanismWizard {
                         <option value="-1" ${comp.sign === -1 ? 'selected' : ''}>-1</option>
                     </select>
                 </div>
+                ${driver ? `
+                <div class="form-group">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">Driver Length Param</label>
+                    <input type="text" value="${driver.lenParam || ''}" oninput="window.wizard.updateSliderDriverParam('${driver.id}', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                </div>
+                ` : ''}
             `;
 
         }
@@ -540,6 +557,101 @@ export class MechanismWizard {
             const list = $('componentList');
             if (list) list.innerHTML = this.renderComponentList();
         }
+    }
+
+    convertSelectedBarToSlider() {
+        if (this.selectedComponentIndex < 0) return;
+        const bar = this.components[this.selectedComponentIndex];
+        if (!bar || bar.type !== 'bar') return;
+
+        const findPointCoords = (pointId) => {
+            if (!pointId) return { x: 0, y: 0 };
+            for (const comp of this.components) {
+                if (comp.type === 'polygon' && comp.points) {
+                    const hit = comp.points.find(p => p.id === pointId);
+                    if (hit && Number.isFinite(Number(hit.x)) && Number.isFinite(Number(hit.y))) {
+                        return { x: Number(hit.x), y: Number(hit.y) };
+                    }
+                    continue;
+                }
+                for (const key of ['p1', 'p2', 'p3']) {
+                    const pt = comp[key];
+                    if (pt && pt.id === pointId && Number.isFinite(Number(pt.x)) && Number.isFinite(Number(pt.y))) {
+                        return { x: Number(pt.x), y: Number(pt.y) };
+                    }
+                }
+            }
+            return { x: 0, y: 0 };
+        };
+
+        const ids = new Set(this.getAllPointIds());
+        let sIdx = 1;
+        while (ids.has(`S${sIdx}`)) sIdx++;
+        const sliderPointId = `S${sIdx}`;
+
+        const p1 = bar.p1 || { id: '', type: 'fixed', x: 0, y: 0 };
+        const p2 = bar.p2 || { id: '', type: 'fixed', x: 100, y: 0 };
+        const p1Coords = Number.isFinite(Number(p1.x)) && Number.isFinite(Number(p1.y))
+            ? { x: Number(p1.x), y: Number(p1.y) }
+            : findPointCoords(p1.id);
+        const p2Coords = Number.isFinite(Number(p2.x)) && Number.isFinite(Number(p2.y))
+            ? { x: Number(p2.x), y: Number(p2.y) }
+            : findPointCoords(p2.id);
+
+        let tIdx = 1;
+        const nextTrackId = () => {
+            while (ids.has(`T${tIdx}`)) tIdx++;
+            const id = `T${tIdx}`;
+            ids.add(id);
+            tIdx++;
+            return id;
+        };
+
+        const trackId1 = nextTrackId();
+        const trackId2 = nextTrackId();
+
+        const midX = (p1Coords.x + p2Coords.x) / 2;
+        const midY = (p1Coords.y + p2Coords.y) / 2;
+        const midLen = Math.hypot(midX - p1Coords.x, midY - p1Coords.y);
+
+        const sliderComp = {
+            type: 'slider',
+            id: `Slider${sIdx}`,
+            color: '#8e44ad',
+            p1: { id: trackId1, type: 'fixed', x: p1Coords.x, y: p1Coords.y },
+            p2: { id: trackId2, type: 'fixed', x: p2Coords.x, y: p2Coords.y },
+            p3: { id: sliderPointId, type: 'floating', x: midX, y: midY },
+            sign: 1,
+            driverId: bar.id
+        };
+
+        bar.p2 = { id: sliderPointId, type: 'existing' };
+        bar.isInput = false;
+        if (bar.lenParam) {
+            if (!this.topology.params) this.topology.params = { theta: 0 };
+            this.topology.params[bar.lenParam] = Math.round(midLen);
+        }
+
+        this.components.splice(this.selectedComponentIndex, 1, bar);
+        this.components.push(sliderComp);
+        this.selectedComponentIndex = this.components.length - 1;
+        this.render();
+        this.syncTopology();
+    }
+
+    convertBarToSliderById(barId) {
+        const idx = this.components.findIndex(c => c.id === barId && c.type === 'bar');
+        if (idx < 0) return;
+        this.selectedComponentIndex = idx;
+        this.convertSelectedBarToSlider();
+    }
+
+    updateSliderDriverParam(driverId, val) {
+        const driver = this.components.find(c => c.id === driverId && c.type === 'bar');
+        if (!driver) return;
+        driver.lenParam = val;
+        const list = $('componentList');
+        if (list) list.innerHTML = this.renderComponentList();
     }
 
     updatePointProp(pointKey, prop, val) {
@@ -891,7 +1003,7 @@ export class MechanismWizard {
         this.components.forEach(c => {
             if (c.type === 'slider' && c.p1?.id && c.p2?.id && c.p3?.id) {
                 const sliderId = c.p3.id;
-                const driver = this.components.find(b => b.type === 'bar' && b.lenParam && (b.p1?.id === sliderId || b.p2?.id === sliderId));
+                const driver = c.driverId ? this.components.find(b => b.id === c.driverId && b.type === 'bar') : this.components.find(b => b.type === 'bar' && b.lenParam && (b.p1?.id === sliderId || b.p2?.id === sliderId));
                 if (driver) {
                     const otherId = driver.p1.id === sliderId ? driver.p2.id : driver.p1.id;
                     steps.push({

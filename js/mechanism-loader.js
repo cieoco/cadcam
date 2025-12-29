@@ -768,7 +768,11 @@ function setupLinkClickHandler() {
     const wizard = window.wizard;
 
     if (drawState === 'SELECT') {
-      const items = [{ label: '刪除桿件', action: () => id && removeFromTopology(id) }];
+      const items = [];
+      if (wizard && id && Array.isArray(wizard.components) && wizard.components.find(c => c.type === 'bar' && c.id === id)) {
+        items.push({ label: 'Convert to Slider', action: () => wizard.convertBarToSliderById(id) });
+      }
+      items.push({ label: '刪除桿件', action: () => id && removeFromTopology(id) });
       openPropertySheet(items, `桿件 ${id || ''} 屬性`, id);
       return;
     }
