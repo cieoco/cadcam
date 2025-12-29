@@ -61,11 +61,20 @@ cadcam/
 
 #### 4. 🦀 多連桿機構 (Multilink Wizard) **(NEW)**
 
+
+
 - **應用**：客製化複雜機構 (如夾爪、仿生獸腿、折疊機構)
 - **特點**：
   - **互動編輯**：提供「新增二孔桿」、「新增三角桿」等工具。
   - **範本系統**：支援載入 JSON 範本 (如夾爪、模擬滑塊)。
   - **自動求解**：內建 Dyad Solver，自動計算節點位置。
+
+### Triangle Parameter Naming (Multilink)
+
+- gParam: base length (P1-P2)
+- r1Param: side length (P1-P3)
+- r2Param: side length (P2-P3)
+- JSON step keys use g_param / r1_param / r2_param and map 1:1 to the above.
 
 #### 5. ✏️ 桿件繪圖工具 (Bar Drawer) **(NEW)**
 
