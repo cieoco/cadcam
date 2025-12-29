@@ -567,7 +567,43 @@ export class MechanismWizard {
         // 1. Ground 步驟
         allPointsMap.forEach((info, id) => {
             if (info.type === 'fixed') {
-                steps.push({ id, type: 'ground', x: parseFloat(info.x) || 0, y: parseFloat(info.y) || 0 });
+                const step = { id, type: 'ground', x: parseFloat(info.x) || 0, y: parseFloat(info.y) || 0 };
+
+                // 🌟 核心增強：支援固定桿 (Ground Bar) 動態調整
+                // 檢查是否有連桿連接此固定點與另一個「已處理過」的固定點
+                const groundBar = this.components.find(c => {
+                    if (c.type !== 'bar' || !c.lenParam) return false;
+                    const otherId = (c.p1.id === id) ? c.p2.id : c.p1.id;
+                    const otherPt = allPointsMap.get(otherId);
+                    // 必須兩端都是固定點，且另一端已經在 steps 中 (已處理過)
+                    return otherPt && otherPt.type === 'fixed' && steps.find(s => s.id === otherId);
+                });
+
+                if (groundBar) {
+                    const otherId = (groundBar.p1.id === id) ? groundBar.p2.id : groundBar.p1.id;
+                    const otherPt = allPointsMap.get(otherId);
+                    if (otherPt) {
+                        const dx = info.x - otherPt.x;
+                        const dy = info.y - otherPt.y;
+                        // 判定主軸方向 (水平或垂直)
+                        if (Math.abs(dx) >= Math.abs(dy)) {
+                            step.x_param = groundBar.lenParam;
+                            step.x_offset = otherPt.x;
+                            // 如果位移是負的，我們讓參數代表位移量 (可能為負)，或者未來支援 param_sign
+                            // 目前 solver 是 offset + paramValue
+                            if (dx < 0) {
+                                // 暫時維持原樣，使用者滑桿往右拉，點會往右移
+                            }
+                            delete step.x;
+                        } else {
+                            step.y_param = groundBar.lenParam;
+                            step.y_offset = otherPt.y;
+                            delete step.y;
+                        }
+                    }
+                }
+
+                steps.push(step);
                 joints.add(id);
             }
         });

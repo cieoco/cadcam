@@ -222,6 +222,12 @@ if (document.readyState === 'loading') {
   initMechanismPage();
 }
 
+// 🌟 暴露給全域 (供非模組腳本或主控台使用)
+window.initMechanismPage = initMechanismPage;
+window.updatePreview = updatePreview;
+window.pushTopologyHistory = pushTopologyHistory;
+window.undoTopology = undoTopology;
+
 /**
  * 設定連結點擊互動功能 (Add Hole)
  */

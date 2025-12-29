@@ -426,6 +426,12 @@ export function updatePreview() {
         const svgWrap = $("svgWrap");
         const isInvalid = !sol || sol.isValid === false;
 
+        // 🌟 顯示警告橫幅 (不論是否在阻力模式)
+        const warning = document.getElementById('invalidWarning');
+        if (warning) {
+            warning.style.display = isInvalid ? 'block' : 'none';
+        }
+
         // 🌟 阻力模式 (Resistance Mode) 🌟
         // 當使用者拖曳滑桿碰到死點時，強制回彈
         if (isInvalid) {
@@ -446,6 +452,7 @@ export function updatePreview() {
             } else {
                 // 如果連一個有效解都沒有 (剛載入就是壞的)，那就只好顯示錯誤
                 log(`${mods.config.name}: invalid parameters, adjust values.`);
+
                 if (!svgWrap.firstChild) {
                     svgWrap.textContent = "(invalid)";
                     $("partsWrap").innerHTML = "";
@@ -802,4 +809,11 @@ export function setupUIHandlers() {
             }, 1000);
         });
     }
+
+    // 🌟 核心修正：確保所有機構載入時都能顯示動態滑桿
+    updateDynamicParams();
 }
+
+// 🌟 暴露給全域
+window.updateDynamicParams = updateDynamicParams;
+window.setupUIHandlers = setupUIHandlers;

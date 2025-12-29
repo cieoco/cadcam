@@ -182,7 +182,10 @@ export function solveTopology(topologyOrParams, params) {
                 let x, y;
 
                 if (step.x_param) {
-                    const paramValue = Number(actualParams[step.x_param] || (topology.params && topology.params[step.x_param]) || 0);
+                    const paramValue = Number(
+                        (actualParams[step.x_param] !== undefined) ? actualParams[step.x_param] :
+                            (topology.params && topology.params[step.x_param] !== undefined) ? topology.params[step.x_param] : 0
+                    );
                     const offset = step.x_offset || 0;
                     x = offset + paramValue;
                 } else {
@@ -190,7 +193,10 @@ export function solveTopology(topologyOrParams, params) {
                 }
 
                 if (step.y_param) {
-                    const paramValue = Number(actualParams[step.y_param] || (topology.params && topology.params[step.y_param]) || 0);
+                    const paramValue = Number(
+                        (actualParams[step.y_param] !== undefined) ? actualParams[step.y_param] :
+                            (topology.params && topology.params[step.y_param] !== undefined) ? topology.params[step.y_param] : 0
+                    );
                     const offset = step.y_offset || 0;
                     y = offset + paramValue;
                 } else {

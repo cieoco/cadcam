@@ -144,6 +144,12 @@
                                 style="width: 100%; height: 100%; display: flex; justify-content: center; border: none;">
                             </div>
 
+                            <!-- 🌟 幾何極限警告橫幅 -->
+                            <div id="invalidWarning"
+                                style="position: absolute; top: 0; left: 0; width: 100%; background: rgba(231, 76, 60, 0.9); color: white; padding: 10px; text-align: center; font-weight: bold; z-index: 1000; display: none; backdrop-filter: blur(4px);">
+                                ⚠️ 幾何極限已達：當前長度組合在該角度下不可行
+                            </div>
+
                             <!-- Overlay Controls -->
                             <div id="thetaSliderContainer"
                                 style="position:absolute; top:10px; left:10px; padding:6px 10px; background:transparent; pointer-events: none; display: none;">
@@ -264,16 +270,24 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script type="module">
-        import(`./js/mechanism-loader.js?t=${Date.now()}`);
+    <script type="module" src="js/mechanism-loader.js"></script>
+    <script>
+        // 非模組邏輯：UI 介面控制
+        window.addEventListener('DOMContentLoaded', () => {
+            const btnCloseProp = document.getElementById('btnCloseProp');
+            const btnApplyProp = document.getElementById('btnApplyProp');
+            const propertySheet = document.getElementById('propertySheet');
 
-        document.getElementById('btnCloseProp').onclick = function () {
-            const sheet = document.getElementById('propertySheet');
-            sheet.classList.remove('open');
-            setTimeout(() => { sheet.style.display = 'none'; }, 300);
-        };
+            const closeSheet = () => {
+                if (propertySheet) {
+                    propertySheet.classList.remove('open');
+                    setTimeout(() => { propertySheet.style.display = 'none'; }, 300);
+                }
+            };
 
-        document.getElementById('btnApplyProp').onclick = document.getElementById('btnCloseProp').onclick;
+            if (btnCloseProp) btnCloseProp.onclick = closeSheet;
+            if (btnApplyProp) btnApplyProp.onclick = closeSheet;
+        });
     </script>
 </body>
 
