@@ -573,8 +573,13 @@ export class MechanismWizard {
                 // 檢查是否有連桿連接此固定點與另一個「已處理過」的固定點
                 const groundBar = this.components.find(c => {
                     if (c.type !== 'bar' || !c.lenParam) return false;
+                    if (c.p1.id !== id && c.p2.id !== id) return false; // 🌟 必須連接到當前點
                     const otherId = (c.p1.id === id) ? c.p2.id : c.p1.id;
                     const otherPt = allPointsMap.get(otherId);
+
+                    // Debug Log
+                    // console.log(`[Wizard] Checking bar ${c.id} for ${id}: other=${otherId}, type=${otherPt?.type}, inSteps=${!!steps.find(s => s.id === otherId)}`);
+
                     // 必須兩端都是固定點，且另一端已經在 steps 中 (已處理過)
                     return otherPt && otherPt.type === 'fixed' && steps.find(s => s.id === otherId);
                 });
@@ -585,19 +590,14 @@ export class MechanismWizard {
                     if (otherPt) {
                         const dx = info.x - otherPt.x;
                         const dy = info.y - otherPt.y;
-                        // 判定主軸方向 (水平或垂直)
-                        if (Math.abs(dx) >= Math.abs(dy)) {
-                            step.x_param = groundBar.lenParam;
-                            step.x_offset = otherPt.x;
-                            // 如果位移是負的，我們讓參數代表位移量 (可能為負)，或者未來支援 param_sign
-                            // 目前 solver 是 offset + paramValue
-                            if (dx < 0) {
-                                // 暫時維持原樣，使用者滑桿往右拉，點會往右移
-                            }
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist > 0) {
+                            step.dist_param = groundBar.lenParam;
+                            step.ref_id = otherId;
+                            step.ux = dx / dist; // 單位向量 X
+                            step.uy = dy / dist; // 單位向量 Y
                             delete step.x;
-                        } else {
-                            step.y_param = groundBar.lenParam;
-                            step.y_offset = otherPt.y;
                             delete step.y;
                         }
                     }

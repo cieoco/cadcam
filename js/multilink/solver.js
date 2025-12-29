@@ -181,26 +181,28 @@ export function solveTopology(topologyOrParams, params) {
             if (step.type === 'ground') {
                 let x, y;
 
-                if (step.x_param) {
-                    const paramValue = Number(
-                        (actualParams[step.x_param] !== undefined) ? actualParams[step.x_param] :
-                            (topology.params && topology.params[step.x_param] !== undefined) ? topology.params[step.x_param] : 0
-                    );
-                    const offset = step.x_offset || 0;
-                    x = offset + paramValue;
+                if (step.dist_param) {
+                    const dist = getVal(step, 'dist');
+                    const ref = points[step.ref_id];
+                    if (ref) {
+                        x = ref.x + (step.ux || 0) * dist;
+                        y = ref.y + (step.uy || 0) * dist;
+                    } else {
+                        x = step.x || 0;
+                        y = step.y || 0;
+                    }
                 } else {
-                    x = step.x || 0;
-                }
+                    if (step.x_param) {
+                        x = (step.x_offset || 0) + getVal(step, 'x');
+                    } else {
+                        x = step.x || 0;
+                    }
 
-                if (step.y_param) {
-                    const paramValue = Number(
-                        (actualParams[step.y_param] !== undefined) ? actualParams[step.y_param] :
-                            (topology.params && topology.params[step.y_param] !== undefined) ? topology.params[step.y_param] : 0
-                    );
-                    const offset = step.y_offset || 0;
-                    y = offset + paramValue;
-                } else {
-                    y = step.y || 0;
+                    if (step.y_param) {
+                        y = (step.y_offset || 0) + getVal(step, 'y');
+                    } else {
+                        y = step.y || 0;
+                    }
                 }
 
                 points[step.id] = { x: Number(x), y: Number(y) };

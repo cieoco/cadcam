@@ -97,13 +97,6 @@ function applySnapshot(snapshot) {
     Object.keys(mfg).forEach((key) => setValueById(key, mfg[key]));
     Object.keys(viewParams).forEach((key) => setValueById(key, viewParams[key]));
 
-    updateDynamicParams();
-
-    Object.keys(dynamicParams).forEach((key) => {
-        setValueById(`dyn_${key}`, dynamicParams[key]);
-        setValueById(`dyn_${key}_range`, dynamicParams[key]);
-    });
-
     if (window.wizard && topologyValue) {
         try {
             window.wizard.init(JSON.parse(topologyValue));
@@ -111,6 +104,14 @@ function applySnapshot(snapshot) {
             console.warn('[applySnapshot] Failed to init wizard from topology', e);
         }
     }
+
+    // 🌟 核心修正：移動到 Wizard 初始化之後，確保能抓到 Wizard 同步後的參數化 Topology
+    updateDynamicParams();
+
+    Object.keys(dynamicParams).forEach((key) => {
+        setValueById(`dyn_${key}`, dynamicParams[key]);
+        setValueById(`dyn_${key}_range`, dynamicParams[key]);
+    });
 
     const svgWrap = $("svgWrap");
     if (svgWrap) svgWrap.innerHTML = "";
@@ -321,14 +322,97 @@ export function updateDynamicParams() {
 
                 numInput.addEventListener('input', (e) => {
                     e.stopPropagation();
-                    rangeInput.value = numInput.value;
-                    debouncedUpdate();
+
+                    // 🌟 預判式約束檢查 (Predictive Constraints)
+                    const mods = getActiveModules();
+                    if (mods && mods.config && mods.config.id === 'multilink') {
+                        const { mech } = readInputs();
+                        // 必須先更新其他參數，才能計算當前參數的有效範圍
+                        // 但不能更新當前正在輸入的參數 (因為我們要檢查它)
+                        const dynContainer = document.getElementById('dynamicParamsContainer');
+                        if (dynContainer) {
+                            const inputs = dynContainer.querySelectorAll('input.dynamic-input');
+                            inputs.forEach(inp => {
+                                const vId = inp.dataset.varId;
+                                if (vId !== varId) {
+                                    mech[vId] = parseFloat(inp.value) || 0;
+                                }
+                            });
+                        }
+
+                        // 引入約束計算
+                        const constraints = mods.constraints || {};
+                        const calcFn = constraints.calculateValidRange;
+
+                        // 注意：我們需要動態 import constraints 模組，或者假設它已經掛載在 mods 上
+                        // 這裡假設 loader 會把 constraints 掛載上去，或者我們直接在這裡 import
+                        // 由於這是 UI 模組，直接 import 比較簡單
+                        import('../multilink/constraints.js').then(({ calculateValidRange }) => {
+                            const range = calculateValidRange(mech, varId);
+                            let val = parseFloat(numInput.value) || 0;
+
+                            if (range) {
+                                // 執行 Clamp
+                                if (val < range.min) val = range.min;
+                                if (val > range.max) val = range.max;
+
+                                // 如果數值被修正，更新 UI
+                                if (val !== parseFloat(numInput.value)) {
+                                    numInput.value = val;
+                                }
+
+                                // 視覺回饋：更新滑桿的 min/max (可選)
+                                // rangeInput.min = Math.max(0, range.min - 50); // 讓滑桿有點餘裕
+                                // rangeInput.max = range.max + 50;
+                            }
+
+                            rangeInput.value = val;
+                            debouncedUpdate();
+                        });
+                    } else {
+                        rangeInput.value = numInput.value;
+                        debouncedUpdate();
+                    }
                 }, true);
 
                 rangeInput.addEventListener('input', (e) => {
                     e.stopPropagation();
-                    numInput.value = rangeInput.value;
-                    debouncedUpdate();
+
+                    // 🌟 預判式約束檢查 (同上)
+                    const mods = getActiveModules();
+                    if (mods && mods.config && mods.config.id === 'multilink') {
+                        const { mech } = readInputs();
+                        const dynContainer = document.getElementById('dynamicParamsContainer');
+                        if (dynContainer) {
+                            const inputs = dynContainer.querySelectorAll('input.dynamic-input');
+                            inputs.forEach(inp => {
+                                const vId = inp.dataset.varId;
+                                if (vId !== varId) {
+                                    mech[vId] = parseFloat(inp.value) || 0;
+                                }
+                            });
+                        }
+
+                        import('../multilink/constraints.js').then(({ calculateValidRange }) => {
+                            const range = calculateValidRange(mech, varId);
+                            let val = parseFloat(rangeInput.value) || 0;
+
+                            if (range) {
+                                if (val < range.min) val = range.min;
+                                if (val > range.max) val = range.max;
+
+                                if (val !== parseFloat(rangeInput.value)) {
+                                    rangeInput.value = val;
+                                }
+                            }
+
+                            numInput.value = val;
+                            debouncedUpdate();
+                        });
+                    } else {
+                        numInput.value = rangeInput.value;
+                        debouncedUpdate();
+                    }
                 }, true);
             }
         } else {
@@ -446,6 +530,16 @@ export function updatePreview() {
                     // 注意：這裡不觸發 event，避免無窮迴圈
                 }
 
+                // 🌟 還原動態參數滑桿 (例如 L4)
+                if (lastMultilinkSolution.dynamicParams) {
+                    for (const [varId, val] of Object.entries(lastMultilinkSolution.dynamicParams)) {
+                        const inp = document.getElementById(`dyn_${varId}`);
+                        const range = document.getElementById(`dyn_${varId}_range`);
+                        if (inp) inp.value = val;
+                        if (range) range.value = val;
+                    }
+                }
+
                 // 繼續執行，用舊的有效解來繪圖
                 sol = lastMultilinkSolution;
                 log(`${mods.config.name}: limit reached, holding position.`);
@@ -464,12 +558,13 @@ export function updatePreview() {
             // 如果是有效解，記住它，以此作為下一次的回退點
             if (mods.config && mods.config.id === 'multilink') {
                 sol.inputTheta = mech.theta; // 記錄對應的輸入角度
+                sol.dynamicParams = collectDynamicParams(); // 🌟 記錄動態參數
                 lastMultilinkSolution = sol;
             }
         }
 
         if (mods.config && mods.config.id === 'multilink') {
-            lastMultilinkSolution = sol;
+            // lastMultilinkSolution = sol; // 🌟 移除冗餘且可能造成問題的賦值
 
             const showTrajectory = $("showTrajectory")?.checked;
             if (showTrajectory) {

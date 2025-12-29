@@ -6,7 +6,7 @@
 import { getMechanismFromURL, generateParameterHTML, MECHANISMS } from './mechanism-config.js';
 import { setupUIHandlers, updatePreview } from './ui/controls.js';
 import { downloadText, downloadZip, log, calcAdaptiveGridStep } from './utils.js';
-import { MechanismWizard } from './ui/wizard.js';
+import { MechanismWizard } from './ui/wizard.js?v=debug_1';
 
 const topologyHistory = [];
 
