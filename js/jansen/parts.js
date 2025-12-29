@@ -13,6 +13,64 @@ function solveTriangleVertex(b, a, c) {
     return { x: b * cosA, y: b * sinA };
 }
 
+function ensureCCW(points) {
+    let area = 0;
+    for (let i = 0; i < points.length; i++) {
+        const p1 = points[i];
+        const p2 = points[(i + 1) % points.length];
+        area += (p1.x * p2.y - p2.x * p1.y);
+    }
+    if (area < 0) return [...points].reverse();
+    return points;
+}
+
+function offsetPolygonInward(points, offset) {
+    if (!points || points.length < 3 || offset <= 0) return null;
+    const pts = ensureCCW(points);
+    const n = pts.length;
+
+    const edges = [];
+    for (let i = 0; i < n; i++) {
+        const p1 = pts[i];
+        const p2 = pts[(i + 1) % n];
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const len = Math.hypot(dx, dy);
+        if (len === 0) return null;
+        const ux = dx / len;
+        const uy = dy / len;
+        // CCW polygon: inward normal is left normal (-uy, ux)
+        const nx = -uy;
+        const ny = ux;
+        const pOffset = { x: p1.x + nx * offset, y: p1.y + ny * offset };
+        edges.push({ p: pOffset, d: { x: ux, y: uy } });
+    }
+
+    const intersect = (l1, l2) => {
+        const rx = l1.d.x;
+        const ry = l1.d.y;
+        const sx = l2.d.x;
+        const sy = l2.d.y;
+        const denom = rx * sy - ry * sx;
+        if (Math.abs(denom) < 1e-9) return null;
+        const qpx = l2.p.x - l1.p.x;
+        const qpy = l2.p.y - l1.p.y;
+        const t = (qpx * sy - qpy * sx) / denom;
+        return { x: l1.p.x + t * rx, y: l1.p.y + t * ry };
+    };
+
+    const out = [];
+    for (let i = 0; i < n; i++) {
+        const lPrev = edges[(i - 1 + n) % n];
+        const lCurr = edges[i];
+        const p = intersect(lPrev, lCurr);
+        if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+        out.push(p);
+    }
+
+    return out;
+}
+
 export function generateJansenParts(params) {
     // 1. Determine Topology
     let topology = JANSEN_TOPOLOGY;
@@ -26,7 +84,8 @@ export function generateJansenParts(params) {
 
     const {
         barW = 15, margin = 7, holeD = 3.2,
-        workX, workY, spacing = 8
+        workX, workY, spacing = 8,
+        triHollow = false
     } = params;
 
     const parts = [];
@@ -87,14 +146,25 @@ export function generateJansenParts(params) {
             const minX = Math.min(...xs), maxX = Math.max(...xs);
             const minY = Math.min(...ys), maxY = Math.max(...ys);
 
-            const triW = (maxX - minX) + 2 * margin;
+            const outerR = Math.max(barW / 2, holeD / 2);
+            const pad = Math.max(margin, outerR);
+            const triW = (maxX - minX) + 2 * pad;
             // Height calculation
             const rawH = maxY - minY;
-            const triH = Math.max(rawH + 2 * margin, barW + 2 * margin);
+            const triH = Math.max(rawH + 2 * pad, barW + 2 * pad);
 
-            const offsetX = margin - minX;
+            const offsetX = pad - minX;
             // Center vertically if thin
-            const offsetY = margin - minY + (triH - (rawH + 2 * margin)) / 2;
+            const offsetY = pad - minY + (triH - (rawH + 2 * pad)) / 2;
+
+            const basePoints = [
+                { x: 0 + offsetX, y: 0 + offsetY },
+                { x: len1 + offsetX, y: 0 + offsetY },
+                { x: v.x + offsetX, y: v.y + offsetY }
+            ];
+
+            const innerPoints = triHollow ? offsetPolygonInward(basePoints, barW) : null;
+            const hollowEnabled = triHollow && innerPoints && innerPoints.length === 3;
 
             parts.push({
                 id: p.id,
@@ -106,7 +176,17 @@ export function generateJansenParts(params) {
                     { x: 0 + offsetX, y: 0 + offsetY },      // P1
                     { x: len1 + offsetX, y: 0 + offsetY },   // P3
                     { x: v.x + offsetX, y: v.y + offsetY }   // P4
-                ]
+                ],
+                outline: [
+                    { x: 0 + offsetX, y: 0 + offsetY, r: outerR },
+                    { x: len1 + offsetX, y: 0 + offsetY, r: outerR },
+                    { x: v.x + offsetX, y: v.y + offsetY, r: outerR }
+                ],
+                innerOutline: hollowEnabled ? [
+                    { x: innerPoints[0].x, y: innerPoints[0].y, r: outerR },
+                    { x: innerPoints[1].x, y: innerPoints[1].y, r: outerR },
+                    { x: innerPoints[2].x, y: innerPoints[2].y, r: outerR }
+                ] : null
             });
         }
     }
@@ -127,13 +207,27 @@ export function generateJansenParts(params) {
             y: yCursor + h.y
         }));
 
+        const placedOutline = p.outline ? p.outline.map(c => ({
+            x: xCursor + c.x,
+            y: yCursor + c.y,
+            r: c.r
+        })) : null;
+
+        const placedInnerOutline = p.innerOutline ? p.innerOutline.map(c => ({
+            x: xCursor + c.x,
+            y: yCursor + c.y,
+            r: c.r
+        })) : null;
+
         out.push({
             id: p.id,
             rect: { x: xCursor, y: yCursor, w: p.w, h: p.h },
             holes: placedHoles,
+            outline: placedOutline,
+            innerOutline: placedInnerOutline,
             color: p.color,
             holeD,
-            barStyle: params.barStyle
+            barStyle: p.barStyle || params.barStyle
         });
 
         rowH = Math.max(rowH, p.h);

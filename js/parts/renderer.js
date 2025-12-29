@@ -53,15 +53,24 @@ export function renderPartsLayout(parts, workX, workY) {
             console.log('Rendering outline for', p.id, p.outline);
             const pathData = computeTangentHullPath(p.outline, tx, ty, scale);
             console.log('Path data:', pathData);
-            svg.appendChild(
-                svgEl("path", {
-                    d: pathData,
-                    fill: p.color ? `${p.color}15` : "rgba(0,0,0,0.03)",
-                    stroke: p.color || "#111",
-                    "stroke-width": 1.5,
-                    "stroke-linejoin": "round"
-                })
-            );
+            let combinedPath = pathData;
+            let fillRule = undefined;
+            if (p.innerOutline && p.innerOutline.length >= 2) {
+                const innerPath = computeTangentHullPath(p.innerOutline, tx, ty, scale);
+                if (innerPath) {
+                    combinedPath = `${pathData} ${innerPath}`;
+                    fillRule = "evenodd";
+                }
+            }
+            const pathAttrs = {
+                d: combinedPath,
+                fill: p.color ? `${p.color}15` : "rgba(0,0,0,0.03)",
+                stroke: p.color || "#111",
+                "stroke-width": 1.5,
+                "stroke-linejoin": "round"
+            };
+            if (fillRule) pathAttrs["fill-rule"] = fillRule;
+            svg.appendChild(svgEl("path", pathAttrs));
         }
         // 舊的繪製邏輯 (Rect/Circle/Polygon)
         else if (p.barStyle === 'disk') {
