@@ -858,7 +858,7 @@ export class MechanismWizard {
         this.components.forEach(c => {
             if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
                 steps.push({
-                    id: c.p3.id, type: 'dyad', p1: c.p1.id, p2: c.p2.id,
+                    id: c.p3.id, type: 'rigid_triangle', p1: c.p1.id, p2: c.p2.id,
                     r1_param: c.r1Param, r2_param: c.r2Param, sign: c.sign || 1
                 });
                 polygons.push({ points: [c.p1.id, c.p2.id, c.p3.id], color: c.color, alpha: 0.3 });
@@ -892,8 +892,26 @@ export class MechanismWizard {
         // 5. Links 視覺化
         this.components.forEach(c => {
             if (c.type === 'bar' && c.p1?.id && c.p2?.id) {
-                visualization.links.push({ id: c.id, p1: c.p1.id, p2: c.p2.id, color: c.color, style: c.isInput ? 'crank' : 'normal', lenParam: c.lenParam });
+                visualization.links.push({
+                    id: c.id,
+                    p1: c.p1.id,
+                    p2: c.p2.id,
+                    color: c.color,
+                    style: c.isInput ? 'crank' : 'normal',
+                    lenParam: c.lenParam,
+                    hidden: Boolean(c.hidden)
+                });
             } else if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
+                if (c.gParam) {
+                    visualization.links.push({
+                        id: `${c.id}_base`,
+                        p1: c.p1.id,
+                        p2: c.p2.id,
+                        color: c.color,
+                        lenParam: c.gParam,
+                        hidden: true
+                    });
+                }
                 visualization.links.push({ p1: c.p1.id, p2: c.p3.id, color: c.color });
                 visualization.links.push({ p1: c.p2.id, p2: c.p3.id, color: c.color });
                 visualization.links.push({ p1: c.p1.id, p2: c.p2.id, color: c.color, style: 'dashed' });
@@ -939,6 +957,7 @@ export class MechanismWizard {
             tracePoint: this.topology.tracePoint || Array.from(joints)[0] || '',
             visualization: { links: visualization.links, polygons, joints: Array.from(joints) },
             parts: this.components.map(c => {
+                if (c.skipPart) return null;
                 if (c.type === 'bar') {
                     return { id: `${c.id}(${c.lenParam})`, type: 'bar', len_param: c.lenParam, color: c.color };
                 } else if (c.type === 'triangle') {

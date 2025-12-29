@@ -35,6 +35,7 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
     // 2. Links
     if (links) {
         for (const link of links) {
+            if (link.hidden) continue;
             const p1 = pts[link.p1];
             const p2 = pts[link.p2];
             if (!p1 || !p2) {

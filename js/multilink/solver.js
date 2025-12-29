@@ -60,6 +60,7 @@ function autoDyadFromLinks(topo, params) {
                 // 優先序：l.len_param -> l.lenParam -> topo.params[l.id]? -> l.id
                 let lenParam = l.len_param || l.lenParam;
                 if (!lenParam && topo.params && topo.params[l.id] !== undefined) lenParam = l.id;
+                if (!lenParam) return;
 
                 barLinks.push({ p1: l.p1, p2: l.p2, len_param: lenParam });
             }
@@ -212,7 +213,7 @@ export function solveTopology(topologyOrParams, params) {
     // --- 自動任務排序 (確保 Ground > Crank > Others) ---
     // 這樣使用者在 JSON 中不論順序如何，計算都不會因為依賴點未解而掛掉
     const sortedSteps = [...topology.steps].sort((a, b) => {
-        const order = { 'ground': 0, 'input_crank': 1, 'dyad': 2, 'joint': 3 };
+        const order = { 'ground': 0, 'input_crank': 1, 'dyad': 2, 'rigid_triangle': 2, 'joint': 3 };
         const oa = order[a.type] ?? 99;
         const ob = order[b.type] ?? 99;
         if (oa !== ob) return oa - ob;
@@ -271,7 +272,7 @@ export function solveTopology(topologyOrParams, params) {
                     y: center.y + r * Math.sin(ang)
                 };
             }
-            else if (step.type === 'dyad') {
+            else if (step.type === 'dyad' || step.type === 'rigid_triangle') {
                 const p1 = points[step.p1];
                 const p2 = points[step.p2];
                 if (!p1 || !p2) {
@@ -337,7 +338,7 @@ export function solveTopology(topologyOrParams, params) {
     // 如果有 Dyad 或 Crank 解不出來 (undefined/NaN)，則視為機構卡死
     let allResolved = true;
     for (const s of topology.steps) {
-        if ((s.type === 'dyad' || s.type === 'input_crank') && !points[s.id]) {
+        if ((s.type === 'dyad' || s.type === 'rigid_triangle' || s.type === 'input_crank') && !points[s.id]) {
             allResolved = false;
             break;
         }
