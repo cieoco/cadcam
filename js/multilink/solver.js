@@ -114,6 +114,44 @@ function autoDyadFromLinks(topo, params) {
 }
 
 /**
+ * Infer ground distance parameters from links between ground points.
+ * This allows fixed ground bars to be driven by len_param (e.g., L4).
+ */
+function autoGroundDistFromLinks(topo) {
+    if (!topo || !topo.steps || !topo.visualization || !Array.isArray(topo.visualization.links)) {
+        return topo;
+    }
+
+    const steps = topo.steps.map(s => ({ ...s }));
+    const stepMap = new Map(steps.map(s => [s.id, s]));
+
+    topo.visualization.links.forEach((link) => {
+        if (!link || !link.p1 || !link.p2) return;
+        const lenParam = link.len_param || link.lenParam;
+        if (!lenParam) return;
+
+        const s1 = stepMap.get(link.p1);
+        const s2 = stepMap.get(link.p2);
+        if (!s1 || !s2) return;
+        if (s1.type !== 'ground' || s2.type !== 'ground') return;
+        if (s1.dist_param || s2.dist_param) return;
+        if (s1.x === undefined || s1.y === undefined || s2.x === undefined || s2.y === undefined) return;
+
+        const dx = s2.x - s1.x;
+        const dy = s2.y - s1.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= 0) return;
+
+        s2.dist_param = lenParam;
+        s2.ref_id = s1.id;
+        s2.ux = dx / dist;
+        s2.uy = dy / dist;
+    });
+
+    return { ...topo, steps };
+}
+
+/**
  * 通用求解函數
  * @param {Object|string} topologyOrParams - 機構定義或參數物件
  * @param {Object} [params] - 當前參數 (如果第一個參數是拓撲)
@@ -140,6 +178,9 @@ export function solveTopology(topologyOrParams, params) {
     if (!topology || !topology.steps) {
         return { isValid: true, points: {}, B: undefined };
     }
+
+    // Auto-infer ground distance parameters from links (for fixed ground bars).
+    topology = autoGroundDistFromLinks(topology);
 
     // 自動補足缺失的 Dyad 步驟
     topology = autoDyadFromLinks(topology, actualParams);
@@ -172,7 +213,18 @@ export function solveTopology(topologyOrParams, params) {
     // 這樣使用者在 JSON 中不論順序如何，計算都不會因為依賴點未解而掛掉
     const sortedSteps = [...topology.steps].sort((a, b) => {
         const order = { 'ground': 0, 'input_crank': 1, 'dyad': 2, 'joint': 3 };
-        return (order[a.type] ?? 99) - (order[b.type] ?? 99);
+        const oa = order[a.type] ?? 99;
+        const ob = order[b.type] ?? 99;
+        if (oa !== ob) return oa - ob;
+
+        // For ground points, resolve absolute points before dependent (ref_id) points.
+        if (a.type === 'ground' && b.type === 'ground') {
+            const aDep = Boolean(a.dist_param && a.ref_id);
+            const bDep = Boolean(b.dist_param && b.ref_id);
+            if (aDep !== bDep) return aDep ? 1 : -1;
+        }
+
+        return 0;
     });
 
     // 處理所有步驟
