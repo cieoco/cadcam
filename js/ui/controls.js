@@ -616,7 +616,7 @@ export function updatePreview() {
         );
 
         const partsFn = mods.parts[mods.config.partsFn];
-        const parts = partsFn({ ...mech, ...partSpec });
+        const parts = partsFn({ ...mech, ...partSpec, ...(sol ? sol.dynamicParams : {}) });
 
         $("partsWrap").innerHTML = "";
         $("partsWrap").appendChild(

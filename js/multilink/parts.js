@@ -53,6 +53,10 @@ export function generateMultilinkParts(params) {
                 holes: [
                     { x: margin, y: barW / 2 },
                     { x: margin + L, y: barW / 2 }
+                ],
+                outline: [
+                    { x: margin, y: barW / 2, r: holeD / 2 + margin },
+                    { x: margin + L, y: barW / 2, r: holeD / 2 + margin }
                 ]
             });
         }
@@ -63,6 +67,9 @@ export function generateMultilinkParts(params) {
             const len1 = getVal(pName1); // Base
             const len2 = getVal(pName2); // Left
             const len3 = getVal(pName3); // Right
+
+            console.log(`Triangle ${p.id}: len1=${len1}, len2=${len2}, len3=${len3}, margin=${margin}, holeD=${holeD}`);
+
 
             const v = solveTriangleVertex(len2, len3, len1);
 
@@ -88,6 +95,11 @@ export function generateMultilinkParts(params) {
                     { x: 0 + offsetX, y: 0 + offsetY },
                     { x: len1 + offsetX, y: 0 + offsetY },
                     { x: v.x + offsetX, y: v.y + offsetY }
+                ],
+                outline: [
+                    { x: 0 + offsetX, y: 0 + offsetY, r: holeD / 2 + margin },
+                    { x: len1 + offsetX, y: 0 + offsetY, r: holeD / 2 + margin },
+                    { x: v.x + offsetX, y: v.y + offsetY, r: holeD / 2 + margin }
                 ]
             });
         }
@@ -109,10 +121,21 @@ export function generateMultilinkParts(params) {
             y: yCursor + h.y
         }));
 
+        // Transform outline to absolute coords
+        let placedOutline = null;
+        if (p.outline) {
+            placedOutline = p.outline.map(c => ({
+                x: xCursor + c.x,
+                y: yCursor + c.y,
+                r: c.r
+            }));
+        }
+
         out.push({
             id: p.id,
             rect: { x: xCursor, y: yCursor, w: p.w, h: p.h },
             holes: placedHoles,
+            outline: placedOutline,
             color: p.color,
             holeD,
             barStyle: params.barStyle

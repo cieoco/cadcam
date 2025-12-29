@@ -48,8 +48,23 @@ export function renderPartsLayout(parts, workX, workY) {
     for (const p of parts) {
         const r = p.rect;
 
-        // 繪製外框
-        if (p.barStyle === 'disk') {
+        // 優先使用 Outline (Tangent Hull)
+        if (p.outline && p.outline.length >= 2) {
+            console.log('Rendering outline for', p.id, p.outline);
+            const pathData = computeTangentHullPath(p.outline, tx, ty, scale);
+            console.log('Path data:', pathData);
+            svg.appendChild(
+                svgEl("path", {
+                    d: pathData,
+                    fill: p.color ? `${p.color}15` : "rgba(0,0,0,0.03)",
+                    stroke: p.color || "#111",
+                    "stroke-width": 1.5,
+                    "stroke-linejoin": "round"
+                })
+            );
+        }
+        // 舊的繪製邏輯 (Rect/Circle/Polygon)
+        else if (p.barStyle === 'disk') {
             const r = p.rect;
             svg.appendChild(
                 svgEl("circle", {
@@ -138,6 +153,123 @@ export function renderPartsLayout(parts, workX, workY) {
     }
 
     return svg;
+}
+
+/**
+ * 計算多圓的外切輪廓路徑 (Tangent Hull)
+ * @param {Array} circles - Array of {x, y, r}
+ * @param {Function} tx - Transform X
+ * @param {Function} ty - Transform Y
+ * @param {number} scale - Scale factor
+ * @returns {string} SVG Path 'd' attribute
+ */
+function computeTangentHullPath(circles, tx, ty, scale) {
+    if (!circles || circles.length < 2) return "";
+
+    console.log('computeTangentHullPath input:', circles);
+
+    // Helper: Get tangent points between two circles
+    // Assumes equal radii for now (simplification for this use case)
+    // Returns { p1: {x,y}, p2: {x,y} } for the "outer" tangent on the Right side (CCW)
+    const getTangent = (c1, c2) => {
+        const dx = c2.x - c1.x;
+        const dy = c2.y - c1.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist === 0) {
+            console.warn('Circles coincide:', c1, c2);
+            return null;
+        }
+
+        // Normal vector (Right side for CCW traversal)
+        // Vec (dx, dy) -> Right Normal (dy, -dx)
+        const nx = dy / dist;
+        const ny = -dx / dist;
+
+        const r1 = c1.r;
+        const r2 = c2.r; // Should be equal
+
+        return {
+            start: { x: c1.x + nx * r1, y: c1.y + ny * r1 },
+            end: { x: c2.x + nx * r2, y: c2.y + ny * r2 }
+        };
+    };
+
+    let d = "";
+    const n = circles.length;
+
+    // Special case for 2 circles (Bar)
+    if (n === 2) {
+        const c1 = circles[0];
+        const c2 = circles[1];
+
+        // Tangent 1 (Right side P1->P2)
+        const t1 = getTangent(c1, c2);
+        // Tangent 2 (Right side P2->P1) -> effectively Left side P1->P2
+        const t2 = getTangent(c2, c1);
+
+        if (!t1 || !t2) return "";
+
+        // Start at T1 start
+        d += `M ${tx(t1.start.x)} ${ty(t1.start.y)} `;
+        // Line to T1 end
+        d += `L ${tx(t1.end.x)} ${ty(t1.end.y)} `;
+        // Arc around C2 to T2 start
+        // Sweep flag 0 (CCW in SVG coords? No, SVG Y is down. ty inverts Y.)
+        // In Math coords (Y up), we go CCW.
+        // In SVG coords (Y down), ty inverts Y, so CCW becomes CW visually?
+        // Let's check ty: H - (pad + y*scale). Yes, Y is inverted.
+        // So Math CCW = SVG CW.
+        // Arc from T1.end to T2.start around C2.
+        // We want the "outer" arc.
+        d += `A ${c2.r * scale} ${c2.r * scale} 0 1 0 ${tx(t2.start.x)} ${ty(t2.start.y)} `;
+
+        // Line to T2 end
+        d += `L ${tx(t2.end.x)} ${ty(t2.end.y)} `;
+
+        // Arc around C1 to T1 start
+        d += `A ${c1.r * scale} ${c1.r * scale} 0 1 0 ${tx(t1.start.x)} ${ty(t1.start.y)} `;
+
+        d += "Z";
+        return d;
+    }
+
+    // General case for N >= 3 (Polygon)
+    // Assume circles are ordered CCW (or at least consistent perimeter)
+    const tangents = [];
+    for (let i = 0; i < n; i++) {
+        const c1 = circles[i];
+        const c2 = circles[(i + 1) % n];
+        const t = getTangent(c1, c2);
+        if (t) tangents.push(t);
+        else console.warn('Failed to get tangent for', i, c1, c2);
+    }
+
+    if (tangents.length !== n) {
+        console.warn('Not enough tangents:', tangents);
+        return "";
+    }
+
+    d = "";
+    for (let i = 0; i < n; i++) {
+        const curr = tangents[i];
+        const next = tangents[(i + 1) % n];
+        const cNext = circles[(i + 1) % n];
+
+        if (i === 0) {
+            d += `M ${tx(curr.start.x)} ${ty(curr.start.y)} `;
+        }
+
+        // Line for current tangent
+        d += `L ${tx(curr.end.x)} ${ty(curr.end.y)} `;
+
+        // Arc around cNext from curr.end to next.start
+        // Sweep flag 0 (SVG CW) for convex outer corner
+        d += `A ${cNext.r * scale} ${cNext.r * scale} 0 0 0 ${tx(next.start.x)} ${ty(next.start.y)} `;
+    }
+
+    d += "Z";
+    console.log('Hull Path:', d);
+    return d;
 }
 
 /**

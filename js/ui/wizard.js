@@ -938,7 +938,14 @@ export class MechanismWizard {
             steps,
             tracePoint: this.topology.tracePoint || Array.from(joints)[0] || '',
             visualization: { links: visualization.links, polygons, joints: Array.from(joints) },
-            parts: this.components.filter(c => c.type === 'bar').map(c => ({ id: `${c.id}(${c.lenParam})`, type: 'bar', len_param: c.lenParam, color: c.color })),
+            parts: this.components.map(c => {
+                if (c.type === 'bar') {
+                    return { id: `${c.id}(${c.lenParam})`, type: 'bar', len_param: c.lenParam, color: c.color };
+                } else if (c.type === 'triangle') {
+                    return { id: c.id, type: 'triangle', len_params: [c.gParam, c.r1Param, c.r2Param], color: c.color };
+                }
+                return null;
+            }).filter(p => p),
             params,
             _wizard_data: this.components
         };

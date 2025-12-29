@@ -17,7 +17,18 @@ export function buildDXF(parts) {
     for (const p of parts) {
         const { x, y, w, h } = p.rect;
 
-        if (p.barStyle === 'disk') {
+        // 優先使用 Outline (Tangent Hull)
+        if (p.outline && p.outline.length >= 2) {
+            const hull = computeTangentHullDXF(p.outline);
+            for (const seg of hull) {
+                if (seg.type === 'line') {
+                    addLine(lines, seg.x1, seg.y1, seg.x2, seg.y2);
+                } else if (seg.type === 'arc') {
+                    addArc(lines, seg.x, seg.y, seg.r, seg.startAngle, seg.endAngle);
+                }
+            }
+        }
+        else if (p.barStyle === 'disk') {
             // 圓形
             addCircle(lines, x + w / 2, y + h / 2, p.diameter / 2);
         } else if (p.barStyle === 'rounded') {
@@ -109,4 +120,100 @@ function addArc(lines, x, y, r, startAngle, endAngle) {
     lines.push(" 40", r.toFixed(4));
     lines.push(" 50", startAngle.toFixed(4));
     lines.push(" 51", endAngle.toFixed(4));
+}
+
+/**
+ * 計算多圓的外切輪廓 (Tangent Hull) 並轉換為 DXF 線段
+ * @param {Array} circles - Array of {x, y, r}
+ * @returns {Array} Array of segments {type: 'line'|'arc', ...}
+ */
+function computeTangentHullDXF(circles) {
+    if (!circles || circles.length < 2) return [];
+
+    const getTangent = (c1, c2) => {
+        const dx = c2.x - c1.x;
+        const dy = c2.y - c1.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist === 0) return null;
+
+        const nx = dy / dist;
+        const ny = -dx / dist;
+
+        const r1 = c1.r;
+        const r2 = c2.r;
+
+        return {
+            start: { x: c1.x + nx * r1, y: c1.y + ny * r1 },
+            end: { x: c2.x + nx * r2, y: c2.y + ny * r2 },
+            angle: Math.atan2(ny, nx) * 180 / Math.PI // Normal angle
+        };
+    };
+
+    const segments = [];
+    const n = circles.length;
+    const tangents = [];
+
+    // Calculate all tangents first
+    for (let i = 0; i < n; i++) {
+        const c1 = circles[i];
+        const c2 = circles[(i + 1) % n];
+        tangents.push(getTangent(c1, c2));
+    }
+
+    // Generate segments (Line -> Arc -> Line -> Arc ...)
+    for (let i = 0; i < n; i++) {
+        const curr = tangents[i];
+        if (!curr) continue;
+
+        // 1. Line Segment
+        segments.push({
+            type: 'line',
+            x1: curr.start.x, y1: curr.start.y,
+            x2: curr.end.x, y2: curr.end.y
+        });
+
+        // 2. Arc Segment (to connect to next tangent start)
+        const next = tangents[(i + 1) % n];
+        const cNext = circles[(i + 1) % n];
+        if (!next) continue;
+
+        // Calculate angles for DXF Arc (CCW)
+        // Current tangent end normal angle
+        let startAngle = curr.angle;
+        // Next tangent start normal angle
+        let endAngle = next.angle;
+
+        // DXF Arcs are always CCW.
+        // We are traversing the hull CCW (if circles are ordered CCW).
+        // The normal points OUT.
+        // So we go from curr.angle to next.angle.
+
+        // Normalize angles to 0-360
+        if (startAngle < 0) startAngle += 360;
+        if (endAngle < 0) endAngle += 360;
+
+        // Ensure we go the "short way" around the outside?
+        // Actually, for a convex hull, we always turn left (CCW).
+        // So endAngle should be > startAngle (modulo 360).
+        // Wait, if we turn left, the normal rotates CCW.
+        // So yes, simple CCW arc from start to end.
+
+        // Handle wrap-around
+        // If end < start, it means we crossed 0/360.
+        // DXF handles this fine if we just give start and end?
+        // No, DXF ARC is drawn CCW from start to end.
+        // If start=350, end=10, it draws 350->360->10 (20 degrees). Correct.
+        // If start=10, end=350, it draws 10->...->350 (340 degrees). Incorrect (inner arc).
+        // We want the outer arc.
+        // Since we are traversing CCW, the change in angle should be positive.
+
+        segments.push({
+            type: 'arc',
+            x: cNext.x, y: cNext.y, r: cNext.r,
+            startAngle: startAngle,
+            endAngle: endAngle
+        });
+    }
+
+    return segments;
 }
