@@ -206,10 +206,12 @@ export function updateDynamicParams() {
 
     // 2. 從 Topology JSON 自動掃描參數名 (針對 Multilink)
     const topoEl = document.getElementById('topology');
+    let topologyObj = null; // Store parsed topology for grouping
+
     if (topoEl) {
-        let topology;
         try {
-            topology = JSON.parse(topoEl.value);
+            topologyObj = JSON.parse(topoEl.value);
+            const topology = topologyObj;
 
             const scan = (obj) => {
                 if (!obj || typeof obj !== 'object') return;
@@ -222,7 +224,7 @@ export function updateDynamicParams() {
                 for (const k in obj) {
                     const val = obj[k];
                     // 擴展掃描關鍵字，包含孔位的 r1Param, r2Param 以及新的 distParam
-                    const isParamKey = k.endsWith('_param') || k === 'lenParam' || k === 'len_param' || k === 'r1Param' || k === 'r2Param' || k === 'distParam' || k === 'dist_param';
+                    const isParamKey = k.endsWith('_param') || k === 'lenParam' || k === 'len_param' || k === 'r1Param' || k === 'r2Param' || k === 'angleParam' || k === 'distParam' || k === 'dist_param';
                     if (isParamKey && typeof val === 'string') {
                         if (val && !vars.has(val)) {
                             // 🌟 修正：優先使用 topology.params 裡面的實測數值，而非死板的 100
@@ -274,7 +276,7 @@ export function updateDynamicParams() {
         return;
     }
 
-    // 3. 移除舊的動態參數
+    // 3. 移除舊的動態參數 (Remove params that no longer exist)
     const existingDynamic = container.querySelectorAll('.dynamic-param-wrapper');
     existingDynamic.forEach(div => {
         const id = div.dataset.varId;
@@ -283,10 +285,17 @@ export function updateDynamicParams() {
         }
     });
 
-    // 4. 更新或新增動態參數
-    vars.forEach((info, varId) => {
-        let wrapper = container.querySelector(`.dynamic-param-wrapper[data-var-id="${varId}"]`);
+    // Remove empty groups
+    const existingGroups = container.querySelectorAll('.param-group');
+    existingGroups.forEach(group => {
+        if (group.querySelectorAll('.dynamic-param-wrapper').length === 0) {
+            group.remove();
+        }
+    });
 
+    // Helper to create/get wrapper
+    const getOrCreateWrapper = (varId, info) => {
+        let wrapper = container.querySelector(`.dynamic-param-wrapper[data-var-id="${varId}"]`);
         if (!wrapper) {
             wrapper = document.createElement('div');
             wrapper.className = 'dynamic-param-wrapper';
@@ -304,127 +313,134 @@ export function updateDynamicParams() {
                     <input type="range" id="dyn_${varId}_range" value="${info.default}" min="${info.min}" max="${info.max}" step="${info.step}" style="flex:1; height:14px; margin:0; cursor:pointer;">
                 </div>
             `;
-            container.appendChild(wrapper);
 
+            // Bind events (same as before)
             const numInput = wrapper.querySelector('input[type="number"]');
             const rangeInput = wrapper.querySelector('input[type="range"]');
-
-            if (!numInput.dataset.eventsBound) {
-                numInput.dataset.eventsBound = 'true';
-
-                let updateTimer;
-                const debouncedUpdate = () => {
-                    clearTimeout(updateTimer);
-                    updateTimer = setTimeout(() => {
-                        updatePreview();
-                    }, 300);
-                };
-
-                numInput.addEventListener('input', (e) => {
-                    e.stopPropagation();
-
-                    // 🌟 預判式約束檢查 (Predictive Constraints)
-                    const mods = getActiveModules();
-                    if (mods && mods.config && mods.config.id === 'multilink') {
-                        const { mech } = readInputs();
-                        // 必須先更新其他參數，才能計算當前參數的有效範圍
-                        // 但不能更新當前正在輸入的參數 (因為我們要檢查它)
-                        const dynContainer = document.getElementById('dynamicParamsContainer');
-                        if (dynContainer) {
-                            const inputs = dynContainer.querySelectorAll('input.dynamic-input');
-                            inputs.forEach(inp => {
-                                const vId = inp.dataset.varId;
-                                if (vId !== varId) {
-                                    mech[vId] = parseFloat(inp.value) || 0;
-                                }
-                            });
-                        }
-
-                        // 引入約束計算
-                        const constraints = mods.constraints || {};
-                        const calcFn = constraints.calculateValidRange;
-
-                        // 注意：我們需要動態 import constraints 模組，或者假設它已經掛載在 mods 上
-                        // 這裡假設 loader 會把 constraints 掛載上去，或者我們直接在這裡 import
-                        // 由於這是 UI 模組，直接 import 比較簡單
-                        import('../multilink/constraints.js').then(({ calculateValidRange }) => {
-                            const range = calculateValidRange(mech, varId);
-                            let val = parseFloat(numInput.value) || 0;
-
-                            if (range) {
-                                // 執行 Clamp
-                                if (val < range.min) val = range.min;
-                                if (val > range.max) val = range.max;
-
-                                // 如果數值被修正，更新 UI
-                                if (val !== parseFloat(numInput.value)) {
-                                    numInput.value = val;
-                                }
-
-                                // 視覺回饋：更新滑桿的 min/max (可選)
-                                // rangeInput.min = Math.max(0, range.min - 50); // 讓滑桿有點餘裕
-                                // rangeInput.max = range.max + 50;
-                            }
-
-                            rangeInput.value = val;
-                            debouncedUpdate();
-                        });
-                    } else {
-                        rangeInput.value = numInput.value;
-                        debouncedUpdate();
-                    }
-                }, true);
-
-                rangeInput.addEventListener('input', (e) => {
-                    e.stopPropagation();
-
-                    // 🌟 預判式約束檢查 (同上)
-                    const mods = getActiveModules();
-                    if (mods && mods.config && mods.config.id === 'multilink') {
-                        const { mech } = readInputs();
-                        const dynContainer = document.getElementById('dynamicParamsContainer');
-                        if (dynContainer) {
-                            const inputs = dynContainer.querySelectorAll('input.dynamic-input');
-                            inputs.forEach(inp => {
-                                const vId = inp.dataset.varId;
-                                if (vId !== varId) {
-                                    mech[vId] = parseFloat(inp.value) || 0;
-                                }
-                            });
-                        }
-
-                        import('../multilink/constraints.js').then(({ calculateValidRange }) => {
-                            const range = calculateValidRange(mech, varId);
-                            let val = parseFloat(rangeInput.value) || 0;
-
-                            if (range) {
-                                if (val < range.min) val = range.min;
-                                if (val > range.max) val = range.max;
-
-                                if (val !== parseFloat(rangeInput.value)) {
-                                    rangeInput.value = val;
-                                }
-                            }
-
-                            numInput.value = val;
-                            debouncedUpdate();
-                        });
-                    } else {
-                        numInput.value = rangeInput.value;
-                        debouncedUpdate();
-                    }
-                }, true);
-            }
+            bindParamEvents(numInput, rangeInput, varId);
         } else {
-            const numInput = wrapper.querySelector('input[type="number"]');
-            const rangeInput = wrapper.querySelector('input[type="range"]');
+            // Update existing wrapper values if needed (optional, but good for sync)
+            // We don't overwrite value if user is editing, but here we are not editing.
+            // Actually, we should respect current value if it exists? 
+            // The original code didn't overwrite value if wrapper existed.
+        }
+        return wrapper;
+    };
 
-            if (numInput && rangeInput) {
-                if (numInput.step !== String(info.step)) numInput.step = info.step;
-                if (rangeInput.min !== String(info.min)) rangeInput.min = info.min;
-                if (rangeInput.max !== String(info.max)) rangeInput.max = info.max;
-                if (rangeInput.step !== String(info.step)) rangeInput.step = info.step;
+    const bindParamEvents = (numInput, rangeInput, varId) => {
+        if (numInput.dataset.eventsBound) return;
+        numInput.dataset.eventsBound = 'true';
+
+        let updateTimer;
+        const debouncedUpdate = () => {
+            clearTimeout(updateTimer);
+            updateTimer = setTimeout(() => {
+                updatePreview();
+            }, 300);
+        };
+
+        numInput.addEventListener('input', (e) => {
+            e.stopPropagation();
+            handleParamInput(varId, numInput, rangeInput, debouncedUpdate);
+        }, true);
+
+        rangeInput.addEventListener('input', (e) => {
+            e.stopPropagation();
+            handleParamInput(varId, numInput, rangeInput, debouncedUpdate, true);
+        }, true);
+    };
+
+    const handleParamInput = (varId, numInput, rangeInput, callback, isRange = false) => {
+        const mods = getActiveModules();
+        if (mods && mods.config && mods.config.id === 'multilink') {
+            const { mech } = readInputs();
+            const dynContainer = document.getElementById('dynamicParamsContainer');
+            if (dynContainer) {
+                const inputs = dynContainer.querySelectorAll('input.dynamic-input');
+                inputs.forEach(inp => {
+                    const vId = inp.dataset.varId;
+                    if (vId !== varId) {
+                        mech[vId] = parseFloat(inp.value) || 0;
+                    }
+                });
             }
+
+            import('../multilink/constraints.js').then(({ calculateValidRange }) => {
+                const range = calculateValidRange(mech, varId);
+                let val = parseFloat(isRange ? rangeInput.value : numInput.value) || 0;
+
+                if (range) {
+                    if (val < range.min) val = range.min;
+                    if (val > range.max) val = range.max;
+
+                    if (isRange) {
+                        if (val !== parseFloat(rangeInput.value)) rangeInput.value = val;
+                    } else {
+                        if (val !== parseFloat(numInput.value)) numInput.value = val;
+                    }
+                }
+
+                if (isRange) numInput.value = val;
+                else rangeInput.value = val;
+
+                callback();
+            });
+        } else {
+            if (isRange) numInput.value = rangeInput.value;
+            else rangeInput.value = numInput.value;
+            callback();
+        }
+    };
+
+    const renderedVars = new Set();
+    if (topologyObj && topologyObj._wizard_data) {
+        topologyObj._wizard_data.forEach(comp => {
+            if (comp.type === 'triangle') {
+                // Check if any of its params exist in vars
+                const params = [comp.r1Param, comp.r2Param, comp.gParam].filter(p => p && vars.has(p));
+
+                if (params.length > 0) {
+                    // Create Group Container
+                    let group = container.querySelector(`.param-group[data-comp-id="${comp.id}"]`);
+                    if (!group) {
+                        group = document.createElement('div');
+                        group.className = 'param-group';
+                        group.dataset.compId = comp.id;
+                        group.style.border = '1px solid #ddd';
+                        group.style.borderRadius = '4px';
+                        group.style.padding = '8px';
+                        group.style.marginBottom = '8px';
+                        group.style.background = '#f9f9f9';
+
+                        const title = document.createElement('div');
+                        title.style.fontSize = '12px';
+                        title.style.fontWeight = 'bold';
+                        title.style.marginBottom = '6px';
+                        title.style.color = '#555';
+                        title.style.display = 'flex';
+                        title.style.justifyContent = 'space-between';
+                        title.innerHTML = `<span>${comp.id}</span>`;
+                        group.appendChild(title);
+
+                        container.appendChild(group);
+                    }
+
+                    // Render params inside group
+                    params.forEach(varId => {
+                        const wrapper = getOrCreateWrapper(varId, vars.get(varId));
+                        group.appendChild(wrapper); // Move to group
+                        renderedVars.add(varId);
+                    });
+                }
+            }
+        });
+    }
+
+    // 5. Render remaining params (flat)
+    vars.forEach((info, varId) => {
+        if (!renderedVars.has(varId)) {
+            const wrapper = getOrCreateWrapper(varId, info);
+            container.appendChild(wrapper); // Move to main container (if not already there)
         }
     });
 

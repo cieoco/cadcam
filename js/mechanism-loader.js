@@ -345,10 +345,10 @@ function setupLinkClickHandler() {
 
 
   // --- State Machine for Drawing ---
-  // State: IDLE, DRAWING_P1 (Waiting for P2), 
+  // State: IDLE, DRAWING_LINK (Collecting points)
   let drawState = 'IDLE';
-  let drawP1 = null; // { id, x, y, isNew }
-  let ghostLine = null;
+  let drawPoints = []; // Array of { id, x, y, isNew }
+  let ghostLineGroup = null; // SVG Group for ghost lines
   let lastPointer = { x: 0, y: 0 };
 
   // Helper to find the H3 title element
@@ -455,9 +455,10 @@ function setupLinkClickHandler() {
 
     drawBtn.onclick = () => {
       if (drawState === 'IDLE') {
-        drawState = 'WAIT_P1';
+        drawState = 'DRAWING_LINK';
+        drawPoints = [];
         drawBtn.style.background = '#ffeaa7';
-        drawBtn.textContent = '選取起點...';
+        drawBtn.textContent = '左鍵加點 / 右鍵結束';
         document.getElementById('svgWrap').style.cursor = 'crosshair';
 
         // Auto Enter Zen Mode? Optional.
@@ -499,7 +500,7 @@ function setupLinkClickHandler() {
 
   function resetDrawState(isCancel = true) {
     drawState = 'IDLE';
-    drawP1 = null;
+    drawPoints = [];
     if (drawBtn) {
       drawBtn.style.background = '';
       drawBtn.textContent = '畫桿件';
@@ -512,9 +513,9 @@ function setupLinkClickHandler() {
       selectBtn.style.background = '';
       selectBtn.textContent = '選取';
     }
-    if (ghostLine) {
-      ghostLine.remove();
-      ghostLine = null;
+    if (ghostLineGroup) {
+      ghostLineGroup.remove();
+      ghostLineGroup = null;
     }
     hideContextMenu();
     document.getElementById('svgWrap').style.cursor = 'default';
@@ -796,6 +797,7 @@ function setupLinkClickHandler() {
 
 
   // 2. Joint Click Handler (Select Point)
+  // 2. Joint Click Handler (Select Point)
   svgWrap._jointClickHandler = (e) => {
     if (drawState === 'IDLE') return;
 
@@ -817,14 +819,9 @@ function setupLinkClickHandler() {
     const detail = e.detail; // { id, x, y }
     console.log('[Draw] Clicked Joint:', detail);
 
-    if (drawState === 'WAIT_P1') {
-      drawP1 = { id: detail.id, isNew: false, x: detail.x, y: detail.y };
-      drawState = 'WAIT_P2';
-      drawBtn.textContent = `P1: ${detail.id} -> 選取終點...`;
-    } else if (drawState === 'WAIT_P2') {
-      // Finish
-      const drawP2 = { id: detail.id, isNew: false, x: detail.x, y: detail.y };
-      finishDraw(drawP1, drawP2);
+    if (drawState === 'DRAWING_LINK') {
+      drawPoints.push({ id: detail.id, isNew: false, x: detail.x, y: detail.y });
+      drawBtn.textContent = `已選 ${drawPoints.length} 點 (右鍵結束)...`;
     }
   };
 
@@ -836,14 +833,6 @@ function setupLinkClickHandler() {
       hideContextMenu();
       return;
     }
-
-    // Ensure we are clicking on SVG (not on a button or something)
-    // Note: 'click' bubbles from Joint too, but Joint stops Prop if matched?
-    // Actually our Joint Click is a CustomEvent dispatched from an inner element.
-    // The inner element naturally bubbles 'click' too.
-    // We need to coordinate.
-    // The joints have e.stopPropagation() on their 'click' listener which dispatches custom event.
-    // So this _bgClickHandler (native 'click') will NOT fire if joint is clicked. Correct.
 
     const coords = getWorldCoords(e.clientX, e.clientY);
     if (!coords) return;
@@ -859,20 +848,11 @@ function setupLinkClickHandler() {
 
     if (drawState === 'ADD_POINT') {
       addPointToTopology(finalX, finalY);
-      // Don't reset state immediately? User might want to add multiple points.
-      // Let's keep it active.
-      // resetDrawState();
-      // Just show a small visual feedback? Log?
-    } else if (drawState === 'WAIT_P1') {
-      drawP1 = { id: null, isNew: true, x: finalX, y: finalY };
-      drawState = 'WAIT_P2';
-      drawBtn.textContent = `P1: (${finalX},${finalY}) -> 選取終點...`;
-    } else if (drawState === 'WAIT_P2') {
-      const drawP2 = { id: null, isNew: true, x: finalX, y: finalY };
-      finishDraw(drawP1, drawP2);
+    } else if (drawState === 'DRAWING_LINK') {
+      drawPoints.push({ id: null, isNew: true, x: finalX, y: finalY });
+      drawBtn.textContent = `已選 ${drawPoints.length} 點 (右鍵結束)...`;
     }
   }
-
 
   // 4. Mouse Move (Ghost Line + Tooltip)
   svgWrap._moveHandler = (e) => {
@@ -897,52 +877,113 @@ function setupLinkClickHandler() {
 
     updateCoordTooltip(true, e.clientX, e.clientY, displayX, displayY, snapped.type);
 
-    if (drawState !== 'WAIT_P2' || !drawP1) return;
-
-    updateGhostLine();
-    if (ghostLine) {
-      // ... ghost line update logic using displayX/displayY or snapped ...
-      // Need to re-calc svg coords for ghost line end
-      const svg = svgWrap.querySelector('svg');
-      // ... get scale ...
-      const viewRange = parseFloat(document.getElementById('viewRange').value) || 800;
-      const vb = svg.viewBox && svg.viewBox.baseVal ? svg.viewBox.baseVal : null;
-      const W = vb && vb.width ? vb.width : svg.clientWidth;
-      const H = vb && vb.height ? vb.height : svg.clientHeight;
-      const pad = 50;
-      const scale = Math.min(W - 2 * pad, H - 2 * pad) / viewRange;
-
-      const p1SvgX = (W / 2) + drawP1.x * scale;
-      const p1SvgY = (H / 2) - drawP1.y * scale;
-
-      const targetSvgX = (W / 2) + displayX * scale;
-      const targetSvgY = (H / 2) - displayY * scale;
-
-      ghostLine.setAttribute('x1', p1SvgX);
-      ghostLine.setAttribute('y1', p1SvgY);
-      ghostLine.setAttribute('x2', targetSvgX);
-      ghostLine.setAttribute('y2', targetSvgY);
+    if (drawState === 'DRAWING_LINK' && drawPoints.length > 0) {
+      updateGhostPolyline(displayX, displayY);
     }
   }
 
   // Hide tooltip on mouse leave
   svgWrap.addEventListener('mouseleave', () => updateCoordTooltip(false));
 
-  function finishDraw(p1, p2) {
-    console.log('[Draw] Finish:', p1, p2);
+  // 5. Context Menu (Right Click) -> Finish Drawing
+  svgWrap.addEventListener('contextmenu', (e) => {
+    if (drawState === 'DRAWING_LINK') {
+      e.preventDefault();
+      finishDraw(drawPoints);
+    }
+  });
 
-    // Force integer coordinates for new points
-    if (p1 && p1.isNew) {
-      p1.x = Math.round(p1.x);
-      p1.y = Math.round(p1.y);
+  function updateGhostPolyline(currX, currY) {
+    const svg = svgWrap.querySelector('svg');
+    if (!svg) return;
+
+    if (!ghostLineGroup) {
+      ghostLineGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      ghostLineGroup.setAttribute('pointer-events', 'none');
+      svg.appendChild(ghostLineGroup);
     }
-    if (p2 && p2.isNew) {
-      p2.x = Math.round(p2.x);
-      p2.y = Math.round(p2.y);
+
+    // Clear existing lines
+    while (ghostLineGroup.firstChild) {
+      ghostLineGroup.removeChild(ghostLineGroup.firstChild);
     }
+
+    const viewRange = parseFloat(document.getElementById('viewRange').value) || 800;
+    const vb = svg.viewBox && svg.viewBox.baseVal ? svg.viewBox.baseVal : null;
+    const W = vb && vb.width ? vb.width : svg.clientWidth;
+    const H = vb && vb.height ? vb.height : svg.clientHeight;
+    const pad = 50;
+    const scale = Math.min(W - 2 * pad, H - 2 * pad) / viewRange;
+
+    const toSvg = (x, y) => ({
+      x: (W / 2) + x * scale,
+      y: (H / 2) - y * scale
+    });
+
+    // Draw lines between existing points
+    for (let i = 0; i < drawPoints.length - 1; i++) {
+      const p1 = toSvg(drawPoints[i].x, drawPoints[i].y);
+      const p2 = toSvg(drawPoints[i + 1].x, drawPoints[i + 1].y);
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', p1.x);
+      line.setAttribute('y1', p1.y);
+      line.setAttribute('x2', p2.x);
+      line.setAttribute('y2', p2.y);
+      line.setAttribute('stroke', '#3498db');
+      line.setAttribute('stroke-width', '2');
+      line.setAttribute('stroke-dasharray', '5,5');
+      ghostLineGroup.appendChild(line);
+    }
+
+    // Draw line from last point to cursor
+    const lastPt = drawPoints[drawPoints.length - 1];
+    const pStart = toSvg(lastPt.x, lastPt.y);
+    const pEnd = toSvg(currX, currY);
+
+    const activeLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    activeLine.setAttribute('x1', pStart.x);
+    activeLine.setAttribute('y1', pStart.y);
+    activeLine.setAttribute('x2', pEnd.x);
+    activeLine.setAttribute('y2', pEnd.y);
+    activeLine.setAttribute('stroke', '#e74c3c'); // Red for active segment
+    activeLine.setAttribute('stroke-width', '2');
+    activeLine.setAttribute('stroke-dasharray', '5,5');
+    ghostLineGroup.appendChild(activeLine);
+
+    // If > 2 points, draw closing line to start (preview polygon)
+    if (drawPoints.length >= 2) {
+      const pFirst = toSvg(drawPoints[0].x, drawPoints[0].y);
+      const closingLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      closingLine.setAttribute('x1', pEnd.x);
+      closingLine.setAttribute('y1', pEnd.y);
+      closingLine.setAttribute('x2', pFirst.x);
+      closingLine.setAttribute('y2', pFirst.y);
+      closingLine.setAttribute('stroke', '#2ecc71'); // Green for closing
+      closingLine.setAttribute('stroke-width', '1');
+      closingLine.setAttribute('stroke-dasharray', '2,2');
+      ghostLineGroup.appendChild(closingLine);
+    }
+  }
+
+  function finishDraw(points) {
+    console.log('[Draw] Finish:', points);
+
+    if (!points || points.length < 2) {
+      console.warn('Need at least 2 points');
+      resetDrawState();
+      return;
+    }
+
+    // Force integer coordinates
+    points.forEach(p => {
+      if (p.isNew) {
+        p.x = Math.round(p.x);
+        p.y = Math.round(p.y);
+      }
+    });
 
     if (window.wizard) {
-      window.wizard.addLinkFromCanvas(p1, p2);
+      window.wizard.addComponentFromCanvas(points);
     }
     resetDrawState(false);
   }

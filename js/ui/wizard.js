@@ -224,6 +224,12 @@ export class MechanismWizard {
                         <input type="text" value="${comp.r2Param || 'L2'}" oninput="window.wizard.updateCompProp('r2Param', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
                     </div>
                 </div>
+
+                <div class="form-group">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">底邊 (P1-P2)</label>
+                    <input type="text" value="${comp.gParam || 'G'}" oninput="window.wizard.updateCompProp('gParam', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                </div>
+
                 <div class="form-group">
                     <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">解方向</label>
                     <select onchange="window.wizard.updateCompProp('sign', parseInt(this.value))" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
@@ -292,6 +298,88 @@ export class MechanismWizard {
             this.topology.tracePoint = e.target.value;
             this.syncTopology();
         };
+    }
+
+    addComponentFromCanvas(points) {
+        console.log('[Wizard] Adding component from canvas:', points);
+
+        if (!points || points.length < 2) return;
+
+        // 1. Ensure all points have IDs
+        const allPointIds = this.getAllPointIds();
+        let nextP = 1;
+        const getNextPId = () => {
+            while (allPointIds.includes(`P${nextP}`)) nextP++;
+            const id = `P${nextP}`;
+            allPointIds.push(id);
+            return id;
+        };
+
+        points.forEach(p => {
+            if (!p.id) p.id = getNextPId();
+        });
+
+        // 2. If 2 points, use existing Bar logic
+        if (points.length === 2) {
+            this.addLinkFromCanvas(points[0], points[1]);
+            return;
+        }
+
+        // 3. If 3 points, create Triangle (to support SAS mode)
+        if (points.length === 3) {
+            let count = 1;
+            while (this.components.find(c => c.id === `Tri${count}`)) count++;
+            const id = `Tri${count}`;
+
+            // 🌟 核心修正：如果是第一個組件，將前兩個點設為固定 (Ground)，確保有解
+            const isFirst = this.components.length === 0;
+
+            const newTri = {
+                type: 'triangle',
+                id,
+                color: '#27ae60',
+                p1: { id: points[0].id, type: (isFirst) ? 'fixed' : (points[0].isNew ? 'floating' : 'existing'), x: points[0].x, y: points[0].y },
+                p2: { id: points[1].id, type: (isFirst) ? 'fixed' : (points[1].isNew ? 'floating' : 'existing'), x: points[1].x, y: points[1].y },
+                p3: { id: points[2].id, type: (points[2].isNew ? 'floating' : 'existing'), x: points[2].x, y: points[2].y },
+                r1Param: 'R1_' + (this.components.length + 1),
+                r2Param: 'R2_' + (this.components.length + 1),
+                gParam: 'G_' + (this.components.length + 1),
+                sign: 1,
+                isInput: false
+            };
+
+            this.components.push(newTri);
+            this.selectedComponentIndex = this.components.length - 1;
+            this.render();
+            this.syncTopology();
+            return;
+        }
+
+        // 4. If > 3 points, create generic Polygon
+        let count = 1;
+        while (this.components.find(c => c.id === `Poly${count}`)) count++;
+        const id = `Poly${count}`;
+
+        // 🌟 核心修正：如果是第一個組件，將前兩個點設為固定 (Ground)，確保有解
+        const isFirst = this.components.length === 0;
+
+        const newPoly = {
+            type: 'polygon',
+            id,
+            color: '#e67e22', // Orange for polygons
+            points: points.map((p, idx) => ({
+                id: p.id,
+                type: (isFirst && idx < 2) ? 'fixed' : (p.isNew ? 'floating' : 'existing'),
+                x: p.x,
+                y: p.y
+            })),
+            isInput: false
+        };
+
+        this.components.push(newPoly);
+        this.selectedComponentIndex = this.components.length - 1;
+        this.render();
+        this.syncTopology();
     }
 
     addLinkFromCanvas(p1Data, p2Data) {
@@ -377,8 +465,8 @@ export class MechanismWizard {
 
     addComponent(type) {
         const count = this.components.filter(c => c.type === type).length + 1;
-        let id = type === 'bar' ? `Link${count}` : (type === 'triangle' ? `Tri${count}` : `H${count}`);
-        const newComp = { type, id, color: type === 'bar' ? '#3498db' : (type === 'triangle' ? '#27ae60' : '#2d3436') };
+        let id = type === 'bar' ? `Link${count}` : (type === 'triangle' ? `Tri${count}` : (type === 'polygon' ? `Poly${count}` : `H${count}`));
+        const newComp = { type, id, color: type === 'bar' ? '#3498db' : (type === 'triangle' ? '#27ae60' : (type === 'polygon' ? '#e67e22' : '#2d3436')) };
 
         if (type === 'bar') {
             newComp.p1 = { id: '', type: 'fixed', x: 0, y: 0 };
@@ -391,7 +479,12 @@ export class MechanismWizard {
             newComp.p3 = { id: '', type: 'floating', x: 0, y: 0 };
             newComp.r1Param = 'R1_' + (this.components.length + 1);
             newComp.r2Param = 'R2_' + (this.components.length + 1);
+            newComp.paramMode = 'SSS'; // Default: Side-Side-Side
+            newComp.angleParam = 'Ang_' + (this.components.length + 1); // For SAS mode
             newComp.sign = 1;
+        } else if (type === 'polygon') {
+            newComp.points = []; // Empty initially
+            newComp.isInput = false;
         } else if (type === 'hole') {
             newComp.p1 = { id: '', type: 'existing' };
             newComp.p2 = { id: '', type: 'existing' };
@@ -421,6 +514,16 @@ export class MechanismWizard {
     updatePointProp(pointKey, prop, val) {
         if (this.selectedComponentIndex >= 0) {
             const comp = this.components[this.selectedComponentIndex];
+            if (comp.type === 'polygon') {
+                // Handle polygon point update
+                const idx = parseInt(pointKey.replace('p', ''));
+                if (comp.points && comp.points[idx]) {
+                    comp.points[idx][prop] = val;
+                    if (prop === 'type') this.render();
+                }
+                return;
+            }
+
             if (!comp[pointKey]) comp[pointKey] = { id: '', type: 'floating', x: 0, y: 0 };
             comp[pointKey][prop] = val;
             if (prop === 'type') this.render();
@@ -439,9 +542,13 @@ export class MechanismWizard {
     getAllPointIds() {
         const ids = new Set();
         this.components.forEach(c => {
-            ['p1', 'p2', 'p3'].forEach(k => {
-                if (c[k] && c[k].id) ids.add(c[k].id);
-            });
+            if (c.type === 'polygon' && c.points) {
+                c.points.forEach(p => { if (p.id) ids.add(p.id); });
+            } else {
+                ['p1', 'p2', 'p3'].forEach(k => {
+                    if (c[k] && c[k].id) ids.add(c[k].id);
+                });
+            }
         });
         return Array.from(ids).sort();
     }
@@ -467,9 +574,13 @@ export class MechanismWizard {
         const solved = new Set();
         // 1. 固定點
         this.components.forEach(c => {
-            ['p1', 'p2', 'p3'].forEach(k => {
-                if (c[k] && c[k].type === 'fixed' && c[k].id) solved.add(c[k].id);
-            });
+            if (c.type === 'polygon' && c.points) {
+                c.points.forEach(p => { if (p.type === 'fixed' && p.id) solved.add(p.id); });
+            } else {
+                ['p1', 'p2', 'p3'].forEach(k => {
+                    if (c[k] && c[k].type === 'fixed' && c[k].id) solved.add(c[k].id);
+                });
+            }
         });
 
         // 2. 迭代求解其餘點 (含馬達與智慧連桿推導)
@@ -488,6 +599,18 @@ export class MechanismWizard {
                     const p3Id = c.type === 'triangle' ? c.p3?.id : c.id;
                     if (c.p1?.id && c.p2?.id && p3Id && solved.has(c.p1.id) && solved.has(c.p2.id) && !solved.has(p3Id)) {
                         solved.add(p3Id); changed = true;
+                    }
+                }
+                // Polygon Rigid Body Logic
+                if (c.type === 'polygon' && c.points) {
+                    // If any 2 points are solved, the whole rigid body is solved (in 2D)
+                    const solvedCount = c.points.filter(p => p.id && solved.has(p.id)).length;
+                    if (solvedCount >= 2) {
+                        c.points.forEach(p => {
+                            if (p.id && !solved.has(p.id)) {
+                                solved.add(p.id); changed = true;
+                            }
+                        });
                     }
                 }
             });
@@ -546,22 +669,40 @@ export class MechanismWizard {
 
         // 收集座標與屬性 (智慧合併：fixed/input 優先權高於 existing)
         this.components.forEach(c => {
-            ['p1', 'p2', 'p3'].forEach(k => {
-                if (c[k] && c[k].id) {
-                    const existing = allPointsMap.get(c[k].id);
-                    // 只有當新屬性更「強」(例如 fixed) 或者舊屬性是空的/existing 時，才更新
-                    const isStronger = (c[k].type === 'fixed' || (c[k].type === 'input' && (!existing || existing.type !== 'fixed')));
-                    const isEmpty = !existing || existing.type === 'existing';
+            if (c.type === 'polygon' && c.points) {
+                c.points.forEach(p => {
+                    if (p.id) {
+                        const existing = allPointsMap.get(p.id);
+                        const isStronger = (p.type === 'fixed');
+                        const isEmpty = !existing || existing.type === 'existing';
 
-                    if (isStronger || isEmpty || (c[k].x !== undefined && existing?.x === undefined)) {
-                        allPointsMap.set(c[k].id, {
-                            x: c[k].x ?? existing?.x,
-                            y: c[k].y ?? existing?.y,
-                            type: (isStronger ? c[k].type : (existing?.type || c[k].type))
-                        });
+                        if (isStronger || isEmpty || (p.x !== undefined && existing?.x === undefined)) {
+                            allPointsMap.set(p.id, {
+                                x: p.x ?? existing?.x,
+                                y: p.y ?? existing?.y,
+                                type: (isStronger ? p.type : (existing?.type || p.type))
+                            });
+                        }
                     }
-                }
-            });
+                });
+            } else {
+                ['p1', 'p2', 'p3'].forEach(k => {
+                    if (c[k] && c[k].id) {
+                        const existing = allPointsMap.get(c[k].id);
+                        // 只有當新屬性更「強」(例如 fixed) 或者舊屬性是空的/existing 時，才更新
+                        const isStronger = (c[k].type === 'fixed' || (c[k].type === 'input' && (!existing || existing.type !== 'fixed')));
+                        const isEmpty = !existing || existing.type === 'existing';
+
+                        if (isStronger || isEmpty || (c[k].x !== undefined && existing?.x === undefined)) {
+                            allPointsMap.set(c[k].id, {
+                                x: c[k].x ?? existing?.x,
+                                y: c[k].y ?? existing?.y,
+                                type: (isStronger ? c[k].type : (existing?.type || c[k].type))
+                            });
+                        }
+                    }
+                });
+            }
         });
 
         // 1. Ground 步驟
@@ -571,21 +712,33 @@ export class MechanismWizard {
 
                 // 🌟 核心增強：支援固定桿 (Ground Bar) 動態調整
                 // 檢查是否有連桿連接此固定點與另一個「已處理過」的固定點
-                const groundBar = this.components.find(c => {
+                // 1. Check for Bar
+                let groundLink = this.components.find(c => {
                     if (c.type !== 'bar' || !c.lenParam) return false;
                     if (c.p1.id !== id && c.p2.id !== id) return false; // 🌟 必須連接到當前點
                     const otherId = (c.p1.id === id) ? c.p2.id : c.p1.id;
                     const otherPt = allPointsMap.get(otherId);
-
-                    // Debug Log
-                    // console.log(`[Wizard] Checking bar ${c.id} for ${id}: other=${otherId}, type=${otherPt?.type}, inSteps=${!!steps.find(s => s.id === otherId)}`);
-
-                    // 必須兩端都是固定點，且另一端已經在 steps 中 (已處理過)
                     return otherPt && otherPt.type === 'fixed' && steps.find(s => s.id === otherId);
                 });
 
-                if (groundBar) {
-                    const otherId = (groundBar.p1.id === id) ? groundBar.p2.id : groundBar.p1.id;
+                // 2. Check for Triangle Base (P1-P2)
+                if (!groundLink) {
+                    groundLink = this.components.find(c => {
+                        if (c.type !== 'triangle' || !c.gParam) return false;
+                        // Triangle base is P1-P2
+                        if (c.p1.id !== id && c.p2.id !== id) return false;
+                        const otherId = (c.p1.id === id) ? c.p2.id : c.p1.id;
+                        // Ensure we are talking about P1-P2 edge
+                        if ((c.p1.id === id && c.p2.id === otherId) || (c.p2.id === id && c.p1.id === otherId)) {
+                            const otherPt = allPointsMap.get(otherId);
+                            return otherPt && otherPt.type === 'fixed' && steps.find(s => s.id === otherId);
+                        }
+                        return false;
+                    });
+                }
+
+                if (groundLink) {
+                    const otherId = (groundLink.p1.id === id) ? groundLink.p2.id : groundLink.p1.id;
                     const otherPt = allPointsMap.get(otherId);
                     if (otherPt) {
                         const dx = info.x - otherPt.x;
@@ -593,7 +746,8 @@ export class MechanismWizard {
                         const dist = Math.sqrt(dx * dx + dy * dy);
 
                         if (dist > 0) {
-                            step.dist_param = groundBar.lenParam;
+                            // Use lenParam for Bar, gParam for Triangle
+                            step.dist_param = (groundLink.type === 'bar') ? groundLink.lenParam : groundLink.gParam;
                             step.ref_id = otherId;
                             step.ux = dx / dist; // 單位向量 X
                             step.uy = dy / dist; // 單位向量 Y
@@ -608,8 +762,49 @@ export class MechanismWizard {
             }
         });
 
+        // 🌟 Prepare Virtual Components for Polygons
+        // Decompose polygons into bars for the solver
+        const virtualComponents = [...this.components];
+        this.components.forEach(c => {
+            if (c.type === 'polygon' && c.points && c.points.length >= 3) {
+                // 1. Perimeter
+                for (let i = 0; i < c.points.length; i++) {
+                    const p1 = c.points[i];
+                    const p2 = c.points[(i + 1) % c.points.length];
+                    virtualComponents.push({
+                        type: 'bar',
+                        id: `${c.id}_edge_${i}`,
+                        p1: p1,
+                        p2: p2,
+                        lenParam: `${c.id}_L${i + 1}`, // e.g. Poly1_L1
+                        isVirtual: true
+                    });
+                }
+                // 2. Triangulation (Fan from P0)
+                // Connect P0 to P2, P3... P(n-2)
+                for (let i = 2; i < c.points.length - 1; i++) {
+                    const p1 = c.points[0];
+                    const p2 = c.points[i];
+                    virtualComponents.push({
+                        type: 'bar',
+                        id: `${c.id}_diag_${i}`,
+                        p1: p1,
+                        p2: p2,
+                        lenParam: `${c.id}_D${i}`, // e.g. Poly1_D2
+                        isVirtual: true
+                    });
+                }
+
+                // Add to visualization
+                polygons.push({
+                    points: c.points.map(p => p.id),
+                    color: c.color || '#e67e22'
+                });
+            }
+        });
+
         // 2. Input Crank 步驟
-        this.components.filter(c => c.type === 'bar' && c.isInput).forEach(c => {
+        virtualComponents.filter(c => c.type === 'bar' && c.isInput).forEach(c => {
             if (c.p1?.id && c.p2?.id && solvedPoints.has(c.p1.id)) {
                 steps.push({
                     id: c.p2.id,
@@ -624,7 +819,8 @@ export class MechanismWizard {
 
         // 🎯 智慧連桿自動解法 (Auto-Dyad Inference)
         // 針對那些只是普通 Bar 連接而成的關節點，自動產生 dyad 步
-        const bars = this.components.filter(c => c.type === 'bar' && !c.isInput);
+        // 🌟 Use virtualComponents to include polygon edges
+        const bars = virtualComponents.filter(c => c.type === 'bar' && !c.isInput);
         const unsolvedJoints = Array.from(allPointsMap.keys()).filter(id => !steps.find(s => s.id === id));
 
         unsolvedJoints.forEach(jId => {
@@ -719,8 +915,22 @@ export class MechanismWizard {
                     });
                 }
             } else if (c.type === 'triangle') {
-                if (c.r1Param && params[c.r1Param] === undefined) params[c.r1Param] = 100;
-                if (c.r2Param && params[c.r2Param] === undefined) params[c.r2Param] = 100;
+                // 🌟 Initialize parameters from geometry if undefined
+                if (c.r1Param && params[c.r1Param] === undefined) {
+                    const p1 = allPointsMap.get(c.p1.id);
+                    const p3 = allPointsMap.get(c.p3.id);
+                    params[c.r1Param] = (p1 && p3) ? Math.round(Math.sqrt((p3.x - p1.x) ** 2 + (p3.y - p1.y) ** 2)) : 100;
+                }
+                if (c.r2Param && params[c.r2Param] === undefined) {
+                    const p2 = allPointsMap.get(c.p2.id);
+                    const p3 = allPointsMap.get(c.p3.id);
+                    params[c.r2Param] = (p2 && p3) ? Math.round(Math.sqrt((p3.x - p2.x) ** 2 + (p3.y - p2.y) ** 2)) : 100;
+                }
+                if (c.gParam && params[c.gParam] === undefined) {
+                    const p1 = allPointsMap.get(c.p1.id);
+                    const p2 = allPointsMap.get(c.p2.id);
+                    params[c.gParam] = (p1 && p2) ? Math.round(Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2)) : 100;
+                }
             }
         });
 
