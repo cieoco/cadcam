@@ -622,7 +622,6 @@ export const MECHANISMS = {
             { id: 'margin', label: '孔邊距', type: 'number', min: 3, max: 15, default: 6, unit: 'mm' },
             { id: 'holeD', label: '孔徑', type: 'number', min: 2, max: 10, default: 3.2, unit: 'mm' },
             { id: 'spacing', label: '排版間距', type: 'number', min: 2, max: 20, default: 5, unit: 'mm' },
-            { id: 'triHollow', label: 'Triangle Hollow', type: 'checkbox', default: false }
         ],
 
         simNotes: ``,

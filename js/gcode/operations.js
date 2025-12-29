@@ -266,3 +266,89 @@ export function profilePathOps({
 
     return lines;
 }
+
+/**
+ * Tangent-hull outline for equal-radius circles (outer boundary).
+ * @param {Object} params
+ * @param {Array<{x:number,y:number,r:number}>} params.circles
+ * @param {number} params.safeZ
+ * @param {number} params.cutDepth
+ * @param {number} params.stepdown
+ * @param {number} params.feedXY
+ * @param {number} params.feedZ
+ */
+export function profileTangentHullOps({
+    circles,
+    safeZ,
+    cutDepth,
+    stepdown,
+    feedXY,
+    feedZ,
+}) {
+    if (!circles || circles.length < 2) return [];
+
+    const getTangent = (c1, c2) => {
+        const dx = c2.x - c1.x;
+        const dy = c2.y - c1.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist === 0) return null;
+        const nx = dy / dist;
+        const ny = -dx / dist;
+        return {
+            start: { x: c1.x + nx * c1.r, y: c1.y + ny * c1.r },
+            end: { x: c2.x + nx * c2.r, y: c2.y + ny * c2.r }
+        };
+    };
+
+    const tangents = [];
+    const n = circles.length;
+    for (let i = 0; i < n; i++) {
+        const t = getTangent(circles[i], circles[(i + 1) % n]);
+        if (!t) return [];
+        tangents.push(t);
+    }
+
+    const zLevels = [];
+    const total = Math.abs(cutDepth);
+    const sd = Math.abs(stepdown);
+    const steps = Math.max(1, Math.ceil(total / sd));
+    for (let i = 1; i <= steps; i++) {
+        zLevels.push(-Math.min(i * sd, total));
+    }
+
+    const lines = [];
+    lines.push("(Profile tangent hull)");
+
+    const cross = (ax, ay, bx, by) => ax * by - ay * bx;
+
+    for (const z of zLevels) {
+        const first = tangents[0].start;
+        lines.push(`G0 Z${fmt(safeZ)}`);
+        lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)}`);
+        lines.push(`G1 Z${fmt(z)} F${fmt(feedZ)}`);
+
+        for (let i = 0; i < n; i++) {
+            const curr = tangents[i];
+            const next = tangents[(i + 1) % n];
+            const cNext = circles[(i + 1) % n];
+
+            lines.push(`G1 X${fmt(curr.end.x)} Y${fmt(curr.end.y)} F${fmt(feedXY)}`);
+
+            const v1x = curr.end.x - cNext.x;
+            const v1y = curr.end.y - cNext.y;
+            const v2x = next.start.x - cNext.x;
+            const v2y = next.start.y - cNext.y;
+            const ccw = cross(v1x, v1y, v2x, v2y) > 0;
+            const cmd = ccw ? "G3" : "G2";
+            const iOff = cNext.x - curr.end.x;
+            const jOff = cNext.y - curr.end.y;
+            lines.push(
+                `${cmd} X${fmt(next.start.x)} Y${fmt(next.start.y)} I${fmt(iOff)} J${fmt(jOff)} F${fmt(feedXY)}`
+            );
+        }
+
+        lines.push(`G0 Z${fmt(safeZ)}`);
+    }
+
+    return lines;
+}

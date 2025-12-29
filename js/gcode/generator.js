@@ -11,6 +11,7 @@ import {
     profileRoundedRectOps,
     profileCircleOps,
     profilePathOps,
+    profileTangentHullOps,
 } from './operations.js';
 
 /**
@@ -68,8 +69,24 @@ export function buildPartGcode(part, mfg) {
         }
     }
 
-    // 2. 外形切割
-    if (part.barStyle === 'disk') {
+    if (part.useOutlineForGcode && part.innerOutline && part.innerOutline.length >= 2) {
+        lines.push("(Profile inner outline)");
+        lines.push(
+            ...profileTangentHullOps({
+                circles: part.innerOutline,
+                safeZ, cutDepth, stepdown, feedXY, feedZ
+            })
+        );
+    }
+
+    if (part.useOutlineForGcode && part.outline && part.outline.length >= 2) {
+        lines.push(
+            ...profileTangentHullOps({
+                circles: part.outline,
+                safeZ, cutDepth, stepdown, feedXY, feedZ
+            })
+        );
+    } else if (part.barStyle === 'disk') {
         const cx = part.rect ? (part.rect.x + part.rect.w / 2) : 0;
         const cy = part.rect ? (part.rect.y + part.rect.h / 2) : 0;
         lines.push(
