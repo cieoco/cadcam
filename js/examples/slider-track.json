@@ -1,0 +1,154 @@
+{
+  "steps": [
+    {
+      "id": "O",
+      "type": "ground",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "T1",
+      "type": "ground",
+      "x": -80,
+      "y": 0
+    },
+    {
+      "id": "T2",
+      "type": "ground",
+      "x": 140,
+      "y": 0
+    },
+    {
+      "id": "P0",
+      "type": "input_crank",
+      "center": "O",
+      "len_param": "L_Crank",
+      "phase_offset": 0
+    },
+    {
+      "id": "S",
+      "type": "slider",
+      "p1": "P0",
+      "r_param": "L_Rod",
+      "line_p1": "T1",
+      "line_p2": "T2",
+      "sign": 1
+    }
+  ],
+  "tracePoint": "S",
+  "visualization": {
+    "links": [
+      {
+        "id": "Crank",
+        "p1": "O",
+        "p2": "P0",
+        "color": "#e74c3c",
+        "style": "crank",
+        "lenParam": "L_Crank"
+      },
+      {
+        "id": "Rod",
+        "p1": "P0",
+        "p2": "S",
+        "color": "#3498db",
+        "style": "normal",
+        "lenParam": "L_Rod"
+      },
+      {
+        "id": "Track",
+        "p1": "T1",
+        "p2": "T2",
+        "color": "#8e44ad",
+        "style": "track"
+      }
+    ],
+    "polygons": [],
+    "joints": [
+      "O",
+      "P0",
+      "S",
+      "T1",
+      "T2"
+    ]
+  },
+  "parts": [
+    {
+      "id": "Crank(L_Crank)",
+      "type": "bar",
+      "len_param": "L_Crank",
+      "color": "#e74c3c"
+    },
+    {
+      "id": "Rod(L_Rod)",
+      "type": "bar",
+      "len_param": "L_Rod",
+      "color": "#3498db"
+    }
+  ],
+  "params": {
+    "theta": 0,
+    "L_Crank": 20,
+    "L_Rod": 80
+  },
+  "_wizard_data": [
+    {
+      "type": "bar",
+      "id": "Crank",
+      "color": "#e74c3c",
+      "p1": {
+        "id": "O",
+        "type": "fixed",
+        "x": 0,
+        "y": 0
+      },
+      "p2": {
+        "id": "P0",
+        "type": "floating",
+        "x": 20,
+        "y": 0
+      },
+      "lenParam": "L_Crank",
+      "isInput": true,
+      "phaseOffset": 0
+    },
+    {
+      "type": "bar",
+      "id": "Rod",
+      "color": "#3498db",
+      "p1": {
+        "id": "P0",
+        "type": "existing"
+      },
+      "p2": {
+        "id": "S",
+        "type": "existing"
+      },
+      "lenParam": "L_Rod",
+      "isInput": false
+    },
+    {
+      "type": "slider",
+      "id": "Slider",
+      "color": "#8e44ad",
+      "p1": {
+        "id": "T1",
+        "type": "fixed",
+        "x": -80,
+        "y": 0
+      },
+      "p2": {
+        "id": "T2",
+        "type": "fixed",
+        "x": 140,
+        "y": 0
+      },
+      "p3": {
+        "id": "S",
+        "type": "floating",
+        "x": 60,
+        "y": 0
+      },
+      "sign": 1
+    }
+  ]
+}

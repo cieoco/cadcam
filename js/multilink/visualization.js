@@ -10,6 +10,36 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
     if (!topology || !topology.visualization) return;
     const { links, polygons, joints } = topology.visualization;
     const pts = sol.points;
+    const bodies = sol.bodies || [];
+
+    const renderBody = (body) => {
+        if (!body || !body.localPoints || !body.worldPoints) return;
+        const ids = Object.keys(body.localPoints);
+        if (ids.length < 2) return;
+
+        const originId = ids[0];
+        const worldOrigin = body.worldPoints[originId];
+        if (!worldOrigin) return;
+
+        const localOrigin = body.localPoints[originId];
+        const worldX = (x) => worldOrigin.x + (x - localOrigin.x);
+        const worldY = (y) => worldOrigin.y + (y - localOrigin.y);
+
+        for (let i = 0; i < ids.length; i++) {
+            for (let j = i + 1; j < ids.length; j++) {
+                const a = body.worldPoints[ids[i]];
+                const b = body.worldPoints[ids[j]];
+                if (!a || !b) continue;
+                svg.appendChild(svgEl('line', {
+                    x1: tx(a), y1: ty(a),
+                    x2: tx(b), y2: ty(b),
+                    stroke: '#7f8c8d',
+                    'stroke-width': 2,
+                    'stroke-dasharray': '2,4'
+                }));
+            }
+        }
+    };
 
     // 1. Polygons (Background Plates)
     if (polygons) {
@@ -32,6 +62,31 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
         }
     }
 
+    // 1.5 Render Bodies (rigid plates)
+    if (bodies.length) {
+        for (const body of bodies) {
+            if (body.type === 'triangle') {
+                const ids = Object.keys(body.worldPoints);
+                if (ids.length >= 3) {
+                    const pointsStr = ids
+                        .map(id => body.worldPoints[id])
+                        .filter(p => p)
+                        .map(p => `${tx(p)},${ty(p)}`)
+                        .join(' ');
+                    svg.appendChild(svgEl('polygon', {
+                        points: pointsStr,
+                        fill: '#27ae60',
+                        'fill-opacity': 0.15,
+                        stroke: '#27ae60',
+                        'stroke-width': 1.5
+                    }));
+                }
+            } else {
+                renderBody(body);
+            }
+        }
+    }
+
     // 2. Links
     if (links) {
         for (const link of links) {
@@ -50,6 +105,11 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
                 'stroke-width': link.width || 4,
                 'stroke-linecap': 'round'
             };
+
+            if (link.style === 'track') {
+                attrs['stroke-dasharray'] = '6,4';
+                attrs['stroke-width'] = link.width || 2;
+            }
 
             if (link.style === 'dashed' || link.dash) {
                 attrs['stroke-dasharray'] = link.dash ? link.dash.join(',') : '5,5';

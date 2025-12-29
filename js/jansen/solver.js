@@ -3,6 +3,7 @@
  */
 
 import { solveTopology, sweepTopology, calculateTrajectoryStats } from '../multilink/solver.js';
+import { buildBodiesFromSolution } from '../body-joint/solver.js';
 import { JANSEN_TOPOLOGY } from './topology.js';
 
 export function solveJansen(params) {
@@ -17,7 +18,10 @@ export function solveJansen(params) {
         }
     }
 
-    return solveTopology(topology, params);
+    const sol = solveTopology(topology, params);
+    if (!sol || !sol.isValid) return sol;
+    sol.bodies = buildBodiesFromSolution(topology, params, sol.points || {});
+    return sol;
 }
 
 export function sweepTheta(params, startDeg, endDeg, stepDeg) {

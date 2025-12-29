@@ -52,6 +52,7 @@ export class MechanismWizard {
                 <button id="btnAddTriangle" style="flex: 1; padding: 8px; background: #27ae60; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;">
                     📐 新增三角桿
                 </button>
+                <button id="btnAddSlider" style="flex: 1; padding: 8px; background: #8e44ad; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;">Slider</button>
             </div>
 
             <div class="wizard-content" style="display: grid; grid-template-columns: 120px 1fr; gap: 10px; height: 350px; overflow: hidden; padding: 0 10px 10px 10px;">
@@ -238,6 +239,29 @@ export class MechanismWizard {
                     </select>
                 </div>
             `;
+        } else if (comp.type === 'slider') {
+            html += `
+                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">Line P1</label>
+                    ${this.renderPointEditor(comp, 'p1')}
+                </div>
+                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">Line P2</label>
+                    ${this.renderPointEditor(comp, 'p2')}
+                </div>
+                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">Slider Point</label>
+                    ${this.renderPointEditor(comp, 'p3')}
+                </div>
+                <div class="form-group">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">Sign</label>
+                    <select onchange="window.wizard.updateCompProp('sign', parseInt(this.value))" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
+                        <option value="1" ${comp.sign === 1 ? 'selected' : ''}>+1</option>
+                        <option value="-1" ${comp.sign === -1 ? 'selected' : ''}>-1</option>
+                    </select>
+                </div>
+            `;
+
         }
 
         html += `</div>`;
@@ -280,12 +304,14 @@ export class MechanismWizard {
     attachEvents() {
         const btnAddBar = $('btnAddBar');
         const btnAddTriangle = $('btnAddTriangle');
+        const btnAddSlider = $('btnAddSlider');
         const btnReset = $('btnWizardReset');
         const btnApply = $('btnWizardApply');
         const templateSelect = $('templateSelect');
 
         if (btnAddBar) btnAddBar.onclick = () => this.addComponent('bar');
         if (btnAddTriangle) btnAddTriangle.onclick = () => this.addComponent('triangle');
+        if (btnAddSlider) btnAddSlider.onclick = () => this.addComponent('slider');
         if (btnReset) btnReset.onclick = () => this.reset();
         if (btnApply) btnApply.onclick = () => this.syncTopology();
 
@@ -465,8 +491,8 @@ export class MechanismWizard {
 
     addComponent(type) {
         const count = this.components.filter(c => c.type === type).length + 1;
-        let id = type === 'bar' ? `Link${count}` : (type === 'triangle' ? `Tri${count}` : (type === 'polygon' ? `Poly${count}` : `H${count}`));
-        const newComp = { type, id, color: type === 'bar' ? '#3498db' : (type === 'triangle' ? '#27ae60' : (type === 'polygon' ? '#e67e22' : '#2d3436')) };
+        let id = type === 'bar' ? `Link${count}` : (type === 'triangle' ? `Tri${count}` : (type === 'slider' ? `Slider${count}` : (type === 'polygon' ? `Poly${count}` : `H${count}`)));
+        const newComp = { type, id, color: type === 'bar' ? '#3498db' : (type === 'triangle' ? '#27ae60' : (type === 'slider' ? '#8e44ad' : (type === 'polygon' ? '#e67e22' : '#2d3436'))) };
 
         if (type === 'bar') {
             newComp.p1 = { id: '', type: 'fixed', x: 0, y: 0 };
@@ -481,6 +507,11 @@ export class MechanismWizard {
             newComp.r2Param = 'R2_' + (this.components.length + 1);
             newComp.paramMode = 'SSS'; // Default: Side-Side-Side
             newComp.angleParam = 'Ang_' + (this.components.length + 1); // For SAS mode
+            newComp.sign = 1;
+        } else if (type === 'slider') {
+            newComp.p1 = { id: '', type: 'fixed', x: 0, y: 0 };
+            newComp.p2 = { id: '', type: 'fixed', x: 100, y: 0 };
+            newComp.p3 = { id: '', type: 'floating', x: 50, y: 0 };
             newComp.sign = 1;
         } else if (type === 'polygon') {
             newComp.points = []; // Empty initially
@@ -637,6 +668,8 @@ export class MechanismWizard {
         if (comp.type === 'bar') {
             return solvedPoints.has(comp.p1.id) && solvedPoints.has(comp.p2.id);
         } else if (comp.type === 'triangle') {
+            return solvedPoints.has(comp.p1.id) && solvedPoints.has(comp.p2.id) && solvedPoints.has(comp.p3?.id);
+        } else if (comp.type === 'slider') {
             return solvedPoints.has(comp.p1.id) && solvedPoints.has(comp.p2.id) && solvedPoints.has(comp.p3?.id);
         }
         return false;
@@ -856,10 +889,37 @@ export class MechanismWizard {
 
         // 3. Dyad 步驟 (Triangle) & Nested Holes
         this.components.forEach(c => {
+            if (c.type === 'slider' && c.p1?.id && c.p2?.id && c.p3?.id) {
+                const sliderId = c.p3.id;
+                const driver = this.components.find(b => b.type === 'bar' && b.lenParam && (b.p1?.id === sliderId || b.p2?.id === sliderId));
+                if (driver) {
+                    const otherId = driver.p1.id === sliderId ? driver.p2.id : driver.p1.id;
+                    steps.push({
+                        id: sliderId,
+                        type: 'slider',
+                        p1: otherId,
+                        r_param: driver.lenParam,
+                        line_p1: c.p1.id,
+                        line_p2: c.p2.id,
+                        sign: c.sign || 1
+                    });
+                    joints.add(sliderId);
+                } else {
+                    steps.push({ id: sliderId, type: 'joint', x: Number(c.p3.x || 0), y: Number(c.p3.y || 0) });
+                    joints.add(sliderId);
+                }
+                visualization.links.push({
+                    id: `${c.id}_track`,
+                    p1: c.p1.id,
+                    p2: c.p2.id,
+                    color: c.color || '#8e44ad',
+                    style: 'track'
+                });
+            }
             if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
                 steps.push({
                     id: c.p3.id, type: 'rigid_triangle', p1: c.p1.id, p2: c.p2.id,
-                    r1_param: c.r1Param, r2_param: c.r2Param, sign: c.sign || 1
+                    r1_param: c.r1Param, r2_param: c.r2Param, g_param: c.gParam, sign: c.sign || 1
                 });
                 polygons.push({ points: [c.p1.id, c.p2.id, c.p3.id], color: c.color, alpha: 0.3 });
                 joints.add(c.p3.id);

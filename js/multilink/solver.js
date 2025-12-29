@@ -34,6 +34,37 @@ function solveIntersectionOptions(p1, r1, p2, r2) {
     return [pPlus, pMinus];
 }
 
+function solveLineCircleIntersection(a, b, center, r) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len === 0) return [];
+
+    const ux = dx / len;
+    const uy = dy / len;
+    const acx = center.x - a.x;
+    const acy = center.y - a.y;
+    const proj = acx * ux + acy * uy;
+    const dist2 = acx * acx + acy * acy - proj * proj;
+
+    const r2 = r * r;
+    if (dist2 > r2) return [];
+
+    const offset = Math.sqrt(Math.max(0, r2 - dist2));
+    const t1 = proj - offset;
+    const t2 = proj + offset;
+
+    const pts = [];
+    if (t1 >= 0 && t1 <= len) {
+        pts.push({ x: a.x + ux * t1, y: a.y + uy * t1 });
+    }
+    if (t2 >= 0 && t2 <= len) {
+        pts.push({ x: a.x + ux * t2, y: a.y + uy * t2 });
+    }
+
+    return pts;
+}
+
 /**
  * 自動從連桿關係推導 Dyad 步驟
  * 當使用者只定義了連桿 (Link) 而沒定義 Dyad 步驟時，此函數會自動補足。
@@ -213,7 +244,7 @@ export function solveTopology(topologyOrParams, params) {
     // --- 自動任務排序 (確保 Ground > Crank > Others) ---
     // 這樣使用者在 JSON 中不論順序如何，計算都不會因為依賴點未解而掛掉
     const sortedSteps = [...topology.steps].sort((a, b) => {
-        const order = { 'ground': 0, 'input_crank': 1, 'dyad': 2, 'rigid_triangle': 2, 'joint': 3 };
+        const order = { 'ground': 0, 'input_crank': 1, 'dyad': 2, 'rigid_triangle': 2, 'slider': 2, 'joint': 3 };
         const oa = order[a.type] ?? 99;
         const ob = order[b.type] ?? 99;
         if (oa !== ob) return oa - ob;
@@ -272,7 +303,69 @@ export function solveTopology(topologyOrParams, params) {
                     y: center.y + r * Math.sin(ang)
                 };
             }
-            else if (step.type === 'dyad' || step.type === 'rigid_triangle') {
+            else if (step.type === 'rigid_triangle') {
+                const p1 = points[step.p1];
+                const p2 = points[step.p2];
+                if (!p1 || !p2) {
+                    continue;
+                }
+
+                const baseLen = getVal(step, 'g') || Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                const r1 = getVal(step, 'r1');
+                const r2 = getVal(step, 'r2');
+
+                const localOptions = solveIntersectionOptions({ x: 0, y: 0 }, r1, { x: baseLen, y: 0 }, r2);
+                if (!localOptions.length) {
+                    continue;
+                }
+
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const actualBase = Math.hypot(dx, dy);
+                if (actualBase <= 0) {
+                    continue;
+                }
+
+                if (Math.abs(actualBase - baseLen) > 1e-3) {
+                    continue;
+                }
+
+                const ux = dx / actualBase;
+                const uy = dy / actualBase;
+                const local = step.sign === -1 ? localOptions[1] : localOptions[0];
+
+                points[step.id] = {
+                    x: p1.x + (ux * local.x - uy * local.y),
+                    y: p1.y + (uy * local.x + ux * local.y)
+                };
+            }
+            else if (step.type === 'slider') {
+                const p1 = points[step.p1];
+                const a = points[step.line_p1];
+                const b = points[step.line_p2];
+                if (!p1 || !a || !b) {
+                    continue;
+                }
+
+                const r = getVal(step, 'r');
+                const options = solveLineCircleIntersection(a, b, p1, r);
+                if (!options.length) {
+                    continue;
+                }
+
+                let chosen = null;
+                const prevPoints = actualParams && actualParams._prevPoints;
+                const prev = prevPoints ? prevPoints[step.id] : null;
+                if (prev) {
+                    const d0 = Math.hypot(options[0].x - prev.x, options[0].y - prev.y);
+                    const d1 = options[1] ? Math.hypot(options[1].x - prev.x, options[1].y - prev.y) : Infinity;
+                    chosen = d0 <= d1 ? options[0] : options[1];
+                } else {
+                    chosen = step.sign === -1 && options[1] ? options[1] : options[0];
+                }
+                if (chosen) points[step.id] = chosen;
+            }
+            else if (step.type === 'dyad') {
                 const p1 = points[step.p1];
                 const p2 = points[step.p2];
                 if (!p1 || !p2) {
@@ -338,7 +431,7 @@ export function solveTopology(topologyOrParams, params) {
     // 如果有 Dyad 或 Crank 解不出來 (undefined/NaN)，則視為機構卡死
     let allResolved = true;
     for (const s of topology.steps) {
-        if ((s.type === 'dyad' || s.type === 'rigid_triangle' || s.type === 'input_crank') && !points[s.id]) {
+        if ((s.type === 'dyad' || s.type === 'rigid_triangle' || s.type === 'slider' || s.type === 'input_crank') && !points[s.id]) {
             allResolved = false;
             break;
         }

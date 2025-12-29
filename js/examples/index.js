@@ -18,6 +18,11 @@ export const EXAMPLE_TEMPLATES = [
         id: 'crank-slider',
         name: '曲柄滑塊 (模擬)',
         file: './js/examples/crank-slider.json'
+    },
+    {
+        id: 'slider-track',
+        name: 'Slider Track',
+        file: './js/examples/slider-track.json'
     }
     // 您可以在這裡新增更多範本，例如：
     // { id: 'jansen', name: 'Theo Jansen 仿生獸', file: './js/examples/jansen.json' }
