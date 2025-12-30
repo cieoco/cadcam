@@ -15,11 +15,6 @@ export const EXAMPLE_TEMPLATES = [
         file: './js/examples/gripper.json'
     },
     {
-        id: 'crank-slider',
-        name: '曲柄滑塊 (模擬)',
-        file: './js/examples/crank-slider.json'
-    },
-    {
         id: 'slider-track',
         name: 'Slider Track',
         file: './js/examples/slider-track.json'

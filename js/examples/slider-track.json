@@ -88,7 +88,10 @@
   "params": {
     "theta": 0,
     "L_Crank": 20,
-    "L_Rod": 80
+    "L_Rod": 80,
+    "L_TrackBase": 220,
+    "L_TrackBase_track": 110,
+    "L_TrackBase_offset": 10
   },
   "_wizard_data": [
     {
@@ -149,6 +152,10 @@
         "y": 0
       },
       "sign": 1
+      ,
+      "lenParam": "L_TrackBase",
+      "trackLenParam": "L_TrackBase_track",
+      "trackOffsetParam": "L_TrackBase_offset"
     }
   ]
 }

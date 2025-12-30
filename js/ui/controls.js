@@ -395,9 +395,14 @@ export function updateDynamicParams() {
     const renderedVars = new Set();
     if (topologyObj && topologyObj._wizard_data) {
         topologyObj._wizard_data.forEach(comp => {
-            if (comp.type === 'triangle') {
-                // Check if any of its params exist in vars
-                const params = [comp.r1Param, comp.r2Param, comp.gParam].filter(p => p && vars.has(p));
+            if (comp.type === 'triangle' || comp.type === 'slider') {
+                let params = [];
+                if (comp.type === 'triangle') {
+                    params = [comp.r1Param, comp.r2Param, comp.gParam];
+                } else if (comp.type === 'slider') {
+                    params = [comp.lenParam, comp.trackLenParam, comp.trackOffsetParam];
+                }
+                params = params.filter(p => p && vars.has(p));
 
                 if (params.length > 0) {
                     // Create Group Container
