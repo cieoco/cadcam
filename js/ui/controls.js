@@ -5,15 +5,15 @@
 
 import { $, log, downloadText, downloadZip, fmt } from '../utils.js';
 import { readInputs, readSweepParams, readViewParams } from '../config.js';
-import { solveFourBar, sweepTheta, calculateTrajectoryStats } from '../fourbar/solver.js';
+import { sweepTheta, calculateTrajectoryStats } from '../fourbar/solver.js';
 import { startAnimation, pauseAnimation, stopAnimation, setupMotorTypeHandler } from '../fourbar/animation.js';
 import { renderPartsLayout } from '../parts/renderer.js';
-import { buildDXF } from '../utils/dxf-generator.js';
 import { computePreviewState } from '../core/preview-state.js';
 import { buildExportBundle } from '../core/export.js';
 import { computeSweepState } from '../core/sweep-state.js';
+import { computeViewState } from '../core/view-state.js';
+import { clampDynamicParam } from '../core/param-constraints.js';
 import { collectDynamicParamSpec } from '../core/dynamic-params.js';
-import { renderFourbar } from './visualization.js';
 
 // 全域狀態資料
 let currentTrajectoryData = null;
@@ -302,23 +302,18 @@ export function updateDynamicParams() {
                 });
             }
 
-            import('../multilink/constraints.js').then(({ calculateValidRange }) => {
-                const range = calculateValidRange(mech, varId);
-                let val = parseFloat(isRange ? rangeInput.value : numInput.value) || 0;
-
+            const rawVal = parseFloat(isRange ? rangeInput.value : numInput.value);
+            clampDynamicParam({ mech, varId, value: rawVal }).then(({ value, range }) => {
                 if (range) {
-                    if (val < range.min) val = range.min;
-                    if (val > range.max) val = range.max;
-
                     if (isRange) {
-                        if (val !== parseFloat(rangeInput.value)) rangeInput.value = val;
+                        if (value !== parseFloat(rangeInput.value)) rangeInput.value = value;
                     } else {
-                        if (val !== parseFloat(numInput.value)) numInput.value = val;
+                        if (value !== parseFloat(numInput.value)) numInput.value = value;
                     }
                 }
 
-                if (isRange) numInput.value = val;
-                else rangeInput.value = val;
+                if (isRange) numInput.value = value;
+                else rangeInput.value = value;
 
                 callback();
             });
@@ -400,19 +395,6 @@ export function updatePreview() {
             mech[key] = dynamicParams[key];
         });
 
-        if (mods.config && mods.config.id === 'multilink') {
-            const thetaContainer = $("thetaSliderContainer");
-            if (thetaContainer) {
-                let topology = mech.topology;
-                if (typeof topology === 'string') {
-                    try { topology = JSON.parse(topology); } catch (e) { topology = null; }
-                }
-                const hasInput = topology && Array.isArray(topology.steps) &&
-                    topology.steps.some(s => s.type === 'input_crank');
-                thetaContainer.style.display = hasInput ? 'block' : 'none';
-            }
-        }
-
         const viewParams = readViewParams();
         viewParams.motorType = mech.motorType;
         viewParams.motorRotation = mech.motorRotation || 0;
@@ -452,9 +434,23 @@ export function updatePreview() {
         currentTrajectoryData = previewState.trajectoryData;
 
         const svgWrap = $("svgWrap");
+        const showPartsPreview = $("showPartsPreview") ? $("showPartsPreview").checked : true;
+        const partsPanel = $("partsPreviewPanel");
+        const viewState = computeViewState({
+            previewState,
+            showPartsPreview,
+            expandedHeight: partsPanel ? partsPanel.dataset.expandedHeight : null,
+            hasSvgChild: Boolean(svgWrap.firstChild)
+        });
+
         const warning = document.getElementById('invalidWarning');
         if (warning) {
-            warning.style.display = previewState.isInvalid ? 'block' : 'none';
+            warning.style.display = viewState.warningVisible ? 'block' : 'none';
+        }
+
+        const thetaContainer = $("thetaSliderContainer");
+        if (thetaContainer) {
+            thetaContainer.style.display = viewState.thetaVisible ? 'block' : 'none';
         }
 
         if (previewState.statusMessage) {
@@ -476,8 +472,8 @@ export function updatePreview() {
             }
         }
 
-        if (previewState.fatalInvalid) {
-            if (!svgWrap.firstChild) {
+        if (viewState.fatalInvalid) {
+            if (viewState.showInvalidPlaceholder) {
                 svgWrap.textContent = '(invalid)';
                 $("partsWrap").innerHTML = "";
                 $("dlButtons").innerHTML = "";
@@ -493,15 +489,12 @@ export function updatePreview() {
 
         const parts = previewState.parts;
 
-        const showParts = $("showPartsPreview") ? $("showPartsPreview").checked : true;
-        const partsPanel = $("partsPreviewPanel");
         const partsBody = $("partsPreviewBody");
         if (partsPanel) {
-            const expandedHeight = partsPanel.dataset.expandedHeight || "540px";
-            partsPanel.style.height = showParts ? expandedHeight : "auto";
+            partsPanel.style.height = viewState.parts.panelHeight;
         }
-        if (partsBody) partsBody.style.display = showParts ? "flex" : "none";
-        if (showParts) {
+        if (partsBody) partsBody.style.display = viewState.parts.bodyDisplay;
+        if (viewState.parts.show) {
             $("partsWrap").innerHTML = "";
             $("partsWrap").appendChild(
                 renderPartsLayout(parts, partSpec.workX, partSpec.workY)
@@ -517,18 +510,17 @@ export function updatePreview() {
         const dl = $("dlButtons");
         dl.innerHTML = ""; // Clear previous buttons
 
-        try {
-            const dxfText = buildDXF(parts);
+        if (viewState.dxfPreviewEnabled) {
             const dxfBtn = document.createElement("button");
             dxfBtn.textContent = `下載 DXF 零件檔 (預覽)`;
             dxfBtn.className = "btn-download";
             dxfBtn.style.backgroundColor = "#6a1b9a";
             dxfBtn.style.width = "100%"; // Make it prominent
             dxfBtn.style.marginBottom = "5px";
-            dxfBtn.onclick = () => downloadText("mechanism_parts.dxf", dxfText);
+            dxfBtn.onclick = () => downloadText("mechanism_parts.dxf", previewState.dxfPreviewText);
             dl.appendChild(dxfBtn);
-        } catch (e) {
-            console.warn("Auto-DXF generation failed:", e);
+        } else if (previewState.dxfError) {
+            console.warn("Auto-DXF generation failed:", previewState.dxfError);
         }
 
     } catch (e) {
@@ -639,7 +631,7 @@ export function performSweepAnalysis() {
         log(
             `分析完成 (${motorTypeText})\n` +
             `範圍: ${sweepParams.sweepStart}° 到 ${sweepParams.sweepEnd}°\n` +
-            `有效區間: ${validRanges.length}, 無效區間: ${invalidRanges.length}`
+            `有效區間: ${sweepState.validRanges.length}, 無效區間: ${sweepState.invalidRanges.length}`
         );
     } catch (e) {
         log(`錯誤：${e.message}`);

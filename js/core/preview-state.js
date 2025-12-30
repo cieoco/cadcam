@@ -6,6 +6,7 @@
 import { fmt } from '../utils.js';
 import { computeSolution, computeParts } from './preview.js';
 import { getUnsolvedSummary } from './solver-status.js';
+import { buildDXF } from '../utils/dxf-generator.js';
 
 function parseTopology(raw) {
     if (!raw) return null;
@@ -55,6 +56,9 @@ export function computePreviewState({
         fatalInvalid: false,
         statusMessage: '',
         previewLog: '',
+        showThetaSlider: false,
+        dxfPreviewText: '',
+        dxfError: null,
         restore: null,
         lastSolution,
         lastTopology
@@ -74,6 +78,11 @@ export function computePreviewState({
         if (result.lastSolution && result.lastSolution.points) {
             mech._prevPoints = result.lastSolution.points;
         }
+        result.showThetaSlider = Boolean(
+            topologyObj &&
+            Array.isArray(topologyObj.steps) &&
+            topologyObj.steps.some(s => s.type === 'input_crank')
+        );
     }
 
     let sol = computeSolution(mods, mech, partSpec, mfg);
@@ -124,6 +133,11 @@ export function computePreviewState({
 
     result.solution = sol;
     result.parts = computeParts(mods, mech, partSpec, sol);
+    try {
+        result.dxfPreviewText = buildDXF(result.parts);
+    } catch (e) {
+        result.dxfError = e;
+    }
     result.previewLog = buildPreviewLog(mods, partSpec, mfg, topologyObj);
 
     return result;
