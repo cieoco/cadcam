@@ -244,18 +244,11 @@ export function updateDynamicParams() {
             };
             scan(topology);
 
-            // 3. 補強：掃描 params 物件中的所有鍵 (確保 Wizard 定義的 r1, r2 也能變成滑桿)
+            // 3. 僅同步已被引用的參數預設值，避免孤兒參數變成滑桿
             if (topology.params) {
-                Object.keys(topology.params).forEach(k => {
-                    if (k === 'theta' || k === 'thetaDeg') return;
-                    if (!vars.has(k)) {
-                        vars.set(k, {
-                            label: k,
-                            min: 0,
-                            max: 500,
-                            step: 1,
-                            default: topology.params[k] || 100
-                        });
+                vars.forEach((info, k) => {
+                    if (topology.params[k] !== undefined) {
+                        info.default = topology.params[k];
                     }
                 });
             }

@@ -65,6 +65,277 @@ function solveLineCircleIntersection(a, b, center, r) {
     return pts;
 }
 
+
+function solveBodyJointTopology(topology, params) {
+    const components = topology && topology._wizard_data ? topology._wizard_data : [];
+    if (!components.length) {
+        return { isValid: false, points: {}, B: null };
+    }
+
+    const actualParams = params || {};
+    const points = {};
+    const triangles = new Map();
+    const constraints = [];
+    const pointIds = new Set();
+
+    const getParamVal = (name, fallback = 0) => {
+        if (!name) return fallback;
+        if (actualParams[name] !== undefined) return Number(actualParams[name]);
+        if (topology && topology.params && topology.params[name] !== undefined) {
+            return Number(topology.params[name]);
+        }
+        const parsed = Number(name);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    const addPointId = (pt) => {
+        if (pt && pt.id) pointIds.add(pt.id);
+    };
+
+    const getInitialPoint = (id) => {
+        if (!id) return null;
+        for (const c of components) {
+            if (c.type === 'polygon' && c.points) {
+                const hit = c.points.find(p => p.id === id && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y)));
+                if (hit) return { x: Number(hit.x), y: Number(hit.y) };
+                continue;
+            }
+            for (const key of ['p1', 'p2', 'p3']) {
+                const pt = c[key];
+                if (pt && pt.id === id && Number.isFinite(Number(pt.x)) && Number.isFinite(Number(pt.y))) {
+                    return { x: Number(pt.x), y: Number(pt.y) };
+                }
+            }
+        }
+        return null;
+    };
+
+    if (topology && Array.isArray(topology.steps)) {
+        topology.steps.forEach(step => {
+            if (step.type !== 'ground') return;
+            if (step.x !== undefined && step.y !== undefined) {
+                points[step.id] = { x: Number(step.x), y: Number(step.y) };
+            }
+        });
+
+        topology.steps.forEach(step => {
+            if (step.type !== 'ground' || !step.dist_param || !step.ref_id) return;
+            const ref = points[step.ref_id];
+            if (!ref) return;
+            const dist = getParamVal(step.dist_param, 0);
+            points[step.id] = {
+                x: ref.x + (step.ux || 0) * dist,
+                y: ref.y + (step.uy || 0) * dist
+            };
+        });
+    }
+
+    const fixedIds = new Set();
+    if (topology && Array.isArray(topology.steps)) {
+        topology.steps.forEach(step => {
+            if (step.type === 'ground' && step.id) fixedIds.add(step.id);
+        });
+    }
+
+    components.forEach((c) => {
+        if (c.type === 'polygon' && c.points) {
+            c.points.forEach(p => {
+                addPointId(p);
+                if (p.type === 'fixed') {
+                    points[p.id] = { x: Number(p.x || 0), y: Number(p.y || 0) };
+                    fixedIds.add(p.id);
+                }
+            });
+            return;
+        }
+
+        ['p1', 'p2', 'p3'].forEach(k => addPointId(c[k]));
+
+        if (c.p1 && c.p1.type === 'fixed' && !points[c.p1.id]) {
+            points[c.p1.id] = { x: Number(c.p1.x || 0), y: Number(c.p1.y || 0) };
+            fixedIds.add(c.p1.id);
+        }
+        if (c.p2 && c.p2.type === 'fixed' && !points[c.p2.id]) {
+            points[c.p2.id] = { x: Number(c.p2.x || 0), y: Number(c.p2.y || 0) };
+            fixedIds.add(c.p2.id);
+        }
+        if (c.p3 && c.p3.type === 'fixed' && !points[c.p3.id]) {
+            points[c.p3.id] = { x: Number(c.p3.x || 0), y: Number(c.p3.y || 0) };
+            fixedIds.add(c.p3.id);
+        }
+    });
+
+    const theta = actualParams.thetaDeg !== undefined
+        ? deg2rad(actualParams.thetaDeg)
+        : deg2rad(actualParams.theta || 0);
+
+    components.forEach((c) => {
+        if (c.type === 'bar' && c.p1?.id && c.p2?.id) {
+            const len = getParamVal(c.lenParam, 0);
+            constraints.push({ a: c.p1.id, b: c.p2.id, len, type: 'bar' });
+
+            if (c.isInput) {
+                const p1 = points[c.p1.id];
+                const p2 = points[c.p2.id];
+                const ang = theta + deg2rad(c.phaseOffset || 0);
+
+                if (p1 && !p2) {
+                    points[c.p2.id] = {
+                        x: p1.x + len * Math.cos(ang),
+                        y: p1.y + len * Math.sin(ang)
+                    };
+                } else if (p2 && !p1) {
+                    points[c.p1.id] = {
+                        x: p2.x - len * Math.cos(ang),
+                        y: p2.y - len * Math.sin(ang)
+                    };
+                }
+            }
+        } else if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
+            const g = getParamVal(c.gParam, 0);
+            const r1 = getParamVal(c.r1Param, 0);
+            const r2 = getParamVal(c.r2Param, 0);
+            const triId = c.id || c.p3.id;
+            triangles.set(triId, { p1: c.p1.id, p2: c.p2.id, p3: c.p3.id, sign: c.sign || 1 });
+            constraints.push({ a: c.p1.id, b: c.p2.id, len: g, type: 'tri', role: 'g', triId });
+            constraints.push({ a: c.p1.id, b: c.p3.id, len: r1, type: 'tri', role: 'r1', triId });
+            constraints.push({ a: c.p2.id, b: c.p3.id, len: r2, type: 'tri', role: 'r2', triId });
+        }
+    });
+
+    // Allow ground bars (fixed-fixed) to follow their length parameter.
+    components.forEach((c) => {
+        if (c.type !== 'bar' || c.isInput) return;
+        if (!c.p1?.id || !c.p2?.id || !c.lenParam) return;
+        if (!fixedIds.has(c.p1.id) || !fixedIds.has(c.p2.id)) return;
+        const p1 = points[c.p1.id];
+        const p2 = points[c.p2.id];
+        if (!p1 || !p2) return;
+        const targetLen = getParamVal(c.lenParam, 0);
+        if (!Number.isFinite(targetLen) || targetLen <= 0) return;
+
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const ux = dx / d;
+        const uy = dy / d;
+
+        // Anchor the endpoint that has a ground step if available.
+        const p1Ground = topology?.steps?.some(s => s.type === 'ground' && s.id === c.p1.id);
+        const p2Ground = topology?.steps?.some(s => s.type === 'ground' && s.id === c.p2.id);
+        if (p1Ground && !p2Ground) {
+            points[c.p2.id] = { x: p1.x + ux * targetLen, y: p1.y + uy * targetLen };
+        } else if (p2Ground && !p1Ground) {
+            points[c.p1.id] = { x: p2.x - ux * targetLen, y: p2.y - uy * targetLen };
+        } else {
+            points[c.p2.id] = { x: p1.x + ux * targetLen, y: p1.y + uy * targetLen };
+        }
+    });
+
+    const prevPoints = actualParams && actualParams._prevPoints;
+    let infeasible = false;
+    let changed = true;
+    let guard = 0;
+    while (changed && guard < 50) {
+        changed = false;
+        guard += 1;
+
+        for (const pid of pointIds) {
+            if (points[pid]) continue;
+
+            const related = constraints
+                .filter(c => c.a === pid || c.b === pid)
+                .map(c => {
+                    const otherId = c.a === pid ? c.b : c.a;
+                    return { ...c, otherId };
+                })
+                .filter(c => points[c.otherId]);
+
+            if (related.length < 2) continue;
+
+            const c1 = related[0];
+            const c2 = related[1];
+            const p1 = points[c1.otherId];
+            const p2 = points[c2.otherId];
+            const options = solveIntersectionOptions(p1, c1.len, p2, c2.len);
+            if (!options.length) {
+                infeasible = true;
+                continue;
+            }
+
+            let chosen = null;
+            const triKey = c1.triId && c1.triId === c2.triId ? c1.triId : null;
+            if (triKey && triangles.has(triKey)) {
+                const tri = triangles.get(triKey);
+                if (pid === tri.p3 && ((c1.role === 'r1' && c2.role === 'r2') || (c1.role === 'r2' && c2.role === 'r1'))) {
+                    chosen = tri.sign === -1 && options[1] ? options[1] : options[0];
+                }
+            }
+
+            if (!chosen) {
+                const prev = prevPoints ? prevPoints[pid] : null;
+                if (prev) {
+                    const d0 = Math.hypot(options[0].x - prev.x, options[0].y - prev.y);
+                    const d1 = options[1] ? Math.hypot(options[1].x - prev.x, options[1].y - prev.y) : Infinity;
+                    chosen = d0 <= d1 ? options[0] : options[1];
+                } else {
+                    chosen = options[0];
+                }
+            }
+
+            if (chosen) {
+                points[pid] = chosen;
+                changed = true;
+            }
+        }
+    }
+
+    let allResolved = true;
+    for (const pid of pointIds) {
+        if (!points[pid]) {
+            allResolved = false;
+            break;
+        }
+    }
+
+    if (!infeasible) {
+        for (const pid of pointIds) {
+            if (points[pid]) continue;
+            const related = constraints
+                .filter(c => c.a === pid || c.b === pid)
+                .map(c => {
+                    const otherId = c.a === pid ? c.b : c.a;
+                    return { ...c, otherId };
+                })
+                .filter(c => points[c.otherId]);
+
+            if (!related.length) continue;
+            const pick = related[0];
+            const other = points[pick.otherId];
+            const len = pick.len || 0;
+            const seed = getInitialPoint(pid) || { x: other.x + len, y: other.y };
+            let dx = seed.x - other.x;
+            let dy = seed.y - other.y;
+            const d = Math.hypot(dx, dy);
+            if (d === 0) {
+                dx = len;
+                dy = 0;
+            } else {
+                dx = (dx / d) * len;
+                dy = (dy / d) * len;
+            }
+            points[pid] = { x: other.x + dx, y: other.y + dy };
+        }
+    }
+
+    return {
+        isValid: !infeasible,
+        isUnderconstrained: !infeasible && !allResolved,
+        points,
+        B: points[topology.tracePoint]
+    };
+}
+
 /**
  * 自動從連桿關係推導 Dyad 步驟
  * 當使用者只定義了連桿 (Link) 而沒定義 Dyad 步驟時，此函數會自動補足。
@@ -206,6 +477,11 @@ export function solveTopology(topologyOrParams, params) {
             }
         }
     }
+    if (topology && topology._wizard_data && topology.bodyJoint !== false) {
+        return solveBodyJointTopology(topology, actualParams);
+    }
+
+
 
     if (!topology || !topology.steps) {
         return { isValid: true, points: {}, B: undefined };

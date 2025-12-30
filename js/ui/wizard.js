@@ -853,6 +853,7 @@ export class MechanismWizard {
         const visualization = { links: [], polygons: [], joints: [] };
         const parts = [];
         const params = this.topology.params || { theta: 0 };
+        this.topology.bodyJoint = true;
         const joints = new Set();
         const polygons = [];
         const solvedPoints = this.getSolvedPointIds();
