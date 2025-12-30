@@ -11,6 +11,8 @@ import { generateParts } from '../parts/generator.js';
 import { renderPartsLayout, renderTrajectory } from '../parts/renderer.js';
 import { buildAllGcodes, generateMachiningInfo } from '../gcode/generator.js';
 import { buildDXF } from '../utils/dxf-generator.js';
+import { computeSolution, computeParts } from '../core/preview.js';
+import { collectDynamicParamSpec } from '../core/dynamic-params.js';
 import { renderFourbar } from './visualization.js';
 
 // 全域狀態資料
@@ -186,76 +188,18 @@ export function updateDynamicParams() {
         return;
     }
 
-    const vars = new Map(); // Map of varId -> { label, min, max, step, default }
-
-    // 1. 從 Mechanism Config 讀取設定好的 isDynamic 參數
     const mods = getActiveModules();
-    if (mods && mods.config && mods.config.parameters) {
-        mods.config.parameters.forEach(p => {
-            if (p.isDynamic) {
-                vars.set(p.id, {
-                    label: p.label,
-                    min: p.min ?? 0,
-                    max: p.max ?? 300,
-                    step: p.step ?? 0.1,
-                    default: p.default ?? 50
-                });
-            }
-        });
-    }
-
-    // 2. 從 Topology JSON 自動掃描參數名 (針對 Multilink)
     const topoEl = document.getElementById('topology');
-    let topologyObj = null; // Store parsed topology for grouping
-
+    let topologyObj = null;
     if (topoEl) {
         try {
             topologyObj = JSON.parse(topoEl.value);
-            const topology = topologyObj;
-
-            const scan = (obj) => {
-                if (!obj || typeof obj !== 'object') return;
-
-                if (Array.isArray(obj)) {
-                    obj.forEach(item => scan(item));
-                    return;
-                }
-
-                for (const k in obj) {
-                    const val = obj[k];
-                    // 擴展掃描關鍵字，包含孔位的 r1Param, r2Param 以及新的 distParam
-                    const isParamKey = k.endsWith('_param') || k === 'lenParam' || k === 'len_param' || k === 'r1Param' || k === 'r2Param' || k === 'angleParam' || k === 'distParam' || k === 'dist_param';
-                    if (isParamKey && typeof val === 'string') {
-                        if (val && !vars.has(val)) {
-                            // 🌟 修正：優先使用 topology.params 裡面的實測數值，而非死板的 100
-                            const actualVal = (topology.params && topology.params[val] !== undefined) ? topology.params[val] : 100;
-                            vars.set(val, {
-                                label: val,
-                                min: 0,
-                                max: 500,
-                                step: 0.5,
-                                default: actualVal
-                            });
-                        }
-                    } else if (val && typeof val === 'object') {
-                        scan(val);
-                    }
-                }
-            };
-            scan(topology);
-
-            // 3. 僅同步已被引用的參數預設值，避免孤兒參數變成滑桿
-            if (topology.params) {
-                vars.forEach((info, k) => {
-                    if (topology.params[k] !== undefined) {
-                        info.default = topology.params[k];
-                    }
-                });
-            }
         } catch (e) {
             console.warn('[updateDynamicParams] Topology JSON parse failed', e);
         }
     }
+
+    const { vars, groups } = collectDynamicParamSpec(mods ? mods.config : null, topologyObj);
 
     // 紀錄當前焦點位置
     const activeElement = document.activeElement;
@@ -386,51 +330,37 @@ export function updateDynamicParams() {
     };
 
     const renderedVars = new Set();
-    if (topologyObj && topologyObj._wizard_data) {
-        topologyObj._wizard_data.forEach(comp => {
-            if (comp.type === 'triangle' || comp.type === 'slider') {
-                let params = [];
-                if (comp.type === 'triangle') {
-                    params = [comp.r1Param, comp.r2Param, comp.gParam];
-                } else if (comp.type === 'slider') {
-                    params = [comp.lenParam, comp.trackLenParam, comp.trackOffsetParam];
-                }
-                params = params.filter(p => p && vars.has(p));
+    if (groups.length) {
+        groups.forEach(groupSpec => {
+            let group = container.querySelector(`.param-group[data-comp-id="${groupSpec.id}"]`);
+            if (!group) {
+                group = document.createElement('div');
+                group.className = 'param-group';
+                group.dataset.compId = groupSpec.id;
+                group.style.border = '1px solid #ddd';
+                group.style.borderRadius = '4px';
+                group.style.padding = '8px';
+                group.style.marginBottom = '8px';
+                group.style.background = 'transparent';
 
-                if (params.length > 0) {
-                    // Create Group Container
-                    let group = container.querySelector(`.param-group[data-comp-id="${comp.id}"]`);
-                    if (!group) {
-                        group = document.createElement('div');
-                        group.className = 'param-group';
-                        group.dataset.compId = comp.id;
-                        group.style.border = '1px solid #ddd';
-                        group.style.borderRadius = '4px';
-                        group.style.padding = '8px';
-                        group.style.marginBottom = '8px';
-                        group.style.background = 'transparent';
+                const title = document.createElement('div');
+                title.style.fontSize = '12px';
+                title.style.fontWeight = 'bold';
+                title.style.marginBottom = '6px';
+                title.style.color = '#555';
+                title.style.display = 'flex';
+                title.style.justifyContent = 'space-between';
+                title.innerHTML = `<span>${groupSpec.id}</span>`;
+                group.appendChild(title);
 
-                        const title = document.createElement('div');
-                        title.style.fontSize = '12px';
-                        title.style.fontWeight = 'bold';
-                        title.style.marginBottom = '6px';
-                        title.style.color = '#555';
-                        title.style.display = 'flex';
-                        title.style.justifyContent = 'space-between';
-                        title.innerHTML = `<span>${comp.id}</span>`;
-                        group.appendChild(title);
-
-                        container.appendChild(group);
-                    }
-
-                    // Render params inside group
-                    params.forEach(varId => {
-                        const wrapper = getOrCreateWrapper(varId, vars.get(varId));
-                        group.appendChild(wrapper); // Move to group
-                        renderedVars.add(varId);
-                    });
-                }
+                container.appendChild(group);
             }
+
+            groupSpec.params.forEach(varId => {
+                const wrapper = getOrCreateWrapper(varId, vars.get(varId));
+                group.appendChild(wrapper);
+                renderedVars.add(varId);
+            });
         });
     }
 
@@ -516,10 +446,7 @@ export function updatePreview() {
             viewParams.height = Math.max(0, innerH) || 600;
         }
 
-        validateConfig(mech, partSpec, mfg);
-
-        const solveFn = mods.solver[mods.config.solveFn];
-        let sol = solveFn(mech);
+        let sol = computeSolution(mods, mech, partSpec, mfg);
 
         const svgWrap = $("svgWrap");
         const isInvalid = !sol || sol.isValid === false;
@@ -613,8 +540,7 @@ export function updatePreview() {
             renderFn(sol, mech.thetaDeg || mech.theta, currentTrajectoryData, viewParams)
         );
 
-        const partsFn = mods.parts[mods.config.partsFn];
-        const parts = partsFn({ ...mech, ...partSpec, ...(sol ? sol.dynamicParams : {}) });
+        const parts = computeParts(mods, mech, partSpec, sol);
 
         const showParts = $("showPartsPreview") ? $("showPartsPreview").checked : true;
         const partsPanel = $("partsPreviewPanel");

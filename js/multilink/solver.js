@@ -16,9 +16,10 @@ function solveIntersectionOptions(p1, r1, p2, r2) {
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     const d = Math.hypot(dx, dy);
+    const eps = 1e-6;
 
     // 檢查是否有解
-    if (d > r1 + r2 || d < Math.abs(r1 - r2) || d === 0) return [];
+    if (d > r1 + r2 + eps || d < Math.abs(r1 - r2) - eps || d === 0) return [];
 
     const a_dist = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
     const h = Math.sqrt(Math.max(0, r1 * r1 - a_dist * a_dist));
