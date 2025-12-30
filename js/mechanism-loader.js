@@ -228,6 +228,7 @@ window.updatePreview = updatePreview;
 window.pushTopologyHistory = pushTopologyHistory;
 window.undoTopology = undoTopology;
 
+
 /**
  * 設定連結點擊互動功能 (Add Hole)
  */
@@ -378,8 +379,13 @@ function setupLinkClickHandler() {
     addPointBtn = document.createElement('button');
     addPointBtn.id = 'btnAddPoint';
     addPointBtn.innerHTML = '新增點位';
-    addPointBtn.style.marginLeft = '15px'; // Space from title
-    addPointBtn.style.border = '1px solid #aaa';
+    addPointBtn.style.marginLeft = '12px'; // Space from title
+    addPointBtn.style.padding = '6px 12px';
+    addPointBtn.style.fontSize = '14px';
+    addPointBtn.style.borderRadius = '4px';
+    addPointBtn.style.border = '1px solid #ccc';
+    addPointBtn.style.background = '#fff';
+    addPointBtn.style.cursor = 'pointer';
 
     // Insert after title
     titleParent.insertBefore(addPointBtn, titleEl.nextSibling);
@@ -402,8 +408,13 @@ function setupLinkClickHandler() {
     selectBtn = document.createElement('button');
     selectBtn.id = 'btnSelect';
     selectBtn.innerHTML = '選取';
-    selectBtn.style.marginLeft = '10px';
-    selectBtn.style.border = '1px solid #aaa';
+    selectBtn.style.marginLeft = '8px';
+    selectBtn.style.padding = '6px 12px';
+    selectBtn.style.fontSize = '14px';
+    selectBtn.style.borderRadius = '4px';
+    selectBtn.style.border = '1px solid #ccc';
+    selectBtn.style.background = '#fff';
+    selectBtn.style.cursor = 'pointer';
 
     const refNode = addPointBtn || titleEl;
     refNode.parentNode.insertBefore(selectBtn, refNode.nextSibling);
@@ -426,8 +437,13 @@ function setupLinkClickHandler() {
     undoBtn = document.createElement('button');
     undoBtn.id = 'btnUndo';
     undoBtn.innerHTML = '回復上一步';
-    undoBtn.style.marginLeft = '10px';
-    undoBtn.style.border = '1px solid #aaa';
+    undoBtn.style.marginLeft = '8px';
+    undoBtn.style.padding = '6px 12px';
+    undoBtn.style.fontSize = '14px';
+    undoBtn.style.borderRadius = '4px';
+    undoBtn.style.border = '1px solid #ccc';
+    undoBtn.style.background = '#fff';
+    undoBtn.style.cursor = 'pointer';
     undoBtn.disabled = true;
 
     const refNode = selectBtn || addPointBtn || titleEl;
@@ -446,8 +462,13 @@ function setupLinkClickHandler() {
     drawBtn = document.createElement('button');
     drawBtn.id = 'btnDrawLink';
     drawBtn.innerHTML = '畫桿件';
-    drawBtn.style.marginLeft = '10px'; // Space from previous btn
-    drawBtn.style.border = '1px solid #aaa';
+    drawBtn.style.marginLeft = '8px'; // Space from previous btn
+    drawBtn.style.padding = '6px 12px';
+    drawBtn.style.fontSize = '14px';
+    drawBtn.style.borderRadius = '4px';
+    drawBtn.style.border = '1px solid #ccc';
+    drawBtn.style.background = '#fff';
+    drawBtn.style.cursor = 'pointer';
 
     // Insert after Select button if exists
     const refNode = selectBtn || addPointBtn || titleEl;
@@ -477,8 +498,13 @@ function setupLinkClickHandler() {
     zenBtn = document.createElement('button');
     zenBtn.id = 'btnZenMode';
     zenBtn.innerHTML = '全螢幕';
-    zenBtn.style.marginLeft = '10px';
-    zenBtn.style.border = '1px solid #aaa';
+    zenBtn.style.marginLeft = '8px';
+    zenBtn.style.padding = '6px 12px';
+    zenBtn.style.fontSize = '14px';
+    zenBtn.style.borderRadius = '4px';
+    zenBtn.style.border = '1px solid #ccc';
+    zenBtn.style.background = '#fff';
+    zenBtn.style.cursor = 'pointer';
 
     // Insert after draw button (which is nextSibling of title now)
     // Actually, drawBtn is inserted. So titleEl.nextSibling is drawBtn.
@@ -489,12 +515,41 @@ function setupLinkClickHandler() {
       document.body.classList.toggle('zen-mode');
       const isZen = document.body.classList.contains('zen-mode');
       zenBtn.innerHTML = isZen ? '恢復' : '全螢幕';
-      zenBtn.style.background = isZen ? '#fab1a0' : '';
+      zenBtn.style.background = isZen ? '#fab1a0' : '#fff';
 
       // Force redraw/resize
       setTimeout(() => {
         window.dispatchEvent(new Event('resize'));
       }, 100);
+    };
+  }
+
+  // Reset Button (between Zen and Undo)
+  let resetBtn = document.getElementById('btnWizardReset');
+  if (!resetBtn && titleEl && titleParent) {
+    resetBtn = document.createElement('button');
+    resetBtn.id = 'btnWizardReset';
+    resetBtn.innerHTML = '重置';
+    resetBtn.style.marginLeft = '8px';
+    resetBtn.style.padding = '6px 12px';
+    resetBtn.style.fontSize = '14px';
+    resetBtn.style.borderRadius = '4px';
+    resetBtn.style.border = '1px solid #ccc';
+    resetBtn.style.background = '#fff';
+    resetBtn.style.cursor = 'pointer';
+
+    if (undoBtn) {
+      titleParent.insertBefore(resetBtn, undoBtn);
+    } else if (zenBtn) {
+      titleParent.insertBefore(resetBtn, zenBtn.nextSibling);
+    } else {
+      titleParent.appendChild(resetBtn);
+    }
+
+    resetBtn.onclick = () => {
+      if (window.wizard && typeof window.wizard.reset === 'function') {
+        window.wizard.reset();
+      }
     };
   }
 

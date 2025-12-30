@@ -36,8 +36,8 @@ export class MechanismWizard {
 
         this.container.innerHTML = `
             <div class="wizard-header" style="padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-radius: 8px 8px 0 0;">
-                <h4 style="margin: 0; font-size: 14px; color: #34495e; display: flex; align-items: center; gap: 5px;">
-                    🛠️ 機構設計器 <button id="btnWizardReset" style="font-size: 10px; padding: 2px 6px; cursor: pointer; background: #fff; border: 1px solid #ddd; border-radius: 4px; color: #e74c3c;">🗑️ 重置</button>
+                <h4 style="margin: 0; font-size: 14px; color: #34495e; display: flex; align-items: center; gap: 5px; white-space: nowrap">
+                    🛠️ 機構設計器
                 </h4>
                 <select id="templateSelect" style="font-size: 11px; padding: 2px 4px; border-radius: 4px; border: 1px solid #ddd;">
                     <option value="">-- 載入範本 --</option>
@@ -45,15 +45,7 @@ export class MechanismWizard {
                 </select>
             </div>
             
-            <div style="display: flex; gap: 10px; padding: 10px; background: #fff;">
-                <button id="btnAddBar" style="flex: 1; padding: 8px; background: #3498db; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;">
-                    📏 新增二孔桿
-                </button>
-                <button id="btnAddTriangle" style="flex: 1; padding: 8px; background: #27ae60; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;">
-                    📐 新增三角桿
-                </button>
-                <button id="btnAddSlider" style="flex: 1; padding: 8px; background: #8e44ad; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;">Slider</button>
-            </div>
+            <div style="height: 6px;"></div>
 
             <div class="wizard-content" style="display: grid; grid-template-columns: 120px 1fr; gap: 10px; height: 350px; overflow: hidden; padding: 0 10px 10px 10px;">
                 <!-- 左側：組件列表 -->
@@ -342,16 +334,10 @@ export class MechanismWizard {
     }
 
     attachEvents() {
-        const btnAddBar = $('btnAddBar');
-        const btnAddTriangle = $('btnAddTriangle');
-        const btnAddSlider = $('btnAddSlider');
         const btnReset = $('btnWizardReset');
         const btnApply = $('btnWizardApply');
         const templateSelect = $('templateSelect');
 
-        if (btnAddBar) btnAddBar.onclick = () => this.addComponent('bar');
-        if (btnAddTriangle) btnAddTriangle.onclick = () => this.addComponent('triangle');
-        if (btnAddSlider) btnAddSlider.onclick = () => this.addComponent('slider');
         if (btnReset) btnReset.onclick = () => this.reset();
         if (btnApply) btnApply.onclick = () => this.syncTopology();
 
