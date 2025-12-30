@@ -21,11 +21,21 @@ export function generateMultilinkParts(params) {
             console.warn("Parts: Invalid JSON", e);
         }
     }
+    const inputIds = new Set();
+    if (topology && Array.isArray(topology._wizard_data)) {
+        topology._wizard_data.forEach(c => {
+            if (c && c.type === 'bar' && c.isInput && c.id) {
+                inputIds.add(String(c.id));
+            }
+        });
+    }
 
     const {
         barW = 15, margin = 7, holeD = 3.2,
         workX = 800, workY = 600, spacing = 8
     } = params;
+    const motorShaftD = 5.4;
+    const motorShaftFlat = 3.6;
 
     const parts = [];
 
@@ -43,6 +53,7 @@ export function generateMultilinkParts(params) {
     for (const p of topology.parts) {
         if (p.type === 'bar') {
             const L = getVal(p.len_param);
+            const isInput = Boolean(p.isInput) || Array.from(inputIds).some(id => String(p.id || '').startsWith(`${id}(`) || String(p.id || '') === id);
 
             // 🌟 支援自定義軌道長度與偏移
             const totalLen = p.total_len_param ? getVal(p.total_len_param) : null;
@@ -81,6 +92,13 @@ export function generateMultilinkParts(params) {
                 });
             }
 
+            const hole1 = { x: hole1X, y: currentBarW / 2 };
+            if (isInput) {
+                hole1.shape = 'doubleFlat';
+                hole1.d = motorShaftD;
+                hole1.flat = motorShaftFlat;
+            }
+
             parts.push({
                 id: p.id,
                 type: 'bar',
@@ -89,7 +107,7 @@ export function generateMultilinkParts(params) {
                 h: currentBarW,
                 color: p.color || '#34495e',
                 holes: [
-                    { x: hole1X, y: currentBarW / 2 },
+                    hole1,
                     { x: hole2X, y: currentBarW / 2 }
                 ],
                 slots: slots, // 🌟 加入槽
@@ -156,6 +174,7 @@ export function generateMultilinkParts(params) {
         }
 
         const placedHoles = p.holes.map(h => ({
+            ...h,
             x: xCursor + h.x,
             y: yCursor + h.y
         }));

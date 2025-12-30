@@ -5,6 +5,74 @@
 
 import { svgEl } from '../utils.js';
 
+function rotatePoints90(points, cx, cy) {
+    return points.map(pt => ({
+        x: cx - (pt.y - cy),
+        y: cy + (pt.x - cx)
+    }));
+}
+
+function buildDoubleDPoints(cx, cy, d, flat, flatAxis = 'y', segments = 12) {
+    const r = d / 2;
+    if (!Number.isFinite(r) || r <= 0) return [];
+    const halfFlatRaw = flat / 2;
+    const halfFlat = Math.max(0, Math.min(halfFlatRaw, r - 0.0001));
+    const y = Math.sqrt(Math.max(0, r * r - halfFlat * halfFlat));
+    const startA = Math.acos(halfFlat / r);
+    const endA = Math.PI - startA;
+    const pts = [];
+
+    for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const a = startA + (endA - startA) * t;
+        pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+    }
+
+    pts.push({ x: cx - halfFlat, y: cy - y });
+
+    for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const a = Math.PI + startA + (2 * Math.PI - 2 * startA) * t;
+        pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+    }
+
+    pts.push({ x: cx + halfFlat, y: cy + y });
+
+    if (flatAxis === 'x') {
+        return rotatePoints90(pts, cx, cy);
+    }
+    return pts;
+}
+
+function buildDoubleFlatPointsTB(cx, cy, d, flat, segments = 12) {
+    const r = d / 2;
+    if (!Number.isFinite(r) || r <= 0) return [];
+    const halfFlatRaw = flat / 2;
+    const halfFlat = Math.max(0, Math.min(halfFlatRaw, r - 0.0001));
+    const x = Math.sqrt(Math.max(0, r * r - halfFlat * halfFlat));
+    const angle = Math.asin(halfFlat / r);
+    const pts = [];
+
+    pts.push({ x: cx - x, y: cy + halfFlat });
+    pts.push({ x: cx + x, y: cy + halfFlat });
+
+    for (let i = 1; i <= segments; i++) {
+        const t = i / segments;
+        const a = angle + (-2 * angle) * t;
+        pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+    }
+
+    pts.push({ x: cx - x, y: cy - halfFlat });
+
+    for (let i = 1; i <= segments; i++) {
+        const t = i / segments;
+        const a = Math.PI + angle + (-2 * angle) * t;
+        pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+    }
+
+    return pts;
+}
+
 /**
  * 渲染零件排版圖
  * @param {Array} parts - 零件陣列
@@ -123,6 +191,44 @@ export function renderPartsLayout(parts, workX, workY) {
 
         // 孔洞
         for (const h of p.holes) {
+            if (h.shape === 'doubleFlat') {
+                const holeD = Number.isFinite(h.d) ? h.d : p.holeD;
+                const flat = Number.isFinite(h.flat) ? h.flat : holeD * 0.6667;
+                const pts = buildDoubleFlatPointsTB(h.x, h.y, holeD, flat);
+                if (pts.length >= 3) {
+                    const path = pts
+                        .map((pt, idx) => `${idx === 0 ? 'M' : 'L'} ${tx(pt.x)} ${ty(pt.y)}`)
+                        .join(' ') + ' Z';
+                    svg.appendChild(
+                        svgEl("path", {
+                            d: path,
+                            fill: "none",
+                            stroke: "#111",
+                            "stroke-width": 1,
+                        })
+                    );
+                    continue;
+                }
+            }
+            if (h.shape === 'doubleD') {
+                const holeD = Number.isFinite(h.d) ? h.d : p.holeD;
+                const flat = Number.isFinite(h.flat) ? h.flat : holeD * 0.6667;
+                const pts = buildDoubleDPoints(h.x, h.y, holeD, flat, h.flatAxis || 'y');
+                if (pts.length >= 3) {
+                    const path = pts
+                        .map((pt, idx) => `${idx === 0 ? 'M' : 'L'} ${tx(pt.x)} ${ty(pt.y)}`)
+                        .join(' ') + ' Z';
+                    svg.appendChild(
+                        svgEl("path", {
+                            d: path,
+                            fill: "none",
+                            stroke: "#111",
+                            "stroke-width": 1,
+                        })
+                    );
+                    continue;
+                }
+            }
             const holeD = Number.isFinite(h.d) ? h.d : p.holeD;
             svg.appendChild(
                 svgEl("circle", {

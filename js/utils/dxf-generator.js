@@ -72,6 +72,18 @@ export function buildDXF(parts) {
 
         // 孔洞
         for (const hole of p.holes) {
+            if (hole.shape === 'doubleFlat') {
+                const holeD = Number.isFinite(hole.d) ? hole.d : p.holeD;
+                const flat = Number.isFinite(hole.flat) ? hole.flat : holeD * 0.6667;
+                addDoubleFlat(lines, hole.x, hole.y, holeD, flat);
+                continue;
+            }
+            if (hole.shape === 'doubleD') {
+                const holeD = Number.isFinite(hole.d) ? hole.d : p.holeD;
+                const flat = Number.isFinite(hole.flat) ? hole.flat : holeD * 0.6667;
+                addDoubleD(lines, hole.x, hole.y, holeD, flat, hole.flatAxis || 'y');
+                continue;
+            }
             const holeD = Number.isFinite(hole.d) ? hole.d : p.holeD;
             addCircle(lines, hole.x, hole.y, holeD / 2);
         }
@@ -120,6 +132,81 @@ function addArc(lines, x, y, r, startAngle, endAngle) {
     lines.push(" 40", r.toFixed(4));
     lines.push(" 50", startAngle.toFixed(4));
     lines.push(" 51", endAngle.toFixed(4));
+}
+
+function rotatePoints90(points, cx, cy) {
+    return points.map(pt => ({
+        x: cx - (pt.y - cy),
+        y: cy + (pt.x - cx)
+    }));
+}
+
+function addDoubleD(lines, cx, cy, d, flat, flatAxis = 'y', segments = 12) {
+    const r = d / 2;
+    if (!Number.isFinite(r) || r <= 0) return;
+    const halfFlatRaw = flat / 2;
+    const halfFlat = Math.max(0, Math.min(halfFlatRaw, r - 0.0001));
+    const y = Math.sqrt(Math.max(0, r * r - halfFlat * halfFlat));
+    const startA = Math.acos(halfFlat / r);
+    const endA = Math.PI - startA;
+    const pts = [];
+
+    for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const a = startA + (endA - startA) * t;
+        pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+    }
+
+    pts.push({ x: cx - halfFlat, y: cy - y });
+
+    for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const a = Math.PI + startA + (2 * Math.PI - 2 * startA) * t;
+        pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+    }
+
+    pts.push({ x: cx + halfFlat, y: cy + y });
+
+    const finalPts = (flatAxis === 'x') ? rotatePoints90(pts, cx, cy) : pts;
+
+    for (let i = 0; i < finalPts.length; i++) {
+        const p1 = finalPts[i];
+        const p2 = finalPts[(i + 1) % finalPts.length];
+        addLine(lines, p1.x, p1.y, p2.x, p2.y);
+    }
+}
+
+function addDoubleFlat(lines, cx, cy, d, flat, segments = 12) {
+    const r = d / 2;
+    if (!Number.isFinite(r) || r <= 0) return;
+    const halfFlatRaw = flat / 2;
+    const halfFlat = Math.max(0, Math.min(halfFlatRaw, r - 0.0001));
+    const x = Math.sqrt(Math.max(0, r * r - halfFlat * halfFlat));
+    const angle = Math.asin(halfFlat / r);
+    const pts = [];
+
+    pts.push({ x: cx - x, y: cy + halfFlat });
+    pts.push({ x: cx + x, y: cy + halfFlat });
+
+    for (let i = 1; i <= segments; i++) {
+        const t = i / segments;
+        const a = angle + (-2 * angle) * t;
+        pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+    }
+
+    pts.push({ x: cx - x, y: cy - halfFlat });
+
+    for (let i = 1; i <= segments; i++) {
+        const t = i / segments;
+        const a = Math.PI + angle + (-2 * angle) * t;
+        pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+    }
+
+    for (let i = 0; i < pts.length; i++) {
+        const p1 = pts[i];
+        const p2 = pts[(i + 1) % pts.length];
+        addLine(lines, p1.x, p1.y, p2.x, p2.y);
+    }
 }
 
 /**

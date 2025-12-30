@@ -1200,7 +1200,7 @@ export class MechanismWizard {
             parts: this.components.map(c => {
                 if (c.skipPart) return null;
                 if (c.type === 'bar') {
-                    return { id: `${c.id}(${c.lenParam})`, type: 'bar', len_param: c.lenParam, color: c.color };
+                    return { id: `${c.id}(${c.lenParam})`, type: 'bar', len_param: c.lenParam, color: c.color, isInput: Boolean(c.isInput) };
                 } else if (c.type === 'triangle') {
                     return { id: c.id, type: 'triangle', len_params: [c.gParam, c.r1Param, c.r2Param], color: c.color };
                 } else if (c.type === 'slider') {
