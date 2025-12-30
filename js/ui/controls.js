@@ -4,14 +4,14 @@
  */
 
 import { $, log, downloadText, downloadZip, fmt } from '../utils.js';
-import { readInputs, validateConfig, readSweepParams, readViewParams } from '../config.js';
+import { readInputs, readSweepParams, readViewParams } from '../config.js';
 import { solveFourBar, sweepTheta, calculateTrajectoryStats } from '../fourbar/solver.js';
 import { startAnimation, pauseAnimation, stopAnimation, setupMotorTypeHandler } from '../fourbar/animation.js';
-import { generateParts } from '../parts/generator.js';
-import { renderPartsLayout, renderTrajectory } from '../parts/renderer.js';
-import { buildAllGcodes, generateMachiningInfo } from '../gcode/generator.js';
+import { renderPartsLayout } from '../parts/renderer.js';
 import { buildDXF } from '../utils/dxf-generator.js';
-import { computeSolution, computeParts } from '../core/preview.js';
+import { computePreviewState } from '../core/preview-state.js';
+import { buildExportBundle } from '../core/export.js';
+import { computeSweepState } from '../core/sweep-state.js';
 import { collectDynamicParamSpec } from '../core/dynamic-params.js';
 import { renderFourbar } from './visualization.js';
 
@@ -395,25 +395,12 @@ export function updatePreview() {
         const { mech, partSpec, mfg } = readInputs();
 
         // 併入動態參數
-        const dynContainer = document.getElementById('dynamicParamsContainer');
-        if (dynContainer) {
-            const inputs = dynContainer.querySelectorAll('input.dynamic-input');
-            inputs.forEach(inp => {
-                const varId = inp.id.replace('dyn_', '');
-                mech[varId] = parseFloat(inp.value) || 0;
-            });
-        }
+        const dynamicParams = collectDynamicParams();
+        Object.keys(dynamicParams).forEach((key) => {
+            mech[key] = dynamicParams[key];
+        });
 
         if (mods.config && mods.config.id === 'multilink') {
-            const topoKey = mech.topology || '';
-            if (topoKey !== lastMultilinkTopology) {
-                lastMultilinkTopology = topoKey;
-                lastMultilinkSolution = null;
-            }
-            if (lastMultilinkSolution && lastMultilinkSolution.points) {
-                mech._prevPoints = lastMultilinkSolution.points;
-            }
-
             const thetaContainer = $("thetaSliderContainer");
             if (thetaContainer) {
                 let topology = mech.topology;
@@ -446,101 +433,65 @@ export function updatePreview() {
             viewParams.height = Math.max(0, innerH) || 600;
         }
 
-        let sol = computeSolution(mods, mech, partSpec, mfg);
+        const showTrajectory = $("showTrajectory")?.checked;
+        const sweepParams = showTrajectory ? readSweepParams() : null;
+        const previewState = computePreviewState({
+            mods,
+            mech,
+            partSpec,
+            mfg,
+            dynamicParams,
+            lastSolution: lastMultilinkSolution,
+            lastTopology: lastMultilinkTopology,
+            showTrajectory: Boolean(showTrajectory),
+            sweepParams
+        });
+
+        lastMultilinkSolution = previewState.lastSolution;
+        lastMultilinkTopology = previewState.lastTopology;
+        currentTrajectoryData = previewState.trajectoryData;
 
         const svgWrap = $("svgWrap");
-        const isInvalid = !sol || sol.isValid === false;
-
-        // 🌟 顯示警告橫幅 (不論是否在阻力模式)
         const warning = document.getElementById('invalidWarning');
         if (warning) {
-            warning.style.display = isInvalid ? 'block' : 'none';
+            warning.style.display = previewState.isInvalid ? 'block' : 'none';
         }
 
-        // 🌟 阻力模式 (Resistance Mode) 🌟
-        // 當使用者拖曳滑桿碰到死點時，強制回彈
-        if (isInvalid) {
-            if (lastMultilinkSolution && lastMultilinkSolution.isValid) {
-                // 1. 還原解 (凍結畫面)
-                // sol = lastMultilinkSolution; // 為了安全起見，我們不直接替換 sol 變數，而是下面直接用舊的 sol 畫圖
+        if (previewState.statusMessage) {
+            log(previewState.statusMessage);
+        }
 
-                // 2. 還原滑桿數值 (產生阻力感)
-                const thetaInput = $("theta");
-                if (thetaInput && lastMultilinkSolution.inputTheta !== undefined) {
-                    thetaInput.value = lastMultilinkSolution.inputTheta;
-                    // 注意：這裡不觸發 event，避免無窮迴圈
-                }
-
-                // 🌟 還原動態參數滑桿 (例如 L4)
-                if (lastMultilinkSolution.dynamicParams) {
-                    for (const [varId, val] of Object.entries(lastMultilinkSolution.dynamicParams)) {
-                        const inp = document.getElementById(`dyn_${varId}`);
-                        const range = document.getElementById(`dyn_${varId}_range`);
-                        if (inp) inp.value = val;
-                        if (range) range.value = val;
-                    }
-                }
-
-                // 繼續執行，用舊的有效解來繪圖
-                sol = lastMultilinkSolution;
-                log(`${mods.config.name}: limit reached, holding position.`);
-            } else {
-                // 如果連一個有效解都沒有 (剛載入就是壞的)，那就只好顯示錯誤
-                log(`${mods.config.name}: invalid parameters, adjust values.`);
-
-                if (!svgWrap.firstChild) {
-                    svgWrap.textContent = "(invalid)";
-                    $("partsWrap").innerHTML = "";
-                    $("dlButtons").innerHTML = "";
-                }
-                return;
+        if (previewState.restore) {
+            const thetaInput = $("theta");
+            if (thetaInput && previewState.restore.theta !== undefined) {
+                thetaInput.value = previewState.restore.theta;
             }
-        } else {
-            // 如果是有效解，記住它，以此作為下一次的回退點
-            if (mods.config && mods.config.id === 'multilink') {
-                sol.inputTheta = mech.theta; // 記錄對應的輸入角度
-                sol.dynamicParams = collectDynamicParams(); // 🌟 記錄動態參數
-                lastMultilinkSolution = sol;
+
+            const restored = previewState.restore.dynamicParams || {};
+            for (const [varId, val] of Object.entries(restored)) {
+                const inp = document.getElementById(`dyn_${varId}`);
+                const range = document.getElementById(`dyn_${varId}_range`);
+                if (inp) inp.value = val;
+                if (range) range.value = val;
             }
         }
 
-        if (mods.config && mods.config.id === 'multilink') {
-            // lastMultilinkSolution = sol; // 🌟 移除冗餘且可能造成問題的賦值
-
-            const showTrajectory = $("showTrajectory")?.checked;
-            if (showTrajectory) {
-                const sweepParams = readSweepParams();
-                const sweepFn = mods.solver.sweepTopology || mods.solver.sweepTheta;
-                if (sweepFn) {
-                    let sweepResult;
-                    if (mods.solver.sweepTopology) {
-                        let topology = mech.topology;
-                        if (typeof topology === 'string') {
-                            try { topology = JSON.parse(topology); } catch (e) { }
-                        }
-                        sweepResult = sweepFn(topology, mech, sweepParams.sweepStart, sweepParams.sweepEnd, sweepParams.sweepStep);
-                    } else {
-                        sweepResult = sweepFn(mech, sweepParams.sweepStart, sweepParams.sweepEnd, sweepParams.sweepStep);
-                    }
-                    currentTrajectoryData = {
-                        results: sweepResult.results,
-                        validRanges: sweepResult.validRanges,
-                        invalidRanges: sweepResult.invalidRanges,
-                        validBPoints: sweepResult.results.filter((r) => r.isValid && r.B).map((r) => r.B)
-                    };
-                }
-            } else {
-                currentTrajectoryData = null;
+        if (previewState.fatalInvalid) {
+            if (!svgWrap.firstChild) {
+                svgWrap.textContent = '(invalid)';
+                $("partsWrap").innerHTML = "";
+                $("dlButtons").innerHTML = "";
             }
+            return;
         }
 
         svgWrap.innerHTML = "";
         const renderFn = mods.visualization[mods.config.renderFn];
         svgWrap.appendChild(
-            renderFn(sol, mech.thetaDeg || mech.theta, currentTrajectoryData, viewParams)
+            renderFn(previewState.solution, mech.thetaDeg || mech.theta, currentTrajectoryData, viewParams)
         );
 
-        const parts = computeParts(mods, mech, partSpec, sol);
+        const parts = previewState.parts;
 
         const showParts = $("showPartsPreview") ? $("showPartsPreview").checked : true;
         const partsPanel = $("partsPreviewPanel");
@@ -559,18 +510,9 @@ export function updatePreview() {
             $("partsWrap").innerHTML = "";
         }
 
-        const cutDepth = mfg.thickness + mfg.overcut;
-        const layers = Math.max(1, Math.ceil(cutDepth / mfg.stepdown));
-        const baseLog = [
-            `${mods.config.name} 預覽：OK`,
-            `加工資訊：切割深度=${fmt(cutDepth)}mm, Stepdown=${fmt(mfg.stepdown)}mm, 總層數=${layers}`,
-            `工作範圍：${partSpec.workX} x ${partSpec.workY} (mm)`,
-        ].join("\n");
-        const unsolvedSummary = window.wizard && typeof window.wizard.getUnsolvedSummary === 'function'
-            ? window.wizard.getUnsolvedSummary()
-            : '';
-        log(unsolvedSummary ? `${baseLog}\n\n${unsolvedSummary}` : baseLog);
-
+        if (previewState.previewLog) {
+            log(previewState.previewLog);
+        }
         // 🌟 自動生成 DXF 下載按鈕 (同步預覽)
         const dl = $("dlButtons");
         dl.innerHTML = ""; // Clear previous buttons
@@ -607,25 +549,18 @@ export function generateGcodes() {
         if (!mods) return;
 
         const { mech, partSpec, mfg } = readInputs();
-        const dynContainer = document.getElementById('dynamicParamsContainer');
-        if (dynContainer) {
-            const inputs = dynContainer.querySelectorAll('input.dynamic-input');
-            inputs.forEach(inp => {
-                const varId = inp.id.replace('dyn_', '');
-                mech[varId] = parseFloat(inp.value) || 0;
-            });
-        }
+        const dynamicParams = collectDynamicParams();
+        Object.keys(dynamicParams).forEach((key) => {
+            mech[key] = dynamicParams[key];
+        });
 
-        validateConfig(mech, partSpec, mfg);
-
-        const solveFn = mods.solver[mods.config.solveFn];
-        const sol = solveFn(mech);
-        if (!sol || sol.isValid === false) throw new Error("Invalid parameters, adjust values.");
-
-        const partsFn = mods.parts[mods.config.partsFn];
-        const parts = partsFn({ ...mech, ...partSpec });
-
-        const files = buildAllGcodes(parts, mfg);
+        const { files, dxfText, machiningInfo } = buildExportBundle({
+            mods,
+            mech,
+            partSpec,
+            mfg,
+            dynamicParams
+        });
 
         const dl = $("dlButtons");
         dl.innerHTML = "";
@@ -638,7 +573,6 @@ export function generateGcodes() {
             dl.appendChild(btn);
         }
 
-        const dxfText = buildDXF(parts);
         const dxfBtn = document.createElement("button");
         dxfBtn.textContent = `下載 DXF 零件檔`;
         dxfBtn.className = "btn-download";
@@ -656,7 +590,6 @@ export function generateGcodes() {
         };
         dl.appendChild(zipBtn);
 
-        const machiningInfo = generateMachiningInfo(mfg, parts.length);
         log($("log").textContent + "\n\n" + machiningInfo + "\n\nG-code generated.");
     } catch (e) {
         log(`生成失敗：${e.message}`);
@@ -673,46 +606,34 @@ export function performSweepAnalysis() {
         if (!mods) return;
 
         const { mech, partSpec, mfg } = readInputs();
-        const dynContainer = document.getElementById('dynamicParamsContainer');
-        if (dynContainer) {
-            const inputs = dynContainer.querySelectorAll('input.dynamic-input');
-            inputs.forEach(inp => {
-                const varId = inp.id.replace('dyn_', '');
-                mech[varId] = parseFloat(inp.value) || 0;
-            });
-        }
-
-        validateConfig(mech, partSpec, mfg);
+        const dynamicParams = collectDynamicParams();
+        Object.keys(dynamicParams).forEach((key) => {
+            mech[key] = dynamicParams[key];
+        });
 
         const sweepParams = readSweepParams();
         const motorTypeEl = $("motorType");
         const motorTypeText = motorTypeEl ? motorTypeEl.selectedOptions[0].textContent : "motor";
 
-        if (sweepParams.sweepStart >= sweepParams.sweepEnd) {
-            throw new Error("掃描起始度需小於結束角度。");
-        }
-        if (sweepParams.sweepStep <= 0) {
-            throw new Error("掃描間隔需大於 0。");
-        }
-
-        const sweepFn = mods.solver.sweepTheta || sweepTheta;
-        const { results, validRanges, invalidRanges } = sweepFn(
+        const sweepState = computeSweepState({
+            mods,
             mech,
-            sweepParams.sweepStart,
-            sweepParams.sweepEnd,
-            sweepParams.sweepStep
+            partSpec,
+            mfg,
+            dynamicParams,
+            sweepParams,
+            motorTypeText
+        });
+        if (!sweepState) return;
+        currentTrajectoryData = sweepState;
+
+        displaySweepResults(
+            sweepState.results,
+            sweepState.validRanges,
+            sweepState.invalidRanges,
+            sweepParams.showTrajectory,
+            motorTypeText
         );
-
-        const validBPoints = results.filter((r) => r.isValid && r.B).map((r) => r.B);
-        currentTrajectoryData = {
-            results,
-            validRanges,
-            invalidRanges,
-            validBPoints,
-            motorType: motorTypeText,
-        };
-
-        displaySweepResults(results, validRanges, invalidRanges, sweepParams.showTrajectory, motorTypeText);
         updatePreview();
 
         log(
