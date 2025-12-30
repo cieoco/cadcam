@@ -43,20 +43,59 @@ export function generateMultilinkParts(params) {
     for (const p of topology.parts) {
         if (p.type === 'bar') {
             const L = getVal(p.len_param);
+
+            // 🌟 支援自定義軌道長度與偏移
+            const totalLen = p.total_len_param ? getVal(p.total_len_param) : null;
+            const trackOffset = p.offset_param ? getVal(p.offset_param) : margin;
+
+            // 🌟 支援軌道寬度 (若為軌道零件)
+            const isTrack = Boolean(p.isTrack || p.track || (p.id && p.id.endsWith('_Track')));
+            const currentBarW = barW;
+
+            // 如果有指定總長，則使用總長作為 w，否則使用 L + 2*margin
+            // 如果有指定偏移，則第一孔位置為 offset，第二孔為 offset + L
+            const w = isTrack ? (L + 2 * margin) : (totalLen ? totalLen : (L + 2 * margin));
+            const hole1X = isTrack ? margin : (p.offset_param ? trackOffset : margin);
+            const hole2X = isTrack ? (margin + L) : (hole1X + L);
+
+            // 🌟 軌道專用：生成長槽 (Slot)
+            const slots = [];
+            if (isTrack) {
+                // 槽寬度預設=孔徑，可用 trackWidth 覆蓋，但不可大於桿件寬度
+                const rawSlotH = Number.isFinite(Number(params.trackWidth)) ? Number(params.trackWidth) : holeD;
+                const slotInset = Math.max(0.5, Math.min(2, currentBarW * 0.15));
+                const maxSlotH = Math.max(0.5, currentBarW - 2 * slotInset);
+                const slotH = Math.min(Math.max(0.5, rawSlotH), maxSlotH);
+                // 槽長度 = 總長 - 2*margin
+                // 槽起始 x = margin
+                // 槽起始 y = (barH - slotH) / 2
+                const rawSlotW = totalLen ? totalLen : Math.max(slotH, w - 2 * trackOffset);
+                const slotW = Math.max(slotH, Math.min(rawSlotW, w - 2 * trackOffset));
+                const slotX = Math.max(0, w - trackOffset - slotW);
+
+                slots.push({
+                    x: slotX,
+                    y: (currentBarW - slotH) / 2,
+                    w: slotW,
+                    h: slotH
+                });
+            }
+
             parts.push({
                 id: p.id,
                 type: 'bar',
                 L: L,
-                w: L + 2 * margin,
-                h: barW,
+                w: w,
+                h: currentBarW,
                 color: p.color || '#34495e',
                 holes: [
-                    { x: margin, y: barW / 2 },
-                    { x: margin + L, y: barW / 2 }
+                    { x: hole1X, y: currentBarW / 2 },
+                    { x: hole2X, y: currentBarW / 2 }
                 ],
+                slots: slots, // 🌟 加入槽
                 outline: [
-                    { x: margin, y: barW / 2, r: holeD / 2 + margin },
-                    { x: margin + L, y: barW / 2, r: holeD / 2 + margin }
+                    { x: hole1X, y: currentBarW / 2, r: holeD / 2 + margin },
+                    { x: hole2X, y: currentBarW / 2, r: holeD / 2 + margin }
                 ]
             });
         }
@@ -131,10 +170,22 @@ export function generateMultilinkParts(params) {
             }));
         }
 
+        // Transform slots to absolute coords
+        let placedSlots = null;
+        if (p.slots) {
+            placedSlots = p.slots.map(s => ({
+                x: xCursor + s.x,
+                y: yCursor + s.y,
+                w: s.w,
+                h: s.h
+            }));
+        }
+
         out.push({
             id: p.id,
             rect: { x: xCursor, y: yCursor, w: p.w, h: p.h },
             holes: placedHoles,
+            slots: placedSlots, // 🌟 Include slots in output
             outline: placedOutline,
             color: p.color,
             holeD,

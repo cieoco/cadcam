@@ -633,7 +633,24 @@ export function updatePreview() {
             ].join("\n")
         );
 
-        $("dlButtons").innerHTML = "";
+        // 🌟 自動生成 DXF 下載按鈕 (同步預覽)
+        const dl = $("dlButtons");
+        dl.innerHTML = ""; // Clear previous buttons
+
+        try {
+            const dxfText = buildDXF(parts);
+            const dxfBtn = document.createElement("button");
+            dxfBtn.textContent = `下載 DXF 零件檔 (預覽)`;
+            dxfBtn.className = "btn-download";
+            dxfBtn.style.backgroundColor = "#6a1b9a";
+            dxfBtn.style.width = "100%"; // Make it prominent
+            dxfBtn.style.marginBottom = "5px";
+            dxfBtn.onclick = () => downloadText("mechanism_parts.dxf", dxfText);
+            dl.appendChild(dxfBtn);
+        } catch (e) {
+            console.warn("Auto-DXF generation failed:", e);
+        }
+
     } catch (e) {
         log(`更新失敗：${e.message}`);
         console.error(e);

@@ -252,31 +252,54 @@ export class MechanismWizard {
             `;
         } else if (comp.type === 'slider') {
             html += `
-                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">Line P1</label>
-                    ${this.renderPointEditor(comp, 'p1')}
+                <div style="margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; overflow: hidden;">
+                    <div style="background: #f1f2f6; padding: 6px 10px; font-size: 11px; font-weight: bold; color: #555; border-bottom: 1px solid #ddd;">
+                        🛤️ 軌道設定 (Track)
+                    </div>
+                    <div style="padding: 10px; background: #fff;">
+                        <div style="margin-bottom: 8px;">
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">起點 (P1)</label>
+                            ${this.renderPointEditor(comp, 'p1')}
+                        </div>
+                        <div style="margin-bottom: 8px; border-top: 1px dashed #eee; padding-top: 8px;">
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">終點 (P2)</label>
+                            ${this.renderPointEditor(comp, 'p2')}
+                        </div>
+                        <div class="form-group" style="margin-top: 8px; border-top: 1px dashed #eee; padding-top: 8px;">
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">軌道總長參數 (Track Length)</label>
+                            <input type="text" value="${comp.trackLenParam || ''}" oninput="window.wizard.updateCompProp('trackLenParam', this.value)" placeholder="例如: 200 或 L_track" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
+                        </div>
+                        <div class="form-group" style="margin-top: 4px;">
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">P1 偏移參數 (P1 Offset)</label>
+                            <input type="text" value="${comp.trackOffsetParam || ''}" oninput="window.wizard.updateCompProp('trackOffsetParam', this.value)" placeholder="例如: 20 或 Offset" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
+                        </div>
+                        ${driver ? `
+                        <div class="form-group" style="margin-top: 8px; border-top: 1px dashed #eee; padding-top: 8px;">
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">驅動桿長參數</label>
+                            <input type="text" value="${driver.lenParam || ''}" oninput="window.wizard.updateSliderDriverParam('${driver.id}', this.value)" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
+                        </div>
+                        ` : ''}
+                    </div>
                 </div>
-                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">Line P2</label>
-                    ${this.renderPointEditor(comp, 'p2')}
+
+                <div style="margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; overflow: hidden;">
+                    <div style="background: #f1f2f6; padding: 6px 10px; font-size: 11px; font-weight: bold; color: #555; border-bottom: 1px solid #ddd;">
+                        🔲 滑塊設定 (Slider Block)
+                    </div>
+                    <div style="padding: 10px; background: #fff;">
+                        <div style="margin-bottom: 8px;">
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">滑塊點 (P3)</label>
+                            ${this.renderPointEditor(comp, 'p3')}
+                        </div>
+                        <div class="form-group">
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">解方向 (Sign)</label>
+                            <select onchange="window.wizard.updateCompProp('sign', parseInt(this.value))" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; background: #fff;">
+                                <option value="1" ${comp.sign === 1 ? 'selected' : ''}>+1</option>
+                                <option value="-1" ${comp.sign === -1 ? 'selected' : ''}>-1</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">Slider Point</label>
-                    ${this.renderPointEditor(comp, 'p3')}
-                </div>
-                <div class="form-group">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">Sign</label>
-                    <select onchange="window.wizard.updateCompProp('sign', parseInt(this.value))" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
-                        <option value="1" ${comp.sign === 1 ? 'selected' : ''}>+1</option>
-                        <option value="-1" ${comp.sign === -1 ? 'selected' : ''}>-1</option>
-                    </select>
-                </div>
-                ${driver ? `
-                <div class="form-group">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">Driver Length Param</label>
-                    <input type="text" value="${driver.lenParam || ''}" oninput="window.wizard.updateSliderDriverParam('${driver.id}', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
-                </div>
-                ` : ''}
             `;
 
         }
@@ -589,27 +612,14 @@ export class MechanismWizard {
         while (ids.has(`S${sIdx}`)) sIdx++;
         const sliderPointId = `S${sIdx}`;
 
-        const p1 = bar.p1 || { id: '', type: 'fixed', x: 0, y: 0 };
-        const p2 = bar.p2 || { id: '', type: 'fixed', x: 100, y: 0 };
-        const p1Coords = Number.isFinite(Number(p1.x)) && Number.isFinite(Number(p1.y))
-            ? { x: Number(p1.x), y: Number(p1.y) }
-            : findPointCoords(p1.id);
-        const p2Coords = Number.isFinite(Number(p2.x)) && Number.isFinite(Number(p2.y))
-            ? { x: Number(p2.x), y: Number(p2.y) }
-            : findPointCoords(p2.id);
+        // 🌟 核心修正：直接使用原桿件的 P1, P2 作為軌道端點
+        // 這樣可以保留原有的幾何設定與參數關聯
+        const p1 = bar.p1;
+        const p2 = bar.p2;
 
-        let tIdx = 1;
-        const nextTrackId = () => {
-            while (ids.has(`T${tIdx}`)) tIdx++;
-            const id = `T${tIdx}`;
-            ids.add(id);
-            tIdx++;
-            return id;
-        };
-
-        const trackId1 = nextTrackId();
-        const trackId2 = nextTrackId();
-
+        // 計算中點作為滑塊初始位置
+        const p1Coords = findPointCoords(p1.id);
+        const p2Coords = findPointCoords(p2.id);
         const midX = (p1Coords.x + p2Coords.x) / 2;
         const midY = (p1Coords.y + p2Coords.y) / 2;
         const midLen = Math.hypot(midX - p1Coords.x, midY - p1Coords.y);
@@ -618,23 +628,43 @@ export class MechanismWizard {
             type: 'slider',
             id: `Slider${sIdx}`,
             color: '#8e44ad',
-            p1: { id: trackId1, type: 'fixed', x: p1Coords.x, y: p1Coords.y },
-            p2: { id: trackId2, type: 'fixed', x: p2Coords.x, y: p2Coords.y },
+            p1: { ...p1 }, // Copy P1
+            p2: { ...p2 }, // Copy P2
             p3: { id: sliderPointId, type: 'floating', x: midX, y: midY },
             sign: 1,
-            driverId: bar.id
+            lenParam: bar.lenParam, // 保留長度參數，用於生成實體桿件
+            trackLenParam: bar.lenParam ? `${bar.lenParam}_track` : '',
+            trackOffsetParam: bar.lenParam ? `${bar.lenParam}_offset` : ''
         };
 
-        bar.p2 = { id: sliderPointId, type: 'existing' };
-        bar.isInput = false;
+        // 如果原桿件有長度參數，確保它被保留在 topology.params 中
         if (bar.lenParam) {
+            // 這裡其實不需要特別做什麼，因為 compileTopology 會處理
+            // 但為了保險起見，我們確認一下
             if (!this.topology.params) this.topology.params = { theta: 0 };
-            this.topology.params[bar.lenParam] = Math.round(midLen);
+            // 如果參數不存在，才初始化 (避免覆蓋使用者設定)
+            if (this.topology.params[bar.lenParam] === undefined) {
+                const fullLen = Math.hypot(p2Coords.x - p1Coords.x, p2Coords.y - p1Coords.y);
+                this.topology.params[bar.lenParam] = Math.round(fullLen);
+            }
+
+            const fullLen = Math.hypot(p2Coords.x - p1Coords.x, p2Coords.y - p1Coords.y);
+            const totalLenVal = Math.round(fullLen * 0.5);
+            const holeD = Number.isFinite(Number(this.topology?.params?.holeD))
+                ? Number(this.topology.params.holeD)
+                : 3.2;
+            const offsetVal = Math.max(1, Math.round(holeD * 3));
+
+            if (sliderComp.trackLenParam && this.topology.params[sliderComp.trackLenParam] === undefined) {
+                this.topology.params[sliderComp.trackLenParam] = totalLenVal;
+            }
+            if (sliderComp.trackOffsetParam && this.topology.params[sliderComp.trackOffsetParam] === undefined) {
+                this.topology.params[sliderComp.trackOffsetParam] = offsetVal;
+            }
         }
 
-        this.components.splice(this.selectedComponentIndex, 1, bar);
-        this.components.push(sliderComp);
-        this.selectedComponentIndex = this.components.length - 1;
+        this.components.splice(this.selectedComponentIndex, 1, sliderComp);
+        // this.selectedComponentIndex remains the same as we replaced the item at that index
         this.render();
         this.syncTopology();
     }
@@ -1104,6 +1134,18 @@ export class MechanismWizard {
                         if (params[h.distParam] === undefined) params[h.distParam] = 50;
                     });
                 }
+            } else if (c.type === 'slider') {
+                // 🌟 收集 Slider 軌道參數
+                if (c.trackLenParam && params[c.trackLenParam] === undefined) {
+                    // 預設長度：計算 P1-P2 距離
+                    const p1 = allPointsMap.get(c.p1.id);
+                    const p2 = allPointsMap.get(c.p2.id);
+                    params[c.trackLenParam] = (p1 && p2) ? Math.round(Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2)) : 200;
+                }
+                if (c.trackOffsetParam && params[c.trackOffsetParam] === undefined) {
+                    // 預設偏移：10
+                    params[c.trackOffsetParam] = 10;
+                }
             } else if (c.type === 'triangle') {
                 // 🌟 Initialize parameters from geometry if undefined
                 if (c.r1Param && params[c.r1Param] === undefined) {
@@ -1134,6 +1176,30 @@ export class MechanismWizard {
                     return { id: `${c.id}(${c.lenParam})`, type: 'bar', len_param: c.lenParam, color: c.color };
                 } else if (c.type === 'triangle') {
                     return { id: c.id, type: 'triangle', len_params: [c.gParam, c.r1Param, c.r2Param], color: c.color };
+                } else if (c.type === 'slider') {
+                    // 🌟 核心修正：Slider 組件也生成實體 Bar 零件 (作為軌道)
+                    let lenVal = c.lenParam;
+
+                    // 如果沒有參數，則直接計算長度
+                    if (!lenVal && c.p1 && c.p2) {
+                        const p1 = allPointsMap.get(c.p1.id);
+                        const p2 = allPointsMap.get(c.p2.id);
+                        if (p1 && p2) {
+                            lenVal = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                        }
+                    }
+
+                    if (lenVal) {
+                        return {
+                            id: `${c.id}_Track`,
+                            type: 'bar',
+                            len_param: lenVal,
+                            total_len_param: c.trackLenParam,
+                            offset_param: c.trackOffsetParam,
+                            isTrack: true,
+                            color: c.color
+                        };
+                    }
                 }
                 return null;
             }).filter(p => p),
