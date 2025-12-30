@@ -302,8 +302,8 @@ export function updateDynamicParams() {
             wrapper.dataset.varId = varId;
             wrapper.style.marginBottom = '8px';
             wrapper.style.padding = '4px 8px';
-            wrapper.style.background = '#fff';
-            wrapper.style.border = '1px solid #eee';
+            wrapper.style.background = 'transparent';
+            wrapper.style.border = '1px solid rgba(0,0,0,0.08)';
             wrapper.style.borderRadius = '4px';
 
             wrapper.innerHTML = `
@@ -415,7 +415,7 @@ export function updateDynamicParams() {
                         group.style.borderRadius = '4px';
                         group.style.padding = '8px';
                         group.style.marginBottom = '8px';
-                        group.style.background = '#f9f9f9';
+                        group.style.background = 'transparent';
 
                         const title = document.createElement('div');
                         title.style.fontSize = '12px';
@@ -623,20 +623,34 @@ export function updatePreview() {
         const partsFn = mods.parts[mods.config.partsFn];
         const parts = partsFn({ ...mech, ...partSpec, ...(sol ? sol.dynamicParams : {}) });
 
-        $("partsWrap").innerHTML = "";
-        $("partsWrap").appendChild(
-            renderPartsLayout(parts, partSpec.workX, partSpec.workY)
-        );
+        const showParts = $("showPartsPreview") ? $("showPartsPreview").checked : true;
+        const partsPanel = $("partsPreviewPanel");
+        const partsBody = $("partsPreviewBody");
+        if (partsPanel) {
+            const expandedHeight = partsPanel.dataset.expandedHeight || "540px";
+            partsPanel.style.height = showParts ? expandedHeight : "auto";
+        }
+        if (partsBody) partsBody.style.display = showParts ? "flex" : "none";
+        if (showParts) {
+            $("partsWrap").innerHTML = "";
+            $("partsWrap").appendChild(
+                renderPartsLayout(parts, partSpec.workX, partSpec.workY)
+            );
+        } else {
+            $("partsWrap").innerHTML = "";
+        }
 
         const cutDepth = mfg.thickness + mfg.overcut;
         const layers = Math.max(1, Math.ceil(cutDepth / mfg.stepdown));
-        log(
-            [
-                `${mods.config.name} 預覽：OK`,
-                `加工資訊：切割深度=${fmt(cutDepth)}mm, Stepdown=${fmt(mfg.stepdown)}mm, 總層數=${layers}`,
-                `工作範圍：${partSpec.workX} x ${partSpec.workY} (mm)`,
-            ].join("\n")
-        );
+        const baseLog = [
+            `${mods.config.name} 預覽：OK`,
+            `加工資訊：切割深度=${fmt(cutDepth)}mm, Stepdown=${fmt(mfg.stepdown)}mm, 總層數=${layers}`,
+            `工作範圍：${partSpec.workX} x ${partSpec.workY} (mm)`,
+        ].join("\n");
+        const unsolvedSummary = window.wizard && typeof window.wizard.getUnsolvedSummary === 'function'
+            ? window.wizard.getUnsolvedSummary()
+            : '';
+        log(unsolvedSummary ? `${baseLog}\n\n${unsolvedSummary}` : baseLog);
 
         // 🌟 自動生成 DXF 下載按鈕 (同步預覽)
         const dl = $("dlButtons");
@@ -890,6 +904,13 @@ export function setupUIHandlers() {
             viewRangeInput.addEventListener('input', syncRangeFromInput);
             viewRangeSlider.addEventListener('input', syncRangeFromSlider);
         }
+    }
+
+    const showPartsPreview = $("showPartsPreview");
+    if (showPartsPreview) {
+        showPartsPreview.addEventListener('change', () => {
+            updatePreview();
+        });
     }
 
     const btnNewConfig = $("btnNewConfig");

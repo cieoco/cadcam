@@ -806,6 +806,36 @@ export class MechanismWizard {
         return solved;
     }
 
+    getUnsolvedSummary() {
+        const solved = this.getSolvedPointIds();
+        const lines = [];
+
+        this.components.forEach(c => {
+            if (c.type !== 'bar' && c.type !== 'triangle' && c.type !== 'slider') return;
+            if (this.isComponentSolved(c, solved)) return;
+
+            const pointKeys = c.type === 'bar' ? ['p1', 'p2'] : ['p1', 'p2', 'p3'];
+            const missing = [];
+            pointKeys.forEach(key => {
+                const pt = c[key];
+                if (!pt || !pt.id) {
+                    missing.push(`${key.toUpperCase()}未指定`);
+                    return;
+                }
+                if (!solved.has(pt.id)) {
+                    missing.push(pt.id);
+                }
+            });
+
+            if (missing.length) {
+                lines.push(`- ${c.id || c.type}: 缺少點位 ${missing.join(', ')}`);
+            }
+        });
+
+        if (!lines.length) return '';
+        return `未求解原因:\n${lines.join('\n')}`;
+    }
+
     isComponentSolved(comp, solvedPoints) {
         if (comp.type === 'bar') {
             return solvedPoints.has(comp.p1.id) && solvedPoints.has(comp.p2.id);
@@ -912,6 +942,17 @@ export class MechanismWizard {
                     });
                 }
 
+                // 3. Check for Slider Track (P1-P2)
+                if (!groundLink) {
+                    groundLink = this.components.find(c => {
+                        if (c.type !== 'slider' || !c.lenParam) return false;
+                        if (c.p1.id !== id && c.p2.id !== id) return false;
+                        const otherId = (c.p1.id === id) ? c.p2.id : c.p1.id;
+                        const otherPt = allPointsMap.get(otherId);
+                        return otherPt && otherPt.type === 'fixed' && steps.find(s => s.id === otherId);
+                    });
+                }
+
                 if (groundLink) {
                     const otherId = (groundLink.p1.id === id) ? groundLink.p2.id : groundLink.p1.id;
                     const otherPt = allPointsMap.get(otherId);
@@ -921,8 +962,8 @@ export class MechanismWizard {
                         const dist = Math.sqrt(dx * dx + dy * dy);
 
                         if (dist > 0) {
-                            // Use lenParam for Bar, gParam for Triangle
-                            step.dist_param = (groundLink.type === 'bar') ? groundLink.lenParam : groundLink.gParam;
+                        // Use lenParam for Bar/Slider, gParam for Triangle
+                        step.dist_param = (groundLink.type === 'triangle') ? groundLink.gParam : groundLink.lenParam;
                             step.ref_id = otherId;
                             step.ux = dx / dist; // 單位向量 X
                             step.uy = dy / dist; // 單位向量 Y
