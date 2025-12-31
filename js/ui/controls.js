@@ -7,7 +7,7 @@ import { $, log, downloadText, downloadZip, fmt } from '../utils.js';
 import { readInputs, readSweepParams, readViewParams } from '../config.js';
 import { sweepTheta, calculateTrajectoryStats } from '../fourbar/solver.js';
 import { startAnimation, pauseAnimation, stopAnimation, setupMotorTypeHandler } from '../fourbar/animation.js';
-import { renderPartsLayout, renderPartsOverlay } from '../parts/renderer.js';
+import { renderPartsLayout, renderPartsOverlayLayer } from '../parts/renderer.js';
 import { computeEnginePreview, computeEngineSweep, computeEngineExport, clampEngineParam } from '../core/mechanism-engine.js';
 import { collectDynamicParamSpec } from '../core/dynamic-params.js';
 
@@ -506,20 +506,13 @@ export function updatePreview() {
             $("partsWrap").innerHTML = "";
         }
 
-        const overlayWrap = $("partsOverlayWrap");
         const overlayToggle = $("showPartsOverlay");
-        if (overlayWrap && overlayToggle && overlayToggle.checked) {
-            if (svgWrap) {
-                const swStyles = getComputedStyle(svgWrap);
-                const padL = parseFloat(swStyles.paddingLeft) || 0;
-                const padR = parseFloat(swStyles.paddingRight) || 0;
-                const padT = parseFloat(swStyles.paddingTop) || 0;
-                const padB = parseFloat(swStyles.paddingBottom) || 0;
-                overlayWrap.style.left = `${padL}px`;
-                overlayWrap.style.right = `${padR}px`;
-                overlayWrap.style.top = `${padT}px`;
-                overlayWrap.style.bottom = `${padB}px`;
-            }
+        const overlaySvg = svgWrap ? svgWrap.querySelector('svg') : null;
+        if (overlaySvg) {
+            const existingLayer = overlaySvg.querySelector('#partsOverlayLayer');
+            if (existingLayer) existingLayer.remove();
+        }
+        if (overlayToggle && overlayToggle.checked && mods.config && mods.config.id === 'multilink') {
             let topologyObj = null;
             if (mech.topology) {
                 try {
@@ -528,16 +521,10 @@ export function updatePreview() {
                     topologyObj = null;
                 }
             }
-
-            const overlaySvg = renderPartsOverlay(previewState.solution, topologyObj, partSpec, viewParams);
-            overlayWrap.style.display = overlaySvg ? "block" : "none";
-            overlayWrap.innerHTML = "";
             if (overlaySvg) {
-                overlayWrap.appendChild(overlaySvg);
+                const layer = renderPartsOverlayLayer(previewState.solution, topologyObj, partSpec, viewParams);
+                if (layer) overlaySvg.appendChild(layer);
             }
-        } else if (overlayWrap) {
-            overlayWrap.style.display = "none";
-            overlayWrap.innerHTML = "";
         }
 
         if (previewState.previewLog) {

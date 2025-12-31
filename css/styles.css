@@ -264,6 +264,12 @@ button.primary:hover {
   display: block;
 }
 
+#partsOverlayWrap svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
 #partsWrap svg {
   max-width: 100%;
   height: auto;

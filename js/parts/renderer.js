@@ -481,7 +481,7 @@ function orderCirclesCCW(circles) {
         .sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
 }
 
-export function renderPartsOverlay(sol, topology, partSpec, viewParams = {}) {
+export function renderPartsOverlayLayer(sol, topology, partSpec, viewParams = {}) {
     if (!sol || sol.isValid === false || !sol.points || !topology || !Array.isArray(topology._wizard_data)) return null;
 
     const W = viewParams.width || 800;
@@ -489,21 +489,13 @@ export function renderPartsOverlay(sol, topology, partSpec, viewParams = {}) {
     const pad = 50;
     const viewRange = viewParams.viewRange || 800;
     const scale = Math.max(0.01, Math.min(W - 2 * pad, H - 2 * pad) / viewRange);
-    const panX = viewParams.panX || 0;
-    const panY = viewParams.panY || 0;
 
     const txNum = (x) => W / 2 + x * scale;
     const tyNum = (y) => H / 2 - y * scale;
     const tx = (p) => txNum(p.x);
     const ty = (p) => tyNum(p.y);
 
-    const svg = svgEl("svg", {
-        width: "100%",
-        height: "100%",
-        viewBox: `${-panX} ${-panY} ${W} ${H}`,
-        preserveAspectRatio: "xMidYMid meet",
-        style: "display:block; width:100%; height:100%;"
-    });
+    const layer = svgEl('g', { id: 'partsOverlayLayer' });
 
     const radius = (partSpec.holeD / 2) + partSpec.margin;
     const holeD = partSpec.holeD;
@@ -533,7 +525,7 @@ export function renderPartsOverlay(sol, topology, partSpec, viewParams = {}) {
             ];
             const path = computeTangentHullPathQuiet(circles, txNum, tyNum, scale);
             if (path) {
-                svg.appendChild(svgEl('path', { d: path, ...strokeAttrs }));
+                layer.appendChild(svgEl('path', { d: path, ...strokeAttrs }));
             }
 
             const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
@@ -545,7 +537,7 @@ export function renderPartsOverlay(sol, topology, partSpec, viewParams = {}) {
                         const pathData = rotated
                             .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${txNum(p.x)} ${tyNum(p.y)}`)
                             .join(' ') + ' Z';
-                        svg.appendChild(svgEl('path', {
+                        layer.appendChild(svgEl('path', {
                             d: pathData,
                             fill: 'none',
                             stroke: color,
@@ -555,7 +547,7 @@ export function renderPartsOverlay(sol, topology, partSpec, viewParams = {}) {
                     }
                 }
 
-                svg.appendChild(svgEl('circle', {
+                layer.appendChild(svgEl('circle', {
                     cx: tx(pt),
                     cy: ty(pt),
                     r: (holeD / 2) * scale,
@@ -583,11 +575,11 @@ export function renderPartsOverlay(sol, topology, partSpec, viewParams = {}) {
             ]);
             const path = computeTangentHullPathQuiet(circles, txNum, tyNum, scale);
             if (path) {
-                svg.appendChild(svgEl('path', { d: path, ...strokeAttrs }));
+                layer.appendChild(svgEl('path', { d: path, ...strokeAttrs }));
             }
 
             [p1, p2, p3].forEach(pt => {
-                svg.appendChild(svgEl('circle', {
+                layer.appendChild(svgEl('circle', {
                     cx: tx(pt),
                     cy: ty(pt),
                     r: (holeD / 2) * scale,
@@ -599,7 +591,7 @@ export function renderPartsOverlay(sol, topology, partSpec, viewParams = {}) {
         }
     });
 
-    return svg;
+    return layer;
 }
 
 /**
