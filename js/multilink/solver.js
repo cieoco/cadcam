@@ -77,6 +77,7 @@ function solveBodyJointTopology(topology, params) {
     const points = {};
     const triangles = new Map();
     const constraints = [];
+    const lineConstraints = [];
     const pointIds = new Set();
 
     const getParamVal = (name, fallback = 0) => {
@@ -201,6 +202,19 @@ function solveBodyJointTopology(topology, params) {
             constraints.push({ a: c.p1.id, b: c.p2.id, len: g, type: 'tri', role: 'g', triId });
             constraints.push({ a: c.p1.id, b: c.p3.id, len: r1, type: 'tri', role: 'r1', triId });
             constraints.push({ a: c.p2.id, b: c.p3.id, len: r2, type: 'tri', role: 'r2', triId });
+        } else if (c.type === 'slider' && c.p1?.id && c.p2?.id) {
+            const len = getParamVal(c.lenParam, 0);
+            if (len > 0) {
+                constraints.push({ a: c.p1.id, b: c.p2.id, len, type: 'slider' });
+            }
+            if (c.p3?.id) {
+                lineConstraints.push({
+                    id: c.p3.id,
+                    line_p1: c.p1.id,
+                    line_p2: c.p2.id,
+                    sign: c.sign || 1
+                });
+            }
         }
     });
 
@@ -291,6 +305,51 @@ function solveBodyJointTopology(topology, params) {
         }
     }
 
+    if (lineConstraints.length) {
+        let lineChanged = true;
+        let lineGuard = 0;
+        while (lineChanged && lineGuard < 20) {
+            lineChanged = false;
+            lineGuard += 1;
+
+            for (const lc of lineConstraints) {
+                const a = points[lc.line_p1] || getInitialPoint(lc.line_p1);
+                const b = points[lc.line_p2] || getInitialPoint(lc.line_p2);
+                if (!a || !b) continue;
+
+                const distConstraint = constraints.find(c => {
+                    if (c.a === lc.id) return points[c.b];
+                    if (c.b === lc.id) return points[c.a];
+                    return false;
+                });
+                if (!distConstraint) continue;
+
+                const otherId = distConstraint.a === lc.id ? distConstraint.b : distConstraint.a;
+                const center = points[otherId];
+                const r = distConstraint.len || 0;
+                if (!center || r <= 0) continue;
+
+                const options = solveLineCircleIntersection(a, b, center, r);
+                if (!options.length) continue;
+
+                let chosen = null;
+                const prev = (prevPoints && prevPoints[lc.id]) || points[lc.id] || null;
+                if (prev) {
+                    const d0 = Math.hypot(options[0].x - prev.x, options[0].y - prev.y);
+                    const d1 = options[1] ? Math.hypot(options[1].x - prev.x, options[1].y - prev.y) : Infinity;
+                    chosen = d0 <= d1 ? options[0] : options[1];
+                } else {
+                    chosen = lc.sign === -1 && options[1] ? options[1] : options[0];
+                }
+
+                if (chosen) {
+                    points[lc.id] = chosen;
+                    lineChanged = true;
+                }
+            }
+        }
+    }
+
     let allResolved = true;
     for (const pid of pointIds) {
         if (!points[pid]) {
@@ -328,6 +387,22 @@ function solveBodyJointTopology(topology, params) {
             points[pid] = { x: other.x + dx, y: other.y + dy };
         }
     }
+
+    const seedPoint = (pt) => {
+        if (!pt || !pt.id || points[pt.id]) return;
+        const x = Number(pt.x);
+        const y = Number(pt.y);
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+            points[pt.id] = { x, y };
+        }
+    };
+
+    components.forEach((c) => {
+        if (c.type !== 'slider') return;
+        seedPoint(c.p1);
+        seedPoint(c.p2);
+        seedPoint(c.p3);
+    });
 
     return {
         isValid: !infeasible,
