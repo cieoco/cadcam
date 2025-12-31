@@ -267,13 +267,6 @@ export class MechanismWizard {
                             <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">P1 偏移參數 (P1 Offset)</label>
                             <input type="text" value="${comp.trackOffsetParam || ''}" oninput="window.wizard.updateCompProp('trackOffsetParam', this.value)" placeholder="例如: 20 或 Offset" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
                         </div>
-                        <div class="form-group" style="margin-top: 8px; border-top: 1px dashed #eee; padding-top: 8px;">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">軌道必經點 (lineThroughId)</label>
-                            <select onchange="window.wizard.updateCompProp('lineThroughId', this.value)" style="width: 100%; padding: 4px; font-size: 11px; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
-                                <option value="">-- 不指定 --</option>
-                                ${this.getAllPointIds().map(id => `<option value="${id}" ${comp.lineThroughId === id ? 'selected' : ''}>${id}</option>`).join('')}
-                            </select>
-                        </div>
                         ${driver ? `
                         <div class="form-group" style="margin-top: 8px; border-top: 1px dashed #eee; padding-top: 8px;">
                             <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">驅動桿長參數</label>
@@ -362,7 +355,9 @@ export class MechanismWizard {
     }
 
     addComponentFromCanvas(points) {
-        console.log('[Wizard] Adding component from canvas:', points);
+        if (window.DEBUG_WIZARD) {
+            console.log('[Wizard] Adding component from canvas:', points);
+        }
 
         if (!points || points.length < 2) return;
 
@@ -444,7 +439,9 @@ export class MechanismWizard {
     }
 
     addLinkFromCanvas(p1Data, p2Data) {
-        console.log('[Wizard] Adding link from canvas:', p1Data, p2Data);
+        if (window.DEBUG_WIZARD) {
+            console.log('[Wizard] Adding link from canvas:', p1Data, p2Data);
+        }
 
         // 1. 確保點位有 ID (如果是畫布點擊產生的新點可能沒 ID)
         const allPointIds = this.getAllPointIds();

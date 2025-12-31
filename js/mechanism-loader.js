@@ -49,7 +49,9 @@ function refreshUndoButtonState() {
 async function initMechanismPage() {
   const mech = getMechanismFromURL();
 
-  console.log(`Loading mechanism: ${mech.name}`);
+  if (window.DEBUG_MECH) {
+    console.log(`Loading mechanism: ${mech.name}`);
+  }
 
   // 設定頁面標題和圖示
   document.getElementById('pageTitle').textContent = `${mech.name} - 機構模擬工具`;
@@ -193,7 +195,9 @@ async function initMechanismPage() {
       }
     }
 
-    console.log('Mechanism modules loaded successfully');
+    if (window.DEBUG_MECH) {
+      console.log('Mechanism modules loaded successfully');
+    }
 
     // 🌟 核心修正：主動觸發第一次預覽繪圖，確保畫面不留白
     setTimeout(() => {
@@ -255,7 +259,9 @@ function setupLinkClickHandler() {
       const dist = Math.abs(e.clientX - lastMiddleClickX) + Math.abs(e.clientY - lastMiddleClickY);
 
       if (now - lastMiddleClickTime < 300 && dist < 10) {
-        console.log('[View] Reset to Center');
+        if (window.DEBUG_MECH) {
+          console.log('[View] Reset to Center');
+        }
         window.mechanismViewOffset = { x: 0, y: 0 };
         const btnUpdate = document.getElementById('btnUpdate');
         if (btnUpdate) btnUpdate.click();
@@ -579,7 +585,7 @@ function setupLinkClickHandler() {
     }
     hideContextMenu();
     document.getElementById('svgWrap').style.cursor = 'default';
-    if (isCancel) console.log('[Draw] Canceled');
+    if (isCancel && window.DEBUG_DRAW) console.log('[Draw] Canceled');
   }
 
   let contextMenu = null;
@@ -850,7 +856,6 @@ function setupLinkClickHandler() {
 
     // 🌟 修正：加孔後立即結束繪圖狀態，防止產生「幽靈雜點」
     drawState = 'IDLE';
-    drawP1 = null;
     drawBtn.textContent = '點擊新增...';
     drawBtn.classList.remove('active');
 
@@ -881,7 +886,7 @@ function setupLinkClickHandler() {
     e.stopPropagation(); // Handled
 
     const detail = e.detail; // { id, x, y }
-    console.log('[Draw] Clicked Joint:', detail);
+    if (window.DEBUG_DRAW) console.log('[Draw] Clicked Joint:', detail);
 
     if (drawState === 'DRAWING_LINK') {
       drawPoints.push({ id: detail.id, isNew: false, x: detail.x, y: detail.y });
@@ -1030,7 +1035,7 @@ function setupLinkClickHandler() {
   }
 
   function finishDraw(points) {
-    console.log('[Draw] Finish:', points);
+    if (window.DEBUG_DRAW) console.log('[Draw] Finish:', points);
 
     if (!points || points.length < 2) {
       console.warn('Need at least 2 points');

@@ -109,7 +109,8 @@ export function computePreviewState({
             sol = result.lastSolution;
         } else {
             result.errorType = ErrorCodes.INFEASIBLE;
-            result.statusMessage = `${mods.config.name}: ${toUserMessage(ErrorCodes.INFEASIBLE)}`;
+            const reason = sol && sol.errorReason ? ` (${sol.errorReason})` : '';
+            result.statusMessage = `${mods.config.name}: ${toUserMessage(ErrorCodes.INFEASIBLE)}${reason}`;
             result.fatalInvalid = true;
             result.solution = sol;
             return result;

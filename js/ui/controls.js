@@ -445,6 +445,7 @@ export function updatePreview() {
         lastMultilinkSolution = engineState.lastState.lastSolution;
         lastMultilinkTopology = engineState.lastState.lastTopology;
         currentTrajectoryData = previewState.trajectoryData;
+        window.currentTrajectoryData = currentTrajectoryData;
 
         const warning = document.getElementById('invalidWarning');
         if (warning) {
@@ -460,20 +461,16 @@ export function updatePreview() {
             log(previewState.statusMessage);
         }
 
-        if (previewState.restore) {
-            const thetaInput = $("theta");
-            if (thetaInput && previewState.restore.theta !== undefined) {
-                thetaInput.value = previewState.restore.theta;
-            }
-
-            const restored = previewState.restore.dynamicParams || {};
-            for (const [varId, val] of Object.entries(restored)) {
+        if (previewState.solution && previewState.solution.autoParams) {
+            for (const [varId, val] of Object.entries(previewState.solution.autoParams)) {
                 const inp = document.getElementById(`dyn_${varId}`);
                 const range = document.getElementById(`dyn_${varId}_range`);
                 if (inp) inp.value = val;
                 if (range) range.value = val;
             }
         }
+
+        // Keep user-entered values even when preview holds last valid state.
 
         if (viewState.fatalInvalid) {
             if (viewState.showInvalidPlaceholder) {

@@ -54,6 +54,30 @@ export function startAnimation(updateCallback) {
             break;
     }
 
+    const sweepData = window.currentTrajectoryData;
+    const validRanges = sweepData && Array.isArray(sweepData.validRanges) ? sweepData.validRanges : [];
+    if (validRanges.length) {
+        const currentTheta = Number($("theta").value);
+        const inRange = validRanges.find(r => currentTheta >= r.start && currentTheta <= r.end);
+        const baseStart = animationState.rangeStart;
+        const baseEnd = animationState.rangeEnd;
+        const candidates = validRanges
+            .map(r => ({
+                start: Math.max(baseStart, r.start),
+                end: Math.min(baseEnd, r.end)
+            }))
+            .filter(r => r.end > r.start);
+
+        const chosen = inRange
+            ? { start: Math.max(baseStart, inRange.start), end: Math.min(baseEnd, inRange.end) }
+            : candidates[0];
+
+        if (chosen && chosen.end > chosen.start) {
+            animationState.rangeStart = chosen.start;
+            animationState.rangeEnd = chosen.end;
+        }
+    }
+
     // 初始化 theta 到起始位置
     const currentTheta = Number($("theta").value);
     if (

@@ -69,12 +69,14 @@ export function collectDynamicParamSpec(modsConfig, topologyObj) {
     const groups = [];
     if (topologyObj && Array.isArray(topologyObj._wizard_data)) {
         topologyObj._wizard_data.forEach(comp => {
-            if (comp.type !== 'triangle' && comp.type !== 'slider') return;
+            if (comp.type !== 'triangle' && comp.type !== 'slider' && comp.type !== 'bar') return;
             let params = [];
             if (comp.type === 'triangle') {
                 params = [comp.r1Param, comp.r2Param, comp.gParam];
             } else if (comp.type === 'slider') {
                 params = [comp.lenParam, comp.trackLenParam, comp.trackOffsetParam];
+            } else if (comp.type === 'bar' && comp.holes && comp.holes.length) {
+                params = [comp.lenParam, ...comp.holes.map(h => h.distParam)];
             }
             params = params.filter(p => p && vars.has(p));
             if (params.length) {

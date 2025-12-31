@@ -35,7 +35,7 @@ function solveIntersectionOptions(p1, r1, p2, r2) {
     return [pPlus, pMinus];
 }
 
-function solveLineCircleIntersection(a, b, center, r) {
+function solveLineCircleIntersection(a, b, center, r, allowExtension = false) {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const len = Math.hypot(dx, dy);
@@ -56,10 +56,10 @@ function solveLineCircleIntersection(a, b, center, r) {
     const t2 = proj + offset;
 
     const pts = [];
-    if (t1 >= 0 && t1 <= len) {
+    if (allowExtension || (t1 >= 0 && t1 <= len)) {
         pts.push({ x: a.x + ux * t1, y: a.y + uy * t1 });
     }
-    if (t2 >= 0 && t2 <= len) {
+    if (allowExtension || (t2 >= 0 && t2 <= len)) {
         pts.push({ x: a.x + ux * t2, y: a.y + uy * t2 });
     }
 
@@ -78,9 +78,12 @@ function solveBodyJointTopology(topology, params) {
     const triangles = new Map();
     const constraints = [];
     const lineConstraints = [];
+    const autoParams = {};
     const pointIds = new Set();
     const holeIds = new Set();
+    let infeasibleReason = '';
 
+    const tol = 1e-3;
     const getParamVal = (name, fallback = 0) => {
         if (!name) return fallback;
         if (actualParams[name] !== undefined) return Number(actualParams[name]);
@@ -89,6 +92,11 @@ function solveBodyJointTopology(topology, params) {
         }
         const parsed = Number(name);
         return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const getEffectiveParamVal = (name, fallback = 0) => {
+        if (!name) return fallback;
+        if (autoParams[name] !== undefined) return Number(autoParams[name]);
+        return getParamVal(name, fallback);
     };
 
     const addPointId = (pt) => {
@@ -231,27 +239,28 @@ function solveBodyJointTopology(topology, params) {
             if (len > 0) {
                 constraints.push({ a: c.p1.id, b: c.p2.id, len, type: 'slider' });
             }
-            if (c.p3?.id) {
+            const isHoleP3 = c.p3?.id && holeIds.has(c.p3.id);
+            if (c.p3?.id && !isHoleP3) {
                 lineConstraints.push({
                     id: c.p3.id,
                     line_p1: c.p1.id,
                     line_p2: c.p2.id,
                     sign: c.sign || 1,
                     trackLenParam: c.trackLenParam,
-                    trackOffsetParam: c.trackOffsetParam,
-                    hard: holeIds.has(c.p3.id)
+                    trackOffsetParam: c.trackOffsetParam
                 });
             }
-            if (c.p2?.id && c.lineThroughId) {
+            if (c.p2?.id && isHoleP3 && c.p1?.id) {
                 lineConstraints.push({
                     id: c.p2.id,
                     line_p1: c.p1.id,
-                    line_p2: c.lineThroughId,
+                    line_p2: c.p3.id,
                     sign: c.sign || 1,
                     maxLen: len,
                     trackLenParam: c.trackLenParam,
                     trackOffsetParam: c.trackOffsetParam,
-                    forceThrough: true
+                    extendLine: true,
+                    autoExpand: true
                 });
             }
         }
@@ -364,6 +373,9 @@ function solveBodyJointTopology(topology, params) {
                 if (!distConstraint) {
                     if (lc.hard) {
                         infeasible = true;
+                        if (!infeasibleReason) {
+                            infeasibleReason = `共點 ${lc.id} 無法同時落在線上`;
+                        }
                         continue;
                     }
                     const dx = b.x - a.x;
@@ -398,8 +410,14 @@ function solveBodyJointTopology(topology, params) {
                 const r = distConstraint.len || 0;
                 if (!center || r <= 0) continue;
 
-                let options = solveLineCircleIntersection(a, b, center, r);
-                if (!options.length) continue;
+                let options = solveLineCircleIntersection(a, b, center, r, Boolean(lc.extendLine));
+                if (!options.length) {
+                    infeasible = true;
+                    if (!infeasibleReason) {
+                        infeasibleReason = `共點 ${lc.id} 無法落在軌道或長度條件`;
+                    }
+                    continue;
+                }
 
                 const dx = b.x - a.x;
                 const dy = b.y - a.y;
@@ -407,31 +425,48 @@ function solveBodyJointTopology(topology, params) {
                 if (len > 0 && (lc.trackLenParam || lc.trackOffsetParam || Number.isFinite(lc.maxLen))) {
                     const dirX = dx / len;
                     const dirY = dy / len;
-                    const trackOffset = Number.isFinite(lc.maxLen)
+                    let trackOffset = Number.isFinite(lc.maxLen)
                         ? 0
-                        : getParamVal(lc.trackOffsetParam, 0);
-                    const rawTrackLen = Number.isFinite(lc.maxLen)
+                        : getEffectiveParamVal(lc.trackOffsetParam, 0);
+                    let rawTrackLen = Number.isFinite(lc.maxLen)
                         ? lc.maxLen
-                        : getParamVal(lc.trackLenParam, len);
-                    const startDist = Math.max(0, Math.min(trackOffset, len));
-                    const endDist = Math.max(startDist, Math.min(startDist + Math.max(0, rawTrackLen), len));
+                        : getEffectiveParamVal(lc.trackLenParam, len);
 
-                    if (lc.forceThrough) {
-                        const throughDist = (b.x - a.x) * dirX + (b.y - a.y) * dirY;
-                        if (throughDist < startDist - 1e-6 || throughDist > endDist + 1e-6) {
-                            infeasible = true;
-                            continue;
-                        }
+                    let startDist = Math.max(0, trackOffset);
+                    let endDist = Math.max(startDist, startDist + Math.max(0, rawTrackLen));
+                    if (!lc.extendLine) {
+                        startDist = Math.min(startDist, len);
+                        endDist = Math.min(endDist, len);
                     }
 
+                    const filtered = options.filter(opt => {
+                        const tx = (opt.x - a.x) * dirX + (opt.y - a.y) * dirY;
+                        return tx >= startDist - 1e-6 && tx <= endDist + 1e-6;
+                    });
+                    if (!filtered.length && lc.autoExpand && lc.trackLenParam) {
+                        const pick = options[0];
+                        if (pick) {
+                            const proj = (pick.x - a.x) * dirX + (pick.y - a.y) * dirY;
+                            const newStart = Math.max(0, Math.min(startDist, proj));
+                            const newEnd = Math.max(newStart, Math.max(endDist, proj));
+                            autoParams[lc.trackOffsetParam] = newStart;
+                            autoParams[lc.trackLenParam] = newEnd - newStart;
+                            trackOffset = newStart;
+                            rawTrackLen = newEnd - newStart;
+                            startDist = newStart;
+                            endDist = newEnd;
+                        }
+                    } else if (!filtered.length) {
+                        infeasible = true;
+                        if (!infeasibleReason) {
+                            infeasibleReason = `共點 ${lc.id} 超出滑軌範圍`;
+                        }
+                        continue;
+                    }
                     options = options.filter(opt => {
                         const tx = (opt.x - a.x) * dirX + (opt.y - a.y) * dirY;
                         return tx >= startDist - 1e-6 && tx <= endDist + 1e-6;
                     });
-                    if (!options.length) {
-                        infeasible = true;
-                        continue;
-                    }
                 }
 
                 let chosen = null;
@@ -453,7 +488,6 @@ function solveBodyJointTopology(topology, params) {
     }
 
     if (!infeasible) {
-        const tol = 1e-3;
         lineConstraints.forEach(lc => {
             if (!lc.hard) return;
             const pt = points[lc.id];
@@ -461,6 +495,13 @@ function solveBodyJointTopology(topology, params) {
             const b = points[lc.line_p2] || getInitialPoint(lc.line_p2);
             if (!pt || !a || !b) {
                 infeasible = true;
+                if (!infeasibleReason) {
+                    const missing = [];
+                    if (!pt) missing.push(lc.id);
+                    if (!a) missing.push(lc.line_p1);
+                    if (!b) missing.push(lc.line_p2);
+                    infeasibleReason = `共點 ${lc.id} 無法求出座標（缺: ${missing.join(', ')}）`;
+                }
                 return;
             }
             const vx = b.x - a.x;
@@ -468,13 +509,79 @@ function solveBodyJointTopology(topology, params) {
             const denom = Math.hypot(vx, vy);
             if (denom <= 0) {
                 infeasible = true;
+                if (!infeasibleReason) {
+                    infeasibleReason = `共點 ${lc.id} 無法求出座標（線段長度為 0）`;
+                }
                 return;
             }
             const dist = Math.abs((pt.x - a.x) * vy - (pt.y - a.y) * vx) / denom;
             if (dist > tol) {
                 infeasible = true;
+                if (!infeasibleReason) {
+                    infeasibleReason = `共點 ${lc.id} 無法落在線上`;
+                }
             }
         });
+    }
+
+    if (!infeasible) {
+        components.forEach(c => {
+            if (c.type !== 'slider' || !c.p3?.id || !holeIds.has(c.p3.id)) return;
+            const p1 = points[c.p1?.id];
+            const p2 = points[c.p2?.id];
+            const p3 = points[c.p3.id];
+            if (!p1 || !p2 || !p3) {
+                infeasible = true;
+                return;
+            }
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const len = Math.hypot(dx, dy);
+            if (len <= 0) {
+                infeasible = true;
+                return;
+            }
+            const dirX = dx / len;
+            const dirY = dy / len;
+            const trackOffset = getEffectiveParamVal(c.trackOffsetParam, 0);
+            const rawTrackLen = getEffectiveParamVal(c.trackLenParam, len);
+            const startDist = Math.max(0, Math.min(trackOffset, len));
+            const endDist = Math.max(startDist, Math.min(startDist + Math.max(0, rawTrackLen), len));
+            const proj = (p3.x - p1.x) * dirX + (p3.y - p1.y) * dirY;
+            if (proj < startDist - tol || proj > endDist + tol) {
+                infeasible = true;
+                if (!infeasibleReason) {
+                    infeasibleReason = `共點 ${c.p3.id} 超出滑軌範圍`;
+                }
+            }
+        });
+    }
+
+    if (!infeasibleReason) {
+        for (const c of components) {
+            if (c.type !== 'slider' || !c.p3?.id || !holeIds.has(c.p3.id)) continue;
+            const p1 = points[c.p1?.id];
+            const p2 = points[c.p2?.id];
+            const p3 = points[c.p3.id];
+            if (!p1 || !p2 || !p3) {
+                const missing = [];
+                if (!p1) missing.push(c.p1?.id || 'P1');
+                if (!p2) missing.push(c.p2?.id || 'P2');
+                if (!p3) missing.push(c.p3.id);
+                infeasibleReason = `共點 ${c.p3.id} 無法求出座標（缺: ${missing.join(', ')}）`;
+                break;
+            }
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const len = Math.hypot(dx, dy);
+            const trackOffset = getParamVal(c.trackOffsetParam, 0);
+            const rawTrackLen = getParamVal(c.trackLenParam, len);
+            const startDist = Math.max(0, Math.min(trackOffset, len));
+            const endDist = Math.max(startDist, Math.min(startDist + Math.max(0, rawTrackLen), len));
+            const proj = len > 0 ? ((p3.x - p1.x) * (dx / len) + (p3.y - p1.y) * (dy / len)) : 0;
+            infeasibleReason = `共點 ${c.p3.id}：|P2-H1|≈${proj.toFixed(2)}，軌道範圍=[${startDist.toFixed(2)}, ${endDist.toFixed(2)}]`;
+            break;
+        }
     }
 
     let allResolved = true;
@@ -535,7 +642,9 @@ function solveBodyJointTopology(topology, params) {
         isValid: !infeasible,
         isUnderconstrained: !infeasible && !allResolved,
         points,
-        B: points[topology.tracePoint]
+        B: points[topology.tracePoint],
+        errorReason: infeasibleReason || null,
+        autoParams: Object.keys(autoParams).length ? autoParams : null
     };
 }
 

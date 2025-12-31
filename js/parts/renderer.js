@@ -137,9 +137,13 @@ export function renderPartsLayout(parts, workX, workY) {
             if (!validOutline) {
                 continue;
             }
-            console.log('Rendering outline for', p.id, p.outline);
+            if (window.DEBUG_PARTS) {
+                console.log('Rendering outline for', p.id, p.outline);
+            }
             const pathData = computeTangentHullPath(p.outline, tx, ty, scale);
-            console.log('Path data:', pathData);
+            if (window.DEBUG_PARTS) {
+                console.log('Path data:', pathData);
+            }
             let combinedPath = pathData;
             let fillRule = undefined;
             if (p.innerOutline && p.innerOutline.length >= 2) {
@@ -300,7 +304,9 @@ export function renderPartsLayout(parts, workX, workY) {
 function computeTangentHullPath(circles, tx, ty, scale) {
     if (!circles || circles.length < 2) return "";
 
-    console.log('computeTangentHullPath input:', circles);
+    if (window.DEBUG_PARTS) {
+        console.log('computeTangentHullPath input:', circles);
+    }
 
     // Helper: Get tangent points between two circles
     // Assumes equal radii for now (simplification for this use case)
@@ -402,7 +408,9 @@ function computeTangentHullPath(circles, tx, ty, scale) {
     }
 
     d += "Z";
-    console.log('Hull Path:', d);
+    if (window.DEBUG_PARTS) {
+        console.log('Hull Path:', d);
+    }
     return d;
 }
 
