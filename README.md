@@ -40,6 +40,28 @@ cadcam/
 └── ...
 ```
 
+## ?? 最新架構說明 (Core/UI 分層)
+
+核心邏輯已抽離成 `js/core/`，UI 只處理 DOM 與事件，透過「Engine Facade」單一入口呼叫核心計算。
+
+- `js/core/mechanism-engine.js`
+  - `computeEnginePreview`：求解 + 軌跡 + preview/view state
+  - `computeEngineSweep`：掃描分析 (sweep)
+  - `computeEngineExport`：G-code/DXF 匯出
+  - `clampEngineParam`：動態參數約束
+- `js/core/preview-state.js`：整理求解結果、軌跡資料、訊息、DXF preview
+- `js/core/view-state.js`：UI 顯示狀態計算 (警告/面板/顯示策略)
+- `js/core/sweep-state.js`：掃描結果彙整
+- `js/core/export.js`：匯出流程彙整
+- `js/core/param-constraints.js`：動態參數限制
+
+UI 端主要留在 `js/ui/controls.js` 與 `js/ui/wizard.js`，負責：
+- DOM 更新與事件綁定
+- 將輸入組裝成 engine 所需資料，並依回傳狀態渲染
+
+此分層降低 UI 與求解器耦合，提升可測試性與可維護性。
+
+
 ## 🔧 支援的機構類型
 
 ### ✅ 已實作機構

@@ -12,6 +12,19 @@ function rotatePoints90(points, cx, cy) {
     }));
 }
 
+function rotatePoints(points, cx, cy, angleRad) {
+    const cosA = Math.cos(angleRad);
+    const sinA = Math.sin(angleRad);
+    return points.map(pt => {
+        const dx = pt.x - cx;
+        const dy = pt.y - cy;
+        return {
+            x: cx + dx * cosA - dy * sinA,
+            y: cy + dx * sinA + dy * cosA
+        };
+    });
+}
+
 function buildDoubleDPoints(cx, cy, d, flat, flatAxis = 'y', segments = 12) {
     const r = d / 2;
     if (!Number.isFinite(r) || r <= 0) return [];
@@ -391,6 +404,202 @@ function computeTangentHullPath(circles, tx, ty, scale) {
     d += "Z";
     console.log('Hull Path:', d);
     return d;
+}
+
+function computeTangentHullPathQuiet(circles, tx, ty, scale) {
+    if (!circles || circles.length < 2) return "";
+
+    const getTangent = (c1, c2) => {
+        const dx = c2.x - c1.x;
+        const dy = c2.y - c1.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist === 0) return null;
+
+        const nx = dy / dist;
+        const ny = -dx / dist;
+
+        const r1 = c1.r;
+        const r2 = c2.r;
+
+        return {
+            start: { x: c1.x + nx * r1, y: c1.y + ny * r1 },
+            end: { x: c2.x + nx * r2, y: c2.y + ny * r2 }
+        };
+    };
+
+    let d = "";
+    const n = circles.length;
+
+    if (n === 2) {
+        const c1 = circles[0];
+        const c2 = circles[1];
+        const t1 = getTangent(c1, c2);
+        const t2 = getTangent(c2, c1);
+        if (!t1 || !t2) return "";
+
+        d += `M ${tx(t1.start.x)} ${ty(t1.start.y)} `;
+        d += `L ${tx(t1.end.x)} ${ty(t1.end.y)} `;
+        d += `A ${c2.r * scale} ${c2.r * scale} 0 1 0 ${tx(t2.start.x)} ${ty(t2.start.y)} `;
+        d += `L ${tx(t2.end.x)} ${ty(t2.end.y)} `;
+        d += `A ${c1.r * scale} ${c1.r * scale} 0 1 0 ${tx(t1.start.x)} ${ty(t1.start.y)} `;
+        d += "Z";
+        return d;
+    }
+
+    const tangents = [];
+    for (let i = 0; i < n; i++) {
+        const c1 = circles[i];
+        const c2 = circles[(i + 1) % n];
+        const t = getTangent(c1, c2);
+        if (t) tangents.push(t);
+    }
+
+    if (tangents.length !== n) return "";
+
+    d = "";
+    for (let i = 0; i < n; i++) {
+        const curr = tangents[i];
+        const next = tangents[(i + 1) % n];
+        const cNext = circles[(i + 1) % n];
+
+        if (i === 0) {
+            d += `M ${tx(curr.start.x)} ${ty(curr.start.y)} `;
+        }
+        d += `L ${tx(curr.end.x)} ${ty(curr.end.y)} `;
+        d += `A ${cNext.r * scale} ${cNext.r * scale} 0 0 0 ${tx(next.start.x)} ${ty(next.start.y)} `;
+    }
+    d += "Z";
+    return d;
+}
+
+function orderCirclesCCW(circles) {
+    if (!circles || circles.length < 3) return circles;
+    const cx = circles.reduce((sum, c) => sum + c.x, 0) / circles.length;
+    const cy = circles.reduce((sum, c) => sum + c.y, 0) / circles.length;
+    return circles
+        .slice()
+        .sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+}
+
+export function renderPartsOverlay(sol, topology, partSpec, viewParams = {}) {
+    if (!sol || sol.isValid === false || !sol.points || !topology || !Array.isArray(topology._wizard_data)) return null;
+
+    const W = viewParams.width || 800;
+    const H = viewParams.height || 600;
+    const pad = 50;
+    const viewRange = viewParams.viewRange || 800;
+    const scale = Math.max(0.01, Math.min(W - 2 * pad, H - 2 * pad) / viewRange);
+    const panX = viewParams.panX || 0;
+    const panY = viewParams.panY || 0;
+
+    const txNum = (x) => W / 2 + x * scale;
+    const tyNum = (y) => H / 2 - y * scale;
+    const tx = (p) => txNum(p.x);
+    const ty = (p) => tyNum(p.y);
+
+    const svg = svgEl("svg", {
+        width: "100%",
+        height: "100%",
+        viewBox: `${-panX} ${-panY} ${W} ${H}`,
+        preserveAspectRatio: "xMidYMid meet",
+        style: "display:block; width:100%; height:100%;"
+    });
+
+    const radius = (partSpec.holeD / 2) + partSpec.margin;
+    const holeD = partSpec.holeD;
+
+    topology._wizard_data.forEach(comp => {
+        if (!comp || !comp.type) return;
+        if (comp.type !== 'bar' && comp.type !== 'triangle' && comp.type !== 'slider') return;
+
+        const color = comp.color || '#111';
+        const strokeAttrs = {
+            fill: color,
+            'fill-opacity': 0.12,
+            stroke: color,
+            'stroke-opacity': 0.55,
+            'stroke-width': 1.2,
+            'stroke-linejoin': 'round'
+        };
+
+        if (comp.type === 'bar' || comp.type === 'slider') {
+            const p1 = sol.points[comp.p1?.id];
+            const p2 = sol.points[comp.p2?.id];
+            if (!p1 || !p2) return;
+
+            const circles = [
+                { x: p1.x, y: p1.y, r: radius },
+                { x: p2.x, y: p2.y, r: radius }
+            ];
+            const path = computeTangentHullPathQuiet(circles, txNum, tyNum, scale);
+            if (path) {
+                svg.appendChild(svgEl('path', { d: path, ...strokeAttrs }));
+            }
+
+            const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+            const drawHole = (pt, isInputHole) => {
+                if (isInputHole) {
+                    const pts = buildDoubleFlatPointsTB(pt.x, pt.y, holeD, holeD * 0.6667);
+                    if (pts.length >= 3) {
+                        const rotated = rotatePoints(pts, pt.x, pt.y, angle);
+                        const pathData = rotated
+                            .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${txNum(p.x)} ${tyNum(p.y)}`)
+                            .join(' ') + ' Z';
+                        svg.appendChild(svgEl('path', {
+                            d: pathData,
+                            fill: 'none',
+                            stroke: color,
+                            'stroke-width': 1
+                        }));
+                        return;
+                    }
+                }
+
+                svg.appendChild(svgEl('circle', {
+                    cx: tx(pt),
+                    cy: ty(pt),
+                    r: (holeD / 2) * scale,
+                    fill: 'none',
+                    stroke: color,
+                    'stroke-width': 1
+                }));
+            };
+
+            drawHole(p1, Boolean(comp.isInput));
+            drawHole(p2, false);
+            return;
+        }
+
+        if (comp.type === 'triangle') {
+            const p1 = sol.points[comp.p1?.id];
+            const p2 = sol.points[comp.p2?.id];
+            const p3 = sol.points[comp.p3?.id];
+            if (!p1 || !p2 || !p3) return;
+
+            const circles = orderCirclesCCW([
+                { x: p1.x, y: p1.y, r: radius },
+                { x: p2.x, y: p2.y, r: radius },
+                { x: p3.x, y: p3.y, r: radius }
+            ]);
+            const path = computeTangentHullPathQuiet(circles, txNum, tyNum, scale);
+            if (path) {
+                svg.appendChild(svgEl('path', { d: path, ...strokeAttrs }));
+            }
+
+            [p1, p2, p3].forEach(pt => {
+                svg.appendChild(svgEl('circle', {
+                    cx: tx(pt),
+                    cy: ty(pt),
+                    r: (holeD / 2) * scale,
+                    fill: 'none',
+                    stroke: color,
+                    'stroke-width': 1
+                }));
+            });
+        }
+    });
+
+    return svg;
 }
 
 /**

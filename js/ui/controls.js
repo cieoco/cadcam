@@ -7,7 +7,7 @@ import { $, log, downloadText, downloadZip, fmt } from '../utils.js';
 import { readInputs, readSweepParams, readViewParams } from '../config.js';
 import { sweepTheta, calculateTrajectoryStats } from '../fourbar/solver.js';
 import { startAnimation, pauseAnimation, stopAnimation, setupMotorTypeHandler } from '../fourbar/animation.js';
-import { renderPartsLayout } from '../parts/renderer.js';
+import { renderPartsLayout, renderPartsOverlay } from '../parts/renderer.js';
 import { computeEnginePreview, computeEngineSweep, computeEngineExport, clampEngineParam } from '../core/mechanism-engine.js';
 import { collectDynamicParamSpec } from '../core/dynamic-params.js';
 
@@ -395,6 +395,11 @@ export function updatePreview() {
         viewParams.motorType = mech.motorType;
         viewParams.motorRotation = mech.motorRotation || 0;
         viewParams.topology = mech.topology;
+        if (!Number.isFinite(viewParams.viewRange)) {
+            const viewRangeSlider = $("viewRangeSlider");
+            const sliderVal = viewRangeSlider ? Number(viewRangeSlider.value) : NaN;
+            viewParams.viewRange = Number.isFinite(sliderVal) ? sliderVal : 800;
+        }
         if (window.mechanismViewOffset) {
             viewParams.panX = window.mechanismViewOffset.x;
             viewParams.panY = window.mechanismViewOffset.y;
@@ -499,6 +504,40 @@ export function updatePreview() {
             );
         } else {
             $("partsWrap").innerHTML = "";
+        }
+
+        const overlayWrap = $("partsOverlayWrap");
+        const overlayToggle = $("showPartsOverlay");
+        if (overlayWrap && overlayToggle && overlayToggle.checked) {
+            if (svgWrap) {
+                const swStyles = getComputedStyle(svgWrap);
+                const padL = parseFloat(swStyles.paddingLeft) || 0;
+                const padR = parseFloat(swStyles.paddingRight) || 0;
+                const padT = parseFloat(swStyles.paddingTop) || 0;
+                const padB = parseFloat(swStyles.paddingBottom) || 0;
+                overlayWrap.style.left = `${padL}px`;
+                overlayWrap.style.right = `${padR}px`;
+                overlayWrap.style.top = `${padT}px`;
+                overlayWrap.style.bottom = `${padB}px`;
+            }
+            let topologyObj = null;
+            if (mech.topology) {
+                try {
+                    topologyObj = typeof mech.topology === 'string' ? JSON.parse(mech.topology) : mech.topology;
+                } catch (e) {
+                    topologyObj = null;
+                }
+            }
+
+            const overlaySvg = renderPartsOverlay(previewState.solution, topologyObj, partSpec, viewParams);
+            overlayWrap.style.display = overlaySvg ? "block" : "none";
+            overlayWrap.innerHTML = "";
+            if (overlaySvg) {
+                overlayWrap.appendChild(overlaySvg);
+            }
+        } else if (overlayWrap) {
+            overlayWrap.style.display = "none";
+            overlayWrap.innerHTML = "";
         }
 
         if (previewState.previewLog) {
@@ -739,6 +778,13 @@ export function setupUIHandlers() {
     const showPartsPreview = $("showPartsPreview");
     if (showPartsPreview) {
         showPartsPreview.addEventListener('change', () => {
+            updatePreview();
+        });
+    }
+
+    const showPartsOverlay = $("showPartsOverlay");
+    if (showPartsOverlay) {
+        showPartsOverlay.addEventListener('change', () => {
             updatePreview();
         });
     }

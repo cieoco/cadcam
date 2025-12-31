@@ -284,15 +284,20 @@ function setupLinkClickHandler() {
     const currentPanX = initialPanOffset.x + dx;
     const currentPanY = initialPanOffset.y + dy;
 
-    const svg = svgWrap.querySelector('svg');
-    if (svg && svg.viewBox && svg.viewBox.baseVal) {
+    const overlayWrap = document.getElementById('partsOverlayWrap');
+    const svgs = [
+      svgWrap.querySelector('svg'),
+      overlayWrap ? overlayWrap.querySelector('svg') : null
+    ].filter(Boolean);
+    svgs.forEach((svg) => {
+      if (!svg || !svg.viewBox || !svg.viewBox.baseVal) return;
       const vb = svg.viewBox.baseVal;
       // Shift ViewBox: Camera moves opposite to Pan
       // ViewBox Origin = -(PanOffset)
       if (typeof vb.width === 'number') {
         svg.setAttribute('viewBox', `${-currentPanX} ${-currentPanY} ${vb.width} ${vb.height}`);
       }
-    }
+    });
   });
 
   // 3. Mouse Up (Commit Pan)
