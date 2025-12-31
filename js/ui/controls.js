@@ -8,11 +8,7 @@ import { readInputs, readSweepParams, readViewParams } from '../config.js';
 import { sweepTheta, calculateTrajectoryStats } from '../fourbar/solver.js';
 import { startAnimation, pauseAnimation, stopAnimation, setupMotorTypeHandler } from '../fourbar/animation.js';
 import { renderPartsLayout } from '../parts/renderer.js';
-import { computePreviewState } from '../core/preview-state.js';
-import { buildExportBundle } from '../core/export.js';
-import { computeSweepState } from '../core/sweep-state.js';
-import { computeViewState } from '../core/view-state.js';
-import { clampDynamicParam } from '../core/param-constraints.js';
+import { computeEnginePreview, computeEngineSweep, computeEngineExport, clampEngineParam } from '../core/mechanism-engine.js';
 import { collectDynamicParamSpec } from '../core/dynamic-params.js';
 
 // 全域狀態資料
@@ -303,7 +299,7 @@ export function updateDynamicParams() {
             }
 
             const rawVal = parseFloat(isRange ? rangeInput.value : numInput.value);
-            clampDynamicParam({ mech, varId, value: rawVal }).then(({ value, range }) => {
+            clampEngineParam({ mech, varId, value: rawVal }).then(({ value, range }) => {
                 if (range) {
                     if (isRange) {
                         if (value !== parseFloat(rangeInput.value)) rangeInput.value = value;
@@ -417,31 +413,33 @@ export function updatePreview() {
 
         const showTrajectory = $("showTrajectory")?.checked;
         const sweepParams = showTrajectory ? readSweepParams() : null;
-        const previewState = computePreviewState({
+        const svgWrap = $("svgWrap");
+        const showPartsPreview = $("showPartsPreview") ? $("showPartsPreview").checked : true;
+        const partsPanel = $("partsPreviewPanel");
+        const engineState = computeEnginePreview({
             mods,
             mech,
             partSpec,
             mfg,
             dynamicParams,
-            lastSolution: lastMultilinkSolution,
-            lastTopology: lastMultilinkTopology,
+            lastState: {
+                lastSolution: lastMultilinkSolution,
+                lastTopology: lastMultilinkTopology
+            },
             showTrajectory: Boolean(showTrajectory),
-            sweepParams
+            sweepParams,
+            view: {
+                showPartsPreview,
+                expandedHeight: partsPanel ? partsPanel.dataset.expandedHeight : null,
+                hasSvgChild: Boolean(svgWrap.firstChild)
+            }
         });
+        const previewState = engineState.previewState;
+        const viewState = engineState.viewState;
 
-        lastMultilinkSolution = previewState.lastSolution;
-        lastMultilinkTopology = previewState.lastTopology;
+        lastMultilinkSolution = engineState.lastState.lastSolution;
+        lastMultilinkTopology = engineState.lastState.lastTopology;
         currentTrajectoryData = previewState.trajectoryData;
-
-        const svgWrap = $("svgWrap");
-        const showPartsPreview = $("showPartsPreview") ? $("showPartsPreview").checked : true;
-        const partsPanel = $("partsPreviewPanel");
-        const viewState = computeViewState({
-            previewState,
-            showPartsPreview,
-            expandedHeight: partsPanel ? partsPanel.dataset.expandedHeight : null,
-            hasSvgChild: Boolean(svgWrap.firstChild)
-        });
 
         const warning = document.getElementById('invalidWarning');
         if (warning) {
@@ -546,7 +544,7 @@ export function generateGcodes() {
             mech[key] = dynamicParams[key];
         });
 
-        const { files, dxfText, machiningInfo } = buildExportBundle({
+        const { files, dxfText, machiningInfo } = computeEngineExport({
             mods,
             mech,
             partSpec,
@@ -607,7 +605,7 @@ export function performSweepAnalysis() {
         const motorTypeEl = $("motorType");
         const motorTypeText = motorTypeEl ? motorTypeEl.selectedOptions[0].textContent : "motor";
 
-        const sweepState = computeSweepState({
+        const sweepState = computeEngineSweep({
             mods,
             mech,
             partSpec,
