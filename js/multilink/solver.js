@@ -79,6 +79,7 @@ function solveBodyJointTopology(topology, params) {
     const constraints = [];
     const lineConstraints = [];
     const pointIds = new Set();
+    const holeIds = new Set();
 
     const getParamVal = (name, fallback = 0) => {
         if (!name) return fallback;
@@ -152,6 +153,11 @@ function solveBodyJointTopology(topology, params) {
         }
 
         ['p1', 'p2', 'p3'].forEach(k => addPointId(c[k]));
+        if (c.holes) {
+            c.holes.forEach(h => {
+                if (h && h.id) holeIds.add(h.id);
+            });
+        }
 
         if (c.p1 && c.p1.type === 'fixed' && !points[c.p1.id]) {
             points[c.p1.id] = { x: Number(c.p1.x || 0), y: Number(c.p1.y || 0) };
@@ -193,6 +199,24 @@ function solveBodyJointTopology(topology, params) {
                     };
                 }
             }
+            if (c.holes && c.holes.length) {
+                c.holes.forEach(h => {
+                    if (!h || !h.id || !h.distParam) return;
+                    addPointId({ id: h.id });
+                    const dist = getParamVal(h.distParam, 0);
+                    if (dist > 0) {
+                        constraints.push({ a: c.p1.id, b: h.id, len: dist, type: 'hole' });
+                        lineConstraints.push({
+                            id: h.id,
+                            line_p1: c.p1.id,
+                            line_p2: c.p2.id,
+                            sign: 1,
+                            maxLen: len,
+                            hard: true
+                        });
+                    }
+                });
+            }
         } else if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
             const g = getParamVal(c.gParam, 0);
             const r1 = getParamVal(c.r1Param, 0);
@@ -212,7 +236,22 @@ function solveBodyJointTopology(topology, params) {
                     id: c.p3.id,
                     line_p1: c.p1.id,
                     line_p2: c.p2.id,
-                    sign: c.sign || 1
+                    sign: c.sign || 1,
+                    trackLenParam: c.trackLenParam,
+                    trackOffsetParam: c.trackOffsetParam,
+                    hard: holeIds.has(c.p3.id)
+                });
+            }
+            if (c.p2?.id && c.lineThroughId) {
+                lineConstraints.push({
+                    id: c.p2.id,
+                    line_p1: c.p1.id,
+                    line_p2: c.lineThroughId,
+                    sign: c.sign || 1,
+                    maxLen: len,
+                    trackLenParam: c.trackLenParam,
+                    trackOffsetParam: c.trackOffsetParam,
+                    forceThrough: true
                 });
             }
         }
@@ -322,15 +361,78 @@ function solveBodyJointTopology(topology, params) {
                     if (c.b === lc.id) return points[c.a];
                     return false;
                 });
-                if (!distConstraint) continue;
+                if (!distConstraint) {
+                    if (lc.hard) {
+                        infeasible = true;
+                        continue;
+                    }
+                    const dx = b.x - a.x;
+                    const dy = b.y - a.y;
+                    const len = Math.hypot(dx, dy);
+                    if (len <= 0) {
+                        infeasible = true;
+                        continue;
+                    }
+                    const dirX = dx / len;
+                    const dirY = dy / len;
+                    const trackOffset = Number.isFinite(lc.maxLen)
+                        ? 0
+                        : getParamVal(lc.trackOffsetParam, 0);
+                    const rawTrackLen = Number.isFinite(lc.maxLen)
+                        ? lc.maxLen
+                        : getParamVal(lc.trackLenParam, len);
+                    const startDist = Math.max(0, Math.min(trackOffset, len));
+                    const endDist = Math.max(startDist, Math.min(startDist + Math.max(0, rawTrackLen), len));
+                    const seed = (prevPoints && prevPoints[lc.id]) || points[lc.id] || getInitialPoint(lc.id);
+                    const seedX = seed ? seed.x : (a.x + dirX * startDist);
+                    const seedY = seed ? seed.y : (a.y + dirY * startDist);
+                    const proj = (seedX - a.x) * dirX + (seedY - a.y) * dirY;
+                    const t = lc.forceThrough ? endDist : Math.max(startDist, Math.min(endDist, proj));
+                    points[lc.id] = { x: a.x + dirX * t, y: a.y + dirY * t };
+                    lineChanged = true;
+                    continue;
+                }
 
                 const otherId = distConstraint.a === lc.id ? distConstraint.b : distConstraint.a;
                 const center = points[otherId];
                 const r = distConstraint.len || 0;
                 if (!center || r <= 0) continue;
 
-                const options = solveLineCircleIntersection(a, b, center, r);
+                let options = solveLineCircleIntersection(a, b, center, r);
                 if (!options.length) continue;
+
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const len = Math.hypot(dx, dy);
+                if (len > 0 && (lc.trackLenParam || lc.trackOffsetParam || Number.isFinite(lc.maxLen))) {
+                    const dirX = dx / len;
+                    const dirY = dy / len;
+                    const trackOffset = Number.isFinite(lc.maxLen)
+                        ? 0
+                        : getParamVal(lc.trackOffsetParam, 0);
+                    const rawTrackLen = Number.isFinite(lc.maxLen)
+                        ? lc.maxLen
+                        : getParamVal(lc.trackLenParam, len);
+                    const startDist = Math.max(0, Math.min(trackOffset, len));
+                    const endDist = Math.max(startDist, Math.min(startDist + Math.max(0, rawTrackLen), len));
+
+                    if (lc.forceThrough) {
+                        const throughDist = (b.x - a.x) * dirX + (b.y - a.y) * dirY;
+                        if (throughDist < startDist - 1e-6 || throughDist > endDist + 1e-6) {
+                            infeasible = true;
+                            continue;
+                        }
+                    }
+
+                    options = options.filter(opt => {
+                        const tx = (opt.x - a.x) * dirX + (opt.y - a.y) * dirY;
+                        return tx >= startDist - 1e-6 && tx <= endDist + 1e-6;
+                    });
+                    if (!options.length) {
+                        infeasible = true;
+                        continue;
+                    }
+                }
 
                 let chosen = null;
                 const prev = (prevPoints && prevPoints[lc.id]) || points[lc.id] || null;
@@ -348,6 +450,31 @@ function solveBodyJointTopology(topology, params) {
                 }
             }
         }
+    }
+
+    if (!infeasible) {
+        const tol = 1e-3;
+        lineConstraints.forEach(lc => {
+            if (!lc.hard) return;
+            const pt = points[lc.id];
+            const a = points[lc.line_p1] || getInitialPoint(lc.line_p1);
+            const b = points[lc.line_p2] || getInitialPoint(lc.line_p2);
+            if (!pt || !a || !b) {
+                infeasible = true;
+                return;
+            }
+            const vx = b.x - a.x;
+            const vy = b.y - a.y;
+            const denom = Math.hypot(vx, vy);
+            if (denom <= 0) {
+                infeasible = true;
+                return;
+            }
+            const dist = Math.abs((pt.x - a.x) * vy - (pt.y - a.y) * vx) / denom;
+            if (dist > tol) {
+                infeasible = true;
+            }
+        });
     }
 
     let allResolved = true;

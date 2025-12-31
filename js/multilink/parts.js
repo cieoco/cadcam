@@ -82,7 +82,7 @@ export function generateMultilinkParts(params) {
                 // 槽起始 y = (barH - slotH) / 2
                 const rawSlotW = totalLen ? totalLen : Math.max(slotH, w - 2 * trackOffset);
                 const slotW = Math.max(slotH, Math.min(rawSlotW, w - 2 * trackOffset));
-                const slotX = Math.max(0, w - trackOffset - slotW);
+                const slotX = Math.max(0, Math.min(w - slotW, hole1X + trackOffset));
 
                 slots.push({
                     x: slotX,
@@ -99,6 +99,18 @@ export function generateMultilinkParts(params) {
                 hole1.flat = motorShaftFlat;
             }
 
+            const extraHoles = [];
+            if (p.holes && p.holes.length) {
+                p.holes.forEach(h => {
+                    const distParam = h.dist_param || h.distParam;
+                    const distValRaw = getVal(distParam);
+                    const distVal = Math.max(0, Math.min(distValRaw, L));
+                    if (distVal > 0.001 && distVal < L - 0.001) {
+                        extraHoles.push({ x: hole1X + distVal, y: currentBarW / 2 });
+                    }
+                });
+            }
+
             parts.push({
                 id: p.id,
                 type: 'bar',
@@ -108,7 +120,8 @@ export function generateMultilinkParts(params) {
                 color: p.color || '#34495e',
                 holes: [
                     hole1,
-                    { x: hole2X, y: currentBarW / 2 }
+                    { x: hole2X, y: currentBarW / 2 },
+                    ...extraHoles
                 ],
                 slots: slots, // 🌟 加入槽
                 outline: [

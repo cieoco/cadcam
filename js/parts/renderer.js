@@ -499,6 +499,14 @@ export function renderPartsOverlayLayer(sol, topology, partSpec, viewParams = {}
 
     const radius = (partSpec.holeD / 2) + partSpec.margin;
     const holeD = partSpec.holeD;
+    const getParamVal = (name, fallback = 0) => {
+        if (typeof name === 'number') return name;
+        if (topology && topology.params && topology.params[name] !== undefined) {
+            return Number(topology.params[name]);
+        }
+        const parsed = Number(name);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    };
 
     topology._wizard_data.forEach(comp => {
         if (!comp || !comp.type) return;
@@ -559,6 +567,55 @@ export function renderPartsOverlayLayer(sol, topology, partSpec, viewParams = {}
 
             drawHole(p1, Boolean(comp.isInput));
             drawHole(p2, false);
+            if (comp.holes && comp.holes.length) {
+                comp.holes.forEach(h => {
+                    const holePt = sol.points[h.id];
+                    if (!holePt) return;
+                    layer.appendChild(svgEl('circle', {
+                        cx: tx(holePt),
+                        cy: ty(holePt),
+                        r: (holeD / 2) * scale,
+                        fill: 'none',
+                        stroke: color,
+                        'stroke-width': 1
+                    }));
+                });
+            }
+
+            if (comp.type === 'slider' && comp.trackLenParam) {
+                const trackLen = getParamVal(comp.trackLenParam, 0);
+                const trackOffset = getParamVal(comp.trackOffsetParam, partSpec.margin || 0);
+                const trackWidth = getParamVal(topology?.params?.trackWidth, holeD);
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const len = Math.hypot(dx, dy);
+
+                    if (len > 0 && trackLen > 0) {
+                        const dirX = dx / len;
+                        const dirY = dy / len;
+                        const startDist = Math.max(0, Math.min(trackOffset, len));
+                        const slotLen = Math.max(0.1, Math.min(trackLen, len - startDist));
+                        const s = {
+                        x: p1.x + dirX * startDist,
+                        y: p1.y + dirY * startDist
+                        };
+                        const e = {
+                        x: p1.x + dirX * (startDist + slotLen),
+                        y: p1.y + dirY * (startDist + slotLen)
+                        };
+
+                    layer.appendChild(svgEl('line', {
+                        x1: tx(s),
+                        y1: ty(s),
+                        x2: tx(e),
+                        y2: ty(e),
+                        stroke: color,
+                        'stroke-opacity': 0.8,
+                        'stroke-width': Math.max(1, trackWidth * scale),
+                        'stroke-linecap': 'round'
+                    }));
+                }
+            }
             return;
         }
 
