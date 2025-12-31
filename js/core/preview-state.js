@@ -7,6 +7,7 @@ import { fmt } from '../utils.js';
 import { computeSolution, computeParts } from './preview.js';
 import { getUnsolvedSummary } from './solver-status.js';
 import { buildDXF } from '../utils/dxf-generator.js';
+import { ErrorCodes, toUserMessage } from './errors.js';
 
 function parseTopology(raw) {
     if (!raw) return null;
@@ -59,6 +60,7 @@ export function computePreviewState({
         showThetaSlider: false,
         dxfPreviewText: '',
         dxfError: null,
+        errorType: null,
         restore: null,
         lastSolution,
         lastTopology
@@ -85,7 +87,15 @@ export function computePreviewState({
         );
     }
 
-    let sol = computeSolution(mods, mech, partSpec, mfg);
+    let sol = null;
+    try {
+        sol = computeSolution(mods, mech, partSpec, mfg);
+    } catch (e) {
+        result.fatalInvalid = true;
+        result.errorType = ErrorCodes.INVALID_PARAMS;
+        result.statusMessage = e && e.message ? e.message : toUserMessage(ErrorCodes.INVALID_PARAMS);
+        return result;
+    }
     const isInvalid = !sol || sol.isValid === false;
     result.isInvalid = isInvalid;
 
@@ -98,7 +108,8 @@ export function computePreviewState({
             };
             sol = result.lastSolution;
         } else {
-            result.statusMessage = `${mods.config.name}: invalid parameters, adjust values.`;
+            result.errorType = ErrorCodes.INFEASIBLE;
+            result.statusMessage = `${mods.config.name}: ${toUserMessage(ErrorCodes.INFEASIBLE)}`;
             result.fatalInvalid = true;
             result.solution = sol;
             return result;
