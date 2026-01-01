@@ -19,6 +19,8 @@ export class MechanismWizard {
         this.components = []; // { type: 'bar'|'triangle', id, ...props }
         this.selectedComponentIndex = -1;
         this.topology = { steps: [], visualization: { links: [], polygons: [], joints: [] }, parts: [] };
+        this._syncTimer = null;
+        this._syncDelay = 150;
 
         this.init();
     }
@@ -168,6 +170,7 @@ export class MechanismWizard {
                     <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">點位 2 (P2)</label>
                     ${this.renderPointEditor(comp, 'p2')}
                 </div>
+
                 <div class="form-group">
                     <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">桿長參數</label>
                     <input type="text" value="${comp.lenParam || 'L'}" oninput="window.wizard.updateCompProp('lenParam', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
@@ -177,6 +180,18 @@ export class MechanismWizard {
                         <input type="checkbox" ${comp.isInput ? 'checked' : ''} onchange="window.wizard.updateCompProp('isInput', this.checked)" style="width: 14px; height: 14px;"> 馬達驅動
                     </label>
                 </div>
+
+                ${comp.isInput ? `
+                <div class="form-group" style="padding: 0 6px;">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">對應實體馬達</label>
+                    <select onchange="window.wizard.updateCompProp('physicalMotor', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
+                        <option value="1" ${comp.physicalMotor === '1' || !comp.physicalMotor ? 'selected' : ''}>M1</option>
+                        <option value="2" ${comp.physicalMotor === '2' ? 'selected' : ''}>M2</option>
+                        <option value="3" ${comp.physicalMotor === '3' ? 'selected' : ''}>M3</option>
+                        <option value="4" ${comp.physicalMotor === '4' ? 'selected' : ''}>M4</option>
+                    </select>
+                </div>
+                ` : ''}
 
                 <div class="form-group">
                     <button onclick="window.wizard.convertSelectedBarToSlider()" style="width: 100%; padding: 8px; background: #8e44ad; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
@@ -568,9 +583,21 @@ export class MechanismWizard {
 
     updateCompProp(prop, val) {
         if (this.selectedComponentIndex >= 0) {
-            this.components[this.selectedComponentIndex][prop] = val;
+            const comp = this.components[this.selectedComponentIndex];
+            comp[prop] = val;
+
+            if (prop === 'isInput' && val && !comp.physicalMotor) {
+                comp.physicalMotor = '1';
+            }
+
             const list = $('componentList');
             if (list) list.innerHTML = this.renderComponentList();
+
+            if (prop === 'isInput') {
+                this.render();
+            }
+
+            this.scheduleSyncTopology();
         }
     }
 
@@ -674,6 +701,7 @@ export class MechanismWizard {
         driver.lenParam = val;
         const list = $('componentList');
         if (list) list.innerHTML = this.renderComponentList();
+        this.scheduleSyncTopology();
     }
 
     updatePointProp(pointKey, prop, val) {
@@ -685,6 +713,7 @@ export class MechanismWizard {
                 if (comp.points && comp.points[idx]) {
                     comp.points[idx][prop] = val;
                     if (prop === 'type') this.render();
+                    this.scheduleSyncTopology();
                 }
                 return;
             }
@@ -692,6 +721,7 @@ export class MechanismWizard {
             if (!comp[pointKey]) comp[pointKey] = { id: '', type: 'floating', x: 0, y: 0 };
             comp[pointKey][prop] = val;
             if (prop === 'type') this.render();
+            this.scheduleSyncTopology();
         }
     }
 
@@ -725,7 +755,7 @@ export class MechanismWizard {
         const bar = this.components.find(c => c.id === linkId);
         if (bar && bar.holes && bar.holes[holeIdx]) {
             bar.holes[holeIdx][prop] = val;
-            this.syncTopology();
+            this.scheduleSyncTopology();
         }
     }
 
@@ -758,6 +788,13 @@ export class MechanismWizard {
             this.render();
             this.syncTopology();
         }
+    }
+
+    scheduleSyncTopology() {
+        clearTimeout(this._syncTimer);
+        this._syncTimer = setTimeout(() => {
+            this.syncTopology();
+        }, this._syncDelay);
     }
 
     syncTopology() {

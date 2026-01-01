@@ -159,7 +159,8 @@ export function compileTopology(components, topology, solvedPoints) {
                 type: 'input_crank',
                 center: c.p1.id,
                 len_param: c.lenParam,
-                phase_offset: c.phaseOffset || 0
+                phase_offset: c.phaseOffset || 0,
+                physical_motor: c.physicalMotor || '1'
             });
             joints.add(c.p2.id);
         }

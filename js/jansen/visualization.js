@@ -77,15 +77,17 @@ export function renderJansen(sol, thetaDeg, trajectoryData = null, viewParams = 
         }
     }
 
-    // 2. Drive Component (only when input_crank exists)
-    if (viewParams.motorType) {
-        const crankStep = topology.steps.find(s => s.type === 'input_crank');
-        if (crankStep) {
-            const O_id = crankStep.center || 'O';
-            const O = sol.points[O_id] || { x: 0, y: 0 };
+    // 2. Drive Components (all input_crank centers)
+    if (viewParams.motorType && topology.steps) {
+        const crankSteps = topology.steps.filter(s => s.type === 'input_crank');
+        if (crankSteps.length) {
             const motorRotation = viewParams.motorRotation || 0;
-            const motor = createDriveComponent(viewParams.motorType, tx(O), ty(O), scale, motorRotation);
-            if (motor) svg.appendChild(motor);
+            crankSteps.forEach((crankStep) => {
+                const O_id = crankStep.center || 'O';
+                const O = sol.points[O_id] || { x: 0, y: 0 };
+                const motor = createDriveComponent(viewParams.motorType, tx(O), ty(O), scale, motorRotation);
+                if (motor) svg.appendChild(motor);
+            });
         }
     }
 

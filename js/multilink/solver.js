@@ -184,6 +184,21 @@ function solveBodyJointTopology(topology, params) {
     const theta = actualParams.thetaDeg !== undefined
         ? deg2rad(actualParams.thetaDeg)
         : deg2rad(actualParams.theta || 0);
+    const motorAngles = actualParams && typeof actualParams.motorAngles === 'object'
+        ? actualParams.motorAngles
+        : null;
+    const resolveMotorTheta = (motorId, fallbackTheta) => {
+        if (!motorId) return fallbackTheta;
+        const key = String(motorId);
+        if (motorAngles && motorAngles[key] !== undefined) {
+            return deg2rad(Number(motorAngles[key]) || 0);
+        }
+        const direct = actualParams[`theta_M${key}`] ?? actualParams[`motor_${key}`] ?? actualParams[`motor${key}`];
+        if (direct !== undefined) {
+            return deg2rad(Number(direct) || 0);
+        }
+        return fallbackTheta;
+    };
 
     components.forEach((c) => {
         if (c.type === 'bar' && c.p1?.id && c.p2?.id) {
@@ -193,7 +208,9 @@ function solveBodyJointTopology(topology, params) {
             if (c.isInput) {
                 const p1 = points[c.p1.id];
                 const p2 = points[c.p2.id];
-                const ang = theta + deg2rad(c.phaseOffset || 0);
+                const motorId = c.physicalMotor || c.physical_motor;
+                const baseTheta = resolveMotorTheta(motorId, theta);
+                const ang = baseTheta + deg2rad(c.phaseOffset || 0);
 
                 if (p1 && !p2) {
                     points[c.p2.id] = {
@@ -807,6 +824,21 @@ export function solveTopology(topologyOrParams, params) {
 
     const points = {};
     const theta = deg2rad(actualParams.thetaDeg || actualParams.theta || 0);
+    const motorAngles = actualParams && typeof actualParams.motorAngles === 'object'
+        ? actualParams.motorAngles
+        : null;
+    const resolveMotorTheta = (motorId, fallbackTheta) => {
+        if (!motorId) return fallbackTheta;
+        const key = String(motorId);
+        if (motorAngles && motorAngles[key] !== undefined) {
+            return deg2rad(Number(motorAngles[key]) || 0);
+        }
+        const direct = actualParams[`theta_M${key}`] ?? actualParams[`motor_${key}`] ?? actualParams[`motor${key}`];
+        if (direct !== undefined) {
+            return deg2rad(Number(direct) || 0);
+        }
+        return fallbackTheta;
+    };
 
     // Helper to get value: either direct number or from params
     const getVal = (step, key) => {
@@ -884,7 +916,9 @@ export function solveTopology(topologyOrParams, params) {
                 if (!center) throw new Error(`Missing center point ${step.center}`);
 
                 const r = getVal(step, 'len');
-                const ang = theta + (deg2rad(step.phase_offset || 0));
+                const motorId = step.physical_motor || step.physicalMotor;
+                const baseTheta = resolveMotorTheta(motorId, theta);
+                const ang = baseTheta + (deg2rad(step.phase_offset || 0));
 
                 points[step.id] = {
                     x: center.x + r * Math.cos(ang),

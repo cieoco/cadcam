@@ -74,7 +74,8 @@ export class RemoteSync {
         }
 
         // 3. Normalize Keys (motor vs motor_id, value vs degree)
-        const motorIdStr = String(sourceData.motor_id || sourceData.motor || sourceData.id || '');
+        const motorIdRaw = String(sourceData.motor_id || sourceData.motor || sourceData.id || '');
+        const motorIdStr = motorIdRaw.replace(/[^0-9]/g, '') || motorIdRaw;
         const action = sourceData.action || sourceData.cmd || '';
 
         // Normalize values
@@ -82,6 +83,7 @@ export class RemoteSync {
         const rpm = sourceData.rpm !== undefined ? sourceData.rpm : sourceData.rpm_meas;
         const pwm = sourceData.pwm !== undefined ? sourceData.pwm :
             (sourceData.duty !== undefined ? sourceData.duty * 255 : sourceData.value);
+        const motorAngles = window.motorAngles || (window.motorAngles = {});
 
         // 4. Update Telemetry Dashboard
         if (motorIdStr && motorIdStr === this.targetMotorId) {
@@ -127,13 +129,14 @@ export class RemoteSync {
 
             if (isPositionUpdate) {
                 let shouldDriveSim = false;
+                let boundStep = null;
                 const topoArea = document.getElementById('topology');
 
                 if (topoArea && topoArea.value) {
                     try {
                         const topo = JSON.parse(topoArea.value);
                         const steps = topo.steps || [];
-                        const boundStep = steps.find(s => s.type === 'input_crank' && String(s.physicalMotor) === motorIdStr);
+                        boundStep = steps.find(s => s.type === 'input_crank' && String(s.physical_motor) === motorIdStr);
 
                         if (boundStep) {
                             shouldDriveSim = true;
@@ -148,27 +151,44 @@ export class RemoteSync {
                 }
 
                 if (shouldDriveSim) {
-                    const thetaSlider = document.getElementById('thetaSlider');
-                    if (thetaSlider) {
-                        const newAngle = (parseFloat(degree) - this.degreeOffset);
-                        thetaSlider.value = newAngle;
+                    const newAngle = (parseFloat(degree) - this.degreeOffset);
+                    const resolvedMotorId = motorIdStr || this.targetMotorId || '1';
+                    if (resolvedMotorId) {
+                        motorAngles[resolvedMotorId] = newAngle;
+                        const slider = document.getElementById(`motorAngle_M${resolvedMotorId}`);
+                        const label = document.getElementById(`motorAngleValue_M${resolvedMotorId}`);
+                        if (slider) slider.value = String(newAngle);
+                        if (label) label.textContent = `${Math.round(newAngle)}°`;
 
-                        // 1. Update Label manually (Immediate feedback)
-                        const valLabel = document.getElementById('thetaSliderValue');
-                        if (valLabel) valLabel.textContent = `${Math.round(newAngle)}°`;
-
-                        // 2. Dispatch event for other listeners (like hidden theta input)
-                        thetaSlider.dispatchEvent(new Event('input', { bubbles: true }));
-
-                        // 3. Force simulation update
-                        this.onUpdate();
+                        const thetaInput = document.getElementById('theta');
+                        if (thetaInput && resolvedMotorId === '1') {
+                            thetaInput.value = String(newAngle);
+                            thetaInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
                     }
+
+                    if (!boundStep) {
+                        const thetaSlider = document.getElementById('thetaSlider');
+                        if (thetaSlider) {
+                            thetaSlider.value = newAngle;
+
+                            // 1. Update Label manually (Immediate feedback)
+                            const valLabel = document.getElementById('thetaSliderValue');
+                            if (valLabel) valLabel.textContent = `${Math.round(newAngle)}°`;
+
+                            // 2. Dispatch event for other listeners (like hidden theta input)
+                            thetaSlider.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                    }
+
+                    // 3. Force simulation update
+                    this.onUpdate();
                 }
             }
         }
 
         // 7. Handle Animation Control (Speed Mode)
-        if (this.isSyncing && motorIdStr === this.targetMotorId) {
+        if (this.isSyncing) {
             if (action === 'speed' || action === 'set_speed') {
                 const targetRpm = sourceData.rpm !== undefined ? sourceData.rpm : sourceData.value;
                 if (targetRpm !== undefined) {
@@ -178,9 +198,12 @@ export class RemoteSync {
                         const animSpeedInput = document.getElementById('animSpeed');
                         if (animSpeedInput) animSpeedInput.value = Math.round(absRpm);
 
+                        const resolvedMotorId = motorIdStr || this.targetMotorId || '1';
+                        window.activeMotorForAnimation = resolvedMotorId;
+
                         // Start animation if not already playing
                         if (window.startAnimation) {
-                            window.startAnimation(this.onUpdate, parseFloat(targetRpm));
+                            window.startAnimation(this.onUpdate, parseFloat(targetRpm), resolvedMotorId);
                         }
                     } else {
                         if (window.stopAnimation) window.stopAnimation(this.onUpdate);
@@ -188,6 +211,10 @@ export class RemoteSync {
                 }
             } else if (action === 'mode' && sourceData.value === 'idle') {
                 if (window.stopAnimation) window.stopAnimation(this.onUpdate);
+            }
+
+            if (motorIdStr && motorIdStr === this.targetMotorId && rpm !== undefined) {
+                this.updateDashboard({ rpm });
             }
         }
     }

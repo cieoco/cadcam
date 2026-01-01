@@ -1494,26 +1494,26 @@ function openPropertySheet(items, title, selectedId) {
             targetWizardLink.isInput = true;
 
             // 4. 設定實體馬達預設值 (如果尚未綁定，預設為 M1)
-            if (!step.physicalMotor) {
-              step.physicalMotor = '1';
+            if (!step.physical_motor) {
+              step.physical_motor = '1';
             }
 
             // 立即儲存並刷新
             if (window.wizard) {
               window.wizard.components = wizardData;
-              // 我們需要手動更新 topology 裡的 step 資訊，因為 syncTopology 可能不會覆寫 physicalMotor
+              // 我們需要手動更新 topology 裡的 step 資訊，因為 syncTopology 可能不會覆寫 physical_motor
               window.wizard.syncTopology();
 
-              // 再次確保 topology 檔案包含 physicalMotor
+              // 再次確保 topology 檔案包含 physical_motor
               try {
                 const currentTopo = JSON.parse(topoArea.value);
                 const s = currentTopo.steps.find(st => st.id === selectedId);
-                if (s) s.physicalMotor = step.physicalMotor;
+                if (s) s.physical_motor = step.physical_motor;
                 topoArea.value = JSON.stringify(currentTopo, null, 2);
                 topoArea.dispatchEvent(new Event('input', { bubbles: true }));
               } catch (e) { }
 
-              alert(`已將 ${selectedId} 設為馬達轉軸，並綁定 M${step.physicalMotor}。指定 ${targetLink.id} 為驅動曲柄 (L=${targetWizardLink.lenParam})。`);
+              alert(`已將 ${selectedId} 設為馬達轉軸，並綁定 M${step.physical_motor}。指定 ${targetLink.id} 為驅動曲柄 (L=${targetWizardLink.lenParam})。`);
             }
           };
 
@@ -1598,16 +1598,16 @@ function openPropertySheet(items, title, selectedId) {
             <div style="font-weight:bold; margin-bottom:8px; font-size:13px; color:#856404;">🔗 綁定實體馬達 (Hardware Binding)</div>
             <select id="selMotorBinding" style="width:100%; padding:8px; border-radius:4px; border:1px solid #d9d9d9; font-size:14px; background:#fff;">
               <option value="">-- 未綁定 --</option>
-              <option value="1" ${step.physicalMotor === '1' ? 'selected' : ''}>馬達 M1</option>
-              <option value="2" ${step.physicalMotor === '2' ? 'selected' : ''}>馬達 M2</option>
-              <option value="3" ${step.physicalMotor === '3' ? 'selected' : ''}>馬達 M3</option>
-              <option value="4" ${step.physicalMotor === '4' ? 'selected' : ''}>馬達 M4</option>
+              <option value="1" ${step.physical_motor === '1' ? 'selected' : ''}>馬達 M1</option>
+              <option value="2" ${step.physical_motor === '2' ? 'selected' : ''}>馬達 M2</option>
+              <option value="3" ${step.physical_motor === '3' ? 'selected' : ''}>馬達 M3</option>
+              <option value="4" ${step.physical_motor === '4' ? 'selected' : ''}>馬達 M4</option>
             </select>
             <div style="margin-top:6px; font-size:11px; color:#999;">* 指定後，在此模式下模擬將讀取該馬達數據。</div>
           `;
 
           bindingWrapper.querySelector('#selMotorBinding').onchange = (e) => {
-            step.physicalMotor = e.target.value || undefined;
+            step.physical_motor = e.target.value || undefined;
             topoArea.value = JSON.stringify(topology, null, 2);
             topoArea.dispatchEvent(new Event('input', { bubbles: true }));
           };

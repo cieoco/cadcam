@@ -15,10 +15,139 @@ import { collectDynamicParamSpec } from '../core/dynamic-params.js';
 let currentTrajectoryData = null;
 let lastMultilinkSolution = null;
 let lastMultilinkTopology = null;
+let lastMotorAngleKey = '';
+let motorAngleUpdateTimer = null;
 
 // 輔助函數：獲取當前活耀的機構模組
 function getActiveModules() {
     return window.mechanismModules || null;
+}
+
+
+function parseTopologySafe(raw) {
+    if (!raw) return null;
+    if (typeof raw === 'string') {
+        try {
+            return JSON.parse(raw);
+        } catch (e) {
+            return null;
+        }
+    }
+    if (typeof raw === 'object') return raw;
+    return null;
+}
+
+function getMotorIdsFromTopology(topology) {
+    if (!topology || !Array.isArray(topology.steps)) return [];
+    const ids = topology.steps
+        .filter(s => s.type === 'input_crank')
+        .map(s => String(s.physical_motor || '1'));
+    const uniq = Array.from(new Set(ids));
+    return uniq.sort((a, b) => Number(a) - Number(b));
+}
+
+function setMotorAngleValue(motorId, value, options = {}) {
+    const id = String(motorId);
+    const val = Number(value) || 0;
+    if (!window.motorAngles) window.motorAngles = {};
+    window.motorAngles[id] = val;
+
+    const slider = document.getElementById(`motorAngle_M${id}`);
+    const label = document.getElementById(`motorAngleValue_M${id}`);
+    if (slider) slider.value = String(val);
+    if (label) label.textContent = `${Math.round(val)}°`;
+
+    const thetaInput = document.getElementById('theta');
+    if (thetaInput && id === '1') {
+        thetaInput.value = String(val);
+        if (!options.silent) {
+            thetaInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+}
+
+function collectMotorAnglesFromUI() {
+    const container = document.getElementById('motorAngleContainer');
+    if (!container || container.style.display === 'none') return {};
+    const inputs = container.querySelectorAll('input[type="range"][data-motor-id]');
+    const angles = {};
+    inputs.forEach(inp => {
+        const id = inp.dataset.motorId;
+        angles[id] = Number(inp.value || 0);
+    });
+    return angles;
+}
+
+function updateMotorAngleControls(topology) {
+    const mods = getActiveModules();
+    if (!mods || !mods.config || mods.config.id !== 'multilink') return;
+
+    const container = document.getElementById('thetaSliderContainer');
+    const motorContainer = document.getElementById('motorAngleContainer');
+    const thetaBlock = document.getElementById('thetaSliderBlock');
+    if (!container || !motorContainer) return;
+
+    const motorIds = getMotorIdsFromTopology(topology);
+    if (!motorIds.length) {
+        motorContainer.style.display = 'none';
+        if (thetaBlock) thetaBlock.style.display = 'none';
+        return;
+    }
+
+    motorContainer.style.display = 'block';
+    if (thetaBlock) thetaBlock.style.display = 'none';
+
+    const key = motorIds.join(',');
+    if (key !== lastMotorAngleKey) {
+        motorContainer.innerHTML = '';
+        motorIds.forEach((motorId) => {
+            const row = document.createElement('div');
+            row.style.marginBottom = '6px';
+            row.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px; pointer-events: auto;">
+                    <label style="font-size:12px; color:#555; white-space:nowrap; font-weight:600;">M${motorId}</label>
+                    <input id="motorAngle_M${motorId}" data-motor-id="${motorId}" type="range" min="-360" max="360" step="1" value="0" style="width:200px;" />
+                    <span id="motorAngleValue_M${motorId}" style="font-size:12px; color:#333; font-weight:600; min-width:40px; text-align:center;">0°</span>
+                </div>
+            `;
+            motorContainer.appendChild(row);
+
+            const slider = row.querySelector('input[type="range"]');
+            const label = row.querySelector(`#motorAngleValue_M${motorId}`);
+            if (slider && label) {
+                slider.addEventListener('input', () => {
+                    const val = Number(slider.value || 0);
+                    label.textContent = `${Math.round(val)}°`;
+                    setMotorAngleValue(motorId, val, { silent: true });
+
+                    clearTimeout(motorAngleUpdateTimer);
+                    motorAngleUpdateTimer = setTimeout(() => {
+                        updatePreview();
+                    }, 120);
+                });
+            }
+        });
+        lastMotorAngleKey = key;
+    }
+
+    const sweepStart = document.getElementById('sweepStart');
+    const sweepEnd = document.getElementById('sweepEnd');
+    const minVal = sweepStart ? Number(sweepStart.value || -360) : -360;
+    const maxVal = sweepEnd ? Number(sweepEnd.value || 360) : 360;
+    motorContainer.querySelectorAll('input[type="range"][data-motor-id]').forEach(inp => {
+        inp.min = String(minVal);
+        inp.max = String(maxVal);
+    });
+
+    const currentAngles = collectMotorAnglesFromUI();
+    motorIds.forEach(id => {
+        if (currentAngles[id] === undefined) {
+            const fallback = window.motorAngles && window.motorAngles[id] !== undefined
+                ? window.motorAngles[id]
+                : 0;
+            setMotorAngleValue(id, fallback, { silent: true });
+        }
+    });
 }
 
 function collectDynamicParams() {
@@ -143,9 +272,10 @@ function ensureValidThetaAfterLoad() {
     const firstValid = sweep.results.find(r => r.isValid);
     if (!firstValid) return;
 
-    setValueById('theta', firstValid.theta);
+    setMotorAngleValue('1', firstValid.theta, { silent: true });
     const thetaInput = $("theta");
     if (thetaInput) {
+        thetaInput.value = String(firstValid.theta);
         thetaInput.dispatchEvent(new Event("input", { bubbles: true }));
     }
 }
@@ -391,6 +521,23 @@ export function updatePreview() {
             mech[key] = dynamicParams[key];
         });
 
+        const remoteSync = window.remoteSyncInstance;
+        const isSyncing = Boolean(remoteSync && remoteSync.isSyncing);
+
+        let topologyObj = null;
+        if (mods.config && mods.config.id === 'multilink') {
+            topologyObj = parseTopologySafe(mech.topology);
+            updateMotorAngleControls(topologyObj);
+            const uiAngles = collectMotorAnglesFromUI();
+            if (Object.keys(uiAngles).length && !isSyncing) {
+                if (!window.motorAngles) window.motorAngles = {};
+                Object.assign(window.motorAngles, uiAngles);
+            }
+            if (window.motorAngles && Object.keys(window.motorAngles).length) {
+                mech.motorAngles = { ...window.motorAngles };
+            }
+        }
+
         const viewParams = readViewParams();
         viewParams.motorType = mech.motorType;
         viewParams.motorRotation = mech.motorRotation || 0;
@@ -483,8 +630,11 @@ export function updatePreview() {
 
         svgWrap.innerHTML = "";
         const renderFn = mods.visualization[mods.config.renderFn];
+        const renderTheta = (mods.config && mods.config.id === 'multilink' && mech.motorAngles && mech.motorAngles['1'] !== undefined)
+            ? mech.motorAngles['1']
+            : (mech.thetaDeg || mech.theta);
         svgWrap.appendChild(
-            renderFn(previewState.solution, mech.thetaDeg || mech.theta, currentTrajectoryData, viewParams)
+            renderFn(previewState.solution, renderTheta, currentTrajectoryData, viewParams)
         );
 
         const parts = previewState.parts;
@@ -510,16 +660,9 @@ export function updatePreview() {
             if (existingLayer) existingLayer.remove();
         }
         if (overlayToggle && overlayToggle.checked && mods.config && mods.config.id === 'multilink') {
-            let topologyObj = null;
-            if (mech.topology) {
-                try {
-                    topologyObj = typeof mech.topology === 'string' ? JSON.parse(mech.topology) : mech.topology;
-                } catch (e) {
-                    topologyObj = null;
-                }
-            }
+            const overlayTopology = topologyObj || parseTopologySafe(mech.topology);
             if (overlaySvg) {
-                const layer = renderPartsOverlayLayer(previewState.solution, topologyObj, partSpec, viewParams);
+                const layer = renderPartsOverlayLayer(previewState.solution, overlayTopology, partSpec, viewParams);
                 if (layer) overlaySvg.appendChild(layer);
             }
         }
@@ -695,8 +838,13 @@ export function setupUIHandlers() {
     const thetaSlider = $("thetaSlider");
     const thetaSliderValue = $("thetaSliderValue");
     const thetaInput = $("theta");
+    const thetaBlock = document.getElementById('thetaSliderBlock');
     if (thetaSlider && thetaSliderValue) {
-        if (thetaInput) {
+        const mods = getActiveModules();
+        const isMultilink = mods && mods.config && mods.config.id === 'multilink';
+        if (isMultilink) {
+            if (thetaBlock) thetaBlock.style.display = 'none';
+        } else if (thetaInput) {
             const syncThetaFromInput = () => {
                 const val = Number(thetaInput.value || 0);
                 thetaSlider.value = String(val);
@@ -822,7 +970,7 @@ export function setupUIHandlers() {
             topologyUpdateTimer = setTimeout(() => {
                 updateDynamicParams();
                 updatePreview();
-            }, 1000);
+            }, 200);
         });
     }
 

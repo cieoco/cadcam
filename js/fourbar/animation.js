@@ -19,9 +19,31 @@ export const animationState = {
     rangeEnd: 180,
     isContinuous: false,
     targetRpm: 0,
+    activeMotorId: null,
 };
 
 function syncThetaValue(value) {
+    const motorId = animationState.activeMotorId;
+    if (motorId && window.motorAngles) {
+        const id = String(motorId);
+        const val = Number(value) || 0;
+        window.motorAngles[id] = val;
+
+        const slider = document.getElementById(`motorAngle_M${id}`);
+        const label = document.getElementById(`motorAngleValue_M${id}`);
+        if (slider) slider.value = String(val);
+        if (label) label.textContent = `${Math.round(val)}°`;
+
+        if (id === '1') {
+            const thetaInput = $("theta");
+            if (thetaInput) {
+                thetaInput.value = val;
+                thetaInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+        }
+        return;
+    }
+
     const thetaInput = $("theta");
     if (!thetaInput) return;
     thetaInput.value = value;
@@ -32,15 +54,22 @@ function syncThetaValue(value) {
  * 開始動畫
  * @param {Function} updateCallback - 更新回調函數
  */
-export function startAnimation(updateCallback, rpmOverride = null) {
+export function startAnimation(updateCallback, rpmOverride = null, motorIdOverride = null) {
     if (animationState.isPlaying && rpmOverride === null) return;
 
-    const motorId = $("motorType").value;
+    const motorTypeId = $("motorType").value;
     const speed = rpmOverride !== null ? rpmOverride : Number($("animSpeed").value); // RPM
     animationState.targetRpm = speed;
 
-    const component = DRIVE_COMPONENTS[motorId];
-    const isContinuous = component ? component.type === 'motor_continuous' : (motorId === 'motor360');
+    let activeMotorId = motorIdOverride || window.activeMotorForAnimation || null;
+    if (!activeMotorId && window.motorAngles) {
+        const keys = Object.keys(window.motorAngles);
+        if (keys.length) activeMotorId = keys.sort((a, b) => Number(a) - Number(b))[0];
+    }
+    animationState.activeMotorId = activeMotorId;
+
+    const component = DRIVE_COMPONENTS[motorTypeId];
+    const isContinuous = component ? component.type === 'motor_continuous' : (motorTypeId === 'motor360');
     animationState.isContinuous = isContinuous;
 
     // 根據馬達類型設定範圍
@@ -69,9 +98,11 @@ export function startAnimation(updateCallback, rpmOverride = null) {
 
     const sweepData = window.currentTrajectoryData;
     const validRanges = sweepData && Array.isArray(sweepData.validRanges) ? sweepData.validRanges : [];
+    const baseTheta = (animationState.activeMotorId && window.motorAngles && window.motorAngles[String(animationState.activeMotorId)] !== undefined)
+        ? Number(window.motorAngles[String(animationState.activeMotorId)])
+        : Number($("theta").value);
     if (validRanges.length) {
-        const currentTheta = Number($("theta").value);
-        const inRange = validRanges.find(r => currentTheta >= r.start && currentTheta <= r.end);
+        const inRange = validRanges.find(r => baseTheta >= r.start && baseTheta <= r.end);
         const baseStart = animationState.rangeStart;
         const baseEnd = animationState.rangeEnd;
         const candidates = validRanges
@@ -92,7 +123,7 @@ export function startAnimation(updateCallback, rpmOverride = null) {
     }
 
     // 初始化 theta 到起始位置
-    const currentTheta = Number($("theta").value);
+    const currentTheta = baseTheta;
     if (
         currentTheta < animationState.rangeStart ||
         currentTheta > animationState.rangeEnd
@@ -120,7 +151,7 @@ export function startAnimation(updateCallback, rpmOverride = null) {
         const result = updateCallback ? updateCallback() : null;
 
         // 2. 傳入結果給 animateFrame 判斷是否撞牆
-        animateFrame(degreesPerFrame, motorId, result);
+        animateFrame(degreesPerFrame, motorTypeId, result);
     }, interval);
 
     // 更新 UI
