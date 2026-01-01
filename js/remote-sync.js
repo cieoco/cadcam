@@ -88,6 +88,14 @@ export class RemoteSync {
             // Update gauges if feedback-like data is present
             if (rpm !== undefined || degree !== undefined || pwm !== undefined) {
                 this.updateDashboard({ rpm, degree, pwm });
+
+                // Also sync animation speed if it's a speed command or feedback
+                if (rpm !== undefined && rpm !== 0) {
+                    const animSpeedInput = document.getElementById('animSpeed');
+                    if (animSpeedInput) {
+                        animSpeedInput.value = Math.abs(Math.round(rpm));
+                    }
+                }
             } else if (action === 'pwm' || action === 'set_speed' || (data.status === 'ok' && sourceData.value !== undefined)) {
                 // Special case for status:ok or specific PWM updates
                 if (action === 'pwm' || sourceData.cmd === 'pwm') {
@@ -98,6 +106,11 @@ export class RemoteSync {
 
         // 5. Update "Target Position" display from control events
         if (action === 'set_angle' || action === 'move_to') {
+            // Stop animation if we are jumping to a position
+            if (this.isSyncing && window.stopAnimation) {
+                window.stopAnimation(this.onUpdate);
+            }
+
             if (!motorIdStr || motorIdStr === this.targetMotorId) {
                 const targetEl = document.getElementById('valTargetDeg');
                 const targetVal = sourceData.deg !== undefined ? sourceData.deg : sourceData.value;
@@ -153,6 +166,30 @@ export class RemoteSync {
                 }
             }
         }
+
+        // 7. Handle Animation Control (Speed Mode)
+        if (this.isSyncing && motorIdStr === this.targetMotorId) {
+            if (action === 'speed' || action === 'set_speed') {
+                const targetRpm = sourceData.rpm !== undefined ? sourceData.rpm : sourceData.value;
+                if (targetRpm !== undefined) {
+                    const absRpm = Math.abs(parseFloat(targetRpm));
+                    if (absRpm > 0.1) {
+                        // Update animation speed input first
+                        const animSpeedInput = document.getElementById('animSpeed');
+                        if (animSpeedInput) animSpeedInput.value = Math.round(absRpm);
+
+                        // Start animation if not already playing
+                        if (window.startAnimation) {
+                            window.startAnimation(this.onUpdate, parseFloat(targetRpm));
+                        }
+                    } else {
+                        if (window.stopAnimation) window.stopAnimation(this.onUpdate);
+                    }
+                }
+            } else if (action === 'mode' && sourceData.value === 'idle') {
+                if (window.stopAnimation) window.stopAnimation(this.onUpdate);
+            }
+        }
     }
 
     updateDashboard(data) {
@@ -161,8 +198,12 @@ export class RemoteSync {
         const pwmText = document.getElementById('valPwmText');
         const pwmBar = document.getElementById('valPwmBar');
 
-        if (rpmEl) rpmEl.textContent = data.rpm !== undefined ? data.rpm.toFixed(1) : '---';
-        if (degEl) degEl.textContent = data.degree !== undefined ? `${data.degree.toFixed(1)}°` : '---';
+        if (rpmEl && data.rpm !== undefined) {
+            rpmEl.textContent = data.rpm.toFixed(1);
+        }
+        if (degEl && data.degree !== undefined) {
+            degEl.textContent = `${data.degree.toFixed(1)}°`;
+        }
 
         if (pwmText && data.pwm !== undefined) {
             const percent = Math.min(100, Math.max(0, (data.pwm / 255) * 100));
@@ -174,6 +215,16 @@ export class RemoteSync {
     setTargetMotor(id) {
         this.targetMotorId = String(id);
         console.log(`[RemoteSync] Target motor changed to M${id}`);
+    }
+
+    setSync(enabled) {
+        this.isSyncing = !!enabled;
+        console.log(`[RemoteSync] Sync with hardware: ${this.isSyncing}`);
+
+        // If syncing is disabled, stop any running animation
+        if (!this.isSyncing && window.stopAnimation) {
+            window.stopAnimation(this.onUpdate);
+        }
     }
 
     setZero() {

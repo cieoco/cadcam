@@ -4,6 +4,8 @@
  */
 
 import { $, fmt } from '../utils.js';
+import { DRIVE_COMPONENTS } from '../motor-data.js';
+
 
 /**
  * 動畫狀態
@@ -15,6 +17,8 @@ export const animationState = {
     direction: 1, // 1 for forward, -1 for backward
     rangeStart: -180,
     rangeEnd: 180,
+    isContinuous: false,
+    targetRpm: 0,
 };
 
 function syncThetaValue(value) {
@@ -28,30 +32,39 @@ function syncThetaValue(value) {
  * 開始動畫
  * @param {Function} updateCallback - 更新回調函數
  */
-export function startAnimation(updateCallback) {
-    if (animationState.isPlaying) return;
+export function startAnimation(updateCallback, rpmOverride = null) {
+    if (animationState.isPlaying && rpmOverride === null) return;
 
-    const motorType = $("motorType").value;
-    const speed = Number($("animSpeed").value); // RPM
+    const motorId = $("motorType").value;
+    const speed = rpmOverride !== null ? rpmOverride : Number($("animSpeed").value); // RPM
+    animationState.targetRpm = speed;
+
+    const component = DRIVE_COMPONENTS[motorId];
+    const isContinuous = component ? component.type === 'motor_continuous' : (motorId === 'motor360');
+    animationState.isContinuous = isContinuous;
 
     // 根據馬達類型設定範圍
-    switch (motorType) {
-        case "motor360":
-            animationState.rangeStart = -180;
-            animationState.rangeEnd = 180;
-            break;
-        case "servo180":
-            animationState.rangeStart = 0;
-            animationState.rangeEnd = 180;
-            break;
-        case "servo270":
-            animationState.rangeStart = -135;
-            animationState.rangeEnd = 135;
-            break;
-        case "custom":
-            animationState.rangeStart = Number($("sweepStart").value);
-            animationState.rangeEnd = Number($("sweepEnd").value);
-            break;
+    if (isContinuous) {
+        animationState.rangeStart = -180;
+        animationState.rangeEnd = 180;
+    } else {
+        switch (motorId) {
+            case "servo180":
+                animationState.rangeStart = 0;
+                animationState.rangeEnd = 180;
+                break;
+            case "servo270":
+                animationState.rangeStart = -135;
+                animationState.rangeEnd = 135;
+                break;
+            case "custom":
+                animationState.rangeStart = Number($("sweepStart").value);
+                animationState.rangeEnd = Number($("sweepEnd").value);
+                break;
+            default:
+                animationState.rangeStart = 0;
+                animationState.rangeEnd = 180;
+        }
     }
 
     const sweepData = window.currentTrajectoryData;
@@ -89,14 +102,15 @@ export function startAnimation(updateCallback) {
         animationState.currentTheta = currentTheta;
     }
 
-    animationState.direction = 1;
+    animationState.direction = speed >= 0 ? 1 : -1;
     animationState.isPlaying = true;
     syncThetaValue(Math.round(animationState.currentTheta));
 
     // 計算動畫間隔
     // degrees_per_second = RPM * 360 / 60
     // degrees_per_frame = degrees_per_second / frameRate
-    const degreesPerSecond = (speed * 360) / 60;
+    const absSpeed = Math.abs(speed);
+    const degreesPerSecond = (absSpeed * 360) / 60;
     const frameRate = 30; // frames per second
     const degreesPerFrame = degreesPerSecond / frameRate;
     const interval = 1000 / frameRate; // ms per frame
@@ -106,7 +120,7 @@ export function startAnimation(updateCallback) {
         const result = updateCallback ? updateCallback() : null;
 
         // 2. 傳入結果給 animateFrame 判斷是否撞牆
-        animateFrame(degreesPerFrame, motorType, result);
+        animateFrame(degreesPerFrame, motorId, result);
     }, interval);
 
     // 更新 UI
@@ -179,11 +193,15 @@ function animateFrame(degreesPerFrame, motorType, lastResult) {
         console.log("撞到機構極限，自動反轉！");
     } else {
         // 正常前進
+        // 如果是連續旋轉，方向由 targetRpm 決定
+        if (animationState.isContinuous) {
+            animationState.direction = animationState.targetRpm >= 0 ? 1 : -1;
+        }
         animationState.currentTheta += degreesPerFrame * animationState.direction;
     }
 
     // 處理邊界條件
-    if (motorType === "motor360") {
+    if (animationState.isContinuous) {
         // 連續旋轉 - 循環 (除非撞牆反彈模式被激活)
         if (animationState.currentTheta > rangeEnd) {
             animationState.currentTheta =
@@ -218,35 +236,42 @@ export function setupMotorTypeHandler() {
     if (!motorType) return;
 
     motorType.addEventListener("change", (e) => {
-        const type = e.target.value;
+        const motorId = e.target.value;
+        const component = DRIVE_COMPONENTS[motorId];
+        const isContinuous = component ? component.type === 'motor_continuous' : (motorId === 'motor360');
         const sweepStart = $("sweepStart");
         const sweepEnd = $("sweepEnd");
-
         if (!sweepStart || !sweepEnd) return;
 
-        switch (type) {
-            case "motor360":
-                sweepStart.value = -180;
-                sweepEnd.value = 180;
-                sweepStart.disabled = true;
-                sweepEnd.disabled = true;
-                break;
-            case "servo180":
-                sweepStart.value = 0;
-                sweepEnd.value = 180;
-                sweepStart.disabled = true;
-                sweepEnd.disabled = true;
-                break;
-            case "servo270":
-                sweepStart.value = -135;
-                sweepEnd.value = 135;
-                sweepStart.disabled = true;
-                sweepEnd.disabled = true;
-                break;
-            case "custom":
-                sweepStart.disabled = false;
-                sweepEnd.disabled = false;
-                break;
+        if (isContinuous) {
+            sweepStart.value = -180;
+            sweepEnd.value = 180;
+            sweepStart.disabled = true;
+            sweepEnd.disabled = true;
+        } else {
+            switch (motorId) {
+                case "servo180":
+                    sweepStart.value = 0;
+                    sweepEnd.value = 180;
+                    sweepStart.disabled = true;
+                    sweepEnd.disabled = true;
+                    break;
+                case "servo270":
+                    sweepStart.value = -135;
+                    sweepEnd.value = 135;
+                    sweepStart.disabled = true;
+                    sweepEnd.disabled = true;
+                    break;
+                case "custom":
+                    sweepStart.disabled = false;
+                    sweepEnd.disabled = false;
+                    break;
+                default:
+                    sweepStart.value = 0;
+                    sweepEnd.value = 180;
+                    sweepStart.disabled = true;
+                    sweepEnd.disabled = true;
+            }
         }
     });
 

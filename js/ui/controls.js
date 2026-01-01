@@ -544,6 +544,8 @@ export function updatePreview() {
             console.warn("Auto-DXF generation failed:", previewState.dxfError);
         }
 
+        return previewState.solution;
+
     } catch (e) {
         log(`更新失敗：${e.message}`);
         console.error(e);
@@ -831,3 +833,7 @@ export function setupUIHandlers() {
 // 🌟 暴露給全域
 window.updateDynamicParams = updateDynamicParams;
 window.setupUIHandlers = setupUIHandlers;
+window.startAnimation = startAnimation;
+window.pauseAnimation = pauseAnimation;
+window.stopAnimation = stopAnimation;
+
