@@ -37,6 +37,94 @@
     <div class="row">
         <!-- Left Panel -->
         <div class="card" id="leftPanel" style="min-width: 380px; max-width: 380px;">
+            <!-- Motor Sync Dashboard (Digital Twin Panel) -->
+            <div id="motorSyncPanel"
+                style="margin-bottom: 20px; padding: 12px; background: #fff; border: 1px solid #eee; border-radius: 8px; border-left: 4px solid #3498db; display: none;">
+                <h3
+                    style="margin-top:0; border:none; padding:0; display: flex; align-items: center; justify-content: space-between;">
+                    <span>📡 馬達同步面板</span>
+                    <span id="remoteStatusBadge"
+                        style="font-size: 10px; background: #f1f2f6; padding: 2px 6px; border-radius: 10px; color: #666; font-weight: normal;">OFFLINE</span>
+                </h3>
+
+                <div style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; color: #666;">目標馬達源 (Target Source)</label>
+                    <div style="display: flex; gap: 4px; margin-top: 4px;">
+                        <button class="motor-btn active" data-id="1">M1</button>
+                        <button class="motor-btn" data-id="2">M2</button>
+                        <button class="motor-btn" data-id="3">M3</button>
+                        <button class="motor-btn" data-id="4">M4</button>
+                    </div>
+                </div>
+
+                <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div>
+                        <label style="font-size: 11px; margin-bottom: 2px; display:block;">指令位置 (Target)</label>
+                        <div id="valTargetDeg"
+                            style="font-size: 18px; font-weight: bold; font-family: monospace; color: #e67e22;">---
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; margin-bottom: 2px; display:block;">實測角度 (DEG)</label>
+                        <div id="valDeg"
+                            style="font-size: 18px; font-weight: bold; font-family: monospace; color: #2c3e50;">0.0°
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; margin-bottom: 2px; display:block;">實測轉速 (RPM)</label>
+                        <div id="valRpm"
+                            style="font-size: 18px; font-weight: bold; font-family: monospace; color: #2c3e50;">0.0
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <label style="font-size: 11px; display: flex; justify-content: space-between;">
+                        <span>PWM 負載</span>
+                        <span id="valPwmText">0%</span>
+                    </label>
+                    <div style="height: 8px; background: #eee; border-radius: 4px; overflow: hidden; margin-top: 4px;">
+                        <div id="valPwmBar"
+                            style="height: 100%; width: 0%; background: linear-gradient(90deg, #3498db, #2ecc71); transition: width 0.2s;">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 8px;">
+                    <button id="btnSetZero"
+                        style="flex: 1; padding: 6px; font-size: 12px; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer;">角度校零</button>
+                    <label
+                        style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; background: #f8f9fa; border-radius: 4px; cursor: pointer; border: 1px solid #ddd;">
+                        <input id="chkSyncMotor" type="checkbox" />
+                        <span>追隨硬體</span>
+                    </label>
+                </div>
+
+                <style>
+                    .motor-btn {
+                        flex: 1;
+                        padding: 4px 0;
+                        border: 1px solid #ddd;
+                        background: white;
+                        cursor: pointer;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        transition: all 0.2s;
+                    }
+
+                    .motor-btn.active {
+                        background: #3498db;
+                        color: white;
+                        border-color: #2980b9;
+                        font-weight: bold;
+                    }
+
+                    .motor-btn:hover:not(.active) {
+                        background: #f8f9fa;
+                    }
+                </style>
+            </div>
+
             <div id="wizardContainer"></div>
             <div id="parametersPanel"></div>
 
@@ -127,6 +215,19 @@
                             <input id="showPartsOverlay" type="checkbox" />
                             套用零件外形
                         </label>
+                        <div style="height: 20px; width: 1px; background: #ddd; margin: 0 5px;"></div>
+                        <div id="wsStatus"
+                            style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #777;">
+                            <span id="wsDot"
+                                style="width: 8px; height: 8px; background: #ccc; border-radius: 50%;"></span>
+                            <span id="wsStatusText">離線</span>
+                            <label
+                                style="display:flex; align-items:center; gap:4px; cursor:pointer; margin-left: 4px; font-weight: bold; color: #2980b9;">
+                                <input id="chkEnableRemote" type="checkbox" />
+                                開啟遠端通訊
+                            </label>
+                        </div>
+                        <div style="height: 20px; width: 1px; background: #ddd; margin: 0 5px;"></div>
                         <button id="btnNewConfig" style="padding: 6px 12px; font-size: 14px;">新檔</button>
                         <button id="btnOpenConfig" style="padding: 6px 12px; font-size: 14px;">開啟</button>
                         <button id="btnSaveConfig" style="padding: 6px 12px; font-size: 14px;">存檔</button>
@@ -212,7 +313,8 @@
                                 style="margin:0; padding: 8px 12px; font-size: 14px; color: #555; background: #f1f2f6; border-bottom: 1px solid #eee;">
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <span>?? 零件排版預覽</span>
-                                    <label style="font-size:12px; color:#666; display:flex; align-items:center; gap:6px;">
+                                    <label
+                                        style="font-size:12px; color:#666; display:flex; align-items:center; gap:6px;">
                                         <input id="showPartsPreview" type="checkbox" checked />
                                         顯示
                                     </label>
@@ -234,16 +336,22 @@
                     <!-- Right Panel (Dynamic Params) -->
                     <div id="rightParamsPanel"
                         style="position: absolute; top: 10px; right: 10px; width: 320px; height: calc(100% - 20px); background: transparent; border: none; padding: 0; display: flex; flex-direction: column; gap: 6px; z-index: 200; pointer-events: none;">
-                        <div style="pointer-events: auto; display: flex; flex-direction: column; gap: 6px; max-height: 100%; overflow-y: auto; padding: 0 6px 6px;">
-    <div style="display:flex; justify-content:flex-end; align-items:center; gap:6px;">
-        <label for="viewRangeSlider" style="font-size:12px; color:#555; white-space:nowrap;">Range</label>
-        <input id="viewRangeSlider" type="range" min="50" max="2000" step="10" value="800" style="width:160px;" />
-        <span id="viewRangeSliderValue" style="font-size:12px; color:#333; min-width:48px; text-align:right;">800</span>
-    </div>
-    <h4 style="margin: 0; font-size: 14px; color: #555; border-bottom: 1px solid #eee; padding-bottom: 5px;">📏 桿件幾何動態調整</h4>
-    <div id="dynamicParamsContainer"></div>
-</div>
-</div>
+                        <div
+                            style="pointer-events: auto; display: flex; flex-direction: column; gap: 6px; max-height: 100%; overflow-y: auto; padding: 0 6px 6px;">
+                            <div style="display:flex; justify-content:flex-end; align-items:center; gap:6px;">
+                                <label for="viewRangeSlider"
+                                    style="font-size:12px; color:#555; white-space:nowrap;">Range</label>
+                                <input id="viewRangeSlider" type="range" min="50" max="2000" step="10" value="800"
+                                    style="width:160px;" />
+                                <span id="viewRangeSliderValue"
+                                    style="font-size:12px; color:#333; min-width:48px; text-align:right;">800</span>
+                            </div>
+                            <h4
+                                style="margin: 0; font-size: 14px; color: #555; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                                📏 桿件幾何動態調整</h4>
+                            <div id="dynamicParamsContainer"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -7,8 +7,10 @@ import { getMechanismFromURL, generateParameterHTML, MECHANISMS } from './mechan
 import { setupUIHandlers, updatePreview } from './ui/controls.js';
 import { downloadText, downloadZip, log, calcAdaptiveGridStep } from './utils.js';
 import { MechanismWizard } from './ui/wizard.js?v=debug_1';
+import { RemoteSync } from './remote-sync.js';
 
 const topologyHistory = [];
+let remoteSync = null;
 
 function pushTopologyHistory() {
   const topoArea = document.getElementById('topology');
@@ -208,6 +210,80 @@ async function initMechanismPage() {
     console.error('Failed to load mechanism modules:', error);
     document.getElementById('log').textContent =
       `錯誤：無法載入 ${mech.name}模組。\n${error.message}\n\n此機構可能尚未實作。`;
+  }
+
+  // 初始化遠端同步
+  initRemoteSyncLogic();
+}
+
+/**
+ * 初始化 WebSocket 遠端同步邏輯
+ */
+function initRemoteSyncLogic() {
+  const chkEnableRemote = document.getElementById('chkEnableRemote');
+  const motorSyncPanel = document.getElementById('motorSyncPanel');
+  const wsDot = document.getElementById('wsDot');
+  const wsStatusText = document.getElementById('wsStatusText');
+
+  if (!chkEnableRemote) return;
+
+  window.DEBUG_SYNC = true;
+
+  chkEnableRemote.addEventListener('change', (e) => {
+    if (e.target.checked) {
+      if (!remoteSync) {
+        remoteSync = new RemoteSync({
+          update: updatePreview,
+          onStatusChange: (connected) => {
+            if (wsDot) wsDot.style.background = connected ? '#2ecc71' : '#e74c3c';
+            if (wsStatusText) {
+              wsStatusText.textContent = connected ? '已連線' : '連線失敗';
+              wsStatusText.style.color = connected ? '#27ae60' : '#e74c3c';
+            }
+          }
+        });
+        window.remoteSyncInstance = remoteSync;
+      }
+      if (motorSyncPanel) motorSyncPanel.style.display = 'block';
+    } else {
+      if (remoteSync) {
+        remoteSync.close();
+        remoteSync = null;
+        window.remoteSyncInstance = null;
+      }
+      if (motorSyncPanel) motorSyncPanel.style.display = 'none';
+      if (wsDot) wsDot.style.background = '#ccc';
+      if (wsStatusText) {
+        wsStatusText.textContent = '離線';
+        wsStatusText.style.color = '#777';
+      }
+    }
+  });
+
+  // 馬達切換按鈕處理
+  const motorBtns = document.querySelectorAll('.motor-btn');
+  motorBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      motorBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (remoteSync) remoteSync.setTargetMotor(btn.dataset.id);
+    });
+  });
+
+  // 角度校零
+  const btnSetZero = document.getElementById('btnSetZero');
+  if (btnSetZero) {
+    btnSetZero.addEventListener('click', () => {
+      if (remoteSync) remoteSync.setZero();
+    });
+  }
+
+  // 監聽同步開關 (追隨硬體)
+  const chkSyncMotor = document.getElementById('chkSyncMotor');
+  if (chkSyncMotor) {
+    chkSyncMotor.addEventListener('change', (e) => {
+      if (remoteSync) remoteSync.setSync(e.target.checked);
+    });
   }
 }
 
@@ -1417,14 +1493,27 @@ function openPropertySheet(items, title, selectedId) {
             // 2. 設定選定的桿件為 Input Crank
             targetWizardLink.isInput = true;
 
-            // 3. 設定另一端為 Floating (因為它必須繞著馬達轉)
-            targetWizardLink[otherPointProp].type = 'floating';
+            // 4. 設定實體馬達預設值 (如果尚未綁定，預設為 M1)
+            if (!step.physicalMotor) {
+              step.physicalMotor = '1';
+            }
 
             // 立即儲存並刷新
             if (window.wizard) {
               window.wizard.components = wizardData;
+              // 我們需要手動更新 topology 裡的 step 資訊，因為 syncTopology 可能不會覆寫 physicalMotor
               window.wizard.syncTopology();
-              alert(`已將 ${selectedId} 設為馬達轉軸，並指定 ${targetLink.id} 為驅動曲柄 (L=${targetWizardLink.lenParam})。`);
+
+              // 再次確保 topology 檔案包含 physicalMotor
+              try {
+                const currentTopo = JSON.parse(topoArea.value);
+                const s = currentTopo.steps.find(st => st.id === selectedId);
+                if (s) s.physicalMotor = step.physicalMotor;
+                topoArea.value = JSON.stringify(currentTopo, null, 2);
+                topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+              } catch (e) { }
+
+              alert(`已將 ${selectedId} 設為馬達轉軸，並綁定 M${step.physicalMotor}。指定 ${targetLink.id} 為驅動曲柄 (L=${targetWizardLink.lenParam})。`);
             }
           };
 
@@ -1495,6 +1584,35 @@ function openPropertySheet(items, title, selectedId) {
             coordGroup.appendChild(wrapper);
           });
           sheetContent.appendChild(coordGroup);
+        }
+
+        if (currentType === 'input_crank' || step.type === 'input_crank') {
+          const bindingWrapper = document.createElement('div');
+          bindingWrapper.style.marginTop = '12px';
+          bindingWrapper.style.padding = '10px';
+          bindingWrapper.style.background = '#fffbe6';
+          bindingWrapper.style.border = '1px solid #ffe58f';
+          bindingWrapper.style.borderRadius = '8px';
+
+          bindingWrapper.innerHTML = `
+            <div style="font-weight:bold; margin-bottom:8px; font-size:13px; color:#856404;">🔗 綁定實體馬達 (Hardware Binding)</div>
+            <select id="selMotorBinding" style="width:100%; padding:8px; border-radius:4px; border:1px solid #d9d9d9; font-size:14px; background:#fff;">
+              <option value="">-- 未綁定 --</option>
+              <option value="1" ${step.physicalMotor === '1' ? 'selected' : ''}>馬達 M1</option>
+              <option value="2" ${step.physicalMotor === '2' ? 'selected' : ''}>馬達 M2</option>
+              <option value="3" ${step.physicalMotor === '3' ? 'selected' : ''}>馬達 M3</option>
+              <option value="4" ${step.physicalMotor === '4' ? 'selected' : ''}>馬達 M4</option>
+            </select>
+            <div style="margin-top:6px; font-size:11px; color:#999;">* 指定後，在此模式下模擬將讀取該馬達數據。</div>
+          `;
+
+          bindingWrapper.querySelector('#selMotorBinding').onchange = (e) => {
+            step.physicalMotor = e.target.value || undefined;
+            topoArea.value = JSON.stringify(topology, null, 2);
+            topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+          };
+
+          sheetContent.appendChild(bindingWrapper);
         }
 
         const featureBox = document.createElement('div');
