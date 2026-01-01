@@ -60,16 +60,34 @@ export class RemoteSync {
         // 1. Unpack Payload if present (Common in Control Events)
         const sourceData = data.payload || data;
 
-        // 2. Normalize Keys (motor vs motor_id, value vs degree)
-        const motorIdStr = String(sourceData.motor_id || sourceData.motor || '');
-        const action = sourceData.action || sourceData.cmd || '';
-        const value = sourceData.value !== undefined ? sourceData.value : sourceData.degree;
+        // 2. Handle array of motors (Common in Hardware Feedback)
+        if (Array.isArray(sourceData.motors)) {
+            sourceData.motors.forEach(m => {
+                // Recursively handle each motor as a flat object
+                this.handleIncomingData({
+                    ...data,
+                    payload: null, // Clear payload to avoid infinite loop
+                    ...m
+                });
+            });
+            return;
+        }
 
-        // 3. Update Telemetry Dashboard
+        // 3. Normalize Keys (motor vs motor_id, value vs degree)
+        const motorIdStr = String(sourceData.motor_id || sourceData.motor || sourceData.id || '');
+        const action = sourceData.action || sourceData.cmd || '';
+
+        // Normalize values
+        const degree = sourceData.degree !== undefined ? sourceData.degree : sourceData.deg;
+        const rpm = sourceData.rpm !== undefined ? sourceData.rpm : sourceData.rpm_meas;
+        const pwm = sourceData.pwm !== undefined ? sourceData.pwm :
+            (sourceData.duty !== undefined ? sourceData.duty * 255 : sourceData.value);
+
+        // 4. Update Telemetry Dashboard
         if (motorIdStr && motorIdStr === this.targetMotorId) {
             // Update gauges if feedback-like data is present
-            if (sourceData.rpm !== undefined || sourceData.degree !== undefined || sourceData.pwm !== undefined) {
-                this.updateDashboard(sourceData);
+            if (rpm !== undefined || degree !== undefined || pwm !== undefined) {
+                this.updateDashboard({ rpm, degree, pwm });
             } else if (action === 'pwm' || action === 'set_speed' || (data.status === 'ok' && sourceData.value !== undefined)) {
                 // Special case for status:ok or specific PWM updates
                 if (action === 'pwm' || sourceData.cmd === 'pwm') {
@@ -78,20 +96,21 @@ export class RemoteSync {
             }
         }
 
-        // 4. Update "Target Position" display from control events
+        // 5. Update "Target Position" display from control events
         if (action === 'set_angle' || action === 'move_to') {
             if (!motorIdStr || motorIdStr === this.targetMotorId) {
                 const targetEl = document.getElementById('valTargetDeg');
-                if (targetEl && value !== undefined) {
-                    targetEl.textContent = `${parseFloat(value).toFixed(1)}°`;
+                const targetVal = sourceData.deg !== undefined ? sourceData.deg : sourceData.value;
+                if (targetEl && targetVal !== undefined) {
+                    targetEl.textContent = `${parseFloat(targetVal).toFixed(1)}°`;
                 }
             }
         }
 
-        // 5. Drive Simulation if Syncing is enabled
-        if (this.isSyncing && value !== undefined) {
+        // 6. Drive Simulation if Syncing is enabled
+        if (this.isSyncing && degree !== undefined) {
             // Only drive if it's a position update or motor feedback
-            const isPositionUpdate = (action === 'set_angle' || data.type === 'motor_feedback' || sourceData.degree !== undefined);
+            const isPositionUpdate = (action === 'set_angle' || action === 'move_to' || data.type === 'motor_feedback' || degree !== undefined);
 
             if (isPositionUpdate) {
                 let shouldDriveSim = false;
@@ -118,10 +137,17 @@ export class RemoteSync {
                 if (shouldDriveSim) {
                     const thetaSlider = document.getElementById('thetaSlider');
                     if (thetaSlider) {
-                        const newAngle = (parseFloat(value) - this.degreeOffset);
+                        const newAngle = (parseFloat(degree) - this.degreeOffset);
                         thetaSlider.value = newAngle;
+
+                        // 1. Update Label manually (Immediate feedback)
                         const valLabel = document.getElementById('thetaSliderValue');
                         if (valLabel) valLabel.textContent = `${Math.round(newAngle)}°`;
+
+                        // 2. Dispatch event for other listeners (like hidden theta input)
+                        thetaSlider.dispatchEvent(new Event('input', { bubbles: true }));
+
+                        // 3. Force simulation update
                         this.onUpdate();
                     }
                 }
