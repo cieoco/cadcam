@@ -26,18 +26,21 @@ function syncThetaValue(value) {
     const motorId = animationState.activeMotorId;
     if (motorId && window.motorAngles) {
         const id = String(motorId);
-        const val = Number(value) || 0;
-        window.motorAngles[id] = val;
+        const displayVal = Number(value) || 0;
+        const offsets = window.motorAngleZeroOffsets || {};
+        const offsetVal = Number(offsets[id]) || 0;
+        const actualVal = displayVal + offsetVal;
+        window.motorAngles[id] = actualVal;
 
         const slider = document.getElementById(`motorAngle_M${id}`);
         const label = document.getElementById(`motorAngleValue_M${id}`);
-        if (slider) slider.value = String(val);
-        if (label) label.textContent = `${Math.round(val)}°`;
+        if (slider) slider.value = String(displayVal);
+        if (label) label.textContent = `${Math.round(displayVal)}°`;
 
         if (id === '1') {
             const thetaInput = $("theta");
             if (thetaInput) {
-                thetaInput.value = val;
+                thetaInput.value = displayVal;
                 thetaInput.dispatchEvent(new Event("input", { bubbles: true }));
             }
         }

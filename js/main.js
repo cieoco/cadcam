@@ -3,7 +3,7 @@
  * 主程式入口
  */
 
-import { setupUIHandlers } from './ui/controls.js';
+import { setupUIHandlers } from './ui/controls.js?v=debug_2';
 
 /**
  * 初始化應用程式

@@ -46,25 +46,62 @@ function getMotorIdsFromTopology(topology) {
     return uniq.sort((a, b) => Number(a) - Number(b));
 }
 
-function setMotorAngleValue(motorId, value, options = {}) {
+function getMotorAngleZeroOffset(motorId) {
+    const offsets = window.motorAngleZeroOffsets || {};
+    const val = offsets[String(motorId)];
+    return Number.isFinite(Number(val)) ? Number(val) : 0;
+}
+
+function setMotorAngleActualValue(motorId, actualValue, options = {}) {
     const id = String(motorId);
-    const val = Number(value) || 0;
+    const actual = Number(actualValue) || 0;
+    const offset = getMotorAngleZeroOffset(id);
+    const display = actual - offset;
+
     if (!window.motorAngles) window.motorAngles = {};
-    window.motorAngles[id] = val;
+    window.motorAngles[id] = actual;
 
     const slider = document.getElementById(`motorAngle_M${id}`);
     const label = document.getElementById(`motorAngleValue_M${id}`);
-    if (slider) slider.value = String(val);
-    if (label) label.textContent = `${Math.round(val)}°`;
+    if (slider) slider.value = String(display);
+    if (label) label.textContent = `${Math.round(display)}°`;
 
-    const thetaInput = document.getElementById('theta');
-    if (thetaInput && id === '1') {
-        thetaInput.value = String(val);
-        if (!options.silent) {
-            thetaInput.dispatchEvent(new Event('input', { bubbles: true }));
+    if (id === '1') {
+        const thetaInput = document.getElementById('theta');
+        if (thetaInput) {
+            thetaInput.value = String(display);
+            if (!options.silent) {
+                thetaInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
         }
     }
 }
+
+function setMotorAngleValue(motorId, value, options = {}) {
+    const id = String(motorId);
+    const display = Number(value) || 0;
+    const offset = getMotorAngleZeroOffset(id);
+    const actual = display + offset;
+
+    if (!window.motorAngles) window.motorAngles = {};
+    window.motorAngles[id] = actual;
+
+    const slider = document.getElementById(`motorAngle_M${id}`);
+    const label = document.getElementById(`motorAngleValue_M${id}`);
+    if (slider) slider.value = String(display);
+    if (label) label.textContent = `${Math.round(display)}°`;
+
+    if (id === '1') {
+        const thetaInput = document.getElementById('theta');
+        if (thetaInput) {
+            thetaInput.value = String(display);
+            if (!options.silent) {
+                thetaInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }
+    }
+}
+
 
 function collectMotorAnglesFromUI() {
     const container = document.getElementById('motorAngleContainer');
@@ -145,7 +182,7 @@ function updateMotorAngleControls(topology) {
             const fallback = window.motorAngles && window.motorAngles[id] !== undefined
                 ? window.motorAngles[id]
                 : 0;
-            setMotorAngleValue(id, fallback, { silent: true });
+            setMotorAngleActualValue(id, fallback, { silent: true });
         }
     });
 }
@@ -531,7 +568,10 @@ export function updatePreview() {
             const uiAngles = collectMotorAnglesFromUI();
             if (Object.keys(uiAngles).length && !isSyncing) {
                 if (!window.motorAngles) window.motorAngles = {};
-                Object.assign(window.motorAngles, uiAngles);
+                Object.entries(uiAngles).forEach(([id, display]) => {
+                    const actual = Number(display) + getMotorAngleZeroOffset(id);
+                    window.motorAngles[id] = Number.isFinite(actual) ? actual : 0;
+                });
             }
             if (window.motorAngles && Object.keys(window.motorAngles).length) {
                 mech.motorAngles = { ...window.motorAngles };

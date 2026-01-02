@@ -151,18 +151,22 @@ export class RemoteSync {
                 }
 
                 if (shouldDriveSim) {
-                    const newAngle = (parseFloat(degree) - this.degreeOffset);
+                    const actualAngle = parseFloat(degree);
                     const resolvedMotorId = motorIdStr || this.targetMotorId || '1';
+                    const offsets = window.motorAngleZeroOffsets || {};
+                    const offsetVal = Number(offsets[resolvedMotorId]) || 0;
+                    const displayAngle = actualAngle - offsetVal;
+
                     if (resolvedMotorId) {
-                        motorAngles[resolvedMotorId] = newAngle;
+                        motorAngles[resolvedMotorId] = actualAngle;
                         const slider = document.getElementById(`motorAngle_M${resolvedMotorId}`);
                         const label = document.getElementById(`motorAngleValue_M${resolvedMotorId}`);
-                        if (slider) slider.value = String(newAngle);
-                        if (label) label.textContent = `${Math.round(newAngle)}°`;
+                        if (slider) slider.value = String(displayAngle);
+                        if (label) label.textContent = `${Math.round(displayAngle)}°`;
 
                         const thetaInput = document.getElementById('theta');
                         if (thetaInput && resolvedMotorId === '1') {
-                            thetaInput.value = String(newAngle);
+                            thetaInput.value = String(displayAngle);
                             thetaInput.dispatchEvent(new Event('input', { bubbles: true }));
                         }
                     }
@@ -170,11 +174,11 @@ export class RemoteSync {
                     if (!boundStep) {
                         const thetaSlider = document.getElementById('thetaSlider');
                         if (thetaSlider) {
-                            thetaSlider.value = newAngle;
+                            thetaSlider.value = displayAngle;
 
                             // 1. Update Label manually (Immediate feedback)
                             const valLabel = document.getElementById('thetaSliderValue');
-                            if (valLabel) valLabel.textContent = `${Math.round(newAngle)}°`;
+                            if (valLabel) valLabel.textContent = `${Math.round(displayAngle)}°`;
 
                             // 2. Dispatch event for other listeners (like hidden theta input)
                             thetaSlider.dispatchEvent(new Event('input', { bubbles: true }));
@@ -255,15 +259,47 @@ export class RemoteSync {
     }
 
     setZero() {
-        // Use current hardware degree as offset
-        const degEl = document.getElementById('valDeg');
-        if (degEl) {
-            const currentDeg = parseFloat(degEl.textContent);
-            if (!isNaN(currentDeg)) {
-                this.degreeOffset = currentDeg;
-                console.log(`[RemoteSync] Set Zero. Offset: ${this.degreeOffset}`);
+        const motorId = this.targetMotorId || '1';
+        if (!window.motorAngleZeroOffsets) window.motorAngleZeroOffsets = {};
+        const offsets = window.motorAngleZeroOffsets;
+        const oldOffset = Number(offsets[motorId]) || 0;
+
+        const slider = document.getElementById(`motorAngle_M${motorId}`);
+        const label = document.getElementById(`motorAngleValue_M${motorId}`);
+        const displayVal = slider ? Number(slider.value) : NaN;
+
+        const motorAngles = window.motorAngles || {};
+        let actualVal = Number.isFinite(Number(motorAngles[motorId]))
+            ? Number(motorAngles[motorId])
+            : NaN;
+
+        if (!Number.isFinite(actualVal) && Number.isFinite(displayVal)) {
+            actualVal = oldOffset + displayVal;
+        }
+
+        if (!Number.isFinite(actualVal)) {
+            // Fallback: use current hardware degree as actual
+            const degEl = document.getElementById('valDeg');
+            if (degEl) {
+                actualVal = parseFloat(degEl.textContent);
             }
         }
+
+        if (!Number.isFinite(actualVal)) return;
+
+        // Use actual value as the new zero baseline to avoid stale slider state.
+        const newOffset = actualVal;
+        offsets[motorId] = Number.isFinite(newOffset) ? newOffset : oldOffset;
+        window.motorAngleZeroOffsets = offsets;
+
+        if (!window.motorAngles) window.motorAngles = {};
+        window.motorAngles[motorId] = actualVal;
+
+        if (slider) slider.value = '0';
+        if (label) label.textContent = '0°';
+
+        if (this.onUpdate) this.onUpdate();
+        console.log(`[RemoteSync] Set Zero. Offset: ${offsets[motorId]}`);
     }
 
     setSync(enabled) {
@@ -287,3 +323,4 @@ export class RemoteSync {
         }
     }
 }
+

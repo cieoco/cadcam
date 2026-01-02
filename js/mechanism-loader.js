@@ -4,10 +4,10 @@
  */
 
 import { getMechanismFromURL, generateParameterHTML, MECHANISMS } from './mechanism-config.js';
-import { setupUIHandlers, updatePreview } from './ui/controls.js';
+import { setupUIHandlers, updatePreview } from './ui/controls.js?v=debug_2';
 import { downloadText, downloadZip, log, calcAdaptiveGridStep } from './utils.js';
 import { MechanismWizard } from './ui/wizard.js?v=debug_1';
-import { RemoteSync } from './remote-sync.js';
+import { RemoteSync } from './remote-sync.js?v=debug_4';
 
 const topologyHistory = [];
 let remoteSync = null;
