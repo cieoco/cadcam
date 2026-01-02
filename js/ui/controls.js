@@ -200,6 +200,30 @@ function collectDynamicParams() {
     return params;
 }
 
+
+function syncDynamicParamsToTopology(dynamicParams) {
+    const topoEl = document.getElementById('topology');
+    if (!topoEl) return;
+    const topology = parseTopologySafe(topoEl.value);
+    if (!topology || typeof topology !== 'object') return;
+    if (!topology.params || typeof topology.params !== 'object') {
+        topology.params = {};
+    }
+
+    let changed = false;
+    Object.entries(dynamicParams || {}).forEach(([key, val]) => {
+        if (topology.params[key] !== val) {
+            topology.params[key] = val;
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        topoEl.value = JSON.stringify(topology, null, 2);
+        topoEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+}
+
 function setValueById(id, value) {
     const el = document.getElementById(id);
     if (!el || value === undefined || value === null) return;
@@ -478,11 +502,13 @@ export function updateDynamicParams() {
                 if (isRange) numInput.value = value;
                 else rangeInput.value = value;
 
+                syncDynamicParamsToTopology(collectDynamicParams());
                 callback();
             });
         } else {
             if (isRange) numInput.value = rangeInput.value;
             else rangeInput.value = numInput.value;
+            syncDynamicParamsToTopology(collectDynamicParams());
             callback();
         }
     };

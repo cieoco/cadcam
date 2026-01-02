@@ -1,161 +1,175 @@
-{
+{ 
   "steps": [
     {
-      "id": "O",
+      "id": "P1",
       "type": "ground",
-      "x": 0,
-      "y": 0
+      "x": -205,
+      "y": 28
     },
     {
-      "id": "T1",
+      "id": "P4",
       "type": "ground",
-      "x": -80,
-      "y": 0
+      "dist_param": "L3",
+      "ref_id": "P1",
+      "ux": 0.999948988700964,
+      "uy": 0.010100494835363273
     },
     {
-      "id": "T2",
-      "type": "ground",
-      "x": 140,
-      "y": 0
-    },
-    {
-      "id": "P0",
+      "id": "P2",
       "type": "input_crank",
-      "center": "O",
-      "len_param": "L_Crank",
-      "phase_offset": 0
+      "center": "P1",
+      "len_param": "L1",
+      "phase_offset": 51,
+      "physical_motor": "1"
     },
     {
-      "id": "S",
+      "id": "P3",
       "type": "slider",
-      "p1": "P0",
-      "r_param": "L_Rod",
-      "line_p1": "T1",
-      "line_p2": "T2",
+      "p1": "P2",
+      "r_param": "L2",
+      "line_p1": "P1",
+      "line_p2": "P4",
       "sign": 1
     }
   ],
-  "tracePoint": "S",
+  "tracePoint": "P1",
   "visualization": {
     "links": [
       {
-        "id": "Crank",
-        "p1": "O",
-        "p2": "P0",
-        "color": "#e74c3c",
-        "style": "crank",
-        "lenParam": "L_Crank"
-      },
-      {
-        "id": "Rod",
-        "p1": "P0",
-        "p2": "S",
-        "color": "#3498db",
-        "style": "normal",
-        "lenParam": "L_Rod"
-      },
-      {
-        "id": "Track",
-        "p1": "T1",
-        "p2": "T2",
+        "id": "Slider1_track",
+        "p1": "P1",
+        "p2": "P4",
         "color": "#8e44ad",
         "style": "track"
+      },
+      {
+        "id": "Link1",
+        "p1": "P1",
+        "p2": "P2",
+        "color": "#3498db",
+        "style": "crank",
+        "lenParam": "L1",
+        "hidden": false
+      },
+      {
+        "id": "Link2",
+        "p1": "P2",
+        "p2": "P3",
+        "color": "#3498db",
+        "style": "normal",
+        "lenParam": "L2",
+        "hidden": false
       }
     ],
     "polygons": [],
     "joints": [
-      "O",
-      "P0",
-      "S",
-      "T1",
-      "T2"
+      "P1",
+      "P4",
+      "P2",
+      "P3"
     ]
   },
   "parts": [
     {
-      "id": "Crank(L_Crank)",
+      "id": "Link1(L1)",
       "type": "bar",
-      "len_param": "L_Crank",
-      "color": "#e74c3c"
+      "len_param": "L1",
+      "color": "#3498db",
+      "isInput": true,
+      "holes": []
     },
     {
-      "id": "Rod(L_Rod)",
+      "id": "Link2(L2)",
       "type": "bar",
-      "len_param": "L_Rod",
-      "color": "#3498db"
+      "len_param": "L2",
+      "color": "#3498db",
+      "isInput": false,
+      "holes": []
+    },
+    {
+      "id": "Slider1_Track",
+      "type": "bar",
+      "len_param": "L3",
+      "total_len_param": "L3_track",
+      "offset_param": "L3_offset",
+      "isTrack": true,
+      "color": "#8e44ad"
     }
   ],
   "params": {
     "theta": 0,
-    "L_Crank": 20,
-    "L_Rod": 80,
-    "L_TrackBase": 220,
-    "L_TrackBase_track": 110,
-    "L_TrackBase_offset": 10
+    "L1": 70,
+    "L2": 59,
+    "L3": 198,
+    "L3_track": 99,
+    "L3_offset": 10
   },
   "_wizard_data": [
     {
       "type": "bar",
-      "id": "Crank",
-      "color": "#e74c3c",
+      "id": "Link1",
+      "color": "#3498db",
       "p1": {
-        "id": "O",
+        "id": "P1",
         "type": "fixed",
-        "x": 0,
-        "y": 0
+        "x": -205,
+        "y": 28
       },
       "p2": {
-        "id": "P0",
+        "id": "P2",
         "type": "floating",
-        "x": 20,
-        "y": 0
+        "x": -161,
+        "y": 83
       },
-      "lenParam": "L_Crank",
+      "lenParam": "L1",
       "isInput": true,
-      "phaseOffset": 0
+      "phaseOffset": 51
     },
     {
       "type": "bar",
-      "id": "Rod",
+      "id": "Link2",
       "color": "#3498db",
       "p1": {
-        "id": "P0",
-        "type": "existing"
+        "id": "P2",
+        "type": "existing",
+        "x": -160.94757262651137,
+        "y": 82.40021730198796
       },
       "p2": {
-        "id": "S",
-        "type": "existing"
+        "id": "P3",
+        "type": "floating",
+        "x": -126,
+        "y": 36
       },
-      "lenParam": "L_Rod",
+      "lenParam": "L2",
       "isInput": false
     },
     {
       "type": "slider",
-      "id": "Slider",
+      "id": "Slider1",
       "color": "#8e44ad",
       "p1": {
-        "id": "T1",
-        "type": "fixed",
-        "x": -80,
-        "y": 0
+        "id": "P1",
+        "type": "existing",
+        "x": -205,
+        "y": 28
       },
       "p2": {
-        "id": "T2",
+        "id": "P4",
         "type": "fixed",
-        "x": 140,
-        "y": 0
+        "x": -7,
+        "y": 30
       },
       "p3": {
-        "id": "S",
-        "type": "floating",
-        "x": 60,
-        "y": 0
+        "id": "P3",
+        "type": "existing",
+        "x": -106,
+        "y": 29
       },
-      "sign": 1
-      ,
-      "lenParam": "L_TrackBase",
-      "trackLenParam": "L_TrackBase_track",
-      "trackOffsetParam": "L_TrackBase_offset"
+      "sign": 1,
+      "lenParam": "L3",
+      "trackLenParam": "L3_track",
+      "trackOffsetParam": "L3_offset"
     }
   ]
 }
