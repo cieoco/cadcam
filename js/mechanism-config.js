@@ -622,6 +622,7 @@ export const MECHANISMS = {
             { id: 'trackWidth', label: '軌道寬度', type: 'number', min: 2, max: 50, step: 0.1, default: 3.2, unit: 'mm' },
             { id: 'margin', label: '孔邊距', type: 'number', min: 3, max: 15, default: 6, unit: 'mm' },
             { id: 'holeD', label: '孔徑', type: 'number', min: 2, max: 10, default: 3.2, unit: 'mm' },
+            { id: 'motorJointD', label: '??????', type: 'number', min: 3, max: 12, step: 0.1, default: 8, unit: 'mm' },
             { id: 'spacing', label: '排版間距', type: 'number', min: 2, max: 20, default: 5, unit: 'mm' },
         ],
 

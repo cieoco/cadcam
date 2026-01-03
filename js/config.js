@@ -31,6 +31,7 @@ export function readInputs() {
         barL: Number($("barL")?.value || 100),
         barW: Number($("barW")?.value || 20),
         holeD: Number($("holeD")?.value || 3.2),
+        motorJointD: Number($("motorJointD")?.value || 8),
         margin: Number($("margin")?.value || 10),
         extraHoles: $("extraHoles")?.value || "",
         barStyle: $("barStyle")?.value || "rounded",

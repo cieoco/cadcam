@@ -30,8 +30,26 @@ export function generateMultilinkParts(params) {
         });
     }
 
+    const motorCenters = new Set();
+    if (topology && Array.isArray(topology.steps)) {
+        topology.steps.forEach(step => {
+            if (step && step.type === 'input_crank' && step.center) {
+                motorCenters.add(String(step.center));
+            }
+        });
+    }
+
+    const compMap = new Map();
+    if (topology && Array.isArray(topology._wizard_data)) {
+        topology._wizard_data.forEach(c => {
+            if (c && (c.type === 'bar' || c.type === 'slider') && c.id) {
+                compMap.set(String(c.id), c);
+            }
+        });
+    }
+
     const {
-        barW = 15, margin = 7, holeD = 3.2,
+        barW = 15, margin = 7, holeD = 3.2, motorJointD = 8,
         workX = 800, workY = 600, spacing = 8
     } = params;
     const motorShaftD = 5.4;
@@ -99,6 +117,28 @@ export function generateMultilinkParts(params) {
                 hole1.flat = motorShaftFlat;
             }
 
+            const hole2 = { x: hole2X, y: currentBarW / 2 };
+            if (isTrack) {
+                const partId = String(p.id || '');
+                let comp = null;
+                for (const [cid, c] of compMap.entries()) {
+                    if (partId === `${cid}_Track` || partId === cid) {
+                        comp = c;
+                        break;
+                    }
+                }
+                if (comp) {
+                    const p1Id = comp.p1 && comp.p1.id ? String(comp.p1.id) : null;
+                    const p2Id = comp.p2 && comp.p2.id ? String(comp.p2.id) : null;
+                    if (p1Id && motorCenters.has(p1Id)) {
+                        hole1.d = motorJointD;
+                    }
+                    if (p2Id && motorCenters.has(p2Id)) {
+                        hole2.d = motorJointD;
+                    }
+                }
+            }
+
             const extraHoles = [];
             if (p.holes && p.holes.length) {
                 p.holes.forEach(h => {
@@ -111,6 +151,9 @@ export function generateMultilinkParts(params) {
                 });
             }
 
+            const r1 = ((Number.isFinite(hole1.d) ? hole1.d : holeD) / 2) + margin;
+            const r2 = ((Number.isFinite(hole2.d) ? hole2.d : holeD) / 2) + margin;
+
             parts.push({
                 id: p.id,
                 type: 'bar',
@@ -120,13 +163,13 @@ export function generateMultilinkParts(params) {
                 color: p.color || '#34495e',
                 holes: [
                     hole1,
-                    { x: hole2X, y: currentBarW / 2 },
+                    hole2,
                     ...extraHoles
                 ],
                 slots: slots, // 🌟 加入槽
                 outline: [
-                    { x: hole1X, y: currentBarW / 2, r: holeD / 2 + margin },
-                    { x: hole2X, y: currentBarW / 2, r: holeD / 2 + margin }
+                    { x: hole1X, y: currentBarW / 2, r: r1 },
+                    { x: hole2X, y: currentBarW / 2, r: r2 }
                 ]
             });
         }
