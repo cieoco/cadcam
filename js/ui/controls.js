@@ -677,6 +677,9 @@ export function updatePreview() {
         viewParams.motorType = mech.motorType;
         viewParams.motorRotation = mech.motorRotation || 0;
         viewParams.topology = mech.topology;
+        if (mech.motorAngles) {
+            viewParams.motorAngles = { ...mech.motorAngles };
+        }
         if (!Number.isFinite(viewParams.viewRange)) {
             const viewRangeSlider = $("viewRangeSlider");
             const sliderVal = viewRangeSlider ? Number(viewRangeSlider.value) : NaN;

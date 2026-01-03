@@ -1,7 +1,7 @@
 /**
  * Generic Visualization Engine for Multilink
  */
-import { svgEl, drawGridCompatible } from '../utils.js';
+import { svgEl, drawGridCompatible, describeArc, deg2rad, rad2deg } from '../utils.js';
 import { createDriveComponent } from '../motor-data.js';
 
 export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
@@ -360,6 +360,69 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
                 if (motor) svg.appendChild(motor);
             });
         }
+    }
+
+    // 2.5 Motor Angle Labels (input cranks)
+    if (topology.steps) {
+        const crankSteps = topology.steps.filter(s => s.type === 'input_crank');
+        crankSteps.forEach((crankStep) => {
+            const centerId = crankStep.center || 'O1';
+            const tipId = crankStep.id;
+            const center = sol.points[centerId];
+            const tip = sol.points[tipId];
+            if (!center || !tip) return;
+            const dx = tip.x - center.x;
+            const dy = tip.y - center.y;
+            if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+            if (dx * dx + dy * dy < 1e-6) return;
+
+            const angleModel = rad2deg(Math.atan2(dy, dx));
+            const motorId = String(crankStep.physical_motor || crankStep.physicalMotor || '1');
+            const angleDeg = angleModel;
+
+            const angleScreen = -angleDeg;
+            const cx = tx(center);
+            const cy = ty(center);
+            const arcR = Math.max(18, Math.min(32, scale * 12 + 10));
+            const color = '#e74c3c';
+
+            const baseline = svgEl('line', {
+                x1: cx,
+                y1: cy,
+                x2: cx + arcR,
+                y2: cy,
+                stroke: color,
+                'stroke-width': 1,
+                'stroke-dasharray': '2,3',
+                'stroke-linecap': 'round'
+            });
+            svg.appendChild(baseline);
+
+            const arcPath = describeArc(cx, cy, arcR, 0, angleScreen);
+            svg.appendChild(svgEl('path', {
+                d: arcPath,
+                fill: 'none',
+                stroke: color,
+                'stroke-width': 1.2
+            }));
+
+            const midAngle = angleScreen / 2;
+            const labelR = arcR + 10;
+            const labelX = cx + labelR * Math.cos(deg2rad(midAngle));
+            const labelY = cy + labelR * Math.sin(deg2rad(midAngle));
+            const label = svgEl('text', {
+                x: labelX,
+                y: labelY,
+                fill: color,
+                'font-size': '11px',
+                'font-family': 'sans-serif',
+                'text-anchor': 'middle',
+                'dominant-baseline': 'middle',
+                'pointer-events': 'none'
+            });
+            label.textContent = `M${motorId}=${Math.round(angleDeg)} deg`;
+            svg.appendChild(label);
+        });
     }
     // 3. Render Topology
     renderTopology(svg, topology, sol, viewParams, scale, tx, ty);
