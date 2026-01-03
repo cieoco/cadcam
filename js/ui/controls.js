@@ -45,12 +45,12 @@ function renderGridLabelOverlay(viewParams) {
         overlay = document.createElement('div');
         overlay.id = 'gridLabelOverlay';
         overlay.style.position = 'absolute';
-        overlay.style.inset = '0';
         overlay.style.pointerEvents = 'none';
-        overlay.style.fontSize = '9px';
+        overlay.style.fontSize = '11px';
         overlay.style.color = '#999';
         overlay.style.fontFamily = 'sans-serif';
         overlay.style.zIndex = '5';
+        overlay.style.padding = '6px 8px';
         if (getComputedStyle(wrap).position === 'static') {
             wrap.style.position = 'relative';
         }
@@ -59,6 +59,17 @@ function renderGridLabelOverlay(viewParams) {
 
     overlay.innerHTML = '';
     if (!viewParams || viewParams.showGrid === false) return;
+
+    const style = getComputedStyle(wrap);
+    const padLeft = parseFloat(style.paddingLeft) || 0;
+    const padRight = parseFloat(style.paddingRight) || 0;
+    const padTop = parseFloat(style.paddingTop) || 0;
+    const padBottom = parseFloat(style.paddingBottom) || 0;
+
+    overlay.style.left = `-${padLeft}px`;
+    overlay.style.top = `-${padTop}px`;
+    overlay.style.width = `calc(100% + ${padLeft + padRight}px)`;
+    overlay.style.height = `calc(100% + ${padTop + padBottom}px)`;
 
     const W = viewParams.width || 800;
     const H = viewParams.height || 600;
@@ -90,26 +101,26 @@ function renderGridLabelOverlay(viewParams) {
         if (Math.abs(modelX) <= step / 10) continue;
         const screenX = W / 2 + modelX * scale + panX;
         if (screenX < 0 || screenX > W) continue;
-        const bottom = document.createElement('div');
-        bottom.textContent = Math.round(modelX);
-        bottom.style.position = 'absolute';
-        bottom.style.left = `${screenX}px`;
-        bottom.style.top = `${H - 12}px`;
-        bottom.style.transform = 'translateX(-50%)';
-        frag.appendChild(bottom);
+        const top = document.createElement('div');
+        top.textContent = Math.round(modelX);
+        top.style.position = 'absolute';
+        top.style.left = `${screenX + padLeft}px`;
+        top.style.top = '6px';
+        top.style.transform = 'translateX(-50%)';
+        frag.appendChild(top);
     }
 
     for (let modelY = startY; modelY <= maxModelY + step; modelY += step) {
         if (Math.abs(modelY) <= step / 10) continue;
         const screenY = H / 2 - modelY * scale + panY;
         if (screenY < 0 || screenY > H) continue;
-        const right = document.createElement('div');
-        right.textContent = Math.round(modelY);
-        right.style.position = 'absolute';
-        right.style.left = `${W - 4}px`;
-        right.style.top = `${screenY}px`;
-        right.style.transform = 'translate(-100%, -50%)';
-        frag.appendChild(right);
+        const left = document.createElement('div');
+        left.textContent = Math.round(modelY);
+        left.style.position = 'absolute';
+        left.style.left = '10px';
+        left.style.top = `${screenY + padTop}px`;
+        left.style.transform = 'translateY(-50%)';
+        frag.appendChild(left);
     }
 
     overlay.appendChild(frag);
@@ -117,43 +128,19 @@ function renderGridLabelOverlay(viewParams) {
 
 function getMotorIdsFromTopology(topology) {
     if (!topology || !Array.isArray(topology.steps)) return [];
-    const ids = topology.steps
+    return topology.steps
         .filter(s => s.type === 'input_crank')
-        .map(s => String(s.physical_motor || '1'));
-    const uniq = Array.from(new Set(ids));
-    return uniq.sort((a, b) => Number(a) - Number(b));
+        .map(s => s.id)
+        .filter(Boolean);
+
+}
+function getMotorAngleZeroOffset(id) {
+    if (!window.motorAngleZeroOffsets) window.motorAngleZeroOffsets = {};
+    const key = String(id);
+    return Number(window.motorAngleZeroOffsets[key] || 0);
 }
 
-function getMotorAngleZeroOffset(motorId) {
-    const offsets = window.motorAngleZeroOffsets || {};
-    const val = offsets[String(motorId)];
-    return Number.isFinite(Number(val)) ? Number(val) : 0;
-}
 
-function setMotorAngleActualValue(motorId, actualValue, options = {}) {
-    const id = String(motorId);
-    const actual = Number(actualValue) || 0;
-    const offset = getMotorAngleZeroOffset(id);
-    const display = actual - offset;
-
-    if (!window.motorAngles) window.motorAngles = {};
-    window.motorAngles[id] = actual;
-
-    const slider = document.getElementById(`motorAngle_M${id}`);
-    const label = document.getElementById(`motorAngleValue_M${id}`);
-    if (slider) slider.value = String(display);
-    if (label) label.textContent = `${Math.round(display)}°`;
-
-    if (id === '1') {
-        const thetaInput = document.getElementById('theta');
-        if (thetaInput) {
-            thetaInput.value = String(display);
-            if (!options.silent) {
-                thetaInput.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-        }
-    }
-}
 
 function setMotorAngleValue(motorId, value, options = {}) {
     const id = String(motorId);
@@ -784,6 +771,7 @@ export function updatePreview() {
         if (mods.config && mods.config.id === 'multilink') {
             renderGridLabelOverlay(viewParams);
         }
+
 
         const parts = previewState.parts;
 

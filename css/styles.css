@@ -202,7 +202,7 @@ button {
   border-radius: 10px;
   border: 1px solid #bbb;
   cursor: pointer;
-  background: #fff;
+  background: #fafafa;
   font-size: 16px;
   font-weight: 600;
 }
@@ -259,8 +259,9 @@ button.primary:hover {
 }
 
 #svgWrap svg {
+  width: 100%;
+  height: 100%;
   max-width: 100%;
-  height: auto;
   display: block;
 }
 

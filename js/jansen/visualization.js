@@ -51,9 +51,9 @@ export function renderJansen(sol, thetaDeg, trajectoryData = null, viewParams = 
     // Background
     svg.appendChild(svgEl("rect", { width: W, height: H, fill: "#fafafa" }));
 
-    // Grid
+    // Grid (lines only; labels handled by HTML overlay)
     if (viewParams.showGrid !== false) {
-        drawGridCompatible(svg, W, H, viewRange, 0, 0, tx, ty, viewParams.gridStep);
+        drawGridCompatible(svg, W, H, viewRange, 0, 0, tx, ty, viewParams.gridStep, panX, panY, false, true);
     }
 
     if (!sol || !sol.isValid) {
