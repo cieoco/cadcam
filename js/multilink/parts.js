@@ -223,7 +223,33 @@ export function generateMultilinkParts(params) {
     const out = [];
 
     for (const p of parts) {
-        if (xCursor + p.w + 10 > workX) {
+        let offsetX = 0;
+        let offsetY = 0;
+        let layoutW = p.w;
+        let layoutH = p.h;
+
+        if (p.outline && p.outline.length) {
+            let minX = Infinity;
+            let maxX = -Infinity;
+            let minY = Infinity;
+            let maxY = -Infinity;
+            p.outline.forEach(c => {
+                minX = Math.min(minX, c.x - c.r);
+                maxX = Math.max(maxX, c.x + c.r);
+                minY = Math.min(minY, c.y - c.r);
+                maxY = Math.max(maxY, c.y + c.r);
+            });
+            if (Number.isFinite(minX) && Number.isFinite(maxX)) {
+                offsetX = -minX;
+                layoutW = maxX - minX;
+            }
+            if (Number.isFinite(minY) && Number.isFinite(maxY)) {
+                offsetY = -minY;
+                layoutH = maxY - minY;
+            }
+        }
+
+        if (xCursor + layoutW + 10 > workX) {
             xCursor = 10;
             yCursor += rowH + spacing;
             rowH = 0;
@@ -231,16 +257,16 @@ export function generateMultilinkParts(params) {
 
         const placedHoles = p.holes.map(h => ({
             ...h,
-            x: xCursor + h.x,
-            y: yCursor + h.y
+            x: xCursor + h.x + offsetX,
+            y: yCursor + h.y + offsetY
         }));
 
         // Transform outline to absolute coords
         let placedOutline = null;
         if (p.outline) {
             placedOutline = p.outline.map(c => ({
-                x: xCursor + c.x,
-                y: yCursor + c.y,
+                x: xCursor + c.x + offsetX,
+                y: yCursor + c.y + offsetY,
                 r: c.r
             }));
         }
@@ -249,8 +275,8 @@ export function generateMultilinkParts(params) {
         let placedSlots = null;
         if (p.slots) {
             placedSlots = p.slots.map(s => ({
-                x: xCursor + s.x,
-                y: yCursor + s.y,
+                x: xCursor + s.x + offsetX,
+                y: yCursor + s.y + offsetY,
                 w: s.w,
                 h: s.h
             }));
@@ -258,17 +284,17 @@ export function generateMultilinkParts(params) {
 
         out.push({
             id: p.id,
-            rect: { x: xCursor, y: yCursor, w: p.w, h: p.h },
+            rect: { x: xCursor, y: yCursor, w: layoutW, h: layoutH },
             holes: placedHoles,
-            slots: placedSlots, // 🌟 Include slots in output
+            slots: placedSlots, // ?? Include slots in output
             outline: placedOutline,
             color: p.color,
             holeD,
             barStyle: params.barStyle
         });
 
-        rowH = Math.max(rowH, p.h);
-        xCursor += p.w + spacing;
+        rowH = Math.max(rowH, layoutH);
+        xCursor += layoutW + spacing;
     }
 
     return out;
