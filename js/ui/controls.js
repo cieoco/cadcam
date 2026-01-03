@@ -3,7 +3,7 @@
  * UI 控制器模組 - 處理使用者介面互動邏輯
  */
 
-import { $, log, downloadText, downloadZip, fmt } from '../utils.js';
+import { $, log, downloadText, downloadZip, fmt, calcAdaptiveGridStep } from '../utils.js';
 import { readInputs, readSweepParams, readViewParams } from '../config.js';
 import { sweepTheta, calculateTrajectoryStats } from '../fourbar/solver.js';
 import { startAnimation, pauseAnimation, stopAnimation, setupMotorTypeHandler } from '../fourbar/animation.js';
@@ -35,6 +35,84 @@ function parseTopologySafe(raw) {
     }
     if (typeof raw === 'object') return raw;
     return null;
+}
+
+function renderGridLabelOverlay(viewParams) {
+    const wrap = $("svgWrap");
+    if (!wrap) return;
+    let overlay = document.getElementById('gridLabelOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'gridLabelOverlay';
+        overlay.style.position = 'absolute';
+        overlay.style.inset = '0';
+        overlay.style.pointerEvents = 'none';
+        overlay.style.fontSize = '9px';
+        overlay.style.color = '#999';
+        overlay.style.fontFamily = 'sans-serif';
+        overlay.style.zIndex = '5';
+        if (getComputedStyle(wrap).position === 'static') {
+            wrap.style.position = 'relative';
+        }
+        wrap.appendChild(overlay);
+    }
+
+    overlay.innerHTML = '';
+    if (!viewParams || viewParams.showGrid === false) return;
+
+    const W = viewParams.width || 800;
+    const H = viewParams.height || 600;
+    const viewRange = viewParams.viewRange || 800;
+    const pad = 50;
+    const scale = Math.max(0.01, Math.min(W - 2 * pad, H - 2 * pad) / viewRange);
+    const panX = viewParams.panX || 0;
+    const panY = viewParams.panY || 0;
+
+    let step = 50;
+    if (viewParams.gridStep && viewParams.gridStep !== 'auto') {
+        step = Number(viewParams.gridStep) || step;
+    } else {
+        const effectiveViewRange = Math.min(W, H) / scale;
+        step = calcAdaptiveGridStep(effectiveViewRange);
+    }
+
+    const minModelX = (0 - W / 2 - panX) / scale;
+    const maxModelX = (W - W / 2 - panX) / scale;
+    const maxModelY = (H / 2 + panY - 0) / scale;
+    const minModelY = (H / 2 + panY - H) / scale;
+
+    const startX = Math.floor(minModelX / step) * step;
+    const startY = Math.floor(minModelY / step) * step;
+
+    const frag = document.createDocumentFragment();
+
+    for (let modelX = startX; modelX <= maxModelX + step; modelX += step) {
+        if (Math.abs(modelX) <= step / 10) continue;
+        const screenX = W / 2 + modelX * scale + panX;
+        if (screenX < 0 || screenX > W) continue;
+        const bottom = document.createElement('div');
+        bottom.textContent = Math.round(modelX);
+        bottom.style.position = 'absolute';
+        bottom.style.left = `${screenX}px`;
+        bottom.style.top = `${H - 12}px`;
+        bottom.style.transform = 'translateX(-50%)';
+        frag.appendChild(bottom);
+    }
+
+    for (let modelY = startY; modelY <= maxModelY + step; modelY += step) {
+        if (Math.abs(modelY) <= step / 10) continue;
+        const screenY = H / 2 - modelY * scale + panY;
+        if (screenY < 0 || screenY > H) continue;
+        const right = document.createElement('div');
+        right.textContent = Math.round(modelY);
+        right.style.position = 'absolute';
+        right.style.left = `${W - 4}px`;
+        right.style.top = `${screenY}px`;
+        right.style.transform = 'translate(-100%, -50%)';
+        frag.appendChild(right);
+    }
+
+    overlay.appendChild(frag);
 }
 
 function getMotorIdsFromTopology(topology) {
@@ -702,6 +780,10 @@ export function updatePreview() {
         svgWrap.appendChild(
             renderFn(previewState.solution, renderTheta, currentTrajectoryData, viewParams)
         );
+
+        if (mods.config && mods.config.id === 'multilink') {
+            renderGridLabelOverlay(viewParams);
+        }
 
         const parts = previewState.parts;
 

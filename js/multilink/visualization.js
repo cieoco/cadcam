@@ -313,7 +313,7 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
     if (viewParams.showGrid !== false) {
         // Grid Range: Make it huge to cover panning
         const gridRange = 20000; // Covers +/- 10000 units
-        drawGridCompatible(svg, W, H, gridRange * 1.2, 0, 0, tx, ty, viewParams.gridStep, panX, panY);
+        drawGridCompatible(svg, W, H, gridRange * 1.2, 0, 0, tx, ty, viewParams.gridStep, panX, panY, false, true);
     }
 
     if (!sol || !sol.isValid) {
@@ -361,7 +361,6 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
             });
         }
     }
-
     // 3. Render Topology
     renderTopology(svg, topology, sol, viewParams, scale, tx, ty);
 

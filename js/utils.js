@@ -195,7 +195,7 @@ export function calcAdaptiveGridStep(viewRange) {
   else return 10 * power;
 }
 
-export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridStep = 'auto', panX = 0, panY = 0) {
+export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridStep = 'auto', panX = 0, panY = 0, showLabels = true, showLines = true) {
   let step = 50;
   if (gridStep === 'auto' || !gridStep) {
     // Calculate effective range for adaptive step
@@ -265,13 +265,15 @@ export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridSte
     // In multlink/viz, originX is passed as 0. So x is absolute coordinate.
 
 
-    svg.appendChild(svgEl("line", {
+    if (showLines) {
+      svg.appendChild(svgEl("line", {
       x1: screenX, y1: -50000, x2: screenX, y2: 50000,
       stroke: gridColor, "stroke-width": Math.abs(x) < step / 10 ? 1.5 : 0.5
-    }));
+      }));
+    }
 
     // Labels (Top/Bottom) with Sticky Logic
-    if (Math.abs(x) > step / 10) {
+    if (showLabels && Math.abs(x) > step / 10) {
       if (screenX >= visLeft && screenX <= visRight) {
         const lblTop = svgEl("text", { x: screenX, y: visTop + 12, fill: "#999", "font-size": 9, "text-anchor": "middle" });
         lblTop.textContent = Math.round(x);
@@ -289,13 +291,15 @@ export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridSte
     const screenY = ty(y + originY);
 
 
-    svg.appendChild(svgEl("line", {
+    if (showLines) {
+      svg.appendChild(svgEl("line", {
       x1: -50000, y1: screenY, x2: 50000, y2: screenY,
       stroke: gridColor, "stroke-width": Math.abs(y) < step / 10 ? 1.5 : 0.5
-    }));
+      }));
+    }
 
     // Labels (Left/Right) with Sticky Logic
-    if (Math.abs(y) > step / 10) {
+    if (showLabels && Math.abs(y) > step / 10) {
       if (screenY >= visTop && screenY <= visBottom) {
         const lblLeft = svgEl("text", { x: visLeft + 6, y: screenY + 3, fill: "#999", "font-size": 9, "text-anchor": "start" });
         lblLeft.textContent = Math.round(y);
@@ -312,7 +316,7 @@ export function drawGrid(svg, W, H, viewRange, originX, originY, tx, ty, gridSte
 /**
  * Helper to update grid drawing in a standard way
  */
-export function drawGridCompatible(svg, W, H, viewRange, centerModelX, centerModelY, tx, ty, gridStep) {
+export function drawGridCompatible(svg, W, H, viewRange, centerModelX, centerModelY, tx, ty, gridStep, panX = 0, panY = 0, showLabels = true, showLines = true) {
   // Wrapper to handle tx/ty differences
   const safeTx = (val) => {
     try {
@@ -333,5 +337,5 @@ export function drawGridCompatible(svg, W, H, viewRange, centerModelX, centerMod
     }
   };
 
-  drawGrid(svg, W, H, viewRange, centerModelX, centerModelY, safeTx, safeTy, gridStep);
+  drawGrid(svg, W, H, viewRange, centerModelX, centerModelY, safeTx, safeTy, gridStep, panX, panY, showLabels, showLines);
 }

@@ -325,6 +325,15 @@ function setupLinkClickHandler() {
   let lastMiddleClickX = 0;
   let lastMiddleClickY = 0;
 
+  let panRenderTimer = null;
+  const schedulePanRender = () => {
+    clearTimeout(panRenderTimer);
+    panRenderTimer = setTimeout(() => {
+      panRenderTimer = null;
+      schedulePanRender();
+    }, 220);
+  };
+
   // 1. Middle Mouse Button Pan (Mousedown)
   svgWrap.addEventListener('mousedown', (e) => {
     if (e.button === 1) { // Middle Button
@@ -380,11 +389,12 @@ function setupLinkClickHandler() {
         svg.setAttribute('viewBox', `${-currentPanX} ${-currentPanY} ${vb.width} ${vb.height}`);
       }
     });
+    schedulePanRender();
   });
 
   // 3. Mouse Up (Commit Pan)
   window.addEventListener('mouseup', (e) => {
-    if (isPanning && e.button === 1) {
+    if (isPanning) {
       isPanning = false;
       svgWrap.style.cursor = '';
 
@@ -394,6 +404,9 @@ function setupLinkClickHandler() {
       // Commit to Global State
       window.mechanismViewOffset.x = initialPanOffset.x + dx;
       window.mechanismViewOffset.y = initialPanOffset.y + dy;
+
+      if (typeof updatePreview === 'function') updatePreview();
+      if (typeof updateFixedGridLabel === 'function') updateFixedGridLabel();
 
       // ⛔️ No Re-render needed! The SVG viewBox is already in the correct state.
       // Future re-renders (e.g., param change) will pick up window.mechanismViewOffset via renderMultilink.
