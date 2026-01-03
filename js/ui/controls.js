@@ -128,11 +128,15 @@ function renderGridLabelOverlay(viewParams) {
 
 function getMotorIdsFromTopology(topology) {
     if (!topology || !Array.isArray(topology.steps)) return [];
-    return topology.steps
+    const ids = [];
+    topology.steps
         .filter(s => s.type === 'input_crank')
-        .map(s => s.id)
-        .filter(Boolean);
-
+        .forEach((step) => {
+            const raw = step.physical_motor || step.physicalMotor || '1';
+            const id = String(raw);
+            if (!ids.includes(id)) ids.push(id);
+        });
+    return ids;
 }
 function getMotorAngleZeroOffset(id) {
     if (!window.motorAngleZeroOffsets) window.motorAngleZeroOffsets = {};
@@ -751,10 +755,11 @@ export function updatePreview() {
         // Keep user-entered values even when preview holds last valid state.
 
         if (viewState.fatalInvalid) {
-            if (viewState.showInvalidPlaceholder) {
+            if (svgWrap) svgWrap.textContent = '';
+            $("partsWrap").innerHTML = "";
+            $("dlButtons").innerHTML = "";
+            if (viewState.showInvalidPlaceholder && svgWrap) {
                 svgWrap.textContent = '(invalid)';
-                $("partsWrap").innerHTML = "";
-                $("dlButtons").innerHTML = "";
             }
             return;
         }

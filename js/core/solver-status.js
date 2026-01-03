@@ -46,6 +46,18 @@ export function getSolvedPointIds(components) {
                     changed = true;
                 }
             }
+            if (c.type === 'slider') {
+                const p1Id = c.p1?.id;
+                const p2Id = c.p2?.id;
+                const p3Id = c.p3?.id;
+                if (p1Id && p2Id && p3Id && solved.has(p1Id) && solved.has(p2Id) && !solved.has(p3Id)) {
+                    const driver = components.find(b => b.type === 'bar' && ((b.p1?.id === p3Id && solved.has(b.p2?.id)) || (b.p2?.id === p3Id && solved.has(b.p1?.id))));
+                    if (driver) {
+                        solved.add(p3Id);
+                        changed = true;
+                    }
+                }
+            }
             if (c.type === 'polygon' && c.points) {
                 const solvedCount = c.points.filter(p => p.id && solved.has(p.id)).length;
                 if (solvedCount >= 2) {

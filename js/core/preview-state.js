@@ -100,6 +100,18 @@ export function computePreviewState({
     result.isInvalid = isInvalid;
 
     if (isInvalid) {
+        const noSteps = mods.config.id === 'multilink'
+            && topologyObj
+            && Array.isArray(topologyObj.steps)
+            && topologyObj.steps.length === 0;
+        if (noSteps) {
+            result.statusMessage = '';
+            result.isInvalid = false;
+            result.fatalInvalid = false;
+            result.solution = { isValid: true, points: {} };
+            result.lastSolution = null;
+            return result;
+        }
         if (result.lastSolution && result.lastSolution.isValid) {
             result.statusMessage = `${mods.config.name}: limit reached, holding position.`;
             result.restore = {

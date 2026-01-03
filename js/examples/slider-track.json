@@ -1,34 +1,34 @@
-{ 
+{
   "steps": [
     {
       "id": "P1",
       "type": "ground",
-      "x": -205,
-      "y": 28
+      "x": -100,
+      "y": 0
     },
     {
-      "id": "P4",
+      "id": "P3",
       "type": "ground",
-      "dist_param": "L3",
+      "dist_param": "L2",
       "ref_id": "P1",
-      "ux": 0.999948988700964,
-      "uy": 0.010100494835363273
+      "ux": -1,
+      "uy": 0
     },
     {
       "id": "P2",
       "type": "input_crank",
       "center": "P1",
       "len_param": "L1",
-      "phase_offset": 51,
+      "phase_offset": 111,
       "physical_motor": "1"
     },
     {
-      "id": "P3",
+      "id": "P4",
       "type": "slider",
       "p1": "P2",
-      "r_param": "L2",
+      "r_param": "L3",
       "line_p1": "P1",
-      "line_p2": "P4",
+      "line_p2": "P3",
       "sign": 1
     }
   ],
@@ -38,7 +38,7 @@
       {
         "id": "Slider1_track",
         "p1": "P1",
-        "p2": "P4",
+        "p2": "P3",
         "color": "#8e44ad",
         "style": "track"
       },
@@ -52,21 +52,21 @@
         "hidden": false
       },
       {
-        "id": "Link2",
+        "id": "Link3",
         "p1": "P2",
-        "p2": "P3",
+        "p2": "P4",
         "color": "#3498db",
         "style": "normal",
-        "lenParam": "L2",
+        "lenParam": "L3",
         "hidden": false
       }
     ],
     "polygons": [],
     "joints": [
       "P1",
-      "P4",
+      "P3",
       "P2",
-      "P3"
+      "P4"
     ]
   },
   "parts": [
@@ -79,30 +79,30 @@
       "holes": []
     },
     {
-      "id": "Link2(L2)",
+      "id": "Slider1_Track",
       "type": "bar",
       "len_param": "L2",
+      "total_len_param": "L2_track",
+      "offset_param": "L2_offset",
+      "isTrack": true,
+      "color": "#8e44ad"
+    },
+    {
+      "id": "Link3(L3)",
+      "type": "bar",
+      "len_param": "L3",
       "color": "#3498db",
       "isInput": false,
       "holes": []
-    },
-    {
-      "id": "Slider1_Track",
-      "type": "bar",
-      "len_param": "L3",
-      "total_len_param": "L3_track",
-      "offset_param": "L3_offset",
-      "isTrack": true,
-      "color": "#8e44ad"
     }
   ],
   "params": {
     "theta": 0,
-    "L1": 70,
-    "L2": 59,
-    "L3": 198,
-    "L3_track": 99,
-    "L3_offset": 10
+    "L1": 16.5,
+    "L2": 100,
+    "L3": 65,
+    "L2_track": 55,
+    "L2_offset": 30
   },
   "_wizard_data": [
     {
@@ -112,37 +112,18 @@
       "p1": {
         "id": "P1",
         "type": "fixed",
-        "x": -205,
-        "y": 28
+        "x": -100,
+        "y": 0
       },
       "p2": {
         "id": "P2",
         "type": "floating",
-        "x": -161,
-        "y": 83
+        "x": -114,
+        "y": 37
       },
       "lenParam": "L1",
       "isInput": true,
-      "phaseOffset": 51
-    },
-    {
-      "type": "bar",
-      "id": "Link2",
-      "color": "#3498db",
-      "p1": {
-        "id": "P2",
-        "type": "existing",
-        "x": -160.94757262651137,
-        "y": 82.40021730198796
-      },
-      "p2": {
-        "id": "P3",
-        "type": "floating",
-        "x": -126,
-        "y": 36
-      },
-      "lenParam": "L2",
-      "isInput": false
+      "phaseOffset": 111
     },
     {
       "type": "slider",
@@ -151,25 +132,44 @@
       "p1": {
         "id": "P1",
         "type": "existing",
-        "x": -205,
-        "y": 28
+        "x": -100,
+        "y": 0
+      },
+      "p2": {
+        "id": "P3",
+        "type": "fixed",
+        "x": -200,
+        "y": 0
+      },
+      "p3": {
+        "id": "P4",
+        "type": "existing",
+        "x": -150,
+        "y": 0
+      },
+      "sign": 1,
+      "lenParam": "L2",
+      "trackLenParam": "L2_track",
+      "trackOffsetParam": "L2_offset"
+    },
+    {
+      "type": "bar",
+      "id": "Link3",
+      "color": "#3498db",
+      "p1": {
+        "id": "P2",
+        "type": "existing",
+        "x": -114.334717981812,
+        "y": 37.34321705988807
       },
       "p2": {
         "id": "P4",
-        "type": "fixed",
-        "x": -7,
-        "y": 30
+        "type": "floating",
+        "x": -143,
+        "y": 18
       },
-      "p3": {
-        "id": "P3",
-        "type": "existing",
-        "x": -106,
-        "y": 29
-      },
-      "sign": 1,
       "lenParam": "L3",
-      "trackLenParam": "L3_track",
-      "trackOffsetParam": "L3_offset"
+      "isInput": false
     }
   ]
 }
