@@ -892,8 +892,10 @@ function setupLinkClickHandler() {
     const offsetX = (rect.width - W * scaleToViewBox) / 2;
     const offsetY = (rect.height - H * scaleToViewBox) / 2;
 
-    const relX = (clientX - rect.left - offsetX) / scaleToViewBox;
-    const relY = (clientY - rect.top - offsetY) / scaleToViewBox;
+    const vbX = vb && Number.isFinite(vb.x) ? vb.x : 0;
+    const vbY = vb && Number.isFinite(vb.y) ? vb.y : 0;
+    const relX = (clientX - rect.left - offsetX) / scaleToViewBox + vbX;
+    const relY = (clientY - rect.top - offsetY) / scaleToViewBox + vbY;
 
     const originX = W / 2;
     const originY = H / 2;
