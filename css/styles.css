@@ -138,6 +138,60 @@ body.zen-mode #svgWrap {
   background: white;
 }
 
+#leftPanel {
+  font-size: 12px;
+}
+
+#leftPanel .wizard-property label,
+#leftPanel .wizard-property input,
+#leftPanel .wizard-property select,
+#leftPanel .wizard-property button,
+#leftPanel .wizard-property .wizard-summary {
+  font-size: 11px !important;
+}
+
+#leftPanel .wizard-property.wizard-collapsed .wizard-detail {
+  display: none;
+}
+
+.wizard-section {
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 8px;
+  background: #fff;
+}
+
+.wizard-section + .wizard-section {
+  margin-top: 8px;
+}
+
+.wizard-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #2c3e50;
+  cursor: pointer;
+  user-select: none;
+}
+
+.wizard-section-toggle {
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  border: 1px solid #bdc3c7;
+  border-radius: 3px;
+  font-size: 12px;
+  color: #555;
+  background: #f8f9fa;
+}
+
+.wizard-section-body {
+  margin-top: 6px;
+}
+
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

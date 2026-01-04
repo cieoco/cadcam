@@ -21,6 +21,7 @@ export class MechanismWizard {
         this.topology = { steps: [], visualization: { links: [], polygons: [], joints: [] }, parts: [] };
         this._syncTimer = null;
         this._syncDelay = 150;
+        this.sectionCollapsed = {};
 
         this.init();
     }
@@ -58,7 +59,7 @@ export class MechanismWizard {
                 </div>
 
                 <!-- 右側：屬性編輯器 -->
-                <div id="propertyEditor" style="border: 1px solid #eee; border-radius: 8px; padding: 12px; overflow-y: auto; background: #fff; box-shadow: inset 0 0 5px rgba(0,0,0,0.02);">
+                <div id="propertyEditor" class="wizard-property" style="border: 1px solid #eee; border-radius: 8px; padding: 12px; overflow-y: auto; background: #fff; box-shadow: inset 0 0 5px rgba(0,0,0,0.02);">
                     ${this.renderPropertyEditor()}
                 </div>
             </div>
@@ -138,6 +139,23 @@ export class MechanismWizard {
             : null;
         const solvedPoints = this.getSolvedPointIds();
         const isSolved = this.isComponentSolved(comp, solvedPoints);
+        const section = (title, key, body) => {
+            const collapsed = !!this.sectionCollapsed[key];
+            const symbol = collapsed ? '+' : '-';
+            return `
+                <div class="wizard-section">
+                    <div class="wizard-section-header" onclick="window.wizard.toggleSection('${key}')">
+                        <span class="wizard-section-toggle">${symbol}</span>
+                        <span class="wizard-section-title">${title}</span>
+                    </div>
+                    <div class="wizard-section-body" style="${collapsed ? 'display: none;' : ''}">
+                        ${body}
+                    </div>
+                </div>
+            `;
+        };
+
+        const toggleLabel = this.editorCollapsed ? 'å±•é–‹' : 'æ”¶åˆ';
 
         let html = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #f8f9fa;">
@@ -146,8 +164,11 @@ export class MechanismWizard {
                 </h5>
                 <button onclick="window.wizard.removeSelected()" style="background: #fff; border: 1px solid #ff7675; color: #ff7675; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;">刪除</button>
             </div>
+            <div class="wizard-summary" style="font-size: 11px; color: #7f8c8d; margin-bottom: 10px;">
+                ID: ${comp.id || '(unnamed)'} ${comp.type ? `&middot; ${comp.type}` : ''}
+            </div>
             
-            <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div class="wizard-detail" style="display: flex; flex-direction: column; gap: 12px;">
                 <div class="form-group">
                     <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">名稱 (ID)</label>
                     <input type="text" value="${comp.id || ''}" oninput="window.wizard.updateCompProp('id', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
@@ -162,105 +183,104 @@ export class MechanismWizard {
 
         if (comp.type === 'bar') {
             html += `
-                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">點位 1 (P1)</label>
+                ${section('?? 1 (P1)', `${comp.id || 'bar'}-p1`, `
                     ${this.renderPointEditor(comp, 'p1')}
-                </div>
-                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">點位 2 (P2)</label>
+                `)}
+                ${section('?? 2 (P2)', `${comp.id || 'bar'}-p2`, `
                     ${this.renderPointEditor(comp, 'p2')}
-                </div>
+                `)}
 
-                <div class="form-group">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">桿長參數</label>
-                    <input type="text" value="${comp.lenParam || 'L'}" oninput="window.wizard.updateCompProp('lenParam', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
-                </div>
-                <div class="form-group">
-                    <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #2c3e50; cursor: pointer; padding: 6px; background: #f8f9fa; border-radius: 4px;">
-                        <input type="checkbox" ${comp.isInput ? 'checked' : ''} onchange="window.wizard.updateCompProp('isInput', this.checked)" style="width: 14px; height: 14px;"> 馬達驅動
-                    </label>
-                </div>
-
-                ${comp.isInput ? `
-                <div class="form-group" style="padding: 0 6px;">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">對應實體馬達</label>
-                    <select onchange="window.wizard.updateCompProp('physicalMotor', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
-                        <option value="1" ${comp.physicalMotor === '1' || !comp.physicalMotor ? 'selected' : ''}>M1</option>
-                        <option value="2" ${comp.physicalMotor === '2' ? 'selected' : ''}>M2</option>
-                        <option value="3" ${comp.physicalMotor === '3' ? 'selected' : ''}>M3</option>
-                        <option value="4" ${comp.physicalMotor === '4' ? 'selected' : ''}>M4</option>
-                    </select>
-                </div>
-                ` : ''}
-
-                <div class="form-group">
-                    <button onclick="window.wizard.convertSelectedBarToSlider()" style="width: 100%; padding: 8px; background: #8e44ad; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
-                        Convert to Slider
-                    </button>
-                </div>
-
-                <!-- 🌟 巢狀孔位管理區區塊 -->
-                <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #eee;">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px;">📍 桿件孔位管理</label>
-                    <div id="nestedHoleList" style="display: flex; flex-direction: column; gap: 8px;">
-                        ${(comp.holes || []).map((h, hIdx) => `
-                            <div style="background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                                    <span style="font-size: 11px; font-weight: bold; color: #34495e;">孔位 ${h.id}</span>
-                                    <button onclick="window.wizard.removeNestedHole('${comp.id}', '${h.id}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px;">✕ 刪除</button>
-                                </div>
-                                <div class="form-group" style="margin:0;">
-                                    <label style="display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;">距離 P1 參數名</label>
-                                    <input type="text" value="${h.distParam || ''}" 
-                                        oninput="window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'distParam', this.value)" 
-                                        style="width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;">
-                                </div>
-                            </div>
-                        `).join('')}
-                        ${!(comp.holes && comp.holes.length) ? '<div style="font-size: 10px; color: #bdc3c7; text-align: center; padding: 10px; border: 1px dashed #eee; border-radius: 6px;">在畫面上點擊桿件即可加孔</div>' : ''}
+                ${section('?? / ??', `${comp.id || 'bar'}-params`, `
+                    <div class="form-group">
+                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">????</label>
+                        <input type="text" value="${comp.lenParam || 'L'}" oninput="window.wizard.updateCompProp('lenParam', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
                     </div>
-                </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #2c3e50; cursor: pointer; padding: 6px; background: #f8f9fa; border-radius: 4px;">
+                            <input type="checkbox" ${comp.isInput ? 'checked' : ''} onchange="window.wizard.updateCompProp('isInput', this.checked)" style="width: 14px; height: 14px;"> ????
+                        </label>
+                    </div>
+
+                    ${comp.isInput ? `
+                    <div class="form-group" style="padding: 0 6px;">
+                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">??????</label>
+                        <select onchange="window.wizard.updateCompProp('physicalMotor', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
+                            <option value="1" ${comp.physicalMotor === '1' || !comp.physicalMotor ? 'selected' : ''}>M1</option>
+                            <option value="2" ${comp.physicalMotor === '2' ? 'selected' : ''}>M2</option>
+                            <option value="3" ${comp.physicalMotor === '3' ? 'selected' : ''}>M3</option>
+                            <option value="4" ${comp.physicalMotor === '4' ? 'selected' : ''}>M4</option>
+                        </select>
+                    </div>
+                    ` : ''}
+
+                    <div class="form-group">
+                        <button onclick="window.wizard.convertSelectedBarToSlider()" style="width: 100%; padding: 8px; background: #8e44ad; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
+                            Convert to Slider
+                        </button>
+                    </div>
+                `)}
+
+                ${section('????', `${comp.id || 'bar'}-holes`, `
+                    <div style="margin-top: 4px;">
+                        <div id="nestedHoleList" style="display: flex; flex-direction: column; gap: 8px;">
+                            ${(comp.holes || []).map((h, hIdx) => `
+                                <div style="background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                        <span style="font-size: 11px; font-weight: bold; color: #34495e;">?? ${h.id}</span>
+                                        <button onclick="window.wizard.removeNestedHole('${comp.id}', '${h.id}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px;">??</button>
+                                    </div>
+                                    <div class="form-group" style="margin:0;">
+                                        <label style="display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;">?? P1 ??</label>
+                                        <input type="text" value="${h.distParam || ''}" 
+                                            oninput="window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'distParam', this.value)" 
+                                            style="width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;">
+                                    </div>
+                                </div>
+                            `).join('')}
+                            ${!(comp.holes && comp.holes.length) ? '<div style="font-size: 10px; color: #bdc3c7; text-align: center; padding: 10px; border: 1px dashed #eee; border-radius: 6px;">????????????</div>' : ''}
+                        </div>
+                    </div>
+                `)}
             `;
         } else if (comp.type === 'triangle') {
             html += `
-                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">端點 1 (P1)</label>
+                ${section('?? 1 (P1)', `${comp.id || 'tri'}-p1`, `
                     ${this.renderPointEditor(comp, 'p1')}
-                </div>
-                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">端點 2 (P2)</label>
+                `)}
+                ${section('?? 2 (P2)', `${comp.id || 'tri'}-p2`, `
                     ${this.renderPointEditor(comp, 'p2')}
-                </div>
-                <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #2c3e50; margin-bottom: 8px; border-bottom: 1px solid #ddd;">頂點 (P3)</label>
+                `)}
+                ${section('??? (P3)', `${comp.id || 'tri'}-p3`, `
                     ${this.renderPointEditor(comp, 'p3')}
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div class="form-group">
-                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">邊長 1 (P1-P3)</label>
-                        <input type="text" value="${comp.r1Param || 'L1'}" oninput="window.wizard.updateCompProp('r1Param', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                `)}
+                ${section('??', `${comp.id || 'tri'}-params`, `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="form-group">
+                            <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">?? 1 (P1-P3)</label>
+                            <input type="text" value="${comp.r1Param || 'L1'}" oninput="window.wizard.updateCompProp('r1Param', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                        </div>
+                        <div class="form-group">
+                            <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">?? 2 (P2-P3)</label>
+                            <input type="text" value="${comp.r2Param || 'L2'}" oninput="window.wizard.updateCompProp('r2Param', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">邊長 2 (P2-P3)</label>
-                        <input type="text" value="${comp.r2Param || 'L2'}" oninput="window.wizard.updateCompProp('r2Param', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">?? (P1-P2)</label>
+                        <input type="text" value="${comp.gParam || 'G'}" oninput="window.wizard.updateCompProp('gParam', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
                     </div>
-                </div>
-
-                <div class="form-group">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">底邊 (P1-P2)</label>
-                    <input type="text" value="${comp.gParam || 'G'}" oninput="window.wizard.updateCompProp('gParam', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
-                </div>
-
-                <div class="form-group">
-                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">解方向</label>
-                    <select onchange="window.wizard.updateCompProp('sign', parseInt(this.value))" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
-                        <option value="1" ${comp.sign === 1 ? 'selected' : ''}>正向 (+1)</option>
-                        <option value="-1" ${comp.sign === -1 ? 'selected' : ''}>反向 (-1)</option>
-                    </select>
-                </div>
+                    <div class="form-group">
+                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">??</label>
+                        <select onchange="window.wizard.updateCompProp('sign', parseInt(this.value))" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
+                            <option value="1" ${comp.sign === 1 ? 'selected' : ''}>?? (+1)</option>
+                            <option value="-1" ${comp.sign === -1 ? 'selected' : ''}>?? (-1)</option>
+                        </select>
+                    </div>
+                `)}
             `;
         } else if (comp.type === 'slider') {
             html += `
+                ${section('????', `${comp.id || 'slider'}-track`, `
+
                 <div style="margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; overflow: hidden;">
                     <div style="background: #f1f2f6; padding: 6px 10px; font-size: 11px; font-weight: bold; color: #555; border-bottom: 1px solid #ddd;">
                         🛤️ 軌道設定 (Track)
@@ -580,6 +600,11 @@ export class MechanismWizard {
         this.selectedComponentIndex = index;
         this.render();
     }
+    toggleSection(key) {
+        this.sectionCollapsed[key] = !this.sectionCollapsed[key];
+        this.render();
+    }
+
 
     updateCompProp(prop, val) {
         if (this.selectedComponentIndex >= 0) {
@@ -653,93 +678,10 @@ export class MechanismWizard {
             sign: 1,
             lenParam: bar.lenParam, // 保留長度參數，用於生成實體桿件
             trackLenParam: bar.lenParam ? `${bar.lenParam}_track` : '',
-            trackOffsetParam: bar.lenParam ? `${bar.lenParam}_offset` : ''
-        };
-
-        // 如果原桿件有長度參數，確保它被保留在 topology.params 中
-        if (bar.lenParam) {
-            // 這裡其實不需要特別做什麼，因為 compileTopology 會處理
-            // 但為了保險起見，我們確認一下
-            if (!this.topology.params) this.topology.params = { theta: 0 };
-            // 如果參數不存在，才初始化 (避免覆蓋使用者設定)
-            if (this.topology.params[bar.lenParam] === undefined) {
-                const fullLen = Math.hypot(p2Coords.x - p1Coords.x, p2Coords.y - p1Coords.y);
-                this.topology.params[bar.lenParam] = Math.round(fullLen);
-            }
-
-            const fullLen = Math.hypot(p2Coords.x - p1Coords.x, p2Coords.y - p1Coords.y);
-            const totalLenVal = Math.round(fullLen * 0.5);
-            const holeD = Number.isFinite(Number(this.topology?.params?.holeD))
-                ? Number(this.topology.params.holeD)
-                : 3.2;
-            const offsetVal = Math.max(1, Math.round(holeD * 3));
-
-            if (sliderComp.trackLenParam && this.topology.params[sliderComp.trackLenParam] === undefined) {
-                this.topology.params[sliderComp.trackLenParam] = totalLenVal;
-            }
-            if (sliderComp.trackOffsetParam && this.topology.params[sliderComp.trackOffsetParam] === undefined) {
-                this.topology.params[sliderComp.trackOffsetParam] = offsetVal;
-            }
-        }
-
-        this.components.splice(this.selectedComponentIndex, 1, sliderComp);
-        // this.selectedComponentIndex remains the same as we replaced the item at that index
-        this.render();
-        this.syncTopology();
-    }
-
-    convertBarToSliderById(barId) {
-        const idx = this.components.findIndex(c => c.id === barId && c.type === 'bar');
-        if (idx < 0) return;
-        this.selectedComponentIndex = idx;
-        this.convertSelectedBarToSlider();
-    }
-
-    updateSliderDriverParam(driverId, val) {
-        const driver = this.components.find(c => c.id === driverId && c.type === 'bar');
-        if (!driver) return;
-        driver.lenParam = val;
-        const list = $('componentList');
-        if (list) list.innerHTML = this.renderComponentList();
-        this.scheduleSyncTopology();
-    }
-
-    updatePointProp(pointKey, prop, val) {
-        if (this.selectedComponentIndex >= 0) {
-            const comp = this.components[this.selectedComponentIndex];
-            if (comp.type === 'polygon') {
-                // Handle polygon point update
-                const idx = parseInt(pointKey.replace('p', ''));
-                if (comp.points && comp.points[idx]) {
-                    comp.points[idx][prop] = val;
-                    if (prop === 'type') this.render();
-                    this.scheduleSyncTopology();
-                }
-                return;
-            }
-
-            if (!comp[pointKey]) comp[pointKey] = { id: '', type: 'floating', x: 0, y: 0 };
-            comp[pointKey][prop] = val;
-            if (prop === 'type') this.render();
-            this.scheduleSyncTopology();
-        }
-    }
-
-    removeSelected() {
-        if (this.selectedComponentIndex >= 0) {
-            this.components.splice(this.selectedComponentIndex, 1);
-            this.selectedComponentIndex = -1;
-            this.render();
-            this.syncTopology();
-        }
-    }
-
-    getAllPointIds() {
-        const ids = new Set();
-        this.components.forEach(c => {
-            if (c.type === 'polygon' && c.points) {
-                c.points.forEach(p => { if (p.id) ids.add(p.id); });
-            } else {
+            trackOffsetParam: bar.lenParam ? `${bar.lenParam}_offset
+                `)}
+            `;
+        } } else {
                 ['p1', 'p2', 'p3'].forEach(k => {
                     if (c[k] && c[k].id) ids.add(c[k].id);
                 });
