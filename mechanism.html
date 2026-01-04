@@ -417,6 +417,70 @@
             if (btnApplyProp) btnApplyProp.onclick = closeSheet;
         });
     </script>
+    <script>
+        (function setupLeftPanelSections() {
+            const panel = document.getElementById('leftPanel');
+            if (!panel) return;
+
+            const wrapHeading = (heading) => {
+                if (!heading || heading.dataset.sectionWrapped === '1') return;
+                if (heading.closest('.left-section')) return;
+                const titleText = (heading.textContent || '').trim();
+                if (heading.closest('#wizardContainer')) return;
+                if (titleText.includes('機構設計器') || titleText.includes('輸出 / 訊息')) return;
+
+                const section = document.createElement('div');
+                section.className = 'left-section';
+
+                const header = document.createElement('div');
+                header.className = 'left-section-header';
+
+                const toggle = document.createElement('span');
+                toggle.className = 'left-section-toggle';
+                toggle.textContent = '+';
+
+                const title = document.createElement('span');
+                title.textContent = heading.textContent;
+
+                header.appendChild(toggle);
+                header.appendChild(title);
+
+                const body = document.createElement('div');
+                body.className = 'left-section-body';
+
+                let next = heading.nextSibling;
+                while (next && !(next.nodeType === 1 && (next.tagName === 'H3' || next.tagName === 'H4'))) {
+                    const curr = next;
+                    next = next.nextSibling;
+                    body.appendChild(curr);
+                }
+
+                section.appendChild(header);
+                section.appendChild(body);
+                heading.dataset.sectionWrapped = '1';
+                heading.replaceWith(section);
+
+                section.classList.add('collapsed');
+
+                header.addEventListener('click', () => {
+                    const collapsed = section.classList.toggle('collapsed');
+                    toggle.textContent = collapsed ? '+' : '-';
+                });
+            };
+
+            const refresh = () => {
+                const headings = Array.from(panel.querySelectorAll('h3, h4'));
+                headings.forEach(wrapHeading);
+            };
+
+            refresh();
+
+            const observer = new MutationObserver(() => {
+                refresh();
+            });
+            observer.observe(panel, { childList: true, subtree: true });
+        })();
+    </script>
 </body>
 
 </html>

@@ -182,146 +182,148 @@ export class MechanismWizard {
         `;
 
         if (comp.type === 'bar') {
-            html += `
-                ${section('?? 1 (P1)', `${comp.id || 'bar'}-p1`, `
-                    ${this.renderPointEditor(comp, 'p1')}
-                `)}
-                ${section('?? 2 (P2)', `${comp.id || 'bar'}-p2`, `
-                    ${this.renderPointEditor(comp, 'p2')}
-                `)}
+            html += section('?? 1 (P1)', `${comp.id || 'bar'}-p1`, `
+                ${this.renderPointEditor(comp, 'p1')}
+            `);
+            html += section('?? 2 (P2)', `${comp.id || 'bar'}-p2`, `
+                ${this.renderPointEditor(comp, 'p2')}
+            `);
 
-                ${section('?? / ??', `${comp.id || 'bar'}-params`, `
-                    <div class="form-group">
-                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">????</label>
-                        <input type="text" value="${comp.lenParam || 'L'}" oninput="window.wizard.updateCompProp('lenParam', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
-                    </div>
-                    <div class="form-group">
-                        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #2c3e50; cursor: pointer; padding: 6px; background: #f8f9fa; border-radius: 4px;">
-                            <input type="checkbox" ${comp.isInput ? 'checked' : ''} onchange="window.wizard.updateCompProp('isInput', this.checked)" style="width: 14px; height: 14px;"> ????
-                        </label>
-                    </div>
+            const paramsBody = `
+                <div class=\"form-group\">
+                    <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">????</label>
+                    <input type=\"text\" value=\"${comp.lenParam || 'L'}\" oninput=\"window.wizard.updateCompProp('lenParam', this.value)\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;\">
+                </div>
+                <div class=\"form-group\">
+                    <label style=\"display: flex; align-items: center; gap: 8px; font-size: 12px; color: #2c3e50; cursor: pointer; padding: 6px; background: #f8f9fa; border-radius: 4px;\">
+                        <input type=\"checkbox\" ${comp.isInput ? 'checked' : ''} onchange=\"window.wizard.updateCompProp('isInput', this.checked)\" style=\"width: 14px; height: 14px;\"> ????
+                    </label>
+                </div>
 
-                    ${comp.isInput ? `
-                    <div class="form-group" style="padding: 0 6px;">
-                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">??????</label>
-                        <select onchange="window.wizard.updateCompProp('physicalMotor', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
-                            <option value="1" ${comp.physicalMotor === '1' || !comp.physicalMotor ? 'selected' : ''}>M1</option>
-                            <option value="2" ${comp.physicalMotor === '2' ? 'selected' : ''}>M2</option>
-                            <option value="3" ${comp.physicalMotor === '3' ? 'selected' : ''}>M3</option>
-                            <option value="4" ${comp.physicalMotor === '4' ? 'selected' : ''}>M4</option>
-                        </select>
-                    </div>
-                    ` : ''}
+                ${comp.isInput ? `
+                <div class=\"form-group\" style=\"padding: 0 6px;\">
+                    <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">??????</label>
+                    <select onchange=\"window.wizard.updateCompProp('physicalMotor', this.value)\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;\">
+                        <option value=\"1\" ${comp.physicalMotor === '1' || !comp.physicalMotor ? 'selected' : ''}>M1</option>
+                        <option value=\"2\" ${comp.physicalMotor === '2' ? 'selected' : ''}>M2</option>
+                        <option value=\"3\" ${comp.physicalMotor === '3' ? 'selected' : ''}>M3</option>
+                        <option value=\"4\" ${comp.physicalMotor === '4' ? 'selected' : ''}>M4</option>
+                    </select>
+                </div>
+                ` : ''}
 
-                    <div class="form-group">
-                        <button onclick="window.wizard.convertSelectedBarToSlider()" style="width: 100%; padding: 8px; background: #8e44ad; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
-                            Convert to Slider
-                        </button>
-                    </div>
-                `)}
+                <div class=\"form-group\">
+                    <button onclick=\"window.wizard.convertSelectedBarToSlider()\" style=\"width: 100%; padding: 8px; background: #8e44ad; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;\">
+                        Convert to Slider
+                    </button>
+                </div>
+            `;
+            html += section('?? / ??', `${comp.id || 'bar'}-params`, paramsBody);
 
-                ${section('????', `${comp.id || 'bar'}-holes`, `
-                    <div style="margin-top: 4px;">
-                        <div id="nestedHoleList" style="display: flex; flex-direction: column; gap: 8px;">
-                            ${(comp.holes || []).map((h, hIdx) => `
-                                <div style="background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                                        <span style="font-size: 11px; font-weight: bold; color: #34495e;">?? ${h.id}</span>
-                                        <button onclick="window.wizard.removeNestedHole('${comp.id}', '${h.id}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px;">??</button>
-                                    </div>
-                                    <div class="form-group" style="margin:0;">
-                                        <label style="display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;">?? P1 ??</label>
-                                        <input type="text" value="${h.distParam || ''}" 
-                                            oninput="window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'distParam', this.value)" 
-                                            style="width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;">
-                                    </div>
+            const holesBody = `
+                <div style=\"margin-top: 4px;\">
+                    <div id=\"nestedHoleList\" style=\"display: flex; flex-direction: column; gap: 8px;\">
+                        ${(comp.holes || []).map((h, hIdx) => `
+                            <div style=\"background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px;\">
+                                <div style=\"display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;\">
+                                    <span style=\"font-size: 11px; font-weight: bold; color: #34495e;\">?? ${h.id}</span>
+                                    <button onclick=\"window.wizard.removeNestedHole('${comp.id}', '${h.id}')\" style=\"background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px;\">??</button>
                                 </div>
-                            `).join('')}
-                            ${!(comp.holes && comp.holes.length) ? '<div style="font-size: 10px; color: #bdc3c7; text-align: center; padding: 10px; border: 1px dashed #eee; border-radius: 6px;">????????????</div>' : ''}
-                        </div>
+                                <div class=\"form-group\" style=\"margin:0;\">
+                                    <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">?? P1 ??</label>
+                                    <input type=\"text\" value=\"${h.distParam || ''}\" 
+                                        oninput=\"window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'distParam', this.value)\" 
+                                        style=\"width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;\">
+                                </div>
+                            </div>
+                        `).join('')}
+                        ${!(comp.holes && comp.holes.length) ? '<div style=\"font-size: 10px; color: #bdc3c7; text-align: center; padding: 10px; border: 1px dashed #eee; border-radius: 6px;\">????????????</div>' : ''}
                     </div>
-                `)}
+                </div>
             `;
+            html += section('????', `${comp.id || 'bar'}-holes`, holesBody);
         } else if (comp.type === 'triangle') {
-            html += `
-                ${section('?? 1 (P1)', `${comp.id || 'tri'}-p1`, `
-                    ${this.renderPointEditor(comp, 'p1')}
-                `)}
-                ${section('?? 2 (P2)', `${comp.id || 'tri'}-p2`, `
-                    ${this.renderPointEditor(comp, 'p2')}
-                `)}
-                ${section('??? (P3)', `${comp.id || 'tri'}-p3`, `
-                    ${this.renderPointEditor(comp, 'p3')}
-                `)}
-                ${section('??', `${comp.id || 'tri'}-params`, `
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div class="form-group">
-                            <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">?? 1 (P1-P3)</label>
-                            <input type="text" value="${comp.r1Param || 'L1'}" oninput="window.wizard.updateCompProp('r1Param', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
-                        </div>
-                        <div class="form-group">
-                            <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">?? 2 (P2-P3)</label>
-                            <input type="text" value="${comp.r2Param || 'L2'}" oninput="window.wizard.updateCompProp('r2Param', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">?? (P1-P2)</label>
-                        <input type="text" value="${comp.gParam || 'G'}" oninput="window.wizard.updateCompProp('gParam', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
-                    </div>
-                    <div class="form-group">
-                        <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">??</label>
-                        <select onchange="window.wizard.updateCompProp('sign', parseInt(this.value))" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
-                            <option value="1" ${comp.sign === 1 ? 'selected' : ''}>?? (+1)</option>
-                            <option value="-1" ${comp.sign === -1 ? 'selected' : ''}>?? (-1)</option>
-                        </select>
-                    </div>
-                `)}
-            `;
-        } else if (comp.type === 'slider') {
-            html += `
-                ${section('????', `${comp.id || 'slider'}-track`, `
+            html += section('?? 1 (P1)', `${comp.id || 'tri'}-p1`, `
+                ${this.renderPointEditor(comp, 'p1')}
+            `);
+            html += section('?? 2 (P2)', `${comp.id || 'tri'}-p2`, `
+                ${this.renderPointEditor(comp, 'p2')}
+            `);
+            html += section('??? (P3)', `${comp.id || 'tri'}-p3`, `
+                ${this.renderPointEditor(comp, 'p3')}
+            `);
 
+            const triParams = `
+                <div style=\"display: grid; grid-template-columns: 1fr 1fr; gap: 10px;\">
+                    <div class=\"form-group\">
+                        <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">?? 1 (P1-P3)</label>
+                        <input type=\"text\" value=\"${comp.r1Param || 'L1'}\" oninput=\"window.wizard.updateCompProp('r1Param', this.value)\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;\">
+                    </div>
+                    <div class=\"form-group\">
+                        <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">?? 2 (P2-P3)</label>
+                        <input type=\"text\" value=\"${comp.r2Param || 'L2'}\" oninput=\"window.wizard.updateCompProp('r2Param', this.value)\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;\">
+                    </div>
+                </div>
+                <div class=\"form-group\">
+                    <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">?? (P1-P2)</label>
+                    <input type=\"text\" value=\"${comp.gParam || 'G'}\" oninput=\"window.wizard.updateCompProp('gParam', this.value)\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;\">
+                </div>
+                <div class=\"form-group\">
+                    <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">??</label>
+                    <select onchange=\"window.wizard.updateCompProp('sign', parseInt(this.value))\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;\">
+                        <option value=\"1\" ${comp.sign === 1 ? 'selected' : ''}>?? (+1)</option>
+                        <option value=\"-1\" ${comp.sign === -1 ? 'selected' : ''}>?? (-1)</option>
+                    </select>
+                </div>
+            `;
+            html += section('??', `${comp.id || 'tri'}-params`, triParams);
+        } else if (comp.type === 'slider') {
+            const driverBlock = driver ? `
+                        <div class="form-group" style="margin-top: 8px; border-top: 1px dashed #eee; padding-top: 8px;">
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">??????</label>
+                            <input type="text" value="${driver.lenParam || ''}" oninput="window.wizard.updateSliderDriverParam('${driver.id}', this.value)" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
+                        </div>
+            ` : '';
+
+            const trackBody = `
                 <div style="margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; overflow: hidden;">
                     <div style="background: #f1f2f6; padding: 6px 10px; font-size: 11px; font-weight: bold; color: #555; border-bottom: 1px solid #ddd;">
-                        🛤️ 軌道設定 (Track)
+                        ???? (Track)
                     </div>
                     <div style="padding: 10px; background: #fff;">
                         <div style="margin-bottom: 8px;">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">起點 (P1)</label>
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">?? (P1)</label>
                             ${this.renderPointEditor(comp, 'p1')}
                         </div>
                         <div style="margin-bottom: 8px; border-top: 1px dashed #eee; padding-top: 8px;">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">終點 (P2)</label>
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">?? (P2)</label>
                             ${this.renderPointEditor(comp, 'p2')}
                         </div>
                         <div class="form-group" style="margin-top: 8px; border-top: 1px dashed #eee; padding-top: 8px;">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">軌道總長參數 (Track Length)</label>
-                            <input type="text" value="${comp.trackLenParam || ''}" oninput="window.wizard.updateCompProp('trackLenParam', this.value)" placeholder="例如: 200 或 L_track" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">?????? (Track Length)</label>
+                            <input type="text" value="${comp.trackLenParam || ''}" oninput="window.wizard.updateCompProp('trackLenParam', this.value)" placeholder="??: 200 ? L_track" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
                         </div>
                         <div class="form-group" style="margin-top: 4px;">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">P1 偏移參數 (P1 Offset)</label>
-                            <input type="text" value="${comp.trackOffsetParam || ''}" oninput="window.wizard.updateCompProp('trackOffsetParam', this.value)" placeholder="例如: 20 或 Offset" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">P1 ???? (P1 Offset)</label>
+                            <input type="text" value="${comp.trackOffsetParam || ''}" oninput="window.wizard.updateCompProp('trackOffsetParam', this.value)" placeholder="??: 20 ? Offset" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
                         </div>
-                        ${driver ? `
-                        <div class="form-group" style="margin-top: 8px; border-top: 1px dashed #eee; padding-top: 8px;">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">驅動桿長參數</label>
-                            <input type="text" value="${driver.lenParam || ''}" oninput="window.wizard.updateSliderDriverParam('${driver.id}', this.value)" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
-                        </div>
-                        ` : ''}
+                        ${driverBlock}
                     </div>
                 </div>
+            `;
 
+            const blockBody = `
                 <div style="margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; overflow: hidden;">
                     <div style="background: #f1f2f6; padding: 6px 10px; font-size: 11px; font-weight: bold; color: #555; border-bottom: 1px solid #ddd;">
-                        🔲 滑塊設定 (Slider Block)
+                        ???? (Slider Block)
                     </div>
                     <div style="padding: 10px; background: #fff;">
                         <div style="margin-bottom: 8px;">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">滑塊點 (P3)</label>
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">??? (P3)</label>
                             ${this.renderPointEditor(comp, 'p3')}
                         </div>
                         <div class="form-group">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">解方向 (Sign)</label>
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">??? (Sign)</label>
                             <select onchange="window.wizard.updateCompProp('sign', parseInt(this.value))" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; background: #fff;">
                                 <option value="1" ${comp.sign === 1 ? 'selected' : ''}>+1</option>
                                 <option value="-1" ${comp.sign === -1 ? 'selected' : ''}>-1</option>
@@ -331,6 +333,8 @@ export class MechanismWizard {
                 </div>
             `;
 
+            html += section('????', `${comp.id || 'slider'}-track`, trackBody);
+            html += section('????', `${comp.id || 'slider'}-block`, blockBody);
         }
 
         html += `</div>`;
@@ -656,32 +660,105 @@ export class MechanismWizard {
         while (ids.has(`S${sIdx}`)) sIdx++;
         const sliderPointId = `S${sIdx}`;
 
-        // 🌟 核心修正：直接使用原桿件的 P1, P2 作為軌道端點
-        // 這樣可以保留原有的幾何設定與參數關聯
         const p1 = bar.p1;
         const p2 = bar.p2;
 
-        // 計算中點作為滑塊初始位置
         const p1Coords = findPointCoords(p1.id);
         const p2Coords = findPointCoords(p2.id);
         const midX = (p1Coords.x + p2Coords.x) / 2;
         const midY = (p1Coords.y + p2Coords.y) / 2;
-        const midLen = Math.hypot(midX - p1Coords.x, midY - p1Coords.y);
 
         const sliderComp = {
             type: 'slider',
             id: `Slider${sIdx}`,
             color: '#8e44ad',
-            p1: { ...p1 }, // Copy P1
-            p2: { ...p2 }, // Copy P2
+            p1: { ...p1 },
+            p2: { ...p2 },
             p3: { id: sliderPointId, type: 'floating', x: midX, y: midY },
             sign: 1,
-            lenParam: bar.lenParam, // 保留長度參數，用於生成實體桿件
+            lenParam: bar.lenParam,
             trackLenParam: bar.lenParam ? `${bar.lenParam}_track` : '',
-            trackOffsetParam: bar.lenParam ? `${bar.lenParam}_offset
-                `)}
-            `;
-        } } else {
+            trackOffsetParam: bar.lenParam ? `${bar.lenParam}_offset` : ''
+        };
+
+        if (bar.lenParam) {
+            if (!this.topology.params) this.topology.params = { theta: 0 };
+            if (this.topology.params[bar.lenParam] === undefined) {
+                const fullLen = Math.hypot(p2Coords.x - p1Coords.x, p2Coords.y - p1Coords.y);
+                this.topology.params[bar.lenParam] = Math.round(fullLen);
+            }
+
+            const fullLen = Math.hypot(p2Coords.x - p1Coords.x, p2Coords.y - p1Coords.y);
+            const totalLenVal = Math.round(fullLen * 0.5);
+            const holeD = Number.isFinite(Number(this.topology?.params?.holeD))
+                ? Number(this.topology.params.holeD)
+                : 3.2;
+            const offsetVal = Math.max(1, Math.round(holeD * 3));
+
+            if (sliderComp.trackLenParam && this.topology.params[sliderComp.trackLenParam] === undefined) {
+                this.topology.params[sliderComp.trackLenParam] = totalLenVal;
+            }
+            if (sliderComp.trackOffsetParam && this.topology.params[sliderComp.trackOffsetParam] === undefined) {
+                this.topology.params[sliderComp.trackOffsetParam] = offsetVal;
+            }
+        }
+
+        this.components.splice(this.selectedComponentIndex, 1, sliderComp);
+        this.render();
+        this.syncTopology();
+    }
+
+    convertBarToSliderById(barId) {
+        const idx = this.components.findIndex(c => c.id === barId && c.type === 'bar');
+        if (idx < 0) return;
+        this.selectedComponentIndex = idx;
+        this.convertSelectedBarToSlider();
+    }
+
+    updateSliderDriverParam(driverId, val) {
+        const driver = this.components.find(c => c.id === driverId && c.type === 'bar');
+        if (!driver) return;
+        driver.lenParam = val;
+        const list = $('componentList');
+        if (list) list.innerHTML = this.renderComponentList();
+        this.scheduleSyncTopology();
+    }
+
+    updatePointProp(pointKey, prop, val) {
+        if (this.selectedComponentIndex >= 0) {
+            const comp = this.components[this.selectedComponentIndex];
+            if (comp.type === 'polygon') {
+                const idx = parseInt(pointKey.replace('p', ''));
+                if (comp.points && comp.points[idx]) {
+                    comp.points[idx][prop] = val;
+                    if (prop === 'type') this.render();
+                    this.scheduleSyncTopology();
+                }
+                return;
+            }
+
+            if (!comp[pointKey]) comp[pointKey] = { id: '', type: 'floating', x: 0, y: 0 };
+            comp[pointKey][prop] = val;
+            if (prop === 'type') this.render();
+            this.scheduleSyncTopology();
+        }
+    }
+
+    removeSelected() {
+        if (this.selectedComponentIndex >= 0) {
+            this.components.splice(this.selectedComponentIndex, 1);
+            this.selectedComponentIndex = -1;
+            this.render();
+            this.syncTopology();
+        }
+    }
+
+    getAllPointIds() {
+        const ids = new Set();
+        this.components.forEach(c => {
+            if (c.type === 'polygon' && c.points) {
+                c.points.forEach(p => { if (p.id) ids.add(p.id); });
+            } else {
                 ['p1', 'p2', 'p3'].forEach(k => {
                     if (c[k] && c[k].id) ids.add(c[k].id);
                 });
