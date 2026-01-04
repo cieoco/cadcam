@@ -1,17 +1,9 @@
 /**
  * G-code Operations
- * G-code 基本操作
  */
 
 import { fmt } from '../utils.js';
 
-/**
- * G-code 檔頭
- * @param {Object} params - 參數
- * @param {number} params.safeZ - 安全高度
- * @param {number} params.spindle - 主軸轉速（可選）
- * @returns {Array<string>} G-code 行陣列
- */
 export function gcodeHeader({ safeZ, spindle }) {
     const lines = [];
     lines.push("(MVP 4-bar parts, GRBL)");
@@ -26,13 +18,6 @@ export function gcodeHeader({ safeZ, spindle }) {
     return lines;
 }
 
-/**
- * G-code 檔尾
- * @param {Object} params - 參數
- * @param {number} params.safeZ - 安全高度
- * @param {number} params.spindle - 主軸轉速（可選）
- * @returns {Array<string>} G-code 行陣列
- */
 export function gcodeFooter({ safeZ, spindle }) {
     const lines = [];
     lines.push(`G0 Z${fmt(safeZ)}`);
@@ -43,15 +28,6 @@ export function gcodeFooter({ safeZ, spindle }) {
     return lines;
 }
 
-/**
- * 鑽孔操作
- * @param {Object} params - 參數
- * @param {Array} params.holes - 孔位陣列 [{x, y}, ...]
- * @param {number} params.safeZ - 安全高度
- * @param {number} params.drillZ - 鑽孔深度（負值）
- * @param {number} params.feedZ - Z 軸進給速度
- * @returns {Array<string>} G-code 行陣列
- */
 export function drillOps({ holes, safeZ, drillZ, feedZ }) {
     const lines = [];
     lines.push("(Drill holes)");
@@ -64,17 +40,110 @@ export function drillOps({ holes, safeZ, drillZ, feedZ }) {
     return lines;
 }
 
-/**
- * 矩形外形切割操作（多層）
- * @param {Object} params - 參數
- * @param {Object} params.rect - 矩形 {x, y, w, h}
- * @param {number} params.safeZ - 安全高度
- * @param {number} params.cutDepth - 總切深（負值）
- * @param {number} params.stepdown - 每層下刀深度
- * @param {number} params.feedXY - XY 進給速度
- * @param {number} params.feedZ - Z 進給速度
- * @returns {Array<string>} G-code 行陣列
- */
+function buildTabIntervals(totalLen, tabCount, tabWidth) {
+    const intervals = [];
+    if (!Number.isFinite(totalLen) || totalLen <= 0) return intervals;
+    if (!Number.isFinite(tabCount) || tabCount <= 0) return intervals;
+    if (!Number.isFinite(tabWidth) || tabWidth <= 0) return intervals;
+    const count = Math.floor(tabCount);
+    if (count <= 0) return intervals;
+    const spacing = totalLen / count;
+    const offset = spacing / 2;
+    for (let i = 0; i < count; i++) {
+        const center = offset + i * spacing;
+        const start = Math.max(0, center - tabWidth / 2);
+        const end = Math.min(totalLen, center + tabWidth / 2);
+        if (end > start) intervals.push({ start, end });
+    }
+    return intervals;
+}
+
+function addLineWithTabs(lines, start, end, z, tabZ, intervals, s0, feedXY, feedZ, tabActive) {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const segLen = Math.hypot(dx, dy);
+    if (!segLen) return s0;
+
+    if (!tabActive || !intervals.length || !Number.isFinite(tabZ)) {
+        lines.push(`G1 X${fmt(end.x)} Y${fmt(end.y)} F${fmt(feedXY)}`);
+        return s0 + segLen;
+    }
+
+    let cursor = 0;
+    for (const interval of intervals) {
+        if (interval.end <= s0 || interval.start >= s0 + segLen) continue;
+        const localStart = Math.max(0, interval.start - s0);
+        const localEnd = Math.min(segLen, interval.end - s0);
+        if (localStart > cursor + 1e-6) {
+            const t = localStart / segLen;
+            const x = start.x + dx * t;
+            const y = start.y + dy * t;
+            lines.push(`G1 X${fmt(x)} Y${fmt(y)} F${fmt(feedXY)}`);
+        }
+        if (localEnd > localStart + 1e-6) {
+            lines.push(`G1 Z${fmt(tabZ)} F${fmt(feedZ)}`);
+            const t2 = localEnd / segLen;
+            const x2 = start.x + dx * t2;
+            const y2 = start.y + dy * t2;
+            lines.push(`G1 X${fmt(x2)} Y${fmt(y2)} F${fmt(feedXY)}`);
+            lines.push(`G1 Z${fmt(z)} F${fmt(feedZ)}`);
+        }
+        cursor = Math.max(cursor, localEnd);
+    }
+
+    if (cursor < segLen - 1e-6) {
+        lines.push(`G1 X${fmt(end.x)} Y${fmt(end.y)} F${fmt(feedXY)}`);
+    }
+
+    return s0 + segLen;
+}
+
+function addArcWithTabs(lines, center, radius, startAngle, endAngle, ccw, z, tabZ, intervals, s0, feedXY, feedZ, tabActive) {
+    if (!Number.isFinite(radius) || radius <= 0) return s0;
+    const dir = ccw ? 1 : -1;
+    let sweep = ccw ? (endAngle - startAngle) : (startAngle - endAngle);
+    if (sweep < 0) sweep += Math.PI * 2;
+    const arcLen = sweep * radius;
+
+    const arcSegment = (fromLen, toLen, zLevel) => {
+        const aStart = startAngle + dir * (fromLen / radius);
+        const aEnd = startAngle + dir * (toLen / radius);
+        const endX = center.x + radius * Math.cos(aEnd);
+        const endY = center.y + radius * Math.sin(aEnd);
+        const iOff = center.x - (center.x + radius * Math.cos(aStart));
+        const jOff = center.y - (center.y + radius * Math.sin(aStart));
+        const cmd = ccw ? 'G3' : 'G2';
+        lines.push(`${cmd} X${fmt(endX)} Y${fmt(endY)} I${fmt(iOff)} J${fmt(jOff)} F${fmt(feedXY)}`);
+    };
+
+    if (!tabActive || !intervals.length || !Number.isFinite(tabZ)) {
+        arcSegment(0, arcLen, z);
+        return s0 + arcLen;
+    }
+
+    let cursor = 0;
+    for (const interval of intervals) {
+        if (interval.end <= s0 || interval.start >= s0 + arcLen) continue;
+        const localStart = Math.max(0, interval.start - s0);
+        const localEnd = Math.min(arcLen, interval.end - s0);
+        if (localStart > cursor + 1e-6) {
+            arcSegment(cursor, localStart, z);
+        }
+        if (localEnd > localStart + 1e-6) {
+            lines.push(`G1 Z${fmt(tabZ)} F${fmt(feedZ)}`);
+            arcSegment(localStart, localEnd, tabZ);
+            lines.push(`G1 Z${fmt(z)} F${fmt(feedZ)}`);
+        }
+        cursor = Math.max(cursor, localEnd);
+    }
+
+    if (cursor < arcLen - 1e-6) {
+        arcSegment(cursor, arcLen, z);
+    }
+
+    return s0 + arcLen;
+}
+
 export function profileRectOps({
     rect,
     safeZ,
@@ -82,6 +151,9 @@ export function profileRectOps({
     stepdown,
     feedXY,
     feedZ,
+    tabWidth,
+    tabCount,
+    tabZ,
 }) {
     const lines = [];
     lines.push("(Profile rectangle)");
@@ -90,11 +162,9 @@ export function profileRectOps({
         x1 = rect.x + rect.w,
         y1 = rect.y + rect.h;
 
-    // 起始點：左下角
     const startX = x0;
     const startY = y0;
 
-    // 多層 Z 深度：-stepdown, -2*stepdown, ... 直到 -cutDepth
     const zLevels = [];
     const total = Math.abs(cutDepth);
     const sd = Math.abs(stepdown);
@@ -104,16 +174,25 @@ export function profileRectOps({
         zLevels.push(z);
     }
 
+    const totalLen = 2 * (rect.w + rect.h);
+    const tabIntervals = buildTabIntervals(totalLen, tabCount, tabWidth);
+
     for (const z of zLevels) {
+        const tabActive = tabIntervals.length && Number.isFinite(tabZ) && z < tabZ - 1e-6;
+        let dist = 0;
+        let curr = { x: startX, y: startY };
+
         lines.push(`G0 Z${fmt(safeZ)}`);
         lines.push(`G0 X${fmt(startX)} Y${fmt(startY)}`);
         lines.push(`G1 Z${fmt(z)} F${fmt(feedZ)}`);
 
-        // 逆時針繞矩形
-        lines.push(`G1 X${fmt(x1)} Y${fmt(y0)} F${fmt(feedXY)}`);
-        lines.push(`G1 X${fmt(x1)} Y${fmt(y1)} F${fmt(feedXY)}`);
-        lines.push(`G1 X${fmt(x0)} Y${fmt(y1)} F${fmt(feedXY)}`);
-        lines.push(`G1 X${fmt(x0)} Y${fmt(y0)} F${fmt(feedXY)}`);
+        dist = addLineWithTabs(lines, curr, { x: x1, y: y0 }, z, tabZ, tabIntervals, dist, feedXY, feedZ, tabActive);
+        curr = { x: x1, y: y0 };
+        dist = addLineWithTabs(lines, curr, { x: x1, y: y1 }, z, tabZ, tabIntervals, dist, feedXY, feedZ, tabActive);
+        curr = { x: x1, y: y1 };
+        dist = addLineWithTabs(lines, curr, { x: x0, y: y1 }, z, tabZ, tabIntervals, dist, feedXY, feedZ, tabActive);
+        curr = { x: x0, y: y1 };
+        addLineWithTabs(lines, curr, { x: x0, y: y0 }, z, tabZ, tabIntervals, dist, feedXY, feedZ, tabActive);
 
         lines.push(`G0 Z${fmt(safeZ)}`);
     }
@@ -121,9 +200,6 @@ export function profileRectOps({
     return lines;
 }
 
-/**
- * 圓角矩形外形切割（多層）
- */
 export function profileRoundedRectOps({
     rect,
     safeZ,
@@ -131,6 +207,9 @@ export function profileRoundedRectOps({
     stepdown,
     feedXY,
     feedZ,
+    tabWidth,
+    tabCount,
+    tabZ,
 }) {
     const lines = [];
     lines.push("(Profile rounded rectangle)");
@@ -147,22 +226,21 @@ export function profileRoundedRectOps({
         zLevels.push(-Math.min(i * sd, total));
     }
 
+    const totalLen = 2 * (w - 2 * r) + 2 * Math.PI * r;
+    const tabIntervals = buildTabIntervals(totalLen, tabCount, tabWidth);
+
     for (const z of zLevels) {
+        const tabActive = tabIntervals.length && Number.isFinite(tabZ) && z < tabZ - 1e-6;
+        let dist = 0;
+
         lines.push(`G0 Z${fmt(safeZ)}`);
-        // 起點：底部直線的開始
         lines.push(`G0 X${fmt(x0 + r)} Y${fmt(y0)}`);
         lines.push(`G1 Z${fmt(z)} F${fmt(feedZ)}`);
 
-        // 1. 底部直線
-        lines.push(`G1 X${fmt(x1 - r)} Y${fmt(y0)} F${fmt(feedXY)}`);
-        // 2. 右側半圓 (G3 CCW, I,J 為起點到中心的位移)
-        // 起點 (x1-r, y0), 中心 (x1-r, y0+r) -> I=0, J=r
-        lines.push(`G3 X${fmt(x1 - r)} Y${fmt(y1)} I${fmt(0)} J${fmt(r)} F${fmt(feedXY)}`);
-        // 3. 頂部直線
-        lines.push(`G1 X${fmt(x0 + r)} Y${fmt(y1)} F${fmt(feedXY)}`);
-        // 4. 左側半圓
-        // 起點 (x0+r, y1), 中心 (x0+r, y0+r) -> I=0, J=-r
-        lines.push(`G3 X${fmt(x0 + r)} Y${fmt(y0)} I${fmt(0)} J${fmt(-r)} F${fmt(feedXY)}`);
+        dist = addLineWithTabs(lines, { x: x0 + r, y: y0 }, { x: x1 - r, y: y0 }, z, tabZ, tabIntervals, dist, feedXY, feedZ, tabActive);
+        dist = addArcWithTabs(lines, { x: x1 - r, y: y0 + r }, r, -Math.PI / 2, Math.PI / 2, true, z, tabZ, tabIntervals, dist, feedXY, feedZ, tabActive);
+        dist = addLineWithTabs(lines, { x: x1 - r, y: y1 }, { x: x0 + r, y: y1 }, z, tabZ, tabIntervals, dist, feedXY, feedZ, tabActive);
+        dist = addArcWithTabs(lines, { x: x0 + r, y: y0 + r }, r, Math.PI / 2, Math.PI * 1.5, true, z, tabZ, tabIntervals, dist, feedXY, feedZ, tabActive);
 
         lines.push(`G0 Z${fmt(safeZ)}`);
     }
@@ -170,9 +248,6 @@ export function profileRoundedRectOps({
     return lines;
 }
 
-/**
- * 圓形外形切割操作（多層）
- */
 export function profileCircleOps({
     cx,
     cy,
@@ -182,6 +257,9 @@ export function profileCircleOps({
     stepdown,
     feedXY,
     feedZ,
+    tabWidth,
+    tabCount,
+    tabZ,
 }) {
     const lines = [];
     lines.push("(Profile circle)");
@@ -195,15 +273,18 @@ export function profileCircleOps({
         zLevels.push(-Math.min(i * sd, total));
     }
 
+    const totalLen = 2 * Math.PI * r;
+    const tabIntervals = buildTabIntervals(totalLen, tabCount, tabWidth);
+
     for (const z of zLevels) {
+        const tabActive = tabIntervals.length && Number.isFinite(tabZ) && z < tabZ - 1e-6;
+        let dist = 0;
+
         lines.push(`G0 Z${fmt(safeZ)}`);
-        // 起點：圓的最右側 (cx + r, cy)
         lines.push(`G0 X${fmt(cx + r)} Y${fmt(cy)}`);
         lines.push(`G1 Z${fmt(z)} F${fmt(feedZ)}`);
 
-        // 使用 G3 逆時針繞一整圈
-        // 起點 (cx + r, cy), 切回 (cx + r, cy), 中心偏移 I=-r, J=0
-        lines.push(`G3 X${fmt(cx + r)} Y${fmt(cy)} I${fmt(-r)} J${fmt(0)} F${fmt(feedXY)}`);
+        dist = addArcWithTabs(lines, { x: cx, y: cy }, r, 0, Math.PI * 2, true, z, tabZ, tabIntervals, dist, feedXY, feedZ, tabActive);
 
         lines.push(`G0 Z${fmt(safeZ)}`);
     }
@@ -211,23 +292,16 @@ export function profileCircleOps({
     return lines;
 }
 
-/**
- * 任意點陣列路徑切割操作 (多層)
- * @param {Object} params - 參數
- * @param {Array<{x, y}>} params.points - 封閉路徑的點陣列
- * @param {number} params.safeZ - 安全高度
- * @param {number} params.cutDepth - 總切深
- * @param {number} params.stepdown - 每層下刀
- * @param {number} params.feedXY - XY 進給
- * @param {number} params.feedZ - Z 進給
- */
 export function profilePathOps({
     points,
     safeZ,
     cutDepth,
     stepdown,
     feedXY,
-    feedZ
+    feedZ,
+    tabWidth,
+    tabCount,
+    tabZ
 }) {
     if (!points || points.length < 2) return [];
 
@@ -242,23 +316,34 @@ export function profilePathOps({
         zLevels.push(-Math.min(i * sd, total));
     }
 
+    let totalLen = 0;
+    for (let i = 1; i < points.length; i++) {
+        const dx = points[i].x - points[i - 1].x;
+        const dy = points[i].y - points[i - 1].y;
+        totalLen += Math.hypot(dx, dy);
+    }
+    const lastP = points[points.length - 1];
+    if (lastP.x !== points[0].x || lastP.y !== points[0].y) {
+        totalLen += Math.hypot(points[0].x - lastP.x, points[0].y - lastP.y);
+    }
+    const tabIntervals = buildTabIntervals(totalLen, tabCount, tabWidth);
+
     const startX = points[0].x;
     const startY = points[0].y;
 
     for (const z of zLevels) {
+        const tabActive = tabIntervals.length && Number.isFinite(tabZ) && z < tabZ - 1e-6;
+        let dist = 0;
         lines.push(`G0 Z${fmt(safeZ)}`);
         lines.push(`G0 X${fmt(startX)} Y${fmt(startY)}`);
         lines.push(`G1 Z${fmt(z)} F${fmt(feedZ)}`);
 
-        // 沿點陣列移動
         for (let j = 1; j < points.length; j++) {
-            lines.push(`G1 X${fmt(points[j].x)} Y${fmt(points[j].y)} F${fmt(feedXY)}`);
+            dist = addLineWithTabs(lines, points[j - 1], points[j], z, tabZ, tabIntervals, dist, feedXY, feedZ, tabActive);
         }
 
-        // 確保路徑閉合：回到起點
-        const lastP = points[points.length - 1];
         if (lastP.x !== startX || lastP.y !== startY) {
-            lines.push(`G1 X${fmt(startX)} Y${fmt(startY)} F${fmt(feedXY)}`);
+            addLineWithTabs(lines, lastP, { x: startX, y: startY }, z, tabZ, tabIntervals, dist, feedXY, feedZ, tabActive);
         }
 
         lines.push(`G0 Z${fmt(safeZ)}`);
@@ -267,16 +352,6 @@ export function profilePathOps({
     return lines;
 }
 
-/**
- * Tangent-hull outline for equal-radius circles (outer boundary).
- * @param {Object} params
- * @param {Array<{x:number,y:number,r:number}>} params.circles
- * @param {number} params.safeZ
- * @param {number} params.cutDepth
- * @param {number} params.stepdown
- * @param {number} params.feedXY
- * @param {number} params.feedZ
- */
 export function profileTangentHullOps({
     circles,
     safeZ,
@@ -284,6 +359,9 @@ export function profileTangentHullOps({
     stepdown,
     feedXY,
     feedZ,
+    tabWidth,
+    tabCount,
+    tabZ,
 }) {
     if (!circles || circles.length < 2) return [];
 
@@ -308,6 +386,32 @@ export function profileTangentHullOps({
         tangents.push(t);
     }
 
+    const cross = (ax, ay, bx, by) => ax * by - ay * bx;
+
+    const arcMeta = [];
+    let totalLen = 0;
+    for (let i = 0; i < n; i++) {
+        const curr = tangents[i];
+        const next = tangents[(i + 1) % n];
+        const lineLen = Math.hypot(curr.end.x - curr.start.x, curr.end.y - curr.start.y);
+
+        const cNext = circles[(i + 1) % n];
+        const v1x = curr.end.x - cNext.x;
+        const v1y = curr.end.y - cNext.y;
+        const v2x = next.start.x - cNext.x;
+        const v2y = next.start.y - cNext.y;
+        const ccw = cross(v1x, v1y, v2x, v2y) > 0;
+        const startA = Math.atan2(v1y, v1x);
+        const endA = Math.atan2(v2y, v2x);
+        let sweep = ccw ? (endA - startA) : (startA - endA);
+        if (sweep < 0) sweep += Math.PI * 2;
+        const arcLen = Math.abs(sweep) * cNext.r;
+        arcMeta.push({ center: cNext, r: cNext.r, startA, endA, ccw, arcLen, lineLen });
+        totalLen += lineLen + arcLen;
+    }
+
+    const tabIntervals = buildTabIntervals(totalLen, tabCount, tabWidth);
+
     const zLevels = [];
     const total = Math.abs(cutDepth);
     const sd = Math.abs(stepdown);
@@ -319,32 +423,23 @@ export function profileTangentHullOps({
     const lines = [];
     lines.push("(Profile tangent hull)");
 
-    const cross = (ax, ay, bx, by) => ax * by - ay * bx;
-
     for (const z of zLevels) {
-        const first = tangents[0].start;
+        const tabActive = tabIntervals.length && Number.isFinite(tabZ) && z < tabZ - 1e-6;
+        let dist = 0;
+        let currPos = tangents[0].start;
+
         lines.push(`G0 Z${fmt(safeZ)}`);
-        lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)}`);
+        lines.push(`G0 X${fmt(currPos.x)} Y${fmt(currPos.y)}`);
         lines.push(`G1 Z${fmt(z)} F${fmt(feedZ)}`);
 
         for (let i = 0; i < n; i++) {
             const curr = tangents[i];
             const next = tangents[(i + 1) % n];
-            const cNext = circles[(i + 1) % n];
+            const meta = arcMeta[i];
 
-            lines.push(`G1 X${fmt(curr.end.x)} Y${fmt(curr.end.y)} F${fmt(feedXY)}`);
-
-            const v1x = curr.end.x - cNext.x;
-            const v1y = curr.end.y - cNext.y;
-            const v2x = next.start.x - cNext.x;
-            const v2y = next.start.y - cNext.y;
-            const ccw = cross(v1x, v1y, v2x, v2y) > 0;
-            const cmd = ccw ? "G3" : "G2";
-            const iOff = cNext.x - curr.end.x;
-            const jOff = cNext.y - curr.end.y;
-            lines.push(
-                `${cmd} X${fmt(next.start.x)} Y${fmt(next.start.y)} I${fmt(iOff)} J${fmt(jOff)} F${fmt(feedXY)}`
-            );
+            dist = addLineWithTabs(lines, currPos, curr.end, z, tabZ, tabIntervals, dist, feedXY, feedZ, tabActive);
+            dist = addArcWithTabs(lines, { x: meta.center.x, y: meta.center.y }, meta.r, meta.startA, meta.endA, meta.ccw, z, tabZ, tabIntervals, dist, feedXY, feedZ, tabActive);
+            currPos = next.start;
         }
 
         lines.push(`G0 Z${fmt(safeZ)}`);

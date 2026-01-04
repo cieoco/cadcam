@@ -83,6 +83,9 @@ export function readInputs() {
         safeZ: Number($("safeZ")?.value || 5),         // 安全高度
         feedXY: Number($("feedXY")?.value || 400),     // XY 進給速度
         feedZ: Number($("feedZ")?.value || 100),       // Z 進給速度
+        tabThickness: Number($("tabThickness")?.value || 1.1), // ?????
+        tabWidth: Number($("tabWidth")?.value || 2), // ?????
+        tabCount: Number($("tabCount")?.value || 4), // ?????
         spindle: spindleRaw === "" ? NaN : Number(spindleRaw), // 主軸轉速
         holeMode: $("holeMode")?.value || "drill",
     };

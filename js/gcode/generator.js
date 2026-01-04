@@ -21,10 +21,16 @@ import {
  * @returns {string} G-code 文字
  */
 export function buildPartGcode(part, mfg) {
-    const { safeZ, feedXY, feedZ, thickness, overcut, stepdown, spindle, holeMode } = mfg;
+    const { safeZ, feedXY, feedZ, thickness, overcut, stepdown, spindle, holeMode, tabThickness, tabWidth, tabCount } = mfg;
 
     const cutDepth = -(thickness + overcut); // 負值
     const drillZ = cutDepth; // 鑽孔深度與切深相同
+
+    const tabEnabled = Number.isFinite(tabThickness) && tabThickness > 0
+        && Number.isFinite(tabWidth) && tabWidth > 0
+        && Number.isFinite(tabCount) && tabCount > 0
+        && Number.isFinite(thickness) && tabThickness < thickness;
+    const tabZ = tabEnabled ? -(thickness - tabThickness) : NaN;
 
     const lines = [];
     lines.push(...gcodeHeader({ safeZ, spindle }));
@@ -63,7 +69,7 @@ export function buildPartGcode(part, mfg) {
             lines.push(
                 ...profileRoundedRectOps({
                     rect: slot,
-                    safeZ, cutDepth, stepdown, feedXY, feedZ
+                    safeZ, cutDepth, stepdown, feedXY, feedZ, tabWidth: 0, tabCount: 0, tabZ: NaN
                 })
             );
         }
@@ -74,7 +80,7 @@ export function buildPartGcode(part, mfg) {
         lines.push(
             ...profileTangentHullOps({
                 circles: part.innerOutline,
-                safeZ, cutDepth, stepdown, feedXY, feedZ
+                safeZ, cutDepth, stepdown, feedXY, feedZ, tabWidth: 0, tabCount: 0, tabZ: NaN
             })
         );
     }
@@ -83,7 +89,7 @@ export function buildPartGcode(part, mfg) {
         lines.push(
             ...profileTangentHullOps({
                 circles: part.outline,
-                safeZ, cutDepth, stepdown, feedXY, feedZ
+                safeZ, cutDepth, stepdown, feedXY, feedZ, tabWidth, tabCount, tabZ
             })
         );
     } else if (part.barStyle === 'disk') {
@@ -98,18 +104,18 @@ export function buildPartGcode(part, mfg) {
         );
     } else if (part.barStyle === 'rounded') {
         lines.push(
-            ...profileRoundedRectOps({ rect: part.rect, safeZ, cutDepth, stepdown, feedXY, feedZ })
+            ...profileRoundedRectOps({ rect: part.rect, safeZ, cutDepth, stepdown, feedXY, feedZ, tabWidth, tabCount, tabZ })
         );
     } else if (part.barStyle === 'path' && part.points) {
         lines.push(
             ...profilePathOps({
                 points: part.points,
-                safeZ, cutDepth, stepdown, feedXY, feedZ
+                safeZ, cutDepth, stepdown, feedXY, feedZ, tabWidth, tabCount, tabZ
             })
         );
     } else {
         lines.push(
-            ...profileRectOps({ rect: part.rect, safeZ, cutDepth, stepdown, feedXY, feedZ })
+            ...profileRectOps({ rect: part.rect, safeZ, cutDepth, stepdown, feedXY, feedZ, tabWidth, tabCount, tabZ })
         );
     }
 
@@ -127,7 +133,7 @@ export function buildAllGcodes(parts, mfg) {
     const files = [];
     for (const p of parts) {
         const g = buildPartGcode(p, mfg);
-        files.push({ name: `${p.id}.gcode`, text: g });
+        files.push({ name: `${p.id}.nc`, text: g });
     }
     return files;
 }
@@ -156,6 +162,10 @@ export function generateMachiningInfo(mfg, partCount) {
     if (Number.isFinite(mfg.spindle) && mfg.spindle > 0) {
         info.push(`- 主軸轉速：${mfg.spindle.toFixed(0)} RPM`);
     }
+    if (Number.isFinite(mfg.tabThickness) && mfg.tabThickness > 0 && Number.isFinite(mfg.tabWidth) && mfg.tabWidth > 0 && Number.isFinite(mfg.tabCount) && mfg.tabCount > 0) {
+        info.push(`- Tabs: thickness ${mfg.tabThickness.toFixed(2)} mm, width ${mfg.tabWidth.toFixed(2)} mm, count ${Math.round(mfg.tabCount)}`);
+    }
+
 
     return info.join('\n');
 }
