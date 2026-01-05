@@ -42,7 +42,7 @@ export class MechanismWizard {
         this.container.innerHTML = `
             <div class="wizard-header" style="padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-radius: 8px 8px 0 0;">
                 <h4 style="margin: 0; font-size: 14px; color: #34495e; display: flex; align-items: center; gap: 5px; white-space: nowrap">
-                    🛠️ 機構設計器
+                     機構設計器
                 </h4>
                 <select id="templateSelect" style="font-size: 11px; padding: 2px 4px; border-radius: 4px; border: 1px solid #ddd;">
                     <option value="">-- 載入範本 --</option>
@@ -91,7 +91,7 @@ export class MechanismWizard {
         return this.components.map((c, i) => {
             const isSelected = this.selectedComponentIndex === i;
             const isSolved = this.isComponentSolved(c, solvedPoints);
-            const icon = c.type === 'bar' ? '📏' : (c.type === 'triangle' ? '📐' : (c.type === 'slider' ? 'S' : '⚪'));
+            const icon = c.type === 'bar' ? '' : (c.type === 'triangle' ? '' : (c.type === 'slider' ? 'S' : ''));
             const color = c.color || '#333';
 
             return `
@@ -113,7 +113,7 @@ export class MechanismWizard {
                     <span style="flex: 1; font-weight: ${isSelected ? 'bold' : 'normal'}; color: ${isSelected ? '#2980b9' : '#34495e'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         ${c.id || (c.type + (i + 1))}
                     </span>
-                    ${!isSolved ? '<span title="此桿件目前無法求解" style="color: #ff7675; font-size: 10px;">⚠️</span>' : ''}
+                    ${!isSolved ? '<span title="此桿件目前無法求解" style="color: #ff7675; font-size: 10px;"></span>' : ''}
                     <div style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; border: 1px solid rgba(0,0,0,0.1);"></div>
                 </div>
             `;
@@ -125,13 +125,13 @@ export class MechanismWizard {
         if (!comp) {
             return `
                 <div style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #bdc3c7; text-align: center;">
-                    <div style="font-size: 40px; margin-bottom: 10px; opacity: 0.5;">📏</div>
+                    <div style="font-size: 40px; margin-bottom: 10px; opacity: 0.5;"></div>
                     <div style="font-size: 12px; font-weight: bold;">請新增桿件</div>
                 </div>
             `;
         }
 
-        const icon = comp.type === 'bar' ? '📏' : (comp.type === 'triangle' ? '📐' : (comp.type === 'slider' ? 'S' : '⚪'));
+        const icon = comp.type === 'bar' ? '' : (comp.type === 'triangle' ? '' : (comp.type === 'slider' ? 'S' : ''));
         const driver = comp.type === 'slider'
             ? (comp.driverId
                 ? this.components.find(c => c.id === comp.driverId && c.type === 'bar')
@@ -160,7 +160,7 @@ export class MechanismWizard {
         let html = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #f8f9fa;">
                 <h5 style="margin: 0; font-size: 14px; color: #2c3e50; display: flex; align-items: center; gap: 5px;">
-                    ${icon} 編輯 ${comp.type === 'hole' ? '孔位' : '桿件'} ${!isSolved ? '<span style="color: #ff7675; font-size: 12px;">(⚠️ 未求解)</span>' : ''}
+                    ${icon} 編輯 ${comp.type === 'hole' ? '孔位' : '桿件'} ${!isSolved ? '<span style="color: #ff7675; font-size: 12px;">( 未求解)</span>' : ''}
                 </h5>
                 <button onclick="window.wizard.removeSelected()" style="background: #fff; border: 1px solid #ff7675; color: #ff7675; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;">刪除</button>
             </div>
@@ -182,27 +182,27 @@ export class MechanismWizard {
         `;
 
         if (comp.type === 'bar') {
-            html += section('?? 1 (P1)', `${comp.id || 'bar'}-p1`, `
+            html += section('點位 1 (P1)', `${comp.id || 'bar'}-p1`, `
                 ${this.renderPointEditor(comp, 'p1')}
             `);
-            html += section('?? 2 (P2)', `${comp.id || 'bar'}-p2`, `
+            html += section('點位 2 (P2)', `${comp.id || 'bar'}-p2`, `
                 ${this.renderPointEditor(comp, 'p2')}
             `);
 
             const paramsBody = `
                 <div class=\"form-group\">
-                    <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">????</label>
+                    <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">桿長參數</label>
                     <input type=\"text\" value=\"${comp.lenParam || 'L'}\" oninput=\"window.wizard.updateCompProp('lenParam', this.value)\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;\">
                 </div>
                 <div class=\"form-group\">
                     <label style=\"display: flex; align-items: center; gap: 8px; font-size: 12px; color: #2c3e50; cursor: pointer; padding: 6px; background: #f8f9fa; border-radius: 4px;\">
-                        <input type=\"checkbox\" ${comp.isInput ? 'checked' : ''} onchange=\"window.wizard.updateCompProp('isInput', this.checked)\" style=\"width: 14px; height: 14px;\"> ????
+                        <input type=\"checkbox\" ${comp.isInput ? 'checked' : ''} onchange=\"window.wizard.updateCompProp('isInput', this.checked)\" style=\"width: 14px; height: 14px;\"> 馬達驅動
                     </label>
                 </div>
 
                 ${comp.isInput ? `
                 <div class=\"form-group\" style=\"padding: 0 6px;\">
-                    <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">??????</label>
+                    <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">實體馬達</label>
                     <select onchange=\"window.wizard.updateCompProp('physicalMotor', this.value)\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;\">
                         <option value=\"1\" ${comp.physicalMotor === '1' || !comp.physicalMotor ? 'selected' : ''}>M1</option>
                         <option value=\"2\" ${comp.physicalMotor === '2' ? 'selected' : ''}>M2</option>
@@ -218,7 +218,7 @@ export class MechanismWizard {
                     </button>
                 </div>
             `;
-            html += section('?? / ??', `${comp.id || 'bar'}-params`, paramsBody);
+            html += section('桿件 / 參數', `${comp.id || 'bar'}-params`, paramsBody);
 
             const holesBody = `
                 <div style=\"margin-top: 4px;\">
@@ -226,61 +226,61 @@ export class MechanismWizard {
                         ${(comp.holes || []).map((h, hIdx) => `
                             <div style=\"background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px;\">
                                 <div style=\"display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;\">
-                                    <span style=\"font-size: 11px; font-weight: bold; color: #34495e;\">?? ${h.id}</span>
-                                    <button onclick=\"window.wizard.removeNestedHole('${comp.id}', '${h.id}')\" style=\"background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px;\">??</button>
+                                    <span style=\"font-size: 11px; font-weight: bold; color: #34495e;\">孔位 ${h.id}</span>
+                                    <button onclick=\"window.wizard.removeNestedHole('${comp.id}', '${h.id}')\" style=\"background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px;\">刪除</button>
                                 </div>
                                 <div class=\"form-group\" style=\"margin:0;\">
-                                    <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">?? P1 ??</label>
+                                    <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">距離 P1 參數名</label>
                                     <input type=\"text\" value=\"${h.distParam || ''}\" 
                                         oninput=\"window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'distParam', this.value)\" 
                                         style=\"width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;\">
                                 </div>
                             </div>
                         `).join('')}
-                        ${!(comp.holes && comp.holes.length) ? '<div style=\"font-size: 10px; color: #bdc3c7; text-align: center; padding: 10px; border: 1px dashed #eee; border-radius: 6px;\">????????????</div>' : ''}
+                        ${!(comp.holes && comp.holes.length) ? '<div style=\"font-size: 10px; color: #bdc3c7; text-align: center; padding: 10px; border: 1px dashed #eee; border-radius: 6px;\">在畫面上點擊桿件即可加孔</div>' : ''}
                     </div>
                 </div>
             `;
-            html += section('????', `${comp.id || 'bar'}-holes`, holesBody);
+            html += section('孔位管理', `${comp.id || 'bar'}-holes`, holesBody);
         } else if (comp.type === 'triangle') {
-            html += section('?? 1 (P1)', `${comp.id || 'tri'}-p1`, `
+            html += section('點位 1 (P1)', `${comp.id || 'tri'}-p1`, `
                 ${this.renderPointEditor(comp, 'p1')}
             `);
-            html += section('?? 2 (P2)', `${comp.id || 'tri'}-p2`, `
+            html += section('點位 2 (P2)', `${comp.id || 'tri'}-p2`, `
                 ${this.renderPointEditor(comp, 'p2')}
             `);
-            html += section('??? (P3)', `${comp.id || 'tri'}-p3`, `
+            html += section('點位 (P3)', `${comp.id || 'tri'}-p3`, `
                 ${this.renderPointEditor(comp, 'p3')}
             `);
 
             const triParams = `
                 <div style=\"display: grid; grid-template-columns: 1fr 1fr; gap: 10px;\">
                     <div class=\"form-group\">
-                        <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">?? 1 (P1-P3)</label>
+                        <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">邊長 1 (P1-P3)</label>
                         <input type=\"text\" value=\"${comp.r1Param || 'L1'}\" oninput=\"window.wizard.updateCompProp('r1Param', this.value)\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;\">
                     </div>
                     <div class=\"form-group\">
-                        <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">?? 2 (P2-P3)</label>
+                        <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">邊長 2 (P2-P3)</label>
                         <input type=\"text\" value=\"${comp.r2Param || 'L2'}\" oninput=\"window.wizard.updateCompProp('r2Param', this.value)\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;\">
                     </div>
                 </div>
                 <div class=\"form-group\">
-                    <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">?? (P1-P2)</label>
+                    <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">基準邊 (P1-P2)</label>
                     <input type=\"text\" value=\"${comp.gParam || 'G'}\" oninput=\"window.wizard.updateCompProp('gParam', this.value)\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;\">
                 </div>
                 <div class=\"form-group\">
-                    <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">??</label>
+                    <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">解方向</label>
                     <select onchange=\"window.wizard.updateCompProp('sign', parseInt(this.value))\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;\">
-                        <option value=\"1\" ${comp.sign === 1 ? 'selected' : ''}>?? (+1)</option>
-                        <option value=\"-1\" ${comp.sign === -1 ? 'selected' : ''}>?? (-1)</option>
+                        <option value=\"1\" ${comp.sign === 1 ? 'selected' : ''}>正向 (+1)</option>
+                        <option value=\"-1\" ${comp.sign === -1 ? 'selected' : ''}>反向 (-1)</option>
                     </select>
                 </div>
             `;
-            html += section('??', `${comp.id || 'tri'}-params`, triParams);
+            html += section('參數', `${comp.id || 'tri'}-params`, triParams);
         } else if (comp.type === 'slider') {
             const driverBlock = driver ? `
                         <div class="form-group" style="margin-top: 8px; border-top: 1px dashed #eee; padding-top: 8px;">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">??????</label>
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">驅動桿長度參數</label>
                             <input type="text" value="${driver.lenParam || ''}" oninput="window.wizard.updateSliderDriverParam('${driver.id}', this.value)" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
                         </div>
             ` : '';
@@ -288,24 +288,24 @@ export class MechanismWizard {
             const trackBody = `
                 <div style="margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; overflow: hidden;">
                     <div style="background: #f1f2f6; padding: 6px 10px; font-size: 11px; font-weight: bold; color: #555; border-bottom: 1px solid #ddd;">
-                        ???? (Track)
+                        滑軌 (Track)
                     </div>
                     <div style="padding: 10px; background: #fff;">
                         <div style="margin-bottom: 8px;">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">?? (P1)</label>
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">端點 (P1)</label>
                             ${this.renderPointEditor(comp, 'p1')}
                         </div>
                         <div style="margin-bottom: 8px; border-top: 1px dashed #eee; padding-top: 8px;">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">?? (P2)</label>
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">端點 (P2)</label>
                             ${this.renderPointEditor(comp, 'p2')}
                         </div>
                         <div class="form-group" style="margin-top: 8px; border-top: 1px dashed #eee; padding-top: 8px;">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">?????? (Track Length)</label>
-                            <input type="text" value="${comp.trackLenParam || ''}" oninput="window.wizard.updateCompProp('trackLenParam', this.value)" placeholder="??: 200 ? L_track" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">滑軌長度參數 (Track Length)</label>
+                            <input type="text" value="${comp.trackLenParam || ''}" oninput="window.wizard.updateCompProp('trackLenParam', this.value)" placeholder="例如: 200 或 L_track" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
                         </div>
                         <div class="form-group" style="margin-top: 4px;">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">P1 ???? (P1 Offset)</label>
-                            <input type="text" value="${comp.trackOffsetParam || ''}" oninput="window.wizard.updateCompProp('trackOffsetParam', this.value)" placeholder="??: 20 ? Offset" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">P1 偏移參數 (P1 Offset)</label>
+                            <input type="text" value="${comp.trackOffsetParam || ''}" oninput="window.wizard.updateCompProp('trackOffsetParam', this.value)" placeholder="例如: 20 或 Offset" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
                         </div>
                         ${driverBlock}
                     </div>
@@ -315,15 +315,15 @@ export class MechanismWizard {
             const blockBody = `
                 <div style="margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; overflow: hidden;">
                     <div style="background: #f1f2f6; padding: 6px 10px; font-size: 11px; font-weight: bold; color: #555; border-bottom: 1px solid #ddd;">
-                        ???? (Slider Block)
+                        滑塊 (Slider Block)
                     </div>
                     <div style="padding: 10px; background: #fff;">
                         <div style="margin-bottom: 8px;">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">??? (P3)</label>
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">端點 (P3)</label>
                             ${this.renderPointEditor(comp, 'p3')}
                         </div>
                         <div class="form-group">
-                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">??? (Sign)</label>
+                            <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">解方向 (Sign)</label>
                             <select onchange="window.wizard.updateCompProp('sign', parseInt(this.value))" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; background: #fff;">
                                 <option value="1" ${comp.sign === 1 ? 'selected' : ''}>+1</option>
                                 <option value="-1" ${comp.sign === -1 ? 'selected' : ''}>-1</option>
@@ -333,8 +333,8 @@ export class MechanismWizard {
                 </div>
             `;
 
-            html += section('????', `${comp.id || 'slider'}-track`, trackBody);
-            html += section('????', `${comp.id || 'slider'}-block`, blockBody);
+            html += section('滑軌設定', `${comp.id || 'slider'}-track`, trackBody);
+            html += section('滑塊設定', `${comp.id || 'slider'}-block`, blockBody);
         }
 
         html += `</div>`;
@@ -349,9 +349,9 @@ export class MechanismWizard {
             <div style="display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; gap: 5px; align-items: center;">
                     <select onchange="window.wizard.updatePointProp('${pointKey}', 'type', this.value)" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px; background: #fff;">
-                        <option value="fixed" ${pt.type === 'fixed' ? 'selected' : ''}>📍 固定 (Fixed)</option>
-                        <option value="existing" ${pt.type === 'existing' ? 'selected' : ''}>🔗 現有 (Existing)</option>
-                        <option value="floating" ${pt.type === 'floating' ? 'selected' : ''}>☁️ 浮動 (Floating)</option>
+                        <option value="fixed" ${pt.type === 'fixed' ? 'selected' : ''}> 固定 (Fixed)</option>
+                        <option value="existing" ${pt.type === 'existing' ? 'selected' : ''}> 現有 (Existing)</option>
+                        <option value="floating" ${pt.type === 'floating' ? 'selected' : ''}> 浮動 (Floating)</option>
                     </select>
                 </div>
 
@@ -426,7 +426,7 @@ export class MechanismWizard {
             while (this.components.find(c => c.id === `Tri${count}`)) count++;
             const id = `Tri${count}`;
 
-            // 🌟 核心修正：如果是第一個組件，將前兩個點設為固定 (Ground)，確保有解
+            //  核心修正：如果是第一個組件，將前兩個點設為固定 (Ground)，確保有解
             const isFirst = this.components.length === 0;
 
             const newTri = {
@@ -455,7 +455,7 @@ export class MechanismWizard {
         while (this.components.find(c => c.id === `Poly${count}`)) count++;
         const id = `Poly${count}`;
 
-        // 🌟 核心修正：如果是第一個組件，將前兩個點設為固定 (Ground)，確保有解
+        //  核心修正：如果是第一個組件，將前兩個點設為固定 (Ground)，確保有解
         const isFirst = this.components.length === 0;
 
         const newPoly = {
@@ -508,12 +508,12 @@ export class MechanismWizard {
             isInput: false
         };
 
-        // 🎯 核心修正：如果是第一根桿件，且 P1 是起始點 (不管是新點還是既有的 O 點)，將其設為固定點
+        //  核心修正：如果是第一根桿件，且 P1 是起始點 (不管是新點還是既有的 O 點)，將其設為固定點
         if (this.components.length === 0) {
             newBar.p1.type = 'fixed';
             newBar.isInput = true;
 
-            // 🌟 核心修正：計算繪製時的角度偏移，防止自動「變平」
+            //  核心修正：計算繪製時的角度偏移，防止自動「變平」
             const dx = p2Data.x - p1Data.x;
             const dy = p2Data.y - p1Data.y;
             const rad = Math.atan2(dy, dx);
@@ -527,7 +527,7 @@ export class MechanismWizard {
 
         this.components.push(newBar);
 
-        // 🌟 核心修正：每當畫出新桿件，確保長度參數立刻被重新計算，不被舊值 100 蓋過
+        //  核心修正：每當畫出新桿件，確保長度參數立刻被重新計算，不被舊值 100 蓋過
         if (this.topology.params) {
             delete this.topology.params[newBar.lenParam];
         }
@@ -803,7 +803,7 @@ export class MechanismWizard {
         if (confirm('確定要重置所有設計嗎？')) {
             this.components = [];
             this.selectedComponentIndex = -1;
-            this.topology.params = { theta: 0 }; // 🌟 徹底清空參數
+            this.topology.params = { theta: 0 }; //  徹底清空參數
             this.render();
             this.syncTopology();
         }
