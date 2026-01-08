@@ -133,8 +133,15 @@
             <div id="partSpecsPanel"></div>
 
             <div style="height:10px"></div>
-            <h3>加工設定（GRBL / 3018）</h3>
+            <h3>加工設定（GRBL / MACH3）</h3>
             <div class="grid">
+                <div>
+                    <label>後處理器</label>
+                    <select id="postProcessor">
+                        <option value="grbl" selected>GRBL</option>
+                        <option value="mach3">MACH3</option>
+                    </select>
+                </div>
                 <div>
                     <label>工作範圍 X（mm）</label>
                     <input id="workX" type="number" value="300" />

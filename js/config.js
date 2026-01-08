@@ -76,6 +76,7 @@ export function readInputs() {
     const spindleEl = $("spindle");
     const spindleRaw = spindleEl ? spindleEl.value.trim() : "";
     const mfg = {
+        postProcessor: $("postProcessor")?.value || "grbl",
         toolD: Number($("toolD")?.value || 3.0),       // 刀徑
         thickness: Number($("thickness")?.value || 3.0), // 材料厚度
         overcut: Number($("overcut")?.value || 0.5),   // 穿透餘量

@@ -4,13 +4,24 @@
 
 import { fmt } from '../utils.js';
 
-export function gcodeHeader({ safeZ, spindle }) {
+function normalizePostProcessor(postProcessor) {
+    const val = String(postProcessor || '').toLowerCase();
+    return val === 'mach3' ? 'mach3' : 'grbl';
+}
+
+export function gcodeHeader({ safeZ, spindle, postProcessor }) {
     const lines = [];
-    lines.push("(MVP 4-bar parts, GRBL)");
+    const post = normalizePostProcessor(postProcessor);
+    lines.push(`(MVP 4-bar parts, ${post === 'mach3' ? 'MACH3' : 'GRBL'})`);
     lines.push("G21  (mm)");
     lines.push("G90  (absolute)");
     lines.push("G17  (XY plane)");
     lines.push("G94  (feed per minute)");
+    if (post === 'mach3') {
+        lines.push("G40  (cutter comp off)");
+        lines.push("G49  (tool length comp off)");
+        lines.push("G80  (cancel canned cycles)");
+    }
     lines.push(`G0 Z${fmt(safeZ)}`);
     if (Number.isFinite(spindle) && spindle > 0) {
         lines.push(`M3 S${fmt(spindle)}`);
@@ -18,13 +29,14 @@ export function gcodeHeader({ safeZ, spindle }) {
     return lines;
 }
 
-export function gcodeFooter({ safeZ, spindle }) {
+export function gcodeFooter({ safeZ, spindle, postProcessor }) {
     const lines = [];
+    const post = normalizePostProcessor(postProcessor);
     lines.push(`G0 Z${fmt(safeZ)}`);
     if (Number.isFinite(spindle) && spindle > 0) {
         lines.push("M5");
     }
-    lines.push("M2");
+    lines.push(post === 'mach3' ? "M30" : "M2");
     return lines;
 }
 

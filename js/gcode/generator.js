@@ -21,7 +21,7 @@ import {
  * @returns {string} G-code 文字
  */
 export function buildPartGcode(part, mfg) {
-    const { safeZ, feedXY, feedZ, thickness, overcut, stepdown, spindle, holeMode, tabThickness, tabWidth, tabCount } = mfg;
+    const { safeZ, feedXY, feedZ, thickness, overcut, stepdown, spindle, holeMode, tabThickness, tabWidth, tabCount, postProcessor } = mfg;
 
     const cutDepth = -(thickness + overcut); // 負值
     const drillZ = cutDepth; // 鑽孔深度與切深相同
@@ -33,7 +33,7 @@ export function buildPartGcode(part, mfg) {
     const tabZ = tabEnabled ? -(thickness - tabThickness) : NaN;
 
     const lines = [];
-    lines.push(...gcodeHeader({ safeZ, spindle }));
+    lines.push(...gcodeHeader({ safeZ, spindle, postProcessor }));
 
     // 註解說明
     let labelL = part.L !== undefined ? `L=${part.L.toFixed(2)}mm` : `W=${part.width}, H=${part.height || part.diameter}`;
@@ -119,7 +119,7 @@ export function buildPartGcode(part, mfg) {
         );
     }
 
-    lines.push(...gcodeFooter({ safeZ, spindle }));
+    lines.push(...gcodeFooter({ safeZ, spindle, postProcessor }));
     return lines.join("\n") + "\n";
 }
 
@@ -159,6 +159,7 @@ export function generateMachiningInfo(mfg, partCount) {
     info.push(`- XY 進給：${mfg.feedXY.toFixed(0)} mm/min`);
     info.push(`- Z 進給：${mfg.feedZ.toFixed(0)} mm/min`);
     info.push(`- 孔加工：${mfg.holeMode === "mill" ? "銑內徑" : "鑽中心點"}`);
+    info.push(`- 後處理器：${mfg.postProcessor === "mach3" ? "MACH3" : "GRBL"}`);
     if (Number.isFinite(mfg.spindle) && mfg.spindle > 0) {
         info.push(`- 主軸轉速：${mfg.spindle.toFixed(0)} RPM`);
     }
