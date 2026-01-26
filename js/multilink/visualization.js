@@ -366,28 +366,63 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
         return svg;
     }
 
-    // 1. Draw Trajectory
-    if (trajectoryData && trajectoryData.results) {
-        let traceId = topology.tracePoint;
-        if (!traceId) {
-            const firstValid = trajectoryData.results.find(r => r.isValid && r.points);
-            if (firstValid && firstValid.points) {
-                const ids = Object.keys(firstValid.points);
-                traceId = ids.length ? ids[ids.length - 1] : null;
-            }
-        }
+    // 1. Draw Trajectories (Ghost Paths) for all points
+    if (trajectoryData && trajectoryData.results && trajectoryData.results.length > 0) {
+        // Collect all point IDs found in the results
+        const firstValid = trajectoryData.results.find(r => r.isValid && r.points);
+        if (firstValid && firstValid.points) {
+            const allPointIds = Object.keys(firstValid.points);
 
-        if (traceId) {
-            const pts = trajectoryData.results
-                .filter(r => r.isValid && r.points && r.points[traceId])
-                .map(r => `${tx(r.points[traceId])},${ty(r.points[traceId])}`)
-                .join(' ');
-            if (pts) {
-                svg.appendChild(svgEl('polyline', {
-                    points: pts, fill: 'none', stroke: '#9b59b6', 'stroke-width': 2, 'stroke-opacity': 0.6
-                }));
-            }
+            allPointIds.forEach(ptId => {
+                // Skip ground points (they don't move)
+                const isGround = ptId.startsWith('O');
+                if (isGround) return;
+
+                const results = trajectoryData.results;
+                let currentSegment = [];
+                let currentValid = null;
+
+                for (let i = 0; i < results.length; i++) {
+                    const r = results[i];
+                    const p = r.points ? r.points[ptId] : null;
+                    if (!p) {
+                        // If no point, break segment
+                        renderSegment(currentSegment, currentValid, ptId);
+                        currentSegment = [];
+                        currentValid = null;
+                        continue;
+                    }
+
+                    if (currentValid === null) {
+                        currentValid = r.isValid;
+                    } else if (currentValid !== r.isValid) {
+                        // State changed, render previous segment
+                        renderSegment(currentSegment, currentValid, ptId);
+                        currentSegment = [p];
+                        currentValid = r.isValid;
+                        continue;
+                    }
+                    currentSegment.push(p);
+                }
+                renderSegment(currentSegment, currentValid, ptId);
+            });
         }
+    }
+
+    function renderSegment(points, isValid, ptId) {
+        if (points.length < 2) return;
+        const ptsString = points.map(p => `${tx(p)},${ty(p)}`).join(' ');
+        const isTrace = ptId === (topology.tracePoint || '');
+
+        svg.appendChild(svgEl('polyline', {
+            points: ptsString,
+            fill: 'none',
+            stroke: isValid ? (isTrace ? '#9b59b6' : '#bdc3c7') : '#e74c3c',
+            'stroke-width': isTrace ? 2.5 : 1,
+            'stroke-opacity': isValid ? (isTrace ? 0.8 : 0.4) : 0.6,
+            'stroke-dasharray': isValid ? (isTrace ? 'none' : '4,4') : '2,2',
+            class: isValid ? 'ghost-trajectory' : 'invalid-trajectory'
+        }));
     }
 
     // 2. Drive Components
