@@ -98,12 +98,54 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
                 continue;
             }
 
+            // 「機敏預警」顏色計算
+            let strokeColor = link.color || '#333';
+            let filter = 'none';
+            if (sol.dyadQualities) {
+                const q1 = sol.dyadQualities[link.p1] ?? 1.0;
+                const q2 = sol.dyadQualities[link.p2] ?? 1.0;
+                const quality = Math.min(q1, q2); // 取傳動最差的一端
+
+                if (quality < 0.4) { // 低於 23 度左右
+                    const r = 255;
+                    const g = Math.round(200 * (quality / 0.4));
+                    strokeColor = `rgb(${r},${g},0)`;
+
+                    // 「機敏情境語句」：不再顯示冷冰冰的數字，而是直覺的狀態
+                    let hintMsg = `⚠️ 運作吃力`;
+
+                    if (quality < 0.15) { // 極度危險
+                        strokeColor = '#ff4d4d'; // 更亮的紅色
+                        filter = 'drop-shadow(0 0 4px #ff0000)';
+                        hintMsg = `❌ 即將卡死`;
+                    }
+
+                    // 在連桿中心點繪製提示語 (加強視覺化：白底黑字或發亮文字)
+                    const midX = (tx(p1) + tx(p2)) / 2;
+                    const midY = (ty(p1) + ty(p2)) / 2;
+
+                    // 背景底色標籤感 (使用 rect + text)
+                    const textEl = svgEl('text', {
+                        x: midX, y: midY + 22,
+                        fill: strokeColor,
+                        'font-size': '11px',
+                        'font-weight': '900',
+                        'text-anchor': 'middle',
+                        'pointer-events': 'none',
+                        style: 'text-shadow: 0px 0px 4px rgba(255,255,255,0.9); font-family: "Noto Sans TC", sans-serif;'
+                    });
+                    textEl.textContent = hintMsg;
+                    svg.appendChild(textEl);
+                }
+            }
+
             const attrs = {
                 x1: tx(p1), y1: ty(p1),
                 x2: tx(p2), y2: ty(p2),
-                stroke: link.color || '#333',
+                stroke: strokeColor,
                 'stroke-width': link.width || 4,
-                'stroke-linecap': 'round'
+                'stroke-linecap': 'round',
+                filter: filter
             };
 
             if (link.style === 'track') {

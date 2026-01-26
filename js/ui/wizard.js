@@ -528,10 +528,10 @@ export class MechanismWizard {
 
         this.components.push(newBar);
 
-        //  核心修正：每當畫出新桿件，確保長度參數立刻被重新計算，不被舊值 100 蓋過
-        if (this.topology.params) {
-            delete this.topology.params[newBar.lenParam];
-        }
+        //  核心修正：立刻初始化長度參數，防止求解器因找不到參數而預設為 0 (導致無解)
+        const dist = Math.round(Math.sqrt((p2Data.x - p1Data.x) ** 2 + (p2Data.y - p1Data.y) ** 2));
+        if (!this.topology.params) this.topology.params = {};
+        this.topology.params[newBar.lenParam] = dist;
 
         this.selectedComponentIndex = this.components.length - 1;
         this.render();
@@ -842,6 +842,33 @@ export class MechanismWizard {
         }
     }
 
+    mergePoints(sourceId, targetId) {
+        if (!sourceId || !targetId || sourceId === targetId) return;
+        let changed = false;
+
+        this.components.forEach(c => {
+            if (c.type === 'polygon' && c.points) {
+                c.points.forEach(p => {
+                    if (p.id === sourceId) { p.id = targetId; changed = true; }
+                });
+            } else {
+                ['p1', 'p2', 'p3'].forEach(k => {
+                    if (c[k] && c[k].id === sourceId) { c[k].id = targetId; changed = true; }
+                });
+            }
+        });
+
+        if (changed) {
+            // Remove zero-length bars that might have been created
+            this.components = this.components.filter(c => {
+                if (c.type === 'bar' && c.p1.id === c.p2.id) return false;
+                return true;
+            });
+            this.render();
+            this.syncTopology();
+        }
+    }
+
     removeSelected() {
         if (this.selectedComponentIndex >= 0) {
             this.components.splice(this.selectedComponentIndex, 1);
@@ -917,6 +944,12 @@ export class MechanismWizard {
     syncTopology() {
         this.compileTopology();
         if (this.onUpdate) this.onUpdate(this.topology);
+    }
+
+    // 🌟 新增：立刻同步 (不等待 Timer)，解決畫布互動後的延遲感
+    syncTopologyNow() {
+        clearTimeout(this._syncTimer);
+        this.syncTopology();
     }
     compileTopology() {
         // 「長度驅動坐標」：在編譯前，檢查是否有長度參數改變了固定點的物理預期

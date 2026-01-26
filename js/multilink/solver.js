@@ -79,6 +79,7 @@ function solveBodyJointTopology(topology, params) {
     const constraints = [];
     const lineConstraints = [];
     const autoParams = {};
+    const dyadQualities = {};
     const pointIds = new Set();
     const holeIds = new Set();
     let infeasibleReason = '';
@@ -365,6 +366,17 @@ function solveBodyJointTopology(topology, params) {
 
             if (chosen) {
                 points[pid] = chosen;
+                // 「機敏預警」：計算傳動品質 (sin of the angle between incoming links)
+                const v1 = { x: p1.x - chosen.x, y: p1.y - chosen.y };
+                const v2 = { x: p2.x - chosen.x, y: p2.y - chosen.y };
+                const mag1 = Math.hypot(v1.x, v1.y);
+                const mag2 = Math.hypot(v2.x, v2.y);
+                if (mag1 > 0 && mag2 > 0) {
+                    const dot = v1.x * v2.x + v1.y * v2.y;
+                    const cosTheta = dot / (mag1 * mag2);
+                    const sinTheta = Math.sqrt(Math.max(0, 1 - cosTheta * cosTheta));
+                    dyadQualities[pid] = sinTheta; // 1.0 = Perfect 90deg, 0.0 = Dead Lock
+                }
                 changed = true;
             }
         }
@@ -659,6 +671,7 @@ function solveBodyJointTopology(topology, params) {
         isValid: !infeasible,
         isUnderconstrained: !infeasible && !allResolved,
         points,
+        dyadQualities: dyadQualities || {},
         B: points[topology.tracePoint],
         errorReason: infeasibleReason || null,
         autoParams: Object.keys(autoParams).length ? autoParams : null

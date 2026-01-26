@@ -436,6 +436,11 @@ function setupLinkClickHandler() {
   // 3. Mouse Up (Commit Pan & Drag)
   window.addEventListener('mouseup', (e) => {
     if (isDraggingNode) {
+      if (currentSnapPoint && currentSnapPoint.type === 'joint' && currentSnapPoint.id && currentSnapPoint.id !== dragJointId) {
+        if (confirm(`是否將節點 ${dragJointId} 合併至 ${currentSnapPoint.id}？`)) {
+          if (window.wizard) window.wizard.mergePoints(dragJointId, currentSnapPoint.id);
+        }
+      }
       isDraggingNode = false;
       dragJointId = null;
       if (window.wizard) {
@@ -1036,6 +1041,9 @@ function setupLinkClickHandler() {
   svgWrap._bgClickHandler = (e) => {
     if (drawState === 'IDLE') return;
 
+    // 🌟 修正：只允許左鍵點擊 (防止右鍵結束繪圖時誤加點)
+    if (e.button !== 0) return;
+
     if (drawState === 'SELECT') {
       hideContextMenu();
       return;
@@ -1191,6 +1199,11 @@ function setupLinkClickHandler() {
 
     if (window.wizard) {
       window.wizard.addComponentFromCanvas(points);
+      // 🌟 修正：畫完立刻強制同步並顯示，不再等待 350ms 的 Timer
+      if (typeof window.wizard.syncTopologyNow === 'function') {
+        window.wizard.syncTopologyNow();
+        if (typeof updatePreview === 'function') updatePreview();
+      }
     }
     resetDrawState(false);
   }
