@@ -875,10 +875,16 @@ function setupLinkClickHandler() {
     let status = '';
     if (type === 'joint') {
       coordTooltip.style.border = '1px solid #3498db';
-      status = ' <span style="color:#3498db">● JOINT</span>';
+      status = ' <span style="color:#3498db">● 節點鎖點</span>';
     } else if (type === 'grid') {
       coordTooltip.style.border = '1px solid #2ecc71';
-      status = ' <span style="color:#2ecc71"># GRID</span>';
+      status = ' <span style="color:#2ecc71"># 網格鎖點</span>';
+    } else if (type === 'axial-h' || type === 'axial-v' || type === 'axial-hv') {
+      coordTooltip.style.border = '1px solid #e67e22';
+      status = ' <span style="color:#e67e22">⚓ 正交鎖點</span>';
+    } else if (type === 'equal-length') {
+      coordTooltip.style.border = '1px solid #9b59b6';
+      status = ` <span style="color:#9b59b6">📏 等長鎖點 (${currentSnapPoint ? currentSnapPoint.lenValue : ''})</span>`;
     } else {
       coordTooltip.style.border = '1px solid #7f8c8d';
     }
@@ -887,23 +893,78 @@ function setupLinkClickHandler() {
   }
 
   function getSnappedCoords(rawX, rawY) {
-    // 1. Grid Snap
     const viewRange = parseFloat(document.getElementById('viewRange').value) || 800;
     const step = calcAdaptiveGridStep(viewRange);
-
     const snapX = Math.round(rawX / step) * step;
     const snapY = Math.round(rawY / step) * step;
-
-    // Threshold: 10% of step?
     const threshold = step * 0.25;
 
     let res = { x: rawX, y: rawY, type: 'raw' };
 
+    // 1. Grid Snap
     if (Math.abs(rawX - snapX) < threshold && Math.abs(rawY - snapY) < threshold) {
       res = { x: snapX, y: snapY, type: 'grid' };
     }
 
-    // 2. Joint Snap (Higher priority)
+    // 2. Axial Snap (H/V) & Equal Length Snap (Only when drawing link)
+    const isDrawing = drawState === 'DRAWING_LINK' && drawPoints.length > 0;
+    const refPt = isDrawing ? drawPoints[drawPoints.length - 1] : null;
+
+    if (refPt) {
+      const axialThreshold = (viewRange / 800) * 15;
+      let axialSnapped = false;
+
+      // Vertical Snap (X remains same as ref)
+      if (Math.abs(rawX - refPt.x) < axialThreshold) {
+        res.x = refPt.x;
+        res.type = 'axial-v';
+        axialSnapped = true;
+      }
+      // Horizontal Snap (Y remains same as ref)
+      if (Math.abs(rawY - refPt.y) < axialThreshold) {
+        res.y = refPt.y;
+        res.type = axialSnapped ? 'axial-hv' : 'axial-h';
+      }
+
+      // Equal Length Snap (Only if not axial snapped or we want to prioritize length? Let's allow overlap)
+      if (window.wizard && window.wizard.components) {
+        const lenThreshold = (viewRange / 800) * 15;
+        const currentDist = Math.hypot(rawX - refPt.x, rawY - refPt.y);
+        let bestLen = -1;
+        let minDiff = lenThreshold;
+
+        for (const comp of window.wizard.components) {
+          const segments = [];
+          if (comp.type === 'bar' && comp.p1 && comp.p2) {
+            segments.push([comp.p1, comp.p2]);
+          } else if (comp.type === 'polygon' && comp.points) {
+            for (let i = 0; i < comp.points.length; i++) {
+              segments.push([comp.points[i], comp.points[(i + 1) % comp.points.length]]);
+            }
+          }
+
+          for (const [p1, p2] of segments) {
+            if (!Number.isFinite(p1.x) || !Number.isFinite(p2.x)) continue;
+            const l = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+            const diff = Math.abs(currentDist - l);
+            if (diff < minDiff) {
+              minDiff = diff;
+              bestLen = l;
+            }
+          }
+        }
+
+        if (bestLen > 0 && currentDist > 5) {
+          const ratio = bestLen / currentDist;
+          res.x = refPt.x + (rawX - refPt.x) * ratio;
+          res.y = refPt.y + (rawY - refPt.y) * ratio;
+          res.type = 'equal-length';
+          res.lenValue = Math.round(bestLen * 10) / 10;
+        }
+      }
+    }
+
+    // 3. Joint Snap (Highest priority)
     const jointThreshold = (viewRange / 800) * 15;
     if (window.wizard) {
       for (const comp of window.wizard.components) {
@@ -1154,6 +1215,46 @@ function setupLinkClickHandler() {
     const lastPt = drawPoints[drawPoints.length - 1];
     const pStart = toSvg(lastPt.x, lastPt.y);
     const pEnd = toSvg(currX, currY);
+
+    // Axial Snap Visual Guides
+    if (currentSnapPoint && (currentSnapPoint.type.startsWith('axial') || currentSnapPoint.type === 'equal-length')) {
+      const type = currentSnapPoint.type;
+
+      if (type.includes('v')) { // Vertical guide
+        const guide = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        guide.setAttribute('x1', pStart.x);
+        guide.setAttribute('y1', 0);
+        guide.setAttribute('x2', pStart.x);
+        guide.setAttribute('y2', H);
+        guide.setAttribute('stroke', 'rgba(230, 126, 34, 0.4)');
+        guide.setAttribute('stroke-width', '1');
+        guide.setAttribute('stroke-dasharray', '2,4');
+        ghostLineGroup.appendChild(guide);
+      }
+      if (type.includes('h')) { // Horizontal guide
+        const guide = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        guide.setAttribute('x1', 0);
+        guide.setAttribute('y1', pStart.y);
+        guide.setAttribute('x2', W);
+        guide.setAttribute('y2', pStart.y);
+        guide.setAttribute('stroke', 'rgba(230, 126, 34, 0.4)');
+        guide.setAttribute('stroke-width', '1');
+        guide.setAttribute('stroke-dasharray', '2,4');
+        ghostLineGroup.appendChild(guide);
+      }
+
+      if (type === 'equal-length') {
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', pStart.x);
+        circle.setAttribute('cy', pStart.y);
+        circle.setAttribute('r', (currentSnapPoint.lenValue || 0) * scale);
+        circle.setAttribute('fill', 'none');
+        circle.setAttribute('stroke', 'rgba(155, 89, 182, 0.3)');
+        circle.setAttribute('stroke-width', '1');
+        circle.setAttribute('stroke-dasharray', '5,5');
+        ghostLineGroup.appendChild(circle);
+      }
+    }
 
     const activeLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     activeLine.setAttribute('x1', pStart.x);
