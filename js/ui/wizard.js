@@ -22,6 +22,7 @@ export class MechanismWizard {
         this._syncTimer = null;
         this._syncDelay = 150;
         this.sectionCollapsed = {};
+        this.isDragging = false;
 
         this.init();
     }
@@ -542,8 +543,15 @@ export class MechanismWizard {
         if (!bar) return;
 
         if (!bar.holes) bar.holes = [];
-        const holeCount = this.components.reduce((acc, c) => acc + (c.holes ? c.holes.length : 0), 0) + 1;
-        const holeId = 'H' + holeCount;
+
+        let count = 1;
+        const allHoleIds = [];
+        this.components.forEach(c => {
+            if (c.holes) c.holes.forEach(h => allHoleIds.push(h.id));
+        });
+
+        while (allHoleIds.includes(`H${count}`)) count++;
+        const holeId = `H${count}`;
 
         const newHole = {
             id: holeId,
@@ -560,24 +568,30 @@ export class MechanismWizard {
         this.syncTopology();
     }
 
+    _getNextId(type) {
+        const prefix = type === 'bar' ? 'Link' : (type === 'triangle' ? 'Tri' : (type === 'slider' ? 'Slider' : (type === 'polygon' ? 'Poly' : 'H')));
+        let count = 1;
+        while (this.components.find(c => c.id === `${prefix}${count}`)) count++;
+        return `${prefix}${count}`;
+    }
+
     addComponent(type) {
-        const count = this.components.filter(c => c.type === type).length + 1;
-        let id = type === 'bar' ? `Link${count}` : (type === 'triangle' ? `Tri${count}` : (type === 'slider' ? `Slider${count}` : (type === 'polygon' ? `Poly${count}` : `H${count}`)));
+        const id = this._getNextId(type);
         const newComp = { type, id, color: type === 'bar' ? '#3498db' : (type === 'triangle' ? '#27ae60' : (type === 'slider' ? '#8e44ad' : (type === 'polygon' ? '#e67e22' : '#2d3436'))) };
 
         if (type === 'bar') {
             newComp.p1 = { id: '', type: 'fixed', x: 0, y: 0 };
             newComp.p2 = { id: '', type: 'floating', x: 0, y: 0 };
-            newComp.lenParam = 'L' + (this.components.length + 1);
+            newComp.lenParam = 'L' + id.replace('Link', '');
             newComp.isInput = false;
         } else if (type === 'triangle') {
             newComp.p1 = { id: '', type: 'existing', x: 0, y: 0 };
             newComp.p2 = { id: '', type: 'existing', x: 0, y: 0 };
             newComp.p3 = { id: '', type: 'floating', x: 0, y: 0 };
-            newComp.r1Param = 'R1_' + (this.components.length + 1);
-            newComp.r2Param = 'R2_' + (this.components.length + 1);
+            newComp.r1Param = 'R1_' + id.replace('Tri', '');
+            newComp.r2Param = 'R2_' + id.replace('Tri', '');
             newComp.paramMode = 'SSS'; // Default: Side-Side-Side
-            newComp.angleParam = 'Ang_' + (this.components.length + 1); // For SAS mode
+            newComp.angleParam = 'Ang_' + id.replace('Tri', ''); // For SAS mode
             newComp.sign = 1;
         } else if (type === 'slider') {
             newComp.p1 = { id: '', type: 'fixed', x: 0, y: 0 };
@@ -598,6 +612,7 @@ export class MechanismWizard {
         this.components.push(newComp);
         this.selectedComponentIndex = this.components.length - 1;
         this.render();
+        this.syncTopology();
     }
 
     selectComponent(index) {
@@ -655,25 +670,23 @@ export class MechanismWizard {
             return { x: 0, y: 0 };
         };
 
-        const ids = new Set(this.getAllPointIds());
+        const existingPointIds = new Set(this.getAllPointIds());
         let sIdx = 1;
-        while (ids.has(`S${sIdx}`)) sIdx++;
+        while (existingPointIds.has(`S${sIdx}`)) sIdx++;
         const sliderPointId = `S${sIdx}`;
 
-        const p1 = bar.p1;
-        const p2 = bar.p2;
-
-        const p1Coords = findPointCoords(p1.id);
-        const p2Coords = findPointCoords(p2.id);
+        const p1Coords = findPointCoords(bar.p1.id);
+        const p2Coords = findPointCoords(bar.p2.id);
         const midX = (p1Coords.x + p2Coords.x) / 2;
         const midY = (p1Coords.y + p2Coords.y) / 2;
 
+        const sliderId = this._getNextId('slider');
         const sliderComp = {
             type: 'slider',
-            id: `Slider${sIdx}`,
+            id: sliderId,
             color: '#8e44ad',
-            p1: { ...p1 },
-            p2: { ...p2 },
+            p1: { ...bar.p1, type: bar.p1.type === 'floating' ? 'existing' : bar.p1.type },
+            p2: { ...bar.p2, type: bar.p2.type === 'floating' ? 'existing' : bar.p2.type },
             p3: { id: sliderPointId, type: 'floating', x: midX, y: midY },
             sign: 1,
             lenParam: bar.lenParam,
@@ -681,6 +694,7 @@ export class MechanismWizard {
             trackOffsetParam: bar.lenParam ? `${bar.lenParam}_offset` : ''
         };
 
+        // Initialize params if missing
         if (bar.lenParam) {
             if (!this.topology.params) this.topology.params = { theta: 0 };
             if (this.topology.params[bar.lenParam] === undefined) {
@@ -703,7 +717,9 @@ export class MechanismWizard {
             }
         }
 
-        this.components.splice(this.selectedComponentIndex, 1, sliderComp);
+        // SWAP in place
+        this.components[this.selectedComponentIndex] = sliderComp;
+
         this.render();
         this.syncTopology();
     }
@@ -738,8 +754,90 @@ export class MechanismWizard {
             }
 
             if (!comp[pointKey]) comp[pointKey] = { id: '', type: 'floating', x: 0, y: 0 };
-            comp[pointKey][prop] = val;
-            if (prop === 'type') this.render();
+
+            if (prop === 'x' || prop === 'y') {
+                const valNum = Number(val);
+                if (Number.isFinite(valNum)) {
+                    comp[pointKey][prop] = valNum;
+
+                    // 「機敏連動」：如果兩端都是固定/指定點，自動更新長度參數
+                    if (comp.type === 'bar' && comp.lenParam) {
+                        const getCoord = (pt, axis) => {
+                            if (pt.id === comp[pointKey].id) return valNum;
+                            for (const c of this.components) {
+                                if (c.p1?.id === pt.id) return c.p1[axis];
+                                if (c.p2?.id === pt.id) return c.p2[axis];
+                                if (c.p3?.id === pt.id) return c.p3[axis];
+                            }
+                            return pt[axis];
+                        };
+
+                        const x1 = (pointKey === 'p1') ? valNum : getCoord(comp.p1, 'x');
+                        const y1 = (pointKey === 'p1') ? valNum : getCoord(comp.p1, 'y');
+                        const x2 = (pointKey === 'p2') ? valNum : getCoord(comp.p2, 'x');
+                        const y2 = (pointKey === 'p2') ? valNum : getCoord(comp.p2, 'y');
+
+                        const dist = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+                        if (this.topology.params) {
+                            this.topology.params[comp.lenParam] = Math.round(dist);
+                            // 觸發外部 UI (滑桿) 同步
+                            const slider = document.getElementById(`dyn_${comp.lenParam}`);
+                            if (slider) slider.value = Math.round(dist);
+                        }
+                    }
+                }
+            } else {
+                comp[pointKey][prop] = val;
+            }
+
+            if (prop === 'type' || prop === 'id') this.render();
+            this.scheduleSyncTopology();
+        }
+    }
+
+    updatePointCoordsById(id, x, y) {
+        if (!id) return;
+        let changed = false;
+        const xNum = Number(x);
+        const yNum = Number(y);
+
+        this.components.forEach(c => {
+            if (c.type === 'polygon' && c.points) {
+                c.points.forEach(p => {
+                    if (p.id === id) {
+                        if (p.x !== xNum || p.y !== yNum) {
+                            p.x = xNum; p.y = yNum; changed = true;
+                        }
+                    }
+                });
+            } else {
+                ['p1', 'p2', 'p3'].forEach(k => {
+                    if (c[k] && c[k].id === id) {
+                        if (c[k].x !== xNum || c[k].y !== yNum) {
+                            c[k].x = xNum; c[k].y = yNum; changed = true;
+                        }
+                    }
+                });
+            }
+
+            // 同步更新關聯的長度參數
+            if (c.type === 'bar' && c.lenParam && this.topology.params) {
+                const dx = c.p2.x - c.p1.x;
+                const dy = c.p2.y - c.p1.y;
+                const dist = Math.round(Math.sqrt(dx * dx + dy * dy));
+                if (this.topology.params[c.lenParam] !== dist) {
+                    this.topology.params[c.lenParam] = dist;
+                    const slider = document.getElementById(`dyn_${c.lenParam}`);
+                    if (slider) slider.value = dist;
+                    changed = true;
+                }
+            }
+        });
+
+        if (changed) {
+            if (!this.isDragging) {
+                this.render();
+            }
             this.scheduleSyncTopology();
         }
     }
@@ -821,6 +919,29 @@ export class MechanismWizard {
         if (this.onUpdate) this.onUpdate(this.topology);
     }
     compileTopology() {
+        // 「長度驅動坐標」：在編譯前，檢查是否有長度參數改變了固定點的物理預期
+        this.components.forEach(c => {
+            if (c.type === 'bar' && c.lenParam && this.topology.params && this.topology.params[c.lenParam] !== undefined) {
+                const targetL = this.topology.params[c.lenParam];
+                const p1 = c.p1;
+                const p2 = c.p2;
+
+                // 只有當 P1 是 Fixed 且 P2 也是固定類點時才啟動「強迫對齊」
+                if (p1.type === 'fixed' && (p2.type === 'fixed' || p2.type === 'existing')) {
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const currentL = Math.sqrt(dx * dx + dy * dy);
+
+                    if (currentL > 0.1 && Math.abs(currentL - targetL) > 0.5) {
+                        const ratio = targetL / currentL;
+                        p2.x = p1.x + dx * ratio;
+                        p2.y = p1.y + dy * ratio;
+                        // 不直接 render 以免無窮迴圈，只更新數據
+                    }
+                }
+            }
+        });
+
         this.topology = compileTopology(this.components, this.topology, this.getSolvedPointIds());
     }
 

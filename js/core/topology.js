@@ -330,47 +330,63 @@ export function compileTopology(components, topology, solvedPoints) {
         }
     });
 
+    const rawParts = components.map(c => {
+        if (c.skipPart) return null;
+        if (c.type === 'bar') {
+            return {
+                id: `${c.id}(${c.lenParam})`,
+                type: 'bar',
+                len_param: c.lenParam,
+                color: c.color,
+                isInput: Boolean(c.isInput),
+                holes: c.holes ? c.holes.map(h => ({ id: h.id, dist_param: h.distParam })) : []
+            };
+        } else if (c.type === 'triangle') {
+            return { id: c.id, type: 'triangle', len_params: [c.gParam, c.r1Param, c.r2Param], color: c.color };
+        } else if (c.type === 'slider') {
+            let lenVal = c.lenParam;
+            if (!lenVal && c.p1 && c.p2) {
+                const p1 = allPointsMap.get(c.p1.id);
+                const p2 = allPointsMap.get(c.p2.id);
+                if (p1 && p2) {
+                    lenVal = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                }
+            }
+
+            if (lenVal) {
+                return {
+                    id: `${c.id}_Track`,
+                    type: 'bar',
+                    len_param: lenVal,
+                    total_len_param: c.trackLenParam,
+                    offset_param: c.trackOffsetParam,
+                    isTrack: true,
+                    color: c.color
+                };
+            }
+        }
+        return null;
+    }).filter(p => p);
+
+    // ?? Name conflict resolution (ensure unique IDs in the parts array)
+    const finalParts = [];
+    const usedIds = new Set();
+    rawParts.forEach(p => {
+        let uniqueId = p.id;
+        let suffix = 1;
+        while (usedIds.has(uniqueId)) {
+            uniqueId = `${p.id}_${suffix}`;
+            suffix++;
+        }
+        usedIds.add(uniqueId);
+        finalParts.push({ ...p, id: uniqueId });
+    });
+
     return {
         steps,
         tracePoint: topology.tracePoint || Array.from(joints)[0] || '',
         visualization: { links: visualization.links, polygons, joints: Array.from(joints) },
-        parts: components.map(c => {
-            if (c.skipPart) return null;
-            if (c.type === 'bar') {
-                return {
-                    id: `${c.id}(${c.lenParam})`,
-                    type: 'bar',
-                    len_param: c.lenParam,
-                    color: c.color,
-                    isInput: Boolean(c.isInput),
-                    holes: c.holes ? c.holes.map(h => ({ id: h.id, dist_param: h.distParam })) : []
-                };
-            } else if (c.type === 'triangle') {
-                return { id: c.id, type: 'triangle', len_params: [c.gParam, c.r1Param, c.r2Param], color: c.color };
-            } else if (c.type === 'slider') {
-                let lenVal = c.lenParam;
-                if (!lenVal && c.p1 && c.p2) {
-                    const p1 = allPointsMap.get(c.p1.id);
-                    const p2 = allPointsMap.get(c.p2.id);
-                    if (p1 && p2) {
-                        lenVal = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-                    }
-                }
-
-                if (lenVal) {
-                    return {
-                        id: `${c.id}_Track`,
-                        type: 'bar',
-                        len_param: lenVal,
-                        total_len_param: c.trackLenParam,
-                        offset_param: c.trackOffsetParam,
-                        isTrack: true,
-                        color: c.color
-                    };
-                }
-            }
-            return null;
-        }).filter(p => p),
+        parts: finalParts,
         params,
         _wizard_data: components
     };

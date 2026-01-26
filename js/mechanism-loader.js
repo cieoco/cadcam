@@ -361,39 +361,90 @@ function setupLinkClickHandler() {
       panStart = { x: e.clientX, y: e.clientY };
       initialPanOffset = { ...window.mechanismViewOffset };
       svgWrap.style.cursor = 'grabbing';
+    } else if (e.button === 0) { // Left Button
+      const jointTarget = e.target.closest('[data-joint-id]');
+      if (jointTarget && drawState === 'IDLE') {
+        dragJointId = jointTarget.getAttribute('data-joint-id');
+        isDraggingNode = true;
+        svgWrap.style.cursor = 'grabbing';
+        e.preventDefault();
+        e.stopPropagation();
+      }
     }
   });
 
-  // 2. Mouse Move (Unified Handler for Pan)
+  let rafId = null;
+
+  // 3. Mouse Move (Unified Handler for Pan & Drag)
   window.addEventListener('mousemove', (e) => {
-    if (!isPanning) return;
-    e.preventDefault();
+    lastPointer = { x: e.clientX, y: e.clientY };
 
-    const dx = e.clientX - panStart.x;
-    const dy = e.clientY - panStart.y;
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = null;
 
-    const currentPanX = initialPanOffset.x + dx;
-    const currentPanY = initialPanOffset.y + dy;
+      if (isDraggingNode && dragJointId) {
+        const coords = getWorldCoords(lastPointer.x, lastPointer.y);
+        if (coords && window.wizard) {
+          window.wizard.isDragging = true;
+          const snapped = getSnappedCoords(coords.x, coords.y);
+          window.wizard.updatePointCoordsById(dragJointId, snapped.x, snapped.y);
+        }
+        return;
+      }
 
-    const overlayWrap = document.getElementById('partsOverlayWrap');
-    const svgs = [
-      svgWrap.querySelector('svg'),
-      overlayWrap ? overlayWrap.querySelector('svg') : null
-    ].filter(Boolean);
-    svgs.forEach((svg) => {
-      if (!svg || !svg.viewBox || !svg.viewBox.baseVal) return;
-      const vb = svg.viewBox.baseVal;
-      // Shift ViewBox: Camera moves opposite to Pan
-      // ViewBox Origin = -(PanOffset)
-      if (typeof vb.width === 'number') {
-        svg.setAttribute('viewBox', `${-currentPanX} ${-currentPanY} ${vb.width} ${vb.height}`);
+      if (isPanning) {
+        const dx = lastPointer.x - panStart.x;
+        const dy = lastPointer.y - panStart.y;
+        const currentPanX = initialPanOffset.x + dx;
+        const currentPanY = initialPanOffset.y + dy;
+
+        const overlayWrap = document.getElementById('partsOverlayWrap');
+        const svgs = [
+          svgWrap.querySelector('svg'),
+          overlayWrap ? overlayWrap.querySelector('svg') : null
+        ].filter(Boolean);
+        svgs.forEach((svg) => {
+          if (!svg || !svg.viewBox || !svg.viewBox.baseVal) return;
+          const vb = svg.viewBox.baseVal;
+          if (typeof vb.width === 'number') {
+            svg.setAttribute('viewBox', `${-currentPanX} ${-currentPanY} ${vb.width} ${vb.height}`);
+          }
+        });
+      }
+
+      // Always update tooltip and ghost lines
+      const coords = getWorldCoords(lastPointer.x, lastPointer.y);
+      if (coords) {
+        const snapped = getSnappedCoords(coords.x, coords.y);
+        currentSnapPoint = snapped;
+        let displayX = Math.round(snapped.x);
+        let displayY = Math.round(snapped.y);
+        if (snapped.type !== 'raw') {
+          displayX = Math.round(snapped.x);
+          displayY = Math.round(snapped.y);
+        }
+        updateCoordTooltip(true, lastPointer.x, lastPointer.y, displayX, displayY, snapped.type);
+
+        if (drawState === 'DRAWING_LINK' && drawPoints.length > 0) {
+          updateGhostPolyline(displayX, displayY);
+        }
       }
     });
-    schedulePanRender();
   });
 
-  // 3. Mouse Up (Commit Pan)
+  // 3. Mouse Up (Commit Pan & Drag)
   window.addEventListener('mouseup', (e) => {
+    if (isDraggingNode) {
+      isDraggingNode = false;
+      dragJointId = null;
+      if (window.wizard) {
+        window.wizard.isDragging = false;
+        window.wizard.render(); // 最後補上一版完整的側邊欄刷新
+      }
+      svgWrap.style.cursor = '';
+    }
+
     if (isPanning) {
       isPanning = false;
       svgWrap.style.cursor = '';
@@ -401,15 +452,11 @@ function setupLinkClickHandler() {
       const dx = e.clientX - panStart.x;
       const dy = e.clientY - panStart.y;
 
-      // Commit to Global State
       window.mechanismViewOffset.x = initialPanOffset.x + dx;
       window.mechanismViewOffset.y = initialPanOffset.y + dy;
 
       if (typeof updatePreview === 'function') updatePreview();
       if (typeof updateFixedGridLabel === 'function') updateFixedGridLabel();
-
-      // ⛔️ No Re-render needed! The SVG viewBox is already in the correct state.
-      // Future re-renders (e.g., param change) will pick up window.mechanismViewOffset via renderMultilink.
     }
   });
 
@@ -450,6 +497,8 @@ function setupLinkClickHandler() {
   let drawState = 'IDLE';
   let drawPoints = []; // Array of { id, x, y, isNew }
   let ghostLineGroup = null; // SVG Group for ghost lines
+  let dragJointId = null;
+  let isDraggingNode = false;
   let lastPointer = { x: 0, y: 0 };
 
   // Helper to find the H3 title element
@@ -850,21 +899,18 @@ function setupLinkClickHandler() {
     }
 
     // 2. Joint Snap (Higher priority)
-    // We need existing joints. Where to get?
-    // From Wizard components or Topology JSON?
-    // Topology is easier.
-    const topoArea = document.getElementById('topology');
-    if (topoArea) {
-      try {
-        const topo = JSON.parse(topoArea.value);
-        // Need SOLVED positions. We have `lastMultilinkSolution` in controls.js
-        // But we can't access it easily here.
-        // Alternative: get points from wizard components?
-        // Or, if we enabled "Joint Click", we know joints are there.
-        // But for snapping we need their coords without clicking.
-        // Actually, `mechanism-loader.js` doesn't have direct access to solution.
-        // Let's implement Grid Snap first. Joint snap requires Solution state sharing.
-      } catch (e) { }
+    const jointThreshold = (viewRange / 800) * 15;
+    if (window.wizard) {
+      for (const comp of window.wizard.components) {
+        const pts = comp.type === 'polygon' ? (comp.points || []) : [comp.p1, comp.p2, comp.p3].filter(Boolean);
+        for (const pt of pts) {
+          if (!pt.id || !Number.isFinite(pt.x) || (dragJointId && pt.id === dragJointId)) continue;
+          const d = Math.hypot(rawX - pt.x, rawY - pt.y);
+          if (d < jointThreshold) {
+            return { x: pt.x, y: pt.y, type: 'joint', id: pt.id };
+          }
+        }
+      }
     }
 
     return res;
@@ -967,6 +1013,7 @@ function setupLinkClickHandler() {
       const id = detail.id;
       const label = id && String(id).startsWith('H') ? '刪除孔位' : '刪除關節';
       const items = [
+        { id, x: detail.x, y: detail.y }, // 保存座標載荷
         { label, action: () => id && removeFromTopology(id) }
       ];
       openPropertySheet(items, `節點 ${id || ''} 屬性`, id);
@@ -1467,9 +1514,15 @@ function openPropertySheet(items, title, selectedId) {
 
         behaviorWrapper.querySelector('#btnSetGround').onclick = () => {
           step.type = 'ground';
-          const detail = items.find(i => i.id === selectedId) || {};
-          step.x = step.x ?? (detail.x || 0);
-          step.y = step.y ?? (detail.y || 0);
+          // 抓取傳入的當前座標載荷
+          const dragPayload = items.find(i => i.id === selectedId && i.x !== undefined);
+          if (dragPayload) {
+            step.x = Math.round(dragPayload.x);
+            step.y = Math.round(dragPayload.y);
+          } else {
+            step.x = step.x ?? 0;
+            step.y = step.y ?? 0;
+          }
           delete step.center; delete step.len_param;
           saveAndRefresh();
         };
