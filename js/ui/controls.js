@@ -130,9 +130,11 @@ function getMotorIdsFromTopology(topology) {
     if (!topology || !Array.isArray(topology.steps)) return [];
     const ids = [];
     topology.steps
-        .filter(s => s.type === 'input_crank')
+        .filter(s => s.type === 'input_crank' || s.type === 'input_linear')
         .forEach((step) => {
-            const raw = step.physical_motor || step.physicalMotor || '1';
+            const raw = (step.type === 'input_linear')
+                ? (step.valve_id || '1')
+                : (step.physical_motor || step.physicalMotor || '1');
             const id = String(raw);
             if (!ids.includes(id)) ids.push(id);
         });
@@ -157,8 +159,11 @@ function setMotorAngleValue(motorId, value, options = {}) {
 
     const slider = document.getElementById(`motorAngle_M${id}`);
     const label = document.getElementById(`motorAngleValue_M${id}`);
+    const isLinear = slider && slider.dataset.isLinear === 'true';
+    const unit = isLinear ? 'mm' : '°';
+
     if (slider) slider.value = String(display);
-    if (label) label.textContent = `${Math.round(display)}°`;
+    if (label) label.textContent = `${Math.round(display)}${unit}`;
 
     if (id === '1') {
         const thetaInput = document.getElementById('theta');
@@ -184,7 +189,7 @@ function collectMotorAnglesFromUI() {
     return angles;
 }
 
-function updateMotorAngleControls(topology) {
+function updateMotorAngleControls(topology, mech) {
     const mods = getActiveModules();
     if (!mods || !mods.config || mods.config.id !== 'multilink') return;
 
@@ -196,7 +201,7 @@ function updateMotorAngleControls(topology) {
     const motorIds = getMotorIdsFromTopology(topology);
     if (!motorIds.length) {
         motorContainer.style.display = 'none';
-        if (thetaBlock) thetaBlock.style.display = 'none';
+        if (thetaBlock) thetaBlock.style.display = 'block'; // Fallback to single slider
         return;
     }
 
@@ -207,23 +212,47 @@ function updateMotorAngleControls(topology) {
     if (key !== lastMotorAngleKey) {
         motorContainer.innerHTML = '';
         motorIds.forEach((motorId) => {
+            // Check if this motorId corresponds to a linear input in the current steps
+            // Check if this motorId corresponds to a linear input in the current steps
+            // We check both specific valve_id match, or if this ID is NOT associated with a crank but IS in our list
+            const linearStep = topology && topology.steps && topology.steps.find(s => s.type === 'input_linear' && String(s.valve_id) === String(motorId));
+            const crankStep = topology && topology.steps && topology.steps.find(s => s.type === 'input_crank' && (String(s.physical_motor) === String(motorId) || String(s.physicalMotor) === String(motorId)));
+
+            // Priority: If it's explicitly a crank step, treat as crank. Otherwise if linear step exists, treat as linear.
+            const isLinear = Boolean(linearStep) && !crankStep;
+            const label = isLinear ? `Ext ${motorId}` : `M${motorId}`;
+            const unit = isLinear ? 'mm' : '°';
+
+            let min = -360;
+            let max = 360;
+
+            if (isLinear) {
+                // If linear, calculate range based on maxStroke
+                // Standard approach: 0 to Stroke
+                const stroke = (linearStep && linearStep.maxStroke) ? Number(linearStep.maxStroke) : 50;
+                min = 0;
+                max = stroke;
+            }
+
+            const val = 0;
+
             const row = document.createElement('div');
             row.style.marginBottom = '6px';
             row.innerHTML = `
                 <div style="display:flex; align-items:center; gap:8px; pointer-events: auto;">
-                    <label style="font-size:12px; color:#555; white-space:nowrap; font-weight:600;">M${motorId}</label>
-                    <input id="motorAngle_M${motorId}" data-motor-id="${motorId}" type="range" min="-360" max="360" step="1" value="0" style="width:200px;" />
-                    <span id="motorAngleValue_M${motorId}" style="font-size:12px; color:#333; font-weight:600; min-width:40px; text-align:center;">0°</span>
+                    <label style="font-size:12px; color:#555; white-space:nowrap; font-weight:600;">${label}</label>
+                    <input id="motorAngle_M${motorId}" data-motor-id="${motorId}" data-is-linear="${isLinear}" type="range" min="${min}" max="${max}" step="1" value="${val}" style="width:200px;" />
+                    <span id="motorAngleValue_M${motorId}" style="font-size:12px; color:#333; font-weight:600; min-width:40px; text-align:center;">${val}${unit}</span>
                 </div>
             `;
             motorContainer.appendChild(row);
 
             const slider = row.querySelector('input[type="range"]');
-            const label = row.querySelector(`#motorAngleValue_M${motorId}`);
-            if (slider && label) {
+            const valLabel = row.querySelector(`#motorAngleValue_M${motorId}`);
+            if (slider && valLabel) {
                 slider.addEventListener('input', () => {
                     const val = Number(slider.value || 0);
-                    label.textContent = `${Math.round(val)}°`;
+                    valLabel.textContent = `${Math.round(val)}${unit}`; // Re-use unit from outer scope
                     setMotorAngleValue(motorId, val, { silent: true });
 
                     clearTimeout(motorAngleUpdateTimer);
@@ -241,8 +270,36 @@ function updateMotorAngleControls(topology) {
     const minVal = sweepStart ? Number(sweepStart.value || -360) : -360;
     const maxVal = sweepEnd ? Number(sweepEnd.value || 360) : 360;
     motorContainer.querySelectorAll('input[type="range"][data-motor-id]').forEach(inp => {
-        inp.min = String(minVal);
-        inp.max = String(maxVal);
+        // Only override range for rotational motors based on sweep settings
+        if (inp.dataset.isLinear !== 'true') {
+            inp.min = String(minVal);
+            inp.max = String(maxVal);
+        } else {
+            // Update linear slider range if maxStroke was updated in topology
+            const motorId = inp.dataset.motorId;
+            const linearStep = topology && topology.steps && topology.steps.find(s => s.type === 'input_linear' && String(s.valve_id) === String(motorId));
+            if (linearStep && linearStep.maxStroke) {
+                let strokeVal = Number(linearStep.maxStroke);
+                if (isNaN(strokeVal)) {
+                    // Try to resolve parameter
+                    const paramName = String(linearStep.maxStroke);
+
+                    // 1. Check passed-in mech params (most reliable as it includes dynamic updates)
+                    if (mech && (mech[paramName] !== undefined || (mech.params && mech.params[paramName] !== undefined))) {
+                        strokeVal = Number(mech[paramName] !== undefined ? mech[paramName] : mech.params[paramName]);
+                    } else {
+                        // 2. Fallback to topology params
+                        if (topology.params && topology.params[paramName] !== undefined) {
+                            strokeVal = Number(topology.params[paramName]);
+                        }
+                    }
+                }
+
+                if (Number.isFinite(strokeVal) && strokeVal > 0) {
+                    inp.max = String(strokeVal);
+                }
+            }
+        }
     });
 
     const currentAngles = collectMotorAnglesFromUI();
@@ -659,7 +716,7 @@ export function updatePreview() {
         let topologyObj = null;
         if (mods.config && mods.config.id === 'multilink') {
             topologyObj = parseTopologySafe(mech.topology);
-            updateMotorAngleControls(topologyObj);
+            updateMotorAngleControls(topologyObj, mech);
             const uiAngles = collectMotorAnglesFromUI();
             if (Object.keys(uiAngles).length && !isSyncing) {
                 if (!window.motorAngles) window.motorAngles = {};
@@ -1071,7 +1128,12 @@ export function setupUIHandlers() {
     if (btnNewConfig) {
         btnNewConfig.onclick = () => {
             if (confirm('確定要建立新檔嗎？未儲存的變更將消失。')) {
-                window.location.reload();
+                const url = new URL(window.location);
+                // 如果在 wizard 模式，強制指定 type=multilink 確保不會載入四連桿
+                if (url.searchParams.get('mode') === 'wizard') {
+                    url.searchParams.set('type', 'multilink');
+                }
+                window.location.href = url.toString();
             }
         };
     }

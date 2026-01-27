@@ -80,11 +80,14 @@ export function computePreviewState({
         if (result.lastSolution && result.lastSolution.points) {
             mech._prevPoints = result.lastSolution.points;
         }
-        result.showThetaSlider = Boolean(
-            topologyObj &&
-            Array.isArray(topologyObj.steps) &&
-            topologyObj.steps.some(s => s.type === 'input_crank')
-        );
+
+        // 判斷是否顯示角度滑桿：檢查拓撲結構中是否有驅動元件
+        const hasInputs = topologyObj && Array.isArray(topologyObj.steps) &&
+            topologyObj.steps.some(s => s.type === 'input_crank' || s.type === 'input_linear');
+        result.showThetaSlider = Boolean(hasInputs);
+    } else {
+        // 其他內建機構 (如四連桿) 預設開啟角度滑桿
+        result.showThetaSlider = true;
     }
 
     let sol = null;

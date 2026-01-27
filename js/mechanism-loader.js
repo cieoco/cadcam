@@ -3,7 +3,7 @@
  * 通用機構頁面載入器
  */
 
-import { getMechanismFromURL, generateParameterHTML, MECHANISMS } from './mechanism-config.js';
+import { getMechanismFromURL, generateParameterHTML, MECHANISMS } from './mechanism-config.js?v=20240427_01';
 import { setupUIHandlers, updatePreview } from './ui/controls.js?v=debug_2';
 import { downloadText, downloadZip, log, calcAdaptiveGridStep } from './utils.js';
 import { MechanismWizard } from './ui/wizard.js?v=debug_1';
@@ -49,6 +49,17 @@ function refreshUndoButtonState() {
  * 初始化機構頁面
  */
 async function initMechanismPage() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const mode = urlParams.get('mode');
+  const type = urlParams.get('type');
+
+  // 強制修正：如果你在設計器模式但沒有指定類型，立刻跳轉到 multilink
+  if (mode === 'wizard' && !type) {
+    urlParams.set('type', 'multilink');
+    window.location.replace(window.location.pathname + '?' + urlParams.toString());
+    return;
+  }
+
   const mech = getMechanismFromURL();
 
   if (window.DEBUG_MECH) {
@@ -167,25 +178,29 @@ async function initMechanismPage() {
     // 初始化精靈 (如果存在)
     const wizardContainer = document.getElementById('wizardContainer');
     if (wizardContainer) {
+      const topoArea = document.getElementById('topology');
+      const isWizardMode = new URLSearchParams(window.location.search).get('mode') === 'wizard';
+
+      // 如果是設計器模式，且目前沒有數據，確保它是乾淨的
+      if (isWizardMode && topoArea && !topoArea.value) {
+        topoArea.value = "";
+      }
+
       const wizard = new MechanismWizard('wizardContainer', (newTopo) => {
-        const topoArea = document.getElementById('topology');
         if (topoArea) {
           const nextValue = JSON.stringify(newTopo, null, 2);
           if (topoArea.value !== nextValue) {
             pushTopologyHistory();
           }
           topoArea.value = nextValue;
-          // 觸發輸入事件以更新動態參數
           topoArea.dispatchEvent(new Event('input', { bubbles: true }));
-          // 更新預覽
           updatePreview();
         }
       });
-      window.wizard = wizard; // 供內嵌 HTML 調用
+      window.wizard = wizard;
 
-      setupLinkClickHandler(); // Initialize interactive link features
+      setupLinkClickHandler();
 
-      const topoArea = document.getElementById('topology');
       if (topoArea && topoArea.value) {
         try {
           wizard.init(JSON.parse(topoArea.value));

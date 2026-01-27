@@ -195,20 +195,32 @@ export class MechanismWizard {
                     <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">桿長參數</label>
                     <input type=\"text\" value=\"${comp.lenParam || 'L'}\" oninput=\"window.wizard.updateCompProp('lenParam', this.value)\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;\">
                 </div>
-                <div class=\"form-group\">
-                    <label style=\"display: flex; align-items: center; gap: 8px; font-size: 12px; color: #2c3e50; cursor: pointer; padding: 6px; background: #f8f9fa; border-radius: 4px;\">
-                        <input type=\"checkbox\" ${comp.isInput ? 'checked' : ''} onchange=\"window.wizard.updateCompProp('isInput', this.checked)\" style=\"width: 14px; height: 14px;\"> 馬達驅動
-                    </label>
+                <div class="form-group">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">驅動模式 (Driver Mode)</label>
+                    <select onchange="window.wizard.updateDriverMode(this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
+                        <option value="none" ${!comp.isInput ? 'selected' : ''}>無 (Passive)</option>
+                        <option value="motor" ${comp.isInput && comp.style !== 'piston' ? 'selected' : ''}>旋轉馬達 (Rotary)</option>
+                        <option value="piston" ${comp.isInput && comp.style === 'piston' ? 'selected' : ''}>氣壓推桿 (Piston)</option>
+                    </select>
                 </div>
 
+                ${comp.style === 'piston' ? `
+                <div style="display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 8px; background: #e3f2fd; padding: 8px; border-radius: 6px; border: 1px solid #bbdefb;">
+                    <div class="form-group" style="margin:0;">
+                         <label style="display: block; font-size: 10px; font-weight: bold; color: #1565c0; margin-bottom: 2px;">管長 (Tube Len)</label>
+                         <input type="number" value="${comp.tubeLen || 100}" oninput="window.wizard.updateCompProp('tubeLen', Number(this.value))" style="width: 100%; padding: 4px; border: 1px solid #90caf9; border-radius: 3px; font-size: 11px;">
+                    </div>
+                </div>
+                ` : ''}
+
                 ${comp.isInput ? `
-                <div class=\"form-group\" style=\"padding: 0 6px;\">
-                    <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">實體馬達</label>
-                    <select onchange=\"window.wizard.updateCompProp('physicalMotor', this.value)\" style=\"width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;\">
-                        <option value=\"1\" ${comp.physicalMotor === '1' || !comp.physicalMotor ? 'selected' : ''}>M1</option>
-                        <option value=\"2\" ${comp.physicalMotor === '2' ? 'selected' : ''}>M2</option>
-                        <option value=\"3\" ${comp.physicalMotor === '3' ? 'selected' : ''}>M3</option>
-                        <option value=\"4\" ${comp.physicalMotor === '4' ? 'selected' : ''}>M4</option>
+                <div class="form-group" style="padding: 0 6px;">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">動力來源 ID</label>
+                    <select onchange="window.wizard.updateCompProp('physicalMotor', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
+                        <option value="1" ${comp.physicalMotor === '1' || !comp.physicalMotor ? 'selected' : ''}>${comp.style === 'piston' ? 'Valve 1' : 'M1'}</option>
+                        <option value="2" ${comp.physicalMotor === '2' ? 'selected' : ''}>${comp.style === 'piston' ? 'Valve 2' : 'M2'}</option>
+                        <option value="3" ${comp.physicalMotor === '3' ? 'selected' : ''}>${comp.style === 'piston' ? 'Valve 3' : 'M3'}</option>
+                        <option value="4" ${comp.physicalMotor === '4' ? 'selected' : ''}>${comp.style === 'piston' ? 'Valve 4' : 'M4'}</option>
                     </select>
                 </div>
                 ` : ''}
@@ -323,6 +335,24 @@ export class MechanismWizard {
                             <label style="display: block; font-size: 10px; font-weight: bold; color: #2c3e50; margin-bottom: 4px;">端點 (P3)</label>
                             ${this.renderPointEditor(comp, 'p3')}
                         </div>
+
+                        <div class="form-group" style="margin-bottom: 0px; ${comp.isInput ? 'margin-bottom: 8px;' : ''}">
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #2c3e50; cursor: pointer; padding: 6px; background: #f8f9fa; border-radius: 4px;">
+                                <input type="checkbox" ${comp.isInput ? 'checked' : ''} onchange="window.wizard.updateCompProp('isInput', this.checked)" style="width: 14px; height: 14px;"> 線性致動 (Input)
+                            </label>
+                        </div>
+
+                        ${comp.isInput ? `
+                        <div class="form-group" style="padding: 0 6px; margin-bottom: 8px;">
+                            <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">實體馬達 (線性傳動)</label>
+                            <select onchange="window.wizard.updateCompProp('physicalMotor', this.value)" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
+                                <option value="1" ${comp.physicalMotor === '1' || !comp.physicalMotor ? 'selected' : ''}>M1</option>
+                                <option value="2" ${comp.physicalMotor === '2' ? 'selected' : ''}>M2</option>
+                                <option value="3" ${comp.physicalMotor === '3' ? 'selected' : ''}>M3</option>
+                                <option value="4" ${comp.physicalMotor === '4' ? 'selected' : ''}>M4</option>
+                            </select>
+                        </div>
+                        ` : `
                         <div class="form-group">
                             <label style="display: block; font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px;">解方向 (Sign)</label>
                             <select onchange="window.wizard.updateCompProp('sign', parseInt(this.value))" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; background: #fff;">
@@ -330,6 +360,7 @@ export class MechanismWizard {
                                 <option value="-1" ${comp.sign === -1 ? 'selected' : ''}>-1</option>
                             </select>
                         </div>
+                        `}
                     </div>
                 </div>
             `;
@@ -346,33 +377,110 @@ export class MechanismWizard {
         const pt = comp[pointKey] || { id: '', type: 'floating', x: 0, y: 0 };
         const existingPoints = this.getAllPointIds();
 
-        return `
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-                <div style="display: flex; gap: 5px; align-items: center;">
-                    <select onchange="window.wizard.updatePointProp('${pointKey}', 'type', this.value)" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px; background: #fff;">
-                        <option value="fixed" ${pt.type === 'fixed' ? 'selected' : ''}> 固定 (Fixed)</option>
-                        <option value="existing" ${pt.type === 'existing' ? 'selected' : ''}> 現有 (Existing)</option>
-                        <option value="floating" ${pt.type === 'floating' ? 'selected' : ''}> 浮動 (Floating)</option>
-                    </select>
-                </div>
+        // Map types to titles and colors for the UI
+        const types = [
+            { value: 'fixed', label: '固定 (地)', color: '#2c3e50', icon: '⚓' },
+            { value: 'motor', label: '馬達 (轉)', color: '#e67e22', icon: '⚙️' },
+            { value: 'linear', label: '氣壓 (直)', color: '#0984e3', icon: '🌬️' },
+            { value: 'floating', label: '浮動 (點)', color: '#6c5ce7', icon: '●' }
+        ];
 
-                ${pt.type === 'existing' ? `
-                    <select onchange="window.wizard.updatePointProp('${pointKey}', 'id', this.value)" style="width: 100%; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px; background: #fff;">
-                        <option value="">-- 選擇點位 --</option>
-                        ${existingPoints.map(id => `<option value="${id}" ${pt.id === id ? 'selected' : ''}>${id}</option>`).join('')}
-                    </select>
-                ` : `
-                    <input type="text" value="${pt.id || ''}" placeholder="點位名稱" oninput="window.wizard.updatePointProp('${pointKey}', 'id', this.value)" style="width: 100%; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
-                `}
+        let html = `
+            <div class="point-editor-container" style="background: #f8f9fa; border-radius: 12px; padding: 12px; border: 1px solid #eee;">
+                
+                <!-- 1. Node Role Selector (Hidden/Removed per streamlined UI) -->
+                ${/* types selector removed */ ''}
 
-                ${pt.type === 'fixed' ? `
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-                        <input type="number" value="${pt.x || 0}" placeholder="X" oninput="window.wizard.updatePointProp('${pointKey}', 'x', this.value)" style="padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
-                        <input type="number" value="${pt.y || 0}" placeholder="Y" oninput="window.wizard.updatePointProp('${pointKey}', 'y', this.value)" style="padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
+
+                <!-- 2. Existing Point Selection -->
+                ${pt.type !== 'existing' ? `
+                    <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="chk_${pointKey}_existing" ${pt.type === 'existing' ? 'checked' : ''} 
+                            onchange="window.wizard.updatePointProp('${pointKey}', 'type', this.checked ? 'existing' : 'floating')" 
+                            style="width: 14px; height: 14px;">
+                        <label for="chk_${pointKey}_existing" style="font-size: 11px; color: #636e72; cursor: pointer;">連接至現有節點</label>
                     </div>
                 ` : ''}
+
+                <!-- 3. Coordinate Inputs / ID Selection -->
+                <div style="background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #dfe6e9;">
+                    ${pt.type === 'existing' ? `
+                        <label style="display: block; font-size: 10px; color: #b2bec3; margin-bottom: 4px;">目標節點 ID</label>
+                        <select onchange="window.wizard.updatePointProp('${pointKey}', 'id', this.value)" style="width: 100%; padding: 8px; font-size: 12px; border: 1px solid #eee; border-radius: 6px; background: #fbfbfb;">
+                            <option value="">-- 選擇已有節點 --</option>
+                            ${existingPoints.filter(id => id !== pt.id).map(id => `<option value="${id}" ${pt.id === id ? 'selected' : ''}>${id}</option>`).join('')}
+                        </select>
+                    ` : `
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <div>
+                                <label style="display: block; font-size: 10px; color: #b2bec3; margin-bottom: 4px;">X 位置 (mm)</label>
+                                <input type="number" value="${pt.x || 0}" oninput="window.wizard.updatePointProp('${pointKey}', 'x', this.value)" 
+                                    style="width: 100%; padding: 6px; border: 1px solid #eee; border-radius: 4px; font-size: 12px; background: #fdfdfd;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 10px; color: #b2bec3; margin-bottom: 4px;">Y 位置 (mm)</label>
+                                <input type="number" value="${pt.y || 0}" oninput="window.wizard.updatePointProp('${pointKey}', 'y', this.value)" 
+                                    style="width: 100%; padding: 6px; border: 1px solid #eee; border-radius: 4px; font-size: 12px; background: #fdfdfd;">
+                            </div>
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <label style="display: block; font-size: 10px; color: #b2bec3; margin-bottom: 4px;">節點命名</label>
+                            <input type="text" value="${pt.id || ''}" placeholder="如: O1, P1" oninput="window.wizard.updatePointProp('${pointKey}', 'id', this.value)" 
+                                style="width: 100%; padding: 6px; border: 1px solid #eee; border-radius: 4px; font-size: 12px; background: #fdfdfd; font-family: monospace;">
+                        </div>
+                    `}
+                </div>
+
+                <!-- 4. Actuator Specific Settings (Rotary Motor vs Pneumatic Valve) -->
+                ${pt.type === 'motor' ? `
+                    <div style="margin-top: 12px; padding: 10px; background: #fff4e5; border: 1px solid #ffe8cc; border-radius: 8px;">
+                        <label style="display: block; font-size: 11px; font-weight: bold; color: #d9480f; margin-bottom: 6px;">⚙️ 馬達驅動設定</label>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 10px; color: #d9480f; white-space: nowrap;">伺服編號:</span>
+                            <select onchange="window.wizard.updatePointProp('${pointKey}', 'physicalMotor', this.value)" 
+                                style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #ffc078; border-radius: 4px; background: #fff;">
+                                <option value="1" ${pt.physicalMotor === '1' || !pt.physicalMotor ? 'selected' : ''}>Servo (M1)</option>
+                                <option value="2" ${pt.physicalMotor === '2' ? 'selected' : ''}>Servo (M2)</option>
+                                <option value="3" ${pt.physicalMotor === '3' ? 'selected' : ''}>Servo (M3)</option>
+                                <option value="4" ${pt.physicalMotor === '4' ? 'selected' : ''}>Servo (M4)</option>
+                            </select>
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${pt.type === 'linear' ? `
+                    <div style="margin-top: 12px; padding: 10px; background: #e3f2fd; border: 1px solid #bbdefb; border-radius: 8px;">
+                        <label style="display: block; font-size: 11px; font-weight: bold; color: #1976d2; margin-bottom: 6px;">🌬️ 氣壓推桿設定</label>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                            <span style="font-size: 10px; color: #1976d2; white-space: nowrap;">閥門通道:</span>
+                            <select onchange="window.wizard.updatePointProp('${pointKey}', 'valveId', this.value)" 
+                                style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #90caf9; border-radius: 4px; background: #fff;">
+                                <option value="1" ${pt.valveId === '1' || !pt.valveId ? 'selected' : ''}>Valve V1</option>
+                                <option value="2" ${pt.valveId === '2' ? 'selected' : ''}>Valve V2</option>
+                                <option value="3" ${pt.valveId === '3' ? 'selected' : ''}>Valve V3</option>
+                                <option value="4" ${pt.valveId === '4' ? 'selected' : ''}>Valve V4</option>
+                            </select>
+                        </div>
+                    </div>
+                ` : ''}
+
+                <!-- 5. Trace Control -->
+                <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px; padding: 4px;">
+                    <input type="checkbox" id="chk_${pointKey}_trace" ${this.topology.tracePoint === pt.id ? 'checked' : ''} 
+                        onchange="window.wizard.setAsTracePoint(this.checked ? '${pt.id}' : '')" 
+                        style="width: 14px; height: 14px; cursor: pointer;">
+                    <label for="chk_${pointKey}_trace" style="font-size: 12px; color: #2c3e50; font-weight: 500; cursor: pointer;">追蹤路徑 (Trace)</label>
+                </div>
+
             </div>
         `;
+        return html;
+    }
+
+    setAsTracePoint(id) {
+        this.topology.tracePoint = id;
+        this.syncTopology();
+        this.render(); // Refresh UI to update checkbox states
     }
 
     attachEvents() {
@@ -512,7 +620,7 @@ export class MechanismWizard {
         //  核心修正：如果是第一根桿件，且 P1 是起始點 (不管是新點還是既有的 O 點)，將其設為固定點
         if (this.components.length === 0) {
             newBar.p1.type = 'fixed';
-            newBar.isInput = true;
+            newBar.isInput = false;
 
             //  核心修正：計算繪製時的角度偏移，防止自動「變平」
             const dx = p2Data.x - p1Data.x;
@@ -584,6 +692,7 @@ export class MechanismWizard {
             newComp.p2 = { id: '', type: 'floating', x: 0, y: 0 };
             newComp.lenParam = 'L' + id.replace('Link', '');
             newComp.isInput = false;
+            newComp.physicalMotor = null; // Ensure clean slate
         } else if (type === 'triangle') {
             newComp.p1 = { id: '', type: 'existing', x: 0, y: 0 };
             newComp.p2 = { id: '', type: 'existing', x: 0, y: 0 };
@@ -630,6 +739,22 @@ export class MechanismWizard {
             const comp = this.components[this.selectedComponentIndex];
             comp[prop] = val;
 
+            // Auto-sync: If Tube Len changes in Piston mode, update the dynamic parameter value if lenParam is set
+            if (prop === 'tubeLen' && comp.style === 'piston' && comp.lenParam) {
+                // We don't change comp.lenParam (the name), but we don't have a direct way 
+                // to set the parameter *value* here if it's dynamic. 
+                // However, the solver now prioritization: getParamVal(c.lenParam, c.tubeLen).
+                // So updating c.tubeLen is enough IF the dynamic param isn't overriding it.
+                // But the user wants them 'synchronized'.
+                // If I change Tube Len -> 150, I want the 'L1' dynamic slider to also jump to 150.
+
+                // We can try to update the global autoParams or similar?
+                // Actually, the simplest way is to ensure `updateDriverMode` or initial setup 
+                // sets a default.
+
+                // If we want the Right Panel input to update the Dynamic Slider:
+            }
+
             if (prop === 'isInput' && val && !comp.physicalMotor) {
                 comp.physicalMotor = '1';
             }
@@ -641,6 +766,40 @@ export class MechanismWizard {
                 this.render();
             }
 
+            this.scheduleSyncTopology();
+        }
+    }
+
+    updateDriverMode(mode) {
+        if (this.selectedComponentIndex >= 0) {
+            const comp = this.components[this.selectedComponentIndex];
+
+            if (mode === 'none') {
+                comp.isInput = false;
+                comp.physicalMotor = null; // Clear ID
+                if (comp.style === 'piston') comp.style = undefined;
+                // Don't forcefully reset point types if they were manually set to fixed/existing
+                if (comp.p1.type === 'motor') comp.p1.type = 'fixed';
+                if (comp.p1.type === 'linear') comp.p1.type = 'fixed';
+            } else if (mode === 'motor') {
+                comp.isInput = true;
+                comp.style = undefined; // Default style
+                // If point is generic 'fixed', upgrade it to 'motor' for clarity, but 'fixed' is also acceptable as center
+                if (comp.p1.type === 'fixed' || comp.p1.type === 'floating') comp.p1.type = 'motor';
+                if (comp.p1.type === 'linear') comp.p1.type = 'motor';
+                if (!comp.physicalMotor) comp.physicalMotor = '1';
+            } else if (mode === 'piston') {
+                comp.isInput = true;
+                comp.style = 'piston';
+                if (!comp.tubeLen) comp.tubeLen = 100;
+                if (!comp.maxStroke) comp.maxStroke = 50;
+
+                if (comp.p1.type === 'fixed' || comp.p1.type === 'floating') comp.p1.type = 'linear';
+                if (comp.p1.type === 'motor') comp.p1.type = 'linear';
+                if (!comp.physicalMotor) comp.physicalMotor = '1';
+            }
+
+            this.render();
             this.scheduleSyncTopology();
         }
     }

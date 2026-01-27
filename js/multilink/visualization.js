@@ -5,7 +5,7 @@ import { svgEl, drawGridCompatible, describeArc, deg2rad, rad2deg } from '../uti
 import { createDriveComponent } from '../motor-data.js';
 
 export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
-    if (!sol || !sol.isValid) return;
+    if (!sol || !sol.isValid || !sol.points) return;
 
     if (!topology || !topology.visualization) return;
     const { links, polygons, joints } = topology.visualization;
@@ -137,6 +137,54 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
                     textEl.textContent = hintMsg;
                     svg.appendChild(textEl);
                 }
+            }
+
+            if (link.style === 'piston') {
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const currentL = Math.hypot(dx, dy);
+                const ux = dx / currentL;
+                const uy = dy / currentL;
+
+                // Track (Background dashed line)
+                svg.appendChild(svgEl('line', {
+                    x1: tx(p1) - ux * 500 * scale, y1: ty(p1) + uy * 500 * scale,
+                    x2: tx(p1) + ux * 500 * scale, y2: ty(p1) - uy * 500 * scale,
+                    stroke: '#ecf0f1',
+                    'stroke-width': 1,
+                    'stroke-dasharray': '5,5'
+                }));
+
+                // Cylinder (Fixed part, thick) - Use specific tubeLen from link info if available, else fallback
+                // We need to access the link's tubeLen. The visualization link object comes from topology.js
+                // topology.js needs to ensure `tubeLen` is passed into visualization.links.
+
+                let cylLen = currentL * 0.65; // Default fallback
+                if (link.tubeLen) {
+                    cylLen = Number(link.tubeLen);
+                }
+
+                // Clamp cylinder length to not exceed current total length (physically impossible but good for viz stability)
+                if (cylLen > currentL) cylLen = currentL;
+
+                const cylTip = { x: p1.x + ux * cylLen, y: p1.y + uy * cylLen };
+
+                svg.appendChild(svgEl('line', {
+                    x1: tx(p1), y1: ty(p1),
+                    x2: tx(cylTip), y2: ty(cylTip),
+                    stroke: '#2c3e50',
+                    'stroke-width': 12,
+                    'stroke-linecap': 'butt'
+                }));
+                // Piston Rod (Moving part, thin)
+                svg.appendChild(svgEl('line', {
+                    x1: tx(cylTip), y1: ty(cylTip),
+                    x2: tx(p2), y2: ty(p2),
+                    stroke: '#bdc3c7',
+                    'stroke-width': 4,
+                    'stroke-linecap': 'round'
+                }));
+                continue;
             }
 
             const attrs = {
@@ -308,11 +356,15 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
  */
 export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams = {}) {
     let topology = { steps: [], visualization: { links: [], polygons: [], joints: [] } };
-    if (viewParams.topology) {
+    if (viewParams && viewParams.topology) {
         try {
-            topology = JSON.parse(viewParams.topology);
+            if (typeof viewParams.topology === 'string' && viewParams.topology.trim()) {
+                topology = JSON.parse(viewParams.topology);
+            } else if (typeof viewParams.topology === 'object') {
+                topology = viewParams.topology;
+            }
         } catch (e) {
-            console.warn("Viz: Invalid Topology JSON");
+            console.warn("Viz: Invalid Topology JSON", e);
         }
     }
 
@@ -426,21 +478,23 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
     }
 
     // 2. Drive Components
-    if (viewParams.motorType && topology.steps) {
+    if (topology.steps) {
         const crankSteps = topology.steps.filter(s => s.type === 'input_crank');
         if (crankSteps.length) {
+            const motorType = viewParams.motorType || 'tt_motor';
             const motorRotation = viewParams.motorRotation || 0;
             crankSteps.forEach((crankStep) => {
                 const O_id = crankStep.center || 'O1';
                 const O = sol.points[O_id] || { x: 0, y: 0 };
-                const motor = createDriveComponent(viewParams.motorType, tx(O), ty(O), scale, motorRotation);
+                const motor = createDriveComponent(motorType, tx(O), ty(O), scale, motorRotation);
                 if (motor) svg.appendChild(motor);
             });
         }
     }
 
-    // 2.5 Motor Angle Labels (input cranks)
+    // 2.5 Motor Labels (input cranks & linear actuators)
     if (topology.steps) {
+        // --- Crank Labels ---
         const crankSteps = topology.steps.filter(s => s.type === 'input_crank');
         crankSteps.forEach((crankStep) => {
             const centerId = crankStep.center || 'O1';
@@ -499,6 +553,38 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
             });
             label.textContent = `M${motorId}=${Math.round(angleDeg)} deg`;
             svg.appendChild(label);
+        });
+
+        // --- Linear Labels ---
+        const linearSteps = topology.steps.filter(s => s.type === 'input_linear');
+        linearSteps.forEach((linStep) => {
+            const p1 = sol.points[linStep.p1];
+            const p3 = sol.points[linStep.id];
+            if (!p1 || !p3) return;
+
+            const motorId = String(linStep.physical_motor || '1');
+            const dist = Math.hypot(p3.x - p1.x, p3.y - p1.y) - (linStep.baseDist || 0);
+
+            const cx = tx(p3);
+            const cy = ty(p3);
+            const color = '#3498db';
+
+            const label = svgEl('text', {
+                x: cx + 12,
+                y: cy - 12,
+                fill: color,
+                'font-size': '11px',
+                'font-weight': 'bold',
+                'font-family': 'sans-serif',
+                'pointer-events': 'none'
+            });
+            label.textContent = `M${motorId}(Lin)=${Math.round(dist)} mm`;
+            svg.appendChild(label);
+
+            // Optional: Draw a small indicator for linear displacement
+            svg.appendChild(svgEl('circle', {
+                cx, cy, r: 4, fill: 'none', stroke: color, 'stroke-width': 1.5
+            }));
         });
     }
     // 3. Render Topology

@@ -575,7 +575,6 @@ export const MECHANISMS = {
         description: '通用多連桿模擬器 - 可自定義拓撲結構',
 
         parameters: [
-            // Wizard Container
             {
                 id: 'wizardPlaceholder',
                 label: '✨ 機構設計器 (Wizard)',
@@ -583,8 +582,6 @@ export const MECHANISMS = {
                 fullWidth: true,
                 render: () => '<div id="wizardContainer"></div>'
             },
-
-            // Topology Editor
             {
                 id: 'topology',
                 label: '拓撲結構定義 (JSON)',
@@ -592,25 +589,15 @@ export const MECHANISMS = {
                 rows: 15,
                 fullWidth: true,
                 default: JSON.stringify({
-                    steps: [
-                        { id: 'O', type: 'ground', x: 0, y: 0 }
-                    ],
+                    steps: [],
                     tracePoint: '',
-                    visualization: {
-                        links: [],
-                        polygons: [],
-                        joints: ['O']
-                    },
+                    visualization: { links: [], polygons: [], joints: [] },
                     parts: []
                 }, null, 2)
             },
-
-            // Drive
             { id: 'theta', label: '曲柄角度 θ', type: 'number', min: -360, max: 360, step: 1, default: 0, unit: '度' },
             { id: 'motorType', label: '驅動元件', type: 'select', options: getDriveOptions(), default: 'tt_motor' },
             { id: 'motorRotation', label: '驅動元件旋轉角度', type: 'number', min: -180, max: 180, step: 5, default: 0, unit: '度' },
-
-            // Sweep
             { id: 'sweepStart', label: '起始角度', type: 'number', min: -360, max: 360, default: -360 },
             { id: 'sweepEnd', label: '結束角度', type: 'number', min: -360, max: 360, default: 360 },
             { id: 'sweepStep', label: '掃描間隔', type: 'number', min: 1, max: 10, default: 2 },
@@ -628,10 +615,10 @@ export const MECHANISMS = {
 
         simNotes: ``,
 
-        solverModule: './jansen/solver.js',
-        solveFn: 'solveJansen',
-        visualizationModule: './jansen/visualization.js',
-        renderFn: 'renderJansen',
+        solverModule: './multilink/solver.js',
+        solveFn: 'solveTopology',
+        visualizationModule: './multilink/visualization.js',
+        renderFn: 'renderMultilink',
         partsModule: './multilink/parts.js',
         partsFn: 'generateMultilinkParts'
     },
@@ -706,7 +693,15 @@ export const MECHANISMS = {
  */
 export function getMechanismFromURL() {
     const params = new URLSearchParams(window.location.search);
-    const mechType = params.get('type') || 'fourbar';
+    const mode = params.get('mode');
+    const type = params.get('type');
+
+    // 如果是 Wizard 模式，且未指定具體類型，強制預設為 multilink
+    if (mode === 'wizard' && !type) {
+        return MECHANISMS.multilink;
+    }
+
+    const mechType = type || 'fourbar';
     return MECHANISMS[mechType] || MECHANISMS.fourbar;
 }
 

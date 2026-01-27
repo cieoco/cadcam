@@ -210,19 +210,53 @@ function solveBodyJointTopology(topology, params) {
                 const p1 = points[c.p1.id];
                 const p2 = points[c.p2.id];
                 const motorId = c.physicalMotor || c.physical_motor;
-                const baseTheta = resolveMotorTheta(motorId, theta);
-                const ang = baseTheta + deg2rad(c.phaseOffset || 0);
 
-                if (p1 && !p2) {
-                    points[c.p2.id] = {
-                        x: p1.x + len * Math.cos(ang),
-                        y: p1.y + len * Math.sin(ang)
-                    };
-                } else if (p2 && !p1) {
-                    points[c.p1.id] = {
-                        x: p2.x - len * Math.cos(ang),
-                        y: p2.y - len * Math.sin(ang)
-                    };
+                if (c.style === 'piston') {
+                    // Linear Input Logic: Input value adds to base length
+                    let val = 0;
+                    const key = String(motorId);
+                    if (motorId && motorAngles && motorAngles[key] !== undefined) {
+                        val = Number(motorAngles[key]) || 0;
+                    } else {
+                        // Check direct params fallback
+                        const direct = actualParams[`theta_M${key}`] ?? actualParams[`motor_${key}`] ?? actualParams[`motor${key}`];
+                        if (direct !== undefined) val = Number(direct) || 0;
+                    }
+
+                    // c.tubeLen is the static retracted length. 
+                    // However, we want to allow dynamic resizing via lenParam.
+                    // Priority: Dynamic Param Value (from UI sliders) > Static Tube Len > Default 100
+                    const baseLen = getParamVal(c.lenParam, c.tubeLen || 100);
+                    const currentLen = baseLen + val;
+                    const ang = deg2rad(c.phaseOffset || 0);
+
+                    if (p1 && !p2) {
+                        points[c.p2.id] = {
+                            x: p1.x + currentLen * Math.cos(ang),
+                            y: p1.y + currentLen * Math.sin(ang)
+                        };
+                    } else if (p2 && !p1) {
+                        points[c.p1.id] = {
+                            x: p2.x - currentLen * Math.cos(ang),
+                            y: p2.y - currentLen * Math.sin(ang)
+                        };
+                    }
+                } else {
+                    // Rotary Input Logic
+                    const baseTheta = resolveMotorTheta(motorId, theta);
+                    const ang = baseTheta + deg2rad(c.phaseOffset || 0);
+
+                    if (p1 && !p2) {
+                        points[c.p2.id] = {
+                            x: p1.x + len * Math.cos(ang),
+                            y: p1.y + len * Math.sin(ang)
+                        };
+                    } else if (p2 && !p1) {
+                        points[c.p1.id] = {
+                            x: p2.x - len * Math.cos(ang),
+                            y: p2.y - len * Math.sin(ang)
+                        };
+                    }
                 }
             }
             if (c.holes && c.holes.length) {
@@ -937,6 +971,24 @@ export function solveTopology(topologyOrParams, params) {
                     x: center.x + r * Math.cos(ang),
                     y: center.y + r * Math.sin(ang)
                 };
+            }
+            else if (step.type === 'input_linear') {
+                const p1 = points[step.p1];
+                if (p1) {
+                    const ux = step.ux || 1;
+                    const uy = step.uy || 0;
+                    const baseLen = step.baseLen || 0;
+
+                    // 將馬達旋轉角度 (thetaDeg) 對應為位移
+                    // 這裡可以做一個類比：馬達轉 1 度 = 伸長 1mm
+                    const shift = (actualParams.thetaDeg || 0);
+                    const currentLen = baseLen + shift;
+
+                    points[step.id] = {
+                        x: p1.x + ux * currentLen,
+                        y: p1.y + uy * currentLen
+                    };
+                }
             }
             else if (step.type === 'rigid_triangle') {
                 const p1 = points[step.p1];

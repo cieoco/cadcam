@@ -19,14 +19,17 @@ export function compileTopology(components, topology, solvedPoints) {
             c.points.forEach(p => {
                 if (p.id) {
                     const existing = allPointsMap.get(p.id);
-                    const isStronger = (p.type === 'fixed');
-                    const isEmpty = !existing || existing.type === 'existing';
+                    // 強度排序：fixed/motor/linear > input > existing
+                    const isStronger = (p.type === 'fixed' || p.type === 'motor' || p.type === 'linear');
+                    const isEmpty = !existing || existing.type === 'existing' || existing.type === 'floating';
 
                     if (isStronger || isEmpty || (p.x !== undefined && existing?.x === undefined)) {
                         allPointsMap.set(p.id, {
                             x: p.x ?? existing?.x,
                             y: p.y ?? existing?.y,
-                            type: (isStronger ? p.type : (existing?.type || p.type))
+                            type: (isStronger ? p.type : (existing?.type || p.type)),
+                            physicalMotor: p.physicalMotor,
+                            valveId: p.valveId
                         });
                     }
                 }
@@ -35,15 +38,16 @@ export function compileTopology(components, topology, solvedPoints) {
             ['p1', 'p2', 'p3'].forEach(k => {
                 if (c[k] && c[k].id) {
                     const existing = allPointsMap.get(c[k].id);
-                    // 只有當新屬性更「強」(例如 fixed) 或者舊屬性是空的/existing 時，才更新
-                    const isStronger = (c[k].type === 'fixed' || (c[k].type === 'input' && (!existing || existing.type !== 'fixed')));
-                    const isEmpty = !existing || existing.type === 'existing';
+                    const isStronger = (c[k].type === 'fixed' || c[k].type === 'motor' || c[k].type === 'linear');
+                    const isEmpty = !existing || existing.type === 'existing' || existing.type === 'floating';
 
                     if (isStronger || isEmpty || (c[k].x !== undefined && existing?.x === undefined)) {
                         allPointsMap.set(c[k].id, {
                             x: c[k].x ?? existing?.x,
                             y: c[k].y ?? existing?.y,
-                            type: (isStronger ? c[k].type : (existing?.type || c[k].type))
+                            type: (isStronger ? c[k].type : (existing?.type || c[k].type)),
+                            physicalMotor: c[k].physicalMotor,
+                            valveId: c[k].valveId
                         });
                     }
                 }
@@ -51,9 +55,9 @@ export function compileTopology(components, topology, solvedPoints) {
         }
     });
 
-    // 1. Ground 步驟
+    // 1. Ground 步驟 (包含固定點、馬達基座、氣壓基座)
     allPointsMap.forEach((info, id) => {
-        if (info.type === 'fixed') {
+        if (info.type === 'fixed' || info.type === 'motor' || info.type === 'linear') {
             const step = { id, type: 'ground', x: parseFloat(info.x) || 0, y: parseFloat(info.y) || 0 };
 
             // 檢查是否有連桿連接此固定點與另一個「已處理過」的固定點
@@ -151,18 +155,99 @@ export function compileTopology(components, topology, solvedPoints) {
         }
     });
 
-    // 2. Input Crank 步驟
-    virtualComponents.filter(c => c.type === 'bar' && c.isInput).forEach(c => {
-        if (c.p1?.id && c.p2?.id && solvedPoints.has(c.p1.id)) {
+    // 2. 自動偵測驅動步驟 (基於節點角色)
+    virtualComponents.filter(c => c.type === 'bar').forEach(c => {
+        const p1 = allPointsMap.get(c.p1.id);
+        const p2 = allPointsMap.get(c.p2.id);
+
+        const isCrank = (p1 && p1.type === 'motor') || (p2 && p2.type === 'motor') || (c.isInput && c.style !== 'piston');
+        const isLinear = (p1 && p1.type === 'linear') || (p2 && p2.type === 'linear') || (c.isInput && c.style === 'piston');
+
+        if (isCrank) {
+            // Determine which point is the fixed center
+            let centerId = null;
+            if (p1 && (p1.type === 'motor' || p1.type === 'fixed' || (c.isInput && solvedPoints.has(c.p1.id)))) centerId = c.p1.id;
+            else if (p2 && (p2.type === 'motor' || p2.type === 'fixed' || (c.isInput && solvedPoints.has(c.p2.id)))) centerId = c.p2.id;
+
+            if (centerId) {
+                const targetId = (centerId === c.p1.id) ? c.p2.id : c.p1.id;
+                const centerPt = allPointsMap.get(centerId);
+                steps.push({
+                    id: targetId,
+                    type: 'input_crank',
+                    center: centerId,
+                    len_param: c.lenParam,
+                    physical_motor: centerPt?.physicalMotor || '1'
+                });
+                joints.add(targetId);
+            }
+        } else if (isLinear) {
+            let baseId = null;
+            if (p1 && (p1.type === 'linear' || p1.type === 'fixed' || (c.isInput && solvedPoints.has(c.p1.id)))) baseId = c.p1.id;
+            else if (p2 && (p2.type === 'linear' || p2.type === 'fixed' || (c.isInput && solvedPoints.has(c.p2.id)))) baseId = c.p2.id;
+
+            if (baseId) {
+                const targetId = (baseId === c.p1.id) ? c.p2.id : c.p1.id;
+                const basePt = allPointsMap.get(baseId);
+                const targetPt = allPointsMap.get(targetId);
+                if (basePt && targetPt) {
+                    const dx = targetPt.x - basePt.x;
+                    const dy = targetPt.y - basePt.y;
+                    const L = Math.hypot(dx, dy);
+                    steps.push({
+                        id: targetId,
+                        type: 'input_linear',
+                        p1: baseId,
+                        ux: L > 0 ? dx / L : 1,
+                        uy: L > 0 ? dy / L : 0,
+                        baseLen: c.tubeLen || L, // Use user-defined tube length if available
+                        maxStroke: c.maxStroke || 50,
+                        valve_id: c.physicalMotor || '1'
+                    });
+                    visualization.links.push({
+                        id: `${c.id}_piston`,
+                        p1: baseId,
+                        p2: targetId,
+                        color: '#3498db',
+                        style: 'piston',
+                        tubeLen: c.tubeLen || L // Pass visualization parameter
+                    });
+                    joints.add(targetId);
+                }
+            }
+        }
+    });
+
+    // 2.5 Input Linear 步驟 (線性致動件)
+    components.filter(c => c.type === 'slider' && c.isInput).forEach(c => {
+        if (c.p1?.id && c.p2?.id && c.p3?.id) {
+            const p1 = allPointsMap.get(c.p1.id);
+            const p2 = allPointsMap.get(c.p2.id);
+            const p3 = allPointsMap.get(c.p3.id);
+
+            let baseDist = 0;
+            if (p1 && p3) {
+                // 計算初始位置相對於 P1 的距離
+                const dx = p3.x - p1.x;
+                const dy = p3.y - p1.y;
+                const trackDx = p2.x - p1.x;
+                const trackDy = p2.y - p1.y;
+                const L = Math.hypot(trackDx, trackDy);
+                if (L > 0) {
+                    // 使用投影來確定初始位移 (避免點不在線上時的誤差)
+                    baseDist = (dx * trackDx + dy * trackDy) / L;
+                }
+            }
+
             steps.push({
-                id: c.p2.id,
-                type: 'input_crank',
-                center: c.p1.id,
-                len_param: c.lenParam,
-                phase_offset: c.phaseOffset || 0,
+                id: c.p3.id,
+                type: 'input_linear',
+                p1: c.p1.id,
+                p2: c.p2.id,
+                baseDist: baseDist,
                 physical_motor: c.physicalMotor || '1'
             });
-            joints.add(c.p2.id);
+            joints.add(c.p3.id);
         }
     });
 
@@ -200,7 +285,7 @@ export function compileTopology(components, topology, solvedPoints) {
 
     // 3. Dyad 步驟 (Triangle) & Nested Holes
     components.forEach(c => {
-        if (c.type === 'slider' && c.p1?.id && c.p2?.id && c.p3?.id) {
+        if (c.type === 'slider' && !c.isInput && c.p1?.id && c.p2?.id && c.p3?.id) {
             const sliderId = c.p3.id;
             const driver = c.driverId
                 ? components.find(b => b.id === c.driverId && b.type === 'bar')
@@ -262,6 +347,9 @@ export function compileTopology(components, topology, solvedPoints) {
 
     // 5. Links 視覺化
     components.forEach(c => {
+        const existingLink = visualization.links.find(l => l.id === c.id || l.id === `${c.id}_piston`);
+        if (existingLink) return;
+
         if (c.type === 'bar' && c.p1?.id && c.p2?.id) {
             visualization.links.push({
                 id: c.id,

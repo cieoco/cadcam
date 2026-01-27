@@ -21,10 +21,12 @@ export function getSolvedPointIds(components) {
     const solved = new Set();
     components.forEach(c => {
         if (c.type === 'polygon' && c.points) {
-            c.points.forEach(p => { if (p.type === 'fixed' && p.id) solved.add(p.id); });
+            c.points.forEach(p => {
+                if ((p.type === 'fixed' || p.type === 'motor' || p.type === 'linear') && p.id) solved.add(p.id);
+            });
         } else {
             ['p1', 'p2', 'p3'].forEach(k => {
-                if (c[k] && c[k].type === 'fixed' && c[k].id) solved.add(c[k].id);
+                if (c[k] && (c[k].type === 'fixed' || c[k].type === 'motor' || c[k].type === 'linear') && c[k].id) solved.add(c[k].id);
             });
         }
     });
