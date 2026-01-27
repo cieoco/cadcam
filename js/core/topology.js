@@ -328,10 +328,12 @@ export function compileTopology(components, topology, solvedPoints) {
 
         if (c.type === 'bar' && c.holes) {
             c.holes.forEach(h => {
-                steps.push({
-                    id: h.id, type: 'point_on_link', p1: c.p1.id, p2: c.p2.id,
-                    dist_param: h.distParam
-                });
+                if (!steps.find(s => s.id === h.id)) {
+                    steps.push({
+                        id: h.id, type: 'point_on_link', p1: c.p1.id, p2: c.p2.id,
+                        dist_param: h.distParam
+                    });
+                }
                 joints.add(h.id);
             });
         }

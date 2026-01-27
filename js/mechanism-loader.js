@@ -980,8 +980,11 @@ function setupLinkClickHandler() {
     }
 
     // 3. Joint Snap (Highest priority)
+    // Disable joint snapping for the very first point in a new link,
+    // so users can start anywhere unless they explicitly click a joint.
+    const allowJointSnap = !(drawState === 'DRAWING_LINK' && drawPoints.length === 0);
     const jointThreshold = (viewRange / 800) * 15;
-    if (window.wizard) {
+    if (allowJointSnap && window.wizard) {
       for (const comp of window.wizard.components) {
         const pts = comp.type === 'polygon' ? (comp.points || []) : [comp.p1, comp.p2, comp.p3].filter(Boolean);
         for (const pt of pts) {

@@ -414,7 +414,14 @@ function solveBodyJointTopology(topology, params) {
                     const d1 = options[1] ? Math.hypot(options[1].x - prev.x, options[1].y - prev.y) : Infinity;
                     chosen = d0 <= d1 ? options[0] : options[1];
                 } else {
-                    chosen = options[0];
+                    const seed = getInitialPoint(pid);
+                    if (seed) {
+                        const d0 = Math.hypot(options[0].x - seed.x, options[0].y - seed.y);
+                        const d1 = options[1] ? Math.hypot(options[1].x - seed.x, options[1].y - seed.y) : Infinity;
+                        chosen = d0 <= d1 ? options[0] : options[1];
+                    } else {
+                        chosen = options[0];
+                    }
                 }
             }
 
@@ -435,6 +442,32 @@ function solveBodyJointTopology(topology, params) {
             }
         }
     }
+
+    // If a bar has a known endpoint and a known hole point on the bar,
+    // use that direction to resolve the other endpoint (e.g. drive Link2 by P2).
+    components.forEach((c) => {
+        if (c.type !== 'bar' || !c.p1?.id || !c.p2?.id || !c.holes || !c.holes.length) return;
+        const p1 = points[c.p1.id];
+        const p2 = points[c.p2.id];
+        if (!p1 || p2) return;
+
+        const len = getParamVal(c.lenParam, 0);
+        if (!Number.isFinite(len) || len <= 0) return;
+
+        for (const h of c.holes) {
+            if (!h || !h.id || !h.distParam) continue;
+            const hp = points[h.id];
+            if (!hp) continue;
+            const dx = hp.x - p1.x;
+            const dy = hp.y - p1.y;
+            const d = Math.hypot(dx, dy);
+            if (d <= 1e-6) continue;
+            const ux = dx / d;
+            const uy = dy / d;
+            points[c.p2.id] = { x: p1.x + ux * len, y: p1.y + uy * len };
+            break;
+        }
+    });
 
     // Fallback: If any Piston Input Tip is still unresolved (e.g. Dangling Piston), 
     // solve it using the default phaseOffset (Angle) + Current Length.

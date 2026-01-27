@@ -183,13 +183,17 @@ export class MechanismWizard {
         `;
 
         if (comp.type === 'bar') {
-            html += section('點位 1 (P1)', `${comp.id || 'bar'}-p1`, `
+            html += section(`點位 1 (${comp.p1?.id || 'P1'})`, `${comp.id || 'bar'}-p1`, `
                 ${this.renderPointEditor(comp, 'p1')}
             `);
-            html += section('點位 2 (P2)', `${comp.id || 'bar'}-p2`, `
+            html += section(`點位 2 (${comp.p2?.id || 'P2'})`, `${comp.id || 'bar'}-p2`, `
                 ${this.renderPointEditor(comp, 'p2')}
             `);
 
+            const holeTargets = this.getAllHoles();
+            const attachOptions = holeTargets.length
+                ? holeTargets.map(h => `<option value=\"${h.id}\">${h.id} (${h.linkId})</option>`).join('')
+                : '<option value=\"\">(none)</option>';
             const paramsBody = `
                 <div class=\"form-group\">
                     <label style=\"display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;\">桿長參數</label>
@@ -224,6 +228,20 @@ export class MechanismWizard {
                     </select>
                 </div>
                 ` : ''}
+${comp.isInput && comp.style === 'piston' ? `
+                <div class="form-group" style="padding: 0 6px;">
+                    <label style="display: block; font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">Attach P2 to Hole</label>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <select id="attachHoleSelect" style="flex:1; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; background: #fff;">
+                            <option value="">-- select --</option>
+                            ${attachOptions}
+                        </select>
+                        <button onclick="window.wizard.attachInputToHole('${comp.id}', document.getElementById('attachHoleSelect').value)" style="padding: 6px 10px; background: #2c3e50; color: #fff; border: none; border-radius: 4px; font-size: 11px; cursor: pointer;">
+                            Merge
+                        </button>
+                    </div>
+                </div>
+                ` : ''}
 
                 <div class=\"form-group\">
                     <button onclick=\"window.wizard.convertSelectedBarToSlider()\" style=\"width: 100%; padding: 8px; background: #8e44ad; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;\">
@@ -242,6 +260,12 @@ export class MechanismWizard {
                                     <span style=\"font-size: 11px; font-weight: bold; color: #34495e;\">孔位 ${h.id}</span>
                                     <button onclick=\"window.wizard.removeNestedHole('${comp.id}', '${h.id}')\" style=\"background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px;\">刪除</button>
                                 </div>
+                                <div class=\"form-group\" style=\"margin:0 0 6px 0;\">
+                                    <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">?? ID</label>
+                                    <input type=\"text\" value=\"${h.id || ''}\" 
+                                        oninput=\"window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'id', this.value)\" 
+                                        style=\"width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;\">
+                                </div>
                                 <div class=\"form-group\" style=\"margin:0;\">
                                     <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">距離 P1 參數名</label>
                                     <input type=\"text\" value=\"${h.distParam || ''}\" 
@@ -256,13 +280,13 @@ export class MechanismWizard {
             `;
             html += section('孔位管理', `${comp.id || 'bar'}-holes`, holesBody);
         } else if (comp.type === 'triangle') {
-            html += section('點位 1 (P1)', `${comp.id || 'tri'}-p1`, `
+            html += section(`點位 1 (${comp.p1?.id || 'P1'})`, `${comp.id || 'tri'}-p1`, `
                 ${this.renderPointEditor(comp, 'p1')}
             `);
-            html += section('點位 2 (P2)', `${comp.id || 'tri'}-p2`, `
+            html += section(`點位 2 (${comp.p2?.id || 'P2'})`, `${comp.id || 'tri'}-p2`, `
                 ${this.renderPointEditor(comp, 'p2')}
             `);
-            html += section('點位 (P3)', `${comp.id || 'tri'}-p3`, `
+            html += section(`點位 (${comp.p3?.id || 'P3'})`, `${comp.id || 'tri'}-p3`, `
                 ${this.renderPointEditor(comp, 'p3')}
             `);
 
@@ -676,6 +700,39 @@ export class MechanismWizard {
         this.syncTopology();
     }
 
+    addHoleToSelectedBar() {
+        if (this.selectedComponentIndex < 0) return;
+        const bar = this.components[this.selectedComponentIndex];
+        if (!bar || bar.type !== 'bar') return;
+
+        if (!bar.holes) bar.holes = [];
+
+        let count = 1;
+        const allHoleIds = [];
+        this.components.forEach(c => {
+            if (c.holes) c.holes.forEach(h => allHoleIds.push(h.id));
+        });
+        while (allHoleIds.includes(`H${count}`)) count++;
+        const holeId = `H${count}`;
+
+        const distParam = `${holeId}_dist`;
+        bar.holes.push({ id: holeId, distParam });
+
+        if (!this.topology.params) this.topology.params = {};
+        if (this.topology.params[distParam] === undefined) {
+            const p1 = bar.p1 || {};
+            const p2 = bar.p2 || {};
+            const dx = (Number(p2.x) || 0) - (Number(p1.x) || 0);
+            const dy = (Number(p2.y) || 0) - (Number(p1.y) || 0);
+            const fullLen = Math.hypot(dx, dy);
+            const defaultDist = Number.isFinite(fullLen) && fullLen > 0 ? Math.round(fullLen / 2) : 50;
+            this.topology.params[distParam] = defaultDist;
+        }
+
+        this.render();
+        this.syncTopology();
+    }
+
     _getNextId(type) {
         const prefix = type === 'bar' ? 'Link' : (type === 'triangle' ? 'Tri' : (type === 'slider' ? 'Slider' : (type === 'polygon' ? 'Poly' : 'H')));
         let count = 1;
@@ -1012,6 +1069,11 @@ export class MechanismWizard {
                 ['p1', 'p2', 'p3'].forEach(k => {
                     if (c[k] && c[k].id === sourceId) { c[k].id = targetId; changed = true; }
                 });
+                if (c.holes) {
+                    c.holes.forEach(h => {
+                        if (h.id === sourceId) { h.id = targetId; changed = true; }
+                    });
+                }
             }
         });
 
@@ -1052,12 +1114,97 @@ export class MechanismWizard {
         return Array.from(ids).sort();
     }
 
+    getAllHoles() {
+        const holes = [];
+        this.components.forEach(c => {
+            if (c.type === 'bar' && c.holes) {
+                c.holes.forEach(h => {
+                    if (h && h.id) holes.push({ id: h.id, distParam: h.distParam, linkId: c.id });
+                });
+            }
+        });
+        return holes;
+    }
+
+    attachInputToHole(linkId, holeId) {
+        if (!linkId || !holeId) return;
+        const comp = this.components.find(c => c.id === linkId);
+        if (!comp || !comp.p2 || !comp.p2.id) return;
+        this.mergePoints(holeId, comp.p2.id);
+    }
+
     updateNestedHoleProp(linkId, holeIdx, prop, val) {
         const bar = this.components.find(c => c.id === linkId);
         if (bar && bar.holes && bar.holes[holeIdx]) {
-            bar.holes[holeIdx][prop] = val;
+            if (prop === 'id') {
+                const oldId = bar.holes[holeIdx].id;
+                const newId = String(val || '').trim();
+                if (!newId || newId === oldId) return;
+                bar.holes[holeIdx].id = newId;
+                const existing = this.getAllPointIds().includes(newId);
+                if (existing) {
+                    this.alignBarToHole(linkId, newId);
+                    this.mergePoints(oldId, newId);
+                    return;
+                }
+            } else {
+                bar.holes[holeIdx][prop] = val;
+            }
             this.scheduleSyncTopology();
         }
+    }
+
+    alignBarToHole(linkId, holeId) {
+        const bar = this.components.find(c => c.id === linkId);
+        if (!bar || !bar.p1 || !bar.p2 || !bar.lenParam) return;
+        const p1 = bar.p1;
+        if (!Number.isFinite(p1.x) || !Number.isFinite(p1.y)) return;
+
+        const findPoint = (id) => {
+            for (const comp of this.components) {
+                if (comp.type === 'polygon' && comp.points) {
+                    const hit = comp.points.find(p => p.id === id);
+                    if (hit && Number.isFinite(hit.x) && Number.isFinite(hit.y)) return hit;
+                }
+                for (const key of ['p1', 'p2', 'p3']) {
+                    const pt = comp[key];
+                    if (pt && pt.id === id && Number.isFinite(pt.x) && Number.isFinite(pt.y)) return pt;
+                }
+            }
+            return null;
+        };
+
+        const holePt = findPoint(holeId);
+        if (!holePt) return;
+
+        const len = (this.topology && this.topology.params && Number.isFinite(this.topology.params[bar.lenParam]))
+            ? Number(this.topology.params[bar.lenParam])
+            : Math.hypot((bar.p2.x || 0) - p1.x, (bar.p2.y || 0) - p1.y);
+        if (!Number.isFinite(len) || len <= 0) return;
+
+        const dx = holePt.x - p1.x;
+        const dy = holePt.y - p1.y;
+        const d = Math.hypot(dx, dy);
+        if (d <= 1e-6) return;
+        let ux = dx / d;
+        let uy = dy / d;
+
+        // Choose the orientation with minimal angle change from current bar direction
+        const curDx = (bar.p2.x || 0) - p1.x;
+        const curDy = (bar.p2.y || 0) - p1.y;
+        const curD = Math.hypot(curDx, curDy);
+        if (curD > 1e-6) {
+            const curUx = curDx / curD;
+            const curUy = curDy / curD;
+            const dot = curUx * ux + curUy * uy;
+            if (dot < 0) {
+                ux = -ux;
+                uy = -uy;
+            }
+        }
+
+        bar.p2.x = p1.x + ux * len;
+        bar.p2.y = p1.y + uy * len;
     }
 
     removeNestedHole(linkId, holeId) {

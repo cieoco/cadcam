@@ -5,12 +5,42 @@ import { svgEl, drawGridCompatible, describeArc, deg2rad, rad2deg } from '../uti
 import { createDriveComponent } from '../motor-data.js';
 
 export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
-    if (!sol || !sol.isValid || !sol.points) return;
+    if (!sol || sol.isValid === false) return;
 
     if (!topology || !topology.visualization) return;
     const { links, polygons, joints } = topology.visualization;
-    const pts = sol.points;
+    const pts = sol.points || {};
     const bodies = sol.bodies || [];
+
+    const fallbackPoints = new Map();
+    if (topology && Array.isArray(topology.steps)) {
+        topology.steps.forEach(step => {
+            if (!step || !step.id) return;
+            if (Number.isFinite(step.x) && Number.isFinite(step.y)) {
+                fallbackPoints.set(step.id, { x: Number(step.x), y: Number(step.y) });
+            }
+        });
+    }
+    if (topology && Array.isArray(topology._wizard_data)) {
+        topology._wizard_data.forEach(c => {
+            if (!c) return;
+            if (c.type === 'polygon' && Array.isArray(c.points)) {
+                c.points.forEach(p => {
+                    if (p && p.id && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+                        fallbackPoints.set(p.id, { x: Number(p.x), y: Number(p.y) });
+                    }
+                });
+                return;
+            }
+            ['p1', 'p2', 'p3'].forEach(k => {
+                const pt = c[k];
+                if (pt && pt.id && Number.isFinite(pt.x) && Number.isFinite(pt.y)) {
+                    fallbackPoints.set(pt.id, { x: Number(pt.x), y: Number(pt.y) });
+                }
+            });
+        });
+    }
+    const getPoint = (id) => pts[id] || fallbackPoints.get(id) || null;
 
     const renderBody = (body) => {
         if (!body || !body.localPoints || !body.worldPoints) return;
@@ -45,7 +75,7 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
     if (polygons) {
         for (const poly of polygons) {
             const pointsStr = poly.points
-                .map(id => pts[id])
+                .map(id => getPoint(id))
                 .filter(p => p)
                 .map(p => `${tx(p)},${ty(p)}`)
                 .join(' ');
@@ -91,8 +121,8 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
     if (links) {
         for (const link of links) {
             if (link.hidden) continue;
-            const p1 = pts[link.p1];
-            const p2 = pts[link.p2];
+            const p1 = getPoint(link.p1);
+            const p2 = getPoint(link.p2);
             if (!p1 || !p2) {
                 // console.warn(`Viz: Missing point for link ${link.p1}-${link.p2}`, { p1, p2 });
                 continue;
@@ -254,7 +284,7 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
     // 3. Joints & Labels
     if (joints) {
         for (const jId of joints) {
-            const p = pts[jId];
+            const p = getPoint(jId);
             if (p) {
                 // Find point type from steps
                 const step = (topology.steps || []).find(s => s.id === jId);
