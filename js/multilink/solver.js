@@ -212,37 +212,37 @@ function solveBodyJointTopology(topology, params) {
                 const motorId = c.physicalMotor || c.physical_motor;
 
                 if (c.style === 'piston') {
-                    // Linear Input Logic: Input value adds to base length
+                    // Linear Input Logic:
+                    // 1. Calculate the dynamic length (Base + Extension)
                     let val = 0;
                     const key = String(motorId);
                     if (motorId && motorAngles && motorAngles[key] !== undefined) {
                         val = Number(motorAngles[key]) || 0;
                     } else {
-                        // Check direct params fallback
                         const direct = actualParams[`theta_M${key}`] ?? actualParams[`motor_${key}`] ?? actualParams[`motor${key}`];
                         if (direct !== undefined) val = Number(direct) || 0;
                     }
 
-                    // c.tubeLen is the static retracted length. 
-                    // However, we want to allow dynamic resizing via lenParam.
-                    // Priority: Dynamic Param Value (from UI sliders) > Static Tube Len > Default 100
+                    // Priority: Dynamic Param Value > Static Tube Len > Default 100
                     const baseLen = getParamVal(c.lenParam, c.tubeLen || 100);
                     const currentLen = baseLen + val;
-                    const ang = deg2rad(c.phaseOffset || 0);
 
-                    if (p1 && !p2) {
-                        points[c.p2.id] = {
-                            x: p1.x + currentLen * Math.cos(ang),
-                            y: p1.y + currentLen * Math.sin(ang)
-                        };
-                    } else if (p2 && !p1) {
-                        points[c.p1.id] = {
-                            x: p2.x - currentLen * Math.cos(ang),
-                            y: p2.y - currentLen * Math.sin(ang)
-                        };
+                    // 2. Update the constraint length to this dynamic length
+                    // The constraint was pushed just above with 'len'. We need to fix it.
+                    // Or better, we modify the constraints array's last element? 
+                    // Or we just push a new one? No, duplicate constraints are bad.
+                    // Let's modify the last constraint if it matches.
+                    if (constraints.length > 0) {
+                        const last = constraints[constraints.length - 1];
+                        if (last.a === c.p1.id && last.b === c.p2.id && last.type === 'bar') {
+                            last.len = currentLen;
+                        }
                     }
+
+                    // 3. DO NOT force-set the point here (Allow Pivoting).
+                    // We will handle dangling pistons (dangling tip) in a post-process step.
                 } else {
-                    // Rotary Input Logic
+                    // Rotary Input Logic - Force set the point (Fixed Angle)
                     const baseTheta = resolveMotorTheta(motorId, theta);
                     const ang = baseTheta + deg2rad(c.phaseOffset || 0);
 
@@ -415,6 +415,37 @@ function solveBodyJointTopology(topology, params) {
             }
         }
     }
+
+    // Fallback: If any Piston Input Tip is still unresolved (e.g. Dangling Piston), 
+    // solve it using the default phaseOffset (Angle) + Current Length.
+    components.forEach((c) => {
+        if (c.isInput && c.style === 'piston' && points[c.p1.id] && !points[c.p2.id]) {
+            // Re-calculate the length used in constraint (we updated it in the constraints array)
+            // But simpler to re-calc here or fetch from constraint logic.
+            // Let's re-calc to be safe.
+            let val = 0;
+            const motorId = c.physicalMotor || c.physical_motor;
+            const key = String(motorId);
+            if (motorId && motorAngles && motorAngles[key] !== undefined) {
+                val = Number(motorAngles[key]) || 0;
+            } else {
+                const direct = actualParams[`theta_M${key}`] ?? actualParams[`motor_${key}`] ?? actualParams[`motor${key}`];
+                if (direct !== undefined) val = Number(direct) || 0;
+            }
+            const baseLen = getParamVal(c.lenParam, c.tubeLen || 100);
+            const currentLen = baseLen + val;
+
+            // Use phaseOffset angle
+            const thetaBase = resolveMotorTheta(motorId, theta); // Usually 0 if not rotary
+            const ang = thetaBase + deg2rad(c.phaseOffset || 0);
+
+            points[c.p2.id] = {
+                x: points[c.p1.id].x + currentLen * Math.cos(ang),
+                y: points[c.p1.id].y + currentLen * Math.sin(ang)
+            };
+            // Also mark as changed? No, loop is done.
+        }
+    });
 
     if (lineConstraints.length) {
         let lineChanged = true;
