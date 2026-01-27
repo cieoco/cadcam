@@ -302,7 +302,7 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
                     fill = '#e74c3c'; // Red for motor/crank
                     stroke = '#c0392b';
                     radius = 5.5;
-                } else if (jId && jId.startsWith('H')) {
+                } else if (jId && jId.startsWith('H') && type !== 'ground') {
                     fill = '#f1c40f'; // Yellow for holes
                 }
 

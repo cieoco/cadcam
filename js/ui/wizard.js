@@ -261,12 +261,32 @@ ${comp.isInput && comp.style === 'piston' ? `
                                     <button onclick=\"window.wizard.removeNestedHole('${comp.id}', '${h.id}')\" style=\"background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px;\">刪除</button>
                                 </div>
                                 <div class=\"form-group\" style=\"margin:0 0 6px 0;\">
-                                    <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">?? ID</label>
+                                    <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">孔位 ID</label>
                                     <input type=\"text\" value=\"${h.id || ''}\" 
                                         oninput=\"window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'id', this.value)\" 
                                         onkeydown=\"if (event.key === 'Enter') { event.preventDefault(); window.wizard.syncTopologyNow(); }\"
                                         style=\"width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;\">
                                 </div>
+                                <div class=\"form-group\" style=\"margin:0 0 6px 0;\">
+                                    <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">孔位固定(地面)</label>
+                                    <input type=\"checkbox\" ${h.fixed ? 'checked' : ''}
+                                        onchange=\"window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'fixed', this.checked)\"
+                                        style=\"width: 14px; height: 14px;\">
+                                </div>
+                                ${h.fixed ? `
+                                <div style=\"display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px;\">
+                                    <div>
+                                        <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">X</label>
+                                        <input type=\"number\" value=\"${Number.isFinite(h.x) ? h.x : ''}\" oninput=\"window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'x', this.value)\"
+                                            style=\"width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;\">
+                                    </div>
+                                    <div>
+                                        <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">Y</label>
+                                        <input type=\"number\" value=\"${Number.isFinite(h.y) ? h.y : ''}\" oninput=\"window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'y', this.value)\"
+                                            style=\"width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;\">
+                                    </div>
+                                </div>
+                                ` : ''}
                                 <div class=\"form-group\" style=\"margin:0;\">
                                     <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">距離 P1 參數名</label>
                                     <input type=\"text\" value=\"${h.distParam || ''}\" 
@@ -1149,6 +1169,20 @@ ${comp.isInput && comp.style === 'piston' ? `
                     this.mergePoints(oldId, newId);
                     return;
                 }
+            } else if (prop === 'fixed') {
+                bar.holes[holeIdx].fixed = Boolean(val);
+                if (bar.holes[holeIdx].fixed) {
+                    const pos = this.computeHoleCoords(bar, bar.holes[holeIdx]);
+                    if (pos) {
+                        bar.holes[holeIdx].x = pos.x;
+                        bar.holes[holeIdx].y = pos.y;
+                    }
+                }
+            } else if (prop === 'x' || prop === 'y') {
+                const num = Number(val);
+                if (Number.isFinite(num)) {
+                    bar.holes[holeIdx][prop] = num;
+                }
             } else {
                 bar.holes[holeIdx][prop] = val;
             }
@@ -1161,22 +1195,7 @@ ${comp.isInput && comp.style === 'piston' ? `
         if (!bar || !bar.p1 || !bar.p2 || !bar.lenParam) return;
         const p1 = bar.p1;
         if (!Number.isFinite(p1.x) || !Number.isFinite(p1.y)) return;
-
-        const findPoint = (id) => {
-            for (const comp of this.components) {
-                if (comp.type === 'polygon' && comp.points) {
-                    const hit = comp.points.find(p => p.id === id);
-                    if (hit && Number.isFinite(hit.x) && Number.isFinite(hit.y)) return hit;
-                }
-                for (const key of ['p1', 'p2', 'p3']) {
-                    const pt = comp[key];
-                    if (pt && pt.id === id && Number.isFinite(pt.x) && Number.isFinite(pt.y)) return pt;
-                }
-            }
-            return null;
-        };
-
-        const holePt = findPoint(holeId);
+        const holePt = this.getPointCoordsById(holeId);
         if (!holePt) return;
 
         const len = (this.topology && this.topology.params && Number.isFinite(this.topology.params[bar.lenParam]))
@@ -1207,6 +1226,44 @@ ${comp.isInput && comp.style === 'piston' ? `
 
         bar.p2.x = p1.x + ux * len;
         bar.p2.y = p1.y + uy * len;
+    }
+
+    getPointCoordsById(id) {
+        if (!id) return null;
+        for (const comp of this.components) {
+            if (comp.type === 'polygon' && comp.points) {
+                const hit = comp.points.find(p => p.id === id);
+                if (hit && Number.isFinite(hit.x) && Number.isFinite(hit.y)) return hit;
+            }
+            for (const key of ['p1', 'p2', 'p3']) {
+                const pt = comp[key];
+                if (pt && pt.id === id && Number.isFinite(pt.x) && Number.isFinite(pt.y)) return pt;
+            }
+        }
+        return null;
+    }
+
+    computeHoleCoords(bar, hole) {
+        if (!bar || !bar.p1 || !bar.p2 || !hole) return null;
+        const p1 = bar.p1;
+        const p2 = bar.p2;
+        if (!Number.isFinite(p1.x) || !Number.isFinite(p1.y) || !Number.isFinite(p2.x) || !Number.isFinite(p2.y)) return null;
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const len = Math.hypot(dx, dy);
+        if (len <= 1e-6) return null;
+
+        let dist = 0;
+        const paramName = hole.distParam;
+        if (paramName && this.topology && this.topology.params && this.topology.params[paramName] !== undefined) {
+            dist = Number(this.topology.params[paramName]) || 0;
+        } else if (paramName && !isNaN(parseFloat(paramName))) {
+            dist = Number(paramName);
+        }
+
+        const ux = dx / len;
+        const uy = dy / len;
+        return { x: p1.x + ux * dist, y: p1.y + uy * dist };
     }
 
     removeNestedHole(linkId, holeId) {

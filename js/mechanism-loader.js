@@ -1594,6 +1594,92 @@ function openPropertySheet(items, title, selectedId) {
         }
       }
     }
+  } else if (typeof selectedId === 'string' && selectedId.startsWith('H')) {
+    // --- 孔位屬性 (固定/浮動) ---
+    if (topoArea && topoArea.value) {
+      try {
+        const topology = JSON.parse(topoArea.value);
+        const wizardData = topology._wizard_data || [];
+        let targetBar = null;
+        let targetHole = null;
+        wizardData.forEach(w => {
+          if (w.type !== 'bar' || !w.holes) return;
+          const hit = w.holes.find(h => h.id === selectedId);
+          if (hit) {
+            targetBar = w;
+            targetHole = hit;
+          }
+        });
+
+        if (!targetHole) {
+          if (emptyMsg) {
+            emptyMsg.textContent = `節點 ${selectedId}`;
+            emptyMsg.style.display = 'block';
+          }
+        } else {
+          const wrapper = document.createElement('div');
+          wrapper.style.marginTop = '10px';
+          wrapper.style.padding = '10px';
+          wrapper.style.background = '#f8f9fa';
+          wrapper.style.border = '1px solid #e9ecef';
+          wrapper.style.borderRadius = '8px';
+
+          const fixedChecked = Boolean(targetHole.fixed);
+          const hx = Number.isFinite(targetHole.x) ? targetHole.x : '';
+          const hy = Number.isFinite(targetHole.y) ? targetHole.y : '';
+          const distParam = targetHole.distParam || targetHole.dist_param || '';
+
+          wrapper.innerHTML = `
+            <div style="font-weight:bold; margin-bottom:8px; font-size:13px; color:#57606f;">孔位設定</div>
+            <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:8px;">
+              <input id="holeFixedToggle" type="checkbox" ${fixedChecked ? 'checked' : ''} style="width:16px; height:16px;">
+              孔位固定(地面)
+            </label>
+            <div style="font-size:11px; color:#747d8c;">距離參數: ${distParam}</div>
+          `;
+
+          const save = () => {
+            if (window.wizard) {
+              window.wizard.init(topology);
+              if (typeof window.wizard.syncTopologyNow === 'function') {
+                window.wizard.syncTopologyNow();
+                if (typeof updatePreview === 'function') updatePreview();
+                return;
+              }
+            }
+            topoArea.value = JSON.stringify(topology, null, 2);
+            topoArea.dispatchEvent(new Event('input', { bubbles: true }));
+          };
+
+          wrapper.querySelector('#holeFixedToggle').onchange = (e) => {
+            targetHole.fixed = e.target.checked;
+            if (targetHole.fixed && targetBar && targetBar.p1 && targetBar.p2) {
+              const x1 = Number(targetBar.p1.x);
+              const y1 = Number(targetBar.p1.y);
+              const x2 = Number(targetBar.p2.x);
+              const y2 = Number(targetBar.p2.y);
+              const dx = x2 - x1;
+              const dy = y2 - y1;
+              const L = Math.hypot(dx, dy);
+              if (Number.isFinite(L) && L > 1e-6) {
+                let dist = 0;
+                if (topology.params && distParam && topology.params[distParam] !== undefined) {
+                  dist = Number(topology.params[distParam]) || 0;
+                } else if (distParam && !isNaN(parseFloat(distParam))) {
+                  dist = Number(distParam);
+                }
+                targetHole.x = x1 + (dx / L) * dist;
+                targetHole.y = y1 + (dy / L) * dist;
+              }
+            }
+            save();
+            setTimeout(() => openPropertySheet(items, title, selectedId), 50);
+          };
+
+          sheetContent.appendChild(wrapper);
+        }
+      } catch (e) { console.error('Hole sheet error:', e); }
+    }
   } else if (typeof selectedId === 'string' && (selectedId.startsWith('O') || selectedId.startsWith('P') || selectedId.startsWith('J'))) {
     // --- 🎨 節點行為設定 (LEGO 邏輯) ---
     if (topoArea && topoArea.value) {

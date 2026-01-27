@@ -13,6 +13,27 @@ export function compileTopology(components, topology, solvedPoints) {
 
     if (topology) topology.bodyJoint = true;
 
+    const resolveHolePoint = (bar, hole) => {
+        if (Number.isFinite(hole.x) && Number.isFinite(hole.y)) {
+            return { x: Number(hole.x), y: Number(hole.y) };
+        }
+        if (!bar || !bar.p1 || !bar.p2) return null;
+        const x1 = Number(bar.p1.x);
+        const y1 = Number(bar.p1.y);
+        const x2 = Number(bar.p2.x);
+        const y2 = Number(bar.p2.y);
+        if (!Number.isFinite(x1) || !Number.isFinite(y1) || !Number.isFinite(x2) || !Number.isFinite(y2)) return null;
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const L = Math.hypot(dx, dy);
+        if (L <= 1e-6) return null;
+        let dist = 0;
+        const paramName = hole.distParam;
+        if (paramName && params[paramName] !== undefined) dist = Number(params[paramName]) || 0;
+        else if (paramName && !isNaN(parseFloat(paramName))) dist = Number(paramName);
+        return { x: x1 + (dx / L) * dist, y: y1 + (dy / L) * dist };
+    };
+
     // 收集座標與屬性 (智慧合併：fixed/input 優先權高於 existing)
     components.forEach(c => {
         if (c.type === 'polygon' && c.points) {
@@ -52,6 +73,23 @@ export function compileTopology(components, topology, solvedPoints) {
                     }
                 }
             });
+            if (c.type === 'bar' && c.holes) {
+                c.holes.forEach(h => {
+                    if (!h || !h.id || !h.fixed) return;
+                    const existing = allPointsMap.get(h.id);
+                    const isEmpty = !existing || existing.type === 'existing' || existing.type === 'floating';
+                    if (isEmpty) {
+                        const pos = resolveHolePoint(c, h);
+                        if (pos) {
+                            allPointsMap.set(h.id, {
+                                x: pos.x,
+                                y: pos.y,
+                                type: 'fixed'
+                            });
+                        }
+                    }
+                });
+            }
         }
     });
 
@@ -328,6 +366,7 @@ export function compileTopology(components, topology, solvedPoints) {
 
         if (c.type === 'bar' && c.holes) {
             c.holes.forEach(h => {
+                if (h && h.fixed) return;
                 if (!steps.find(s => s.id === h.id)) {
                     steps.push({
                         id: h.id, type: 'point_on_link', p1: c.p1.id, p2: c.p2.id,
