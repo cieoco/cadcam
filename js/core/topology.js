@@ -160,8 +160,8 @@ export function compileTopology(components, topology, solvedPoints) {
         const p1 = allPointsMap.get(c.p1.id);
         const p2 = allPointsMap.get(c.p2.id);
 
-        const isCrank = (p1 && p1.type === 'motor') || (p2 && p2.type === 'motor') || (c.isInput && c.style !== 'piston');
         const isLinear = (p1 && p1.type === 'linear') || (p2 && p2.type === 'linear') || (c.isInput && c.style === 'piston');
+        const isCrank = !isLinear && ((p1 && p1.type === 'motor') || (p2 && p2.type === 'motor') || (c.isInput && c.style !== 'piston'));
 
         if (isCrank) {
             // Determine which point is the fixed center
@@ -177,14 +177,14 @@ export function compileTopology(components, topology, solvedPoints) {
                     type: 'input_crank',
                     center: centerId,
                     len_param: c.lenParam,
-                    physical_motor: centerPt?.physicalMotor || '1'
+                    physical_motor: String(centerPt?.physicalMotor || '1')
                 });
                 joints.add(targetId);
             }
         } else if (isLinear) {
             let baseId = null;
-            if (p1 && (p1.type === 'linear' || p1.type === 'fixed' || (c.isInput && solvedPoints.has(c.p1.id)))) baseId = c.p1.id;
-            else if (p2 && (p2.type === 'linear' || p2.type === 'fixed' || (c.isInput && solvedPoints.has(c.p2.id)))) baseId = c.p2.id;
+            if (p1 && (p1.type === 'linear' || p1.type === 'motor' || p1.type === 'fixed' || (c.isInput && solvedPoints.has(c.p1.id)))) baseId = c.p1.id;
+            else if (p2 && (p2.type === 'linear' || p2.type === 'motor' || p2.type === 'fixed' || (c.isInput && solvedPoints.has(c.p2.id)))) baseId = c.p2.id;
 
             if (baseId) {
                 const targetId = (baseId === c.p1.id) ? c.p2.id : c.p1.id;
@@ -200,9 +200,11 @@ export function compileTopology(components, topology, solvedPoints) {
                         p1: baseId,
                         ux: L > 0 ? dx / L : 1,
                         uy: L > 0 ? dy / L : 0,
-                        baseLen: c.tubeLen || L, // Use user-defined tube length if available
+                        baseLen: c.tubeLen || L,
+                        len_param: c.lenParam, // 綁定基礎長度參數 (如 L1)
                         maxStroke: c.maxStroke || 50,
-                        valve_id: c.physicalMotor || '1'
+                        valve_id: String(c.physicalMotor || '1'),
+                        physical_motor: String(c.physicalMotor || '1')
                     });
                     visualization.links.push({
                         id: `${c.id}_piston`,
@@ -210,7 +212,7 @@ export function compileTopology(components, topology, solvedPoints) {
                         p2: targetId,
                         color: '#3498db',
                         style: 'piston',
-                        tubeLen: c.tubeLen || L // Pass visualization parameter
+                        tubeLen: c.tubeLen || L
                     });
                     joints.add(targetId);
                 }
@@ -245,7 +247,8 @@ export function compileTopology(components, topology, solvedPoints) {
                 p1: c.p1.id,
                 p2: c.p2.id,
                 baseDist: baseDist,
-                physical_motor: c.physicalMotor || '1'
+                valve_id: String(c.physicalMotor || '1'),
+                physical_motor: String(c.physicalMotor || '1')
             });
             joints.add(c.p3.id);
         }

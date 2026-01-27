@@ -791,11 +791,9 @@ export class MechanismWizard {
             } else if (mode === 'piston') {
                 comp.isInput = true;
                 comp.style = 'piston';
+                if (comp.p1.type === 'fixed' || comp.p1.type === 'floating' || comp.p1.type === 'motor') comp.p1.type = 'linear';
                 if (!comp.tubeLen) comp.tubeLen = 100;
                 if (!comp.maxStroke) comp.maxStroke = 50;
-
-                if (comp.p1.type === 'fixed' || comp.p1.type === 'floating') comp.p1.type = 'linear';
-                if (comp.p1.type === 'motor') comp.p1.type = 'linear';
                 if (!comp.physicalMotor) comp.physicalMotor = '1';
             }
 

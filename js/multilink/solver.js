@@ -200,6 +200,33 @@ function solveBodyJointTopology(topology, params) {
         }
         return fallbackTheta;
     };
+    const getLinearShift = (motorId) => {
+        if (!motorId) return 0;
+        const key = String(motorId);
+
+        // Priority A: UI standard motorAngles
+        if (motorAngles && motorAngles[key] !== undefined) {
+            return Number(motorAngles[key]) || 0;
+        }
+
+        // Priority B: Ext params (Ext1/ext1) from actualParams or topology.params
+        const extKey = `Ext${key}`;
+        const extKeyLower = `ext${key}`;
+        if (actualParams[extKey] !== undefined) return Number(actualParams[extKey]) || 0;
+        if (actualParams[extKeyLower] !== undefined) return Number(actualParams[extKeyLower]) || 0;
+        if (topology && topology.params) {
+            if (topology.params[extKey] !== undefined) return Number(topology.params[extKey]) || 0;
+            if (topology.params[extKeyLower] !== undefined) return Number(topology.params[extKeyLower]) || 0;
+        }
+
+        // Priority C: motor1 / motor_1
+        if (actualParams[`motor${key}`] !== undefined) return Number(actualParams[`motor${key}`]) || 0;
+        if (actualParams[`motor_${key}`] !== undefined) return Number(actualParams[`motor_${key}`]) || 0;
+
+        // Priority D: fallback theta for id=1
+        if (key === '1') return Number(actualParams.theta || actualParams.thetaDeg || 0);
+        return 0;
+    };
 
     components.forEach((c) => {
         if (c.type === 'bar' && c.p1?.id && c.p2?.id) {
@@ -214,14 +241,7 @@ function solveBodyJointTopology(topology, params) {
                 if (c.style === 'piston') {
                     // Linear Input Logic:
                     // 1. Calculate the dynamic length (Base + Extension)
-                    let val = 0;
-                    const key = String(motorId);
-                    if (motorId && motorAngles && motorAngles[key] !== undefined) {
-                        val = Number(motorAngles[key]) || 0;
-                    } else {
-                        const direct = actualParams[`theta_M${key}`] ?? actualParams[`motor_${key}`] ?? actualParams[`motor${key}`];
-                        if (direct !== undefined) val = Number(direct) || 0;
-                    }
+                    const val = getLinearShift(motorId);
 
                     // Priority: Dynamic Param Value > Static Tube Len > Default 100
                     const baseLen = getParamVal(c.lenParam, c.tubeLen || 100);
@@ -423,21 +443,21 @@ function solveBodyJointTopology(topology, params) {
             // Re-calculate the length used in constraint (we updated it in the constraints array)
             // But simpler to re-calc here or fetch from constraint logic.
             // Let's re-calc to be safe.
-            let val = 0;
             const motorId = c.physicalMotor || c.physical_motor;
-            const key = String(motorId);
-            if (motorId && motorAngles && motorAngles[key] !== undefined) {
-                val = Number(motorAngles[key]) || 0;
-            } else {
-                const direct = actualParams[`theta_M${key}`] ?? actualParams[`motor_${key}`] ?? actualParams[`motor${key}`];
-                if (direct !== undefined) val = Number(direct) || 0;
-            }
+            const val = getLinearShift(motorId);
             const baseLen = getParamVal(c.lenParam, c.tubeLen || 100);
             const currentLen = baseLen + val;
 
-            // Use phaseOffset angle
-            const thetaBase = resolveMotorTheta(motorId, theta); // Usually 0 if not rotary
-            const ang = thetaBase + deg2rad(c.phaseOffset || 0);
+            // Use a stable piston direction (ignore motorAngles to avoid coupling ext -> angle)
+            let ang = deg2rad(c.phaseOffset || 0);
+            const p2Seed = getInitialPoint(c.p2.id);
+            if (p2Seed) {
+                const dx = p2Seed.x - points[c.p1.id].x;
+                const dy = p2Seed.y - points[c.p1.id].y;
+                if (dx !== 0 || dy !== 0) {
+                    ang = Math.atan2(dy, dx);
+                }
+            }
 
             points[c.p2.id] = {
                 x: points[c.p1.id].x + currentLen * Math.cos(ang),
@@ -917,6 +937,33 @@ export function solveTopology(topologyOrParams, params) {
         }
         return fallbackTheta;
     };
+    const getLinearShift = (motorId) => {
+        if (!motorId) return 0;
+        const key = String(motorId);
+
+        // Priority A: UI standard motorAngles
+        if (motorAngles && motorAngles[key] !== undefined) {
+            return Number(motorAngles[key]) || 0;
+        }
+
+        // Priority B: Ext params (Ext1/ext1) from actualParams or topology.params
+        const extKey = `Ext${key}`;
+        const extKeyLower = `ext${key}`;
+        if (actualParams[extKey] !== undefined) return Number(actualParams[extKey]) || 0;
+        if (actualParams[extKeyLower] !== undefined) return Number(actualParams[extKeyLower]) || 0;
+        if (topology && topology.params) {
+            if (topology.params[extKey] !== undefined) return Number(topology.params[extKey]) || 0;
+            if (topology.params[extKeyLower] !== undefined) return Number(topology.params[extKeyLower]) || 0;
+        }
+
+        // Priority C: motor1 / motor_1
+        if (actualParams[`motor${key}`] !== undefined) return Number(actualParams[`motor${key}`]) || 0;
+        if (actualParams[`motor_${key}`] !== undefined) return Number(actualParams[`motor_${key}`]) || 0;
+
+        // Priority D: fallback theta for id=1
+        if (key === '1') return Number(actualParams.theta || actualParams.thetaDeg || 0);
+        return 0;
+    };
 
     // Helper to get value: either direct number or from params
     const getVal = (step, key) => {
@@ -1008,11 +1055,19 @@ export function solveTopology(topologyOrParams, params) {
                 if (p1) {
                     const ux = step.ux || 1;
                     const uy = step.uy || 0;
-                    const baseLen = step.baseLen || 0;
 
-                    // 將馬達旋轉角度 (thetaDeg) 對應為位移
-                    // 這裡可以做一個類比：馬達轉 1 度 = 伸長 1mm
-                    const shift = (actualParams.thetaDeg || 0);
+                    // 1. 讀取基礎長度 (L1, L2...)
+                    let baseLen = Number(step.baseLen || 0);
+                    const lp = step.len_param;
+                    if (lp) {
+                        if (actualParams[lp] !== undefined) baseLen = Number(actualParams[lp]);
+                        else if (topology.params && topology.params[lp] !== undefined) baseLen = Number(topology.params[lp]);
+                    }
+
+                    // 2. 讀取位移量 (Ext1, Ext2...)
+                    const motorId = String(step.valve_id || '1');
+                    const shift = getLinearShift(motorId);
+
                     const currentLen = baseLen + shift;
 
                     points[step.id] = {

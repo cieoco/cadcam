@@ -208,18 +208,25 @@ function updateMotorAngleControls(topology, mech) {
     motorContainer.style.display = 'block';
     if (thetaBlock) thetaBlock.style.display = 'none';
 
-    const key = motorIds.join(',');
+    // Generate a key that includes both motor IDs and their types (linear vs rotational)
+    // to detect when a motor type has changed even if the ID list is the same.
+    const motorTypes = motorIds.map(id => {
+        const isLin = topology && topology.steps && topology.steps.some(s => s.type === 'input_linear' && String(s.valve_id || s.physical_motor) === String(id));
+        return `${id}:${isLin ? 'L' : 'C'}`;
+    });
+    const key = motorTypes.join(',');
+
     if (key !== lastMotorAngleKey) {
         motorContainer.innerHTML = '';
         motorIds.forEach((motorId) => {
             // Check if this motorId corresponds to a linear input in the current steps
             // Check if this motorId corresponds to a linear input in the current steps
             // We check both specific valve_id match, or if this ID is NOT associated with a crank but IS in our list
-            const linearStep = topology && topology.steps && topology.steps.find(s => s.type === 'input_linear' && String(s.valve_id) === String(motorId));
+            const linearStep = topology && topology.steps && topology.steps.find(s => s.type === 'input_linear' && String(s.valve_id || s.physical_motor) === String(motorId));
             const crankStep = topology && topology.steps && topology.steps.find(s => s.type === 'input_crank' && (String(s.physical_motor) === String(motorId) || String(s.physicalMotor) === String(motorId)));
 
-            // Priority: If it's explicitly a crank step, treat as crank. Otherwise if linear step exists, treat as linear.
-            const isLinear = Boolean(linearStep) && !crankStep;
+            // Priority: If any part of the topology says this motorId is linear, treat as linear (mm)
+            const isLinear = Boolean(linearStep);
             const label = isLinear ? `Ext ${motorId}` : `M${motorId}`;
             const unit = isLinear ? 'mm' : '°';
 
