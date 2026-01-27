@@ -264,12 +264,14 @@ ${comp.isInput && comp.style === 'piston' ? `
                                     <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">?? ID</label>
                                     <input type=\"text\" value=\"${h.id || ''}\" 
                                         oninput=\"window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'id', this.value)\" 
+                                        onkeydown=\"if (event.key === 'Enter') { event.preventDefault(); window.wizard.syncTopologyNow(); }\"
                                         style=\"width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;\">
                                 </div>
                                 <div class=\"form-group\" style=\"margin:0;\">
                                     <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">距離 P1 參數名</label>
                                     <input type=\"text\" value=\"${h.distParam || ''}\" 
                                         oninput=\"window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'distParam', this.value)\" 
+                                        onkeydown=\"if (event.key === 'Enter') { event.preventDefault(); window.wizard.syncTopologyNow(); }\"
                                         style=\"width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;\">
                                 </div>
                             </div>

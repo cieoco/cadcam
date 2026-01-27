@@ -227,7 +227,7 @@ function updateMotorAngleControls(topology, mech) {
 
             // Priority: If any part of the topology says this motorId is linear, treat as linear (mm)
             const isLinear = Boolean(linearStep);
-            const label = isLinear ? `Ext ${motorId}` : `M${motorId}`;
+            const label = isLinear ? `Ext ${motorId} (mm)` : `M${motorId}`;
             const unit = isLinear ? 'mm' : '°';
 
             let min = -360;
