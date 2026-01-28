@@ -140,6 +140,7 @@ function solveBodyJointTopology(topology, params) {
                 y: ref.y + (step.uy || 0) * dist
             };
         });
+
     }
 
     const fixedIds = new Set();
@@ -227,6 +228,32 @@ function solveBodyJointTopology(topology, params) {
         if (key === '1') return Number(actualParams.theta || actualParams.thetaDeg || 0);
         return 0;
     };
+
+    // Resolve linear input tips early so downstream constraints can use them.
+    if (topology && Array.isArray(topology.steps)) {
+        topology.steps.forEach(step => {
+            if (step.type !== 'input_linear') return;
+            if (!step.id || !step.p1) return;
+            if (points[step.id]) return;
+            const p1 = points[step.p1];
+            if (!p1) return;
+            const ux = Number.isFinite(step.ux) ? Number(step.ux) : 1;
+            const uy = Number.isFinite(step.uy) ? Number(step.uy) : 0;
+            let baseLen = Number(step.baseLen || step.baseDist || 0);
+            const lp = step.len_param;
+            if (lp) {
+                const v = getParamVal(lp, baseLen);
+                if (Number.isFinite(v)) baseLen = v;
+            }
+            const motorId = String(step.valve_id || step.physical_motor || '1');
+            const shift = getLinearShift(motorId);
+            const currentLen = baseLen + shift;
+            points[step.id] = {
+                x: p1.x + ux * currentLen,
+                y: p1.y + uy * currentLen
+            };
+        });
+    }
 
     components.forEach((c) => {
         if (c.type === 'bar' && c.p1?.id && c.p2?.id) {
@@ -513,12 +540,16 @@ function solveBodyJointTopology(topology, params) {
                 if (!a || !b) continue;
 
                 const distConstraint = constraints.find(c => {
-                    if (c.a === lc.id) return points[c.b];
-                    if (c.b === lc.id) return points[c.a];
+                    if (c.a === lc.id) return points[c.b] || getInitialPoint(c.b);
+                    if (c.b === lc.id) return points[c.a] || getInitialPoint(c.a);
                     return false;
                 });
                 if (!distConstraint) {
-                    if (lc.hard) {
+                    const pa = points[lc.line_p1];
+                    const pb = points[lc.line_p2];
+                    const pp = points[lc.id];
+                    // Only hard-fail when the point and line endpoints are already resolved but inconsistent.
+                    if (lc.hard && pa && pb && pp) {
                         infeasible = true;
                         if (!infeasibleReason) {
                             infeasibleReason = `共點 ${lc.id} 無法同時落在線上`;
@@ -553,7 +584,7 @@ function solveBodyJointTopology(topology, params) {
                 }
 
                 const otherId = distConstraint.a === lc.id ? distConstraint.b : distConstraint.a;
-                const center = points[otherId];
+                const center = points[otherId] || getInitialPoint(otherId);
                 const r = distConstraint.len || 0;
                 if (!center || r <= 0) continue;
 

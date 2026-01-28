@@ -1,0 +1,14 @@
+{
+  "steps": [
+    {"id":"P1","type":"ground","x":-352,"y":3},
+    {"id":"P2","type":"input_linear","p1":"P1","ux":1,"uy":0,"baseLen":100,"len_param":"L1","maxStroke":50,"valve_id":"1","physical_motor":"1"},
+    {"id":"H1","type":"point_on_link","p1":"P3","p2":"P4","dist_param":"H1_dist"},
+    {"id":"P3","type":"joint","x":-97.13091675133538,"y":94.89149242231662},
+    {"id":"P4","type":"joint","x":0,"y":-146}
+  ],
+  "tracePoint":"P1",
+  "visualization":{"links":[{"id":"Link1_piston","p1":"P1","p2":"P2","color":"#3498db","style":"piston","tubeLen":100},{"id":"Link2","p1":"P2","p2":"P3","color":"#3498db","style":"normal","lenParam":"L2","hidden":false},{"id":"Link3","p1":"P3","p2":"P4","color":"#3498db","style":"normal","lenParam":"L3","hidden":false}],"polygons":[],"joints":["P1","P2","H1","P3","P4"]},
+  "parts":[{"id":"Link1(L1)","type":"bar","len_param":"L1","color":"#3498db","isInput":true,"holes":[]},{"id":"Link2(L2)","type":"bar","len_param":"L2","color":"#3498db","isInput":false,"holes":[]},{"id":"Link3(L3)","type":"bar","len_param":"L3","color":"#3498db","isInput":false,"holes":[{"id":"H1","dist_param":"H1_dist"}]}],
+  "params":{"L1":144,"L2":144,"L3":260,"H1_dist":145},
+  "_wizard_data":[{"type":"bar","id":"Link1","color":"#3498db","p1":{"id":"P1","type":"linear","x":-352,"y":3},"p2":{"id":"P2","type":"floating","x":-208,"y":3},"lenParam":"L1","isInput":true,"phaseOffset":0,"style":"piston","tubeLen":100,"maxStroke":50,"physicalMotor":"1"},{"type":"bar","id":"Link2","color":"#3498db","p1":{"id":"P2","type":"existing","x":-208,"y":3},"p2":{"id":"P3","type":"floating","x":-97,"y":95},"lenParam":"L2","isInput":false},{"type":"bar","id":"Link3","color":"#3498db","p1":{"id":"P3","type":"existing","x":-97.13091675133538,"y":94.89149242231662},"p2":{"id":"P4","type":"floating","x":0,"y":-146},"lenParam":"L3","isInput":false,"holes":[{"id":"H1","distParam":"H1_dist"}]}]
+}

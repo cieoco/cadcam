@@ -11,6 +11,8 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
     const { links, polygons, joints } = topology.visualization;
     const pts = sol.points || {};
     const bodies = sol.bodies || [];
+    const topoParams = (topology && topology.params) ? topology.params : {};
+    const dynParams = sol && sol.dynamicParams ? sol.dynamicParams : {};
 
     const fallbackPoints = new Map();
     if (topology && Array.isArray(topology.steps)) {
@@ -41,6 +43,55 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
         });
     }
     const getPoint = (id) => pts[id] || fallbackPoints.get(id) || null;
+    const getParamVal = (name, fallback = 0) => {
+        if (!name) return fallback;
+        if (dynParams && dynParams[name] !== undefined) return Number(dynParams[name]);
+        if (topoParams && topoParams[name] !== undefined) return Number(topoParams[name]);
+        const parsed = Number(name);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const getHolePoint = (id) => {
+        if (!id) return null;
+
+        // Prefer wizard data (more reliable during underconstrained states)
+        if (topology && Array.isArray(topology._wizard_data)) {
+            for (const c of topology._wizard_data) {
+                if (c.type !== 'bar' || !c.holes) continue;
+                const hole = c.holes.find(h => h.id === id);
+                if (!hole) continue;
+                const a = getPoint(c.p1?.id);
+                const b = getPoint(c.p2?.id);
+                if (!a || !b) return null;
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const L = Math.hypot(dx, dy);
+                if (L <= 1e-6) return null;
+                const dist = Math.max(0, Math.min(getParamVal(hole.distParam || hole.dist_param, 0), L));
+                const ux = dx / L;
+                const uy = dy / L;
+                return { x: a.x + ux * dist, y: a.y + uy * dist };
+            }
+        }
+
+        // Fallback to topology.steps
+        if (topology && Array.isArray(topology.steps)) {
+            const step = topology.steps.find(s => s.type === 'point_on_link' && s.id === id);
+            if (!step) return null;
+            const a = getPoint(step.p1);
+            const b = getPoint(step.p2);
+            if (!a || !b) return null;
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const L = Math.hypot(dx, dy);
+            if (L <= 1e-6) return null;
+            const dist = Math.max(0, Math.min(getParamVal(step.dist_param, 0), L));
+            const ux = dx / L;
+            const uy = dy / L;
+            return { x: a.x + ux * dist, y: a.y + uy * dist };
+        }
+
+        return null;
+    };
 
     const renderBody = (body) => {
         if (!body || !body.localPoints || !body.worldPoints) return;
@@ -251,16 +302,37 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
                 const vb = svg.viewBox && svg.viewBox.baseVal ? svg.viewBox.baseVal : null;
                 const vbW = vb && vb.width ? vb.width : rect.width;
                 const vbH = vb && vb.height ? vb.height : rect.height;
+                const vbX = vb && Number.isFinite(vb.x) ? vb.x : 0;
+                const vbY = vb && Number.isFinite(vb.y) ? vb.y : 0;
                 const scaleToViewBox = Math.min(rect.width / vbW, rect.height / vbH);
                 const offsetX = (rect.width - vbW * scaleToViewBox) / 2;
                 const offsetY = (rect.height - vbH * scaleToViewBox) / 2;
-                const clickX = (e.clientX - rect.left - offsetX) / scaleToViewBox;
-                const clickY = (e.clientY - rect.top - offsetY) / scaleToViewBox;
+                const clickX = (e.clientX - rect.left - offsetX) / scaleToViewBox + vbX;
+                const clickY = (e.clientY - rect.top - offsetY) / scaleToViewBox + vbY;
 
                 const originX = tx({ x: 0, y: 0 });
                 const originY = ty({ x: 0, y: 0 });
                 const worldX = (clickX - originX) / scale;
                 const worldY = (originY - clickY) / scale;
+
+                const p1Val = getPoint(link.p1);
+                const p2Val = getPoint(link.p2);
+
+                let projDist = null;
+                if (p1Val && p2Val) {
+                    const s1x = tx(p1Val);
+                    const s1y = ty(p1Val);
+                    const s2x = tx(p2Val);
+                    const s2y = ty(p2Val);
+                    const dsx = s2x - s1x;
+                    const dsy = s2y - s1y;
+                    const denom = (dsx * dsx + dsy * dsy);
+                    if (denom > 1e-6) {
+                        const t = Math.max(0, Math.min(1, ((clickX - s1x) * dsx + (clickY - s1y) * dsy) / denom));
+                        const Lw = Math.hypot(p2Val.x - p1Val.x, p2Val.y - p1Val.y);
+                        projDist = Number.isFinite(Lw) ? t * Lw : null;
+                    }
+                }
 
                 const event = new CustomEvent('mechanism-link-click', {
                     bubbles: true,
@@ -268,10 +340,11 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
                         id: link.id,
                         p1: link.p1,
                         p2: link.p2,
-                        p1Val: pts[link.p1],
-                        p2Val: pts[link.p2],
+                        p1Val,
+                        p2Val,
                         x: worldX,
-                        y: worldY
+                        y: worldY,
+                        projDist
                     }
                 });
                 lineEl.dispatchEvent(event);
@@ -284,7 +357,7 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
     // 3. Joints & Labels
     if (joints) {
         for (const jId of joints) {
-            const p = getPoint(jId);
+            const p = getPoint(jId) || getHolePoint(jId);
             if (p) {
                 // Find point type from steps
                 const step = (topology.steps || []).find(s => s.id === jId);
@@ -352,6 +425,55 @@ export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
                 }
             }
         }
+    }
+
+    // 3.5 Hole Debug Overlay (auto when hole points are missing, or toggle via window.DEBUG_HOLES)
+    const holeIds = [];
+    if (topology && Array.isArray(topology._wizard_data)) {
+        topology._wizard_data.forEach(c => {
+            if (c.type !== 'bar' || !Array.isArray(c.holes)) return;
+            c.holes.forEach(h => {
+                if (h && h.id) holeIds.push(h.id);
+            });
+        });
+    }
+    const missingHoleIds = holeIds.filter(id => !pts[id]);
+    const debugHoles = (typeof window !== 'undefined' && window.DEBUG_HOLES) || missingHoleIds.length > 0;
+    if (debugHoles && holeIds.length) {
+        holeIds.forEach(id => {
+            const p = pts[id] || getHolePoint(id);
+            if (!p) return;
+            // Draw a large debug cross + label so it is obvious
+            const size = 8;
+            svg.appendChild(svgEl('line', {
+                x1: tx({ x: p.x - size, y: p.y }),
+                y1: ty({ x: p.x - size, y: p.y }),
+                x2: tx({ x: p.x + size, y: p.y }),
+                y2: ty({ x: p.x + size, y: p.y }),
+                stroke: '#ff00ff',
+                'stroke-width': 2,
+                'pointer-events': 'none'
+            }));
+            svg.appendChild(svgEl('line', {
+                x1: tx({ x: p.x, y: p.y - size }),
+                y1: ty({ x: p.x, y: p.y - size }),
+                x2: tx({ x: p.x, y: p.y + size }),
+                y2: ty({ x: p.x, y: p.y + size }),
+                stroke: '#ff00ff',
+                'stroke-width': 2,
+                'pointer-events': 'none'
+            }));
+            const label = svgEl('text', {
+                x: tx({ x: p.x + size + 2, y: p.y }),
+                y: ty({ x: p.x + size + 2, y: p.y }),
+                fill: '#ff00ff',
+                'font-size': '10px',
+                'font-family': 'monospace',
+                'pointer-events': 'none'
+            });
+            label.textContent = `${id}${pts[id] ? '' : ' (fb)'}`;
+            svg.appendChild(label);
+        });
     }
 
     // 4. Link Name Labels

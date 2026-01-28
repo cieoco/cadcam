@@ -1073,7 +1073,7 @@ function setupLinkClickHandler() {
 
     // 2. 呼叫 Wizard API 建立孔位 (這會自動處理參數、清單同步、與右側滑桿產出)
     pushTopologyHistory();
-    wizard.addHoleFromCanvas(id, detail.p1, detail.p2, r1, r2, detail.x, detail.y);
+    wizard.addHoleFromCanvas(id, detail.p1, detail.p2, r1, r2, detail.x, detail.y, detail.p1Val, detail.p2Val, detail.projDist);
 
     // 🌟 修正：加孔後立即結束繪圖狀態，防止產生「幽靈雜點」
     drawState = 'IDLE';

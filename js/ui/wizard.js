@@ -278,11 +278,13 @@ ${comp.isInput && comp.style === 'piston' ? `
                                     <div>
                                         <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">X</label>
                                         <input type=\"number\" value=\"${Number.isFinite(h.x) ? h.x : ''}\" oninput=\"window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'x', this.value)\"
+                                            onkeydown=\"if (event.key === 'Enter') { event.preventDefault(); window.wizard.syncTopologyNow(); }\"
                                             style=\"width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;\">
                                     </div>
                                     <div>
                                         <label style=\"display: block; font-size: 9px; color: #7f8c8d; margin-bottom: 2px;\">Y</label>
                                         <input type=\"number\" value=\"${Number.isFinite(h.y) ? h.y : ''}\" oninput=\"window.wizard.updateNestedHoleProp('${comp.id}', ${hIdx}, 'y', this.value)\"
+                                            onkeydown=\"if (event.key === 'Enter') { event.preventDefault(); window.wizard.syncTopologyNow(); }\"
                                             style=\"width: 100%; padding: 4px; border: 1px solid #eee; border-radius: 3px; font-size: 11px;\">
                                     </div>
                                 </div>
@@ -692,7 +694,7 @@ ${comp.isInput && comp.style === 'piston' ? `
         this.syncTopology();
     }
 
-    addHoleFromCanvas(linkId, p1Id, p2Id, r1, r2, x, y) {
+    addHoleFromCanvas(linkId, p1Id, p2Id, r1, r2, x, y, p1Val, p2Val, projDist) {
         const bar = this.components.find(c => c.id === linkId);
         if (!bar) return;
 
@@ -716,7 +718,49 @@ ${comp.isInput && comp.style === 'piston' ? `
 
         // 初始化參數
         if (!this.topology.params) this.topology.params = {};
-        this.topology.params[newHole.distParam] = Math.round(r1);
+
+        // Project click position onto the bar segment so the hole always lies on the bar.
+        // Use the projection ratio to map onto the current length parameter (prevents infeasible H_dist > L).
+        let dist = Number.isFinite(projDist)
+            ? Number(projDist)
+            : (Number.isFinite(r1) ? Number(r1) : 0);
+        const useP1 = p1Val && Number.isFinite(p1Val.x) && Number.isFinite(p1Val.y)
+            ? { x: Number(p1Val.x), y: Number(p1Val.y) }
+            : null;
+        const useP2 = p2Val && Number.isFinite(p2Val.x) && Number.isFinite(p2Val.y)
+            ? { x: Number(p2Val.x), y: Number(p2Val.y) }
+            : null;
+        const p1 = useP1 || this.getPointCoordsById(p1Id);
+        const p2 = useP2 || this.getPointCoordsById(p2Id);
+        if (p1 && p2 && Number.isFinite(p1.x) && Number.isFinite(p1.y) && Number.isFinite(p2.x) && Number.isFinite(p2.y)) {
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const L = Math.hypot(dx, dy);
+            if (L > 1e-6) {
+                let effectiveLen = L;
+                if (bar.lenParam && this.topology && this.topology.params && Number.isFinite(this.topology.params[bar.lenParam])) {
+                    effectiveLen = Number(this.topology.params[bar.lenParam]);
+                }
+
+                if (!Number.isFinite(projDist) && Number.isFinite(x) && Number.isFinite(y)) {
+                    const px = Number(x);
+                    const py = Number(y);
+                    const t = Math.max(0, Math.min(1, ((px - p1.x) * dx + (py - p1.y) * dy) / (L * L)));
+                    dist = t * effectiveLen;
+                }
+
+                dist = Math.max(0, Math.min(effectiveLen, dist));
+            }
+        }
+
+        const distVal = Math.round(dist);
+        this.topology.params[newHole.distParam] = distVal;
+
+        // Keep dynamic param inputs in sync (avoid stale values overriding topology.params)
+        const numInput = document.getElementById(`dyn_${newHole.distParam}`);
+        const rangeInput = document.getElementById(`dyn_${newHole.distParam}_range`);
+        if (numInput) numInput.value = String(distVal);
+        if (rangeInput) rangeInput.value = String(distVal);
 
         this.render();
         this.syncTopology();
