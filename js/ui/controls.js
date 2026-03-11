@@ -8,7 +8,7 @@ import { readInputs, readSweepParams, readViewParams } from '../config.js';
 import { sweepTheta, calculateTrajectoryStats } from '../fourbar/solver.js';
 import { startAnimation, pauseAnimation, stopAnimation, setupMotorTypeHandler } from '../fourbar/animation.js';
 import { renderPartsLayout, renderPartsOverlayLayer } from '../parts/renderer.js';
-import { computeEnginePreview, computeEngineSweep, clampEngineParam } from '../core/mechanism-engine.js';
+import { computeEnginePreview, computeEngineSweep, computeEngineExport, clampEngineParam } from '../core/mechanism-engine.js';
 import { collectDynamicParamSpec } from '../core/dynamic-params.js';
 
 // 全域狀態資料
@@ -893,6 +893,30 @@ export function updatePreview() {
             dl.appendChild(dxfBtn);
         } else if (previewState.dxfError) {
             console.warn("Auto-DXF generation failed:", previewState.dxfError);
+        }
+
+        try {
+            const exportBundle = computeEngineExport({
+                mods,
+                mech,
+                partSpec,
+                mfg,
+                dynamicParams
+            });
+            if (exportBundle && exportBundle.mechanismText) {
+                const mechBtn = document.createElement("button");
+                mechBtn.textContent = "下載 mechanism.json (給 ARM)";
+                mechBtn.className = "btn-download";
+                mechBtn.style.backgroundColor = "#1565c0";
+                mechBtn.style.width = "100%";
+                mechBtn.onclick = () => {
+                    const fileName = `${mods.config.id || 'linkage'}.mechanism.json`;
+                    downloadText(fileName, exportBundle.mechanismText);
+                };
+                dl.appendChild(mechBtn);
+            }
+        } catch (e) {
+            console.warn("mechanism.json generation failed:", e);
         }
 
         return previewState.solution;
