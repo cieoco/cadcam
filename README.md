@@ -2,6 +2,26 @@ Linkage 閉環機構拓樸工具
 
 > 聚焦於閉環機構拓樸、2D 模擬、零件佈局與 DXF 輸出的機構設計工具
 
+## 試用方式
+
+### 線上試用
+
+- 目前可用：
+  - https://cieoco.github.io/cadcam/
+- 備註：
+  - 線上 demo 若尚未同步更名，路徑仍沿用舊的 `cadcam` URL
+
+### 本機試用
+
+```bash
+cd d:\tool\linkage
+python -m http.server 8000
+```
+
+然後開啟：
+
+- `http://localhost:8000`
+
 [![Live Demo](https://img.shields.io/badge/🚀_線上試用-Live_Demo-success?style=for-the-badge)](https://cieoco.github.io/cadcam/)
 
 > 備註：線上 demo 若尚未同步更名，路徑可能仍沿用舊的 `cadcam` URL。
