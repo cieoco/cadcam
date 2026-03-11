@@ -1,10 +1,9 @@
 /**
  * Export Core
- * G-code / DXF 匯出整理
+ * DXF 匯出整理
  */
 
 import { validateConfig } from '../config.js';
-import { buildAllGcodes, generateMachiningInfo } from '../gcode/generator.js';
 import { buildDXF } from '../utils/dxf-generator.js';
 
 export function buildExportBundle({ mods, mech, partSpec, mfg, dynamicParams }) {
@@ -22,9 +21,8 @@ export function buildExportBundle({ mods, mech, partSpec, mfg, dynamicParams }) 
     const partsFn = mods.parts[mods.config.partsFn];
     const parts = partsFn ? partsFn({ ...mergedMech, ...partSpec }) : [];
 
-    const files = buildAllGcodes(parts, mfg);
     const dxfText = buildDXF(parts);
-    const machiningInfo = generateMachiningInfo(mfg, parts.length);
+    const machiningInfo = `Linkage export ready.\n- 零件數量：${parts.length}\n- 輸出格式：DXF`;
 
-    return { files, dxfText, machiningInfo };
+    return { files: [], dxfText, machiningInfo };
 }

@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title id="pageTitle">機構模擬工具</title>
+    <title id="pageTitle">Linkage 閉環機構拓樸工具</title>
     <link rel="stylesheet" href="css/styles.css" />
     <style>
         #svgWrap,
@@ -21,7 +21,7 @@
             <div>
                 <a href="index.html" class="nav-back">
                     <span style="font-size: 20px;">←</span>
-                    <span>返回機構選單</span>
+                    <span>返回 Linkage 選單</span>
                 </a>
             </div>
             <h2 class="nav-title">
@@ -133,88 +133,15 @@
             <div id="partSpecsPanel"></div>
 
             <div style="height:10px"></div>
-            <h3>加工設定（GRBL / MACH3）</h3>
-            <div class="grid">
-                <div>
-                    <label>後處理器</label>
-                    <select id="postProcessor">
-                        <option value="grbl" selected>GRBL</option>
-                        <option value="mach3">MACH3</option>
-                    </select>
-                </div>
-                <div>
-                    <label>工作範圍 X（mm）</label>
-                    <input id="workX" type="number" value="300" />
-                </div>
-                <div>
-                    <label>工作範圍 Y（mm）</label>
-                    <input id="workY" type="number" value="180" />
-                </div>
-                <div>
-                    <label>刀徑（mm）</label>
-                    <input id="toolD" type="number" min="0.5" max="10" step="0.1" value="3.0" />
-                </div>
-                <div>
-                    <label>孔加工方式</label>
-                    <select id="holeMode">
-                        <option value="drill">鑽中心點</option>
-                        <option value="mill">銑內徑</option>
-                    </select>
-                </div>
-                <div>
-                    <label>材料厚度 T（mm）</label>
-                    <input id="thickness" type="number" min="1" max="30" step="0.1" value="3.0" />
-                </div>
-                <div>
-                    <label>穿透餘量（mm）</label>
-                    <input id="overcut" type="number" min="0" max="2" step="0.1" value="0.5" />
-                </div>
-                <div>
-                    <label>每層下刀（mm）</label>
-                    <input id="stepdown" type="number" min="0.1" max="5" step="0.1" value="0.5" />
-                </div>
-                <div>
-                    <label>SAFE_Z（mm）</label>
-                    <input id="safeZ" type="number" min="1" max="30" step="0.5" value="5" />
-                </div>
-                <div>
-                    <label>Feed XY（mm/min）</label>
-                    <input id="feedXY" type="number" min="50" max="3000" step="10" value="400" />
-                </div>
-                <div>
-                    <label>Feed Z（mm/min）</label>
-                    <input id="feedZ" type="number" min="30" max="2000" step="10" value="100" />
-                </div>
-                <div>
-                    <label>Tab thickness (mm)</label>
-                    <input id="tabThickness" type="number" min="0" max="5" step="0.1" value="1.1" />
-                </div>
-                <div>
-                    <label>Tab width (mm)</label>
-                    <input id="tabWidth" type="number" min="0" max="10" step="0.1" value="2" />
-                </div>
-                <div>
-                    <label>Tab count</label>
-                    <input id="tabCount" type="number" min="0" max="20" step="1" value="4" />
-                </div>
-                <div>
-                    <label>主軸 S（可空白）</label>
-                    <input id="spindle" type="number" min="1000" max="30000" step="100" placeholder="例如 12000" />
-                </div>
-            </div>
-
-            <div class="btnrow">
-                <button id="btnGen">生成 G-code</button>
-            </div>
-
-            <div style="height:10px"></div>
+            <h3>拓樸輸出</h3>
             <div class="note">
-                <div class="warn">注意：v0.1 不含 tabs。外形切完零件可能鬆脫，請用雙面膠/壓板固定。</div>
-                <div>預設：G21 / G90 / SAFE_Z 先抬刀、先鑽孔後外形、多層 stepdown。</div>
+                <div>本工具已聚焦為 <strong>閉環機構拓樸 / 零件佈局</strong>。</div>
+                <div>刀路 / G-code 流程請改由 <strong>svg2gcode-project</strong> 處理。</div>
+                <div>此頁面保留 2D 模擬、零件預覽與 DXF 輸出。</div>
             </div>
 
             <div style="height:10px"></div>
-            <h3>輸出 / 訊息</h3>
+            <h3>匯出 / 訊息</h3>
             <div id="log" class="card" style="padding:10px; background:#fafafa;"></div>
             <div class="btnrow" id="dlButtons"></div>
 
@@ -228,7 +155,7 @@
                 <!-- Toolbar -->
                 <div
                     style="padding: 12px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                    <h3 style="margin:0; border:none; font-size: 16px;">2D 模擬與參數調整</h3>
+                    <h3 style="margin:0; border:none; font-size: 16px;">2D 機構模擬與拓樸調整</h3>
                     <div style="display:flex; gap:10px; align-items:center;">
                         <label style="font-size:12px; color:#555; display:flex; align-items:center; gap:6px;">
                             <input id="showPartsOverlay" type="checkbox" />
@@ -349,7 +276,7 @@
                                 </div>
                                 <div class="note"
                                     style="padding: 6px 12px; background: #fff; border-top: 1px solid #eee; font-size: 12px; color: #888;">
-                                    ℹ️ 零件排版在工作區（0..X, 0..Y），每根各自輸出一份 G-code。
+                                    ℹ️ 零件排版在工作區（0..X, 0..Y），可輸出 DXF 並交由其他 CAD / 製造工具接續。
                                 </div>
                             </div>
                         </div>

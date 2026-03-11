@@ -23,12 +23,10 @@ function parseTopology(raw) {
 }
 
 function buildPreviewLog(mods, partSpec, mfg, topologyObj) {
-    const cutDepth = mfg.thickness + mfg.overcut;
-    const layers = Math.max(1, Math.ceil(cutDepth / mfg.stepdown));
     const baseLog = [
         `${mods.config.name} 預覽：OK`,
-        `加工資訊：切割深度=${fmt(cutDepth)}mm, Stepdown=${fmt(mfg.stepdown)}mm, 總層數=${layers}`,
         `工作範圍：${partSpec.workX} x ${partSpec.workY} (mm)`,
+        `零件輸出：DXF preview ready`,
     ].join("\n");
 
     const components = topologyObj && Array.isArray(topologyObj._wizard_data)

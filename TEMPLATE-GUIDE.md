@@ -13,7 +13,7 @@ mechanism.html?type=parallelogram → 平行四邊形
 ## 📁 檔案結構
 
 ```
-cadcam/
+linkage/
 ├── index.html                    # 你的新首頁（已完成）✅
 ├── mechanism.html                # 統一的機構模擬頁面 ⭐ 新
 ├── fourbar.html                  # 保留作為獨立版本（可選）
@@ -102,7 +102,7 @@ enabled: true  // 改為 true
 
 ### 中期（1週）
 8. 實作零件生成（圓形零件）
-9. 實作 G-code 生成
+9. 實作 DXF / 零件輸出
 10. 完善文件
 
 ## 🔄 立即行動：更新首頁連結
@@ -147,7 +147,7 @@ mechanism-config.js (100 行/機構)
 - ✅ 不同的零件規格
 - ✅ 不同的視覺化
 - ✅ 不同的說明文字
-- ✅ 相同的 UI 框架和加工參數
+- ✅ 相同的 UI 框架和零件輸出流程
 
 ## 📝 下一步
 

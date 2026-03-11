@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>機構快速原型工具</title>
+    <title>Linkage 閉環機構拓樸工具</title>
     <style>
         :root {
             --bg: #0b0c10;
@@ -436,8 +436,8 @@
     <div class="wrap">
         <header>
             <div class="brand">
-                <h1>機構快速原型工具</h1>
-                <p>先定運動 → 選機構 → 選致動器 → 最後才做工程粗估與加工</p>
+                <h1>Linkage 閉環機構拓樸工具</h1>
+                <p>先定運動 → 選機構 → 選致動器 → 驗證拓樸與零件，再交由其他工具做製造</p>
             </div>
 
         </header>
@@ -546,8 +546,8 @@
                         <ul class="list">
                             <li><b>先讓幾何順</b>（不卡、行程合理）再談控制（PID/速度）。</li>
                             <li>原型階段重點是 <b>可預期、可重複</b>：少選項、少魔法、先把流程跑通。</li>
-                            <li>木板加工：先保守（<b>stepdown 0.5mm</b>、SAFE_Z 5mm、先孔後外形）。</li>
-                            <li>v0.1 不含 tabs：外形切完會掉件，請用雙面膠/壓板固定。</li>
+                            <li>先把 <b>拓樸與可動範圍</b> 跑通，再決定零件厚度與製造方式。</li>
+                            <li>DXF / SVG 輸出後，可交給 <b>svg2gcode-project</b> 做刀路與 G-code。</li>
                         </ul>
                     </div>
                 </div>
@@ -568,7 +568,7 @@
                         </div>
 
                         <div class="meterRow" style="margin-top:6px;">
-                            <div class="tag">可加工性（桿件化 / 2.5D）</div>
+                            <div class="tag">拓樸可落地性（桿件化 / 2.5D）</div>
                             <div class="tag" id="mCamTxt">—</div>
                         </div>
                         <div class="bar">
@@ -678,7 +678,7 @@
                     name: "四連桿（4-bar）",
                     badge: "桿件化 ★★★★★",
                     why: "旋轉輸入 → 擺動輸出；結構穩、好算、好切、原型效率最高。",
-                    pros: ["夾爪/擺臂/抬升常見", "2D 模擬最直覺", "桿件 CNC 切割最友善"],
+                    pros: ["夾爪/擺臂/抬升常見", "2D 模擬最直覺", "桿件板件化最友善"],
                     cons: ["不是每個角度都可行（需可行區間）", "open/crossed 需鎖定解"],
                     cta: "進入四連桿工具",
                     href: "./mechanism.html?type=fourbar",
@@ -713,7 +713,7 @@
                     badge: "長行程 ★★★★☆",
                     why: "行程可長、效率高，適合滑台/升降。",
                     pros: ["速度快", "行程可擴展"],
-                    cons: ["加工與齒形精度要求", "背隙與定位要處理"],
+                    cons: ["齒形精度要求高", "背隙與定位要處理"],
                     cta: "進入齒條齒輪工具",
                     href: "./mechanism.html?type=rackpinion",
                     enabled: true
@@ -736,7 +736,7 @@
                     badge: "節奏固定 ★★★☆☆",
                     why: "想要固定節奏的動作（送料/分度）可以考慮凸輪。",
                     pros: ["節奏可設計", "重複性高"],
-                    cons: ["輪廓設計與加工較複雜", "不太適合第一版原型"],
+                    cons: ["輪廓設計較複雜", "不太適合第一版原型"],
                     cta: "（進階）",
                     href: "#",
                     enabled: false
@@ -878,7 +878,7 @@
                 const hint = document.createElement("div");
                 hint.className = "hint";
                 hint.style.textAlign = "center";
-                hint.innerHTML = "點擊上方按鈕即可進入 2D 模擬並生成 CNC 用 G-code。";
+                hint.innerHTML = "點擊上方按鈕即可進入 2D 模擬、驗證閉環機構拓樸，並輸出零件資料。";
                 ctaContainer.appendChild(hint);
             }
         }
@@ -900,7 +900,7 @@
             if (state.motion === "recip") geom = 70;
             if (state.motion === "translate") geom = 65;
 
-            // CAM friendliness (prototype)
+            // manufacturability heuristic (prototype)
             if (state.motion === "swing") cam = 90;       // link-based
             if (state.motion === "linear") cam = 85;      // crank-slider link parts
             if (state.motion === "recip") cam = 80;

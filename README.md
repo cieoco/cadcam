@@ -1,17 +1,19 @@
-機構設計輔助系統 (Bot Builder)
+Linkage 閉環機構拓樸工具
 
-> 從運動需求到 G-code 的一站式機構設計與製造解決方案
+> 聚焦於閉環機構拓樸、2D 模擬、零件佈局與 DXF 輸出的機構設計工具
 
 [![Live Demo](https://img.shields.io/badge/🚀_線上試用-Live_Demo-success?style=for-the-badge)](https://cieoco.github.io/cadcam/)
 
+> 備註：線上 demo 若尚未同步更名，路徑可能仍沿用舊的 `cadcam` URL。
+
 ## 🎯 專案概述
 
-這是一個模組化的機構設計輔助系統，專為創客、學生與工程師設計。它提供完整的機構設計工作流程：
+這是一個模組化的閉環機構拓樸工具，專為創客、學生與工程師設計。它聚焦在機構本身，而不再內建製造刀路流程：
 
 1. **運動優先 (Motion First)** - 先決定要什麼運動（擺動、直線、往復），系統會推薦合適機構。
 2. **參數化設計** - 輸入設計參數，即時 2D 物理模擬。
 3. **多連桿精靈** - 透過互動式介面，自由組裝桿件與三角形，或載入經典範本（如夾爪、曲柄滑塊）。
-4. **零件生成** - 自動產生可加工的 SVG 圖檔與 CNC G-code。
+4. **零件輸出** - 產生零件佈局與 DXF，供後續 CAD 或製造工具接續使用。
 
 ## ✨ 主要特色
 
@@ -19,17 +21,18 @@
 - 🛠️ **多連桿設計器** - 像樂高一樣組裝連桿，支援自動求解與拖拉編輯
 - 📁 **範本系統** - 內建平形四連桿、夾爪、曲柄滑塊等多種範本
 - ⚙️ **參數化設計** - 調整參數立即看到效果
-- 🔧 **零件自動化** - 一鍵生成所有零件的加工程式
-- 🎯 **工程防呆** - 內建「幾何可行性」、「可加工性」儀表板
+- 📐 **閉環拓樸管理** - 聚焦四連桿、多連桿、平行四邊形等閉環機構
+- 🧩 **零件佈局輸出** - 支援 DXF 與零件預覽，方便交由其他製造工具接續
+- 🎯 **工程防呆** - 內建「幾何可行性」、「拓樸可落地性」儀表板
 
 ## 🗂️ 專案結構
 
 *(省略部分技術細節，詳見程式碼)*
 
 ```
-cadcam/
+linkage/
 ├── index.html                  # 機構選單首頁 (Wizard 入口)
-├── mechanism.html              # 統一的機構模擬頁面
+├── mechanism.html              # 統一的閉環機構模擬頁面
 ├── js/
 │   ├── mechanism-loader.js     # 核心載入器
 │   ├── ui/wizard.js            #多連桿設計精靈 (Wizard UI)
@@ -47,7 +50,7 @@ cadcam/
 - `js/core/mechanism-engine.js`
   - `computeEnginePreview`：求解 + 軌跡 + preview/view state
   - `computeEngineSweep`：掃描分析 (sweep)
-  - `computeEngineExport`：G-code/DXF 匯出
+  - `computeEngineExport`：DXF 與零件輸出整理
   - `clampEngineParam`：動態參數約束
 - `js/core/preview-state.js`：整理求解結果、軌跡資料、訊息、DXF preview
 - `js/core/view-state.js`：UI 顯示狀態計算 (警告/面板/顯示策略)
@@ -78,7 +81,7 @@ UI 端主要留在 `js/ui/controls.js` 與 `js/ui/wizard.js`，負責：
 
 #### 3. 齒輪齒條機構（Rack & Pinion）
 
-- **應用**：長行程直線傳動、CNC 軸
+- **應用**：長行程直線傳動、滑台
 - **特點**：精確控制位置。
 
 #### 4. 🦀 多連桿機構 (Multilink Wizard) **(NEW)**
@@ -101,7 +104,7 @@ UI 端主要留在 `js/ui/controls.js` 與 `js/ui/wizard.js`，負責：
 #### 5. ✏️ 桿件繪圖工具 (Bar Drawer) **(NEW)**
 
 - **應用**：純粹的 2D 零件繪製
-- **特點**：不涉及運動模擬，專注於繪製連桿外型與孔位，產生 DXF/G-code。
+- **特點**：不涉及運動模擬，專注於繪製連桿外型與孔位，產生 DXF。
 
 ## 🚀 快速開始
 
@@ -130,7 +133,18 @@ python -m http.server 8000
 3. **調整參數**：
    - **四連桿/滑塊**：右側面板調整數值。
    - **多連桿**：使用左側 Wizard 新增/刪除桿件，或載入範本。
-4. **驗證與輸出**：確認動畫無誤後，點擊「生成 G-code」或下載 SVG。
+4. **驗證與輸出**：確認動畫無誤後，下載 DXF 或將零件資料交由其他 CAD / 製造工具接續。
+
+## 🔁 與其它工具的關係
+
+- `linkage`
+  - 管閉環機構拓樸、2D 模擬、連桿配置與 DXF 輸出
+- `cad`
+  - 管單一零件 CAD 與 `part.json`
+- `arm`
+  - 管 3D 組裝、URDF 與機械手臂模擬
+- `svg2gcode-project`
+  - 管製造刀路與 G-code
 
 ## 🛠️ 開發指南 (給維護者)
 

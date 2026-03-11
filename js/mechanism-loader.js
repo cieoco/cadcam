@@ -1,5 +1,5 @@
 /**
- * Universal Mechanism Page Loader
+ * Universal Linkage Page Loader
  * 通用機構頁面載入器
  */
 
@@ -67,7 +67,7 @@ async function initMechanismPage() {
   }
 
   // 設定頁面標題和圖示
-  document.getElementById('pageTitle').textContent = `${mech.name} - 機構模擬工具`;
+  document.getElementById('pageTitle').textContent = `${mech.name} - Linkage 閉環機構拓樸工具`;
   document.getElementById('mechIcon').textContent = mech.icon;
   document.getElementById('mechName').textContent = mech.name;
 

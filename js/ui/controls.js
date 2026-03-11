@@ -3,12 +3,12 @@
  * UI 控制器模組 - 處理使用者介面互動邏輯
  */
 
-import { $, log, downloadText, downloadZip, fmt, calcAdaptiveGridStep } from '../utils.js';
+import { $, log, downloadText, fmt, calcAdaptiveGridStep } from '../utils.js';
 import { readInputs, readSweepParams, readViewParams } from '../config.js';
 import { sweepTheta, calculateTrajectoryStats } from '../fourbar/solver.js';
 import { startAnimation, pauseAnimation, stopAnimation, setupMotorTypeHandler } from '../fourbar/animation.js';
 import { renderPartsLayout, renderPartsOverlayLayer } from '../parts/renderer.js';
-import { computeEnginePreview, computeEngineSweep, computeEngineExport, clampEngineParam } from '../core/mechanism-engine.js';
+import { computeEnginePreview, computeEngineSweep, clampEngineParam } from '../core/mechanism-engine.js';
 import { collectDynamicParamSpec } from '../core/dynamic-params.js';
 
 // 全域狀態資料
@@ -907,63 +907,6 @@ export function updatePreview() {
 }
 
 /**
- * 生成 G-code 檔案
- */
-export function generateGcodes() {
-    try {
-        const mods = getActiveModules();
-        if (!mods) return;
-
-        const { mech, partSpec, mfg } = readInputs();
-        const dynamicParams = collectDynamicParams();
-        Object.keys(dynamicParams).forEach((key) => {
-            mech[key] = dynamicParams[key];
-        });
-
-        const { files, dxfText, machiningInfo } = computeEngineExport({
-            mods,
-            mech,
-            partSpec,
-            mfg,
-            dynamicParams
-        });
-
-        const dl = $("dlButtons");
-        dl.innerHTML = "";
-
-        for (const f of files) {
-            const btn = document.createElement("button");
-            btn.textContent = `下載 ${f.name}`;
-            btn.className = "btn-download";
-            btn.onclick = () => downloadText(f.name, f.text);
-            dl.appendChild(btn);
-        }
-
-        const dxfBtn = document.createElement("button");
-        dxfBtn.textContent = `下載 DXF 零件檔`;
-        dxfBtn.className = "btn-download";
-        dxfBtn.style.backgroundColor = "#6a1b9a";
-        dxfBtn.onclick = () => downloadText("mechanism_parts.dxf", dxfText);
-        dl.appendChild(dxfBtn);
-
-        const zipBtn = document.createElement("button");
-        zipBtn.textContent = `下載所有檔案 (ZIP)`;
-        zipBtn.className = "btn-download";
-        zipBtn.style.backgroundColor = "#2e7d32";
-        zipBtn.onclick = () => {
-            const allFiles = [...files, { name: "mechanism_parts.dxf", text: dxfText }];
-            downloadZip("mechanism_cnc_files.zip", allFiles);
-        };
-        dl.appendChild(zipBtn);
-
-        log($("log").textContent + "\n\n" + machiningInfo + "\n\nG-code generated.");
-    } catch (e) {
-        log(`生成失敗：${e.message}`);
-        $("dlButtons").innerHTML = "";
-    }
-}
-
-/**
  * 執行掃描分析
  */
 export function performSweepAnalysis() {
@@ -1162,9 +1105,6 @@ export function setupUIHandlers() {
     if (btnSaveConfig) {
         btnSaveConfig.onclick = downloadSnapshot;
     }
-
-    const btnGen = $("btnGen");
-    if (btnGen) btnGen.onclick = generateGcodes;
 
     const btnPlay = $("btnPlayAnim");
     if (btnPlay) btnPlay.onclick = () => startAnimation(updatePreview);

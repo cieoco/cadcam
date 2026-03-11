@@ -9,7 +9,7 @@ import { setupUIHandlers } from './ui/controls.js?v=debug_2';
  * 初始化應用程式
  */
 function init() {
-    console.log('4-Bar Linkage CAD/CAM System - Modular Version');
+    console.log('4-Bar Linkage Topology System - Modular Version');
     console.log('Initializing...');
 
     // 設定所有 UI 處理器
