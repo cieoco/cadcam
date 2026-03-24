@@ -10,6 +10,7 @@ import { startAnimation, pauseAnimation, stopAnimation, setupMotorTypeHandler } 
 import { renderPartsLayout, renderPartsOverlayLayer } from '../parts/renderer.js';
 import { computeEnginePreview, computeEngineSweep, computeEngineExport, clampEngineParam } from '../core/mechanism-engine.js';
 import { collectDynamicParamSpec } from '../core/dynamic-params.js';
+import { renderDiagnosticsPanel } from './diagnostics/panel.js';
 
 // 全域狀態資料
 let currentTrajectoryData = null;
@@ -35,6 +36,16 @@ function parseTopologySafe(raw) {
     }
     if (typeof raw === 'object') return raw;
     return null;
+}
+
+function updateDiagnostics(previewState) {
+    const diagnosticsContainer = document.getElementById('diagnosticsPanel');
+    if (!diagnosticsContainer) return;
+    renderDiagnosticsPanel(
+        diagnosticsContainer,
+        previewState ? previewState.validationReport : null,
+        previewState ? previewState.sanitySummary : null
+    );
 }
 
 function renderGridLabelOverlay(viewParams) {
@@ -791,6 +802,8 @@ export function updatePreview() {
         const previewState = engineState.previewState;
         const viewState = engineState.viewState;
 
+        updateDiagnostics(previewState);
+
         lastMultilinkSolution = engineState.lastState.lastSolution;
         lastMultilinkTopology = engineState.lastState.lastTopology;
         currentTrajectoryData = previewState.trajectoryData;
@@ -924,6 +937,7 @@ export function updatePreview() {
     } catch (e) {
         log(`更新失敗：${e.message}`);
         console.error(e);
+        updateDiagnostics(null);
         $("svgWrap").innerHTML = "";
         $("partsWrap").innerHTML = "";
         $("dlButtons").innerHTML = "";

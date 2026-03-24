@@ -10,6 +10,14 @@ import { EXAMPLE_TEMPLATES } from '../examples/index.js';
 import { compileTopology } from '../core/topology.js';
 import { getSolvedPointIds as coreGetSolvedPointIds, isComponentSolved as coreIsComponentSolved, getUnsolvedSummary as coreGetUnsolvedSummary } from '../core/solver-status.js';
 
+function escapeHtml(text) {
+    return String(text ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 export class MechanismWizard {
     constructor(containerId, onUpdate) {
         this.container = $(containerId);
@@ -23,6 +31,7 @@ export class MechanismWizard {
         this._syncDelay = 150;
         this.sectionCollapsed = {};
         this.isDragging = false;
+        this.activeTemplateId = '';
 
         this.init();
     }
@@ -31,14 +40,59 @@ export class MechanismWizard {
         if (initialTopology && initialTopology._wizard_data) {
             this.components = initialTopology._wizard_data;
             this.topology = initialTopology;
+            this.activeTemplateId = initialTopology._templateId || this.activeTemplateId || '';
         }
         this.render();
+    }
+
+    getActiveTemplate() {
+        return EXAMPLE_TEMPLATES.find((template) => template.id === this.activeTemplateId) || null;
+    }
+
+    renderTemplateInsight() {
+        const template = this.getActiveTemplate();
+        if (!template) {
+            return `
+                <div style="margin: 0 10px 8px 10px; padding: 10px 12px; border: 1px dashed #d7dee8; border-radius: 8px; background: #fcfcfd;">
+                    <div style="font-size: 12px; font-weight: bold; color: #34495e; margin-bottom: 4px;">範本提示</div>
+                    <div style="font-size: 11px; line-height: 1.5; color: #7f8c8d;">
+                        先從範本開始，比從空白畫面更容易理解閉環、驅動與追蹤點的關係。
+                    </div>
+                </div>
+            `;
+        }
+
+        const keyParams = Array.isArray(template.keyParams) && template.keyParams.length
+            ? template.keyParams.map((param) => `<span style="display:inline-block; margin:2px 4px 0 0; padding:2px 6px; border-radius:999px; background:#edf2f7; color:#2d3748; font-size:10px; font-weight:600;">${escapeHtml(param)}</span>`).join('')
+            : '<span style="font-size: 11px; color:#7f8c8d;">尚未定義</span>';
+
+        return `
+            <div style="margin: 0 10px 8px 10px; padding: 10px 12px; border: 1px solid #dbe7f3; border-radius: 8px; background: linear-gradient(180deg, #f8fbff 0%, #f3f8fc 100%);">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+                    <div style="font-size: 12px; font-weight: bold; color: #2c5282;">範本學習卡</div>
+                    <div style="font-size: 10px; color: #718096;">${escapeHtml(template.name)}</div>
+                </div>
+                <div style="font-size: 11px; line-height: 1.5; color: #2d3748; margin-bottom: 8px;">
+                    <strong>學習目標：</strong> ${escapeHtml(template.learningGoal || '')}
+                </div>
+                <div style="font-size: 11px; color: #4a5568; margin-bottom: 8px;">
+                    <strong>關鍵參數：</strong><br/>
+                    <div style="margin-top: 4px;">${keyParams}</div>
+                </div>
+                <div style="font-size: 11px; line-height: 1.5; color: #4a5568; margin-bottom: 6px;">
+                    <strong>常見失敗：</strong> ${escapeHtml(template.commonFailure || '')}
+                </div>
+                <div style="font-size: 11px; line-height: 1.5; color: #4a5568;">
+                    <strong>下一步：</strong> ${escapeHtml(template.nextStep || '')}
+                </div>
+            </div>
+        `;
     }
 
     render() {
         if (!this.container) return;
 
-        const optionsHtml = EXAMPLE_TEMPLATES.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+        const optionsHtml = EXAMPLE_TEMPLATES.map(t => `<option value="${t.id}" ${t.id === this.activeTemplateId ? 'selected' : ''}>${t.name}</option>`).join('');
 
         this.container.innerHTML = `
             <div class="wizard-header" style="padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-radius: 8px 8px 0 0;">
@@ -50,6 +104,8 @@ export class MechanismWizard {
                     ${optionsHtml}
                 </select>
             </div>
+
+            ${this.renderTemplateInsight()}
             
             <div style="height: 6px;"></div>
 
@@ -1398,6 +1454,14 @@ ${comp.isInput && comp.style === 'piston' ? `
                 // Deep copy to avoid reference issues
                 this.components = JSON.parse(JSON.stringify(topo._wizard_data || []));
                 this.topology = JSON.parse(JSON.stringify(topo));
+                this.topology._templateId = template.id;
+                this.topology._templateMeta = {
+                    learningGoal: template.learningGoal || '',
+                    keyParams: Array.isArray(template.keyParams) ? [...template.keyParams] : [],
+                    commonFailure: template.commonFailure || '',
+                    nextStep: template.nextStep || ''
+                };
+                this.activeTemplateId = template.id;
                 this.render();
                 this.syncTopology();
             }

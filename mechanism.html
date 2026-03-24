@@ -12,16 +12,228 @@
             background: #fafafa;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
+
+        body[data-entry="loading"] #entryChooser,
+        body[data-entry="loading"] #mechanismApp {
+            display: none;
+        }
+
+        body[data-entry="chooser"] #mechanismApp {
+            display: none;
+        }
+
+        body[data-entry="app"] #entryChooser {
+            display: none;
+        }
+
+        #entryChooser {
+            min-height: 100vh;
+            padding: 28px 20px 40px;
+            background:
+                radial-gradient(circle at top left, rgba(52, 152, 219, 0.18), transparent 28%),
+                radial-gradient(circle at top right, rgba(46, 204, 113, 0.16), transparent 30%),
+                linear-gradient(180deg, #f6f8fb 0%, #eef2f6 100%);
+        }
+
+        .entry-shell {
+            max-width: 1120px;
+            margin: 0 auto;
+        }
+
+        .entry-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .entry-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(44, 62, 80, 0.08);
+            color: #34495e;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .entry-title {
+            margin: 14px 0 8px;
+            font-size: 36px;
+            line-height: 1.1;
+            color: #1f2937;
+        }
+
+        .entry-desc {
+            margin: 0;
+            max-width: 720px;
+            font-size: 16px;
+            line-height: 1.7;
+            color: #526170;
+        }
+
+        .entry-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: #fff;
+            border: 1px solid rgba(31, 41, 55, 0.1);
+            text-decoration: none;
+            color: #1f2937;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+        }
+
+        .entry-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .entry-card {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 18px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(31, 41, 55, 0.08);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+        }
+
+        .entry-card.featured {
+            background: linear-gradient(180deg, #ffffff 0%, #f5fbff 100%);
+            border-color: rgba(52, 152, 219, 0.2);
+        }
+
+        .entry-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .entry-icon {
+            font-size: 28px;
+            line-height: 1;
+        }
+
+        .entry-badge {
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: rgba(52, 152, 219, 0.1);
+            color: #2471a3;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .entry-name {
+            margin: 0;
+            font-size: 20px;
+            color: #1f2937;
+        }
+
+        .entry-copy {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #5b6775;
+            min-height: 44px;
+        }
+
+        .entry-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: auto;
+        }
+
+        .entry-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-height: 42px;
+            padding: 0 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(31, 41, 55, 0.12);
+            background: #f8fafc;
+            color: #1f2937;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .entry-btn.primary {
+            background: #1f2937;
+            border-color: #1f2937;
+            color: #fff;
+        }
+
+        .entry-note {
+            margin-top: 22px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(31, 41, 55, 0.08);
+            color: #5b6775;
+            font-size: 14px;
+            line-height: 1.65;
+        }
+
+        @media (max-width: 720px) {
+            #entryChooser {
+                padding: 18px 14px 28px;
+            }
+
+            .entry-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .entry-title {
+                font-size: 28px;
+            }
+        }
     </style>
 </head>
 
-<body>
+<body data-entry="loading">
+    <div id="entryChooser">
+        <div class="entry-shell">
+            <div class="entry-header">
+                <div>
+                    <div class="entry-kicker">Linkage Entry</div>
+                    <h1 class="entry-title">先選機構，再進工作頁。</h1>
+                    <p class="entry-desc">這裡只保留最短入口。直接選一種機構，或進入多連桿設計器，接著就在同一頁完成試動、檢核、零件預覽與匯出。</p>
+                </div>
+                <a href="../PROJECT_WORKFLOW.md" class="entry-back">查看流程文件</a>
+            </div>
+
+            <div id="entryChooserGrid" class="entry-grid"></div>
+
+            <div class="entry-note">
+                `Multilink` 會提供設計器入口，適合從經典範本開始改；其餘機構則直接進入對應模擬頁。
+            </div>
+        </div>
+    </div>
+
+    <div id="mechanismApp">
     <div class="nav-header">
         <div class="nav-content">
             <div>
-                <a href="index.html" class="nav-back">
+                <a href="mechanism.html" class="nav-back">
                     <span style="font-size: 20px;">←</span>
-                    <span>返回 Linkage 選單</span>
+                    <span>返回機構入口</span>
                 </a>
             </div>
             <h2 class="nav-title">
@@ -139,6 +351,9 @@
                 <div>刀路 / G-code 流程請改由 <strong>svg2gcode-project</strong> 處理。</div>
                 <div>此頁面保留 2D 模擬、零件預覽與 DXF 輸出。</div>
             </div>
+
+            <div style="height:10px"></div>
+            <div id="diagnosticsPanel"></div>
 
             <div style="height:10px"></div>
             <h3>匯出 / 訊息</h3>
@@ -329,6 +544,8 @@
             <button id="btnApplyProp" class="primary"
                 style="padding: 10px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">關閉</button>
         </div>
+    </div>
+
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>

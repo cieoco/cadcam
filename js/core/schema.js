@@ -35,7 +35,9 @@ export const PreviewState = {
     errorType: 'string | null',
     restore: '{ theta, dynamicParams } | null',
     lastSolution: 'SolveResult | null',
-    lastTopology: 'string | null'
+    lastTopology: 'string | null',
+    validationReport: 'HealthReport',
+    sanitySummary: 'HealthSummary'
 };
 
 export const ViewState = {
@@ -59,4 +61,28 @@ export const ExportBundle = {
     files: 'Array<{ name, text }>',
     dxfText: 'string',
     machiningInfo: 'string'
+};
+
+export const HealthReport = {
+    status: '"pass" | "warn" | "fail"',
+    issues: 'HealthIssue[]',
+    counts: '{ pass, warn, fail }'
+};
+
+export const HealthIssue = {
+    status: '"pass" | "warn" | "fail"',
+    code: 'string',
+    title: 'string',
+    message: 'string',
+    suggestion: 'string',
+    severity: 'number',
+    targets: 'string[]'
+};
+
+export const HealthSummary = {
+    status: '"pass" | "warn" | "fail"',
+    issueCount: 'number',
+    counts: '{ pass, warn, fail }',
+    leadCode: 'string | null',
+    leadMessage: 'string'
 };

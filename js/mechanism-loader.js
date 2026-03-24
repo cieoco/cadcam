@@ -12,6 +12,44 @@ import { RemoteSync } from './remote-sync.js?v=debug_4';
 const topologyHistory = [];
 let remoteSync = null;
 
+const ENTRY_CHOOSER_ITEMS = [
+  {
+    id: 'fourbar',
+    badge: '入門',
+    description: '最穩的閉環起點，適合擺動、夾爪與基本行程驗證。'
+  },
+  {
+    id: 'crankslider',
+    badge: '直線',
+    description: '把旋轉轉成往復或直線，適合滑塊、推桿與行程分析。'
+  },
+  {
+    id: 'parallelogram',
+    badge: '平移',
+    description: '保持姿態的平移平台，適合升降、定位與教學示範。'
+  },
+  {
+    id: 'rackpinion',
+    badge: '傳動',
+    description: '齒條齒輪適合長行程直線傳動與快速原型驗證。'
+  },
+  {
+    id: 'multilink',
+    badge: '設計器',
+    description: '從範本開始改自己的閉環、多連桿或夾爪機構。',
+    featured: true,
+    actions: [
+      { label: '進入設計器', mode: 'wizard', primary: true },
+      { label: '直接模擬', primary: false }
+    ]
+  },
+  {
+    id: 'bardrawer',
+    badge: '草繪',
+    description: '快速畫單一桿件與孔位，拿來做零件草圖與幾何準備。'
+  }
+];
+
 function pushTopologyHistory() {
   const topoArea = document.getElementById('topology');
   if (!topoArea) return;
@@ -45,6 +83,56 @@ function refreshUndoButtonState() {
   btn.disabled = topologyHistory.length === 0;
 }
 
+function setEntryMode(mode) {
+  document.body.dataset.entry = mode;
+}
+
+function buildEntryURL(type, mode) {
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.searchParams.set('type', type);
+  if (mode) {
+    url.searchParams.set('mode', mode);
+  }
+  return url.toString();
+}
+
+function renderEntryChooser() {
+  const chooserGrid = document.getElementById('entryChooserGrid');
+  if (!chooserGrid) return;
+
+  chooserGrid.innerHTML = ENTRY_CHOOSER_ITEMS
+    .map((item) => {
+      const mech = MECHANISMS[item.id];
+      if (!mech) return '';
+
+      const actions = item.actions?.length
+        ? item.actions
+        : [{ label: '進入工具', primary: true }];
+
+      const actionMarkup = actions
+        .map((action) => {
+          const href = buildEntryURL(item.id, action.mode);
+          const buttonClass = action.primary ? 'entry-btn primary' : 'entry-btn';
+          return `<a class="${buttonClass}" href="${href}">${action.label}</a>`;
+        })
+        .join('');
+
+      return `
+        <article class="entry-card ${item.featured ? 'featured' : ''}">
+          <div class="entry-card-top">
+            <span class="entry-icon">${mech.icon}</span>
+            <span class="entry-badge">${item.badge}</span>
+          </div>
+          <h2 class="entry-name">${mech.name}</h2>
+          <p class="entry-copy">${item.description}</p>
+          <div class="entry-actions">${actionMarkup}</div>
+        </article>
+      `;
+    })
+    .join('');
+}
+
 /**
  * 初始化機構頁面
  */
@@ -53,13 +141,20 @@ async function initMechanismPage() {
   const mode = urlParams.get('mode');
   const type = urlParams.get('type');
 
-  // 強制修正：如果你在設計器模式但沒有指定類型，立刻跳轉到 multilink
+  // 保留既有設計器快捷入口
   if (mode === 'wizard' && !type) {
     urlParams.set('type', 'multilink');
     window.location.replace(window.location.pathname + '?' + urlParams.toString());
     return;
   }
 
+  if (!type) {
+    renderEntryChooser();
+    setEntryMode('chooser');
+    return;
+  }
+
+  setEntryMode('app');
   const mech = getMechanismFromURL();
 
   if (window.DEBUG_MECH) {

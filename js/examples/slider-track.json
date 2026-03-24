@@ -1,4 +1,11 @@
 {
+  "_templateId": "slider-track",
+  "_templateMeta": {
+    "learningGoal": "理解曲柄滑塊如何把旋轉運動轉成近似直線往復，並觀察 crank、ground 與 coupler 的幾何關係。",
+    "keyParams": ["L1", "L2", "L3"],
+    "commonFailure": "若 crank、ground 與 coupler 的比例不合理，滑塊行程會受限，甚至在極限位置附近失效。",
+    "nextStep": "確認行程與滑軌方向後，可將零件輪廓轉給 cad 與 svg2gcode-project。"
+  },
   "steps": [
     {
       "id": "P1",

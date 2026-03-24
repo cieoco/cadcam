@@ -1,4 +1,11 @@
 {
+  "_templateId": "gripper",
+  "_templateMeta": {
+    "learningGoal": "理解曲柄帶動夾爪開合的閉環關係，觀察 coupler 與 finger 三角形對夾持路徑的影響。",
+    "keyParams": ["L_Crank", "L_Coupler", "L_FingerBase", "L_FingerTip", "L_FingerSide"],
+    "commonFailure": "若 finger 三角形邊長比例不合理，夾爪尖端可能無法形成可用解或開合角度過小。",
+    "nextStep": "選定夾持範圍後，可把指尖、基座與關節位置轉交 cad 與 arm。"
+  },
   "steps": [
     {
       "id": "O",

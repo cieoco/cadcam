@@ -1,4 +1,11 @@
 {
+  "_templateId": "parallel-fourbar",
+  "_templateMeta": {
+    "learningGoal": "理解平行四邊形四連桿如何保持輸出桿姿態，並觀察輸入半徑與連桿長度對運動的影響。",
+    "keyParams": ["R", "L"],
+    "commonFailure": "若固定點距離、輸入半徑與連桿長度比例不合理，會讓閉環無法形成或輸出行程過小。",
+    "nextStep": "確認運動方向後，可把連桿尺寸帶到 cad 做板件零件設計。"
+  },
   "steps": [],
   "tracePoint": "P1",
   "visualization": {

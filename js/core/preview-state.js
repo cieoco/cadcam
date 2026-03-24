@@ -8,6 +8,10 @@ import { computeSolution, computeParts } from './preview.js';
 import { getUnsolvedSummary } from './solver-status.js';
 import { buildDXF } from '../utils/dxf-generator.js';
 import { ErrorCodes, toUserMessage } from './errors.js';
+import { buildSanitySummary, createHealthReport, HealthStatus, mergeHealthReports } from './validation/health-report.js';
+import { validatePreviewInputs } from './validation/input-validator.js';
+import { validateTopologyState } from './validation/topology-validator.js';
+import { validateSolveState } from './validation/solve-validator.js';
 
 function parseTopology(raw) {
     if (!raw) return null;
@@ -61,12 +65,38 @@ export function computePreviewState({
         errorType: null,
         restore: null,
         lastSolution,
-        lastTopology
+        lastTopology,
+        validationReport: createHealthReport(),
+        sanitySummary: buildSanitySummary(createHealthReport())
     };
 
     if (!mods || !mods.config) return result;
 
-    const topologyObj = parseTopology(mech.topology);
+    let topologyObj = parseTopology(mech.topology);
+    const validationState = validatePreviewInputs({ mods, mech, partSpec, mfg });
+    result.validationReport = validationState.report;
+    result.sanitySummary = validationState.sanitySummary;
+    if (validationState.topology) {
+        topologyObj = validationState.topology;
+    }
+
+    const topologyState = validateTopologyState({ mods, topology: topologyObj });
+    result.validationReport = mergeHealthReports(result.validationReport, topologyState.report);
+    result.sanitySummary = buildSanitySummary(result.validationReport);
+
+    if (result.validationReport.status === HealthStatus.FAIL) {
+        const leadIssue = result.validationReport.issues.find((issue) => issue.status === HealthStatus.FAIL)
+            || result.validationReport.issues[0];
+        result.isInvalid = true;
+        result.fatalInvalid = true;
+        result.errorType = ErrorCodes.INVALID_PARAMS;
+        result.statusMessage = leadIssue
+            ? (leadIssue.message || leadIssue.title)
+            : toUserMessage(ErrorCodes.INVALID_PARAMS);
+        result.previewLog = buildPreviewLog(mods, partSpec, mfg, topologyObj);
+        return result;
+    }
+
     if (mods.config.id === 'multilink') {
         const topoKey = typeof mech.topology === 'string'
             ? mech.topology
@@ -99,6 +129,14 @@ export function computePreviewState({
     }
     const isInvalid = !sol || sol.isValid === false;
     result.isInvalid = isInvalid;
+
+    const solveState = validateSolveState({
+        mods,
+        topology: topologyObj,
+        solution: sol
+    });
+    result.validationReport = mergeHealthReports(result.validationReport, solveState.report);
+    result.sanitySummary = buildSanitySummary(result.validationReport);
 
     if (isInvalid) {
         const noSteps = mods.config.id === 'multilink'
