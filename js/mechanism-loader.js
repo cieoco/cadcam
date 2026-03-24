@@ -39,6 +39,9 @@ const ENTRY_CHOOSER_ITEMS = [
     description: '從範本開始改自己的閉環、多連桿或夾爪機構。',
     featured: true,
     actions: [
+      { label: '夾爪範本', mode: 'wizard', template: 'gripper', primary: true },
+      { label: '平行四連桿', mode: 'wizard', template: 'parallel-fourbar', primary: false },
+      { label: 'Slider Track', mode: 'wizard', template: 'slider-track', primary: false },
       { label: '進入設計器', mode: 'wizard', primary: true },
       { label: '直接模擬', primary: false }
     ]
@@ -87,12 +90,15 @@ function setEntryMode(mode) {
   document.body.dataset.entry = mode;
 }
 
-function buildEntryURL(type, mode) {
+function buildEntryURL(type, mode, template) {
   const url = new URL(window.location.href);
   url.search = '';
   url.searchParams.set('type', type);
   if (mode) {
     url.searchParams.set('mode', mode);
+  }
+  if (template) {
+    url.searchParams.set('template', template);
   }
   return url.toString();
 }
@@ -112,7 +118,7 @@ function renderEntryChooser() {
 
       const actionMarkup = actions
         .map((action) => {
-          const href = buildEntryURL(item.id, action.mode);
+          const href = buildEntryURL(item.id, action.mode, action.template);
           const buttonClass = action.primary ? 'entry-btn primary' : 'entry-btn';
           return `<a class="${buttonClass}" href="${href}">${action.label}</a>`;
         })
@@ -140,6 +146,7 @@ async function initMechanismPage() {
   const urlParams = new URLSearchParams(window.location.search);
   const mode = urlParams.get('mode');
   const type = urlParams.get('type');
+  const templateId = urlParams.get('template');
 
   // 保留既有設計器快捷入口
   if (mode === 'wizard' && !type) {
@@ -296,7 +303,12 @@ async function initMechanismPage() {
 
       setupLinkClickHandler();
 
-      if (topoArea && topoArea.value) {
+      if (templateId && topoArea && !topoArea.value) {
+        const loaded = await wizard.loadTemplate(templateId);
+        if (!loaded) {
+          wizard.init();
+        }
+      } else if (topoArea && topoArea.value) {
         try {
           wizard.init(JSON.parse(topoArea.value));
         } catch (e) {
