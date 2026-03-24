@@ -44,7 +44,8 @@ function updateDiagnostics(previewState) {
     renderDiagnosticsPanel(
         diagnosticsContainer,
         previewState ? previewState.validationReport : null,
-        previewState ? previewState.sanitySummary : null
+        previewState ? previewState.sanitySummary : null,
+        previewState ? previewState.templateGuidance : null
     );
 }
 

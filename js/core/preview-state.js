@@ -40,6 +40,39 @@ function buildPreviewLog(mods, partSpec, mfg, topologyObj) {
     return unsolvedSummary ? `${baseLog}\n\n${unsolvedSummary}` : baseLog;
 }
 
+function buildTemplateGuidance(topologyObj, validationReport) {
+    if (!topologyObj || typeof topologyObj !== 'object') return null;
+
+    const templateId = topologyObj._templateId || '';
+    const meta = topologyObj._templateMeta && typeof topologyObj._templateMeta === 'object'
+        ? topologyObj._templateMeta
+        : null;
+
+    if (!templateId && !meta) return null;
+
+    const keyParams = Array.isArray(meta?.keyParams)
+        ? meta.keyParams.filter(Boolean).map((param) => String(param))
+        : [];
+    const leadIssue = validationReport && Array.isArray(validationReport.issues)
+        ? (validationReport.issues.find((issue) => issue.status === HealthStatus.FAIL)
+            || validationReport.issues.find((issue) => issue.status === HealthStatus.WARN)
+            || null)
+        : null;
+
+    return {
+        templateId: String(templateId || ''),
+        templateName: String(meta?.name || templateId || '目前範本'),
+        learningGoal: String(meta?.learningGoal || ''),
+        keyParams,
+        commonFailure: String(meta?.commonFailure || ''),
+        nextStep: String(meta?.nextStep || ''),
+        focusText: keyParams.length ? `建議先改：${keyParams.join(' / ')}` : '',
+        issueHint: leadIssue
+            ? String(leadIssue.suggestion || leadIssue.message || leadIssue.title || '')
+            : ''
+    };
+}
+
 export function computePreviewState({
     mods,
     mech,
@@ -67,7 +100,8 @@ export function computePreviewState({
         lastSolution,
         lastTopology,
         validationReport: createHealthReport(),
-        sanitySummary: buildSanitySummary(createHealthReport())
+        sanitySummary: buildSanitySummary(createHealthReport()),
+        templateGuidance: null
     };
 
     if (!mods || !mods.config) return result;
@@ -83,6 +117,7 @@ export function computePreviewState({
     const topologyState = validateTopologyState({ mods, topology: topologyObj });
     result.validationReport = mergeHealthReports(result.validationReport, topologyState.report);
     result.sanitySummary = buildSanitySummary(result.validationReport);
+    result.templateGuidance = buildTemplateGuidance(topologyObj, result.validationReport);
 
     if (result.validationReport.status === HealthStatus.FAIL) {
         const leadIssue = result.validationReport.issues.find((issue) => issue.status === HealthStatus.FAIL)
@@ -137,6 +172,7 @@ export function computePreviewState({
     });
     result.validationReport = mergeHealthReports(result.validationReport, solveState.report);
     result.sanitySummary = buildSanitySummary(result.validationReport);
+    result.templateGuidance = buildTemplateGuidance(topologyObj, result.validationReport);
 
     if (isInvalid) {
         const noSteps = mods.config.id === 'multilink'

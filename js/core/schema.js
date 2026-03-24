@@ -37,7 +37,8 @@ export const PreviewState = {
     lastSolution: 'SolveResult | null',
     lastTopology: 'string | null',
     validationReport: 'HealthReport',
-    sanitySummary: 'HealthSummary'
+    sanitySummary: 'HealthSummary',
+    templateGuidance: 'TemplateGuidance | null'
 };
 
 export const ViewState = {
@@ -85,4 +86,15 @@ export const HealthSummary = {
     counts: '{ pass, warn, fail }',
     leadCode: 'string | null',
     leadMessage: 'string'
+};
+
+export const TemplateGuidance = {
+    templateId: 'string',
+    templateName: 'string',
+    learningGoal: 'string',
+    keyParams: 'string[]',
+    commonFailure: 'string',
+    nextStep: 'string',
+    focusText: 'string',
+    issueHint: 'string'
 };

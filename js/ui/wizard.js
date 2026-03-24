@@ -1443,7 +1443,7 @@ ${comp.isInput && comp.style === 'piston' ? `
 
     async loadTemplate(id) {
         const template = EXAMPLE_TEMPLATES.find(t => t.id === id);
-        if (!template) return;
+        if (!template) return false;
 
         try {
             const resp = await fetch(template.file);
@@ -1456,6 +1456,7 @@ ${comp.isInput && comp.style === 'piston' ? `
                 this.topology = JSON.parse(JSON.stringify(topo));
                 this.topology._templateId = template.id;
                 this.topology._templateMeta = {
+                    name: template.name || template.id,
                     learningGoal: template.learningGoal || '',
                     keyParams: Array.isArray(template.keyParams) ? [...template.keyParams] : [],
                     commonFailure: template.commonFailure || '',
@@ -1464,10 +1465,13 @@ ${comp.isInput && comp.style === 'piston' ? `
                 this.activeTemplateId = template.id;
                 this.render();
                 this.syncTopology();
+                return true;
             }
         } catch (e) {
             console.error('Template Load Error:', e);
             alert('無法載入範本，請檢查檔案是否存在。');
         }
+
+        return false;
     }
 }

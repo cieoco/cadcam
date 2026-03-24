@@ -36,7 +36,7 @@ function getStatusMeta(status) {
     };
 }
 
-export function renderDiagnosticsPanel(container, validationReport, sanitySummary) {
+export function renderDiagnosticsPanel(container, validationReport, sanitySummary, templateGuidance) {
     if (!container) return;
 
     const summary = sanitySummary || {
@@ -73,6 +73,31 @@ export function renderDiagnosticsPanel(container, validationReport, sanitySummar
     const leadText = summary.leadMessage
         ? escapeHtml(summary.leadMessage)
         : '目前沒有明顯檢核異常。';
+    const safeTemplate = templateGuidance && typeof templateGuidance === 'object'
+        ? templateGuidance
+        : null;
+    const keyParamHtml = safeTemplate && Array.isArray(safeTemplate.keyParams) && safeTemplate.keyParams.length
+        ? safeTemplate.keyParams.map((param) => `
+            <span style="display:inline-flex; align-items:center; padding:2px 7px; border-radius:999px; background:#edf2f7; color:#2d3748; font-size:10px; font-weight:700; margin:0 4px 4px 0;">
+                ${escapeHtml(param)}
+            </span>
+        `).join('')
+        : '';
+    const templateHtml = safeTemplate
+        ? `
+            <div style="padding:8px 10px; border:1px solid #dbe7f3; border-radius:8px; background:linear-gradient(180deg, #f8fbff 0%, #f3f8fc 100%); margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+                    <strong style="font-size:12px; color:#2c5282;">範本導引</strong>
+                    <span style="font-size:10px; color:#718096;">${escapeHtml(safeTemplate.templateName || safeTemplate.templateId || '')}</span>
+                </div>
+                ${safeTemplate.focusText ? `<div style="font-size:12px; color:#2d3748; line-height:1.45; margin-bottom:6px;"><strong>先改哪裡：</strong> ${escapeHtml(safeTemplate.focusText)}</div>` : ''}
+                ${keyParamHtml ? `<div style="margin-bottom:6px;">${keyParamHtml}</div>` : ''}
+                ${safeTemplate.commonFailure ? `<div style="font-size:11px; color:#4a5568; line-height:1.5; margin-bottom:6px;"><strong>常見失敗：</strong> ${escapeHtml(safeTemplate.commonFailure)}</div>` : ''}
+                ${safeTemplate.issueHint ? `<div style="font-size:11px; color:#4a5568; line-height:1.5; margin-bottom:6px;"><strong>目前優先處理：</strong> ${escapeHtml(safeTemplate.issueHint)}</div>` : ''}
+                ${safeTemplate.nextStep ? `<div style="font-size:11px; color:#4a5568; line-height:1.5;"><strong>下一步：</strong> ${escapeHtml(safeTemplate.nextStep)}</div>` : ''}
+            </div>
+        `
+        : '';
 
     container.innerHTML = `
         <div class="card" style="padding:10px; background:#fff; border:1px solid ${meta.border};">
@@ -102,10 +127,11 @@ export function renderDiagnosticsPanel(container, validationReport, sanitySummar
                 <strong>摘要：</strong> ${leadText}
             </div>
 
+            ${templateHtml}
+
             <div>
                 ${issueHtml}
             </div>
         </div>
     `;
 }
-
