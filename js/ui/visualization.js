@@ -5,6 +5,7 @@
 
 import { svgEl, describeArc, deg2rad, drawGridCompatible } from '../utils.js';
 import { createDriveComponent } from '../motor-data.js';
+import { renderTrajectoryMarkers } from './trajectory-markers.js';
 
 /**
  * 渲染四連桿機構
@@ -74,6 +75,7 @@ export function renderFourbar(sol, thetaDeg, trajectoryData = null, viewParams =
 
     // 高亮當前 B 點
     if (trajectoryData) {
+        renderTrajectoryMarkers(svg, trajectoryData, tx, ty);
         svg.appendChild(
             svgEl("circle", {
                 cx: tx(sol.B),

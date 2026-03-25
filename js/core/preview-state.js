@@ -230,6 +230,7 @@ export function computePreviewState({
                 };
                 result.motionAnalysis = analyzeMotionTrajectory(result.trajectoryData);
                 if (result.motionAnalysis) {
+                    result.trajectoryData.analysis = result.motionAnalysis;
                     result.validationReport = mergeHealthReports(
                         result.validationReport,
                         createHealthReport({ issues: buildMotionAnalysisIssues(result.motionAnalysis) })

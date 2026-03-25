@@ -5,6 +5,7 @@
 
 import { svgEl, fmt, drawGridCompatible } from '../utils.js';
 import { createDriveComponent } from '../motor-data.js';
+import { renderTrajectoryMarkers } from '../ui/trajectory-markers.js';
 
 /**
  * 渲染曲柄滑塊機構
@@ -68,6 +69,7 @@ export function renderSliderCrank(sol, thetaDeg, trajectoryData = null, viewPara
                 points: pts, fill: 'none', stroke: '#3498db', 'stroke-width': 2, 'stroke-opacity': 0.2
             }));
         }
+        renderTrajectoryMarkers(svg, trajectoryData, tx, ty);
     }
 
     // 3. 繪製連桿 (A-B)

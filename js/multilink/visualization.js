@@ -3,6 +3,7 @@
  */
 import { svgEl, drawGridCompatible, describeArc, deg2rad, rad2deg } from '../utils.js';
 import { createDriveComponent } from '../motor-data.js';
+import { renderTrajectoryMarkers } from '../ui/trajectory-markers.js';
 
 export function renderTopology(svg, topology, sol, viewParams, scale, tx, ty) {
     if (!sol || sol.isValid === false) return;
@@ -611,6 +612,7 @@ export function renderMultilink(sol, thetaDeg, trajectoryData = null, viewParams
                 renderSegment(currentSegment, currentValid, ptId);
             });
         }
+        renderTrajectoryMarkers(svg, trajectoryData, tx, ty);
     }
 
     function renderSegment(points, isValid, ptId) {
