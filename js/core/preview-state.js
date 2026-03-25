@@ -12,6 +12,7 @@ import { buildSanitySummary, createHealthReport, HealthStatus, mergeHealthReport
 import { validatePreviewInputs } from './validation/input-validator.js';
 import { validateTopologyState } from './validation/topology-validator.js';
 import { validateSolveState } from './validation/solve-validator.js';
+import { analyzeMotionTrajectory, buildMotionAnalysisIssues } from './analysis/motion-analysis.js';
 
 function parseTopology(raw) {
     if (!raw) return null;
@@ -101,7 +102,8 @@ export function computePreviewState({
         lastTopology,
         validationReport: createHealthReport(),
         sanitySummary: buildSanitySummary(createHealthReport()),
-        templateGuidance: null
+        templateGuidance: null,
+        motionAnalysis: null
     };
 
     if (!mods || !mods.config) return result;
@@ -226,6 +228,15 @@ export function computePreviewState({
                     invalidRanges: sweepResult.invalidRanges,
                     validBPoints: sweepResult.results.filter((r) => r.isValid && r.B).map((r) => r.B)
                 };
+                result.motionAnalysis = analyzeMotionTrajectory(result.trajectoryData);
+                if (result.motionAnalysis) {
+                    result.validationReport = mergeHealthReports(
+                        result.validationReport,
+                        createHealthReport({ issues: buildMotionAnalysisIssues(result.motionAnalysis) })
+                    );
+                    result.sanitySummary = buildSanitySummary(result.validationReport);
+                    result.templateGuidance = buildTemplateGuidance(topologyObj, result.validationReport);
+                }
             }
         }
     }

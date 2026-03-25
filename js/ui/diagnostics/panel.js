@@ -36,7 +36,7 @@ function getStatusMeta(status) {
     };
 }
 
-export function renderDiagnosticsPanel(container, validationReport, sanitySummary, templateGuidance) {
+export function renderDiagnosticsPanel(container, validationReport, sanitySummary, templateGuidance, motionAnalysis) {
     if (!container) return;
 
     const summary = sanitySummary || {
@@ -98,6 +98,40 @@ export function renderDiagnosticsPanel(container, validationReport, sanitySummar
             </div>
         `
         : '';
+    const safeMotion = motionAnalysis && typeof motionAnalysis === 'object'
+        ? motionAnalysis
+        : null;
+    const deadCenterText = safeMotion && Array.isArray(safeMotion.candidateAngles) && safeMotion.candidateAngles.length
+        ? safeMotion.candidateAngles.slice(0, 4).map((angle) => `${escapeHtml(angle)}°`).join(' / ')
+        : '';
+    const motionHtml = safeMotion
+        ? `
+            <div style="padding:8px 10px; border:1px solid #e6e6e6; border-radius:8px; background:#fafafa; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+                    <strong style="font-size:12px; color:#374151;">運動分析</strong>
+                    <span style="font-size:10px; color:#6b7280;">有效點 ${escapeHtml(safeMotion.validPointCount)}</span>
+                </div>
+                <div style="font-size:12px; color:#333; line-height:1.45; margin-bottom:6px;">
+                    ${escapeHtml(safeMotion.leadText || '目前尚無運動分析摘要。')}
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:6px; margin-bottom:6px;">
+                    <div style="padding:6px 8px; border:1px solid #eee; border-radius:6px; background:#fff;">
+                        <div style="font-size:10px; color:#777;">有效區間</div>
+                        <div style="font-size:13px; font-weight:bold; color:#374151;">${escapeHtml(safeMotion.validRangeCount ?? 0)}</div>
+                    </div>
+                    <div style="padding:6px 8px; border:1px solid #eee; border-radius:6px; background:#fff;">
+                        <div style="font-size:10px; color:#777;">不可行區間</div>
+                        <div style="font-size:13px; font-weight:bold; color:#374151;">${escapeHtml(safeMotion.invalidRangeCount ?? 0)}</div>
+                    </div>
+                    <div style="padding:6px 8px; border:1px solid #eee; border-radius:6px; background:#fff;">
+                        <div style="font-size:10px; color:#777;">總路徑</div>
+                        <div style="font-size:13px; font-weight:bold; color:#374151;">${escapeHtml(safeMotion.pathLength ?? '—')} mm</div>
+                    </div>
+                </div>
+                ${deadCenterText ? `<div style="font-size:11px; color:#4a5568; line-height:1.5;"><strong>死點候選：</strong> ${deadCenterText}</div>` : ''}
+            </div>
+        `
+        : '';
 
     container.innerHTML = `
         <div class="card" style="padding:10px; background:#fff; border:1px solid ${meta.border};">
@@ -128,6 +162,7 @@ export function renderDiagnosticsPanel(container, validationReport, sanitySummar
             </div>
 
             ${templateHtml}
+            ${motionHtml}
 
             <div>
                 ${issueHtml}

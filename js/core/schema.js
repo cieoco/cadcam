@@ -38,7 +38,8 @@ export const PreviewState = {
     lastTopology: 'string | null',
     validationReport: 'HealthReport',
     sanitySummary: 'HealthSummary',
-    templateGuidance: 'TemplateGuidance | null'
+    templateGuidance: 'TemplateGuidance | null',
+    motionAnalysis: 'MotionAnalysis | null'
 };
 
 export const ViewState = {
@@ -97,4 +98,20 @@ export const TemplateGuidance = {
     nextStep: 'string',
     focusText: 'string',
     issueHint: 'string'
+};
+
+export const MotionAnalysis = {
+    validPointCount: 'number',
+    validRangeCount: 'number',
+    invalidRangeCount: 'number',
+    rangeX: 'number | null',
+    rangeY: 'number | null',
+    totalRange: 'number | null',
+    pathLength: 'number | null',
+    avgStepDistance: 'number | null',
+    minStepDistance: 'number | null',
+    minStepTheta: 'number | null',
+    candidateAngles: 'number[]',
+    likelyDeadCenter: 'boolean',
+    leadText: 'string'
 };
