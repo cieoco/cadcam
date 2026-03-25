@@ -39,7 +39,8 @@ export const PreviewState = {
     validationReport: 'HealthReport',
     sanitySummary: 'HealthSummary',
     templateGuidance: 'TemplateGuidance | null',
-    motionAnalysis: 'MotionAnalysis | null'
+    motionAnalysis: 'MotionAnalysis | null',
+    parameterGuidance: 'ParameterGuidance | null'
 };
 
 export const ViewState = {
@@ -114,4 +115,9 @@ export const MotionAnalysis = {
     candidateAngles: 'number[]',
     likelyDeadCenter: 'boolean',
     leadText: 'string'
+};
+
+export const ParameterGuidance = {
+    leadText: 'string',
+    suggestedParams: 'Array<{ id, label, reason }>'
 };

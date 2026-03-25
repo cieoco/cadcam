@@ -13,6 +13,7 @@ import { validatePreviewInputs } from './validation/input-validator.js';
 import { validateTopologyState } from './validation/topology-validator.js';
 import { validateSolveState } from './validation/solve-validator.js';
 import { analyzeMotionTrajectory, buildMotionAnalysisIssues } from './analysis/motion-analysis.js';
+import { buildParameterGuidance } from './analysis/parameter-guidance.js';
 
 function parseTopology(raw) {
     if (!raw) return null;
@@ -103,7 +104,8 @@ export function computePreviewState({
         validationReport: createHealthReport(),
         sanitySummary: buildSanitySummary(createHealthReport()),
         templateGuidance: null,
-        motionAnalysis: null
+        motionAnalysis: null,
+        parameterGuidance: null
     };
 
     if (!mods || !mods.config) return result;
@@ -120,6 +122,12 @@ export function computePreviewState({
     result.validationReport = mergeHealthReports(result.validationReport, topologyState.report);
     result.sanitySummary = buildSanitySummary(result.validationReport);
     result.templateGuidance = buildTemplateGuidance(topologyObj, result.validationReport);
+    result.parameterGuidance = buildParameterGuidance({
+        mechId: mods.config.id,
+        mech,
+        topology: topologyObj,
+        motionAnalysis: result.motionAnalysis
+    });
 
     if (result.validationReport.status === HealthStatus.FAIL) {
         const leadIssue = result.validationReport.issues.find((issue) => issue.status === HealthStatus.FAIL)
@@ -175,6 +183,12 @@ export function computePreviewState({
     result.validationReport = mergeHealthReports(result.validationReport, solveState.report);
     result.sanitySummary = buildSanitySummary(result.validationReport);
     result.templateGuidance = buildTemplateGuidance(topologyObj, result.validationReport);
+    result.parameterGuidance = buildParameterGuidance({
+        mechId: mods.config.id,
+        mech,
+        topology: topologyObj,
+        motionAnalysis: result.motionAnalysis
+    });
 
     if (isInvalid) {
         const noSteps = mods.config.id === 'multilink'
@@ -238,6 +252,12 @@ export function computePreviewState({
                     result.sanitySummary = buildSanitySummary(result.validationReport);
                     result.templateGuidance = buildTemplateGuidance(topologyObj, result.validationReport);
                 }
+                result.parameterGuidance = buildParameterGuidance({
+                    mechId: mods.config.id,
+                    mech,
+                    topology: topologyObj,
+                    motionAnalysis: result.motionAnalysis
+                });
             }
         }
     }

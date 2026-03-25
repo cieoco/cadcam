@@ -46,7 +46,8 @@ function updateDiagnostics(previewState) {
         previewState ? previewState.validationReport : null,
         previewState ? previewState.sanitySummary : null,
         previewState ? previewState.templateGuidance : null,
-        previewState ? previewState.motionAnalysis : null
+        previewState ? previewState.motionAnalysis : null,
+        previewState ? previewState.parameterGuidance : null
     );
 }
 

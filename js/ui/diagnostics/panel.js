@@ -36,7 +36,7 @@ function getStatusMeta(status) {
     };
 }
 
-export function renderDiagnosticsPanel(container, validationReport, sanitySummary, templateGuidance, motionAnalysis) {
+export function renderDiagnosticsPanel(container, validationReport, sanitySummary, templateGuidance, motionAnalysis, parameterGuidance) {
     if (!container) return;
 
     const summary = sanitySummary || {
@@ -132,6 +132,36 @@ export function renderDiagnosticsPanel(container, validationReport, sanitySummar
             </div>
         `
         : '';
+    const safeParamGuidance = parameterGuidance && typeof parameterGuidance === 'object'
+        ? parameterGuidance
+        : null;
+    const paramChipHtml = safeParamGuidance && Array.isArray(safeParamGuidance.suggestedParams)
+        ? safeParamGuidance.suggestedParams.map((entry) => `
+            <span style="display:inline-flex; align-items:center; padding:2px 7px; border-radius:999px; background:#fff7ed; color:#9a3412; font-size:10px; font-weight:700; margin:0 4px 4px 0; border:1px solid #fed7aa;">
+                ${escapeHtml(entry.label || entry.id)}
+            </span>
+        `).join('')
+        : '';
+    const paramReasonHtml = safeParamGuidance && Array.isArray(safeParamGuidance.suggestedParams) && safeParamGuidance.suggestedParams.length
+        ? safeParamGuidance.suggestedParams.slice(0, 3).map((entry) => `
+            <div style="font-size:11px; color:#7c2d12; line-height:1.5; margin-top:4px;">
+                <strong>${escapeHtml(entry.label || entry.id)}：</strong> ${escapeHtml(entry.reason || '')}
+            </div>
+        `).join('')
+        : '';
+    const parameterHtml = safeParamGuidance && Array.isArray(safeParamGuidance.suggestedParams) && safeParamGuidance.suggestedParams.length
+        ? `
+            <div style="padding:8px 10px; border:1px solid #fed7aa; border-radius:8px; background:#fffaf5; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+                    <strong style="font-size:12px; color:#9a3412;">調參建議</strong>
+                    <span style="font-size:10px; color:#c2410c;">先從這幾個數值看</span>
+                </div>
+                ${safeParamGuidance.leadText ? `<div style="font-size:12px; color:#7c2d12; line-height:1.45; margin-bottom:6px;">${escapeHtml(safeParamGuidance.leadText)}</div>` : ''}
+                ${paramChipHtml ? `<div style="margin-bottom:4px;">${paramChipHtml}</div>` : ''}
+                ${paramReasonHtml}
+            </div>
+        `
+        : '';
 
     container.innerHTML = `
         <div class="card" style="padding:10px; background:#fff; border:1px solid ${meta.border};">
@@ -163,6 +193,7 @@ export function renderDiagnosticsPanel(container, validationReport, sanitySummar
 
             ${templateHtml}
             ${motionHtml}
+            ${parameterHtml}
 
             <div>
                 ${issueHtml}
