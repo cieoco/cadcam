@@ -1,0 +1,6 @@
+{
+  "_comment": "故意做壞：steps 為空 → TOPOLOGY_STEPS_EMPTY",
+  "params": {},
+  "steps": [],
+  "tracePoint": ""
+}

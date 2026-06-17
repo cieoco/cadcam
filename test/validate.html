@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>機構驗收員 — 測試頁</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 24px; color: #222; background: #f7f8fb; }
+    h1 { font-size: 1.4em; }
+    p.note { color: #666; font-size: 0.9em; }
+    #summary { font-size: 1.1em; font-weight: 700; padding: 10px 14px; border-radius: 8px; margin: 14px 0; }
+    .all-pass { background: #e7f7ee; color: #1e7a3a; }
+    .has-fail { background: #fde8ea; color: #b3261e; }
+    table { border-collapse: collapse; width: 100%; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 0.88em; vertical-align: top; }
+    th { background: #f1f3fb; }
+    td.ok { color: #1e7a3a; font-weight: 700; }
+    td.bad { color: #b3261e; font-weight: 700; }
+    code { font-family: 'Consolas', monospace; font-size: 0.92em; }
+    .muted { color: #888; }
+  </style>
+</head>
+<body>
+  <h1>🧪 機構驗收員 — 測試頁</h1>
+  <p class="note">
+    用 <code>python -m http.server</code> 從專案根目錄啟動，開啟
+    <code>http://localhost:8000/test/validate.html</code>。<br/>
+    本頁對每個樣本呼叫 <code>validateMechanismJSON()</code>，比對「預期」與「實際」判決。
+  </p>
+  <div id="summary">執行中…</div>
+  <table id="results">
+    <thead>
+      <tr><th>類別</th><th>樣本</th><th>預期</th><th>實際 status</th><th>判定</th><th>命中的 code</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script type="module">
+    import { validateMechanismJSON } from '../js/core/validation/validate-mechanism.js';
+
+    // GOOD：應該沒有任何 FAIL（counts.fail === 0）
+    const GOOD = [
+      '../js/examples/parallel-fourbar.json',
+      '../js/examples/gripper.json',
+      '../js/examples/slider-track.json',
+      './fixtures/good/fourbar-steps.json'
+    ];
+
+    // BAD：每個對應一個「必須命中」的 code
+    const BAD = [
+      ['./fixtures/bad/no-ground.json',    'NO_GROUNDED_POINTS'],
+      ['./fixtures/bad/dup-id.json',       'DUPLICATE_ID'],
+      ['./fixtures/bad/unknown-ref.json',  'UNKNOWN_REF'],
+      ['./fixtures/bad/empty-steps.json',  'TOPOLOGY_STEPS_EMPTY'],
+      ['./fixtures/bad/trace-missing.json','TRACE_POINT_NOT_IN_STEPS'],
+      ['./fixtures/bad/infeasible.json',   'INFEASIBLE_GEOMETRY'],
+      ['./fixtures/bad/unknown-type.json', 'STEP_TYPE_UNKNOWN']
+    ];
+
+    const tbody = document.querySelector('#results tbody');
+    let passed = 0, failed = 0;
+
+    function row(cells, verdictOk) {
+      const tr = document.createElement('tr');
+      cells.forEach((c, i) => {
+        const td = document.createElement('td');
+        if (i === 4) { td.className = verdictOk ? 'ok' : 'bad'; td.textContent = verdictOk ? '✓ PASS' : '✗ FAIL'; }
+        else td.innerHTML = c;
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    }
+
+    async function loadText(path) {
+      const r = await fetch(path);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    }
+
+    function codes(result) {
+      return result.issues.map(i => i.code);
+    }
+
+    async function run() {
+      // GOOD
+      for (const path of GOOD) {
+        const name = path.split('/').pop();
+        try {
+          const txt = await loadText(path);
+          const res = validateMechanismJSON(txt);
+          const ok = res.counts.fail === 0;
+          if (ok) passed++; else failed++;
+          row(['GOOD', `<code>${name}</code>`, '無 FAIL', res.status,
+               '', ok ? '' : `<span class="bad">${codes(res).join(', ')}</span>`], ok);
+        } catch (e) {
+          failed++;
+          row(['GOOD', `<code>${name}</code>`, '無 FAIL', '載入失敗', '', `<span class="bad">${e.message}</span>`], false);
+        }
+      }
+
+      // BAD
+      for (const [path, expectCode] of BAD) {
+        const name = path.split('/').pop();
+        try {
+          const txt = await loadText(path);
+          const res = validateMechanismJSON(txt);
+          const hit = codes(res).includes(expectCode);
+          if (hit) passed++; else failed++;
+          row(['BAD', `<code>${name}</code>`, `<code>${expectCode}</code>`, res.status,
+               '', `<span class="${hit ? 'muted' : 'bad'}">${codes(res).join(', ') || '(無)'}</span>`], hit);
+        } catch (e) {
+          failed++;
+          row(['BAD', `<code>${name}</code>`, `<code>${expectCode}</code>`, '載入失敗', '', `<span class="bad">${e.message}</span>`], false);
+        }
+      }
+
+      // 額外：非 JSON 字串 → 應命中 TOPOLOGY_JSON_PARSE_FAILED
+      {
+        const res = validateMechanismJSON('{ this is not json');
+        const hit = codes(res).includes('TOPOLOGY_JSON_PARSE_FAILED');
+        if (hit) passed++; else failed++;
+        row(['BAD', '<code>(壞字串)</code>', '<code>TOPOLOGY_JSON_PARSE_FAILED</code>', res.status,
+             '', `<span class="${hit ? 'muted' : 'bad'}">${codes(res).join(', ')}</span>`], hit);
+      }
+
+      const summary = document.getElementById('summary');
+      summary.textContent = `${passed} passed / ${failed} failed`;
+      summary.className = failed === 0 ? 'all-pass' : 'has-fail';
+    }
+
+    run();
+  </script>
+</body>
+</html>

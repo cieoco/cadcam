@@ -1,0 +1,11 @@
+{
+  "_comment": "故意做壞：沒有任何 ground 步驟 → NO_GROUNDED_POINTS",
+  "params": { "theta": 30, "Lc": 40, "Lcoup": 90, "Lout": 70 },
+  "steps": [
+    { "id": "C", "type": "joint", "x": 0, "y": 0 },
+    { "id": "O4", "type": "joint", "x": 120, "y": 0 },
+    { "id": "A", "type": "input_crank", "center": "C", "len_param": "Lc", "physical_motor": "1" },
+    { "id": "B", "type": "dyad", "p1": "A", "p2": "O4", "r1_param": "Lcoup", "r2_param": "Lout" }
+  ],
+  "tracePoint": "B"
+}

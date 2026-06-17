@@ -1,0 +1,9 @@
+{
+  "_comment": "故意做壞：用了不存在的 type wobble → STEP_TYPE_UNKNOWN",
+  "params": { "theta": 30, "Lc": 40 },
+  "steps": [
+    { "id": "O2", "type": "ground", "x": 0, "y": 0 },
+    { "id": "A", "type": "wobble", "center": "O2", "len_param": "Lc" }
+  ],
+  "tracePoint": "A"
+}

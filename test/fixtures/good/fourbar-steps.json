@@ -1,0 +1,11 @@
+{
+  "_comment": "AI 風格的最小可行機構：純 steps + params，無 _wizard_data。應 PASS。",
+  "params": { "theta": 30, "Lc": 40, "Lcoup": 90, "Lout": 70 },
+  "steps": [
+    { "id": "O2", "type": "ground", "x": 0, "y": 0 },
+    { "id": "O4", "type": "ground", "x": 120, "y": 0 },
+    { "id": "A", "type": "input_crank", "center": "O2", "len_param": "Lc", "physical_motor": "1" },
+    { "id": "B", "type": "dyad", "p1": "A", "p2": "O4", "r1_param": "Lcoup", "r2_param": "Lout" }
+  ],
+  "tracePoint": "B"
+}
