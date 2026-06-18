@@ -62,6 +62,16 @@
     .ctrl-sub { font-size: 13px; color: #7f8c8d; min-width: 64px; }
     .clear-btn { border: 1px solid #e6e9f0; background: #fff; color: #7f8c8d; border-radius: 10px;
       padding: 8px 12px; cursor: pointer; font-size: 13px; }
+    /* 選取連桿後的長度編輯面板 */
+    .len-editor { position: absolute; top: 16px; left: 16px; display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.96); border: 1px solid #e6e9f0; border-radius: 12px; padding: 8px 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.1); }
+    .len-editor .le-title { font-size: 13px; font-weight: 700; color: #2c5282; }
+    .len-editor button { width: 28px; height: 28px; border: 1px solid #d8dee6; background: #fff;
+      border-radius: 8px; font-size: 16px; cursor: pointer; line-height: 1; }
+    .len-editor input { width: 62px; padding: 5px; border: 1px solid #d8dee6; border-radius: 8px;
+      font-size: 14px; text-align: center; }
+    .len-editor .le-unit { font-size: 12px; color: #95a5a6; }
   </style>
 </head>
 <body>
@@ -93,6 +103,13 @@
     <div class="canvas-wrap">
       <svg id="stageSvg" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="hint" id="hint">點左邊的積木放到畫面上<br/>拖動圓點互相靠近就會接起來<br/>湊好後按 ▶ 看它動</div>
+      <div class="len-editor" id="lenEditor" style="display:none;">
+        <span class="le-title">🔵 連桿長度</span>
+        <button onclick="window.blocks.changeLen(-10)">−</button>
+        <input type="number" id="lenInput" min="10" step="5" onchange="window.blocks.setLen(this.value)" />
+        <span class="le-unit">mm</span>
+        <button onclick="window.blocks.changeLen(10)">＋</button>
+      </div>
       <div class="controls">
         <button class="play-btn" id="playBtn" onclick="window.blocks.togglePlay()">▶</button>
         <div class="ctrl-sub">角度 <span id="thetaVal">0</span>°</div>
@@ -119,8 +136,9 @@
     let topo = { params: { theta: 0 }, tracePoint: '' };
     let compiled = null;
     let theta = 0, raf = null, counter = 0;
-    let dragId = null, snapTarget = null;
+    let dragId = null, snapTarget = null, selectedLinkId = null;
     const SNAP_WORLD = 18 / SCALE; // 吸附門檻（世界座標 mm）
+    const LINK_DEFAULT_LEN = 90;   // 連桿預設長度
 
     function rebuild() {
       compiled = compileTopology(comps, topo, new Set());
@@ -147,11 +165,18 @@
         const a = pts[l.p1], b = pts[l.p2];
         if (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(b.x)) return;
         if (l.hidden) return;
+        const isSel = l.id && l.id === selectedLinkId;
+        const editable = l.id && comps.some(c => c.id === l.id && c.type === 'bar' && c.fixedLen);
         const line = document.createElementNS(SVG_NS, 'line');
         line.setAttribute('x1', TX(a.x)); line.setAttribute('y1', TY(a.y));
         line.setAttribute('x2', TX(b.x)); line.setAttribute('y2', TY(b.y));
-        line.setAttribute('stroke', l.style === 'crank' ? '#e74c3c' : (l.color || '#3498db'));
-        line.setAttribute('stroke-width', 6); line.setAttribute('stroke-linecap', 'round');
+        line.setAttribute('stroke', isSel ? '#e67e22' : (l.style === 'crank' ? '#e74c3c' : (l.color || '#3498db')));
+        line.setAttribute('stroke-width', isSel ? 8 : 6); line.setAttribute('stroke-linecap', 'round');
+        if (editable) {
+          line.setAttribute('data-link-id', l.id);
+          line.style.cursor = 'pointer';
+          line.addEventListener('pointerdown', (e) => { e.stopPropagation(); selectLink(l.id); });
+        }
         svg.appendChild(line);
       });
 
@@ -229,6 +254,8 @@
     function clearAll() {
       pause();
       comps = []; theta = 0; counter = 0;
+      selectedLinkId = null;
+      document.getElementById('lenEditor').style.display = 'none';
       topo = { params: { theta: 0 }, tracePoint: '' };
       document.getElementById('thetaVal').textContent = '0';
       rebuild(); draw();
@@ -259,14 +286,16 @@
       const n = ++counter;
       const linkCount = comps.filter(c => c.type === 'bar' && !c.isInput).length;
       const y = 45 + linkCount * 35; // 多根時錯開，避免一放就重疊
+      const half = LINK_DEFAULT_LEN / 2;
       comps.push({
         type: 'bar', id: 'Link' + n, color: '#3498db',
-        p1: { id: 'P' + n + 'a', type: 'floating', x: -45, y },
-        p2: { id: 'P' + n + 'b', type: 'floating', x: 45, y },
-        lenParam: 'LL' + n, isInput: false
+        p1: { id: 'P' + n + 'a', type: 'floating', x: -half, y },
+        p2: { id: 'P' + n + 'b', type: 'floating', x: half, y },
+        lenParam: 'LL' + n, isInput: false, fixedLen: true // 連桿是固定長度的剛性桿
       });
-      recomputeLengths();
+      topo.params['LL' + n] = LINK_DEFAULT_LEN;
       rebuild(); draw();
+      selectLink('Link' + n); // 放下就選取，方便馬上改長度
     }
 
     // ---- 拖曳接點 + 靠近吸附合併（這就是「連接」）----
@@ -308,12 +337,19 @@
       comps = comps.filter(c => !(c.type === 'bar' && c.p1 && c.p2 && c.p1.id === c.p2.id));
     }
     function recomputeLengths() {
+      // 固定長度的連桿不跟著拉伸；其餘桿（如曲柄）長度跟著畫面更新
       comps.forEach(c => {
-        if (c.type === 'bar' && c.lenParam && c.p1 && c.p2) {
+        if (c.type === 'bar' && !c.fixedLen && c.lenParam && c.p1 && c.p2) {
           topo.params[c.lenParam] = Math.round(
             Math.hypot((c.p2.x || 0) - (c.p1.x || 0), (c.p2.y || 0) - (c.p1.y || 0)));
         }
       });
+    }
+
+    // 找出「以此點為端點、且只屬於一根」的固定長度連桿（用來做圓規式拖曳）
+    function fixedLinkFor(id) {
+      const ls = comps.filter(c => c.type === 'bar' && c.fixedLen && (c.p1.id === id || c.p2.id === id));
+      return ls.length === 1 ? ls[0] : null;
     }
     function onNodeDown(e, id) {
       e.preventDefault();
@@ -325,7 +361,19 @@
     function onDragMove(e) {
       if (!dragId) return;
       const w = worldFromEvent(e); if (!w) return;
-      updatePointCoordsById(dragId, w.x, w.y);
+      let tx = w.x, ty = w.y;
+      // 固定長度連桿：拖端點時繞另一端以固定半徑旋轉（圓規），長度不變
+      const fl = fixedLinkFor(dragId);
+      if (fl) {
+        const other = fl.p1.id === dragId ? fl.p2 : fl.p1;
+        const L = Math.max(1, topo.params[fl.lenParam] ||
+          Math.hypot((fl.p2.x || 0) - (fl.p1.x || 0), (fl.p2.y || 0) - (fl.p1.y || 0)));
+        let dx = w.x - (other.x || 0), dy = w.y - (other.y || 0);
+        const d = Math.hypot(dx, dy) || 1;
+        tx = (other.x || 0) + dx / d * L;
+        ty = (other.y || 0) + dy / d * L;
+      }
+      updatePointCoordsById(dragId, tx, ty);
       recomputeLengths();
       snapTarget = findNearest(dragId);
       rebuild(); draw();
@@ -338,11 +386,46 @@
       recomputeLengths();
       rebuild(); draw();
     }
+    // ---- 選取連桿 + 改長度 ----
+    function selectLink(id) {
+      const c = comps.find(x => x.id === id && x.type === 'bar' && x.fixedLen);
+      if (!c) return;
+      selectedLinkId = id;
+      document.getElementById('lenEditor').style.display = 'flex';
+      document.getElementById('lenInput').value = Math.round(topo.params[c.lenParam] || 0);
+      draw();
+    }
+    function deselectLink() {
+      if (!selectedLinkId) return;
+      selectedLinkId = null;
+      document.getElementById('lenEditor').style.display = 'none';
+      draw();
+    }
+    function setLen(v) {
+      const c = comps.find(x => x.id === selectedLinkId);
+      if (!c) return;
+      const L = Math.max(10, Math.round(Number(v) || 0));
+      topo.params[c.lenParam] = L;
+      // 把 b 端重新擺到半徑 L（自由連桿才看得到；已連接的由 solver 接手）
+      const dx = (c.p2.x || 0) - (c.p1.x || 0), dy = (c.p2.y || 0) - (c.p1.y || 0);
+      const d = Math.hypot(dx, dy) || 1;
+      c.p2.x = (c.p1.x || 0) + dx / d * L;
+      c.p2.y = (c.p1.y || 0) + dy / d * L;
+      document.getElementById('lenInput').value = L;
+      rebuild(); draw();
+    }
+    function changeLen(delta) {
+      const c = comps.find(x => x.id === selectedLinkId);
+      if (c) setLen((topo.params[c.lenParam] || 0) + delta);
+    }
+
     svg.addEventListener('pointermove', onDragMove);
     svg.addEventListener('pointerup', onDragEnd);
     svg.addEventListener('pointercancel', onDragEnd);
+    // 點空白處（背景/地面線，未 stopPropagation）取消選取
+    svg.addEventListener('pointerdown', () => { if (!dragId) deselectLink(); });
 
-    window.blocks = { addMotorCrank, addAnchor, addLink, clearAll, togglePlay };
+    window.blocks = { addMotorCrank, addAnchor, addLink, clearAll, togglePlay, setLen, changeLen, selectLink };
     rebuild(); draw();
   </script>
 </body>
