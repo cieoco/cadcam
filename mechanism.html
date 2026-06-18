@@ -368,35 +368,71 @@
                 style="height: 100%; display: flex; flex-direction: column; padding: 0; overflow: hidden; min-height: 800px;">
 
                 <!-- Toolbar -->
+                <style>
+                    .tb-menu { position: relative; }
+                    .tb-menu > summary { list-style: none; cursor: pointer; padding: 6px 12px; font-size: 14px; border: 1px solid #cbd2db; border-radius: 6px; background: #fff; user-select: none; white-space: nowrap; }
+                    .tb-menu > summary::-webkit-details-marker { display: none; }
+                    .tb-menu[open] > summary { background: #eef2f7; border-color: #9fb3c8; }
+                    .tb-menu-list { position: absolute; right: 0; top: calc(100% + 6px); min-width: 170px; background: #fff; border: 1px solid #e1e5ea; border-radius: 10px; box-shadow: 0 12px 28px rgba(15,23,42,0.14); padding: 6px; display: flex; flex-direction: column; gap: 2px; z-index: 400; }
+                    .tb-menu-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 10px; font-size: 13px; border: none; background: transparent; border-radius: 6px; cursor: pointer; color: #2c3e50; }
+                    .tb-menu-item:hover { background: #f1f3f7; }
+                    .tb-divider { height: 1px; background: #eee; margin: 4px 2px; }
+                </style>
                 <div
-                    style="padding: 12px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                    <h3 style="margin:0; border:none; font-size: 16px;">2D 機構模擬與拓樸調整</h3>
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <label style="font-size:12px; color:#555; display:flex; align-items:center; gap:6px;">
-                            <input id="showPartsOverlay" type="checkbox" />
-                            套用零件外形
-                        </label>
-                        <div style="height: 20px; width: 1px; background: #ddd; margin: 0 5px;"></div>
-                        <div id="wsStatus"
-                            style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #777;">
-                            <span id="wsDot"
-                                style="width: 8px; height: 8px; background: #ccc; border-radius: 50%;"></span>
-                            <span id="wsStatusText">離線</span>
-                            <label
-                                style="display:flex; align-items:center; gap:4px; cursor:pointer; margin-left: 4px; font-weight: bold; color: #2980b9;">
-                                <input id="chkEnableRemote" type="checkbox" />
-                                開啟遠端通訊
-                            </label>
-                        </div>
-                        <div style="height: 20px; width: 1px; background: #ddd; margin: 0 5px;"></div>
-                        <button id="btnNewConfig" style="padding: 6px 12px; font-size: 14px;">新檔</button>
-                        <button id="btnOpenConfig" style="padding: 6px 12px; font-size: 14px;">開啟</button>
-                        <button id="btnSaveConfig" style="padding: 6px 12px; font-size: 14px;">存檔</button>
-                        <button id="btnShareConfig" style="padding: 6px 12px; font-size: 14px;" title="把目前機構壓成一條連結，複製給別人就能打開">🔗 分享連結</button>
-                        <button class="primary" id="btnUpdate" style="padding: 6px 12px; font-size: 14px;">更新 /
-                            預覽</button>
+                    style="padding: 12px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+                        <h3 style="margin:0; border:none; font-size: 16px; white-space:nowrap;">2D 機構模擬</h3>
+                        <!-- 繪圖工具箱：選取 / 加點 / 畫桿 / 復原 由 loader 注入 -->
+                        <div id="designToolbox" style="display:flex; align-items:center; gap:0;"></div>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <details class="tb-menu">
+                            <summary class="tb-menu-btn">檢視 ▾</summary>
+                            <div class="tb-menu-list" id="menuView">
+                                <label class="tb-menu-item">
+                                    <input id="showPartsOverlay" type="checkbox" /> 顯示零件外形
+                                </label>
+                                <!-- 全螢幕 由 loader 注入 -->
+                            </div>
+                        </details>
+                        <details class="tb-menu">
+                            <summary class="tb-menu-btn">檔案 ▾</summary>
+                            <div class="tb-menu-list" id="menuFile">
+                                <button id="btnNewConfig" class="tb-menu-item">🆕 新檔</button>
+                                <button id="btnOpenConfig" class="tb-menu-item">📂 開啟</button>
+                                <button id="btnSaveConfig" class="tb-menu-item">💾 存檔</button>
+                                <button id="btnShareConfig" class="tb-menu-item" title="把目前機構壓成一條連結，複製給別人就能打開">🔗 分享連結</button>
+                                <div class="tb-divider"></div>
+                                <!-- 清空畫布 由 loader 注入 -->
+                            </div>
+                        </details>
+                        <details class="tb-menu">
+                            <summary class="tb-menu-btn">進階 ▾</summary>
+                            <div class="tb-menu-list" id="menuAdv" style="min-width:210px;">
+                                <div id="wsStatus"
+                                    style="display:flex; align-items:center; gap:6px; font-size:12px; color:#777; padding:6px 10px;">
+                                    <span id="wsDot" style="width:8px; height:8px; background:#ccc; border-radius:50%;"></span>
+                                    <span id="wsStatusText">離線</span>
+                                    <label
+                                        style="display:flex; align-items:center; gap:4px; cursor:pointer; margin-left:auto; font-weight:bold; color:#2980b9;">
+                                        <input id="chkEnableRemote" type="checkbox" /> 開啟遠端通訊
+                                    </label>
+                                </div>
+                            </div>
+                        </details>
+                        <button class="primary" id="btnUpdate" style="padding: 6px 12px; font-size: 14px;">更新 / 預覽</button>
                     </div>
                 </div>
+                <script>
+                    // 下拉選單：點選單外或點到動作項就關閉（toggle 類的 label 不關）
+                    document.addEventListener('click', (e) => {
+                        document.querySelectorAll('details.tb-menu[open]').forEach((d) => {
+                            if (!d.contains(e.target)) { d.removeAttribute('open'); return; }
+                            const item = e.target.closest('.tb-menu-item');
+                            if (item && !e.target.closest('label')) d.removeAttribute('open');
+                        });
+                    });
+                </script>
                 <input id="configFileInput" type="file" accept="application/json,.json" style="display:none" />
 
                 <!-- Split View: Sim + Right Panel -->

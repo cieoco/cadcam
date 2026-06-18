@@ -656,22 +656,29 @@ function setupLinkClickHandler() {
   const titleEl = getTitleElement();
   const titleParent = titleEl ? titleEl.parentNode : null;
 
+  // 新工具列容器：繪圖工具箱（左）+ 檢視/檔案 下拉選單。缺少時回退到 titleParent，行為不變。
+  const tbToolbox = document.getElementById('designToolbox') || titleParent;
+  const tbMenuView = document.getElementById('menuView') || titleParent;
+  const tbMenuFile = document.getElementById('menuFile') || titleParent;
+  let tbModeGroup = document.getElementById('toolModeGroup');
+  if (!tbModeGroup && document.getElementById('designToolbox')) {
+    tbModeGroup = document.createElement('div');
+    tbModeGroup.id = 'toolModeGroup';
+    tbModeGroup.style.cssText = 'display:inline-flex; background:#fff; border:1px solid #cbd2db; border-radius:6px; overflow:hidden;';
+    document.getElementById('designToolbox').appendChild(tbModeGroup);
+  }
+  const tbModeHost = tbModeGroup || titleParent;
+  // 互斥工具的分段樣式（選取/加點/畫桿）
+  const tbSegStyle = 'padding:6px 12px; font-size:14px; border:none; border-right:1px solid #cbd2db; background:#fff; cursor:pointer;';
+
   // Add "Add Point" Button
   let addPointBtn = document.getElementById('btnAddPoint');
   if (!addPointBtn && titleEl && titleParent) {
     addPointBtn = document.createElement('button');
     addPointBtn.id = 'btnAddPoint';
     addPointBtn.innerHTML = '新增點位';
-    addPointBtn.style.marginLeft = '12px'; // Space from title
-    addPointBtn.style.padding = '6px 12px';
-    addPointBtn.style.fontSize = '14px';
-    addPointBtn.style.borderRadius = '4px';
-    addPointBtn.style.border = '1px solid #ccc';
-    addPointBtn.style.background = '#fff';
-    addPointBtn.style.cursor = 'pointer';
-
-    // Insert after title
-    titleParent.insertBefore(addPointBtn, titleEl.nextSibling);
+    addPointBtn.style.cssText = tbSegStyle;
+    tbModeHost.appendChild(addPointBtn);
 
     addPointBtn.onclick = () => {
       if (drawState === 'IDLE') {
@@ -691,16 +698,8 @@ function setupLinkClickHandler() {
     selectBtn = document.createElement('button');
     selectBtn.id = 'btnSelect';
     selectBtn.innerHTML = '選取';
-    selectBtn.style.marginLeft = '8px';
-    selectBtn.style.padding = '6px 12px';
-    selectBtn.style.fontSize = '14px';
-    selectBtn.style.borderRadius = '4px';
-    selectBtn.style.border = '1px solid #ccc';
-    selectBtn.style.background = '#fff';
-    selectBtn.style.cursor = 'pointer';
-
-    const refNode = addPointBtn || titleEl;
-    refNode.parentNode.insertBefore(selectBtn, refNode.nextSibling);
+    selectBtn.style.cssText = tbSegStyle;
+    tbModeHost.appendChild(selectBtn);
 
     selectBtn.onclick = () => {
       if (drawState === 'IDLE') {
@@ -720,17 +719,10 @@ function setupLinkClickHandler() {
     undoBtn = document.createElement('button');
     undoBtn.id = 'btnUndo';
     undoBtn.innerHTML = '回復上一步';
-    undoBtn.style.marginLeft = '8px';
-    undoBtn.style.padding = '6px 12px';
-    undoBtn.style.fontSize = '14px';
-    undoBtn.style.borderRadius = '4px';
-    undoBtn.style.border = '1px solid #ccc';
-    undoBtn.style.background = '#fff';
-    undoBtn.style.cursor = 'pointer';
+    undoBtn.innerHTML = '↶ 復原';
+    undoBtn.style.cssText = 'margin-left:8px; padding:6px 10px; font-size:13px; border-radius:6px; border:1px solid #cbd2db; background:#fff; cursor:pointer;';
     undoBtn.disabled = true;
-
-    const refNode = selectBtn || addPointBtn || titleEl;
-    refNode.parentNode.insertBefore(undoBtn, refNode.nextSibling);
+    tbToolbox.appendChild(undoBtn);
 
     undoBtn.onclick = () => {
       undoTopology();
@@ -745,17 +737,9 @@ function setupLinkClickHandler() {
     drawBtn = document.createElement('button');
     drawBtn.id = 'btnDrawLink';
     drawBtn.innerHTML = '畫桿件';
-    drawBtn.style.marginLeft = '8px'; // Space from previous btn
-    drawBtn.style.padding = '6px 12px';
-    drawBtn.style.fontSize = '14px';
-    drawBtn.style.borderRadius = '4px';
-    drawBtn.style.border = '1px solid #ccc';
-    drawBtn.style.background = '#fff';
-    drawBtn.style.cursor = 'pointer';
-
-    // Insert after Select button if exists
-    const refNode = selectBtn || addPointBtn || titleEl;
-    refNode.parentNode.insertBefore(drawBtn, refNode.nextSibling);
+    drawBtn.style.cssText = tbSegStyle;
+    drawBtn.style.borderRight = 'none';
+    tbModeHost.appendChild(drawBtn);
 
     drawBtn.onclick = () => {
       if (drawState === 'IDLE') {
@@ -781,18 +765,9 @@ function setupLinkClickHandler() {
     zenBtn = document.createElement('button');
     zenBtn.id = 'btnZenMode';
     zenBtn.innerHTML = '全螢幕';
-    zenBtn.style.marginLeft = '8px';
-    zenBtn.style.padding = '6px 12px';
-    zenBtn.style.fontSize = '14px';
-    zenBtn.style.borderRadius = '4px';
-    zenBtn.style.border = '1px solid #ccc';
-    zenBtn.style.background = '#fff';
-    zenBtn.style.cursor = 'pointer';
-
-    // Insert after draw button (which is nextSibling of title now)
-    // Actually, drawBtn is inserted. So titleEl.nextSibling is drawBtn.
-    // Insert after drawBtn.
-    titleParent.insertBefore(zenBtn, drawBtn.nextSibling);
+    zenBtn.className = 'tb-menu-item';
+    zenBtn.innerHTML = '⛶ 全螢幕';
+    tbMenuView.appendChild(zenBtn);
 
     zenBtn.onclick = () => {
       document.body.classList.toggle('zen-mode');
@@ -812,22 +787,9 @@ function setupLinkClickHandler() {
   if (!resetBtn && titleEl && titleParent) {
     resetBtn = document.createElement('button');
     resetBtn.id = 'btnWizardReset';
-    resetBtn.innerHTML = '重置';
-    resetBtn.style.marginLeft = '8px';
-    resetBtn.style.padding = '6px 12px';
-    resetBtn.style.fontSize = '14px';
-    resetBtn.style.borderRadius = '4px';
-    resetBtn.style.border = '1px solid #ccc';
-    resetBtn.style.background = '#fff';
-    resetBtn.style.cursor = 'pointer';
-
-    if (undoBtn) {
-      titleParent.insertBefore(resetBtn, undoBtn);
-    } else if (zenBtn) {
-      titleParent.insertBefore(resetBtn, zenBtn.nextSibling);
-    } else {
-      titleParent.appendChild(resetBtn);
-    }
+    resetBtn.className = 'tb-menu-item';
+    resetBtn.innerHTML = '🗑 清空畫布';
+    tbMenuFile.appendChild(resetBtn);
 
     resetBtn.onclick = () => {
       if (window.wizard && typeof window.wizard.reset === 'function') {
