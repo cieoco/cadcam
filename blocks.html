@@ -37,6 +37,7 @@
     .block .role { font-size: 10px; color: #95a5a6; }
     .block.motor { border-color: #f7c5c0; }
     .block.anchor { border-color: #d8dee6; }
+    .block.link { border-color: #bcd3f0; }
 
     /* 畫布 */
     .canvas-wrap { flex: 1; position: relative; min-width: 0; }
@@ -82,11 +83,16 @@
         <span class="name">馬達曲柄</span>
         <span class="role">轉圈圈的動力</span>
       </div>
+      <div class="block link" onclick="window.blocks.addLink()">
+        <span class="ico">🔵</span>
+        <span class="name">連桿</span>
+        <span class="role">跟著動的</span>
+      </div>
     </div>
 
     <div class="canvas-wrap">
       <svg id="stageSvg" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
-      <div class="hint" id="hint">點左邊的積木，放到畫面上<br/>然後按 ▶ 看它動起來</div>
+      <div class="hint" id="hint">點左邊的積木放到畫面上<br/>拖動圓點互相靠近就會接起來<br/>湊好後按 ▶ 看它動</div>
       <div class="controls">
         <button class="play-btn" id="playBtn" onclick="window.blocks.togglePlay()">▶</button>
         <div class="ctrl-sub">角度 <span id="thetaVal">0</span>°</div>
@@ -113,6 +119,8 @@
     let topo = { params: { theta: 0 }, tracePoint: '' };
     let compiled = null;
     let theta = 0, raf = null, counter = 0;
+    let dragId = null, snapTarget = null;
+    const SNAP_WORLD = 18 / SCALE; // 吸附門檻（世界座標 mm）
 
     function rebuild() {
       compiled = compileTopology(comps, topo, new Set());
@@ -127,7 +135,10 @@
 
       let sol = null;
       try { sol = solveTopology(compiled, { thetaDeg: theta }); } catch (_) {}
-      const pts = (sol && sol.points) ? sol.points : {};
+      // 合併位置：先用元件座標打底（未被解出的靜態點才畫得出來、拖得動），求解結果再覆蓋
+      const solved = (sol && sol.points) ? sol.points : {};
+      const pts = pointCoords();
+      Object.keys(solved).forEach(id => { if (Number.isFinite(solved[id].x)) pts[id] = solved[id]; });
 
       const groundIds = new Set((compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
 
@@ -144,7 +155,17 @@
         svg.appendChild(line);
       });
 
-      // 節點
+      // 吸附高亮：拖曳時靠近的接點亮綠圈
+      if (dragId && snapTarget && pts[snapTarget] && Number.isFinite(pts[snapTarget].x)) {
+        const t = pts[snapTarget];
+        const ring = document.createElementNS(SVG_NS, 'circle');
+        ring.setAttribute('cx', TX(t.x)); ring.setAttribute('cy', TY(t.y));
+        ring.setAttribute('r', 14); ring.setAttribute('fill', 'none');
+        ring.setAttribute('stroke', '#2ecc71'); ring.setAttribute('stroke-width', 3);
+        svg.appendChild(ring);
+      }
+
+      // 節點（可拖曳；拖近別的接點會吸附合併）
       Object.keys(pts).forEach(id => {
         const p = pts[id];
         if (!Number.isFinite(p.x)) return;
@@ -156,9 +177,13 @@
           node.setAttribute('rx', 3); node.setAttribute('fill', '#34495e');
         } else {
           node.setAttribute('cx', TX(p.x)); node.setAttribute('cy', TY(p.y));
-          node.setAttribute('r', 7); node.setAttribute('fill', '#fff');
-          node.setAttribute('stroke', '#34495e'); node.setAttribute('stroke-width', 3);
+          node.setAttribute('r', id === dragId ? 9 : 7); node.setAttribute('fill', '#fff');
+          node.setAttribute('stroke', id === dragId ? '#2ecc71' : '#34495e');
+          node.setAttribute('stroke-width', 3);
         }
+        node.setAttribute('data-id', id);
+        node.style.cursor = 'grab';
+        node.addEventListener('pointerdown', (e) => onNodeDown(e, id));
         svg.appendChild(node);
       });
     }
@@ -230,7 +255,94 @@
     }
     function togglePlay() { raf ? pause() : play(); }
 
-    window.blocks = { addMotorCrank, addAnchor, clearAll, togglePlay };
+    function addLink() {
+      const n = ++counter;
+      const linkCount = comps.filter(c => c.type === 'bar' && !c.isInput).length;
+      const y = 45 + linkCount * 35; // 多根時錯開，避免一放就重疊
+      comps.push({
+        type: 'bar', id: 'Link' + n, color: '#3498db',
+        p1: { id: 'P' + n + 'a', type: 'floating', x: -45, y },
+        p2: { id: 'P' + n + 'b', type: 'floating', x: 45, y },
+        lenParam: 'LL' + n, isInput: false
+      });
+      recomputeLengths();
+      rebuild(); draw();
+    }
+
+    // ---- 拖曳接點 + 靠近吸附合併（這就是「連接」）----
+    function worldFromEvent(e) {
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return null;
+      const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
+      return { x: (p.x - OX) / SCALE, y: (OY - p.y) / SCALE };
+    }
+    function pointCoords() {
+      const m = {};
+      comps.forEach(c => ['p1', 'p2', 'p3'].forEach(k => {
+        if (c[k] && c[k].id) m[c[k].id] = { x: Number(c[k].x) || 0, y: Number(c[k].y) || 0 };
+      }));
+      return m;
+    }
+    function updatePointCoordsById(id, x, y) {
+      comps.forEach(c => ['p1', 'p2', 'p3'].forEach(k => {
+        if (c[k] && c[k].id === id) { c[k].x = x; c[k].y = y; }
+      }));
+    }
+    function findNearest(id) {
+      const m = pointCoords();
+      const d = m[id]; if (!d) return null;
+      let best = null, bestDist = SNAP_WORLD;
+      Object.keys(m).forEach(id2 => {
+        if (id2 === id) return;
+        const dist = Math.hypot(m[id2].x - d.x, m[id2].y - d.y);
+        if (dist < bestDist) { bestDist = dist; best = id2; }
+      });
+      return best;
+    }
+    function mergePoints(fromId, toId) {
+      const t = pointCoords()[toId]; if (!t) return;
+      comps.forEach(c => ['p1', 'p2', 'p3'].forEach(k => {
+        if (c[k] && c[k].id === fromId) { c[k].id = toId; c[k].x = t.x; c[k].y = t.y; }
+      }));
+      // 被合併成零長度的桿就移除
+      comps = comps.filter(c => !(c.type === 'bar' && c.p1 && c.p2 && c.p1.id === c.p2.id));
+    }
+    function recomputeLengths() {
+      comps.forEach(c => {
+        if (c.type === 'bar' && c.lenParam && c.p1 && c.p2) {
+          topo.params[c.lenParam] = Math.round(
+            Math.hypot((c.p2.x || 0) - (c.p1.x || 0), (c.p2.y || 0) - (c.p1.y || 0)));
+        }
+      });
+    }
+    function onNodeDown(e, id) {
+      e.preventDefault();
+      pause();
+      dragId = id; snapTarget = null;
+      try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+      draw();
+    }
+    function onDragMove(e) {
+      if (!dragId) return;
+      const w = worldFromEvent(e); if (!w) return;
+      updatePointCoordsById(dragId, w.x, w.y);
+      recomputeLengths();
+      snapTarget = findNearest(dragId);
+      rebuild(); draw();
+    }
+    function onDragEnd() {
+      if (!dragId) return;
+      const did = dragId, tgt = snapTarget;
+      dragId = null; snapTarget = null;
+      if (tgt) mergePoints(did, tgt);
+      recomputeLengths();
+      rebuild(); draw();
+    }
+    svg.addEventListener('pointermove', onDragMove);
+    svg.addEventListener('pointerup', onDragEnd);
+    svg.addEventListener('pointercancel', onDragEnd);
+
+    window.blocks = { addMotorCrank, addAnchor, addLink, clearAll, togglePlay };
     rebuild(); draw();
   </script>
 </body>
