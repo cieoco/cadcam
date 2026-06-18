@@ -47,6 +47,12 @@
       position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
       color: #b0bac6; font-size: 16px; text-align: center; pointer-events: none; line-height: 1.7;
     }
+    .mode-banner {
+      position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+      background: rgba(44,62,80,0.94); color: #fff; border-radius: 999px;
+      padding: 9px 16px; font-size: 14px; font-weight: 700;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.18); pointer-events: none;
+    }
     /* 控制列 */
     .controls {
       position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
@@ -88,21 +94,22 @@
         <span class="name">地錨</span>
         <span class="role">釘在地上</span>
       </div>
-      <div class="block motor" onclick="window.blocks.addMotorCrank()">
-        <span class="ico">🔴↻</span>
-        <span class="name">馬達曲柄</span>
-        <span class="role">轉圈圈的動力</span>
-      </div>
       <div class="block link" onclick="window.blocks.addLink()">
         <span class="ico">🔵</span>
         <span class="name">連桿</span>
-        <span class="role">跟著動的</span>
+        <span class="role">桿子，有長度</span>
+      </div>
+      <div class="block motor" onclick="window.blocks.placeMotor()">
+        <span class="ico">🔴</span>
+        <span class="name">馬達</span>
+        <span class="role">放到接點上</span>
       </div>
     </div>
 
     <div class="canvas-wrap">
       <svg id="stageSvg" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
-      <div class="hint" id="hint">點左邊的積木放到畫面上<br/>拖動圓點互相靠近就會接起來<br/>湊好後按 ▶ 看它動</div>
+      <div class="hint" id="hint">放一根🔵連桿 → 把🔴馬達放到它一端 → 按 ▶ 看它動</div>
+      <div class="mode-banner" id="modeBanner" style="display:none;"></div>
       <div class="len-editor" id="lenEditor" style="display:none;">
         <span class="le-title">🔵 連桿長度</span>
         <button onclick="window.blocks.changeLen(-10)">−</button>
@@ -136,7 +143,8 @@
     let topo = { params: { theta: 0 }, tracePoint: '' };
     let compiled = null;
     let theta = 0, raf = null, counter = 0;
-    let dragId = null, snapTarget = null, selectedLinkId = null;
+    let dragId = null, dragLinkId = null, dragLastWorld = null, snapTarget = null, selectedLinkId = null;
+    let placingMotor = false, pickBars = null;
     const SNAP_WORLD = 18 / SCALE; // 吸附門檻（世界座標 mm）
     const LINK_DEFAULT_LEN = 90;   // 連桿預設長度
 
@@ -159,6 +167,7 @@
       Object.keys(solved).forEach(id => { if (Number.isFinite(solved[id].x)) pts[id] = solved[id]; });
 
       const groundIds = new Set((compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
+      const motorCenterIds = new Set((compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
 
       // 桿件
       (compiled.visualization.links || []).forEach(l => {
@@ -167,15 +176,23 @@
         if (l.hidden) return;
         const isSel = l.id && l.id === selectedLinkId;
         const editable = l.id && comps.some(c => c.id === l.id && c.type === 'bar' && c.fixedLen);
+        const isPickCandidate = pickBars && pickBars.ids.includes(l.id);
         const line = document.createElementNS(SVG_NS, 'line');
         line.setAttribute('x1', TX(a.x)); line.setAttribute('y1', TY(a.y));
         line.setAttribute('x2', TX(b.x)); line.setAttribute('y2', TY(b.y));
-        line.setAttribute('stroke', isSel ? '#e67e22' : (l.style === 'crank' ? '#e74c3c' : (l.color || '#3498db')));
-        line.setAttribute('stroke-width', isSel ? 8 : 6); line.setAttribute('stroke-linecap', 'round');
-        if (editable) {
+        line.setAttribute('stroke', isPickCandidate ? '#f39c12' : (isSel ? '#e67e22' : (l.style === 'crank' ? '#e74c3c' : (l.color || '#3498db'))));
+        line.setAttribute('stroke-width', isPickCandidate ? 10 : (isSel ? 8 : 6));
+        line.setAttribute('stroke-linecap', 'round');
+        if (isPickCandidate) line.setAttribute('stroke-dasharray', '12 8');
+        if (editable || isPickCandidate) {
           line.setAttribute('data-link-id', l.id);
           line.style.cursor = 'pointer';
-          line.addEventListener('pointerdown', (e) => { e.stopPropagation(); selectLink(l.id); });
+          line.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            if (pickBars) { tryPickBar(l.id); return; }
+            if (startFreeLinkDrag(e, l.id)) return;
+            selectLink(l.id);
+          });
         }
         svg.appendChild(line);
       });
@@ -195,11 +212,14 @@
         const p = pts[id];
         if (!Number.isFinite(p.x)) return;
         const isGround = groundIds.has(id);
+        const isMotorCenter = motorCenterIds.has(id);
         const node = document.createElementNS(SVG_NS, isGround ? 'rect' : 'circle');
         if (isGround) {
-          node.setAttribute('x', TX(p.x) - 7); node.setAttribute('y', TY(p.y) - 7);
-          node.setAttribute('width', 14); node.setAttribute('height', 14);
+          const size = isMotorCenter ? 18 : 14;
+          node.setAttribute('x', TX(p.x) - size / 2); node.setAttribute('y', TY(p.y) - size / 2);
+          node.setAttribute('width', size); node.setAttribute('height', size);
           node.setAttribute('rx', 3); node.setAttribute('fill', '#34495e');
+          if (isMotorCenter) node.setAttribute('fill', '#e74c3c');
         } else {
           node.setAttribute('cx', TX(p.x)); node.setAttribute('cy', TY(p.y));
           node.setAttribute('r', id === dragId ? 9 : 7); node.setAttribute('fill', '#fff');
@@ -231,22 +251,9 @@
     }
 
     // ---- 零件：放下時自動設好「角色」----
-    function addMotorCrank() {
-      const n = ++counter;
-      const crankCount = comps.filter(c => c.isInput).length;
-      const cx = crankCount * 70;          // 多顆時錯開
-      comps.push({
-        type: 'bar', id: 'Crank' + n, color: '#e74c3c',
-        p1: { id: 'M' + n, type: 'motor', x: cx, y: 0, physicalMotor: '1' }, // 馬達中心：自動接地
-        p2: { id: 'T' + n, type: 'floating', x: cx + 60, y: 0 },             // 曲柄端：跟著轉
-        lenParam: 'L' + n, isInput: true, physicalMotor: '1'
-      });
-      topo.params['L' + n] = 60;
-      rebuild(); draw();
-    }
-
     function addAnchor() {
       const n = ++counter;
+      cancelMotorMode();
       comps.push({ type: 'anchor', id: 'Anchor' + n, p1: { id: 'A' + n, type: 'fixed', x: -110, y: 0 } });
       rebuild(); draw();
     }
@@ -255,6 +262,7 @@
       pause();
       comps = []; theta = 0; counter = 0;
       selectedLinkId = null;
+      cancelMotorMode();
       document.getElementById('lenEditor').style.display = 'none';
       topo = { params: { theta: 0 }, tracePoint: '' };
       document.getElementById('thetaVal').textContent = '0';
@@ -284,6 +292,7 @@
 
     function addLink() {
       const n = ++counter;
+      cancelMotorMode();
       const linkCount = comps.filter(c => c.type === 'bar' && !c.isInput).length;
       const y = 45 + linkCount * 35; // 多根時錯開，避免一放就重疊
       const half = LINK_DEFAULT_LEN / 2;
@@ -296,6 +305,65 @@
       topo.params['LL' + n] = LINK_DEFAULT_LEN;
       rebuild(); draw();
       selectLink('Link' + n); // 放下就選取，方便馬上改長度
+    }
+
+    // ---- 馬達：放到接點上，挑一根連桿來驅動 ----
+    function setBanner(text) {
+      const el = document.getElementById('modeBanner');
+      el.textContent = text;
+      el.style.display = text ? 'block' : 'none';
+    }
+    function clearBanner() { setBanner(''); }
+    function cancelMotorMode() {
+      placingMotor = false;
+      pickBars = null;
+      svg.style.cursor = '';
+      clearBanner();
+    }
+    function placeMotor() {
+      pause();
+      deselectLink();
+      placingMotor = true;
+      pickBars = null;
+      svg.style.cursor = 'crosshair';
+      setBanner('點一個接點放上馬達 🔴');
+      draw();
+    }
+    function barsAtNode(nodeId) {
+      return comps.filter(c => c.type === 'bar' && c.p1 && c.p2 && (c.p1.id === nodeId || c.p2.id === nodeId));
+    }
+    function handleMotorOnNode(nodeId) {
+      const bars = barsAtNode(nodeId);
+      if (!bars.length) {
+        setBanner('馬達要放在連桿的端點上喔');
+        return;
+      }
+      if (bars.length === 1) {
+        driveBarAt(bars[0].id, nodeId);
+        return;
+      }
+      placingMotor = false;
+      pickBars = { nodeId, ids: bars.map(b => b.id) };
+      svg.style.cursor = '';
+      setBanner('這個接點有好幾根桿，點一下你要馬達轉的那根');
+      draw();
+    }
+    function tryPickBar(barId) {
+      if (!pickBars) return;
+      if (pickBars.ids.includes(barId)) driveBarAt(barId, pickBars.nodeId);
+      else cancelMotorMode();
+    }
+    function driveBarAt(barId, nodeId) {
+      const bar = comps.find(c => c.id === barId && c.type === 'bar');
+      if (!bar) return;
+      const key = bar.p1.id === nodeId ? 'p1' : (bar.p2.id === nodeId ? 'p2' : null);
+      if (!key) return;
+      bar[key].type = 'fixed';
+      bar[key].physicalMotor = '1';
+      bar.isInput = true;
+      bar.physicalMotor = '1';
+      cancelMotorMode();
+      rebuild(); draw();
     }
 
     // ---- 拖曳接點 + 靠近吸附合併（這就是「連接」）----
@@ -315,6 +383,14 @@
     function updatePointCoordsById(id, x, y) {
       comps.forEach(c => ['p1', 'p2', 'p3'].forEach(k => {
         if (c[k] && c[k].id === id) { c[k].x = x; c[k].y = y; }
+      }));
+    }
+    function movePointById(id, dx, dy) {
+      comps.forEach(c => ['p1', 'p2', 'p3'].forEach(k => {
+        if (c[k] && c[k].id === id) {
+          c[k].x = (Number(c[k].x) || 0) + dx;
+          c[k].y = (Number(c[k].y) || 0) + dy;
+        }
       }));
     }
     function findNearest(id) {
@@ -351,18 +427,77 @@
       const ls = comps.filter(c => c.type === 'bar' && c.fixedLen && (c.p1.id === id || c.p2.id === id));
       return ls.length === 1 ? ls[0] : null;
     }
+    function pointUseCount(id) {
+      let count = 0;
+      comps.forEach(c => ['p1', 'p2', 'p3'].forEach(k => {
+        if (c[k] && c[k].id === id) count += 1;
+      }));
+      return count;
+    }
+    function isGroundPoint(p) {
+      return p && (p.type === 'fixed' || p.type === 'motor' || p.type === 'linear');
+    }
+    function isFreeLink(c) {
+      return c && c.type === 'bar' && c.fixedLen &&
+        c.p1 && c.p2 &&
+        !isGroundPoint(c.p1) && !isGroundPoint(c.p2) &&
+        pointUseCount(c.p1.id) === 1 && pointUseCount(c.p2.id) === 1;
+    }
+    function freeLinkForPoint(id) {
+      const c = fixedLinkFor(id);
+      return isFreeLink(c) ? c : null;
+    }
+    function startFreeLinkDrag(e, linkId) {
+      const c = comps.find(x => x.id === linkId && isFreeLink(x));
+      if (!c) return false;
+      const w = worldFromEvent(e);
+      if (!w) return false;
+      pause();
+      selectLink(linkId);
+      dragLinkId = linkId;
+      dragLastWorld = w;
+      snapTarget = null;
+      try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+      draw();
+      return true;
+    }
     function onNodeDown(e, id) {
       e.preventDefault();
+      if (placingMotor) { e.stopPropagation(); handleMotorOnNode(id); return; }
+      if (pickBars) return;
       pause();
       dragId = id; snapTarget = null;
       try { svg.setPointerCapture(e.pointerId); } catch (_) {}
       draw();
     }
     function onDragMove(e) {
-      if (!dragId) return;
       const w = worldFromEvent(e); if (!w) return;
+      if (dragLinkId && dragLastWorld) {
+        const c = comps.find(x => x.id === dragLinkId && isFreeLink(x));
+        if (!c) return;
+        const dx = w.x - dragLastWorld.x;
+        const dy = w.y - dragLastWorld.y;
+        movePointById(c.p1.id, dx, dy);
+        movePointById(c.p2.id, dx, dy);
+        dragLastWorld = w;
+        rebuild(); draw();
+        return;
+      }
+      if (!dragId) return;
       let tx = w.x, ty = w.y;
-      // 固定長度連桿：拖端點時繞另一端以固定半徑旋轉（圓規），長度不變
+      // 自由連桿：兩端都未固定、也沒接到別的桿時，拖端點等於整根平移。
+      const free = freeLinkForPoint(dragId);
+      if (free) {
+        const p = pointCoords()[dragId];
+        const dx = w.x - (p?.x || 0);
+        const dy = w.y - (p?.y || 0);
+        movePointById(free.p1.id, dx, dy);
+        movePointById(free.p2.id, dx, dy);
+        snapTarget = findNearest(dragId);
+        rebuild(); draw();
+        return;
+      }
+      // 固定長度連桿：已有約束時，拖端點繞另一端以固定半徑旋轉（圓規），長度不變
       const fl = fixedLinkFor(dragId);
       if (fl) {
         const other = fl.p1.id === dragId ? fl.p2 : fl.p1;
@@ -379,6 +514,11 @@
       rebuild(); draw();
     }
     function onDragEnd() {
+      if (dragLinkId) {
+        dragLinkId = null; dragLastWorld = null;
+        rebuild(); draw();
+        return;
+      }
       if (!dragId) return;
       const did = dragId, tgt = snapTarget;
       dragId = null; snapTarget = null;
@@ -388,6 +528,7 @@
     }
     // ---- 選取連桿 + 改長度 ----
     function selectLink(id) {
+      cancelMotorMode();
       const c = comps.find(x => x.id === id && x.type === 'bar' && x.fixedLen);
       if (!c) return;
       selectedLinkId = id;
@@ -423,9 +564,12 @@
     svg.addEventListener('pointerup', onDragEnd);
     svg.addEventListener('pointercancel', onDragEnd);
     // 點空白處（背景/地面線，未 stopPropagation）取消選取
-    svg.addEventListener('pointerdown', () => { if (!dragId) deselectLink(); });
+    svg.addEventListener('pointerdown', () => {
+      if (placingMotor || pickBars) { cancelMotorMode(); draw(); return; }
+      if (!dragId) deselectLink();
+    });
 
-    window.blocks = { addMotorCrank, addAnchor, addLink, clearAll, togglePlay, setLen, changeLen, selectLink };
+    window.blocks = { placeMotor, addAnchor, addLink, clearAll, togglePlay, setLen, changeLen, selectLink };
     rebuild(); draw();
   </script>
 </body>
