@@ -78,6 +78,14 @@
     .len-editor input { width: 62px; padding: 5px; border: 1px solid #d8dee6; border-radius: 8px;
       font-size: 14px; text-align: center; }
     .len-editor .le-unit { font-size: 12px; color: #95a5a6; }
+    .role-editor { position: absolute; top: 16px; right: 16px; display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.96); border: 1px solid #e6e9f0; border-radius: 12px; padding: 8px 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.1); }
+    .role-editor .re-title { font-size: 13px; font-weight: 700; color: #8e3b32; }
+    .role-editor .re-status { font-size: 12px; color: #7f8c8d; min-width: 58px; }
+    .role-editor button { border: 1px solid #d8dee6; background: #fff; border-radius: 8px; padding: 6px 9px;
+      font-size: 12px; cursor: pointer; }
+    .role-editor button:hover { background: #f6f8fb; }
   </style>
 </head>
 <body>
@@ -110,12 +118,20 @@
       <svg id="stageSvg" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="hint" id="hint">放一根🔵連桿 → 把🔴馬達放到它一端 → 按 ▶ 看它動</div>
       <div class="mode-banner" id="modeBanner" style="display:none;"></div>
+      <div class="mode-banner" id="solveBanner" style="display:none; top:58px;"></div>
       <div class="len-editor" id="lenEditor" style="display:none;">
         <span class="le-title">🔵 連桿長度</span>
         <button onclick="window.blocks.changeLen(-10)">−</button>
         <input type="number" id="lenInput" min="10" step="5" onchange="window.blocks.setLen(this.value)" />
         <span class="le-unit">mm</span>
         <button onclick="window.blocks.changeLen(10)">＋</button>
+      </div>
+      <div class="role-editor" id="roleEditor" style="display:none;">
+        <span class="re-title">接點角色</span>
+        <span class="re-status" id="roleStatus">自由</span>
+        <button onclick="window.blocks.setNodeRole('floating')">變自由</button>
+        <button onclick="window.blocks.setNodeRole('fixed')">設地錨</button>
+        <button onclick="window.blocks.removeNodeMotor()">拿掉馬達</button>
       </div>
       <div class="controls">
         <button class="play-btn" id="playBtn" onclick="window.blocks.togglePlay()">▶</button>
@@ -143,7 +159,7 @@
     let topo = { params: { theta: 0 }, tracePoint: '' };
     let compiled = null;
     let theta = 0, raf = null, counter = 0;
-    let dragId = null, dragLinkId = null, dragLastWorld = null, snapTarget = null, selectedLinkId = null;
+    let dragId = null, dragLinkId = null, dragLastWorld = null, snapTarget = null, selectedLinkId = null, selectedNodeId = null;
     let placingMotor = false, pickBars = null;
     const SNAP_WORLD = 18 / SCALE; // 吸附門檻（世界座標 mm）
     const LINK_DEFAULT_LEN = 90;   // 連桿預設長度
@@ -152,12 +168,16 @@
       compiled = compileTopology(comps, topo, new Set());
       topo.params = compiled.params; // 沿用補齊後的參數
       document.getElementById('hint').style.display = comps.length ? 'none' : 'block';
+      updateRoleEditor();
     }
 
     function draw() {
       while (svg.firstChild) svg.removeChild(svg.firstChild);
       drawGround();
-      if (!compiled || !comps.length) return;
+      if (!compiled || !comps.length) {
+        updateSolveBanner(null, 0);
+        return;
+      }
 
       let sol = null;
       try { sol = solveTopology(compiled, { thetaDeg: theta }); } catch (_) {}
@@ -169,11 +189,20 @@
       const groundIds = new Set((compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
       const motorCenterIds = new Set((compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
 
-      // 桿件
-      (compiled.visualization.links || []).forEach(l => {
+      // 桿件：紅色曲柄最後畫，避免和藍色桿重疊時被蓋住。
+      let missingVisibleLinks = 0;
+      const linksToDraw = [...(compiled.visualization.links || [])].sort((a, b) => {
+        const ac = a.style === 'crank' ? 1 : 0;
+        const bc = b.style === 'crank' ? 1 : 0;
+        return ac - bc;
+      });
+      linksToDraw.forEach(l => {
         const a = pts[l.p1], b = pts[l.p2];
-        if (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(b.x)) return;
         if (l.hidden) return;
+        if (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(b.x)) {
+          missingVisibleLinks += 1;
+          return;
+        }
         const isSel = l.id && l.id === selectedLinkId;
         const editable = l.id && comps.some(c => c.id === l.id && c.type === 'bar' && c.fixedLen);
         const isPickCandidate = pickBars && pickBars.ids.includes(l.id);
@@ -196,6 +225,7 @@
         }
         svg.appendChild(line);
       });
+      updateSolveBanner(sol, missingVisibleLinks);
 
       // 吸附高亮：拖曳時靠近的接點亮綠圈
       if (dragId && snapTarget && pts[snapTarget] && Number.isFinite(pts[snapTarget].x)) {
@@ -262,8 +292,11 @@
       pause();
       comps = []; theta = 0; counter = 0;
       selectedLinkId = null;
+      selectedNodeId = null;
       cancelMotorMode();
       document.getElementById('lenEditor').style.display = 'none';
+      document.getElementById('roleEditor').style.display = 'none';
+      document.getElementById('solveBanner').style.display = 'none';
       topo = { params: { theta: 0 }, tracePoint: '' };
       document.getElementById('thetaVal').textContent = '0';
       rebuild(); draw();
@@ -314,6 +347,13 @@
       el.style.display = text ? 'block' : 'none';
     }
     function clearBanner() { setBanner(''); }
+    function updateSolveBanner(sol, missingVisibleLinks) {
+      const el = document.getElementById('solveBanner');
+      if (!el) return;
+      const show = missingVisibleLinks > 0 || (sol && sol.isValid === false);
+      el.textContent = show ? '這個姿勢到死點了：有些桿件重合，求解器暫時不知道要往哪邊翻' : '';
+      el.style.display = show ? 'block' : 'none';
+    }
     function cancelMotorMode() {
       placingMotor = false;
       pickBars = null;
@@ -358,6 +398,16 @@
       if (!bar) return;
       const key = bar.p1.id === nodeId ? 'p1' : (bar.p2.id === nodeId ? 'p2' : null);
       if (!key) return;
+      const otherKey = key === 'p1' ? 'p2' : 'p1';
+      if (pointIsGround(bar[otherKey].id)) {
+        placingMotor = false;
+        pickBars = null;
+        svg.style.cursor = '';
+        setBanner('這根連桿另一端已經釘住了，兩端都固定不會動');
+        draw();
+        return;
+      }
+      freezePointAtDisplay(nodeId);
       bar[key].type = 'fixed';
       bar[key].physicalMotor = '1';
       bar.isInput = true;
@@ -380,10 +430,25 @@
       }));
       return m;
     }
+    function displayPoint(id) {
+      const pts = pointCoords();
+      if (compiled) {
+        try {
+          const sol = solveTopology(compiled, { thetaDeg: theta });
+          const p = sol && sol.points && sol.points[id];
+          if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) return { x: p.x, y: p.y };
+        } catch (_) {}
+      }
+      return pts[id] || null;
+    }
     function updatePointCoordsById(id, x, y) {
       comps.forEach(c => ['p1', 'p2', 'p3'].forEach(k => {
         if (c[k] && c[k].id === id) { c[k].x = x; c[k].y = y; }
       }));
+    }
+    function freezePointAtDisplay(id) {
+      const p = displayPoint(id);
+      if (p) updatePointCoordsById(id, p.x, p.y);
     }
     function movePointById(id, dx, dy) {
       comps.forEach(c => ['p1', 'p2', 'p3'].forEach(k => {
@@ -392,6 +457,80 @@
           c[k].y = (Number(c[k].y) || 0) + dy;
         }
       }));
+    }
+    function pointRefs(id) {
+      const refs = [];
+      comps.forEach(c => ['p1', 'p2', 'p3'].forEach(k => {
+        if (c[k] && c[k].id === id) refs.push({ comp: c, key: k, point: c[k] });
+      }));
+      return refs;
+    }
+    function hasPoint(id) { return pointRefs(id).length > 0; }
+    function pointHasMotor(id) {
+      return comps.some(c => c.type === 'bar' && c.isInput && (
+        (c.p1 && c.p1.id === id && c.p1.physicalMotor) ||
+        (c.p2 && c.p2.id === id && c.p2.physicalMotor)
+      ));
+    }
+    function pointIsGround(id) {
+      return pointRefs(id).some(ref => isGroundPoint(ref.point));
+    }
+    function removeMotorAtPoint(id) {
+      comps.forEach(c => {
+        if (c.type !== 'bar' || !c.isInput || !c.p1 || !c.p2) return;
+        const isMotorEnd = (c.p1.id === id && c.p1.physicalMotor) || (c.p2.id === id && c.p2.physicalMotor);
+        if (!isMotorEnd) return;
+        c.isInput = false;
+        delete c.physicalMotor;
+        delete c.physical_motor;
+      });
+      pointRefs(id).forEach(ref => {
+        delete ref.point.physicalMotor;
+        delete ref.point.physical_motor;
+      });
+    }
+    function removeAnchorsAtPoint(id) {
+      comps = comps.filter(c => !(c.type === 'anchor' && c.p1 && c.p1.id === id));
+    }
+    function setPointType(id, type) {
+      pointRefs(id).forEach(ref => {
+        ref.point.type = type;
+        if (type !== 'fixed') {
+          delete ref.point.physicalMotor;
+          delete ref.point.physical_motor;
+        }
+      });
+    }
+    function roleLabel(id) {
+      if (pointHasMotor(id)) return '馬達';
+      if (pointIsGround(id)) return '地錨';
+      return '自由';
+    }
+    function updateRoleEditor() {
+      const editor = document.getElementById('roleEditor');
+      if (!editor) return;
+      if (!selectedNodeId || !hasPoint(selectedNodeId)) {
+        editor.style.display = 'none';
+        return;
+      }
+      document.getElementById('roleStatus').textContent = roleLabel(selectedNodeId);
+      editor.style.display = 'flex';
+    }
+    function setNodeRole(type) {
+      if (!selectedNodeId || !hasPoint(selectedNodeId)) return;
+      pause();
+      if (type === 'floating') removeMotorAtPoint(selectedNodeId);
+      if (type === 'fixed') removeMotorAtPoint(selectedNodeId);
+      if (type === 'fixed') freezePointAtDisplay(selectedNodeId);
+      setPointType(selectedNodeId, type);
+      if (type === 'floating') removeAnchorsAtPoint(selectedNodeId);
+      rebuild(); draw();
+    }
+    function removeNodeMotor() {
+      if (!selectedNodeId || !hasPoint(selectedNodeId)) return;
+      pause();
+      removeMotorAtPoint(selectedNodeId);
+      rebuild(); draw();
     }
     function findNearest(id) {
       const m = pointCoords();
@@ -466,6 +605,8 @@
       if (placingMotor) { e.stopPropagation(); handleMotorOnNode(id); return; }
       if (pickBars) return;
       pause();
+      selectedNodeId = id;
+      updateRoleEditor();
       dragId = id; snapTarget = null;
       try { svg.setPointerCapture(e.pointerId); } catch (_) {}
       draw();
@@ -523,6 +664,7 @@
       const did = dragId, tgt = snapTarget;
       dragId = null; snapTarget = null;
       if (tgt) mergePoints(did, tgt);
+      if (tgt && selectedNodeId === did) selectedNodeId = tgt;
       recomputeLengths();
       rebuild(); draw();
     }
@@ -566,10 +708,13 @@
     // 點空白處（背景/地面線，未 stopPropagation）取消選取
     svg.addEventListener('pointerdown', () => {
       if (placingMotor || pickBars) { cancelMotorMode(); draw(); return; }
+      if (dragId || dragLinkId) return;
+      selectedNodeId = null;
+      updateRoleEditor();
       if (!dragId) deselectLink();
     });
 
-    window.blocks = { placeMotor, addAnchor, addLink, clearAll, togglePlay, setLen, changeLen, selectLink };
+    window.blocks = { placeMotor, addAnchor, addLink, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor };
     rebuild(); draw();
   </script>
 </body>
