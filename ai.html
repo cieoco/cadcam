@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>🤖 AI 生成機構 — Linkage</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #4d7fff 100%);
+      min-height: 100vh; padding: 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .main { background: rgba(255,255,255,0.96); border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1); padding: 28px; max-width: 980px; margin: 0 auto; }
+    .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+    .header h1 { margin: 0; font-size: 1.8em;
+      background: linear-gradient(45deg, #667eea, #4d7fff); -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent; background-clip: text; }
+    .header p { color: #666; margin: 6px 0 0; font-size: 0.92em; }
+    .home-btn { background: linear-gradient(45deg,#ff6b6b,#ee5a52); color:#fff; border:none;
+      padding:10px 18px; border-radius:22px; cursor:pointer; font-weight:bold; text-decoration:none; }
+    .section { background:#fff; border-radius:14px; box-shadow:0 8px 20px rgba(0,0,0,0.06); padding:18px; margin:14px 0; }
+    .section-title { font-size:1.05em; font-weight:600; border-bottom:2px solid #eee; padding-bottom:8px; margin-bottom:14px; }
+    label { display:block; font-size:0.86em; color:#555; margin-bottom:5px; font-weight:600; }
+    textarea, input[type=text], input[type=password] {
+      width:100%; padding:10px; border:1px solid #d8dde8; border-radius:8px;
+      font-family:inherit; font-size:0.92em; resize:vertical; }
+    textarea#promptInput { min-height:70px; }
+    textarea#jsonOutput { min-height:200px; font-family:'Consolas',monospace; font-size:0.82em; white-space:pre; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .row .grow { flex:1 1 200px; }
+    .btn { border:none; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:700; font-size:0.92em; }
+    .btn:hover { filter:brightness(1.05); }
+    .btn-primary { background:linear-gradient(45deg,#667eea,#4d7fff); color:#fff; }
+    .btn-secondary { background:#eef0f5; color:#333; }
+    .btn:disabled { opacity:0.5; cursor:not-allowed; }
+    .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+    .chip { background:#f1f3fb; color:#4252b8; padding:5px 10px; border-radius:16px; cursor:pointer;
+      font-size:0.8em; border:1px solid #dde2f3; }
+    .chip:hover { background:#e6e9fa; }
+    .mode-toggle { display:inline-flex; gap:2px; background:#eef0f5; padding:2px; border-radius:10px; }
+    .mode-opt { padding:4px 10px; border-radius:8px; cursor:pointer; font-size:0.8em; user-select:none; }
+    .mode-opt.active { background:#fff; box-shadow:0 2px 5px rgba(0,0,0,0.08); font-weight:700; }
+    .hint { font-size:0.76em; color:#888; margin-top:4px; }
+    .verdict { padding:12px 14px; border-radius:10px; font-weight:700; margin-bottom:10px; }
+    .v-pass { background:#e7f7ee; color:#1e7a3a; }
+    .v-warn { background:#fff5e6; color:#b76b00; }
+    .v-fail { background:#fde8ea; color:#b3261e; }
+    .issues { list-style:none; padding:0; margin:0; font-weight:400; font-size:0.85em; }
+    .issues li { padding:6px 0; border-top:1px dashed #eee; }
+    .issues code { background:#f4f4f8; padding:1px 5px; border-radius:4px; }
+    #previewWrap { background:#fafbff; border:1px solid #e6e9f2; border-radius:10px; }
+    #previewSvg { width:100%; height:380px; display:block; }
+    .slider-row { display:flex; align-items:center; gap:10px; margin-top:10px; }
+    .slider-row input[type=range] { flex:1; }
+    #log { font-family:'Consolas',monospace; font-size:0.78em; color:#444; max-height:140px; overflow-y:auto; white-space:pre-wrap; }
+  </style>
+</head>
+<body>
+  <div class="main">
+    <div class="header">
+      <div>
+        <h1>🤖 AI 生成機構</h1>
+        <p>用一句話描述需求 → AI 產生機構 JSON → 自動驗收 → 畫出來</p>
+      </div>
+      <a class="home-btn" href="mechanism.html">🏠 回機構工具</a>
+    </div>
+
+    <!-- 設定 -->
+    <div class="section">
+      <div class="section-title">⚙️ Azure OpenAI 設定</div>
+      <div class="row" style="margin-bottom:10px;">
+        <div class="grow">
+          <label for="endpoint">Endpoint</label>
+          <input type="text" id="endpoint" placeholder="https://你的資源.openai.azure.com/" autocomplete="off" />
+        </div>
+        <div class="grow">
+          <label for="deployment">Deployment 名稱</label>
+          <input type="text" id="deployment" placeholder="例如 gpt-4o" autocomplete="off" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="grow">
+          <label for="apiKey">API Key</label>
+          <input type="password" id="apiKey" placeholder="你的 Azure OpenAI API Key" autocomplete="off" />
+          <div class="hint">只存在瀏覽器 localStorage,不會上傳到任何伺服器</div>
+        </div>
+        <div>
+          <label>來源</label>
+          <div class="mode-toggle" id="sourceToggle">
+            <div class="mode-opt active" data-source="azure" onclick="setSource('azure')">Azure</div>
+            <div class="mode-opt" data-source="mock" onclick="setSource('mock')">Mock(離線)</div>
+          </div>
+          <div class="hint">未填 key 可先用 Mock 試流程</div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px; justify-content:space-between;">
+        <label style="display:flex; align-items:center; gap:6px; margin:0; cursor:pointer;">
+          <input type="checkbox" id="autofix" checked /> 生壞時自動把錯誤回灌給 AI 重生(最多 2 次)
+        </label>
+        <button class="btn btn-secondary" onclick="clearKey()">🧹 清除已存金鑰</button>
+      </div>
+    </div>
+
+    <!-- 需求 -->
+    <div class="section">
+      <div class="section-title">📝 你想要什麼機構?</div>
+      <textarea id="promptInput" placeholder="例如:一個把旋轉變成直線往復的機構"></textarea>
+      <div class="chips">
+        <span class="chip" onclick="setPrompt('一個四連桿,輸入桿轉動時讓輸出端畫出弧線')">四連桿擺動</span>
+        <span class="chip" onclick="setPrompt('把旋轉變成直線往復的曲柄滑塊')">曲柄滑塊</span>
+        <span class="chip" onclick="setPrompt('一個夾爪,曲柄帶動讓兩側開合')">夾爪</span>
+        <span class="chip" onclick="setPrompt('平行四連桿,讓輸出桿保持水平平移')">平行四連桿</span>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <button id="genBtn" class="btn btn-primary" onclick="generate()">🪄 產生機構</button>
+        <span id="genStatus" class="hint"></span>
+      </div>
+    </div>
+
+    <!-- 結果:驗收 + 預覽 -->
+    <div class="section">
+      <div class="section-title">🔎 驗收結果</div>
+      <div id="verdict" class="verdict" style="display:none;"></div>
+      <ul id="issues" class="issues"></ul>
+    </div>
+
+    <div class="section">
+      <div class="section-title">🖼️ 機構預覽</div>
+      <div id="previewWrap">
+        <svg id="previewSvg" viewBox="0 0 800 380" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+      <div class="slider-row">
+        <span class="hint">驅動角 θ</span>
+        <input type="range" id="thetaSlider" min="-180" max="180" value="0" step="1" />
+        <span id="thetaVal" class="hint" style="width:48px; text-align:right;">0°</span>
+      </div>
+    </div>
+
+    <!-- JSON -->
+    <div class="section">
+      <div class="section-title">📦 機構 JSON</div>
+      <textarea id="jsonOutput" placeholder="AI 產生的 JSON 會出現在這裡,可手動修改後按「重新驗收」"></textarea>
+      <div class="row" style="margin-top:12px;">
+        <button class="btn btn-secondary" onclick="revalidate()">✓ 重新驗收</button>
+        <button class="btn btn-secondary" onclick="copyJson()">📋 複製</button>
+        <button class="btn btn-secondary" onclick="downloadJson()">💾 下載 .json</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">📜 紀錄</div>
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { validateMechanismJSON } from './js/core/validation/validate-mechanism.js';
+    import { solveTopology } from './js/multilink/solver.js';
+
+    // ---------- 常數 ----------
+    const LS = { endpoint:'cadcam.ai.endpoint', key:'cadcam.ai.key', deployment:'cadcam.ai.deployment', source:'cadcam.ai.source' };
+    const AZURE_API_VERSION = '2024-08-01-preview';
+
+    const SYSTEM_PROMPT = `你是 cadcam(linkage 閉環機構工具)的機構生成器。
+把使用者的自然語言需求,轉成一份「機構 JSON」。
+
+# 嚴格規則
+1. 只輸出 JSON,不要 markdown、不要解釋文字。
+2. 頂層格式必須是: {"params":{...},"steps":[...],"tracePoint":"<id>"}
+3. 單位 mm、角度為度。params 必須包含 theta(驅動角,通常 0~30)。
+4. steps 至少要有一個 type 為 "ground" 的固定點。
+5. 每個 step 有唯一 id 與 type。step 用 id 互相參照,被參照的點要先出現。
+6. steps 裡的長度用 *_param 欄位填「參數名字」,實際數值放在 params。
+7. 選能閉合的桿長:dyad 的兩半徑「和」要大於兩端點距離、「差」要小於距離,否則機構卡死。
+
+# 可用的 step type
+- ground: 固定點。{"id","type":"ground","x","y"};或相對定位用 dist_param+ref_id+ux,uy。
+- input_crank: 馬達曲柄。{"id","type":"input_crank","center":<id>,"len_param":<名>,"physical_motor":"1","phase_offset":0}
+- dyad: 兩圓交點(最常用的連動點)。{"id","type":"dyad","p1":<id>,"p2":<id>,"r1_param":<名>,"r2_param":<名>,"sign":1}
+- rigid_triangle: 兩點+三邊定第三點。{"id","type":"rigid_triangle","p1","p2","r1_param","r2_param","g_param"(選),"sign"}
+- slider: 線與圓交點(滑塊落在軌道上,交點須落在 line_p1~line_p2 線段內,軌道要夠長)。{"id","type":"slider","p1":<id>,"r_param":<名>,"line_p1":<id>,"line_p2":<id>,"sign":1}
+- input_linear: 線性致動器。{"id","type":"input_linear","p1":<id>,"len_param":<名>,"ux":1,"uy":0}
+- point_on_link: 桿上一點。{"id","type":"point_on_link","p1","p2","dist_param"}
+- joint: 靜態點。{"id","type":"joint","x","y"}
+
+# 範例一:四連桿
+{"params":{"theta":30,"Lc":40,"Lcoup":90,"Lout":70},
+ "steps":[
+  {"id":"O2","type":"ground","x":0,"y":0},
+  {"id":"O4","type":"ground","x":120,"y":0},
+  {"id":"A","type":"input_crank","center":"O2","len_param":"Lc","physical_motor":"1"},
+  {"id":"B","type":"dyad","p1":"A","p2":"O4","r1_param":"Lcoup","r2_param":"Lout"}],
+ "tracePoint":"B"}
+
+# 範例二:曲柄滑塊(旋轉變直線往復)
+{"params":{"theta":0,"Lc":30,"Lrod":150},
+ "steps":[
+  {"id":"O2","type":"ground","x":0,"y":0},
+  {"id":"T1","type":"ground","x":40,"y":0},
+  {"id":"T2","type":"ground","x":260,"y":0},
+  {"id":"A","type":"input_crank","center":"O2","len_param":"Lc","physical_motor":"1"},
+  {"id":"S","type":"slider","p1":"A","r_param":"Lrod","line_p1":"T1","line_p2":"T2","sign":1}],
+ "tracePoint":"S"}
+
+需求不合理或無法表達時,回 {"params":{"theta":30},"steps":[],"tracePoint":""}。`;
+
+    // ---------- 狀態 ----------
+    let source = localStorage.getItem(LS.source) || 'azure';
+    let currentTopo = null;   // 目前解析後的機構物件
+
+    // ---------- 初始化 ----------
+    window.addEventListener('load', () => {
+      document.getElementById('endpoint').value   = localStorage.getItem(LS.endpoint)   || '';
+      document.getElementById('apiKey').value      = localStorage.getItem(LS.key)        || '';
+      document.getElementById('deployment').value  = localStorage.getItem(LS.deployment) || '';
+      bindSave('endpoint', LS.endpoint);
+      bindSave('apiKey', LS.key);
+      bindSave('deployment', LS.deployment);
+      setSource(source);
+      document.getElementById('thetaSlider').addEventListener('input', onTheta);
+      log('頁面就緒');
+    });
+
+    function bindSave(id, lsKey) {
+      document.getElementById(id).addEventListener('input', e => localStorage.setItem(lsKey, e.target.value.trim()));
+    }
+
+    window.setSource = (s) => {
+      source = s; localStorage.setItem(LS.source, s);
+      document.querySelectorAll('#sourceToggle .mode-opt').forEach(el => el.classList.toggle('active', el.dataset.source === s));
+    };
+    window.setPrompt = (t) => { document.getElementById('promptInput').value = t; };
+
+    // 清除 localStorage 裡的金鑰(公用電腦用完可一鍵清掉)
+    window.clearKey = () => {
+      localStorage.removeItem(LS.key);
+      document.getElementById('apiKey').value = '';
+      setGen('已清除瀏覽器中儲存的金鑰', '#1e7a3a');
+      log('已清除已存金鑰');
+    };
+
+    // ---------- 產生 ----------
+    window.generate = async function () {
+      const prompt = document.getElementById('promptInput').value.trim();
+      if (!prompt) { setGen('請先輸入需求', '#b76b00'); return; }
+      const btn = document.getElementById('genBtn');
+      btn.disabled = true; setGen('產生中…', '#3949ab');
+
+      try {
+        const maxRetries = document.getElementById('autofix').checked ? 2 : 0;
+        let messages = [
+          { role:'system', content: SYSTEM_PROMPT },
+          { role:'user',   content: prompt }
+        ];
+        let prog, result, attempt = 0;
+
+        while (true) {
+          ({ prog } = source === 'mock' ? mockGenerate(prompt, messages) : await azureGenerate(messages));
+          setOutput(prog);
+          result = validateMechanismJSON(prog);
+          renderVerdict(result);
+          renderPreview(prog);
+          log(`第 ${attempt + 1} 次:${result.status.toUpperCase()} (${result.counts.fail} fail / ${result.counts.warn} warn)`);
+
+          if (result.status !== 'fail' || attempt >= maxRetries) break;
+
+          // 回灌錯誤,請 AI 修正
+          attempt++;
+          const fails = result.issues.filter(i => i.status === 'fail')
+            .map(i => `- [${i.code}] ${i.message}`).join('\n');
+          messages.push({ role:'assistant', content: JSON.stringify(prog) });
+          messages.push({ role:'user', content: `驗收員回報以下 FAIL,請修正後只輸出修正過的完整 JSON:\n${fails}` });
+          setGen(`生壞了,自動請 AI 修正(第 ${attempt} 次)…`, '#b76b00');
+        }
+
+        const tag = source === 'mock' ? 'Mock' : 'Azure';
+        if (result.status === 'pass')      setGen(`✅ 產生成功 (${tag})`, '#1e7a3a');
+        else if (result.status === 'warn') setGen(`⚠️ 可用但有提醒 (${tag})`, '#b76b00');
+        else                               setGen(`❌ 仍無法產生可用機構 (${tag})`, '#b3261e');
+      } catch (err) {
+        setGen('產生失敗:' + err.message, '#b3261e');
+        log('!! ' + err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    async function azureGenerate(messages) {
+      const endpoint   = document.getElementById('endpoint').value.trim().replace(/\/$/, '');
+      const apiKey     = document.getElementById('apiKey').value.trim();
+      const deployment = document.getElementById('deployment').value.trim();
+      if (!endpoint || !apiKey || !deployment) throw new Error('請先填 Azure 設定(Endpoint / Deployment / Key)');
+
+      const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${AZURE_API_VERSION}`;
+      const resp = await fetch(url, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'api-key':apiKey },
+        body: JSON.stringify({ messages, temperature:0.2, response_format:{ type:'json_object' } })
+      });
+      if (!resp.ok) {
+        const e = await resp.json().catch(() => ({}));
+        throw new Error(`Azure API ${resp.status}: ${e.error?.message || resp.statusText}`);
+      }
+      const data = await resp.json();
+      const text = data.choices?.[0]?.message?.content || '';
+      return { prog: JSON.parse(text) };
+    }
+
+    // ---------- Mock(離線示範)----------
+    function mockGenerate(prompt) {
+      const p = prompt.toLowerCase();
+      const slider = /滑|直線|往復|slider|linear/.test(p);
+      const prog = slider ? {
+        params:{ theta:0, Lc:30, Lrod:150 },
+        steps:[
+          { id:'O2', type:'ground', x:0, y:0 },
+          { id:'T1', type:'ground', x:40, y:0 },
+          { id:'T2', type:'ground', x:260, y:0 },
+          { id:'A',  type:'input_crank', center:'O2', len_param:'Lc', physical_motor:'1' },
+          { id:'S',  type:'slider', p1:'A', r_param:'Lrod', line_p1:'T1', line_p2:'T2', sign:1 }
+        ], tracePoint:'S'
+      } : {
+        params:{ theta:30, Lc:40, Lcoup:90, Lout:70 },
+        steps:[
+          { id:'O2', type:'ground', x:0, y:0 },
+          { id:'O4', type:'ground', x:120, y:0 },
+          { id:'A',  type:'input_crank', center:'O2', len_param:'Lc', physical_motor:'1' },
+          { id:'B',  type:'dyad', p1:'A', p2:'O4', r1_param:'Lcoup', r2_param:'Lout' }
+        ], tracePoint:'B'
+      };
+      return { prog };
+    }
+
+    // ---------- 驗收顯示 ----------
+    function renderVerdict(result) {
+      const v = document.getElementById('verdict');
+      v.style.display = 'block';
+      v.className = 'verdict ' + (result.status === 'pass' ? 'v-pass' : result.status === 'warn' ? 'v-warn' : 'v-fail');
+      const label = result.status === 'pass' ? '✅ 這個機構可用' : result.status === 'warn' ? '⚠️ 可用,但有提醒' : '❌ 這個機構不能用';
+      v.textContent = `${label}　(fail ${result.counts.fail} / warn ${result.counts.warn})`;
+
+      const ul = document.getElementById('issues');
+      ul.innerHTML = '';
+      result.issues.forEach(i => {
+        const li = document.createElement('li');
+        const icon = i.status === 'fail' ? '❌' : i.status === 'warn' ? '⚠️' : '✓';
+        li.innerHTML = `${icon} <code>${i.code}</code> ${i.message}${i.suggestion ? `<br/><span class="hint">建議:${i.suggestion}</span>` : ''}`;
+        ul.appendChild(li);
+      });
+    }
+
+    window.revalidate = function () {
+      const txt = document.getElementById('jsonOutput').value;
+      const result = validateMechanismJSON(txt);
+      renderVerdict(result);
+      try { renderPreview(JSON.parse(txt)); } catch (_) {}
+      log('重新驗收:' + result.status.toUpperCase());
+    };
+
+    // ---------- 預覽(用 solver 算 + SVG 畫)----------
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+
+    function parentSegments(topo) {
+      const segs = [];
+      (topo.steps || []).forEach(s => {
+        if (s.type === 'input_crank' && s.center) segs.push([s.center, s.id, 'crank']);
+        else if (s.type === 'dyad' || s.type === 'rigid_triangle') {
+          if (s.p1) segs.push([s.p1, s.id, 'link']);
+          if (s.p2) segs.push([s.p2, s.id, 'link']);
+        }
+        else if (s.type === 'slider') {
+          if (s.p1) segs.push([s.p1, s.id, 'link']);
+          if (s.line_p1 && s.line_p2) segs.push([s.line_p1, s.line_p2, 'track']);
+        }
+        else if (s.type === 'input_linear' && s.p1) segs.push([s.p1, s.id, 'crank']);
+        else if (s.type === 'point_on_link' && s.p1) segs.push([s.p1, s.id, 'link']);
+      });
+      return segs;
+    }
+
+    function renderPreview(topo) {
+      currentTopo = (topo && typeof topo === 'object') ? topo : null;
+      const slider = document.getElementById('thetaSlider');
+      const baseTheta = currentTopo && currentTopo.params && currentTopo.params.theta != null ? Number(currentTopo.params.theta) : 0;
+      slider.value = baseTheta;
+      document.getElementById('thetaVal').textContent = Math.round(baseTheta) + '°';
+      drawAt(baseTheta);
+    }
+
+    function onTheta(e) {
+      const t = Number(e.target.value);
+      document.getElementById('thetaVal').textContent = t + '°';
+      drawAt(t);
+    }
+
+    function drawAt(thetaDeg) {
+      const svg = document.getElementById('previewSvg');
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      if (!currentTopo || !Array.isArray(currentTopo.steps) || currentTopo.steps.length === 0) return;
+
+      let sol;
+      try { sol = solveTopology(currentTopo, { thetaDeg }); } catch (_) { sol = null; }
+      if (!sol || !sol.points) return;
+      const pts = sol.points;
+      const ids = Object.keys(pts).filter(id => pts[id] && Number.isFinite(pts[id].x));
+      if (!ids.length) return;
+
+      // 邊界 + 縮放(Y 反向)
+      const W = 800, H = 380, pad = 40;
+      let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+      ids.forEach(id => { const p=pts[id]; minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); });
+      const spanX = Math.max(1, maxX-minX), spanY = Math.max(1, maxY-minY);
+      const scale = Math.min((W-2*pad)/spanX, (H-2*pad)/spanY);
+      const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+      const TX = x => W/2 + (x-cx)*scale;
+      const TY = y => H/2 - (y-cy)*scale;
+
+      const groundIds = new Set((currentTopo.steps||[]).filter(s=>s.type==='ground').map(s=>s.id));
+      const styleOf = { crank:{stroke:'#e74c3c',w:4}, link:{stroke:'#3498db',w:4}, track:{stroke:'#8e44ad',w:2,dash:'6,5'} };
+
+      // 桿件
+      parentSegments(currentTopo).forEach(([a,b,kind]) => {
+        if (!pts[a] || !pts[b]) return;
+        const st = styleOf[kind] || styleOf.link;
+        const line = document.createElementNS(SVG_NS,'line');
+        line.setAttribute('x1',TX(pts[a].x)); line.setAttribute('y1',TY(pts[a].y));
+        line.setAttribute('x2',TX(pts[b].x)); line.setAttribute('y2',TY(pts[b].y));
+        line.setAttribute('stroke',st.stroke); line.setAttribute('stroke-width',st.w);
+        line.setAttribute('stroke-linecap','round');
+        if (st.dash) line.setAttribute('stroke-dasharray',st.dash);
+        svg.appendChild(line);
+      });
+
+      // 節點
+      ids.forEach(id => {
+        const p = pts[id];
+        const isGround = groundIds.has(id);
+        const isTrace = id === currentTopo.tracePoint;
+        const node = document.createElementNS(SVG_NS, isGround ? 'rect' : 'circle');
+        if (isGround) {
+          node.setAttribute('x',TX(p.x)-5); node.setAttribute('y',TY(p.y)-5);
+          node.setAttribute('width',10); node.setAttribute('height',10); node.setAttribute('fill','#333');
+        } else {
+          node.setAttribute('cx',TX(p.x)); node.setAttribute('cy',TY(p.y));
+          node.setAttribute('r', isTrace ? 6 : 4);
+          node.setAttribute('fill', isTrace ? '#e74c3c' : '#2c3e50');
+        }
+        svg.appendChild(node);
+        const label = document.createElementNS(SVG_NS,'text');
+        label.setAttribute('x',TX(p.x)+8); label.setAttribute('y',TY(p.y)-8);
+        label.setAttribute('font-size','12'); label.setAttribute('fill','#666');
+        label.textContent = id;
+        svg.appendChild(label);
+      });
+    }
+
+    // ---------- JSON 工具 ----------
+    function setOutput(prog) { document.getElementById('jsonOutput').value = JSON.stringify(prog, null, 2); }
+    window.copyJson = function () {
+      const ta = document.getElementById('jsonOutput'); ta.select();
+      navigator.clipboard.writeText(ta.value).then(() => log('已複製')).catch(() => document.execCommand('copy'));
+    };
+    window.downloadJson = function () {
+      const blob = new Blob([document.getElementById('jsonOutput').value], { type:'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'mechanism.json'; a.click();
+      URL.revokeObjectURL(a.href); log('已下載 mechanism.json');
+    };
+
+    // ---------- helpers ----------
+    function setGen(text, color) { const el=document.getElementById('genStatus'); el.textContent=text; el.style.color=color||'#666'; }
+    function log(msg) { const el=document.getElementById('log'); el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + el.textContent; }
+  </script>
+</body>
+</html>
