@@ -4,7 +4,7 @@
  */
 
 import { getMechanismFromURL, generateParameterHTML, MECHANISMS } from './mechanism-config.js?v=20240427_01';
-import { setupUIHandlers, updatePreview } from './ui/controls.js?v=debug_2';
+import { setupUIHandlers, updatePreview, applyShareFromHash } from './ui/controls.js?v=debug_2';
 import { downloadText, downloadZip, log, calcAdaptiveGridStep } from './utils.js';
 import { MechanismWizard } from './ui/wizard.js?v=debug_1';
 import { RemoteSync } from './remote-sync.js?v=debug_4';
@@ -321,6 +321,13 @@ async function initMechanismPage() {
 
     if (window.DEBUG_MECH) {
       console.log('Mechanism modules loaded successfully');
+    }
+
+    // 若 URL hash 帶有分享資料，安全還原並套用（須在模組與 wizard 初始化之後）
+    try {
+      applyShareFromHash();
+    } catch (e) {
+      console.warn('Failed to apply shared mechanism from URL:', e);
     }
 
     // 🌟 核心修正：主動觸發第一次預覽繪圖，確保畫面不留白

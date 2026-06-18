@@ -11,6 +11,8 @@ import { renderPartsLayout, renderPartsOverlayLayer } from '../parts/renderer.js
 import { computeEnginePreview, computeEngineSweep, computeEngineExport, clampEngineParam } from '../core/mechanism-engine.js';
 import { collectDynamicParamSpec } from '../core/dynamic-params.js';
 import { renderDiagnosticsPanel } from './diagnostics/panel.js';
+import { encodeSnapshot, decodeShareString } from '../share-codec.js?v=20260619';
+import { validateMechanismJSON } from '../core/validation/validate-mechanism.js?v=20260619';
 
 // 全域狀態資料
 let currentTrajectoryData = null;
@@ -510,6 +512,69 @@ function handleOpenSnapshot(file) {
         log('Load failed: Unable to read file.');
     };
     reader.readAsText(file);
+}
+
+// ── 分享網址（一條連結 = 一份存檔，純前端、無伺服器）─────────────
+const SHARE_HASH_KEY = 'm';
+
+function buildShareUrl() {
+    const snapshot = buildSnapshot();
+    const encoded = encodeSnapshot(snapshot);
+    // 保留現有 ?type=，讓對方開連結時載入同一種機構；資料放在 #hash（不會送到伺服器）
+    const base = `${location.origin}${location.pathname}${location.search}`;
+    return `${base}#${SHARE_HASH_KEY}=${encoded}`;
+}
+
+async function copyShareUrl() {
+    let url;
+    try {
+        url = buildShareUrl();
+    } catch (e) {
+        log(`產生分享連結失敗：${e.message}`);
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(url);
+        log('已複製分享連結，貼給別人就能打開這個機構。');
+    } catch (e) {
+        // 沒有 clipboard 權限時，退而求其次讓使用者手動複製
+        window.prompt('複製這條分享連結：', url);
+    }
+}
+
+/**
+ * 開頁時若 URL hash 帶有分享資料，安全還原並套用。
+ * @returns {boolean} 是否有套用分享資料
+ */
+export function applyShareFromHash() {
+    const hash = location.hash || '';
+    const m = hash.match(/[#&]m=([^&]+)/);
+    if (!m) return false;
+
+    let snapshot;
+    try {
+        snapshot = decodeShareString(m[1]); // 解碼 + 安全閘（含字元白名單）
+    } catch (e) {
+        log(`分享連結無法開啟：${e.message}`);
+        return false;
+    }
+
+    // 友善檢核：若帶有 multilink topology，先用驗收員看看是否可用（不擋載入，只提示）
+    try {
+        const topo = snapshot && snapshot.data && snapshot.data.mech
+            ? snapshot.data.mech.topology
+            : null;
+        if (topo) {
+            const result = validateMechanismJSON(topo);
+            if (result.status === 'fail') {
+                log(`分享的機構檢核未過（${result.counts.fail} 項問題），仍嘗試載入供你修改。`);
+            }
+        }
+    } catch (_) { /* 檢核失敗不影響載入 */ }
+
+    applySnapshot(snapshot);
+    log('已從分享連結載入機構。');
+    return true;
 }
 
 /**
@@ -1145,6 +1210,11 @@ export function setupUIHandlers() {
     const btnSaveConfig = $("btnSaveConfig");
     if (btnSaveConfig) {
         btnSaveConfig.onclick = downloadSnapshot;
+    }
+
+    const btnShareConfig = $("btnShareConfig");
+    if (btnShareConfig) {
+        btnShareConfig.onclick = copyShareUrl;
     }
 
     const btnPlay = $("btnPlayAnim");
