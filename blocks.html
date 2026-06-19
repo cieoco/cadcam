@@ -161,12 +161,27 @@
     let theta = 0, raf = null, counter = 0;
     let dragId = null, dragLinkId = null, dragLastWorld = null, snapTarget = null, selectedLinkId = null, selectedNodeId = null;
     let placingMotor = false, pickBars = null;
+    let lastSolved = {};           // 上一幀求解成功的點位：給求解器挑「連續」分支 + 死點暫態回退
+    let prevSolved = {};           // 再上一幀：和 lastSolved 一起外插出「帶動量」的預測種子
     const SNAP_WORLD = 18 / SCALE; // 吸附門檻（世界座標 mm）
     const LINK_DEFAULT_LEN = 90;   // 連桿預設長度
+
+    // 用「上一點 + 速度」外插出預測位置當求解種子：靠動量挑連續分支，
+    // 平行四邊形過共線點時才不會翻成交叉四邊形（單純取最近解會挑錯邊）。
+    function extrapolateSeed(last, prev) {
+      const seed = {};
+      for (const id in last) {
+        const a = last[id], b = prev[id];
+        seed[id] = (b && Number.isFinite(b.x)) ? { x: 2 * a.x - b.x, y: 2 * a.y - b.y } : a;
+      }
+      return seed;
+    }
 
     function rebuild() {
       compiled = compileTopology(comps, topo, new Set());
       topo.params = compiled.params; // 沿用補齊後的參數
+      lastSolved = {};               // 拓撲變了：丟掉舊解，避免拿到不相干的種子
+      prevSolved = {};
       document.getElementById('hint').style.display = comps.length ? 'none' : 'block';
       updateRoleEditor();
     }
@@ -180,11 +195,20 @@
       }
 
       let sol = null;
-      try { sol = solveTopology(compiled, { thetaDeg: theta }); } catch (_) {}
-      // 合併位置：先用元件座標打底（未被解出的靜態點才畫得出來、拖得動），求解結果再覆蓋
+      // 帶「外插（上一幀＋速度）」的預測當種子：靠動量挑連續分支，平行四邊形不會翻成交叉。
+      const seed = extrapolateSeed(lastSolved, prevSolved);
+      try { sol = solveTopology(compiled, { thetaDeg: theta, _prevPoints: seed }); } catch (_) {}
       const solved = (sol && sol.points) ? sol.points : {};
+      // 位移歷史往前推一格：這幀沒解出來的點沿用上一幀的舊值（桿件就不會憑空消失）
+      const newLast = { ...lastSolved };
+      Object.keys(solved).forEach(id => {
+        if (Number.isFinite(solved[id].x) && Number.isFinite(solved[id].y)) newLast[id] = solved[id];
+      });
+      prevSolved = lastSolved;
+      lastSolved = newLast;
+      // 合併位置：先用元件座標打底（未被解出的靜態點才畫得出來、拖得動），再用 lastSolved 覆蓋。
       const pts = pointCoords();
-      Object.keys(solved).forEach(id => { if (Number.isFinite(solved[id].x)) pts[id] = solved[id]; });
+      Object.keys(lastSolved).forEach(id => { if (Number.isFinite(lastSolved[id].x)) pts[id] = lastSolved[id]; });
 
       const groundIds = new Set((compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
       const motorCenterIds = new Set((compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
@@ -302,14 +326,80 @@
       rebuild(); draw();
     }
 
+    const norm360 = deg => ((deg % 360) + 360) % 360;
+
     // ---- 播放 ----
+    const PLAY_STEP = 2;       // 每幀轉幾度
+    let playDir = 1;           // 目前轉動方向
+    let playPlan = { mode: 'rotate' }; // 'rotate'=整圈轉；{mode:'rock',lo,hi}=在極限間來回擺
+
+    // 從目前姿勢沿著「同一組裝態」往單一方向走，走到「無解」或「接點瞬移過大」為止。
+    // 瞬移過大＝求解器被迫跳到另一組鏡像裝態（桿件會看起來塌掉），那就是這個方向的真正極限。
+    function walkBranch(dir) {
+      const ids = new Set();
+      (compiled.visualization.links || []).forEach(l => { if (!l.hidden) { ids.add(l.p1); ids.add(l.p2); } });
+      const lens = (compiled.visualization.links || [])
+        .filter(l => !l.hidden && l.lenParam).map(l => Math.abs(topo.params[l.lenParam]) || 0);
+      const jumpTol = 0.25 * Math.max(60, ...lens); // 單步位移超過此值＝跳裝態＝到極限
+      const solveAt = (deg, seed) => {
+        let s = null;
+        try { s = solveTopology(compiled, { thetaDeg: norm360(deg), _prevPoints: seed }); } catch (_) {}
+        return s;
+      };
+      const maxDisp = (seed, pts) => {
+        let m = 0;
+        for (const id of ids) {
+          const a = seed[id], b = pts && pts[id];
+          if (a && b && Number.isFinite(b.x)) { const d = Math.hypot(b.x - a.x, b.y - a.y); if (d > m) m = d; }
+        }
+        return m;
+      };
+      const s0 = solveAt(theta, lastSolved);
+      let cur = (s0 && s0.points) ? { ...s0.points } : {};
+      let before = {};                 // 用來外插的「再前一格」
+      let last = theta;
+      const steps = Math.round(360 / PLAY_STEP);
+      for (let k = 1; k <= steps; k++) {
+        const th = theta + dir * PLAY_STEP * k;
+        const s = solveAt(th, extrapolateSeed(cur, before)); // 帶動量預測，分支判斷才一致
+        if (!s || s.isValid === false || !s.points) return { full: false, limit: last };
+        if (maxDisp(cur, s.points) > jumpTol) return { full: false, limit: last };
+        before = cur;
+        cur = { ...cur, ...s.points };
+        last = th;
+      }
+      return { full: true };           // 繞一整圈都沒斷 = 可整圈轉
+    }
+
+    // 開始播放前先規劃這個機構是「整圈轉」還是「來回擺」、以及來回擺的兩端在哪。
+    function planMotion() {
+      const fwd = walkBranch(1);
+      const bwd = walkBranch(-1);
+      if (fwd.full || bwd.full || (fwd.limit - bwd.limit) >= 360 - PLAY_STEP) {
+        return { mode: 'rotate' };
+      }
+      return { mode: 'rock', lo: bwd.limit, hi: fwd.limit };
+    }
+
     function play() {
       if (raf) return;
       document.getElementById('playBtn').classList.add('playing');
       document.getElementById('playBtn').textContent = '⏸';
+      playPlan = planMotion();
+      if (playPlan.mode === 'rock' && playDir > 0 && theta >= playPlan.hi) playDir = -1;
+      if (playPlan.mode === 'rock' && playDir < 0 && theta <= playPlan.lo) playDir = 1;
       const step = () => {
-        theta = (theta + 2) % 360;
-        document.getElementById('thetaVal').textContent = Math.round(theta);
+        if (playPlan.mode === 'rock') {
+          // 搖桿：在 lo..hi 間來回擺，到極限就反向（真實的搖桿物理）
+          let next = theta + PLAY_STEP * playDir;
+          if (next > playPlan.hi) { playDir = -1; next = theta + PLAY_STEP * playDir; }
+          else if (next < playPlan.lo) { playDir = 1; next = theta + PLAY_STEP * playDir; }
+          theta = next;
+        } else {
+          // 曲柄／平行四邊形：順向整圈轉
+          theta = theta + PLAY_STEP * playDir;
+        }
+        document.getElementById('thetaVal').textContent = Math.round(norm360(theta));
         draw();
         raf = requestAnimationFrame(step);
       };
@@ -408,6 +498,10 @@
         return;
       }
       freezePointAtDisplay(nodeId);
+      // 讓馬達「從現在這個姿勢」開始轉：把曲柄目前的角度記成相位偏移。
+      // 否則 input 會把曲柄瞬間轉到絕對角度 0，曲柄端點被甩到別處、整個四連桿當場塌掉。
+      const angDeg = Math.atan2(bar.p2.y - bar.p1.y, bar.p2.x - bar.p1.x) * 180 / Math.PI;
+      bar.phaseOffset = angDeg - theta;
       bar[key].type = 'fixed';
       bar[key].physicalMotor = '1';
       bar.isInput = true;
