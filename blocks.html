@@ -278,6 +278,22 @@
           });
         }
         svg.appendChild(stick);
+
+        // 在兩端冰棒棍頭上鑽孔：與外形同色的細圈，讓它看起來像真的打孔的扁棍。
+        // 地錨（方塊）本身就是固定銷，不畫孔。
+        const holeR = HULL_R_WORLD * SCALE * 0.72;
+        [[a, l.p1], [b, l.p2]].forEach(([pt, pid]) => {
+          if (groundIds.has(pid)) return;
+          const hole = document.createElementNS(SVG_NS, 'circle');
+          hole.setAttribute('cx', TX(pt.x)); hole.setAttribute('cy', TY(pt.y));
+          hole.setAttribute('r', holeR);
+          hole.setAttribute('fill', 'none');
+          hole.setAttribute('stroke', stroke);
+          hole.setAttribute('stroke-width', 1.5);
+          hole.setAttribute('stroke-opacity', 0.7);
+          hole.style.pointerEvents = 'none'; // 不擋下面桿身/上面節點的互動
+          svg.appendChild(hole);
+        });
       });
       updateSolveBanner(sol, missingVisibleLinks);
 
