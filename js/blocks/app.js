@@ -39,6 +39,8 @@ let compiled = null;
 let theta = 0, raf = null, counter = 0;
 let dragId = null, dragLinkId = null, dragLastWorld = null, snapTarget = null, selectedLinkId = null, selectedNodeId = null;
 let placingMotor = false, pickBars = null;
+// 畫桿模式（像 Word 畫表格：點工具後在畫面拖曳拉出連桿）
+let drawingLink = false, drawActive = false, drawStart = null, drawPreview = null, drawStartNodeId = null;
 let lastSolved = {};           // 上一幀求解成功的點位：給求解器挑「連續」分支 + 死點暫態回退
 let prevSolved = {};           // 再上一幀：和 lastSolved 一起外插出「帶動量」的預測種子
 
@@ -136,6 +138,7 @@ function draw() {
   drawGround();
   if (!compiled || !comps.length) {
     updateSolveBanner(null, 0);
+    drawDrawPreview();   // 空畫布也要顯示正在拉出的第一根連桿
     return;
   }
 
@@ -188,6 +191,7 @@ function draw() {
       stick.setAttribute('data-link-id', l.id);
       stick.style.cursor = 'pointer';
       stick.addEventListener('pointerdown', (e) => {
+        if (drawingLink) return; // 畫桿模式：不攔截，讓 svg 起點處理（可從桿上開始畫並吸附）
         e.stopPropagation();
         if (pickBars) { tryPickBar(l.id); return; }
         if (startFreeLinkDrag(e, l.id)) return;
@@ -249,6 +253,8 @@ function draw() {
     svg.appendChild(node);
   });
 
+  drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
+
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
   lastModelInputs = { links: linksToDraw, pts, groundIds };
   if (view3DActive) push3D();
@@ -305,6 +311,7 @@ function drawGround() {
 function addAnchor() {
   pushUndo();
   const n = ++counter;
+  exitDrawLink();
   cancelMotorMode();
   comps.push({ type: 'anchor', id: 'Anchor' + n, p1: { id: 'A' + n, type: 'fixed', x: -110, y: 0 } });
   rebuild(); draw();
@@ -316,6 +323,7 @@ function clearAll() {
   comps = []; theta = 0; counter = 0;
   selectedLinkId = null;
   selectedNodeId = null;
+  exitDrawLink();
   cancelMotorMode();
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('roleEditor').style.display = 'none';
@@ -379,6 +387,95 @@ function addLink() {
   selectLink('Link' + n); // 放下就選取，方便馬上改長度
 }
 
+// ---- 畫桿模式：點「連桿」→ 在畫面拖曳拉出連桿（像 Word 畫表格）----
+function startDrawLink() {
+  if (drawingLink) { exitDrawLink(); return; } // 再點一次＝取消
+  pause();
+  cancelMotorMode();
+  deselectLink();
+  drawingLink = true;
+  drawActive = false;
+  svg.style.cursor = 'crosshair';
+  setBanner('拖曳拉出連桿，放開完成；點一下＝預設長度');
+  draw();
+}
+function exitDrawLink() {
+  drawingLink = false;
+  drawActive = false;
+  drawStart = null;
+  drawPreview = null;
+  drawStartNodeId = null;
+  svg.style.cursor = '';
+  clearBanner();
+}
+// 找最靠近某世界座標的既有接點 id（吸附用），exclude 內的略過
+function nearestNodeId(world, exclude = []) {
+  const m = pointCoords();
+  let best = null, bestD = View.snapWorld();
+  for (const id in m) {
+    if (exclude.includes(id)) continue;
+    const d = Math.hypot(m[id].x - world.x, m[id].y - world.y);
+    if (d < bestD) { bestD = d; best = id; }
+  }
+  return best;
+}
+// 從起點 start 拖到 cur 時，算出實際終點：靠近既有接點就吸附相接（長度＝實距），
+// 否則長度對齊 8mm；拖得太短＝當作點一下，給預設長度。
+function resolveDrawEnd(start, cur, startNodeId) {
+  const endNodeId = nearestNodeId(cur, startNodeId ? [startNodeId] : []);
+  if (endNodeId) {
+    const p = pointCoords()[endNodeId];
+    return { pos: { x: p.x, y: p.y }, len: Math.round(Math.hypot(p.x - start.x, p.y - start.y)), nodeId: endNodeId };
+  }
+  const dx = cur.x - start.x, dy = cur.y - start.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 6) return { pos: { x: start.x + LINK_DEFAULT_LEN, y: start.y }, len: LINK_DEFAULT_LEN, nodeId: null };
+  const len = snapLego(dist);
+  const k = len / (dist || 1);
+  return { pos: { x: start.x + dx * k, y: start.y + dy * k }, len, nodeId: null };
+}
+function drawDrawPreview() {
+  if (!drawingLink || !drawActive || !drawStart || !drawPreview) return;
+  const res = resolveDrawEnd(drawStart, drawPreview, drawStartNodeId);
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', barHullPath(drawStart, res.pos));
+  path.setAttribute('fill', '#3498db22');
+  path.setAttribute('stroke', '#3498db');
+  path.setAttribute('stroke-width', 2);
+  path.setAttribute('stroke-dasharray', '8 6');
+  path.setAttribute('stroke-linejoin', 'round');
+  svg.appendChild(path);
+  const label = document.createElementNS(SVG_NS, 'text');
+  label.setAttribute('x', (TX(drawStart.x) + TX(res.pos.x)) / 2);
+  label.setAttribute('y', (TY(drawStart.y) + TY(res.pos.y)) / 2 - 10);
+  label.setAttribute('text-anchor', 'middle');
+  label.setAttribute('font-size', '13');
+  label.setAttribute('font-weight', '700');
+  label.setAttribute('fill', '#2c5282');
+  label.textContent = res.len + 'mm' + (res.nodeId ? ' 🔗' : '');
+  svg.appendChild(label);
+}
+function finishDrawLink(e) {
+  const cur = worldFromEvent(e) || drawPreview || drawStart;
+  const res = resolveDrawEnd(drawStart, cur, drawStartNodeId);
+  pushUndo();
+  const n = ++counter;
+  const lp = 'LL' + n;
+  comps.push({
+    type: 'bar', id: 'Link' + n, color: '#3498db',
+    p1: { id: 'P' + n + 'a', type: 'floating', x: drawStart.x, y: drawStart.y },
+    p2: { id: 'P' + n + 'b', type: 'floating', x: res.pos.x, y: res.pos.y },
+    lenParam: lp, isInput: false, fixedLen: true
+  });
+  topo.params[lp] = res.len;
+  // 端點落在既有接點上就合併相接（這就是「連接」）
+  if (drawStartNodeId) comps = Model.mergePoints(comps, 'P' + n + 'a', drawStartNodeId);
+  if (res.nodeId && res.nodeId !== drawStartNodeId) comps = Model.mergePoints(comps, 'P' + n + 'b', res.nodeId);
+  exitDrawLink();
+  rebuild(); draw();
+  selectLink('Link' + n);
+}
+
 // ---- 馬達：放到接點上，挑一根連桿來驅動 ----
 function setBanner(text) {
   const el = document.getElementById('modeBanner');
@@ -401,6 +498,7 @@ function cancelMotorMode() {
 }
 function placeMotor() {
   pause();
+  exitDrawLink();
   deselectLink();
   placingMotor = true;
   pickBars = null;
@@ -475,6 +573,7 @@ function startFreeLinkDrag(e, linkId) {
 }
 function onNodeDown(e, id) {
   e.preventDefault();
+  if (drawingLink) return; // 畫桿模式：交給 svg 的畫桿起點處理（會自動吸附到此接點）
   if (placingMotor) { e.stopPropagation(); handleMotorOnNode(id); return; }
   if (pickBars) return;
   preDragSnap = snapshotStr(); // 拖曳前狀態；若真的有變動，drag end 才記入 undo
@@ -486,6 +585,10 @@ function onNodeDown(e, id) {
   draw();
 }
 function onDragMove(e) {
+  if (drawingLink) { // 畫桿模式：更新拖曳預覽
+    if (drawActive) { const wp = worldFromEvent(e); if (wp) { drawPreview = wp; draw(); } }
+    return;
+  }
   if (activePointers.size >= 2) return; // 雙指縮放/平移中，不做單指拖曳
   const w = worldFromEvent(e); if (!w) return;
   if (dragLinkId && dragLastWorld) {
@@ -538,7 +641,12 @@ function commitDragUndo() {
   }
   preDragSnap = null;
 }
-function onDragEnd() {
+function onDragEnd(e) {
+  if (drawingLink) { // 畫桿模式：放開＝建立連桿
+    if (drawActive) finishDrawLink(e);
+    drawActive = false;
+    return;
+  }
   if (dragLinkId) {
     dragLinkId = null; dragLastWorld = null;
     rebuild(); draw();
@@ -643,6 +751,7 @@ svg.addEventListener('pointerup', onDragEnd);
 svg.addEventListener('pointercancel', onDragEnd);
 // 點空白處（背景/地面線，未 stopPropagation）取消選取
 svg.addEventListener('pointerdown', () => {
+  if (drawingLink) return; // 畫桿模式：交給畫桿起點處理
   if (placingMotor || pickBars) { cancelMotorMode(); draw(); return; }
   if (dragId || dragLinkId) return;
   selectedNodeId = null;
@@ -694,6 +803,20 @@ svg.addEventListener('wheel', (e) => {
   View.zoomAt(svg, e.clientX, e.clientY, e.deltaY < 0 ? 1.12 : 1 / 1.12);
   draw();
 }, { passive: false });
+
+// 畫桿模式的起點（在 gesture 追蹤之後註冊，才讀得到正確的指數）
+svg.addEventListener('pointerdown', (e) => {
+  if (!drawingLink) return;
+  if (activePointers.size >= 2) { drawActive = false; return; } // 第二指落下＝改成縮放
+  const w = worldFromEvent(e); if (!w) return;
+  drawStartNodeId = nearestNodeId(w);
+  const m = pointCoords();
+  drawStart = (drawStartNodeId && m[drawStartNodeId]) ? { x: m[drawStartNodeId].x, y: m[drawStartNodeId].y } : w;
+  drawPreview = { x: drawStart.x, y: drawStart.y };
+  drawActive = true;
+  try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+  draw();
+});
 
 // 目前機構的世界外接框（給 fit 用）
 function currentBounds() {
@@ -782,5 +905,5 @@ function init() {
   updateUndoBtn();
 }
 
-window.blocks = { placeMotor, addAnchor, addLink, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggle3D, fitView, undo, saveFile, openFile, share };
+window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggle3D, fitView, undo, saveFile, openFile, share };
 init();
