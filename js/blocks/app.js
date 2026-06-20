@@ -25,7 +25,12 @@ import * as Store from './storage.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('stageSvg');
 const { W, H, HULL_R_WORLD, TX, TY } = View;
-const LINK_DEFAULT_LEN = 90;   // 連桿預設長度
+// 樂高 Technic 孔距 = 8mm，桿長（兩端孔中心距）= (孔數 - 1) × 8。長度一律對齊 8mm。
+const LEGO_STEP = 8;
+const LINK_DEFAULT_LEN = 88;   // 連桿預設長度（12 孔，對齊 8mm）
+const LEGO_HOLES = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+const legoLen = h => (h - 1) * LEGO_STEP;
+const snapLego = v => Math.max(LEGO_STEP, Math.round((Number(v) || 0) / LEGO_STEP) * LEGO_STEP);
 
 // ---- 狀態 ----
 let comps = [];                       // wizard 風格的組件（角色就藏在 type 裡）
@@ -557,8 +562,26 @@ function selectLink(id) {
   if (!c) return;
   selectedLinkId = id;
   document.getElementById('lenEditor').style.display = 'flex';
-  document.getElementById('lenInput').value = Math.round(topo.params[c.lenParam] || 0);
+  renderLenEditor(Math.round(topo.params[c.lenParam] || 0));
   draw();
+}
+
+// 點選連桿時跳出的長度選項：以 8mm（樂高孔距）為間距，目前長度高亮。
+function renderLenEditor(len) {
+  const valEl = document.getElementById('lenValue');
+  if (valEl) valEl.textContent = len;
+  const wrap = document.getElementById('lenChips');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  LEGO_HOLES.forEach(h => {
+    const L = legoLen(h);
+    const chip = document.createElement('button');
+    chip.className = 'len-chip' + (L === len ? ' active' : '');
+    chip.textContent = L;
+    chip.title = h + ' 孔 / ' + L + 'mm';
+    chip.addEventListener('click', () => setLen(L));
+    wrap.appendChild(chip);
+  });
 }
 function deselectLink() {
   if (!selectedLinkId) return;
@@ -570,14 +593,14 @@ function setLen(v) {
   const c = comps.find(x => x.id === selectedLinkId);
   if (!c) return;
   pushUndo();
-  const L = Math.max(10, Math.round(Number(v) || 0));
+  const L = snapLego(v);     // 對齊 8mm 樂高格
   topo.params[c.lenParam] = L;
   // 把 b 端重新擺到半徑 L（自由連桿才看得到；已連接的由 solver 接手）
   const dx = (c.p2.x || 0) - (c.p1.x || 0), dy = (c.p2.y || 0) - (c.p1.y || 0);
   const d = Math.hypot(dx, dy) || 1;
   c.p2.x = (c.p1.x || 0) + dx / d * L;
   c.p2.y = (c.p1.y || 0) + dy / d * L;
-  document.getElementById('lenInput').value = L;
+  renderLenEditor(L);
   rebuild(); draw();
 }
 function changeLen(delta) {
