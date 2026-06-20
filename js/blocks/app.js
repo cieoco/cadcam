@@ -387,16 +387,20 @@ function addLink() {
   selectLink('Link' + n); // 放下就選取，方便馬上改長度
 }
 
-// ---- 畫桿模式：點「連桿」→ 在畫面拖曳拉出連桿（像 Word 畫表格）----
+// ---- 畫桿模式：點「連桿」→ 立刻出現一根連桿，游標控制其中一端 ----
+// 滑鼠：移動就改長度，按右鍵確定。手機：拖曳後放開確定。支點固定在畫面中央。
 function startDrawLink() {
-  if (drawingLink) { exitDrawLink(); return; } // 再點一次＝取消
+  if (drawingLink) { exitDrawLink(); draw(); return; } // 再點一次＝取消
   pause();
   cancelMotorMode();
   deselectLink();
   drawingLink = true;
-  drawActive = false;
+  drawActive = true;                       // 進來就活著：滑鼠一移動就更新（不必壓住）
+  drawStart = View.centerWorld();          // 固定支點＝畫面中央
+  drawStartNodeId = nearestNodeId(drawStart);
+  drawPreview = { x: drawStart.x + LINK_DEFAULT_LEN, y: drawStart.y }; // 先給一根預設長度
   svg.style.cursor = 'crosshair';
-  setBanner('拖曳拉出連桿，放開完成；點一下＝預設長度');
+  setBanner('移動滑鼠改長度，按右鍵確定（手機：拖曳後放開）');
   draw();
 }
 function exitDrawLink() {
@@ -585,7 +589,8 @@ function onNodeDown(e, id) {
   draw();
 }
 function onDragMove(e) {
-  if (drawingLink) { // 畫桿模式：更新拖曳預覽
+  if (drawingLink) { // 畫桿模式：滑鼠移動（或觸控拖曳）就更新自由端
+    if (activePointers.size >= 2) return; // 雙指縮放優先
     if (drawActive) { const wp = worldFromEvent(e); if (wp) { drawPreview = wp; draw(); } }
     return;
   }
@@ -642,9 +647,8 @@ function commitDragUndo() {
   preDragSnap = null;
 }
 function onDragEnd(e) {
-  if (drawingLink) { // 畫桿模式：放開＝建立連桿
-    if (drawActive) finishDrawLink(e);
-    drawActive = false;
+  if (drawingLink) { // 觸控/筆：放開＝確定長度（滑鼠改用右鍵確定，見 contextmenu）
+    if (e && e.pointerType && e.pointerType !== 'mouse') finishDrawLink(e);
     return;
   }
   if (dragLinkId) {
@@ -804,18 +808,20 @@ svg.addEventListener('wheel', (e) => {
   draw();
 }, { passive: false });
 
-// 畫桿模式的起點（在 gesture 追蹤之後註冊，才讀得到正確的指數）
+// 畫桿模式：按下時把自由端跳到觸/點位置（觸控才需要；滑鼠靠 hover 已跟隨），並捕捉指標。
 svg.addEventListener('pointerdown', (e) => {
   if (!drawingLink) return;
-  if (activePointers.size >= 2) { drawActive = false; return; } // 第二指落下＝改成縮放
+  if (activePointers.size >= 2) return; // 雙指縮放優先
   const w = worldFromEvent(e); if (!w) return;
-  drawStartNodeId = nearestNodeId(w);
-  const m = pointCoords();
-  drawStart = (drawStartNodeId && m[drawStartNodeId]) ? { x: m[drawStartNodeId].x, y: m[drawStartNodeId].y } : w;
-  drawPreview = { x: drawStart.x, y: drawStart.y };
-  drawActive = true;
+  drawPreview = w;
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
   draw();
+});
+// 滑鼠右鍵＝確定長度
+svg.addEventListener('contextmenu', (e) => {
+  if (!drawingLink) return;
+  e.preventDefault();
+  finishDrawLink(e);
 });
 
 // 目前機構的世界外接框（給 fit 用）
