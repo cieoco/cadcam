@@ -159,6 +159,9 @@ function draw() {
   const groundIds = new Set((compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
   const motorCenterIds = new Set((compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
 
+  // TT 馬達本體：畫在桿件底下，曲柄轉在它上面
+  motorCenterIds.forEach(id => { const p = pts[id]; if (p && Number.isFinite(p.x)) drawTTMotor(p.x, p.y); });
+
   // 桿件：紅色曲柄最後畫，避免和藍色桿重疊時被蓋住。
   let missingVisibleLinks = 0;
   const linksToDraw = [...(compiled.visualization.links || [])].sort((a, b) => {
@@ -232,13 +235,18 @@ function draw() {
     if (!Number.isFinite(p.x)) return;
     const isGround = groundIds.has(id);
     const isMotorCenter = motorCenterIds.has(id);
-    const node = document.createElementNS(SVG_NS, isGround ? 'rect' : 'circle');
-    if (isGround) {
-      const size = isMotorCenter ? 18 : 14;
+    const node = document.createElementNS(SVG_NS, (isGround && !isMotorCenter) ? 'rect' : 'circle');
+    if (isMotorCenter) {
+      // 馬達輸出軸：紅色軸蓋（TT 馬達本體已畫在底下）
+      node.setAttribute('cx', TX(p.x)); node.setAttribute('cy', TY(p.y));
+      node.setAttribute('r', id === dragId ? 8 : 6);
+      node.setAttribute('fill', '#e74c3c');
+      node.setAttribute('stroke', '#922b21'); node.setAttribute('stroke-width', 2);
+    } else if (isGround) {
+      const size = 14;
       node.setAttribute('x', TX(p.x) - size / 2); node.setAttribute('y', TY(p.y) - size / 2);
       node.setAttribute('width', size); node.setAttribute('height', size);
       node.setAttribute('rx', 3); node.setAttribute('fill', '#34495e');
-      if (isMotorCenter) node.setAttribute('fill', '#e74c3c');
     } else {
       node.setAttribute('cx', TX(p.x)); node.setAttribute('cy', TY(p.y));
       node.setAttribute('r', id === dragId ? 9 : 7); node.setAttribute('fill', '#fff');
@@ -303,6 +311,30 @@ function drawGround() {
     h.setAttribute('stroke', '#dfe4ec'); h.setAttribute('stroke-width', 2);
     svg.appendChild(h);
   }
+}
+
+// 在馬達中心畫一顆 TT 減速馬達（黃色齒輪箱 + 深色馬達罐 + 輸出軸）。
+// 畫在桿件底下當固定基座；尺寸用真實比例（mm）並隨縮放縮放，朝畫面下方像鎖在底板上。
+function drawTTMotor(cx, cy) {
+  const s = View.getScale();
+  const jx = TX(cx), jy = TY(cy);
+  const add = (el, attrs) => {
+    const e = document.createElementNS(SVG_NS, el);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    e.style.pointerEvents = 'none';
+    svg.appendChild(e);
+    return e;
+  };
+  const sw = (v) => Math.max(1, v * s);
+  // TT 馬達真實比例：齒輪箱 37×22.5、輸出軸距頂端 11、馬達罐 ⌀20.5 長 22
+  const Wb = 22.5 * s, Lb = 37 * s, ax = 11 * s, Dc = 20.5 * s, Lc = 22 * s, r = 4 * s;
+  const top = jy - ax;                         // 齒輪箱頂端（軸在頂端下方 ax 處）
+  // DC 馬達罐（深色膠囊，從齒輪箱底端再往下凸出）
+  add('rect', { x: jx - Dc / 2, y: top + Lb - r, width: Dc, height: Lc, rx: Dc / 2, ry: Dc / 2, fill: '#37474f', stroke: '#263238', 'stroke-width': sw(1) });
+  // 齒輪箱（黃色圓角矩形）
+  add('rect', { x: jx - Wb / 2, y: top, width: Wb, height: Lb, rx: r, ry: r, fill: '#f7c948', stroke: '#c9971b', 'stroke-width': sw(1.4) });
+  // 齒輪箱上的固定孔裝飾
+  add('circle', { cx: jx, cy: top + Lb * 0.66, r: 2.4 * s, fill: 'none', stroke: '#c9971b', 'stroke-width': sw(1) });
 }
 
 // ---- 零件：放下時自動設好「角色」----
