@@ -396,7 +396,7 @@ function startDrawLink() {
   deselectLink();
   drawingLink = true;
   drawActive = true;                       // 進來就活著：滑鼠一移動就更新（不必壓住）
-  drawStart = View.centerWorld();          // 固定支點＝畫面中央
+  drawStart = View.worldFromScreen(W * 0.18, H * 0.26); // 支點＝畫布左上、靠連桿按鈕右側的空白處
   drawStartNodeId = nearestNodeId(drawStart);
   drawPreview = { x: drawStart.x + LINK_DEFAULT_LEN, y: drawStart.y }; // 先給一根預設長度
   svg.style.cursor = 'crosshair';

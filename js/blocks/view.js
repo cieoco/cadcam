@@ -31,9 +31,10 @@ export const TY = y => oy - y * scale; // y 向上為正
 export function getScale() { return scale; }
 export function snapWorld() { return SNAP_PX / scale; } // 吸附門檻（世界 mm，隨縮放維持固定畫面距離）
 
-// 目前畫面正中央對應的世界座標（畫桿時當固定支點用）
-export function centerWorld() {
-  return { x: (W / 2 - ox) / scale, y: (oy - H / 2) / scale };
+// 把畫面座標（svg user units，0..W / 0..H）反推成世界座標。
+// 畫桿時用來把支點放在「畫布左上、靠連桿按鈕右側的空白處」，而非正中央。
+export function worldFromScreen(sx, sy) {
+  return { x: (sx - ox) / scale, y: (oy - sy) / scale };
 }
 
 export function resetView() {
