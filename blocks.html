@@ -166,6 +166,34 @@
     const SNAP_WORLD = 18 / SCALE; // 吸附門檻（世界座標 mm）
     const LINK_DEFAULT_LEN = 90;   // 連桿預設長度
 
+    const HULL_R_WORLD = 9;        // 冰棒棍外形半徑（世界 mm）：桿件不再是線段，而是有寬度的扁棍
+
+    // 把一根桿（兩端點 a、b）算成「冰棒棍」外形：兩端圓 + 外切線 + 半圓封口。
+    // 切線/封弧的幾何沿用 mechanism 零件外形（js/parts/renderer.js 的 computeTangentHullPathQuiet），
+    // 確保半圓封口方向正確。座標用 TX/TY 轉到畫面，弧半徑乘 SCALE。
+    function barHullPath(a, b) {
+      const r = HULL_R_WORLD;
+      const getTangent = (p, q) => {
+        const dx = q.x - p.x, dy = q.y - p.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist === 0) return null;
+        const nx = dy / dist, ny = -dx / dist; // 右側法線（CCW 走訪的外側）
+        return {
+          start: { x: p.x + nx * r, y: p.y + ny * r },
+          end: { x: q.x + nx * r, y: q.y + ny * r }
+        };
+      };
+      const t1 = getTangent(a, b), t2 = getTangent(b, a);
+      if (!t1 || !t2) return '';
+      const R = r * SCALE;
+      let d = `M ${TX(t1.start.x)} ${TY(t1.start.y)} `;
+      d += `L ${TX(t1.end.x)} ${TY(t1.end.y)} `;
+      d += `A ${R} ${R} 0 1 0 ${TX(t2.start.x)} ${TY(t2.start.y)} `;
+      d += `L ${TX(t2.end.x)} ${TY(t2.end.y)} `;
+      d += `A ${R} ${R} 0 1 0 ${TX(t1.start.x)} ${TY(t1.start.y)} Z`;
+      return d;
+    }
+
     // 用「上一點 + 速度」外插出預測位置當求解種子：靠動量挑連續分支，
     // 平行四邊形過共線點時才不會翻成交叉四邊形（單純取最近解會挑錯邊）。
     function extrapolateSeed(last, prev) {
@@ -230,24 +258,26 @@
         const isSel = l.id && l.id === selectedLinkId;
         const editable = l.id && comps.some(c => c.id === l.id && c.type === 'bar' && c.fixedLen);
         const isPickCandidate = pickBars && pickBars.ids.includes(l.id);
-        const line = document.createElementNS(SVG_NS, 'line');
-        line.setAttribute('x1', TX(a.x)); line.setAttribute('y1', TY(a.y));
-        line.setAttribute('x2', TX(b.x)); line.setAttribute('y2', TY(b.y));
-        line.setAttribute('stroke', isPickCandidate ? '#f39c12' : (isSel ? '#e67e22' : (l.style === 'crank' ? '#e74c3c' : (l.color || '#3498db'))));
-        line.setAttribute('stroke-width', isPickCandidate ? 10 : (isSel ? 8 : 6));
-        line.setAttribute('stroke-linecap', 'round');
-        if (isPickCandidate) line.setAttribute('stroke-dasharray', '12 8');
+        // 冰棒棍外形：填色扁棍取代原本的圓頭線段
+        const stroke = isPickCandidate ? '#f39c12' : (isSel ? '#e67e22' : (l.style === 'crank' ? '#e74c3c' : (l.color || '#3498db')));
+        const stick = document.createElementNS(SVG_NS, 'path');
+        stick.setAttribute('d', barHullPath(a, b));
+        stick.setAttribute('fill', stroke + '33');   // 淡色填滿，像一塊積木
+        stick.setAttribute('stroke', stroke);
+        stick.setAttribute('stroke-width', isSel || isPickCandidate ? 2.5 : 2);
+        stick.setAttribute('stroke-linejoin', 'round');
+        if (isPickCandidate) stick.setAttribute('stroke-dasharray', '10 7');
         if (editable || isPickCandidate) {
-          line.setAttribute('data-link-id', l.id);
-          line.style.cursor = 'pointer';
-          line.addEventListener('pointerdown', (e) => {
+          stick.setAttribute('data-link-id', l.id);
+          stick.style.cursor = 'pointer';
+          stick.addEventListener('pointerdown', (e) => {
             e.stopPropagation();
             if (pickBars) { tryPickBar(l.id); return; }
             if (startFreeLinkDrag(e, l.id)) return;
             selectLink(l.id);
           });
         }
-        svg.appendChild(line);
+        svg.appendChild(stick);
       });
       updateSolveBanner(sol, missingVisibleLinks);
 
