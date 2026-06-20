@@ -86,7 +86,17 @@
     .role-editor button { border: 1px solid #d8dee6; background: #fff; border-radius: 8px; padding: 6px 9px;
       font-size: 12px; cursor: pointer; }
     .role-editor button:hover { background: #f6f8fb; }
+    /* 3D 預覽覆蓋層 */
+    #view3d { position: absolute; inset: 0; display: none; background: #0f1420; }
+    #view3d canvas { display: block; width: 100%; height: 100%; }
+    .view3d-hint { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      background: rgba(15,20,32,0.75); color: #cdd6e6; border-radius: 999px; padding: 7px 14px;
+      font-size: 13px; pointer-events: none; }
+    #btn3d.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
   </style>
+  <script type="importmap">
+    { "imports": { "three": "./js/vendor/three.module.js" } }
+  </script>
 </head>
 <body>
   <header>
@@ -133,9 +143,13 @@
         <button onclick="window.blocks.setNodeRole('fixed')">設地錨</button>
         <button onclick="window.blocks.removeNodeMotor()">拿掉馬達</button>
       </div>
+      <div id="view3d">
+        <div class="view3d-hint">🧊 3D 預覽：拖曳旋轉、滾輪縮放。編輯請關掉 3D 回到平面。</div>
+      </div>
       <div class="controls">
         <button class="play-btn" id="playBtn" onclick="window.blocks.togglePlay()">▶</button>
         <div class="ctrl-sub">角度 <span id="thetaVal">0</span>°</div>
+        <button class="clear-btn" id="btn3d" onclick="window.blocks.toggle3D()">🧊 3D</button>
         <button class="clear-btn" onclick="window.blocks.clearAll()">🗑 清空</button>
       </div>
     </div>
@@ -145,6 +159,8 @@
     // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
     import { compileTopology } from './js/core/topology.js';
     import { solveTopology } from './js/multilink/solver.js';
+    // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
+    import { buildSceneModel } from './js/blocks3d/scene-model.js';
 
     const SVG_NS = 'http://www.w3.org/2000/svg';
     const svg = document.getElementById('stageSvg');
@@ -165,6 +181,11 @@
     let prevSolved = {};           // 再上一幀：和 lastSolved 一起外插出「帶動量」的預測種子
     const SNAP_WORLD = 18 / SCALE; // 吸附門檻（世界座標 mm）
     const LINK_DEFAULT_LEN = 90;   // 連桿預設長度
+
+    // ---- 3D 唯讀預覽狀態 ----
+    let viewer3D = null;           // createViewer() 的實體（首次開啟才懶載入）
+    let view3DActive = false;      // 3D 覆蓋層是否開著
+    let lastModelInputs = null;    // 最近一次 draw() 算好的 { links, pts, groundIds }，給 3D 鏡像用
 
     const HULL_R_WORLD = 9;        // 冰棒棍外形半徑（世界 mm）：桿件不再是線段，而是有寬度的扁棍
 
@@ -331,6 +352,40 @@
         node.addEventListener('pointerdown', (e) => onNodeDown(e, id));
         svg.appendChild(node);
       });
+
+      // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
+      lastModelInputs = { links: linksToDraw, pts, groundIds };
+      if (view3DActive) push3D();
+    }
+
+    // 用最近一幀的求解結果建場景模型，推進 3D viewer
+    function push3D() {
+      if (!viewer3D || !lastModelInputs) return;
+      const { links, pts, groundIds } = lastModelInputs;
+      const model = buildSceneModel(links, pts, { groundIds, hullR: HULL_R_WORLD });
+      viewer3D.update(model);
+    }
+
+    // 切換 3D 唯讀預覽：首次開啟才動態載入 THREE viewer。
+    async function toggle3D() {
+      view3DActive = !view3DActive;
+      const overlay = document.getElementById('view3d');
+      const btn = document.getElementById('btn3d');
+      btn.classList.toggle('active', view3DActive);
+      if (view3DActive) {
+        // 開 3D 時收起 2D 的編輯小面板（避免疊在覆蓋層上）
+        deselectLink();
+        document.getElementById('roleEditor').style.display = 'none';
+        overlay.style.display = 'block';
+        if (!viewer3D) {
+          const { createViewer } = await import('./js/blocks3d/viewer.js');
+          viewer3D = createViewer(overlay);
+        }
+        viewer3D.resize();
+        push3D();
+      } else {
+        overlay.style.display = 'none';
+      }
     }
 
     // 地面基線（機架的視覺暗示）
@@ -854,7 +909,9 @@
       if (!dragId) deselectLink();
     });
 
-    window.blocks = { placeMotor, addAnchor, addLink, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor };
+    window.addEventListener('resize', () => { if (viewer3D && view3DActive) viewer3D.resize(); });
+
+    window.blocks = { placeMotor, addAnchor, addLink, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggle3D };
     rebuild(); draw();
   </script>
 </body>
