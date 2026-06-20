@@ -23,7 +23,7 @@ import * as Motion from './motion.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('stageSvg');
-const { W, H, SCALE, HULL_R_WORLD, SNAP_WORLD, TX, TY } = View;
+const { W, H, HULL_R_WORLD, TX, TY } = View;
 const LINK_DEFAULT_LEN = 90;   // 連桿預設長度
 
 // ---- 狀態 ----
@@ -59,7 +59,7 @@ const removeAnchorsAtPoint = (id) => { comps = Model.removeAnchorsAtPoint(comps,
 const setPointType = (id, type) => Model.setPointType(comps, id, type);
 const roleLabel = (id) => Model.roleLabel(comps, id);
 const hasPoint = (id) => Model.hasPoint(comps, id);
-const findNearest = (id) => Model.findNearest(comps, id, SNAP_WORLD);
+const findNearest = (id) => Model.findNearest(comps, id, View.snapWorld());
 const mergePoints = (fromId, toId) => { comps = Model.mergePoints(comps, fromId, toId); };
 const recomputeLengths = () => Model.recomputeLengths(comps, topo);
 const fixedLinkFor = (id) => Model.fixedLinkFor(comps, id);
@@ -143,7 +143,7 @@ function draw() {
 
     // 在兩端冰棒棍頭上鑽孔：與外形同色的細圈，讓它看起來像真的打孔的扁棍。
     // 地錨（方塊）本身就是固定銷，不畫孔。
-    const holeR = HULL_R_WORLD * SCALE * 0.72;
+    const holeR = HULL_R_WORLD * View.getScale() * 0.72;
     [[a, l.p1], [b, l.p2]].forEach(([pt, pid]) => {
       if (groundIds.has(pid)) return;
       const hole = document.createElementNS(SVG_NS, 'circle');
@@ -425,6 +425,7 @@ function onNodeDown(e, id) {
   draw();
 }
 function onDragMove(e) {
+  if (activePointers.size >= 2) return; // 雙指縮放/平移中，不做單指拖曳
   const w = worldFromEvent(e); if (!w) return;
   if (dragLinkId && dragLastWorld) {
     const c = comps.find(x => x.id === dragLinkId && isFreeLink(x));
@@ -556,7 +557,72 @@ svg.addEventListener('pointerdown', () => {
   if (!dragId) deselectLink();
 });
 
+// ---- 縮放 / 平移手勢 ----
+// 雙指：pinch 縮放 + 兩指中心平移；滑鼠滾輪：以游標為錨縮放。單指維持原本的拖曳。
+const activePointers = new Map();   // pointerId -> { x, y }（client 座標）
+let pinchState = null;              // { dist, cx, cy }
+
+function abortSingleDrag() {
+  // 第二指落下時，放棄正在進行的單指拖曳，避免與縮放打架
+  dragId = null; dragLinkId = null; dragLastWorld = null; snapTarget = null;
+}
+
+svg.addEventListener('pointerdown', (e) => {
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (activePointers.size === 2) {
+    abortSingleDrag();
+    const [p, q] = [...activePointers.values()];
+    pinchState = { dist: Math.hypot(q.x - p.x, q.y - p.y), cx: (p.x + q.x) / 2, cy: (p.y + q.y) / 2 };
+    draw();
+  }
+});
+svg.addEventListener('pointermove', (e) => {
+  if (!activePointers.has(e.pointerId)) return;
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (activePointers.size === 2 && pinchState) {
+    const [p, q] = [...activePointers.values()];
+    const dist = Math.hypot(q.x - p.x, q.y - p.y);
+    const cx = (p.x + q.x) / 2, cy = (p.y + q.y) / 2;
+    View.zoomAt(svg, cx, cy, dist / (pinchState.dist || dist));
+    View.panByClient(svg, cx - pinchState.cx, cy - pinchState.cy);
+    pinchState = { dist, cx, cy };
+    draw();
+  }
+});
+function endPointer(e) {
+  activePointers.delete(e.pointerId);
+  if (activePointers.size < 2) pinchState = null;
+}
+svg.addEventListener('pointerup', endPointer);
+svg.addEventListener('pointercancel', endPointer);
+
+svg.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  View.zoomAt(svg, e.clientX, e.clientY, e.deltaY < 0 ? 1.12 : 1 / 1.12);
+  draw();
+}, { passive: false });
+
+// 目前機構的世界外接框（給 fit 用）
+function currentBounds() {
+  const pts = lastModelInputs && lastModelInputs.pts;
+  if (!pts) return null;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, any = false;
+  Object.values(pts).forEach(p => {
+    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+      any = true;
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    }
+  });
+  return any ? { minX, maxX, minY, maxY } : null;
+}
+function fitView() {
+  const b = currentBounds();
+  if (b) View.fit(b); else View.resetView();
+  draw();
+}
+
 window.addEventListener('resize', () => { if (viewer3D && view3DActive) viewer3D.resize(); });
 
-window.blocks = { placeMotor, addAnchor, addLink, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggle3D };
+window.blocks = { placeMotor, addAnchor, addLink, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggle3D, fitView };
 rebuild(); draw();

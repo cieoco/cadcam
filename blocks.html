@@ -42,7 +42,7 @@
     /* 畫布 */
     .canvas-wrap { flex: 1; position: relative; min-width: 0; }
     #stageSvg { width: 100%; height: 100%; display: block; background:
-      linear-gradient(#f6f8fb 0 0); }
+      linear-gradient(#f6f8fb 0 0); touch-action: none; }
     .hint {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
       color: #b0bac6; font-size: 16px; text-align: center; pointer-events: none; line-height: 1.7;
@@ -93,6 +93,19 @@
       background: rgba(15,20,32,0.75); color: #cdd6e6; border-radius: 999px; padding: 7px 14px;
       font-size: 13px; pointer-events: none; }
     #btn3d.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+    /* 手機：零件盤移到底部橫條，畫布吃滿上方 */
+    @media (max-width: 640px) {
+      .stage { flex-direction: column-reverse; }
+      .tray { width: 100%; flex-direction: row; gap: 8px; padding: 8px 10px;
+        border-right: none; border-top: 1px solid #eee; overflow-x: auto; }
+      .tray-title { display: none; }
+      .block { flex: 0 0 auto; min-width: 84px; padding: 8px 6px; }
+      .block .ico { font-size: 24px; }
+      .controls { bottom: 10px; gap: 8px; padding: 8px 12px; flex-wrap: wrap; justify-content: center; }
+      .len-editor, .role-editor { top: 10px; padding: 6px 8px; gap: 6px; }
+      .len-editor { left: 8px; }
+      .role-editor { right: 8px; }
+    }
   </style>
   <script type="importmap">
     { "imports": { "three": "./js/vendor/three.module.js" } }
@@ -149,6 +162,7 @@
       <div class="controls">
         <button class="play-btn" id="playBtn" onclick="window.blocks.togglePlay()">▶</button>
         <div class="ctrl-sub">角度 <span id="thetaVal">0</span>°</div>
+        <button class="clear-btn" onclick="window.blocks.fitView()" title="把機構縮放置中到畫面">⊡ 置中</button>
         <button class="clear-btn" id="btn3d" onclick="window.blocks.toggle3D()">🧊 3D</button>
         <button class="clear-btn" onclick="window.blocks.clearAll()">🗑 清空</button>
       </div>
