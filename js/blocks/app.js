@@ -159,8 +159,28 @@ function draw() {
   const groundIds = new Set((compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
   const motorCenterIds = new Set((compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
 
-  // TT 馬達本體：畫在桿件底下，曲柄轉在它上面
-  motorCenterIds.forEach(id => { const p = pts[id]; if (p && Number.isFinite(p.x)) drawTTMotor(p.x, p.y); });
+  // TT 馬達本體：畫在桿件底下，曲柄轉在它上面。
+  // 朝向＝對準接在馬達中心、非曲柄的那根桿（指向它的另一端）；沒有就朝最近的另一個地錨；都沒有才朝下。
+  motorCenterIds.forEach(id => {
+    const p = pts[id]; if (!p || !Number.isFinite(p.x)) return;
+    let tgt = null;
+    const others = comps.filter(c => c.type === 'bar' && !c.isInput && c.p1 && c.p2 && (c.p1.id === id || c.p2.id === id));
+    if (others.length) {
+      const b = others[0];
+      const o = b.p1.id === id ? b.p2.id : b.p1.id;
+      if (pts[o] && Number.isFinite(pts[o].x)) tgt = pts[o];
+    }
+    if (!tgt) {
+      let bd = Infinity;
+      groundIds.forEach(gid => {
+        if (gid === id) return;
+        const gp = pts[gid];
+        if (gp && Number.isFinite(gp.x)) { const d = Math.hypot(gp.x - p.x, gp.y - p.y); if (d < bd) { bd = d; tgt = gp; } }
+      });
+    }
+    const rotDeg = tgt ? Math.atan2(-(tgt.x - p.x), -(tgt.y - p.y)) * 180 / Math.PI : 0;
+    drawTTMotor(p.x, p.y, rotDeg);
+  });
 
   // 桿件：紅色曲柄最後畫，避免和藍色桿重疊時被蓋住。
   let missingVisibleLinks = 0;
@@ -314,27 +334,31 @@ function drawGround() {
 }
 
 // 在馬達中心畫一顆 TT 減速馬達（黃色齒輪箱 + 深色馬達罐 + 輸出軸）。
-// 畫在桿件底下當固定基座；尺寸用真實比例（mm）並隨縮放縮放，朝畫面下方像鎖在底板上。
-function drawTTMotor(cx, cy) {
+// 畫在桿件底下當固定基座；尺寸用真實比例（mm）並隨縮放縮放。
+// rotDeg＝整顆繞輸出軸旋轉的角度（0＝朝畫面下方）；本體沿局部 +Y 方向延伸。
+function drawTTMotor(cx, cy, rotDeg = 0) {
   const s = View.getScale();
   const jx = TX(cx), jy = TY(cy);
+  const g = document.createElementNS(SVG_NS, 'g');
+  g.setAttribute('transform', `translate(${jx} ${jy}) rotate(${rotDeg})`);
+  g.style.pointerEvents = 'none';
   const add = (el, attrs) => {
     const e = document.createElementNS(SVG_NS, el);
     for (const k in attrs) e.setAttribute(k, attrs[k]);
-    e.style.pointerEvents = 'none';
-    svg.appendChild(e);
+    g.appendChild(e);
     return e;
   };
   const sw = (v) => Math.max(1, v * s);
   // TT 馬達真實比例：齒輪箱 37×22.5、輸出軸距頂端 11、馬達罐 ⌀20.5 長 22
   const Wb = 22.5 * s, Lb = 37 * s, ax = 11 * s, Dc = 20.5 * s, Lc = 22 * s, r = 4 * s;
-  const top = jy - ax;                         // 齒輪箱頂端（軸在頂端下方 ax 處）
-  // DC 馬達罐（深色膠囊，從齒輪箱底端再往下凸出）
-  add('rect', { x: jx - Dc / 2, y: top + Lb - r, width: Dc, height: Lc, rx: Dc / 2, ry: Dc / 2, fill: '#37474f', stroke: '#263238', 'stroke-width': sw(1) });
+  const top = -ax;                             // 局部座標：軸在原點，齒輪箱頂端在 -ax
+  // DC 馬達罐（深色膠囊，從齒輪箱底端再往外凸出）
+  add('rect', { x: -Dc / 2, y: top + Lb - r, width: Dc, height: Lc, rx: Dc / 2, ry: Dc / 2, fill: '#37474f', stroke: '#263238', 'stroke-width': sw(1) });
   // 齒輪箱（黃色圓角矩形）
-  add('rect', { x: jx - Wb / 2, y: top, width: Wb, height: Lb, rx: r, ry: r, fill: '#f7c948', stroke: '#c9971b', 'stroke-width': sw(1.4) });
+  add('rect', { x: -Wb / 2, y: top, width: Wb, height: Lb, rx: r, ry: r, fill: '#f7c948', stroke: '#c9971b', 'stroke-width': sw(1.4) });
   // 齒輪箱上的固定孔裝飾
-  add('circle', { cx: jx, cy: top + Lb * 0.66, r: 2.4 * s, fill: 'none', stroke: '#c9971b', 'stroke-width': sw(1) });
+  add('circle', { cx: 0, cy: top + Lb * 0.66, r: 2.4 * s, fill: 'none', stroke: '#c9971b', 'stroke-width': sw(1) });
+  svg.appendChild(g);
 }
 
 // ---- 零件：放下時自動設好「角色」----
