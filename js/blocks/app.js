@@ -28,8 +28,6 @@ const { W, H, HULL_R_WORLD, TX, TY } = View;
 // 樂高 Technic 孔距 = 8mm，桿長（兩端孔中心距）= (孔數 - 1) × 8。長度一律對齊 8mm。
 const LEGO_STEP = 8;
 const LINK_DEFAULT_LEN = 88;   // 連桿預設長度（12 孔，對齊 8mm）
-const LEGO_HOLES = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-const legoLen = h => (h - 1) * LEGO_STEP;
 const snapLego = v => Math.max(LEGO_STEP, Math.round((Number(v) || 0) / LEGO_STEP) * LEGO_STEP);
 
 // ---- 狀態 ----
@@ -678,22 +676,10 @@ function selectLink(id) {
   draw();
 }
 
-// 點選連桿時跳出的長度選項：以 8mm（樂高孔距）為間距，目前長度高亮。
+// 更新長度顯示（用上方的 − / + 以 8mm 為單位調整）
 function renderLenEditor(len) {
   const valEl = document.getElementById('lenValue');
   if (valEl) valEl.textContent = len;
-  const wrap = document.getElementById('lenChips');
-  if (!wrap) return;
-  wrap.innerHTML = '';
-  LEGO_HOLES.forEach(h => {
-    const L = legoLen(h);
-    const chip = document.createElement('button');
-    chip.className = 'len-chip' + (L === len ? ' active' : '');
-    chip.textContent = L;
-    chip.title = h + ' 孔 / ' + L + 'mm';
-    chip.addEventListener('click', () => setLen(L));
-    wrap.appendChild(chip);
-  });
 }
 function deselectLink() {
   if (!selectedLinkId) return;

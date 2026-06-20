@@ -84,11 +84,6 @@
       border-radius: 8px; font-size: 16px; cursor: pointer; line-height: 1; }
     .len-editor .le-value { font-size: 14px; font-weight: 700; color: #2c5282; min-width: 54px; text-align: center; }
     .len-editor .le-unit { font-size: 12px; color: #95a5a6; margin-left: 2px; }
-    .len-chips { display: flex; flex-wrap: wrap; gap: 6px; max-width: 264px; }
-    .len-chip { border: 1px solid #d8dee6; background: #fff; color: #34495e; border-radius: 8px;
-      padding: 5px 8px; font-size: 12px; cursor: pointer; line-height: 1; }
-    .len-chip:hover { background: #f6f8fb; }
-    .len-chip.active { background: #2c5282; color: #fff; border-color: #2c5282; }
     .role-editor { position: absolute; top: 16px; right: 16px; display: flex; align-items: center; gap: 8px;
       background: rgba(255,255,255,0.96); border: 1px solid #e6e9f0; border-radius: 12px; padding: 8px 12px;
       box-shadow: 0 6px 18px rgba(0,0,0,0.1); }
@@ -168,7 +163,6 @@
           <span class="le-value"><span id="lenValue">88</span><span class="le-unit">mm</span></span>
           <button class="le-step" onclick="window.blocks.changeLen(8)" title="長 8mm（多一孔）">＋</button>
         </div>
-        <div id="lenChips" class="len-chips"></div>
       </div>
       <div class="role-editor" id="roleEditor" style="display:none;">
         <span class="re-title">接點角色</span>
