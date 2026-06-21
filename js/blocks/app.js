@@ -13,7 +13,7 @@
 
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
-import { solveTopology } from '../multilink/solver.js';
+import { solveTopology, sweepTopology } from '../multilink/solver.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
 import { buildSceneModel } from '../blocks3d/scene-model.js';
 // 純邏輯模組
@@ -42,6 +42,7 @@ let placingMotor = false, pickBars = null;
 let drawingLink = false, drawActive = false, drawStart = null, drawPreview = null, drawStartNodeId = null;
 let lastSolved = {};           // 上一幀求解成功的點位：給求解器挑「連續」分支 + 死點暫態回退
 let prevSolved = {};           // 再上一幀：和 lastSolved 一起外插出「帶動量」的預測種子
+let trajectoryCache = null;    // 沿用 multilink sweepTopology 的軌跡資料格式
 
 // ---- 3D 唯讀預覽狀態 ----
 let viewer3D = null;           // createViewer() 的實體（首次開啟才懶載入）
@@ -84,7 +85,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
   pause();
   cancelMotorMode();
   comps = norm.comps;
-  topo = { params: norm.params || {}, tracePoint: '' };
+  topo = { params: norm.params || {}, tracePoint: norm.tracePoint || '' };
   counter = Math.max(norm.counter || 0, Store.highestIdNum(comps));
   theta = 0;
   selectedLinkId = null;
@@ -153,9 +154,42 @@ function rebuild() {
   topo.params = compiled.params; // 沿用補齊後的參數
   lastSolved = {};               // 拓撲變了：丟掉舊解，避免拿到不相干的種子
   prevSolved = {};
+  trajectoryCache = null;
   document.getElementById('hint').style.display = comps.length ? 'none' : 'block';
   updateRoleEditor();
   scheduleAutosave();            // 任何結構變更都防丟（debounce，播放不觸發）
+}
+
+function getTrajectoryData() {
+  const tracePoint = topo.tracePoint || (compiled && compiled.tracePoint) || '';
+  if (!compiled || !tracePoint || !comps.length) return null;
+  const key = JSON.stringify(Store.toSnapshot(comps, topo, counter));
+  if (trajectoryCache && trajectoryCache.key === key) return trajectoryCache.data;
+  let data = null;
+  try {
+    const sweep = sweepTopology({ ...compiled, tracePoint }, compiled.params || topo.params || {}, 0, 360, 5);
+    if (sweep && sweep.results) data = sweep;
+  } catch (_) {
+    data = null;
+  }
+  trajectoryCache = { key, data };
+  return data;
+}
+
+function drawTraceTrajectory(trajectoryData) {
+  if (!trajectoryData || !Array.isArray(trajectoryData.results)) return;
+  const pts = trajectoryData.results.filter(r => r && r.isValid && r.B).map(r => r.B);
+  if (pts.length < 2) return;
+  const poly = document.createElementNS(SVG_NS, 'polyline');
+  poly.setAttribute('points', pts.map(p => `${TX(p.x)},${TY(p.y)}`).join(' '));
+  poly.setAttribute('fill', 'none');
+  poly.setAttribute('stroke', '#008060');
+  poly.setAttribute('stroke-width', 2.5);
+  poly.setAttribute('stroke-opacity', 0.72);
+  poly.setAttribute('stroke-linejoin', 'round');
+  poly.setAttribute('stroke-linecap', 'round');
+  poly.style.pointerEvents = 'none';
+  svg.appendChild(poly);
 }
 
 function draw() {
@@ -185,6 +219,7 @@ function draw() {
 
   const groundIds = new Set((compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
   const motorCenterIds = new Set((compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
+  drawTraceTrajectory(getTrajectoryData());
 
   // TT 馬達本體：畫在桿件底下，曲柄轉在它上面。
   // 朝向＝對準接在馬達中心、非曲柄的那根桿（指向它的另一端）；沒有就朝最近的另一個地錨；都沒有才朝下。
@@ -798,6 +833,13 @@ function updateRoleEditor() {
     return;
   }
   document.getElementById('roleStatus').textContent = roleLabel(selectedNodeId);
+  const traceBtn = document.getElementById('traceBtn');
+  if (traceBtn) {
+    const isTrace = topo.tracePoint === selectedNodeId;
+    traceBtn.textContent = isTrace ? '取消軌跡' : '設軌跡點';
+    traceBtn.classList.toggle('trace-on', isTrace);
+    traceBtn.title = isTrace ? '停止追蹤這個接點' : '追蹤這個接點走過的路徑';
+  }
   editor.style.display = 'flex';
 }
 function setNodeRole(type) {
@@ -817,6 +859,15 @@ function removeNodeMotor() {
   pause();
   removeMotorAtPoint(selectedNodeId);
   rebuild(); draw();
+}
+function toggleTracePoint() {
+  if (!selectedNodeId || !hasPoint(selectedNodeId)) return;
+  pushUndo();
+  pause();
+  topo.tracePoint = topo.tracePoint === selectedNodeId ? '' : selectedNodeId;
+  trajectoryCache = null;
+  updateRoleEditor();
+  draw();
 }
 
 svg.addEventListener('pointermove', onDragMove);
@@ -981,5 +1032,5 @@ function init() {
   updateUndoBtn();
 }
 
-window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();

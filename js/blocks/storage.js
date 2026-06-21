@@ -7,8 +7,8 @@
  *   - 壓成分享連結（沿用 js/share-codec.js 的安全編解碼）
  *
  * snapshot 形狀（純資料、可被 share-codec 的白名單閘接受）：
- *   { kind:'blocks', v:1, counter, comps, params }
- * comps 是 wizard 風格組件陣列、params 是長度等參數（topo.params）。
+ *   { kind:'blocks', v:1, counter, comps, params, tracePoint? }
+ * comps 是 wizard 風格組件陣列、params 是長度等參數（topo.params），tracePoint 是選配軌跡點。
  */
 
 import { encodeSnapshot, decodeShareString } from '../share-codec.js';

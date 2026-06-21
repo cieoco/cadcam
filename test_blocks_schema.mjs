@@ -23,9 +23,10 @@ const ok = (name, cond) => {
 for (const example of BLOCK_EXAMPLES) {
   const norm = normalizeSnapshot(example.snapshot);
   ok(`${example.id} normalizes`, !!norm);
+  if (example.id === 'chebyshev-linkage') ok('chebyshev keeps trace point', norm && norm.tracePoint === 'P');
   if (!norm || norm.comps.length === 0) continue;
 
-  const compiled = compileTopology(norm.comps, { params: norm.params, tracePoint: '' }, new Set());
+  const compiled = compileTopology(norm.comps, { params: norm.params, tracePoint: norm.tracePoint || '' }, new Set());
   const solved = solveTopology(compiled, { thetaDeg: 0 });
   ok(`${example.id} compiles to steps`, compiled.steps.length > 0);
   ok(`${example.id} solves at 0deg`, solved && solved.isValid !== false);
@@ -55,4 +56,3 @@ ok('toSnapshot writes blocks kind', snap.kind === 'blocks' && snap.v === 1);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
-

@@ -2,7 +2,7 @@
  * blocks / schema
  *
  * 「機構積木」作品格式的正規化與輕量驗證。這裡只接受 UI 能做得出來的積木語法：
- * anchor、bar、接點角色、固定長度參數，以及放在連桿端點上的馬達。
+ * anchor、bar、triangle、接點角色、固定長度參數，以及放在連桿端點上的馬達。
  */
 
 const KIND = 'blocks';
@@ -70,18 +70,47 @@ function normalizeBar(comp, index, params, warnings) {
   return out;
 }
 
+function normalizeTriangle(comp, index, params, warnings) {
+  const id = safeId(comp.id) ? comp.id : `Tri${index + 1}`;
+  const p1 = normalizePoint(comp.p1, `T${index + 1}a`, warnings);
+  const p2 = normalizePoint(comp.p2, `T${index + 1}b`, warnings);
+  const p3 = normalizePoint(comp.p3, `T${index + 1}c`, warnings);
+  const gParam = safeId(comp.gParam) ? comp.gParam : `TG${index + 1}`;
+  const r1Param = safeId(comp.r1Param) ? comp.r1Param : `TR1_${index + 1}`;
+  const r2Param = safeId(comp.r2Param) ? comp.r2Param : `TR2_${index + 1}`;
+  const out = {
+    type: 'triangle',
+    id,
+    color: SAFE_COLOR.test(comp.color || '') ? comp.color : '#27ae60',
+    p1,
+    p2,
+    p3,
+    gParam,
+    r1Param,
+    r2Param,
+    sign: Number(comp.sign) < 0 ? -1 : 1
+  };
+
+  params[gParam] = Math.round(num(params[gParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y), 0));
+  params[r1Param] = Math.round(num(params[r1Param] ?? Math.hypot(p3.x - p1.x, p3.y - p1.y), 0));
+  params[r2Param] = Math.round(num(params[r2Param] ?? Math.hypot(p3.x - p2.x, p3.y - p2.y), 0));
+  return out;
+}
+
 function dropZeroBars(comps) {
   return comps.filter(comp => !(comp.type === 'bar' && comp.p1 && comp.p2 && comp.p1.id === comp.p2.id));
 }
 
 export function toSnapshot(comps, topo, counter) {
-  return {
+  const snapshot = {
     kind: KIND,
     v: VERSION,
     counter: Number(counter) || 0,
     comps: clone(comps || []),
     params: clone((topo && topo.params) ? topo.params : {})
   };
+  if (topo && safeId(topo.tracePoint)) snapshot.tracePoint = topo.tracePoint;
+  return snapshot;
 }
 
 export function normalizeSnapshot(obj) {
@@ -91,6 +120,7 @@ export function normalizeSnapshot(obj) {
 
   const warnings = [];
   const params = (obj.params && typeof obj.params === 'object' && !Array.isArray(obj.params)) ? clone(obj.params) : {};
+  const tracePoint = safeId(obj.tracePoint) ? obj.tracePoint : '';
   const comps = [];
 
   sourceComps.forEach((raw, index) => {
@@ -100,12 +130,13 @@ export function normalizeSnapshot(obj) {
     }
     if (raw.type === 'anchor') comps.push(normalizeAnchor(raw, index, warnings));
     else if (raw.type === 'bar') comps.push(normalizeBar(raw, index, params, warnings));
+    else if (raw.type === 'triangle') comps.push(normalizeTriangle(raw, index, params, warnings));
     else warnings.push(`不支援的零件 ${raw.type || '(unknown)'}，已略過。`);
   });
 
   const cleanComps = dropZeroBars(comps);
   const counter = Math.max(Number(obj.counter) || 0, highestIdNum(cleanComps));
-  return { comps: cleanComps, params, counter, warnings };
+  return { comps: cleanComps, params, counter, tracePoint, warnings };
 }
 
 export function highestIdNum(comps) {
@@ -121,4 +152,3 @@ export function highestIdNum(comps) {
   });
   return max;
 }
-
