@@ -12,44 +12,14 @@
  */
 
 import { encodeSnapshot, decodeShareString } from '../share-codec.js';
+import { toSnapshot, normalizeSnapshot, highestIdNum } from './schema.js';
 
 const AUTOSAVE_KEY = 'cadcam.blocks.autosave';
 
 // ---- 純：序列化 / 還原 ----
-export function toSnapshot(comps, topo, counter) {
-  return {
-    kind: 'blocks',
-    v: 1,
-    counter: Number(counter) || 0,
-    comps: comps || [],
-    params: (topo && topo.params) ? topo.params : {},
-  };
-}
+export { toSnapshot, normalizeSnapshot, highestIdNum };
 
 // 把外來物件正規化成 { comps, params, counter }，不合法回傳 null。
-export function normalizeSnapshot(obj) {
-  if (!obj || typeof obj !== 'object') return null;
-  const comps = Array.isArray(obj.comps) ? obj.comps : null;
-  if (!comps) return null;
-  const params = (obj.params && typeof obj.params === 'object' && !Array.isArray(obj.params)) ? obj.params : {};
-  return { comps, params, counter: Number(obj.counter) || 0 };
-}
-
-// 掃出所有 id 尾端數字的最大值，避免還原後新增零件時 id 撞號。
-export function highestIdNum(comps) {
-  let max = 0;
-  const scan = (s) => {
-    if (typeof s !== 'string') return;
-    const m = s.match(/(\d+)/g);
-    if (m) m.forEach(n => { const v = Number(n); if (v > max) max = v; });
-  };
-  (comps || []).forEach(c => {
-    scan(c.id);
-    ['p1', 'p2', 'p3'].forEach(k => { if (c[k]) scan(c[k].id); });
-  });
-  return max;
-}
-
 // ---- localStorage 自動存檔 ----
 export function saveLocal(snapshot) {
   try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(snapshot)); } catch (_) {}

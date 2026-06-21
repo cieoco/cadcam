@@ -22,6 +22,8 @@
     .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .tool-btn { border: 1px solid #e6e9f0; background: #fff; color: #34495e; border-radius: 10px;
       padding: 8px 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .example-select { border: 1px solid #e6e9f0; background: #fff; color: #34495e; border-radius: 10px;
+      padding: 8px 10px; font-size: 14px; font-weight: 600; max-width: 180px; }
     .tool-btn:hover { background: #f6f8fb; }
     .tool-btn:disabled { opacity: .45; cursor: default; }
     .stage { flex: 1; display: flex; min-height: 0; }
@@ -127,6 +129,9 @@
       <button class="tool-btn" onclick="window.blocks.saveFile()" title="存成檔案">💾 存檔</button>
       <button class="tool-btn" onclick="window.blocks.openFile()" title="開啟檔案">📂 開啟</button>
       <button class="tool-btn" onclick="window.blocks.share()" title="複製分享連結，貼給別人就能打開">🔗 分享</button>
+      <select class="example-select" id="exampleSelect" onchange="window.blocks.loadExample(this.value)" title="載入課堂範例">
+        <option value="">📘 範例</option>
+      </select>
       <a class="home-btn" href="mechanism.html">← 回機構工具</a>
     </div>
   </header>

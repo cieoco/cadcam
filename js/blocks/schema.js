@@ -1,0 +1,124 @@
+/**
+ * blocks / schema
+ *
+ * 「機構積木」作品格式的正規化與輕量驗證。這裡只接受 UI 能做得出來的積木語法：
+ * anchor、bar、接點角色、固定長度參數，以及放在連桿端點上的馬達。
+ */
+
+const KIND = 'blocks';
+const VERSION = 1;
+const LEGO_STEP = 8;
+const SAFE_ID = /^[\w.-]+$/u;
+const SAFE_COLOR = /^#[0-9a-fA-F]{6}$/;
+const POINT_TYPES = new Set(['floating', 'fixed', 'motor', 'linear']);
+
+const clone = value => JSON.parse(JSON.stringify(value));
+const snapLego = value => Math.max(LEGO_STEP, Math.round((Number(value) || 0) / LEGO_STEP) * LEGO_STEP);
+const num = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const safeId = value => typeof value === 'string' && SAFE_ID.test(value);
+
+function normalizePoint(point, fallbackId, warnings) {
+  if (!point || typeof point !== 'object') {
+    warnings.push(`接點 ${fallbackId} 格式不正確，已用自由接點補上。`);
+    return { id: fallbackId, type: 'floating', x: 0, y: 0 };
+  }
+  const id = safeId(point.id) ? point.id : fallbackId;
+  if (id !== point.id) warnings.push(`接點 id 不安全或遺失，已改成 ${id}。`);
+  const type = POINT_TYPES.has(point.type) ? point.type : 'floating';
+  const out = {
+    id,
+    type,
+    x: num(point.x, 0),
+    y: num(point.y, 0)
+  };
+  if (point.physicalMotor) out.physicalMotor = String(point.physicalMotor);
+  return out;
+}
+
+function normalizeAnchor(comp, index, warnings) {
+  const id = safeId(comp.id) ? comp.id : `Anchor${index + 1}`;
+  const p1 = normalizePoint(comp.p1, `A${index + 1}`, warnings);
+  p1.type = 'fixed';
+  return { type: 'anchor', id, p1 };
+}
+
+function normalizeBar(comp, index, params, warnings) {
+  const id = safeId(comp.id) ? comp.id : `Link${index + 1}`;
+  const p1 = normalizePoint(comp.p1, `P${index + 1}a`, warnings);
+  const p2 = normalizePoint(comp.p2, `P${index + 1}b`, warnings);
+  const lenParam = safeId(comp.lenParam) ? comp.lenParam : `LL${index + 1}`;
+  const out = {
+    type: 'bar',
+    id,
+    color: SAFE_COLOR.test(comp.color || '') ? comp.color : '#3498db',
+    p1,
+    p2,
+    lenParam,
+    isInput: Boolean(comp.isInput),
+    fixedLen: comp.fixedLen !== false
+  };
+
+  if (comp.phaseOffset !== undefined) out.phaseOffset = num(comp.phaseOffset, 0);
+  if (comp.physicalMotor) out.physicalMotor = String(comp.physicalMotor);
+  if (comp.isInput || comp.physicalMotor || p1.physicalMotor || p2.physicalMotor) {
+    out.isInput = true;
+    out.physicalMotor = String(comp.physicalMotor || p1.physicalMotor || p2.physicalMotor || '1');
+  }
+
+  const rawLen = params[lenParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  params[lenParam] = out.fixedLen ? snapLego(rawLen) : Math.round(num(rawLen, 0));
+  return out;
+}
+
+function dropZeroBars(comps) {
+  return comps.filter(comp => !(comp.type === 'bar' && comp.p1 && comp.p2 && comp.p1.id === comp.p2.id));
+}
+
+export function toSnapshot(comps, topo, counter) {
+  return {
+    kind: KIND,
+    v: VERSION,
+    counter: Number(counter) || 0,
+    comps: clone(comps || []),
+    params: clone((topo && topo.params) ? topo.params : {})
+  };
+}
+
+export function normalizeSnapshot(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  const sourceComps = Array.isArray(obj.comps) ? obj.comps : null;
+  if (!sourceComps) return null;
+
+  const warnings = [];
+  const params = (obj.params && typeof obj.params === 'object' && !Array.isArray(obj.params)) ? clone(obj.params) : {};
+  const comps = [];
+
+  sourceComps.forEach((raw, index) => {
+    if (!raw || typeof raw !== 'object') {
+      warnings.push(`第 ${index + 1} 個零件格式不正確，已略過。`);
+      return;
+    }
+    if (raw.type === 'anchor') comps.push(normalizeAnchor(raw, index, warnings));
+    else if (raw.type === 'bar') comps.push(normalizeBar(raw, index, params, warnings));
+    else warnings.push(`不支援的零件 ${raw.type || '(unknown)'}，已略過。`);
+  });
+
+  const cleanComps = dropZeroBars(comps);
+  const counter = Math.max(Number(obj.counter) || 0, highestIdNum(cleanComps));
+  return { comps: cleanComps, params, counter, warnings };
+}
+
+export function highestIdNum(comps) {
+  let max = 0;
+  const scan = (s) => {
+    if (typeof s !== 'string') return;
+    const matches = s.match(/(\d+)/g);
+    if (matches) matches.forEach(n => { const v = Number(n); if (v > max) max = v; });
+  };
+  (comps || []).forEach(c => {
+    scan(c.id);
+    ['p1', 'p2', 'p3'].forEach(k => { if (c[k]) scan(c[k].id); });
+  });
+  return max;
+}
+

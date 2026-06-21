@@ -21,6 +21,7 @@ import * as View from './view.js';
 import * as Model from './model.js';
 import * as Motion from './motion.js';
 import * as Store from './storage.js';
+import { BLOCK_EXAMPLES, getExample } from './examples.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('stageSvg');
@@ -93,6 +94,32 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
   document.getElementById('thetaVal').textContent = '0';
   rebuild(); draw();
   if (fit) fitView();
+}
+
+function populateExamples() {
+  const sel = document.getElementById('exampleSelect');
+  if (!sel) return;
+  BLOCK_EXAMPLES.forEach(example => {
+    const opt = document.createElement('option');
+    opt.value = example.id;
+    opt.textContent = example.title;
+    opt.title = example.note || '';
+    sel.appendChild(opt);
+  });
+}
+
+function loadExample(id) {
+  const sel = document.getElementById('exampleSelect');
+  const example = getExample(id || (sel && sel.value));
+  if (!example) return;
+  const norm = Store.normalizeSnapshot(example.snapshot);
+  if (!norm) {
+    transient('⚠️ 範例格式不正確');
+    return;
+  }
+  applySnapshot(norm);
+  transient('📘 已載入：' + example.title);
+  if (sel) sel.value = '';
 }
 
 // ---- 綁定層：把純模組綁到本檔狀態，維持原呼叫端不變 ----
@@ -934,6 +961,7 @@ async function share() {
 
 // ---- 啟動：分享連結優先，其次 localStorage 自動還原，否則空白 ----
 function init() {
+  populateExamples();
   let loaded = false;
   try {
     const hashObj = Store.readShareFromHash();
@@ -953,5 +981,5 @@ function init() {
   updateUndoBtn();
 }
 
-window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggle3D, fitView, undo, saveFile, openFile, share };
+window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();
