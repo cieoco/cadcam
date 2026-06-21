@@ -7,7 +7,8 @@ Linkage 閉環機構拓樸工具
 ### 線上試用
 
 - 目前可用：
-  - https://cieoco.github.io/cadcam/
+  - 機構工具主站：https://cieoco.github.io/cadcam/
+  - 🧩 機構積木（像樂高一樣拼連桿的簡化沙盒，含 2D／3D 預覽）：https://cieoco.github.io/cadcam/blocks.html
 - 備註：
   - 線上 demo 若尚未同步更名，路徑仍沿用舊的 `cadcam` URL
 
@@ -29,6 +30,7 @@ python -m http.server 8000
 - 這類功能不應當作公開 demo 的必要流程
 
 [![Live Demo](https://img.shields.io/badge/🚀_線上試用-Live_Demo-success?style=for-the-badge)](https://cieoco.github.io/cadcam/)
+[![機構積木](https://img.shields.io/badge/🧩_機構積木-Blocks_Sandbox-blue?style=for-the-badge)](https://cieoco.github.io/cadcam/blocks.html)
 
 > 備註：線上 demo 若尚未同步更名，路徑可能仍沿用舊的 `cadcam` URL。
 
