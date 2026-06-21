@@ -423,6 +423,18 @@ function draw() {
     node.style.cursor = 'grab';
     node.addEventListener('pointerdown', (e) => onNodeDown(e, id));
     svg.appendChild(node);
+
+    if (mobilePrompt()) {
+      const hit = document.createElementNS(SVG_NS, 'circle');
+      hit.setAttribute('cx', TX(p.x));
+      hit.setAttribute('cy', TY(p.y));
+      hit.setAttribute('r', 22);
+      hit.setAttribute('fill', 'transparent');
+      hit.setAttribute('data-id', id);
+      hit.style.cursor = 'grab';
+      hit.addEventListener('pointerdown', (e) => onNodeDown(e, id));
+      svg.appendChild(hit);
+    }
   });
 
   drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
