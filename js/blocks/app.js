@@ -135,6 +135,8 @@ const extrapolateSeed = Motion.extrapolateSeed;
 const norm360 = Motion.norm360;
 const PLAY_STEP = Motion.PLAY_STEP;
 const planMotion = () => Motion.planMotion(compiled, topo, theta, lastSolved);
+const mobilePrompt = () => window.matchMedia('(hover: none), (pointer: coarse), (max-width: 640px)').matches;
+const promptText = (desktop, mobile) => mobilePrompt() ? mobile : desktop;
 
 const pointCoords = () => Model.pointCoords(comps);
 const updatePointCoordsById = (id, x, y) => Model.updatePointCoordsById(comps, id, x, y);
@@ -479,7 +481,7 @@ function drawGround() {
   }
 }
 
-// 在馬達中心畫一顆 TT 減速馬達（黃色齒輪箱 + 深色馬達罐 + 輸出軸）。
+// 在馬達中心畫一顆 TT 減速馬達（黃色齒輪箱 + 側視方形馬達罐 + 輸出軸）。
 // 畫在桿件底下當固定基座；尺寸用真實比例（mm）並隨縮放縮放。
 // rotDeg＝整顆繞輸出軸旋轉的角度（0＝朝畫面下方）；本體沿局部 +Y 方向延伸。
 function drawTTMotor(cx, cy, rotDeg = 0, parent = svg) {
@@ -495,11 +497,23 @@ function drawTTMotor(cx, cy, rotDeg = 0, parent = svg) {
     return e;
   };
   const sw = (v) => Math.max(1, v * s);
-  // TT 馬達真實比例：齒輪箱 37×22.5、輸出軸距頂端 11、馬達罐 ⌀20.5 長 22
-  const Wb = 22.5 * s, Lb = 37 * s, ax = 11 * s, Dc = 20.5 * s, Lc = 22 * s, r = 4 * s;
+  // TT 馬達側視比例：齒輪箱 37×22.5、輸出軸距頂端 11、馬達罐約 20.5 高、22 長。
+  const Wb = 22.5 * s, Lb = 37 * s, ax = 11 * s, Hc = 20.5 * s, Lc = 22 * s, r = 4 * s;
   const top = -ax;                             // 局部座標：軸在原點，齒輪箱頂端在 -ax
-  // DC 馬達罐（鐵灰色膠囊，從齒輪箱底端再往外凸出）
-  add('rect', { x: -Dc / 2, y: top + Lb - r, width: Dc, height: Lc, rx: Dc / 2, ry: Dc / 2, fill: '#5f6b75', stroke: '#3a434b', 'stroke-width': sw(1) });
+  // DC 馬達罐側視：靠齒輪箱端是平的，末端才收圓角。
+  const canW = Hc, canTop = top + Lb - r, canEnd = canTop + Lc, canR = 5 * s;
+  add('path', {
+    d: [
+      `M ${-canW / 2} ${canTop}`,
+      `L ${canW / 2} ${canTop}`,
+      `L ${canW / 2} ${canEnd - canR}`,
+      `Q ${canW / 2} ${canEnd} ${canW / 2 - canR} ${canEnd}`,
+      `L ${-canW / 2 + canR} ${canEnd}`,
+      `Q ${-canW / 2} ${canEnd} ${-canW / 2} ${canEnd - canR}`,
+      'Z'
+    ].join(' '),
+    fill: '#5f6b75', stroke: '#3a434b', 'stroke-width': sw(1)
+  });
   // 齒輪箱（黃色圓角矩形）
   add('rect', { x: -Wb / 2, y: top, width: Wb, height: Lb, rx: r, ry: r, fill: '#f7c948', stroke: '#c9971b', 'stroke-width': sw(1.4) });
   // 齒輪箱上的固定孔裝飾
@@ -604,7 +618,10 @@ function startDrawLink() {
   drawStartNodeId = nearestNodeId(drawStart);
   drawPreview = { x: drawStart.x + LINK_DEFAULT_LEN, y: drawStart.y }; // 先給一根預設長度
   svg.style.cursor = 'crosshair';
-  setBanner('移動滑鼠改長度，按右鍵確定（手機：拖曳後放開）');
+  setBanner(promptText(
+    '移動滑鼠改長度，按右鍵確定',
+    '在畫面拖曳改長度，放開確定'
+  ));
   draw();
 }
 function exitDrawLink() {
@@ -678,7 +695,10 @@ function startDrawTriangle() {
   trianglePoints = [first];
   trianglePreview = b;
   svg.style.cursor = 'crosshair';
-  setBanner('三點桿：先移動調第一段，按右鍵確定（8mm 倍數）');
+  setBanner(promptText(
+    '三點桿：先移動調第一段，按右鍵確定（8mm 倍數）',
+    '三點桿：先拖曳調第一段，放開確定（8mm 倍數）'
+  ));
   draw();
 }
 function exitDrawTriangle() {
@@ -814,7 +834,10 @@ function confirmTriangleBase(e) {
   triangleStage = 'third';
   const a = trianglePoints[0].pos, b = trianglePoints[1].pos;
   trianglePreview = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - Math.max(40, picked.len * 0.8) };
-  setBanner('三點桿：移動選第三孔，按一下或右鍵確定（距離自動對齊 8mm）');
+  setBanner(promptText(
+    '三點桿：移動選第三孔，按一下或右鍵確定（距離自動對齊 8mm）',
+    '三點桿：拖曳選第三孔，放開確定（距離自動對齊 8mm）'
+  ));
   draw();
 }
 function finishDrawTriangle(e) {
@@ -896,7 +919,10 @@ function placeMotor() {
   placingMotor = true;
   pickBars = null;
   svg.style.cursor = 'crosshair';
-  setBanner('點一個接點放上馬達 🔴');
+  setBanner(promptText(
+    '點一個接點放上馬達 🔴',
+    '點一下接點放上馬達 🔴'
+  ));
   draw();
 }
 function handleMotorOnNode(nodeId) {
@@ -912,7 +938,10 @@ function handleMotorOnNode(nodeId) {
   placingMotor = false;
   pickBars = { nodeId, ids: bars.map(b => b.id) };
   svg.style.cursor = '';
-  setBanner('這個接點有好幾根桿，點一下你要馬達轉的那根');
+  setBanner(promptText(
+    '這個接點有好幾根桿，點一下你要馬達轉的那根',
+    '這個接點有好幾根桿，點一下要馬達轉的那根'
+  ));
   draw();
 }
 function tryPickBar(barId) {

@@ -55,6 +55,7 @@
       position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
       color: #b0bac6; font-size: 16px; text-align: center; pointer-events: none; line-height: 1.7;
     }
+    .mobile-hint { display: none; }
     .mode-banner {
       position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
       background: rgba(44,62,80,0.94); color: #fff; border-radius: 999px;
@@ -63,19 +64,26 @@
     }
     /* 控制列 */
     .controls {
-      position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
-      display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.92);
-      backdrop-filter: blur(6px); padding: 10px 16px; border-radius: 16px;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.12);
+      position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.9);
+      backdrop-filter: blur(6px); padding: 6px; border: 1px solid rgba(216,222,230,0.8); border-radius: 999px;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.12);
     }
     .play-btn {
-      width: 54px; height: 54px; border-radius: 50%; border: none; cursor: pointer;
-      background: #2ecc71; color: #fff; font-size: 22px; box-shadow: 0 4px 12px rgba(46,204,113,0.4);
+      width: 38px; height: 38px; border-radius: 50%; border: none; cursor: pointer;
+      background: #2ecc71; color: #fff; font-size: 17px; line-height: 1;
+      box-shadow: 0 3px 10px rgba(46,204,113,0.32);
     }
-    .play-btn.playing { background: #f1c40f; box-shadow: 0 4px 12px rgba(241,196,15,0.4); }
-    .ctrl-sub { font-size: 13px; color: #7f8c8d; min-width: 64px; }
+    .play-btn.playing { background: #f1c40f; box-shadow: 0 3px 10px rgba(241,196,15,0.32); }
+    .ctrl-sub {
+      min-width: 42px; padding: 0 8px; font-size: 12px; font-weight: 700; color: #60717d;
+      text-align: center; white-space: nowrap;
+    }
     .clear-btn { border: 1px solid #e6e9f0; background: #fff; color: #7f8c8d; border-radius: 10px;
       padding: 8px 12px; cursor: pointer; font-size: 13px; }
+    .controls .clear-btn {
+      width: 34px; height: 34px; border-radius: 999px; padding: 0; line-height: 1;
+    }
     .danger-btn { border-color: #ffc9c9; background: #fff5f5; color: #c0392b; font-weight: 700; }
     /* 選取連桿後的長度編輯面板 */
     .len-editor { position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column;
@@ -110,6 +118,10 @@
       background: rgba(15,20,32,0.75); color: #cdd6e6; border-radius: 999px; padding: 7px 14px;
       font-size: 13px; pointer-events: none; }
     #btn3d.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+    @media (hover: none), (pointer: coarse) {
+      .desktop-hint { display: none; }
+      .mobile-hint { display: inline; }
+    }
     /* 手機：零件盤移到底部橫條，畫布吃滿上方 */
     @media (max-width: 640px) {
       header { flex-wrap: wrap; gap: 8px; }
@@ -120,7 +132,10 @@
       .tray-title { display: none; }
       .block { flex: 0 0 auto; min-width: 84px; padding: 8px 6px; }
       .block .ico { font-size: 24px; }
-      .controls { bottom: 10px; gap: 8px; padding: 8px 12px; flex-wrap: wrap; justify-content: center; }
+      .controls { bottom: 8px; gap: 5px; padding: 5px; max-width: calc(100% - 16px); }
+      .play-btn { width: 36px; height: 36px; font-size: 16px; }
+      .controls .clear-btn { width: 32px; height: 32px; font-size: 12px; }
+      .ctrl-sub { min-width: 36px; padding: 0 5px; font-size: 11px; }
       .len-editor, .role-editor { top: 10px; padding: 6px 8px; gap: 6px; }
       .len-editor { left: 8px; }
       .role-editor { right: 8px; }
@@ -156,12 +171,12 @@
       <div class="block link" onclick="window.blocks.startDrawLink()">
         <span class="ico">🔵</span>
         <span class="name">連桿</span>
-        <span class="role">在畫面拖曳拉出</span>
+        <span class="role"><span class="desktop-hint">移動滑鼠拉出</span><span class="mobile-hint">拖曳拉出</span></span>
       </div>
       <div class="block triangle" onclick="window.blocks.startDrawTriangle()">
         <span class="ico">🔺</span>
         <span class="name">三點桿</span>
-        <span class="role">移動調形狀，右鍵確定</span>
+        <span class="role"><span class="desktop-hint">移動調形狀，右鍵確定</span><span class="mobile-hint">拖曳調形狀，放開確定</span></span>
       </div>
       <div class="block motor" onclick="window.blocks.placeMotor()">
         <span class="ico">🔴</span>
@@ -172,7 +187,10 @@
 
     <div class="canvas-wrap">
       <svg id="stageSvg" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
-      <div class="hint" id="hint">放一根🔵連桿 → 把🔴馬達放到它一端 → 按 ▶ 看它動</div>
+      <div class="hint" id="hint">
+        <span class="desktop-hint">先點🔵連桿，移動滑鼠拉長，右鍵確定<br>再把🔴馬達放到端點，按 ▶ 看它動</span>
+        <span class="mobile-hint">先點🔵連桿，在畫面拖曳拉長並放開<br>再把🔴馬達放到端點，按 ▶ 看它動</span>
+      </div>
       <div class="mode-banner" id="modeBanner" style="display:none;"></div>
       <div class="mode-banner" id="solveBanner" style="display:none; top:58px;"></div>
       <div class="len-editor" id="lenEditor" style="display:none;">
@@ -205,14 +223,17 @@
         <button id="traceBtn" onclick="window.blocks.toggleTracePoint()" title="追蹤這個接點走過的路徑">設軌跡點</button>
       </div>
       <div id="view3d">
-        <div class="view3d-hint">🧊 3D 預覽：拖曳旋轉、滾輪縮放。編輯請關掉 3D 回到平面。</div>
+        <div class="view3d-hint">
+          <span class="desktop-hint">🧊 3D 預覽：拖曳旋轉、滾輪縮放。編輯請關掉 3D 回到平面。</span>
+          <span class="mobile-hint">🧊 3D 預覽：單指旋轉、雙指縮放。編輯請關掉 3D 回到平面。</span>
+        </div>
       </div>
       <div class="controls">
-        <button class="play-btn" id="playBtn" onclick="window.blocks.togglePlay()">▶</button>
-        <div class="ctrl-sub">角度 <span id="thetaVal">0</span>°</div>
-        <button class="clear-btn" onclick="window.blocks.fitView()" title="把機構縮放置中到畫面">⊡ 置中</button>
-        <button class="clear-btn" id="btn3d" onclick="window.blocks.toggle3D()">🧊 3D</button>
-        <button class="clear-btn" onclick="window.blocks.clearAll()">🗑 清空</button>
+        <button class="play-btn" id="playBtn" onclick="window.blocks.togglePlay()" title="播放 / 暫停">▶</button>
+        <div class="ctrl-sub" title="目前角度"><span id="thetaVal">0</span>°</div>
+        <button class="clear-btn" onclick="window.blocks.fitView()" title="置中">⊡</button>
+        <button class="clear-btn" id="btn3d" onclick="window.blocks.toggle3D()" title="3D 預覽">3D</button>
+        <button class="clear-btn" onclick="window.blocks.clearAll()" title="清空">🗑</button>
       </div>
     </div>
   </div>
