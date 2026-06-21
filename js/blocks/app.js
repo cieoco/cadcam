@@ -1052,8 +1052,11 @@ function onNodeDown(e, id) {
   if (pickBars) return;
   preDragSnap = snapshotStr(); // 拖曳前狀態；若真的有變動，drag end 才記入 undo
   pause();
-  selectedNodeId = id;
+  // 選接點時收掉桿件 / 三點桿的長度面板，兩種屬性列互斥不疊在一起。
+  selectedLinkId = null;
   selectedTriangleId = null;
+  document.getElementById('lenEditor').style.display = 'none';
+  selectedNodeId = id;
   updateRoleEditor();
   dragId = id; snapTarget = null;
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
