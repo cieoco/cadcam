@@ -248,9 +248,10 @@
             <span class="le-value"><span id="lenValue">88</span><span class="le-unit">mm</span></span>
             <button class="le-step" onclick="window.blocks.changeLen(8)" title="長 8mm（多一孔）">＋</button>
           </span>
+          <button class="lift-btn" id="sliderFlipBtn" style="display:none;" onclick="window.blocks.flipSlider()" title="把滑塊翻到軌道的另一側（組裝在錯邊時用）">🔄 翻面</button>
           <button class="clear-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除選取的桿件">🗑 刪除</button>
         </div>
-        <div class="le-row">
+        <div class="le-row" id="zliftRow">
           <span class="le-title">疊放</span>
           <button class="lift-btn" id="liftUpBtn" onclick="window.blocks.bringPart('up')" title="往上疊一層（一路挪回去就回到自動）">🔼 上移一層</button>
           <button class="lift-btn" id="liftDownBtn" onclick="window.blocks.bringPart('down')" title="往下疊一層（一路挪回去就回到自動）">🔽 下移一層</button>
@@ -326,6 +327,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/blocks/app.js?v=20240128_06"></script>
+  <script type="module" src="js/blocks/app.js?v=20240128_07"></script>
 </body>
 </html>
