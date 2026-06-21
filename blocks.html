@@ -49,6 +49,7 @@
     .block.anchor { border-color: #d8dee6; }
     .block.link { border-color: #bcd3f0; }
     .block.triangle { border-color: #c7ead2; }
+    .block.slider { border-color: #bfe3da; }
 
     /* 畫布 */
     .canvas-wrap { flex: 1; position: relative; min-width: 0; }
@@ -214,6 +215,11 @@
         <span class="name">三點桿</span>
         <span class="role"><span class="desktop-hint">移動調形狀，右鍵確定</span><span class="mobile-hint">拖曳調形狀，放開確定</span></span>
       </div>
+      <div class="block slider" onclick="window.blocks.startDrawRail()">
+        <span class="ico">🟩</span>
+        <span class="name">滑軌</span>
+        <span class="role"><span class="desktop-hint">拉出軌道，右鍵確定</span><span class="mobile-hint">拖出軌道，放開確定</span></span>
+      </div>
       <div class="block motor" onclick="window.blocks.openPowerMenu()">
         <span class="ico">⚡</span>
         <span class="name">動力來源</span>
@@ -273,6 +279,21 @@
           <button class="le-step" onclick="window.blocks.changeServoAngle('end',15)" title="結束角 ＋15°">＋</button>
         </div>
       </div>
+      <div class="servo-editor" id="strokeEditor" style="display:none;">
+        <span class="se-title">🟢 活塞行程</span>
+        <div class="se-row">
+          <span class="se-label">起點</span>
+          <button class="le-step" onclick="window.blocks.changeStroke('start',-8)" title="行程起點 −8mm">−</button>
+          <span class="le-value"><span id="strokeStartVal">0</span><span class="le-unit">mm</span></span>
+          <button class="le-step" onclick="window.blocks.changeStroke('start',8)" title="行程起點 ＋8mm">＋</button>
+        </div>
+        <div class="se-row">
+          <span class="se-label">終點</span>
+          <button class="le-step" onclick="window.blocks.changeStroke('end',-8)" title="行程終點 −8mm">−</button>
+          <span class="le-value"><span id="strokeEndVal">64</span><span class="le-unit">mm</span></span>
+          <button class="le-step" onclick="window.blocks.changeStroke('end',8)" title="行程終點 ＋8mm">＋</button>
+        </div>
+      </div>
       <div class="power-menu" id="powerMenu" style="display:none;">
         <div class="pm-title">選擇動力來源</div>
         <button class="pm-opt" onclick="window.blocks.pickMotorType('tt')">
@@ -282,6 +303,10 @@
         <button class="pm-opt" onclick="window.blocks.pickMotorType('mg995')">
           <span class="pm-ico">🟦</span>
           <span class="pm-text"><b>MG995 伺服</b><small>角度範圍內來回擺</small></span>
+        </button>
+        <button class="pm-opt" onclick="window.blocks.pickMotorType('linear')">
+          <span class="pm-ico">🟢</span>
+          <span class="pm-text"><b>線性致動器</b><small>沿滑軌直線推拉（放到滑塊上）</small></span>
         </button>
         <button class="pm-cancel" onclick="window.blocks.openPowerMenu()">取消</button>
       </div>
@@ -301,6 +326,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/blocks/app.js?v=20240128_04"></script>
+  <script type="module" src="js/blocks/app.js?v=20240128_06"></script>
 </body>
 </html>

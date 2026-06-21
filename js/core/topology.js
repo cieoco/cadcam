@@ -266,16 +266,18 @@ export function compileTopology(components, topology, solvedPoints) {
             const p3 = allPointsMap.get(c.p3.id);
 
             let baseDist = 0;
-            if (p1 && p3) {
-                // 計算初始位置相對於 P1 的距離
-                const dx = p3.x - p1.x;
-                const dy = p3.y - p1.y;
+            let ux = 1, uy = 0;                         // 軌道方向單位向量（活塞沿此推移）
+            if (p1 && p2) {
                 const trackDx = p2.x - p1.x;
                 const trackDy = p2.y - p1.y;
                 const L = Math.hypot(trackDx, trackDy);
                 if (L > 0) {
-                    // 使用投影來確定初始位移 (避免點不在線上時的誤差)
-                    baseDist = (dx * trackDx + dy * trackDy) / L;
+                    ux = trackDx / L;
+                    uy = trackDy / L;
+                    if (p3) {
+                        // 使用投影來確定初始位移 (避免點不在線上時的誤差)
+                        baseDist = ((p3.x - p1.x) * trackDx + (p3.y - p1.y) * trackDy) / L;
+                    }
                 }
             }
 
@@ -284,7 +286,10 @@ export function compileTopology(components, topology, solvedPoints) {
                 type: 'input_linear',
                 p1: c.p1.id,
                 p2: c.p2.id,
+                ux: ux,
+                uy: uy,
                 baseDist: baseDist,
+                baseLen: baseDist,
                 valve_id: String(c.physicalMotor || '1'),
                 physical_motor: String(c.physicalMotor || '1')
             });

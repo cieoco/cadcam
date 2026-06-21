@@ -107,6 +107,31 @@ export const BLOCK_EXAMPLES = [
     }
   },
   {
+    id: 'slider-crank',
+    title: '滑塊曲柄：往復運動',
+    note: '紅色馬達整圈轉，透過連桿推動綠色滑塊在🟩滑軌上往復滑動（活塞原理）。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 6,
+      comps: [
+        { type: 'anchor', id: 'Anchor1', p1: pt('O', 'fixed', 0, 0) },
+        bar('Link1', pt('O', 'fixed', 0, 0, { physicalMotor: '1' }), pt('A', 'floating', 30, 0), 30, {
+          color: '#e74c3c',
+          isInput: true,
+          physicalMotor: '1',
+          phaseOffset: 0
+        }),
+        {
+          type: 'slider', id: 'Slider1', color: '#16a085', sign: 1, lenParam: 'SL1',
+          p1: pt('Sa', 'fixed', 40, 0), p2: pt('Sb', 'fixed', 140, 0), p3: pt('P3', 'floating', 120, 0)
+        },
+        bar('Link2', pt('A', 'floating', 30, 0), pt('P3', 'floating', 120, 0), 90)
+      ],
+      params: { LL1: 30, LL2: 90, SL1: 100 }
+    }
+  },
+  {
     id: 'empty-challenge',
     title: '空白挑戰',
     note: '從零開始，試著做出馬達可整圈轉的機構。',

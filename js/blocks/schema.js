@@ -107,6 +107,39 @@ function normalizeTriangle(comp, index, params, warnings) {
   return out;
 }
 
+function normalizeSlider(comp, index, params, warnings) {
+  const id = safeId(comp.id) ? comp.id : `Slider${index + 1}`;
+  const p1 = normalizePoint(comp.p1, `S${index + 1}a`, warnings);
+  const p2 = normalizePoint(comp.p2, `S${index + 1}b`, warnings);
+  const p3 = normalizePoint(comp.p3, `S${index + 1}c`, warnings);
+  p1.type = 'fixed';   // 軌道兩端釘地
+  p2.type = 'fixed';
+  p3.type = 'floating'; // 滑塊點沿軌道滑動（活塞模式由 input_linear 推算，型別仍非 fixed）
+  const lenParam = safeId(comp.lenParam) ? comp.lenParam : `SL${index + 1}`;
+  const out = {
+    type: 'slider',
+    id,
+    color: SAFE_COLOR.test(comp.color || '') ? comp.color : '#16a085',
+    p1,
+    p2,
+    p3,
+    lenParam,
+    sign: Number(comp.sign) < 0 ? -1 : 1
+  };
+  // 線性致動器（活塞）模式：滑塊點本身被直線位移驅動
+  if (comp.isInput || comp.physicalMotor || p3.physicalMotor) {
+    out.isInput = true;
+    out.physicalMotor = String(comp.physicalMotor || p3.physicalMotor || '1');
+    const clampMm = v => Math.max(-400, Math.min(400, Math.round(num(v, 0))));
+    out.strokeMin = clampMm(comp.strokeMin ?? 0);
+    out.strokeMax = clampMm(comp.strokeMax ?? 64);
+  }
+  // 軌道長度參數（保留；被動時驅動桿長由 compile 自動找，這裡僅記錄軌道兩端距離）
+  const rawLen = params[lenParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  params[lenParam] = Math.round(num(rawLen, 0));
+  return out;
+}
+
 function dropZeroBars(comps) {
   return comps.filter(comp => !(comp.type === 'bar' && comp.p1 && comp.p2 && comp.p1.id === comp.p2.id));
 }
@@ -141,6 +174,7 @@ export function normalizeSnapshot(obj) {
     if (raw.type === 'anchor') comps.push(normalizeAnchor(raw, index, warnings));
     else if (raw.type === 'bar') comps.push(normalizeBar(raw, index, params, warnings));
     else if (raw.type === 'triangle') comps.push(normalizeTriangle(raw, index, params, warnings));
+    else if (raw.type === 'slider') comps.push(normalizeSlider(raw, index, params, warnings));
     else warnings.push(`不支援的零件 ${raw.type || '(unknown)'}，已略過。`);
   });
 

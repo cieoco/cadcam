@@ -1117,11 +1117,13 @@ export function solveTopology(topologyOrParams, params) {
             else if (step.type === 'input_linear') {
                 const p1 = points[step.p1];
                 if (p1) {
-                    const ux = step.ux || 1;
-                    const uy = step.uy || 0;
+                    // 方向＝軌道單位向量。注意 ux 可能為 0（垂直軌道），不能用 || 預設成 1，
+                    // 否則垂直/斜向的線性致動件方向會被硬掰成水平（早期 bug）。
+                    const ux = Number.isFinite(step.ux) ? Number(step.ux) : 1;
+                    const uy = Number.isFinite(step.uy) ? Number(step.uy) : 0;
 
-                    // 1. 讀取基礎長度 (L1, L2...)
-                    let baseLen = Number(step.baseLen || 0);
+                    // 1. 讀取基礎長度（桿活塞寫 baseLen、滑塊輸入寫 baseDist，兩者都收）
+                    let baseLen = Number(step.baseLen ?? step.baseDist ?? 0);
                     const lp = step.len_param;
                     if (lp) {
                         if (actualParams[lp] !== undefined) baseLen = Number(actualParams[lp]);
