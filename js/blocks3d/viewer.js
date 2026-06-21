@@ -126,6 +126,13 @@ export function createViewer(container) {
   const holeR = 3.4;   // 板上孔徑（視覺用）
   const pinMat = new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.6, roughness: 0.35 });
   const groundMat = new THREE.MeshStandardMaterial({ color: 0x34495e, metalness: 0.2, roughness: 0.8 });
+  // TT 齒輪馬達：黃色齒輪箱 + 深色 DC 罐（與 2D drawTTMotor 同色系）
+  const motorBoxMat = new THREE.MeshStandardMaterial({ color: 0xf7c948, metalness: 0.1, roughness: 0.55 });
+  const motorCanMat = new THREE.MeshStandardMaterial({ color: 0x37474f, metalness: 0.4, roughness: 0.5 });
+  // TT 馬達真實比例（mm）：齒輪箱 37(長)×22.5(寬)×16(厚)、DC 罐 ⌀20.5×22、輸出軸 ⌀~5。
+  // 馬達躺在與機構平行的平面、沉在桿件背面；長軸(boxLen)朝機架方向，輸出軸沿 z。
+  // shaftInset = 輸出軸距齒輪箱近端的距離（與 2D 的 ax 一致）。
+  const MOTOR = { boxLen: 37, boxW: 22.5, boxThick: 16, canD: 20.5, canLen: 22, shaftR: 2.6, shaftInset: 11, gap: 1 };
   const matCache = new Map(); // color -> material（避免每幀重建材質）
 
   function plateMaterial(color) {
@@ -144,7 +151,8 @@ export function createViewer(container) {
     for (let i = dynamic.children.length - 1; i >= 0; i--) {
       const obj = dynamic.children[i];
       dynamic.remove(obj);
-      if (obj.geometry) obj.geometry.dispose();
+      // 含 group（馬達）：把底下每個 mesh 的 geometry 都釋放掉，避免逐幀洩漏
+      obj.traverse(o => { if (o.geometry) o.geometry.dispose(); });
       // 材質有快取共用，不在這裡 dispose
     }
   }
@@ -179,6 +187,40 @@ export function createViewer(container) {
       const mesh = new THREE.Mesh(geo, plateMaterial(pl.color));
       mesh.position.z = pl.z;
       dynamic.add(mesh);
+    });
+
+    // 馬達：躺在機構背面（z<0）、長軸朝機架方向，輸出軸沿 +z 往上頂到曲柄那層帶動它。
+    // 用一個 group 擺位 + 繞 z 轉到朝向；輸出軸在 local 原點（不受轉向影響、永遠在關節軸上）。
+    // 輸出軸兼當該關節的軸，因此 scene-model 不再為馬達中心畫銷柱／地錨支柱。
+    (model.motors || []).forEach(m => {
+      const g = new THREE.Group();
+      g.position.set(m.x, m.y, 0);
+      g.rotation.z = Math.atan2(m.dir ? m.dir.y : -1, m.dir ? m.dir.x : 0);
+
+      const bodyCz = -(MOTOR.gap + MOTOR.boxThick / 2);   // 本體中心 z（沉在桿件背面）
+      // 齒輪箱：寬面平行機構平面、薄邊沿 z；輸出軸在近端，本體往機架方向延伸不壓到連桿
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(MOTOR.boxLen, MOTOR.boxW, MOTOR.boxThick), motorBoxMat);
+      box.position.set(MOTOR.boxLen / 2 - MOTOR.shaftInset, 0, bodyCz);
+      g.add(box);
+
+      // DC 罐：軸沿馬達長軸（local x），接在齒輪箱遠端再往外凸
+      const can = new THREE.Mesh(
+        new THREE.CylinderGeometry(MOTOR.canD / 2, MOTOR.canD / 2, MOTOR.canLen, 20), motorCanMat);
+      can.rotation.z = Math.PI / 2;   // 預設沿 y → 轉成沿 x（長軸）
+      can.position.set(MOTOR.boxLen - MOTOR.shaftInset + MOTOR.canLen / 2 - 2, 0, bodyCz);
+      g.add(can);
+
+      // 輸出軸：沿 z，從齒輪箱頂面頂到曲柄
+      const boxTopZ = -MOTOR.gap;
+      const shaftLen = Math.max(1, m.shaftTopZ - boxTopZ);
+      const shaft = new THREE.Mesh(
+        new THREE.CylinderGeometry(MOTOR.shaftR, MOTOR.shaftR, shaftLen, 16), pinMat);
+      shaft.rotation.x = Math.PI / 2;
+      shaft.position.set(0, 0, boxTopZ + shaftLen / 2);
+      g.add(shaft);
+
+      dynamic.add(g);
     });
 
     // 關節：銷柱（圓柱預設沿 Y 軸，轉成沿 Z）
@@ -239,6 +281,8 @@ export function createViewer(container) {
     matCache.forEach(m => m.dispose());
     pinMat.dispose();
     groundMat.dispose();
+    motorBoxMat.dispose();
+    motorCanMat.dispose();
     controls.dispose();
     renderer.dispose();
     if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);

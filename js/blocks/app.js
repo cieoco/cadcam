@@ -381,15 +381,16 @@ function draw() {
 
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
   // polygons 一併帶上：3D 用它把三點桿畫成實心板，並過濾掉與三角板邊重疊的桿（避免分身）。
-  lastModelInputs = { links: linksToDraw, pts, groundIds, polygons: compiled.visualization.polygons || [] };
+  // motorCenterIds：3D 把這些中心畫成沉在機構背面的馬達，輸出軸往上帶動曲柄。
+  lastModelInputs = { links: linksToDraw, pts, groundIds, motorCenterIds, polygons: compiled.visualization.polygons || [] };
   if (view3DActive) push3D();
 }
 
 // 用最近一幀的求解結果建場景模型，推進 3D viewer
 function push3D() {
   if (!viewer3D || !lastModelInputs) return;
-  const { links, pts, groundIds, polygons } = lastModelInputs;
-  const model = buildSceneModel(links, pts, { groundIds, hullR: HULL_R_WORLD, polygons });
+  const { links, pts, groundIds, motorCenterIds, polygons } = lastModelInputs;
+  const model = buildSceneModel(links, pts, { groundIds, motorCenters: motorCenterIds, hullR: HULL_R_WORLD, polygons });
   viewer3D.update(model);
 }
 

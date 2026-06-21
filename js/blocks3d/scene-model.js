@@ -13,12 +13,13 @@
  * @param {Object} points - id -> { x, y }（已合併靜態點與 solver 解）
  * @param {Object} [opts]
  * @param {Set}    [opts.groundIds]      - 視為地錨的節點 id
+ * @param {Set}    [opts.motorCenters]   - 馬達輸出軸所在的節點 id（input crank 的中心）
  * @param {Array}  [opts.polygons]       - compiled.visualization.polygons：三點桿，{ points:[id,id,id], color }
  * @param {number} [opts.hullR=9]        - 冰棒棍外形半徑（與 2D 一致）
  * @param {number} [opts.plateGap=6]     - 相鄰層的 z 間距 (mm)
  * @param {number} [opts.plateThickness=4] - 每片板的厚度 (mm)
  * @param {number} [opts.pinR=3.2]       - 銷柱半徑 (mm)
- * @returns {{ sticks, plates, pins, grounds, plateGap, plateThickness, center, span }}
+ * @returns {{ sticks, plates, pins, grounds, motors, plateGap, plateThickness, center, span }}
  */
 export function buildSceneModel(links, points, opts = {}) {
   const hullR = opts.hullR ?? 9;
@@ -26,6 +27,7 @@ export function buildSceneModel(links, points, opts = {}) {
   const plateThickness = opts.plateThickness ?? 4;
   const pinR = opts.pinR ?? 3.2;
   const groundIds = opts.groundIds || new Set();
+  const motorCenters = opts.motorCenters || new Set();
   const polygons = opts.polygons || [];
 
   const valid = (id) => {
@@ -170,9 +172,38 @@ export function buildSceneModel(links, points, opts = {}) {
 
   const pins = [];
   const grounds = [];
+  const motors = [];
   joints.forEach(j => {
     const z0 = j.min * plateGap;
     const z1 = j.max * plateGap + plateThickness;
+    if (motorCenters.has(j.id)) {
+      // 馬達鎖在固定桿上：本體沉到機構背面（z<0）、躺平往機架方向延伸，輸出軸沿 z 往上帶動曲柄。
+      // 輸出軸兼當這個關節的軸，所以這裡不再另畫銷柱、也不畫地錨支柱（改由 viewer 畫馬達）。
+      // 朝向：對準接在中心、非曲柄的那根桿的另一端（通常是機架）；沒有就朝最近的另一個地錨；都沒有朝 -y。
+      let tx = null, ty = null;
+      const frameBar = sticks.find(s => !s.isCrank && (s.p1 === j.id || s.p2 === j.id));
+      if (frameBar) {
+        const oid = frameBar.p1 === j.id ? frameBar.p2 : frameBar.p1;
+        const op = points[oid];
+        if (op && Number.isFinite(op.x)) { tx = op.x; ty = op.y; }
+      }
+      if (tx === null) {
+        let bd = Infinity;
+        groundIds.forEach(gid => {
+          if (gid === j.id) return;
+          const gp = points[gid];
+          if (gp && Number.isFinite(gp.x)) {
+            const d = Math.hypot(gp.x - j.x, gp.y - j.y);
+            if (d < bd) { bd = d; tx = gp.x; ty = gp.y; }
+          }
+        });
+      }
+      const dx = tx !== null ? tx - j.x : 0;
+      const dy = ty !== null ? ty - j.y : -1;
+      const dl = Math.hypot(dx, dy) || 1;
+      motors.push({ id: j.id, x: j.x, y: j.y, baseZ: z0, shaftTopZ: z1 + 1.5, dir: { x: dx / dl, y: dy / dl } });
+      return;
+    }
     pins.push({
       id: j.id,
       x: j.x,
@@ -203,14 +234,16 @@ export function buildSceneModel(links, points, opts = {}) {
   // anchored=true 時 viewer 可每幀同步（反正不動）；false 時 viewer 只在初次定位、之後凍結。
   const maxLayer = [...sticks, ...plates].reduce((m, s) => Math.max(m, s.layer), 0);
   const midZ = (maxLayer * plateGap + plateThickness) / 2;
-  const anchored = grounds.length > 0;
+  // 馬達中心也是固定點，一併納入對焦形心（否則只有馬達、沒有其他地錨時相機會抓不到定點）
+  const anchorPts = [...grounds, ...motors];
+  const anchored = anchorPts.length > 0;
   const focus = anchored
     ? {
-        x: grounds.reduce((s, g) => s + g.x, 0) / grounds.length,
-        y: grounds.reduce((s, g) => s + g.y, 0) / grounds.length,
+        x: anchorPts.reduce((s, g) => s + g.x, 0) / anchorPts.length,
+        y: anchorPts.reduce((s, g) => s + g.y, 0) / anchorPts.length,
         z: midZ,
       }
     : { x: bboxCenter.x, y: bboxCenter.y, z: midZ };
 
-  return { sticks, plates, pins, grounds, plateGap, plateThickness, span, focus, anchored };
+  return { sticks, plates, pins, grounds, motors, plateGap, plateThickness, span, focus, anchored };
 }
