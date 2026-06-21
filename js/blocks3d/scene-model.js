@@ -9,6 +9,71 @@
  */
 
 /**
+ * 以「離固定桿的距離」決定每個剛體的疊放層級。2D 的繪製疊放順序與 3D 的 z 分層
+ * 共用這同一套，兩邊才會一致。
+ * @param {Array} bodies - [{ joints: [nodeId...] }]（桿 2 個、三角板 3 個銷孔）
+ * @param {Set}   [groundIds] - 地錨節點 id
+ * @param {Object} [opts]
+ * @param {(i:number)=>number} [opts.floorOf] - 取代 rank 當「樓地板」的覆寫（手動圖層用）
+ * @returns {number[]} 與 bodies 同序的層級（越大越外/越上）
+ *
+ * 原則：(1) 節點離地深度 BFS（地錨 0；其餘＝相鄰最小深度＋1；無地錨/不連通視為 0）。
+ *       (2) 剛體 rank ＝ 端點最大深度：機架 0 疊最內、逐級往外。
+ *       (3) 依 rank 由小到大著色，取「≥ 樓地板、共銷鄰居未佔」的最小層。
+ *       rank 當樓地板 → 固定桿最底、外側往上、銷柱只跨相鄰層；共銷檢查 → 同銷孔必不同層
+ *       （避免穿模，dyad 閉合的兩根自動錯開）。只看拓撲不看姿勢，逐幀穩定。
+ *       floorOf 可覆寫樓地板，給「移到最上 / 最下」之類的手動調整用。
+ */
+export function computeBodyLayers(bodies, groundIds = new Set(), opts = {}) {
+  const adj = new Map();
+  const link2 = (a, b) => { if (!adj.has(a)) adj.set(a, new Set()); adj.get(a).add(b); };
+  bodies.forEach(body => {
+    const js = body.joints;
+    for (let i = 0; i < js.length; i++) {
+      for (let k = i + 1; k < js.length; k++) { link2(js[i], js[k]); link2(js[k], js[i]); }
+    }
+  });
+  const depth = new Map();
+  const seeds = [...new Set(bodies.flatMap(b => b.joints))].filter(id => groundIds.has(id));
+  seeds.forEach(id => depth.set(id, 0));
+  const queue = [...seeds];
+  while (queue.length) {
+    const cur = queue.shift();
+    const d = depth.get(cur);
+    (adj.get(cur) || []).forEach(nb => { if (!depth.has(nb)) { depth.set(nb, d + 1); queue.push(nb); } });
+  }
+  const depthOf = id => (depth.has(id) ? depth.get(id) : 0);
+  const rankOf = body => body.joints.reduce((m, id) => Math.max(m, depthOf(id)), 0);
+  const floorOf = opts.floorOf || ((i) => rankOf(bodies[i]));
+  const floors = bodies.map((_, i) => floorOf(i));
+
+  // 共銷衝突圖（剛體 i,j 共用同一銷孔則相鄰）
+  const jointTo = new Map();
+  bodies.forEach((body, i) => body.joints.forEach(pid => {
+    if (!jointTo.has(pid)) jointTo.set(pid, []);
+    jointTo.get(pid).push(i);
+  }));
+  const neighbors = bodies.map(() => new Set());
+  jointTo.forEach(idxs => {
+    for (let a = 0; a < idxs.length; a++) {
+      for (let b = a + 1; b < idxs.length; b++) { neighbors[idxs[a]].add(idxs[b]); neighbors[idxs[b]].add(idxs[a]); }
+    }
+  });
+
+  // 依樓地板由小到大（同高維持原始順序）著色，取「≥樓地板、共銷鄰居未佔」的最小層
+  const order = bodies.map((_, i) => i).sort((a, b) => (floors[a] - floors[b]) || (a - b));
+  const layerOf = new Array(bodies.length).fill(undefined);
+  order.forEach(i => {
+    const used = new Set();
+    neighbors[i].forEach(j => { if (layerOf[j] !== undefined) used.add(layerOf[j]); });
+    let c = floors[i];
+    while (used.has(c)) c++;
+    layerOf[i] = c;
+  });
+  return layerOf;
+}
+
+/**
  * @param {Array} links  - compiled.visualization.links 風格：{ id, p1, p2, style, color, hidden }
  * @param {Object} points - id -> { x, y }（已合併靜態點與 solver 解）
  * @param {Object} [opts]
@@ -57,65 +122,8 @@ export function buildSceneModel(links, points, opts = {}) {
     ...triPlates.map(poly => ({ kind: 'plate', src: poly, joints: [...poly.points] })),
   ];
 
-  // --- 分層原則：以「離固定桿的距離」由內往外疊 ---
-  // (1) 節點離地深度：地錨 = 0，其餘 = 相鄰節點最小深度 + 1（從地錨向外 BFS）。
-  //     沒有地錨（或某塊與地錨不連通）時深度視為 0 —— 等同退回「全部從底層開始」。
-  // (2) 剛體 rank = 它端點的「最大」節點深度：兩端皆地錨的機架 rank 0 疊最內，
-  //     接在機架上的曲柄/搖桿 rank 1，再外面的連桿/三角板 rank 2…逐級往外。
-  // (3) 依 rank 由小到大著色，每個剛體取「≥ 自己 rank、且沒有共銷鄰居佔用」的最小層。
-  //     rank 當樓地板 → 固定桿最底、外側桿往上，銷柱只跨相鄰層（短、不橫穿別的桿）；
-  //     共銷檢查 → 同一個銷孔上的剛體必不同層（避免銷孔穿模），dyad 閉合的兩根會自動錯開。
-  // 分層只看拓撲、不看當下姿勢，逐幀穩定不跳動。日後要「額外設定」（手動指定某桿層級）
-  // 只需在這裡用覆寫值取代 rank 當樓地板即可。
-  const adj = new Map();
-  const link2 = (a, b) => {
-    if (!adj.has(a)) adj.set(a, new Set());
-    adj.get(a).add(b);
-  };
-  bodies.forEach(body => {
-    const js = body.joints;
-    for (let i = 0; i < js.length; i++) {
-      for (let k = i + 1; k < js.length; k++) { link2(js[i], js[k]); link2(js[k], js[i]); }
-    }
-  });
-  const depth = new Map();
-  const seeds = [...new Set(bodies.flatMap(b => b.joints))].filter(id => groundIds.has(id));
-  seeds.forEach(id => depth.set(id, 0));
-  const queue = [...seeds];
-  while (queue.length) {
-    const cur = queue.shift();
-    const d = depth.get(cur);
-    (adj.get(cur) || []).forEach(nb => {
-      if (!depth.has(nb)) { depth.set(nb, d + 1); queue.push(nb); }
-    });
-  }
-  const depthOf = id => (depth.has(id) ? depth.get(id) : 0);
-  const rankOf = body => body.joints.reduce((m, id) => Math.max(m, depthOf(id)), 0);
-  const ranks = bodies.map(rankOf);
-
-  // 共銷衝突圖（剛體 i,j 共用同一銷孔則相鄰）
-  const jointTo = new Map();
-  bodies.forEach((body, i) => body.joints.forEach(pid => {
-    if (!jointTo.has(pid)) jointTo.set(pid, []);
-    jointTo.get(pid).push(i);
-  }));
-  const neighbors = bodies.map(() => new Set());
-  jointTo.forEach(idxs => {
-    for (let a = 0; a < idxs.length; a++) {
-      for (let b = a + 1; b < idxs.length; b++) { neighbors[idxs[a]].add(idxs[b]); neighbors[idxs[b]].add(idxs[a]); }
-    }
-  });
-
-  // 依 rank 由小到大（同 rank 維持原始順序）著色，rank 當樓地板、共銷鄰居不可同層
-  const order = bodies.map((_, i) => i).sort((a, b) => (ranks[a] - ranks[b]) || (a - b));
-  const layerOf = new Array(bodies.length).fill(undefined);
-  order.forEach(i => {
-    const used = new Set();
-    neighbors[i].forEach(j => { if (layerOf[j] !== undefined) used.add(layerOf[j]); });
-    let c = ranks[i];
-    while (used.has(c)) c++;
-    layerOf[i] = c;
-  });
+  // 分層（離地深度，2D 疊放順序與此共用同一套 → 兩邊一致）
+  const layerOf = computeBodyLayers(bodies, groundIds);
 
   const sticks = [];
   const plates = [];

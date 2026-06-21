@@ -15,7 +15,8 @@
 import { compileTopology } from '../core/topology.js';
 import { solveTopology, sweepTopology } from '../multilink/solver.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
-import { buildSceneModel } from '../blocks3d/scene-model.js';
+// computeBodyLayers：2D 疊放順序與 3D z 分層共用同一套，兩邊才一致。
+import { buildSceneModel, computeBodyLayers } from '../blocks3d/scene-model.js';
 // 純邏輯模組
 import * as View from './view.js';
 import * as Model from './model.js';
@@ -225,6 +226,47 @@ function draw() {
   const motorCenterIds = new Set((compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
   drawTraceTrajectory(getTrajectoryData());
 
+  // 三角板邊：這些 link 由實心三角板代表，2D 不另畫（與 3D scene-model 的 visible 篩法一致）。
+  const triangleEdgeKeys = new Set();
+  (compiled.visualization.polygons || []).forEach(poly => {
+    if (!poly.points || poly.points.length !== 3) return;
+    const [p1, p2, p3] = poly.points;
+    [[p1, p2], [p1, p3], [p2, p3]].forEach(([x, y]) => {
+      triangleEdgeKeys.add([x, y].sort().join('|'));
+    });
+  });
+  const validPt = (id) => pts[id] && Number.isFinite(pts[id].x) && Number.isFinite(pts[id].y);
+  const triKey = (ids) => [...ids].sort().join('|');
+
+  // 疊放分層：用與 3D 完全相同的剛體集合＋原始順序餵 computeBodyLayers，2D/3D 才會一致。
+  // （桿集合與 scene-model 的 visible 一致：可見、兩端有效、不落在三角板邊上。）
+  const layerLinks = (compiled.visualization.links || []).filter(l =>
+    l && !l.hidden && validPt(l.p1) && validPt(l.p2) &&
+    !triangleEdgeKeys.has([l.p1, l.p2].sort().join('|')));
+  const triComps = comps.filter(c => c.type === 'triangle' && c.p1 && c.p2 && c.p3 &&
+    validPt(c.p1.id) && validPt(c.p2.id) && validPt(c.p3.id));
+  const bodyLayers = computeBodyLayers([
+    ...layerLinks.map(l => ({ joints: [l.p1, l.p2] })),
+    ...triComps.map(t => ({ joints: [t.p1.id, t.p2.id, t.p3.id] })),
+  ], groundIds);
+  const linkLayer = new Map();      // link 物件 -> 層
+  layerLinks.forEach((l, i) => linkLayer.set(l, bodyLayers[i]));
+  const triLayerByKey = new Map();  // 三角板三點 key -> 層
+  triComps.forEach((t, j) => triLayerByKey.set(triKey([t.p1.id, t.p2.id, t.p3.id]), bodyLayers[layerLinks.length + j]));
+
+  // 依層級建立 <g> 容器，append 順序＝疊放順序（內層在底、外層在上）。
+  // 馬達擺在所有桿件底下；節點等在這之後直接接到 svg（疊在最上層）。
+  const motorLayer = document.createElementNS(SVG_NS, 'g');
+  svg.appendChild(motorLayer);
+  const sortedLayers = [...new Set(bodyLayers)].sort((a, b) => a - b);
+  const layerGroups = new Map();
+  sortedLayers.forEach(L => {
+    const g = document.createElementNS(SVG_NS, 'g');
+    layerGroups.set(L, g);
+    svg.appendChild(g);
+  });
+  const groupForLayer = (L) => layerGroups.get(L) || motorLayer;
+
   // 三點桿：用圓角三角板呈現，同時仍保留每條邊/孔位的求解語法。
   comps.filter(comp => comp.type === 'triangle' && comp.p1 && comp.p2 && comp.p3).forEach(tri => {
     const ids = [tri.p1.id, tri.p2.id, tri.p3.id];
@@ -244,7 +286,7 @@ function draw() {
       e.stopPropagation();
       selectTriangle(tri.id);
     });
-    svg.appendChild(path);
+    groupForLayer(triLayerByKey.get(triKey(ids))).appendChild(path);
   });
 
   // TT 馬達本體：畫在桿件底下，曲柄轉在它上面。
@@ -267,23 +309,15 @@ function draw() {
       });
     }
     const rotDeg = tgt ? Math.atan2(-(tgt.x - p.x), -(tgt.y - p.y)) * 180 / Math.PI : 0;
-    drawTTMotor(p.x, p.y, rotDeg);
+    drawTTMotor(p.x, p.y, rotDeg, motorLayer);
   });
 
-  // 桿件：紅色曲柄最後畫，避免和藍色桿重疊時被蓋住。
+  // 桿件：依層級放進對應的 <g>（內層在底、外層在上）；同層內紅色曲柄最後畫不被蓋住。
   let missingVisibleLinks = 0;
   const linksToDraw = [...(compiled.visualization.links || [])].sort((a, b) => {
     const ac = a.style === 'crank' ? 1 : 0;
     const bc = b.style === 'crank' ? 1 : 0;
     return ac - bc;
-  });
-  const triangleEdgeKeys = new Set();
-  (compiled.visualization.polygons || []).forEach(poly => {
-    if (!poly.points || poly.points.length !== 3) return;
-    const [p1, p2, p3] = poly.points;
-    [[p1, p2], [p1, p3], [p2, p3]].forEach(([x, y]) => {
-      triangleEdgeKeys.add([x, y].sort().join('|'));
-    });
   });
   linksToDraw.forEach(l => {
     const a = pts[l.p1], b = pts[l.p2];
@@ -316,7 +350,8 @@ function draw() {
         selectLink(l.id);
       });
     }
-    svg.appendChild(stick);
+    const targetG = groupForLayer(linkLayer.get(l));
+    targetG.appendChild(stick);
 
     // 在兩端冰棒棍頭上鑽孔：與外形同色的細圈，讓它看起來像真的打孔的扁棍。
     // 地錨（方塊）本身就是固定銷，不畫孔。
@@ -331,7 +366,7 @@ function draw() {
       hole.setAttribute('stroke-width', 1.5);
       hole.setAttribute('stroke-opacity', 0.7);
       hole.style.pointerEvents = 'none'; // 不擋下面桿身/上面節點的互動
-      svg.appendChild(hole);
+      targetG.appendChild(hole);
     });
   });
   updateSolveBanner(sol, missingVisibleLinks);
@@ -436,7 +471,7 @@ function drawGround() {
 // 在馬達中心畫一顆 TT 減速馬達（黃色齒輪箱 + 深色馬達罐 + 輸出軸）。
 // 畫在桿件底下當固定基座；尺寸用真實比例（mm）並隨縮放縮放。
 // rotDeg＝整顆繞輸出軸旋轉的角度（0＝朝畫面下方）；本體沿局部 +Y 方向延伸。
-function drawTTMotor(cx, cy, rotDeg = 0) {
+function drawTTMotor(cx, cy, rotDeg = 0, parent = svg) {
   const s = View.getScale();
   const jx = TX(cx), jy = TY(cy);
   const g = document.createElementNS(SVG_NS, 'g');
@@ -458,7 +493,7 @@ function drawTTMotor(cx, cy, rotDeg = 0) {
   add('rect', { x: -Wb / 2, y: top, width: Wb, height: Lb, rx: r, ry: r, fill: '#f7c948', stroke: '#c9971b', 'stroke-width': sw(1.4) });
   // 齒輪箱上的固定孔裝飾
   add('circle', { cx: 0, cy: top + Lb * 0.66, r: 2.4 * s, fill: 'none', stroke: '#c9971b', 'stroke-width': sw(1) });
-  svg.appendChild(g);
+  parent.appendChild(g);
 }
 
 // ---- 零件：放下時自動設好「角色」----
