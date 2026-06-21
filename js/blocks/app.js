@@ -144,6 +144,40 @@ const snapWorld = () => View.snapWorld() * (mobilePrompt() ? 2.35 : 1);
 const NODE_TAP_PX = 34;   // 手機點接點的命中半徑（畫面 px，縮放下維持一致手感）
 
 const pointCoords = () => Model.pointCoords(comps);
+// 接點「畫面上實際位置」：元件座標打底，再用最近一次求解結果覆蓋（與 draw() 的 pts 同源）。
+// 吸附 / 命中都該用這個，才會對齊使用者看到的位置——solver 驅動的點（如曲柄動端）尤其重要，
+// 它的元件座標會與被驅動後的畫面位置脫節。
+const displayCoords = () => {
+  const m = pointCoords();
+  for (const id in lastSolved) {
+    const p = lastSolved[id];
+    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) m[id] = { x: p.x, y: p.y };
+  }
+  return m;
+};
+// 以「世界座標 world」為中心，找畫面上最近的接點（排除 exclude），門檻 maxDist。
+const nearestDisplayToPoint = (world, exclude = [], maxDist = snapWorld()) => {
+  const m = displayCoords();
+  let best = null, bestD = maxDist;
+  for (const id in m) {
+    if (exclude.includes(id)) continue;
+    const d = Math.hypot(m[id].x - world.x, m[id].y - world.y);
+    if (d < bestD) { bestD = d; best = id; }
+  }
+  return best;
+};
+// 找最接近「某接點目前畫面位置」的另一個接點（拖曳吸附用）。
+const nearestDisplayTo = (id, exclude = []) => {
+  const m = displayCoords();
+  const d = m[id];
+  if (!d) return null;
+  return nearestDisplayToPoint(d, [id, ...exclude]);
+};
+// 若 id 是某根「馬達輸入桿」的動端（非馬達中心那頭），回那根桿；否則 null。
+const inputCrankMovingEnd = (id) => comps.find(c =>
+  c.type === 'bar' && c.isInput && c.p1 && c.p2 &&
+  ((c.p1.id === id && !c.p1.physicalMotor && c.p2.physicalMotor) ||
+   (c.p2.id === id && !c.p2.physicalMotor && c.p1.physicalMotor))) || null;
 const updatePointCoordsById = (id, x, y) => Model.updatePointCoordsById(comps, id, x, y);
 const freezePointAtDisplay = (id) => Model.freezePointAtDisplay(comps, compiled, theta, id);
 const movePointById = (id, dx, dy) => Model.movePointById(comps, id, dx, dy);
@@ -153,7 +187,6 @@ const removeAnchorsAtPoint = (id) => { comps = Model.removeAnchorsAtPoint(comps,
 const setPointType = (id, type) => Model.setPointType(comps, id, type);
 const roleLabel = (id) => Model.roleLabel(comps, id);
 const hasPoint = (id) => Model.hasPoint(comps, id);
-const findNearest = (id) => Model.findNearest(comps, id, snapWorld());
 const mergePoints = (fromId, toId) => { comps = Model.mergePoints(comps, fromId, toId); };
 const recomputeLengths = () => Model.recomputeLengths(comps, topo);
 const fixedLinkFor = (id) => Model.fixedLinkFor(comps, id);
@@ -722,15 +755,9 @@ function exitDrawLink() {
   clearBanner();
 }
 // 找最靠近某世界座標的既有接點 id（吸附用），exclude 內的略過
+// 命中用「畫面實際位置」(displayCoords) 比對，才點得到 solver 驅動而位置已移動的接點。
 function nearestNodeId(world, exclude = [], maxDist = snapWorld()) {
-  const m = pointCoords();
-  let best = null, bestD = maxDist;
-  for (const id in m) {
-    if (exclude.includes(id)) continue;
-    const d = Math.hypot(m[id].x - world.x, m[id].y - world.y);
-    if (d < bestD) { bestD = d; best = id; }
-  }
-  return best;
+  return nearestDisplayToPoint(world, exclude, maxDist);
 }
 // 從起點 start 拖到 cur 時，算出實際終點：靠近既有接點就吸附相接（長度＝實距），
 // 否則長度對齊 8mm；拖得太短＝當作點一下，給預設長度。
@@ -1210,6 +1237,14 @@ function onDragMove(e) {
     return;
   }
   if (!dragId) return;
+  // 馬達輸入桿的動端：solver 會把它釘在 theta 對應的姿勢，直接拖會被拉回、移不動。
+  // 不跟 solver 較勁——以「指標位置」找最近的接點當吸附目標、放開即連接（綠圈給回饋）。
+  const crankBar = inputCrankMovingEnd(dragId);
+  if (crankBar) {
+    snapTarget = nearestDisplayToPoint(w, [crankBar.p1.id, crankBar.p2.id]);
+    draw();
+    return;
+  }
   let tx = w.x, ty = w.y;
   // 自由連桿：兩端都未固定、也沒接到別的桿時，拖端點等於整根平移。
   const free = freeLinkForPoint(dragId);
@@ -1219,7 +1254,7 @@ function onDragMove(e) {
     const dy = w.y - (p?.y || 0);
     movePointById(free.p1.id, dx, dy);
     movePointById(free.p2.id, dx, dy);
-    snapTarget = findNearest(dragId);
+    snapTarget = nearestDisplayTo(dragId);
     rebuild(); draw();
     return;
   }
@@ -1236,7 +1271,7 @@ function onDragMove(e) {
   }
   updatePointCoordsById(dragId, tx, ty);
   recomputeLengths();
-  snapTarget = findNearest(dragId);
+  snapTarget = nearestDisplayTo(dragId);
   rebuild(); draw();
 }
 function commitDragUndo() {
