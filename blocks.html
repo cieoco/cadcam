@@ -82,12 +82,14 @@
       align-items: stretch; gap: 8px; max-width: 288px;
       background: rgba(255,255,255,0.96); border: 1px solid #e6e9f0; border-radius: 12px; padding: 8px 12px;
       box-shadow: 0 6px 18px rgba(0,0,0,0.1); }
-    .len-editor .le-row { display: flex; align-items: center; gap: 8px; }
+    .len-editor .le-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .len-editor .le-title { font-size: 13px; font-weight: 700; color: #2c5282; }
     .len-editor .le-step { width: 28px; height: 28px; border: 1px solid #d8dee6; background: #fff;
       border-radius: 8px; font-size: 16px; cursor: pointer; line-height: 1; }
     .len-editor .le-value { font-size: 14px; font-weight: 700; color: #2c5282; min-width: 54px; text-align: center; }
     .len-editor .le-unit { font-size: 12px; color: #95a5a6; margin-left: 2px; }
+    .len-editor .tri-side { border: 1px solid #d8dee6; border-radius: 8px; padding: 4px 6px;
+      font-size: 12px; font-weight: 700; color: #2c5282; background: #fff; }
     .len-editor .lift-btn { border: 1px solid #d8dee6; background: #fff; border-radius: 8px;
       font-size: 12px; padding: 6px 9px; cursor: pointer; line-height: 1; white-space: nowrap; }
     .len-editor .lift-btn:hover { background: #f6f8fb; }
@@ -176,6 +178,11 @@
       <div class="len-editor" id="lenEditor" style="display:none;">
         <div class="le-row">
           <span class="le-title" id="lenTitle">🔵 連桿長度</span>
+          <select class="tri-side" id="triSideSelect" style="display:none;" onchange="window.blocks.setTriSide(this.value)" title="選要調整的邊">
+            <option value="g">底邊</option>
+            <option value="r1">邊1</option>
+            <option value="r2">邊2</option>
+          </select>
           <span class="le-row" id="lenControls">
             <button class="le-step" onclick="window.blocks.changeLen(-8)" title="短 8mm（少一孔）">−</button>
             <span class="le-value"><span id="lenValue">88</span><span class="le-unit">mm</span></span>
@@ -185,8 +192,8 @@
         </div>
         <div class="le-row">
           <span class="le-title">疊放</span>
-          <button class="lift-btn" id="liftUpBtn" onclick="window.blocks.bringPart('top')" title="把這個桿件疊到最上層（再點一次回到自動）">🔼 移到最上</button>
-          <button class="lift-btn" id="liftDownBtn" onclick="window.blocks.bringPart('bottom')" title="把這個桿件疊到最下層（再點一次回到自動）">🔽 移到最下</button>
+          <button class="lift-btn" id="liftUpBtn" onclick="window.blocks.bringPart('up')" title="往上疊一層（一路挪回去就回到自動）">🔼 上移一層</button>
+          <button class="lift-btn" id="liftDownBtn" onclick="window.blocks.bringPart('down')" title="往下疊一層（一路挪回去就回到自動）">🔽 下移一層</button>
         </div>
       </div>
       <div class="role-editor" id="roleEditor" style="display:none;">

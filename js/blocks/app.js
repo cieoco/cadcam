@@ -38,6 +38,7 @@ let topo = { params: { theta: 0 }, tracePoint: '' };
 let compiled = null;
 let theta = 0, raf = null, counter = 0;
 let dragId = null, dragLinkId = null, dragLastWorld = null, snapTarget = null, selectedLinkId = null, selectedTriangleId = null, selectedNodeId = null;
+let triSide = 'g';                    // 三點桿目前在調哪一條邊：'g' 底邊 / 'r1' P1–P3 / 'r2' P2–P3
 let placingMotor = false, pickBars = null;
 // 畫桿模式（像 Word 畫表格：點工具後在畫面拖曳拉出連桿）
 let drawingLink = false, drawActive = false, drawStart = null, drawPreview = null, drawStartNodeId = null;
@@ -1076,6 +1077,7 @@ function selectLink(id) {
   selectedNodeId = null;
   document.getElementById('roleEditor').style.display = 'none';
   document.getElementById('lenTitle').textContent = '🔵 連桿長度';
+  document.getElementById('triSideSelect').style.display = 'none';
   document.getElementById('lenControls').style.display = 'flex';
   document.getElementById('lenEditor').style.display = 'flex';
   renderLenEditor(Math.round(topo.params[c.lenParam] || 0));
@@ -1090,22 +1092,75 @@ function selectTriangle(id) {
   selectedNodeId = null;
   document.getElementById('roleEditor').style.display = 'none';
   document.getElementById('lenTitle').textContent = '🔺 三點桿';
-  document.getElementById('lenControls').style.display = 'none';
+  triSide = 'g';
+  const sel = document.getElementById('triSideSelect');
+  sel.value = 'g';
+  sel.style.display = '';
+  document.getElementById('lenControls').style.display = 'flex';
   document.getElementById('lenEditor').style.display = 'flex';
+  renderTriValue();
   updateZliftButtons();
   draw();
 }
 
-// 把選取的桿件/三角板手動移到最上或最下層（2D 疊放與 3D z 分層同步）。
-// 再點一次同方向 → 回到自動分層。zlift 只改疊放、不動拓撲，所以 draw() 即可、不必 rebuild。
+// 三點桿：下拉切換要調的邊（底邊 g / P1–P3 r1 / P2–P3 r2），−/＋ 就調該邊
+function triParamFor(c) {
+  return triSide === 'r1' ? c.r1Param : triSide === 'r2' ? c.r2Param : c.gParam;
+}
+function renderTriValue() {
+  const c = comps.find(x => x.id === selectedTriangleId);
+  if (c) renderLenEditor(Math.round(topo.params[triParamFor(c)] || 0));
+}
+function setTriSide(side) {
+  triSide = (side === 'r1' || side === 'r2') ? side : 'g';
+  renderTriValue();
+}
+function changeTriSide(delta) {
+  const c = comps.find(x => x.id === selectedTriangleId);
+  if (!c) return;
+  pushUndo();
+  const key = triParamFor(c);
+  const L = snapLego((topo.params[key] || 0) + delta);
+  topo.params[key] = L;
+  reshapeTriangle(c);   // 自由三點桿才看得到；已連接的由 solver 接手
+  renderLenEditor(L);
+  rebuild(); draw();
+}
+// 依 g/r1/r2 重擺三點桿：固定 P1 與底邊方向，P2 落在距 P1 為 g 處，P3 取兩圓交點
+// 中離目前位置較近的那個（避免翻面）。三角不等式不成立時 P3 不動，交給驗證提示。
+function reshapeTriangle(c) {
+  const g = topo.params[c.gParam], r1 = topo.params[c.r1Param], r2 = topo.params[c.r2Param];
+  if (!(g > 0 && r1 > 0 && r2 > 0)) return;
+  const P1 = { x: c.p1.x || 0, y: c.p1.y || 0 };
+  const dx = (c.p2.x || 0) - P1.x, dy = (c.p2.y || 0) - P1.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const P2 = { x: P1.x + dx / d * g, y: P1.y + dy / d * g };
+  c.p2.x = P2.x; c.p2.y = P2.y;
+  const bx = P2.x - P1.x, by = P2.y - P1.y;
+  const base = Math.hypot(bx, by) || 1;
+  if (base > r1 + r2 || base < Math.abs(r1 - r2)) return; // 三角不等式不成立
+  const a = (r1 * r1 - r2 * r2 + base * base) / (2 * base);
+  const h = Math.sqrt(Math.max(0, r1 * r1 - a * a));
+  const mx = P1.x + a * (bx / base), my = P1.y + a * (by / base);
+  const ox = -by / base * h, oy = bx / base * h;
+  const cur = { x: c.p3.x || 0, y: c.p3.y || 0 };
+  const cand = [{ x: mx + ox, y: my + oy }, { x: mx - ox, y: my - oy }];
+  const pick = cand.reduce((best, p) =>
+    Math.hypot(p.x - cur.x, p.y - cur.y) < Math.hypot(best.x - cur.x, best.y - cur.y) ? p : best);
+  c.p3.x = pick.x; c.p3.y = pick.y;
+}
+
+// 把選取的桿件/三角板相對自動分層往上 / 往下挪一層（2D 疊放與 3D z 分層同步）。
+// 一路往回挪到 0 就回到自動。zlift 只改疊放、不動拓撲，所以 draw() 即可、不必 rebuild。
 function bringPart(dir) {
   const id = selectedLinkId || selectedTriangleId;
   if (!id) return;
   const c = comps.find(x => x.id === id);
   if (!c) return;
   pushUndo();
-  const want = dir === 'top' ? 1 : -1;
-  c.zlift = (c.zlift === want) ? 0 : want;
+  const step = dir === 'up' ? 1 : -1;
+  c.zlift = Math.max(-4, Math.min(4, (c.zlift || 0) + step));
+  if (!c.zlift) delete c.zlift;
   scheduleAutosave();
   updateZliftButtons();
   draw();
@@ -1168,6 +1223,7 @@ function setLen(v) {
   rebuild(); draw();
 }
 function changeLen(delta) {
+  if (selectedTriangleId) { changeTriSide(delta); return; }
   const c = comps.find(x => x.id === selectedLinkId);
   if (c) setLen((topo.params[c.lenParam] || 0) + delta);
 }
@@ -1395,5 +1451,5 @@ function init() {
   updateUndoBtn();
 }
 
-window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, startDrawTriangle, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, startDrawTriangle, clearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();

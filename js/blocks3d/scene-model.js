@@ -12,7 +12,7 @@
  * 以「離固定桿的距離」決定每個剛體的疊放層級。2D 的繪製疊放順序與 3D 的 z 分層
  * 共用這同一套，兩邊才會一致。
  * @param {Array} bodies - [{ joints: [nodeId...], lift? }]（桿 2 個、三角板 3 個銷孔；
- *                          lift>0＝手動移到最上、lift<0＝移到最下、0/缺＝自動）
+ *                          lift＝手動相對位移：+1 往上一層、-1 往下一層、0/缺＝自動）
  * @param {Set}   [groundIds] - 地錨節點 id
  * @param {Object} [opts]
  * @param {(i:number)=>number} [opts.floorOf] - 完全取代「樓地板」的覆寫（預設用 rank + body.lift）
@@ -46,14 +46,9 @@ export function computeBodyLayers(bodies, groundIds = new Set(), opts = {}) {
   const depthOf = id => (depth.has(id) ? depth.get(id) : 0);
   const rankOf = body => body.joints.reduce((m, id) => Math.max(m, depthOf(id)), 0);
   const ranks = bodies.map(rankOf);
-  const maxRank = ranks.reduce((m, r) => Math.max(m, r), 0);
-  // 樓地板＝自然 rank；body.lift 手動覆寫：>0 疊到所有自然層之上、<0 壓到最底（共銷檢查仍生效）
-  const floorOf = opts.floorOf || ((i) => {
-    const lift = bodies[i].lift || 0;
-    if (lift > 0) return maxRank + 1;
-    if (lift < 0) return 0;
-    return ranks[i];
-  });
+  // 樓地板＝自然 rank ＋ 手動相對位移 body.lift（+1 往上一層、-1 往下一層）。
+  // 共銷檢查仍生效：被推到同層的同銷孔剛體會自動再往上錯開，不會穿模。
+  const floorOf = opts.floorOf || ((i) => ranks[i] + (bodies[i].lift || 0));
   const floors = bodies.map((_, i) => floorOf(i));
 
   // 共銷衝突圖（剛體 i,j 共用同一銷孔則相鄰）
