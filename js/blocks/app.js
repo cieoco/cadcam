@@ -612,8 +612,7 @@ function addLink() {
   selectLink('Link' + n); // 放下就選取，方便馬上改長度
 }
 
-// ---- 畫桿模式：點「連桿」→ 立刻出現一根連桿，游標控制其中一端 ----
-// 滑鼠：移動就改長度，按右鍵確定。手機：拖曳後放開確定。支點固定在畫面中央。
+// ---- 畫桿模式：桌機點工具後移動游標調長度；手機則按住起點、拖到終點放開。----
 function startDrawLink() {
   if (drawingLink) { exitDrawLink(); draw(); return; } // 再點一次＝取消
   pause();
@@ -621,14 +620,21 @@ function startDrawLink() {
   exitDrawTriangle();
   deselectLink();
   drawingLink = true;
-  drawActive = true;                       // 進來就活著：滑鼠一移動就更新（不必壓住）
-  drawStart = View.worldFromScreen(W * 0.18, H * 0.26); // 支點＝畫布左上、靠連桿按鈕右側的空白處
-  drawStartNodeId = nearestNodeId(drawStart);
-  drawPreview = { x: drawStart.x + LINK_DEFAULT_LEN, y: drawStart.y }; // 先給一根預設長度
   svg.style.cursor = 'crosshair';
+  if (mobilePrompt()) {
+    drawActive = false;
+    drawStart = null;
+    drawStartNodeId = null;
+    drawPreview = null;
+  } else {
+    drawActive = true;                       // 進來就活著：滑鼠一移動就更新（不必壓住）
+    drawStart = View.worldFromScreen(W * 0.18, H * 0.26); // 支點＝畫布左上、靠連桿按鈕右側的空白處
+    drawStartNodeId = nearestNodeId(drawStart);
+    drawPreview = { x: drawStart.x + LINK_DEFAULT_LEN, y: drawStart.y }; // 先給一根預設長度
+  }
   setBanner(promptText(
     '移動滑鼠改長度，按右鍵確定',
-    '在畫面拖曳改長度，放開確定'
+    '按住起點拖到終點，放開建立連桿'
   ));
   draw();
 }
@@ -667,6 +673,10 @@ function resolveDrawEnd(start, cur, startNodeId) {
   const k = len / (dist || 1);
   return { pos: { x: start.x + dx * k, y: start.y + dy * k }, len, nodeId: null };
 }
+function linkLenLabel(len, nodeId = null) {
+  const holes = (Math.abs(len % LEGO_STEP) < 0.01) ? ` / ${Math.round(len / LEGO_STEP) + 1}孔` : '';
+  return len + 'mm' + holes + (nodeId ? ' 🔗' : '');
+}
 function drawDrawPreview() {
   if (!drawingLink || !drawActive || !drawStart || !drawPreview) return;
   const res = resolveDrawEnd(drawStart, drawPreview, drawStartNodeId);
@@ -685,7 +695,7 @@ function drawDrawPreview() {
   label.setAttribute('font-size', '13');
   label.setAttribute('font-weight', '700');
   label.setAttribute('fill', '#2c5282');
-  label.textContent = res.len + 'mm' + (res.nodeId ? ' 🔗' : '');
+  label.textContent = linkLenLabel(res.len, res.nodeId);
   svg.appendChild(label);
 }
 
@@ -879,6 +889,7 @@ function finishDrawTriangle(e) {
   rebuild(); draw();
 }
 function finishDrawLink(e) {
+  if (!drawStart) return;
   const cur = worldFromEvent(e) || drawPreview || drawStart;
   const res = resolveDrawEnd(drawStart, cur, drawStartNodeId);
   pushUndo();
@@ -1374,7 +1385,15 @@ svg.addEventListener('pointerdown', (e) => {
   if (!drawingLink) return;
   if (activePointers.size >= 2) return; // 雙指縮放優先
   const w = worldFromEvent(e); if (!w) return;
-  drawPreview = w;
+  e.preventDefault();
+  if (e.pointerType !== 'mouse' || mobilePrompt()) {
+    drawStart = w;
+    drawStartNodeId = nearestNodeId(drawStart);
+    drawPreview = w;
+    drawActive = true;
+  } else {
+    drawPreview = w;
+  }
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
   draw();
 });
