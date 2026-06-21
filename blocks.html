@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>🧩 機構積木</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; height: 100%; }
@@ -11,6 +11,9 @@
       background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
       font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; color: #2c3e50;
       display: flex; flex-direction: column; height: 100vh;
+    }
+    @supports (height: 100dvh) {
+      body { height: 100dvh; }
     }
     header {
       display: flex; align-items: center; justify-content: space-between;
@@ -127,7 +130,7 @@
       header { flex-wrap: wrap; gap: 8px; }
       .tool-btn { padding: 7px 10px; font-size: 13px; }
       .stage { flex-direction: column-reverse; }
-      .tray { width: 100%; flex-direction: row; gap: 6px; padding: 6px;
+      .tray { width: 100%; flex-direction: row; gap: 6px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
         border-right: none; border-top: 1px solid #eee; overflow-x: hidden; }
       .tray-title { display: none; }
       .block { flex: 1 1 0; min-width: 0; padding: 7px 4px; gap: 4px; border-radius: 12px; }
@@ -143,7 +146,7 @@
       .role-editor { right: 8px; }
     }
     @media (max-width: 380px) {
-      .tray { gap: 4px; padding: 5px; }
+      .tray { gap: 4px; padding: 5px 5px calc(5px + env(safe-area-inset-bottom, 0px)); }
       .block { padding: 6px 3px; }
       .block .ico { font-size: 20px; }
       .block .name { font-size: 11px; }
