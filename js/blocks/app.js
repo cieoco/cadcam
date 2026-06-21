@@ -36,7 +36,7 @@ let comps = [];                       // wizard 風格的組件（角色就藏�
 let topo = { params: { theta: 0 }, tracePoint: '' };
 let compiled = null;
 let theta = 0, raf = null, counter = 0;
-let dragId = null, dragLinkId = null, dragLastWorld = null, snapTarget = null, selectedLinkId = null, selectedNodeId = null;
+let dragId = null, dragLinkId = null, dragLastWorld = null, snapTarget = null, selectedLinkId = null, selectedTriangleId = null, selectedNodeId = null;
 let placingMotor = false, pickBars = null;
 // 畫桿模式（像 Word 畫表格：點工具後在畫面拖曳拉出連桿）
 let drawingLink = false, drawActive = false, drawStart = null, drawPreview = null, drawStartNodeId = null;
@@ -90,6 +90,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
   counter = Math.max(norm.counter || 0, Store.highestIdNum(comps));
   theta = 0;
   selectedLinkId = null;
+  selectedTriangleId = null;
   selectedNodeId = null;
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('roleEditor').style.display = 'none';
@@ -225,18 +226,24 @@ function draw() {
   drawTraceTrajectory(getTrajectoryData());
 
   // 三點桿：用圓角三角板呈現，同時仍保留每條邊/孔位的求解語法。
-  (compiled.visualization.polygons || []).forEach(poly => {
-    if (!poly.points || poly.points.length !== 3) return;
-    const [a, b, c] = poly.points.map(id => pts[id]);
+  comps.filter(comp => comp.type === 'triangle' && comp.p1 && comp.p2 && comp.p3).forEach(tri => {
+    const ids = [tri.p1.id, tri.p2.id, tri.p3.id];
+    const [a, b, c] = ids.map(id => pts[id]);
     if (![a, b, c].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))) return;
     const path = document.createElementNS(SVG_NS, 'path');
-    const color = poly.color || '#27ae60';
+    const color = tri.color || '#27ae60';
+    const isSel = tri.id === selectedTriangleId;
     path.setAttribute('d', roundedTriangleHullPath(a, b, c));
     path.setAttribute('fill', color + '33');
-    path.setAttribute('stroke', color);
-    path.setAttribute('stroke-width', 2.5);
+    path.setAttribute('stroke', isSel ? '#e67e22' : color);
+    path.setAttribute('stroke-width', isSel ? 3.2 : 2.5);
     path.setAttribute('stroke-linejoin', 'round');
-    path.style.pointerEvents = 'none';
+    path.style.cursor = 'pointer';
+    path.addEventListener('pointerdown', (e) => {
+      if (drawingLink || drawingTriangle) return;
+      e.stopPropagation();
+      selectTriangle(tri.id);
+    });
     svg.appendChild(path);
   });
 
@@ -468,6 +475,7 @@ function clearAll() {
   pause();
   comps = []; theta = 0; counter = 0;
   selectedLinkId = null;
+  selectedTriangleId = null;
   selectedNodeId = null;
   exitDrawLink();
   exitDrawTriangle();
@@ -916,6 +924,7 @@ function onNodeDown(e, id) {
   preDragSnap = snapshotStr(); // 拖曳前狀態；若真的有變動，drag end 才記入 undo
   pause();
   selectedNodeId = id;
+  selectedTriangleId = null;
   updateRoleEditor();
   dragId = id; snapTarget = null;
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
@@ -1016,8 +1025,25 @@ function selectLink(id) {
   const c = comps.find(x => x.id === id && x.type === 'bar' && x.fixedLen);
   if (!c) return;
   selectedLinkId = id;
+  selectedTriangleId = null;
+  selectedNodeId = null;
+  document.getElementById('roleEditor').style.display = 'none';
+  document.getElementById('lenTitle').textContent = '🔵 連桿長度';
+  document.getElementById('lenControls').style.display = 'flex';
   document.getElementById('lenEditor').style.display = 'flex';
   renderLenEditor(Math.round(topo.params[c.lenParam] || 0));
+  draw();
+}
+function selectTriangle(id) {
+  cancelMotorMode();
+  if (!comps.some(x => x.id === id && x.type === 'triangle')) return;
+  selectedTriangleId = id;
+  selectedLinkId = null;
+  selectedNodeId = null;
+  document.getElementById('roleEditor').style.display = 'none';
+  document.getElementById('lenTitle').textContent = '🔺 三點桿';
+  document.getElementById('lenControls').style.display = 'none';
+  document.getElementById('lenEditor').style.display = 'flex';
   draw();
 }
 
@@ -1027,10 +1053,30 @@ function renderLenEditor(len) {
   if (valEl) valEl.textContent = len;
 }
 function deselectLink() {
-  if (!selectedLinkId) return;
+  if (!selectedLinkId && !selectedTriangleId) return;
   selectedLinkId = null;
+  selectedTriangleId = null;
   document.getElementById('lenEditor').style.display = 'none';
   draw();
+}
+function deleteSelectedPart() {
+  const id = selectedLinkId || selectedTriangleId;
+  if (!id) return;
+  const comp = comps.find(c => c.id === id);
+  if (!comp) return;
+  pushUndo();
+  pause();
+  if (comp.type === 'bar' && comp.lenParam) delete topo.params[comp.lenParam];
+  if (comp.type === 'triangle') {
+    [comp.gParam, comp.r1Param, comp.r2Param].forEach(k => { if (k) delete topo.params[k]; });
+  }
+  comps = comps.filter(c => c.id !== id);
+  selectedLinkId = null;
+  selectedTriangleId = null;
+  selectedNodeId = null;
+  document.getElementById('lenEditor').style.display = 'none';
+  document.getElementById('roleEditor').style.display = 'none';
+  rebuild(); draw();
 }
 function setLen(v) {
   const c = comps.find(x => x.id === selectedLinkId);
@@ -1274,5 +1320,5 @@ function init() {
   updateUndoBtn();
 }
 
-window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, startDrawTriangle, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, startDrawTriangle, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();
