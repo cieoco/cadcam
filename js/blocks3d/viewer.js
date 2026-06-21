@@ -98,7 +98,7 @@ export function createViewer(container) {
   camera.position.set(0, 0, 600);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   container.appendChild(renderer.domElement);
 
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -252,11 +252,13 @@ export function createViewer(container) {
   }
 
   function resize() {
-    const w = container.clientWidth || 1;
-    const h = container.clientHeight || 1;
+    const box = container.getBoundingClientRect();
+    const w = Math.max(1, Math.round(box.width || container.clientWidth || window.innerWidth || 1));
+    const h = Math.max(1, Math.round(box.height || container.clientHeight || window.innerHeight || 1));
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
   }
 
   let raf = null;
@@ -268,6 +270,9 @@ export function createViewer(container) {
   function start() { if (!raf) loop(); }
   function stop() { if (raf) cancelAnimationFrame(raf); raf = null; }
 
+  const resizeObserver = 'ResizeObserver' in window ? new ResizeObserver(() => resize()) : null;
+  if (resizeObserver) resizeObserver.observe(container);
+
   function dispose() {
     stop();
     clearDynamic();
@@ -277,6 +282,7 @@ export function createViewer(container) {
     motorBoxMat.dispose();
     motorCanMat.dispose();
     controls.dispose();
+    if (resizeObserver) resizeObserver.disconnect();
     renderer.dispose();
     if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
   }

@@ -442,6 +442,12 @@ function push3D() {
   viewer3D.update(model);
 }
 
+function refresh3DView() {
+  if (!viewer3D || !view3DActive) return;
+  viewer3D.resize();
+  push3D();
+}
+
 // 切換 3D 唯讀預覽：首次開啟才動態載入 THREE viewer。
 async function toggle3D() {
   view3DActive = !view3DActive;
@@ -457,8 +463,10 @@ async function toggle3D() {
       const { createViewer } = await import('../blocks3d/viewer.js');
       viewer3D = createViewer(overlay);
     }
-    viewer3D.resize();
-    push3D();
+    refresh3DView();
+    requestAnimationFrame(refresh3DView);
+    setTimeout(refresh3DView, 120);
+    setTimeout(refresh3DView, 360);
   } else {
     overlay.style.display = 'none';
   }
@@ -1412,7 +1420,14 @@ function fitView() {
   draw();
 }
 
-window.addEventListener('resize', () => { if (viewer3D && view3DActive) viewer3D.resize(); });
+window.addEventListener('resize', refresh3DView);
+window.addEventListener('orientationchange', () => {
+  setTimeout(refresh3DView, 120);
+  setTimeout(refresh3DView, 360);
+});
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) setTimeout(refresh3DView, 80);
+});
 
 // ---- 課堂閉環：存檔 / 開啟 / 分享 ----
 function transient(msg) {
