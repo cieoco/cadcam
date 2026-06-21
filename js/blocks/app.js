@@ -40,6 +40,7 @@ let dragId = null, dragLinkId = null, dragLastWorld = null, snapTarget = null, s
 let placingMotor = false, pickBars = null;
 // 畫桿模式（像 Word 畫表格：點工具後在畫面拖曳拉出連桿）
 let drawingLink = false, drawActive = false, drawStart = null, drawPreview = null, drawStartNodeId = null;
+let drawingTriangle = false, triangleStage = 'base', trianglePoints = [], trianglePreview = null;
 let lastSolved = {};           // 上一幀求解成功的點位：給求解器挑「連續」分支 + 死點暫態回退
 let prevSolved = {};           // 再上一幀：和 lastSolved 一起外插出「帶動量」的預測種子
 let trajectoryCache = null;    // 沿用 multilink sweepTopology 的軌跡資料格式
@@ -125,6 +126,7 @@ function loadExample(id) {
 
 // ---- 綁定層：把純模組綁到本檔狀態，維持原呼叫端不變 ----
 const barHullPath = View.barHullPath;
+const roundedTriangleHullPath = View.roundedTriangleHullPath;
 const worldFromEvent = (e) => View.worldFromEvent(svg, e);
 const extrapolateSeed = Motion.extrapolateSeed;
 const norm360 = Motion.norm360;
@@ -198,6 +200,7 @@ function draw() {
   if (!compiled || !comps.length) {
     updateSolveBanner(null, 0);
     drawDrawPreview();   // 空畫布也要顯示正在拉出的第一根連桿
+    drawTrianglePreview();
     return;
   }
 
@@ -220,6 +223,22 @@ function draw() {
   const groundIds = new Set((compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
   const motorCenterIds = new Set((compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
   drawTraceTrajectory(getTrajectoryData());
+
+  // 三點桿：用圓角三角板呈現，同時仍保留每條邊/孔位的求解語法。
+  (compiled.visualization.polygons || []).forEach(poly => {
+    if (!poly.points || poly.points.length !== 3) return;
+    const [a, b, c] = poly.points.map(id => pts[id]);
+    if (![a, b, c].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))) return;
+    const path = document.createElementNS(SVG_NS, 'path');
+    const color = poly.color || '#27ae60';
+    path.setAttribute('d', roundedTriangleHullPath(a, b, c));
+    path.setAttribute('fill', color + '33');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', 2.5);
+    path.setAttribute('stroke-linejoin', 'round');
+    path.style.pointerEvents = 'none';
+    svg.appendChild(path);
+  });
 
   // TT 馬達本體：畫在桿件底下，曲柄轉在它上面。
   // 朝向＝對準接在馬達中心、非曲柄的那根桿（指向它的另一端）；沒有就朝最近的另一個地錨；都沒有才朝下。
@@ -251,9 +270,18 @@ function draw() {
     const bc = b.style === 'crank' ? 1 : 0;
     return ac - bc;
   });
+  const triangleEdgeKeys = new Set();
+  (compiled.visualization.polygons || []).forEach(poly => {
+    if (!poly.points || poly.points.length !== 3) return;
+    const [p1, p2, p3] = poly.points;
+    [[p1, p2], [p1, p3], [p2, p3]].forEach(([x, y]) => {
+      triangleEdgeKeys.add([x, y].sort().join('|'));
+    });
+  });
   linksToDraw.forEach(l => {
     const a = pts[l.p1], b = pts[l.p2];
     if (l.hidden) return;
+    if (triangleEdgeKeys.has([l.p1, l.p2].sort().join('|'))) return;
     if (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(b.x)) {
       missingVisibleLinks += 1;
       return;
@@ -274,7 +302,7 @@ function draw() {
       stick.setAttribute('data-link-id', l.id);
       stick.style.cursor = 'pointer';
       stick.addEventListener('pointerdown', (e) => {
-        if (drawingLink) return; // 畫桿模式：不攔截，讓 svg 起點處理（可從桿上開始畫並吸附）
+        if (drawingLink || drawingTriangle) return; // 畫圖模式：不攔截，讓 svg 起點處理
         e.stopPropagation();
         if (pickBars) { tryPickBar(l.id); return; }
         if (startFreeLinkDrag(e, l.id)) return;
@@ -342,6 +370,7 @@ function draw() {
   });
 
   drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
+  drawTrianglePreview(); // 三點桿模式：疊在最上層的三角預覽
 
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
   lastModelInputs = { links: linksToDraw, pts, groundIds };
@@ -428,6 +457,7 @@ function addAnchor() {
   pushUndo();
   const n = ++counter;
   exitDrawLink();
+  exitDrawTriangle();
   cancelMotorMode();
   comps.push({ type: 'anchor', id: 'Anchor' + n, p1: { id: 'A' + n, type: 'fixed', x: -110, y: 0 } });
   rebuild(); draw();
@@ -440,6 +470,7 @@ function clearAll() {
   selectedLinkId = null;
   selectedNodeId = null;
   exitDrawLink();
+  exitDrawTriangle();
   cancelMotorMode();
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('roleEditor').style.display = 'none';
@@ -509,6 +540,7 @@ function startDrawLink() {
   if (drawingLink) { exitDrawLink(); draw(); return; } // 再點一次＝取消
   pause();
   cancelMotorMode();
+  exitDrawTriangle();
   deselectLink();
   drawingLink = true;
   drawActive = true;                       // 進來就活著：滑鼠一移動就更新（不必壓住）
@@ -575,6 +607,190 @@ function drawDrawPreview() {
   label.textContent = res.len + 'mm' + (res.nodeId ? ' 🔗' : '');
   svg.appendChild(label);
 }
+
+function startDrawTriangle() {
+  if (drawingTriangle) { exitDrawTriangle(); draw(); return; }
+  pause();
+  cancelMotorMode();
+  exitDrawLink();
+  deselectLink();
+  drawingTriangle = true;
+  triangleStage = 'base';
+  const a = View.worldFromScreen(W * 0.18, H * 0.26);
+  const b = { x: a.x + 64, y: a.y };
+  const first = resolveTrianglePointAt(a);
+  trianglePoints = [first];
+  trianglePreview = b;
+  svg.style.cursor = 'crosshair';
+  setBanner('三點桿：先移動調第一段，按右鍵確定（8mm 倍數）');
+  draw();
+}
+function exitDrawTriangle() {
+  drawingTriangle = false;
+  triangleStage = 'base';
+  trianglePoints = [];
+  trianglePreview = null;
+  if (!drawingLink) svg.style.cursor = '';
+  if (!drawingLink) clearBanner();
+}
+function resolveTrianglePointAt(world, exclude = []) {
+  const used = exclude.filter(Boolean);
+  const nodeId = nearestNodeId(world, used);
+  if (nodeId) {
+    const p = pointCoords()[nodeId];
+    return { nodeId, pos: { x: p.x, y: p.y } };
+  }
+  return { nodeId: null, pos: { x: world.x, y: world.y } };
+}
+function resolveTrianglePoint(world) {
+  return resolveTrianglePointAt(world, trianglePoints.map(p => p.nodeId));
+}
+function resolveTriangleBaseEnd(cur) {
+  const start = trianglePoints[0];
+  if (!start) return null;
+  const endNodeId = nearestNodeId(cur, start.nodeId ? [start.nodeId] : []);
+  if (endNodeId) {
+    const p = pointCoords()[endNodeId];
+    const d = Math.hypot(p.x - start.pos.x, p.y - start.pos.y);
+    const L = legoLength(d);
+    if (Math.abs(d - L) < 0.75) return { nodeId: endNodeId, pos: { x: p.x, y: p.y }, len: L };
+  }
+  const dx = cur.x - start.pos.x, dy = cur.y - start.pos.y;
+  const dist = Math.hypot(dx, dy);
+  const len = dist < 6 ? 64 : legoLength(dist);
+  const k = len / (dist || 1);
+  return { nodeId: null, pos: { x: start.pos.x + dx * k, y: start.pos.y + dy * k }, len };
+}
+function legoLength(v) {
+  return snapLego(v);
+}
+function resolveTriangleThirdPoint(cur) {
+  if (trianglePoints.length < 2) return null;
+  const a = trianglePoints[0].pos;
+  const b = trianglePoints[1].pos;
+  const exclude = trianglePoints.map(p => p.nodeId).filter(Boolean);
+  const nodeId = nearestNodeId(cur, exclude);
+  if (nodeId) {
+    const p = pointCoords()[nodeId];
+    const d1 = Math.hypot(p.x - a.x, p.y - a.y);
+    const d2 = Math.hypot(p.x - b.x, p.y - b.y);
+    if (Math.abs(d1 - legoLength(d1)) < 0.75 && Math.abs(d2 - legoLength(d2)) < 0.75) {
+      return { nodeId, pos: { x: p.x, y: p.y }, r1: legoLength(d1), r2: legoLength(d2) };
+    }
+  }
+
+  const base = Math.hypot(b.x - a.x, b.y - a.y);
+  const d1Target = legoLength(Math.hypot(cur.x - a.x, cur.y - a.y));
+  const d2Target = legoLength(Math.hypot(cur.x - b.x, cur.y - b.y));
+  let best = null, bestScore = Infinity;
+  const tryCandidate = (r1, r2) => {
+    if (r1 < LEGO_STEP || r2 < LEGO_STEP) return;
+    if (r1 + r2 < base || Math.abs(r1 - r2) > base) return;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const d = Math.hypot(dx, dy);
+    if (d <= 1e-6) return;
+    const along = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+    const h2 = r1 * r1 - along * along;
+    if (h2 < -1e-6) return;
+    const h = Math.sqrt(Math.max(0, h2));
+    const ux = dx / d, uy = dy / d;
+    const px = a.x + along * ux, py = a.y + along * uy;
+    const nx = -uy, ny = ux;
+    [{ x: px + h * nx, y: py + h * ny }, { x: px - h * nx, y: py - h * ny }].forEach(pos => {
+      const score = Math.hypot(pos.x - cur.x, pos.y - cur.y);
+      if (score < bestScore) { bestScore = score; best = { nodeId: null, pos, r1, r2 }; }
+    });
+  };
+  for (let r1 = Math.max(LEGO_STEP, d1Target - 80); r1 <= d1Target + 80; r1 += LEGO_STEP) {
+    for (let r2 = Math.max(LEGO_STEP, d2Target - 80); r2 <= d2Target + 80; r2 += LEGO_STEP) {
+      tryCandidate(r1, r2);
+    }
+  }
+  return best;
+}
+function drawTrianglePreview() {
+  if (!drawingTriangle) return;
+  const pts = trianglePoints.map(p => p.pos);
+  let floating = null;
+  if (trianglePreview) {
+    floating = triangleStage === 'base' ? resolveTriangleBaseEnd(trianglePreview) : resolveTriangleThirdPoint(trianglePreview);
+    if (floating) pts.push(floating.pos);
+  }
+  if (pts.length >= 2) {
+    const path = document.createElementNS(SVG_NS, pts.length >= 3 ? 'polygon' : 'polyline');
+    path.setAttribute('points', pts.map(p => `${TX(p.x)},${TY(p.y)}`).join(' '));
+    path.setAttribute('fill', pts.length >= 3 ? '#27ae6022' : 'none');
+    path.setAttribute('stroke', '#27ae60');
+    path.setAttribute('stroke-width', 2);
+    path.setAttribute('stroke-dasharray', '8 6');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path);
+  }
+  pts.forEach((p, idx) => {
+    const c = document.createElementNS(SVG_NS, 'circle');
+    c.setAttribute('cx', TX(p.x)); c.setAttribute('cy', TY(p.y));
+    c.setAttribute('r', 6);
+    c.setAttribute('fill', idx < trianglePoints.length ? '#27ae60' : '#fff');
+    c.setAttribute('stroke', '#117a45');
+    c.setAttribute('stroke-width', 2);
+    svg.appendChild(c);
+  });
+  if (floating) {
+    const label = document.createElementNS(SVG_NS, 'text');
+    label.setAttribute('x', TX(floating.pos.x));
+    label.setAttribute('y', TY(floating.pos.y) - 12);
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('font-size', '13');
+    label.setAttribute('font-weight', '700');
+    label.setAttribute('fill', '#117a45');
+    label.textContent = triangleStage === 'base'
+      ? `${floating.len}mm`
+      : `${floating.r1}/${floating.r2}mm`;
+    svg.appendChild(label);
+  }
+}
+function confirmTriangleBase(e) {
+  const cur = worldFromEvent(e) || trianglePreview;
+  if (!cur || trianglePoints.length !== 1) return;
+  const picked = resolveTriangleBaseEnd(cur);
+  if (!picked) return;
+  trianglePoints.push(picked);
+  triangleStage = 'third';
+  const a = trianglePoints[0].pos, b = trianglePoints[1].pos;
+  trianglePreview = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - Math.max(40, picked.len * 0.8) };
+  setBanner('三點桿：移動選第三孔，按一下或右鍵確定（距離自動對齊 8mm）');
+  draw();
+}
+function finishDrawTriangle(e) {
+  const cur = worldFromEvent(e) || trianglePreview;
+  if (triangleStage === 'base') { confirmTriangleBase(e); return; }
+  if (!cur || trianglePoints.length < 2) return;
+  const picked = resolveTriangleThirdPoint(cur);
+  if (!picked) return;
+  pushUndo();
+  const n = ++counter;
+  const suffix = ['a', 'b', 'c'];
+  const all = [...trianglePoints, picked];
+  const pts = all.map((p, i) => ({
+    id: p.nodeId || `T${n}${suffix[i]}`,
+    type: 'floating',
+    x: p.pos.x,
+    y: p.pos.y
+  }));
+  const dist = (a, b) => Math.round(Math.hypot(b.x - a.x, b.y - a.y));
+  const gParam = 'TG' + n, r1Param = 'TR1_' + n, r2Param = 'TR2_' + n;
+  comps.push({
+    type: 'triangle', id: 'Tri' + n, color: '#27ae60',
+    p1: pts[0], p2: pts[1], p3: pts[2],
+    gParam, r1Param, r2Param, sign: 1
+  });
+  topo.params[gParam] = dist(pts[0], pts[1]);
+  topo.params[r1Param] = picked.r1 || dist(pts[0], pts[2]);
+  topo.params[r2Param] = picked.r2 || dist(pts[1], pts[2]);
+  selectedNodeId = pts[2].id;
+  exitDrawTriangle();
+  rebuild(); draw();
+}
 function finishDrawLink(e) {
   const cur = worldFromEvent(e) || drawPreview || drawStart;
   const res = resolveDrawEnd(drawStart, cur, drawStartNodeId);
@@ -619,6 +835,7 @@ function cancelMotorMode() {
 function placeMotor() {
   pause();
   exitDrawLink();
+  exitDrawTriangle();
   deselectLink();
   placingMotor = true;
   pickBars = null;
@@ -693,7 +910,7 @@ function startFreeLinkDrag(e, linkId) {
 }
 function onNodeDown(e, id) {
   e.preventDefault();
-  if (drawingLink) return; // 畫桿模式：交給 svg 的畫桿起點處理（會自動吸附到此接點）
+  if (drawingLink || drawingTriangle) return; // 畫圖模式：交給 svg 起點處理（會自動吸附到此接點）
   if (placingMotor) { e.stopPropagation(); handleMotorOnNode(id); return; }
   if (pickBars) return;
   preDragSnap = snapshotStr(); // 拖曳前狀態；若真的有變動，drag end 才記入 undo
@@ -705,6 +922,12 @@ function onNodeDown(e, id) {
   draw();
 }
 function onDragMove(e) {
+  if (drawingTriangle) {
+    if (activePointers.size >= 2) return;
+    const wp = worldFromEvent(e);
+    if (wp) { trianglePreview = wp; draw(); }
+    return;
+  }
   if (drawingLink) { // 畫桿模式：滑鼠移動（或觸控拖曳）就更新自由端
     if (activePointers.size >= 2) return; // 雙指縮放優先
     if (drawActive) { const wp = worldFromEvent(e); if (wp) { drawPreview = wp; draw(); } }
@@ -763,6 +986,10 @@ function commitDragUndo() {
   preDragSnap = null;
 }
 function onDragEnd(e) {
+  if (drawingTriangle) {
+    if (e && e.pointerType && e.pointerType !== 'mouse') finishDrawTriangle(e);
+    return;
+  }
   if (drawingLink) { // 觸控/筆：放開＝確定長度（滑鼠改用右鍵確定，見 contextmenu）
     if (e && e.pointerType && e.pointerType !== 'mouse') finishDrawLink(e);
     return;
@@ -875,7 +1102,7 @@ svg.addEventListener('pointerup', onDragEnd);
 svg.addEventListener('pointercancel', onDragEnd);
 // 點空白處（背景/地面線，未 stopPropagation）取消選取
 svg.addEventListener('pointerdown', () => {
-  if (drawingLink) return; // 畫桿模式：交給畫桿起點處理
+  if (drawingLink || drawingTriangle) return; // 畫圖模式：交給工具處理
   if (placingMotor || pickBars) { cancelMotorMode(); draw(); return; }
   if (dragId || dragLinkId) return;
   selectedNodeId = null;
@@ -937,11 +1164,26 @@ svg.addEventListener('pointerdown', (e) => {
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
   draw();
 });
-// 滑鼠右鍵＝確定長度
-svg.addEventListener('contextmenu', (e) => {
-  if (!drawingLink) return;
+svg.addEventListener('pointerdown', (e) => {
+  if (!drawingTriangle) return;
+  if (activePointers.size >= 2) return;
+  const w = worldFromEvent(e); if (!w) return;
   e.preventDefault();
-  finishDrawLink(e);
+  if (triangleStage === 'third' && e.pointerType === 'mouse') {
+    trianglePreview = w;
+    finishDrawTriangle(e);
+    return;
+  }
+  trianglePreview = w;
+  try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+  draw();
+});
+// 滑鼠右鍵＝確定長度 / 三點桿
+svg.addEventListener('contextmenu', (e) => {
+  if (!drawingLink && !drawingTriangle) return;
+  e.preventDefault();
+  if (drawingTriangle) finishDrawTriangle(e);
+  else finishDrawLink(e);
 });
 
 // 目前機構的世界外接框（給 fit 用）
@@ -1032,5 +1274,5 @@ function init() {
   updateUndoBtn();
 }
 
-window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, startDrawTriangle, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();

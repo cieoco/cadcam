@@ -111,3 +111,32 @@ export function barHullPath(a, b) {
   d += `A ${R} ${R} 0 1 0 ${TX(t1.start.x)} ${TY(t1.start.y)} Z`;
   return d;
 }
+
+// 三個孔中心的圓角三角板外形：把三個等半徑圓做外切線 hull。
+export function roundedTriangleHullPath(a, b, c) {
+  const pts = [a, b, c];
+  const area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  const ordered = area < 0 ? [a, c, b] : pts; // 讓路徑穩定走 CCW
+  const r = HULL_R_WORLD;
+  const tangent = (p, q) => {
+    const dx = q.x - p.x, dy = q.y - p.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= 1e-6) return null;
+    const nx = dy / dist, ny = -dx / dist;
+    return {
+      start: { x: p.x + nx * r, y: p.y + ny * r },
+      end: { x: q.x + nx * r, y: q.y + ny * r }
+    };
+  };
+  const ts = ordered.map((p, i) => tangent(p, ordered[(i + 1) % ordered.length]));
+  if (ts.some(t => !t)) return '';
+  const R = r * scale;
+  let d = `M ${TX(ts[0].start.x)} ${TY(ts[0].start.y)} `;
+  for (let i = 0; i < ts.length; i++) {
+    const curr = ts[i];
+    const next = ts[(i + 1) % ts.length];
+    d += `L ${TX(curr.end.x)} ${TY(curr.end.y)} `;
+    d += `A ${R} ${R} 0 0 0 ${TX(next.start.x)} ${TY(next.start.y)} `;
+  }
+  return d + 'Z';
+}
