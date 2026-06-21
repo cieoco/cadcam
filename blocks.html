@@ -127,11 +127,13 @@
       header { flex-wrap: wrap; gap: 8px; }
       .tool-btn { padding: 7px 10px; font-size: 13px; }
       .stage { flex-direction: column-reverse; }
-      .tray { width: 100%; flex-direction: row; gap: 8px; padding: 8px 10px;
-        border-right: none; border-top: 1px solid #eee; overflow-x: auto; }
+      .tray { width: 100%; flex-direction: row; gap: 6px; padding: 6px;
+        border-right: none; border-top: 1px solid #eee; overflow-x: hidden; }
       .tray-title { display: none; }
-      .block { flex: 0 0 auto; min-width: 84px; padding: 8px 6px; }
-      .block .ico { font-size: 24px; }
+      .block { flex: 1 1 0; min-width: 0; padding: 7px 4px; gap: 4px; border-radius: 12px; }
+      .block .ico { font-size: 22px; }
+      .block .name { font-size: 12px; }
+      .block .role { font-size: 9px; line-height: 1.25; }
       .controls { bottom: 8px; gap: 5px; padding: 5px; max-width: calc(100% - 16px); }
       .play-btn { width: 36px; height: 36px; font-size: 16px; }
       .controls .clear-btn { width: 32px; height: 32px; font-size: 12px; }
@@ -139,6 +141,13 @@
       .len-editor, .role-editor { top: 10px; padding: 6px 8px; gap: 6px; }
       .len-editor { left: 8px; }
       .role-editor { right: 8px; }
+    }
+    @media (max-width: 380px) {
+      .tray { gap: 4px; padding: 5px; }
+      .block { padding: 6px 3px; }
+      .block .ico { font-size: 20px; }
+      .block .name { font-size: 11px; }
+      .block .role { font-size: 8px; }
     }
   </style>
   <script type="importmap">
