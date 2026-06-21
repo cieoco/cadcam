@@ -53,6 +53,43 @@ function stadiumShape(a, b, r, holeR) {
   return shape;
 }
 
+// 三點桿（三角板）做成 THREE.Shape：三個孔中心圓 + 外切線 hull + 三個角鑽孔。
+// 外形與 2D 的 roundedTriangleHullPath 一致（三個等半徑圓的外切線 hull）。
+function triPlateShape(corners, r, holeR) {
+  const [A, B, C] = corners;
+  const area = (B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x);
+  const ordered = area < 0 ? [A, C, B] : [A, B, C]; // 走 CCW，外凸弧才朝外
+  const tangent = (p, q) => {
+    const dx = q.x - p.x, dy = q.y - p.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const nx = dy / dist, ny = -dx / dist; // 右側法線
+    return {
+      start: { x: p.x + nx * r, y: p.y + ny * r },
+      end: { x: q.x + nx * r, y: q.y + ny * r },
+    };
+  };
+  const ts = ordered.map((p, i) => tangent(p, ordered[(i + 1) % 3]));
+  const shape = new THREE.Shape();
+  shape.moveTo(ts[0].start.x, ts[0].start.y);
+  for (let i = 0; i < 3; i++) {
+    const curr = ts[i];
+    const next = ts[(i + 1) % 3];
+    const corner = ordered[(i + 1) % 3];
+    shape.lineTo(curr.end.x, curr.end.y);
+    // 角落外凸圓弧（CCW，與冰棒棍封口同向）
+    shape.absarc(corner.x, corner.y, r,
+      Math.atan2(curr.end.y - corner.y, curr.end.x - corner.x),
+      Math.atan2(next.start.y - corner.y, next.start.x - corner.x), false);
+  }
+  // 三個角鑽孔
+  ordered.forEach(p => {
+    const h = new THREE.Path();
+    h.absarc(p.x, p.y, holeR, 0, Math.PI * 2, true);
+    shape.holes.push(h);
+  });
+  return shape;
+}
+
 export function createViewer(container) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#0f1420');
@@ -128,6 +165,19 @@ export function createViewer(container) {
       });
       const mesh = new THREE.Mesh(geo, plateMaterial(s.color));
       mesh.position.z = s.z;     // 幾何已是世界 XY 絕對座標，只需抬 z
+      dynamic.add(mesh);
+    });
+
+    // 三點桿：擠出成實心三角板（取代它三條邊各自的桿）
+    (model.plates || []).forEach(pl => {
+      const shape = triPlateShape(pl.corners, pl.r, holeR);
+      const geo = new THREE.ExtrudeGeometry(shape, {
+        depth: pl.thickness,
+        bevelEnabled: false,
+        curveSegments: 24,
+      });
+      const mesh = new THREE.Mesh(geo, plateMaterial(pl.color));
+      mesh.position.z = pl.z;
       dynamic.add(mesh);
     });
 

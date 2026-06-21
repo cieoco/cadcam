@@ -13,11 +13,12 @@
  * @param {Object} points - id -> { x, y }（已合併靜態點與 solver 解）
  * @param {Object} [opts]
  * @param {Set}    [opts.groundIds]      - 視為地錨的節點 id
+ * @param {Array}  [opts.polygons]       - compiled.visualization.polygons：三點桿，{ points:[id,id,id], color }
  * @param {number} [opts.hullR=9]        - 冰棒棍外形半徑（與 2D 一致）
  * @param {number} [opts.plateGap=6]     - 相鄰層的 z 間距 (mm)
  * @param {number} [opts.plateThickness=4] - 每片板的厚度 (mm)
  * @param {number} [opts.pinR=3.2]       - 銷柱半徑 (mm)
- * @returns {{ sticks, pins, grounds, plateGap, plateThickness, center, span }}
+ * @returns {{ sticks, plates, pins, grounds, plateGap, plateThickness, center, span }}
  */
 export function buildSceneModel(links, points, opts = {}) {
   const hullR = opts.hullR ?? 9;
@@ -25,27 +26,46 @@ export function buildSceneModel(links, points, opts = {}) {
   const plateThickness = opts.plateThickness ?? 4;
   const pinR = opts.pinR ?? 3.2;
   const groundIds = opts.groundIds || new Set();
+  const polygons = opts.polygons || [];
 
   const valid = (id) => {
     const p = points[id];
     return p && Number.isFinite(p.x) && Number.isFinite(p.y);
   };
 
-  // 只取「可見且兩端都有有效座標」的桿
-  const visible = (links || []).filter(l => l && !l.hidden && valid(l.p1) && valid(l.p2));
+  // 三點桿：以實心三角板呈現（與 2D 的圓角三角板一致）。它的三條邊不再各自畫成桿——
+  // 否則 triangle 編譯出的邊 link 會和使用者明確畫出的桿（如切比雪夫的 Link2）重疊，
+  // 在 3D 變成「同一根桿件兩支」。這裡與 2D draw() 的 triangleEdgeKeys 過濾邏輯一致。
+  const triPlates = (polygons || []).filter(poly =>
+    poly && Array.isArray(poly.points) && poly.points.length === 3 && poly.points.every(valid));
+  const triEdgeKeys = new Set();
+  triPlates.forEach(poly => {
+    const [a, b, c] = poly.points;
+    [[a, b], [a, c], [b, c]].forEach(([x, y]) => triEdgeKeys.add([x, y].sort().join('|')));
+  });
 
-  // 分層 = 圖著色：唯一硬約束是「共用同一個銷孔的桿不能同層」（同層會在銷孔處穿模）。
-  // 衝突圖的節點是桿、邊是「共銷」；用貪婪著色取最少層——四連桿（4-cycle）自然只要 2 層，
-  // 只有三根以上共用一個銷孔的關節才需要更多層。依 visible 順序著色，結果穩定不會逐幀跳動。
-  const jointToLinks = new Map();
-  visible.forEach((l, i) => {
-    [l.p1, l.p2].forEach(pid => {
-      if (!jointToLinks.has(pid)) jointToLinks.set(pid, []);
-      jointToLinks.get(pid).push(i);
+  // 只取「可見、兩端有效、且不落在三角板邊上」的桿
+  const visible = (links || []).filter(l =>
+    l && !l.hidden && valid(l.p1) && valid(l.p2) &&
+    !triEdgeKeys.has([l.p1, l.p2].sort().join('|')));
+
+  // 把桿與三角板統一成「剛體」做分層 = 圖著色：唯一硬約束是「共用同一個銷孔的剛體不能同層」
+  // （同層會在銷孔處穿模）。衝突圖的節點是剛體、邊是「共銷」；用貪婪著色取最少層——四連桿
+  // （4-cycle）自然只要 2 層，只有三個以上共用一個銷孔的關節才需要更多層。依固定順序著色，
+  // 結果穩定不會逐幀跳動。
+  const bodies = [
+    ...visible.map(l => ({ kind: 'stick', src: l, joints: [l.p1, l.p2] })),
+    ...triPlates.map(poly => ({ kind: 'plate', src: poly, joints: [...poly.points] })),
+  ];
+  const jointToBodies = new Map();
+  bodies.forEach((body, i) => {
+    body.joints.forEach(pid => {
+      if (!jointToBodies.has(pid)) jointToBodies.set(pid, []);
+      jointToBodies.get(pid).push(i);
     });
   });
-  const neighbors = visible.map(() => new Set());
-  jointToLinks.forEach(idxs => {
+  const neighbors = bodies.map(() => new Set());
+  jointToBodies.forEach(idxs => {
     for (let a = 0; a < idxs.length; a++) {
       for (let b = a + 1; b < idxs.length; b++) {
         neighbors[idxs[a]].add(idxs[b]);
@@ -53,8 +73,8 @@ export function buildSceneModel(links, points, opts = {}) {
       }
     }
   });
-  const layerOf = new Array(visible.length).fill(0);
-  for (let i = 0; i < visible.length; i++) {
+  const layerOf = new Array(bodies.length).fill(0);
+  for (let i = 0; i < bodies.length; i++) {
     const used = new Set();
     neighbors[i].forEach(j => { if (j < i) used.add(layerOf[j]); });
     let c = 0;
@@ -62,23 +82,41 @@ export function buildSceneModel(links, points, opts = {}) {
     layerOf[i] = c;
   }
 
-  const sticks = visible.map((l, i) => {
-    const a = points[l.p1];
-    const b = points[l.p2];
+  const sticks = [];
+  const plates = [];
+  bodies.forEach((body, i) => {
     const layer = layerOf[i];
-    return {
-      id: l.id,
-      p1: l.p1,
-      p2: l.p2,
-      a: { x: a.x, y: a.y },
-      b: { x: b.x, y: b.y },
-      layer,
-      z: layer * plateGap,
-      r: hullR,
-      thickness: plateThickness,
-      isCrank: l.style === 'crank',
-      color: l.style === 'crank' ? '#e74c3c' : (l.color || '#3498db'),
-    };
+    const z = layer * plateGap;
+    if (body.kind === 'stick') {
+      const l = body.src;
+      const a = points[l.p1];
+      const b = points[l.p2];
+      sticks.push({
+        id: l.id,
+        p1: l.p1,
+        p2: l.p2,
+        a: { x: a.x, y: a.y },
+        b: { x: b.x, y: b.y },
+        layer,
+        z,
+        r: hullR,
+        thickness: plateThickness,
+        isCrank: l.style === 'crank',
+        color: l.style === 'crank' ? '#e74c3c' : (l.color || '#3498db'),
+      });
+    } else {
+      const poly = body.src;
+      const corners = poly.points.map(id => ({ x: points[id].x, y: points[id].y }));
+      plates.push({
+        ids: [...poly.points],
+        corners,
+        layer,
+        z,
+        r: hullR,
+        thickness: plateThickness,
+        color: poly.color || '#27ae60',
+      });
+    }
   });
 
   // 每個關節蒐集「接到它的桿層」，銷柱從最低層貫穿到最高層
@@ -95,6 +133,7 @@ export function buildSceneModel(links, points, opts = {}) {
     }
   };
   sticks.forEach(s => { touch(s.p1, s.layer); touch(s.p2, s.layer); });
+  plates.forEach(pl => pl.ids.forEach(id => touch(id, pl.layer)));
 
   const pins = [];
   const grounds = [];
@@ -113,13 +152,14 @@ export function buildSceneModel(links, points, opts = {}) {
     if (j.ground) grounds.push({ id: j.id, x: j.x, y: j.y });
   });
 
-  // 整體外接框：只用來估初始相機距離（span）
+  // 整體外接框：只用來估初始相機距離（span）。含三角板角點，純三角板的機構也估得準。
   let span = 100;
   let bboxCenter = { x: 0, y: 0 };
-  if (sticks.length) {
-    const xs = [];
-    const ys = [];
-    sticks.forEach(s => { xs.push(s.a.x, s.b.x); ys.push(s.a.y, s.b.y); });
+  const xs = [];
+  const ys = [];
+  sticks.forEach(s => { xs.push(s.a.x, s.b.x); ys.push(s.a.y, s.b.y); });
+  plates.forEach(pl => pl.corners.forEach(c => { xs.push(c.x); ys.push(c.y); }));
+  if (xs.length) {
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
     bboxCenter = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
@@ -128,7 +168,7 @@ export function buildSceneModel(links, points, opts = {}) {
 
   // 相機對焦點：有地錨就用地錨形心（恆定不動，動畫時不會晃）；沒地錨才退回外接框中心。
   // anchored=true 時 viewer 可每幀同步（反正不動）；false 時 viewer 只在初次定位、之後凍結。
-  const maxLayer = sticks.reduce((m, s) => Math.max(m, s.layer), 0);
+  const maxLayer = [...sticks, ...plates].reduce((m, s) => Math.max(m, s.layer), 0);
   const midZ = (maxLayer * plateGap + plateThickness) / 2;
   const anchored = grounds.length > 0;
   const focus = anchored
@@ -139,5 +179,5 @@ export function buildSceneModel(links, points, opts = {}) {
       }
     : { x: bboxCenter.x, y: bboxCenter.y, z: midZ };
 
-  return { sticks, pins, grounds, plateGap, plateThickness, span, focus, anchored };
+  return { sticks, plates, pins, grounds, plateGap, plateThickness, span, focus, anchored };
 }
