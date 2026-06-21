@@ -452,8 +452,8 @@ function drawTTMotor(cx, cy, rotDeg = 0) {
   // TT 馬達真實比例：齒輪箱 37×22.5、輸出軸距頂端 11、馬達罐 ⌀20.5 長 22
   const Wb = 22.5 * s, Lb = 37 * s, ax = 11 * s, Dc = 20.5 * s, Lc = 22 * s, r = 4 * s;
   const top = -ax;                             // 局部座標：軸在原點，齒輪箱頂端在 -ax
-  // DC 馬達罐（深色膠囊，從齒輪箱底端再往外凸出）
-  add('rect', { x: -Dc / 2, y: top + Lb - r, width: Dc, height: Lc, rx: Dc / 2, ry: Dc / 2, fill: '#37474f', stroke: '#263238', 'stroke-width': sw(1) });
+  // DC 馬達罐（鐵灰色膠囊，從齒輪箱底端再往外凸出）
+  add('rect', { x: -Dc / 2, y: top + Lb - r, width: Dc, height: Lc, rx: Dc / 2, ry: Dc / 2, fill: '#5f6b75', stroke: '#3a434b', 'stroke-width': sw(1) });
   // 齒輪箱（黃色圓角矩形）
   add('rect', { x: -Wb / 2, y: top, width: Wb, height: Lb, rx: r, ry: r, fill: '#f7c948', stroke: '#c9971b', 'stroke-width': sw(1.4) });
   // 齒輪箱上的固定孔裝飾

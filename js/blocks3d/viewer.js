@@ -126,9 +126,9 @@ export function createViewer(container) {
   const holeR = 3.4;   // 板上孔徑（視覺用）
   const pinMat = new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.6, roughness: 0.35 });
   const groundMat = new THREE.MeshStandardMaterial({ color: 0x34495e, metalness: 0.2, roughness: 0.8 });
-  // TT 齒輪馬達：黃色齒輪箱 + 深色 DC 罐（與 2D drawTTMotor 同色系）
+  // TT 齒輪馬達：黃色齒輪箱 + 鐵灰色 DC 罐（與 2D drawTTMotor 同色系）
   const motorBoxMat = new THREE.MeshStandardMaterial({ color: 0xf7c948, metalness: 0.1, roughness: 0.55 });
-  const motorCanMat = new THREE.MeshStandardMaterial({ color: 0x37474f, metalness: 0.4, roughness: 0.5 });
+  const motorCanMat = new THREE.MeshStandardMaterial({ color: 0x5f6b75, metalness: 0.5, roughness: 0.45 });
   // TT 馬達真實比例（mm）：齒輪箱 37(長)×22.5(寬)×16(厚)、DC 罐 ⌀20.5×22、輸出軸 ⌀~5。
   // 馬達躺在與機構平行的平面、沉在桿件背面；長軸(boxLen)朝機架方向，輸出軸沿 z。
   // shaftInset = 輸出軸距齒輪箱近端的距離（與 2D 的 ax 一致）。
