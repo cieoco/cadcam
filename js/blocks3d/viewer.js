@@ -233,15 +233,8 @@ export function createViewer(container) {
       dynamic.add(mesh);
     });
 
-    // 地錨：在 y=0 地面與關節之間立一根支柱，暗示「釘在地上」
-    model.grounds.forEach(g => {
-      const top = g.y;
-      const h = Math.max(2, top);          // 從地面 y=0 拉到關節高度
-      const geo = new THREE.CylinderGeometry(5, 7, h, 6);
-      const mesh = new THREE.Mesh(geo, groundMat);
-      mesh.position.set(g.x, top - h / 2, -8);
-      dynamic.add(mesh);
-    });
+    // 地錨是「固定」的慣例（接點本身的銷柱已標示），不另外畫立柱實體。
+    // model.grounds 仍保留，供下方相機對焦用。
 
     // 相機對焦：對到固定的地錨形心（model.focus）。動畫時 focus 不動，畫面就不會晃。
     // 有地錨（anchored）時每幀同步沒差（反正是同一點）；沒地錨時只在初次定位、之後凍結。
