@@ -137,6 +137,7 @@ const PLAY_STEP = Motion.PLAY_STEP;
 const planMotion = () => Motion.planMotion(compiled, topo, theta, lastSolved);
 const mobilePrompt = () => window.matchMedia('(hover: none), (pointer: coarse), (max-width: 640px)').matches;
 const promptText = (desktop, mobile) => mobilePrompt() ? mobile : desktop;
+const snapWorld = () => View.snapWorld() * (mobilePrompt() ? 2.35 : 1);
 
 const pointCoords = () => Model.pointCoords(comps);
 const updatePointCoordsById = (id, x, y) => Model.updatePointCoordsById(comps, id, x, y);
@@ -148,7 +149,7 @@ const removeAnchorsAtPoint = (id) => { comps = Model.removeAnchorsAtPoint(comps,
 const setPointType = (id, type) => Model.setPointType(comps, id, type);
 const roleLabel = (id) => Model.roleLabel(comps, id);
 const hasPoint = (id) => Model.hasPoint(comps, id);
-const findNearest = (id) => Model.findNearest(comps, id, View.snapWorld());
+const findNearest = (id) => Model.findNearest(comps, id, snapWorld());
 const mergePoints = (fromId, toId) => { comps = Model.mergePoints(comps, fromId, toId); };
 const recomputeLengths = () => Model.recomputeLengths(comps, topo);
 const fixedLinkFor = (id) => Model.fixedLinkFor(comps, id);
@@ -389,8 +390,8 @@ function draw() {
     const t = pts[snapTarget];
     const ring = document.createElementNS(SVG_NS, 'circle');
     ring.setAttribute('cx', TX(t.x)); ring.setAttribute('cy', TY(t.y));
-    ring.setAttribute('r', 14); ring.setAttribute('fill', 'none');
-    ring.setAttribute('stroke', '#2ecc71'); ring.setAttribute('stroke-width', 3);
+    ring.setAttribute('r', mobilePrompt() ? 24 : 14); ring.setAttribute('fill', 'none');
+    ring.setAttribute('stroke', '#2ecc71'); ring.setAttribute('stroke-width', mobilePrompt() ? 4 : 3);
     svg.appendChild(ring);
   }
 
@@ -536,7 +537,10 @@ function addAnchor() {
   exitDrawLink();
   exitDrawTriangle();
   cancelMotorMode();
-  comps.push({ type: 'anchor', id: 'Anchor' + n, p1: { id: 'A' + n, type: 'fixed', x: -110, y: 0 } });
+  const p = mobilePrompt()
+    ? View.worldFromScreen(W * 0.34, H * 0.62)
+    : { x: -110, y: 0 };
+  comps.push({ type: 'anchor', id: 'Anchor' + n, p1: { id: 'A' + n, type: 'fixed', x: p.x, y: p.y } });
   rebuild(); draw();
 }
 
@@ -650,7 +654,7 @@ function exitDrawLink() {
 // 找最靠近某世界座標的既有接點 id（吸附用），exclude 內的略過
 function nearestNodeId(world, exclude = []) {
   const m = pointCoords();
-  let best = null, bestD = View.snapWorld();
+  let best = null, bestD = snapWorld();
   for (const id in m) {
     if (exclude.includes(id)) continue;
     const d = Math.hypot(m[id].x - world.x, m[id].y - world.y);
