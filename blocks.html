@@ -114,6 +114,28 @@
       font-size: 12px; cursor: pointer; }
     .role-editor button:hover { background: #f6f8fb; }
     .role-editor .trace-on { background: #e8f8ef; color: #117a45; border-color: #9dddb8; font-weight: 700; }
+    /* MG995 伺服角度面板（接點角色面板下方） */
+    .servo-editor { position: absolute; top: 70px; right: 16px; display: flex; flex-direction: column; gap: 6px;
+      background: rgba(255,255,255,0.96); border: 1px solid #bcd3f0; border-radius: 12px; padding: 8px 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.1); }
+    .servo-editor .se-title { font-size: 13px; font-weight: 700; color: #2c5282; }
+    .servo-editor .se-row { display: flex; align-items: center; gap: 8px; }
+    .servo-editor .se-label { font-size: 12px; font-weight: 700; color: #60717d; min-width: 30px; }
+    /* 動力來源選單（置中彈出卡片） */
+    .power-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      display: flex; flex-direction: column; gap: 10px; z-index: 6;
+      background: #fff; border: 1px solid #e6e9f0; border-radius: 16px; padding: 16px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.22); min-width: 240px; }
+    .power-menu .pm-title { font-size: 14px; font-weight: 700; color: #2c3e50; text-align: center; }
+    .power-menu .pm-opt { display: flex; align-items: center; gap: 12px; text-align: left;
+      border: 2px solid #e6e9f0; background: #fff; border-radius: 12px; padding: 12px 14px; cursor: pointer; }
+    .power-menu .pm-opt:hover { background: #f6f8fb; border-color: #bcd3f0; }
+    .power-menu .pm-ico { font-size: 26px; line-height: 1; }
+    .power-menu .pm-text { display: flex; flex-direction: column; gap: 2px; }
+    .power-menu .pm-text b { font-size: 15px; color: #2c3e50; }
+    .power-menu .pm-text small { font-size: 12px; color: #8a95a1; }
+    .power-menu .pm-cancel { border: none; background: transparent; color: #8a95a1; font-size: 13px;
+      cursor: pointer; padding: 4px; }
     /* 3D 預覽覆蓋層 */
     #view3d { position: absolute; inset: 0; display: none; background: #0f1420; }
     #view3d canvas { display: block; width: 100%; height: 100%; }
@@ -144,6 +166,8 @@
       .len-editor, .role-editor { top: 10px; padding: 6px 8px; gap: 6px; }
       .len-editor { left: 8px; }
       .role-editor { right: 8px; }
+      .servo-editor { top: 62px; right: 8px; padding: 6px 8px; gap: 5px; }
+      .power-menu { min-width: 0; width: calc(100% - 48px); max-width: 320px; padding: 14px; }
     }
     @media (max-width: 380px) {
       .tray { gap: 4px; padding: 5px 5px calc(5px + env(safe-area-inset-bottom, 0px)); }
@@ -190,10 +214,10 @@
         <span class="name">三點桿</span>
         <span class="role"><span class="desktop-hint">移動調形狀，右鍵確定</span><span class="mobile-hint">拖曳調形狀，放開確定</span></span>
       </div>
-      <div class="block motor" onclick="window.blocks.placeMotor()">
-        <span class="ico">🔴</span>
-        <span class="name">馬達</span>
-        <span class="role">放到接點上</span>
+      <div class="block motor" onclick="window.blocks.openPowerMenu()">
+        <span class="ico">⚡</span>
+        <span class="name">動力來源</span>
+        <span class="role">TT馬達 / MG995</span>
       </div>
     </div>
 
@@ -234,6 +258,33 @@
         <button onclick="window.blocks.removeNodeMotor()">拿掉馬達</button>
         <button id="traceBtn" onclick="window.blocks.toggleTracePoint()" title="追蹤這個接點走過的路徑">設軌跡點</button>
       </div>
+      <div class="servo-editor" id="servoEditor" style="display:none;">
+        <span class="se-title">🟦 伺服角度</span>
+        <div class="se-row">
+          <span class="se-label">起始</span>
+          <button class="le-step" onclick="window.blocks.changeServoAngle('start',-15)" title="起始角 −15°">−</button>
+          <span class="le-value"><span id="servoStartVal">0</span><span class="le-unit">°</span></span>
+          <button class="le-step" onclick="window.blocks.changeServoAngle('start',15)" title="起始角 ＋15°">＋</button>
+        </div>
+        <div class="se-row">
+          <span class="se-label">結束</span>
+          <button class="le-step" onclick="window.blocks.changeServoAngle('end',-15)" title="結束角 −15°">−</button>
+          <span class="le-value"><span id="servoEndVal">90</span><span class="le-unit">°</span></span>
+          <button class="le-step" onclick="window.blocks.changeServoAngle('end',15)" title="結束角 ＋15°">＋</button>
+        </div>
+      </div>
+      <div class="power-menu" id="powerMenu" style="display:none;">
+        <div class="pm-title">選擇動力來源</div>
+        <button class="pm-opt" onclick="window.blocks.pickMotorType('tt')">
+          <span class="pm-ico">🔴</span>
+          <span class="pm-text"><b>TT馬達</b><small>整圈連續轉</small></span>
+        </button>
+        <button class="pm-opt" onclick="window.blocks.pickMotorType('mg995')">
+          <span class="pm-ico">🟦</span>
+          <span class="pm-text"><b>MG995 伺服</b><small>角度範圍內來回擺</small></span>
+        </button>
+        <button class="pm-cancel" onclick="window.blocks.openPowerMenu()">取消</button>
+      </div>
       <div id="view3d">
         <div class="view3d-hint">
           <span class="desktop-hint">🧊 3D 預覽：拖曳旋轉、滾輪縮放。編輯請關掉 3D 回到平面。</span>
@@ -250,6 +301,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/blocks/app.js?v=20240128_02"></script>
+  <script type="module" src="js/blocks/app.js?v=20240128_03"></script>
 </body>
 </html>

@@ -40,6 +40,8 @@ let theta = 0, raf = null, counter = 0;
 let dragId = null, dragLinkId = null, dragLastWorld = null, snapTarget = null, selectedLinkId = null, selectedTriangleId = null, selectedNodeId = null;
 let triSide = 'g';                    // 三點桿目前在調哪一條邊：'g' 底邊 / 'r1' P1–P3 / 'r2' P2–P3
 let placingMotor = false, pickBars = null;
+let pendingMotorType = 'tt';           // 下一次放置的動力來源型號：'tt' TT馬達 / 'mg995' 伺服
+const SERVO_STEP = 15;                 // 伺服角度面板的每步度數
 // 畫桿模式（像 Word 畫表格：點工具後在畫面拖曳拉出連桿）
 let drawingLink = false, drawActive = false, drawStart = null, drawPreview = null, drawStartNodeId = null;
 let drawingTriangle = false, triangleStage = 'base', trianglePoints = [], trianglePreview = null;
@@ -96,6 +98,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
   selectedNodeId = null;
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('roleEditor').style.display = 'none';
+  document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('thetaVal').textContent = '0';
   rebuild(); draw();
   if (fit) fitView();
@@ -304,7 +307,7 @@ function draw() {
     groupForLayer(triLayerByKey.get(triKey(ids))).appendChild(path);
   });
 
-  // TT 馬達本體：畫在桿件底下，曲柄轉在它上面。
+  // 動力來源本體：畫在桿件底下，曲柄轉在它上面。依型號畫 TT馬達或 MG995 伺服。
   // 朝向＝對準接在馬達中心、非曲柄的那根桿（指向它的另一端）；沒有就朝最近的另一個地錨；都沒有才朝下。
   motorCenterIds.forEach(id => {
     const p = pts[id]; if (!p || !Number.isFinite(p.x)) return;
@@ -324,7 +327,10 @@ function draw() {
       });
     }
     const rotDeg = tgt ? Math.atan2(-(tgt.x - p.x), -(tgt.y - p.y)) * 180 / Math.PI : 0;
-    drawTTMotor(p.x, p.y, rotDeg, motorLayer);
+    const isServo = motorTypeForCenter(id) === 'mg995';
+    if (isServo) drawMG995Servo(p.x, p.y, rotDeg, motorLayer);
+    else drawTTMotor(p.x, p.y, rotDeg, motorLayer);
+    drawMotorLabel(p.x, p.y, isServo ? 'MG995' : 'TT', isServo ? '#2c6fbb' : '#c9971b', motorLayer);
   });
 
   // 桿件：依層級放進對應的 <g>（內層在底、外層在上）；同層內紅色曲柄最後畫不被蓋住。
@@ -434,15 +440,18 @@ function draw() {
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
   // polygons 一併帶上：3D 用它把三點桿畫成實心板，並過濾掉與三角板邊重疊的桿（避免分身）。
   // motorCenterIds：3D 把這些中心畫成沉在機構背面的馬達，輸出軸往上帶動曲柄。
-  lastModelInputs = { links: linksToDraw, pts, groundIds, motorCenterIds, polygons: compiled.visualization.polygons || [] };
+  // motorTypes：每個馬達中心的型號（'tt'/'mg995'），讓 3D 也畫出對應外形。
+  const motorTypes = new Map();
+  motorCenterIds.forEach(id => motorTypes.set(id, motorTypeForCenter(id)));
+  lastModelInputs = { links: linksToDraw, pts, groundIds, motorCenterIds, motorTypes, polygons: compiled.visualization.polygons || [] };
   if (view3DActive) push3D();
 }
 
 // 用最近一幀的求解結果建場景模型，推進 3D viewer
 function push3D() {
   if (!viewer3D || !lastModelInputs) return;
-  const { links, pts, groundIds, motorCenterIds, polygons } = lastModelInputs;
-  const model = buildSceneModel(links, pts, { groundIds, motorCenters: motorCenterIds, hullR: HULL_R_WORLD, polygons });
+  const { links, pts, groundIds, motorCenterIds, motorTypes, polygons } = lastModelInputs;
+  const model = buildSceneModel(links, pts, { groundIds, motorCenters: motorCenterIds, motorTypes, hullR: HULL_R_WORLD, polygons });
   viewer3D.update(model);
 }
 
@@ -462,6 +471,7 @@ async function toggle3D() {
     // 開 3D 時收起 2D 的編輯小面板（避免疊在覆蓋層上）
     deselectLink();
     document.getElementById('roleEditor').style.display = 'none';
+    document.getElementById('servoEditor').style.display = 'none';
     overlay.style.display = 'block';
     if (!viewer3D) {
       const { createViewer } = await import('../blocks3d/viewer.js');
@@ -533,6 +543,59 @@ function drawTTMotor(cx, cy, rotDeg = 0, parent = svg) {
   parent.appendChild(g);
 }
 
+// MG995 伺服側視：藍色扁方殼 + 兩側固定耳 + 輸出軸上的舵盤（horn）。
+// 與 TT 馬達同一套擺位慣例：輸出軸在 local 原點，本體沿 -y（朝機架）延伸。
+function drawMG995Servo(cx, cy, rotDeg = 0, parent = svg) {
+  const s = View.getScale();
+  const jx = TX(cx), jy = TY(cy);
+  const g = document.createElementNS(SVG_NS, 'g');
+  g.setAttribute('transform', `translate(${jx} ${jy}) rotate(${rotDeg})`);
+  g.style.pointerEvents = 'none';
+  const add = (el, attrs) => {
+    const e = document.createElementNS(SVG_NS, el);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    g.appendChild(e);
+    return e;
+  };
+  const sw = (v) => Math.max(1, v * s);
+  // MG995 標準伺服比例：本體約 40×20、含耳約 54、軸距上緣約 10。
+  const Wb = 20 * s, Lb = 40 * s, ax = 10 * s, r = 3 * s;
+  const top = -ax;                              // 軸在原點，殼體頂端在 -ax
+  const earW = 7 * s, earH = 6 * s, earY = top + Lb * 0.12;
+  // 兩側固定耳（先畫，被殼體壓住內緣）
+  add('rect', { x: -Wb / 2 - earW, y: earY, width: Wb / 2 + earW, height: earH, rx: r, ry: r,
+    fill: '#2c6fbb', stroke: '#1c4f8a', 'stroke-width': sw(1) });
+  add('rect', { x: 0, y: earY, width: Wb / 2 + earW, height: earH, rx: r, ry: r,
+    fill: '#2c6fbb', stroke: '#1c4f8a', 'stroke-width': sw(1) });
+  // 伺服殼體（藍色圓角矩形）
+  add('rect', { x: -Wb / 2, y: top, width: Wb, height: Lb, rx: r, ry: r,
+    fill: '#3d8bf0', stroke: '#1c4f8a', 'stroke-width': sw(1.4) });
+  // 殼體分模線裝飾
+  add('line', { x1: -Wb / 2, y1: top + Lb * 0.32, x2: Wb / 2, y2: top + Lb * 0.32,
+    stroke: '#1c4f8a', 'stroke-width': sw(0.8), 'stroke-opacity': 0.6 });
+  // 輸出軸上的舵盤（horn）：白色圓盤 + 中心軸
+  add('circle', { cx: 0, cy: 0, r: 6 * s, fill: '#eef3fb', stroke: '#1c4f8a', 'stroke-width': sw(1.2) });
+  add('circle', { cx: 0, cy: 0, r: 1.8 * s, fill: '#1c4f8a' });
+  parent.appendChild(g);
+}
+
+// 動力來源型號標籤：畫在本體中心上方一點，永遠保持水平（不隨朝向旋轉）。
+function drawMotorLabel(cx, cy, text, color, parent = svg) {
+  const t = document.createElementNS(SVG_NS, 'text');
+  t.setAttribute('x', TX(cx));
+  t.setAttribute('y', TY(cy) - 16 * View.getScale());
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('font-size', Math.max(9, 9 * View.getScale()));
+  t.setAttribute('font-weight', '700');
+  t.setAttribute('fill', color);
+  t.setAttribute('stroke', '#ffffff');
+  t.setAttribute('stroke-width', Math.max(2, 2.4 * View.getScale()));
+  t.setAttribute('paint-order', 'stroke');   // 白色描邊在底，文字在上，才看得清
+  t.style.pointerEvents = 'none';
+  t.textContent = text;
+  parent.appendChild(t);
+}
+
 // ---- 零件：放下時自動設好「角色」----
 function addAnchor() {
   pushUndo();
@@ -559,6 +622,7 @@ function clearAll() {
   cancelMotorMode();
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('roleEditor').style.display = 'none';
+  document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('solveBanner').style.display = 'none';
   topo = { params: { theta: 0 }, tracePoint: '' };
   document.getElementById('thetaVal').textContent = '0';
@@ -574,6 +638,9 @@ function play() {
   document.getElementById('playBtn').classList.add('playing');
   document.getElementById('playBtn').textContent = '⏸';
   playPlan = planMotion();
+  // MG995 伺服：被命令在起始/結束角間來回擺，覆寫幾何自動判斷的整圈/來回。
+  const servo = inputServoRange();
+  if (servo && servo.hi > servo.lo) playPlan = { mode: 'rock', lo: servo.lo, hi: servo.hi };
   if (playPlan.mode === 'rock' && playDir > 0 && theta >= playPlan.hi) playDir = -1;
   if (playPlan.mode === 'rock' && playDir < 0 && theta <= playPlan.lo) playDir = 1;
   const step = () => {
@@ -963,6 +1030,22 @@ function cancelMotorMode() {
   svg.style.cursor = '';
   clearBanner();
 }
+// ---- 動力來源選單：點「動力來源」先選 TT馬達 / MG995，再進入放置模式 ----
+function powerMenuEl() { return document.getElementById('powerMenu'); }
+function openPowerMenu() {
+  const m = powerMenuEl();
+  if (m) m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
+}
+function closePowerMenu() {
+  const m = powerMenuEl();
+  if (m) m.style.display = 'none';
+}
+function pickMotorType(type) {
+  pendingMotorType = (type === 'mg995') ? 'mg995' : 'tt';
+  closePowerMenu();
+  placeMotor();
+}
+const motorTypeLabel = (type) => (type === 'mg995') ? 'MG995 🟦' : 'TT馬達 🔴';
 function placeMotor() {
   pause();
   exitDrawLink();
@@ -971,9 +1054,10 @@ function placeMotor() {
   placingMotor = true;
   pickBars = null;
   svg.style.cursor = 'crosshair';
+  const label = motorTypeLabel(pendingMotorType);
   setBanner(promptText(
-    '點一個接點放上馬達 🔴',
-    '點一下接點放上馬達 🔴'
+    '點一個接點放上 ' + label,
+    '點一下接點放上 ' + label
   ));
   draw();
 }
@@ -1020,13 +1104,51 @@ function driveBarAt(barId, nodeId) {
   // 讓馬達「從現在這個姿勢」開始轉：把曲柄目前的角度記成相位偏移。
   // 否則 input 會把曲柄瞬間轉到絕對角度 0，曲柄端點被甩到別處、整個四連桿當場塌掉。
   const angDeg = Math.atan2(bar.p2.y - bar.p1.y, bar.p2.x - bar.p1.x) * 180 / Math.PI;
-  bar.phaseOffset = angDeg - theta;
+  bar.motorType = pendingMotorType;
+  if (pendingMotorType === 'mg995') {
+    // 伺服：theta 從 0 起算、曲柄停在原姿勢（phaseOffset 吸收絕對角），
+    // 角度面板的「起始/結束角」才直覺地對應 thetaVal。
+    theta = 0;
+    bar.phaseOffset = angDeg;
+    bar.servoStart = 0;
+    bar.servoEnd = 90;
+  } else {
+    bar.phaseOffset = angDeg - theta;
+    delete bar.servoStart;
+    delete bar.servoEnd;
+  }
   bar[key].type = 'fixed';
   bar[key].physicalMotor = '1';
   bar.isInput = true;
   bar.physicalMotor = '1';
   cancelMotorMode();
+  // 放完直接選取這顆馬達的接點，MG995 就會跳出角度面板。
+  selectedNodeId = nodeId;
+  selectedLinkId = null;
+  selectedTriangleId = null;
   rebuild(); draw();
+  updateRoleEditor();
+}
+
+// ---- 動力來源型號查詢 ----
+// 找以此接點為馬達中心（physicalMotor 端）的輸入桿。
+function motorBarForCenter(id) {
+  return comps.find(c => c.type === 'bar' && c.isInput && (
+    (c.p1 && c.p1.id === id && c.p1.physicalMotor) ||
+    (c.p2 && c.p2.id === id && c.p2.physicalMotor)
+  )) || null;
+}
+function motorTypeForCenter(id) {
+  const bar = motorBarForCenter(id);
+  return (bar && bar.motorType === 'mg995') ? 'mg995' : 'tt';
+}
+// 目前機構若由 MG995 伺服驅動，回它來回擺的兩端角度（theta 座標系）；否則 null。
+function inputServoRange() {
+  const bar = comps.find(c => c.type === 'bar' && c.isInput && c.motorType === 'mg995');
+  if (!bar) return null;
+  const a = Number(bar.servoStart) || 0;
+  const b = Number.isFinite(Number(bar.servoEnd)) ? Number(bar.servoEnd) : 90;
+  return { lo: Math.min(a, b), hi: Math.max(a, b) };
 }
 
 // ---- 拖曳接點 + 靠近吸附合併（這就是「連接」）----
@@ -1160,6 +1282,7 @@ function selectLink(id) {
   selectedTriangleId = null;
   selectedNodeId = null;
   document.getElementById('roleEditor').style.display = 'none';
+  document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('lenTitle').textContent = '🔵 連桿長度';
   document.getElementById('triSideSelect').style.display = 'none';
   document.getElementById('lenControls').style.display = 'flex';
@@ -1175,6 +1298,7 @@ function selectTriangle(id) {
   selectedLinkId = null;
   selectedNodeId = null;
   document.getElementById('roleEditor').style.display = 'none';
+  document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('lenTitle').textContent = '🔺 三點桿';
   triSide = 'g';
   const sel = document.getElementById('triSideSelect');
@@ -1290,6 +1414,7 @@ function deleteSelectedPart() {
   selectedNodeId = null;
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('roleEditor').style.display = 'none';
+  document.getElementById('servoEditor').style.display = 'none';
   rebuild(); draw();
 }
 function setLen(v) {
@@ -1318,6 +1443,7 @@ function updateRoleEditor() {
   if (!editor) return;
   if (!selectedNodeId || !hasPoint(selectedNodeId)) {
     editor.style.display = 'none';
+    updateServoEditor();
     return;
   }
   document.getElementById('roleStatus').textContent = roleLabel(selectedNodeId);
@@ -1329,6 +1455,33 @@ function updateRoleEditor() {
     traceBtn.title = isTrace ? '停止追蹤這個接點' : '追蹤這個接點走過的路徑';
   }
   editor.style.display = 'flex';
+  updateServoEditor();
+}
+// 選到 MG995 伺服的接點時，跳出起始/結束角面板；其餘情況收起。
+function updateServoEditor() {
+  const panel = document.getElementById('servoEditor');
+  if (!panel) return;
+  const bar = selectedNodeId && hasPoint(selectedNodeId) ? motorBarForCenter(selectedNodeId) : null;
+  if (!bar || bar.motorType !== 'mg995') {
+    panel.style.display = 'none';
+    return;
+  }
+  const sv = document.getElementById('servoStartVal');
+  const ev = document.getElementById('servoEndVal');
+  if (sv) sv.textContent = Math.round(Number(bar.servoStart) || 0);
+  if (ev) ev.textContent = Math.round(Number.isFinite(Number(bar.servoEnd)) ? Number(bar.servoEnd) : 90);
+  panel.style.display = 'flex';
+}
+function changeServoAngle(which, delta) {
+  const bar = selectedNodeId && hasPoint(selectedNodeId) ? motorBarForCenter(selectedNodeId) : null;
+  if (!bar || bar.motorType !== 'mg995') return;
+  pushUndo();
+  const field = (which === 'end') ? 'servoEnd' : 'servoStart';
+  const cur = Number(bar[field]);
+  const base = Number.isFinite(cur) ? cur : (field === 'servoEnd' ? 90 : 0);
+  bar[field] = Math.max(0, Math.min(360, Math.round(base + delta)));
+  updateServoEditor();
+  scheduleAutosave();
 }
 function setNodeRole(type) {
   if (!selectedNodeId || !hasPoint(selectedNodeId)) return;
@@ -1570,5 +1723,5 @@ function init() {
   updateUndoBtn();
 }
 
-window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, startDrawTriangle, clearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, changeServoAngle, addAnchor, addLink, startDrawLink, startDrawTriangle, clearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();

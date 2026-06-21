@@ -63,6 +63,14 @@ function normalizeBar(comp, index, params, warnings) {
   if (comp.isInput || comp.physicalMotor || p1.physicalMotor || p2.physicalMotor) {
     out.isInput = true;
     out.physicalMotor = String(comp.physicalMotor || p1.physicalMotor || p2.physicalMotor || '1');
+    // 動力來源型號：TT 馬達（整圈轉）或 MG995 伺服（角度範圍內來回擺）。
+    out.motorType = comp.motorType === 'mg995' ? 'mg995' : 'tt';
+    if (out.motorType === 'mg995') {
+      // 伺服來回擺的兩端角度（與 play 的 theta 同座標系），clamp 0..360。
+      const clampAng = v => Math.max(0, Math.min(360, Math.round(num(v, 0))));
+      out.servoStart = clampAng(comp.servoStart ?? 0);
+      out.servoEnd = clampAng(comp.servoEnd ?? 90);
+    }
   }
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0)))); // 手動疊放相對位移
 

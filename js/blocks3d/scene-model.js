@@ -97,6 +97,7 @@ export function buildSceneModel(links, points, opts = {}) {
   const pinR = opts.pinR ?? 3.2;
   const groundIds = opts.groundIds || new Set();
   const motorCenters = opts.motorCenters || new Set();
+  const motorTypes = opts.motorTypes || new Map();   // id -> 'tt' | 'mg995'
   const polygons = opts.polygons || [];
 
   const valid = (id) => {
@@ -214,7 +215,8 @@ export function buildSceneModel(links, points, opts = {}) {
       const dx = tx !== null ? tx - j.x : 0;
       const dy = ty !== null ? ty - j.y : -1;
       const dl = Math.hypot(dx, dy) || 1;
-      motors.push({ id: j.id, x: j.x, y: j.y, baseZ: z0, shaftTopZ: z1 + 1.5, dir: { x: dx / dl, y: dy / dl } });
+      const type = motorTypes.get(j.id) === 'mg995' ? 'mg995' : 'tt';
+      motors.push({ id: j.id, x: j.x, y: j.y, baseZ: z0, shaftTopZ: z1 + 1.5, dir: { x: dx / dl, y: dy / dl }, type });
       return;
     }
     pins.push({

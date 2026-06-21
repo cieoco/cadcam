@@ -129,10 +129,15 @@ export function createViewer(container) {
   // TT 齒輪馬達：黃色齒輪箱 + 鐵灰色 DC 罐（與 2D drawTTMotor 同色系）
   const motorBoxMat = new THREE.MeshStandardMaterial({ color: 0xf7c948, metalness: 0.1, roughness: 0.55 });
   const motorCanMat = new THREE.MeshStandardMaterial({ color: 0x5f6b75, metalness: 0.5, roughness: 0.45 });
+  // MG995 伺服：藍色殼體 + 白色舵盤（與 2D drawMG995Servo 同色系）
+  const servoBodyMat = new THREE.MeshStandardMaterial({ color: 0x3d8bf0, metalness: 0.1, roughness: 0.5 });
+  const servoHornMat = new THREE.MeshStandardMaterial({ color: 0xeef3fb, metalness: 0.1, roughness: 0.6 });
   // TT 馬達真實比例（mm）：齒輪箱 37(長)×22.5(寬)×16(厚)、DC 罐 ⌀20.5×22、輸出軸 ⌀~5。
   // 馬達躺在與機構平行的平面、沉在桿件背面；長軸(boxLen)朝機架方向，輸出軸沿 z。
   // shaftInset = 輸出軸距齒輪箱近端的距離（與 2D 的 ax 一致）。
   const MOTOR = { boxLen: 37, boxW: 22.5, boxThick: 16, canD: 20.5, canLen: 22, shaftR: 2.6, shaftInset: 11, gap: 1 };
+  // MG995 標準伺服真實比例（mm）：本體 40×20×38、輸出軸距近端 10、舵盤 ⌀~20。
+  const SERVO = { boxLen: 40, boxW: 20, boxThick: 38, hornR: 10, hornThick: 3, shaftInset: 10, gap: 1 };
   const matCache = new Map(); // color -> material（避免每幀重建材質）
 
   function plateMaterial(color) {
@@ -196,6 +201,35 @@ export function createViewer(container) {
       const g = new THREE.Group();
       g.position.set(m.x, m.y, 0);
       g.rotation.z = Math.atan2(m.dir ? m.dir.y : -1, m.dir ? m.dir.x : 0);
+
+      if (m.type === 'mg995') {
+        // MG995 伺服：藍色扁方殼沉在背面、輸出軸近端有白色舵盤
+        const bodyCz = -(SERVO.gap + SERVO.boxThick / 2);
+        const body = new THREE.Mesh(
+          new THREE.BoxGeometry(SERVO.boxLen, SERVO.boxW, SERVO.boxThick), servoBodyMat);
+        body.position.set(SERVO.boxLen / 2 - SERVO.shaftInset, 0, bodyCz);
+        g.add(body);
+
+        // 舵盤（horn）：圓盤，貼在齒輪箱頂面、繞輸出軸
+        const hornZ = -SERVO.gap + SERVO.hornThick / 2;
+        const horn = new THREE.Mesh(
+          new THREE.CylinderGeometry(SERVO.hornR, SERVO.hornR, SERVO.hornThick, 24), servoHornMat);
+        horn.rotation.x = Math.PI / 2;
+        horn.position.set(0, 0, hornZ);
+        g.add(horn);
+
+        // 輸出軸：沿 z，從舵盤頂到曲柄
+        const topZ = -SERVO.gap;
+        const sLen = Math.max(1, m.shaftTopZ - topZ);
+        const shaft = new THREE.Mesh(
+          new THREE.CylinderGeometry(MOTOR.shaftR, MOTOR.shaftR, sLen, 16), pinMat);
+        shaft.rotation.x = Math.PI / 2;
+        shaft.position.set(0, 0, topZ + sLen / 2);
+        g.add(shaft);
+
+        dynamic.add(g);
+        return;
+      }
 
       const bodyCz = -(MOTOR.gap + MOTOR.boxThick / 2);   // 本體中心 z（沉在桿件背面）
       // 齒輪箱：寬面平行機構平面、薄邊沿 z；輸出軸在近端，本體往機架方向延伸不壓到連桿
@@ -281,6 +315,8 @@ export function createViewer(container) {
     groundMat.dispose();
     motorBoxMat.dispose();
     motorCanMat.dispose();
+    servoBodyMat.dispose();
+    servoHornMat.dispose();
     controls.dispose();
     if (resizeObserver) resizeObserver.disconnect();
     renderer.dispose();
