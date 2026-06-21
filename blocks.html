@@ -88,6 +88,10 @@
       border-radius: 8px; font-size: 16px; cursor: pointer; line-height: 1; }
     .len-editor .le-value { font-size: 14px; font-weight: 700; color: #2c5282; min-width: 54px; text-align: center; }
     .len-editor .le-unit { font-size: 12px; color: #95a5a6; margin-left: 2px; }
+    .len-editor .lift-btn { border: 1px solid #d8dee6; background: #fff; border-radius: 8px;
+      font-size: 12px; padding: 6px 9px; cursor: pointer; line-height: 1; white-space: nowrap; }
+    .len-editor .lift-btn:hover { background: #f6f8fb; }
+    .len-editor .lift-btn.lift-on { background: #eaf2ff; border-color: #7fb0ff; color: #2c5282; font-weight: 700; }
     .role-editor { position: absolute; top: 16px; right: 16px; display: flex; align-items: center; gap: 8px;
       background: rgba(255,255,255,0.96); border: 1px solid #e6e9f0; border-radius: 12px; padding: 8px 12px;
       box-shadow: 0 6px 18px rgba(0,0,0,0.1); }
@@ -178,6 +182,11 @@
             <button class="le-step" onclick="window.blocks.changeLen(8)" title="長 8mm（多一孔）">＋</button>
           </span>
           <button class="clear-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除選取的桿件">🗑 刪除</button>
+        </div>
+        <div class="le-row">
+          <span class="le-title">疊放</span>
+          <button class="lift-btn" id="liftUpBtn" onclick="window.blocks.bringPart('top')" title="把這個桿件疊到最上層（再點一次回到自動）">🔼 移到最上</button>
+          <button class="lift-btn" id="liftDownBtn" onclick="window.blocks.bringPart('bottom')" title="把這個桿件疊到最下層（再點一次回到自動）">🔽 移到最下</button>
         </div>
       </div>
       <div class="role-editor" id="roleEditor" style="display:none;">

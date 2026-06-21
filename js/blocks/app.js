@@ -245,9 +245,19 @@ function draw() {
     !triangleEdgeKeys.has([l.p1, l.p2].sort().join('|')));
   const triComps = comps.filter(c => c.type === 'triangle' && c.p1 && c.p2 && c.p3 &&
     validPt(c.p1.id) && validPt(c.p2.id) && validPt(c.p3.id));
+  // 手動疊放偏好（zlift）標到 visualization 物件上：2D bodies 與 3D buildSceneModel 都讀同一份
+  (compiled.visualization.links || []).forEach(l => {
+    const c = l.id ? comps.find(x => x.id === l.id) : null;
+    l._zlift = (c && c.zlift) || 0;
+  });
+  (compiled.visualization.polygons || []).forEach(poly => {
+    const k = triKey(poly.points);
+    const t = triComps.find(tc => triKey([tc.p1.id, tc.p2.id, tc.p3.id]) === k);
+    poly._zlift = (t && t.zlift) || 0;
+  });
   const bodyLayers = computeBodyLayers([
-    ...layerLinks.map(l => ({ joints: [l.p1, l.p2] })),
-    ...triComps.map(t => ({ joints: [t.p1.id, t.p2.id, t.p3.id] })),
+    ...layerLinks.map(l => ({ joints: [l.p1, l.p2], lift: l._zlift || 0 })),
+    ...triComps.map(t => ({ joints: [t.p1.id, t.p2.id, t.p3.id], lift: t.zlift || 0 })),
   ], groundIds);
   const linkLayer = new Map();      // link 物件 -> 層
   layerLinks.forEach((l, i) => linkLayer.set(l, bodyLayers[i]));
@@ -1069,6 +1079,7 @@ function selectLink(id) {
   document.getElementById('lenControls').style.display = 'flex';
   document.getElementById('lenEditor').style.display = 'flex';
   renderLenEditor(Math.round(topo.params[c.lenParam] || 0));
+  updateZliftButtons();
   draw();
 }
 function selectTriangle(id) {
@@ -1081,7 +1092,34 @@ function selectTriangle(id) {
   document.getElementById('lenTitle').textContent = '🔺 三點桿';
   document.getElementById('lenControls').style.display = 'none';
   document.getElementById('lenEditor').style.display = 'flex';
+  updateZliftButtons();
   draw();
+}
+
+// 把選取的桿件/三角板手動移到最上或最下層（2D 疊放與 3D z 分層同步）。
+// 再點一次同方向 → 回到自動分層。zlift 只改疊放、不動拓撲，所以 draw() 即可、不必 rebuild。
+function bringPart(dir) {
+  const id = selectedLinkId || selectedTriangleId;
+  if (!id) return;
+  const c = comps.find(x => x.id === id);
+  if (!c) return;
+  pushUndo();
+  const want = dir === 'top' ? 1 : -1;
+  c.zlift = (c.zlift === want) ? 0 : want;
+  scheduleAutosave();
+  updateZliftButtons();
+  draw();
+}
+
+// 反映目前選取件的 zlift 狀態到「移到最上/最下」按鈕的高亮
+function updateZliftButtons() {
+  const id = selectedLinkId || selectedTriangleId;
+  const c = id ? comps.find(x => x.id === id) : null;
+  const z = c ? (c.zlift || 0) : 0;
+  const up = document.getElementById('liftUpBtn');
+  const dn = document.getElementById('liftDownBtn');
+  if (up) up.classList.toggle('lift-on', z > 0);
+  if (dn) dn.classList.toggle('lift-on', z < 0);
 }
 
 // 更新長度顯示（用上方的 − / + 以 8mm 為單位調整）
@@ -1357,5 +1395,5 @@ function init() {
   updateUndoBtn();
 }
 
-window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, startDrawTriangle, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, addAnchor, addLink, startDrawLink, startDrawTriangle, clearAll, togglePlay, setLen, changeLen, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();

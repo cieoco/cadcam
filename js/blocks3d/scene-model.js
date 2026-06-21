@@ -11,10 +11,11 @@
 /**
  * 以「離固定桿的距離」決定每個剛體的疊放層級。2D 的繪製疊放順序與 3D 的 z 分層
  * 共用這同一套，兩邊才會一致。
- * @param {Array} bodies - [{ joints: [nodeId...] }]（桿 2 個、三角板 3 個銷孔）
+ * @param {Array} bodies - [{ joints: [nodeId...], lift? }]（桿 2 個、三角板 3 個銷孔；
+ *                          lift>0＝手動移到最上、lift<0＝移到最下、0/缺＝自動）
  * @param {Set}   [groundIds] - 地錨節點 id
  * @param {Object} [opts]
- * @param {(i:number)=>number} [opts.floorOf] - 取代 rank 當「樓地板」的覆寫（手動圖層用）
+ * @param {(i:number)=>number} [opts.floorOf] - 完全取代「樓地板」的覆寫（預設用 rank + body.lift）
  * @returns {number[]} 與 bodies 同序的層級（越大越外/越上）
  *
  * 原則：(1) 節點離地深度 BFS（地錨 0；其餘＝相鄰最小深度＋1；無地錨/不連通視為 0）。
@@ -44,7 +45,15 @@ export function computeBodyLayers(bodies, groundIds = new Set(), opts = {}) {
   }
   const depthOf = id => (depth.has(id) ? depth.get(id) : 0);
   const rankOf = body => body.joints.reduce((m, id) => Math.max(m, depthOf(id)), 0);
-  const floorOf = opts.floorOf || ((i) => rankOf(bodies[i]));
+  const ranks = bodies.map(rankOf);
+  const maxRank = ranks.reduce((m, r) => Math.max(m, r), 0);
+  // 樓地板＝自然 rank；body.lift 手動覆寫：>0 疊到所有自然層之上、<0 壓到最底（共銷檢查仍生效）
+  const floorOf = opts.floorOf || ((i) => {
+    const lift = bodies[i].lift || 0;
+    if (lift > 0) return maxRank + 1;
+    if (lift < 0) return 0;
+    return ranks[i];
+  });
   const floors = bodies.map((_, i) => floorOf(i));
 
   // 共銷衝突圖（剛體 i,j 共用同一銷孔則相鄰）
@@ -117,9 +126,10 @@ export function buildSceneModel(links, points, opts = {}) {
     !triEdgeKeys.has([l.p1, l.p2].sort().join('|')));
 
   // 把桿與三角板統一成「剛體」（joints = 它佔用的銷孔；桿 2 個、三角板 3 個）。
+  // lift = 手動疊放偏好（由 app.js 標在 visualization 物件的 _zlift 上，2D/3D 共用同一份）。
   const bodies = [
-    ...visible.map(l => ({ kind: 'stick', src: l, joints: [l.p1, l.p2] })),
-    ...triPlates.map(poly => ({ kind: 'plate', src: poly, joints: [...poly.points] })),
+    ...visible.map(l => ({ kind: 'stick', src: l, joints: [l.p1, l.p2], lift: l._zlift || 0 })),
+    ...triPlates.map(poly => ({ kind: 'plate', src: poly, joints: [...poly.points], lift: poly._zlift || 0 })),
   ];
 
   // 分層（離地深度，2D 疊放順序與此共用同一套 → 兩邊一致）

@@ -64,6 +64,7 @@ function normalizeBar(comp, index, params, warnings) {
     out.isInput = true;
     out.physicalMotor = String(comp.physicalMotor || p1.physicalMotor || p2.physicalMotor || '1');
   }
+  if (comp.zlift) out.zlift = Number(comp.zlift) > 0 ? 1 : -1; // 手動疊放：移到最上/最下
 
   const rawLen = params[lenParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y);
   params[lenParam] = out.fixedLen ? snapLego(rawLen) : Math.round(num(rawLen, 0));
@@ -90,6 +91,7 @@ function normalizeTriangle(comp, index, params, warnings) {
     r2Param,
     sign: Number(comp.sign) < 0 ? -1 : 1
   };
+  if (comp.zlift) out.zlift = Number(comp.zlift) > 0 ? 1 : -1; // 手動疊放：移到最上/最下
 
   params[gParam] = Math.round(num(params[gParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y), 0));
   params[r1Param] = Math.round(num(params[r1Param] ?? Math.hypot(p3.x - p1.x, p3.y - p1.y), 0));
