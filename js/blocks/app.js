@@ -138,6 +138,7 @@ const planMotion = () => Motion.planMotion(compiled, topo, theta, lastSolved);
 const mobilePrompt = () => window.matchMedia('(hover: none), (pointer: coarse), (max-width: 640px)').matches;
 const promptText = (desktop, mobile) => mobilePrompt() ? mobile : desktop;
 const snapWorld = () => View.snapWorld() * (mobilePrompt() ? 2.35 : 1);
+const NODE_TAP_PX = 34;   // 手機點接點的命中半徑（畫面 px，縮放下維持一致手感）
 
 const pointCoords = () => Model.pointCoords(comps);
 const updatePointCoordsById = (id, x, y) => Model.updatePointCoordsById(comps, id, x, y);
@@ -423,18 +424,8 @@ function draw() {
     node.style.cursor = 'grab';
     node.addEventListener('pointerdown', (e) => onNodeDown(e, id));
     svg.appendChild(node);
-
-    if (mobilePrompt()) {
-      const hit = document.createElementNS(SVG_NS, 'circle');
-      hit.setAttribute('cx', TX(p.x));
-      hit.setAttribute('cy', TY(p.y));
-      hit.setAttribute('r', 22);
-      hit.setAttribute('fill', 'transparent');
-      hit.setAttribute('data-id', id);
-      hit.style.cursor = 'grab';
-      hit.addEventListener('pointerdown', (e) => onNodeDown(e, id));
-      svg.appendChild(hit);
-    }
+    // 手機的接點命中放大改由 capture 階段的 pointerdown 統一處理（見下方），
+    // 不再每個節點疊一圈透明命中圈。
   });
 
   drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
@@ -664,9 +655,9 @@ function exitDrawLink() {
   clearBanner();
 }
 // 找最靠近某世界座標的既有接點 id（吸附用），exclude 內的略過
-function nearestNodeId(world, exclude = []) {
+function nearestNodeId(world, exclude = [], maxDist = snapWorld()) {
   const m = pointCoords();
-  let best = null, bestD = snapWorld();
+  let best = null, bestD = maxDist;
   for (const id in m) {
     if (exclude.includes(id)) continue;
     const d = Math.hypot(m[id].x - world.x, m[id].y - world.y);
@@ -1415,6 +1406,26 @@ function endPointer(e) {
 }
 svg.addEventListener('pointerup', endPointer);
 svg.addEventListener('pointercancel', endPointer);
+
+// 手機：接點優先命中（capture 階段先攔）。
+// 觸控目標常比手指小，落點容易偏到接點旁邊的桿身，結果只跳出長度面板、
+// 點不到那個接點去接地錨。這裡在事件還沒走到桿身/三角板的 handler 之前先判斷：
+// 落點若靠近某個接點（用畫面 px 當門檻，縮放下手感一致），就直接接手那個接點，
+// 並擋住桿身的 pointerdown，避免它把選取搶去顯示長度。
+svg.addEventListener('pointerdown', (e) => {
+  if (!mobilePrompt()) return;
+  if (e.pointerType === 'mouse') return;
+  if (drawingLink || drawingTriangle || pickBars) return; // 這些模式各自有起點處理
+  if (activePointers.size >= 1) return;                    // 第二指：交給縮放手勢
+  const w = worldFromEvent(e); if (!w) return;
+  const ctm = svg.getScreenCTM();
+  const pxToWorld = ctm && ctm.a ? 1 / (ctm.a * View.getScale()) : 1 / View.getScale();
+  const id = nearestNodeId(w, [], NODE_TAP_PX * pxToWorld);
+  if (!id) return;
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); // 維持縮放偵測的指標帳本
+  e.stopPropagation();   // 攔住桿身/三角板的 pointerdown，避免被搶去選長度
+  onNodeDown(e, id);
+}, true);
 
 svg.addEventListener('wheel', (e) => {
   e.preventDefault();
