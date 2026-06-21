@@ -688,14 +688,40 @@ function drawDrawPreview() {
   path.setAttribute('stroke-dasharray', '8 6');
   path.setAttribute('stroke-linejoin', 'round');
   svg.appendChild(path);
+  const labelText = linkLenLabel(res.len, res.nodeId);
+  const isMobileLabel = mobilePrompt();
+  const fontSize = isMobileLabel ? 22 : 13;
+  const labelPadX = isMobileLabel ? 10 : 0;
+  const labelPadY = isMobileLabel ? 6 : 0;
+  const labelX = (TX(drawStart.x) + TX(res.pos.x)) / 2;
+  const labelY = (TY(drawStart.y) + TY(res.pos.y)) / 2 - (isMobileLabel ? 18 : 10);
+  if (isMobileLabel) {
+    const bg = document.createElementNS(SVG_NS, 'rect');
+    const approxW = labelText.length * fontSize * 0.58 + labelPadX * 2;
+    const approxH = fontSize + labelPadY * 2;
+    bg.setAttribute('x', labelX - approxW / 2);
+    bg.setAttribute('y', labelY - fontSize + 1 - labelPadY);
+    bg.setAttribute('width', approxW);
+    bg.setAttribute('height', approxH);
+    bg.setAttribute('rx', 12);
+    bg.setAttribute('ry', 12);
+    bg.setAttribute('fill', '#ffffff');
+    bg.setAttribute('fill-opacity', '0.92');
+    bg.setAttribute('stroke', '#bcd3f0');
+    bg.setAttribute('stroke-width', 1.5);
+    svg.appendChild(bg);
+  }
   const label = document.createElementNS(SVG_NS, 'text');
-  label.setAttribute('x', (TX(drawStart.x) + TX(res.pos.x)) / 2);
-  label.setAttribute('y', (TY(drawStart.y) + TY(res.pos.y)) / 2 - 10);
+  label.setAttribute('x', labelX);
+  label.setAttribute('y', labelY);
   label.setAttribute('text-anchor', 'middle');
-  label.setAttribute('font-size', '13');
+  label.setAttribute('font-size', fontSize);
   label.setAttribute('font-weight', '700');
   label.setAttribute('fill', '#2c5282');
-  label.textContent = linkLenLabel(res.len, res.nodeId);
+  label.setAttribute('paint-order', 'stroke');
+  label.setAttribute('stroke', '#ffffff');
+  label.setAttribute('stroke-width', isMobileLabel ? 3 : 0);
+  label.textContent = labelText;
   svg.appendChild(label);
 }
 
