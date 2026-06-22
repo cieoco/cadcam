@@ -53,6 +53,54 @@ function stadiumShape(a, b, r, holeR) {
   return shape;
 }
 
+// 膠囊形（stadium）孔路徑：給軌道挖長槽用。順時針繞（與圓孔同向），當作 hole。
+function capsuleHolePath(a, b, r) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const nx = dy / dist;   // 右側法線
+  const ny = -dx / dist;
+  const aR = { x: a.x + nx * r, y: a.y + ny * r };
+  const bR = { x: b.x + nx * r, y: b.y + ny * r };
+  const aL = { x: a.x - nx * r, y: a.y - ny * r };
+  const bL = { x: b.x - nx * r, y: b.y - ny * r };
+  const p = new THREE.Path();
+  p.moveTo(aR.x, aR.y);
+  p.lineTo(bR.x, bR.y);
+  p.absarc(b.x, b.y, r,
+    Math.atan2(bR.y - b.y, bR.x - b.x),
+    Math.atan2(bL.y - b.y, bL.x - b.x), true);   // b 端半圓（CW）
+  p.lineTo(aL.x, aL.y);
+  p.absarc(a.x, a.y, r,
+    Math.atan2(aL.y - a.y, aL.x - a.x),
+    Math.atan2(aR.y - a.y, aR.x - a.x), true);   // a 端半圓（CW）
+  return p;
+}
+
+// 膠囊形（stadium）實心 THREE.Shape：給槽底有色墊片用（逆時針繞，當實心輪廓）。
+function capsuleShape(a, b, r) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const nx = dy / dist;
+  const ny = -dx / dist;
+  const aR = { x: a.x + nx * r, y: a.y + ny * r };
+  const bR = { x: b.x + nx * r, y: b.y + ny * r };
+  const aL = { x: a.x - nx * r, y: a.y - ny * r };
+  const bL = { x: b.x - nx * r, y: b.y - ny * r };
+  const s = new THREE.Shape();
+  s.moveTo(aR.x, aR.y);
+  s.lineTo(bR.x, bR.y);
+  s.absarc(b.x, b.y, r,
+    Math.atan2(bR.y - b.y, bR.x - b.x),
+    Math.atan2(bL.y - b.y, bL.x - b.x), false);
+  s.lineTo(aL.x, aL.y);
+  s.absarc(a.x, a.y, r,
+    Math.atan2(aL.y - a.y, aL.x - a.x),
+    Math.atan2(aR.y - a.y, aR.x - a.x), false);
+  return s;
+}
+
 // 三點桿（三角板）做成 THREE.Shape：三個孔中心圓 + 外切線 hull + 三個角鑽孔。
 // 外形與 2D 的 roundedTriangleHullPath 一致（三個等半徑圓的外切線 hull）。
 function triPlateShape(corners, r, holeR) {
@@ -192,6 +240,50 @@ export function createViewer(container) {
       const mesh = new THREE.Mesh(geo, plateMaterial(pl.color));
       mesh.position.z = pl.z;
       dynamic.add(mesh);
+    });
+
+    // 滑塊軌道：m1-m2 承載桿擠成扁條（兩端鎖孔＝固定螺絲），沿行程方向挖一條長槽
+    (model.rails || []).forEach(r => {
+      const shape = stadiumShape(r.a, r.b, r.r, holeR);
+      if (r.slot) shape.holes.push(capsuleHolePath(r.slot.a, r.slot.b, r.slot.half));
+      const geo = new THREE.ExtrudeGeometry(shape, {
+        depth: r.thickness,
+        bevelEnabled: false,
+        curveSegments: 24,
+      });
+      const mesh = new THREE.Mesh(geo, plateMaterial(r.color));
+      mesh.position.z = r.z;
+      dynamic.add(mesh);
+
+      // 槽底有色墊片：墊在洞後方、只填底部一小段厚度 → 看起來像「有色底的凹槽」而非透空黑洞
+      if (r.slot && r.slot.color) {
+        const floorGeo = new THREE.ExtrudeGeometry(
+          capsuleShape(r.slot.a, r.slot.b, r.slot.half),
+          { depth: 1.5, bevelEnabled: false, curveSegments: 20 });
+        const floor = new THREE.Mesh(floorGeo, plateMaterial(r.slot.color));
+        floor.position.z = r.z;   // 與軌道背面齊，凹槽剩 (thickness-1.5) 的深度
+        dynamic.add(floor);
+      }
+    });
+
+    // 滑件：短滑件本體連起前後兩螺絲；兩根導引螺絲沿 z 穿過軌道槽（中心銷接連桿由 pins 處理）
+    (model.carriages || []).forEach(c => {
+      const shape = stadiumShape(c.bodyA, c.bodyB, c.bodyR, c.screwR);
+      const geo = new THREE.ExtrudeGeometry(shape, {
+        depth: c.thickness,
+        bevelEnabled: false,
+        curveSegments: 20,
+      });
+      const body = new THREE.Mesh(geo, plateMaterial(c.color));
+      body.position.z = c.z;
+      dynamic.add(body);
+      (c.screws || []).forEach(s => {
+        const h = Math.max(1, c.screwZ1 - c.screwZ0);
+        const pin = new THREE.Mesh(new THREE.CylinderGeometry(c.screwR, c.screwR, h, 16), pinMat);
+        pin.rotation.x = Math.PI / 2;
+        pin.position.set(s.x, s.y, (c.screwZ0 + c.screwZ1) / 2);
+        dynamic.add(pin);
+      });
     });
 
     // 馬達：躺在機構背面（z<0）、長軸朝機架方向，輸出軸沿 +z 往上頂到曲柄那層帶動它。

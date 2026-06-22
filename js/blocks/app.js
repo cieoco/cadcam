@@ -39,6 +39,7 @@ let topo = { params: { theta: 0 }, tracePoint: '' };
 let compiled = null;
 let theta = 0, raf = null, counter = 0;
 let dragId = null, dragLinkId = null, dragLastWorld = null, snapTarget = null, selectedLinkId = null, selectedTriangleId = null, selectedNodeId = null, selectedSliderId = null;
+let dragFrame = false;         // 拖曳「機架」把手：所有固定銷整組平移
 let triSide = 'g';                    // 三點桿目前在調哪一條邊：'g' 底邊 / 'r1' P1–P3 / 'r2' P2–P3
 let placingMotor = false, pickBars = null;
 let pendingMotorType = 'tt';           // 下一次放置的動力來源型號：'tt' TT馬達 / 'mg995' 伺服
@@ -210,6 +211,30 @@ const fixedLinkFor = (id) => Model.fixedLinkFor(comps, id);
 const freeLinkForPoint = (id) => Model.freeLinkForPoint(comps, id);
 const isFreeLink = (c) => Model.isFreeLink(comps, c);
 const barsAtNode = (nodeId) => Model.barsAtNode(comps, nodeId);
+
+// 隱性機架：所有 type:'fixed' 的接點視為同一個固定底座（機架）。
+// 不是獨立物件，只是把散落的固定銷當成一組——拖機架把手時整組一起平移。
+const FRAME_POINT_KEYS = ['p1', 'p2', 'p3', 'm1', 'm2'];
+function frameNodeIds() {
+  const ids = new Set();
+  comps.forEach(c => FRAME_POINT_KEYS.forEach(k => {
+    if (c[k] && c[k].id && c[k].type === 'fixed') ids.add(c[k].id);
+  }));
+  return ids;
+}
+// 機架上各固定銷的座標（固定點不隨求解移動，直接用元件座標）。x 排序方便連線。
+function frameNodes() {
+  const m = pointCoords();
+  return [...frameNodeIds()]
+    .map(id => ({ id, ...(m[id] || {}) }))
+    .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
+    .sort((a, b) => (a.x - b.x) || (a.y - b.y));
+}
+// 機架「視覺」用的固定銷：排除滑塊自己的 rail/mount 點（它們已有滑軌與安裝孔外觀，
+// 不讓機架連接線再沿軌道疊一條）。注意：移動仍以 frameNodeIds() 為準，滑塊照樣跟著走。
+function frameConnectorNodes() {
+  return frameNodes().filter(p => !isHiddenSliderRailPoint(p.id) && !isSliderMountPoint(p.id));
+}
 
 function syncSliderGeometries() {
   comps.filter(c => c.type === 'slider' && c.p1 && c.p2).forEach(c => {
@@ -574,6 +599,7 @@ function draw() {
     // 不再每個節點疊一圈透明命中圈。
   });
 
+  drawFrameHandle();   // 機架移動把手：畫在節點之上，才點得到、拖得動
   drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
   drawTrianglePreview(); // 三點桿模式：疊在最上層的三角預覽
 
@@ -583,15 +609,22 @@ function draw() {
   // motorTypes：每個馬達中心的型號（'tt'/'mg995'），讓 3D 也畫出對應外形。
   const motorTypes = new Map();
   motorCenterIds.forEach(id => motorTypes.set(id, motorTypeForCenter(id)));
-  lastModelInputs = { links: linksToDraw, pts, groundIds, motorCenterIds, motorTypes, polygons: compiled.visualization.polygons || [] };
+  // 滑塊（無動力）幾何餵給 3D：軌道（m1-m2）＋滑塊方塊（p3，沿 p1-p2 軸向）。
+  const sliders3d = comps
+    .filter(c => c.type === 'slider' && !c.isInput && c.p1 && c.p2 && c.p3 && c.m1 && c.m2)
+    .map(c => ({ id: c.id, p1: c.p1.id, p2: c.p2.id, m1: c.m1.id, m2: c.m2.id, p3: c.p3.id,
+                 baseEnd: c.baseEnd === 'p2' ? 'p2' : 'p1',
+                 travelStart: sliderTravelStart(c), travelEnd: sliderTravelEnd(c),
+                 carriageLen: sliderBodyLength(c), color: c.color }));
+  lastModelInputs = { links: linksToDraw, pts, groundIds, motorCenterIds, motorTypes, polygons: compiled.visualization.polygons || [], sliders: sliders3d };
   if (view3DActive) push3D();
 }
 
 // 用最近一幀的求解結果建場景模型，推進 3D viewer
 function push3D() {
   if (!viewer3D || !lastModelInputs) return;
-  const { links, pts, groundIds, motorCenterIds, motorTypes, polygons } = lastModelInputs;
-  const model = buildSceneModel(links, pts, { groundIds, motorCenters: motorCenterIds, motorTypes, hullR: HULL_R_WORLD, polygons });
+  const { links, pts, groundIds, motorCenterIds, motorTypes, polygons, sliders } = lastModelInputs;
+  const model = buildSceneModel(links, pts, { groundIds, motorCenters: motorCenterIds, motorTypes, hullR: HULL_R_WORLD, polygons, sliders });
   viewer3D.update(model);
 }
 
@@ -627,8 +660,8 @@ async function toggle3D() {
   }
 }
 
-// 地面基線（機架的視覺暗示）
-function drawGround() {
+// 飄浮地面基線（沒有固定銷時的世界地板暗示）。
+function drawGroundBaseline() {
   const y = TY(0);
   const base = document.createElementNS(SVG_NS, 'line');
   base.setAttribute('x1', 0); base.setAttribute('y1', y);
@@ -642,6 +675,66 @@ function drawGround() {
     h.setAttribute('stroke', '#dfe4ec'); h.setAttribute('stroke-width', 2);
     svg.appendChild(h);
   }
+}
+
+// 機架（隱性）：把所有固定銷用淡連接線＋陰影斜線串起來，讀作「同一個固定底座」。
+// 畫在最底層（draw() 開頭呼叫）；可拖的機架把手另由 drawFrameHandle 畫在最上層。
+function drawGround() {
+  const nodes = frameConnectorNodes();
+  if (nodes.length < 2) { drawGroundBaseline(); return; }
+  // 沿 x 排序的固定銷連成機架桿身
+  for (let i = 0; i < nodes.length - 1; i++) {
+    const a = nodes[i], b = nodes[i + 1];
+    const seg = document.createElementNS(SVG_NS, 'line');
+    seg.setAttribute('x1', TX(a.x)); seg.setAttribute('y1', TY(a.y));
+    seg.setAttribute('x2', TX(b.x)); seg.setAttribute('y2', TY(b.y));
+    seg.setAttribute('stroke', '#c2cad6'); seg.setAttribute('stroke-width', 3);
+    seg.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(seg);
+    // 沿桿身畫短斜線陰影（固定/接地記號），間距 14px
+    const x1 = TX(a.x), y1 = TY(a.y), x2 = TX(b.x), y2 = TY(b.y);
+    const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+    const ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+    const nx = -uy, ny = ux;                 // 桿身法線：陰影往「下方」(法線取 y 為正那側)
+    const side = ny >= 0 ? 1 : -1;
+    for (let d = 8; d < len; d += 14) {
+      const px = x1 + ux * d, py = y1 + uy * d;
+      const h = document.createElementNS(SVG_NS, 'line');
+      h.setAttribute('x1', px); h.setAttribute('y1', py);
+      h.setAttribute('x2', px + (nx - ux) * 8 * side); h.setAttribute('y2', py + (ny - uy) * 8 * side);
+      h.setAttribute('stroke', '#dfe4ec'); h.setAttribute('stroke-width', 2);
+      svg.appendChild(h);
+    }
+  }
+}
+
+// 機架移動把手：固定銷形心放一顆「🏠 機架」鈕，拖它＝把所有固定銷整組平移。
+function drawFrameHandle() {
+  const nodes = frameConnectorNodes();
+  if (nodes.length < 2) return;
+  const cx = nodes.reduce((s, p) => s + p.x, 0) / nodes.length;
+  const cy = nodes.reduce((s, p) => s + p.y, 0) / nodes.length;
+  const x = TX(cx), y = TY(cy);
+  const g = document.createElementNS(SVG_NS, 'g');
+  g.setAttribute('transform', `translate(${x} ${y})`);
+  g.style.cursor = 'move';
+  const chip = document.createElementNS(SVG_NS, 'circle');
+  chip.setAttribute('r', dragFrame ? 13 : 11);
+  chip.setAttribute('fill', '#eef1f5');
+  chip.setAttribute('stroke', dragFrame ? '#2ecc71' : '#9aa5b4');
+  chip.setAttribute('stroke-width', 2);
+  g.appendChild(chip);
+  const icon = document.createElementNS(SVG_NS, 'text');
+  icon.setAttribute('text-anchor', 'middle');
+  icon.setAttribute('dominant-baseline', 'central');
+  icon.setAttribute('font-size', '12');
+  icon.textContent = '🏠';
+  g.appendChild(icon);
+  const title = document.createElementNS(SVG_NS, 'title');
+  title.textContent = '機架：拖曳整組移動所有固定銷';
+  g.appendChild(title);
+  g.addEventListener('pointerdown', onFrameHandleDown);
+  svg.appendChild(g);
 }
 
 // 在馬達中心畫一顆 TT 減速馬達（黃色齒輪箱 + 側視方形馬達罐 + 輸出軸）。
@@ -1577,6 +1670,20 @@ function startFreeLinkDrag(e, linkId) {
   draw();
   return true;
 }
+// 拖機架把手：整組平移所有固定銷。不選取任何節點、不叫屬性列。
+function onFrameHandleDown(e) {
+  e.preventDefault();
+  if (drawingLink || drawingTriangle || placingMotor || pickBars) return;
+  e.stopPropagation();
+  const w = worldFromEvent(e);
+  if (!w) return;
+  preDragSnap = snapshotStr(); // 整段拖曳合併成一筆 undo
+  pause();
+  dragFrame = true;
+  dragLastWorld = w;
+  try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+  draw();
+}
 function onNodeDown(e, id) {
   e.preventDefault();
   if (drawingLink || drawingTriangle) return; // 畫圖模式：交給 svg 起點處理（會自動吸附到此接點）
@@ -1612,6 +1719,14 @@ function onDragMove(e) {
   }
   if (activePointers.size >= 2) return; // 雙指縮放/平移中，不做單指拖曳
   const w = worldFromEvent(e); if (!w) return;
+  if (dragFrame && dragLastWorld) {
+    const dx = w.x - dragLastWorld.x;
+    const dy = w.y - dragLastWorld.y;
+    frameNodeIds().forEach(id => movePointById(id, dx, dy));
+    dragLastWorld = w;
+    rebuild(); draw();
+    return;
+  }
   if (dragLinkId && dragLastWorld) {
     const c = comps.find(x => x.id === dragLinkId && isFreeLink(x));
     if (!c) return;
@@ -1677,6 +1792,12 @@ function onDragEnd(e) {
   }
   if (drawingLink) { // 觸控/筆：放開＝確定長度（滑鼠改用右鍵確定，見 contextmenu）
     if (e && e.pointerType && e.pointerType !== 'mouse') finishDrawLink(e);
+    return;
+  }
+  if (dragFrame) {
+    dragFrame = false; dragLastWorld = null;
+    rebuild(); draw();
+    commitDragUndo();
     return;
   }
   if (dragLinkId) {

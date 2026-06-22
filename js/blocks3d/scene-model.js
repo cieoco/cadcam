@@ -84,11 +84,13 @@ export function computeBodyLayers(bodies, groundIds = new Set(), opts = {}) {
  * @param {Set}    [opts.groundIds]      - 視為地錨的節點 id
  * @param {Set}    [opts.motorCenters]   - 馬達輸出軸所在的節點 id（input crank 的中心）
  * @param {Array}  [opts.polygons]       - compiled.visualization.polygons：三點桿，{ points:[id,id,id], color }
+ * @param {Array}  [opts.sliders]        - 滑塊：{ id, p1, p2, m1, m2, p3, baseEnd, travelStart, travelEnd, carriageLen, color }
+ *                                          （開槽軌道＋兩螺絲導引的滑件）
  * @param {number} [opts.hullR=9]        - 冰棒棍外形半徑（與 2D 一致）
  * @param {number} [opts.plateGap=6]     - 相鄰層的 z 間距 (mm)
  * @param {number} [opts.plateThickness=4] - 每片板的厚度 (mm)
  * @param {number} [opts.pinR=3.2]       - 銷柱半徑 (mm)
- * @returns {{ sticks, plates, pins, grounds, motors, plateGap, plateThickness, center, span }}
+ * @returns {{ sticks, plates, pins, grounds, motors, rails, carriages, plateGap, plateThickness, center, span }}
  */
 export function buildSceneModel(links, points, opts = {}) {
   const hullR = opts.hullR ?? 9;
@@ -116,9 +118,10 @@ export function buildSceneModel(links, points, opts = {}) {
     [[a, b], [a, c], [b, c]].forEach(([x, y]) => triEdgeKeys.add([x, y].sort().join('|')));
   });
 
-  // 只取「可見、兩端有效、且不落在三角板邊上」的桿
+  // 只取「可見、兩端有效、且不落在三角板邊上」的桿。
+  // style:'track' 是滑塊軌道的視覺輔助線，3D 另以實體軌道槽呈現（見下方 rails），不當普通桿。
   const visible = (links || []).filter(l =>
-    l && !l.hidden && valid(l.p1) && valid(l.p2) &&
+    l && !l.hidden && l.style !== 'track' && valid(l.p1) && valid(l.p2) &&
     !triEdgeKeys.has([l.p1, l.p2].sort().join('|')));
 
   // 把桿與三角板統一成「剛體」（joints = 它佔用的銷孔；桿 2 個、三角板 3 個）。
@@ -184,6 +187,57 @@ export function buildSceneModel(links, points, opts = {}) {
   sticks.forEach(s => { touch(s.p1, s.layer); touch(s.p2, s.layer); });
   plates.forEach(pl => pl.ids.forEach(id => touch(id, pl.layer)));
 
+  // 滑塊（無動力）＝開槽連桿 + 帶兩根導引螺絲的滑件：
+  //   - 軌道：m1-m2 承載桿（固定底座），沿行程範圍挖一條長槽。
+  //   - 滑件：中心 p3，沿軸向前後各 carriageLen/2 放一根螺絲穿過槽（兩螺絲定出直線、鎖死旋轉）；
+  //           短滑件本體把兩螺絲連起來，連接桿接在正中 p3（中心銷由現有關節銷處理）。
+  //   - z 疊放：滑件在連接桿那層（在前），軌道緊貼其背面，螺絲沿 z 貫穿軌道槽到滑件。
+  // baseEnd / travelStart / travelEnd 沿用 2D 慣例：行程距離從 base 端沿軸向量、夾在 [0, railLen]。
+  const sliderDefs = opts.sliders || [];
+  const rails = [];
+  const carriages = [];
+  sliderDefs.forEach(sl => {
+    const m1 = points[sl.m1], m2 = points[sl.m2];
+    const a1 = points[sl.p1], a2 = points[sl.p2], pc = points[sl.p3];
+    if (![m1, m2, a1, a2, pc].every(p => p && Number.isFinite(p.x))) return;
+    const base = sl.baseEnd === 'p2' ? a2 : a1;
+    const other = sl.baseEnd === 'p2' ? a1 : a2;
+    const adx = other.x - base.x, ady = other.y - base.y;
+    const L = Math.hypot(adx, ady) || 1;
+    const ux = adx / L, uy = ady / L;
+    const half = Math.max(2, (sl.carriageLen || 32) / 2);   // 前後螺絲距中心
+    const screwA = { x: pc.x - ux * half, y: pc.y - uy * half };
+    const screwB = { x: pc.x + ux * half, y: pc.y + uy * half };
+
+    const screwR = 1.5;                          // M3 導引螺絲（⌀3mm）
+    const slotHalf = screwR + 1;                 // 槽寬 ~5mm：螺絲外留滑動間隙，通道才看得到
+    const driver = sticks.find(s => s.p1 === sl.p3 || s.p2 === sl.p3);
+    const linkLayer = driver ? driver.layer : 1;
+    const bodyLayer = linkLayer - 1;             // 滑件在連接桿內側一層 → 連桿在更外層，避免穿模
+    const bodyZ = bodyLayer * plateGap;
+    const railZ = (linkLayer - 2) * plateGap;    // 軌道再內一層，緊貼滑件背面
+    touch(sl.p3, bodyLayer);                     // 中心銷往內延伸到滑件，連桿↔滑件才接得上
+
+    // 槽涵蓋螺絲的掃掠範圍（行程 ± 螺絲半距），夾在軌道 [0, L] 內
+    const ts = Math.max(0, Math.min(L, (Number(sl.travelStart) || 0) - half));
+    const te = Math.max(0, Math.min(L, (Number.isFinite(Number(sl.travelEnd)) ? Number(sl.travelEnd) : L) + half));
+    const slotA = { x: base.x + ux * ts, y: base.y + uy * ts };
+    const slotB = { x: base.x + ux * te, y: base.y + uy * te };
+
+    rails.push({
+      a: { x: m1.x, y: m1.y }, b: { x: m2.x, y: m2.y },
+      r: hullR * 0.9, thickness: plateThickness,
+      z: railZ, color: '#7f8c9b',
+      slot: { a: slotA, b: slotB, half: slotHalf, color: '#3a4452' },
+    });
+    carriages.push({
+      bodyA: screwA, bodyB: screwB, bodyR: hullR * 0.7,
+      thickness: plateThickness, z: bodyZ, color: sl.color || '#16a085',
+      screws: [screwA, screwB], screwR,
+      screwZ0: railZ - 1, screwZ1: bodyZ + plateThickness + 1,
+    });
+  });
+
   const pins = [];
   const grounds = [];
   const motors = [];
@@ -238,6 +292,7 @@ export function buildSceneModel(links, points, opts = {}) {
   const ys = [];
   sticks.forEach(s => { xs.push(s.a.x, s.b.x); ys.push(s.a.y, s.b.y); });
   plates.forEach(pl => pl.corners.forEach(c => { xs.push(c.x); ys.push(c.y); }));
+  rails.forEach(r => { xs.push(r.a.x, r.b.x); ys.push(r.a.y, r.b.y); });
   if (xs.length) {
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -260,5 +315,5 @@ export function buildSceneModel(links, points, opts = {}) {
       }
     : { x: bboxCenter.x, y: bboxCenter.y, z: midZ };
 
-  return { sticks, plates, pins, grounds, motors, plateGap, plateThickness, span, focus, anchored };
+  return { sticks, plates, pins, grounds, motors, rails, carriages, plateGap, plateThickness, span, focus, anchored };
 }
