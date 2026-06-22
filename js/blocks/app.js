@@ -104,6 +104,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
   document.getElementById('sliderBaseBtn').style.display = 'none';
+  document.getElementById('linkToRailBtn').style.display = 'none';
   setSliderDetailRows(false);
   document.getElementById('thetaVal').textContent = '0';
   rebuild(); draw();
@@ -384,21 +385,38 @@ function draw() {
 
   // 動力來源本體：畫在桿件底下，曲柄轉在它上面。依型號畫 TT馬達或 MG995 伺服。
   // 朝向＝對準接在馬達中心、非曲柄的那根桿（指向它的另一端）；沒有就朝最近的另一個地錨；都沒有才朝下。
+  // 注意：馬達記在「節點」上（point.type='motor'），曲柄那根桿的 isInput 通常仍是 false，
+  // 光靠 !c.isInput 排不掉曲柄。改用 input_crank 步驟算出曲柄動端，明確把曲柄那根桿排除。
   motorCenterIds.forEach(id => {
     const p = pts[id]; if (!p || !Number.isFinite(p.x)) return;
     let tgt = null;
-    const others = comps.filter(c => c.type === 'bar' && !c.isInput && c.p1 && c.p2 && (c.p1.id === id || c.p2.id === id));
+    const crankTips = new Set((compiled.steps || [])
+      .filter(s => s.type === 'input_crank' && s.center === id)
+      .map(s => s.id));
+    const others = comps.filter(c => c.type === 'bar' && !c.isInput && c.p1 && c.p2 &&
+      (c.p1.id === id || c.p2.id === id) &&
+      !crankTips.has(c.p1.id === id ? c.p2.id : c.p1.id));
     if (others.length) {
       const b = others[0];
       const o = b.p1.id === id ? b.p2.id : b.p1.id;
       if (pts[o] && Number.isFinite(pts[o].x)) tgt = pts[o];
     }
     if (!tgt) {
+      // 馬達裝在滑軌固定孔上：固定框架就是滑軌，朝另一個固定孔（沿軌道方向）。
+      const mount = sliderMountInfo(id);
+      if (mount) {
+        const other = mount.label === 'M1' ? mount.slider.m2 : mount.slider.m1;
+        if (other && pts[other.id] && Number.isFinite(pts[other.id].x)) tgt = pts[other.id];
+      }
+    }
+    if (!tgt) {
+      // 後備：朝最近的另一個地錨。跳過與馬達重合的點（含滑軌隱藏軌道端，railOffset=0 時會疊在固定孔上）
+      // ——否則 atan2 對到零向量會亂轉（±180° 把馬達翻上去）。
       let bd = Infinity;
       groundIds.forEach(gid => {
-        if (gid === id) return;
+        if (gid === id || isHiddenSliderRailPoint(gid)) return;
         const gp = pts[gid];
-        if (gp && Number.isFinite(gp.x)) { const d = Math.hypot(gp.x - p.x, gp.y - p.y); if (d < bd) { bd = d; tgt = gp; } }
+        if (gp && Number.isFinite(gp.x)) { const d = Math.hypot(gp.x - p.x, gp.y - p.y); if (d > 1e-3 && d < bd) { bd = d; tgt = gp; } }
       });
     }
     const rotDeg = tgt ? Math.atan2(-(tgt.x - p.x), -(tgt.y - p.y)) * 180 / Math.PI : 0;
@@ -475,12 +493,6 @@ function draw() {
     if (![a, b].every(p => p && Number.isFinite(p.x))) return;
     const isSel = sl.id === selectedSliderId;
     drawSliderTrack(a, b, isSel, svg, ma, mb);
-    drawSliderMountHole(ma, sl.m1?.id, isSel, 'M1', svg);
-    drawSliderMountHole(mb, sl.m2?.id, isSel, 'M2', svg);
-    if (isSel) {
-      drawMountLabel(ma, 'M1', svg);
-      drawMountLabel(mb, 'M2', svg);
-    }
     if (isSel) drawSliderTravelMarks(a, b, sl.baseEnd === 'p2' ? b : a, sliderTravelStart(sl), sliderTravelEnd(sl), svg);
     if (s && Number.isFinite(s.x)) {
       const dirDeg = Math.atan2(TY(b.y) - TY(a.y), TX(b.x) - TX(a.x)) * 180 / Math.PI;
@@ -488,7 +500,7 @@ function draw() {
       drawSliderBlock(s, dirDeg, sl.isInput, isSel, svg, sliderBodyLength(sl));
       drawMotorLabel(s.x, s.y, sl.isInput ? '活塞' : '滑塊', sl.isInput ? '#1f8f4e' : '#107a63', svg);
     }
-    // 透明命中區：點軌道（非接點處）即選取滑軌，叫出屬性列。節點在更上層仍可拖。
+    // 透明命中區：點軌道（非接點處）即選取滑軌，叫出屬性列。
     const hit = document.createElementNS(SVG_NS, 'path');
     hit.setAttribute('d', barHullPath(a, b));
     hit.setAttribute('fill', 'transparent');
@@ -499,6 +511,13 @@ function draw() {
       selectSlider(sl.id);
     });
     svg.appendChild(hit);
+    // 固定孔畫在命中區之上，才能被點到（拖曳 / 放馬達）；否則命中區會把點擊吃掉。
+    drawSliderMountHole(ma, sl.m1?.id, isSel, 'M1', svg);
+    drawSliderMountHole(mb, sl.m2?.id, isSel, 'M2', svg);
+    if (isSel) {
+      drawMountLabel(ma, 'M1', svg);
+      drawMountLabel(mb, 'M2', svg);
+    }
   });
 
   // 吸附高亮：拖曳時靠近的接點亮綠圈
@@ -1323,6 +1342,46 @@ function finishDrawRail(res) {
   rebuild(); draw();
   setBanner(promptText('用🔵連桿把曲柄端接到滑塊，按 ▶ 看它滑動', '用🔵連桿把曲柄端接到滑塊，按 ▶ 看它滑動'));
 }
+// 連桿就地升級成滑軌：另一條建置路徑——先用連桿把結構接好、錨好，再把要滑動的那根變成滑軌。
+// 沿用連桿兩端點的 id 當承載桿件固定孔（m1/m2），原本的連接 / 地錨都靠 id 參照自動保留；
+// 軌道（p1/p2）整段貼著承載桿件、滑塊（p3）落在中點，與🟩滑軌工具畫出來的形狀一致。
+function convertLinkToSlider() {
+  const c = comps.find(x => x.id === selectedLinkId && x.type === 'bar' && x.fixedLen);
+  if (!c) return;
+  pushUndo();
+  pause();
+  const aId = c.p1.id, bId = c.p2.id;
+  const a = { x: c.p1.x || 0, y: c.p1.y || 0 };
+  const b = { x: c.p2.x || 0, y: c.p2.y || 0 };
+  const len = Math.max(1, Math.round(topo.params[c.lenParam] || Math.hypot(b.x - a.x, b.y - a.y)));
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  const n = ++counter;
+  const lp = 'SL' + n;
+  // 移除原連桿：剛性桿約束由固定的承載桿件取代，避免同兩點同時有桿與移動副
+  if (c.lenParam) delete topo.params[c.lenParam];
+  comps = comps.filter(x => x.id !== c.id);
+  comps.push({
+    type: 'slider', id: 'Slider' + n, color: '#16a085', sign: 1,
+    p1: { id: 'S' + n + 'a', type: 'fixed', x: a.x, y: a.y },
+    p2: { id: 'S' + n + 'b', type: 'fixed', x: b.x, y: b.y },
+    p3: { id: 'S' + n + 'c', type: 'floating', x: mid.x, y: mid.y },
+    // 沿用連桿端點 id → 承載桿件固定孔，保留原本接好的連接與地錨
+    m1: { id: aId, type: 'fixed', x: a.x, y: a.y },
+    m2: { id: bId, type: 'fixed', x: b.x, y: b.y },
+    lenParam: lp,
+    baseEnd: 'p1',
+    carriageLen: 32,
+    carrierLen: len,
+    railOffset: 0,
+    travelStart: 0,
+    travelEnd: len
+  });
+  topo.params[lp] = len;
+  selectedLinkId = null;
+  rebuild(); draw();
+  selectSlider('Slider' + n);
+  setBanner(promptText('連桿已變成滑軌：用🔵連桿把曲柄端接到滑塊，按 ▶ 看它滑動', '連桿已變成滑軌：用🔵連桿把曲柄端接到滑塊，按 ▶ 看它滑動'));
+}
 
 // ---- 馬達：放到接點上，挑一根連桿來驅動 ----
 function setBanner(text) {
@@ -1531,6 +1590,7 @@ function onNodeDown(e, id) {
   selectedSliderId = null;
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('sliderBaseBtn').style.display = 'none';
+  document.getElementById('linkToRailBtn').style.display = 'none';
   setSliderDetailRows(false);
   selectedNodeId = id;
   updateRoleEditor();
@@ -1652,6 +1712,7 @@ function selectLink(id) {
   document.getElementById('triSideSelect').style.display = 'none';
   document.getElementById('sliderFlipBtn').style.display = 'none';
   document.getElementById('sliderBaseBtn').style.display = 'none';
+  document.getElementById('linkToRailBtn').style.display = '';
   setSliderDetailRows(false);
   document.getElementById('zliftRow').style.display = 'flex';
   document.getElementById('lenControls').style.display = 'flex';
@@ -1678,6 +1739,7 @@ function selectTriangle(id) {
   sel.style.display = '';
   document.getElementById('sliderFlipBtn').style.display = 'none';
   document.getElementById('sliderBaseBtn').style.display = 'none';
+  document.getElementById('linkToRailBtn').style.display = 'none';
   setSliderDetailRows(false);
   document.getElementById('zliftRow').style.display = 'flex';
   document.getElementById('lenControls').style.display = 'flex';
@@ -1703,6 +1765,7 @@ function selectSlider(id) {
   document.getElementById('triSideSelect').style.display = 'none';
   document.getElementById('sliderFlipBtn').style.display = '';
   document.getElementById('sliderBaseBtn').style.display = '';
+  document.getElementById('linkToRailBtn').style.display = 'none';
   setSliderDetailRows(true);
   document.getElementById('zliftRow').style.display = 'none';   // 滑軌不做疊放
   document.getElementById('lenControls').style.display = 'flex';
@@ -1978,6 +2041,7 @@ function deselectLink() {
   selectedSliderId = null;
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('sliderBaseBtn').style.display = 'none';
+  document.getElementById('linkToRailBtn').style.display = 'none';
   setSliderDetailRows(false);
   draw();
 }
@@ -2002,6 +2066,7 @@ function deleteSelectedPart() {
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
   document.getElementById('sliderBaseBtn').style.display = 'none';
+  document.getElementById('linkToRailBtn').style.display = 'none';
   setSliderDetailRows(false);
   rebuild(); draw();
 }
@@ -2358,5 +2423,5 @@ function init() {
   updateUndoBtn();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addLink, startDrawLink, startDrawRail, startDrawTriangle, clearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addLink, startDrawLink, startDrawRail, startDrawTriangle, clearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();

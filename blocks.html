@@ -253,6 +253,7 @@
           </span>
           <button class="lift-btn" id="sliderFlipBtn" style="display:none;" onclick="window.blocks.flipSlider()" title="被動滑塊由連桿和滑軌交點求解；若組裝結果跑到軌道另一側或連桿交叉，按這裡切換另一個幾何解。">🔄 翻面</button>
           <button class="lift-btn" id="sliderBaseBtn" style="display:none;" onclick="window.blocks.toggleSliderBase()" title="線性致動器的本體固定端。A 表示從軌道 A 端往 B 端推出；B 表示從 B 端往 A 端推出。調整滑軌長度時固定端會留在原位。">固定端：A</button>
+          <button class="lift-btn" id="linkToRailBtn" style="display:none;" onclick="window.blocks.convertLinkToSlider()" title="把這根連桿就地升級成滑軌：沿用連桿兩端的接點當固定孔，原本接好的連接與地錨都會保留。">🟩 變滑軌</button>
           <button class="clear-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除選取的桿件">🗑 刪除</button>
         </div>
         <div class="le-row" id="sliderBodyRow" style="display:none;">
@@ -373,6 +374,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/blocks/app.js?v=20240128_07"></script>
+  <script type="module" src="js/blocks/app.js?v=20240128_11"></script>
 </body>
 </html>
