@@ -116,19 +116,24 @@ export const BLOCK_EXAMPLES = [
       counter: 6,
       comps: [
         { type: 'anchor', id: 'Anchor1', p1: pt('O', 'fixed', 0, 0) },
+        { type: 'anchor', id: 'Anchor2', p1: pt('M1', 'fixed', 40, 0) },
+        { type: 'anchor', id: 'Anchor3', p1: pt('M2', 'fixed', 152, 0) },
         bar('Link1', pt('O', 'fixed', 0, 0, { physicalMotor: '1' }), pt('A', 'floating', 30, 0), 30, {
           color: '#e74c3c',
           isInput: true,
           physicalMotor: '1',
           phaseOffset: 0
         }),
+        bar('Link3', pt('M1', 'fixed', 40, 0), pt('M2', 'fixed', 152, 0), 112, { color: '#95a5a6' }),
         {
           type: 'slider', id: 'Slider1', color: '#16a085', sign: 1, lenParam: 'SL1',
-          p1: pt('Sa', 'fixed', 40, 0), p2: pt('Sb', 'fixed', 140, 0), p3: pt('P3', 'floating', 120, 0)
+          m1: pt('M1', 'fixed', 40, 0), m2: pt('M2', 'fixed', 152, 0),
+          p1: pt('Sa', 'fixed', 45, 0), p2: pt('Sb', 'fixed', 140, 0), p3: pt('P3', 'floating', 120, 0),
+          carrierLen: 112, railOffset: 5, carriageLen: 24, travelStart: 0, travelEnd: 95
         },
         bar('Link2', pt('A', 'floating', 30, 0), pt('P3', 'floating', 120, 0), 90)
       ],
-      params: { LL1: 30, LL2: 90, SL1: 100 }
+      params: { LL1: 30, LL2: 90, LL3: 112, SL1: 95 }
     }
   },
   {

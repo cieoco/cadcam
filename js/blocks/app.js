@@ -27,10 +27,11 @@ import { BLOCK_EXAMPLES, getExample } from './examples.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('stageSvg');
 const { W, H, HULL_R_WORLD, TX, TY } = View;
-// 樂高 Technic 孔距 = 8mm，桿長（兩端孔中心距）= (孔數 - 1) × 8。長度一律對齊 8mm。
+// 樂高 Technic 孔距 = 8mm；連桿/三點桿孔位長度對齊 8mm，滑軌外形尺寸不套用。
 const LEGO_STEP = 8;
 const LINK_DEFAULT_LEN = 88;   // 連桿預設長度（12 孔，對齊 8mm）
 const snapLego = v => Math.max(LEGO_STEP, Math.round((Number(v) || 0) / LEGO_STEP) * LEGO_STEP);
+const roundMm = v => Math.round(Number(v) || 0);
 
 // ---- 狀態 ----
 let comps = [];                       // wizard 風格的組件（角色就藏在 type 裡）
@@ -102,6 +103,8 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
   document.getElementById('roleEditor').style.display = 'none';
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
+  document.getElementById('sliderBaseBtn').style.display = 'none';
+  setSliderDetailRows(false);
   document.getElementById('thetaVal').textContent = '0';
   rebuild(); draw();
   if (fit) fitView();
@@ -158,11 +161,21 @@ const displayCoords = () => {
   }
   return m;
 };
+const isHiddenSliderRailPoint = (id) => comps.some(c =>
+  c.type === 'slider' && c.m1 && c.m2 && (c.p1?.id === id || c.p2?.id === id));
+const isSliderMountPoint = (id) => comps.some(c =>
+  c.type === 'slider' && (c.m1?.id === id || c.m2?.id === id));
+const sliderMountInfo = (id) => {
+  const sl = comps.find(c => c.type === 'slider' && (c.m1?.id === id || c.m2?.id === id));
+  if (!sl) return null;
+  return { slider: sl, label: sl.m1?.id === id ? 'M1' : 'M2' };
+};
 // 以「世界座標 world」為中心，找畫面上最近的接點（排除 exclude），門檻 maxDist。
 const nearestDisplayToPoint = (world, exclude = [], maxDist = snapWorld()) => {
   const m = displayCoords();
   let best = null, bestD = maxDist;
   for (const id in m) {
+    if (isHiddenSliderRailPoint(id)) continue;
     if (exclude.includes(id)) continue;
     const d = Math.hypot(m[id].x - world.x, m[id].y - world.y);
     if (d < bestD) { bestD = d; best = id; }
@@ -197,7 +210,33 @@ const freeLinkForPoint = (id) => Model.freeLinkForPoint(comps, id);
 const isFreeLink = (c) => Model.isFreeLink(comps, c);
 const barsAtNode = (nodeId) => Model.barsAtNode(comps, nodeId);
 
+function syncSliderGeometries() {
+  comps.filter(c => c.type === 'slider' && c.p1 && c.p2).forEach(c => {
+    if (!c.m1 || !c.m2) {
+      c.m1 = { id: `${c.id || 'Slider'}m1`, type: 'fixed', x: c.p1.x || 0, y: c.p1.y || 0 };
+      c.m2 = { id: `${c.id || 'Slider'}m2`, type: 'fixed', x: c.p2.x || 0, y: c.p2.y || 0 };
+    }
+    c.m1.type = 'fixed';
+    c.m2.type = 'fixed';
+    const dx = (c.m2.x || 0) - (c.m1.x || 0);
+    const dy = (c.m2.y || 0) - (c.m1.y || 0);
+    const d = Math.hypot(dx, dy) || 1;
+    const carrierLen = Math.max(railLength(c), roundMm(d));
+    const ux = dx / d, uy = dy / d;
+    c.m2.x = (c.m1.x || 0) + ux * carrierLen;
+    c.m2.y = (c.m1.y || 0) + uy * carrierLen;
+    c.carrierLen = carrierLen;
+    const maxOffset = Math.max(0, carrierLen - railLength(c));
+    c.railOffset = Math.max(0, Math.min(maxOffset, roundMm(c.railOffset || 0)));
+    c.p1.x = (c.m1.x || 0) + ux * c.railOffset;
+    c.p1.y = (c.m1.y || 0) + uy * c.railOffset;
+    c.p2.x = c.p1.x + ux * railLength(c);
+    c.p2.y = c.p1.y + uy * railLength(c);
+  });
+}
+
 function rebuild() {
+  syncSliderGeometries();
   compiled = compileTopology(comps, topo, new Set());
   topo.params = compiled.params; // 沿用補齊後的參數
   lastSolved = {};               // 拓撲變了：丟掉舊解，避免拿到不相干的種子
@@ -431,13 +470,22 @@ function draw() {
   // 滑軌：軌道（滑槽＋導軌線）＋ 滑塊方塊；活塞模式再疊缸體與「活塞」標籤。
   comps.filter(c => c.type === 'slider' && c.p1 && c.p2 && c.p3).forEach(sl => {
     const a = pts[sl.p1.id], b = pts[sl.p2.id], s = pts[sl.p3.id];
+    const ma = sl.m1 && pts[sl.m1.id] ? pts[sl.m1.id] : a;
+    const mb = sl.m2 && pts[sl.m2.id] ? pts[sl.m2.id] : b;
     if (![a, b].every(p => p && Number.isFinite(p.x))) return;
     const isSel = sl.id === selectedSliderId;
-    drawSliderTrack(a, b, isSel, svg);
+    drawSliderTrack(a, b, isSel, svg, ma, mb);
+    drawSliderMountHole(ma, sl.m1?.id, isSel, 'M1', svg);
+    drawSliderMountHole(mb, sl.m2?.id, isSel, 'M2', svg);
+    if (isSel) {
+      drawMountLabel(ma, 'M1', svg);
+      drawMountLabel(mb, 'M2', svg);
+    }
+    if (isSel) drawSliderTravelMarks(a, b, sl.baseEnd === 'p2' ? b : a, sliderTravelStart(sl), sliderTravelEnd(sl), svg);
     if (s && Number.isFinite(s.x)) {
       const dirDeg = Math.atan2(TY(b.y) - TY(a.y), TX(b.x) - TX(a.x)) * 180 / Math.PI;
-      if (sl.isInput) drawPiston(a, b, s, svg);
-      drawSliderBlock(s, dirDeg, sl.isInput, isSel, svg);
+      if (sl.isInput) drawPiston(a, b, s, sl.baseEnd === 'p2' ? b : a, svg);
+      drawSliderBlock(s, dirDeg, sl.isInput, isSel, svg, sliderBodyLength(sl));
       drawMotorLabel(s.x, s.y, sl.isInput ? '活塞' : '滑塊', sl.isInput ? '#1f8f4e' : '#107a63', svg);
     }
     // 透明命中區：點軌道（非接點處）即選取滑軌，叫出屬性列。節點在更上層仍可拖。
@@ -465,17 +513,29 @@ function draw() {
 
   // 節點（可拖曳；拖近別的接點會吸附合併）
   Object.keys(pts).forEach(id => {
+    if (isHiddenSliderRailPoint(id)) return;
+    if (isSliderMountPoint(id)) return;
     const p = pts[id];
     if (!Number.isFinite(p.x)) return;
     const isGround = groundIds.has(id);
     const isMotorCenter = motorCenterIds.has(id);
-    const node = document.createElementNS(SVG_NS, (isGround && !isMotorCenter) ? 'rect' : 'circle');
+    const mount = sliderMountInfo(id);
+    const node = document.createElementNS(SVG_NS, (isGround && !isMotorCenter && !mount) ? 'rect' : 'circle');
     if (isMotorCenter) {
       // 馬達輸出軸：紅色軸蓋（TT 馬達本體已畫在底下）
       node.setAttribute('cx', TX(p.x)); node.setAttribute('cy', TY(p.y));
       node.setAttribute('r', id === dragId ? 8 : 6);
       node.setAttribute('fill', '#e74c3c');
       node.setAttribute('stroke', '#922b21'); node.setAttribute('stroke-width', 2);
+    } else if (mount) {
+      node.setAttribute('cx', TX(p.x)); node.setAttribute('cy', TY(p.y));
+      node.setAttribute('r', id === dragId ? 9 : 7);
+      node.setAttribute('fill', '#f8fafc');
+      node.setAttribute('stroke', id === dragId ? '#2ecc71' : '#34495e');
+      node.setAttribute('stroke-width', 3);
+      const title = document.createElementNS(SVG_NS, 'title');
+      title.textContent = `${mount.label} 固定孔：承載滑軌桿件的端點，可拖曳或吸附到其他接點`;
+      node.appendChild(title);
     } else if (isGround) {
       const size = 14;
       node.setAttribute('x', TX(p.x) - size / 2); node.setAttribute('y', TY(p.y) - size / 2);
@@ -658,8 +718,53 @@ function drawMotorLabel(cx, cy, text, color, parent = svg) {
   parent.appendChild(t);
 }
 
-// 滑軌：淡灰滑槽（膠囊）+ 兩條導軌線 + 兩端擋塊。a、b 為世界座標的軌道兩端。
-function drawSliderTrack(a, b, isSel = false, parent = svg) {
+function drawMountLabel(p, text, parent = svg) {
+  if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+  const t = document.createElementNS(SVG_NS, 'text');
+  const s = View.getScale();
+  t.setAttribute('x', TX(p.x));
+  t.setAttribute('y', TY(p.y) - 14 * s);
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('font-size', Math.max(8, 8 * s));
+  t.setAttribute('font-weight', '700');
+  t.setAttribute('fill', '#34495e');
+  t.setAttribute('stroke', '#ffffff');
+  t.setAttribute('stroke-width', Math.max(2, 2.2 * s));
+  t.setAttribute('paint-order', 'stroke');
+  t.style.pointerEvents = 'none';
+  t.textContent = text;
+  parent.appendChild(t);
+}
+
+function drawSliderMountHole(p, id, isSel = false, label = '', parent = svg) {
+  if (!p || !id || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+  const s = View.getScale();
+  const outer = document.createElementNS(SVG_NS, 'circle');
+  outer.setAttribute('cx', TX(p.x));
+  outer.setAttribute('cy', TY(p.y));
+  outer.setAttribute('r', Math.max(7, 9 * s));
+  outer.setAttribute('fill', '#f8fafc');
+  outer.setAttribute('stroke', isSel ? '#e67e22' : '#34495e');
+  outer.setAttribute('stroke-width', Math.max(2, 2.8 * s));
+  outer.style.cursor = 'grab';
+  outer.setAttribute('data-id', id);
+  outer.addEventListener('pointerdown', (e) => onNodeDown(e, id));
+  const title = document.createElementNS(SVG_NS, 'title');
+  title.textContent = `${label} 固定孔：承載滑軌桿件的端點，可拖曳或吸附到其他接點`;
+  outer.appendChild(title);
+  parent.appendChild(outer);
+
+  const inner = document.createElementNS(SVG_NS, 'circle');
+  inner.setAttribute('cx', TX(p.x));
+  inner.setAttribute('cy', TY(p.y));
+  inner.setAttribute('r', Math.max(2.5, 3.5 * s));
+  inner.setAttribute('fill', '#34495e');
+  inner.style.pointerEvents = 'none';
+  parent.appendChild(inner);
+}
+
+// 滑軌：承載桿件底座 + 淡灰滑槽 + 兩條導軌線 + 兩端擋塊。a、b 為可滑動軌道兩端。
+function drawSliderTrack(a, b, isSel = false, parent = svg, carrierA = a, carrierB = b) {
   const s = View.getScale();
   const g = document.createElementNS(SVG_NS, 'g');
   g.style.pointerEvents = 'none';
@@ -673,6 +778,8 @@ function drawSliderTrack(a, b, isSel = false, parent = svg) {
   const L = Math.hypot(dx, dy) || 1;
   const nx = -dy / L, ny = dx / L;          // 世界法線
   const off = 6;                            // 導軌半距（世界 mm）
+  add('path', { d: barHullPath(carrierA, carrierB), fill: '#f3f5f7', stroke: isSel ? '#f0a35f' : '#d2d8df',
+    'stroke-width': Math.max(1, 1.1 * s), 'stroke-linejoin': 'round' });
   // 滑槽底（淡灰膠囊；選取時外框轉橘）
   add('path', { d: barHullPath(a, b), fill: '#e6eaee', stroke: isSel ? '#e67e22' : '#b9c2cc',
     'stroke-width': Math.max(1, (isSel ? 2.4 : 1.2) * s), 'stroke-linejoin': 'round' });
@@ -691,13 +798,37 @@ function drawSliderTrack(a, b, isSel = false, parent = svg) {
   parent.appendChild(g);
 }
 
+// 滑軌行程：從固定端沿軌道量出的 min/max 位置，選取滑軌時顯示。
+function drawSliderTravelMarks(a, b, base, startDist, endDist, parent = svg) {
+  const s = View.getScale();
+  const other = base === b ? a : b;
+  const dx = other.x - base.x, dy = other.y - base.y;
+  const L = Math.hypot(dx, dy) || 1;
+  const ux = dx / L, uy = dy / L;
+  const nx = -uy, ny = ux;
+  const addMark = (dist, color) => {
+    const d = Math.max(0, Math.min(L, Number(dist) || 0));
+    const p = { x: base.x + ux * d, y: base.y + uy * d };
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', TX(p.x + nx * 12)); line.setAttribute('y1', TY(p.y + ny * 12));
+    line.setAttribute('x2', TX(p.x - nx * 12)); line.setAttribute('y2', TY(p.y - ny * 12));
+    line.setAttribute('stroke', color);
+    line.setAttribute('stroke-width', Math.max(1.6, 2.4 * s));
+    line.setAttribute('stroke-linecap', 'round');
+    line.style.pointerEvents = 'none';
+    parent.appendChild(line);
+  };
+  addMark(startDist, '#2c5282');
+  addMark(endDist, '#c05621');
+}
+
 // 滑塊方塊：沿軌道方向（dirDeg 為畫面角度）的圓角矩形，騎在 p3 上。
-function drawSliderBlock(p, dirDeg, isInput = false, isSel = false, parent = svg) {
+function drawSliderBlock(p, dirDeg, isInput = false, isSel = false, parent = svg, bodyLen = 32) {
   const s = View.getScale();
   const g = document.createElementNS(SVG_NS, 'g');
   g.setAttribute('transform', `translate(${TX(p.x)} ${TY(p.y)}) rotate(${dirDeg})`);
   g.style.pointerEvents = 'none';
-  const w = 26 * s, h = 16 * s, r = 4 * s;  // 沿軌道方向較長
+  const w = Math.max(16, Number(bodyLen) || 32) * s, h = 16 * s, r = 4 * s;  // 沿軌道方向較長
   const rect = document.createElementNS(SVG_NS, 'rect');
   rect.setAttribute('x', -w / 2); rect.setAttribute('y', -h / 2);
   rect.setAttribute('width', w); rect.setAttribute('height', h);
@@ -710,11 +841,10 @@ function drawSliderBlock(p, dirDeg, isInput = false, isSel = false, parent = svg
   parent.appendChild(g);
 }
 
-// 活塞：缸體釘在離滑塊較遠的軌道端，伸出桿頂到滑塊。a、b 軌道端、s 滑塊（世界座標）。
-function drawPiston(a, b, s, parent = svg) {
+// 活塞：缸體釘在指定的軌道固定端，伸出桿頂到滑塊。a、b 軌道端、s 滑塊（世界座標）。
+function drawPiston(a, b, s, basePoint = a, parent = svg) {
   const sc = View.getScale();
-  // 缸體擺在離滑塊較遠的那個軌道端，桿往滑塊延伸
-  const base = (Math.hypot(a.x - s.x, a.y - s.y) >= Math.hypot(b.x - s.x, b.y - s.y)) ? a : b;
+  const base = basePoint || a;
   const dx = s.x - base.x, dy = s.y - base.y;
   const L = Math.hypot(dx, dy) || 1;
   const ux = dx / L, uy = dy / L;
@@ -731,6 +861,9 @@ function drawPiston(a, b, s, parent = svg) {
   // 缸體（深灰膠囊）
   add('path', { d: barHullPath(base, cEnd), fill: '#cfd6dd', stroke: '#6b7783',
     'stroke-width': Math.max(1, 1.4 * sc), 'stroke-linejoin': 'round' });
+  // 本體固定點：和求解器的 input_linear 起點一致，避免視覺固定端和物理固定端分離。
+  add('circle', { cx: TX(base.x), cy: TY(base.y), r: Math.max(3, 4.5 * sc),
+    fill: '#6b7783', stroke: '#ffffff', 'stroke-width': Math.max(1, 1.6 * sc) });
   // 活塞桿（缸口到滑塊的細線）
   add('line', { x1: TX(cEnd.x), y1: TY(cEnd.y), x2: TX(s.x), y2: TY(s.y),
     stroke: '#6b7783', 'stroke-width': Math.max(1.4, 2.4 * sc), 'stroke-linecap': 'round' });
@@ -878,9 +1011,9 @@ function exitDrawLink() {
 function nearestNodeId(world, exclude = [], maxDist = snapWorld()) {
   return nearestDisplayToPoint(world, exclude, maxDist);
 }
-// 從起點 start 拖到 cur 時，算出實際終點：靠近既有接點就吸附相接（長度＝實距），
-// 否則長度對齊 8mm；拖得太短＝當作點一下，給預設長度。
-function resolveDrawEnd(start, cur, startNodeId) {
+// 從起點 start 拖到 cur 時，算出實際終點：靠近既有接點就吸附相接。
+// 連桿長度對齊 8mm 孔距；滑軌/滑塊本體屬於外形尺寸，不套孔距限制。
+function resolveDrawEnd(start, cur, startNodeId, snapToHoles = true) {
   const endNodeId = nearestNodeId(cur, startNodeId ? [startNodeId] : []);
   if (endNodeId) {
     const p = pointCoords()[endNodeId];
@@ -889,7 +1022,7 @@ function resolveDrawEnd(start, cur, startNodeId) {
   const dx = cur.x - start.x, dy = cur.y - start.y;
   const dist = Math.hypot(dx, dy);
   if (dist < 6) return { pos: { x: start.x + LINK_DEFAULT_LEN, y: start.y }, len: LINK_DEFAULT_LEN, nodeId: null };
-  const len = snapLego(dist);
+  const len = snapToHoles ? snapLego(dist) : Math.max(1, roundMm(dist));
   const k = len / (dist || 1);
   return { pos: { x: start.x + dx * k, y: start.y + dy * k }, len, nodeId: null };
 }
@@ -900,7 +1033,7 @@ function linkLenLabel(len, nodeId = null) {
 function drawDrawPreview() {
   if (!drawingLink || !drawActive || !drawStart || !drawPreview) return;
   const isRail = drawKind === 'rail';
-  const res = resolveDrawEnd(drawStart, drawPreview, drawStartNodeId);
+  const res = resolveDrawEnd(drawStart, drawPreview, drawStartNodeId, !isRail);
   const accent = isRail ? '#16a085' : '#3498db';
   const path = document.createElementNS(SVG_NS, 'path');
   path.setAttribute('d', barHullPath(drawStart, res.pos));
@@ -1139,7 +1272,7 @@ function finishDrawTriangle(e) {
 function finishDrawLink(e) {
   if (!drawStart) return;
   const cur = worldFromEvent(e) || drawPreview || drawStart;
-  const res = resolveDrawEnd(drawStart, cur, drawStartNodeId);
+  const res = resolveDrawEnd(drawStart, cur, drawStartNodeId, drawKind !== 'rail');
   if (drawKind === 'rail') { finishDrawRail(res); return; }
   pushUndo();
   const n = ++counter;
@@ -1172,7 +1305,15 @@ function finishDrawRail(res) {
     p1: { id: 'S' + n + 'a', type: 'fixed', x: a.x, y: a.y },
     p2: { id: 'S' + n + 'b', type: 'fixed', x: b.x, y: b.y },
     p3: { id: 'S' + n + 'c', type: 'floating', x: mid.x, y: mid.y },
-    lenParam: lp
+    m1: { id: 'S' + n + 'm1', type: 'fixed', x: a.x, y: a.y },
+    m2: { id: 'S' + n + 'm2', type: 'fixed', x: b.x, y: b.y },
+    lenParam: lp,
+    baseEnd: 'p1',
+    carriageLen: 32,
+    carrierLen: res.len,
+    railOffset: 0,
+    travelStart: 0,
+    travelEnd: res.len
   });
   topo.params[lp] = res.len;
   // 軌道端點落在既有接點上就合併（讓滑軌掛到既有結構）
@@ -1317,8 +1458,13 @@ function driveSliderAt(sliderId) {
   theta = 0;                 // theta 直接當行程位移（getLinearShift valve '1' fallback 到 theta）
   sl.isInput = true;
   sl.physicalMotor = '1';
-  sl.strokeMin = 0;
-  sl.strokeMax = 64;
+  if (sl.baseEnd !== 'p2') sl.baseEnd = 'p1';
+  sl.travelStart = sliderProjectedDistance(sl);
+  if (!Number.isFinite(Number(sl.travelEnd)) || Number(sl.travelEnd) <= Number(sl.travelStart)) {
+    sl.travelEnd = railLength(sl);
+  }
+  delete sl.strokeMin;
+  delete sl.strokeMax;
   cancelMotorMode();
   selectedNodeId = sl.p3.id;
   selectedLinkId = null;
@@ -1350,9 +1496,8 @@ function inputRockRange() {
   }
   const slider = comps.find(c => c.type === 'slider' && c.isInput);
   if (slider) {
-    const a = Number(slider.strokeMin) || 0;
-    const b = Number.isFinite(Number(slider.strokeMax)) ? Number(slider.strokeMax) : 64;
-    return { lo: Math.min(a, b), hi: Math.max(a, b) };
+    const stroke = Math.max(0, sliderTravelEnd(slider) - sliderTravelStart(slider));
+    return { lo: 0, hi: stroke };
   }
   return null;
 }
@@ -1385,6 +1530,8 @@ function onNodeDown(e, id) {
   selectedTriangleId = null;
   selectedSliderId = null;
   document.getElementById('lenEditor').style.display = 'none';
+  document.getElementById('sliderBaseBtn').style.display = 'none';
+  setSliderDetailRows(false);
   selectedNodeId = id;
   updateRoleEditor();
   dragId = id; snapTarget = null;
@@ -1501,8 +1648,11 @@ function selectLink(id) {
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
   document.getElementById('lenTitle').textContent = '🔵 連桿長度';
+  setLenButtonTitles('短 8mm（少一孔）', '長 8mm（多一孔）');
   document.getElementById('triSideSelect').style.display = 'none';
   document.getElementById('sliderFlipBtn').style.display = 'none';
+  document.getElementById('sliderBaseBtn').style.display = 'none';
+  setSliderDetailRows(false);
   document.getElementById('zliftRow').style.display = 'flex';
   document.getElementById('lenControls').style.display = 'flex';
   document.getElementById('lenEditor').style.display = 'flex';
@@ -1521,11 +1671,14 @@ function selectTriangle(id) {
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
   document.getElementById('lenTitle').textContent = '🔺 三點桿';
+  setLenButtonTitles('短 8mm（少一孔）', '長 8mm（多一孔）');
   triSide = 'g';
   const sel = document.getElementById('triSideSelect');
   sel.value = 'g';
   sel.style.display = '';
   document.getElementById('sliderFlipBtn').style.display = 'none';
+  document.getElementById('sliderBaseBtn').style.display = 'none';
+  setSliderDetailRows(false);
   document.getElementById('zliftRow').style.display = 'flex';
   document.getElementById('lenControls').style.display = 'flex';
   document.getElementById('lenEditor').style.display = 'flex';
@@ -1546,30 +1699,188 @@ function selectSlider(id) {
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
   document.getElementById('lenTitle').textContent = '🟩 滑軌長度';
+  setLenButtonTitles('滑軌短 1mm', '滑軌長 1mm');
   document.getElementById('triSideSelect').style.display = 'none';
   document.getElementById('sliderFlipBtn').style.display = '';
+  document.getElementById('sliderBaseBtn').style.display = '';
+  setSliderDetailRows(true);
   document.getElementById('zliftRow').style.display = 'none';   // 滑軌不做疊放
   document.getElementById('lenControls').style.display = 'flex';
   document.getElementById('lenEditor').style.display = 'flex';
   renderLenEditor(railLength(c));
+  renderSliderBaseButton(c);
+  renderSliderDetails(c);
   draw();
+}
+function setLenButtonTitles(minusTitle, plusTitle) {
+  const minus = document.getElementById('lenMinusBtn');
+  const plus = document.getElementById('lenPlusBtn');
+  if (minus) minus.title = minusTitle;
+  if (plus) plus.title = plusTitle;
+}
+function setSliderDetailRows(show) {
+  const display = show ? 'flex' : 'none';
+  const body = document.getElementById('sliderBodyRow');
+  const carrier = document.getElementById('sliderCarrierRow');
+  const railOffset = document.getElementById('sliderRailOffsetRow');
+  const start = document.getElementById('sliderStartRow');
+  const end = document.getElementById('sliderEndRow');
+  if (body) body.style.display = display;
+  if (carrier) carrier.style.display = display;
+  if (railOffset) railOffset.style.display = display;
+  if (start) start.style.display = display;
+  if (end) end.style.display = display;
 }
 function railLength(c) {
   return Math.round(topo.params[c.lenParam] ||
     Math.hypot((c.p2.x || 0) - (c.p1.x || 0), (c.p2.y || 0) - (c.p1.y || 0)));
 }
-// 改軌道長度：沿軌道方向把 p2 推遠/拉近（兩端釘地，p3 仍在線上由 solver 接手）。
+function sliderBodyLength(c) {
+  return Math.max(1, roundMm(c.carriageLen || 32));
+}
+function sliderCarrierLength(c) {
+  return Math.max(railLength(c), roundMm(c.carrierLen || railLength(c)));
+}
+function sliderRailOffset(c) {
+  return Math.max(0, Math.min(Math.max(0, sliderCarrierLength(c) - railLength(c)), roundMm(c.railOffset || 0)));
+}
+function sliderTravelStart(c) {
+  return Math.max(0, Math.min(Math.max(0, railLength(c)), roundMm(c.travelStart || 0)));
+}
+function sliderTravelEnd(c) {
+  const L = Math.max(0, railLength(c));
+  const fallback = Number.isFinite(Number(c.travelEnd)) ? Number(c.travelEnd) : L;
+  return Math.max(sliderTravelStart(c), Math.min(L, roundMm(fallback)));
+}
+function renderSliderDetails(c) {
+  const body = document.getElementById('sliderBodyVal');
+  const carrier = document.getElementById('sliderCarrierVal');
+  const railOffset = document.getElementById('sliderRailOffsetVal');
+  const start = document.getElementById('sliderStartVal');
+  const end = document.getElementById('sliderEndVal');
+  if (body) body.textContent = sliderBodyLength(c);
+  if (carrier) carrier.textContent = sliderCarrierLength(c);
+  if (railOffset) railOffset.textContent = sliderRailOffset(c);
+  if (start) start.textContent = sliderTravelStart(c);
+  if (end) end.textContent = sliderTravelEnd(c);
+}
+function renderSliderBaseButton(c) {
+  const btn = document.getElementById('sliderBaseBtn');
+  if (!btn || !c) return;
+  btn.textContent = c.baseEnd === 'p2' ? '固定端：B' : '固定端：A';
+  btn.classList.toggle('lift-on', Boolean(c.isInput));
+}
+function nodeRoleLabel(id) {
+  const mount = sliderMountInfo(id);
+  if (mount) return `${mount.label} 滑軌固定孔`;
+  return roleLabel(id);
+}
+function renderNodePosition(id) {
+  const p = pointCoords()[id];
+  const x = document.getElementById('nodeXVal');
+  const y = document.getElementById('nodeYVal');
+  if (x) x.textContent = p ? Math.round(p.x) : '0';
+  if (y) y.textContent = p ? Math.round(p.y) : '0';
+}
+function sliderProjectedDistance(c) {
+  if (!c || !c.p1 || !c.p2 || !c.p3) return 0;
+  const base = c.baseEnd === 'p2' ? c.p2 : c.p1;
+  const other = c.baseEnd === 'p2' ? c.p1 : c.p2;
+  const dx = (other.x || 0) - (base.x || 0);
+  const dy = (other.y || 0) - (base.y || 0);
+  const L = Math.hypot(dx, dy) || 1;
+  return Math.max(0, Math.min(L, roundMm((((c.p3.x || 0) - (base.x || 0)) * dx + ((c.p3.y || 0) - (base.y || 0)) * dy) / L)));
+}
+function normalizeSliderRange(c) {
+  const L = railLength(c);
+  c.carriageLen = Math.max(1, Math.min(Math.max(1, L), sliderBodyLength(c)));
+  c.carrierLen = sliderCarrierLength(c);
+  c.railOffset = sliderRailOffset(c);
+  c.travelStart = sliderTravelStart(c);
+  c.travelEnd = sliderTravelEnd(c);
+}
+// 改軌道長度：沿軌道方向伸縮，保留本體固定端不動（p3 仍在線上由 solver 接手）。
 function changeRailLen(delta) {
   const c = comps.find(x => x.id === selectedSliderId && x.type === 'slider');
   if (!c) return;
   pushUndo();
   const dx = (c.p2.x || 0) - (c.p1.x || 0), dy = (c.p2.y || 0) - (c.p1.y || 0);
   const d = Math.hypot(dx, dy) || 1;
-  const L = Math.max(LEGO_STEP * 2, snapLego(d + delta));   // 軌道至少 2 格長
-  c.p2.x = (c.p1.x || 0) + dx / d * L;
-  c.p2.y = (c.p1.y || 0) + dy / d * L;
+  const L = Math.max(1, Math.min(sliderCarrierLength(c) - sliderRailOffset(c), roundMm(d + delta)));
+  if (c.baseEnd === 'p2') {
+    c.p1.x = (c.p2.x || 0) - dx / d * L;
+    c.p1.y = (c.p2.y || 0) - dy / d * L;
+  } else {
+    c.p2.x = (c.p1.x || 0) + dx / d * L;
+    c.p2.y = (c.p1.y || 0) + dy / d * L;
+  }
   topo.params[c.lenParam] = L;
+  normalizeSliderRange(c);
   renderLenEditor(L);
+  renderSliderDetails(c);
+  rebuild(); draw();
+}
+function changeSliderBodyLen(delta) {
+  const c = comps.find(x => x.id === selectedSliderId && x.type === 'slider');
+  if (!c) return;
+  pushUndo();
+  c.carriageLen = Math.max(1, Math.min(Math.max(1, railLength(c)), sliderBodyLength(c) + delta));
+  normalizeSliderRange(c);
+  renderSliderDetails(c);
+  rebuild(); draw();
+}
+function changeSliderCarrierLen(delta) {
+  const c = comps.find(x => x.id === selectedSliderId && x.type === 'slider');
+  if (!c) return;
+  pushUndo();
+  const dx = (c.m2.x || 0) - (c.m1.x || 0);
+  const dy = (c.m2.y || 0) - (c.m1.y || 0);
+  const d = Math.hypot(dx, dy) || 1;
+  const L = Math.max(railLength(c), sliderCarrierLength(c) + delta);
+  c.m2.x = (c.m1.x || 0) + dx / d * L;
+  c.m2.y = (c.m1.y || 0) + dy / d * L;
+  c.carrierLen = L;
+  normalizeSliderRange(c);
+  renderSliderDetails(c);
+  rebuild(); draw();
+}
+function changeSliderRailOffset(delta) {
+  const c = comps.find(x => x.id === selectedSliderId && x.type === 'slider');
+  if (!c) return;
+  pushUndo();
+  c.railOffset = sliderRailOffset(c) + delta;
+  normalizeSliderRange(c);
+  renderSliderDetails(c);
+  rebuild(); draw();
+}
+function changeSliderTravelStart(delta) {
+  const c = comps.find(x => x.id === selectedSliderId && x.type === 'slider');
+  if (!c) return;
+  pushUndo();
+  c.travelStart = Math.min(sliderTravelEnd(c), Math.max(0, sliderTravelStart(c) + delta));
+  normalizeSliderRange(c);
+  renderSliderDetails(c);
+  rebuild(); draw();
+}
+function changeSliderTravelEnd(delta) {
+  const c = comps.find(x => x.id === selectedSliderId && x.type === 'slider');
+  if (!c) return;
+  pushUndo();
+  c.travelEnd = Math.max(sliderTravelStart(c), Math.min(railLength(c), sliderTravelEnd(c) + delta));
+  normalizeSliderRange(c);
+  renderSliderDetails(c);
+  rebuild(); draw();
+}
+function toggleSliderBase() {
+  const c = comps.find(x => x.id === selectedSliderId && x.type === 'slider');
+  if (!c) return;
+  pushUndo();
+  c.baseEnd = c.baseEnd === 'p2' ? 'p1' : 'p2';
+  c.travelStart = sliderProjectedDistance(c);
+  c.travelEnd = Math.max(c.travelStart, railLength(c));
+  normalizeSliderRange(c);
+  renderSliderBaseButton(c);
+  renderSliderDetails(c);
   rebuild(); draw();
 }
 // 翻面：切換滑塊解的那一側（slider-crank 組裝在錯邊時用）。
@@ -1666,6 +1977,8 @@ function deselectLink() {
   selectedTriangleId = null;
   selectedSliderId = null;
   document.getElementById('lenEditor').style.display = 'none';
+  document.getElementById('sliderBaseBtn').style.display = 'none';
+  setSliderDetailRows(false);
   draw();
 }
 function deleteSelectedPart() {
@@ -1688,6 +2001,8 @@ function deleteSelectedPart() {
   document.getElementById('roleEditor').style.display = 'none';
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
+  document.getElementById('sliderBaseBtn').style.display = 'none';
+  setSliderDetailRows(false);
   rebuild(); draw();
 }
 function setLen(v) {
@@ -1705,7 +2020,7 @@ function setLen(v) {
   rebuild(); draw();
 }
 function changeLen(delta) {
-  if (selectedSliderId) { changeRailLen(delta); return; }
+  if (selectedSliderId) { changeRailLen(Math.sign(delta) || 0); return; }
   if (selectedTriangleId) { changeTriSide(delta); return; }
   const c = comps.find(x => x.id === selectedLinkId);
   if (c) setLen((topo.params[c.lenParam] || 0) + delta);
@@ -1721,7 +2036,8 @@ function updateRoleEditor() {
     updateStrokeEditor();
     return;
   }
-  document.getElementById('roleStatus').textContent = roleLabel(selectedNodeId);
+  document.getElementById('roleStatus').textContent = nodeRoleLabel(selectedNodeId);
+  renderNodePosition(selectedNodeId);
   const traceBtn = document.getElementById('traceBtn');
   if (traceBtn) {
     const isTrace = topo.tracePoint === selectedNodeId;
@@ -1742,24 +2058,20 @@ function sliderInputForPoint(id) {
 function updateStrokeEditor() {
   const panel = document.getElementById('strokeEditor');
   if (!panel) return;
-  const sl = sliderInputForPoint(selectedNodeId);
-  if (!sl) { panel.style.display = 'none'; return; }
-  const sv = document.getElementById('strokeStartVal');
-  const ev = document.getElementById('strokeEndVal');
-  if (sv) sv.textContent = Math.round(Number(sl.strokeMin) || 0);
-  if (ev) ev.textContent = Math.round(Number.isFinite(Number(sl.strokeMax)) ? Number(sl.strokeMax) : 64);
-  panel.style.display = 'flex';
+  panel.style.display = 'none';
 }
 function changeStroke(which, delta) {
   const sl = sliderInputForPoint(selectedNodeId);
   if (!sl) return;
   pushUndo();
-  const field = (which === 'end') ? 'strokeMax' : 'strokeMin';
-  const cur = Number(sl[field]);
-  const base = Number.isFinite(cur) ? cur : (field === 'strokeMax' ? 64 : 0);
-  sl[field] = Math.max(-400, Math.min(400, Math.round(base + delta)));
+  if (which === 'end') {
+    sl.travelEnd = Math.max(sliderTravelStart(sl), Math.min(railLength(sl), sliderTravelEnd(sl) + delta));
+  } else {
+    sl.travelStart = Math.min(sliderTravelEnd(sl), Math.max(0, sliderTravelStart(sl) + delta));
+  }
+  normalizeSliderRange(sl);
   updateStrokeEditor();
-  scheduleAutosave();
+  rebuild(); draw();
 }
 // 選到 MG995 伺服的接點時，跳出起始/結束角面板；其餘情況收起。
 function updateServoEditor() {
@@ -1789,6 +2101,10 @@ function changeServoAngle(which, delta) {
 }
 function setNodeRole(type) {
   if (!selectedNodeId || !hasPoint(selectedNodeId)) return;
+  if (sliderMountInfo(selectedNodeId) && type !== 'fixed') {
+    setBanner('滑軌固定孔需要維持固定；可用 X/Y 或拖曳調整位置');
+    return;
+  }
   pushUndo();
   pause();
   if (type === 'floating') removeMotorAtPoint(selectedNodeId);
@@ -1797,6 +2113,17 @@ function setNodeRole(type) {
   setPointType(selectedNodeId, type);
   if (type === 'floating') removeAnchorsAtPoint(selectedNodeId);
   rebuild(); draw();
+}
+function changeNodePos(axis, delta) {
+  if (!selectedNodeId || !hasPoint(selectedNodeId)) return;
+  const p = pointCoords()[selectedNodeId];
+  if (!p) return;
+  pushUndo();
+  const x = axis === 'x' ? p.x + delta : p.x;
+  const y = axis === 'y' ? p.y + delta : p.y;
+  updatePointCoordsById(selectedNodeId, x, y);
+  rebuild(); draw();
+  updateRoleEditor();
 }
 function removeNodeMotor() {
   if (!selectedNodeId || !hasPoint(selectedNodeId)) return;
@@ -2031,5 +2358,5 @@ function init() {
   updateUndoBtn();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, changeServoAngle, changeStroke, flipSlider, addAnchor, addLink, startDrawLink, startDrawRail, startDrawTriangle, clearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addLink, startDrawLink, startDrawRail, startDrawTriangle, clearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();

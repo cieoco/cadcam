@@ -10,6 +10,7 @@ export function compileTopology(components, topology, solvedPoints) {
     const joints = new Set();
     const polygons = [];
     const allPointsMap = new Map();
+    const componentPointKeys = ['p1', 'p2', 'p3', 'm1', 'm2'];
 
     if (topology) topology.bodyJoint = true;
 
@@ -56,7 +57,7 @@ export function compileTopology(components, topology, solvedPoints) {
                 }
             });
         } else {
-            ['p1', 'p2', 'p3'].forEach(k => {
+            componentPointKeys.forEach(k => {
                 if (c[k] && c[k].id) {
                     const existing = allPointsMap.get(c[k].id);
                     const isStronger = (c[k].type === 'fixed' || c[k].type === 'motor' || c[k].type === 'linear');
@@ -261,8 +262,12 @@ export function compileTopology(components, topology, solvedPoints) {
     // 2.5 Input Linear 步驟 (線性致動件)
     components.filter(c => c.type === 'slider' && c.isInput).forEach(c => {
         if (c.p1?.id && c.p2?.id && c.p3?.id) {
-            const p1 = allPointsMap.get(c.p1.id);
-            const p2 = allPointsMap.get(c.p2.id);
+            const baseKey = c.baseEnd === 'p2' ? 'p2' : 'p1';
+            const otherKey = baseKey === 'p1' ? 'p2' : 'p1';
+            const baseComp = c[baseKey];
+            const otherComp = c[otherKey];
+            const p1 = allPointsMap.get(baseComp.id);
+            const p2 = allPointsMap.get(otherComp.id);
             const p3 = allPointsMap.get(c.p3.id);
 
             let baseDist = 0;
@@ -280,12 +285,15 @@ export function compileTopology(components, topology, solvedPoints) {
                     }
                 }
             }
+            if (Number.isFinite(Number(c.travelStart))) {
+                baseDist = Number(c.travelStart);
+            }
 
             steps.push({
                 id: c.p3.id,
                 type: 'input_linear',
-                p1: c.p1.id,
-                p2: c.p2.id,
+                p1: baseComp.id,
+                p2: otherComp.id,
                 ux: ux,
                 uy: uy,
                 baseDist: baseDist,
@@ -386,7 +394,7 @@ export function compileTopology(components, topology, solvedPoints) {
     // 4. 其他點位 (靜態顯示)
     allPointsMap.forEach((info, id) => {
         const isUsed = Array.from(joints).includes(id) ||
-            components.some(c => (c.p1?.id === id || c.p2?.id === id || c.p3?.id === id));
+            components.some(c => componentPointKeys.some(k => c[k]?.id === id));
 
         if (isUsed && !steps.find(s => s.id === id)) {
             steps.push({ id, type: 'joint', x: Number(info.x) || 0, y: Number(info.y) || 0 });
@@ -495,7 +503,7 @@ export function compileTopology(components, topology, solvedPoints) {
                     id: `${c.id}_Track`,
                     type: 'bar',
                     len_param: lenVal,
-                    total_len_param: c.trackLenParam,
+                    total_len_param: c.carrierLen,
                     offset_param: c.trackOffsetParam,
                     isTrack: true,
                     color: c.color

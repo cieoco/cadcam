@@ -15,6 +15,7 @@ const POINT_TYPES = new Set(['floating', 'fixed', 'motor', 'linear']);
 const clone = value => JSON.parse(JSON.stringify(value));
 const snapLego = value => Math.max(LEGO_STEP, Math.round((Number(value) || 0) / LEGO_STEP) * LEGO_STEP);
 const num = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const roundMm = (value, fallback = 0) => Math.round(num(value, fallback));
 const safeId = value => typeof value === 'string' && SAFE_ID.test(value);
 
 function normalizePoint(point, fallbackId, warnings) {
@@ -112,10 +113,38 @@ function normalizeSlider(comp, index, params, warnings) {
   const p1 = normalizePoint(comp.p1, `S${index + 1}a`, warnings);
   const p2 = normalizePoint(comp.p2, `S${index + 1}b`, warnings);
   const p3 = normalizePoint(comp.p3, `S${index + 1}c`, warnings);
+  const m1Seed = comp.m1 || (comp.p1 ? { type: 'fixed', x: comp.p1.x, y: comp.p1.y } : null);
+  const m2Seed = comp.m2 || (comp.p2 ? { type: 'fixed', x: comp.p2.x, y: comp.p2.y } : null);
+  const m1 = normalizePoint(m1Seed, `S${index + 1}m1`, warnings);
+  const m2 = normalizePoint(m2Seed, `S${index + 1}m2`, warnings);
   p1.type = 'fixed';   // 軌道兩端釘地
   p2.type = 'fixed';
   p3.type = 'floating'; // 滑塊點沿軌道滑動（活塞模式由 input_linear 推算，型別仍非 fixed）
+  m1.type = 'fixed';   // 承載桿件兩端固定孔
+  m2.type = 'fixed';
   const lenParam = safeId(comp.lenParam) ? comp.lenParam : `SL${index + 1}`;
+  const rawLen = Math.max(1, roundMm(params[lenParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y), 1));
+  const carriageLen = Math.max(1, Math.min(rawLen, roundMm(comp.carriageLen, 32)));
+  const carrierLen = Math.max(rawLen, Math.min(1000, roundMm(comp.carrierLen ?? comp.trackLen ?? rawLen, rawLen)));
+  const axisDx = p2.x - p1.x;
+  const axisDy = p2.y - p1.y;
+  const axisLen = Math.hypot(axisDx, axisDy) || 1;
+  const ux = axisDx / axisLen;
+  const uy = axisDy / axisLen;
+  const maxOffset = Math.max(0, carrierLen - rawLen);
+  let railOffset = Math.max(0, Math.min(maxOffset, roundMm(comp.railOffset, 0)));
+  if (!comp.m1 && !comp.m2 && comp.railOffset === undefined && carrierLen > rawLen) {
+    railOffset = Math.round(maxOffset / 2);
+  }
+  if (comp.m1 && comp.m2 && comp.railOffset === undefined) {
+    railOffset = Math.max(0, Math.min(maxOffset, roundMm((p1.x - m1.x) * ux + (p1.y - m1.y) * uy, 0)));
+  }
+  m1.x = p1.x - ux * railOffset;
+  m1.y = p1.y - uy * railOffset;
+  m2.x = m1.x + ux * carrierLen;
+  m2.y = m1.y + uy * carrierLen;
+  const travelStart = Math.max(0, Math.min(rawLen, roundMm(comp.travelStart ?? comp.strokeMin, 0)));
+  const travelEnd = Math.max(travelStart, Math.min(rawLen, roundMm(comp.travelEnd ?? comp.strokeMax, rawLen)));
   const out = {
     type: 'slider',
     id,
@@ -123,20 +152,24 @@ function normalizeSlider(comp, index, params, warnings) {
     p1,
     p2,
     p3,
+    m1,
+    m2,
     lenParam,
+    baseEnd: comp.baseEnd === 'p2' ? 'p2' : 'p1',
+    carriageLen,
+    carrierLen,
+    railOffset,
+    travelStart,
+    travelEnd,
     sign: Number(comp.sign) < 0 ? -1 : 1
   };
   // 線性致動器（活塞）模式：滑塊點本身被直線位移驅動
   if (comp.isInput || comp.physicalMotor || p3.physicalMotor) {
     out.isInput = true;
     out.physicalMotor = String(comp.physicalMotor || p3.physicalMotor || '1');
-    const clampMm = v => Math.max(-400, Math.min(400, Math.round(num(v, 0))));
-    out.strokeMin = clampMm(comp.strokeMin ?? 0);
-    out.strokeMax = clampMm(comp.strokeMax ?? 64);
   }
   // 軌道長度參數（保留；被動時驅動桿長由 compile 自動找，這裡僅記錄軌道兩端距離）
-  const rawLen = params[lenParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y);
-  params[lenParam] = Math.round(num(rawLen, 0));
+  params[lenParam] = rawLen;
   return out;
 }
 
@@ -192,7 +225,7 @@ export function highestIdNum(comps) {
   };
   (comps || []).forEach(c => {
     scan(c.id);
-    ['p1', 'p2', 'p3'].forEach(k => { if (c[k]) scan(c[k].id); });
+    ['p1', 'p2', 'p3', 'm1', 'm2'].forEach(k => { if (c[k]) scan(c[k].id); });
   });
   return max;
 }
