@@ -20,6 +20,7 @@ import { buildSceneModel, computeBodyLayers } from '../blocks3d/scene-model.js';
 // 純邏輯模組
 import * as View from './view.js';
 import * as Render from './render.js';   // SVG 繪製基元（純呈現）
+import * as Panels from './panels.js';   // 編輯面板呈現（讀 S + 寫 DOM）
 import * as Model from './model.js';
 import * as Motion from './motion.js';
 import * as Store from './storage.js';
@@ -257,7 +258,7 @@ function rebuild() {
   prevSolved = {};
   trajectoryCache = null;
   document.getElementById('hint').style.display = S.comps.length ? 'none' : 'block';
-  updateRoleEditor();
+  Panels.updateRoleEditor();
   scheduleAutosave();            // 任何結構變更都防丟（debounce，播放不觸發）
 }
 
@@ -1423,7 +1424,7 @@ function driveBarAt(barId, nodeId) {
   S.selectedLinkId = null;
   S.selectedTriangleId = null;
   rebuild(); draw();
-  updateRoleEditor();
+  Panels.updateRoleEditor();
 }
 // 線性致動器：把某根滑軌的滑塊點改成被直線位移驅動（活塞）。S.theta 從 0 起算＝行程位移。
 function driveSliderAt(sliderId) {
@@ -1445,7 +1446,7 @@ function driveSliderAt(sliderId) {
   S.selectedLinkId = null;
   S.selectedTriangleId = null;
   rebuild(); draw();
-  updateRoleEditor();
+  Panels.updateRoleEditor();
 }
 
 // ---- 動力來源型號查詢 ----
@@ -1523,7 +1524,7 @@ function onNodeDown(e, id) {
   document.getElementById('linkToRailBtn').style.display = 'none';
   setSliderDetailRows(false);
   S.selectedNodeId = id;
-  updateRoleEditor();
+  Panels.updateRoleEditor();
   S.dragId = id; S.snapTarget = null;
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
   draw();
@@ -1652,7 +1653,7 @@ function selectLink(id) {
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
   document.getElementById('lenTitle').textContent = '🔵 連桿長度';
-  setLenButtonTitles('短 8mm（少一孔）', '長 8mm（多一孔）');
+  Panels.setLenButtonTitles('短 8mm（少一孔）', '長 8mm（多一孔）');
   document.getElementById('triSideSelect').style.display = 'none';
   document.getElementById('sliderFlipBtn').style.display = 'none';
   document.getElementById('sliderBaseBtn').style.display = 'none';
@@ -1661,8 +1662,8 @@ function selectLink(id) {
   document.getElementById('zliftRow').style.display = 'flex';
   document.getElementById('lenControls').style.display = 'flex';
   document.getElementById('lenEditor').style.display = 'flex';
-  renderLenEditor(Math.round(S.topo.params[c.lenParam] || 0));
-  updateZliftButtons();
+  Panels.renderLenEditor(Math.round(S.topo.params[c.lenParam] || 0));
+  Panels.updateZliftButtons();
   draw();
 }
 function selectTriangle(id) {
@@ -1676,7 +1677,7 @@ function selectTriangle(id) {
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
   document.getElementById('lenTitle').textContent = '🔺 三點桿';
-  setLenButtonTitles('短 8mm（少一孔）', '長 8mm（多一孔）');
+  Panels.setLenButtonTitles('短 8mm（少一孔）', '長 8mm（多一孔）');
   S.triSide = 'g';
   const sel = document.getElementById('triSideSelect');
   sel.value = 'g';
@@ -1688,8 +1689,8 @@ function selectTriangle(id) {
   document.getElementById('zliftRow').style.display = 'flex';
   document.getElementById('lenControls').style.display = 'flex';
   document.getElementById('lenEditor').style.display = 'flex';
-  renderTriValue();
-  updateZliftButtons();
+  Panels.renderTriValue();
+  Panels.updateZliftButtons();
   draw();
 }
 // 選取滑軌：屬性列顯示軌道長度（可調）＋ 翻面（換滑塊解的那一側）＋ 刪除。
@@ -1705,7 +1706,7 @@ function selectSlider(id) {
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
   document.getElementById('lenTitle').textContent = '🟩 滑軌長度';
-  setLenButtonTitles('滑軌短 1mm', '滑軌長 1mm');
+  Panels.setLenButtonTitles('滑軌短 1mm', '滑軌長 1mm');
   document.getElementById('triSideSelect').style.display = 'none';
   document.getElementById('sliderFlipBtn').style.display = '';
   document.getElementById('sliderBaseBtn').style.display = '';
@@ -1714,16 +1715,10 @@ function selectSlider(id) {
   document.getElementById('zliftRow').style.display = 'none';   // 滑軌不做疊放
   document.getElementById('lenControls').style.display = 'flex';
   document.getElementById('lenEditor').style.display = 'flex';
-  renderLenEditor(railLength(c));
+  Panels.renderLenEditor(railLength(c));
   renderSliderBaseButton(c);
   renderSliderDetails(c);
   draw();
-}
-function setLenButtonTitles(minusTitle, plusTitle) {
-  const minus = document.getElementById('lenMinusBtn');
-  const plus = document.getElementById('lenPlusBtn');
-  if (minus) minus.title = minusTitle;
-  if (plus) plus.title = plusTitle;
 }
 function setSliderDetailRows(show) {
   const display = show ? 'flex' : 'none';
@@ -1777,18 +1772,6 @@ function renderSliderBaseButton(c) {
   btn.textContent = c.baseEnd === 'p2' ? '固定端：B' : '固定端：A';
   btn.classList.toggle('lift-on', Boolean(c.isInput));
 }
-function nodeRoleLabel(id) {
-  const mount = sliderMountInfo(id);
-  if (mount) return `${mount.label} 滑軌固定孔`;
-  return roleLabel(id);
-}
-function renderNodePosition(id) {
-  const p = pointCoords()[id];
-  const x = document.getElementById('nodeXVal');
-  const y = document.getElementById('nodeYVal');
-  if (x) x.textContent = p ? Math.round(p.x) : '0';
-  if (y) y.textContent = p ? Math.round(p.y) : '0';
-}
 function sliderProjectedDistance(c) {
   if (!c || !c.p1 || !c.p2 || !c.p3) return 0;
   const base = c.baseEnd === 'p2' ? c.p2 : c.p1;
@@ -1823,7 +1806,7 @@ function changeRailLen(delta) {
   }
   S.topo.params[c.lenParam] = L;
   normalizeSliderRange(c);
-  renderLenEditor(L);
+  Panels.renderLenEditor(L);
   renderSliderDetails(c);
   rebuild(); draw();
 }
@@ -1903,13 +1886,9 @@ function flipSlider() {
 function triParamFor(c) {
   return S.triSide === 'r1' ? c.r1Param : S.triSide === 'r2' ? c.r2Param : c.gParam;
 }
-function renderTriValue() {
-  const c = S.comps.find(x => x.id === S.selectedTriangleId);
-  if (c) renderLenEditor(Math.round(S.topo.params[triParamFor(c)] || 0));
-}
 function setTriSide(side) {
   S.triSide = (side === 'r1' || side === 'r2') ? side : 'g';
-  renderTriValue();
+  Panels.renderTriValue();
 }
 function changeTriSide(delta) {
   const c = S.comps.find(x => x.id === S.selectedTriangleId);
@@ -1919,7 +1898,7 @@ function changeTriSide(delta) {
   const L = snapLego((S.topo.params[key] || 0) + delta);
   S.topo.params[key] = L;
   reshapeTriangle(c);   // 自由三點桿才看得到；已連接的由 solver 接手
-  renderLenEditor(L);
+  Panels.renderLenEditor(L);
   rebuild(); draw();
 }
 // 依 g/r1/r2 重擺三點桿：固定 P1 與底邊方向，P2 落在距 P1 為 g 處，P3 取兩圓交點
@@ -1958,26 +1937,11 @@ function bringPart(dir) {
   c.zlift = Math.max(-4, Math.min(4, (c.zlift || 0) + step));
   if (!c.zlift) delete c.zlift;
   scheduleAutosave();
-  updateZliftButtons();
+  Panels.updateZliftButtons();
   draw();
 }
 
-// 反映目前選取件的 zlift 狀態到「移到最上/最下」按鈕的高亮
-function updateZliftButtons() {
-  const id = S.selectedLinkId || S.selectedTriangleId;
-  const c = id ? S.comps.find(x => x.id === id) : null;
-  const z = c ? (c.zlift || 0) : 0;
-  const up = document.getElementById('liftUpBtn');
-  const dn = document.getElementById('liftDownBtn');
-  if (up) up.classList.toggle('lift-on', z > 0);
-  if (dn) dn.classList.toggle('lift-on', z < 0);
-}
 
-// 更新長度顯示（用上方的 − / + 以 8mm 為單位調整）
-function renderLenEditor(len) {
-  const valEl = document.getElementById('lenValue');
-  if (valEl) valEl.textContent = len;
-}
 function deselectLink() {
   if (!S.selectedLinkId && !S.selectedTriangleId && !S.selectedSliderId) return;
   S.selectedLinkId = null;
@@ -2025,7 +1989,7 @@ function setLen(v) {
   const d = Math.hypot(dx, dy) || 1;
   c.p2.x = (c.p1.x || 0) + dx / d * L;
   c.p2.y = (c.p1.y || 0) + dy / d * L;
-  renderLenEditor(L);
+  Panels.renderLenEditor(L);
   rebuild(); draw();
 }
 function changeLen(delta) {
@@ -2035,39 +1999,11 @@ function changeLen(delta) {
   if (c) setLen((S.topo.params[c.lenParam] || 0) + delta);
 }
 
-// ---- 角色編輯（接點：自由 / 地錨 / 馬達）----
-function updateRoleEditor() {
-  const editor = document.getElementById('roleEditor');
-  if (!editor) return;
-  if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) {
-    editor.style.display = 'none';
-    updateServoEditor();
-    updateStrokeEditor();
-    return;
-  }
-  document.getElementById('roleStatus').textContent = nodeRoleLabel(S.selectedNodeId);
-  renderNodePosition(S.selectedNodeId);
-  const traceBtn = document.getElementById('traceBtn');
-  if (traceBtn) {
-    const isTrace = S.topo.tracePoint === S.selectedNodeId;
-    traceBtn.textContent = isTrace ? '取消軌跡' : '設軌跡點';
-    traceBtn.classList.toggle('trace-on', isTrace);
-    traceBtn.title = isTrace ? '停止追蹤這個接點' : '追蹤這個接點走過的路徑';
-  }
-  editor.style.display = 'flex';
-  updateServoEditor();
-  updateStrokeEditor();
-}
 // 選到被線性致動器驅動的滑塊點時，跳出行程面板；其餘情況收起。
 function sliderInputForPoint(id) {
   return (id && hasPoint(id))
     ? S.comps.find(c => c.type === 'slider' && c.isInput && c.p3 && c.p3.id === id) || null
     : null;
-}
-function updateStrokeEditor() {
-  const panel = document.getElementById('strokeEditor');
-  if (!panel) return;
-  panel.style.display = 'none';
 }
 function changeStroke(which, delta) {
   const sl = sliderInputForPoint(S.selectedNodeId);
@@ -2079,23 +2015,8 @@ function changeStroke(which, delta) {
     sl.travelStart = Math.min(sliderTravelEnd(sl), Math.max(0, sliderTravelStart(sl) + delta));
   }
   normalizeSliderRange(sl);
-  updateStrokeEditor();
+  Panels.updateStrokeEditor();
   rebuild(); draw();
-}
-// 選到 MG995 伺服的接點時，跳出起始/結束角面板；其餘情況收起。
-function updateServoEditor() {
-  const panel = document.getElementById('servoEditor');
-  if (!panel) return;
-  const bar = S.selectedNodeId && hasPoint(S.selectedNodeId) ? motorBarForCenter(S.selectedNodeId) : null;
-  if (!bar || bar.motorType !== 'mg995') {
-    panel.style.display = 'none';
-    return;
-  }
-  const sv = document.getElementById('servoStartVal');
-  const ev = document.getElementById('servoEndVal');
-  if (sv) sv.textContent = Math.round(Number(bar.servoStart) || 0);
-  if (ev) ev.textContent = Math.round(Number.isFinite(Number(bar.servoEnd)) ? Number(bar.servoEnd) : 90);
-  panel.style.display = 'flex';
 }
 function changeServoAngle(which, delta) {
   const bar = S.selectedNodeId && hasPoint(S.selectedNodeId) ? motorBarForCenter(S.selectedNodeId) : null;
@@ -2105,7 +2026,7 @@ function changeServoAngle(which, delta) {
   const cur = Number(bar[field]);
   const base = Number.isFinite(cur) ? cur : (field === 'servoEnd' ? 90 : 0);
   bar[field] = Math.max(0, Math.min(360, Math.round(base + delta)));
-  updateServoEditor();
+  Panels.updateServoEditor();
   scheduleAutosave();
 }
 function setNodeRole(type) {
@@ -2132,7 +2053,7 @@ function changeNodePos(axis, delta) {
   const y = axis === 'y' ? p.y + delta : p.y;
   updatePointCoordsById(S.selectedNodeId, x, y);
   rebuild(); draw();
-  updateRoleEditor();
+  Panels.updateRoleEditor();
 }
 function removeNodeMotor() {
   if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) return;
@@ -2143,7 +2064,7 @@ function removeNodeMotor() {
   const sl = sliderInputForPoint(S.selectedNodeId);
   if (sl) { delete sl.isInput; delete sl.physicalMotor; delete sl.strokeMin; delete sl.strokeMax; }
   rebuild(); draw();
-  updateRoleEditor();
+  Panels.updateRoleEditor();
 }
 function toggleTracePoint() {
   if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) return;
@@ -2151,7 +2072,7 @@ function toggleTracePoint() {
   pause();
   S.topo.tracePoint = S.topo.tracePoint === S.selectedNodeId ? '' : S.selectedNodeId;
   trajectoryCache = null;
-  updateRoleEditor();
+  Panels.updateRoleEditor();
   draw();
 }
 
@@ -2164,7 +2085,7 @@ svg.addEventListener('pointerdown', () => {
   if (S.placingMotor || S.pickBars) { cancelMotorMode(); draw(); return; }
   if (S.dragId || S.dragLinkId) return;
   S.selectedNodeId = null;
-  updateRoleEditor();
+  Panels.updateRoleEditor();
   if (!S.dragId) deselectLink();
 });
 
@@ -2348,6 +2269,7 @@ async function share() {
 // ---- 啟動：分享連結優先，其次 localStorage 自動還原，否則空白 ----
 function init() {
   Render.init({ svg, onNodeDown });   // 注入繪製基元的外部依賴（預設 parent + 固定孔互動）
+  Panels.init({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter });
   populateExamples();
   let loaded = false;
   try {
