@@ -305,16 +305,15 @@ function drawTraceTrajectory(trajectoryData) {
   svg.appendChild(poly);
 }
 
-function draw() {
-  while (svg.firstChild) svg.removeChild(svg.firstChild);
-  drawGround();
-  if (!compiled || !comps.length) {
-    updateSolveBanner(null, 0);
-    drawDrawPreview();   // 空畫布也要顯示正在拉出的第一根連桿
-    drawTrianglePreview();
-    return;
-  }
+// ---- 重建 / 播放兩條路徑共用的狀態與 helper ----
+// build/update 分離：draw() 走完整重建並為每個會動的元素註冊一個 (pts)=>更新幾何 的閉包；
+// 播放時 renderFrame() 只重解 + 跑這些閉包就地改 d/cx/transform，不拆 DOM（手機才不會每幀重建整棵樹）。
+let frameUpdaters = [];        // 重建時填入：每個是 (pts)=>void，只改既有元素的幾何屬性
+let sliderLayer = null;        // 滑軌動態層：播放時就地清空重畫（滑軌少，與重建共用同段碼＝零分歧）
+let recountBanner = null;      // (pts, sol)=>void：播放時重算死點橫幅（沿用重建時的桿件清單）
 
+// 解這一幀 + 推進位移歷史，回傳合併後的「點 id -> 畫面位置」。draw 與 renderFrame 共用同一套求解語意。
+function solveFrame() {
   let sol = null;
   // 帶「外插（上一幀＋速度）」的預測當種子：靠動量挑連續分支，平行四邊形不會翻成交叉。
   const seed = extrapolateSeed(lastSolved, prevSolved);
@@ -330,6 +329,60 @@ function draw() {
   // 合併位置：先用元件座標打底（未被解出的靜態點才畫得出來、拖得動），再用 lastSolved 覆蓋。
   const pts = pointCoords();
   Object.keys(lastSolved).forEach(id => { if (Number.isFinite(lastSolved[id].x)) pts[id] = lastSolved[id]; });
+  return { pts, sol };
+}
+
+// 算馬達本體的朝向（度）：對準接在中心、非曲柄的那根桿；沒有就朝滑軌另一固定孔；再沒有才朝最近地錨。
+// 從 draw() 抽出，讓播放更新器每幀用新 pts 重算同一個角度（邏輯與原本一字不差）。
+function computeMotorRotDeg(id, pts, groundIds) {
+  const p = pts[id];
+  let tgt = null;
+  const crankTips = new Set((compiled.steps || [])
+    .filter(s => s.type === 'input_crank' && s.center === id)
+    .map(s => s.id));
+  const others = comps.filter(c => c.type === 'bar' && !c.isInput && c.p1 && c.p2 &&
+    (c.p1.id === id || c.p2.id === id) &&
+    !crankTips.has(c.p1.id === id ? c.p2.id : c.p1.id));
+  if (others.length) {
+    const b = others[0];
+    const o = b.p1.id === id ? b.p2.id : b.p1.id;
+    if (pts[o] && Number.isFinite(pts[o].x)) tgt = pts[o];
+  }
+  if (!tgt) {
+    // 馬達裝在滑軌固定孔上：固定框架就是滑軌，朝另一個固定孔（沿軌道方向）。
+    const mount = sliderMountInfo(id);
+    if (mount) {
+      const other = mount.label === 'M1' ? mount.slider.m2 : mount.slider.m1;
+      if (other && pts[other.id] && Number.isFinite(pts[other.id].x)) tgt = pts[other.id];
+    }
+  }
+  if (!tgt) {
+    // 後備：朝最近的另一個地錨。跳過與馬達重合的點（含滑軌隱藏軌道端，railOffset=0 時會疊在固定孔上）
+    // ——否則 atan2 對到零向量會亂轉（±180° 把馬達翻上去）。
+    let bd = Infinity;
+    groundIds.forEach(gid => {
+      if (gid === id || isHiddenSliderRailPoint(gid)) return;
+      const gp = pts[gid];
+      if (gp && Number.isFinite(gp.x)) { const d = Math.hypot(gp.x - p.x, gp.y - p.y); if (d > 1e-3 && d < bd) { bd = d; tgt = gp; } }
+    });
+  }
+  return tgt ? Math.atan2(-(tgt.x - p.x), -(tgt.y - p.y)) * 180 / Math.PI : 0;
+}
+
+function draw() {
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  frameUpdaters = [];
+  sliderLayer = null;
+  recountBanner = null;
+  drawGround();
+  if (!compiled || !comps.length) {
+    updateSolveBanner(null, 0);
+    drawDrawPreview();   // 空畫布也要顯示正在拉出的第一根連桿
+    drawTrianglePreview();
+    return;
+  }
+
+  const { pts, sol } = solveFrame();
 
   const groundIds = new Set((compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
   const motorCenterIds = new Set((compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
@@ -389,12 +442,9 @@ function draw() {
   // 三點桿：用圓角三角板呈現，同時仍保留每條邊/孔位的求解語法。
   comps.filter(comp => comp.type === 'triangle' && comp.p1 && comp.p2 && comp.p3).forEach(tri => {
     const ids = [tri.p1.id, tri.p2.id, tri.p3.id];
-    const [a, b, c] = ids.map(id => pts[id]);
-    if (![a, b, c].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))) return;
     const path = document.createElementNS(SVG_NS, 'path');
     const color = tri.color || '#27ae60';
     const isSel = tri.id === selectedTriangleId;
-    path.setAttribute('d', roundedTriangleHullPath(a, b, c));
     path.setAttribute('fill', color + '33');
     path.setAttribute('stroke', isSel ? '#e67e22' : color);
     path.setAttribute('stroke-width', isSel ? 3.2 : 2.5);
@@ -405,7 +455,16 @@ function draw() {
       e.stopPropagation();
       selectTriangle(tri.id);
     });
+    // 每幀更新：解出三點就更新外形，三點不全則隱藏（與原本「無效不畫」同效果）
+    const applyTri = (P) => {
+      const [a, b, c] = ids.map(id => P[id]);
+      const ok = [a, b, c].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
+      path.style.display = ok ? '' : 'none';
+      if (ok) path.setAttribute('d', roundedTriangleHullPath(a, b, c));
+    };
+    applyTri(pts);
     groupForLayer(triLayerByKey.get(triKey(ids))).appendChild(path);
+    frameUpdaters.push(applyTri);
   });
 
   // 動力來源本體：畫在桿件底下，曲柄轉在它上面。依型號畫 TT馬達或 MG995 伺服。
@@ -414,65 +473,49 @@ function draw() {
   // 光靠 !c.isInput 排不掉曲柄。改用 input_crank 步驟算出曲柄動端，明確把曲柄那根桿排除。
   motorCenterIds.forEach(id => {
     const p = pts[id]; if (!p || !Number.isFinite(p.x)) return;
-    let tgt = null;
-    const crankTips = new Set((compiled.steps || [])
-      .filter(s => s.type === 'input_crank' && s.center === id)
-      .map(s => s.id));
-    const others = comps.filter(c => c.type === 'bar' && !c.isInput && c.p1 && c.p2 &&
-      (c.p1.id === id || c.p2.id === id) &&
-      !crankTips.has(c.p1.id === id ? c.p2.id : c.p1.id));
-    if (others.length) {
-      const b = others[0];
-      const o = b.p1.id === id ? b.p2.id : b.p1.id;
-      if (pts[o] && Number.isFinite(pts[o].x)) tgt = pts[o];
-    }
-    if (!tgt) {
-      // 馬達裝在滑軌固定孔上：固定框架就是滑軌，朝另一個固定孔（沿軌道方向）。
-      const mount = sliderMountInfo(id);
-      if (mount) {
-        const other = mount.label === 'M1' ? mount.slider.m2 : mount.slider.m1;
-        if (other && pts[other.id] && Number.isFinite(pts[other.id].x)) tgt = pts[other.id];
-      }
-    }
-    if (!tgt) {
-      // 後備：朝最近的另一個地錨。跳過與馬達重合的點（含滑軌隱藏軌道端，railOffset=0 時會疊在固定孔上）
-      // ——否則 atan2 對到零向量會亂轉（±180° 把馬達翻上去）。
-      let bd = Infinity;
-      groundIds.forEach(gid => {
-        if (gid === id || isHiddenSliderRailPoint(gid)) return;
-        const gp = pts[gid];
-        if (gp && Number.isFinite(gp.x)) { const d = Math.hypot(gp.x - p.x, gp.y - p.y); if (d > 1e-3 && d < bd) { bd = d; tgt = gp; } }
-      });
-    }
-    const rotDeg = tgt ? Math.atan2(-(tgt.x - p.x), -(tgt.y - p.y)) * 180 / Math.PI : 0;
+    const rotDeg = computeMotorRotDeg(id, pts, groundIds);
     const isServo = motorTypeForCenter(id) === 'mg995';
-    if (isServo) drawMG995Servo(p.x, p.y, rotDeg, motorLayer);
-    else drawTTMotor(p.x, p.y, rotDeg, motorLayer);
-    drawMotorLabel(p.x, p.y, isServo ? 'MG995' : 'TT', isServo ? '#2c6fbb' : '#c9971b', motorLayer);
+    const body = isServo ? drawMG995Servo(p.x, p.y, rotDeg, motorLayer)
+                         : drawTTMotor(p.x, p.y, rotDeg, motorLayer);
+    const label = drawMotorLabel(p.x, p.y, isServo ? 'MG995' : 'TT', isServo ? '#2c6fbb' : '#c9971b', motorLayer);
+    // 每幀更新：本體只改 transform（位置+朝向）、標籤只改 x/y；縮放在播放時不變故內部尺寸免重算。
+    frameUpdaters.push((P) => {
+      const q = P[id];
+      const ok = q && Number.isFinite(q.x) && Number.isFinite(q.y);
+      body.style.display = ok ? '' : 'none';
+      label.style.display = ok ? '' : 'none';
+      if (!ok) return;
+      body.setAttribute('transform', `translate(${TX(q.x)} ${TY(q.y)}) rotate(${computeMotorRotDeg(id, P, groundIds)})`);
+      label.setAttribute('x', TX(q.x));
+      label.setAttribute('y', TY(q.y) - 16 * View.getScale());
+    });
   });
 
   // 桿件：依層級放進對應的 <g>（內層在底、外層在上）；同層內紅色曲柄最後畫不被蓋住。
-  let missingVisibleLinks = 0;
   const linksToDraw = [...(compiled.visualization.links || [])].sort((a, b) => {
     const ac = a.style === 'crank' ? 1 : 0;
     const bc = b.style === 'crank' ? 1 : 0;
     return ac - bc;
   });
-  linksToDraw.forEach(l => {
-    const a = pts[l.p1], b = pts[l.p2];
-    if (l.hidden) return;
-    if (triangleEdgeKeys.has([l.p1, l.p2].sort().join('|'))) return;
-    if (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(b.x)) {
-      missingVisibleLinks += 1;
-      return;
-    }
+  // 可見桿（排除隱藏與三角板邊）：建一次、無效時隱藏，播放只更新外形——不再每幀重建。
+  const eligibleLinks = linksToDraw.filter(l =>
+    !l.hidden && !triangleEdgeKeys.has([l.p1, l.p2].sort().join('|')));
+  // 死點橫幅的「缺漏可見桿」計數：重建與播放共用同一套判斷（含與原本一致、只看 .x 有限）
+  const countMissingLinks = (P) => {
+    let m = 0;
+    eligibleLinks.forEach(l => {
+      const a = P[l.p1], b = P[l.p2];
+      if (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(b.x)) m += 1;
+    });
+    return m;
+  };
+  eligibleLinks.forEach(l => {
     const isSel = l.id && l.id === selectedLinkId;
     const editable = l.id && comps.some(c => c.id === l.id && c.type === 'bar' && c.fixedLen);
     const isPickCandidate = pickBars && pickBars.ids.includes(l.id);
     // 冰棒棍外形：填色扁棍取代原本的圓頭線段
     const stroke = isPickCandidate ? '#f39c12' : (isSel ? '#e67e22' : (l.style === 'crank' ? '#e74c3c' : (l.color || '#3498db')));
     const stick = document.createElementNS(SVG_NS, 'path');
-    stick.setAttribute('d', barHullPath(a, b));
     stick.setAttribute('fill', stroke + '33');   // 淡色填滿，像一塊積木
     stick.setAttribute('stroke', stroke);
     stick.setAttribute('stroke-width', isSel || isPickCandidate ? 2.5 : 2);
@@ -493,12 +536,12 @@ function draw() {
     targetG.appendChild(stick);
 
     // 在兩端冰棒棍頭上鑽孔：與外形同色的細圈，讓它看起來像真的打孔的扁棍。
-    // 地錨（方塊）本身就是固定銷，不畫孔。
+    // 地錨（方塊）本身就是固定銷，不畫孔。地錨判定屬結構性，播放期間不變。
     const holeR = HULL_R_WORLD * View.getScale() * 0.72;
-    [[a, l.p1], [b, l.p2]].forEach(([pt, pid]) => {
+    const holes = [];
+    [l.p1, l.p2].forEach(pid => {
       if (groundIds.has(pid)) return;
       const hole = document.createElementNS(SVG_NS, 'circle');
-      hole.setAttribute('cx', TX(pt.x)); hole.setAttribute('cy', TY(pt.y));
       hole.setAttribute('r', holeR);
       hole.setAttribute('fill', 'none');
       hole.setAttribute('stroke', stroke);
@@ -506,44 +549,32 @@ function draw() {
       hole.setAttribute('stroke-opacity', 0.7);
       hole.style.pointerEvents = 'none'; // 不擋下面桿身/上面節點的互動
       targetG.appendChild(hole);
+      holes.push({ el: hole, pid });
     });
+    // 每幀更新：解出兩端就更新棍身外形與孔位，否則整根隱藏（與原本「無效不畫」同效果）
+    const applyLink = (P) => {
+      const a = P[l.p1], b = P[l.p2];
+      const ok = a && b && Number.isFinite(a.x) && Number.isFinite(b.x);
+      stick.style.display = ok ? '' : 'none';
+      holes.forEach(h => { h.el.style.display = ok ? '' : 'none'; });
+      if (!ok) return;
+      stick.setAttribute('d', barHullPath(a, b));
+      holes.forEach(h => {
+        const pt = P[h.pid];
+        if (pt && Number.isFinite(pt.x)) { h.el.setAttribute('cx', TX(pt.x)); h.el.setAttribute('cy', TY(pt.y)); }
+      });
+    };
+    applyLink(pts);
+    frameUpdaters.push(applyLink);
   });
-  updateSolveBanner(sol, missingVisibleLinks);
+  updateSolveBanner(sol, countMissingLinks(pts));
+  recountBanner = (P, s) => updateSolveBanner(s, countMissingLinks(P));
 
-  // 滑軌：軌道（滑槽＋導軌線）＋ 滑塊方塊；活塞模式再疊缸體與「活塞」標籤。
-  comps.filter(c => c.type === 'slider' && c.p1 && c.p2 && c.p3).forEach(sl => {
-    const a = pts[sl.p1.id], b = pts[sl.p2.id], s = pts[sl.p3.id];
-    const ma = sl.m1 && pts[sl.m1.id] ? pts[sl.m1.id] : a;
-    const mb = sl.m2 && pts[sl.m2.id] ? pts[sl.m2.id] : b;
-    if (![a, b].every(p => p && Number.isFinite(p.x))) return;
-    const isSel = sl.id === selectedSliderId;
-    drawSliderTrack(a, b, isSel, svg, ma, mb);
-    if (isSel) drawSliderTravelMarks(a, b, sl.baseEnd === 'p2' ? b : a, sliderTravelStart(sl), sliderTravelEnd(sl), svg);
-    if (s && Number.isFinite(s.x)) {
-      const dirDeg = Math.atan2(TY(b.y) - TY(a.y), TX(b.x) - TX(a.x)) * 180 / Math.PI;
-      if (sl.isInput) drawPiston(a, b, s, sl.baseEnd === 'p2' ? b : a, svg);
-      drawSliderBlock(s, dirDeg, sl.isInput, isSel, svg, sliderBodyLength(sl));
-      drawMotorLabel(s.x, s.y, sl.isInput ? '活塞' : '滑塊', sl.isInput ? '#1f8f4e' : '#107a63', svg);
-    }
-    // 透明命中區：點軌道（非接點處）即選取滑軌，叫出屬性列。
-    const hit = document.createElementNS(SVG_NS, 'path');
-    hit.setAttribute('d', barHullPath(a, b));
-    hit.setAttribute('fill', 'transparent');
-    hit.style.cursor = 'pointer';
-    hit.addEventListener('pointerdown', (e) => {
-      if (drawingLink || drawingTriangle || placingMotor || pickBars) return;
-      e.stopPropagation();
-      selectSlider(sl.id);
-    });
-    svg.appendChild(hit);
-    // 固定孔畫在命中區之上，才能被點到（拖曳 / 放馬達）；否則命中區會把點擊吃掉。
-    drawSliderMountHole(ma, sl.m1?.id, isSel, 'M1', svg);
-    drawSliderMountHole(mb, sl.m2?.id, isSel, 'M2', svg);
-    if (isSel) {
-      drawMountLabel(ma, 'M1', svg);
-      drawMountLabel(mb, 'M2', svg);
-    }
-  });
+  // 滑軌：放進專屬動態層。滑軌數量少且結構複雜（軌道/滑塊/活塞/固定孔多件），
+  // 播放時就地清空重畫整層、與重建共用 drawSliders（零分歧），代價可忽略。
+  sliderLayer = document.createElementNS(SVG_NS, 'g');
+  svg.appendChild(sliderLayer);
+  drawSliders(pts, sliderLayer);
 
   // 吸附高亮：拖曳時靠近的接點亮綠圈
   if (dragId && snapTarget && pts[snapTarget] && Number.isFinite(pts[snapTarget].x)) {
@@ -556,23 +587,24 @@ function draw() {
   }
 
   // 節點（可拖曳；拖近別的接點會吸附合併）
+  // 節點型別（rect/circle）、樣式、半徑只由結構性狀態（地錨/馬達/固定孔/dragId）決定——
+  // 播放期間這些都不變，故建一次、每幀只更新座標。
+  const SIZE = 14;   // 地錨方塊邊長
   Object.keys(pts).forEach(id => {
     if (isHiddenSliderRailPoint(id)) return;
     if (isSliderMountPoint(id)) return;
     const p = pts[id];
-    if (!Number.isFinite(p.x)) return;
     const isGround = groundIds.has(id);
     const isMotorCenter = motorCenterIds.has(id);
     const mount = sliderMountInfo(id);
-    const node = document.createElementNS(SVG_NS, (isGround && !isMotorCenter && !mount) ? 'rect' : 'circle');
+    const isRect = isGround && !isMotorCenter && !mount;
+    const node = document.createElementNS(SVG_NS, isRect ? 'rect' : 'circle');
     if (isMotorCenter) {
       // 馬達輸出軸：紅色軸蓋（TT 馬達本體已畫在底下）
-      node.setAttribute('cx', TX(p.x)); node.setAttribute('cy', TY(p.y));
       node.setAttribute('r', id === dragId ? 8 : 6);
       node.setAttribute('fill', '#e74c3c');
       node.setAttribute('stroke', '#922b21'); node.setAttribute('stroke-width', 2);
     } else if (mount) {
-      node.setAttribute('cx', TX(p.x)); node.setAttribute('cy', TY(p.y));
       node.setAttribute('r', id === dragId ? 9 : 7);
       node.setAttribute('fill', '#f8fafc');
       node.setAttribute('stroke', id === dragId ? '#2ecc71' : '#34495e');
@@ -580,13 +612,10 @@ function draw() {
       const title = document.createElementNS(SVG_NS, 'title');
       title.textContent = `${mount.label} 固定孔：承載滑軌桿件的端點，可拖曳或吸附到其他接點`;
       node.appendChild(title);
-    } else if (isGround) {
-      const size = 14;
-      node.setAttribute('x', TX(p.x) - size / 2); node.setAttribute('y', TY(p.y) - size / 2);
-      node.setAttribute('width', size); node.setAttribute('height', size);
+    } else if (isRect) {
+      node.setAttribute('width', SIZE); node.setAttribute('height', SIZE);
       node.setAttribute('rx', 3); node.setAttribute('fill', '#34495e');
     } else {
-      node.setAttribute('cx', TX(p.x)); node.setAttribute('cy', TY(p.y));
       node.setAttribute('r', id === dragId ? 9 : 7); node.setAttribute('fill', '#fff');
       node.setAttribute('stroke', id === dragId ? '#2ecc71' : '#34495e');
       node.setAttribute('stroke-width', 3);
@@ -597,6 +626,17 @@ function draw() {
     svg.appendChild(node);
     // 手機的接點命中放大改由 capture 階段的 pointerdown 統一處理（見下方），
     // 不再每個節點疊一圈透明命中圈。
+    // 每幀更新：只改座標，無效（未解出）則隱藏（與原本「無效不畫」同效果）
+    const applyNode = (P) => {
+      const q = P[id];
+      const ok = q && Number.isFinite(q.x);
+      node.style.display = ok ? '' : 'none';
+      if (!ok) return;
+      if (isRect) { node.setAttribute('x', TX(q.x) - SIZE / 2); node.setAttribute('y', TY(q.y) - SIZE / 2); }
+      else { node.setAttribute('cx', TX(q.x)); node.setAttribute('cy', TY(q.y)); }
+    };
+    applyNode(pts);
+    frameUpdaters.push(applyNode);
   });
 
   drawFrameHandle();   // 機架移動把手：畫在節點之上，才點得到、拖得動
@@ -618,6 +658,59 @@ function draw() {
                  carriageLen: sliderBodyLength(c), color: c.color }));
   lastModelInputs = { links: linksToDraw, pts, groundIds, motorCenterIds, motorTypes, polygons: compiled.visualization.polygons || [], sliders: sliders3d };
   if (view3DActive) push3D();
+}
+
+// 滑軌繪製：畫進指定 parent。重建（draw）與播放（renderFrame）共用同一段碼，確保零分歧。
+function drawSliders(pts, parent) {
+  comps.filter(c => c.type === 'slider' && c.p1 && c.p2 && c.p3).forEach(sl => {
+    const a = pts[sl.p1.id], b = pts[sl.p2.id], s = pts[sl.p3.id];
+    const ma = sl.m1 && pts[sl.m1.id] ? pts[sl.m1.id] : a;
+    const mb = sl.m2 && pts[sl.m2.id] ? pts[sl.m2.id] : b;
+    if (![a, b].every(p => p && Number.isFinite(p.x))) return;
+    const isSel = sl.id === selectedSliderId;
+    drawSliderTrack(a, b, isSel, parent, ma, mb);
+    if (isSel) drawSliderTravelMarks(a, b, sl.baseEnd === 'p2' ? b : a, sliderTravelStart(sl), sliderTravelEnd(sl), parent);
+    if (s && Number.isFinite(s.x)) {
+      const dirDeg = Math.atan2(TY(b.y) - TY(a.y), TX(b.x) - TX(a.x)) * 180 / Math.PI;
+      if (sl.isInput) drawPiston(a, b, s, sl.baseEnd === 'p2' ? b : a, parent);
+      drawSliderBlock(s, dirDeg, sl.isInput, isSel, parent, sliderBodyLength(sl));
+      drawMotorLabel(s.x, s.y, sl.isInput ? '活塞' : '滑塊', sl.isInput ? '#1f8f4e' : '#107a63', parent);
+    }
+    // 透明命中區：點軌道（非接點處）即選取滑軌，叫出屬性列。
+    const hit = document.createElementNS(SVG_NS, 'path');
+    hit.setAttribute('d', barHullPath(a, b));
+    hit.setAttribute('fill', 'transparent');
+    hit.style.cursor = 'pointer';
+    hit.addEventListener('pointerdown', (e) => {
+      if (drawingLink || drawingTriangle || placingMotor || pickBars) return;
+      e.stopPropagation();
+      selectSlider(sl.id);
+    });
+    parent.appendChild(hit);
+    // 固定孔畫在命中區之上，才能被點到（拖曳 / 放馬達）；否則命中區會把點擊吃掉。
+    drawSliderMountHole(ma, sl.m1?.id, isSel, 'M1', parent);
+    drawSliderMountHole(mb, sl.m2?.id, isSel, 'M2', parent);
+    if (isSel) {
+      drawMountLabel(ma, 'M1', parent);
+      drawMountLabel(mb, 'M2', parent);
+    }
+  });
+}
+
+// 播放快路徑：只重解 + 跑各更新器就地改幾何，不拆 DOM 結構。只有 play() 迴圈會呼叫。
+// 結構（零件/選取/縮放/拖曳）在播放期間不變，故安全；任何結構變更都走 draw() 完整重建。
+function renderFrame() {
+  if (!compiled || !comps.length || !frameUpdaters.length) { draw(); return; }
+  const { pts, sol } = solveFrame();
+  frameUpdaters.forEach(fn => fn(pts));
+  // 滑軌動態層：就地清空重畫（共用 drawSliders）
+  if (sliderLayer) {
+    while (sliderLayer.firstChild) sliderLayer.removeChild(sliderLayer.firstChild);
+    drawSliders(pts, sliderLayer);
+  }
+  if (recountBanner) recountBanner(pts, sol);
+  // 3D 鏡像：沿用重建時算好的結構，只換這一幀的 pts
+  if (view3DActive && lastModelInputs) { lastModelInputs = { ...lastModelInputs, pts }; push3D(); }
 }
 
 // 用最近一幀的求解結果建場景模型，推進 3D viewer
@@ -775,6 +868,7 @@ function drawTTMotor(cx, cy, rotDeg = 0, parent = svg) {
   // 齒輪箱上的固定孔裝飾
   add('circle', { cx: 0, cy: top + Lb * 0.66, r: 2.4 * s, fill: 'none', stroke: '#c9971b', 'stroke-width': sw(1) });
   parent.appendChild(g);
+  return g;   // 回傳根 <g>：播放快路徑只改它的 transform（位置/朝向），不重建內部
 }
 
 // MG995 伺服側視：藍色扁方殼 + 兩側固定耳 + 輸出軸上的舵盤（horn）。
@@ -811,6 +905,7 @@ function drawMG995Servo(cx, cy, rotDeg = 0, parent = svg) {
   add('circle', { cx: 0, cy: 0, r: 6 * s, fill: '#eef3fb', stroke: '#1c4f8a', 'stroke-width': sw(1.2) });
   add('circle', { cx: 0, cy: 0, r: 1.8 * s, fill: '#1c4f8a' });
   parent.appendChild(g);
+  return g;   // 回傳根 <g>：播放快路徑只改它的 transform，不重建內部
 }
 
 // 動力來源型號標籤：畫在本體中心上方一點，永遠保持水平（不隨朝向旋轉）。
@@ -828,6 +923,7 @@ function drawMotorLabel(cx, cy, text, color, parent = svg) {
   t.style.pointerEvents = 'none';
   t.textContent = text;
   parent.appendChild(t);
+  return t;   // 回傳 <text>：播放快路徑只改它的 x/y（位置），不重建
 }
 
 function drawMountLabel(p, text, parent = svg) {
@@ -1031,6 +1127,7 @@ function play() {
   if (ranged && ranged.hi > ranged.lo) playPlan = { mode: 'rock', lo: ranged.lo, hi: ranged.hi };
   if (playPlan.mode === 'rock' && playDir > 0 && theta >= playPlan.hi) playDir = -1;
   if (playPlan.mode === 'rock' && playDir < 0 && theta <= playPlan.lo) playDir = 1;
+  draw();   // 先完整重建一次以建立場景與更新器，之後每幀走 renderFrame() 只更新幾何（不拆 DOM）
   const step = () => {
     if (playPlan.mode === 'rock') {
       // 搖桿：在 lo..hi 間來回擺，到極限就反向（真實的搖桿物理）
@@ -1043,7 +1140,7 @@ function play() {
       theta = theta + PLAY_STEP * playDir;
     }
     document.getElementById('thetaVal').textContent = Math.round(norm360(theta));
-    draw();
+    renderFrame();
     raf = requestAnimationFrame(step);
   };
   raf = requestAnimationFrame(step);
