@@ -1241,12 +1241,11 @@ function changeRailLen(delta) {
   const dx = (c.p2.x || 0) - (c.p1.x || 0), dy = (c.p2.y || 0) - (c.p1.y || 0);
   const d = Math.hypot(dx, dy) || 1;
   const L = Math.max(1, Math.min(sliderCarrierLength(c) - sliderRailOffset(c), roundMm(d + delta)));
+  // 用 updatePointCoordsById 更新所有共用此接點 id 的副本（見 setLen 說明；軌道端可能被 merge 共用）
   if (c.baseEnd === 'p2') {
-    c.p1.x = (c.p2.x || 0) - dx / d * L;
-    c.p1.y = (c.p2.y || 0) - dy / d * L;
+    updatePointCoordsById(c.p1.id, (c.p2.x || 0) - dx / d * L, (c.p2.y || 0) - dy / d * L);
   } else {
-    c.p2.x = (c.p1.x || 0) + dx / d * L;
-    c.p2.y = (c.p1.y || 0) + dy / d * L;
+    updatePointCoordsById(c.p2.id, (c.p1.x || 0) + dx / d * L, (c.p1.y || 0) + dy / d * L);
   }
   S.topo.params[c.lenParam] = L;
   normalizeSliderRange(c);
@@ -1354,7 +1353,7 @@ function reshapeTriangle(c) {
   const dx = (c.p2.x || 0) - P1.x, dy = (c.p2.y || 0) - P1.y;
   const d = Math.hypot(dx, dy) || 1;
   const P2 = { x: P1.x + dx / d * g, y: P1.y + dy / d * g };
-  c.p2.x = P2.x; c.p2.y = P2.y;
+  updatePointCoordsById(c.p2.id, P2.x, P2.y);   // 更新所有共用此接點 id 的副本（見 setLen 說明）
   const bx = P2.x - P1.x, by = P2.y - P1.y;
   const base = Math.hypot(bx, by) || 1;
   if (base > r1 + r2 || base < Math.abs(r1 - r2)) return; // 三角不等式不成立
@@ -1366,7 +1365,7 @@ function reshapeTriangle(c) {
   const cand = [{ x: mx + ox, y: my + oy }, { x: mx - ox, y: my - oy }];
   const pick = cand.reduce((best, p) =>
     Math.hypot(p.x - cur.x, p.y - cur.y) < Math.hypot(best.x - cur.x, best.y - cur.y) ? p : best);
-  c.p3.x = pick.x; c.p3.y = pick.y;
+  updatePointCoordsById(c.p3.id, pick.x, pick.y);   // 更新所有共用此接點 id 的副本（見 setLen 說明）
 }
 
 // 把選取的桿件/三角板相對自動分層往上 / 往下挪一層（2D 疊放與 3D z 分層同步）。
@@ -1426,11 +1425,13 @@ function setLen(v) {
   pushUndo();
   const L = snapLego(v);     // 對齊 8mm 樂高格
   S.topo.params[c.lenParam] = L;
-  // 把 b 端重新擺到半徑 L（自由連桿才看得到；已連接的由 solver 接手）
+  // 把 b 端重新擺到半徑 L。用 updatePointCoordsById 更新「所有」共用此接點 id 的元件副本，
+  // 不要只改 c.p2 一份：接點被別的桿共用時，只動本桿副本會讓其他副本留舊值；當這幀重解失敗
+  // 退回元件座標時，可能被那份舊副本蓋回去，看起來長度沒同步變（要等播放重解成功才更新）。
+  // 自由連桿的 b 端沒被共用，所以原本就看得到——共用（已連接）的才會卡住。
   const dx = (c.p2.x || 0) - (c.p1.x || 0), dy = (c.p2.y || 0) - (c.p1.y || 0);
   const d = Math.hypot(dx, dy) || 1;
-  c.p2.x = (c.p1.x || 0) + dx / d * L;
-  c.p2.y = (c.p1.y || 0) + dy / d * L;
+  updatePointCoordsById(c.p2.id, (c.p1.x || 0) + dx / d * L, (c.p1.y || 0) + dy / d * L);
   Panels.renderLenEditor(L);
   rebuild(); draw();
 }
