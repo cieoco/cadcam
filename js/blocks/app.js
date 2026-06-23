@@ -48,6 +48,8 @@ let raf = null;
 let lastSolved = {};           // 上一幀求解成功的點位：給求解器挑「連續」分支 + 死點暫態回退
 let prevSolved = {};           // 再上一幀：和 lastSolved 一起外插出「帶動量」的預測種子
 let trajectoryCache = null;    // 沿用 multilink sweepTopology 的軌跡資料格式
+let geomVersion = 0;           // 結構版本號：任何會改動軌跡的事（rebuild / 切換軌跡點）就 +1，
+                               // 當 trajectoryCache 的快取鍵——比每幀 JSON.stringify 整份快照便宜。
 
 // ---- 3D 唯讀預覽狀態 ----
 let viewer3D = null;           // createViewer() 的實體（首次開啟才懶載入）
@@ -259,7 +261,7 @@ function rebuild() {
   S.topo.params = S.compiled.params; // 沿用補齊後的參數
   lastSolved = {};               // 拓撲變了：丟掉舊解，避免拿到不相干的種子
   prevSolved = {};
-  trajectoryCache = null;
+  geomVersion++;                 // 結構/參數變了：讓軌跡快取失效（getTrajectoryData 重算）
   document.getElementById('hint').style.display = S.comps.length ? 'none' : 'block';
   Panels.updateRoleEditor();
   scheduleAutosave();            // 任何結構變更都防丟（debounce，播放不觸發）
@@ -268,8 +270,10 @@ function rebuild() {
 function getTrajectoryData() {
   const tracePoint = S.topo.tracePoint || (S.compiled && S.compiled.tracePoint) || '';
   if (!S.compiled || !tracePoint || !S.comps.length) return null;
-  const key = JSON.stringify(Store.toSnapshot(S.comps, S.topo, S.counter));
-  if (trajectoryCache && trajectoryCache.key === key) return trajectoryCache.data;
+  // 快取鍵＝結構版本號 geomVersion，取代每幀 JSON.stringify 整份快照（零件多時字串化本身會變慢）。
+  // 軌跡只取決於 S.compiled 與 tracePoint，兩者都只在 rebuild / 切換軌跡點變動、那兩處都會 +1，
+  // 故版本號是完整且正確的失效訊號。
+  if (trajectoryCache && trajectoryCache.version === geomVersion) return trajectoryCache.data;
   let data = null;
   try {
     const sweep = sweepTopology({ ...S.compiled, tracePoint }, S.compiled.params || S.topo.params || {}, 0, 360, 5);
@@ -277,7 +281,7 @@ function getTrajectoryData() {
   } catch (_) {
     data = null;
   }
-  trajectoryCache = { key, data };
+  trajectoryCache = { version: geomVersion, data };
   return data;
 }
 
@@ -1514,7 +1518,7 @@ function toggleTracePoint() {
   pushUndo();
   pause();
   S.topo.tracePoint = S.topo.tracePoint === S.selectedNodeId ? '' : S.selectedNodeId;
-  trajectoryCache = null;
+  geomVersion++;                 // 軌跡點換了：讓軌跡快取失效
   Panels.updateRoleEditor();
   draw();
 }
