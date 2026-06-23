@@ -5,16 +5,18 @@
 
 ## 0. 一句話現況
 
-在 `feat/blocks-arch` 分支上，已完成 SDD 的 **Phase 1**（draw build/update 分離）與
-**Phase 3 模組切分全部**（render.js / state.js / panels.js / tools.js / input.js 五個模組抽出）。
+在 `feat/blocks-arch` 分支上，已完成 SDD 的 **Phase 1**（draw build/update 分離）、
+**Phase 3 模組切分全部**（render.js / state.js / panels.js / tools.js / input.js 五個模組抽出），
+以及 **Phase 2 第一刀**（part-types.js 型別表 + 點 key 走表）。
 **已 rebase 到 `origin/main`（含遠端 3D slider 那筆 84c03b8）並 push。**
-模組切分到此完結；剩 SDD 的 **Phase 2**（part-types 型別查表）與 **Phase 4**（收尾）。
+剩 SDD **Phase 2 其餘**（draw / 長度 / 角色等 `c.type` 分流逐步掛進表）與 **Phase 4**（收尾）。
 
 ## 1. 分支與 commit
 
 分支：`feat/blocks-arch`（已 rebase 疊在 `origin/main` 的 `84c03b8 Add 3D slider rail preview and frame handle` 之上，已 push 並設好 tracking）。
 
 ```
+54eb38a refactor(blocks): add part-types table, route point-key enumeration through it
 f4b170b refactor(blocks): extract pointer/gesture interactions to input.js
 3990de7 docs(blocks): update handoff for tools.js + rebase onto origin/main
 9ff86f4 refactor(blocks): extract tool-mode interactions to tools.js
@@ -35,7 +37,8 @@ a3892f1 perf(blocks): split draw() into build/update to stop per-frame SVG teard
 （`.claude/` 是未追蹤的本機設定，**不要** commit。）
 
 目前 `js/blocks/` 行數：app.js 1631（原本 ~2500）、tools.js 441、input.js 318、render.js 292、
-model.js 181、examples.js 149、view.js 142、panels.js 108、motion.js 70、storage.js 61、state.js 58。
+model.js 180、examples.js 149、view.js 142、panels.js 108、motion.js 70、storage.js 61、state.js 58、
+part-types.js 34。
 
 ## 2. ⚠️ 驗證狀態（重要，先讀）
 
@@ -128,6 +131,18 @@ commitDragUndo / onDragEnd / abortSingleDrag / endPointer，加上 module 狀態
 - onFrameHandleDown 是 84c03b8 新增、doc 原清單未列，但同屬拖曳起點、共用 drag 生命週期，
   一併搬入並 export。export 面：startFreeLinkDrag / onFrameHandleDown / onNodeDown / init。
 
+### 54eb38a — part-types.js：零件型別表（Phase 2 第一刀 / 痛點 C）
+新增 `js/blocks/part-types.js`，宣告 `PART_TYPES`（bar / triangle / slider / anchor 各自的
+`pointKeys`）＋ `ALL_POINT_KEYS`（聯集）＋ `pointKeysFor(c)`（已知型別走表、未知型別回聯集後備）。
+- 把原本散落兩處的扁平點 key 清單收斂到表：model.js 刪 `const POINT_KEYS`、6 處改 `pointKeysFor(c)`；
+  app.js `frameNodeIds` 刪 `FRAME_POINT_KEYS`、改 `pointKeysFor(c)`。
+- **行為等價**：各迴圈本就 `if (c[k] && c[k].id …)` 守門，型別 pointKeys 與實際建立 key 一致
+  （已對 examples.js / 各建立點核對；anchor=p1 / bar=p1,p2 / triangle=p1,p2,p3 / slider=全部）。
+- **區分兩種 type**：元件型別 `c.type`（本表 key）vs 接點角色 `point.type`（fixed/floating/motor/
+  linear/ground，非本表）。後者那批 `=== 'fixed'` 之類**不是**型別表要收的東西。
+- 後續可漸進把更多 `c.type` 分流掛進表項（draw 的 build/update 分派、長度、預設角色…），
+  但 draw 分派較大且和 render/play 綁緊，要小心、分刀做、逐刀瀏覽器驗證。
+
 ## 4. 既定模式（接手請沿用）
 
 1. **一個模組一個 commit**，每步 `node --check` + grep 驗證後再進下一步。
@@ -143,13 +158,17 @@ commitDragUndo / onDragEnd / abortSingleDrag / endPointer，加上 module 狀態
 ### 5a. tools.js — ✅ 已完成（9ff86f4，已瀏覽器實測 OK）
 ### 5b. input.js — ✅ 已完成（f4b170b，**尚未瀏覽器實測，請優先驗證**，見第 2 節清單）
 
-### 5c.（下一步）SDD Phase 2：part-types 型別查表
-把散落各處的 `c.type === 'bar' / 'triangle' / 'slider' / 'anchor'` 分支收斂成一張
-part-types 查表（每型別宣告它的 partsModule / 預設角色 / 繪製分派等）。詳見
-`docs/SDD-BLOCKS-ARCHITECTURE.md`。屬於純整理，無互動行為變更，風險低。
+### 5c. SDD Phase 2：part-types 型別查表
+- 第一刀（點 key 走表）✅ 已完成（54eb38a，見第 3 節）。
+- **其餘（下一步）**：把更多 `c.type === 'bar'/'triangle'/'slider'/'anchor'` 分流逐步收進表——
+  candidate：model.js 的 `recomputeLengths`/`fixedLinkFor` 等 bar 專屬判斷、draw 的繪製分派
+  （build/update 閉包，較大且綁 render/play，**分刀做、逐刀瀏覽器驗證**）、預設角色 / 長度語意。
+  挑無行為變更、可獨立驗證的小刀優先。app.js 目前 `.type ===` 仍約 36 處（含不少是 point.type）。
 
 ### 5d.（收尾）SDD Phase 4
-最後收尾項（render/播放迴圈/3D 內部狀態的歸屬、文件對齊等），見 SDD。
+最後收尾項（痛點 D/E）：`getTrajectoryData()` 的 cache key 從 `JSON.stringify` 改結構版本號
+（dirty flag / counter）；評估 `examples.js` 與 `js/examples/` 是否共用註冊機制（先 audit 再決定）。
+其餘 render/播放迴圈/3D 內部狀態的歸屬、文件對齊等，見 SDD。
 
 > 提醒：再往下做任何一步之前，**先把 input.js 在瀏覽器實測過**（第 2 節清單），
 > 避免把後續整理疊在未驗證的互動層上。
