@@ -25,6 +25,7 @@ export const S = {
   selectedTriangleId: null,
   selectedNodeId: null,
   selectedSliderId: null,
+  selectedGearId: null,
 
   // ---- 拖曳 ----
   dragId: null,

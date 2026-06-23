@@ -70,7 +70,9 @@ export function onNodeDown(e, id) {
   S.selectedLinkId = null;
   S.selectedTriangleId = null;
   S.selectedSliderId = null;
+  S.selectedGearId = null;   // 選接點＝離開齒輪編輯
   document.getElementById('lenEditor').style.display = 'none';
+  document.getElementById('gearEditor').style.display = 'none';
   document.getElementById('sliderBaseBtn').style.display = 'none';
   document.getElementById('linkToRailBtn').style.display = 'none';
   setSliderDetailRows(false);

@@ -196,6 +196,14 @@ function normalizeGear(comp, index, params, warnings) {
   const p1 = normalizePoint(comp.p1, `GC${index + 1}`, warnings);
   const p2 = normalizePoint(comp.p2, `GP${index + 1}`, warnings);
   const radiusParam = safeId(comp.radiusParam) ? comp.radiusParam : `GR${index + 1}`;
+  const teeth = Math.max(6, Math.round(num(comp.teeth, 12)));
+  const rawR = params[radiusParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  const R = Math.max(1, Math.round(num(rawR, 40)));
+  params[radiusParam] = R;
+  // 模數沒給就從節圓半徑反推（R = teeth·module/2 → module = 2R/teeth），讓齒形大小自洽。
+  const module = num(comp.module, 0) > 0
+    ? Math.max(1, num(comp.module, 6))
+    : Math.max(1, Number((2 * R / teeth).toFixed(2)));
   const out = {
     type: 'gear',
     id,
@@ -203,14 +211,13 @@ function normalizeGear(comp, index, params, warnings) {
     p1,
     p2,
     radiusParam,
-    teeth: Math.max(6, Math.round(num(comp.teeth, 12))),
+    teeth,
+    module,
     phase: num(comp.phase, 0)
   };
   if (safeId(comp.mesh)) out.mesh = comp.mesh;
   if (comp.physicalMotor) out.physicalMotor = String(comp.physicalMotor);
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
-  const rawR = params[radiusParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y);
-  params[radiusParam] = Math.max(1, Math.round(num(rawR, 40)));
   return out;
 }
 

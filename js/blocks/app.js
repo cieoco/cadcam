@@ -96,6 +96,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
   S.selectedTriangleId = null;
   S.selectedSliderId = null;
   S.selectedNodeId = null;
+  deselectGear();
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('roleEditor').style.display = 'none';
   document.getElementById('servoEditor').style.display = 'none';
@@ -409,14 +410,20 @@ function draw() {
       Cq -= Math.floor(Cq);                                 // mod 1
       meshDeg = (Cq - 0.5) * (360 / NB);                    // 補到 0.5（半齒）
     }
+    const isSelGear = c.id === S.selectedGearId;
     const g = document.createElementNS(SVG_NS, 'g');
-    g.style.pointerEvents = 'none';
     const poly = document.createElementNS(SVG_NS, 'polygon');
     poly.setAttribute('points', polyStr);
-    poly.setAttribute('fill', (c.color || '#b0772e') + '33');
-    poly.setAttribute('stroke', c.color || '#b0772e');
-    poly.setAttribute('stroke-width', Math.max(1, 1.4 * sc));
+    poly.setAttribute('fill', (c.color || '#b0772e') + (isSelGear ? '55' : '33'));
+    poly.setAttribute('stroke', isSelGear ? '#e67e22' : (c.color || '#b0772e'));
+    poly.setAttribute('stroke-width', Math.max(1, (isSelGear ? 2.4 : 1.4) * sc));
     poly.setAttribute('stroke-linejoin', 'round');
+    poly.style.cursor = 'pointer';
+    poly.addEventListener('pointerdown', (e) => {
+      if (S.drawingLink || S.drawingTriangle || S.placingMotor || S.pickBars) return;
+      e.stopPropagation();   // 點齒輪本體＝選齒輪（不觸發背景取消選取）
+      selectGear(c.id);
+    });
     g.appendChild(poly);
     svg.appendChild(g);
     // 輪緣螺栓孔（＝輸出銷 p2，連桿接這裡）：畫成齒輪上的安裝孔，跟著銷走。
@@ -887,43 +894,129 @@ function addAnchor() {
   rebuild(); draw();
 }
 
-// 放下一個齒輪。第一顆＝驅動輪（中心放馬達，一放下就會轉）；之後每顆＝從動輪，自動和上一顆
-// 齒輪嚙合並擺在相切位置（中心距＝兩節圓半徑和），播放時依齒數（＝半徑）反比反向轉。
-// 所有齒輪共用同一模數 GEAR_MODULE，故節圓半徑 R = teeth·module/2，彼此一定咬得起來。
-function addGear() {
+// 齒輪以「成對」為基本單位（圓心距、反向同動都是一對的性質）：放下一個嚙合齒輪對——
+// 驅動輪（中心放馬達、一放下就轉）＋ 從動輪（mesh＝驅動輪），擺在相切位置（中心距＝兩節圓
+// 半徑和），播放時依齒數比反向轉。兩輪共用模數 module，節圓半徑 R＝teeth·module/2，必定咬合。
+function makeGear(n, opts) {
+  const { teeth, module, cx, cy, isDriver, meshId, color } = opts;
+  const R = teeth * module / 2;
+  const radiusParam = 'GR' + n;
+  const center = { id: 'GC' + n, type: isDriver ? 'motor' : 'fixed', x: cx, y: cy };
+  if (isDriver) center.physicalMotor = '1';
+  const gear = {
+    type: 'gear', id: 'Gear' + n, color,
+    p1: center,
+    p2: { id: 'GP' + n, type: 'floating', x: cx + R, y: cy },
+    radiusParam, teeth, module, phase: 0
+  };
+  if (meshId) gear.mesh = meshId;
+  S.topo.params[radiusParam] = R;
+  return gear;
+}
+function addGearPair() {
   pushUndo();
   Tools.exitDrawLink();
   Tools.exitDrawTriangle();
   cancelMotorMode();
-  const n = ++S.counter;
-  const gears = S.comps.filter(c => c.type === 'gear');
-  const isDriver = !gears.length;
-  const teeth = isDriver ? 12 : 18;            // 第一對 12:18 就看得到轉速比
-  const R = teeth * GEAR_MODULE / 2;
-  const radiusParam = 'GR' + n;
-  let cx, cy, meshId;
-  if (isDriver) {
-    cx = -48; cy = 0; meshId = null;
-  } else {
-    const driver = gears[gears.length - 1];     // 接最後一顆齒輪
-    const dc = pointCoords()[driver.p1.id] || driver.p1;
-    const Rd = Number(S.topo.params[driver.radiusParam]) || R;
-    cx = (dc.x || 0) + Rd + R; cy = (dc.y || 0); // 往右擺相切
-    meshId = driver.id;
-  }
-  const center = { id: 'GC' + n, type: isDriver ? 'motor' : 'fixed', x: cx, y: cy };
-  if (isDriver) center.physicalMotor = '1';
-  const gear = {
-    type: 'gear', id: 'Gear' + n,
-    color: isDriver ? '#e74c3c' : '#2c6fbb',
-    p1: center,
-    p2: { id: 'GP' + n, type: 'floating', x: cx + R, y: cy },
-    radiusParam, teeth, phase: 0
-  };
-  if (meshId) gear.mesh = meshId;
-  S.comps.push(gear);
-  S.topo.params[radiusParam] = R;
+  const m = GEAR_MODULE;
+  const na = 12, nb = 18;                         // 預設 12:18，一放下就看得到轉速比
+  const Ra = na * m / 2, Rb = nb * m / 2;
+  // 擺在畫布中央偏左，整對沿 x 排開、相切
+  const base = mobilePrompt() ? View.worldFromScreen(W * 0.30, H * 0.45) : { x: -70, y: 0 };
+  const nA = ++S.counter;
+  const driver = makeGear(nA, { teeth: na, module: m, cx: base.x, cy: base.y, isDriver: true, meshId: null, color: '#e74c3c' });
+  const nB = ++S.counter;
+  const driven = makeGear(nB, { teeth: nb, module: m, cx: base.x + Ra + Rb, cy: base.y, isDriver: false, meshId: driver.id, color: '#2c6fbb' });
+  S.comps.push(driver, driven);
   rebuild(); draw();
+  selectGear(driven.id);                          // 放下就選從動輪，方便改模數 / 齒數
+}
+
+// ---- 齒輪：選取 + 改模數 / 齒數（成對同動）----
+function gearById(id) { return S.comps.find(c => c.type === 'gear' && c.id === id) || null; }
+
+// 和某齒輪同一條嚙合鏈的所有齒輪（沿 mesh 連通分量）。模數必須整鏈一致才咬得起來。
+function gearMeshChain(start) {
+  const all = S.comps.filter(g => g.type === 'gear');
+  const seen = new Set();
+  const stack = [start];
+  while (stack.length) {
+    const g = stack.pop();
+    if (!g || seen.has(g.id)) continue;
+    seen.add(g.id);
+    if (g.mesh) { const drv = all.find(x => x.id === g.mesh); if (drv) stack.push(drv); }
+    all.forEach(x => { if (x.mesh === g.id) stack.push(x); });
+  }
+  return all.filter(g => seen.has(g.id));
+}
+// 把每顆「從動輪」重擺到和它驅動輪相切（中心距＝兩節圓半徑和），沿目前方向。改模數/齒數後保持嚙合。
+function syncGearMesh() {
+  S.comps.filter(c => c.type === 'gear' && c.mesh).forEach(c => {
+    const drv = gearById(c.mesh);
+    if (!drv) return;
+    const dc = pointCoords()[drv.p1.id] || drv.p1;
+    const cc = pointCoords()[c.p1.id] || c.p1;
+    const Rd = Number(S.topo.params[drv.radiusParam]) || 40;
+    const Rc = Number(S.topo.params[c.radiusParam]) || 40;
+    let dx = (cc.x || 0) - (dc.x || 0), dy = (cc.y || 0) - (dc.y || 0);
+    let d = Math.hypot(dx, dy);
+    if (d < 1e-6) { dx = 1; dy = 0; d = 1; }
+    updatePointCoordsById(c.p1.id, (dc.x || 0) + dx / d * (Rd + Rc), (dc.y || 0) + dy / d * (Rd + Rc));
+  });
+}
+function selectGear(id) {
+  cancelMotorMode();
+  const c = gearById(id);
+  if (!c) return;
+  S.selectedGearId = id;
+  S.selectedLinkId = null;
+  S.selectedTriangleId = null;
+  S.selectedSliderId = null;
+  S.selectedNodeId = null;
+  document.getElementById('lenEditor').style.display = 'none';
+  document.getElementById('roleEditor').style.display = 'none';
+  document.getElementById('servoEditor').style.display = 'none';
+  document.getElementById('strokeEditor').style.display = 'none';
+  updateGearEditor();
+  draw();
+}
+function updateGearEditor() {
+  const panel = document.getElementById('gearEditor');
+  if (!panel) return;
+  const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
+  if (!c) { panel.style.display = 'none'; return; }
+  const mod = Number(c.module) || GEAR_MODULE;
+  const setText = (elId, v) => { const el = document.getElementById(elId); if (el) el.textContent = v; };
+  setText('gearModuleVal', Math.round(mod));
+  setText('gearTeethVal', c.teeth);
+  setText('gearRadiusVal', Math.round(Number(S.topo.params[c.radiusParam]) || c.teeth * mod / 2));
+  panel.style.display = 'flex';
+}
+function changeGearTeeth(delta) {
+  const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
+  if (!c) return;
+  pushUndo();
+  c.teeth = Math.max(6, Math.round((Number(c.teeth) || 12) + delta));
+  S.topo.params[c.radiusParam] = c.teeth * (Number(c.module) || GEAR_MODULE) / 2;
+  syncGearMesh();
+  rebuild(); draw();
+  updateGearEditor();
+}
+function changeGearModule(delta) {
+  const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
+  if (!c) return;
+  pushUndo();
+  // 模數是「整鏈」共用：同時改本輪與和它嚙合的所有齒輪，否則齒大小不一咬不起來。
+  const mod = Math.max(1, (Number(c.module) || GEAR_MODULE) + delta);
+  gearMeshChain(c).forEach(g => { g.module = mod; S.topo.params[g.radiusParam] = g.teeth * mod / 2; });
+  syncGearMesh();
+  rebuild(); draw();
+  updateGearEditor();
+}
+function deselectGear() {
+  S.selectedGearId = null;
+  const panel = document.getElementById('gearEditor');
+  if (panel) panel.style.display = 'none';
 }
 
 function clearAll() {
@@ -1191,6 +1284,7 @@ function inputRockRange() {
 // ---- 選取連桿 + 改長度 ----
 function selectLink(id) {
   cancelMotorMode();
+  deselectGear();
   const c = S.comps.find(x => x.id === id && x.type === 'bar' && x.fixedLen);
   if (!c) return;
   S.selectedLinkId = id;
@@ -1216,6 +1310,7 @@ function selectLink(id) {
 }
 function selectTriangle(id) {
   cancelMotorMode();
+  deselectGear();
   if (!S.comps.some(x => x.id === id && x.type === 'triangle')) return;
   S.selectedTriangleId = id;
   S.selectedLinkId = null;
@@ -1244,6 +1339,7 @@ function selectTriangle(id) {
 // 選取滑軌：屬性列顯示軌道長度（可調）＋ 翻面（換滑塊解的那一側）＋ 刪除。
 function selectSlider(id) {
   cancelMotorMode();
+  deselectGear();
   const c = S.comps.find(x => x.id === id && x.type === 'slider');
   if (!c) return;
   S.selectedSliderId = id;
@@ -1490,17 +1586,33 @@ function bringPart(dir) {
 
 
 function deselectLink() {
-  if (!S.selectedLinkId && !S.selectedTriangleId && !S.selectedSliderId) return;
+  if (!S.selectedLinkId && !S.selectedTriangleId && !S.selectedSliderId && !S.selectedGearId) return;
   S.selectedLinkId = null;
   S.selectedTriangleId = null;
   S.selectedSliderId = null;
+  deselectGear();
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('sliderBaseBtn').style.display = 'none';
   document.getElementById('linkToRailBtn').style.display = 'none';
   setSliderDetailRows(false);
   draw();
 }
+// 刪除整條嚙合鏈（成對/成列一起刪，避免留下 mesh 指向已刪齒輪的破狀態）。
+function deleteGearChain(id) {
+  const start = gearById(id);
+  if (!start) return;
+  pushUndo();
+  pause();
+  const chain = gearMeshChain(start);
+  chain.forEach(g => ownedParamKeys(g).forEach(k => delete S.topo.params[k]));
+  const ids = new Set(chain.map(g => g.id));
+  S.comps = S.comps.filter(c => !ids.has(c.id));
+  deselectGear();
+  S.selectedNodeId = null;
+  rebuild(); draw();
+}
 function deleteSelectedPart() {
+  if (S.selectedGearId) { deleteGearChain(S.selectedGearId); return; }
   const id = S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId;
   if (!id) return;
   const comp = S.comps.find(c => c.id === id);
@@ -1731,5 +1843,5 @@ function init() {
   updateUndoBtn();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGear, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: Tools.startDrawTriangle, clearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: Tools.startDrawTriangle, clearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();
