@@ -6,10 +6,11 @@
 ## 0. 一句話現況
 
 在 `feat/blocks-arch` 分支上，已完成 SDD 的 **Phase 1**（draw build/update 分離）、
-**Phase 3 模組切分全部**（render.js / state.js / panels.js / tools.js / input.js 五個模組抽出），
-以及 **Phase 2 第一刀**（part-types.js 型別表 + 點 key 走表）。
+**Phase 3 模組切分全部**（render / state / panels / tools / input 五個模組抽出）、
+**Phase 2 兩刀**（part-types.js 型別表：點 key + owned-param 走表），
+以及 **Phase 4 的軌跡快取鍵**（geomVersion 取代每幀 JSON.stringify）。
 **已 rebase 到 `origin/main`（含遠端 3D slider 那筆 84c03b8）並 push。**
-剩 SDD **Phase 2 其餘**（draw / 長度 / 角色等 `c.type` 分流逐步掛進表）與 **Phase 4**（收尾）。
+剩 SDD **Phase 2 其餘**（draw 繪製分派逐步掛表，最大最 risky）與 **Phase 4 其餘**（examples 註冊機制 audit）。
 
 ## 1. 分支與 commit
 
@@ -153,6 +154,14 @@ commitDragUndo / onDragEnd / abortSingleDrag / endPointer，加上 module 狀態
   `delete …[c.lenParam]` 也改走 `ownedParamKeys`。至此 owned-param 清理無硬寫型別分支。
 - 已核對：comp 上唯一存 topo.params key 的欄位就是 lenParam / gParam / r1Param / r2Param，故等價。
 
+### 475baf4 — Phase 4 痛點 E：軌跡快取鍵改結構版本號
+`getTrajectoryData()` 原本每次（含每個播放幀）`JSON.stringify(toSnapshot(...))` 當快取鍵，
+零件多時字串化本身是負擔。改成整數版本號 `geomVersion`：rebuild() 與 toggleTracePoint() 各 +1，
+比對時只是 `=== `。正確性論證：軌跡只取決於 `S.compiled` 與 `tracePoint`，前者只在 rebuild 變
+（所有幾何/拓撲/參數編輯，含 applySnapshot 的 undo/載入/分享，都 funnel 過 rebuild），
+後者只在 toggleTracePoint 變——兩處都 +1，故版本號是完整正確的失效訊號。
+（附帶修正：zlift/伺服角等不影響軌跡 locus 的改動，舊 stringify 會誤觸重算，現在正確地略過。）
+
 ## 4. 既定模式（接手請沿用）
 
 1. **一個模組一個 commit**，每步 `node --check` + grep 驗證後再進下一步。
@@ -178,9 +187,10 @@ commitDragUndo / onDragEnd / abortSingleDrag / endPointer，加上 module 狀態
   filter/find（非多型分派），不必硬塞進表。注意分清元件型別 `c.type` vs 接點角色 `point.type`。
 
 ### 5d.（收尾）SDD Phase 4
-最後收尾項（痛點 D/E）：`getTrajectoryData()` 的 cache key 從 `JSON.stringify` 改結構版本號
-（dirty flag / counter）；評估 `examples.js` 與 `js/examples/` 是否共用註冊機制（先 audit 再決定）。
-其餘 render/播放迴圈/3D 內部狀態的歸屬、文件對齊等，見 SDD。
+- 痛點 E（軌跡 cache key）✅ 已完成（475baf4）：`getTrajectoryData()` 改用結構版本號 `geomVersion`
+  （rebuild / toggleTracePoint 各 +1），取代每幀 `JSON.stringify` 整份快照。見第 3 節。
+- **其餘**：評估 `examples.js`（blocks 的 `_wizard_data`）與 `js/examples/`（範本格式）是否共用註冊機制
+  （**先 audit 再決定，可能不動**）；render/播放迴圈/3D 內部狀態的歸屬、文件對齊等，見 SDD。
 
 > 提醒：再往下做任何一步之前，**先把 input.js 在瀏覽器實測過**（第 2 節清單），
 > 避免把後續整理疊在未驗證的互動層上。
