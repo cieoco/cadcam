@@ -14,6 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { solveTopology, sweepTopology } from '../multilink/solver.js';
+import { createGearPath } from '../utils/gear-geometry.js';   // 齒輪漸開線齒廓（rack-pinion 也用）
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
 // computeBodyLayers：2D 疊放順序與 3D z 分層共用同一套，兩邊才一致。
 import { buildSceneModel, computeBodyLayers } from '../blocks3d/scene-model.js';
@@ -383,6 +384,41 @@ function draw() {
   const groundIds = new Set((S.compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
   const motorCenterIds = new Set((S.compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
   drawTraceTrajectory(getTrajectoryData());
+
+  // 齒輪：在連桿下層畫齒形多邊形（漸開線齒廓由 createGearPath 產），每幀只更新旋轉。
+  // 轉角＝輸出銷(p2)相對中心(p1)的角度;嚙合對的驅動/從動會自然反向轉。
+  // （slice 1a 先就地畫;slice 2 再抽進 PART_TYPES.gear.draw。）
+  S.comps.filter(c => c.type === 'gear' && c.p1 && c.p2).forEach(c => {
+    const teeth = Math.max(6, Math.round(Number(c.teeth) || 12));
+    const R = Number(S.topo.params[c.radiusParam]) || 40;        // 節圓半徑（世界 mm）
+    const localPts = createGearPath({ teeth, module: (2 * R) / teeth });
+    const sc = View.getScale();
+    const polyStr = localPts.map(p => `${(p.x * sc).toFixed(2)},${(-p.y * sc).toFixed(2)}`).join(' ');
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.style.pointerEvents = 'none';
+    const poly = document.createElementNS(SVG_NS, 'polygon');
+    poly.setAttribute('points', polyStr);
+    poly.setAttribute('fill', (c.color || '#b0772e') + '33');
+    poly.setAttribute('stroke', c.color || '#b0772e');
+    poly.setAttribute('stroke-width', Math.max(1, 1.4 * sc));
+    poly.setAttribute('stroke-linejoin', 'round');
+    g.appendChild(poly);
+    const hub = document.createElementNS(SVG_NS, 'circle');
+    hub.setAttribute('r', Math.max(2, 3 * sc));
+    hub.setAttribute('fill', c.color || '#b0772e');
+    g.appendChild(hub);
+    svg.appendChild(g);
+    const applyGear = (P) => {
+      const ctr = P[c.p1.id], pin = P[c.p2.id];
+      const ok = ctr && pin && Number.isFinite(ctr.x) && Number.isFinite(pin.x);
+      g.style.display = ok ? '' : 'none';
+      if (!ok) return;
+      const deg = Math.atan2(pin.y - ctr.y, pin.x - ctr.x) * 180 / Math.PI;
+      g.setAttribute('transform', `translate(${TX(ctr.x)} ${TY(ctr.y)}) rotate(${-deg})`);
+    };
+    applyGear(pts);
+    frameUpdaters.push(applyGear);
+  });
 
   // 三角板邊：這些 link 由實心三角板代表，2D 不另畫（與 3D scene-model 的 visible 篩法一致）。
   const triangleEdgeKeys = new Set();
