@@ -53,7 +53,7 @@ part-types.js 34。
 附帶修了一個既有 bug（非重構造成，與 84c03b8 前邏輯一致）：
 - **8d8d216 改長度不同步**：改桿件/三點桿/滑軌長度時只更新元件自己那份共用接點座標副本，
   已連接（共用接點）的會看似沒變、要播放才更新。改用 `updatePointCoordsById`（更新所有副本）。
-  **連桿案例使用者已實測 OK；三點桿（reshapeTriangle）/ 滑軌（changeRailLen）為同類同修，待一併驗證。**
+  **連桿 / 三點桿 / 滑軌三案例使用者皆已在瀏覽器實測 OK。**
 
 驗證方式：`python -m http.server 8000` → 開 `http://localhost:8000/blocks.html`，跑第 6 節的黃金流程。
 
