@@ -394,6 +394,20 @@ function draw() {
     const localPts = createGearPath({ teeth, module: (2 * R) / teeth });
     const sc = View.getScale();
     const polyStr = localPts.map(p => `${(p.x * sc).toFixed(2)},${(-p.y * sc).toFixed(2)}`).join(' ');
+    // 嚙合相位：讓從動輪的「齒」對上驅動輪的「齒隙」（否則齒對齒相撞）。createGearPath 在 local
+    // 角 0 放齒冠;嚙合不變量 qA+qB=(NA·βA+NB·βB)/2π 需 =0.5,給齒形（非銷/運動學）補常數偏移 δ。
+    let meshDeg = 0;
+    const drv = c.mesh ? S.comps.find(g => g.type === 'gear' && g.id === c.mesh) : null;
+    if (drv && drv.p1) {
+      const pc = pointCoords();
+      const CA = pc[drv.p1.id] || drv.p1, CB = pc[c.p1.id] || c.p1;
+      const NA = Math.max(6, Math.round(Number(drv.teeth) || 12)), NB = teeth;
+      const betaA = Math.atan2(CB.y - CA.y, CB.x - CA.x);   // 驅動→從動
+      const betaB = Math.atan2(CA.y - CB.y, CA.x - CB.x);   // 從動→驅動
+      let Cq = (NA * betaA + NB * betaB) / (2 * Math.PI);
+      Cq -= Math.floor(Cq);                                 // mod 1
+      meshDeg = (Cq - 0.5) * (360 / NB);                    // 補到 0.5（半齒）
+    }
     const g = document.createElementNS(SVG_NS, 'g');
     g.style.pointerEvents = 'none';
     const poly = document.createElementNS(SVG_NS, 'polygon');
@@ -414,7 +428,7 @@ function draw() {
       g.style.display = ok ? '' : 'none';
       if (!ok) return;
       const deg = Math.atan2(pin.y - ctr.y, pin.x - ctr.x) * 180 / Math.PI;
-      g.setAttribute('transform', `translate(${TX(ctr.x)} ${TY(ctr.y)}) rotate(${-deg})`);
+      g.setAttribute('transform', `translate(${TX(ctr.x)} ${TY(ctr.y)}) rotate(${-(deg + meshDeg)})`);
     };
     applyGear(pts);
     frameUpdaters.push(applyGear);
