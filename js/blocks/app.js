@@ -417,18 +417,25 @@ function draw() {
     poly.setAttribute('stroke-width', Math.max(1, 1.4 * sc));
     poly.setAttribute('stroke-linejoin', 'round');
     g.appendChild(poly);
-    const hub = document.createElementNS(SVG_NS, 'circle');
-    hub.setAttribute('r', Math.max(2, 3 * sc));
-    hub.setAttribute('fill', c.color || '#b0772e');
-    g.appendChild(hub);
     svg.appendChild(g);
+    // 輪緣螺栓孔（＝輸出銷 p2，連桿接這裡）：畫成齒輪上的安裝孔，跟著銷走。
+    // 直接放在銷的世界位置（不進旋轉的 g），所以不受齒形嚙合相位 meshDeg 影響、正落在 p2 上。
+    const bolt = document.createElementNS(SVG_NS, 'circle');
+    bolt.setAttribute('r', Math.max(2.5, 3.5 * sc));
+    bolt.setAttribute('fill', '#ffffff');
+    bolt.setAttribute('stroke', c.color || '#b0772e');
+    bolt.setAttribute('stroke-width', Math.max(1.5, 2 * sc));
+    bolt.style.pointerEvents = 'none';
+    svg.appendChild(bolt);
     const applyGear = (P) => {
       const ctr = P[c.p1.id], pin = P[c.p2.id];
       const ok = ctr && pin && Number.isFinite(ctr.x) && Number.isFinite(pin.x);
       g.style.display = ok ? '' : 'none';
+      bolt.style.display = ok ? '' : 'none';
       if (!ok) return;
       const deg = Math.atan2(pin.y - ctr.y, pin.x - ctr.x) * 180 / Math.PI;
       g.setAttribute('transform', `translate(${TX(ctr.x)} ${TY(ctr.y)}) rotate(${-(deg + meshDeg)})`);
+      bolt.setAttribute('cx', TX(pin.x)); bolt.setAttribute('cy', TY(pin.y));
     };
     applyGear(pts);
     frameUpdaters.push(applyGear);
@@ -636,9 +643,12 @@ function draw() {
   // 節點型別（rect/circle）、樣式、半徑只由結構性狀態（地錨/馬達/固定孔/S.dragId）決定——
   // 播放期間這些都不變，故建一次、每幀只更新座標。
   const SIZE = 14;   // 地錨方塊邊長
+  // 齒輪輪緣銷不畫成通用浮動節點——改由齒輪自己畫成「螺栓孔」（見上面齒輪繪製）。
+  const gearPinIds = new Set(S.comps.filter(c => c.type === 'gear' && c.p2).map(c => c.p2.id));
   Object.keys(pts).forEach(id => {
     if (isHiddenSliderRailPoint(id)) return;
     if (isSliderMountPoint(id)) return;
+    if (gearPinIds.has(id)) return;
     const p = pts[id];
     const isGround = groundIds.has(id);
     const isMotorCenter = motorCenterIds.has(id);
