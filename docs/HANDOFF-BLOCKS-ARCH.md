@@ -6,25 +6,33 @@
 ## 0. 一句話現況
 
 在 `feat/blocks-arch` 分支上，已完成 SDD 的 **Phase 1**（draw build/update 分離）與
-**Phase 3 的前半**（render.js / state.js / panels.js 三個模組抽出）。
-**尚未 push、尚未合併 main。** 剩 `tools.js`、`input.js` 兩個模組未抽。
+**Phase 3 的前半 + tools.js**（render.js / state.js / panels.js / tools.js 四個模組抽出）。
+**已 rebase 到 `origin/main`（含遠端 3D slider 那筆 84c03b8）並 push。** 剩 `input.js` 一個模組未抽。
 
 ## 1. 分支與 commit
 
-分支：`feat/blocks-arch`（從 `main` 開出）
+分支：`feat/blocks-arch`（已 rebase 疊在 `origin/main` 的 `84c03b8 Add 3D slider rail preview and frame handle` 之上，已 push 並設好 tracking）。
 
 ```
-80bdf56 refactor(blocks): extract editing panels to panels.js
-dda9234 refactor(blocks): hoist shared editing state into state.js (S object)
-4834782 refactor(blocks): extract SVG drawing primitives to render.js
-d8f8c44 perf(blocks): split draw() into build/update to stop per-frame SVG teardown
+9ff86f4 refactor(blocks): extract tool-mode interactions to tools.js
+e399297 docs(blocks): add handoff record for blocks architecture refactor
+425dc01 refactor(blocks): extract editing panels to panels.js
+cdae546 refactor(blocks): hoist shared editing state into state.js (S object)
+c5c1092 refactor(blocks): extract SVG drawing primitives to render.js
+a3892f1 perf(blocks): split draw() into build/update to stop per-frame SVG teardown
+84c03b8 Add 3D slider rail preview and frame handle   ← 遠端基底（rebase 時手動併進重構）
 ```
 
-另外 `docs/SDD-BLOCKS-ARCHITECTURE.md` 也在第一個 commit 一起進來。
+> rebase 衝突重點（已解）：`84c03b8` 把舊 `drawGround`(地板基線) 改名 `drawGroundBaseline`
+> 並新增依賴 app 狀態的新 `drawGround`(機架連接線)＋`drawFrameHandle`＋`S.dragFrame`。
+> 純基線基元隨重構搬進 render.js 改名 `drawGroundBaseline`；機架兩函式與 `dragFrame`
+> 留 app/state（`S.dragFrame` 已加入 state.js）。
+
+`docs/SDD-BLOCKS-ARCHITECTURE.md` 與本交接檔均已入版控。
 （`.claude/` 是未追蹤的本機設定，**不要** commit。）
 
-目前 `js/blocks/` 行數：app.js 2173（原本 ~2500）、render.js 292、model.js 181、
-examples.js 149、view.js 142、panels.js 108、motion.js 70、storage.js 61、state.js 57。
+目前 `js/blocks/` 行數：app.js 1898（原本 ~2500）、tools.js 441、render.js 292、model.js 181、
+examples.js 149、view.js 142、panels.js 108、motion.js 70、storage.js 61、state.js 58。
 
 ## 2. ⚠️ 驗證狀態（重要，先讀）
 
@@ -78,6 +86,22 @@ updateServoEditor / updateStrokeEditor / updateRoleEditor。app 端 23 處改 `P
   sliderCarrierLength / sliderRailOffset / sliderTravelStart / sliderTravelEnd /
   sliderProjectedDistance / normalizeSliderRange）。
 
+### 9ff86f4 — tools.js：工具模式互動（Phase 3 後半 / 5a）
+21 個「工具模式」函式搬到 `tools.js`：startDrawLink / startDrawRail / beginDraw / exitDrawLink /
+nearestNodeId / resolveDrawEnd / linkLenLabel / drawDrawPreview / startDrawTriangle /
+exitDrawTriangle / resolveTrianglePointAt / resolveTrianglePoint / resolveTriangleBaseEnd /
+legoLength / resolveTriangleThirdPoint / drawTrianglePreview / confirmTriangleBase /
+finishDrawTriangle / finishDrawLink / finishDrawRail / convertLinkToSlider。
+- import 純模組：`{ S }`、`* as View`（W/H/TX/TY/barHullPath/worldFromScreen）、`* as Model`（mergePoints）。
+- 重宣告純常數（與 app.js 同值）：SVG_NS / LEGO_STEP / LINK_DEFAULT_LEN / snapLego / roundMm。
+- **`Tools.init({...})` 注入** 17 項 app 動作 / 查詢：svg / draw / rebuild / pushUndo / pause /
+  cancelMotorMode / deselectLink / selectLink / selectSlider / setBanner / clearBanner /
+  worldFromEvent / pointCoords / nearestDisplayToPoint / snapWorld / mobilePrompt / promptText。
+- app 端外部呼叫改 `Tools.*`（exitDraw* / drawDrawPreview / drawTrianglePreview / finishDraw* /
+  nearestNodeId）；`window.blocks` 的 startDraw* 與 convertLinkToSlider 改指 `Tools.*`，HTML onclick 不動。
+- export 只開外部會用到的 11 個；其餘（beginDraw / resolve* / legoLength / linkLenLabel /
+  confirmTriangleBase / finishDrawRail）維持模組內部不 export。
+
 ## 4. 既定模式（接手請沿用）
 
 1. **一個模組一個 commit**，每步 `node --check` + grep 驗證後再進下一步。
@@ -88,21 +112,12 @@ updateServoEditor / updateStrokeEditor / updateRoleEditor。app 端 23 處改 `P
 4. 改名/搬移用小 Python 腳本做 word-boundary 取代，並注意：屬性存取（`x.comps`）、
    spread（`...comps`）、物件鍵（`theta:`）的安全處理（dda9234 的腳本可參考做法）。
 
-## 5. 下一步：tools.js → input.js（依風險由低到高）
+## 5. 下一步：input.js（tools.js 已完成）
 
-### 5a. tools.js（畫桿 / 畫三角 / 畫軌道模式）— 建議先做
-擬搬函式（都在 app.js）：`startDrawLink` `startDrawRail` `beginDraw` `exitDrawLink`
-`nearestNodeId` `resolveDrawEnd` `linkLenLabel` `drawDrawPreview`
-`startDrawTriangle` `exitDrawTriangle` `resolveTrianglePointAt` `resolveTrianglePoint`
-`resolveTriangleBaseEnd` `legoLength` `resolveTriangleThirdPoint` `drawTrianglePreview`
-`confirmTriangleBase` `finishDrawTriangle` `finishDrawLink` `finishDrawRail` `convertLinkToSlider`
-- 依賴：S（直接 import）、`draw`/`rebuild`/`pushUndo`/`scheduleAutosave`、`worldFromEvent`、
-  `snapWorld`、`mobilePrompt`/`promptText`、`barHullPath`、`Model.mergePoints` 等 → 注入。
-- 注意 `window.blocks` 對外進入點（startDrawLink/startDrawRail/startDrawTriangle/
-  convertLinkToSlider）：保持 `window.blocks.startDrawLink = () => Tools.startDrawLink()`
-  之類，**HTML inline onclick 不動**（縮小範圍）。
+### 5a. tools.js（畫桿 / 畫三角 / 畫軌道模式）— ✅ 已完成（commit 9ff86f4）
+做法見上面第 3 節的 9ff86f4 條目。**僅 node --check + grep 驗證，未在瀏覽器實測。**
 
-### 5b. input.js（指標/拖曳/吸附合併/pinch）— **最複雜、最謹慎**
+### 5b. input.js（指標/拖曳/吸附合併/pinch）— **下一步、最複雜、最謹慎**
 擬搬：`startFreeLinkDrag` `onNodeDown` `onDragMove` `commitDragUndo` `onDragEnd`
 `abortSingleDrag` `endPointer` + 檔尾的 `svg.addEventListener(...)` 那批與 `activePointers`
 （pinch 縮放 + capture 階段命中放大）。
