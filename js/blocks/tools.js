@@ -16,6 +16,7 @@
 import { S } from './state.js';
 import * as View from './view.js';
 import * as Model from './model.js';
+import { ownedParamKeys } from './part-types.js';   // 零件型別表：元件擁有的 topo.params key
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const { W, H, TX, TY } = View;
@@ -415,7 +416,8 @@ export function convertLinkToSlider() {
   const n = ++S.counter;
   const lp = 'SL' + n;
   // 移除原連桿：剛性桿約束由固定的承載桿件取代，避免同兩點同時有桿與移動副
-  if (c.lenParam) delete S.topo.params[c.lenParam];
+  // 清掉原連桿佔用的參數（型別表宣告它擁有哪些）
+  ownedParamKeys(c).forEach(k => delete S.topo.params[k]);
   S.comps = S.comps.filter(x => x.id !== c.id);
   S.comps.push({
     type: 'slider', id: 'Slider' + n, color: '#16a085', sign: 1,

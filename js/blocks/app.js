@@ -24,7 +24,7 @@ import * as Panels from './panels.js';   // 編輯面板呈現（讀 S + 寫 DOM
 import * as Tools from './tools.js';     // 工具模式互動（畫桿 / 畫滑軌 / 畫三點桿 / 連桿升級滑軌）
 import * as Input from './input.js';     // 指標 / 手勢互動（拖曳 + 吸附合併 + pinch 縮放）
 import * as Model from './model.js';
-import { pointKeysFor } from './part-types.js';   // 零件型別表：依 c.type 取點 key 清單
+import { pointKeysFor, ownedParamKeys } from './part-types.js';   // 零件型別表：點 key / 擁有的參數 key
 import * as Motion from './motion.js';
 import * as Store from './storage.js';
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
@@ -1404,10 +1404,8 @@ function deleteSelectedPart() {
   if (!comp) return;
   pushUndo();
   pause();
-  if ((comp.type === 'bar' || comp.type === 'slider') && comp.lenParam) delete S.topo.params[comp.lenParam];
-  if (comp.type === 'triangle') {
-    [comp.gParam, comp.r1Param, comp.r2Param].forEach(k => { if (k) delete S.topo.params[k]; });
-  }
+  // 刪除前先清掉這個元件佔用的 topo.params（型別表宣告它擁有哪些參數）
+  ownedParamKeys(comp).forEach(k => delete S.topo.params[k]);
   S.comps = S.comps.filter(c => c.id !== id);
   S.selectedLinkId = null;
   S.selectedTriangleId = null;

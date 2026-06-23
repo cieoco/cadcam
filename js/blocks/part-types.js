@@ -16,11 +16,13 @@
  *   - 接點角色 point.type：fixed / floating / motor / linear / ground（不是本表範圍）。
  */
 
+// 每筆：pointKeys = 該型別用到的接點 key；paramProps = 元件上「存著 topo.params key 的欄位」
+// 名稱（用來在刪除元件時把它佔用的參數一併清掉）。
 export const PART_TYPES = {
-  anchor:   { pointKeys: ['p1'] },                         // 地錨：單一固定銷
-  bar:      { pointKeys: ['p1', 'p2'] },                   // 連桿：兩端
-  triangle: { pointKeys: ['p1', 'p2', 'p3'] },             // 三點桿：三頂點
-  slider:   { pointKeys: ['p1', 'p2', 'p3', 'm1', 'm2'] }, // 滑軌：軌道兩端 + 滑塊 + 兩固定孔
+  anchor:   { pointKeys: ['p1'],                          paramProps: [] },                          // 地錨：單一固定銷、無參數
+  bar:      { pointKeys: ['p1', 'p2'],                    paramProps: ['lenParam'] },                // 連桿：兩端 + 長度
+  triangle: { pointKeys: ['p1', 'p2', 'p3'],             paramProps: ['gParam', 'r1Param', 'r2Param'] }, // 三點桿：三頂點 + 三邊
+  slider:   { pointKeys: ['p1', 'p2', 'p3', 'm1', 'm2'], paramProps: ['lenParam'] },                // 滑軌：軌道兩端 + 滑塊 + 兩固定孔 + 軌長
 };
 
 // 所有型別點 key 的聯集。未知型別時當安全後備，行為與舊的扁平 POINT_KEYS 一致（不漏點）。
@@ -31,4 +33,12 @@ export const ALL_POINT_KEYS = ['p1', 'p2', 'p3', 'm1', 'm2'];
 export function pointKeysFor(c) {
   const t = c && PART_TYPES[c.type];
   return t ? t.pointKeys : ALL_POINT_KEYS;
+}
+
+// 此元件「擁有」的 topo.params key 清單（依型別宣告的 paramProps 取出實際 key 字串）。
+// 刪除元件時用來把它佔用的參數一併清掉，不必在各處硬寫 `c.type === …` 分支。
+export function ownedParamKeys(c) {
+  const t = c && PART_TYPES[c.type];
+  if (!t || !t.paramProps) return [];
+  return t.paramProps.map(prop => c[prop]).filter(Boolean);
 }
