@@ -6,14 +6,17 @@
 ## 0. 一句話現況
 
 在 `feat/blocks-arch` 分支上，已完成 SDD 的 **Phase 1**（draw build/update 分離）與
-**Phase 3 的前半 + tools.js**（render.js / state.js / panels.js / tools.js 四個模組抽出）。
-**已 rebase 到 `origin/main`（含遠端 3D slider 那筆 84c03b8）並 push。** 剩 `input.js` 一個模組未抽。
+**Phase 3 模組切分全部**（render.js / state.js / panels.js / tools.js / input.js 五個模組抽出）。
+**已 rebase 到 `origin/main`（含遠端 3D slider 那筆 84c03b8）並 push。**
+模組切分到此完結；剩 SDD 的 **Phase 2**（part-types 型別查表）與 **Phase 4**（收尾）。
 
 ## 1. 分支與 commit
 
 分支：`feat/blocks-arch`（已 rebase 疊在 `origin/main` 的 `84c03b8 Add 3D slider rail preview and frame handle` 之上，已 push 並設好 tracking）。
 
 ```
+f4b170b refactor(blocks): extract pointer/gesture interactions to input.js
+3990de7 docs(blocks): update handoff for tools.js + rebase onto origin/main
 9ff86f4 refactor(blocks): extract tool-mode interactions to tools.js
 e399297 docs(blocks): add handoff record for blocks architecture refactor
 425dc01 refactor(blocks): extract editing panels to panels.js
@@ -31,17 +34,20 @@ a3892f1 perf(blocks): split draw() into build/update to stop per-frame SVG teard
 `docs/SDD-BLOCKS-ARCHITECTURE.md` 與本交接檔均已入版控。
 （`.claude/` 是未追蹤的本機設定，**不要** commit。）
 
-目前 `js/blocks/` 行數：app.js 1898（原本 ~2500）、tools.js 441、render.js 292、model.js 181、
-examples.js 149、view.js 142、panels.js 108、motion.js 70、storage.js 61、state.js 58。
+目前 `js/blocks/` 行數：app.js 1631（原本 ~2500）、tools.js 441、input.js 318、render.js 292、
+model.js 181、examples.js 149、view.js 142、panels.js 108、motion.js 70、storage.js 61、state.js 58。
 
 ## 2. ⚠️ 驗證狀態（重要，先讀）
 
-**所有改動只經過 `node --check` 語法檢查 + grep 比對驗證，沒有實機跑過瀏覽器。**
-（執行環境無法開瀏覽器；專案也沒有 test runner——驗證一律是人工開 app 操作。）
+**所有改動只經過 `node --check` 語法檢查 + grep / 依賴對照驗證；環境開不了瀏覽器。**
+（專案沒有 test runner——驗證一律是人工開 app 操作。）
 
-使用者在中斷前回了「都 OK」，但**不確定那是否為瀏覽器實測結果**。
-接手者請把「在瀏覽器驗證 commit `d8f8c44..80bdf56` 無回歸」當成**尚未完成、且應優先做**的事，
-尤其在再往下疊 `input.js`（互動邏輯最複雜）之前。
+進度（使用者回報）：
+- `perf split → tools.js`（含 render/state/panels）已**經使用者在瀏覽器實測 OK**。
+- **`input.js`（f4b170b）尚未瀏覽器實測** —— 互動邏輯最密集的一塊，**請優先實機驗證**：
+  拖曳節點 / 吸附綠圈 + 放開合併 / 自由連桿整根平移 / 固定連桿圓規旋轉 /
+  機架🏠把手整組平移 / 雙指 pinch 縮放＋平移 / 滾輪縮放 / 手機點接點優先命中 /
+  畫桿・三點桿模式（觸控放開確定、滑鼠右鍵確定）。
 
 驗證方式：`python -m http.server 8000` → 開 `http://localhost:8000/blocks.html`，跑第 6 節的黃金流程。
 
@@ -102,6 +108,26 @@ finishDrawTriangle / finishDrawLink / finishDrawRail / convertLinkToSlider。
 - export 只開外部會用到的 11 個；其餘（beginDraw / resolve* / legoLength / linkLenLabel /
   confirmTriangleBase / finishDrawRail）維持模組內部不 export。
 
+### f4b170b — input.js：指標 / 手勢互動（Phase 3 模組切分收尾 / 5b）
+搬移 8 個函式：startFreeLinkDrag / onFrameHandleDown / onNodeDown / onDragMove /
+commitDragUndo / onDragEnd / abortSingleDrag / endPointer，加上 module 狀態 `activePointers`
+/ `pinchState`，以及原 app.js 檔尾那批 `svg.addEventListener`（背景取消選取 / pinch 雙指縮放平移 /
+滾輪縮放 / 手機 capture 階段接點優先命中 / 畫桿・三點桿起點 / 右鍵確定）。
+- **事件監聽改在 `Input.init()` 內掛載**（取代原本 module 頂層的側效果）；時序仍在第一次 draw
+  之前（app.init() 內呼叫），行為不變。listener 掛載順序原封不動。
+- import 純模組 `{ S }` / `* as View`，並呼叫 `* as Tools`（畫圖收尾 / 命中 nearestNodeId）、
+  `* as Panels`（updateRoleEditor）。`NODE_TAP_PX` 重宣告（與 app.js 同值）。
+- **`Input.init({...})` 注入 25 項** app 動作 / 查詢：svg / draw / rebuild / pause /
+  cancelMotorMode / deselectLink / selectLink / worldFromEvent / pointCoords / mobilePrompt /
+  snapshotStr / updateUndoBtn / nearestDisplayTo / nearestDisplayToPoint / movePointById /
+  updatePointCoordsById / recomputeLengths / mergePoints / isFreeLink / freeLinkForPoint /
+  fixedLinkFor / inputCrankMovingEnd / handleMotorOnNode / setSliderDetailRows / frameNodeIds。
+- **交叉依賴（已處理）**：`onNodeDown` 搬走後，app 端 node pointerdown 改 `Input.onNodeDown`、
+  free-link 拖曳改 `Input.startFreeLinkDrag`、機架把手改 `Input.onFrameHandleDown`，
+  且 `Render.init({ svg, onNodeDown: Input.onNodeDown })`（滑軌固定孔互動的來源）。
+- onFrameHandleDown 是 84c03b8 新增、doc 原清單未列，但同屬拖曳起點、共用 drag 生命週期，
+  一併搬入並 export。export 面：startFreeLinkDrag / onFrameHandleDown / onNodeDown / init。
+
 ## 4. 既定模式（接手請沿用）
 
 1. **一個模組一個 commit**，每步 `node --check` + grep 驗證後再進下一步。
@@ -112,23 +138,21 @@ finishDrawTriangle / finishDrawLink / finishDrawRail / convertLinkToSlider。
 4. 改名/搬移用小 Python 腳本做 word-boundary 取代，並注意：屬性存取（`x.comps`）、
    spread（`...comps`）、物件鍵（`theta:`）的安全處理（dda9234 的腳本可參考做法）。
 
-## 5. 下一步：input.js（tools.js 已完成）
+## 5. 下一步：Phase 2 / Phase 4（模組切分已全部完成）
 
-### 5a. tools.js（畫桿 / 畫三角 / 畫軌道模式）— ✅ 已完成（commit 9ff86f4）
-做法見上面第 3 節的 9ff86f4 條目。**僅 node --check + grep 驗證，未在瀏覽器實測。**
+### 5a. tools.js — ✅ 已完成（9ff86f4，已瀏覽器實測 OK）
+### 5b. input.js — ✅ 已完成（f4b170b，**尚未瀏覽器實測，請優先驗證**，見第 2 節清單）
 
-### 5b. input.js（指標/拖曳/吸附合併/pinch）— **下一步、最複雜、最謹慎**
-擬搬：`startFreeLinkDrag` `onNodeDown` `onDragMove` `commitDragUndo` `onDragEnd`
-`abortSingleDrag` `endPointer` + 檔尾的 `svg.addEventListener(...)` 那批與 `activePointers`
-（pinch 縮放 + capture 階段命中放大）。
-- **交叉依賴提醒**：`render.js` 的 `drawSliderMountHole` 目前注入 `onNodeDown`。
-  `onNodeDown` 一旦搬進 input.js，記得把 `Render.init({ svg, onNodeDown: Input.onNodeDown })`
-  的來源改掉（順序：先 import Input，再 init Render）。
-- 這塊讀寫 S.drag*/snapTarget 最密集，且和 draw 的吸附高亮、節點命中綁很緊。
-  **務必抽完立刻在瀏覽器測拖曳/吸附/合併/雙指縮放**。
+### 5c.（下一步）SDD Phase 2：part-types 型別查表
+把散落各處的 `c.type === 'bar' / 'triangle' / 'slider' / 'anchor'` 分支收斂成一張
+part-types 查表（每型別宣告它的 partsModule / 預設角色 / 繪製分派等）。詳見
+`docs/SDD-BLOCKS-ARCHITECTURE.md`。屬於純整理，無互動行為變更，風險低。
 
-### 5c.（SDD 其餘）Phase 2 part-types 型別表、Phase 4 收尾
-見 SDD。Phase 2 可在 tools/input 之後做，把散落的 `c.type ===` 收斂成查表。
+### 5d.（收尾）SDD Phase 4
+最後收尾項（render/播放迴圈/3D 內部狀態的歸屬、文件對齊等），見 SDD。
+
+> 提醒：再往下做任何一步之前，**先把 input.js 在瀏覽器實測過**（第 2 節清單），
+> 避免把後續整理疊在未驗證的互動層上。
 
 ## 6. 黃金驗證流程（每個模組抽完都跑一遍）
 
