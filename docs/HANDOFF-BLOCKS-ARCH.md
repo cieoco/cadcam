@@ -10,7 +10,8 @@
 **Phase 2 兩刀**（part-types.js 型別表：點 key + owned-param 走表），
 以及 **Phase 4 的軌跡快取鍵**（geomVersion 取代每幀 JSON.stringify）。
 **已 rebase 到 `origin/main`（含遠端 3D slider 那筆 84c03b8）並 push。**
-剩 SDD **Phase 2 其餘**（draw 繪製分派逐步掛表，最大最 risky）與 **Phase 4 其餘**（examples 註冊機制 audit）。
+Phase 4 痛點 E（軌跡 cache key）已做、痛點 D（範例兩套）已 audit 結論不動。
+**剩唯一一塊**：SDD **Phase 2 的 draw 繪製分派**（最大、最 risky，需分小刀＋逐刀瀏覽器驗證）——其餘皆收尾。
 
 ## 1. 分支與 commit
 
@@ -189,8 +190,14 @@ commitDragUndo / onDragEnd / abortSingleDrag / endPointer，加上 module 狀態
 ### 5d.（收尾）SDD Phase 4
 - 痛點 E（軌跡 cache key）✅ 已完成（475baf4）：`getTrajectoryData()` 改用結構版本號 `geomVersion`
   （rebuild / toggleTracePoint 各 +1），取代每幀 `JSON.stringify` 整份快照。見第 3 節。
-- **其餘**：評估 `examples.js`（blocks 的 `_wizard_data`）與 `js/examples/`（範本格式）是否共用註冊機制
-  （**先 audit 再決定，可能不動**）；render/播放迴圈/3D 內部狀態的歸屬、文件對齊等，見 SDD。
+- 痛點 D（範例兩套）✅ 已 audit，**結論：不統一、維持現狀**（程式碼不動）。理由：
+  - 兩套互不相交：`BLOCK_EXAMPLES`（→ 只 app.js / blocks.html）vs `EXAMPLE_TEMPLATES`（→ 只 ui/wizard.js /
+    multilink wizard）；範例集不重疊、消費者不重疊、無跨工具載入——**沒有實際重複痛點**。
+  - 格式需求本質不同：blocks 只需 `comps`（載入即重編譯）；wizard 需整包預編譯 `steps/parts/_templateMeta`
+    + lazy JSON。硬統一＝增加跨工具耦合、打破 blocks 自成一格的邊界，換不到實質好處（YAGNI）。
+  - 唯一共同子結構是元件陣列（blocks `comps` ≈ wizard `_wizard_data`）；未來若真要單一範例服務兩邊，
+    那是接縫處，但**現在不需要動**。（對應 SDD §7 open question #3，視為已回答。）
+- **其餘**：render/播放迴圈/3D 內部狀態的歸屬、文件對齊等收尾，見 SDD（無急迫性）。
 
 > 提醒：再往下做任何一步之前，**先把 input.js 在瀏覽器實測過**（第 2 節清單），
 > 避免把後續整理疊在未驗證的互動層上。
