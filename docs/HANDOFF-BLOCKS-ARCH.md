@@ -47,11 +47,13 @@ part-types.js 34。
 （專案沒有 test runner——驗證一律是人工開 app 操作。）
 
 進度（使用者回報）：
-- `perf split → tools.js`（含 render/state/panels）已**經使用者在瀏覽器實測 OK**。
-- **`input.js`（f4b170b）尚未瀏覽器實測** —— 互動邏輯最密集的一塊，**請優先實機驗證**：
-  拖曳節點 / 吸附綠圈 + 放開合併 / 自由連桿整根平移 / 固定連桿圓規旋轉 /
-  機架🏠把手整組平移 / 雙指 pinch 縮放＋平移 / 滾輪縮放 / 手機點接點優先命中 /
-  畫桿・三點桿模式（觸控放開確定、滑鼠右鍵確定）。
+- `perf split → tools.js`（含 render/state/panels）、`input.js`、part-types 兩刀
+  皆已**經使用者在瀏覽器實測 OK**。
+
+附帶修了一個既有 bug（非重構造成，與 84c03b8 前邏輯一致）：
+- **8d8d216 改長度不同步**：改桿件/三點桿/滑軌長度時只更新元件自己那份共用接點座標副本，
+  已連接（共用接點）的會看似沒變、要播放才更新。改用 `updatePointCoordsById`（更新所有副本）。
+  **連桿案例使用者已實測 OK；三點桿（reshapeTriangle）/ 滑軌（changeRailLen）為同類同修，待一併驗證。**
 
 驗證方式：`python -m http.server 8000` → 開 `http://localhost:8000/blocks.html`，跑第 6 節的黃金流程。
 
