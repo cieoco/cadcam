@@ -11,7 +11,32 @@
 以及 **Phase 4 的軌跡快取鍵**（geomVersion 取代每幀 JSON.stringify）。
 **已 rebase 到 `origin/main`（含遠端 3D slider 那筆 84c03b8）並 push。**
 Phase 4 痛點 E（軌跡 cache key）已做、痛點 D（範例兩套）已 audit 結論不動。
-**剩唯一一塊**：SDD **Phase 2 的 draw 繪製分派**（最大、最 risky，需分小刀＋逐刀瀏覽器驗證）——其餘皆收尾。
+SDD 重構本身已收斂；**目前主線已轉向新方向**（見下節 0.5）。
+（SDD Phase 2 的 draw 繪製分派尚未做，現在正好搭著新機件一起把繪製/求解分派長成登錄表。）
+
+## 0.5 新方向：可擴充「基礎機件」（齒輪已落地）
+
+使用者目標升級為**機構繪製＋模擬系統**，未來會陸續加入大量基礎機件（齒輪、凸輪、齒條、彈簧…），
+**每個機件連求解器一起進來**。重構是 MVP，確認可行後開始正式發展「機件外掛」架構：
+每加一個機件＝加一個自帶 **{資料結構 + 畫法 + 求解步驟}** 的描述，不改核心（同 `MECHANISMS` registry 精神）。
+
+**齒輪（嚙合對 A）已做完 slice 1a**（commit `fc2184f` + 修正 `55fa74c` 嚙合相位、`54ddb87` 螺栓孔）：
+- 新 comp type `gear`：`p1`=中心（fixed/motor）、`p2`=輪緣輸出銷；欄位 `radiusParam`/`teeth`/`mesh`/`phase`。
+- 運動學：從動輪角 = −(R_driver/R_driven)·motorTheta（外嚙合反向）。已 Node 驗證 0.75 比正確、isValid。
+- **關鍵踩雷**：blocks 實走 `solveBodyJointTopology`（`solver.js:971` 因 `_wizard_data`+`bodyJoint` 委派過去），
+  不是主 step-walker。齒輪在那裡用 force-set（與旋轉曲柄同位置）。**schema.js 也要加 normalizeGear**，
+  否則 gear comp 載入被當不支援零件略過。
+- 繪製：`createGearPath`（既有漸開線工具 `js/utils/gear-geometry.js`）；嚙合相位 δ 用不變量
+  qA+qB=(NA·βA+NB·βB)/2π 補到 0.5；輪緣銷畫成螺栓孔（節點繪製略過該 id）。
+- 範例：`BLOCK_EXAMPLES` 的「齒輪對：嚙合傳動」。瀏覽器已驗證：嚙合、反向、比例、外觀皆正確。
+
+**為齒條（B）留位**：核心抽象「齒輪有效角 = sign·driverAngle·ratio + phase」；slice 1 輸出端是旋轉銷，
+齒條只是換成直線位移（disp=θ·R，照搬 input_linear + `createRackPath`）。
+
+**下一步 slice 1b（進行中）**：放置 UI——齒輪鈕/addGear、選取+改半徑/齒數、宣告嚙合（就近自動相切）、
+把連桿接到螺栓孔讓齒輪真的驅動機構。之後 slice 2：把 draw/solver/compile 的型別分派升級成登錄表
+（PART_TYPES.draw/compile + STEP_SOLVERS），讓「加機件＝加表項」。詳見 plan 檔
+`~/.claude/plans/refactored-sniffing-narwhal.md`。
 
 ## 1. 分支與 commit
 
