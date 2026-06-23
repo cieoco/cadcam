@@ -16,6 +16,7 @@
 分支：`feat/blocks-arch`（已 rebase 疊在 `origin/main` 的 `84c03b8 Add 3D slider rail preview and frame handle` 之上，已 push 並設好 tracking）。
 
 ```
+acc931c refactor(blocks): route owned-param cleanup through part-types table
 54eb38a refactor(blocks): add part-types table, route point-key enumeration through it
 f4b170b refactor(blocks): extract pointer/gesture interactions to input.js
 3990de7 docs(blocks): update handoff for tools.js + rebase onto origin/main
@@ -143,6 +144,13 @@ commitDragUndo / onDragEnd / abortSingleDrag / endPointer，加上 module 狀態
 - 後續可漸進把更多 `c.type` 分流掛進表項（draw 的 build/update 分派、長度、預設角色…），
   但 draw 分派較大且和 render/play 綁緊，要小心、分刀做、逐刀瀏覽器驗證。
 
+### acc931c — part-types 第二刀：owned-param 清理走表
+型別表每筆加 `paramProps`（元件上存著 topo.params key 的欄位名）＋ `ownedParamKeys(c)`
+（取出實際 key 字串）。bar/slider=['lenParam']、triangle=['gParam','r1Param','r2Param']、anchor=[]。
+- app.js `deleteSelectedPart` 移除兩條硬寫型別分支；tools.js `convertLinkToSlider` 的
+  `delete …[c.lenParam]` 也改走 `ownedParamKeys`。至此 owned-param 清理無硬寫型別分支。
+- 已核對：comp 上唯一存 topo.params key 的欄位就是 lenParam / gParam / r1Param / r2Param，故等價。
+
 ## 4. 既定模式（接手請沿用）
 
 1. **一個模組一個 commit**，每步 `node --check` + grep 驗證後再進下一步。
@@ -159,11 +167,13 @@ commitDragUndo / onDragEnd / abortSingleDrag / endPointer，加上 module 狀態
 ### 5b. input.js — ✅ 已完成（f4b170b，**尚未瀏覽器實測，請優先驗證**，見第 2 節清單）
 
 ### 5c. SDD Phase 2：part-types 型別查表
-- 第一刀（點 key 走表）✅ 已完成（54eb38a，見第 3 節）。
-- **其餘（下一步）**：把更多 `c.type === 'bar'/'triangle'/'slider'/'anchor'` 分流逐步收進表——
-  candidate：model.js 的 `recomputeLengths`/`fixedLinkFor` 等 bar 專屬判斷、draw 的繪製分派
-  （build/update 閉包，較大且綁 render/play，**分刀做、逐刀瀏覽器驗證**）、預設角色 / 長度語意。
-  挑無行為變更、可獨立驗證的小刀優先。app.js 目前 `.type ===` 仍約 36 處（含不少是 point.type）。
+- 第一刀（點 key 走表）✅ 已完成（54eb38a）。
+- 第二刀（owned-param 清理走表）✅ 已完成（acc931c）。見第 3 節。
+- **其餘（下一步）**：把更多 `c.type` 分流逐步收進表。下一個 candidate 是 **draw 的繪製分派**
+  （`draw()` 內依 type filter 再各自畫：triangle / slider / bar / 馬達；build/update 兩條路徑），
+  這是痛點 C 最大塊但**也最risky**——和 render.js build/update 與 play 迴圈綁緊，
+  **務必分小刀、每刀瀏覽器驗證四種零件外觀/互動**。其餘 `.type ===` 多是「挑某型別來做事」的
+  filter/find（非多型分派），不必硬塞進表。注意分清元件型別 `c.type` vs 接點角色 `point.type`。
 
 ### 5d.（收尾）SDD Phase 4
 最後收尾項（痛點 D/E）：`getTrajectoryData()` 的 cache key 從 `JSON.stringify` 改結構版本號
