@@ -24,6 +24,7 @@ import * as Panels from './panels.js';   // 編輯面板呈現（讀 S + 寫 DOM
 import * as Tools from './tools.js';     // 工具模式互動（畫桿 / 畫滑軌 / 畫三點桿 / 連桿升級滑軌）
 import * as Input from './input.js';     // 指標 / 手勢互動（拖曳 + 吸附合併 + pinch 縮放）
 import * as Model from './model.js';
+import { pointKeysFor } from './part-types.js';   // 零件型別表：依 c.type 取點 key 清單
 import * as Motion from './motion.js';
 import * as Store from './storage.js';
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
@@ -205,10 +206,10 @@ const barsAtNode = (nodeId) => Model.barsAtNode(S.comps, nodeId);
 
 // 隱性機架：所有 type:'fixed' 的接點視為同一個固定底座（機架）。
 // 不是獨立物件，只是把散落的固定銷當成一組——拖機架把手時整組一起平移。
-const FRAME_POINT_KEYS = ['p1', 'p2', 'p3', 'm1', 'm2'];
+// 點 key 走 part-types 的 pointKeysFor（依元件型別），不再各自維護扁平清單。
 function frameNodeIds() {
   const ids = new Set();
-  S.comps.forEach(c => FRAME_POINT_KEYS.forEach(k => {
+  S.comps.forEach(c => pointKeysFor(c).forEach(k => {
     if (c[k] && c[k].id && c[k].type === 'fixed') ids.add(c[k].id);
   }));
   return ids;
