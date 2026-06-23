@@ -37,6 +37,7 @@ const { W, H, HULL_R_WORLD, TX, TY } = View;
 // 樂高 Technic 孔距 = 8mm；連桿/三點桿孔位長度對齊 8mm，滑軌外形尺寸不套用。
 const LEGO_STEP = 8;
 const LINK_DEFAULT_LEN = 88;   // 連桿預設長度（12 孔，對齊 8mm）
+const GEAR_MODULE = 6;         // 齒輪模數（mm）：所有齒輪共用，節圓半徑 R=teeth·module/2，故必定咬合
 const snapLego = v => Math.max(LEGO_STEP, Math.round((Number(v) || 0) / LEGO_STEP) * LEGO_STEP);
 const roundMm = v => Math.round(Number(v) || 0);
 
@@ -886,6 +887,45 @@ function addAnchor() {
   rebuild(); draw();
 }
 
+// 放下一個齒輪。第一顆＝驅動輪（中心放馬達，一放下就會轉）；之後每顆＝從動輪，自動和上一顆
+// 齒輪嚙合並擺在相切位置（中心距＝兩節圓半徑和），播放時依齒數（＝半徑）反比反向轉。
+// 所有齒輪共用同一模數 GEAR_MODULE，故節圓半徑 R = teeth·module/2，彼此一定咬得起來。
+function addGear() {
+  pushUndo();
+  Tools.exitDrawLink();
+  Tools.exitDrawTriangle();
+  cancelMotorMode();
+  const n = ++S.counter;
+  const gears = S.comps.filter(c => c.type === 'gear');
+  const isDriver = !gears.length;
+  const teeth = isDriver ? 12 : 18;            // 第一對 12:18 就看得到轉速比
+  const R = teeth * GEAR_MODULE / 2;
+  const radiusParam = 'GR' + n;
+  let cx, cy, meshId;
+  if (isDriver) {
+    cx = -48; cy = 0; meshId = null;
+  } else {
+    const driver = gears[gears.length - 1];     // 接最後一顆齒輪
+    const dc = pointCoords()[driver.p1.id] || driver.p1;
+    const Rd = Number(S.topo.params[driver.radiusParam]) || R;
+    cx = (dc.x || 0) + Rd + R; cy = (dc.y || 0); // 往右擺相切
+    meshId = driver.id;
+  }
+  const center = { id: 'GC' + n, type: isDriver ? 'motor' : 'fixed', x: cx, y: cy };
+  if (isDriver) center.physicalMotor = '1';
+  const gear = {
+    type: 'gear', id: 'Gear' + n,
+    color: isDriver ? '#e74c3c' : '#2c6fbb',
+    p1: center,
+    p2: { id: 'GP' + n, type: 'floating', x: cx + R, y: cy },
+    radiusParam, teeth, phase: 0
+  };
+  if (meshId) gear.mesh = meshId;
+  S.comps.push(gear);
+  S.topo.params[radiusParam] = R;
+  rebuild(); draw();
+}
+
 function clearAll() {
   pushUndo();
   pause();
@@ -1691,5 +1731,5 @@ function init() {
   updateUndoBtn();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: Tools.startDrawTriangle, clearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGear, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: Tools.startDrawTriangle, clearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();
