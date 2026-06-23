@@ -189,6 +189,38 @@ export function toSnapshot(comps, topo, counter) {
   return snapshot;
 }
 
+// 齒輪：p1 = 中心（fixed/motor，驅動輪在中心放馬達）、p2 = 輪緣輸出銷（floating，由 solver 解出）。
+// radiusParam = 節圓半徑;teeth/module 供齒形繪製;mesh = 嚙合對象（驅動輪 id），驅動輪自己無 mesh。
+function normalizeGear(comp, index, params, warnings) {
+  const id = safeId(comp.id) ? comp.id : `Gear${index + 1}`;
+  const p1 = normalizePoint(comp.p1, `GC${index + 1}`, warnings);
+  const p2 = normalizePoint(comp.p2, `GP${index + 1}`, warnings);
+  const radiusParam = safeId(comp.radiusParam) ? comp.radiusParam : `GR${index + 1}`;
+  const teeth = Math.max(6, Math.round(num(comp.teeth, 12)));
+  const rawR = params[radiusParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  const R = Math.max(1, Math.round(num(rawR, 40)));
+  params[radiusParam] = R;
+  // 模數沒給就從節圓半徑反推（R = teeth·module/2 → module = 2R/teeth），讓齒形大小自洽。
+  const module = num(comp.module, 0) > 0
+    ? Math.max(1, num(comp.module, 6))
+    : Math.max(1, Number((2 * R / teeth).toFixed(2)));
+  const out = {
+    type: 'gear',
+    id,
+    color: SAFE_COLOR.test(comp.color || '') ? comp.color : '#b0772e',
+    p1,
+    p2,
+    radiusParam,
+    teeth,
+    module,
+    phase: num(comp.phase, 0)
+  };
+  if (safeId(comp.mesh)) out.mesh = comp.mesh;
+  if (comp.physicalMotor) out.physicalMotor = String(comp.physicalMotor);
+  if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
+  return out;
+}
+
 export function normalizeSnapshot(obj) {
   if (!obj || typeof obj !== 'object') return null;
   const sourceComps = Array.isArray(obj.comps) ? obj.comps : null;
@@ -208,6 +240,7 @@ export function normalizeSnapshot(obj) {
     else if (raw.type === 'bar') comps.push(normalizeBar(raw, index, params, warnings));
     else if (raw.type === 'triangle') comps.push(normalizeTriangle(raw, index, params, warnings));
     else if (raw.type === 'slider') comps.push(normalizeSlider(raw, index, params, warnings));
+    else if (raw.type === 'gear') comps.push(normalizeGear(raw, index, params, warnings));
     else warnings.push(`不支援的零件 ${raw.type || '(unknown)'}，已略過。`);
   });
 

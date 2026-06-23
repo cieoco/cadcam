@@ -13,12 +13,11 @@
  */
 
 import { solveTopology } from '../multilink/solver.js';
-
-const POINT_KEYS = ['p1', 'p2', 'p3', 'm1', 'm2'];
+import { pointKeysFor } from './part-types.js';
 
 export function pointCoords(comps) {
   const m = {};
-  comps.forEach(c => POINT_KEYS.forEach(k => {
+  comps.forEach(c => pointKeysFor(c).forEach(k => {
     if (c[k] && c[k].id) m[c[k].id] = { x: Number(c[k].x) || 0, y: Number(c[k].y) || 0 };
   }));
   return m;
@@ -38,7 +37,7 @@ export function displayPoint(comps, compiled, theta, id) {
 }
 
 export function updatePointCoordsById(comps, id, x, y) {
-  comps.forEach(c => POINT_KEYS.forEach(k => {
+  comps.forEach(c => pointKeysFor(c).forEach(k => {
     if (c[k] && c[k].id === id) { c[k].x = x; c[k].y = y; }
   }));
 }
@@ -49,7 +48,7 @@ export function freezePointAtDisplay(comps, compiled, theta, id) {
 }
 
 export function movePointById(comps, id, dx, dy) {
-  comps.forEach(c => POINT_KEYS.forEach(k => {
+  comps.forEach(c => pointKeysFor(c).forEach(k => {
     if (c[k] && c[k].id === id) {
       c[k].x = (Number(c[k].x) || 0) + dx;
       c[k].y = (Number(c[k].y) || 0) + dy;
@@ -59,7 +58,7 @@ export function movePointById(comps, id, dx, dy) {
 
 export function pointRefs(comps, id) {
   const refs = [];
-  comps.forEach(c => POINT_KEYS.forEach(k => {
+  comps.forEach(c => pointKeysFor(c).forEach(k => {
     if (c[k] && c[k].id === id) refs.push({ comp: c, key: k, point: c[k] });
   }));
   return refs;
@@ -133,7 +132,7 @@ export function findNearest(comps, id, snapWorld) {
 // 把 fromId 併到 toId（座標對齊 toId）；併成零長度的桿就移除。回傳新的 comps。
 export function mergePoints(comps, fromId, toId) {
   const t = pointCoords(comps)[toId]; if (!t) return comps;
-  comps.forEach(c => POINT_KEYS.forEach(k => {
+  comps.forEach(c => pointKeysFor(c).forEach(k => {
     if (c[k] && c[k].id === fromId) { c[k].id = toId; c[k].x = t.x; c[k].y = t.y; }
   }));
   // 被合併成零長度的桿就移除
@@ -158,7 +157,7 @@ export function fixedLinkFor(comps, id) {
 
 export function pointUseCount(comps, id) {
   let count = 0;
-  comps.forEach(c => POINT_KEYS.forEach(k => {
+  comps.forEach(c => pointKeysFor(c).forEach(k => {
     if (c[k] && c[k].id === id) count += 1;
   }));
   return count;

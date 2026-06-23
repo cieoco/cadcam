@@ -255,6 +255,31 @@ function solveBodyJointTopology(topology, params) {
         });
     }
 
+    // 齒輪輸出銷：和旋轉曲柄同理，提前 force-set，下游連桿約束才有已知點可用。
+    // 銷 = center + r·dir(角度);驅動輪角 = motorTheta(ratio=1, sign=+1)、
+    // 從動輪角 = -(R_driver/R_driven)·motorTheta(外嚙合反向)。馬達記在齒輪中心點 p1 上。
+    components.forEach((c) => {
+        if (c.type !== 'gear' || !c.p1?.id || !c.p2?.id) return;
+        addPointId(c.p1); addPointId(c.p2);
+        const center = points[c.p1.id];
+        if (!center) return;
+        const r = getParamVal(c.radiusParam, 40);
+        let motorId, ratio, sign;
+        if (c.mesh) {
+            const driver = components.find(g => g.type === 'gear' && g.id === c.mesh);
+            if (!driver || !driver.p1) return;
+            motorId = driver.p1.physicalMotor || driver.p1.physical_motor || '1';
+            const rDriver = getParamVal(driver.radiusParam, r);
+            ratio = rDriver / (r || 1);   // R_driver / R_driven
+            sign = -1;
+        } else {
+            motorId = c.p1.physicalMotor || c.p1.physical_motor || '1';
+            ratio = 1; sign = 1;
+        }
+        const ang = sign * resolveMotorTheta(String(motorId), theta) * ratio + deg2rad(c.phase || 0);
+        points[c.p2.id] = { x: center.x + r * Math.cos(ang), y: center.y + r * Math.sin(ang) };
+    });
+
     components.forEach((c) => {
         if (c.type === 'bar' && c.p1?.id && c.p2?.id) {
             const len = getParamVal(c.lenParam, 0);
@@ -1053,7 +1078,7 @@ export function solveTopology(topologyOrParams, params) {
     // --- 自動任務排序 (確保 Ground > Crank > Others) ---
     // 這樣使用者在 JSON 中不論順序如何，計算都不會因為依賴點未解而掛掉
     const sortedSteps = [...topology.steps].sort((a, b) => {
-        const order = { 'ground': 0, 'input_crank': 1, 'dyad': 2, 'rigid_triangle': 2, 'slider': 2, 'joint': 3 };
+        const order = { 'ground': 0, 'input_crank': 1, 'gear': 1, 'dyad': 2, 'rigid_triangle': 2, 'slider': 2, 'joint': 3 };
         const oa = order[a.type] ?? 99;
         const ob = order[b.type] ?? 99;
         if (oa !== ob) return oa - ob;
@@ -1109,6 +1134,21 @@ export function solveTopology(topologyOrParams, params) {
                 const baseTheta = resolveMotorTheta(motorId, theta);
                 const ang = baseTheta + (deg2rad(step.phase_offset || 0));
 
+                points[step.id] = {
+                    x: center.x + r * Math.cos(ang),
+                    y: center.y + r * Math.sin(ang)
+                };
+            }
+            else if (step.type === 'gear') {
+                // 齒輪輪緣輸出銷：和 input_crank 同形，只是角度被齒輪比耦合。
+                // angle = sign·motorTheta·ratio + phase（從動輪 sign=-1、ratio=R_driver/R_driven）。
+                const center = points[step.center];
+                if (!center) throw new Error(`Missing center point ${step.center} for gear`);
+                const r = getVal(step, 'len');
+                const baseTheta = resolveMotorTheta(step.motor, theta);
+                const sign = (step.sign === -1) ? -1 : 1;
+                const ratio = Number(step.ratio) || 1;
+                const ang = sign * baseTheta * ratio + deg2rad(step.phase_offset || 0);
                 points[step.id] = {
                     x: center.x + r * Math.cos(ang),
                     y: center.y + r * Math.sin(ang)

@@ -223,6 +223,11 @@
         <span class="name">滑軌</span>
         <span class="role"><span class="desktop-hint">拉出軌道，右鍵確定</span><span class="mobile-hint">拖出軌道，放開確定</span></span>
       </div>
+      <div class="block gear" onclick="window.blocks.addGearPair()">
+        <span class="ico">⚙️</span>
+        <span class="name">齒輪對</span>
+        <span class="role">成對嚙合</span>
+      </div>
       <div class="block motor" onclick="window.blocks.openPowerMenu()">
         <span class="ico">⚡</span>
         <span class="name">動力來源</span>
@@ -325,6 +330,26 @@
           <button class="le-step" onclick="window.blocks.changeServoAngle('end',-15)" title="結束角 −15°">−</button>
           <span class="le-value"><span id="servoEndVal">90</span><span class="le-unit">°</span></span>
           <button class="le-step" onclick="window.blocks.changeServoAngle('end',15)" title="結束角 ＋15°">＋</button>
+        </div>
+      </div>
+      <div class="servo-editor" id="gearEditor" style="display:none;">
+        <span class="se-title">⚙️ 齒輪</span>
+        <div class="se-row">
+          <span class="se-label">模數</span>
+          <button class="le-step" onclick="window.blocks.changeGearModule(-1)" title="模數 −1（齒變小，整對齒輪同步，才咬得起來）">−</button>
+          <span class="le-value"><span id="gearModuleVal">6</span><span class="le-unit">mm</span></span>
+          <button class="le-step" onclick="window.blocks.changeGearModule(1)" title="模數 ＋1（齒變大，整對齒輪同步）">＋</button>
+        </div>
+        <div class="se-row">
+          <span class="se-label">齒數</span>
+          <button class="le-step" onclick="window.blocks.changeGearTeeth(-1)" title="這顆齒輪 −1 齒（改變傳動比）">−</button>
+          <span class="le-value"><span id="gearTeethVal">12</span><span class="le-unit">齒</span></span>
+          <button class="le-step" onclick="window.blocks.changeGearTeeth(1)" title="這顆齒輪 ＋1 齒（改變傳動比）">＋</button>
+        </div>
+        <div class="se-row">
+          <span class="se-label">節圓</span>
+          <span class="le-value"><span id="gearRadiusVal">36</span><span class="le-unit">mm 半徑</span></span>
+          <button class="clear-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除這對齒輪">🗑 刪除</button>
         </div>
       </div>
       <div class="servo-editor" id="strokeEditor" style="display:none;">

@@ -137,6 +137,27 @@ export const BLOCK_EXAMPLES = [
     }
   },
   {
+    id: 'gear-pair',
+    title: '齒輪對：嚙合傳動',
+    note: '紅色驅動齒輪整圈轉、藍色從動齒輪反向轉，轉速比＝半徑反比（30:40，大輪較慢）。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 2,
+      comps: [
+        { type: 'gear', id: 'GearA', color: '#e74c3c',
+          p1: pt('GCA', 'motor', -40, 0, { physicalMotor: '1' }),
+          p2: pt('GPA', 'floating', -10, 0),
+          radiusParam: 'GRA', teeth: 15, phase: 0 },
+        { type: 'gear', id: 'GearB', color: '#2c6fbb',
+          p1: pt('GCB', 'fixed', 30, 0),
+          p2: pt('GPB', 'floating', 70, 0),
+          radiusParam: 'GRB', teeth: 20, phase: 0, mesh: 'GearA' }
+      ],
+      params: { GRA: 30, GRB: 40, theta: 0 }
+    }
+  },
+  {
     id: 'empty-challenge',
     title: '空白挑戰',
     note: '從零開始，試著做出馬達可整圈轉的機構。',

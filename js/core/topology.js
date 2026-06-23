@@ -305,6 +305,42 @@ export function compileTopology(components, topology, solvedPoints) {
         }
     });
 
+    // 2.6 Gear 步驟（嚙合齒輪對）：齒輪輪緣輸出銷 p2 隨齒輪角轉，當下游連桿的驅動點。
+    // 驅動輪（mesh=null、中心 p1 帶馬達）：角度 = motorTheta（ratio=1, sign=+1）。
+    // 從動輪（mesh=<驅動輪 id>）：外嚙合反向，角度 = -(R_driver/R_driven)·motorTheta。
+    // 必須在 Auto-Dyad 之前 push，p2 才不會被當未解節點。單一 DOF 不變（從動角全由 theta 決定）。
+    const gearRadius = (g) => {
+        if (g && g.radiusParam && params[g.radiusParam] === undefined) params[g.radiusParam] = 40;
+        return (g && g.radiusParam && Number(params[g.radiusParam])) || 40;
+    };
+    components.filter(c => c.type === 'gear' && c.p1?.id && c.p2?.id).forEach(c => {
+        let motor, ratio, sign;
+        if (c.mesh) {
+            const driver = components.find(g => g.type === 'gear' && g.id === c.mesh);
+            if (!driver || !driver.p1?.id) return;
+            const driverCenter = allPointsMap.get(driver.p1.id);
+            motor = String(driverCenter?.physicalMotor || '1');
+            ratio = gearRadius(driver) / (gearRadius(c) || 1);   // R_driver / R_driven
+            sign = -1;                                           // 外嚙合：反向旋轉
+        } else {
+            const center = allPointsMap.get(c.p1.id);
+            motor = String(center?.physicalMotor || '1');
+            ratio = 1;
+            sign = 1;
+        }
+        steps.push({
+            id: c.p2.id,
+            type: 'gear',
+            center: c.p1.id,
+            len_param: c.radiusParam,   // 輸出銷半徑＝節圓半徑（銷在輪緣）
+            motor,
+            ratio,
+            sign,
+            phase_offset: Number(c.phase) || 0
+        });
+        joints.add(c.p2.id);
+    });
+
     // Auto-Dyad Inference
     const bars = virtualComponents.filter(c => c.type === 'bar' && !c.isInput);
     const unsolvedJoints = Array.from(allPointsMap.keys()).filter(id => !steps.find(s => s.id === id));
