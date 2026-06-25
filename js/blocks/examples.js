@@ -43,18 +43,18 @@ export const BLOCK_EXAMPLES = [
       v: 1,
       counter: 6,
       comps: [
-        { type: 'anchor', id: 'Anchor1', p1: pt('A', 'fixed', -120, 0) },
-        { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 90, 0) },
-        bar('Link1', pt('A', 'fixed', -120, 0, { physicalMotor: '1' }), pt('C', 'floating', -80, 0), 40, {
+        { type: 'anchor', id: 'Anchor1', p1: pt('A', 'fixed', -80, 0) },
+        { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 20, 0) },
+        bar('Link1', pt('A', 'fixed', -80, 0, { physicalMotor: '1' }), pt('C', 'floating', -50, 0), 30, {
           color: '#e74c3c',
           isInput: true,
           physicalMotor: '1',
           phaseOffset: 0
         }),
-        bar('Link2', pt('C', 'floating', -80, 0), pt('D', 'floating', 10, 50), 104),
-        bar('Link3', pt('B', 'fixed', 90, 0), pt('D', 'floating', 10, 50), 96)
+        bar('Link2', pt('C', 'floating', -50, 0), pt('D', 'floating', 10.7, 79.5), 100),
+        bar('Link3', pt('B', 'fixed', 20, 0), pt('D', 'floating', 10.7, 79.5), 80)
       ],
-      params: { LL1: 40, LL2: 104, LL3: 96 }
+      params: { LL1: 30, LL2: 100, LL3: 80 }
     }
   },
   {

@@ -13,12 +13,14 @@ export function sweep(comps, params, watchIds = [], stepDeg = 10) {
   const compiled = compileTopology(comps, topo, new Set());
   const frames = [];
   let allValid = true;
+  let prevPoints = null;
   for (let theta = 0; theta <= 360; theta += stepDeg) {
-    const sol = solveTopology(compiled, { thetaDeg: theta });
+    const sol = solveTopology(compiled, { thetaDeg: theta, _prevPoints: prevPoints });
     const points = (sol && sol.points) || {};
     const ok = watchIds.every(id => points[id] && Number.isFinite(points[id].x) && Number.isFinite(points[id].y));
     if (!ok) allValid = false;
     frames.push({ theta, points });
+    if (ok) prevPoints = points;
   }
   return { frames, allValid };
 }
