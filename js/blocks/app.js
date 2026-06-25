@@ -369,11 +369,13 @@ function computeMotorRotDeg(id, pts, groundIds) {
 }
 
 // ---- 零件繪製分派表（slice 2：登錄表化）----
-// PART_DRAW[type](c, pts)：把 draw() 內依 `c.type===` 的繪製分流逐步收進表，達成「加機件＝加表項」。
+// PART_DRAW[type] = { phase, draw }：把 draw() 內依 `c.type===` 的繪製分流逐步收進表，達成「加機件＝加表項」。
+//   phase 決定繪製時機：'underlay'＝畫在連桿之下（gear 等機件，draw(c, pts)）；
+//                       'layered' ＝畫進 zlift 疊放層（三點桿，draw(c, pts, ctx) 用 ctx 取對應 <g>）。
 // 放在 app.js（DOM 層）而非純資料的 part-types.js——後者不碰 DOM（CLAUDE.md 的 core/UI 邊界）。
 // 各函式體照搬自原 draw() 內聯區塊、零行為改變：直接用 app 模組級的
-// svg / TX / TY / frameUpdaters / pointCoords / selectGear / gearMeshOff 等。
-// 目前只有 gear；bar / triangle / slider / 馬達之後逐刀填表（每刀瀏覽器驗證）。
+// svg / TX / TY / frameUpdaters / pointCoords / selectGear / selectTriangle / gearMeshOff 等。
+// 目前有 gear / triangle；bar / slider / 馬達之後逐刀填表（每刀瀏覽器驗證）。
 function drawGearPart(c, pts) {
   // 齒輪：在連桿下層畫齒形多邊形（漸開線齒廓由 createGearPath 產），每幀只更新旋轉。
   // 轉角＝輸出銷(p2)相對中心(p1)的角度;嚙合對的驅動/從動會自然反向轉。
@@ -442,7 +444,42 @@ function drawGearPart(c, pts) {
   applyGear(pts);
   frameUpdaters.push(applyGear);
 }
-const PART_DRAW = { gear: drawGearPart };
+// 三點桿：用圓角三角板呈現，同時仍保留每條邊/孔位的求解語法。phase 'layered'：畫進
+// draw() 依 zlift 算好的疊放層（透過 ctx.groupForLayer/triLayerByKey/triKey 取得對應 <g>）。
+// 函式體照搬自原 draw() 內聯三角板迴圈、零行為改變（內部解構改名 a,b,d 以免遮蔽參數 c）。
+function drawTrianglePart(c, pts, ctx) {
+  if (!c.p1 || !c.p2 || !c.p3) return;
+  const ids = [c.p1.id, c.p2.id, c.p3.id];
+  const path = document.createElementNS(SVG_NS, 'path');
+  const color = c.color || '#27ae60';
+  const isSel = c.id === S.selectedTriangleId;
+  path.setAttribute('fill', color + '33');
+  path.setAttribute('stroke', isSel ? '#e67e22' : color);
+  path.setAttribute('stroke-width', isSel ? 3.2 : 2.5);
+  path.setAttribute('stroke-linejoin', 'round');
+  path.style.cursor = 'pointer';
+  path.addEventListener('pointerdown', (e) => {
+    if (S.drawingLink || S.drawingTriangle) return;
+    e.stopPropagation();
+    selectTriangle(c.id);
+  });
+  // 每幀更新：解出三點就更新外形，三點不全則隱藏（與原本「無效不畫」同效果）
+  const applyTri = (P) => {
+    const [a, b, d] = ids.map(id => P[id]);
+    const ok = [a, b, d].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
+    path.style.display = ok ? '' : 'none';
+    if (ok) path.setAttribute('d', roundedTriangleHullPath(a, b, d));
+  };
+  applyTri(pts);
+  ctx.groupForLayer(ctx.triLayerByKey.get(ctx.triKey(ids))).appendChild(path);
+  frameUpdaters.push(applyTri);
+}
+
+// 登錄表：phase 決定繪製時機——'underlay'＝連桿之下（gear 等機件）、'layered'＝畫進 zlift 疊放層（三點桿）。
+const PART_DRAW = {
+  gear:     { phase: 'underlay', draw: drawGearPart },
+  triangle: { phase: 'layered',  draw: drawTrianglePart },
+};
 
 function draw() {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
@@ -463,9 +500,8 @@ function draw() {
   const motorCenterIds = new Set((S.compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
   drawTraceTrajectory(getTrajectoryData());
 
-  // 零件繪製分派（slice 2 登錄表化）：在連桿下層畫（此處＝z 序在連桿之下，與原本一致）。
-  // 目前表中只有 gear；逐刀把 bar / triangle / slider / 馬達也收進 PART_DRAW（每刀瀏覽器驗證）。
-  S.comps.forEach(c => { const fn = PART_DRAW[c.type]; if (fn) fn(c, pts); });
+  // 零件繪製分派（slice 2 登錄表化）— 'underlay' 機件畫在連桿之下（z 序與原本一致）。
+  S.comps.forEach(c => { const e = PART_DRAW[c.type]; if (e && e.phase === 'underlay') e.draw(c, pts); });
 
   // 三角板邊：這些 link 由實心三角板代表，2D 不另畫（與 3D scene-model 的 visible 篩法一致）。
   const triangleEdgeKeys = new Set();
@@ -518,33 +554,9 @@ function draw() {
   });
   const groupForLayer = (L) => layerGroups.get(L) || motorLayer;
 
-  // 三點桿：用圓角三角板呈現，同時仍保留每條邊/孔位的求解語法。
-  S.comps.filter(comp => comp.type === 'triangle' && comp.p1 && comp.p2 && comp.p3).forEach(tri => {
-    const ids = [tri.p1.id, tri.p2.id, tri.p3.id];
-    const path = document.createElementNS(SVG_NS, 'path');
-    const color = tri.color || '#27ae60';
-    const isSel = tri.id === S.selectedTriangleId;
-    path.setAttribute('fill', color + '33');
-    path.setAttribute('stroke', isSel ? '#e67e22' : color);
-    path.setAttribute('stroke-width', isSel ? 3.2 : 2.5);
-    path.setAttribute('stroke-linejoin', 'round');
-    path.style.cursor = 'pointer';
-    path.addEventListener('pointerdown', (e) => {
-      if (S.drawingLink || S.drawingTriangle) return;
-      e.stopPropagation();
-      selectTriangle(tri.id);
-    });
-    // 每幀更新：解出三點就更新外形，三點不全則隱藏（與原本「無效不畫」同效果）
-    const applyTri = (P) => {
-      const [a, b, c] = ids.map(id => P[id]);
-      const ok = [a, b, c].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
-      path.style.display = ok ? '' : 'none';
-      if (ok) path.setAttribute('d', roundedTriangleHullPath(a, b, c));
-    };
-    applyTri(pts);
-    groupForLayer(triLayerByKey.get(triKey(ids))).appendChild(path);
-    frameUpdaters.push(applyTri);
-  });
+  // 三點桿繪製分派（slice 2 登錄表化）— 'layered' 畫進對應 zlift 疊放層（ctx 帶層查詢 helper）。
+  const triCtx = { groupForLayer, triLayerByKey, triKey };
+  S.comps.forEach(c => { const e = PART_DRAW[c.type]; if (e && e.phase === 'layered') e.draw(c, pts, triCtx); });
 
   // 動力來源本體：畫在桿件底下，曲柄轉在它上面。依型號畫 TT馬達或 MG995 伺服。
   // 朝向＝對準接在馬達中心、非曲柄的那根桿（指向它的另一端）；沒有就朝最近的另一個地錨；都沒有才朝下。
