@@ -423,79 +423,82 @@ function solveBodyJointTopology(topology, params) {
 
     const prevPoints = actualParams && actualParams._prevPoints;
     let infeasible = false;
-    let changed = true;
-    let guard = 0;
-    while (changed && guard < 50) {
-        changed = false;
-        guard += 1;
+    const solveDistanceConstraints = () => {
+        let changed = true;
+        let guard = 0;
+        while (changed && guard < 50) {
+            changed = false;
+            guard += 1;
 
-        for (const pid of pointIds) {
-            if (points[pid]) continue;
+            for (const pid of pointIds) {
+                if (points[pid]) continue;
 
-            const related = constraints
-                .filter(c => c.a === pid || c.b === pid)
-                .map(c => {
-                    const otherId = c.a === pid ? c.b : c.a;
-                    return { ...c, otherId };
-                })
-                .filter(c => points[c.otherId]);
+                const related = constraints
+                    .filter(c => c.a === pid || c.b === pid)
+                    .map(c => {
+                        const otherId = c.a === pid ? c.b : c.a;
+                        return { ...c, otherId };
+                    })
+                    .filter(c => points[c.otherId]);
 
-            if (related.length < 2) continue;
+                if (related.length < 2) continue;
 
-            const c1 = related[0];
-            const c2 = related[1];
-            const p1 = points[c1.otherId];
-            const p2 = points[c2.otherId];
-            const options = solveIntersectionOptions(p1, c1.len, p2, c2.len);
-            if (!options.length) {
-                infeasible = true;
-                continue;
-            }
-
-            let chosen = null;
-            const triKey = c1.triId && c1.triId === c2.triId ? c1.triId : null;
-            if (triKey && triangles.has(triKey)) {
-                const tri = triangles.get(triKey);
-                if (pid === tri.p3 && ((c1.role === 'r1' && c2.role === 'r2') || (c1.role === 'r2' && c2.role === 'r1'))) {
-                    chosen = tri.sign === -1 && options[1] ? options[1] : options[0];
+                const c1 = related[0];
+                const c2 = related[1];
+                const p1 = points[c1.otherId];
+                const p2 = points[c2.otherId];
+                const options = solveIntersectionOptions(p1, c1.len, p2, c2.len);
+                if (!options.length) {
+                    infeasible = true;
+                    continue;
                 }
-            }
 
-            if (!chosen) {
-                const prev = prevPoints ? prevPoints[pid] : null;
-                if (prev) {
-                    const d0 = Math.hypot(options[0].x - prev.x, options[0].y - prev.y);
-                    const d1 = options[1] ? Math.hypot(options[1].x - prev.x, options[1].y - prev.y) : Infinity;
-                    chosen = d0 <= d1 ? options[0] : options[1];
-                } else {
-                    const seed = getInitialPoint(pid);
-                    if (seed) {
-                        const d0 = Math.hypot(options[0].x - seed.x, options[0].y - seed.y);
-                        const d1 = options[1] ? Math.hypot(options[1].x - seed.x, options[1].y - seed.y) : Infinity;
-                        chosen = d0 <= d1 ? options[0] : options[1];
-                    } else {
-                        chosen = options[0];
+                let chosen = null;
+                const triKey = c1.triId && c1.triId === c2.triId ? c1.triId : null;
+                if (triKey && triangles.has(triKey)) {
+                    const tri = triangles.get(triKey);
+                    if (pid === tri.p3 && ((c1.role === 'r1' && c2.role === 'r2') || (c1.role === 'r2' && c2.role === 'r1'))) {
+                        chosen = tri.sign === -1 && options[1] ? options[1] : options[0];
                     }
                 }
-            }
 
-            if (chosen) {
-                points[pid] = chosen;
-                // 「機敏預警」：計算傳動品質 (sin of the angle between incoming links)
-                const v1 = { x: p1.x - chosen.x, y: p1.y - chosen.y };
-                const v2 = { x: p2.x - chosen.x, y: p2.y - chosen.y };
-                const mag1 = Math.hypot(v1.x, v1.y);
-                const mag2 = Math.hypot(v2.x, v2.y);
-                if (mag1 > 0 && mag2 > 0) {
-                    const dot = v1.x * v2.x + v1.y * v2.y;
-                    const cosTheta = dot / (mag1 * mag2);
-                    const sinTheta = Math.sqrt(Math.max(0, 1 - cosTheta * cosTheta));
-                    dyadQualities[pid] = sinTheta; // 1.0 = Perfect 90deg, 0.0 = Dead Lock
+                if (!chosen) {
+                    const prev = prevPoints ? prevPoints[pid] : null;
+                    if (prev) {
+                        const d0 = Math.hypot(options[0].x - prev.x, options[0].y - prev.y);
+                        const d1 = options[1] ? Math.hypot(options[1].x - prev.x, options[1].y - prev.y) : Infinity;
+                        chosen = d0 <= d1 ? options[0] : options[1];
+                    } else {
+                        const seed = getInitialPoint(pid);
+                        if (seed) {
+                            const d0 = Math.hypot(options[0].x - seed.x, options[0].y - seed.y);
+                            const d1 = options[1] ? Math.hypot(options[1].x - seed.x, options[1].y - seed.y) : Infinity;
+                            chosen = d0 <= d1 ? options[0] : options[1];
+                        } else {
+                            chosen = options[0];
+                        }
+                    }
                 }
-                changed = true;
+
+                if (chosen) {
+                    points[pid] = chosen;
+                    // 「機敏預警」：計算傳動品質 (sin of the angle between incoming links)
+                    const v1 = { x: p1.x - chosen.x, y: p1.y - chosen.y };
+                    const v2 = { x: p2.x - chosen.x, y: p2.y - chosen.y };
+                    const mag1 = Math.hypot(v1.x, v1.y);
+                    const mag2 = Math.hypot(v2.x, v2.y);
+                    if (mag1 > 0 && mag2 > 0) {
+                        const dot = v1.x * v2.x + v1.y * v2.y;
+                        const cosTheta = dot / (mag1 * mag2);
+                        const sinTheta = Math.sqrt(Math.max(0, 1 - cosTheta * cosTheta));
+                        dyadQualities[pid] = sinTheta; // 1.0 = Perfect 90deg, 0.0 = Dead Lock
+                    }
+                    changed = true;
+                }
             }
         }
-    }
+    };
+    solveDistanceConstraints();
 
     // If a bar has a known endpoint and a known hole point on the bar,
     // use that direction to resolve the other endpoint (e.g. drive Link2 by P2).
@@ -691,6 +694,8 @@ function solveBodyJointTopology(topology, params) {
             }
         }
     }
+    // 桿上孔位/滑軌點可能在線約束階段才解出；再跑一次距離約束，讓接在孔位上的後續連桿能被推出。
+    solveDistanceConstraints();
 
     if (!infeasible) {
         lineConstraints.forEach(lc => {
