@@ -139,11 +139,11 @@ export const BLOCK_EXAMPLES = [
   {
     id: 'pantograph',
     title: '縮放儀：2 倍放大',
-    note: '黃色點是追蹤點，外端輸出點會保持在同方向的 2 倍距離，用來驗證放大比例。',
+    note: '黃色點是追蹤點，外端輸出點會保持在同方向的 2 倍距離；上下等長桿讓倍率架構看得出來。',
     snapshot: {
       kind: 'blocks',
       v: 1,
-      counter: 2,
+      counter: 6,
       tracePoint: 'P',
       comps: [
         { type: 'anchor', id: 'Anchor1', p1: pt('O', 'fixed', 0, 0) },
@@ -153,9 +153,13 @@ export const BLOCK_EXAMPLES = [
           physicalMotor: '1',
           phaseOffset: 0,
           holes: [{ id: 'I', distParam: 'DI' }]
-        })
+        }),
+        bar('Link2', pt('O', 'fixed', 0, 0), pt('U', 'floating', 40, 30), 50, { color: '#3498db' }),
+        bar('Link3', pt('U', 'floating', 40, 30), pt('P', 'floating', 80, 0), 50, { color: '#3498db' }),
+        bar('Link4', pt('O', 'fixed', 0, 0), pt('V', 'floating', 40, -30), 50, { color: '#27ae60' }),
+        bar('Link5', pt('V', 'floating', 40, -30), pt('P', 'floating', 80, 0), 50, { color: '#27ae60' })
       ],
-      params: { LL1: 80, DI: 40 }
+      params: { LL1: 80, LL2: 50, LL3: 50, LL4: 50, LL5: 50, DI: 40 }
     }
   },
   {
