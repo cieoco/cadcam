@@ -901,8 +901,10 @@ function makeGear(n, opts) {
   const { teeth, module, cx, cy, isDriver, meshId, color } = opts;
   const R = teeth * module / 2;
   const radiusParam = 'GR' + n;
-  const center = { id: 'GC' + n, type: isDriver ? 'motor' : 'fixed', x: cx, y: cy };
-  if (isDriver) center.physicalMotor = '1';
+  // 乙：放下即「浮動未固定」——兩個中心都是 floating，比照桿件由使用者把中心拖去地錨/接點才接地。
+  // 驅動輪不必顯式給馬達：兩中心接地後，gear step 的 motor 會 fallback 到預設馬達 '1'（＝播放 theta），
+  // 按 ▶ 即轉（見 core/topology.js 的 gear 步驟、solver.js 的齒輪 force-set）。
+  const center = { id: 'GC' + n, type: 'floating', x: cx, y: cy };
   const gear = {
     type: 'gear', id: 'Gear' + n, color,
     p1: center,
@@ -1159,9 +1161,12 @@ function handleMotorOnNode(nodeId) {
     driveSliderAt(sl.id);
     return;
   }
+  // 齒輪中心：放馬達＝把這條嚙合鏈的驅動輪固定到機架並給動力（沒馬達的齒輪是靜止接地輪）。
+  const gearC = S.comps.find(c => c.type === 'gear' && c.p1 && c.p1.id === nodeId);
+  if (gearC) { driveGearAt(gearC.id); return; }
   const bars = barsAtNode(nodeId);
   if (!bars.length) {
-    setBanner('馬達要放在連桿的端點上喔');
+    setBanner('馬達要放在連桿的端點上，或齒輪中心上喔');
     return;
   }
   if (bars.length === 1) {
@@ -1247,6 +1252,31 @@ function driveSliderAt(sliderId) {
   S.selectedTriangleId = null;
   rebuild(); draw();
   Panels.updateRoleEditor();
+}
+// 在齒輪中心放馬達：把這條嚙合鏈的「根驅動輪」中心固定到機架並給動力。
+// 馬達一律記在驅動輪（mesh=null）中心；從動輪角度由它推算（外嚙合反向、按齒比）。
+// 沒馬達的齒輪是靜止接地輪——這個動作讓齒輪「會轉」，與桿件放馬達同理（順手把樞軸固定）。
+// 註：齒輪目前一律連續旋轉（不分 TT / 伺服），gear 層 motorType 不入 schema 故不保存。
+function driveGearAt(gearId) {
+  if (S.pendingMotorType === 'linear') {
+    setBanner('線性致動器不能驅動齒輪；請改用 TT馬達 / MG995');
+    cancelMotorMode();
+    return;
+  }
+  let g = gearById(gearId);
+  if (!g || !g.p1) return;
+  const seen = new Set();
+  while (g.mesh && !seen.has(g.id)) { seen.add(g.id); const d = gearById(g.mesh); if (!d || !d.p1) break; g = d; }
+  pushUndo();
+  freezePointAtDisplay(g.p1.id);     // 馬達順手把驅動輪中心釘在目前位置（固定在機架），與桿件一致
+  setPointType(g.p1.id, 'fixed');
+  g.p1.physicalMotor = '1';
+  cancelMotorMode();
+  selectGear(g.id);
+  rebuild(); draw();
+  // 嚙合對要兩個中心都接地，整對才會完整解出、固定；提醒把另一個中心也設地錨。
+  const ungrounded = gearMeshChain(g).filter(x => x.p1 && !pointIsGround(x.p1.id));
+  if (ungrounded.length) setBanner('驅動輪已上馬達並固定；記得把另一個齒輪中心也設成地錨，整對才會轉');
 }
 
 // ---- 動力來源型號查詢 ----

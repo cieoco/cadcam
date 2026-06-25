@@ -264,19 +264,21 @@ function solveBodyJointTopology(topology, params) {
         const center = points[c.p1.id];
         if (!center) return;
         const r = getParamVal(c.radiusParam, 40);
-        let motorId, ratio, sign;
+        let driverPt = c.p1, ratio = 1, sign = 1;
         if (c.mesh) {
             const driver = components.find(g => g.type === 'gear' && g.id === c.mesh);
             if (!driver || !driver.p1) return;
-            motorId = driver.p1.physicalMotor || driver.p1.physical_motor || '1';
+            driverPt = driver.p1;                                    // 馬達記在這條嚙合鏈的驅動輪中心上
             const rDriver = getParamVal(driver.radiusParam, r);
             ratio = rDriver / (r || 1);   // R_driver / R_driven
-            sign = -1;
-        } else {
-            motorId = c.p1.physicalMotor || c.p1.physical_motor || '1';
-            ratio = 1; sign = 1;
+            sign = -1;                    // 外嚙合：從動輪反向
         }
-        const ang = sign * resolveMotorTheta(String(motorId), theta) * ratio + deg2rad(c.phase || 0);
+        // 只有「驅動輪中心帶實體馬達」才依 theta 旋轉；沒馬達＝靜止的接地輪（銷停在放置角度，theta 不影響）。
+        // 與桿件一致：沒放馬達就不動，不再自動退回預設馬達 '1' 而平白轉起來。
+        const motorId = driverPt.physicalMotor || driverPt.physical_motor || '';
+        const ang = motorId
+            ? sign * resolveMotorTheta(String(motorId), theta) * ratio + deg2rad(c.phase || 0)
+            : Math.atan2((c.p2.y || 0) - (c.p1.y || 0), (c.p2.x || 0) - (c.p1.x || 0));
         points[c.p2.id] = { x: center.x + r * Math.cos(ang), y: center.y + r * Math.sin(ang) };
     });
 

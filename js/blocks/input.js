@@ -124,6 +124,19 @@ function onDragMove(e) {
     draw();
     return;
   }
+  // 齒輪中心：拖中心＝整顆齒輪剛性平移（輪緣銷 p2 跟著走），否則齒形繞 p1、銷停舊位會分離。
+  // 拖去吸附/合併到已知點或地錨即「固定在機架上」（乙）。嚙合夥伴的同步保留給後續 snap 增強。
+  const gearForCenter = S.comps.find(c => c.type === 'gear' && c.p1 && c.p1.id === S.dragId);
+  if (gearForCenter && gearForCenter.p2) {
+    const p = pointCoords()[S.dragId];
+    const dx = w.x - (p?.x || 0);
+    const dy = w.y - (p?.y || 0);
+    movePointById(gearForCenter.p1.id, dx, dy);
+    movePointById(gearForCenter.p2.id, dx, dy);
+    S.snapTarget = nearestDisplayTo(S.dragId);
+    rebuild(); draw();
+    return;
+  }
   let tx = w.x, ty = w.y;
   // 自由連桿：兩端都未固定、也沒接到別的桿時，拖端點等於整根平移。
   const free = freeLinkForPoint(S.dragId);
