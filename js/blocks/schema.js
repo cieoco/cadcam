@@ -74,6 +74,16 @@ function normalizeBar(comp, index, params, warnings) {
     }
   }
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0)))); // 手動疊放相對位移
+  if (Array.isArray(comp.holes)) {
+    const holes = comp.holes
+      .filter(h => h && safeId(h.id))
+      .map((h, hIndex) => {
+        const distParam = safeId(h.distParam) ? h.distParam : `${lenParam}_H${hIndex + 1}`;
+        if (params[distParam] === undefined) params[distParam] = Math.max(0, Math.round(num(h.dist, 0)));
+        return { id: h.id, distParam };
+      });
+    if (holes.length) out.holes = holes;
+  }
 
   const rawLen = params[lenParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y);
   params[lenParam] = out.fixedLen ? snapLego(rawLen) : Math.round(num(rawLen, 0));

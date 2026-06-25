@@ -137,6 +137,28 @@ export const BLOCK_EXAMPLES = [
     }
   },
   {
+    id: 'pantograph',
+    title: '縮放儀：2 倍放大',
+    note: '黃色點是追蹤點，外端輸出點會保持在同方向的 2 倍距離，用來驗證放大比例。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 2,
+      tracePoint: 'P',
+      comps: [
+        { type: 'anchor', id: 'Anchor1', p1: pt('O', 'fixed', 0, 0) },
+        bar('Link1', pt('O', 'fixed', 0, 0, { physicalMotor: '1' }), pt('P', 'floating', 80, 0), 80, {
+          color: '#e74c3c',
+          isInput: true,
+          physicalMotor: '1',
+          phaseOffset: 0,
+          holes: [{ id: 'I', distParam: 'DI' }]
+        })
+      ],
+      params: { LL1: 80, DI: 40 }
+    }
+  },
+  {
     id: 'gear-pair',
     title: '齒輪對：嚙合傳動',
     note: '紅色驅動齒輪整圈轉、藍色從動齒輪反向轉，轉速比＝半徑反比（30:40，大輪較慢）。',

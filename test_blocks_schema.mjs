@@ -51,6 +51,22 @@ ok('schema accepts UI bar shape', messy && messy.comps.length === 1);
 ok('schema snaps fixed link length to LEGO pitch', messy && messy.params.LLX === 32);
 ok('schema repairs invalid color', messy && messy.comps[0].color === '#3498db');
 
+const withHole = normalizeSnapshot({
+  kind: 'blocks',
+  v: 1,
+  counter: 0,
+  comps: [{
+    type: 'bar',
+    id: 'ScaleLink',
+    p1: { id: 'O', type: 'fixed', x: 0, y: 0 },
+    p2: { id: 'P', type: 'floating', x: 80, y: 0 },
+    lenParam: 'LP',
+    holes: [{ id: 'I', distParam: 'DI' }]
+  }],
+  params: { LP: 80, DI: 40 }
+});
+ok('schema preserves bar holes', withHole && withHole.comps[0].holes && withHole.comps[0].holes[0].id === 'I');
+
 const snap = toSnapshot(messy.comps, { params: messy.params }, messy.counter);
 ok('toSnapshot writes blocks kind', snap.kind === 'blocks' && snap.v === 1);
 
