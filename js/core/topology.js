@@ -3,6 +3,55 @@
  * 將 Wizard 組件轉換為可求解的拓撲結構
  */
 
+function compileGearSteps(c, ctx) {
+    const { components, params, allPointsMap, steps, joints } = ctx;
+    if (!c.p1?.id || !c.p2?.id) return;
+
+    const gearRadius = (g) => {
+        if (g && g.radiusParam && params[g.radiusParam] === undefined) params[g.radiusParam] = 40;
+        return (g && g.radiusParam && Number(params[g.radiusParam])) || 40;
+    };
+
+    let motor, ratio, sign;
+    if (c.mesh) {
+        const driver = components.find(g => g.type === 'gear' && g.id === c.mesh);
+        if (!driver || !driver.p1?.id) return;
+        const driverCenter = allPointsMap.get(driver.p1.id);
+        motor = String(driverCenter?.physicalMotor || '1');
+        ratio = gearRadius(driver) / (gearRadius(c) || 1);   // R_driver / R_driven
+        sign = -1;                                           // 外嚙合：反向旋轉
+    } else {
+        const center = allPointsMap.get(c.p1.id);
+        motor = String(center?.physicalMotor || '1');
+        ratio = 1;
+        sign = 1;
+    }
+    steps.push({
+        id: c.p2.id,
+        type: 'gear',
+        center: c.p1.id,
+        len_param: c.radiusParam,   // 輸出銷半徑＝節圓半徑（銷在輪緣）
+        motor,
+        ratio,
+        sign,
+        phase_offset: Number(c.phase) || 0
+    });
+    joints.add(c.p2.id);
+}
+
+// PART_COMPILE[type]：把「某零件如何編譯成求解 step」逐步收進表，對齊 blocks 的 PART_DRAW 方向。
+// phase 讓新機件能宣告插入求解流程的位置；齒輪必須在 Auto-Dyad 前先產生 p2，供下游連桿使用。
+const PART_COMPILE = {
+    gear: { phase: 'beforeAutoDyad', compile: compileGearSteps }
+};
+
+function compileRegisteredParts(components, phase, ctx) {
+    components.forEach(c => {
+        const entry = PART_COMPILE[c.type];
+        if (entry && entry.phase === phase) entry.compile(c, ctx);
+    });
+}
+
 export function compileTopology(components, topology, solvedPoints) {
     const steps = [];
     const visualization = { links: [], polygons: [], joints: [] };
@@ -309,37 +358,7 @@ export function compileTopology(components, topology, solvedPoints) {
     // 驅動輪（mesh=null、中心 p1 帶馬達）：角度 = motorTheta（ratio=1, sign=+1）。
     // 從動輪（mesh=<驅動輪 id>）：外嚙合反向，角度 = -(R_driver/R_driven)·motorTheta。
     // 必須在 Auto-Dyad 之前 push，p2 才不會被當未解節點。單一 DOF 不變（從動角全由 theta 決定）。
-    const gearRadius = (g) => {
-        if (g && g.radiusParam && params[g.radiusParam] === undefined) params[g.radiusParam] = 40;
-        return (g && g.radiusParam && Number(params[g.radiusParam])) || 40;
-    };
-    components.filter(c => c.type === 'gear' && c.p1?.id && c.p2?.id).forEach(c => {
-        let motor, ratio, sign;
-        if (c.mesh) {
-            const driver = components.find(g => g.type === 'gear' && g.id === c.mesh);
-            if (!driver || !driver.p1?.id) return;
-            const driverCenter = allPointsMap.get(driver.p1.id);
-            motor = String(driverCenter?.physicalMotor || '1');
-            ratio = gearRadius(driver) / (gearRadius(c) || 1);   // R_driver / R_driven
-            sign = -1;                                           // 外嚙合：反向旋轉
-        } else {
-            const center = allPointsMap.get(c.p1.id);
-            motor = String(center?.physicalMotor || '1');
-            ratio = 1;
-            sign = 1;
-        }
-        steps.push({
-            id: c.p2.id,
-            type: 'gear',
-            center: c.p1.id,
-            len_param: c.radiusParam,   // 輸出銷半徑＝節圓半徑（銷在輪緣）
-            motor,
-            ratio,
-            sign,
-            phase_offset: Number(c.phase) || 0
-        });
-        joints.add(c.p2.id);
-    });
+    compileRegisteredParts(components, 'beforeAutoDyad', { components, params, allPointsMap, steps, joints });
 
     // Auto-Dyad Inference
     const bars = virtualComponents.filter(c => c.type === 'bar' && !c.isInput);
