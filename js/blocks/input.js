@@ -28,7 +28,7 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
     snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
     movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
     isFreeLink, freeLinkForPoint, fixedLinkFor, inputCrankMovingEnd,
-    handleMotorOnNode, setSliderDetailRows, frameNodeIds;
+    handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround;
 
 export function startFreeLinkDrag(e, linkId) {
   const c = S.comps.find(x => x.id === linkId && isFreeLink(x));
@@ -125,14 +125,33 @@ function onDragMove(e) {
     return;
   }
   // 齒輪中心：拖中心＝整顆齒輪剛性平移（輪緣銷 p2 跟著走），否則齒形繞 p1、銷停舊位會分離。
-  // 拖去吸附/合併到已知點或地錨即「固定在機架上」（乙）。嚙合夥伴的同步保留給後續 snap 增強。
+  // 並維持嚙合（中心距 D=Ra+Rb 是死的）：
+  //  - 夥伴已接地 → 本中心被 D 綁住，繞夥伴中心「公轉」（保持咬合，只改方位，之後可就地設地錨）。
+  //  - 夥伴未接地 → 整對一起平移（兩顆都搬，維持咬合）。
+  //  - 沒夥伴（單顆）→ 整顆剛性平移。
+  // 放開沿用既有 mergePoints 合併到已知點/地錨＝固定在機架上（乙）。
   const gearForCenter = S.comps.find(c => c.type === 'gear' && c.p1 && c.p1.id === S.dragId);
   if (gearForCenter && gearForCenter.p2) {
-    const p = pointCoords()[S.dragId];
-    const dx = w.x - (p?.x || 0);
-    const dy = w.y - (p?.y || 0);
-    movePointById(gearForCenter.p1.id, dx, dy);
-    movePointById(gearForCenter.p2.id, dx, dy);
+    const pc = pointCoords();
+    const cur = pc[S.dragId] || { x: gearForCenter.p1.x || 0, y: gearForCenter.p1.y || 0 };
+    const partner = S.comps.find(p => p.type === 'gear' && p !== gearForCenter &&
+      (gearForCenter.mesh === p.id || p.mesh === gearForCenter.id));
+    const moveGear = (g, dx, dy) => { if (g.p1) movePointById(g.p1.id, dx, dy); if (g.p2) movePointById(g.p2.id, dx, dy); };
+    if (partner && partner.p1 && pointIsGround(partner.p1.id)) {
+      // 公轉：本中心固定在以夥伴中心為圓心、半徑 D=Ra+Rb 的圓上，方位跟指標。
+      const pCtr = pc[partner.p1.id] || { x: partner.p1.x || 0, y: partner.p1.y || 0 };
+      const D = (Number(S.topo.params[gearForCenter.radiusParam]) || 40) +
+                (Number(S.topo.params[partner.radiusParam]) || 40);
+      let vx = w.x - pCtr.x, vy = w.y - pCtr.y;
+      const d = Math.hypot(vx, vy) || 1;
+      moveGear(gearForCenter, (pCtr.x + vx / d * D) - cur.x, (pCtr.y + vy / d * D) - cur.y);
+    } else if (partner && partner.p1) {
+      // 整對平移：兩顆一起搬。
+      moveGear(gearForCenter, w.x - cur.x, w.y - cur.y);
+      moveGear(partner, w.x - cur.x, w.y - cur.y);
+    } else {
+      moveGear(gearForCenter, w.x - cur.x, w.y - cur.y);
+    }
     S.snapTarget = nearestDisplayTo(S.dragId);
     rebuild(); draw();
     return;
@@ -223,7 +242,7 @@ export function init(deps) {
      snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
      movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
      isFreeLink, freeLinkForPoint, fixedLinkFor, inputCrankMovingEnd,
-     handleMotorOnNode, setSliderDetailRows, frameNodeIds } = deps);
+     handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround } = deps);
 
   // ---- 掛上 svg 的指標 / 手勢監聽（原 app.js 檔尾那批，順序不變）----
   svg.addEventListener('pointermove', onDragMove);

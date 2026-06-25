@@ -1852,7 +1852,7 @@ function init() {
                snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
                movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
                isFreeLink, freeLinkForPoint, fixedLinkFor, inputCrankMovingEnd,
-               handleMotorOnNode, setSliderDetailRows, frameNodeIds });
+               handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround });
   populateExamples();
   let loaded = false;
   try {
