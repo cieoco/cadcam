@@ -411,13 +411,20 @@ function draw() {
       meshDeg = (Cq - 0.5) * (360 / NB);                    // 補到 0.5（半齒）
     }
     const isSelGear = c.id === S.selectedGearId;
+    const meshOff = gearMeshOff(c);   // 兩中心都接地但沒對好咬合距離 → 紅色虛線環提示
     const g = document.createElementNS(SVG_NS, 'g');
     const poly = document.createElementNS(SVG_NS, 'polygon');
     poly.setAttribute('points', polyStr);
     poly.setAttribute('fill', (c.color || '#b0772e') + (isSelGear ? '55' : '33'));
-    poly.setAttribute('stroke', isSelGear ? '#e67e22' : (c.color || '#b0772e'));
+    poly.setAttribute('stroke', meshOff ? '#e74c3c' : (isSelGear ? '#e67e22' : (c.color || '#b0772e')));
     poly.setAttribute('stroke-width', Math.max(1, (isSelGear ? 2.4 : 1.4) * sc));
     poly.setAttribute('stroke-linejoin', 'round');
+    if (meshOff) {
+      poly.setAttribute('stroke-dasharray', `${(4 * sc).toFixed(1)},${(3 * sc).toFixed(1)}`);
+      const t = document.createElementNS(SVG_NS, 'title');
+      t.textContent = '這對齒輪的兩個軸心都已固定，但中心距不等於 Ra+Rb，沒對好咬合——把其中一個中心拖到嚙合圓上再固定';
+      poly.appendChild(t);
+    }
     poly.style.cursor = 'pointer';
     poly.addEventListener('pointerdown', (e) => {
       if (S.drawingLink || S.drawingTriangle || S.placingMotor || S.pickBars) return;
@@ -965,6 +972,19 @@ function syncGearMesh() {
     if (d < 1e-6) { dx = 1; dy = 0; d = 1; }
     updatePointCoordsById(c.p1.id, (dc.x || 0) + dx / d * (Rd + Rc), (dc.y || 0) + dy / d * (Rd + Rc));
   });
+}
+// 嚙合防呆：這顆齒輪與其嚙合夥伴若「都已接地」但中心距 ≠ Ra+Rb（>tol），代表沒對好咬合
+// （多半是把中心拖去合併到不在嚙合圓上的地錨）。回 true 讓繪製給紅色虛線環提示，不自動搬動錨點。
+function gearMeshOff(c) {
+  if (!c || c.type !== 'gear' || !c.p1) return false;
+  const partner = S.comps.find(p => p.type === 'gear' && p !== c && (c.mesh === p.id || p.mesh === c.id));
+  if (!partner || !partner.p1) return false;
+  if (!pointIsGround(c.p1.id) || !pointIsGround(partner.p1.id)) return false;
+  const pc = pointCoords();
+  const a = pc[c.p1.id], b = pc[partner.p1.id];
+  if (!a || !b) return false;
+  const D = (Number(S.topo.params[c.radiusParam]) || 40) + (Number(S.topo.params[partner.radiusParam]) || 40);
+  return Math.abs(Math.hypot(b.x - a.x, b.y - a.y) - D) > 1.5;
 }
 function selectGear(id) {
   cancelMotorMode();
