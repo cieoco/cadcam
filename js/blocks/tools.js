@@ -65,7 +65,7 @@ function beginDraw(kind) {
   } else {
     S.drawActive = true;                       // 進來就活著：滑鼠一移動就更新（不必壓住）
     S.drawStart = View.worldFromScreen(W * 0.18, H * 0.26); // 支點＝畫布左上、靠按鈕右側的空白處
-    S.drawStartNodeId = nearestNodeId(S.drawStart);
+    S.drawStartNodeId = null;                   // 新桿件兩端都自由：不自動吸附既有接點（要連接改用拖曳合併）
     S.drawPreview = { x: S.drawStart.x + LINK_DEFAULT_LEN, y: S.drawStart.y }; // 先給一根預設長度
   }
   setBanner(kind === 'rail'
@@ -91,11 +91,7 @@ export function nearestNodeId(world, exclude = [], maxDist = snapWorld()) {
 // 從起點 start 拖到 cur 時，算出實際終點：靠近既有接點就吸附相接。
 // 連桿長度對齊 8mm 孔距；滑軌/滑塊本體屬於外形尺寸，不套孔距限制。
 function resolveDrawEnd(start, cur, startNodeId, snapToHoles = true) {
-  const endNodeId = nearestNodeId(cur, startNodeId ? [startNodeId] : []);
-  if (endNodeId) {
-    const p = pointCoords()[endNodeId];
-    return { pos: { x: p.x, y: p.y }, len: Math.round(Math.hypot(p.x - start.x, p.y - start.y)), nodeId: endNodeId };
-  }
+  // 新桿件兩端都自由：不再吸附／合併到既有接點（要連接改用拖曳節點合併，要分開用「分離」）
   const dx = cur.x - start.x, dy = cur.y - start.y;
   const dist = Math.hypot(dx, dy);
   if (dist < 6) return { pos: { x: start.x + LINK_DEFAULT_LEN, y: start.y }, len: LINK_DEFAULT_LEN, nodeId: null };

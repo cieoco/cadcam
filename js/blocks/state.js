@@ -15,7 +15,7 @@
 export const S = {
   // ---- 機構資料 ----
   comps: [],                                       // wizard 風格的組件（角色就藏在 type 裡）
-  topo: { params: { theta: 0 }, tracePoint: '' },
+  topo: { params: { theta: 0 }, tracePoint: '', tracePoints: [] },
   compiled: null,
   counter: 0,
   theta: 0,                                        // 目前驅動角度（播放迴圈與編輯都會改）

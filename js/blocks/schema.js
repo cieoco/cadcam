@@ -17,6 +17,7 @@ const snapLego = value => Math.max(LEGO_STEP, Math.round((Number(value) || 0) / 
 const num = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const roundMm = (value, fallback = 0) => Math.round(num(value, fallback));
 const safeId = value => typeof value === 'string' && SAFE_ID.test(value);
+const uniqueSafeIds = values => Array.from(new Set((values || []).filter(safeId)));
 
 function normalizePoint(point, fallbackId, warnings) {
   if (!point || typeof point !== 'object') {
@@ -195,7 +196,9 @@ export function toSnapshot(comps, topo, counter) {
     comps: clone(comps || []),
     params: clone((topo && topo.params) ? topo.params : {})
   };
-  if (topo && safeId(topo.tracePoint)) snapshot.tracePoint = topo.tracePoint;
+  const tracePoints = uniqueSafeIds([...(topo?.tracePoints || []), ...(safeId(topo?.tracePoint) ? [topo.tracePoint] : [])]);
+  if (tracePoints.length === 1) snapshot.tracePoint = tracePoints[0]; // 舊欄位相容：單點檔案仍好讀。
+  if (tracePoints.length) snapshot.tracePoints = tracePoints;
   return snapshot;
 }
 
@@ -239,6 +242,7 @@ export function normalizeSnapshot(obj) {
   const warnings = [];
   const params = (obj.params && typeof obj.params === 'object' && !Array.isArray(obj.params)) ? clone(obj.params) : {};
   const tracePoint = safeId(obj.tracePoint) ? obj.tracePoint : '';
+  const tracePoints = uniqueSafeIds([...(Array.isArray(obj.tracePoints) ? obj.tracePoints : []), ...(tracePoint ? [tracePoint] : [])]);
   const comps = [];
 
   sourceComps.forEach((raw, index) => {
@@ -256,7 +260,7 @@ export function normalizeSnapshot(obj) {
 
   const cleanComps = dropZeroBars(comps);
   const counter = Math.max(Number(obj.counter) || 0, highestIdNum(cleanComps));
-  return { comps: cleanComps, params, counter, tracePoint, warnings };
+  return { comps: cleanComps, params, counter, tracePoint, tracePoints, warnings };
 }
 
 export function highestIdNum(comps) {

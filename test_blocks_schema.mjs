@@ -55,6 +55,7 @@ const withHole = normalizeSnapshot({
   kind: 'blocks',
   v: 1,
   counter: 0,
+  tracePoints: ['P', 'I'],
   comps: [{
     type: 'bar',
     id: 'ScaleLink',
@@ -66,6 +67,7 @@ const withHole = normalizeSnapshot({
   params: { LP: 80, DI: 40 }
 });
 ok('schema preserves bar holes', withHole && withHole.comps[0].holes && withHole.comps[0].holes[0].id === 'I');
+ok('schema preserves multiple trace points', withHole && withHole.tracePoints.length === 2);
 
 const snap = toSnapshot(messy.comps, { params: messy.params }, messy.counter);
 ok('toSnapshot writes blocks kind', snap.kind === 'blocks' && snap.v === 1);

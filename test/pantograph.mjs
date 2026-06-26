@@ -1,20 +1,48 @@
 // 範例驗收：縮放儀 pantograph。對應 BLOCK_EXAMPLES「縮放儀：2 倍放大」。
-// 驗收條件（自動，本檔）：① 全程解得穩 ② 輸出點 P = O + k·(追蹤點 I − O)，k=2。
+// 驗收條件（自動，本檔）：① 多個手動姿態都解得穩 ② 輸出點 P = O + k·(追蹤點 I − O)，k=2。
 // 跑法：node test/pantograph.mjs
 import { BLOCK_EXAMPLES } from '../js/blocks/examples.js';
 import { normalizeSnapshot } from '../js/blocks/schema.js';
-import { sweep, check, report } from './_harness.mjs';
+import { compileTopology } from '../js/core/topology.js';
+import { solveTopology } from '../js/multilink/solver.js';
+import { check, report } from './_harness.mjs';
 
 const example = BLOCK_EXAMPLES.find(e => e.id === 'pantograph');
 const normalized = normalizeSnapshot(example.snapshot);
-const comps = normalized.comps;
 const params = normalized.params;
 const scale = params.LL1 / params.DI;
 
-const { frames, allValid } = sweep(comps, params, ['O', 'I', 'P', 'U', 'V', 'W', 'X'], 5);
-check('全程解得穩（每幀 O/I/P/U/V/W/X 都有限）', allValid);
+const clone = value => JSON.parse(JSON.stringify(value));
+const movePoint = (comps, id, x, y) => {
+  comps.forEach(c => {
+    ['p1', 'p2', 'p3', 'm1', 'm2'].forEach(k => {
+      if (c[k]?.id === id) { c[k].x = x; c[k].y = y; }
+    });
+  });
+};
+const solveManualPose = (angleDeg, prevPoints) => {
+  const comps = clone(normalized.comps);
+  const a = angleDeg * Math.PI / 180;
+  movePoint(comps, 'P', Math.cos(a) * params.LL1, Math.sin(a) * params.LL1);
+  const topo = { params: { theta: 0, ...params }, tracePoints: normalized.tracePoints || [] };
+  const compiled = compileTopology(comps, topo, new Set());
+  const sol = solveTopology(compiled, { thetaDeg: 0, _prevPoints: prevPoints });
+  return { comps, sol };
+};
 
-const validFrames = frames.filter(f => f.points.O && f.points.I && f.points.P && f.points.U && f.points.V && f.points.W && f.points.X);
+const poses = [];
+let prevPoints = null;
+for (const angle of [-25, 0, 25, 50]) {
+  const pose = solveManualPose(angle, prevPoints);
+  poses.push({ angle, points: pose.sol.points || {}, isValid: pose.sol && pose.sol.isValid !== false });
+  prevPoints = pose.sol.points || prevPoints;
+}
+const allValid = poses.every(f => f.isValid && ['O', 'I', 'P', 'M', 'N'].every(id =>
+  f.points[id] && Number.isFinite(f.points[id].x) && Number.isFinite(f.points[id].y)
+));
+check('多個手動姿態都解得穩（O/I/P/M/N 都有限）', allValid);
+
+const validFrames = poses.filter(f => ['O', 'I', 'P', 'M', 'N'].every(id => f.points[id]));
 const errors = validFrames.map(f => {
   const { O, I, P } = f.points;
   const expectedX = O.x + scale * (I.x - O.x);
@@ -24,22 +52,24 @@ const errors = validFrames.map(f => {
 check('輸出點 = 樞軸 + k × 追蹤向量', Math.max(...errors) < 1e-6,
   `k=${scale.toFixed(1)}，最大誤差 ${Math.max(...errors).toExponential(2)} mm`);
 
+// 平行四邊形 O-M-N-P：四邊各維持固定桿長，且對邊相等（→ 真平行四邊形，比例骨架不變形）
 const braceErrors = validFrames.map(f => {
-  const { O, I, P, U, V, W, X } = f.points;
+  const { O, I, P, M, N } = f.points;
+  const OM = Math.hypot(M.x - O.x, M.y - O.y);
+  const PN = Math.hypot(N.x - P.x, N.y - P.y);
+  const MN = Math.hypot(N.x - M.x, N.y - M.y);
+  const OP = Math.hypot(P.x - O.x, P.y - O.y);
   return Math.max(
-    Math.abs(Math.hypot(U.x - O.x, U.y - O.y) - params.LL2),
-    Math.abs(Math.hypot(I.x - U.x, I.y - U.y) - params.LL3),
-    Math.abs(Math.hypot(W.x - I.x, W.y - I.y) - params.LL4),
-    Math.abs(Math.hypot(P.x - W.x, P.y - W.y) - params.LL5),
-    Math.abs(Math.hypot(V.x - O.x, V.y - O.y) - params.LL6),
-    Math.abs(Math.hypot(I.x - V.x, I.y - V.y) - params.LL7),
-    Math.abs(Math.hypot(X.x - I.x, X.y - I.y) - params.LL8),
-    Math.abs(Math.hypot(P.x - X.x, P.y - X.y) - params.LL9),
-    Math.abs(Math.hypot(W.x - U.x, W.y - U.y) - params.LL10),
-    Math.abs(Math.hypot(X.x - V.x, X.y - V.y) - params.LL11)
+    Math.abs(OM - params.LL2),                      // O-M
+    Math.abs(Math.hypot(M.x - I.x, M.y - I.y) - params.LL3), // I-M
+    Math.abs(Math.hypot(N.x - I.x, N.y - I.y) - params.LL4), // I-N
+    Math.abs(PN - params.LL5),                      // P-N
+    Math.abs(MN - params.LL6),                      // M-N
+    Math.abs(OM - PN),                              // 對邊 O-M = P-N
+    Math.abs(MN - OP)                               // 對邊 M-N = O-P
   );
 });
-check('兩段菱形剪架保持約束長度', Math.max(...braceErrors) < 1e-6,
+check('平行四邊形骨架保持約束長度且對邊相等', Math.max(...braceErrors) < 1e-6,
   `最大長度誤差 ${Math.max(...braceErrors).toExponential(2)} mm`);
 
 report('pantograph');

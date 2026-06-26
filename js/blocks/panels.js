@@ -12,10 +12,10 @@
 import { S } from './state.js';
 
 // ---- 注入的查詢 helper（由 app 在啟動時提供）----
-let pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter;
+let pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount;
 
 export function init(deps) {
-  ({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter } = deps);
+  ({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount } = deps);
 }
 
 // 更新長度顯示（用上方的 − / + 以 8mm 為單位調整）
@@ -97,10 +97,16 @@ export function updateRoleEditor() {
   renderNodePosition(S.selectedNodeId);
   const traceBtn = document.getElementById('traceBtn');
   if (traceBtn) {
-    const isTrace = S.topo.tracePoint === S.selectedNodeId;
-    traceBtn.textContent = isTrace ? '取消軌跡' : '設軌跡點';
+    const traceIds = new Set([...(S.topo.tracePoints || []), ...(S.topo.tracePoint ? [S.topo.tracePoint] : [])]);
+    const isTrace = traceIds.has(S.selectedNodeId);
+    traceBtn.textContent = isTrace ? '取消軌跡' : '加入軌跡';
     traceBtn.classList.toggle('trace-on', isTrace);
-    traceBtn.title = isTrace ? '停止追蹤這個接點' : '追蹤這個接點走過的路徑';
+    traceBtn.title = isTrace ? '停止追蹤這個接點' : '把這個接點加入軌跡追蹤';
+  }
+  // 「分離」只在此接點被多個端點共用（兩桿件鎖在同一點）時出現
+  const splitBtn = document.getElementById('splitBtn');
+  if (splitBtn) {
+    splitBtn.style.display = (pointUseCount && pointUseCount(S.selectedNodeId) >= 2) ? '' : 'none';
   }
   editor.style.display = 'flex';
   updateServoEditor();

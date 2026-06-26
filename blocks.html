@@ -304,6 +304,7 @@
           <button onclick="window.blocks.setNodeRole('floating')">變自由</button>
           <button onclick="window.blocks.setNodeRole('fixed')">設地錨</button>
           <button onclick="window.blocks.removeNodeMotor()">拿掉馬達</button>
+          <button id="splitBtn" onclick="window.blocks.splitNode()" title="把鎖在同一點的桿件分開" style="display:none;">分離</button>
           <button id="traceBtn" onclick="window.blocks.toggleTracePoint()" title="追蹤這個接點走過的路徑">設軌跡點</button>
         </div>
         <div class="re-row">
@@ -399,6 +400,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/blocks/app.js?v=20240128_11"></script>
+  <script type="module" src="js/blocks/app.js?v=20240128_14"></script>
 </body>
 </html>

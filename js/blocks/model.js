@@ -149,6 +149,138 @@ export function recomputeLengths(comps, topo) {
   });
 }
 
+export function solvePinnedConstraints(comps, topo, pinId, target, options = {}) {
+  if (!pinId || !target || !Number.isFinite(target.x) || !Number.isFinite(target.y)) return false;
+  const params = (topo && topo.params) ? topo.params : {};
+  const points = pointCoords(comps);
+  if (!points[pinId]) return false;
+
+  const pointIds = new Set(Object.keys(points));
+  const pinned = new Set([pinId]);
+  comps.forEach(c => pointKeysFor(c).forEach(k => {
+    const p = c[k];
+    if (p && p.id && isGroundPoint(p)) pinned.add(p.id);
+  }));
+
+  const constraints = [];
+  const collinearConstraints = [];
+  const paramLen = (name, fallback) => {
+    const v = name && params[name] !== undefined ? Number(params[name]) : fallback;
+    return Number.isFinite(v) && v > 0 ? v : fallback;
+  };
+  const addDist = (a, b, len) => {
+    if (!a || !b || a === b || !Number.isFinite(len) || len <= 0) return;
+    pointIds.add(a);
+    pointIds.add(b);
+    constraints.push({ a, b, len });
+  };
+  const addCollinear = (a, mid, b, aMidLen, midBLen, aBLen) => {
+    if (!a || !mid || !b || a === mid || mid === b || a === b) return;
+    const sum = aMidLen + midBLen;
+    const eps = Math.max(0.75, sum * 0.01);
+    if (!Number.isFinite(sum) || sum <= 0 || Math.abs(sum - aBLen) > eps) return;
+    collinearConstraints.push({ a, mid, b, t: aMidLen / sum });
+  };
+
+  comps.forEach(c => {
+    if (c.type === 'bar' && c.p1?.id && c.p2?.id) {
+      const fallback = Math.hypot((c.p2.x || 0) - (c.p1.x || 0), (c.p2.y || 0) - (c.p1.y || 0));
+      addDist(c.p1.id, c.p2.id, paramLen(c.lenParam, fallback));
+    } else if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
+      const g = Math.hypot((c.p2.x || 0) - (c.p1.x || 0), (c.p2.y || 0) - (c.p1.y || 0));
+      const r1 = Math.hypot((c.p3.x || 0) - (c.p1.x || 0), (c.p3.y || 0) - (c.p1.y || 0));
+      const r2 = Math.hypot((c.p3.x || 0) - (c.p2.x || 0), (c.p3.y || 0) - (c.p2.y || 0));
+      const lg = paramLen(c.gParam, g);
+      const lr1 = paramLen(c.r1Param, r1);
+      const lr2 = paramLen(c.r2Param, r2);
+      addDist(c.p1.id, c.p2.id, lg);
+      addDist(c.p1.id, c.p3.id, lr1);
+      addDist(c.p2.id, c.p3.id, lr2);
+      addCollinear(c.p1.id, c.p2.id, c.p3.id, lg, lr2, lr1);
+      addCollinear(c.p1.id, c.p3.id, c.p2.id, lr1, lr2, lg);
+      addCollinear(c.p2.id, c.p1.id, c.p3.id, lg, lr1, lr2);
+    }
+  });
+
+  const relevant = new Set([pinId]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    constraints.forEach(c => {
+      if (relevant.has(c.a) && !relevant.has(c.b)) { relevant.add(c.b); grew = true; }
+      if (relevant.has(c.b) && !relevant.has(c.a)) { relevant.add(c.a); grew = true; }
+    });
+  }
+  const hasGround = Array.from(relevant).some(id => pinned.has(id) && id !== pinId);
+  if (!hasGround) return false;
+
+  points[pinId] = { x: target.x, y: target.y };
+  const original = pointCoords(comps);
+  const iterations = options.iterations || 80;
+  for (let iter = 0; iter < iterations; iter++) {
+    points[pinId] = { x: target.x, y: target.y };
+    constraints.forEach(c => {
+      if (!relevant.has(c.a) || !relevant.has(c.b)) return;
+      const a = points[c.a];
+      const b = points[c.b];
+      if (!a || !b) return;
+      let dx = b.x - a.x;
+      let dy = b.y - a.y;
+      let d = Math.hypot(dx, dy);
+      if (d <= 1e-9) {
+        const oa = original[c.a] || { x: 0, y: 0 };
+        const ob = original[c.b] || { x: c.len, y: 0 };
+        dx = ob.x - oa.x;
+        dy = ob.y - oa.y;
+        d = Math.hypot(dx, dy) || 1;
+      }
+      const err = (d - c.len) / d;
+      const axPinned = pinned.has(c.a);
+      const bxPinned = pinned.has(c.b);
+      if (axPinned && bxPinned) return;
+      if (axPinned) {
+        b.x -= dx * err;
+        b.y -= dy * err;
+      } else if (bxPinned) {
+        a.x += dx * err;
+        a.y += dy * err;
+      } else {
+        a.x += dx * err * 0.5;
+        a.y += dy * err * 0.5;
+        b.x -= dx * err * 0.5;
+        b.y -= dy * err * 0.5;
+      }
+    });
+    collinearConstraints.forEach(c => {
+      if (!relevant.has(c.a) || !relevant.has(c.mid) || !relevant.has(c.b) || pinned.has(c.mid)) return;
+      const a = points[c.a];
+      const b = points[c.b];
+      const mid = points[c.mid];
+      if (!a || !b || !mid) return;
+      mid.x = a.x + (b.x - a.x) * c.t;
+      mid.y = a.y + (b.y - a.y) * c.t;
+    });
+  }
+  points[pinId] = { x: target.x, y: target.y };
+
+  let maxErr = 0;
+  constraints.forEach(c => {
+    if (!relevant.has(c.a) || !relevant.has(c.b)) return;
+    const a = points[c.a];
+    const b = points[c.b];
+    if (!a || !b) return;
+    maxErr = Math.max(maxErr, Math.abs(Math.hypot(b.x - a.x, b.y - a.y) - c.len));
+  });
+  if (maxErr > (options.tolerance || 2)) return false;
+
+  relevant.forEach(id => {
+    const p = points[id];
+    if (p && !pinned.has(id)) updatePointCoordsById(comps, id, p.x, p.y);
+  });
+  updatePointCoordsById(comps, pinId, target.x, target.y);
+  return true;
+}
+
 // 找出「以此點為端點、且只屬於一根」的固定長度連桿（用來做圓規式拖曳）
 export function fixedLinkFor(comps, id) {
   const ls = comps.filter(c => c.type === 'bar' && c.fixedLen && (c.p1.id === id || c.p2.id === id));
@@ -177,4 +309,48 @@ export function freeLinkForPoint(comps, id) {
 
 export function barsAtNode(comps, nodeId) {
   return comps.filter(c => c.type === 'bar' && c.p1 && c.p2 && (c.p1.id === nodeId || c.p2.id === nodeId));
+}
+
+// 自由三點桿：三頂點都未接地、且各自只屬於這個三角（沒和別的桿/接點合併）。
+// 此時整個三角是自由剛體——拖任一頂點＝整體平移，三邊長不變（不會被拖到變形）。
+export function freeTriangleForPoint(comps, id) {
+  const t = comps.find(c => c.type === 'triangle' &&
+    [c.p1, c.p2, c.p3].some(p => p && p.id === id));
+  if (!t || !t.p1 || !t.p2 || !t.p3) return null;
+  const free = [t.p1, t.p2, t.p3].every(p =>
+    !isGroundPoint(p) && pointUseCount(comps, p.id) === 1);
+  return free ? t : null;
+}
+
+// 一頂點被「固定」（接地，或與其他桿/元件共用而被牽制）、另兩頂點自由的三點桿：
+// 拖自由頂點＝整個三角繞那個樞紐頂點剛性旋轉。回傳 { tri, pivot }；dragId 必須是兩個自由頂點之一。
+// 樞紐放寬到「useCount>1」是為了支援「桿＋三點桿」相接：相接的角落雖非地錨，卻被另一支桿牽住，
+// 仍應作為旋轉中心，三角才不會被拖到變形。
+export function pinnedTriangleForPoint(comps, id) {
+  const t = comps.find(c => c.type === 'triangle' &&
+    [c.p1, c.p2, c.p3].some(p => p && p.id === id));
+  if (!t || !t.p1 || !t.p2 || !t.p3) return null;
+  const verts = [t.p1, t.p2, t.p3];
+  const isPivot = p => pointIsGround(comps, p.id) || pointUseCount(comps, p.id) > 1;
+  const pivots = verts.filter(isPivot);
+  if (pivots.length !== 1) return null;              // 需恰好一個樞紐頂點
+  const pivot = pivots[0];
+  if (pivot.id === id) return null;                  // 拖的是樞紐本身 → 不旋轉
+  const others = verts.filter(p => p.id !== pivot.id);
+  // 另兩頂點都必須自由（未接地、未與別處共用），才能單純繞樞紐旋轉
+  if (!others.every(p => !pointIsGround(comps, p.id) && pointUseCount(comps, p.id) === 1)) return null;
+  return { tri: t, pivot };
+}
+
+// 被機構鎖死的三點桿自由頂點：拖的是某三角的自由頂點（未接地、useCount===1），
+// 但「另外兩個頂點都被牽制」（接地或與別的桿共用）。此時這個頂點被剛體完全決定（兩固定點＋三邊長
+// → 唯一解），不該能自由拖動。回傳 true 表示「鎖住、別讓它變形」。
+export function lockedTriangleVertex(comps, id) {
+  const t = comps.find(c => c.type === 'triangle' &&
+    [c.p1, c.p2, c.p3].some(p => p && p.id === id));
+  if (!t || !t.p1 || !t.p2 || !t.p3) return false;
+  if (pointIsGround(comps, id) || pointUseCount(comps, id) > 1) return false; // 拖的是樞紐本身，不鎖
+  const others = [t.p1, t.p2, t.p3].filter(p => p.id !== id);
+  const pinned = others.filter(p => pointIsGround(comps, p.id) || pointUseCount(comps, p.id) > 1);
+  return pinned.length >= 2;                          // 另兩頂點都被牽制 → 此頂點被剛體決定
 }

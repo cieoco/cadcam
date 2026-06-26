@@ -27,8 +27,10 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
     worldFromEvent, pointCoords, mobilePrompt,
     snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
     movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
-    isFreeLink, freeLinkForPoint, fixedLinkFor, inputCrankMovingEnd,
-    handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround;
+    isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
+    handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
+    recordManualTrace = () => {},
+    solvePinnedConstraints = null;
 
 export function startFreeLinkDrag(e, linkId) {
   const c = S.comps.find(x => x.id === linkId && isFreeLink(x));
@@ -44,6 +46,12 @@ export function startFreeLinkDrag(e, linkId) {
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
   draw();
   return true;
+}
+
+function redrawAfterDrag() {
+  rebuild();
+  recordManualTrace();
+  draw();
 }
 // 拖機架把手：整組平移所有固定銷。不選取任何節點、不叫屬性列。
 export function onFrameHandleDown(e) {
@@ -101,7 +109,7 @@ function onDragMove(e) {
     const dy = w.y - S.dragLastWorld.y;
     frameNodeIds().forEach(id => movePointById(id, dx, dy));
     S.dragLastWorld = w;
-    rebuild(); draw();
+    redrawAfterDrag();
     return;
   }
   if (S.dragLinkId && S.dragLastWorld) {
@@ -112,7 +120,7 @@ function onDragMove(e) {
     movePointById(c.p1.id, dx, dy);
     movePointById(c.p2.id, dx, dy);
     S.dragLastWorld = w;
-    rebuild(); draw();
+    redrawAfterDrag();
     return;
   }
   if (!S.dragId) return;
@@ -153,7 +161,7 @@ function onDragMove(e) {
       moveGear(gearForCenter, w.x - cur.x, w.y - cur.y);
     }
     S.snapTarget = nearestDisplayTo(S.dragId);
-    rebuild(); draw();
+    redrawAfterDrag();
     return;
   }
   let tx = w.x, ty = w.y;
@@ -166,9 +174,51 @@ function onDragMove(e) {
     movePointById(free.p1.id, dx, dy);
     movePointById(free.p2.id, dx, dy);
     S.snapTarget = nearestDisplayTo(S.dragId);
-    rebuild(); draw();
+    redrawAfterDrag();
     return;
   }
+  // 自由三點桿：三頂點都沒接到別處時是自由剛體，拖任一頂點＝整個三角平移（三邊長不變，不變形）。
+  const freeTri = freeTriangleForPoint && freeTriangleForPoint(S.dragId);
+  if (freeTri) {
+    const p = pointCoords()[S.dragId];
+    const dx = w.x - (p?.x || 0);
+    const dy = w.y - (p?.y || 0);
+    movePointById(freeTri.p1.id, dx, dy);
+    movePointById(freeTri.p2.id, dx, dy);
+    movePointById(freeTri.p3.id, dx, dy);
+    S.snapTarget = nearestDisplayTo(S.dragId);
+    redrawAfterDrag();
+    return;
+  }
+  // 一頂點固定的三點桿：整個三角繞固定頂點剛性旋轉（拖的頂點沿其半徑圓走，第三點同步轉），三邊長不變。
+  const pinTri = freeTriangleForPoint && pinnedTriangleForPoint && pinnedTriangleForPoint(S.dragId);
+  if (pinTri) {
+    const pc = pointCoords();
+    const f = pc[pinTri.pivot.id];
+    const d = pc[S.dragId];
+    if (f && d) {
+      const delta = Math.atan2(w.y - f.y, w.x - f.x) - Math.atan2(d.y - f.y, d.x - f.x);
+      const cosD = Math.cos(delta), sinD = Math.sin(delta);
+      [pinTri.tri.p1, pinTri.tri.p2, pinTri.tri.p3].forEach(p => {
+        if (!p || p.id === pinTri.pivot.id) return;   // 固定頂點不動
+        const cur = pc[p.id]; if (!cur) return;
+        const vx = cur.x - f.x, vy = cur.y - f.y;
+        updatePointCoordsById(p.id, f.x + vx * cosD - vy * sinD, f.y + vx * sinD + vy * cosD);
+      });
+      S.snapTarget = nearestDisplayTo(S.dragId);
+      redrawAfterDrag();
+      return;
+    }
+  }
+  // 一般閉鏈/欠定機構的手抓點：把被拖的洞暫時 pin 到游標，用距離約束迭代解其他桿件。
+  if (solvePinnedConstraints && solvePinnedConstraints(S.dragId, w)) {
+    S.snapTarget = nearestDisplayTo(S.dragId);
+    redrawAfterDrag();
+    return;
+  }
+  // 三點桿自由頂點，但另兩頂點都被機構牽制（≥2 樞紐）：此頂點被剛體完全決定，
+  // 自由拖會破壞三角剛性 → 鎖住不動（要移動請拖牽制較少的接點，或加馬達驅動機構）。
+  if (lockedTriangleVertex && lockedTriangleVertex(S.dragId)) return;
   // 固定長度連桿：已有約束時，拖端點繞另一端以固定半徑旋轉（圓規），長度不變
   const fl = fixedLinkFor(S.dragId);
   if (fl) {
@@ -183,7 +233,7 @@ function onDragMove(e) {
   updatePointCoordsById(S.dragId, tx, ty);
   recomputeLengths();
   S.snapTarget = nearestDisplayTo(S.dragId);
-  rebuild(); draw();
+  redrawAfterDrag();
 }
 function commitDragUndo() {
   if (S.preDragSnap == null) return;
@@ -221,7 +271,7 @@ function onDragEnd(e) {
   if (tgt) mergePoints(did, tgt);
   if (tgt && S.selectedNodeId === did) S.selectedNodeId = tgt;
   recomputeLengths();
-  rebuild(); draw();
+  rebuild(); recordManualTrace(); draw();
   commitDragUndo();
 }
 
@@ -241,8 +291,10 @@ export function init(deps) {
      worldFromEvent, pointCoords, mobilePrompt,
      snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
      movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
-     isFreeLink, freeLinkForPoint, fixedLinkFor, inputCrankMovingEnd,
-     handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround } = deps);
+     isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
+     handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
+     recordManualTrace = (() => {}),
+     solvePinnedConstraints = null } = deps);
 
   // ---- 掛上 svg 的指標 / 手勢監聽（原 app.js 檔尾那批，順序不變）----
   svg.addEventListener('pointermove', onDragMove);
@@ -319,7 +371,7 @@ export function init(deps) {
     e.preventDefault();
     if (e.pointerType !== 'mouse' || mobilePrompt()) {
       S.drawStart = w;
-      S.drawStartNodeId = Tools.nearestNodeId(S.drawStart);
+      S.drawStartNodeId = null;                 // 新桿件兩端都自由：起點不自動吸附既有接點
       S.drawPreview = w;
       S.drawActive = true;
     } else {
