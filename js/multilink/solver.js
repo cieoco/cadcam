@@ -256,28 +256,36 @@ function solveBodyJointTopology(topology, params) {
     }
 
     // 齒輪輸出銷：和旋轉曲柄同理，提前 force-set，下游連桿約束才有已知點可用。
-    // 銷 = center + r·dir(角度);驅動輪角 = motorTheta(ratio=1, sign=+1)、
-    // 從動輪角 = -(R_driver/R_driven)·motorTheta(外嚙合反向)。馬達記在齒輪中心點 p1 上。
+    // 銷 = center + r·dir(角度)。沿 mesh 鏈向上找根驅動輪，外嚙合每一級乘上 -R_driver/R_driven。
     components.forEach((c) => {
         if (c.type !== 'gear' || !c.p1?.id || !c.p2?.id) return;
         addPointId(c.p1); addPointId(c.p2);
         const center = points[c.p1.id];
         if (!center) return;
         const r = getParamVal(c.radiusParam, 40);
-        let driverPt = c.p1, ratio = 1, sign = 1;
-        if (c.mesh) {
-            const driver = components.find(g => g.type === 'gear' && g.id === c.mesh);
-            if (!driver || !driver.p1) return;
-            driverPt = driver.p1;                                    // 馬達記在這條嚙合鏈的驅動輪中心上
+        const gearById = new Map(components.filter(g => g.type === 'gear' && g.id).map(g => [g.id, g]));
+        const driveState = (gear, seen = new Set()) => {
+            if (!gear || seen.has(gear.id)) return null;
+            if (!gear.mesh) return { driverPt: gear.p1, factor: 1 };
+            seen.add(gear.id);
+            const driver = gearById.get(gear.mesh);
+            if (!driver || !driver.p1) return null;
+            const parent = driveState(driver, seen);
+            if (!parent) return null;
             const rDriver = getParamVal(driver.radiusParam, r);
-            ratio = rDriver / (r || 1);   // R_driver / R_driven
-            sign = -1;                    // 外嚙合：從動輪反向
-        }
+            const rDriven = getParamVal(gear.radiusParam, r);
+            return {
+                driverPt: parent.driverPt,
+                factor: parent.factor * -(rDriver / (rDriven || 1))
+            };
+        };
+        const state = driveState(c);
+        if (!state) return;
         // 只有「驅動輪中心帶實體馬達」才依 theta 旋轉；沒馬達＝靜止的接地輪（銷停在放置角度，theta 不影響）。
         // 與桿件一致：沒放馬達就不動，不再自動退回預設馬達 '1' 而平白轉起來。
-        const motorId = driverPt.physicalMotor || driverPt.physical_motor || '';
+        const motorId = state.driverPt.physicalMotor || state.driverPt.physical_motor || '';
         const ang = motorId
-            ? sign * resolveMotorTheta(String(motorId), theta) * ratio + deg2rad(c.phase || 0)
+            ? resolveMotorTheta(String(motorId), theta) * state.factor + deg2rad(c.phase || 0)
             : Math.atan2((c.p2.y || 0) - (c.p1.y || 0), (c.p2.x || 0) - (c.p1.x || 0));
         points[c.p2.id] = { x: center.x + r * Math.cos(ang), y: center.y + r * Math.sin(ang) };
     });

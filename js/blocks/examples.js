@@ -210,6 +210,31 @@ export const BLOCK_EXAMPLES = [
     }
   },
   {
+    id: 'reduction-gear-train',
+    title: '減速齒輪列：4 倍減速',
+    note: '紅色 12 齒小齒輪驅動，中間 24 齒惰輪換方向，最後 48 齒大齒輪同向慢速輸出（末輪/首輪 = 1/4）。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 3,
+      comps: [
+        { type: 'gear', id: 'GearA', color: '#e74c3c',
+          p1: pt('GCA', 'motor', -128, 0, { physicalMotor: '1' }),
+          p2: pt('GPA', 'floating', -104, 0),
+          radiusParam: 'GRA', teeth: 12, module: 4, phase: 0 },
+        { type: 'gear', id: 'GearB', color: '#2c6fbb',
+          p1: pt('GCB', 'fixed', -56, 0),
+          p2: pt('GPB', 'floating', -8, 0),
+          radiusParam: 'GRB', teeth: 24, module: 4, phase: 0, mesh: 'GearA' },
+        { type: 'gear', id: 'GearC', color: '#27ae60',
+          p1: pt('GCC', 'fixed', 88, 0),
+          p2: pt('GPC', 'floating', 184, 0),
+          radiusParam: 'GRC', teeth: 48, module: 4, phase: 0, mesh: 'GearB' }
+      ],
+      params: { GRA: 24, GRB: 48, GRC: 96, theta: 0 }
+    }
+  },
+  {
     id: 'empty-challenge',
     title: '空白挑戰',
     note: '從零開始，試著做出馬達可整圈轉的機構。',

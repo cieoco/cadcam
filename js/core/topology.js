@@ -12,26 +12,35 @@ function compileGearSteps(c, ctx) {
         return (g && g.radiusParam && Number(params[g.radiusParam])) || 40;
     };
 
-    let motor, ratio, sign;
-    if (c.mesh) {
-        const driver = components.find(g => g.type === 'gear' && g.id === c.mesh);
-        if (!driver || !driver.p1?.id) return;
-        const driverCenter = allPointsMap.get(driver.p1.id);
-        motor = String(driverCenter?.physicalMotor || '1');
-        ratio = gearRadius(driver) / (gearRadius(c) || 1);   // R_driver / R_driven
-        sign = -1;                                           // 外嚙合：反向旋轉
-    } else {
-        const center = allPointsMap.get(c.p1.id);
-        motor = String(center?.physicalMotor || '1');
-        ratio = 1;
-        sign = 1;
-    }
+    const gearById = new Map(components.filter(g => g.type === 'gear' && g.id).map(g => [g.id, g]));
+    const driveState = (gear, seen = new Set()) => {
+        if (!gear || seen.has(gear.id)) return null;
+        if (!gear.mesh) {
+            const center = allPointsMap.get(gear.p1?.id);
+            return { motor: String(center?.physicalMotor || '1'), factor: 1 };
+        }
+
+        seen.add(gear.id);
+        const driver = gearById.get(gear.mesh);
+        if (!driver || !driver.p1?.id) return null;
+        const parent = driveState(driver, seen);
+        if (!parent) return null;
+        return {
+            motor: parent.motor,
+            factor: parent.factor * -(gearRadius(driver) / (gearRadius(gear) || 1))
+        };
+    };
+
+    const state = driveState(c);
+    if (!state) return;
+    const sign = state.factor < 0 ? -1 : 1;
+    const ratio = Math.abs(state.factor);
     steps.push({
         id: c.p2.id,
         type: 'gear',
         center: c.p1.id,
         len_param: c.radiusParam,   // 輸出銷半徑＝節圓半徑（銷在輪緣）
-        motor,
+        motor: state.motor,
         ratio,
         sign,
         phase_offset: Number(c.phase) || 0

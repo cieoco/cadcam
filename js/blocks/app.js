@@ -225,13 +225,13 @@ const isFreeLink = (c) => Model.isFreeLink(S.comps, c);
 const barsAtNode = (nodeId) => Model.barsAtNode(S.comps, nodeId);
 const pointUseCount = (id) => Model.pointUseCount(S.comps, id);
 
-// 隱性機架：所有 type:'fixed' 的接點視為同一個固定底座（機架）。
+// 隱性機架：所有 grounded 接點（fixed / motor / linear）視為同一個固定底座（機架）。
 // 不是獨立物件，只是把散落的固定銷當成一組——拖機架把手時整組一起平移。
 // 點 key 走 part-types 的 pointKeysFor（依元件型別），不再各自維護扁平清單。
 function frameNodeIds() {
   const ids = new Set();
   S.comps.forEach(c => pointKeysFor(c).forEach(k => {
-    if (c[k] && c[k].id && c[k].type === 'fixed') ids.add(c[k].id);
+    if (c[k] && c[k].id && Model.isGroundPoint(c[k])) ids.add(c[k].id);
   }));
   return ids;
 }
