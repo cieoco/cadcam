@@ -88,6 +88,7 @@
     .controls .clear-btn {
       width: 34px; height: 34px; border-radius: 999px; padding: 0; line-height: 1;
     }
+    .clear-btn.active { background: #eaf2ff; border-color: #7fb0ff; color: #2c5282; font-weight: 700; }
     .danger-btn { border-color: #ffc9c9; background: #fff5f5; color: #c0392b; font-weight: 700; }
     /* 選取連桿後的長度編輯面板 */
     .len-editor { position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column;
@@ -394,6 +395,8 @@
         <button class="play-btn" id="playBtn" onclick="window.blocks.togglePlay()" title="播放 / 暫停">▶</button>
         <div class="ctrl-sub" title="目前角度"><span id="thetaVal">0</span>°</div>
         <button class="clear-btn" onclick="window.blocks.fitView()" title="置中">⊡</button>
+        <button class="clear-btn active" id="btnFrameHoles" onclick="window.blocks.toggleFrameHoles()" title="顯示 / 隱藏 LEGO 機架孔位">孔</button>
+        <button class="clear-btn" id="btnFrameLock" onclick="window.blocks.toggleFrameLock()" title="拖曳固定孔與機架時吸附到 8mm LEGO 孔距">鎖</button>
         <button class="clear-btn" id="btn3d" onclick="window.blocks.toggle3D()" title="3D 預覽">3D</button>
         <button class="clear-btn" onclick="window.blocks.clearAll()" title="清空">🗑</button>
       </div>

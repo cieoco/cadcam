@@ -30,7 +30,9 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
     isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
     handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
     recordManualTrace = () => {},
-    solvePinnedConstraints = null;
+    solvePinnedConstraints = null,
+    snapFramePoint = p => p,
+    snapFrameNodesToGrid = () => {};
 
 export function startFreeLinkDrag(e, linkId) {
   const c = S.comps.find(x => x.id === linkId && isFreeLink(x));
@@ -107,8 +109,12 @@ function onDragMove(e) {
   if (S.dragFrame && S.dragLastWorld) {
     const dx = w.x - S.dragLastWorld.x;
     const dy = w.y - S.dragLastWorld.y;
+    const anchorId = Array.from(frameNodeIds())[0];
+    const before = anchorId ? pointCoords()[anchorId] : null;
     frameNodeIds().forEach(id => movePointById(id, dx, dy));
-    S.dragLastWorld = w;
+    snapFrameNodesToGrid();
+    const after = anchorId ? pointCoords()[anchorId] : null;
+    if (!before || !after || Math.hypot(after.x - before.x, after.y - before.y) > 1e-6) S.dragLastWorld = w;
     redrawAfterDrag();
     return;
   }
@@ -132,6 +138,7 @@ function onDragMove(e) {
     draw();
     return;
   }
+  const dragTarget = pointIsGround(S.dragId) ? snapFramePoint(w) : w;
   // 齒輪中心：拖中心＝整顆齒輪剛性平移（輪緣銷 p2 跟著走），否則齒形繞 p1、銷停舊位會分離。
   // 並維持嚙合（中心距 D=Ra+Rb 是死的）：
   //  - 夥伴已接地 → 本中心被 D 綁住，繞夥伴中心「公轉」（保持咬合，只改方位，之後可就地設地錨）。
@@ -150,21 +157,21 @@ function onDragMove(e) {
       const pCtr = pc[partner.p1.id] || { x: partner.p1.x || 0, y: partner.p1.y || 0 };
       const D = (Number(S.topo.params[gearForCenter.radiusParam]) || 40) +
                 (Number(S.topo.params[partner.radiusParam]) || 40);
-      let vx = w.x - pCtr.x, vy = w.y - pCtr.y;
+      let vx = dragTarget.x - pCtr.x, vy = dragTarget.y - pCtr.y;
       const d = Math.hypot(vx, vy) || 1;
       moveGear(gearForCenter, (pCtr.x + vx / d * D) - cur.x, (pCtr.y + vy / d * D) - cur.y);
     } else if (partner && partner.p1) {
       // 整對平移：兩顆一起搬。
-      moveGear(gearForCenter, w.x - cur.x, w.y - cur.y);
-      moveGear(partner, w.x - cur.x, w.y - cur.y);
+      moveGear(gearForCenter, dragTarget.x - cur.x, dragTarget.y - cur.y);
+      moveGear(partner, dragTarget.x - cur.x, dragTarget.y - cur.y);
     } else {
-      moveGear(gearForCenter, w.x - cur.x, w.y - cur.y);
+      moveGear(gearForCenter, dragTarget.x - cur.x, dragTarget.y - cur.y);
     }
     S.snapTarget = nearestDisplayTo(S.dragId);
     redrawAfterDrag();
     return;
   }
-  let tx = w.x, ty = w.y;
+  let tx = dragTarget.x, ty = dragTarget.y;
   // 自由連桿：兩端都未固定、也沒接到別的桿時，拖端點等於整根平移。
   const free = freeLinkForPoint(S.dragId);
   if (free) {
@@ -197,7 +204,7 @@ function onDragMove(e) {
     const f = pc[pinTri.pivot.id];
     const d = pc[S.dragId];
     if (f && d) {
-      const delta = Math.atan2(w.y - f.y, w.x - f.x) - Math.atan2(d.y - f.y, d.x - f.x);
+      const delta = Math.atan2(dragTarget.y - f.y, dragTarget.x - f.x) - Math.atan2(d.y - f.y, d.x - f.x);
       const cosD = Math.cos(delta), sinD = Math.sin(delta);
       [pinTri.tri.p1, pinTri.tri.p2, pinTri.tri.p3].forEach(p => {
         if (!p || p.id === pinTri.pivot.id) return;   // 固定頂點不動
@@ -211,7 +218,7 @@ function onDragMove(e) {
     }
   }
   // 一般閉鏈/欠定機構的手抓點：把被拖的洞暫時 pin 到游標，用距離約束迭代解其他桿件。
-  if (solvePinnedConstraints && solvePinnedConstraints(S.dragId, w)) {
+  if (solvePinnedConstraints && solvePinnedConstraints(S.dragId, dragTarget)) {
     S.snapTarget = nearestDisplayTo(S.dragId);
     redrawAfterDrag();
     return;
@@ -225,7 +232,7 @@ function onDragMove(e) {
     const other = fl.p1.id === S.dragId ? fl.p2 : fl.p1;
     const L = Math.max(1, S.topo.params[fl.lenParam] ||
       Math.hypot((fl.p2.x || 0) - (fl.p1.x || 0), (fl.p2.y || 0) - (fl.p1.y || 0)));
-    let dx = w.x - (other.x || 0), dy = w.y - (other.y || 0);
+    let dx = dragTarget.x - (other.x || 0), dy = dragTarget.y - (other.y || 0);
     const d = Math.hypot(dx, dy) || 1;
     tx = (other.x || 0) + dx / d * L;
     ty = (other.y || 0) + dy / d * L;
@@ -294,7 +301,9 @@ export function init(deps) {
      isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
      handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
      recordManualTrace = (() => {}),
-     solvePinnedConstraints = null } = deps);
+     solvePinnedConstraints = null,
+     snapFramePoint = (p => p),
+     snapFrameNodesToGrid = (() => {}) } = deps);
 
   // ---- 掛上 svg 的指標 / 手勢監聽（原 app.js 檔尾那批，順序不變）----
   svg.addEventListener('pointermove', onDragMove);
