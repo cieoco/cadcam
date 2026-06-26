@@ -159,6 +159,36 @@ export const BLOCK_EXAMPLES = [
     }
   },
   {
+    id: 'quick-return',
+    title: '急回機構：偏置曲柄滑塊',
+    note: '滑軌刻意放在曲柄中心上方；同樣的水平行程，一段約用 220° 慢慢走，另一段約用 140° 快速回來。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 6,
+      tracePoint: 'S',
+      comps: [
+        { type: 'anchor', id: 'Anchor1', p1: pt('O', 'fixed', 0, 0) },
+        { type: 'anchor', id: 'Anchor2', p1: pt('M1', 'fixed', 0, 48) },
+        { type: 'anchor', id: 'Anchor3', p1: pt('M2', 'fixed', 184, 48) },
+        bar('Link1', pt('O', 'fixed', 0, 0, { physicalMotor: '1' }), pt('A', 'floating', 48, 0), 48, {
+          color: '#e74c3c',
+          isInput: true,
+          physicalMotor: '1',
+          phaseOffset: 0
+        }),
+        {
+          type: 'slider', id: 'Slider1', color: '#16a085', sign: 1, lenParam: 'SL1',
+          m1: pt('M1', 'fixed', 0, 48), m2: pt('M2', 'fixed', 184, 48),
+          p1: pt('Sa', 'fixed', 0, 48), p2: pt('Sb', 'fixed', 184, 48), p3: pt('S', 'floating', 140.26, 48),
+          carrierLen: 184, railOffset: 0, carriageLen: 24, travelStart: 0, travelEnd: 184
+        },
+        bar('Link2', pt('A', 'floating', 48, 0), pt('S', 'floating', 140.26, 48), 104)
+      ],
+      params: { LL1: 48, LL2: 104, SL1: 184 }
+    }
+  },
+  {
     id: 'gear-pair',
     title: '齒輪對：嚙合傳動',
     note: '紅色驅動齒輪整圈轉、藍色從動齒輪反向轉，轉速比＝半徑反比（30:40，大輪較慢）。',
