@@ -819,7 +819,19 @@ function draw() {
                  baseEnd: c.baseEnd === 'p2' ? 'p2' : 'p1',
                  travelStart: sliderTravelStart(c), travelEnd: sliderTravelEnd(c),
                  carriageLen: sliderBodyLength(c), color: c.color }));
-  lastModelInputs = { links: linksToDraw, pts, groundIds, motorCenterIds, motorTypes, polygons: S.compiled.visualization.polygons || [], sliders: sliders3d };
+  const gears3d = S.comps
+    .filter(c => c.type === 'gear' && c.p1 && c.p2)
+    .map(c => ({
+      id: c.id,
+      center: c.p1.id,
+      pin: c.p2.id,
+      radius: Number(S.topo.params[c.radiusParam]) || 40,
+      teeth: c.teeth,
+      module: c.module,
+      mesh: c.mesh,
+      color: c.color,
+    }));
+  lastModelInputs = { links: linksToDraw, pts, groundIds, motorCenterIds, motorTypes, polygons: S.compiled.visualization.polygons || [], sliders: sliders3d, gears: gears3d };
   if (view3DActive) push3D();
 }
 
@@ -879,8 +891,8 @@ function renderFrame() {
 // 用最近一幀的求解結果建場景模型，推進 3D viewer
 function push3D() {
   if (!viewer3D || !lastModelInputs) return;
-  const { links, pts, groundIds, motorCenterIds, motorTypes, polygons, sliders } = lastModelInputs;
-  const model = buildSceneModel(links, pts, { groundIds, motorCenters: motorCenterIds, motorTypes, hullR: HULL_R_WORLD, polygons, sliders });
+  const { links, pts, groundIds, motorCenterIds, motorTypes, polygons, sliders, gears } = lastModelInputs;
+  const model = buildSceneModel(links, pts, { groundIds, motorCenters: motorCenterIds, motorTypes, hullR: HULL_R_WORLD, polygons, sliders, gears });
   viewer3D.update(model);
 }
 
@@ -1138,7 +1150,9 @@ function addAnchor() {
 function makeGear(n, opts) {
   const { teeth, module, cx, cy, isDriver, meshId, color } = opts;
   const R = teeth * module / 2;
+  const pinR = Math.round(R * 0.6);
   const radiusParam = 'GR' + n;
+  const pinRadiusParam = 'GPR' + n;
   // 乙：放下即「浮動未固定」——兩個中心都是 floating，比照桿件由使用者把中心拖去地錨/接點才接地。
   // 驅動輪不必顯式給馬達：兩中心接地後，gear step 的 motor 會 fallback 到預設馬達 '1'（＝播放 theta），
   // 按 ▶ 即轉（見 core/topology.js 的 gear 步驟、solver.js 的齒輪 force-set）。
@@ -1146,11 +1160,12 @@ function makeGear(n, opts) {
   const gear = {
     type: 'gear', id: 'Gear' + n, color,
     p1: center,
-    p2: { id: 'GP' + n, type: 'floating', x: cx + R, y: cy },
-    radiusParam, teeth, module, phase: 0
+    p2: { id: 'GP' + n, type: 'floating', x: cx + pinR, y: cy },
+    radiusParam, pinRadiusParam, teeth, module, phase: 0
   };
   if (meshId) gear.mesh = meshId;
   S.topo.params[radiusParam] = R;
+  S.topo.params[pinRadiusParam] = pinR;
   return gear;
 }
 function addGearPair() {

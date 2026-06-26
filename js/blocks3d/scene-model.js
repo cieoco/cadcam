@@ -86,11 +86,12 @@ export function computeBodyLayers(bodies, groundIds = new Set(), opts = {}) {
  * @param {Array}  [opts.polygons]       - compiled.visualization.polygons：三點桿，{ points:[id,id,id], color }
  * @param {Array}  [opts.sliders]        - 滑塊：{ id, p1, p2, m1, m2, p3, baseEnd, travelStart, travelEnd, carriageLen, color }
  *                                          （開槽軌道＋兩螺絲導引的滑件）
+ * @param {Array}  [opts.gears]          - 齒輪：{ id, center, pin, radius, teeth, module, mesh, color }
  * @param {number} [opts.hullR=9]        - 冰棒棍外形半徑（與 2D 一致）
  * @param {number} [opts.plateGap=6]     - 相鄰層的 z 間距 (mm)
  * @param {number} [opts.plateThickness=4] - 每片板的厚度 (mm)
  * @param {number} [opts.pinR=3.2]       - 銷柱半徑 (mm)
- * @returns {{ sticks, plates, pins, grounds, motors, rails, carriages, plateGap, plateThickness, center, span }}
+ * @returns {{ sticks, plates, pins, grounds, motors, rails, carriages, gears, plateGap, plateThickness, center, span }}
  */
 export function buildSceneModel(links, points, opts = {}) {
   const hullR = opts.hullR ?? 9;
@@ -101,6 +102,7 @@ export function buildSceneModel(links, points, opts = {}) {
   const motorCenters = opts.motorCenters || new Set();
   const motorTypes = opts.motorTypes || new Map();   // id -> 'tt' | 'mg995'
   const polygons = opts.polygons || [];
+  const gearDefs = opts.gears || [];
 
   const valid = (id) => {
     const p = points[id];
@@ -238,6 +240,49 @@ export function buildSceneModel(links, points, opts = {}) {
     });
   });
 
+  // 齒輪：2D 中畫在連桿下方；3D 中整條嚙合鏈放在同一個內側平面，讓齒面能互相咬合。
+  // 齒形本體使用嚙合相位補償；輪緣輸出銷仍直接使用 solver 的 p2 位置，不受齒形相位影響。
+  const gears = [];
+  const gearLayer = -1;
+  const gearZ = gearLayer * plateGap;
+  const gearById = new Map(gearDefs.map(g => [g.id, g]));
+  gearDefs.forEach(g => {
+    const center = points[g.center];
+    const pin = points[g.pin];
+    if (![center, pin].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))) return;
+    const teeth = Math.max(6, Math.round(Number(g.teeth) || 12));
+    const radius = Math.max(1, Number(g.radius) || Math.hypot(pin.x - center.x, pin.y - center.y) || 40);
+    const module = Math.max(0.1, Number(g.module) || (2 * radius / teeth));
+    const angle = Math.atan2(pin.y - center.y, pin.x - center.x);
+    let meshPhase = 0;
+    const driver = g.mesh ? gearById.get(g.mesh) : null;
+    if (driver && driver.center && points[driver.center]) {
+      const dc = points[driver.center];
+      const NA = Math.max(6, Math.round(Number(driver.teeth) || 12));
+      const betaA = Math.atan2(center.y - dc.y, center.x - dc.x);
+      const betaB = Math.atan2(dc.y - center.y, dc.x - center.x);
+      let q = (NA * betaA + teeth * betaB) / (2 * Math.PI);
+      q -= Math.floor(q);
+      meshPhase = (q - 0.5) * (2 * Math.PI / teeth);
+    }
+    gears.push({
+      id: g.id,
+      center: { x: center.x, y: center.y },
+      pin: { x: pin.x, y: pin.y },
+      radius,
+      teeth,
+      module,
+      angle,
+      meshPhase,
+      z: gearZ,
+      layer: gearLayer,
+      thickness: plateThickness,
+      color: g.color || '#b0772e',
+    });
+    touch(g.center, gearLayer);
+    touch(g.pin, gearLayer);
+  });
+
   const pins = [];
   const grounds = [];
   const motors = [];
@@ -293,6 +338,11 @@ export function buildSceneModel(links, points, opts = {}) {
   sticks.forEach(s => { xs.push(s.a.x, s.b.x); ys.push(s.a.y, s.b.y); });
   plates.forEach(pl => pl.corners.forEach(c => { xs.push(c.x); ys.push(c.y); }));
   rails.forEach(r => { xs.push(r.a.x, r.b.x); ys.push(r.a.y, r.b.y); });
+  gears.forEach(g => {
+    const outer = g.radius + g.module;
+    xs.push(g.center.x - outer, g.center.x + outer);
+    ys.push(g.center.y - outer, g.center.y + outer);
+  });
   if (xs.length) {
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -302,7 +352,7 @@ export function buildSceneModel(links, points, opts = {}) {
 
   // 相機對焦點：有地錨就用地錨形心（恆定不動，動畫時不會晃）；沒地錨才退回外接框中心。
   // anchored=true 時 viewer 可每幀同步（反正不動）；false 時 viewer 只在初次定位、之後凍結。
-  const maxLayer = [...sticks, ...plates].reduce((m, s) => Math.max(m, s.layer), 0);
+  const maxLayer = [...sticks, ...plates, ...gears].reduce((m, s) => Math.max(m, s.layer), 0);
   const midZ = (maxLayer * plateGap + plateThickness) / 2;
   // 馬達中心也是固定點，一併納入對焦形心（否則只有馬達、沒有其他地錨時相機會抓不到定點）
   const anchorPts = [...grounds, ...motors];
@@ -315,5 +365,5 @@ export function buildSceneModel(links, points, opts = {}) {
       }
     : { x: bboxCenter.x, y: bboxCenter.y, z: midZ };
 
-  return { sticks, plates, pins, grounds, motors, rails, carriages, plateGap, plateThickness, span, focus, anchored };
+  return { sticks, plates, pins, grounds, motors, rails, carriages, gears, plateGap, plateThickness, span, focus, anchored };
 }

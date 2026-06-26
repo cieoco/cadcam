@@ -15,6 +15,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
+import { createGearPath } from '../utils/gear-geometry.js';
 
 // 把一根桿（兩端 a、b、半徑 r、兩端孔徑 holeR）做成 THREE.Shape。
 // 外形與 blocks.html 的 barHullPath 一致：兩端圓 + 外切線 + 半圓封口，外加兩個孔。
@@ -138,6 +139,24 @@ function triPlateShape(corners, r, holeR) {
   return shape;
 }
 
+function gearShape(gear, centerHoleR) {
+  const pts = createGearPath({
+    teeth: gear.teeth,
+    module: gear.module,
+    segmentsPerTooth: 5,
+  });
+  const shape = new THREE.Shape();
+  if (!pts.length) return shape;
+  shape.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i].x, pts[i].y);
+  shape.closePath();
+
+  const center = new THREE.Path();
+  center.absarc(0, 0, centerHoleR, 0, Math.PI * 2, true);
+  shape.holes.push(center);
+  return shape;
+}
+
 export function createViewer(container) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#0f1420');
@@ -180,6 +199,7 @@ export function createViewer(container) {
   // MG995 伺服：藍色殼體 + 白色舵盤（與 2D drawMG995Servo 同色系）
   const servoBodyMat = new THREE.MeshStandardMaterial({ color: 0x3d8bf0, metalness: 0.1, roughness: 0.5 });
   const servoHornMat = new THREE.MeshStandardMaterial({ color: 0xeef3fb, metalness: 0.1, roughness: 0.6 });
+  const gearBoltMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.15, roughness: 0.45 });
   // TT 馬達真實比例（mm）：齒輪箱 37(長)×22.5(寬)×16(厚)、DC 罐 ⌀20.5×22、輸出軸 ⌀~5。
   // 馬達躺在與機構平行的平面、沉在桿件背面；長軸(boxLen)朝機架方向，輸出軸沿 z。
   // shaftInset = 輸出軸距齒輪箱近端的距離（與 2D 的 ax 一致）。
@@ -284,6 +304,31 @@ export function createViewer(container) {
         pin.position.set(s.x, s.y, (c.screwZ0 + c.screwZ1) / 2);
         dynamic.add(pin);
       });
+    });
+
+    // 齒輪：和 2D 共用齒形產生器，整條嚙合鏈在同一個內側 z 平面。
+    // 齒形本體套 meshPhase 讓齒對齒隙；輪緣輸出銷另依 solver p2 畫在真實位置。
+    (model.gears || []).forEach(g => {
+      const group = new THREE.Group();
+      group.position.set(g.center.x, g.center.y, 0);
+      group.rotation.z = g.angle + g.meshPhase;
+
+      const shape = gearShape(g, holeR * 1.05);
+      const geo = new THREE.ExtrudeGeometry(shape, {
+        depth: g.thickness,
+        bevelEnabled: false,
+        curveSegments: 18,
+      });
+      const body = new THREE.Mesh(geo, plateMaterial(g.color));
+      body.position.z = g.z;
+      group.add(body);
+      dynamic.add(group);
+
+      const boltH = Math.max(1, g.thickness * 0.35);
+      const bolt = new THREE.Mesh(new THREE.CylinderGeometry(holeR * 1.15, holeR * 1.15, boltH, 20), gearBoltMat);
+      bolt.rotation.x = Math.PI / 2;
+      bolt.position.set(g.pin.x, g.pin.y, g.z + g.thickness + boltH / 2 + 0.2);
+      dynamic.add(bolt);
     });
 
     // 馬達：躺在機構背面（z<0）、長軸朝機架方向，輸出軸沿 +z 往上頂到曲柄那層帶動它。
@@ -409,6 +454,7 @@ export function createViewer(container) {
     motorCanMat.dispose();
     servoBodyMat.dispose();
     servoHornMat.dispose();
+    gearBoltMat.dispose();
     controls.dispose();
     if (resizeObserver) resizeObserver.disconnect();
     renderer.dispose();

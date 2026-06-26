@@ -11,6 +11,15 @@ function compileGearSteps(c, ctx) {
         if (g && g.radiusParam && params[g.radiusParam] === undefined) params[g.radiusParam] = 40;
         return (g && g.radiusParam && Number(params[g.radiusParam])) || 40;
     };
+    const gearPinRadius = (g) => {
+        const pitchR = gearRadius(g);
+        if (g && g.pinRadiusParam) {
+            if (params[g.pinRadiusParam] === undefined) params[g.pinRadiusParam] = Math.round(pitchR * 0.6);
+            return Number(params[g.pinRadiusParam]) || pitchR * 0.6;
+        }
+        if (g && Number.isFinite(Number(g.pinRadius))) return Number(g.pinRadius);
+        return pitchR * 0.6;
+    };
 
     const gearById = new Map(components.filter(g => g.type === 'gear' && g.id).map(g => [g.id, g]));
     const driveState = (gear, seen = new Set()) => {
@@ -39,7 +48,8 @@ function compileGearSteps(c, ctx) {
         id: c.p2.id,
         type: 'gear',
         center: c.p1.id,
-        len_param: c.radiusParam,   // 輸出銷半徑＝節圓半徑（銷在輪緣）
+        // 齒比/嚙合用 radiusParam（節圓）；輸出銷孔放在齒輪腹板內側，不打在齒上。
+        ...(c.pinRadiusParam ? { len_param: c.pinRadiusParam } : { len_val: gearPinRadius(c) }),
         motor: state.motor,
         ratio,
         sign,

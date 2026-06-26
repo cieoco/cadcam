@@ -262,7 +262,10 @@ function solveBodyJointTopology(topology, params) {
         addPointId(c.p1); addPointId(c.p2);
         const center = points[c.p1.id];
         if (!center) return;
-        const r = getParamVal(c.radiusParam, 40);
+        const pitchR = getParamVal(c.radiusParam, 40);
+        const r = c.pinRadiusParam
+            ? getParamVal(c.pinRadiusParam, Math.round(pitchR * 0.6))
+            : (Number.isFinite(Number(c.pinRadius)) ? Number(c.pinRadius) : pitchR * 0.6);
         const gearById = new Map(components.filter(g => g.type === 'gear' && g.id).map(g => [g.id, g]));
         const driveState = (gear, seen = new Set()) => {
             if (!gear || seen.has(gear.id)) return null;
@@ -272,8 +275,8 @@ function solveBodyJointTopology(topology, params) {
             if (!driver || !driver.p1) return null;
             const parent = driveState(driver, seen);
             if (!parent) return null;
-            const rDriver = getParamVal(driver.radiusParam, r);
-            const rDriven = getParamVal(gear.radiusParam, r);
+            const rDriver = getParamVal(driver.radiusParam, pitchR);
+            const rDriven = getParamVal(gear.radiusParam, pitchR);
             return {
                 driverPt: parent.driverPt,
                 factor: parent.factor * -(rDriver / (rDriven || 1))
