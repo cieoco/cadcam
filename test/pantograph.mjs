@@ -1,75 +1,72 @@
 // 範例驗收：縮放儀 pantograph。對應 BLOCK_EXAMPLES「縮放儀：2 倍放大」。
-// 驗收條件（自動，本檔）：① 多個手動姿態都解得穩 ② 輸出點 P = O + k·(追蹤點 I − O)，k=2。
+// 驗收條件：① 拖曳右端 R 的多個姿態都能解 ② R = B + 2×(P-B)
+// ③ 兩支三點桿維持共線 ④ 所有桿長/三點桿邊長維持。
 // 跑法：node test/pantograph.mjs
 import { BLOCK_EXAMPLES } from '../js/blocks/examples.js';
 import { normalizeSnapshot } from '../js/blocks/schema.js';
-import { compileTopology } from '../js/core/topology.js';
-import { solveTopology } from '../js/multilink/solver.js';
+import { pointCoords, solvePinnedConstraints } from '../js/blocks/model.js';
 import { check, report } from './_harness.mjs';
 
 const example = BLOCK_EXAMPLES.find(e => e.id === 'pantograph');
 const normalized = normalizeSnapshot(example.snapshot);
 const params = normalized.params;
-const scale = params.LL1 / params.DI;
+const scale = params.TR1_Tri4 / params.TG4;
 
 const clone = value => JSON.parse(JSON.stringify(value));
-const movePoint = (comps, id, x, y) => {
-  comps.forEach(c => {
-    ['p1', 'p2', 'p3', 'm1', 'm2'].forEach(k => {
-      if (c[k]?.id === id) { c[k].x = x; c[k].y = y; }
-    });
-  });
+const dist = (pts, a, b) => Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y);
+const lineError = (pts, a, m, b) => {
+  const ax = pts[a].x, ay = pts[a].y;
+  const bx = pts[b].x, by = pts[b].y;
+  const mx = pts[m].x, my = pts[m].y;
+  const len = Math.hypot(bx - ax, by - ay);
+  return len > 1e-9 ? Math.abs((bx - ax) * (ay - my) - (ax - mx) * (by - ay)) / len : Infinity;
 };
-const solveManualPose = (angleDeg, prevPoints) => {
+
+const targets = [
+  { x: 192, y: 160 },
+  { x: 176, y: 112 },
+  { x: 136, y: 200 },
+  { x: 224, y: 192 }
+];
+
+const poses = targets.map(target => {
   const comps = clone(normalized.comps);
-  const a = angleDeg * Math.PI / 180;
-  movePoint(comps, 'P', Math.cos(a) * params.LL1, Math.sin(a) * params.LL1);
-  const topo = { params: { theta: 0, ...params }, tracePoints: normalized.tracePoints || [] };
-  const compiled = compileTopology(comps, topo, new Set());
-  const sol = solveTopology(compiled, { thetaDeg: 0, _prevPoints: prevPoints });
-  return { comps, sol };
-};
+  const ok = solvePinnedConstraints(comps, { params }, 'R', target, { tolerance: 1, iterations: 160 });
+  return { ok, target, pts: pointCoords(comps) };
+});
 
-const poses = [];
-let prevPoints = null;
-for (const angle of [-25, 0, 25, 50]) {
-  const pose = solveManualPose(angle, prevPoints);
-  poses.push({ angle, points: pose.sol.points || {}, isValid: pose.sol && pose.sol.isValid !== false });
-  prevPoints = pose.sol.points || prevPoints;
-}
-const allValid = poses.every(f => f.isValid && ['O', 'I', 'P', 'M', 'N'].every(id =>
-  f.points[id] && Number.isFinite(f.points[id].x) && Number.isFinite(f.points[id].y)
+const required = ['O', 'A', 'B', 'D', 'P', 'R'];
+const allValid = poses.every(pose => pose.ok && required.every(id =>
+  pose.pts[id] && Number.isFinite(pose.pts[id].x) && Number.isFinite(pose.pts[id].y)
 ));
-check('多個手動姿態都解得穩（O/I/P/M/N 都有限）', allValid);
+check('多個手動姿態都解得穩（O/A/B/D/P/R 都有限）', allValid);
 
-const validFrames = poses.filter(f => ['O', 'I', 'P', 'M', 'N'].every(id => f.points[id]));
-const errors = validFrames.map(f => {
-  const { O, I, P } = f.points;
-  const expectedX = O.x + scale * (I.x - O.x);
-  const expectedY = O.y + scale * (I.y - O.y);
-  return Math.hypot(P.x - expectedX, P.y - expectedY);
+const scaleErrors = poses.map(({ pts }) => {
+  const expectedX = pts.B.x + scale * (pts.P.x - pts.B.x);
+  const expectedY = pts.B.y + scale * (pts.P.y - pts.B.y);
+  return Math.hypot(pts.R.x - expectedX, pts.R.y - expectedY);
 });
-check('輸出點 = 樞軸 + k × 追蹤向量', Math.max(...errors) < 1e-6,
-  `k=${scale.toFixed(1)}，最大誤差 ${Math.max(...errors).toExponential(2)} mm`);
+check('輸出點 R = B + k × 追蹤向量 BP', Math.max(...scaleErrors) < 1e-6,
+  `k=${scale.toFixed(1)}，最大誤差 ${Math.max(...scaleErrors).toExponential(2)} mm`);
 
-// 平行四邊形 O-M-N-P：四邊各維持固定桿長，且對邊相等（→ 真平行四邊形，比例骨架不變形）
-const braceErrors = validFrames.map(f => {
-  const { O, I, P, M, N } = f.points;
-  const OM = Math.hypot(M.x - O.x, M.y - O.y);
-  const PN = Math.hypot(N.x - P.x, N.y - P.y);
-  const MN = Math.hypot(N.x - M.x, N.y - M.y);
-  const OP = Math.hypot(P.x - O.x, P.y - O.y);
-  return Math.max(
-    Math.abs(OM - params.LL2),                      // O-M
-    Math.abs(Math.hypot(M.x - I.x, M.y - I.y) - params.LL3), // I-M
-    Math.abs(Math.hypot(N.x - I.x, N.y - I.y) - params.LL4), // I-N
-    Math.abs(PN - params.LL5),                      // P-N
-    Math.abs(MN - params.LL6),                      // M-N
-    Math.abs(OM - PN),                              // 對邊 O-M = P-N
-    Math.abs(MN - OP)                               // 對邊 M-N = O-P
-  );
-});
-check('平行四邊形骨架保持約束長度且對邊相等', Math.max(...braceErrors) < 1e-6,
-  `最大長度誤差 ${Math.max(...braceErrors).toExponential(2)} mm`);
+const collinearErrors = poses.map(({ pts }) => Math.max(
+  lineError(pts, 'O', 'A', 'B'),
+  lineError(pts, 'B', 'P', 'R')
+));
+check('兩支三點桿的中間孔維持在線上', Math.max(...collinearErrors) < 1e-6,
+  `最大偏離 ${Math.max(...collinearErrors).toExponential(2)} mm`);
+
+const lengthErrors = poses.map(({ pts }) => Math.max(
+  Math.abs(dist(pts, 'O', 'A') - params.TG1),
+  Math.abs(dist(pts, 'O', 'B') - params.TR1_Tri1),
+  Math.abs(dist(pts, 'A', 'B') - params.TR2_Tri1),
+  Math.abs(dist(pts, 'A', 'D') - params.LL2),
+  Math.abs(dist(pts, 'D', 'P') - params.LL3),
+  Math.abs(dist(pts, 'B', 'P') - params.TG4),
+  Math.abs(dist(pts, 'B', 'R') - params.TR1_Tri4),
+  Math.abs(dist(pts, 'P', 'R') - params.TR2_Tri4)
+));
+check('所有桿長/三點桿邊長維持', Math.max(...lengthErrors) < 1,
+  `最大誤差 ${Math.max(...lengthErrors).toFixed(2)} mm`);
 
 report('pantograph');

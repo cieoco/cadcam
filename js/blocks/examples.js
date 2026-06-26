@@ -139,28 +139,23 @@ export const BLOCK_EXAMPLES = [
   {
     id: 'pantograph',
     title: '縮放儀：2 倍放大',
-    note: '紅色主桿上 O—I—P 三點共線：追蹤點 I 描小圖、輸出點 P 永遠在同方向 2 倍距離描出放大圖。藍色平行四邊形維持比例結構。',
+    note: '左下 O 固定，拖曳右端 R 操作縮放儀；中點 P 與右端 R 會留下不同色軌跡，R 永遠是 B→P 方向的 2 倍輸出。',
     snapshot: {
       kind: 'blocks',
       v: 1,
       counter: 12,
-      tracePoints: ['I', 'P'],
+      tracePoints: ['P', 'R'],
       comps: [
         { type: 'anchor', id: 'Anchor1', p1: pt('O', 'fixed', 0, 0) },
-        // 主桿：固定樞軸 O → 輸出筆點 P，孔 I 在桿上 DI 處 → O、I、P 永遠共線，OP = (LL1/DI)·OI = 2·OI
-        bar('Link1', pt('O', 'fixed', 0, 0), pt('P', 'floating', 96, 0), 96, {
-          color: '#e74c3c',
-          holes: [{ id: 'I', distParam: 'DI' }]
-        }),
-        // 平行四邊形 O-M-N-P：M、N 各由主桿上的已解點 dyad 出，維持縮放儀的比例骨架。
-        // 桿長全取整數（64/80/96）以免序列化捨入造成過約束不一致而擾動自由筆點 P。
-        bar('Link2', pt('O', 'fixed', 0, 0), pt('M', 'floating', 0, 64), 64, { color: '#3498db' }),
-        bar('Link3', pt('I', 'floating', 48, 0), pt('M', 'floating', 0, 64), 80, { color: '#3498db' }),
-        bar('Link4', pt('I', 'floating', 48, 0), pt('N', 'floating', 96, 64), 80, { color: '#3498db' }),
-        bar('Link5', pt('P', 'floating', 96, 0), pt('N', 'floating', 96, 64), 64, { color: '#3498db' }),
-        bar('Link6', pt('M', 'floating', 0, 64), pt('N', 'floating', 96, 64), 96, { color: '#3498db' })
+        // 左側固定三孔桿 O-A-B：80 + 80 = 160。
+        triangle('Tri1', pt('O', 'fixed', 0, 0), pt('A', 'floating', 0, 80), pt('B', 'floating', 0, 160), { color: '#27ae60' }),
+        // 藍色平行四邊形 A-D-P-B，維持右側三孔桿的姿態。
+        bar('Link2', pt('A', 'floating', 0, 80), pt('D', 'floating', 96, 80), 96, { color: '#3498db' }),
+        bar('Link3', pt('D', 'floating', 96, 80), pt('P', 'floating', 96, 160), 80, { color: '#3498db' }),
+        // 右側手抓三孔桿 B-P-R：96 + 96 = 192，故 R = B + 2 × (P - B)。
+        triangle('Tri4', pt('B', 'floating', 0, 160), pt('P', 'floating', 96, 160), pt('R', 'floating', 192, 160), { color: '#27ae60' })
       ],
-      params: { LL1: 96, LL2: 64, LL3: 80, LL4: 80, LL5: 64, LL6: 96, DI: 48 }
+      params: { TG1: 80, TR1_Tri1: 160, TR2_Tri1: 80, LL2: 96, LL3: 80, TG4: 96, TR1_Tri4: 192, TR2_Tri4: 96 }
     }
   },
   {
