@@ -6,8 +6,8 @@ export const JANSEN_TOPOLOGY = {
     // 定義求解步驟
     steps: [
         // 1. 固定點
-        { id: 'O', type: 'ground', x: 0, y: 0 },
-        { id: 'F', type: 'ground', x: -38, y: -7.8 }, // Jansen fixed point relative to crank
+        { id: 'F', type: 'ground', x: 0, y: 0 },
+        { id: 'O', type: 'ground', x: 38, y: 7.8 }, // crank center: a=38, l=7.8 from F
 
         // 2. 輸入曲柄 (P0)
         { id: 'P0', type: 'input_crank', center: 'O', len_param: 'm' },
@@ -19,16 +19,13 @@ export const JANSEN_TOPOLOGY = {
         // 4. 下節點 (P2): connect O-P0 (extend k) & F (extend c). P2 is "lower".
         { id: 'P2', type: 'dyad', p1: 'P0', r1_param: 'k', p2: 'F', r2_param: 'c', sign: 1 },
 
-        // 5. 肩關節 (P3): connecting P1 (e) and P2 (d).
-        // This forms the central deformable quad/triangle structure.
-        { id: 'P3', type: 'dyad', p1: 'P1', r1_param: 'e', p2: 'P2', r2_param: 'd', sign: -1 },
+        // 5. 上三角左角 (P3): fixed triangle F-P1-P3 uses b, d, e.
+        { id: 'P3', type: 'dyad', p1: 'P1', r1_param: 'e', p2: 'F', r2_param: 'd', sign: -1 },
 
-        // 6. 上外角 (P4): connecting P1 (f) and P3 (a_len). 
-        // Note: P1-P3-P4 is a rigid triangle plate usually. 
-        // Solving P4 relative to P1, P3 using lengths f, a_len.
-        { id: 'P4', type: 'dyad', p1: 'P1', r1_param: 'f', p2: 'P3', r2_param: 'a_len', sign: -1 },
+        // 6. 下三角左角 (P4): connects the upper triangle to lower triangle by f and g.
+        { id: 'P4', type: 'dyad', p1: 'P3', r1_param: 'f', p2: 'P2', r2_param: 'g', sign: -1 },
 
-        // 7. 腳底 (P5): connecting P4 (h) and P2 (i).
+        // 7. 腳底 (P5): lower fixed triangle P2-P4-P5 uses g, h, i.
         { id: 'P5', type: 'dyad', p1: 'P4', r1_param: 'h', p2: 'P2', r2_param: 'i', sign: -1 }
     ],
 
@@ -43,13 +40,17 @@ export const JANSEN_TOPOLOGY = {
             { p1: 'P0', p2: 'P2', color: '#34495e' }, // k
             { p1: 'F', p2: 'P1', color: '#95a5a6' },  // b
             { p1: 'F', p2: 'P2', color: '#95a5a6' },  // c
-            { p1: 'P2', p2: 'P3', color: '#2ecc71' }, // d
+            { p1: 'F', p2: 'P3', color: '#2ecc71' },  // d
+            { p1: 'P1', p2: 'P3', color: '#2ecc71' }, // e
+            { p1: 'P3', p2: 'P4', color: '#2ecc71' }, // f
+            { p1: 'P2', p2: 'P4', color: '#e67e22' }, // g
             { p1: 'P2', p2: 'P5', color: '#e67e22' }, // i
             { p1: 'P4', p2: 'P5', color: '#e67e22' }, // h
         ],
         polygons: [
-            // Upper Triangle Plate
-            { points: ['P1', 'P3', 'P4'], fill: '#3498db', stroke: '#2980b9' }
+            // Holy numbers: upper b-d-e triangle and lower g-h-i triangle.
+            { points: ['F', 'P1', 'P3'], fill: '#3498db', stroke: '#2980b9' },
+            { points: ['P2', 'P4', 'P5'], fill: '#3498db', stroke: '#2980b9' }
         ],
         joints: ['O', 'F', 'P0', 'P1', 'P2', 'P3', 'P4', 'P5']
     },
@@ -63,14 +64,36 @@ export const JANSEN_TOPOLOGY = {
         { id: 'Link(c)', type: 'bar', len_param: 'c' },
         // ... bars
 
-        // Triangle Plate
+        // Triangle Plates
         {
             id: 'UpperLeg',
             type: 'triangle',
-            len_params: ['e', 'f', 'a_len'], // Side lengths: P1-P3, P1-P4, P3-P4
-            // We need to know which one is the "Base" for simple generation?
-            // Solver in parts.js will assemble triangle from 3 lengths.
-            nodes: ['P1', 'P3', 'P4'] // Used to verifying
+            len_params: ['b', 'd', 'e'],
+            nodes: ['F', 'P1', 'P3']
+        },
+        {
+            id: 'LowerLeg',
+            type: 'triangle',
+            len_params: ['g', 'h', 'i'],
+            nodes: ['P2', 'P4', 'P5']
         }
     ]
+};
+
+// 經典 Theo Jansen 腿比例（mm）。固定幾何在 topology ground 點中：
+// F = (0, 0)，曲柄中心 O = (a, l) = (38, 7.8)，曲柄半徑 m = 15。
+export const JANSEN_DEFAULT_PARAMS = {
+    a: 38,
+    l: 7.8,
+    m: 15,
+    j: 50,
+    k: 61.9,
+    b: 41.5,
+    c: 39.3,
+    e: 55.8,
+    d: 40.1,
+    f: 39.4,
+    g: 36.7,
+    h: 65.7,
+    i: 49
 };

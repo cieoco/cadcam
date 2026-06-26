@@ -16,6 +16,7 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const snapLego = value => Math.max(LEGO_STEP, Math.round((Number(value) || 0) / LEGO_STEP) * LEGO_STEP);
 const num = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const roundMm = (value, fallback = 0) => Math.round(num(value, fallback));
+const roundTenth = (value, fallback = 0) => Number(num(value, fallback).toFixed(1));
 const safeId = value => typeof value === 'string' && SAFE_ID.test(value);
 const uniqueSafeIds = values => Array.from(new Set((values || []).filter(safeId)));
 
@@ -34,6 +35,7 @@ function normalizePoint(point, fallbackId, warnings) {
     y: num(point.y, 0)
   };
   if (point.physicalMotor) out.physicalMotor = String(point.physicalMotor);
+  if (Number(point.solveSign) === -1) out.solveSign = -1;
   return out;
 }
 
@@ -59,6 +61,7 @@ function normalizeBar(comp, index, params, warnings) {
     isInput: Boolean(comp.isInput),
     fixedLen: comp.fixedLen !== false
   };
+  if (comp.snapLength === false) out.snapLength = false;
 
   if (comp.phaseOffset !== undefined) out.phaseOffset = num(comp.phaseOffset, 0);
   if (comp.physicalMotor) out.physicalMotor = String(comp.physicalMotor);
@@ -87,7 +90,9 @@ function normalizeBar(comp, index, params, warnings) {
   }
 
   const rawLen = params[lenParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y);
-  params[lenParam] = out.fixedLen ? snapLego(rawLen) : Math.round(num(rawLen, 0));
+  params[lenParam] = out.snapLength === false
+    ? roundTenth(rawLen)
+    : (out.fixedLen ? snapLego(rawLen) : Math.round(num(rawLen, 0)));
   return out;
 }
 
@@ -112,10 +117,15 @@ function normalizeTriangle(comp, index, params, warnings) {
     sign: Number(comp.sign) < 0 ? -1 : 1
   };
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0)))); // 手動疊放相對位移
+  if (comp.visualOnly) out.visualOnly = true;
+  if (comp.snapLength === false) out.snapLength = false;
 
-  params[gParam] = Math.round(num(params[gParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y), 0));
-  params[r1Param] = Math.round(num(params[r1Param] ?? Math.hypot(p3.x - p1.x, p3.y - p1.y), 0));
-  params[r2Param] = Math.round(num(params[r2Param] ?? Math.hypot(p3.x - p2.x, p3.y - p2.y), 0));
+  const normalizeLen = out.snapLength === false
+    ? value => roundTenth(value)
+    : value => Math.round(num(value, 0));
+  params[gParam] = normalizeLen(params[gParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y));
+  params[r1Param] = normalizeLen(params[r1Param] ?? Math.hypot(p3.x - p1.x, p3.y - p1.y));
+  params[r2Param] = normalizeLen(params[r2Param] ?? Math.hypot(p3.x - p2.x, p3.y - p2.y));
   return out;
 }
 

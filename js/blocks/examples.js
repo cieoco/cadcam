@@ -17,6 +17,8 @@ const bar = (id, p1, p2, len, extra = {}) => ({
   ...extra
 });
 
+const exactBar = (id, p1, p2, len, extra = {}) => bar(id, p1, p2, len, { snapLength: false, ...extra });
+
 const triangle = (id, p1, p2, p3, extra = {}) => ({
   type: 'triangle',
   id,
@@ -232,6 +234,58 @@ export const BLOCK_EXAMPLES = [
           radiusParam: 'GRC', teeth: 48, module: 4, phase: 0, mesh: 'GearB' }
       ],
       params: { GRA: 24, GRB: 48, GRC: 96, theta: 0 }
+    }
+  },
+  {
+    id: 'jansen-leg',
+    title: '步行腿：Jansen',
+    note: 'Theo Jansen 腿的教具比例；右側 TT 馬達帶動紅色曲柄，藍色連桿讓足端 P5 走出閉合步態軌跡。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 14,
+      tracePoint: 'P5',
+      comps: [
+        { type: 'anchor', id: 'Anchor1', p1: pt('F', 'fixed', 0, 0) },
+        { type: 'anchor', id: 'Anchor2', p1: pt('O', 'motor', 38, 7.8, { physicalMotor: '1' }) },
+        exactBar('LinkM', pt('O', 'motor', 38, 7.8, { physicalMotor: '1' }), pt('P0', 'floating', 53, 7.8), 15, {
+          lenParam: 'm',
+          color: '#e74c3c',
+          isInput: true,
+          physicalMotor: '1'
+        }),
+        exactBar('LinkJ', pt('P0', 'floating', 53, 7.8), pt('P1', 'floating', 13.986, 39.072, { solveSign: -1 }), 50, { lenParam: 'j', color: '#168bd1' }),
+        exactBar('LinkK', pt('P0', 'floating', 53, 7.8), pt('P2', 'floating', 11.048, -37.715), 61.9, { lenParam: 'k', color: '#168bd1' }),
+        exactBar('LinkB', pt('F', 'fixed', 0, 0), pt('P1', 'floating', 13.986, 39.072, { solveSign: -1 }), 41.5, { lenParam: 'b', color: '#168bd1' }),
+        exactBar('LinkC', pt('F', 'fixed', 0, 0), pt('P2', 'floating', 11.048, -37.715), 39.3, { lenParam: 'c', color: '#168bd1' }),
+        exactBar('LinkE', pt('P1', 'floating', 13.986, 39.072, { solveSign: -1 }), pt('P3', 'floating', -36.794, 15.943, { solveSign: -1 }), 55.8, { lenParam: 'e', color: '#168bd1' }),
+        exactBar('LinkD', pt('F', 'fixed', 0, 0), pt('P3', 'floating', -36.794, 15.943, { solveSign: -1 }), 40.1, { lenParam: 'd', color: '#168bd1' }),
+        triangle('TriUpper', pt('F', 'fixed', 0, 0), pt('P1', 'floating', 13.986, 39.072), pt('P3', 'floating', -36.794, 15.943), {
+          color: '#168bd1',
+          gParam: 'b',
+          r1Param: 'd',
+          r2Param: 'e',
+          sign: -1,
+          visualOnly: true,
+          snapLength: false,
+          zlift: 1
+        }),
+        exactBar('LinkF', pt('P3', 'floating', -36.794, 15.943, { solveSign: -1 }), pt('P4', 'floating', -21.232, -20.253, { solveSign: -1 }), 39.4, { lenParam: 'f', color: '#168bd1' }),
+        exactBar('LinkG', pt('P2', 'floating', 11.048, -37.715), pt('P4', 'floating', -21.232, -20.253, { solveSign: -1 }), 36.7, { lenParam: 'g', color: '#168bd1' }),
+        exactBar('LinkH', pt('P4', 'floating', -21.232, -20.253, { solveSign: -1 }), pt('P5', 'floating', -5.16, -83.957, { solveSign: -1 }), 65.7, { lenParam: 'h', color: '#168bd1' }),
+        exactBar('LinkI', pt('P2', 'floating', 11.048, -37.715), pt('P5', 'floating', -5.16, -83.957, { solveSign: -1 }), 49, { lenParam: 'i', color: '#168bd1' }),
+        triangle('TriLower', pt('P2', 'floating', 11.048, -37.715), pt('P4', 'floating', -21.232, -20.253), pt('P5', 'floating', -5.16, -83.957), {
+          color: '#168bd1',
+          gParam: 'g',
+          r1Param: 'i',
+          r2Param: 'h',
+          sign: -1,
+          visualOnly: true,
+          snapLength: false,
+          zlift: 1
+        })
+      ],
+      params: { a: 38, l: 7.8, m: 15, j: 50, k: 61.9, b: 41.5, c: 39.3, e: 55.8, d: 40.1, f: 39.4, g: 36.7, h: 65.7, i: 49 }
     }
   },
   {

@@ -119,7 +119,8 @@ export function compileTopology(components, topology, solvedPoints) {
                             y: p.y ?? existing?.y,
                             type: (isStronger ? p.type : (existing?.type || p.type)),
                             physicalMotor: p.physicalMotor,
-                            valveId: p.valveId
+                            valveId: p.valveId,
+                            solveSign: p.solveSign ?? existing?.solveSign
                         });
                     }
                 }
@@ -137,7 +138,8 @@ export function compileTopology(components, topology, solvedPoints) {
                             y: c[k].y ?? existing?.y,
                             type: (isStronger ? c[k].type : (existing?.type || c[k].type)),
                             physicalMotor: c[k].physicalMotor,
-                            valveId: c[k].valveId
+                            valveId: c[k].valveId,
+                            solveSign: c[k].solveSign ?? existing?.solveSign
                         });
                     }
                 }
@@ -403,7 +405,7 @@ export function compileTopology(components, topology, solvedPoints) {
                         type: 'dyad',
                         p1: p1Id, r1_param: b1.lenParam,
                         p2: p2Id, r2_param: b2.lenParam,
-                        sign: 1
+                        sign: Number(allPointsMap.get(jId)?.solveSign) || 1
                     });
                     joints.add(jId);
                 }
@@ -443,12 +445,14 @@ export function compileTopology(components, topology, solvedPoints) {
             });
         }
         if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
-            steps.push({
-                id: c.p3.id, type: 'rigid_triangle', p1: c.p1.id, p2: c.p2.id,
-                r1_param: c.r1Param, r2_param: c.r2Param, g_param: c.gParam, sign: c.sign || 1
-            });
+            if (!c.visualOnly) {
+                steps.push({
+                    id: c.p3.id, type: 'rigid_triangle', p1: c.p1.id, p2: c.p2.id,
+                    r1_param: c.r1Param, r2_param: c.r2Param, g_param: c.gParam, sign: c.sign || 1
+                });
+                joints.add(c.p3.id);
+            }
             polygons.push({ points: [c.p1.id, c.p2.id, c.p3.id], color: c.color, alpha: 0.3 });
-            joints.add(c.p3.id);
         }
 
         if (c.type === 'bar' && c.holes) {
@@ -561,6 +565,7 @@ export function compileTopology(components, topology, solvedPoints) {
                 holes: c.holes ? c.holes.map(h => ({ id: h.id, dist_param: h.distParam })) : []
             };
         } else if (c.type === 'triangle') {
+            if (c.visualOnly) return null;
             return { id: c.id, type: 'triangle', len_params: [c.gParam, c.r1Param, c.r2Param], color: c.color };
         } else if (c.type === 'slider') {
             let lenVal = c.lenParam;
