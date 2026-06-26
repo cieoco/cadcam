@@ -293,6 +293,29 @@ function solveBodyJointTopology(topology, params) {
         points[c.p2.id] = { x: center.x + r * Math.cos(ang), y: center.y + r * Math.sin(ang) };
     });
 
+    // 齒條（rack-and-pinion）：與小齒輪嚙合的直線齒桿。小齒輪轉 θ → 齒桿沿 axisDeg 方向平移 s = R·θ（純滾動）。
+    // 和齒輪銷同理提前 force-set：齒桿輸出點 p1 解出後可當下游連桿的驅動點。pinion 指向嚙合的小齒輪 id。
+    const rackGearById = new Map(components.filter(g => g.type === 'gear' && g.id).map(g => [g.id, g]));
+    components.forEach((c) => {
+        if (c.type !== 'rack' || !c.p1?.id) return;
+        addPointId(c.p1);
+        const pinion = c.pinion ? rackGearById.get(c.pinion) : null;
+        if (!pinion || !pinion.p1?.id) return;
+        const center = points[pinion.p1.id];
+        if (!center) return;
+        const R = getParamVal(pinion.radiusParam, 40);
+        // 只有小齒輪中心帶實體馬達才會帶動齒桿；沒馬達＝靜止齒桿（停在放置位置）。和齒輪/桿件一致。
+        const motorId = pinion.p1.physicalMotor || pinion.p1.physical_motor || '';
+        const motorTheta = motorId ? resolveMotorTheta(String(motorId), theta) : 0;
+        const axisRad = deg2rad(Number(c.axisDeg) || 0);
+        const ux = Math.cos(axisRad);
+        const uy = Math.sin(axisRad);
+        const baseX = Number(c.p1.x) || 0;   // θ=0 放置位置＝平移基準
+        const baseY = Number(c.p1.y) || 0;
+        const s = (c.sign === -1 ? -1 : 1) * R * motorTheta;
+        points[c.p1.id] = { x: baseX + ux * s, y: baseY + uy * s };
+    });
+
     components.forEach((c) => {
         if (c.type === 'bar' && c.p1?.id && c.p2?.id) {
             const len = getParamVal(c.lenParam, 0);

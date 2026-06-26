@@ -14,7 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { solveTopology, sweepTopology } from '../multilink/solver.js';
-import { createGearPath } from '../utils/gear-geometry.js';   // 齒輪漸開線齒廓（rack-pinion 也用）
+import { createGearPath, createRackPath } from '../utils/gear-geometry.js';   // 齒輪漸開線齒廓 / 齒條齒形（rack-pinion 也用）
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
 // computeBodyLayers：2D 疊放順序與 3D z 分層共用同一套，兩邊才一致。
 import { buildSceneModel, computeBodyLayers } from '../blocks3d/scene-model.js';
@@ -543,9 +543,78 @@ function drawTrianglePart(c, pts, ctx) {
   frameUpdaters.push(applyTri);
 }
 
-// 登錄表：phase 決定繪製時機——'underlay'＝連桿之下（gear 等機件）、'layered'＝畫進 zlift 疊放層（三點桿）。
+// 齒條（rack-and-pinion）：與小齒輪嚙合的直線齒桿，沿 axisDeg 平移。齒形由 createRackPath 產，
+// 每幀只更新平移（齒桿是剛體，p1 為其上一個材料點，整條跟著 p1 移動）。
+function drawRackPart(c, pts) {
+  if (!c.p1) return;
+  const pinion = c.pinion ? S.comps.find(g => g.type === 'gear' && g.id === c.pinion) : null;
+  const teeth = pinion ? Math.max(6, Math.round(Number(pinion.teeth) || 12)) : 12;
+  const R = pinion ? (Number(S.topo.params[pinion.radiusParam]) || 40) : 40;   // 小齒輪節圓半徑（世界 mm）
+  const module = (2 * R) / teeth;                                              // 模數對齊小齒輪，齒距才一致
+  const L = Number(S.topo.params[c.lenParam]) || 160;
+  const localPts = createRackPath({ length: L, height: module * 2.5, module });
+  const sc = View.getScale();
+  const axisDeg = Number(c.axisDeg) || 0;
+  // 齒相位對齊（純滾動只需在 θ=0 對一次，之後 rolling 自動保持咬合）：
+  // 算出讓「小齒輪齒頂落進齒條齒隙」所需的齒條齒形局部平移 phShift（沿桿軸）。
+  // 鎖相條件 p_rack − p_pin = 0.5（半齒；齒對齒隙）。p_pin=(angC−φ)/齒角、p_rack=(xc−齒頂相位)/齒距，
+  // 兩者隨 θ 同速前進（rolling），故差值恆定；在 θ=0（＝零件放置姿態）解出常數 phShift 即可。
+  const phShift = (() => {
+    if (!pinion || !pinion.p1 || !pinion.p2) return 0;
+    const a = axisDeg * Math.PI / 180;
+    const ux = Math.cos(a), uy = Math.sin(a);
+    const ctr0 = pinion.p1, pin0 = pinion.p2, ref0 = c.p1;          // 放置姿態（θ=0）座標
+    const phi0 = Math.atan2(pin0.y - ctr0.y, pin0.x - ctr0.x);      // 小齒輪齒頂參考角（createGearPath 在 local 0 放齒頂、銷對齊它）
+    const t0 = (ctr0.x - ref0.x) * ux + (ctr0.y - ref0.y) * uy;     // 接觸點沿桿軸的投影 = 齒條 local x
+    const Ctx = ref0.x + ux * t0, Cty = ref0.y + uy * t0;           // 接觸點（中心對節線的垂足）
+    const angC = Math.atan2(Cty - ctr0.y, Ctx - ctr0.x);           // 中心→接觸點方向角
+    const toothAng = (2 * Math.PI) / teeth;
+    const pitch = Math.PI * module;
+    const ppFrac = ((angC - phi0) / toothAng) % 1;                  // 接觸點相對齒頂的分數齒位
+    let crownPhase = t0 - pitch * (0.5 + ppFrac);                   // 期望的齒條齒頂中心相位
+    const startX0 = -L / 2 - pitch;                                 // createRackPath 的齒頂中心起點
+    let sh = (crownPhase - startX0) % pitch;
+    if (sh < 0) sh += pitch;
+    return sh;
+  })();
+  const polyStr = localPts.map(p => `${((p.x + phShift) * sc).toFixed(2)},${(-p.y * sc).toFixed(2)}`).join(' ');
+  const g = document.createElementNS(SVG_NS, 'g');
+  const poly = document.createElementNS(SVG_NS, 'polygon');
+  poly.setAttribute('points', polyStr);
+  poly.setAttribute('fill', (c.color || '#16a085') + '33');
+  poly.setAttribute('stroke-width', Math.max(1, 1.4 * sc));
+  poly.setAttribute('stroke-linejoin', 'round');
+  g.appendChild(poly);
+  svg.appendChild(g);
+  // 齒桿本體：原點在參考點 p1（位於節線上），沿 axisDeg 旋轉；齒朝 +y 指向小齒輪。
+  const applyRack = (P) => {
+    const ref = P[c.p1.id];
+    const ok = ref && Number.isFinite(ref.x) && Number.isFinite(ref.y);
+    g.style.display = ok ? '' : 'none';
+    if (!ok) return;
+    // tangency 護欄：小齒輪中心到節線（過 ref、方向 axisDeg）的垂距 ≠ R → 紅色虛線提示沒對好咬合。
+    let meshOff = false;
+    if (pinion && pinion.p1) {
+      const ctr = P[pinion.p1.id] || pinion.p1;
+      if (ctr && Number.isFinite(ctr.x)) {
+        const ar = axisDeg * Math.PI / 180;
+        const nx = -Math.sin(ar), ny = Math.cos(ar);   // 節線法向
+        const d = Math.abs((ctr.x - ref.x) * nx + (ctr.y - ref.y) * ny);
+        meshOff = Math.abs(d - R) > Math.max(1, R * 0.08);
+      }
+    }
+    poly.setAttribute('stroke', meshOff ? '#e74c3c' : (c.color || '#16a085'));
+    poly.setAttribute('stroke-dasharray', meshOff ? `${(4 * sc).toFixed(1)},${(3 * sc).toFixed(1)}` : '');
+    g.setAttribute('transform', `translate(${TX(ref.x)} ${TY(ref.y)}) rotate(${-axisDeg})`);
+  };
+  applyRack(pts);
+  frameUpdaters.push(applyRack);
+}
+
+// 登錄表：phase 決定繪製時機——'underlay'＝連桿之下（gear/rack 等機件）、'layered'＝畫進 zlift 疊放層（三點桿）。
 const PART_DRAW = {
   gear:     { phase: 'underlay', draw: drawGearPart },
+  rack:     { phase: 'underlay', draw: drawRackPart },
   triangle: { phase: 'layered',  draw: drawTrianglePart },
 };
 

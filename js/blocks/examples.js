@@ -237,6 +237,26 @@ export const BLOCK_EXAMPLES = [
     }
   },
   {
+    id: 'rack-pinion',
+    title: '齒條齒輪：轉→直線',
+    note: '紅色小齒輪整圈轉，綠色齒條沿水平方向往復平移；轉一圈齒條走過 2πR 的弧長（純滾動，位移＝R·θ）。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 2,
+      comps: [
+        { type: 'gear', id: 'Pinion', color: '#e74c3c',
+          p1: pt('PC', 'motor', 0, 0, { physicalMotor: '1' }),
+          p2: pt('PP', 'floating', 18, 0),
+          radiusParam: 'PR', teeth: 15, module: 4, phase: 0 },
+        { type: 'rack', id: 'Rack1', color: '#16a085',
+          p1: pt('RKP', 'floating', 0, -30),
+          pinion: 'Pinion', lenParam: 'RKL', axisDeg: 0, sign: 1 }
+      ],
+      params: { PR: 30, RKL: 160, theta: 0 }
+    }
+  },
+  {
     id: 'jansen-leg',
     title: '步行腿：Jansen',
     note: 'Theo Jansen 腿的教具比例；右側 TT 馬達帶動紅色曲柄，藍色連桿讓足端 P5 走出閉合步態軌跡。',

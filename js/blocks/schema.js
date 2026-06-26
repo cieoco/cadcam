@@ -250,6 +250,27 @@ function normalizeGear(comp, index, params, warnings) {
   return out;
 }
 
+// 齒條：與小齒輪嚙合的直線齒桿。p1 = 齒桿參考/輸出點（floating，沿 axisDeg 方向平移，由 solver 解出）。
+// pinion = 嚙合的小齒輪 id（提供節圓半徑 R 與馬達）；位移 s = R·θ（純滾動）。lenParam = 齒桿長度（視覺/行程）。
+function normalizeRack(comp, index, params, warnings) {
+  const id = safeId(comp.id) ? comp.id : `Rack${index + 1}`;
+  const p1 = normalizePoint(comp.p1, `RK${index + 1}`, warnings);
+  const lenParam = safeId(comp.lenParam) ? comp.lenParam : `RKL${index + 1}`;
+  const out = {
+    type: 'rack',
+    id,
+    color: SAFE_COLOR.test(comp.color || '') ? comp.color : '#16a085',
+    p1,
+    lenParam,
+    axisDeg: Math.round(num(comp.axisDeg, 0)),
+    sign: Number(comp.sign) < 0 ? -1 : 1
+  };
+  if (safeId(comp.pinion)) out.pinion = comp.pinion;
+  params[lenParam] = Math.max(1, Math.round(num(params[lenParam] ?? comp.len, 160)));
+  if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
+  return out;
+}
+
 export function normalizeSnapshot(obj) {
   if (!obj || typeof obj !== 'object') return null;
   const sourceComps = Array.isArray(obj.comps) ? obj.comps : null;
@@ -271,6 +292,7 @@ export function normalizeSnapshot(obj) {
     else if (raw.type === 'triangle') comps.push(normalizeTriangle(raw, index, params, warnings));
     else if (raw.type === 'slider') comps.push(normalizeSlider(raw, index, params, warnings));
     else if (raw.type === 'gear') comps.push(normalizeGear(raw, index, params, warnings));
+    else if (raw.type === 'rack') comps.push(normalizeRack(raw, index, params, warnings));
     else warnings.push(`不支援的零件 ${raw.type || '(unknown)'}，已略過。`);
   });
 
