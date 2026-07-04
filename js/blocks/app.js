@@ -1641,7 +1641,48 @@ function inputRockRange() {
     const stroke = Math.max(0, sliderTravelEnd(slider) - sliderTravelStart(slider));
     return { lo: 0, hi: stroke };
   }
+  const rackRange = rackPinionThetaRange();
+  if (rackRange) return rackRange;
   return null;
+}
+
+// 有限齒條不是無限長齒條：接觸點跑到齒條端部之外時，真實機構就會脫離嚙合。
+// 播放時把 theta 限在接觸點仍落在齒條齒面內的範圍，讓齒條齒輪範例推到端點前反向。
+function rackPinionThetaRange() {
+  const racks = S.comps.filter(c => c.type === 'rack' && c.p1?.id && c.pinion);
+  if (!racks.length) return null;
+  let lo = -Infinity;
+  let hi = Infinity;
+  let found = false;
+  racks.forEach(rack => {
+    const pinion = gearById(rack.pinion);
+    if (!pinion || !pinion.p1) return;
+    const center = pinion.p1;
+    const ref = rack.p1;
+    const R = Number(S.topo.params[pinion.radiusParam]) || 40;
+    const L = Number(S.topo.params[rack.lenParam]) || 160;
+    if (!Number.isFinite(R) || R <= 0 || !Number.isFinite(L) || L <= 0) return;
+    const axisRad = (Number(rack.axisDeg) || 0) * Math.PI / 180;
+    const ux = Math.cos(axisRad);
+    const uy = Math.sin(axisRad);
+    const contactAtTheta0 = ((Number(center.x) || 0) - (Number(ref.x) || 0)) * ux
+      + ((Number(center.y) || 0) - (Number(ref.y) || 0)) * uy;
+    const teeth = Math.max(6, Math.round(Number(pinion.teeth) || 12));
+    const module = (2 * R) / teeth;
+    const pitch = Math.PI * module;
+    const usableHalf = Math.max(0, L / 2 - Math.max(pitch, R * 0.15));
+    if (usableHalf <= 0) return;
+    const sign = rack.sign === -1 ? -1 : 1;
+    const a = (contactAtTheta0 - usableHalf) / (sign * R);
+    const b = (contactAtTheta0 + usableHalf) / (sign * R);
+    const degA = a * 180 / Math.PI;
+    const degB = b * 180 / Math.PI;
+    lo = Math.max(lo, Math.min(degA, degB));
+    hi = Math.min(hi, Math.max(degA, degB));
+    found = true;
+  });
+  if (!found || !Number.isFinite(lo) || !Number.isFinite(hi) || hi <= lo) return null;
+  return { lo, hi };
 }
 
 // ---- 拖曳接點 + 靠近吸附合併（這就是「連接」）----

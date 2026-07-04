@@ -239,7 +239,7 @@ export const BLOCK_EXAMPLES = [
   {
     id: 'rack-pinion',
     title: '齒條齒輪：轉→直線',
-    note: '紅色小齒輪整圈轉，綠色齒條沿水平方向往復平移；轉一圈齒條走過 2πR 的弧長（純滾動，位移＝R·θ）。',
+    note: '紅色小齒輪帶動綠色齒條沿水平方向平移；因為齒條是有限長，接觸點到端部前會反向，保持齒輪與齒條一直嚙合。',
     snapshot: {
       kind: 'blocks',
       v: 1,
