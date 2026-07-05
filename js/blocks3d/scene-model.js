@@ -8,6 +8,9 @@
  * 設計理念見 CLAUDE.md 的 core/ui 分層：這支屬於 core（純計算）。
  */
 
+import { createRackPath } from '../utils/gear-geometry.js';
+import { camRadius } from '../utils/cam-profile.js';
+
 /**
  * 以「離固定桿的距離」決定每個剛體的疊放層級。2D 的繪製疊放順序與 3D 的 z 分層
  * 共用這同一套，兩邊才會一致。
@@ -87,6 +90,10 @@ export function computeBodyLayers(bodies, groundIds = new Set(), opts = {}) {
  * @param {Array}  [opts.sliders]        - 滑塊：{ id, p1, p2, m1, m2, p3, baseEnd, travelStart, travelEnd, carriageLen, color }
  *                                          （開槽軌道＋兩螺絲導引的滑件）
  * @param {Array}  [opts.gears]          - 齒輪：{ id, center, pin, radius, teeth, module, mesh, color }
+ * @param {Array}  [opts.racks]          - 齒條：{ id, ref, pinion, length, axisDeg, color }
+ * @param {Array}  [opts.cams]           - 凸輪：{ id, center, follower, baseRadius, lift, axisDeg, profile, phase, rollerRadius, thetaDeg, color }
+ * @param {Array}  [opts.pulleys]        - 皮帶輪：{ id, center, pin, radius, pinRadius, color }
+ * @param {Array}  [opts.belts]          - 皮帶：{ id, driver, driven, color }
  * @param {number} [opts.hullR=9]        - 冰棒棍外形半徑（與 2D 一致）
  * @param {number} [opts.plateGap=6]     - 相鄰層的 z 間距 (mm)
  * @param {number} [opts.plateThickness=4] - 每片板的厚度 (mm)
@@ -101,8 +108,13 @@ export function buildSceneModel(links, points, opts = {}) {
   const groundIds = opts.groundIds || new Set();
   const motorCenters = opts.motorCenters || new Set();
   const motorTypes = opts.motorTypes || new Map();   // id -> 'tt' | 'mg995'
+  const motorMounts = opts.motorMounts || new Map(); // id -> { dir:{x,y}, reason }
   const polygons = opts.polygons || [];
   const gearDefs = opts.gears || [];
+  const rackDefs = opts.racks || [];
+  const camDefs = opts.cams || [];
+  const pulleyDefs = opts.pulleys || [];
+  const beltDefs = opts.belts || [];
 
   const valid = (id) => {
     const p = points[id];
@@ -283,9 +295,158 @@ export function buildSceneModel(links, points, opts = {}) {
     touch(g.pin, gearLayer);
   });
 
+  const pinionById = new Map(gears.map(g => [g.id, g]));
+  const racks = [];
+  rackDefs.forEach(r => {
+    const ref = points[r.ref];
+    if (!ref || !Number.isFinite(ref.x) || !Number.isFinite(ref.y)) return;
+    const pinion = pinionById.get(r.pinion);
+    const teeth = pinion ? pinion.teeth : 12;
+    const radius = pinion ? pinion.radius : 40;
+    const module = pinion ? pinion.module : Math.max(0.1, 2 * radius / teeth);
+    const length = Math.max(1, Number(r.length) || 160);
+    const axisDeg = Number(r.axisDeg) || 0;
+    const axisRad = axisDeg * Math.PI / 180;
+    const local = createRackPath({ length, height: module * 2.5, module });
+    let phaseShift = Number.isFinite(Number(r.phaseShift)) ? Number(r.phaseShift) : 0;
+    if (!Number.isFinite(Number(r.phaseShift)) && pinion) {
+      const ux = Math.cos(axisRad), uy = Math.sin(axisRad);
+      const ctr0 = points[pinion.center];
+      const pin0 = points[pinion.pin];
+      if (ctr0 && pin0) {
+        const phi0 = Math.atan2(pin0.y - ctr0.y, pin0.x - ctr0.x);
+        const t0 = (ctr0.x - ref.x) * ux + (ctr0.y - ref.y) * uy;
+        const cx = ref.x + ux * t0;
+        const cy = ref.y + uy * t0;
+        const angC = Math.atan2(cy - ctr0.y, cx - ctr0.x);
+        const toothAng = (2 * Math.PI) / teeth;
+        const pitch = Math.PI * module;
+        const ppFrac = ((angC - phi0) / toothAng) % 1;
+        const crownPhase = t0 - pitch * (0.5 + ppFrac);
+        const startX0 = -length / 2 - pitch;
+        phaseShift = (crownPhase - startX0) % pitch;
+        if (phaseShift < 0) phaseShift += pitch;
+      }
+    }
+    racks.push({
+      id: r.id,
+      ref: { x: ref.x, y: ref.y },
+      axisDeg,
+      local: local.map(p => ({ x: p.x + phaseShift, y: p.y })),
+      z: gearZ,
+      layer: gearLayer,
+      thickness: plateThickness,
+      color: r.color || '#16a085',
+    });
+    touch(r.ref, gearLayer);
+  });
+
+  const pulleys = [];
+  const pulleyById = new Map();
+  pulleyDefs.forEach(pu => {
+    const center = points[pu.center];
+    const pin = points[pu.pin];
+    if (![center, pin].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))) return;
+    const radius = Math.max(1, Number(pu.radius) || 32);
+    const pulley = {
+      id: pu.id,
+      center: { x: center.x, y: center.y },
+      pin: { x: pin.x, y: pin.y },
+      radius,
+      pinRadius: Math.max(1, Number(pu.pinRadius) || radius * 0.65),
+      angle: Math.atan2(pin.y - center.y, pin.x - center.x),
+      z: gearZ,
+      layer: gearLayer,
+      thickness: plateThickness,
+      color: pu.color || '#d35400',
+    };
+    pulleys.push(pulley);
+    pulleyById.set(pu.id, pulley);
+    touch(pu.center, gearLayer);
+    touch(pu.pin, gearLayer);
+  });
+
+  const belts = [];
+  beltDefs.forEach(b => {
+    const driver = pulleyById.get(b.driver);
+    const driven = pulleyById.get(b.driven);
+    if (!driver || !driven) return;
+    belts.push({
+      id: b.id,
+      driver,
+      driven,
+      z: gearZ + plateThickness + 1.2,
+      thickness: 2.2,
+      color: b.color || '#2c3e50',
+    });
+  });
+
+  const cams = [];
+  camDefs.forEach(c => {
+    const center = points[c.center];
+    const follower = points[c.follower];
+    if (![center, follower].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))) return;
+    const baseRadius = Math.max(1, Number(c.baseRadius) || 24);
+    const lift = Math.max(0, Number(c.lift) || 24);
+    const axisDeg = Number(c.axisDeg) || 90;
+    const axisRad = axisDeg * Math.PI / 180;
+    const local = [];
+    for (let i = 0; i < 144; i++) {
+      const a = (i / 144) * Math.PI * 2;
+      const rr = camRadius({ profile: c.profile, baseRadius, lift, angleRad: a });
+      local.push({ x: Math.cos(a) * rr, y: Math.sin(a) * rr });
+    }
+    cams.push({
+      id: c.id,
+      center: { x: center.x, y: center.y },
+      follower: { x: follower.x, y: follower.y },
+      local,
+      angle: ((Number(c.thetaDeg) || 0) + (Number(c.phase) || 0)) * Math.PI / 180,
+      axis: { x: Math.cos(axisRad), y: Math.sin(axisRad), deg: axisDeg },
+      rollerRadius: Math.max(0, Number(c.rollerRadius) || 6),
+      z: gearZ,
+      layer: gearLayer,
+      thickness: plateThickness,
+      color: c.color || '#9b59b6',
+    });
+    touch(c.center, gearLayer);
+    touch(c.follower, 0);
+  });
+
   const pins = [];
   const grounds = [];
   const motors = [];
+  const motorBodyTarget = (id, origin) => {
+    const oppositeOf = (p) => (p && Number.isFinite(p.x))
+      ? { x: origin.x * 2 - p.x, y: origin.y * 2 - p.y }
+      : null;
+
+    // 齒輪馬達：本體退到嚙合側的反方向，避免插進兩齒輪中間。
+    const motorGear = gearDefs.find(g => g.center === id);
+    if (motorGear) {
+      const meshed = motorGear.mesh
+        ? gearDefs.find(g => g.id === motorGear.mesh)
+        : gearDefs.find(g => g.mesh === motorGear.id);
+      if (meshed && points[meshed.center]) return oppositeOf(points[meshed.center]);
+      const rack = rackDefs.find(r => r.pinion === motorGear.id && points[r.ref]);
+      if (rack) return oppositeOf(points[rack.ref]);
+    }
+
+    // 皮帶輪馬達：避開另一顆皮帶輪，讓輸出軸貼輪，本體在外側。
+    const motorPulley = pulleyDefs.find(p => p.center === id);
+    if (motorPulley) {
+      const belt = beltDefs.find(b => b.driver === motorPulley.id || b.driven === motorPulley.id);
+      const otherId = belt && (belt.driver === motorPulley.id ? belt.driven : belt.driver);
+      const other = otherId && pulleyDefs.find(p => p.id === otherId);
+      if (other && points[other.center]) return oppositeOf(points[other.center]);
+    }
+
+    // 凸輪馬達：避開從動件導桿方向，本體退到凸輪背側。
+    const motorCam = camDefs.find(c => c.center === id);
+    if (motorCam && points[motorCam.follower]) return oppositeOf(points[motorCam.follower]);
+
+    return null;
+  };
   joints.forEach(j => {
     const z0 = j.min * plateGap;
     const z1 = j.max * plateGap + plateThickness;
@@ -294,8 +455,15 @@ export function buildSceneModel(links, points, opts = {}) {
       // 輸出軸兼當這個關節的軸，所以這裡不再另畫銷柱、也不畫地錨支柱（改由 viewer 畫馬達）。
       // 朝向：對準接在中心、非曲柄的那根桿的另一端（通常是機架）；沒有就朝最近的另一個地錨；都沒有朝 -y。
       let tx = null, ty = null;
+      const mount = motorMounts.get(j.id);
+      if (mount && mount.dir && Number.isFinite(mount.dir.x) && Number.isFinite(mount.dir.y)) {
+        tx = j.x + mount.dir.x;
+        ty = j.y + mount.dir.y;
+      }
+      const clearTarget = tx === null ? motorBodyTarget(j.id, j) : null;
+      if (clearTarget) { tx = clearTarget.x; ty = clearTarget.y; }
       const frameBar = sticks.find(s => !s.isCrank && (s.p1 === j.id || s.p2 === j.id));
-      if (frameBar) {
+      if (tx === null && frameBar) {
         const oid = frameBar.p1 === j.id ? frameBar.p2 : frameBar.p1;
         const op = points[oid];
         if (op && Number.isFinite(op.x)) { tx = op.x; ty = op.y; }
@@ -343,6 +511,27 @@ export function buildSceneModel(links, points, opts = {}) {
     xs.push(g.center.x - outer, g.center.x + outer);
     ys.push(g.center.y - outer, g.center.y + outer);
   });
+  racks.forEach(r => {
+    const a = r.axisDeg * Math.PI / 180;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    r.local.forEach(p => {
+      xs.push(r.ref.x + p.x * ca - p.y * sa);
+      ys.push(r.ref.y + p.x * sa + p.y * ca);
+    });
+  });
+  pulleys.forEach(p => {
+    xs.push(p.center.x - p.radius, p.center.x + p.radius);
+    ys.push(p.center.y - p.radius, p.center.y + p.radius);
+  });
+  cams.forEach(c => {
+    c.local.forEach(p => {
+      const ca = Math.cos(c.angle), sa = Math.sin(c.angle);
+      xs.push(c.center.x + p.x * ca - p.y * sa);
+      ys.push(c.center.y + p.x * sa + p.y * ca);
+    });
+    xs.push(c.follower.x - c.rollerRadius, c.follower.x + c.rollerRadius);
+    ys.push(c.follower.y - c.rollerRadius, c.follower.y + c.rollerRadius);
+  });
   if (xs.length) {
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -352,7 +541,7 @@ export function buildSceneModel(links, points, opts = {}) {
 
   // 相機對焦點：有地錨就用地錨形心（恆定不動，動畫時不會晃）；沒地錨才退回外接框中心。
   // anchored=true 時 viewer 可每幀同步（反正不動）；false 時 viewer 只在初次定位、之後凍結。
-  const maxLayer = [...sticks, ...plates, ...gears].reduce((m, s) => Math.max(m, s.layer), 0);
+  const maxLayer = [...sticks, ...plates, ...gears, ...racks, ...pulleys, ...cams].reduce((m, s) => Math.max(m, s.layer), 0);
   const midZ = (maxLayer * plateGap + plateThickness) / 2;
   // 馬達中心也是固定點，一併納入對焦形心（否則只有馬達、沒有其他地錨時相機會抓不到定點）
   const anchorPts = [...grounds, ...motors];
@@ -365,5 +554,5 @@ export function buildSceneModel(links, points, opts = {}) {
       }
     : { x: bboxCenter.x, y: bboxCenter.y, z: midZ };
 
-  return { sticks, plates, pins, grounds, motors, rails, carriages, gears, plateGap, plateThickness, span, focus, anchored };
+  return { sticks, plates, pins, grounds, motors, rails, carriages, gears, racks, pulleys, belts, cams, plateGap, plateThickness, span, focus, anchored };
 }

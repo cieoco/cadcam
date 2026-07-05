@@ -157,6 +157,97 @@ function gearShape(gear, centerHoleR) {
   return shape;
 }
 
+function polygonShape(points) {
+  const shape = new THREE.Shape();
+  if (!points || !points.length) return shape;
+  shape.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) shape.lineTo(points[i].x, points[i].y);
+  shape.closePath();
+  return shape;
+}
+
+function pulleyShape(radius, centerHoleR) {
+  const shape = new THREE.Shape();
+  shape.moveTo(radius, 0);
+  shape.absarc(0, 0, radius, 0, Math.PI * 2, false);
+  const center = new THREE.Path();
+  center.absarc(0, 0, centerHoleR, 0, Math.PI * 2, true);
+  shape.holes.push(center);
+  return shape;
+}
+
+function doubleDShape(radius, flatWidth, boreR) {
+  const r = Math.max(0.1, Number(radius) || 2.7);
+  const halfFlat = Math.min(r * 0.98, Math.max(0.1, (Number(flatWidth) || 3.7) / 2));
+  const xFlat = Math.sqrt(Math.max(0, r * r - halfFlat * halfFlat));
+  const a = Math.atan2(halfFlat, xFlat);
+  const shape = new THREE.Shape();
+  shape.moveTo(xFlat, halfFlat);
+  shape.lineTo(-xFlat, halfFlat);
+  shape.absarc(0, 0, r, Math.PI - a, Math.PI + a, false);
+  shape.lineTo(xFlat, -halfFlat);
+  shape.absarc(0, 0, r, -a, a, false);
+  shape.closePath();
+  if (boreR > 0) {
+    const bore = new THREE.Path();
+    bore.absarc(0, 0, boreR, 0, Math.PI * 2, true);
+    shape.holes.push(bore);
+  }
+  return shape;
+}
+
+function openBeltTangents(c1, r1, c2, r2) {
+  const dx = c2.x - c1.x;
+  const dy = c2.y - c1.y;
+  const d = Math.hypot(dx, dy);
+  if (!Number.isFinite(d) || d <= Math.abs(r1 - r2) || d < 1e-6) return [];
+  const ux = dx / d, uy = dy / d;
+  const nx = -uy, ny = ux;
+  const h = (r1 - r2) / d;
+  const k = Math.sqrt(Math.max(0, 1 - h * h));
+  return [-1, 1].map(sign => {
+    const vx = h * ux + sign * k * nx;
+    const vy = h * uy + sign * k * ny;
+    return {
+      a: { x: c1.x + vx * r1, y: c1.y + vy * r1 },
+      b: { x: c2.x + vx * r2, y: c2.y + vy * r2 }
+    };
+  });
+}
+
+function beltArcPoints(center, radius, from, to, awayFrom, steps = 24) {
+  const a0 = Math.atan2(from.y - center.y, from.x - center.x);
+  const a1 = Math.atan2(to.y - center.y, to.x - center.x);
+  let ccw = a1 - a0;
+  while (ccw < 0) ccw += Math.PI * 2;
+  const cw = ccw - Math.PI * 2;
+  const score = (delta) => {
+    const mid = a0 + delta / 2;
+    const p = { x: center.x + Math.cos(mid) * radius, y: center.y + Math.sin(mid) * radius };
+    return Math.hypot(p.x - awayFrom.x, p.y - awayFrom.y);
+  };
+  const delta = score(ccw) >= score(cw) ? ccw : cw;
+  const n = Math.max(4, Math.round(Math.abs(delta) / (Math.PI * 2) * steps));
+  const pts = [];
+  for (let i = 1; i <= n; i++) {
+    const a = a0 + delta * (i / n);
+    pts.push({ x: center.x + Math.cos(a) * radius, y: center.y + Math.sin(a) * radius });
+  }
+  return pts;
+}
+
+function openBeltPoints(c1, r1, c2, r2) {
+  const t = openBeltTangents(c1, r1, c2, r2);
+  if (t.length < 2) return [];
+  return [
+    t[0].a,
+    t[0].b,
+    ...beltArcPoints(c2, r2, t[0].b, t[1].b, c1),
+    t[1].a,
+    ...beltArcPoints(c1, r1, t[1].a, t[0].a, c2)
+  ];
+}
+
 export function createViewer(container) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#0f1420');
@@ -200,10 +291,16 @@ export function createViewer(container) {
   const servoBodyMat = new THREE.MeshStandardMaterial({ color: 0x3d8bf0, metalness: 0.1, roughness: 0.5 });
   const servoHornMat = new THREE.MeshStandardMaterial({ color: 0xeef3fb, metalness: 0.1, roughness: 0.6 });
   const gearBoltMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.15, roughness: 0.45 });
+  const beltMat = new THREE.MeshStandardMaterial({ color: 0x1f2933, metalness: 0.05, roughness: 0.75 });
+  const rollerMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.2, roughness: 0.45 });
   // TT 馬達真實比例（mm）：齒輪箱 37(長)×22.5(寬)×16(厚)、DC 罐 ⌀20.5×22、輸出軸 ⌀~5。
   // 馬達躺在與機構平行的平面、沉在桿件背面；長軸(boxLen)朝機架方向，輸出軸沿 z。
   // shaftInset = 輸出軸距齒輪箱近端的距離（與 2D 的 ax 一致）。
-  const MOTOR = { boxLen: 37, boxW: 22.5, boxThick: 16, canD: 20.5, canLen: 22, shaftR: 2.6, shaftInset: 11, gap: 1 };
+  const MOTOR = {
+    boxLen: 37, boxW: 22.5, boxThick: 16, canD: 20.5, canLen: 22,
+    shaftR: 2.7, shaftFlatW: 3.7, shaftBoreR: 0.95,
+    shaftInset: 11, gap: 1, collarR: 5.2, collarH: 3.2, shaftLen: 8
+  };
   // MG995 標準伺服真實比例（mm）：本體 40×20×38、輸出軸距近端 10、舵盤 ⌀~20。
   const SERVO = { boxLen: 40, boxW: 20, boxThick: 38, hornR: 10, hornThick: 3, shaftInset: 10, gap: 1 };
   const matCache = new Map(); // color -> material（避免每幀重建材質）
@@ -331,6 +428,117 @@ export function createViewer(container) {
       dynamic.add(bolt);
     });
 
+    // 齒條：和齒輪同在內側傳動平面，齒形本身擠出成一片有厚度的齒桿。
+    (model.racks || []).forEach(r => {
+      const group = new THREE.Group();
+      group.position.set(r.ref.x, r.ref.y, 0);
+      group.rotation.z = (r.axisDeg || 0) * Math.PI / 180;
+      const geo = new THREE.ExtrudeGeometry(polygonShape(r.local), {
+        depth: r.thickness,
+        bevelEnabled: false,
+        curveSegments: 8,
+      });
+      const mesh = new THREE.Mesh(geo, plateMaterial(r.color));
+      mesh.position.z = r.z;
+      group.add(mesh);
+      dynamic.add(group);
+    });
+
+    // 皮帶輪與皮帶：圓盤留中心孔，輪緣銷由 solver 位置決定；皮帶用閉合管線繞外公切線。
+    (model.pulleys || []).forEach(p => {
+      const group = new THREE.Group();
+      group.position.set(p.center.x, p.center.y, 0);
+      group.rotation.z = p.angle || 0;
+      const geo = new THREE.ExtrudeGeometry(pulleyShape(p.radius, holeR * 1.05), {
+        depth: p.thickness,
+        bevelEnabled: false,
+        curveSegments: 36,
+      });
+      const disk = new THREE.Mesh(geo, plateMaterial(p.color));
+      disk.position.z = p.z;
+      group.add(disk);
+
+      const groove = new THREE.Mesh(
+        new THREE.TorusGeometry(Math.max(1, p.radius - 2.2), 0.8, 8, 48),
+        plateMaterial('#7f4a17'));
+      groove.position.z = p.z + p.thickness + 0.35;
+      group.add(groove);
+
+      const spokeLen = Math.max(1, p.pinRadius);
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(spokeLen, 2.4, 1.8), plateMaterial(p.color));
+      spoke.position.set(spokeLen / 2, 0, p.z + p.thickness + 1.2);
+      group.add(spoke);
+      dynamic.add(group);
+
+      const boltH = Math.max(1, p.thickness * 0.35);
+      const bolt = new THREE.Mesh(new THREE.CylinderGeometry(holeR * 1.05, holeR * 1.05, boltH, 20), gearBoltMat);
+      bolt.rotation.x = Math.PI / 2;
+      bolt.position.set(p.pin.x, p.pin.y, p.z + p.thickness + boltH / 2 + 0.2);
+      dynamic.add(bolt);
+    });
+
+    (model.belts || []).forEach(b => {
+      const pts = openBeltPoints(b.driver.center, b.driver.radius, b.driven.center, b.driven.radius);
+      if (pts.length < 4) return;
+      const curve = new THREE.CatmullRomCurve3(
+        pts.map(p => new THREE.Vector3(p.x, p.y, b.z)),
+        true,
+        'centripetal'
+      );
+      const geo = new THREE.TubeGeometry(curve, Math.max(12, pts.length * 2), b.thickness, 8, true);
+      const mat = b.color ? plateMaterial(b.color) : beltMat;
+      dynamic.add(new THREE.Mesh(geo, mat));
+    });
+
+    // 凸輪從動件：凸輪輪廓在底層旋轉，滾子/從動塊沿導桿方向顯示輸出位置。
+    (model.cams || []).forEach(c => {
+      const group = new THREE.Group();
+      group.position.set(c.center.x, c.center.y, 0);
+      group.rotation.z = c.angle || 0;
+      const geo = new THREE.ExtrudeGeometry(polygonShape(c.local), {
+        depth: c.thickness,
+        bevelEnabled: false,
+        curveSegments: 18,
+      });
+      const body = new THREE.Mesh(geo, plateMaterial(c.color));
+      body.position.z = c.z;
+      group.add(body);
+      dynamic.add(group);
+
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(holeR * 1.05, holeR * 1.05, c.thickness + 1, 24), gearBoltMat);
+      hub.rotation.x = Math.PI / 2;
+      hub.position.set(c.center.x, c.center.y, c.z + c.thickness / 2);
+      dynamic.add(hub);
+
+      const roller = new THREE.Mesh(
+        new THREE.CylinderGeometry(c.rollerRadius, c.rollerRadius, c.thickness, 24),
+        rollerMat);
+      roller.rotation.x = Math.PI / 2;
+      roller.position.set(c.follower.x, c.follower.y, c.z + c.thickness / 2);
+      dynamic.add(roller);
+
+      const blockLen = 22;
+      const blockW = 16;
+      const block = new THREE.Mesh(new THREE.BoxGeometry(blockLen, blockW, c.thickness), rollerMat);
+      block.position.set(
+        c.follower.x + c.axis.x * (c.rollerRadius + blockLen / 2 + 3),
+        c.follower.y + c.axis.y * (c.rollerRadius + blockLen / 2 + 3),
+        c.z + c.thickness / 2
+      );
+      block.rotation.z = c.axis.deg * Math.PI / 180;
+      dynamic.add(block);
+
+      const guideLen = 120;
+      const guide = new THREE.Mesh(new THREE.BoxGeometry(guideLen, 2.2, 1.8), plateMaterial('#8a96a3'));
+      guide.position.set(
+        c.center.x + c.axis.x * (guideLen / 2),
+        c.center.y + c.axis.y * (guideLen / 2),
+        c.z - 1
+      );
+      guide.rotation.z = c.axis.deg * Math.PI / 180;
+      dynamic.add(guide);
+    });
+
     // 馬達：躺在機構背面（z<0）、長軸朝機架方向，輸出軸沿 +z 往上頂到曲柄那層帶動它。
     // 用一個 group 擺位 + 繞 z 轉到朝向；輸出軸在 local 原點（不受轉向影響、永遠在關節軸上）。
     // 輸出軸兼當該關節的軸，因此 scene-model 不再為馬達中心畫銷柱／地錨支柱。
@@ -355,9 +563,10 @@ export function createViewer(container) {
         horn.position.set(0, 0, hornZ);
         g.add(horn);
 
-        // 輸出軸：沿 z，從舵盤頂到曲柄
+        // 輸出軸：沿 z，從舵盤頂到原動件外側；末端略突出，讓「軸接到原動件」看得見。
         const topZ = -SERVO.gap;
-        const sLen = Math.max(1, m.shaftTopZ - topZ);
+        const shaftTop = m.shaftTopZ + 3.5;
+        const sLen = Math.max(1, shaftTop - topZ);
         const shaft = new THREE.Mesh(
           new THREE.CylinderGeometry(MOTOR.shaftR, MOTOR.shaftR, sLen, 16), pinMat);
         shaft.rotation.x = Math.PI / 2;
@@ -382,13 +591,26 @@ export function createViewer(container) {
       can.position.set(MOTOR.boxLen - MOTOR.shaftInset + MOTOR.canLen / 2 - 2, 0, bodyCz);
       g.add(can);
 
-      // 輸出軸：沿 z，從齒輪箱頂面頂到曲柄
+      // 輸出軸：沿 z，從齒輪箱頂面頂到原動件外側；殼體不直接貼桿，真正接觸的是這支軸。
       const boxTopZ = -MOTOR.gap;
-      const shaftLen = Math.max(1, m.shaftTopZ - boxTopZ);
+      const collar = new THREE.Mesh(
+        new THREE.CylinderGeometry(MOTOR.collarR, MOTOR.collarR, MOTOR.collarH, 24), pinMat);
+      collar.rotation.x = Math.PI / 2;
+      collar.position.set(0, 0, boxTopZ + MOTOR.collarH / 2);
+      g.add(collar);
+
+      const shaftBaseZ = boxTopZ + MOTOR.collarH;
+      const shaftLen = MOTOR.shaftLen;
+      const shaftTopZ = shaftBaseZ + shaftLen;
+      g.position.z = (Number.isFinite(m.baseZ) ? m.baseZ : shaftTopZ) - shaftTopZ;
       const shaft = new THREE.Mesh(
-        new THREE.CylinderGeometry(MOTOR.shaftR, MOTOR.shaftR, shaftLen, 16), pinMat);
-      shaft.rotation.x = Math.PI / 2;
-      shaft.position.set(0, 0, boxTopZ + shaftLen / 2);
+        new THREE.ExtrudeGeometry(
+          doubleDShape(MOTOR.shaftR, MOTOR.shaftFlatW, MOTOR.shaftBoreR),
+          { depth: shaftLen, bevelEnabled: false, curveSegments: 20 }
+        ),
+        pinMat
+      );
+      shaft.position.set(0, 0, shaftBaseZ);
       g.add(shaft);
 
       dynamic.add(g);
@@ -455,6 +677,8 @@ export function createViewer(container) {
     servoBodyMat.dispose();
     servoHornMat.dispose();
     gearBoltMat.dispose();
+    beltMat.dispose();
+    rollerMat.dispose();
     controls.dispose();
     if (resizeObserver) resizeObserver.disconnect();
     renderer.dispose();

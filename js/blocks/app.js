@@ -417,6 +417,105 @@ function computeMotorRotDeg(id, pts, groundIds) {
   return tgt ? Math.atan2(-(tgt.x - p.x), -(tgt.y - p.y)) * 180 / Math.PI : 0;
 }
 
+function motorRotDegFromDir(dir) {
+  return dir ? Math.atan2(-dir.x, -dir.y) * 180 / Math.PI : 0;
+}
+
+function normalizedDir(from, to, fallback = { x: 0, y: -1 }) {
+  if (!from || !to || !Number.isFinite(from.x) || !Number.isFinite(to.x)) return fallback;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const d = Math.hypot(dx, dy);
+  return d > 1e-6 ? { x: dx / d, y: dy / d } : fallback;
+}
+
+function oppositeTarget(origin, p) {
+  return (origin && p && Number.isFinite(origin.x) && Number.isFinite(p.x))
+    ? { x: origin.x * 2 - p.x, y: origin.y * 2 - p.y }
+    : null;
+}
+
+// 馬達固定邏輯：輸出軸鎖在軸心；機身方向只看靜態裝配參考，不看播放後的 solved moving point。
+// 這份 mount 同時供 2D/3D 使用，避免 3D 動畫時馬達跟著齒條/從動件轉。
+function buildMotorMounts(motorIds, groundIds) {
+  const staticPts = pointCoords();
+  const mounts = new Map();
+  const add = (id, target, reason) => {
+    const center = staticPts[id];
+    const dir = normalizedDir(center, target);
+    mounts.set(id, { dir, rotDeg: motorRotDegFromDir(dir), reason });
+  };
+  motorIds.forEach(id => {
+    const center = staticPts[id];
+    if (!center) return;
+
+    const gear = S.comps.find(c => c.type === 'gear' && c.p1?.id === id);
+    if (gear) {
+      const meshed = gear.mesh
+        ? S.comps.find(c => c.type === 'gear' && c.id === gear.mesh)
+        : S.comps.find(c => c.type === 'gear' && c.mesh === gear.id);
+      if (meshed?.p1 && staticPts[meshed.p1.id]) {
+        add(id, oppositeTarget(center, staticPts[meshed.p1.id]), 'gear-mesh');
+        return;
+      }
+      const rack = S.comps.find(c => c.type === 'rack' && c.pinion === gear.id);
+      if (rack?.p1 && staticPts[rack.p1.id]) {
+        add(id, oppositeTarget(center, staticPts[rack.p1.id]), 'rack-pinion');
+        return;
+      }
+    }
+
+    const pulley = S.comps.find(c => c.type === 'pulley' && c.p1?.id === id);
+    if (pulley) {
+      const belt = S.comps.find(c => c.type === 'belt' && (c.driver === pulley.id || c.driven === pulley.id));
+      const otherId = belt && (belt.driver === pulley.id ? belt.driven : belt.driver);
+      const other = otherId && S.comps.find(c => c.type === 'pulley' && c.id === otherId);
+      if (other?.p1 && staticPts[other.p1.id]) {
+        add(id, oppositeTarget(center, staticPts[other.p1.id]), 'pulley-belt');
+        return;
+      }
+    }
+
+    const cam = S.comps.find(c => c.type === 'cam' && c.p1?.id === id);
+    if (cam?.p2 && staticPts[cam.p2.id]) {
+      add(id, oppositeTarget(center, staticPts[cam.p2.id]), 'cam-follower');
+      return;
+    }
+
+    const crankTips = new Set((S.compiled.steps || [])
+      .filter(s => s.type === 'input_crank' && s.center === id)
+      .map(s => s.id));
+    const frameBar = S.comps.find(c => c.type === 'bar' && !c.isInput && c.p1 && c.p2 &&
+      (c.p1.id === id || c.p2.id === id) &&
+      !crankTips.has(c.p1.id === id ? c.p2.id : c.p1.id));
+    if (frameBar) {
+      const oid = frameBar.p1.id === id ? frameBar.p2.id : frameBar.p1.id;
+      add(id, staticPts[oid], 'frame-bar');
+      return;
+    }
+
+    const mount = sliderMountInfo(id);
+    if (mount) {
+      const other = mount.label === 'M1' ? mount.slider.m2 : mount.slider.m1;
+      if (other && staticPts[other.id]) {
+        add(id, staticPts[other.id], 'slider-mount');
+        return;
+      }
+    }
+
+    let best = null, bd = Infinity;
+    groundIds.forEach(gid => {
+      if (gid === id || isHiddenSliderRailPoint(gid)) return;
+      const gp = staticPts[gid];
+      if (!gp) return;
+      const d = Math.hypot(gp.x - center.x, gp.y - center.y);
+      if (d > 1e-3 && d < bd) { bd = d; best = gp; }
+    });
+    add(id, best || { x: center.x, y: center.y - 1 }, 'nearest-ground');
+  });
+  return mounts;
+}
+
 // ---- 零件繪製分派表（slice 2：登錄表化）----
 // PART_DRAW[type] = { phase, draw }：把 draw() 內依 `c.type===` 的繪製分流逐步收進表，達成「加機件＝加表項」。
 //   phase 決定繪製時機：'underlay'＝畫在連桿之下（gear 等機件，draw(c, pts)）；
@@ -536,28 +635,7 @@ function drawRackPart(c, pts) {
   const localPts = createRackPath({ length: L, height: module * 2.5, module });
   const sc = View.getScale();
   const axisDeg = Number(c.axisDeg) || 0;
-  // 齒相位對齊（純滾動只需在 θ=0 對一次，之後 rolling 自動保持咬合）：
-  // 算出讓「小齒輪齒頂落進齒條齒隙」所需的齒條齒形局部平移 phShift（沿桿軸）。
-  // 鎖相條件 p_rack − p_pin = 0.5（半齒；齒對齒隙）。p_pin=(angC−φ)/齒角、p_rack=(xc−齒頂相位)/齒距，
-  // 兩者隨 θ 同速前進（rolling），故差值恆定；在 θ=0（＝零件放置姿態）解出常數 phShift 即可。
-  const phShift = (() => {
-    if (!pinion || !pinion.p1 || !pinion.p2) return 0;
-    const a = axisDeg * Math.PI / 180;
-    const ux = Math.cos(a), uy = Math.sin(a);
-    const ctr0 = pinion.p1, pin0 = pinion.p2, ref0 = c.p1;          // 放置姿態（θ=0）座標
-    const phi0 = Math.atan2(pin0.y - ctr0.y, pin0.x - ctr0.x);      // 小齒輪齒頂參考角（createGearPath 在 local 0 放齒頂、銷對齊它）
-    const t0 = (ctr0.x - ref0.x) * ux + (ctr0.y - ref0.y) * uy;     // 接觸點沿桿軸的投影 = 齒條 local x
-    const Ctx = ref0.x + ux * t0, Cty = ref0.y + uy * t0;           // 接觸點（中心對節線的垂足）
-    const angC = Math.atan2(Cty - ctr0.y, Ctx - ctr0.x);           // 中心→接觸點方向角
-    const toothAng = (2 * Math.PI) / teeth;
-    const pitch = Math.PI * module;
-    const ppFrac = ((angC - phi0) / toothAng) % 1;                  // 接觸點相對齒頂的分數齒位
-    let crownPhase = t0 - pitch * (0.5 + ppFrac);                   // 期望的齒條齒頂中心相位
-    const startX0 = -L / 2 - pitch;                                 // createRackPath 的齒頂中心起點
-    let sh = (crownPhase - startX0) % pitch;
-    if (sh < 0) sh += pitch;
-    return sh;
-  })();
+  const phShift = rackPhaseShift(c, pinion, { length: L, module, teeth, axisDeg });
   const polyStr = localPts.map(p => `${((p.x + phShift) * sc).toFixed(2)},${(-p.y * sc).toFixed(2)}`).join(' ');
   const g = document.createElementNS(SVG_NS, 'g');
   const poly = document.createElementNS(SVG_NS, 'polygon');
@@ -590,6 +668,28 @@ function drawRackPart(c, pts) {
   };
   applyRack(pts);
   frameUpdaters.push(applyRack);
+}
+
+// 齒相位對齊（純滾動只需在 θ=0 對一次，之後 rolling 自動保持咬合）：
+// 算出讓「小齒輪齒頂落進齒條齒隙」所需的齒條齒形局部平移（沿桿軸）。
+// 2D 和 3D 都必須用同一個 θ=0 放置姿態，不能用播放後的 solved points 重算，否則會雙重位移而錯齒。
+function rackPhaseShift(rack, pinion, { length, module, teeth, axisDeg }) {
+  if (!rack || !rack.p1 || !pinion || !pinion.p1 || !pinion.p2) return 0;
+  const a = (Number(axisDeg) || 0) * Math.PI / 180;
+  const ux = Math.cos(a), uy = Math.sin(a);
+  const ctr0 = pinion.p1, pin0 = pinion.p2, ref0 = rack.p1;
+  const phi0 = Math.atan2(pin0.y - ctr0.y, pin0.x - ctr0.x);
+  const t0 = (ctr0.x - ref0.x) * ux + (ctr0.y - ref0.y) * uy;
+  const Ctx = ref0.x + ux * t0, Cty = ref0.y + uy * t0;
+  const angC = Math.atan2(Cty - ctr0.y, Ctx - ctr0.x);
+  const toothAng = (2 * Math.PI) / teeth;
+  const pitch = Math.PI * module;
+  const ppFrac = ((angC - phi0) / toothAng) % 1;
+  const crownPhase = t0 - pitch * (0.5 + ppFrac);
+  const startX0 = -length / 2 - pitch;
+  let sh = (crownPhase - startX0) % pitch;
+  if (sh < 0) sh += pitch;
+  return sh;
 }
 
 function pulleyRadius(c, fallback = 32) {
@@ -911,8 +1011,16 @@ function draw() {
   const motorCenterIds = new Set((S.compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
   const camCenterIds = new Set(S.comps.filter(c => c.type === 'cam' && c.p1).map(c => c.p1.id));
   Model.motorPointIds(S.comps).forEach(id => { if (!camCenterIds.has(id)) motorCenterIds.add(id); });
+  const modelMotorCenterIds = new Set(motorCenterIds);
+  Model.motorPointIds(S.comps).forEach(id => modelMotorCenterIds.add(id));
+  const motorMounts = buildMotorMounts(modelMotorCenterIds, groundIds);
   drawTraceTrajectory(getTrajectoryData());
   drawManualTrace();
+
+  // 馬達本體是固定在機架背後的動力源，必須先建立在機件 underlay 之下；
+  // 否則 2D 會看起來像馬達蓋在齒輪/齒條最前面。
+  const motorLayer = document.createElementNS(SVG_NS, 'g');
+  svg.appendChild(motorLayer);
 
   // 零件繪製分派（slice 2 登錄表化）— 'underlay' 機件畫在連桿之下（z 序與原本一致）。
   [...S.comps.filter(c => c.type === 'belt'), ...S.comps.filter(c => c.type !== 'belt')]
@@ -957,9 +1065,7 @@ function draw() {
   triComps.forEach((t, j) => triLayerByKey.set(triKey([t.p1.id, t.p2.id, t.p3.id]), bodyLayers[layerLinks.length + j]));
 
   // 依層級建立 <g> 容器，append 順序＝疊放順序（內層在底、外層在上）。
-  // 馬達擺在所有桿件底下；節點等在這之後直接接到 svg（疊在最上層）。
-  const motorLayer = document.createElementNS(SVG_NS, 'g');
-  svg.appendChild(motorLayer);
+  // motorLayer 已經在 underlay 機件之前建立；節點等在這之後直接接到 svg（疊在最上層）。
   const sortedLayers = [...new Set(bodyLayers)].sort((a, b) => a - b);
   const layerGroups = new Map();
   sortedLayers.forEach(L => {
@@ -979,7 +1085,8 @@ function draw() {
   // 光靠 !c.isInput 排不掉曲柄。改用 input_crank 步驟算出曲柄動端，明確把曲柄那根桿排除。
   motorCenterIds.forEach(id => {
     const p = pts[id]; if (!p || !Number.isFinite(p.x)) return;
-    const rotDeg = computeMotorRotDeg(id, pts, groundIds);
+    const mount = motorMounts.get(id);
+    const rotDeg = mount ? mount.rotDeg : computeMotorRotDeg(id, pts, groundIds);
     const isServo = motorTypeForCenter(id) === 'mg995';
     const body = isServo ? Render.drawMG995Servo(p.x, p.y, rotDeg, motorLayer)
                          : Render.drawTTMotor(p.x, p.y, rotDeg, motorLayer);
@@ -991,7 +1098,7 @@ function draw() {
       body.style.display = ok ? '' : 'none';
       label.style.display = ok ? '' : 'none';
       if (!ok) return;
-      body.setAttribute('transform', `translate(${TX(q.x)} ${TY(q.y)}) rotate(${computeMotorRotDeg(id, P, groundIds)})`);
+      body.setAttribute('transform', `translate(${TX(q.x)} ${TY(q.y)}) rotate(${rotDeg})`);
       label.setAttribute('x', TX(q.x));
       label.setAttribute('y', TY(q.y) - 16 * View.getScale());
     });
@@ -1167,7 +1274,7 @@ function draw() {
   // motorCenterIds：3D 把這些中心畫成沉在機構背面的馬達，輸出軸往上帶動曲柄。
   // motorTypes：每個馬達中心的型號（'tt'/'mg995'），讓 3D 也畫出對應外形。
   const motorTypes = new Map();
-  motorCenterIds.forEach(id => motorTypes.set(id, motorTypeForCenter(id)));
+  modelMotorCenterIds.forEach(id => motorTypes.set(id, motorTypeForCenter(id)));
   // 滑塊（無動力）幾何餵給 3D：軌道（m1-m2）＋滑塊方塊（p3，沿 p1-p2 軸向）。
   const sliders3d = S.comps
     .filter(c => c.type === 'slider' && !c.isInput && c.p1 && c.p2 && c.p3 && c.m1 && c.m2)
@@ -1187,7 +1294,61 @@ function draw() {
       mesh: c.mesh,
       color: c.color,
     }));
-  lastModelInputs = { links: linksToDraw, pts, groundIds, motorCenterIds, motorTypes, polygons: S.compiled.visualization.polygons || [], sliders: sliders3d, gears: gears3d };
+  const racks3d = S.comps
+    .filter(c => c.type === 'rack' && c.p1)
+    .map(c => {
+      const pinion = c.pinion ? S.comps.find(g => g.type === 'gear' && g.id === c.pinion) : null;
+      const teeth = pinion ? Math.max(6, Math.round(Number(pinion.teeth) || 12)) : 12;
+      const R = pinion ? (Number(S.topo.params[pinion.radiusParam]) || 40) : 40;
+      const module = (2 * R) / teeth;
+      const length = Number(S.topo.params[c.lenParam]) || 160;
+      const axisDeg = Number(c.axisDeg) || 0;
+      return {
+        id: c.id,
+        ref: c.p1.id,
+        pinion: c.pinion,
+        length,
+        axisDeg,
+        phaseShift: rackPhaseShift(c, pinion, { length, module, teeth, axisDeg }),
+        color: c.color,
+      };
+    });
+  const cams3d = S.comps
+    .filter(c => c.type === 'cam' && c.p1 && c.p2)
+    .map(c => ({
+      id: c.id,
+      center: c.p1.id,
+      follower: c.p2.id,
+      baseRadius: Number(S.topo.params[c.baseRadiusParam]) || 24,
+      lift: Number(S.topo.params[c.liftParam]) || 24,
+      axisDeg: c.axisDeg,
+      profile: c.profile,
+      phase: c.phase,
+      rollerRadius: c.rollerRadius,
+      thetaDeg: S.theta,
+      color: c.color,
+    }));
+  const pulleys3d = S.comps
+    .filter(c => c.type === 'pulley' && c.p1 && c.p2)
+    .map(c => {
+      const radius = pulleyRadius(c);
+      return {
+        id: c.id,
+        center: c.p1.id,
+        pin: c.p2.id,
+        radius,
+        pinRadius: pulleyPinRadius(c, radius),
+        color: c.color,
+      };
+    });
+  const belts3d = S.comps
+    .filter(c => c.type === 'belt')
+    .map(c => ({ id: c.id, driver: c.driver, driven: c.driven, color: c.color }));
+  lastModelInputs = {
+    links: linksToDraw, pts, groundIds, motorCenterIds: modelMotorCenterIds, motorTypes, motorMounts,
+    polygons: S.compiled.visualization.polygons || [],
+    sliders: sliders3d, gears: gears3d, racks: racks3d, cams: cams3d, pulleys: pulleys3d, belts: belts3d
+  };
   if (view3DActive) push3D();
 }
 
@@ -1241,14 +1402,21 @@ function renderFrame() {
   }
   if (recountBanner) recountBanner(pts, sol);
   // 3D 鏡像：沿用重建時算好的結構，只換這一幀的 pts
-  if (view3DActive && lastModelInputs) { lastModelInputs = { ...lastModelInputs, pts }; push3D(); }
+  if (view3DActive && lastModelInputs) {
+    const cams = (lastModelInputs.cams || []).map(c => ({ ...c, thetaDeg: S.theta }));
+    lastModelInputs = { ...lastModelInputs, pts, cams };
+    push3D();
+  }
 }
 
 // 用最近一幀的求解結果建場景模型，推進 3D viewer
 function push3D() {
   if (!viewer3D || !lastModelInputs) return;
-  const { links, pts, groundIds, motorCenterIds, motorTypes, polygons, sliders, gears } = lastModelInputs;
-  const model = buildSceneModel(links, pts, { groundIds, motorCenters: motorCenterIds, motorTypes, hullR: HULL_R_WORLD, polygons, sliders, gears });
+  const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = lastModelInputs;
+  const model = buildSceneModel(links, pts, {
+    groundIds, motorCenters: motorCenterIds, motorTypes, motorMounts, hullR: HULL_R_WORLD,
+    polygons, sliders, gears, racks, cams, pulleys, belts
+  });
   viewer3D.update(model);
 }
 
