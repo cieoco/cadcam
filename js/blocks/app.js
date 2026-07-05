@@ -1056,7 +1056,11 @@ function draw() {
     poly._zlift = (t && t.zlift) || 0;
   });
   const bodyLayers = computeBodyLayers([
-    ...layerLinks.map(l => ({ joints: [l.p1, l.p2], lift: l._zlift || 0 })),
+    ...layerLinks.map(l => ({
+      joints: [l.p1, l.p2],
+      lift: l._zlift || 0,
+      motorDriven: l.style === 'crank' && (motorCenterIds.has(l.p1) || motorCenterIds.has(l.p2)),
+    })),
     ...triComps.map(t => ({ joints: [t.p1.id, t.p2.id, t.p3.id], lift: t.zlift || 0 })),
   ], groundIds);
   const linkLayer = new Map();      // link 物件 -> 層

@@ -114,6 +114,13 @@ const rackFixedMotor = rackFixedMount.motors.find(m => m.id === 'PC');
 check('3D 馬達方向優先使用固定 mount，不隨動畫點重算', rackFixedMotor && Math.abs(rackFixedMotor.dir.x + 1) < 1e-12 && Math.abs(rackFixedMotor.dir.y) < 1e-12,
   `dir=${rackFixedMotor ? `${rackFixedMotor.dir.x.toFixed(2)},${rackFixedMotor.dir.y.toFixed(2)}` : 'missing'}`);
 
+const jansen = sceneFor('jansen-leg');
+const jansenCrank = jansen.sticks.find(s => s.id === 'LinkM');
+const jansenStack = jansen.sticks.filter(s => ['LinkJ', 'LinkK'].includes(s.id));
+check('步行腿紅色馬達曲柄貼近輸出軸側', jansenCrank && jansenCrank.layer === 0 &&
+  jansenStack.every(s => jansenCrank.layer < s.layer),
+  `LinkM=${jansenCrank ? jansenCrank.layer : 'missing'}, stack=${jansenStack.map(s => `${s.id}:${s.layer}`).join(',')}`);
+
 const cam = sceneFor('cam-follower');
 check('凸輪從動件 3D 有凸輪', cam.cams.length === 1, `cams=${cam.cams.length}`);
 check('凸輪馬達也進入 3D 底層', cam.motors.some(m => m.id === 'CC') && cam.cams[0].layer < 0,

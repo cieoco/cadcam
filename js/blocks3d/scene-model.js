@@ -14,8 +14,9 @@ import { camRadius } from '../utils/cam-profile.js';
 /**
  * 以「離固定桿的距離」決定每個剛體的疊放層級。2D 的繪製疊放順序與 3D 的 z 分層
  * 共用這同一套，兩邊才會一致。
- * @param {Array} bodies - [{ joints: [nodeId...], lift? }]（桿 2 個、三角板 3 個銷孔；
- *                          lift＝手動相對位移：+1 往上一層、-1 往下一層、0/缺＝自動）
+ * @param {Array} bodies - [{ joints: [nodeId...], lift?, motorDriven? }]（桿 2 個、三角板 3 個銷孔；
+ *                          lift＝手動相對位移：+1 往上一層、-1 往下一層、0/缺＝自動；
+ *                          motorDriven＝接在馬達輸出軸上的原動桿，優先貼近馬達側）
  * @param {Set}   [groundIds] - 地錨節點 id
  * @param {Object} [opts]
  * @param {(i:number)=>number} [opts.floorOf] - 完全取代「樓地板」的覆寫（預設用 rank + body.lift）
@@ -50,8 +51,12 @@ export function computeBodyLayers(bodies, groundIds = new Set(), opts = {}) {
   const rankOf = body => body.joints.reduce((m, id) => Math.max(m, depthOf(id)), 0);
   const ranks = bodies.map(rankOf);
   // 樓地板＝自然 rank ＋ 手動相對位移 body.lift（+1 往上一層、-1 往下一層）。
+  // 接在馬達輸出軸上的原動桿要最靠近馬達側，避免後續連桿夾在輸出軸與曲柄中間造成干涉。
   // 共銷檢查仍生效：被推到同層的同銷孔剛體會自動再往上錯開，不會穿模。
-  const floorOf = opts.floorOf || ((i) => ranks[i] + (bodies[i].lift || 0));
+  const floorOf = opts.floorOf || ((i) => {
+    const natural = ranks[i] + (bodies[i].lift || 0);
+    return bodies[i].motorDriven ? Math.max(0, natural - 1) : natural;
+  });
   const floors = bodies.map((_, i) => floorOf(i));
 
   // 共銷衝突圖（剛體 i,j 共用同一銷孔則相鄰）
@@ -67,8 +72,10 @@ export function computeBodyLayers(bodies, groundIds = new Set(), opts = {}) {
     }
   });
 
-  // 依樓地板由小到大（同高維持原始順序）著色，取「≥樓地板、共銷鄰居未佔」的最小層
-  const order = bodies.map((_, i) => i).sort((a, b) => (floors[a] - floors[b]) || (a - b));
+  // 依樓地板由小到大著色；同高時馬達原動桿先拿內層，再維持原始順序。
+  const priorityOf = i => bodies[i].motorDriven ? -1 : 0;
+  const order = bodies.map((_, i) => i).sort((a, b) =>
+    (floors[a] - floors[b]) || (priorityOf(a) - priorityOf(b)) || (a - b));
   const layerOf = new Array(bodies.length).fill(undefined);
   order.forEach(i => {
     const used = new Set();
@@ -141,7 +148,13 @@ export function buildSceneModel(links, points, opts = {}) {
   // 把桿與三角板統一成「剛體」（joints = 它佔用的銷孔；桿 2 個、三角板 3 個）。
   // lift = 手動疊放偏好（由 app.js 標在 visualization 物件的 _zlift 上，2D/3D 共用同一份）。
   const bodies = [
-    ...visible.map(l => ({ kind: 'stick', src: l, joints: [l.p1, l.p2], lift: l._zlift || 0 })),
+    ...visible.map(l => ({
+      kind: 'stick',
+      src: l,
+      joints: [l.p1, l.p2],
+      lift: l._zlift || 0,
+      motorDriven: l.style === 'crank' && (motorCenters.has(l.p1) || motorCenters.has(l.p2)),
+    })),
     ...triPlates.map(poly => ({ kind: 'plate', src: poly, joints: [...poly.points], lift: poly._zlift || 0 })),
   ];
 
