@@ -8,6 +8,7 @@
  */
 
 import { deg2rad } from '../utils.js';
+import { camFollowerState } from '../utils/cam-profile.js';
 
 /**
  * 兩圓交點 (Dyad Solver)
@@ -314,6 +315,32 @@ function solveBodyJointTopology(topology, params) {
         const baseY = Number(c.p1.y) || 0;
         const s = (c.sign === -1 ? -1 : 1) * R * motorTheta;
         points[c.p1.id] = { x: baseX + ux * s, y: baseY + uy * s };
+    });
+
+    // 凸輪從動件：凸輪軸轉角 theta 依輪廓/滾子相切幾何轉成直動從動點位移。
+    // p2 是輸出點，可直接接連桿；沒馬達時停在 theta=0 放置姿態，與齒輪/齒條一致。
+    components.forEach((c) => {
+        if (c.type !== 'cam' || !c.p1?.id || !c.p2?.id) return;
+        addPointId(c.p1); addPointId(c.p2);
+        const center = points[c.p1.id];
+        if (!center) return;
+        const motorId = c.p1.physicalMotor || c.p1.physical_motor || '';
+        const motorTheta = motorId ? resolveMotorTheta(String(motorId), theta) : 0;
+        const phase = deg2rad(Number(c.phase) || 0);
+        const baseRadius = getParamVal(c.baseRadiusParam, 24);
+        const lift = getParamVal(c.liftParam, 24);
+        const axisRad = deg2rad(Number(c.axisDeg) || 90);
+        const state = camFollowerState({
+            profile: c.profile,
+            baseRadius,
+            lift,
+            thetaRad: motorTheta + phase,
+            axisRad,
+            rollerRadius: c.rollerRadius
+        });
+        const ux = Math.cos(axisRad);
+        const uy = Math.sin(axisRad);
+        points[c.p2.id] = { x: center.x + ux * state.offset, y: center.y + uy * state.offset };
     });
 
     components.forEach((c) => {

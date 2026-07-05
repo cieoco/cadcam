@@ -15,6 +15,7 @@
 import { compileTopology } from '../core/topology.js';
 import { solveTopology, sweepTopology } from '../multilink/solver.js';
 import { createGearPath, createRackPath } from '../utils/gear-geometry.js';   // 齒輪漸開線齒廓 / 齒條齒形（rack-pinion 也用）
+import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
 // computeBodyLayers：2D 疊放順序與 3D z 分層共用同一套，兩邊才一致。
 import { buildSceneModel, computeBodyLayers } from '../blocks3d/scene-model.js';
@@ -25,7 +26,7 @@ import * as Panels from './panels.js';   // 編輯面板呈現（讀 S + 寫 DOM
 import * as Tools from './tools.js';     // 工具模式互動（畫桿 / 畫滑軌 / 畫三點桿 / 連桿升級滑軌）
 import * as Input from './input.js';     // 指標 / 手勢互動（拖曳 + 吸附合併 + pinch 縮放）
 import * as Model from './model.js';
-import { pointKeysFor, ownedParamKeys } from './part-types.js';   // 零件型別表：點 key / 擁有的參數 key
+import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import * as Motion from './motion.js';
 import * as Store from './storage.js';
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
@@ -35,7 +36,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('stageSvg');
 const { W, H, HULL_R_WORLD, TX, TY } = View;
 // 樂高 Technic 孔距 = 8mm；連桿/三點桿孔位長度對齊 8mm，滑軌外形尺寸不套用。
-const LEGO_STEP = 8;
+const LEGO_STEP = Model.LEGO_FRAME_STEP;
 const LINK_DEFAULT_LEN = 88;   // 連桿預設長度（12 孔，對齊 8mm）
 const GEAR_MODULE = 6;         // 齒輪模數（mm）：所有齒輪共用，節圓半徑 R=teeth·module/2，故必定咬合
 const snapLego = v => Math.max(LEGO_STEP, Math.round((Number(v) || 0) / LEGO_STEP) * LEGO_STEP);
@@ -162,15 +163,9 @@ const displayCoords = () => {
   }
   return m;
 };
-const isHiddenSliderRailPoint = (id) => S.comps.some(c =>
-  c.type === 'slider' && c.m1 && c.m2 && (c.p1?.id === id || c.p2?.id === id));
-const isSliderMountPoint = (id) => S.comps.some(c =>
-  c.type === 'slider' && (c.m1?.id === id || c.m2?.id === id));
-const sliderMountInfo = (id) => {
-  const sl = S.comps.find(c => c.type === 'slider' && (c.m1?.id === id || c.m2?.id === id));
-  if (!sl) return null;
-  return { slider: sl, label: sl.m1?.id === id ? 'M1' : 'M2' };
-};
+const isHiddenSliderRailPoint = (id) => Model.isHiddenSliderRailPoint(S.comps, id);
+const isSliderMountPoint = (id) => Model.isSliderMountPoint(S.comps, id);
+const sliderMountInfo = (id) => Model.sliderMountInfo(S.comps, id);
 // 以「世界座標 world」為中心，找畫面上最近的接點（排除 exclude），門檻 maxDist。
 const nearestDisplayToPoint = (world, exclude = [], maxDist = snapWorld()) => {
   const m = displayCoords();
@@ -198,7 +193,7 @@ const inputCrankMovingEnd = (id) => S.comps.find(c =>
 const updatePointCoordsById = (id, x, y) => Model.updatePointCoordsById(S.comps, id, x, y);
 const freezePointAtDisplay = (id) => Model.freezePointAtDisplay(S.comps, S.compiled, S.theta, id);
 const movePointById = (id, dx, dy) => Model.movePointById(S.comps, id, dx, dy);
-const snapFrameCoord = (v) => Math.round((Number(v) || 0) / LEGO_STEP) * LEGO_STEP;
+const snapFrameCoord = (v) => Model.snapFrameCoord(v, LEGO_STEP);
 const snapFramePoint = (p) => S.lockFrameHoles ? { x: snapFrameCoord(p.x), y: snapFrameCoord(p.y) } : p;
 const snapFrameNodesToGrid = () => {
   if (!S.lockFrameHoles) return;
@@ -227,28 +222,14 @@ const pointUseCount = (id) => Model.pointUseCount(S.comps, id);
 
 // 隱性機架：所有 grounded 接點（fixed / motor / linear）視為同一個固定底座（機架）。
 // 不是獨立物件，只是把散落的固定銷當成一組——拖機架把手時整組一起平移。
-// 點 key 走 part-types 的 pointKeysFor（依元件型別），不再各自維護扁平清單。
-function frameNodeIds() {
-  const ids = new Set();
-  S.comps.forEach(c => pointKeysFor(c).forEach(k => {
-    if (c[k] && c[k].id && Model.isGroundPoint(c[k])) ids.add(c[k].id);
-  }));
-  return ids;
-}
+// 點 key 的掃描集中在 model.js（依 part-types 表），app 只負責把結果畫出來。
+function frameNodeIds() { return Model.frameNodeIds(S.comps); }
 // 機架上各固定銷的座標（固定點不隨求解移動，直接用元件座標）。x 排序方便連線。
-function frameNodes() {
-  const m = pointCoords();
-  return [...frameNodeIds()]
-    .map(id => ({ id, ...(m[id] || {}) }))
-    .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
-    .sort((a, b) => (a.x - b.x) || (a.y - b.y));
-}
+function frameNodes() { return Model.frameNodes(S.comps); }
 // 機架「視覺」用的固定銷：排除滑塊自己的 rail 端點（p1/p2），保留 mount 點（m1/m2）。
 // m1/m2 是真正鎖在機架上的孔；急回/滑塊範例需要把它們和曲柄軸畫成同一塊底座。
 // 注意：移動仍以 frameNodeIds() 為準，滑塊照樣跟著走。
-function frameConnectorNodes() {
-  return frameNodes().filter(p => !isHiddenSliderRailPoint(p.id));
-}
+function frameConnectorNodes() { return Model.frameConnectorNodes(S.comps); }
 
 function syncSliderGeometries() {
   S.comps.filter(c => c.type === 'slider' && c.p1 && c.p2).forEach(c => {
@@ -611,10 +592,127 @@ function drawRackPart(c, pts) {
   frameUpdaters.push(applyRack);
 }
 
+// 凸輪從動件：p1 為凸輪軸心，p2 為沿 axisDeg 直動的從動點；滾子中心由凸輪相切幾何推出。
+function drawCamPart(c, pts) {
+  if (!c.p1 || !c.p2) return;
+  const baseRadius = Number(S.topo.params[c.baseRadiusParam]) || 24;
+  const lift = Number(S.topo.params[c.liftParam]) || 24;
+  const rollerRadiusWorld = Math.max(0, Number(c.rollerRadius) || 6);
+  const sc = View.getScale();
+  const color = c.color || '#9b59b6';
+  const profilePts = [];
+  for (let i = 0; i < 128; i++) {
+    const a = (i / 128) * Math.PI * 2;
+    const r = camRadius({ profile: c.profile, baseRadius, lift, angleRad: a });
+    profilePts.push(`${(Math.cos(a) * r * sc).toFixed(2)},${(-Math.sin(a) * r * sc).toFixed(2)}`);
+  }
+  const axisDeg = Number(c.axisDeg) || 90;
+  const axisRad = axisDeg * Math.PI / 180;
+  const ux = Math.cos(axisRad), uy = Math.sin(axisRad);
+  const g = document.createElementNS(SVG_NS, 'g');
+  const outlineHalo = document.createElementNS(SVG_NS, 'polygon');
+  outlineHalo.setAttribute('points', profilePts.join(' '));
+  outlineHalo.setAttribute('fill', 'none');
+  outlineHalo.setAttribute('stroke', '#ffffff');
+  outlineHalo.setAttribute('stroke-width', Math.max(2.5, 4.5 * sc));
+  outlineHalo.setAttribute('stroke-linejoin', 'round');
+  outlineHalo.setAttribute('opacity', '0.8');
+  g.appendChild(outlineHalo);
+  const body = document.createElementNS(SVG_NS, 'polygon');
+  body.setAttribute('points', profilePts.join(' '));
+  body.setAttribute('fill', color + '55');
+  body.setAttribute('stroke', '#8e44ad');
+  body.setAttribute('stroke-width', Math.max(1.8, 2.6 * sc));
+  body.setAttribute('stroke-linejoin', 'round');
+  g.appendChild(body);
+  const hub = document.createElementNS(SVG_NS, 'circle');
+  hub.setAttribute('r', Math.max(3, 4 * sc));
+  hub.setAttribute('fill', '#ffffff');
+  hub.setAttribute('stroke', color);
+  hub.setAttribute('stroke-width', Math.max(1.4, 1.8 * sc));
+  g.appendChild(hub);
+  svg.appendChild(g);
+
+  const guide = document.createElementNS(SVG_NS, 'line');
+  guide.setAttribute('stroke', '#8a96a3');
+  guide.setAttribute('stroke-width', Math.max(1.2, 1.8 * sc));
+  guide.setAttribute('stroke-linecap', 'round');
+  guide.setAttribute('stroke-dasharray', `${(5 * sc).toFixed(1)},${(4 * sc).toFixed(1)}`);
+  guide.style.pointerEvents = 'none';
+  svg.appendChild(guide);
+  const follower = document.createElementNS(SVG_NS, 'rect');
+  follower.setAttribute('width', Math.max(12, 16 * sc));
+  follower.setAttribute('height', Math.max(8, 10 * sc));
+  follower.setAttribute('rx', Math.max(2, 2.5 * sc));
+  follower.setAttribute('fill', '#f8fafc');
+  follower.setAttribute('stroke', '#34495e');
+  follower.setAttribute('stroke-width', Math.max(1.5, 2 * sc));
+  follower.style.pointerEvents = 'none';
+  svg.appendChild(follower);
+  const roller = document.createElementNS(SVG_NS, 'circle');
+  roller.setAttribute('r', Math.max(3, rollerRadiusWorld * sc));
+  roller.setAttribute('fill', '#ffffff');
+  roller.setAttribute('stroke', '#34495e');
+  roller.setAttribute('stroke-width', Math.max(1.2, 1.6 * sc));
+  roller.style.pointerEvents = 'none';
+  svg.appendChild(roller);
+  const contact = document.createElementNS(SVG_NS, 'line');
+  contact.setAttribute('stroke', '#2c3e50');
+  contact.setAttribute('stroke-width', Math.max(1.2, 1.5 * sc));
+  contact.setAttribute('stroke-linecap', 'round');
+  contact.style.pointerEvents = 'none';
+  svg.appendChild(contact);
+
+  const applyCam = (P) => {
+    const ctr = P[c.p1.id], out = P[c.p2.id];
+    const ok = ctr && out && Number.isFinite(ctr.x) && Number.isFinite(out.x);
+    g.style.display = ok ? '' : 'none';
+    guide.style.display = ok ? '' : 'none';
+    follower.style.display = ok ? '' : 'none';
+    roller.style.display = ok ? '' : 'none';
+    contact.style.display = ok ? '' : 'none';
+    if (!ok) return;
+    const thetaDeg = (Number(S.theta) || 0) + (Number(c.phase) || 0);
+    g.setAttribute('transform', `translate(${TX(ctr.x)} ${TY(ctr.y)}) rotate(${-thetaDeg})`);
+    const state = camFollowerState({
+      profile: c.profile,
+      baseRadius,
+      lift,
+      thetaRad: thetaDeg * Math.PI / 180,
+      axisRad,
+      rollerRadius: rollerRadiusWorld
+    });
+    const support = { x: ctr.x + state.support.x, y: ctr.y + state.support.y };
+    const railBack = baseRadius + lift + 18;
+    const railFront = Math.max(8, baseRadius * 0.35);
+    guide.setAttribute('x1', TX(ctr.x + ux * railFront));
+    guide.setAttribute('y1', TY(ctr.y + uy * railFront));
+    guide.setAttribute('x2', TX(ctr.x + ux * railBack));
+    guide.setAttribute('y2', TY(ctr.y + uy * railBack));
+    const fw = Number(follower.getAttribute('width')) || 16;
+    const fh = Number(follower.getAttribute('height')) || 10;
+    const blockGap = 12;
+    const bx = out.x + ux * blockGap;
+    const by = out.y + uy * blockGap;
+    follower.setAttribute('x', TX(bx) - fw / 2);
+    follower.setAttribute('y', TY(by) - fh / 2);
+    follower.setAttribute('transform', `rotate(${-axisDeg} ${TX(bx)} ${TY(by)})`);
+    roller.setAttribute('cx', TX(out.x));
+    roller.setAttribute('cy', TY(out.y));
+    contact.setAttribute('x1', TX(support.x));
+    contact.setAttribute('y1', TY(support.y));
+    contact.setAttribute('x2', TX(out.x));
+    contact.setAttribute('y2', TY(out.y));
+  };
+  applyCam(pts);
+  frameUpdaters.push(applyCam);
+}
+
 // 登錄表：phase 決定繪製時機——'underlay'＝連桿之下（gear/rack 等機件）、'layered'＝畫進 zlift 疊放層（三點桿）。
 const PART_DRAW = {
   gear:     { phase: 'underlay', draw: drawGearPart },
   rack:     { phase: 'underlay', draw: drawRackPart },
+  cam:      { phase: 'underlay', draw: drawCamPart },
   triangle: { phase: 'layered',  draw: drawTrianglePart },
 };
 
@@ -635,6 +733,8 @@ function draw() {
 
   const groundIds = new Set((S.compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
   const motorCenterIds = new Set((S.compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
+  const camCenterIds = new Set(S.comps.filter(c => c.type === 'cam' && c.p1).map(c => c.p1.id));
+  Model.motorPointIds(S.comps).forEach(id => { if (!camCenterIds.has(id)) motorCenterIds.add(id); });
   drawTraceTrajectory(getTrajectoryData());
   drawManualTrace();
 
@@ -821,17 +921,25 @@ function draw() {
   const SIZE = 14;   // 地錨方塊邊長
   // 齒輪輪緣銷不畫成通用浮動節點——改由齒輪自己畫成「螺栓孔」（見上面齒輪繪製）。
   const gearPinIds = new Set(S.comps.filter(c => c.type === 'gear' && c.p2).map(c => c.p2.id));
+  const camFollowerIds = new Set(S.comps.filter(c => c.type === 'cam' && c.p2).map(c => c.p2.id));
   Object.keys(pts).forEach(id => {
     if (isHiddenSliderRailPoint(id)) return;
     if (isSliderMountPoint(id)) return;
     if (gearPinIds.has(id)) return;
+    if (camFollowerIds.has(id)) return;
     const p = pts[id];
     const isGround = groundIds.has(id);
     const isMotorCenter = motorCenterIds.has(id);
+    const isCamCenter = camCenterIds.has(id);
     const mount = sliderMountInfo(id);
-    const isRect = isGround && !isMotorCenter && !mount;
+    const isRect = isGround && !isMotorCenter && !isCamCenter && !mount;
     const node = document.createElementNS(SVG_NS, isRect ? 'rect' : 'circle');
-    if (isMotorCenter) {
+    if (isCamCenter) {
+      node.setAttribute('r', id === S.dragId ? 7 : 5);
+      node.setAttribute('fill', '#ffffff');
+      node.setAttribute('stroke', '#9b59b6');
+      node.setAttribute('stroke-width', 2.4);
+    } else if (isMotorCenter) {
       // 馬達輸出軸：紅色軸蓋（TT 馬達本體已畫在底下）
       node.setAttribute('r', id === S.dragId ? 8 : 6);
       node.setAttribute('fill', '#e74c3c');

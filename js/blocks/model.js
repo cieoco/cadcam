@@ -15,6 +15,8 @@
 import { solveTopology } from '../multilink/solver.js';
 import { pointKeysFor } from './part-types.js';
 
+export const LEGO_FRAME_STEP = 8;
+
 export function pointCoords(comps) {
   const m = {};
   comps.forEach(c => pointKeysFor(c).forEach(k => {
@@ -79,6 +81,53 @@ export function isGroundPoint(p) {
 
 export function pointIsGround(comps, id) {
   return pointRefs(comps, id).some(ref => isGroundPoint(ref.point));
+}
+
+export function motorPointIds(comps) {
+  const ids = new Set();
+  comps.forEach(c => pointKeysFor(c).forEach(k => {
+    const p = c[k];
+    if (p && p.id && (p.physicalMotor || p.physical_motor)) ids.add(p.id);
+  }));
+  return ids;
+}
+
+export function sliderMountInfo(comps, id) {
+  const sl = comps.find(c => c.type === 'slider' && (c.m1?.id === id || c.m2?.id === id));
+  if (!sl) return null;
+  return { slider: sl, label: sl.m1?.id === id ? 'M1' : 'M2' };
+}
+
+export function isSliderMountPoint(comps, id) {
+  return Boolean(sliderMountInfo(comps, id));
+}
+
+export function isHiddenSliderRailPoint(comps, id) {
+  return comps.some(c => c.type === 'slider' && c.m1 && c.m2 && (c.p1?.id === id || c.p2?.id === id));
+}
+
+export function frameNodeIds(comps) {
+  const ids = new Set();
+  comps.forEach(c => pointKeysFor(c).forEach(k => {
+    if (c[k] && c[k].id && isGroundPoint(c[k])) ids.add(c[k].id);
+  }));
+  return ids;
+}
+
+export function frameNodes(comps) {
+  const m = pointCoords(comps);
+  return [...frameNodeIds(comps)]
+    .map(id => ({ id, ...(m[id] || {}) }))
+    .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
+    .sort((a, b) => (a.x - b.x) || (a.y - b.y));
+}
+
+export function frameConnectorNodes(comps) {
+  return frameNodes(comps).filter(p => !isHiddenSliderRailPoint(comps, p.id));
+}
+
+export function snapFrameCoord(v, step = LEGO_FRAME_STEP) {
+  return Math.round((Number(v) || 0) / step) * step;
 }
 
 export function removeMotorAtPoint(comps, id) {

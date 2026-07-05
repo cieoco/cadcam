@@ -271,6 +271,34 @@ function normalizeRack(comp, index, params, warnings) {
   return out;
 }
 
+// 凸輪：p1 = 凸輪軸心（fixed/motor），p2 = 直動從動件輸出點。
+// 從動件沿 axisDeg 方向位移：offset = baseRadius + liftProfile(theta)。
+function normalizeCam(comp, index, params, warnings) {
+  const id = safeId(comp.id) ? comp.id : `Cam${index + 1}`;
+  const p1 = normalizePoint(comp.p1, `CC${index + 1}`, warnings);
+  const p2 = normalizePoint(comp.p2, `CF${index + 1}`, warnings);
+  const baseRadiusParam = safeId(comp.baseRadiusParam) ? comp.baseRadiusParam : `CBR${index + 1}`;
+  const liftParam = safeId(comp.liftParam) ? comp.liftParam : `CLF${index + 1}`;
+  const profile = comp.profile === 'constant' ? 'constant' : 'harmonic';
+  params[baseRadiusParam] = Math.max(1, Math.round(num(params[baseRadiusParam] ?? comp.baseRadius, 24)));
+  params[liftParam] = Math.max(0, Math.round(num(params[liftParam] ?? comp.lift, 24)));
+  const out = {
+    type: 'cam',
+    id,
+    color: SAFE_COLOR.test(comp.color || '') ? comp.color : '#9b59b6',
+    p1,
+    p2,
+    baseRadiusParam,
+    liftParam,
+    axisDeg: Math.round(num(comp.axisDeg, 90)),
+    profile,
+    phase: num(comp.phase, 0),
+    rollerRadius: Math.max(0, roundTenth(comp.rollerRadius ?? 6, 6))
+  };
+  if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
+  return out;
+}
+
 export function normalizeSnapshot(obj) {
   if (!obj || typeof obj !== 'object') return null;
   const sourceComps = Array.isArray(obj.comps) ? obj.comps : null;
@@ -293,6 +321,7 @@ export function normalizeSnapshot(obj) {
     else if (raw.type === 'slider') comps.push(normalizeSlider(raw, index, params, warnings));
     else if (raw.type === 'gear') comps.push(normalizeGear(raw, index, params, warnings));
     else if (raw.type === 'rack') comps.push(normalizeRack(raw, index, params, warnings));
+    else if (raw.type === 'cam') comps.push(normalizeCam(raw, index, params, warnings));
     else warnings.push(`不支援的零件 ${raw.type || '(unknown)'}，已略過。`);
   });
 

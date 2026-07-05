@@ -257,6 +257,24 @@ export const BLOCK_EXAMPLES = [
     }
   },
   {
+    id: 'cam-follower',
+    title: '凸輪從動件：轉→上下',
+    note: '紫色凸輪旋轉，滾子從動件沿導桿上下移動；輪廓用 harmonic 半徑函數建立，從動件位置由凸輪外形與滾子相切的幾何推出。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 2,
+      tracePoint: 'CF',
+      comps: [
+        { type: 'cam', id: 'Cam1', color: '#9b59b6',
+          p1: pt('CC', 'motor', 0, 0, { physicalMotor: '1' }),
+          p2: pt('CF', 'floating', 0, 28),
+          baseRadiusParam: 'CBR', liftParam: 'CLF', axisDeg: 90, profile: 'harmonic', phase: 0 }
+      ],
+      params: { CBR: 24, CLF: 40, theta: 0 }
+    }
+  },
+  {
     id: 'jansen-leg',
     title: '步行腿：Jansen',
     note: 'Theo Jansen 腿的教具比例；右側 TT 馬達帶動紅色曲柄，藍色連桿讓足端 P5 走出閉合步態軌跡。',
