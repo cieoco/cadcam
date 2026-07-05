@@ -299,6 +299,54 @@ function normalizeCam(comp, index, params, warnings) {
   return out;
 }
 
+// 皮帶輪：p1 = 輪軸中心（fixed/motor），p2 = 輪緣輸出銷（floating，由 solver 解出）。
+// radiusParam = 節圓半徑；belt 零件會用 pulley id 建立開口皮帶傳動。
+function normalizePulley(comp, index, params, warnings) {
+  const id = safeId(comp.id) ? comp.id : `Pulley${index + 1}`;
+  const p1 = normalizePoint(comp.p1, `PLC${index + 1}`, warnings);
+  const p2 = normalizePoint(comp.p2, `PLP${index + 1}`, warnings);
+  const radiusParam = safeId(comp.radiusParam) ? comp.radiusParam : `PLR${index + 1}`;
+  const rawR = params[radiusParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  const R = Math.max(1, Math.round(num(rawR, 32)));
+  params[radiusParam] = R;
+  const pinRadiusParam = safeId(comp.pinRadiusParam) ? comp.pinRadiusParam : '';
+  if (pinRadiusParam) {
+    params[pinRadiusParam] = Math.max(1, Math.round(num(params[pinRadiusParam] ?? comp.pinRadius, R * 0.65)));
+  }
+  const out = {
+    type: 'pulley',
+    id,
+    color: SAFE_COLOR.test(comp.color || '') ? comp.color : '#d35400',
+    p1,
+    p2,
+    radiusParam,
+    phase: num(comp.phase, 0)
+  };
+  if (pinRadiusParam) out.pinRadiusParam = pinRadiusParam;
+  else if (Number.isFinite(Number(comp.pinRadius))) out.pinRadius = Math.max(1, Math.round(num(comp.pinRadius, R * 0.65)));
+  if (comp.physicalMotor) out.physicalMotor = String(comp.physicalMotor);
+  if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
+  return out;
+}
+
+// 開口皮帶：driver/driven 連兩個 pulley id。第一版只做 open belt（同向），crossed 保留給後續。
+function normalizeBelt(comp, index, params, warnings) {
+  const id = safeId(comp.id) ? comp.id : `Belt${index + 1}`;
+  const out = {
+    type: 'belt',
+    id,
+    color: SAFE_COLOR.test(comp.color || '') ? comp.color : '#2c3e50',
+    driver: safeId(comp.driver) ? comp.driver : '',
+    driven: safeId(comp.driven) ? comp.driven : '',
+    crossed: false
+  };
+  if (!out.driver || !out.driven || out.driver === out.driven) {
+    warnings.push(`皮帶 ${id} 需要兩個不同的 pulley id。`);
+  }
+  if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
+  return out;
+}
+
 export function normalizeSnapshot(obj) {
   if (!obj || typeof obj !== 'object') return null;
   const sourceComps = Array.isArray(obj.comps) ? obj.comps : null;
@@ -322,6 +370,8 @@ export function normalizeSnapshot(obj) {
     else if (raw.type === 'gear') comps.push(normalizeGear(raw, index, params, warnings));
     else if (raw.type === 'rack') comps.push(normalizeRack(raw, index, params, warnings));
     else if (raw.type === 'cam') comps.push(normalizeCam(raw, index, params, warnings));
+    else if (raw.type === 'pulley') comps.push(normalizePulley(raw, index, params, warnings));
+    else if (raw.type === 'belt') comps.push(normalizeBelt(raw, index, params, warnings));
     else warnings.push(`不支援的零件 ${raw.type || '(unknown)'}，已略過。`);
   });
 

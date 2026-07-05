@@ -343,6 +343,47 @@ function solveBodyJointTopology(topology, params) {
         points[c.p2.id] = { x: center.x + ux * state.offset, y: center.y + uy * state.offset };
     });
 
+    // 皮帶輪：開口皮帶傳動同向，角速度比 = R_driver / R_driven。
+    // pulley 的 p2 是輪緣輸出銷，可接下游連桿；belt 只描述兩輪間的傳動關係。
+    const pulleyById = new Map(components.filter(p => p.type === 'pulley' && p.id).map(p => [p.id, p]));
+    const beltByDriven = new Map(components
+        .filter(b => b.type === 'belt' && b.driver && b.driven)
+        .map(b => [b.driven, b]));
+    components.forEach((c) => {
+        if (c.type !== 'pulley' || !c.p1?.id || !c.p2?.id) return;
+        addPointId(c.p1); addPointId(c.p2);
+        const center = points[c.p1.id];
+        if (!center) return;
+        const pitchR = getParamVal(c.radiusParam, 32);
+        const pinR = c.pinRadiusParam
+            ? getParamVal(c.pinRadiusParam, Math.round(pitchR * 0.65))
+            : (Number.isFinite(Number(c.pinRadius)) ? Number(c.pinRadius) : pitchR * 0.65);
+        const driveState = (pulley, seen = new Set()) => {
+            if (!pulley || seen.has(pulley.id)) return null;
+            const belt = beltByDriven.get(pulley.id);
+            if (!belt) return { driverPt: pulley.p1, factor: 1 };
+            seen.add(pulley.id);
+            const driver = pulleyById.get(belt.driver);
+            if (!driver || !driver.p1) return null;
+            const parent = driveState(driver, seen);
+            if (!parent) return null;
+            const rDriver = getParamVal(driver.radiusParam, pitchR);
+            const rDriven = getParamVal(pulley.radiusParam, pitchR);
+            const sign = belt.crossed ? -1 : 1;
+            return {
+                driverPt: parent.driverPt,
+                factor: parent.factor * sign * (rDriver / (rDriven || 1))
+            };
+        };
+        const state = driveState(c);
+        if (!state) return;
+        const motorId = state.driverPt.physicalMotor || state.driverPt.physical_motor || '';
+        const ang = motorId
+            ? resolveMotorTheta(String(motorId), theta) * state.factor + deg2rad(c.phase || 0)
+            : Math.atan2((c.p2.y || 0) - (c.p1.y || 0), (c.p2.x || 0) - (c.p1.x || 0));
+        points[c.p2.id] = { x: center.x + pinR * Math.cos(ang), y: center.y + pinR * Math.sin(ang) };
+    });
+
     components.forEach((c) => {
         if (c.type === 'bar' && c.p1?.id && c.p2?.id) {
             const len = getParamVal(c.lenParam, 0);

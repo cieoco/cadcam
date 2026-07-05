@@ -25,6 +25,8 @@ export const PART_TYPES = {
   slider:   { pointKeys: ['p1', 'p2', 'p3', 'm1', 'm2'], paramProps: ['lenParam'] },                // 滑軌：軌道兩端 + 滑塊 + 兩固定孔 + 軌長
   gear:     { pointKeys: ['p1', 'p2'],                    paramProps: ['radiusParam'] },             // 齒輪：中心(p1) + 輪緣輸出銷(p2) + 節圓半徑
   cam:      { pointKeys: ['p1', 'p2'],                    paramProps: ['baseRadiusParam', 'liftParam'] }, // 凸輪：中心 + 直動從動點 + 基圓/升程
+  pulley:   { pointKeys: ['p1', 'p2'],                    paramProps: ['radiusParam'] },             // 皮帶輪：中心 + 輪緣輸出銷 + 節圓半徑
+  belt:     { pointKeys: [],                              paramProps: [] },                          // 皮帶：用 pulley id 連接兩輪，本身沒有接點
 };
 
 // 所有型別點 key 的聯集。未知型別時當安全後備，行為與舊的扁平 POINT_KEYS 一致（不漏點）。

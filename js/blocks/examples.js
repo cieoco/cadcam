@@ -275,6 +275,29 @@ export const BLOCK_EXAMPLES = [
     }
   },
   {
+    id: 'pulley-belt',
+    title: '皮帶輪傳動：同向變速',
+    note: '紅色小皮帶輪用開口皮帶帶動藍色大皮帶輪；兩輪同向旋轉，角速度比等於半徑反比。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 3,
+      comps: [
+        { type: 'pulley', id: 'PulleyA', color: '#e74c3c',
+          p1: pt('PLA', 'motor', -56, 0, { physicalMotor: '1' }),
+          p2: pt('PPA', 'floating', -35, 0),
+          radiusParam: 'PRA', phase: 0 },
+        { type: 'pulley', id: 'PulleyB', color: '#2c6fbb',
+          p1: pt('PLB', 'fixed', 64, 0),
+          p2: pt('PPB', 'floating', 106, 0),
+          radiusParam: 'PRB', phase: 0 },
+        { type: 'belt', id: 'Belt1', color: '#2c3e50',
+          driver: 'PulleyA', driven: 'PulleyB' }
+      ],
+      params: { PRA: 24, PRB: 48, theta: 0 }
+    }
+  },
+  {
     id: 'jansen-leg',
     title: '步行腿：Jansen',
     note: 'Theo Jansen 腿的教具比例；右側 TT 馬達帶動紅色曲柄，藍色連桿讓足端 P5 走出閉合步態軌跡。',

@@ -592,6 +592,180 @@ function drawRackPart(c, pts) {
   frameUpdaters.push(applyRack);
 }
 
+function pulleyRadius(c, fallback = 32) {
+  return Number(S.topo.params[c.radiusParam]) || fallback;
+}
+
+function pulleyPinRadius(c, pitchR) {
+  return c.pinRadiusParam
+    ? (Number(S.topo.params[c.pinRadiusParam]) || Math.round(pitchR * 0.65))
+    : (Number.isFinite(Number(c.pinRadius)) ? Number(c.pinRadius) : pitchR * 0.65);
+}
+
+// 皮帶輪：p1 為中心，p2 為輪緣輸出孔；旋轉角由 solver 反映在 p2 位置。
+function drawPulleyPart(c, pts) {
+  if (!c.p1 || !c.p2) return;
+  const R = pulleyRadius(c);
+  const pinR = pulleyPinRadius(c, R);
+  const sc = View.getScale();
+  const color = c.color || '#d35400';
+  const g = document.createElementNS(SVG_NS, 'g');
+
+  const outer = document.createElementNS(SVG_NS, 'circle');
+  outer.setAttribute('r', Math.max(1, R * sc));
+  outer.setAttribute('fill', color + '26');
+  outer.setAttribute('stroke', color);
+  outer.setAttribute('stroke-width', Math.max(1.8, 2.4 * sc));
+  g.appendChild(outer);
+
+  const groove = document.createElementNS(SVG_NS, 'circle');
+  groove.setAttribute('r', Math.max(1, (R - 3) * sc));
+  groove.setAttribute('fill', 'none');
+  groove.setAttribute('stroke', '#7f4a17');
+  groove.setAttribute('stroke-width', Math.max(0.9, 1.2 * sc));
+  groove.setAttribute('opacity', '0.55');
+  g.appendChild(groove);
+
+  const spoke = document.createElementNS(SVG_NS, 'line');
+  spoke.setAttribute('x1', '0');
+  spoke.setAttribute('y1', '0');
+  spoke.setAttribute('x2', (pinR * sc).toFixed(2));
+  spoke.setAttribute('y2', '0');
+  spoke.setAttribute('stroke', color);
+  spoke.setAttribute('stroke-width', Math.max(1.2, 1.8 * sc));
+  spoke.setAttribute('stroke-linecap', 'round');
+  g.appendChild(spoke);
+
+  const hub = document.createElementNS(SVG_NS, 'circle');
+  hub.setAttribute('r', Math.max(3, 4 * sc));
+  hub.setAttribute('fill', '#ffffff');
+  hub.setAttribute('stroke', color);
+  hub.setAttribute('stroke-width', Math.max(1.4, 1.8 * sc));
+  g.appendChild(hub);
+  svg.appendChild(g);
+
+  const bolt = document.createElementNS(SVG_NS, 'circle');
+  bolt.setAttribute('r', Math.max(2.5, 3.6 * sc));
+  bolt.setAttribute('fill', '#ffffff');
+  bolt.setAttribute('stroke', color);
+  bolt.setAttribute('stroke-width', Math.max(1.3, 1.8 * sc));
+  bolt.style.pointerEvents = 'none';
+  svg.appendChild(bolt);
+
+  const applyPulley = (P) => {
+    const ctr = P[c.p1.id], pin = P[c.p2.id];
+    const ok = ctr && pin && Number.isFinite(ctr.x) && Number.isFinite(pin.x);
+    g.style.display = ok ? '' : 'none';
+    bolt.style.display = ok ? '' : 'none';
+    if (!ok) return;
+    const deg = Math.atan2(pin.y - ctr.y, pin.x - ctr.x) * 180 / Math.PI;
+    g.setAttribute('transform', `translate(${TX(ctr.x)} ${TY(ctr.y)}) rotate(${-deg})`);
+    bolt.setAttribute('cx', TX(pin.x));
+    bolt.setAttribute('cy', TY(pin.y));
+  };
+  applyPulley(pts);
+  frameUpdaters.push(applyPulley);
+}
+
+function openBeltTangents(c1, r1, c2, r2) {
+  const dx = c2.x - c1.x;
+  const dy = c2.y - c1.y;
+  const d = Math.hypot(dx, dy);
+  if (!Number.isFinite(d) || d <= Math.abs(r1 - r2) || d < 1e-6) return [];
+  const ux = dx / d, uy = dy / d;
+  const nx = -uy, ny = ux;
+  const h = (r1 - r2) / d;
+  const k = Math.sqrt(Math.max(0, 1 - h * h));
+  return [-1, 1].map(sign => {
+    const vx = h * ux + sign * k * nx;
+    const vy = h * uy + sign * k * ny;
+    return {
+      a: { x: c1.x + vx * r1, y: c1.y + vy * r1 },
+      b: { x: c2.x + vx * r2, y: c2.y + vy * r2 }
+    };
+  });
+}
+
+function beltArcPoints(center, radius, from, to, awayFrom, steps = 22) {
+  const a0 = Math.atan2(from.y - center.y, from.x - center.x);
+  const a1 = Math.atan2(to.y - center.y, to.x - center.x);
+  let ccw = a1 - a0;
+  while (ccw < 0) ccw += Math.PI * 2;
+  const cw = ccw - Math.PI * 2;
+  const choose = (delta) => {
+    const mid = a0 + delta / 2;
+    const midPt = { x: center.x + Math.cos(mid) * radius, y: center.y + Math.sin(mid) * radius };
+    return Math.hypot(midPt.x - awayFrom.x, midPt.y - awayFrom.y);
+  };
+  const delta = choose(ccw) >= choose(cw) ? ccw : cw;
+  const n = Math.max(4, Math.round(Math.abs(delta) / (Math.PI * 2) * steps));
+  const pts = [];
+  for (let i = 1; i <= n; i++) {
+    const a = a0 + delta * (i / n);
+    pts.push({ x: center.x + Math.cos(a) * radius, y: center.y + Math.sin(a) * radius });
+  }
+  return pts;
+}
+
+function openBeltPath(c1, r1, c2, r2) {
+  const t = openBeltTangents(c1, r1, c2, r2);
+  if (t.length < 2) return '';
+  const pts = [
+    t[0].a,
+    t[0].b,
+    ...beltArcPoints(c2, r2, t[0].b, t[1].b, c1),
+    t[1].a,
+    ...beltArcPoints(c1, r1, t[1].a, t[0].a, c2)
+  ];
+  return pts.map((p, i) => `${i ? 'L' : 'M'} ${TX(p.x).toFixed(2)} ${TY(p.y).toFixed(2)}`).join(' ') + ' Z';
+}
+
+// 開口皮帶：畫成「兩段外公切線 + 兩段包覆圓弧」的完整路徑；傳動數學由 solver 處理。
+function drawBeltPart(c, pts) {
+  const driver = c.driver ? S.comps.find(p => p.type === 'pulley' && p.id === c.driver) : null;
+  const driven = c.driven ? S.comps.find(p => p.type === 'pulley' && p.id === c.driven) : null;
+  if (!driver?.p1 || !driven?.p1) return;
+  const color = c.color || '#2c3e50';
+  const sc = View.getScale();
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width', Math.max(2.8, 4.4 * sc));
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  path.setAttribute('opacity', '0.82');
+  path.style.pointerEvents = 'none';
+  svg.appendChild(path);
+  const motion = document.createElementNS(SVG_NS, 'path');
+  motion.setAttribute('fill', 'none');
+  motion.setAttribute('stroke', '#f8fafc');
+  motion.setAttribute('stroke-width', Math.max(0.8, 1.2 * sc));
+  motion.setAttribute('stroke-linecap', 'round');
+  motion.setAttribute('stroke-linejoin', 'round');
+  motion.setAttribute('stroke-dasharray', `${(5 * sc).toFixed(1)},${(13 * sc).toFixed(1)}`);
+  motion.setAttribute('opacity', '0.62');
+  motion.style.pointerEvents = 'none';
+  svg.appendChild(motion);
+  const applyBelt = (P) => {
+    const a = P[driver.p1.id], b = P[driven.p1.id];
+    const ok = a && b && Number.isFinite(a.x) && Number.isFinite(b.x);
+    path.style.display = ok ? '' : 'none';
+    motion.style.display = ok ? '' : 'none';
+    if (!ok) return;
+    const d = openBeltPath(a, pulleyRadius(driver), b, pulleyRadius(driven));
+    path.style.display = d ? '' : 'none';
+    motion.style.display = d ? '' : 'none';
+    if (!d) return;
+    path.setAttribute('d', d);
+    motion.setAttribute('d', d);
+    const driverR = pulleyRadius(driver);
+    const beltTravelPx = driverR * (Number(S.theta) || 0) * Math.PI / 180 * sc;
+    motion.setAttribute('stroke-dashoffset', (-beltTravelPx).toFixed(2));
+  };
+  applyBelt(pts);
+  frameUpdaters.push(applyBelt);
+}
+
 // 凸輪從動件：p1 為凸輪軸心，p2 為沿 axisDeg 直動的從動點；滾子中心由凸輪相切幾何推出。
 function drawCamPart(c, pts) {
   if (!c.p1 || !c.p2) return;
@@ -713,6 +887,8 @@ const PART_DRAW = {
   gear:     { phase: 'underlay', draw: drawGearPart },
   rack:     { phase: 'underlay', draw: drawRackPart },
   cam:      { phase: 'underlay', draw: drawCamPart },
+  pulley:   { phase: 'underlay', draw: drawPulleyPart },
+  belt:     { phase: 'underlay', draw: drawBeltPart },
   triangle: { phase: 'layered',  draw: drawTrianglePart },
 };
 
@@ -739,7 +915,8 @@ function draw() {
   drawManualTrace();
 
   // 零件繪製分派（slice 2 登錄表化）— 'underlay' 機件畫在連桿之下（z 序與原本一致）。
-  S.comps.forEach(c => { const e = PART_DRAW[c.type]; if (e && e.phase === 'underlay') e.draw(c, pts); });
+  [...S.comps.filter(c => c.type === 'belt'), ...S.comps.filter(c => c.type !== 'belt')]
+    .forEach(c => { const e = PART_DRAW[c.type]; if (e && e.phase === 'underlay') e.draw(c, pts); });
 
   // 三角板邊：這些 link 由實心三角板代表，2D 不另畫（與 3D scene-model 的 visible 篩法一致）。
   const triangleEdgeKeys = new Set();
@@ -921,11 +1098,13 @@ function draw() {
   const SIZE = 14;   // 地錨方塊邊長
   // 齒輪輪緣銷不畫成通用浮動節點——改由齒輪自己畫成「螺栓孔」（見上面齒輪繪製）。
   const gearPinIds = new Set(S.comps.filter(c => c.type === 'gear' && c.p2).map(c => c.p2.id));
+  const pulleyPinIds = new Set(S.comps.filter(c => c.type === 'pulley' && c.p2).map(c => c.p2.id));
   const camFollowerIds = new Set(S.comps.filter(c => c.type === 'cam' && c.p2).map(c => c.p2.id));
   Object.keys(pts).forEach(id => {
     if (isHiddenSliderRailPoint(id)) return;
     if (isSliderMountPoint(id)) return;
     if (gearPinIds.has(id)) return;
+    if (pulleyPinIds.has(id)) return;
     if (camFollowerIds.has(id)) return;
     const p = pts[id];
     const isGround = groundIds.has(id);
