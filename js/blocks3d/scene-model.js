@@ -14,9 +14,10 @@ import { camRadius } from '../utils/cam-profile.js';
 /**
  * 以「離固定桿的距離」決定每個剛體的疊放層級。2D 的繪製疊放順序與 3D 的 z 分層
  * 共用這同一套，兩邊才會一致。
- * @param {Array} bodies - [{ joints: [nodeId...], lift?, motorDriven? }]（桿 2 個、三角板 3 個銷孔；
+ * @param {Array} bodies - [{ joints: [nodeId...], lift?, motorDriven?, assemblyLayer? }]（桿 2 個、三角板 3 個銷孔；
  *                          lift＝手動相對位移：+1 往上一層、-1 往下一層、0/缺＝自動；
- *                          motorDriven＝接在馬達輸出軸上的原動桿，優先貼近馬達側）
+ *                          motorDriven＝接在馬達輸出軸上的原動桿，優先貼近馬達側；
+ *                          assemblyLayer＝實體裝配指定層，0 代表最靠馬達側）
  * @param {Set}   [groundIds] - 地錨節點 id
  * @param {Object} [opts]
  * @param {(i:number)=>number} [opts.floorOf] - 完全取代「樓地板」的覆寫（預設用 rank + body.lift）
@@ -51,10 +52,14 @@ export function computeBodyLayers(bodies, groundIds = new Set(), opts = {}) {
   const rankOf = body => body.joints.reduce((m, id) => Math.max(m, depthOf(id)), 0);
   const ranks = bodies.map(rankOf);
   // 樓地板＝自然 rank ＋ 手動相對位移 body.lift（+1 往上一層、-1 往下一層）。
+  // 實體 assembly 可明確指定「馬達 -> 機架 -> 曲柄」的裝配層；否則才用 motorDriven fallback。
   // 接在馬達輸出軸上的原動桿要最靠近馬達側，避免後續連桿夾在輸出軸與曲柄中間造成干涉。
   // 共銷檢查仍生效：被推到同層的同銷孔剛體會自動再往上錯開，不會穿模。
   const floorOf = opts.floorOf || ((i) => {
     const natural = ranks[i] + (bodies[i].lift || 0);
+    if (typeof bodies[i].assemblyLayer === 'number' && Number.isFinite(bodies[i].assemblyLayer)) {
+      return Math.max(0, bodies[i].assemblyLayer + (bodies[i].lift || 0));
+    }
     return bodies[i].motorDriven ? Math.max(0, natural - 1) : natural;
   });
   const floors = bodies.map((_, i) => floorOf(i));
@@ -72,8 +77,11 @@ export function computeBodyLayers(bodies, groundIds = new Set(), opts = {}) {
     }
   });
 
-  // 依樓地板由小到大著色；同高時馬達原動桿先拿內層，再維持原始順序。
-  const priorityOf = i => bodies[i].motorDriven ? -1 : 0;
+  // 依樓地板由小到大著色；同高時有 assembly 的零件先按指定層，否則馬達原動桿先拿內層。
+  const hasAssemblyLayer = i => typeof bodies[i].assemblyLayer === 'number' && Number.isFinite(bodies[i].assemblyLayer);
+  const priorityOf = i => hasAssemblyLayer(i)
+    ? -2 + Number(bodies[i].assemblyLayer) * 0.01
+    : (bodies[i].motorDriven ? -1 : 0);
   const order = bodies.map((_, i) => i).sort((a, b) =>
     (floors[a] - floors[b]) || (priorityOf(a) - priorityOf(b)) || (a - b));
   const layerOf = new Array(bodies.length).fill(undefined);
@@ -145,6 +153,18 @@ export function buildSceneModel(links, points, opts = {}) {
     l && !l.hidden && l.style !== 'track' && valid(l.p1) && valid(l.p2) &&
     !triEdgeKeys.has([l.p1, l.p2].sort().join('|')));
 
+  const assemblyLayerForBody = (bodyId) => {
+    if (!bodyId) return null;
+    let found = null;
+    motorMounts.forEach(mount => {
+      if (found !== null || !mount) return;
+      const hasFrame = !!mount.frameBody;
+      if (hasFrame && bodyId === mount.frameBody) found = 0;
+      else if (bodyId === mount.outputBody) found = hasFrame ? 1 : 0;
+    });
+    return found;
+  };
+
   // 把桿與三角板統一成「剛體」（joints = 它佔用的銷孔；桿 2 個、三角板 3 個）。
   // lift = 手動疊放偏好（由 app.js 標在 visualization 物件的 _zlift 上，2D/3D 共用同一份）。
   const bodies = [
@@ -154,6 +174,7 @@ export function buildSceneModel(links, points, opts = {}) {
       joints: [l.p1, l.p2],
       lift: l._zlift || 0,
       motorDriven: l.style === 'crank' && (motorCenters.has(l.p1) || motorCenters.has(l.p2)),
+      assemblyLayer: assemblyLayerForBody(l.id),
     })),
     ...triPlates.map(poly => ({ kind: 'plate', src: poly, joints: [...poly.points], lift: poly._zlift || 0 })),
   ];

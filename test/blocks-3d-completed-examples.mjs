@@ -121,6 +121,20 @@ check('步行腿紅色馬達曲柄貼近輸出軸側', jansenCrank && jansenCran
   jansenStack.every(s => jansenCrank.layer < s.layer),
   `LinkM=${jansenCrank ? jansenCrank.layer : 'missing'}, stack=${jansenStack.map(s => `${s.id}:${s.layer}`).join(',')}`);
 
+const chebyshevMounted = sceneFor('chebyshev-linkage', 45, {
+  motorMounts: new Map([['A', {
+    dir: { x: 1, y: 0 },
+    frameBody: 'Link4',
+    outputBody: 'Link1',
+    order: ['motor', 'frameBody', 'outputBody'],
+  }]]),
+});
+const chebFrame = chebyshevMounted.sticks.find(s => s.id === 'Link4');
+const chebCrank = chebyshevMounted.sticks.find(s => s.id === 'Link1');
+check('切比雪夫馬達裝配為馬達-固定桿-曲柄', chebFrame && chebCrank &&
+  chebFrame.layer === 0 && chebCrank.layer === 1,
+  `Link4=${chebFrame ? chebFrame.layer : 'missing'}, Link1=${chebCrank ? chebCrank.layer : 'missing'}`);
+
 const cam = sceneFor('cam-follower');
 check('凸輪從動件 3D 有凸輪', cam.cams.length === 1, `cams=${cam.cams.length}`);
 check('凸輪馬達也進入 3D 底層', cam.motors.some(m => m.id === 'CC') && cam.cams[0].layer < 0,

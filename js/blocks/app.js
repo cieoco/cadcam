@@ -435,19 +435,49 @@ function oppositeTarget(origin, p) {
     : null;
 }
 
+function motorAssemblyLayerForBody(bodyId, motorMounts) {
+  if (!bodyId || !motorMounts) return null;
+  let found = null;
+  motorMounts.forEach(mount => {
+    if (found !== null || !mount) return;
+    const hasFrame = !!mount.frameBody;
+    if (hasFrame && bodyId === mount.frameBody) found = 0;
+    else if (bodyId === mount.outputBody) found = hasFrame ? 1 : 0;
+  });
+  return found;
+}
+
 // 馬達固定邏輯：輸出軸鎖在軸心；機身方向只看靜態裝配參考，不看播放後的 solved moving point。
 // 這份 mount 同時供 2D/3D 使用，避免 3D 動畫時馬達跟著齒條/從動件轉。
 function buildMotorMounts(motorIds, groundIds) {
   const staticPts = pointCoords();
   const mounts = new Map();
-  const add = (id, target, reason) => {
+  const add = (id, target, reason, assembly = {}) => {
     const center = staticPts[id];
     const dir = normalizedDir(center, target);
-    mounts.set(id, { dir, rotDeg: motorRotDegFromDir(dir), reason });
+    mounts.set(id, { dir, rotDeg: motorRotDegFromDir(dir), reason, ...assembly });
   };
   motorIds.forEach(id => {
     const center = staticPts[id];
     if (!center) return;
+
+    const crankTips = new Set((S.compiled.steps || [])
+      .filter(s => s.type === 'input_crank' && s.center === id)
+      .map(s => s.id));
+    const outputBar = S.comps.find(c => c.type === 'bar' && c.p1 && c.p2 &&
+      (c.p1.id === id || c.p2.id === id) &&
+      (c.isInput || crankTips.has(c.p1.id === id ? c.p2.id : c.p1.id)));
+    const frameBar = S.comps.find(c => c.type === 'bar' && !c.isInput && c.p1 && c.p2 &&
+      (c.p1.id === id || c.p2.id === id) &&
+      !crankTips.has(c.p1.id === id ? c.p2.id : c.p1.id) &&
+      groundIds.has(c.p1.id) && groundIds.has(c.p2.id));
+    const barAssembly = outputBar
+      ? {
+          outputBody: outputBar.id,
+          frameBody: frameBar ? frameBar.id : null,
+          order: frameBar ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody'],
+        }
+      : {};
 
     const gear = S.comps.find(c => c.type === 'gear' && c.p1?.id === id);
     if (gear) {
@@ -455,12 +485,12 @@ function buildMotorMounts(motorIds, groundIds) {
         ? S.comps.find(c => c.type === 'gear' && c.id === gear.mesh)
         : S.comps.find(c => c.type === 'gear' && c.mesh === gear.id);
       if (meshed?.p1 && staticPts[meshed.p1.id]) {
-        add(id, oppositeTarget(center, staticPts[meshed.p1.id]), 'gear-mesh');
+        add(id, oppositeTarget(center, staticPts[meshed.p1.id]), 'gear-mesh', { outputBody: gear.id, order: ['motor', 'outputBody'] });
         return;
       }
       const rack = S.comps.find(c => c.type === 'rack' && c.pinion === gear.id);
       if (rack?.p1 && staticPts[rack.p1.id]) {
-        add(id, oppositeTarget(center, staticPts[rack.p1.id]), 'rack-pinion');
+        add(id, oppositeTarget(center, staticPts[rack.p1.id]), 'rack-pinion', { outputBody: gear.id, order: ['motor', 'outputBody'] });
         return;
       }
     }
@@ -471,26 +501,25 @@ function buildMotorMounts(motorIds, groundIds) {
       const otherId = belt && (belt.driver === pulley.id ? belt.driven : belt.driver);
       const other = otherId && S.comps.find(c => c.type === 'pulley' && c.id === otherId);
       if (other?.p1 && staticPts[other.p1.id]) {
-        add(id, oppositeTarget(center, staticPts[other.p1.id]), 'pulley-belt');
+        add(id, oppositeTarget(center, staticPts[other.p1.id]), 'pulley-belt', { outputBody: pulley.id, order: ['motor', 'outputBody'] });
         return;
       }
     }
 
     const cam = S.comps.find(c => c.type === 'cam' && c.p1?.id === id);
     if (cam?.p2 && staticPts[cam.p2.id]) {
-      add(id, oppositeTarget(center, staticPts[cam.p2.id]), 'cam-follower');
+      add(id, oppositeTarget(center, staticPts[cam.p2.id]), 'cam-follower', { outputBody: cam.id, order: ['motor', 'outputBody'] });
       return;
     }
 
-    const crankTips = new Set((S.compiled.steps || [])
-      .filter(s => s.type === 'input_crank' && s.center === id)
-      .map(s => s.id));
-    const frameBar = S.comps.find(c => c.type === 'bar' && !c.isInput && c.p1 && c.p2 &&
-      (c.p1.id === id || c.p2.id === id) &&
-      !crankTips.has(c.p1.id === id ? c.p2.id : c.p1.id));
     if (frameBar) {
       const oid = frameBar.p1.id === id ? frameBar.p2.id : frameBar.p1.id;
-      add(id, staticPts[oid], 'frame-bar');
+      add(id, staticPts[oid], 'frame-bar', barAssembly);
+      return;
+    }
+    if (outputBar) {
+      const oid = outputBar.p1.id === id ? outputBar.p2.id : outputBar.p1.id;
+      add(id, oppositeTarget(center, staticPts[oid]), 'output-crank', barAssembly);
       return;
     }
 
@@ -498,7 +527,7 @@ function buildMotorMounts(motorIds, groundIds) {
     if (mount) {
       const other = mount.label === 'M1' ? mount.slider.m2 : mount.slider.m1;
       if (other && staticPts[other.id]) {
-        add(id, staticPts[other.id], 'slider-mount');
+        add(id, staticPts[other.id], 'slider-mount', barAssembly);
         return;
       }
     }
@@ -511,7 +540,7 @@ function buildMotorMounts(motorIds, groundIds) {
       const d = Math.hypot(gp.x - center.x, gp.y - center.y);
       if (d > 1e-3 && d < bd) { bd = d; best = gp; }
     });
-    add(id, best || { x: center.x, y: center.y - 1 }, 'nearest-ground');
+    add(id, best || { x: center.x, y: center.y - 1 }, 'nearest-ground', barAssembly);
   });
   return mounts;
 }
@@ -1060,6 +1089,7 @@ function draw() {
       joints: [l.p1, l.p2],
       lift: l._zlift || 0,
       motorDriven: l.style === 'crank' && (motorCenterIds.has(l.p1) || motorCenterIds.has(l.p2)),
+      assemblyLayer: motorAssemblyLayerForBody(l.id, motorMounts),
     })),
     ...triComps.map(t => ({ joints: [t.p1.id, t.p2.id, t.p3.id], lift: t.zlift || 0 })),
   ], groundIds);

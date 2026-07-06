@@ -16,15 +16,19 @@
   "params":     { "theta": 30, "L1": 60, ... },   // ★必要：所有參數的「數值」
   "steps":      [ ... ],                           // ★必要：求解步驟,決定每個點怎麼算出
   "tracePoint": "B",                               //  選填:要畫軌跡的點 id
+  "assembly":   { "motorMounts": [] },             //  選填:實體裝配語意(馬達/機架/曲柄疊層)
   "visualization": { "links": [], "polygons": [], "joints": [] }, // 選填:純畫圖
   "parts":      [],                                //  選填:零件摘要
-  "_wizard_data": [ ... ],                         //  選填:設計器編輯副本(見 §5)
+  "_wizard_data": [ ... ],                         //  選填:設計器編輯副本(見 §6)
   "_templateId": "...", "_templateMeta": { ... }   //  選填:範本學習卡
 }
 ```
 
 **核心規則:`steps` + `params` 是「可獨立求解的真相」。** 一份合格的機構 JSON,
 光靠這兩個欄位就要能被求解,不依賴 `_wizard_data`。
+
+`assembly` 是實體裝配語意：它不改變幾何求解,只告訴 2D/3D viewer 與後續 CAD
+「馬達固定在哪個機架上、輸出軸穿過哪個孔、哪個零件接在輸出軸外側」。
 
 ---
 
@@ -127,7 +131,56 @@
 
 ---
 
-## 4. tracePoint / visualization / parts
+## 4. assembly:實體裝配語意
+
+`steps` 能表達「曲柄怎麼轉」,但不能完整表達實物裝配。例如切比雪夫連桿中,
+馬達輸出軸心在固定桿孔位上,正確由底往上應為:
+
+```text
+馬達本體 -> 固定桿/機架 -> 曲柄
+```
+
+這種語意應放在 `assembly.motorMounts`。它只影響呈現、製造與干涉檢查,不影響求解。
+
+```jsonc
+{
+  "assembly": {
+    "motorMounts": [
+      {
+        "motor": "1",
+        "shaftCenter": "A",
+        "frameBody": "Link4",
+        "outputBody": "Link1",
+        "order": ["motor", "frameBody", "outputBody"],
+        "shaft": { "type": "tt-d-flat", "length": 8, "diameter": 5.4, "flatWidth": 3.7, "bore": 1.9 }
+      }
+    ]
+  }
+}
+```
+
+| 欄位 | 必要 | 說明 |
+|---|---|---|
+| `motor` | ✓ | 實體馬達 id,對應 `physical_motor` / `physicalMotor` |
+| `shaftCenter` | ✓ | 馬達輸出軸心所在點 id |
+| `frameBody` | 選 | 馬達鎖上的固定桿/機架零件 id |
+| `outputBody` | ✓ | 輸出軸外側帶動的曲柄/齒輪/皮帶輪/凸輪 id |
+| `order` | 選 | 由底往上的裝配順序;預設 `["motor","frameBody","outputBody"]` |
+| `shaft` | 選 | 輸出軸規格;TT 馬達預設可用 `tt-d-flat` |
+
+推導規則:
+
+- 若沒有 `assembly.motorMounts`,viewer 可由既有語意推導:
+  `physical_motor` 找馬達、`input_crank`/`isInput` 找 `outputBody`,
+  兩端皆 fixed 或屬於 frame 的零件找 `frameBody`。
+- 若同一軸心同時有固定桿與曲柄,預設疊層為 `motor -> frameBody -> outputBody`。
+- 若沒有固定桿/機架可推導,退回目前的自動疊層:馬達在最底,馬達原動件優先靠近輸出軸側。
+- 若檔案明確提供 `assembly.motorMounts`,viewer / CAD 以它為準,不要再用顏色或拓撲猜測覆寫。
+- `order` 只描述裝配順序,不應用來改變機構運動學;同一份 `steps` 在有無 `assembly` 時應求出相同軌跡。
+
+---
+
+## 5. tracePoint / visualization / parts
 
 - `tracePoint`:要追蹤畫運動軌跡的 step id;必須存在於 steps,否則 `TRACE_POINT_NOT_IN_STEPS`。
 - `visualization.links / polygons / joints`:**只影響畫面**,不影響求解。連桿用 `p1`/`p2` 連兩個點 id,可帶 `color`、`style`(如 `track`/`crank`)。
@@ -135,7 +188,7 @@
 
 ---
 
-## 5. steps 與 _wizard_data 的關係(重要)
+## 6. steps 與 _wizard_data 的關係(重要)
 
 兩種資料描述同一個機構,方向相反:
 
@@ -150,7 +203,7 @@
 
 ---
 
-## 6. 驗收員會回的判決代碼
+## 7. 驗收員會回的判決代碼
 
 `validateMechanismJSON(json)` 回 `{ status, issues[], counts }`,`status` 為 `pass`/`warn`/`fail`。
 每個 issue 帶機器可讀 `code`,未來可直接回灌給 AI 修正。
@@ -174,7 +227,7 @@
 
 ---
 
-## 7. 完整最小範例(可直接驗收通過)
+## 8. 完整最小範例(可直接驗收通過)
 
 ```json
 {
