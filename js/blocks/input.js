@@ -29,6 +29,8 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
     movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
     isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
     handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
+    openMobileEditPanel = () => {},
+    closeMobileEditPanel = () => {},
     recordManualTrace = () => {},
     solvePinnedConstraints = null,
     snapFramePoint = p => p,
@@ -87,6 +89,7 @@ export function onNodeDown(e, id) {
   document.getElementById('linkToRailBtn').style.display = 'none';
   setSliderDetailRows(false);
   S.selectedNodeId = id;
+  openMobileEditPanel();
   Panels.updateRoleEditor();
   S.dragId = id; S.snapTarget = null;
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
@@ -300,6 +303,8 @@ export function init(deps) {
      movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
      isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
      handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
+     openMobileEditPanel = (() => {}),
+     closeMobileEditPanel = (() => {}),
      recordManualTrace = (() => {}),
      solvePinnedConstraints = null,
      snapFramePoint = (p => p),
@@ -315,6 +320,7 @@ export function init(deps) {
     if (S.placingMotor || S.pickBars) { cancelMotorMode(); draw(); return; }
     if (S.dragId || S.dragLinkId) return;
     S.selectedNodeId = null;
+    closeMobileEditPanel();
     Panels.updateRoleEditor();
     if (!S.dragId) deselectLink();
   });

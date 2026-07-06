@@ -100,6 +100,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
   S.selectedSliderId = null;
   S.selectedNodeId = null;
   deselectGear();
+  closeMobileEditPanel();
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('roleEditor').style.display = 'none';
   document.getElementById('servoEditor').style.display = 'none';
@@ -1460,12 +1461,37 @@ function refresh3DView() {
   push3D();
 }
 
+function syncMobilePanelTabs(active = document.body.dataset.mobilePanel || 'build') {
+  document.querySelectorAll('.mobile-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === active);
+  });
+}
+
+function setMobilePanel(panel) {
+  const next = ['build', 'edit', 'view', 'project'].includes(panel) ? panel : 'build';
+  document.body.dataset.mobilePanel = next;
+  if (next !== 'edit') closeMobileEditPanel();
+  syncMobilePanelTabs(next);
+}
+
+function openMobileEditPanel() {
+  if (!mobilePrompt()) return;
+  document.body.dataset.mobileEditor = 'active';
+  setMobilePanel('edit');
+}
+
+function closeMobileEditPanel() {
+  delete document.body.dataset.mobileEditor;
+}
+
 // 切換 3D 唯讀預覽：首次開啟才動態載入 THREE viewer。
 async function toggle3D() {
   view3DActive = !view3DActive;
   const overlay = document.getElementById('view3d');
   const btn = document.getElementById('btn3d');
+  const mobileBtn = document.getElementById('mobileBtn3d');
   btn.classList.toggle('active', view3DActive);
+  if (mobileBtn) mobileBtn.classList.toggle('active', view3DActive);
   if (view3DActive) {
     // 開 3D 時收起 2D 的編輯小面板（避免疊在覆蓋層上）
     deselectLink();
@@ -1588,16 +1614,16 @@ function drawFrameHole(x, y, used = false) {
 }
 
 function syncFrameOptionButtons() {
-  const holes = document.getElementById('btnFrameHoles');
-  if (holes) {
+  const holesButtons = [document.getElementById('btnFrameHoles'), document.getElementById('mobileBtnFrameHoles')].filter(Boolean);
+  holesButtons.forEach(holes => {
     holes.classList.toggle('active', Boolean(S.showFrameHoles));
     holes.title = S.showFrameHoles ? '隱藏 LEGO 機架孔位' : '顯示 LEGO 機架孔位';
-  }
-  const lock = document.getElementById('btnFrameLock');
-  if (lock) {
+  });
+  const lockButtons = [document.getElementById('btnFrameLock'), document.getElementById('mobileBtnFrameLock')].filter(Boolean);
+  lockButtons.forEach(lock => {
     lock.classList.toggle('active', Boolean(S.lockFrameHoles));
     lock.title = S.lockFrameHoles ? '取消固定孔 8mm 吸附' : '拖曳固定孔與機架時吸附到 8mm LEGO 孔距';
-  }
+  });
 }
 
 function toggleFrameHoles() {
@@ -1794,6 +1820,7 @@ function selectGear(id) {
   cancelMotorMode();
   const c = gearById(id);
   if (!c) return;
+  openMobileEditPanel();
   S.selectedGearId = id;
   S.selectedLinkId = null;
   S.selectedTriangleId = null;
@@ -1856,6 +1883,7 @@ function clearAll() {
   Tools.exitDrawLink();
   Tools.exitDrawTriangle();
   cancelMotorMode();
+  closeMobileEditPanel();
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('roleEditor').style.display = 'none';
   document.getElementById('servoEditor').style.display = 'none';
@@ -1948,8 +1976,25 @@ function cancelMotorMode() {
   clearBanner();
 }
 // ---- 動力來源選單：點「動力來源」先選 TT馬達 / MG995，再進入放置模式 ----
+function linkMenuEl() { return document.getElementById('linkMenu'); }
+function openLinkMenu() {
+  const power = powerMenuEl();
+  if (power) power.style.display = 'none';
+  const m = linkMenuEl();
+  if (m) m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
+}
+function closeLinkMenu() {
+  const m = linkMenuEl();
+  if (m) m.style.display = 'none';
+}
+function pickLinkTool(type) {
+  closeLinkMenu();
+  if (type === 'triangle') Tools.startDrawTriangle();
+  else Tools.startDrawLink();
+}
 function powerMenuEl() { return document.getElementById('powerMenu'); }
 function openPowerMenu() {
+  closeLinkMenu();
   const m = powerMenuEl();
   if (m) m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
 }
@@ -2055,6 +2100,7 @@ function driveBarAt(barId, nodeId) {
   S.selectedTriangleId = null;
   rebuild(); draw();
   Panels.updateRoleEditor();
+  openMobileEditPanel();
 }
 // 線性致動器：把某根滑軌的滑塊點改成被直線位移驅動（活塞）。S.theta 從 0 起算＝行程位移。
 function driveSliderAt(sliderId) {
@@ -2077,6 +2123,7 @@ function driveSliderAt(sliderId) {
   S.selectedTriangleId = null;
   rebuild(); draw();
   Panels.updateRoleEditor();
+  openMobileEditPanel();
 }
 // 在齒輪中心放馬達：把這條嚙合鏈的「根驅動輪」中心固定到機架並給動力。
 // 馬達一律記在驅動輪（mesh=null）中心；從動輪角度由它推算（外嚙合反向、按齒比）。
@@ -2183,6 +2230,7 @@ function selectLink(id) {
   deselectGear();
   const c = S.comps.find(x => x.id === id && x.type === 'bar' && x.fixedLen);
   if (!c) return;
+  openMobileEditPanel();
   S.selectedLinkId = id;
   S.selectedTriangleId = null;
   S.selectedNodeId = null;
@@ -2208,6 +2256,7 @@ function selectTriangle(id) {
   cancelMotorMode();
   deselectGear();
   if (!S.comps.some(x => x.id === id && x.type === 'triangle')) return;
+  openMobileEditPanel();
   S.selectedTriangleId = id;
   S.selectedLinkId = null;
   S.selectedNodeId = null;
@@ -2238,6 +2287,7 @@ function selectSlider(id) {
   deselectGear();
   const c = S.comps.find(x => x.id === id && x.type === 'slider');
   if (!c) return;
+  openMobileEditPanel();
   S.selectedSliderId = id;
   S.selectedLinkId = null;
   S.selectedTriangleId = null;
@@ -2487,6 +2537,7 @@ function deselectLink() {
   S.selectedTriangleId = null;
   S.selectedSliderId = null;
   deselectGear();
+  closeMobileEditPanel();
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('sliderBaseBtn').style.display = 'none';
   document.getElementById('linkToRailBtn').style.display = 'none';
@@ -2505,6 +2556,7 @@ function deleteGearChain(id) {
   S.comps = S.comps.filter(c => !ids.has(c.id));
   deselectGear();
   S.selectedNodeId = null;
+  closeMobileEditPanel();
   rebuild(); draw();
 }
 function deleteSelectedPart() {
@@ -2522,6 +2574,7 @@ function deleteSelectedPart() {
   S.selectedTriangleId = null;
   S.selectedSliderId = null;
   S.selectedNodeId = null;
+  closeMobileEditPanel();
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('roleEditor').style.display = 'none';
   document.getElementById('servoEditor').style.display = 'none';
@@ -2742,7 +2795,7 @@ async function share() {
 function init() {
   Render.init({ svg, onNodeDown: Input.onNodeDown });   // 注入繪製基元的外部依賴（預設 parent + 固定孔互動）
   Panels.init({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount });
-  Tools.init({ svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectSlider,
+  Tools.init({ svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
                setBanner, clearBanner, worldFromEvent, pointCoords, nearestDisplayToPoint, snapWorld,
                mobilePrompt, promptText });
   Input.init({ svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
@@ -2751,7 +2804,7 @@ function init() {
                movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
                isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
                handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround, recordManualTrace, solvePinnedConstraints,
-               snapFramePoint, snapFrameNodesToGrid });
+               snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel });
   populateExamples();
   let loaded = false;
   try {
@@ -2769,9 +2822,10 @@ function init() {
     if (local && local.comps.length) { applySnapshot(local, { recordUndo: false }); loaded = true; }
   }
   if (!loaded) { rebuild(); draw(); }
+  setMobilePanel('build');
   updateUndoBtn();
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: Tools.startDrawTriangle, clearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: Tools.startDrawTriangle, clearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();

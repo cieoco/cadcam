@@ -15,11 +15,11 @@
     @supports (height: 100dvh) {
       body { height: 100dvh; }
     }
-    header {
+    header, .appbar {
       display: flex; align-items: center; justify-content: space-between;
       padding: 12px 20px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.06); z-index: 5;
     }
-    header h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 8px; }
+    header h1, .appbar h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 8px; }
     .home-btn { text-decoration: none; color: #34495e; background: #eef2f7; padding: 8px 14px;
       border-radius: 20px; font-size: 14px; font-weight: 600; }
     .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -29,14 +29,18 @@
       padding: 8px 10px; font-size: 14px; font-weight: 600; max-width: 180px; }
     .tool-btn:hover { background: #f6f8fb; }
     .tool-btn:disabled { opacity: .45; cursor: default; }
-    .stage { flex: 1; display: flex; min-height: 0; }
+    .tool-btn.active { background: #eaf2ff; border-color: #7fb0ff; color: #2c5282; font-weight: 800; }
+    .stage, .workspace { flex: 1; display: flex; min-height: 0; }
+    .mobile-panel, .mobile-tabs { display: none; }
 
     /* 零件盤 */
-    .tray { width: 150px; background: #fff; border-right: 1px solid #eee; padding: 14px 10px;
-      display: flex; flex-direction: column; gap: 12px; }
-    .tray-title { font-size: 12px; color: #95a5a6; font-weight: 700; letter-spacing: 0.05em; }
+    .tray { width: 188px; background: #fff; border-right: 1px solid #e6e9f0; padding: 14px 10px;
+      display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+    .tray-title, .tray-section-title { font-size: 12px; color: #7f8c8d; font-weight: 800; letter-spacing: 0.05em; }
+    .tray-section { display: flex; flex-direction: column; gap: 8px; }
+    .tray-section-items { display: grid; grid-template-columns: 1fr; gap: 8px; }
     .block {
-      border: 2px solid #e6e9f0; border-radius: 14px; padding: 12px 8px; cursor: pointer;
+      border: 2px solid #e6e9f0; border-radius: 8px; padding: 11px 8px; cursor: pointer;
       background: #fff; text-align: center; transition: transform .08s, box-shadow .12s;
       display: flex; flex-direction: column; align-items: center; gap: 6px; user-select: none;
     }
@@ -52,7 +56,7 @@
     .block.slider { border-color: #bfe3da; }
 
     /* 畫布 */
-    .canvas-wrap { flex: 1; position: relative; min-width: 0; }
+    .canvas-wrap { flex: 1; position: relative; min-width: 0; background: #f6f8fb; }
     #stageSvg { width: 100%; height: 100%; display: block; background:
       linear-gradient(#f6f8fb 0 0); touch-action: none; }
     .hint {
@@ -90,11 +94,11 @@
     }
     .clear-btn.active { background: #eaf2ff; border-color: #7fb0ff; color: #2c5282; font-weight: 700; }
     .danger-btn { border-color: #ffc9c9; background: #fff5f5; color: #c0392b; font-weight: 700; }
-    /* 選取連桿後的長度編輯面板 */
-    .len-editor { position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column;
-      align-items: stretch; gap: 8px; max-width: 288px;
-      background: rgba(255,255,255,0.96); border: 1px solid #e6e9f0; border-radius: 12px; padding: 8px 12px;
+    /* 選取物件後的檢查器面板 */
+    .inspector-panel { position: absolute; display: flex; flex-direction: column; align-items: stretch;
+      background: rgba(255,255,255,0.96); border: 1px solid #e6e9f0; border-radius: 8px; padding: 8px 12px;
       box-shadow: 0 6px 18px rgba(0,0,0,0.1); }
+    .len-editor { top: 16px; left: 16px; gap: 8px; max-width: 288px; }
     .len-editor .le-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .len-editor .le-title { font-size: 13px; font-weight: 700; color: #2c5282; }
     .len-editor .le-step { width: 28px; height: 28px; border: 1px solid #d8dee6; background: #fff;
@@ -107,10 +111,9 @@
       font-size: 12px; padding: 6px 9px; cursor: pointer; line-height: 1; white-space: nowrap; }
     .len-editor .lift-btn:hover { background: #f6f8fb; }
     .len-editor .lift-btn.lift-on { background: #eaf2ff; border-color: #7fb0ff; color: #2c5282; font-weight: 700; }
-    .role-editor { position: absolute; top: 16px; right: 16px; display: flex; flex-direction: column; align-items: stretch; gap: 7px;
-      background: rgba(255,255,255,0.96); border: 1px solid #e6e9f0; border-radius: 12px; padding: 8px 12px;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.1); max-width: 330px; }
+    .role-editor { top: 16px; right: 16px; gap: 7px; max-width: 330px; }
     .role-editor .re-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .node-role-actions, .node-axis-control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .role-editor .re-title { font-size: 13px; font-weight: 700; color: #8e3b32; }
     .role-editor .re-status { font-size: 12px; color: #7f8c8d; min-width: 58px; }
     .role-editor button { border: 1px solid #d8dee6; background: #fff; border-radius: 8px; padding: 6px 9px;
@@ -120,26 +123,24 @@
     .role-editor .pos-label { font-size: 12px; font-weight: 700; color: #60717d; }
     .role-editor .pos-value { min-width: 42px; text-align: center; font-size: 12px; font-weight: 700; color: #2c5282; }
     /* MG995 伺服角度面板（接點角色面板下方） */
-    .servo-editor { position: absolute; top: 70px; right: 16px; display: flex; flex-direction: column; gap: 6px;
-      background: rgba(255,255,255,0.96); border: 1px solid #bcd3f0; border-radius: 12px; padding: 8px 12px;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.1); }
+    .servo-editor { top: 70px; right: 16px; gap: 6px; border-color: #bcd3f0; }
     .servo-editor .se-title { font-size: 13px; font-weight: 700; color: #2c5282; }
     .servo-editor .se-row { display: flex; align-items: center; gap: 8px; }
     .servo-editor .se-label { font-size: 12px; font-weight: 700; color: #60717d; min-width: 30px; }
     /* 動力來源選單（置中彈出卡片） */
-    .power-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    .tool-menu, .power-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
       display: flex; flex-direction: column; gap: 10px; z-index: 6;
-      background: #fff; border: 1px solid #e6e9f0; border-radius: 16px; padding: 16px;
+      background: #fff; border: 1px solid #e6e9f0; border-radius: 8px; padding: 16px;
       box-shadow: 0 16px 40px rgba(0,0,0,0.22); min-width: 240px; }
-    .power-menu .pm-title { font-size: 14px; font-weight: 700; color: #2c3e50; text-align: center; }
-    .power-menu .pm-opt { display: flex; align-items: center; gap: 12px; text-align: left;
-      border: 2px solid #e6e9f0; background: #fff; border-radius: 12px; padding: 12px 14px; cursor: pointer; }
-    .power-menu .pm-opt:hover { background: #f6f8fb; border-color: #bcd3f0; }
-    .power-menu .pm-ico { font-size: 26px; line-height: 1; }
-    .power-menu .pm-text { display: flex; flex-direction: column; gap: 2px; }
-    .power-menu .pm-text b { font-size: 15px; color: #2c3e50; }
-    .power-menu .pm-text small { font-size: 12px; color: #8a95a1; }
-    .power-menu .pm-cancel { border: none; background: transparent; color: #8a95a1; font-size: 13px;
+    .tool-menu .pm-title, .power-menu .pm-title { font-size: 14px; font-weight: 700; color: #2c3e50; text-align: center; }
+    .tool-menu .pm-opt, .power-menu .pm-opt { display: flex; align-items: center; gap: 12px; text-align: left;
+      border: 2px solid #e6e9f0; background: #fff; border-radius: 8px; padding: 12px 14px; cursor: pointer; }
+    .tool-menu .pm-opt:hover, .power-menu .pm-opt:hover { background: #f6f8fb; border-color: #bcd3f0; }
+    .tool-menu .pm-ico, .power-menu .pm-ico { font-size: 26px; line-height: 1; }
+    .tool-menu .pm-text, .power-menu .pm-text { display: flex; flex-direction: column; gap: 2px; }
+    .tool-menu .pm-text b, .power-menu .pm-text b { font-size: 15px; color: #2c3e50; }
+    .tool-menu .pm-text small, .power-menu .pm-text small { font-size: 12px; color: #8a95a1; }
+    .tool-menu .pm-cancel, .power-menu .pm-cancel { border: none; background: transparent; color: #8a95a1; font-size: 13px;
       cursor: pointer; padding: 4px; }
     /* 3D 預覽覆蓋層 */
     #view3d { position: absolute; inset: 0; display: none; background: #0f1420; }
@@ -148,18 +149,78 @@
       background: rgba(15,20,32,0.75); color: #cdd6e6; border-radius: 999px; padding: 7px 14px;
       font-size: 13px; pointer-events: none; }
     #btn3d.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+    @media (min-width: 1100px) {
+      .canvas-wrap::after {
+        content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 320px;
+        background: #fff; border-left: 1px solid #e6e9f0; box-shadow: -4px 0 18px rgba(44,62,80,0.04);
+        pointer-events: none;
+      }
+      #stageSvg { width: calc(100% - 320px); }
+      #view3d { right: 320px; }
+      .hint, .mode-banner { left: calc((100% - 320px) / 2); }
+      .controls { left: calc((100% - 320px) / 2); }
+      .inspector-panel {
+        left: auto; right: 16px; width: 288px; max-width: 288px;
+        box-shadow: none; z-index: 2;
+      }
+      .len-editor, .role-editor, #gearEditor, #strokeEditor { top: 16px; }
+      #servoEditor { top: 154px; }
+      .len-editor .le-row, .role-editor .re-row { align-items: center; }
+    }
     @media (hover: none), (pointer: coarse) {
       .desktop-hint { display: none; }
       .mobile-hint { display: inline; }
     }
     /* 手機：零件盤移到底部橫條，畫布吃滿上方 */
-    @media (max-width: 640px) {
+    @media (max-width: 700px) {
+      html, body { overflow: hidden; width: 100%; }
       header { flex-wrap: wrap; gap: 8px; }
+      .appbar { padding: 10px 14px; }
+      .appbar h1 { font-size: 18px; }
+      .project-actions { display: none; }
       .tool-btn { padding: 7px 10px; font-size: 13px; }
       .stage { flex-direction: column-reverse; }
+      .canvas-wrap { min-height: 0; overflow: hidden; }
       .tray { width: 100%; flex-direction: row; gap: 6px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
         border-right: none; border-top: 1px solid #eee; overflow-x: hidden; }
-      .tray-title { display: none; }
+      body[data-mobile-panel="edit"] .part-palette,
+      body[data-mobile-panel="view"] .part-palette,
+      body[data-mobile-panel="project"] .part-palette { display: none; }
+      body[data-mobile-panel="build"] .mobile-panel,
+      body:not([data-mobile-panel]) .mobile-panel { display: none; }
+      body[data-mobile-panel="edit"] .mobile-panel,
+      body[data-mobile-panel="view"] .mobile-panel,
+      body[data-mobile-panel="project"] .mobile-panel {
+        display: grid; grid-template-columns: 1fr; gap: 8px;
+        width: 100%; background: #fff; border-top: 1px solid #e6e9f0;
+        padding: 8px 10px;
+      }
+      .mobile-panel-section { display: none; align-items: center; gap: 8px; overflow-x: auto; }
+      .mobile-panel-section::-webkit-scrollbar { display: none; }
+      body[data-mobile-panel="edit"] .mobile-panel-section[data-panel="edit"],
+      body[data-mobile-panel="view"] .mobile-panel-section[data-panel="view"],
+      body[data-mobile-panel="project"] .mobile-panel-section[data-panel="project"] { display: flex; }
+      body[data-mobile-panel="edit"][data-mobile-editor="active"] .mobile-panel-section[data-panel="edit"] { display: none; }
+      body[data-mobile-panel="edit"][data-mobile-editor="active"] .mobile-panel { display: none; }
+      .mobile-panel-title { flex: 0 0 auto; color: #60717d; font-size: 12px; font-weight: 800; }
+      .mobile-panel .tool-btn, .mobile-panel .home-btn, .mobile-panel .example-select {
+        min-height: 38px; border-radius: 8px; white-space: nowrap;
+      }
+      .mobile-tabs {
+        display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;
+        background: #fff; border-top: 1px solid #e6e9f0;
+        padding: 5px 6px calc(5px + env(safe-area-inset-bottom, 0px)); z-index: 7; flex: 0 0 auto;
+      }
+      .mobile-tab {
+        min-width: 0; min-height: 44px; border: 1px solid transparent; border-radius: 8px;
+        background: #fff; color: #60717d; font-size: 12px; font-weight: 800; cursor: pointer;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+      }
+      .mobile-tab .mt-ico { font-size: 17px; line-height: 1; }
+      .mobile-tab.active { background: #eaf2ff; border-color: #7fb0ff; color: #2c5282; }
+      .tray-title, .tray-section-title { display: none; }
+      .tray-section { display: contents; }
+      .tray-section-items { display: contents; }
       .block { flex: 1 1 0; min-width: 0; padding: 7px 4px; gap: 4px; border-radius: 12px; }
       .block .ico { font-size: 22px; }
       .block .name { font-size: 12px; }
@@ -168,11 +229,41 @@
       .play-btn { width: 36px; height: 36px; font-size: 16px; }
       .controls .clear-btn { width: 32px; height: 32px; font-size: 12px; }
       .ctrl-sub { min-width: 36px; padding: 0 5px; font-size: 11px; }
-      .len-editor, .role-editor { top: 10px; padding: 6px 8px; gap: 6px; }
-      .len-editor { left: 8px; }
-      .role-editor { right: 8px; }
-      .servo-editor { top: 62px; right: 8px; padding: 6px 8px; gap: 5px; }
-      .power-menu { min-width: 0; width: calc(100% - 48px); max-width: 320px; padding: 14px; }
+      body[data-mobile-panel="edit"] .inspector-panel {
+        position: fixed; left: 8px; right: auto; bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+        top: auto; width: calc(100% - 16px); max-width: none; max-height: min(42vh, 320px);
+        overflow-y: auto; gap: 6px; padding: 8px 10px; z-index: 8;
+        border-radius: 8px 8px 0 0; box-shadow: 0 -8px 24px rgba(44,62,80,0.16);
+      }
+      body:not([data-mobile-panel="edit"]) .inspector-panel {
+        left: 8px; right: auto; top: 10px; width: calc(100% - 16px); max-width: none;
+      }
+      .role-editor .re-row, .len-editor .le-row, .servo-editor .se-row {
+        width: 100%; min-width: 0;
+      }
+      .node-inspector { gap: 8px; }
+      .node-role-row {
+        display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center;
+        padding-bottom: 8px; border-bottom: 1px solid #edf1f6;
+      }
+      .node-role-row .re-status { justify-self: start; min-width: 0; }
+      .node-role-actions {
+        grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
+      }
+      .node-role-actions button { width: 100%; padding: 7px 6px; white-space: nowrap; }
+      .node-position-row {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+      }
+      .node-axis-control {
+        display: grid; grid-template-columns: auto 32px minmax(54px, 1fr) 32px;
+        gap: 6px; align-items: center; min-width: 0;
+      }
+      .node-axis-control button { width: 32px; height: 32px; padding: 0; }
+      .role-editor .re-row button, .len-editor button, .servo-editor button { min-height: 32px; }
+      .role-editor .pos-label { text-align: left; }
+      .role-editor .pos-value { min-width: 0; padding: 0 4px; }
+      .servo-editor { padding: 6px 8px; gap: 5px; }
+      .tool-menu, .power-menu { min-width: 0; width: calc(100% - 48px); max-width: 320px; padding: 14px; }
     }
     @media (max-width: 380px) {
       .tray { gap: 4px; padding: 5px 5px calc(5px + env(safe-area-inset-bottom, 0px)); }
@@ -187,9 +278,9 @@
   </script>
 </head>
 <body>
-  <header>
+  <header class="appbar">
     <h1>🧩 機構積木</h1>
-    <div class="toolbar">
+    <div class="toolbar project-actions">
       <button class="tool-btn" id="btnUndo" onclick="window.blocks.undo()" disabled title="復原上一步">↩ 復原</button>
       <button class="tool-btn" onclick="window.blocks.saveFile()" title="存成檔案">💾 存檔</button>
       <button class="tool-btn" onclick="window.blocks.openFile()" title="開啟檔案">📂 開啟</button>
@@ -201,42 +292,52 @@
     </div>
   </header>
 
-  <div class="stage">
-    <div class="tray">
+  <div class="stage workspace">
+    <div class="tray part-palette">
       <div class="tray-title">零件盤</div>
-      <div class="block anchor" onclick="window.blocks.addAnchor()">
-        <span class="ico">📌</span>
-        <span class="name">地錨</span>
-        <span class="role">釘在地上</span>
+      <div class="tray-section">
+        <div class="tray-section-title">基礎</div>
+        <div class="tray-section-items">
+          <div class="block anchor" onclick="window.blocks.addAnchor()">
+            <span class="ico">📌</span>
+            <span class="name">地錨</span>
+            <span class="role">釘在地上</span>
+          </div>
+          <div class="block link" onclick="window.blocks.openLinkMenu()">
+            <span class="ico">🔵</span>
+            <span class="name">桿件</span>
+            <span class="role">連桿 / 三點桿</span>
+          </div>
+          <div class="block slider" onclick="window.blocks.startDrawRail()">
+            <span class="ico">🟩</span>
+            <span class="name">滑軌</span>
+            <span class="role"><span class="desktop-hint">拉出軌道，右鍵確定</span><span class="mobile-hint">拖出軌道，放開確定</span></span>
+          </div>
+        </div>
       </div>
-      <div class="block link" onclick="window.blocks.startDrawLink()">
-        <span class="ico">🔵</span>
-        <span class="name">連桿</span>
-        <span class="role"><span class="desktop-hint">移動滑鼠拉出</span><span class="mobile-hint">按住拖出</span></span>
+      <div class="tray-section">
+        <div class="tray-section-title">傳動</div>
+        <div class="tray-section-items">
+          <div class="block gear" onclick="window.blocks.addGearPair()">
+            <span class="ico">⚙️</span>
+            <span class="name">齒輪對</span>
+            <span class="role">成對嚙合</span>
+          </div>
+        </div>
       </div>
-      <div class="block triangle" onclick="window.blocks.startDrawTriangle()">
-        <span class="ico">🔺</span>
-        <span class="name">三點桿</span>
-        <span class="role"><span class="desktop-hint">移動調形狀，右鍵確定</span><span class="mobile-hint">拖曳調形狀，放開確定</span></span>
-      </div>
-      <div class="block slider" onclick="window.blocks.startDrawRail()">
-        <span class="ico">🟩</span>
-        <span class="name">滑軌</span>
-        <span class="role"><span class="desktop-hint">拉出軌道，右鍵確定</span><span class="mobile-hint">拖出軌道，放開確定</span></span>
-      </div>
-      <div class="block gear" onclick="window.blocks.addGearPair()">
-        <span class="ico">⚙️</span>
-        <span class="name">齒輪對</span>
-        <span class="role">成對嚙合</span>
-      </div>
-      <div class="block motor" onclick="window.blocks.openPowerMenu()">
-        <span class="ico">⚡</span>
-        <span class="name">動力來源</span>
-        <span class="role">TT馬達 / MG995</span>
+      <div class="tray-section">
+        <div class="tray-section-title">動力</div>
+        <div class="tray-section-items">
+          <div class="block motor" onclick="window.blocks.openPowerMenu()">
+            <span class="ico">⚡</span>
+            <span class="name">動力來源</span>
+            <span class="role">TT馬達 / MG995</span>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="canvas-wrap">
+    <div class="canvas-wrap canvas-area">
       <svg id="stageSvg" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="hint" id="hint">
         <span class="desktop-hint">先點🔵連桿，移動滑鼠拉長，右鍵確定<br>再把🔴馬達放到端點，按 ▶ 看它動</span>
@@ -244,7 +345,7 @@
       </div>
       <div class="mode-banner" id="modeBanner" style="display:none;"></div>
       <div class="mode-banner" id="solveBanner" style="display:none; top:58px;"></div>
-      <div class="len-editor" id="lenEditor" style="display:none;">
+      <div class="inspector-panel len-editor" id="lenEditor" style="display:none;">
         <div class="le-row">
           <span class="le-title" id="lenTitle">🔵 連桿長度</span>
           <select class="tri-side" id="triSideSelect" style="display:none;" onchange="window.blocks.setTriSide(this.value)" title="選要調整的邊">
@@ -298,28 +399,34 @@
           <button class="lift-btn" id="liftDownBtn" onclick="window.blocks.bringPart('down')" title="往下疊一層（一路挪回去就回到自動）">🔽 下移一層</button>
         </div>
       </div>
-      <div class="role-editor" id="roleEditor" style="display:none;">
-        <div class="re-row">
+      <div class="inspector-panel role-editor node-inspector" id="roleEditor" style="display:none;">
+        <div class="re-row node-role-row">
           <span class="re-title">接點</span>
           <span class="re-status" id="roleStatus">自由</span>
-          <button onclick="window.blocks.setNodeRole('floating')">變自由</button>
-          <button onclick="window.blocks.setNodeRole('fixed')">設地錨</button>
-          <button onclick="window.blocks.removeNodeMotor()">拿掉馬達</button>
-          <button id="splitBtn" onclick="window.blocks.splitNode()" title="把鎖在同一點的桿件分開" style="display:none;">分離</button>
-          <button id="traceBtn" onclick="window.blocks.toggleTracePoint()" title="追蹤這個接點走過的路徑">設軌跡點</button>
+          <span class="node-role-actions">
+            <button onclick="window.blocks.setNodeRole('floating')">變自由</button>
+            <button onclick="window.blocks.setNodeRole('fixed')">設地錨</button>
+            <button onclick="window.blocks.removeNodeMotor()">拿掉馬達</button>
+            <button id="splitBtn" onclick="window.blocks.splitNode()" title="把鎖在同一點的桿件分開" style="display:none;">分離</button>
+            <button id="traceBtn" onclick="window.blocks.toggleTracePoint()" title="追蹤這個接點走過的路徑">設軌跡點</button>
+          </span>
         </div>
-        <div class="re-row">
-          <span class="pos-label">X</span>
-          <button onclick="window.blocks.changeNodePos('x',-1)" title="接點 X 座標 −1mm">−</button>
-          <span class="pos-value"><span id="nodeXVal">0</span>mm</span>
-          <button onclick="window.blocks.changeNodePos('x',1)" title="接點 X 座標 ＋1mm">＋</button>
-          <span class="pos-label">Y</span>
-          <button onclick="window.blocks.changeNodePos('y',-1)" title="接點 Y 座標 −1mm">−</button>
-          <span class="pos-value"><span id="nodeYVal">0</span>mm</span>
-          <button onclick="window.blocks.changeNodePos('y',1)" title="接點 Y 座標 ＋1mm">＋</button>
+        <div class="re-row node-position-row">
+          <span class="node-axis-control">
+            <span class="pos-label">X</span>
+            <button onclick="window.blocks.changeNodePos('x',-1)" title="接點 X 座標 −1mm">−</button>
+            <span class="pos-value"><span id="nodeXVal">0</span>mm</span>
+            <button onclick="window.blocks.changeNodePos('x',1)" title="接點 X 座標 ＋1mm">＋</button>
+          </span>
+          <span class="node-axis-control">
+            <span class="pos-label">Y</span>
+            <button onclick="window.blocks.changeNodePos('y',-1)" title="接點 Y 座標 −1mm">−</button>
+            <span class="pos-value"><span id="nodeYVal">0</span>mm</span>
+            <button onclick="window.blocks.changeNodePos('y',1)" title="接點 Y 座標 ＋1mm">＋</button>
+          </span>
         </div>
       </div>
-      <div class="servo-editor" id="servoEditor" style="display:none;">
+      <div class="inspector-panel servo-editor" id="servoEditor" style="display:none;">
         <span class="se-title">🟦 伺服角度</span>
         <div class="se-row">
           <span class="se-label">起始</span>
@@ -334,7 +441,7 @@
           <button class="le-step" onclick="window.blocks.changeServoAngle('end',15)" title="結束角 ＋15°">＋</button>
         </div>
       </div>
-      <div class="servo-editor" id="gearEditor" style="display:none;">
+      <div class="inspector-panel servo-editor" id="gearEditor" style="display:none;">
         <span class="se-title">⚙️ 齒輪</span>
         <div class="se-row">
           <span class="se-label">模數</span>
@@ -354,7 +461,7 @@
           <button class="clear-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除這對齒輪">🗑 刪除</button>
         </div>
       </div>
-      <div class="servo-editor" id="strokeEditor" style="display:none;">
+      <div class="inspector-panel servo-editor" id="strokeEditor" style="display:none;">
         <span class="se-title">🟢 活塞行程</span>
         <div class="se-row">
           <span class="se-label">起點</span>
@@ -369,7 +476,7 @@
           <button class="le-step" onclick="window.blocks.changeStroke('end',1)" title="行程終點 ＋1mm">＋</button>
         </div>
       </div>
-      <div class="power-menu" id="powerMenu" style="display:none;">
+      <div class="tool-menu power-menu" id="powerMenu" style="display:none;">
         <div class="pm-title">選擇動力來源</div>
         <button class="pm-opt" onclick="window.blocks.pickMotorType('tt')">
           <span class="pm-ico">🔴</span>
@@ -384,6 +491,18 @@
           <span class="pm-text"><b>線性致動器</b><small>沿滑軌直線推拉（放到滑塊上）</small></span>
         </button>
         <button class="pm-cancel" onclick="window.blocks.openPowerMenu()">取消</button>
+      </div>
+      <div class="tool-menu power-menu" id="linkMenu" style="display:none;">
+        <div class="pm-title">選擇桿件</div>
+        <button class="pm-opt" onclick="window.blocks.pickLinkTool('bar')">
+          <span class="pm-ico">🔵</span>
+          <span class="pm-text"><b>連桿</b><small>兩個孔，固定長度</small></span>
+        </button>
+        <button class="pm-opt" onclick="window.blocks.pickLinkTool('triangle')">
+          <span class="pm-ico">🔺</span>
+          <span class="pm-text"><b>三點桿</b><small>三個孔，做成剛性板</small></span>
+        </button>
+        <button class="pm-cancel" onclick="window.blocks.openLinkMenu()">取消</button>
       </div>
       <div id="view3d">
         <div class="view3d-hint">
@@ -402,6 +521,47 @@
       </div>
     </div>
   </div>
+
+  <div class="mobile-panel" aria-label="手機工具面板">
+    <div class="mobile-panel-section" data-panel="edit">
+      <span class="mobile-panel-title">編輯</span>
+      <button class="tool-btn" onclick="window.blocks.fitView()" title="置中畫布">⊡ 置中</button>
+      <button class="tool-btn" onclick="window.blocks.undo()" title="復原上一步">↩ 復原</button>
+      <button class="tool-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除選取零件">🗑 刪除選取</button>
+    </div>
+    <div class="mobile-panel-section" data-panel="view">
+      <span class="mobile-panel-title">視圖</span>
+      <button class="tool-btn" onclick="window.blocks.fitView()" title="置中畫布">⊡ 置中</button>
+      <button class="tool-btn" id="mobileBtn3d" onclick="window.blocks.toggle3D()" title="3D 預覽">3D 預覽</button>
+      <button class="tool-btn" id="mobileBtnFrameHoles" onclick="window.blocks.toggleFrameHoles()" title="顯示 / 隱藏 LEGO 機架孔位">孔位</button>
+      <button class="tool-btn" id="mobileBtnFrameLock" onclick="window.blocks.toggleFrameLock()" title="拖曳固定孔與機架時吸附到 8mm LEGO 孔距">鎖孔距</button>
+    </div>
+    <div class="mobile-panel-section" data-panel="project">
+      <span class="mobile-panel-title">專案</span>
+      <button class="tool-btn" onclick="window.blocks.saveFile()" title="存成檔案">💾 存檔</button>
+      <button class="tool-btn" onclick="window.blocks.openFile()" title="開啟檔案">📂 開啟</button>
+      <button class="tool-btn" onclick="window.blocks.share()" title="複製分享連結">🔗 分享</button>
+      <select class="example-select" onchange="window.blocks.loadExample(this.value)" title="載入課堂範例">
+        <option value="">📘 範例</option>
+      </select>
+      <a class="home-btn" href="mechanism.html">回機構工具</a>
+    </div>
+  </div>
+
+  <nav class="mobile-tabs" aria-label="手機模式切換">
+    <button class="mobile-tab active" data-tab="build" onclick="window.blocks.setMobilePanel('build')" type="button">
+      <span class="mt-ico">▦</span><span>建構</span>
+    </button>
+    <button class="mobile-tab" data-tab="edit" onclick="window.blocks.setMobilePanel('edit')" type="button">
+      <span class="mt-ico">✎</span><span>編輯</span>
+    </button>
+    <button class="mobile-tab" data-tab="view" onclick="window.blocks.setMobilePanel('view')" type="button">
+      <span class="mt-ico">◉</span><span>視圖</span>
+    </button>
+    <button class="mobile-tab" data-tab="project" onclick="window.blocks.setMobilePanel('project')" type="button">
+      <span class="mt-ico">☰</span><span>專案</span>
+    </button>
+  </nav>
 
   <script type="module" src="js/blocks/app.js?v=20240128_14"></script>
 </body>

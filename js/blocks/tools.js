@@ -9,7 +9,7 @@
  * 節點合併取自 model.js。其餘跨檔 helper（app 的控制器動作與查詢）用 init() 注入，
  * 避免與 app 互相 import：
  *   svg / draw / rebuild / pushUndo / pause / cancelMotorMode / deselectLink /
- *   selectLink / selectSlider / setBanner / clearBanner / worldFromEvent /
+ *   selectLink / selectTriangle / selectSlider / setBanner / clearBanner / worldFromEvent /
  *   pointCoords / nearestDisplayToPoint / snapWorld / mobilePrompt / promptText
  */
 
@@ -29,12 +29,12 @@ const snapLego = v => Math.max(LEGO_STEP, Math.round((Number(v) || 0) / LEGO_STE
 const roundMm = v => Math.round(Number(v) || 0);
 
 // ---- 注入的外部依賴（由 app 在啟動時提供）----
-let svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectSlider,
+let svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
     setBanner, clearBanner, worldFromEvent, pointCoords, nearestDisplayToPoint, snapWorld,
     mobilePrompt, promptText;
 
 export function init(deps) {
-  ({ svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectSlider,
+  ({ svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
      setBanner, clearBanner, worldFromEvent, pointCoords, nearestDisplayToPoint, snapWorld,
      mobilePrompt, promptText } = deps);
 }
@@ -338,9 +338,9 @@ export function finishDrawTriangle(e) {
   S.topo.params[gParam] = dist(pts[0], pts[1]);
   S.topo.params[r1Param] = picked.r1 || dist(pts[0], pts[2]);
   S.topo.params[r2Param] = picked.r2 || dist(pts[1], pts[2]);
-  S.selectedNodeId = pts[2].id;
   exitDrawTriangle();
   rebuild(); draw();
+  if (selectTriangle) selectTriangle('Tri' + n);
 }
 export function finishDrawLink(e) {
   if (!S.drawStart) return;
