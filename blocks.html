@@ -27,6 +27,11 @@
     .app-status[data-state="ready"] { background: #e8f8ef; color: #117a45; }
     .app-status[data-state="warn"] { background: #fff7dd; color: #8a6500; }
     .app-status[data-state="error"] { background: #fff0f0; color: #b33b32; }
+    .task-btn {
+      border: 1px solid #d7e4f7; background: #eef6ff; color: #2c5282; border-radius: 999px;
+      padding: 7px 12px; font-size: 13px; font-weight: 800; cursor: pointer; white-space: nowrap;
+    }
+    .task-btn:hover { background: #e3efff; border-color: #9fc3f5; }
     .home-btn { text-decoration: none; color: #34495e; background: #eef2f7; padding: 8px 14px;
       border-radius: 20px; font-size: 14px; font-weight: 600; }
     .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -149,6 +154,22 @@
     .tool-menu .pm-text small, .power-menu .pm-text small { font-size: 12px; color: #8a95a1; }
     .tool-menu .pm-cancel, .power-menu .pm-cancel { border: none; background: transparent; color: #8a95a1; font-size: 13px;
       cursor: pointer; padding: 4px; }
+    .task-menu {
+      position: fixed; top: 66px; left: 50%; transform: translateX(-50%);
+      z-index: 12; display: flex; flex-direction: column; gap: 8px;
+      width: min(360px, calc(100% - 32px)); background: #fff; border: 1px solid #e6e9f0;
+      border-radius: 8px; padding: 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+    }
+    .task-menu[style*="flex"] { display: flex !important; }
+    .task-menu-title { font-size: 13px; font-weight: 800; color: #60717d; }
+    .task-card {
+      display: flex; align-items: center; gap: 10px; min-height: 42px;
+      border: 1px solid #d8dee6; background: #fff; color: #34495e; border-radius: 8px;
+      padding: 9px 11px; text-align: left; font-size: 14px; font-weight: 800; cursor: pointer;
+    }
+    .task-card:hover { background: #f6f8fb; border-color: #bcd3f0; }
+    .task-card .task-ico { font-size: 20px; line-height: 1; }
+    .task-close { border: none; background: transparent; color: #8a95a1; font-size: 13px; cursor: pointer; padding: 4px; }
     /* 3D 預覽覆蓋層 */
     #view3d { position: absolute; inset: 0; display: none; background: #0f1420; }
     #view3d canvas { display: block; width: 100%; height: 100%; }
@@ -184,7 +205,8 @@
       header { flex-wrap: wrap; gap: 8px; }
       .appbar { padding: 10px 14px; }
       .appbar h1 { font-size: 18px; }
-      .app-status { margin: 0 0 0 auto; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+      .app-status { margin: 0 0 0 auto; max-width: 118px; overflow: hidden; text-overflow: ellipsis; }
+      .task-btn { padding: 6px 9px; font-size: 12px; }
       .project-actions { display: none; }
       .tool-btn { padding: 7px 10px; font-size: 13px; }
       .stage { flex-direction: column-reverse; }
@@ -234,6 +256,10 @@
       .mobile-open-menu[style*="flex"] { display: flex !important; }
       .mobile-open-title { font-size: 13px; font-weight: 800; color: #60717d; }
       .mobile-open-divider { height: 1px; background: #edf1f6; margin: 2px 0; }
+      .task-menu {
+        top: auto; left: 12px; right: 12px; bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+        width: auto; transform: none; box-shadow: 0 -10px 30px rgba(44,62,80,0.18);
+      }
       .mobile-tabs {
         display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;
         background: #fff; border-top: 1px solid #e6e9f0;
@@ -314,6 +340,7 @@
   <header class="appbar">
     <h1>🧩 機構積木</h1>
     <div class="app-status" id="mechanismStatus" data-state="idle">尚未建立機構</div>
+    <button class="task-btn" onclick="window.blocks.openTaskMenu()" title="開啟任務">任務</button>
     <div class="toolbar project-actions">
       <button class="tool-btn" id="btnUndo" onclick="window.blocks.undo()" disabled title="復原上一步">↩ 復原</button>
       <button class="tool-btn" onclick="window.blocks.saveFile()" title="存成檔案">💾 存檔</button>
@@ -587,6 +614,20 @@
     <div class="mobile-open-title">範例</div>
     <div class="mobile-example-list" id="mobileExampleList" aria-label="課堂範例"></div>
     <button class="tool-btn" onclick="window.blocks.openMobileOpenMenu()">取消</button>
+  </div>
+
+  <div class="task-menu" id="taskMenu" style="display:none;" aria-label="任務">
+    <div class="task-menu-title">任務</div>
+    <button class="task-card" onclick="window.blocks.taskOpenExamples()" type="button">
+      <span class="task-ico">📘</span><span>開範例</span>
+    </button>
+    <button class="task-card" onclick="window.blocks.taskStartLink()" type="button">
+      <span class="task-ico">🔵</span><span>畫連桿</span>
+    </button>
+    <button class="task-card" onclick="window.blocks.taskAddPower()" type="button">
+      <span class="task-ico">⚡</span><span>加動力</span>
+    </button>
+    <button class="task-close" onclick="window.blocks.openTaskMenu()" type="button">關閉</button>
   </div>
 
   <nav class="mobile-tabs" aria-label="手機模式切換">

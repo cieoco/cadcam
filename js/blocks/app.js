@@ -1548,6 +1548,40 @@ function openMobileFile() {
   openFile();
 }
 
+function taskMenuEl() { return document.getElementById('taskMenu'); }
+function closeTaskMenu() {
+  const m = taskMenuEl();
+  if (m) m.style.display = 'none';
+}
+function openTaskMenu() {
+  const m = taskMenuEl();
+  if (!m) return;
+  closeMobileOpenMenu();
+  closeLinkMenu();
+  const powerMenu = powerMenuEl();
+  if (powerMenu) powerMenu.style.display = 'none';
+  m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
+}
+function taskOpenExamples() {
+  closeTaskMenu();
+  if (mobilePrompt()) {
+    setMobilePanel('project');
+    openMobileOpenMenu();
+    return;
+  }
+  const select = document.getElementById('exampleSelect');
+  if (select) select.focus();
+  transient('請從上方範例選單選擇');
+}
+function taskStartLink() {
+  closeTaskMenu();
+  Tools.startDrawLink();
+}
+function taskAddPower() {
+  closeTaskMenu();
+  openPowerMenu();
+}
+
 // 切換 3D 唯讀預覽：首次開啟才動態載入 THREE viewer。
 async function toggle3D() {
   view3DActive = !view3DActive;
@@ -2896,5 +2930,5 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: Tools.startDrawTriangle, clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, openTaskMenu, taskOpenExamples, taskStartLink, taskAddPower, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: Tools.startDrawTriangle, clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();
