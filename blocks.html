@@ -31,7 +31,7 @@
     .tool-btn:disabled { opacity: .45; cursor: default; }
     .tool-btn.active { background: #eaf2ff; border-color: #7fb0ff; color: #2c5282; font-weight: 800; }
     .stage, .workspace { flex: 1; display: flex; min-height: 0; }
-    .mobile-panel, .mobile-tabs { display: none; }
+    .mobile-panel, .mobile-tabs, .mobile-example-list, .mobile-open-menu { display: none; }
 
     /* 零件盤 */
     .tray { width: 188px; background: #fff; border-right: 1px solid #e6e9f0; padding: 14px 10px;
@@ -206,6 +206,26 @@
       .mobile-panel .tool-btn, .mobile-panel .home-btn, .mobile-panel .example-select {
         min-height: 38px; border-radius: 8px; white-space: nowrap;
       }
+      .mobile-panel-section[data-panel="project"] {
+        flex-wrap: wrap; align-items: stretch; max-height: min(42vh, 320px); overflow-y: auto;
+      }
+      .mobile-panel-section[data-panel="project"] .example-select { display: none; }
+      .mobile-example-list {
+        display: grid; grid-template-columns: 1fr; gap: 6px; max-height: 230px; overflow-y: auto;
+      }
+      .mobile-example-btn {
+        min-height: 42px; border: 1px solid #d8dee6; background: #fff; border-radius: 8px;
+        padding: 8px; text-align: left; font-size: 12px; font-weight: 800; color: #34495e;
+      }
+      .mobile-example-btn:active { background: #eaf2ff; border-color: #7fb0ff; color: #2c5282; }
+      .mobile-open-menu {
+        position: fixed; left: 12px; right: 12px; bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+        z-index: 10; background: #fff; border: 1px solid #e6e9f0; border-radius: 8px;
+        box-shadow: 0 -10px 30px rgba(44,62,80,0.18); padding: 10px; gap: 8px; flex-direction: column;
+      }
+      .mobile-open-menu[style*="flex"] { display: flex !important; }
+      .mobile-open-title { font-size: 13px; font-weight: 800; color: #60717d; }
+      .mobile-open-divider { height: 1px; background: #edf1f6; margin: 2px 0; }
       .mobile-tabs {
         display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;
         background: #fff; border-top: 1px solid #e6e9f0;
@@ -544,14 +564,20 @@
     <div class="mobile-panel-section" data-panel="project">
       <span class="mobile-panel-title">專案</span>
       <button class="tool-btn" onclick="window.blocks.saveFile()" title="存成檔案">💾 存檔</button>
-      <button class="tool-btn" onclick="window.blocks.openFile()" title="開啟檔案">📂 開啟</button>
+      <button class="tool-btn" onclick="window.blocks.openMobileOpenMenu()" title="開啟舊檔或課堂範例">📂 開啟</button>
       <button class="tool-btn" onclick="window.blocks.share()" title="複製分享連結">🔗 分享</button>
       <button class="tool-btn danger-btn" onclick="window.blocks.confirmClearAll()" title="清空目前全部零件">🗑 清空全部</button>
-      <select class="example-select" onchange="window.blocks.loadExample(this.value)" title="載入課堂範例">
-        <option value="">📘 範例</option>
-      </select>
       <a class="home-btn" href="mechanism.html">回機構工具</a>
     </div>
+  </div>
+
+  <div class="mobile-open-menu" id="mobileOpenMenu" style="display:none;" aria-label="開啟">
+    <div class="mobile-open-title">開啟</div>
+    <button class="tool-btn" onclick="window.blocks.openMobileFile()" title="從檔案開啟自己的機構">📂 開啟舊檔</button>
+    <div class="mobile-open-divider"></div>
+    <div class="mobile-open-title">範例</div>
+    <div class="mobile-example-list" id="mobileExampleList" aria-label="課堂範例"></div>
+    <button class="tool-btn" onclick="window.blocks.openMobileOpenMenu()">取消</button>
   </div>
 
   <nav class="mobile-tabs" aria-label="手機模式切換">

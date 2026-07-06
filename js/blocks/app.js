@@ -115,13 +115,24 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
 
 function populateExamples() {
   const sel = document.getElementById('exampleSelect');
-  if (!sel) return;
+  const mobileList = document.getElementById('mobileExampleList');
   BLOCK_EXAMPLES.forEach(example => {
-    const opt = document.createElement('option');
-    opt.value = example.id;
-    opt.textContent = example.title;
-    opt.title = example.note || '';
-    sel.appendChild(opt);
+    if (sel) {
+      const opt = document.createElement('option');
+      opt.value = example.id;
+      opt.textContent = example.title;
+      opt.title = example.note || '';
+      sel.appendChild(opt);
+    }
+    if (mobileList) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mobile-example-btn';
+      btn.textContent = example.title;
+      btn.title = example.note || '';
+      btn.addEventListener('click', () => loadExample(example.id));
+      mobileList.appendChild(btn);
+    }
   });
 }
 
@@ -137,6 +148,8 @@ function loadExample(id) {
   applySnapshot(norm);
   transient('📘 已載入：' + example.title);
   if (sel) sel.value = '';
+  closeMobileOpenMenu();
+  if (mobilePrompt()) setMobilePanel('build');
 }
 
 // ---- 綁定層：把純模組綁到本檔狀態，維持原呼叫端不變 ----
@@ -1471,6 +1484,7 @@ function setMobilePanel(panel) {
   const next = ['build', 'edit', 'view', 'project'].includes(panel) ? panel : 'build';
   document.body.dataset.mobilePanel = next;
   if (next !== 'edit') closeMobileEditPanel();
+  if (next !== 'project') closeMobileOpenMenu();
   syncMobilePanelTabs(next);
 }
 
@@ -1482,6 +1496,21 @@ function openMobileEditPanel() {
 
 function closeMobileEditPanel() {
   delete document.body.dataset.mobileEditor;
+}
+
+function mobileOpenMenuEl() { return document.getElementById('mobileOpenMenu'); }
+function openMobileOpenMenu() {
+  const m = mobileOpenMenuEl();
+  if (!m) return;
+  m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
+}
+function closeMobileOpenMenu() {
+  const m = mobileOpenMenuEl();
+  if (m) m.style.display = 'none';
+}
+function openMobileFile() {
+  closeMobileOpenMenu();
+  openFile();
 }
 
 // 切換 3D 唯讀預覽：首次開啟才動態載入 THREE viewer。
@@ -2832,5 +2861,5 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: Tools.startDrawTriangle, clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: Tools.startDrawTriangle, clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
 init();
