@@ -228,6 +228,11 @@
       .controls { bottom: 8px; gap: 5px; padding: 5px; max-width: calc(100% - 16px); }
       .play-btn { width: 36px; height: 36px; font-size: 16px; }
       .controls .clear-btn { width: 32px; height: 32px; font-size: 12px; }
+      .controls #btnFitView,
+      .controls #btnFrameHoles,
+      .controls #btnFrameLock,
+      .controls #btn3d,
+      .controls #btnClearAll { display: none; }
       .ctrl-sub { min-width: 36px; padding: 0 5px; font-size: 11px; }
       body[data-mobile-panel="edit"] .inspector-panel {
         position: fixed; left: 8px; right: auto; bottom: calc(56px + env(safe-area-inset-bottom, 0px));
@@ -513,11 +518,11 @@
       <div class="controls">
         <button class="play-btn" id="playBtn" onclick="window.blocks.togglePlay()" title="播放 / 暫停">▶</button>
         <div class="ctrl-sub" title="目前角度"><span id="thetaVal">0</span>°</div>
-        <button class="clear-btn" onclick="window.blocks.fitView()" title="置中">⊡</button>
+        <button class="clear-btn" id="btnFitView" onclick="window.blocks.fitView()" title="置中">⊡</button>
         <button class="clear-btn active" id="btnFrameHoles" onclick="window.blocks.toggleFrameHoles()" title="顯示 / 隱藏 LEGO 機架孔位">孔</button>
         <button class="clear-btn" id="btnFrameLock" onclick="window.blocks.toggleFrameLock()" title="拖曳固定孔與機架時吸附到 8mm LEGO 孔距">鎖</button>
         <button class="clear-btn" id="btn3d" onclick="window.blocks.toggle3D()" title="3D 預覽">3D</button>
-        <button class="clear-btn" onclick="window.blocks.clearAll()" title="清空">🗑</button>
+        <button class="clear-btn" id="btnClearAll" onclick="window.blocks.clearAll()" title="清空">🗑</button>
       </div>
     </div>
   </div>
@@ -541,6 +546,7 @@
       <button class="tool-btn" onclick="window.blocks.saveFile()" title="存成檔案">💾 存檔</button>
       <button class="tool-btn" onclick="window.blocks.openFile()" title="開啟檔案">📂 開啟</button>
       <button class="tool-btn" onclick="window.blocks.share()" title="複製分享連結">🔗 分享</button>
+      <button class="tool-btn danger-btn" onclick="window.blocks.confirmClearAll()" title="清空目前全部零件">🗑 清空全部</button>
       <select class="example-select" onchange="window.blocks.loadExample(this.value)" title="載入課堂範例">
         <option value="">📘 範例</option>
       </select>
