@@ -394,6 +394,38 @@ function solveFrame() {
   return { pts, sol };
 }
 
+function hasDriveSource() {
+  return S.comps.some(c => c && c.isInput) || Model.motorPointIds(S.comps).size > 0;
+}
+
+function gearMeshHasWarning() {
+  return S.comps.some(c => c && c.type === 'gear' && gearMeshOff(c));
+}
+
+function updateMechanismStatus(sol = null) {
+  const el = document.getElementById('mechanismStatus');
+  if (!el) return;
+  let state = 'idle';
+  let text = '尚未建立機構';
+  if (S.comps.length) {
+    if (gearMeshHasWarning()) {
+      state = 'error';
+      text = '齒輪未嚙合';
+    } else if (!hasDriveSource()) {
+      state = 'warn';
+      text = '缺少動力';
+    } else if (S.compiled && sol === null && (S.compiled.steps || []).length) {
+      state = 'error';
+      text = '機構可能卡住';
+    } else {
+      state = 'ready';
+      text = '可播放';
+    }
+  }
+  el.dataset.state = state;
+  el.textContent = text;
+}
+
 // 算馬達本體的朝向（度）：對準接在中心、非曲柄的那根桿；沒有就朝滑軌另一固定孔；再沒有才朝最近地錨。
 // 從 draw() 抽出，讓播放更新器每幀用新 pts 重算同一個角度（邏輯與原本一字不差）。
 function computeMotorRotDeg(id, pts, groundIds) {
@@ -1042,6 +1074,7 @@ function draw() {
   recountBanner = null;
   drawGround();   // app 層機架連接線（固定銷不足時 fallback 到 Render.drawGroundBaseline）
   if (!S.compiled || !S.comps.length) {
+    updateMechanismStatus(null);
     updateSolveBanner(null, 0);
     Tools.drawDrawPreview();   // 空畫布也要顯示正在拉出的第一根連桿
     Tools.drawTrianglePreview();
@@ -1049,6 +1082,7 @@ function draw() {
   }
 
   const { pts, sol } = solveFrame();
+  updateMechanismStatus(sol);
 
   const groundIds = new Set((S.compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
   const motorCenterIds = new Set((S.compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
@@ -1449,6 +1483,7 @@ function renderFrame() {
     drawSliders(pts, sliderLayer);
   }
   if (recountBanner) recountBanner(pts, sol);
+  updateMechanismStatus(sol);
   // 3D 鏡像：沿用重建時算好的結構，只換這一幀的 pts
   if (view3DActive && lastModelInputs) {
     const cams = (lastModelInputs.cams || []).map(c => ({ ...c, thetaDeg: S.theta }));
