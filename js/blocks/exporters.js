@@ -179,6 +179,7 @@ function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
   const maxLineDist = nodes.length <= 2 ? 0 : Math.max(...nodes.map(p => lineDistance(p, nodes[0], nodes[nodes.length - 1])));
   const isBarLike = nodes.length === 2 || maxLineDist < 6;
   const outlines = [];
+  const mountOutlines = [];
   const holes = [];
   const addHole = (x, y, r, layer = 'HOLE') => {
     const q = { x: round(x), y: round(y), r: round(r), layer };
@@ -220,11 +221,22 @@ function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
     const m = mount.settings || {};
     const shaftR = (Number(m.shaftDiameterMm) || 6.1) / 2;
     const screwR = (Number(m.screwDiameterMm) || 3) / 2;
-    const locatorR = (Number(m.locatorDiameterMm) || 2.8) / 2;
-    const screwX = Number(m.screwOffsetXMm) || -31.75;
+    const locatorR = (Number(m.locatorDiameterMm) || 1.9) / 2;
+    const screwX = Number(m.screwOffsetXMm) || 20.6;
     const screwSpacing = Number(m.screwSpacingMm) || 17.3;
-    const locatorX = Number(m.locatorOffsetXMm) || 11.28;
+    const locatorX = Number(m.locatorOffsetXMm) || 11.18;
     const locatorY = Number(m.locatorOffsetYMm) || 0;
+    const margin = 5;
+    const minX = Math.min(screwX, 0, locatorX) - Math.max(screwR, shaftR, locatorR, margin);
+    const maxX = Math.max(screwX, 0, locatorX) + Math.max(screwR, shaftR, locatorR, margin);
+    const minY = Math.min(-screwSpacing / 2, 0, locatorY) - Math.max(screwR, shaftR, locatorR, margin);
+    const maxY = Math.max(screwSpacing / 2, 0, locatorY) + Math.max(screwR, shaftR, locatorR, margin);
+    mountOutlines.push([
+      local(minX, minY),
+      local(maxX, minY),
+      local(maxX, maxY),
+      local(minX, maxY)
+    ]);
     let p = local(0, 0); addHole(p.x, p.y, shaftR, 'TT_SHAFT');
     p = local(screwX, screwSpacing / 2); addHole(p.x, p.y, screwR, 'TT_SCREW');
     p = local(screwX, -screwSpacing / 2); addHole(p.x, p.y, screwR, 'TT_SCREW');
@@ -236,6 +248,12 @@ function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
     const overlapsMotorHole = holes.some((h, j) =>
       j !== i && h.layer.startsWith('TT_') && Math.hypot(h.x - holes[i].x, h.y - holes[i].y) < 0.05);
     if (overlapsMotorHole) holes.splice(i, 1);
+  }
+
+  if (mountOutlines.length) {
+    const merged = hull([...outlines.flat(), ...mountOutlines.flat()]);
+    outlines.length = 0;
+    outlines.push(merged);
   }
 
   return { outlines, holes };
