@@ -222,9 +222,9 @@ function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
     const shaftR = (Number(m.shaftDiameterMm) || 6.1) / 2;
     const screwR = (Number(m.screwDiameterMm) || 3) / 2;
     const locatorR = (Number(m.locatorDiameterMm) || 1.9) / 2;
-    const screwX = Number(m.screwOffsetXMm) || 20.6;
+    const screwX = Number(m.screwOffsetXMm) || -20.6;
     const screwSpacing = Number(m.screwSpacingMm) || 17.3;
-    const locatorX = Number(m.locatorOffsetXMm) || 11.18;
+    const locatorX = Number(m.locatorOffsetXMm) || -11.18;
     const locatorY = Number(m.locatorOffsetYMm) || 0;
     const margin = 5;
     const minX = Math.min(screwX, 0, locatorX) - Math.max(screwR, shaftR, locatorR, margin);

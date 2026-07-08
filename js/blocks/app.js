@@ -43,14 +43,14 @@ const GEAR_MODULE = 6;         // 齒輪模數（mm）：所有齒輪共用，�
 const snapLego = v => Math.max(LEGO_STEP, Math.round((Number(v) || 0) / LEGO_STEP) * LEGO_STEP);
 const roundMm = v => Math.round(Number(v) || 0);
 const EXPORT_SETTINGS_KEY = 'cadcam.blocks.exportSettings';
-const TT_MOUNT_SETTINGS_KEY = 'cadcam.blocks.ttMountSettings.v4';
+const TT_MOUNT_SETTINGS_KEY = 'cadcam.blocks.ttMountSettings.v5';
 const TT_MOUNT_DEFAULTS = {
   shaftDiameterMm: 6.1,
   screwDiameterMm: 3,
-  screwOffsetXMm: 20.6,
+  screwOffsetXMm: -20.6,
   screwSpacingMm: 17.3,
   locatorDiameterMm: 1.9,
-  locatorOffsetXMm: 11.18,
+  locatorOffsetXMm: -11.18,
   locatorOffsetYMm: 0
 };
 
@@ -1746,7 +1746,7 @@ function drawTtMotorMountHoles(motorIds, motorMounts, pts) {
     if (motorTypeForCenter(id) !== 'tt') return;
     const p = pts[id];
     if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
-    const rotDeg = ttMountRotDegForCenter(id, pts, motorMounts.get(id));
+    const rotDeg = ttMountPatternRotDegForCenter(id, pts, motorMounts.get(id));
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('transform', `translate(${TX(p.x)} ${TY(p.y)}) rotate(${rotDeg})`);
     const title = document.createElementNS(SVG_NS, 'title');
@@ -3004,17 +3004,10 @@ function setTtMountSetting(key, value) {
   syncTtMountSettingInputs();
   draw();
 }
-function ttMountRotDegForCenter(id, pts, mount = null) {
-  const center = pts && pts[id];
-  const bar = motorBarForCenter(id);
-  const otherId = bar && bar.p1 && bar.p2 ? (bar.p1.id === id ? bar.p2.id : bar.p1.id) : null;
-  const other = otherId && pts && pts[otherId];
-  if (center && other && Number.isFinite(center.x) && Number.isFinite(other.x)) {
-    const dx = other.x - center.x;
-    const dy = other.y - center.y;
-    if (Math.hypot(dx, dy) > 1e-6) return Math.atan2(-dy, dx) * 180 / Math.PI;
-  }
-  return mount ? mount.rotDeg : computeMotorRotDeg(id, pts || {}, new Set());
+function ttMountPatternRotDegForCenter(id, pts, mount = null) {
+  // drawTTMotor's local long axis is +Y, while TT mount/CAD coordinates use +X as the motor long axis.
+  const visualRotDeg = mount ? mount.rotDeg : computeMotorRotDeg(id, pts || {}, new Set());
+  return visualRotDeg - 90;
 }
 function ttFrameExportMounts() {
   const inputs = lastModelInputs || {};
@@ -3031,7 +3024,7 @@ function ttFrameExportMounts() {
     const mount = motorMounts.get(id);
     mounts.push({
       center,
-      rotDeg: ttMountRotDegForCenter(id, pts, mount),
+      rotDeg: ttMountPatternRotDegForCenter(id, pts, mount),
       settings
     });
   });
