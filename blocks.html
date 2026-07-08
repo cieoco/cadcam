@@ -42,6 +42,24 @@
     .tool-btn:hover { background: #f6f8fb; }
     .tool-btn:disabled { opacity: .45; cursor: default; }
     .tool-btn.active { background: #eaf2ff; border-color: #7fb0ff; color: #2c5282; font-weight: 800; }
+    .export-settings { display: flex; align-items: center; gap: 6px; padding: 4px 6px;
+      border: 1px solid #e6e9f0; border-radius: 8px; background: #fff; }
+    .export-field { display: flex; align-items: center; gap: 4px; color: #60717d; font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .export-field input { width: 56px; border: 1px solid #d8dee6; border-radius: 6px; padding: 5px 6px;
+      color: #2c3e50; font: inherit; font-weight: 700; }
+    .mount-settings { position: relative; border: 1px solid #e6e9f0; border-radius: 8px; background: #fff;
+      color: #60717d; font-size: 12px; font-weight: 800; }
+    .mount-settings summary { cursor: pointer; list-style: none; padding: 8px 10px; white-space: nowrap; }
+    .mount-settings summary::-webkit-details-marker { display: none; }
+    .mount-settings summary::after { content: "v"; margin-left: 6px; color: #8a95a1; }
+    .mount-settings[open] summary::after { content: "^"; }
+    .mount-grid { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20;
+      display: grid; grid-template-columns: repeat(2, max-content); gap: 6px 8px;
+      padding: 10px; border: 1px solid #d8dee6; border-radius: 8px; background: #fff;
+      box-shadow: 0 12px 28px rgba(44,62,80,0.16); }
+    .mount-field { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .mount-field input { width: 62px; border: 1px solid #d8dee6; border-radius: 6px; padding: 5px 6px;
+      color: #2c3e50; font: inherit; font-weight: 700; }
     .stage, .workspace { flex: 1; display: flex; min-height: 0; }
     .mobile-panel, .mobile-tabs, .mobile-example-list, .mobile-open-menu { display: none; }
 
@@ -236,6 +254,13 @@
       .mobile-panel .tool-btn, .mobile-panel .home-btn, .mobile-panel .example-select {
         min-height: 38px; border-radius: 8px; white-space: nowrap;
       }
+      .mobile-panel .export-settings { flex: 1 1 100%; justify-content: flex-start; flex-wrap: wrap; }
+      .mobile-panel .mount-settings { flex: 1 1 100%; }
+      .mobile-panel .mount-grid { position: static; grid-template-columns: repeat(2, minmax(0, 1fr));
+        box-shadow: none; border-top: 1px solid #edf1f6; border-left: none; border-right: none; border-bottom: none;
+        border-radius: 0; margin: 0 8px 8px; padding: 8px 0 0; }
+      .mobile-panel .mount-field { min-width: 0; justify-content: space-between; }
+      .mobile-panel .mount-field input { width: 68px; }
       .mobile-panel-section[data-panel="project"] {
         flex-wrap: wrap; align-items: stretch; max-height: min(42vh, 320px); overflow-y: auto;
       }
@@ -344,6 +369,28 @@
     <div class="toolbar project-actions">
       <button class="tool-btn" id="btnUndo" onclick="window.blocks.undo()" disabled title="復原上一步">↩ 復原</button>
       <button class="tool-btn" onclick="window.blocks.saveFile()" title="存成檔案">💾 存檔</button>
+      <span class="export-settings" aria-label="匯出尺寸">
+        <label class="export-field">桿寬mm
+          <input data-export-setting="barWidthMm" type="number" min="2" max="120" step="0.5" oninput="window.blocks.setExportSetting('barWidthMm', this.value)" title="匯出桿件寬度 mm">
+        </label>
+        <label class="export-field">孔徑mm
+          <input data-export-setting="holeDiameterMm" type="number" min="0.5" max="119" step="0.5" oninput="window.blocks.setExportSetting('holeDiameterMm', this.value)" title="匯出孔直徑 mm">
+        </label>
+      </span>
+      <details class="mount-settings">
+        <summary>TT固定孔</summary>
+        <div class="mount-grid">
+          <label class="mount-field">軸孔<input data-tt-mount-setting="shaftDiameterMm" type="number" min="0.5" max="30" step="0.1" onchange="window.blocks.setTtMountSetting('shaftDiameterMm', this.value)" title="馬達輸出軸孔直徑 mm"></label>
+          <label class="mount-field">螺絲孔<input data-tt-mount-setting="screwDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('screwDiameterMm', this.value)" title="固定螺絲孔直徑 mm"></label>
+          <label class="mount-field">螺絲X<input data-tt-mount-setting="screwOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('screwOffsetXMm', this.value)" title="螺絲孔中心相對輸出軸 X mm"></label>
+          <label class="mount-field">螺絲距<input data-tt-mount-setting="screwSpacingMm" type="number" min="0" max="80" step="0.1" onchange="window.blocks.setTtMountSetting('screwSpacingMm', this.value)" title="上下兩螺絲孔中心距 mm"></label>
+          <label class="mount-field">定位孔<input data-tt-mount-setting="locatorDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('locatorDiameterMm', this.value)" title="定位孔直徑 mm"></label>
+          <label class="mount-field">定位X<input data-tt-mount-setting="locatorOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetXMm', this.value)" title="定位孔相對輸出軸 X mm"></label>
+          <label class="mount-field">定位Y<input data-tt-mount-setting="locatorOffsetYMm" type="number" min="-80" max="80" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetYMm', this.value)" title="定位孔相對輸出軸 Y mm"></label>
+        </div>
+      </details>
+      <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>
+      <button class="tool-btn" onclick="window.blocks.exportLinksDxf()" title="逐一匯出所畫桿件為 DXF">匯出 DXF</button>
       <button class="tool-btn" onclick="window.blocks.openFile()" title="開啟檔案">📂 開啟</button>
       <button class="tool-btn" onclick="window.blocks.share()" title="複製分享連結，貼給別人就能打開">🔗 分享</button>
       <select class="example-select" id="exampleSelect" onchange="window.blocks.loadExample(this.value)" title="載入課堂範例">
@@ -600,6 +647,28 @@
     <div class="mobile-panel-section" data-panel="project">
       <span class="mobile-panel-title">專案</span>
       <button class="tool-btn" onclick="window.blocks.saveFile()" title="存成檔案">💾 存檔</button>
+      <span class="export-settings" aria-label="匯出尺寸">
+        <label class="export-field">桿寬mm
+          <input data-export-setting="barWidthMm" type="number" min="2" max="120" step="0.5" oninput="window.blocks.setExportSetting('barWidthMm', this.value)" title="匯出桿件寬度 mm">
+        </label>
+        <label class="export-field">孔徑mm
+          <input data-export-setting="holeDiameterMm" type="number" min="0.5" max="119" step="0.5" oninput="window.blocks.setExportSetting('holeDiameterMm', this.value)" title="匯出孔直徑 mm">
+        </label>
+      </span>
+      <details class="mount-settings">
+        <summary>TT固定孔</summary>
+        <div class="mount-grid">
+          <label class="mount-field">軸孔<input data-tt-mount-setting="shaftDiameterMm" type="number" min="0.5" max="30" step="0.1" onchange="window.blocks.setTtMountSetting('shaftDiameterMm', this.value)" title="馬達輸出軸孔直徑 mm"></label>
+          <label class="mount-field">螺絲孔<input data-tt-mount-setting="screwDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('screwDiameterMm', this.value)" title="固定螺絲孔直徑 mm"></label>
+          <label class="mount-field">螺絲X<input data-tt-mount-setting="screwOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('screwOffsetXMm', this.value)" title="螺絲孔中心相對輸出軸 X mm"></label>
+          <label class="mount-field">螺絲距<input data-tt-mount-setting="screwSpacingMm" type="number" min="0" max="80" step="0.1" onchange="window.blocks.setTtMountSetting('screwSpacingMm', this.value)" title="上下兩螺絲孔中心距 mm"></label>
+          <label class="mount-field">定位孔<input data-tt-mount-setting="locatorDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('locatorDiameterMm', this.value)" title="定位孔直徑 mm"></label>
+          <label class="mount-field">定位X<input data-tt-mount-setting="locatorOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetXMm', this.value)" title="定位孔相對輸出軸 X mm"></label>
+          <label class="mount-field">定位Y<input data-tt-mount-setting="locatorOffsetYMm" type="number" min="-80" max="80" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetYMm', this.value)" title="定位孔相對輸出軸 Y mm"></label>
+        </div>
+      </details>
+      <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>
+      <button class="tool-btn" onclick="window.blocks.exportLinksDxf()" title="逐一匯出所畫桿件為 DXF">匯出 DXF</button>
       <button class="tool-btn" onclick="window.blocks.openMobileOpenMenu()" title="開啟舊檔或課堂範例">📂 開啟</button>
       <button class="tool-btn" onclick="window.blocks.share()" title="複製分享連結">🔗 分享</button>
       <button class="tool-btn danger-btn" onclick="window.blocks.confirmClearAll()" title="清空目前全部零件">🗑 清空全部</button>

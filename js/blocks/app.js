@@ -29,6 +29,7 @@ import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import * as Motion from './motion.js';
 import * as Store from './storage.js';
+import * as Exporters from './exporters.js';
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
 import { BLOCK_EXAMPLES, getExample } from './examples.js';
 
@@ -41,6 +42,17 @@ const LINK_DEFAULT_LEN = 88;   // 連桿預設長度（12 孔，對齊 8mm）
 const GEAR_MODULE = 6;         // 齒輪模數（mm）：所有齒輪共用，節圓半徑 R=teeth·module/2，故必定咬合
 const snapLego = v => Math.max(LEGO_STEP, Math.round((Number(v) || 0) / LEGO_STEP) * LEGO_STEP);
 const roundMm = v => Math.round(Number(v) || 0);
+const EXPORT_SETTINGS_KEY = 'cadcam.blocks.exportSettings';
+const TT_MOUNT_SETTINGS_KEY = 'cadcam.blocks.ttMountSettings';
+const TT_MOUNT_DEFAULTS = {
+  shaftDiameterMm: 6.1,
+  screwDiameterMm: 3,
+  screwOffsetXMm: -31.75,
+  screwSpacingMm: 17.3,
+  locatorDiameterMm: 2.8,
+  locatorOffsetXMm: 11.28,
+  locatorOffsetYMm: 0
+};
 
 // ---- 狀態 ----
 // 跨模組共享的編輯 / 機構 / 選取 / 拖曳 / 工具 / undo 狀態收在 state.js 的 S 物件，
@@ -1091,6 +1103,7 @@ function draw() {
   const modelMotorCenterIds = new Set(motorCenterIds);
   Model.motorPointIds(S.comps).forEach(id => modelMotorCenterIds.add(id));
   const motorMounts = buildMotorMounts(modelMotorCenterIds, groundIds);
+  drawTtMotorMountHoles(motorCenterIds, motorMounts, pts);
   drawTraceTrajectory(getTrajectoryData());
   drawManualTrace();
 
@@ -1709,6 +1722,46 @@ function drawFrameHole(x, y, used = false) {
   hole.setAttribute('stroke-opacity', used ? 0.95 : 0.72);
   hole.style.pointerEvents = 'none';
   svg.appendChild(hole);
+}
+
+function drawTtMotorMountHoles(motorIds, motorMounts, pts) {
+  if (!S.showFrameHoles) return;
+  const settings = ttMountSettings();
+  const s = View.getScale();
+  const mountLayer = document.createElementNS(SVG_NS, 'g');
+  mountLayer.style.pointerEvents = 'none';
+  svg.appendChild(mountLayer);
+  const addHole = (group, xMm, yMm, diaMm, attrs = {}) => {
+    const hole = document.createElementNS(SVG_NS, 'circle');
+    hole.setAttribute('cx', (xMm * s).toFixed(2));
+    hole.setAttribute('cy', (-yMm * s).toFixed(2));
+    hole.setAttribute('r', Math.max(1.5, diaMm * s / 2).toFixed(2));
+    hole.setAttribute('fill', attrs.fill || '#ffffff');
+    hole.setAttribute('stroke', attrs.stroke || '#c0392b');
+    hole.setAttribute('stroke-width', attrs.strokeWidth || Math.max(1.2, 1.5 * s));
+    if (attrs.dash) hole.setAttribute('stroke-dasharray', attrs.dash);
+    group.appendChild(hole);
+  };
+  motorIds.forEach(id => {
+    if (motorTypeForCenter(id) !== 'tt') return;
+    const p = pts[id];
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+    const mount = motorMounts.get(id);
+    const rotDeg = (mount ? mount.rotDeg : computeMotorRotDeg(id, pts, new Set())) - 90;
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('transform', `translate(${TX(p.x)} ${TY(p.y)}) rotate(${rotDeg})`);
+    const title = document.createElementNS(SVG_NS, 'title');
+    title.textContent = 'TT馬達機架固定孔：輸出軸孔、2 個螺絲孔、定位孔';
+    g.appendChild(title);
+    addHole(g, 0, 0, settings.shaftDiameterMm, { stroke: '#e74c3c', strokeWidth: Math.max(1.5, 2 * s) });
+    addHole(g, settings.screwOffsetXMm, settings.screwSpacingMm / 2, settings.screwDiameterMm, { stroke: '#2c6fbb' });
+    addHole(g, settings.screwOffsetXMm, -settings.screwSpacingMm / 2, settings.screwDiameterMm, { stroke: '#2c6fbb' });
+    addHole(g, settings.locatorOffsetXMm, settings.locatorOffsetYMm, settings.locatorDiameterMm, {
+      stroke: '#117a45',
+      dash: `${Math.max(2, 3 * s).toFixed(1)} ${Math.max(1.5, 2 * s).toFixed(1)}`
+    });
+    mountLayer.appendChild(g);
+  });
 }
 
 function syncFrameOptionButtons() {
@@ -2855,8 +2908,136 @@ function transient(msg) {
   setBanner(msg);
   setTimeout(() => { if (document.getElementById('modeBanner').textContent === msg) clearBanner(); }, 1600);
 }
+function exportSettings() {
+  return Exporters.normalizeExportSettings({
+    barWidthMm: S.exportBarWidthMm,
+    holeDiameterMm: S.exportHoleDiameterMm
+  });
+}
+function normalizeTtMountSettings(settings = {}) {
+  const from = { ...TT_MOUNT_DEFAULTS, ...(settings || {}) };
+  const clamp = (key, min, max) => {
+    const v = Number(from[key]);
+    return Number.isFinite(v) ? Math.max(min, Math.min(max, v)) : TT_MOUNT_DEFAULTS[key];
+  };
+  return {
+    shaftDiameterMm: Number(clamp('shaftDiameterMm', 0.5, 30).toFixed(2)),
+    screwDiameterMm: Number(clamp('screwDiameterMm', 0.5, 20).toFixed(2)),
+    screwOffsetXMm: Number(clamp('screwOffsetXMm', -120, 120).toFixed(2)),
+    screwSpacingMm: Number(clamp('screwSpacingMm', 0, 80).toFixed(2)),
+    locatorDiameterMm: Number(clamp('locatorDiameterMm', 0.5, 20).toFixed(2)),
+    locatorOffsetXMm: Number(clamp('locatorOffsetXMm', -120, 120).toFixed(2)),
+    locatorOffsetYMm: Number(clamp('locatorOffsetYMm', -80, 80).toFixed(2))
+  };
+}
+function ttMountSettings() {
+  return normalizeTtMountSettings({
+    shaftDiameterMm: S.ttShaftDiameterMm,
+    screwDiameterMm: S.ttScrewDiameterMm,
+    screwOffsetXMm: S.ttScrewOffsetXMm,
+    screwSpacingMm: S.ttScrewSpacingMm,
+    locatorDiameterMm: S.ttLocatorDiameterMm,
+    locatorOffsetXMm: S.ttLocatorOffsetXMm,
+    locatorOffsetYMm: S.ttLocatorOffsetYMm
+  });
+}
+function syncExportSettingInputs() {
+  const settings = exportSettings();
+  document.querySelectorAll('[data-export-setting="barWidthMm"]').forEach(el => { el.value = settings.barWidthMm; });
+  document.querySelectorAll('[data-export-setting="holeDiameterMm"]').forEach(el => { el.value = settings.holeDiameterMm; });
+}
+function syncTtMountSettingInputs() {
+  const settings = ttMountSettings();
+  Object.entries(settings).forEach(([key, value]) => {
+    document.querySelectorAll(`[data-tt-mount-setting="${key}"]`).forEach(el => { el.value = value; });
+  });
+}
+function loadExportSettings() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(EXPORT_SETTINGS_KEY) || 'null'); } catch (_) {}
+  const settings = Exporters.normalizeExportSettings(saved || {});
+  S.exportBarWidthMm = settings.barWidthMm;
+  S.exportHoleDiameterMm = settings.holeDiameterMm;
+  syncExportSettingInputs();
+}
+function loadTtMountSettings() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(TT_MOUNT_SETTINGS_KEY) || 'null'); } catch (_) {}
+  const settings = normalizeTtMountSettings(saved || {});
+  S.ttShaftDiameterMm = settings.shaftDiameterMm;
+  S.ttScrewDiameterMm = settings.screwDiameterMm;
+  S.ttScrewOffsetXMm = settings.screwOffsetXMm;
+  S.ttScrewSpacingMm = settings.screwSpacingMm;
+  S.ttLocatorDiameterMm = settings.locatorDiameterMm;
+  S.ttLocatorOffsetXMm = settings.locatorOffsetXMm;
+  S.ttLocatorOffsetYMm = settings.locatorOffsetYMm;
+  syncTtMountSettingInputs();
+}
+function setExportSetting(key, value) {
+  if (key === 'barWidthMm') S.exportBarWidthMm = Number(value);
+  if (key === 'holeDiameterMm') S.exportHoleDiameterMm = Number(value);
+  const settings = exportSettings();
+  S.exportBarWidthMm = settings.barWidthMm;
+  S.exportHoleDiameterMm = settings.holeDiameterMm;
+  try { localStorage.setItem(EXPORT_SETTINGS_KEY, JSON.stringify(settings)); } catch (_) {}
+  syncExportSettingInputs();
+}
+function setTtMountSetting(key, value) {
+  const map = {
+    shaftDiameterMm: 'ttShaftDiameterMm',
+    screwDiameterMm: 'ttScrewDiameterMm',
+    screwOffsetXMm: 'ttScrewOffsetXMm',
+    screwSpacingMm: 'ttScrewSpacingMm',
+    locatorDiameterMm: 'ttLocatorDiameterMm',
+    locatorOffsetXMm: 'ttLocatorOffsetXMm',
+    locatorOffsetYMm: 'ttLocatorOffsetYMm'
+  };
+  if (map[key]) S[map[key]] = Number(value);
+  const settings = ttMountSettings();
+  S.ttShaftDiameterMm = settings.shaftDiameterMm;
+  S.ttScrewDiameterMm = settings.screwDiameterMm;
+  S.ttScrewOffsetXMm = settings.screwOffsetXMm;
+  S.ttScrewSpacingMm = settings.screwSpacingMm;
+  S.ttLocatorDiameterMm = settings.locatorDiameterMm;
+  S.ttLocatorOffsetXMm = settings.locatorOffsetXMm;
+  S.ttLocatorOffsetYMm = settings.locatorOffsetYMm;
+  try { localStorage.setItem(TT_MOUNT_SETTINGS_KEY, JSON.stringify(settings)); } catch (_) {}
+  syncTtMountSettingInputs();
+  draw();
+}
+function ttFrameExportMounts() {
+  const inputs = lastModelInputs || {};
+  const pts = inputs.pts || {};
+  const motorIds = inputs.motorCenterIds || new Set();
+  const motorTypes = inputs.motorTypes || new Map();
+  const motorMounts = inputs.motorMounts || new Map();
+  const settings = ttMountSettings();
+  const mounts = [];
+  motorIds.forEach(id => {
+    if ((motorTypes.get(id) || motorTypeForCenter(id)) !== 'tt') return;
+    const center = pts[id];
+    if (!center || !Number.isFinite(center.x) || !Number.isFinite(center.y)) return;
+    const mount = motorMounts.get(id);
+    mounts.push({
+      center,
+      rotDeg: (mount ? mount.rotDeg : computeMotorRotDeg(id, pts, new Set())) - 90,
+      settings
+    });
+  });
+  return mounts;
+}
 function saveFile() {
   Store.downloadJson(Store.toSnapshot(S.comps, S.topo, S.counter), 'blocks.json');
+}
+function exportLinksSvg() {
+  const count = Exporters.exportLinksAsSvg(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, exportSettings());
+  const frameCount = Exporters.exportFrameAsSvg(frameConnectorNodes(), exportSettings(), ttFrameExportMounts());
+  transient(count || frameCount ? `已匯出 ${count} 根桿件 + ${frameCount ? '機架' : '無機架'} SVG` : '沒有可匯出的桿件或機架');
+}
+function exportLinksDxf() {
+  const count = Exporters.exportLinksAsDxf(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, exportSettings());
+  const frameCount = Exporters.exportFrameAsDxf(frameConnectorNodes(), exportSettings(), ttFrameExportMounts());
+  transient(count || frameCount ? `已匯出 ${count} 根桿件 + ${frameCount ? '機架' : '無機架'} DXF` : '沒有可匯出的桿件或機架');
 }
 function openFile() {
   const inp = document.createElement('input');
@@ -2908,6 +3089,8 @@ function init() {
                isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
                handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround, recordManualTrace, solvePinnedConstraints,
                snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel });
+  loadExportSettings();
+  loadTtMountSettings();
   populateExamples();
   let loaded = false;
   try {
@@ -2930,5 +3113,5 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, openTaskMenu, taskOpenExamples, taskStartLink, taskAddPower, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: Tools.startDrawTriangle, clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, openTaskMenu, taskOpenExamples, taskStartLink, taskAddPower, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: Tools.startDrawTriangle, clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
 init();
