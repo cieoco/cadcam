@@ -1,4 +1,5 @@
 import { HULL_R_WORLD } from './view.js';
+import { createGearPath } from '../utils/gear-geometry.js';
 
 export const DEFAULT_BAR_WIDTH_MM = HULL_R_WORLD * 2;
 export const DEFAULT_HOLE_DIAMETER_MM = HULL_R_WORLD * 2 * 0.72;
@@ -82,6 +83,13 @@ function exportablePlates(comps, pts) {
     .filter(c => c && c.type === 'triangle' && c.p1 && c.p2 && c.p3)
     .map(c => ({ comp: c, points: [pointForExport(c, 'p1', pts), pointForExport(c, 'p2', pts), pointForExport(c, 'p3', pts)] }))
     .filter(item => item.points.every(Boolean));
+}
+
+function exportableGears(comps, params, settings) {
+  return comps
+    .filter(c => c && c.type === 'gear' && c.p1 && c.p2)
+    .map(c => ({ comp: c, geometry: gearGeometry(c, params, settings) }))
+    .filter(item => item.geometry && item.geometry.outline.length >= 3);
 }
 
 function isTtMotorEnd(comp, key) {
@@ -188,6 +196,33 @@ function dxfCircle(x, y, radius, layer) {
   ].join('\n');
 }
 
+function gearGeometry(comp, params = {}, settings = {}) {
+  const teeth = Math.max(6, Math.round(Number(comp.teeth) || 12));
+  const pitchR = Number(params && comp.radiusParam ? params[comp.radiusParam] : NaN) ||
+    (Number(comp.module) > 0 ? teeth * Number(comp.module) / 2 : 36);
+  const module = Math.max(0.1, 2 * pitchR / teeth);
+  const outline = createGearPath({ teeth, module, segmentsPerTooth: 8 })
+    .map(p => ({ x: round(p.x), y: round(p.y) }));
+  const pinR = Number(params && comp.pinRadiusParam ? params[comp.pinRadiusParam] : NaN) ||
+    Number(comp.pinRadius) ||
+    Math.max(4, pitchR * 0.6);
+  const seedCenter = comp.p1 || { x: 0, y: 0 };
+  const seedPin = comp.p2 || { x: Number(seedCenter.x) + pinR, y: Number(seedCenter.y) };
+  const dx = Number(seedPin.x) - Number(seedCenter.x);
+  const dy = Number(seedPin.y) - Number(seedCenter.y);
+  const angle = Math.hypot(dx, dy) > 1e-6 ? Math.atan2(dy, dx) : 0;
+  const { holeDiameterMm } = normalizeExportSettings(settings);
+  const centerR = holeDiameterMm / 2;
+  const outputR = Math.max(0.5, Number(comp.pinHoleDiameter) > 0 ? Number(comp.pinHoleDiameter) / 2 : centerR);
+  return {
+    outline,
+    holes: [
+      { x: 0, y: 0, r: centerR, layer: 'CENTER_HOLE' },
+      { x: pinR * Math.cos(angle), y: pinR * Math.sin(angle), r: outputR, layer: 'PIN_HOLE' }
+    ]
+  };
+}
+
 function hull(points) {
   const sorted = [...points].sort((a, b) => (a.x - b.x) || (a.y - b.y));
   const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
@@ -233,6 +268,132 @@ function barOutline(a, b, radius) {
   ];
 }
 
+function arcOutlinePoints(center, radius, a0, a1, steps = 10, shortest = false) {
+  let delta = a1 - a0;
+  if (shortest) {
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+  } else {
+    while (delta <= 0) delta += Math.PI * 2;
+  }
+  const pts = [];
+  for (let i = 1; i <= steps; i++) {
+    const a = a0 + delta * (i / steps);
+    pts.push({ x: center.x + Math.cos(a) * radius, y: center.y + Math.sin(a) * radius });
+  }
+  return pts;
+}
+
+function arcOutlinePointsClockwise(center, radius, a0, a1, steps = 14) {
+  let delta = a1 - a0;
+  while (delta >= 0) delta -= Math.PI * 2;
+  while (delta < -Math.PI * 2) delta += Math.PI * 2;
+  const pts = [];
+  for (let i = 1; i <= steps; i++) {
+    const a = a0 + delta * (i / steps);
+    pts.push({ x: center.x + Math.cos(a) * radius, y: center.y + Math.sin(a) * radius });
+  }
+  return pts;
+}
+
+function lineIntersection(a, ua, b, ub) {
+  const den = ua.x * ub.y - ua.y * ub.x;
+  if (Math.abs(den) < 1e-9) return null;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const t = (dx * ub.y - dy * ub.x) / den;
+  return { x: a.x + ua.x * t, y: a.y + ua.y * t };
+}
+
+function roundedPolylineOutline(points, radius) {
+  const clean = points.filter((p, i) => i === 0 || Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y) > 1e-6);
+  if (clean.length < 2) return [];
+  const segs = [];
+  for (let i = 0; i < clean.length - 1; i++) {
+    const a = clean[i], b = clean[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len <= 1e-6) continue;
+    const ux = dx / len, uy = dy / len;
+    const nx = -uy, ny = ux;
+    segs.push({ a, b, ux, uy, nx, ny, nAng: Math.atan2(ny, nx) });
+  }
+  if (!segs.length) return [];
+  const sidePoint = (p, seg, side) => ({ x: p.x + seg.nx * radius * side, y: p.y + seg.ny * radius * side });
+  const sideAngle = (seg, side) => seg.nAng + (side < 0 ? Math.PI : 0);
+  const buildSide = (side) => {
+    const chain = [sidePoint(clean[0], segs[0], side)];
+    for (let i = 1; i < clean.length - 1; i++) {
+      const prev = segs[i - 1], next = segs[i], p = clean[i];
+      const turn = prev.ux * next.uy - prev.uy * next.ux;
+      const outer = side > 0 ? turn > 0 : turn < 0;
+      if (outer) {
+        chain.push(sidePoint(p, prev, side));
+        chain.push(...arcOutlinePoints(p, radius, sideAngle(prev, side), sideAngle(next, side), 10, true));
+      } else {
+        const hit = lineIntersection(
+          sidePoint(p, prev, side), { x: prev.ux, y: prev.uy },
+          sidePoint(p, next, side), { x: next.ux, y: next.uy }
+        );
+        chain.push(hit || sidePoint(p, next, side));
+      }
+    }
+    chain.push(sidePoint(clean[clean.length - 1], segs[segs.length - 1], side));
+    return chain;
+  };
+  const left = buildSide(1);
+  const right = buildSide(-1);
+  const last = segs[segs.length - 1];
+  const first = segs[0];
+  return [
+    ...left,
+    ...arcOutlinePointsClockwise(clean[clean.length - 1], radius, sideAngle(last, 1), sideAngle(last, -1), 14),
+    ...right.reverse(),
+    ...arcOutlinePointsClockwise(clean[0], radius, sideAngle(first, -1), sideAngle(first, 1), 14)
+  ];
+}
+
+function cleanPolylineOutline(points, radius) {
+  const clean = points.filter((p, i) => i === 0 || Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y) > 1e-6);
+  if (clean.length < 2) return [];
+  const segs = [];
+  for (let i = 0; i < clean.length - 1; i++) {
+    const a = clean[i], b = clean[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len <= 1e-6) continue;
+    const ux = dx / len, uy = dy / len;
+    const nx = -uy, ny = ux;
+    segs.push({ a, b, ux, uy, nx, ny, nAng: Math.atan2(ny, nx) });
+  }
+  if (!segs.length) return [];
+  const sidePoint = (p, seg, side) => ({ x: p.x + seg.nx * radius * side, y: p.y + seg.ny * radius * side });
+  const sideAngle = (seg, side) => seg.nAng + (side < 0 ? Math.PI : 0);
+  const buildSide = (side) => {
+    const chain = [sidePoint(clean[0], segs[0], side)];
+    for (let i = 1; i < clean.length - 1; i++) {
+      const prev = segs[i - 1], next = segs[i], p = clean[i];
+      const hit = lineIntersection(
+        sidePoint(p, prev, side), { x: prev.ux, y: prev.uy },
+        sidePoint(p, next, side), { x: next.ux, y: next.uy }
+      );
+      chain.push(hit || sidePoint(p, next, side));
+    }
+    chain.push(sidePoint(clean[clean.length - 1], segs[segs.length - 1], side));
+    return chain;
+  };
+  const left = buildSide(1);
+  const right = buildSide(-1);
+  const last = segs[segs.length - 1];
+  const first = segs[0];
+  return [
+    ...left,
+    ...arcOutlinePointsClockwise(clean[clean.length - 1], radius, sideAngle(last, 1), sideAngle(last, -1), 14),
+    ...right.reverse(),
+    ...arcOutlinePointsClockwise(clean[0], radius, sideAngle(first, -1), sideAngle(first, 1), 14)
+  ];
+}
+
 function roundedTriangleOutline(a, b, c, radius) {
   const pts = [a, b, c];
   const area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
@@ -264,11 +425,11 @@ function roundedTriangleOutline(a, b, c, radius) {
   return out;
 }
 
-function jawPlateOutlines(pivot, drive, tip, turnSign = 0) {
+function jawCenterline(pivot, drive, tip, turnSign = 0) {
   const dx = tip.x - pivot.x;
   const dy = tip.y - pivot.y;
   const len = Math.hypot(dx, dy);
-  if (len <= 1e-6) return [roundedTriangleOutline(pivot, drive, tip, HULL_R_WORLD)];
+  if (len <= 1e-6) return null;
   const ux = dx / len;
   const uy = dy / len;
   const cross = ux * (drive.y - pivot.y) - uy * (drive.x - pivot.x);
@@ -280,11 +441,13 @@ function jawPlateOutlines(pivot, drive, tip, turnSign = 0) {
   const ey = ux * sin + uy * cos;
   const extend = Math.max(38, Math.min(84, len * 0.58));
   const end = { x: tip.x + ex * extend, y: tip.y + ey * extend };
-  return [
-    barOutline(drive, pivot, HULL_R_WORLD),
-    barOutline(pivot, tip, HULL_R_WORLD),
-    barOutline(tip, end, HULL_R_WORLD)
-  ];
+  return [drive, pivot, tip, end];
+}
+
+function jawPlateOutline(pivot, drive, tip, turnSign = 0) {
+  const centerline = jawCenterline(pivot, drive, tip, turnSign);
+  if (!centerline) return roundedTriangleOutline(pivot, drive, tip, HULL_R_WORLD);
+  return cleanPolylineOutline(centerline, HULL_R_WORLD);
 }
 
 function svgPolyline(points) {
@@ -294,7 +457,7 @@ function svgPolyline(points) {
 function plateGeometry(comp, points, settings) {
   const { holeDiameterMm } = normalizeExportSettings(settings);
   const outlines = comp.shape === 'jaw'
-    ? jawPlateOutlines(points[0], points[1], points[2], comp.jawTurnSign)
+    ? [jawPlateOutline(points[0], points[1], points[2], comp.jawTurnSign)]
     : [roundedTriangleOutline(points[0], points[1], points[2], HULL_R_WORLD)];
   const holes = points.map(p => ({ x: p.x, y: p.y, r: holeDiameterMm / 2 }));
   return { outlines, holes };
@@ -345,6 +508,37 @@ function dxfForPlate(comp, points, settings) {
     dxfPair(2, 'ENTITIES'),
     ...geometry.outlines.map(outline => dxfPolyline(outline, 'CUT')),
     ...geometry.holes.map(h => dxfCircle(h.x, h.y, h.r, 'HOLE')),
+    dxfPair(0, 'ENDSEC'),
+    dxfPair(0, 'EOF')
+  ].join('\n') + '\n';
+}
+
+function svgForGear(comp, geometry) {
+  const b = boundsForGeometry([geometry.outline], geometry.holes);
+  const width = round(b.maxX - b.minX);
+  const height = round(b.maxY - b.minY);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${round(b.minX)} ${round(b.minY)} ${width} ${height}">
+  <title>${esc(comp.id || 'gear')}</title>
+  <g fill="none" stroke="#000" stroke-width="0.25">
+    <path d="${svgPolyline(geometry.outline)}" data-layer="GEAR_CUT" />
+${geometry.holes.map(h => `    <circle cx="${round(h.x)}" cy="${round(h.y)}" r="${round(h.r)}" data-layer="${esc(h.layer)}" />`).join('\n')}
+  </g>
+</svg>
+`;
+}
+
+function dxfForGear(comp, geometry) {
+  return [
+    dxfPair(0, 'SECTION'),
+    dxfPair(2, 'HEADER'),
+    dxfPair(9, '$INSUNITS'),
+    dxfPair(70, 4),
+    dxfPair(0, 'ENDSEC'),
+    dxfPair(0, 'SECTION'),
+    dxfPair(2, 'ENTITIES'),
+    dxfPolyline(geometry.outline, 'GEAR_CUT'),
+    ...geometry.holes.map(h => dxfCircle(h.x, h.y, h.r, h.layer)),
     dxfPair(0, 'ENDSEC'),
     dxfPair(0, 'EOF')
   ].join('\n') + '\n';
@@ -530,7 +724,11 @@ export function exportLinksAsSvg(comps, pts, params, settings) {
   plates.forEach(({ comp, points }) => {
     downloadText(svgForPlate(comp, points, settings), `${safeName(comp.id)}.svg`, 'image/svg+xml');
   });
-  return links.length + plates.length;
+  const gears = exportableGears(comps, params, settings);
+  gears.forEach(({ comp, geometry }) => {
+    downloadText(svgForGear(comp, geometry), `${safeName(comp.id)}.svg`, 'image/svg+xml');
+  });
+  return links.length + plates.length + gears.length;
 }
 
 export function exportLinksAsDxf(comps, pts, params, settings) {
@@ -542,7 +740,11 @@ export function exportLinksAsDxf(comps, pts, params, settings) {
   plates.forEach(({ comp, points }) => {
     downloadText(dxfForPlate(comp, points, settings), `${safeName(comp.id)}.dxf`, 'application/dxf');
   });
-  return links.length + plates.length;
+  const gears = exportableGears(comps, params, settings);
+  gears.forEach(({ comp, geometry }) => {
+    downloadText(dxfForGear(comp, geometry), `${safeName(comp.id)}.dxf`, 'application/dxf');
+  });
+  return links.length + plates.length + gears.length;
 }
 
 export function exportFrameAsSvg(frameNodes, settings, ttMounts = []) {

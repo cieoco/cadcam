@@ -168,6 +168,7 @@ function loadExample(id) {
 const barHullPath = View.barHullPath;
 const roundedTriangleHullPath = View.roundedTriangleHullPath;
 const jawPlatePath = View.jawPlatePath;
+const jawPlateStrokePath = View.jawPlateStrokePath;
 const worldFromEvent = (e) => View.worldFromEvent(svg, e);
 const extrapolateSeed = Motion.extrapolateSeed;
 const norm360 = Motion.norm360;
@@ -757,8 +758,17 @@ function drawTrianglePart(c, pts, ctx) {
     const [a, b, d] = ids.map(id => P[id]);
     const ok = [a, b, d].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
     path.style.display = ok ? '' : 'none';
-    if (ok) path.setAttribute('d', c.shape === 'jaw' ? jawPlatePath(a, b, d, c.jawTurnSign) : roundedTriangleHullPath(a, b, d));
+    if (ok) {
+      if (c.shape === 'jaw') path.setAttribute('d', jawPlateStrokePath(a, b, d, c.jawTurnSign));
+      else path.setAttribute('d', roundedTriangleHullPath(a, b, d));
+    }
   };
+  if (c.shape === 'jaw') {
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    path.setAttribute('stroke-width', Math.max(2, HULL_R_WORLD * 2 * View.getScale()));
+  }
   applyTri(pts);
   ctx.groupForLayer(ctx.triLayerByKey.get(ctx.triKey(ids))).appendChild(path);
   frameUpdaters.push(applyTri);
@@ -3214,12 +3224,12 @@ function saveFile() {
 function exportLinksSvg() {
   const count = Exporters.exportLinksAsSvg(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, exportSettings());
   const frameCount = Exporters.exportFrameAsSvg(frameConnectorNodes(), exportSettings(), ttFrameExportMounts());
-  transient(count || frameCount ? `已匯出 ${count} 根桿件 + ${frameCount ? '機架' : '無機架'} SVG` : '沒有可匯出的桿件或機架');
+  transient(count || frameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} SVG` : '沒有可匯出的零件或機架');
 }
 function exportLinksDxf() {
   const count = Exporters.exportLinksAsDxf(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, exportSettings());
   const frameCount = Exporters.exportFrameAsDxf(frameConnectorNodes(), exportSettings(), ttFrameExportMounts());
-  transient(count || frameCount ? `已匯出 ${count} 根桿件 + ${frameCount ? '機架' : '無機架'} DXF` : '沒有可匯出的桿件或機架');
+  transient(count || frameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} DXF` : '沒有可匯出的零件或機架');
 }
 function openFile() {
   const inp = document.createElement('input');
