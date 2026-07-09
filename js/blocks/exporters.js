@@ -1,8 +1,8 @@
-import { HULL_R_WORLD } from './view.js';
+import { DEFAULT_PLATE_RADIUS_WORLD, createPlateGeometry } from './plate-geometry.js';
 import { createGearPath } from '../utils/gear-geometry.js';
 
-export const DEFAULT_BAR_WIDTH_MM = HULL_R_WORLD * 2;
-export const DEFAULT_HOLE_DIAMETER_MM = HULL_R_WORLD * 2 * 0.72;
+export const DEFAULT_BAR_WIDTH_MM = DEFAULT_PLATE_RADIUS_WORLD * 2;
+export const DEFAULT_HOLE_DIAMETER_MM = DEFAULT_PLATE_RADIUS_WORLD * 2 * 0.72;
 const TT_SHAFT_FLAT_DIAMETER_MM = 5.4;
 const TT_SHAFT_FLAT_THICKNESS_MM = 3.7;
 
@@ -446,8 +446,8 @@ function jawCenterline(pivot, drive, tip, turnSign = 0) {
 
 function jawPlateOutline(pivot, drive, tip, turnSign = 0) {
   const centerline = jawCenterline(pivot, drive, tip, turnSign);
-  if (!centerline) return roundedTriangleOutline(pivot, drive, tip, HULL_R_WORLD);
-  return cleanPolylineOutline(centerline, HULL_R_WORLD);
+  if (!centerline) return roundedTriangleOutline(pivot, drive, tip, DEFAULT_PLATE_RADIUS_WORLD);
+  return cleanPolylineOutline(centerline, DEFAULT_PLATE_RADIUS_WORLD);
 }
 
 function svgPolyline(points) {
@@ -456,11 +456,10 @@ function svgPolyline(points) {
 
 function plateGeometry(comp, points, settings) {
   const { holeDiameterMm } = normalizeExportSettings(settings);
-  const outlines = comp.shape === 'jaw'
-    ? [jawPlateOutline(points[0], points[1], points[2], comp.jawTurnSign)]
-    : [roundedTriangleOutline(points[0], points[1], points[2], HULL_R_WORLD)];
-  const holes = points.map(p => ({ x: p.x, y: p.y, r: holeDiameterMm / 2 }));
-  return { outlines, holes };
+  return createPlateGeometry(comp, points, {
+    radius: DEFAULT_PLATE_RADIUS_WORLD,
+    holeRadius: holeDiameterMm / 2
+  });
 }
 
 function boundsForGeometry(outlines, holes = []) {

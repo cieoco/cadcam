@@ -168,7 +168,6 @@ function loadExample(id) {
 const barHullPath = View.barHullPath;
 const roundedTriangleHullPath = View.roundedTriangleHullPath;
 const jawPlatePath = View.jawPlatePath;
-const jawPlateStrokePath = View.jawPlateStrokePath;
 const worldFromEvent = (e) => View.worldFromEvent(svg, e);
 const extrapolateSeed = Motion.extrapolateSeed;
 const norm360 = Motion.norm360;
@@ -759,15 +758,13 @@ function drawTrianglePart(c, pts, ctx) {
     const ok = [a, b, d].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
     path.style.display = ok ? '' : 'none';
     if (ok) {
-      if (c.shape === 'jaw') path.setAttribute('d', jawPlateStrokePath(a, b, d, c.jawTurnSign));
+      if (c.shape === 'jaw') path.setAttribute('d', jawPlatePath(a, b, d, c.jawTurnSign));
       else path.setAttribute('d', roundedTriangleHullPath(a, b, d));
     }
   };
   if (c.shape === 'jaw') {
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('fill', (c.color || '#ff7043') + '26');
     path.setAttribute('stroke-linejoin', 'round');
-    path.setAttribute('stroke-width', Math.max(2, HULL_R_WORLD * 2 * View.getScale()));
   }
   applyTri(pts);
   ctx.groupForLayer(ctx.triLayerByKey.get(ctx.triKey(ids))).appendChild(path);

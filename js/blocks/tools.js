@@ -356,6 +356,7 @@ export function finishDrawTriangle(e) {
   };
   if (isJaw) {
     comp.shape = 'jaw';
+    comp.shapeMode = 'polyline';
     comp.jawTurnSign = jawTurnSign(pts[0], pts[1], pts[2]);
   }
   S.comps.push(comp);

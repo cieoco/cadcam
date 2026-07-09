@@ -277,6 +277,7 @@ export const BLOCK_EXAMPLES = [
         triangle('LeftJaw', pt('GCA', 'motor', -30, 0, { physicalMotor: '1' }), pt('GPA', 'floating', -30, 18), pt('LT', 'floating', -95, -85), {
           color: '#ff6b35',
           shape: 'jaw',
+          shapeMode: 'polyline',
           jawTurnSign: -1,
           gParam: 'GPRA',
           r1Param: 'LJ_tip',
@@ -286,6 +287,7 @@ export const BLOCK_EXAMPLES = [
         triangle('RightJaw', pt('GCB', 'fixed', 30, 0), pt('GPB', 'floating', 30, 18), pt('RT', 'floating', 95, -85), {
           color: '#ff6b35',
           shape: 'jaw',
+          shapeMode: 'polyline',
           jawTurnSign: 1,
           gParam: 'GPRB',
           r1Param: 'RJ_tip',

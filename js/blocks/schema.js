@@ -120,10 +120,13 @@ function normalizeTriangle(comp, index, params, warnings) {
   const inferredJaw = comp.shape === 'jaw' || /(^|[-_])(?:left|right)?jaw/i.test(id);
   if (inferredJaw) {
     out.shape = 'jaw';
+    out.shapeMode = 'polyline';
     if (Number(comp.jawTurnSign) < 0) out.jawTurnSign = -1;
     else if (Number(comp.jawTurnSign) > 0) out.jawTurnSign = 1;
     else if (/leftjaw/i.test(id)) out.jawTurnSign = -1;
     else if (/rightjaw/i.test(id)) out.jawTurnSign = 1;
+  } else if (comp.shapeMode === 'polyline' || comp.shapeMode === 'hull') {
+    out.shapeMode = comp.shapeMode;
   }
   if (comp.visualOnly) out.visualOnly = true;
   if (comp.snapLength === false) out.snapLength = false;

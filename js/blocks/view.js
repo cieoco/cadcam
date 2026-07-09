@@ -9,9 +9,16 @@
  * （0..W, 0..H），與螢幕 px 之間的換算交給 CTM。
  */
 
+import {
+  DEFAULT_PLATE_RADIUS_WORLD,
+  createPlateGeometry,
+  plateCenterline,
+  roundedHullOutline
+} from './plate-geometry.js';
+
 export const W = 900;
 export const H = 560;
-export const HULL_R_WORLD = 9;        // 冰棒棍外形半徑（世界 mm）
+export const HULL_R_WORLD = DEFAULT_PLATE_RADIUS_WORLD;        // 冰棒棍外形半徑（世界 mm）
 
 const SCALE_DEFAULT = 1.4;            // 1mm = 1.4 user units（初始）
 const SCALE_MIN = 0.2;
@@ -114,31 +121,7 @@ export function barHullPath(a, b) {
 
 // 三個孔中心的圓角三角板外形：把三個等半徑圓做外切線 hull。
 export function roundedTriangleHullPath(a, b, c) {
-  const pts = [a, b, c];
-  const area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-  const ordered = area < 0 ? [a, c, b] : pts; // 讓路徑穩定走 CCW
-  const r = HULL_R_WORLD;
-  const tangent = (p, q) => {
-    const dx = q.x - p.x, dy = q.y - p.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist <= 1e-6) return null;
-    const nx = dy / dist, ny = -dx / dist;
-    return {
-      start: { x: p.x + nx * r, y: p.y + ny * r },
-      end: { x: q.x + nx * r, y: q.y + ny * r }
-    };
-  };
-  const ts = ordered.map((p, i) => tangent(p, ordered[(i + 1) % ordered.length]));
-  if (ts.some(t => !t)) return '';
-  const R = r * scale;
-  let d = `M ${TX(ts[0].start.x)} ${TY(ts[0].start.y)} `;
-  for (let i = 0; i < ts.length; i++) {
-    const curr = ts[i];
-    const next = ts[(i + 1) % ts.length];
-    d += `L ${TX(curr.end.x)} ${TY(curr.end.y)} `;
-    d += `A ${R} ${R} 0 0 0 ${TX(next.start.x)} ${TY(next.start.y)} `;
-  }
-  return d + 'Z';
+  return polylineOutlinePath(roundedHullOutline([a, b, c], HULL_R_WORLD));
 }
 
 function arcWorldPoints(center, radius, a0, a1, steps = 10, shortest = false) {
@@ -251,14 +234,17 @@ function jawCenterline(pivot, drive, tip, turnSign = 0) {
 }
 
 export function jawPlateStrokePath(pivot, drive, tip, turnSign = 0) {
-  const centerline = jawCenterline(pivot, drive, tip, turnSign);
+  const centerline = plateCenterline({ shape: 'jaw', jawTurnSign: turnSign }, [pivot, drive, tip]);
   if (!centerline) return '';
   return centerline.map((p, i) => `${i ? 'L' : 'M'} ${TX(p.x)} ${TY(p.y)}`).join(' ');
 }
 
 export function jawPlatePath(pivot, drive, tip, turnSign = 0) {
-  const centerline = jawCenterline(pivot, drive, tip, turnSign);
-  if (!centerline) return roundedTriangleHullPath(pivot, drive, tip);
-  const outline = roundedPolylineOutline(centerline, HULL_R_WORLD);
-  return outline.length ? polylineOutlinePath(outline) : roundedTriangleHullPath(pivot, drive, tip);
+  const geometry = createPlateGeometry(
+    { shape: 'jaw', jawTurnSign: turnSign },
+    [pivot, drive, tip],
+    { radius: HULL_R_WORLD }
+  );
+  const outline = geometry.outlines[0];
+  return outline && outline.length ? polylineOutlinePath(outline) : roundedTriangleHullPath(pivot, drive, tip);
 }
