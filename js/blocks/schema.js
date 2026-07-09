@@ -8,6 +8,7 @@
 const KIND = 'blocks';
 const VERSION = 1;
 const LEGO_STEP = 8;
+const MAX_PLATE_POINTS = 6;
 const SAFE_ID = /^[\w.-]+$/u;
 const SAFE_COLOR = /^#[0-9a-fA-F]{6}$/;
 const POINT_TYPES = new Set(['floating', 'fixed', 'motor', 'linear']);
@@ -128,6 +129,22 @@ function normalizeTriangle(comp, index, params, warnings) {
   } else if (comp.shapeMode === 'polyline' || comp.shapeMode === 'hull') {
     out.shapeMode = comp.shapeMode;
   }
+  const extraLimit = Math.max(0, MAX_PLATE_POINTS - 3);
+  const outlinePoints = Array.isArray(comp.outlinePoints) ? comp.outlinePoints : [];
+  const normalizedOutline = outlinePoints.slice(0, extraLimit)
+    .map((p, i) => {
+      const u = num(p && p.u, NaN);
+      const v = num(p && p.v, NaN);
+      if (!Number.isFinite(u) || !Number.isFinite(v)) {
+        warnings.push(`三點桿 ${id} 的外形控制點 ${i + 1} 格式錯誤，已略過`);
+        return null;
+      }
+      const point = { u: roundTenth(u), v: roundTenth(v) };
+      if (p.hole === true) point.hole = true;
+      return point;
+    })
+    .filter(Boolean);
+  if (normalizedOutline.length) out.outlinePoints = normalizedOutline;
   if (comp.visualOnly) out.visualOnly = true;
   if (comp.snapLength === false) out.snapLength = false;
 

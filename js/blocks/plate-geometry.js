@@ -1,4 +1,5 @@
 export const DEFAULT_PLATE_RADIUS_WORLD = 9;
+export const MAX_PLATE_POINTS = 6;
 
 const EPS = 1e-6;
 
@@ -156,14 +157,63 @@ export function jawCenterline(points, turnSign = 0) {
   return [drive, pivot, tip, end];
 }
 
+function triangleBasis(points) {
+  const [a, b] = points || [];
+  if (!a || !b) return null;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  if (len <= EPS) return null;
+  const ux = dx / len;
+  const uy = dy / len;
+  return { origin: a, ux, uy, nx: -uy, ny: ux };
+}
+
+export function localToWorld(points, local) {
+  const basis = triangleBasis(points);
+  if (!basis || !local) return null;
+  const u = Number(local.u);
+  const v = Number(local.v);
+  if (!Number.isFinite(u) || !Number.isFinite(v)) return null;
+  return {
+    x: basis.origin.x + basis.ux * u + basis.nx * v,
+    y: basis.origin.y + basis.uy * u + basis.ny * v
+  };
+}
+
+export function worldToLocal(points, world) {
+  const basis = triangleBasis(points);
+  if (!basis || !world) return null;
+  const dx = world.x - basis.origin.x;
+  const dy = world.y - basis.origin.y;
+  return {
+    u: dx * basis.ux + dy * basis.uy,
+    v: dx * basis.nx + dy * basis.ny
+  };
+}
+
+export function outlineControlWorldPoints(comp = {}, points = []) {
+  return (comp.outlinePoints || [])
+    .map(p => {
+      const world = localToWorld(points, p);
+      return world ? { ...world, hole: p.hole === true } : null;
+    })
+    .filter(Boolean);
+}
+
+export function plateContourPoints(comp = {}, points = []) {
+  return [...cleanPoints(points), ...outlineControlWorldPoints(comp, points)];
+}
+
 export function plateShapeMode(comp = {}) {
-  if (comp.shapeMode === 'polyline' || comp.outlineMode === 'polyline' || comp.shape === 'jaw') return 'polyline';
+  if (comp.shapeMode === 'polyline' || comp.shapeMode === 'hull') return comp.shapeMode;
+  if (comp.outlineMode === 'polyline' || comp.shape === 'jaw') return 'polyline';
   return 'hull';
 }
 
 export function plateCenterline(comp, points) {
   if (comp && comp.shape === 'jaw') return jawCenterline(points, comp.jawTurnSign);
-  return cleanPoints(points);
+  return plateContourPoints(comp, points);
 }
 
 export function createPlateGeometry(comp, points, options = {}) {
@@ -171,14 +221,18 @@ export function createPlateGeometry(comp, points, options = {}) {
   const holeRadius = Number.isFinite(Number(options.holeRadius)) ? Number(options.holeRadius) : radius * 0.72;
   const mode = plateShapeMode(comp);
   const source = mode === 'polyline' ? plateCenterline(comp, points) : cleanPoints(points);
-  const fallback = cleanPoints(points);
+  const fallback = plateContourPoints(comp, points);
   const outline = mode === 'polyline'
     ? cleanPolylineOutline(source || fallback, radius)
     : roundedHullOutline(fallback, radius);
+  const solvedHoles = cleanPoints(points).map(p => ({ x: p.x, y: p.y, r: holeRadius }));
+  const controlHoles = outlineControlWorldPoints(comp, points)
+    .filter(p => p.hole)
+    .map(p => ({ x: p.x, y: p.y, r: holeRadius }));
   return {
     mode,
     sourcePoints: source || fallback,
     outlines: outline.length ? [outline] : [],
-    holes: fallback.map(p => ({ x: p.x, y: p.y, r: holeRadius }))
+    holes: [...solvedHoles, ...controlHoles]
   };
 }

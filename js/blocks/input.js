@@ -384,14 +384,15 @@ export function init(deps) {
     if (activePointers.size >= 2) return; // 雙指縮放優先
     const w = worldFromEvent(e); if (!w) return;
     e.preventDefault();
-    if (e.pointerType !== 'mouse' || mobilePrompt()) {
-      S.drawStart = w;
-      S.drawStartNodeId = null;                 // 新桿件兩端都自由：起點不自動吸附既有接點
-      S.drawPreview = w;
-      S.drawActive = true;
-    } else {
-      S.drawPreview = w;
+    if (e.pointerType === 'mouse' && !mobilePrompt()) {
+      Tools.placeLinkPoint(e);                  // 滑鼠：左鍵點兩下（起點 → 終點建立）
+      return;
     }
+    // 觸控 / 觸控筆：按下起點、拖曳、放開建立（維持一筆完成的手勢）
+    S.drawStart = w;
+    S.drawStartNodeId = null;                   // 新桿件兩端都自由：起點不自動吸附既有接點
+    S.drawPreview = w;
+    S.drawActive = true;
     try { svg.setPointerCapture(e.pointerId); } catch (_) {}
     draw();
   });
@@ -400,9 +401,8 @@ export function init(deps) {
     if (activePointers.size >= 2) return;
     const w = worldFromEvent(e); if (!w) return;
     e.preventDefault();
-    if (S.triangleStage === 'third' && e.pointerType === 'mouse') {
-      S.trianglePreview = w;
-      Tools.finishDrawTriangle(e);
+    if (e.pointerType === 'mouse') {
+      Tools.placeTrianglePoint(e);
       return;
     }
     S.trianglePreview = w;
@@ -413,7 +413,7 @@ export function init(deps) {
   svg.addEventListener('contextmenu', (e) => {
     if (!S.drawingLink && !S.drawingTriangle) return;
     e.preventDefault();
-    if (S.drawingTriangle) Tools.finishDrawTriangle(e);
+    if (S.drawingTriangle) Tools.finishPlateAsLinkEarly();
     else Tools.finishDrawLink(e);
   });
 }

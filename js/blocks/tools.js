@@ -16,6 +16,7 @@
 import { S } from './state.js';
 import * as View from './view.js';
 import * as Model from './model.js';
+import { MAX_PLATE_POINTS } from './plate-geometry.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：元件擁有的 topo.params key
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -29,6 +30,7 @@ const LEGO_STEP = 8;
 const LINK_DEFAULT_LEN = 88;   // 連桿預設長度（12 孔，對齊 8mm）
 const snapLego = v => Math.max(LEGO_STEP, Math.round((Number(v) || 0) / LEGO_STEP) * LEGO_STEP);
 const roundMm = v => Math.round(Number(v) || 0);
+const pointLimitMessage = () => `多點桿最多 ${MAX_PLATE_POINTS} 點；點數太多時，請拆成兩片板件或減少外形控制點。`;
 
 // ---- 注入的外部依賴（由 app 在啟動時提供）----
 let svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
@@ -59,20 +61,17 @@ function beginDraw(kind) {
   S.drawKind = kind;
   S.drawingLink = true;
   svg.style.cursor = 'crosshair';
-  if (mobilePrompt()) {
-    S.drawActive = false;
-    S.drawStart = null;
-    S.drawStartNodeId = null;
-    S.drawPreview = null;
-  } else {
-    S.drawActive = true;                       // 進來就活著：滑鼠一移動就更新（不必壓住）
-    S.drawStart = View.worldFromScreen(W * 0.18, H * 0.26); // 支點＝畫布左上、靠按鈕右側的空白處
-    S.drawStartNodeId = null;                   // 新桿件兩端都自由：不自動吸附既有接點（要連接改用拖曳合併）
-    S.drawPreview = { x: S.drawStart.x + LINK_DEFAULT_LEN, y: S.drawStart.y }; // 先給一根預設長度
-  }
-  setBanner(kind === 'rail'
-    ? promptText('移動滑鼠拉出滑軌，按右鍵確定', '按住起點拖出滑軌，放開建立')
-    : promptText('移動滑鼠改長度，按右鍵確定', '按住起點拖到終點，放開建立連桿'));
+  // 連桿 / 滑軌統一改成「點兩下」：起點也由使用者自己點，不再自動落位（與三點桿一致）。
+  // 觸控維持按下起點、拖曳、放開一筆完成，起點本來就落在按下處。
+  S.drawActive = false;
+  S.drawStart = null;
+  S.drawStartNodeId = null;
+  S.drawPreview = null;
+  const noun = kind === 'rail' ? '滑軌' : '連桿';
+  setBanner(promptText(
+    `${noun}：左鍵點第一點`,
+    kind === 'rail' ? '按住起點拖出滑軌，放開建立' : '按住起點拖到終點，放開建立連桿'
+  ));
   draw();
 }
 export function exitDrawLink() {
@@ -163,24 +162,22 @@ export function startDrawTriangle(shape = 'triangle') {
   deselectLink();
   S.drawingTriangle = true;
   S.triangleShape = shape === 'jaw' ? 'jaw' : 'triangle';
-  S.triangleStage = 'base';
-  const a = View.worldFromScreen(W * 0.18, H * 0.26);
-  const b = { x: a.x + 64, y: a.y };
-  const first = resolveTrianglePointAt(a);
-  S.trianglePoints = [first];
-  S.trianglePreview = b;
+  // 三點桿統一改成「左鍵點三下」：第一點也由使用者自己點，不再自動落位。
+  S.triangleStage = 'first';
+  S.trianglePoints = [];
+  S.trianglePreview = View.worldFromScreen(W * 0.5, H * 0.5);
   svg.style.cursor = 'crosshair';
-  const label = S.triangleShape === 'jaw' ? '夾爪板' : '三點桿';
+  const label = S.triangleShape === 'jaw' ? '夾爪板' : '桿件';
   setBanner(promptText(
-    `${label}：先移動調第一段，按右鍵確定（8mm 倍數）`,
-    `${label}：先拖曳調第一段，放開確定（8mm 倍數）`
+    `${label}：左鍵點第一點`,
+    `${label}：點一下放第一點`
   ));
   draw();
 }
 export function exitDrawTriangle() {
   S.drawingTriangle = false;
   S.triangleShape = 'triangle';
-  S.triangleStage = 'base';
+  S.triangleStage = 'first';
   S.trianglePoints = [];
   S.trianglePreview = null;
   if (!S.drawingLink) svg.style.cursor = '';
@@ -197,6 +194,11 @@ function resolveTrianglePointAt(world, exclude = []) {
 }
 function resolveTrianglePoint(world) {
   return resolveTrianglePointAt(world, S.trianglePoints.map(p => p.nodeId));
+}
+function canAddPlatePoint(extraCount = 1) {
+  if (S.trianglePoints.length + extraCount <= MAX_PLATE_POINTS) return true;
+  setBanner(pointLimitMessage());
+  return false;
 }
 function resolveTriangleBaseEnd(cur) {
   const start = S.trianglePoints[0];
@@ -274,7 +276,9 @@ export function drawTrianglePreview() {
   const pts = S.trianglePoints.map(p => p.pos);
   let floating = null;
   if (S.trianglePreview) {
-    floating = S.triangleStage === 'base' ? resolveTriangleBaseEnd(S.trianglePreview) : resolveTriangleThirdPoint(S.trianglePreview);
+    if (S.triangleStage === 'first') floating = resolveTrianglePoint(S.trianglePreview);
+    else if (S.triangleStage === 'base') floating = resolveTriangleBaseEnd(S.trianglePreview);
+    else floating = resolveTriangleThirdPoint(S.trianglePreview);
     if (floating) pts.push(floating.pos);
   }
   if (pts.length >= 2) {
@@ -300,7 +304,7 @@ export function drawTrianglePreview() {
     c.setAttribute('stroke-width', 2);
     svg.appendChild(c);
   });
-  if (floating) {
+  if (floating && S.triangleStage !== 'first') {
     const label = document.createElementNS(SVG_NS, 'text');
     label.setAttribute('x', TX(floating.pos.x));
     label.setAttribute('y', TY(floating.pos.y) - 12);
@@ -314,32 +318,62 @@ export function drawTrianglePreview() {
     svg.appendChild(label);
   }
 }
+// 左鍵放下第一點（可吸附既有接點），進入底邊階段。
+function confirmTriangleFirst(cur) {
+  if (!cur) return;
+  const first = resolveTrianglePoint(cur);
+  S.trianglePoints = [first];
+  S.triangleStage = 'base';
+  S.trianglePreview = { x: first.pos.x + 64, y: first.pos.y };
+  const label = S.triangleShape === 'jaw' ? '夾爪板' : '桿件';
+  setBanner(promptText(
+    `${label}：移動定第二點，左鍵確定（8mm 倍數）`,
+    `${label}：移動定第二點，放開確定（8mm 倍數）`
+  ));
+  draw();
+}
 function confirmTriangleBase(e) {
   const cur = worldFromEvent(e) || S.trianglePreview;
   if (!cur || S.trianglePoints.length !== 1) return;
+  if (!canAddPlatePoint()) return;
   const picked = resolveTriangleBaseEnd(cur);
   if (!picked) return;
   S.trianglePoints.push(picked);
   S.triangleStage = 'third';
   const a = S.trianglePoints[0].pos, b = S.trianglePoints[1].pos;
   S.trianglePreview = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - Math.max(40, picked.len * 0.8) };
-  const label = S.triangleShape === 'jaw' ? '夾爪板' : '三點桿';
+  const label = S.triangleShape === 'jaw' ? '夾爪板' : '桿件';
   setBanner(promptText(
-    `${label}：移動選第三孔，按一下或右鍵確定（距離自動對齊 8mm）`,
-    `${label}：拖曳選第三孔，放開確定（距離自動對齊 8mm）`
+    `${label}：移動定第三點，左鍵完成`,
+    `${label}：移動定第三點，放開完成`
   ));
   draw();
 }
-export function finishDrawTriangle(e) {
-  const cur = worldFromEvent(e) || S.trianglePreview;
-  if (S.triangleStage === 'base') { confirmTriangleBase(e); return; }
-  if (!cur || S.trianglePoints.length < 2) return;
-  const picked = resolveTriangleThirdPoint(cur);
-  if (!picked) return;
+function finishTriangleAsLink() {
+  if (S.trianglePoints.length < 2) return;
+  pushUndo();
+  const n = ++S.counter;
+  const lp = 'LL' + n;
+  const a = S.trianglePoints[0];
+  const b = S.trianglePoints[1];
+  const len = Math.round(Math.hypot(b.pos.x - a.pos.x, b.pos.y - a.pos.y));
+  S.comps.push({
+    type: 'bar', id: 'Link' + n, color: '#3498db',
+    p1: { id: a.nodeId || 'P' + n + 'a', type: 'floating', x: a.pos.x, y: a.pos.y },
+    p2: { id: b.nodeId || 'P' + n + 'b', type: 'floating', x: b.pos.x, y: b.pos.y },
+    lenParam: lp, isInput: false, fixedLen: true
+  });
+  S.topo.params[lp] = len;
+  exitDrawTriangle();
+  rebuild(); draw();
+  if (selectLink) selectLink('Link' + n);
+}
+function finishTriangleFromPoints() {
+  if (S.trianglePoints.length < 3) return;
   pushUndo();
   const n = ++S.counter;
   const suffix = ['a', 'b', 'c'];
-  const all = [...S.trianglePoints, picked];
+  const all = S.trianglePoints.slice(0, 3);
   const pts = all.map((p, i) => ({
     id: p.nodeId || `T${n}${suffix[i]}`,
     type: 'floating',
@@ -361,11 +395,59 @@ export function finishDrawTriangle(e) {
   }
   S.comps.push(comp);
   S.topo.params[gParam] = dist(pts[0], pts[1]);
-  S.topo.params[r1Param] = picked.r1 || dist(pts[0], pts[2]);
-  S.topo.params[r2Param] = picked.r2 || dist(pts[1], pts[2]);
+  S.topo.params[r1Param] = dist(pts[0], pts[2]);
+  S.topo.params[r2Param] = dist(pts[1], pts[2]);
   exitDrawTriangle();
   rebuild(); draw();
   if (selectTriangle) selectTriangle(comp.id);
+}
+// 確認第三點並建立三點板 / 夾爪板（第三點一放下就完成）。
+function confirmTriangleThird(cur) {
+  if (!cur || S.trianglePoints.length < 2) return;
+  if (!canAddPlatePoint()) return;
+  const picked = resolveTriangleThirdPoint(cur);
+  if (!picked) return;
+  S.trianglePoints.push(picked);
+  finishTriangleFromPoints();
+}
+// 滑鼠：左鍵一路點三下（第一點 → 底邊第二點 → 第三點完成）。
+export function placeTrianglePoint(e) {
+  const cur = worldFromEvent(e) || S.trianglePreview;
+  if (!cur) return;
+  if (S.triangleStage === 'first') { confirmTriangleFirst(cur); return; }
+  if (S.triangleStage === 'base') { confirmTriangleBase(e); return; }
+  confirmTriangleThird(cur);
+}
+// 觸控 / 觸控筆：每次「拖曳→放開」推進一個點，第三點放開即完成。
+export function finishDrawTriangle(e) {
+  const cur = worldFromEvent(e) || S.trianglePreview;
+  if (S.triangleStage === 'first') { confirmTriangleFirst(cur); return; }
+  if (S.triangleStage === 'base') { confirmTriangleBase(e); return; }
+  confirmTriangleThird(cur);
+}
+// 右鍵逃生門：若已放好底邊（≥2 點）就只用前兩點做連桿；夾爪板不適用。
+export function finishPlateAsLinkEarly() {
+  if (!S.drawingTriangle || S.triangleShape === 'jaw') return;
+  if (S.trianglePoints.length >= 2) finishTriangleAsLink();
+}
+// 滑鼠：左鍵點兩下（第一點放起點，第二點確定長度並建立）；與三點桿的操作一致。
+export function placeLinkPoint(e) {
+  const cur = worldFromEvent(e) || S.drawPreview;
+  if (!cur) return;
+  if (!S.drawActive || !S.drawStart) {
+    S.drawStart = { x: cur.x, y: cur.y };
+    S.drawStartNodeId = null;                  // 兩端都自由：起點不自動吸附（連接改用拖曳合併）
+    S.drawPreview = { x: cur.x + LINK_DEFAULT_LEN, y: cur.y };
+    S.drawActive = true;
+    const noun = S.drawKind === 'rail' ? '滑軌' : '連桿';
+    setBanner(promptText(
+      `${noun}：移動改長度，左鍵建立`,
+      `${noun}：移動改長度，左鍵建立`
+    ));
+    draw();
+    return;
+  }
+  finishDrawLink(e);
 }
 export function finishDrawLink(e) {
   if (!S.drawStart) return;

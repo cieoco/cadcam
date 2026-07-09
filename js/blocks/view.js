@@ -248,3 +248,9 @@ export function jawPlatePath(pivot, drive, tip, turnSign = 0) {
   const outline = geometry.outlines[0];
   return outline && outline.length ? polylineOutlinePath(outline) : roundedTriangleHullPath(pivot, drive, tip);
 }
+
+export function platePath(comp, points) {
+  const geometry = createPlateGeometry(comp, points, { radius: HULL_R_WORLD });
+  const outline = geometry.outlines[0];
+  return outline && outline.length ? polylineOutlinePath(outline) : '';
+}

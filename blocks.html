@@ -415,12 +415,12 @@
           <div class="block link" onclick="window.blocks.openLinkMenu()">
             <span class="ico">🔵</span>
             <span class="name">桿件</span>
-            <span class="role">連桿 / 三點桿</span>
+            <span class="role">畫 2 點成連桿，3 點成板</span>
           </div>
           <div class="block slider" onclick="window.blocks.startDrawRail()">
             <span class="ico">🟩</span>
             <span class="name">滑軌</span>
-            <span class="role"><span class="desktop-hint">拉出軌道，右鍵確定</span><span class="mobile-hint">拖出軌道，放開確定</span></span>
+            <span class="role"><span class="desktop-hint">點兩下畫軌道</span><span class="mobile-hint">拖出軌道，放開確定</span></span>
           </div>
         </div>
       </div>
@@ -449,7 +449,7 @@
     <div class="canvas-wrap canvas-area">
       <svg id="stageSvg" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="hint" id="hint">
-        <span class="desktop-hint">先點🔵連桿，移動滑鼠拉長，右鍵確定<br>再把🔴馬達放到端點，按 ▶ 看它動</span>
+        <span class="desktop-hint">先點🔵連桿，左鍵點兩下畫出來<br>再把🔴馬達放到端點，按 ▶ 看它動</span>
         <span class="mobile-hint">先點🔵連桿，按住起點拖到終點放開<br>再把🔴馬達放到端點，按 ▶ 看它動</span>
       </div>
       <div class="mode-banner" id="modeBanner" style="display:none;"></div>
@@ -462,6 +462,11 @@
             <option value="r1">邊1</option>
             <option value="r2">邊2</option>
           </select>
+          <select class="tri-side" id="plateShapeModeSelect" style="display:none;" onchange="window.blocks.setTriangleShapeMode(this.value)" title="選擇板件外形">
+            <option value="hull">包絡板</option>
+            <option value="polyline">折線桿</option>
+          </select>
+          <button class="lift-btn" id="addOutlinePointBtn" style="display:none;" onclick="window.blocks.addTriangleOutlinePoint()" title="新增只影響外形、不參與求解的控制點">＋外形點</button>
           <span class="le-row" id="lenControls">
             <button class="le-step" id="lenMinusBtn" onclick="window.blocks.changeLen(-8)" title="短 8mm（少一孔）">−</button>
             <span class="le-value"><span id="lenValue">88</span><span class="le-unit">mm</span></span>
