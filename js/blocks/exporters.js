@@ -2,6 +2,8 @@ import { HULL_R_WORLD } from './view.js';
 
 export const DEFAULT_BAR_WIDTH_MM = HULL_R_WORLD * 2;
 export const DEFAULT_HOLE_DIAMETER_MM = HULL_R_WORLD * 2 * 0.72;
+const TT_SHAFT_FLAT_DIAMETER_MM = 5.4;
+const TT_SHAFT_FLAT_THICKNESS_MM = 3.7;
 
 const round = (v, digits = 3) => {
   const n = Number(v);
@@ -55,10 +57,45 @@ function exportableLinks(comps, pts, params) {
     .filter(item => item.length > 0);
 }
 
+function isTtMotorEnd(comp, key) {
+  return Boolean(comp && comp.isInput && comp.motorType !== 'mg995' && comp[key] && comp[key].physicalMotor);
+}
+
+function ttShaftFlatPoints(cx, cy, steps = 12) {
+  const r = TT_SHAFT_FLAT_DIAMETER_MM / 2;
+  const halfAcrossFlats = TT_SHAFT_FLAT_THICKNESS_MM / 2;
+  const y = Math.sqrt(Math.max(0, r * r - halfAcrossFlats * halfAcrossFlats));
+  const rightTop = Math.atan2(-y, halfAcrossFlats) * 180 / Math.PI;
+  const leftTop = Math.atan2(-y, -halfAcrossFlats) * 180 / Math.PI;
+  const leftBottom = Math.atan2(y, -halfAcrossFlats) * 180 / Math.PI;
+  const rightBottom = Math.atan2(y, halfAcrossFlats) * 180 / Math.PI;
+  return [
+    ...arcPoints(cx, cy, r, rightTop, leftTop, steps),
+    ...arcPoints(cx, cy, r, leftBottom, rightBottom, steps),
+  ];
+}
+
+function svgTtShaftFlatPath(cx, cy) {
+  return svgPolyline(ttShaftFlatPoints(cx, cy));
+}
+
+function linkHoleSpecs(comp, length, settings) {
+  const { holeDiameterMm } = normalizeExportSettings(settings);
+  const holeR = round(holeDiameterMm / 2, 3);
+  return [
+    isTtMotorEnd(comp, 'p1')
+      ? { kind: 'tt-shaft-flat', x: 0, y: 0 }
+      : { kind: 'circle', x: 0, y: 0, r: holeR },
+    isTtMotorEnd(comp, 'p2')
+      ? { kind: 'tt-shaft-flat', x: length, y: 0 }
+      : { kind: 'circle', x: length, y: 0, r: holeR }
+  ];
+}
+
 function svgForLink(comp, length, settings) {
   const { barWidthMm, holeDiameterMm } = normalizeExportSettings(settings);
   const r = round(barWidthMm / 2, 3);
-  const holeR = round(holeDiameterMm / 2, 3);
+  const holes = linkHoleSpecs(comp, length, { barWidthMm, holeDiameterMm });
   const width = round(length + r * 2, 3);
   const height = round(r * 2, 3);
   const d = [
@@ -74,8 +111,9 @@ function svgForLink(comp, length, settings) {
   <title>${esc(comp.id || 'link')}</title>
   <g fill="none" stroke="#000" stroke-width="0.25">
     <path d="${d}" />
-    <circle cx="0" cy="0" r="${holeR}" />
-    <circle cx="${length}" cy="0" r="${holeR}" />
+${holes.map(h => h.kind === 'tt-shaft-flat'
+    ? `    <path d="${svgTtShaftFlatPath(h.x, h.y)}" data-hole="TT_SHAFT_FLAT" />`
+    : `    <circle cx="${h.x}" cy="${h.y}" r="${h.r}" />`).join('\n')}
   </g>
 </svg>
 `;
@@ -316,7 +354,7 @@ function dxfForFrame(frameNodes, settings, ttMounts) {
 function dxfForLink(comp, length, settings) {
   const { barWidthMm, holeDiameterMm } = normalizeExportSettings(settings);
   const r = round(barWidthMm / 2, 3);
-  const holeR = round(holeDiameterMm / 2, 3);
+  const holes = linkHoleSpecs(comp, length, { barWidthMm, holeDiameterMm });
   const outline = [
     { x: 0, y: r },
     { x: length, y: r },
@@ -333,8 +371,9 @@ function dxfForLink(comp, length, settings) {
     dxfPair(0, 'SECTION'),
     dxfPair(2, 'ENTITIES'),
     dxfPolyline(outline, 'CUT'),
-    dxfCircle(0, 0, holeR, 'HOLE'),
-    dxfCircle(length, 0, holeR, 'HOLE'),
+    ...holes.map(h => h.kind === 'tt-shaft-flat'
+      ? dxfPolyline(ttShaftFlatPoints(h.x, h.y, 18), 'TT_SHAFT_FLAT')
+      : dxfCircle(h.x, h.y, h.r, 'HOLE')),
     dxfPair(0, 'ENDSEC'),
     dxfPair(0, 'EOF')
   ].join('\n') + '\n';
