@@ -57,6 +57,8 @@
       display: grid; grid-template-columns: repeat(2, max-content); gap: 6px 8px;
       padding: 10px; border: 1px solid #d8dee6; border-radius: 8px; background: #fff;
       box-shadow: 0 12px 28px rgba(44,62,80,0.16); }
+    .settings-heading { grid-column: 1 / -1; padding-top: 4px; color: #95a5a6; font-size: 11px; letter-spacing: 0.05em; }
+    .settings-heading:first-child { padding-top: 0; }
     .mount-field { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
     .mount-field input { width: 62px; border: 1px solid #d8dee6; border-radius: 6px; padding: 5px 6px;
       color: #2c3e50; font: inherit; font-weight: 700; }
@@ -369,17 +371,13 @@
     <div class="toolbar project-actions">
       <button class="tool-btn" id="btnUndo" onclick="window.blocks.undo()" disabled title="復原上一步">↩ 復原</button>
       <button class="tool-btn" onclick="window.blocks.saveFile()" title="存成檔案">💾 存檔</button>
-      <span class="export-settings" aria-label="匯出尺寸">
-        <label class="export-field">桿寬mm
-          <input data-export-setting="barWidthMm" type="number" min="2" max="120" step="0.5" oninput="window.blocks.setExportSetting('barWidthMm', this.value)" title="匯出桿件寬度 mm">
-        </label>
-        <label class="export-field">孔徑mm
-          <input data-export-setting="holeDiameterMm" type="number" min="0.5" max="119" step="0.5" oninput="window.blocks.setExportSetting('holeDiameterMm', this.value)" title="匯出孔直徑 mm">
-        </label>
-      </span>
-      <details class="mount-settings">
-        <summary>TT固定孔</summary>
+      <details class="mount-settings fabrication-settings">
+        <summary>加工設定</summary>
         <div class="mount-grid">
+          <div class="settings-heading">桿件</div>
+          <label class="mount-field">桿寬<input data-export-setting="barWidthMm" type="number" min="2" max="120" step="0.5" oninput="window.blocks.setExportSetting('barWidthMm', this.value)" title="匯出桿件寬度 mm"></label>
+          <label class="mount-field">連接孔<input data-export-setting="holeDiameterMm" type="number" min="0.5" max="119" step="0.5" oninput="window.blocks.setExportSetting('holeDiameterMm', this.value)" title="一般連接孔直徑 mm"></label>
+          <div class="settings-heading">TT 機架孔</div>
           <label class="mount-field">軸孔<input data-tt-mount-setting="shaftDiameterMm" type="number" min="0.5" max="30" step="0.1" onchange="window.blocks.setTtMountSetting('shaftDiameterMm', this.value)" title="馬達輸出軸孔直徑 mm"></label>
           <label class="mount-field">螺絲孔<input data-tt-mount-setting="screwDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('screwDiameterMm', this.value)" title="固定螺絲孔直徑 mm"></label>
           <label class="mount-field">螺絲X<input data-tt-mount-setting="screwOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('screwOffsetXMm', this.value)" title="螺絲孔中心相對輸出軸 X mm"></label>
@@ -387,6 +385,9 @@
           <label class="mount-field">定位孔<input data-tt-mount-setting="locatorDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('locatorDiameterMm', this.value)" title="定位孔直徑 mm"></label>
           <label class="mount-field">定位X<input data-tt-mount-setting="locatorOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetXMm', this.value)" title="定位孔相對輸出軸 X mm"></label>
           <label class="mount-field">定位Y<input data-tt-mount-setting="locatorOffsetYMm" type="number" min="-80" max="80" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetYMm', this.value)" title="定位孔相對輸出軸 Y mm"></label>
+          <div class="settings-heading">TT 輸出軸</div>
+          <label class="mount-field">扁軸外徑<input data-export-setting="ttShaftFlatDiameterMm" type="number" min="1" max="30" step="0.1" oninput="window.blocks.setExportSetting('ttShaftFlatDiameterMm', this.value)" title="曲柄扁軸孔外徑 mm"></label>
+          <label class="mount-field">削邊厚<input data-export-setting="ttShaftFlatThicknessMm" type="number" min="0.5" max="30" step="0.1" oninput="window.blocks.setExportSetting('ttShaftFlatThicknessMm', this.value)" title="曲柄扁軸孔雙切邊間距 mm"></label>
         </div>
       </details>
       <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>
@@ -647,17 +648,13 @@
     <div class="mobile-panel-section" data-panel="project">
       <span class="mobile-panel-title">專案</span>
       <button class="tool-btn" onclick="window.blocks.saveFile()" title="存成檔案">💾 存檔</button>
-      <span class="export-settings" aria-label="匯出尺寸">
-        <label class="export-field">桿寬mm
-          <input data-export-setting="barWidthMm" type="number" min="2" max="120" step="0.5" oninput="window.blocks.setExportSetting('barWidthMm', this.value)" title="匯出桿件寬度 mm">
-        </label>
-        <label class="export-field">孔徑mm
-          <input data-export-setting="holeDiameterMm" type="number" min="0.5" max="119" step="0.5" oninput="window.blocks.setExportSetting('holeDiameterMm', this.value)" title="匯出孔直徑 mm">
-        </label>
-      </span>
-      <details class="mount-settings">
-        <summary>TT固定孔</summary>
+      <details class="mount-settings fabrication-settings">
+        <summary>加工設定</summary>
         <div class="mount-grid">
+          <div class="settings-heading">桿件</div>
+          <label class="mount-field">桿寬<input data-export-setting="barWidthMm" type="number" min="2" max="120" step="0.5" oninput="window.blocks.setExportSetting('barWidthMm', this.value)" title="匯出桿件寬度 mm"></label>
+          <label class="mount-field">連接孔<input data-export-setting="holeDiameterMm" type="number" min="0.5" max="119" step="0.5" oninput="window.blocks.setExportSetting('holeDiameterMm', this.value)" title="一般連接孔直徑 mm"></label>
+          <div class="settings-heading">TT 機架孔</div>
           <label class="mount-field">軸孔<input data-tt-mount-setting="shaftDiameterMm" type="number" min="0.5" max="30" step="0.1" onchange="window.blocks.setTtMountSetting('shaftDiameterMm', this.value)" title="馬達輸出軸孔直徑 mm"></label>
           <label class="mount-field">螺絲孔<input data-tt-mount-setting="screwDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('screwDiameterMm', this.value)" title="固定螺絲孔直徑 mm"></label>
           <label class="mount-field">螺絲X<input data-tt-mount-setting="screwOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('screwOffsetXMm', this.value)" title="螺絲孔中心相對輸出軸 X mm"></label>
@@ -665,6 +662,9 @@
           <label class="mount-field">定位孔<input data-tt-mount-setting="locatorDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('locatorDiameterMm', this.value)" title="定位孔直徑 mm"></label>
           <label class="mount-field">定位X<input data-tt-mount-setting="locatorOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetXMm', this.value)" title="定位孔相對輸出軸 X mm"></label>
           <label class="mount-field">定位Y<input data-tt-mount-setting="locatorOffsetYMm" type="number" min="-80" max="80" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetYMm', this.value)" title="定位孔相對輸出軸 Y mm"></label>
+          <div class="settings-heading">TT 輸出軸</div>
+          <label class="mount-field">扁軸外徑<input data-export-setting="ttShaftFlatDiameterMm" type="number" min="1" max="30" step="0.1" oninput="window.blocks.setExportSetting('ttShaftFlatDiameterMm', this.value)" title="曲柄扁軸孔外徑 mm"></label>
+          <label class="mount-field">削邊厚<input data-export-setting="ttShaftFlatThicknessMm" type="number" min="0.5" max="30" step="0.1" oninput="window.blocks.setExportSetting('ttShaftFlatThicknessMm', this.value)" title="曲柄扁軸孔雙切邊間距 mm"></label>
         </div>
       </details>
       <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>

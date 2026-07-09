@@ -2910,7 +2910,9 @@ function transient(msg) {
 function exportSettings() {
   return Exporters.normalizeExportSettings({
     barWidthMm: S.exportBarWidthMm,
-    holeDiameterMm: S.exportHoleDiameterMm
+    holeDiameterMm: S.exportHoleDiameterMm,
+    ttShaftFlatDiameterMm: S.exportTtShaftFlatDiameterMm,
+    ttShaftFlatThicknessMm: S.exportTtShaftFlatThicknessMm
   });
 }
 function normalizeTtMountSettings(settings = {}) {
@@ -2942,8 +2944,9 @@ function ttMountSettings() {
 }
 function syncExportSettingInputs() {
   const settings = exportSettings();
-  document.querySelectorAll('[data-export-setting="barWidthMm"]').forEach(el => { el.value = settings.barWidthMm; });
-  document.querySelectorAll('[data-export-setting="holeDiameterMm"]').forEach(el => { el.value = settings.holeDiameterMm; });
+  Object.entries(settings).forEach(([key, value]) => {
+    document.querySelectorAll(`[data-export-setting="${key}"]`).forEach(el => { el.value = value; });
+  });
 }
 function syncTtMountSettingInputs() {
   const settings = ttMountSettings();
@@ -2957,6 +2960,8 @@ function loadExportSettings() {
   const settings = Exporters.normalizeExportSettings(saved || {});
   S.exportBarWidthMm = settings.barWidthMm;
   S.exportHoleDiameterMm = settings.holeDiameterMm;
+  S.exportTtShaftFlatDiameterMm = settings.ttShaftFlatDiameterMm;
+  S.exportTtShaftFlatThicknessMm = settings.ttShaftFlatThicknessMm;
   syncExportSettingInputs();
 }
 function loadTtMountSettings() {
@@ -2975,9 +2980,13 @@ function loadTtMountSettings() {
 function setExportSetting(key, value) {
   if (key === 'barWidthMm') S.exportBarWidthMm = Number(value);
   if (key === 'holeDiameterMm') S.exportHoleDiameterMm = Number(value);
+  if (key === 'ttShaftFlatDiameterMm') S.exportTtShaftFlatDiameterMm = Number(value);
+  if (key === 'ttShaftFlatThicknessMm') S.exportTtShaftFlatThicknessMm = Number(value);
   const settings = exportSettings();
   S.exportBarWidthMm = settings.barWidthMm;
   S.exportHoleDiameterMm = settings.holeDiameterMm;
+  S.exportTtShaftFlatDiameterMm = settings.ttShaftFlatDiameterMm;
+  S.exportTtShaftFlatThicknessMm = settings.ttShaftFlatThicknessMm;
   try { localStorage.setItem(EXPORT_SETTINGS_KEY, JSON.stringify(settings)); } catch (_) {}
   syncExportSettingInputs();
 }

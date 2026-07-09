@@ -20,13 +20,23 @@ const safeName = s => String(s || 'link').replace(/[^\w.-]+/g, '_');
 export function normalizeExportSettings(settings = {}) {
   const barWidth = Number(settings.barWidthMm);
   const holeDiameter = Number(settings.holeDiameterMm);
+  const ttShaftFlatDiameter = Number(settings.ttShaftFlatDiameterMm);
+  const ttShaftFlatThickness = Number(settings.ttShaftFlatThicknessMm);
   const safeBarWidth = Number.isFinite(barWidth) ? Math.max(2, Math.min(120, barWidth)) : DEFAULT_BAR_WIDTH_MM;
   const safeHoleDiameter = Number.isFinite(holeDiameter)
     ? Math.max(0.5, Math.min(safeBarWidth - 0.5, holeDiameter))
     : Math.min(DEFAULT_HOLE_DIAMETER_MM, safeBarWidth - 0.5);
+  const safeFlatDiameter = Number.isFinite(ttShaftFlatDiameter)
+    ? Math.max(1, Math.min(safeBarWidth - 0.5, ttShaftFlatDiameter))
+    : Math.min(TT_SHAFT_FLAT_DIAMETER_MM, safeBarWidth - 0.5);
+  const safeFlatThickness = Number.isFinite(ttShaftFlatThickness)
+    ? Math.max(0.5, Math.min(safeFlatDiameter - 0.1, ttShaftFlatThickness))
+    : Math.min(TT_SHAFT_FLAT_THICKNESS_MM, safeFlatDiameter - 0.1);
   return {
     barWidthMm: round(safeBarWidth, 2),
-    holeDiameterMm: round(safeHoleDiameter, 2)
+    holeDiameterMm: round(safeHoleDiameter, 2),
+    ttShaftFlatDiameterMm: round(safeFlatDiameter, 2),
+    ttShaftFlatThicknessMm: round(safeFlatThickness, 2)
   };
 }
 
@@ -61,9 +71,10 @@ function isTtMotorEnd(comp, key) {
   return Boolean(comp && comp.isInput && comp.motorType !== 'mg995' && comp[key] && comp[key].physicalMotor);
 }
 
-function ttShaftFlatPoints(cx, cy, steps = 12) {
-  const r = TT_SHAFT_FLAT_DIAMETER_MM / 2;
-  const halfAcrossFlats = TT_SHAFT_FLAT_THICKNESS_MM / 2;
+function ttShaftFlatPoints(cx, cy, settings = {}, steps = 12) {
+  const normalized = normalizeExportSettings(settings);
+  const r = normalized.ttShaftFlatDiameterMm / 2;
+  const halfAcrossFlats = normalized.ttShaftFlatThicknessMm / 2;
   const y = Math.sqrt(Math.max(0, r * r - halfAcrossFlats * halfAcrossFlats));
   const rightTop = Math.atan2(-y, halfAcrossFlats) * 180 / Math.PI;
   const leftTop = Math.atan2(-y, -halfAcrossFlats) * 180 / Math.PI;
@@ -75,19 +86,20 @@ function ttShaftFlatPoints(cx, cy, steps = 12) {
   ];
 }
 
-function svgTtShaftFlatPath(cx, cy) {
-  return svgPolyline(ttShaftFlatPoints(cx, cy));
+function svgTtShaftFlatPath(cx, cy, settings) {
+  return svgPolyline(ttShaftFlatPoints(cx, cy, settings));
 }
 
 function linkHoleSpecs(comp, length, settings) {
-  const { holeDiameterMm } = normalizeExportSettings(settings);
+  const { holeDiameterMm, ttShaftFlatDiameterMm, ttShaftFlatThicknessMm } = normalizeExportSettings(settings);
   const holeR = round(holeDiameterMm / 2, 3);
+  const flat = { ttShaftFlatDiameterMm, ttShaftFlatThicknessMm };
   return [
     isTtMotorEnd(comp, 'p1')
-      ? { kind: 'tt-shaft-flat', x: 0, y: 0 }
+      ? { kind: 'tt-shaft-flat', x: 0, y: 0, settings: flat }
       : { kind: 'circle', x: 0, y: 0, r: holeR },
     isTtMotorEnd(comp, 'p2')
-      ? { kind: 'tt-shaft-flat', x: length, y: 0 }
+      ? { kind: 'tt-shaft-flat', x: length, y: 0, settings: flat }
       : { kind: 'circle', x: length, y: 0, r: holeR }
   ];
 }
@@ -112,7 +124,7 @@ function svgForLink(comp, length, settings) {
   <g fill="none" stroke="#000" stroke-width="0.25">
     <path d="${d}" />
 ${holes.map(h => h.kind === 'tt-shaft-flat'
-    ? `    <path d="${svgTtShaftFlatPath(h.x, h.y)}" data-hole="TT_SHAFT_FLAT" />`
+    ? `    <path d="${svgTtShaftFlatPath(h.x, h.y, h.settings)}" data-hole="TT_SHAFT_FLAT" />`
     : `    <circle cx="${h.x}" cy="${h.y}" r="${h.r}" />`).join('\n')}
   </g>
 </svg>
@@ -372,7 +384,7 @@ function dxfForLink(comp, length, settings) {
     dxfPair(2, 'ENTITIES'),
     dxfPolyline(outline, 'CUT'),
     ...holes.map(h => h.kind === 'tt-shaft-flat'
-      ? dxfPolyline(ttShaftFlatPoints(h.x, h.y, 18), 'TT_SHAFT_FLAT')
+      ? dxfPolyline(ttShaftFlatPoints(h.x, h.y, h.settings, 18), 'TT_SHAFT_FLAT')
       : dxfCircle(h.x, h.y, h.r, 'HOLE')),
     dxfPair(0, 'ENDSEC'),
     dxfPair(0, 'EOF')
