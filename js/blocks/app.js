@@ -167,6 +167,7 @@ function loadExample(id) {
 // ---- 綁定層：把純模組綁到本檔狀態，維持原呼叫端不變 ----
 const barHullPath = View.barHullPath;
 const roundedTriangleHullPath = View.roundedTriangleHullPath;
+const jawPlatePath = View.jawPlatePath;
 const worldFromEvent = (e) => View.worldFromEvent(svg, e);
 const extrapolateSeed = Motion.extrapolateSeed;
 const norm360 = Motion.norm360;
@@ -620,20 +621,7 @@ function drawGearPart(c, pts) {
   const localPts = createGearPath({ teeth, module: (2 * R) / teeth });
   const sc = View.getScale();
   const polyStr = localPts.map(p => `${(p.x * sc).toFixed(2)},${(-p.y * sc).toFixed(2)}`).join(' ');
-  // 嚙合相位：讓從動輪的「齒」對上驅動輪的「齒隙」（否則齒對齒相撞）。createGearPath 在 local
-  // 角 0 放齒冠;嚙合不變量 qA+qB=(NA·βA+NB·βB)/2π 需 =0.5,給齒形（非銷/運動學）補常數偏移 δ。
-  let meshDeg = 0;
-  const drv = c.mesh ? S.comps.find(g => g.type === 'gear' && g.id === c.mesh) : null;
-  if (drv && drv.p1) {
-    const pc = pointCoords();
-    const CA = pc[drv.p1.id] || drv.p1, CB = pc[c.p1.id] || c.p1;
-    const NA = Math.max(6, Math.round(Number(drv.teeth) || 12)), NB = teeth;
-    const betaA = Math.atan2(CB.y - CA.y, CB.x - CA.x);   // 驅動→從動
-    const betaB = Math.atan2(CA.y - CB.y, CA.x - CB.x);   // 從動→驅動
-    let Cq = (NA * betaA + NB * betaB) / (2 * Math.PI);
-    Cq -= Math.floor(Cq);                                 // mod 1
-    meshDeg = (Cq - 0.5) * (360 / NB);                    // 補到 0.5（半齒）
-  }
+  const meshDeg = gearMeshPhaseDeg(c, pts);
   const isSelGear = c.id === S.selectedGearId;
   const meshOff = gearMeshOff(c);   // 兩中心都接地但沒對好咬合距離 → 紅色虛線環提示
   const g = document.createElementNS(SVG_NS, 'g');
@@ -660,11 +648,16 @@ function drawGearPart(c, pts) {
   // 輪緣螺栓孔（＝輸出銷 p2，連桿接這裡）：畫成齒輪上的安裝孔，跟著銷走。
   // 直接放在銷的世界位置（不進旋轉的 g），所以不受齒形嚙合相位 meshDeg 影響、正落在 p2 上。
   const bolt = document.createElementNS(SVG_NS, 'circle');
-  bolt.setAttribute('r', Math.max(2.5, 3.5 * sc));
+  const pinHoleR = Math.max(1, Number(c.pinHoleDiameter) || 5) / 2;
+  bolt.setAttribute('r', Math.max(2.5, pinHoleR * sc));
   bolt.setAttribute('fill', '#ffffff');
   bolt.setAttribute('stroke', c.color || '#b0772e');
   bolt.setAttribute('stroke-width', Math.max(1.5, 2 * sc));
-  bolt.style.pointerEvents = 'none';
+  bolt.style.cursor = 'grab';
+  bolt.addEventListener('pointerdown', (e) => startGearManualRotate(e, c.id));
+  const title = document.createElementNS(SVG_NS, 'title');
+  title.textContent = '拖曳旋轉齒輪輸出孔';
+  bolt.appendChild(title);
   svg.appendChild(bolt);
   const applyGear = (P) => {
     const ctr = P[c.p1.id], pin = P[c.p2.id];
@@ -678,6 +671,67 @@ function drawGearPart(c, pts) {
   };
   applyGear(pts);
   frameUpdaters.push(applyGear);
+}
+function gearMeshPhaseDeg(c, pts, memo = new Map()) {
+  if (!c || !c.mesh) return 0;
+  if (memo.has(c.id)) return memo.get(c.id);
+  const drv = gearById(c.mesh);
+  if (!drv || !drv.p1 || !drv.p2 || !c.p1 || !c.p2) return 0;
+  const CA = pts[drv.p1.id] || drv.p1;
+  const CB = pts[c.p1.id] || c.p1;
+  const PA = pts[drv.p2.id] || drv.p2;
+  const PB = pts[c.p2.id] || c.p2;
+  if (![CA, CB, PA, PB].every(p => p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y)))) return 0;
+  const NA = Math.max(6, Math.round(Number(drv.teeth) || 12));
+  const NB = Math.max(6, Math.round(Number(c.teeth) || 12));
+  const betaA = Math.atan2(CB.y - CA.y, CB.x - CA.x);
+  const betaB = Math.atan2(CA.y - CB.y, CA.x - CB.x);
+  const angleA = Math.atan2(PA.y - CA.y, PA.x - CA.x);
+  const angleB = Math.atan2(PB.y - CB.y, PB.x - CB.x);
+  const meshA = gearMeshPhaseDeg(drv, pts, memo) * Math.PI / 180;
+  let q = (NA * (betaA + angleA + meshA) + NB * (betaB + angleB)) / (2 * Math.PI);
+  q -= Math.floor(q);
+  const phase = (0.5 - q) * (360 / NB);
+  memo.set(c.id, phase);
+  return phase;
+}
+function drawGearManualHandles(pts) {
+  S.comps.filter(c => c.type === 'gear' && c.p1 && c.p2).forEach(c => {
+    const sc = View.getScale();
+    const pinHoleR = Math.max(1, Number(c.pinHoleDiameter) || 5) / 2;
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.style.cursor = 'grab';
+
+    const hit = document.createElementNS(SVG_NS, 'circle');
+    hit.setAttribute('r', Math.max(13, pinHoleR * sc + 7));
+    hit.setAttribute('fill', 'transparent');
+    hit.setAttribute('stroke', 'none');
+    hit.addEventListener('pointerdown', (e) => startGearManualRotate(e, c.id));
+
+    const ring = document.createElementNS(SVG_NS, 'circle');
+    ring.setAttribute('r', Math.max(3.2, pinHoleR * sc));
+    ring.setAttribute('fill', '#ffffff');
+    ring.setAttribute('stroke', c.id === S.selectedGearId ? '#e67e22' : (c.color || '#b0772e'));
+    ring.setAttribute('stroke-width', Math.max(1.8, 2.2 * sc));
+    ring.style.pointerEvents = 'none';
+
+    const title = document.createElementNS(SVG_NS, 'title');
+    title.textContent = '拖曳旋轉齒輪輸出孔';
+    g.appendChild(title);
+    g.appendChild(hit);
+    g.appendChild(ring);
+    svg.appendChild(g);
+
+    const applyHandle = (P) => {
+      const pin = P[c.p2.id];
+      const ok = pin && Number.isFinite(pin.x) && Number.isFinite(pin.y);
+      g.style.display = ok ? '' : 'none';
+      if (!ok) return;
+      g.setAttribute('transform', `translate(${TX(pin.x)} ${TY(pin.y)})`);
+    };
+    applyHandle(pts);
+    frameUpdaters.push(applyHandle);
+  });
 }
 // 三點桿：用圓角三角板呈現，同時仍保留每條邊/孔位的求解語法。phase 'layered'：畫進
 // draw() 依 zlift 算好的疊放層（透過 ctx.groupForLayer/triLayerByKey/triKey 取得對應 <g>）。
@@ -703,7 +757,7 @@ function drawTrianglePart(c, pts, ctx) {
     const [a, b, d] = ids.map(id => P[id]);
     const ok = [a, b, d].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
     path.style.display = ok ? '' : 'none';
-    if (ok) path.setAttribute('d', roundedTriangleHullPath(a, b, d));
+    if (ok) path.setAttribute('d', c.shape === 'jaw' ? jawPlatePath(a, b, d, c.jawTurnSign) : roundedTriangleHullPath(a, b, d));
   };
   applyTri(pts);
   ctx.groupForLayer(ctx.triLayerByKey.get(ctx.triKey(ids))).appendChild(path);
@@ -1360,6 +1414,7 @@ function draw() {
     frameUpdaters.push(applyNode);
   });
 
+  drawGearManualHandles(pts);
   drawFrameHandle();   // 機架移動把手：畫在節點之上，才點得到、拖得動
   Tools.drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
   Tools.drawTrianglePreview(); // 三點桿模式：疊在最上層的三角預覽
@@ -1388,6 +1443,7 @@ function draw() {
       module: c.module,
       mesh: c.mesh,
       color: c.color,
+      pinHoleDiameter: Number(c.pinHoleDiameter) || 5,
     }));
   const racks3d = S.comps
     .filter(c => c.type === 'rack' && c.p1)
@@ -1895,7 +1951,7 @@ function makeGear(n, opts) {
     type: 'gear', id: 'Gear' + n, color,
     p1: center,
     p2: { id: 'GP' + n, type: 'floating', x: cx + pinR, y: cy },
-    radiusParam, pinRadiusParam, teeth, module, phase: 0
+    radiusParam, pinRadiusParam, pinHoleDiameter: 5, teeth, module, phase: 0
   };
   if (meshId) gear.mesh = meshId;
   S.topo.params[radiusParam] = R;
@@ -1993,7 +2049,90 @@ function updateGearEditor() {
   setText('gearModuleVal', Math.round(mod));
   setText('gearTeethVal', c.teeth);
   setText('gearRadiusVal', Math.round(Number(S.topo.params[c.radiusParam]) || c.teeth * mod / 2));
+  setText('gearPinRadiusVal', Math.round(gearPinRadius(c)));
+  setText('gearPinHoleVal', Number(c.pinHoleDiameter || 5).toFixed(1).replace(/\.0$/, ''));
   panel.style.display = 'flex';
+}
+function gearPitchRadius(c) {
+  return Number(S.topo.params[c.radiusParam]) || (Number(c.teeth) || 12) * (Number(c.module) || GEAR_MODULE) / 2 || 40;
+}
+function gearPinRadius(c) {
+  const pitchR = gearPitchRadius(c);
+  return c.pinRadiusParam
+    ? Number(S.topo.params[c.pinRadiusParam]) || Math.round(pitchR * 0.6)
+    : Number(c.pinRadius) || Math.round(pitchR * 0.6);
+}
+function gearDriveState(c, seen = new Set()) {
+  if (!c || seen.has(c.id)) return null;
+  if (!c.mesh) return { root: c, factor: 1 };
+  seen.add(c.id);
+  const driver = gearById(c.mesh);
+  if (!driver) return null;
+  const parent = gearDriveState(driver, seen);
+  if (!parent) return null;
+  return {
+    root: parent.root,
+    factor: parent.factor * -(gearPitchRadius(driver) / (gearPitchRadius(c) || 1))
+  };
+}
+function setGearManualAngle(c, angleRad) {
+  if (!c || !c.p1 || !c.p2) return;
+  const state = gearDriveState(c);
+  const rootMotor = state && state.root && state.root.p1 &&
+    (state.root.p1.physicalMotor || state.root.p1.physical_motor);
+  const phaseRad = (Number(c.phase) || 0) * Math.PI / 180;
+  if (rootMotor && state && Math.abs(state.factor) > 1e-9) {
+    S.theta = (angleRad - phaseRad) * 180 / Math.PI / state.factor;
+    S.topo.params.theta = S.theta;
+    const thetaEl = document.getElementById('thetaVal');
+    if (thetaEl) thetaEl.textContent = Math.round(norm360(S.theta));
+  } else {
+    const ctr = pointCoords()[c.p1.id] || c.p1;
+    const r = gearPinRadius(c);
+    updatePointCoordsById(c.p2.id, (ctr.x || 0) + r * Math.cos(angleRad), (ctr.y || 0) + r * Math.sin(angleRad));
+  }
+}
+function startGearManualRotate(e, gearId) {
+  if (S.drawingLink || S.drawingTriangle || S.placingMotor || S.pickBars) return;
+  const c = gearById(gearId);
+  if (!c || !c.p1 || !c.p2) return;
+  e.preventDefault();
+  e.stopPropagation();
+  pause();
+  selectGear(gearId);
+  S.preDragSnap = snapshotStr();
+  const move = (ev) => {
+    const w = worldFromEvent(ev);
+    const ctr = pointCoords()[c.p1.id] || c.p1;
+    if (!w || !ctr) return;
+    setGearManualAngle(c, Math.atan2(w.y - ctr.y, w.x - ctr.x));
+    renderFrame();
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
+    if (S.preDragSnap != null && snapshotStr() !== S.preDragSnap) {
+      S.undoStack.push(S.preDragSnap);
+      if (S.undoStack.length > 60) S.undoStack.shift();
+      updateUndoBtn();
+    }
+    S.preDragSnap = null;
+    rebuild();
+    recordManualTrace();
+    draw();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+  move(e);
+}
+function clampGearPinRadius(c) {
+  if (!c) return;
+  const pitchR = gearPitchRadius(c);
+  const next = Math.max(4, Math.min(Math.max(4, pitchR - 4), gearPinRadius(c)));
+  if (c.pinRadiusParam) S.topo.params[c.pinRadiusParam] = Math.round(next);
+  else c.pinRadius = Math.round(next);
 }
 function changeGearTeeth(delta) {
   const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
@@ -2001,7 +2140,31 @@ function changeGearTeeth(delta) {
   pushUndo();
   c.teeth = Math.max(6, Math.round((Number(c.teeth) || 12) + delta));
   S.topo.params[c.radiusParam] = c.teeth * (Number(c.module) || GEAR_MODULE) / 2;
+  clampGearPinRadius(c);
   syncGearMesh();
+  rebuild(); draw();
+  updateGearEditor();
+}
+function changeGearPinRadius(delta) {
+  const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
+  if (!c) return;
+  pushUndo();
+  const pitchR = gearPitchRadius(c);
+  const next = Math.max(4, Math.min(Math.max(4, pitchR - 4), gearPinRadius(c) + delta));
+  if (c.pinRadiusParam) S.topo.params[c.pinRadiusParam] = Math.round(next);
+  else c.pinRadius = Math.round(next);
+  const ctr = pointCoords()[c.p1.id] || c.p1;
+  const pin = pointCoords()[c.p2.id] || c.p2;
+  const ang = Math.atan2((pin.y || 0) - (ctr.y || 0), (pin.x || 0) - (ctr.x || 0));
+  updatePointCoordsById(c.p2.id, (ctr.x || 0) + next * Math.cos(ang), (ctr.y || 0) + next * Math.sin(ang));
+  rebuild(); draw();
+  updateGearEditor();
+}
+function changeGearPinHoleDiameter(delta) {
+  const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
+  if (!c) return;
+  pushUndo();
+  c.pinHoleDiameter = Number(Math.max(1, Math.min(30, (Number(c.pinHoleDiameter) || 5) + delta)).toFixed(1));
   rebuild(); draw();
   updateGearEditor();
 }
@@ -2011,7 +2174,11 @@ function changeGearModule(delta) {
   pushUndo();
   // 模數是「整鏈」共用：同時改本輪與和它嚙合的所有齒輪，否則齒大小不一咬不起來。
   const mod = Math.max(1, (Number(c.module) || GEAR_MODULE) + delta);
-  gearMeshChain(c).forEach(g => { g.module = mod; S.topo.params[g.radiusParam] = g.teeth * mod / 2; });
+  gearMeshChain(c).forEach(g => {
+    g.module = mod;
+    S.topo.params[g.radiusParam] = g.teeth * mod / 2;
+    clampGearPinRadius(g);
+  });
   syncGearMesh();
   rebuild(); draw();
   updateGearEditor();
@@ -2144,7 +2311,8 @@ function closeLinkMenu() {
 }
 function pickLinkTool(type) {
   closeLinkMenu();
-  if (type === 'triangle') Tools.startDrawTriangle();
+  if (type === 'triangle') Tools.startDrawTriangle('triangle');
+  else if (type === 'jaw') Tools.startDrawTriangle('jaw');
   else Tools.startDrawLink();
 }
 function powerMenuEl() { return document.getElementById('powerMenu'); }
@@ -2419,7 +2587,8 @@ function selectTriangle(id) {
   document.getElementById('roleEditor').style.display = 'none';
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
-  document.getElementById('lenTitle').textContent = '🔺 三點桿';
+  const comp = S.comps.find(x => x.id === id && x.type === 'triangle');
+  document.getElementById('lenTitle').textContent = comp && comp.shape === 'jaw' ? '⌒ 夾爪板' : '🔺 三點桿';
   Panels.setLenButtonTitles('短 8mm（少一孔）', '長 8mm（多一孔）');
   S.triSide = 'g';
   const sel = document.getElementById('triSideSelect');
@@ -3126,5 +3295,5 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, openTaskMenu, taskOpenExamples, taskStartLink, taskAddPower, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: Tools.startDrawTriangle, clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, openTaskMenu, taskOpenExamples, taskStartLink, taskAddPower, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
 init();

@@ -67,6 +67,23 @@ function exportableLinks(comps, pts, params) {
     .filter(item => item.length > 0);
 }
 
+function pointForExport(comp, key, pts) {
+  const id = comp && comp[key] && comp[key].id;
+  const solved = id && pts && pts[id];
+  if (solved && Number.isFinite(solved.x) && Number.isFinite(solved.y)) return solved;
+  const seed = comp && comp[key];
+  return seed && Number.isFinite(Number(seed.x)) && Number.isFinite(Number(seed.y))
+    ? { x: Number(seed.x), y: Number(seed.y) }
+    : null;
+}
+
+function exportablePlates(comps, pts) {
+  return comps
+    .filter(c => c && c.type === 'triangle' && c.p1 && c.p2 && c.p3)
+    .map(c => ({ comp: c, points: [pointForExport(c, 'p1', pts), pointForExport(c, 'p2', pts), pointForExport(c, 'p3', pts)] }))
+    .filter(item => item.points.every(Boolean));
+}
+
 function isTtMotorEnd(comp, key) {
   return Boolean(comp && comp.isInput && comp.motorType !== 'mg995' && comp[key] && comp[key].physicalMotor);
 }
@@ -216,8 +233,121 @@ function barOutline(a, b, radius) {
   ];
 }
 
+function roundedTriangleOutline(a, b, c, radius) {
+  const pts = [a, b, c];
+  const area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  const ordered = area < 0 ? [a, c, b] : pts;
+  const tangent = (p, q) => {
+    const dx = q.x - p.x, dy = q.y - p.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const nx = dy / dist, ny = -dx / dist;
+    return {
+      start: { x: p.x + nx * radius, y: p.y + ny * radius },
+      end: { x: q.x + nx * radius, y: q.y + ny * radius }
+    };
+  };
+  const out = [];
+  const ts = ordered.map((p, i) => tangent(p, ordered[(i + 1) % ordered.length]));
+  out.push(ts[0].start);
+  for (let i = 0; i < ts.length; i++) {
+    const curr = ts[i];
+    const next = ts[(i + 1) % ts.length];
+    const corner = ordered[(i + 1) % ordered.length];
+    out.push(curr.end);
+    out.push(...arcPoints(
+      corner.x, corner.y, radius,
+      Math.atan2(curr.end.y - corner.y, curr.end.x - corner.x) * 180 / Math.PI,
+      Math.atan2(next.start.y - corner.y, next.start.x - corner.x) * 180 / Math.PI,
+      14
+    ).slice(1));
+  }
+  return out;
+}
+
+function jawPlateOutlines(pivot, drive, tip, turnSign = 0) {
+  const dx = tip.x - pivot.x;
+  const dy = tip.y - pivot.y;
+  const len = Math.hypot(dx, dy);
+  if (len <= 1e-6) return [roundedTriangleOutline(pivot, drive, tip, HULL_R_WORLD)];
+  const ux = dx / len;
+  const uy = dy / len;
+  const cross = ux * (drive.y - pivot.y) - uy * (drive.x - pivot.x);
+  const side = Number(turnSign) < 0 ? -1 : (Number(turnSign) > 0 ? 1 : (Math.sign(cross) || 1));
+  const turn = side * 55 * Math.PI / 180;
+  const cos = Math.cos(turn);
+  const sin = Math.sin(turn);
+  const ex = ux * cos - uy * sin;
+  const ey = ux * sin + uy * cos;
+  const extend = Math.max(38, Math.min(84, len * 0.58));
+  const end = { x: tip.x + ex * extend, y: tip.y + ey * extend };
+  return [
+    barOutline(drive, pivot, HULL_R_WORLD),
+    barOutline(pivot, tip, HULL_R_WORLD),
+    barOutline(tip, end, HULL_R_WORLD)
+  ];
+}
+
 function svgPolyline(points) {
   return points.map((p, i) => `${i ? 'L' : 'M'} ${round(p.x)} ${round(p.y)}`).join(' ') + ' Z';
+}
+
+function plateGeometry(comp, points, settings) {
+  const { holeDiameterMm } = normalizeExportSettings(settings);
+  const outlines = comp.shape === 'jaw'
+    ? jawPlateOutlines(points[0], points[1], points[2], comp.jawTurnSign)
+    : [roundedTriangleOutline(points[0], points[1], points[2], HULL_R_WORLD)];
+  const holes = points.map(p => ({ x: p.x, y: p.y, r: holeDiameterMm / 2 }));
+  return { outlines, holes };
+}
+
+function boundsForGeometry(outlines, holes = []) {
+  const xs = [], ys = [];
+  outlines.flat().forEach(p => { xs.push(p.x); ys.push(p.y); });
+  holes.forEach(h => {
+    xs.push(h.x - h.r, h.x + h.r);
+    ys.push(h.y - h.r, h.y + h.r);
+  });
+  const pad = 4;
+  return {
+    minX: Math.min(...xs) - pad,
+    maxX: Math.max(...xs) + pad,
+    minY: Math.min(...ys) - pad,
+    maxY: Math.max(...ys) + pad
+  };
+}
+
+function svgForPlate(comp, points, settings) {
+  const geometry = plateGeometry(comp, points, settings);
+  const b = boundsForGeometry(geometry.outlines, geometry.holes);
+  const width = round(b.maxX - b.minX);
+  const height = round(b.maxY - b.minY);
+  const paths = geometry.outlines.map(outline => `    <path d="${svgPolyline(outline)}" />`).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${round(b.minX)} ${round(b.minY)} ${width} ${height}">
+  <title>${esc(comp.id || 'plate')}</title>
+  <g fill="none" stroke="#000" stroke-width="0.25">
+${paths}
+${geometry.holes.map(h => `    <circle cx="${round(h.x)}" cy="${round(h.y)}" r="${round(h.r)}" />`).join('\n')}
+  </g>
+</svg>
+`;
+}
+
+function dxfForPlate(comp, points, settings) {
+  const geometry = plateGeometry(comp, points, settings);
+  return [
+    dxfPair(0, 'SECTION'),
+    dxfPair(2, 'HEADER'),
+    dxfPair(9, '$INSUNITS'),
+    dxfPair(70, 4),
+    dxfPair(0, 'ENDSEC'),
+    dxfPair(0, 'SECTION'),
+    dxfPair(2, 'ENTITIES'),
+    ...geometry.outlines.map(outline => dxfPolyline(outline, 'CUT')),
+    ...geometry.holes.map(h => dxfCircle(h.x, h.y, h.r, 'HOLE')),
+    dxfPair(0, 'ENDSEC'),
+    dxfPair(0, 'EOF')
+  ].join('\n') + '\n';
 }
 
 function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
@@ -396,7 +526,11 @@ export function exportLinksAsSvg(comps, pts, params, settings) {
   links.forEach(({ comp, length }) => {
     downloadText(svgForLink(comp, length, settings), `${safeName(comp.id)}.svg`, 'image/svg+xml');
   });
-  return links.length;
+  const plates = exportablePlates(comps, pts);
+  plates.forEach(({ comp, points }) => {
+    downloadText(svgForPlate(comp, points, settings), `${safeName(comp.id)}.svg`, 'image/svg+xml');
+  });
+  return links.length + plates.length;
 }
 
 export function exportLinksAsDxf(comps, pts, params, settings) {
@@ -404,7 +538,11 @@ export function exportLinksAsDxf(comps, pts, params, settings) {
   links.forEach(({ comp, length }) => {
     downloadText(dxfForLink(comp, length, settings), `${safeName(comp.id)}.dxf`, 'application/dxf');
   });
-  return links.length;
+  const plates = exportablePlates(comps, pts);
+  plates.forEach(({ comp, points }) => {
+    downloadText(dxfForPlate(comp, points, settings), `${safeName(comp.id)}.dxf`, 'application/dxf');
+  });
+  return links.length + plates.length;
 }
 
 export function exportFrameAsSvg(frameNodes, settings, ttMounts = []) {

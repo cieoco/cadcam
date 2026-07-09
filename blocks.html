@@ -567,6 +567,18 @@
         <div class="se-row">
           <span class="se-label">節圓</span>
           <span class="le-value"><span id="gearRadiusVal">36</span><span class="le-unit">mm 半徑</span></span>
+        </div>
+        <div class="se-row">
+          <span class="se-label">輸出孔距</span>
+          <button class="le-step" onclick="window.blocks.changeGearPinRadius(-2)" title="輸出孔往齒輪中心移 2mm">−</button>
+          <span class="le-value"><span id="gearPinRadiusVal">22</span><span class="le-unit">mm 半徑</span></span>
+          <button class="le-step" onclick="window.blocks.changeGearPinRadius(2)" title="輸出孔往齒輪外側移 2mm">＋</button>
+        </div>
+        <div class="se-row">
+          <span class="se-label">輸出孔徑</span>
+          <button class="le-step" onclick="window.blocks.changeGearPinHoleDiameter(-0.5)" title="輸出孔徑縮小 0.5mm">−</button>
+          <span class="le-value"><span id="gearPinHoleVal">5</span><span class="le-unit">mm</span></span>
+          <button class="le-step" onclick="window.blocks.changeGearPinHoleDiameter(0.5)" title="輸出孔徑放大 0.5mm">＋</button>
           <button class="clear-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除這對齒輪">🗑 刪除</button>
         </div>
       </div>
@@ -610,6 +622,10 @@
         <button class="pm-opt" onclick="window.blocks.pickLinkTool('triangle')">
           <span class="pm-ico">🔺</span>
           <span class="pm-text"><b>三點桿</b><small>三個孔，做成剛性板</small></span>
+        </button>
+        <button class="pm-opt" onclick="window.blocks.pickLinkTool('jaw')">
+          <span class="pm-ico">⌒</span>
+          <span class="pm-text"><b>夾爪板</b><small>三個機構孔，外形做成夾持器</small></span>
         </button>
         <button class="pm-cancel" onclick="window.blocks.openLinkMenu()">取消</button>
       </div>

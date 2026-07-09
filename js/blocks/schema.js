@@ -117,6 +117,14 @@ function normalizeTriangle(comp, index, params, warnings) {
     sign: Number(comp.sign) < 0 ? -1 : 1
   };
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0)))); // 手動疊放相對位移
+  const inferredJaw = comp.shape === 'jaw' || /(^|[-_])(?:left|right)?jaw/i.test(id);
+  if (inferredJaw) {
+    out.shape = 'jaw';
+    if (Number(comp.jawTurnSign) < 0) out.jawTurnSign = -1;
+    else if (Number(comp.jawTurnSign) > 0) out.jawTurnSign = 1;
+    else if (/leftjaw/i.test(id)) out.jawTurnSign = -1;
+    else if (/rightjaw/i.test(id)) out.jawTurnSign = 1;
+  }
   if (comp.visualOnly) out.visualOnly = true;
   if (comp.snapLength === false) out.snapLength = false;
 
@@ -244,6 +252,7 @@ function normalizeGear(comp, index, params, warnings) {
   };
   if (pinRadiusParam) out.pinRadiusParam = pinRadiusParam;
   else if (Number.isFinite(Number(comp.pinRadius))) out.pinRadius = Math.max(1, Math.round(num(comp.pinRadius, R * 0.6)));
+  if (Number.isFinite(Number(comp.pinHoleDiameter))) out.pinHoleDiameter = Math.max(1, Math.min(30, roundTenth(comp.pinHoleDiameter, 5)));
   if (safeId(comp.mesh)) out.mesh = comp.mesh;
   if (comp.physicalMotor) out.physicalMotor = String(comp.physicalMotor);
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));

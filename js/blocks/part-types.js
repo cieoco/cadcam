@@ -23,7 +23,7 @@ export const PART_TYPES = {
   bar:      { pointKeys: ['p1', 'p2'],                    paramProps: ['lenParam'] },                // 連桿：兩端 + 長度
   triangle: { pointKeys: ['p1', 'p2', 'p3'],             paramProps: ['gParam', 'r1Param', 'r2Param'] }, // 三點桿：三頂點 + 三邊
   slider:   { pointKeys: ['p1', 'p2', 'p3', 'm1', 'm2'], paramProps: ['lenParam'] },                // 滑軌：軌道兩端 + 滑塊 + 兩固定孔 + 軌長
-  gear:     { pointKeys: ['p1', 'p2'],                    paramProps: ['radiusParam'] },             // 齒輪：中心(p1) + 輪緣輸出銷(p2) + 節圓半徑
+  gear:     { pointKeys: ['p1', 'p2'],                    paramProps: ['radiusParam', 'pinRadiusParam'] }, // 齒輪：中心 + 輸出孔 + 節圓/偏心半徑
   cam:      { pointKeys: ['p1', 'p2'],                    paramProps: ['baseRadiusParam', 'liftParam'] }, // 凸輪：中心 + 直動從動點 + 基圓/升程
   pulley:   { pointKeys: ['p1', 'p2'],                    paramProps: ['radiusParam'] },             // 皮帶輪：中心 + 輪緣輸出銷 + 節圓半徑
   belt:     { pointKeys: [],                              paramProps: [] },                          // 皮帶：用 pulley id 連接兩輪，本身沒有接點

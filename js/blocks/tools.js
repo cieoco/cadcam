@@ -21,6 +21,8 @@ import { ownedParamKeys } from './part-types.js';   // 零件型別表：元件�
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const { W, H, TX, TY } = View;
 const barHullPath = View.barHullPath;
+const roundedTriangleHullPath = View.roundedTriangleHullPath;
+const jawPlatePath = View.jawPlatePath;
 
 // 樂高孔距幾何常數與純 helper（與 app.js 同值；畫桿/三角的長度一律對齊 8mm 孔距）
 const LEGO_STEP = 8;
@@ -153,13 +155,14 @@ export function drawDrawPreview() {
   svg.appendChild(label);
 }
 
-export function startDrawTriangle() {
+export function startDrawTriangle(shape = 'triangle') {
   if (S.drawingTriangle) { exitDrawTriangle(); draw(); return; }
   pause();
   cancelMotorMode();
   exitDrawLink();
   deselectLink();
   S.drawingTriangle = true;
+  S.triangleShape = shape === 'jaw' ? 'jaw' : 'triangle';
   S.triangleStage = 'base';
   const a = View.worldFromScreen(W * 0.18, H * 0.26);
   const b = { x: a.x + 64, y: a.y };
@@ -167,14 +170,16 @@ export function startDrawTriangle() {
   S.trianglePoints = [first];
   S.trianglePreview = b;
   svg.style.cursor = 'crosshair';
+  const label = S.triangleShape === 'jaw' ? '夾爪板' : '三點桿';
   setBanner(promptText(
-    '三點桿：先移動調第一段，按右鍵確定（8mm 倍數）',
-    '三點桿：先拖曳調第一段，放開確定（8mm 倍數）'
+    `${label}：先移動調第一段，按右鍵確定（8mm 倍數）`,
+    `${label}：先拖曳調第一段，放開確定（8mm 倍數）`
   ));
   draw();
 }
 export function exitDrawTriangle() {
   S.drawingTriangle = false;
+  S.triangleShape = 'triangle';
   S.triangleStage = 'base';
   S.trianglePoints = [];
   S.trianglePreview = null;
@@ -211,6 +216,14 @@ function resolveTriangleBaseEnd(cur) {
 }
 function legoLength(v) {
   return snapLego(v);
+}
+function jawTurnSign(pivot, drive, tip) {
+  const dx = tip.x - pivot.x;
+  const dy = tip.y - pivot.y;
+  const len = Math.hypot(dx, dy);
+  if (len <= 1e-6) return 1;
+  const cross = (dx / len) * (drive.y - pivot.y) - (dy / len) * (drive.x - pivot.x);
+  return Math.sign(cross) || 1;
 }
 function resolveTriangleThirdPoint(cur) {
   if (S.trianglePoints.length < 2) return null;
@@ -265,10 +278,14 @@ export function drawTrianglePreview() {
     if (floating) pts.push(floating.pos);
   }
   if (pts.length >= 2) {
-    const path = document.createElementNS(SVG_NS, pts.length >= 3 ? 'polygon' : 'polyline');
-    path.setAttribute('points', pts.map(p => `${TX(p.x)},${TY(p.y)}`).join(' '));
-    path.setAttribute('fill', pts.length >= 3 ? '#27ae6022' : 'none');
-    path.setAttribute('stroke', '#27ae60');
+    const path = document.createElementNS(SVG_NS, 'path');
+    const isJaw = S.triangleShape === 'jaw';
+    const d = pts.length >= 3
+      ? (isJaw ? jawPlatePath(pts[0], pts[1], pts[2], jawTurnSign(pts[0], pts[1], pts[2])) : roundedTriangleHullPath(pts[0], pts[1], pts[2]))
+      : `M ${TX(pts[0].x)} ${TY(pts[0].y)} L ${TX(pts[1].x)} ${TY(pts[1].y)}`;
+    path.setAttribute('d', d);
+    path.setAttribute('fill', pts.length >= 3 ? (isJaw ? '#ff704322' : '#27ae6022') : 'none');
+    path.setAttribute('stroke', isJaw ? '#ff7043' : '#27ae60');
     path.setAttribute('stroke-width', 2);
     path.setAttribute('stroke-dasharray', '8 6');
     path.setAttribute('stroke-linejoin', 'round');
@@ -306,9 +323,10 @@ function confirmTriangleBase(e) {
   S.triangleStage = 'third';
   const a = S.trianglePoints[0].pos, b = S.trianglePoints[1].pos;
   S.trianglePreview = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - Math.max(40, picked.len * 0.8) };
+  const label = S.triangleShape === 'jaw' ? '夾爪板' : '三點桿';
   setBanner(promptText(
-    '三點桿：移動選第三孔，按一下或右鍵確定（距離自動對齊 8mm）',
-    '三點桿：拖曳選第三孔，放開確定（距離自動對齊 8mm）'
+    `${label}：移動選第三孔，按一下或右鍵確定（距離自動對齊 8mm）`,
+    `${label}：拖曳選第三孔，放開確定（距離自動對齊 8mm）`
   ));
   draw();
 }
@@ -330,17 +348,23 @@ export function finishDrawTriangle(e) {
   }));
   const dist = (a, b) => Math.round(Math.hypot(b.x - a.x, b.y - a.y));
   const gParam = 'TG' + n, r1Param = 'TR1_' + n, r2Param = 'TR2_' + n;
-  S.comps.push({
-    type: 'triangle', id: 'Tri' + n, color: '#27ae60',
+  const isJaw = S.triangleShape === 'jaw';
+  const comp = {
+    type: 'triangle', id: (isJaw ? 'Jaw' : 'Tri') + n, color: isJaw ? '#ff7043' : '#27ae60',
     p1: pts[0], p2: pts[1], p3: pts[2],
     gParam, r1Param, r2Param, sign: 1
-  });
+  };
+  if (isJaw) {
+    comp.shape = 'jaw';
+    comp.jawTurnSign = jawTurnSign(pts[0], pts[1], pts[2]);
+  }
+  S.comps.push(comp);
   S.topo.params[gParam] = dist(pts[0], pts[1]);
   S.topo.params[r1Param] = picked.r1 || dist(pts[0], pts[2]);
   S.topo.params[r2Param] = picked.r2 || dist(pts[1], pts[2]);
   exitDrawTriangle();
   rebuild(); draw();
-  if (selectTriangle) selectTriangle('Tri' + n);
+  if (selectTriangle) selectTriangle(comp.id);
 }
 export function finishDrawLink(e) {
   if (!S.drawStart) return;

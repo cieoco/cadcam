@@ -257,6 +257,51 @@ export const BLOCK_EXAMPLES = [
     }
   },
   {
+    id: 'gear-gripper',
+    title: '雙齒輪夾持器：偏心孔帶動夾爪',
+    note: '兩顆嚙合齒輪反向轉，齒輪上的偏心輸出孔推動左右「夾爪板」同步開合。可選齒輪調整「輸出孔距」改變夾爪行程。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 8,
+      tracePoints: ['LT', 'RT'],
+      comps: [
+        { type: 'gear', id: 'GearA', color: '#e74c3c',
+          p1: pt('GCA', 'motor', -30, 0, { physicalMotor: '1' }),
+          p2: pt('GPA', 'floating', -30, 18),
+          radiusParam: 'GRA', pinRadiusParam: 'GPRA', pinHoleDiameter: 5, teeth: 15, module: 4, phase: 90 },
+        { type: 'gear', id: 'GearB', color: '#2c6fbb',
+          p1: pt('GCB', 'fixed', 30, 0),
+          p2: pt('GPB', 'floating', 30, 18),
+          radiusParam: 'GRB', pinRadiusParam: 'GPRB', pinHoleDiameter: 5, teeth: 15, module: 4, phase: 90, mesh: 'GearA' },
+        triangle('LeftJaw', pt('GCA', 'motor', -30, 0, { physicalMotor: '1' }), pt('GPA', 'floating', -30, 18), pt('LT', 'floating', -95, -85), {
+          color: '#ff6b35',
+          shape: 'jaw',
+          jawTurnSign: -1,
+          gParam: 'GPRA',
+          r1Param: 'LJ_tip',
+          r2Param: 'LJ_edge',
+          sign: 1
+        }),
+        triangle('RightJaw', pt('GCB', 'fixed', 30, 0), pt('GPB', 'floating', 30, 18), pt('RT', 'floating', 95, -85), {
+          color: '#ff6b35',
+          shape: 'jaw',
+          jawTurnSign: 1,
+          gParam: 'GPRB',
+          r1Param: 'RJ_tip',
+          r2Param: 'RJ_edge',
+          sign: -1
+        })
+      ],
+      params: {
+        GRA: 30, GRB: 30, GPRA: 18, GPRB: 18,
+        LJ_tip: 107, LJ_edge: 121.8,
+        RJ_tip: 107, RJ_edge: 121.8,
+        theta: 0
+      }
+    }
+  },
+  {
     id: 'cam-follower',
     title: '凸輪從動件：轉→上下',
     note: '紫色凸輪旋轉，滾子從動件沿導桿上下移動；輪廓用 harmonic 半徑函數建立，從動件位置由凸輪外形與滾子相切的幾何推出。',

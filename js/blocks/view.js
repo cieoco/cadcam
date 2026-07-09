@@ -140,3 +140,26 @@ export function roundedTriangleHullPath(a, b, c) {
   }
   return d + 'Z';
 }
+
+export function jawPlatePath(pivot, drive, tip, turnSign = 0) {
+  const dx = tip.x - pivot.x;
+  const dy = tip.y - pivot.y;
+  const len = Math.hypot(dx, dy);
+  if (len <= 1e-6) return roundedTriangleHullPath(pivot, drive, tip);
+  const ux = dx / len;
+  const uy = dy / len;
+  const cross = ux * (drive.y - pivot.y) - uy * (drive.x - pivot.x);
+  const side = Number(turnSign) < 0 ? -1 : (Number(turnSign) > 0 ? 1 : (Math.sign(cross) || 1));
+  const turn = side * 55 * Math.PI / 180;
+  const cos = Math.cos(turn);
+  const sin = Math.sin(turn);
+  const ex = ux * cos - uy * sin;
+  const ey = ux * sin + uy * cos;
+  const extend = Math.max(38, Math.min(84, len * 0.58));
+  const end = { x: tip.x + ex * extend, y: tip.y + ey * extend };
+  const a = barHullPath(drive, pivot);
+  const b = barHullPath(pivot, tip);
+  const c = barHullPath(tip, end);
+  if (!a || !b || !c) return roundedTriangleHullPath(pivot, drive, tip);
+  return `${a} ${b} ${c}`;
+}

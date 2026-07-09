@@ -452,7 +452,7 @@ export function compileTopology(components, topology, solvedPoints) {
                 });
                 joints.add(c.p3.id);
             }
-            polygons.push({ points: [c.p1.id, c.p2.id, c.p3.id], color: c.color, alpha: 0.3 });
+            polygons.push({ points: [c.p1.id, c.p2.id, c.p3.id], color: c.color, alpha: 0.3, shape: c.shape || 'triangle', jawTurnSign: c.jawTurnSign });
         }
 
         if (c.type === 'bar' && c.holes) {

@@ -139,6 +139,39 @@ function triPlateShape(corners, r, holeR) {
   return shape;
 }
 
+function jawPlateShape(corners, r, holeR, turnSign = 0) {
+  const addHole = (shape, p) => {
+    const h = new THREE.Path();
+    h.absarc(p.x, p.y, holeR, 0, Math.PI * 2, true);
+    shape.holes.push(h);
+  };
+  const [pivot, drive, tip] = corners;
+  const dx = tip.x - pivot.x;
+  const dy = tip.y - pivot.y;
+  const len = Math.hypot(dx, dy);
+  if (len <= 1e-6) return triPlateShape(corners, r, holeR);
+  const ux = dx / len;
+  const uy = dy / len;
+  const cross = ux * (drive.y - pivot.y) - uy * (drive.x - pivot.x);
+  const side = Number(turnSign) < 0 ? -1 : (Number(turnSign) > 0 ? 1 : (Math.sign(cross) || 1));
+  const turn = side * 55 * Math.PI / 180;
+  const cos = Math.cos(turn);
+  const sin = Math.sin(turn);
+  const ex = ux * cos - uy * sin;
+  const ey = ux * sin + uy * cos;
+  const extend = Math.max(38, Math.min(84, len * 0.58));
+  const end = { x: tip.x + ex * extend, y: tip.y + ey * extend };
+  const a = stickShape(drive, pivot, r);
+  addHole(a, drive);
+  addHole(a, pivot);
+  const b = stickShape(pivot, tip, r);
+  addHole(b, pivot);
+  addHole(b, tip);
+  const c = stickShape(tip, end, r);
+  addHole(c, tip);
+  return [a, b, c];
+}
+
 function gearShape(gear, centerHoleR) {
   const pts = createGearPath({
     teeth: gear.teeth,
@@ -348,7 +381,7 @@ export function createViewer(container) {
 
     // 三點桿：擠出成實心三角板（取代它三條邊各自的桿）
     (model.plates || []).forEach(pl => {
-      const shape = triPlateShape(pl.corners, pl.r, holeR);
+      const shape = pl.shape === 'jaw' ? jawPlateShape(pl.corners, pl.r, holeR, pl.jawTurnSign) : triPlateShape(pl.corners, pl.r, holeR);
       const geo = new THREE.ExtrudeGeometry(shape, {
         depth: pl.thickness,
         bevelEnabled: false,
@@ -422,7 +455,8 @@ export function createViewer(container) {
       dynamic.add(group);
 
       const boltH = Math.max(1, g.thickness * 0.35);
-      const bolt = new THREE.Mesh(new THREE.CylinderGeometry(holeR * 1.15, holeR * 1.15, boltH, 20), gearBoltMat);
+      const pinR = Math.max(0.5, Number(g.pinHoleDiameter || 5) / 2);
+      const bolt = new THREE.Mesh(new THREE.CylinderGeometry(pinR, pinR, boltH, 20), gearBoltMat);
       bolt.rotation.x = Math.PI / 2;
       bolt.position.set(g.pin.x, g.pin.y, g.z + g.thickness + boltH / 2 + 0.2);
       dynamic.add(bolt);

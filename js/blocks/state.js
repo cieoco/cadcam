@@ -53,6 +53,7 @@ export const S = {
   drawStartNodeId: null,
   drawKind: 'link',                                // 拖出線段時要建什麼：'link' 連桿 / 'rail' 滑軌
   drawingTriangle: false,
+  triangleShape: 'triangle',                         // 'triangle' 三點桿 / 'jaw' 夾爪板
   triangleStage: 'base',
   trianglePoints: [],
   trianglePreview: null,

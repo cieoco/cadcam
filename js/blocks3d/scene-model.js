@@ -215,6 +215,8 @@ export function buildSceneModel(links, points, opts = {}) {
         r: hullR,
         thickness: plateThickness,
         color: poly.color || '#27ae60',
+        shape: poly.shape || 'triangle',
+        jawTurnSign: poly.jawTurnSign,
       });
     }
   });
@@ -292,6 +294,27 @@ export function buildSceneModel(links, points, opts = {}) {
   const gearLayer = -1;
   const gearZ = gearLayer * plateGap;
   const gearById = new Map(gearDefs.map(g => [g.id, g]));
+  const gearMeshPhase = (g, memo = new Map()) => {
+    if (!g || !g.mesh) return 0;
+    if (memo.has(g.id)) return memo.get(g.id);
+    const driver = gearById.get(g.mesh);
+    if (!driver || !driver.center || !driver.pin || !g.center || !g.pin) return 0;
+    const CA = points[driver.center], CB = points[g.center];
+    const PA = points[driver.pin], PB = points[g.pin];
+    if (![CA, CB, PA, PB].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))) return 0;
+    const NA = Math.max(6, Math.round(Number(driver.teeth) || 12));
+    const NB = Math.max(6, Math.round(Number(g.teeth) || 12));
+    const betaA = Math.atan2(CB.y - CA.y, CB.x - CA.x);
+    const betaB = Math.atan2(CA.y - CB.y, CA.x - CB.x);
+    const angleA = Math.atan2(PA.y - CA.y, PA.x - CA.x);
+    const angleB = Math.atan2(PB.y - CB.y, PB.x - CB.x);
+    const phaseA = gearMeshPhase(driver, memo);
+    let q = (NA * (betaA - angleA - phaseA) + NB * (betaB - angleB)) / (2 * Math.PI);
+    q -= Math.floor(q);
+    const phase = (q - 0.5) * (2 * Math.PI / NB);
+    memo.set(g.id, phase);
+    return phase;
+  };
   gearDefs.forEach(g => {
     const center = points[g.center];
     const pin = points[g.pin];
@@ -300,17 +323,7 @@ export function buildSceneModel(links, points, opts = {}) {
     const radius = Math.max(1, Number(g.radius) || Math.hypot(pin.x - center.x, pin.y - center.y) || 40);
     const module = Math.max(0.1, Number(g.module) || (2 * radius / teeth));
     const angle = Math.atan2(pin.y - center.y, pin.x - center.x);
-    let meshPhase = 0;
-    const driver = g.mesh ? gearById.get(g.mesh) : null;
-    if (driver && driver.center && points[driver.center]) {
-      const dc = points[driver.center];
-      const NA = Math.max(6, Math.round(Number(driver.teeth) || 12));
-      const betaA = Math.atan2(center.y - dc.y, center.x - dc.x);
-      const betaB = Math.atan2(dc.y - center.y, dc.x - center.x);
-      let q = (NA * betaA + teeth * betaB) / (2 * Math.PI);
-      q -= Math.floor(q);
-      meshPhase = (q - 0.5) * (2 * Math.PI / teeth);
-    }
+    const meshPhase = gearMeshPhase(g);
     gears.push({
       id: g.id,
       center: { x: center.x, y: center.y },
@@ -324,6 +337,7 @@ export function buildSceneModel(links, points, opts = {}) {
       layer: gearLayer,
       thickness: plateThickness,
       color: g.color || '#b0772e',
+      pinHoleDiameter: Math.max(1, Number(g.pinHoleDiameter) || 5),
     });
     touch(g.center, gearLayer);
     touch(g.pin, gearLayer);
