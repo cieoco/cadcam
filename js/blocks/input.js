@@ -60,7 +60,7 @@ function redrawAfterDrag() {
 // 拖機架把手：整組平移所有固定銷。不選取任何節點、不叫屬性列。
 export function onFrameHandleDown(e) {
   e.preventDefault();
-  if (S.drawingLink || S.drawingTriangle || S.placingMotor || S.pickBars) return;
+  if (S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars) return;
   e.stopPropagation();
   const w = worldFromEvent(e);
   if (!w) return;
@@ -73,7 +73,7 @@ export function onFrameHandleDown(e) {
 }
 export function onNodeDown(e, id) {
   e.preventDefault();
-  if (S.drawingLink || S.drawingTriangle) return; // 畫圖模式：交給 svg 起點處理（會自動吸附到此接點）
+  if (S.drawingLink || S.drawingTriangle || S.drawingPolygon) return; // 畫圖模式：交給 svg 起點處理（會自動吸附到此接點）
   if (S.placingMotor) { e.stopPropagation(); handleMotorOnNode(id); return; }
   if (S.pickBars) return;
   S.preDragSnap = snapshotStr(); // 拖曳前狀態；若真的有變動，drag end 才記入 undo
@@ -96,6 +96,13 @@ export function onNodeDown(e, id) {
   draw();
 }
 function onDragMove(e) {
+  if (S.dragShape) return;   // 造形點拖曳由 app 的專用監聽處理
+  if (S.drawingPolygon) {
+    if (activePointers.size >= 2) return;
+    const wp = worldFromEvent(e);
+    if (wp) { S.polygonPreview = wp; draw(); }
+    return;
+  }
   if (S.drawingTriangle) {
     if (activePointers.size >= 2) return;
     const wp = worldFromEvent(e);
@@ -255,6 +262,11 @@ function commitDragUndo() {
   S.preDragSnap = null;
 }
 function onDragEnd(e) {
+  if (S.dragShape) return;   // 造形點拖曳由 app 的專用監聽處理
+  if (S.drawingPolygon) {
+    if (e && e.pointerType && e.pointerType !== 'mouse') Tools.addPolygonVertex(e);
+    return;
+  }
   if (S.drawingTriangle) {
     if (e && e.pointerType && e.pointerType !== 'mouse') Tools.finishDrawTriangle(e);
     return;
@@ -316,7 +328,7 @@ export function init(deps) {
   svg.addEventListener('pointercancel', onDragEnd);
   // 點空白處（背景/地面線，未 stopPropagation）取消選取
   svg.addEventListener('pointerdown', () => {
-    if (S.drawingLink || S.drawingTriangle) return; // 畫圖模式：交給工具處理
+    if (S.drawingLink || S.drawingTriangle || S.drawingPolygon) return; // 畫圖模式：交給工具處理
     if (S.placingMotor || S.pickBars) { cancelMotorMode(); draw(); return; }
     if (S.dragId || S.dragLinkId) return;
     S.selectedNodeId = null;
@@ -360,7 +372,7 @@ export function init(deps) {
   svg.addEventListener('pointerdown', (e) => {
     if (!mobilePrompt()) return;
     if (e.pointerType === 'mouse') return;
-    if (S.drawingLink || S.drawingTriangle || S.pickBars) return; // 這些模式各自有起點處理
+    if (S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.pickBars) return; // 這些模式各自有起點處理
     if (activePointers.size >= 1) return;                    // 第二指：交給縮放手勢
     const w = worldFromEvent(e); if (!w) return;
     const ctm = svg.getScreenCTM();
@@ -409,10 +421,25 @@ export function init(deps) {
     try { svg.setPointerCapture(e.pointerId); } catch (_) {}
     draw();
   });
-  // 滑鼠右鍵＝確定長度 / 三點桿
-  svg.addEventListener('contextmenu', (e) => {
-    if (!S.drawingLink && !S.drawingTriangle) return;
+  // 多邊形板：滑鼠左鍵逐點加頂點 / 選求解點；觸控按下設預覽、放開時提交（見 onDragEnd）。
+  svg.addEventListener('pointerdown', (e) => {
+    if (!S.drawingPolygon) return;
+    if (activePointers.size >= 2) return;
+    const w = worldFromEvent(e); if (!w) return;
     e.preventDefault();
+    if (e.pointerType === 'mouse') {
+      Tools.addPolygonVertex(e);
+      return;
+    }
+    S.polygonPreview = w;
+    try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+    draw();
+  });
+  // 滑鼠右鍵＝確定長度 / 三點桿 / 多邊形收尾
+  svg.addEventListener('contextmenu', (e) => {
+    if (!S.drawingLink && !S.drawingTriangle && !S.drawingPolygon) return;
+    e.preventDefault();
+    if (S.drawingPolygon) { Tools.finishPolygonDraw(); return; }
     if (S.drawingTriangle) Tools.finishPlateAsLinkEarly();
     else Tools.finishDrawLink(e);
   });

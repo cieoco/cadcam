@@ -57,6 +57,11 @@ export const S = {
   triangleStage: 'first',                            // 'first' 放第一點 / 'base' 底邊 / 'third' 第三點
   trianglePoints: [],
   trianglePreview: null,
+  // 板件：逐點畫孔、右鍵收尾。前 3 孔＝機構求解孔，第 4 孔起＝造形孔（順序決定角色）
+  drawingPolygon: false,
+  polygonPoints: [],                                 // [{ nodeId, pos:{x,y} }] 依畫的順序
+  polygonPreview: null,
+  dragShape: null,                                   // 造形點拖曳中：{ compId, vi, moved, startX, startY }
 
   // ---- 課堂閉環：復原 / 自動存檔 ----
   undoStack: [],                                   // 每筆是一份 snapshot 字串（變更前的狀態）

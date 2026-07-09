@@ -52,8 +52,8 @@ function convexHull(points) {
   return lower.slice(0, -1).concat(upper.slice(0, -1));
 }
 
-export function roundedHullOutline(points, radius = DEFAULT_PLATE_RADIUS_WORLD) {
-  const ordered = convexHull(points);
+// 沿一個已排好序（逆時針）的封閉環，每邊外擴 radius、每個角用圓弧收圓。
+function roundClosedRing(ordered, radius) {
   if (ordered.length < 2) return [];
   if (ordered.length === 2) return cleanPolylineOutline(ordered, radius);
 
@@ -85,6 +85,21 @@ export function roundedHullOutline(points, radius = DEFAULT_PLATE_RADIUS_WORLD) 
     ));
   }
   return out;
+}
+
+export function roundedHullOutline(points, radius = DEFAULT_PLATE_RADIUS_WORLD) {
+  return roundClosedRing(convexHull(points), radius);
+}
+
+// 封閉圓角多邊形：把孔位依「繞形心的角度」排序成不自交的簡單多邊形再收圓。
+// 與 hull 不同——保留凹形（星狀點集皆可），不像凸包會把凹處抹平。
+export function roundedPolygonOutline(points, radius = DEFAULT_PLATE_RADIUS_WORLD) {
+  const pts = cleanPoints(points);
+  if (pts.length < 3) return roundClosedRing(pts, radius);
+  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+  const ring = [...pts].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+  return roundClosedRing(ring, radius);
 }
 
 export function cleanPolylineOutline(points, radius = DEFAULT_PLATE_RADIUS_WORLD) {
@@ -192,21 +207,67 @@ export function worldToLocal(points, world) {
   };
 }
 
-export function outlineControlWorldPoints(comp = {}, points = []) {
-  return (comp.outlinePoints || [])
-    .map(p => {
-      const world = localToWorld(points, p);
-      return world ? { ...world, hole: p.hole === true } : null;
-    })
-    .filter(Boolean);
+const PLATE_REF_INDEX = { p1: 0, p2: 1, p3: 2 };
+
+// 由 p1/p2/p3 + outlinePoints 合成一條有順序的頂點清單（相容舊資料，不改動 comp）。
+// solve 頂點用 ref 指向求解點；shape 頂點存局部 u,v(,hole)。
+export function defaultPlateVertices(comp = {}) {
+  const verts = [];
+  if (comp.p1 && comp.p1.id) verts.push({ solve: true, ref: 'p1' });
+  if (comp.p2 && comp.p2.id) verts.push({ solve: true, ref: 'p2' });
+  if (comp.p3 && comp.p3.id) verts.push({ solve: true, ref: 'p3' });
+  (comp.outlinePoints || []).forEach(p => {
+    const u = Number(p && p.u);
+    const v = Number(p && p.v);
+    if (Number.isFinite(u) && Number.isFinite(v)) {
+      const pt = { solve: false, u, v };
+      if (p.hole === true) pt.hole = true;
+      verts.push(pt);
+    }
+  });
+  return verts;
 }
 
+// 取得有效頂點清單（沒有 comp.vertices 就即時合成）。
+export function plateVertices(comp = {}) {
+  return (Array.isArray(comp.vertices) && comp.vertices.length)
+    ? comp.vertices
+    : defaultPlateVertices(comp);
+}
+
+// 依頂點順序算出世界座標；solve 頂點取 solved[ref]（每幀由求解器給），shape 頂點做 localToWorld。
+// 每點附帶 { solve, hole } 供輪廓 / 孔位使用。
+export function plateVertexWorldPoints(comp = {}, points = []) {
+  const out = [];
+  plateVertices(comp).forEach(vt => {
+    if (vt.solve) {
+      const w = points[PLATE_REF_INDEX[vt.ref]];
+      if (w && Number.isFinite(w.x) && Number.isFinite(w.y)) {
+        out.push({ x: w.x, y: w.y, solve: true, hole: true });
+      }
+    } else {
+      const w = localToWorld(points, vt);
+      if (w) out.push({ x: w.x, y: w.y, solve: false, hole: vt.hole === true });
+    }
+  });
+  return out;
+}
+
+// 造形（非求解）頂點的世界座標；保留給既有呼叫端。
+export function outlineControlWorldPoints(comp = {}, points = []) {
+  return plateVertexWorldPoints(comp, points)
+    .filter(p => !p.solve)
+    .map(p => ({ x: p.x, y: p.y, hole: p.hole }));
+}
+
+// 依頂點順序的世界輪廓點（求解點 + 造形點）。
 export function plateContourPoints(comp = {}, points = []) {
-  return [...cleanPoints(points), ...outlineControlWorldPoints(comp, points)];
+  const world = plateVertexWorldPoints(comp, points).map(p => ({ x: p.x, y: p.y }));
+  return world.length ? world : cleanPoints(points);
 }
 
 export function plateShapeMode(comp = {}) {
-  if (comp.shapeMode === 'polyline' || comp.shapeMode === 'hull') return comp.shapeMode;
+  if (comp.shapeMode === 'polyline' || comp.shapeMode === 'hull' || comp.shapeMode === 'polygon') return comp.shapeMode;
   if (comp.outlineMode === 'polyline' || comp.shape === 'jaw') return 'polyline';
   return 'hull';
 }
@@ -220,19 +281,22 @@ export function createPlateGeometry(comp, points, options = {}) {
   const radius = Number.isFinite(Number(options.radius)) ? Number(options.radius) : DEFAULT_PLATE_RADIUS_WORLD;
   const holeRadius = Number.isFinite(Number(options.holeRadius)) ? Number(options.holeRadius) : radius * 0.72;
   const mode = plateShapeMode(comp);
-  const source = mode === 'polyline' ? plateCenterline(comp, points) : cleanPoints(points);
-  const fallback = plateContourPoints(comp, points);
-  const outline = mode === 'polyline'
-    ? cleanPolylineOutline(source || fallback, radius)
-    : roundedHullOutline(fallback, radius);
-  const solvedHoles = cleanPoints(points).map(p => ({ x: p.x, y: p.y, r: holeRadius }));
-  const controlHoles = outlineControlWorldPoints(comp, points)
-    .filter(p => p.hole)
+  const world = plateVertexWorldPoints(comp, points);
+  const contour = world.map(p => ({ x: p.x, y: p.y }));
+  const fallback = contour.length ? contour : cleanPoints(points);
+  const usesOrder = (mode === 'polyline' || mode === 'polygon');
+  const source = usesOrder ? plateCenterline(comp, points) : fallback;
+  let outline;
+  if (mode === 'polyline') outline = cleanPolylineOutline(source || fallback, radius);       // 折線桿：沿孔順序的細彎桿
+  else if (mode === 'polygon') outline = roundedPolygonOutline(source || fallback, radius);  // 多邊形板：照孔位收成封閉圓角實心板
+  else outline = roundedHullOutline(fallback, radius);                                        // 包絡板：凸包外框
+  const holePts = world.filter(p => p.solve || p.hole);
+  const holes = (holePts.length ? holePts : cleanPoints(points))
     .map(p => ({ x: p.x, y: p.y, r: holeRadius }));
   return {
     mode,
     sourcePoints: source || fallback,
     outlines: outline.length ? [outline] : [],
-    holes: [...solvedHoles, ...controlHoles]
+    holes
   };
 }

@@ -126,25 +126,49 @@ function normalizeTriangle(comp, index, params, warnings) {
     else if (Number(comp.jawTurnSign) > 0) out.jawTurnSign = 1;
     else if (/leftjaw/i.test(id)) out.jawTurnSign = -1;
     else if (/rightjaw/i.test(id)) out.jawTurnSign = 1;
-  } else if (comp.shapeMode === 'polyline' || comp.shapeMode === 'hull') {
+  } else if (comp.shapeMode === 'polyline' || comp.shapeMode === 'hull' || comp.shapeMode === 'polygon') {
     out.shapeMode = comp.shapeMode;
   }
-  const extraLimit = Math.max(0, MAX_PLATE_POINTS - 3);
-  const outlinePoints = Array.isArray(comp.outlinePoints) ? comp.outlinePoints : [];
-  const normalizedOutline = outlinePoints.slice(0, extraLimit)
-    .map((p, i) => {
-      const u = num(p && p.u, NaN);
-      const v = num(p && p.v, NaN);
-      if (!Number.isFinite(u) || !Number.isFinite(v)) {
-        warnings.push(`三點桿 ${id} 的外形控制點 ${i + 1} 格式錯誤，已略過`);
-        return null;
+  // 有順序的頂點清單：solve 頂點用 ref 指向 p1/p2/p3；shape 頂點存局部 u,v(,hole)。
+  // 新檔直接帶 vertices；舊檔（只有 outlinePoints）合成成「求解點在前、造形點在後」。
+  const refExists = { p1: !!(p1 && p1.id), p2: !!(p2 && p2.id), p3: !!(p3 && p3.id) };
+  const pushShape = (list, p, i) => {
+    const u = num(p && p.u, NaN);
+    const v = num(p && p.v, NaN);
+    if (!Number.isFinite(u) || !Number.isFinite(v)) {
+      warnings.push(`三點桿 ${id} 的造形頂點 ${i + 1} 格式錯誤，已略過`);
+      return;
+    }
+    const pt = { solve: false, u: roundTenth(u), v: roundTenth(v) };
+    if (p && p.hole === true) pt.hole = true;
+    list.push(pt);
+  };
+  const vertices = [];
+  if (Array.isArray(comp.vertices) && comp.vertices.length) {
+    comp.vertices.slice(0, MAX_PLATE_POINTS).forEach((vt, i) => {
+      if (vt && vt.solve) {
+        const ref = vt.ref;
+        if ((ref === 'p1' || ref === 'p2' || ref === 'p3') && refExists[ref]
+          && !vertices.some(x => x.solve && x.ref === ref)) {
+          vertices.push({ solve: true, ref });
+        } else {
+          warnings.push(`三點桿 ${id} 的求解頂點 ${i + 1} 無效，已略過`);
+        }
+      } else {
+        pushShape(vertices, vt, i);
       }
-      const point = { u: roundTenth(u), v: roundTenth(v) };
-      if (p.hole === true) point.hole = true;
-      return point;
-    })
-    .filter(Boolean);
-  if (normalizedOutline.length) out.outlinePoints = normalizedOutline;
+    });
+  } else {
+    if (refExists.p1) vertices.push({ solve: true, ref: 'p1' });
+    if (refExists.p2) vertices.push({ solve: true, ref: 'p2' });
+    if (refExists.p3) vertices.push({ solve: true, ref: 'p3' });
+    const extraLimit = Math.max(0, MAX_PLATE_POINTS - vertices.length);
+    (Array.isArray(comp.outlinePoints) ? comp.outlinePoints : [])
+      .slice(0, extraLimit)
+      .forEach((p, i) => pushShape(vertices, p, i));
+  }
+  if (!vertices.some(v => v.solve) && refExists.p1) vertices.unshift({ solve: true, ref: 'p1' });
+  out.vertices = vertices;
   if (comp.visualOnly) out.visualOnly = true;
   if (comp.snapLength === false) out.snapLength = false;
 

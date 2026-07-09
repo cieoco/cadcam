@@ -415,7 +415,7 @@
           <div class="block link" onclick="window.blocks.openLinkMenu()">
             <span class="ico">🔵</span>
             <span class="name">桿件</span>
-            <span class="role">畫 2 點成連桿，3 點成板</span>
+            <span class="role">逐點畫孔，前 3 孔求解、之後造形點；右鍵完成</span>
           </div>
           <div class="block slider" onclick="window.blocks.startDrawRail()">
             <span class="ico">🟩</span>
@@ -464,6 +464,7 @@
           </select>
           <select class="tri-side" id="plateShapeModeSelect" style="display:none;" onchange="window.blocks.setTriangleShapeMode(this.value)" title="選擇板件外形">
             <option value="hull">包絡板</option>
+            <option value="polygon">多邊形板</option>
             <option value="polyline">折線桿</option>
           </select>
           <button class="lift-btn" id="addOutlinePointBtn" style="display:none;" onclick="window.blocks.addTriangleOutlinePoint()" title="新增只影響外形、不參與求解的控制點">＋外形點</button>

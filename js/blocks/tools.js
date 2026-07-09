@@ -16,7 +16,7 @@
 import { S } from './state.js';
 import * as View from './view.js';
 import * as Model from './model.js';
-import { MAX_PLATE_POINTS } from './plate-geometry.js';
+import { MAX_PLATE_POINTS, worldToLocal } from './plate-geometry.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：元件擁有的 topo.params key
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -429,6 +429,129 @@ export function finishDrawTriangle(e) {
 export function finishPlateAsLinkEarly() {
   if (!S.drawingTriangle || S.triangleShape === 'jaw') return;
   if (S.trianglePoints.length >= 2) finishTriangleAsLink();
+}
+
+/* ---- 板件：逐點畫孔、右鍵（或點回起點）收尾。角色由畫的順序決定 ----
+ * 前 3 孔＝機構求解孔（p1/p2/p3，進求解）；第 4 孔起＝造形孔（只描外形＋鑽孔，不進求解）。
+ * 這一版求解仍沿用三點板；2 求解點的耦桿板留待 Phase 4（需改編譯層的 p3 前提）。 */
+export function startDrawPolygon() {
+  if (S.drawingPolygon) { exitDrawPolygon(); draw(); return; }
+  pause();
+  cancelMotorMode();
+  exitDrawLink();
+  exitDrawTriangle();
+  deselectLink();
+  S.drawingPolygon = true;
+  S.polygonPoints = [];
+  S.polygonPreview = View.worldFromScreen(W * 0.5, H * 0.5);
+  svg.style.cursor = 'crosshair';
+  setBanner(promptText(
+    '板件：前 3 孔＝機構求解孔，第 4 點起＝造形點（描外形、預設不鑽孔）；右鍵完成',
+    '板件：前 3 孔＝機構孔，之後＝造形點（不鑽孔）；點回起點完成'
+  ));
+  draw();
+}
+export function exitDrawPolygon() {
+  S.drawingPolygon = false;
+  S.polygonPoints = [];
+  S.polygonPreview = null;
+  if (!S.drawingLink) svg.style.cursor = '';
+  if (!S.drawingLink) clearBanner();
+}
+function polygonNearFirst(world) {
+  const first = S.polygonPoints[0];
+  if (!first || !world) return false;
+  return Math.hypot(world.x - first.pos.x, world.y - first.pos.y) <= snapWorld();
+}
+// 左鍵：加一個孔（吸附既有接點）；若點回起點且已 ≥3 孔則收尾建立。
+export function addPolygonVertex(e) {
+  const cur = worldFromEvent(e) || S.polygonPreview;
+  if (!cur) return;
+  if (S.polygonPoints.length >= 3 && polygonNearFirst(cur)) { finishPolygonDraw(); return; }
+  if (S.polygonPoints.length >= MAX_PLATE_POINTS) {
+    setBanner(`板件最多 ${MAX_PLATE_POINTS} 孔（前 3 為機構孔）`);
+    return;
+  }
+  const picked = resolveTrianglePointAt(cur, S.polygonPoints.map(p => p.nodeId));
+  S.polygonPoints.push(picked);
+  const done = S.polygonPoints.length;
+  setBanner(done < 3
+    ? promptText(`機構孔 ${done}/3；再點放下一孔`, `機構孔 ${done}/3`)
+    : promptText('造形點（描外形、不鑽孔）；右鍵完成，或繼續加點', '造形點；點回起點完成'));
+  draw();
+}
+// 右鍵（或點回起點）：≥3 孔就建立板件（前 3 求解、其餘造形孔）。
+export function finishPolygonDraw() {
+  if (S.polygonPoints.length < 3) { setBanner('板件至少要 3 孔'); return; }
+  buildPolygonPlate();
+}
+function buildPolygonPlate() {
+  const all = S.polygonPoints;
+  if (all.length < 3) return;
+  pushUndo();
+  const n = ++S.counter;
+  const suffix = ['a', 'b', 'c'];
+  const solvePts = all.slice(0, 3);                   // 前 3 孔＝機構求解孔
+  const pNode = solvePts.map((p, k) => ({
+    id: p.nodeId || `T${n}${suffix[k]}`,
+    type: 'floating',
+    x: p.pos.x,
+    y: p.pos.y
+  }));
+  const basis = [solvePts[0].pos, solvePts[1].pos];   // 局部座標系＝前兩個機構孔（p1→p2）
+  const vertices = all.map((p, i) => {
+    if (i < 3) return { solve: true, ref: ['p1', 'p2', 'p3'][i] };
+    // 造形點：存局部座標、只描外形。DXF 預設不鑽孔（hole 旗標可日後逐點再設定）。
+    const local = worldToLocal(basis, p.pos);
+    return { solve: false, u: Number((local && local.u || 0).toFixed(1)), v: Number((local && local.v || 0).toFixed(1)) };
+  });
+  const dist = (a, b) => Math.round(Math.hypot(b.x - a.x, b.y - a.y));
+  const gParam = 'TG' + n, r1Param = 'TR1_' + n, r2Param = 'TR2_' + n;
+  const comp = {
+    type: 'triangle', id: 'Tri' + n, color: '#27ae60',
+    p1: pNode[0], p2: pNode[1], p3: pNode[2],
+    gParam, r1Param, r2Param, sign: 1,
+    vertices
+  };
+  S.comps.push(comp);
+  S.topo.params[gParam] = dist(pNode[0], pNode[1]);
+  S.topo.params[r1Param] = dist(pNode[0], pNode[2]);
+  S.topo.params[r2Param] = dist(pNode[1], pNode[2]);
+  exitDrawPolygon();
+  rebuild(); draw();
+  if (selectTriangle) selectTriangle(comp.id);
+}
+export function drawPolygonPreview() {
+  if (!S.drawingPolygon) return;
+  const pts = S.polygonPoints.map(p => p.pos);
+  const chain = pts.slice();
+  let closing = false;
+  if (S.polygonPreview) {
+    closing = pts.length >= 3 && polygonNearFirst(S.polygonPreview);
+    if (!closing) chain.push(S.polygonPreview);
+  }
+  if (chain.length >= 2) {
+    const d = 'M ' + chain.map(p => `${TX(p.x)} ${TY(p.y)}`).join(' L ') + (closing ? ' Z' : '');
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', closing ? '#27ae6022' : 'none');
+    path.setAttribute('stroke', '#27ae60');
+    path.setAttribute('stroke-width', 2);
+    path.setAttribute('stroke-dasharray', '8 6');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path);
+  }
+  pts.forEach((p, i) => {
+    const solve = i < 3;                               // 前 3＝機構孔（綠實心），其餘＝造形點（橘框空心＝不鑽孔）
+    const highlightFirst = i === 0 && closing;
+    const c = document.createElementNS(SVG_NS, 'circle');
+    c.setAttribute('cx', TX(p.x)); c.setAttribute('cy', TY(p.y));
+    c.setAttribute('r', solve ? 7 : 6);
+    c.setAttribute('fill', highlightFirst ? '#f1c40f' : (solve ? '#27ae60' : '#fff'));
+    c.setAttribute('stroke', solve ? '#117a45' : '#e67e22');
+    c.setAttribute('stroke-width', 2);
+    svg.appendChild(c);
+  });
 }
 // 滑鼠：左鍵點兩下（第一點放起點，第二點確定長度並建立）；與三點桿的操作一致。
 export function placeLinkPoint(e) {

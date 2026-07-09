@@ -30,7 +30,7 @@ import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有�
 import * as Motion from './motion.js';
 import * as Store from './storage.js';
 import * as Exporters from './exporters.js';
-import { MAX_PLATE_POINTS, worldToLocal } from './plate-geometry.js';
+import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, plateVertices } from './plate-geometry.js';
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
 import { BLOCK_EXAMPLES, getExample } from './examples.js';
 
@@ -641,7 +641,7 @@ function drawGearPart(c, pts) {
   }
   poly.style.cursor = 'pointer';
   poly.addEventListener('pointerdown', (e) => {
-    if (S.drawingLink || S.drawingTriangle || S.placingMotor || S.pickBars) return;
+    if (S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars) return;
     e.stopPropagation();   // 點齒輪本體＝選齒輪（不觸發背景取消選取）
     selectGear(c.id);
   });
@@ -750,7 +750,7 @@ function drawTrianglePart(c, pts, ctx) {
   path.setAttribute('stroke-linejoin', 'round');
   path.style.cursor = 'pointer';
   path.addEventListener('pointerdown', (e) => {
-    if (S.drawingLink || S.drawingTriangle) return;
+    if (S.drawingLink || S.drawingTriangle || S.drawingPolygon) return;
     e.stopPropagation();
     selectTriangle(c.id);
   });
@@ -770,6 +770,116 @@ function drawTrianglePart(c, pts, ctx) {
   applyTri(pts);
   ctx.groupForLayer(ctx.triLayerByKey.get(ctx.triKey(ids))).appendChild(path);
   frameUpdaters.push(applyTri);
+  if (isSel) drawPlateShapeHandles(c, ids, pts);   // 選取此板：造形點顯示可編輯握把
+}
+// 造形點編輯握把：選取板件時，每個造形點畫成握把。點＝切換是否鑽孔（DXF），拖＝移動，右鍵＝刪除。
+// 實心橘＝會鑽孔；空心＝只描外形不鑽孔。握把每幀跟著解出的板子移動。
+function drawPlateShapeHandles(comp, ids, pts) {
+  plateVertices(comp).forEach((vt, vi) => {
+    if (vt.solve) return;
+    const handle = document.createElementNS(SVG_NS, 'circle');
+    handle.setAttribute('r', 6);
+    handle.setAttribute('stroke', '#e67e22');
+    handle.setAttribute('stroke-width', 2);
+    handle.style.cursor = 'move';
+    const tip = document.createElementNS(SVG_NS, 'title');
+    tip.textContent = '造形點：點一下切換是否鑽孔、拖曳移動、右鍵刪除';
+    handle.appendChild(tip);
+    const applyHandle = (P) => {
+      const a = P[ids[0]], b = P[ids[1]];
+      const w = (a && b) ? localToWorld([a, b], vt) : null;
+      const ok = w && Number.isFinite(w.x) && Number.isFinite(w.y);
+      handle.style.display = ok ? '' : 'none';
+      if (ok) { handle.setAttribute('cx', TX(w.x)); handle.setAttribute('cy', TY(w.y)); }
+      handle.setAttribute('fill', vt.hole === true ? '#e67e22' : '#fff');
+    };
+    handle.addEventListener('pointerdown', (e) => {
+      if (S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars) return;
+      e.stopPropagation();
+      startShapeDrag(e, comp.id, vi);
+    });
+    handle.addEventListener('contextmenu', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      deleteShapeVertex(comp.id, vi);
+    });
+    applyHandle(pts);
+    svg.appendChild(handle);
+    frameUpdaters.push(applyHandle);
+  });
+}
+// 造形點的局部座標系＝解出的 p1、p2（與 plate-geometry 一致）。
+function plateBasisFor(comp) {
+  const P = pointCoords();
+  const a = comp.p1 && P[comp.p1.id];
+  const b = comp.p2 && P[comp.p2.id];
+  if (a && b && Number.isFinite(a.x) && Number.isFinite(b.x)) return [a, b];
+  if (comp.p1 && comp.p2) return [{ x: comp.p1.x, y: comp.p1.y }, { x: comp.p2.x, y: comp.p2.y }];
+  return null;
+}
+function startShapeDrag(e, compId, vi) {
+  const comp = S.comps.find(x => x.id === compId && x.type === 'triangle');
+  if (!comp) return;
+  pause();
+  S.dragShape = { compId, vi, moved: false, startX: e.clientX, startY: e.clientY };
+  try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+  const onMove = (ev) => shapeDragMove(ev);
+  const onUp = (ev) => {
+    svg.removeEventListener('pointermove', onMove);
+    svg.removeEventListener('pointerup', onUp);
+    svg.removeEventListener('pointercancel', onUp);
+    shapeDragEnd(ev);
+  };
+  svg.addEventListener('pointermove', onMove);
+  svg.addEventListener('pointerup', onUp);
+  svg.addEventListener('pointercancel', onUp);
+}
+function shapeDragMove(e) {
+  const ds = S.dragShape;
+  if (!ds) return;
+  if (!ds.moved) {
+    if (Math.hypot(e.clientX - ds.startX, e.clientY - ds.startY) < 4) return; // 抖動門檻：分辨點擊 vs 拖曳
+    ds.moved = true;
+    const c0 = S.comps.find(x => x.id === ds.compId && x.type === 'triangle');
+    if (c0) { ensurePlateVertices(c0); pushUndo(); }
+  }
+  const comp = S.comps.find(x => x.id === ds.compId && x.type === 'triangle');
+  if (!comp) return;
+  const basis = plateBasisFor(comp);
+  const w = worldFromEvent(e);
+  if (!basis || !w) return;
+  const local = worldToLocal(basis, w);
+  if (!local) return;
+  const vt = comp.vertices && comp.vertices[ds.vi];
+  if (!vt || vt.solve) return;
+  vt.u = Number(local.u.toFixed(1));
+  vt.v = Number(local.v.toFixed(1));
+  draw();
+}
+function shapeDragEnd() {
+  const ds = S.dragShape;
+  S.dragShape = null;
+  if (!ds) return;
+  const comp = S.comps.find(x => x.id === ds.compId && x.type === 'triangle');
+  if (!comp) return;
+  if (!ds.moved) {                                   // 純點擊＝切換是否鑽孔
+    ensurePlateVertices(comp);
+    const vt = comp.vertices[ds.vi];
+    if (vt && !vt.solve) {
+      pushUndo();
+      if (vt.hole === true) delete vt.hole; else vt.hole = true;
+    }
+  }
+  rebuild(); draw();
+}
+function deleteShapeVertex(compId, vi) {
+  const comp = S.comps.find(x => x.id === compId && x.type === 'triangle');
+  if (!comp) return;
+  ensurePlateVertices(comp);
+  const vt = comp.vertices[vi];
+  if (!vt || vt.solve) return;
+  pushUndo();
+  comp.vertices.splice(vi, 1);
+  rebuild(); draw();
 }
 
 // 齒條（rack-and-pinion）：與小齒輪嚙合的直線齒桿，沿 axisDeg 平移。齒形由 createRackPath 產，
@@ -1152,6 +1262,7 @@ function draw() {
     updateSolveBanner(null, 0);
     Tools.drawDrawPreview();   // 空畫布也要顯示正在拉出的第一根連桿
     Tools.drawTrianglePreview();
+    Tools.drawPolygonPreview();
     return;
   }
 
@@ -1295,7 +1406,7 @@ function draw() {
       stick.setAttribute('data-link-id', l.id);
       stick.style.cursor = 'pointer';
       stick.addEventListener('pointerdown', (e) => {
-        if (S.drawingLink || S.drawingTriangle) return; // 畫圖模式：不攔截，讓 svg 起點處理
+        if (S.drawingLink || S.drawingTriangle || S.drawingPolygon) return; // 畫圖模式：不攔截，讓 svg 起點處理
         e.stopPropagation();
         if (S.pickBars) { tryPickBar(l.id); return; }
         if (Input.startFreeLinkDrag(e, l.id)) return;
@@ -1426,6 +1537,7 @@ function draw() {
   drawFrameHandle();   // 機架移動把手：畫在節點之上，才點得到、拖得動
   Tools.drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
   Tools.drawTrianglePreview(); // 三點桿模式：疊在最上層的三角預覽
+  Tools.drawPolygonPreview();  // 多邊形板模式：疊在最上層的預覽
 
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
   // polygons 一併帶上：3D 用它把三點桿畫成實心板，並過濾掉與三角板邊重疊的桿（避免分身）。
@@ -1533,7 +1645,7 @@ function drawSliders(pts, parent) {
     hit.setAttribute('fill', 'transparent');
     hit.style.cursor = 'pointer';
     hit.addEventListener('pointerdown', (e) => {
-      if (S.drawingLink || S.drawingTriangle || S.placingMotor || S.pickBars) return;
+      if (S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars) return;
       e.stopPropagation();
       selectSlider(sl.id);
     });
@@ -1934,6 +2046,7 @@ function addAnchor() {
   const n = ++S.counter;
   Tools.exitDrawLink();
   Tools.exitDrawTriangle();
+  Tools.exitDrawPolygon();
   cancelMotorMode();
   const p = mobilePrompt()
     ? View.worldFromScreen(W * 0.34, H * 0.62)
@@ -1970,6 +2083,7 @@ function addGearPair() {
   pushUndo();
   Tools.exitDrawLink();
   Tools.exitDrawTriangle();
+  Tools.exitDrawPolygon();
   cancelMotorMode();
   const m = GEAR_MODULE;
   const na = 12, nb = 18;                         // 預設 12:18，一放下就看得到轉速比
@@ -2101,7 +2215,7 @@ function setGearManualAngle(c, angleRad) {
   }
 }
 function startGearManualRotate(e, gearId) {
-  if (S.drawingLink || S.drawingTriangle || S.placingMotor || S.pickBars) return;
+  if (S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars) return;
   const c = gearById(gearId);
   if (!c || !c.p1 || !c.p2) return;
   e.preventDefault();
@@ -2207,6 +2321,7 @@ function clearAll() {
   S.selectedNodeId = null;
   Tools.exitDrawLink();
   Tools.exitDrawTriangle();
+  Tools.exitDrawPolygon();
   cancelMotorMode();
   closeMobileEditPanel();
   document.getElementById('lenEditor').style.display = 'none';
@@ -2311,7 +2426,7 @@ function openLinkMenu() {
   const power = powerMenuEl();
   if (power) power.style.display = 'none';
   closeLinkMenu();
-  Tools.startDrawTriangle('triangle');
+  Tools.startDrawPolygon();
 }
 function closeLinkMenu() {
   const m = linkMenuEl();
@@ -2343,6 +2458,7 @@ function placeMotor() {
   pause();
   Tools.exitDrawLink();
   Tools.exitDrawTriangle();
+  Tools.exitDrawPolygon();
   deselectLink();
   S.placingMotor = true;
   S.pickBars = null;
@@ -2626,10 +2742,18 @@ function updatePlateShapeControls(comp = null) {
     return;
   }
   const mode = comp.shapeMode || (comp.shape === 'jaw' ? 'polyline' : 'hull');
-  modeSel.value = mode === 'polyline' ? 'polyline' : 'hull';
+  modeSel.value = ['hull', 'polygon', 'polyline'].includes(mode) ? mode : 'hull';
   modeSel.style.display = '';
   addBtn.style.display = '';
-  addBtn.disabled = 3 + ((comp.outlinePoints || []).length) >= MAX_PLATE_POINTS;
+  addBtn.disabled = plateVertices(comp).length >= MAX_PLATE_POINTS;
+}
+// 首次編輯造形時，把板件就地轉成有順序的 vertices（相容舊資料；outlinePoints 併入後移除）。
+function ensurePlateVertices(comp) {
+  if (!Array.isArray(comp.vertices) || !comp.vertices.length) {
+    comp.vertices = defaultPlateVertices(comp);
+  }
+  if (comp.outlinePoints) delete comp.outlinePoints;
+  return comp.vertices;
 }
 function triangleWorldPoints(comp) {
   if (!comp || !comp.p1 || !comp.p2 || !comp.p3) return null;
@@ -2647,14 +2771,14 @@ function setTriangleShapeMode(mode) {
   const comp = S.comps.find(x => x.id === S.selectedTriangleId && x.type === 'triangle');
   if (!comp) return;
   pushUndo();
-  comp.shapeMode = mode === 'polyline' ? 'polyline' : 'hull';
+  comp.shapeMode = ['hull', 'polygon', 'polyline'].includes(mode) ? mode : 'hull';
   updatePlateShapeControls(comp);
   rebuild(); draw();
 }
 function addTriangleOutlinePoint() {
   const comp = S.comps.find(x => x.id === S.selectedTriangleId && x.type === 'triangle');
   if (!comp) return;
-  if (3 + ((comp.outlinePoints || []).length) >= MAX_PLATE_POINTS) {
+  if (plateVertices(comp).length >= MAX_PLATE_POINTS) {
     setBanner(`多點桿最多 ${MAX_PLATE_POINTS} 點；其它點只作外形控制。`);
     return;
   }
@@ -2668,15 +2792,17 @@ function addTriangleOutlinePoint() {
   const uy = dy / len;
   const nx = -uy;
   const ny = ux;
-  const offsetIndex = (comp.outlinePoints || []).length;
+  const shapeCount = plateVertices(comp).filter(v => !v.solve).length;
   const world = {
-    x: c.x + ux * 32 + nx * offsetIndex * 12,
-    y: c.y + uy * 32 + ny * offsetIndex * 12
+    x: c.x + ux * 32 + nx * shapeCount * 12,
+    y: c.y + uy * 32 + ny * shapeCount * 12
   };
   const local = worldToLocal(pts, world);
   if (!local) return;
   pushUndo();
-  comp.outlinePoints = [...(comp.outlinePoints || []), {
+  ensurePlateVertices(comp);
+  comp.vertices = [...comp.vertices, {
+    solve: false,
     u: Number(local.u.toFixed(1)),
     v: Number(local.v.toFixed(1))
   }];
@@ -3374,5 +3500,5 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, openTaskMenu, taskOpenExamples, taskStartLink, taskAddPower, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, openTaskMenu, taskOpenExamples, taskStartLink, taskAddPower, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
 init();
