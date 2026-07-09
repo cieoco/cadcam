@@ -409,7 +409,7 @@
         <div class="tray-section-items">
           <div class="block anchor" onclick="window.blocks.addAnchor()">
             <span class="ico">📌</span>
-            <span class="name">地錨</span>
+            <span class="name">機架固定點</span>
             <span class="role">釘在地上</span>
           </div>
           <div class="block link" onclick="window.blocks.openLinkMenu()">
@@ -469,7 +469,7 @@
           </span>
           <button class="lift-btn" id="sliderFlipBtn" style="display:none;" onclick="window.blocks.flipSlider()" title="被動滑塊由連桿和滑軌交點求解；若組裝結果跑到軌道另一側或連桿交叉，按這裡切換另一個幾何解。">🔄 翻面</button>
           <button class="lift-btn" id="sliderBaseBtn" style="display:none;" onclick="window.blocks.toggleSliderBase()" title="線性致動器的本體固定端。A 表示從軌道 A 端往 B 端推出；B 表示從 B 端往 A 端推出。調整滑軌長度時固定端會留在原位。">固定端：A</button>
-          <button class="lift-btn" id="linkToRailBtn" style="display:none;" onclick="window.blocks.convertLinkToSlider()" title="把這根連桿就地升級成滑軌：沿用連桿兩端的接點當固定孔，原本接好的連接與地錨都會保留。">🟩 變滑軌</button>
+          <button class="lift-btn" id="linkToRailBtn" style="display:none;" onclick="window.blocks.convertLinkToSlider()" title="把這根連桿就地升級成滑軌：沿用連桿兩端的接點當固定孔，原本接好的連接與機架固定點都會保留。">🟩 變滑軌</button>
           <button class="clear-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除選取的桿件">🗑 刪除</button>
         </div>
         <div class="le-row" id="sliderBodyRow" style="display:none;">
@@ -514,7 +514,7 @@
           <span class="re-status" id="roleStatus">自由</span>
           <span class="node-role-actions">
             <button onclick="window.blocks.setNodeRole('floating')">變自由</button>
-            <button onclick="window.blocks.setNodeRole('fixed')">設地錨</button>
+            <button onclick="window.blocks.setNodeRole('fixed')">設為機架點</button>
             <button onclick="window.blocks.removeNodeMotor()">拿掉馬達</button>
             <button id="splitBtn" onclick="window.blocks.splitNode()" title="把鎖在同一點的桿件分開" style="display:none;">分離</button>
             <button id="traceBtn" onclick="window.blocks.toggleTracePoint()" title="追蹤這個接點走過的路徑">設軌跡點</button>

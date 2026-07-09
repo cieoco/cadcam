@@ -162,7 +162,7 @@ export function setPointType(comps, id, type) {
 
 export function roleLabel(comps, id) {
   if (pointHasMotor(comps, id)) return '馬達';
-  if (pointIsGround(comps, id)) return '地錨';
+  if (pointIsGround(comps, id)) return '機架固定點';
   return '自由';
 }
 

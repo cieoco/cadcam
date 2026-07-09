@@ -2303,7 +2303,7 @@ function driveGearAt(gearId) {
   rebuild(); draw();
   // 嚙合對要兩個中心都接地，整對才會完整解出、固定；提醒把另一個中心也設地錨。
   const ungrounded = gearMeshChain(g).filter(x => x.p1 && !pointIsGround(x.p1.id));
-  if (ungrounded.length) setBanner('驅動輪已上馬達並固定；記得把另一個齒輪中心也設成地錨，整對才會轉');
+  if (ungrounded.length) setBanner('驅動輪已上馬達並固定；記得把另一個齒輪中心也設為機架點，整對才會轉');
 }
 
 // ---- 動力來源型號查詢 ----
