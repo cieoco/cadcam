@@ -43,13 +43,13 @@ const GEAR_MODULE = 6;         // 齒輪模數（mm）：所有齒輪共用，�
 const snapLego = v => Math.max(LEGO_STEP, Math.round((Number(v) || 0) / LEGO_STEP) * LEGO_STEP);
 const roundMm = v => Math.round(Number(v) || 0);
 const EXPORT_SETTINGS_KEY = 'cadcam.blocks.exportSettings';
-const TT_MOUNT_SETTINGS_KEY = 'cadcam.blocks.ttMountSettings.v5';
+const TT_MOUNT_SETTINGS_KEY = 'cadcam.blocks.ttMountSettings.v7';
 const TT_MOUNT_DEFAULTS = {
-  shaftDiameterMm: 6.1,
+  shaftDiameterMm: 6,
   screwDiameterMm: 3,
   screwOffsetXMm: -20.6,
   screwSpacingMm: 17.3,
-  locatorDiameterMm: 1.9,
+  locatorDiameterMm: 4,
   locatorOffsetXMm: -11.18,
   locatorOffsetYMm: 0
 };

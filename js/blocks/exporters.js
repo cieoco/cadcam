@@ -219,9 +219,9 @@ function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
       y: mount.center.y - x * sin + y * cos
     });
     const m = mount.settings || {};
-    const shaftR = (Number(m.shaftDiameterMm) || 6.1) / 2;
+    const shaftR = (Number(m.shaftDiameterMm) || 6) / 2;
     const screwR = (Number(m.screwDiameterMm) || 3) / 2;
-    const locatorR = (Number(m.locatorDiameterMm) || 1.9) / 2;
+    const locatorR = (Number(m.locatorDiameterMm) || 4) / 2;
     const screwX = Number(m.screwOffsetXMm) || -20.6;
     const screwSpacing = Number(m.screwSpacingMm) || 17.3;
     const locatorX = Number(m.locatorOffsetXMm) || -11.18;
