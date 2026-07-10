@@ -282,30 +282,37 @@ function signedArea(points) {
   }, 0) / 2;
 }
 
-function offsetLineIntersection(a, ua, b, ub) {
-  const cross = ua.x * ub.y - ua.y * ub.x;
-  if (Math.abs(cross) < 1e-9) return null;
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const t = (dx * ub.y - dy * ub.x) / cross;
-  return { x: a.x + ua.x * t, y: a.y + ua.y * t };
-}
-
-// 凸包的真正等距外擴：每一條邊平行外移後取交點，避免舊版「由中心放射」造成邊距不一。
-function offsetConvexHull(points, offset) {
+// 凸包的圓角等距外擴（凸包與半徑 offset 圓的 Minkowski 和）：
+// 每條邊沿外法線平移 offset，相鄰邊之間用圓弧接起來。
+// 相較於舊版「兩邊外移取交點」的尖角 miter，銳角頂點不會爆衝成又大又歪的尖楔，
+// 而是收成一段外弧，整片板貼著孔群、四周等距、圓角收邊。
+function roundedOffsetHull(points, offset) {
   if (points.length < 3 || offset <= 0) return points;
   const ccw = signedArea(points) >= 0;
-  const shifted = points.map((p, index) => {
-    const q = points[(index + 1) % points.length];
+  const n = points.length;
+  // 邊 p→q 的單位外法線
+  const outward = (p, q) => {
     const dx = q.x - p.x, dy = q.y - p.y;
-    const length = Math.hypot(dx, dy) || 1;
-    const nx = (ccw ? dy : -dy) / length;
-    const ny = (ccw ? -dx : dx) / length;
-    return { point: { x: p.x + nx * offset, y: p.y + ny * offset }, dir: { x: dx / length, y: dy / length } };
-  });
-  return shifted.map((edge, index) => {
-    const previous = shifted[(index - 1 + shifted.length) % shifted.length];
-    return offsetLineIntersection(previous.point, previous.dir, edge.point, edge.dir) || edge.point;
-  });
+    const len = Math.hypot(dx, dy) || 1;
+    return ccw ? { x: dy / len, y: -dx / len } : { x: -dy / len, y: dx / len };
+  };
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const p = points[i], q = points[(i + 1) % n], r = points[(i + 2) % n];
+    const nEdge = outward(p, q), nNext = outward(q, r);
+    // 這條邊平移後的兩端
+    out.push({ x: p.x + nEdge.x * offset, y: p.y + nEdge.y * offset });
+    out.push({ x: q.x + nEdge.x * offset, y: q.y + nEdge.y * offset });
+    // 頂點 q 的圓角：外法線由本邊掃到下一邊（取內部點，兩端已由相鄰邊供應）
+    const a0 = Math.atan2(nEdge.y, nEdge.x) * 180 / Math.PI;
+    let a1 = Math.atan2(nNext.y, nNext.x) * 180 / Math.PI;
+    if (ccw) { while (a1 < a0) a1 += 360; } else { while (a1 > a0) a1 -= 360; }
+    if (Math.abs(a1 - a0) > 0.5) {
+      const steps = Math.max(1, Math.round(Math.abs(a1 - a0) / 15));
+      out.push(...arcPoints(q.x, q.y, offset, a0, a1, steps).slice(1, -1));
+    }
+  }
+  return out;
 }
 
 function pointToSegmentDistance(point, a, b) {
@@ -640,7 +647,7 @@ function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
       }
     } else {
     const baseHull = hull(nodes);
-      if (baseHull.length >= 3) outlines.push(offsetConvexHull(baseHull, Math.max(18, frameR)));
+      if (baseHull.length >= 3) outlines.push(roundedOffsetHull(baseHull, Math.max(18, frameR)));
     }
   } else if (nodes.length === 1) {
     outlines.push(roundPadOutline(nodes[0], Math.max(18, frameR + holeR + 4)));
@@ -704,12 +711,14 @@ function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
     const end = { x: barAxis.a.x + barAxis.ux * maxAlong, y: barAxis.a.y + barAxis.uy * maxAlong };
     outlines.length = 0;
     outlines.push(barOutline(start, end, halfWidth));
-  } else if (mountOutlines.length && outlines.length) {
-    const merged = hull([...outlines.flat(), ...mountOutlines.flat()]);
-    outlines.length = 0;
-    outlines.push(merged);
   } else if (mountOutlines.length) {
-    outlines.push(hull(mountOutlines.flat()));
+    // 有馬達座（非兩點主桿）：把機架節點與馬達座角點一起取凸包，再做一次圓角等距外擴。
+    // 不對「已外擴的外形」再取尖角凸包，才不會產生歪斜尖楔。
+    const seeds = [...nodes, ...mountOutlines.flat()];
+    const base = hull(seeds);
+    outlines.length = 0;
+    if (base.length >= 3) outlines.push(roundedOffsetHull(base, Math.max(18, frameR)));
+    else if (base.length) outlines.push(roundPadOutline(base[0], Math.max(18, frameR)));
   }
 
   if (!outlines.length) return null;

@@ -15,7 +15,9 @@ const motorBar = inspectFrameExport([{ id: 'A', x: -80, y: 0 }, { id: 'M', x: 0,
 check('兩點機架加馬達座仍維持單一連續桿形外框', Boolean(motorBar && motorBar.outlines.length === 1 && motorBar.outlines[0].length > 20));
 
 const triangle = inspectFrameExport([{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 0, y: 40 }], settings);
-check('非共線固定點產生外擴底板', Boolean(triangle && triangle.outlines[0].length === 3));
+const triXs = triangle?.outlines[0].map(p => p.x) || [];
+// 圓角等距外擴：外形貼著三角形往外均勻擴張、四角收成圓弧（頂點數 > 3），不再是尖角三角。
+check('非共線固定點產生圓角外擴底板', Boolean(triangle && triangle.outlines.length === 1 && triangle.outlines[0].length > 3 && Math.min(...triXs) < 0));
 
 const plainBar = inspectFrameExport([{ x: 0, y: 0 }, { x: 100, y: 0 }], settings);
 const barXs = plainBar?.outlines[0].map(p => p.x) || [];
