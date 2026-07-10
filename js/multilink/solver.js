@@ -315,6 +315,9 @@ function solveBodyJointTopology(topology, params) {
         const baseY = Number(c.p1.y) || 0;
         const s = (c.sign === -1 ? -1 : 1) * R * motorTheta;
         points[c.p1.id] = { x: baseX + ux * s, y: baseY + uy * s };
+        const nx=-uy, ny=ux;
+        const holeSpan=getParamVal(c.lenParam,160);
+        (Array.isArray(c.holes)?c.holes:[]).forEach(h=>{ if(h?.id){ const u=h.role==='endA'?-holeSpan/2:h.role==='endB'?holeSpan/2:(Number(h.u)||0); points[h.id]={x:points[c.p1.id].x+ux*u+nx*(Number(h.v)||0),y:points[c.p1.id].y+uy*u+ny*(Number(h.v)||0)}; } });
     });
 
     // 凸輪從動件：凸輪軸轉角 theta 依輪廓/滾子相切幾何轉成直動從動點位移。

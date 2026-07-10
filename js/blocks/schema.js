@@ -341,6 +341,15 @@ function normalizeRack(comp, index, params, warnings) {
   }
   const framePins = uniqueSafeIds(comp.framePins);
   if (framePins.length) out.framePins = framePins;
+  if (Array.isArray(comp.holes)) {
+    const holes=comp.holes.filter(h=>h&&safeId(h.id)).slice(0,16).map(h=>{
+      const hole={ id:h.id, type:'floating', u:roundTenth(h.u,0), v:roundTenth(h.v,0), diameter:Math.max(1,roundTenth(h.diameter,5)) };
+      if(h.role==='endA'||h.role==='endB')hole.role=h.role;
+      return hole;
+    });
+    if(holes.length)out.holes=holes;
+  }
+  out.endMargin=Math.max(6,roundTenth(comp.endMargin,12));
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
   return out;
 }

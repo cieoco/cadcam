@@ -35,6 +35,7 @@ import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, pla
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
 import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js';
 import { LIFT_PARAM_FIELDS, analyzeCompetitionLift } from './competition-lift.js';
+import { rackGuideThetaRange } from './rack-limits.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('stageSvg');
@@ -305,6 +306,7 @@ const snapFrameNodesToGrid = () => {
   });
 };
 const pointIsGround = (id) => Model.pointIsGround(S.comps, id);
+const pointIsRackHole = id => S.comps.some(c => c.type === 'rack' && Array.isArray(c.holes) && c.holes.some(h => h.id === id));
 const removeMotorAtPoint = (id) => Model.removeMotorAtPoint(S.comps, id);
 const removeAnchorsAtPoint = (id) => { S.comps = Model.removeAnchorsAtPoint(S.comps, id); };
 const setPointType = (id, type) => Model.setPointType(S.comps, id, type);
@@ -1109,7 +1111,8 @@ function drawRackPart(c, pts) {
   const teeth = pinion ? Math.max(6, Math.round(Number(pinion.teeth) || 12)) : 12;
   const R = pinion ? (Number(S.topo.params[pinion.radiusParam]) || 40) : 40;   // 小齒輪節圓半徑（世界 mm）
   const module = (2 * R) / teeth;                                              // 模數對齊小齒輪，齒距才一致
-  const L = Number(S.topo.params[c.lenParam]) || 160;
+  const holeSpan = Number(S.topo.params[c.lenParam]) || 160;
+  const L = holeSpan + 2 * (Number(c.endMargin) || 12);
   const bodyHeight = rackBodyHeight(c, module);
   const localPts = createRackPath({ length: L, height: bodyHeight, module });
   const sc = View.getScale();
@@ -2383,10 +2386,12 @@ function addRackPinion() {
     axisDeg: 0,
     sign: 1,
     bodyHeight,
+    endMargin:12,
     slot: { length: 136, width: 5, offset: 0 },
-    framePins: [pinAId, pinBId]
+    framePins: [pinAId, pinBId],
+    holes:[{id:`RKH${S.counter}A`,role:'endA',u:0,v:-15,diameter:5},{id:`RKH${S.counter}B`,role:'endB',u:0,v:-15,diameter:5}]
   };
-  const pins = rackFramePinPositions(rack, pinion, { length: rackLen, module, teeth, axisDeg: rack.axisDeg });
+  const pins = rackFramePinPositions(rack, pinion, { length: rackLen+24, module, teeth, axisDeg: rack.axisDeg });
   const guideA = { type: 'anchor', id: 'RackGuide' + (S.counter - 2), p1: { id: pinAId, type: 'fixed', x: pins[0].x, y: pins[0].y } };
   const guideB = { type: 'anchor', id: 'RackGuide' + (S.counter - 1), p1: { id: pinBId, type: 'fixed', x: pins[1].x, y: pins[1].y } };
   S.topo.params[rack.lenParam] = rackLen;
@@ -2472,6 +2477,7 @@ function updateGearEditor() {
   setText('gearPinRadiusVal', Math.round(gearPinRadius(c)));
   setText('gearPinHoleVal', Number(c.pinHoleDiameter || 5).toFixed(1).replace(/\.0$/, ''));
   setRow('rackLengthRow', !!rack);
+  setRow('rackOrientationRow', !!rack);
   setRow('rackBodyHeightRow', !!rack);
   setRow('rackSlotLengthRow', !!rack);
   setRow('rackSlotWidthRow', !!rack);
@@ -2483,15 +2489,30 @@ function updateGearEditor() {
     setText('rackBodyHeightVal', Number(bodyH).toFixed(1).replace(/\.0$/, ''));
     setText('rackSlotLengthVal', Math.round(slot.length));
     setText('rackSlotWidthVal', Number(slot.width).toFixed(1).replace(/\.0$/, ''));
+    const orientationBtn=document.getElementById('rackOrientationBtn');
+    if(orientationBtn){ const vertical=Math.abs(Math.sin((Number(rack.axisDeg)||0)*Math.PI/180))>.7; orientationBtn.textContent=vertical?'↕ 垂直升降':'↔ 水平伸縮'; }
   }
   panel.style.display = 'flex';
 }
 function rackForGear(gear) {
   return gear ? S.comps.find(c => c.type === 'rack' && c.pinion === gear.id) || null : null;
 }
+function toggleRackOrientation() {
+  const gear=S.selectedGearId?gearById(S.selectedGearId):null, rack=rackForGear(gear);
+  if(!gear||!rack||!gear.p1)return;
+  pushUndo(); pause();
+  const points=pointCoords(), center=points[gear.p1.id]||gear.p1;
+  const vertical=Math.abs(Math.sin((Number(rack.axisDeg)||0)*Math.PI/180))>.7;
+  const delta=vertical?-Math.PI/2:Math.PI/2, cos=Math.cos(delta), sin=Math.sin(delta);
+  [rack.p1.id,...(rack.framePins||[])].forEach(id=>{ const p=points[id]; if(!p)return; const x=p.x-center.x,y=p.y-center.y; updatePointCoordsById(id,center.x+x*cos-y*sin,center.y+x*sin+y*cos); });
+  rack.axisDeg=vertical?0:90;
+  rebuild(); draw(); updateGearEditor(); scheduleAutosave();
+  transient(vertical?'↔ 已改為水平伸縮':'↕ 已改為垂直升降');
+}
 function rackLength(rack) {
   return Number(S.topo.params[rack.lenParam]) || 160;
 }
+function rackBodyLength(rack){ return rackLength(rack)+2*(Number(rack?.endMargin)||12); }
 function rackBodyHeight(rack, module = GEAR_MODULE) {
   return Math.max(4, Number(rack && rack.bodyHeight) || Math.max(8, module * 2.5));
 }
@@ -2526,7 +2547,7 @@ function syncRackFramePins(rack, gear = null) {
   const teeth = Math.max(6, Math.round(Number(pinion.teeth) || 12));
   const R = Number(S.topo.params[pinion.radiusParam]) || 40;
   const module = (2 * R) / teeth;
-  const length = rackLength(rack);
+    const length = rackBodyLength(rack);
   const axisDeg = Number(rack.axisDeg) || 0;
   const pins = rackFramePinPositions(rack, pinion, { length, module, teeth, axisDeg });
   rack.framePins.slice(0, 2).forEach((id, index) => {
@@ -2568,6 +2589,8 @@ function setGearManualAngle(c, angleRad) {
   const phaseRad = (Number(c.phase) || 0) * Math.PI / 180;
   if (rootMotor && state && Math.abs(state.factor) > 1e-9) {
     S.theta = (angleRad - phaseRad) * 180 / Math.PI / state.factor;
+    const rackRange=rackPinionThetaRange();
+    if(rackRange)S.theta=Math.max(rackRange.lo,Math.min(rackRange.hi,S.theta));
     S.topo.params.theta = S.theta;
     const thetaEl = document.getElementById('thetaVal');
     if (thetaEl) thetaEl.textContent = Math.round(norm360(S.theta));
@@ -3070,7 +3093,7 @@ function rackPinionThetaRange() {
     const center = pinion.p1;
     const ref = rack.p1;
     const R = Number(S.topo.params[pinion.radiusParam]) || 40;
-    const L = Number(S.topo.params[rack.lenParam]) || 160;
+    const L = rackBodyLength(rack);
     if (!Number.isFinite(R) || R <= 0 || !Number.isFinite(L) || L <= 0) return;
     const axisRad = (Number(rack.axisDeg) || 0) * Math.PI / 180;
     const ux = Math.cos(axisRad);
@@ -3089,6 +3112,11 @@ function rackPinionThetaRange() {
     const degB = b * 180 / Math.PI;
     lo = Math.max(lo, Math.min(degA, degB));
     hi = Math.min(hi, Math.max(degA, degB));
+    if(Array.isArray(rack.framePins)&&rack.framePins.length){
+      const slot=ensureRackSlot(rack,L);
+      const guideRange=rackGuideThetaRange(R,slot.length,slot.width,sign);
+      if(guideRange){ lo=Math.max(lo,guideRange.lo); hi=Math.min(hi,guideRange.hi); }
+    }
     found = true;
   });
   if (!found || !Number.isFinite(lo) || !Number.isFinite(hi) || hi <= lo) return null;
@@ -3934,7 +3962,7 @@ function init() {
                isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
                handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround, recordManualTrace, solvePinnedConstraints,
                snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel,
-               isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint });
+               isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, pointIsRackHole });
   loadExportSettings();
   loadTtMountSettings();
   populateExamples();
@@ -3959,5 +3987,5 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
 init();

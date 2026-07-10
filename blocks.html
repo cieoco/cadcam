@@ -641,10 +641,14 @@
           <button class="clear-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除這對齒輪">🗑 刪除</button>
         </div>
         <div class="se-row rack-row" id="rackLengthRow" style="display:none;">
-          <span class="se-label">齒條長度</span>
-          <button class="le-step" onclick="window.blocks.changeRackLength(-8)" title="齒條長度 −8mm">−</button>
+          <span class="se-label">兩端孔距</span>
+          <button class="le-step" onclick="window.blocks.changeRackLength(-8)" title="兩端孔距 −8mm">−</button>
           <span class="le-value"><span id="rackLengthVal">160</span><span class="le-unit">mm</span></span>
-          <button class="le-step" onclick="window.blocks.changeRackLength(8)" title="齒條長度 ＋8mm">＋</button>
+          <button class="le-step" onclick="window.blocks.changeRackLength(8)" title="兩端孔距 ＋8mm">＋</button>
+        </div>
+        <div class="se-row rack-row" id="rackOrientationRow" style="display:none;">
+          <span class="se-label">安裝方向</span>
+          <button class="clear-btn" id="rackOrientationBtn" onclick="window.blocks.toggleRackOrientation()" title="垂直升降／水平伸縮切換">↕ 垂直升降</button>
         </div>
         <div class="se-row rack-row" id="rackBodyHeightRow" style="display:none;">
           <span class="se-label">齒條 d</span>

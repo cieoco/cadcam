@@ -649,7 +649,6 @@ export const BLOCK_EXAMPLES = [
       kind: 'blocks',
       v: 1,
       counter: 5,
-      tracePoint: 'LiftRack',
       comps: [
         { type: 'gear', id: 'LiftPinion', color: '#e74c3c',
           p1: pt('LPC', 'motor', 0, 0, { physicalMotor: '1' }),
@@ -662,7 +661,8 @@ export const BLOCK_EXAMPLES = [
           pinion: 'LiftPinion', lenParam: 'LRL', axisDeg: 90, sign: 1,
           bodyHeight: 20,
           slot: { length: 144, width: 5, offset: 0 },
-          framePins: ['LGA', 'LGB'] }
+          framePins: ['LGA', 'LGB'], endMargin:12,
+          holes: [{id:'LiftHoleA',role:'endA',u:0,v:-15,diameter:5},{id:'LiftOutput',role:'endB',u:0,v:-15,diameter:5}] }
       ],
       params: { LPR: 30, LRL: 176, theta: 0 }
     }

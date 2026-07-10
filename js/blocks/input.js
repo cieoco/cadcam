@@ -38,7 +38,8 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
     snapFrameNodesToGrid = () => {},
     isGroundPositionUnlocked = () => false,
     relockGroundPosition = () => {},
-    rotateInputCrankToPoint = () => false;
+    rotateInputCrankToPoint = () => false,
+    pointIsRackHole = () => false;
 
 export function startFreeLinkDrag(e, linkId) {
   const c = S.comps.find(x => x.id === linkId && isFreeLink(x));
@@ -156,6 +157,7 @@ function onDragMove(e) {
     return;
   }
   if (!S.dragId) return;
+  if (pointIsRackHole(S.dragId)) return;
   // 馬達輸入桿的動端：solver 會把它釘在 S.theta 對應的姿勢，直接拖會被拉回、移不動。
   // 不跟 solver 較勁——以「指標位置」找最近的接點當吸附目標、放開即連接（綠圈給回饋）。
   const crankBar = inputCrankMovingEnd(S.dragId);
@@ -339,7 +341,8 @@ export function init(deps) {
      snapFrameNodesToGrid = (() => {}),
      isGroundPositionUnlocked = (() => false),
      relockGroundPosition = (() => {}),
-     rotateInputCrankToPoint = (() => false) } = deps);
+     rotateInputCrankToPoint = (() => false),
+     pointIsRackHole = (() => false) } = deps);
 
   // ---- 掛上 svg 的指標 / 手勢監聽（原 app.js 檔尾那批，順序不變）----
   svg.addEventListener('pointermove', onDragMove);

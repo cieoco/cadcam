@@ -22,6 +22,9 @@ export function pointCoords(comps) {
   comps.forEach(c => pointKeysFor(c).forEach(k => {
     if (c[k] && c[k].id) m[c[k].id] = { x: Number(c[k].x) || 0, y: Number(c[k].y) || 0 };
   }));
+  comps.filter(c => c.type === 'rack' && Array.isArray(c.holes)).forEach(c => c.holes.forEach(h => {
+    if (h?.id) m[h.id] = { x: Number(h.x ?? c.p1?.x) || 0, y: Number(h.y ?? c.p1?.y) || 0 };
+  }));
   return m;
 }
 
@@ -62,6 +65,9 @@ export function pointRefs(comps, id) {
   const refs = [];
   comps.forEach(c => pointKeysFor(c).forEach(k => {
     if (c[k] && c[k].id === id) refs.push({ comp: c, key: k, point: c[k] });
+  }));
+  comps.filter(c => c.type === 'rack' && Array.isArray(c.holes)).forEach(c => c.holes.forEach((h, index) => {
+    if (h?.id === id) refs.push({ comp: c, key: `holes.${index}`, point: h });
   }));
   return refs;
 }
