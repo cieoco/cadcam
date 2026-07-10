@@ -428,6 +428,7 @@ export function init(deps) {
     const w = worldFromEvent(e); if (!w) return;
     e.preventDefault();
     if (e.pointerType === 'mouse') {
+      if (e.button !== 0) return; // 右鍵只負責下方 contextmenu 的「完成」，不能先加一點。
       Tools.addPolygonVertex(e);
       return;
     }

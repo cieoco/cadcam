@@ -56,6 +56,7 @@ export function startDrawRail() {
 function beginDraw(kind) {
   pause();
   cancelMotorMode();
+  exitDrawPolygon();
   exitDrawTriangle();
   deselectLink();
   S.drawKind = kind;
@@ -159,6 +160,7 @@ export function startDrawTriangle(shape = 'triangle') {
   pause();
   cancelMotorMode();
   exitDrawLink();
+  exitDrawPolygon();
   deselectLink();
   S.drawingTriangle = true;
   S.triangleShape = shape === 'jaw' ? 'jaw' : 'triangle';
@@ -446,8 +448,8 @@ export function startDrawPolygon() {
   S.polygonPreview = View.worldFromScreen(W * 0.5, H * 0.5);
   svg.style.cursor = 'crosshair';
   setBanner(promptText(
-    '板件：前 3 孔＝機構求解孔，第 4 點起＝造形點（描外形、預設不鑽孔）；右鍵完成',
-    '板件：前 3 孔＝機構孔，之後＝造形點（不鑽孔）；點回起點完成'
+    '桿件：左鍵放孔，右鍵完成（2 孔＝連桿、3 孔＝三點桿）',
+    '桿件：點一下放孔；點回第一孔完成'
   ));
   draw();
 }
@@ -463,11 +465,14 @@ function polygonNearFirst(world) {
   if (!first || !world) return false;
   return Math.hypot(world.x - first.pos.x, world.y - first.pos.y) <= snapWorld();
 }
-// 左鍵：加一個孔（吸附既有接點）；若點回起點且已 ≥3 孔則收尾建立。
+// 左鍵：加一個孔（吸附既有接點）。桌機一律由右鍵收尾；觸控可點回第一孔收尾。
 export function addPolygonVertex(e) {
   const cur = worldFromEvent(e) || S.polygonPreview;
   if (!cur) return;
-  if (S.polygonPoints.length >= 3 && polygonNearFirst(cur)) { finishPolygonDraw(); return; }
+  if (e?.pointerType && e.pointerType !== 'mouse' && S.polygonPoints.length >= 2 && polygonNearFirst(cur)) {
+    finishPolygonDraw();
+    return;
+  }
   if (S.polygonPoints.length >= MAX_PLATE_POINTS) {
     setBanner(`板件最多 ${MAX_PLATE_POINTS} 孔（前 3 為機構孔）`);
     return;
@@ -475,15 +480,41 @@ export function addPolygonVertex(e) {
   const picked = resolveTrianglePointAt(cur, S.polygonPoints.map(p => p.nodeId));
   S.polygonPoints.push(picked);
   const done = S.polygonPoints.length;
-  setBanner(done < 3
-    ? promptText(`機構孔 ${done}/3；再點放下一孔`, `機構孔 ${done}/3`)
-    : promptText('造形點（描外形、不鑽孔）；右鍵完成，或繼續加點', '造形點；點回起點完成'));
+  let hint = promptText(`已放 ${done} 孔：右鍵完成；左鍵可繼續加外形點`, `已放 ${done} 孔；點回第一孔完成`);
+  if (done === 1) hint = promptText('已放第 1 孔；左鍵放第 2 孔', '已放第 1 孔');
+  else if (done === 2) hint = promptText('二孔連桿就緒：右鍵完成；左鍵可加第 3 孔', '二孔連桿就緒；點回第一孔完成');
+  setBanner(hint);
   draw();
 }
-// 右鍵（或點回起點）：≥3 孔就建立板件（前 3 求解、其餘造形孔）。
+// 右鍵：2 孔建立連桿；3 孔建立三點桿；第 4 點起是板件外形點。
 export function finishPolygonDraw() {
-  if (S.polygonPoints.length < 3) { setBanner('板件至少要 3 孔'); return; }
+  if (S.polygonPoints.length < 2) { setBanner('至少左鍵放 2 孔，才能建立桿件'); return; }
+  if (S.polygonPoints.length === 2) { buildBarFromPolygonPoints(); return; }
   buildPolygonPlate();
+}
+function buildBarFromPolygonPoints() {
+  const [first, second] = S.polygonPoints;
+  const dx = second.pos.x - first.pos.x, dy = second.pos.y - first.pos.y;
+  const rawLength = Math.hypot(dx, dy);
+  const length = rawLength < 6 ? LINK_DEFAULT_LEN : snapLego(rawLength);
+  const scale = length / (rawLength || 1);
+  const end = second.nodeId ? second.pos : {
+    x: first.pos.x + dx * scale,
+    y: first.pos.y + dy * scale
+  };
+  pushUndo();
+  const n = ++S.counter;
+  const param = 'LL' + n;
+  const comp = {
+    type: 'bar', id: 'Link' + n, color: '#3498db', fixedLen: true, lenParam: param,
+    p1: { id: first.nodeId || `P${n}a`, type: 'floating', x: first.pos.x, y: first.pos.y },
+    p2: { id: second.nodeId || `P${n}b`, type: 'floating', x: end.x, y: end.y }
+  };
+  S.comps.push(comp);
+  S.topo.params[param] = Math.round(Math.hypot(end.x - first.pos.x, end.y - first.pos.y));
+  exitDrawPolygon();
+  rebuild(); draw();
+  selectLink(comp.id);
 }
 function buildPolygonPlate() {
   const all = S.polygonPoints;

@@ -424,7 +424,7 @@
           <div class="block link" onclick="window.blocks.openLinkMenu()">
             <span class="ico">🔵</span>
             <span class="name">桿件</span>
-            <span class="role">逐點畫孔，前 3 孔求解、之後造形點；右鍵完成</span>
+            <span class="role">左鍵放孔，右鍵完成；2孔連桿、3孔三點桿</span>
           </div>
           <div class="block slider" onclick="window.blocks.startDrawRail()">
             <span class="ico">🟩</span>
@@ -632,22 +632,6 @@
         </button>
         <button class="pm-cancel" onclick="window.blocks.openPowerMenu()">取消</button>
       </div>
-      <div class="tool-menu power-menu" id="linkMenu" style="display:none;">
-        <div class="pm-title">選擇桿件</div>
-        <button class="pm-opt" onclick="window.blocks.pickLinkTool('bar')">
-          <span class="pm-ico">🔵</span>
-          <span class="pm-text"><b>連桿</b><small>兩個孔，固定長度</small></span>
-        </button>
-        <button class="pm-opt" onclick="window.blocks.pickLinkTool('triangle')">
-          <span class="pm-ico">🔺</span>
-          <span class="pm-text"><b>三點桿</b><small>三個孔，做成剛性板</small></span>
-        </button>
-        <button class="pm-opt" onclick="window.blocks.pickLinkTool('jaw')">
-          <span class="pm-ico">⌒</span>
-          <span class="pm-text"><b>夾爪板</b><small>三個機構孔，外形做成夾持器</small></span>
-        </button>
-        <button class="pm-cancel" onclick="window.blocks.openLinkMenu()">取消</button>
-      </div>
       <div id="view3d">
         <div class="view3d-hint">
           <span class="desktop-hint">🧊 3D 預覽：拖曳旋轉、滾輪縮放。編輯請關掉 3D 回到平面。</span>
@@ -749,6 +733,6 @@
     </button>
   </nav>
 
-  <script type="module" src="js/blocks/app.js?v=20260710_02"></script>
+  <script type="module" src="js/blocks/app.js?v=20260710_05"></script>
 </body>
 </html>
