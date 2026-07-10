@@ -314,6 +314,13 @@ export function createViewer(container) {
   const dynamic = new THREE.Group();
   scene.add(dynamic);
 
+  // 點選變半透明（ghost）：因為 update() 每幀重建 dynamic，隱藏狀態不能存在 mesh 上，
+  // 改存在這個以 pickKey 為索引的 Set，重建時再套用。ghost 的部件仍可被點回實體。
+  const ghosted = new Set();
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  let lastModel = null;
+
   const holeR = 3.4;   // 板上孔徑（視覺用）
   const pinMat = new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.6, roughness: 0.35 });
   const groundMat = new THREE.MeshStandardMaterial({ color: 0x34495e, metalness: 0.2, roughness: 0.8 });
@@ -350,6 +357,32 @@ export function createViewer(container) {
     return matCache.get(color);
   }
 
+  // ghost 材質：把任一來源材質做成半透明複本（快取，避免逐幀重建）。
+  // 用複本而非直接改共用材質，非 ghost 的部件材質才不受影響。
+  const ghostMatCache = new Map();
+  function ghostMaterialFor(mat) {
+    if (!ghostMatCache.has(mat.uuid)) {
+      const g = mat.clone();
+      g.transparent = true;
+      g.opacity = 0.16;
+      g.depthWrite = false;
+      ghostMatCache.set(mat.uuid, g);
+    }
+    return ghostMatCache.get(mat.uuid);
+  }
+
+  function ghostify(obj) {
+    obj.traverse(o => { if (o.isMesh) o.material = ghostMaterialFor(o.material); });
+  }
+
+  // 統一的加入點：標上 pickKey 供點選判定；若該部件目前為 ghost 就套半透明材質。
+  function addPart(obj, key) {
+    obj.userData.pickKey = key;
+    if (ghosted.has(key)) ghostify(obj);
+    dynamic.add(obj);
+    return obj;
+  }
+
   function clearDynamic() {
     for (let i = dynamic.children.length - 1; i >= 0; i--) {
       const obj = dynamic.children[i];
@@ -365,6 +398,7 @@ export function createViewer(container) {
   function update(model) {
     clearDynamic();
     if (!model) return;
+    lastModel = model;
 
     // 機架：直接使用 2D / DXF 共用的 frameGeometry，孔位與加工輸出完全一致。
     if (model.frame && Array.isArray(model.frame.outlines)) {
@@ -374,7 +408,7 @@ export function createViewer(container) {
         outline.slice(1).forEach(p=>shape.lineTo(p.x,p.y)); shape.closePath();
         if(index===0)(model.frame.holes||[]).forEach(h=>{ const path=new THREE.Path(); path.absarc(h.x,h.y,Math.max(.2,h.r),0,Math.PI*2,false); shape.holes.push(path); });
         const geo=new THREE.ExtrudeGeometry(shape,{depth:model.frame.thickness,bevelEnabled:false,curveSegments:24});
-        const mesh=new THREE.Mesh(geo,plateMaterial(model.frame.color||'#465568')); mesh.position.z=model.frame.z; dynamic.add(mesh);
+        const mesh=new THREE.Mesh(geo,plateMaterial(model.frame.color||'#465568')); mesh.position.z=model.frame.z; addPart(mesh,'frame');
       });
     }
 
@@ -388,7 +422,7 @@ export function createViewer(container) {
       });
       const mesh = new THREE.Mesh(geo, plateMaterial(s.color));
       mesh.position.z = s.z;     // 幾何已是世界 XY 絕對座標，只需抬 z
-      dynamic.add(mesh);
+      addPart(mesh, 'stick:' + s.id);
     });
 
     // 三點桿：擠出成實心三角板（取代它三條邊各自的桿）
@@ -401,11 +435,12 @@ export function createViewer(container) {
       });
       const mesh = new THREE.Mesh(geo, plateMaterial(pl.color));
       mesh.position.z = pl.z;
-      dynamic.add(mesh);
+      addPart(mesh, 'plate:' + (pl.ids || []).join('-'));
     });
 
     // 滑塊軌道：m1-m2 承載桿擠成扁條（兩端鎖孔＝固定螺絲），沿行程方向挖一條長槽
-    (model.rails || []).forEach(r => {
+    (model.rails || []).forEach((r, ri) => {
+      const railKey = 'rail:' + ri;
       const shape = stadiumShape(r.a, r.b, r.r, holeR);
       if (r.slot) shape.holes.push(capsuleHolePath(r.slot.a, r.slot.b, r.slot.half));
       const geo = new THREE.ExtrudeGeometry(shape, {
@@ -415,7 +450,7 @@ export function createViewer(container) {
       });
       const mesh = new THREE.Mesh(geo, plateMaterial(r.color));
       mesh.position.z = r.z;
-      dynamic.add(mesh);
+      addPart(mesh, railKey);
 
       // 槽底有色墊片：墊在洞後方、只填底部一小段厚度 → 看起來像「有色底的凹槽」而非透空黑洞
       if (r.slot && r.slot.color) {
@@ -424,12 +459,13 @@ export function createViewer(container) {
           { depth: 1.5, bevelEnabled: false, curveSegments: 20 });
         const floor = new THREE.Mesh(floorGeo, plateMaterial(r.slot.color));
         floor.position.z = r.z;   // 與軌道背面齊，凹槽剩 (thickness-1.5) 的深度
-        dynamic.add(floor);
+        addPart(floor, railKey);
       }
     });
 
     // 滑件：短滑件本體連起前後兩螺絲；兩根導引螺絲沿 z 穿過軌道槽（中心銷接連桿由 pins 處理）
-    (model.carriages || []).forEach(c => {
+    (model.carriages || []).forEach((c, ci) => {
+      const carKey = 'carriage:' + ci;
       const shape = stadiumShape(c.bodyA, c.bodyB, c.bodyR, c.screwR);
       const geo = new THREE.ExtrudeGeometry(shape, {
         depth: c.thickness,
@@ -438,13 +474,13 @@ export function createViewer(container) {
       });
       const body = new THREE.Mesh(geo, plateMaterial(c.color));
       body.position.z = c.z;
-      dynamic.add(body);
+      addPart(body, carKey);
       (c.screws || []).forEach(s => {
         const h = Math.max(1, c.screwZ1 - c.screwZ0);
         const pin = new THREE.Mesh(new THREE.CylinderGeometry(c.screwR, c.screwR, h, 16), pinMat);
         pin.rotation.x = Math.PI / 2;
         pin.position.set(s.x, s.y, (c.screwZ0 + c.screwZ1) / 2);
-        dynamic.add(pin);
+        addPart(pin, carKey);
       });
     });
 
@@ -464,14 +500,14 @@ export function createViewer(container) {
       const body = new THREE.Mesh(geo, plateMaterial(g.color));
       body.position.z = g.z;
       group.add(body);
-      dynamic.add(group);
+      addPart(group, 'gear:' + g.id);
 
       const boltH = Math.max(1, g.thickness * 0.35);
       const pinR = Math.max(0.5, Number(g.pinHoleDiameter || 5) / 2);
       const bolt = new THREE.Mesh(new THREE.CylinderGeometry(pinR, pinR, boltH, 20), gearBoltMat);
       bolt.rotation.x = Math.PI / 2;
       bolt.position.set(g.pin.x, g.pin.y, g.z + g.thickness + boltH / 2 + 0.2);
-      dynamic.add(bolt);
+      addPart(bolt, 'gear:' + g.id);
     });
 
     // 齒條：和齒輪同在內側傳動平面，齒形本身擠出成一片有厚度的齒桿。
@@ -497,7 +533,7 @@ export function createViewer(container) {
         floor.position.z = r.z;
         group.add(floor);
       }
-      dynamic.add(group);
+      addPart(group, 'rack:' + r.id);
     });
 
     // 皮帶輪與皮帶：圓盤留中心孔，輪緣銷由 solver 位置決定；皮帶用閉合管線繞外公切線。
@@ -524,13 +560,13 @@ export function createViewer(container) {
       const spoke = new THREE.Mesh(new THREE.BoxGeometry(spokeLen, 2.4, 1.8), plateMaterial(p.color));
       spoke.position.set(spokeLen / 2, 0, p.z + p.thickness + 1.2);
       group.add(spoke);
-      dynamic.add(group);
+      addPart(group, 'pulley:' + p.id);
 
       const boltH = Math.max(1, p.thickness * 0.35);
       const bolt = new THREE.Mesh(new THREE.CylinderGeometry(holeR * 1.05, holeR * 1.05, boltH, 20), gearBoltMat);
       bolt.rotation.x = Math.PI / 2;
       bolt.position.set(p.pin.x, p.pin.y, p.z + p.thickness + boltH / 2 + 0.2);
-      dynamic.add(bolt);
+      addPart(bolt, 'pulley:' + p.id);
     });
 
     (model.belts || []).forEach(b => {
@@ -543,7 +579,7 @@ export function createViewer(container) {
       );
       const geo = new THREE.TubeGeometry(curve, Math.max(12, pts.length * 2), b.thickness, 8, true);
       const mat = b.color ? plateMaterial(b.color) : beltMat;
-      dynamic.add(new THREE.Mesh(geo, mat));
+      addPart(new THREE.Mesh(geo, mat), 'belt:' + b.id);
     });
 
     // 凸輪從動件：凸輪輪廓在底層旋轉，滾子/從動塊沿導桿方向顯示輸出位置。
@@ -559,19 +595,19 @@ export function createViewer(container) {
       const body = new THREE.Mesh(geo, plateMaterial(c.color));
       body.position.z = c.z;
       group.add(body);
-      dynamic.add(group);
+      addPart(group, 'cam:' + c.id);
 
       const hub = new THREE.Mesh(new THREE.CylinderGeometry(holeR * 1.05, holeR * 1.05, c.thickness + 1, 24), gearBoltMat);
       hub.rotation.x = Math.PI / 2;
       hub.position.set(c.center.x, c.center.y, c.z + c.thickness / 2);
-      dynamic.add(hub);
+      addPart(hub, 'cam:' + c.id);
 
       const roller = new THREE.Mesh(
         new THREE.CylinderGeometry(c.rollerRadius, c.rollerRadius, c.thickness, 24),
         rollerMat);
       roller.rotation.x = Math.PI / 2;
       roller.position.set(c.follower.x, c.follower.y, c.z + c.thickness / 2);
-      dynamic.add(roller);
+      addPart(roller, 'cam:' + c.id);
 
       const blockLen = 22;
       const blockW = 16;
@@ -582,7 +618,7 @@ export function createViewer(container) {
         c.z + c.thickness / 2
       );
       block.rotation.z = c.axis.deg * Math.PI / 180;
-      dynamic.add(block);
+      addPart(block, 'cam:' + c.id);
 
       const guideLen = 120;
       const guide = new THREE.Mesh(new THREE.BoxGeometry(guideLen, 2.2, 1.8), plateMaterial('#8a96a3'));
@@ -592,7 +628,7 @@ export function createViewer(container) {
         c.z - 1
       );
       guide.rotation.z = c.axis.deg * Math.PI / 180;
-      dynamic.add(guide);
+      addPart(guide, 'cam:' + c.id);
     });
 
     // 馬達：躺在機構背面（z<0）、長軸朝機架方向，輸出軸沿 +z 往上頂到曲柄那層帶動它。
@@ -629,7 +665,7 @@ export function createViewer(container) {
         shaft.position.set(0, 0, topZ + sLen / 2);
         g.add(shaft);
 
-        dynamic.add(g);
+        addPart(g, 'motor:' + m.id);
         return;
       }
 
@@ -669,7 +705,7 @@ export function createViewer(container) {
       shaft.position.set(0, 0, shaftBaseZ);
       g.add(shaft);
 
-      dynamic.add(g);
+      addPart(g, 'motor:' + m.id);
     });
 
     // 關節：銷柱（圓柱預設沿 Y 軸，轉成沿 Z）
@@ -719,12 +755,51 @@ export function createViewer(container) {
   function start() { if (!raf) loop(); }
   function stop() { if (raf) cancelAnimationFrame(raf); raf = null; }
 
+  // 點選判定：從滑鼠位置射線找出最近、且帶 pickKey 的部件（關節銷柱無 key，會穿透到後方板件）。
+  function pickAt(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(dynamic.children, true);
+    for (const hit of hits) {
+      let o = hit.object;
+      while (o && o !== dynamic && o.userData.pickKey === undefined) o = o.parent;
+      if (o && o.userData.pickKey !== undefined) return o.userData.pickKey;
+    }
+    return null;
+  }
+
+  // 用 pointerdown/up 的位移量區分「點選」與「拖曳旋轉」，才不會在轉動視角時誤觸隱藏。
+  let downX = 0, downY = 0;
+  function onPointerDown(e) { downX = e.clientX; downY = e.clientY; }
+  function onPointerUp(e) {
+    if (e.button !== 0) return;
+    if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return;   // 視為拖曳
+    const key = pickAt(e.clientX, e.clientY);
+    if (!key) return;
+    if (ghosted.has(key)) ghosted.delete(key); else ghosted.add(key);
+    if (lastModel) update(lastModel);   // 停在靜止幀時也要即時反映
+  }
+  renderer.domElement.addEventListener('pointerdown', onPointerDown);
+  renderer.domElement.addEventListener('pointerup', onPointerUp);
+
+  // 讓外部（如「全部顯示」按鈕）可清掉所有隱藏狀態。
+  function showAll() {
+    if (!ghosted.size) return;
+    ghosted.clear();
+    if (lastModel) update(lastModel);
+  }
+
   const resizeObserver = 'ResizeObserver' in window ? new ResizeObserver(() => resize()) : null;
   if (resizeObserver) resizeObserver.observe(container);
 
   function dispose() {
     stop();
     clearDynamic();
+    renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+    renderer.domElement.removeEventListener('pointerup', onPointerUp);
+    ghostMatCache.forEach(m => m.dispose());
     matCache.forEach(m => m.dispose());
     pinMat.dispose();
     groundMat.dispose();
@@ -744,5 +819,5 @@ export function createViewer(container) {
   resize();
   start();
 
-  return { update, resize, dispose, start, stop, get camera() { return camera; }, get controls() { return controls; } };
+  return { update, resize, dispose, start, stop, showAll, get camera() { return camera; }, get controls() { return controls; } };
 }
