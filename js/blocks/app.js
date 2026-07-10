@@ -28,6 +28,7 @@ import * as Input from './input.js';     // 指標 / 手勢互動（拖曳 + 吸
 import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import * as Motion from './motion.js';
+import { analyzeDof } from './dof.js';
 import * as Store from './storage.js';
 import * as Exporters from './exporters.js';
 import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, plateVertices } from './plate-geometry.js';
@@ -538,23 +539,36 @@ function updateMechanismStatus(sol = null) {
   if (!el) return;
   let state = 'idle';
   let text = '尚未建立機構';
+  let title = '';
   if (S.comps.length) {
+    const mobility = analyzeDof(S.comps);
+    title = `理論自由度：F = ${mobility.dof}（剛體 ${mobility.bodies}、低副 ${mobility.lowerPairs}、高副 ${mobility.higherPairs}）`;
     if (gearMeshHasWarning()) {
       state = 'error';
-      text = '齒輪未嚙合';
+      text = `DOF ${mobility.dof} · 齒輪未嚙合`;
+    } else if (mobility.dof < 0) {
+      state = 'error';
+      text = `DOF ${mobility.dof} · 約束過多，可能卡住`;
+    } else if (mobility.dof === 0) {
+      state = 'static';
+      text = 'DOF 0 · 固定結構，不能動';
     } else if (!hasDriveSource()) {
       state = 'warn';
-      text = '缺少動力';
+      text = mobility.dof === 1 ? 'DOF 1 · 可運動，請加動力' : `DOF ${mobility.dof} · 太鬆，請固定或連接`;
     } else if (S.compiled && sol === null && (S.compiled.steps || []).length) {
       state = 'error';
-      text = '機構可能卡住';
-    } else {
+      text = `DOF ${mobility.dof} · 機構可能卡住`;
+    } else if (mobility.dof === 1) {
       state = 'ready';
-      text = '可播放';
+      text = 'DOF 1 · 可運動';
+    } else {
+      state = 'warn';
+      text = `DOF ${mobility.dof} · 太鬆，無法預測軌跡`;
     }
   }
   el.dataset.state = state;
   el.textContent = text;
+  el.title = title;
 }
 
 // 算馬達本體的朝向（度）：對準接在中心、非曲柄的那根桿；沒有就朝滑軌另一固定孔；再沒有才朝最近地錨。
