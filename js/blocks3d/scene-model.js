@@ -125,6 +125,7 @@ export function buildSceneModel(links, points, opts = {}) {
   const motorTypes = opts.motorTypes || new Map();   // id -> 'tt' | 'mg995'
   const motorMounts = opts.motorMounts || new Map(); // id -> { dir:{x,y}, reason }
   const frameGeometry = opts.frameGeometry || null;
+  const plateGeometries = opts.plateGeometries || {}; // 孔序字串 -> { outline, holes }（沿用 2D/DXF 共用板形，如夾爪）
   const polygons = opts.polygons || [];
   const gearDefs = opts.gears || [];
   const rackDefs = opts.racks || [];
@@ -208,6 +209,7 @@ export function buildSceneModel(links, points, opts = {}) {
     } else {
       const poly = body.src;
       const corners = poly.points.map(id => ({ x: points[id].x, y: points[id].y }));
+      const shared = plateGeometries[poly.points.join(',')]; // 有共用板形（world 座標的 outline+holes）就沿用
       plates.push({
         ids: [...poly.points],
         corners,
@@ -218,6 +220,8 @@ export function buildSceneModel(links, points, opts = {}) {
         color: poly.color || '#27ae60',
         shape: poly.shape || 'triangle',
         jawTurnSign: poly.jawTurnSign,
+        outline: shared ? shared.outline : null,
+        holes: shared ? shared.holes : null,
       });
     }
   });

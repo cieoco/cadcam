@@ -4,6 +4,7 @@ import { BLOCK_EXAMPLES } from '../js/blocks/examples.js';
 import { compileTopology } from '../js/core/topology.js';
 import { solveTopology } from '../js/multilink/solver.js';
 import { buildSceneModel } from '../js/blocks3d/scene-model.js';
+import { createPlateGeometry } from '../js/blocks/plate-geometry.js';
 import { check, report } from './_harness.mjs';
 
 function physicalMotorIds(comps) {
@@ -78,15 +79,26 @@ function sceneFor(id, thetaDeg = 45, extraOpts = {}) {
   });
   const belts = comps.filter(c => c.type === 'belt')
     .map(c => ({ id: c.id, driver: c.driver, driven: c.driven, color: c.color }));
+  const polygons = compiled.visualization.polygons || [];
+  // 比照 push3D：夾爪等 jaw 板沿用 2D/DXF 共用板形
+  const plateGeometries = {};
+  polygons.forEach(poly => {
+    if (poly.shape !== 'jaw') return;
+    const world = poly.points.map(id => pts[id]).filter(p => p && Number.isFinite(p.x));
+    if (world.length < 3) return;
+    const g = createPlateGeometry({ shape: 'jaw', jawTurnSign: poly.jawTurnSign }, world, { radius: 5 });
+    if (g.outlines.length) plateGeometries[poly.points.join(',')] = { outline: g.outlines[0], holes: g.holes };
+  });
   return buildSceneModel(compiled.visualization.links, pts, {
     groundIds,
     motorCenters,
-    polygons: compiled.visualization.polygons || [],
+    polygons,
     gears,
     racks,
     cams,
     pulleys,
     belts,
+    plateGeometries,
     ...extraOpts,
   });
 }
@@ -152,6 +164,14 @@ const pulleyMotor = pulley.motors.find(m => m.id === 'PLA');
 const drivenPulley = pulley.pulleys.find(p => p.id === 'PulleyB');
 check('皮帶輪馬達本體背向另一輪', pulleyMotor && drivenPulley && dotFromToWithDir(pulleyMotor, drivenPulley.center, pulleyMotor.dir) < 0,
   `dir=${pulleyMotor ? `${pulleyMotor.dir.x.toFixed(2)},${pulleyMotor.dir.y.toFixed(2)}` : 'missing'}`);
+
+const gripper=sceneFor('gear-gripper',20);
+const gripperJaws=gripper.plates.filter(p=>p.shape==='jaw');
+check('雙齒輪夾持器 3D 有兩顆齒輪與兩片夾爪',gripper.gears.length===2&&gripperJaws.length===2,
+  `gears=${gripper.gears.length}, jaws=${gripperJaws.length}`);
+check('夾爪 3D 沿用 2D/DXF 共用板形（outline 而非近似三角）',
+  gripperJaws.length===2&&gripperJaws.every(p=>Array.isArray(p.outline)&&p.outline.length>=3&&Array.isArray(p.holes)&&p.holes.length===3),
+  `outline頂點=${gripperJaws.map(p=>p.outline?p.outline.length:'null').join('/')}`);
 
 const framed=sceneFor('competition-rack-lift',0,{frameGeometry:{outlines:[[{x:-20,y:-20},{x:20,y:-20},{x:20,y:20},{x:-20,y:20}]],holes:[{x:0,y:0,r:3,layer:'TT_SHAFT'}],warnings:[]}});
 check('3D 場景沿用 DXF 機架外形與孔位',framed.frame&&framed.frame.outlines.length===1&&framed.frame.holes[0].layer==='TT_SHAFT');

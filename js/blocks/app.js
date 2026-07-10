@@ -31,7 +31,7 @@ import * as Motion from './motion.js';
 import { analyzeDof } from './dof.js';
 import * as Store from './storage.js';
 import * as Exporters from './exporters.js';
-import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, plateVertices } from './plate-geometry.js';
+import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, plateVertices, createPlateGeometry } from './plate-geometry.js';
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
 import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js';
 import { rackGuideThetaRange } from './rack-limits.js';
@@ -1974,9 +1974,19 @@ function push3D() {
   if (!viewer3D || !lastModelInputs) return;
   const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = lastModelInputs;
   const frameGeometry=Exporters.inspectFrameExport(frameConnectorNodes(),exportSettings(),ttFrameExportMounts());
+  // 夾爪（jaw）板：3D 直接沿用 2D/DXF 共用的 createPlateGeometry 外形，孔位與加工輸出一致，
+  // 取代 viewer 內部的近似 jawPlateShape。以孔序字串為鍵，供 scene-model 對應到各片板。
+  const plateGeometries={};
+  (polygons||[]).forEach(poly=>{
+    if(poly.shape!=='jaw') return;
+    const world=poly.points.map(id=>pts[id]).filter(p=>p&&Number.isFinite(p.x));
+    if(world.length<3) return;
+    const g=createPlateGeometry({shape:'jaw',jawTurnSign:poly.jawTurnSign},world,{radius:HULL_R_WORLD});
+    if(g.outlines.length) plateGeometries[poly.points.join(',')]={outline:g.outlines[0],holes:g.holes};
+  });
   const model = buildSceneModel(links, pts, {
     groundIds, motorCenters: motorCenterIds, motorTypes, motorMounts, hullR: HULL_R_WORLD,
-    polygons, sliders, gears, racks, cams, pulleys, belts, frameGeometry
+    polygons, sliders, gears, racks, cams, pulleys, belts, frameGeometry, plateGeometries
   });
   viewer3D.update(model);
 }

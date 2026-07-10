@@ -427,7 +427,17 @@ export function createViewer(container) {
 
     // 三點桿：擠出成實心三角板（取代它三條邊各自的桿）
     (model.plates || []).forEach(pl => {
-      const shape = pl.shape === 'jaw' ? jawPlateShape(pl.corners, pl.r, holeR, pl.jawTurnSign) : triPlateShape(pl.corners, pl.r, holeR);
+      let shape;
+      if (pl.outline && pl.outline.length >= 3) {
+        // 共用板形（world 座標）：夾爪等直接沿用 2D/DXF 外形與孔位，形狀完全一致。
+        shape = new THREE.Shape();
+        shape.moveTo(pl.outline[0].x, pl.outline[0].y);
+        pl.outline.slice(1).forEach(p => shape.lineTo(p.x, p.y));
+        shape.closePath();
+        (pl.holes || []).forEach(h => { const path = new THREE.Path(); path.absarc(h.x, h.y, Math.max(0.2, h.r), 0, Math.PI * 2, true); shape.holes.push(path); });
+      } else {
+        shape = pl.shape === 'jaw' ? jawPlateShape(pl.corners, pl.r, holeR, pl.jawTurnSign) : triPlateShape(pl.corners, pl.r, holeR);
+      }
       const geo = new THREE.ExtrudeGeometry(shape, {
         depth: pl.thickness,
         bevelEnabled: false,
