@@ -259,13 +259,81 @@ function barOutline(a, b, radius) {
   const dx = b.x - a.x, dy = b.y - a.y;
   const len = Math.hypot(dx, dy) || 1;
   const nx = -dy / len, ny = dx / len;
+  const rightAngle = Math.atan2(ny, nx) * 180 / Math.PI;
+  const leftAngle = Math.atan2(-ny, -nx) * 180 / Math.PI;
   return [
     { x: a.x + nx * radius, y: a.y + ny * radius },
     { x: b.x + nx * radius, y: b.y + ny * radius },
-    ...arcPoints(b.x, b.y, radius, Math.atan2(ny, nx) * 180 / Math.PI, Math.atan2(-ny, -nx) * 180 / Math.PI, 18).slice(1),
+    ...arcPoints(b.x, b.y, radius, rightAngle, leftAngle, 18).slice(1),
     { x: a.x - nx * radius, y: a.y - ny * radius },
-    ...arcPoints(a.x, a.y, radius, Math.atan2(-ny, -nx) * 180 / Math.PI, Math.atan2(ny, nx) * 180 / Math.PI, 18).slice(1)
+    // 從左端下側繞到上側時必須經過桿外側（-180°）；直接走到同值角度會繞進桿內側形成凹口。
+    ...arcPoints(a.x, a.y, radius, leftAngle, rightAngle - 360, 18).slice(1)
   ];
+}
+
+function roundPadOutline(center, radius) {
+  return arcPoints(center.x, center.y, radius, 0, 360, 32).slice(0, -1);
+}
+
+function signedArea(points) {
+  return points.reduce((sum, p, index) => {
+    const q = points[(index + 1) % points.length];
+    return sum + p.x * q.y - q.x * p.y;
+  }, 0) / 2;
+}
+
+function offsetLineIntersection(a, ua, b, ub) {
+  const cross = ua.x * ub.y - ua.y * ub.x;
+  if (Math.abs(cross) < 1e-9) return null;
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const t = (dx * ub.y - dy * ub.x) / cross;
+  return { x: a.x + ua.x * t, y: a.y + ua.y * t };
+}
+
+// 凸包的真正等距外擴：每一條邊平行外移後取交點，避免舊版「由中心放射」造成邊距不一。
+function offsetConvexHull(points, offset) {
+  if (points.length < 3 || offset <= 0) return points;
+  const ccw = signedArea(points) >= 0;
+  const shifted = points.map((p, index) => {
+    const q = points[(index + 1) % points.length];
+    const dx = q.x - p.x, dy = q.y - p.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const nx = (ccw ? dy : -dy) / length;
+    const ny = (ccw ? -dx : dx) / length;
+    return { point: { x: p.x + nx * offset, y: p.y + ny * offset }, dir: { x: dx / length, y: dy / length } };
+  });
+  return shifted.map((edge, index) => {
+    const previous = shifted[(index - 1 + shifted.length) % shifted.length];
+    return offsetLineIntersection(previous.point, previous.dir, edge.point, edge.dir) || edge.point;
+  });
+}
+
+function pointToSegmentDistance(point, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 <= 1e-9) return Math.hypot(point.x - a.x, point.y - a.y);
+  const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / len2));
+  return Math.hypot(point.x - (a.x + dx * t), point.y - (a.y + dy * t));
+}
+
+function frameWarnings(outlines, holes) {
+  const warnings = [];
+  const pivots = holes.filter(h => h.layer === 'PIVOT_HOLE');
+  const minWeb = 3;
+  pivots.forEach((hole, index) => {
+    let edgeDistance = Infinity;
+    outlines.forEach(outline => outline.forEach((p, i) => {
+      edgeDistance = Math.min(edgeDistance, pointToSegmentDistance(hole, p, outline[(i + 1) % outline.length]));
+    }));
+    if (edgeDistance - hole.r < minWeb) {
+      warnings.push(`固定孔距外緣僅 ${round(Math.max(0, edgeDistance - hole.r), 1)} mm，建議至少 ${minWeb} mm`);
+    }
+    pivots.slice(index + 1).forEach(other => {
+      const web = Math.hypot(hole.x - other.x, hole.y - other.y) - hole.r - other.r;
+      if (web < minWeb) warnings.push(`兩個固定孔間肉厚僅 ${round(Math.max(0, web), 1)} mm，建議至少 ${minWeb} mm`);
+    });
+  });
+  return [...new Set(warnings)];
 }
 
 function arcOutlinePoints(center, radius, a0, a1, steps = 10, shortest = false) {
@@ -545,40 +613,37 @@ function dxfForGear(comp, geometry) {
 
 function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
   const nodes = (frameNodes || []).filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
-  if (nodes.length < 2) return null;
   const { barWidthMm, holeDiameterMm } = normalizeExportSettings(settings);
   const holeR = holeDiameterMm / 2;
   const frameR = barWidthMm / 2;
-  const maxLineDist = nodes.length <= 2 ? 0 : Math.max(...nodes.map(p => lineDistance(p, nodes[0], nodes[nodes.length - 1])));
-  const isBarLike = nodes.length === 2 || maxLineDist < 6;
   const outlines = [];
   const mountOutlines = [];
   const holes = [];
+  let barAxis = null;
   const addHole = (x, y, r, layer = 'HOLE') => {
     const q = { x: round(x), y: round(y), r: round(r), layer };
     const duplicate = holes.some(h => Math.hypot(h.x - q.x, h.y - q.y) < 0.05 && Math.abs(h.r - q.r) < 0.05 && h.layer === q.layer);
     if (!duplicate) holes.push(q);
   };
 
-  if (isBarLike) {
+  if (nodes.length >= 2) {
+    const maxLineDist = nodes.length === 2 ? 0 : Math.max(...nodes.map(p => lineDistance(p, nodes[0], nodes[nodes.length - 1])));
+    const isBarLike = nodes.length === 2 || maxLineDist < 6;
+    if (isBarLike) {
     const sorted = [...nodes].sort((a, b) => (a.x - b.x) || (a.y - b.y));
-    const a = sorted[0], b = sorted[sorted.length - 1];
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const len = Math.hypot(dx, dy);
-    if (len <= 1e-6) return null;
-    outlines.push(barOutline(a, b, frameR));
-  } else {
+      const a = sorted[0], b = sorted[sorted.length - 1];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      if (len > 1e-6) {
+        barAxis = { a, ux: dx / len, uy: dy / len, len };
+        outlines.push(barOutline(a, b, frameR));
+      }
+    } else {
     const baseHull = hull(nodes);
-    if (baseHull.length < 3) return null;
-    const cx = baseHull.reduce((s, p) => s + p.x, 0) / baseHull.length;
-    const cy = baseHull.reduce((s, p) => s + p.y, 0) / baseHull.length;
-    const pad = Math.max(18, frameR);
-    const expanded = baseHull.map(p => {
-      const dx = p.x - cx, dy = p.y - cy;
-      const d = Math.hypot(dx, dy) || 1;
-      return { x: p.x + dx / d * pad, y: p.y + dy / d * pad };
-    });
-    outlines.push(expanded);
+      if (baseHull.length >= 3) outlines.push(offsetConvexHull(baseHull, Math.max(18, frameR)));
+    }
+  } else if (nodes.length === 1) {
+    outlines.push(roundPadOutline(nodes[0], Math.max(18, frameR + holeR + 4)));
   }
 
   nodes.forEach(p => addHole(p.x, p.y, holeR, 'PIVOT_HOLE'));
@@ -623,13 +688,40 @@ function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
     if (overlapsMotorHole) holes.splice(i, 1);
   }
 
-  if (mountOutlines.length) {
+  if (mountOutlines.length && barAxis) {
+    // 兩點機架＝明確的主桿。馬達座不可再與它取凸包，否則會變成一大片梯形板；
+    // 改為沿主桿方向延長／加寬，讓所有馬達孔落在同一條可製造的連續機架桿內。
+    let minAlong = 0, maxAlong = barAxis.len, halfWidth = frameR;
+    mountOutlines.flat().forEach(p => {
+      const dx = p.x - barAxis.a.x, dy = p.y - barAxis.a.y;
+      const along = dx * barAxis.ux + dy * barAxis.uy;
+      const across = Math.abs(dx * -barAxis.uy + dy * barAxis.ux);
+      minAlong = Math.min(minAlong, along);
+      maxAlong = Math.max(maxAlong, along);
+      halfWidth = Math.max(halfWidth, across);
+    });
+    const start = { x: barAxis.a.x + barAxis.ux * minAlong, y: barAxis.a.y + barAxis.uy * minAlong };
+    const end = { x: barAxis.a.x + barAxis.ux * maxAlong, y: barAxis.a.y + barAxis.uy * maxAlong };
+    outlines.length = 0;
+    outlines.push(barOutline(start, end, halfWidth));
+  } else if (mountOutlines.length && outlines.length) {
     const merged = hull([...outlines.flat(), ...mountOutlines.flat()]);
     outlines.length = 0;
     outlines.push(merged);
+  } else if (mountOutlines.length) {
+    outlines.push(hull(mountOutlines.flat()));
   }
 
-  return { outlines, holes };
+  if (!outlines.length) return null;
+  return { outlines, holes, warnings: frameWarnings(outlines, holes) };
+}
+
+export function inspectFrameExport(frameNodes, settings, ttMounts = []) {
+  return frameGeometry(frameNodes, settings, ttMounts);
+}
+
+export function frameExportWarnings(frameNodes, settings, ttMounts = []) {
+  return inspectFrameExport(frameNodes, settings, ttMounts)?.warnings || [];
 }
 
 function boundsForFrame(geometry) {

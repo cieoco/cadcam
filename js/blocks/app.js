@@ -1872,40 +1872,6 @@ function openMobileFile() {
   openFile();
 }
 
-function taskMenuEl() { return document.getElementById('taskMenu'); }
-function closeTaskMenu() {
-  const m = taskMenuEl();
-  if (m) m.style.display = 'none';
-}
-function openTaskMenu() {
-  const m = taskMenuEl();
-  if (!m) return;
-  closeMobileOpenMenu();
-  closeLinkMenu();
-  const powerMenu = powerMenuEl();
-  if (powerMenu) powerMenu.style.display = 'none';
-  m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
-}
-function taskOpenExamples() {
-  closeTaskMenu();
-  if (mobilePrompt()) {
-    setMobilePanel('project');
-    openMobileOpenMenu();
-    return;
-  }
-  const select = document.getElementById('exampleSelect');
-  if (select) select.focus();
-  transient('請從上方範例選單選擇');
-}
-function taskStartLink() {
-  closeTaskMenu();
-  Tools.startDrawLink();
-}
-function taskAddPower() {
-  closeTaskMenu();
-  openPowerMenu();
-}
-
 // 切換 3D 唯讀預覽：首次開啟才動態載入 THREE viewer。
 async function toggle3D() {
   view3DActive = !view3DActive;
@@ -3554,14 +3520,18 @@ function saveFile() {
   Store.downloadJson(Store.toSnapshot(S.comps, S.topo, S.counter), 'blocks.json');
 }
 function exportLinksSvg() {
-  const count = Exporters.exportLinksAsSvg(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, exportSettings());
-  const frameCount = Exporters.exportFrameAsSvg(frameConnectorNodes(), exportSettings(), ttFrameExportMounts());
-  transient(count || frameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} SVG` : '沒有可匯出的零件或機架');
+  const settings = exportSettings(), nodes = frameConnectorNodes(), mounts = ttFrameExportMounts();
+  const count = Exporters.exportLinksAsSvg(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings);
+  const frameCount = Exporters.exportFrameAsSvg(nodes, settings, mounts);
+  const warnings = Exporters.frameExportWarnings(nodes, settings, mounts);
+  transient(count || frameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} SVG${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
 }
 function exportLinksDxf() {
-  const count = Exporters.exportLinksAsDxf(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, exportSettings());
-  const frameCount = Exporters.exportFrameAsDxf(frameConnectorNodes(), exportSettings(), ttFrameExportMounts());
-  transient(count || frameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} DXF` : '沒有可匯出的零件或機架');
+  const settings = exportSettings(), nodes = frameConnectorNodes(), mounts = ttFrameExportMounts();
+  const count = Exporters.exportLinksAsDxf(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings);
+  const frameCount = Exporters.exportFrameAsDxf(nodes, settings, mounts);
+  const warnings = Exporters.frameExportWarnings(nodes, settings, mounts);
+  transient(count || frameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} DXF${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
 }
 function openFile() {
   const inp = document.createElement('input');
@@ -3637,5 +3607,5 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, openTaskMenu, taskOpenExamples, taskStartLink, taskAddPower, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
 init();
