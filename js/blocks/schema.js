@@ -320,6 +320,7 @@ function normalizeRack(comp, index, params, warnings) {
   };
   if (safeId(comp.pinion)) out.pinion = comp.pinion;
   params[lenParam] = Math.max(1, Math.round(num(params[lenParam] ?? comp.len, 160)));
+  if (Number.isFinite(Number(comp.bodyHeight))) out.bodyHeight = Math.max(4, roundTenth(comp.bodyHeight, 20));
   const normalizeSlot = (slot) => ({
     length: Math.max(1, roundMm(slot.length, Math.max(24, params[lenParam] - 32))),
     width: Math.max(1, roundTenth(slot.width, 5)),
@@ -335,6 +336,8 @@ function normalizeRack(comp, index, params, warnings) {
   } else if (comp.guide === true) {
     out.slot = normalizeSlot({});
   }
+  const framePins = uniqueSafeIds(comp.framePins);
+  if (framePins.length) out.framePins = framePins;
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
   return out;
 }

@@ -381,16 +381,20 @@ export const BLOCK_EXAMPLES = [
     snapshot: {
       kind: 'blocks',
       v: 1,
-      counter: 2,
+      counter: 4,
       comps: [
         { type: 'gear', id: 'Pinion', color: '#e74c3c',
           p1: pt('PC', 'motor', 0, 0, { physicalMotor: '1' }),
           p2: pt('PP', 'floating', 18, 0),
           radiusParam: 'PR', teeth: 15, module: 4, phase: 0 },
+        { type: 'anchor', id: 'RackGuideA', p1: pt('RGA', 'fixed', -2.5, -45) },
+        { type: 'anchor', id: 'RackGuideB', p1: pt('RGB', 'fixed', 18, -45) },
         { type: 'rack', id: 'Rack1', color: '#16a085',
           p1: pt('RKP', 'floating', 0, -30),
           pinion: 'Pinion', lenParam: 'RKL', axisDeg: 0, sign: 1,
-          slot: { length: 128, width: 5, offset: 0 } }
+          bodyHeight: 20,
+          slot: { length: 128, width: 5, offset: 0 },
+          framePins: ['RGA', 'RGB'] }
       ],
       params: { PR: 30, RKL: 160, theta: 0 }
     }
@@ -643,17 +647,21 @@ export const BLOCK_EXAMPLES = [
     snapshot: {
       kind: 'blocks',
       v: 1,
-      counter: 3,
+      counter: 5,
       tracePoint: 'LiftRack',
       comps: [
         { type: 'gear', id: 'LiftPinion', color: '#e74c3c',
           p1: pt('LPC', 'motor', 0, 0, { physicalMotor: '1' }),
           p2: pt('LPP', 'floating', 18, 0),
           radiusParam: 'LPR', teeth: 15, module: 4, phase: 0 },
+        { type: 'anchor', id: 'LiftGuideA', p1: pt('LGA', 'fixed', 45, -5.2) },
+        { type: 'anchor', id: 'LiftGuideB', p1: pt('LGB', 'fixed', 45, 17.8) },
         { type: 'rack', id: 'LiftRackGear', color: '#16a085',
           p1: pt('LiftRack', 'floating', 30, 0),
           pinion: 'LiftPinion', lenParam: 'LRL', axisDeg: 90, sign: 1,
-          slot: { length: 144, width: 5, offset: 0 } }
+          bodyHeight: 20,
+          slot: { length: 144, width: 5, offset: 0 },
+          framePins: ['LGA', 'LGB'] }
       ],
       params: { LPR: 30, LRL: 176, theta: 0 }
     }

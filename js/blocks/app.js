@@ -1075,7 +1075,8 @@ function drawRackPart(c, pts) {
   const R = pinion ? (Number(S.topo.params[pinion.radiusParam]) || 40) : 40;   // 小齒輪節圓半徑（世界 mm）
   const module = (2 * R) / teeth;                                              // 模數對齊小齒輪，齒距才一致
   const L = Number(S.topo.params[c.lenParam]) || 160;
-  const localPts = createRackPath({ length: L, height: module * 2.5, module });
+  const bodyHeight = rackBodyHeight(c, module);
+  const localPts = createRackPath({ length: L, height: bodyHeight, module });
   const sc = View.getScale();
   const axisDeg = Number(c.axisDeg) || 0;
   const phShift = rackPhaseShift(c, pinion, { length: L, module, teeth, axisDeg });
@@ -1094,7 +1095,7 @@ function drawRackPart(c, pts) {
     selectGear(pinion.id);
   });
   g.appendChild(poly);
-  drawRackSlot(g, c, { length: L, module, phaseShift: phShift, scale: sc });
+  drawRackSlot(g, c, { length: L, module, bodyHeight, phaseShift: phShift, scale: sc });
   svg.appendChild(g);
   // 齒桿本體：原點在參考點 p1（位於節線上），沿 axisDeg 旋轉；齒朝 +y 指向小齒輪。
   const applyRack = (P) => {
@@ -1121,10 +1122,10 @@ function drawRackPart(c, pts) {
   frameUpdaters.push(applyRack);
 }
 
-function drawRackSlot(parent, c, { length, module, phaseShift, scale }) {
+function drawRackSlot(parent, c, { length, module, bodyHeight, phaseShift, scale }) {
   if (!c.slot) return;
   const slot = typeof c.slot === 'object' ? c.slot : {};
-  const bodyH = module * 2.5;
+  const bodyH = Math.max(4, Number(bodyHeight) || module * 2.5);
   const dedendum = module * 1.25;
   const slotLen = Math.max(8, Math.min(length - module * 3, Number(slot.length) || Math.max(24, length - 32)));
   const slotW = Math.max(2, Math.min(bodyH * 0.7, Number(slot.width) || Math.max(4, module * 1.25)));
@@ -1818,8 +1819,10 @@ function draw() {
         pinion: c.pinion,
         length,
         axisDeg,
+        bodyHeight: rackBodyHeight(c, module),
         phaseShift: rackPhaseShift(c, pinion, { length, module, teeth, axisDeg }),
         slot: c.slot,
+        framePins: c.framePins,
         color: c.color,
       };
     });
@@ -2317,20 +2320,31 @@ function addRackPinion() {
   const base = mobilePrompt() ? View.worldFromScreen(W * 0.32, H * 0.44) : { x: -60, y: 0 };
   const n = ++S.counter;
   const pinion = makeGear(n, { teeth, module, cx: base.x, cy: base.y, isDriver: true, meshId: null, color: '#e74c3c' });
+  pinion.p1.type = 'motor';
+  pinion.p1.physicalMotor = '1';
   const rackLen = 176;
+  const bodyHeight = 20;
+  const rackRef = { x: base.x, y: base.y - R };
+  const pinAId = 'RKG' + (++S.counter);
+  const pinBId = 'RKG' + (++S.counter);
   const rack = {
     type: 'rack',
     id: 'Rack' + (++S.counter),
     color: '#16a085',
-    p1: { id: 'RKP' + S.counter, type: 'floating', x: base.x, y: base.y - R },
+    p1: { id: 'RKP' + S.counter, type: 'floating', x: rackRef.x, y: rackRef.y },
     pinion: pinion.id,
     lenParam: 'RKL' + S.counter,
     axisDeg: 0,
     sign: 1,
-    slot: { length: 136, width: 5, offset: 0 }
+    bodyHeight,
+    slot: { length: 136, width: 5, offset: 0 },
+    framePins: [pinAId, pinBId]
   };
+  const pins = rackFramePinPositions(rack, pinion, { length: rackLen, module, teeth, axisDeg: rack.axisDeg });
+  const guideA = { type: 'anchor', id: 'RackGuide' + (S.counter - 2), p1: { id: pinAId, type: 'fixed', x: pins[0].x, y: pins[0].y } };
+  const guideB = { type: 'anchor', id: 'RackGuide' + (S.counter - 1), p1: { id: pinBId, type: 'fixed', x: pins[1].x, y: pins[1].y } };
   S.topo.params[rack.lenParam] = rackLen;
-  S.comps.push(pinion, rack);
+  S.comps.push(pinion, guideA, guideB, rack);
   rebuild(); draw();
   selectGear(pinion.id);
 }
@@ -2412,12 +2426,15 @@ function updateGearEditor() {
   setText('gearPinRadiusVal', Math.round(gearPinRadius(c)));
   setText('gearPinHoleVal', Number(c.pinHoleDiameter || 5).toFixed(1).replace(/\.0$/, ''));
   setRow('rackLengthRow', !!rack);
+  setRow('rackBodyHeightRow', !!rack);
   setRow('rackSlotLengthRow', !!rack);
   setRow('rackSlotWidthRow', !!rack);
   if (rack) {
     const len = rackLength(rack);
+    const bodyH = rackBodyHeight(rack, mod);
     const slot = ensureRackSlot(rack, len);
     setText('rackLengthVal', Math.round(len));
+    setText('rackBodyHeightVal', Number(bodyH).toFixed(1).replace(/\.0$/, ''));
     setText('rackSlotLengthVal', Math.round(slot.length));
     setText('rackSlotWidthVal', Number(slot.width).toFixed(1).replace(/\.0$/, ''));
   }
@@ -2429,12 +2446,51 @@ function rackForGear(gear) {
 function rackLength(rack) {
   return Number(S.topo.params[rack.lenParam]) || 160;
 }
+function rackBodyHeight(rack, module = GEAR_MODULE) {
+  return Math.max(4, Number(rack && rack.bodyHeight) || Math.max(8, module * 2.5));
+}
 function ensureRackSlot(rack, length = rackLength(rack)) {
   if (!rack.slot || typeof rack.slot !== 'object') rack.slot = {};
   rack.slot.length = Math.max(8, Math.min(Math.max(8, length - 12), Math.round(Number(rack.slot.length) || Math.max(24, length - 40))));
   rack.slot.width = Number(Math.max(2, Math.min(20, Number(rack.slot.width) || 5)).toFixed(1));
   rack.slot.offset = Number(Number(rack.slot.offset) || 0);
   return rack.slot;
+}
+function rackFramePinPositions(rack, pinion, { length, module, teeth, axisDeg }) {
+  const slot = ensureRackSlot(rack, length);
+  const phaseShift = rackPhaseShift(rack, pinion, { length, module, teeth, axisDeg });
+  const bodyH = rackBodyHeight(rack, module);
+  const dedendum = module * 1.25;
+  const slotY = -dedendum - bodyH / 2 + (Number(slot.offset) || 0);
+  const sep = Math.min(18, Math.max(6, slot.length * 0.08));
+  const ar = (Number(axisDeg) || 0) * Math.PI / 180;
+  const ux = Math.cos(ar), uy = Math.sin(ar);
+  const nx = -Math.sin(ar), ny = Math.cos(ar);
+  const ref = rack.p1 || { x: 0, y: 0 };
+  const toWorld = x => ({
+    x: (ref.x || 0) + ux * x + nx * slotY,
+    y: (ref.y || 0) + uy * x + ny * slotY
+  });
+  return [toWorld(phaseShift - sep), toWorld(phaseShift + sep)];
+}
+function syncRackFramePins(rack, gear = null) {
+  if (!rack || !Array.isArray(rack.framePins) || rack.framePins.length < 2) return;
+  const pinion = gear || (rack.pinion ? gearById(rack.pinion) : null);
+  if (!pinion) return;
+  const teeth = Math.max(6, Math.round(Number(pinion.teeth) || 12));
+  const R = Number(S.topo.params[pinion.radiusParam]) || 40;
+  const module = (2 * R) / teeth;
+  const length = rackLength(rack);
+  const axisDeg = Number(rack.axisDeg) || 0;
+  const pins = rackFramePinPositions(rack, pinion, { length, module, teeth, axisDeg });
+  rack.framePins.slice(0, 2).forEach((id, index) => {
+    const p = pins[index];
+    updatePointCoordsById(id, p.x, p.y);
+  });
+}
+function syncRackFramePinsForGear(gear) {
+  const rack = rackForGear(gear);
+  if (rack) syncRackFramePins(rack, gear);
 }
 function gearPitchRadius(c) {
   return Number(S.topo.params[c.radiusParam]) || (Number(c.teeth) || 12) * (Number(c.module) || GEAR_MODULE) / 2 || 40;
@@ -2525,6 +2581,7 @@ function changeGearTeeth(delta) {
   S.topo.params[c.radiusParam] = c.teeth * (Number(c.module) || GEAR_MODULE) / 2;
   clampGearPinRadius(c);
   syncGearMesh();
+  syncRackFramePinsForGear(c);
   rebuild(); draw();
   updateGearEditor();
 }
@@ -2561,6 +2618,7 @@ function changeGearModule(delta) {
     g.module = mod;
     S.topo.params[g.radiusParam] = g.teeth * mod / 2;
     clampGearPinRadius(g);
+    syncRackFramePinsForGear(g);
   });
   syncGearMesh();
   rebuild(); draw();
@@ -2574,6 +2632,19 @@ function changeRackLength(delta) {
   const next = Math.max(32, Math.round((rackLength(rack) + delta) / 8) * 8);
   S.topo.params[rack.lenParam] = next;
   ensureRackSlot(rack, next);
+  syncRackFramePins(rack, gear);
+  rebuild(); draw();
+  updateGearEditor();
+}
+function changeRackBodyHeight(delta) {
+  const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
+  const rack = rackForGear(gear);
+  if (!rack) return;
+  pushUndo();
+  const mod = Number(gear.module) || GEAR_MODULE;
+  const next = Math.max(4, rackBodyHeight(rack, mod) + delta);
+  rack.bodyHeight = Number(next.toFixed(1));
+  syncRackFramePins(rack, gear);
   rebuild(); draw();
   updateGearEditor();
 }
@@ -2585,6 +2656,7 @@ function changeRackSlotLength(delta) {
   const len = rackLength(rack);
   const slot = ensureRackSlot(rack, len);
   slot.length = Math.max(8, Math.min(Math.max(8, len - 12), Math.round((slot.length + delta) / 8) * 8));
+  syncRackFramePins(rack, gear);
   rebuild(); draw();
   updateGearEditor();
 }
@@ -2595,6 +2667,7 @@ function changeRackSlotWidth(delta) {
   pushUndo();
   const slot = ensureRackSlot(rack);
   slot.width = Number(Math.max(2, Math.min(20, slot.width + delta)).toFixed(1));
+  syncRackFramePins(rack, gear);
   rebuild(); draw();
   updateGearEditor();
 }
@@ -3376,14 +3449,16 @@ function deleteGearChain(id) {
   chain.forEach(g => ownedParamKeys(g).forEach(k => delete S.topo.params[k]));
   const chainIds = new Set(chain.map(g => g.id));
   const rackIds = new Set();
+  const rackFramePins = new Set();
   S.comps.forEach(c => {
     if (c.type === 'rack' && chainIds.has(c.pinion)) {
       rackIds.add(c.id);
+      (c.framePins || []).forEach(id => rackFramePins.add(id));
       ownedParamKeys(c).forEach(k => delete S.topo.params[k]);
     }
   });
   const ids = new Set(chain.map(g => g.id));
-  S.comps = S.comps.filter(c => !ids.has(c.id) && !rackIds.has(c.id));
+  S.comps = S.comps.filter(c => !ids.has(c.id) && !rackIds.has(c.id) && !(c.type === 'anchor' && rackFramePins.has(c.p1?.id)));
   deselectGear();
   S.selectedNodeId = null;
   closeMobileEditPanel();
@@ -3807,5 +3882,5 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
 init();

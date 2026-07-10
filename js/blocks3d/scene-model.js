@@ -353,9 +353,10 @@ export function buildSceneModel(links, points, opts = {}) {
     const radius = pinion ? pinion.radius : 40;
     const module = pinion ? pinion.module : Math.max(0.1, 2 * radius / teeth);
     const length = Math.max(1, Number(r.length) || 160);
+    const bodyHeight = Math.max(4, Number(r.bodyHeight) || module * 2.5);
     const axisDeg = Number(r.axisDeg) || 0;
     const axisRad = axisDeg * Math.PI / 180;
-    const local = createRackPath({ length, height: module * 2.5, module });
+    const local = createRackPath({ length, height: bodyHeight, module });
     let phaseShift = Number.isFinite(Number(r.phaseShift)) ? Number(r.phaseShift) : 0;
     if (!Number.isFinite(Number(r.phaseShift)) && pinion) {
       const ux = Math.cos(axisRad), uy = Math.sin(axisRad);
@@ -381,18 +382,22 @@ export function buildSceneModel(links, points, opts = {}) {
       ref: { x: ref.x, y: ref.y },
       axisDeg,
       local: local.map(p => ({ x: p.x + phaseShift, y: p.y })),
-      slot: rackSlot3d(r.slot, { length, module, phaseShift }),
+      slot: rackSlot3d(r.slot, { length, module, bodyHeight, phaseShift }),
+      framePins: Array.isArray(r.framePins) ? r.framePins : [],
       z: gearZ,
       layer: gearLayer,
       thickness: plateThickness,
       color: r.color || '#16a085',
     });
     touch(r.ref, gearLayer);
+    if (Array.isArray(r.framePins)) {
+      r.framePins.forEach(id => touch(id, gearLayer));
+    }
   });
 
-  function rackSlot3d(slot, { length, module, phaseShift }) {
+  function rackSlot3d(slot, { length, module, bodyHeight, phaseShift }) {
     if (!slot) return null;
-    const bodyH = module * 2.5;
+    const bodyH = Math.max(4, Number(bodyHeight) || module * 2.5);
     const dedendum = module * 1.25;
     const slotLen = Math.max(8, Math.min(length - module * 3, Number(slot.length) || Math.max(24, length - 32)));
     const slotW = Math.max(2, Math.min(bodyH * 0.7, Number(slot.width) || Math.max(4, module * 1.25)));
