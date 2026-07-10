@@ -34,7 +34,6 @@ import * as Exporters from './exporters.js';
 import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, plateVertices } from './plate-geometry.js';
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
 import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js';
-import { LIFT_PARAM_FIELDS, analyzeCompetitionLift } from './competition-lift.js';
 import { rackGuideThetaRange } from './rack-limits.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -222,7 +221,6 @@ function loadExample(id) {
   applySnapshot(norm);
   activeExampleId = example.id;
   renderExampleLessonCard(example);
-  renderCompetitionLiftCard();
   transient('📘 已載入：' + example.title);
   if (sel) sel.value = '';
   closeMobileOpenMenu();
@@ -1168,16 +1166,6 @@ function drawRackPart(c, pts) {
   frameUpdaters.push(applyRack);
 }
 
-function renderCompetitionLiftCard() {
-  const card = document.getElementById('competitionLiftCard'); if (!card) return;
-  card.style.display = activeExampleId === 'competition-fourbar-lift' ? '' : 'none'; if (card.style.display === 'none') return;
-  const grid = document.getElementById('competitionLiftParams'); grid.textContent = '';
-  LIFT_PARAM_FIELDS.forEach(f => { const label=document.createElement('label'); label.textContent=f.label; const input=document.createElement('input'); input.type='number'; input.min=f.min; input.max=f.max; input.step=f.step; input.value=S.topo.params[f.key]; input.addEventListener('change',()=>setCompetitionLiftParam(f.key,input.value)); grid.append(label,input); });
-  const r=analyzeCompetitionLift(S.topo.params,exportSettings());
-  document.getElementById('liftTravel').textContent=`${roundMm(r.travelMm)} mm`; document.getElementById('liftPoseError').textContent=`${r.poseErrorMm.toFixed(1)} mm`; document.getElementById('liftArmDelta').textContent=`${r.armDeltaMm.toFixed(1)} mm`; document.getElementById('liftEdgeMargin').textContent=`${r.edgeMarginMm.toFixed(1)} mm`;
-  const verdict=document.getElementById('liftVerdict'); verdict.dataset.state=r.status; verdict.textContent=r.errors[0]||r.warnings[0]||'✓ 模擬尺寸一致，可以加工';
-}
-function setCompetitionLiftParam(key,value) { const f=LIFT_PARAM_FIELDS.find(x=>x.key===key); if(!f)return; pushUndo(); S.topo.params[key]=Math.max(f.min,Math.min(f.max,Number(value)||f.min)); rebuild(); draw(); scheduleAutosave(); renderCompetitionLiftCard(); }
 
 function drawRackSlot(parent, c, { length, module, bodyHeight, phaseShift, scale }) {
   if (!c.slot) return;
@@ -3914,7 +3902,6 @@ function exportLinksSvg() {
   transient(count || frameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} SVG${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
 }
 function exportLinksDxf() {
-  if (activeExampleId === 'competition-fourbar-lift') { const check=analyzeCompetitionLift(S.topo.params,exportSettings()); if(!check.ok){ transient(`⛔ DXF 尚未匯出：${check.errors[0]}`); renderCompetitionLiftCard(); return; } }
   const settings = exportSettings(), nodes = frameConnectorNodes(), mounts = ttFrameExportMounts();
   const count = Exporters.exportLinksAsDxf(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings);
   const frameCount = Exporters.exportFrameAsDxf(nodes, settings, mounts);

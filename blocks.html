@@ -130,10 +130,6 @@
     .lesson-card-label { color: #60717d; font-size: 12px; font-weight: 800; }
     .lesson-card-text { color: #34495e; font-size: 12px; line-height: 1.45; }
     .lesson-card-tasks { margin: 0; padding-left: 18px; color: #34495e; font-size: 12px; line-height: 1.45; }
-    .lift-card { position:absolute; left:16px; bottom:72px; z-index:3; width:300px; padding:12px; border:1px solid #c9d8eb; border-radius:10px; background:rgba(255,255,255,.97); box-shadow:0 8px 22px rgba(44,62,80,.12); }
-    .lift-card h2 { margin:0 0 8px; font-size:15px; color:#2c5282; } .lift-param-grid { display:grid; grid-template-columns:1fr 88px; gap:6px 8px; align-items:center; font-size:12px; } .lift-param-grid input { width:100%; padding:5px; border:1px solid #d8dee6; border-radius:6px; }
-    .lift-metrics { display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-top:9px; font-size:11px; } .lift-metric { padding:6px; border-radius:6px; background:#f3f6fa; } .lift-verdict { margin-top:8px; padding:7px; border-radius:7px; font-size:12px; font-weight:700; }
-    .lift-verdict[data-state="ready"] { background:#e8f8ef; color:#117a45; } .lift-verdict[data-state="warn"] { background:#fff7dd; color:#8a6500; } .lift-verdict[data-state="error"] { background:#fff0f0; color:#b33b32; }
     /* 控制列 */
     .controls {
       position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
@@ -285,7 +281,6 @@
       }
       .mobile-panel-section[data-panel="project"] .example-select { display: none; }
       .lesson-card { display: none !important; }
-      .lift-card { display: none !important; }
       .mobile-example-list {
         display: grid; grid-template-columns: 1fr; gap: 6px; max-height: 230px; overflow-y: auto;
       }
@@ -504,7 +499,6 @@
           <ul class="lesson-card-tasks" id="exampleLessonTasks"></ul>
         </div>
       </aside>
-      <aside class="lift-card" id="competitionLiftCard" style="display:none;" aria-live="polite"><h2>四連桿升降臂調校</h2><div class="lift-param-grid" id="competitionLiftParams"></div><div class="lift-metrics"><div class="lift-metric">升降行程<br><strong id="liftTravel">0 mm</strong></div><div class="lift-metric">姿態誤差<br><strong id="liftPoseError">0 mm</strong></div><div class="lift-metric">臂長差<br><strong id="liftArmDelta">0 mm</strong></div><div class="lift-metric">孔邊距<br><strong id="liftEdgeMargin">0 mm</strong></div></div><div class="lift-verdict" id="liftVerdict" data-state="ready">可以加工</div></aside>
       <div class="inspector-panel len-editor" id="lenEditor" style="display:none;">
         <div class="le-row">
           <span class="le-title" id="lenTitle">🔵 連桿長度</span>
