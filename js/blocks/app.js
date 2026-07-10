@@ -743,6 +743,14 @@ function buildMotorMounts(motorIds, groundIds) {
     const center = staticPts[id];
     if (!center) return;
 
+    const locatedComponent=S.comps.find(c=>c?.p1?.id===id&&c.mountLocatorPoint&&staticPts[c.mountLocatorPoint]);
+    if(locatedComponent){
+      const locator=staticPts[locatedComponent.mountLocatorPoint], q=normalizedDir(center,locator);
+      const rotDeg=Math.atan2(q.y,-q.x)*180/Math.PI, rr=rotDeg*Math.PI/180;
+      mounts.set(id,{dir:{x:-Math.sin(rr),y:-Math.cos(rr)},rotDeg,reason:'shaft-locator',locatorPoint:locatedComponent.mountLocatorPoint,outputBody:locatedComponent.id,order:['motor','outputBody']});
+      return;
+    }
+
     const crankTips = new Set((S.compiled.steps || [])
       .filter(s => s.type === 'input_crank' && s.center === id)
       .map(s => s.id));
@@ -1977,9 +1985,10 @@ function renderFrame() {
 function push3D() {
   if (!viewer3D || !lastModelInputs) return;
   const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = lastModelInputs;
+  const frameGeometry=Exporters.inspectFrameExport(frameConnectorNodes(),exportSettings(),ttFrameExportMounts());
   const model = buildSceneModel(links, pts, {
     groundIds, motorCenters: motorCenterIds, motorTypes, motorMounts, hullR: HULL_R_WORLD,
-    polygons, sliders, gears, racks, cams, pulleys, belts
+    polygons, sliders, gears, racks, cams, pulleys, belts, frameGeometry
   });
   viewer3D.update(model);
 }

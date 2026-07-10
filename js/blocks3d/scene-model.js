@@ -124,6 +124,7 @@ export function buildSceneModel(links, points, opts = {}) {
   const motorCenters = opts.motorCenters || new Set();
   const motorTypes = opts.motorTypes || new Map();   // id -> 'tt' | 'mg995'
   const motorMounts = opts.motorMounts || new Map(); // id -> { dir:{x,y}, reason }
+  const frameGeometry = opts.frameGeometry || null;
   const polygons = opts.polygons || [];
   const gearDefs = opts.gears || [];
   const rackDefs = opts.racks || [];
@@ -623,5 +624,6 @@ export function buildSceneModel(links, points, opts = {}) {
       }
     : { x: bboxCenter.x, y: bboxCenter.y, z: midZ };
 
-  return { sticks, plates, pins, grounds, motors, rails, carriages, gears, racks, pulleys, belts, cams, plateGap, plateThickness, span, focus, anchored };
+  const frame = frameGeometry ? { ...frameGeometry, z: -2 * plateGap, thickness: plateThickness, color:'#465568' } : null;
+  return { sticks, plates, pins, grounds, motors, rails, carriages, gears, racks, pulleys, belts, cams, frame, plateGap, plateThickness, span, focus, anchored };
 }

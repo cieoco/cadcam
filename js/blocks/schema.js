@@ -301,6 +301,7 @@ function normalizeGear(comp, index, params, warnings) {
   else if (Number.isFinite(Number(comp.pinRadius))) out.pinRadius = Math.max(1, Math.round(num(comp.pinRadius, R * 0.6)));
   if (Number.isFinite(Number(comp.pinHoleDiameter))) out.pinHoleDiameter = Math.max(1, Math.min(30, roundTenth(comp.pinHoleDiameter, 5)));
   if (safeId(comp.mesh)) out.mesh = comp.mesh;
+  if (safeId(comp.mountLocatorPoint)) out.mountLocatorPoint = comp.mountLocatorPoint;
   if (comp.physicalMotor) out.physicalMotor = String(comp.physicalMotor);
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
   return out;

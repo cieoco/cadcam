@@ -3,6 +3,7 @@ import { rackGuideTravel, rackGuideThetaRange } from '../js/blocks/rack-limits.j
 import { normalizeSnapshot } from '../js/blocks/schema.js';
 import { compileTopology } from '../js/core/topology.js';
 import { solveTopology } from '../js/multilink/solver.js';
+import { BLOCK_EXAMPLES } from '../js/blocks/examples.js';
 const travel=rackGuideTravel(144,5);
 assert.equal(travel.separation,11.52);
 assert.ok(Math.abs(travel.travel-115.96)<1e-9);
@@ -18,4 +19,8 @@ const compiled=compileTopology(snap.comps,{params:snap.params},new Set());
 const solved=solveTopology(compiled,{thetaDeg:90}).points;
 assert.ok(solved.RH&&Math.abs(solved.RH.x-40)<1e-6&&Math.abs(solved.RH.y-(40+15*Math.PI))<1e-6,'齒條孔應隨剛體直線移動');
 assert.ok(Math.abs(Math.hypot(solved.RB.x-solved.RA.x,solved.RB.y-solved.RA.y)-160)<1e-6,'兩端主孔距應等於齒條長度參數');
+const lift=normalizeSnapshot(BLOCK_EXAMPLES.find(e=>e.id==='competition-rack-lift').snapshot);
+const liftGear=lift.comps.find(c=>c.id==='LiftPinion'), locator=lift.comps.find(c=>c.p1?.id==='LML');
+assert.equal(liftGear.mountLocatorPoint,'LML');
+assert.ok(locator&&Math.abs(Math.hypot(locator.p1.x-liftGear.p1.x,locator.p1.y-liftGear.p1.y)-11.18)<1e-6,'TT 輸出軸與定位孔距應符合模板');
 console.log('rack guide limits: ok');

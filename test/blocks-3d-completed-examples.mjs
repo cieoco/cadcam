@@ -153,4 +153,7 @@ const drivenPulley = pulley.pulleys.find(p => p.id === 'PulleyB');
 check('皮帶輪馬達本體背向另一輪', pulleyMotor && drivenPulley && dotFromToWithDir(pulleyMotor, drivenPulley.center, pulleyMotor.dir) < 0,
   `dir=${pulleyMotor ? `${pulleyMotor.dir.x.toFixed(2)},${pulleyMotor.dir.y.toFixed(2)}` : 'missing'}`);
 
+const framed=sceneFor('competition-rack-lift',0,{frameGeometry:{outlines:[[{x:-20,y:-20},{x:20,y:-20},{x:20,y:20},{x:-20,y:20}]],holes:[{x:0,y:0,r:3,layer:'TT_SHAFT'}],warnings:[]}});
+check('3D 場景沿用 DXF 機架外形與孔位',framed.frame&&framed.frame.outlines.length===1&&framed.frame.holes[0].layer==='TT_SHAFT');
+
 report('blocks-3d-completed-examples');

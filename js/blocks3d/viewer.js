@@ -366,6 +366,18 @@ export function createViewer(container) {
     clearDynamic();
     if (!model) return;
 
+    // 機架：直接使用 2D / DXF 共用的 frameGeometry，孔位與加工輸出完全一致。
+    if (model.frame && Array.isArray(model.frame.outlines)) {
+      model.frame.outlines.forEach((outline,index)=>{
+        if(!Array.isArray(outline)||outline.length<3)return;
+        const shape=new THREE.Shape(); shape.moveTo(outline[0].x,outline[0].y);
+        outline.slice(1).forEach(p=>shape.lineTo(p.x,p.y)); shape.closePath();
+        if(index===0)(model.frame.holes||[]).forEach(h=>{ const path=new THREE.Path(); path.absarc(h.x,h.y,Math.max(.2,h.r),0,Math.PI*2,false); shape.holes.push(path); });
+        const geo=new THREE.ExtrudeGeometry(shape,{depth:model.frame.thickness,bevelEnabled:false,curveSegments:24});
+        const mesh=new THREE.Mesh(geo,plateMaterial(model.frame.color||'#465568')); mesh.position.z=model.frame.z; dynamic.add(mesh);
+      });
+    }
+
     // 桿件：擠出成扁板
     model.sticks.forEach(s => {
       const shape = stadiumShape(s.a, s.b, s.r, holeR);
