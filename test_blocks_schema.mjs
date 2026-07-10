@@ -55,7 +55,7 @@ const withHole = normalizeSnapshot({
   kind: 'blocks',
   v: 1,
   counter: 0,
-  tracePoints: ['P', 'I'],
+  tracePoints: ['P', 'I'], referencePoint: 'A',
   comps: [{
     type: 'bar',
     id: 'ScaleLink',
@@ -68,6 +68,9 @@ const withHole = normalizeSnapshot({
 });
 ok('schema preserves bar holes', withHole && withHole.comps[0].holes && withHole.comps[0].holes[0].id === 'I');
 ok('schema preserves multiple trace points', withHole && withHole.tracePoints.length === 2);
+ok('schema preserves measurement reference', withHole && withHole.referencePoint === 'A');
+const referenceSnap = toSnapshot(withHole.comps, { params: withHole.params, tracePoints: withHole.tracePoints, referencePoint: withHole.referencePoint }, withHole.counter);
+ok('toSnapshot writes measurement reference', referenceSnap.referencePoint === 'A');
 
 const snap = toSnapshot(messy.comps, { params: messy.params }, messy.counter);
 ok('toSnapshot writes blocks kind', snap.kind === 'blocks' && snap.v === 1);

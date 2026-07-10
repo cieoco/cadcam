@@ -63,6 +63,8 @@ function normalizeBar(comp, index, params, warnings) {
     fixedLen: comp.fixedLen !== false
   };
   if (comp.snapLength === false) out.snapLength = false;
+  if (Number.isFinite(Number(comp.assemblyMobility))) out.assemblyMobility = Math.max(0, Math.round(Number(comp.assemblyMobility)));
+  if (safeId(comp.assemblyType)) out.assemblyType = comp.assemblyType;
 
   if (comp.phaseOffset !== undefined) out.phaseOffset = num(comp.phaseOffset, 0);
   if (comp.physicalMotor) out.physicalMotor = String(comp.physicalMotor);
@@ -261,6 +263,7 @@ export function toSnapshot(comps, topo, counter) {
   const tracePoints = uniqueSafeIds([...(topo?.tracePoints || []), ...(safeId(topo?.tracePoint) ? [topo.tracePoint] : [])]);
   if (tracePoints.length === 1) snapshot.tracePoint = tracePoints[0]; // 舊欄位相容：單點檔案仍好讀。
   if (tracePoints.length) snapshot.tracePoints = tracePoints;
+  if (safeId(topo?.referencePoint)) snapshot.referencePoint = topo.referencePoint;
   return snapshot;
 }
 
@@ -427,6 +430,7 @@ export function normalizeSnapshot(obj) {
   const params = (obj.params && typeof obj.params === 'object' && !Array.isArray(obj.params)) ? clone(obj.params) : {};
   const tracePoint = safeId(obj.tracePoint) ? obj.tracePoint : '';
   const tracePoints = uniqueSafeIds([...(Array.isArray(obj.tracePoints) ? obj.tracePoints : []), ...(tracePoint ? [tracePoint] : [])]);
+  const referencePoint = safeId(obj.referencePoint) ? obj.referencePoint : '';
   const comps = [];
 
   sourceComps.forEach((raw, index) => {
@@ -448,7 +452,7 @@ export function normalizeSnapshot(obj) {
 
   const cleanComps = dropZeroBars(comps);
   const counter = Math.max(Number(obj.counter) || 0, highestIdNum(cleanComps));
-  return { comps: cleanComps, params, counter, tracePoint, tracePoints, warnings };
+  return { comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, warnings };
 }
 
 export function highestIdNum(comps) {

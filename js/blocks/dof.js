@@ -66,6 +66,7 @@ function sharedCount(a, b) {
  * classification 僅描述拓撲，呼叫端仍應把求解失敗與齒輪未嚙合當較高優先警告。
  */
 export function analyzeDof(comps = []) {
+  const assemblyMobility = comps.map(comp => Number(comp?.assemblyMobility)).find(Number.isFinite);
   const bodies = comps.filter(comp => BODY_TYPES.has(comp?.type) && !comp.visualOnly)
     .map((comp, index) => ({ id: `body:${index}`, comp, points: new Set(pointIds(comp)) }));
   const groundPoints = allGroundPointIds(comps);
@@ -108,8 +109,12 @@ export function analyzeDof(comps = []) {
         (comp.type === 'belt' && comp.driver && comp.driven)) higherPairs++;
   });
 
-  const dof = 3 * (groups.size - 1) - 2 * lowerPairs - higherPairs;
+  const formulaDof = 3 * (groups.size - 1) - 2 * lowerPairs - higherPairs;
+  // 特殊幾何組裝（例如雙平行四連桿升降臂）含冗餘平行約束，通用 Grübler
+  // 計數無法反映其實際 mobility。範例可明確宣告經機構驗證的組裝自由度；
+  // formulaDof 仍回傳供狀態提示與除錯使用，避免把覆寫當成公式結果。
+  const dof = Number.isFinite(assemblyMobility) ? assemblyMobility : formulaDof;
   const classification = bodies.length === 0 ? 'empty' : (dof < 0 ? 'overconstrained' :
     (dof === 0 ? 'structure' : (dof === 1 ? 'single' : 'underconstrained')));
-  return { dof, bodies: groups.size - 1, lowerPairs, higherPairs, classification };
+  return { dof, formulaDof, mobilityOverride: Number.isFinite(assemblyMobility), bodies: groups.size - 1, lowerPairs, higherPairs, classification };
 }

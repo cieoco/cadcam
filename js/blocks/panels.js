@@ -12,10 +12,10 @@
 import { S } from './state.js';
 
 // ---- 注入的查詢 helper（由 app 在啟動時提供）----
-let pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount;
+let pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked;
 
 export function init(deps) {
-  ({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount } = deps);
+  ({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked } = deps);
 }
 
 // 更新長度顯示（用上方的 − / + 以 8mm 為單位調整）
@@ -106,6 +106,18 @@ export function updateRoleEditor() {
     traceBtn.title = isTrace ? '停止量測這個工作點' : (hasOneWorkPoint
       ? '加入第二點，量出兩點間可夾的尺寸'
       : (hasPair ? '以這個接點開始新的單點量測' : '選擇此接點，自動量出它的工作範圍'));
+  }
+  const referenceBtn = document.getElementById('referenceBtn');
+  if (referenceBtn) {
+    const isReference = S.topo.referencePoint === S.selectedNodeId;
+    referenceBtn.textContent = isReference ? '取消量測基準' : '設量測基準';
+    referenceBtn.classList.toggle('trace-on', isReference);
+  }
+  const lockBtn = document.getElementById('positionLockBtn');
+  if (lockBtn) {
+    const ground = pointIsGround?.(S.selectedNodeId), unlocked = ground && isGroundPositionUnlocked?.(S.selectedNodeId);
+    lockBtn.style.display = ground ? '' : 'none'; lockBtn.textContent = unlocked ? '重新鎖定位置' : '解除位置鎖定';
+    lockBtn.classList.toggle('trace-on', Boolean(unlocked));
   }
   // 「分離」只在此接點被多個端點共用（兩桿件鎖在同一點）時出現
   const splitBtn = document.getElementById('splitBtn');

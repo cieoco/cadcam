@@ -21,6 +21,7 @@ const NODE_TAP_PX = 34;   // 手機點接點的命中半徑（畫面 px，縮放
 // ---- 縮放 / 平移手勢的指標帳本（畫布層級狀態）----
 const activePointers = new Map();   // pointerId -> { x, y }（client 座標）
 let pinchState = null;              // { dist, cx, cy }
+let pendingNodeDrag = null;         // 點擊先選取；超過門檻後才真正開始拖曳
 
 // ---- 注入的外部依賴（由 app 在啟動時提供）----
 let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
@@ -34,7 +35,10 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
     recordManualTrace = () => {},
     solvePinnedConstraints = null,
     snapFramePoint = p => p,
-    snapFrameNodesToGrid = () => {};
+    snapFrameNodesToGrid = () => {},
+    isGroundPositionUnlocked = () => false,
+    relockGroundPosition = () => {},
+    rotateInputCrankToPoint = () => false;
 
 export function startFreeLinkDrag(e, linkId) {
   const c = S.comps.find(x => x.id === linkId && isFreeLink(x));
@@ -76,6 +80,10 @@ export function onNodeDown(e, id) {
   if (S.drawingLink || S.drawingTriangle || S.drawingPolygon) return; // 畫圖模式：交給 svg 起點處理（會自動吸附到此接點）
   if (S.placingMotor) { e.stopPropagation(); handleMotorOnNode(id); return; }
   if (S.pickBars) return;
+  // 接點已經接手這次 pointerdown；不要再冒泡到畫布的「點空白取消選取」。
+  // 過去 dragId 會間接擋住取消，但加入拖曳門檻後按下階段尚未設定 dragId，
+  // 因此必須在事件語意上明確阻止背景處理。
+  e.stopPropagation();
   S.preDragSnap = snapshotStr(); // 拖曳前狀態；若真的有變動，drag end 才記入 undo
   pause();
   // 選接點時收掉桿件 / 三點桿 / 滑軌的長度面板，各種屬性列互斥不疊在一起。
@@ -91,12 +99,20 @@ export function onNodeDown(e, id) {
   S.selectedNodeId = id;
   openMobileEditPanel();
   Panels.updateRoleEditor();
-  S.dragId = id; S.snapTarget = null;
+  S.dragId = null; S.snapTarget = null;
+  pendingNodeDrag = pointIsGround(id) && !isGroundPositionUnlocked(id) ? null : {
+    id, x:e.clientX, y:e.clientY, pointerType:e.pointerType || 'mouse'
+  };
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
   draw();
 }
 function onDragMove(e) {
   if (S.dragShape) return;   // 造形點拖曳由 app 的專用監聽處理
+  if (pendingNodeDrag && !S.dragId) {
+    const threshold = pendingNodeDrag.pointerType === 'mouse' ? 6 : 12;
+    if (Math.hypot(e.clientX-pendingNodeDrag.x,e.clientY-pendingNodeDrag.y) < threshold) return;
+    S.dragId=pendingNodeDrag.id; pendingNodeDrag=null; draw();
+  }
   if (S.drawingPolygon) {
     if (activePointers.size >= 2) return;
     const wp = worldFromEvent(e);
@@ -144,8 +160,7 @@ function onDragMove(e) {
   // 不跟 solver 較勁——以「指標位置」找最近的接點當吸附目標、放開即連接（綠圈給回饋）。
   const crankBar = inputCrankMovingEnd(S.dragId);
   if (crankBar) {
-    S.snapTarget = nearestDisplayToPoint(w, [crankBar.p1.id, crankBar.p2.id]);
-    draw();
+    if (rotateInputCrankToPoint(crankBar,w)) { rebuild(); recordManualTrace(); draw(); }
     return;
   }
   const dragTarget = pointIsGround(S.dragId) ? snapFramePoint(w) : w;
@@ -287,7 +302,7 @@ function onDragEnd(e) {
     commitDragUndo();
     return;
   }
-  if (!S.dragId) { S.preDragSnap = null; return; }
+  if (!S.dragId) { pendingNodeDrag=null; S.preDragSnap = null; return; }
   const did = S.dragId, tgt = S.snapTarget;
   S.dragId = null; S.snapTarget = null;
   if (tgt) mergePoints(did, tgt);
@@ -295,6 +310,7 @@ function onDragEnd(e) {
   recomputeLengths();
   rebuild(); recordManualTrace(); draw();
   commitDragUndo();
+  if (pointIsGround(did)) relockGroundPosition(did);
 }
 
 function abortSingleDrag() {
@@ -320,7 +336,10 @@ export function init(deps) {
      recordManualTrace = (() => {}),
      solvePinnedConstraints = null,
      snapFramePoint = (p => p),
-     snapFrameNodesToGrid = (() => {}) } = deps);
+     snapFrameNodesToGrid = (() => {}),
+     isGroundPositionUnlocked = (() => false),
+     relockGroundPosition = (() => {}),
+     rotateInputCrankToPoint = (() => false) } = deps);
 
   // ---- 掛上 svg 的指標 / 手勢監聽（原 app.js 檔尾那批，順序不變）----
   svg.addEventListener('pointermove', onDragMove);

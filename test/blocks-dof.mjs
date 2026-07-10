@@ -19,6 +19,7 @@ const cases = [
   ['pulley-belt', 1],
   ['jansen-leg', 1],
   ['pantograph', 2],
+  ['competition-fourbar-lift', 1],
 ];
 
 cases.forEach(([id, expected]) => {

@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { analyzeCompetitionLift } from '../js/blocks/competition-lift.js';
+import { BLOCK_EXAMPLES } from '../js/blocks/examples.js';
+import { analyzeDof } from '../js/blocks/dof.js';
+const good = analyzeCompetitionLift({LIFT_ARM:48,LIFT_ARM_2:48,LIFT_UPRIGHT:72,LIFT_TOOL_FRONT:72,LIFT_TOOL_TOP:48,LIFT_TOOL_BOTTOM:48},{barWidthMm:16,holeDiameterMm:5});
+assert.equal(good.ok, true); assert.equal(good.travelMm, 96); assert.equal(good.poseErrorMm, 0);
+const bad = analyzeCompetitionLift({LIFT_ARM:48,LIFT_ARM_2:64,LIFT_UPRIGHT:72,LIFT_TOOL_FRONT:64,LIFT_TOOL_TOP:48,LIFT_TOOL_BOTTOM:56},{barWidthMm:8,holeDiameterMm:5});
+assert.equal(bad.ok, false); assert.ok(bad.errors.length >= 3);
+const example = BLOCK_EXAMPLES.find(item => item.id === 'competition-fourbar-lift');
+assert.equal(analyzeDof(example.snapshot.comps).dof, 1, '升降臂應只有一個自由度');
+assert.equal(example.snapshot.comps.some(comp => comp.id === 'ToolDiagonal'), false, '升降臂不應使用斜撐');
+assert.equal(example.snapshot.tracePoint, 'C', '升降臂應追蹤單一工作點');
+assert.equal(Array.isArray(example.snapshot.tracePoints), false, '升降臂不應被誤判成雙點夾爪');
+console.log('competition lift analysis: ok');

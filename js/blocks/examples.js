@@ -547,7 +547,7 @@ export const BLOCK_EXAMPLES = [
       kind: 'blocks',
       v: 1,
       counter: 8,
-      tracePoints: ['C', 'D'],
+      tracePoint: 'C',
       comps: [
         { type: 'anchor', id: 'Anchor1', p1: pt('O1', 'fixed', -96, 0) },
         { type: 'anchor', id: 'Anchor2', p1: pt('O2', 'fixed', -96, 72) },
@@ -556,7 +556,9 @@ export const BLOCK_EXAMPLES = [
           color: '#e74c3c',
           isInput: true,
           physicalMotor: '1',
-          phaseOffset: 0
+          phaseOffset: 0,
+          assemblyMobility: 1,
+          assemblyType: 'parallel-fourbar-lift'
         }),
         bar('LiftFollower', pt('O2', 'fixed', -96, 72), pt('B', 'floating', -48, 72), 48, {
           lenParam: 'LIFT_ARM_2',
