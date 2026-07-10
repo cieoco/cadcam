@@ -175,5 +175,12 @@ check('夾爪 3D 沿用 2D/DXF 共用板形（outline 而非近似三角）',
 
 const framed=sceneFor('competition-rack-lift',0,{frameGeometry:{outlines:[[{x:-20,y:-20},{x:20,y:-20},{x:20,y:20},{x:-20,y:20}]],holes:[{x:0,y:0,r:3,layer:'TT_SHAFT'}],warnings:[]}});
 check('3D 場景沿用 DXF 機架外形與孔位',framed.frame&&framed.frame.outlines.length===1&&framed.frame.holes[0].layer==='TT_SHAFT');
+check('有機架時馬達帶貼合面 mountZ＝機架背面 z',
+  framed.motors.length>0&&framed.motors.every(mo=>mo.mountZ===framed.frame.z),
+  `mountZ=${framed.motors.map(mo=>mo.mountZ).join(',')} frameZ=${framed.frame.z}`);
+// 無機架的範例維持原本行為：mountZ 為 null（viewer 走固定軸長、軸頂落在 baseZ）
+check('無機架時馬達 mountZ 為 null（維持原疊層行為）',
+  gripper.motors.length>0&&gripper.motors.every(mo=>mo.mountZ===null),
+  `mountZ=${gripper.motors.map(mo=>mo.mountZ).join(',')}`);
 
 report('blocks-3d-completed-examples');

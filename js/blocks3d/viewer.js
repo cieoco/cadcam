@@ -702,9 +702,18 @@ export function createViewer(container) {
       g.add(collar);
 
       const shaftBaseZ = boxTopZ + MOTOR.collarH;
-      const shaftLen = MOTOR.shaftLen;
-      const shaftTopZ = shaftBaseZ + shaftLen;
-      g.position.z = (Number.isFinite(m.baseZ) ? m.baseZ : shaftTopZ) - shaftTopZ;
+      // 有機架時：齒輪箱正面(boxTopZ)貼齊機架背面(mountZ)，輸出軸改為可變長度橋接到被驅動件(baseZ)，
+      // 讓馬達實際「坐」在機架上，不再因被驅動件所在層數不同而懸空。無機架則沿用固定軸長、軸頂落在 baseZ。
+      let shaftLen;
+      if (Number.isFinite(m.mountZ)) {
+        g.position.z = m.mountZ - boxTopZ;
+        const reach = Number.isFinite(m.baseZ) ? m.baseZ : m.mountZ + shaftBaseZ + MOTOR.shaftLen;
+        shaftLen = Math.max(2, reach - g.position.z - shaftBaseZ);
+      } else {
+        shaftLen = MOTOR.shaftLen;
+        const shaftTopZ = shaftBaseZ + shaftLen;
+        g.position.z = (Number.isFinite(m.baseZ) ? m.baseZ : shaftTopZ) - shaftTopZ;
+      }
       const shaft = new THREE.Mesh(
         new THREE.ExtrudeGeometry(
           doubleDShape(MOTOR.shaftR, MOTOR.shaftFlatW, MOTOR.shaftBoreR),

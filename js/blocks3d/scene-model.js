@@ -125,6 +125,7 @@ export function buildSceneModel(links, points, opts = {}) {
   const motorTypes = opts.motorTypes || new Map();   // id -> 'tt' | 'mg995'
   const motorMounts = opts.motorMounts || new Map(); // id -> { dir:{x,y}, reason }
   const frameGeometry = opts.frameGeometry || null;
+  const frameBackZ = frameGeometry ? -2 * plateGap : null; // 機架板背面 z（馬達齒輪箱貼合面）
   const plateGeometries = opts.plateGeometries || {}; // 孔序字串 -> { outline, holes }（沿用 2D/DXF 共用板形，如夾爪）
   const polygons = opts.polygons || [];
   const gearDefs = opts.gears || [];
@@ -557,7 +558,7 @@ export function buildSceneModel(links, points, opts = {}) {
       const dy = ty !== null ? ty - j.y : -1;
       const dl = Math.hypot(dx, dy) || 1;
       const type = motorTypes.get(j.id) === 'mg995' ? 'mg995' : 'tt';
-      motors.push({ id: j.id, x: j.x, y: j.y, baseZ: z0, shaftTopZ: z1 + 1.5, dir: { x: dx / dl, y: dy / dl }, type });
+      motors.push({ id: j.id, x: j.x, y: j.y, baseZ: z0, shaftTopZ: z1 + 1.5, dir: { x: dx / dl, y: dy / dl }, type, mountZ: frameBackZ });
       return;
     }
     pins.push({
@@ -628,6 +629,6 @@ export function buildSceneModel(links, points, opts = {}) {
       }
     : { x: bboxCenter.x, y: bboxCenter.y, z: midZ };
 
-  const frame = frameGeometry ? { ...frameGeometry, z: -2 * plateGap, thickness: plateThickness, color:'#465568' } : null;
+  const frame = frameGeometry ? { ...frameGeometry, z: frameBackZ, thickness: plateThickness, color:'#465568' } : null;
   return { sticks, plates, pins, grounds, motors, rails, carriages, gears, racks, pulleys, belts, cams, frame, plateGap, plateThickness, span, focus, anchored };
 }
