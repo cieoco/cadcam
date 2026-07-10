@@ -381,6 +381,7 @@ export function buildSceneModel(links, points, opts = {}) {
       ref: { x: ref.x, y: ref.y },
       axisDeg,
       local: local.map(p => ({ x: p.x + phaseShift, y: p.y })),
+      slot: rackSlot3d(r.slot, { length, module, phaseShift }),
       z: gearZ,
       layer: gearLayer,
       thickness: plateThickness,
@@ -388,6 +389,21 @@ export function buildSceneModel(links, points, opts = {}) {
     });
     touch(r.ref, gearLayer);
   });
+
+  function rackSlot3d(slot, { length, module, phaseShift }) {
+    if (!slot) return null;
+    const bodyH = module * 2.5;
+    const dedendum = module * 1.25;
+    const slotLen = Math.max(8, Math.min(length - module * 3, Number(slot.length) || Math.max(24, length - 32)));
+    const slotW = Math.max(2, Math.min(bodyH * 0.7, Number(slot.width) || Math.max(4, module * 1.25)));
+    const y = -dedendum - bodyH / 2 + (Number(slot.offset) || 0);
+    return {
+      a: { x: -slotLen / 2 + phaseShift, y },
+      b: { x: slotLen / 2 + phaseShift, y },
+      half: slotW / 2,
+      color: '#3a4452'
+    };
+  }
 
   const pulleys = [];
   const pulleyById = new Map();

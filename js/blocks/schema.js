@@ -320,6 +320,21 @@ function normalizeRack(comp, index, params, warnings) {
   };
   if (safeId(comp.pinion)) out.pinion = comp.pinion;
   params[lenParam] = Math.max(1, Math.round(num(params[lenParam] ?? comp.len, 160)));
+  const normalizeSlot = (slot) => ({
+    length: Math.max(1, roundMm(slot.length, Math.max(24, params[lenParam] - 32))),
+    width: Math.max(1, roundTenth(slot.width, 5)),
+    offset: roundTenth(slot.offset, 0)
+  });
+  if (comp.slot && typeof comp.slot === 'object') {
+    out.slot = normalizeSlot(comp.slot);
+  } else if (comp.slot === true || comp.rackHoleType === 'slot') {
+    out.slot = normalizeSlot({ length: comp.rackSlotL || Math.max(24, params[lenParam] - 32), width: comp.holeD || 5, offset: 0 });
+  } else if (comp.guide && typeof comp.guide === 'object') {
+    // 舊的「外掛導軌」資料視為齒條本體內的導軌長槽，避免範例多出不合理的獨立桿件。
+    out.slot = normalizeSlot({ length: comp.guide.length, width: comp.guide.slotWidth || 5, offset: comp.guide.offset || 0 });
+  } else if (comp.guide === true) {
+    out.slot = normalizeSlot({});
+  }
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
   return out;
 }

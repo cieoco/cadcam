@@ -33,7 +33,7 @@ import * as Store from './storage.js';
 import * as Exporters from './exporters.js';
 import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, plateVertices } from './plate-geometry.js';
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
-import { BLOCK_EXAMPLES, getExample } from './examples.js';
+import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('stageSvg');
@@ -131,24 +131,77 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
 function populateExamples() {
   const sel = document.getElementById('exampleSelect');
   const mobileList = document.getElementById('mobileExampleList');
+  const groupById = Object.fromEntries(EXAMPLE_GROUPS.map(group => [group.id, group]));
+  const desktopGroups = {};
+  if (sel) {
+    EXAMPLE_GROUPS.forEach(group => {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = group.label;
+      desktopGroups[group.id] = optgroup;
+      sel.appendChild(optgroup);
+    });
+  }
   BLOCK_EXAMPLES.forEach(example => {
+    const lesson = getExampleLesson(example.id);
+    const groupId = groupById[lesson.group] ? lesson.group : 'challenge';
     if (sel) {
       const opt = document.createElement('option');
       opt.value = example.id;
-      opt.textContent = example.title;
-      opt.title = example.note || '';
-      sel.appendChild(opt);
+      opt.textContent = `${lesson.level || '探索'}｜${example.title}`;
+      opt.title = lesson.use || example.note || '';
+      (desktopGroups[groupId] || sel).appendChild(opt);
     }
     if (mobileList) {
+      let section = mobileList.querySelector(`[data-example-group="${groupId}"]`);
+      if (!section) {
+        section = document.createElement('div');
+        section.className = 'mobile-example-section';
+        section.dataset.exampleGroup = groupId;
+        const title = document.createElement('div');
+        title.className = 'mobile-example-group-title';
+        title.textContent = groupById[groupId]?.label || '挑戰';
+        section.appendChild(title);
+        mobileList.appendChild(section);
+      }
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'mobile-example-btn';
       btn.textContent = example.title;
-      btn.title = example.note || '';
+      btn.title = lesson.use || example.note || '';
       btn.addEventListener('click', () => loadExample(example.id));
-      mobileList.appendChild(btn);
+      section.appendChild(btn);
     }
   });
+  renderExampleLessonCard(null);
+}
+
+function renderExampleLessonCard(example) {
+  const card = document.getElementById('exampleLessonCard');
+  if (!card) return;
+  const title = document.getElementById('exampleLessonTitle');
+  const meta = document.getElementById('exampleLessonMeta');
+  const use = document.getElementById('exampleLessonUse');
+  const learn = document.getElementById('exampleLessonLearn');
+  const tasks = document.getElementById('exampleLessonTasks');
+  if (!example) {
+    card.style.display = 'none';
+    return;
+  }
+  const lesson = getExampleLesson(example.id);
+  const group = EXAMPLE_GROUPS.find(item => item.id === lesson.group);
+  card.style.display = '';
+  if (title) title.textContent = example.title;
+  if (meta) meta.textContent = [lesson.level, group && group.label].filter(Boolean).join(' · ');
+  if (use) use.textContent = lesson.use || example.note || '';
+  if (learn) learn.textContent = lesson.learn || '';
+  if (tasks) {
+    tasks.textContent = '';
+    (lesson.try || []).forEach(task => {
+      const li = document.createElement('li');
+      li.textContent = task;
+      tasks.appendChild(li);
+    });
+  }
 }
 
 function loadExample(id) {
@@ -161,6 +214,7 @@ function loadExample(id) {
     return;
   }
   applySnapshot(norm);
+  renderExampleLessonCard(example);
   transient('📘 已載入：' + example.title);
   if (sel) sel.value = '';
   closeMobileOpenMenu();
@@ -1030,9 +1084,17 @@ function drawRackPart(c, pts) {
   const poly = document.createElementNS(SVG_NS, 'polygon');
   poly.setAttribute('points', polyStr);
   poly.setAttribute('fill', (c.color || '#16a085') + '33');
-  poly.setAttribute('stroke-width', Math.max(1, 1.4 * sc));
+  const isSelectedRack = pinion && pinion.id === S.selectedGearId;
+  poly.setAttribute('stroke-width', Math.max(1, (isSelectedRack ? 2.4 : 1.4) * sc));
   poly.setAttribute('stroke-linejoin', 'round');
+  poly.style.cursor = 'pointer';
+  poly.addEventListener('pointerdown', e => {
+    if (!pinion) return;
+    e.stopPropagation();
+    selectGear(pinion.id);
+  });
   g.appendChild(poly);
+  drawRackSlot(g, c, { length: L, module, phaseShift: phShift, scale: sc });
   svg.appendChild(g);
   // 齒桿本體：原點在參考點 p1（位於節線上），沿 axisDeg 旋轉；齒朝 +y 指向小齒輪。
   const applyRack = (P) => {
@@ -1051,12 +1113,54 @@ function drawRackPart(c, pts) {
         meshOff = Math.abs(d - R) > Math.max(1, R * 0.08);
       }
     }
-    poly.setAttribute('stroke', meshOff ? '#e74c3c' : (c.color || '#16a085'));
+    poly.setAttribute('stroke', meshOff ? '#e74c3c' : (isSelectedRack ? '#e67e22' : (c.color || '#16a085')));
     poly.setAttribute('stroke-dasharray', meshOff ? `${(4 * sc).toFixed(1)},${(3 * sc).toFixed(1)}` : '');
     g.setAttribute('transform', `translate(${TX(ref.x)} ${TY(ref.y)}) rotate(${-axisDeg})`);
   };
   applyRack(pts);
   frameUpdaters.push(applyRack);
+}
+
+function drawRackSlot(parent, c, { length, module, phaseShift, scale }) {
+  if (!c.slot) return;
+  const slot = typeof c.slot === 'object' ? c.slot : {};
+  const bodyH = module * 2.5;
+  const dedendum = module * 1.25;
+  const slotLen = Math.max(8, Math.min(length - module * 3, Number(slot.length) || Math.max(24, length - 32)));
+  const slotW = Math.max(2, Math.min(bodyH * 0.7, Number(slot.width) || Math.max(4, module * 1.25)));
+  const slotY = -dedendum - bodyH / 2 + (Number(slot.offset) || 0);
+  const x1 = (-slotLen / 2 + phaseShift) * scale;
+  const x2 = (slotLen / 2 + phaseShift) * scale;
+  const y = -slotY * scale;
+  const r = slotW * scale / 2;
+  const d = [
+    `M ${x1.toFixed(2)} ${(y - r).toFixed(2)}`,
+    `L ${x2.toFixed(2)} ${(y - r).toFixed(2)}`,
+    `A ${r.toFixed(2)} ${r.toFixed(2)} 0 0 1 ${x2.toFixed(2)} ${(y + r).toFixed(2)}`,
+    `L ${x1.toFixed(2)} ${(y + r).toFixed(2)}`,
+    `A ${r.toFixed(2)} ${r.toFixed(2)} 0 0 1 ${x1.toFixed(2)} ${(y - r).toFixed(2)}`,
+    'Z'
+  ].join(' ');
+
+  const hole = document.createElementNS(SVG_NS, 'path');
+  hole.setAttribute('d', d);
+  hole.setAttribute('fill', '#f7fafc');
+  hole.setAttribute('stroke', '#5d6d7e');
+  hole.setAttribute('stroke-width', Math.max(1, 1.1 * scale));
+  hole.setAttribute('stroke-linejoin', 'round');
+  hole.style.pointerEvents = 'none';
+  parent.appendChild(hole);
+
+  const guideLine = document.createElementNS(SVG_NS, 'line');
+  guideLine.setAttribute('x1', x1.toFixed(2));
+  guideLine.setAttribute('y1', y.toFixed(2));
+  guideLine.setAttribute('x2', x2.toFixed(2));
+  guideLine.setAttribute('y2', y.toFixed(2));
+  guideLine.setAttribute('stroke', '#95a5a6');
+  guideLine.setAttribute('stroke-width', Math.max(1, 0.7 * scale));
+  guideLine.setAttribute('stroke-dasharray', `${(3 * scale).toFixed(1)},${(3 * scale).toFixed(1)}`);
+  guideLine.style.pointerEvents = 'none';
+  parent.appendChild(guideLine);
 }
 
 // 齒相位對齊（純滾動只需在 θ=0 對一次，之後 rolling 自動保持咬合）：
@@ -1715,6 +1819,7 @@ function draw() {
         length,
         axisDeg,
         phaseShift: rackPhaseShift(c, pinion, { length, module, teeth, axisDeg }),
+        slot: c.slot,
         color: c.color,
       };
     });
@@ -2200,6 +2305,36 @@ function addGearPair() {
   selectGear(driven.id);                          // 放下就選從動輪，方便改模數 / 齒數
 }
 
+function addRackPinion() {
+  pushUndo();
+  Tools.exitDrawLink();
+  Tools.exitDrawTriangle();
+  Tools.exitDrawPolygon();
+  cancelMotorMode();
+  const module = 4;
+  const teeth = 15;
+  const R = teeth * module / 2;
+  const base = mobilePrompt() ? View.worldFromScreen(W * 0.32, H * 0.44) : { x: -60, y: 0 };
+  const n = ++S.counter;
+  const pinion = makeGear(n, { teeth, module, cx: base.x, cy: base.y, isDriver: true, meshId: null, color: '#e74c3c' });
+  const rackLen = 176;
+  const rack = {
+    type: 'rack',
+    id: 'Rack' + (++S.counter),
+    color: '#16a085',
+    p1: { id: 'RKP' + S.counter, type: 'floating', x: base.x, y: base.y - R },
+    pinion: pinion.id,
+    lenParam: 'RKL' + S.counter,
+    axisDeg: 0,
+    sign: 1,
+    slot: { length: 136, width: 5, offset: 0 }
+  };
+  S.topo.params[rack.lenParam] = rackLen;
+  S.comps.push(pinion, rack);
+  rebuild(); draw();
+  selectGear(pinion.id);
+}
+
 // ---- 齒輪：選取 + 改模數 / 齒數（成對同動）----
 function gearById(id) { return S.comps.find(c => c.type === 'gear' && c.id === id) || null; }
 
@@ -2268,13 +2403,38 @@ function updateGearEditor() {
   const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
   if (!c) { panel.style.display = 'none'; return; }
   const mod = Number(c.module) || GEAR_MODULE;
+  const rack = rackForGear(c);
   const setText = (elId, v) => { const el = document.getElementById(elId); if (el) el.textContent = v; };
+  const setRow = (elId, show) => { const el = document.getElementById(elId); if (el) el.style.display = show ? '' : 'none'; };
   setText('gearModuleVal', Math.round(mod));
   setText('gearTeethVal', c.teeth);
   setText('gearRadiusVal', Math.round(Number(S.topo.params[c.radiusParam]) || c.teeth * mod / 2));
   setText('gearPinRadiusVal', Math.round(gearPinRadius(c)));
   setText('gearPinHoleVal', Number(c.pinHoleDiameter || 5).toFixed(1).replace(/\.0$/, ''));
+  setRow('rackLengthRow', !!rack);
+  setRow('rackSlotLengthRow', !!rack);
+  setRow('rackSlotWidthRow', !!rack);
+  if (rack) {
+    const len = rackLength(rack);
+    const slot = ensureRackSlot(rack, len);
+    setText('rackLengthVal', Math.round(len));
+    setText('rackSlotLengthVal', Math.round(slot.length));
+    setText('rackSlotWidthVal', Number(slot.width).toFixed(1).replace(/\.0$/, ''));
+  }
   panel.style.display = 'flex';
+}
+function rackForGear(gear) {
+  return gear ? S.comps.find(c => c.type === 'rack' && c.pinion === gear.id) || null : null;
+}
+function rackLength(rack) {
+  return Number(S.topo.params[rack.lenParam]) || 160;
+}
+function ensureRackSlot(rack, length = rackLength(rack)) {
+  if (!rack.slot || typeof rack.slot !== 'object') rack.slot = {};
+  rack.slot.length = Math.max(8, Math.min(Math.max(8, length - 12), Math.round(Number(rack.slot.length) || Math.max(24, length - 40))));
+  rack.slot.width = Number(Math.max(2, Math.min(20, Number(rack.slot.width) || 5)).toFixed(1));
+  rack.slot.offset = Number(Number(rack.slot.offset) || 0);
+  return rack.slot;
 }
 function gearPitchRadius(c) {
   return Number(S.topo.params[c.radiusParam]) || (Number(c.teeth) || 12) * (Number(c.module) || GEAR_MODULE) / 2 || 40;
@@ -2403,6 +2563,38 @@ function changeGearModule(delta) {
     clampGearPinRadius(g);
   });
   syncGearMesh();
+  rebuild(); draw();
+  updateGearEditor();
+}
+function changeRackLength(delta) {
+  const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
+  const rack = rackForGear(gear);
+  if (!rack) return;
+  pushUndo();
+  const next = Math.max(32, Math.round((rackLength(rack) + delta) / 8) * 8);
+  S.topo.params[rack.lenParam] = next;
+  ensureRackSlot(rack, next);
+  rebuild(); draw();
+  updateGearEditor();
+}
+function changeRackSlotLength(delta) {
+  const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
+  const rack = rackForGear(gear);
+  if (!rack) return;
+  pushUndo();
+  const len = rackLength(rack);
+  const slot = ensureRackSlot(rack, len);
+  slot.length = Math.max(8, Math.min(Math.max(8, len - 12), Math.round((slot.length + delta) / 8) * 8));
+  rebuild(); draw();
+  updateGearEditor();
+}
+function changeRackSlotWidth(delta) {
+  const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
+  const rack = rackForGear(gear);
+  if (!rack) return;
+  pushUndo();
+  const slot = ensureRackSlot(rack);
+  slot.width = Number(Math.max(2, Math.min(20, slot.width + delta)).toFixed(1));
   rebuild(); draw();
   updateGearEditor();
 }
@@ -3182,8 +3374,16 @@ function deleteGearChain(id) {
   pause();
   const chain = gearMeshChain(start);
   chain.forEach(g => ownedParamKeys(g).forEach(k => delete S.topo.params[k]));
+  const chainIds = new Set(chain.map(g => g.id));
+  const rackIds = new Set();
+  S.comps.forEach(c => {
+    if (c.type === 'rack' && chainIds.has(c.pinion)) {
+      rackIds.add(c.id);
+      ownedParamKeys(c).forEach(k => delete S.topo.params[k]);
+    }
+  });
   const ids = new Set(chain.map(g => g.id));
-  S.comps = S.comps.filter(c => !ids.has(c.id));
+  S.comps = S.comps.filter(c => !ids.has(c.id) && !rackIds.has(c.id));
   deselectGear();
   S.selectedNodeId = null;
   closeMobileEditPanel();
@@ -3607,5 +3807,5 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
 init();

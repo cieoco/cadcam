@@ -117,6 +117,19 @@
     }
     .work-range-card strong { font-size: 14px; }
     .work-range-card span { color: #4f7461; font-size: 12px; font-weight: 700; }
+    .lesson-card {
+      position: absolute; top: 16px; right: 16px; width: 288px; z-index: 2;
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 12px 14px; border: 1px solid #e6e9f0; border-radius: 8px;
+      background: rgba(255,255,255,0.96); color: #2c3e50;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    }
+    .lesson-card-title { font-size: 15px; font-weight: 800; color: #2c5282; line-height: 1.35; }
+    .lesson-card-meta { color: #7f8c8d; font-size: 11px; font-weight: 800; letter-spacing: 0.04em; }
+    .lesson-card-row { display: flex; flex-direction: column; gap: 3px; }
+    .lesson-card-label { color: #60717d; font-size: 12px; font-weight: 800; }
+    .lesson-card-text { color: #34495e; font-size: 12px; line-height: 1.45; }
+    .lesson-card-tasks { margin: 0; padding-left: 18px; color: #34495e; font-size: 12px; line-height: 1.45; }
     /* 控制列 */
     .controls {
       position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
@@ -206,6 +219,7 @@
       #view3d { right: 320px; }
       .hint, .mode-banner { left: calc((100% - 320px) / 2); }
       .controls { left: calc((100% - 320px) / 2); }
+      .lesson-card { right: 16px; width: 288px; box-shadow: none; }
       .inspector-panel {
         left: auto; right: 16px; width: 288px; max-width: 288px;
         box-shadow: none; z-index: 2;
@@ -265,9 +279,12 @@
         flex-wrap: wrap; align-items: stretch; max-height: min(42vh, 320px); overflow-y: auto;
       }
       .mobile-panel-section[data-panel="project"] .example-select { display: none; }
+      .lesson-card { display: none !important; }
       .mobile-example-list {
         display: grid; grid-template-columns: 1fr; gap: 6px; max-height: 230px; overflow-y: auto;
       }
+      .mobile-example-section { display: grid; grid-template-columns: 1fr; gap: 6px; }
+      .mobile-example-group-title { color: #60717d; font-size: 12px; font-weight: 900; padding: 6px 2px 2px; }
       .mobile-example-btn {
         min-height: 42px; border: 1px solid #d8dee6; background: #fff; border-radius: 8px;
         padding: 8px; text-align: left; font-size: 12px; font-weight: 800; color: #34495e;
@@ -431,6 +448,11 @@
             <span class="name">齒輪對</span>
             <span class="role">成對嚙合</span>
           </div>
+          <div class="block gear" onclick="window.blocks.addRackPinion()">
+            <span class="ico">▥</span>
+            <span class="name">齒輪齒條</span>
+            <span class="role">直線滑台，齒條內建長槽</span>
+          </div>
         </div>
       </div>
       <div class="tray-section">
@@ -457,6 +479,22 @@
         <strong id="workRangeValue">工作範圍 0 mm</strong>
         <span id="workRangeDetail">左右 0 mm · 上下 0 mm</span>
       </div>
+      <aside class="lesson-card" id="exampleLessonCard" style="display:none;" aria-live="polite">
+        <div class="lesson-card-meta" id="exampleLessonMeta">課程範本</div>
+        <div class="lesson-card-title" id="exampleLessonTitle">範本名稱</div>
+        <div class="lesson-card-row">
+          <span class="lesson-card-label">實戰用途</span>
+          <span class="lesson-card-text" id="exampleLessonUse"></span>
+        </div>
+        <div class="lesson-card-row">
+          <span class="lesson-card-label">學習重點</span>
+          <span class="lesson-card-text" id="exampleLessonLearn"></span>
+        </div>
+        <div class="lesson-card-row">
+          <span class="lesson-card-label">修改任務</span>
+          <ul class="lesson-card-tasks" id="exampleLessonTasks"></ul>
+        </div>
+      </aside>
       <div class="inspector-panel len-editor" id="lenEditor" style="display:none;">
         <div class="le-row">
           <span class="le-title" id="lenTitle">🔵 連桿長度</span>
@@ -589,6 +627,24 @@
           <span class="le-value"><span id="gearPinHoleVal">5</span><span class="le-unit">mm</span></span>
           <button class="le-step" onclick="window.blocks.changeGearPinHoleDiameter(0.5)" title="輸出孔徑放大 0.5mm">＋</button>
           <button class="clear-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除這對齒輪">🗑 刪除</button>
+        </div>
+        <div class="se-row rack-row" id="rackLengthRow" style="display:none;">
+          <span class="se-label">齒條長度</span>
+          <button class="le-step" onclick="window.blocks.changeRackLength(-8)" title="齒條長度 −8mm">−</button>
+          <span class="le-value"><span id="rackLengthVal">160</span><span class="le-unit">mm</span></span>
+          <button class="le-step" onclick="window.blocks.changeRackLength(8)" title="齒條長度 ＋8mm">＋</button>
+        </div>
+        <div class="se-row rack-row" id="rackSlotLengthRow" style="display:none;">
+          <span class="se-label">導軌槽長</span>
+          <button class="le-step" onclick="window.blocks.changeRackSlotLength(-8)" title="導軌槽長 −8mm">−</button>
+          <span class="le-value"><span id="rackSlotLengthVal">128</span><span class="le-unit">mm</span></span>
+          <button class="le-step" onclick="window.blocks.changeRackSlotLength(8)" title="導軌槽長 ＋8mm">＋</button>
+        </div>
+        <div class="se-row rack-row" id="rackSlotWidthRow" style="display:none;">
+          <span class="se-label">導軌槽寬</span>
+          <button class="le-step" onclick="window.blocks.changeRackSlotWidth(-0.5)" title="導軌槽寬 −0.5mm">−</button>
+          <span class="le-value"><span id="rackSlotWidthVal">5</span><span class="le-unit">mm</span></span>
+          <button class="le-step" onclick="window.blocks.changeRackSlotWidth(0.5)" title="導軌槽寬 ＋0.5mm">＋</button>
         </div>
       </div>
       <div class="inspector-panel servo-editor" id="strokeEditor" style="display:none;">

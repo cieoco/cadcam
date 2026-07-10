@@ -35,6 +35,144 @@ const triangle = (id, p1, p2, p3, extra = {}) => ({
 
 const pt = (id, type, x, y, extra = {}) => ({ id, type, x, y, ...extra });
 
+export const EXAMPLE_GROUPS = [
+  { id: 'starter', label: '入門：先讓它動' },
+  { id: 'transmission', label: '傳動：速度與力矩' },
+  { id: 'manipulator', label: '實戰：夾取與物件操作' },
+  { id: 'lift-motion', label: '實戰：升降與直線運動' },
+  { id: 'mobility', label: '實戰：底盤與行走' },
+  { id: 'challenge', label: '挑戰：自己改造' }
+];
+
+const EXAMPLE_LESSONS = {
+  'fourbar-crank-rocker': {
+    group: 'starter',
+    level: '基礎',
+    use: '把馬達連續旋轉轉成搖臂擺動，可用在撥桿、閘門、簡單推送。',
+    learn: '觀察固定點、曲柄、連桿、搖桿如何形成一個可連續運轉的閉環。',
+    try: ['把右側搖桿加長或縮短', '移動兩個機架點，看擺角如何改變', '把搖桿末端設為工作點量行程']
+  },
+  'parallel-fourbar': {
+    group: 'starter',
+    level: '基礎',
+    use: '讓平台或夾爪在升降時保持姿態，常見於簡易托盤與平行夾具。',
+    learn: '理解等長對邊如何讓輸出桿保持和輸入桿相同姿態。',
+    try: ['改變兩根短桿長度', '把垂直輸出桿加高', '在輸出桿上加工作點觀察姿態']
+  },
+  'chebyshev-linkage': {
+    group: 'lift-motion',
+    level: '進階',
+    use: '用旋轉馬達產生近似直線軌跡，可做低成本推送或支撐腳路徑。',
+    learn: '比較理想直線和閉環連桿產生的近似直線誤差。',
+    try: ['改曲柄長度', '改追蹤點位置', '觀察工作範圍卡上的水平與垂直行程']
+  },
+  'slider-crank': {
+    group: 'lift-motion',
+    level: '基礎',
+    use: '把馬達旋轉轉成往復直線，可用在推球、頂升、活塞式送料。',
+    learn: '理解曲柄半徑如何決定滑塊行程。',
+    try: ['調整曲柄長度', '調整滑軌行程起點與終點', '把滑軌改成斜向，觀察輸出方向']
+  },
+  pantograph: {
+    group: 'manipulator',
+    level: '進階',
+    use: '把小範圍操作放大成大範圍末端運動，可用在描圖、定位、遠端夾取。',
+    learn: '理解平行四邊形約束和比例放大。',
+    try: ['拖曳末端 R', '改中間長桿長度', '比較 P 和 R 的軌跡比例']
+  },
+  'quick-return': {
+    group: 'lift-motion',
+    level: '進階',
+    use: '需要一邊慢推、一邊快速回程的機構，例如撥料、推送、回位。',
+    learn: '觀察偏置滑軌如何讓前進與回程花費不同角度。',
+    try: ['改滑軌高度', '改連桿長度', '看快回比例如何變化']
+  },
+  'gear-pair': {
+    group: 'transmission',
+    level: '基礎',
+    use: '改變轉速、方向與扭力，是競賽機器人最常用的傳動基礎。',
+    learn: '齒輪外嚙合會反向，半徑越大轉越慢、扭力越大。',
+    try: ['改齒數', '改輸出孔距', '把從動輪輸出孔接到連桿']
+  },
+  'reduction-gear-train': {
+    group: 'transmission',
+    level: '基礎',
+    use: '用小齒輪帶大齒輪取得較慢但更有力的輸出。',
+    learn: '把多段齒比連乘，得到總減速比。',
+    try: ['改末輪齒數', '移除中間惰輪比較方向', '把末輪輸出孔拿去推連桿']
+  },
+  'rack-pinion': {
+    group: 'lift-motion',
+    level: '基礎',
+    use: '把旋轉直接轉成可控直線位移，可用於升降滑台、伸縮臂、推送器。',
+    learn: '理解位移等於齒輪半徑乘以旋轉角度。',
+    try: ['改小齒輪半徑', '改齒條長度', '把齒條當成升降機構輸出']
+  },
+  'gear-gripper': {
+    group: 'manipulator',
+    level: '實戰',
+    use: '兩側同步開合的夾爪，可用於夾方塊、圓柱、球類或遊戲道具。',
+    learn: '用嚙合齒輪同步左右夾爪，並用偏心孔決定開合行程。',
+    try: ['調整輸出孔距改變開口', '改夾爪尖端距離', '把一側夾爪改長測試抓取範圍']
+  },
+  'cam-follower': {
+    group: 'lift-motion',
+    level: '進階',
+    use: '做週期性升降或敲擊，例如撥片、震動送料、間歇推送。',
+    learn: '凸輪輪廓決定從動件高度，而不是只有桿長決定運動。',
+    try: ['改 lift 高度', '改基圓半徑', '觀察從動點軌跡']
+  },
+  'pulley-belt': {
+    group: 'transmission',
+    level: '基礎',
+    use: '跨距較遠的同向傳動，適合把馬達移到容易固定的位置。',
+    learn: '皮帶輪半徑比決定速度比，開口皮帶讓兩輪同向。',
+    try: ['改兩輪半徑', '拉遠中心距', '比較齒輪傳動和皮帶傳動差異']
+  },
+  'jansen-leg': {
+    group: 'mobility',
+    level: '實戰',
+    use: '步行底盤範例，適合探索非輪式移動與足端軌跡。',
+    learn: '多連桿可以把單一馬達轉成複雜步態。',
+    try: ['改曲柄長度 m', '觀察足端 P5 軌跡', '嘗試左右複製成雙腿底盤']
+  },
+  'competition-fourbar-lift': {
+    group: 'lift-motion',
+    level: '實戰',
+    use: '競賽常用升降臂：把前端托盤、夾爪或掛鉤抬高，同時保持末端姿態接近穩定。',
+    learn: '平行四連桿能讓輸出端在升降時保持姿態，馬達曲柄角度決定工作高度。',
+    try: ['調整上下兩根短臂長度', '把前端立桿加高或降低', '把前端接點設為工作點量升降高度']
+  },
+  'competition-roller-intake': {
+    group: 'manipulator',
+    level: '實戰',
+    use: '滾輪進料/吸取機構：把遊戲物件從地面帶進機器內，可接後續輸送或射球。',
+    learn: '皮帶輪可以同步遠端滾輪，馬達位置可以離開實際接觸物件的位置。',
+    try: ['改上下滾輪間距', '改從動輪半徑看表面速度', '把整組旋轉成斜坡式進料']
+  },
+  'competition-flywheel-shooter': {
+    group: 'manipulator',
+    level: '實戰',
+    use: '飛輪射球/拋射機構：用大輪帶小輪加速，讓輸出輪高速旋轉。',
+    learn: '速度比和半徑比相反；大驅動輪帶小輸出輪可以提高轉速。',
+    try: ['改輸出輪半徑', '拉開兩輪中心距', '比較它和減速齒輪列的差異']
+  },
+  'competition-rack-lift': {
+    group: 'lift-motion',
+    level: '實戰',
+    use: '齒條升降滑台：適合直上直下推高物件、調整夾爪高度或做伸縮臂。',
+    learn: '齒條的 axisDeg 是節線方向，齒面固定在 local +Y 側；垂直滑台若小齒輪在左邊，axisDeg 要用 90 讓齒面朝左。',
+    try: ['改小齒輪半徑', '改齒條長度', '把齒條方向改成水平，做成伸縮臂']
+  },
+  'empty-challenge': {
+    group: 'challenge',
+    level: '挑戰',
+    use: '從任務需求出發，自行組合機架、連桿、滑軌、齒輪與動力。',
+    learn: '把已學過的單元整合成自己的競賽機構。',
+    try: ['先做一個可連續運轉的閉環', '設定工作點量行程', '存檔後和同學交換修改']
+  }
+};
+
 export const BLOCK_EXAMPLES = [
   {
     id: 'fourbar-crank-rocker',
@@ -251,7 +389,8 @@ export const BLOCK_EXAMPLES = [
           radiusParam: 'PR', teeth: 15, module: 4, phase: 0 },
         { type: 'rack', id: 'Rack1', color: '#16a085',
           p1: pt('RKP', 'floating', 0, -30),
-          pinion: 'Pinion', lenParam: 'RKL', axisDeg: 0, sign: 1 }
+          pinion: 'Pinion', lenParam: 'RKL', axisDeg: 0, sign: 1,
+          slot: { length: 128, width: 5, offset: 0 } }
       ],
       params: { PR: 30, RKL: 160, theta: 0 }
     }
@@ -397,6 +536,129 @@ export const BLOCK_EXAMPLES = [
     }
   },
   {
+    id: 'competition-fourbar-lift',
+    title: '競賽四連桿升降臂',
+    note: '常見於托盤、夾爪或掛鉤升降。平行四連桿讓前端工具在抬升時保持接近固定姿態。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 8,
+      tracePoints: ['C', 'D'],
+      comps: [
+        { type: 'anchor', id: 'Anchor1', p1: pt('O1', 'fixed', -96, 0) },
+        { type: 'anchor', id: 'Anchor2', p1: pt('O2', 'fixed', -96, 72) },
+        bar('LiftCrank', pt('O1', 'fixed', -96, 0, { physicalMotor: '1' }), pt('A', 'floating', -48, 0), 48, {
+          lenParam: 'LIFT_ARM',
+          color: '#e74c3c',
+          isInput: true,
+          physicalMotor: '1',
+          phaseOffset: 0
+        }),
+        bar('LiftFollower', pt('O2', 'fixed', -96, 72), pt('B', 'floating', -48, 72), 48, {
+          lenParam: 'LIFT_ARM_2',
+          color: '#3498db'
+        }),
+        bar('LiftUpright', pt('A', 'floating', -48, 0), pt('B', 'floating', -48, 72), 72, {
+          lenParam: 'LIFT_UPRIGHT',
+          color: '#27ae60'
+        }),
+        bar('ToolPlate', pt('B', 'floating', -48, 72), pt('C', 'floating', 0, 72), 48, {
+          lenParam: 'LIFT_TOOL_TOP',
+          color: '#f39c12'
+        }),
+        bar('ToolBrace', pt('A', 'floating', -48, 0), pt('D', 'floating', 0, 0), 48, {
+          lenParam: 'LIFT_TOOL_BOTTOM',
+          color: '#f39c12'
+        }),
+        bar('ToolFront', pt('D', 'floating', 0, 0), pt('C', 'floating', 0, 72), 72, {
+          lenParam: 'LIFT_TOOL_FRONT',
+          color: '#f39c12'
+        })
+      ],
+      params: {
+        LIFT_ARM: 48, LIFT_ARM_2: 48, LIFT_UPRIGHT: 72,
+        LIFT_TOOL_TOP: 48, LIFT_TOOL_BOTTOM: 48, LIFT_TOOL_FRONT: 72,
+        theta: 0
+      }
+    }
+  },
+  {
+    id: 'competition-roller-intake',
+    title: '競賽滾輪進料模組',
+    note: '用皮帶同步遠端滾輪，把物件從前方帶入機器內。適合作為 intake / conveyor 的第一個範本。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 4,
+      comps: [
+        { type: 'pulley', id: 'IntakeMotorRoller', color: '#e74c3c',
+          p1: pt('IMC', 'motor', -72, 0, { physicalMotor: '1' }),
+          p2: pt('IMP', 'floating', -48, 0),
+          radiusParam: 'IR_A', phase: 0 },
+        { type: 'pulley', id: 'IntakeFrontRoller', color: '#16a085',
+          p1: pt('IFC', 'fixed', 72, 0),
+          p2: pt('IFP', 'floating', 96, 0),
+          radiusParam: 'IR_B', phase: 0 },
+        { type: 'belt', id: 'IntakeBelt', color: '#2c3e50',
+          driver: 'IntakeMotorRoller', driven: 'IntakeFrontRoller' },
+        bar('IntakeFrame', pt('IMC', 'motor', -72, 0, { physicalMotor: '1' }), pt('IFC', 'fixed', 72, 0), 144, {
+          lenParam: 'INTAKE_FRAME',
+          color: '#95a5a6'
+        })
+      ],
+      params: { IR_A: 24, IR_B: 24, INTAKE_FRAME: 144, theta: 0 }
+    }
+  },
+  {
+    id: 'competition-flywheel-shooter',
+    title: '競賽飛輪射球：皮帶加速',
+    note: '大皮帶輪帶小飛輪，讓輸出輪高速旋轉。可用來討論射球速度、打滑與減速/加速取捨。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 4,
+      comps: [
+        { type: 'pulley', id: 'ShooterDrivePulley', color: '#e74c3c',
+          p1: pt('SDC', 'motor', -72, 0, { physicalMotor: '1' }),
+          p2: pt('SDP', 'floating', -24, 0),
+          radiusParam: 'SH_DRIVE_R', phase: 0 },
+        { type: 'pulley', id: 'ShooterFlywheel', color: '#2c6fbb',
+          p1: pt('SFC', 'fixed', 72, 0),
+          p2: pt('SFP', 'floating', 96, 0),
+          radiusParam: 'SH_FLY_R', phase: 0 },
+        { type: 'belt', id: 'ShooterBelt', color: '#2c3e50',
+          driver: 'ShooterDrivePulley', driven: 'ShooterFlywheel' },
+        bar('ShooterFrame', pt('SDC', 'motor', -72, 0, { physicalMotor: '1' }), pt('SFC', 'fixed', 72, 0), 144, {
+          lenParam: 'SH_FRAME',
+          color: '#95a5a6'
+        })
+      ],
+      params: { SH_DRIVE_R: 48, SH_FLY_R: 24, SH_FRAME: 144, theta: 0 }
+    }
+  },
+  {
+    id: 'competition-rack-lift',
+    title: '競賽齒條升降滑台',
+    note: '小齒輪帶動垂直齒條，做直上直下升降。適合作為伸縮臂、升降夾爪或推桿的出發點。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 3,
+      tracePoint: 'LiftRack',
+      comps: [
+        { type: 'gear', id: 'LiftPinion', color: '#e74c3c',
+          p1: pt('LPC', 'motor', 0, 0, { physicalMotor: '1' }),
+          p2: pt('LPP', 'floating', 18, 0),
+          radiusParam: 'LPR', teeth: 15, module: 4, phase: 0 },
+        { type: 'rack', id: 'LiftRackGear', color: '#16a085',
+          p1: pt('LiftRack', 'floating', 30, 0),
+          pinion: 'LiftPinion', lenParam: 'LRL', axisDeg: 90, sign: 1,
+          slot: { length: 144, width: 5, offset: 0 } }
+      ],
+      params: { LPR: 30, LRL: 176, theta: 0 }
+    }
+  },
+  {
     id: 'empty-challenge',
     title: '空白挑戰',
     note: '從零開始，試著做出馬達可整圈轉的機構。',
@@ -406,4 +668,14 @@ export const BLOCK_EXAMPLES = [
 
 export function getExample(id) {
   return BLOCK_EXAMPLES.find(example => example.id === id) || null;
+}
+
+export function getExampleLesson(id) {
+  return EXAMPLE_LESSONS[id] || {
+    group: 'challenge',
+    level: '探索',
+    use: '',
+    learn: '',
+    try: []
+  };
 }

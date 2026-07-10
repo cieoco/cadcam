@@ -467,7 +467,9 @@ export function createViewer(container) {
       const group = new THREE.Group();
       group.position.set(r.ref.x, r.ref.y, 0);
       group.rotation.z = (r.axisDeg || 0) * Math.PI / 180;
-      const geo = new THREE.ExtrudeGeometry(polygonShape(r.local), {
+      const shape = polygonShape(r.local);
+      if (r.slot) shape.holes.push(capsuleHolePath(r.slot.a, r.slot.b, r.slot.half));
+      const geo = new THREE.ExtrudeGeometry(shape, {
         depth: r.thickness,
         bevelEnabled: false,
         curveSegments: 8,
@@ -475,6 +477,14 @@ export function createViewer(container) {
       const mesh = new THREE.Mesh(geo, plateMaterial(r.color));
       mesh.position.z = r.z;
       group.add(mesh);
+      if (r.slot && r.slot.color) {
+        const floorGeo = new THREE.ExtrudeGeometry(
+          capsuleShape(r.slot.a, r.slot.b, r.slot.half),
+          { depth: 1.2, bevelEnabled: false, curveSegments: 16 });
+        const floor = new THREE.Mesh(floorGeo, plateMaterial(r.slot.color));
+        floor.position.z = r.z;
+        group.add(floor);
+      }
       dynamic.add(group);
     });
 
