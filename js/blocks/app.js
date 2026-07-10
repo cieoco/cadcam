@@ -305,9 +305,13 @@ function getTrajectoryData() {
   // 軌跡只取決於 S.compiled 與 traceIds，兩者都只在 rebuild / 切換軌跡點變動、那兩處都會 +1，
   // 故版本號是完整且正確的失效訊號。
   if (trajectoryCache && trajectoryCache.version === geomVersion) return trajectoryCache.data;
+  // 伺服與線性致動器只在自己的有限行程內運動；量測不應誤把不存在的整圈算進去。
+  const range = inputRockRange();
+  const thetaStart = range ? range.lo : 0;
+  const thetaEnd = range ? range.hi : 360;
   const data = ids.map(id => {
     try {
-      const sweep = sweepTopology({ ...S.compiled, tracePoint: id }, S.compiled.params || S.topo.params || {}, 0, 360, 5);
+      const sweep = sweepTopology({ ...S.compiled, tracePoint: id }, S.compiled.params || S.topo.params || {}, thetaStart, thetaEnd, 5);
       return (sweep && sweep.results) ? { id, results: sweep.results } : null;
     } catch (_) {
       return null;
@@ -335,6 +339,97 @@ function drawTraceTrajectory(trajectoryData) {
     poly.style.pointerEvents = 'none';
     svg.appendChild(poly);
   });
+}
+
+// 工作範圍＝工作點在一個完整有效運動範圍內，任兩個位置的最大直線距離。
+// 這比軌跡總長更接近「末端實際能伸到多遠」，也讓圓弧、擺動與直線推拉能用同一個數字比較。
+function workRangeFromTrace(trace) {
+  const pts = (trace?.results || []).filter(r => r && r.isValid && r.B &&
+    Number.isFinite(r.B.x) && Number.isFinite(r.B.y)).map(r => r.B);
+  if (pts.length < 2) return null;
+  let a = pts[0], b = pts[1], maxDistance = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      const d = Math.hypot(pts[j].x - pts[i].x, pts[j].y - pts[i].y);
+      if (d > maxDistance) { maxDistance = d; a = pts[i]; b = pts[j]; }
+    }
+  }
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  return {
+    a, b,
+    distance: maxDistance,
+    spanX: Math.max(...xs) - Math.min(...xs),
+    spanY: Math.max(...ys) - Math.min(...ys)
+  };
+}
+
+function clampRangeFromTraces(firstTrace, secondTrace) {
+  const aResults = firstTrace?.results || [];
+  const bResults = secondTrace?.results || [];
+  let min = null, max = null;
+  const count = Math.min(aResults.length, bResults.length);
+  for (let i = 0; i < count; i++) {
+    const a = aResults[i], b = bResults[i];
+    if (!a?.isValid || !b?.isValid || !a.B || !b.B ||
+        !Number.isFinite(a.B.x) || !Number.isFinite(a.B.y) ||
+        !Number.isFinite(b.B.x) || !Number.isFinite(b.B.y)) continue;
+    const distance = Math.hypot(a.B.x - b.B.x, a.B.y - b.B.y);
+    const sample = { a: a.B, b: b.B, distance };
+    if (!min || distance < min.distance) min = sample;
+    if (!max || distance > max.distance) max = sample;
+  }
+  return min && max ? { min, max } : null;
+}
+
+function updateWorkRangeCard(measurement) {
+  const card = document.getElementById('workRangeCard');
+  if (!card) return;
+  card.style.display = measurement ? 'flex' : 'none';
+  if (!measurement) return;
+  const value = document.getElementById('workRangeValue');
+  const detail = document.getElementById('workRangeDetail');
+  if (measurement.kind === 'clamp') {
+    value.textContent = `可夾尺寸 ${roundMm(measurement.min.distance)}–${roundMm(measurement.max.distance)} mm`;
+    detail.textContent = `最小開口 ${roundMm(measurement.min.distance)} mm · 最大開口 ${roundMm(measurement.max.distance)} mm`;
+    return;
+  }
+  value.textContent = `工作範圍 ${roundMm(measurement.distance)} mm`;
+  detail.textContent = `左右 ${roundMm(measurement.spanX)} mm · 上下 ${roundMm(measurement.spanY)} mm`;
+}
+
+function drawMeasurementLine(a, b, { dash = '6 5', opacity = '0.78' } = {}) {
+  const group = document.createElementNS(SVG_NS, 'g');
+  group.style.pointerEvents = 'none';
+  const line = document.createElementNS(SVG_NS, 'line');
+  line.setAttribute('x1', TX(a.x)); line.setAttribute('y1', TY(a.y));
+  line.setAttribute('x2', TX(b.x)); line.setAttribute('y2', TY(b.y));
+  line.setAttribute('stroke', '#117a45'); line.setAttribute('stroke-width', 1.5);
+  line.setAttribute('stroke-dasharray', dash); line.setAttribute('stroke-opacity', opacity);
+  group.appendChild(line);
+  [a, b].forEach(p => {
+    const dot = document.createElementNS(SVG_NS, 'circle');
+    dot.setAttribute('cx', TX(p.x)); dot.setAttribute('cy', TY(p.y));
+    dot.setAttribute('r', 5); dot.setAttribute('fill', '#fff');
+    dot.setAttribute('stroke', '#117a45'); dot.setAttribute('stroke-width', 2);
+    group.appendChild(dot);
+  });
+  svg.appendChild(group);
+}
+
+function drawWorkRange(trajectoryData) {
+  const traces = Array.isArray(trajectoryData) ? trajectoryData : (trajectoryData ? [trajectoryData] : []);
+  if (traces.length >= 2) {
+    const clamp = clampRangeFromTraces(traces[0], traces[1]);
+    updateWorkRangeCard(clamp ? { kind: 'clamp', ...clamp } : null);
+    if (!clamp) return;
+    drawMeasurementLine(clamp.max.a, clamp.max.b);
+    // 最小開口也標出來，讓使用者看得到可夾尺寸的兩個極限。
+    drawMeasurementLine(clamp.min.a, clamp.min.b, { dash: '2 5', opacity: '0.5' });
+    return;
+  }
+  const range = workRangeFromTrace(traces[0]);
+  updateWorkRangeCard(range);
+  if (range) drawMeasurementLine(range.a, range.b);
 }
 
 function traceIds() {
@@ -1258,6 +1353,7 @@ function draw() {
   recountBanner = null;
   drawGround();   // app 層機架連接線（固定銷不足時 fallback 到 Render.drawGroundBaseline）
   if (!S.compiled || !S.comps.length) {
+    updateWorkRangeCard(null);
     updateMechanismStatus(null);
     updateSolveBanner(null, 0);
     Tools.drawDrawPreview();   // 空畫布也要顯示正在拉出的第一根連桿
@@ -1277,7 +1373,9 @@ function draw() {
   Model.motorPointIds(S.comps).forEach(id => modelMotorCenterIds.add(id));
   const motorMounts = buildMotorMounts(modelMotorCenterIds, groundIds);
   drawTtMotorMountHoles(motorCenterIds, motorMounts, pts);
-  drawTraceTrajectory(getTrajectoryData());
+  const trajectoryData = getTrajectoryData();
+  drawTraceTrajectory(trajectoryData);
+  drawWorkRange(trajectoryData);
   drawManualTrace();
 
   // 馬達本體是固定在機架背後的動力源，必須先建立在機件 underlay 之下；
@@ -3233,10 +3331,12 @@ function toggleTracePoint() {
   pushUndo();
   pause();
   const ids = traceIds();
-  const idx = ids.indexOf(S.selectedNodeId);
-  if (idx >= 0) ids.splice(idx, 1);
-  else ids.push(S.selectedNodeId);
+  const currentIndex = ids.indexOf(S.selectedNodeId);
   S.topo.tracePoint = '';
+  // 第一點量單點範圍；第二點自然切換成夾持距離。第三點則開始新的量測，畫面不會堆滿軌跡。
+  if (currentIndex >= 0) ids.splice(currentIndex, 1);
+  else if (ids.length >= 2) ids.splice(0, ids.length, S.selectedNodeId);
+  else ids.push(S.selectedNodeId);
   S.topo.tracePoints = ids;
   manualTrace = {};
   trajectoryCache = null;

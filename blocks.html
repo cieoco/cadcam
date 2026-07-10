@@ -102,6 +102,14 @@
       padding: 9px 16px; font-size: 14px; font-weight: 700;
       box-shadow: 0 8px 22px rgba(0,0,0,0.18); pointer-events: none;
     }
+    .work-range-card {
+      position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column; gap: 2px;
+      padding: 9px 12px; border: 1px solid #9dddb8; border-radius: 10px;
+      background: rgba(232,248,239,0.96); color: #117a45; box-shadow: 0 6px 18px rgba(17,122,69,0.12);
+      pointer-events: none;
+    }
+    .work-range-card strong { font-size: 14px; }
+    .work-range-card span { color: #4f7461; font-size: 12px; font-weight: 700; }
     /* 控制列 */
     .controls {
       position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
@@ -454,6 +462,10 @@
       </div>
       <div class="mode-banner" id="modeBanner" style="display:none;"></div>
       <div class="mode-banner" id="solveBanner" style="display:none; top:58px;"></div>
+      <div class="work-range-card" id="workRangeCard" style="display:none;" aria-live="polite">
+        <strong id="workRangeValue">工作範圍 0 mm</strong>
+        <span id="workRangeDetail">左右 0 mm · 上下 0 mm</span>
+      </div>
       <div class="inspector-panel len-editor" id="lenEditor" style="display:none;">
         <div class="le-row">
           <span class="le-title" id="lenTitle">🔵 連桿長度</span>
@@ -523,7 +535,7 @@
             <button onclick="window.blocks.setNodeRole('fixed')">設為機架點</button>
             <button onclick="window.blocks.removeNodeMotor()">拿掉馬達</button>
             <button id="splitBtn" onclick="window.blocks.splitNode()" title="把鎖在同一點的桿件分開" style="display:none;">分離</button>
-            <button id="traceBtn" onclick="window.blocks.toggleTracePoint()" title="追蹤這個接點走過的路徑">設軌跡點</button>
+            <button id="traceBtn" onclick="window.blocks.toggleTracePoint()" title="選擇此接點，自動量出它的工作範圍">設工作點</button>
           </span>
         </div>
         <div class="re-row node-position-row">
@@ -736,6 +748,6 @@
     </button>
   </nav>
 
-  <script type="module" src="js/blocks/app.js?v=20240128_14"></script>
+  <script type="module" src="js/blocks/app.js?v=20260710_01"></script>
 </body>
 </html>

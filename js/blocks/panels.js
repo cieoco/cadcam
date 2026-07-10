@@ -99,9 +99,13 @@ export function updateRoleEditor() {
   if (traceBtn) {
     const traceIds = new Set([...(S.topo.tracePoints || []), ...(S.topo.tracePoint ? [S.topo.tracePoint] : [])]);
     const isTrace = traceIds.has(S.selectedNodeId);
-    traceBtn.textContent = isTrace ? '取消軌跡' : '加入軌跡';
+    const hasOneWorkPoint = traceIds.size === 1;
+    const hasPair = traceIds.size >= 2;
+    traceBtn.textContent = isTrace ? '取消工作點' : (hasOneWorkPoint ? '加入夾持點' : (hasPair ? '改為工作點' : '設工作點'));
     traceBtn.classList.toggle('trace-on', isTrace);
-    traceBtn.title = isTrace ? '停止追蹤這個接點' : '把這個接點加入軌跡追蹤';
+    traceBtn.title = isTrace ? '停止量測這個工作點' : (hasOneWorkPoint
+      ? '加入第二點，量出兩點間可夾的尺寸'
+      : (hasPair ? '以這個接點開始新的單點量測' : '選擇此接點，自動量出它的工作範圍'));
   }
   // 「分離」只在此接點被多個端點共用（兩桿件鎖在同一點）時出現
   const splitBtn = document.getElementById('splitBtn');
