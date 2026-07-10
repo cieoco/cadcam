@@ -1536,8 +1536,8 @@ function draw() {
   frameUpdaters = [];
   sliderLayer = null;
   recountBanner = null;
-  drawGround();   // app 層機架連接線（固定銷不足時 fallback 到 Render.drawGroundBaseline）
   if (!S.compiled || !S.comps.length) {
+    drawGround();   // 空畫布：固定銷不足 → fallback 到地面基線
     liveClampPointIds = null;
     updateWorkRangeCard(null);
     updateMechanismStatus(null);
@@ -1558,6 +1558,11 @@ function draw() {
   const modelMotorCenterIds = new Set(motorCenterIds);
   Model.motorPointIds(S.comps).forEach(id => modelMotorCenterIds.add(id));
   const motorMounts = buildMotorMounts(modelMotorCenterIds, groundIds);
+  // 地基：用「當前」pts＋mount 算共用 frameGeometry（放馬達即變形），畫在最底層。
+  const frameGeometry2d = Exporters.inspectFrameExport(
+    frameConnectorNodes(), exportSettings(),
+    ttFrameExportMounts({ pts, motorCenterIds: modelMotorCenterIds, motorMounts }));
+  drawGround(frameGeometry2d);
   drawTtMotorMountHoles(motorCenterIds, motorMounts, pts);
   const trajectoryData = getTrajectoryData();
   drawTraceTrajectory(trajectoryData);
@@ -2067,106 +2072,31 @@ async function toggle3D() {
 // 機架（隱性）：把所有固定銷用淡連接線＋陰影斜線串起來，讀作「同一個固定底座」。
 // 畫在最底層（draw() 開頭呼叫）；可拖的機架把手另由 drawFrameHandle 畫在最上層。
 // 沒有足夠固定銷時，退回 render.js 的飄浮地面基線（純繪圖基元）。
-function drawGround() {
+function drawGround(frameGeometry) {
   const nodes = frameConnectorNodes();
   if (nodes.length < 2) { Render.drawGroundBaseline(); return; }
 
-  const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-  const hull = (pts) => {
-    const sorted = [...pts].sort((a, b) => (a.x - b.x) || (a.y - b.y));
-    const lower = [];
-    sorted.forEach(p => {
-      while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
-      lower.push(p);
-    });
-    const upper = [];
-    [...sorted].reverse().forEach(p => {
-      while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
-      upper.push(p);
-    });
-    return lower.slice(0, -1).concat(upper.slice(0, -1));
-  };
-  const lineDistance = (p, a, b) => {
-    const d = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    return Math.abs((b.x - a.x) * (a.y - p.y) - (a.x - p.x) * (b.y - a.y)) / d;
-  };
-  const maxLineDist = nodes.length <= 2 ? 0 : Math.max(...nodes.map(p => lineDistance(p, nodes[0], nodes[nodes.length - 1])));
-  const isBarLike = nodes.length === 2 || maxLineDist < 6;
-  const framePathNodes = isBarLike ? [...nodes].sort((a, b) => (a.x - b.x) || (a.y - b.y)) : hull(nodes);
+  // 地基：2D 直接沿用和 3D / DXF 共用的同一份 frameGeometry（外形＋孔位）。
+  // 放定位點會長出、放馬達會變形（含馬達座外擴）、加定位點會增生，三視圖完全一致。
+  // frameGeometry 由 draw() 用「當前」馬達 mount 算好傳入；缺省時才退回 lastModelInputs。
+  const fg = frameGeometry || Exporters.inspectFrameExport(nodes, exportSettings(), ttFrameExportMounts());
+  if (!fg || !fg.outlines.length) { Render.drawGroundBaseline(); return; }
 
-  if (!isBarLike && framePathNodes.length >= 3) {
-    const cx = framePathNodes.reduce((s, p) => s + p.x, 0) / framePathNodes.length;
-    const cy = framePathNodes.reduce((s, p) => s + p.y, 0) / framePathNodes.length;
-    const pad = 18;
-    const expanded = framePathNodes.map(p => {
-      const dx = p.x - cx, dy = p.y - cy;
-      const d = Math.hypot(dx, dy) || 1;
-      return { x: p.x + dx / d * pad, y: p.y + dy / d * pad };
-    });
+  fg.outlines.forEach(outline => {
+    if (!Array.isArray(outline) || outline.length < 2) return;
     const plate = document.createElementNS(SVG_NS, 'polygon');
-    plate.setAttribute('points', expanded.map(p => `${TX(p.x)},${TY(p.y)}`).join(' '));
+    plate.setAttribute('points', outline.map(p => `${TX(p.x)},${TY(p.y)}`).join(' '));
     plate.setAttribute('fill', '#eef2f7');
     plate.setAttribute('fill-opacity', '0.82');
     plate.setAttribute('stroke', '#c2cad6');
-    plate.setAttribute('stroke-width', 2.5);
+    plate.setAttribute('stroke-width', 2);
     plate.setAttribute('stroke-linejoin', 'round');
+    plate.style.pointerEvents = 'none';
     svg.appendChild(plate);
-
-    for (let i = 0; i < expanded.length; i++) {
-      const a = expanded[i], b = expanded[(i + 1) % expanded.length];
-      drawFrameHatches(a, b);
-    }
-    drawFramePlateHoles(expanded, nodes);
-    return;
-  }
-
-  // 二點或近似共線的固定銷：畫成一根多孔機架桿身。
-  for (let i = 0; i < framePathNodes.length - 1; i++) {
-    const a = framePathNodes[i], b = framePathNodes[i + 1];
-    const seg = document.createElementNS(SVG_NS, 'line');
-    seg.setAttribute('x1', TX(a.x)); seg.setAttribute('y1', TY(a.y));
-    seg.setAttribute('x2', TX(b.x)); seg.setAttribute('y2', TY(b.y));
-    seg.setAttribute('stroke', '#c2cad6'); seg.setAttribute('stroke-width', 3);
-    seg.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(seg);
-    drawFrameHatches(a, b);
-    drawFrameBarHoles(a, b, nodes);
-  }
-}
-
-function drawFrameHatches(a, b) {
-  const x1 = TX(a.x), y1 = TY(a.y), x2 = TX(b.x), y2 = TY(b.y);
-  const len = Math.hypot(x2 - x1, y2 - y1) || 1;
-  const ux = (x2 - x1) / len, uy = (y2 - y1) / len;
-  const nx = -uy, ny = ux;                 // 桿身法線：陰影往「下方」(法線取 y 為正那側)
-  const side = ny >= 0 ? 1 : -1;
-  for (let d = 8; d < len; d += 14) {
-    const px = x1 + ux * d, py = y1 + uy * d;
-    const h = document.createElementNS(SVG_NS, 'line');
-    h.setAttribute('x1', px); h.setAttribute('y1', py);
-    h.setAttribute('x2', px + (nx - ux) * 8 * side); h.setAttribute('y2', py + (ny - uy) * 8 * side);
-    h.setAttribute('stroke', '#dfe4ec'); h.setAttribute('stroke-width', 2);
-    svg.appendChild(h);
-  }
-}
-
-function drawFrameHole(x, y, used = false) {
-  if (!S.showFrameHoles) return;
-  const r = Math.max(1.8, 2.6 * View.getScale());
-  const hole = document.createElementNS(SVG_NS, 'circle');
-  hole.setAttribute('cx', TX(x));
-  hole.setAttribute('cy', TY(y));
-  hole.setAttribute('r', used ? r * 1.25 : r);
-  hole.setAttribute('fill', used ? '#ffffff' : '#f8fafc');
-  hole.setAttribute('stroke', used ? '#8a97a8' : '#cbd5e1');
-  hole.setAttribute('stroke-width', used ? 1.8 : 1.2);
-  hole.setAttribute('stroke-opacity', used ? 0.95 : 0.72);
-  hole.style.pointerEvents = 'none';
-  svg.appendChild(hole);
+  });
 }
 
 function drawTtMotorMountHoles(motorIds, motorMounts, pts) {
-  if (!S.showFrameHoles) return;
   const settings = ttMountSettings();
   const s = View.getScale();
   const mountLayer = document.createElementNS(SVG_NS, 'g');
@@ -2205,11 +2135,6 @@ function drawTtMotorMountHoles(motorIds, motorMounts, pts) {
 }
 
 function syncFrameOptionButtons() {
-  const holesButtons = [document.getElementById('btnFrameHoles'), document.getElementById('mobileBtnFrameHoles')].filter(Boolean);
-  holesButtons.forEach(holes => {
-    holes.classList.toggle('active', Boolean(S.showFrameHoles));
-    holes.title = S.showFrameHoles ? '隱藏 LEGO 機架孔位' : '顯示 LEGO 機架孔位';
-  });
   const lockButtons = [document.getElementById('btnFrameLock'), document.getElementById('mobileBtnFrameLock')].filter(Boolean);
   lockButtons.forEach(lock => {
     lock.classList.toggle('active', Boolean(S.lockFrameHoles));
@@ -2217,61 +2142,10 @@ function syncFrameOptionButtons() {
   });
 }
 
-function toggleFrameHoles() {
-  S.showFrameHoles = !S.showFrameHoles;
-  syncFrameOptionButtons();
-  draw();
-}
-
 function toggleFrameLock() {
   S.lockFrameHoles = !S.lockFrameHoles;
   syncFrameOptionButtons();
   draw();
-}
-
-function drawFrameBarHoles(a, b, usedNodes) {
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const len = Math.hypot(dx, dy);
-  if (len < LEGO_STEP) return;
-  const ux = dx / len, uy = dy / len;
-  const count = Math.max(1, Math.round(len / LEGO_STEP));
-  for (let i = 0; i <= count; i++) {
-    const t = count ? i / count : 0;
-    const x = a.x + ux * len * t;
-    const y = a.y + uy * len * t;
-    const used = usedNodes.some(p => Math.hypot(p.x - x, p.y - y) < LEGO_STEP * 0.35);
-    drawFrameHole(x, y, used);
-  }
-}
-
-function pointInPoly(p, poly) {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const a = poly[i], b = poly[j];
-    const crosses = ((a.y > p.y) !== (b.y > p.y)) &&
-      (p.x < (b.x - a.x) * (p.y - a.y) / ((b.y - a.y) || 1e-9) + a.x);
-    if (crosses) inside = !inside;
-  }
-  return inside;
-}
-
-function drawFramePlateHoles(poly, usedNodes) {
-  const xs = poly.map(p => p.x);
-  const ys = poly.map(p => p.y);
-  const minX = Math.ceil(Math.min(...xs) / LEGO_STEP) * LEGO_STEP;
-  const maxX = Math.floor(Math.max(...xs) / LEGO_STEP) * LEGO_STEP;
-  const minY = Math.ceil(Math.min(...ys) / LEGO_STEP) * LEGO_STEP;
-  const maxY = Math.floor(Math.max(...ys) / LEGO_STEP) * LEGO_STEP;
-  let drawn = 0;
-  for (let x = minX; x <= maxX; x += LEGO_STEP) {
-    for (let y = minY; y <= maxY; y += LEGO_STEP) {
-      if (drawn > 600) return;
-      if (!pointInPoly({ x, y }, poly)) continue;
-      const used = usedNodes.some(p => Math.hypot(p.x - x, p.y - y) < LEGO_STEP * 0.35);
-      drawFrameHole(x, y, used);
-      drawn++;
-    }
-  }
 }
 
 // 機架移動把手：固定銷形心放一顆「🏠 機架」鈕，拖它＝把所有固定銷整組平移。
@@ -3880,8 +3754,7 @@ function ttMountPatternRotDegForCenter(id, pts, mount = null) {
   const visualRotDeg = mount ? mount.rotDeg : computeMotorRotDeg(id, pts || {}, new Set());
   return visualRotDeg - 90;
 }
-function ttFrameExportMounts() {
-  const inputs = lastModelInputs || {};
+function ttFrameExportMounts(inputs = lastModelInputs || {}) {
   const pts = inputs.pts || {};
   const motorIds = inputs.motorCenterIds || new Set();
   const motorTypes = inputs.motorTypes || new Map();
@@ -3993,5 +3866,5 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameHoles, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
 init();

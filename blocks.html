@@ -325,7 +325,6 @@
       .controls #btnMotorDirection::before { content:"↻"; font-size:17px; }
       .controls #btnMotorDirection.active::before { content:"↺"; }
       .controls #btnFitView,
-      .controls #btnFrameHoles,
       .controls #btnFrameLock,
       .controls #btn3d,
       .controls #btnClearAll { display: none; }
@@ -705,7 +704,6 @@
         <button class="clear-btn" id="btnMotorDirection" onclick="window.blocks.toggleMotorDirection()" title="切換馬達轉動方向">↻ 順時針</button>
         <div class="ctrl-sub" title="目前角度"><span id="thetaVal">0</span>°</div>
         <button class="clear-btn" id="btnFitView" onclick="window.blocks.fitView()" title="置中">⊡</button>
-        <button class="clear-btn active" id="btnFrameHoles" onclick="window.blocks.toggleFrameHoles()" title="顯示 / 隱藏 LEGO 機架孔位">孔</button>
         <button class="clear-btn" id="btnFrameLock" onclick="window.blocks.toggleFrameLock()" title="拖曳固定孔與機架時吸附到 8mm LEGO 孔距">鎖</button>
         <button class="clear-btn" id="btn3d" onclick="window.blocks.toggle3D()" title="3D 預覽">3D</button>
         <button class="clear-btn" id="btnClearAll" onclick="window.blocks.clearAll()" title="清空">🗑</button>
@@ -724,7 +722,6 @@
       <span class="mobile-panel-title">視圖</span>
       <button class="tool-btn" onclick="window.blocks.fitView()" title="置中畫布">⊡ 置中</button>
       <button class="tool-btn" id="mobileBtn3d" onclick="window.blocks.toggle3D()" title="3D 預覽">3D 預覽</button>
-      <button class="tool-btn" id="mobileBtnFrameHoles" onclick="window.blocks.toggleFrameHoles()" title="顯示 / 隱藏 LEGO 機架孔位">孔位</button>
       <button class="tool-btn" id="mobileBtnFrameLock" onclick="window.blocks.toggleFrameLock()" title="拖曳固定孔與機架時吸附到 8mm LEGO 孔距">鎖孔距</button>
     </div>
     <div class="mobile-panel-section" data-panel="project">
