@@ -547,7 +547,6 @@ export const BLOCK_EXAMPLES = [
       kind: 'blocks',
       v: 1,
       counter: 8,
-      tracePoint: 'C',
       comps: [
         { type: 'anchor', id: 'Anchor1', p1: pt('O1', 'fixed', -96, 0) },
         { type: 'anchor', id: 'Anchor2', p1: pt('O2', 'fixed', -96, 72) },
