@@ -128,8 +128,17 @@ export function frameNodes(comps) {
     .sort((a, b) => (a.x - b.x) || (a.y - b.y));
 }
 
+// 只當作「馬達裝配方向參考」的定位點——供 buildMotorMounts 讀座標，
+// 本身不是要加工的連接孔，因此不列入機架孔位。
+export function mountLocatorPointIds(comps) {
+  const ids = new Set();
+  (comps || []).forEach(c => { if (c && c.mountLocatorPoint) ids.add(c.mountLocatorPoint); });
+  return ids;
+}
+
 export function frameConnectorNodes(comps) {
-  return frameNodes(comps).filter(p => !isHiddenSliderRailPoint(comps, p.id));
+  const locators = mountLocatorPointIds(comps);
+  return frameNodes(comps).filter(p => !isHiddenSliderRailPoint(comps, p.id) && !locators.has(p.id));
 }
 
 export function snapFrameCoord(v, step = LEGO_FRAME_STEP) {
