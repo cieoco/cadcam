@@ -67,6 +67,7 @@ let trajectoryCache = null;    // 沿用 multilink sweepTopology 的軌跡資料
 let geomVersion = 0;           // 結構版本號：任何會改動軌跡的事（rebuild / 切換軌跡點）就 +1，
                                // 當 trajectoryCache 的快取鍵——比每幀 JSON.stringify 整份快照便宜。
 let manualTrace = {};          // 手動拖曳軌跡：{ pointId: [{x,y}, ...] }，給無馬達範例使用。
+let liveClampPointIds = null;  // 雙點量測時的兩個夾持端；播放每幀更新它們的目前開口。
 
 // ---- 3D 唯讀預覽狀態 ----
 let viewer3D = null;           // createViewer() 的實體（首次開啟才懶載入）
@@ -381,6 +382,14 @@ function clampRangeFromTraces(firstTrace, secondTrace) {
   return min && max ? { min, max } : null;
 }
 
+function currentPointDistance(points, pointIds) {
+  if (!points || !pointIds || pointIds.length !== 2) return null;
+  const a = points[pointIds[0]], b = points[pointIds[1]];
+  if (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(a.y) ||
+      !Number.isFinite(b.x) || !Number.isFinite(b.y)) return null;
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
 function updateWorkRangeCard(measurement) {
   const card = document.getElementById('workRangeCard');
   if (!card) return;
@@ -390,7 +399,9 @@ function updateWorkRangeCard(measurement) {
   const detail = document.getElementById('workRangeDetail');
   if (measurement.kind === 'clamp') {
     value.textContent = `可夾尺寸 ${roundMm(measurement.min.distance)}–${roundMm(measurement.max.distance)} mm`;
-    detail.textContent = `最小開口 ${roundMm(measurement.min.distance)} mm · 最大開口 ${roundMm(measurement.max.distance)} mm`;
+    detail.textContent = Number.isFinite(measurement.currentDistance)
+      ? `目前開口 ${roundMm(measurement.currentDistance)} mm`
+      : `最小開口 ${roundMm(measurement.min.distance)} mm · 最大開口 ${roundMm(measurement.max.distance)} mm`;
     return;
   }
   value.textContent = `工作範圍 ${roundMm(measurement.distance)} mm`;
@@ -416,11 +427,14 @@ function drawMeasurementLine(a, b, { dash = '6 5', opacity = '0.78' } = {}) {
   svg.appendChild(group);
 }
 
-function drawWorkRange(trajectoryData) {
+function drawWorkRange(trajectoryData, currentPoints) {
+  liveClampPointIds = null;
   const traces = Array.isArray(trajectoryData) ? trajectoryData : (trajectoryData ? [trajectoryData] : []);
   if (traces.length >= 2) {
     const clamp = clampRangeFromTraces(traces[0], traces[1]);
-    updateWorkRangeCard(clamp ? { kind: 'clamp', ...clamp } : null);
+    const pointIds = [traces[0].id, traces[1].id];
+    liveClampPointIds = clamp ? pointIds : null;
+    updateWorkRangeCard(clamp ? { kind: 'clamp', ...clamp, currentDistance: currentPointDistance(currentPoints, pointIds) } : null);
     if (!clamp) return;
     drawMeasurementLine(clamp.max.a, clamp.max.b);
     // 最小開口也標出來，讓使用者看得到可夾尺寸的兩個極限。
@@ -430,6 +444,13 @@ function drawWorkRange(trajectoryData) {
   const range = workRangeFromTrace(traces[0]);
   updateWorkRangeCard(range);
   if (range) drawMeasurementLine(range.a, range.b);
+}
+
+function updateLiveClampDistance(points) {
+  const distance = currentPointDistance(points, liveClampPointIds);
+  if (!Number.isFinite(distance)) return;
+  const detail = document.getElementById('workRangeDetail');
+  if (detail) detail.textContent = `目前開口 ${roundMm(distance)} mm`;
 }
 
 function traceIds() {
@@ -1353,6 +1374,7 @@ function draw() {
   recountBanner = null;
   drawGround();   // app 層機架連接線（固定銷不足時 fallback 到 Render.drawGroundBaseline）
   if (!S.compiled || !S.comps.length) {
+    liveClampPointIds = null;
     updateWorkRangeCard(null);
     updateMechanismStatus(null);
     updateSolveBanner(null, 0);
@@ -1375,7 +1397,7 @@ function draw() {
   drawTtMotorMountHoles(motorCenterIds, motorMounts, pts);
   const trajectoryData = getTrajectoryData();
   drawTraceTrajectory(trajectoryData);
-  drawWorkRange(trajectoryData);
+  drawWorkRange(trajectoryData, pts);
   drawManualTrace();
 
   // 馬達本體是固定在機架背後的動力源，必須先建立在機件 underlay 之下；
@@ -1763,6 +1785,7 @@ function drawSliders(pts, parent) {
 function renderFrame() {
   if (!S.compiled || !S.comps.length || !frameUpdaters.length) { draw(); return; }
   const { pts, sol } = solveFrame();
+  updateLiveClampDistance(pts);
   frameUpdaters.forEach(fn => fn(pts));
   // 滑軌動態層：就地清空重畫（共用 drawSliders）
   if (sliderLayer) {
