@@ -39,6 +39,7 @@ import { circleRectCompression } from './intake-contact.js';
 import { drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
 import { gearMeshPhaseDeg } from './transmission-geometry.js';
 import { drawCam as renderCam, drawWorkpiece as renderWorkpiece } from './special-part-render.js';
+import { drawPlate as renderPlate } from './plate-render.js';
 import * as Settings from './settings.js';   // 匯出 / TT / MG995 安裝設定（localStorage 持久化 + 表單同步）
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -910,102 +911,17 @@ function drawGearManualHandles(pts) {
 // draw() 依 zlift 算好的疊放層（透過 ctx.groupForLayer/triLayerByKey/triKey 取得對應 <g>）。
 // 函式體照搬自原 draw() 內聯三角板迴圈、零行為改變（內部解構改名 a,b,d 以免遮蔽參數 c）。
 function drawTrianglePart(c, pts, ctx) {
-  if (!c.p1 || !c.p2 || !c.p3) return;
-  const ids = [c.p1.id, c.p2.id, c.p3.id];
-  const path = document.createElementNS(SVG_NS, 'path');
-  const color = c.color || '#27ae60';
-  const isSel = c.id === S.selectedTriangleId;
-  path.setAttribute('fill', color + '33');
-  path.setAttribute('stroke', isSel ? '#e67e22' : color);
-  path.setAttribute('stroke-width', isSel ? 3.2 : 2.5);
-  path.setAttribute('stroke-linejoin', 'round');
-  path.style.cursor = 'pointer';
-  path.addEventListener('pointerdown', (e) => {
-    if (S.drawingLink || S.drawingTriangle || S.drawingPolygon) return;
-    e.stopPropagation();
-    selectTriangle(c.id);
-  });
-  // 折線桿的機架固定頂點畫一顆軸轂圓盤（對應實體套件鎖在結構上的軸轂），跟著每幀更新。
-  const hubs = [];
-  if (plateShapeMode(c) === 'polyline') {
-    [c.p1, c.p2, c.p3].forEach(p => {
-      if (!p || p.type !== 'fixed') return;
-      const hub = document.createElementNS(SVG_NS, 'circle');
-      hub.setAttribute('fill', color + '59');
-      hub.setAttribute('stroke', isSel ? '#e67e22' : color);
-      hub.setAttribute('stroke-width', 2.5);
-      hub.style.pointerEvents = 'none';
-      hubs.push({ el: hub, id: p.id });
-    });
-  }
-  // 靜態結構板承載的馬達穿板特徵：板身直接開槽（與 DXF/3D 同一份幾何），evenodd 讀作挖空。
   const hostedPlateMounts = ctx.hostedMounts ? ctx.hostedMounts.get(c.id) : null;
   const plateExtras = (hostedPlateMounts && hostedPlateMounts.length)
     ? Exporters.plateMountExtras(hostedPlateMounts) : null;
-  if (plateExtras) path.setAttribute('fill-rule', 'evenodd');
-  // 每幀更新：解出三點就更新外形，三點不全則隱藏（與原本「無效不畫」同效果）
-  const applyTri = (P) => {
-    const [a, b, d] = ids.map(id => P[id]);
-    const ok = [a, b, d].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
-    path.style.display = ok ? '' : 'none';
-    if (ok) {
-      path.setAttribute('d', platePath(c, [a, b, d], plateExtras) || roundedTriangleHullPath(a, b, d));
-    }
-    hubs.forEach(h => {
-      const q = P[h.id];
-      const okHub = ok && q && Number.isFinite(q.x) && Number.isFinite(q.y);
-      h.el.style.display = okHub ? '' : 'none';
-      if (okHub) {
-        h.el.setAttribute('cx', TX(q.x));
-        h.el.setAttribute('cy', TY(q.y));
-        h.el.setAttribute('r', Math.max(8, 15 * View.getScale()));
-      }
-    });
-  };
-  if (c.shape === 'jaw') {
-    path.setAttribute('fill', (c.color || '#ff7043') + '26');
-    path.setAttribute('stroke-linejoin', 'round');
-  }
-  applyTri(pts);
-  const triGroup = ctx.groupForLayer(ctx.triLayerByKey.get(ctx.triKey(ids)));
-  triGroup.appendChild(path);
-  hubs.forEach(h => triGroup.appendChild(h.el));
-  frameUpdaters.push(applyTri);
-  if (isSel) drawPlateShapeHandles(c, ids, pts);   // 選取此板：造形點顯示可編輯握把
-}
-// 造形點編輯握把：選取板件時，每個造形點畫成握把。點＝切換是否鑽孔（DXF），拖＝移動，右鍵＝刪除。
-// 實心橘＝會鑽孔；空心＝只描外形不鑽孔。握把每幀跟著解出的板子移動。
-function drawPlateShapeHandles(comp, ids, pts) {
-  plateVertices(comp).forEach((vt, vi) => {
-    if (vt.solve) return;
-    const handle = document.createElementNS(SVG_NS, 'circle');
-    handle.setAttribute('r', 6);
-    handle.setAttribute('stroke', '#e67e22');
-    handle.setAttribute('stroke-width', 2);
-    handle.style.cursor = 'move';
-    const tip = document.createElementNS(SVG_NS, 'title');
-    tip.textContent = '造形點：點一下切換是否鑽孔、拖曳移動、右鍵刪除';
-    handle.appendChild(tip);
-    const applyHandle = (P) => {
-      const a = P[ids[0]], b = P[ids[1]];
-      const w = (a && b) ? localToWorld([a, b], vt) : null;
-      const ok = w && Number.isFinite(w.x) && Number.isFinite(w.y);
-      handle.style.display = ok ? '' : 'none';
-      if (ok) { handle.setAttribute('cx', TX(w.x)); handle.setAttribute('cy', TY(w.y)); }
-      handle.setAttribute('fill', vt.hole === true ? '#e67e22' : '#fff');
-    };
-    handle.addEventListener('pointerdown', (e) => {
-      if (S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars) return;
-      e.stopPropagation();
-      startShapeDrag(e, comp.id, vi);
-    });
-    handle.addEventListener('contextmenu', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      deleteShapeVertex(comp.id, vi);
-    });
-    applyHandle(pts);
-    svg.appendChild(handle);
-    frameUpdaters.push(applyHandle);
+  renderPlate({
+    component: c, points: pts, ctx, svg, scale: View.getScale(),
+    project: p => ({ x: TX(p.x), y: TY(p.y) }), selectedId: S.selectedTriangleId,
+    interactionBlocked: () => Boolean(S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars),
+    onSelect: selectTriangle, shapeMode: plateShapeMode, plateExtras,
+    platePath, roundedPath: roundedTriangleHullPath, vertices: plateVertices, localToWorld,
+    onShapeDrag: startShapeDrag, onDeleteShapeVertex: deleteShapeVertex,
+    registerUpdate: update => frameUpdaters.push(update)
   });
 }
 // 造形點的局部座標系＝解出的 p1、p2（與 plate-geometry 一致）。
