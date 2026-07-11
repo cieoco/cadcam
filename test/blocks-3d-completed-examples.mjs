@@ -133,19 +133,15 @@ check('步行腿紅色馬達曲柄貼近輸出軸側', jansenCrank && jansenCran
   jansenStack.every(s => jansenCrank.layer < s.layer),
   `LinkM=${jansenCrank ? jansenCrank.layer : 'missing'}, stack=${jansenStack.map(s => `${s.id}:${s.layer}`).join(',')}`);
 
+// 切比雪夫已無顯式接地桿（機架＝自動地基）；馬達裝配為「馬達 → 曲柄」，曲柄貼近地基那層。
 const chebyshevMounted = sceneFor('chebyshev-linkage', 45, {
-  motorMounts: new Map([['A', {
-    dir: { x: 1, y: 0 },
-    frameBody: 'Link4',
-    outputBody: 'Link1',
-    order: ['motor', 'frameBody', 'outputBody'],
-  }]]),
+  motorMounts: new Map([['A', { dir: { x: 1, y: 0 }, outputBody: 'Link1', order: ['motor', 'outputBody'] }]]),
 });
-const chebFrame = chebyshevMounted.sticks.find(s => s.id === 'Link4');
+const chebHasGroundBar = chebyshevMounted.sticks.some(s => s.id === 'Link4');
 const chebCrank = chebyshevMounted.sticks.find(s => s.id === 'Link1');
-check('切比雪夫馬達裝配為馬達-固定桿-曲柄', chebFrame && chebCrank &&
-  chebFrame.layer === 0 && chebCrank.layer === 1,
-  `Link4=${chebFrame ? chebFrame.layer : 'missing'}, Link1=${chebCrank ? chebCrank.layer : 'missing'}`);
+check('切比雪夫無顯式接地桿、馬達曲柄在最底層（貼近地基）',
+  !chebHasGroundBar && chebCrank && chebCrank.layer === 0,
+  `Link4=${chebHasGroundBar ? 'present' : 'gone'}, Link1=${chebCrank ? chebCrank.layer : 'missing'}`);
 
 const cam = sceneFor('cam-follower');
 check('凸輪從動件 3D 有凸輪', cam.cams.length === 1, `cams=${cam.cams.length}`);
@@ -182,5 +178,18 @@ check('有機架時馬達帶貼合面 mountZ＝機架背面 z',
 check('無機架時馬達 mountZ 為 null（維持原疊層行為）',
   gripper.motors.length>0&&gripper.motors.every(mo=>mo.mountZ===null),
   `mountZ=${gripper.motors.map(mo=>mo.mountZ).join(',')}`);
+
+// 接地桿去重規則：兩端都是固定點的桿，有機架時不畫成 stick（交給地基），無機架時保留。
+const gbLinks = [{ id: 'GroundBar', p1: 'G1', p2: 'G2' }, { id: 'Arm', p1: 'G1', p2: 'F' }];
+const gbPoints = { G1: { x: 0, y: 0 }, G2: { x: 100, y: 0 }, F: { x: 50, y: 40 } };
+const gbOpts = { groundIds: new Set(['G1', 'G2']) };
+const gbFrame = { outlines: [[{x:-10,y:-10},{x:110,y:-10},{x:110,y:10},{x:-10,y:10}]], holes: [], warnings: [] };
+const withFrame = buildSceneModel(gbLinks, gbPoints, { ...gbOpts, frameGeometry: gbFrame });
+const noFrame = buildSceneModel(gbLinks, gbPoints, gbOpts);
+check('有機架時接地桿不畫成 stick（交給地基），一般桿保留',
+  !withFrame.sticks.some(s => s.id === 'GroundBar') && withFrame.sticks.some(s => s.id === 'Arm'),
+  `sticks=${withFrame.sticks.map(s => s.id).join(',')}`);
+check('無機架時接地桿仍畫成 stick（不遺失）',
+  noFrame.sticks.some(s => s.id === 'GroundBar'));
 
 report('blocks-3d-completed-examples');

@@ -152,9 +152,11 @@ export function buildSceneModel(links, points, opts = {}) {
 
   // 只取「可見、兩端有效、且不落在三角板邊上」的桿。
   // style:'track' 是滑塊軌道的視覺輔助線，3D 另以實體軌道槽呈現（見下方 rails），不當普通桿。
+  // 兩端都是固定點的接地桿＝機架本身：有機架板時就交給它呈現，不重複畫成桿（2D draw() 同一套規則）。
+  const isGroundBar = (l) => frameGeometry && groundIds.has(l.p1) && groundIds.has(l.p2);
   const visible = (links || []).filter(l =>
     l && !l.hidden && l.style !== 'track' && valid(l.p1) && valid(l.p2) &&
-    !triEdgeKeys.has([l.p1, l.p2].sort().join('|')));
+    !triEdgeKeys.has([l.p1, l.p2].sort().join('|')) && !isGroundBar(l));
 
   const assemblyLayerForBody = (bodyId) => {
     if (!bodyId) return null;

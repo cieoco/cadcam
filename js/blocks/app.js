@@ -755,16 +755,10 @@ function buildMotorMounts(motorIds, groundIds) {
     const outputBar = S.comps.find(c => c.type === 'bar' && c.p1 && c.p2 &&
       (c.p1.id === id || c.p2.id === id) &&
       (c.isInput || crankTips.has(c.p1.id === id ? c.p2.id : c.p1.id)));
-    const frameBar = S.comps.find(c => c.type === 'bar' && !c.isInput && c.p1 && c.p2 &&
-      (c.p1.id === id || c.p2.id === id) &&
-      !crankTips.has(c.p1.id === id ? c.p2.id : c.p1.id) &&
-      groundIds.has(c.p1.id) && groundIds.has(c.p2.id));
+    // 機架＝地基（自動生成的 frameGeometry），不再靠一根顯式接地桿當 frameBody。
+    // 馬達一律裝配為「馬達 → 曲柄」，曲柄貼近地基那層；馬達本體則坐在地基背面（見 scene-model 的 mountZ）。
     const barAssembly = outputBar
-      ? {
-          outputBody: outputBar.id,
-          frameBody: frameBar ? frameBar.id : null,
-          order: frameBar ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody'],
-        }
+      ? { outputBody: outputBar.id, order: ['motor', 'outputBody'] }
       : {};
 
     const gear = S.comps.find(c => c.type === 'gear' && c.p1?.id === id);
@@ -800,11 +794,6 @@ function buildMotorMounts(motorIds, groundIds) {
       return;
     }
 
-    if (frameBar) {
-      const oid = frameBar.p1.id === id ? frameBar.p2.id : frameBar.p1.id;
-      add(id, staticPts[oid], 'frame-bar', barAssembly);
-      return;
-    }
     if (outputBar) {
       const oid = outputBar.p1.id === id ? outputBar.p2.id : outputBar.p1.id;
       add(id, oppositeTarget(center, staticPts[oid]), 'output-crank', barAssembly);
@@ -1563,6 +1552,8 @@ function draw() {
     frameConnectorNodes(), exportSettings(),
     ttFrameExportMounts({ pts, motorCenterIds: modelMotorCenterIds, motorMounts }));
   drawGround(frameGeometry2d);
+  // 兩端都是固定點的接地桿＝機架本身：有機架時交給地基呈現，不重複畫成桿、也不進分層（3D scene-model 同一套規則）。
+  const isGroundBar = (l) => Boolean(frameGeometry2d) && groundIds.has(l.p1) && groundIds.has(l.p2);
   drawTtMotorMountHoles(motorCenterIds, motorMounts, pts);
   const trajectoryData = getTrajectoryData();
   drawTraceTrajectory(trajectoryData);
@@ -1594,7 +1585,7 @@ function draw() {
   // （桿集合與 scene-model 的 visible 一致：可見、兩端有效、不落在三角板邊上。）
   const layerLinks = (S.compiled.visualization.links || []).filter(l =>
     l && !l.hidden && validPt(l.p1) && validPt(l.p2) &&
-    !triangleEdgeKeys.has([l.p1, l.p2].sort().join('|')));
+    !triangleEdgeKeys.has([l.p1, l.p2].sort().join('|')) && !isGroundBar(l));
   const triComps = S.comps.filter(c => c.type === 'triangle' && c.p1 && c.p2 && c.p3 &&
     validPt(c.p1.id) && validPt(c.p2.id) && validPt(c.p3.id));
   // 手動疊放偏好（zlift）標到 visualization 物件上：2D bodies 與 3D buildSceneModel 都讀同一份
@@ -1669,7 +1660,7 @@ function draw() {
   });
   // 可見桿（排除隱藏與三角板邊）：建一次、無效時隱藏，播放只更新外形——不再每幀重建。
   const eligibleLinks = linksToDraw.filter(l =>
-    !l.hidden && !triangleEdgeKeys.has([l.p1, l.p2].sort().join('|')));
+    !l.hidden && !triangleEdgeKeys.has([l.p1, l.p2].sort().join('|')) && !isGroundBar(l));
   // 死點橫幅的「缺漏可見桿」計數：重建與播放共用同一套判斷（含與原本一致、只看 .x 有限）
   const countMissingLinks = (P) => {
     let m = 0;

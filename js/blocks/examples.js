@@ -240,10 +240,10 @@ export const BLOCK_EXAMPLES = [
         }),
         bar('Link2', pt('B', 'floating', -9.373, 57.373), pt('C', 'floating', 47.996, 1.616), 80, { color: '#e74c3c' }),
         bar('Link3', pt('D', 'fixed', 32, 80), pt('C', 'floating', 47.996, 1.616), 80, { color: '#e74c3c' }),
-        triangle('Tri1', pt('B', 'floating', -9.373, 57.373), pt('C', 'floating', 47.996, 1.616), pt('P', 'floating', 88, -37), { color: '#e74c3c' }),
-        bar('Link4', pt('A', 'fixed', -32, 80), pt('D', 'fixed', 32, 80), 64, { color: '#27ae60' })
+        triangle('Tri1', pt('B', 'floating', -9.373, 57.373), pt('C', 'floating', 47.996, 1.616), pt('P', 'floating', 88, -37), { color: '#e74c3c' })
       ],
-      params: { LL1: 32, LL2: 80, LL3: 80, LL4: 64, TG1: 80, TR1_Tri1: 136, TR2_Tri1: 56 }
+      // 接地桿（A-D）由自動生成的機架地基表現，不再另放一根顯式桿。
+      params: { LL1: 32, LL2: 80, LL3: 80, TG1: 80, TR1_Tri1: 136, TR2_Tri1: 56 }
     }
   },
   {
@@ -264,7 +264,6 @@ export const BLOCK_EXAMPLES = [
           physicalMotor: '1',
           phaseOffset: 0
         }),
-        bar('Link3', pt('M1', 'fixed', 40, 0), pt('M2', 'fixed', 152, 0), 112, { color: '#95a5a6' }),
         {
           type: 'slider', id: 'Slider1', color: '#16a085', sign: 1, lenParam: 'SL1',
           m1: pt('M1', 'fixed', 40, 0), m2: pt('M2', 'fixed', 152, 0),
@@ -273,7 +272,8 @@ export const BLOCK_EXAMPLES = [
         },
         bar('Link2', pt('A', 'floating', 30, 0), pt('P3', 'floating', 120, 0), 90)
       ],
-      params: { LL1: 30, LL2: 90, LL3: 112, SL1: 95 }
+      // 兩固定滑軌座 M1-M2 的機架由自動地基表現，不再另放一根顯式接地桿。
+      params: { LL1: 30, LL2: 90, SL1: 95 }
     }
   },
   {
