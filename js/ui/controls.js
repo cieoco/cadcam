@@ -5,7 +5,7 @@
 
 import { $, log, downloadText, fmt, calcAdaptiveGridStep } from '../utils.js';
 import { readInputs, readSweepParams, readViewParams } from '../config.js';
-import { sweepTheta, calculateTrajectoryStats } from '../fourbar/solver.js';
+import { calculateTrajectoryStats } from '../fourbar/solver.js';
 import { startAnimation, pauseAnimation, stopAnimation, setupMotorTypeHandler } from '../fourbar/animation.js';
 import { renderPartsLayout, renderPartsOverlayLayer } from '../parts/renderer.js';
 import { computeEnginePreview, computeEngineSweep, computeEngineExport, clampEngineParam } from '../core/mechanism-engine.js';
@@ -471,9 +471,22 @@ function ensureValidThetaAfterLoad() {
     const sol = solveFn(mech);
     if (sol && sol.isValid !== false) return;
 
+    // multilink 用自己的 sweepTopology 掃描（先前誤用 fourbar 的 sweepTheta，永遠掃不到有效角度）
+    const sweepFn = mods.solver.sweepTopology;
+    if (!sweepFn) return;
+    let topology = mech.topology;
+    if (typeof topology === 'string') {
+        try {
+            topology = JSON.parse(topology);
+        } catch (e) {
+            return;
+        }
+    }
+    if (!topology) return;
+
     const sweepParams = readSweepParams();
-    const sweepFn = mods.solver.sweepTheta || sweepTheta;
     const sweep = sweepFn(
+        topology,
         mech,
         sweepParams.sweepStart,
         sweepParams.sweepEnd,
@@ -1076,6 +1089,7 @@ function displaySweepResults(results, validRanges, invalidRanges, showTrajectory
         html += `<span style="color:#e74c3c;">無任何可運行區間</span><br/>`;
     }
 
+    // fallback 的 fourbar calculateTrajectoryStats 只讀 {isValid, B}，對所有機構的掃描結果通用（jansen 依賴此路徑）
     const statsFn = getActiveModules().solver.calculateTrajectoryStats || calculateTrajectoryStats;
     const stats = statsFn(results);
     if (stats) {

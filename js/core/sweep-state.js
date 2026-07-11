@@ -4,7 +4,6 @@
  */
 
 import { validateConfig } from '../config.js';
-import { sweepTheta } from '../fourbar/solver.js';
 
 export function computeSweepState({ mods, mech, partSpec, mfg, dynamicParams, sweepParams, motorTypeText }) {
     if (!mods || !mods.config) return null;
@@ -22,7 +21,11 @@ export function computeSweepState({ mods, mech, partSpec, mfg, dynamicParams, sw
         throw new Error("掃描間隔需大於 0。");
     }
 
-    const sweepFn = mods.solver.sweepTheta || sweepTheta;
+    // 不再靜默改用 fourbar 的 sweepTheta：拿別的機構數學掃描會回傳看似合法的錯誤結果
+    const sweepFn = mods.solver.sweepTheta;
+    if (!sweepFn) {
+        throw new Error(`${mods.config.name || mods.config.id}: solver 未提供 sweepTheta，無法執行掃描分析。`);
+    }
     const { results, validRanges, invalidRanges } = sweepFn(
         mergedMech,
         sweepParams.sweepStart,

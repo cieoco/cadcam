@@ -5,7 +5,7 @@
 
 import { svgEl, fmt, drawGridCompatible } from '../utils.js';
 import { createDriveComponent } from '../motor-data.js';
-import { renderTrajectoryMarkers } from '../ui/trajectory-markers.js';
+import { renderTrajectoryMarkers } from '../render-utils/trajectory-markers.js';
 
 /**
  * 渲染曲柄滑塊機構

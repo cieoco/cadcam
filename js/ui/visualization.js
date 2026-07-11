@@ -5,7 +5,7 @@
 
 import { svgEl, describeArc, deg2rad, drawGridCompatible } from '../utils.js';
 import { createDriveComponent } from '../motor-data.js';
-import { renderTrajectoryMarkers } from './trajectory-markers.js';
+import { renderTrajectoryMarkers } from '../render-utils/trajectory-markers.js';
 
 /**
  * 渲染四連桿機構
