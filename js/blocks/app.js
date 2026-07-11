@@ -38,6 +38,7 @@ import { rackGuideThetaRange } from './rack-limits.js';
 import { circleRectCompression } from './intake-contact.js';
 import { drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
 import { gearMeshPhaseDeg } from './transmission-geometry.js';
+import { drawCam as renderCam, drawWorkpiece as renderWorkpiece } from './special-part-render.js';
 import * as Settings from './settings.js';   // 匯出 / TT / MG995 安裝設定（localStorage 持久化 + 表單同步）
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -1091,16 +1092,7 @@ function drawRackPart(c, pts) {
 
 
 function drawWorkpiecePart(c,pts){
-  const p=pts[c.p1?.id]; if(!p)return;
-  const w=Number(c.width)||48,h=Number(c.height)||48;
-  const g=document.createElementNS(SVG_NS,'g'), rect=document.createElementNS(SVG_NS,'rect');
-  rect.setAttribute('x',TX(p.x)-w*View.getScale()/2); rect.setAttribute('y',TY(p.y)-h*View.getScale()/2);
-  rect.setAttribute('width',w*View.getScale()); rect.setAttribute('height',h*View.getScale()); rect.setAttribute('rx',8);
-  rect.setAttribute('fill',(c.color||'#d97706')+'33'); rect.setAttribute('stroke',c.color||'#d97706'); rect.setAttribute('stroke-width',2);
-  g.appendChild(rect);
-  const roller=S.comps.find(x=>x.id==='IntakeFrontRoller'), rp=roller&&pts[roller.p1?.id];
-  if(rp){ const result=circleRectCompression({x:rp.x,y:rp.y,radius:pulleyRadius(roller)},{x:p.x,y:p.y,width:w,height:h}); const t=document.createElementNS(SVG_NS,'text'); t.setAttribute('x',TX(p.x)); t.setAttribute('y',TY(p.y)+4); t.setAttribute('text-anchor','middle'); t.setAttribute('font-size','12'); t.setAttribute('font-weight','700'); t.setAttribute('fill',result.contact?'#117a45':'#b45309'); t.textContent=result.contact?`壓縮 ${result.compression.toFixed(1)}mm`:'未接觸'; g.appendChild(t); }
-  svg.appendChild(g);
+  renderWorkpiece({ component: c, points: pts, comps: S.comps, svg, scale: View.getScale(), project: p => ({ x: TX(p.x), y: TY(p.y) }), pulleyRadius, circleRectCompression });
 }
 
 
@@ -1151,118 +1143,12 @@ function drawBeltPart(c, pts) {
 
 // 凸輪從動件：p1 為凸輪軸心，p2 為沿 axisDeg 直動的從動點；滾子中心由凸輪相切幾何推出。
 function drawCamPart(c, pts) {
-  if (!c.p1 || !c.p2) return;
-  const baseRadius = Number(S.topo.params[c.baseRadiusParam]) || 24;
-  const lift = Number(S.topo.params[c.liftParam]) || 24;
-  const rollerRadiusWorld = Math.max(0, Number(c.rollerRadius) || 6);
-  const sc = View.getScale();
-  const color = c.color || '#9b59b6';
-  const profilePts = [];
-  for (let i = 0; i < 128; i++) {
-    const a = (i / 128) * Math.PI * 2;
-    const r = camRadius({ profile: c.profile, baseRadius, lift, angleRad: a });
-    profilePts.push(`${(Math.cos(a) * r * sc).toFixed(2)},${(-Math.sin(a) * r * sc).toFixed(2)}`);
-  }
-  const axisDeg = Number(c.axisDeg) || 90;
-  const axisRad = axisDeg * Math.PI / 180;
-  const ux = Math.cos(axisRad), uy = Math.sin(axisRad);
-  const g = document.createElementNS(SVG_NS, 'g');
-  const outlineHalo = document.createElementNS(SVG_NS, 'polygon');
-  outlineHalo.setAttribute('points', profilePts.join(' '));
-  outlineHalo.setAttribute('fill', 'none');
-  outlineHalo.setAttribute('stroke', '#ffffff');
-  outlineHalo.setAttribute('stroke-width', Math.max(2.5, 4.5 * sc));
-  outlineHalo.setAttribute('stroke-linejoin', 'round');
-  outlineHalo.setAttribute('opacity', '0.8');
-  g.appendChild(outlineHalo);
-  const body = document.createElementNS(SVG_NS, 'polygon');
-  body.setAttribute('points', profilePts.join(' '));
-  body.setAttribute('fill', color + '55');
-  body.setAttribute('stroke', '#8e44ad');
-  body.setAttribute('stroke-width', Math.max(1.8, 2.6 * sc));
-  body.setAttribute('stroke-linejoin', 'round');
-  g.appendChild(body);
-  const hub = document.createElementNS(SVG_NS, 'circle');
-  hub.setAttribute('r', Math.max(3, 4 * sc));
-  hub.setAttribute('fill', '#ffffff');
-  hub.setAttribute('stroke', color);
-  hub.setAttribute('stroke-width', Math.max(1.4, 1.8 * sc));
-  g.appendChild(hub);
-  svg.appendChild(g);
-
-  const guide = document.createElementNS(SVG_NS, 'line');
-  guide.setAttribute('stroke', '#8a96a3');
-  guide.setAttribute('stroke-width', Math.max(1.2, 1.8 * sc));
-  guide.setAttribute('stroke-linecap', 'round');
-  guide.setAttribute('stroke-dasharray', `${(5 * sc).toFixed(1)},${(4 * sc).toFixed(1)}`);
-  guide.style.pointerEvents = 'none';
-  svg.appendChild(guide);
-  const follower = document.createElementNS(SVG_NS, 'rect');
-  follower.setAttribute('width', Math.max(12, 16 * sc));
-  follower.setAttribute('height', Math.max(8, 10 * sc));
-  follower.setAttribute('rx', Math.max(2, 2.5 * sc));
-  follower.setAttribute('fill', '#f8fafc');
-  follower.setAttribute('stroke', '#34495e');
-  follower.setAttribute('stroke-width', Math.max(1.5, 2 * sc));
-  follower.style.pointerEvents = 'none';
-  svg.appendChild(follower);
-  const roller = document.createElementNS(SVG_NS, 'circle');
-  roller.setAttribute('r', Math.max(3, rollerRadiusWorld * sc));
-  roller.setAttribute('fill', '#ffffff');
-  roller.setAttribute('stroke', '#34495e');
-  roller.setAttribute('stroke-width', Math.max(1.2, 1.6 * sc));
-  roller.style.pointerEvents = 'none';
-  svg.appendChild(roller);
-  const contact = document.createElementNS(SVG_NS, 'line');
-  contact.setAttribute('stroke', '#2c3e50');
-  contact.setAttribute('stroke-width', Math.max(1.2, 1.5 * sc));
-  contact.setAttribute('stroke-linecap', 'round');
-  contact.style.pointerEvents = 'none';
-  svg.appendChild(contact);
-
-  const applyCam = (P) => {
-    const ctr = P[c.p1.id], out = P[c.p2.id];
-    const ok = ctr && out && Number.isFinite(ctr.x) && Number.isFinite(out.x);
-    g.style.display = ok ? '' : 'none';
-    guide.style.display = ok ? '' : 'none';
-    follower.style.display = ok ? '' : 'none';
-    roller.style.display = ok ? '' : 'none';
-    contact.style.display = ok ? '' : 'none';
-    if (!ok) return;
-    const thetaDeg = (Number(S.theta) || 0) + (Number(c.phase) || 0);
-    g.setAttribute('transform', `translate(${TX(ctr.x)} ${TY(ctr.y)}) rotate(${-thetaDeg})`);
-    const state = camFollowerState({
-      profile: c.profile,
-      baseRadius,
-      lift,
-      thetaRad: thetaDeg * Math.PI / 180,
-      axisRad,
-      rollerRadius: rollerRadiusWorld
-    });
-    const support = { x: ctr.x + state.support.x, y: ctr.y + state.support.y };
-    const railBack = baseRadius + lift + 18;
-    const railFront = Math.max(8, baseRadius * 0.35);
-    guide.setAttribute('x1', TX(ctr.x + ux * railFront));
-    guide.setAttribute('y1', TY(ctr.y + uy * railFront));
-    guide.setAttribute('x2', TX(ctr.x + ux * railBack));
-    guide.setAttribute('y2', TY(ctr.y + uy * railBack));
-    const fw = Number(follower.getAttribute('width')) || 16;
-    const fh = Number(follower.getAttribute('height')) || 10;
-    const blockGap = 12;
-    const bx = out.x + ux * blockGap;
-    const by = out.y + uy * blockGap;
-    follower.setAttribute('x', TX(bx) - fw / 2);
-    follower.setAttribute('y', TY(by) - fh / 2);
-    follower.setAttribute('transform', `rotate(${-axisDeg} ${TX(bx)} ${TY(by)})`);
-    roller.setAttribute('cx', TX(out.x));
-    roller.setAttribute('cy', TY(out.y));
-    contact.setAttribute('x1', TX(support.x));
-    contact.setAttribute('y1', TY(support.y));
-    contact.setAttribute('x2', TX(out.x));
-    contact.setAttribute('y2', TY(out.y));
-  };
-  applyCam(pts);
-  frameUpdaters.push(applyCam);
+  const update = renderCam({
+    component: c, points: pts, svg, scale: View.getScale(),
+    project: p => ({ x: TX(p.x), y: TY(p.y) }), params: S.topo.params,
+    theta: () => S.theta, camRadius, camFollowerState
+  });
+  if (update) frameUpdaters.push(update);
 }
 
 // 登錄表：phase 決定繪製時機——'underlay'＝連桿之下（gear/rack 等機件）、'layered'＝畫進 zlift 疊放層（三點桿）。
