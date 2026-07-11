@@ -40,6 +40,9 @@ import { drawCam as renderCam, drawWorkpiece as renderWorkpiece } from './specia
 import { drawPlate as renderPlate } from './plate-render.js';
 import { buildMotorMounts as planMotorMounts, computeMotorRotDeg as planMotorRotDeg, motorAssemblyLayerForBody } from './motor-mounts.js';
 import { drawFrameGeometry as renderFrameGeometry, drawMotorMountHoles as renderMotorMountHoles } from './motor-frame-render.js';
+import { collectSceneIds, prepareRenderScene } from './render-scene.js';
+import { buildPreviewModelInputs } from './preview-model-inputs.js';
+import { renderLinks, renderNodes } from './mechanism-layer-render.js';
 import * as Settings from './settings.js';   // 匯出 / TT / MG995 安裝設定（localStorage 持久化 + 表單同步）
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -892,12 +895,8 @@ function draw() {
   const { pts, sol } = solveFrame();
   updateMechanismStatus(sol);
 
-  const groundIds = new Set((S.compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
-  const motorCenterIds = new Set((S.compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
-  const camCenterIds = new Set(S.comps.filter(c => c.type === 'cam' && c.p1).map(c => c.p1.id));
-  Model.motorPointIds(S.comps).forEach(id => motorCenterIds.add(id));
-  const modelMotorCenterIds = new Set(motorCenterIds);
-  Model.motorPointIds(S.comps).forEach(id => modelMotorCenterIds.add(id));
+  const sceneIds = collectSceneIds({ compiled: S.compiled, comps: S.comps, motorPointIds: Model.motorPointIds(S.comps) });
+  const { groundIds, motorCenterIds, modelMotorCenterIds, camCenterIds } = sceneIds;
   const motorMounts = buildMotorMounts(modelMotorCenterIds, groundIds);
   // 地基：用「當前」pts＋mount 算共用 frameGeometry（放馬達即變形），畫在最底層。
   // 已宣告宿主機架桿的 mount 不進地基——特徵切在宿主桿身上，2D 桿身照合併外形畫（見連桿迴圈）。
@@ -906,8 +905,11 @@ function draw() {
   const frameGeometry2d = Exporters.inspectFrameExport(
     frameConnectorNodes(), Settings.exportSettings(), mountSplit2d.free);
   drawGround(frameGeometry2d);
-  // 兩端都是固定點的接地桿＝機架本身：有機架時交給地基呈現，不重複畫成桿、也不進分層（3D scene-model 同一套規則）。
-  const isGroundBar = (l) => Boolean(frameGeometry2d) && !S.comps.some(c=>c.id===l.id&&c.frameSeparate) && groundIds.has(l.p1) && groundIds.has(l.p2);
+  const renderScene = prepareRenderScene({
+    compiled: S.compiled, comps: S.comps, points: pts, frameGeometry: frameGeometry2d, sceneIds,
+    computeBodyLayers, motorAssemblyLayerForBody, motorMounts
+  });
+  const { isGroundBar, triangleEdgeKeys, triangleKey: triKey, bodyLayers, linkLayer, triangleLayerByKey: triLayerByKey } = renderScene;
   drawMotorMountHoles(motorCenterIds, motorMounts, pts);
   const trajectoryData = getTrajectoryData();
   drawTraceTrajectory(trajectoryData);
@@ -922,50 +924,6 @@ function draw() {
   // 零件繪製分派（slice 2 登錄表化）— 'underlay' 機件畫在連桿之下（z 序與原本一致）。
   [...S.comps.filter(c => c.type === 'belt'), ...S.comps.filter(c => c.type !== 'belt')]
     .forEach(c => { const e = PART_DRAW[c.type]; if (e && e.phase === 'underlay') e.draw(c, pts); });
-
-  // 三角板邊：這些 link 由實心三角板代表，2D 不另畫（與 3D scene-model 的 visible 篩法一致）。
-  const triangleEdgeKeys = new Set();
-  (S.compiled.visualization.polygons || []).forEach(poly => {
-    if (!poly.points || poly.points.length !== 3) return;
-    const [p1, p2, p3] = poly.points;
-    [[p1, p2], [p1, p3], [p2, p3]].forEach(([x, y]) => {
-      triangleEdgeKeys.add([x, y].sort().join('|'));
-    });
-  });
-  const validPt = (id) => pts[id] && Number.isFinite(pts[id].x) && Number.isFinite(pts[id].y);
-  const triKey = (ids) => [...ids].sort().join('|');
-
-  // 疊放分層：用與 3D 完全相同的剛體集合＋原始順序餵 computeBodyLayers，2D/3D 才會一致。
-  // （桿集合與 scene-model 的 visible 一致：可見、兩端有效、不落在三角板邊上。）
-  const layerLinks = (S.compiled.visualization.links || []).filter(l =>
-    l && !l.hidden && validPt(l.p1) && validPt(l.p2) &&
-    !triangleEdgeKeys.has([l.p1, l.p2].sort().join('|')) && !isGroundBar(l));
-  const triComps = S.comps.filter(c => c.type === 'triangle' && c.p1 && c.p2 && c.p3 &&
-    validPt(c.p1.id) && validPt(c.p2.id) && validPt(c.p3.id));
-  // 手動疊放偏好（zlift）標到 visualization 物件上：2D bodies 與 3D buildSceneModel 都讀同一份
-  (S.compiled.visualization.links || []).forEach(l => {
-    const c = l.id ? S.comps.find(x => x.id === l.id) : null;
-    l._zlift = (c && c.zlift) || 0;
-    l._frameSeparate = Boolean(c && c.frameSeparate);
-  });
-  (S.compiled.visualization.polygons || []).forEach(poly => {
-    const k = triKey(poly.points);
-    const t = triComps.find(tc => triKey([tc.p1.id, tc.p2.id, tc.p3.id]) === k);
-    poly._zlift = (t && t.zlift) || 0;
-  });
-  const bodyLayers = computeBodyLayers([
-    ...layerLinks.map(l => ({
-      joints: [l.p1, l.p2],
-      lift: l._zlift || 0,
-      motorDriven: l.style === 'crank' && (motorCenterIds.has(l.p1) || motorCenterIds.has(l.p2)),
-      assemblyLayer: motorAssemblyLayerForBody(l.id, motorMounts),
-    })),
-    ...triComps.map(t => ({ joints: [t.p1.id, t.p2.id, t.p3.id], lift: t.zlift || 0 })),
-  ], groundIds);
-  const linkLayer = new Map();      // link 物件 -> 層
-  layerLinks.forEach((l, i) => linkLayer.set(l, bodyLayers[i]));
-  const triLayerByKey = new Map();  // 三角板三點 key -> 層
-  triComps.forEach((t, j) => triLayerByKey.set(triKey([t.p1.id, t.p2.id, t.p3.id]), bodyLayers[layerLinks.length + j]));
 
   // 依層級建立 <g> 容器，append 順序＝疊放順序（內層在底、外層在上）。
   // motorLayer 已經在 underlay 機件之前建立；節點等在這之後直接接到 svg（疊在最上層）。
@@ -1011,91 +969,15 @@ function draw() {
   });
 
   // 桿件：依層級放進對應的 <g>（內層在底、外層在上）；同層內紅色曲柄最後畫不被蓋住。
-  const linksToDraw = [...(S.compiled.visualization.links || [])].sort((a, b) => {
-    const ac = a.style === 'crank' ? 1 : 0;
-    const bc = b.style === 'crank' ? 1 : 0;
-    return ac - bc;
-  });
-  // 可見桿（排除隱藏與三角板邊）：建一次、無效時隱藏，播放只更新外形——不再每幀重建。
-  const eligibleLinks = linksToDraw.filter(l =>
-    !l.hidden && !triangleEdgeKeys.has([l.p1, l.p2].sort().join('|')) && !isGroundBar(l));
-  // 死點橫幅的「缺漏可見桿」計數：重建與播放共用同一套判斷（含與原本一致、只看 .x 有限）
-  const countMissingLinks = (P) => {
-    let m = 0;
-    eligibleLinks.forEach(l => {
-      const a = P[l.p1], b = P[l.p2];
-      if (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(b.x)) m += 1;
-    });
-    return m;
-  };
-  eligibleLinks.forEach(l => {
-    const isSel = l.id && l.id === S.selectedLinkId;
-    const editable = l.id && S.comps.some(c => c.id === l.id && c.type === 'bar' && c.fixedLen);
-    const isPickCandidate = S.pickBars && S.pickBars.ids.includes(l.id);
-    // 冰棒棍外形：填色扁棍取代原本的圓頭線段
-    const stroke = isPickCandidate ? '#f39c12' : (isSel ? '#e67e22' : (l.style === 'crank' ? '#e74c3c' : (l.color || '#3498db')));
-    const stick = document.createElementNS(SVG_NS, 'path');
-    stick.setAttribute('fill', stroke + '33');   // 淡色填滿，像一塊積木
-    stick.setAttribute('stroke', stroke);
-    stick.setAttribute('stroke-width', isSel || isPickCandidate ? 2.5 : 2);
-    stick.setAttribute('stroke-linejoin', 'round');
-    if (isPickCandidate) stick.setAttribute('stroke-dasharray', '10 7');
-    if (editable || isPickCandidate) {
-      stick.setAttribute('data-link-id', l.id);
-      stick.style.cursor = 'pointer';
-      stick.addEventListener('pointerdown', (e) => {
-        if (S.drawingLink || S.drawingTriangle || S.drawingPolygon) return; // 畫圖模式：不攔截，讓 svg 起點處理
-        e.stopPropagation();
-        if (S.pickBars) { tryPickBar(l.id); return; }
-        if (Input.startFreeLinkDrag(e, l.id)) return;
-        selectLink(l.id);
-      });
-    }
-    const targetG = groupForLayer(linkLayer.get(l));
-    targetG.appendChild(stick);
-
-    // 在兩端冰棒棍頭上鑽孔：與外形同色的細圈，讓它看起來像真的打孔的扁棍。
-    // 地錨（方塊）本身就是固定銷，不畫孔。地錨判定屬結構性，播放期間不變。
-    const holeR = HULL_R_WORLD * View.getScale() * 0.72;
-    const holes = [];
-    [l.p1, l.p2].forEach(pid => {
-      if (groundIds.has(pid)) return;
-      const hole = document.createElementNS(SVG_NS, 'circle');
-      hole.setAttribute('r', holeR);
-      hole.setAttribute('fill', 'none');
-      hole.setAttribute('stroke', stroke);
-      hole.setAttribute('stroke-width', 1.5);
-      hole.setAttribute('stroke-opacity', 0.7);
-      hole.style.pointerEvents = 'none'; // 不擋下面桿身/上面節點的互動
-      targetG.appendChild(hole);
-      holes.push({ el: hole, pid });
-    });
-    // 宿主機架桿：桿身照「桿＋馬達穿板特徵」合併後的外形畫（與 DXF 同一份幾何），
-    // 穿板槽用 evenodd 挖空——伺服和桿上其他固定孔讀作同一塊料。
-    const hostedMounts2d = l.id ? mountSplit2d.hosted.get(l.id) : null;
-    const hostedBarPath = (a, b) => {
-      const hg = Exporters.inspectFrameExport([a, b], Settings.exportSettings(), hostedMounts2d);
-      if (!hg || !hg.outlines.length) return null;
-      const ring = ps => 'M ' + ps.map(p => `${TX(p.x).toFixed(2)} ${TY(p.y).toFixed(2)}`).join(' L ') + ' Z';
-      stick.setAttribute('fill-rule', 'evenodd');
-      return [...hg.outlines, ...(hg.cutouts || []).map(c => c.points)].map(ring).join(' ');
-    };
-    // 每幀更新：解出兩端就更新棍身外形與孔位，否則整根隱藏（與原本「無效不畫」同效果）
-    const applyLink = (P) => {
-      const a = P[l.p1], b = P[l.p2];
-      const ok = a && b && Number.isFinite(a.x) && Number.isFinite(b.x);
-      stick.style.display = ok ? '' : 'none';
-      holes.forEach(h => { h.el.style.display = ok ? '' : 'none'; });
-      if (!ok) return;
-      const hostD = (hostedMounts2d && hostedMounts2d.length) ? hostedBarPath(a, b) : null;
-      stick.setAttribute('d', hostD || barHullPath(a, b));
-      holes.forEach(h => {
-        const pt = P[h.pid];
-        if (pt && Number.isFinite(pt.x)) { h.el.setAttribute('cx', TX(pt.x)); h.el.setAttribute('cy', TY(pt.y)); }
-      });
-    };
-    applyLink(pts);
-    frameUpdaters.push(applyLink);
+  const { linksToDraw, countMissing: countMissingLinks } = renderLinks({
+    links: S.compiled.visualization.links || [], comps: S.comps, points: pts, triangleEdgeKeys, isGroundBar,
+    selectedLinkId: S.selectedLinkId, pickBars: S.pickBars,
+    interactionBlocked: () => Boolean(S.drawingLink || S.drawingTriangle || S.drawingPolygon),
+    onTryPick: tryPickBar, onFreeDrag: Input.startFreeLinkDrag, onSelect: selectLink,
+    groupForLayer, linkLayer, groundIds, hullRadius: HULL_R_WORLD, scale: View.getScale(),
+    barHullPath, project: p => ({ x: TX(p.x), y: TY(p.y) }), hostedMounts: mountSplit2d.hosted,
+    inspectHostedFrame: (nodes, mounts) => Exporters.inspectFrameExport(nodes, Settings.exportSettings(), mounts),
+    registerUpdate: update => frameUpdaters.push(update)
   });
   updateSolveBanner(sol, countMissingLinks(pts));
   recountBanner = (P, s) => updateSolveBanner(s, countMissingLinks(P));
@@ -1119,69 +1001,17 @@ function draw() {
   // 節點（可拖曳；拖近別的接點會吸附合併）
   // 節點型別（rect/circle）、樣式、半徑只由結構性狀態（地錨/馬達/固定孔/S.dragId）決定——
   // 播放期間這些都不變，故建一次、每幀只更新座標。
-  const SIZE = 14;   // 地錨方塊邊長
   // 齒輪輪緣銷不畫成通用浮動節點——改由齒輪自己畫成「螺栓孔」（見上面齒輪繪製）。
   const gearPinIds = new Set(S.comps.filter(c => c.type === 'gear' && c.p2).map(c => c.p2.id));
   const pulleyPinIds = new Set(S.comps.filter(c => c.type === 'pulley' && c.p2).map(c => c.p2.id));
   const camFollowerIds = new Set(S.comps.filter(c => c.type === 'cam' && c.p2).map(c => c.p2.id));
   const workpieceIds = new Set(S.comps.filter(c=>c.type==='workpiece'&&c.p1).map(c=>c.p1.id));
-  Object.keys(pts).forEach(id => {
-    if (isHiddenSliderRailPoint(id)) return;
-    if (isSliderMountPoint(id)) return;
-    if (gearPinIds.has(id)) return;
-    if (pulleyPinIds.has(id)) return;
-    if (camFollowerIds.has(id)) return;
-    if (workpieceIds.has(id)) return;
-    const p = pts[id];
-    const isGround = groundIds.has(id);
-    const isMotorCenter = motorCenterIds.has(id);
-    const isCamCenter = camCenterIds.has(id);
-    const mount = sliderMountInfo(id);
-    const isRect = isGround && !isMotorCenter && !isCamCenter && !mount;
-    const node = document.createElementNS(SVG_NS, isRect ? 'rect' : 'circle');
-    if (isCamCenter) {
-      node.setAttribute('r', id === S.dragId ? 7 : 5);
-      node.setAttribute('fill', '#ffffff');
-      node.setAttribute('stroke', '#9b59b6');
-      node.setAttribute('stroke-width', 2.4);
-    } else if (isMotorCenter) {
-      // 馬達輸出軸：紅色軸蓋（TT 馬達本體已畫在底下）
-      node.setAttribute('r', id === S.dragId ? 8 : 6);
-      node.setAttribute('fill', '#e74c3c');
-      node.setAttribute('stroke', '#922b21'); node.setAttribute('stroke-width', 2);
-    } else if (mount) {
-      node.setAttribute('r', id === S.dragId ? 9 : 7);
-      node.setAttribute('fill', '#f8fafc');
-      node.setAttribute('stroke', id === S.dragId ? '#2ecc71' : '#34495e');
-      node.setAttribute('stroke-width', 3);
-      const title = document.createElementNS(SVG_NS, 'title');
-      title.textContent = `${mount.label} 固定孔：承載滑軌桿件的端點，可拖曳或吸附到其他接點`;
-      node.appendChild(title);
-    } else if (isRect) {
-      node.setAttribute('width', SIZE); node.setAttribute('height', SIZE);
-      node.setAttribute('rx', 3); node.setAttribute('fill', '#34495e');
-    } else {
-      node.setAttribute('r', id === S.dragId ? 9 : 7); node.setAttribute('fill', '#fff');
-      node.setAttribute('stroke', id === S.dragId ? '#2ecc71' : '#34495e');
-      node.setAttribute('stroke-width', 3);
-    }
-    node.setAttribute('data-id', id);
-    node.style.cursor = 'grab';
-    node.addEventListener('pointerdown', (e) => Input.onNodeDown(e, id));
-    svg.appendChild(node);
-    // 手機的接點命中放大改由 capture 階段的 pointerdown 統一處理（見下方），
-    // 不再每個節點疊一圈透明命中圈。
-    // 每幀更新：只改座標，無效（未解出）則隱藏（與原本「無效不畫」同效果）
-    const applyNode = (P) => {
-      const q = P[id];
-      const ok = q && Number.isFinite(q.x);
-      node.style.display = ok ? '' : 'none';
-      if (!ok) return;
-      if (isRect) { node.setAttribute('x', TX(q.x) - SIZE / 2); node.setAttribute('y', TY(q.y) - SIZE / 2); }
-      else { node.setAttribute('cx', TX(q.x)); node.setAttribute('cy', TY(q.y)); }
-    };
-    applyNode(pts);
-    frameUpdaters.push(applyNode);
+  const hiddenPointIds = new Set(Object.keys(pts).filter(id => isHiddenSliderRailPoint(id) || isSliderMountPoint(id)));
+  renderNodes({
+    points: pts, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds,
+    gearPinIds, pulleyPinIds, camFollowerIds, workpieceIds, dragId: S.dragId,
+    sliderMountInfo, project: p => ({ x: TX(p.x), y: TY(p.y) }),
+    onPointerDown: Input.onNodeDown, registerUpdate: update => frameUpdaters.push(update)
   });
 
   drawGearManualHandles(pts);
@@ -1196,85 +1026,12 @@ function draw() {
   // motorTypes：每個馬達中心的型號（'tt'/'mg995'），讓 3D 也畫出對應外形。
   const motorTypes = new Map();
   modelMotorCenterIds.forEach(id => motorTypes.set(id, motorTypeForCenter(id)));
-  // 滑塊（無動力）幾何餵給 3D：軌道（m1-m2）＋滑塊方塊（p3，沿 p1-p2 軸向）。
-  const sliders3d = S.comps
-    .filter(c => c.type === 'slider' && !c.isInput && c.p1 && c.p2 && c.p3 && c.m1 && c.m2)
-    .map(c => ({ id: c.id, p1: c.p1.id, p2: c.p2.id, m1: c.m1.id, m2: c.m2.id, p3: c.p3.id,
-                 baseEnd: c.baseEnd === 'p2' ? 'p2' : 'p1',
-                 travelStart: sliderTravelStart(c), travelEnd: sliderTravelEnd(c),
-                 carriageLen: sliderBodyLength(c), color: c.color }));
-  const gears3d = S.comps
-    .filter(c => c.type === 'gear' && c.p1 && c.p2)
-    .map(c => ({
-      id: c.id,
-      center: c.p1.id,
-      pin: c.p2.id,
-      radius: Number(S.topo.params[c.radiusParam]) || 40,
-      teeth: c.teeth,
-      module: c.module,
-      mesh: c.mesh,
-      color: c.color,
-      pinHoleDiameter: Number(c.pinHoleDiameter) || 5,
-    }));
-  const racks3d = S.comps
-    .filter(c => c.type === 'rack' && c.p1)
-    .map(c => {
-      const pinion = c.pinion ? S.comps.find(g => g.type === 'gear' && g.id === c.pinion) : null;
-      const teeth = pinion ? Math.max(6, Math.round(Number(pinion.teeth) || 12)) : 12;
-      const R = pinion ? (Number(S.topo.params[pinion.radiusParam]) || 40) : 40;
-      const module = (2 * R) / teeth;
-      const length = Number(S.topo.params[c.lenParam]) || 160;
-      const axisDeg = Number(c.axisDeg) || 0;
-      return {
-        id: c.id,
-        ref: c.p1.id,
-        pinion: c.pinion,
-        length,
-        axisDeg,
-        bodyHeight: rackBodyHeight(c, module),
-        phaseShift: rackPhaseShift(c, pinion, { length, module, teeth, axisDeg }),
-        slot: c.slot,
-        framePins: c.framePins,
-        color: c.color,
-      };
-    });
-  const cams3d = S.comps
-    .filter(c => c.type === 'cam' && c.p1 && c.p2)
-    .map(c => ({
-      id: c.id,
-      center: c.p1.id,
-      follower: c.p2.id,
-      baseRadius: Number(S.topo.params[c.baseRadiusParam]) || 24,
-      lift: Number(S.topo.params[c.liftParam]) || 24,
-      axisDeg: c.axisDeg,
-      profile: c.profile,
-      phase: c.phase,
-      rollerRadius: c.rollerRadius,
-      thetaDeg: S.theta,
-      color: c.color,
-    }));
-  const pulleys3d = S.comps
-    .filter(c => c.type === 'pulley' && c.p1 && c.p2)
-    .map(c => {
-      const radius = pulleyRadius(c);
-      return {
-        id: c.id,
-        center: c.p1.id,
-        pin: c.p2.id,
-        radius,
-        pinRadius: pulleyPinRadius(c, radius),
-        rollerWidth: Number(c.rollerWidth) || 0,
-        color: c.color,
-      };
-    });
-  const belts3d = S.comps
-    .filter(c => c.type === 'belt')
-    .map(c => ({ id: c.id, driver: c.driver, driven: c.driven, color: c.color }));
-  lastModelInputs = {
-    links: linksToDraw, pts, groundIds, motorCenterIds: modelMotorCenterIds, motorTypes, motorMounts,
-    polygons: S.compiled.visualization.polygons || [],
-    sliders: sliders3d, gears: gears3d, racks: racks3d, cams: cams3d, pulleys: pulleys3d, belts: belts3d
-  };
+  lastModelInputs = buildPreviewModelInputs({
+    comps: S.comps, params: S.topo.params, theta: S.theta, links: linksToDraw, points: pts,
+    groundIds, motorCenterIds: modelMotorCenterIds, motorTypes, motorMounts,
+    polygons: S.compiled.visualization.polygons || [], sliderTravelStart, sliderTravelEnd,
+    sliderBodyLength, rackBodyHeight, rackPhaseShift, pulleyRadius, pulleyPinRadius
+  });
   if (view3DActive) push3D();
 }
 
