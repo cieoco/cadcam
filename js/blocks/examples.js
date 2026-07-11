@@ -598,6 +598,8 @@ const ALL_BLOCK_EXAMPLES = [
         exactBar('IntakeFrameTop', pt('INTAKE_MOTOR', 'fixed', -24, 82), pt('FRAME_TR', 'fixed', 112, 82), 136, { lenParam: 'INTAKE_FRAME_TOP', color: '#95a5a6', frameSeparate: true }),
         exactBar('IntakeFrameSide', pt('FRAME_TR', 'fixed', 112, 82), pt('FRAME_BR', 'fixed', 112, -88), 170, { lenParam: 'INTAKE_FRAME_SIDE', color: '#95a5a6', frameSeparate: true }),
         exactBar('IntakeFrameBottom', pt('FRAME_BL', 'fixed', -72, -88), pt('FRAME_BR', 'fixed', 112, -88), 184, { lenParam: 'INTAKE_FRAME_BOTTOM', color: '#95a5a6', frameSeparate: true }),
+        // 樞軸支架：擺臂固定軸不能懸空，用一根結構桿從伺服軸心掛下來鎖住（同參考圖的軸轂支架）。
+        exactBar('IntakePivotBrace', pt('INTAKE_MOTOR', 'fixed', -24, 82), pt('INTAKE_PIVOT', 'fixed', -12, 22), Math.hypot(12, 60), { lenParam: 'INTAKE_PIVOT_BRACE', color: '#95a5a6', frameSeparate: true }),
         // 靜止姿勢＝擺動起點（theta=0、phaseOffset=150），舵臂朝左上，同參考圖。
         bar('IntakeCrank',
           pt('INTAKE_MOTOR', 'fixed', -24, 82, { physicalMotor: '1' }),
@@ -628,6 +630,7 @@ const ALL_BLOCK_EXAMPLES = [
         INTAKE_FRAME_TOP: 136,
         INTAKE_FRAME_SIDE: 170,
         INTAKE_FRAME_BOTTOM: 184,
+        INTAKE_PIVOT_BRACE: Math.hypot(12, 60),
         TGIntakeArm: Math.hypot(36, 8),
         TR1_IntakeArm: Math.hypot(48, 40),
         TR2_IntakeArm: Math.hypot(12, 48),
