@@ -408,6 +408,15 @@
           <div class="settings-heading">TT 輸出軸</div>
           <label class="mount-field">扁軸外徑<input data-export-setting="ttShaftFlatDiameterMm" type="number" min="1" max="30" step="0.1" oninput="window.blocks.setExportSetting('ttShaftFlatDiameterMm', this.value)" title="曲柄扁軸孔外徑 mm"></label>
           <label class="mount-field">削邊厚<input data-export-setting="ttShaftFlatThicknessMm" type="number" min="0.5" max="30" step="0.1" oninput="window.blocks.setExportSetting('ttShaftFlatThicknessMm', this.value)" title="曲柄扁軸孔雙切邊間距 mm"></label>
+          <div class="settings-heading">MG995 機架槽</div>
+          <label class="mount-field">槽長<input data-mg995-mount-setting="bodyLengthMm" type="number" min="20" max="80" step="0.1" onchange="window.blocks.setMg995MountSetting('bodyLengthMm', this.value)" title="伺服本體穿板槽長 mm（本體 40.7 含公差）"></label>
+          <label class="mount-field">槽寬<input data-mg995-mount-setting="bodyWidthMm" type="number" min="10" max="40" step="0.1" onchange="window.blocks.setMg995MountSetting('bodyWidthMm', this.value)" title="伺服本體穿板槽寬 mm（本體 19.7 含公差）"></label>
+          <label class="mount-field">軸偏移<input data-mg995-mount-setting="shaftOffsetMm" type="number" min="0" max="40" step="0.1" onchange="window.blocks.setMg995MountSetting('shaftOffsetMm', this.value)" title="輸出軸心到槽近端距離 mm"></label>
+          <label class="mount-field">耳孔徑<input data-mg995-mount-setting="screwDiameterMm" type="number" min="0.5" max="10" step="0.1" onchange="window.blocks.setMg995MountSetting('screwDiameterMm', this.value)" title="凸緣耳螺絲孔直徑 mm（M3 通孔 3.2）"></label>
+          <label class="mount-field">耳孔距<input data-mg995-mount-setting="screwSpanMm" type="number" min="20" max="80" step="0.1" onchange="window.blocks.setMg995MountSetting('screwSpanMm', this.value)" title="兩耳螺絲孔沿機身長向的中心距 mm"></label>
+          <label class="mount-field">孔間距<input data-mg995-mount-setting="screwSpacingMm" type="number" min="0" max="30" step="0.1" onchange="window.blocks.setMg995MountSetting('screwSpacingMm', this.value)" title="同一耳上下兩孔中心距 mm；0＝每耳單孔"></label>
+          <label class="mount-field">缺口寬<input data-mg995-mount-setting="cableNotchWidthMm" type="number" min="0" max="20" step="0.5" onchange="window.blocks.setMg995MountSetting('cableNotchWidthMm', this.value)" title="機身尾端線槽缺口寬 mm（出線口兼 180° 反裝防呆）；0＝不開"></label>
+          <label class="mount-field">缺口深<input data-mg995-mount-setting="cableNotchDepthMm" type="number" min="0" max="20" step="0.5" onchange="window.blocks.setMg995MountSetting('cableNotchDepthMm', this.value)" title="線槽缺口深 mm（沿機身長向外擴）；0＝不開"></label>
         </div>
           </details>
           <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>
@@ -744,6 +753,15 @@
           <div class="settings-heading">TT 輸出軸</div>
           <label class="mount-field">扁軸外徑<input data-export-setting="ttShaftFlatDiameterMm" type="number" min="1" max="30" step="0.1" oninput="window.blocks.setExportSetting('ttShaftFlatDiameterMm', this.value)" title="曲柄扁軸孔外徑 mm"></label>
           <label class="mount-field">削邊厚<input data-export-setting="ttShaftFlatThicknessMm" type="number" min="0.5" max="30" step="0.1" oninput="window.blocks.setExportSetting('ttShaftFlatThicknessMm', this.value)" title="曲柄扁軸孔雙切邊間距 mm"></label>
+          <div class="settings-heading">MG995 機架槽</div>
+          <label class="mount-field">槽長<input data-mg995-mount-setting="bodyLengthMm" type="number" min="20" max="80" step="0.1" onchange="window.blocks.setMg995MountSetting('bodyLengthMm', this.value)" title="伺服本體穿板槽長 mm（本體 40.7 含公差）"></label>
+          <label class="mount-field">槽寬<input data-mg995-mount-setting="bodyWidthMm" type="number" min="10" max="40" step="0.1" onchange="window.blocks.setMg995MountSetting('bodyWidthMm', this.value)" title="伺服本體穿板槽寬 mm（本體 19.7 含公差）"></label>
+          <label class="mount-field">軸偏移<input data-mg995-mount-setting="shaftOffsetMm" type="number" min="0" max="40" step="0.1" onchange="window.blocks.setMg995MountSetting('shaftOffsetMm', this.value)" title="輸出軸心到槽近端距離 mm"></label>
+          <label class="mount-field">耳孔徑<input data-mg995-mount-setting="screwDiameterMm" type="number" min="0.5" max="10" step="0.1" onchange="window.blocks.setMg995MountSetting('screwDiameterMm', this.value)" title="凸緣耳螺絲孔直徑 mm（M3 通孔 3.2）"></label>
+          <label class="mount-field">耳孔距<input data-mg995-mount-setting="screwSpanMm" type="number" min="20" max="80" step="0.1" onchange="window.blocks.setMg995MountSetting('screwSpanMm', this.value)" title="兩耳螺絲孔沿機身長向的中心距 mm"></label>
+          <label class="mount-field">孔間距<input data-mg995-mount-setting="screwSpacingMm" type="number" min="0" max="30" step="0.1" onchange="window.blocks.setMg995MountSetting('screwSpacingMm', this.value)" title="同一耳上下兩孔中心距 mm；0＝每耳單孔"></label>
+          <label class="mount-field">缺口寬<input data-mg995-mount-setting="cableNotchWidthMm" type="number" min="0" max="20" step="0.5" onchange="window.blocks.setMg995MountSetting('cableNotchWidthMm', this.value)" title="機身尾端線槽缺口寬 mm（出線口兼 180° 反裝防呆）；0＝不開"></label>
+          <label class="mount-field">缺口深<input data-mg995-mount-setting="cableNotchDepthMm" type="number" min="0" max="20" step="0.5" onchange="window.blocks.setMg995MountSetting('cableNotchDepthMm', this.value)" title="線槽缺口深 mm（沿機身長向外擴）；0＝不開"></label>
         </div>
       </details>
       <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>
@@ -778,6 +796,6 @@
     </button>
   </nav>
 
-  <script type="module" src="js/blocks/app.js?v=20260711_01"></script>
+  <script type="module" src="js/blocks/app.js?v=20260711_02"></script>
 </body>
 </html>

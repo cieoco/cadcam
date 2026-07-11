@@ -115,6 +115,28 @@ function svgTtShaftFlatPath(cx, cy, settings) {
   return svgPolyline(ttShaftFlatPoints(cx, cy, settings));
 }
 
+// MG995 穿板槽的 local 外形（+X＝機身反方向、輸出軸心在原點）：
+// 矩形本體槽，機身尾端可帶線材缺口——走線出口兼 180° 反裝防呆
+//（軸心偏一端、耳孔卻對稱，反裝鎖得上但軸心會偏掉；反裝時出線端被板封死，一裝就發現）。
+// 缺口寬或深為 0 則是純矩形。2D 預覽與 DXF/SVG 匯出共用這一份。
+export function mg995SlotOutline(m = {}) {
+  const bodyLen = Number(m.bodyLengthMm) || 41.2;
+  const halfW = (Number(m.bodyWidthMm) || 20.2) / 2;
+  const shaftOffset = Number(m.shaftOffsetMm) || 10;
+  const notchW = Math.min(Number(m.cableNotchWidthMm) || 0, halfW * 2);
+  const notchD = Number(m.cableNotchDepthMm) || 0;
+  const maxX = shaftOffset;                 // 槽近端（輸出軸側）
+  const minX = shaftOffset - bodyLen;       // 槽遠端（機身尾端、出線側）
+  if (notchW <= 0 || notchD <= 0) {
+    return [{ x: minX, y: -halfW }, { x: maxX, y: -halfW }, { x: maxX, y: halfW }, { x: minX, y: halfW }];
+  }
+  const hn = notchW / 2;
+  return [
+    { x: minX, y: -halfW }, { x: maxX, y: -halfW }, { x: maxX, y: halfW }, { x: minX, y: halfW },
+    { x: minX, y: hn }, { x: minX - notchD, y: hn }, { x: minX - notchD, y: -hn }, { x: minX, y: -hn }
+  ];
+}
+
 function linkHoleSpecs(comp, length, settings) {
   const { holeDiameterMm, ttShaftFlatDiameterMm, ttShaftFlatThicknessMm } = normalizeExportSettings(settings);
   const holeR = round(holeDiameterMm / 2, 3);
@@ -618,13 +640,14 @@ function dxfForGear(comp, geometry) {
   ].join('\n') + '\n';
 }
 
-function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
+function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   const nodes = (frameNodes || []).filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
   const { barWidthMm, holeDiameterMm } = normalizeExportSettings(settings);
   const holeR = holeDiameterMm / 2;
   const frameR = barWidthMm / 2;
   const outlines = [];
   const mountOutlines = [];
+  const cutouts = [];   // 非圓形的內部切割（MG995 穿板槽），與 holes 一樣屬於板內開孔
   const holes = [];
   let barAxis = null;
   const addHole = (x, y, r, layer = 'HOLE') => {
@@ -655,7 +678,7 @@ function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
 
   nodes.forEach(p => addHole(p.x, p.y, holeR, 'PIVOT_HOLE'));
 
-  ttMounts.forEach(mount => {
+  motorMounts.forEach(mount => {
     if (!mount || !mount.center || !Number.isFinite(mount.center.x)) return;
     const rot = (Number(mount.rotDeg) || 0) * Math.PI / 180;
     const cos = Math.cos(rot), sin = Math.sin(rot);
@@ -663,6 +686,39 @@ function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
       x: mount.center.x + x * cos + y * sin,
       y: mount.center.y - x * sin + y * cos
     });
+    if (mount.kind === 'mg995') {
+      // MG995 穿板式固定：本體矩形槽（含線槽缺口）+ 兩耳共 4 個螺絲孔。
+      // CAD local 與 TT 同慣例：+X 為機身反方向（機殼沿 -X 延伸），輸出軸心在原點。
+      const m = mount.settings || {};
+      const bodyLen = Number(m.bodyLengthMm) || 41.2;
+      const bodyWidth = Number(m.bodyWidthMm) || 20.2;
+      const shaftOffset = Number(m.shaftOffsetMm) || 10;
+      const screwR = (Number(m.screwDiameterMm) || 3.2) / 2;
+      const screwSpan = Number(m.screwSpanMm) || 49.5;
+      const screwSpacing = Number(m.screwSpacingMm) || 10;
+      const halfW = bodyWidth / 2;
+      const slotOutline = mg995SlotOutline(m);
+      cutouts.push({ layer: 'MG995_SLOT', points: slotOutline.map(p => local(p.x, p.y)) });
+      const slotMinX = Math.min(...slotOutline.map(p => p.x));   // 含缺口深度
+      const slotMaxX = Math.max(...slotOutline.map(p => p.x));
+      const earX = shaftOffset - bodyLen / 2;    // 耳孔跨距以機殼中心為準，不是軸心
+      [-1, 1].forEach(sx => [-1, 1].forEach(sy => {
+        const p = local(earX + sx * screwSpan / 2, sy * screwSpacing / 2);
+        addHole(p.x, p.y, screwR, 'MG995_SCREW');
+      }));
+      const margin = 5;
+      const pad = Math.max(screwR, margin);
+      const contentMinX = Math.min(slotMinX, earX - screwSpan / 2);
+      const contentMaxX = Math.max(slotMaxX, earX + screwSpan / 2);
+      const contentHalfY = Math.max(halfW, screwSpacing / 2 + screwR);
+      mountOutlines.push([
+        local(contentMinX - pad, -(contentHalfY + margin)),
+        local(contentMaxX + pad, -(contentHalfY + margin)),
+        local(contentMaxX + pad, contentHalfY + margin),
+        local(contentMinX - pad, contentHalfY + margin)
+      ]);
+      return;
+    }
     const m = mount.settings || {};
     const shaftR = (Number(m.shaftDiameterMm) || 6) / 2;
     const screwR = (Number(m.screwDiameterMm) || 3) / 2;
@@ -691,8 +747,10 @@ function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
   for (let i = holes.length - 1; i >= 0; i--) {
     if (holes[i].layer !== 'PIVOT_HOLE') continue;
     const overlapsMotorHole = holes.some((h, j) =>
-      j !== i && h.layer.startsWith('TT_') && Math.hypot(h.x - holes[i].x, h.y - holes[i].y) < 0.05);
-    if (overlapsMotorHole) holes.splice(i, 1);
+      j !== i && (h.layer.startsWith('TT_') || h.layer.startsWith('MG995_')) && Math.hypot(h.x - holes[i].x, h.y - holes[i].y) < 0.05);
+    // 落在 MG995 穿板槽內的固定孔沒有意義（那塊材料被切掉了），一併移除。
+    const insideCutout = cutouts.some(c => pointInPoly(holes[i], c.points));
+    if (overlapsMotorHole || insideCutout) holes.splice(i, 1);
   }
 
   if (mountOutlines.length && barAxis) {
@@ -722,20 +780,23 @@ function frameGeometry(frameNodes, settings = {}, ttMounts = []) {
   }
 
   if (!outlines.length) return null;
-  return { outlines, holes, warnings: frameWarnings(outlines, holes) };
+  // 固定孔貼近槽緣一樣是薄肉，警告時把槽邊當外緣一起檢查。
+  const warnEdges = [...outlines, ...cutouts.map(c => c.points)];
+  return { outlines, cutouts, holes, warnings: frameWarnings(warnEdges, holes) };
 }
 
-export function inspectFrameExport(frameNodes, settings, ttMounts = []) {
-  return frameGeometry(frameNodes, settings, ttMounts);
+export function inspectFrameExport(frameNodes, settings, motorMounts = []) {
+  return frameGeometry(frameNodes, settings, motorMounts);
 }
 
-export function frameExportWarnings(frameNodes, settings, ttMounts = []) {
-  return inspectFrameExport(frameNodes, settings, ttMounts)?.warnings || [];
+export function frameExportWarnings(frameNodes, settings, motorMounts = []) {
+  return inspectFrameExport(frameNodes, settings, motorMounts)?.warnings || [];
 }
 
 function boundsForFrame(geometry) {
   const xs = [], ys = [];
   geometry.outlines.flat().forEach(p => { xs.push(p.x); ys.push(p.y); });
+  (geometry.cutouts || []).forEach(c => c.points.forEach(p => { xs.push(p.x); ys.push(p.y); }));
   geometry.holes.forEach(h => {
     xs.push(h.x - h.r, h.x + h.r);
     ys.push(h.y - h.r, h.y + h.r);
@@ -749,13 +810,15 @@ function boundsForFrame(geometry) {
   };
 }
 
-function svgForFrame(frameNodes, settings, ttMounts) {
-  const geometry = frameGeometry(frameNodes, settings, ttMounts);
+function svgForFrame(frameNodes, settings, motorMounts) {
+  const geometry = frameGeometry(frameNodes, settings, motorMounts);
   if (!geometry) return null;
   const b = boundsForFrame(geometry);
   const width = round(b.maxX - b.minX);
   const height = round(b.maxY - b.minY);
   const paths = geometry.outlines.map(points => `    <path d="${svgPolyline(points)}" />`).join('\n');
+  const cutouts = (geometry.cutouts || []).map(c =>
+    `    <path d="${svgPolyline(c.points)}" data-layer="${esc(c.layer)}" />`).join('\n');
   const holes = geometry.holes.map(h =>
     `    <circle cx="${h.x}" cy="${h.y}" r="${h.r}" data-layer="${esc(h.layer)}" />`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -763,14 +826,14 @@ function svgForFrame(frameNodes, settings, ttMounts) {
   <title>frame</title>
   <g fill="none" stroke="#000" stroke-width="0.25">
 ${paths}
-${holes}
+${cutouts ? cutouts + '\n' : ''}${holes}
   </g>
 </svg>
 `;
 }
 
-function dxfForFrame(frameNodes, settings, ttMounts) {
-  const geometry = frameGeometry(frameNodes, settings, ttMounts);
+function dxfForFrame(frameNodes, settings, motorMounts) {
+  const geometry = frameGeometry(frameNodes, settings, motorMounts);
   if (!geometry) return null;
   return [
     dxfPair(0, 'SECTION'),
@@ -781,6 +844,7 @@ function dxfForFrame(frameNodes, settings, ttMounts) {
     dxfPair(0, 'SECTION'),
     dxfPair(2, 'ENTITIES'),
     ...geometry.outlines.map(points => dxfPolyline(points, 'FRAME_CUT')),
+    ...(geometry.cutouts || []).map(c => dxfPolyline(c.points, c.layer)),
     ...geometry.holes.map(h => dxfCircle(h.x, h.y, h.r, h.layer)),
     dxfPair(0, 'ENDSEC'),
     dxfPair(0, 'EOF')
@@ -847,15 +911,15 @@ export function exportLinksAsDxf(comps, pts, params, settings) {
   return links.length + plates.length + gears.length;
 }
 
-export function exportFrameAsSvg(frameNodes, settings, ttMounts = []) {
-  const svg = svgForFrame(frameNodes, settings, ttMounts);
+export function exportFrameAsSvg(frameNodes, settings, motorMounts = []) {
+  const svg = svgForFrame(frameNodes, settings, motorMounts);
   if (!svg) return 0;
   downloadText(svg, 'frame.svg', 'image/svg+xml');
   return 1;
 }
 
-export function exportFrameAsDxf(frameNodes, settings, ttMounts = []) {
-  const dxf = dxfForFrame(frameNodes, settings, ttMounts);
+export function exportFrameAsDxf(frameNodes, settings, motorMounts = []) {
+  const dxf = dxfForFrame(frameNodes, settings, motorMounts);
   if (!dxf) return 0;
   downloadText(dxf, 'frame.dxf', 'application/dxf');
   return 1;

@@ -407,6 +407,9 @@ export function createViewer(container) {
         const shape=new THREE.Shape(); shape.moveTo(outline[0].x,outline[0].y);
         outline.slice(1).forEach(p=>shape.lineTo(p.x,p.y)); shape.closePath();
         if(index===0)(model.frame.holes||[]).forEach(h=>{ const path=new THREE.Path(); path.absarc(h.x,h.y,Math.max(.2,h.r),0,Math.PI*2,false); shape.holes.push(path); });
+        // 非圓形切割（MG995 穿板槽）：多邊形內孔，同樣只挖在主外形上。
+        if(index===0)(model.frame.cutouts||[]).forEach(c=>{ const pts=c.points; if(!Array.isArray(pts)||pts.length<3)return;
+          const path=new THREE.Path(); path.moveTo(pts[0].x,pts[0].y); pts.slice(1).forEach(p=>path.lineTo(p.x,p.y)); path.closePath(); shape.holes.push(path); });
         const geo=new THREE.ExtrudeGeometry(shape,{depth:model.frame.thickness,bevelEnabled:false,curveSegments:24});
         const mesh=new THREE.Mesh(geo,plateMaterial(model.frame.color||'#465568')); mesh.position.z=model.frame.z; addPart(mesh,'frame');
       });
