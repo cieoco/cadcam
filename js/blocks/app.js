@@ -14,7 +14,6 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { solveTopology, sweepTopology } from '../multilink/solver.js';
-import { createGearPath } from '../utils/gear-geometry.js';   // 齒輪漸開線齒廓（rack 繪製在 transmission-render.js）
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
 // computeBodyLayers：2D 疊放順序與 3D z 分層共用同一套，兩邊才一致。
@@ -36,8 +35,7 @@ import { S } from './state.js';          // 跨模組共享的可變狀態（S.c
 import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js';
 import { rackGuideThetaRange } from './rack-limits.js';
 import { circleRectCompression } from './intake-contact.js';
-import { drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
-import { gearMeshPhaseDeg } from './transmission-geometry.js';
+import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
 import { drawCam as renderCam, drawWorkpiece as renderWorkpiece } from './special-part-render.js';
 import { drawPlate as renderPlate } from './plate-render.js';
 import * as Settings from './settings.js';   // 匯出 / TT / MG995 安裝設定（localStorage 持久化 + 表單同步）
@@ -840,64 +838,14 @@ function buildMotorMounts(motorIds, groundIds) {
 // svg / TX / TY / frameUpdaters / pointCoords / selectGear / selectTriangle / gearMeshOff 等。
 // 目前有 gear / triangle；bar / slider / 馬達之後逐刀填表（每刀瀏覽器驗證）。
 function drawGearPart(c, pts) {
-  // 齒輪：在連桿下層畫齒形多邊形（漸開線齒廓由 createGearPath 產），每幀只更新旋轉。
-  // 轉角＝輸出銷(p2)相對中心(p1)的角度;嚙合對的驅動/從動會自然反向轉。
-  if (!c.p1 || !c.p2) return;
-  const teeth = Math.max(6, Math.round(Number(c.teeth) || 12));
-  const R = Number(S.topo.params[c.radiusParam]) || 40;        // 節圓半徑（世界 mm）
-  const localPts = createGearPath({ teeth, module: (2 * R) / teeth });
-  const sc = View.getScale();
-  const polyStr = localPts.map(p => `${(p.x * sc).toFixed(2)},${(-p.y * sc).toFixed(2)}`).join(' ');
-  const meshDeg = gearMeshPhaseDeg(c, pts, gearById);
-  const isSelGear = c.id === S.selectedGearId;
-  const meshOff = gearMeshOff(c);   // 兩中心都接地但沒對好咬合距離 → 紅色虛線環提示
-  const g = document.createElementNS(SVG_NS, 'g');
-  const poly = document.createElementNS(SVG_NS, 'polygon');
-  poly.setAttribute('points', polyStr);
-  poly.setAttribute('fill', (c.color || '#b0772e') + (isSelGear ? '55' : '33'));
-  poly.setAttribute('stroke', meshOff ? '#e74c3c' : (isSelGear ? '#e67e22' : (c.color || '#b0772e')));
-  poly.setAttribute('stroke-width', Math.max(1, (isSelGear ? 2.4 : 1.4) * sc));
-  poly.setAttribute('stroke-linejoin', 'round');
-  if (meshOff) {
-    poly.setAttribute('stroke-dasharray', `${(4 * sc).toFixed(1)},${(3 * sc).toFixed(1)}`);
-    const t = document.createElementNS(SVG_NS, 'title');
-    t.textContent = '這對齒輪的兩個軸心都已固定，但中心距不等於 Ra+Rb，沒對好咬合——把其中一個中心拖到嚙合圓上再固定';
-    poly.appendChild(t);
-  }
-  poly.style.cursor = 'pointer';
-  poly.addEventListener('pointerdown', (e) => {
-    if (S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars) return;
-    e.stopPropagation();   // 點齒輪本體＝選齒輪（不觸發背景取消選取）
-    selectGear(c.id);
+  const update = renderGear({
+    component: c, points: pts, svg, scale: View.getScale(),
+    project: p => ({ x: TX(p.x), y: TY(p.y) }), params: S.topo.params,
+    gearById, selected: c.id === S.selectedGearId, meshOff: gearMeshOff(c),
+    interactionBlocked: () => Boolean(S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars),
+    onSelect: selectGear, onRotate: startGearManualRotate
   });
-  g.appendChild(poly);
-  svg.appendChild(g);
-  // 輪緣螺栓孔（＝輸出銷 p2，連桿接這裡）：畫成齒輪上的安裝孔，跟著銷走。
-  // 直接放在銷的世界位置（不進旋轉的 g），所以不受齒形嚙合相位 meshDeg 影響、正落在 p2 上。
-  const bolt = document.createElementNS(SVG_NS, 'circle');
-  const pinHoleR = Math.max(1, Number(c.pinHoleDiameter) || 5) / 2;
-  bolt.setAttribute('r', Math.max(2.5, pinHoleR * sc));
-  bolt.setAttribute('fill', '#ffffff');
-  bolt.setAttribute('stroke', c.color || '#b0772e');
-  bolt.setAttribute('stroke-width', Math.max(1.5, 2 * sc));
-  bolt.style.cursor = 'grab';
-  bolt.addEventListener('pointerdown', (e) => startGearManualRotate(e, c.id));
-  const title = document.createElementNS(SVG_NS, 'title');
-  title.textContent = '拖曳旋轉齒輪輸出孔';
-  bolt.appendChild(title);
-  svg.appendChild(bolt);
-  const applyGear = (P) => {
-    const ctr = P[c.p1.id], pin = P[c.p2.id];
-    const ok = ctr && pin && Number.isFinite(ctr.x) && Number.isFinite(pin.x);
-    g.style.display = ok ? '' : 'none';
-    bolt.style.display = ok ? '' : 'none';
-    if (!ok) return;
-    const deg = Math.atan2(pin.y - ctr.y, pin.x - ctr.x) * 180 / Math.PI;
-    g.setAttribute('transform', `translate(${TX(ctr.x)} ${TY(ctr.y)}) rotate(${-(deg + meshDeg)})`);
-    bolt.setAttribute('cx', TX(pin.x)); bolt.setAttribute('cy', TY(pin.y));
-  };
-  applyGear(pts);
-  frameUpdaters.push(applyGear);
+  if (update) frameUpdaters.push(update);
 }
 function drawGearManualHandles(pts) {
   renderGearManualHandles({

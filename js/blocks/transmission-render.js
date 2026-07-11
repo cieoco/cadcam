@@ -1,15 +1,69 @@
 /**
  * blocks / transmission-render
  *
- * 齒輪以外的傳動 SVG 畫法。呼叫端注入座標投影與參數讀取，
+ * 傳動零件的 SVG 畫法。呼叫端注入座標投影與參數讀取，
  * 本模組因此不持有 Blocks 狀態，也不依賴 app.js。
  */
 
-import { buildOpenBeltPath } from './transmission-geometry.js';
-import { createRackPath } from '../utils/gear-geometry.js';
+import { buildOpenBeltPath, gearMeshPhaseDeg } from './transmission-geometry.js';
+import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svgEl = tag => document.createElementNS(SVG_NS, tag);
+
+export function drawGear({ component, points, svg, scale, project, params, gearById, selected, meshOff, interactionBlocked, onSelect, onRotate }) {
+  if (!component.p1 || !component.p2) return null;
+  const teeth = Math.max(6, Math.round(Number(component.teeth) || 12));
+  const radius = Number(params[component.radiusParam]) || 40;
+  const polygonPoints = createGearPath({ teeth, module: 2 * radius / teeth })
+    .map(point => `${(point.x * scale).toFixed(2)},${(-point.y * scale).toFixed(2)}`).join(' ');
+  const meshPhase = gearMeshPhaseDeg(component, points, gearById);
+  const color = component.color || '#b0772e';
+  const group = svgEl('g'), polygon = svgEl('polygon');
+  polygon.setAttribute('points', polygonPoints);
+  polygon.setAttribute('fill', color + (selected ? '55' : '33'));
+  polygon.setAttribute('stroke', meshOff ? '#e74c3c' : (selected ? '#e67e22' : color));
+  polygon.setAttribute('stroke-width', Math.max(1, (selected ? 2.4 : 1.4) * scale));
+  polygon.setAttribute('stroke-linejoin', 'round');
+  if (meshOff) {
+    polygon.setAttribute('stroke-dasharray', `${(4 * scale).toFixed(1)},${(3 * scale).toFixed(1)}`);
+    const title = svgEl('title');
+    title.textContent = '這對齒輪的兩個軸心都已固定，但中心距不等於 Ra+Rb，沒對好咬合——把其中一個中心拖到嚙合圓上再固定';
+    polygon.appendChild(title);
+  }
+  polygon.style.cursor = 'pointer';
+  polygon.addEventListener('pointerdown', event => {
+    if (interactionBlocked()) return;
+    event.stopPropagation();
+    onSelect(component.id);
+  });
+  group.appendChild(polygon);
+  svg.appendChild(group);
+
+  const bolt = svgEl('circle');
+  const pinHoleRadius = Math.max(1, Number(component.pinHoleDiameter) || 5) / 2;
+  bolt.setAttribute('r', Math.max(2.5, pinHoleRadius * scale));
+  bolt.setAttribute('fill', '#ffffff');
+  bolt.setAttribute('stroke', color);
+  bolt.setAttribute('stroke-width', Math.max(1.5, 2 * scale));
+  bolt.style.cursor = 'grab';
+  bolt.addEventListener('pointerdown', event => onRotate(event, component.id));
+  const title = svgEl('title'); title.textContent = '拖曳旋轉齒輪輸出孔'; bolt.appendChild(title);
+  svg.appendChild(bolt);
+
+  const update = current => {
+    const center = current[component.p1.id], pin = current[component.p2.id];
+    const valid = center && pin && Number.isFinite(center.x) && Number.isFinite(pin.x);
+    group.style.display = valid ? '' : 'none'; bolt.style.display = valid ? '' : 'none';
+    if (!valid) return;
+    const angle = Math.atan2(pin.y - center.y, pin.x - center.x) * 180 / Math.PI;
+    const centerPx = project(center), pinPx = project(pin);
+    group.setAttribute('transform', `translate(${centerPx.x} ${centerPx.y}) rotate(${-(angle + meshPhase)})`);
+    bolt.setAttribute('cx', pinPx.x); bolt.setAttribute('cy', pinPx.y);
+  };
+  update(points);
+  return update;
+}
 
 export function drawPulley({ component, points, svg, scale, project, radius, pinRadius }) {
   if (!component.p1 || !component.p2) return null;
