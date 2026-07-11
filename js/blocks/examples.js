@@ -150,13 +150,6 @@ const EXAMPLE_LESSONS = {
     learn: '馬達可透過皮帶遠端驅動進料滾輪；擺臂、滾輪與底板共同形成入口間隙。',
     try: ['改前端滾輪半徑', '調整擺臂高度與入口間隙', '切換馬達方向確認物件是吸入而非推出']
   },
-  'competition-flywheel-shooter': {
-    group: 'manipulator',
-    level: '實戰',
-    use: '飛輪射球/拋射機構：用大輪帶小輪加速，讓輸出輪高速旋轉。',
-    learn: '速度比和半徑比相反；大驅動輪帶小輸出輪可以提高轉速。',
-    try: ['改輸出輪半徑', '拉開兩輪中心距', '比較它和減速齒輪列的差異']
-  },
   'competition-rack-lift': {
     group: 'lift-motion',
     level: '實戰',
@@ -173,7 +166,7 @@ const EXAMPLE_LESSONS = {
   }
 };
 
-export const BLOCK_EXAMPLES = [
+const ALL_BLOCK_EXAMPLES = [
   {
     id: 'fourbar-crank-rocker',
     title: '四連桿：曲柄搖桿',
@@ -681,6 +674,10 @@ export const BLOCK_EXAMPLES = [
     snapshot: { kind: 'blocks', v: 1, counter: 0, comps: [], params: { theta: 0 } }
   }
 ];
+
+export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES.filter(
+  example => example.id !== 'competition-flywheel-shooter'
+);
 
 export function getExample(id) {
   return BLOCK_EXAMPLES.find(example => example.id === id) || null;

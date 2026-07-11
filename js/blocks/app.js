@@ -1558,7 +1558,7 @@ function draw() {
   const groundIds = new Set((S.compiled.steps || []).filter(s => s.type === 'ground').map(s => s.id));
   const motorCenterIds = new Set((S.compiled.steps || []).filter(s => s.type === 'input_crank').map(s => s.center));
   const camCenterIds = new Set(S.comps.filter(c => c.type === 'cam' && c.p1).map(c => c.p1.id));
-  Model.motorPointIds(S.comps).forEach(id => { if (!camCenterIds.has(id)) motorCenterIds.add(id); });
+  Model.motorPointIds(S.comps).forEach(id => motorCenterIds.add(id));
   const modelMotorCenterIds = new Set(motorCenterIds);
   Model.motorPointIds(S.comps).forEach(id => modelMotorCenterIds.add(id));
   const motorMounts = buildMotorMounts(modelMotorCenterIds, groundIds);
@@ -1656,7 +1656,7 @@ function draw() {
                          : Render.drawTTMotor(p.x, p.y, rotDeg, motorLayer);
     const label = Render.drawMotorLabel(p.x, p.y, isServo ? 'MG995' : 'TT', isServo ? '#2c6fbb' : '#c9971b', motorLayer);
     // 每幀更新：本體只改 transform（位置+朝向）、標籤只改 x/y；縮放在播放時不變故內部尺寸免重算。
-    frameUpdaters.push((P) => {
+    const updateMotor = (P) => {
       const q = P[id];
       const ok = q && Number.isFinite(q.x) && Number.isFinite(q.y);
       body.style.display = ok ? '' : 'none';
@@ -1665,7 +1665,9 @@ function draw() {
       body.setAttribute('transform', `translate(${TX(q.x)} ${TY(q.y)}) rotate(${rotDeg})`);
       label.setAttribute('x', TX(q.x));
       label.setAttribute('y', TY(q.y) - 16 * View.getScale());
-    });
+    };
+    // 凸輪軸心固定在機架上；馬達只需畫一次，避免加入一般曲柄的逐幀更新鏈。
+    if (!camCenterIds.has(id)) frameUpdaters.push(updateMotor);
   });
 
   // 桿件：依層級放進對應的 <g>（內層在底、外層在上）；同層內紅色曲柄最後畫不被蓋住。
