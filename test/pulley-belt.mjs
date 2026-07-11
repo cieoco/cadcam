@@ -5,6 +5,7 @@
 import { sweep, angle, unwrapSum, check, report } from './_harness.mjs';
 import { BLOCK_EXAMPLES } from '../js/blocks/examples.js';
 import { normalizeSnapshot } from '../js/blocks/schema.js';
+import { buildOpenBeltPath, openBeltTangents } from '../js/blocks/transmission-geometry.js';
 
 const example = BLOCK_EXAMPLES.find(e => e.id === 'pulley-belt');
 const norm = normalizeSnapshot(example.snapshot);
@@ -29,5 +30,8 @@ const d = Math.hypot(b.x - a.x, b.y - a.y);
 const tangentExists = d > Math.abs(RA - RB);
 check('兩輪可建立開口皮帶外公切線', tangentExists,
   `中心距 ${d.toFixed(1)}mm，半徑差 ${Math.abs(RA - RB).toFixed(1)}mm`);
+const tangents = openBeltTangents(a, RA, b, RB);
+const path = buildOpenBeltPath(a, RA, b, RB, p => p);
+check('皮帶 SVG 路徑由獨立傳動幾何模組生成', tangents.length === 2 && path.startsWith('M ') && path.endsWith(' Z'));
 
 report('pulley-belt');

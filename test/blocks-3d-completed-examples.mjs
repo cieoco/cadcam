@@ -163,11 +163,17 @@ check('皮帶輪馬達本體背向另一輪', pulleyMotor && drivenPulley && dot
 
 const intake=sceneFor('competition-roller-intake');
 const intakeComps=BLOCK_EXAMPLES.find(e=>e.id==='competition-roller-intake').snapshot.comps;
-check('競賽 Intake 包含雙輪皮帶、雙側擺臂、底板與入口板',intake.pulleys.length===2&&intake.belts.length===1&&['IntakeArmInner','IntakeArmOuter','IntakeGuide','IntakeFunnel'].every(id=>intakeComps.some(c=>c.id===id)),
-  `pulleys=${intake.pulleys.length}, belts=${intake.belts.length}`);
-const intakeArms=intake.sticks.filter(s=>s.id==='IntakeArmInner'||s.id==='IntakeArmOuter');
-check('Intake 雙側擺臂位於不同裝配層',intakeArms.length===2&&intakeArms[0].z!==intakeArms[1].z,
-  `z=${intakeArms.map(a=>a.z).join('/')}`);
+// Intake 已改為「結構板機架 + 單支折線擺臂 + 伺服曲柄」；不再是舊版的雙皮帶輪結構。
+const intakePlateIds = ['IntakeServoPlate', 'IntakeFrameColumn', 'IntakeArm'];
+check('競賽 Intake 包含結構板機架、伺服曲柄、連桿與折線擺臂',
+  intakePlateIds.every(id => intakeComps.some(c => c.id === id)) &&
+  ['IntakeCrank', 'IntakeCoupler', 'IntakeTarget'].every(id => intakeComps.some(c => c.id === id)) &&
+  intake.plates.length === 3,
+  `plates=${intake.plates.length}`);
+const intakeArm = intake.plates.find(p => p.ids.join(',') === 'INTAKE_PIVOT,ARM_LINK,INTAKE_TIP');
+check('Intake 擺臂以獨立 3D 結構板呈現',
+  intakeArm && intakeArm.color === '#2f343b' && intakeArm.layer >= 0,
+  `layer=${intakeArm ? intakeArm.layer : 'missing'}, color=${intakeArm ? intakeArm.color : 'missing'}`);
 
 const gripper=sceneFor('gear-gripper',20);
 const gripperJaws=gripper.plates.filter(p=>p.shape==='jaw');
