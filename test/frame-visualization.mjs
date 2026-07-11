@@ -40,4 +40,10 @@ check('滑軌 mount 孔保留為機架視覺連接孔',
 check('機架吸附使用 8mm LEGO pitch',
   snapFrameCoord(18.1) === 16 && snapFrameCoord(20.9) === 24 && snapFrameCoord(-3.9) === 0);
 
+const intake=normalizeSnapshot(BLOCK_EXAMPLES.find(e=>e.id==='competition-roller-intake').snapshot);
+const intakeConnectors=frameConnectorNodes(intake.comps).map(p=>p.id);
+check('Intake 獨立擺臂與導引板不併入 TT 馬達座凸包',
+  !['IMC','IFC','IGR','IGF','IFT'].some(id=>intakeConnectors.includes(id)),
+  `connectors=${intakeConnectors.join(',')}`);
+
 report('frame-visualization');

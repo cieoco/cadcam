@@ -35,6 +35,7 @@ import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, pla
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
 import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js';
 import { rackGuideThetaRange } from './rack-limits.js';
+import { circleRectCompression } from './intake-contact.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('stageSvg');
@@ -1155,6 +1156,19 @@ function drawRackPart(c, pts) {
   frameUpdaters.push(applyRack);
 }
 
+function drawWorkpiecePart(c,pts){
+  const p=pts[c.p1?.id]; if(!p)return;
+  const w=Number(c.width)||48,h=Number(c.height)||48;
+  const g=document.createElementNS(SVG_NS,'g'), rect=document.createElementNS(SVG_NS,'rect');
+  rect.setAttribute('x',TX(p.x)-w*View.getScale()/2); rect.setAttribute('y',TY(p.y)-h*View.getScale()/2);
+  rect.setAttribute('width',w*View.getScale()); rect.setAttribute('height',h*View.getScale()); rect.setAttribute('rx',8);
+  rect.setAttribute('fill',(c.color||'#d97706')+'33'); rect.setAttribute('stroke',c.color||'#d97706'); rect.setAttribute('stroke-width',2);
+  g.appendChild(rect);
+  const roller=S.comps.find(x=>x.id==='IntakeFrontRoller'), rp=roller&&pts[roller.p1?.id];
+  if(rp){ const result=circleRectCompression({x:rp.x,y:rp.y,radius:pulleyRadius(roller)},{x:p.x,y:p.y,width:w,height:h}); const t=document.createElementNS(SVG_NS,'text'); t.setAttribute('x',TX(p.x)); t.setAttribute('y',TY(p.y)+4); t.setAttribute('text-anchor','middle'); t.setAttribute('font-size','12'); t.setAttribute('font-weight','700'); t.setAttribute('fill',result.contact?'#117a45':'#b45309'); t.textContent=result.contact?`壓縮 ${result.compression.toFixed(1)}mm`:'未接觸'; g.appendChild(t); }
+  svg.appendChild(g);
+}
+
 
 function drawRackSlot(parent, c, { length, module, bodyHeight, phaseShift, scale }) {
   if (!c.slot) return;
@@ -1516,6 +1530,7 @@ const PART_DRAW = {
   rack:     { phase: 'underlay', draw: drawRackPart },
   cam:      { phase: 'underlay', draw: drawCamPart },
   pulley:   { phase: 'underlay', draw: drawPulleyPart },
+  workpiece:{ phase: 'underlay', draw: drawWorkpiecePart },
   belt:     { phase: 'underlay', draw: drawBeltPart },
   triangle: { phase: 'layered',  draw: drawTrianglePart },
 };
@@ -1553,7 +1568,7 @@ function draw() {
     ttFrameExportMounts({ pts, motorCenterIds: modelMotorCenterIds, motorMounts }));
   drawGround(frameGeometry2d);
   // 兩端都是固定點的接地桿＝機架本身：有機架時交給地基呈現，不重複畫成桿、也不進分層（3D scene-model 同一套規則）。
-  const isGroundBar = (l) => Boolean(frameGeometry2d) && groundIds.has(l.p1) && groundIds.has(l.p2);
+  const isGroundBar = (l) => Boolean(frameGeometry2d) && !S.comps.some(c=>c.id===l.id&&c.frameSeparate) && groundIds.has(l.p1) && groundIds.has(l.p2);
   drawTtMotorMountHoles(motorCenterIds, motorMounts, pts);
   const trajectoryData = getTrajectoryData();
   drawTraceTrajectory(trajectoryData);
@@ -1592,6 +1607,7 @@ function draw() {
   (S.compiled.visualization.links || []).forEach(l => {
     const c = l.id ? S.comps.find(x => x.id === l.id) : null;
     l._zlift = (c && c.zlift) || 0;
+    l._frameSeparate = Boolean(c && c.frameSeparate);
   });
   (S.compiled.visualization.polygons || []).forEach(poly => {
     const k = triKey(poly.points);
@@ -1755,12 +1771,14 @@ function draw() {
   const gearPinIds = new Set(S.comps.filter(c => c.type === 'gear' && c.p2).map(c => c.p2.id));
   const pulleyPinIds = new Set(S.comps.filter(c => c.type === 'pulley' && c.p2).map(c => c.p2.id));
   const camFollowerIds = new Set(S.comps.filter(c => c.type === 'cam' && c.p2).map(c => c.p2.id));
+  const workpieceIds = new Set(S.comps.filter(c=>c.type==='workpiece'&&c.p1).map(c=>c.p1.id));
   Object.keys(pts).forEach(id => {
     if (isHiddenSliderRailPoint(id)) return;
     if (isSliderMountPoint(id)) return;
     if (gearPinIds.has(id)) return;
     if (pulleyPinIds.has(id)) return;
     if (camFollowerIds.has(id)) return;
+    if (workpieceIds.has(id)) return;
     const p = pts[id];
     const isGround = groundIds.has(id);
     const isMotorCenter = motorCenterIds.has(id);
@@ -1892,6 +1910,7 @@ function draw() {
         pin: c.p2.id,
         radius,
         pinRadius: pulleyPinRadius(c, radius),
+        rollerWidth: Number(c.rollerWidth) || 0,
         color: c.color,
       };
     });

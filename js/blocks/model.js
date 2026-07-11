@@ -138,7 +138,9 @@ export function mountLocatorPointIds(comps) {
 
 export function frameConnectorNodes(comps) {
   const locators = mountLocatorPointIds(comps);
-  return frameNodes(comps).filter(p => !isHiddenSliderRailPoint(comps, p.id) && !locators.has(p.id));
+  const separateIds=new Set();
+  (comps||[]).filter(c=>c?.frameSeparate).forEach(c=>pointKeysFor(c).forEach(k=>{if(c[k]?.id)separateIds.add(c[k].id);}));
+  return frameNodes(comps).filter(p => !isHiddenSliderRailPoint(comps, p.id) && !locators.has(p.id) && !separateIds.has(p.id));
 }
 
 export function snapFrameCoord(v, step = LEGO_FRAME_STEP) {

@@ -28,6 +28,7 @@ export const PART_TYPES = {
   cam:      { pointKeys: ['p1', 'p2'],                    paramProps: ['baseRadiusParam', 'liftParam'] }, // 凸輪：中心 + 直動從動點 + 基圓/升程
   pulley:   { pointKeys: ['p1', 'p2'],                    paramProps: ['radiusParam'] },             // 皮帶輪：中心 + 輪緣輸出銷 + 節圓半徑
   belt:     { pointKeys: [],                              paramProps: [] },                          // 皮帶：用 pulley id 連接兩輪，本身沒有接點
+  workpiece:{ pointKeys: ['p1'],                          paramProps: [] },                          // 模擬物件：只用於接觸驗證，不輸出加工
 };
 
 // 所有型別點 key 的聯集。未知型別時當安全後備，行為與舊的扁平 POINT_KEYS 一致（不漏點）。

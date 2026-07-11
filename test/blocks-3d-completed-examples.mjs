@@ -161,6 +161,14 @@ const drivenPulley = pulley.pulleys.find(p => p.id === 'PulleyB');
 check('皮帶輪馬達本體背向另一輪', pulleyMotor && drivenPulley && dotFromToWithDir(pulleyMotor, drivenPulley.center, pulleyMotor.dir) < 0,
   `dir=${pulleyMotor ? `${pulleyMotor.dir.x.toFixed(2)},${pulleyMotor.dir.y.toFixed(2)}` : 'missing'}`);
 
+const intake=sceneFor('competition-roller-intake');
+const intakeComps=BLOCK_EXAMPLES.find(e=>e.id==='competition-roller-intake').snapshot.comps;
+check('競賽 Intake 包含雙輪皮帶、雙側擺臂、底板與入口板',intake.pulleys.length===2&&intake.belts.length===1&&['IntakeArmInner','IntakeArmOuter','IntakeGuide','IntakeFunnel'].every(id=>intakeComps.some(c=>c.id===id)),
+  `pulleys=${intake.pulleys.length}, belts=${intake.belts.length}`);
+const intakeArms=intake.sticks.filter(s=>s.id==='IntakeArmInner'||s.id==='IntakeArmOuter');
+check('Intake 雙側擺臂位於不同裝配層',intakeArms.length===2&&intakeArms[0].z!==intakeArms[1].z,
+  `z=${intakeArms.map(a=>a.z).join('/')}`);
+
 const gripper=sceneFor('gear-gripper',20);
 const gripperJaws=gripper.plates.filter(p=>p.shape==='jaw');
 check('雙齒輪夾持器 3D 有兩顆齒輪與兩片夾爪',gripper.gears.length===2&&gripperJaws.length===2,

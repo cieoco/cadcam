@@ -355,6 +355,22 @@ function solveBodyJointTopology(topology, params) {
     components.forEach((c) => {
         if (c.type !== 'pulley' || !c.p1?.id || !c.p2?.id) return;
         addPointId(c.p1); addPointId(c.p2);
+        if(c.floatingPivot){
+            const fp=c.floatingPivot,pivot=points[fp.pivotCenter];
+            const target=components.find(x=>x.type==='workpiece'&&x.id===fp.targetWorkpiece);
+            const obj=target&&(points[target.p1?.id]||target.p1);
+            if(pivot){
+                const arm=getParamVal(fp.armLengthParam,Math.hypot((c.p1.x||0)-pivot.x,(c.p1.y||0)-pivot.y));
+                let best={angle:Number(fp.restAngle)||0,error:Infinity};
+                for(let i=0;i<=160;i++){
+                    const angle=(Number(fp.minAngle)||-30)+((Number(fp.maxAngle)||15)-(Number(fp.minAngle)||-30))*i/160;
+                    let error=Math.abs(angle-(Number(fp.restAngle)||0))*.001;
+                    if(obj){ const rad=angle*Math.PI/180,x=pivot.x+arm*Math.cos(rad),y=pivot.y+arm*Math.sin(rad),hw=(Number(target.width)||48)/2,hh=(Number(target.height)||48)/2,dx=x-obj.x,dy=y-obj.y,qx=Math.max(-hw,Math.min(hw,dx)),qy=Math.max(-hh,Math.min(hh,dy)),dist=Math.hypot(dx-qx,dy-qy),compression=Math.max(0,getParamVal(c.radiusParam,32)-dist); error=Math.abs(compression-(Number(fp.targetCompression)||0))+Math.abs(angle-(Number(fp.restAngle)||0))*.001; }
+                    if(error<best.error)best={angle,error};
+                }
+                const a=best.angle*Math.PI/180; points[c.p1.id]={x:pivot.x+arm*Math.cos(a),y:pivot.y+arm*Math.sin(a)};
+            }
+        }
         const center = points[c.p1.id];
         if (!center) return;
         const pitchR = getParamVal(c.radiusParam, 32);

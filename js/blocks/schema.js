@@ -63,6 +63,7 @@ function normalizeBar(comp, index, params, warnings) {
     fixedLen: comp.fixedLen !== false
   };
   if (comp.snapLength === false) out.snapLength = false;
+  if (comp.frameSeparate === true) out.frameSeparate = true;
   if (Number.isFinite(Number(comp.assemblyMobility))) out.assemblyMobility = Math.max(0, Math.round(Number(comp.assemblyMobility)));
   if (safeId(comp.assemblyType)) out.assemblyType = comp.assemblyType;
 
@@ -408,6 +409,9 @@ function normalizePulley(comp, index, params, warnings) {
   };
   if (pinRadiusParam) out.pinRadiusParam = pinRadiusParam;
   else if (Number.isFinite(Number(comp.pinRadius))) out.pinRadius = Math.max(1, Math.round(num(comp.pinRadius, R * 0.65)));
+  if (safeId(comp.mountLocatorPoint)) out.mountLocatorPoint = comp.mountLocatorPoint;
+  if (Number.isFinite(Number(comp.rollerWidth))) out.rollerWidth = Math.max(4, Math.min(120, Number(comp.rollerWidth)));
+  if(comp.floatingPivot&&safeId(comp.floatingPivot.pivotCenter))out.floatingPivot={pivotCenter:comp.floatingPivot.pivotCenter,armLengthParam:safeId(comp.floatingPivot.armLengthParam)?comp.floatingPivot.armLengthParam:'',minAngle:Number(comp.floatingPivot.minAngle)||-30,maxAngle:Number(comp.floatingPivot.maxAngle)||15,restAngle:Number(comp.floatingPivot.restAngle)||0,targetWorkpiece:safeId(comp.floatingPivot.targetWorkpiece)?comp.floatingPivot.targetWorkpiece:'',targetCompression:Math.max(0,Number(comp.floatingPivot.targetCompression)||0)};
   if (comp.physicalMotor) out.physicalMotor = String(comp.physicalMotor);
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
   return out;
@@ -429,6 +433,10 @@ function normalizeBelt(comp, index, params, warnings) {
   }
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
   return out;
+}
+
+function normalizeWorkpiece(comp,index,warnings){
+  return {type:'workpiece',id:safeId(comp.id)?comp.id:`Workpiece${index+1}`,p1:normalizePoint(comp.p1,`WP${index+1}`,warnings),width:Math.max(4,roundTenth(comp.width,48)),height:Math.max(4,roundTenth(comp.height,48)),color:SAFE_COLOR.test(comp.color||'')?comp.color:'#d97706'};
 }
 
 export function normalizeSnapshot(obj) {
@@ -456,6 +464,7 @@ export function normalizeSnapshot(obj) {
     else if (raw.type === 'rack') comps.push(normalizeRack(raw, index, params, warnings));
     else if (raw.type === 'cam') comps.push(normalizeCam(raw, index, params, warnings));
     else if (raw.type === 'pulley') comps.push(normalizePulley(raw, index, params, warnings));
+    else if (raw.type === 'workpiece') comps.push(normalizeWorkpiece(raw,index,warnings));
     else if (raw.type === 'belt') comps.push(normalizeBelt(raw, index, params, warnings));
     else warnings.push(`不支援的零件 ${raw.type || '(unknown)'}，已略過。`);
   });

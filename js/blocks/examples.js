@@ -146,9 +146,9 @@ const EXAMPLE_LESSONS = {
   'competition-roller-intake': {
     group: 'manipulator',
     level: '實戰',
-    use: '滾輪進料/吸取機構：把遊戲物件從地面帶進機器內，可接後續輸送或射球。',
-    learn: '皮帶輪可以同步遠端滾輪，馬達位置可以離開實際接觸物件的位置。',
-    try: ['改上下滾輪間距', '改從動輪半徑看表面速度', '把整組旋轉成斜坡式進料']
+    use: '擺臂式進料機構：前端大滾輪把地面物件壓向導引板並帶入機器。',
+    learn: '馬達可透過皮帶遠端驅動進料滾輪；擺臂、滾輪與底板共同形成入口間隙。',
+    try: ['改前端滾輪半徑', '調整擺臂高度與入口間隙', '切換馬達方向確認物件是吸入而非推出']
   },
   'competition-flywheel-shooter': {
     group: 'manipulator',
@@ -590,28 +590,34 @@ export const BLOCK_EXAMPLES = [
   {
     id: 'competition-roller-intake',
     title: '競賽滾輪進料模組',
-    note: '用皮帶同步遠端滾輪，把物件從前方帶入機器內。適合作為 intake / conveyor 的第一個範本。',
+    note: 'TT 馬達透過皮帶驅動前端大滾輪；擺臂、底部導引板與入口斜板構成可實作的 Intake。',
     snapshot: {
       kind: 'blocks',
       v: 1,
-      counter: 4,
+      counter: 9,
       comps: [
         { type: 'pulley', id: 'IntakeMotorRoller', color: '#e74c3c',
-          p1: pt('IMC', 'motor', -72, 0, { physicalMotor: '1' }),
-          p2: pt('IMP', 'floating', -48, 0),
-          radiusParam: 'IR_A', phase: 0 },
+          p1: pt('IMC', 'motor', -72, 32, { physicalMotor: '1' }),
+          p2: pt('IMP', 'floating', -52, 32),
+          radiusParam: 'IR_A', phase: 0, mountLocatorPoint: 'IML' },
+        { type:'anchor', id:'IntakeMotorLocator', p1:pt('IML','fixed',-72,43.18) },
         { type: 'pulley', id: 'IntakeFrontRoller', color: '#16a085',
-          p1: pt('IFC', 'fixed', 72, 0),
-          p2: pt('IFP', 'floating', 96, 0),
-          radiusParam: 'IR_B', phase: 0 },
+          p1: pt('IFC', 'floating', 72, 0),
+          p2: pt('IFP', 'floating', 108, 0),
+          radiusParam: 'IR_B', phase: 0, rollerWidth: 48,
+          floatingPivot:{pivotCenter:'IMC',armLengthParam:'INTAKE_ARM_INNER',minAngle:-28,maxAngle:8,restAngle:-12.5,targetWorkpiece:'IntakeTarget',targetCompression:6} },
         { type: 'belt', id: 'IntakeBelt', color: '#2c3e50',
           driver: 'IntakeMotorRoller', driven: 'IntakeFrontRoller' },
-        bar('IntakeFrame', pt('IMC', 'motor', -72, 0, { physicalMotor: '1' }), pt('IFC', 'fixed', 72, 0), 144, {
-          lenParam: 'INTAKE_FRAME',
-          color: '#95a5a6'
-        })
+        exactBar('IntakeArmInner',pt('IMC','fixed',-72,32),pt('IFC','floating',72,0),Math.hypot(144,32),{lenParam:'INTAKE_ARM_INNER',color:'#3498db',frameSeparate:true,zlift:0}),
+        exactBar('IntakeArmOuter',pt('IMC','fixed',-72,32),pt('IFC','floating',72,0),Math.hypot(144,32),{lenParam:'INTAKE_ARM_OUTER',color:'#2980b9',frameSeparate:true,zlift:1}),
+        {type:'anchor',id:'GuideRear',p1:pt('IGR','fixed',-96,-44)},
+        {type:'anchor',id:'GuideFront',p1:pt('IGF','fixed',100,-44)},
+        exactBar('IntakeGuide',pt('IGR','fixed',-96,-44),pt('IGF','fixed',100,-44),196,{lenParam:'INTAKE_GUIDE',color:'#95a5a6',frameSeparate:true}),
+        {type:'anchor',id:'FunnelTip',p1:pt('IFT','fixed',136,-20)},
+        exactBar('IntakeFunnel',pt('IGF','fixed',100,-44),pt('IFT','fixed',136,-20),Math.hypot(36,24),{lenParam:'INTAKE_FUNNEL',color:'#f39c12',frameSeparate:true}),
+        {type:'workpiece',id:'IntakeTarget',p1:pt('OBJ','floating',126,-12),width:48,height:48,color:'#d97706'}
       ],
-      params: { IR_A: 24, IR_B: 24, INTAKE_FRAME: 144, theta: 0 }
+      params: {IR_A:20,IR_B:36,INTAKE_ARM_INNER:Math.hypot(144,32),INTAKE_ARM_OUTER:Math.hypot(144,32),INTAKE_GUIDE:196,INTAKE_FUNNEL:Math.hypot(36,24),theta:0}
     }
   },
   {

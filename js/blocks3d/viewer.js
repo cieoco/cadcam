@@ -566,6 +566,11 @@ export function createViewer(container) {
       groove.position.z = p.z + p.thickness + 0.35;
       group.add(groove);
 
+      if(p.rollerWidth>0){
+        const roller=new THREE.Mesh(new THREE.CylinderGeometry(p.radius,p.radius,p.rollerWidth,40),plateMaterial('#238f78'));
+        roller.rotation.x=Math.PI/2; roller.position.z=p.z+p.thickness/2; group.add(roller);
+      }
+
       const spokeLen = Math.max(1, p.pinRadius);
       const spoke = new THREE.Mesh(new THREE.BoxGeometry(spokeLen, 2.4, 1.8), plateMaterial(p.color));
       spoke.position.set(spokeLen / 2, 0, p.z + p.thickness + 1.2);
