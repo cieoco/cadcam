@@ -146,9 +146,9 @@ const EXAMPLE_LESSONS = {
   'competition-roller-intake': {
     group: 'manipulator',
     level: '實戰',
-    use: '參考競賽機器人的收放式進料臂：馬達短曲柄推拉長連桿，使前端擺臂繞固定軸升降。',
-    learn: '理解曲柄、連桿與搖臂如何把馬達旋轉轉換成進料臂的有限角度擺動。',
-    try: ['改短曲柄長度觀察擺角', '移動擺臂固定軸比較收放高度', '調整前端臂長確認能否接近黃色物件']
+    use: '參考競賽機器人的收放式進料臂：伺服曲柄推拉連桿，使彎折臂繞固定軸掃過地面收料。',
+    learn: '機架直接用結構板（三點桿）組成：伺服與擺臂樞軸鎖在同一塊板上、穿板槽自動開在板身；曲柄—連桿—搖臂把伺服擺角轉成取物端的掃掠。',
+    try: ['改曲柄或連桿長度，觀察擺程與死點', '調整彎折臂桿段長度（彎角會自動保持）', '移動黃色物件位置，確認取物端的掃入範圍']
   },
   'competition-rack-lift': {
     group: 'lift-motion',
@@ -583,67 +583,74 @@ const ALL_BLOCK_EXAMPLES = [
   {
     id: 'competition-roller-intake',
     title: '競賽擺臂進料機構',
-    note: '依參考圖重建：頂板左端的 MG995 伺服帶動橘色短曲柄，經長連桿推拉黑色進料臂，前端取物端繞固定軸往下掃，把黃色物件撥入機架。',
+    note: '機架全部用結構板組成：伺服板承載 MG995（穿板槽直接開在板上）與擺臂樞軸，折線立柱板連到地面。曲柄經連桿推拉黑色彎折臂，取物端沿地面掃過，把黃色物件耙入機架。',
     snapshot: {
       kind: 'blocks',
       v: 1,
-      counter: 7,
+      counter: 9,
       tracePoint: 'INTAKE_TIP',
       comps: [
-        // 整體座標以下樑中心線 y=8 為準：下樑底緣貼齊 y=0 的地面基線，機架「坐在地上」。
-        // 樞軸緊貼頂樑下緣：伺服（穿板槽）和擺臂軸轂同在一根頂部多孔樑上（同參考圖），
-        // 軸轂座由自動地基生成一塊小圓盤板疊在樑面上，不需要另外的吊桿。
-        { type: 'anchor', id: 'IntakePivotAnchor', p1: pt('INTAKE_PIVOT', 'fixed', -24, 152) },
-        { type: 'anchor', id: 'IntakeFrameTopRight', p1: pt('FRAME_TR', 'fixed', 112, 178) },
-        { type: 'anchor', id: 'IntakeFrameBottomLeft', p1: pt('FRAME_BL', 'fixed', -72, 8) },
-        { type: 'anchor', id: 'IntakeFrameBottomRight', p1: pt('FRAME_BR', 'fixed', 112, 8) },
-        // 頂板左端就是伺服軸心：左側整個開放，擺臂才有空間在機架前緣收放（同參考圖）。
-        // motorMountPoint：MG995 穿板槽/耳孔切在這根頂樑身上——伺服鎖在多孔樑上。
-        exactBar('IntakeFrameTop', pt('INTAKE_MOTOR', 'fixed', -24, 178), pt('FRAME_TR', 'fixed', 112, 178), 136, { lenParam: 'INTAKE_FRAME_TOP', color: '#95a5a6', frameSeparate: true, motorMountPoint: 'INTAKE_MOTOR' }),
-        exactBar('IntakeFrameSide', pt('FRAME_TR', 'fixed', 112, 178), pt('FRAME_BR', 'fixed', 112, 8), 170, { lenParam: 'INTAKE_FRAME_SIDE', color: '#95a5a6', frameSeparate: true }),
-        exactBar('IntakeFrameBottom', pt('FRAME_BL', 'fixed', -72, 8), pt('FRAME_BR', 'fixed', 112, 8), 184, { lenParam: 'INTAKE_FRAME_BOTTOM', color: '#95a5a6', frameSeparate: true }),
-        // 靜止姿勢＝擺動起點（theta=0、phaseOffset=150），舵臂朝左上，同參考圖。
+        // 伺服板＝靜態結構板（樞軸與板尾兩個固定點）：擺臂樞軸、MG995、右側立柱都掛在它上面。
+        // 馬達軸心是板頂點 → MG995 穿板槽/耳孔自動切進這塊板（2D/3D/DXF 同一份幾何）。
+        triangle('IntakeServoPlate',
+          pt('INTAKE_PIVOT', 'fixed', 170.5, 147.1),
+          pt('INTAKE_MOTOR', 'floating', 203.9, 189.5),
+          pt('PLATE_END', 'fixed', 336.5, 144.1), {
+            color: '#95a5a6',
+            gParam: 'INTAKE_PLATE_G', r1Param: 'INTAKE_PLATE_R1', r2Param: 'INTAKE_PLATE_R2'
+          }),
+        // 立柱板（折線桿）：從伺服板尾端往下到地面、再沿地面往左——右立柱＋底座一體成形。
+        triangle('IntakeFrameColumn',
+          pt('PLATE_END', 'fixed', 336.5, 144.1),
+          pt('FRAME_BR', 'fixed', 336.2, 2.1),
+          pt('FRAME_BL', 'fixed', 177.2, 1.2), {
+            color: '#95a5a6', shapeMode: 'polyline',
+            gParam: 'INTAKE_COL_G', r1Param: 'INTAKE_COL_R1', r2Param: 'INTAKE_COL_R2'
+          }),
+        // 靜止姿勢＝擺動起點（theta=0、phaseOffset≈138.8），舵臂朝左下。
+        // mountLocatorPoint：伺服本體朝向定位點（在軸心正下方 → 本體水平朝右），不參與求解。
         bar('IntakeCrank',
-          pt('INTAKE_MOTOR', 'fixed', -24, 178, { physicalMotor: '1' }),
-          pt('CRANK_PIN', 'floating', -51.713, 194), 32, {
+          pt('INTAKE_MOTOR', 'fixed', 203.9, 189.5, { physicalMotor: '1' }),
+          pt('CRANK_PIN', 'floating', 149.8, 237.0), 72, {
             lenParam: 'INTAKE_CRANK', color: '#f05a28', isInput: true,
-            physicalMotor: '1', motorType: 'mg995', servoStart: 0, servoEnd: 45,
-            phaseOffset: 150
+            physicalMotor: '1', motorType: 'mg995', servoStart: 0, servoEnd: 90,
+            phaseOffset: 138.75853160493327,
+            mountLocatorPoint: 'SERVO_DIR'
           }),
+        { type: 'anchor', id: 'IntakeServoDir', p1: pt('SERVO_DIR', 'fixed', 203.9, 179.5) },
         exactBar('IntakeCoupler',
-          pt('CRANK_PIN', 'floating', -51.713, 194),
-          pt('ARM_LINK', 'floating', -52, 160), Math.hypot(0.287, 34), {
-            lenParam: 'INTAKE_COUPLER', color: '#7f8c8d', zlift: 1
+          pt('CRANK_PIN', 'floating', 149.8, 237.0),
+          pt('ARM_LINK', 'floating', 123.0, 182.1), 64, {
+            lenParam: 'INTAKE_COUPLER', color: '#7f8c8d'
           }),
-        // 黑色進料臂：上端吃連桿、軸轂緊貼頂樑固定、前端往左下伸出取物。
-        // 折線桿模式照參考圖畫成彎折桿：連桿端 → 軸轂（折點，開角約 96°）→ 取物端；求解定義不變。
+        // 黑色進料臂（折線桿）：樞軸在伺服板上，彎折點吃連桿，取物端往左下伸出。
+        // 調桿段長度時彎角自動保持（對角線 INTAKE_ARM_R1 是彎角參數）。
         triangle('IntakeArm',
-          pt('INTAKE_PIVOT', 'fixed', -24, 152),
-          pt('ARM_LINK', 'floating', -52, 160),
-          pt('INTAKE_TIP', 'floating', -42, 48), {
-            color: '#2f343b', zlift: 0,
-            snapLength: false,   // 邊長取 0.1mm：靜止姿勢才會精確落在種子座標上
+          pt('INTAKE_PIVOT', 'fixed', 170.5, 147.1),
+          pt('ARM_LINK', 'floating', 123.0, 182.1),
+          pt('INTAKE_TIP', 'floating', 73.9, 118.9), {
+            color: '#2f343b',
+            snapLength: false,   // 邊長取 0.1mm：彎角與靜止姿勢不因整數化漂移
             shapeMode: 'polyline',
+            gParam: 'INTAKE_ARM_G', r1Param: 'INTAKE_ARM_R1', r2Param: 'INTAKE_ARM_R2',
             vertices: [
-              { solve: true, ref: 'p2' },
               { solve: true, ref: 'p1' },
+              { solve: true, ref: 'p2' },
               { solve: true, ref: 'p3' }
             ]
           }),
-        // 黃色物件底邊（39−22=17）貼在下樑上緣（8+9），放在機架地板上等著被撥入。
+        // 黃色物件放在底座板上（底座頂緣≈10.7、物件高 44 → 中心 y=33）；
+        // 取物端低點掃過 y≈47、x 75→270，正好從物件上緣把它往機架內耙。
         { type: 'workpiece', id: 'IntakeTarget',
-          p1: pt('INTAKE_OBJECT', 'floating', 10, 39),
+          p1: pt('INTAKE_OBJECT', 'floating', 150, 33),
           width: 44, height: 44, color: '#f4b400' }
       ],
       params: {
-        INTAKE_CRANK: 32,
-        INTAKE_COUPLER: Math.hypot(0.287, 34),
-        INTAKE_FRAME_TOP: 136,
-        INTAKE_FRAME_SIDE: 170,
-        INTAKE_FRAME_BOTTOM: 184,
-        TGIntakeArm: Math.hypot(28, 8),
-        TR1_IntakeArm: Math.hypot(18, 104),
-        TR2_IntakeArm: Math.hypot(10, 112),
+        INTAKE_PLATE_G: 54, INTAKE_PLATE_R1: 166, INTAKE_PLATE_R2: 141,
+        INTAKE_COL_G: 142, INTAKE_COL_R1: 214, INTAKE_COL_R2: 159,
+        INTAKE_CRANK: 72,
+        INTAKE_COUPLER: 64,
+        INTAKE_ARM_G: 59, INTAKE_ARM_R1: 100.6, INTAKE_ARM_R2: 80,
         theta: 0
       }
     }
