@@ -438,6 +438,15 @@ export function createViewer(container) {
         pl.outline.slice(1).forEach(p => shape.lineTo(p.x, p.y));
         shape.closePath();
         (pl.holes || []).forEach(h => { const path = new THREE.Path(); path.absarc(h.x, h.y, Math.max(0.2, h.r), 0, Math.PI * 2, true); shape.holes.push(path); });
+        // 非圓形切割（如 MG995 穿板槽）：多邊形子路徑挖空
+        (pl.cutouts || []).forEach(c => {
+          if (!c || !Array.isArray(c.points) || c.points.length < 3) return;
+          const path = new THREE.Path();
+          path.moveTo(c.points[0].x, c.points[0].y);
+          c.points.slice(1).forEach(p => path.lineTo(p.x, p.y));
+          path.closePath();
+          shape.holes.push(path);
+        });
       } else {
         shape = pl.shape === 'jaw' ? jawPlateShape(pl.corners, pl.r, holeR, pl.jawTurnSign) : triPlateShape(pl.corners, pl.r, holeR);
       }

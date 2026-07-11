@@ -25,6 +25,20 @@ function arcPoints(center, radius, a0, a1, steps = 14, clockwise = false) {
   return pts;
 }
 
+// 取最短方向掃過的圓弧（|delta| ≤ π）：折線轉角外側收圓用，不含起訖點本身。
+function shortestArcPoints(center, radius, a0, a1, stepAngle = Math.PI / 10) {
+  let delta = a1 - a0;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  const n = Math.max(2, Math.ceil(Math.abs(delta) / stepAngle));
+  const pts = [];
+  for (let i = 1; i < n; i++) {
+    const a = a0 + delta * (i / n);
+    pts.push({ x: center.x + Math.cos(a) * radius, y: center.y + Math.sin(a) * radius });
+  }
+  return pts;
+}
+
 function lineIntersection(a, ua, b, ub) {
   const den = ua.x * ub.y - ua.y * ub.x;
   if (Math.abs(den) < 1e-9) return null;
@@ -129,11 +143,20 @@ export function cleanPolylineOutline(points, radius = DEFAULT_PLATE_RADIUS_WORLD
       const prev = segs[i - 1];
       const next = segs[i];
       const p = clean[i];
-      const hit = lineIntersection(
-        sidePoint(p, prev, side), { x: prev.ux, y: prev.uy },
-        sidePoint(p, next, side), { x: next.ux, y: next.uy }
-      );
-      chain.push(hit || sidePoint(p, next, side));
+      // 彎的外側不能用 miter 交點：急彎時外角會爆成長刺、內側自交。
+      // 外側改成繞頂點的圓弧收圓；內側維持交點（等同 miter，內縮量有限）。
+      const cross = prev.ux * next.uy - prev.uy * next.ux;
+      if (side * cross < -EPS) {
+        chain.push(sidePoint(p, prev, side));
+        chain.push(...shortestArcPoints(p, radius, sideAngle(prev, side), sideAngle(next, side)));
+        chain.push(sidePoint(p, next, side));
+      } else {
+        const hit = lineIntersection(
+          sidePoint(p, prev, side), { x: prev.ux, y: prev.uy },
+          sidePoint(p, next, side), { x: next.ux, y: next.uy }
+        );
+        chain.push(hit || sidePoint(p, next, side));
+      }
     }
     chain.push(sidePoint(clean[clean.length - 1], segs[segs.length - 1], side));
     return chain;
@@ -277,9 +300,22 @@ export function plateCenterline(comp, points) {
   return plateContourPoints(comp, points);
 }
 
+function pointInPoly(p, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
 export function createPlateGeometry(comp, points, options = {}) {
   const radius = Number.isFinite(Number(options.radius)) ? Number(options.radius) : DEFAULT_PLATE_RADIUS_WORLD;
   const holeRadius = Number.isFinite(Number(options.holeRadius)) ? Number(options.holeRadius) : radius * 0.72;
+  // 外加加工特徵（呼叫端算好、世界座標）：extraCutouts＝非圓形切割（如 MG995 穿板槽）、
+  // extraHoles＝額外圓孔（如伺服耳孔）。結構板承載動力來源時由這裡切進板身。
+  const extraCutouts = Array.isArray(options.extraCutouts) ? options.extraCutouts.filter(c => c && Array.isArray(c.points) && c.points.length >= 3) : [];
+  const extraHoles = Array.isArray(options.extraHoles) ? options.extraHoles.filter(h => h && Number.isFinite(h.x) && Number.isFinite(h.y)) : [];
   const mode = plateShapeMode(comp);
   const world = plateVertexWorldPoints(comp, points);
   const contour = world.map(p => ({ x: p.x, y: p.y }));
@@ -291,12 +327,16 @@ export function createPlateGeometry(comp, points, options = {}) {
   else if (mode === 'polygon') outline = roundedPolygonOutline(source || fallback, radius);  // 多邊形板：照孔位收成封閉圓角實心板
   else outline = roundedHullOutline(fallback, radius);                                        // 包絡板：凸包外框
   const holePts = world.filter(p => p.solve || p.hole);
-  const holes = (holePts.length ? holePts : cleanPoints(points))
+  let holes = (holePts.length ? holePts : cleanPoints(points))
     .map(p => ({ x: p.x, y: p.y, r: holeRadius }));
+  // 落在切割槽內或與外加孔重疊的頂點孔沒有意義（材料被切掉／同軸），移除。
+  if (extraCutouts.length) holes = holes.filter(h => !extraCutouts.some(c => pointInPoly(h, c.points)));
+  if (extraHoles.length) holes = holes.filter(h => !extraHoles.some(e => Math.hypot(e.x - h.x, e.y - h.y) < 0.05));
   return {
     mode,
     sourcePoints: source || fallback,
     outlines: outline.length ? [outline] : [],
-    holes
+    cutouts: extraCutouts,
+    holes: [...holes, ...extraHoles]
   };
 }

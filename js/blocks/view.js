@@ -249,8 +249,11 @@ export function jawPlatePath(pivot, drive, tip, turnSign = 0) {
   return outline && outline.length ? polylineOutlinePath(outline) : roundedTriangleHullPath(pivot, drive, tip);
 }
 
-export function platePath(comp, points) {
-  const geometry = createPlateGeometry(comp, points, { radius: HULL_R_WORLD });
+export function platePath(comp, points, extras = null) {
+  const geometry = createPlateGeometry(comp, points, { radius: HULL_R_WORLD, ...(extras || {}) });
   const outline = geometry.outlines[0];
-  return outline && outline.length ? polylineOutlinePath(outline) : '';
+  if (!outline || !outline.length) return '';
+  // 切割槽（如 MG995 穿板槽）當子路徑附加；呼叫端配合 fill-rule="evenodd" 讀作板上開孔。
+  const rings = [outline, ...(geometry.cutouts || []).map(c => c.points)];
+  return rings.map(polylineOutlinePath).join(' ');
 }

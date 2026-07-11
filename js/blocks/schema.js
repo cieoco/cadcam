@@ -64,6 +64,9 @@ function normalizeBar(comp, index, params, warnings) {
   };
   if (comp.snapLength === false) out.snapLength = false;
   if (comp.frameSeparate === true) out.frameSeparate = true;
+  // 宿主機架桿：此桿承載該馬達接點的穿板安裝特徵（MG995 槽/耳孔、TT 孔位），
+  // 匯出時特徵切進桿身、不再進自動地基 frame.dxf。
+  if (safeId(comp.motorMountPoint)) out.motorMountPoint = comp.motorMountPoint;
   if (Number.isFinite(Number(comp.assemblyMobility))) out.assemblyMobility = Math.max(0, Math.round(Number(comp.assemblyMobility)));
   if (safeId(comp.assemblyType)) out.assemblyType = comp.assemblyType;
 
@@ -120,6 +123,7 @@ function normalizeTriangle(comp, index, params, warnings) {
     r2Param,
     sign: Number(comp.sign) < 0 ? -1 : 1
   };
+  if (comp.snapLength === false) out.snapLength = false;   // 與 bar 同義：邊長取 0.1mm，不取整數
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0)))); // 手動疊放相對位移
   const inferredJaw = comp.shape === 'jaw' || /(^|[-_])(?:left|right)?jaw/i.test(id);
   if (inferredJaw) {

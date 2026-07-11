@@ -590,50 +590,60 @@ const ALL_BLOCK_EXAMPLES = [
       counter: 7,
       tracePoint: 'INTAKE_TIP',
       comps: [
-        { type: 'anchor', id: 'IntakePivotAnchor', p1: pt('INTAKE_PIVOT', 'fixed', -12, 22) },
-        { type: 'anchor', id: 'IntakeFrameTopRight', p1: pt('FRAME_TR', 'fixed', 112, 82) },
-        { type: 'anchor', id: 'IntakeFrameBottomLeft', p1: pt('FRAME_BL', 'fixed', -72, -88) },
-        { type: 'anchor', id: 'IntakeFrameBottomRight', p1: pt('FRAME_BR', 'fixed', 112, -88) },
+        // 整體座標以下樑中心線 y=8 為準：下樑底緣貼齊 y=0 的地面基線，機架「坐在地上」。
+        // 樞軸緊貼頂樑下緣：伺服（穿板槽）和擺臂軸轂同在一根頂部多孔樑上（同參考圖），
+        // 軸轂座由自動地基生成一塊小圓盤板疊在樑面上，不需要另外的吊桿。
+        { type: 'anchor', id: 'IntakePivotAnchor', p1: pt('INTAKE_PIVOT', 'fixed', -24, 152) },
+        { type: 'anchor', id: 'IntakeFrameTopRight', p1: pt('FRAME_TR', 'fixed', 112, 178) },
+        { type: 'anchor', id: 'IntakeFrameBottomLeft', p1: pt('FRAME_BL', 'fixed', -72, 8) },
+        { type: 'anchor', id: 'IntakeFrameBottomRight', p1: pt('FRAME_BR', 'fixed', 112, 8) },
         // 頂板左端就是伺服軸心：左側整個開放，擺臂才有空間在機架前緣收放（同參考圖）。
-        exactBar('IntakeFrameTop', pt('INTAKE_MOTOR', 'fixed', -24, 82), pt('FRAME_TR', 'fixed', 112, 82), 136, { lenParam: 'INTAKE_FRAME_TOP', color: '#95a5a6', frameSeparate: true }),
-        exactBar('IntakeFrameSide', pt('FRAME_TR', 'fixed', 112, 82), pt('FRAME_BR', 'fixed', 112, -88), 170, { lenParam: 'INTAKE_FRAME_SIDE', color: '#95a5a6', frameSeparate: true }),
-        exactBar('IntakeFrameBottom', pt('FRAME_BL', 'fixed', -72, -88), pt('FRAME_BR', 'fixed', 112, -88), 184, { lenParam: 'INTAKE_FRAME_BOTTOM', color: '#95a5a6', frameSeparate: true }),
-        // 樞軸支架：擺臂固定軸不能懸空，用一根結構桿從伺服軸心掛下來鎖住（同參考圖的軸轂支架）。
-        exactBar('IntakePivotBrace', pt('INTAKE_MOTOR', 'fixed', -24, 82), pt('INTAKE_PIVOT', 'fixed', -12, 22), Math.hypot(12, 60), { lenParam: 'INTAKE_PIVOT_BRACE', color: '#95a5a6', frameSeparate: true }),
+        // motorMountPoint：MG995 穿板槽/耳孔切在這根頂樑身上——伺服鎖在多孔樑上。
+        exactBar('IntakeFrameTop', pt('INTAKE_MOTOR', 'fixed', -24, 178), pt('FRAME_TR', 'fixed', 112, 178), 136, { lenParam: 'INTAKE_FRAME_TOP', color: '#95a5a6', frameSeparate: true, motorMountPoint: 'INTAKE_MOTOR' }),
+        exactBar('IntakeFrameSide', pt('FRAME_TR', 'fixed', 112, 178), pt('FRAME_BR', 'fixed', 112, 8), 170, { lenParam: 'INTAKE_FRAME_SIDE', color: '#95a5a6', frameSeparate: true }),
+        exactBar('IntakeFrameBottom', pt('FRAME_BL', 'fixed', -72, 8), pt('FRAME_BR', 'fixed', 112, 8), 184, { lenParam: 'INTAKE_FRAME_BOTTOM', color: '#95a5a6', frameSeparate: true }),
         // 靜止姿勢＝擺動起點（theta=0、phaseOffset=150），舵臂朝左上，同參考圖。
         bar('IntakeCrank',
-          pt('INTAKE_MOTOR', 'fixed', -24, 82, { physicalMotor: '1' }),
-          pt('CRANK_PIN', 'floating', -51.713, 98), 32, {
+          pt('INTAKE_MOTOR', 'fixed', -24, 178, { physicalMotor: '1' }),
+          pt('CRANK_PIN', 'floating', -51.713, 194), 32, {
             lenParam: 'INTAKE_CRANK', color: '#f05a28', isInput: true,
-            physicalMotor: '1', motorType: 'mg995', servoStart: 0, servoEnd: 60,
+            physicalMotor: '1', motorType: 'mg995', servoStart: 0, servoEnd: 45,
             phaseOffset: 150
           }),
         exactBar('IntakeCoupler',
-          pt('CRANK_PIN', 'floating', -51.713, 98),
-          pt('ARM_LINK', 'floating', -48, 30), Math.hypot(3.713, 68), {
+          pt('CRANK_PIN', 'floating', -51.713, 194),
+          pt('ARM_LINK', 'floating', -52, 160), Math.hypot(0.287, 34), {
             lenParam: 'INTAKE_COUPLER', color: '#7f8c8d', zlift: 1
           }),
-        // 黑色進料臂：上端吃連桿、中段軸轂固定在機架、前端往左下伸出取物。
+        // 黑色進料臂：上端吃連桿、軸轂緊貼頂樑固定、前端往左下伸出取物。
+        // 折線桿模式照參考圖畫成彎折桿：連桿端 → 軸轂（折點，開角約 96°）→ 取物端；求解定義不變。
         triangle('IntakeArm',
-          pt('INTAKE_PIVOT', 'fixed', -12, 22),
-          pt('ARM_LINK', 'floating', -48, 30),
-          pt('INTAKE_TIP', 'floating', -60, -18), {
-            color: '#2f343b', zlift: 0
+          pt('INTAKE_PIVOT', 'fixed', -24, 152),
+          pt('ARM_LINK', 'floating', -52, 160),
+          pt('INTAKE_TIP', 'floating', -42, 48), {
+            color: '#2f343b', zlift: 0,
+            snapLength: false,   // 邊長取 0.1mm：靜止姿勢才會精確落在種子座標上
+            shapeMode: 'polyline',
+            vertices: [
+              { solve: true, ref: 'p2' },
+              { solve: true, ref: 'p1' },
+              { solve: true, ref: 'p3' }
+            ]
           }),
+        // 黃色物件底邊（39−22=17）貼在下樑上緣（8+9），放在機架地板上等著被撥入。
         { type: 'workpiece', id: 'IntakeTarget',
-          p1: pt('INTAKE_OBJECT', 'floating', 10, -36),
+          p1: pt('INTAKE_OBJECT', 'floating', 10, 39),
           width: 44, height: 44, color: '#f4b400' }
       ],
       params: {
         INTAKE_CRANK: 32,
-        INTAKE_COUPLER: Math.hypot(3.713, 68),
+        INTAKE_COUPLER: Math.hypot(0.287, 34),
         INTAKE_FRAME_TOP: 136,
         INTAKE_FRAME_SIDE: 170,
         INTAKE_FRAME_BOTTOM: 184,
-        INTAKE_PIVOT_BRACE: Math.hypot(12, 60),
-        TGIntakeArm: Math.hypot(36, 8),
-        TR1_IntakeArm: Math.hypot(48, 40),
-        TR2_IntakeArm: Math.hypot(12, 48),
+        TGIntakeArm: Math.hypot(28, 8),
+        TR1_IntakeArm: Math.hypot(18, 104),
+        TR2_IntakeArm: Math.hypot(10, 112),
         theta: 0
       }
     }

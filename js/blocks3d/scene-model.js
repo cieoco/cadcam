@@ -225,6 +225,7 @@ export function buildSceneModel(links, points, opts = {}) {
         jawTurnSign: poly.jawTurnSign,
         outline: shared ? shared.outline : null,
         holes: shared ? shared.holes : null,
+        cutouts: shared ? (shared.cutouts || null) : null,
       });
     }
   });

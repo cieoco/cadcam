@@ -31,7 +31,7 @@ import * as Motion from './motion.js';
 import { analyzeDof } from './dof.js';
 import * as Store from './storage.js';
 import * as Exporters from './exporters.js';
-import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, plateVertices, createPlateGeometry } from './plate-geometry.js';
+import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, plateVertices, plateShapeMode, createPlateGeometry } from './plate-geometry.js';
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
 import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js';
 import { rackGuideThetaRange } from './rack-limits.js';
@@ -998,21 +998,51 @@ function drawTrianglePart(c, pts, ctx) {
     e.stopPropagation();
     selectTriangle(c.id);
   });
+  // 折線桿的機架固定頂點畫一顆軸轂圓盤（對應實體套件鎖在結構上的軸轂），跟著每幀更新。
+  const hubs = [];
+  if (plateShapeMode(c) === 'polyline') {
+    [c.p1, c.p2, c.p3].forEach(p => {
+      if (!p || p.type !== 'fixed') return;
+      const hub = document.createElementNS(SVG_NS, 'circle');
+      hub.setAttribute('fill', color + '59');
+      hub.setAttribute('stroke', isSel ? '#e67e22' : color);
+      hub.setAttribute('stroke-width', 2.5);
+      hub.style.pointerEvents = 'none';
+      hubs.push({ el: hub, id: p.id });
+    });
+  }
+  // 靜態結構板承載的馬達穿板特徵：板身直接開槽（與 DXF/3D 同一份幾何），evenodd 讀作挖空。
+  const hostedPlateMounts = ctx.hostedMounts ? ctx.hostedMounts.get(c.id) : null;
+  const plateExtras = (hostedPlateMounts && hostedPlateMounts.length)
+    ? Exporters.plateMountExtras(hostedPlateMounts) : null;
+  if (plateExtras) path.setAttribute('fill-rule', 'evenodd');
   // 每幀更新：解出三點就更新外形，三點不全則隱藏（與原本「無效不畫」同效果）
   const applyTri = (P) => {
     const [a, b, d] = ids.map(id => P[id]);
     const ok = [a, b, d].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
     path.style.display = ok ? '' : 'none';
     if (ok) {
-      path.setAttribute('d', platePath(c, [a, b, d]) || roundedTriangleHullPath(a, b, d));
+      path.setAttribute('d', platePath(c, [a, b, d], plateExtras) || roundedTriangleHullPath(a, b, d));
     }
+    hubs.forEach(h => {
+      const q = P[h.id];
+      const okHub = ok && q && Number.isFinite(q.x) && Number.isFinite(q.y);
+      h.el.style.display = okHub ? '' : 'none';
+      if (okHub) {
+        h.el.setAttribute('cx', TX(q.x));
+        h.el.setAttribute('cy', TY(q.y));
+        h.el.setAttribute('r', Math.max(8, 15 * View.getScale()));
+      }
+    });
   };
   if (c.shape === 'jaw') {
     path.setAttribute('fill', (c.color || '#ff7043') + '26');
     path.setAttribute('stroke-linejoin', 'round');
   }
   applyTri(pts);
-  ctx.groupForLayer(ctx.triLayerByKey.get(ctx.triKey(ids))).appendChild(path);
+  const triGroup = ctx.groupForLayer(ctx.triLayerByKey.get(ctx.triKey(ids)));
+  triGroup.appendChild(path);
+  hubs.forEach(h => triGroup.appendChild(h.el));
   frameUpdaters.push(applyTri);
   if (isSel) drawPlateShapeHandles(c, ids, pts);   // 選取此板：造形點顯示可編輯握把
 }
@@ -1590,9 +1620,11 @@ function draw() {
   Model.motorPointIds(S.comps).forEach(id => modelMotorCenterIds.add(id));
   const motorMounts = buildMotorMounts(modelMotorCenterIds, groundIds);
   // 地基：用「當前」pts＋mount 算共用 frameGeometry（放馬達即變形），畫在最底層。
-  const frameGeometry2d = Exporters.inspectFrameExport(
-    frameConnectorNodes(), exportSettings(),
+  // 已宣告宿主機架桿的 mount 不進地基——特徵切在宿主桿身上，2D 桿身照合併外形畫（見連桿迴圈）。
+  const mountSplit2d = Exporters.splitMountsByHost(S.comps,
     motorFrameExportMounts({ pts, motorCenterIds: modelMotorCenterIds, motorMounts }));
+  const frameGeometry2d = Exporters.inspectFrameExport(
+    frameConnectorNodes(), exportSettings(), mountSplit2d.free);
   drawGround(frameGeometry2d);
   // 兩端都是固定點的接地桿＝機架本身：有機架時交給地基呈現，不重複畫成桿、也不進分層（3D scene-model 同一套規則）。
   const isGroundBar = (l) => Boolean(frameGeometry2d) && !S.comps.some(c=>c.id===l.id&&c.frameSeparate) && groundIds.has(l.p1) && groundIds.has(l.p2);
@@ -1667,7 +1699,8 @@ function draw() {
   const groupForLayer = (L) => layerGroups.get(L) || motorLayer;
 
   // 三點桿繪製分派（slice 2 登錄表化）— 'layered' 畫進對應 zlift 疊放層（ctx 帶層查詢 helper）。
-  const triCtx = { groupForLayer, triLayerByKey, triKey };
+  // hostedMounts：靜態結構板承載的馬達安裝特徵（穿板槽/耳孔），板身直接開槽。
+  const triCtx = { groupForLayer, triLayerByKey, triKey, hostedMounts: mountSplit2d.hosted };
   S.comps.forEach(c => { const e = PART_DRAW[c.type]; if (e && e.phase === 'layered') e.draw(c, pts, triCtx); });
 
   // 動力來源本體：畫在桿件底下，曲柄轉在它上面。依型號畫 TT馬達或 MG995 伺服。
@@ -1757,6 +1790,16 @@ function draw() {
       targetG.appendChild(hole);
       holes.push({ el: hole, pid });
     });
+    // 宿主機架桿：桿身照「桿＋馬達穿板特徵」合併後的外形畫（與 DXF 同一份幾何），
+    // 穿板槽用 evenodd 挖空——伺服和桿上其他固定孔讀作同一塊料。
+    const hostedMounts2d = l.id ? mountSplit2d.hosted.get(l.id) : null;
+    const hostedBarPath = (a, b) => {
+      const hg = Exporters.inspectFrameExport([a, b], exportSettings(), hostedMounts2d);
+      if (!hg || !hg.outlines.length) return null;
+      const ring = ps => 'M ' + ps.map(p => `${TX(p.x).toFixed(2)} ${TY(p.y).toFixed(2)}`).join(' L ') + ' Z';
+      stick.setAttribute('fill-rule', 'evenodd');
+      return [...hg.outlines, ...(hg.cutouts || []).map(c => c.points)].map(ring).join(' ');
+    };
     // 每幀更新：解出兩端就更新棍身外形與孔位，否則整根隱藏（與原本「無效不畫」同效果）
     const applyLink = (P) => {
       const a = P[l.p1], b = P[l.p2];
@@ -1764,7 +1807,8 @@ function draw() {
       stick.style.display = ok ? '' : 'none';
       holes.forEach(h => { h.el.style.display = ok ? '' : 'none'; });
       if (!ok) return;
-      stick.setAttribute('d', barHullPath(a, b));
+      const hostD = (hostedMounts2d && hostedMounts2d.length) ? hostedBarPath(a, b) : null;
+      stick.setAttribute('d', hostD || barHullPath(a, b));
       holes.forEach(h => {
         const pt = P[h.pid];
         if (pt && Number.isFinite(pt.x)) { h.el.setAttribute('cx', TX(pt.x)); h.el.setAttribute('cy', TY(pt.y)); }
@@ -2017,16 +2061,24 @@ function renderFrame() {
 function push3D() {
   if (!viewer3D || !lastModelInputs) return;
   const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = lastModelInputs;
-  const frameGeometry=Exporters.inspectFrameExport(frameConnectorNodes(),exportSettings(),motorFrameExportMounts());
-  // 夾爪（jaw）板：3D 直接沿用 2D/DXF 共用的 createPlateGeometry 外形，孔位與加工輸出一致，
-  // 取代 viewer 內部的近似 jawPlateShape。以孔序字串為鍵，供 scene-model 對應到各片板。
+  const mountSplit3d=Exporters.splitMountsByHost(S.comps,motorFrameExportMounts());
+  const frameGeometry=Exporters.inspectFrameExport(frameConnectorNodes(),exportSettings(),mountSplit3d.free);
+  // 三點桿板形：3D 直接沿用 2D/DXF 共用的 createPlateGeometry 外形（含 shapeMode——
+  // 包絡板/多邊形板/折線桿——與 vertices 順序），孔位與加工輸出一致，三視圖不分歧。
+  // 以孔序字串為鍵，供 scene-model 對應到各片板；找不到原 comp 的純視覺 polygon 退回夾爪近似。
   const plateGeometries={};
   (polygons||[]).forEach(poly=>{
-    if(poly.shape!=='jaw') return;
     const world=poly.points.map(id=>pts[id]).filter(p=>p&&Number.isFinite(p.x));
     if(world.length<3) return;
-    const g=createPlateGeometry({shape:'jaw',jawTurnSign:poly.jawTurnSign},world,{radius:HULL_R_WORLD});
-    if(g.outlines.length) plateGeometries[poly.points.join(',')]={outline:g.outlines[0],holes:g.holes};
+    const key=poly.points.join(',');
+    const comp=S.comps.find(c=>c.type==='triangle'&&c.p1&&c.p2&&c.p3&&[c.p1.id,c.p2.id,c.p3.id].join(',')===key)
+      || (poly.shape==='jaw' ? {shape:'jaw',jawTurnSign:poly.jawTurnSign} : null);
+    if(!comp) return;
+    // 靜態結構板承載的馬達穿板特徵一併切進 3D 板身（同 2D/DXF）。
+    const hostedPlateMounts=comp.id?mountSplit3d.hosted.get(comp.id):null;
+    const extras=(hostedPlateMounts&&hostedPlateMounts.length)?Exporters.plateMountExtras(hostedPlateMounts):null;
+    const g=createPlateGeometry(comp,world,{radius:HULL_R_WORLD,...(extras||{})});
+    if(g.outlines.length) plateGeometries[key]={outline:g.outlines[0],holes:g.holes,cutouts:g.cutouts||[]};
   });
   const model = buildSceneModel(links, pts, {
     groundIds, motorCenters: motorCenterIds, motorTypes, motorMounts, hullR: HULL_R_WORLD,
@@ -2113,13 +2165,16 @@ async function toggle3D() {
 // 沒有足夠固定銷時，退回 render.js 的飄浮地面基線（純繪圖基元）。
 function drawGround(frameGeometry) {
   const nodes = frameConnectorNodes();
-  if (nodes.length < 2) { Render.drawGroundBaseline(); return; }
+  // 不足兩個地基節點時仍畫地面基線；若剩一個孤立固定點（例如緊貼機架樑的軸轂座），
+  // 繼續往下把它的小圓盤座畫出來——與 frame.dxf 匯出的軸轂座板一致。
+  if (nodes.length < 2) Render.drawGroundBaseline();
 
   // 地基：2D 直接沿用和 3D / DXF 共用的同一份 frameGeometry（外形＋孔位）。
   // 放定位點會長出、放馬達會變形（含馬達座外擴）、加定位點會增生，三視圖完全一致。
   // frameGeometry 由 draw() 用「當前」馬達 mount 算好傳入；缺省時才退回 lastModelInputs。
-  const fg = frameGeometry || Exporters.inspectFrameExport(nodes, exportSettings(), motorFrameExportMounts());
-  if (!fg || !fg.outlines.length) { Render.drawGroundBaseline(); return; }
+  const fg = frameGeometry || Exporters.inspectFrameExport(nodes, exportSettings(),
+    Exporters.splitMountsByHost(S.comps, motorFrameExportMounts()).free);
+  if (!fg || !fg.outlines.length) { if (nodes.length >= 2) Render.drawGroundBaseline(); return; }
 
   fg.outlines.forEach(outline => {
     if (!Array.isArray(outline) || outline.length < 2) return;
@@ -3911,6 +3966,7 @@ function motorFrameExportMounts(inputs = lastModelInputs || {}) {
     const mount = motorMounts.get(id);
     mounts.push({
       kind: type === 'mg995' ? 'mg995' : 'tt',
+      pointId: id,   // 供 splitMountsByHost 對應 bar.motorMountPoint（宿主機架桿）
       center,
       rotDeg: motorMountPatternRotDegForCenter(id, pts, mount),
       settings: type === 'mg995' ? mg995Settings : ttSettings
@@ -3923,16 +3979,19 @@ function saveFile() {
 }
 function exportLinksSvg() {
   const settings = exportSettings(), nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
-  const count = Exporters.exportLinksAsSvg(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings);
-  const frameCount = Exporters.exportFrameAsSvg(nodes, settings, mounts);
-  const warnings = Exporters.frameExportWarnings(nodes, settings, mounts);
+  // 有宿主機架桿的 mount 隨該桿匯出（特徵切進桿身）；剩下的才進 frame.svg。
+  const freeMounts = Exporters.splitMountsByHost(S.comps, mounts).free;
+  const count = Exporters.exportLinksAsSvg(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts);
+  const frameCount = Exporters.exportFrameAsSvg(nodes, settings, freeMounts);
+  const warnings = Exporters.frameExportWarnings(nodes, settings, freeMounts);
   transient(count || frameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} SVG${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
 }
 function exportLinksDxf() {
   const settings = exportSettings(), nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
-  const count = Exporters.exportLinksAsDxf(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings);
-  const frameCount = Exporters.exportFrameAsDxf(nodes, settings, mounts);
-  const warnings = Exporters.frameExportWarnings(nodes, settings, mounts);
+  const freeMounts = Exporters.splitMountsByHost(S.comps, mounts).free;
+  const count = Exporters.exportLinksAsDxf(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts);
+  const frameCount = Exporters.exportFrameAsDxf(nodes, settings, freeMounts);
+  const warnings = Exporters.frameExportWarnings(nodes, settings, freeMounts);
   transient(count || frameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} DXF${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
 }
 function openFile() {

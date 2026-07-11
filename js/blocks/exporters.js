@@ -551,12 +551,17 @@ function svgPolyline(points) {
   return points.map((p, i) => `${i ? 'L' : 'M'} ${round(p.x)} ${round(p.y)}`).join(' ') + ' Z';
 }
 
-function plateGeometry(comp, points, settings) {
+function plateGeometry(comp, points, settings, mounts = []) {
   const { holeDiameterMm } = normalizeExportSettings(settings);
   return createPlateGeometry(comp, points, {
     radius: DEFAULT_PLATE_RADIUS_WORLD,
-    holeRadius: holeDiameterMm / 2
+    holeRadius: holeDiameterMm / 2,
+    ...plateMountExtras(mounts)
   });
+}
+
+export function inspectPlateExport(comp, points, settings, mounts = []) {
+  return plateGeometry(comp, points, settings, mounts);
 }
 
 function boundsForGeometry(outlines, holes = []) {
@@ -575,25 +580,27 @@ function boundsForGeometry(outlines, holes = []) {
   };
 }
 
-function svgForPlate(comp, points, settings) {
-  const geometry = plateGeometry(comp, points, settings);
-  const b = boundsForGeometry(geometry.outlines, geometry.holes);
+function svgForPlate(comp, points, settings, mounts = []) {
+  const geometry = plateGeometry(comp, points, settings, mounts);
+  const b = boundsForGeometry([...geometry.outlines, ...(geometry.cutouts || []).map(c => c.points)], geometry.holes);
   const width = round(b.maxX - b.minX);
   const height = round(b.maxY - b.minY);
   const paths = geometry.outlines.map(outline => `    <path d="${svgPolyline(outline)}" />`).join('\n');
+  const cutouts = (geometry.cutouts || []).map(c =>
+    `    <path d="${svgPolyline(c.points)}" data-layer="${esc(c.layer)}" />`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${round(b.minX)} ${round(b.minY)} ${width} ${height}">
   <title>${esc(comp.id || 'plate')}</title>
   <g fill="none" stroke="#000" stroke-width="0.25">
 ${paths}
-${geometry.holes.map(h => `    <circle cx="${round(h.x)}" cy="${round(h.y)}" r="${round(h.r)}" />`).join('\n')}
+${cutouts ? cutouts + '\n' : ''}${geometry.holes.map(h => `    <circle cx="${round(h.x)}" cy="${round(h.y)}" r="${round(h.r)}" />`).join('\n')}
   </g>
 </svg>
 `;
 }
 
-function dxfForPlate(comp, points, settings) {
-  const geometry = plateGeometry(comp, points, settings);
+function dxfForPlate(comp, points, settings, mounts = []) {
+  const geometry = plateGeometry(comp, points, settings, mounts);
   return [
     dxfPair(0, 'SECTION'),
     dxfPair(2, 'HEADER'),
@@ -603,7 +610,8 @@ function dxfForPlate(comp, points, settings) {
     dxfPair(0, 'SECTION'),
     dxfPair(2, 'ENTITIES'),
     ...geometry.outlines.map(outline => dxfPolyline(outline, 'CUT')),
-    ...geometry.holes.map(h => dxfCircle(h.x, h.y, h.r, 'HOLE')),
+    ...(geometry.cutouts || []).map(c => dxfPolyline(c.points, c.layer)),
+    ...geometry.holes.map(h => dxfCircle(h.x, h.y, h.r, h.layer || 'HOLE')),
     dxfPair(0, 'ENDSEC'),
     dxfPair(0, 'EOF')
   ].join('\n') + '\n';
@@ -638,6 +646,90 @@ function dxfForGear(comp, geometry) {
     dxfPair(0, 'ENDSEC'),
     dxfPair(0, 'EOF')
   ].join('\n') + '\n';
+}
+
+// 單一動力來源的加工特徵（世界座標）：corners＝安裝內容角點（供外形合併／延伸判斷）、
+// cutouts＝非圓形切割（MG995 穿板槽）、holes＝圓孔。自動地基、宿主機架桿與結構板共用。
+export function motorMountFeatures(mount) {
+  if (!mount || !mount.center || !Number.isFinite(mount.center.x)) return null;
+  const rot = (Number(mount.rotDeg) || 0) * Math.PI / 180;
+  const cos = Math.cos(rot), sin = Math.sin(rot);
+  const local = (x, y) => ({
+    x: mount.center.x + x * cos + y * sin,
+    y: mount.center.y - x * sin + y * cos
+  });
+  const cutouts = [];
+  const holes = [];
+  if (mount.kind === 'mg995') {
+    // MG995 穿板式固定：本體矩形槽（含線槽缺口）+ 兩耳共 4 個螺絲孔。
+    // CAD local 與 TT 同慣例：+X 為機身反方向（機殼沿 -X 延伸），輸出軸心在原點。
+    const m = mount.settings || {};
+    const bodyLen = Number(m.bodyLengthMm) || 41.2;
+    const bodyWidth = Number(m.bodyWidthMm) || 20.2;
+    const shaftOffset = Number(m.shaftOffsetMm) || 10;
+    const screwR = (Number(m.screwDiameterMm) || 3.2) / 2;
+    const screwSpan = Number(m.screwSpanMm) || 49.5;
+    const screwSpacing = Number(m.screwSpacingMm) || 10;
+    const halfW = bodyWidth / 2;
+    const slotOutline = mg995SlotOutline(m);
+    cutouts.push({ layer: 'MG995_SLOT', points: slotOutline.map(p => local(p.x, p.y)) });
+    const slotMinX = Math.min(...slotOutline.map(p => p.x));   // 含缺口深度
+    const slotMaxX = Math.max(...slotOutline.map(p => p.x));
+    const earX = shaftOffset - bodyLen / 2;    // 耳孔跨距以機殼中心為準，不是軸心
+    [-1, 1].forEach(sx => [-1, 1].forEach(sy => {
+      const p = local(earX + sx * screwSpan / 2, sy * screwSpacing / 2);
+      holes.push({ x: p.x, y: p.y, r: screwR, layer: 'MG995_SCREW' });
+    }));
+    const margin = 5;
+    const pad = Math.max(screwR, margin);
+    const contentMinX = Math.min(slotMinX, earX - screwSpan / 2);
+    const contentMaxX = Math.max(slotMaxX, earX + screwSpan / 2);
+    const contentHalfY = Math.max(halfW, screwSpacing / 2 + screwR);
+    const corners = [
+      local(contentMinX - pad, -(contentHalfY + margin)),
+      local(contentMaxX + pad, -(contentHalfY + margin)),
+      local(contentMaxX + pad, contentHalfY + margin),
+      local(contentMinX - pad, contentHalfY + margin)
+    ];
+    return { corners, cutouts, holes };
+  }
+  const m = mount.settings || {};
+  const shaftR = (Number(m.shaftDiameterMm) || 6) / 2;
+  const screwR = (Number(m.screwDiameterMm) || 3) / 2;
+  const locatorR = (Number(m.locatorDiameterMm) || 4) / 2;
+  const screwX = Number(m.screwOffsetXMm) || -20.6;
+  const screwSpacing = Number(m.screwSpacingMm) || 17.3;
+  const locatorX = Number(m.locatorOffsetXMm) || -11.18;
+  const locatorY = Number(m.locatorOffsetYMm) || 0;
+  const margin = 5;
+  const minX = Math.min(screwX, 0, locatorX) - Math.max(screwR, shaftR, locatorR, margin);
+  const maxX = Math.max(screwX, 0, locatorX) + Math.max(screwR, shaftR, locatorR, margin);
+  const minY = Math.min(-screwSpacing / 2, 0, locatorY) - Math.max(screwR, shaftR, locatorR, margin);
+  const maxY = Math.max(screwSpacing / 2, 0, locatorY) + Math.max(screwR, shaftR, locatorR, margin);
+  const corners = [
+    local(minX, minY),
+    local(maxX, minY),
+    local(maxX, maxY),
+    local(minX, maxY)
+  ];
+  holes.push({ x: local(0, 0).x, y: local(0, 0).y, r: shaftR, layer: 'TT_SHAFT' });
+  let p = local(screwX, screwSpacing / 2); holes.push({ x: p.x, y: p.y, r: screwR, layer: 'TT_SCREW' });
+  p = local(screwX, -screwSpacing / 2); holes.push({ x: p.x, y: p.y, r: screwR, layer: 'TT_SCREW' });
+  p = local(locatorX, locatorY); holes.push({ x: p.x, y: p.y, r: locatorR, layer: 'TT_LOCATOR' });
+  return { corners, cutouts, holes };
+}
+
+// 結構板宿主的 mount 特徵 → createPlateGeometry 的 extras 形狀。
+export function plateMountExtras(mounts = []) {
+  const extraCutouts = [];
+  const extraHoles = [];
+  (mounts || []).forEach(m => {
+    const feats = motorMountFeatures(m);
+    if (!feats) return;
+    extraCutouts.push(...feats.cutouts);
+    extraHoles.push(...feats.holes);
+  });
+  return { extraCutouts, extraHoles };
 }
 
 function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
@@ -679,69 +771,11 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   nodes.forEach(p => addHole(p.x, p.y, holeR, 'PIVOT_HOLE'));
 
   motorMounts.forEach(mount => {
-    if (!mount || !mount.center || !Number.isFinite(mount.center.x)) return;
-    const rot = (Number(mount.rotDeg) || 0) * Math.PI / 180;
-    const cos = Math.cos(rot), sin = Math.sin(rot);
-    const local = (x, y) => ({
-      x: mount.center.x + x * cos + y * sin,
-      y: mount.center.y - x * sin + y * cos
-    });
-    if (mount.kind === 'mg995') {
-      // MG995 穿板式固定：本體矩形槽（含線槽缺口）+ 兩耳共 4 個螺絲孔。
-      // CAD local 與 TT 同慣例：+X 為機身反方向（機殼沿 -X 延伸），輸出軸心在原點。
-      const m = mount.settings || {};
-      const bodyLen = Number(m.bodyLengthMm) || 41.2;
-      const bodyWidth = Number(m.bodyWidthMm) || 20.2;
-      const shaftOffset = Number(m.shaftOffsetMm) || 10;
-      const screwR = (Number(m.screwDiameterMm) || 3.2) / 2;
-      const screwSpan = Number(m.screwSpanMm) || 49.5;
-      const screwSpacing = Number(m.screwSpacingMm) || 10;
-      const halfW = bodyWidth / 2;
-      const slotOutline = mg995SlotOutline(m);
-      cutouts.push({ layer: 'MG995_SLOT', points: slotOutline.map(p => local(p.x, p.y)) });
-      const slotMinX = Math.min(...slotOutline.map(p => p.x));   // 含缺口深度
-      const slotMaxX = Math.max(...slotOutline.map(p => p.x));
-      const earX = shaftOffset - bodyLen / 2;    // 耳孔跨距以機殼中心為準，不是軸心
-      [-1, 1].forEach(sx => [-1, 1].forEach(sy => {
-        const p = local(earX + sx * screwSpan / 2, sy * screwSpacing / 2);
-        addHole(p.x, p.y, screwR, 'MG995_SCREW');
-      }));
-      const margin = 5;
-      const pad = Math.max(screwR, margin);
-      const contentMinX = Math.min(slotMinX, earX - screwSpan / 2);
-      const contentMaxX = Math.max(slotMaxX, earX + screwSpan / 2);
-      const contentHalfY = Math.max(halfW, screwSpacing / 2 + screwR);
-      mountOutlines.push([
-        local(contentMinX - pad, -(contentHalfY + margin)),
-        local(contentMaxX + pad, -(contentHalfY + margin)),
-        local(contentMaxX + pad, contentHalfY + margin),
-        local(contentMinX - pad, contentHalfY + margin)
-      ]);
-      return;
-    }
-    const m = mount.settings || {};
-    const shaftR = (Number(m.shaftDiameterMm) || 6) / 2;
-    const screwR = (Number(m.screwDiameterMm) || 3) / 2;
-    const locatorR = (Number(m.locatorDiameterMm) || 4) / 2;
-    const screwX = Number(m.screwOffsetXMm) || -20.6;
-    const screwSpacing = Number(m.screwSpacingMm) || 17.3;
-    const locatorX = Number(m.locatorOffsetXMm) || -11.18;
-    const locatorY = Number(m.locatorOffsetYMm) || 0;
-    const margin = 5;
-    const minX = Math.min(screwX, 0, locatorX) - Math.max(screwR, shaftR, locatorR, margin);
-    const maxX = Math.max(screwX, 0, locatorX) + Math.max(screwR, shaftR, locatorR, margin);
-    const minY = Math.min(-screwSpacing / 2, 0, locatorY) - Math.max(screwR, shaftR, locatorR, margin);
-    const maxY = Math.max(screwSpacing / 2, 0, locatorY) + Math.max(screwR, shaftR, locatorR, margin);
-    mountOutlines.push([
-      local(minX, minY),
-      local(maxX, minY),
-      local(maxX, maxY),
-      local(minX, maxY)
-    ]);
-    let p = local(0, 0); addHole(p.x, p.y, shaftR, 'TT_SHAFT');
-    p = local(screwX, screwSpacing / 2); addHole(p.x, p.y, screwR, 'TT_SCREW');
-    p = local(screwX, -screwSpacing / 2); addHole(p.x, p.y, screwR, 'TT_SCREW');
-    p = local(locatorX, locatorY); addHole(p.x, p.y, locatorR, 'TT_LOCATOR');
+    const feats = motorMountFeatures(mount);
+    if (!feats) return;
+    cutouts.push(...feats.cutouts);
+    feats.holes.forEach(h => addHole(h.x, h.y, h.r, h.layer));
+    mountOutlines.push(feats.corners);
   });
 
   for (let i = holes.length - 1; i >= 0; i--) {
@@ -754,8 +788,10 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   }
 
   if (mountOutlines.length && barAxis) {
-    // 兩點機架＝明確的主桿。馬達座不可再與它取凸包，否則會變成一大片梯形板；
-    // 改為沿主桿方向延長／加寬，讓所有馬達孔落在同一條可製造的連續機架桿內。
+    // 兩點機架＝明確的主桿。長樑：沿主桿方向延長／加寬成等寬膠囊，讓馬達孔落在同一條
+    // 連續機架桿內（取凸包會變一大片梯形板）。但短桿＋垂直大馬達座時，等寬膠囊會爆成
+    // 巨大圓端板——改成兩案並比：膠囊 vs「節點＋馬達座角點」圓角凸包，取面積小者。
+    // 凸包案自然形成「馬達端寬、另一端收窄」的錐形支架板（伺服支架掛軸轂的典型形狀）。
     let minAlong = 0, maxAlong = barAxis.len, halfWidth = frameR;
     mountOutlines.flat().forEach(p => {
       const dx = p.x - barAxis.a.x, dy = p.y - barAxis.a.y;
@@ -767,8 +803,14 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
     });
     const start = { x: barAxis.a.x + barAxis.ux * minAlong, y: barAxis.a.y + barAxis.uy * minAlong };
     const end = { x: barAxis.a.x + barAxis.ux * maxAlong, y: barAxis.a.y + barAxis.uy * maxAlong };
+    const capsule = barOutline(start, end, halfWidth);
+    const base = hull([...nodes, ...mountOutlines.flat()]);
+    const taperedPlate = base.length >= 3 ? roundedOffsetHull(base, Math.max(18, frameR)) : null;
+    const area = pts => Math.abs(signedArea(pts));
     outlines.length = 0;
-    outlines.push(barOutline(start, end, halfWidth));
+    // 凸包要「明顯」較小（<75%）才捨棄膠囊——長樑上的馬達座兩案面積接近時，
+    // 維持等寬連續樑的可製造外形，避免抖動成梯形板。
+    outlines.push(taperedPlate && area(taperedPlate) < area(capsule) * 0.75 ? taperedPlate : capsule);
   } else if (mountOutlines.length) {
     // 有馬達座（非兩點主桿）：把機架節點與馬達座角點一起取凸包，再做一次圓角等距外擴。
     // 不對「已外擴的外形」再取尖角凸包，才不會產生歪斜尖楔。
@@ -787,6 +829,56 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
 
 export function inspectFrameExport(frameNodes, settings, motorMounts = []) {
   return frameGeometry(frameNodes, settings, motorMounts);
+}
+
+// 靜態結構板：三點桿有 ≥2 個機架固定點＝使用者畫的機架本體（整片板都是靜止剛體）。
+export function isStaticPlate(comp) {
+  return Boolean(comp && comp.type === 'triangle' &&
+    ['p1', 'p2', 'p3'].filter(k => comp[k] && comp[k].type === 'fixed').length >= 2);
+}
+
+// 馬達安裝特徵的宿主分派：
+// 1. bar.motorMountPoint = 馬達軸心接點 id → 該機架桿承載（顯式宣告）。
+// 2. 馬達軸心是某塊靜態結構板的頂點 → 該板承載（馬達就鎖在板上，無需宣告）。
+// hosted：宿主零件 id → mounts；free：仍由自動地基（frame.dxf）承載。
+export function splitMountsByHost(comps, mounts = []) {
+  const hosted = new Map();
+  const free = [];
+  (mounts || []).forEach(m => {
+    const host = m && m.pointId
+      ? ((comps || []).find(c => c && c.type === 'bar' && c.motorMountPoint === m.pointId)
+        || (comps || []).find(c => isStaticPlate(c) && ['p1', 'p2', 'p3'].some(k => c[k] && c[k].id === m.pointId)))
+      : null;
+    if (host) {
+      if (!hosted.has(host.id)) hosted.set(host.id, []);
+      hosted.get(host.id).push(m);
+    } else {
+      free.push(m);
+    }
+  });
+  return { hosted, free };
+}
+
+// 宿主機架桿幾何：桿局部座標（p1 在原點、+X 沿桿軸），複用 frameGeometry 的
+// 「沿桿軸延長/加寬＋槽內固定孔剔除」邏輯，讓桿本體、端點孔與馬達穿板特徵成為同一塊料。
+export function hostedBarGeometry(comp, pts, settings, mounts = []) {
+  const a = pointForExport(comp, 'p1', pts);
+  const b = pointForExport(comp, 'p2', pts);
+  if (!a || !b) return null;
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  if (len <= 1e-6) return null;
+  const ux = (b.x - a.x) / len;
+  const uy = (b.y - a.y) / len;
+  const barAngleDeg = Math.atan2(uy, ux) * 180 / Math.PI;
+  const toLocal = p => ({
+    x: (p.x - a.x) * ux + (p.y - a.y) * uy,
+    y: -(p.x - a.x) * uy + (p.y - a.y) * ux
+  });
+  const localMounts = (mounts || [])
+    .filter(m => m && m.center && Number.isFinite(m.center.x) && Number.isFinite(m.center.y))
+    .map(m => ({ ...m, center: toLocal(m.center), rotDeg: (Number(m.rotDeg) || 0) + barAngleDeg }));
+  if (!localMounts.length) return null;
+  return frameGeometry([{ x: 0, y: 0 }, { x: len, y: 0 }], settings, localMounts);
 }
 
 export function frameExportWarnings(frameNodes, settings, motorMounts = []) {
@@ -813,6 +905,10 @@ function boundsForFrame(geometry) {
 function svgForFrame(frameNodes, settings, motorMounts) {
   const geometry = frameGeometry(frameNodes, settings, motorMounts);
   if (!geometry) return null;
+  return svgForFrameGeometry(geometry, 'frame');
+}
+
+function svgForFrameGeometry(geometry, title) {
   const b = boundsForFrame(geometry);
   const width = round(b.maxX - b.minX);
   const height = round(b.maxY - b.minY);
@@ -823,7 +919,7 @@ function svgForFrame(frameNodes, settings, motorMounts) {
     `    <circle cx="${h.x}" cy="${h.y}" r="${h.r}" data-layer="${esc(h.layer)}" />`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${round(b.minX)} ${round(b.minY)} ${width} ${height}">
-  <title>frame</title>
+  <title>${esc(title)}</title>
   <g fill="none" stroke="#000" stroke-width="0.25">
 ${paths}
 ${cutouts ? cutouts + '\n' : ''}${holes}
@@ -835,6 +931,10 @@ ${cutouts ? cutouts + '\n' : ''}${holes}
 function dxfForFrame(frameNodes, settings, motorMounts) {
   const geometry = frameGeometry(frameNodes, settings, motorMounts);
   if (!geometry) return null;
+  return dxfForFrameGeometry(geometry);
+}
+
+function dxfForFrameGeometry(geometry) {
   return [
     dxfPair(0, 'SECTION'),
     dxfPair(2, 'HEADER'),
@@ -879,14 +979,18 @@ function dxfForLink(comp, length, settings) {
   ].join('\n') + '\n';
 }
 
-export function exportLinksAsSvg(comps, pts, params, settings) {
+export function exportLinksAsSvg(comps, pts, params, settings, mounts = []) {
+  const { hosted } = splitMountsByHost(comps, mounts);
   const links = exportableLinks(comps, pts, params);
   links.forEach(({ comp, length }) => {
-    downloadText(svgForLink(comp, length, settings), `${safeName(comp.id)}.svg`, 'image/svg+xml');
+    // 宿主機架桿：桿身直接帶馬達穿板特徵（同一塊料），其餘桿件走一般路徑。
+    const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id)) : null;
+    const text = hostGeometry ? svgForFrameGeometry(hostGeometry, comp.id) : svgForLink(comp, length, settings);
+    downloadText(text, `${safeName(comp.id)}.svg`, 'image/svg+xml');
   });
   const plates = exportablePlates(comps, pts);
   plates.forEach(({ comp, points }) => {
-    downloadText(svgForPlate(comp, points, settings), `${safeName(comp.id)}.svg`, 'image/svg+xml');
+    downloadText(svgForPlate(comp, points, settings, hosted.get(comp.id)), `${safeName(comp.id)}.svg`, 'image/svg+xml');
   });
   const gears = exportableGears(comps, params, settings);
   gears.forEach(({ comp, geometry }) => {
@@ -895,14 +999,17 @@ export function exportLinksAsSvg(comps, pts, params, settings) {
   return links.length + plates.length + gears.length;
 }
 
-export function exportLinksAsDxf(comps, pts, params, settings) {
+export function exportLinksAsDxf(comps, pts, params, settings, mounts = []) {
+  const { hosted } = splitMountsByHost(comps, mounts);
   const links = exportableLinks(comps, pts, params);
   links.forEach(({ comp, length }) => {
-    downloadText(dxfForLink(comp, length, settings), `${safeName(comp.id)}.dxf`, 'application/dxf');
+    const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id)) : null;
+    const text = hostGeometry ? dxfForFrameGeometry(hostGeometry) : dxfForLink(comp, length, settings);
+    downloadText(text, `${safeName(comp.id)}.dxf`, 'application/dxf');
   });
   const plates = exportablePlates(comps, pts);
   plates.forEach(({ comp, points }) => {
-    downloadText(dxfForPlate(comp, points, settings), `${safeName(comp.id)}.dxf`, 'application/dxf');
+    downloadText(dxfForPlate(comp, points, settings, hosted.get(comp.id)), `${safeName(comp.id)}.dxf`, 'application/dxf');
   });
   const gears = exportableGears(comps, params, settings);
   gears.forEach(({ comp, geometry }) => {
