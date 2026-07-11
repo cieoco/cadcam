@@ -38,6 +38,8 @@ import { circleRectCompression } from './intake-contact.js';
 import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
 import { drawCam as renderCam, drawWorkpiece as renderWorkpiece } from './special-part-render.js';
 import { drawPlate as renderPlate } from './plate-render.js';
+import { buildMotorMounts as planMotorMounts, computeMotorRotDeg as planMotorRotDeg, motorAssemblyLayerForBody } from './motor-mounts.js';
+import { drawFrameGeometry as renderFrameGeometry, drawMotorMountHoles as renderMotorMountHoles } from './motor-frame-render.js';
 import * as Settings from './settings.js';   // 匯出 / TT / MG995 安裝設定（localStorage 持久化 + 表單同步）
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -657,176 +659,20 @@ function updateMechanismStatus(sol = null) {
 // 算馬達本體的朝向（度）：對準接在中心、非曲柄的那根桿；沒有就朝滑軌另一固定孔；再沒有才朝最近地錨。
 // 從 draw() 抽出，讓播放更新器每幀用新 pts 重算同一個角度（邏輯與原本一字不差）。
 function computeMotorRotDeg(id, pts, groundIds) {
-  const p = pts[id];
-  let tgt = null;
-  const crankTips = new Set((S.compiled.steps || [])
-    .filter(s => s.type === 'input_crank' && s.center === id)
-    .map(s => s.id));
-  const others = S.comps.filter(c => c.type === 'bar' && !c.isInput && c.p1 && c.p2 &&
-    (c.p1.id === id || c.p2.id === id) &&
-    !crankTips.has(c.p1.id === id ? c.p2.id : c.p1.id));
-  if (others.length) {
-    const b = others[0];
-    const o = b.p1.id === id ? b.p2.id : b.p1.id;
-    if (pts[o] && Number.isFinite(pts[o].x)) tgt = pts[o];
-  }
-  if (!tgt) {
-    // 馬達裝在滑軌固定孔上：固定框架就是滑軌，朝另一個固定孔（沿軌道方向）。
-    const mount = sliderMountInfo(id);
-    if (mount) {
-      const other = mount.label === 'M1' ? mount.slider.m2 : mount.slider.m1;
-      if (other && pts[other.id] && Number.isFinite(pts[other.id].x)) tgt = pts[other.id];
-    }
-  }
-  if (!tgt) {
-    // 後備：朝最近的另一個地錨。跳過與馬達重合的點（含滑軌隱藏軌道端，railOffset=0 時會疊在固定孔上）
-    // ——否則 atan2 對到零向量會亂轉（±180° 把馬達翻上去）。
-    let bd = Infinity;
-    groundIds.forEach(gid => {
-      if (gid === id || isHiddenSliderRailPoint(gid)) return;
-      const gp = pts[gid];
-      if (gp && Number.isFinite(gp.x)) { const d = Math.hypot(gp.x - p.x, gp.y - p.y); if (d > 1e-3 && d < bd) { bd = d; tgt = gp; } }
-    });
-  }
-  return tgt ? Math.atan2(-(tgt.x - p.x), -(tgt.y - p.y)) * 180 / Math.PI : 0;
-}
-
-function motorRotDegFromDir(dir) {
-  return dir ? Math.atan2(-dir.x, -dir.y) * 180 / Math.PI : 0;
-}
-
-function normalizedDir(from, to, fallback = { x: 0, y: -1 }) {
-  if (!from || !to || !Number.isFinite(from.x) || !Number.isFinite(to.x)) return fallback;
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const d = Math.hypot(dx, dy);
-  return d > 1e-6 ? { x: dx / d, y: dy / d } : fallback;
-}
-
-function oppositeTarget(origin, p) {
-  return (origin && p && Number.isFinite(origin.x) && Number.isFinite(p.x))
-    ? { x: origin.x * 2 - p.x, y: origin.y * 2 - p.y }
-    : null;
-}
-
-function motorAssemblyLayerForBody(bodyId, motorMounts) {
-  if (!bodyId || !motorMounts) return null;
-  let found = null;
-  motorMounts.forEach(mount => {
-    if (found !== null || !mount) return;
-    const hasFrame = !!mount.frameBody;
-    if (hasFrame && bodyId === mount.frameBody) found = 0;
-    else if (bodyId === mount.outputBody) found = hasFrame ? 1 : 0;
+  return planMotorRotDeg({
+    id, points: pts, groundIds, comps: S.comps, compiledSteps: S.compiled?.steps || [],
+    sliderMountInfo, isHiddenSliderRailPoint
   });
-  return found;
 }
 
 // 馬達固定邏輯：輸出軸鎖在軸心；機身方向只看靜態裝配參考，不看播放後的 solved moving point。
 // 這份 mount 同時供 2D/3D 使用，避免 3D 動畫時馬達跟著齒條/從動件轉。
 function buildMotorMounts(motorIds, groundIds) {
-  const staticPts = pointCoords();
-  const mounts = new Map();
-  const add = (id, target, reason, assembly = {}) => {
-    const center = staticPts[id];
-    const dir = normalizedDir(center, target);
-    mounts.set(id, { dir, rotDeg: motorRotDegFromDir(dir), reason, ...assembly });
-  };
-  motorIds.forEach(id => {
-    const center = staticPts[id];
-    if (!center) return;
-
-    const locatedComponent=S.comps.find(c=>c?.p1?.id===id&&c.mountLocatorPoint&&staticPts[c.mountLocatorPoint]);
-    if(locatedComponent){
-      const locator=staticPts[locatedComponent.mountLocatorPoint], q=normalizedDir(center,locator);
-      const rotDeg=Math.atan2(q.y,-q.x)*180/Math.PI, rr=rotDeg*Math.PI/180;
-      mounts.set(id,{dir:{x:-Math.sin(rr),y:-Math.cos(rr)},rotDeg,reason:'shaft-locator',locatorPoint:locatedComponent.mountLocatorPoint,outputBody:locatedComponent.id,order:['motor','outputBody']});
-      return;
-    }
-
-    const crankTips = new Set((S.compiled.steps || [])
-      .filter(s => s.type === 'input_crank' && s.center === id)
-      .map(s => s.id));
-    const outputBar = S.comps.find(c => c.type === 'bar' && c.p1 && c.p2 &&
-      (c.p1.id === id || c.p2.id === id) &&
-      (c.isInput || crankTips.has(c.p1.id === id ? c.p2.id : c.p1.id)));
-    // 機架＝地基（自動生成的 frameGeometry），不再靠一根顯式接地桿當 frameBody。
-    // 馬達一律裝配為「馬達 → 曲柄」，曲柄貼近地基那層；馬達本體則坐在地基背面（見 scene-model 的 mountZ）。
-    const barAssembly = outputBar
-      ? { outputBody: outputBar.id, order: ['motor', 'outputBody'] }
-      : {};
-
-    const gear = S.comps.find(c => c.type === 'gear' && c.p1?.id === id);
-    if (gear) {
-      const meshed = gear.mesh
-        ? S.comps.find(c => c.type === 'gear' && c.id === gear.mesh)
-        : S.comps.find(c => c.type === 'gear' && c.mesh === gear.id);
-      if (meshed?.p1 && staticPts[meshed.p1.id]) {
-        add(id, oppositeTarget(center, staticPts[meshed.p1.id]), 'gear-mesh', { outputBody: gear.id, order: ['motor', 'outputBody'] });
-        return;
-      }
-      const rack = S.comps.find(c => c.type === 'rack' && c.pinion === gear.id);
-      if (rack?.p1 && staticPts[rack.p1.id]) {
-        add(id, oppositeTarget(center, staticPts[rack.p1.id]), 'rack-pinion', { outputBody: gear.id, order: ['motor', 'outputBody'] });
-        return;
-      }
-    }
-
-    const pulley = S.comps.find(c => c.type === 'pulley' && c.p1?.id === id);
-    if (pulley) {
-      const belt = S.comps.find(c => c.type === 'belt' && (c.driver === pulley.id || c.driven === pulley.id));
-      const otherId = belt && (belt.driver === pulley.id ? belt.driven : belt.driver);
-      const other = otherId && S.comps.find(c => c.type === 'pulley' && c.id === otherId);
-      if (other?.p1 && staticPts[other.p1.id]) {
-        add(id, oppositeTarget(center, staticPts[other.p1.id]), 'pulley-belt', { outputBody: pulley.id, order: ['motor', 'outputBody'] });
-        return;
-      }
-    }
-
-    const cam = S.comps.find(c => c.type === 'cam' && c.p1?.id === id);
-    if (cam?.p2 && staticPts[cam.p2.id]) {
-      add(id, oppositeTarget(center, staticPts[cam.p2.id]), 'cam-follower', { outputBody: cam.id, order: ['motor', 'outputBody'] });
-      return;
-    }
-
-    // MG995 穿板槽沿機架桿方向開，機身才與框架平行；軸心上接著非曲柄桿時優先對準它，
-    // 不再綁死「機身＝曲柄反方向」（舵盤是花鍵，機身朝向本來就與舵臂初始角無關）。
-    if (motorTypeForCenter(id) === 'mg995') {
-      const alongBar = S.comps.find(c => c.type === 'bar' && !c.isInput && c.p1 && c.p2 &&
-        (c.p1.id === id || c.p2.id === id) &&
-        !crankTips.has(c.p1.id === id ? c.p2.id : c.p1.id));
-      const alongId = alongBar && (alongBar.p1.id === id ? alongBar.p2.id : alongBar.p1.id);
-      if (alongId && staticPts[alongId]) {
-        add(id, staticPts[alongId], 'servo-frame-bar', barAssembly);
-        return;
-      }
-    }
-
-    if (outputBar) {
-      const oid = outputBar.p1.id === id ? outputBar.p2.id : outputBar.p1.id;
-      add(id, oppositeTarget(center, staticPts[oid]), 'output-crank', barAssembly);
-      return;
-    }
-
-    const mount = sliderMountInfo(id);
-    if (mount) {
-      const other = mount.label === 'M1' ? mount.slider.m2 : mount.slider.m1;
-      if (other && staticPts[other.id]) {
-        add(id, staticPts[other.id], 'slider-mount', barAssembly);
-        return;
-      }
-    }
-
-    let best = null, bd = Infinity;
-    groundIds.forEach(gid => {
-      if (gid === id || isHiddenSliderRailPoint(gid)) return;
-      const gp = staticPts[gid];
-      if (!gp) return;
-      const d = Math.hypot(gp.x - center.x, gp.y - center.y);
-      if (d > 1e-3 && d < bd) { bd = d; best = gp; }
-    });
-    add(id, best || { x: center.x, y: center.y - 1 }, 'nearest-ground', barAssembly);
+  return planMotorMounts({
+    motorIds, groundIds, staticPoints: pointCoords(), comps: S.comps,
+    compiledSteps: S.compiled?.steps || [], sliderMountInfo,
+    isHiddenSliderRailPoint, motorTypeForCenter
   });
-  return mounts;
 }
 
 // ---- 零件繪製分派表（slice 2：登錄表化）----
@@ -1599,99 +1445,18 @@ async function toggle3D() {
 // 沒有足夠固定銷時，退回 render.js 的飄浮地面基線（純繪圖基元）。
 function drawGround(frameGeometry) {
   const nodes = frameConnectorNodes();
-  // 不足兩個地基節點時仍畫地面基線；若剩一個孤立固定點（例如緊貼機架樑的軸轂座），
-  // 繼續往下把它的小圓盤座畫出來——與 frame.dxf 匯出的軸轂座板一致。
-  if (nodes.length < 2) Render.drawGroundBaseline();
-
-  // 地基：2D 直接沿用和 3D / DXF 共用的同一份 frameGeometry（外形＋孔位）。
-  // 放定位點會長出、放馬達會變形（含馬達座外擴）、加定位點會增生，三視圖完全一致。
-  // frameGeometry 由 draw() 用「當前」馬達 mount 算好傳入；缺省時才退回 lastModelInputs。
   const fg = frameGeometry || Exporters.inspectFrameExport(nodes, Settings.exportSettings(),
     Exporters.splitMountsByHost(S.comps, motorFrameExportMounts()).free);
-  if (!fg || !fg.outlines.length) { if (nodes.length >= 2) Render.drawGroundBaseline(); return; }
-
-  fg.outlines.forEach(outline => {
-    if (!Array.isArray(outline) || outline.length < 2) return;
-    const plate = document.createElementNS(SVG_NS, 'polygon');
-    plate.setAttribute('points', outline.map(p => `${TX(p.x)},${TY(p.y)}`).join(' '));
-    plate.setAttribute('fill', '#eef2f7');
-    plate.setAttribute('fill-opacity', '0.82');
-    plate.setAttribute('stroke', '#c2cad6');
-    plate.setAttribute('stroke-width', 2);
-    plate.setAttribute('stroke-linejoin', 'round');
-    plate.style.pointerEvents = 'none';
-    svg.appendChild(plate);
-  });
-  // 板內非圓形切割（MG995 穿板槽）：用畫布底色蓋掉地基填色，讀作「板上挖掉的洞」。
-  (fg.cutouts || []).forEach(cutout => {
-    if (!Array.isArray(cutout.points) || cutout.points.length < 3) return;
-    const hole = document.createElementNS(SVG_NS, 'polygon');
-    hole.setAttribute('points', cutout.points.map(p => `${TX(p.x)},${TY(p.y)}`).join(' '));
-    hole.setAttribute('fill', '#f6f8fb');
-    hole.setAttribute('stroke', '#c2cad6');
-    hole.setAttribute('stroke-width', 2);
-    hole.setAttribute('stroke-linejoin', 'round');
-    hole.style.pointerEvents = 'none';
-    svg.appendChild(hole);
-  });
+  renderFrameGeometry({ nodes, frameGeometry: fg, svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), drawBaseline: () => Render.drawGroundBaseline() });
 }
 
 function drawMotorMountHoles(motorIds, motorMounts, pts) {
-  const ttSettings = Settings.ttMountSettings();
-  const mg995Settings = Settings.mg995MountSettings();
-  const s = View.getScale();
-  const mountLayer = document.createElementNS(SVG_NS, 'g');
-  mountLayer.style.pointerEvents = 'none';
-  svg.appendChild(mountLayer);
-  const addHole = (group, xMm, yMm, diaMm, attrs = {}) => {
-    const hole = document.createElementNS(SVG_NS, 'circle');
-    hole.setAttribute('cx', (xMm * s).toFixed(2));
-    hole.setAttribute('cy', (-yMm * s).toFixed(2));
-    hole.setAttribute('r', Math.max(1.5, diaMm * s / 2).toFixed(2));
-    hole.setAttribute('fill', attrs.fill || '#ffffff');
-    hole.setAttribute('stroke', attrs.stroke || '#c0392b');
-    hole.setAttribute('stroke-width', attrs.strokeWidth || Math.max(1.2, 1.5 * s));
-    if (attrs.dash) hole.setAttribute('stroke-dasharray', attrs.dash);
-    group.appendChild(hole);
-  };
-  motorIds.forEach(id => {
-    const type = motorTypeForCenter(id);
-    const p = pts[id];
-    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
-    const rotDeg = motorMountPatternRotDegForCenter(id, pts, motorMounts.get(id));
-    const g = document.createElementNS(SVG_NS, 'g');
-    g.setAttribute('transform', `translate(${TX(p.x)} ${TY(p.y)}) rotate(${rotDeg})`);
-    const title = document.createElementNS(SVG_NS, 'title');
-    if (type === 'mg995') {
-      // MG995 穿板槽（含線槽缺口）＋兩耳 4 螺絲孔；local 座標同匯出（+X＝機身反方向，y 取負進螢幕座標）。
-      const m = mg995Settings;
-      title.textContent = 'MG995 機架固定：本體穿板槽（尾端線槽缺口）、兩耳共 4 個螺絲孔';
-      g.appendChild(title);
-      const slot = document.createElementNS(SVG_NS, 'polygon');
-      slot.setAttribute('points', Exporters.mg995SlotOutline(m)
-        .map(p => `${(p.x * s).toFixed(2)},${(-p.y * s).toFixed(2)}`).join(' '));
-      slot.setAttribute('fill', 'none');
-      slot.setAttribute('stroke', '#e74c3c');
-      slot.setAttribute('stroke-width', Math.max(1.2, 1.5 * s));
-      slot.setAttribute('stroke-linejoin', 'round');
-      g.appendChild(slot);
-      const earX = m.shaftOffsetMm - m.bodyLengthMm / 2;
-      [-1, 1].forEach(sx => [-1, 1].forEach(sy => {
-        addHole(g, earX + sx * m.screwSpanMm / 2, sy * m.screwSpacingMm / 2, m.screwDiameterMm, { stroke: '#2c6fbb' });
-      }));
-    } else {
-      const settings = ttSettings;
-      title.textContent = 'TT馬達機架固定孔：輸出軸孔、2 個螺絲孔、定位孔';
-      g.appendChild(title);
-      addHole(g, 0, 0, settings.shaftDiameterMm, { stroke: '#e74c3c', strokeWidth: Math.max(1.5, 2 * s) });
-      addHole(g, settings.screwOffsetXMm, settings.screwSpacingMm / 2, settings.screwDiameterMm, { stroke: '#2c6fbb' });
-      addHole(g, settings.screwOffsetXMm, -settings.screwSpacingMm / 2, settings.screwDiameterMm, { stroke: '#2c6fbb' });
-      addHole(g, settings.locatorOffsetXMm, settings.locatorOffsetYMm, settings.locatorDiameterMm, {
-        stroke: '#117a45',
-        dash: `${Math.max(2, 3 * s).toFixed(1)} ${Math.max(1.5, 2 * s).toFixed(1)}`
-      });
-    }
-    mountLayer.appendChild(g);
+  renderMotorMountHoles({
+    motorIds, motorMounts, points: pts, svg, scale: View.getScale(),
+    project: p => ({ x: TX(p.x), y: TY(p.y) }), motorTypeForCenter,
+    rotationForCenter: motorMountPatternRotDegForCenter,
+    ttSettings: Settings.ttMountSettings(), mg995Settings: Settings.mg995MountSettings(),
+    mg995SlotOutline: Exporters.mg995SlotOutline
   });
 }
 
