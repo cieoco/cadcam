@@ -36,6 +36,7 @@ import { S } from './state.js';          // 跨模組共享的可變狀態（S.c
 import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js';
 import { rackGuideThetaRange } from './rack-limits.js';
 import { circleRectCompression } from './intake-contact.js';
+import * as Settings from './settings.js';   // 匯出 / TT / MG995 安裝設定（localStorage 持久化 + 表單同步）
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('stageSvg');
@@ -46,31 +47,7 @@ const LINK_DEFAULT_LEN = 88;   // 連桿預設長度（12 孔，對齊 8mm）
 const GEAR_MODULE = 6;         // 齒輪模數（mm）：所有齒輪共用，節圓半徑 R=teeth·module/2，故必定咬合
 const snapLego = v => Math.max(LEGO_STEP, Math.round((Number(v) || 0) / LEGO_STEP) * LEGO_STEP);
 const roundMm = v => Math.round(Number(v) || 0);
-const EXPORT_SETTINGS_KEY = 'cadcam.blocks.exportSettings';
-const TT_MOUNT_SETTINGS_KEY = 'cadcam.blocks.ttMountSettings.v7';
-const TT_MOUNT_DEFAULTS = {
-  shaftDiameterMm: 6,
-  screwDiameterMm: 3,
-  screwOffsetXMm: -20.6,
-  screwSpacingMm: 17.3,
-  locatorDiameterMm: 4,
-  locatorOffsetXMm: -11.18,
-  locatorOffsetYMm: 0
-};
-const MG995_MOUNT_SETTINGS_KEY = 'cadcam.blocks.mg995MountSettings.v1';
-// MG995 穿板式固定（3mm 板）：本體 40.7×19.7 開槽各加 0.5 公差；
-// 耳孔 M3 通孔＋螺帽，長向兩耳孔心距 49.5、每耳兩孔距 10；輸出軸心距槽近端 10。
-// 線槽缺口開在機身尾端：出線口兼 180° 反裝防呆，設 0 則不開。
-const MG995_MOUNT_DEFAULTS = {
-  bodyLengthMm: 41.2,
-  bodyWidthMm: 20.2,
-  shaftOffsetMm: 10,
-  screwDiameterMm: 3.2,
-  screwSpanMm: 49.5,
-  screwSpacingMm: 10,
-  cableNotchWidthMm: 8,
-  cableNotchDepthMm: 4
-};
+// 匯出 / TT / MG995 安裝設定的常數與函式已抽到 ./settings.js（以 Settings.* 呼叫）
 
 // ---- 狀態 ----
 // 跨模組共享的編輯 / 機構 / 選取 / 拖曳 / 工具 / undo 狀態收在 state.js 的 S 物件，
@@ -1624,7 +1601,7 @@ function draw() {
   const mountSplit2d = Exporters.splitMountsByHost(S.comps,
     motorFrameExportMounts({ pts, motorCenterIds: modelMotorCenterIds, motorMounts }));
   const frameGeometry2d = Exporters.inspectFrameExport(
-    frameConnectorNodes(), exportSettings(), mountSplit2d.free);
+    frameConnectorNodes(), Settings.exportSettings(), mountSplit2d.free);
   drawGround(frameGeometry2d);
   // 兩端都是固定點的接地桿＝機架本身：有機架時交給地基呈現，不重複畫成桿、也不進分層（3D scene-model 同一套規則）。
   const isGroundBar = (l) => Boolean(frameGeometry2d) && !S.comps.some(c=>c.id===l.id&&c.frameSeparate) && groundIds.has(l.p1) && groundIds.has(l.p2);
@@ -1794,7 +1771,7 @@ function draw() {
     // 穿板槽用 evenodd 挖空——伺服和桿上其他固定孔讀作同一塊料。
     const hostedMounts2d = l.id ? mountSplit2d.hosted.get(l.id) : null;
     const hostedBarPath = (a, b) => {
-      const hg = Exporters.inspectFrameExport([a, b], exportSettings(), hostedMounts2d);
+      const hg = Exporters.inspectFrameExport([a, b], Settings.exportSettings(), hostedMounts2d);
       if (!hg || !hg.outlines.length) return null;
       const ring = ps => 'M ' + ps.map(p => `${TX(p.x).toFixed(2)} ${TY(p.y).toFixed(2)}`).join(' L ') + ' Z';
       stick.setAttribute('fill-rule', 'evenodd');
@@ -2062,7 +2039,7 @@ function push3D() {
   if (!viewer3D || !lastModelInputs) return;
   const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = lastModelInputs;
   const mountSplit3d=Exporters.splitMountsByHost(S.comps,motorFrameExportMounts());
-  const frameGeometry=Exporters.inspectFrameExport(frameConnectorNodes(),exportSettings(),mountSplit3d.free);
+  const frameGeometry=Exporters.inspectFrameExport(frameConnectorNodes(),Settings.exportSettings(),mountSplit3d.free);
   // 三點桿板形：3D 直接沿用 2D/DXF 共用的 createPlateGeometry 外形（含 shapeMode——
   // 包絡板/多邊形板/折線桿——與 vertices 順序），孔位與加工輸出一致，三視圖不分歧。
   // 以孔序字串為鍵，供 scene-model 對應到各片板；找不到原 comp 的純視覺 polygon 退回夾爪近似。
@@ -2172,7 +2149,7 @@ function drawGround(frameGeometry) {
   // 地基：2D 直接沿用和 3D / DXF 共用的同一份 frameGeometry（外形＋孔位）。
   // 放定位點會長出、放馬達會變形（含馬達座外擴）、加定位點會增生，三視圖完全一致。
   // frameGeometry 由 draw() 用「當前」馬達 mount 算好傳入；缺省時才退回 lastModelInputs。
-  const fg = frameGeometry || Exporters.inspectFrameExport(nodes, exportSettings(),
+  const fg = frameGeometry || Exporters.inspectFrameExport(nodes, Settings.exportSettings(),
     Exporters.splitMountsByHost(S.comps, motorFrameExportMounts()).free);
   if (!fg || !fg.outlines.length) { if (nodes.length >= 2) Render.drawGroundBaseline(); return; }
 
@@ -2203,8 +2180,8 @@ function drawGround(frameGeometry) {
 }
 
 function drawMotorMountHoles(motorIds, motorMounts, pts) {
-  const ttSettings = ttMountSettings();
-  const mg995Settings = mg995MountSettings();
+  const ttSettings = Settings.ttMountSettings();
+  const mg995Settings = Settings.mg995MountSettings();
   const s = View.getScale();
   const mountLayer = document.createElementNS(SVG_NS, 'g');
   mountLayer.style.pointerEvents = 'none';
@@ -3785,181 +3762,6 @@ function transient(msg) {
   setBanner(msg);
   setTimeout(() => { if (document.getElementById('modeBanner').textContent === msg) clearBanner(); }, 1600);
 }
-function exportSettings() {
-  return Exporters.normalizeExportSettings({
-    barWidthMm: S.exportBarWidthMm,
-    holeDiameterMm: S.exportHoleDiameterMm,
-    ttShaftFlatDiameterMm: S.exportTtShaftFlatDiameterMm,
-    ttShaftFlatThicknessMm: S.exportTtShaftFlatThicknessMm
-  });
-}
-function normalizeTtMountSettings(settings = {}) {
-  const from = { ...TT_MOUNT_DEFAULTS, ...(settings || {}) };
-  const clamp = (key, min, max) => {
-    const v = Number(from[key]);
-    return Number.isFinite(v) ? Math.max(min, Math.min(max, v)) : TT_MOUNT_DEFAULTS[key];
-  };
-  return {
-    shaftDiameterMm: Number(clamp('shaftDiameterMm', 0.5, 30).toFixed(2)),
-    screwDiameterMm: Number(clamp('screwDiameterMm', 0.5, 20).toFixed(2)),
-    screwOffsetXMm: Number(clamp('screwOffsetXMm', -120, 120).toFixed(2)),
-    screwSpacingMm: Number(clamp('screwSpacingMm', 0, 80).toFixed(2)),
-    locatorDiameterMm: Number(clamp('locatorDiameterMm', 0.5, 20).toFixed(2)),
-    locatorOffsetXMm: Number(clamp('locatorOffsetXMm', -120, 120).toFixed(2)),
-    locatorOffsetYMm: Number(clamp('locatorOffsetYMm', -80, 80).toFixed(2))
-  };
-}
-function ttMountSettings() {
-  return normalizeTtMountSettings({
-    shaftDiameterMm: S.ttShaftDiameterMm,
-    screwDiameterMm: S.ttScrewDiameterMm,
-    screwOffsetXMm: S.ttScrewOffsetXMm,
-    screwSpacingMm: S.ttScrewSpacingMm,
-    locatorDiameterMm: S.ttLocatorDiameterMm,
-    locatorOffsetXMm: S.ttLocatorOffsetXMm,
-    locatorOffsetYMm: S.ttLocatorOffsetYMm
-  });
-}
-function normalizeMg995MountSettings(settings = {}) {
-  const from = { ...MG995_MOUNT_DEFAULTS, ...(settings || {}) };
-  const clamp = (key, min, max) => {
-    const v = Number(from[key]);
-    return Number.isFinite(v) ? Math.max(min, Math.min(max, v)) : MG995_MOUNT_DEFAULTS[key];
-  };
-  return {
-    bodyLengthMm: Number(clamp('bodyLengthMm', 20, 80).toFixed(2)),
-    bodyWidthMm: Number(clamp('bodyWidthMm', 10, 40).toFixed(2)),
-    shaftOffsetMm: Number(clamp('shaftOffsetMm', 0, 40).toFixed(2)),
-    screwDiameterMm: Number(clamp('screwDiameterMm', 0.5, 10).toFixed(2)),
-    screwSpanMm: Number(clamp('screwSpanMm', 20, 80).toFixed(2)),
-    screwSpacingMm: Number(clamp('screwSpacingMm', 0, 30).toFixed(2)),
-    cableNotchWidthMm: Number(clamp('cableNotchWidthMm', 0, 20).toFixed(2)),
-    cableNotchDepthMm: Number(clamp('cableNotchDepthMm', 0, 20).toFixed(2))
-  };
-}
-function mg995MountSettings() {
-  return normalizeMg995MountSettings({
-    bodyLengthMm: S.mg995BodyLengthMm,
-    bodyWidthMm: S.mg995BodyWidthMm,
-    shaftOffsetMm: S.mg995ShaftOffsetMm,
-    screwDiameterMm: S.mg995ScrewDiameterMm,
-    screwSpanMm: S.mg995ScrewSpanMm,
-    screwSpacingMm: S.mg995ScrewSpacingMm,
-    cableNotchWidthMm: S.mg995CableNotchWidthMm,
-    cableNotchDepthMm: S.mg995CableNotchDepthMm
-  });
-}
-function applyMg995MountSettings(settings) {
-  S.mg995BodyLengthMm = settings.bodyLengthMm;
-  S.mg995BodyWidthMm = settings.bodyWidthMm;
-  S.mg995ShaftOffsetMm = settings.shaftOffsetMm;
-  S.mg995ScrewDiameterMm = settings.screwDiameterMm;
-  S.mg995ScrewSpanMm = settings.screwSpanMm;
-  S.mg995ScrewSpacingMm = settings.screwSpacingMm;
-  S.mg995CableNotchWidthMm = settings.cableNotchWidthMm;
-  S.mg995CableNotchDepthMm = settings.cableNotchDepthMm;
-}
-function syncExportSettingInputs() {
-  const settings = exportSettings();
-  Object.entries(settings).forEach(([key, value]) => {
-    document.querySelectorAll(`[data-export-setting="${key}"]`).forEach(el => { el.value = value; });
-  });
-}
-function syncTtMountSettingInputs() {
-  const settings = ttMountSettings();
-  Object.entries(settings).forEach(([key, value]) => {
-    document.querySelectorAll(`[data-tt-mount-setting="${key}"]`).forEach(el => { el.value = value; });
-  });
-}
-function syncMg995MountSettingInputs() {
-  const settings = mg995MountSettings();
-  Object.entries(settings).forEach(([key, value]) => {
-    document.querySelectorAll(`[data-mg995-mount-setting="${key}"]`).forEach(el => { el.value = value; });
-  });
-}
-function loadExportSettings() {
-  let saved = null;
-  try { saved = JSON.parse(localStorage.getItem(EXPORT_SETTINGS_KEY) || 'null'); } catch (_) {}
-  const settings = Exporters.normalizeExportSettings(saved || {});
-  S.exportBarWidthMm = settings.barWidthMm;
-  S.exportHoleDiameterMm = settings.holeDiameterMm;
-  S.exportTtShaftFlatDiameterMm = settings.ttShaftFlatDiameterMm;
-  S.exportTtShaftFlatThicknessMm = settings.ttShaftFlatThicknessMm;
-  syncExportSettingInputs();
-}
-function loadTtMountSettings() {
-  let saved = null;
-  try { saved = JSON.parse(localStorage.getItem(TT_MOUNT_SETTINGS_KEY) || 'null'); } catch (_) {}
-  const settings = normalizeTtMountSettings(saved || {});
-  S.ttShaftDiameterMm = settings.shaftDiameterMm;
-  S.ttScrewDiameterMm = settings.screwDiameterMm;
-  S.ttScrewOffsetXMm = settings.screwOffsetXMm;
-  S.ttScrewSpacingMm = settings.screwSpacingMm;
-  S.ttLocatorDiameterMm = settings.locatorDiameterMm;
-  S.ttLocatorOffsetXMm = settings.locatorOffsetXMm;
-  S.ttLocatorOffsetYMm = settings.locatorOffsetYMm;
-  syncTtMountSettingInputs();
-}
-function loadMg995MountSettings() {
-  let saved = null;
-  try { saved = JSON.parse(localStorage.getItem(MG995_MOUNT_SETTINGS_KEY) || 'null'); } catch (_) {}
-  applyMg995MountSettings(normalizeMg995MountSettings(saved || {}));
-  syncMg995MountSettingInputs();
-}
-function setExportSetting(key, value) {
-  if (key === 'barWidthMm') S.exportBarWidthMm = Number(value);
-  if (key === 'holeDiameterMm') S.exportHoleDiameterMm = Number(value);
-  if (key === 'ttShaftFlatDiameterMm') S.exportTtShaftFlatDiameterMm = Number(value);
-  if (key === 'ttShaftFlatThicknessMm') S.exportTtShaftFlatThicknessMm = Number(value);
-  const settings = exportSettings();
-  S.exportBarWidthMm = settings.barWidthMm;
-  S.exportHoleDiameterMm = settings.holeDiameterMm;
-  S.exportTtShaftFlatDiameterMm = settings.ttShaftFlatDiameterMm;
-  S.exportTtShaftFlatThicknessMm = settings.ttShaftFlatThicknessMm;
-  try { localStorage.setItem(EXPORT_SETTINGS_KEY, JSON.stringify(settings)); } catch (_) {}
-  syncExportSettingInputs();
-}
-function setTtMountSetting(key, value) {
-  const map = {
-    shaftDiameterMm: 'ttShaftDiameterMm',
-    screwDiameterMm: 'ttScrewDiameterMm',
-    screwOffsetXMm: 'ttScrewOffsetXMm',
-    screwSpacingMm: 'ttScrewSpacingMm',
-    locatorDiameterMm: 'ttLocatorDiameterMm',
-    locatorOffsetXMm: 'ttLocatorOffsetXMm',
-    locatorOffsetYMm: 'ttLocatorOffsetYMm'
-  };
-  if (map[key]) S[map[key]] = Number(value);
-  const settings = ttMountSettings();
-  S.ttShaftDiameterMm = settings.shaftDiameterMm;
-  S.ttScrewDiameterMm = settings.screwDiameterMm;
-  S.ttScrewOffsetXMm = settings.screwOffsetXMm;
-  S.ttScrewSpacingMm = settings.screwSpacingMm;
-  S.ttLocatorDiameterMm = settings.locatorDiameterMm;
-  S.ttLocatorOffsetXMm = settings.locatorOffsetXMm;
-  S.ttLocatorOffsetYMm = settings.locatorOffsetYMm;
-  try { localStorage.setItem(TT_MOUNT_SETTINGS_KEY, JSON.stringify(settings)); } catch (_) {}
-  syncTtMountSettingInputs();
-  draw();
-}
-function setMg995MountSetting(key, value) {
-  const map = {
-    bodyLengthMm: 'mg995BodyLengthMm',
-    bodyWidthMm: 'mg995BodyWidthMm',
-    shaftOffsetMm: 'mg995ShaftOffsetMm',
-    screwDiameterMm: 'mg995ScrewDiameterMm',
-    screwSpanMm: 'mg995ScrewSpanMm',
-    screwSpacingMm: 'mg995ScrewSpacingMm',
-    cableNotchWidthMm: 'mg995CableNotchWidthMm',
-    cableNotchDepthMm: 'mg995CableNotchDepthMm'
-  };
-  if (map[key]) S[map[key]] = Number(value);
-  const settings = mg995MountSettings();
-  applyMg995MountSettings(settings);
-  try { localStorage.setItem(MG995_MOUNT_SETTINGS_KEY, JSON.stringify(settings)); } catch (_) {}
-  syncMg995MountSettingInputs();
-  draw();
-}
 function motorMountPatternRotDegForCenter(id, pts, mount = null) {
   // drawTTMotor / drawMG995Servo's local long axis is +Y, while mount/CAD coordinates use +X as the motor long axis.
   const visualRotDeg = mount ? mount.rotDeg : computeMotorRotDeg(id, pts || {}, new Set());
@@ -3971,8 +3773,8 @@ function motorFrameExportMounts(inputs = lastModelInputs || {}) {
   const motorIds = inputs.motorCenterIds || new Set();
   const motorTypes = inputs.motorTypes || new Map();
   const motorMounts = inputs.motorMounts || new Map();
-  const ttSettings = ttMountSettings();
-  const mg995Settings = mg995MountSettings();
+  const ttSettings = Settings.ttMountSettings();
+  const mg995Settings = Settings.mg995MountSettings();
   const mounts = [];
   motorIds.forEach(id => {
     const type = motorTypes.get(id) || motorTypeForCenter(id);
@@ -3993,7 +3795,7 @@ function saveFile() {
   Store.downloadJson(Store.toSnapshot(S.comps, S.topo, S.counter), 'blocks.json');
 }
 function exportLinksSvg() {
-  const settings = exportSettings(), nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
+  const settings = Settings.exportSettings(), nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
   // 有宿主機架桿的 mount 隨該桿匯出（特徵切進桿身）；剩下的才進 frame.svg。
   const freeMounts = Exporters.splitMountsByHost(S.comps, mounts).free;
   const count = Exporters.exportLinksAsSvg(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts);
@@ -4002,7 +3804,7 @@ function exportLinksSvg() {
   transient(count || frameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} SVG${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
 }
 function exportLinksDxf() {
-  const settings = exportSettings(), nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
+  const settings = Settings.exportSettings(), nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
   const freeMounts = Exporters.splitMountsByHost(S.comps, mounts).free;
   const count = Exporters.exportLinksAsDxf(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts);
   const frameCount = Exporters.exportFrameAsDxf(nodes, settings, freeMounts);
@@ -4060,9 +3862,10 @@ function init() {
                handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround, recordManualTrace, solvePinnedConstraints,
                snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel,
                isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, pointIsRackHole });
-  loadExportSettings();
-  loadTtMountSettings();
-  loadMg995MountSettings();
+  Settings.init({ draw });
+  Settings.loadExportSettings();
+  Settings.loadTtMountSettings();
+  Settings.loadMg995MountSettings();
   populateExamples();
   let loaded = false;
   try {
@@ -4085,5 +3888,5 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting, setTtMountSetting, setMg995MountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
 init();
