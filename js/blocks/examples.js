@@ -146,9 +146,9 @@ const EXAMPLE_LESSONS = {
   'competition-roller-intake': {
     group: 'manipulator',
     level: '實戰',
-    use: '擺臂式進料機構：前端大滾輪把地面物件壓向導引板並帶入機器。',
-    learn: '馬達可透過皮帶遠端驅動進料滾輪；擺臂、滾輪與底板共同形成入口間隙。',
-    try: ['改前端滾輪半徑', '調整擺臂高度與入口間隙', '切換馬達方向確認物件是吸入而非推出']
+    use: '參考競賽機器人的收放式進料臂：馬達短曲柄推拉長連桿，使前端擺臂繞固定軸升降。',
+    learn: '理解曲柄、連桿與搖臂如何把馬達旋轉轉換成進料臂的有限角度擺動。',
+    try: ['改短曲柄長度觀察擺角', '移動擺臂固定軸比較收放高度', '調整前端臂長確認能否接近黃色物件']
   },
   'competition-rack-lift': {
     group: 'lift-motion',
@@ -582,35 +582,57 @@ const ALL_BLOCK_EXAMPLES = [
   },
   {
     id: 'competition-roller-intake',
-    title: '競賽滾輪進料模組',
-    note: 'TT 馬達透過皮帶驅動前端大滾輪；擺臂、底部導引板與入口斜板構成可實作的 Intake。',
+    title: '競賽擺臂進料機構',
+    note: '依參考圖重建：頂板左端的 MG995 伺服帶動橘色短曲柄，經長連桿推拉黑色進料臂，前端取物端繞固定軸往下掃，把黃色物件撥入機架。',
     snapshot: {
       kind: 'blocks',
       v: 1,
-      counter: 9,
+      counter: 7,
+      tracePoint: 'INTAKE_TIP',
       comps: [
-        { type: 'pulley', id: 'IntakeMotorRoller', color: '#e74c3c',
-          p1: pt('IMC', 'motor', -72, 32, { physicalMotor: '1' }),
-          p2: pt('IMP', 'floating', -52, 32),
-          radiusParam: 'IR_A', phase: 0, mountLocatorPoint: 'IML' },
-        { type:'anchor', id:'IntakeMotorLocator', p1:pt('IML','fixed',-72,43.18) },
-        { type: 'pulley', id: 'IntakeFrontRoller', color: '#16a085',
-          p1: pt('IFC', 'floating', 72, 0),
-          p2: pt('IFP', 'floating', 108, 0),
-          radiusParam: 'IR_B', phase: 0, rollerWidth: 48,
-          floatingPivot:{pivotCenter:'IMC',armLengthParam:'INTAKE_ARM_INNER',minAngle:-28,maxAngle:8,restAngle:-12.5,targetWorkpiece:'IntakeTarget',targetCompression:6} },
-        { type: 'belt', id: 'IntakeBelt', color: '#2c3e50',
-          driver: 'IntakeMotorRoller', driven: 'IntakeFrontRoller' },
-        exactBar('IntakeArmInner',pt('IMC','fixed',-72,32),pt('IFC','floating',72,0),Math.hypot(144,32),{lenParam:'INTAKE_ARM_INNER',color:'#3498db',frameSeparate:true,zlift:0}),
-        exactBar('IntakeArmOuter',pt('IMC','fixed',-72,32),pt('IFC','floating',72,0),Math.hypot(144,32),{lenParam:'INTAKE_ARM_OUTER',color:'#2980b9',frameSeparate:true,zlift:1}),
-        {type:'anchor',id:'GuideRear',p1:pt('IGR','fixed',-96,-44)},
-        {type:'anchor',id:'GuideFront',p1:pt('IGF','fixed',100,-44)},
-        exactBar('IntakeGuide',pt('IGR','fixed',-96,-44),pt('IGF','fixed',100,-44),196,{lenParam:'INTAKE_GUIDE',color:'#95a5a6',frameSeparate:true}),
-        {type:'anchor',id:'FunnelTip',p1:pt('IFT','fixed',136,-20)},
-        exactBar('IntakeFunnel',pt('IGF','fixed',100,-44),pt('IFT','fixed',136,-20),Math.hypot(36,24),{lenParam:'INTAKE_FUNNEL',color:'#f39c12',frameSeparate:true}),
-        {type:'workpiece',id:'IntakeTarget',p1:pt('OBJ','floating',126,-12),width:48,height:48,color:'#d97706'}
+        { type: 'anchor', id: 'IntakePivotAnchor', p1: pt('INTAKE_PIVOT', 'fixed', -12, 22) },
+        { type: 'anchor', id: 'IntakeFrameTopRight', p1: pt('FRAME_TR', 'fixed', 112, 82) },
+        { type: 'anchor', id: 'IntakeFrameBottomLeft', p1: pt('FRAME_BL', 'fixed', -72, -88) },
+        { type: 'anchor', id: 'IntakeFrameBottomRight', p1: pt('FRAME_BR', 'fixed', 112, -88) },
+        // 頂板左端就是伺服軸心：左側整個開放，擺臂才有空間在機架前緣收放（同參考圖）。
+        exactBar('IntakeFrameTop', pt('INTAKE_MOTOR', 'fixed', -24, 82), pt('FRAME_TR', 'fixed', 112, 82), 136, { lenParam: 'INTAKE_FRAME_TOP', color: '#95a5a6', frameSeparate: true }),
+        exactBar('IntakeFrameSide', pt('FRAME_TR', 'fixed', 112, 82), pt('FRAME_BR', 'fixed', 112, -88), 170, { lenParam: 'INTAKE_FRAME_SIDE', color: '#95a5a6', frameSeparate: true }),
+        exactBar('IntakeFrameBottom', pt('FRAME_BL', 'fixed', -72, -88), pt('FRAME_BR', 'fixed', 112, -88), 184, { lenParam: 'INTAKE_FRAME_BOTTOM', color: '#95a5a6', frameSeparate: true }),
+        // 靜止姿勢＝擺動起點（theta=0、phaseOffset=150），舵臂朝左上，同參考圖。
+        bar('IntakeCrank',
+          pt('INTAKE_MOTOR', 'fixed', -24, 82, { physicalMotor: '1' }),
+          pt('CRANK_PIN', 'floating', -51.713, 98), 32, {
+            lenParam: 'INTAKE_CRANK', color: '#f05a28', isInput: true,
+            physicalMotor: '1', motorType: 'mg995', servoStart: 0, servoEnd: 60,
+            phaseOffset: 150
+          }),
+        exactBar('IntakeCoupler',
+          pt('CRANK_PIN', 'floating', -51.713, 98),
+          pt('ARM_LINK', 'floating', -48, 30), Math.hypot(3.713, 68), {
+            lenParam: 'INTAKE_COUPLER', color: '#7f8c8d', zlift: 1
+          }),
+        // 黑色進料臂：上端吃連桿、中段軸轂固定在機架、前端往左下伸出取物。
+        triangle('IntakeArm',
+          pt('INTAKE_PIVOT', 'fixed', -12, 22),
+          pt('ARM_LINK', 'floating', -48, 30),
+          pt('INTAKE_TIP', 'floating', -60, -18), {
+            color: '#2f343b', zlift: 0
+          }),
+        { type: 'workpiece', id: 'IntakeTarget',
+          p1: pt('INTAKE_OBJECT', 'floating', 10, -36),
+          width: 44, height: 44, color: '#f4b400' }
       ],
-      params: {IR_A:20,IR_B:36,INTAKE_ARM_INNER:Math.hypot(144,32),INTAKE_ARM_OUTER:Math.hypot(144,32),INTAKE_GUIDE:196,INTAKE_FUNNEL:Math.hypot(36,24),theta:0}
+      params: {
+        INTAKE_CRANK: 32,
+        INTAKE_COUPLER: Math.hypot(3.713, 68),
+        INTAKE_FRAME_TOP: 136,
+        INTAKE_FRAME_SIDE: 170,
+        INTAKE_FRAME_BOTTOM: 184,
+        TGIntakeArm: Math.hypot(36, 8),
+        TR1_IntakeArm: Math.hypot(48, 40),
+        TR2_IntakeArm: Math.hypot(12, 48),
+        theta: 0
+      }
     }
   },
   {
