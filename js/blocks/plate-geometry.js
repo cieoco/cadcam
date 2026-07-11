@@ -300,6 +300,31 @@ export function plateCenterline(comp, points) {
   return plateContourPoints(comp, points);
 }
 
+// 折線桿的參數配置：依頂點順序，相鄰兩對頂點是實體桿段，首尾那一對是「對角線」——
+// 它不是實體桿，而是決定彎角的剛化參數。回傳 { segParams: [段1, 段2], diagParam }。
+export function polylineTriangleParams(comp) {
+  if (!comp || plateShapeMode(comp) !== 'polyline') return null;
+  const order = plateVertices(comp).filter(v => v.solve && v.ref).map(v => v.ref);
+  if (order.length !== 3) return null;
+  const paramOf = (x, y) => {
+    const pair = [x, y].sort().join(',');
+    return pair === 'p1,p2' ? comp.gParam : pair === 'p1,p3' ? comp.r1Param : comp.r2Param;
+  };
+  return {
+    segParams: [paramOf(order[0], order[1]), paramOf(order[1], order[2])],
+    diagParam: paramOf(order[0], order[2])
+  };
+}
+
+// 桿段長度從 (a0,b0) 改成 (a1,b1)、彎角維持不變時，新的對角線長。
+// 彎角由改動前的三邊 (a0,b0,d0) 反推；輸入退化（零長）時回傳 null。
+export function preservedDiagonalLength(a0, b0, d0, a1, b1) {
+  if (!(a0 > 0 && b0 > 0 && d0 > 0 && a1 > 0 && b1 > 0)) return null;
+  const cosElbow = Math.max(-1, Math.min(1, (a0 * a0 + b0 * b0 - d0 * d0) / (2 * a0 * b0)));
+  const d1 = Math.sqrt(Math.max(0, a1 * a1 + b1 * b1 - 2 * a1 * b1 * cosElbow));
+  return d1 > 0 ? d1 : null;
+}
+
 function pointInPoly(p, poly) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {

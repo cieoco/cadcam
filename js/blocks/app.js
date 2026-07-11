@@ -31,7 +31,7 @@ import * as Motion from './motion.js';
 import { analyzeDof } from './dof.js';
 import * as Store from './storage.js';
 import * as Exporters from './exporters.js';
-import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, plateVertices, plateShapeMode, createPlateGeometry } from './plate-geometry.js';
+import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, plateVertices, plateShapeMode, polylineTriangleParams, preservedDiagonalLength, createPlateGeometry } from './plate-geometry.js';
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
 import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js';
 import { rackGuideThetaRange } from './rack-limits.js';
@@ -3477,6 +3477,21 @@ function changeTriSide(delta) {
   pushUndo();
   const key = triParamFor(c);
   const L = snapLego((S.topo.params[key] || 0) + delta);
+  // 折線桿：改實體桿段長度時，自動重算對角線以保持當下彎角（直角改長仍是直角）；
+  // 直接調對角線那一邊才會改變彎角。對角線需 0.1mm 精度，關掉整數化避免重載後彎角漂移。
+  const poly = polylineTriangleParams(c);
+  if (poly && key !== poly.diagParam) {
+    const a0 = Number(S.topo.params[poly.segParams[0]]) || 0;
+    const b0 = Number(S.topo.params[poly.segParams[1]]) || 0;
+    const d0 = Number(S.topo.params[poly.diagParam]) || 0;
+    const a1 = key === poly.segParams[0] ? L : a0;
+    const b1 = key === poly.segParams[1] ? L : b0;
+    const d1 = preservedDiagonalLength(a0, b0, d0, a1, b1);
+    if (d1 !== null) {
+      S.topo.params[poly.diagParam] = Math.round(d1 * 10) / 10;
+      c.snapLength = false;
+    }
+  }
   S.topo.params[key] = L;
   reshapeTriangle(c);   // 自由三點桿才看得到；已連接的由 solver 接手
   Panels.renderLenEditor(L);

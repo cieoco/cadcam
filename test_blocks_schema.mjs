@@ -6,6 +6,7 @@ import { BLOCK_EXAMPLES } from './js/blocks/examples.js';
 import { normalizeSnapshot, toSnapshot } from './js/blocks/schema.js';
 import { splitMountsByHost, hostedBarGeometry, inspectFrameExport, isStaticPlate, inspectPlateExport } from './js/blocks/exporters.js';
 import { frameConnectorNodes } from './js/blocks/model.js';
+import { polylineTriangleParams, preservedDiagonalLength } from './js/blocks/plate-geometry.js';
 import { compileTopology } from './js/core/topology.js';
 import { solveTopology } from './js/multilink/solver.js';
 
@@ -148,6 +149,33 @@ ok('plate geometry carries MG995 slot + ear holes',
 // 馬達軸心頂點孔落在穿板槽內，應被剔除（材料已切掉）
 const motorHoleKept = plateGeo.holes.some(h => (h.layer || 'HOLE') === 'HOLE' && Math.hypot(h.x - 204, h.y - 190) < 0.5);
 ok('vertex hole inside slot removed', !motorHoleKept);
+
+// 折線桿改桿段長度時保持彎角：段/對角線判定依頂點順序，重算後彎角不變。
+const bentArm = {
+  type: 'triangle', id: 'BentArm',
+  p1: { id: 'BA1', type: 'fixed', x: 0, y: 0 },
+  p2: { id: 'BA2', type: 'floating', x: 59, y: 0 },
+  p3: { id: 'BA3', type: 'floating', x: 59, y: -40 },
+  gParam: 'BG', r1Param: 'BR1', r2Param: 'BR2',
+  shapeMode: 'polyline',
+  vertices: [
+    { solve: true, ref: 'p1' },
+    { solve: true, ref: 'p2' },
+    { solve: true, ref: 'p3' }
+  ]
+};
+const polyInfo = polylineTriangleParams(bentArm);
+ok('polyline segments/diagonal identified', polyInfo &&
+  polyInfo.segParams[0] === 'BG' && polyInfo.segParams[1] === 'BR2' && polyInfo.diagParam === 'BR1');
+// 直角彎（段 59、40，對角線 √(59²+40²)）：段2 加長到 48，新對角線應為 √(59²+48²)、彎角仍 90°
+const d0 = Math.hypot(59, 40);
+const d1 = preservedDiagonalLength(59, 40, d0, 59, 48);
+ok('right angle preserved when segment lengthened', d1 !== null && Math.abs(d1 - Math.hypot(59, 48)) < 0.01);
+// 一般彎角（120°）也要維持：cos120 = -0.5
+const d120 = Math.sqrt(50 * 50 + 30 * 30 - 2 * 50 * 30 * -0.5);
+const d120b = preservedDiagonalLength(50, 30, d120, 50, 46);
+const expect120 = Math.sqrt(50 * 50 + 46 * 46 - 2 * 50 * 46 * -0.5);
+ok('arbitrary elbow angle preserved', d120b !== null && Math.abs(d120b - expect120) < 0.01);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
