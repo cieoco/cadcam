@@ -6,7 +6,7 @@
 import { $, log, downloadText, fmt, calcAdaptiveGridStep } from '../utils.js';
 import { readInputs, readSweepParams, readViewParams } from '../config.js';
 import { calculateTrajectoryStats } from '../fourbar/solver.js';
-import { startAnimation, pauseAnimation, stopAnimation, setupMotorTypeHandler } from '../fourbar/animation.js';
+import { startAnimation, pauseAnimation, stopAnimation, setupMotorTypeHandler } from './animation.js';
 import { renderPartsLayout, renderPartsOverlayLayer } from '../parts/renderer.js';
 import { computeEnginePreview, computeEngineSweep, computeEngineExport, clampEngineParam } from '../core/mechanism-engine.js';
 import { collectDynamicParamSpec } from '../core/dynamic-params.js';

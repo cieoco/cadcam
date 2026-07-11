@@ -202,7 +202,7 @@ export const MECHANISMS = {
         // 模組路徑及函數名稱
         solverModule: './fourbar/solver.js',
         solveFn: 'solveFourBar',
-        visualizationModule: './ui/visualization.js',
+        visualizationModule: './fourbar/visualization.js',
         renderFn: 'renderFourbar',
         partsModule: './parts/generator.js',
         partsFn: 'generateParts'

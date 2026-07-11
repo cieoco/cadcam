@@ -3,7 +3,7 @@
  * 平行四邊形機構視覺化
  */
 
-import { renderFourbar } from '../ui/visualization.js';
+import { renderFourbar } from '../fourbar/visualization.js';
 
 /**
  * 渲染平行四邊形機構

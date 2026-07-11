@@ -80,7 +80,8 @@ export function startAnimation(updateCallback, rpmOverride = null, motorIdOverri
         animationState.rangeStart = -180;
         animationState.rangeEnd = 180;
     } else {
-        switch (motorId) {
+        // 修正：原寫成 switch (motorId)，該變數在此作用域不存在（嚴格模式直接 ReferenceError，舵機播放整個失效）
+        switch (motorTypeId) {
             case "servo180":
                 animationState.rangeStart = 0;
                 animationState.rangeEnd = 180;
