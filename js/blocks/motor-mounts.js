@@ -84,7 +84,7 @@ export function buildMotorMounts({ motorIds, groundIds, staticPoints, comps, com
     // A riding motor is mounted to its carrier link, not to the world frame.
     // Preserve that assembly relationship so 3D does not rebuild the frame at
     // the motor's moving centre on every animation frame.
-    const carrierId = outputBar && (outputBar.motorCarrier || outputBar.motor_carrier);
+    const carrierId = outputBar && (outputBar.motorMount?.frameBody || outputBar.motorCarrier || outputBar.motor_carrier);
     const barAssembly = outputBar
       ? {
           outputBody: outputBar.id,

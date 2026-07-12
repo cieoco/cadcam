@@ -569,6 +569,10 @@ const ALL_BLOCK_EXAMPLES = [
           physicalMotor: '2',
           motorType: 'tt',
           motorCarrier: 'LiftUpright',
+          motorMount: {
+            motor: '2', center: 'B', outputBody: 'ToolPlate', frameBody: 'LiftUpright',
+            orientation: 'follow-frame', order: ['motor', 'frameBody', 'outputBody']
+          },
           phaseOffset: -90
         }),
         bar('ToolBrace', pt('A', 'floating', -48, 0), pt('D', 'floating', 0, 0), 48, {

@@ -88,6 +88,21 @@ function normalizeBar(comp, index, params, warnings) {
       out.servoStart = clampAng(comp.servoStart ?? 0);
       out.servoEnd = clampAng(comp.servoEnd ?? 90);
     }
+    // Explicit assembly semantics.  Older files only have motorCarrier, so
+    // synthesize the equivalent mount while preserving backwards compatibility.
+    const rawMount = comp.motorMount && typeof comp.motorMount === 'object' ? comp.motorMount : {};
+    const center = safeId(rawMount.center) ? rawMount.center : (p1.physicalMotor ? p1.id : (p2.physicalMotor ? p2.id : ''));
+    const frameBody = safeId(rawMount.frameBody) ? rawMount.frameBody : out.motorCarrier;
+    if (center) {
+      out.motorMount = {
+        motor: String(rawMount.motor || out.physicalMotor),
+        center,
+        outputBody: id,
+        ...(frameBody ? { frameBody } : {}),
+        orientation: rawMount.orientation === 'fixed' ? 'fixed' : (frameBody ? 'follow-frame' : 'fixed'),
+        order: frameBody ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody']
+      };
+    }
   }
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0)))); // 手動疊放相對位移
   if (Array.isArray(comp.holes)) {

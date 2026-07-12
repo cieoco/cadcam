@@ -150,6 +150,16 @@ export function createMotorTools({
     bar[key].physicalMotor = motorId;
     bar.isInput = true;
     bar.physicalMotor = motorId;
+    // Keep the physical assembly as first-class data instead of requiring
+    // render/export code to infer it again from the kinematic bar.
+    bar.motorMount = {
+      motor: motorId,
+      center: nodeId,
+      outputBody: bar.id,
+      ...(carrier ? { frameBody: carrier.id } : {}),
+      orientation: carrier ? 'follow-frame' : 'fixed',
+      order: carrier ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody']
+    };
     cancelMotorMode();
     // 放完直接選取這顆馬達的接點，MG995 就會跳出角度面板。
     S.selectedNodeId = nodeId;
