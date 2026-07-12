@@ -32,7 +32,7 @@ import * as Store from './storage.js';
 import * as Exporters from './exporters.js';
 import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, plateVertices, plateShapeMode, polylineTriangleParams, preservedDiagonalLength, createPlateGeometry } from './plate-geometry.js';
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
-import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js';
+import { createExampleController } from './example-controller.js';
 import { rackGuideThetaRange } from './rack-limits.js';
 import { circleRectCompression } from './intake-contact.js';
 import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
@@ -69,7 +69,6 @@ let geomVersion = 0;           // 結構版本號：任何會改動軌跡的事�
                                // 當 trajectoryCache 的快取鍵——比每幀 JSON.stringify 整份快照便宜。
 let manualTrace = {};          // 手動拖曳軌跡：{ pointId: [{x,y}, ...] }，給無馬達範例使用。
 let liveClampPointIds = null;  // 雙點量測時的兩個夾持端；播放每幀更新它們的目前開口。
-let activeExampleId = '';
 let unlockedGroundPointId = '';
 
 // ---- 3D 唯讀預覽狀態 ----
@@ -132,99 +131,12 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
   if (fit) fitView();
 }
 
-function populateExamples() {
-  const sel = document.getElementById('exampleSelect');
-  const mobileList = document.getElementById('mobileExampleList');
-  const groupById = Object.fromEntries(EXAMPLE_GROUPS.map(group => [group.id, group]));
-  const desktopGroups = {};
-  if (sel) {
-    EXAMPLE_GROUPS.forEach(group => {
-      const optgroup = document.createElement('optgroup');
-      optgroup.label = group.label;
-      desktopGroups[group.id] = optgroup;
-      sel.appendChild(optgroup);
-    });
-  }
-  BLOCK_EXAMPLES.forEach(example => {
-    const lesson = getExampleLesson(example.id);
-    const groupId = groupById[lesson.group] ? lesson.group : 'challenge';
-    if (sel) {
-      const opt = document.createElement('option');
-      opt.value = example.id;
-      opt.textContent = `${lesson.level || '探索'}｜${example.title}`;
-      opt.title = lesson.use || example.note || '';
-      (desktopGroups[groupId] || sel).appendChild(opt);
-    }
-    if (mobileList) {
-      let section = mobileList.querySelector(`[data-example-group="${groupId}"]`);
-      if (!section) {
-        section = document.createElement('div');
-        section.className = 'mobile-example-section';
-        section.dataset.exampleGroup = groupId;
-        const title = document.createElement('div');
-        title.className = 'mobile-example-group-title';
-        title.textContent = groupById[groupId]?.label || '挑戰';
-        section.appendChild(title);
-        mobileList.appendChild(section);
-      }
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'mobile-example-btn';
-      btn.textContent = example.title;
-      btn.title = lesson.use || example.note || '';
-      btn.addEventListener('click', () => loadExample(example.id));
-      section.appendChild(btn);
-    }
-  });
-  renderExampleLessonCard(null);
-}
-
-function renderExampleLessonCard(example) {
-  const card = document.getElementById('exampleLessonCard');
-  if (!card) return;
-  const title = document.getElementById('exampleLessonTitle');
-  const meta = document.getElementById('exampleLessonMeta');
-  const use = document.getElementById('exampleLessonUse');
-  const learn = document.getElementById('exampleLessonLearn');
-  const tasks = document.getElementById('exampleLessonTasks');
-  if (!example) {
-    card.style.display = 'none';
-    return;
-  }
-  const lesson = getExampleLesson(example.id);
-  const group = EXAMPLE_GROUPS.find(item => item.id === lesson.group);
-  card.style.display = '';
-  if (title) title.textContent = example.title;
-  if (meta) meta.textContent = [lesson.level, group && group.label].filter(Boolean).join(' · ');
-  if (use) use.textContent = lesson.use || example.note || '';
-  if (learn) learn.textContent = lesson.learn || '';
-  if (tasks) {
-    tasks.textContent = '';
-    (lesson.try || []).forEach(task => {
-      const li = document.createElement('li');
-      li.textContent = task;
-      tasks.appendChild(li);
-    });
-  }
-}
-
-function loadExample(id) {
-  const sel = document.getElementById('exampleSelect');
-  const example = getExample(id || (sel && sel.value));
-  if (!example) return;
-  const norm = Store.normalizeSnapshot(example.snapshot);
-  if (!norm) {
-    transient('⚠️ 範例格式不正確');
-    return;
-  }
-  applySnapshot(norm);
-  activeExampleId = example.id;
-  renderExampleLessonCard(example);
-  transient('📘 已載入：' + example.title);
-  if (sel) sel.value = '';
-  closeMobileOpenMenu();
-  if (mobilePrompt()) setMobilePanel('build');
-}
+const exampleController = createExampleController({
+  applySnapshot, notify: transient, closeMobileMenu: closeMobileOpenMenu,
+  isMobile: () => mobilePrompt(), showBuildPanel: () => setMobilePanel('build')
+});
+const populateExamples = () => exampleController.populate();
+const loadExample = id => exampleController.load(id);
 
 // ---- 綁定層：把純模組綁到本檔狀態，維持原呼叫端不變 ----
 const barHullPath = View.barHullPath;
