@@ -417,7 +417,21 @@ export function createViewer(container) {
 
     // 桿件：擠出成扁板
     model.sticks.forEach(s => {
-      const shape = stadiumShape(s.a, s.b, s.r, holeR);
+      let shape;
+      if (s.outline && s.outline.length >= 3) {
+        shape = new THREE.Shape();
+        shape.moveTo(s.outline[0].x, s.outline[0].y);
+        s.outline.slice(1).forEach(p => shape.lineTo(p.x, p.y));
+        shape.closePath();
+        (s.holes || []).forEach(h => { const path = new THREE.Path(); path.absarc(h.x, h.y, Math.max(0.2, h.r), 0, Math.PI * 2, true); shape.holes.push(path); });
+        (s.cutouts || []).forEach(c => {
+          if (!c?.points || c.points.length < 3) return;
+          const path = new THREE.Path(); path.moveTo(c.points[0].x, c.points[0].y);
+          c.points.slice(1).forEach(p => path.lineTo(p.x, p.y)); path.closePath(); shape.holes.push(path);
+        });
+      } else {
+        shape = stadiumShape(s.a, s.b, s.r, holeR);
+      }
       const geo = new THREE.ExtrudeGeometry(shape, {
         depth: s.thickness,
         bevelEnabled: false,

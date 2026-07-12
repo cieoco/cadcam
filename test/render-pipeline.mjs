@@ -44,4 +44,9 @@ const ridingModel = buildSceneModel([
 const ridingMotor = ridingModel.motors.find(motor => motor.id === 'B');
 check('騎乘馬達 3D 朝向跟隨機架桿，而非初始 mount.dir', ridingMotor && Math.abs(ridingMotor.dir.x) < 1e-9 && ridingMotor.dir.y < -0.999);
 
+const hostedBarModel = buildSceneModel([{ id: 'Host', p1: 'A', p2: 'B', color: '#27ae60' }], ridingPoints, {
+  barGeometries: { Host: { outline: [{ x: -4, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 40 }, { x: -4, y: 40 }], holes: [{ x: 0, y: 20, r: 3 }], cutouts: [] } }
+});
+check('3D 宿主桿保留馬達孔型幾何', hostedBarModel.sticks[0].outline?.length === 4 && hostedBarModel.sticks[0].holes?.[0]?.r === 3);
+
 report('render-pipeline');

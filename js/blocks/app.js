@@ -1046,6 +1046,22 @@ function push3D() {
   // 包絡板/多邊形板/折線桿——與 vertices 順序），孔位與加工輸出一致，三視圖不分歧。
   // 以孔序字串為鍵，供 scene-model 對應到各片板；找不到原 comp 的純視覺 polygon 退回夾爪近似。
   const plateGeometries={};
+  const barGeometries={};
+  mountSplit3d.hosted.forEach((mounts, barId) => {
+    const bar = S.comps.find(comp => comp.type === 'bar' && comp.id === barId);
+    if (!bar || !pts[bar.p1.id] || !pts[bar.p2.id]) return;
+    const geometry = Exporters.hostedBarGeometry(bar, pts, Settings.exportSettings(), mounts);
+    if (!geometry?.outlines?.length) return;
+    const a = pts[bar.p1.id], b = pts[bar.p2.id];
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+    const world = point => ({ x: a.x + point.x * ux - point.y * uy, y: a.y + point.x * uy + point.y * ux });
+    barGeometries[barId] = {
+      outline: geometry.outlines[0].map(world),
+      holes: geometry.holes.map(hole => ({ ...world(hole), r: hole.r })),
+      cutouts: (geometry.cutouts || []).map(cutout => ({ ...cutout, points: cutout.points.map(world) }))
+    };
+  });
   (polygons||[]).forEach(poly=>{
     const world=poly.points.map(id=>pts[id]).filter(p=>p&&Number.isFinite(p.x));
     if(world.length<3) return;
@@ -1061,7 +1077,7 @@ function push3D() {
   });
   const model = buildSceneModel(links, pts, {
     groundIds, motorCenters: motorCenterIds, motorTypes, motorMounts, hullR: HULL_R_WORLD,
-    polygons, sliders, gears, racks, cams, pulleys, belts, frameGeometry, plateGeometries
+    polygons, sliders, gears, racks, cams, pulleys, belts, frameGeometry, plateGeometries, barGeometries
   });
   viewer3D.update(model);
 }

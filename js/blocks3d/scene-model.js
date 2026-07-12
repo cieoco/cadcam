@@ -127,6 +127,7 @@ export function buildSceneModel(links, points, opts = {}) {
   const frameGeometry = opts.frameGeometry || null;
   const frameBackZ = frameGeometry ? -2 * plateGap : null; // 機架板背面 z（馬達齒輪箱貼合面）
   const plateGeometries = opts.plateGeometries || {}; // 孔序字串 -> { outline, holes }（沿用 2D/DXF 共用板形，如夾爪）
+  const barGeometries = opts.barGeometries || {}; // bar id -> { outline, holes, cutouts }（宿主馬達座）
   const polygons = opts.polygons || [];
   const gearDefs = opts.gears || [];
   const rackDefs = opts.racks || [];
@@ -196,6 +197,7 @@ export function buildSceneModel(links, points, opts = {}) {
       const l = body.src;
       const a = points[l.p1];
       const b = points[l.p2];
+      const shared = barGeometries[l.id];
       sticks.push({
         id: l.id,
         p1: l.p1,
@@ -208,6 +210,9 @@ export function buildSceneModel(links, points, opts = {}) {
         thickness: plateThickness,
         isCrank: l.style === 'crank',
         color: l.style === 'crank' ? '#e74c3c' : (l.color || '#3498db'),
+        outline: shared?.outline || null,
+        holes: shared?.holes || null,
+        cutouts: shared?.cutouts || null,
       });
     } else {
       const poly = body.src;
