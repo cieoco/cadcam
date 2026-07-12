@@ -803,6 +803,9 @@ function draw() {
   sliderLayer = null;
   recountBanner = null;
   if (!S.compiled || !S.comps.length) {
+    // 機構已清空：作廢上一機構的模型快照。否則 drawGround() → motorFrameExportMounts()
+    // 的預設參數會撿到舊 lastModelInputs 裡已刪馬達的安裝座，畫出一塊幽靈機架板。
+    lastModelInputs = null;
     drawGround();   // 空畫布：固定銷不足 → fallback 到地面基線
     liveClampPointIds = null;
     updateWorkRangeCard(null);
