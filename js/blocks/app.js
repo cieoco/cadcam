@@ -33,7 +33,9 @@ import * as Exporters from './exporters.js';
 import { MAX_PLATE_POINTS, worldToLocal, localToWorld, defaultPlateVertices, plateVertices, plateShapeMode, polylineTriangleParams, preservedDiagonalLength, createPlateGeometry } from './plate-geometry.js';
 import { S } from './state.js';          // 跨模組共享的可變狀態（S.comps / S.theta / S.selected* …）
 import { createExampleController } from './example-controller.js';
-import { rackGuideThetaRange } from './rack-limits.js';
+import { createGearEditor, rackPhaseShift } from './gear-editor.js';
+import { createSliderEditor } from './slider-editor.js';
+import { createMotorTools } from './motor-tools.js';
 import { circleRectCompression } from './intake-contact.js';
 import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
 import { drawCam as renderCam, drawWorkpiece as renderWorkpiece } from './special-part-render.js';
@@ -51,7 +53,7 @@ const { W, H, HULL_R_WORLD, TX, TY } = View;
 // 樂高 Technic 孔距 = 8mm；連桿/三點桿孔位長度對齊 8mm，滑軌外形尺寸不套用。
 const LEGO_STEP = Model.LEGO_FRAME_STEP;
 const LINK_DEFAULT_LEN = 88;   // 連桿預設長度（12 孔，對齊 8mm）
-const GEAR_MODULE = 6;         // 齒輪模數（mm）：所有齒輪共用，節圓半徑 R=teeth·module/2，故必定咬合
+// GEAR_MODULE（齒輪模數）已隨齒輪 / 齒條域移到 ./gear-editor.js
 const snapLego = v => Math.max(LEGO_STEP, Math.round((Number(v) || 0) / LEGO_STEP) * LEGO_STEP);
 const roundMm = v => Math.round(Number(v) || 0);
 // 匯出 / TT / MG995 安裝設定的常數與函式已抽到 ./settings.js（以 Settings.* 呼叫）
@@ -233,6 +235,55 @@ const isFreeLink = (c) => Model.isFreeLink(S.comps, c);
 const barsAtNode = (nodeId) => Model.barsAtNode(S.comps, nodeId);
 const pointUseCount = (id) => Model.pointUseCount(S.comps, id);
 
+// ---- 齒輪 / 齒條域：邏輯抽到 ./gear-editor.js，這裡注入 app 能力並把常用函式綁回原名 ----
+const gearEditor = createGearEditor({
+  pushUndo, pause, rebuild, draw, renderFrame, transient, scheduleAutosave,
+  cancelMotorMode: (...a) => cancelMotorMode(...a),   // 延遲取用：motorTools 在下方才建立
+  exitDrawTools: () => { Tools.exitDrawLink(); Tools.exitDrawTriangle(); Tools.exitDrawPolygon(); },
+  openMobileEditPanel, closeMobileEditPanel,
+  hideEditorPanels: () => {
+    document.getElementById('lenEditor').style.display = 'none';
+    document.getElementById('roleEditor').style.display = 'none';
+    document.getElementById('servoEditor').style.display = 'none';
+    document.getElementById('strokeEditor').style.display = 'none';
+  },
+  snapshotStr, updateUndoBtn, recordManualTrace,
+  worldFromEvent, mobilePrompt, pointCoords, updatePointCoordsById, pointIsGround
+});
+const { gearById, gearMeshChain, gearMeshOff, selectGear, deselectGear, startGearManualRotate,
+        rackBodyHeight, rackPinionThetaRange, deleteGearChain,
+        addGearPair, addRackPinion, toggleRackOrientation,
+        changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter,
+        changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth } = gearEditor;
+
+// ---- 滑軌域：邏輯抽到 ./slider-editor.js，同樣注入 app 能力並綁回原名 ----
+const sliderEditor = createSliderEditor({
+  pushUndo, rebuild, draw,
+  cancelMotorMode: (...a) => cancelMotorMode(...a),   // 延遲取用：motorTools 在下方才建立
+  deselectGear, openMobileEditPanel,
+  updatePointCoordsById, roundMm,
+  renderLenEditor: Panels.renderLenEditor, setLenButtonTitles: Panels.setLenButtonTitles,
+  updatePlateShapeControls: (comp) => updatePlateShapeControls(comp)
+});
+const { syncSliderGeometries, selectSlider, setSliderDetailRows,
+        railLength, sliderBodyLength, sliderTravelStart, sliderTravelEnd,
+        sliderProjectedDistance, normalizeSliderRange, changeRailLen,
+        changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset,
+        changeSliderTravelStart, changeSliderTravelEnd, toggleSliderBase, flipSlider } = sliderEditor;
+
+// ---- 動力來源域：邏輯抽到 ./motor-tools.js（放置 / 指派輸入 / 型號查詢 / 有限行程）----
+const motorTools = createMotorTools({
+  svg, pushUndo, pause, rebuild, draw, setBanner, clearBanner, promptText,
+  exitDrawTools: () => { Tools.exitDrawLink(); Tools.exitDrawTriangle(); Tools.exitDrawPolygon(); },
+  deselectLink, openMobileEditPanel, updateRoleEditor: Panels.updateRoleEditor,
+  barsAtNode, pointIsGround, freezePointAtDisplay, setPointType,
+  gearById, gearMeshChain, selectGear, rackPinionThetaRange,
+  sliderProjectedDistance, railLength, sliderTravelStart, sliderTravelEnd
+});
+const { cancelMotorMode, placeMotor, handleMotorOnNode, tryPickBar,
+        driveBarAt, driveSliderAt, driveGearAt,
+        motorBarForCenter, motorTypeForCenter, inputRockRange } = motorTools;
+
 // 隱性機架：所有 grounded 接點（fixed / motor / linear）視為同一個固定底座（機架）。
 // 不是獨立物件，只是把散落的固定銷當成一組——拖機架把手時整組一起平移。
 // 點 key 的掃描集中在 model.js（依 part-types 表），app 只負責把結果畫出來。
@@ -244,30 +295,7 @@ function frameNodes() { return Model.frameNodes(S.comps); }
 // 注意：移動仍以 frameNodeIds() 為準，滑塊照樣跟著走。
 function frameConnectorNodes() { return Model.frameConnectorNodes(S.comps); }
 
-function syncSliderGeometries() {
-  S.comps.filter(c => c.type === 'slider' && c.p1 && c.p2).forEach(c => {
-    if (!c.m1 || !c.m2) {
-      c.m1 = { id: `${c.id || 'Slider'}m1`, type: 'fixed', x: c.p1.x || 0, y: c.p1.y || 0 };
-      c.m2 = { id: `${c.id || 'Slider'}m2`, type: 'fixed', x: c.p2.x || 0, y: c.p2.y || 0 };
-    }
-    c.m1.type = 'fixed';
-    c.m2.type = 'fixed';
-    const dx = (c.m2.x || 0) - (c.m1.x || 0);
-    const dy = (c.m2.y || 0) - (c.m1.y || 0);
-    const d = Math.hypot(dx, dy) || 1;
-    const carrierLen = Math.max(railLength(c), roundMm(d));
-    const ux = dx / d, uy = dy / d;
-    c.m2.x = (c.m1.x || 0) + ux * carrierLen;
-    c.m2.y = (c.m1.y || 0) + uy * carrierLen;
-    c.carrierLen = carrierLen;
-    const maxOffset = Math.max(0, carrierLen - railLength(c));
-    c.railOffset = Math.max(0, Math.min(maxOffset, roundMm(c.railOffset || 0)));
-    c.p1.x = (c.m1.x || 0) + ux * c.railOffset;
-    c.p1.y = (c.m1.y || 0) + uy * c.railOffset;
-    c.p2.x = c.p1.x + ux * railLength(c);
-    c.p2.y = c.p1.y + uy * railLength(c);
-  });
-}
+// syncSliderGeometries（滑軌幾何同步）已隨滑軌域移到 ./slider-editor.js
 
 function rebuild() {
   syncSliderGeometries();
@@ -722,28 +750,6 @@ function drawWorkpiecePart(c,pts){
 
 
 
-// 齒相位對齊（純滾動只需在 θ=0 對一次，之後 rolling 自動保持咬合）：
-// 算出讓「小齒輪齒頂落進齒條齒隙」所需的齒條齒形局部平移（沿桿軸）。
-// 2D 和 3D 都必須用同一個 θ=0 放置姿態，不能用播放後的 solved points 重算，否則會雙重位移而錯齒。
-function rackPhaseShift(rack, pinion, { length, module, teeth, axisDeg }) {
-  if (!rack || !rack.p1 || !pinion || !pinion.p1 || !pinion.p2) return 0;
-  const a = (Number(axisDeg) || 0) * Math.PI / 180;
-  const ux = Math.cos(a), uy = Math.sin(a);
-  const ctr0 = pinion.p1, pin0 = pinion.p2, ref0 = rack.p1;
-  const phi0 = Math.atan2(pin0.y - ctr0.y, pin0.x - ctr0.x);
-  const t0 = (ctr0.x - ref0.x) * ux + (ctr0.y - ref0.y) * uy;
-  const Ctx = ref0.x + ux * t0, Cty = ref0.y + uy * t0;
-  const angC = Math.atan2(Cty - ctr0.y, Ctx - ctr0.x);
-  const toothAng = (2 * Math.PI) / teeth;
-  const pitch = Math.PI * module;
-  const ppFrac = ((angC - phi0) / toothAng) % 1;
-  const crownPhase = t0 - pitch * (0.5 + ppFrac);
-  const startX0 = -length / 2 - pitch;
-  let sh = (crownPhase - startX0) % pitch;
-  if (sh < 0) sh += pitch;
-  return sh;
-}
-
 function pulleyRadius(c, fallback = 32) {
   return Number(S.topo.params[c.radiusParam]) || fallback;
 }
@@ -1189,439 +1195,6 @@ function addAnchor() {
   rebuild(); draw();
 }
 
-// 齒輪以「成對」為基本單位（圓心距、反向同動都是一對的性質）：放下一個嚙合齒輪對——
-// 驅動輪（中心放馬達、一放下就轉）＋ 從動輪（mesh＝驅動輪），擺在相切位置（中心距＝兩節圓
-// 半徑和），播放時依齒數比反向轉。兩輪共用模數 module，節圓半徑 R＝teeth·module/2，必定咬合。
-function makeGear(n, opts) {
-  const { teeth, module, cx, cy, isDriver, meshId, color } = opts;
-  const R = teeth * module / 2;
-  const pinR = Math.round(R * 0.6);
-  const radiusParam = 'GR' + n;
-  const pinRadiusParam = 'GPR' + n;
-  // 乙：放下即「浮動未固定」——兩個中心都是 floating，比照桿件由使用者把中心拖去地錨/接點才接地。
-  // 驅動輪不必顯式給馬達：兩中心接地後，gear step 的 motor 會 fallback 到預設馬達 '1'（＝播放 theta），
-  // 按 ▶ 即轉（見 core/topology.js 的 gear 步驟、solver.js 的齒輪 force-set）。
-  const center = { id: 'GC' + n, type: 'floating', x: cx, y: cy };
-  const gear = {
-    type: 'gear', id: 'Gear' + n, color,
-    p1: center,
-    p2: { id: 'GP' + n, type: 'floating', x: cx + pinR, y: cy },
-    radiusParam, pinRadiusParam, pinHoleDiameter: 5, teeth, module, phase: 0
-  };
-  if (meshId) gear.mesh = meshId;
-  S.topo.params[radiusParam] = R;
-  S.topo.params[pinRadiusParam] = pinR;
-  return gear;
-}
-function addGearPair() {
-  pushUndo();
-  Tools.exitDrawLink();
-  Tools.exitDrawTriangle();
-  Tools.exitDrawPolygon();
-  cancelMotorMode();
-  const m = GEAR_MODULE;
-  const na = 12, nb = 18;                         // 預設 12:18，一放下就看得到轉速比
-  const Ra = na * m / 2, Rb = nb * m / 2;
-  // 擺在畫布中央偏左，整對沿 x 排開、相切
-  const base = mobilePrompt() ? View.worldFromScreen(W * 0.30, H * 0.45) : { x: -70, y: 0 };
-  const nA = ++S.counter;
-  const driver = makeGear(nA, { teeth: na, module: m, cx: base.x, cy: base.y, isDriver: true, meshId: null, color: '#e74c3c' });
-  const nB = ++S.counter;
-  const driven = makeGear(nB, { teeth: nb, module: m, cx: base.x + Ra + Rb, cy: base.y, isDriver: false, meshId: driver.id, color: '#2c6fbb' });
-  S.comps.push(driver, driven);
-  rebuild(); draw();
-  selectGear(driven.id);                          // 放下就選從動輪，方便改模數 / 齒數
-}
-
-function addRackPinion() {
-  pushUndo();
-  Tools.exitDrawLink();
-  Tools.exitDrawTriangle();
-  Tools.exitDrawPolygon();
-  cancelMotorMode();
-  const module = 4;
-  const teeth = 15;
-  const R = teeth * module / 2;
-  const base = mobilePrompt() ? View.worldFromScreen(W * 0.32, H * 0.44) : { x: -60, y: 0 };
-  const n = ++S.counter;
-  const pinion = makeGear(n, { teeth, module, cx: base.x, cy: base.y, isDriver: true, meshId: null, color: '#e74c3c' });
-  pinion.p1.type = 'motor';
-  pinion.p1.physicalMotor = '1';
-  const rackLen = 176;
-  const bodyHeight = 20;
-  const rackRef = { x: base.x, y: base.y - R };
-  const pinAId = 'RKG' + (++S.counter);
-  const pinBId = 'RKG' + (++S.counter);
-  const rack = {
-    type: 'rack',
-    id: 'Rack' + (++S.counter),
-    color: '#16a085',
-    p1: { id: 'RKP' + S.counter, type: 'floating', x: rackRef.x, y: rackRef.y },
-    pinion: pinion.id,
-    lenParam: 'RKL' + S.counter,
-    axisDeg: 0,
-    sign: 1,
-    bodyHeight,
-    endMargin:12,
-    slot: { length: 136, width: 5, offset: 0 },
-    framePins: [pinAId, pinBId],
-    holes:[{id:`RKH${S.counter}A`,role:'endA',u:0,v:-15,diameter:5},{id:`RKH${S.counter}B`,role:'endB',u:0,v:-15,diameter:5}]
-  };
-  const pins = rackFramePinPositions(rack, pinion, { length: rackLen+24, module, teeth, axisDeg: rack.axisDeg });
-  const guideA = { type: 'anchor', id: 'RackGuide' + (S.counter - 2), p1: { id: pinAId, type: 'fixed', x: pins[0].x, y: pins[0].y } };
-  const guideB = { type: 'anchor', id: 'RackGuide' + (S.counter - 1), p1: { id: pinBId, type: 'fixed', x: pins[1].x, y: pins[1].y } };
-  S.topo.params[rack.lenParam] = rackLen;
-  S.comps.push(pinion, guideA, guideB, rack);
-  rebuild(); draw();
-  selectGear(pinion.id);
-}
-
-// ---- 齒輪：選取 + 改模數 / 齒數（成對同動）----
-function gearById(id) { return S.comps.find(c => c.type === 'gear' && c.id === id) || null; }
-
-// 和某齒輪同一條嚙合鏈的所有齒輪（沿 mesh 連通分量）。模數必須整鏈一致才咬得起來。
-function gearMeshChain(start) {
-  const all = S.comps.filter(g => g.type === 'gear');
-  const seen = new Set();
-  const stack = [start];
-  while (stack.length) {
-    const g = stack.pop();
-    if (!g || seen.has(g.id)) continue;
-    seen.add(g.id);
-    if (g.mesh) { const drv = all.find(x => x.id === g.mesh); if (drv) stack.push(drv); }
-    all.forEach(x => { if (x.mesh === g.id) stack.push(x); });
-  }
-  return all.filter(g => seen.has(g.id));
-}
-// 把每顆「從動輪」重擺到和它驅動輪相切（中心距＝兩節圓半徑和），沿目前方向。改模數/齒數後保持嚙合。
-function syncGearMesh() {
-  S.comps.filter(c => c.type === 'gear' && c.mesh).forEach(c => {
-    const drv = gearById(c.mesh);
-    if (!drv) return;
-    const dc = pointCoords()[drv.p1.id] || drv.p1;
-    const cc = pointCoords()[c.p1.id] || c.p1;
-    const Rd = Number(S.topo.params[drv.radiusParam]) || 40;
-    const Rc = Number(S.topo.params[c.radiusParam]) || 40;
-    let dx = (cc.x || 0) - (dc.x || 0), dy = (cc.y || 0) - (dc.y || 0);
-    let d = Math.hypot(dx, dy);
-    if (d < 1e-6) { dx = 1; dy = 0; d = 1; }
-    updatePointCoordsById(c.p1.id, (dc.x || 0) + dx / d * (Rd + Rc), (dc.y || 0) + dy / d * (Rd + Rc));
-  });
-}
-// 嚙合防呆：這顆齒輪與其嚙合夥伴若「都已接地」但中心距 ≠ Ra+Rb（>tol），代表沒對好咬合
-// （多半是把中心拖去合併到不在嚙合圓上的地錨）。回 true 讓繪製給紅色虛線環提示，不自動搬動錨點。
-function gearMeshOff(c) {
-  if (!c || c.type !== 'gear' || !c.p1) return false;
-  const partner = S.comps.find(p => p.type === 'gear' && p !== c && (c.mesh === p.id || p.mesh === c.id));
-  if (!partner || !partner.p1) return false;
-  if (!pointIsGround(c.p1.id) || !pointIsGround(partner.p1.id)) return false;
-  const pc = pointCoords();
-  const a = pc[c.p1.id], b = pc[partner.p1.id];
-  if (!a || !b) return false;
-  const D = (Number(S.topo.params[c.radiusParam]) || 40) + (Number(S.topo.params[partner.radiusParam]) || 40);
-  return Math.abs(Math.hypot(b.x - a.x, b.y - a.y) - D) > 1.5;
-}
-function selectGear(id) {
-  cancelMotorMode();
-  const c = gearById(id);
-  if (!c) return;
-  openMobileEditPanel();
-  S.selectedGearId = id;
-  S.selectedLinkId = null;
-  S.selectedTriangleId = null;
-  S.selectedSliderId = null;
-  S.selectedNodeId = null;
-  document.getElementById('lenEditor').style.display = 'none';
-  document.getElementById('roleEditor').style.display = 'none';
-  document.getElementById('servoEditor').style.display = 'none';
-  document.getElementById('strokeEditor').style.display = 'none';
-  updateGearEditor();
-  draw();
-}
-function updateGearEditor() {
-  const panel = document.getElementById('gearEditor');
-  if (!panel) return;
-  const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
-  if (!c) { panel.style.display = 'none'; return; }
-  const mod = Number(c.module) || GEAR_MODULE;
-  const rack = rackForGear(c);
-  const setText = (elId, v) => { const el = document.getElementById(elId); if (el) el.textContent = v; };
-  const setRow = (elId, show) => { const el = document.getElementById(elId); if (el) el.style.display = show ? '' : 'none'; };
-  setText('gearModuleVal', Math.round(mod));
-  setText('gearTeethVal', c.teeth);
-  setText('gearRadiusVal', Math.round(Number(S.topo.params[c.radiusParam]) || c.teeth * mod / 2));
-  setText('gearPinRadiusVal', Math.round(gearPinRadius(c)));
-  setText('gearPinHoleVal', Number(c.pinHoleDiameter || 5).toFixed(1).replace(/\.0$/, ''));
-  setRow('rackLengthRow', !!rack);
-  setRow('rackOrientationRow', !!rack);
-  setRow('rackBodyHeightRow', !!rack);
-  setRow('rackSlotLengthRow', !!rack);
-  setRow('rackSlotWidthRow', !!rack);
-  if (rack) {
-    const len = rackLength(rack);
-    const bodyH = rackBodyHeight(rack, mod);
-    const slot = ensureRackSlot(rack, len);
-    setText('rackLengthVal', Math.round(len));
-    setText('rackBodyHeightVal', Number(bodyH).toFixed(1).replace(/\.0$/, ''));
-    setText('rackSlotLengthVal', Math.round(slot.length));
-    setText('rackSlotWidthVal', Number(slot.width).toFixed(1).replace(/\.0$/, ''));
-    const orientationBtn=document.getElementById('rackOrientationBtn');
-    if(orientationBtn){ const vertical=Math.abs(Math.sin((Number(rack.axisDeg)||0)*Math.PI/180))>.7; orientationBtn.textContent=vertical?'↕ 垂直升降':'↔ 水平伸縮'; }
-  }
-  panel.style.display = 'flex';
-}
-function rackForGear(gear) {
-  return gear ? S.comps.find(c => c.type === 'rack' && c.pinion === gear.id) || null : null;
-}
-function toggleRackOrientation() {
-  const gear=S.selectedGearId?gearById(S.selectedGearId):null, rack=rackForGear(gear);
-  if(!gear||!rack||!gear.p1)return;
-  pushUndo(); pause();
-  const points=pointCoords(), center=points[gear.p1.id]||gear.p1;
-  const vertical=Math.abs(Math.sin((Number(rack.axisDeg)||0)*Math.PI/180))>.7;
-  const delta=vertical?-Math.PI/2:Math.PI/2, cos=Math.cos(delta), sin=Math.sin(delta);
-  [rack.p1.id,...(rack.framePins||[])].forEach(id=>{ const p=points[id]; if(!p)return; const x=p.x-center.x,y=p.y-center.y; updatePointCoordsById(id,center.x+x*cos-y*sin,center.y+x*sin+y*cos); });
-  rack.axisDeg=vertical?0:90;
-  rebuild(); draw(); updateGearEditor(); scheduleAutosave();
-  transient(vertical?'↔ 已改為水平伸縮':'↕ 已改為垂直升降');
-}
-function rackLength(rack) {
-  return Number(S.topo.params[rack.lenParam]) || 160;
-}
-function rackBodyLength(rack){ return rackLength(rack)+2*(Number(rack?.endMargin)||12); }
-function rackBodyHeight(rack, module = GEAR_MODULE) {
-  return Math.max(4, Number(rack && rack.bodyHeight) || Math.max(8, module * 2.5));
-}
-function ensureRackSlot(rack, length = rackLength(rack)) {
-  if (!rack.slot || typeof rack.slot !== 'object') rack.slot = {};
-  rack.slot.length = Math.max(8, Math.min(Math.max(8, length - 12), Math.round(Number(rack.slot.length) || Math.max(24, length - 40))));
-  rack.slot.width = Number(Math.max(2, Math.min(20, Number(rack.slot.width) || 5)).toFixed(1));
-  rack.slot.offset = Number(Number(rack.slot.offset) || 0);
-  return rack.slot;
-}
-function rackFramePinPositions(rack, pinion, { length, module, teeth, axisDeg }) {
-  const slot = ensureRackSlot(rack, length);
-  const phaseShift = rackPhaseShift(rack, pinion, { length, module, teeth, axisDeg });
-  const bodyH = rackBodyHeight(rack, module);
-  const dedendum = module * 1.25;
-  const slotY = -dedendum - bodyH / 2 + (Number(slot.offset) || 0);
-  const sep = Math.min(18, Math.max(6, slot.length * 0.08));
-  const ar = (Number(axisDeg) || 0) * Math.PI / 180;
-  const ux = Math.cos(ar), uy = Math.sin(ar);
-  const nx = -Math.sin(ar), ny = Math.cos(ar);
-  const ref = rack.p1 || { x: 0, y: 0 };
-  const toWorld = x => ({
-    x: (ref.x || 0) + ux * x + nx * slotY,
-    y: (ref.y || 0) + uy * x + ny * slotY
-  });
-  return [toWorld(phaseShift - sep), toWorld(phaseShift + sep)];
-}
-function syncRackFramePins(rack, gear = null) {
-  if (!rack || !Array.isArray(rack.framePins) || rack.framePins.length < 2) return;
-  const pinion = gear || (rack.pinion ? gearById(rack.pinion) : null);
-  if (!pinion) return;
-  const teeth = Math.max(6, Math.round(Number(pinion.teeth) || 12));
-  const R = Number(S.topo.params[pinion.radiusParam]) || 40;
-  const module = (2 * R) / teeth;
-    const length = rackBodyLength(rack);
-  const axisDeg = Number(rack.axisDeg) || 0;
-  const pins = rackFramePinPositions(rack, pinion, { length, module, teeth, axisDeg });
-  rack.framePins.slice(0, 2).forEach((id, index) => {
-    const p = pins[index];
-    updatePointCoordsById(id, p.x, p.y);
-  });
-}
-function syncRackFramePinsForGear(gear) {
-  const rack = rackForGear(gear);
-  if (rack) syncRackFramePins(rack, gear);
-}
-function gearPitchRadius(c) {
-  return Number(S.topo.params[c.radiusParam]) || (Number(c.teeth) || 12) * (Number(c.module) || GEAR_MODULE) / 2 || 40;
-}
-function gearPinRadius(c) {
-  const pitchR = gearPitchRadius(c);
-  return c.pinRadiusParam
-    ? Number(S.topo.params[c.pinRadiusParam]) || Math.round(pitchR * 0.6)
-    : Number(c.pinRadius) || Math.round(pitchR * 0.6);
-}
-function gearDriveState(c, seen = new Set()) {
-  if (!c || seen.has(c.id)) return null;
-  if (!c.mesh) return { root: c, factor: 1 };
-  seen.add(c.id);
-  const driver = gearById(c.mesh);
-  if (!driver) return null;
-  const parent = gearDriveState(driver, seen);
-  if (!parent) return null;
-  return {
-    root: parent.root,
-    factor: parent.factor * -(gearPitchRadius(driver) / (gearPitchRadius(c) || 1))
-  };
-}
-function setGearManualAngle(c, angleRad) {
-  if (!c || !c.p1 || !c.p2) return;
-  const state = gearDriveState(c);
-  const rootMotor = state && state.root && state.root.p1 &&
-    (state.root.p1.physicalMotor || state.root.p1.physical_motor);
-  const phaseRad = (Number(c.phase) || 0) * Math.PI / 180;
-  if (rootMotor && state && Math.abs(state.factor) > 1e-9) {
-    S.theta = (angleRad - phaseRad) * 180 / Math.PI / state.factor;
-    const rackRange=rackPinionThetaRange();
-    if(rackRange)S.theta=Math.max(rackRange.lo,Math.min(rackRange.hi,S.theta));
-    S.topo.params.theta = S.theta;
-    const thetaEl = document.getElementById('thetaVal');
-    if (thetaEl) thetaEl.textContent = Math.round(norm360(S.theta));
-  } else {
-    const ctr = pointCoords()[c.p1.id] || c.p1;
-    const r = gearPinRadius(c);
-    updatePointCoordsById(c.p2.id, (ctr.x || 0) + r * Math.cos(angleRad), (ctr.y || 0) + r * Math.sin(angleRad));
-  }
-}
-function startGearManualRotate(e, gearId) {
-  if (S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars) return;
-  const c = gearById(gearId);
-  if (!c || !c.p1 || !c.p2) return;
-  e.preventDefault();
-  e.stopPropagation();
-  pause();
-  selectGear(gearId);
-  S.preDragSnap = snapshotStr();
-  const move = (ev) => {
-    const w = worldFromEvent(ev);
-    const ctr = pointCoords()[c.p1.id] || c.p1;
-    if (!w || !ctr) return;
-    setGearManualAngle(c, Math.atan2(w.y - ctr.y, w.x - ctr.x));
-    renderFrame();
-  };
-  const up = () => {
-    window.removeEventListener('pointermove', move);
-    window.removeEventListener('pointerup', up);
-    window.removeEventListener('pointercancel', up);
-    if (S.preDragSnap != null && snapshotStr() !== S.preDragSnap) {
-      S.undoStack.push(S.preDragSnap);
-      if (S.undoStack.length > 60) S.undoStack.shift();
-      updateUndoBtn();
-    }
-    S.preDragSnap = null;
-    rebuild();
-    recordManualTrace();
-    draw();
-  };
-  window.addEventListener('pointermove', move);
-  window.addEventListener('pointerup', up);
-  window.addEventListener('pointercancel', up);
-  move(e);
-}
-function clampGearPinRadius(c) {
-  if (!c) return;
-  const pitchR = gearPitchRadius(c);
-  const next = Math.max(4, Math.min(Math.max(4, pitchR - 4), gearPinRadius(c)));
-  if (c.pinRadiusParam) S.topo.params[c.pinRadiusParam] = Math.round(next);
-  else c.pinRadius = Math.round(next);
-}
-function changeGearTeeth(delta) {
-  const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
-  if (!c) return;
-  pushUndo();
-  c.teeth = Math.max(6, Math.round((Number(c.teeth) || 12) + delta));
-  S.topo.params[c.radiusParam] = c.teeth * (Number(c.module) || GEAR_MODULE) / 2;
-  clampGearPinRadius(c);
-  syncGearMesh();
-  syncRackFramePinsForGear(c);
-  rebuild(); draw();
-  updateGearEditor();
-}
-function changeGearPinRadius(delta) {
-  const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
-  if (!c) return;
-  pushUndo();
-  const pitchR = gearPitchRadius(c);
-  const next = Math.max(4, Math.min(Math.max(4, pitchR - 4), gearPinRadius(c) + delta));
-  if (c.pinRadiusParam) S.topo.params[c.pinRadiusParam] = Math.round(next);
-  else c.pinRadius = Math.round(next);
-  const ctr = pointCoords()[c.p1.id] || c.p1;
-  const pin = pointCoords()[c.p2.id] || c.p2;
-  const ang = Math.atan2((pin.y || 0) - (ctr.y || 0), (pin.x || 0) - (ctr.x || 0));
-  updatePointCoordsById(c.p2.id, (ctr.x || 0) + next * Math.cos(ang), (ctr.y || 0) + next * Math.sin(ang));
-  rebuild(); draw();
-  updateGearEditor();
-}
-function changeGearPinHoleDiameter(delta) {
-  const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
-  if (!c) return;
-  pushUndo();
-  c.pinHoleDiameter = Number(Math.max(1, Math.min(30, (Number(c.pinHoleDiameter) || 5) + delta)).toFixed(1));
-  rebuild(); draw();
-  updateGearEditor();
-}
-function changeGearModule(delta) {
-  const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
-  if (!c) return;
-  pushUndo();
-  // 模數是「整鏈」共用：同時改本輪與和它嚙合的所有齒輪，否則齒大小不一咬不起來。
-  const mod = Math.max(1, (Number(c.module) || GEAR_MODULE) + delta);
-  gearMeshChain(c).forEach(g => {
-    g.module = mod;
-    S.topo.params[g.radiusParam] = g.teeth * mod / 2;
-    clampGearPinRadius(g);
-    syncRackFramePinsForGear(g);
-  });
-  syncGearMesh();
-  rebuild(); draw();
-  updateGearEditor();
-}
-function changeRackLength(delta) {
-  const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
-  const rack = rackForGear(gear);
-  if (!rack) return;
-  pushUndo();
-  const next = Math.max(32, Math.round((rackLength(rack) + delta) / 8) * 8);
-  S.topo.params[rack.lenParam] = next;
-  ensureRackSlot(rack, next);
-  syncRackFramePins(rack, gear);
-  rebuild(); draw();
-  updateGearEditor();
-}
-function changeRackBodyHeight(delta) {
-  const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
-  const rack = rackForGear(gear);
-  if (!rack) return;
-  pushUndo();
-  const mod = Number(gear.module) || GEAR_MODULE;
-  const next = Math.max(4, rackBodyHeight(rack, mod) + delta);
-  rack.bodyHeight = Number(next.toFixed(1));
-  syncRackFramePins(rack, gear);
-  rebuild(); draw();
-  updateGearEditor();
-}
-function changeRackSlotLength(delta) {
-  const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
-  const rack = rackForGear(gear);
-  if (!rack) return;
-  pushUndo();
-  const len = rackLength(rack);
-  const slot = ensureRackSlot(rack, len);
-  slot.length = Math.max(8, Math.min(Math.max(8, len - 12), Math.round((slot.length + delta) / 8) * 8));
-  syncRackFramePins(rack, gear);
-  rebuild(); draw();
-  updateGearEditor();
-}
-function changeRackSlotWidth(delta) {
-  const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
-  const rack = rackForGear(gear);
-  if (!rack) return;
-  pushUndo();
-  const slot = ensureRackSlot(rack);
-  slot.width = Number(Math.max(2, Math.min(20, slot.width + delta)).toFixed(1));
-  syncRackFramePins(rack, gear);
-  rebuild(); draw();
-  updateGearEditor();
-}
-function deselectGear() {
-  S.selectedGearId = null;
-  const panel = document.getElementById('gearEditor');
-  if (panel) panel.style.display = 'none';
-}
-
 function clearAll() {
   pushUndo();
   pause();
@@ -1740,12 +1313,7 @@ function updateSolveBanner(sol, missingVisibleLinks) {
   el.textContent = show ? '這個姿勢到死點了：有些桿件重合，求解器暫時不知道要往哪邊翻' : '';
   el.style.display = show ? 'block' : 'none';
 }
-function cancelMotorMode() {
-  S.placingMotor = false;
-  S.pickBars = null;
-  svg.style.cursor = '';
-  clearBanner();
-}
+// cancelMotorMode 已隨動力來源域移到 ./motor-tools.js
 // ---- 動力來源選單：點「動力來源」先選 TT馬達 / MG995，再進入放置模式 ----
 function linkMenuEl() { return document.getElementById('linkMenu'); }
 function openLinkMenu() {
@@ -1779,225 +1347,10 @@ function pickMotorType(type) {
   closePowerMenu();
   placeMotor();
 }
-const motorTypeLabel = (type) => (type === 'mg995') ? 'MG995 🟦' : (type === 'linear') ? '線性致動器 🟢' : 'TT馬達 🔴';
-function placeMotor() {
-  pause();
-  Tools.exitDrawLink();
-  Tools.exitDrawTriangle();
-  Tools.exitDrawPolygon();
-  deselectLink();
-  S.placingMotor = true;
-  S.pickBars = null;
-  svg.style.cursor = 'crosshair';
-  const label = motorTypeLabel(S.pendingMotorType);
-  setBanner(promptText(
-    '點一個接點放上 ' + label,
-    '點一下接點放上 ' + label
-  ));
-  draw();
-}
-function handleMotorOnNode(nodeId) {
-  // 線性致動器：目標是滑塊點（slider 的 p3），讓滑塊改由直線位移驅動（活塞）。
-  if (S.pendingMotorType === 'linear') {
-    const sl = S.comps.find(c => c.type === 'slider' && c.p3 && c.p3.id === nodeId);
-    if (!sl) { setBanner('線性致動器要放在滑塊（🟩 滑軌的方塊）上喔'); return; }
-    driveSliderAt(sl.id);
-    return;
-  }
-  // 齒輪中心：放馬達＝把這條嚙合鏈的驅動輪固定到機架並給動力（沒馬達的齒輪是靜止接地輪）。
-  const gearC = S.comps.find(c => c.type === 'gear' && c.p1 && c.p1.id === nodeId);
-  if (gearC) { driveGearAt(gearC.id); return; }
-  const bars = barsAtNode(nodeId);
-  if (!bars.length) {
-    setBanner('馬達要放在連桿的端點上，或齒輪中心上喔');
-    return;
-  }
-  if (bars.length === 1) {
-    driveBarAt(bars[0].id, nodeId);
-    return;
-  }
-  S.placingMotor = false;
-  S.pickBars = { nodeId, ids: bars.map(b => b.id) };
-  svg.style.cursor = '';
-  setBanner(promptText(
-    '這個接點有好幾根桿，點一下你要馬達轉的那根',
-    '這個接點有好幾根桿，點一下要馬達轉的那根'
-  ));
-  draw();
-}
-function tryPickBar(barId) {
-  if (!S.pickBars) return;
-  if (S.pickBars.ids.includes(barId)) driveBarAt(barId, S.pickBars.nodeId);
-  else cancelMotorMode();
-}
-function driveBarAt(barId, nodeId) {
-  const bar = S.comps.find(c => c.id === barId && c.type === 'bar');
-  if (!bar) return;
-  const key = bar.p1.id === nodeId ? 'p1' : (bar.p2.id === nodeId ? 'p2' : null);
-  if (!key) return;
-  const otherKey = key === 'p1' ? 'p2' : 'p1';
-  if (pointIsGround(bar[otherKey].id)) {
-    S.placingMotor = false;
-    S.pickBars = null;
-    svg.style.cursor = '';
-    setBanner('這根連桿另一端已經釘住了，兩端都固定不會動');
-    draw();
-    return;
-  }
-  pushUndo();
-  freezePointAtDisplay(nodeId);
-  // 讓馬達「從現在這個姿勢」開始轉：把曲柄目前的角度記成相位偏移。
-  // 否則 input 會把曲柄瞬間轉到絕對角度 0，曲柄端點被甩到別處、整個四連桿當場塌掉。
-  const angDeg = Math.atan2(bar.p2.y - bar.p1.y, bar.p2.x - bar.p1.x) * 180 / Math.PI;
-  bar.motorType = S.pendingMotorType;
-  if (S.pendingMotorType === 'mg995') {
-    // 伺服：S.theta 從 0 起算、曲柄停在原姿勢（phaseOffset 吸收絕對角），
-    // 角度面板的「起始/結束角」才直覺地對應 thetaVal。
-    S.theta = 0;
-    bar.phaseOffset = angDeg;
-    bar.servoStart = 0;
-    bar.servoEnd = 90;
-  } else {
-    bar.phaseOffset = angDeg - S.theta;
-    delete bar.servoStart;
-    delete bar.servoEnd;
-  }
-  bar[key].type = 'fixed';
-  bar[key].physicalMotor = '1';
-  bar.isInput = true;
-  bar.physicalMotor = '1';
-  cancelMotorMode();
-  // 放完直接選取這顆馬達的接點，MG995 就會跳出角度面板。
-  S.selectedNodeId = nodeId;
-  S.selectedLinkId = null;
-  S.selectedTriangleId = null;
-  rebuild(); draw();
-  Panels.updateRoleEditor();
-  openMobileEditPanel();
-}
-// 線性致動器：把某根滑軌的滑塊點改成被直線位移驅動（活塞）。S.theta 從 0 起算＝行程位移。
-function driveSliderAt(sliderId) {
-  const sl = S.comps.find(c => c.id === sliderId && c.type === 'slider');
-  if (!sl) return;
-  pushUndo();
-  S.theta = 0;                 // S.theta 直接當行程位移（getLinearShift valve '1' fallback 到 S.theta）
-  sl.isInput = true;
-  sl.physicalMotor = '1';
-  if (sl.baseEnd !== 'p2') sl.baseEnd = 'p1';
-  sl.travelStart = sliderProjectedDistance(sl);
-  if (!Number.isFinite(Number(sl.travelEnd)) || Number(sl.travelEnd) <= Number(sl.travelStart)) {
-    sl.travelEnd = railLength(sl);
-  }
-  delete sl.strokeMin;
-  delete sl.strokeMax;
-  cancelMotorMode();
-  S.selectedNodeId = sl.p3.id;
-  S.selectedLinkId = null;
-  S.selectedTriangleId = null;
-  rebuild(); draw();
-  Panels.updateRoleEditor();
-  openMobileEditPanel();
-}
-// 在齒輪中心放馬達：把這條嚙合鏈的「根驅動輪」中心固定到機架並給動力。
-// 馬達一律記在驅動輪（mesh=null）中心；從動輪角度由它推算（外嚙合反向、按齒比）。
-// 沒馬達的齒輪是靜止接地輪——這個動作讓齒輪「會轉」，與桿件放馬達同理（順手把樞軸固定）。
-// 註：齒輪目前一律連續旋轉（不分 TT / 伺服），gear 層 motorType 不入 schema 故不保存。
-function driveGearAt(gearId) {
-  if (S.pendingMotorType === 'linear') {
-    setBanner('線性致動器不能驅動齒輪；請改用 TT馬達 / MG995');
-    cancelMotorMode();
-    return;
-  }
-  let g = gearById(gearId);
-  if (!g || !g.p1) return;
-  const seen = new Set();
-  while (g.mesh && !seen.has(g.id)) { seen.add(g.id); const d = gearById(g.mesh); if (!d || !d.p1) break; g = d; }
-  pushUndo();
-  freezePointAtDisplay(g.p1.id);     // 馬達順手把驅動輪中心釘在目前位置（固定在機架），與桿件一致
-  setPointType(g.p1.id, 'fixed');
-  g.p1.physicalMotor = '1';
-  cancelMotorMode();
-  selectGear(g.id);
-  rebuild(); draw();
-  // 嚙合對要兩個中心都接地，整對才會完整解出、固定；提醒把另一個中心也設地錨。
-  const ungrounded = gearMeshChain(g).filter(x => x.p1 && !pointIsGround(x.p1.id));
-  if (ungrounded.length) setBanner('驅動輪已上馬達並固定；記得把另一個齒輪中心也設為機架點，整對才會轉');
-}
+// 動力來源域（placeMotor / handleMotorOnNode / driveBarAt / driveSliderAt / driveGearAt /
+// motorBarForCenter / motorTypeForCenter / inputRockRange）已移到 ./motor-tools.js
 
-// ---- 動力來源型號查詢 ----
-// 找以此接點為馬達中心（physicalMotor 端）的輸入桿。
-function motorBarForCenter(id) {
-  return S.comps.find(c => c.type === 'bar' && c.isInput && (
-    (c.p1 && c.p1.id === id && c.p1.physicalMotor) ||
-    (c.p2 && c.p2.id === id && c.p2.physicalMotor)
-  )) || null;
-}
-function motorTypeForCenter(id) {
-  const bar = motorBarForCenter(id);
-  return (bar && bar.motorType === 'mg995') ? 'mg995' : 'tt';
-}
-// 目前機構若由「有限行程的輸入」驅動（MG995 伺服角度範圍，或線性致動器的行程），
-// 回它來回擺的兩端（S.theta 座標系）；否則 null。play() 用它把整圈轉覆寫成來回擺。
-function inputRockRange() {
-  const servoBar = S.comps.find(c => c.type === 'bar' && c.isInput && c.motorType === 'mg995');
-  if (servoBar) {
-    const a = Number(servoBar.servoStart) || 0;
-    const b = Number.isFinite(Number(servoBar.servoEnd)) ? Number(servoBar.servoEnd) : 90;
-    return { lo: Math.min(a, b), hi: Math.max(a, b) };
-  }
-  const slider = S.comps.find(c => c.type === 'slider' && c.isInput);
-  if (slider) {
-    const stroke = Math.max(0, sliderTravelEnd(slider) - sliderTravelStart(slider));
-    return { lo: 0, hi: stroke };
-  }
-  const rackRange = rackPinionThetaRange();
-  if (rackRange) return rackRange;
-  return null;
-}
-
-// 有限齒條不是無限長齒條：接觸點跑到齒條端部之外時，真實機構就會脫離嚙合。
-// 播放時把 theta 限在接觸點仍落在齒條齒面內的範圍，讓齒條齒輪範例推到端點前反向。
-function rackPinionThetaRange() {
-  const racks = S.comps.filter(c => c.type === 'rack' && c.p1?.id && c.pinion);
-  if (!racks.length) return null;
-  let lo = -Infinity;
-  let hi = Infinity;
-  let found = false;
-  racks.forEach(rack => {
-    const pinion = gearById(rack.pinion);
-    if (!pinion || !pinion.p1) return;
-    const center = pinion.p1;
-    const ref = rack.p1;
-    const R = Number(S.topo.params[pinion.radiusParam]) || 40;
-    const L = rackBodyLength(rack);
-    if (!Number.isFinite(R) || R <= 0 || !Number.isFinite(L) || L <= 0) return;
-    const axisRad = (Number(rack.axisDeg) || 0) * Math.PI / 180;
-    const ux = Math.cos(axisRad);
-    const uy = Math.sin(axisRad);
-    const contactAtTheta0 = ((Number(center.x) || 0) - (Number(ref.x) || 0)) * ux
-      + ((Number(center.y) || 0) - (Number(ref.y) || 0)) * uy;
-    const teeth = Math.max(6, Math.round(Number(pinion.teeth) || 12));
-    const module = (2 * R) / teeth;
-    const pitch = Math.PI * module;
-    const usableHalf = Math.max(0, L / 2 - Math.max(pitch, R * 0.15));
-    if (usableHalf <= 0) return;
-    const sign = rack.sign === -1 ? -1 : 1;
-    const a = (contactAtTheta0 - usableHalf) / (sign * R);
-    const b = (contactAtTheta0 + usableHalf) / (sign * R);
-    const degA = a * 180 / Math.PI;
-    const degB = b * 180 / Math.PI;
-    lo = Math.max(lo, Math.min(degA, degB));
-    hi = Math.min(hi, Math.max(degA, degB));
-    if(Array.isArray(rack.framePins)&&rack.framePins.length){
-      const slot=ensureRackSlot(rack,L);
-      const guideRange=rackGuideThetaRange(R,slot.length,slot.width,sign);
-      if(guideRange){ lo=Math.max(lo,guideRange.lo); hi=Math.min(hi,guideRange.hi); }
-    }
-    found = true;
-  });
-  if (!found || !Number.isFinite(lo) || !Number.isFinite(hi) || hi <= lo) return null;
-  return { lo, hi };
-}
+// rackPinionThetaRange（有限齒條的 theta 範圍）已隨齒輪 / 齒條域移到 ./gear-editor.js
 
 // ---- 拖曳接點 + 靠近吸附合併（這就是「連接」）----
 // ---- 節點 / 連桿 / 機架拖曳處理已抽到 ./input.js（以 Input.* 呼叫；事件監聽見其 init）----
@@ -2140,196 +1493,7 @@ function addTriangleOutlinePoint() {
   updatePlateShapeControls(comp);
   rebuild(); draw();
 }
-// 選取滑軌：屬性列顯示軌道長度（可調）＋ 翻面（換滑塊解的那一側）＋ 刪除。
-function selectSlider(id) {
-  cancelMotorMode();
-  deselectGear();
-  const c = S.comps.find(x => x.id === id && x.type === 'slider');
-  if (!c) return;
-  openMobileEditPanel();
-  S.selectedSliderId = id;
-  S.selectedLinkId = null;
-  S.selectedTriangleId = null;
-  S.selectedNodeId = null;
-  document.getElementById('roleEditor').style.display = 'none';
-  document.getElementById('servoEditor').style.display = 'none';
-  document.getElementById('strokeEditor').style.display = 'none';
-  document.getElementById('lenTitle').textContent = '🟩 滑軌長度';
-  Panels.setLenButtonTitles('滑軌短 1mm', '滑軌長 1mm');
-  document.getElementById('triSideSelect').style.display = 'none';
-  updatePlateShapeControls(null);
-  document.getElementById('sliderFlipBtn').style.display = '';
-  document.getElementById('sliderBaseBtn').style.display = '';
-  document.getElementById('linkToRailBtn').style.display = 'none';
-  setSliderDetailRows(true);
-  document.getElementById('zliftRow').style.display = 'none';   // 滑軌不做疊放
-  document.getElementById('lenControls').style.display = 'flex';
-  document.getElementById('lenEditor').style.display = 'flex';
-  Panels.renderLenEditor(railLength(c));
-  renderSliderBaseButton(c);
-  renderSliderDetails(c);
-  draw();
-}
-function setSliderDetailRows(show) {
-  const display = show ? 'flex' : 'none';
-  const body = document.getElementById('sliderBodyRow');
-  const carrier = document.getElementById('sliderCarrierRow');
-  const railOffset = document.getElementById('sliderRailOffsetRow');
-  const start = document.getElementById('sliderStartRow');
-  const end = document.getElementById('sliderEndRow');
-  if (body) body.style.display = display;
-  if (carrier) carrier.style.display = display;
-  if (railOffset) railOffset.style.display = display;
-  if (start) start.style.display = display;
-  if (end) end.style.display = display;
-}
-function railLength(c) {
-  return Math.round(S.topo.params[c.lenParam] ||
-    Math.hypot((c.p2.x || 0) - (c.p1.x || 0), (c.p2.y || 0) - (c.p1.y || 0)));
-}
-function sliderBodyLength(c) {
-  return Math.max(1, roundMm(c.carriageLen || 32));
-}
-function sliderCarrierLength(c) {
-  return Math.max(railLength(c), roundMm(c.carrierLen || railLength(c)));
-}
-function sliderRailOffset(c) {
-  return Math.max(0, Math.min(Math.max(0, sliderCarrierLength(c) - railLength(c)), roundMm(c.railOffset || 0)));
-}
-function sliderTravelStart(c) {
-  return Math.max(0, Math.min(Math.max(0, railLength(c)), roundMm(c.travelStart || 0)));
-}
-function sliderTravelEnd(c) {
-  const L = Math.max(0, railLength(c));
-  const fallback = Number.isFinite(Number(c.travelEnd)) ? Number(c.travelEnd) : L;
-  return Math.max(sliderTravelStart(c), Math.min(L, roundMm(fallback)));
-}
-function renderSliderDetails(c) {
-  const body = document.getElementById('sliderBodyVal');
-  const carrier = document.getElementById('sliderCarrierVal');
-  const railOffset = document.getElementById('sliderRailOffsetVal');
-  const start = document.getElementById('sliderStartVal');
-  const end = document.getElementById('sliderEndVal');
-  if (body) body.textContent = sliderBodyLength(c);
-  if (carrier) carrier.textContent = sliderCarrierLength(c);
-  if (railOffset) railOffset.textContent = sliderRailOffset(c);
-  if (start) start.textContent = sliderTravelStart(c);
-  if (end) end.textContent = sliderTravelEnd(c);
-}
-function renderSliderBaseButton(c) {
-  const btn = document.getElementById('sliderBaseBtn');
-  if (!btn || !c) return;
-  btn.textContent = c.baseEnd === 'p2' ? '固定端：B' : '固定端：A';
-  btn.classList.toggle('lift-on', Boolean(c.isInput));
-}
-function sliderProjectedDistance(c) {
-  if (!c || !c.p1 || !c.p2 || !c.p3) return 0;
-  const base = c.baseEnd === 'p2' ? c.p2 : c.p1;
-  const other = c.baseEnd === 'p2' ? c.p1 : c.p2;
-  const dx = (other.x || 0) - (base.x || 0);
-  const dy = (other.y || 0) - (base.y || 0);
-  const L = Math.hypot(dx, dy) || 1;
-  return Math.max(0, Math.min(L, roundMm((((c.p3.x || 0) - (base.x || 0)) * dx + ((c.p3.y || 0) - (base.y || 0)) * dy) / L)));
-}
-function normalizeSliderRange(c) {
-  const L = railLength(c);
-  c.carriageLen = Math.max(1, Math.min(Math.max(1, L), sliderBodyLength(c)));
-  c.carrierLen = sliderCarrierLength(c);
-  c.railOffset = sliderRailOffset(c);
-  c.travelStart = sliderTravelStart(c);
-  c.travelEnd = sliderTravelEnd(c);
-}
-// 改軌道長度：沿軌道方向伸縮，保留本體固定端不動（p3 仍在線上由 solver 接手）。
-function changeRailLen(delta) {
-  const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
-  if (!c) return;
-  pushUndo();
-  const dx = (c.p2.x || 0) - (c.p1.x || 0), dy = (c.p2.y || 0) - (c.p1.y || 0);
-  const d = Math.hypot(dx, dy) || 1;
-  const L = Math.max(1, Math.min(sliderCarrierLength(c) - sliderRailOffset(c), roundMm(d + delta)));
-  // 用 updatePointCoordsById 更新所有共用此接點 id 的副本（見 setLen 說明；軌道端可能被 merge 共用）
-  if (c.baseEnd === 'p2') {
-    updatePointCoordsById(c.p1.id, (c.p2.x || 0) - dx / d * L, (c.p2.y || 0) - dy / d * L);
-  } else {
-    updatePointCoordsById(c.p2.id, (c.p1.x || 0) + dx / d * L, (c.p1.y || 0) + dy / d * L);
-  }
-  S.topo.params[c.lenParam] = L;
-  normalizeSliderRange(c);
-  Panels.renderLenEditor(L);
-  renderSliderDetails(c);
-  rebuild(); draw();
-}
-function changeSliderBodyLen(delta) {
-  const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
-  if (!c) return;
-  pushUndo();
-  c.carriageLen = Math.max(1, Math.min(Math.max(1, railLength(c)), sliderBodyLength(c) + delta));
-  normalizeSliderRange(c);
-  renderSliderDetails(c);
-  rebuild(); draw();
-}
-function changeSliderCarrierLen(delta) {
-  const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
-  if (!c) return;
-  pushUndo();
-  const dx = (c.m2.x || 0) - (c.m1.x || 0);
-  const dy = (c.m2.y || 0) - (c.m1.y || 0);
-  const d = Math.hypot(dx, dy) || 1;
-  const L = Math.max(railLength(c), sliderCarrierLength(c) + delta);
-  c.m2.x = (c.m1.x || 0) + dx / d * L;
-  c.m2.y = (c.m1.y || 0) + dy / d * L;
-  c.carrierLen = L;
-  normalizeSliderRange(c);
-  renderSliderDetails(c);
-  rebuild(); draw();
-}
-function changeSliderRailOffset(delta) {
-  const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
-  if (!c) return;
-  pushUndo();
-  c.railOffset = sliderRailOffset(c) + delta;
-  normalizeSliderRange(c);
-  renderSliderDetails(c);
-  rebuild(); draw();
-}
-function changeSliderTravelStart(delta) {
-  const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
-  if (!c) return;
-  pushUndo();
-  c.travelStart = Math.min(sliderTravelEnd(c), Math.max(0, sliderTravelStart(c) + delta));
-  normalizeSliderRange(c);
-  renderSliderDetails(c);
-  rebuild(); draw();
-}
-function changeSliderTravelEnd(delta) {
-  const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
-  if (!c) return;
-  pushUndo();
-  c.travelEnd = Math.max(sliderTravelStart(c), Math.min(railLength(c), sliderTravelEnd(c) + delta));
-  normalizeSliderRange(c);
-  renderSliderDetails(c);
-  rebuild(); draw();
-}
-function toggleSliderBase() {
-  const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
-  if (!c) return;
-  pushUndo();
-  c.baseEnd = c.baseEnd === 'p2' ? 'p1' : 'p2';
-  c.travelStart = sliderProjectedDistance(c);
-  c.travelEnd = Math.max(c.travelStart, railLength(c));
-  normalizeSliderRange(c);
-  renderSliderBaseButton(c);
-  renderSliderDetails(c);
-  rebuild(); draw();
-}
-// 翻面：切換滑塊解的那一側（slider-crank 組裝在錯邊時用）。
-function flipSlider() {
-  const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
-  if (!c) return;
-  pushUndo();
-  c.sign = (Number(c.sign) < 0) ? 1 : -1;
-  rebuild(); draw();
-}
+// 滑軌域（selectSlider / 尺寸與行程調整 / 固定端切換 / 翻面）已移到 ./slider-editor.js
 
 // 三點桿：下拉切換要調的邊（底邊 g / P1–P3 r1 / P2–P3 r2），−/＋ 就調該邊
 function triParamFor(c) {
@@ -2418,31 +1582,6 @@ function deselectLink() {
   document.getElementById('linkToRailBtn').style.display = 'none';
   setSliderDetailRows(false);
   draw();
-}
-// 刪除整條嚙合鏈（成對/成列一起刪，避免留下 mesh 指向已刪齒輪的破狀態）。
-function deleteGearChain(id) {
-  const start = gearById(id);
-  if (!start) return;
-  pushUndo();
-  pause();
-  const chain = gearMeshChain(start);
-  chain.forEach(g => ownedParamKeys(g).forEach(k => delete S.topo.params[k]));
-  const chainIds = new Set(chain.map(g => g.id));
-  const rackIds = new Set();
-  const rackFramePins = new Set();
-  S.comps.forEach(c => {
-    if (c.type === 'rack' && chainIds.has(c.pinion)) {
-      rackIds.add(c.id);
-      (c.framePins || []).forEach(id => rackFramePins.add(id));
-      ownedParamKeys(c).forEach(k => delete S.topo.params[k]);
-    }
-  });
-  const ids = new Set(chain.map(g => g.id));
-  S.comps = S.comps.filter(c => !ids.has(c.id) && !rackIds.has(c.id) && !(c.type === 'anchor' && rackFramePins.has(c.p1?.id)));
-  deselectGear();
-  S.selectedNodeId = null;
-  closeMobileEditPanel();
-  rebuild(); draw();
 }
 function deleteSelectedPart() {
   if (S.selectedGearId) { deleteGearChain(S.selectedGearId); return; }
