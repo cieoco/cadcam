@@ -63,7 +63,7 @@ multilink 三角形參數命名：`gParam` = 底邊（P1-P2）、`r1Param` = P1-
 
 ### Blocks 積木設計頁（獨立的第二個應用）
 
-`blocks.html`（進入點 `js/blocks/app.js`）是與 `mechanism.html` 平行的「積木式」設計頁：拖放零件（桿 / 結構板 / 齒輪 / 滑軌 / 馬達）直接組機構，求解重用 `js/multilink/solver.js`（`solveTopology` / `sweepTopology`）與 `js/core/topology.js`，不自帶數學。模組分工：`state.js`（跨模組共享可變狀態 `S`）、`model.js`（元件 ↔ topology 轉換）、`render.js`（SVG 繪製基元）、`panels.js`（編輯面板）、`tools.js`（畫桿等工具模式）、`input.js`（指標 / 手勢）、`motion.js`、`dof.js`、`storage.js` + `schema.js`（存檔 / 分享 / snapshot 正規化）、`exporters.js`、`examples.js` + `example-controller.js`（範例選單 / 教學卡）、`gear-editor.js`（齒輪 / 齒條域）、`slider-editor.js`（滑軌域）、`motor-tools.js`（動力來源域）——這三個域模組是 `createXxx(deps)` 工廠，app.js 注入回呼後把函式綁回原名。`js/blocks3d/` 是唯讀 3D 預覽（用 `js/vendor/three.module.js`）。`app.js` 仍是全 repo 最大的自寫檔案，抽離工作進行中——**新功能請放進對應子模組，不要再往 app.js 堆**。
+`blocks.html`（進入點 `js/blocks/app.js`）是與 `mechanism.html` 平行的「積木式」設計頁：拖放零件（桿 / 結構板 / 齒輪 / 滑軌 / 馬達）直接組機構，求解重用 `js/multilink/solver.js`（`solveTopology` / `sweepTopology`）與 `js/core/topology.js`，不自帶數學。模組分工：`state.js`（跨模組共享可變狀態 `S`）、`model.js`（元件 ↔ topology 轉換）、`render.js`（SVG 繪製基元）、`panels.js`（編輯面板）、`tools.js`（畫桿等工具模式）、`input.js`（指標 / 手勢）、`motion.js`、`dof.js`、`storage.js` + `schema.js`（存檔 / 分享 / snapshot 正規化）、`exporters.js`、`examples.js` + `example-controller.js`（範例選單 / 教學卡）、`gear-editor.js`（齒輪 / 齒條域）、`slider-editor.js`（滑軌域）、`motor-tools.js`（動力來源域）、`plate-editor.js`（三點桿 / 板件域）、`node-editor.js`（節點角色域）——這五個域模組是 `createXxx(deps)` 工廠，app.js 注入回呼後把函式綁回原名；`measurement.js` 是工作範圍 / 夾持量測的純計算。`js/blocks3d/` 是唯讀 3D 預覽（用 `js/vendor/three.module.js`）。`app.js` 仍是全 repo 最大的自寫檔案，抽離工作進行中——**新功能請放進對應子模組，不要再往 app.js 堆**。
 
 ### Remote sync（僅開發用的 digital twin）
 
