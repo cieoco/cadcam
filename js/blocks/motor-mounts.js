@@ -10,6 +10,7 @@ export function normalizedDir(from, to, fallback = { x: 0, y: -1 }) {
   return distance > 1e-6 ? { x: dx / distance, y: dy / distance } : fallback;
 }
 
+import { resolveMotorOrientation } from './motor-orientation.js';
 export function motorRotDegFromDir(dir) {
   return dir ? Math.atan2(-dir.x, -dir.y) * 180 / Math.PI : 0;
 }
@@ -85,13 +86,27 @@ export function buildMotorMounts({ motorIds, groundIds, staticPoints, comps, com
     // Preserve that assembly relationship so 3D does not rebuild the frame at
     // the motor's moving centre on every animation frame.
     const carrierId = outputBar && (outputBar.motorMount?.frameBody || outputBar.motorCarrier || outputBar.motor_carrier);
+    const orientation = outputBar?.motorMount?.orientation;
     const barAssembly = outputBar
       ? {
           outputBody: outputBar.id,
           ...(carrierId ? { frameBody: carrierId } : {}),
+          orientation: orientation || (carrierId ? 'follow-frame' : 'horizontal'),
+          reversed: Boolean(outputBar.motorMount?.reversed),
           order: carrierId ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody']
         }
       : {};
+    // "follow-frame" only means follow a concrete moving carrier.  With the
+    // world frame there is no carrier bar to follow, so use the frame's
+    // default horizontal datum instead of falling back to the output crank.
+    if (orientation === 'horizontal' || orientation === 'vertical' || orientation === 'follow-frame') {
+      // A carrier's live direction is resolved by 2D/3D frame updates.  At
+      // build time this gives world mounts their canonical horizontal/vertical
+      // direction and prevents any fallback to the output crank.
+      const resolved = resolveMotorOrientation(orientation, { center, reversed: Boolean(outputBar.motorMount?.reversed) });
+      mounts.set(id, { ...resolved, reason: `mount-${orientation}`, ...barAssembly });
+      return;
+    }
     const gear = comps.find(comp => comp.type === 'gear' && comp.p1?.id === id);
     if (gear) {
       const meshed = gear.mesh ? comps.find(comp => comp.type === 'gear' && comp.id === gear.mesh) : comps.find(comp => comp.type === 'gear' && comp.mesh === gear.id);

@@ -537,12 +537,12 @@ export function buildSceneModel(links, points, opts = {}) {
       const mount = motorMounts.get(j.id);
       // A riding motor follows its carrier body's current direction. mount.dir
       // is only the draw-time orientation and otherwise diverges from 2D.
-      const carrier = mount?.frameBody && sticks.find(stick => stick.id === mount.frameBody &&
+      const carrier = !['horizontal', 'vertical'].includes(mount?.orientation) && mount?.frameBody && sticks.find(stick => stick.id === mount.frameBody &&
         (stick.p1 === j.id || stick.p2 === j.id));
       if (carrier) {
         const far = carrier.p1 === j.id ? carrier.b : carrier.a;
-        tx = far.x;
-        ty = far.y;
+        tx = mount?.reversed ? j.x * 2 - far.x : far.x;
+        ty = mount?.reversed ? j.y * 2 - far.y : far.y;
       } else if (mount && mount.dir && Number.isFinite(mount.dir.x) && Number.isFinite(mount.dir.y)) {
         tx = j.x + mount.dir.x;
         ty = j.y + mount.dir.y;

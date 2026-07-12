@@ -72,9 +72,64 @@ export function createMotorTools({
     if (!S.pickBars.ids.includes(barId)) { cancelMotorMode(); return; }
     if (S.pickBars.stage === 'carrier') {
       finishDriveBar(S.pickBars.drivenId, S.pickBars.nodeId, barId, false);
+    } else if (S.pickBars.stage === 'mount-carrier') {
+      setMotorCarrier(S.pickBars.drivenId, S.pickBars.nodeId, barId);
     } else {
       driveBarAt(barId, S.pickBars.nodeId);
     }
+  }
+  function setMotorCarrier(barId, nodeId, carrierId = null) {
+    const bar = S.comps.find(comp => comp.type === 'bar' && comp.id === barId);
+    const carrier = carrierId && S.comps.find(comp => comp.type === 'bar' && comp.id === carrierId);
+    if (!bar) return;
+    pushUndo();
+    const angle = Math.atan2(bar.p2.y - bar.p1.y, bar.p2.x - bar.p1.x) * 180 / Math.PI;
+    if (carrier) {
+      const carrierAngle = Math.atan2(carrier.p2.y - carrier.p1.y, carrier.p2.x - carrier.p1.x) * 180 / Math.PI;
+      bar.motorCarrier = carrier.id;
+      bar.phaseOffset = angle - carrierAngle;
+    } else {
+      delete bar.motorCarrier;
+      bar.phaseOffset = angle;
+    }
+    const motor = String(bar.physicalMotor || '1');
+    bar.motorMount = { motor, center: nodeId, outputBody: bar.id,
+      ...(carrier ? { frameBody: carrier.id } : {}), orientation: carrier ? 'follow-frame' : 'horizontal',
+      order: carrier ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody'] };
+    cancelMotorMode(); rebuild(); draw(); updateRoleEditor();
+  }
+  function configureMotorMount(nodeId) {
+    const driven = motorBarForCenter(nodeId);
+    if (!driven) return;
+    const carriers = barsAtNode(nodeId).filter(bar => bar.id !== driven.id);
+    if (!carriers.length) { setBanner('此軸沒有其他連桿可作為移動機架；可改為世界機架。'); return; }
+    S.placingMotor = false;
+    S.pickBars = { nodeId, ids: carriers.map(bar => bar.id), stage: 'mount-carrier', drivenId: driven.id };
+    setBanner('選擇馬達殼要固定的機架桿');
+    draw();
+  }
+  function setMotorWorldMount(nodeId) {
+    const driven = motorBarForCenter(nodeId);
+    if (driven) setMotorCarrier(driven.id, nodeId, null);
+  }
+  function setMotorOrientation(nodeId, orientation) {
+    const bar = motorBarForCenter(nodeId);
+    if (!bar || !['horizontal', 'vertical', 'follow-frame'].includes(orientation)) return;
+    pushUndo();
+    bar.motorMount = { ...(bar.motorMount || {}), motor: String(bar.physicalMotor || '1'), center: nodeId,
+      outputBody: bar.id, ...(bar.motorCarrier ? { frameBody: bar.motorCarrier } : {}), orientation,
+      order: bar.motorCarrier ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody'] };
+    rebuild(); draw(); updateRoleEditor();
+  }
+  function toggleMotorReverse(nodeId) {
+    const bar = motorBarForCenter(nodeId);
+    if (!bar) return;
+    pushUndo();
+    bar.motorMount = { ...(bar.motorMount || {}), motor: String(bar.physicalMotor || '1'), center: nodeId,
+      outputBody: bar.id, ...(bar.motorCarrier ? { frameBody: bar.motorCarrier } : {}),
+      orientation: bar.motorMount?.orientation || (bar.motorCarrier ? 'follow-frame' : 'horizontal'),
+      reversed: !bar.motorMount?.reversed, order: bar.motorCarrier ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody'] };
+    rebuild(); draw(); updateRoleEditor();
   }
   function driveBarAt(barId, nodeId) {
     const bar = S.comps.find(c => c.id === barId && c.type === 'bar');
@@ -157,7 +212,7 @@ export function createMotorTools({
       center: nodeId,
       outputBody: bar.id,
       ...(carrier ? { frameBody: carrier.id } : {}),
-      orientation: carrier ? 'follow-frame' : 'fixed',
+      orientation: carrier ? 'follow-frame' : 'horizontal',
       order: carrier ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody']
     };
     cancelMotorMode();
@@ -262,7 +317,7 @@ export function createMotorTools({
 
   return {
     cancelMotorMode, motorTypeLabel, placeMotor, handleMotorOnNode, tryPickBar,
-    driveBarAt, driveSliderAt, driveGearAt,
+    driveBarAt, driveSliderAt, driveGearAt, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse,
     motorBarForCenter, motorTypeForCenter, inputRockRange
   };
 }

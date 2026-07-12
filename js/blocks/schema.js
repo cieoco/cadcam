@@ -99,7 +99,9 @@ function normalizeBar(comp, index, params, warnings) {
         center,
         outputBody: id,
         ...(frameBody ? { frameBody } : {}),
-        orientation: rawMount.orientation === 'fixed' ? 'fixed' : (frameBody ? 'follow-frame' : 'fixed'),
+        orientation: ['horizontal', 'vertical', 'follow-frame'].includes(rawMount.orientation)
+          ? rawMount.orientation : (frameBody ? 'follow-frame' : 'horizontal'),
+        reversed: Boolean(rawMount.reversed),
         order: frameBody ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody']
       };
     }

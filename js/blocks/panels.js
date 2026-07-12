@@ -89,12 +89,30 @@ export function updateRoleEditor() {
   if (!editor) return;
   if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) {
     editor.style.display = 'none';
+    const motorMountRow = document.getElementById('motorMountRow');
+    if (motorMountRow) motorMountRow.style.display = 'none';
     updateServoEditor();
     updateStrokeEditor();
     return;
   }
   document.getElementById('roleStatus').textContent = nodeRoleLabel(S.selectedNodeId);
+  editor.dataset.nodeId = S.selectedNodeId;
   renderNodePosition(S.selectedNodeId);
+  const motorMountRow = document.getElementById('motorMountRow');
+  const motorMountStatus = document.getElementById('motorMountStatus');
+  const motorBar = motorBarForCenter(S.selectedNodeId);
+  if (motorMountRow) {
+    motorMountRow.style.display = motorBar ? 'flex' : 'none';
+    motorMountRow.dataset.nodeId = S.selectedNodeId;
+  }
+  if (motorMountStatus && motorBar) {
+    const mount = motorBar.motorMount || {};
+    const frameBody = mount.frameBody || motorBar.motorCarrier;
+    const orientation = mount.orientation || (frameBody ? 'follow-frame' : 'horizontal');
+    const effectiveOrientation = orientation === 'follow-frame' && !frameBody ? 'horizontal' : orientation;
+    const orientationLabel = effectiveOrientation === 'horizontal' ? '水平' : effectiveOrientation === 'vertical' ? '垂直' : '沿機架';
+    motorMountStatus.textContent = `${frameBody ? `機架：${frameBody}` : '機架：世界固定'}・${orientationLabel}`;
+  }
   const traceBtn = document.getElementById('traceBtn');
   if (traceBtn) {
     const traceIds = new Set([...(S.topo.tracePoints || []), ...(S.topo.tracePoint ? [S.topo.tracePoint] : [])]);

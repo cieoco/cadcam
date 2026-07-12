@@ -310,7 +310,7 @@ const motorTools = createMotorTools({
 });
 const { cancelMotorMode, placeMotor, handleMotorOnNode, tryPickBar,
         driveBarAt, driveSliderAt, driveGearAt,
-        motorBarForCenter, motorTypeForCenter, inputRockRange } = motorTools;
+        motorBarForCenter, motorTypeForCenter, inputRockRange, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse } = motorTools;
 
 // ---- 三點桿 / 板件域：邏輯抽到 ./plate-editor.js（Panels / plate-geometry 由該模組自行 import）----
 const plateEditor = createPlateEditor({
@@ -873,7 +873,7 @@ function draw() {
     // 世界機架馬達維持既有的一次性朝向（mount / computeMotorRotDeg）。
     const inputBarHere = S.comps.find(c => c.type === 'bar' && c.isInput && c.p1 && c.p2 &&
       ((c.p1.id === id && c.p1.physicalMotor) || (c.p2.id === id && c.p2.physicalMotor)));
-    const carrierBar = inputBarHere && inputBarHere.motorCarrier
+    const carrierBar = inputBarHere && inputBarHere.motorCarrier && !['horizontal', 'vertical'].includes(motorMounts.get(id)?.orientation)
       ? S.comps.find(k => k.type === 'bar' && k.id === inputBarHere.motorCarrier) : null;
     const mount = motorMounts.get(id);
     const staticRotDeg = mount ? mount.rotDeg : computeMotorRotDeg(id, pts, groundIds);
@@ -882,7 +882,7 @@ function draw() {
       const farId = carrierBar.p1.id === id ? carrierBar.p2.id : carrierBar.p1.id;
       const ctr = P[id], far = P[farId];
       if (!ctr || !far || !Number.isFinite(far.x)) return staticRotDeg;
-      return Math.atan2(-(far.x - ctr.x), -(far.y - ctr.y)) * 180 / Math.PI;  // 同 computeMotorRotDeg 慣例
+      return Math.atan2(-(far.x - ctr.x), -(far.y - ctr.y)) * 180 / Math.PI + (mount?.reversed ? 180 : 0);  // 同 computeMotorRotDeg 慣例
     };
     const rotDeg0 = rotFor(pts);
     const isServo = motorTypeForCenter(id) === 'mg995';
@@ -1667,5 +1667,5 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
 init();

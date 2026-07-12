@@ -602,6 +602,18 @@
             <button onclick="window.blocks.changeNodePos('y',1)" title="接點 Y 座標 ＋1mm">＋</button>
           </span>
         </div>
+        <div class="re-row" id="motorMountRow" style="display:none;">
+        <span class="re-title">馬達裝配</span>
+        <span class="re-status" id="motorMountStatus"></span>
+        <span class="node-role-actions">
+          <button onclick="window.blocks.configureMotorMount(this.closest('#motorMountRow').dataset.nodeId)">選機架桿</button>
+          <button onclick="window.blocks.setMotorWorldMount(this.closest('#motorMountRow').dataset.nodeId)">世界機架</button>
+          <button onclick="window.blocks.setMotorOrientation(this.closest('#motorMountRow').dataset.nodeId,'horizontal')">水平</button>
+          <button onclick="window.blocks.setMotorOrientation(this.closest('#motorMountRow').dataset.nodeId,'vertical')">垂直</button>
+          <button onclick="window.blocks.setMotorOrientation(this.closest('#motorMountRow').dataset.nodeId,'follow-frame')">沿機架</button>
+          <button onclick="window.blocks.toggleMotorReverse(this.closest('#motorMountRow').dataset.nodeId)">反相</button>
+        </span>
+        </div>
       </div>
       <div class="inspector-panel servo-editor" id="servoEditor" style="display:none;">
         <span class="se-title">🟦 伺服角度</span>
