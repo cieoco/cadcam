@@ -310,6 +310,10 @@ function rebuild() {
 }
 
 function getTrajectoryData() {
+  // 拖曳中不掃軌跡：每次移動 rebuild() 都讓快取失效，整段 sweepTopology（每個追蹤點 72 步）
+  // 會把拖曳拖到掉幀。拖曳中軌跡本來就持續失真，乾脆不畫；放開時 drag end 走完整
+  // rebuild+draw，軌跡即恢復。（shapeDrag 只改造形孔、不動 geomVersion，走快取即可不必跳過。）
+  if (S.dragId || S.dragFrame || S.dragLinkId) return null;
   const ids = traceIds();
   if (!ids.length && S.compiled && S.compiled.tracePoint) ids.push(S.compiled.tracePoint);
   if (!S.compiled || !ids.length || !S.comps.length) return null;

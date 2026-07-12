@@ -345,7 +345,29 @@ export function init(deps) {
      pointIsRackHole = (() => false) } = deps);
 
   // ---- 掛上 svg 的指標 / 手勢監聽（原 app.js 檔尾那批，順序不變）----
-  svg.addEventListener('pointermove', onDragMove);
+  // 拖曳節流：高回報率滑鼠 / 觸控一幀可能送多筆 pointermove，每筆都 rebuild+draw 會掉幀。
+  // 把移動事件合併到 requestAnimationFrame——一幀最多處理最後一筆；放開時取消未執行的那筆，
+  // 避免 drag end 之後才補跑一步舊移動。
+  let pendingMoveEvent = null;
+  let moveRaf = 0;
+  const onDragMoveThrottled = (e) => {
+    pendingMoveEvent = e;
+    if (moveRaf) return;
+    moveRaf = requestAnimationFrame(() => {
+      moveRaf = 0;
+      const ev = pendingMoveEvent;
+      pendingMoveEvent = null;
+      if (ev) onDragMove(ev);
+    });
+  };
+  const cancelPendingMove = () => {
+    if (moveRaf) cancelAnimationFrame(moveRaf);
+    moveRaf = 0;
+    pendingMoveEvent = null;
+  };
+  svg.addEventListener('pointermove', onDragMoveThrottled);
+  svg.addEventListener('pointerup', cancelPendingMove);
+  svg.addEventListener('pointercancel', cancelPendingMove);
   svg.addEventListener('pointerup', onDragEnd);
   svg.addEventListener('pointercancel', onDragEnd);
   // 點空白處（背景/地面線，未 stopPropagation）取消選取
