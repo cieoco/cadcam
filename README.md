@@ -2,13 +2,16 @@ Linkage 閉環機構拓樸工具
 
 > 聚焦於閉環機構拓樸、2D 模擬、零件佈局與 DXF 輸出的機構設計工具
 
+> ⚠️ **2026-07 起主入口改為「🧩 機構積木」（`blocks.html`）**——像樂高一樣拖放零件組機構，含 2D 模擬 / 3D 預覽 / 教學範例 / DXF 輸出。
+> 舊的表單式設計器 `mechanism.html` **已凍結**（bug 不修、功能不加），檔案保留只為不讓舊連結失效；本文件中與 mechanism.html 相關的段落僅供查考。
+
 ## 試用方式
 
 ### 線上試用
 
 - 目前可用：
-  - 機構工具主站：https://cieoco.github.io/cadcam/
-  - 🧩 機構積木（像樂高一樣拼連桿的簡化沙盒，含 2D／3D 預覽）：https://cieoco.github.io/cadcam/blocks.html
+  - 🧩 機構積木（主入口）：https://cieoco.github.io/cadcam/ （即 `blocks.html`）
+  - 舊版表單式設計器（已凍結）：https://cieoco.github.io/cadcam/mechanism.html
 - 備註：
   - 線上 demo 若尚未同步更名，路徑仍沿用舊的 `cadcam` URL
 
@@ -38,7 +41,7 @@ python -m http.server 8000
 
 這是一個模組化的閉環機構拓樸工具，專為創客、學生與工程師設計。它聚焦在機構本身，而不再內建製造刀路流程：
 
-1. **入口整合** - `mechanism.html` 已成為主入口；未指定 `type` 時，會先顯示機構 chooser。
+1. **入口** - `index.html` 轉址到 `blocks.html`（機構積木）；舊的 `mechanism.html` chooser 已凍結。
 2. **參數化設計** - 輸入設計參數，即時 2D 物理模擬。
 3. **多連桿精靈** - 透過互動式介面，自由組裝桿件與三角形，或載入經典範本（如夾爪、曲柄滑塊）。
 4. **檢核導向** - 內建輸入、拓樸、求解檢核與 diagnostics panel，先看出問題，再修機構。
@@ -54,7 +57,7 @@ python -m http.server 8000
 - 🧩 **零件佈局輸出** - 支援 DXF 與零件預覽，方便交由其他製造工具接續
 - 🔁 **ARM 交換格式** - 可輸出 `mechanism.json` 給 `arm` 作為閉環機構拓樸中介格式
 - 🎯 **工程防呆** - 內建 validation report、sanity summary 與 diagnostics panel
-- 🚪 **單一主入口** - `mechanism.html` 負責機構選擇與正式工作頁；`index.html` 僅保留轉址用途
+- 🚪 **單一主入口** - `blocks.html`（機構積木）；`index.html` 僅保留轉址用途，`mechanism.html` 為凍結的舊版
 
 ## 🗂️ 專案結構
 
@@ -62,17 +65,19 @@ python -m http.server 8000
 
 ```
 linkage/
-├── index.html                  # 極簡轉址頁，會導向 mechanism.html
-├── mechanism.html              # 主入口 + 統一的閉環機構模擬頁面
+├── index.html                  # 極簡轉址頁，會導向 blocks.html
+├── blocks.html                 # 主入口：機構積木（拖放零件組機構）
+├── mechanism.html              # 舊版表單式設計器（已凍結）
 ├── js/
-│   ├── mechanism-loader.js     # 核心載入器
-│   ├── core/validation/        # 輸入 / 拓樸 / 求解檢核
-│   ├── ui/diagnostics/         # diagnostics panel
-│   ├── ui/wizard.js            # 多連桿設計精靈 (Wizard UI)
-│   ├── examples/               # 機構範本 JSON (Gripper, Slider...)
-│   ├── fourbar/                # 四連桿模組
-│   ├── multilink/              # 多連桿核心模組
+│   ├── blocks/                 # 機構積木：app.js 控制器 + 各域模組（gear/slider/motor/plate/node…）
+│   ├── blocks3d/               # 積木頁的唯讀 3D 預覽
+│   ├── core/topology.js        # 角色 → 求解步驟編譯（blocks 共用）
+│   ├── multilink/solver.js     # constructive-geometry 求解核心（blocks 共用）
+│   ├── utils/                  # 齒形 / 凸輪等共用幾何
+│   ├── mechanism-loader.js     # （凍結）舊版載入器
+│   ├── ui/                     # （凍結）舊版 wizard / controls / diagnostics
 │   └── ...
+├── test/                       # Node 驗收測試（node test/<name>.mjs）
 └── ...
 ```
 
@@ -165,15 +170,13 @@ python -m http.server 8000
 
 瀏覽器開啟 `http://localhost:8000`
 
-### 2. 使用流程
+### 2. 使用流程（機構積木）
 
-1. **進入主入口**：開啟 `mechanism.html`，先在 chooser 選擇機構類型。
-2. **進入模擬**：一般機構會直接進工作頁；`multilink` 可選擇直接模擬或進入設計器。
-3. **調整參數**：
-   - **四連桿/滑塊**：右側面板調整數值。
-   - **多連桿**：使用左側 Wizard 新增/刪除桿件，或載入範本與學習卡。
-4. **先看檢核**：確認 diagnostics panel 中的 `PASS / WARN / FAIL`、建議與摘要。
-5. **驗證與輸出**：確認動畫無誤後，下載 DXF 或將零件資料交由其他 CAD / 製造工具接續。
+1. **進入主入口**：開啟 `http://localhost:8000`（自動轉到 `blocks.html`），或載入內建課堂範例。
+2. **組機構**：拖放桿件 / 結構板 / 齒輪 / 滑軌，端點靠近會吸附合併（合併＝連接）。
+3. **上動力**：把 TT馬達 / MG995 / 線性致動器放到接點，按 ▶ 播放。
+4. **量測與檢核**：設軌跡點看工作範圍 / 夾持開口，狀態列顯示 DOF 與嚙合警告。
+5. **輸出**：下載 DXF / SVG 零件圖、存檔或分享連結；3D 預覽確認疊放。
 
 ## 🔁 與其它工具的關係
 
@@ -198,6 +201,13 @@ python -m http.server 8000
 *(更多模組擴充細節請參考原始程式碼架構)*
 
 ## 📝 版本歷史
+
+### v4.0 - 2026-07-12
+
+- 🧩 **主入口改為機構積木**：`index.html` 轉址到 `blocks.html`；`mechanism.html` 凍結棄置。
+- 🏗️ **blocks 架構整理**：app.js 抽出 gear / slider / motor / plate / node 等域模組（`createXxx(deps)` 工廠），量測純計算獨立。
+- 🧪 **Node 驗收測試**：`test/*.mjs` 覆蓋求解範例與各域模組。
+- ⚡ **拖曳效能**：pointermove 併入 rAF、拖曳中暫停軌跡掃描；修復清空後殘留幽靈機架板。
 
 ### v3.2 - 2026-03-25
 
