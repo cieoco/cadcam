@@ -81,7 +81,17 @@ export function buildMotorMounts({ motorIds, groundIds, staticPoints, comps, com
     const crankTips = new Set(compiledSteps.filter(step => step.type === 'input_crank' && step.center === id).map(step => step.id));
     const outputBar = comps.find(comp => comp.type === 'bar' && comp.p1 && comp.p2 && (comp.p1.id === id || comp.p2.id === id) &&
       (comp.isInput || crankTips.has(comp.p1.id === id ? comp.p2.id : comp.p1.id)));
-    const barAssembly = outputBar ? { outputBody: outputBar.id, order: ['motor', 'outputBody'] } : {};
+    // A riding motor is mounted to its carrier link, not to the world frame.
+    // Preserve that assembly relationship so 3D does not rebuild the frame at
+    // the motor's moving centre on every animation frame.
+    const carrierId = outputBar && (outputBar.motorCarrier || outputBar.motor_carrier);
+    const barAssembly = outputBar
+      ? {
+          outputBody: outputBar.id,
+          ...(carrierId ? { frameBody: carrierId } : {}),
+          order: carrierId ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody']
+        }
+      : {};
     const gear = comps.find(comp => comp.type === 'gear' && comp.p1?.id === id);
     if (gear) {
       const meshed = gear.mesh ? comps.find(comp => comp.type === 'gear' && comp.id === gear.mesh) : comps.find(comp => comp.type === 'gear' && comp.mesh === gear.id);

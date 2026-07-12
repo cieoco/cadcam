@@ -23,7 +23,7 @@ export function extrapolateSeed(last, prev) {
 
 // 從目前姿勢沿著「同一組裝態」往單一方向走，走到「無解」或「接點瞬移過大」為止。
 // 瞬移過大＝求解器被迫跳到另一組鏡像裝態（桿件會看起來塌掉），那就是這個方向的真正極限。
-function walkBranch(compiled, topo, theta, lastSolved, dir) {
+function walkBranch(compiled, topo, theta, lastSolved, dir, motorCtx) {
   const ids = new Set();
   (compiled.visualization.links || []).forEach(l => { if (!l.hidden) { ids.add(l.p1); ids.add(l.p2); } });
   const lens = (compiled.visualization.links || [])
@@ -31,7 +31,10 @@ function walkBranch(compiled, topo, theta, lastSolved, dir) {
   const jumpTol = 0.25 * Math.max(60, ...lens); // 單步位移超過此值＝跳裝態＝到極限
   const solveAt = (deg, seed) => {
     let s = null;
-    try { s = solveTopology(compiled, { thetaDeg: norm360(deg), _prevPoints: seed }); } catch (_) {}
+    const params = { thetaDeg: norm360(deg), _prevPoints: seed };
+    // 多馬達：探路的角度只掃 active 那顆，其餘馬達凍結在 motorCtx.frozen 的角度。
+    if (motorCtx) params.motorAngles = { ...motorCtx.frozen, [motorCtx.active]: norm360(deg) };
+    try { s = solveTopology(compiled, params); } catch (_) {}
     return s;
   };
   const maxDisp = (seed, pts) => {
@@ -60,9 +63,9 @@ function walkBranch(compiled, topo, theta, lastSolved, dir) {
 }
 
 // 開始播放前先規劃這個機構是「整圈轉」還是「來回擺」、以及來回擺的兩端在哪。
-export function planMotion(compiled, topo, theta, lastSolved) {
-  const fwd = walkBranch(compiled, topo, theta, lastSolved, 1);
-  const bwd = walkBranch(compiled, topo, theta, lastSolved, -1);
+export function planMotion(compiled, topo, theta, lastSolved, motorCtx) {
+  const fwd = walkBranch(compiled, topo, theta, lastSolved, 1, motorCtx);
+  const bwd = walkBranch(compiled, topo, theta, lastSolved, -1, motorCtx);
   if (fwd.full || bwd.full || (fwd.limit - bwd.limit) >= 360 - PLAY_STEP) {
     return { mode: 'rotate' };
   }

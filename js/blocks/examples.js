@@ -139,9 +139,9 @@ const EXAMPLE_LESSONS = {
   'competition-fourbar-lift': {
     group: 'lift-motion',
     level: '實戰',
-    use: '競賽常用升降臂：把前端托盤、夾爪或掛鉤抬高，同時保持末端姿態接近穩定。',
-    learn: '平行四連桿能讓輸出端在升降時保持姿態，馬達曲柄角度決定工作高度。',
-    try: ['調整上下兩根短臂長度', '把前端立桿加高或降低', '把前端接點設為工作點量升降高度']
+    use: '競賽常用升降臂：M1 把前端工具抬高（平行四連桿保持姿態），M2 像手腕一樣調整工具架角度。',
+    learn: '兩個自由度配兩顆馬達＝每個動作都有人管：一次控制一顆、另一顆凍結，動作完全可預測。',
+    try: ['切換 M1 / M2 感受兩軸分工', '調整上下兩根短臂長度', '把前端接點設為工作點量升降高度']
   },
   'competition-roller-intake': {
     group: 'manipulator',
@@ -535,7 +535,7 @@ const ALL_BLOCK_EXAMPLES = [
   {
     id: 'competition-fourbar-lift',
     title: '競賽四連桿升降臂',
-    note: '常見於托盤、夾爪或掛鉤升降。平行四連桿讓前端工具在抬升時保持接近固定姿態。',
+    note: '常見於托盤、夾爪或掛鉤升降。雙馬達：M1 驅動平行四連桿升降，M2 騎在前端立桿上控制工具架角度（手腕軸）。用下方 M1 / M2 切換要控制哪顆，另一顆會停在原角度。',
     snapshot: {
       kind: 'blocks',
       v: 1,
@@ -549,7 +549,6 @@ const ALL_BLOCK_EXAMPLES = [
           isInput: true,
           physicalMotor: '1',
           phaseOffset: 0,
-          assemblyMobility: 1,
           assemblyType: 'parallel-fourbar-lift'
         }),
         bar('LiftFollower', pt('O2', 'fixed', -96, 72), pt('B', 'floating', -48, 72), 48, {
@@ -560,9 +559,17 @@ const ALL_BLOCK_EXAMPLES = [
           lenParam: 'LIFT_UPRIGHT',
           color: '#27ae60'
         }),
-        bar('ToolPlate', pt('B', 'floating', -48, 72), pt('C', 'floating', 0, 72), 48, {
+        // 騎乘馬達（手腕軸）：馬達殼固定在綠色立桿上——綠桿就是這顆馬達的「機架」
+        // （motorCarrier），軸心 B 跟著升降。B 保持 floating——它不是世界機架點。
+        // phaseOffset 是「相對機架桿」的夾角：放置時 B→C 水平 0°、綠桿 A→B 朝上 90°，故 -90。
+        bar('ToolPlate', pt('B', 'floating', -48, 72, { physicalMotor: '2' }), pt('C', 'floating', 0, 72), 48, {
           lenParam: 'LIFT_TOOL_TOP',
-          color: '#f39c12'
+          color: '#f39c12',
+          isInput: true,
+          physicalMotor: '2',
+          motorType: 'tt',
+          motorCarrier: 'LiftUpright',
+          phaseOffset: -90
         }),
         bar('ToolBrace', pt('A', 'floating', -48, 0), pt('D', 'floating', 0, 0), 48, {
           lenParam: 'LIFT_TOOL_BOTTOM',

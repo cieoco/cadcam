@@ -535,7 +535,15 @@ export function buildSceneModel(links, points, opts = {}) {
       // 朝向：對準接在中心、非曲柄的那根桿的另一端（通常是機架）；沒有就朝最近的另一個地錨；都沒有朝 -y。
       let tx = null, ty = null;
       const mount = motorMounts.get(j.id);
-      if (mount && mount.dir && Number.isFinite(mount.dir.x) && Number.isFinite(mount.dir.y)) {
+      // A riding motor follows its carrier body's current direction. mount.dir
+      // is only the draw-time orientation and otherwise diverges from 2D.
+      const carrier = mount?.frameBody && sticks.find(stick => stick.id === mount.frameBody &&
+        (stick.p1 === j.id || stick.p2 === j.id));
+      if (carrier) {
+        const far = carrier.p1 === j.id ? carrier.b : carrier.a;
+        tx = far.x;
+        ty = far.y;
+      } else if (mount && mount.dir && Number.isFinite(mount.dir.x) && Number.isFinite(mount.dir.y)) {
         tx = j.x + mount.dir.x;
         ty = j.y + mount.dir.y;
       }

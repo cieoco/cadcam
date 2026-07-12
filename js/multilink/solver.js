@@ -436,6 +436,9 @@ function solveBodyJointTopology(topology, params) {
 
                     // 3. DO NOT force-set the point here (Allow Pivoting).
                     // We will handle dangling pistons (dangling tip) in a post-process step.
+                } else if (c.motorCarrier || c.motor_carrier) {
+                    // 機架桿馬達：曲柄角要加上機架桿方位角，交給後面的騎乘驅動迴圈
+                    // （它會等機架桿兩端都解出才 force-set），這裡不能先用絕對角搶著定位。
                 } else {
                     // Rotary Input Logic - Force set the point (Fixed Angle)
                     const baseTheta = resolveMotorTheta(motorId, theta);
@@ -620,6 +623,48 @@ function solveBodyJointTopology(topology, params) {
         }
     };
     solveDistanceConstraints();
+
+    // 騎乘馬達（軸心在「動桿」上的旋轉輸入）：軸心點不是世界機架，收約束時兩端都未知、
+    // 上面的 force-set 不會發生。等距離傳播把軸心解出後，再用馬達角度定出曲柄端，
+    // 並重跑傳播讓下游連桿（dyad）跟著解出。多顆馬達串接時可能要好幾輪，故迴圈。
+    // 機架語意：每顆馬達固定在某根桿上，那根桿就是它的機架。motorCarrier 指向機架桿時，
+    // 曲柄角＝機架桿方位角 + θ + phaseOffset（相位是「相對機架桿」的夾角，跟著機架桿轉）；
+    // 沒有 motorCarrier 則退回「不轉的機架」＝世界座標絕對角（θ+phaseOffset＝p1→p2 方位角）。
+    {
+        const carrierBarById = new Map(components.filter(k => k.type === 'bar' && k.id).map(k => [k.id, k]));
+        let droveGuard = 0;
+        let drove = true;
+        while (drove && droveGuard < 8) {
+            drove = false;
+            droveGuard += 1;
+            components.forEach((c) => {
+                if (c.type !== 'bar' || !c.isInput || c.style === 'piston' || !c.p1?.id || !c.p2?.id) return;
+                const p1 = points[c.p1.id];
+                const p2 = points[c.p2.id];
+                if ((p1 && p2) || (!p1 && !p2)) return;
+                const len = getParamVal(c.lenParam, 0);
+                if (!Number.isFinite(len) || len <= 0) return;
+                // 機架桿方位角：機架桿兩端都解出後才能定曲柄；還沒解出就等下一輪傳播。
+                let base = 0;
+                const carrier = (c.motorCarrier || c.motor_carrier) ? carrierBarById.get(c.motorCarrier || c.motor_carrier) : null;
+                if (carrier && carrier.p1?.id && carrier.p2?.id) {
+                    const q1 = points[carrier.p1.id];
+                    const q2 = points[carrier.p2.id];
+                    if (!q1 || !q2) return;
+                    base = Math.atan2(q2.y - q1.y, q2.x - q1.x);
+                }
+                const motorId = c.physicalMotor || c.physical_motor;
+                const ang = base + resolveMotorTheta(motorId, theta) + deg2rad(c.phaseOffset || 0);
+                if (p1 && !p2) {
+                    points[c.p2.id] = { x: p1.x + len * Math.cos(ang), y: p1.y + len * Math.sin(ang) };
+                } else {
+                    points[c.p1.id] = { x: p2.x - len * Math.cos(ang), y: p2.y - len * Math.sin(ang) };
+                }
+                drove = true;
+            });
+            if (drove) solveDistanceConstraints();
+        }
+    }
 
     // If a bar has a known endpoint and a known hole point on the bar,
     // use that direction to resolve the other endpoint (e.g. drive Link2 by P2).
@@ -1462,8 +1507,14 @@ export function sweepTopology(topology, params, startDeg, endDeg, stepDeg) {
     let currentInvalid = null;
     let prevPoints = null;
 
+    // sweepMotor：多馬達機構掃「指定那顆」——掃描角同步寫進 motorAngles[sweepMotor]，
+    // 其餘馬達保持 params.motorAngles 的凍結角。未指定時沿用單馬達行為（th 只走 thetaDeg fallback）。
+    const sweepMotor = params && params.sweepMotor ? String(params.sweepMotor) : null;
+
     for (let th = startDeg; th <= endDeg; th += stepDeg) {
-        const sol = solveTopology(topology, { ...params, thetaDeg: th, _prevPoints: prevPoints });
+        const stepParams = { ...params, thetaDeg: th, _prevPoints: prevPoints };
+        if (sweepMotor) stepParams.motorAngles = { ...(params.motorAngles || {}), [sweepMotor]: th };
+        const sol = solveTopology(topology, stepParams);
         const isValid = sol.isValid;
 
         results.push({

@@ -6,7 +6,7 @@
  * app 層以注入回呼提供重建 / 繪製 / undo / 面板切換等能力（見 createGearEditor(deps)）。
  */
 
-import { S } from './state.js';
+import { S, activateMotor, nextMotorId } from './state.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { rackGuideThetaRange } from './rack-limits.js';
 import { norm360 } from './motion.js';
@@ -97,7 +97,8 @@ export function createGearEditor({
     const n = ++S.counter;
     const pinion = makeGear(n, { teeth, module, cx: base.x, cy: base.y, isDriver: true, meshId: null, color: '#e74c3c' });
     pinion.p1.type = 'motor';
-    pinion.p1.physicalMotor = '1';
+    pinion.p1.physicalMotor = nextMotorId();       // 多馬達：新齒條組配新編號，不再寫死 '1'
+    activateMotor(pinion.p1.physicalMotor);        // 新動力來源直接接手控制權（θ 沿用，齒輪舊行為）
     const rackLen = 176;
     const bodyHeight = 20;
     const rackRef = { x: base.x, y: base.y - R };
@@ -312,6 +313,10 @@ export function createGearEditor({
       (state.root.p1.physicalMotor || state.root.p1.physical_motor);
     const phaseRad = (Number(c.phase) || 0) * Math.PI / 180;
     if (rootMotor && state && Math.abs(state.factor) > 1e-9) {
+      // 多馬達：手轉哪條齒輪鏈就把控制權切給它的驅動馬達，其他馬達凍結在原角度。
+      if (String(S.activeMotor) !== String(rootMotor)) {
+        activateMotor(rootMotor, Number(S.motorAngles[String(rootMotor)]) || 0);
+      }
       S.theta = (angleRad - phaseRad) * 180 / Math.PI / state.factor;
       const rackRange=rackPinionThetaRange();
       if(rackRange)S.theta=Math.max(rackRange.lo,Math.min(rackRange.hi,S.theta));

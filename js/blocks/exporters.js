@@ -845,10 +845,14 @@ export function splitMountsByHost(comps, mounts = []) {
   const hosted = new Map();
   const free = [];
   (mounts || []).forEach(m => {
-    const host = m && m.pointId
-      ? ((comps || []).find(c => c && c.type === 'bar' && c.motorMountPoint === m.pointId)
-        || (comps || []).find(c => isStaticPlate(c) && ['p1', 'p2', 'p3'].some(k => c[k] && c[k].id === m.pointId)))
-      : null;
+    // `frameBody` is explicit assembly semantics for a riding motor. Prefer it
+    // over the moving motor-centre lookup used by older snapshots.
+    const host = m?.frameBody
+      ? (comps || []).find(c => c && c.id === m.frameBody)
+      : (m && m.pointId
+        ? ((comps || []).find(c => c && c.type === 'bar' && c.motorMountPoint === m.pointId)
+          || (comps || []).find(c => isStaticPlate(c) && ['p1', 'p2', 'p3'].some(k => c[k] && c[k].id === m.pointId)))
+        : null);
     if (host) {
       if (!hosted.has(host.id)) hosted.set(host.id, []);
       hosted.get(host.id).push(m);

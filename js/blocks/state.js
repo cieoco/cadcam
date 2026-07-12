@@ -18,7 +18,9 @@ export const S = {
   topo: { params: { theta: 0 }, tracePoint: '', tracePoints: [], referencePoint: '' },
   compiled: null,
   counter: 0,
-  theta: 0,                                        // 目前驅動角度（播放迴圈與編輯都會改）
+  theta: 0,                                        // 「目前控制中馬達」的驅動角度（播放迴圈與編輯都會改）
+  activeMotor: '1',                                // S.theta 對應的馬達編號；切換時把舊角度凍進 motorAngles
+  motorAngles: {},                                 // 非控制中馬達的凍結角度（度），key = physicalMotor 編號
 
   // ---- 選取 ----
   selectedLinkId: null,
@@ -66,3 +68,44 @@ export const S = {
   undoStack: [],                                   // 每筆是一份 snapshot 字串（變更前的狀態）
   autosaveTimer: null,
 };
+
+// 已被任何動力來源（桿 / 齒輪 / 滑軌）占用的馬達編號。
+export function usedMotorIds() {
+  const ids = new Set();
+  S.comps.forEach(c => {
+    [c, c.p1, c.p2, c.p3].forEach(o => {
+      const v = o && (o.physicalMotor || o.physical_motor);
+      if (v) ids.add(String(v));
+    });
+  });
+  return ids;
+}
+export function nextMotorId() {
+  const used = usedMotorIds();
+  let n = 1;
+  while (used.has(String(n))) n += 1;
+  return String(n);
+}
+
+// 切換「目前控制中」的馬達：舊馬達的角度凍結進 S.motorAngles，新馬達接手 S.theta。
+// startTheta 省略時保留現值。放在這裡（而非 motor-tools）因為齒輪域 / 輸入域也要切換控制權。
+export function activateMotor(motorId, startTheta) {
+  const id = String(motorId);
+  if (String(S.activeMotor) !== id) S.motorAngles[String(S.activeMotor)] = S.theta;
+  delete S.motorAngles[id];
+  S.activeMotor = id;
+  if (startTheta !== undefined) S.theta = startTheta;
+  if (S.topo && S.topo.params) S.topo.params.theta = S.theta;
+}
+
+// 目前所有馬達的角度（active 用 S.theta、其餘用凍結值）——餵給 solveTopology 的 motorAngles。
+export function motorAnglesNow() {
+  return { ...S.motorAngles, [String(S.activeMotor)]: S.theta };
+}
+
+// 掃描 / 播放規劃用：只含「非 active」馬達的凍結角，active 的角度由掃描逐步帶入。
+export function frozenMotorAngles() {
+  const m = { ...S.motorAngles };
+  delete m[String(S.activeMotor)];
+  return m;
+}

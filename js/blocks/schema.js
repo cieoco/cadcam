@@ -74,6 +74,9 @@ function normalizeBar(comp, index, params, warnings) {
 
   if (comp.phaseOffset !== undefined) out.phaseOffset = num(comp.phaseOffset, 0);
   if (comp.physicalMotor) out.physicalMotor = String(comp.physicalMotor);
+  // 馬達的機架桿：騎乘馬達的殼鎖在這根桿上（那根桿＝這顆馬達的機架），
+  // 曲柄角與 phaseOffset 都是相對它；沒有此欄＝世界機架。
+  if (safeId(comp.motorCarrier)) out.motorCarrier = comp.motorCarrier;
   if (comp.isInput || comp.physicalMotor || p1.physicalMotor || p2.physicalMotor) {
     out.isInput = true;
     out.physicalMotor = String(comp.physicalMotor || p1.physicalMotor || p2.physicalMotor || '1');
@@ -259,7 +262,7 @@ function dropZeroBars(comps) {
   return comps.filter(comp => !(comp.type === 'bar' && comp.p1 && comp.p2 && comp.p1.id === comp.p2.id));
 }
 
-export function toSnapshot(comps, topo, counter) {
+export function toSnapshot(comps, topo, counter, motor) {
   const snapshot = {
     kind: KIND,
     v: VERSION,
@@ -267,6 +270,17 @@ export function toSnapshot(comps, topo, counter) {
     comps: clone(comps || []),
     params: clone((topo && topo.params) ? topo.params : {})
   };
+  // 多馬達：目前控制中的馬達編號與其他馬達的凍結角度（度）。單馬達檔案兩者皆省略。
+  if (motor && safeId(String(motor.activeMotor || '')) && String(motor.activeMotor) !== '1') {
+    snapshot.activeMotor = String(motor.activeMotor);
+  }
+  if (motor && motor.motorAngles && typeof motor.motorAngles === 'object') {
+    const angles = {};
+    Object.keys(motor.motorAngles).forEach(k => {
+      if (safeId(k) && Number.isFinite(Number(motor.motorAngles[k]))) angles[k] = roundTenth(motor.motorAngles[k]);
+    });
+    if (Object.keys(angles).length) snapshot.motorAngles = angles;
+  }
   const tracePoints = uniqueSafeIds([...(topo?.tracePoints || []), ...(safeId(topo?.tracePoint) ? [topo.tracePoint] : [])]);
   if (tracePoints.length === 1) snapshot.tracePoint = tracePoints[0]; // 舊欄位相容：單點檔案仍好讀。
   if (tracePoints.length) snapshot.tracePoints = tracePoints;
@@ -477,7 +491,15 @@ export function normalizeSnapshot(obj) {
 
   const cleanComps = dropZeroBars(comps);
   const counter = Math.max(Number(obj.counter) || 0, highestIdNum(cleanComps));
-  return { comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, warnings };
+  // 多馬達欄位（選配）：activeMotor = 目前控制中的馬達編號；motorAngles = 其他馬達的凍結角度。
+  const activeMotor = safeId(String(obj.activeMotor || '')) ? String(obj.activeMotor) : '1';
+  const motorAngles = {};
+  if (obj.motorAngles && typeof obj.motorAngles === 'object' && !Array.isArray(obj.motorAngles)) {
+    Object.keys(obj.motorAngles).forEach(k => {
+      if (safeId(k) && Number.isFinite(Number(obj.motorAngles[k]))) motorAngles[k] = Number(obj.motorAngles[k]);
+    });
+  }
+  return { comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles, warnings };
 }
 
 export function highestIdNum(comps) {

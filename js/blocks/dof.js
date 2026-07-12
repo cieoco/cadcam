@@ -42,8 +42,9 @@ function pointIds(comp) {
 }
 
 function isGroundPoint(point) {
-  return Boolean(point && (point.type === 'fixed' || point.type === 'motor' || point.type === 'linear' ||
-    point.physicalMotor || point.physical_motor));
+  // 只看接點型別。帶 physicalMotor 但型別 floating 的是「騎乘馬達」（馬達殼固定在動桿上、
+  // 軸心跟著機構動），它驅動一個關節而非把節點釘到機架，不能算接地。
+  return Boolean(point && (point.type === 'fixed' || point.type === 'motor' || point.type === 'linear'));
 }
 
 function allGroundPointIds(comps) {
@@ -114,7 +115,18 @@ export function analyzeDof(comps = []) {
   // 計數無法反映其實際 mobility。範例可明確宣告經機構驗證的組裝自由度；
   // formulaDof 仍回傳供狀態提示與除錯使用，避免把覆寫當成公式結果。
   const dof = Number.isFinite(assemblyMobility) ? assemblyMobility : formulaDof;
+  // 獨立動力輸入數：不同的 physicalMotor 編號各算一個（多馬達可各自驅動一個自由度）。
+  const motorIds = new Set();
+  comps.forEach(comp => {
+    if (!comp) return;
+    [comp, comp.p1, comp.p2, comp.p3].forEach(o => {
+      const v = o && (o.physicalMotor || o.physical_motor);
+      if (v) motorIds.add(String(v));
+    });
+  });
+  const inputs = motorIds.size;
   const classification = bodies.length === 0 ? 'empty' : (dof < 0 ? 'overconstrained' :
-    (dof === 0 ? 'structure' : (dof === 1 ? 'single' : 'underconstrained')));
-  return { dof, formulaDof, mobilityOverride: Number.isFinite(assemblyMobility), bodies: groups.size - 1, lowerPairs, higherPairs, classification };
+    (dof === 0 ? 'structure' : (dof === 1 ? 'single' :
+      (inputs >= dof ? 'multi-driven' : 'underconstrained'))));
+  return { dof, formulaDof, mobilityOverride: Number.isFinite(assemblyMobility), bodies: groups.size - 1, lowerPairs, higherPairs, inputs, classification };
 }

@@ -29,7 +29,7 @@ export function drawFrameGeometry({ nodes, frameGeometry, svg, project, drawBase
   });
 }
 
-export function drawMotorMountHoles({ motorIds, motorMounts, points, svg, scale, project, motorTypeForCenter, rotationForCenter, ttSettings, mg995Settings, mg995SlotOutline }) {
+export function drawMotorMountHoles({ motorIds, motorMounts, points, svg, scale, project, motorTypeForCenter, rotationForCenter, ttSettings, mg995Settings, mg995SlotOutline, registerUpdate }) {
   const layer = svgEl('g'); layer.style.pointerEvents = 'none'; svg.appendChild(layer);
   const addHole = (group, xMm, yMm, diameterMm, attrs = {}) => {
     const hole = svgEl('circle');
@@ -41,8 +41,16 @@ export function drawMotorMountHoles({ motorIds, motorMounts, points, svg, scale,
   motorIds.forEach(id => {
     const type = motorTypeForCenter(id), point = points[id];
     if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
-    const group = svgEl('g'), p = project(point);
-    group.setAttribute('transform', `translate(${p.x} ${p.y}) rotate(${rotationForCenter(id, points, motorMounts.get(id))})`);
+    const group = svgEl('g');
+    const update = current => {
+      const livePoint = current[id];
+      const valid = livePoint && Number.isFinite(livePoint.x) && Number.isFinite(livePoint.y);
+      group.style.display = valid ? '' : 'none';
+      if (!valid) return;
+      const p = project(livePoint);
+      group.setAttribute('transform', `translate(${p.x} ${p.y}) rotate(${rotationForCenter(id, current, motorMounts.get(id))})`);
+    };
+    update(points);
     const title = svgEl('title');
     if (type === 'mg995') {
       const settings = mg995Settings;
@@ -61,5 +69,6 @@ export function drawMotorMountHoles({ motorIds, motorMounts, points, svg, scale,
       addHole(group, settings.locatorOffsetXMm, settings.locatorOffsetYMm, settings.locatorDiameterMm, { stroke: '#117a45', dash: `${Math.max(2, 3 * scale).toFixed(1)} ${Math.max(1.5, 2 * scale).toFixed(1)}` });
     }
     layer.appendChild(group);
+    if (registerUpdate) registerUpdate(update);
   });
 }

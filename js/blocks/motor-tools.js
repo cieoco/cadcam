@@ -7,12 +7,12 @@
  * 齒輪域 / 滑軌域能力（見 createMotorTools(deps)）。
  */
 
-import { S } from './state.js';
+import { S, activateMotor, usedMotorIds, nextMotorId } from './state.js';
 
 export function createMotorTools({
   svg, pushUndo, pause, rebuild, draw, setBanner, clearBanner, promptText,
   exitDrawTools, deselectLink, openMobileEditPanel, updateRoleEditor,
-  barsAtNode, pointIsGround, freezePointAtDisplay, setPointType,
+  barsAtNode, pointIsGround, pointUseCount, freezePointAtDisplay, setPointType,
   gearById, gearMeshChain, selectGear, rackPinionThetaRange,
   sliderProjectedDistance, railLength, sliderTravelStart, sliderTravelEnd
 }) {
@@ -69,8 +69,12 @@ export function createMotorTools({
   }
   function tryPickBar(barId) {
     if (!S.pickBars) return;
-    if (S.pickBars.ids.includes(barId)) driveBarAt(barId, S.pickBars.nodeId);
-    else cancelMotorMode();
+    if (!S.pickBars.ids.includes(barId)) { cancelMotorMode(); return; }
+    if (S.pickBars.stage === 'carrier') {
+      finishDriveBar(S.pickBars.drivenId, S.pickBars.nodeId, barId, false);
+    } else {
+      driveBarAt(barId, S.pickBars.nodeId);
+    }
   }
   function driveBarAt(barId, nodeId) {
     const bar = S.comps.find(c => c.id === barId && c.type === 'bar');
@@ -86,28 +90,66 @@ export function createMotorTools({
       draw();
       return;
     }
+    // 每顆馬達都固定在某個「機架」上：接點接地＝機架是世界機架（傳統放法，順手把接點釘住）；
+    // 接點未接地但還有別根桿共用＝騎乘馬達，馬達殼鎖在其中一根桿上、那根桿就是它的機架桿。
+    if (!pointIsGround(nodeId)) {
+      const carriers = barsAtNode(nodeId).filter(c => c.id !== barId);
+      if (carriers.length === 1) { finishDriveBar(barId, nodeId, carriers[0].id, false); return; }
+      if (carriers.length > 1) {
+        // 第二階段選桿：馬達殼要鎖在哪根桿上（那根桿＝這顆馬達的機架）
+        S.placingMotor = false;
+        S.pickBars = { nodeId, ids: carriers.map(c => c.id), stage: 'carrier', drivenId: barId };
+        svg.style.cursor = '';
+        setBanner(promptText(
+          '馬達殼要固定在哪根桿上？點那根桿（它就是這顆馬達的機架）',
+          '馬達殼要鎖在哪根桿上？點一下那根桿'
+        ));
+        draw();
+        return;
+      }
+      // 沒有別根桿、但節點與其他零件（如三點板）共用：不能落地，先用「不轉的機架」語意騎乘。
+      if (pointUseCount(nodeId) > 1) { finishDriveBar(barId, nodeId, null, false); return; }
+    }
+    finishDriveBar(barId, nodeId, null, true);
+  }
+  // 完成放置。carrierId = 馬達殼鎖定的機架桿（null = 世界機架 / 不轉的機架）；
+  // pinNode = 順手把接點釘到世界機架（傳統放法）。
+  function finishDriveBar(barId, nodeId, carrierId, pinNode) {
+    const bar = S.comps.find(c => c.id === barId && c.type === 'bar');
+    if (!bar) return;
+    const key = bar.p1.id === nodeId ? 'p1' : (bar.p2.id === nodeId ? 'p2' : null);
+    if (!key) return;
+    const carrier = carrierId ? S.comps.find(c => c.id === carrierId && c.type === 'bar') : null;
+    // 這根桿已是輸入就沿用原編號；否則配一個新編號（第一顆自然是 '1'）。
+    const motorId = String(bar.physicalMotor || bar.physical_motor ||
+      bar.p1.physicalMotor || bar.p2.physicalMotor || nextMotorId());
     pushUndo();
     freezePointAtDisplay(nodeId);
-    // 讓馬達「從現在這個姿勢」開始轉：把曲柄目前的角度記成相位偏移。
-    // 否則 input 會把曲柄瞬間轉到絕對角度 0，曲柄端點被甩到別處、整個四連桿當場塌掉。
+    // 讓馬達「從現在這個姿勢」開始轉：把曲柄目前的角度記成相位偏移，每顆馬達的角度從 0 起算。
+    // 世界機架馬達：相位＝絕對方位角；機架桿馬達：相位＝相對機架桿的夾角（機構動時跟著機架桿轉）。
     const angDeg = Math.atan2(bar.p2.y - bar.p1.y, bar.p2.x - bar.p1.x) * 180 / Math.PI;
     bar.motorType = S.pendingMotorType;
-    if (S.pendingMotorType === 'mg995') {
-      // 伺服：S.theta 從 0 起算、曲柄停在原姿勢（phaseOffset 吸收絕對角），
-      // 角度面板的「起始/結束角」才直覺地對應 thetaVal。
-      S.theta = 0;
+    activateMotor(motorId, 0);
+    if (carrier) {
+      const carrierAng = Math.atan2(carrier.p2.y - carrier.p1.y, carrier.p2.x - carrier.p1.x) * 180 / Math.PI;
+      bar.motorCarrier = carrier.id;
+      bar.phaseOffset = angDeg - carrierAng;
+    } else {
+      delete bar.motorCarrier;
       bar.phaseOffset = angDeg;
+      if (pinNode) bar[key].type = 'fixed';   // 世界機架：接點釘住（馬達殼鎖在機架上）
+    }
+    if (S.pendingMotorType === 'mg995') {
+      // 伺服：角度面板的「起始/結束角」直覺對應 thetaVal。
       bar.servoStart = 0;
       bar.servoEnd = 90;
     } else {
-      bar.phaseOffset = angDeg - S.theta;
       delete bar.servoStart;
       delete bar.servoEnd;
     }
-    bar[key].type = 'fixed';
-    bar[key].physicalMotor = '1';
+    bar[key].physicalMotor = motorId;
     bar.isInput = true;
-    bar.physicalMotor = '1';
+    bar.physicalMotor = motorId;
     cancelMotorMode();
     // 放完直接選取這顆馬達的接點，MG995 就會跳出角度面板。
     S.selectedNodeId = nodeId;
@@ -122,9 +164,10 @@ export function createMotorTools({
     const sl = S.comps.find(c => c.id === sliderId && c.type === 'slider');
     if (!sl) return;
     pushUndo();
-    S.theta = 0;                 // S.theta 直接當行程位移（getLinearShift valve '1' fallback 到 S.theta）
+    const motorId = String(sl.physicalMotor || sl.physical_motor || nextMotorId());
+    activateMotor(motorId, 0);   // S.theta 直接當行程位移（active 馬達由 motorAngles 傳給 getLinearShift）
     sl.isInput = true;
-    sl.physicalMotor = '1';
+    sl.physicalMotor = motorId;
     if (sl.baseEnd !== 'p2') sl.baseEnd = 'p1';
     sl.travelStart = sliderProjectedDistance(sl);
     if (!Number.isFinite(Number(sl.travelEnd)) || Number(sl.travelEnd) <= Number(sl.travelStart)) {
@@ -157,7 +200,9 @@ export function createMotorTools({
     pushUndo();
     freezePointAtDisplay(g.p1.id);     // 馬達順手把驅動輪中心釘在目前位置（固定在機架），與桿件一致
     setPointType(g.p1.id, 'fixed');
-    g.p1.physicalMotor = '1';
+    const motorId = String(g.p1.physicalMotor || g.p1.physical_motor || nextMotorId());
+    activateMotor(motorId);            // 齒輪沿用舊行為：不重置 θ，只切換控制權
+    g.p1.physicalMotor = motorId;
     cancelMotorMode();
     selectGear(g.id);
     rebuild(); draw();
@@ -178,22 +223,30 @@ export function createMotorTools({
     const bar = motorBarForCenter(id);
     return (bar && bar.motorType === 'mg995') ? 'mg995' : 'tt';
   }
-  // 目前機構若由「有限行程的輸入」驅動（MG995 伺服角度範圍，或線性致動器的行程），
+  // 目前「控制中的馬達」若是有限行程的輸入（MG995 伺服角度範圍，或線性致動器的行程），
   // 回它來回擺的兩端（S.theta 座標系）；否則 null。play() 用它把整圈轉覆寫成來回擺。
+  // 多馬達時只看 active 那顆——其他馬達凍結不動，不該影響播放範圍。
   function inputRockRange() {
-    const servoBar = S.comps.find(c => c.type === 'bar' && c.isInput && c.motorType === 'mg995');
+    const active = String(S.activeMotor || '1');
+    const motorIdOf = (c) => String(c.physicalMotor || c.physical_motor || '1');
+    const servoBar = S.comps.find(c => c.type === 'bar' && c.isInput && c.motorType === 'mg995' && motorIdOf(c) === active);
     if (servoBar) {
       const a = Number(servoBar.servoStart) || 0;
       const b = Number.isFinite(Number(servoBar.servoEnd)) ? Number(servoBar.servoEnd) : 90;
       return { lo: Math.min(a, b), hi: Math.max(a, b) };
     }
-    const slider = S.comps.find(c => c.type === 'slider' && c.isInput);
+    const slider = S.comps.find(c => c.type === 'slider' && c.isInput && motorIdOf(c) === active);
     if (slider) {
       const stroke = Math.max(0, sliderTravelEnd(slider) - sliderTravelStart(slider));
       return { lo: 0, hi: stroke };
     }
-    const rackRange = rackPinionThetaRange();
-    if (rackRange) return rackRange;
+    // 齒條行程只在 active 馬達就是驅動齒輪那顆時才適用
+    const gearDriven = S.comps.some(c => c.type === 'gear' && c.p1 &&
+      String(c.p1.physicalMotor || c.p1.physical_motor || '') === active);
+    if (gearDriven) {
+      const rackRange = rackPinionThetaRange();
+      if (rackRange) return rackRange;
+    }
     return null;
   }
 

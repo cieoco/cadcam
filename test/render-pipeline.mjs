@@ -1,7 +1,7 @@
 // draw() 流水線的資料準備驗收：場景 id、疊放層與 3D 預覽輸入。
 import { collectSceneIds, prepareRenderScene } from '../js/blocks/render-scene.js';
 import { buildPreviewModelInputs } from '../js/blocks/preview-model-inputs.js';
-import { computeBodyLayers } from '../js/blocks3d/scene-model.js';
+import { buildSceneModel, computeBodyLayers } from '../js/blocks3d/scene-model.js';
 import { motorAssemblyLayerForBody } from '../js/blocks/motor-mounts.js';
 import { check, report } from './_harness.mjs';
 
@@ -32,5 +32,16 @@ const preview = buildPreviewModelInputs({ comps, params: { GR: 18 }, theta: 45, 
   polygons: compiled.visualization.polygons, sliderTravelStart: () => 0, sliderTravelEnd: () => 0, sliderBodyLength: () => 0,
   rackBodyHeight: () => 0, rackPhaseShift: () => 0, pulleyRadius: () => 0, pulleyPinRadius: () => 0 });
 check('3D 預覽輸入集中產生齒輪與馬達資料', preview.gears.length === 1 && preview.gears[0].radius === 18 && preview.motorTypes.get('O') === 'tt');
+
+const ridingPoints = { A: { x: 0, y: 0 }, B: { x: 0, y: 40 }, C: { x: 30, y: 40 } };
+const ridingModel = buildSceneModel([
+  { id: 'Carrier', p1: 'A', p2: 'B', color: '#27ae60' },
+  { id: 'Output', p1: 'B', p2: 'C', style: 'crank', color: '#f39c12' }
+], ridingPoints, {
+  motorCenters: new Set(['B']), motorTypes: new Map([['B', 'tt']]),
+  motorMounts: new Map([['B', { frameBody: 'Carrier', dir: { x: 1, y: 0 } }]])
+});
+const ridingMotor = ridingModel.motors.find(motor => motor.id === 'B');
+check('騎乘馬達 3D 朝向跟隨機架桿，而非初始 mount.dir', ridingMotor && Math.abs(ridingMotor.dir.x) < 1e-9 && ridingMotor.dir.y < -0.999);
 
 report('render-pipeline');

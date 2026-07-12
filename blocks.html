@@ -147,6 +147,13 @@
       min-width: 42px; padding: 0 8px; font-size: 12px; font-weight: 700; color: #60717d;
       text-align: center; white-space: nowrap;
     }
+    /* 多馬達切換：一次控制一顆、其他凍結在原角度（≥2 顆馬達才顯示） */
+    .motor-switch { display: flex; gap: 4px; }
+    .motor-switch .motor-chip {
+      border: 1px solid #e6e9f0; background: #fff; color: #7f8c8d; border-radius: 999px;
+      height: 34px; min-width: 38px; padding: 0 10px; cursor: pointer; font-size: 12px; font-weight: 700;
+    }
+    .motor-switch .motor-chip.active { background: #fdebd0; border-color: #f39c12; color: #9c640c; }
     .clear-btn { border: 1px solid #e6e9f0; background: #fff; color: #7f8c8d; border-radius: 10px;
       padding: 8px 12px; cursor: pointer; font-size: 13px; }
     .controls .clear-btn {
@@ -709,6 +716,7 @@
         </div>
       </div>
       <div class="controls">
+        <div class="motor-switch" id="motorSwitch" style="display:none" title="切換要控制的馬達（其他馬達停在原角度）"></div>
         <button class="play-btn" id="playBtn" onclick="window.blocks.togglePlay()" title="播放 / 暫停">▶</button>
         <button class="clear-btn" id="btnMotorDirection" onclick="window.blocks.toggleMotorDirection()" title="切換馬達轉動方向">↻ 順時針</button>
         <div class="ctrl-sub" title="目前角度"><span id="thetaVal">0</span>°</div>

@@ -29,11 +29,12 @@ export function pointCoords(comps) {
 }
 
 // 該點「目前畫面上的位置」：能解就用 solver 解，解不出來才退回元件座標。
-export function displayPoint(comps, compiled, theta, id) {
+// motorAngles（選填）：多馬達時各馬達的角度表，沒帶就退回單一 theta 舊語意。
+export function displayPoint(comps, compiled, theta, id, motorAngles) {
   const pts = pointCoords(comps);
   if (compiled) {
     try {
-      const sol = solveTopology(compiled, { thetaDeg: theta });
+      const sol = solveTopology(compiled, motorAngles ? { thetaDeg: theta, motorAngles } : { thetaDeg: theta });
       const p = sol && sol.points && sol.points[id];
       if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) return { x: p.x, y: p.y };
     } catch (_) {}
@@ -47,8 +48,8 @@ export function updatePointCoordsById(comps, id, x, y) {
   }));
 }
 
-export function freezePointAtDisplay(comps, compiled, theta, id) {
-  const p = displayPoint(comps, compiled, theta, id);
+export function freezePointAtDisplay(comps, compiled, theta, id, motorAngles) {
+  const p = displayPoint(comps, compiled, theta, id, motorAngles);
   if (p) updatePointCoordsById(comps, id, p.x, p.y);
 }
 

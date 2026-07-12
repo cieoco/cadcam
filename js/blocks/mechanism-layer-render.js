@@ -43,8 +43,16 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       group.appendChild(hole); holes.push({ element: hole, pointId });
     });
     const mounts = link.id ? hostedMounts.get(link.id) : null;
-    const hostedPath = (a, b) => {
-      const geometry = inspectHostedFrame([a, b], mounts);
+    const hostedPath = (a, b, current) => {
+      // The carrier link moves during animation.  Its mount definition is
+      // created when draw() starts, so refresh each mount centre from the
+      // current solved point before regenerating the combined outline.  Using
+      // the initial centre here left the old M2 cutout behind as a ghost.
+      const liveMounts = mounts.map(mount => {
+        const center = mount?.pointId && current[mount.pointId];
+        return center && Number.isFinite(center.x) ? { ...mount, center } : mount;
+      });
+      const geometry = inspectHostedFrame([a, b], liveMounts);
       if (!geometry || !geometry.outlines.length) return null;
       const ring = polygon => 'M ' + polygon.map(point => { const p = project(point); return `${p.x.toFixed(2)} ${p.y.toFixed(2)}`; }).join(' L ') + ' Z';
       stick.setAttribute('fill-rule', 'evenodd');
@@ -55,7 +63,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       const valid = a && b && Number.isFinite(a.x) && Number.isFinite(b.x);
       stick.style.display = valid ? '' : 'none'; holes.forEach(hole => { hole.element.style.display = valid ? '' : 'none'; });
       if (!valid) return;
-      stick.setAttribute('d', mounts?.length ? (hostedPath(a, b) || barHullPath(a, b)) : barHullPath(a, b));
+      stick.setAttribute('d', mounts?.length ? (hostedPath(a, b, current) || barHullPath(a, b)) : barHullPath(a, b));
       holes.forEach(hole => { const point = current[hole.pointId]; if (point && Number.isFinite(point.x)) { const p = project(point); hole.element.setAttribute('cx', p.x); hole.element.setAttribute('cy', p.y); } });
     };
     update(points); registerUpdate(update);

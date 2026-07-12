@@ -61,7 +61,7 @@ check('放置模式：游標十字並顯示提示', S.placingMotor === true && s
 motorTools.cancelMotorMode();
 check('取消放置：游標與提示復原', S.placingMotor === false && svg.style.cursor === '' && banner === '');
 
-// ---- 桿件指派：TT 馬達從目前姿勢起轉（相位偏移吸收絕對角）----
+// ---- 桿件指派：TT 馬達從目前姿勢起轉（多馬達後每顆軸的角度從 0 起算，絕對角全由相位偏移吸收）----
 const bar = {
   type: 'bar', id: 'Bar1', lenParam: 'LL1', fixedLen: true,
   p1: { id: 'N1', type: 'fixed', x: 0, y: 0 },
@@ -70,7 +70,8 @@ const bar = {
 S.comps = [bar];
 S.theta = 30;
 motorTools.driveBarAt('Bar1', 'N1');
-check('TT 馬達：曲柄設輸入且相位偏移 = 目前角 − theta', bar.isInput === true && bar.p1.physicalMotor === '1' && Math.abs(bar.phaseOffset - (90 - 30)) < 1e-9);
+check('TT 馬達：曲柄設輸入、theta 歸零且相位偏移 = 目前絕對角',
+  bar.isInput === true && bar.p1.physicalMotor === '1' && S.theta === 0 && Math.abs(bar.phaseOffset - 90) < 1e-9);
 check('指派後選取馬達接點', S.selectedNodeId === 'N1');
 
 // ---- MG995：theta 歸零、預設 0..90 擺動 ----
