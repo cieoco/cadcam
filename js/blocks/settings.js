@@ -46,6 +46,8 @@ export function exportSettings() {
   return Exporters.normalizeExportSettings({
     barWidthMm: S.exportBarWidthMm,
     holeDiameterMm: S.exportHoleDiameterMm,
+    frameMarginMm: S.frameMarginMm,
+    frameHoleDiameterMm: S.frameHoleDiameterMm,
     ttShaftFlatDiameterMm: S.exportTtShaftFlatDiameterMm,
     ttShaftFlatThicknessMm: S.exportTtShaftFlatThicknessMm
   });
@@ -140,6 +142,8 @@ export function loadExportSettings() {
   const settings = Exporters.normalizeExportSettings(saved || {});
   S.exportBarWidthMm = settings.barWidthMm;
   S.exportHoleDiameterMm = settings.holeDiameterMm;
+  S.frameMarginMm = settings.frameMarginMm;
+  S.frameHoleDiameterMm = settings.frameHoleDiameterMm;
   S.exportTtShaftFlatDiameterMm = settings.ttShaftFlatDiameterMm;
   S.exportTtShaftFlatThicknessMm = settings.ttShaftFlatThicknessMm;
   syncExportSettingInputs();
@@ -166,15 +170,20 @@ export function loadMg995MountSettings() {
 export function setExportSetting(key, value) {
   if (key === 'barWidthMm') S.exportBarWidthMm = Number(value);
   if (key === 'holeDiameterMm') S.exportHoleDiameterMm = Number(value);
+  if (key === 'frameMarginMm') S.frameMarginMm = Number(value);
+  if (key === 'frameHoleDiameterMm') S.frameHoleDiameterMm = Number(value);
   if (key === 'ttShaftFlatDiameterMm') S.exportTtShaftFlatDiameterMm = Number(value);
   if (key === 'ttShaftFlatThicknessMm') S.exportTtShaftFlatThicknessMm = Number(value);
   const settings = exportSettings();
   S.exportBarWidthMm = settings.barWidthMm;
   S.exportHoleDiameterMm = settings.holeDiameterMm;
+  S.frameMarginMm = settings.frameMarginMm;
+  S.frameHoleDiameterMm = settings.frameHoleDiameterMm;
   S.exportTtShaftFlatDiameterMm = settings.ttShaftFlatDiameterMm;
   S.exportTtShaftFlatThicknessMm = settings.ttShaftFlatThicknessMm;
   try { localStorage.setItem(EXPORT_SETTINGS_KEY, JSON.stringify(settings)); } catch (_) {}
   syncExportSettingInputs();
+  draw();
 }
 export function setTtMountSetting(key, value) {
   const map = {

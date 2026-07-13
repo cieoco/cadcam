@@ -194,6 +194,11 @@
     .servo-editor .se-title { font-size: 13px; font-weight: 700; color: #2c5282; }
     .servo-editor .se-row { display: flex; align-items: center; gap: 8px; }
     .servo-editor .se-label { font-size: 12px; font-weight: 700; color: #60717d; min-width: 30px; }
+    .frame-editor { top: 172px; left: 16px; gap: 7px; border-color: #d7e3ef; max-width: 288px; }
+    .frame-editor .fe-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .frame-editor .fe-title { font-size:13px; font-weight:700; color:#46657f; }
+    .frame-editor .fe-value { font-size:12px; font-weight:700; color:#2c5282; }
+    .frame-editor button { border:1px solid #d8dee6; background:#fff; border-radius:8px; padding:6px 9px; cursor:pointer; }
     /* 動力來源選單（置中彈出卡片） */
     .tool-menu, .power-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
       display: flex; flex-direction: column; gap: 10px; z-index: 6;
@@ -614,6 +619,15 @@
           <button onclick="window.blocks.toggleMotorReverse(this.closest('#motorMountRow').dataset.nodeId)">反相</button>
         </span>
         </div>
+      </div>
+      <div class="inspector-panel frame-editor" id="frameEditor" style="display:none;">
+        <div class="fe-row"><span class="fe-title">機架</span><span class="fe-value" id="frameHoleCount"></span></div>
+        <div class="fe-row"><span class="fe-value">孔距 8 mm</span></div>
+        <div class="fe-row"><span>軸距</span><button onclick="window.blocks.changeFrameGround('length',-8)">−</button><span class="fe-value" id="frameLengthVal"></span><button onclick="window.blocks.changeFrameGround('length',8)">＋</button></div>
+        <div class="fe-row"><span>相對角</span><button onclick="window.blocks.changeFrameGround('angle',-5)">−</button><span class="fe-value" id="frameAngleVal"></span><button onclick="window.blocks.changeFrameGround('angle',5)">＋</button></div>
+        <div class="fe-row"><label>留邊 <input id="frameMarginInput" type="number" min="8" max="80" step="1" oninput="window.blocks.setExportSetting('frameMarginMm', this.value)"> mm</label></div>
+        <div class="fe-row"><label>固定孔 <input id="frameHoleInput" type="number" min="0.5" max="30" step="0.5" oninput="window.blocks.setExportSetting('frameHoleDiameterMm', this.value)"> mm</label></div>
+        <div class="fe-row"><button id="frameLockEditorBtn" onclick="window.blocks.toggleFrameLock()">8 mm 吸附</button></div>
       </div>
       <div class="inspector-panel servo-editor" id="servoEditor" style="display:none;">
         <span class="se-title">🟦 伺服角度</span>

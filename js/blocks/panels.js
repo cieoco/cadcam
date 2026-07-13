@@ -83,6 +83,33 @@ export function updateStrokeEditor() {
   panel.style.display = 'none';
 }
 
+export function updateFrameEditor() {
+  const panel = document.getElementById('frameEditor');
+  if (!panel) return;
+  const points = pointCoords();
+  const grounds = Object.entries(points).filter(([id]) => pointIsGround?.(id)).map(([id, point]) => ({ id, ...point }));
+  if (!grounds.length || !S.frameEditorOpen) { panel.style.display = 'none'; return; }
+  const xs = grounds.map(point => point.x), ys = grounds.map(point => point.y);
+  const width = Math.round(Math.max(...xs) - Math.min(...xs));
+  const height = Math.round(Math.max(...ys) - Math.min(...ys));
+  const count = document.getElementById('frameHoleCount');
+  const lengthValue = document.getElementById('frameLengthVal');
+  const angleValue = document.getElementById('frameAngleVal');
+  const lock = document.getElementById('frameLockEditorBtn');
+  const margin = document.getElementById('frameMarginInput');
+  const hole = document.getElementById('frameHoleInput');
+  if (count) count.textContent = `${grounds.length} 個固定孔`;
+  const base = grounds[0], target = grounds[1];
+  const axisLength = target ? Math.hypot(target.x - base.x, target.y - base.y) : 0;
+  const axisAngle = target ? Math.atan2(target.y - base.y, target.x - base.x) * 180 / Math.PI : 0;
+  if (lengthValue) lengthValue.textContent = `${Math.round(axisLength)} mm`;
+  if (angleValue) angleValue.textContent = `${Math.round(axisAngle)}°`;
+  if (lock) { lock.textContent = S.lockFrameHoles ? '✓ 8 mm 吸附中' : '8 mm 吸附'; lock.classList.toggle('trace-on', Boolean(S.lockFrameHoles)); }
+  if (margin) margin.value = Number(S.frameMarginMm || 18);
+  if (hole) hole.value = Number(S.frameHoleDiameterMm || 5);
+  panel.style.display = 'flex';
+}
+
 // ---- 角色編輯（接點：自由 / 地錨 / 馬達）----
 export function updateRoleEditor() {
   const editor = document.getElementById('roleEditor');
@@ -93,6 +120,7 @@ export function updateRoleEditor() {
     if (motorMountRow) motorMountRow.style.display = 'none';
     updateServoEditor();
     updateStrokeEditor();
+    updateFrameEditor();
     return;
   }
   document.getElementById('roleStatus').textContent = nodeRoleLabel(S.selectedNodeId);
@@ -145,4 +173,5 @@ export function updateRoleEditor() {
   editor.style.display = 'flex';
   updateServoEditor();
   updateStrokeEditor();
+  updateFrameEditor();
 }

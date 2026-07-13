@@ -62,6 +62,15 @@ export function createNodeEditor({
     if (type === 'fixed') removeMotorAtPoint(S.selectedNodeId);
     if (type === 'fixed') freezePointAtDisplay(S.selectedNodeId);
     setPointType(S.selectedNodeId, type);
+    // Promoting a joint to the frame is an explicit manufacturing decision;
+    // immediately place it on the active 8 mm hole grid when locking is on.
+    if (type === 'fixed') {
+      const p = pointCoords()[S.selectedNodeId];
+      if (p) {
+        const q = snapFramePoint(p);
+        updatePointCoordsById(S.selectedNodeId, q.x, q.y);
+      }
+    }
     if (type === 'floating') removeAnchorsAtPoint(S.selectedNodeId);
     rebuild(); draw();
   }

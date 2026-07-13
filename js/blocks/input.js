@@ -32,6 +32,7 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
     handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
     openMobileEditPanel = () => {},
     closeMobileEditPanel = () => {},
+    openFrameEditor = () => {},
     transient = () => {},
     recordManualTrace = () => {},
     solvePinnedConstraints = null,
@@ -72,6 +73,7 @@ export function onFrameHandleDown(e) {
   if (!w) return;
   S.preDragSnap = snapshotStr(); // 整段拖曳合併成一筆 undo
   pause();
+  openFrameEditor();
   S.dragFrame = true;
   S.dragLastWorld = w;
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
@@ -86,6 +88,8 @@ export function onNodeDown(e, id) {
   // 過去 dragId 會間接擋住取消，但加入拖曳門檻後按下階段尚未設定 dragId，
   // 因此必須在事件語意上明確阻止背景處理。
   e.stopPropagation();
+  if (pointIsGround(id)) openFrameEditor();
+  else S.frameEditorOpen = false;
   S.preDragSnap = snapshotStr(); // 拖曳前狀態；若真的有變動，drag end 才記入 undo
   pause();
   // 選接點時收掉桿件 / 三點桿 / 滑軌的長度面板，各種屬性列互斥不疊在一起。
@@ -151,8 +155,16 @@ function onDragMove(e) {
     if (!c) return;
     const dx = w.x - S.dragLastWorld.x;
     const dy = w.y - S.dragLastWorld.y;
-    movePointById(c.p1.id, dx, dy);
-    movePointById(c.p2.id, dx, dy);
+    const points = pointCoords();
+    const anchor = points[c.p1.id];
+    const desired = anchor ? { x: anchor.x + dx, y: anchor.y + dy } : { x: dx, y: dy };
+    // A free bar translates as one rigid part. Snap its first hole to the
+    // 8 mm frame grid, then apply that same delta to its other hole.
+    const snapped = snapFramePoint(desired);
+    const moveX = anchor ? snapped.x - anchor.x : dx;
+    const moveY = anchor ? snapped.y - anchor.y : dy;
+    movePointById(c.p1.id, moveX, moveY);
+    movePointById(c.p2.id, moveX, moveY);
     S.dragLastWorld = w;
     redrawAfterDrag();
     return;
@@ -206,8 +218,10 @@ function onDragMove(e) {
   const free = freeLinkForPoint(S.dragId);
   if (free) {
     const p = pointCoords()[S.dragId];
-    const dx = w.x - (p?.x || 0);
-    const dy = w.y - (p?.y || 0);
+    const desired = { x: w.x, y: w.y };
+    const snapped = snapFramePoint(desired);
+    const dx = snapped.x - (p?.x || 0);
+    const dy = snapped.y - (p?.y || 0);
     movePointById(free.p1.id, dx, dy);
     movePointById(free.p2.id, dx, dy);
     S.snapTarget = nearestDisplayTo(S.dragId);
@@ -345,6 +359,7 @@ export function init(deps) {
      handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
      openMobileEditPanel = (() => {}),
      closeMobileEditPanel = (() => {}),
+     openFrameEditor = (() => {}),
      transient = (() => {}),
      recordManualTrace = (() => {}),
      solvePinnedConstraints = null,

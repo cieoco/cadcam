@@ -39,6 +39,9 @@ export const S = {
 
   // ---- 機架 / LEGO 視覺 ----
   lockFrameHoles: false,                           // 拖曳固定孔/機架時吸附到 8mm pitch
+  frameMarginMm: 18,
+  frameHoleDiameterMm: 5,
+  frameEditorOpen: false,
 
   // ---- 工具 / 放置模式 ----
   triSide: 'g',                                    // 三點桿目前在調哪一條邊：'g' 底邊 / 'r1' / 'r2'

@@ -1211,7 +1211,34 @@ function syncFrameOptionButtons() {
 
 function toggleFrameLock() {
   S.lockFrameHoles = !S.lockFrameHoles;
+  if (S.lockFrameHoles) {
+    pushUndo();
+    snapFrameNodesToGrid();
+    rebuild();
+  }
   syncFrameOptionButtons();
+  Panels.updateFrameEditor();
+  draw();
+}
+
+function changeFrameGround(kind, delta) {
+  const points = pointCoords();
+  const nodes = [...frameNodeIds()].map(id => ({ id, ...points[id] })).filter(point => Number.isFinite(point.x) && Number.isFinite(point.y))
+    .sort((a, b) => (a.x - b.x) || (a.y - b.y));
+  if (nodes.length < 2) return;
+  const base = nodes[0], target = nodes[1];
+  const dx = target.x - base.x, dy = target.y - base.y;
+  let length = Math.hypot(dx, dy), angle = Math.atan2(dy, dx);
+  if (kind === 'length') length += Number(delta || 0);
+  else if (kind === 'angle') angle += Number(delta || 0) * Math.PI / 180;
+  else return;
+  if (length < LEGO_STEP) { transient('機架軸距至少保留 8 mm'); return; }
+  pushUndo();
+  const next = { x: base.x + Math.cos(angle) * length, y: base.y + Math.sin(angle) * length };
+  const snapped = snapFramePoint(next);
+  updatePointCoordsById(target.id, snapped.x, snapped.y);
+  rebuild();
+  Panels.updateFrameEditor();
   draw();
 }
 
@@ -1430,10 +1457,12 @@ function selectLink(id) {
   if (!c) return;
   openMobileEditPanel();
   S.selectedLinkId = id;
+  S.frameEditorOpen = false;
   S.selectedTriangleId = null;
   S.selectedNodeId = null;
   S.selectedSliderId = null;
   document.getElementById('roleEditor').style.display = 'none';
+  document.getElementById('frameEditor').style.display = 'none';
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
   document.getElementById('lenTitle').textContent = '🔵 連桿長度';
@@ -1680,7 +1709,7 @@ function init() {
                movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
                isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
                handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround, recordManualTrace, solvePinnedConstraints,
-               snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel, transient,
+               snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel, openFrameEditor: () => { S.frameEditorOpen = true; Panels.updateFrameEditor(); }, transient,
                isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, pointIsRackHole });
   Settings.init({ draw });
   Settings.loadExportSettings();
@@ -1709,4 +1738,5 @@ function init() {
 }
 
 window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
+window.blocks.changeFrameGround = changeFrameGround;
 init();

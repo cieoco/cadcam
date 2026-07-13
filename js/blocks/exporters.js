@@ -23,6 +23,8 @@ export function normalizeExportSettings(settings = {}) {
   const holeDiameter = Number(settings.holeDiameterMm);
   const ttShaftFlatDiameter = Number(settings.ttShaftFlatDiameterMm);
   const ttShaftFlatThickness = Number(settings.ttShaftFlatThicknessMm);
+  const frameMargin = Number(settings.frameMarginMm);
+  const frameHoleDiameter = Number(settings.frameHoleDiameterMm);
   const safeBarWidth = Number.isFinite(barWidth) ? Math.max(2, Math.min(120, barWidth)) : DEFAULT_BAR_WIDTH_MM;
   const safeHoleDiameter = Number.isFinite(holeDiameter)
     ? Math.max(0.5, Math.min(safeBarWidth - 0.5, holeDiameter))
@@ -36,6 +38,8 @@ export function normalizeExportSettings(settings = {}) {
   return {
     barWidthMm: round(safeBarWidth, 2),
     holeDiameterMm: round(safeHoleDiameter, 2),
+    frameMarginMm: round(Number.isFinite(frameMargin) ? Math.max(8, Math.min(80, frameMargin)) : 18, 2),
+    frameHoleDiameterMm: round(Number.isFinite(frameHoleDiameter) ? Math.max(0.5, Math.min(30, frameHoleDiameter)) : safeHoleDiameter, 2),
     ttShaftFlatDiameterMm: round(safeFlatDiameter, 2),
     ttShaftFlatThicknessMm: round(safeFlatThickness, 2)
   };
@@ -734,8 +738,8 @@ export function plateMountExtras(mounts = []) {
 
 function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   const nodes = (frameNodes || []).filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
-  const { barWidthMm, holeDiameterMm } = normalizeExportSettings(settings);
-  const holeR = holeDiameterMm / 2;
+  const { barWidthMm, frameMarginMm, frameHoleDiameterMm } = normalizeExportSettings(settings);
+  const holeR = frameHoleDiameterMm / 2;
   const frameR = barWidthMm / 2;
   const outlines = [];
   const mountOutlines = [];
@@ -762,10 +766,10 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
       }
     } else {
     const baseHull = hull(nodes);
-      if (baseHull.length >= 3) outlines.push(roundedOffsetHull(baseHull, Math.max(18, frameR)));
+      if (baseHull.length >= 3) outlines.push(roundedOffsetHull(baseHull, Math.max(frameMarginMm, frameR)));
     }
   } else if (nodes.length === 1) {
-    outlines.push(roundPadOutline(nodes[0], Math.max(18, frameR + holeR + 4)));
+    outlines.push(roundPadOutline(nodes[0], Math.max(frameMarginMm, frameR + holeR + 4)));
   }
 
   nodes.forEach(p => addHole(p.x, p.y, holeR, 'PIVOT_HOLE'));
