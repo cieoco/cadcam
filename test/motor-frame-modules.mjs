@@ -41,4 +41,24 @@ drawMotorMountHoles({
 const mountLayer = svg.children[2];
 check('TT 馬達安裝圖包含軸孔、兩螺絲孔與定位孔', mountLayer.tag === 'g' && mountLayer.children[0].children.filter(child => child.tag === 'circle').length === 4);
 
+// 雙馬達共點：M1 曲柄（Link1）的浮動端剛好是 M2 軸心（P4b）。M2 的 mount 必須
+// 取自明確宣告的 Link5.motorMount（frameBody=Link4），不得被 Link1 搶答成世界機架。
+const dualComps = [
+  { type: 'bar', id: 'Link1', isInput: true, p1: { id: 'P4b' }, p2: { id: 'P1b' },
+    motorMount: { motor: '1', center: 'P1b', outputBody: 'Link1', orientation: 'horizontal', order: ['motor', 'outputBody'] } },
+  { type: 'bar', id: 'Link4', p1: { id: 'P2b' }, p2: { id: 'P4b' } },
+  { type: 'bar', id: 'Link5', isInput: true, p1: { id: 'P4b' }, p2: { id: 'P5b' },
+    motorMount: { motor: '2', center: 'P4b', outputBody: 'Link5', frameBody: 'Link4', orientation: 'follow-frame', order: ['motor', 'frameBody', 'outputBody'] } }
+];
+const dualPoints = { P1b: { x: -200, y: 0 }, P2b: { x: -151, y: 39 }, P4b: { x: -174, y: 30 }, P5b: { x: -159, y: 63 } };
+const dualMounts = buildMotorMounts({
+  motorIds: new Set(['P1b', 'P4b']), groundIds: new Set(['P1b']), staticPoints: dualPoints, comps: dualComps,
+  compiledSteps: [], sliderMountInfo: () => null, isHiddenSliderRailPoint: () => false,
+  motorTypeForCenter: () => 'tt'
+});
+const ridingMount = dualMounts.get('P4b');
+check('共點騎乘馬達保留宿主桿裝配關係', ridingMount?.outputBody === 'Link5' && ridingMount?.frameBody === 'Link4' && ridingMount?.orientation === 'follow-frame');
+const groundMount = dualMounts.get('P1b');
+check('共點世界機架馬達不受影響', groundMount?.outputBody === 'Link1' && !groundMount?.frameBody && groundMount?.orientation === 'horizontal');
+
 report('motor-frame-modules');

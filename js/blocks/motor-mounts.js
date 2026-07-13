@@ -80,8 +80,12 @@ export function buildMotorMounts({ motorIds, groundIds, staticPoints, comps, com
       return;
     }
     const crankTips = new Set(compiledSteps.filter(step => step.type === 'input_crank' && step.center === id).map(step => step.id));
-    const outputBar = comps.find(comp => comp.type === 'bar' && comp.p1 && comp.p2 && (comp.p1.id === id || comp.p2.id === id) &&
-      (comp.isInput || crankTips.has(comp.p1.id === id ? comp.p2.id : comp.p1.id)));
+    // 先找明確宣告「軸心就是這顆馬達」的桿（motorMount.center）；只靠「端點接在馬達
+    // 中心且 isInput」推斷會在兩顆馬達共點時搶答（例：M1 曲柄的浮動端剛好是 M2 軸心），
+    // 導致騎乘馬達的 frameBody 被別顆馬達的 mount 蓋掉、安裝特徵誤入自動地基。
+    const outputBar = comps.find(comp => comp.type === 'bar' && comp.motorMount && comp.motorMount.center === id)
+      || comps.find(comp => comp.type === 'bar' && comp.p1 && comp.p2 && (comp.p1.id === id || comp.p2.id === id) &&
+        (comp.isInput || crankTips.has(comp.p1.id === id ? comp.p2.id : comp.p1.id)));
     // A riding motor is mounted to its carrier link, not to the world frame.
     // Preserve that assembly relationship so 3D does not rebuild the frame at
     // the motor's moving centre on every animation frame.
