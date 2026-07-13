@@ -160,6 +160,27 @@ export function createGearEditor({
       updatePointCoordsById(c.p1.id, (dc.x || 0) + dx / d * (Rd + Rc), (dc.y || 0) + dy / d * (Rd + Rc));
     });
   }
+  // 把某齒輪中心「釘」在目前位置後，重擺它的嚙合夥伴以維持圓心距（＝兩節圓半徑和）。
+  // 供「昇格機架點／微調固定點」時呼叫：被吸附到 8mm 格點的中心留在格上（＝方向 B 的驅動側），
+  // 夥伴齒輪沿目前方向跟隨移動，保持咬合（夥伴軸孔因此離格，這是刻意取捨）。
+  // 傳入非齒輪中心的 id 會自然 no-op（找不到 anchorGear 即返回），呼叫端可無條件呼叫。
+  function syncGearMeshAnchoredAt(anchorCenterId) {
+    const anchorGear = S.comps.find(c => c.type === 'gear' && c.p1 && c.p1.id === anchorCenterId);
+    if (!anchorGear) return;
+    const pts = pointCoords();
+    const ac = pts[anchorCenterId] || anchorGear.p1;
+    const Ra = Number(S.topo.params[anchorGear.radiusParam]) || 40;
+    S.comps.forEach(partner => {
+      if (partner.type !== 'gear' || partner === anchorGear || !partner.p1) return;
+      if (!(anchorGear.mesh === partner.id || partner.mesh === anchorGear.id)) return;
+      const pc = pts[partner.p1.id] || partner.p1;
+      const Rp = Number(S.topo.params[partner.radiusParam]) || 40;
+      let dx = (pc.x || 0) - (ac.x || 0), dy = (pc.y || 0) - (ac.y || 0);
+      let d = Math.hypot(dx, dy);
+      if (d < 1e-6) { dx = 1; dy = 0; d = 1; }
+      updatePointCoordsById(partner.p1.id, (ac.x || 0) + dx / d * (Ra + Rp), (ac.y || 0) + dy / d * (Ra + Rp));
+    });
+  }
   // 嚙合防呆：這顆齒輪與其嚙合夥伴若「都已接地」但中心距 ≠ Ra+Rb（>tol），代表沒對好咬合
   // （多半是把中心拖去合併到不在嚙合圓上的地錨）。回 true 讓繪製給紅色虛線環提示，不自動搬動錨點。
   function gearMeshOff(c) {
@@ -547,7 +568,7 @@ export function createGearEditor({
 
   return {
     makeGear, addGearPair, addRackPinion,
-    gearById, gearMeshChain, syncGearMesh, gearMeshOff,
+    gearById, gearMeshChain, syncGearMesh, syncGearMeshAnchoredAt, gearMeshOff,
     selectGear, updateGearEditor, deselectGear,
     rackForGear, toggleRackOrientation, rackLength, rackBodyLength, rackBodyHeight,
     ensureRackSlot, rackFramePinPositions, syncRackFramePins, syncRackFramePinsForGear,

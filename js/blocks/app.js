@@ -278,7 +278,7 @@ const gearEditor = createGearEditor({
   snapshotStr, updateUndoBtn, recordManualTrace,
   worldFromEvent, mobilePrompt, pointCoords, updatePointCoordsById, pointIsGround
 });
-const { gearById, gearMeshChain, gearMeshOff, selectGear, deselectGear, startGearManualRotate,
+const { gearById, gearMeshChain, gearMeshOff, syncGearMeshAnchoredAt, selectGear, deselectGear, startGearManualRotate,
         rackBodyHeight, rackPinionThetaRange, deleteGearChain,
         addGearPair, addRackPinion, toggleRackOrientation,
         changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter,
@@ -324,7 +324,7 @@ const { selectTriangle, startShapeDrag, deleteShapeVertex, updatePlateShapeContr
 // ---- 節點角色域：邏輯抽到 ./node-editor.js（Panels 由該模組自行 import）----
 const nodeEditor = createNodeEditor({
   pushUndo, pause, rebuild, draw, setBanner, transient, scheduleAutosave,
-  hasPoint, pointCoords, pointIsGround, updatePointCoordsById, snapFramePoint,
+  hasPoint, pointCoords, pointIsGround, updatePointCoordsById, snapFramePoint, syncGearMeshAnchoredAt,
   sliderMountInfo, removeMotorAtPoint, removeAnchorsAtPoint, setPointType, freezePointAtDisplay,
   pointRefs: (id) => Model.pointRefs(S.comps, id),
   motorBarForCenter, sliderTravelStart, sliderTravelEnd, railLength, normalizeSliderRange,

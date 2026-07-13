@@ -13,7 +13,7 @@ import { LEGO_FRAME_STEP as LEGO_STEP } from './model.js';
 
 export function createNodeEditor({
   pushUndo, pause, rebuild, draw, setBanner, transient, scheduleAutosave,
-  hasPoint, pointCoords, pointIsGround, updatePointCoordsById, snapFramePoint,
+  hasPoint, pointCoords, pointIsGround, updatePointCoordsById, snapFramePoint, syncGearMeshAnchoredAt,
   sliderMountInfo, removeMotorAtPoint, removeAnchorsAtPoint, setPointType, freezePointAtDisplay, pointRefs,
   motorBarForCenter, sliderTravelStart, sliderTravelEnd, railLength, normalizeSliderRange,
   traceIds, invalidateTrajectory
@@ -69,6 +69,9 @@ export function createNodeEditor({
       if (p) {
         const q = snapFramePoint(p);
         updatePointCoordsById(S.selectedNodeId, q.x, q.y);
+        // 齒輪中心昇格機架點：8mm 格點吸附會破壞圓心距（＝兩節圓半徑和）。
+        // 把此中心當作驅動側釘在格點，讓嚙合夥伴跟隨移動以維持咬合（方向 B）。
+        syncGearMeshAnchoredAt?.(S.selectedNodeId);
       }
     }
     if (type === 'floating') removeAnchorsAtPoint(S.selectedNodeId);
@@ -83,6 +86,8 @@ export function createNodeEditor({
     const next = { x: axis === 'x' ? p.x + step : p.x, y: axis === 'y' ? p.y + step : p.y };
     const q = pointIsGround(S.selectedNodeId) ? snapFramePoint(next) : next;
     updatePointCoordsById(S.selectedNodeId, q.x, q.y);
+    // 微調固定的齒輪中心時同樣維持嚙合：夥伴齒輪跟隨保持圓心距（見 setNodeRole）。
+    if (pointIsGround(S.selectedNodeId)) syncGearMeshAnchoredAt?.(S.selectedNodeId);
     rebuild(); draw();
     Panels.updateRoleEditor();
   }
