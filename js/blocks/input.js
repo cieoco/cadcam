@@ -32,6 +32,7 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
     handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
     openMobileEditPanel = () => {},
     closeMobileEditPanel = () => {},
+    transient = () => {},
     recordManualTrace = () => {},
     solvePinnedConstraints = null,
     snapFramePoint = p => p,
@@ -165,6 +166,8 @@ function onDragMove(e) {
     if (rotateInputCrankToPoint(crankBar,w)) { rebuild(); recordManualTrace(); draw(); }
     return;
   }
+  // Only world-frame holes snap. Floating joints are motion constraints and
+  // must never be quantized to the 8 mm reference grid during editing.
   const dragTarget = pointIsGround(S.dragId) ? snapFramePoint(w) : w;
   // 齒輪中心：拖中心＝整顆齒輪剛性平移（輪緣銷 p2 跟著走），否則齒形繞 p1、銷停舊位會分離。
   // 並維持嚙合（中心距 D=Ra+Rb 是死的）：
@@ -253,6 +256,13 @@ function onDragMove(e) {
   // 三點桿自由頂點，但另兩頂點都被機構牽制（≥2 樞紐）：此頂點被剛體完全決定，
   // 自由拖會破壞三角剛性 → 鎖住不動（要移動請拖牽制較少的接點，或加馬達驅動機構）。
   if (lockedTriangleVertex && lockedTriangleVertex(S.dragId)) return;
+  const sharedFixedBars = !pointIsGround(S.dragId) ? S.comps.filter(comp =>
+    comp.type === 'bar' && comp.fixedLen && comp.p1 && comp.p2 &&
+    (comp.p1.id === S.dragId || comp.p2.id === S.dragId)) : [];
+  if (sharedFixedBars.length > 1) {
+    transient('這是多桿共用的固定長度接點；請調整桿長或移動機架固定孔。');
+    return;
+  }
   // 固定長度連桿：已有約束時，拖端點繞另一端以固定半徑旋轉（圓規），長度不變
   const fl = fixedLinkFor(S.dragId);
   if (fl) {
@@ -335,6 +345,7 @@ export function init(deps) {
      handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
      openMobileEditPanel = (() => {}),
      closeMobileEditPanel = (() => {}),
+     transient = (() => {}),
      recordManualTrace = (() => {}),
      solvePinnedConstraints = null,
      snapFramePoint = (p => p),

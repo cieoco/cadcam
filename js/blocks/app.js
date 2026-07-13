@@ -785,6 +785,7 @@ const PART_DRAW = {
 
 function draw() {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
+  drawFrameGrid();
   frameUpdaters = [];
   sliderLayer = null;
   recountBanner = null;
@@ -975,6 +976,30 @@ function draw() {
     sliderBodyLength, rackBodyHeight, rackPhaseShift, pulleyRadius, pulleyPinRadius
   });
   if (view3DActive) push3D();
+}
+
+// 8 mm LEGO-hole reference grid. It is deliberately a visual aid only; the
+// actual snap remains in snapFramePoint() so all fixed-point editing paths use
+// the same constraint.
+function drawFrameGrid() {
+  if (!S.lockFrameHoles) return;
+  const step = LEGO_STEP * View.getScale();
+  if (!Number.isFinite(step) || step < 3) return;
+  const mod = (value, divisor) => ((value % divisor) + divisor) % divisor;
+  const x0 = mod(TX(0), step), y0 = mod(TY(0), step);
+  const dots = document.createElementNS(SVG_NS, 'g');
+  dots.setAttribute('aria-label', '8mm reference grid');
+  dots.style.pointerEvents = 'none';
+  const radius = Math.max(0.7, Math.min(1.4, step * 0.09));
+  for (let x = x0; x <= W; x += step) {
+    for (let y = y0; y <= H; y += step) {
+      const dot = document.createElementNS(SVG_NS, 'circle');
+      dot.setAttribute('cx', x.toFixed(2)); dot.setAttribute('cy', y.toFixed(2));
+      dot.setAttribute('r', radius.toFixed(2)); dot.setAttribute('fill', '#9fb1c5'); dot.setAttribute('fill-opacity', '0.28');
+      dots.appendChild(dot);
+    }
+  }
+  svg.appendChild(dots);
 }
 
 // 滑軌繪製：畫進指定 parent。重建（draw）與播放（renderFrame）共用同一段碼，確保零分歧。
@@ -1655,7 +1680,7 @@ function init() {
                movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
                isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
                handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround, recordManualTrace, solvePinnedConstraints,
-               snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel,
+               snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel, transient,
                isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, pointIsRackHole });
   Settings.init({ draw });
   Settings.loadExportSettings();
