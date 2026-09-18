@@ -18,7 +18,7 @@ Linkage 閉環機構拓樸工具
 ### 本機試用
 
 ```bash
-cd d:\tool\linkage
+cd C:\project\cadcam
 python -m http.server 8000
 ```
 
@@ -81,7 +81,17 @@ linkage/
 └── ...
 ```
 
-## 🧱 最新架構說明 (Core/UI 分層)
+## 🧱 目前 blocks 架構與驗收
+
+`js/blocks/app.js` 是目前主入口的 UI 控制器，直接使用 `js/core/topology.js` 編譯與 `js/multilink/solver.js` 求解。編輯、輸入、繪製分在 `js/blocks/` 的對應模組；`js/blocks3d/` 提供唯讀 3D 預覽，使用內附的 Three.js，無需 npm 安裝或 build。
+
+作品由 `js/blocks/schema.js` 正規化，`storage.js` 提供 `blocks.json` 存取、自動還原與分享。blocks 的加工匯出為 SVG／DXF，目前包含連桿、板件、齒輪與機架；滑軌本體不在零件匯出清單內。舊版 `mechanism.json` ARM 交換格式不等同於 blocks 作品格式。
+
+Node 22 以上可直接執行 `node test/<name>.mjs`；例如 `node test/slider-crank.mjs`、`node test/gear-pair.mjs`。作品與範例正規化另跑 `node test_blocks_schema.mjs`。沒有 npm test runner，UI 還須在 HTTP 網站實際操作驗收。
+
+本批驗證範圍、證據與限制見 [第一批收尾紀錄](docs/CLOSEOUT-BATCH-1.md)。
+
+### 舊版 Engine Facade 架構（歷史查考）
 
 核心邏輯已抽離成 `js/core/`，UI 只處理 DOM 與事件，透過「Engine Facade」單一入口呼叫核心計算。
 

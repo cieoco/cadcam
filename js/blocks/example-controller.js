@@ -13,7 +13,7 @@ export function createExampleController({ applySnapshot, notify, closeMobileMenu
   function renderLessonCard(example) {
     const card = document.getElementById('exampleLessonCard');
     if (!card) return;
-    if (!example) { card.style.display = 'none'; return; }
+    if (!example) { activeExampleId = ''; card.style.display = 'none'; return; }
     const lesson = getExampleLesson(example.id);
     const group = EXAMPLE_GROUPS.find(item => item.id === lesson.group);
     card.style.display = '';

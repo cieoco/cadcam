@@ -28,5 +28,8 @@ check('初始化時隱藏教學卡', ids.get('exampleLessonCard').style.display 
 check('範例 snapshot 可正規化並套用', controller.load('fourbar-crank-rocker') && applied?.comps?.length > 0 && applied.params?.LL1 === 32);
 check('載入後更新教學卡與通知', ids.get('exampleLessonCard').style.display === '' && ids.get('exampleLessonTitle').textContent.includes('四連桿') && message.includes('已載入'));
 check('控制器記錄目前範例 id', controller.activeExampleId === 'fourbar-crank-rocker');
+controller.renderLessonCard(null);
+check('開啟外部作品時清除舊教學卡與範例身分', ids.get('exampleLessonCard').style.display === 'none' && controller.activeExampleId === '');
+check('清除後仍可載入下一個範例', controller.load('gear-pair') && controller.activeExampleId === 'gear-pair' && ids.get('exampleLessonCard').style.display === '' && ids.get('exampleLessonTitle').textContent.includes('齒輪'));
 
 report('example-controller');

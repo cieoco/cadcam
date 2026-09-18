@@ -1673,6 +1673,7 @@ function openFile() {
         const norm = Store.normalizeSnapshot(JSON.parse(r.result));
         if (!norm) { transient('⚠️ 檔案格式不正確'); return; }
         applySnapshot(norm);
+        exampleController.renderLessonCard(null); // 外部作品沒有範例身分，避免沿用上一個範例的教學卡。
         transient('📂 已開啟');
       } catch (e) { transient('⚠️ 讀取失敗：' + (e.message || e)); }
     };
