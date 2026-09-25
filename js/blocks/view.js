@@ -96,8 +96,7 @@ export function fit(bounds) {
 // 把一根桿（兩端點 a、b）算成「冰棒棍」外形：兩端圓 + 外切線 + 半圓封口。
 // 切線/封弧的幾何沿用 mechanism 零件外形（js/parts/renderer.js 的 computeTangentHullPathQuiet），
 // 確保半圓封口方向正確。座標用 TX/TY 轉到畫面，弧半徑乘 scale。
-export function barHullPath(a, b) {
-  const r = HULL_R_WORLD;
+export function barHullPath(a, b, r = HULL_R_WORLD) {
   const getTangent = (p, q) => {
     const dx = q.x - p.x, dy = q.y - p.y;
     const dist = Math.hypot(dx, dy);

@@ -1,7 +1,8 @@
 /** FTC 夾爪第一輪：用既有 solver 規劃對稱圓頭夾爪的開合範圍。純計算。 */
 import { compileTopology } from '../core/topology.js';
 import { solveTopology } from '../multilink/solver.js';
-import { DEFAULT_PLATE_RADIUS_WORLD, jawCenterline } from './plate-geometry.js';
+import { jawCenterline } from './plate-geometry.js';
+import { memberStock, memberStockLabel } from './member-stock.js';
 
 export function gripperTips(comps, points) {
   const ends = ['LeftJaw', 'RightJaw'].map(id => {
@@ -10,7 +11,8 @@ export function gripperTips(comps, points) {
   });
   const [left, right] = ends;
   if (!left || !right || ![left.x, left.y, right.x, right.y].every(Number.isFinite)) return null;
-  return { left, right, gap: right.x - left.x - 2 * DEFAULT_PLATE_RADIUS_WORLD,
+  const radii = ['LeftJaw', 'RightJaw'].map(id => memberStock(comps.find(c => c.id === id)).widthMm / 2);
+  return { left, right, gap: right.x - left.x - radii[0] - radii[1],
     center: { x: (right.x + left.x) / 2, y: (right.y + left.y) / 2 } };
 }
 
@@ -41,7 +43,9 @@ export function planGripper(comps, params) {
     return fail('齒輪中心距不符合嚙合距離，請先調整。');
   let topo;
   const motor = String(a.p1.physicalMotor);
-  const radius = DEFAULT_PLATE_RADIUS_WORLD;
+  const radius = memberStock(left).widthMm / 2;
+  if (Math.abs(memberStock(left).widthMm - memberStock(right).widthMm) > 0.01)
+    return fail('左右板寬不同；此開合規劃需要對稱夾爪，請同步左右板寬後再試。');
   function sample(theta) {
     const sol = solveTopology(topo, { thetaDeg: theta, motorAngles: { [motor]: theta } });
     if (!sol || sol.isValid === false) return null;
@@ -88,15 +92,17 @@ export function gripperBuildRecord(plan, snapshot) {
     '## 任務與幾何', '',
     `- 方形物件寬度：${plan.width} mm`,
     `- 單側放入餘量：${plan.clearance} mm`,
-    `- 圓頭半徑假設：${plan.radius} mm（沿用 2D／加工板形）`,
+    `- 爪端圓頭半徑：${plan.radius} mm（取自板寬的一半）`,
     `- 預估淨開口：${plan.closed.gap.toFixed(2)}–${plan.open.gap.toFixed(2)} mm`,
     `- 模擬輸入角：張開 ${angle(plan.open.theta)}°；閉合 ${angle(plan.closed.theta)}°`,
     '- 角度為模型座標，不能直接當成真實伺服命令。', '',
     '## 零件與製作', '',
     '- 2 片夾爪板：LeftJaw、RightJaw。',
+    ...snapshot.comps.filter(c => ['bar', 'triangle'].includes(c.type)).map(c => `- ${c.id}：${memberStockLabel(c)}。`),
     ...snapshot.comps.filter(c => c.type === 'gear').map(c => `- ${c.id}：${c.teeth} 齒，模數 ${c.module}，1 片。`),
     '- 機架固定板：使用上方匯出功能取得目前板形與孔位。',
-    '- 馬達、軸／軸承、隔套、螺絲、夾持墊、材料與板厚：待選型。',
+    '- 材料與板厚為設計註記，尚未驗證強度、扭矩或加工參數。',
+    '- 馬達、軸／軸承、隔套、螺絲、夾持墊：待選型。',
     '- 加工前需確認軸與齒輪／夾爪的傳扭固定方式；目前共孔關係不代表已設計好固定件。', '',
     '## 驗收', '',
     '- [x] 求解器找到連續、對稱的目標開合區間。',

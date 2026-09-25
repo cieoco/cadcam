@@ -1,5 +1,6 @@
 import { DEFAULT_PLATE_RADIUS_WORLD, createPlateGeometry } from './plate-geometry.js';
 import { createGearPath } from '../utils/gear-geometry.js';
+import { memberStock, memberStockLabel } from './member-stock.js';
 
 export const DEFAULT_BAR_WIDTH_MM = DEFAULT_PLATE_RADIUS_WORLD * 2;
 export const DEFAULT_HOLE_DIAMETER_MM = DEFAULT_PLATE_RADIUS_WORLD * 2 * 0.72;
@@ -27,11 +28,12 @@ export function normalizeExportSettings(settings = {}) {
   const frameHoleDiameter = Number(settings.frameHoleDiameterMm);
   const safeBarWidth = Number.isFinite(barWidth) ? Math.max(2, Math.min(120, barWidth)) : DEFAULT_BAR_WIDTH_MM;
   const safeHoleDiameter = Number.isFinite(holeDiameter)
-    ? Math.max(0.5, Math.min(safeBarWidth - 0.5, holeDiameter))
-    : Math.min(DEFAULT_HOLE_DIAMETER_MM, safeBarWidth - 0.5);
+    ? Math.max(0.5, Math.min(119, holeDiameter))
+    : DEFAULT_HOLE_DIAMETER_MM;
+  // barWidthMm 現在只控制自動機架；不能暗中縮小其他零件的圓孔或 TT 扁孔。
   const safeFlatDiameter = Number.isFinite(ttShaftFlatDiameter)
-    ? Math.max(1, Math.min(safeBarWidth - 0.5, ttShaftFlatDiameter))
-    : Math.min(TT_SHAFT_FLAT_DIAMETER_MM, safeBarWidth - 0.5);
+    ? Math.max(1, Math.min(30, ttShaftFlatDiameter))
+    : TT_SHAFT_FLAT_DIAMETER_MM;
   const safeFlatThickness = Number.isFinite(ttShaftFlatThickness)
     ? Math.max(0.5, Math.min(safeFlatDiameter - 0.1, ttShaftFlatThickness))
     : Math.min(TT_SHAFT_FLAT_THICKNESS_MM, safeFlatDiameter - 0.1);
@@ -156,9 +158,9 @@ function linkHoleSpecs(comp, length, settings) {
 }
 
 function svgForLink(comp, length, settings) {
-  const { barWidthMm, holeDiameterMm } = normalizeExportSettings(settings);
-  const r = round(barWidthMm / 2, 3);
-  const holes = linkHoleSpecs(comp, length, { barWidthMm, holeDiameterMm });
+  const stock = memberStock(comp);
+  const r = round(stock.widthMm / 2, 3);
+  const holes = linkHoleSpecs(comp, length, settings);
   const width = round(length + r * 2, 3);
   const height = round(r * 2, 3);
   const d = [
@@ -172,6 +174,7 @@ function svgForLink(comp, length, settings) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${-r} ${-r} ${width} ${height}">
   <title>${esc(comp.id || 'link')}</title>
+  <desc>${esc(stockDescription(comp))}</desc>
   <g fill="none" stroke="#000" stroke-width="0.25">
     <path d="${d}" />
 ${holes.map(h => h.kind === 'tt-shaft-flat'
@@ -558,7 +561,7 @@ function svgPolyline(points) {
 function plateGeometry(comp, points, settings, mounts = []) {
   const { holeDiameterMm } = normalizeExportSettings(settings);
   return createPlateGeometry(comp, points, {
-    radius: DEFAULT_PLATE_RADIUS_WORLD,
+    radius: memberStock(comp).widthMm / 2,
     holeRadius: holeDiameterMm / 2,
     ...plateMountExtras(mounts)
   });
@@ -595,6 +598,7 @@ function svgForPlate(comp, points, settings, mounts = []) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${round(b.minX)} ${round(b.minY)} ${width} ${height}">
   <title>${esc(comp.id || 'plate')}</title>
+  <desc>${esc(stockDescription(comp))}</desc>
   <g fill="none" stroke="#000" stroke-width="0.25">
 ${paths}
 ${cutouts ? cutouts + '\n' : ''}${geometry.holes.map(h => `    <circle cx="${round(h.x)}" cy="${round(h.y)}" r="${round(h.r)}" />`).join('\n')}
@@ -606,6 +610,7 @@ ${cutouts ? cutouts + '\n' : ''}${geometry.holes.map(h => `    <circle cx="${rou
 function dxfForPlate(comp, points, settings, mounts = []) {
   const geometry = plateGeometry(comp, points, settings, mounts);
   return [
+    dxfPair(999, stockComment(comp)),
     dxfPair(0, 'SECTION'),
     dxfPair(2, 'HEADER'),
     dxfPair(9, '$INSUNITS'),
@@ -886,7 +891,11 @@ export function hostedBarGeometry(comp, pts, settings, mounts = []) {
     .filter(m => m && m.center && Number.isFinite(m.center.x) && Number.isFinite(m.center.y))
     .map(m => ({ ...m, center: toLocal(m.center), rotDeg: (Number(m.rotDeg) || 0) + barAngleDeg }));
   if (!localMounts.length) return null;
-  return frameGeometry([{ x: 0, y: 0 }, { x: len, y: 0 }], settings, localMounts);
+  const normalized = normalizeExportSettings(settings);
+  return frameGeometry([{ x: 0, y: 0 }, { x: len, y: 0 }], {
+    ...normalized,
+    barWidthMm: memberStock(comp).widthMm
+  }, localMounts);
 }
 
 export function frameExportWarnings(frameNodes, settings, motorMounts = []) {
@@ -936,6 +945,23 @@ ${cutouts ? cutouts + '\n' : ''}${holes}
 `;
 }
 
+function stockDescription(comp) {
+  return `材料與尺寸：${memberStockLabel(comp)}`;
+}
+
+function stockComment(comp) {
+  const stock = memberStock(comp);
+  return `STOCK material=${stock.material} widthMm=${stock.widthMm} thicknessMm=${stock.thicknessMm}`;
+}
+
+function addSvgStockDescription(svg, comp) {
+  return svg.replace('</title>', `</title>\n  <desc>${esc(stockDescription(comp))}</desc>`);
+}
+
+function addDxfStockComment(dxf, comp) {
+  return `${dxfPair(999, stockComment(comp))}\n${dxf}`;
+}
+
 function dxfForFrame(frameNodes, settings, motorMounts) {
   const geometry = frameGeometry(frameNodes, settings, motorMounts);
   if (!geometry) return null;
@@ -960,9 +986,9 @@ function dxfForFrameGeometry(geometry) {
 }
 
 function dxfForLink(comp, length, settings) {
-  const { barWidthMm, holeDiameterMm } = normalizeExportSettings(settings);
-  const r = round(barWidthMm / 2, 3);
-  const holes = linkHoleSpecs(comp, length, { barWidthMm, holeDiameterMm });
+  const stock = memberStock(comp);
+  const r = round(stock.widthMm / 2, 3);
+  const holes = linkHoleSpecs(comp, length, settings);
   const outline = [
     { x: 0, y: r },
     { x: length, y: r },
@@ -971,6 +997,7 @@ function dxfForLink(comp, length, settings) {
     ...arcPoints(0, 0, r, -90, -270, 18).slice(1)
   ];
   return [
+    dxfPair(999, stockComment(comp)),
     dxfPair(0, 'SECTION'),
     dxfPair(2, 'HEADER'),
     dxfPair(9, '$INSUNITS'),
@@ -987,13 +1014,30 @@ function dxfForLink(comp, length, settings) {
   ].join('\n') + '\n';
 }
 
+export function inspectLinkExport(comp, length, settings = {}) {
+  const safeLength = Number.isFinite(Number(length)) && Number(length) > 0 ? Number(length) : 1;
+  const outline = barOutline({ x: 0, y: 0 }, { x: safeLength, y: 0 }, memberStock(comp).widthMm / 2);
+  const holes = [];
+  const cutouts = [];
+  linkHoleSpecs(comp, safeLength, settings).forEach(hole => {
+    if (hole.kind === 'tt-shaft-flat') {
+      cutouts.push({ points: ttShaftFlatPoints(hole.x, hole.y, hole.settings), layer: 'TT_SHAFT_FLAT' });
+    } else {
+      holes.push({ x: hole.x, y: hole.y, r: hole.r, layer: 'HOLE' });
+    }
+  });
+  return { outlines: [outline], holes, cutouts };
+}
+
 export function exportLinksAsSvg(comps, pts, params, settings, mounts = []) {
   const { hosted } = splitMountsByHost(comps, mounts);
   const links = exportableLinks(comps, pts, params);
   links.forEach(({ comp, length }) => {
     // 宿主機架桿：桿身直接帶馬達穿板特徵（同一塊料），其餘桿件走一般路徑。
     const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id)) : null;
-    const text = hostGeometry ? svgForFrameGeometry(hostGeometry, comp.id) : svgForLink(comp, length, settings);
+    const text = hostGeometry
+      ? addSvgStockDescription(svgForFrameGeometry(hostGeometry, comp.id), comp)
+      : svgForLink(comp, length, settings);
     downloadText(text, `${safeName(comp.id)}.svg`, 'image/svg+xml');
   });
   const plates = exportablePlates(comps, pts);
@@ -1012,7 +1056,9 @@ export function exportLinksAsDxf(comps, pts, params, settings, mounts = []) {
   const links = exportableLinks(comps, pts, params);
   links.forEach(({ comp, length }) => {
     const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id)) : null;
-    const text = hostGeometry ? dxfForFrameGeometry(hostGeometry) : dxfForLink(comp, length, settings);
+    const text = hostGeometry
+      ? addDxfStockComment(dxfForFrameGeometry(hostGeometry), comp)
+      : dxfForLink(comp, length, settings);
     downloadText(text, `${safeName(comp.id)}.dxf`, 'application/dxf');
   });
   const plates = exportablePlates(comps, pts);

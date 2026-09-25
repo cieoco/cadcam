@@ -9,6 +9,7 @@ class FakeElement {
   constructor() {
     this.children = [];
     this.style = {};
+    this.parentElement = { style: {} };
     this.value = '';
     this.textContent = '';
     this.checked = false;
@@ -166,4 +167,27 @@ check('leaving tip dimension for another component resets selection to g', (() =
   return S.triSide === 'g' && el('triSideSelect').value === 'g';
 })());
 
+check('stock width, thickness and material mirror without moving pins, one undo per change', (() => {
+  const s = fixture(); reset(s.comps, s.params); S.selectedTriangleId = 'LeftJaw'; editor.setMirror(true);
+  const geometry = JSON.stringify(S.comps.map(c => [c.p1, c.p2, c.p3]));
+  const params = JSON.stringify(S.topo.params);
+  editor.selectDimension('width'); editor.setValue(24);
+  editor.selectDimension('thickness'); editor.setValue(6);
+  editor.setMaterial('plywood');
+  return S.comps.filter(c => c.type === 'triangle').every(c => c.stock.widthMm === 24 && c.stock.thicknessMm === 6 && c.stock.material === 'plywood')
+    && JSON.stringify(S.comps.map(c => [c.p1, c.p2, c.p3])) === geometry && JSON.stringify(S.topo.params) === params
+    && counts.undo === 3 && counts.reshape === 0;
+})());
+check('stock width rejects insufficient hole margin without mutation or undo', (() => {
+  reset([simpleBar()], barParams); S.selectedLinkId = 'Bar1';
+  editor.selectDimension('width'); editor.setValue(12);
+  return !S.comps[0].stock && counts.undo === 0 && notices.at(-1).includes('連接孔');
+})());
+check('stock dimensions stay selected on bar sync and increments use their own steps', (() => {
+  reset([simpleBar()], barParams); S.selectedLinkId = 'Bar1';
+  editor.selectDimension('width'); editor.change(8); editor.sync();
+  const widthSelected = el('triSideSelect').value === 'width' && S.comps[0].stock.widthMm === 19;
+  editor.selectDimension('thickness'); editor.change(-8); editor.sync();
+  return widthSelected && S.comps[0].stock.thicknessMm === 3.5 && S.topo.params.L === 18;
+})());
 report('member-editor');

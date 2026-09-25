@@ -5,6 +5,8 @@
  * anchor、bar、triangle、接點角色、固定長度參數，以及放在連桿端點上的馬達。
  */
 
+import { normalizeMemberStock } from './member-stock.js';
+
 const KIND = 'blocks';
 const VERSION = 1;
 const LEGO_STEP = 8;
@@ -64,6 +66,8 @@ function normalizeBar(comp, index, params, warnings) {
   };
   if (comp.snapLength === false) out.snapLength = false;
   if (comp.frameSeparate === true) out.frameSeparate = true;
+  const stock = normalizeMemberStock(comp.stock);
+  if (stock) out.stock = stock;
   // 宿主機架桿：此桿承載該馬達接點的穿板安裝特徵（MG995 槽/耳孔、TT 孔位），
   // 匯出時特徵切進桿身、不再進自動地基 frame.dxf。
   if (safeId(comp.motorMountPoint)) out.motorMountPoint = comp.motorMountPoint;
@@ -146,6 +150,8 @@ function normalizeTriangle(comp, index, params, warnings) {
     sign: Number(comp.sign) < 0 ? -1 : 1
   };
   if (comp.snapLength === false) out.snapLength = false;   // 與 bar 同義：邊長取 0.1mm，不取整數
+  const stock = normalizeMemberStock(comp.stock);
+  if (stock) out.stock = stock;
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0)))); // 手動疊放相對位移
   const inferredJaw = comp.shape === 'jaw' || /(^|[-_])(?:left|right)?jaw/i.test(id);
   if (inferredJaw) {

@@ -117,8 +117,10 @@ export function computeBodyLayers(bodies, groundIds = new Set(), opts = {}) {
  */
 export function buildSceneModel(links, points, opts = {}) {
   const hullR = opts.hullR ?? 9;
-  const plateGap = opts.plateGap ?? 6;
   const plateThickness = opts.plateThickness ?? 4;
+  const memberStocks = opts.memberStocks || {};
+  const maxThickness = Math.max(plateThickness, ...Object.values(memberStocks).map(s => s.thicknessMm));
+  const plateGap = Math.max(opts.plateGap ?? 6, maxThickness + 2);
   const pinR = opts.pinR ?? 3.2;
   const groundIds = opts.groundIds || new Set();
   const motorCenters = opts.motorCenters || new Set();
@@ -198,6 +200,7 @@ export function buildSceneModel(links, points, opts = {}) {
       const a = points[l.p1];
       const b = points[l.p2];
       const shared = barGeometries[l.id];
+      const stock = memberStocks[l.id];
       sticks.push({
         id: l.id,
         p1: l.p1,
@@ -206,8 +209,9 @@ export function buildSceneModel(links, points, opts = {}) {
         b: { x: b.x, y: b.y },
         layer,
         z,
-        r: hullR,
-        thickness: plateThickness,
+        r: stock ? stock.widthMm / 2 : hullR,
+        thickness: stock?.thicknessMm ?? plateThickness,
+        material: stock?.material ?? 'unspecified',
         isCrank: l.style === 'crank',
         color: l.style === 'crank' ? '#e74c3c' : (l.color || '#3498db'),
         outline: shared?.outline || null,
@@ -218,13 +222,15 @@ export function buildSceneModel(links, points, opts = {}) {
       const poly = body.src;
       const corners = poly.points.map(id => ({ x: points[id].x, y: points[id].y }));
       const shared = plateGeometries[poly.points.join(',')]; // 有共用板形（world 座標的 outline+holes）就沿用
+      const stock = memberStocks[poly.points.join(',')];
       plates.push({
         ids: [...poly.points],
         corners,
         layer,
         z,
-        r: hullR,
-        thickness: plateThickness,
+        r: stock ? stock.widthMm / 2 : hullR,
+        thickness: stock?.thicknessMm ?? plateThickness,
+        material: stock?.material ?? 'unspecified',
         color: poly.color || '#27ae60',
         shape: poly.shape || 'triangle',
         jawTurnSign: poly.jawTurnSign,
@@ -237,19 +243,20 @@ export function buildSceneModel(links, points, opts = {}) {
 
   // 每個關節蒐集「接到它的桿層」，銷柱從最低層貫穿到最高層
   const joints = new Map(); // id -> { id, x, y, min, max, ground }
-  const touch = (id, layer) => {
+  const touch = (id, layer, thickness = plateThickness) => {
     const p = points[id];
     if (!p || !Number.isFinite(p.x)) return;
     let j = joints.get(id);
     if (!j) {
-      joints.set(id, { id, x: p.x, y: p.y, min: layer, max: layer, ground: groundIds.has(id) });
+      joints.set(id, { id, x: p.x, y: p.y, min: layer, max: layer, top: layer * plateGap + thickness, ground: groundIds.has(id) });
     } else {
       j.min = Math.min(j.min, layer);
       j.max = Math.max(j.max, layer);
+      j.top = Math.max(j.top, layer * plateGap + thickness);
     }
   };
-  sticks.forEach(s => { touch(s.p1, s.layer); touch(s.p2, s.layer); });
-  plates.forEach(pl => pl.ids.forEach(id => touch(id, pl.layer)));
+  sticks.forEach(s => { touch(s.p1, s.layer, s.thickness); touch(s.p2, s.layer, s.thickness); });
+  plates.forEach(pl => pl.ids.forEach(id => touch(id, pl.layer, pl.thickness)));
 
   // 滑塊（無動力）＝開槽連桿 + 帶兩根導引螺絲的滑件：
   //   - 軌道：m1-m2 承載桿（固定底座），沿行程範圍挖一條長槽。
@@ -533,7 +540,7 @@ export function buildSceneModel(links, points, opts = {}) {
   };
   joints.forEach(j => {
     const z0 = j.min * plateGap;
-    const z1 = j.max * plateGap + plateThickness;
+    const z1 = j.top;
     if (motorCenters.has(j.id)) {
       // 馬達鎖在固定桿上：本體沉到機構背面（z<0）、躺平往機架方向延伸，輸出軸沿 z 往上帶動曲柄。
       // 輸出軸兼當這個關節的軸，所以這裡不再另畫銷柱、也不畫地錨支柱（改由 viewer 畫馬達）。
@@ -597,6 +604,8 @@ export function buildSceneModel(links, points, opts = {}) {
   const ys = [];
   sticks.forEach(s => { xs.push(s.a.x, s.b.x); ys.push(s.a.y, s.b.y); });
   plates.forEach(pl => pl.corners.forEach(c => { xs.push(c.x); ys.push(c.y); }));
+  // 板寬與爪端屬於外形而非求解孔位；相機也必須包含它們，不能把端部裁掉。
+  [...sticks, ...plates].forEach(part => (part.outline || []).forEach(p => { xs.push(p.x); ys.push(p.y); }));
   rails.forEach(r => { xs.push(r.a.x, r.b.x); ys.push(r.a.y, r.b.y); });
   gears.forEach(g => {
     const outer = g.radius + g.module;
@@ -634,7 +643,7 @@ export function buildSceneModel(links, points, opts = {}) {
   // 相機對焦點：有地錨就用地錨形心（恆定不動，動畫時不會晃）；沒地錨才退回外接框中心。
   // anchored=true 時 viewer 可每幀同步（反正不動）；false 時 viewer 只在初次定位、之後凍結。
   const maxLayer = [...sticks, ...plates, ...gears, ...racks, ...pulleys, ...cams].reduce((m, s) => Math.max(m, s.layer), 0);
-  const midZ = (maxLayer * plateGap + plateThickness) / 2;
+  const midZ = (maxLayer * plateGap + maxThickness) / 2;
   // 馬達中心也是固定點，一併納入對焦形心（否則只有馬達、沒有其他地錨時相機會抓不到定點）
   const anchorPts = [...grounds, ...motors];
   const anchored = anchorPts.length > 0;
@@ -645,6 +654,9 @@ export function buildSceneModel(links, points, opts = {}) {
         z: midZ,
       }
     : { x: bboxCenter.x, y: bboxCenter.y, z: midZ };
+  // 有地錨時焦點不是外框中心，按兩側最遠外形留足空間。
+  if (anchored && xs.length) span = Math.max(span,
+    ...xs.map(x => 2 * Math.abs(x - focus.x)), ...ys.map(y => 2 * Math.abs(y - focus.y)));
 
   const frame = frameGeometry ? { ...frameGeometry, z: frameBackZ, thickness: plateThickness, color:'#465568' } : null;
   return { sticks, plates, pins, grounds, motors, rails, carriages, gears, racks, pulleys, belts, cams, frame, plateGap, plateThickness, span, focus, anchored };

@@ -1,3 +1,5 @@
+import { memberStock } from './member-stock.js';
+
 export const DEFAULT_PLATE_RADIUS_WORLD = 9;
 export const MAX_PLATE_POINTS = 6;
 
@@ -338,8 +340,9 @@ function pointInPoly(p, poly) {
 }
 
 export function createPlateGeometry(comp, points, options = {}) {
-  const radius = Number.isFinite(Number(options.radius)) ? Number(options.radius) : DEFAULT_PLATE_RADIUS_WORLD;
-  const holeRadius = Number.isFinite(Number(options.holeRadius)) ? Number(options.holeRadius) : radius * 0.72;
+  const radius = comp?.stock ? memberStock(comp).widthMm / 2
+    : Number.isFinite(Number(options.radius)) ? Number(options.radius) : DEFAULT_PLATE_RADIUS_WORLD;
+  const holeRadius = Number.isFinite(Number(options.holeRadius)) ? Number(options.holeRadius) : DEFAULT_PLATE_RADIUS_WORLD * 0.72;
   // 外加加工特徵（呼叫端算好、世界座標）：extraCutouts＝非圓形切割（如 MG995 穿板槽）、
   // extraHoles＝額外圓孔（如伺服耳孔）。結構板承載動力來源時由這裡切進板身。
   const extraCutouts = Array.isArray(options.extraCutouts) ? options.extraCutouts.filter(c => c && Array.isArray(c.points) && c.points.length >= 3) : [];

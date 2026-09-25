@@ -4,12 +4,14 @@
  * 可見連桿與節點互動層的 SVG 建立／更新。
  */
 
+import { memberStock } from './member-stock.js';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svgEl = tag => document.createElementNS(SVG_NS, tag);
 
 export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBar, selectedLinkId, pickBars, interactionBlocked,
   onTryPick, onFreeDrag, onSelect, groupForLayer, linkLayer, groundIds, hullRadius, scale, barHullPath, project,
-  hostedMounts, inspectHostedFrame, registerUpdate }) {
+  hostedMounts, inspectHostedFrame, registerUpdate, holeRadius = hullRadius * 0.72 }) {
   const linksToDraw = [...links].sort((a, b) => (a.style === 'crank' ? 1 : 0) - (b.style === 'crank' ? 1 : 0));
   const eligible = linksToDraw.filter(link => !link.hidden && !triangleEdgeKeys.has([link.p1, link.p2].sort().join('|')) && !isGroundBar(link));
   const countMissing = current => eligible.reduce((count, link) => {
@@ -18,7 +20,9 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
   }, 0);
   eligible.forEach(link => {
     const selected = link.id && link.id === selectedLinkId;
-    const editable = link.id && comps.some(comp => comp.id === link.id && comp.type === 'bar' && comp.fixedLen);
+    const component = comps.find(comp => comp.id === link.id && comp.type === 'bar');
+    const editable = component?.fixedLen;
+    const radius = component ? memberStock(component).widthMm / 2 : hullRadius;
     const pickCandidate = pickBars && pickBars.ids.includes(link.id);
     const color = pickCandidate ? '#f39c12' : (selected ? '#e67e22' : (link.style === 'crank' ? '#e74c3c' : (link.color || '#3498db')));
     const stick = svgEl('path');
@@ -39,7 +43,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
     [link.p1, link.p2].forEach(pointId => {
       if (groundIds.has(pointId)) return;
       const hole = svgEl('circle');
-      hole.setAttribute('r', hullRadius * scale * 0.72); hole.setAttribute('fill', 'none'); hole.setAttribute('stroke', color); hole.setAttribute('stroke-width', 1.5); hole.setAttribute('stroke-opacity', 0.7); hole.style.pointerEvents = 'none';
+      hole.setAttribute('r', holeRadius * scale); hole.setAttribute('fill', 'none'); hole.setAttribute('stroke', color); hole.setAttribute('stroke-width', 1.5); hole.setAttribute('stroke-opacity', 0.7); hole.style.pointerEvents = 'none';
       group.appendChild(hole); holes.push({ element: hole, pointId });
     });
     const mounts = link.id ? hostedMounts.get(link.id) : null;
@@ -52,7 +56,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
         const center = mount?.pointId && current[mount.pointId];
         return center && Number.isFinite(center.x) ? { ...mount, center } : mount;
       });
-      const geometry = inspectHostedFrame([a, b], liveMounts);
+      const geometry = inspectHostedFrame([a, b], liveMounts, component);
       if (!geometry || !geometry.outlines.length) return null;
       const ring = polygon => 'M ' + polygon.map(point => { const p = project(point); return `${p.x.toFixed(2)} ${p.y.toFixed(2)}`; }).join(' L ') + ' Z';
       stick.setAttribute('fill-rule', 'evenodd');
@@ -63,7 +67,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       const valid = a && b && Number.isFinite(a.x) && Number.isFinite(b.x);
       stick.style.display = valid ? '' : 'none'; holes.forEach(hole => { hole.element.style.display = valid ? '' : 'none'; });
       if (!valid) return;
-      stick.setAttribute('d', mounts?.length ? (hostedPath(a, b, current) || barHullPath(a, b)) : barHullPath(a, b));
+      stick.setAttribute('d', mounts?.length ? (hostedPath(a, b, current) || barHullPath(a, b, radius)) : barHullPath(a, b, radius));
       holes.forEach(hole => { const point = current[hole.pointId]; if (point && Number.isFinite(point.x)) { const p = project(point); hole.element.setAttribute('cx', p.x); hole.element.setAttribute('cy', p.y); } });
     };
     update(points); registerUpdate(update);

@@ -5,7 +5,7 @@ import { jawCenterline } from './plate-geometry.js';
 const NS = 'http://www.w3.org/2000/svg';
 export function drawMemberDimensions({ svg, comp, points, params, selected, project, onSelect }) {
   if (!comp) return null;
-  const dimensions = memberDimensions(comp);
+  const dimensions = memberDimensions(comp).filter(d => d.refs);
   if (!dimensions.length) return null;
   const group = document.createElementNS(NS, 'g');
   group.setAttribute('id', 'memberDimensions');

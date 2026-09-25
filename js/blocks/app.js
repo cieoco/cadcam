@@ -30,6 +30,8 @@ import * as Motion from './motion.js';
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
 import { drawMemberDimensions } from './member-dimension-render.js';
+import { memberStock, memberHoleDiameter, memberStockWarnings } from './member-stock.js';
+import { createJawTipHandle } from './jaw-tip-handle.js';
 import { analyzeDof } from './dof.js';
 import * as Store from './storage.js';
 import * as Exporters from './exporters.js';
@@ -100,8 +102,10 @@ function pushUndo() {
   updateUndoBtn();
 }
 function updateUndoBtn() {
-  const btn = document.getElementById('btnUndo');
-  if (btn) btn.disabled = S.undoStack.length === 0;
+  ['btnUndo', 'memberUndoBtn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = S.undoStack.length === 0;
+  });
 }
 function undo() {
   if (!S.undoStack.length) return;
@@ -328,7 +332,7 @@ gripperController = createGripperController({
   pause,
   pushUndo,
   fitView,
-  isEditing: () => Boolean(S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.selectedGearId || S.selectedNodeId),
+  isEditing: () => Boolean(view3DActive || S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.selectedGearId || S.selectedNodeId),
   setPose: (theta, motor) => {
     if (String(S.activeMotor) !== String(motor)) activateMotor(motor, theta);
     else S.theta = theta;
@@ -360,8 +364,10 @@ const { selectTriangle, startShapeDrag, deleteShapeVertex, updatePlateShapeContr
         triParamFor, setTriSide, changeTriSide } = plateEditor;
 const memberEditor = createMemberEditor({
   pause, pushUndo, rebuild, draw, reshapeTriangle: plateEditor.reshapeTriangle,
-  updatePointCoordsById, notify: transient
+  updatePointCoordsById, notify: transient, holeDiameter: comp => memberHoleDiameter(comp, Settings.exportSettings())
 });
+const jawTipHandle = createJawTipHandle({ svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
+  editor: memberEditor, getParams: () => S.topo.params });
 
 // ---- 節點角色域：邏輯抽到 ./node-editor.js（Panels 由該模組自行 import）----
 const nodeEditor = createNodeEditor({
@@ -757,6 +763,7 @@ function drawGearManualHandles(pts) {
 // draw() 依 zlift 算好的疊放層（透過 ctx.groupForLayer/triLayerByKey/triKey 取得對應 <g>）。
 // 函式體照搬自原 draw() 內聯三角板迴圈、零行為改變（內部解構改名 a,b,d 以免遮蔽參數 c）。
 function drawTrianglePart(c, pts, ctx) {
+  c = memberEditor.displayComp(c);
   const hostedPlateMounts = ctx.hostedMounts ? ctx.hostedMounts.get(c.id) : null;
   const plateExtras = (hostedPlateMounts && hostedPlateMounts.length)
     ? Exporters.plateMountExtras(hostedPlateMounts) : null;
@@ -968,7 +975,8 @@ function draw() {
     onTryPick: tryPickBar, onFreeDrag: Input.startFreeLinkDrag, onSelect: selectLink,
     groupForLayer, linkLayer, groundIds, hullRadius: HULL_R_WORLD, scale: View.getScale(),
     barHullPath, project: p => ({ x: TX(p.x), y: TY(p.y) }), hostedMounts: mountSplit2d.hosted,
-    inspectHostedFrame: (nodes, mounts) => Exporters.inspectFrameExport(nodes, Settings.exportSettings(), mounts),
+    holeRadius: Settings.exportSettings().holeDiameterMm / 2,
+    inspectHostedFrame: (nodes, mounts, comp) => Exporters.inspectFrameExport(nodes, { ...Settings.exportSettings(), barWidthMm: memberStock(comp).widthMm }, mounts),
     registerUpdate: update => frameUpdaters.push(update)
   });
   updateSolveBanner(sol, countMissingLinks(pts));
@@ -1009,11 +1017,13 @@ function draw() {
   drawGearManualHandles(pts);
   drawFrameHandle();   // 機架移動把手：畫在節點之上，才點得到、拖得動
   const updateMemberDimensions = drawMemberDimensions({
-    svg, comp: memberEditor.selected(), points: pts, params: S.topo.params,
+    svg, comp: memberEditor.displayComp(memberEditor.selected()), points: pts, params: S.topo.params,
     selected: S.selectedTriangleId ? S.triSide : 'g', project: p => ({ x: TX(p.x), y: TY(p.y) }),
     onSelect: memberEditor.selectDimension
   });
   if (updateMemberDimensions) frameUpdaters.push(updateMemberDimensions);
+  const updateJawTip = jawTipHandle.draw(pts);
+  if (updateJawTip) frameUpdaters.push(updateJawTip);
   const updateGripperObject = gripperObject.draw(pts);
   if (updateGripperObject) frameUpdaters.push(updateGripperObject);
   Tools.drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
@@ -1129,13 +1139,16 @@ function push3D() {
   // 以孔序字串為鍵，供 scene-model 對應到各片板；找不到原 comp 的純視覺 polygon 退回夾爪近似。
   const plateGeometries={};
   const barGeometries={};
-  mountSplit3d.hosted.forEach((mounts, barId) => {
-    const bar = S.comps.find(comp => comp.type === 'bar' && comp.id === barId);
+  const memberStocks={};
+  S.comps.filter(c => c.type === 'bar').forEach(bar => {
+    const barId = bar.id, mounts = mountSplit3d.hosted.get(barId);
     if (!bar || !pts[bar.p1.id] || !pts[bar.p2.id]) return;
-    const geometry = Exporters.hostedBarGeometry(bar, pts, Settings.exportSettings(), mounts);
-    if (!geometry?.outlines?.length) return;
     const a = pts[bar.p1.id], b = pts[bar.p2.id];
     const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const geometry = mounts?.length ? Exporters.hostedBarGeometry(bar, pts, Settings.exportSettings(), mounts)
+      : Exporters.inspectLinkExport(bar, len, Settings.exportSettings());
+    memberStocks[barId] = memberStock(bar);
+    if (!geometry?.outlines?.length) return;
     const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
     const world = point => ({ x: a.x + point.x * ux - point.y * uy, y: a.y + point.x * uy + point.y * ux });
     barGeometries[barId] = {
@@ -1154,12 +1167,13 @@ function push3D() {
     // 靜態結構板承載的馬達穿板特徵一併切進 3D 板身（同 2D/DXF）。
     const hostedPlateMounts=comp.id?mountSplit3d.hosted.get(comp.id):null;
     const extras=(hostedPlateMounts&&hostedPlateMounts.length)?Exporters.plateMountExtras(hostedPlateMounts):null;
-    const g=createPlateGeometry(comp,world,{radius:HULL_R_WORLD,...(extras||{})});
+    memberStocks[key] = memberStock(comp);
+    const g=createPlateGeometry(comp,world,{radius:HULL_R_WORLD,holeRadius:Settings.exportSettings().holeDiameterMm/2,...(extras||{})});
     if(g.outlines.length) plateGeometries[key]={outline:g.outlines[0],holes:g.holes,cutouts:g.cutouts||[]};
   });
   const model = buildSceneModel(links, pts, {
     groundIds, motorCenters: motorCenterIds, motorTypes, motorMounts, hullR: HULL_R_WORLD,
-    polygons, sliders, gears, racks, cams, pulleys, belts, frameGeometry, plateGeometries, barGeometries
+    polygons, sliders, gears, racks, cams, pulleys, belts, frameGeometry, plateGeometries, barGeometries, memberStocks
   });
   viewer3D.update(model);
 }
@@ -1235,6 +1249,7 @@ async function toggle3D() {
   } else {
     overlay.style.display = 'none';
   }
+  gripperController.syncVisibility();
 }
 
 // 機架（隱性）：把所有固定銷用淡連接線＋陰影斜線串起來，讀作「同一個固定底座」。
@@ -1521,6 +1536,7 @@ function selectLink(id) {
   if (!c) return;
   openMobileEditPanel();
   S.selectedLinkId = id;
+  S.triSide = 'g';
   S.frameEditorOpen = false;
   S.selectedTriangleId = null;
   S.selectedNodeId = null;
@@ -1723,6 +1739,8 @@ function saveFile() {
 }
 function exportLinksSvg() {
   const settings = Settings.exportSettings(), nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
+  const stockWarnings = memberStockWarnings(S.comps, settings);
+  if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
   // 有宿主機架桿的 mount 隨該桿匯出（特徵切進桿身）；剩下的才進 frame.svg。
   const freeMounts = Exporters.splitMountsByHost(S.comps, mounts).free;
   const count = Exporters.exportLinksAsSvg(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts);
@@ -1732,6 +1750,8 @@ function exportLinksSvg() {
 }
 function exportLinksDxf() {
   const settings = Settings.exportSettings(), nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
+  const stockWarnings = memberStockWarnings(S.comps, settings);
+  if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
   const freeMounts = Exporters.splitMountsByHost(S.comps, mounts).free;
   const count = Exporters.exportLinksAsDxf(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts);
   const frameCount = Exporters.exportFrameAsDxf(nodes, settings, freeMounts);
@@ -1821,6 +1841,7 @@ window.blocks.changeFrameGround = changeFrameGround;
 Object.assign(window.blocks, {
   setTriSide: memberEditor.selectDimension,
   setMemberDimension: memberEditor.setValue,
-  setMemberMirror: memberEditor.setMirror
+  setMemberMirror: memberEditor.setMirror,
+  setMemberMaterial: memberEditor.setMaterial
 });
 init();

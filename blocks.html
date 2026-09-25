@@ -431,7 +431,7 @@
         <summary>加工設定</summary>
         <div class="mount-grid">
           <div class="settings-heading">桿件</div>
-          <label class="mount-field">桿寬<input data-export-setting="barWidthMm" type="number" min="2" max="120" step="0.5" oninput="window.blocks.setExportSetting('barWidthMm', this.value)" title="匯出桿件寬度 mm"></label>
+          <label class="mount-field">機架樑寬<input data-export-setting="barWidthMm" type="number" min="2" max="120" step="0.5" oninput="window.blocks.setExportSetting('barWidthMm', this.value)" title="只設定自動機架樑寬；桿件及夾爪板寬請選取零件調整"></label>
           <label class="mount-field">連接孔<input data-export-setting="holeDiameterMm" type="number" min="0.5" max="119" step="0.5" oninput="window.blocks.setExportSetting('holeDiameterMm', this.value)" title="一般連接孔直徑 mm"></label>
           <div class="settings-heading">TT 機架孔</div>
           <label class="mount-field">軸孔<input data-tt-mount-setting="shaftDiameterMm" type="number" min="0.5" max="30" step="0.1" onchange="window.blocks.setTtMountSetting('shaftDiameterMm', this.value)" title="馬達輸出軸孔直徑 mm"></label>
@@ -592,11 +592,13 @@
           <button class="lift-btn" id="sliderFlipBtn" style="display:none;" onclick="window.blocks.flipSlider()" title="被動滑塊由連桿和滑軌交點求解；若組裝結果跑到軌道另一側或連桿交叉，按這裡切換另一個幾何解。">🔄 翻面</button>
           <button class="lift-btn" id="sliderBaseBtn" style="display:none;" onclick="window.blocks.toggleSliderBase()" title="線性致動器的本體固定端。A 表示從軌道 A 端往 B 端推出；B 表示從 B 端往 A 端推出。調整滑軌長度時固定端會留在原位。">固定端：A</button>
           <button class="lift-btn" id="linkToRailBtn" style="display:none;" onclick="window.blocks.convertLinkToSlider()" title="把這根連桿就地升級成滑軌：沿用連桿兩端的接點當固定孔，原本接好的連接與機架固定點都會保留。">🟩 變滑軌</button>
+          <button class="clear-btn" id="memberUndoBtn" onclick="window.blocks.undo()" title="復原上一步" disabled>↩ 復原</button>
           <button class="clear-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除選取的桿件">🗑 刪除</button>
         </div>
         <div class="le-row" style="font-size:12px;line-height:1.5;flex-wrap:wrap">
           <span id="memberDimensionHint" style="display:none;color:#52677b"></span>
           <label id="memberMirrorLabel" style="display:none;white-space:nowrap"><input id="memberMirror" type="checkbox" checked onchange="window.blocks.setMemberMirror(this.checked)"> 同步左右</label>
+          <label style="display:none;white-space:nowrap">材料 <select id="memberMaterial" class="tri-side" aria-label="零件材料" title="僅記錄材料，尚未驗證強度及加工參數" onchange="window.blocks.setMemberMaterial(this.value)"></select></label>
         </div>
         <div class="le-row" id="sliderBodyRow" style="display:none;">
           <span class="le-title">滑塊長度</span>
@@ -829,7 +831,7 @@
         <summary>加工設定</summary>
         <div class="mount-grid">
           <div class="settings-heading">桿件</div>
-          <label class="mount-field">桿寬<input data-export-setting="barWidthMm" type="number" min="2" max="120" step="0.5" oninput="window.blocks.setExportSetting('barWidthMm', this.value)" title="匯出桿件寬度 mm"></label>
+          <label class="mount-field">機架樑寬<input data-export-setting="barWidthMm" type="number" min="2" max="120" step="0.5" oninput="window.blocks.setExportSetting('barWidthMm', this.value)" title="只設定自動機架樑寬；桿件及夾爪板寬請選取零件調整"></label>
           <label class="mount-field">連接孔<input data-export-setting="holeDiameterMm" type="number" min="0.5" max="119" step="0.5" oninput="window.blocks.setExportSetting('holeDiameterMm', this.value)" title="一般連接孔直徑 mm"></label>
           <div class="settings-heading">TT 機架孔</div>
           <label class="mount-field">軸孔<input data-tt-mount-setting="shaftDiameterMm" type="number" min="0.5" max="30" step="0.1" onchange="window.blocks.setTtMountSetting('shaftDiameterMm', this.value)" title="馬達輸出軸孔直徑 mm"></label>
@@ -888,17 +890,23 @@
   <!-- 同一份共用模組只載入一個版本；避免重載時混用舊幾何或舊存檔 schema。 -->
   <script type="importmap">
     {"imports": {
-      "./js/blocks/plate-geometry.js": "./js/blocks/plate-geometry.js?v=20260925_members1",
+      "./js/blocks/plate-geometry.js": "./js/blocks/plate-geometry.js?v=20260925_stock1",
       "./js/blocks/plate-editor.js": "./js/blocks/plate-editor.js?v=20260925_members2",
       "./js/blocks/plate-render.js": "./js/blocks/plate-render.js?v=20260925_members1",
-      "./js/blocks/schema.js": "./js/blocks/schema.js?v=20260925_members1",
-      "./js/blocks/member-editor.js": "./js/blocks/member-editor.js?v=20260925_members1",
-      "./js/blocks/member-dimensions.js": "./js/blocks/member-dimensions.js?v=20260925_members2",
-      "./js/blocks/member-dimension-render.js": "./js/blocks/member-dimension-render.js?v=20260925_members1",
-      "./js/blocks/gripper-workflow.js": "./js/blocks/gripper-workflow.js?v=20260925_members1",
-      "./js/blocks/gripper-workflow.js?v=20260925_r1b": "./js/blocks/gripper-workflow.js?v=20260925_members1"
+      "./js/blocks/schema.js": "./js/blocks/schema.js?v=20260925_stock1",
+      "./js/blocks/member-editor.js": "./js/blocks/member-editor.js?v=20260925_stock2",
+      "./js/blocks/member-dimensions.js": "./js/blocks/member-dimensions.js?v=20260925_stock1",
+      "./js/blocks/member-dimension-render.js": "./js/blocks/member-dimension-render.js?v=20260925_stock1",
+      "./js/blocks/member-stock.js": "./js/blocks/member-stock.js?v=20260925_stock2",
+      "./js/blocks/jaw-tip-handle.js": "./js/blocks/jaw-tip-handle.js?v=20260925_stock1",
+      "./js/blocks/view.js": "./js/blocks/view.js?v=20260925_stock1",
+      "./js/blocks/mechanism-layer-render.js": "./js/blocks/mechanism-layer-render.js?v=20260925_stock1",
+      "./js/blocks/exporters.js": "./js/blocks/exporters.js?v=20260925_stock2",
+      "./js/blocks3d/scene-model.js": "./js/blocks3d/scene-model.js?v=20260925_stock2",
+      "./js/blocks/gripper-workflow.js": "./js/blocks/gripper-workflow.js?v=20260925_stock1",
+      "./js/blocks/gripper-workflow.js?v=20260925_r1b": "./js/blocks/gripper-workflow.js?v=20260925_stock1"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20260925_members1"></script>
+  <script type="module" src="js/blocks/app.js?v=20260925_stock2"></script>
 </body>
 </html>

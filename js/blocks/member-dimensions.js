@@ -1,8 +1,14 @@
 /** 剛性桿件共用尺寸語意；不持有 UI 或修改輸入資料。 */
 import { polylineTriangleParams, preservedDiagonalLength } from './plate-geometry.js';
+import { memberStock, planMemberStock } from './member-stock.js';
+
+const stockDimensions = () => [
+  { id: 'width', label: '板寬', stockKey: 'widthMm', min: 2, max: 120, step: 1 },
+  { id: 'thickness', label: '板厚', stockKey: 'thicknessMm', min: 0.5, max: 30, step: 0.5 }
+];
 
 export function memberDimensions(comp) {
-  if (comp?.type === 'bar') return [{ id: 'g', label: '孔距 A–B', refs: ['p1', 'p2'], param: comp.lenParam }];
+  if (comp?.type === 'bar') return [{ id: 'g', label: '孔距 A–B', refs: ['p1', 'p2'], param: comp.lenParam }, ...stockDimensions()];
   if (comp?.type !== 'triangle') return [];
   const dimensions = [
     { id: 'g', label: '孔距 A–B', refs: ['p1', 'p2'], param: comp.gParam },
@@ -12,18 +18,23 @@ export function memberDimensions(comp) {
   const poly = polylineTriangleParams(comp);
   if (poly) dimensions.find(d => d.param === poly.diagParam).label += '（跨距）';
   if (comp.shape === 'jaw') dimensions.push({ id: 'tip', label: '爪端長度 C–T', refs: ['p3', 'tip'], property: 'jawTipLength' });
-  return dimensions;
+  return [...dimensions, ...stockDimensions()];
 }
 
 export function memberDimensionValue(comp, params, id = 'g') {
   const dimension = memberDimensions(comp).find(d => d.id === id);
   if (!dimension) return NaN;
+  if (dimension.stockKey) return memberStock(comp)[dimension.stockKey];
   if (dimension.property) return Number(comp.jawTipLength ?? Math.max(38, Math.min(84, Number(params[comp.r1Param]) * 0.58)));
   return Number(params[dimension.param]);
 }
 
 export function planMemberDimension(comp, params, id, raw) {
   const dimension = memberDimensions(comp).find(d => d.id === id);
+  if (dimension?.stockKey) {
+    const plan = planMemberStock(comp, dimension.stockKey, raw);
+    return plan.ok ? { ok: true, params: {}, properties: { stock: plan.stock }, value: plan.stock[dimension.stockKey] } : plan;
+  }
   const numeric = Number(raw);
   const value = Math.round(numeric * 10) / 10;
   const max = id === 'tip' ? 160 : 2000;
@@ -61,7 +72,7 @@ export function mirroredJaw(comp, comps, params) {
 
 export function dimensionLock(comp, comps, id) {
   const dimension = memberDimensions(comp).find(d => d.id === id);
-  if (!dimension || dimension.property) return '';
+  if (!dimension || dimension.property || dimension.stockKey) return '';
   const ids = dimension.refs.map(ref => comp[ref]?.id);
   const gear = comps.find(c => c.type === 'gear' && ids.includes(c.p1?.id) && ids.includes(c.p2?.id));
   return gear ? '這段孔距由齒輪輸出孔決定，請選齒輪調整輸出孔半徑。' : '';

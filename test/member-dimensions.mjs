@@ -26,9 +26,9 @@ check('bar, triangle, and jaw dimensions use named hole distances', (() => {
   const barDims = memberDimensions(bar);
   const triDims = memberDimensions(triangle);
   const jawDims = memberDimensions(jaw);
-  return barDims.length === 1 && barDims[0].label === '孔距 A–B' && barDims[0].param === 'L'
-    && triDims.map(d => d.label).join('|') === '孔距 A–B|孔距 A–C|孔距 B–C'
-    && jawDims.map(d => d.id).join(',') === 'g,r1,r2,tip'
+  return barDims.length === 3 && barDims[0].label === '孔距 A–B' && barDims[0].param === 'L'
+    && triDims.filter(d => d.refs).map(d => d.label).join('|') === '孔距 A–B|孔距 A–C|孔距 B–C'
+    && jawDims.map(d => d.id).join(',') === 'g,r1,r2,tip,width,thickness'
     && jawDims[3].label === '爪端長度 C–T';
 })());
 
