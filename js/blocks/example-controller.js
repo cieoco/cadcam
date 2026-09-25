@@ -4,7 +4,7 @@
  * 課堂範例選單、教學卡與 snapshot 載入流程。
  */
 
-import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js';
+import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js?v=20260925_r1b';
 import { normalizeSnapshot } from './schema.js';
 
 export function createExampleController({ applySnapshot, notify, closeMobileMenu, isMobile, showBuildPanel }) {
@@ -13,10 +13,11 @@ export function createExampleController({ applySnapshot, notify, closeMobileMenu
   function renderLessonCard(example) {
     const card = document.getElementById('exampleLessonCard');
     if (!card) return;
-    if (!example) { activeExampleId = ''; card.style.display = 'none'; return; }
+    if (!example) { activeExampleId = ''; card.dataset.lessonVisible = 'false'; if (!card.classList?.contains('workflow-active')) card.style.display = 'none'; return; }
     const lesson = getExampleLesson(example.id);
     const group = EXAMPLE_GROUPS.find(item => item.id === lesson.group);
-    card.style.display = '';
+    card.dataset.lessonVisible = 'true';
+    if (Number(example.snapshot?.params?.gripperWorkflow) !== 1) card.style.display = '';
     const fields = {
       exampleLessonTitle: example.title,
       exampleLessonMeta: [lesson.level, group?.label].filter(Boolean).join(' · '),
@@ -39,12 +40,26 @@ export function createExampleController({ applySnapshot, notify, closeMobileMenu
     if (!snapshot) { notify('⚠️ 範例格式不正確'); return false; }
     applySnapshot(snapshot);
     activeExampleId = example.id;
-    renderLessonCard(example);
+    if (Number(snapshot.params?.gripperWorkflow) === 1) {
+      const card = document.getElementById('exampleLessonCard');
+      if (card) card.dataset.lessonVisible = 'false';
+    } else renderLessonCard(example);
     notify('📘 已載入：' + example.title);
     if (select) select.value = '';
     closeMobileMenu();
     if (isMobile()) showBuildPanel();
     return true;
+  }
+
+  function snapshotApplied(snapshot) {
+    if (Number(snapshot?.params?.gripperWorkflow) === 1) {
+      activeExampleId = 'gear-gripper';
+      const card = document.getElementById('exampleLessonCard');
+      if (card) card.dataset.lessonVisible = 'false';
+      return;
+    }
+    activeExampleId = '';
+    renderLessonCard(null);
   }
 
   function populate() {
@@ -78,5 +93,5 @@ export function createExampleController({ applySnapshot, notify, closeMobileMenu
     renderLessonCard(null);
   }
 
-  return { populate, load, renderLessonCard, get activeExampleId() { return activeExampleId; } };
+  return { populate, load, renderLessonCard, snapshotApplied, get activeExampleId() { return activeExampleId; } };
 }

@@ -150,6 +150,8 @@ function normalizeTriangle(comp, index, params, warnings) {
   const inferredJaw = comp.shape === 'jaw' || /(^|[-_])(?:left|right)?jaw/i.test(id);
   if (inferredJaw) {
     out.shape = 'jaw';
+    if (comp.jawTipLength != null && Number.isFinite(Number(comp.jawTipLength)))
+      out.jawTipLength = roundTenth(Math.max(8, Math.min(160, Number(comp.jawTipLength))));
     out.shapeMode = 'polyline';
     if (Number(comp.jawTurnSign) < 0) out.jawTurnSign = -1;
     else if (Number(comp.jawTurnSign) > 0) out.jawTurnSign = 1;

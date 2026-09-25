@@ -174,7 +174,7 @@ export function cleanPolylineOutline(points, radius = DEFAULT_PLATE_RADIUS_WORLD
   ];
 }
 
-export function jawCenterline(points, turnSign = 0) {
+export function jawCenterline(points, turnSign = 0, tipLength = null) {
   const [pivot, drive, tip] = points || [];
   if (!pivot || !drive || !tip) return null;
   const dx = tip.x - pivot.x;
@@ -190,7 +190,8 @@ export function jawCenterline(points, turnSign = 0) {
   const sin = Math.sin(turn);
   const ex = ux * cos - uy * sin;
   const ey = ux * sin + uy * cos;
-  const extend = Math.max(38, Math.min(84, len * 0.58));
+  const extend = tipLength != null && Number.isFinite(Number(tipLength))
+    ? Math.max(8, Math.min(160, Number(tipLength))) : Math.max(38, Math.min(84, len * 0.58));
   const end = { x: tip.x + ex * extend, y: tip.y + ey * extend };
   return [drive, pivot, tip, end];
 }
@@ -296,7 +297,7 @@ export function plateShapeMode(comp = {}) {
 }
 
 export function plateCenterline(comp, points) {
-  if (comp && comp.shape === 'jaw') return jawCenterline(points, comp.jawTurnSign);
+  if (comp && comp.shape === 'jaw') return jawCenterline(points, comp.jawTurnSign, comp.jawTipLength);
   return plateContourPoints(comp, points);
 }
 
@@ -304,6 +305,8 @@ export function plateCenterline(comp, points) {
 // 它不是實體桿，而是決定彎角的剛化參數。回傳 { segParams: [段1, 段2], diagParam }。
 export function polylineTriangleParams(comp) {
   if (!comp || plateShapeMode(comp) !== 'polyline') return null;
+  // 夾爪的實體中心線是 B → A → C → 爪端，B–C 只是剛性跨距。
+  if (comp.shape === 'jaw') return { segParams: [comp.gParam, comp.r1Param], diagParam: comp.r2Param };
   const order = plateVertices(comp).filter(v => v.solve && v.ref).map(v => v.ref);
   if (order.length !== 3) return null;
   const paramOf = (x, y) => {

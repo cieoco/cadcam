@@ -35,22 +35,22 @@ const pointLimitMessage = () => `多點桿最多 ${MAX_PLATE_POINTS} 點；點�
 // ---- 注入的外部依賴（由 app 在啟動時提供）----
 let svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
     setBanner, clearBanner, worldFromEvent, pointCoords, nearestDisplayToPoint, snapWorld,
-    mobilePrompt, promptText;
+    mobilePrompt, promptText, displayPointCoords;
 
 export function init(deps) {
   ({ svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
      setBanner, clearBanner, worldFromEvent, pointCoords, nearestDisplayToPoint, snapWorld,
-     mobilePrompt, promptText } = deps);
+     mobilePrompt, promptText, displayPointCoords } = deps);
 }
 
-// ---- 畫桿模式：桌機點工具後移動游標調長度；手機則按住起點、拖到終點放開。----
+// ---- 畫桿模式：桌機可拖放或點兩下；觸控按住起點、拖到終點放開。----
 export function startDrawLink() {
-  if (S.drawingLink) { exitDrawLink(); draw(); return; } // 再點一次＝取消
+  if (S.drawingLink && S.drawKind === 'link') { exitDrawLink(); draw(); return; } // 再點同一工具＝取消
   beginDraw('link');
 }
 // 滑軌：沿用連桿那套拖出線段的互動，只是放開後建的是 slider（軌道+滑塊）而非 bar。
 export function startDrawRail() {
-  if (S.drawingLink) { exitDrawLink(); draw(); return; }
+  if (S.drawingLink && S.drawKind === 'rail') { exitDrawLink(); draw(); return; }
   beginDraw('rail');
 }
 function beginDraw(kind) {
@@ -62,15 +62,14 @@ function beginDraw(kind) {
   S.drawKind = kind;
   S.drawingLink = true;
   svg.style.cursor = 'crosshair';
-  // 連桿 / 滑軌統一改成「點兩下」：起點也由使用者自己點，不再自動落位（與三點桿一致）。
-  // 觸控維持按下起點、拖曳、放開一筆完成，起點本來就落在按下處。
+  // 起點由使用者指定；連桿靠近既有孔時直接接上。
   S.drawActive = false;
   S.drawStart = null;
   S.drawStartNodeId = null;
   S.drawPreview = null;
   const noun = kind === 'rail' ? '滑軌' : '連桿';
   setBanner(promptText(
-    `${noun}：左鍵點第一點`,
+    `${noun}：點起點，拖到終點放開；也可點兩下`,
     kind === 'rail' ? '按住起點拖出滑軌，放開建立' : '按住起點拖到終點，放開建立連桿'
   ));
   draw();
@@ -93,7 +92,13 @@ export function nearestNodeId(world, exclude = [], maxDist = snapWorld()) {
 // 從起點 start 拖到 cur 時，算出實際終點：靠近既有接點就吸附相接。
 // 連桿長度對齊 8mm 孔距；滑軌/滑塊本體屬於外形尺寸，不套孔距限制。
 function resolveDrawEnd(start, cur, startNodeId, snapToHoles = true) {
-  // 新桿件兩端都自由：不再吸附／合併到既有接點（要連接改用拖曳節點合併，要分開用「分離」）
+  if (snapToHoles) {
+    const nodeId = nearestNodeId(cur, startNodeId ? [startNodeId] : []);
+    const p = nodeId && displayPointCoords()[nodeId];
+    if (p && Math.hypot(p.x - start.x, p.y - start.y) >= 6) {
+      return { pos: { x: p.x, y: p.y }, len: Math.round(Math.hypot(p.x - start.x, p.y - start.y)), nodeId };
+    }
+  }
   const dx = cur.x - start.x, dy = cur.y - start.y;
   const dist = Math.hypot(dx, dy);
   if (dist < 6) return { pos: { x: start.x + LINK_DEFAULT_LEN, y: start.y }, len: LINK_DEFAULT_LEN, nodeId: null };
@@ -118,6 +123,13 @@ export function drawDrawPreview() {
   path.setAttribute('stroke-dasharray', '8 6');
   path.setAttribute('stroke-linejoin', 'round');
   svg.appendChild(path);
+  if (res.nodeId) {
+    const ring = document.createElementNS(SVG_NS, 'circle');
+    ring.setAttribute('cx', TX(res.pos.x)); ring.setAttribute('cy', TY(res.pos.y));
+    ring.setAttribute('r', 12); ring.setAttribute('fill', 'none');
+    ring.setAttribute('stroke', '#16a085'); ring.setAttribute('stroke-width', 3);
+    svg.appendChild(ring);
+  }
   const labelText = isRail ? ('滑軌 ' + res.len + 'mm') : linkLenLabel(res.len, res.nodeId);
   const isMobileLabel = mobilePrompt();
   const fontSize = isMobileLabel ? 22 : 13;
@@ -584,21 +596,24 @@ export function drawPolygonPreview() {
     svg.appendChild(c);
   });
 }
-// 滑鼠：左鍵點兩下（第一點放起點，第二點確定長度並建立）；與三點桿的操作一致。
+// 第一點可吸附既有孔；桌機點兩下或按住拖放都由此建立起點。
+export function startLinkAt(cur) {
+  if (!cur) return;
+  const nodeId = S.drawKind === 'link' ? nearestNodeId(cur) : null;
+  const p = nodeId && displayPointCoords()[nodeId];
+  S.drawStart = p ? { x: p.x, y: p.y } : { x: cur.x, y: cur.y };
+  S.drawStartNodeId = nodeId;
+  S.drawPreview = { x: S.drawStart.x + LINK_DEFAULT_LEN, y: S.drawStart.y };
+  S.drawActive = true;
+  const noun = S.drawKind === 'rail' ? '滑軌' : '連桿';
+  setBanner(promptText(`${noun}：拖到終點放開，或再點一下完成`, `${noun}：拖到終點放開`));
+  draw();
+}
 export function placeLinkPoint(e) {
   const cur = worldFromEvent(e) || S.drawPreview;
   if (!cur) return;
   if (!S.drawActive || !S.drawStart) {
-    S.drawStart = { x: cur.x, y: cur.y };
-    S.drawStartNodeId = null;                  // 兩端都自由：起點不自動吸附（連接改用拖曳合併）
-    S.drawPreview = { x: cur.x + LINK_DEFAULT_LEN, y: cur.y };
-    S.drawActive = true;
-    const noun = S.drawKind === 'rail' ? '滑軌' : '連桿';
-    setBanner(promptText(
-      `${noun}：移動改長度，左鍵建立`,
-      `${noun}：移動改長度，左鍵建立`
-    ));
-    draw();
+    startLinkAt(cur);
     return;
   }
   finishDrawLink(e);
@@ -609,6 +624,9 @@ export function finishDrawLink(e) {
   const res = resolveDrawEnd(S.drawStart, cur, S.drawStartNodeId, S.drawKind !== 'rail');
   if (S.drawKind === 'rail') { finishDrawRail(res); return; }
   pushUndo();
+  // 暫停在動畫姿勢時，孔的畫面座標可能不同於元件存檔座標；先把接上的孔定在眼前位置。
+  if (S.drawStartNodeId) Model.updatePointCoordsById(S.comps, S.drawStartNodeId, S.drawStart.x, S.drawStart.y);
+  if (res.nodeId) Model.updatePointCoordsById(S.comps, res.nodeId, res.pos.x, res.pos.y);
   const n = ++S.counter;
   const lp = 'LL' + n;
   S.comps.push({

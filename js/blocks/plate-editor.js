@@ -8,7 +8,8 @@
 
 import { S } from './state.js';
 import * as Panels from './panels.js';
-import { MAX_PLATE_POINTS, worldToLocal, defaultPlateVertices, plateVertices, polylineTriangleParams, preservedDiagonalLength } from './plate-geometry.js';
+import { MAX_PLATE_POINTS, worldToLocal, defaultPlateVertices, plateVertices } from './plate-geometry.js';
+import { memberDimensionValue, planMemberDimension, dimensionLock } from './member-dimensions.js';
 
 export function createPlateEditor({
   svg, pushUndo, pause, rebuild, draw, cancelMotorMode, deselectGear, openMobileEditPanel,
@@ -125,7 +126,7 @@ export function createPlateEditor({
     const modeSel = document.getElementById('plateShapeModeSelect');
     const addBtn = document.getElementById('addOutlinePointBtn');
     if (!modeSel || !addBtn) return;
-    if (!comp || comp.type !== 'triangle') {
+    if (!comp || comp.type !== 'triangle' || comp.shape === 'jaw') {
       modeSel.style.display = 'none';
       addBtn.style.display = 'none';
       return;
@@ -159,6 +160,7 @@ export function createPlateEditor({
   function setTriangleShapeMode(mode) {
     const comp = S.comps.find(x => x.id === S.selectedTriangleId && x.type === 'triangle');
     if (!comp) return;
+    if (comp.shape === 'jaw') { setBanner('夾爪請使用爪端長度調整外形；自由外形仍待支援。'); return; }
     pushUndo();
     comp.shapeMode = ['hull', 'polygon', 'polyline'].includes(mode) ? mode : 'hull';
     updatePlateShapeControls(comp);
@@ -167,6 +169,7 @@ export function createPlateEditor({
   function addTriangleOutlinePoint() {
     const comp = S.comps.find(x => x.id === S.selectedTriangleId && x.type === 'triangle');
     if (!comp) return;
+    if (comp.shape === 'jaw') { setBanner('夾爪請使用爪端長度調整外形；自由外形仍待支援。'); return; }
     if (plateVertices(comp).length >= MAX_PLATE_POINTS) {
       setBanner(`多點桿最多 ${MAX_PLATE_POINTS} 點；其它點只作外形控制。`);
       return;
@@ -210,27 +213,17 @@ export function createPlateEditor({
   function changeTriSide(delta) {
     const c = S.comps.find(x => x.id === S.selectedTriangleId);
     if (!c) return;
-    pushUndo();
-    const key = triParamFor(c);
-    const L = snapLego((S.topo.params[key] || 0) + delta);
     // 折線桿：改實體桿段長度時，自動重算對角線以保持當下彎角（直角改長仍是直角）；
     // 直接調對角線那一邊才會改變彎角。對角線需 0.1mm 精度，關掉整數化避免重載後彎角漂移。
-    const poly = polylineTriangleParams(c);
-    if (poly && key !== poly.diagParam) {
-      const a0 = Number(S.topo.params[poly.segParams[0]]) || 0;
-      const b0 = Number(S.topo.params[poly.segParams[1]]) || 0;
-      const d0 = Number(S.topo.params[poly.diagParam]) || 0;
-      const a1 = key === poly.segParams[0] ? L : a0;
-      const b1 = key === poly.segParams[1] ? L : b0;
-      const d1 = preservedDiagonalLength(a0, b0, d0, a1, b1);
-      if (d1 !== null) {
-        S.topo.params[poly.diagParam] = Math.round(d1 * 10) / 10;
-        c.snapLength = false;
-      }
-    }
-    S.topo.params[key] = L;
-    reshapeTriangle(c);   // 自由三點桿才看得到；已連接的由 solver 接手
-    Panels.renderLenEditor(L);
+    const lock = dimensionLock(c, S.comps, S.triSide);
+    const current = memberDimensionValue(c, S.topo.params, S.triSide);
+    const plan = planMemberDimension(c, S.topo.params, S.triSide, current + delta);
+    if (lock || !plan.ok) { setBanner(lock || plan.message); return; }
+    if (plan.value === current) return;
+    pause(); pushUndo();
+    Object.assign(S.topo.params, plan.params); Object.assign(c, plan.properties);
+    if (S.triSide !== 'tip') reshapeTriangle(c);   // 自由三點桿才看得到；已連接的由 solver 接手
+    Panels.renderLenEditor(plan.value);
     rebuild(); draw();
   }
   // 依 g/r1/r2 重擺三點桿：固定 P1 與底邊方向，P2 落在距 P1 為 g 處，P3 取兩圓交點

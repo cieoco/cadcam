@@ -27,12 +27,17 @@ import * as Input from './input.js';     // 指標 / 手勢互動（拖曳 + 吸
 import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import * as Motion from './motion.js';
+import { advanceRock } from './rock-motion.js';
+import { createMemberEditor } from './member-editor.js';
+import { drawMemberDimensions } from './member-dimension-render.js';
 import { analyzeDof } from './dof.js';
 import * as Store from './storage.js';
 import * as Exporters from './exporters.js';
 import { localToWorld, plateVertices, plateShapeMode, createPlateGeometry } from './plate-geometry.js';
 import { S, activateMotor, motorAnglesNow, frozenMotorAngles, usedMotorIds } from './state.js';  // 跨模組共享的可變狀態與多馬達 helper
-import { createExampleController } from './example-controller.js';
+import { createExampleController } from './example-controller.js?v=20260925_r1b';
+import { createGripperController } from './gripper-controller.js?v=20260925_r1b2';
+import { createGripperObject } from './gripper-object.js?v=20260925_r1b2';
 import { createGearEditor, rackPhaseShift } from './gear-editor.js';
 import { createSliderEditor } from './slider-editor.js';
 import { createMotorTools } from './motor-tools.js';
@@ -83,6 +88,7 @@ let lastModelInputs = null;    // 最近一次 draw() 算好的 { links, pts, gr
 
 // 多馬達：存檔一併保留「哪顆在控制、其他凍在幾度」，載回來才不會全部歸零疊在一起。
 const motorSnapshotState = () => ({ activeMotor: S.activeMotor, motorAngles: frozenMotorAngles() });
+let gripperController = null;
 function snapshotStr() {
   return JSON.stringify(Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()));
 }
@@ -138,7 +144,10 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
   setSliderDetailRows(false);
   document.getElementById('thetaVal').textContent = '0';
   updateMotorDirectionButton();
+  exampleController.snapshotApplied(norm);
+  gripperController?.sync();
   rebuild(); draw();
+  if (gripperController?.isActive() && gripperController.currentPlan().ok) gripperController.moveToOpen();
   if (fit) fitView();
 }
 
@@ -310,7 +319,36 @@ const motorTools = createMotorTools({
 });
 const { cancelMotorMode, placeMotor, handleMotorOnNode, tryPickBar,
         driveBarAt, driveSliderAt, driveGearAt,
-        motorBarForCenter, motorTypeForCenter, inputRockRange, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse } = motorTools;
+        motorBarForCenter, motorTypeForCenter, inputRockRange: baseInputRockRange, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse } = motorTools;
+gripperController = createGripperController({
+  getComps: () => S.comps,
+  getParams: () => S.topo.params,
+  rebuild,
+  draw,
+  pause,
+  pushUndo,
+  fitView,
+  isEditing: () => Boolean(S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.selectedGearId || S.selectedNodeId),
+  setPose: (theta, motor) => {
+    if (String(S.activeMotor) !== String(motor)) activateMotor(motor, theta);
+    else S.theta = theta;
+    S.topo.params.theta = theta;
+    document.getElementById('thetaVal').textContent = Math.round(norm360(theta));
+    draw();
+  },
+  getSnapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
+  notify: transient
+});
+const inputRockRange = () => gripperController?.isActive()
+  ? gripperController.range()
+  : baseInputRockRange();
+const gripperObject = createGripperObject({
+  svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
+  getReference: () => gripperController.reference(), getComps: () => S.comps,
+  isEditing: () => Boolean(S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.selectedGearId || S.selectedNodeId || S.drawingLink || S.drawingTriangle || S.drawingPolygon),
+  previewWidth: value => gripperController.previewWidth(value), commitWidth: value => gripperController.commitWidth(value),
+  cancelPreview: () => gripperController.cancelPreview(), pause
+});
 
 // ---- 三點桿 / 板件域：邏輯抽到 ./plate-editor.js（Panels / plate-geometry 由該模組自行 import）----
 const plateEditor = createPlateEditor({
@@ -320,6 +358,10 @@ const plateEditor = createPlateEditor({
 const { selectTriangle, startShapeDrag, deleteShapeVertex, updatePlateShapeControls,
         setTriangleShapeMode, addTriangleOutlinePoint,
         triParamFor, setTriSide, changeTriSide } = plateEditor;
+const memberEditor = createMemberEditor({
+  pause, pushUndo, rebuild, draw, reshapeTriangle: plateEditor.reshapeTriangle,
+  updatePointCoordsById, notify: transient
+});
 
 // ---- 節點角色域：邏輯抽到 ./node-editor.js（Panels 由該模組自行 import）----
 const nodeEditor = createNodeEditor({
@@ -357,6 +399,7 @@ function rebuild() {
   prevSolved = {};
   geomVersion++;                 // 結構/參數變了：讓軌跡快取失效（getTrajectoryData 重算）
   reconcileMotorState();         // 馬達被刪 / 改指派後：清掉殘留凍結角、控制權交回存在的馬達
+  gripperController?.recompute();
   document.getElementById('hint').style.display = S.comps.length ? 'none' : 'block';
   Panels.updateRoleEditor();
   scheduleAutosave();            // 任何結構變更都防丟（debounce，播放不觸發）
@@ -629,31 +672,35 @@ function updateMechanismStatus(sol = null) {
     title = mobility.mobilityOverride
       ? `組裝自由度：F = ${mobility.dof}（一般公式 ${mobility.formulaDof}；平行冗餘約束已校正）`
       : `理論自由度：F = ${mobility.dof}（剛體 ${mobility.bodies}、低副 ${mobility.lowerPairs}、高副 ${mobility.higherPairs}）`;
-    if (gearMeshHasWarning()) {
+    if (gripperController?.isActive() && !gripperController.currentPlan().ok) {
       state = 'error';
-      text = `DOF ${mobility.dof} · 齒輪未嚙合`;
+      text = '夾爪任務待修正，請查看任務卡';
+      title = gripperController.currentPlan().message;
+    } else if (gearMeshHasWarning()) {
+      state = 'error';
+      text = '齒輪沒有咬合，請調整位置';
     } else if (mobility.dof < 0) {
       state = 'error';
-      text = `DOF ${mobility.dof} · 約束過多，可能卡住`;
+      text = '接點限制太多，機構可能卡住';
     } else if (mobility.dof === 0) {
       state = 'static';
-      text = 'DOF 0 · 固定結構，不能動';
+      text = '目前是固定結構，沒有活動接點';
     } else if (!hasDriveSource()) {
       state = 'warn';
-      text = mobility.dof === 1 ? 'DOF 1 · 可運動，請加動力' : `DOF ${mobility.dof} · 太鬆，請固定或連接`;
+      text = mobility.dof === 1 ? '可以活動了：把動力來源放到轉軸' : '還太鬆：固定接點，或把孔接起來';
     } else if (S.compiled && sol === null && (S.compiled.steps || []).length) {
       state = 'error';
-      text = `DOF ${mobility.dof} · 機構可能卡住`;
+      text = '目前解不出動作，請檢查接點';
     } else if (mobility.dof === 1) {
       state = 'ready';
-      text = 'DOF 1 · 可運動';
+      text = '可以播放了';
     } else if (mobility.inputs >= mobility.dof) {
       // 多自由度但每個自由度都有馬達管：一次控制一顆、其他凍結，動作仍完全可預測。
       state = 'ready';
-      text = `DOF ${mobility.dof} · ${mobility.inputs} 組動力可完整控制`;
+      text = `${mobility.inputs} 組動力已就緒，可以播放`;
     } else {
       state = 'warn';
-      text = `DOF ${mobility.dof} · 太鬆，無法預測軌跡`;
+      text = '還有未控制的活動部分，請補連接或動力';
     }
   }
   el.dataset.state = state;
@@ -784,6 +831,8 @@ const PART_DRAW = {
 };
 
 function draw() {
+  memberEditor.sync();
+  gripperController?.syncVisibility();
   while (svg.firstChild) svg.removeChild(svg.firstChild);
   drawFrameGrid();
   frameUpdaters = [];
@@ -959,6 +1008,14 @@ function draw() {
 
   drawGearManualHandles(pts);
   drawFrameHandle();   // 機架移動把手：畫在節點之上，才點得到、拖得動
+  const updateMemberDimensions = drawMemberDimensions({
+    svg, comp: memberEditor.selected(), points: pts, params: S.topo.params,
+    selected: S.selectedTriangleId ? S.triSide : 'g', project: p => ({ x: TX(p.x), y: TY(p.y) }),
+    onSelect: memberEditor.selectDimension
+  });
+  if (updateMemberDimensions) frameUpdaters.push(updateMemberDimensions);
+  const updateGripperObject = gripperObject.draw(pts);
+  if (updateGripperObject) frameUpdaters.push(updateGripperObject);
   Tools.drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
   Tools.drawTrianglePreview(); // 三點桿模式：疊在最上層的三角預覽
   Tools.drawPolygonPreview();  // 多邊形板模式：疊在最上層的預覽
@@ -1339,22 +1396,29 @@ function toggleMotorDirection() {
 
 function play() {
   if (raf) return;
+  if (!S.comps.length) { transient('先放一個零件，再開始組裝'); return; }
+  if (gripperController?.isActive() && !gripperController.currentPlan().ok) {
+    transient(gripperController.currentPlan().message || '夾爪任務目前無法播放，請先修正尺寸或機構。');
+    return;
+  }
+  if (!hasDriveSource()) { transient('先把動力來源放到轉軸，才能播放'); return; }
   document.getElementById('playBtn').classList.add('playing');
   document.getElementById('playBtn').textContent = '⏸';
   playPlan = planMotion();
   // 有限行程輸入（MG995 角度範圍 / 線性致動器行程）：覆寫成在兩端間來回擺。
   const ranged = inputRockRange();
-  if (ranged && ranged.hi > ranged.lo) playPlan = { mode: 'rock', lo: ranged.lo, hi: ranged.hi };
+  if (ranged && Number.isFinite(ranged.lo) && Number.isFinite(ranged.hi) && ranged.hi >= ranged.lo) {
+    playPlan = { mode: 'rock', lo: ranged.lo, hi: ranged.hi };
+    S.theta = Math.max(playPlan.lo, Math.min(playPlan.hi, S.theta));
+  }
   if (playPlan.mode === 'rock' && playDir > 0 && S.theta >= playPlan.hi) playDir = -1;
   if (playPlan.mode === 'rock' && playDir < 0 && S.theta <= playPlan.lo) playDir = 1;
   draw();   // 先完整重建一次以建立場景與更新器，之後每幀走 renderFrame() 只更新幾何（不拆 DOM）
   const step = () => {
     if (playPlan.mode === 'rock') {
       // 搖桿：在 lo..hi 間來回擺，到極限就反向（真實的搖桿物理）
-      let next = S.theta + PLAY_STEP * playDir;
-      if (next > playPlan.hi) { playDir = -1; next = S.theta + PLAY_STEP * playDir; }
-      else if (next < playPlan.lo) { playDir = 1; next = S.theta + PLAY_STEP * playDir; }
-      S.theta = next;
+      const next = advanceRock(S.theta, playDir, PLAY_STEP, playPlan.lo, playPlan.hi);
+      S.theta = next.theta; playDir = next.direction;
     } else {
       // 曲柄／平行四邊形：順向整圈轉
       S.theta = S.theta + PLAY_STEP * playDir;
@@ -1414,7 +1478,7 @@ function openLinkMenu() {
   const power = powerMenuEl();
   if (power) power.style.display = 'none';
   closeLinkMenu();
-  Tools.startDrawPolygon();
+  Tools.startDrawLink();
 }
 function closeLinkMenu() {
   const m = linkMenuEl();
@@ -1556,9 +1620,7 @@ function setLen(v) {
 }
 function changeLen(delta) {
   if (S.selectedSliderId) { changeRailLen(Math.sign(delta) || 0); return; }
-  if (S.selectedTriangleId) { changeTriSide(delta); return; }
-  const c = S.comps.find(x => x.id === S.selectedLinkId);
-  if (c) setLen((S.topo.params[c.lenParam] || 0) + delta);
+  memberEditor.change(delta);
 }
 
 // 節點角色域（角色 / X・Y 微調 / 拆馬達 / 分離 / 軌跡點 / 量測基準 / 位置鎖 / 伺服・行程面板）
@@ -1577,6 +1639,22 @@ function currentBounds() {
       minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
       minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
     }
+  });
+  const plan = gripperController?.isActive() ? gripperController.currentPlan() : null;
+  const object = gripperController?.reference();
+  if (object) {
+    minX = Math.min(minX, object.center.x - object.width / 2 - 15);
+    maxX = Math.max(maxX, object.center.x + object.width / 2 + 15);
+    minY = Math.min(minY, object.center.y - object.width / 2 - 40);
+    maxY = Math.max(maxY, object.center.y + object.width / 2);
+  }
+  if (plan?.ok) [plan.open, plan.closed].forEach(pose => {
+    if (!pose?.center || !Number.isFinite(pose.center.x) || !Number.isFinite(pose.center.y)) return;
+    const halfWidth = Math.abs(pose.gap) / 2 + 2 * plan.radius;
+    const halfHeight = plan.radius;
+    any = true;
+    minX = Math.min(minX, pose.center.x - halfWidth); maxX = Math.max(maxX, pose.center.x + halfWidth);
+    minY = Math.min(minY, pose.center.y - halfHeight); maxY = Math.max(maxY, pose.center.y + halfHeight);
   });
   return any ? { minX, maxX, minY, maxY } : null;
 }
@@ -1673,7 +1751,7 @@ function openFile() {
         const norm = Store.normalizeSnapshot(JSON.parse(r.result));
         if (!norm) { transient('⚠️ 檔案格式不正確'); return; }
         applySnapshot(norm);
-        exampleController.renderLessonCard(null); // 外部作品沒有範例身分，避免沿用上一個範例的教學卡。
+        // applySnapshot 已清除舊教學卡，或依任務 marker 恢復夾爪；不再覆寫其狀態。
         transient('📂 已開啟');
       } catch (e) { transient('⚠️ 讀取失敗：' + (e.message || e)); }
     };
@@ -1703,7 +1781,7 @@ function init() {
   Panels.init({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked });
   Tools.init({ svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
                setBanner, clearBanner, worldFromEvent, pointCoords, nearestDisplayToPoint, snapWorld,
-               mobilePrompt, promptText });
+               mobilePrompt, promptText, displayPointCoords: displayCoords });
   Input.init({ svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
                worldFromEvent, pointCoords, mobilePrompt,
                snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
@@ -1740,4 +1818,9 @@ function init() {
 
 window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
 window.blocks.changeFrameGround = changeFrameGround;
+Object.assign(window.blocks, {
+  setTriSide: memberEditor.selectDimension,
+  setMemberDimension: memberEditor.setValue,
+  setMemberMirror: memberEditor.setMirror
+});
 init();

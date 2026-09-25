@@ -92,5 +92,5 @@ export function drawPlate({ component, points, ctx, svg, scale, project, selecte
   group.appendChild(path);
   hubs.forEach(hub => group.appendChild(hub.element));
   registerUpdate(update);
-  if (selected) drawShapeHandles({ component, ids, points, svg, scale, project, vertices, localToWorld, interactionBlocked, onDrag: onShapeDrag, onDelete: onDeleteShapeVertex, registerUpdate });
+  if (selected && component.shape !== 'jaw') drawShapeHandles({ component, ids, points, svg, scale, project, vertices, localToWorld, interactionBlocked, onDrag: onShapeDrag, onDelete: onDeleteShapeVertex, registerUpdate });
 }

@@ -22,6 +22,7 @@ const NODE_TAP_PX = 34;   // 手機點接點的命中半徑（畫面 px，縮放
 const activePointers = new Map();   // pointerId -> { x, y }（client 座標）
 let pinchState = null;              // { dist, cx, cy }
 let pendingNodeDrag = null;         // 點擊先選取；超過門檻後才真正開始拖曳
+let linkPointerStart = null;        // 桌機畫桿可按住拖放，也保留點兩下
 
 // ---- 注入的外部依賴（由 app 在啟動時提供）----
 let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
@@ -312,8 +313,11 @@ function onDragEnd(e) {
     if (e && e.pointerType && e.pointerType !== 'mouse') Tools.finishDrawTriangle(e);
     return;
   }
-  if (S.drawingLink) { // 觸控/筆：放開＝確定長度（滑鼠改用右鍵確定，見 contextmenu）
-    if (e && e.pointerType && e.pointerType !== 'mouse') Tools.finishDrawLink(e);
+  if (S.drawingLink) {
+    if (e?.pointerType === 'mouse') {
+      if (linkPointerStart && Math.hypot(e.clientX - linkPointerStart.x, e.clientY - linkPointerStart.y) >= 6) Tools.finishDrawLink(e);
+      linkPointerStart = null;
+    } else if (e?.pointerType) Tools.finishDrawLink(e);
     return;
   }
   if (S.dragFrame) {
@@ -460,23 +464,23 @@ export function init(deps) {
     draw();
   }, { passive: false });
 
-  // 畫桿模式：按下時把自由端跳到觸/點位置（觸控才需要；滑鼠靠 hover 已跟隨），並捕捉指標。
+  // 畫桿模式：按下決定起點；桌機拖放或點兩下，觸控拖放。
   svg.addEventListener('pointerdown', (e) => {
     if (!S.drawingLink) return;
     if (activePointers.size >= 2) return; // 雙指縮放優先
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     const w = worldFromEvent(e); if (!w) return;
     e.preventDefault();
     if (e.pointerType === 'mouse' && !mobilePrompt()) {
-      Tools.placeLinkPoint(e);                  // 滑鼠：左鍵點兩下（起點 → 終點建立）
+      const starting = !S.drawActive;
+      Tools.placeLinkPoint(e);
+      linkPointerStart = starting ? { x: e.clientX, y: e.clientY } : null;
+      if (starting) try { svg.setPointerCapture(e.pointerId); } catch (_) {}
       return;
     }
     // 觸控 / 觸控筆：按下起點、拖曳、放開建立（維持一筆完成的手勢）
-    S.drawStart = w;
-    S.drawStartNodeId = null;                   // 新桿件兩端都自由：起點不自動吸附既有接點
-    S.drawPreview = w;
-    S.drawActive = true;
+    Tools.startLinkAt(w);
     try { svg.setPointerCapture(e.pointerId); } catch (_) {}
-    draw();
   });
   svg.addEventListener('pointerdown', (e) => {
     if (!S.drawingTriangle) return;

@@ -394,8 +394,8 @@ const ALL_BLOCK_EXAMPLES = [
   },
   {
     id: 'gear-gripper',
-    title: '雙齒輪夾持器：偏心孔帶動夾爪',
-    note: '兩顆嚙合齒輪反向轉，齒輪上的偏心輸出孔推動左右「夾爪板」同步開合。可選齒輪調整「輸出孔距」改變夾爪行程。',
+    title: '雙齒輪夾爪：抓取物件',
+    note: '兩顆齒輪帶動內彎夾爪相向開合。拖動畫布上的示意物件改寬度，觀察開口與動作；零件仍可選取改造。',
     snapshot: {
       kind: 'blocks',
       v: 1,
@@ -414,7 +414,7 @@ const ALL_BLOCK_EXAMPLES = [
           color: '#ff6b35',
           shape: 'jaw',
           shapeMode: 'polyline',
-          jawTurnSign: -1,
+          jawTurnSign: 1,
           gParam: 'GPRA',
           r1Param: 'LJ_tip',
           r2Param: 'LJ_edge',
@@ -424,7 +424,7 @@ const ALL_BLOCK_EXAMPLES = [
           color: '#ff6b35',
           shape: 'jaw',
           shapeMode: 'polyline',
-          jawTurnSign: 1,
+          jawTurnSign: -1,
           gParam: 'GPRB',
           r1Param: 'RJ_tip',
           r2Param: 'RJ_edge',
@@ -432,6 +432,7 @@ const ALL_BLOCK_EXAMPLES = [
         })
       ],
       params: {
+        gripperWorkflow: 1, gripperObjectWidth: 50, gripperClearance: 10,
         GRA: 30, GRB: 30, GPRA: 18, GPRB: 18,
         LJ_tip: 107, LJ_edge: 121.8,
         RJ_tip: 107, RJ_edge: 121.8,

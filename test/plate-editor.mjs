@@ -86,7 +86,7 @@ check(`造形點達上限 ${MAX_PLATE_POINTS} 出提示`, tri.vertices.length ==
 
 // ---- 折線桿：改桿段長度保持彎角（對角線自動重算）----
 const seg = {
-  type: 'triangle', id: 'Tri2', shape: 'jaw', shapeMode: 'polyline',
+  type: 'triangle', id: 'Tri2', shapeMode: 'polyline',
   gParam: 'PG2', r1Param: 'PR21', r2Param: 'PR22',
   p1: { id: 'T2a', type: 'floating', x: 0, y: 0 },
   p2: { id: 'T2b', type: 'floating', x: 0, y: 0 },

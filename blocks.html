@@ -117,6 +117,7 @@
     }
     .work-range-card strong { font-size: 14px; }
     .work-range-card span { color: #4f7461; font-size: 12px; font-weight: 700; }
+    .canvas-wrap.gripper-workflow-active #workRangeCard { display: none !important; }
     .lesson-card {
       position: absolute; top: 16px; right: 16px; width: 288px; z-index: 2;
       display: flex; flex-direction: column; gap: 8px;
@@ -124,12 +125,33 @@
       background: rgba(255,255,255,0.96); color: #2c3e50;
       box-shadow: 0 6px 18px rgba(0,0,0,0.1);
     }
+    #exampleLessonContent { display: flex; flex-direction: column; gap: 8px; }
+    .lesson-card.workflow-hidden { display: none !important; }
     .lesson-card-title { font-size: 15px; font-weight: 800; color: #2c5282; line-height: 1.35; }
     .lesson-card-meta { color: #7f8c8d; font-size: 11px; font-weight: 800; letter-spacing: 0.04em; }
     .lesson-card-row { display: flex; flex-direction: column; gap: 3px; }
     .lesson-card-label { color: #60717d; font-size: 12px; font-weight: 800; }
     .lesson-card-text { color: #34495e; font-size: 12px; line-height: 1.45; }
     .lesson-card-tasks { margin: 0; padding-left: 18px; color: #34495e; font-size: 12px; line-height: 1.45; }
+    .gripper-workflow-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .gripper-workflow-form label { display: grid; gap: 3px; color: #60717d; font-size: 11px; font-weight: 800; }
+    .gripper-workflow-form input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 34px; padding: 5px 7px; border: 1px solid #cbd5df; border-radius: 6px; color: #34495e; font: inherit; font-size: 13px; }
+    .gripper-workflow-actions { display: flex; gap: 6px; }
+    .gripper-workflow-actions button { flex: 1; min-height: 36px; border: 1px solid #cbd5df; border-radius: 7px; background: #f8fafc; color: #34495e; font-weight: 800; cursor: pointer; }
+    .gripper-workflow-actions button:disabled { opacity: .48; cursor: not-allowed; }
+    #gripperPlanStatus { color: #a33c32; font-size: 12px; line-height: 1.45; }
+    #gripperPlanStatus[data-state="ok"] {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+    #gripperEstimatedGap { color: #2c5282; font-size: 13px; font-weight: 800; }
+    .gripper-caveat { color: #687782; font-size: 11px; line-height: 1.4; }
+    @media (max-width: 1099px) {
+      .canvas-wrap.gripper-card-visible #stageSvg {
+        position: absolute; top: var(--gripper-card-space, 260px);
+        height: calc(100% - var(--gripper-card-space, 260px) - 64px);
+      }
+    }
     /* 控制列 */
     .controls {
       position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
@@ -293,6 +315,8 @@
       }
       .mobile-panel-section[data-panel="project"] .example-select { display: none; }
       .lesson-card { display: none !important; }
+      .lesson-card.workflow-active { display: flex !important; top: 8px; left: 8px; right: 8px; width: auto; max-height: min(42vh, 330px); overflow-y: auto; padding: 9px 11px; gap: 6px; }
+      .lesson-card.workflow-active.workflow-hidden { display: none !important; }
       .mobile-example-list {
         display: grid; grid-template-columns: 1fr; gap: 6px; max-height: 230px; overflow-y: auto;
       }
@@ -454,8 +478,13 @@
           </div>
           <div class="block link" onclick="window.blocks.openLinkMenu()">
             <span class="ico">🔵</span>
-            <span class="name">桿件</span>
-            <span class="role">左鍵放孔，右鍵完成；2孔連桿、3孔三點桿</span>
+            <span class="name">連桿</span>
+            <span class="role">從孔拖到孔，放開即連接</span>
+          </div>
+          <div class="block triangle" onclick="window.blocks.startDrawPolygon()">
+            <span class="ico">🟢</span>
+            <span class="name">多孔板</span>
+            <span class="role">逐孔放置，右鍵完成</span>
           </div>
           <div class="block slider" onclick="window.blocks.startDrawRail()">
             <span class="ico">🟩</span>
@@ -494,8 +523,8 @@
     <div class="canvas-wrap canvas-area">
       <svg id="stageSvg" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="hint" id="hint">
-        <span class="desktop-hint">先點🔵連桿，左鍵點兩下畫出來<br>再把🔴馬達放到端點，按 ▶ 看它動</span>
-        <span class="mobile-hint">先點🔵連桿，按住起點拖到終點放開<br>再把🔴馬達放到端點，按 ▶ 看它動</span>
+        <span class="desktop-hint">選🔵連桿，從起點拖到終點放開<br>靠近既有孔會直接接上</span>
+        <span class="mobile-hint">選🔵連桿，從起點拖到終點放開<br>靠近既有孔會直接接上</span>
       </div>
       <div class="mode-banner" id="modeBanner" style="display:none;"></div>
       <div class="mode-banner" id="solveBanner" style="display:none; top:58px;"></div>
@@ -504,28 +533,50 @@
         <span id="workRangeDetail">左右 0 mm · 上下 0 mm</span>
       </div>
       <aside class="lesson-card" id="exampleLessonCard" style="display:none;" aria-live="polite">
-        <div class="lesson-card-meta" id="exampleLessonMeta">課程範本</div>
-        <div class="lesson-card-title" id="exampleLessonTitle">範本名稱</div>
-        <div class="lesson-card-row">
-          <span class="lesson-card-label">實戰用途</span>
-          <span class="lesson-card-text" id="exampleLessonUse"></span>
+        <div id="exampleLessonContent">
+          <div class="lesson-card-meta" id="exampleLessonMeta">課程範本</div>
+          <div class="lesson-card-title" id="exampleLessonTitle">範本名稱</div>
+          <div class="lesson-card-row">
+            <span class="lesson-card-label">實戰用途</span>
+            <span class="lesson-card-text" id="exampleLessonUse"></span>
+          </div>
+          <div class="lesson-card-row">
+            <span class="lesson-card-label">學習重點</span>
+            <span class="lesson-card-text" id="exampleLessonLearn"></span>
+          </div>
+          <div class="lesson-card-row">
+            <span class="lesson-card-label">修改任務</span>
+            <ul class="lesson-card-tasks" id="exampleLessonTasks"></ul>
+          </div>
         </div>
-        <div class="lesson-card-row">
-          <span class="lesson-card-label">學習重點</span>
-          <span class="lesson-card-text" id="exampleLessonLearn"></span>
-        </div>
-        <div class="lesson-card-row">
-          <span class="lesson-card-label">修改任務</span>
-          <ul class="lesson-card-tasks" id="exampleLessonTasks"></ul>
+        <div id="gripperWorkflowContent" style="display:none;">
+          <div class="lesson-card-meta">夾爪任務</div>
+          <div class="lesson-card-title">對稱雙齒輪夾爪</div>
+          <div class="gripper-workflow-form">
+            <label for="gripperObjectWidth">方形物件寬度（10–150 mm）
+              <input id="gripperObjectWidth" type="number" min="10" max="150" step="1" value="50" inputmode="decimal">
+            </label>
+            <label for="gripperClearance">單側放入餘量（2–40 mm）
+              <input id="gripperClearance" type="number" min="2" max="40" step="1" value="10" inputmode="decimal">
+            </label>
+          </div>
+          <div id="gripperEstimatedGap" aria-live="polite">預估淨開口：—</div>
+          <div id="gripperPlanStatus" role="status" aria-live="polite"></div>
+          <div class="gripper-workflow-actions">
+            <button id="gripperOpenBtn" type="button">張開</button>
+            <button id="gripperCloseBtn" type="button">閉合</button>
+          </div>
+          <a id="gripperDownloadBtn" href="#" role="button" style="display:block; box-sizing:border-box; padding:8px; min-height:36px; width:100%; text-align:center; text-decoration:none; border:1px solid #cbd5df; border-radius:7px; background:#fff; color:#34495e; font-weight:800;">下載製作記錄</a>
+          <div class="gripper-caveat">拖動藍色示意物件兩側可改寬度；物件未參與物理碰撞。</div>
         </div>
       </aside>
       <div class="inspector-panel len-editor" id="lenEditor" style="display:none;">
         <div class="le-row">
           <span class="le-title" id="lenTitle">🔵 連桿長度</span>
-          <select class="tri-side" id="triSideSelect" style="display:none;" onchange="window.blocks.setTriSide(this.value)" title="選要調整的邊">
-            <option value="g">底邊</option>
-            <option value="r1">邊1</option>
-            <option value="r2">邊2</option>
+          <select class="tri-side" id="triSideSelect" style="display:none;" onchange="window.blocks.setTriSide(this.value)" title="選要調整的孔距">
+            <option value="g">孔距 A–B</option>
+            <option value="r1">孔距 A–C</option>
+            <option value="r2">孔距 B–C</option>
           </select>
           <select class="tri-side" id="plateShapeModeSelect" style="display:none;" onchange="window.blocks.setTriangleShapeMode(this.value)" title="選擇板件外形">
             <option value="hull">包絡板</option>
@@ -535,13 +586,17 @@
           <button class="lift-btn" id="addOutlinePointBtn" style="display:none;" onclick="window.blocks.addTriangleOutlinePoint()" title="新增只影響外形、不參與求解的控制點">＋外形點</button>
           <span class="le-row" id="lenControls">
             <button class="le-step" id="lenMinusBtn" onclick="window.blocks.changeLen(-8)" title="短 8mm（少一孔）">−</button>
-            <span class="le-value"><span id="lenValue">88</span><span class="le-unit">mm</span></span>
+            <span class="le-value"><span id="lenValue">88</span><input id="memberDimensionInput" type="number" min="8" max="2000" step="0.1" style="display:none;width:76px;font:inherit;color:inherit;border:1px solid #cbd5e1;border-radius:6px;padding:5px" aria-label="孔距" onchange="window.blocks.setMemberDimension(this.value)" onkeydown="if(event.key==='Enter')this.blur()"><span class="le-unit">mm</span></span>
             <button class="le-step" id="lenPlusBtn" onclick="window.blocks.changeLen(8)" title="長 8mm（多一孔）">＋</button>
           </span>
           <button class="lift-btn" id="sliderFlipBtn" style="display:none;" onclick="window.blocks.flipSlider()" title="被動滑塊由連桿和滑軌交點求解；若組裝結果跑到軌道另一側或連桿交叉，按這裡切換另一個幾何解。">🔄 翻面</button>
           <button class="lift-btn" id="sliderBaseBtn" style="display:none;" onclick="window.blocks.toggleSliderBase()" title="線性致動器的本體固定端。A 表示從軌道 A 端往 B 端推出；B 表示從 B 端往 A 端推出。調整滑軌長度時固定端會留在原位。">固定端：A</button>
           <button class="lift-btn" id="linkToRailBtn" style="display:none;" onclick="window.blocks.convertLinkToSlider()" title="把這根連桿就地升級成滑軌：沿用連桿兩端的接點當固定孔，原本接好的連接與機架固定點都會保留。">🟩 變滑軌</button>
           <button class="clear-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除選取的桿件">🗑 刪除</button>
+        </div>
+        <div class="le-row" style="font-size:12px;line-height:1.5;flex-wrap:wrap">
+          <span id="memberDimensionHint" style="display:none;color:#52677b"></span>
+          <label id="memberMirrorLabel" style="display:none;white-space:nowrap"><input id="memberMirror" type="checkbox" checked onchange="window.blocks.setMemberMirror(this.checked)"> 同步左右</label>
         </div>
         <div class="le-row" id="sliderBodyRow" style="display:none;">
           <span class="le-title">滑塊長度</span>
@@ -830,6 +885,20 @@
     </button>
   </nav>
 
-  <script type="module" src="js/blocks/app.js?v=20260711_02"></script>
+  <!-- 同一份共用模組只載入一個版本；避免重載時混用舊幾何或舊存檔 schema。 -->
+  <script type="importmap">
+    {"imports": {
+      "./js/blocks/plate-geometry.js": "./js/blocks/plate-geometry.js?v=20260925_members1",
+      "./js/blocks/plate-editor.js": "./js/blocks/plate-editor.js?v=20260925_members2",
+      "./js/blocks/plate-render.js": "./js/blocks/plate-render.js?v=20260925_members1",
+      "./js/blocks/schema.js": "./js/blocks/schema.js?v=20260925_members1",
+      "./js/blocks/member-editor.js": "./js/blocks/member-editor.js?v=20260925_members1",
+      "./js/blocks/member-dimensions.js": "./js/blocks/member-dimensions.js?v=20260925_members2",
+      "./js/blocks/member-dimension-render.js": "./js/blocks/member-dimension-render.js?v=20260925_members1",
+      "./js/blocks/gripper-workflow.js": "./js/blocks/gripper-workflow.js?v=20260925_members1",
+      "./js/blocks/gripper-workflow.js?v=20260925_r1b": "./js/blocks/gripper-workflow.js?v=20260925_members1"
+    }}
+  </script>
+  <script type="module" src="js/blocks/app.js?v=20260925_members1"></script>
 </body>
 </html>
