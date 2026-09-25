@@ -38,7 +38,7 @@ export function createExampleController({ applySnapshot, notify, closeMobileMenu
     if (!example) return false;
     const snapshot = normalizeSnapshot(example.snapshot);
     if (!snapshot) { notify('⚠️ 範例格式不正確'); return false; }
-    applySnapshot(snapshot);
+    applySnapshot(snapshot, { source: 'example' });
     activeExampleId = example.id;
     if (Number(snapshot.params?.gripperWorkflow) === 1) {
       const card = document.getElementById('exampleLessonCard');

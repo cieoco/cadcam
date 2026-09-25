@@ -21,6 +21,7 @@ export const S = {
   theta: 0,                                        // 「目前控制中馬達」的驅動角度（播放迴圈與編輯都會改）
   activeMotor: '1',                                // S.theta 對應的馬達編號；切換時把舊角度凍進 motorAngles
   motorAngles: {},                                 // 非控制中馬達的凍結角度（度），key = physicalMotor 編號
+  fabrication: null,                               // 目前作品的加工／馬達安裝設定（完整 v1 profile）
 
   // ---- 選取 ----
   selectedLinkId: null,

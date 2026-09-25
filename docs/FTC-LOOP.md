@@ -2,13 +2,13 @@
 
 規格來源：[SDD-FTC-MODULES.md](SDD-FTC-MODULES.md)。本文件是開發／驗收記錄，不新增產品 UI，也不是背景排程。
 
-## R1e 加工設定隨作品保存（2026-09-25，規格已建立／待施工）
+## R1e 加工設定隨作品保存（2026-09-25，功能完成／下載落地待驗證）
 
 規格及驗收唯一來源：[SDD-RIGID-MEMBERS.md](SDD-RIGID-MEMBERS.md) 的 R1e 與交接提醒 H1–H6。本節只安排施工與收集證據，不重複定義資料欄位。基準 commit：`4d2b5a6`，已推送 `origin/main`。
 
 ### 狀態與施工界線
 
-- 本次只建立 SDD／LOOP，未修改功能程式、未派施工代理、未啟動排程；E1–E8 皆未驗收。本節不是要求未來代理自動開工或自行 commit／push 的授權。
+- 規格先以 `13b5ff9` commit／push；其後依使用者授權啟動 LOOP。L1 純資料模組由 gpt-6-luna 高推理有界施工，主模型完成 schema、生命週期、UI 交易、測試與實際瀏覽器驗收。功能變更尚未另行 commit／push。
 - 目標是現有孔徑／TT 扁孔／TT 與 MG995 安裝設定的完整作品保存與重現；不是新增通用機械接口庫、材料選型或製造認證。
 - 沿用既有分工：主模型處理資料邊界、遷移、整合與瀏覽器驗收；取得施工授權後，較便宜的施工模型才按下列有界工作包實作。不要只交付「請完成 R1e」讓施工模型自行擴張範圍。
 - 所有包先檢查 H1 孔位／外形、H2 同源／相容、H3 取消／復原、H4 原入口、H5 自動＋UI＋快取、H6 證據邊界。涉及不適用項時寫理由，不能默認跳過。
@@ -17,12 +17,12 @@
 
 | 工作包 | 成果／允許修改範圍 | 驗收及進入下一包的條件 | 狀態 |
 | --- | --- | --- | --- |
-| L0 現況與基準 | 主模型盤點 `state.js`、`schema.js`、`storage.js`、`settings.js`、app 的全部 snapshot／載入入口、幾何 consumer 與分享安全閘；只新增相關 baseline tests 及本節證據。 | 凍結三組 loader 生效後的 version 1 預設、舊作品 fixtures、元件孔徑覆寫規則；47 支與 schema 基準重新確認。不得先改預設。 | 待施工 |
-| L1 純資料契約 | 有界施工：新增純加工設定模組與獨立測試；主模型接入 schema。候選檔案 `js/blocks/fabrication-profile.js`、`schema.js`、`test/fabrication-profile.mjs`（名稱於開工交接時確認）。 | E1 通過：白名單、版本、缺省、嚴格輸入、跨欄位計畫、不污染原資料。規格之外的遷移決策交回主模型。 | 待施工 |
-| L2 保存與載入閉環 | 主模型整合 `state.js`、`settings.js`、`storage.js`、`app.js` 必要接線與相關 tests；需要時局部調整 example／gripper controller 的 snapshot 注入。 | E2、E3、E6 的載入原子性通過。JSON、自存、分享、復原、範例及記錄都帶同份設定；不更改 share-codec 安全限制、不留下兩份可變設定。 | 待施工 |
-| L3 原設定入口與交易 | 有界施工：`settings.js`、`blocks.html`、必要 app callback 與設定控制器 tests；沿用現有控制項。 | E4 通過；先驗證桌面／窄畫面草稿、Escape、Enter＋blur、一次復原，再接下一包。沒有新增常駐面板或全域偏好設定頁。 | 待施工 |
-| L4 幾何與出口核對 | 主模型先列失配 fixture，再指定施工模型修改具體 consumer；範圍限 `member-stock.js`、`exporters.js`、2D render／3D scene 的必要修正、製作記錄與 tests。 | E5、E6 通過；孔心／求解不變、元件覆寫保留、留料不相容能修回。不得順便重構 solver、Frozen mechanism 或更改硬體尺寸標準。 | 待施工 |
-| L5 獨立驗收與交接 | 主模型檢查 diff、全套 tests、HTTP 實際頁面、實際檔案；完成本節證據與 SDD 狀態。程式只修前面驗收發現的具體問題。 | E7、E8 與 H1–H6 全過才完成；下載落地未確認就保留未驗收標記，不沿用歷史成功紀錄。 | 待施工 |
+| L0 現況與基準 | 主模型盤點 `state.js`、`schema.js`、`storage.js`、`settings.js`、app 的全部 snapshot／載入入口、幾何 consumer 與分享安全閘；只新增相關 baseline tests 及本節證據。 | 凍結三組 loader 生效後的 version 1 預設、舊作品 fixtures、元件孔徑覆寫規則；47 支與 schema 基準重新確認。不得先改預設。 | 完成 |
+| L1 純資料契約 | 有界施工：新增純加工設定模組與獨立測試；主模型接入 schema。候選檔案 `js/blocks/fabrication-profile.js`、`schema.js`、`test/fabrication-profile.mjs`（名稱於開工交接時確認）。 | E1 通過：白名單、版本、缺省、嚴格輸入、跨欄位計畫、不污染原資料。規格之外的遷移決策交回主模型。 | 完成 |
+| L2 保存與載入閉環 | 主模型整合 `state.js`、`settings.js`、`storage.js`、`app.js` 必要接線與相關 tests；需要時局部調整 example／gripper controller 的 snapshot 注入。 | E2、E3、E6 的載入原子性通過。JSON、自存、分享、復原、範例及記錄都帶同份設定；不更改 share-codec 安全限制、不留下兩份可變設定。 | 完成 |
+| L3 原設定入口與交易 | 有界施工：`settings.js`、`blocks.html`、必要 app callback 與設定控制器 tests；沿用現有控制項。 | E4 通過；先驗證桌面／窄畫面草稿、Escape、Enter＋blur、一次復原，再接下一包。沒有新增常駐面板或全域偏好設定頁。 | 完成 |
+| L4 幾何與出口核對 | 主模型先列失配 fixture，再指定施工模型修改具體 consumer；範圍限 `member-stock.js`、`exporters.js`、2D render／3D scene 的必要修正、製作記錄與 tests。 | E5、E6 通過；孔心／求解不變、元件覆寫保留、留料不相容能修回。不得順便重構 solver、Frozen mechanism 或更改硬體尺寸標準。 | 完成（沿用既有 consumer，無需改 solver／幾何模組） |
+| L5 獨立驗收與交接 | 主模型檢查 diff、全套 tests、HTTP 實際頁面、實際檔案；完成本節證據與 SDD 狀態。程式只修前面驗收發現的具體問題。 | E7、E8 與 H1–H6 全過才完成；下載落地未確認就保留未驗收標記，不沿用歷史成功紀錄。 | 部分完成：UI／分享／回歸通過，實際下載落地未通過 |
 
 每包流程：指定檔案與預期輸入／輸出 → 施工及自測 → 主模型獨立檢查 → 具體失敗案例修正 → 通過才進下一包。不同模型不要同時修改同一檔案；兩輪未通過則先縮小問題並由主模型診斷，不繼續堆介面。
 
@@ -44,6 +44,13 @@
 - 跨環境：來源與接收環境的不同偏好、載入後有效設定、偏好未被改寫的證據：待填。
 - 檔案：JSON／SVG／DXF／製作記錄的實際路徑與內容核對；未落地者的原因：待填。
 - 測試作品恢復情形、未驗證項、是否獲得 Git 提交／推送授權：待填。
+
+### 本輪實際證據
+
+- 修改：新增版本化 `fabrication` 純模組與三支測試，接入 `state`／`schema`／`settings`／`app`／example controller 及中央 import map；既有加工設定只多一行來源提示，沒有新面板。
+- 自動驗收：50 支獨立測試全過；`test_blocks_schema.mjs` 70/70；語法及 `git diff --check` 通過（只見 Windows 換行提示）。完整、局部、未知、非法、跨欄位、一次交易、Escape、舊偏好遷移、保存／分享／製作記錄皆有 fixture。
+- 實際 UI：窄畫面將連接孔 12.96→6 mm、Escape 取消 9 mm 草稿、重載仍為 6 mm，另做一次 12.96→6→單次復原回 12.96；分享資料解碼確認三組 profile，分享網址重載後以作品 6 mm 覆蓋接收端本機值。桌面 1280×800 顯示同一設定與來源提示，console error／warning 為空。
+- 恢復：移除測試 hash，將孔徑改回 12.96 mm，等待自存後重載確認；視窗 override 已 reset。實際 JSON 下載事件逾時且 Downloads 無新檔，因此 JSON／SVG／DXF 落地仍待後續環境驗證；沒有硬體、配合、公差或加工認證。
 
 本次文件交接已完成；下一個可執行工作是 L0，需後續施工授權。其他待辦（通用鏡像／自由外形、碰撞／夾持力、硬體與實物）仍留作後續獨立規格，不併入 R1e。
 

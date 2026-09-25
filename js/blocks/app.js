@@ -55,7 +55,8 @@ import { drawFrameGeometry as renderFrameGeometry, drawMotorMountHoles as render
 import { collectSceneIds, prepareRenderScene } from './render-scene.js';
 import { buildPreviewModelInputs } from './preview-model-inputs.js';
 import { renderLinks, renderNodes } from './mechanism-layer-render.js';
-import * as Settings from './settings.js';   // 匯出 / TT / MG995 安裝設定（localStorage 持久化 + 表單同步）
+import * as Settings from './settings.js';   // 作品級加工設定 + 舊 localStorage 偏好遷移 + 表單同步
+import { normalizeFabricationProfile } from './fabrication-profile.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('stageSvg');
@@ -89,7 +90,11 @@ let view3DActive = false;      // 3D 覆蓋層是否開著
 let lastModelInputs = null;    // 最近一次 draw() 算好的 { links, pts, groundIds }，給 3D 鏡像用
 
 // 多馬達：存檔一併保留「哪顆在控制、其他凍在幾度」，載回來才不會全部歸零疊在一起。
-const motorSnapshotState = () => ({ activeMotor: S.activeMotor, motorAngles: frozenMotorAngles() });
+const motorSnapshotState = () => ({
+  activeMotor: S.activeMotor,
+  motorAngles: frozenMotorAngles(),
+  fabrication: S.fabrication
+});
 let gripperController = null;
 function snapshotStr() {
   return JSON.stringify(Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()));
@@ -110,7 +115,7 @@ function updateUndoBtn() {
 function undo() {
   if (!S.undoStack.length) return;
   const norm = Store.normalizeSnapshot(JSON.parse(S.undoStack.pop()));
-  if (norm) applySnapshot(norm, { recordUndo: false, fit: false });
+  if (norm) applySnapshot(norm, { recordUndo: false, fit: false, source: 'undo' });
   updateUndoBtn();
 }
 function scheduleAutosave() {
@@ -119,10 +124,11 @@ function scheduleAutosave() {
 }
 
 // 套用一份 snapshot 到目前狀態。recordUndo 預設 true（外部開檔/分享要能 undo）。
-function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
+function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external' } = {}) {
   if (recordUndo) pushUndo();
   pause();
   cancelMotorMode();
+  Settings.syncFabricationInputs(); // 放棄尚未 change/blur 提交的表單草稿。
   S.comps = norm.comps;
   S.topo = { params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '' };
   manualTrace = {};
@@ -132,6 +138,16 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
   S.activeMotor = String(norm.activeMotor || '1');
   S.motorAngles = { ...(norm.motorAngles || {}) };
   delete S.motorAngles[String(S.activeMotor)];
+  const missingFabrication = !norm.fabrication;
+  const fabrication = missingFabrication && source === 'local-autosave'
+    ? Settings.legacyLocalFabrication()
+    : (norm.fabrication || Settings.defaultFabrication());
+  const fabricationSource = norm.fabrication
+    ? '目前作品隨附的加工設定'
+    : source === 'local-autosave'
+      ? '舊本機自存：已帶入此瀏覽器的舊加工偏好'
+      : '舊作品未附加工設定：已套用 v1 固定預設，請核對孔徑';
+  Settings.applyFabricationProfile(fabrication, { source: fabricationSource });
   playDir = Number(S.topo.params.motorDirection) === -1 ? -1 : 1;
   S.selectedLinkId = null;
   S.selectedTriangleId = null;
@@ -153,6 +169,17 @@ function applySnapshot(norm, { recordUndo = true, fit = true } = {}) {
   rebuild(); draw();
   if (gripperController?.isActive() && gripperController.currentPlan().ok) gripperController.moveToOpen();
   if (fit) fitView();
+  if (missingFabrication) transient(source === 'local-autosave'
+    ? '舊本機自存已帶入本機加工偏好；下次保存會隨作品帶走'
+    : '舊作品未附加工設定，已套用固定預設，請核對孔徑');
+  else if (norm.warnings?.length) transient('⚠️ ' + norm.warnings[0]);
+}
+
+function normalizeIncomingSnapshot(raw) {
+  const fabrication = normalizeFabricationProfile(raw?.fabrication);
+  if (!fabrication.ok) return { norm: null, error: fabrication.message };
+  const norm = Store.normalizeSnapshot(raw);
+  return norm ? { norm, error: '' } : { norm: null, error: '作品資料格式不正確' };
 }
 
 const exampleController = createExampleController({
@@ -1380,6 +1407,7 @@ function clearAll() {
   document.getElementById('strokeEditor').style.display = 'none';
   document.getElementById('solveBanner').style.display = 'none';
   S.topo = { params: { theta: 0 }, tracePoint: '', tracePoints: [], referencePoint: '' };
+  Settings.applyFabricationProfile(Settings.legacyLocalFabrication(), { source: '新作品：已帶入此瀏覽器的舊加工偏好' });
   manualTrace = {};
   document.getElementById('thetaVal').textContent = '0';
   rebuild(); draw();
@@ -1768,9 +1796,10 @@ function openFile() {
     const r = new FileReader();
     r.onload = () => {
       try {
-        const norm = Store.normalizeSnapshot(JSON.parse(r.result));
-        if (!norm) { transient('⚠️ 檔案格式不正確'); return; }
-        applySnapshot(norm);
+        const incoming = normalizeIncomingSnapshot(JSON.parse(r.result));
+        const norm = incoming.norm;
+        if (!norm) { transient('⚠️ ' + incoming.error); return; }
+        applySnapshot(norm, { source: 'external' });
         // applySnapshot 已清除舊教學卡，或依任務 marker 恢復夾爪；不再覆寫其狀態。
         transient('📂 已開啟');
       } catch (e) { transient('⚠️ 讀取失敗：' + (e.message || e)); }
@@ -1810,7 +1839,7 @@ function init() {
                handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround, recordManualTrace, solvePinnedConstraints,
                snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel, openFrameEditor: () => { S.frameEditorOpen = true; Panels.updateFrameEditor(); }, transient,
                isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, pointIsRackHole });
-  Settings.init({ draw });
+  Settings.init({ draw, pushUndo, pause, scheduleAutosave, notify: transient });
   Settings.loadExportSettings();
   Settings.loadTtMountSettings();
   Settings.loadMg995MountSettings();
@@ -1819,8 +1848,9 @@ function init() {
   try {
     const hashObj = Store.readShareFromHash();
     if (hashObj) {
-      const norm = Store.normalizeSnapshot(hashObj);
-      if (norm) { applySnapshot(norm, { recordUndo: false }); loaded = true; }
+      const incoming = normalizeIncomingSnapshot(hashObj);
+      if (!incoming.norm) throw new Error(incoming.error);
+      applySnapshot(incoming.norm, { recordUndo: false, source: 'share' }); loaded = true;
     }
   } catch (e) {
     console.warn('share link load failed:', e);
@@ -1828,7 +1858,7 @@ function init() {
   }
   if (!loaded) {
     const local = Store.normalizeSnapshot(Store.loadLocal());
-    if (local && local.comps.length) { applySnapshot(local, { recordUndo: false }); loaded = true; }
+    if (local && local.comps.length) { applySnapshot(local, { recordUndo: false, source: 'local-autosave' }); loaded = true; }
   }
   if (!loaded) { rebuild(); draw(); }
   setMobilePanel('build');

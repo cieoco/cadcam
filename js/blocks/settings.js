@@ -1,13 +1,12 @@
 /**
- * 匯出與馬達安裝設定（localStorage 持久化）
- *   - 匯出設定：桿寬 / 連接孔 / TT 扁軸孔（沿用 exporters 的 normalizeExportSettings 白名單）
- *   - TT 馬達安裝孔位：軸孔 / 螺絲孔 / 定位孔
- *   - MG995 穿板式固定：開槽 / 耳孔 / 線槽缺口
- * 讀寫 S 上的對應欄位、同步 data-*-setting 表單欄位；改動安裝設定後呼叫注入的 draw() 重繪。
+ * 作品級加工與馬達安裝設定。
+ * 舊 localStorage 僅在建立空作品／遷移舊本機自存時讀取；編輯後由作品 snapshot
+ * 負責保存。S.fabrication 是唯一可變來源，舊 S.* 欄位只是既有面板的集中鏡像。
  */
 
 import { S } from './state.js';
 import * as Exporters from './exporters.js';
+import { FABRICATION_DEFAULTS, normalizeFabricationProfile, planFabricationProfile } from './fabrication-profile.js';
 
 const EXPORT_SETTINGS_KEY = 'cadcam.blocks.exportSettings';
 const TT_MOUNT_SETTINGS_KEY = 'cadcam.blocks.ttMountSettings.v7';
@@ -36,21 +35,22 @@ const MG995_MOUNT_DEFAULTS = {
 };
 
 // ---- 綁定層注入（同 tools/input 慣例）----
-let draw = () => {};
+let draw = () => {}, pushUndo = () => {}, pause = () => {}, scheduleAutosave = () => {}, notify = () => {};
+let legacyLocalProfile = JSON.parse(JSON.stringify(FABRICATION_DEFAULTS));
+let sourceLabel = '目前作品的加工設定';
 
 export function init(deps) {
-  ({ draw } = deps);
+  if (deps.draw) draw = deps.draw;
+  if (deps.pushUndo) pushUndo = deps.pushUndo;
+  if (deps.pause) pause = deps.pause;
+  if (deps.scheduleAutosave) scheduleAutosave = deps.scheduleAutosave;
+  if (deps.notify) notify = deps.notify;
+  document.querySelectorAll('[data-export-setting],[data-tt-mount-setting],[data-mg995-mount-setting],#frameMarginInput,#frameHoleInput')
+    .forEach(input => input.addEventListener('keydown', handleFabricationKey));
 }
 
 export function exportSettings() {
-  return Exporters.normalizeExportSettings({
-    barWidthMm: S.exportBarWidthMm,
-    holeDiameterMm: S.exportHoleDiameterMm,
-    frameMarginMm: S.frameMarginMm,
-    frameHoleDiameterMm: S.frameHoleDiameterMm,
-    ttShaftFlatDiameterMm: S.exportTtShaftFlatDiameterMm,
-    ttShaftFlatThicknessMm: S.exportTtShaftFlatThicknessMm
-  });
+  return { ...(S.fabrication?.export || FABRICATION_DEFAULTS.export) };
 }
 function normalizeTtMountSettings(settings = {}) {
   const from = { ...TT_MOUNT_DEFAULTS, ...(settings || {}) };
@@ -69,15 +69,7 @@ function normalizeTtMountSettings(settings = {}) {
   };
 }
 export function ttMountSettings() {
-  return normalizeTtMountSettings({
-    shaftDiameterMm: S.ttShaftDiameterMm,
-    screwDiameterMm: S.ttScrewDiameterMm,
-    screwOffsetXMm: S.ttScrewOffsetXMm,
-    screwSpacingMm: S.ttScrewSpacingMm,
-    locatorDiameterMm: S.ttLocatorDiameterMm,
-    locatorOffsetXMm: S.ttLocatorOffsetXMm,
-    locatorOffsetYMm: S.ttLocatorOffsetYMm
-  });
+  return { ...(S.fabrication?.ttMount || FABRICATION_DEFAULTS.ttMount) };
 }
 function normalizeMg995MountSettings(settings = {}) {
   const from = { ...MG995_MOUNT_DEFAULTS, ...(settings || {}) };
@@ -97,16 +89,7 @@ function normalizeMg995MountSettings(settings = {}) {
   };
 }
 export function mg995MountSettings() {
-  return normalizeMg995MountSettings({
-    bodyLengthMm: S.mg995BodyLengthMm,
-    bodyWidthMm: S.mg995BodyWidthMm,
-    shaftOffsetMm: S.mg995ShaftOffsetMm,
-    screwDiameterMm: S.mg995ScrewDiameterMm,
-    screwSpanMm: S.mg995ScrewSpanMm,
-    screwSpacingMm: S.mg995ScrewSpacingMm,
-    cableNotchWidthMm: S.mg995CableNotchWidthMm,
-    cableNotchDepthMm: S.mg995CableNotchDepthMm
-  });
+  return { ...(S.fabrication?.mg995Mount || FABRICATION_DEFAULTS.mg995Mount) };
 }
 function applyMg995MountSettings(settings) {
   S.mg995BodyLengthMm = settings.bodyLengthMm;
@@ -136,93 +119,69 @@ function syncMg995MountSettingInputs() {
     document.querySelectorAll(`[data-mg995-mount-setting="${key}"]`).forEach(el => { el.value = value; });
   });
 }
+function syncSourceLabel() {
+  document.querySelectorAll('[data-fabrication-source]').forEach(el => { el.textContent = sourceLabel; });
+}
+function applyLegacyMirrors(profile) {
+  const e = profile.export, tt = profile.ttMount, mg = profile.mg995Mount;
+  S.exportBarWidthMm = e.barWidthMm; S.exportHoleDiameterMm = e.holeDiameterMm;
+  S.frameMarginMm = e.frameMarginMm; S.frameHoleDiameterMm = e.frameHoleDiameterMm;
+  S.exportTtShaftFlatDiameterMm = e.ttShaftFlatDiameterMm; S.exportTtShaftFlatThicknessMm = e.ttShaftFlatThicknessMm;
+  S.ttShaftDiameterMm = tt.shaftDiameterMm; S.ttScrewDiameterMm = tt.screwDiameterMm;
+  S.ttScrewOffsetXMm = tt.screwOffsetXMm; S.ttScrewSpacingMm = tt.screwSpacingMm;
+  S.ttLocatorDiameterMm = tt.locatorDiameterMm; S.ttLocatorOffsetXMm = tt.locatorOffsetXMm; S.ttLocatorOffsetYMm = tt.locatorOffsetYMm;
+  applyMg995MountSettings(mg);
+}
+export function applyFabricationProfile(profile, { source = '目前作品的加工設定' } = {}) {
+  const result = normalizeFabricationProfile(profile);
+  if (!result.ok) return result;
+  S.fabrication = result.profile;
+  sourceLabel = source;
+  applyLegacyMirrors(S.fabrication);
+  syncExportSettingInputs(); syncTtMountSettingInputs(); syncMg995MountSettingInputs(); syncSourceLabel();
+  return result;
+}
+export function defaultFabrication() { return JSON.parse(JSON.stringify(FABRICATION_DEFAULTS)); }
+export function legacyLocalFabrication() { return JSON.parse(JSON.stringify(legacyLocalProfile)); }
+export function syncFabricationInputs() {
+  syncExportSettingInputs(); syncTtMountSettingInputs(); syncMg995MountSettingInputs(); syncSourceLabel();
+}
 export function loadExportSettings() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(EXPORT_SETTINGS_KEY) || 'null'); } catch (_) {}
   const settings = Exporters.normalizeExportSettings(saved || {});
-  S.exportBarWidthMm = settings.barWidthMm;
-  S.exportHoleDiameterMm = settings.holeDiameterMm;
-  S.frameMarginMm = settings.frameMarginMm;
-  S.frameHoleDiameterMm = settings.frameHoleDiameterMm;
-  S.exportTtShaftFlatDiameterMm = settings.ttShaftFlatDiameterMm;
-  S.exportTtShaftFlatThicknessMm = settings.ttShaftFlatThicknessMm;
-  syncExportSettingInputs();
+  legacyLocalProfile.export = { ...settings };
+  applyFabricationProfile(legacyLocalProfile, { source: '新作品：已帶入此瀏覽器的舊加工偏好' });
 }
 export function loadTtMountSettings() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(TT_MOUNT_SETTINGS_KEY) || 'null'); } catch (_) {}
   const settings = normalizeTtMountSettings(saved || {});
-  S.ttShaftDiameterMm = settings.shaftDiameterMm;
-  S.ttScrewDiameterMm = settings.screwDiameterMm;
-  S.ttScrewOffsetXMm = settings.screwOffsetXMm;
-  S.ttScrewSpacingMm = settings.screwSpacingMm;
-  S.ttLocatorDiameterMm = settings.locatorDiameterMm;
-  S.ttLocatorOffsetXMm = settings.locatorOffsetXMm;
-  S.ttLocatorOffsetYMm = settings.locatorOffsetYMm;
-  syncTtMountSettingInputs();
+  legacyLocalProfile.ttMount = { ...settings };
+  applyFabricationProfile(legacyLocalProfile, { source: '新作品：已帶入此瀏覽器的舊加工偏好' });
 }
 export function loadMg995MountSettings() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(MG995_MOUNT_SETTINGS_KEY) || 'null'); } catch (_) {}
-  applyMg995MountSettings(normalizeMg995MountSettings(saved || {}));
-  syncMg995MountSettingInputs();
+  legacyLocalProfile.mg995Mount = normalizeMg995MountSettings(saved || {});
+  applyFabricationProfile(legacyLocalProfile, { source: '新作品：已帶入此瀏覽器的舊加工偏好' });
 }
-export function setExportSetting(key, value) {
-  if (key === 'barWidthMm') S.exportBarWidthMm = Number(value);
-  if (key === 'holeDiameterMm') S.exportHoleDiameterMm = Number(value);
-  if (key === 'frameMarginMm') S.frameMarginMm = Number(value);
-  if (key === 'frameHoleDiameterMm') S.frameHoleDiameterMm = Number(value);
-  if (key === 'ttShaftFlatDiameterMm') S.exportTtShaftFlatDiameterMm = Number(value);
-  if (key === 'ttShaftFlatThicknessMm') S.exportTtShaftFlatThicknessMm = Number(value);
-  const settings = exportSettings();
-  S.exportBarWidthMm = settings.barWidthMm;
-  S.exportHoleDiameterMm = settings.holeDiameterMm;
-  S.frameMarginMm = settings.frameMarginMm;
-  S.frameHoleDiameterMm = settings.frameHoleDiameterMm;
-  S.exportTtShaftFlatDiameterMm = settings.ttShaftFlatDiameterMm;
-  S.exportTtShaftFlatThicknessMm = settings.ttShaftFlatThicknessMm;
-  try { localStorage.setItem(EXPORT_SETTINGS_KEY, JSON.stringify(settings)); } catch (_) {}
-  syncExportSettingInputs();
-  draw();
+function commit(group, key, value) {
+  const raw = typeof value === 'string' ? value.trim() : value;
+  const numeric = typeof raw === 'number' ? raw : (typeof raw === 'string' && raw !== '' ? Number(raw) : Number.NaN);
+  const result = planFabricationProfile(S.fabrication || FABRICATION_DEFAULTS, group, key, numeric);
+  if (!result.ok) { notify(result.message); syncFabricationInputs(); return false; }
+  if (!result.changed) { syncFabricationInputs(); return false; }
+  pause(); pushUndo(); applyFabricationProfile(result.profile); scheduleAutosave(); draw(); return true;
 }
+export function setExportSetting(key, value) { return commit('export', key, value); }
 export function setTtMountSetting(key, value) {
-  const map = {
-    shaftDiameterMm: 'ttShaftDiameterMm',
-    screwDiameterMm: 'ttScrewDiameterMm',
-    screwOffsetXMm: 'ttScrewOffsetXMm',
-    screwSpacingMm: 'ttScrewSpacingMm',
-    locatorDiameterMm: 'ttLocatorDiameterMm',
-    locatorOffsetXMm: 'ttLocatorOffsetXMm',
-    locatorOffsetYMm: 'ttLocatorOffsetYMm'
-  };
-  if (map[key]) S[map[key]] = Number(value);
-  const settings = ttMountSettings();
-  S.ttShaftDiameterMm = settings.shaftDiameterMm;
-  S.ttScrewDiameterMm = settings.screwDiameterMm;
-  S.ttScrewOffsetXMm = settings.screwOffsetXMm;
-  S.ttScrewSpacingMm = settings.screwSpacingMm;
-  S.ttLocatorDiameterMm = settings.locatorDiameterMm;
-  S.ttLocatorOffsetXMm = settings.locatorOffsetXMm;
-  S.ttLocatorOffsetYMm = settings.locatorOffsetYMm;
-  try { localStorage.setItem(TT_MOUNT_SETTINGS_KEY, JSON.stringify(settings)); } catch (_) {}
-  syncTtMountSettingInputs();
-  draw();
+  return commit('ttMount', key, value);
 }
 export function setMg995MountSetting(key, value) {
-  const map = {
-    bodyLengthMm: 'mg995BodyLengthMm',
-    bodyWidthMm: 'mg995BodyWidthMm',
-    shaftOffsetMm: 'mg995ShaftOffsetMm',
-    screwDiameterMm: 'mg995ScrewDiameterMm',
-    screwSpanMm: 'mg995ScrewSpanMm',
-    screwSpacingMm: 'mg995ScrewSpacingMm',
-    cableNotchWidthMm: 'mg995CableNotchWidthMm',
-    cableNotchDepthMm: 'mg995CableNotchDepthMm'
-  };
-  if (map[key]) S[map[key]] = Number(value);
-  const settings = mg995MountSettings();
-  applyMg995MountSettings(settings);
-  try { localStorage.setItem(MG995_MOUNT_SETTINGS_KEY, JSON.stringify(settings)); } catch (_) {}
-  syncMg995MountSettingInputs();
-  draw();
+  return commit('mg995Mount', key, value);
+}
+export function handleFabricationKey(event) {
+  if (event.key === 'Escape') { event.preventDefault(); syncFabricationInputs(); event.currentTarget?.blur(); }
+  else if (event.key === 'Enter') { event.preventDefault(); event.currentTarget?.blur(); }
 }

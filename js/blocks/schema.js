@@ -6,6 +6,7 @@
  */
 
 import { normalizeMemberStock } from './member-stock.js';
+import { normalizeFabricationProfile } from './fabrication-profile.js';
 
 const KIND = 'blocks';
 const VERSION = 1;
@@ -310,6 +311,7 @@ export function toSnapshot(comps, topo, counter, motor) {
   if (tracePoints.length === 1) snapshot.tracePoint = tracePoints[0]; // 舊欄位相容：單點檔案仍好讀。
   if (tracePoints.length) snapshot.tracePoints = tracePoints;
   if (safeId(topo?.referencePoint)) snapshot.referencePoint = topo.referencePoint;
+  if (motor?.fabrication) snapshot.fabrication = clone(motor.fabrication);
   return snapshot;
 }
 
@@ -490,6 +492,9 @@ export function normalizeSnapshot(obj) {
   if (!sourceComps) return null;
 
   const warnings = [];
+  const fabricationResult = normalizeFabricationProfile(obj.fabrication);
+  if (!fabricationResult.ok) return null;
+  warnings.push(...fabricationResult.warnings);
   const params = (obj.params && typeof obj.params === 'object' && !Array.isArray(obj.params)) ? clone(obj.params) : {};
   const tracePoint = safeId(obj.tracePoint) ? obj.tracePoint : '';
   const tracePoints = uniqueSafeIds([...(Array.isArray(obj.tracePoints) ? obj.tracePoints : []), ...(tracePoint ? [tracePoint] : [])]);
@@ -524,7 +529,8 @@ export function normalizeSnapshot(obj) {
       if (safeId(k) && Number.isFinite(Number(obj.motorAngles[k]))) motorAngles[k] = Number(obj.motorAngles[k]);
     });
   }
-  return { comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles, warnings };
+  return { comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
+    fabrication: fabricationResult.status === 'present' ? fabricationResult.profile : null, warnings };
 }
 
 export function highestIdNum(comps) {
