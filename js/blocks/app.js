@@ -28,6 +28,8 @@ import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
 import * as Motion from './motion.js';
+import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules } from './assembly.js';
+import { normalizeModules } from './module-schema.js';
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
 import { drawMemberDimensions } from './member-dimension-render.js';
@@ -94,7 +96,8 @@ let lastModelInputs = null;    // 最近一次 draw() 算好的 { links, pts, gr
 const motorSnapshotState = () => ({
   activeMotor: S.activeMotor,
   motorAngles: frozenMotorAngles(),
-  fabrication: S.fabrication
+  fabrication: S.fabrication,
+  modules: S.modules
 });
 let gripperController = null;
 function snapshotStr() {
@@ -131,6 +134,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   cancelMotorMode();
   Settings.syncFabricationInputs(); // 放棄尚未 change/blur 提交的表單草稿。
   S.comps = norm.comps;
+  S.modules = Array.isArray(norm.modules) ? norm.modules : [];
   S.topo = { params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '' };
   manualTrace = {};
   S.counter = Math.max(norm.counter || 0, Store.highestIdNum(S.comps));
@@ -204,7 +208,8 @@ const NOMINAL_FRAME_DT_MS = Motion.NOMINAL_FRAME_DT_MS;
 const playStepDeg = Motion.playStepDeg;
 const advanceByTime = Motion.advanceByTime;
 const planMotion = () => Motion.planMotion(S.compiled, S.topo, S.theta, lastSolved,
-  { active: String(S.activeMotor), frozen: frozenMotorAngles() });
+  { active: String(S.activeMotor), frozen: frozenMotorAngles() },
+  S.assembly ? p => solveAssembly(S.assembly, p) : undefined);
 const mobilePrompt = () => window.matchMedia('(hover: none), (pointer: coarse), (max-width: 640px)').matches;
 const promptText = (desktop, mobile) => mobilePrompt() ? mobile : desktop;
 const snapWorld = () => View.snapWorld() * (mobilePrompt() ? 2.35 : 1);
@@ -431,8 +436,23 @@ function frameConnectorNodes() { return Model.frameConnectorNodes(S.comps); }
 
 function rebuild() {
   syncSliderGeometries();
+  // 模組正規化：清掉零件已被刪光的模組、失效的輸出與安裝（只取 modules，comps 仍用 S.comps 原參照）。
+  if (S.modules.length) {
+    const nm = normalizeModules(S.modules, S.comps);
+    if (nm.ok) S.modules = nm.modules;
+  }
+  // rebake：宿主位姿變了就把子模組座標剛體平移／旋轉，維持 I1（就地寫回，保留零件物件參照）。
+  if (S.modules.length) {
+    const rb = rebakeModules(S.comps, S.modules, S.topo.params);
+    if (rb.changed) {
+      rb.comps.forEach((c, i) => Object.assign(S.comps[i], c));
+      S.modules = rb.modules;
+    }
+  }
   S.compiled = compileTopology(S.comps, S.topo, new Set());
   S.topo.params = S.compiled.params; // 沿用補齊後的參數
+  // 雙軌：求解改讀這份，繪製仍讀 S.compiled；沒有模組時維持 null，求解走原本的 S.compiled（不重複編譯）。
+  S.assembly = S.modules.length ? compileAssembly(S.comps, S.modules, S.topo) : null;
   lastSolved = {};               // 拓撲變了：丟掉舊解，避免拿到不相干的種子
   prevSolved = {};
   geomVersion++;                 // 結構/參數變了：讓軌跡快取失效（getTrajectoryData 重算）
@@ -510,7 +530,9 @@ function getTrajectoryData() {
   try {
     // S2b：範圍太窄（如夾爪 3.8°）時 5° 取不到足夠取樣點，改用 traceSweepRange 算出的步長。
     const { start, end, step } = Motion.traceSweepRange(thetaStart, thetaEnd);
-    data = Motion.traceSweeps(S.compiled, params, ids, start, end, step);
+    data = S.assembly
+      ? Motion.traceSweeps(S.compiled, params, ids, start, end, step, (c, p, s, e, st) => sweepAssembly(S.assembly, p, s, e, st))
+      : Motion.traceSweeps(S.compiled, params, ids, start, end, step);
   } catch (_) {
     data = [];
   }
@@ -677,7 +699,8 @@ function solveFrame() {
   let sol = null;
   // 帶「外插（上一幀＋速度）」的預測當種子：靠動量挑連續分支，平行四邊形不會翻成交叉。
   const seed = extrapolateSeed(lastSolved, prevSolved);
-  try { sol = solveTopology(S.compiled, { thetaDeg: S.theta, motorAngles: motorAnglesNow(), _prevPoints: seed }); } catch (_) {}
+  const frameParams = { thetaDeg: S.theta, motorAngles: motorAnglesNow(), _prevPoints: seed };
+  try { sol = S.assembly ? solveAssembly(S.assembly, frameParams) : solveTopology(S.compiled, frameParams); } catch (_) {}
   const solved = (sol && sol.points) ? sol.points : {};
   // 位移歷史往前推一格：這幀沒解出來的點沿用上一幀的舊值（桿件就不會憑空消失）
   const newLast = { ...lastSolved };

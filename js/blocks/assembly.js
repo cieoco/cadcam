@@ -226,20 +226,101 @@ export function rebakeModules(comps, modules, params) {
   return { comps: curComps, modules: curModules, changed };
 }
 
-export function canMergePoints(comps, idA, idB) {
+// 這個點 id（pointKeysFor 的點或零件 holes 裡的孔）所屬的模組 id；沒有標記或找不到回 null。
+export function moduleOfPoint(comps, id) {
   const list = Array.isArray(comps) ? comps : [];
-  const moduleOf = (id) => {
-    for (const c of list) {
-      for (const k of pointKeysFor(c)) {
-        if (c[k] && c[k].id === id) return c.moduleId || null;
-      }
-      if (Array.isArray(c.holes)) {
-        for (const h of c.holes) {
-          if (h && h.id === id) return c.moduleId || null;
-        }
+  for (const c of list) {
+    for (const k of pointKeysFor(c)) {
+      if (c[k] && c[k].id === id) return c.moduleId || null;
+    }
+    if (Array.isArray(c.holes)) {
+      for (const h of c.holes) {
+        if (h && h.id === id) return c.moduleId || null;
       }
     }
-    return null;
-  };
-  return moduleOf(idA) === moduleOf(idB);
+  }
+  return null;
+}
+
+export function canMergePoints(comps, idA, idB) {
+  return moduleOfPoint(comps, idA) === moduleOfPoint(comps, idB);
+}
+
+// D3：沿安裝鏈往上走，把沿途每個模組 mount.home 合併（祖先先放、越靠近自己的越後放＝覆蓋）。
+// 未安裝、根（null）、找不到 → {}；遇到走過的 id 就停，防迴圈。
+export function homePoseFor(modules, moduleId) {
+  const list = Array.isArray(modules) ? modules : [];
+  const byId = new Map(list.map(m => [m.id, m]));
+  const chain = [];   // chain[0] 是自己的 home，越後面離自己越遠
+  const seen = new Set();
+  let curId = moduleId;
+  while (curId != null) {
+    if (seen.has(curId)) break;
+    seen.add(curId);
+    const mod = byId.get(curId);
+    if (!mod || !mod.mount) break;
+    chain.push(mod.mount.home || {});
+    curId = mod.mount.to.module;
+  }
+  const result = {};
+  for (let i = chain.length - 1; i >= 0; i--) Object.assign(result, chain[i]);
+  return result;
+}
+
+// D3：目前姿態與組裝姿態（home）差多少；current = { activeMotor, theta, motorAngles }。
+// 全部相同（或 home 為空）→ null；否則回傳把 home 裡的馬達角度套用後的 { theta, motorAngles }。
+export function homeAdjustment(modules, moduleId, current) {
+  const home = homePoseFor(modules, moduleId);
+  const keys = Object.keys(home);
+  if (!keys.length) return null;
+  const activeMotor = current.activeMotor;
+  const theta = current.theta;
+  const motorAngles = current.motorAngles || {};
+  const norm = v => ((Number(v) % 360) + 360) % 360;
+  let diff = false;
+  for (const m of keys) {
+    const curAngle = (m === activeMotor) ? theta : (motorAngles[m] ?? 0);
+    const d = Math.abs(norm(curAngle) - norm(home[m]));
+    if (Math.min(d, 360 - d) > 1e-6) { diff = true; break; }   // 359.9999999° 與 0° 視為同角
+  }
+  if (!diff) return null;
+  const newMotorAngles = { ...motorAngles };
+  let newTheta = theta;
+  keys.forEach(m => {
+    if (m === activeMotor) newTheta = home[m];
+    else newMotorAngles[m] = home[m];
+  });
+  return { theta: newTheta, motorAngles: newMotorAngles };
+}
+
+// 不屬於「已安裝模組」的零件：沒有 moduleId、或 moduleId 對應的模組不存在、或該模組 mount 為 null。
+export function worldFrameComps(comps, modules) {
+  const list = Array.isArray(comps) ? comps : [];
+  const modList = Array.isArray(modules) ? modules : [];
+  if (!modList.length) return list;
+  const byId = new Map(modList.map(m => [m.id, m]));
+  return list.filter(c => {
+    if (!c.moduleId) return true;
+    const mod = byId.get(c.moduleId);
+    if (!mod) return true;
+    return !mod.mount;
+  });
+}
+
+// 已安裝模組零件上，type 為 fixed 或 motor 的點 id（這些孔「鎖在宿主上」，外觀不畫地錨樣式）。
+export function mountedBaseIds(comps, modules) {
+  const list = Array.isArray(comps) ? comps : [];
+  const modList = Array.isArray(modules) ? modules : [];
+  const byId = new Map(modList.map(m => [m.id, m]));
+  const ids = new Set();
+  list.forEach(c => {
+    if (!c.moduleId) return;
+    const mod = byId.get(c.moduleId);
+    if (!mod || !mod.mount) return;
+    pointKeysFor(c).forEach(k => {
+      const p = c[k];
+      if (p && (p.type === 'fixed' || p.type === 'motor')) ids.add(p.id);
+    });
+  });
+  return ids;
 }

@@ -54,7 +54,7 @@ export function extrapolateSeed(last, prev) {
 
 // 從目前姿勢沿著「同一組裝態」往單一方向走，走到「無解」或「接點瞬移過大」為止。
 // 瞬移過大＝求解器被迫跳到另一組鏡像裝態（桿件會看起來塌掉），那就是這個方向的真正極限。
-function walkBranch(compiled, topo, theta, lastSolved, dir, motorCtx) {
+function walkBranch(compiled, topo, theta, lastSolved, dir, motorCtx, solveFn) {
   const ids = new Set();
   (compiled.visualization.links || []).forEach(l => { if (!l.hidden) { ids.add(l.p1); ids.add(l.p2); } });
   const lens = (compiled.visualization.links || [])
@@ -65,7 +65,7 @@ function walkBranch(compiled, topo, theta, lastSolved, dir, motorCtx) {
     const params = { thetaDeg: norm360(deg), _prevPoints: seed };
     // 多馬達：探路的角度只掃 active 那顆，其餘馬達凍結在 motorCtx.frozen 的角度。
     if (motorCtx) params.motorAngles = { ...motorCtx.frozen, [motorCtx.active]: norm360(deg) };
-    try { s = solveTopology(compiled, params); } catch (_) {}
+    try { s = solveFn(params); } catch (_) {}
     return s;
   };
   const maxDisp = (seed, pts) => {
@@ -94,9 +94,10 @@ function walkBranch(compiled, topo, theta, lastSolved, dir, motorCtx) {
 }
 
 // S2：軌跡點共用同一份 compiled，只呼叫一次 sweepTopology，再分別取出每個軌跡點的 B，取代逐點各掃一次。
-export function traceSweeps(compiled, params, ids, startDeg, endDeg, stepDeg) {
+// sweepFn 選填：組合作品要改用 sweepAssembly 求解時注入，預設仍是 sweepTopology（行為不變）。
+export function traceSweeps(compiled, params, ids, startDeg, endDeg, stepDeg, sweepFn = sweepTopology) {
   if (!ids.length) return [];
-  const { results } = sweepTopology(compiled, params, startDeg, endDeg, stepDeg);
+  const { results } = sweepFn(compiled, params, startDeg, endDeg, stepDeg);
   return ids.map(id => ({
     id,
     results: results.map(step => ({
@@ -127,9 +128,10 @@ export function fallbackTraceIds(comps, id) {
 }
 
 // 開始播放前先規劃這個機構是「整圈轉」還是「來回擺」、以及來回擺的兩端在哪。
-export function planMotion(compiled, topo, theta, lastSolved, motorCtx) {
-  const fwd = walkBranch(compiled, topo, theta, lastSolved, 1, motorCtx);
-  const bwd = walkBranch(compiled, topo, theta, lastSolved, -1, motorCtx);
+// solveFn 選填：組合作品要改用 sweepAssembly／solveAssembly 求解時注入，預設仍是 solveTopology（行為不變）。
+export function planMotion(compiled, topo, theta, lastSolved, motorCtx, solveFn = p => solveTopology(compiled, p)) {
+  const fwd = walkBranch(compiled, topo, theta, lastSolved, 1, motorCtx, solveFn);
+  const bwd = walkBranch(compiled, topo, theta, lastSolved, -1, motorCtx, solveFn);
   if (fwd.full || bwd.full || (fwd.limit - bwd.limit) >= 360 - PLAY_STEP) {
     return { mode: 'rotate' };
   }
