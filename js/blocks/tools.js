@@ -18,6 +18,7 @@ import * as View from './view.js';
 import * as Model from './model.js';
 import { MAX_PLATE_POINTS, worldToLocal } from './plate-geometry.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：元件擁有的 topo.params key
+import { connectionModule } from './assembly.js';   // D2 樹狀組裝：新零件接的既有節點須同屬一個模組
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const { W, H, TX, TY } = View;
@@ -35,12 +36,19 @@ const pointLimitMessage = () => `多點桿最多 ${MAX_PLATE_POINTS} 點；點�
 // ---- 注入的外部依賴（由 app 在啟動時提供）----
 let svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
     setBanner, clearBanner, worldFromEvent, pointCoords, nearestDisplayToPoint, snapWorld,
-    mobilePrompt, promptText, displayPointCoords;
+    mobilePrompt, promptText, displayPointCoords, notify;
 
 export function init(deps) {
   ({ svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
      setBanner, clearBanner, worldFromEvent, pointCoords, nearestDisplayToPoint, snapWorld,
-     mobilePrompt, promptText, displayPointCoords } = deps);
+     mobilePrompt, promptText, displayPointCoords, notify } = deps);
+}
+
+// D2 樹狀組裝：新零件接到不同模組的既有節點時拒絕，退出目前畫圖工具並提示。
+function rejectCrossModule(exit) {
+  exit();
+  draw();
+  notify('不同模組只能用安裝接口連接');
 }
 
 // ---- 畫桿模式：桌機可拖放或點兩下；觸控按住起點、拖到終點放開。----
@@ -365,18 +373,22 @@ function confirmTriangleBase(e) {
 }
 function finishTriangleAsLink() {
   if (S.trianglePoints.length < 2) return;
+  const conn = connectionModule(S.comps, S.trianglePoints.slice(0, 2).map(p => p.nodeId));
+  if (!conn.ok) { rejectCrossModule(exitDrawTriangle); return; }
   pushUndo();
   const n = ++S.counter;
   const lp = 'LL' + n;
   const a = S.trianglePoints[0];
   const b = S.trianglePoints[1];
   const len = Math.round(Math.hypot(b.pos.x - a.pos.x, b.pos.y - a.pos.y));
-  S.comps.push({
+  const comp = {
     type: 'bar', id: 'Link' + n, color: '#3498db',
     p1: { id: a.nodeId || 'P' + n + 'a', type: 'floating', x: a.pos.x, y: a.pos.y },
     p2: { id: b.nodeId || 'P' + n + 'b', type: 'floating', x: b.pos.x, y: b.pos.y },
     lenParam: lp, isInput: false, fixedLen: true
-  });
+  };
+  if (conn.moduleId) comp.moduleId = conn.moduleId;
+  S.comps.push(comp);
   S.topo.params[lp] = len;
   exitDrawTriangle();
   rebuild(); draw();
@@ -384,6 +396,8 @@ function finishTriangleAsLink() {
 }
 function finishTriangleFromPoints() {
   if (S.trianglePoints.length < 3) return;
+  const conn = connectionModule(S.comps, S.trianglePoints.slice(0, 3).map(p => p.nodeId));
+  if (!conn.ok) { rejectCrossModule(exitDrawTriangle); return; }
   pushUndo();
   const n = ++S.counter;
   const suffix = ['a', 'b', 'c'];
@@ -407,6 +421,7 @@ function finishTriangleFromPoints() {
     comp.shapeMode = 'polyline';
     comp.jawTurnSign = jawTurnSign(pts[0], pts[1], pts[2]);
   }
+  if (conn.moduleId) comp.moduleId = conn.moduleId;
   S.comps.push(comp);
   S.topo.params[gParam] = dist(pts[0], pts[1]);
   S.topo.params[r1Param] = dist(pts[0], pts[2]);
@@ -514,6 +529,8 @@ function buildBarFromPolygonPoints() {
     x: first.pos.x + dx * scale,
     y: first.pos.y + dy * scale
   };
+  const conn = connectionModule(S.comps, [first.nodeId, second.nodeId]);
+  if (!conn.ok) { rejectCrossModule(exitDrawPolygon); return; }
   pushUndo();
   const n = ++S.counter;
   const param = 'LL' + n;
@@ -522,6 +539,7 @@ function buildBarFromPolygonPoints() {
     p1: { id: first.nodeId || `P${n}a`, type: 'floating', x: first.pos.x, y: first.pos.y },
     p2: { id: second.nodeId || `P${n}b`, type: 'floating', x: end.x, y: end.y }
   };
+  if (conn.moduleId) comp.moduleId = conn.moduleId;
   S.comps.push(comp);
   S.topo.params[param] = Math.round(Math.hypot(end.x - first.pos.x, end.y - first.pos.y));
   exitDrawPolygon();
@@ -531,6 +549,8 @@ function buildBarFromPolygonPoints() {
 function buildPolygonPlate() {
   const all = S.polygonPoints;
   if (all.length < 3) return;
+  const conn = connectionModule(S.comps, all.map(p => p.nodeId));
+  if (!conn.ok) { rejectCrossModule(exitDrawPolygon); return; }
   pushUndo();
   const n = ++S.counter;
   const suffix = ['a', 'b', 'c'];
@@ -556,6 +576,7 @@ function buildPolygonPlate() {
     gParam, r1Param, r2Param, sign: 1,
     vertices
   };
+  if (conn.moduleId) comp.moduleId = conn.moduleId;
   S.comps.push(comp);
   S.topo.params[gParam] = dist(pNode[0], pNode[1]);
   S.topo.params[r1Param] = dist(pNode[0], pNode[2]);
@@ -623,18 +644,22 @@ export function finishDrawLink(e) {
   const cur = worldFromEvent(e) || S.drawPreview || S.drawStart;
   const res = resolveDrawEnd(S.drawStart, cur, S.drawStartNodeId, S.drawKind !== 'rail');
   if (S.drawKind === 'rail') { finishDrawRail(res); return; }
+  const conn = connectionModule(S.comps, [S.drawStartNodeId, res.nodeId]);
+  if (!conn.ok) { rejectCrossModule(exitDrawLink); return; }
   pushUndo();
   // 暫停在動畫姿勢時，孔的畫面座標可能不同於元件存檔座標；先把接上的孔定在眼前位置。
   if (S.drawStartNodeId) Model.updatePointCoordsById(S.comps, S.drawStartNodeId, S.drawStart.x, S.drawStart.y);
   if (res.nodeId) Model.updatePointCoordsById(S.comps, res.nodeId, res.pos.x, res.pos.y);
   const n = ++S.counter;
   const lp = 'LL' + n;
-  S.comps.push({
+  const comp = {
     type: 'bar', id: 'Link' + n, color: '#3498db',
     p1: { id: 'P' + n + 'a', type: 'floating', x: S.drawStart.x, y: S.drawStart.y },
     p2: { id: 'P' + n + 'b', type: 'floating', x: res.pos.x, y: res.pos.y },
     lenParam: lp, isInput: false, fixedLen: true
-  });
+  };
+  if (conn.moduleId) comp.moduleId = conn.moduleId;
+  S.comps.push(comp);
   S.topo.params[lp] = res.len;
   // 端點落在既有接點上就合併相接（這就是「連接」）
   if (S.drawStartNodeId) S.comps = Model.mergePoints(S.comps, 'P' + n + 'a', S.drawStartNodeId);
@@ -646,13 +671,15 @@ export function finishDrawLink(e) {
 // 滑軌：軌道兩端釘地（fixed），中點放一個滑塊點（floating），沿軌道滑動。
 // 之後用🔵連桿把曲柄端接到滑塊點，compile 會自動把它解成 slider（滑塊曲柄）。
 function finishDrawRail(res) {
+  const conn = connectionModule(S.comps, [S.drawStartNodeId, res.nodeId]);
+  if (!conn.ok) { rejectCrossModule(exitDrawLink); return; }
   pushUndo();
   const n = ++S.counter;
   const a = { x: S.drawStart.x, y: S.drawStart.y };
   const b = { x: res.pos.x, y: res.pos.y };
   const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
   const lp = 'SL' + n;
-  S.comps.push({
+  const comp = {
     type: 'slider', id: 'Slider' + n, color: '#16a085', sign: 1,
     p1: { id: 'S' + n + 'a', type: 'fixed', x: a.x, y: a.y },
     p2: { id: 'S' + n + 'b', type: 'fixed', x: b.x, y: b.y },
@@ -666,7 +693,9 @@ function finishDrawRail(res) {
     railOffset: 0,
     travelStart: 0,
     travelEnd: res.len
-  });
+  };
+  if (conn.moduleId) comp.moduleId = conn.moduleId;
+  S.comps.push(comp);
   S.topo.params[lp] = res.len;
   // 軌道端點落在既有接點上就合併（讓滑軌掛到既有結構）
   if (S.drawStartNodeId) S.comps = Model.mergePoints(S.comps, 'S' + n + 'a', S.drawStartNodeId);

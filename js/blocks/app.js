@@ -28,7 +28,7 @@ import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
 import * as Motion from './motion.js';
-import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, mountedBaseIds as moduleMountedBaseIds } from './assembly.js';
+import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule } from './assembly.js';
 import { normalizeModules } from './module-schema.js';
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
@@ -243,11 +243,22 @@ const nearestDisplayToPoint = (world, exclude = [], maxDist = snapWorld()) => {
   return best;
 };
 // 找最接近「某接點目前畫面位置」的另一個接點（拖曳吸附用）。
+// 有模組時候選逐一比對：跨模組（D2）的候選要略過，不能只檢查最終挑到的那個。
 const nearestDisplayTo = (id, exclude = []) => {
   const m = displayCoords();
   const d = m[id];
   if (!d) return null;
-  return nearestDisplayToPoint(d, [id, ...exclude]);
+  const maxDist = snapWorld();
+  const excludeSet = [id, ...exclude];
+  let best = null, bestD = maxDist;
+  for (const cid in m) {
+    if (isHiddenSliderRailPoint(cid)) continue;
+    if (excludeSet.includes(cid)) continue;
+    if (S.modules.length && !canMergePoints(S.comps, id, cid)) continue;
+    const dist = Math.hypot(m[cid].x - d.x, m[cid].y - d.y);
+    if (dist < bestD) { bestD = dist; best = cid; }
+  }
+  return best;
 };
 // 若 id 是某根「馬達輸入桿」的動端（非馬達中心那頭），回那根桿；否則 null。
 const inputCrankMovingEnd = (id) => S.comps.find(c =>
@@ -810,7 +821,7 @@ function drawGearPart(c, pts) {
     project: p => ({ x: TX(p.x), y: TY(p.y) }), params: S.topo.params,
     gearById, selected: c.id === S.selectedGearId, meshOff: gearMeshOff(c),
     interactionBlocked: () => Boolean(S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars),
-    onSelect: selectGear, onRotate: startGearManualRotate
+    onSelect: id => { if (ensureModuleHome(compModuleId(id))) return; selectGear(id); }, onRotate: startGearManualRotate
   });
   if (update) frameUpdaters.push(update);
 }
@@ -834,7 +845,7 @@ function drawTrianglePart(c, pts, ctx) {
     component: c, points: pts, ctx, svg, scale: View.getScale(),
     project: p => ({ x: TX(p.x), y: TY(p.y) }), selectedId: S.selectedTriangleId,
     interactionBlocked: () => Boolean(S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars),
-    onSelect: selectTriangle, shapeMode: plateShapeMode, plateExtras,
+    onSelect: id => { if (ensureModuleHome(compModuleId(id))) return; selectTriangle(id); }, shapeMode: plateShapeMode, plateExtras,
     platePath, roundedPath: roundedTriangleHullPath, vertices: plateVertices, localToWorld,
     onShapeDrag: startShapeDrag, onDeleteShapeVertex: deleteShapeVertex,
     registerUpdate: update => frameUpdaters.push(update)
@@ -901,6 +912,7 @@ const PART_DRAW = {
 };
 
 function draw() {
+  clearOffHomeModuleSelection();
   memberEditor.sync();
   gripperController?.syncVisibility();
   while (svg.firstChild) svg.removeChild(svg.firstChild);
@@ -1035,7 +1047,12 @@ function draw() {
     links: S.compiled.visualization.links || [], comps: S.comps, points: pts, triangleEdgeKeys, isGroundBar,
     selectedLinkId: S.selectedLinkId, pickBars: S.pickBars,
     interactionBlocked: () => Boolean(S.drawingLink || S.drawingTriangle || S.drawingPolygon),
-    onTryPick: tryPickBar, onFreeDrag: Input.startFreeLinkDrag, onSelect: selectLink,
+    onTryPick: tryPickBar,
+    onFreeDrag: (e, linkId) => {
+      if (ensureModuleHome(compModuleId(linkId))) { e?.preventDefault?.(); e?.stopPropagation?.(); return true; }
+      return Input.startFreeLinkDrag(e, linkId);
+    },
+    onSelect: id => { if (ensureModuleHome(compModuleId(id))) return; selectLink(id); },
     groupForLayer, linkLayer, groundIds, hullRadius: HULL_R_WORLD, scale: View.getScale(),
     barHullPath, project: p => ({ x: TX(p.x), y: TY(p.y) }), hostedMounts: mountSplit2d.hosted,
     holeRadius: Settings.exportSettings().holeDiameterMm / 2,
@@ -1074,7 +1091,7 @@ function draw() {
     points: pts, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds,
     gearPinIds, pulleyPinIds, camFollowerIds, workpieceIds, dragId: S.dragId,
     sliderMountInfo, project: p => ({ x: TX(p.x), y: TY(p.y) }),
-    onPointerDown: Input.onNodeDown, registerUpdate: update => frameUpdaters.push(update),
+    onPointerDown: guardedNodeDown, registerUpdate: update => frameUpdaters.push(update),
     mountedBaseIds: moduleMountedBaseIds(S.comps, S.modules)
   });
 
@@ -1173,6 +1190,7 @@ function drawSliders(pts, parent) {
 // 播放快路徑：只重解 + 跑各更新器就地改幾何，不拆 DOM 結構。只有 play() 迴圈會呼叫。
 // 結構（零件/選取/縮放/拖曳）在播放期間不變，故安全；任何結構變更都走 draw() 完整重建。
 function renderFrame() {
+  if (clearOffHomeModuleSelection()) { draw(); return; }
   if (!S.compiled || !S.comps.length || !frameUpdaters.length) { draw(); return; }
   const { pts, sol } = solveFrame();
   updateLiveClampDistance(pts);
@@ -1648,6 +1666,49 @@ function bringPart(dir) {
 }
 
 
+// 這個零件目前所屬的模組 id（沒標記＝根）。
+function compModuleId(id) { return S.comps.find(c => c.id === id)?.moduleId || null; }
+
+// D3：要動已安裝模組的零件前，若宿主鏈馬達不在組裝姿態（home）就先轉回去、重畫、提示，
+// 這一下不執行原本動作（回傳 true 給呼叫端擋下）。
+function ensureModuleHome(moduleId) {
+  if (!moduleId || !S.modules.length) return false;
+  const adj = homeAdjustment(S.modules, moduleId, { activeMotor: String(S.activeMotor), theta: S.theta, motorAngles: S.motorAngles });
+  if (!adj) return false;
+  pause();
+  S.theta = adj.theta;
+  S.motorAngles = adj.motorAngles;
+  document.getElementById('thetaVal').textContent = Math.round(norm360(S.theta));
+  draw();
+  transient('已回到組裝姿態，請再點一次進行修改');
+  return true;
+}
+
+// D3：姿態離開 home 時，若目前選取的是已安裝模組的零件／節點，自動取消選取
+// （避免播放中還顯示著把手、再拖曳寫錯座標）。
+function clearOffHomeModuleSelection() {
+  if (!S.modules.length) return false;
+  const mod = selectionModule(S.comps, { linkId: S.selectedLinkId, triangleId: S.selectedTriangleId, sliderId: S.selectedSliderId, gearId: S.selectedGearId, nodeId: S.selectedNodeId });
+  if (!mod) return false;
+  if (!homeAdjustment(S.modules, mod, { activeMotor: String(S.activeMotor), theta: S.theta, motorAngles: S.motorAngles })) return false;
+  S.selectedLinkId = S.selectedTriangleId = S.selectedSliderId = S.selectedNodeId = null;
+  deselectGear();
+  closeMobileEditPanel();
+  document.getElementById('lenEditor').style.display = 'none';
+  document.getElementById('roleEditor').style.display = 'none';
+  document.getElementById('sliderBaseBtn').style.display = 'none';
+  document.getElementById('linkToRailBtn').style.display = 'none';
+  setSliderDetailRows(false);
+  return true;
+}
+
+// D3 守門包住 Input.onNodeDown：按到已安裝模組的節點時，先回組裝姿態，這一下不下拉。
+// renderNodes 與 Render.init 共用同一個包裝，行為才一致。
+function guardedNodeDown(e, id) {
+  if (ensureModuleHome(moduleOfPoint(S.comps, id))) { e?.preventDefault?.(); e?.stopPropagation?.(); return; }
+  Input.onNodeDown(e, id);
+}
+
 function deselectLink() {
   if (!S.selectedLinkId && !S.selectedTriangleId && !S.selectedSliderId && !S.selectedGearId) return;
   S.selectedLinkId = null;
@@ -1886,17 +1947,18 @@ async function share() {
 
 // ---- 啟動：分享連結優先，其次 localStorage 自動還原，否則空白 ----
 function init() {
-  Render.init({ svg, onNodeDown: Input.onNodeDown });   // 注入繪製基元的外部依賴（預設 parent + 固定孔互動）
+  Render.init({ svg, onNodeDown: guardedNodeDown });   // 注入繪製基元的外部依賴（預設 parent + 固定孔互動）
   Panels.init({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked });
   Tools.init({ svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
                setBanner, clearBanner, worldFromEvent, pointCoords, nearestDisplayToPoint, snapWorld,
-               mobilePrompt, promptText, displayPointCoords: displayCoords });
+               mobilePrompt, promptText, displayPointCoords: displayCoords, notify: transient });
   Input.init({ svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
                worldFromEvent, pointCoords, mobilePrompt,
                snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
                movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
                isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
                handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround, recordManualTrace, solvePinnedConstraints,
+               nodeDownEntry: guardedNodeDown,
                snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel, openFrameEditor: () => { S.frameEditorOpen = true; Panels.updateFrameEditor(); }, transient,
                isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, pointIsRackHole });
   Settings.init({ draw, pushUndo, pause, scheduleAutosave, notify: transient });

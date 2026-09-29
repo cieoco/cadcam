@@ -246,6 +246,35 @@ export function canMergePoints(comps, idA, idB) {
   return moduleOfPoint(comps, idA) === moduleOfPoint(comps, idB);
 }
 
+// D2：新零件要接的既有節點是否同屬一個模組（根也算一個）；略過 falsy 的 id。
+export function connectionModule(comps, nodeIds) {
+  const ids = (Array.isArray(nodeIds) ? nodeIds : []).filter(Boolean);
+  let moduleId = null, has = false;
+  for (const id of ids) {
+    const m = moduleOfPoint(comps, id);
+    if (!has) { moduleId = m; has = true; }
+    else if (m !== moduleId) return { ok: false, moduleId: null };
+  }
+  return { ok: true, moduleId: has ? moduleId : null };
+}
+
+// 目前選取的零件／節點屬於哪個模組：依 link → triangle → slider → gear → node 順序，
+// 取第一個「有值」的欄位（零件查不到就回 null，不會落到下一個欄位）。
+export function selectionModule(comps, sel) {
+  if (!sel) return null;
+  const list = Array.isArray(comps) ? comps : [];
+  const byCompId = (id) => {
+    const c = list.find(x => x.id === id);
+    return c ? (c.moduleId ?? null) : null;
+  };
+  if (sel.linkId) return byCompId(sel.linkId);
+  if (sel.triangleId) return byCompId(sel.triangleId);
+  if (sel.sliderId) return byCompId(sel.sliderId);
+  if (sel.gearId) return byCompId(sel.gearId);
+  if (sel.nodeId) return moduleOfPoint(comps, sel.nodeId);
+  return null;
+}
+
 // D3：沿安裝鏈往上走，把沿途每個模組 mount.home 合併（祖先先放、越靠近自己的越後放＝覆蓋）。
 // 未安裝、根（null）、找不到 → {}；遇到走過的 id 就停，防迴圈。
 export function homePoseFor(modules, moduleId) {

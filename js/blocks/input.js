@@ -31,6 +31,7 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
     movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
     isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
     handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
+    nodeDownEntry = null,               // 手機接點優先命中的入口（app 注入模組守門版；未注入用 onNodeDown）
     openMobileEditPanel = () => {},
     closeMobileEditPanel = () => {},
     openFrameEditor = () => {},
@@ -371,6 +372,7 @@ export function init(deps) {
      snapFrameNodesToGrid = (() => {}),
      isGroundPositionUnlocked = (() => false),
      relockGroundPosition = (() => {}),
+     nodeDownEntry = null,
      rotateInputCrankToPoint = (() => false),
      pointIsRackHole = (() => false) } = deps);
 
@@ -455,7 +457,7 @@ export function init(deps) {
     if (!id) return;
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); // 維持縮放偵測的指標帳本
     e.stopPropagation();   // 攔住桿身/三角板的 pointerdown，避免被搶去選長度
-    onNodeDown(e, id);
+    (nodeDownEntry || onNodeDown)(e, id);
   }, true);
 
   svg.addEventListener('wheel', (e) => {

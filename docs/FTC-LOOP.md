@@ -24,7 +24,7 @@
 | S3 漏解警示 | Sonnet | 新純函式（`motion.js` 或新檔）＋ `updateMechanismStatus` 接線；新測試。 | E-S3＋E-S3b。 | 完成（Sonnet 一輪通過） |
 | M0 盤點 | 主模型 | 只讀程式、新增 baseline 測試與本節證據；回答 SDD §7 四個開放問題。 | 列出 fixed 點讀取處、座標寫入口、匯出成本；把 L0 POC 轉成 fixture。 | 完成 |
 | M1a 組合求解 | Sonnet | 新增 `js/blocks/assembly.js`（純函式）＋ `schema.js` 的 `normalizeModules`／`toSnapshot` 選配輸出；測試 `test/assembly.mjs`、`test/assembly-schema.mjs`（fixture 由主模型先寫）。 | E-M1～E-M5、E-M7。不碰 app.js。 | 完成（Sonnet 一輪通過，主模型審查補兩處邊界） |
-| M1b app 接線 | Sonnet（分三刀） | 刀 1：快照帶模組、rebuild 呼叫 rebake、求解呼叫點改走 assembly。刀 2：世界機架排除已安裝模組、節點外觀、每個模組另出機架檔。刀 3：跨模組合併防呆、D3 編輯前回到組裝姿態、新零件歸屬起點模組。 | E-M3 零回歸＋既有全套＋瀏覽器載入所有範例播放無差異。 | 刀 1、刀 2 完成（本機 commit） |
+| M1b app 接線 | Sonnet（分三刀） | 刀 1：快照帶模組、rebuild 呼叫 rebake、求解呼叫點改走 assembly。刀 2：世界機架排除已安裝模組、節點外觀、每個模組另出機架檔。刀 3：跨模組合併防呆、D3 編輯前回到組裝姿態、新零件歸屬起點模組。 | E-M3 零回歸＋既有全套＋瀏覽器載入所有範例播放無差異。 | 完成（三刀皆本機 commit；刀 3 主模型補觸控路徑守門） |
 | M1c 模組操作 UI | Sonnet | 新增 `js/blocks/module-editor.js`（`createModuleEditor(deps)` 工廠）、模組庫資料、`blocks.html` 局部；app.js 只接線。 | E-M6＋SDD §4.3 七項操作的桌機／窄畫面實測。 | 待施工 |
 | M1d R3 驗收 | 主模型 | 內建模組兩個＋必要修正；本節證據與 SDD 狀態。 | E-M8 全程；證據邊界照 SDD §5。 | 待施工 |
 
@@ -105,6 +105,18 @@
 - 瀏覽器（fixture 自存重載）：確認載入 m1b2 版本；GCB 為虛線圓環、LGA 仍為地錨方塊、GCA 仍為馬達樣式。攔截下載（不實際落地）執行 SVG 匯出：7 個檔案含 `frame.svg` 與 `Grip1-frame.svg`，提示「已匯出 5 個零件 + 機架 SVG＋ 1 個模組底座」；世界 `frame.svg` 的圓孔數 6，與原版 `competition-rack-lift` 的 `frame.svg` 相同（夾爪孔已排除）；`Grip1-frame.svg` 5 個圓孔。console error 為 0；測試自存已清除。
 - 既有行為（非本刀造成）：齒條不會匯出成零件檔，原版齒條升降範例同樣只匯出 `LiftPinion.svg` 與 `frame.svg`。
 - 範圍外（M1 不做）：畫布與 3D 不畫模組底座板，只在匯出時產生；DXF 匯出與 SVG 共用同一段邏輯，本輪只以攔截方式實測 SVG。
+
+### M1b 刀 3 證據（2026-09-30，編輯守門；本機 commit、未 push）
+
+- 施工（Sonnet，一輪通過）：`assembly.js` 新增 `connectionModule`、`selectionModule`；app 的 `nearestDisplayTo` 略過跨模組候選（沒有模組時與原本逐步相同）；新增 `ensureModuleHome`（宿主鏈馬達不在 home 時先轉回、重畫、提示，這一下不執行原動作）與 `clearOffHomeModuleSelection`（`draw()`、`renderFrame()` 開頭檢查，姿態離開 home 時自動取消已安裝模組的選取，不在 draw 裡呼叫 draw）；齒輪、三點桿、連桿點選與自由拖曳、節點（renderNodes 與 Render.init 共用 `guardedNodeDown`）包上守門，手轉齒輪不包；tools.js 六個新零件建立點先以 `connectionModule` 檢查、跨模組拒絕並提示，同模組時新零件標上 `moduleId`。
+- **主模型瀏覽器驗收發現的漏洞並修正**：窄畫面（手機）版面下，input.js 的「接點優先命中」capture 監聽器依座標直接呼叫 `onNodeDown`，繞過守門。改為可注入的 `nodeDownEntry`，app 注入 `guardedNodeDown`（未注入時行為不變）；import map 加 `input.js?v=20260930_m1b3`、app.js 升版 `20260930_m1b3b`。
+- 自動：`assembly-edit` 16/16；全套 60 支全過；schema 70/70。
+- 瀏覽器（fixture 自存重載，窄畫面版面）：
+  - 升降播到 62° 後點夾爪 GCB（一般路徑）與觸控點 LT（capture 路徑）：第一下回到 0°、不選取、提示「已回到組裝姿態，請再點一次進行修改」；第二下才選取。修正前觸控路徑會繞過。
+  - GCB 選取中播放：選取自動清除、角色面板收起，播放不中斷。點升降（未安裝模組）的節點 LGA 不觸發回到組裝姿態。
+  - 觸控畫桿：GCA→LPC（跨模組）被拒，無新零件並提示「不同模組只能用安裝接口連接」；LPC→LGA（同為 Lift1）成功，新連桿自動標 `moduleId: Lift1`。
+  - console error 為 0；測試自存已清除。
+- 未能在瀏覽器驗證：拖曳吸附的跨模組防呆。fixture 內沒有可自由拖動的浮動點（爪尖受爪板剛體約束、地錨有位置鎖），對照組無法成立；該路徑由 `canMergePoints` 的 node 測試與 `nearestDisplayTo` 的 diff 審查涵蓋。三點桿／多邊形板的跨模組拒絕也只有 diff 審查，未在瀏覽器操作。
 
 ## R1e 加工設定隨作品保存（2026-09-25 功能完成，2026-09-26 下載落地驗證通過／完成）
 
