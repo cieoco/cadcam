@@ -116,6 +116,7 @@
   - GCB 選取中播放：選取自動清除、角色面板收起，播放不中斷。點升降（未安裝模組）的節點 LGA 不觸發回到組裝姿態。
   - 觸控畫桿：GCA→LPC（跨模組）被拒，無新零件並提示「不同模組只能用安裝接口連接」；LPC→LGA（同為 Lift1）成功，新連桿自動標 `moduleId: Lift1`。
   - console error 為 0；測試自存已清除。
+- **M1b 收尾回歸發現的快取問題並修正**：全範例回歸時 console 出現 `rebuild` 讀 `S.modules.length` 為 undefined。查明刀 1 修改了 `state.js`（新增 `modules: []`）卻沒有進 import map，瀏覽器沿用快取的舊版 state.js；有自存的作品因 `applySnapshot` 會補上 `S.modules` 而沒發作，**第一次開頁、沒有自存的使用者會在初始化時出錯**。補上 `"./js/blocks/state.js": "…?v=20260930_m1b1"`，並核對 M1 期間改過的所有 js（`app.js` 由 script src 升版；`module-schema.js`、`solve-health.js` 為新檔），皆已有版本。新分頁、無自存重載：state.js 載入新版、console error 為 0。全 17 個範例播放回歸：`S.modules` 皆為 0、`S.assembly` 皆為 null，可播放者 20 幀前進 42°（夾爪任務範圍內 4°），縮放儀（手動）與空白挑戰不播放，與改動前一致。
 - 未能在瀏覽器驗證：拖曳吸附的跨模組防呆。fixture 內沒有可自由拖動的浮動點（爪尖受爪板剛體約束、地錨有位置鎖），對照組無法成立；該路徑由 `canMergePoints` 的 node 測試與 `nearestDisplayTo` 的 diff 審查涵蓋。三點桿／多邊形板的跨模組拒絕也只有 diff 審查，未在瀏覽器操作。
 
 ## R1e 加工設定隨作品保存（2026-09-25 功能完成，2026-09-26 下載落地驗證通過／完成）
