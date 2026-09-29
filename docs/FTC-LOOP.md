@@ -20,6 +20,7 @@
 | S1 依時間播放 | Sonnet | `motion.js` 新增 `advanceByTime`；`app.js` 的 `play()` 改用 rAF 時間戳；新測試 `test/play-timing.mjs`。 | E-S1 自動＋E-S1b 瀏覽器；既有 rock-motion 測試通過。 | 完成（Sonnet 一輪通過） |
 | S2 軌跡一次掃 | Sonnet | 只改 `app.js` 的 `getTrajectoryData`；新測試比較新舊算法。 | E-S2。 | 完成（Sonnet 一輪通過） |
 | S2b 窄範圍軌跡取樣 | Sonnet | `traceSweeps` 呼叫端依範圍調整步長（見 S2 證據的發現）；新測試。 | 夾爪範例畫得出兩條軌跡、量測卡最小≠最大；E-S2 仍通過。 | 完成（Sonnet 一輪通過） |
+| S4 預設軌跡點 | Sonnet | `motion.js` 新增 `fallbackTraceIds`；`getTrajectoryData` 退回預設點時略過 fixed／motor 點；新測試。 | 沒指定軌跡點的範例不再顯示 0 mm 量測卡；有指定的範例不變。 | 完成（Sonnet 一輪通過） |
 | S3 漏解警示 | Sonnet | 新純函式（`motion.js` 或新檔）＋ `updateMechanismStatus` 接線；新測試。 | E-S3＋E-S3b。 | 完成（Sonnet 一輪通過） |
 | M0 盤點 | 主模型 | 只讀程式、新增 baseline 測試與本節證據；回答 SDD §7 四個開放問題。 | 列出 fixed 點讀取處、座標寫入口、匯出成本；把 L0 POC 轉成 fixture。 | 待施工 |
 | M1a 組合求解 | Sonnet | 新增 `js/blocks/assembly.js`（純函式）＋ `schema.js` 的 `normalizeModules`／`toSnapshot` 選配輸出；測試 `test/assembly.mjs`、`test/assembly-schema.mjs`（fixture 由主模型先寫）。 | E-M1～E-M5、E-M7。不碰 app.js。 | 待施工 |
@@ -56,7 +57,16 @@
 - 審查：主模型寫測試時原假設「爪尖距離變化＝淨開口差 20 mm」，臨時實作驗證得 13.03 mm（淨開口以內彎爪板接觸處估算，不是爪尖），先修正測試再派工。Sonnet 回報的「app.js 版本字串不符」是誤讀 git diff 的 HEAD 側，工作區實際為預期值。
 - 自動：`trace-range` 24/24、`trace-sweep` 34/34（整圈結果不變）、`play-timing` 17/17、`solve-health` 23/23；全套 54 支全過；schema 70/70。
 - 瀏覽器：雙齒輪夾爪由「0 條軌跡、兩點距離 150–150 mm」變為兩條各 25 點軌跡、「兩點距離 137–150 mm」；Jansen 仍為 73 點、工作範圍 68 mm。
-- **發現（既有問題，未處理）**：`competition-fourbar-lift` 範例沒有指定軌跡點，app 退回 compile 預設的 `O1`（固定樞軸），因此工作範圍卡顯示「0 mm」。舊算法相同結果。可在範例補 `tracePoints` 或讓預設軌跡點略過固定點，待使用者決定。
+- **發現（既有問題，未處理）**：`competition-fourbar-lift` 範例沒有指定軌跡點，app 退回 compile 預設的 `O1`（固定樞軸），因此工作範圍卡顯示「0 mm」。舊算法相同結果。可在範例補 `tracePoints` 或讓預設軌跡點略過固定點，待使用者決定。→ 已由 S4 處理。
+
+### S4 證據（2026-09-29）
+
+- 決策：只做通用修正，不在 `competition-fourbar-lift` 預設軌跡點——該範例教學卡的「試試看」本來就要學生「把前端接點設為工作點量升降高度」，預設好會拿掉這個練習。
+- 盤點：沒指定軌跡點的範例共 9 個（四連桿、平行四連桿、滑塊曲柄、齒輪對、減速齒輪、齒條齒輪、皮帶輪、兩個競賽升降），compile 預設點全是 fixed 或 motor 點，修正前都會畫不動的點並顯示「工作範圍 0 mm」。主模型寫測試時誤記為 8 個，以臨時實作驗證時抓到並修正。
+- 修改：`motion.js` 新增 `fallbackTraceIds`（找不到、或任一處為 fixed／motor 就回傳空陣列）；`getTrajectoryData` 改用它；import map 與 app.js 升版 `20260929_s4`。
+- 自動：`test/trace-fallback.mjs` 20/20；全套 55 支全過；schema 70/70。
+- 瀏覽器：四連桿、齒輪對、兩個競賽升降不再畫軌跡、量測卡隱藏；Jansen（68 mm）、夾爪（137–150 mm）不變。把升降臂設 `tracePoints: ['C']` 寫入預覽自存後重載，工具端軌跡 73 點、「工作範圍 96 mm」。測試自存已清除；console error 為 0。
+- **發現（既有問題，未處理）**：縮放儀是手動拖曳範例（無馬達、F=2），軌跡掃描沒有輸入可掃，量測卡顯示「兩點距離 96–96 mm」。狀態列「還太鬆」在 `78df05f` 已存在。手動機構的量測卡應隱藏或改為拖曳時即時量測，待另議。
 
 ## R1e 加工設定隨作品保存（2026-09-25 功能完成，2026-09-26 下載落地驗證通過／完成）
 

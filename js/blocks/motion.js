@@ -6,6 +6,7 @@
  */
 
 import { solveTopology, sweepTopology } from '../multilink/solver.js';
+import { pointKeysFor } from './part-types.js';
 
 export const PLAY_STEP = 2;           // 每幀轉幾度（僅供 walkBranch/planMotion 探路使用，不參與播放計時）
 export const norm360 = deg => ((deg % 360) + 360) % 360;
@@ -105,6 +106,24 @@ export function traceSweeps(compiled, params, ids, startDeg, endDeg, stepDeg) {
       points: step.points
     }))
   }));
+}
+
+// S4：compile 給的預設軌跡點（沒指定軌跡點時的退回值）常是地錨或馬達軸心——這種點本來就不動，
+// 畫出來只會得到一個定點、量測卡也會顯示「工作範圍 0 mm」。這裡把「該不該畫」的判斷抽成純函式：
+// 只要這個 id 在任一零件上出現的點是 fixed 或 motor，就一律不畫；找不到這個點也不畫。
+export function fallbackTraceIds(comps, id) {
+  if (!id) return [];
+  let found = false;
+  for (const c of comps || []) {
+    for (const key of pointKeysFor(c)) {
+      const pt = c && c[key];
+      if (pt && pt.id === id) {
+        found = true;
+        if (pt.type === 'fixed' || pt.type === 'motor') return [];
+      }
+    }
+  }
+  return found ? [id] : [];
 }
 
 // 開始播放前先規劃這個機構是「整圈轉」還是「來回擺」、以及來回擺的兩端在哪。

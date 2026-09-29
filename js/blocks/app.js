@@ -492,7 +492,8 @@ function getTrajectoryData() {
   // rebuild+draw，軌跡即恢復。（shapeDrag 只改造形孔、不動 geomVersion，走快取即可不必跳過。）
   if (S.dragId || S.dragFrame || S.dragLinkId) return null;
   const ids = traceIds();
-  if (!ids.length && S.compiled && S.compiled.tracePoint) ids.push(S.compiled.tracePoint);
+  // S4：預設點是固定／馬達軸心就不畫，避免「工作範圍 0 mm」的假量測。
+  if (!ids.length && S.compiled) ids.push(...Motion.fallbackTraceIds(S.comps, S.compiled.tracePoint));
   if (!S.compiled || !ids.length || !S.comps.length) return null;
   // 快取鍵＝結構版本號 geomVersion，取代每幀 JSON.stringify 整份快照（零件多時字串化本身會變慢）。
   // 軌跡只取決於 S.compiled 與 traceIds，兩者都只在 rebuild / 切換軌跡點變動、那兩處都會 +1，
