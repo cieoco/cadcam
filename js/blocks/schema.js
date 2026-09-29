@@ -7,6 +7,7 @@
 
 import { normalizeMemberStock } from './member-stock.js';
 import { normalizeFabricationProfile } from './fabrication-profile.js';
+import { normalizeModules } from './module-schema.js';
 
 const KIND = 'blocks';
 const VERSION = 1;
@@ -312,6 +313,8 @@ export function toSnapshot(comps, topo, counter, motor) {
   if (tracePoints.length) snapshot.tracePoints = tracePoints;
   if (safeId(topo?.referencePoint)) snapshot.referencePoint = topo.referencePoint;
   if (motor?.fabrication) snapshot.fabrication = clone(motor.fabrication);
+  // 模組（選配）：沒有模組時不輸出，舊檔逐位元組不變（SDD-ASSEMBLY-MODULES §3.1／§4.1）。
+  if (Array.isArray(motor?.modules) && motor.modules.length) snapshot.modules = clone(motor.modules);
   return snapshot;
 }
 
@@ -516,10 +519,19 @@ export function normalizeSnapshot(obj) {
     else if (raw.type === 'pulley') comps.push(normalizePulley(raw, index, params, warnings));
     else if (raw.type === 'workpiece') comps.push(normalizeWorkpiece(raw,index,warnings));
     else if (raw.type === 'belt') comps.push(normalizeBelt(raw, index, params, warnings));
-    else warnings.push(`不支援的零件 ${raw.type || '(unknown)'}，已略過。`);
+    else { warnings.push(`不支援的零件 ${raw.type || '(unknown)'}，已略過。`); return; }
+    // 模組標記：只在這裡加一次，不動十個 normalizeXxx（SDD-ASSEMBLY-MODULES §3.3）。
+    if (safeId(raw.moduleId)) {
+      const last = comps[comps.length - 1];
+      if (last) last.moduleId = raw.moduleId;
+    }
   });
 
-  const cleanComps = dropZeroBars(comps);
+  let cleanComps = dropZeroBars(comps);
+  const modulesResult = normalizeModules(obj.modules, cleanComps);
+  if (!modulesResult.ok) return null;
+  cleanComps = modulesResult.comps;
+  warnings.push(...modulesResult.warnings);
   const counter = Math.max(Number(obj.counter) || 0, highestIdNum(cleanComps));
   // 多馬達欄位（選配）：activeMotor = 目前控制中的馬達編號；motorAngles = 其他馬達的凍結角度。
   const activeMotor = safeId(String(obj.activeMotor || '')) ? String(obj.activeMotor) : '1';
@@ -530,7 +542,7 @@ export function normalizeSnapshot(obj) {
     });
   }
   return { comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
-    fabrication: fabricationResult.status === 'present' ? fabricationResult.profile : null, warnings };
+    fabrication: fabricationResult.status === 'present' ? fabricationResult.profile : null, modules: modulesResult.modules, warnings };
 }
 
 export function highestIdNum(comps) {

@@ -86,7 +86,7 @@
 | `slider` | `p3`（滑塊）解出位置 | 常數：軌道 `p1 → p2` |
 | `points` | 點 `a` | `a → b`（兩點必須在同一剛體上，由建立者負責） |
 
-`at` 是輸出端上的吸附點（使用者拖模組 `base` 靠近它時吸附），必須是 `body` 上的點。
+`at` 是輸出端上的安裝孔（使用者拖模組 `base` 靠近它時吸附），必須是 `body` 上的點。**輸出端位姿＝位置取 `at` 解出的位置、方向取上表的構件方位角**（M1a 修訂：模組是「鎖在那個孔上」，孔移位時模組跟著移；上表的「原點」只用於 `at` 缺席時的退路，M1 不會發生，因為 3.3 會丟掉沒有 `at` 的輸出）。`mount.ref` 記的就是這個位姿。
 
 ### 3.3 正規化規則（`schema.js` 呼叫純函式 `normalizeModules`）
 
@@ -104,17 +104,32 @@
 ### 4.1 組合求解 `js/blocks/assembly.js`（純函式，不碰 DOM）
 
 ```
-compileAssembly(comps, modules, topo)  → { root, byModule: Map<id, compiled>, order: [moduleId…] }
+compileAssembly(comps, modules, topo)  → asm
+  asm = { single: compiled|null,            // 沒有模組時＝compileTopology(comps, topo) 的結果，其餘欄位空
+          units: [{ id, comps, compiled, mount }],   // 根（id '#root'，mount null）＋各模組，依安裝相依排序（宿主在前）
+          params,                           // 各 unit compiled.params 的合併
+          tracePoint }                      // topo.tracePoint
 solveAssembly(asm, params)             → { isValid, points, B, perModule }   // 與 solveTopology 同形
-sweepAssembly(asm, params, start, end, step) → 與 sweepTopology 同形
-rebakeModules(comps, modules, params)  → { comps, modules }                  // 維持 I1
-bodyPose(body, points, comps)          → { x, y, a }
+  // 沒有模組：直接回傳 solveTopology(asm.single, params) 的結果物件本身
+  // perModule: { [unitId]: { isValid, reason } }；reason ∈ 'ok' | 'host-invalid' | 'solve-invalid'
+  // B = asm.tracePoint ? points[asm.tracePoint] : undefined
+sweepAssembly(asm, params, start, end, step) → 與 sweepTopology 同形（含 sweepMotor 語意；沒有模組時直接委派 sweepTopology）
+outputPose(module, outputId, points, comps) → { x, y, a(度) } | null    // 位置取 at，方向取 body（§3.2）
+rebakeModules(comps, modules, params)  → { comps, modules, changed }   // 不改動輸入；維持 I1
+canMergePoints(comps, idA, idB)        → boolean                     // 兩點所屬模組（無＝根）相同才 true
 ```
+
+檔案：`js/blocks/assembly.js`（純函式，可 import solver／topology／part-types）；schema 端的 `normalizeModules` 放 `js/blocks/module-schema.js`（不 import solver，讓 schema.js 保持輕量）。`toSnapshot` 第 4 個參數（現有的 motor／fabrication 狀態袋）多收 `modules`，非空才輸出；`normalizeSnapshot` 回傳值多一個 `modules`（沒有時為 `[]`）。
 
 - 沒有 `modules`（或為空）時：`compileAssembly` 退化為單一 `compileTopology`、`solveAssembly` 直接回傳 `solveTopology` 的結果物件，**與現況完全等價**（E-M3 保證）。
 - 求解順序：根 → 依 `mount` 拓撲排序。每個模組用同一份 `params`（`thetaDeg`、`motorAngles`、`_prevPoints`）求解，解出的點乘上變換 `T = pose(host 輸出端, 現在) ∘ ref⁻¹` 後併入 `points`。
 - 宿主輸出端算不出位姿（宿主無解）→ 該模組及其子模組本幀視為無效，`isValid` 為 false，`perModule` 標出是哪一個。
 - `_prevPoints` 以世界座標傳入；對子模組要先乘 `T⁻¹` 轉回模組座標再當種子。
+- **rebake 的剛體變換**（`T = 宿主輸出端 home 位姿 ∘ ref⁻¹`，平移＋旋轉 δ）套用到模組內所有零件：
+  - 點座標：`p1 p2 p3 m1 m2` 的 `x, y`。局部座標（三角板 `vertices` 的 `u, v`、齒條 `holes` 的 `u, v`）不動。
+  - 以世界方向表示的角度欄位加上 δ（度）：齒輪 `phase`、皮帶輪 `phase`、齒條 `axisDeg`、凸輪 `axisDeg`、沒有 `motorCarrier` 的桿件馬達 `phaseOffset`。有 `motorCarrier` 的 `phaseOffset` 是相對機架桿，不動；伺服 `servoStart／servoEnd` 是馬達角，不動。
+  - 子模組的子模組不直接搬：父模組搬完後，它的宿主輸出端 home 位姿改變，依序輪到它時自然會被 rebake。
+  - 位姿差在 1e-9 內視為沒變，不改寫（避免浮點漂移讓每次 rebuild 都改檔）。
 
 ### 4.2 app 整合（M0 修訂：雙軌——繪製用整體編譯、求解用組合）
 

@@ -23,7 +23,7 @@
 | S4 預設軌跡點 | Sonnet | `motion.js` 新增 `fallbackTraceIds`；`getTrajectoryData` 退回預設點時略過 fixed／motor 點；新測試。 | 沒指定軌跡點的範例不再顯示 0 mm 量測卡；有指定的範例不變。 | 完成（Sonnet 一輪通過） |
 | S3 漏解警示 | Sonnet | 新純函式（`motion.js` 或新檔）＋ `updateMechanismStatus` 接線；新測試。 | E-S3＋E-S3b。 | 完成（Sonnet 一輪通過） |
 | M0 盤點 | 主模型 | 只讀程式、新增 baseline 測試與本節證據；回答 SDD §7 四個開放問題。 | 列出 fixed 點讀取處、座標寫入口、匯出成本；把 L0 POC 轉成 fixture。 | 完成 |
-| M1a 組合求解 | Sonnet | 新增 `js/blocks/assembly.js`（純函式）＋ `schema.js` 的 `normalizeModules`／`toSnapshot` 選配輸出；測試 `test/assembly.mjs`、`test/assembly-schema.mjs`（fixture 由主模型先寫）。 | E-M1～E-M5、E-M7。不碰 app.js。 | 待施工 |
+| M1a 組合求解 | Sonnet | 新增 `js/blocks/assembly.js`（純函式）＋ `schema.js` 的 `normalizeModules`／`toSnapshot` 選配輸出；測試 `test/assembly.mjs`、`test/assembly-schema.mjs`（fixture 由主模型先寫）。 | E-M1～E-M5、E-M7。不碰 app.js。 | 完成（Sonnet 一輪通過，主模型審查補兩處邊界） |
 | M1b app 接線 | Sonnet（分兩刀） | 刀 1：solver 呼叫點改走 assembly、rebuild 呼叫 rebake、合併防呆。刀 2：fixed 點繪製／3D／匯出依 M0 結論、D3 編輯規則、自由度加總。 | E-M3 零回歸＋既有全套＋瀏覽器載入所有範例播放無差異。 | 待施工 |
 | M1c 模組操作 UI | Sonnet | 新增 `js/blocks/module-editor.js`（`createModuleEditor(deps)` 工廠）、模組庫資料、`blocks.html` 局部；app.js 只接線。 | E-M6＋SDD §4.3 七項操作的桌機／窄畫面實測。 | 待施工 |
 | M1d R3 驗收 | 主模型 | 內建模組兩個＋必要修正；本節證據與 SDD 狀態。 | E-M8 全程；證據邊界照 SDD §5。 | 待施工 |
@@ -78,6 +78,16 @@
 - **兩個會踩雷的發現**：(1) 齒輪既有欄位 `module` 是模數，模組歸屬改名 `comp.moduleId`；現行 schema 會把 `moduleId` 全部丟掉，M1a 要補。(2) share-codec 只以字元黑名單 `< > " ' `` ` 把關（無欄位白名單，`modules` 可通過），但模組名稱含引號會讓整份分享被拒，正規化需過濾。
 - 已知風險（不在 M1 處理）：`buildMotorMounts` 的朝向用靜態座標，宿主會旋轉時模組上的馬達外觀朝向可能停在 home；R3 齒條只平移不受影響。
 - SDD 已同步修訂：§3.1 欄位名、§3.3 名稱過濾與 moduleId 保留、§4.2 雙軌整合、§7 四題答案。
+
+### M1a 證據（2026-09-30）
+
+- 規格修訂（開工前）：輸出端位姿改為「位置取安裝孔 `at`、方向取構件」，孔移位時模組跟著移（SDD §3.2）；rebake 旋轉時一併旋轉世界方向角度欄位（SDD §4.1）；API 定稿（`compileAssembly／solveAssembly／sweepAssembly／outputPose／rebakeModules／canMergePoints`、`module-schema.js` 的 `normalizeModules`）。fixture 的 `mount.ref` 隨之改為 `(45, 88, 90)`。
+- 主模型先寫 `test/assembly.mjs`（E-M1／M2／M3／M5／M7）與 `test/assembly-schema.mjs`（E-M4），並驗證前提：齒條 176→200 時 `LiftOutput` +12 y；旋轉臂 `phaseOffset` 改 30° 時臂端在 (103.923, 60)；夾爪範例 LT／RT 存檔座標與解差 0.1087 mm（範例原有取整），I1 測試對爪尖改驗「誤差不變」。
+- 施工（Sonnet）：新增 `assembly.js`、`module-schema.js`；`schema.js` 在 comps 迴圈單點補回 `moduleId`（順帶讓「不支援的零件」分支 `return`，避免 moduleId 貼到上一個零件）、`normalizeSnapshot` 呼叫 `normalizeModules`、`toSnapshot` 非空才輸出 `modules`。一輪全過。
+- 主模型審查修正兩處邊界並各補測試：(1) rebake 的角度差未換算到 (−180, 180]，180° 與 −180° 會被當成轉一圈、齒輪相位 −360；(2) 安裝迴圈偵測在「P 裝在迴圈上但不在迴圈內」時會誤拆 P，改為只在繞回自己時才拆。
+- 自動：`assembly` 38/38（含所有範例 modules 為 undefined／[] 時 solve／sweep 與原本逐位元組相同）、`assembly-schema` 33/33；全套 57 支全過；schema 70/70。
+- 瀏覽器：import map 的 `schema.js` 升版 `20260930_m1a`，確認載入新版與 `module-schema.js`；五個範例狀態正常；把 fixture 寫入預覽自存後重載，F=2、「2 組動力已就緒」，console error 為 0，測試自存已清除。
+- 已知限制（M1b 處理）：app 存檔尚未傳入 `modules`，含模組的作品再存檔會掉模組資訊；目前沒有任何介面能建立模組，不影響使用者資料。
 
 ## R1e 加工設定隨作品保存（2026-09-25 功能完成，2026-09-26 下載落地驗證通過／完成）
 
