@@ -25,8 +25,8 @@
 | M0 盤點 | 主模型 | 只讀程式、新增 baseline 測試與本節證據；回答 SDD §7 四個開放問題。 | 列出 fixed 點讀取處、座標寫入口、匯出成本；把 L0 POC 轉成 fixture。 | 完成 |
 | M1a 組合求解 | Sonnet | 新增 `js/blocks/assembly.js`（純函式）＋ `schema.js` 的 `normalizeModules`／`toSnapshot` 選配輸出；測試 `test/assembly.mjs`、`test/assembly-schema.mjs`（fixture 由主模型先寫）。 | E-M1～E-M5、E-M7。不碰 app.js。 | 完成（Sonnet 一輪通過，主模型審查補兩處邊界） |
 | M1b app 接線 | Sonnet（分三刀） | 刀 1：快照帶模組、rebuild 呼叫 rebake、求解呼叫點改走 assembly。刀 2：世界機架排除已安裝模組、節點外觀、每個模組另出機架檔。刀 3：跨模組合併防呆、D3 編輯前回到組裝姿態、新零件歸屬起點模組。 | E-M3 零回歸＋既有全套＋瀏覽器載入所有範例播放無差異。 | 完成（三刀皆本機 commit；刀 3 主模型補觸控路徑守門） |
-| M1c 模組操作 UI | Sonnet | 刀 1：純函式 `js/blocks/module-ops.js`（SDD §4.3a）＋測試。刀 2：`js/blocks/module-editor.js`（`createModuleEditor(deps)` 工廠）、零件盤「模組」區、模組面板、`blocks.html` 局部；app.js 只接線。 | 刀 1：E-M6＋`test/module-ops.mjs`。刀 2：SDD §4.3 各項操作的桌機／窄畫面實測。 | 刀 1 完成 |
-| M1d R3 驗收 | 主模型 | 內建模組兩個＋必要修正；本節證據與 SDD 狀態。 | E-M8 全程；證據邊界照 SDD §5。 | 待施工 |
+| M1c 模組操作 UI | Sonnet | 刀 1：純函式 `js/blocks/module-ops.js`（SDD §4.3a）＋測試。刀 2：`js/blocks/module-editor.js`（`createModuleEditor(deps)` 工廠）、零件盤「模組」區、模組面板、`blocks.html` 局部；app.js 只接線。 | 刀 1：E-M6＋`test/module-ops.mjs`。刀 2：SDD §4.3 各項操作的桌機／窄畫面實測。 | 完成 |
+| M1d R3 驗收 | 主模型 | 內建模組兩個＋必要修正；本節證據與 SDD 狀態。 | E-M8 全程；證據邊界照 SDD §5。 | 完成（與 M1c 刀 2 一併驗收；手機面板重疊為既有問題，另開任務） |
 
 建議順序：S1 → S2 → S3（暖身、互不相依）→ M0 → M1a → M1b → M1c → M1d。
 
@@ -126,6 +126,22 @@
 - 主模型審查修正：模板的 params 原本只取 part-types 的 `paramProps`，會漏掉桿件孔 `distParam`、皮帶輪 `pinRadiusParam` 等欄位，模組存檔後這些參數會遺失；改為依 SDD 用參照 token 與 params key 取交集，並補測試。移除因此不再使用的 import。
 - 自動：`module-ops` 64/64（含同一模板插兩次 id／param／馬達不衝突、在升降 0° 與 30° 時安裝 I1 皆成立、拆下後停在世界位置、迴圈與解散拒絕條件）；全套 61 支全過；schema 70/70。
 - app 尚未載入 module-ops.js（刀 2 接線），推上線不影響網站行為。
+
+### M1c 刀 2 ＋ M1d 證據（2026-09-30，模組介面與 R3 情境 E-M8）
+
+- 設計修訂：模組操作做成一列 `#moduleEditor`（`div.module-row`），`sync()` 時搬進目前顯示中的檢查器面板（長度／齒輪／節點面板）底部——手機上所有檢查器面板都是同一個底部抽屜，另開面板必然重疊。零件盤新增「模組」區（內建在前、我的模組在後、最後「📥 匯入模組」）。
+- 施工（Sonnet，一輪通過）：新增 `module-editor.js`（`createModuleEditor(deps)`：`library／insertBuiltin／insertLocal／panelState／saveAsModule／rename／mountTo／unmount／setOutput／dissolve／saveToLibrary／exportTemplate／importLibraryText／removeFromLibrary／sync`）；`draw()` 呼叫 `moduleEditor.sync()`；本機模組庫存於 `localStorage['cadcam.blocks.moduleLibrary']`；模組庫操作不改作品、不記 undo；模組名一律以 `textContent／value` 顯示。import map 升版 `20260930_m1c2`。
+- 自動：`module-editor` 34/34；全套 62 支全過；schema 70/70。
+- 瀏覽器 E-M8（1280×800，從清空的畫布開始）：
+  - 零件盤點「齒條升降」「齒輪夾爪」：9 件、2 模組、馬達自動為 1、2；夾爪齒輪被選取，模組列出現在齒輪面板底部，「安裝到…」列出「齒條升降・滑台」。
+  - 選「齒條升降・滑台」安裝：`mount.ref = (45, 88, 90°)`、`home = {1: 0}`，夾爪底座與滑台孔畫面座標完全重合；模組列改為「裝在 齒條升降・滑台／拆下」。
+  - 播放 M1 到 90°：滑台孔上移 56.6 px，底座全程與孔重合；離開組裝姿態時選取自動清除。切 M2 播放：爪尖距 228→96 px，滑台位移 0（M1 凍結 90°）。
+  - 重載（自存）：兩模組與安裝關係保留，再播 M1 底座仍貼孔。分享連結（約 5 KB）：先清空自存再開連結，9 件與安裝關係完整還原。
+  - 3D 預覽開關無錯；「拆下」→未安裝；「存到我的模組庫」→零件盤出現「齒輪夾爪・我的模組 ×」；「匯出模組」（攔截下載）檔名 `齒輪夾爪.blocks-module.json`；從我的模組庫插入 +4 件、馬達自動為 3；「解散模組」後零件回到根。
+  - 窄畫面 375×812：觸控點模組的馬達軸心，模組列正確放入節點面板（底部抽屜）。
+  - console error 全程為 0；測試用自存與本機模組庫已清除、視窗尺寸已還原。
+- **發現（既有問題，未處理，已開獨立任務）**：手機版點地錨或馬達軸心時，節點面板與機架面板同時打開，機架面板蓋住節點面板下半部（無模組的四連桿範例同樣重現）。選到模組固定點時模組列因此被遮住；選齒輪、桿件、板件時不受影響。
+- 未涵蓋：拖曳吸附安裝（D8 列後續）；E-M8 中「升起時點夾爪改爪端長度」已在 M1b 刀 3 以節點與觸控路徑驗證，本輪未再以爪端把手操作。
 
 ## R1e 加工設定隨作品保存（2026-09-25 功能完成，2026-09-26 下載落地驗證通過／完成）
 

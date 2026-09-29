@@ -200,6 +200,12 @@
       font-size: 12px; padding: 6px 9px; cursor: pointer; line-height: 1; white-space: nowrap; }
     .len-editor .lift-btn:hover { background: #f6f8fb; }
     .len-editor .lift-btn.lift-on { background: #eaf2ff; border-color: #7fb0ff; color: #2c5282; font-weight: 700; }
+    .module-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:6px; padding-top:6px; border-top:1px solid #edf1f6; font-size:12px; }
+    .module-row button, .module-row select { border:1px solid #d8dee6; background:#fff; border-radius:8px; padding:5px 8px; font:inherit; cursor:pointer; }
+    .module-row input { width:110px; border:1px solid #cbd5e1; border-radius:6px; padding:4px 6px; font:inherit; }
+    .module-row .module-status { color:#60717d; }
+    .module-block { position:relative; }
+    .module-block .module-remove { position:absolute; top:2px; right:4px; border:none; background:transparent; color:#95a5a6; cursor:pointer; }
     .role-editor { top: 16px; right: 16px; gap: 7px; max-width: 330px; }
     .role-editor .re-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .node-role-actions, .node-axis-control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -519,6 +525,10 @@
           </div>
         </div>
       </div>
+      <div class="tray-section">
+        <div class="tray-section-title">模組</div>
+        <div class="tray-section-items" id="moduleLibrary"></div>
+      </div>
     </div>
 
     <div class="canvas-wrap canvas-area">
@@ -637,6 +647,7 @@
           <button class="lift-btn" id="liftDownBtn" onclick="window.blocks.bringPart('down')" title="往下疊一層（一路挪回去就回到自動）">🔽 下移一層</button>
         </div>
       </div>
+      <div class="module-row" id="moduleEditor" style="display:none;"></div>
       <div class="inspector-panel role-editor node-inspector" id="roleEditor" style="display:none;">
         <div class="re-row node-role-row">
           <span class="re-title">接點</span>
@@ -913,9 +924,11 @@
       "./js/blocks/assembly.js": "./js/blocks/assembly.js?v=20260930_m1b3",
       "./js/blocks/tools.js": "./js/blocks/tools.js?v=20260930_m1b3",
       "./js/blocks/input.js": "./js/blocks/input.js?v=20260930_m1b3",
-      "./js/blocks/state.js": "./js/blocks/state.js?v=20260930_m1b1"
+      "./js/blocks/state.js": "./js/blocks/state.js?v=20260930_m1b1",
+      "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=20260930_m1c2",
+      "./js/blocks/module-ops.js": "./js/blocks/module-ops.js?v=20260930_m1c2"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20260930_m1b3b"></script>
+  <script type="module" src="js/blocks/app.js?v=20260930_m1c2"></script>
 </body>
 </html>

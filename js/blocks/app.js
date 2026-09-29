@@ -48,6 +48,7 @@ import { createSliderEditor } from './slider-editor.js';
 import { createMotorTools } from './motor-tools.js';
 import { createPlateEditor } from './plate-editor.js';
 import { createNodeEditor } from './node-editor.js';
+import { createModuleEditor } from './module-editor.js';
 import { workRangeFromTrace, clampRangeFromTraces, currentPointDistance } from './measurement.js';
 import { circleRectCompression } from './intake-contact.js';
 import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
@@ -431,6 +432,23 @@ const { changeStroke, changeServoAngle,
         setNodeRole, changeNodePos, removeNodeMotor, splitNode,
         toggleTracePoint, toggleMeasurementReference,
         toggleGroundPositionLock, isGroundPositionUnlocked, relockGroundPosition } = nodeEditor;
+
+// ---- 模組域：邏輯抽到 ./module-editor.js（模組庫 + 模組面板，M1c 刀 2）----
+const moduleEditor = createModuleEditor({
+  pushUndo, rebuild, draw, transient,
+  downloadJson: (obj, name) => Store.downloadJson(obj, name),
+  viewCenter: () => View.worldFromScreen(W * 0.5, H * 0.5),
+  loadLibraryText: () => { try { return localStorage.getItem('cadcam.blocks.moduleLibrary'); } catch (_) { return null; } },
+  saveLibraryText: text => { try { localStorage.setItem('cadcam.blocks.moduleLibrary', text); } catch (_) {} },
+  select: (...a) => selectModuleTarget(...a)   // 延遲取用：selectLink 在後面才定義
+});
+// 依零件 type 把新插入模組的第一個零件選起來，沿用各域既有的 selectXxx。
+function selectModuleTarget(comp) {
+  if (comp.type === 'bar') selectLink(comp.id);
+  else if (comp.type === 'triangle') selectTriangle(comp.id);
+  else if (comp.type === 'gear') selectGear(comp.id);
+  else if (comp.type === 'slider') selectSlider(comp.id);
+}
 
 // 隱性機架：所有 grounded 接點（fixed / motor / linear）視為同一個固定底座（機架）。
 // 不是獨立物件，只是把散落的固定銷當成一組——拖機架把手時整組一起平移。
@@ -914,6 +932,7 @@ const PART_DRAW = {
 function draw() {
   clearOffHomeModuleSelection();
   memberEditor.sync();
+  moduleEditor.sync();
   gripperController?.syncVisibility();
   while (svg.firstChild) svg.removeChild(svg.firstChild);
   drawFrameGrid();
