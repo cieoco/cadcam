@@ -50,7 +50,8 @@
 ```jsonc
 {
   "kind": "blocks", "v": 1,
-  "comps": [ { "type": "gear", "id": "GearA", "module": "Grip1", ... } ],  // comp.module：所屬模組；沒有＝根
+  "comps": [ { "type": "gear", "id": "GearA", "moduleId": "Grip1", ... } ],  // comp.moduleId：所屬模組；沒有＝根
+  // 注意：不可用 comp.module——齒輪既有欄位 module 是「模數」（M0 發現）
   "modules": [
     {
       "id": "Lift1",                     // safeId
@@ -90,11 +91,13 @@
 ### 3.3 正規化規則（`schema.js` 呼叫純函式 `normalizeModules`）
 
 - `modules` 最多 16 個；id 不安全或重複則丟棄該模組並警告。
-- `comp.module` 指向不存在的模組 → 移除標記、該零件回到根，警告。
+- `name` 去除 `< > " ' `` ` 並截到 40 字——share-codec 的字元閘遇到這些字元會拒絕整份分享連結（[share-codec.js:23](../js/share-codec.js)）。
+- `comp.moduleId` 指向不存在的模組 → 移除標記、該零件回到根，警告。
 - `outputs[].body` 指向的零件不屬於本模組、或 `at` 不存在 → 丟棄該輸出，警告。
 - `mount.to` 指向不存在的模組／輸出，或形成安裝迴圈 → `mount` 改為 `null`（模組留在目前座標、固定在世界），警告。
 - 跨模組共用點 id（違反 D2）→ 載入失敗訊息並保留目前作品（比照非法載入不覆寫的既有規則）。
-- 沒有任何模組時，`toSnapshot` 不輸出 `modules` 鍵，`comp.module` 也不存在。
+- 沒有任何模組時，`toSnapshot` 不輸出 `modules` 鍵，`comp.moduleId` 也不存在。
+- 各 `normalizeXxx` 目前會丟掉未知欄位；M1a 要讓每種零件都保留合法的 `moduleId`（M0 驗證：現行 schema 會把它全部丟掉）。
 
 ## 4. 行為規格
 
@@ -113,16 +116,21 @@ bodyPose(body, points, comps)          → { x, y, a }
 - 宿主輸出端算不出位姿（宿主無解）→ 該模組及其子模組本幀視為無效，`isValid` 為 false，`perModule` 標出是哪一個。
 - `_prevPoints` 以世界座標傳入；對子模組要先乘 `T⁻¹` 轉回模組座標再當種子。
 
-### 4.2 app 整合
+### 4.2 app 整合（M0 修訂：雙軌——繪製用整體編譯、求解用組合）
 
-solver 呼叫點共 6 處，全部改走 assembly（沒有模組時行為不變）：
-`app.js` 的 `rebuild`（compile）、`getTrajectoryData`（sweep）、`solveFrame`（solve），以及 `motion.js` 的 `walkBranch`、`model.js` 的 `displayPoint`、`gripper-workflow.js`（後者只在夾爪單獨成作品時啟用，維持呼叫 `solveTopology`，不改）。
+**`S.compiled` 維持「全部零件一起編譯」**（模組間不共用點，只是幾個互不相連的子圖），繪製、3D、馬達安裝、`displayPoint` 全部照舊讀它。**另加 `S.assembly = compileAssembly(...)` 專供求解**。M0 核對：`S.compiled` 只有 app.js 讀（22 處），全部改寫不划算；整體編譯對 fixture 可正常編譯與求解。
 
-- **合併防呆**：拖曳吸附與畫桿起點／終點，若兩點屬於不同模組 → 不合併，狀態列提示「不同模組只能用安裝接口連接」。新畫的零件歸屬起點所在的模組。
-- **自由度**：`analyzeDof` 對每個模組分別計算後加總（安裝接口為 0 自由度）。
-- **繪製**：已安裝模組的 fixed 點畫成「鎖在宿主上的孔」（不畫地面斜線）；輸出端 `at` 畫成可吸附的接口標記（只在選取模組或拖曳模組時顯示）。
-- **3D**：沿用 `pts`，不需另外處理；但已安裝模組的 fixed 點不能被當成世界機架（M0 盤點 `groundIds` 的來源）。
-- **匯出**：已安裝模組的 fixed 點不可混進世界 `frame` 輸出。M1 至少要做到：另出 `<模組名>-base` 或在匯出時明確提示「模組底座尚未產生加工檔」。二擇一由主模型在 M0 依 [exporters.js](../js/blocks/exporters.js) 的成本決定。
+改走 assembly 的求解呼叫點只有 4 處（沒有模組時行為不變）：
+`app.js` 的 `rebuild`（多編一份 assembly、並呼叫 `rebakeModules`）、`solveFrame`（solve）、`getTrajectoryData`（`traceSweeps` 內的 sweep 需有 assembly 版本）、`motion.js` 的 `walkBranch`（`planMotion` 探路）。不改：`model.js` 的 `displayPoint`（D3 規則下編輯模組時處於 home 姿態，整體編譯的解與組合解相同）、`gripper-workflow.js`（D7）。
+
+- **世界機架只排除三處**（皆在 app 的包裝層，傳入「排除已安裝模組零件」的 comps 即可）：`frameNodeIds`（拖曳機架把手、機架吸格——否則拖機架會把掛在滑台上的夾爪底座一起搬走）、`frameNodes`／`frameConnectorNodes`（機架連線繪製與 `frame` 匯出）。
+- **`groundIds` 不排除**：馬達朝向找「最近機架點」、3D 疊層從固定點起算（[motor-mounts.js:55,142](../js/blocks/motor-mounts.js)、[scene-model.js:43](../js/blocks3d/scene-model.js)），對已安裝模組而言它自己的底座點正該扮演這個角色。只有節點外觀要改：`renderNodes` 多收一個 `mountedBaseIds`，這些點畫成「鎖在宿主上的孔」（不畫地錨樣式）。
+- **`pointIsGround`（34 處）不改**：在 D3 規則下，模組的固定點在模組內的編輯語意本來就是「固定」。
+- **合併防呆**：拖曳吸附（`mergePoints` 6 個呼叫點，app／input／tools）與畫桿起點／終點，若兩點屬於不同模組 → 不合併，狀態列提示「不同模組只能用安裝接口連接」。新畫的零件歸屬起點所在的模組。
+- **自由度**：`analyzeDof` **不改**——每個模組各自有底座，對整體分析的結果等於各模組相加（M0：fixture 升降 1＋夾爪 1＝整體 2）。
+- **輸出端標記**：`at` 畫成可吸附的接口標記（只在選取模組或拖曳模組時顯示）。
+- **匯出**：採「另出 `<模組名>-frame`」。`exportFrameAsSvg`／`exportFrameAsDxf`／`frameExportWarnings` 本來就吃一組 `frameNodes` 陣列（[exporters.js:1075-1083](../js/blocks/exporters.js)），對每個已安裝模組用它自己的零件再呼叫一次即可；馬達安裝座依 `splitMountsByHost` 分到各模組。座標用 home 姿態（加工只需相對位置）。
+- **已知風險（M1 不處理，列入驗收觀察）**：`buildMotorMounts` 的朝向用靜態座標計算（[motor-mounts.js:136-148](../js/blocks/motor-mounts.js)）；宿主若會「旋轉」，模組上的馬達外觀朝向可能停在 home。R3 的齒條滑台只平移，不受影響。
 
 ### 4.3 模組操作（UI，沿用既有面板，不新增常駐側欄）
 
@@ -130,7 +138,7 @@ solver 呼叫點共 6 處，全部改走 assembly（沒有模組時行為不變�
 2. **模組庫**：零件盤新增「模組」分頁：內建＋本機模組清單；點選或拖出即插入實例（D5 重新命名），放在畫面中央，`mount: null`。
 3. **安裝**：拖曳模組的 `base` 把手靠近另一模組的輸出端 `at` → 綠圈吸附 → 放開即安裝：整組平移讓 `base` 落在 `at`，寫入 `mount.ref`／`mount.home`。M1 不自動旋轉；方位以使用者放下時為準。
 4. **拆下**：選取已安裝模組 → 「拆下」→ 模組留在目前世界位置，`mount = null`（先依目前姿態 rebake）。
-5. **解散模組**：只允許未安裝的模組；移除所有 `comp.module` 標記與該模組條目，零件回到根。
+5. **解散模組**：只允許未安裝的模組；移除所有 `comp.moduleId` 標記與該模組條目，零件回到根。
 6. **匯出／匯入模組 JSON**：本機模組可下載為 `.blocks-module.json`，匯入時走與作品相同的 schema 正規化（只接受 kind 為 `blocks-module`）。
 7. 上述每個動作都是一次 undo；存檔、分享、autosave、範例切換都保留 `modules`。
 
@@ -173,9 +181,11 @@ solver 呼叫點共 6 處，全部改走 assembly（沒有模組時行為不變�
 - 零相依、無 build step；新功能放子模組（`assembly.js`、`module-editor.js`），`app.js` 只做接線。
 - 不動凍結的 mechanism 應用；不擴張 R1 夾爪任務卡（D7）。
 
-## 7. 開放問題（M0 盤點時由主模型回答並寫入 FTC-LOOP）
+## 7. 開放問題（M0 已回答，2026-09-29）
 
-1. D3 的編輯規則：座標讀寫入口集中度是否允許「任意姿態編輯＋反變換」？
-2. 匯出：模組底座另出檔，還是先提示？
-3. `groundIds`／機架連接線（`frameConnectorNodes`）等讀 fixed 點的地方共有幾處，各自要排除已安裝模組的哪些點？
-4. 內建模組清單第一版是否只收兩個（升降、夾爪）？
+1. **D3 編輯規則 → 維持「回到組裝姿態再編輯」。** 座標寫入入口不集中：`updatePointCoordsById` 24 處／9 檔、`pointCoords` 40 處、`worldFromEvent` 21 處，遠超過 6 處門檻，反變換做不乾淨。
+2. **匯出 → 另出 `<模組名>-frame`**，成本低（見 §4.2）。
+3. **讀 fixed 點的地方**共 109 處／16 檔，但只需排除三個世界機架入口（`frameNodeIds`、`frameNodes`、`frameConnectorNodes`）與節點外觀；`groundIds`、`pointIsGround`、`analyzeDof` 不改（見 §4.2）。
+4. **內建模組第一版只收兩個**：齒條升降（`competition-rack-lift`）與齒輪夾爪（`gear-gripper`）。R3 驗收只需要這兩個；其他範例等模組流程穩定後再逐個評估是否適合當模組。
+
+附帶發現：`comp.module` 會與齒輪的模數欄位撞名，改為 `comp.moduleId`；share-codec 的字元閘會拒絕含引號的模組名稱，正規化時需過濾。

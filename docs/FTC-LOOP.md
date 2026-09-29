@@ -22,7 +22,7 @@
 | S2b 窄範圍軌跡取樣 | Sonnet | `traceSweeps` 呼叫端依範圍調整步長（見 S2 證據的發現）；新測試。 | 夾爪範例畫得出兩條軌跡、量測卡最小≠最大；E-S2 仍通過。 | 完成（Sonnet 一輪通過） |
 | S4 預設軌跡點 | Sonnet | `motion.js` 新增 `fallbackTraceIds`；`getTrajectoryData` 退回預設點時略過 fixed／motor 點；新測試。 | 沒指定軌跡點的範例不再顯示 0 mm 量測卡；有指定的範例不變。 | 完成（Sonnet 一輪通過） |
 | S3 漏解警示 | Sonnet | 新純函式（`motion.js` 或新檔）＋ `updateMechanismStatus` 接線；新測試。 | E-S3＋E-S3b。 | 完成（Sonnet 一輪通過） |
-| M0 盤點 | 主模型 | 只讀程式、新增 baseline 測試與本節證據；回答 SDD §7 四個開放問題。 | 列出 fixed 點讀取處、座標寫入口、匯出成本；把 L0 POC 轉成 fixture。 | 待施工 |
+| M0 盤點 | 主模型 | 只讀程式、新增 baseline 測試與本節證據；回答 SDD §7 四個開放問題。 | 列出 fixed 點讀取處、座標寫入口、匯出成本；把 L0 POC 轉成 fixture。 | 完成 |
 | M1a 組合求解 | Sonnet | 新增 `js/blocks/assembly.js`（純函式）＋ `schema.js` 的 `normalizeModules`／`toSnapshot` 選配輸出；測試 `test/assembly.mjs`、`test/assembly-schema.mjs`（fixture 由主模型先寫）。 | E-M1～E-M5、E-M7。不碰 app.js。 | 待施工 |
 | M1b app 接線 | Sonnet（分兩刀） | 刀 1：solver 呼叫點改走 assembly、rebuild 呼叫 rebake、合併防呆。刀 2：fixed 點繪製／3D／匯出依 M0 結論、D3 編輯規則、自由度加總。 | E-M3 零回歸＋既有全套＋瀏覽器載入所有範例播放無差異。 | 待施工 |
 | M1c 模組操作 UI | Sonnet | 新增 `js/blocks/module-editor.js`（`createModuleEditor(deps)` 工廠）、模組庫資料、`blocks.html` 局部；app.js 只接線。 | E-M6＋SDD §4.3 七項操作的桌機／窄畫面實測。 | 待施工 |
@@ -67,6 +67,17 @@
 - 自動：`test/trace-fallback.mjs` 20/20；全套 55 支全過；schema 70/70。
 - 瀏覽器：四連桿、齒輪對、兩個競賽升降不再畫軌跡、量測卡隱藏；Jansen（68 mm）、夾爪（137–150 mm）不變。把升降臂設 `tracePoints: ['C']` 寫入預覽自存後重載，工具端軌跡 73 點、「工作範圍 96 mm」。測試自存已清除；console error 為 0。
 - **發現（既有問題，未處理）**：縮放儀是手動拖曳範例（無馬達、F=2），軌跡掃描沒有輸入可掃，量測卡顯示「兩點距離 96–96 mm」。狀態列「還太鬆」在 `78df05f` 已存在。手動機構的量測卡應隱藏或改為拖曳時即時量測，待另議。
+
+### M0 盤點證據（2026-09-29，主模型，只讀）
+
+- 基準：`726554c`；55 支 `test/*.mjs` 全過、schema 70/70。
+- 新增 fixture：`test/fixtures/assembly/lift-gripper.json`（齒條升降 Lift1＋齒輪夾爪 Grip1，夾爪馬達改 2 號、底座 GCA 平移到滑台輸出端 `LiftOutput`、不共用點 id；`mount.ref = (30, 0, 90°)`、`home = {1: 0}`；不帶夾爪任務 marker）。以參考算法（各模組獨立解＋`T = pose_now ∘ ref⁻¹`）驗證：M1 ∈ {−40, 0, 60} 時 GCA 相對 `LiftOutput` 偏移為 0、兩齒輪中心距 60.000000；爪尖距只隨 M2 變（189.822 → 87.367）。
+- 座標寫入入口（SDD §7-1）：`updatePointCoordsById` 24 處／9 檔、`movePointById` 10、`mergePoints` 6、`pointCoords` 40、`worldFromEvent` 21 → 超過門檻，維持 D3「回到組裝姿態再編輯」。
+- fixed 點讀取（§7-3）：109 處／16 檔。`S.compiled` 只有 app.js 讀（22 處）。整體編譯 fixture 可正常求解（home 姿態 valid）；`analyzeDof` 整體 F=2＝升降 1＋夾爪 1。→ SDD §4.2 改為雙軌：繪製沿用整體 `S.compiled`，求解另走 `S.assembly`；只需換 4 個求解呼叫點、排除 3 個世界機架入口與節點外觀。`groundIds` 被馬達朝向與 3D 疊層當作「最近機架點」使用，不可排除。
+- 匯出（§7-2）：`exportFrameAsSvg／Dxf` 直接吃 `frameNodes` 陣列，另出 `<模組名>-frame` 成本低。
+- **兩個會踩雷的發現**：(1) 齒輪既有欄位 `module` 是模數，模組歸屬改名 `comp.moduleId`；現行 schema 會把 `moduleId` 全部丟掉，M1a 要補。(2) share-codec 只以字元黑名單 `< > " ' `` ` 把關（無欄位白名單，`modules` 可通過），但模組名稱含引號會讓整份分享被拒，正規化需過濾。
+- 已知風險（不在 M1 處理）：`buildMotorMounts` 的朝向用靜態座標，宿主會旋轉時模組上的馬達外觀朝向可能停在 home；R3 齒條只平移不受影響。
+- SDD 已同步修訂：§3.1 欄位名、§3.3 名稱過濾與 moduleId 保留、§4.2 雙軌整合、§7 四題答案。
 
 ## R1e 加工設定隨作品保存（2026-09-25 功能完成，2026-09-26 下載落地驗證通過／完成）
 

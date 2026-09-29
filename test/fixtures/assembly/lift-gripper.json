@@ -1,0 +1,281 @@
+{
+  "kind": "blocks",
+  "v": 1,
+  "counter": 20,
+  "comps": [
+    {
+      "type": "gear",
+      "id": "LiftPinion",
+      "color": "#e74c3c",
+      "p1": {
+        "id": "LPC",
+        "type": "motor",
+        "x": 0,
+        "y": 0,
+        "physicalMotor": "1"
+      },
+      "p2": {
+        "id": "LPP",
+        "type": "floating",
+        "x": 18,
+        "y": 0
+      },
+      "radiusParam": "LPR",
+      "teeth": 15,
+      "module": 4,
+      "phase": 0,
+      "mountLocatorPoint": "LML",
+      "moduleId": "Lift1"
+    },
+    {
+      "type": "anchor",
+      "id": "MotorLocator",
+      "p1": {
+        "id": "LML",
+        "type": "fixed",
+        "x": 0,
+        "y": 11.18
+      },
+      "moduleId": "Lift1"
+    },
+    {
+      "type": "anchor",
+      "id": "LiftGuideA",
+      "p1": {
+        "id": "LGA",
+        "type": "fixed",
+        "x": 45,
+        "y": -5.2
+      },
+      "moduleId": "Lift1"
+    },
+    {
+      "type": "anchor",
+      "id": "LiftGuideB",
+      "p1": {
+        "id": "LGB",
+        "type": "fixed",
+        "x": 45,
+        "y": 17.8
+      },
+      "moduleId": "Lift1"
+    },
+    {
+      "type": "rack",
+      "id": "LiftRackGear",
+      "color": "#16a085",
+      "p1": {
+        "id": "LiftRack",
+        "type": "floating",
+        "x": 30,
+        "y": 0
+      },
+      "pinion": "LiftPinion",
+      "lenParam": "LRL",
+      "axisDeg": 90,
+      "sign": 1,
+      "bodyHeight": 20,
+      "slot": {
+        "length": 144,
+        "width": 5,
+        "offset": 0
+      },
+      "framePins": [
+        "LGA",
+        "LGB"
+      ],
+      "endMargin": 12,
+      "holes": [
+        {
+          "id": "LiftHoleA",
+          "role": "endA",
+          "u": 0,
+          "v": -15,
+          "diameter": 5
+        },
+        {
+          "id": "LiftOutput",
+          "role": "endB",
+          "u": 0,
+          "v": -15,
+          "diameter": 5
+        }
+      ],
+      "moduleId": "Lift1"
+    },
+    {
+      "type": "gear",
+      "id": "GearA",
+      "color": "#e74c3c",
+      "p1": {
+        "id": "GCA",
+        "type": "motor",
+        "x": 45,
+        "y": 88,
+        "physicalMotor": "2"
+      },
+      "p2": {
+        "id": "GPA",
+        "type": "floating",
+        "x": 45,
+        "y": 106
+      },
+      "radiusParam": "GRA",
+      "pinRadiusParam": "GPRA",
+      "pinHoleDiameter": 5,
+      "teeth": 15,
+      "module": 4,
+      "phase": 90,
+      "moduleId": "Grip1"
+    },
+    {
+      "type": "gear",
+      "id": "GearB",
+      "color": "#2c6fbb",
+      "p1": {
+        "id": "GCB",
+        "type": "fixed",
+        "x": 105,
+        "y": 88
+      },
+      "p2": {
+        "id": "GPB",
+        "type": "floating",
+        "x": 105,
+        "y": 106
+      },
+      "radiusParam": "GRB",
+      "pinRadiusParam": "GPRB",
+      "pinHoleDiameter": 5,
+      "teeth": 15,
+      "module": 4,
+      "phase": 90,
+      "mesh": "GearA",
+      "moduleId": "Grip1"
+    },
+    {
+      "type": "triangle",
+      "id": "LeftJaw",
+      "color": "#ff6b35",
+      "p1": {
+        "id": "GCA",
+        "type": "motor",
+        "x": 45,
+        "y": 88,
+        "physicalMotor": "2"
+      },
+      "p2": {
+        "id": "GPA",
+        "type": "floating",
+        "x": 45,
+        "y": 106
+      },
+      "p3": {
+        "id": "LT",
+        "type": "floating",
+        "x": -20,
+        "y": 3
+      },
+      "gParam": "GPRA",
+      "r1Param": "LJ_tip",
+      "r2Param": "LJ_edge",
+      "sign": 1,
+      "shape": "jaw",
+      "shapeMode": "polyline",
+      "jawTurnSign": 1,
+      "moduleId": "Grip1"
+    },
+    {
+      "type": "triangle",
+      "id": "RightJaw",
+      "color": "#ff6b35",
+      "p1": {
+        "id": "GCB",
+        "type": "fixed",
+        "x": 105,
+        "y": 88
+      },
+      "p2": {
+        "id": "GPB",
+        "type": "floating",
+        "x": 105,
+        "y": 106
+      },
+      "p3": {
+        "id": "RT",
+        "type": "floating",
+        "x": 170,
+        "y": 3
+      },
+      "gParam": "GPRB",
+      "r1Param": "RJ_tip",
+      "r2Param": "RJ_edge",
+      "sign": -1,
+      "shape": "jaw",
+      "shapeMode": "polyline",
+      "jawTurnSign": -1,
+      "moduleId": "Grip1"
+    }
+  ],
+  "params": {
+    "LPR": 30,
+    "LRL": 176,
+    "theta": 0,
+    "GRA": 30,
+    "GRB": 30,
+    "GPRA": 18,
+    "GPRB": 18,
+    "LJ_tip": 107,
+    "LJ_edge": 121.8,
+    "RJ_tip": 107,
+    "RJ_edge": 121.8
+  },
+  "tracePoints": [
+    "LT",
+    "RT"
+  ],
+  "motorAngles": {
+    "2": 0
+  },
+  "modules": [
+    {
+      "id": "Lift1",
+      "name": "齒條升降",
+      "source": "competition-rack-lift",
+      "base": "LPC",
+      "outputs": [
+        {
+          "id": "carriage",
+          "name": "滑台",
+          "at": "LiftOutput",
+          "body": {
+            "kind": "rack",
+            "id": "LiftRackGear"
+          }
+        }
+      ],
+      "mount": null
+    },
+    {
+      "id": "Grip1",
+      "name": "齒輪夾爪",
+      "source": "gear-gripper",
+      "base": "GCA",
+      "outputs": [],
+      "mount": {
+        "to": {
+          "module": "Lift1",
+          "output": "carriage"
+        },
+        "ref": {
+          "x": 30,
+          "y": 0,
+          "a": 90
+        },
+        "home": {
+          "1": 0
+        }
+      }
+    }
+  ]
+}
