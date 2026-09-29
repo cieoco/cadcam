@@ -414,6 +414,13 @@
       .block .name { font-size: 11px; }
       .block .role { font-size: 8px; }
     }
+    /* 機架面板收進節點面板時當一般段落（用 ID 權重蓋過行動版底部抽屜與桌機右上角的 .inspector-panel 定位） */
+    #frameEditor[data-embedded="true"] {
+      position: static; top: auto; left: auto; right: auto; bottom: auto;
+      width: auto; max-width: none; max-height: none; overflow: visible;
+      margin: 0; padding: 8px 0 0; border: 0; border-top: 1px solid #edf1f6; border-radius: 0;
+      box-shadow: none; background: transparent; z-index: auto;
+    }
   </style>
   <script type="importmap">
     { "imports": { "three": "./js/vendor/three.module.js" } }
@@ -925,11 +932,12 @@
       "./js/blocks/tools.js": "./js/blocks/tools.js?v=20260930_m1b3",
       "./js/blocks/input.js": "./js/blocks/input.js?v=20260930_b2",
       "./js/blocks/state.js": "./js/blocks/state.js?v=20260930_m1b1",
+      "./js/blocks/panels.js": "./js/blocks/panels.js?v=20260930_p1",
       "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=20260930_m1c2",
       "./js/blocks/module-ops.js": "./js/blocks/module-ops.js?v=20260930_m1c2",
       "./js/blocks3d/viewer.js": "./js/blocks3d/viewer.js?v=20260930_b2"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20260930_b2"></script>
+  <script type="module" src="js/blocks/app.js?v=20260930_p1"></script>
 </body>
 </html>

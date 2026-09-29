@@ -83,12 +83,31 @@ export function updateStrokeEditor() {
   panel.style.display = 'none';
 }
 
+// 機架面板與節點面板同為 inspector-panel：手機底部抽屜與桌機右上角都會疊在一起，
+// 所以節點面板顯示時把機架面板收進去當最後一段（模組列仍在最底），關閉時放回原位。
+export function placeFrameEditor(frameEl, roleEl) {
+  if (roleEl.style.display !== 'none') {
+    const moduleRow = Array.from(roleEl.children).find(child => child.id === 'moduleEditor');
+    if (frameEl.parentNode !== roleEl || (moduleRow ? frameEl.nextSibling !== moduleRow : frameEl.nextSibling !== null)) {
+      if (moduleRow) roleEl.insertBefore(frameEl, moduleRow);
+      else roleEl.appendChild(frameEl);
+    }
+    frameEl.dataset.embedded = 'true';
+  } else {
+    if (roleEl.parentNode && (frameEl.parentNode !== roleEl.parentNode || roleEl.nextSibling !== frameEl)) {
+      roleEl.parentNode.insertBefore(frameEl, roleEl.nextSibling);
+    }
+    delete frameEl.dataset.embedded;
+  }
+}
+
 export function updateFrameEditor() {
   const panel = document.getElementById('frameEditor');
   if (!panel) return;
+  const roleEditor = document.getElementById('roleEditor');
   const points = pointCoords();
   const grounds = Object.entries(points).filter(([id]) => pointIsGround?.(id)).map(([id, point]) => ({ id, ...point }));
-  if (!grounds.length || !S.frameEditorOpen) { panel.style.display = 'none'; return; }
+  if (!grounds.length || !S.frameEditorOpen) { panel.style.display = 'none'; if (roleEditor) placeFrameEditor(panel, roleEditor); return; }
   const xs = grounds.map(point => point.x), ys = grounds.map(point => point.y);
   const width = Math.round(Math.max(...xs) - Math.min(...xs));
   const height = Math.round(Math.max(...ys) - Math.min(...ys));
@@ -108,6 +127,7 @@ export function updateFrameEditor() {
   if (margin) margin.value = Number(S.frameMarginMm || 18);
   if (hole) hole.value = Number(S.frameHoleDiameterMm || 5);
   panel.style.display = 'flex';
+  if (roleEditor) placeFrameEditor(panel, roleEditor);
 }
 
 // ---- 角色編輯（接點：自由 / 地錨 / 馬達）----
