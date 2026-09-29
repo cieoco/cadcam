@@ -324,3 +324,35 @@ export function mountedBaseIds(comps, modules) {
   });
   return ids;
 }
+
+// 把一組馬達安裝座（free mounts）依所屬模組分流：已安裝模組的歸該模組，其餘（含根與未安裝模組）歸世界。
+export function splitFrameMounts(freeMounts, comps, modules) {
+  const list = Array.isArray(freeMounts) ? freeMounts : [];
+  const modList = Array.isArray(modules) ? modules : [];
+  const byId = new Map(modList.map(m => [m.id, m]));
+  const world = [];
+  const byModule = {};
+  list.forEach(mount => {
+    const m = moduleOfPoint(comps, mount.pointId);
+    const mod = m != null ? byId.get(m) : null;
+    if (mod && mod.mount) {
+      (byModule[m] || (byModule[m] = [])).push(mount);
+    } else {
+      world.push(mount);
+    }
+  });
+  return { world, byModule };
+}
+
+// 每個已安裝模組另出一份機架清單：{ moduleId, fileBase, comps }，依 modules 陣列順序。
+export function moduleFrameExports(comps, modules) {
+  const list = Array.isArray(comps) ? comps : [];
+  const modList = Array.isArray(modules) ? modules : [];
+  return modList
+    .filter(mod => mod && mod.mount)
+    .map(mod => ({
+      moduleId: mod.id,
+      fileBase: `${mod.id}-frame`,
+      comps: list.filter(c => c.moduleId === mod.id)
+    }));
+}

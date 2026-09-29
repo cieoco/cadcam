@@ -24,7 +24,7 @@
 | S3 漏解警示 | Sonnet | 新純函式（`motion.js` 或新檔）＋ `updateMechanismStatus` 接線；新測試。 | E-S3＋E-S3b。 | 完成（Sonnet 一輪通過） |
 | M0 盤點 | 主模型 | 只讀程式、新增 baseline 測試與本節證據；回答 SDD §7 四個開放問題。 | 列出 fixed 點讀取處、座標寫入口、匯出成本；把 L0 POC 轉成 fixture。 | 完成 |
 | M1a 組合求解 | Sonnet | 新增 `js/blocks/assembly.js`（純函式）＋ `schema.js` 的 `normalizeModules`／`toSnapshot` 選配輸出；測試 `test/assembly.mjs`、`test/assembly-schema.mjs`（fixture 由主模型先寫）。 | E-M1～E-M5、E-M7。不碰 app.js。 | 完成（Sonnet 一輪通過，主模型審查補兩處邊界） |
-| M1b app 接線 | Sonnet（分三刀） | 刀 1：快照帶模組、rebuild 呼叫 rebake、求解呼叫點改走 assembly。刀 2：世界機架排除已安裝模組、節點外觀、每個模組另出機架檔。刀 3：跨模組合併防呆、D3 編輯前回到組裝姿態、新零件歸屬起點模組。 | E-M3 零回歸＋既有全套＋瀏覽器載入所有範例播放無差異。 | 刀 1 完成（本機 commit） |
+| M1b app 接線 | Sonnet（分三刀） | 刀 1：快照帶模組、rebuild 呼叫 rebake、求解呼叫點改走 assembly。刀 2：世界機架排除已安裝模組、節點外觀、每個模組另出機架檔。刀 3：跨模組合併防呆、D3 編輯前回到組裝姿態、新零件歸屬起點模組。 | E-M3 零回歸＋既有全套＋瀏覽器載入所有範例播放無差異。 | 刀 1、刀 2 完成（本機 commit） |
 | M1c 模組操作 UI | Sonnet | 新增 `js/blocks/module-editor.js`（`createModuleEditor(deps)` 工廠）、模組庫資料、`blocks.html` 局部；app.js 只接線。 | E-M6＋SDD §4.3 七項操作的桌機／窄畫面實測。 | 待施工 |
 | M1d R3 驗收 | 主模型 | 內建模組兩個＋必要修正；本節證據與 SDD 狀態。 | E-M8 全程；證據邊界照 SDD §5。 | 待施工 |
 
@@ -96,6 +96,15 @@
 - 自動：`assembly-app` 21/21、`assembly` 38/38、`assembly-schema` 33/33、`trace-sweep` 34/34、`trace-range` 24/24；全套 58 支全過；schema 70/70。
 - 瀏覽器（fixture 寫入預覽自存後重載，M1 控制）：以替換 `requestAnimationFrame` 手動推進真實 `play()` 到 62°，滑台 `LiftRack` 與夾爪 GCA、GCB、LT 皆上移 76.97 px；GCA、LiftRack 圓心與 `solveAssembly` 投影誤差 0。爪尖 LT 起初比對有約 4 px 差，追查為比對基準錯誤：schema 載入時把三點桿邊長 `LJ_edge` 121.8 取整為 122（原版範例同樣如此，既有行為），改用 app 實際參數後誤差 0。量測卡顯示兩條軌跡；自存帶 `modules`（2 個）與 9 個 `moduleId`；切到四連桿範例時 `S.assembly` 為 null；復原回組合作品後模組與 units 恢復。console error 為 0；測試自存已清除。
 - 未驗證：窄畫面實際觀感（預覽面板為窄版且隱藏，截圖不可辨識細節）；世界機架、節點外觀、匯出、編輯守門留待刀 2、刀 3。
+
+### M1b 刀 2 證據（2026-09-30，世界機架／安裝孔外觀／模組機架匯出；本機 commit、未 push）
+
+- 施工（Sonnet）：`assembly.js` 新增 `splitFrameMounts`、`moduleFrameExports`；`renderNodes` 可收 `mountedBaseIds`，已安裝模組的固定點畫成虛線圓環並附「安裝孔：鎖在宿主模組上」說明；`exportFrameAsSvg／Dxf` 加選填檔名；app 的三個世界機架包裝改吃 `worldFrameComps`，五處世界機架安裝座只過濾 `.free`（`.hosted` 與零件匯出清單不動），匯出時每個已安裝模組以 home 座標另出 `<模組 id>-frame`；import map 升版 `20260930_m1b2`。
+- 審查：Sonnet 回報 `test/assembly-frame.mjs` 崩潰，查明是主模型的測試錯誤（先替換 `globalThis.URL` 才用 `new URL` 讀 fixture），修正測試讀取順序後 20/20；實作不需修改。
+- 自動：`assembly-frame` 20/20；全套 59 支全過；schema 70/70。
+- 瀏覽器（fixture 自存重載）：確認載入 m1b2 版本；GCB 為虛線圓環、LGA 仍為地錨方塊、GCA 仍為馬達樣式。攔截下載（不實際落地）執行 SVG 匯出：7 個檔案含 `frame.svg` 與 `Grip1-frame.svg`，提示「已匯出 5 個零件 + 機架 SVG＋ 1 個模組底座」；世界 `frame.svg` 的圓孔數 6，與原版 `competition-rack-lift` 的 `frame.svg` 相同（夾爪孔已排除）；`Grip1-frame.svg` 5 個圓孔。console error 為 0；測試自存已清除。
+- 既有行為（非本刀造成）：齒條不會匯出成零件檔，原版齒條升降範例同樣只匯出 `LiftPinion.svg` 與 `frame.svg`。
+- 範圍外（M1 不做）：畫布與 3D 不畫模組底座板，只在匯出時產生；DXF 匯出與 SVG 共用同一段邏輯，本輪只以攔截方式實測 SVG。
 
 ## R1e 加工設定隨作品保存（2026-09-25 功能完成，2026-09-26 下載落地驗證通過／完成）
 

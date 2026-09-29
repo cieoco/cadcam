@@ -1072,16 +1072,16 @@ export function exportLinksAsDxf(comps, pts, params, settings, mounts = []) {
   return links.length + plates.length + gears.length;
 }
 
-export function exportFrameAsSvg(frameNodes, settings, motorMounts = []) {
+export function exportFrameAsSvg(frameNodes, settings, motorMounts = [], name = 'frame') {
   const svg = svgForFrame(frameNodes, settings, motorMounts);
   if (!svg) return 0;
-  downloadText(svg, 'frame.svg', 'image/svg+xml');
+  downloadText(svg, `${name}.svg`, 'image/svg+xml');
   return 1;
 }
 
-export function exportFrameAsDxf(frameNodes, settings, motorMounts = []) {
+export function exportFrameAsDxf(frameNodes, settings, motorMounts = [], name = 'frame') {
   const dxf = dxfForFrame(frameNodes, settings, motorMounts);
   if (!dxf) return 0;
-  downloadText(dxf, 'frame.dxf', 'application/dxf');
+  downloadText(dxf, `${name}.dxf`, 'application/dxf');
   return 1;
 }

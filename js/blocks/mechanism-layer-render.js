@@ -76,20 +76,23 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
 }
 
 export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds, gearPinIds, pulleyPinIds, camFollowerIds,
-  workpieceIds, dragId, sliderMountInfo, project, onPointerDown, registerUpdate }) {
+  workpieceIds, dragId, sliderMountInfo, project, onPointerDown, registerUpdate, mountedBaseIds = new Set() }) {
   const size = 14;
   Object.keys(points).forEach(id => {
     if (hiddenPointIds.has(id) || gearPinIds.has(id) || pulleyPinIds.has(id) || camFollowerIds.has(id) || workpieceIds.has(id)) return;
     const ground = groundIds.has(id), motor = motorCenterIds.has(id), cam = camCenterIds.has(id), mount = sliderMountInfo(id);
     const rectangle = ground && !motor && !cam && !mount;
-    const node = svgEl(rectangle ? 'rect' : 'circle');
+    // 已安裝模組的固定孔：鎖在宿主上，畫成虛線圓環而非地錨方塊。
+    const mountedBase = rectangle && mountedBaseIds.has(id);
+    const node = svgEl((rectangle && !mountedBase) ? 'rect' : 'circle');
     if (cam) { node.setAttribute('r', id === dragId ? 7 : 5); node.setAttribute('fill', '#fff'); node.setAttribute('stroke', '#9b59b6'); node.setAttribute('stroke-width', 2.4); }
     else if (motor) { node.setAttribute('r', id === dragId ? 8 : 6); node.setAttribute('fill', '#e74c3c'); node.setAttribute('stroke', '#922b21'); node.setAttribute('stroke-width', 2); }
     else if (mount) { node.setAttribute('r', id === dragId ? 9 : 7); node.setAttribute('fill', '#f8fafc'); node.setAttribute('stroke', id === dragId ? '#2ecc71' : '#34495e'); node.setAttribute('stroke-width', 3); const title = svgEl('title'); title.textContent = `${mount.label} 固定孔：承載滑軌桿件的端點，可拖曳或吸附到其他接點`; node.appendChild(title); }
+    else if (mountedBase) { node.setAttribute('r', id === dragId ? 9 : 7); node.setAttribute('fill', '#eef6ff'); node.setAttribute('stroke', id === dragId ? '#2ecc71' : '#2c6fbb'); node.setAttribute('stroke-width', 3); node.setAttribute('stroke-dasharray', '3 2'); const title = svgEl('title'); title.textContent = '安裝孔：鎖在宿主模組上（隨宿主移動）'; node.appendChild(title); }
     else if (rectangle) { node.setAttribute('width', size); node.setAttribute('height', size); node.setAttribute('rx', 3); node.setAttribute('fill', '#34495e'); }
     else { node.setAttribute('r', id === dragId ? 9 : 7); node.setAttribute('fill', '#fff'); node.setAttribute('stroke', id === dragId ? '#2ecc71' : '#34495e'); node.setAttribute('stroke-width', 3); }
     node.setAttribute('data-id', id); node.style.cursor = 'grab'; node.addEventListener('pointerdown', event => onPointerDown(event, id)); svg.appendChild(node);
-    const update = current => { const point = current[id], valid = point && Number.isFinite(point.x); node.style.display = valid ? '' : 'none'; if (!valid) return; const p = project(point); if (rectangle) { node.setAttribute('x', p.x - size / 2); node.setAttribute('y', p.y - size / 2); } else { node.setAttribute('cx', p.x); node.setAttribute('cy', p.y); } };
+    const update = current => { const point = current[id], valid = point && Number.isFinite(point.x); node.style.display = valid ? '' : 'none'; if (!valid) return; const p = project(point); if (rectangle && !mountedBase) { node.setAttribute('x', p.x - size / 2); node.setAttribute('y', p.y - size / 2); } else { node.setAttribute('cx', p.x); node.setAttribute('cy', p.y); } };
     update(points); registerUpdate(update);
   });
 }

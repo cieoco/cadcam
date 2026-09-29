@@ -28,7 +28,7 @@ import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
 import * as Motion from './motion.js';
-import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules } from './assembly.js';
+import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, mountedBaseIds as moduleMountedBaseIds } from './assembly.js';
 import { normalizeModules } from './module-schema.js';
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
@@ -424,13 +424,14 @@ const { changeStroke, changeServoAngle,
 // 隱性機架：所有 grounded 接點（fixed / motor / linear）視為同一個固定底座（機架）。
 // 不是獨立物件，只是把散落的固定銷當成一組——拖機架把手時整組一起平移。
 // 點 key 的掃描集中在 model.js（依 part-types 表），app 只負責把結果畫出來。
-function frameNodeIds() { return Model.frameNodeIds(S.comps); }
+// 世界機架排除已安裝模組零件（SDD-ASSEMBLY-MODULES §4.2）：否則拖機架會把裝在宿主上的模組底座一起搬走。
+function frameNodeIds() { return Model.frameNodeIds(worldFrameComps(S.comps, S.modules)); }
 // 機架上各固定銷的座標（固定點不隨求解移動，直接用元件座標）。x 排序方便連線。
-function frameNodes() { return Model.frameNodes(S.comps); }
+function frameNodes() { return Model.frameNodes(worldFrameComps(S.comps, S.modules)); }
 // 機架「視覺」用的固定銷：排除滑塊自己的 rail 端點（p1/p2），保留 mount 點（m1/m2）。
 // m1/m2 是真正鎖在機架上的孔；急回/滑塊範例需要把它們和曲柄軸畫成同一塊底座。
 // 注意：移動仍以 frameNodeIds() 為準，滑塊照樣跟著走。
-function frameConnectorNodes() { return Model.frameConnectorNodes(S.comps); }
+function frameConnectorNodes() { return Model.frameConnectorNodes(worldFrameComps(S.comps, S.modules)); }
 
 // syncSliderGeometries（滑軌幾何同步）已隨滑軌域移到 ./slider-editor.js
 
@@ -933,7 +934,7 @@ function draw() {
   const mountSplit2d = Exporters.splitMountsByHost(S.comps,
     motorFrameExportMounts({ pts, motorCenterIds: modelMotorCenterIds, motorMounts }));
   const frameGeometry2d = Exporters.inspectFrameExport(
-    frameConnectorNodes(), Settings.exportSettings(), mountSplit2d.free);
+    frameConnectorNodes(), Settings.exportSettings(), splitFrameMounts(mountSplit2d.free, S.comps, S.modules).world);
   drawGround(frameGeometry2d);
   const renderScene = prepareRenderScene({
     compiled: S.compiled, comps: S.comps, points: pts, frameGeometry: frameGeometry2d, sceneIds,
@@ -1073,7 +1074,8 @@ function draw() {
     points: pts, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds,
     gearPinIds, pulleyPinIds, camFollowerIds, workpieceIds, dragId: S.dragId,
     sliderMountInfo, project: p => ({ x: TX(p.x), y: TY(p.y) }),
-    onPointerDown: Input.onNodeDown, registerUpdate: update => frameUpdaters.push(update)
+    onPointerDown: Input.onNodeDown, registerUpdate: update => frameUpdaters.push(update),
+    mountedBaseIds: moduleMountedBaseIds(S.comps, S.modules)
   });
 
   drawGearManualHandles(pts);
@@ -1195,7 +1197,7 @@ function push3D() {
   if (!viewer3D || !lastModelInputs) return;
   const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = lastModelInputs;
   const mountSplit3d=Exporters.splitMountsByHost(S.comps,motorFrameExportMounts());
-  const frameGeometry=Exporters.inspectFrameExport(frameConnectorNodes(),Settings.exportSettings(),mountSplit3d.free);
+  const frameGeometry=Exporters.inspectFrameExport(frameConnectorNodes(),Settings.exportSettings(),splitFrameMounts(mountSplit3d.free,S.comps,S.modules).world);
   // 三點桿板形：3D 直接沿用 2D/DXF 共用的 createPlateGeometry 外形（含 shapeMode——
   // 包絡板/多邊形板/折線桿——與 vertices 順序），孔位與加工輸出一致，三視圖不分歧。
   // 以孔序字串為鍵，供 scene-model 對應到各片板；找不到原 comp 的純視覺 polygon 退回夾爪近似。
@@ -1320,7 +1322,7 @@ async function toggle3D() {
 function drawGround(frameGeometry) {
   const nodes = frameConnectorNodes();
   const fg = frameGeometry || Exporters.inspectFrameExport(nodes, Settings.exportSettings(),
-    Exporters.splitMountsByHost(S.comps, motorFrameExportMounts()).free);
+    splitFrameMounts(Exporters.splitMountsByHost(S.comps, motorFrameExportMounts()).free, S.comps, S.modules).world);
   renderFrameGeometry({ nodes, frameGeometry: fg, svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), drawBaseline: () => Render.drawGroundBaseline() });
 }
 
@@ -1807,22 +1809,42 @@ function exportLinksSvg() {
   const settings = Settings.exportSettings(), nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
   const stockWarnings = memberStockWarnings(S.comps, settings);
   if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
-  // 有宿主機架桿的 mount 隨該桿匯出（特徵切進桿身）；剩下的才進 frame.svg。
-  const freeMounts = Exporters.splitMountsByHost(S.comps, mounts).free;
+  // 有宿主機架桿的 mount 隨該桿匯出（特徵切進桿身）；剩下的才進 frame.svg；已安裝模組另出各自的機架檔。
+  const freeMounts = splitFrameMounts(Exporters.splitMountsByHost(S.comps, mounts).free, S.comps, S.modules).world;
   const count = Exporters.exportLinksAsSvg(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts);
   const frameCount = Exporters.exportFrameAsSvg(nodes, settings, freeMounts);
   const warnings = Exporters.frameExportWarnings(nodes, settings, freeMounts);
-  transient(count || frameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} SVG${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
+  // 已安裝模組另出一份機架檔（SDD-ASSEMBLY-MODULES §4.2）；座標用 home 姿態重算安裝座。
+  let moduleFrameCount = 0;
+  moduleFrameExports(S.comps, S.modules).forEach(entry => {
+    const modNodes = Model.frameConnectorNodes(entry.comps);
+    const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
+    const modFree = splitFrameMounts(Exporters.splitMountsByHost(S.comps, homeMounts).free, S.comps, S.modules).byModule[entry.moduleId] || [];
+    const n = Exporters.exportFrameAsSvg(modNodes, settings, modFree, entry.fileBase);
+    moduleFrameCount += n;
+    if (n) warnings.push(...Exporters.frameExportWarnings(modNodes, settings, modFree));
+  });
+  transient(count || frameCount || moduleFrameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} SVG${moduleFrameCount ? `＋ ${moduleFrameCount} 個模組底座` : ''}${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
 }
 function exportLinksDxf() {
   const settings = Settings.exportSettings(), nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
   const stockWarnings = memberStockWarnings(S.comps, settings);
   if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
-  const freeMounts = Exporters.splitMountsByHost(S.comps, mounts).free;
+  const freeMounts = splitFrameMounts(Exporters.splitMountsByHost(S.comps, mounts).free, S.comps, S.modules).world;
   const count = Exporters.exportLinksAsDxf(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts);
   const frameCount = Exporters.exportFrameAsDxf(nodes, settings, freeMounts);
   const warnings = Exporters.frameExportWarnings(nodes, settings, freeMounts);
-  transient(count || frameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} DXF${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
+  // 已安裝模組另出一份機架檔（SDD-ASSEMBLY-MODULES §4.2）；座標用 home 姿態重算安裝座。
+  let moduleFrameCount = 0;
+  moduleFrameExports(S.comps, S.modules).forEach(entry => {
+    const modNodes = Model.frameConnectorNodes(entry.comps);
+    const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
+    const modFree = splitFrameMounts(Exporters.splitMountsByHost(S.comps, homeMounts).free, S.comps, S.modules).byModule[entry.moduleId] || [];
+    const n = Exporters.exportFrameAsDxf(modNodes, settings, modFree, entry.fileBase);
+    moduleFrameCount += n;
+    if (n) warnings.push(...Exporters.frameExportWarnings(modNodes, settings, modFree));
+  });
+  transient(count || frameCount || moduleFrameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} DXF${moduleFrameCount ? `＋ ${moduleFrameCount} 個模組底座` : ''}${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
 }
 function openFile() {
   const inp = document.createElement('input');
