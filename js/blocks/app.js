@@ -1820,6 +1820,16 @@ function currentBounds() {
     minX = Math.min(minX, pose.center.x - halfWidth); maxX = Math.max(maxX, pose.center.x + halfWidth);
     minY = Math.min(minY, pose.center.y - halfHeight); maxY = Math.max(maxY, pose.center.y + halfHeight);
   });
+  // 齒輪接點只有軸心與輸出孔，不能代表輪廓；納入齒頂圓，避免初載／置中裁掉齒輪。
+  S.comps.filter(c => c.type === 'gear').forEach(c => {
+    const p = c.p1 && pts[c.p1.id];
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+    const teeth = Math.max(6, Math.round(Number(c.teeth) || 12));
+    const radius = Number(S.topo.params[c.radiusParam]) || 40;
+    const outerRadius = radius + 2 * radius / teeth;
+    minX = Math.min(minX, p.x - outerRadius); maxX = Math.max(maxX, p.x + outerRadius);
+    minY = Math.min(minY, p.y - outerRadius); maxY = Math.max(maxY, p.y + outerRadius);
+  });
   return any ? { minX, maxX, minY, maxY } : null;
 }
 function fitView() {

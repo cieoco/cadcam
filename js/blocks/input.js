@@ -21,8 +21,10 @@ const NODE_TAP_PX = 34;   // 手機點接點的命中半徑（畫面 px，縮放
 // ---- 縮放 / 平移手勢的指標帳本（畫布層級狀態）----
 const activePointers = new Map();   // pointerId -> { x, y }（client 座標）
 let pinchState = null;              // { dist, cx, cy }
+let pinchActive = false;            // 直到全部手指離開，才恢復單指編輯
 let pendingNodeDrag = null;         // 點擊先選取；超過門檻後才真正開始拖曳
 let linkPointerStart = null;        // 桌機畫桿可按住拖放，也保留點兩下
+let pendingMobileEdit = false;      // 放開接點後再展開面板，避免拖曳途中畫布高度改變
 
 // ---- 注入的外部依賴（由 app 在啟動時提供）----
 let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
@@ -105,7 +107,8 @@ export function onNodeDown(e, id) {
   document.getElementById('linkToRailBtn').style.display = 'none';
   setSliderDetailRows(false);
   S.selectedNodeId = id;
-  openMobileEditPanel();
+  pendingMobileEdit = mobilePrompt();
+  if (!pendingMobileEdit) openMobileEditPanel();
   Panels.updateRoleEditor();
   S.dragId = null; S.snapTarget = null;
   pendingNodeDrag = pointIsGround(id) && !isGroundPositionUnlocked(id) ? null : {
@@ -115,6 +118,7 @@ export function onNodeDown(e, id) {
   draw();
 }
 function onDragMove(e) {
+  if (pinchActive) return;
   if (S.dragShape) return;   // 造形點拖曳由 app 的專用監聽處理
   if (pendingNodeDrag && !S.dragId) {
     const threshold = pendingNodeDrag.pointerType === 'mouse' ? 6 : 12;
@@ -305,6 +309,7 @@ function commitDragUndo() {
   S.preDragSnap = null;
 }
 function onDragEnd(e) {
+  if (pinchActive) return;
   if (S.dragShape) return;   // 造形點拖曳由 app 的專用監聽處理
   if (S.drawingPolygon) {
     if (e && e.pointerType && e.pointerType !== 'mouse') Tools.addPolygonVertex(e);
@@ -346,12 +351,18 @@ function onDragEnd(e) {
 
 function abortSingleDrag() {
   // 第二指落下時，放棄正在進行的單指拖曳，避免與縮放打架
+  commitDragUndo(); // 已完成的單指位移仍保留一筆復原，雙指本身不改機構。
+  pendingNodeDrag = null;
+  pendingMobileEdit = false;
+  S.dragFrame = false;
+  S.drawActive = false;
   S.dragId = null; S.dragLinkId = null; S.dragLastWorld = null; S.snapTarget = null;
 }
 
 function endPointer(e) {
   activePointers.delete(e.pointerId);
   if (activePointers.size < 2) pinchState = null;
+  if (activePointers.size === 0) pinchActive = false;
 }
 
 
@@ -402,6 +413,10 @@ export function init(deps) {
   svg.addEventListener('pointercancel', cancelPendingMove);
   svg.addEventListener('pointerup', onDragEnd);
   svg.addEventListener('pointercancel', onDragEnd);
+  svg.addEventListener('pointerup', () => {
+    if (pendingMobileEdit) { pendingMobileEdit = false; openMobileEditPanel(); }
+  });
+  svg.addEventListener('pointercancel', () => { pendingMobileEdit = false; });
   // 點空白處（背景/地面線，未 stopPropagation）取消選取
   svg.addEventListener('pointerdown', () => {
     if (S.drawingLink || S.drawingTriangle || S.drawingPolygon) return; // 畫圖模式：交給工具處理
@@ -417,13 +432,17 @@ export function init(deps) {
   // 雙指：pinch 縮放 + 兩指中心平移；滑鼠滾輪：以游標為錨縮放。單指維持原本的拖曳。
   svg.addEventListener('pointerdown', (e) => {
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (activePointers.size === 2) {
+    if (activePointers.size >= 2) {
+      pinchActive = true;
       abortSingleDrag();
       const [p, q] = [...activePointers.values()];
       pinchState = { dist: Math.hypot(q.x - p.x, q.y - p.y), cx: (p.x + q.x) / 2, cy: (p.y + q.y) / 2 };
+      e.preventDefault();
+      e.stopImmediatePropagation(); // 第二指不能被零件 handler 接走，或啟動另一段編輯。
+      try { svg.setPointerCapture(e.pointerId); } catch (_) {}
       draw();
     }
-  });
+  }, true); // 先記錄指標，再讓零件處理；零件的 stopPropagation 不可阻止縮放。
   svg.addEventListener('pointermove', (e) => {
     if (!activePointers.has(e.pointerId)) return;
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -449,7 +468,7 @@ export function init(deps) {
     if (!mobilePrompt()) return;
     if (e.pointerType === 'mouse') return;
     if (S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.pickBars) return; // 這些模式各自有起點處理
-    if (activePointers.size >= 1) return;                    // 第二指：交給縮放手勢
+    if (activePointers.size >= 2) return;                    // 第二指：交給縮放手勢
     const w = worldFromEvent(e); if (!w) return;
     const ctm = svg.getScreenCTM();
     const pxToWorld = ctm && ctm.a ? 1 / (ctm.a * View.getScale()) : 1 / View.getScale();

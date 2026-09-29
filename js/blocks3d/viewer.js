@@ -777,7 +777,8 @@ export function createViewer(container) {
     if (f) {
       if (!initialized) {
         controls.target.set(f.x, f.y, f.z);
-        const dist = Math.max(300, model.span * 2.2);
+        // 直向手機的水平視角較窄，初始距離需補償寬高比，否則兩側零件會被裁掉。
+        const dist = Math.max(300, model.span * 2.2) / Math.min(1, camera.aspect);
         camera.position.set(f.x, f.y, dist);
         initialized = true;
       } else if (model.anchored) {
