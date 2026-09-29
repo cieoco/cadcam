@@ -5,10 +5,40 @@
  * 以及來回擺的兩端極限在哪。求解器一行不改，這裡只是反覆呼叫它探路。
  */
 
-import { solveTopology } from '../multilink/solver.js';
+import { solveTopology, sweepTopology } from '../multilink/solver.js';
 
-export const PLAY_STEP = 2;           // 每幀轉幾度
+export const PLAY_STEP = 2;           // 每幀轉幾度（僅供 walkBranch/planMotion 探路使用，不參與播放計時）
 export const norm360 = deg => ((deg % 360) + 360) % 360;
+
+// S2b：窄範圍軌跡取樣。整圈／寬範圍維持每 5°；範圍太窄（如夾爪 3.8°）時 5° 取不到足夠點，
+// 改成把範圍切成至少 TRACE_MIN_SAMPLES 個點的步長，並讓 end 多推一點點以蓋過浮點累加誤差。
+export const TRACE_STEP_DEG = 5;
+export const TRACE_MIN_SAMPLES = 25;
+export function traceSweepRange(lo, hi) {
+  if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi < lo) return { start: 0, end: 360, step: TRACE_STEP_DEG };
+  const span = hi - lo;
+  if (span === 0) return { start: lo, end: hi, step: TRACE_STEP_DEG };
+  if (span / TRACE_STEP_DEG + 1 >= TRACE_MIN_SAMPLES) return { start: lo, end: hi, step: TRACE_STEP_DEG };
+  const step = span / (TRACE_MIN_SAMPLES - 1);
+  return { start: lo, end: hi + step * 1e-6, step };
+}
+
+// S1 依時間播放：播放角速度改以「度／秒」計，與螢幕更新率無關。
+export const PLAY_SPEED_DEG_PER_SEC = 120;   // 預設播放角速度（= 舊版 60Hz × 2°）
+export const MAX_FRAME_DT_MS = 100;          // 單幀 dt 上限，避免切分頁回來後暴衝
+export const NOMINAL_FRAME_DT_MS = 1000 / 60; // 第一幀沒有上一個時間戳可用時的名目幀長
+
+// 依 dt（毫秒）與角速度（度／秒）算出這一幀該前進幾度。
+export function playStepDeg(dtMs, degPerSec = PLAY_SPEED_DEG_PER_SEC) {
+  if (!Number.isFinite(dtMs) || !Number.isFinite(degPerSec) || dtMs < 0 || degPerSec < 0) return 0;
+  const clamped = Math.min(dtMs, MAX_FRAME_DT_MS);
+  return degPerSec * clamped / 1000;
+}
+
+// 依時間前進 theta（整圈轉模式用）；不做 360 取模，沿用舊版累加語意。
+export function advanceByTime(theta, dtMs, degPerSec = PLAY_SPEED_DEG_PER_SEC, dir = 1) {
+  return theta + (dir < 0 ? -1 : 1) * playStepDeg(dtMs, degPerSec);
+}
 
 // 用「上一點 + 速度」外插出預測位置當求解種子：靠動量挑連續分支，
 // 平行四邊形過共線點時才不會翻成交叉四邊形（單純取最近解會挑錯邊）。
@@ -60,6 +90,21 @@ function walkBranch(compiled, topo, theta, lastSolved, dir, motorCtx) {
     last = th;
   }
   return { full: true };           // 繞一整圈都沒斷 = 可整圈轉
+}
+
+// S2：軌跡點共用同一份 compiled，只呼叫一次 sweepTopology，再分別取出每個軌跡點的 B，取代逐點各掃一次。
+export function traceSweeps(compiled, params, ids, startDeg, endDeg, stepDeg) {
+  if (!ids.length) return [];
+  const { results } = sweepTopology(compiled, params, startDeg, endDeg, stepDeg);
+  return ids.map(id => ({
+    id,
+    results: results.map(step => ({
+      theta: step.theta,
+      isValid: step.isValid,
+      B: step.isValid ? (step.points ? step.points[id] : undefined) : null,
+      points: step.points
+    }))
+  }));
 }
 
 // 開始播放前先規劃這個機構是「整圈轉」還是「來回擺」、以及來回擺的兩端在哪。

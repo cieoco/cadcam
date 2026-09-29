@@ -2,6 +2,62 @@
 
 規格來源：[SDD-FTC-MODULES.md](SDD-FTC-MODULES.md)。本文件是開發／驗收記錄，不新增產品 UI，也不是背景排程。
 
+## M1 模擬補齊＋模組組裝（2026-09-29 規格完成，待施工授權）
+
+規格及驗收唯一來源：[SDD-ASSEMBLY-MODULES.md](SDD-ASSEMBLY-MODULES.md)。本輪不含力學。基準 commit：`78df05f`。
+
+### 模型分工與升級規則
+
+- **主模型**：寫 SDD、M0 盤點、為每包先寫好失敗中的測試 fixture 或具體驗收指令、審查 diff、跑全套測試、做瀏覽器驗收、記錄證據。
+- **施工模型（Sonnet）**：只做下表指定的一包，只改列出的檔案；完成後回報修改檔案、測試輸出與未解決問題。交辦內容要附上檔案、函式、輸入／輸出與驗收指令，不能只寫「請完成 M1b」。
+- **升級**：同一包施工 → 主模型審查，**連續兩輪未通過**才改由 Opus 直接施工；升級前主模型先把失敗縮小成具體 fixture。不同模型不同時修改同一檔案。
+- 每包通過後才進下一包；commit／push 等使用者明確指示。
+
+### LOOP 工作包
+
+| 包 | 施工 | 成果／允許修改範圍 | 驗收閘門 | 狀態 |
+| --- | --- | --- | --- | --- |
+| S1 依時間播放 | Sonnet | `motion.js` 新增 `advanceByTime`；`app.js` 的 `play()` 改用 rAF 時間戳；新測試 `test/play-timing.mjs`。 | E-S1 自動＋E-S1b 瀏覽器；既有 rock-motion 測試通過。 | 完成（Sonnet 一輪通過） |
+| S2 軌跡一次掃 | Sonnet | 只改 `app.js` 的 `getTrajectoryData`；新測試比較新舊算法。 | E-S2。 | 完成（Sonnet 一輪通過） |
+| S2b 窄範圍軌跡取樣 | Sonnet | `traceSweeps` 呼叫端依範圍調整步長（見 S2 證據的發現）；新測試。 | 夾爪範例畫得出兩條軌跡、量測卡最小≠最大；E-S2 仍通過。 | 完成（Sonnet 一輪通過） |
+| S3 漏解警示 | Sonnet | 新純函式（`motion.js` 或新檔）＋ `updateMechanismStatus` 接線；新測試。 | E-S3＋E-S3b。 | 完成（Sonnet 一輪通過） |
+| M0 盤點 | 主模型 | 只讀程式、新增 baseline 測試與本節證據；回答 SDD §7 四個開放問題。 | 列出 fixed 點讀取處、座標寫入口、匯出成本；把 L0 POC 轉成 fixture。 | 待施工 |
+| M1a 組合求解 | Sonnet | 新增 `js/blocks/assembly.js`（純函式）＋ `schema.js` 的 `normalizeModules`／`toSnapshot` 選配輸出；測試 `test/assembly.mjs`、`test/assembly-schema.mjs`（fixture 由主模型先寫）。 | E-M1～E-M5、E-M7。不碰 app.js。 | 待施工 |
+| M1b app 接線 | Sonnet（分兩刀） | 刀 1：solver 呼叫點改走 assembly、rebuild 呼叫 rebake、合併防呆。刀 2：fixed 點繪製／3D／匯出依 M0 結論、D3 編輯規則、自由度加總。 | E-M3 零回歸＋既有全套＋瀏覽器載入所有範例播放無差異。 | 待施工 |
+| M1c 模組操作 UI | Sonnet | 新增 `js/blocks/module-editor.js`（`createModuleEditor(deps)` 工廠）、模組庫資料、`blocks.html` 局部；app.js 只接線。 | E-M6＋SDD §4.3 七項操作的桌機／窄畫面實測。 | 待施工 |
+| M1d R3 驗收 | 主模型 | 內建模組兩個＋必要修正；本節證據與 SDD 狀態。 | E-M8 全程；證據邊界照 SDD §5。 | 待施工 |
+
+建議順序：S1 → S2 → S3（暖身、互不相依）→ M0 → M1a → M1b → M1c → M1d。
+
+### S1 證據（2026-09-29）
+
+- 修改：`motion.js` 新增 `PLAY_SPEED_DEG_PER_SEC`／`MAX_FRAME_DT_MS`／`NOMINAL_FRAME_DT_MS`／`playStepDeg`／`advanceByTime`；`app.js` 的 `play()` 以 rAF 時間戳計 dt；`blocks.html` import map 加 `motion.js?v=20260929_s1`、app.js 升版。`PLAY_STEP=2` 保留給 `walkBranch` 探路。
+- 審查：主模型寫的 `test/play-timing.mjs` 有一條期望值錯誤（500 ms 未套 100 ms 上限），Sonnet 回報而未擅改測試；主模型修正測試，實作不變。
+- 自動：`play-timing` 17/17；全套 51 支 `test/*.mjs` 全過；`test_blocks_schema.mjs` 70/70。
+- 瀏覽器（本機 HTTP，四連桿範例）：確認載入 `motion.js?v=20260929_s1`。預覽面板當時隱藏、rAF 不觸發，因此改以頁面內替換 `requestAnimationFrame` 手動推進真實 `play()`：60Hz 與 144Hz 各 1 秒皆前進 122°（120°/s＋第一幀名目 2°；舊版 144Hz 會是 290°），卡頓 400 ms 只前進 14°（2°＋上限 12°）。console error 為 0。
+- 未驗證：實際高更新率螢幕的肉眼觀感、窄畫面播放（E-S1b 以模擬時間戳代替）。
+
+### S2 證據（2026-09-29）
+
+- 修改：`motion.js` 新增 `traceSweeps`（一次 `sweepTopology`，再按 id 取 `points[id]`）；`app.js` 的 `getTrajectoryData` 改呼叫它並移除不再使用的 `sweepTopology` import；import map 升版 `20260929_s2`。
+- 自動：`test/trace-sweep.mjs` 34/34（16 個範例、55 條軌跡、0°–360° 每 5°，新舊逐點相同）；全套 52 支全過；schema 70/70。
+- 瀏覽器：載入 `app.js`／`motion.js?v=20260929_s2`；切比雪夫、Jansen 各畫出 73 點軌跡，工作範圍卡 128／68 mm；console error 為 0。
+- **發現（既有問題，非 S2 造成）**：雙齒輪夾爪的任務擺動範圍為 12.42°–16.21°（僅 3.8°），軌跡以 5° 取樣只得到 1 個點，因此畫不出軌跡線，量測卡顯示「兩點距離 150–150 mm」。舊寫法同範圍同步長，結果相同。列為 S2b。
+
+### S3 證據（2026-09-29）
+
+- 修改：新增 `js/blocks/solve-health.js`（`unsolvedMovingPoints`，排除 workpiece、任一處 fixed 即視為固定）；`app.js` 的 `updateMechanismStatus` 在「解不出動作」之後加 warn 分支；app.js 升版 `20260929_s3`。
+- 自動：主模型先以臨時實作驗證測試前提（23/23），再交 Sonnet 施工；`test/solve-health.mjs` 23/23（16 個範例 × 4 角度不誤報、L0 錯誤接法列出 GCB／GPB／RT、fixed 優先、NaN、去重）；全套 53 支全過；schema 70/70。
+- 瀏覽器（S3）：把 L0 錯誤接法寫入預覽環境自存後重載，狀態列為 warn「有 3 個接點沒有被帶動（停在原位）」，tooltip 列出 GCB、GPB、RT；四連桿、夾爪、進料（含 workpiece）、雙馬達升降臂、皮帶輪皆為 ready。測試自存已清除；console error 為 0。
+
+### S2b 證據（2026-09-29）
+
+- 修改：`motion.js` 新增 `TRACE_STEP_DEG`／`TRACE_MIN_SAMPLES`／`traceSweepRange`（寬範圍維持每 5°；不足 25 個取樣時改用 span/24，end 加 step×1e-6 以取到末端）；`getTrajectoryData` 改用它；import map 與 app.js 升版 `20260929_s2b`。
+- 審查：主模型寫測試時原假設「爪尖距離變化＝淨開口差 20 mm」，臨時實作驗證得 13.03 mm（淨開口以內彎爪板接觸處估算，不是爪尖），先修正測試再派工。Sonnet 回報的「app.js 版本字串不符」是誤讀 git diff 的 HEAD 側，工作區實際為預期值。
+- 自動：`trace-range` 24/24、`trace-sweep` 34/34（整圈結果不變）、`play-timing` 17/17、`solve-health` 23/23；全套 54 支全過；schema 70/70。
+- 瀏覽器：雙齒輪夾爪由「0 條軌跡、兩點距離 150–150 mm」變為兩條各 25 點軌跡、「兩點距離 137–150 mm」；Jansen 仍為 73 點、工作範圍 68 mm。
+- **發現（既有問題，未處理）**：`competition-fourbar-lift` 範例沒有指定軌跡點，app 退回 compile 預設的 `O1`（固定樞軸），因此工作範圍卡顯示「0 mm」。舊算法相同結果。可在範例補 `tracePoints` 或讓預設軌跡點略過固定點，待使用者決定。
+
 ## R1e 加工設定隨作品保存（2026-09-25 功能完成，2026-09-26 下載落地驗證通過／完成）
 
 規格及驗收唯一來源：[SDD-RIGID-MEMBERS.md](SDD-RIGID-MEMBERS.md) 的 R1e 與交接提醒 H1–H6。本節只安排施工與收集證據，不重複定義資料欄位。基準 commit：`4d2b5a6`，已推送 `origin/main`。

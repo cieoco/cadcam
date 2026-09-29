@@ -13,7 +13,7 @@
 
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
-import { solveTopology, sweepTopology } from '../multilink/solver.js';
+import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
 // computeBodyLayers：2D 疊放順序與 3D z 分層共用同一套，兩邊才一致。
@@ -26,6 +26,7 @@ import * as Tools from './tools.js';     // 工具模式互動（畫桿 / 畫滑
 import * as Input from './input.js';     // 指標 / 手勢互動（拖曳 + 吸附合併 + pinch 縮放）
 import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
+import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
 import * as Motion from './motion.js';
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
@@ -198,6 +199,10 @@ const worldFromEvent = (e) => View.worldFromEvent(svg, e);
 const extrapolateSeed = Motion.extrapolateSeed;
 const norm360 = Motion.norm360;
 const PLAY_STEP = Motion.PLAY_STEP;
+const PLAY_SPEED_DEG_PER_SEC = Motion.PLAY_SPEED_DEG_PER_SEC;
+const NOMINAL_FRAME_DT_MS = Motion.NOMINAL_FRAME_DT_MS;
+const playStepDeg = Motion.playStepDeg;
+const advanceByTime = Motion.advanceByTime;
 const planMotion = () => Motion.planMotion(S.compiled, S.topo, S.theta, lastSolved,
   { active: String(S.activeMotor), frozen: frozenMotorAngles() });
 const mobilePrompt = () => window.matchMedia('(hover: none), (pointer: coarse), (max-width: 640px)').matches;
@@ -498,16 +503,16 @@ function getTrajectoryData() {
   const range = inputRockRange();
   const thetaStart = range ? range.lo : 0;
   const thetaEnd = range ? range.hi : 360;
-  const data = ids.map(id => {
-    try {
-      const sweep = sweepTopology({ ...S.compiled, tracePoint: id },
-        { ...(S.compiled.params || S.topo.params || {}), motorAngles: frozenMotorAngles(), sweepMotor: String(S.activeMotor) },
-        thetaStart, thetaEnd, 5);
-      return (sweep && sweep.results) ? { id, results: sweep.results } : null;
-    } catch (_) {
-      return null;
-    }
-  }).filter(Boolean);
+  // S2：軌跡點共用同一份 compiled，只 sweep 一次（traceSweeps 內部處理），不再逐點各掃一次。
+  const params = { ...(S.compiled.params || S.topo.params || {}), motorAngles: frozenMotorAngles(), sweepMotor: String(S.activeMotor) };
+  let data;
+  try {
+    // S2b：範圍太窄（如夾爪 3.8°）時 5° 取不到足夠取樣點，改用 traceSweepRange 算出的步長。
+    const { start, end, step } = Motion.traceSweepRange(thetaStart, thetaEnd);
+    data = Motion.traceSweeps(S.compiled, params, ids, start, end, step);
+  } catch (_) {
+    data = [];
+  }
   trajectoryCache = { version: geomVersion, motorKey, data };
   return data.length ? data : null;
 }
@@ -705,6 +710,7 @@ function updateMechanismStatus(sol = null) {
     title = mobility.mobilityOverride
       ? `組裝自由度：F = ${mobility.dof}（一般公式 ${mobility.formulaDof}；平行冗餘約束已校正）`
       : `理論自由度：F = ${mobility.dof}（剛體 ${mobility.bodies}、低副 ${mobility.lowerPairs}、高副 ${mobility.higherPairs}）`;
+    const unsolvedIds = sol !== null ? unsolvedMovingPoints(S.comps, sol) : [];   // S3 漏解警示：只算一次
     if (gripperController?.isActive() && !gripperController.currentPlan().ok) {
       state = 'error';
       text = '夾爪任務待修正，請查看任務卡';
@@ -724,6 +730,11 @@ function updateMechanismStatus(sol = null) {
     } else if (S.compiled && sol === null && (S.compiled.steps || []).length) {
       state = 'error';
       text = '目前解不出動作，請檢查接點';
+    } else if (unsolvedIds.length) {
+      // S3 漏解警示：solver 回報有效，但有些會動的接點沒被解出來，停在原位卻沒提示。
+      state = 'warn';
+      text = `有 ${unsolvedIds.length} 個接點沒有被帶動（停在原位）`;
+      title = `${title}\n沒有被帶動的接點：${unsolvedIds.join('、')}`;
     } else if (mobility.dof === 1) {
       state = 'ready';
       text = '可以播放了';
@@ -1457,14 +1468,17 @@ function play() {
   if (playPlan.mode === 'rock' && playDir > 0 && S.theta >= playPlan.hi) playDir = -1;
   if (playPlan.mode === 'rock' && playDir < 0 && S.theta <= playPlan.lo) playDir = 1;
   draw();   // 先完整重建一次以建立場景與更新器，之後每幀走 renderFrame() 只更新幾何（不拆 DOM）
-  const step = () => {
+  let lastTs = null;
+  const step = (ts) => {
+    const dt = lastTs == null ? NOMINAL_FRAME_DT_MS : ts - lastTs; // 第一幀用名目幀長，按下播放立即有反應
+    lastTs = ts;
     if (playPlan.mode === 'rock') {
       // 搖桿：在 lo..hi 間來回擺，到極限就反向（真實的搖桿物理）
-      const next = advanceRock(S.theta, playDir, PLAY_STEP, playPlan.lo, playPlan.hi);
+      const next = advanceRock(S.theta, playDir, playStepDeg(dt), playPlan.lo, playPlan.hi);
       S.theta = next.theta; playDir = next.direction;
     } else {
       // 曲柄／平行四邊形：順向整圈轉
-      S.theta = S.theta + PLAY_STEP * playDir;
+      S.theta = advanceByTime(S.theta, dt, PLAY_SPEED_DEG_PER_SEC, playDir);
     }
     document.getElementById('thetaVal').textContent = Math.round(norm360(S.theta));
     renderFrame();
