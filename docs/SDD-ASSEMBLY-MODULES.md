@@ -41,6 +41,7 @@
 - **D4 馬達：各模組保有自己的馬達編號。** 沿用多馬達 `motorAngles`／`activeMotor` 與控制列 M1/M2 切換；插入模組時若編號衝突，自動換成下一個未用的編號。
 - **D5 id 全域唯一。** 插入模組實例時，所有 comp id、點 id、param key、馬達編號都重新命名（沿用 `S.counter`），同一模組插兩次會得到兩組互不相干的零件。
 - **D6 模組庫三來源。** 內建模組（由既有範例定義，先收 `gear-gripper`、`competition-rack-lift`）、本機模組（localStorage）、模組 JSON 匯出／匯入。**作品存檔／分享時，實例已經完整展開在作品裡**，接收端不需要有相同的模組庫。
+- **D8 安裝操作改用面板選單（M1c 修訂）。** 現有拖曳只移動單一接點，沒有「整組模組一起拖」的互動；新做一套在手機上也難操作。M1 改為：選取模組零件 → 模組面板「安裝到…」列出可用接口 → 點選即安裝（模組 `base` 平移到接口 `at` 的目前位置）。拖曳吸附安裝列為後續。
 - **D7 不擴張 R1 夾爪任務卡。** `gripperWorkflow` 只在作品「只有夾爪那組零件」時啟用（現有檢查）；R3 組合範例不帶這個 marker。任務卡改成支援模組是後續工作。
 
 ## 3. 資料契約
@@ -147,11 +148,40 @@ canMergePoints(comps, idA, idB)        → boolean                     // 兩點
 - **匯出**：採「另出 `<模組名>-frame`」。`exportFrameAsSvg`／`exportFrameAsDxf`／`frameExportWarnings` 本來就吃一組 `frameNodes` 陣列（[exporters.js:1075-1083](../js/blocks/exporters.js)），對每個已安裝模組用它自己的零件再呼叫一次即可；馬達安裝座依 `splitMountsByHost` 分到各模組。座標用 home 姿態（加工只需相對位置）。
 - **已知風險（M1 不處理，列入驗收觀察）**：`buildMotorMounts` 的朝向用靜態座標計算（[motor-mounts.js:136-148](../js/blocks/motor-mounts.js)）；宿主若會「旋轉」，模組上的馬達外觀朝向可能停在 home。R3 的齒條滑台只平移，不受影響。
 
+### 4.3a 模組操作的純函式（M1c 刀 1，`js/blocks/module-ops.js`）
+
+「相連」與「重新命名」共用同一套規則：零件的**自有 token**＝它的 id、接點 id、`holes` 內孔 id；**參照 token**＝它所有欄位中的字串值（深層走訪），但略過列舉型欄位 `type color shape shapeMode profile kind motorType role orientation ref baseEnd name id` 與馬達編號欄位 `physicalMotor physical_motor motor`。兩零件相連＝共用接點，或一方的參照 token 命中另一方的自有 token（例如齒條 `pinion`、`framePins`，齒輪 `mesh`、`mountLocatorPoint`）。
+
+```
+connectedRootComps(comps, compId)          → [compId…]            // 從根零件出發的相連群組（只含沒有 moduleId 的零件）
+createModule(comps, modules, compId, name) → { ok, comps, modules, moduleId, reason }
+  // 群組標上新模組 id（Mod1、Mod2…不重複）；base＝群組中第一個 fixed／motor 點；outputs [] ；mount null
+inferOutput(comps, module, pointId)        → { ok, output, reason } // body＝模組內引用該點的 bar／triangle／rack／slider（含 holes）；固定點不可當輸出
+addOutput(comps, modules, moduleId, pointId, name?) → { ok, modules, reason }
+mountModule(comps, modules, moduleId, target, params, motorState) → { ok, comps, modules, reason }
+  // target＝{ module, output }；motorState＝{ activeMotor, theta, motorAngles }
+  // 只可安裝未安裝的模組、目標不可是自己或自己的子孫、需有 base
+  // 以目前姿態求解，模組整組平移讓 base 落在 at 的目前位置；ref＝輸出端目前位姿；
+  // home＝宿主鏈（宿主模組及其祖先）零件用到的每顆馬達的目前角度
+unmountModule(comps, modules, moduleId, params, motorState) → { ok, comps, modules, reason }
+  // 依目前姿態把模組零件剛體變換到世界座標（同 rebake 規則），mount 改 null
+dissolveModule(comps, modules, moduleId)   → { ok, comps, modules, reason } // 已安裝或有其他模組裝在它上面時拒絕
+moduleToTemplate(comps, modules, params, moduleId) → template
+  // { kind: 'blocks-module', v: 1, name, source?, comps（去掉 moduleId）, params（comps 參照到的 key）, base?, outputs }
+normalizeTemplate(raw)                     → { ok, template, warnings }  // 走 normalizeSnapshot＋normalizeModules 同一套檢查
+instantiateTemplate(template, ctx)         → { comps, params, module, counter }
+  // ctx＝{ counter, usedMotorIds, existingTokens, place: {x, y} }
+  // 所有自有 token 與 param key 加後綴 _N（N＝counter 遞增，與 existingTokens 不撞）；參照 token 同步改名；
+  // 馬達編號改成未用過的最小正整數；整組平移讓 base（沒有則第一個接點）落在 place；零件標上新模組 id
+BUILTIN_MODULES / builtinTemplate(id)      // 'rack-lift'（齒條升降，輸出 carriage＝LiftOutput）、'gear-gripper'（齒輪夾爪，base GCA；去掉夾爪任務 params）
+parseLibrary(json) / serializeLibrary(list) // 本機模組庫：陣列、每筆 normalizeTemplate、最多 32 筆、壞的略過
+```
+
 ### 4.3 模組操作（UI，沿用既有面板，不新增常駐側欄）
 
 1. **存成模組**：選取任一零件 → 零件設定列「存成模組」→ 把與它以共用接點相連、且尚未屬於其他模組的整組零件標記為新模組；輸入名稱；`base` 預設為該組第一個 fixed／motor 點。不需要多選。
 2. **模組庫**：零件盤新增「模組」分頁：內建＋本機模組清單；點選或拖出即插入實例（D5 重新命名），放在畫面中央，`mount: null`。
-3. **安裝**：拖曳模組的 `base` 把手靠近另一模組的輸出端 `at` → 綠圈吸附 → 放開即安裝：整組平移讓 `base` 落在 `at`，寫入 `mount.ref`／`mount.home`。M1 不自動旋轉；方位以使用者放下時為準。
+3. **安裝**（D8）：模組面板「安裝到…」列出其他模組的輸出端（排除自己與子孫）→ 點選即安裝：整組平移讓 `base` 落在 `at` 的目前位置，寫入 `mount.ref`／`mount.home`。M1 不自動旋轉。另有「設為輸出端」：選取模組內的活動接點即可宣告為輸出端。
 4. **拆下**：選取已安裝模組 → 「拆下」→ 模組留在目前世界位置，`mount = null`（先依目前姿態 rebake）。
 5. **解散模組**：只允許未安裝的模組；移除所有 `comp.moduleId` 標記與該模組條目，零件回到根。
 6. **匯出／匯入模組 JSON**：本機模組可下載為 `.blocks-module.json`，匯入時走與作品相同的 schema 正規化（只接受 kind 為 `blocks-module`）。

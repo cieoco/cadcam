@@ -14,7 +14,7 @@ const BODY_KINDS = new Set(['bar', 'triangle', 'rack', 'slider']);
 const safeId = v => typeof v === 'string' && SAFE_ID.test(v);
 const isFiniteNum = v => Number.isFinite(Number(v));
 
-function sanitizeName(raw, fallback) {
+export function sanitizeName(raw, fallback) {
   if (typeof raw !== 'string') return fallback;
   const cleaned = raw.replace(/[<>"'`]/g, '');
   return cleaned.slice(0, MAX_NAME_LEN) || fallback;

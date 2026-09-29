@@ -181,7 +181,7 @@ export function sweepAssembly(asm, params, startDeg, endDeg, stepDeg) {
 
 // rebake 的剛體變換（SDD §4.1）：點座標整組平移＋旋轉；世界方向角度欄位 +δ；
 // 局部座標（三角板 vertices 的 u,v、齒條 holes 的 u,v）與馬達角（servoStart/End）不動。
-function transformComp(comp, ref, now, deltaDeg) {
+export function transformComp(comp, ref, now, deltaDeg) {
   const out = { ...comp };
   POINT_KEYS.forEach(k => {
     const pt = out[k];

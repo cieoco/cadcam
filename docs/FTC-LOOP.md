@@ -25,7 +25,7 @@
 | M0 盤點 | 主模型 | 只讀程式、新增 baseline 測試與本節證據；回答 SDD §7 四個開放問題。 | 列出 fixed 點讀取處、座標寫入口、匯出成本；把 L0 POC 轉成 fixture。 | 完成 |
 | M1a 組合求解 | Sonnet | 新增 `js/blocks/assembly.js`（純函式）＋ `schema.js` 的 `normalizeModules`／`toSnapshot` 選配輸出；測試 `test/assembly.mjs`、`test/assembly-schema.mjs`（fixture 由主模型先寫）。 | E-M1～E-M5、E-M7。不碰 app.js。 | 完成（Sonnet 一輪通過，主模型審查補兩處邊界） |
 | M1b app 接線 | Sonnet（分三刀） | 刀 1：快照帶模組、rebuild 呼叫 rebake、求解呼叫點改走 assembly。刀 2：世界機架排除已安裝模組、節點外觀、每個模組另出機架檔。刀 3：跨模組合併防呆、D3 編輯前回到組裝姿態、新零件歸屬起點模組。 | E-M3 零回歸＋既有全套＋瀏覽器載入所有範例播放無差異。 | 完成（三刀皆本機 commit；刀 3 主模型補觸控路徑守門） |
-| M1c 模組操作 UI | Sonnet | 新增 `js/blocks/module-editor.js`（`createModuleEditor(deps)` 工廠）、模組庫資料、`blocks.html` 局部；app.js 只接線。 | E-M6＋SDD §4.3 七項操作的桌機／窄畫面實測。 | 待施工 |
+| M1c 模組操作 UI | Sonnet | 刀 1：純函式 `js/blocks/module-ops.js`（SDD §4.3a）＋測試。刀 2：`js/blocks/module-editor.js`（`createModuleEditor(deps)` 工廠）、零件盤「模組」區、模組面板、`blocks.html` 局部；app.js 只接線。 | 刀 1：E-M6＋`test/module-ops.mjs`。刀 2：SDD §4.3 各項操作的桌機／窄畫面實測。 | 刀 1 完成 |
 | M1d R3 驗收 | 主模型 | 內建模組兩個＋必要修正；本節證據與 SDD 狀態。 | E-M8 全程；證據邊界照 SDD §5。 | 待施工 |
 
 建議順序：S1 → S2 → S3（暖身、互不相依）→ M0 → M1a → M1b → M1c → M1d。
@@ -118,6 +118,14 @@
   - console error 為 0；測試自存已清除。
 - **M1b 收尾回歸發現的快取問題並修正**：全範例回歸時 console 出現 `rebuild` 讀 `S.modules.length` 為 undefined。查明刀 1 修改了 `state.js`（新增 `modules: []`）卻沒有進 import map，瀏覽器沿用快取的舊版 state.js；有自存的作品因 `applySnapshot` 會補上 `S.modules` 而沒發作，**第一次開頁、沒有自存的使用者會在初始化時出錯**。補上 `"./js/blocks/state.js": "…?v=20260930_m1b1"`，並核對 M1 期間改過的所有 js（`app.js` 由 script src 升版；`module-schema.js`、`solve-health.js` 為新檔），皆已有版本。新分頁、無自存重載：state.js 載入新版、console error 為 0。全 17 個範例播放回歸：`S.modules` 皆為 0、`S.assembly` 皆為 null，可播放者 20 幀前進 42°（夾爪任務範圍內 4°），縮放儀（手動）與空白挑戰不播放，與改動前一致。
 - 未能在瀏覽器驗證：拖曳吸附的跨模組防呆。fixture 內沒有可自由拖動的浮動點（爪尖受爪板剛體約束、地錨有位置鎖），對照組無法成立；該路徑由 `canMergePoints` 的 node 測試與 `nearestDisplayTo` 的 diff 審查涵蓋。三點桿／多邊形板的跨模組拒絕也只有 diff 審查，未在瀏覽器操作。
+
+### M1c 刀 1 證據（2026-09-30，模組操作純函式）
+
+- 規格修訂：新增 D8（安裝改為模組面板選單，拖曳吸附列後續）與 SDD §4.3a API；「相連」與「重新命名」共用自有 token／參照 token 規則——齒條升降範例 5 件彼此不共用接點，靠 `pinion`、`framePins`、`mountLocatorPoint` 參照相連（主模型先以 node 盤點確認）。
+- 施工（Sonnet，一輪通過）：新增 `module-ops.js`（相連群組、建立模組、推論／新增輸出端、安裝、拆下、解散、模板匯出／正規化、插入實例、內建模組、模組庫序列化）；`assembly.js` 的 `transformComp`、`module-schema.js` 的 `sanitizeName` 改為 export 共用。Sonnet 自行抓到一個 bug：馬達編號掛在接點物件上（`p1.physicalMotor`），只看零件頂層會讓 home 變成 {}。
+- 主模型審查修正：模板的 params 原本只取 part-types 的 `paramProps`，會漏掉桿件孔 `distParam`、皮帶輪 `pinRadiusParam` 等欄位，模組存檔後這些參數會遺失；改為依 SDD 用參照 token 與 params key 取交集，並補測試。移除因此不再使用的 import。
+- 自動：`module-ops` 64/64（含同一模板插兩次 id／param／馬達不衝突、在升降 0° 與 30° 時安裝 I1 皆成立、拆下後停在世界位置、迴圈與解散拒絕條件）；全套 61 支全過；schema 70/70。
+- app 尚未載入 module-ops.js（刀 2 接線），推上線不影響網站行為。
 
 ## R1e 加工設定隨作品保存（2026-09-25 功能完成，2026-09-26 下載落地驗證通過／完成）
 
