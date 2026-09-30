@@ -27,6 +27,7 @@
 | M1b app 接線 | Sonnet（分三刀） | 刀 1：快照帶模組、rebuild 呼叫 rebake、求解呼叫點改走 assembly。刀 2：世界機架排除已安裝模組、節點外觀、每個模組另出機架檔。刀 3：跨模組合併防呆、D3 編輯前回到組裝姿態、新零件歸屬起點模組。 | E-M3 零回歸＋既有全套＋瀏覽器載入所有範例播放無差異。 | 完成（三刀皆本機 commit；刀 3 主模型補觸控路徑守門） |
 | M1c 模組操作 UI | Sonnet | 刀 1：純函式 `js/blocks/module-ops.js`（SDD §4.3a）＋測試。刀 2：`js/blocks/module-editor.js`（`createModuleEditor(deps)` 工廠）、零件盤「模組」區、模組面板、`blocks.html` 局部；app.js 只接線。 | 刀 1：E-M6＋`test/module-ops.mjs`。刀 2：SDD §4.3 各項操作的桌機／窄畫面實測。 | 完成 |
 | M1d R3 驗收 | 主模型 | 內建模組兩個＋必要修正；本節證據與 SDD 狀態。 | E-M8 全程；證據邊界照 SDD §5。 | 完成（與 M1c 刀 2 一併驗收；手機面板重疊為既有問題，另開任務） |
+| D9 拖曳安裝 | Sonnet | `module-ops.js` 三支純函式、新檔 `js/blocks/module-drag.js`（SDD §4.3b）、`app.js` 接線、`blocks.html` import map；測試 `test/module-drag.mjs` 由主模型先寫。 | E-M9 自動＋E-M9b 瀏覽器；既有全套通過。 | 完成（Sonnet 兩輪：第一輪退回兩點） |
 
 建議順序：S1 → S2 → S3（暖身、互不相依）→ M0 → M1a → M1b → M1c → M1d。
 
@@ -151,6 +152,22 @@
 - 自動：`panel-stacking` 14/14；全套 64 支全過；schema 70/70。
 - 瀏覽器（無頭 Chromium，手機尺寸開觸控模擬）：三種尺寸逐一點四連桿的四個接點，重疊皆為 0，console error 為 0。手機上機架段落在底部抽屜內，往下捲即可操作；桌機排成單欄。實際按「軸距 ＋」：100 → 108 mm。
 - 未涵蓋：真實手機硬體；只開機架（沒有選接點）時仍是原本的獨立面板，行為不變。
+
+
+### D9 拖曳安裝證據（2026-09-30）
+
+- 盤點（主模型）：模組 `base` 是固定點或馬達點，預設有位置鎖；拖曳接點只移動單點，跨模組合併有 `canMergePoints` 防呆。因此不改接點拖曳，改用獨立把手（同 R1d 爪端把手的 capture 模式），規格見 SDD D9／§4.3b。
+- 主模型先寫 `test/module-drag.mjs`（修正前 0/2 失敗）。
+- Sonnet 第一輪：28/28 通過。審查接受三處偏離：`View.getScale()` 是 svg 單位／mm，吸附半徑要再乘 CTM；`renderFrame()` 也更新求解點；把手外觀。退回兩點：把手蓋住 base 節點，模組被選取時點不到節點；`finish()` 先釋放 capture 才清 `drag`，若 `lostpointercapture` 同步觸發會把結果還原。
+- Sonnet 第二輪：把手移到 base 右上 (+24,−24) px 並畫虛連線；先清 `drag` 再釋放 capture。
+- 自動：`module-drag` 28/28；全套 65 支全過；schema 70/70。
+- 瀏覽器（無頭 Chromium）：
+  - 1280×800：點 base 節點可選到節點，節點面板開啟；拖把手到滑台出現吸附環，放開即安裝，base 與 at 螢幕座標相同，一筆 undo，復原回到未安裝；拖到空白處只搬位置。
+  - 主模型補驗：用真的 M1 與播放鍵跑到 103°，滑台上移 65 px，夾爪 base 在 DOM 上與滑台孔重合（誤差 < 0.01 px）。
+  - 390×844 觸控（CDP touch 事件）：拖把手安裝成功，出現「已安裝到 齒條升降・滑台」提示。
+  - console error 全程為 0。
+- 已知（既有，未處理）：兩個內建模組都插在畫面中央，底座會重疊；手機命中區較大，點夾爪 base 可能選到升降的 base。可改點夾爪其他零件，或先拖開。
+- 未涵蓋：真實手機硬體；複雜作品拖曳時每次 pointermove 都 rebuild 的效能。
 
 ## R1e 加工設定隨作品保存（2026-09-25 功能完成，2026-09-26 下載落地驗證通過／完成）
 

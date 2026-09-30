@@ -244,6 +244,43 @@ export function mountModule(comps, modules, moduleId, target, params, motorState
   return { ok: true, comps: newComps, modules: newModules, reason: 'ok' };
 }
 
+// D9 拖曳安裝（SDD §4.3b）：整組平移——只動 moduleId 的零件（不旋轉、不改輸入），其餘零件原物件回傳。
+export function translateModule(comps, moduleId, dx, dy) {
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return comps;
+  const list = Array.isArray(comps) ? comps : [];
+  return list.map(c => c.moduleId === moduleId
+    ? transformComp(c, { x: 0, y: 0, a: 0 }, { x: dx, y: dy, a: 0 }, 0)
+    : c);
+}
+
+// D9：可安裝的目標清單（規則同選單候選：排除自己與子孫；已安裝或不存在回 []）。x,y 取 points[output.at]。
+export function mountTargets(comps, modules, moduleId, points) {
+  const modList = Array.isArray(modules) ? modules : [];
+  const mod = modList.find(m => m.id === moduleId);
+  if (!mod || mod.mount) return [];
+  const list = [];
+  modList.forEach(m => {
+    if (m.id === moduleId || isDescendantOf(modList, m.id, moduleId)) return;
+    (m.outputs || []).forEach(o => {
+      const p = points && points[o.at];
+      if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+      list.push({ module: m.id, output: o.id, label: `${m.name}・${o.name}`, x: p.x, y: p.y });
+    });
+  });
+  return list;
+}
+
+// D9：距離 pos 在 radius 內（含）的最近目標，沒有回 null。
+export function nearestMountTarget(targets, pos, radius) {
+  if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y) || !Number.isFinite(radius)) return null;
+  let best = null, bestD = Infinity;
+  (Array.isArray(targets) ? targets : []).forEach(t => {
+    const d = Math.hypot(t.x - pos.x, t.y - pos.y);
+    if (d <= radius && d < bestD) { best = t; bestD = d; }
+  });
+  return best;
+}
+
 // 拆下：以目前姿態把模組零件剛體變換到世界座標（同 rebake 規則），mount 改 null。
 export function unmountModule(comps, modules, moduleId, params, motorState) {
   const list = Array.isArray(comps) ? comps : [];

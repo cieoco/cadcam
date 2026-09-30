@@ -49,6 +49,7 @@ import { createMotorTools } from './motor-tools.js';
 import { createPlateEditor } from './plate-editor.js';
 import { createNodeEditor } from './node-editor.js';
 import { createModuleEditor } from './module-editor.js';
+import { createModuleDrag } from './module-drag.js';
 import { workRangeFromTrace, clampRangeFromTraces, currentPointDistance } from './measurement.js';
 import { circleRectCompression } from './intake-contact.js';
 import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
@@ -417,6 +418,17 @@ const memberEditor = createMemberEditor({
 });
 const jawTipHandle = createJawTipHandle({ svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
   editor: memberEditor, getParams: () => S.topo.params });
+// ---- 模組拖曳安裝（D9）：邏輯在 ./module-drag.js；points() 取 draw()／renderFrame() 最近一次的求解點 ----
+let lastFramePts = null;
+const moduleDrag = createModuleDrag({
+  svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
+  // getScale() 是「svg user units / 世界 mm」；螢幕 px 再乘 CTM 才換得回世界長度。
+  snapRadiusWorld: () => (mobilePrompt() ? 36 : 28) / (View.getScale() * (svg.getScreenCTM?.()?.a || 1)),
+  pause, pushUndo, rebuild, draw, notify: transient,
+  currentModuleId: () => selectionModule(S.comps, { linkId: S.selectedLinkId, triangleId: S.selectedTriangleId, sliderId: S.selectedSliderId, gearId: S.selectedGearId, nodeId: S.selectedNodeId }),
+  points: () => lastFramePts,
+  motorState: () => ({ activeMotor: String(S.activeMotor), theta: S.theta, motorAngles: S.motorAngles })
+});
 
 // ---- 節點角色域：邏輯抽到 ./node-editor.js（Panels 由該模組自行 import）----
 const nodeEditor = createNodeEditor({
@@ -955,6 +967,7 @@ function draw() {
   }
 
   const { pts, sol } = solveFrame();
+  lastFramePts = pts;
   updateMechanismStatus(sol);
 
   const sceneIds = collectSceneIds({ compiled: S.compiled, comps: S.comps, motorPointIds: Model.motorPointIds(S.comps) });
@@ -1124,6 +1137,8 @@ function draw() {
   if (updateMemberDimensions) frameUpdaters.push(updateMemberDimensions);
   const updateJawTip = jawTipHandle.draw(pts);
   if (updateJawTip) frameUpdaters.push(updateJawTip);
+  const updateModuleHandle = moduleDrag.draw(pts);
+  if (updateModuleHandle) frameUpdaters.push(updateModuleHandle);
   const updateGripperObject = gripperObject.draw(pts);
   if (updateGripperObject) frameUpdaters.push(updateGripperObject);
   Tools.drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
@@ -1212,6 +1227,7 @@ function renderFrame() {
   if (clearOffHomeModuleSelection()) { draw(); return; }
   if (!S.compiled || !S.comps.length || !frameUpdaters.length) { draw(); return; }
   const { pts, sol } = solveFrame();
+  lastFramePts = pts;
   updateLiveClampDistance(pts);
   frameUpdaters.forEach(fn => fn(pts));
   // 滑軌動態層：就地清空重畫（共用 drawSliders）

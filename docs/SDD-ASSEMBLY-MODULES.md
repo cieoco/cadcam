@@ -42,6 +42,7 @@
 - **D5 id 全域唯一。** 插入模組實例時，所有 comp id、點 id、param key、馬達編號都重新命名（沿用 `S.counter`），同一模組插兩次會得到兩組互不相干的零件。
 - **D6 模組庫三來源。** 內建模組（由既有範例定義，先收 `gear-gripper`、`competition-rack-lift`）、本機模組（localStorage）、模組 JSON 匯出／匯入。**作品存檔／分享時，實例已經完整展開在作品裡**，接收端不需要有相同的模組庫。
 - **D8 安裝操作改用面板選單（M1c 修訂）。** 現有拖曳只移動單一接點，沒有「整組模組一起拖」的互動；新做一套在手機上也難操作。M1 改為：選取模組零件 → 模組面板「安裝到…」列出可用接口 → 點選即安裝（模組 `base` 平移到接口 `at` 的目前位置）。拖曳吸附安裝列為後續。
+- **D9 拖曳安裝（2026-09-30，D8 的後續）。** 不改接點拖曳與固定點位置鎖：選取「未安裝、有 `base`」的模組時，在 `base` 畫一個模組移動把手；拖把手＝整組模組剛體平移（不旋轉），`base` 進入其他模組輸出端 `at` 的吸附半徑就顯示吸附，放開即呼叫既有 `mountModule` 安裝；沒吸附就只是搬位置。選單安裝（D8）保留。已安裝的模組不畫把手（先「拆下」）。
 - **D7 不擴張 R1 夾爪任務卡。** `gripperWorkflow` 只在作品「只有夾爪那組零件」時啟用（現有檢查）；R3 組合範例不帶這個 marker。任務卡改成支援模組是後續工作。
 
 ## 3. 資料契約
@@ -187,6 +188,23 @@ parseLibrary(json) / serializeLibrary(list) // 本機模組庫：陣列、每筆
 6. **匯出／匯入模組 JSON**：本機模組可下載為 `.blocks-module.json`，匯入時走與作品相同的 schema 正規化（只接受 kind 為 `blocks-module`）。
 7. 上述每個動作都是一次 undo；存檔、分享、autosave、範例切換都保留 `modules`。
 
+### 4.3b 拖曳安裝（D9，`js/blocks/module-drag.js`＋`module-ops.js` 純函式）
+
+純函式（`module-ops.js`，不碰 DOM、不改輸入）：
+
+- `translateModule(comps, moduleId, dx, dy)`：只把 `moduleId` 的零件用 `transformComp`（`ref = {0,0,0}`、`now = {dx,dy,0}`、δ=0）平移；其餘零件原物件回傳。`dx`／`dy` 非有限數時回傳原陣列。
+- `mountTargets(comps, modules, moduleId, points)`：可安裝的目標清單 `{ module, output, label, x, y }`，`x,y` 取 `points[output.at]`。與選單候選同規則：排除自己與自己的子孫；模組已安裝或不存在回 `[]`；沒有有限座標的輸出端略過。`label` 為 `模組名・輸出名`。
+- `nearestMountTarget(targets, pos, radius)`：距離 ≤ `radius` 的最近目標，沒有回 `null`。
+
+控制器 `createModuleDrag(deps)`，deps：`svg`、`project(world)→screen`、`worldFromEvent(e)→world`、`snapRadiusWorld()`、`pause`、`pushUndo`、`rebuild`、`draw`、`notify(msg)`、`currentModuleId()`、`points()`（目前求解點）、`motorState()`（`{activeMotor, theta, motorAngles}`）。讀寫 `S.comps`／`S.modules`／`S.topo.params`。回傳 `{ draw(points), cancel(), state() }`：
+
+- `draw(points)`：`currentModuleId()` 的模組未安裝、有 `base` 且 `points[base]` 有限時，在 svg 末端加一個 `g[data-module-handle=<moduleId>]`（透明命中圓＋可見圓，`touch-action: none`，`<title>` 說明），回傳每幀更新座標的函式；否則回 `null`。
+- svg **capture 階段**監聽（同 `jaw-tip-handle.js`）：`pointerdown` 只在 `e.target.closest('[data-module-handle]')` 時接手並 `stopImmediatePropagation`、`setPointerCapture`，記下原始 `S.comps`、起點與 `mountTargets`（以 `points()` 算一次），呼叫 `pause()`。
+- `pointermove`：螢幕位移 < 3 px 不動作；之後 `S.comps = translateModule(原始, id, dx, dy)`（dx,dy 以 `worldFromEvent` 世界座標差計），用平移後的 base 位置找 `nearestMountTarget(…, snapRadiusWorld())`，記入 `state().target`，`rebuild(); draw()`。吸附時畫面要看得出目標（在目標 `at` 畫吸附環）。
+- `pointerup`：沒移動＝點一下，不改作品、不記 undo。有吸附目標 → 先還原 `S.comps = 原始`、`pushUndo()`，再套用 `mountModule(原始, S.modules, id, target, params, motorState())` 的結果；失敗則維持原始並 `notify` 原因。沒吸附 → `S.comps = 原始; pushUndo(); S.comps = 平移後`。兩者都只記**一筆** undo，最後 `rebuild(); draw()`，成功安裝時 `notify('已安裝到 <label>')`。
+- 取消（`pointercancel`、`lostpointercapture`、Escape、**拖曳中另一指按下**）：還原 `S.comps = 原始`、`rebuild(); draw()`，不記 undo。另一指按下時**不可**攔截該事件（讓雙指縮放照常接手）。
+- `app.js` 只接線：建立控制器、在 `draw()` 中與爪端把手同處呼叫 `moduleDrag.draw(pts)`；`snapRadiusWorld` 為 28 螢幕 px（手機 36）換算成世界長度。
+
 ### 4.4 模擬補齊（與模組無關，可先做）
 
 - **S1 依時間播放**：播放角速度改為「度／秒」，以 `requestAnimationFrame` 的時間戳計算 `dt`（上限 100 ms，避免切分頁回來瞬間暴衝）。預設 120°/s，等於現在 60Hz × 2°。`PLAY_STEP` 保留給 `walkBranch` 探路用，不改。
@@ -207,11 +225,13 @@ parseLibrary(json) / serializeLibrary(list) // 本機模組庫：陣列、每筆
 - **E-M5**（rebake／I1）：把升降齒條加長、或把 `LiftOutput` 孔位移動後 rebuild，夾爪座標同步平移，且在 home 姿態下 `solveAssembly` 的夾爪點與 comps 座標一致（1e-6）。
 - **E-M6**（插入實例）：同一模組插兩次，所有 id／param／馬達編號不衝突；兩組獨立運動。
 - **E-M7**（合併防呆）：純函式 `canMergePoints(comps, idA, idB)`，跨模組回傳 false，同模組或都在根回傳 true。
+- **E-M9**（拖曳安裝，`test/module-drag.mjs`）：純函式三支的邊界；控制器以假 svg 驅動：未安裝模組有把手、已安裝／根零件沒有；拖曳不吸附＝整組平移一筆 undo；拖到滑台附近放開＝安裝且 base 貼齊 `at`、一筆 undo；Escape／另一指取消＝作品逐位元相同且不記 undo；點一下不改作品。
 - 既有全部 `test/*.mjs` 與 `test_blocks_schema.mjs` 維持通過。
 
 ### 瀏覽器（`python -m http.server 8000`，桌機 1280×800 與窄畫面 ~508 寬）
 
 - **E-M8（R3 情境）**：從模組庫插入「齒條升降」與「齒輪夾爪」→ 把夾爪 `base` 拖到滑台接口吸附 → 播放 M1 升降，夾爪跟著上下且不脫咬 → 切到 M2 開合夾爪 → 暫停在升起姿態，點夾爪爪端改長度（應先回到組裝姿態）→ 復原 → 存檔／重載／分享連結還原 → 3D 預覽播放 → 拆下 → 解散。console 無 error。
+- **E-M9b**：桌機 1280×800 與手機 390×844（觸控）：插入兩個內建模組 → 選夾爪 → 拖把手到滑台吸附放開 → 播放 M1 夾爪跟著走 → 復原回未安裝 → 拖到空白處只搬位置。console 無 error。
 - **E-S1b**：播放速度在桌機與窄畫面肉眼一致；切到別的分頁再切回來，機構不會一次跳一大段。
 - **E-S3b**：用 L0 (A) 的錯誤接法手動組出來，狀態列出現漏解提示。
 
