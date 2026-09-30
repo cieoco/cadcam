@@ -28,6 +28,7 @@
 | M1c 模組操作 UI | Sonnet | 刀 1：純函式 `js/blocks/module-ops.js`（SDD §4.3a）＋測試。刀 2：`js/blocks/module-editor.js`（`createModuleEditor(deps)` 工廠）、零件盤「模組」區、模組面板、`blocks.html` 局部；app.js 只接線。 | 刀 1：E-M6＋`test/module-ops.mjs`。刀 2：SDD §4.3 各項操作的桌機／窄畫面實測。 | 完成 |
 | M1d R3 驗收 | 主模型 | 內建模組兩個＋必要修正；本節證據與 SDD 狀態。 | E-M8 全程；證據邊界照 SDD §5。 | 完成（與 M1c 刀 2 一併驗收；手機面板重疊為既有問題，另開任務） |
 | D9 拖曳安裝 | Sonnet | `module-ops.js` 三支純函式、新檔 `js/blocks/module-drag.js`（SDD §4.3b）、`app.js` 接線、`blocks.html` import map；測試 `test/module-drag.mjs` 由主模型先寫。 | E-M9 自動＋E-M9b 瀏覽器；既有全套通過。 | 完成（Sonnet 兩輪：第一輪退回兩點） |
+| P2 插入模組不重疊 | Sonnet | `module-ops.js` 新增 `insertOffset`；`module-editor.js` 的 `insertTemplate` 插入後平移；import map 升版。測試 `test/module-insert-place.mjs` 由主模型先寫。 | 測試全過＋桌機／手機插入兩個內建模組不重疊。 | 完成（Sonnet 兩輪：第一輪是規格漏算外形） |
 
 建議順序：S1 → S2 → S3（暖身、互不相依）→ M0 → M1a → M1b → M1c → M1d。
 
@@ -168,6 +169,16 @@
   - console error 全程為 0。
 - 已知（既有，未處理）：兩個內建模組都插在畫面中央，底座會重疊；手機命中區較大，點夾爪 base 可能選到升降的 base。可改點夾爪其他零件，或先拖開。
 - 未涵蓋：真實手機硬體；複雜作品拖曳時每次 pointermove 都 rebuild 的效能。
+
+### P2 插入模組不重疊證據（2026-09-30）
+
+- 根因：`instantiateTemplate` 把每個新模組的 base 都放在畫面中心，連續插入的模組疊在同一點。
+- 修法：`insertOffset(existing, new, margin, params)` 以範圍（接點＋齒輪齒頂圓＋齒條外框）判斷是否重疊；重疊就沿 +x／−x／+y／−y 挪到相距 30 mm，取位移最小者。作品是空的時仍放在中央。
+- 第一輪：主模型的規格只算接點，Sonnet 照規格完成、測試全過；瀏覽器實測仍有視覺重疊（齒條升降的接點只在 45×23 mm，齒條實際長約 200 mm）。主模型補規格 v2 與測試（11/16 失敗）。
+- 第二輪：Sonnet 納入齒輪（規則同 `currentBounds()`）與齒條（規則同 `drawRack`）的外形，16/16 通過。
+- 自動：全套 66 支全過；schema 70/70。
+- 瀏覽器：1280×800 與 390×844 觸控，插入「齒條升降」「齒輪夾爪」時夾爪放在右側、不重疊；之後拖曳把手照樣能安裝。console error 為 0。
+- 未涵蓋：只避開既有範圍的外接矩形，不保證落在目前畫面內；世界機架板仍會包住兩個模組的固定點（既有行為）。
 
 ## R1e 加工設定隨作品保存（2026-09-25 功能完成，2026-09-26 下載落地驗證通過／完成）
 

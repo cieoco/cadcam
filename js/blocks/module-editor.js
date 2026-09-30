@@ -9,7 +9,7 @@ import { pointKeysFor } from './part-types.js';
 import { selectionModule } from './assembly.js';
 import {
   createModule, addOutput, inferOutput, mountModule, unmountModule, dissolveModule,
-  moduleToTemplate, normalizeTemplate, instantiateTemplate,
+  moduleToTemplate, normalizeTemplate, instantiateTemplate, insertOffset, translateModule,
   BUILTIN_MODULES, builtinTemplate, parseLibrary, serializeLibrary
 } from './module-ops.js';
 
@@ -178,6 +178,8 @@ export function createModuleEditor(deps) {
       place: viewCenter()
     };
     const r = instantiateTemplate(template, ctx);
+    const off = insertOffset(S.comps, r.comps, 30, { ...S.topo.params, ...r.params });
+    if (off.dx !== 0 || off.dy !== 0) r.comps = translateModule(r.comps, r.module.id, off.dx, off.dy);
     pushUndo();
     S.comps = [...S.comps, ...r.comps];
     Object.keys(r.params).forEach(k => { S.topo.params[k] = r.params[k]; });

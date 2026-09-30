@@ -253,6 +253,53 @@ export function translateModule(comps, moduleId, dx, dy) {
     : c);
 }
 
+// P2：插入新模組時避免與既有零件範圍重疊——回傳把新範圍挪到既有範圍外（相距 margin）所需的最小位移 { dx, dy }。
+// 範圍含接點，另納入齒輪齒頂圓與齒條外框（尺寸取自 params，規則同 app.js currentBounds／drawRack）。
+export function insertOffset(existingComps, newComps, margin, params) {
+  const par = params || {};
+  const boxOf = comps => {
+    const b = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+    (Array.isArray(comps) ? comps : []).forEach(c => {
+      for (const k of pointKeysFor(c)) {
+        const p = c[k];
+        if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+          b.minX = Math.min(b.minX, p.x); b.maxX = Math.max(b.maxX, p.x);
+          b.minY = Math.min(b.minY, p.y); b.maxY = Math.max(b.maxY, p.y);
+        }
+      }
+      const c0 = c && c.p1;
+      if (!c0 || !Number.isFinite(c0.x) || !Number.isFinite(c0.y)) return;
+      let ex = 0, ey = 0;
+      if (c.type === 'gear') {
+        const teeth = Math.max(6, Math.round(Number(c.teeth) || 12));
+        const r = Number(par[c.radiusParam]) || 40;
+        ex = ey = r + 2 * r / teeth;
+      } else if (c.type === 'rack') {
+        const L = (Number(par[c.lenParam]) || 160) + 2 * (Number(c.endMargin) || 12), H = Number(c.bodyHeight) || 20;
+        const a = (Number(c.axisDeg) || 0) * Math.PI / 180;
+        ex = Math.abs(Math.cos(a)) * L / 2 + Math.abs(Math.sin(a)) * H / 2;
+        ey = Math.abs(Math.sin(a)) * L / 2 + Math.abs(Math.cos(a)) * H / 2;
+      } else return;
+      b.minX = Math.min(b.minX, c0.x - ex); b.maxX = Math.max(b.maxX, c0.x + ex);
+      b.minY = Math.min(b.minY, c0.y - ey); b.maxY = Math.max(b.maxY, c0.y + ey);
+    });
+    return b;
+  };
+  const E = boxOf(existingComps), N = boxOf(newComps);
+  if (!Number.isFinite(E.minX) || !Number.isFinite(N.minX)) return { dx: 0, dy: 0 };
+  const dist = Math.max(N.minX - E.maxX, E.minX - N.maxX, N.minY - E.maxY, E.minY - N.maxY);
+  if (dist >= margin) return { dx: 0, dy: 0 };
+  const candidates = [
+    { dx: E.maxX + margin - N.minX, dy: 0 },
+    { dx: E.minX - margin - N.maxX, dy: 0 },
+    { dx: 0, dy: E.maxY + margin - N.minY },
+    { dx: 0, dy: E.minY - margin - N.maxY }
+  ];
+  let best = candidates[0];
+  for (const c of candidates) if (Math.abs(c.dx + c.dy) < Math.abs(best.dx + best.dy)) best = c;
+  return best;
+}
+
 // D9：可安裝的目標清單（規則同選單候選：排除自己與子孫；已安裝或不存在回 []）。x,y 取 points[output.at]。
 export function mountTargets(comps, modules, moduleId, points) {
   const modList = Array.isArray(modules) ? modules : [];
