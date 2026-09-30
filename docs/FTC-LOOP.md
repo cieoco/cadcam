@@ -31,6 +31,7 @@
 | P2 插入模組不重疊 | Sonnet | `module-ops.js` 新增 `insertOffset`；`module-editor.js` 的 `insertTemplate` 插入後平移；import map 升版。測試 `test/module-insert-place.mjs` 由主模型先寫。 | 測試全過＋桌機／手機插入兩個內建模組不重疊。 | 完成（Sonnet 兩輪：第一輪是規格漏算外形） |
 | L1 夾爪 MG995＋開合範圍（走通舉升＋夾取 第 1 包） | Sonnet | `motor-tools.js` 純函式 `motorTypeAt`／`servoRange`／`rackDrivenBy`；`schema.js` 保存齒輪伺服；內建夾爪模組 MG995 0～24°。測試 `test/gear-servo.mjs` 由主模型先寫。 | 測試全過＋M2 只在 0～24° 來回、重載保留。 | 完成（Sonnet 兩輪＋主模型修正範圍） |
 | L2a TT 驅動齒輪扁軸孔（第 2 包前半） | Sonnet | `exporters.js`：`gearGeometry` 對 TT 驅動輪輸出 `TT_SHAFT_FLAT` 取代中心圓孔；新增 `inspectGearExport`。測試 `test/gear-drive-hole.mjs` 由主模型先寫。 | 測試全過＋svg2gcode 讀得進。 | 完成（Sonnet 一輪） |
+| L4 CNC 刀徑／板厚＋匯出警告（第 4 包） | Sonnet | `fabrication-profile.js` 新增 `cnc` 群組（3.175 mm／3 mm，缺席靜默補預設）；新檔 `cnc-check.js`；`exporters.js` 的 `cncPartsForExport`；app 匯出後以 banner 顯示。測試 `test/cnc-check.mjs`、更新 `test/fabrication-profile.mjs` 由主模型寫。 | 測試全過＋實際匯出顯示警告。 | 完成（Sonnet 一輪） |
 
 建議順序：S1 → S2 → S3（暖身、互不相依）→ M0 → M1a → M1b → M1c → M1d。
 

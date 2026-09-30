@@ -34,6 +34,11 @@ export const FABRICATION_DEFAULTS = Object.freeze({
     cableNotchWidthMm: 8,
     cableNotchDepthMm: 4,
   }),
+  // 使用者現場：3.175 mm（1/8 吋）銑刀、3 mm 木板；匯出時據此檢查孔徑／開口／尖角。
+  cnc: freezeRecord({
+    toolDiameterMm: 3.175,
+    stockThicknessMm: 3,
+  }),
 });
 
 const RANGES = Object.freeze({
@@ -64,6 +69,10 @@ const RANGES = Object.freeze({
     cableNotchWidthMm: [0, 20],
     cableNotchDepthMm: [0, 20],
   }),
+  cnc: freezeRecord({
+    toolDiameterMm: [0.5, 12],
+    stockThicknessMm: [0.5, 50],
+  }),
 });
 
 const GROUPS = Object.freeze(Object.keys(FABRICATION_DEFAULTS).filter(key => key !== 'v'));
@@ -74,8 +83,10 @@ const cloneDefaults = () => ({
   export: { ...FABRICATION_DEFAULTS.export },
   ttMount: { ...FABRICATION_DEFAULTS.ttMount },
   mg995Mount: { ...FABRICATION_DEFAULTS.mg995Mount },
+  cnc: { ...FABRICATION_DEFAULTS.cnc },
 });
 const roundHundredth = value => Math.round((value + Number.EPSILON) * 100) / 100;
+const roundThousandth = value => Math.round((value + Number.EPSILON) * 1000) / 1000;
 
 function invalid(message, path = '') {
   return { ok: false, status: 'invalid', message, path };
@@ -89,7 +100,7 @@ function validateKnownValue(group, key, value) {
   if (value < min || value > max) {
     return invalid(`${group}.${key} 必須介於 ${min}–${max} mm。`, `${group}.${key}`);
   }
-  return { ok: true, value: roundHundredth(value) };
+  return { ok: true, value: group === 'cnc' ? roundThousandth(value) : roundHundredth(value) };
 }
 
 function validateCrossFields(profile) {
@@ -128,6 +139,8 @@ export function normalizeFabricationProfile(raw) {
   const profile = cloneDefaults();
   for (const group of GROUPS) {
     if (!own(raw, group)) {
+      // 舊作品沒有 cnc 群組：靜默補預設，不算缺漏。
+      if (group === 'cnc') continue;
       for (const key of Object.keys(FABRICATION_DEFAULTS[group])) {
         warnings.push(`缺少 fabrication.${group}.${key}，已使用 v1 固定預設。`);
       }
@@ -158,8 +171,8 @@ export function normalizeFabricationProfile(raw) {
 }
 
 /**
- * Plan an immutable single-field edit. `group` is export, ttMount, or
- * mg995Mount. Numeric edits require actual finite numbers; invalid edits are
+ * Plan an immutable single-field edit. `group` is export, ttMount,
+ * mg995Mount, or cnc. Numeric edits require actual finite numbers; invalid edits are
  * rejected without clamping or changing the supplied profile.
  */
 export function planFabricationProfile(current, group, key, rawValue) {
@@ -176,6 +189,7 @@ export function planFabricationProfile(current, group, key, rawValue) {
     export: { ...normalized.profile.export },
     ttMount: { ...normalized.profile.ttMount },
     mg995Mount: { ...normalized.profile.mg995Mount },
+    cnc: { ...normalized.profile.cnc },
   };
   profile[group][key] = checked.value;
 

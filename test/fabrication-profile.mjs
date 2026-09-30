@@ -21,8 +21,11 @@ assert.deepEqual(FABRICATION_DEFAULTS, {
     bodyLengthMm: 41.2, bodyWidthMm: 20.2, shaftOffsetMm: 10, screwDiameterMm: 3.2,
     screwSpanMm: 49.5, screwSpacingMm: 10, cableNotchWidthMm: 8, cableNotchDepthMm: 4,
   },
+  // L4（走通舉升＋夾取）：CNC 刀徑與板厚。使用者現場：3.175 mm 銑刀、3 mm 木板。
+  cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 },
 });
 assert.equal(Object.isFrozen(FABRICATION_DEFAULTS), true);
+assert.equal(Object.isFrozen(FABRICATION_DEFAULTS.cnc), true);
 assert.equal(Object.isFrozen(FABRICATION_DEFAULTS.export), true);
 
 const missing = normalizeFabricationProfile(undefined);
@@ -51,9 +54,22 @@ const full = normalizeFabricationProfile(nonDefault);
 assert.deepEqual(nonDefault, original, 'normalization must not mutate its input');
 assert.equal(full.ok, true);
 assert.equal(full.status, 'present');
-assert.deepEqual(full.profile, nonDefault, 'complete profile round-trips all three groups');
-assert.deepEqual(full.warnings, []);
+assert.deepEqual(full.profile, { ...nonDefault, cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 } },
+  'older three-group profiles round-trip and get the cnc defaults');
+assert.deepEqual(full.warnings, [], 'a missing cnc group (older works) is filled silently');
 assert.deepEqual(normalizeFabricationProfile(full.profile).profile, full.profile);
+
+// cnc 群組：保留到 0.001 mm（3.175 不可被四捨五入成 3.18）、範圍檢查、完整往返
+const withCnc = { ...nonDefault, cnc: { toolDiameterMm: 3.175, stockThicknessMm: 6 } };
+const cncFull = normalizeFabricationProfile(withCnc);
+assert.equal(cncFull.ok, true);
+assert.deepEqual(cncFull.profile.cnc, { toolDiameterMm: 3.175, stockThicknessMm: 6 });
+assert.deepEqual(cncFull.warnings, []);
+assert.equal(normalizeFabricationProfile({ ...nonDefault, cnc: { toolDiameterMm: 0.2, stockThicknessMm: 3 } }).ok, false, 'tool below 0.5 mm is rejected');
+assert.equal(normalizeFabricationProfile({ ...nonDefault, cnc: { toolDiameterMm: 3.175, stockThicknessMm: 80 } }).ok, false, 'stock above 50 mm is rejected');
+const partialCnc = normalizeFabricationProfile({ ...nonDefault, cnc: { toolDiameterMm: 2 } });
+assert.equal(partialCnc.profile.cnc.stockThicknessMm, 3);
+assert.ok(partialCnc.warnings.some(w => w.includes('fabrication.cnc.stockThicknessMm')), 'a present-but-partial cnc group still warns');
 
 const partial = normalizeFabricationProfile({
   v: 1,

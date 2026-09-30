@@ -1085,6 +1085,27 @@ export function exportLinksAsDxf(comps, pts, params, settings, mounts = []) {
   return links.length + plates.length + gears.length;
 }
 
+// L4 CNC 檢查用：與 exportLinksAsDxf 輸出同一批零件（桿件含宿主桿、板件、齒輪）的孔與開口。
+export function cncPartsForExport(comps, pts, params, settings, mounts = []) {
+  const { hosted } = splitMountsByHost(comps, mounts);
+  const holesOf = g => ((g && g.holes) || []).map(h => ({ ...h, layer: h.layer || 'HOLE' }));
+  const cutoutsOf = g => (g && g.cutouts) || [];
+  const parts = [];
+  exportableLinks(comps, pts, params).forEach(({ comp, length }) => {
+    const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id)) : null;
+    const g = hostGeometry || inspectLinkExport(comp, length, settings);
+    parts.push({ name: safeName(comp.id), holes: holesOf(g), cutouts: cutoutsOf(g) });
+  });
+  exportablePlates(comps, pts).forEach(({ comp, points }) => {
+    const g = inspectPlateExport(comp, points, settings, hosted.get(comp.id));
+    parts.push({ name: safeName(comp.id), holes: holesOf(g), cutouts: cutoutsOf(g) });
+  });
+  exportableGears(comps, params, settings).forEach(({ comp, geometry }) => {
+    parts.push({ name: safeName(comp.id), holes: holesOf(geometry), cutouts: cutoutsOf(geometry) });
+  });
+  return parts;
+}
+
 export function exportFrameAsSvg(frameNodes, settings, motorMounts = [], name = 'frame') {
   const svg = svgForFrame(frameNodes, settings, motorMounts);
   if (!svg) return 0;
