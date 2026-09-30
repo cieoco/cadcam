@@ -30,6 +30,7 @@
 | D9 拖曳安裝 | Sonnet | `module-ops.js` 三支純函式、新檔 `js/blocks/module-drag.js`（SDD §4.3b）、`app.js` 接線、`blocks.html` import map；測試 `test/module-drag.mjs` 由主模型先寫。 | E-M9 自動＋E-M9b 瀏覽器；既有全套通過。 | 完成（Sonnet 兩輪：第一輪退回兩點） |
 | P2 插入模組不重疊 | Sonnet | `module-ops.js` 新增 `insertOffset`；`module-editor.js` 的 `insertTemplate` 插入後平移；import map 升版。測試 `test/module-insert-place.mjs` 由主模型先寫。 | 測試全過＋桌機／手機插入兩個內建模組不重疊。 | 完成（Sonnet 兩輪：第一輪是規格漏算外形） |
 | L1 夾爪 MG995＋開合範圍（走通舉升＋夾取 第 1 包） | Sonnet | `motor-tools.js` 純函式 `motorTypeAt`／`servoRange`／`rackDrivenBy`；`schema.js` 保存齒輪伺服；內建夾爪模組 MG995 0～24°。測試 `test/gear-servo.mjs` 由主模型先寫。 | 測試全過＋M2 只在 0～24° 來回、重載保留。 | 完成（Sonnet 兩輪＋主模型修正範圍） |
+| L2a TT 驅動齒輪扁軸孔（第 2 包前半） | Sonnet | `exporters.js`：`gearGeometry` 對 TT 驅動輪輸出 `TT_SHAFT_FLAT` 取代中心圓孔；新增 `inspectGearExport`。測試 `test/gear-drive-hole.mjs` 由主模型先寫。 | 測試全過＋svg2gcode 讀得進。 | 完成（Sonnet 一輪） |
 
 建議順序：S1 → S2 → S3（暖身、互不相依）→ M0 → M1a → M1b → M1c → M1d。
 

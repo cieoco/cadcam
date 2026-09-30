@@ -243,13 +243,23 @@ function gearGeometry(comp, params = {}, settings = {}) {
   const { holeDiameterMm } = normalizeExportSettings(settings);
   const centerR = holeDiameterMm / 2;
   const outputR = Math.max(0.5, Number(comp.pinHoleDiameter) > 0 ? Number(comp.pinHoleDiameter) / 2 : centerR);
+  // TT 驅動輪：中心改切 TT 扁軸孔（D-D），才能真的傳扭；從動輪與 MG995 驅動輪維持圓孔。
+  const ttDriven = Boolean(comp.p1 && comp.p1.physicalMotor && comp.motorType !== 'mg995');
   return {
     outline,
     holes: [
-      { x: 0, y: 0, r: centerR, layer: 'CENTER_HOLE' },
+      ...(ttDriven ? [] : [{ x: 0, y: 0, r: centerR, layer: 'CENTER_HOLE' }]),
       { x: pinR * Math.cos(angle), y: pinR * Math.sin(angle), r: outputR, layer: 'PIN_HOLE' }
-    ]
+    ],
+    cutouts: ttDriven
+      ? [{ points: ttShaftFlatPoints(0, 0, settings, 18), layer: 'TT_SHAFT_FLAT' }]
+      : []
   };
+}
+
+export function inspectGearExport(comp, params = {}, settings = {}) {
+  const { outline, holes, cutouts } = gearGeometry(comp, params, settings);
+  return { outline, holes, cutouts };
 }
 
 function hull(points) {
@@ -630,12 +640,14 @@ function svgForGear(comp, geometry) {
   const b = boundsForGeometry([geometry.outline], geometry.holes);
   const width = round(b.maxX - b.minX);
   const height = round(b.maxY - b.minY);
+  const gearCutouts = (geometry.cutouts || []).map(c =>
+    `    <path d="${svgPolyline(c.points)}" data-layer="${esc(c.layer)}" />`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${round(b.minX)} ${round(b.minY)} ${width} ${height}">
   <title>${esc(comp.id || 'gear')}</title>
   <g fill="none" stroke="#000" stroke-width="0.25">
     <path d="${svgPolyline(geometry.outline)}" data-layer="GEAR_CUT" />
-${geometry.holes.map(h => `    <circle cx="${round(h.x)}" cy="${round(h.y)}" r="${round(h.r)}" data-layer="${esc(h.layer)}" />`).join('\n')}
+${gearCutouts ? gearCutouts + '\n' : ''}${geometry.holes.map(h => `    <circle cx="${round(h.x)}" cy="${round(h.y)}" r="${round(h.r)}" data-layer="${esc(h.layer)}" />`).join('\n')}
   </g>
 </svg>
 `;
@@ -652,6 +664,7 @@ function dxfForGear(comp, geometry) {
     dxfPair(2, 'ENTITIES'),
     dxfPolyline(geometry.outline, 'GEAR_CUT'),
     ...geometry.holes.map(h => dxfCircle(h.x, h.y, h.r, h.layer)),
+    ...(geometry.cutouts || []).map(c => dxfPolyline(c.points, c.layer)),
     dxfPair(0, 'ENDSEC'),
     dxfPair(0, 'EOF')
   ].join('\n') + '\n';
