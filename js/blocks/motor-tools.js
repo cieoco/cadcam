@@ -9,6 +9,50 @@
 
 import { S, activateMotor, usedMotorIds, nextMotorId } from './state.js';
 
+// ---- 動力來源查詢純函式（不碰 S / 工廠，方便單測）----
+// 以此接點為馬達中心的型號：桿件輸入 → 齒輪驅動輪 → 預設 TT。
+export function motorTypeAt(comps, centerId) {
+  const bar = comps.find(c => c.type === 'bar' && c.isInput && (
+    (c.p1 && c.p1.id === centerId && c.p1.physicalMotor) ||
+    (c.p2 && c.p2.id === centerId && c.p2.physicalMotor)
+  ));
+  if (bar) return bar.motorType === 'mg995' ? 'mg995' : 'tt';
+  const gear = comps.find(c => c.type === 'gear' && c.p1 && c.p1.id === centerId && c.p1.physicalMotor);
+  if (gear) return gear.motorType === 'mg995' ? 'mg995' : 'tt';
+  return 'tt';
+}
+// active 馬達若是 MG995 伺服（桿件或齒輪），回它來回擺的 {lo, hi}；否則 null。
+export function servoRange(comps, activeMotor) {
+  const active = String(activeMotor);
+  const motorIdOf = (c) => String(c.physicalMotor || c.physical_motor || '1');
+  const range = (c) => {
+    const a = Number(c.servoStart) || 0;
+    const b = Number.isFinite(Number(c.servoEnd)) ? Number(c.servoEnd) : 90;
+    return { lo: Math.min(a, b), hi: Math.max(a, b) };
+  };
+  const servoBar = comps.find(c => c.type === 'bar' && c.isInput && c.motorType === 'mg995' && motorIdOf(c) === active);
+  if (servoBar) return range(servoBar);
+  const servoGear = comps.find(c => c.type === 'gear' && c.motorType === 'mg995' && c.p1 &&
+    String(c.p1.physicalMotor || c.p1.physical_motor || '') === active);
+  return servoGear ? range(servoGear) : null;
+}
+// active 馬達是否帶動某個齒條的小齒輪（小齒輪本身，或沿 mesh 鏈往上的驅動輪）。
+export function rackDrivenBy(comps, activeMotor) {
+  const active = String(activeMotor);
+  const byId = new Map(comps.filter(c => c.type === 'gear').map(g => [g.id, g]));
+  return comps.some(r => {
+    if (r.type !== 'rack' || !r.pinion) return false;
+    const seen = new Set();
+    let g = byId.get(r.pinion);
+    while (g && !seen.has(g.id)) {
+      seen.add(g.id);
+      if (g.p1 && String(g.p1.physicalMotor || g.p1.physical_motor || '') === active) return true;
+      g = g.mesh ? byId.get(g.mesh) : null;
+    }
+    return false;
+  });
+}
+
 export function createMotorTools({
   svg, pushUndo, pause, rebuild, draw, setBanner, clearBanner, promptText,
   exitDrawTools, deselectLink, openMobileEditPanel, updateRoleEditor,
@@ -251,7 +295,7 @@ export function createMotorTools({
   // 在齒輪中心放馬達：把這條嚙合鏈的「根驅動輪」中心固定到機架並給動力。
   // 馬達一律記在驅動輪（mesh=null）中心；從動輪角度由它推算（外嚙合反向、按齒比）。
   // 沒馬達的齒輪是靜止接地輪——這個動作讓齒輪「會轉」，與桿件放馬達同理（順手把樞軸固定）。
-  // 註：齒輪目前一律連續旋轉（不分 TT / 伺服），gear 層 motorType 不入 schema 故不保存。
+  // 註：驅動輪可標 MG995 伺服（motorType / servoStart / servoEnd 隨 schema 保存）；未標則為 TT 連續旋轉。
   function driveGearAt(gearId) {
     if (S.pendingMotorType === 'linear') {
       setBanner('線性致動器不能驅動齒輪；請改用 TT馬達 / MG995');
@@ -263,6 +307,14 @@ export function createMotorTools({
     const seen = new Set();
     while (g.mesh && !seen.has(g.id)) { seen.add(g.id); const d = gearById(g.mesh); if (!d || !d.p1) break; g = d; }
     pushUndo();
+    // 型號記在驅動輪上：MG995 有角度範圍（預設 0～90），TT 連續旋轉。
+    if (S.pendingMotorType === 'mg995') {
+      g.motorType = 'mg995';
+      if (g.servoStart == null) g.servoStart = 0;
+      if (g.servoEnd == null) g.servoEnd = 90;
+    } else {
+      delete g.motorType; delete g.servoStart; delete g.servoEnd;
+    }
     freezePointAtDisplay(g.p1.id);     // 馬達順手把驅動輪中心釘在目前位置（固定在機架），與桿件一致
     setPointType(g.p1.id, 'fixed');
     const motorId = String(g.p1.physicalMotor || g.p1.physical_motor || nextMotorId());
@@ -285,8 +337,7 @@ export function createMotorTools({
     )) || null;
   }
   function motorTypeForCenter(id) {
-    const bar = motorBarForCenter(id);
-    return (bar && bar.motorType === 'mg995') ? 'mg995' : 'tt';
+    return motorTypeAt(S.comps, id);
   }
   // 目前「控制中的馬達」若是有限行程的輸入（MG995 伺服角度範圍，或線性致動器的行程），
   // 回它來回擺的兩端（S.theta 座標系）；否則 null。play() 用它把整圈轉覆寫成來回擺。
@@ -294,21 +345,15 @@ export function createMotorTools({
   function inputRockRange() {
     const active = String(S.activeMotor || '1');
     const motorIdOf = (c) => String(c.physicalMotor || c.physical_motor || '1');
-    const servoBar = S.comps.find(c => c.type === 'bar' && c.isInput && c.motorType === 'mg995' && motorIdOf(c) === active);
-    if (servoBar) {
-      const a = Number(servoBar.servoStart) || 0;
-      const b = Number.isFinite(Number(servoBar.servoEnd)) ? Number(servoBar.servoEnd) : 90;
-      return { lo: Math.min(a, b), hi: Math.max(a, b) };
-    }
+    const servo = servoRange(S.comps, active);
+    if (servo) return servo;
     const slider = S.comps.find(c => c.type === 'slider' && c.isInput && motorIdOf(c) === active);
     if (slider) {
       const stroke = Math.max(0, sliderTravelEnd(slider) - sliderTravelStart(slider));
       return { lo: 0, hi: stroke };
     }
-    // 齒條行程只在 active 馬達就是驅動齒輪那顆時才適用
-    const gearDriven = S.comps.some(c => c.type === 'gear' && c.p1 &&
-      String(c.p1.physicalMotor || c.p1.physical_motor || '') === active);
-    if (gearDriven) {
+    // 齒條行程只在 active 馬達帶動齒條的小齒輪（含嚙合鏈）時才適用
+    if (rackDrivenBy(S.comps, active)) {
       const rackRange = rackPinionThetaRange();
       if (rackRange) return rackRange;
     }

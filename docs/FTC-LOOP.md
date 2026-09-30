@@ -29,6 +29,7 @@
 | M1d R3 驗收 | 主模型 | 內建模組兩個＋必要修正；本節證據與 SDD 狀態。 | E-M8 全程；證據邊界照 SDD §5。 | 完成（與 M1c 刀 2 一併驗收；手機面板重疊為既有問題，另開任務） |
 | D9 拖曳安裝 | Sonnet | `module-ops.js` 三支純函式、新檔 `js/blocks/module-drag.js`（SDD §4.3b）、`app.js` 接線、`blocks.html` import map；測試 `test/module-drag.mjs` 由主模型先寫。 | E-M9 自動＋E-M9b 瀏覽器；既有全套通過。 | 完成（Sonnet 兩輪：第一輪退回兩點） |
 | P2 插入模組不重疊 | Sonnet | `module-ops.js` 新增 `insertOffset`；`module-editor.js` 的 `insertTemplate` 插入後平移；import map 升版。測試 `test/module-insert-place.mjs` 由主模型先寫。 | 測試全過＋桌機／手機插入兩個內建模組不重疊。 | 完成（Sonnet 兩輪：第一輪是規格漏算外形） |
+| L1 夾爪 MG995＋開合範圍（走通舉升＋夾取 第 1 包） | Sonnet | `motor-tools.js` 純函式 `motorTypeAt`／`servoRange`／`rackDrivenBy`；`schema.js` 保存齒輪伺服；內建夾爪模組 MG995 0～24°。測試 `test/gear-servo.mjs` 由主模型先寫。 | 測試全過＋M2 只在 0～24° 來回、重載保留。 | 完成（Sonnet 兩輪＋主模型修正範圍） |
 
 建議順序：S1 → S2 → S3（暖身、互不相依）→ M0 → M1a → M1b → M1c → M1d。
 
@@ -179,6 +180,16 @@
 - 自動：全套 66 支全過；schema 70/70。
 - 瀏覽器：1280×800 與 390×844 觸控，插入「齒條升降」「齒輪夾爪」時夾爪放在右側、不重疊；之後拖曳把手照樣能安裝。console error 為 0。
 - 未涵蓋：只避開既有範圍的外接矩形，不保證落在目前畫面內；世界機架板仍會包住兩個模組的固定點（既有行為）。
+
+### L1 夾爪 MG995＋開合範圍證據（2026-10-01，見 PILOT-LIFT-GRIP.md）
+
+- 盤點：MG995 只支援桿件輸入；齒輪驅動一律當 TT。`inputRockRange` 只要 active 馬達帶任何齒輪就套用全部齒條行程 → 組合後夾爪 M2 借用升降行程，兩爪穿越。
+- Sonnet 第一輪：三個純函式＋工廠改用；`driveGearAt` 記錄型號；內建夾爪模組 MG995。審查發現 `schema.js` 會濾掉齒輪的 `motorType`／`servo*`，重載後變回 TT（主模型規格漏列）。
+- Sonnet 第二輪：`normalizeGear` 只在 mg995 時輸出型號與角度，TT 齒輪輸出不變。
+- 主模型接手修正：規格的 0～45° 是拿接點 p3（折彎處）量的，實際爪尖（`jawCenterline` 末端）扣板寬後，0° 淨距約 134 mm、24° 約 9 mm、約 25.7° 相碰。範圍改 0～24°，測試改用實際爪尖淨距。
+- 自動：`gear-servo` 30/30；全套 67 支全過；schema 70/70。
+- 瀏覽器（1280×800）：標示 `TT·M1`／`MG995·M2`；重載後保留；M2 只在 0～24° 來回，閉合端兩爪不交錯；M1 仍是齒條行程；console error 0。`Mod2-frame.dxf` 出現 `MG995_SLOT`，且落在機架外框內。
+- 下一步發現：安裝後左爪平面上掃過齒條與升降齒輪，前後層與鎖附在 L3（模組實體接口）處理。
 
 ## R1e 加工設定隨作品保存（2026-09-25 功能完成，2026-09-26 下載落地驗證通過／完成）
 

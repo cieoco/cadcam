@@ -354,6 +354,13 @@ function normalizeGear(comp, index, params, warnings) {
   if (safeId(comp.mesh)) out.mesh = comp.mesh;
   if (safeId(comp.mountLocatorPoint)) out.mountLocatorPoint = comp.mountLocatorPoint;
   if (comp.physicalMotor) out.physicalMotor = String(comp.physicalMotor);
+  // 驅動輪可標 MG995 伺服（角度範圍內來回擺）；TT / 未標型號不輸出任何欄位，舊檔不變。
+  if (comp.motorType === 'mg995') {
+    const clampAng = v => Math.max(0, Math.min(360, Math.round(num(v, 0))));
+    out.motorType = 'mg995';
+    out.servoStart = clampAng(comp.servoStart ?? 0);
+    out.servoEnd = clampAng(comp.servoEnd ?? 90);
+  }
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
   return out;
 }
