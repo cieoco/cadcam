@@ -22,6 +22,13 @@ const circlePts = (r, n = 36) => Array.from({ length: n }, (_, i) => ({ x: r * M
     return w2.length === 1 && /2/.test(w2[0]);
   })());
 }
+// 只比刀大一點的孔（d < 刀徑＋0.5）：銑線內幾乎沒有刀路 → 提醒在 svg2gcode 設為鑽孔
+{
+  const w = CC.cncWarnings([{ name: 'joint', holes: [{ r: 1.6, layer: 'HOLE' }, { r: 1.6, layer: 'HOLE' }, { r: 2.5, layer: 'PIN_HOLE' }], cutouts: [] }], cnc);
+  check('Ø3.2 孔（刀 3.175）→ 提醒用鑽孔模式，含 svg2gcode 與數量', w.some(m => m.includes('joint') && m.includes('3.2') && /鑽孔/.test(m) && m.includes('svg2gcode') && /2/.test(m)));
+  check('Ø3.2 孔不算「銑不進去」', !w.some(m => m.includes('3.2') && /銑不進去/.test(m)));
+  check('Ø5 孔（≥ 刀徑＋0.5）不提醒', !w.some(m => m.includes('PIN_HOLE')));
+}
 // 開口寬度與尖角
 {
   const narrow = CC.cncWarnings([{ name: 'p', holes: [], cutouts: [{ points: rect(2.5, 10), layer: 'SLOT' }] }], cnc);

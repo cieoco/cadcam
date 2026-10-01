@@ -76,16 +76,24 @@ export function cncWarnings(parts, cnc) {
   if (!Number.isFinite(tool) || tool <= 0) return [];
   const out = new Set();
   const holeGroups = new Map();
+  const tinyMoreHoles = new Map();
 
   for (const part of parts || []) {
     const name = part && part.name;
     for (const h of (part && part.holes) || []) {
       const dia = 2 * Number(h.r);
-      if (!Number.isFinite(dia) || !(dia < tool - EPS)) continue;
-      const key = `${name}\u0000${h.layer}\u0000${fmt(dia)}`;
-      const g = holeGroups.get(key) || { name, layer: h.layer, dia, count: 0 };
-      g.count++;
-      holeGroups.set(key, g);
+      if (!Number.isFinite(dia)) continue;
+      if (dia < tool - EPS) {
+        const key = `${name}\u0000${h.layer}\u0000${fmt(dia)}`;
+        const g = holeGroups.get(key) || { name, layer: h.layer, dia, count: 0 };
+        g.count++;
+        holeGroups.set(key, g);
+      } else if (dia >= tool - EPS && dia < tool + 0.5) {
+        const key = `${name}\u0000${h.layer}\u0000${fmt(dia)}`;
+        const g = tinyMoreHoles.get(key) || { name, layer: h.layer, dia, count: 0, tool };
+        g.count++;
+        tinyMoreHoles.set(key, g);
+      }
     }
     for (const c of (part && part.cutouts) || []) {
       const points = (c && c.points) || [];
@@ -103,6 +111,10 @@ export function cncWarnings(parts, cnc) {
   for (const g of holeGroups.values()) {
     const qty = g.count > 1 ? ` ×${g.count}` : '';
     out.add(`${g.name}（${g.layer}）Ø${fmt(g.dia)}${qty} 比刀徑 ${fmt(tool)} mm 小，銑不進去；改用鑽頭或加大孔徑`);
+  }
+  for (const g of tinyMoreHoles.values()) {
+    const qty = g.count > 1 ? ` ×${g.count}` : '';
+    out.add(`${g.name}（${g.layer}）Ø${fmt(g.dia)}${qty}（刀徑 ${fmt(g.tool)} mm）只比刀大一點，在 svg2gcode 請設為「鑽孔」`);
   }
   return [...out];
 }

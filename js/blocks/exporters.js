@@ -6,6 +6,9 @@ import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 
 export const DEFAULT_BAR_WIDTH_MM = DEFAULT_PLATE_RADIUS_WORLD * 2;
 export const DEFAULT_HOLE_DIAMETER_MM = DEFAULT_PLATE_RADIUS_WORLD * 2 * 0.72;
+// 匯出（加工）用的預設孔徑：使用者現場關節一律 M3 螺絲＋防鬆螺帽，與 FABRICATION_DEFAULTS.export 一致。
+// 上面那個 12.96 是畫面孔大小的比例，不再當加工預設。
+const DEFAULT_EXPORT_HOLE_DIAMETER_MM = 3.2;
 const TT_SHAFT_FLAT_DIAMETER_MM = 5.4;
 const TT_SHAFT_FLAT_THICKNESS_MM = 3.7;
 
@@ -31,7 +34,7 @@ export function normalizeExportSettings(settings = {}) {
   const safeBarWidth = Number.isFinite(barWidth) ? Math.max(2, Math.min(120, barWidth)) : DEFAULT_BAR_WIDTH_MM;
   const safeHoleDiameter = Number.isFinite(holeDiameter)
     ? Math.max(0.5, Math.min(119, holeDiameter))
-    : DEFAULT_HOLE_DIAMETER_MM;
+    : DEFAULT_EXPORT_HOLE_DIAMETER_MM;
   // barWidthMm 現在只控制自動機架；不能暗中縮小其他零件的圓孔或 TT 扁孔。
   const safeFlatDiameter = Number.isFinite(ttShaftFlatDiameter)
     ? Math.max(1, Math.min(30, ttShaftFlatDiameter))

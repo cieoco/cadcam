@@ -627,6 +627,10 @@ export function builtinTemplate(id) {
     template.outputs = [];
     // 以實際爪尖（jawCenterline 末端）扣板寬量淨距：0° 約 134 mm，24° 約 9 mm，約 25.7° 兩爪相碰、之後交錯；
     // 故夾爪馬達用 MG995 限 0～24°（接點 p3 是折彎處，不是爪尖，不能拿來量）。
+    // 爪臂接齒輪用 M3
+    comps.forEach(c => {
+      if (c.type === 'gear') c.pinHoleDiameter = 3.2;
+    });
     const drive = comps.find(c => c.type === 'gear' && c.p1 && c.p1.physicalMotor);
     if (drive) { drive.motorType = 'mg995'; drive.servoStart = 0; drive.servoEnd = 24; }
   } else {

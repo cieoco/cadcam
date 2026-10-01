@@ -10,7 +10,8 @@ assert.equal(FABRICATION_VERSION, 1);
 assert.deepEqual(FABRICATION_DEFAULTS, {
   v: 1,
   export: {
-    barWidthMm: 18, holeDiameterMm: 12.96, frameMarginMm: 18, frameHoleDiameterMm: 12.96,
+    // L5-0：使用者現場決定關節一律 M3 螺絲＋防鬆螺帽 → 新作品的連接孔／機架孔預設 3.2。
+    barWidthMm: 18, holeDiameterMm: 3.2, frameMarginMm: 18, frameHoleDiameterMm: 3.2,
     ttShaftFlatDiameterMm: 5.4, ttShaftFlatThicknessMm: 3.7,
   },
   ttMount: {

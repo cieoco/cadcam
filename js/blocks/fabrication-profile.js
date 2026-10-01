@@ -9,9 +9,10 @@ export const FABRICATION_DEFAULTS = Object.freeze({
   export: freezeRecord({
     // These match normalizeExportSettings({}) after the three preference loaders run.
     barWidthMm: 18,
-    holeDiameterMm: 12.96,
+    // 使用者現場決定：關節一律 M3 螺絲＋防鬆螺帽，新作品預設 3.2
+    holeDiameterMm: 3.2,
     frameMarginMm: 18,
-    frameHoleDiameterMm: 12.96,
+    frameHoleDiameterMm: 3.2,
     ttShaftFlatDiameterMm: 5.4,
     ttShaftFlatThicknessMm: 3.7,
   }),

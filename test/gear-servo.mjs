@@ -74,6 +74,7 @@ const pt = (id, extra = {}) => ({ id, x: 0, y: 0, type: 'floating', ...extra });
   const t = Ops.builtinTemplate('gear-gripper');
   const drive = t.comps.find(c => c.type === 'gear' && c.p1 && c.p1.physicalMotor);
   check('內建夾爪模組：驅動齒輪是 MG995，範圍 0～24', drive && drive.motorType === 'mg995' && drive.servoStart === 0 && drive.servoEnd === 24);
+  check('內建夾爪模組：兩齒輪輸出孔 Ø3.2（M3 接爪臂）', t.comps.filter(c => c.type === 'gear').every(g => g.pinHoleDiameter === 3.2));
   const lift = Ops.builtinTemplate('rack-lift');
   const liftDrive = lift.comps.find(c => c.type === 'gear' && c.p1 && c.p1.physicalMotor);
   check('內建升降模組：仍是 TT', liftDrive && liftDrive.motorType !== 'mg995');
