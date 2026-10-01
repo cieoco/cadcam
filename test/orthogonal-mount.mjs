@@ -55,7 +55,14 @@ ed.insertBuiltin('fourbar-lift'); ed.insertBuiltin('gear-gripper');
 const L = S.modules[0], G = S.modules[1];
 const P = () => S.topo.params;
 const id = (mod, base) => S.comps.flatMap(c => ['p1', 'p2', 'p3'].map(k => c[k])).find(p => p && p.id.startsWith(base + '_') && S.comps.some(c => c.moduleId === mod.id && ['p1', 'p2', 'p3'].some(k => c[k] && c[k].id === p.id)))?.id;
-const solveAt = (comps, modules, a1, a2 = 0) => Asm.solveAssembly(Asm.compileAssembly(comps, modules, { params: P() }), { thetaDeg: 0, motorAngles: { '1': a1, '2': a2 } });
+// 連續求解（每步 ≤ 5°，上一步當種子），與播放一致，避免平行四連桿跳到交叉分支。
+const solveAt = (comps, modules, a1, a2 = 0) => {
+  const asm = Asm.compileAssembly(comps, modules, { params: P() });
+  let sol = Asm.solveAssembly(asm, { thetaDeg: 0, motorAngles: { '1': 0, '2': 0 } });
+  const n = Math.max(Math.ceil(Math.abs(a1) / 5), Math.ceil(Math.abs(a2) / 5), 1);
+  for (let i = 1; i <= n; i++) sol = Asm.solveAssembly(asm, { thetaDeg: 0, motorAngles: { '1': a1 * i / n, '2': a2 * i / n }, _prevPoints: sol.points });
+  return sol;
+};
 {
   const pts = solveAt(S.comps, S.modules, 0).points;
   const targets = Ops.mountTargets(S.comps, S.modules, G.id, pts);

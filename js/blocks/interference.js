@@ -175,10 +175,38 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
   });
   let asm = null;
   try { asm = compileAssembly(list, modList, { params }); } catch (e) { return []; }
+  // 連續求解：從組裝姿態（全部 0°）沿著馬達角度每步 ≤ 5° 走過去，每步用上一步的點當種子，
+  // 才不會跳到另一個組裝分支（例如平行四連桿在大角度時跳成交叉的反平行四連桿）。
+  const STEP_DEG = 5;
+  const solveOnce = (angles, prev) => {
+    try { return solveAssembly(asm, { thetaDeg: 0, motorAngles: angles, ...(prev ? { _prevPoints: prev } : {}) }); } catch (e) { return null; }
+  };
+  const home = solveOnce({ ...zeros }, null);
+  const walkCache = new Map();   // motor -> [{ a, points }]（由 0 往兩側）
+  const solveWalk = (motor, target) => {
+    if (!home || !home.isValid) return null;
+    if (motor == null || Math.abs(target) < 1e-9) return home;
+    const key = motor + (target < 0 ? '-' : '+');
+    if (!walkCache.has(key)) walkCache.set(key, [{ a: 0, sol: home }]);
+    const path = walkCache.get(key);
+    let last = path[path.length - 1];
+    // 已走過更遠：找最近的已知點再往前
+    const known = path.filter(p => Math.abs(p.a) <= Math.abs(target) + 1e-9).pop();
+    if (known && Math.abs(known.a - target) < 1e-9) return known.sol;
+    last = known;
+    let a = last.a, sol = last.sol;
+    const dir = target > a ? 1 : -1;
+    while (Math.abs(target - a) > 1e-9) {
+      a = Math.abs(target - a) <= STEP_DEG ? target : a + dir * STEP_DEG;
+      sol = solveOnce({ ...zeros, [motor]: a }, sol && sol.points);
+      if (!sol || !sol.isValid) return sol;
+      if (Math.abs(a) > Math.abs(path[path.length - 1].a)) path.push({ a, sol });
+    }
+    return sol;
+  };
   const poses = [];
   poseDefs.forEach(def => {
-    let sol = null;
-    try { sol = solveAssembly(asm, { thetaDeg: 0, motorAngles: def.motorAngles }); } catch (e) { sol = null; }
+    const sol = solveWalk(def.motor, def.angleDeg);
     if (sol && sol.isValid && sol.points) poses.push({ ...def, points: sol.points });
   });
   if (!poses.length) return [];

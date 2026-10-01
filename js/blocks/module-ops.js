@@ -713,6 +713,13 @@ export function builtinTemplate(id) {
       ['isInput', 'physicalMotor', 'motorType', 'motorCarrier', 'motorMount', 'phaseOffset'].forEach(k => { delete plate[k]; });
       if (plate.p1) delete plate.p1.physicalMotor;
     }
+    // 放大到能吊得動夾爪的比例（範例臂長 48 mm 太小，夾爪約 180 mm）：臂長 140、工具架 80，立桿維持 72。
+    const SCALE_PTS = { A: [44, 0], B: [44, 72], C: [124, 72], D: [124, 0] };
+    comps.forEach(c => ['p1', 'p2', 'p3'].forEach(k => {
+      const q = c[k];
+      if (q && SCALE_PTS[q.id]) { q.x = SCALE_PTS[q.id][0]; q.y = SCALE_PTS[q.id][1]; }
+    }));
+    Object.assign(params, { LIFT_ARM: 140, LIFT_ARM_2: 140, LIFT_TOOL_TOP: 80, LIFT_TOOL_BOTTOM: 80 });
     const pB = plate && plate.p1 ? { ...plate.p1, type: 'floating' } : null;
     const pD = brace && brace.p2 ? { ...brace.p2, type: 'floating' } : null;
     if (pB && pD) {

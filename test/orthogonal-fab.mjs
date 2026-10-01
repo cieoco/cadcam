@@ -45,8 +45,8 @@ const base = pts[G.base];
   console.log('layout:', JSON.stringify(a));
   check('預設尺寸：長 20、壁厚 4、翼高 14、孔 3.2', a && a.lengthMm === 20 && a.wallMm === 4 && a.flangeMm === 14 && a.holeDiameterMm === 3.2);
   check('宿主構件＝ToolBrace、子模組板＝夾爪底板', a.hostCompId === brace.id && a.childPart === `${G.id}-frame`);
-  // 宿主孔：沿桿從 p1 起算 u（桿長 48 → 中點 24，再往前 5、15）；v＝side·(寬/2 − 9)＝0（板寬 18、翼孔距接合邊 9）
-  check('宿主孔（桿座標）：u 29、39，v 0', a.hostHoles.length === 2 && near(a.hostHoles[0].u, 29) && near(a.hostHoles[1].u, 39) && a.hostHoles.every(h => near(h.v, 0)));
+  // 宿主孔：沿桿從 p1 起算 u（桿長 80 → 中點 40，再往前 5、15）；v＝side·(寬/2 − 9)＝0（板寬 18、翼孔距接合邊 9）
+  check('宿主孔（桿座標）：u 45、55，v 0', a.hostHoles.length === 2 && near(a.hostHoles[0].u, 45) && near(a.hostHoles[1].u, 55) && a.hostHoles.every(h => near(h.v, 0)));
   // 子模組孔：base + s·e + t·f；e 沿 childAxisDeg（-90° → (0,-1)）、f＝(−e.y, e.x)＝(1,0)；s 5、15；t＝宿主板厚 3＋9＝12
   check('子模組孔（夾爪自己的座標）：base＋(12,−5)、base＋(12,−15)', a.childHoles.length === 2 &&
     near(a.childHoles[0].x, base.x + 12, 1e-3) && near(a.childHoles[0].y, base.y - 5, 1e-3) && near(a.childHoles[1].y, base.y - 15, 1e-3));
@@ -58,11 +58,11 @@ const base = pts[G.base];
   const extras = OJ.orthogonalExportExtras(S.comps, S.modules, P, { stockMm: 3 });
   const lh = extras.linkHoles && extras.linkHoles[brace.id];
   check('extras.linkHoles[ToolBrace]：2 孔', Array.isArray(lh) && lh.length === 2);
-  const g = Ex.inspectLinkExport(brace, 48, { holeDiameterMm: 3.2 }, lh);
+  const g = Ex.inspectLinkExport(brace, 80, { holeDiameterMm: 3.2 }, lh);
   const ad = g.holes.filter(h => h.layer === 'ADAPTER_HOLE');
   const p1 = g.holes.filter(h => h.layer === 'HOLE').sort((a, b) => a.x - b.x)[0];
-  check('桿件匯出：多兩個 ADAPTER_HOLE（u 29、39，與 p1 孔同高）、孔徑 3.2', ad.length === 2 && near(ad[0].x - p1.x, 29, 1e-3) && near(ad[1].x - p1.x, 39, 1e-3) && ad.every(h => near(h.y, p1.y, 1e-3) && near(h.r, 1.6, 1e-3)));
-  check('沒傳 extra 時桿件匯出不變', Ex.inspectLinkExport(brace, 48, { holeDiameterMm: 3.2 }).holes.every(h => h.layer !== 'ADAPTER_HOLE'));
+  check('桿件匯出：多兩個 ADAPTER_HOLE（u 45、55，與 p1 孔同高）、孔徑 3.2', ad.length === 2 && near(ad[0].x - p1.x, 45, 1e-3) && near(ad[1].x - p1.x, 55, 1e-3) && ad.every(h => near(h.y, p1.y, 1e-3) && near(h.r, 1.6, 1e-3)));
+  check('沒傳 extra 時桿件匯出不變', Ex.inspectLinkExport(brace, 80, { holeDiameterMm: 3.2 }).holes.every(h => h.layer !== 'ADAPTER_HOLE'));
   const fn = extras.frameNodes && extras.frameNodes[G.id];
   check('extras.frameNodes[夾爪]：2 個 ADAPTER_HOLE 節點（夾爪自己的座標）', Array.isArray(fn) && fn.length === 2 && fn.every(n => n.holeLayer === 'ADAPTER_HOLE' && near(n.holeDiameterMm, 3.2)) && near(fn[0].x, base.x + 12, 1e-3));
 }

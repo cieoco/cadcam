@@ -78,4 +78,12 @@ const obstacle = (y, x1, x2) => ({ type: 'bar', id: 'Obst', p1: { id: 'OB1', typ
   const w2 = IF.findInterference({ ...base, comps: far, params, plan: plan2, ranges, samplesPerMotor: 5 });
   check('遠處的障礙桿：不報', !w2.some(x => x.kind === 'cross-plane' && x.parts.some(n => n.startsWith('Obst'))));
 }
+// ---------- 3. 連續求解：取樣姿態不可跳到交叉分支 ----------
+{
+  const plan = BP.buildPlan(base);
+  const w = IF.findInterference({ ...base, plan, ranges: { '1': { lo: -60, hi: 60 }, '2': { lo: 0, hi: 24 } }, samplesPerMotor: 13 });
+  check('平行四連桿全行程取樣：曲柄與從動臂不會被誤判互撞（沿行程連續求解）', !w.some(x => x.kind === 'same-layer' && x.parts.some(n => n.startsWith('LiftCrank')) && x.parts.some(n => n.startsWith('LiftFollower'))));
+  const r = IF.resolveSpacers({ ...base, ranges: { '1': { lo: -60, hi: 60 }, '2': { lo: 0, hi: 24 } }, samplesPerMotor: 13 });
+  check('四連桿（臂長 140）＋直角夾爪：−60～60° 干涉 0 項', r.interference.length === 0);
+}
 report('orthogonal-interference');

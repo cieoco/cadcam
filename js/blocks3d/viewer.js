@@ -16,6 +16,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { createGearPath } from '../utils/gear-geometry.js';
+import { applyMatrix4 } from './orthogonal-3d.js';
 
 // 把一根桿（兩端 a、b、半徑 r、兩端孔徑 holeR）做成 THREE.Shape。
 // 外形與 blocks.html 的 barHullPath 一致：兩端圓 + 外切線 + 半圓封口，外加兩個孔。
@@ -798,12 +799,58 @@ export function createViewer(container) {
   function focusCamera(model) {
     // 相機對焦：對到固定的地錨形心（model.focus）。動畫時 focus 不動，畫面就不會晃。
     // 有地錨（anchored）時每幀同步沒差（反正是同一點）；沒地錨時只在初次定位、之後凍結。
+    // 直角安裝子模組（orthogonal）：擴展 span 計算以涵蓋子模組的轉換邊界。
     const f = model.focus;
     if (f) {
       if (!initialized) {
         controls.target.set(f.x, f.y, f.z);
+        // 計算整體 span（包括直角安裝子模組的轉換後邊界）
+        let span = model.span;
+        if (model.orthogonal && model.orthogonal.length > 0) {
+          const xs = [], ys = [];
+          (model.orthogonal || []).forEach(child => {
+            if (!child || !child.model || !Array.isArray(child.matrix) || child.matrix.length !== 16) return;
+            // 從子模型蒐集所有點
+            const collectPoints = (m) => {
+              const pts = [];
+              // 桿件端點
+              (m.sticks || []).forEach(s => { pts.push(s.a, s.b); });
+              // 三角板角點
+              (m.plates || []).forEach(pl => (pl.corners || []).forEach(c => pts.push(c)));
+              // 軌道端點
+              (m.rails || []).forEach(r => { pts.push(r.a, r.b); });
+              // 齒輪中心加半徑
+              (m.gears || []).forEach(g => {
+                const outer = g.radius + g.module;
+                pts.push({ x: g.center.x - outer, y: g.center.y - outer, z: g.z });
+                pts.push({ x: g.center.x + outer, y: g.center.y + outer, z: g.z });
+              });
+              // 皮帶輪中心加半徑
+              (m.pulleys || []).forEach(p => {
+                pts.push({ x: p.center.x - p.radius, y: p.center.y - p.radius, z: p.z });
+                pts.push({ x: p.center.x + p.radius, y: p.center.y + p.radius, z: p.z });
+              });
+              return pts;
+            };
+            const pts = collectPoints(child.model);
+            // 轉換每個點並更新邊界
+            pts.forEach(p => {
+              if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+              // 桿件端點只有 x、y（沒有 z）：缺的 z 當 0，否則整個 span 會變 NaN、畫面全黑。
+              const t = applyMatrix4(child.matrix, { x: p.x, y: p.y, z: Number.isFinite(p.z) ? p.z : 0 });
+              if (Number.isFinite(t.x) && Number.isFinite(t.y)) { xs.push(t.x); ys.push(t.y); }
+            });
+          });
+          // 重新計算 span（只在有子模組時才做）
+          if (xs.length > 0 && ys.length > 0) {
+            const minX = Math.min(...xs), maxX = Math.max(...xs);
+            const minY = Math.min(...ys), maxY = Math.max(...ys);
+            const childSpan = Math.max(maxX - minX, maxY - minY, 1);
+            if (Number.isFinite(childSpan)) span = Math.max(Number.isFinite(span) ? span : 0, childSpan);
+          }
+        }
         // 直向手機的水平視角較窄，初始距離需補償寬高比，否則兩側零件會被裁掉。
-        const dist = Math.max(300, model.span * 2.2) / Math.min(1, camera.aspect);
+        const dist = Math.max(300, span * 2.2) / Math.min(1, camera.aspect);
         camera.position.set(f.x, f.y, dist);
         initialized = true;
       } else if (model.anchored) {
