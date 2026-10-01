@@ -891,7 +891,8 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
     outlines.push(roundPadOutline(nodes[0], Math.max(frameMarginMm, frameR + holeR + 4)));
   }
 
-  nodes.forEach(p => addHole(p.x, p.y, Number.isFinite(p.holeDiameterMm) ? p.holeDiameterMm / 2 : holeR, 'PIVOT_HOLE'));
+  // holeLayer（字串）：模組螺絲孔等專用圖層，其餘節點照舊 PIVOT_HOLE。
+  nodes.forEach(p => addHole(p.x, p.y, Number.isFinite(p.holeDiameterMm) ? p.holeDiameterMm / 2 : holeR, typeof p.holeLayer === 'string' && p.holeLayer ? p.holeLayer : 'PIVOT_HOLE'));
 
   motorMounts.forEach(mount => {
     const feats = motorMountFeatures(mount);

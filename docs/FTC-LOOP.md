@@ -35,6 +35,7 @@
 | L2b 輪轂／舵盤鎖螺絲（第 2 包後半） | Sonnet | `fabrication-profile.js` 新增 `drive` 群組（常見值、缺席靜默補預設）；`exporters.js` 齒輪：TT 驅動輪 `TT_HUB_CENTER`＋2×`TT_HUB_SCREW`（取代 L2a 扁孔），MG995 驅動輪 `MG995_HORN_CENTER`＋N×`MG995_HORN_SCREW`；app 匯出帶 drive、數值仍為預設時提醒實量。 | 測試全過＋匯出 banner。 | 完成（Sonnet 一輪；主模型改提醒條件與 cnc-check 舊期望） |
 | L4c 刀徑／輪轂／舵盤設定欄位 | **Haiku** | `settings.js` 的 `setCncSetting`／`setDriveSetting` 與同步；設定面板 9 個欄位；`window.blocks` 暴露。測試 `test/fabrication-ui.mjs` 由主模型先寫。 | 測試全過＋重載保留（有作品時）。 | 完成（Haiku 一輪；照範本複製類工作可交 Haiku） |
 | L3a 齒條匯出＋M3 導銷（第 3 包前半） | Sonnet | `exporters.js` 新增 `inspectRackExport` 與齒條 DXF／SVG（RACK_CUT／RACK_SLOT／RACK_HOLE），`frameGeometry` 支援節點孔徑；`model.js` 導銷節點帶 `holeDiameterMm`；`schema.js` 保存 `pinHoleDiameterMm`；升降範例槽寬 3.4、孔 3.2。測試 `test/rack-export.mjs` 由主模型先寫。 | 測試全過＋孔位與 solver 誤差 0。 | 完成（Sonnet 一輪；主模型修正外形長度的錯誤假設） |
+| L3b 模組螺絲對鎖（第 3 包後半） | Sonnet | 輸出端 `bolts`（schema 保存、插入改名）；升降齒條加 `LiftOutputB`；夾爪新增專用安裝點 `GripMount`（取代伺服軸心當基準）；`moduleFrameExports` 帶出組裝姿態的螺絲座標，`moduleFrameNodes` 把底板基準孔換成兩個 `MOUNT_BOLT` Ø3.2。測試 `test/module-bolts.mjs` 由主模型先寫。 | 測試全過＋實際匯出夾爪底板有兩顆 MOUNT_BOLT、齒條 3 孔。 | 完成（Sonnet 一輪；主模型更新 L3a 舊期望） |
 
 建議順序：S1 → S2 → S3（暖身、互不相依）→ M0 → M1a → M1b → M1c → M1d。
 

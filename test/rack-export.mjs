@@ -39,7 +39,7 @@ const s = ext(slots[0]?.points || [{ x: 0, y: 0 }]);
 check('長槽總長 ＝ 槽長＋槽寬（144＋3.4）', near(s.maxX - s.minX, rack.slot.length + 3.4, 0.3));
 check('長槽寬 3.4', near(s.maxY - s.minY, 3.4, 0.05));
 const holes = g.holes.filter(h => h.layer === 'RACK_HOLE');
-check('兩個 RACK_HOLE、半徑 1.6', holes.length === 2 && holes.every(h => near(h.r, 1.6, 1e-6)));
+check('三個 RACK_HOLE（兩端＋L3b 的第二顆鎖付螺絲 LiftOutputB）、半徑 1.6', holes.length === 3 && holes.every(h => near(h.r, 1.6, 1e-6)));
 const half = params[rack.lenParam] / 2;
 check('兩端孔在 x ＝ ±齒條長/2（與 solver 的 endA／endB 一致）', holes.some(h => near(h.x, -half, 0.01)) && holes.some(h => near(h.x, half, 0.01)));
 check('孔在 y ＝ v（-15），與長槽中心線同一條線', holes.every(h => near(h.y, -15, 0.01)) && near((s.minY + s.maxY) / 2, -15, 0.05));

@@ -373,15 +373,64 @@ export function splitFrameMounts(freeMounts, comps, modules) {
   return { world, byModule };
 }
 
-// 每個已安裝模組另出一份機架清單：{ moduleId, fileBase, comps }，依 modules 陣列順序。
-export function moduleFrameExports(comps, modules) {
+// 每個已安裝模組另出一份機架清單：{ moduleId, fileBase, comps, bolts, baseId }，依 modules 陣列順序。
+// 帶 params 時：宿主輸出端若有 bolts，以組裝姿態（thetaDeg 0、馬達＝mount.home）解出螺絲孔的世界座標，
+// bolts: [{ id, x, y, diameter }]（diameter 取宿主齒條 holes 的孔徑，找不到用 3.2）；否則 bolts 為 []。
+export function moduleFrameExports(comps, modules, params) {
   const list = Array.isArray(comps) ? comps : [];
   const modList = Array.isArray(modules) ? modules : [];
+  let solved = null;
+  const solveHome = (mod) => {
+    if (!solved) solved = new Map();
+    if (solved.has(mod.id)) return solved.get(mod.id);
+    let pts = null;
+    try {
+      const sol = solveAssembly(compileAssembly(list, modList, { params }), {
+        thetaDeg: 0, motorAngles: { ...((mod.mount && mod.mount.home) || {}) }
+      });
+      pts = sol && sol.points ? sol.points : null;
+    } catch (e) { pts = null; }
+    solved.set(mod.id, pts);
+    return pts;
+  };
   return modList
     .filter(mod => mod && mod.mount)
-    .map(mod => ({
-      moduleId: mod.id,
-      fileBase: `${mod.id}-frame`,
-      comps: list.filter(c => c.moduleId === mod.id)
-    }));
+    .map(mod => {
+      const bolts = [];
+      const host = modList.find(m => m.id === mod.mount.to.module);
+      const output = host && (host.outputs || []).find(o => o.id === mod.mount.to.output);
+      if (params && output && Array.isArray(output.bolts) && output.bolts.length) {
+        const pts = solveHome(mod);
+        output.bolts.forEach(id => {
+          const p = pts && pts[id];
+          if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+          let diameter = 3.2;
+          list.some(c => Array.isArray(c.holes) && c.holes.some(h => {
+            if (h.id !== id) return false;
+            if (Number.isFinite(Number(h.diameter)) && Number(h.diameter) > 0) diameter = Number(h.diameter);
+            return true;
+          }));
+          bolts.push({ id, x: p.x, y: p.y, diameter });
+        });
+      }
+      return {
+        moduleId: mod.id,
+        fileBase: `${mod.id}-frame`,
+        comps: list.filter(c => c.moduleId === mod.id),
+        bolts,
+        baseId: mod.base
+      };
+    });
+}
+
+// 模組底板的機架節點：去掉基準點（它只是安裝用的參考點，不再開大孔），改加每顆螺絲孔（小孔、MOUNT_BOLT 圖層）。
+// 純函式，不改輸入。
+export function moduleFrameNodes(entry, frameNodes) {
+  const nodes = Array.isArray(frameNodes) ? frameNodes : [];
+  const baseId = entry && entry.baseId;
+  const bolts = entry && Array.isArray(entry.bolts) ? entry.bolts : [];
+  return [
+    ...nodes.filter(n => !(baseId && n.id === baseId)),
+    ...bolts.map(b => ({ id: b.id, x: b.x, y: b.y, holeDiameterMm: b.diameter, holeLayer: 'MOUNT_BOLT' }))
+  ];
 }

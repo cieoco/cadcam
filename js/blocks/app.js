@@ -28,7 +28,7 @@ import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
 import * as Motion from './motion.js';
-import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule } from './assembly.js';
+import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule } from './assembly.js';
 import { normalizeModules } from './module-schema.js';
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
@@ -1941,8 +1941,8 @@ function exportLinksSvg() {
   const cncParts = [...Exporters.cncPartsForExport(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts), cncFramePart('frame', nodes, settings, freeMounts)];
   // 已安裝模組另出一份機架檔（SDD-ASSEMBLY-MODULES §4.2）；座標用 home 姿態重算安裝座。
   let moduleFrameCount = 0;
-  moduleFrameExports(S.comps, S.modules).forEach(entry => {
-    const modNodes = Model.frameConnectorNodes(entry.comps);
+  moduleFrameExports(S.comps, S.modules, S.topo.params).forEach(entry => {
+    const modNodes = moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps));
     const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
     const modFree = splitFrameMounts(Exporters.splitMountsByHost(S.comps, homeMounts).free, S.comps, S.modules).byModule[entry.moduleId] || [];
     const n = Exporters.exportFrameAsSvg(modNodes, settings, modFree, entry.fileBase);
@@ -1966,8 +1966,8 @@ function exportLinksDxf() {
   const cncParts = [...Exporters.cncPartsForExport(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts), cncFramePart('frame', nodes, settings, freeMounts)];
   // 已安裝模組另出一份機架檔（SDD-ASSEMBLY-MODULES §4.2）；座標用 home 姿態重算安裝座。
   let moduleFrameCount = 0;
-  moduleFrameExports(S.comps, S.modules).forEach(entry => {
-    const modNodes = Model.frameConnectorNodes(entry.comps);
+  moduleFrameExports(S.comps, S.modules, S.topo.params).forEach(entry => {
+    const modNodes = moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps));
     const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
     const modFree = splitFrameMounts(Exporters.splitMountsByHost(S.comps, homeMounts).free, S.comps, S.modules).byModule[entry.moduleId] || [];
     const n = Exporters.exportFrameAsDxf(modNodes, settings, modFree, entry.fileBase);

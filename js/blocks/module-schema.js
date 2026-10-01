@@ -70,7 +70,14 @@ function validateOutput(rawOut, moduleComps, moduleId, usedIds, warnings) {
     return null;
   }
   usedIds.add(rawOut.id);
-  return { id: rawOut.id, name: sanitizeName(rawOut.name, rawOut.id), at: rawOut.at, body: bodyOut };
+  const out = { id: rawOut.id, name: sanitizeName(rawOut.name, rawOut.id), at: rawOut.at, body: bodyOut };
+  // bolts（選配）：輸出構件上代表鎖付螺絲孔的點 id；只留屬於 body 點池的合法 id、去重，沒有就不輸出。
+  if (Array.isArray(rawOut.bolts)) {
+    const bolts = [];
+    rawOut.bolts.forEach(id => { if (safeId(id) && pointPool.has(id) && !bolts.includes(id)) bolts.push(id); });
+    if (bolts.length) out.bolts = bolts;
+  }
+  return out;
 }
 
 function validateBase(rawBase, moduleComps) {

@@ -576,7 +576,9 @@ export function instantiateTemplate(template, ctx) {
       if (typeof body.a === 'string') body.a = renameStr(body.a);
       if (typeof body.b === 'string') body.b = renameStr(body.b);
     }
-    return { id: o.id, name: o.name, at: renameStr(o.at), body };
+    const out = { id: o.id, name: o.name, at: renameStr(o.at), body };
+    if (Array.isArray(o.bolts) && o.bolts.length) out.bolts = o.bolts.map(renameStr);
+    return out;
   });
 
   const mod = { id: moduleId, name: (typeof t.name === 'string' && t.name) ? t.name : moduleId, outputs, mount: null };
@@ -611,9 +613,17 @@ export function builtinTemplate(id) {
   const template = { kind: 'blocks-module', v: 1, name: entry.name, source: entry.source, comps, params };
   if (id === 'rack-lift') {
     template.base = 'LPC';
-    template.outputs = [{ id: 'carriage', name: '滑台', at: 'LiftOutput', body: { kind: 'rack', id: 'LiftRackGear' } }];
+    // 滑台輸出端兩顆 M3 螺絲孔（LiftOutput＋LiftOutputB，v 同為 -15，u 96 在長槽之外、齒條本體之內），
+    // 夾爪鎖上去才不會繞單一孔轉。
+    const rackComp = comps.find(c => c.type === 'rack');
+    if (rackComp && Array.isArray(rackComp.holes) && !rackComp.holes.some(h => h.id === 'LiftOutputB')) {
+      rackComp.holes.push({ id: 'LiftOutputB', type: 'floating', u: 96, v: -15, diameter: 3.2 });
+    }
+    template.outputs = [{ id: 'carriage', name: '滑台', at: 'LiftOutput', body: { kind: 'rack', id: 'LiftRackGear' }, bolts: ['LiftOutput', 'LiftOutputB'] }];
   } else if (id === 'gear-gripper') {
-    template.base = 'GCA';
+    // 專用安裝點 GripMount：避開伺服軸（GCA 是 MG995 輸出軸心，鎖不了），夾爪以它為基準裝到滑台孔上。
+    comps.push({ type: 'anchor', id: 'GripMount', p1: { id: 'GripMount', type: 'fixed', x: 0, y: 40 } });
+    template.base = 'GripMount';
     template.outputs = [];
     // 以實際爪尖（jawCenterline 末端）扣板寬量淨距：0° 約 134 mm，24° 約 9 mm，約 25.7° 兩爪相碰、之後交錯；
     // 故夾爪馬達用 MG995 限 0～24°（接點 p3 是折彎處，不是爪尖，不能拿來量）。
