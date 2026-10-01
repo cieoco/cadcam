@@ -145,7 +145,12 @@ export function frameConnectorNodes(comps) {
   // 它的接點不再餵給自動地基，否則會生成第二塊重複的機架板。
   (comps||[]).filter(c=>c?.type==='triangle'&&['p1','p2','p3'].filter(k=>c[k]&&isGroundPoint(c[k])).length>=2)
     .forEach(c=>pointKeysFor(c).forEach(k=>{if(c[k]?.id)separateIds.add(c[k].id);}));
-  return frameNodes(comps).filter(p => !isHiddenSliderRailPoint(comps, p.id) && !locators.has(p.id) && !separateIds.has(p.id));
+  // 齒條導銷孔徑（M3）：framePins 節點帶 holeDiameterMm（回傳新物件，不動 comps 內原物件）
+  const pinHoleById = new Map();
+  (comps||[]).filter(c=>c?.type==='rack'&&Number.isFinite(c.pinHoleDiameterMm)&&Array.isArray(c.framePins))
+    .forEach(c=>c.framePins.forEach(id=>pinHoleById.set(id,c.pinHoleDiameterMm)));
+  return frameNodes(comps).filter(p => !isHiddenSliderRailPoint(comps, p.id) && !locators.has(p.id) && !separateIds.has(p.id))
+    .map(p => pinHoleById.has(p.id) ? { ...p, holeDiameterMm: pinHoleById.get(p.id) } : p);
 }
 
 export function snapFrameCoord(v, step = LEGO_FRAME_STEP) {

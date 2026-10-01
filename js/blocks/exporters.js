@@ -1,5 +1,6 @@
 import { DEFAULT_PLATE_RADIUS_WORLD, createPlateGeometry } from './plate-geometry.js';
-import { createGearPath } from '../utils/gear-geometry.js';
+import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
+import { rackPhaseShift } from './gear-editor.js';
 import { memberStock, memberStockLabel } from './member-stock.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 
@@ -97,6 +98,13 @@ function exportableGears(comps, params, settings) {
     .filter(c => c && c.type === 'gear' && c.p1 && c.p2)
     .map(c => ({ comp: c, geometry: gearGeometry(c, params, settings) }))
     .filter(item => item.geometry && item.geometry.outline.length >= 3);
+}
+
+function exportableRacks(comps, params) {
+  return comps
+    .filter(c => c && c.type === 'rack' && c.p1)
+    .map(c => ({ comp: c, geometry: rackGeometry(c, params, c.pinion ? comps.find(g => g && g.type === 'gear' && g.id === c.pinion) || null : null) }))
+    .filter(item => item.geometry.outline.length >= 3);
 }
 
 function isTtMotorEnd(comp, key) {
@@ -276,6 +284,48 @@ function gearGeometry(comp, params = {}, settings = {}) {
 
 export function inspectGearExport(comp, params = {}, settings = {}) {
   const { outline, holes, cutouts } = gearGeometry(comp, params, settings);
+  return { outline, holes, cutouts };
+}
+
+// 齒條局部座標：x 沿齒條軸 u、y 沿法向 n＝(-uy,ux)，原點＝rack.p1（θ=0 放置位置）。
+// 與 solver 孔位一致：u = endA ? -len/2 : endB ? len/2 : h.u、v = h.v（len 不含 endMargin、不含 phaseShift）；
+// 齒形路徑座標 (x, y) 即 (u, v)（drawRack 只在畫 SVG 時才翻 y，這裡不翻）。
+// 本體長度與齒形／長槽的算法同 transmission-render.js 的 drawRack／drawRackSlot。
+function rackGeometry(comp, params = {}, pinion = null) {
+  const teeth = pinion ? Math.max(6, Math.round(Number(pinion.teeth) || 12)) : 12;
+  const radius = pinion ? (Number(params[pinion.radiusParam]) || 40) : 40;
+  const module = 2 * radius / teeth;
+  const lenParam = Number(params[comp.lenParam]) || 160;
+  const length = lenParam + 2 * (Number(comp.endMargin) || 12);
+  const bodyH = Math.max(4, Number(comp.bodyHeight) || Math.max(8, module * 2.5));
+  const axisDeg = Number(comp.axisDeg) || 0;
+  const phaseShift = rackPhaseShift(comp, pinion, { length, module, teeth, axisDeg });
+  const outline = createRackPath({ length, height: bodyH, module })
+    .map(p => ({ x: round(p.x + phaseShift), y: round(p.y) }));
+  const cutouts = [];
+  if (comp.slot) {
+    const slot = typeof comp.slot === 'object' ? comp.slot : {};
+    const slotLen = Math.max(8, Math.min(length - module * 3, Number(slot.length) || Math.max(24, length - 32)));
+    const slotW = Math.max(2, Math.min(bodyH * 0.7, Number(slot.width) || Math.max(4, module * 1.25)));
+    const slotY = -module * 1.25 - bodyH / 2 + (Number(slot.offset) || 0);
+    const r = slotW / 2, x1 = -slotLen / 2 + phaseShift, x2 = slotLen / 2 + phaseShift;
+    // 兩端半圓長槽：右端半圓（-90°→+90°）接左端半圓（90°→270°），閉合
+    const points = [...arcPoints(x2, slotY, r, -90, 90, 16), ...arcPoints(x1, slotY, r, 90, 270, 16)]
+      .map(p => ({ x: round(p.x), y: round(p.y) }));
+    cutouts.push({ layer: 'RACK_SLOT', points });
+  }
+  const holes = (comp.holes || []).map(h => ({
+    id: h.id,
+    x: round(h.role === 'endA' ? -lenParam / 2 : h.role === 'endB' ? lenParam / 2 : Number(h.u) || 0),
+    y: round(Number(h.v) || 0),
+    r: round((Number(h.diameter) || 5) / 2),
+    layer: 'RACK_HOLE'
+  }));
+  return { outline, holes, cutouts };
+}
+
+export function inspectRackExport(rack, params = {}, pinion = null) {
+  const { outline, holes, cutouts } = rackGeometry(rack, params, pinion);
   return { outline, holes, cutouts };
 }
 
@@ -687,6 +737,40 @@ function dxfForGear(comp, geometry) {
   ].join('\n') + '\n';
 }
 
+function svgForRack(comp, geometry) {
+  const b = boundsForGeometry([geometry.outline], geometry.holes);
+  const width = round(b.maxX - b.minX);
+  const height = round(b.maxY - b.minY);
+  const rackCutouts = (geometry.cutouts || []).map(c =>
+    `    <path d="${svgPolyline(c.points)}" data-layer="${esc(c.layer)}" />`).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${round(b.minX)} ${round(b.minY)} ${width} ${height}">
+  <title>${esc(comp.id || 'rack')}</title>
+  <g fill="none" stroke="#000" stroke-width="0.25">
+    <path d="${svgPolyline(geometry.outline)}" data-layer="RACK_CUT" />
+${rackCutouts ? rackCutouts + '\n' : ''}${geometry.holes.map(h => `    <circle cx="${round(h.x)}" cy="${round(h.y)}" r="${round(h.r)}" data-layer="${esc(h.layer)}" />`).join('\n')}
+  </g>
+</svg>
+`;
+}
+
+function dxfForRack(comp, geometry) {
+  return [
+    dxfPair(0, 'SECTION'),
+    dxfPair(2, 'HEADER'),
+    dxfPair(9, '$INSUNITS'),
+    dxfPair(70, 4),
+    dxfPair(0, 'ENDSEC'),
+    dxfPair(0, 'SECTION'),
+    dxfPair(2, 'ENTITIES'),
+    dxfPolyline(geometry.outline, 'RACK_CUT'),
+    ...geometry.holes.map(h => dxfCircle(h.x, h.y, h.r, h.layer)),
+    ...(geometry.cutouts || []).map(c => dxfPolyline(c.points, c.layer)),
+    dxfPair(0, 'ENDSEC'),
+    dxfPair(0, 'EOF')
+  ].join('\n') + '\n';
+}
+
 // 單一動力來源的加工特徵（世界座標）：corners＝安裝內容角點（供外形合併／延伸判斷）、
 // cutouts＝非圓形切割（MG995 穿板槽）、holes＝圓孔。自動地基、宿主機架桿與結構板共用。
 export function motorMountFeatures(mount) {
@@ -807,7 +891,7 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
     outlines.push(roundPadOutline(nodes[0], Math.max(frameMarginMm, frameR + holeR + 4)));
   }
 
-  nodes.forEach(p => addHole(p.x, p.y, holeR, 'PIVOT_HOLE'));
+  nodes.forEach(p => addHole(p.x, p.y, Number.isFinite(p.holeDiameterMm) ? p.holeDiameterMm / 2 : holeR, 'PIVOT_HOLE'));
 
   motorMounts.forEach(mount => {
     const feats = motorMountFeatures(mount);
@@ -1078,7 +1162,11 @@ export function exportLinksAsSvg(comps, pts, params, settings, mounts = []) {
   gears.forEach(({ comp, geometry }) => {
     downloadText(svgForGear(comp, geometry), `${safeName(comp.id)}.svg`, 'image/svg+xml');
   });
-  return links.length + plates.length + gears.length;
+  const racks = exportableRacks(comps, params);
+  racks.forEach(({ comp, geometry }) => {
+    downloadText(svgForRack(comp, geometry), `${safeName(comp.id)}.svg`, 'image/svg+xml');
+  });
+  return links.length + plates.length + gears.length + racks.length;
 }
 
 export function exportLinksAsDxf(comps, pts, params, settings, mounts = []) {
@@ -1099,7 +1187,11 @@ export function exportLinksAsDxf(comps, pts, params, settings, mounts = []) {
   gears.forEach(({ comp, geometry }) => {
     downloadText(dxfForGear(comp, geometry), `${safeName(comp.id)}.dxf`, 'application/dxf');
   });
-  return links.length + plates.length + gears.length;
+  const racks = exportableRacks(comps, params);
+  racks.forEach(({ comp, geometry }) => {
+    downloadText(dxfForRack(comp, geometry), `${safeName(comp.id)}.dxf`, 'application/dxf');
+  });
+  return links.length + plates.length + gears.length + racks.length;
 }
 
 // L4 CNC 檢查用：與 exportLinksAsDxf 輸出同一批零件（桿件含宿主桿、板件、齒輪）的孔與開口。
@@ -1118,6 +1210,9 @@ export function cncPartsForExport(comps, pts, params, settings, mounts = []) {
     parts.push({ name: safeName(comp.id), holes: holesOf(g), cutouts: cutoutsOf(g) });
   });
   exportableGears(comps, params, settings).forEach(({ comp, geometry }) => {
+    parts.push({ name: safeName(comp.id), holes: holesOf(geometry), cutouts: cutoutsOf(geometry) });
+  });
+  exportableRacks(comps, params).forEach(({ comp, geometry }) => {
     parts.push({ name: safeName(comp.id), holes: holesOf(geometry), cutouts: cutoutsOf(geometry) });
   });
   return parts;

@@ -400,6 +400,7 @@ function normalizeRack(comp, index, params, warnings) {
   }
   const framePins = uniqueSafeIds(comp.framePins);
   if (framePins.length) out.framePins = framePins;
+  if (Number.isFinite(comp.pinHoleDiameterMm)) out.pinHoleDiameterMm = Math.max(0.5, roundTenth(comp.pinHoleDiameterMm, 3.2));
   if (Array.isArray(comp.holes)) {
     const holes=comp.holes.filter(h=>h&&safeId(h.id)).slice(0,16).map(h=>{
       const hole={ id:h.id, type:'floating', u:roundTenth(h.u,0), v:roundTenth(h.v,0), diameter:Math.max(1,roundTenth(h.diameter,5)) };

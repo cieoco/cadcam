@@ -714,9 +714,10 @@ const ALL_BLOCK_EXAMPLES = [
           p1: pt('LiftRack', 'floating', 30, 0),
           pinion: 'LiftPinion', lenParam: 'LRL', axisDeg: 90, sign: 1,
           bodyHeight: 20,
-          slot: { length: 144, width: 5, offset: 0 },
-          framePins: ['LGA', 'LGB'], endMargin:12,
-          holes: [{id:'LiftHoleA',role:'endA',u:0,v:-15,diameter:5},{id:'LiftOutput',role:'endB',u:0,v:-15,diameter:5}] }
+          // M3 螺絲當導銷與鎖付：槽寬 3.4、孔 3.2
+          slot: { length: 144, width: 3.4, offset: 0 },
+          framePins: ['LGA', 'LGB'], endMargin:12, pinHoleDiameterMm: 3.2,
+          holes: [{id:'LiftHoleA',role:'endA',u:0,v:-15,diameter:3.2},{id:'LiftOutput',role:'endB',u:0,v:-15,diameter:3.2}] }
       ],
       params: { LPR: 30, LRL: 176, theta: 0 }
     }
