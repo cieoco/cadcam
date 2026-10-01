@@ -60,7 +60,7 @@ const solveWorld = (comps, modules, params, angles) => solveAssembly(compileAsse
 // ---------- 內建模組與插入實例（E-M6） ----------
 let work;
 {
-  check('內建模組兩個：rack-lift、gear-gripper', BUILTIN_MODULES.map(m => m.id).join(',') === 'rack-lift,gear-gripper');
+  check('內建模組三個：rack-lift、gear-gripper、fourbar-lift', BUILTIN_MODULES.map(m => m.id).join(',') === 'rack-lift,gear-gripper,fourbar-lift');
   const tLift = builtinTemplate('rack-lift'), tGrip = builtinTemplate('gear-gripper');
   check('內建模組是合法模板', normalizeTemplate(tLift).ok && normalizeTemplate(tGrip).ok);
   check('齒條升降模板帶滑台輸出端', tLift.outputs.length === 1 && tLift.outputs[0].at === 'LiftOutput');

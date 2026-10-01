@@ -244,6 +244,69 @@ export function mountModule(comps, modules, moduleId, target, params, motorState
   return { ok: true, comps: newComps, modules: newModules, reason: 'ok' };
 }
 
+// 直角安裝（SDD-ORTHOGONAL-MOUNT O2）：子模組在垂直於宿主的平面，零件座標不動（不 2D 變換）；
+// 只記錄 ref＝輸出端目前位姿與 orient（接合軸取 base 指向子模組所有點重心的方向）。
+export function mountOrthogonal(comps, modules, moduleId, target, params, motorState) {
+  const list = Array.isArray(comps) ? comps : [];
+  const modList = Array.isArray(modules) ? modules : [];
+  const fail = reason => ({ ok: false, comps: list, modules: modList, reason });
+  const mod = modList.find(m => m.id === moduleId);
+  if (!mod) return fail('no-module');
+  if (mod.mount) return fail('already-mounted');
+  if (!mod.base) return fail('no-base');
+  if (!target || typeof target !== 'object' || !target.module || !target.output) return fail('no-target');
+  if (target.module === moduleId || isDescendantOf(modList, target.module, moduleId)) return fail('cycle');
+  const hostMod = modList.find(m => m.id === target.module);
+  if (!hostMod) return fail('no-host');
+  const output = (hostMod.outputs || []).find(o => o.id === target.output);
+  if (!output) return fail('no-output');
+  if (!output.orthogonal || (output.orthogonal.side !== 1 && output.orthogonal.side !== -1)) return fail('not-orthogonal');
+
+  const motor = motorState || {};
+  const theta = Number(motor.theta) || 0;
+  const solveAngles = { ...(motor.motorAngles || {}), [motor.activeMotor]: theta };
+  const sol = solveAssembly(compileAssembly(list, modList, { params }), { thetaDeg: theta, motorAngles: solveAngles });
+  if (!sol.isValid) return fail('unsolved');
+  const basePos = sol.points[mod.base];
+  const atPos = sol.points[output.at];
+  if (!atPos || !basePos || !Number.isFinite(atPos.x) || !Number.isFinite(basePos.x)) return fail('no-position');
+  const hostComps = list.filter(c => c.moduleId === hostMod.id);
+  const now = outputPose(hostMod, target.output, sol.points, hostComps);
+  if (!now) return fail('no-ref-pose');
+
+  // childAxisDeg：base → 子模組所有點（p1,p2,p3,m1,m2，id 去重）重心的方向，四捨五入到 0.1°。
+  const seen = new Set();
+  let sx = 0, sy = 0, cnt = 0;
+  list.forEach(c => {
+    if (c.moduleId !== moduleId) return;
+    ['p1', 'p2', 'p3', 'm1', 'm2'].forEach(k => {
+      const pt = c[k];
+      if (!pt || !pt.id || seen.has(pt.id)) return;
+      seen.add(pt.id);
+      const sp = sol.points[pt.id];
+      if (sp && Number.isFinite(sp.x) && Number.isFinite(sp.y)) { sx += sp.x; sy += sp.y; cnt++; }
+    });
+  });
+  const cx = cnt ? sx / cnt : basePos.x, cy = cnt ? sy / cnt : basePos.y;
+  const childAxisDeg = Math.round(Math.atan2(cy - basePos.y, cx - basePos.x) * 180 / Math.PI * 10) / 10;
+
+  const newModules = modList.map(m => m.id === moduleId
+    ? {
+      ...m,
+      mount: {
+        to: { module: target.module, output: target.output },
+        ref: { x: now.x, y: now.y, a: now.a },
+        home: {},
+        orient: {
+          type: 'orthogonal', edge: 'host', side: output.orthogonal.side, childAxisDeg,
+          joint: { kind: 'printed', wallMm: 4, holesPerFlange: 2 }
+        }
+      }
+    }
+    : m);
+  return { ok: true, comps: list, modules: newModules, reason: 'ok' };
+}
+
 // D9 拖曳安裝（SDD §4.3b）：整組平移——只動 moduleId 的零件（不旋轉、不改輸入），其餘零件原物件回傳。
 export function translateModule(comps, moduleId, dx, dy) {
   if (!Number.isFinite(dx) || !Number.isFinite(dy)) return comps;
@@ -311,7 +374,9 @@ export function mountTargets(comps, modules, moduleId, points) {
     (m.outputs || []).forEach(o => {
       const p = points && points[o.at];
       if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
-      list.push({ module: m.id, output: o.id, label: `${m.name}・${o.name}`, x: p.x, y: p.y });
+      const t = { module: m.id, output: o.id, label: `${m.name}・${o.name}`, x: p.x, y: p.y };
+      if (o.orthogonal && (o.orthogonal.side === 1 || o.orthogonal.side === -1)) t.orthogonal = true;
+      list.push(t);
     });
   });
   return list;
@@ -336,6 +401,10 @@ export function unmountModule(comps, modules, moduleId, params, motorState) {
   if (idx < 0) return { ok: false, comps: list, modules: modList, reason: 'no-module' };
   const mod = modList[idx];
   if (!mod.mount) return { ok: false, comps: list, modules: modList, reason: 'not-mounted' };
+  // 直角安裝：零件座標本來就在自己的平面，拆下只清掉 mount。
+  if (mod.mount.orient) {
+    return { ok: true, comps: list, modules: modList.map((m, i) => i === idx ? { ...m, mount: null } : m), reason: 'ok' };
+  }
 
   const motor = motorState || {};
   const activeMotor = motor.activeMotor;
@@ -592,6 +661,7 @@ export function instantiateTemplate(template, ctx) {
     }
     const out = { id: o.id, name: o.name, at: renameStr(o.at), body };
     if (Array.isArray(o.bolts) && o.bolts.length) out.bolts = o.bolts.map(renameStr);
+    if (o.orthogonal && typeof o.orthogonal === 'object') out.orthogonal = { ...o.orthogonal };
     return out;
   });
 
@@ -611,7 +681,8 @@ export function instantiateTemplate(template, ctx) {
 // 內建模組：齒條升降（輸出 carriage＝LiftOutput）、齒輪夾爪（base GCA；去掉夾爪任務 params）。
 export const BUILTIN_MODULES = [
   { id: 'rack-lift', name: '齒條升降', source: 'competition-rack-lift', description: '小齒輪帶動垂直齒條升降。' },
-  { id: 'gear-gripper', name: '齒輪夾爪', source: 'gear-gripper', description: '雙齒輪同步開合夾爪。' }
+  { id: 'gear-gripper', name: '齒輪夾爪', source: 'gear-gripper', description: '雙齒輪同步開合夾爪。' },
+  { id: 'fourbar-lift', name: '四連桿升降臂', source: 'competition-fourbar-lift', description: '平行四連桿升降，工具架保持水平。' }
 ];
 
 export function builtinTemplate(id) {
@@ -634,6 +705,29 @@ export function builtinTemplate(id) {
       rackComp.holes.push({ id: 'LiftOutputB', type: 'floating', u: 96, v: -15, diameter: 3.2 });
     }
     template.outputs = [{ id: 'carriage', name: '滑台', at: 'LiftOutput', body: { kind: 'rack', id: 'LiftRackGear' }, bolts: ['LiftOutput', 'LiftOutputB'] }];
+  } else if (id === 'fourbar-lift') {
+    // 拿掉手腕馬達：工具架 ToolPlate 變成一般桿，靠平行四連桿保持水平；補斜撐 ToolDiag（B–D）避免 A-B-C-D 晃動。
+    const plate = comps.find(c => c.id === 'ToolPlate');
+    const brace = comps.find(c => c.id === 'ToolBrace');
+    if (plate) {
+      ['isInput', 'physicalMotor', 'motorType', 'motorCarrier', 'motorMount', 'phaseOffset'].forEach(k => { delete plate[k]; });
+      if (plate.p1) delete plate.p1.physicalMotor;
+    }
+    const pB = plate && plate.p1 ? { ...plate.p1, type: 'floating' } : null;
+    const pD = brace && brace.p2 ? { ...brace.p2, type: 'floating' } : null;
+    if (pB && pD) {
+      delete pB.physicalMotor; delete pD.physicalMotor;
+      const diag = Math.hypot(pD.x - pB.x, pD.y - pB.y);
+      comps.push({
+        type: 'bar', id: 'ToolDiag', color: '#f39c12', p1: pB, p2: pD,
+        lenParam: 'LIFT_TOOL_DIAG', fixedLen: true, isInput: false
+      });
+      params.LIFT_TOOL_DIAG = diag;
+    }
+    const crank = comps.find(c => c.isInput);
+    if (crank) { crank.motorType = 'mg995'; crank.servoStart = -60; crank.servoEnd = 60; }
+    template.base = 'O1';
+    template.outputs = [{ id: 'tool', name: '工具架', at: 'D', body: { kind: 'bar', id: 'ToolBrace' }, orthogonal: { side: -1 } }];
   } else if (id === 'gear-gripper') {
     // 專用安裝點 GripMount：避開伺服軸（GCA 是 MG995 輸出軸心，鎖不了），夾爪以它為基準裝到滑台孔上。
     comps.push({ type: 'anchor', id: 'GripMount', p1: { id: 'GripMount', type: 'fixed', x: 0, y: 40 } });

@@ -8,7 +8,7 @@ import { S } from './state.js';
 import { pointKeysFor } from './part-types.js';
 import { selectionModule } from './assembly.js';
 import {
-  createModule, addOutput, inferOutput, mountModule, unmountModule, dissolveModule, setMountFlip,
+  createModule, addOutput, inferOutput, mountModule, mountOrthogonal, unmountModule, dissolveModule, setMountFlip,
   moduleToTemplate, normalizeTemplate, instantiateTemplate, insertOffset, translateModule,
   BUILTIN_MODULES, builtinTemplate, parseLibrary, serializeLibrary
 } from './module-ops.js';
@@ -26,6 +26,7 @@ const REASON_MESSAGES = {
   'unsolved': '目前姿態無法求解，先移動到能求解的角度再試。',
   'no-position': '算不出安裝位置。',
   'no-ref-pose': '算不出輸出端姿態。',
+  'not-orthogonal': '這個輸出端不能直角安裝。',
   'not-mounted': '這個模組還沒安裝。',
   'host-invalid': '宿主目前解不出來，無法拆下。',
   'mounted': '請先拆下再解散。',
@@ -58,6 +59,8 @@ export function createModuleEditor(deps) {
     pushUndo, rebuild, draw, transient, downloadJson,
     viewCenter, loadLibraryText, saveLibraryText
   } = deps;
+  // 切換視圖平面（id＝直角安裝模組；null＝主視圖）；由 app.js 注入，這裡不碰繪圖內部。
+  const setViewPlane = deps.setViewPlane || (() => {});
 
   // 依零件 type 設定選取欄位（沒有注入 deps.select 時的預設行為）。
   function defaultSelect(comp) {
@@ -116,7 +119,9 @@ export function createModuleEditor(deps) {
     const host = S.modules.find(m => m.id === mod.mount.to.module);
     const hostName = host ? host.name : mod.mount.to.module;
     const outName = host ? outputNameOf(host, mod.mount.to.output) : mod.mount.to.output;
-    return `裝在 ${hostName}・${outName}${mod.mount.flip ? '（翻面）' : ''}`;
+    const flip = mod.mount.flip ? '（翻面）' : '';
+    if (mod.mount.orient) return `⟂ 直角裝在 ${hostName}・${outName}${flip}`;
+    return `裝在 ${hostName}・${outName}${flip}`;
   }
   // 安裝候選：其他模組的每個輸出端，排除自己與自己的子孫；已安裝的模組不需要再列候選。
   function candidatesFor(mod) {
@@ -124,7 +129,11 @@ export function createModuleEditor(deps) {
     const list = [];
     S.modules.forEach(m => {
       if (m.id === mod.id || isDescendant(S.modules, m.id, mod.id)) return;
-      (m.outputs || []).forEach(o => list.push({ module: m.id, output: o.id, label: `${m.name}・${o.name}` }));
+      (m.outputs || []).forEach(o => {
+        const item = { module: m.id, output: o.id, label: `${m.name}・${o.name}` };
+        if (o.orthogonal && (o.orthogonal.side === 1 || o.orthogonal.side === -1)) item.orthogonal = true;
+        list.push(item);
+      });
     });
     return list;
   }
@@ -149,6 +158,8 @@ export function createModuleEditor(deps) {
       visible: true, kind: 'module', moduleId: mod.id, name: mod.name, mounted,
       mountLabel: mounted ? buildMountLabel(mod) : '未安裝',
       flipped: mounted && !!mod.mount.flip,
+      orthogonal: mounted && !!mod.mount.orient,
+      viewing: S.viewPlane === mod.id,
       candidates: candidatesFor(mod),
       canSetOutput, canUnmount: mounted, canDissolve
     };
@@ -216,6 +227,12 @@ export function createModuleEditor(deps) {
     const selId = currentModuleId();
     if (!selId) { transient('請先選取要安裝的模組。'); return; }
     applyResult(mountModule(S.comps, S.modules, selId, { module: moduleId, output: outputId }, S.topo.params, motorState()));
+  }
+  // 直角安裝：同 mountTo，走 applyResult（一筆 undo）。
+  function mountOrthogonalTo(moduleId, outputId) {
+    const selId = currentModuleId();
+    if (!selId) { transient('請先選取要安裝的模組。'); return; }
+    applyResult(mountOrthogonal(S.comps, S.modules, selId, { module: moduleId, output: outputId }, S.topo.params, motorState()));
   }
   function unmount() {
     const modId = currentModuleId();
@@ -401,10 +418,22 @@ export function createModuleEditor(deps) {
           opt.textContent = c.label;
           opt.setAttribute('value', `${c.module}::${c.output}`);
           sel.appendChild(opt);
+          if (c.orthogonal) {
+            const orthoOpt = document.createElement('option');
+            orthoOpt.textContent = `⟂ 直角安裝到 ${c.label}`;
+            orthoOpt.setAttribute('value', `ortho::${c.module}::${c.output}`);
+            sel.appendChild(orthoOpt);
+          }
         });
         sel.addEventListener('change', () => {
           const v = sel.value;
           if (!v) return;
+          if (v.startsWith('ortho::')) {
+            const rest = v.slice('ortho::'.length);
+            const at = rest.indexOf('::');
+            mountOrthogonalTo(rest.slice(0, at), rest.slice(at + 2));
+            return;
+          }
           const idx = v.indexOf('::');
           mountTo(v.slice(0, idx), v.slice(idx + 2));
         });
@@ -412,6 +441,10 @@ export function createModuleEditor(deps) {
       }
       if (ps.canUnmount) addButton(el, '拆下', () => unmount());
       if (ps.mounted) addButton(el, ps.flipped ? '翻回' : '翻面', () => toggleFlip());
+      if (ps.orthogonal) {
+        if (ps.viewing) addButton(el, '↩ 回主視圖', () => setViewPlane(null));
+        else addButton(el, '編輯此模組（正視）', () => setViewPlane(ps.moduleId));
+      }
       if (ps.canSetOutput) addButton(el, '設為輸出端', () => setOutput());
       addButton(el, '💾 存到我的模組庫', () => { saveToLibrary(); renderLibrary(); });
       addButton(el, '⬇ 匯出模組', () => exportTemplate());
@@ -431,7 +464,7 @@ export function createModuleEditor(deps) {
     library, panelState, sync,
     insertBuiltin, insertLocal,
     saveAsModule, rename,
-    mountTo, unmount, toggleFlip, setOutput, dissolve,
+    mountTo, mountOrthogonalTo, unmount, toggleFlip, setOutput, dissolve,
     saveToLibrary, exportTemplate, importLibraryText, removeFromLibrary
   };
 }

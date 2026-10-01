@@ -77,6 +77,11 @@ function validateOutput(rawOut, moduleComps, moduleId, usedIds, warnings) {
     rawOut.bolts.forEach(id => { if (safeId(id) && pointPool.has(id) && !bolts.includes(id)) bolts.push(id); });
     if (bolts.length) out.bolts = bolts;
   }
+  // orthogonal（選配）：可直角安裝的標記，只留 side 為 1／-1 的合法值，否則丟掉。
+  const ortho = rawOut.orthogonal;
+  if (ortho && typeof ortho === 'object' && (Number(ortho.side) === 1 || Number(ortho.side) === -1)) {
+    out.orthogonal = { side: Number(ortho.side) };
+  }
   return out;
 }
 
@@ -87,6 +92,27 @@ function validateBase(rawBase, moduleComps) {
     return p && p.id === rawBase && (p.type === 'fixed' || p.type === 'motor');
   }));
   return found ? rawBase : null;
+}
+
+// 直角安裝 orient（SDD-ORTHOGONAL-MOUNT §4.1）：不合法就回 null（靜默丟掉，退回同平面安裝）。
+function validateOrient(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  if (raw.type !== 'orthogonal' || raw.edge !== 'host') return null;
+  const side = Number(raw.side);
+  if (side !== 1 && side !== -1) return null;
+  if (typeof raw.childAxisDeg === 'boolean' || raw.childAxisDeg === null || raw.childAxisDeg === '' || !isFiniteNum(raw.childAxisDeg)) return null;
+  const joint = raw.joint;
+  if (!joint || typeof joint !== 'object' || joint.kind !== 'printed') return null;
+  const clampNum = (v, lo, hi, dflt) => {
+    if (v === null || v === '' || typeof v === 'boolean' || !isFiniteNum(v)) return dflt;
+    return Math.min(hi, Math.max(lo, Number(v)));
+  };
+  const hv = joint.holesPerFlange;
+  const holes = (hv === null || hv === '' || typeof hv === 'boolean' || !isFiniteNum(hv)) ? 2 : Math.min(4, Math.max(1, Math.round(Number(hv))));
+  return {
+    type: 'orthogonal', edge: 'host', side, childAxisDeg: Number(raw.childAxisDeg),
+    joint: { kind: 'printed', wallMm: clampNum(joint.wallMm, 1, 20, 4), holesPerFlange: holes }
+  };
 }
 
 function validateMount(rawMount, moduleId, outputsByModule, validModuleIds, warnings) {
@@ -117,6 +143,8 @@ function validateMount(rawMount, moduleId, outputsByModule, validModuleIds, warn
   }
   const mount = { to: { module: to.module, output: to.output }, ref: { x: Number(ref.x), y: Number(ref.y), a: Number(ref.a) }, home };
   if (rawMount.flip === true) mount.flip = true;   // L7：翻面安裝（只有明確的 true 才保留）
+  const orient = validateOrient(rawMount.orient);
+  if (orient) mount.orient = orient;
   return mount;
 }
 

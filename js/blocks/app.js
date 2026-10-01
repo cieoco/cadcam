@@ -18,6 +18,7 @@ import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
 // computeBodyLayers：2D 疊放順序與 3D z 分層共用同一套，兩邊才一致。
 import { buildSceneModel, computeBodyLayers } from '../blocks3d/scene-model.js';
+import { buildOrthogonalChildren, planeInputs } from '../blocks3d/orthogonal-3d.js';   // O6：直角安裝子模組的 3D 位姿
 // 純邏輯模組
 import * as View from './view.js';
 import * as Render from './render.js';   // SVG 繪製基元（純呈現）
@@ -28,7 +29,7 @@ import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
 import * as Motion from './motion.js';
-import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule } from './assembly.js';
+import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand } from './assembly.js';
 import { normalizeModules } from './module-schema.js';
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
@@ -63,6 +64,8 @@ import { renderLinks, renderNodes } from './mechanism-layer-render.js';
 import * as Settings from './settings.js';   // 作品級加工設定 + 舊 localStorage 偏好遷移 + 表單同步
 import { normalizeFabricationProfile, FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { cncWarnings } from './cnc-check.js';   // L4：依刀徑檢查匯出特徵
+import { orthogonalExportExtras, withAdapterNodes } from './orthogonal-joint.js';   // O4a：直角安裝轉接座孔位
+import { adapterMesh, meshToStl } from './adapter-stl.js';   // O4b：3D 列印轉接座 STL
 import { buildPlan, buildPackHtml } from './build-plan.js';   // L5b：製作包（板件＋五金＋組裝步驟）
 import { resolveSpacers, suggestRackStops } from './interference.js';   // L5c／L6：干涉檢查、自動隔圈、齒條長槽限位建議
 
@@ -95,6 +98,8 @@ let liveClampPointIds = null;  // 雙點量測時的兩個夾持端；播放每�
 // ---- 3D 唯讀預覽狀態 ----
 let viewer3D = null;           // createViewer() 的實體（首次開啟才懶載入）
 let view3DActive = false;      // 3D 覆蓋層是否開著
+let lastFullPts = null;         // 最近一幀的全域求解點（含所有平面；給側影帶與 fitView 用）
+let lastModelInputsAll = null;  // O6：所有平面（全域解）的 3D 輸入；只在有直角安裝時才有
 let lastModelInputs = null;    // 最近一次 draw() 算好的 { links, pts, groundIds }，給 3D 鏡像用
 
 // 多馬達：存檔一併保留「哪顆在控制、其他凍在幾度」，載回來才不會全部歸零疊在一起。
@@ -230,8 +235,137 @@ const displayCoords = () => {
     const p = lastSolved[id];
     if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) m[id] = { x: p.x, y: p.y };
   }
-  return m;
+  return filterToView(m);   // 吸附／命中只看目前平面的點（O3）
 };
+// ---- 視圖平面（O3、SDD-ORTHOGONAL-MOUNT §4.3）：一次只畫一個平面，solve 與播放仍是全域 ----
+const ORTHO_STACK_MM = 15;            // 側影帶的疊層高度（先固定 15 mm）
+const HOST_BAND_MM = 3;               // 子視圖裡宿主側影帶的厚度
+const hasOrthogonalModules = () => S.modules.some(m => m.mount && m.mount.orient);
+// 目前平面的零件；沒有直角安裝時原樣回 S.comps（零行為改變）。
+function viewComps() {
+  return hasOrthogonalModules() ? compsInPlane(S.comps, S.modules, S.viewPlane) : S.comps;
+}
+// 目前平面用到的點 id；沒有直角安裝時回 null（代表全部）。
+function viewPointIds() {
+  return hasOrthogonalModules() ? pointIdsInPlane(S.comps, S.modules, S.viewPlane) : null;
+}
+function filterToView(map, ids = viewPointIds()) {
+  if (!ids) return map;
+  const out = {};
+  for (const id in map) if (ids.has(id)) out[id] = map[id];
+  return out;
+}
+// 模組已不存在或不再是直角安裝 → 回主視圖。
+function validateViewPlane() {
+  if (S.viewPlane && planeOf(S.comps, S.modules, S.viewPlane) !== S.viewPlane) S.viewPlane = null;
+}
+function setViewPlane(id) {
+  const next = id || null;
+  S.viewPlane = next;
+  validateViewPlane();
+  // 選取的零件若不在新平面就取消選取，避免面板指著看不到的零件。
+  const selMod = selectionModule(S.comps, { linkId: S.selectedLinkId, triangleId: S.selectedTriangleId, sliderId: S.selectedSliderId, gearId: S.selectedGearId, nodeId: S.selectedNodeId });
+  const hasSel = S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.selectedGearId || S.selectedNodeId;
+  if (hasSel && planeOf(S.comps, S.modules, selMod) !== S.viewPlane) {
+    S.selectedLinkId = S.selectedTriangleId = S.selectedSliderId = S.selectedNodeId = null;
+    deselectGear();
+    closeMobileEditPanel();
+    ['lenEditor', 'roleEditor'].forEach(id2 => { const el = document.getElementById(id2); if (el) el.style.display = 'none'; });
+    const baseBtn = document.getElementById('sliderBaseBtn'); if (baseBtn) baseBtn.style.display = 'none';
+    const railBtn = document.getElementById('linkToRailBtn'); if (railBtn) railBtn.style.display = 'none';
+    setSliderDetailRows(false);
+  }
+  draw();
+  fitView();
+}
+// 目前視圖要畫的側影帶。compute(P) 以點表 P 重算多邊形（播放每幀更新用）；無法算出回 null。
+function viewBands(pts) {
+  const bands = [];
+  if (!pts || !hasOrthogonalModules()) return bands;
+  S.modules.forEach(M => {
+    const orient = M.mount && M.mount.orient;
+    if (!orient) return;
+    const hostId = M.mount.to.module;
+    if (planeOf(S.comps, S.modules, hostId) === S.viewPlane) {
+      // 主視圖（或宿主所在平面）：子模組投影成一條帶。
+      const compute = P => orthogonalBand(S.comps, S.modules, M.id, P, ORTHO_STACK_MM);
+      const polygon = compute(pts);
+      if (polygon) bands.push({ kind: 'child', id: M.id, label: `${M.name}（側影）`, polygon, compute, target: M.id });
+    } else if (S.viewPlane === M.id) {
+      // 子視圖：宿主在子平面裡畫成側影帶，點它回宿主平面。
+      const host = S.modules.find(m => m.id === hostId);
+      const output = host && (host.outputs || []).find(o => o.id === M.mount.to.output);
+      const bodyComp = output && output.body ? S.comps.find(c => c.id === output.body.id) : null;
+      if (!bodyComp || !bodyComp.p1 || !bodyComp.p2) return;
+      const t0 = orient.side === -1 ? 0 : -HOST_BAND_MM, t1 = orient.side === -1 ? HOST_BAND_MM : 0;
+      const compute = P => {
+        const f = orthogonalFrame(S.comps, S.modules, M.id, P);
+        const a = P[bodyComp.p1.id], b = P[bodyComp.p2.id];
+        if (!f || !a || !b) return null;
+        const half = Math.hypot(b.x - a.x, b.y - a.y) / 2;
+        const at = (sv, tv) => ({ x: f.base.x + sv * f.e.x + tv * f.f.x, y: f.base.y + sv * f.e.y + tv * f.f.y });
+        return [at(-half, t0), at(half, t0), at(half, t1), at(-half, t1)];
+      };
+      const polygon = compute(pts);
+      if (polygon) bands.push({ kind: 'host', id: M.id, label: `${host.name}・${output.name}（側影）`, polygon, compute, target: planeOf(S.comps, S.modules, hostId) });
+    }
+  });
+  return bands;
+}
+function drawBands(pts) {
+  const bands = viewBands(pts);
+  if (!bands.length) return;
+  const layer = document.createElementNS(SVG_NS, 'g');
+  layer.setAttribute('data-ortho-layer', '1');
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  const pat = document.createElementNS(SVG_NS, 'pattern');
+  pat.setAttribute('id', 'orthoHatch'); pat.setAttribute('width', 7); pat.setAttribute('height', 7);
+  pat.setAttribute('patternUnits', 'userSpaceOnUse'); pat.setAttribute('patternTransform', 'rotate(45)');
+  const bg = document.createElementNS(SVG_NS, 'rect');
+  bg.setAttribute('width', 7); bg.setAttribute('height', 7); bg.setAttribute('fill', '#8e44ad'); bg.setAttribute('fill-opacity', 0.1);
+  const ln = document.createElementNS(SVG_NS, 'line');
+  ln.setAttribute('x1', 0); ln.setAttribute('y1', 0); ln.setAttribute('x2', 0); ln.setAttribute('y2', 7);
+  ln.setAttribute('stroke', '#8e44ad'); ln.setAttribute('stroke-opacity', 0.55); ln.setAttribute('stroke-width', 2);
+  pat.appendChild(bg); pat.appendChild(ln); defs.appendChild(pat); layer.appendChild(defs);
+  bands.forEach(band => {
+    const g = document.createElementNS(SVG_NS, 'g');
+    const poly = document.createElementNS(SVG_NS, 'polygon');
+    poly.setAttribute(band.kind === 'child' ? 'data-ortho-band' : 'data-ortho-host-band', band.id);
+    poly.setAttribute('fill', 'url(#orthoHatch)'); poly.setAttribute('stroke', '#8e44ad');
+    poly.setAttribute('stroke-width', 1.8); poly.setAttribute('stroke-dasharray', '6 4');
+    poly.style.cursor = 'pointer';
+    // 加寬的透明命中區（畫在可見多邊形之下）：薄帶也點得到。
+    const hit = document.createElementNS(SVG_NS, 'polygon');
+    hit.setAttribute('fill', 'transparent'); hit.setAttribute('stroke', 'transparent');
+    hit.setAttribute('stroke-width', 14); hit.setAttribute('stroke-linejoin', 'round');
+    hit.style.cursor = 'pointer'; hit.style.pointerEvents = 'all';
+    [hit, poly].forEach(el => {
+      el.addEventListener('pointerdown', e => e.stopPropagation());   // 不要被當成點背景而取消選取
+      el.addEventListener('click', e => { e.stopPropagation(); setViewPlane(band.target); });
+    });
+    const title = document.createElementNS(SVG_NS, 'title');
+    title.textContent = band.kind === 'child' ? `${band.label}：點一下進入此模組的平面（正視）` : `${band.label}：點一下回到宿主平面`;
+    poly.appendChild(title);
+    const text = document.createElementNS(SVG_NS, 'text');
+    text.setAttribute('text-anchor', 'middle'); text.setAttribute('font-size', 12); text.setAttribute('font-weight', 700);
+    text.setAttribute('fill', '#6c3483'); text.setAttribute('stroke', '#fff'); text.setAttribute('stroke-width', 3);
+    text.setAttribute('paint-order', 'stroke'); text.style.pointerEvents = 'none';
+    text.textContent = band.label;
+    g.appendChild(hit); g.appendChild(poly); g.appendChild(text); layer.appendChild(g);
+    const update = P => {
+      const polygon = band.compute(P);
+      g.style.display = polygon ? '' : 'none';
+      if (!polygon) return;
+      const ptsAttr = polygon.map(q => `${TX(q.x)},${TY(q.y)}`).join(' ');
+      poly.setAttribute('points', ptsAttr); hit.setAttribute('points', ptsAttr);
+      const cx = polygon.reduce((a, q) => a + q.x, 0) / polygon.length;
+      // 標籤放在帶子下緣之外（畫面座標），不遮住斜線。
+      text.setAttribute('x', TX(cx)); text.setAttribute('y', Math.max(...polygon.map(q => TY(q.y))) + 15);
+    };
+    update(pts); frameUpdaters.push(update);
+  });
+  svg.appendChild(layer);
+}
 const isHiddenSliderRailPoint = (id) => Model.isHiddenSliderRailPoint(S.comps, id);
 const isSliderMountPoint = (id) => Model.isSliderMountPoint(S.comps, id);
 const sliderMountInfo = (id) => Model.sliderMountInfo(S.comps, id);
@@ -455,7 +589,8 @@ const moduleEditor = createModuleEditor({
   viewCenter: () => View.worldFromScreen(W * 0.5, H * 0.5),
   loadLibraryText: () => { try { return localStorage.getItem('cadcam.blocks.moduleLibrary'); } catch (_) { return null; } },
   saveLibraryText: text => { try { localStorage.setItem('cadcam.blocks.moduleLibrary', text); } catch (_) {} },
-  select: (...a) => selectModuleTarget(...a)   // 延遲取用：selectLink 在後面才定義
+  select: (...a) => selectModuleTarget(...a),   // 延遲取用：selectLink 在後面才定義
+  setViewPlane: id => setViewPlane(id)
 });
 // 依零件 type 把新插入模組的第一個零件選起來，沿用各域既有的 selectXxx。
 function selectModuleTarget(comp) {
@@ -503,6 +638,7 @@ function rebuild() {
   geomVersion++;                 // 結構/參數變了：讓軌跡快取失效（getTrajectoryData 重算）
   reconcileMotorState();         // 馬達被刪 / 改指派後：清掉殘留凍結角、控制權交回存在的馬達
   gripperController?.recompute();
+  validateViewPlane();           // 直角模組被拆下／刪除後，回主視圖
   document.getElementById('hint').style.display = S.comps.length ? 'none' : 'block';
   Panels.updateRoleEditor();
   scheduleAutosave();            // 任何結構變更都防丟（debounce，播放不觸發）
@@ -556,14 +692,16 @@ function getTrajectoryData() {
   // 會把拖曳拖到掉幀。拖曳中軌跡本來就持續失真，乾脆不畫；放開時 drag end 走完整
   // rebuild+draw，軌跡即恢復。（shapeDrag 只改造形孔、不動 geomVersion，走快取即可不必跳過。）
   if (S.dragId || S.dragFrame || S.dragLinkId) return null;
-  const ids = traceIds();
+  let ids = traceIds();
   // S4：預設點是固定／馬達軸心就不畫，避免「工作範圍 0 mm」的假量測。
   if (!ids.length && S.compiled) ids.push(...Motion.fallbackTraceIds(S.comps, S.compiled.tracePoint));
+  const planeIds = viewPointIds();
+  if (planeIds) ids = ids.filter(id => planeIds.has(id));   // 只畫目前平面的追蹤點
   if (!S.compiled || !ids.length || !S.comps.length) return null;
   // 快取鍵＝結構版本號 geomVersion，取代每幀 JSON.stringify 整份快照（零件多時字串化本身會變慢）。
   // 軌跡只取決於 S.compiled 與 traceIds，兩者都只在 rebuild / 切換軌跡點變動、那兩處都會 +1，
   // 故版本號是完整且正確的失效訊號。多馬達後軌跡還取決於「掃哪顆馬達＋其他馬達凍在哪」，一併入鍵。
-  const motorKey = String(S.activeMotor) + '|' + JSON.stringify(S.motorAngles);
+  const motorKey = String(S.activeMotor) + '|' + JSON.stringify(S.motorAngles) + '|' + (S.viewPlane || '') + '|' + ids.join(',');
   if (trajectoryCache && trajectoryCache.version === geomVersion && trajectoryCache.motorKey === motorKey) return trajectoryCache.data;
   // 伺服與線性致動器只在自己的有限行程內運動；量測不應誤把不存在的整圈算進去。
   const range = inputRockRange();
@@ -715,7 +853,8 @@ function recordManualTrace() {
 }
 
 function drawManualTrace() {
-  const ids = traceIds();
+  const planeIds = viewPointIds();
+  const ids = traceIds().filter(id => !planeIds || planeIds.has(id));
   ids.forEach((id, index) => {
     const pts = manualTrace[id] || [];
     if (pts.length < 2) return;
@@ -860,7 +999,7 @@ function drawGearPart(c, pts) {
 }
 function drawGearManualHandles(pts) {
   renderGearManualHandles({
-    gears: S.comps.filter(c => c.type === 'gear'), points: pts, svg,
+    gears: viewComps().filter(c => c.type === 'gear'), points: pts, svg,
     scale: View.getScale(), project: p => ({ x: TX(p.x), y: TY(p.y) }),
     selectedGearId: S.selectedGearId, onRotate: startGearManualRotate,
     registerUpdate: update => frameUpdaters.push(update)
@@ -945,6 +1084,13 @@ const PART_DRAW = {
 };
 
 function draw() {
+  validateViewPlane();
+  const planeHint = document.getElementById('viewPlaneHint');
+  if (planeHint) {
+    const viewMod = S.viewPlane ? S.modules.find(m => m.id === S.viewPlane) : null;
+    planeHint.textContent = viewMod ? `正在編輯「${viewMod.name}」的平面（正視）` : '';
+    planeHint.style.display = viewMod ? 'block' : 'none';
+  }
   clearOffHomeModuleSelection();
   memberEditor.sync();
   moduleEditor.sync();
@@ -958,6 +1104,7 @@ function draw() {
     // 機構已清空：作廢上一機構的模型快照。否則 drawGround() → motorFrameExportMounts()
     // 的預設參數會撿到舊 lastModelInputs 裡已刪馬達的安裝座，畫出一塊幽靈機架板。
     lastModelInputs = null;
+    lastFullPts = null;
     drawGround();   // 空畫布：固定銷不足 → fallback 到地面基線
     liveClampPointIds = null;
     updateWorkRangeCard(null);
@@ -969,22 +1116,43 @@ function draw() {
     return;
   }
 
-  const { pts, sol } = solveFrame();
+  const { pts: allPts, sol } = solveFrame();
+  lastFullPts = allPts;
+  // 目前平面：只畫這個平面的零件與點；solve／播放仍是全域（O3、O-D3）。
+  const vComps = viewComps();
+  const vIds = viewPointIds();
+  const pts = filterToView(allPts, vIds);
   lastFramePts = pts;
   updateMechanismStatus(sol);
+  const vis0 = S.compiled.visualization || { links: [], polygons: [] };
+  const viewCompiled = !vIds ? S.compiled : {
+    ...S.compiled,
+    visualization: {
+      ...vis0,
+      links: (vis0.links || []).filter(l => vIds.has(l.p1) && vIds.has(l.p2)),
+      polygons: (vis0.polygons || []).filter(pg => (pg.points || []).every(id => vIds.has(id)))
+    }
+  };
 
-  const sceneIds = collectSceneIds({ compiled: S.compiled, comps: S.comps, motorPointIds: Model.motorPointIds(S.comps) });
+  // 全域（所有平面）的馬達中心：安裝座與匯出／3D 輸入維持全域，只有「畫什麼」依平面過濾。
+  const sceneIdsAll = collectSceneIds({ compiled: S.compiled, comps: S.comps, motorPointIds: Model.motorPointIds(S.comps) });
+  const allModelMotorIds = sceneIdsAll.modelMotorCenterIds;
+  const sceneIds = collectSceneIds({ compiled: viewCompiled, comps: vComps, motorPointIds: Model.motorPointIds(vComps) });
+  if (vIds) {
+    sceneIds.motorCenterIds = new Set([...sceneIds.motorCenterIds].filter(id => vIds.has(id)));
+    sceneIds.modelMotorCenterIds = new Set([...sceneIds.modelMotorCenterIds].filter(id => vIds.has(id)));
+  }
   const { groundIds, motorCenterIds, modelMotorCenterIds, camCenterIds } = sceneIds;
-  const motorMounts = buildMotorMounts(modelMotorCenterIds, groundIds);
+  const motorMounts = buildMotorMounts(allModelMotorIds, groundIds);
   // 地基：用「當前」pts＋mount 算共用 frameGeometry（放馬達即變形），畫在最底層。
   // 已宣告宿主機架桿的 mount 不進地基——特徵切在宿主桿身上，2D 桿身照合併外形畫（見連桿迴圈）。
   const mountSplit2d = Exporters.splitMountsByHost(S.comps,
-    motorFrameExportMounts({ pts, motorCenterIds: modelMotorCenterIds, motorMounts }));
-  const frameGeometry2d = Exporters.inspectFrameExport(
+    motorFrameExportMounts({ pts: allPts, motorCenterIds: allModelMotorIds, motorMounts }));
+  const frameGeometry2d = S.viewPlane ? null : Exporters.inspectFrameExport(
     frameConnectorNodes(), Settings.exportSettings(), splitFrameMounts(mountSplit2d.free, S.comps, S.modules).world);
   drawGround(frameGeometry2d);
   const renderScene = prepareRenderScene({
-    compiled: S.compiled, comps: S.comps, points: pts, frameGeometry: frameGeometry2d, sceneIds,
+    compiled: viewCompiled, comps: vComps, points: pts, frameGeometry: frameGeometry2d, sceneIds,
     computeBodyLayers, motorAssemblyLayerForBody, motorMounts
   });
   const { isGroundBar, triangleEdgeKeys, triangleKey: triKey, bodyLayers, linkLayer, triangleLayerByKey: triLayerByKey } = renderScene;
@@ -1000,7 +1168,7 @@ function draw() {
   svg.appendChild(motorLayer);
 
   // 零件繪製分派（slice 2 登錄表化）— 'underlay' 機件畫在連桿之下（z 序與原本一致）。
-  [...S.comps.filter(c => c.type === 'belt'), ...S.comps.filter(c => c.type !== 'belt')]
+  [...vComps.filter(c => c.type === 'belt'), ...vComps.filter(c => c.type !== 'belt')]
     .forEach(c => { const e = PART_DRAW[c.type]; if (e && e.phase === 'underlay') e.draw(c, pts); });
 
   // 依層級建立 <g> 容器，append 順序＝疊放順序（內層在底、外層在上）。
@@ -1017,7 +1185,7 @@ function draw() {
   // 三點桿繪製分派（slice 2 登錄表化）— 'layered' 畫進對應 zlift 疊放層（ctx 帶層查詢 helper）。
   // hostedMounts：靜態結構板承載的馬達安裝特徵（穿板槽/耳孔），板身直接開槽。
   const triCtx = { groupForLayer, triLayerByKey, triKey, hostedMounts: mountSplit2d.hosted };
-  S.comps.forEach(c => { const e = PART_DRAW[c.type]; if (e && e.phase === 'layered') e.draw(c, pts, triCtx); });
+  vComps.forEach(c => { const e = PART_DRAW[c.type]; if (e && e.phase === 'layered') e.draw(c, pts, triCtx); });
 
   // 動力來源本體：畫在桿件底下，曲柄轉在它上面。依型號畫 TT馬達或 MG995 伺服。
   // 朝向＝對準接在馬達中心、非曲柄的那根桿（指向它的另一端）；沒有就朝最近的另一個地錨；都沒有才朝下。
@@ -1079,7 +1247,7 @@ function draw() {
 
   // 桿件：依層級放進對應的 <g>（內層在底、外層在上）；同層內紅色曲柄最後畫不被蓋住。
   const { linksToDraw, countMissing: countMissingLinks } = renderLinks({
-    links: S.compiled.visualization.links || [], comps: S.comps, points: pts, triangleEdgeKeys, isGroundBar,
+    links: viewCompiled.visualization.links || [], comps: S.comps, points: pts, triangleEdgeKeys, isGroundBar,
     selectedLinkId: S.selectedLinkId, pickBars: S.pickBars,
     interactionBlocked: () => Boolean(S.drawingLink || S.drawingTriangle || S.drawingPolygon),
     onTryPick: tryPickBar,
@@ -1096,6 +1264,9 @@ function draw() {
   });
   updateSolveBanner(sol, countMissingLinks(pts));
   recountBanner = (P, s) => updateSolveBanner(s, countMissingLinks(P));
+
+  // 側影帶（直角安裝的子模組／子視圖裡的宿主）：用全域解 allPts 算，畫在零件之上、節點之下。
+  drawBands(allPts);
 
   // 滑軌：放進專屬動態層。滑軌數量少且結構複雜（軌道/滑塊/活塞/固定孔多件），
   // 播放時就地清空重畫整層、與重建共用 drawSliders（零分歧），代價可忽略。
@@ -1117,10 +1288,10 @@ function draw() {
   // 節點型別（rect/circle）、樣式、半徑只由結構性狀態（地錨/馬達/固定孔/S.dragId）決定——
   // 播放期間這些都不變，故建一次、每幀只更新座標。
   // 齒輪輪緣銷不畫成通用浮動節點——改由齒輪自己畫成「螺栓孔」（見上面齒輪繪製）。
-  const gearPinIds = new Set(S.comps.filter(c => c.type === 'gear' && c.p2).map(c => c.p2.id));
-  const pulleyPinIds = new Set(S.comps.filter(c => c.type === 'pulley' && c.p2).map(c => c.p2.id));
-  const camFollowerIds = new Set(S.comps.filter(c => c.type === 'cam' && c.p2).map(c => c.p2.id));
-  const workpieceIds = new Set(S.comps.filter(c=>c.type==='workpiece'&&c.p1).map(c=>c.p1.id));
+  const gearPinIds = new Set(vComps.filter(c => c.type === 'gear' && c.p2).map(c => c.p2.id));
+  const pulleyPinIds = new Set(vComps.filter(c => c.type === 'pulley' && c.p2).map(c => c.p2.id));
+  const camFollowerIds = new Set(vComps.filter(c => c.type === 'cam' && c.p2).map(c => c.p2.id));
+  const workpieceIds = new Set(vComps.filter(c=>c.type==='workpiece'&&c.p1).map(c=>c.p1.id));
   const hiddenPointIds = new Set(Object.keys(pts).filter(id => isHiddenSliderRailPoint(id) || isSliderMountPoint(id)));
   renderNodes({
     points: pts, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds,
@@ -1153,10 +1324,19 @@ function draw() {
   // motorCenterIds：3D 把這些中心畫成沉在機構背面的馬達，輸出軸往上帶動曲柄。
   // motorTypes：每個馬達中心的型號（'tt'/'mg995'），讓 3D 也畫出對應外形。
   const motorTypes = new Map();
-  modelMotorCenterIds.forEach(id => motorTypes.set(id, motorTypeForCenter(id)));
+  allModelMotorIds.forEach(id => motorTypes.set(id, motorTypeForCenter(id)));
   lastModelInputs = buildPreviewModelInputs({
-    comps: S.comps, params: S.topo.params, theta: S.theta, links: linksToDraw, points: pts,
-    groundIds, motorCenterIds: modelMotorCenterIds, motorTypes, motorMounts,
+    comps: S.comps, params: S.topo.params, theta: S.theta,
+    links: vIds ? [...(S.compiled.visualization.links || [])].sort((a, b) => (a.style === 'crank' ? 1 : 0) - (b.style === 'crank' ? 1 : 0)) : linksToDraw,
+    points: allPts, groundIds, motorCenterIds: allModelMotorIds, motorTypes, motorMounts,
+    polygons: S.compiled.visualization.polygons || [], sliderTravelStart, sliderTravelEnd,
+    sliderBodyLength, rackBodyHeight, rackPhaseShift, pulleyRadius, pulleyPinRadius
+  });
+  // O6：有直角安裝時另備一份「全平面」輸入（3D 預覽依平面各建場景、再把子平面立起來）。
+  lastModelInputsAll = !hasOrthogonalModules() ? null : buildPreviewModelInputs({
+    comps: S.comps, params: S.topo.params, theta: S.theta,
+    links: [...(S.compiled.visualization.links || [])].sort((a, b) => (a.style === 'crank' ? 1 : 0) - (b.style === 'crank' ? 1 : 0)),
+    points: allPts, groundIds: sceneIdsAll.groundIds, motorCenterIds: allModelMotorIds, motorTypes, motorMounts,
     polygons: S.compiled.visualization.polygons || [], sliderTravelStart, sliderTravelEnd,
     sliderBodyLength, rackBodyHeight, rackPhaseShift, pulleyRadius, pulleyPinRadius
   });
@@ -1189,7 +1369,7 @@ function drawFrameGrid() {
 
 // 滑軌繪製：畫進指定 parent。重建（draw）與播放（renderFrame）共用同一段碼，確保零分歧。
 function drawSliders(pts, parent) {
-  S.comps.filter(c => c.type === 'slider' && c.p1 && c.p2 && c.p3).forEach(sl => {
+  viewComps().filter(c => c.type === 'slider' && c.p1 && c.p2 && c.p3).forEach(sl => {
     const a = pts[sl.p1.id], b = pts[sl.p2.id], s = pts[sl.p3.id];
     const ma = sl.m1 && pts[sl.m1.id] ? pts[sl.m1.id] : a;
     const mb = sl.m2 && pts[sl.m2.id] ? pts[sl.m2.id] : b;
@@ -1229,10 +1409,12 @@ function drawSliders(pts, parent) {
 function renderFrame() {
   if (clearOffHomeModuleSelection()) { draw(); return; }
   if (!S.compiled || !S.comps.length || !frameUpdaters.length) { draw(); return; }
-  const { pts, sol } = solveFrame();
+  const { pts: allPts, sol } = solveFrame();
+  lastFullPts = allPts;
+  const pts = filterToView(allPts);
   lastFramePts = pts;
   updateLiveClampDistance(pts);
-  frameUpdaters.forEach(fn => fn(pts));
+  frameUpdaters.forEach(fn => fn(allPts));   // 更新器只碰自己的點 id；側影帶要用全域解
   // 滑軌動態層：就地清空重畫（共用 drawSliders）
   if (sliderLayer) {
     while (sliderLayer.firstChild) sliderLayer.removeChild(sliderLayer.firstChild);
@@ -1244,6 +1426,10 @@ function renderFrame() {
   if (view3DActive && lastModelInputs) {
     const cams = (lastModelInputs.cams || []).map(c => ({ ...c, thetaDeg: S.theta }));
     lastModelInputs = { ...lastModelInputs, pts, cams };
+    if (lastModelInputsAll) {
+      const camsAll = (lastModelInputsAll.cams || []).map(c => ({ ...c, thetaDeg: S.theta }));
+      lastModelInputsAll = { ...lastModelInputsAll, pts: allPts, cams: camsAll };
+    }
     push3D();
   }
 }
@@ -1251,21 +1437,27 @@ function renderFrame() {
 // 用最近一幀的求解結果建場景模型，推進 3D viewer
 function push3D() {
   if (!viewer3D || !lastModelInputs) return;
-  const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = lastModelInputs;
+  // 有直角安裝時，主平面場景只用主平面的輸入；其餘平面由 buildOrthogonalChildren 另建並立起來。
+  const allPlanes = hasOrthogonalModules() && lastModelInputsAll ? lastModelInputsAll : null;
+  const planesApi = allPlanes ? planeInputs(allPlanes, S.comps, S.modules, null) : lastModelInputs;
+  const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = planesApi;
   const mountSplit3d=Exporters.splitMountsByHost(S.comps,motorFrameExportMounts());
   const frameGeometry=Exporters.inspectFrameExport(frameConnectorNodes(),Settings.exportSettings(),splitFrameMounts(mountSplit3d.free,S.comps,S.modules).world);
   // 三點桿板形：3D 直接沿用 2D/DXF 共用的 createPlateGeometry 外形（含 shapeMode——
   // 包絡板/多邊形板/折線桿——與 vertices 順序），孔位與加工輸出一致，三視圖不分歧。
   // 以孔序字串為鍵，供 scene-model 對應到各片板；找不到原 comp 的純視覺 polygon 退回夾爪近似。
+  // 幾何表以 id 為鍵，各平面的場景共用；有直角安裝時用全平面的點／板，子平面的桿與板才有外形。
+  const geomPts = allPlanes ? allPlanes.pts : pts;
+  const geomPolygons = allPlanes ? allPlanes.polygons : polygons;
   const plateGeometries={};
   const barGeometries={};
   const memberStocks={};
   S.comps.filter(c => c.type === 'bar').forEach(bar => {
     const barId = bar.id, mounts = mountSplit3d.hosted.get(barId);
-    if (!bar || !pts[bar.p1.id] || !pts[bar.p2.id]) return;
-    const a = pts[bar.p1.id], b = pts[bar.p2.id];
+    if (!bar || !geomPts[bar.p1.id] || !geomPts[bar.p2.id]) return;
+    const a = geomPts[bar.p1.id], b = geomPts[bar.p2.id];
     const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    const geometry = mounts?.length ? Exporters.hostedBarGeometry(bar, pts, Settings.exportSettings(), mounts)
+    const geometry = mounts?.length ? Exporters.hostedBarGeometry(bar, geomPts, Settings.exportSettings(), mounts)
       : Exporters.inspectLinkExport(bar, len, Settings.exportSettings());
     memberStocks[barId] = memberStock(bar);
     if (!geometry?.outlines?.length) return;
@@ -1277,8 +1469,8 @@ function push3D() {
       cutouts: (geometry.cutouts || []).map(cutout => ({ ...cutout, points: cutout.points.map(world) }))
     };
   });
-  (polygons||[]).forEach(poly=>{
-    const world=poly.points.map(id=>pts[id]).filter(p=>p&&Number.isFinite(p.x));
+  (geomPolygons||[]).forEach(poly=>{
+    const world=poly.points.map(id=>geomPts[id]).filter(p=>p&&Number.isFinite(p.x));
     if(world.length<3) return;
     const key=poly.points.join(',');
     const comp=S.comps.find(c=>c.type==='triangle'&&c.p1&&c.p2&&c.p3&&[c.p1.id,c.p2.id,c.p3.id].join(',')===key)
@@ -1291,10 +1483,22 @@ function push3D() {
     const g=createPlateGeometry(comp,world,{radius:HULL_R_WORLD,holeRadius:Settings.exportSettings().holeDiameterMm/2,...(extras||{})});
     if(g.outlines.length) plateGeometries[key]={outline:g.outlines[0],holes:g.holes,cutouts:g.cutouts||[]};
   });
+  const baseOpts = { hullR: HULL_R_WORLD, plateGeometries, barGeometries, memberStocks };
   const model = buildSceneModel(links, pts, {
-    groundIds, motorCenters: motorCenterIds, motorTypes, motorMounts, hullR: HULL_R_WORLD,
-    polygons, sliders, gears, racks, cams, pulleys, belts, frameGeometry, plateGeometries, barGeometries, memberStocks
+    ...baseOpts, groundIds, motorCenters: motorCenterIds, motorTypes, motorMounts,
+    polygons, sliders, gears, racks, cams, pulleys, belts, frameGeometry
   });
+  if (allPlanes) {
+    // 直角安裝的子模組：在自己的平面建場景（沒有世界機架），再以 4x4 立起來掛在宿主工具上。
+    model.orthogonal = buildOrthogonalChildren({
+      comps: S.comps, modules: S.modules, inputs: allPlanes, mainModel: model,
+      buildModel: inp => buildSceneModel(inp.links, inp.pts, {
+        ...baseOpts, groundIds: inp.groundIds, motorCenters: inp.motorCenterIds, motorTypes: inp.motorTypes,
+        motorMounts: inp.motorMounts, polygons: inp.polygons, sliders: inp.sliders, gears: inp.gears,
+        racks: inp.racks, cams: inp.cams, pulleys: inp.pulleys, belts: inp.belts, frameGeometry: null
+      })
+    });
+  }
   viewer3D.update(model);
 }
 
@@ -1376,6 +1580,7 @@ async function toggle3D() {
 // 畫在最底層（draw() 開頭呼叫）；可拖的機架把手另由 drawFrameHandle 畫在最上層。
 // 沒有足夠固定銷時，退回 render.js 的飄浮地面基線（純繪圖基元）。
 function drawGround(frameGeometry) {
+  if (S.viewPlane) return;   // 子平面沒有世界機架
   const nodes = frameConnectorNodes();
   const fg = frameGeometry || Exporters.inspectFrameExport(nodes, Settings.exportSettings(),
     splitFrameMounts(Exporters.splitMountsByHost(S.comps, motorFrameExportMounts()).free, S.comps, S.modules).world);
@@ -1436,6 +1641,7 @@ function changeFrameGround(kind, delta) {
 
 // 機架移動把手：固定銷形心放一顆「🏠 機架」鈕，拖它＝把所有固定銷整組平移。
 function drawFrameHandle() {
+  if (S.viewPlane) return;
   const nodes = frameConnectorNodes();
   if (nodes.length < 2) return;
   const cx = nodes.reduce((s, p) => s + p.x, 0) / nodes.length;
@@ -1813,9 +2019,16 @@ function changeLen(delta) {
 
 // 目前機構的世界外接框（給 fit 用）
 function currentBounds() {
-  const pts = lastModelInputs && lastModelInputs.pts;
-  if (!pts) return null;
+  const allPts = lastFullPts || (lastModelInputs && lastModelInputs.pts);
+  if (!allPts) return null;
+  const pts = filterToView(allPts);   // 只取目前平面的點
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, any = false;
+  // 側影帶也納入範圍，進入／離開視圖時才看得到它。
+  viewBands(allPts).forEach(b => b.polygon.forEach(p => {
+    any = true;
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  }));
   Object.values(pts).forEach(p => {
     if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
       any = true;
@@ -1840,7 +2053,7 @@ function currentBounds() {
     minY = Math.min(minY, pose.center.y - halfHeight); maxY = Math.max(maxY, pose.center.y + halfHeight);
   });
   // 齒輪接點只有軸心與輸出孔，不能代表輪廓；納入齒頂圓，避免初載／置中裁掉齒輪。
-  S.comps.filter(c => c.type === 'gear').forEach(c => {
+  viewComps().filter(c => c.type === 'gear').forEach(c => {
     const p = c.p1 && pts[c.p1.id];
     if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
     const teeth = Math.max(6, Math.round(Number(c.teeth) || 12));
@@ -1911,6 +2124,26 @@ function motorFrameExportMounts(inputs = lastModelInputs || {}) {
   });
   return mounts;
 }
+// O4a：直角安裝轉接座的孔位（桿件孔＋子模組底板節點）；板厚用 CNC 設定的板材厚度。
+function orthoExtrasNow() {
+  const stockMm = Number(S.fabrication?.cnc?.stockThicknessMm) > 0 ? Number(S.fabrication.cnc.stockThicknessMm) : FABRICATION_DEFAULTS.cnc.stockThicknessMm;
+  return orthogonalExportExtras(S.comps, S.modules, S.topo.params, { stockMm });
+}
+// O4b：下載每個直角安裝的 3D 列印轉接座 STL（L 形，孔位與木板上的 ADAPTER_HOLE 對應）。
+function downloadAdapterStl() {
+  const adapters = (orthoExtrasNow().adapters || []);
+  if (!adapters.length) { transient('沒有直角安裝，不需要轉接座'); return; }
+  adapters.forEach(a => {
+    const name = `adapter-${a.moduleId}`;
+    const stl = meshToStl(adapterMesh({ lengthMm: a.lengthMm, wallMm: a.wallMm, flangeMm: a.flangeMm, holeDiameterMm: a.holeDiameterMm, holesPerFlange: a.holesPerFlange }), name);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([stl], { type: 'model/stl' }));
+    link.download = `${name}.stl`;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  });
+  transient(`已下載 ${adapters.length} 個轉接座 STL`);
+}
 function saveFile() {
   Store.downloadJson(Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()), 'blocks.json');
 }
@@ -1949,7 +2182,7 @@ const homeMountsNow = () => lastModelInputs ? motorFrameExportMounts({ ...lastMo
 function resolvedBuild(settings, mounts) {
   const cnc = S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
   const ranges = currentMotorRanges();
-  const args = { comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: settings, cnc, mounts };
+  const args = { comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: settings, cnc, mounts, extras: orthoExtrasNow() };
   try {
     return { ...resolveSpacers({ ...args, ranges }), ranges };
   } catch (e) {
@@ -1991,14 +2224,15 @@ function exportLinksSvg() {
   if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
   // 有宿主機架桿的 mount 隨該桿匯出（特徵切進桿身）；剩下的才進 frame.svg；已安裝模組另出各自的機架檔。
   const freeMounts = splitFrameMounts(Exporters.splitMountsByHost(S.comps, mounts).free, S.comps, S.modules).world;
-  const count = Exporters.exportLinksAsSvg(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts);
+  const extras = orthoExtrasNow();
+  const count = Exporters.exportLinksAsSvg(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras);
   const frameCount = Exporters.exportFrameAsSvg(nodes, settings, freeMounts);
   const warnings = Exporters.frameExportWarnings(nodes, settings, freeMounts);
-  const cncParts = [...Exporters.cncPartsForExport(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts), cncFramePart('frame', nodes, settings, freeMounts)];
+  const cncParts = [...Exporters.cncPartsForExport(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', nodes, settings, freeMounts)];
   // 已安裝模組另出一份機架檔（SDD-ASSEMBLY-MODULES §4.2）；座標用 home 姿態重算安裝座。
   let moduleFrameCount = 0;
   moduleFrameExports(S.comps, S.modules, S.topo.params).forEach(entry => {
-    const modNodes = moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps));
+    const modNodes = withAdapterNodes(entry.moduleId, moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps)), extras);
     const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
     const modFree = splitFrameMounts(Exporters.splitMountsByHost(S.comps, homeMounts).free, S.comps, S.modules).byModule[entry.moduleId] || [];
     const n = Exporters.exportFrameAsSvg(modNodes, settings, modFree, entry.fileBase);
@@ -2016,14 +2250,15 @@ function exportLinksDxf() {
   const stockWarnings = memberStockWarnings(S.comps, settings);
   if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
   const freeMounts = splitFrameMounts(Exporters.splitMountsByHost(S.comps, mounts).free, S.comps, S.modules).world;
-  const count = Exporters.exportLinksAsDxf(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts);
+  const extras = orthoExtrasNow();
+  const count = Exporters.exportLinksAsDxf(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras);
   const frameCount = Exporters.exportFrameAsDxf(nodes, settings, freeMounts);
   const warnings = Exporters.frameExportWarnings(nodes, settings, freeMounts);
-  const cncParts = [...Exporters.cncPartsForExport(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts), cncFramePart('frame', nodes, settings, freeMounts)];
+  const cncParts = [...Exporters.cncPartsForExport(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', nodes, settings, freeMounts)];
   // 已安裝模組另出一份機架檔（SDD-ASSEMBLY-MODULES §4.2）；座標用 home 姿態重算安裝座。
   let moduleFrameCount = 0;
   moduleFrameExports(S.comps, S.modules, S.topo.params).forEach(entry => {
-    const modNodes = moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps));
+    const modNodes = withAdapterNodes(entry.moduleId, moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps)), extras);
     const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
     const modFree = splitFrameMounts(Exporters.splitMountsByHost(S.comps, homeMounts).free, S.comps, S.modules).byModule[entry.moduleId] || [];
     const n = Exporters.exportFrameAsDxf(modNodes, settings, modFree, entry.fileBase);
@@ -2039,12 +2274,12 @@ function exportLinksDxf() {
 // 製作包用：與匯出相同的零件與機架幾何，只收集 CNC 檢查用的孔與開口（不下載檔案）。
 function collectCncPartsAndFrameWarnings(settings) {
   const nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
-  const pts = lastModelInputs && lastModelInputs.pts;
+  const pts = lastModelInputs && lastModelInputs.pts, extras = orthoExtrasNow();
   const freeMounts = splitFrameMounts(Exporters.splitMountsByHost(S.comps, mounts).free, S.comps, S.modules).world;
   const frameWarnings = Exporters.frameExportWarnings(nodes, settings, freeMounts);
-  const cncParts = [...Exporters.cncPartsForExport(S.comps, pts, S.topo.params, settings, mounts), cncFramePart('frame', nodes, settings, freeMounts)];
+  const cncParts = [...Exporters.cncPartsForExport(S.comps, pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', nodes, settings, freeMounts)];
   moduleFrameExports(S.comps, S.modules, S.topo.params).forEach(entry => {
-    const modNodes = moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps));
+    const modNodes = withAdapterNodes(entry.moduleId, moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps)), extras);
     const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
     const modFree = splitFrameMounts(Exporters.splitMountsByHost(S.comps, homeMounts).free, S.comps, S.modules).byModule[entry.moduleId] || [];
     frameWarnings.push(...Exporters.frameExportWarnings(modNodes, settings, modFree));
@@ -2067,7 +2302,7 @@ function downloadBuildPack() {
   const warnings = [...frameWarnings, ...cncWarningList(cncParts)];
   // 目前沒有作品名稱欄位：有模組就用模組名稱串起來，否則「機構作品」。
   const title = (S.modules || []).map(m => m && m.name).filter(Boolean).join('＋') || '機構作品';
-  const html = buildPackHtml(plan, { title, cnc, warnings, interference, suggestions });
+  const html = buildPackHtml(plan, { title, cnc, warnings, interference, suggestions, modules: S.modules });
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2159,7 +2394,7 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, openFile, share, loadExample };
+window.blocks = { setViewPlane, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample };
 window.blocks.changeFrameGround = changeFrameGround;
 Object.assign(window.blocks, {
   setTriSide: memberEditor.selectDimension,

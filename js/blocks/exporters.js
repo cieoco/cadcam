@@ -155,7 +155,14 @@ export function mg995SlotOutline(m = {}) {
   ];
 }
 
-function linkHoleSpecs(comp, length, settings) {
+// 直角安裝轉接座孔（桿件座標：u 沿桿從 p1 起算、v 沿左法線）→ 圓孔規格，圖層 ADAPTER_HOLE。
+function adapterHoleSpecs(extraHoles) {
+  return (Array.isArray(extraHoles) ? extraHoles : [])
+    .filter(h => h && Number.isFinite(Number(h.u)) && Number.isFinite(Number(h.v)) && Number(h.diameterMm) > 0)
+    .map(h => ({ kind: 'circle', x: round(Number(h.u), 3), y: round(Number(h.v), 3), r: round(Number(h.diameterMm) / 2, 3), layer: 'ADAPTER_HOLE' }));
+}
+
+function linkHoleSpecs(comp, length, settings, extraHoles = []) {
   const { holeDiameterMm, ttShaftFlatDiameterMm, ttShaftFlatThicknessMm } = normalizeExportSettings(settings);
   const holeR = round(holeDiameterMm / 2, 3);
   const flat = { ttShaftFlatDiameterMm, ttShaftFlatThicknessMm };
@@ -165,14 +172,15 @@ function linkHoleSpecs(comp, length, settings) {
       : { kind: 'circle', x: 0, y: 0, r: holeR },
     isTtMotorEnd(comp, 'p2')
       ? { kind: 'tt-shaft-flat', x: length, y: 0, settings: flat }
-      : { kind: 'circle', x: length, y: 0, r: holeR }
+      : { kind: 'circle', x: length, y: 0, r: holeR },
+    ...adapterHoleSpecs(extraHoles)
   ];
 }
 
-function svgForLink(comp, length, settings) {
+function svgForLink(comp, length, settings, extraHoles = []) {
   const stock = memberStock(comp);
   const r = round(stock.widthMm / 2, 3);
-  const holes = linkHoleSpecs(comp, length, settings);
+  const holes = linkHoleSpecs(comp, length, settings, extraHoles);
   const width = round(length + r * 2, 3);
   const height = round(r * 2, 3);
   const d = [
@@ -191,7 +199,7 @@ function svgForLink(comp, length, settings) {
     <path d="${d}" />
 ${holes.map(h => h.kind === 'tt-shaft-flat'
     ? `    <path d="${svgTtShaftFlatPath(h.x, h.y, h.settings)}" data-hole="TT_SHAFT_FLAT" />`
-    : `    <circle cx="${h.x}" cy="${h.y}" r="${h.r}" />`).join('\n')}
+    : `    <circle cx="${h.x}" cy="${h.y}" r="${h.r}"${h.layer ? ` data-layer="${h.layer}"` : ''} />`).join('\n')}
   </g>
 </svg>
 `;
@@ -994,7 +1002,7 @@ export function splitMountsByHost(comps, mounts = []) {
 
 // 宿主機架桿幾何：桿局部座標（p1 在原點、+X 沿桿軸），複用 frameGeometry 的
 // 「沿桿軸延長/加寬＋槽內固定孔剔除」邏輯，讓桿本體、端點孔與馬達穿板特徵成為同一塊料。
-export function hostedBarGeometry(comp, pts, settings, mounts = []) {
+export function hostedBarGeometry(comp, pts, settings, mounts = [], extraHoles = []) {
   const a = pointForExport(comp, 'p1', pts);
   const b = pointForExport(comp, 'p2', pts);
   if (!a || !b) return null;
@@ -1012,10 +1020,15 @@ export function hostedBarGeometry(comp, pts, settings, mounts = []) {
     .map(m => ({ ...m, center: toLocal(m.center), rotDeg: (Number(m.rotDeg) || 0) + barAngleDeg }));
   if (!localMounts.length) return null;
   const normalized = normalizeExportSettings(settings);
-  return frameGeometry([{ x: 0, y: 0 }, { x: len, y: 0 }], {
+  const geometry = frameGeometry([{ x: 0, y: 0 }, { x: len, y: 0 }], {
     ...normalized,
     barWidthMm: memberStock(comp).widthMm
   }, localMounts);
+  const extra = adapterHoleSpecs(extraHoles);
+  // 轉接座孔：桿局部座標（p1 在原點、+X 沿桿軸）；不改 frameGeometry 回傳物件的其他欄位。
+  return geometry && extra.length
+    ? { ...geometry, holes: [...geometry.holes, ...extra.map(h => ({ x: h.x, y: h.y, r: h.r, layer: h.layer }))] }
+    : geometry;
 }
 
 export function frameExportWarnings(frameNodes, settings, motorMounts = []) {
@@ -1105,10 +1118,10 @@ function dxfForFrameGeometry(geometry) {
   ].join('\n') + '\n';
 }
 
-function dxfForLink(comp, length, settings) {
+function dxfForLink(comp, length, settings, extraHoles = []) {
   const stock = memberStock(comp);
   const r = round(stock.widthMm / 2, 3);
-  const holes = linkHoleSpecs(comp, length, settings);
+  const holes = linkHoleSpecs(comp, length, settings, extraHoles);
   const outline = [
     { x: 0, y: r },
     { x: length, y: r },
@@ -1128,36 +1141,37 @@ function dxfForLink(comp, length, settings) {
     dxfPolyline(outline, 'CUT'),
     ...holes.map(h => h.kind === 'tt-shaft-flat'
       ? dxfPolyline(ttShaftFlatPoints(h.x, h.y, h.settings, 18), 'TT_SHAFT_FLAT')
-      : dxfCircle(h.x, h.y, h.r, 'HOLE')),
+      : dxfCircle(h.x, h.y, h.r, h.layer || 'HOLE')),
     dxfPair(0, 'ENDSEC'),
     dxfPair(0, 'EOF')
   ].join('\n') + '\n';
 }
 
-export function inspectLinkExport(comp, length, settings = {}) {
+export function inspectLinkExport(comp, length, settings = {}, extraHoles = []) {
   const safeLength = Number.isFinite(Number(length)) && Number(length) > 0 ? Number(length) : 1;
   const outline = barOutline({ x: 0, y: 0 }, { x: safeLength, y: 0 }, memberStock(comp).widthMm / 2);
   const holes = [];
   const cutouts = [];
-  linkHoleSpecs(comp, safeLength, settings).forEach(hole => {
+  linkHoleSpecs(comp, safeLength, settings, extraHoles).forEach(hole => {
     if (hole.kind === 'tt-shaft-flat') {
       cutouts.push({ points: ttShaftFlatPoints(hole.x, hole.y, hole.settings), layer: 'TT_SHAFT_FLAT' });
     } else {
-      holes.push({ x: hole.x, y: hole.y, r: hole.r, layer: 'HOLE' });
+      holes.push({ x: hole.x, y: hole.y, r: hole.r, layer: hole.layer || 'HOLE' });
     }
   });
   return { outlines: [outline], holes, cutouts };
 }
 
-export function exportLinksAsSvg(comps, pts, params, settings, mounts = []) {
+export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extras = null) {
   const { hosted } = splitMountsByHost(comps, mounts);
+  const extraOf = comp => (extras && extras.linkHoles && extras.linkHoles[comp.id]) || [];
   const links = exportableLinks(comps, pts, params);
   links.forEach(({ comp, length }) => {
     // 宿主機架桿：桿身直接帶馬達穿板特徵（同一塊料），其餘桿件走一般路徑。
-    const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id)) : null;
+    const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id), extraOf(comp)) : null;
     const text = hostGeometry
       ? addSvgStockDescription(svgForFrameGeometry(hostGeometry, comp.id), comp)
-      : svgForLink(comp, length, settings);
+      : svgForLink(comp, length, settings, extraOf(comp));
     downloadText(text, `${safeName(comp.id)}.svg`, 'image/svg+xml');
   });
   const plates = exportablePlates(comps, pts);
@@ -1175,14 +1189,15 @@ export function exportLinksAsSvg(comps, pts, params, settings, mounts = []) {
   return links.length + plates.length + gears.length + racks.length;
 }
 
-export function exportLinksAsDxf(comps, pts, params, settings, mounts = []) {
+export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extras = null) {
   const { hosted } = splitMountsByHost(comps, mounts);
+  const extraOf = comp => (extras && extras.linkHoles && extras.linkHoles[comp.id]) || [];
   const links = exportableLinks(comps, pts, params);
   links.forEach(({ comp, length }) => {
-    const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id)) : null;
+    const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id), extraOf(comp)) : null;
     const text = hostGeometry
       ? addDxfStockComment(dxfForFrameGeometry(hostGeometry), comp)
-      : dxfForLink(comp, length, settings);
+      : dxfForLink(comp, length, settings, extraOf(comp));
     downloadText(text, `${safeName(comp.id)}.dxf`, 'application/dxf');
   });
   const plates = exportablePlates(comps, pts);
@@ -1201,14 +1216,15 @@ export function exportLinksAsDxf(comps, pts, params, settings, mounts = []) {
 }
 
 // L4 CNC 檢查用：與 exportLinksAsDxf 輸出同一批零件（桿件含宿主桿、板件、齒輪）的孔與開口。
-export function cncPartsForExport(comps, pts, params, settings, mounts = []) {
+export function cncPartsForExport(comps, pts, params, settings, mounts = [], extras = null) {
   const { hosted } = splitMountsByHost(comps, mounts);
+  const extraOf = comp => (extras && extras.linkHoles && extras.linkHoles[comp.id]) || [];
   const holesOf = g => ((g && g.holes) || []).map(h => ({ ...h, layer: h.layer || 'HOLE' }));
   const cutoutsOf = g => (g && g.cutouts) || [];
   const parts = [];
   exportableLinks(comps, pts, params).forEach(({ comp, length }) => {
-    const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id)) : null;
-    const g = hostGeometry || inspectLinkExport(comp, length, settings);
+    const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id), extraOf(comp)) : null;
+    const g = hostGeometry || inspectLinkExport(comp, length, settings, extraOf(comp));
     parts.push({ name: safeName(comp.id), holes: holesOf(g), cutouts: cutoutsOf(g) });
   });
   exportablePlates(comps, pts).forEach(({ comp, points }) => {

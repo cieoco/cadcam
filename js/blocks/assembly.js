@@ -10,6 +10,7 @@
 import { compileTopology } from '../core/topology.js';
 import { solveTopology, sweepTopology } from '../multilink/solver.js';
 import { pointKeysFor } from './part-types.js';
+import { memberStock } from './member-stock.js';
 
 const D2R = Math.PI / 180;
 const IDENTITY_POSE = { x: 0, y: 0, a: 0 };
@@ -118,6 +119,7 @@ export function solveAssembly(asm, params) {
   if (asm.single) return solveTopology(asm.single, params);
   const points = {};
   const perModule = {};
+  const orthogonal = {};   // 直角安裝的模組：{ host, now }（宿主輸出端目前位姿；子模組點不做 2D 變換）
   for (const unit of asm.units) {
     if (!unit.compiled) continue;
     let ref = IDENTITY_POSE, now = IDENTITY_POSE;
@@ -125,7 +127,13 @@ export function solveAssembly(asm, params) {
       const host = asm.units.find(u => u.id === unit.mount.to.module);
       now = host && host.module ? outputPose(host.module, unit.mount.to.output, points, host.comps) : null;
       if (!now) { perModule[unit.id] = { isValid: false, reason: 'host-invalid' }; continue; }
-      ref = unit.mount.ref;
+      if (unit.mount.orient) {
+        // 直角安裝：子模組在自己的平面求解，點座標維持原樣（ref＝now＝IDENTITY），位姿另外回報給 3D／側影帶用。
+        orthogonal[unit.id] = { host: unit.mount.to.module, now };
+        now = IDENTITY_POSE;
+      } else {
+        ref = unit.mount.ref;
+      }
     }
     let unitParams = params;
     if (params && params._prevPoints) {
@@ -145,7 +153,7 @@ export function solveAssembly(asm, params) {
   }
   const isValid = Object.values(perModule).every(m => m.isValid);
   const B = asm.tracePoint ? points[asm.tracePoint] : undefined;
-  return { isValid, points, B, perModule };
+  return { isValid, points, B, perModule, orthogonal };
 }
 
 export function sweepAssembly(asm, params, startDeg, endDeg, stepDeg) {
@@ -207,6 +215,7 @@ export function rebakeModules(comps, modules, params) {
     const idx = curModules.findIndex(m => m.id === modId);
     const mod = curModules[idx];
     if (!mod || !mod.mount) continue;
+    if (mod.mount.orient) continue;   // 直角安裝：座標存在自己的平面，不 rebake
     const asm = compileAssembly(curComps, curModules, { params });
     const sol = solveAssembly(asm, { thetaDeg: 0, motorAngles: { ...(mod.mount.home || {}) } });
     const hostId = mod.mount.to.module;
@@ -224,6 +233,123 @@ export function rebakeModules(comps, modules, params) {
     changed = true;
   }
   return { comps: curComps, modules: curModules, changed };
+}
+
+// ---- 直角安裝的 3D 位姿與宿主視圖側影帶（SDD-ORTHOGONAL-MOUNT O2）----
+
+const validPt = p => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+
+// 直角子模組的 3D 座標系：origin＝宿主構件那一側邊緣的中點；d＝構件方向；m＝離開宿主邊緣的外法線；
+// n＝子模組平面的法線（離開宿主平面）；base／e／f＝子模組平面上的基準點與接合軸（e）及其垂直軸（f）。
+// 不是直角安裝、輸出構件不是桿、或點未解出 → null。純函式。
+export function orthogonalFrame(comps, modules, moduleId, points) {
+  const modList = Array.isArray(modules) ? modules : [];
+  const list = Array.isArray(comps) ? comps : [];
+  const mod = modList.find(m => m.id === moduleId);
+  const orient = mod && mod.mount && mod.mount.orient;
+  if (!orient || orient.type !== 'orthogonal') return null;
+  const host = modList.find(m => m.id === mod.mount.to.module);
+  const output = host && (host.outputs || []).find(o => o.id === mod.mount.to.output);
+  if (!output || !output.body || output.body.kind !== 'bar') return null;
+  const bodyComp = list.find(c => c.id === output.body.id);
+  if (!bodyComp || !bodyComp.p1 || !bodyComp.p2) return null;
+  const p1 = points && points[bodyComp.p1.id], p2 = points && points[bodyComp.p2.id];
+  const base = mod.base && points ? points[mod.base] : null;
+  if (!validPt(p1) || !validPt(p2) || !validPt(base)) return null;
+  const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  if (!(len > 0)) return null;
+  const dx = (p2.x - p1.x) / len, dy = (p2.y - p1.y) / len;
+  const side = orient.side;
+  const w = memberStock(bodyComp).widthMm;
+  const mx = side * -dy, my = side * dx;   // m＝side·left，left＝(−d.y, d.x)
+  const rad = orient.childAxisDeg * D2R;
+  const e = { x: Math.cos(rad), y: Math.sin(rad) };
+  return {
+    origin: { x: (p1.x + p2.x) / 2 + mx * w / 2, y: (p1.y + p2.y) / 2 + my * w / 2, z: 0 },
+    d: { x: dx, y: dy, z: 0 },
+    m: { x: mx, y: my, z: 0 },
+    n: { x: 0, y: 0, z: -side },
+    base: { x: base.x, y: base.y },
+    e,
+    f: { x: -e.y, y: e.x }
+  };
+}
+
+// 子模組平面上的點 p（加上疊層高度 wMm，沿 m）→ 3D 世界座標。
+export function toWorld3D(frame, p, wMm = 0) {
+  const rx = p.x - frame.base.x, ry = p.y - frame.base.y;
+  const s = rx * frame.e.x + ry * frame.e.y;
+  const t = rx * frame.f.x + ry * frame.f.y;
+  return {
+    x: frame.origin.x + s * frame.d.x + t * frame.n.x + wMm * frame.m.x,
+    y: frame.origin.y + s * frame.d.y + t * frame.n.y + wMm * frame.m.y,
+    z: frame.origin.z + s * frame.d.z + t * frame.n.z + wMm * frame.m.z
+  };
+}
+
+// 宿主視圖的側影帶：子模組沿接合軸的範圍 × 疊層高度 stackMm，四個點依序
+// (smin,0)、(smax,0)、(smax,stack)、(smin,stack)。沒有直角座標系或沒有點 → null。
+export function orthogonalBand(comps, modules, moduleId, points, stackMm) {
+  const frame = orthogonalFrame(comps, modules, moduleId, points);
+  if (!frame) return null;
+  const list = Array.isArray(comps) ? comps : [];
+  let smin = Infinity, smax = -Infinity;
+  const seen = new Set();
+  list.forEach(c => {
+    if (c.moduleId !== moduleId) return;
+    POINT_KEYS.forEach(k => {
+      const pt = c[k];
+      if (!pt || !pt.id || seen.has(pt.id)) return;
+      seen.add(pt.id);
+      const sp = points[pt.id];
+      if (!validPt(sp)) return;
+      const s = (sp.x - frame.base.x) * frame.e.x + (sp.y - frame.base.y) * frame.e.y;
+      if (s < smin) smin = s;
+      if (s > smax) smax = s;
+    });
+  });
+  if (!Number.isFinite(smin)) return null;
+  const at = (s, w) => ({
+    x: frame.origin.x + s * frame.d.x + w * frame.m.x,
+    y: frame.origin.y + s * frame.d.y + w * frame.m.y
+  });
+  return [at(smin, 0), at(smax, 0), at(smax, stackMm), at(smin, stackMm)];
+}
+
+// ---- 視圖平面（SDD-ORTHOGONAL-MOUNT §4.3、O-D3）----
+
+// 零件／模組所在的平面：沿安裝鏈往上走（含自己），第一個 mount 帶 orient 的模組 id 就是平面；
+// 走到未安裝、找不到的模組或根 → null（主視圖）。安裝成環時以 seen 中止回 null。
+// compOrModuleId 可以是零件物件（取 moduleId）、模組 id 字串或 null。
+export function planeOf(comps, modules, compOrModuleId) {
+  const modList = Array.isArray(modules) ? modules : [];
+  let id = compOrModuleId && typeof compOrModuleId === 'object' ? compOrModuleId.moduleId : compOrModuleId;
+  const seen = new Set();
+  while (id && !seen.has(id)) {
+    seen.add(id);
+    const mod = modList.find(m => m.id === id);
+    if (!mod || !mod.mount) return null;
+    if (mod.mount.orient) return mod.id;
+    id = mod.mount.to && mod.mount.to.module;
+  }
+  return null;
+}
+
+// 屬於指定平面的零件（保持原順序）。
+export function compsInPlane(comps, modules, plane) {
+  const list = Array.isArray(comps) ? comps : [];
+  const target = plane || null;
+  return list.filter(c => planeOf(list, modules, c) === target);
+}
+
+// 指定平面所有零件用到的點 id（含零件 holes 裡的孔）；給繪製與命中過濾用。
+export function pointIdsInPlane(comps, modules, plane) {
+  const ids = new Set();
+  compsInPlane(comps, modules, plane).forEach(c => {
+    pointKeysFor(c).forEach(k => { if (c[k] && c[k].id) ids.add(c[k].id); });
+    if (Array.isArray(c.holes)) c.holes.forEach(h => { if (h && h.id) ids.add(h.id); });
+  });
+  return ids;
 }
 
 // 這個點 id（pointKeysFor 的點或零件 holes 裡的孔）所屬的模組 id；沒有標記或找不到回 null。

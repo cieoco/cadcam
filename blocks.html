@@ -483,6 +483,7 @@
           <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>
           <button class="tool-btn" onclick="window.blocks.exportLinksDxf()" title="逐一匯出所畫桿件為 DXF">匯出 DXF</button>
           <button class="tool-btn" onclick="window.blocks.downloadBuildPack()" title="板件清單＋五金清單＋組裝步驟（可列印）">製作包</button>
+          <button class="tool-btn" onclick="window.blocks.downloadAdapterStl()" title="直角安裝用的 3D 列印 L 形轉接座">轉接座 STL</button>
         </div>
       </details>
       <select class="example-select" id="exampleSelect" onchange="window.blocks.loadExample(this.value)" title="載入課堂範例">
@@ -558,6 +559,7 @@
       </div>
       <div class="mode-banner" id="modeBanner" style="display:none;"></div>
       <div class="mode-banner" id="solveBanner" style="display:none; top:58px;"></div>
+      <div class="mode-banner" id="viewPlaneHint" style="display:none; top:98px; background:rgba(108,52,131,0.94);" aria-live="polite"></div>
       <div class="work-range-card" id="workRangeCard" style="display:none;" aria-live="polite">
         <strong id="workRangeValue">工作範圍 0 mm</strong>
         <span id="workRangeDetail">左右 0 mm · 上下 0 mm</span>
@@ -896,6 +898,7 @@
       <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>
       <button class="tool-btn" onclick="window.blocks.exportLinksDxf()" title="逐一匯出所畫桿件為 DXF">匯出 DXF</button>
       <button class="tool-btn" onclick="window.blocks.downloadBuildPack()" title="板件清單＋五金清單＋組裝步驟（可列印）">製作包</button>
+          <button class="tool-btn" onclick="window.blocks.downloadAdapterStl()" title="直角安裝用的 3D 列印 L 形轉接座">轉接座 STL</button>
       <button class="tool-btn" onclick="window.blocks.openMobileOpenMenu()" title="開啟舊檔或課堂範例">📂 開啟</button>
       <button class="tool-btn" onclick="window.blocks.share()" title="複製分享連結">🔗 分享</button>
       <button class="tool-btn danger-btn" onclick="window.blocks.confirmClearAll()" title="清空目前全部零件">🗑 清空全部</button>
@@ -946,26 +949,29 @@
       "./js/blocks/rack-limits.js": "./js/blocks/rack-limits.js?v=20261001_l6",
       "./js/blocks/gear-editor.js": "./js/blocks/gear-editor.js?v=20261001_l6",
       "./js/blocks/transmission-render.js": "./js/blocks/transmission-render.js?v=20261001_l6",
-      "./js/blocks/exporters.js": "./js/blocks/exporters.js?v=20261001_l6",
-      "./js/blocks/build-plan.js": "./js/blocks/build-plan.js?v=20261001_l7",
-      "./js/blocks/interference.js": "./js/blocks/interference.js?v=20261001_l7",
+      "./js/blocks/exporters.js": "./js/blocks/exporters.js?v=20261001_o4",
+      "./js/blocks/adapter-stl.js": "./js/blocks/adapter-stl.js?v=20261001_o4b",
+      "./js/blocks/orthogonal-joint.js": "./js/blocks/orthogonal-joint.js?v=20261001_o4",
+      "./js/blocks/build-plan.js": "./js/blocks/build-plan.js?v=20261001_o5",
+      "./js/blocks/interference.js": "./js/blocks/interference.js?v=20261001_o5",
       "./js/blocks3d/scene-model.js": "./js/blocks3d/scene-model.js?v=20260925_stock2",
       "./js/blocks/gripper-workflow.js": "./js/blocks/gripper-workflow.js?v=20260925_stock1",
       "./js/blocks/gripper-workflow.js?v=20260925_r1b": "./js/blocks/gripper-workflow.js?v=20260925_stock1",
       "./js/blocks/motion.js": "./js/blocks/motion.js?v=20260930_m1b1",
-      "./js/blocks/assembly.js": "./js/blocks/assembly.js?v=20261001_l3b",
+      "./js/blocks/assembly.js": "./js/blocks/assembly.js?v=20261001_o3",
       "./js/blocks/tools.js": "./js/blocks/tools.js?v=20260930_m1b3",
       "./js/blocks/input.js": "./js/blocks/input.js?v=20260930_b2",
-      "./js/blocks/state.js": "./js/blocks/state.js?v=20260930_m1b1",
+      "./js/blocks/state.js": "./js/blocks/state.js?v=20261001_o3",
       "./js/blocks/panels.js": "./js/blocks/panels.js?v=20260930_p1",
-      "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=20261001_l7",
+      "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=20261001_o3",
       "./js/blocks/motor-tools.js": "./js/blocks/motor-tools.js?v=20261001_l1",
       "./js/blocks/module-ops.js": "./js/blocks/module-ops.js?v=20261001_l7",
       "./js/blocks/module-schema.js": "./js/blocks/module-schema.js?v=20261001_l7",
       "./js/blocks/module-drag.js": "./js/blocks/module-drag.js?v=20260930_d9",
-      "./js/blocks3d/viewer.js": "./js/blocks3d/viewer.js?v=20260930_b2"
+      "./js/blocks3d/viewer.js": "./js/blocks3d/viewer.js?v=20261001_o6",
+      "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261001_o6"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20261001_l7"></script>
+  <script type="module" src="js/blocks/app.js?v=20261001_o6"></script>
 </body>
 </html>

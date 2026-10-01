@@ -8,9 +8,11 @@
  *   - motor-body：MG995 機身穿過底板往後伸，撞到該高度範圍（mm）內的零件。
  * L6：疊層改用 mm 高度（plan.parts[].zMm），隔圈（plan.gaps）拉開層間距離；resolveSpacers 自動加隔圈，
  * suggestRackStops 建議齒條長槽限位。
+ * cross-plane：直角安裝的子模組以「側影帶」（沿接合軸的範圍 × 疊層高度）加上它在宿主法向的高度範圍，
+ *   檢查宿主平面上、高度重疊的零件（宿主桿本身不算）。
  * 平面近似（桿＝膠囊、齒輪＝圓、機架板＝凸包），仍需實物確認。
  */
-import { compileAssembly, solveAssembly, moduleFrameExports, moduleFrameNodes, worldFrameComps, splitFrameMounts } from './assembly.js';
+import { compileAssembly, solveAssembly, moduleFrameExports, moduleFrameNodes, worldFrameComps, splitFrameMounts, planeOf, orthogonalFrame, orthogonalBand } from './assembly.js';
 import { frameConnectorNodes } from './model.js';
 import { inspectFrameExport, inspectRackExport, splitMountsByHost, motorMountFeatures, isStaticPlate } from './exporters.js';
 import { jawCenterline } from './plate-geometry.js';
@@ -32,6 +34,9 @@ const HEAD_FIX_MM = 3;           // 螺絲頭側建議隔圈（≥ 螺絲頭高�
 const NUT_FIX_MM = 5;            // 螺帽側建議隔圈
 const CIRCLE_SEGMENTS = 24;
 const CAP_SEGMENTS = 8;
+const POINT_KEYS = ['p1', 'p2', 'p3', 'm1', 'm2'];
+const CROSS_PAD_MM = 10;         // 跨平面：子模組零件在宿主法向的半寬容許（板寬的一半）
+const DEFAULT_STACK_MM = 9;      // 子模組疊層高度的後備值
 
 const finite = v => Number.isFinite(Number(v));
 const validPt = p => p && finite(p.x) && finite(p.y);
@@ -148,6 +153,8 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
   const modById = new Map(modList.map(m => [m.id, m]));
   const partByName = new Map(parts.map(p => [p.name, p]));
   const exp = { ...exportSettings };
+  // 不同平面（直角安裝）的零件互不比較；跨平面的部分由下面的 cross-plane 檢查處理。
+  const samePlane = (a, b) => ((a && a.plane) || null) === ((b && b.plane) || null);
   const mountedMod = id => { const m = id != null ? modById.get(id) : null; return m && m.mount ? m : null; };
 
   // ---- 取樣姿態 ----
@@ -374,12 +381,14 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
   const layerOfParts = new Map();
   parts.forEach(p => { if (!layerOfParts.has(p.layer)) layerOfParts.set(p.layer, []); layerOfParts.get(p.layer).push(p); });
 
+  const orthoMods = modList.filter(m => m && m.mount && m.mount.orient);
+
   poses.forEach(pose => {
     // 1. 同層零件互撞
     layerOfParts.forEach((group, layer) => {
       for (let i = 0; i < group.length; i++) for (let j = i + 1; j < group.length; j++) {
         const a = group[i], b = group[j];
-        if (sameBody(a.name, b.name) || meshPairs.has(pairKey(a.name, b.name))) continue;
+        if (!samePlane(a, b) || sameBody(a.name, b.name) || meshPairs.has(pairKey(a.name, b.name))) continue;
         if (seen.has(keyOf('same-layer', [a.name, b.name]))) continue;
         if (polysOverlap(partPolys(pose, a), partPolys(pose, b))) {
           report('same-layer', [a.name, b.name], layer, pose,
@@ -402,9 +411,11 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
         { z0: zBottom - HEAD_HEIGHT_MM, z1: zBottom, r: HEAD_RADIUS_MM, label: '螺絲頭', fix: { below: j.layers[0], mm: HEAD_FIX_MM } },
         { z0: zTop, z1: zTop + NUT_HEIGHT_MM, r: NUT_RADIUS_MM, label: '防鬆螺帽', fix: { below: j.layers[1] + 1, mm: NUT_FIX_MM } }
       ].forEach(h => {
+        // 非主平面的關節：隔圈記在該平面（fix 帶 plane）。
+        if (j.plane != null) h.fix = { plane: j.plane, ...h.fix };
         const disc = [circlePoly(center, h.r)];
         parts.forEach(v => {
-          if (j.parts.includes(v.name) || j.parts.some(n => sameBody(n, v.name))) return;
+          if (!samePlane(jp[0], v) || j.parts.includes(v.name) || j.parts.some(n => sameBody(n, v.name))) return;
           const [v0, v1] = zSpan(v);
           if (!zOverlap(h.z0, h.z1, v0, v1)) return;
           if (seen.has(keyOf('hardware', [...j.parts, v.name]))) return;
@@ -429,7 +440,7 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
       if (!empty.size) return;
       const disc = [circlePoly({ x: Number(p.x), y: Number(p.y) }, STANDOFF_RADIUS_MM)];
       parts.forEach(v => {
-        if (!empty.has(v.layer)) return;
+        if (!empty.has(v.layer) || !samePlane(jp[0], v)) return;
         if (j.parts.includes(v.name) || j.parts.some(n => sameBody(n, v.name))) return;
         if (seen.has(keyOf('hardware', [...j.parts, v.name]))) return;
         if (polysOverlap(disc, partPolys(pose, v))) {
@@ -445,13 +456,57 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
       if (!xf) return;
       const poly = [body.poly.map(q => applyXf(xf, q))];
       parts.forEach(v => {
-        if (v.name === body.plate || sameBody(body.plate, v.name)) return;
+        if (v.name === body.plate || sameBody(body.plate, v.name) || !samePlane(partByName.get(body.plate), v)) return;
         const [v0, v1] = zSpan(v);
         if (!zOverlap(body.z0, body.z1, v0, v1)) return;
         if (seen.has(keyOf('motor-body', [body.plate, v.name]))) return;
         if (polysOverlap(poly, partPolys(pose, v))) {
           report('motor-body', [body.plate, v.name], v.layer, pose,
             `馬達軸 ${body.motorId} 的 MG995 機身（穿過 ${body.plate}，往${body.dir < 0 ? '下' : '上'}佔 ${MOTOR_BODY_MM} mm 高）${when(pose)}會撞到第 ${v.layer} 層的 ${v.name}。建議：限制馬達行程（見長槽限位）、調整安裝方向或位置。`);
+        }
+      });
+    });
+
+    // 4. 跨平面：直角安裝的子模組（側影帶＋高度範圍）vs 宿主平面上的零件
+    orthoMods.forEach(M => {
+      const host = modById.get(M.mount.to && M.mount.to.module);
+      const output = host && (host.outputs || []).find(o => o.id === M.mount.to.output);
+      const bodyPart = output && output.body ? parts.find(p => p.compId === output.body.id) : null;
+      if (!bodyPart) return;
+      const hostPlane = planeOf(list, modList, host.id);
+      const childParts = parts.filter(p => p.plane === M.id);
+      const H = childParts.length ? Math.max(...childParts.map(p => zOf(p) + p.thicknessMm)) : DEFAULT_STACK_MM;
+      const band = orthogonalBand(list, modList, M.id, pose.points, H);
+      const frame = orthogonalFrame(list, modList, M.id, pose.points);
+      if (!band || !frame) return;
+      // 子模組各點在宿主法向上的高度（原點＝宿主桿底面）
+      let zMin = Infinity, zMax = -Infinity;
+      const seenPt = new Set();
+      list.forEach(c => {
+        if (c.moduleId !== M.id) return;
+        POINT_KEYS.forEach(k => {
+          const pt = c[k];
+          if (!pt || !pt.id || seenPt.has(pt.id)) return;
+          seenPt.add(pt.id);
+          const sp = pose.points[pt.id];
+          if (!validPt(sp)) return;
+          const t = (sp.x - frame.base.x) * frame.f.x + (sp.y - frame.base.y) * frame.f.y;
+          const z = t * frame.n.z;
+          if (z < zMin) zMin = z;
+          if (z > zMax) zMax = z;
+        });
+      });
+      if (!Number.isFinite(zMin)) return;
+      const z0 = zMin - CROSS_PAD_MM, z1 = zMax + CROSS_PAD_MM;
+      const bodyZ = zOf(bodyPart);
+      parts.forEach(v => {
+        if (v.name === bodyPart.name || ((v.plane == null ? null : v.plane) !== hostPlane)) return;
+        const vz = zOf(v) - bodyZ;
+        if (!zOverlap(z0, z1, vz, vz + v.thicknessMm)) return;
+        if (seen.has(keyOf('cross-plane', [M.id + '-frame', v.name]))) return;
+        if (polysOverlap([band], partPolys(pose, v))) {
+          report('cross-plane', [`${M.id}-frame`, v.name], v.layer, pose,
+            `${M.name || M.id}（直角安裝）${when(pose)}會撞到 ${v.name}。建議：調整升降行程或安裝位置。`);
         }
       });
     });

@@ -376,10 +376,15 @@ export function createViewer(container) {
   }
 
   // 統一的加入點：標上 pickKey 供點選判定；若該部件目前為 ghost 就套半透明材質。
-  function addPart(obj, key) {
+  // sink／keyPrefix：直角安裝的子模組（model.orthogonal，O6）畫進自己的 Group，
+  // 並用模組 id 當 pickKey 前綴，點選隱藏時不會與宿主同名零件互撞。
+  let sink = dynamic;
+  let keyPrefix = '';
+  function addPart(obj, rawKey) {
+    const key = keyPrefix + rawKey;
     obj.userData.pickKey = key;
     if (ghosted.has(key)) ghostify(obj);
-    dynamic.add(obj);
+    sink.add(obj);
     return obj;
   }
 
@@ -399,6 +404,24 @@ export function createViewer(container) {
     clearDynamic();
     if (!model) return;
     lastModel = model;
+    renderModel(model);
+    // 直角安裝的子模組：各自的場景模型包進一個帶 4x4 矩陣的 Group（子平面 → 宿主座標）。
+    (model.orthogonal || []).forEach(child => {
+      if (!child || !child.model || !Array.isArray(child.matrix) || child.matrix.length !== 16) return;
+      const group = new THREE.Group();
+      group.matrixAutoUpdate = false;
+      group.matrix.fromArray(child.matrix);
+      group.matrixWorldNeedsUpdate = true;
+      group.userData.orthogonalId = child.id;
+      dynamic.add(group);
+      sink = group;
+      keyPrefix = child.id + '/';
+      try { renderModel(child.model); } finally { sink = dynamic; keyPrefix = ''; }
+    });
+    focusCamera(model);
+  }
+
+  function renderModel(model) {
 
     // 機架：直接使用 2D / DXF 共用的 frameGeometry，孔位與加工輸出完全一致。
     if (model.frame && Array.isArray(model.frame.outlines)) {
@@ -765,12 +788,14 @@ export function createViewer(container) {
       const mesh = new THREE.Mesh(geo, p.ground ? groundMat : pinMat);
       mesh.rotation.x = Math.PI / 2;
       mesh.position.set(p.x, p.y, (p.z0 + p.z1) / 2);
-      dynamic.add(mesh);
+      sink.add(mesh);
     });
 
     // 地錨是「固定」的慣例（接點本身的銷柱已標示），不另外畫立柱實體。
     // model.grounds 仍保留，供下方相機對焦用。
+  }
 
+  function focusCamera(model) {
     // 相機對焦：對到固定的地錨形心（model.focus）。動畫時 focus 不動，畫面就不會晃。
     // 有地錨（anchored）時每幀同步沒差（反正是同一點）；沒地錨時只在初次定位、之後凍結。
     const f = model.focus;

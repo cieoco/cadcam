@@ -44,7 +44,7 @@ reset();
 // ---------- 模組庫清單與插入 ----------
 {
   const lib = editor.library();
-  check('模組庫：兩個內建模組在前', lib.length === 2 && lib.every(x => x.kind === 'builtin') && lib[0].name === '齒條升降' && lib[1].name === '齒輪夾爪');
+  check('模組庫：三個內建模組在前', lib.length === 3 && lib.every(x => x.kind === 'builtin') && lib[0].name === '齒條升降' && lib[1].name === '齒輪夾爪' && lib[2].name === '四連桿升降臂');
   const u0 = log.undo;
   editor.insertBuiltin('rack-lift');
   check('插入齒條升降：5 件、1 個模組、一次 undo、重建與重畫', S.comps.length === 5 && S.modules.length === 1 && log.undo === u0 + 1 && log.rebuild >= 1 && log.draw >= 1);
@@ -128,7 +128,7 @@ const liftOut = S.modules[0].outputs[0];
   editor.saveToLibrary();
   check('saveToLibrary：寫入本機模組庫', log.saved.length === 1 && JSON.parse(libraryText).length === 1);
   const lib = editor.library();
-  check('模組庫清單：內建 2 ＋ 我的 1', lib.length === 3 && lib[2].kind === 'local' && lib[2].name === '新夾爪');
+  check('模組庫清單：內建 3 ＋ 我的 1', lib.length === 4 && lib[3].kind === 'local' && lib[3].name === '新夾爪');
   const n = S.comps.length;
   editor.insertLocal(0);
   check('從我的模組庫插入：多 4 件與新模組', S.comps.length === n + 4 && S.modules.length === 3);
@@ -142,7 +142,7 @@ const liftOut = S.modules[0].outputs[0];
   editor.removeFromLibrary(0);
   check('從模組庫移除', JSON.parse(libraryText).length === 1);
   libraryText = '{壞掉';
-  check('本機模組庫損壞時清單只剩內建', editor.library().length === 2);
+  check('本機模組庫損壞時清單只剩內建', editor.library().length === 3);
 }
 
 // ---------- 繪製不出錯 ----------
