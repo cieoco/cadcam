@@ -39,6 +39,7 @@
 | L5-0 關節改 M3 預設 | **Haiku** | 加工預設連接孔／機架孔 3.2；夾爪齒輪輸出孔 3.2；CNC 檢查提醒「只比刀大一點的孔在 svg2gcode 設鑽孔」。主模型補上匯出端 `normalizeExportSettings` 的預設（原本仍是畫面用的 12.96）。 | 新作品匯出所有關節孔 3.2。 | 完成（Haiku 一輪；主模型修正規格漏列的匯出預設） |
 | L5a 實體疊層與關節（build plan） | Sonnet | 新檔 `build-plan.js`：群組起始層（裝在宿主構件層＋1）、群組內用 `computeBodyLayers`、齒條同小齒輪層；以點 id 彙整關節（guide-pin／mount-bolt／motor-shaft／pivot）、跨層總厚 spanMm。測試 `test/build-plan.mjs` 由主模型先寫。 | 測試全過：機架 0／小齒輪齒條 1／夾爪底板 2／夾爪齒輪 3／爪臂 4。 | 完成（Sonnet 一輪；主模型修正 GCB 穿三片板的期望） |
 | L5b 製作包 | Sonnet | `build-plan.js` 加零件外形尺寸與孔種類、`hardwareList`（螺絲長度＝跨層厚＋防鬆螺帽 4 mm 取標準長）、`buildPackHtml`（板件／五金／逐層組裝步驟／CNC 注意／尚未驗證）；匯出區「製作包」按鈕。測試 `test/build-pack.mjs` 由主模型先寫。 | 測試全過＋實際下載的製作包與手算五金一致。 | 完成（Sonnet 一輪） |
+| L5c 干涉檢查 | Sonnet | 新檔 `interference.js`：依各馬達播放範圍取樣，凸多邊形 SAT（穿透 > 0.5 mm），檢查同層互撞、螺絲頭／螺帽凸入鄰層、MG995 機身往後佔 9 層；製作包新增「干涉檢查」段落，匯出 banner 提示件數。測試 `test/interference.mjs` 由主模型先寫。 | 測試全過＋舉升＋夾取找出 5 項真實干涉。 | 完成（Sonnet 一輪；主模型接受機身方向朝遠離舵盤側的修正） |
 
 建議順序：S1 → S2 → S3（暖身、互不相依）→ M0 → M1a → M1b → M1c → M1d。
 

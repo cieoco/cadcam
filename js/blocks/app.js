@@ -64,6 +64,7 @@ import * as Settings from './settings.js';   // 作品級加工設定 + 舊 loca
 import { normalizeFabricationProfile, FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { cncWarnings } from './cnc-check.js';   // L4：依刀徑檢查匯出特徵
 import { buildPlan, buildPackHtml } from './build-plan.js';   // L5b：製作包（板件＋五金＋組裝步驟）
+import { findInterference } from './interference.js';   // L5c：同層互撞／螺絲頭螺帽／MG995 機身干涉檢查
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('stageSvg');
@@ -1930,8 +1931,31 @@ function cncWarningList(parts) {
   }
   return list;
 }
-function showCncWarnings(parts) {
+// L5c：依各馬達實際播放範圍取樣檢查干涉；馬達範圍＝暫時把 activeMotor 設成該顆呼叫 inputRockRange()，連續轉（沒範圍）用 [-180, 180]。
+function computeInterference(plan, settings, mounts) {
+  const keep = S.activeMotor;
+  const ranges = {};
+  try {
+    [...usedMotorIds()].sort((a, b) => Number(a) - Number(b)).forEach(id => {
+      S.activeMotor = id;
+      const r = inputRockRange();
+      ranges[id] = r && Number.isFinite(r.lo) && Number.isFinite(r.hi) ? { lo: r.lo, hi: r.hi } : { lo: -180, hi: 180 };
+    });
+  } finally { S.activeMotor = keep; }
+  try {
+    return findInterference({ comps: S.comps, modules: S.modules, params: S.topo.params, plan, ranges, exportSettings: settings, mounts });
+  } catch (e) { return []; }
+}
+const homeMountsNow = () => lastModelInputs ? motorFrameExportMounts({ ...lastModelInputs, pts: pointCoords() }) : undefined;
+function currentBuildPlan(settings, mounts) {
+  const cnc = S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
+  return buildPlan({ comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: settings, cnc, mounts });
+}
+function showCncWarnings(parts, settings) {
   const list = cncWarningList(parts);
+  let found = [];
+  try { const m = homeMountsNow(); found = computeInterference(currentBuildPlan(settings, m), settings, m); } catch (e) { found = []; }
+  if (found.length) list.unshift(`干涉 ${found.length} 項，詳見製作包`);
   if (!list.length) return;
   setBanner(`⚠ CNC：${list.slice(0, 3).join('；')}${list.length > 3 ? `；…等 ${list.length} 項` : ''}`);
 }
@@ -1959,7 +1983,7 @@ function exportLinksSvg() {
     }
   });
   transient(count || frameCount || moduleFrameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} SVG${moduleFrameCount ? `＋ ${moduleFrameCount} 個模組底座` : ''}${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
-  showCncWarnings(cncParts);
+  showCncWarnings(cncParts, settings);
 }
 function exportLinksDxf() {
   const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
@@ -1984,7 +2008,7 @@ function exportLinksDxf() {
     }
   });
   transient(count || frameCount || moduleFrameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} DXF${moduleFrameCount ? `＋ ${moduleFrameCount} 個模組底座` : ''}${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
-  showCncWarnings(cncParts);
+  showCncWarnings(cncParts, settings);
 }
 // 製作包用：與匯出相同的零件與機架幾何，只收集 CNC 檢查用的孔與開口（不下載檔案）。
 function collectCncPartsAndFrameWarnings(settings) {
@@ -2008,14 +2032,15 @@ function downloadBuildPack() {
   const stockWarnings = memberStockWarnings(S.comps, settings);
   if (stockWarnings.length) { transient(`尚未產生製作包：${stockWarnings[0]}`); return; }
   const cnc = S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
-  const homeMounts = lastModelInputs ? motorFrameExportMounts({ ...lastModelInputs, pts: pointCoords() }) : undefined;
-  const plan = buildPlan({ comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: settings, cnc, mounts: homeMounts });
+  const homeMounts = homeMountsNow();
+  const plan = currentBuildPlan(settings, homeMounts);
   if (!plan.parts.length) { transient('沒有可匯出的零件或機架'); return; }
+  const interference = computeInterference(plan, settings, homeMounts);
   const { cncParts, frameWarnings } = collectCncPartsAndFrameWarnings(settings);
   const warnings = [...frameWarnings, ...cncWarningList(cncParts)];
   // 目前沒有作品名稱欄位：有模組就用模組名稱串起來，否則「機構作品」。
   const title = (S.modules || []).map(m => m && m.name).filter(Boolean).join('＋') || '機構作品';
-  const html = buildPackHtml(plan, { title, cnc, warnings });
+  const html = buildPackHtml(plan, { title, cnc, warnings, interference });
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

@@ -67,7 +67,7 @@ function holeLayersOf(holes) {
 
 // 沒給 mounts 時，用 comps 的座標自行規劃馬達安裝座（與 app.js motorFrameExportMounts 同形狀）；
 // 機身方向與 app 的 motorMountPatternRotDegForCenter 相同（沿用靜態座標，不看 solver）。
-function deriveMotorMounts(list) {
+export function deriveMotorMounts(list) {
   const pts = pointCoords(list);
   const ids = new Set(motorPointIds(list));
   const planned = buildMotorMounts({
@@ -367,7 +367,7 @@ const escHtml = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '
 const fmtNum = v => String(Number(Number(v).toFixed(3)));
 const KIND_LABEL = { frame: '機架板', gear: '齒輪', rack: '齒條', member: '桿件／板件' };
 
-export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = [] } = {}) {
+export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = [], interference = [] } = {}) {
   const parts = (plan && plan.parts) || [];
   const joints = (plan && plan.joints) || [];
   const motors = (plan && plan.motors) || [];
@@ -406,6 +406,9 @@ export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = []
     ? `<p class="muted">馬達軸（${motorShafts.map(j => e(j.id)).join('、')}）鎖在輪轂或舵盤上，不另配 M3 螺絲。</p>` : '';
   const warnList = (warnings || []).length
     ? `<ul>${warnings.map(w => `<li>${e(w)}</li>`).join('')}</ul>` : '<p class="muted">目前沒有 CNC 警告。</p>';
+  const interferenceList = (interference || []).length
+    ? `<ul>${interference.map(w => `<li>${e(w.message)}</li>`).join('')}</ul>`
+    : '<p class="muted">已依各馬達行程取樣檢查，未發現干涉（仍需實物確認）。</p>';
 
   return `<!doctype html>
 <html lang="zh-Hant">
@@ -445,10 +448,13 @@ ${shaftNote}
 <h2>CNC 注意事項</h2>
 ${warnList}
 
+<h2>干涉檢查</h2>
+${interferenceList}
+
 <h2>尚未驗證</h2>
 <ul>
   <li>TT 輪轂與 MG995 舵盤的孔位用的是常見值，需實量後修改。</li>
-  <li>前後層之間的零件干涉尚未檢查，組裝前請實際比對。</li>
+  <li>干涉檢查為平面近似，仍需實物確認。</li>
   <li>螺絲長度為依關節厚度加防鬆螺帽的估算值，需實物驗證。</li>
 </ul>
 </body>
