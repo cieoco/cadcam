@@ -467,6 +467,17 @@
           <label class="mount-field">孔間距<input data-mg995-mount-setting="screwSpacingMm" type="number" min="0" max="30" step="0.1" onchange="window.blocks.setMg995MountSetting('screwSpacingMm', this.value)" title="同一耳上下兩孔中心距 mm；0＝每耳單孔"></label>
           <label class="mount-field">缺口寬<input data-mg995-mount-setting="cableNotchWidthMm" type="number" min="0" max="20" step="0.5" onchange="window.blocks.setMg995MountSetting('cableNotchWidthMm', this.value)" title="機身尾端線槽缺口寬 mm（出線口兼 180° 反裝防呆）；0＝不開"></label>
           <label class="mount-field">缺口深<input data-mg995-mount-setting="cableNotchDepthMm" type="number" min="0" max="20" step="0.5" onchange="window.blocks.setMg995MountSetting('cableNotchDepthMm', this.value)" title="線槽缺口深 mm（沿機身長向外擴）；0＝不開"></label>
+          <div class="settings-heading">CNC 加工</div>
+          <label class="mount-field">刀徑<input data-cnc-setting="toolDiameterMm" type="number" min="0.5" max="12" step="0.001" onchange="window.blocks.setCncSetting('toolDiameterMm', this.value)" title="銑刀直徑 mm（例：3.175）"></label>
+          <label class="mount-field">板厚<input data-cnc-setting="stockThicknessMm" type="number" min="0.5" max="50" step="0.1" onchange="window.blocks.setCncSetting('stockThicknessMm', this.value)" title="板材厚度 mm"></label>
+          <div class="settings-heading">TT 輪轂 / MG995 舵盤（請實量）</div>
+          <label class="mount-field">輪轂中心孔<input data-drive-setting="ttHubCenterMm" type="number" min="1" max="20" step="0.1" onchange="window.blocks.setDriveSetting('ttHubCenterMm', this.value)" title="TT 馬達輪轂中心孔直徑 mm"></label>
+          <label class="mount-field">輪轂螺絲孔<input data-drive-setting="ttHubScrewMm" type="number" min="0.5" max="8" step="0.1" onchange="window.blocks.setDriveSetting('ttHubScrewMm', this.value)" title="輪轂螺絲孔直徑 mm"></label>
+          <label class="mount-field">輪轂孔距<input data-drive-setting="ttHubScrewSpacingMm" type="number" min="0" max="40" step="0.1" onchange="window.blocks.setDriveSetting('ttHubScrewSpacingMm', this.value)" title="輪轂上下兩孔中心距 mm"></label>
+          <label class="mount-field">舵盤中心孔<input data-drive-setting="hornCenterMm" type="number" min="0" max="20" step="0.1" onchange="window.blocks.setDriveSetting('hornCenterMm', this.value)" title="MG995 舵盤中心孔直徑 mm"></label>
+          <label class="mount-field">舵盤螺絲孔<input data-drive-setting="hornScrewMm" type="number" min="0.5" max="6" step="0.1" onchange="window.blocks.setDriveSetting('hornScrewMm', this.value)" title="舵盤螺絲孔直徑 mm"></label>
+          <label class="mount-field">舵盤螺絲數<input data-drive-setting="hornScrewCount" type="number" min="0" max="8" step="1" onchange="window.blocks.setDriveSetting('hornScrewCount', this.value)" title="舵盤螺絲孔數（整數）"></label>
+          <label class="mount-field">舵盤孔圓徑<input data-drive-setting="hornScrewCircleMm" type="number" min="0" max="40" step="0.1" onchange="window.blocks.setDriveSetting('hornScrewCircleMm', this.value)" title="舵盤螺絲孔圓周直徑 mm"></label>
         </div>
           </details>
           <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>

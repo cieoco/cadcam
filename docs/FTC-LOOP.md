@@ -33,6 +33,7 @@
 | L2a TT 驅動齒輪扁軸孔（第 2 包前半） | Sonnet | `exporters.js`：`gearGeometry` 對 TT 驅動輪輸出 `TT_SHAFT_FLAT` 取代中心圓孔；新增 `inspectGearExport`。測試 `test/gear-drive-hole.mjs` 由主模型先寫。 | 測試全過＋svg2gcode 讀得進。 | 完成（Sonnet 一輪） |
 | L4 CNC 刀徑／板厚＋匯出警告（第 4 包） | Sonnet | `fabrication-profile.js` 新增 `cnc` 群組（3.175 mm／3 mm，缺席靜默補預設）；新檔 `cnc-check.js`；`exporters.js` 的 `cncPartsForExport`；app 匯出後以 banner 顯示。測試 `test/cnc-check.mjs`、更新 `test/fabrication-profile.mjs` 由主模型寫。 | 測試全過＋實際匯出顯示警告。 | 完成（Sonnet 一輪） |
 | L2b 輪轂／舵盤鎖螺絲（第 2 包後半） | Sonnet | `fabrication-profile.js` 新增 `drive` 群組（常見值、缺席靜默補預設）；`exporters.js` 齒輪：TT 驅動輪 `TT_HUB_CENTER`＋2×`TT_HUB_SCREW`（取代 L2a 扁孔），MG995 驅動輪 `MG995_HORN_CENTER`＋N×`MG995_HORN_SCREW`；app 匯出帶 drive、數值仍為預設時提醒實量。 | 測試全過＋匯出 banner。 | 完成（Sonnet 一輪；主模型改提醒條件與 cnc-check 舊期望） |
+| L4c 刀徑／輪轂／舵盤設定欄位 | **Haiku** | `settings.js` 的 `setCncSetting`／`setDriveSetting` 與同步；設定面板 9 個欄位；`window.blocks` 暴露。測試 `test/fabrication-ui.mjs` 由主模型先寫。 | 測試全過＋重載保留（有作品時）。 | 完成（Haiku 一輪；照範本複製類工作可交 Haiku） |
 
 建議順序：S1 → S2 → S3（暖身、互不相依）→ M0 → M1a → M1b → M1c → M1d。
 

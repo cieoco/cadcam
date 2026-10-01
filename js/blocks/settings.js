@@ -45,7 +45,7 @@ export function init(deps) {
   if (deps.pause) pause = deps.pause;
   if (deps.scheduleAutosave) scheduleAutosave = deps.scheduleAutosave;
   if (deps.notify) notify = deps.notify;
-  document.querySelectorAll('[data-export-setting],[data-tt-mount-setting],[data-mg995-mount-setting],#frameMarginInput,#frameHoleInput')
+  document.querySelectorAll('[data-export-setting],[data-tt-mount-setting],[data-mg995-mount-setting],[data-cnc-setting],[data-drive-setting],#frameMarginInput,#frameHoleInput')
     .forEach(input => input.addEventListener('keydown', handleFabricationKey));
 }
 
@@ -119,6 +119,18 @@ function syncMg995MountSettingInputs() {
     document.querySelectorAll(`[data-mg995-mount-setting="${key}"]`).forEach(el => { el.value = value; });
   });
 }
+function syncCncSettingInputs() {
+  const settings = S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
+  Object.entries(settings).forEach(([key, value]) => {
+    document.querySelectorAll(`[data-cnc-setting="${key}"]`).forEach(el => { el.value = value; });
+  });
+}
+function syncDriveSettingInputs() {
+  const settings = S.fabrication?.drive || FABRICATION_DEFAULTS.drive;
+  Object.entries(settings).forEach(([key, value]) => {
+    document.querySelectorAll(`[data-drive-setting="${key}"]`).forEach(el => { el.value = value; });
+  });
+}
 function syncSourceLabel() {
   document.querySelectorAll('[data-fabrication-source]').forEach(el => { el.textContent = sourceLabel; });
 }
@@ -138,13 +150,13 @@ export function applyFabricationProfile(profile, { source = '目前作品的加�
   S.fabrication = result.profile;
   sourceLabel = source;
   applyLegacyMirrors(S.fabrication);
-  syncExportSettingInputs(); syncTtMountSettingInputs(); syncMg995MountSettingInputs(); syncSourceLabel();
+  syncExportSettingInputs(); syncTtMountSettingInputs(); syncMg995MountSettingInputs(); syncCncSettingInputs(); syncDriveSettingInputs(); syncSourceLabel();
   return result;
 }
 export function defaultFabrication() { return JSON.parse(JSON.stringify(FABRICATION_DEFAULTS)); }
 export function legacyLocalFabrication() { return JSON.parse(JSON.stringify(legacyLocalProfile)); }
 export function syncFabricationInputs() {
-  syncExportSettingInputs(); syncTtMountSettingInputs(); syncMg995MountSettingInputs(); syncSourceLabel();
+  syncExportSettingInputs(); syncTtMountSettingInputs(); syncMg995MountSettingInputs(); syncCncSettingInputs(); syncDriveSettingInputs(); syncSourceLabel();
 }
 export function loadExportSettings() {
   let saved = null;
@@ -180,6 +192,12 @@ export function setTtMountSetting(key, value) {
 }
 export function setMg995MountSetting(key, value) {
   return commit('mg995Mount', key, value);
+}
+export function setCncSetting(key, value) {
+  return commit('cnc', key, value);
+}
+export function setDriveSetting(key, value) {
+  return commit('drive', key, value);
 }
 export function handleFabricationKey(event) {
   if (event.key === 'Escape') { event.preventDefault(); syncFabricationInputs(); event.currentTarget?.blur(); }
