@@ -8,7 +8,7 @@ import { S } from './state.js';
 import { pointKeysFor } from './part-types.js';
 import { selectionModule } from './assembly.js';
 import {
-  createModule, addOutput, inferOutput, mountModule, unmountModule, dissolveModule,
+  createModule, addOutput, inferOutput, mountModule, unmountModule, dissolveModule, setMountFlip,
   moduleToTemplate, normalizeTemplate, instantiateTemplate, insertOffset, translateModule,
   BUILTIN_MODULES, builtinTemplate, parseLibrary, serializeLibrary
 } from './module-ops.js';
@@ -116,7 +116,7 @@ export function createModuleEditor(deps) {
     const host = S.modules.find(m => m.id === mod.mount.to.module);
     const hostName = host ? host.name : mod.mount.to.module;
     const outName = host ? outputNameOf(host, mod.mount.to.output) : mod.mount.to.output;
-    return `裝在 ${hostName}・${outName}`;
+    return `裝在 ${hostName}・${outName}${mod.mount.flip ? '（翻面）' : ''}`;
   }
   // 安裝候選：其他模組的每個輸出端，排除自己與自己的子孫；已安裝的模組不需要再列候選。
   function candidatesFor(mod) {
@@ -148,6 +148,7 @@ export function createModuleEditor(deps) {
     return {
       visible: true, kind: 'module', moduleId: mod.id, name: mod.name, mounted,
       mountLabel: mounted ? buildMountLabel(mod) : '未安裝',
+      flipped: mounted && !!mod.mount.flip,
       candidates: candidatesFor(mod),
       canSetOutput, canUnmount: mounted, canDissolve
     };
@@ -220,6 +221,13 @@ export function createModuleEditor(deps) {
     const modId = currentModuleId();
     if (!modId) return;
     applyResult(unmountModule(S.comps, S.modules, modId, S.topo.params, motorState()));
+  }
+  // 翻面／翻回：只改疊層順序（底板移到最外層），同 mountTo 走 applyResult（一筆 undo）。
+  function toggleFlip() {
+    const modId = currentModuleId();
+    if (!modId) { transient('請先選取要翻面的模組。'); return; }
+    const mod = S.modules.find(m => m.id === modId);
+    applyResult(setMountFlip(S.comps, S.modules, modId, !(mod && mod.mount && mod.mount.flip)));
   }
   function setOutput() {
     const modId = currentModuleId();
@@ -403,6 +411,7 @@ export function createModuleEditor(deps) {
         el.appendChild(sel);
       }
       if (ps.canUnmount) addButton(el, '拆下', () => unmount());
+      if (ps.mounted) addButton(el, ps.flipped ? '翻回' : '翻面', () => toggleFlip());
       if (ps.canSetOutput) addButton(el, '設為輸出端', () => setOutput());
       addButton(el, '💾 存到我的模組庫', () => { saveToLibrary(); renderLibrary(); });
       addButton(el, '⬇ 匯出模組', () => exportTemplate());
@@ -422,7 +431,7 @@ export function createModuleEditor(deps) {
     library, panelState, sync,
     insertBuiltin, insertLocal,
     saveAsModule, rename,
-    mountTo, unmount, setOutput, dissolve,
+    mountTo, unmount, toggleFlip, setOutput, dissolve,
     saveToLibrary, exportTemplate, importLibraryText, removeFromLibrary
   };
 }

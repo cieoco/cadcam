@@ -23,6 +23,7 @@ const D2R = Math.PI / 180;
 const MIN_PENETRATION_MM = 0.5;
 const HEAD_RADIUS_MM = 2.8;      // M3 螺絲頭
 const NUT_RADIUS_MM = 3.2;       // M3 防鬆螺帽
+const STANDOFF_RADIUS_MM = 3;    // L7：M3 隔柱外半徑（直徑 6 mm）
 const MOTOR_BODY_MM = 27;        // MG995 機身約 26 mm（舊版以 9 層 3 mm 板估算）
 const HEAD_HEIGHT_MM = 2.4;      // M3 圓頭螺絲頭高
 const NUT_HEIGHT_MM = 5;         // 尼龍防鬆螺帽 4 mm＋螺絲尾端外露 1 mm
@@ -413,6 +414,28 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
               { ...h.fix });
           }
         });
+      });
+    });
+
+    // 2b. L7 隔柱：螺絲中間沒有板的層會套隔柱（半徑 3 mm 的圓柱），掃到那些層的其他零件就是干涉；隔圈解不掉，不附 fix。
+    joints.forEach(j => {
+      if (!(Number(j.standoffMm) > 0)) return;
+      const p = pose.points[j.id];
+      if (!validPt(p)) return;
+      const jp = j.parts.map(n => partByName.get(n)).filter(Boolean);
+      const jointLayers = new Set(jp.map(q => q.layer));
+      const empty = new Set();
+      for (let l = j.layers[0] + 1; l < j.layers[1]; l++) if (!jointLayers.has(l)) empty.add(l);
+      if (!empty.size) return;
+      const disc = [circlePoly({ x: Number(p.x), y: Number(p.y) }, STANDOFF_RADIUS_MM)];
+      parts.forEach(v => {
+        if (!empty.has(v.layer)) return;
+        if (j.parts.includes(v.name) || j.parts.some(n => sameBody(n, v.name))) return;
+        if (seen.has(keyOf('hardware', [...j.parts, v.name]))) return;
+        if (polysOverlap(disc, partPolys(pose, v))) {
+          report('hardware', [...j.parts, v.name], v.layer, pose,
+            `關節 ${j.id}（${j.parts.join('、')}）中間的 ${Math.round(j.standoffMm * 10) / 10} mm 隔柱穿過第 ${v.layer} 層，${when(pose)}隔柱會刮到 ${v.name}。建議：調整零件路徑，或避免讓這顆螺絲跨過這一層。`);
+        }
       });
     });
 

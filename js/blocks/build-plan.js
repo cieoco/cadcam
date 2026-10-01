@@ -251,7 +251,15 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
       });
       const raw = computeBodyLayers(groupBodies.map(b => ({ joints: b.joints, lift: b.lift })), groundIds);
       const min = Math.min(...raw);
-      groupBodies.forEach((b, i) => { b.part.layer = B + 1 + (raw[i] - min); });
+      const max = Math.max(...raw);
+      const flipped = !!(key !== null && modById.get(key).mount.flip);
+      if (flipped) {
+        // L7 翻面：疊層鏡射——零件先、底板最外層（B＋(max-min)＋1），MG995 機身因此朝外。
+        groupBodies.forEach((b, i) => { b.part.layer = B + (max - raw[i]); });
+        (partsOfGroup.get(key) || []).filter(p => p.kind === 'frame').forEach(p => { p.layer = B + (max - min) + 1; });
+      } else {
+        groupBodies.forEach((b, i) => { b.part.layer = B + 1 + (raw[i] - min); });
+      }
     }
     // 齒條：與帶動它的小齒輪同層（嚙合同平面）；沒有 pinion 就 B＋1。
     list.forEach(c => {
@@ -297,6 +305,23 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     p.zMm = r3(z);
   });
 
+  // L7 隔柱：螺絲兩端之間、沒有這個關節任何零件的層（中間空著）要用隔柱撐住。
+  // 一段空層的隔柱長度＝空層厚度＋落在那段空隙裡的隔圈（隔圈併進隔柱，不另外列隔圈）。
+  const standoffOf = (lo, hi, jointLayers) => {
+    const has = new Set(jointLayers);
+    let sum = 0;
+    const absorbed = new Set();
+    let prev = lo;
+    for (let l = lo + 1; l <= hi; l++) {
+      if (!has.has(l)) continue;
+      if (l - prev > 1) {
+        for (let k = prev + 1; k < l; k++) sum += layerThickness.get(k) || stockMm;
+        gaps.forEach(g => { if (g.below > prev && g.below <= l) { sum += g.mm; absorbed.add(g.below); } });
+      }
+      prev = l;
+    }
+    return { mm: r3(sum), absorbed };
+  };
   const joints = [];
   byId.forEach((entries, id) => {
     if (entries.length < 2) return;
@@ -307,14 +332,17 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     else if (entries.some(e => e.info.mountBolt)) kind = 'mount-bolt';
     else if (motorIds.has(id)) kind = 'motor-shaft';
     const hole = entries.map(e => e.info.holeDiameterMm).find(v => finitePos(v));
-    const crossed = gaps.filter(g => g.below > lo && g.below <= hi).map(g => ({ ...g }));
+    const standoff = standoffOf(lo, hi, layers);
+    const crossed = gaps.filter(g => g.below > lo && g.below <= hi && !standoff.absorbed.has(g.below)).map(g => ({ ...g }));
+    const absorbedMm = gaps.filter(g => standoff.absorbed.has(g.below)).reduce((s, g) => s + g.mm, 0);
     joints.push({
       id,
       kind,
       parts: entries.map(e => e.part.name),
       layers: [lo, hi],
       holeDiameterMm: hole === undefined ? null : Number(hole),
-      spanMm: r3(spanOf(lo, hi) + crossed.reduce((s, g) => s + g.mm, 0)),
+      spanMm: r3(spanOf(lo, hi) + crossed.reduce((s, g) => s + g.mm, 0) + absorbedMm),
+      standoffMm: standoff.mm,
       spacers: crossed
     });
   });
@@ -359,10 +387,12 @@ export function hardwareList(plan) {
     if (nut) nuts += n;
   };
   const spacerRows = new Map();   // mm -> { qty, belows:Set }（只算有螺絲的關節；馬達軸不算）
+  const standoffRows = new Map(); // mm -> qty（L7 隔柱：螺絲中間沒有板的地方）
   joints.forEach(j => {
     const spec = jointScrewSpec(j);
     if (!spec) return;
     addScrew(spec, JOINT_USE_LABEL[j.kind], 1, true);
+    if (Number(j.standoffMm) > 0) standoffRows.set(j.standoffMm, (standoffRows.get(j.standoffMm) || 0) + 1);
     (j.spacers || []).forEach(g => {
       if (!spacerRows.has(g.mm)) spacerRows.set(g.mm, { qty: 0, belows: new Set() });
       const row = spacerRows.get(g.mm);
@@ -390,6 +420,9 @@ export function hardwareList(plan) {
   [...spacerRows.entries()].sort((a, b) => a[0] - b[0]).forEach(([mm, row]) => {
     const between = [...row.belows].sort((a, b) => a - b).map(b => `第 ${b - 1}、${b} 層之間`).join('；');
     rows.push({ spec: `M3 隔圈 ${fmtNum(mm)} mm`, qty: row.qty, note: `套在螺絲上，墊在${between}` });
+  });
+  [...standoffRows.entries()].sort((a, b) => a[0] - b[0]).forEach(([mm, qty]) => {
+    rows.push({ spec: `M3 隔柱 ${fmtNum(mm)} mm`, qty, note: '對鎖螺絲中間沒有板的地方用隔柱撐住' });
   });
   if (nuts > 0) rows.push({ spec: 'M3 防鬆螺帽', qty: nuts, note: '穿透式 M3 螺絲各一顆（鎖進輪轂的 M3×8 不需要）' });
   const ttCount = motors.filter(m => m.type === 'tt').length;
@@ -436,7 +469,12 @@ export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = []
         : '樞軸：防鬆螺帽鎖到不晃但可轉動。';
       const passSp = (j.spacers || []).length
         ? `中間在${j.spacers.map(g => `第 ${g.below - 1}、${g.below} 層之間套 ${fmtNum(g.mm)} mm 隔圈`).join('、')}。` : '';
-      items.push(`<li>${spec ? e(spec) : '螺絲（孔徑不是 M3，請自行選配）'} 穿過 ${through}（關節 ${e(j.id)}，第 ${j.layers[0]}～${j.layers[1]} 層）。${passSp}${how}</li>`);
+      const layerSet = new Set(parts.filter(p => j.parts.includes(p.name)).map(p => p.layer));
+      const emptyLayers = [];
+      for (let l = j.layers[0] + 1; l < j.layers[1]; l++) if (!layerSet.has(l)) emptyLayers.push(l);
+      const passSt = Number(j.standoffMm) > 0 && emptyLayers.length
+        ? `中間套 ${fmtNum(j.standoffMm)} mm 隔柱撐住（第 ${emptyLayers[0]}～${emptyLayers[emptyLayers.length - 1]} 層沒有板）。` : '';
+      items.push(`<li>${spec ? e(spec) : '螺絲（孔徑不是 M3，請自行選配）'} 穿過 ${through}（關節 ${e(j.id)}，第 ${j.layers[0]}～${j.layers[1]} 層）。${passSp}${passSt}${how}</li>`);
     });
     return `<section class="step"><h3>第 ${n} 層：${here.map(p => e(KIND_LABEL[p.kind] || p.kind)).filter((v, i, a) => a.indexOf(v) === i).join('、')}</h3><ol>${items.join('')}</ol></section>`;
   }).join('');

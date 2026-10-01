@@ -358,6 +358,20 @@ export function unmountModule(comps, modules, moduleId, params, motorState) {
   return { ok: true, comps: newComps, modules: newModules, reason: 'ok' };
 }
 
+// 翻面：只改疊層順序（底板移到最外層），零件座標不動；flip 為假時移除 flip 欄位。不改輸入。
+export function setMountFlip(comps, modules, moduleId, flip) {
+  const list = Array.isArray(comps) ? comps : [];
+  const modList = Array.isArray(modules) ? modules : [];
+  const idx = modList.findIndex(m => m.id === moduleId);
+  if (idx < 0) return { ok: false, comps: list, modules: modList, reason: 'no-module' };
+  const mod = modList[idx];
+  if (!mod.mount) return { ok: false, comps: list, modules: modList, reason: 'not-mounted' };
+  const { flip: _drop, ...rest } = mod.mount;
+  const mount = flip ? { ...rest, flip: true } : rest;
+  const newModules = modList.map((m, i) => i === idx ? { ...m, mount } : m);
+  return { ok: true, comps: list, modules: newModules, reason: 'ok' };
+}
+
 // 解散：只允許未安裝、且沒有其他模組裝在它上面的模組。
 export function dissolveModule(comps, modules, moduleId) {
   const list = Array.isArray(comps) ? comps : [];

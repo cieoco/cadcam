@@ -115,7 +115,9 @@ function validateMount(rawMount, moduleId, outputsByModule, validModuleIds, warn
       if (safeId(k) && isFiniteNum(rawMount.home[k])) home[k] = Number(rawMount.home[k]);
     });
   }
-  return { to: { module: to.module, output: to.output }, ref: { x: Number(ref.x), y: Number(ref.y), a: Number(ref.a) }, home };
+  const mount = { to: { module: to.module, output: to.output }, ref: { x: Number(ref.x), y: Number(ref.y), a: Number(ref.a) }, home };
+  if (rawMount.flip === true) mount.flip = true;   // L7：翻面安裝（只有明確的 true 才保留）
+  return mount;
 }
 
 export function normalizeModules(rawModules, comps) {
