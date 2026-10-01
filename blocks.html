@@ -482,6 +482,7 @@
           </details>
           <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>
           <button class="tool-btn" onclick="window.blocks.exportLinksDxf()" title="逐一匯出所畫桿件為 DXF">匯出 DXF</button>
+          <button class="tool-btn" onclick="window.blocks.downloadBuildPack()" title="板件清單＋五金清單＋組裝步驟（可列印）">製作包</button>
         </div>
       </details>
       <select class="example-select" id="exampleSelect" onchange="window.blocks.loadExample(this.value)" title="載入課堂範例">
@@ -888,6 +889,7 @@
       </details>
       <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>
       <button class="tool-btn" onclick="window.blocks.exportLinksDxf()" title="逐一匯出所畫桿件為 DXF">匯出 DXF</button>
+      <button class="tool-btn" onclick="window.blocks.downloadBuildPack()" title="板件清單＋五金清單＋組裝步驟（可列印）">製作包</button>
       <button class="tool-btn" onclick="window.blocks.openMobileOpenMenu()" title="開啟舊檔或課堂範例">📂 開啟</button>
       <button class="tool-btn" onclick="window.blocks.share()" title="複製分享連結">🔗 分享</button>
       <button class="tool-btn danger-btn" onclick="window.blocks.confirmClearAll()" title="清空目前全部零件">🗑 清空全部</button>
@@ -935,7 +937,8 @@
       "./js/blocks/jaw-tip-handle.js": "./js/blocks/jaw-tip-handle.js?v=20260925_stock1",
       "./js/blocks/view.js": "./js/blocks/view.js?v=20260925_stock1",
       "./js/blocks/mechanism-layer-render.js": "./js/blocks/mechanism-layer-render.js?v=20260930_m1b2",
-      "./js/blocks/exporters.js": "./js/blocks/exporters.js?v=20261001_l50",
+      "./js/blocks/exporters.js": "./js/blocks/exporters.js?v=20261001_l5a",
+      "./js/blocks/build-plan.js": "./js/blocks/build-plan.js?v=20261001_l5b",
       "./js/blocks3d/scene-model.js": "./js/blocks3d/scene-model.js?v=20260925_stock2",
       "./js/blocks/gripper-workflow.js": "./js/blocks/gripper-workflow.js?v=20260925_stock1",
       "./js/blocks/gripper-workflow.js?v=20260925_r1b": "./js/blocks/gripper-workflow.js?v=20260925_stock1",
@@ -953,6 +956,6 @@
       "./js/blocks3d/viewer.js": "./js/blocks3d/viewer.js?v=20260930_b2"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20261001_l50"></script>
+  <script type="module" src="js/blocks/app.js?v=20261001_l5b"></script>
 </body>
 </html>

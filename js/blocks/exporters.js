@@ -22,7 +22,7 @@ const esc = s => String(s).replace(/[&<>"']/g, ch => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'
 }[ch]));
 
-const safeName = s => String(s || 'link').replace(/[^\w.-]+/g, '_');
+export const safeName = s => String(s || 'link').replace(/[^\w.-]+/g, '_');
 
 export function normalizeExportSettings(settings = {}) {
   const barWidth = Number(settings.barWidthMm);
@@ -72,7 +72,7 @@ function linkLength(comp, pts, params) {
   return round(d || param || 1, 3);
 }
 
-function exportableLinks(comps, pts, params) {
+export function exportableLinks(comps, pts, params) {
   return comps
     .filter(c => c && c.type === 'bar' && c.p1 && c.p2)
     .map(c => ({ comp: c, length: linkLength(c, pts, params) }))
@@ -89,21 +89,21 @@ function pointForExport(comp, key, pts) {
     : null;
 }
 
-function exportablePlates(comps, pts) {
+export function exportablePlates(comps, pts) {
   return comps
     .filter(c => c && c.type === 'triangle' && c.p1 && c.p2 && c.p3)
     .map(c => ({ comp: c, points: [pointForExport(c, 'p1', pts), pointForExport(c, 'p2', pts), pointForExport(c, 'p3', pts)] }))
     .filter(item => item.points.every(Boolean));
 }
 
-function exportableGears(comps, params, settings) {
+export function exportableGears(comps, params, settings) {
   return comps
     .filter(c => c && c.type === 'gear' && c.p1 && c.p2)
     .map(c => ({ comp: c, geometry: gearGeometry(c, params, settings) }))
     .filter(item => item.geometry && item.geometry.outline.length >= 3);
 }
 
-function exportableRacks(comps, params) {
+export function exportableRacks(comps, params) {
   return comps
     .filter(c => c && c.type === 'rack' && c.p1)
     .map(c => ({ comp: c, geometry: rackGeometry(c, params, c.pinion ? comps.find(g => g && g.type === 'gear' && g.id === c.pinion) || null : null) }))
