@@ -43,8 +43,10 @@ const circlePts = (r, n = 36) => Array.from({ length: n }, (_, i) => ({ x: r * M
   const names = parts.map(p => p.name).sort();
   check('cncPartsForExport：列出桿件與齒輪（名稱同匯出檔名）', names.includes('LiftPinion') && names.includes('Crank'));
   const lp = parts.find(p => p.name === 'LiftPinion');
-  check('cncPartsForExport：TT 驅動輪帶著 TT_SHAFT_FLAT 開口', lp && lp.cutouts.some(c => c.layer === 'TT_SHAFT_FLAT'));
-  const w = CC.cncWarnings(parts, cnc);
-  check('TT 扁軸孔在 3.175 刀下被提醒（尖角會留圓角、軸可能塞不進）', w.some(m => m.includes('LiftPinion') && m.includes('TT_SHAFT_FLAT')));
+  check('cncPartsForExport：TT 驅動輪帶著輪轂孔（L2b 取代扁孔）', lp && lp.holes.some(h => h.layer === 'TT_HUB_SCREW') && lp.holes.some(h => h.layer === 'TT_HUB_CENTER'));
+  const servo = { type: 'gear', id: 'GearA', teeth: 15, module: 4, radiusParam: 'R', motorType: 'mg995', p1: { id: 'S', x: 0, y: 0, physicalMotor: '2' }, p2: { id: 'Q', x: 18, y: 0 } };
+  const sp = Ex.cncPartsForExport([servo], { S: { x: 0, y: 0 }, Q: { x: 18, y: 0 } }, { R: 30 }, { holeDiameterMm: 12.96 }, []);
+  const w = CC.cncWarnings(sp, cnc);
+  check('MG995 舵盤 Ø2.2 螺絲孔在 3.175 刀下被提醒要用鑽頭', w.some(m => m.includes('GearA') && m.includes('MG995_HORN_SCREW') && /鑽/.test(m)));
 }
 report('cnc-check');

@@ -1,4 +1,4 @@
-// L2a（走通舉升＋夾取 第 2 包）：TT 帶動的齒輪中心切 TT 扁軸孔（D-D），才能真的傳扭。
+// L2（走通舉升＋夾取 第 2 包）：被馬達帶動的齒輪要能傳扭——TT 用輪轂鎖螺絲、MG995 用圓舵盤鎖螺絲（L2b 取代 L2a 的扁孔）。
 import { check, report } from './_harness.mjs';
 
 class FakeAnchor { click() {} remove() {} }
@@ -17,30 +17,39 @@ const gear = (id, extra = {}, p1extra = {}) => ({ type: 'gear', id, teeth: 15, m
 const settings = { holeDiameterMm: 12.96 };
 const radii = pts => pts.map(p => Math.hypot(p.x, p.y));
 
-// TT 驅動輪
+const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
+const holesOn = (g, layer) => g.holes.filter(h => h.layer === layer);
+// TT 驅動輪：輪轂鎖螺絲（L2b，使用者決定；取代 L2a 的 D 型扁孔，3.175 刀做不出貼合的扁孔）
 {
   const g = Ex.inspectGearExport(gear('TTG', {}, { physicalMotor: '1' }), params, settings);
-  const center = g.holes.filter(h => h.layer === 'CENTER_HOLE');
-  const flats = (g.cutouts || []).filter(c => c.layer === 'TT_SHAFT_FLAT');
-  check('TT 驅動輪：中心不再是圓孔', center.length === 0);
-  check('TT 驅動輪：中心是一個 TT 扁軸孔', flats.length === 1);
-  const pts = flats[0]?.points || [];
-  check('扁軸孔外徑 ≈ 5.4 mm（預設）', pts.length > 4 && Math.abs(Math.max(...radii(pts)) * 2 - 5.4) < 0.05);
-  const xs = pts.map(p => Math.abs(p.x)), ys = pts.map(p => Math.abs(p.y));
-  const across = Math.min(Math.max(...xs), Math.max(...ys)) * 2;
-  check('扁軸孔兩平面間距 ≈ 3.7 mm（預設）', Math.abs(across - 3.7) < 0.05);
-  check('扁軸孔圍繞齒輪中心', Math.abs(pts.reduce((s, p) => s + p.x, 0) / pts.length) < 0.5 && Math.abs(pts.reduce((s, p) => s + p.y, 0) / pts.length) < 0.5);
-  check('輸出孔（PIN_HOLE）不變', g.holes.some(h => h.layer === 'PIN_HOLE' && Math.abs(h.r - 2.5) < 1e-9));
-  const g2 = Ex.inspectGearExport(gear('TTG', {}, { physicalMotor: '1' }), params, { ...settings, ttShaftFlatDiameterMm: 5.6, ttShaftFlatThicknessMm: 3.9 });
-  const p2 = g2.cutouts[0].points;
-  check('扁軸孔尺寸跟著匯出設定', Math.abs(Math.max(...radii(p2)) * 2 - 5.6) < 0.05);
+  check('TT 驅動輪：沒有 12.96 中心圓孔、也沒有 TT 扁孔', holesOn(g, 'CENTER_HOLE').length === 0 && !(g.cutouts || []).some(c => c.layer === 'TT_SHAFT_FLAT'));
+  const c = holesOn(g, 'TT_HUB_CENTER'), sc = holesOn(g, 'TT_HUB_SCREW');
+  check('TT 驅動輪：中心過軸孔 Ø6（預設）', c.length === 1 && near(c[0].x, 0) && near(c[0].y, 0) && near(c[0].r, 3));
+  check('TT 驅動輪：兩個 Ø3.2 輪轂螺絲孔、孔距 12、對稱於中心', sc.length === 2 && sc.every(h => near(h.r, 1.6)) &&
+    near(Math.hypot(sc[0].x - sc[1].x, sc[0].y - sc[1].y), 12) && near(sc[0].x + sc[1].x, 0) && near(sc[0].y + sc[1].y, 0));
+  check('輸出孔（PIN_HOLE）不變', holesOn(g, 'PIN_HOLE').some(h => near(h.r, 2.5)));
+  const drive = { ttHubCenterMm: 7, ttHubScrewMm: 3, ttHubScrewSpacingMm: 16, hornCenterMm: 5, hornScrewMm: 2, hornScrewCount: 6, hornScrewCircleMm: 18 };
+  const g2 = Ex.inspectGearExport(gear('TTG', {}, { physicalMotor: '1' }), params, { ...settings, drive });
+  const sc2 = holesOn(g2, 'TT_HUB_SCREW');
+  check('輪轂尺寸跟著 settings.drive', sc2.length === 2 && near(holesOn(g2, 'TT_HUB_CENTER')[0]?.r, 3.5) && sc2.every(h => near(h.r, 1.5)) && near(Math.hypot(sc2[0].x - sc2[1].x, sc2[0].y - sc2[1].y), 16));
 }
-// 從動輪、MG995 驅動輪維持原樣（MG995 舵盤介面另案 L2b）
+// MG995 驅動輪：圓舵盤鎖螺絲
+{
+  const g = Ex.inspectGearExport(gear('SRV', { motorType: 'mg995' }, { physicalMotor: '2' }), params, settings);
+  const c = holesOn(g, 'MG995_HORN_CENTER'), sc = holesOn(g, 'MG995_HORN_SCREW');
+  check('MG995 驅動輪：沒有 12.96 中心圓孔', holesOn(g, 'CENTER_HOLE').length === 0);
+  check('MG995 驅動輪：中心孔 Ø6（預設）', c.length === 1 && near(c[0].r, 3));
+  check('MG995 驅動輪：4 個 Ø2.2 螺絲孔平均分布在 Ø14 圓上', sc.length === 4 && sc.every(h => near(h.r, 1.1) && near(Math.hypot(h.x, h.y), 7)) &&
+    near(sc.reduce((s, h) => s + h.x, 0), 0) && near(sc.reduce((s, h) => s + h.y, 0), 0));
+  const g6 = Ex.inspectGearExport(gear('SRV', { motorType: 'mg995' }, { physicalMotor: '2' }), params,
+    { ...settings, drive: { ttHubCenterMm: 6, ttHubScrewMm: 3.2, ttHubScrewSpacingMm: 12, hornCenterMm: 6, hornScrewMm: 2, hornScrewCount: 6, hornScrewCircleMm: 18 } });
+  check('舵盤螺絲數與孔圓跟著 settings.drive', holesOn(g6, 'MG995_HORN_SCREW').length === 6 && holesOn(g6, 'MG995_HORN_SCREW').every(h => near(Math.hypot(h.x, h.y), 9)));
+}
+// 從動輪不變
 {
   const idle = Ex.inspectGearExport(gear('IDL'), params, settings);
-  check('從動輪：中心仍是 12.96 圓孔、沒有扁軸孔', idle.holes.some(h => h.layer === 'CENTER_HOLE' && Math.abs(h.r - 6.48) < 1e-9) && !(idle.cutouts || []).length);
-  const servo = Ex.inspectGearExport(gear('SRV', { motorType: 'mg995' }, { physicalMotor: '2' }), params, settings);
-  check('MG995 驅動輪：本包不改（仍是圓孔、沒有 TT 扁軸孔）', servo.holes.some(h => h.layer === 'CENTER_HOLE') && !(servo.cutouts || []).some(c => c.layer === 'TT_SHAFT_FLAT'));
+  check('從動輪：中心仍是 12.96 圓孔、沒有輪轂／舵盤孔', holesOn(idle, 'CENTER_HOLE').some(h => near(h.r, 6.48)) &&
+    !idle.holes.some(h => /HUB|HORN/.test(h.layer)) && !(idle.cutouts || []).length);
 }
 // 實際匯出檔
 {
@@ -49,12 +58,7 @@ const radii = pts => pts.map(p => Math.hypot(p.x, p.y));
   const pts = { TTGC: { x: 0, y: 0 }, TTGP: { x: 18, y: 0 }, IDLC: { x: 60, y: 0 }, IDLP: { x: 78, y: 0 } };
   Ex.exportLinksAsDxf(comps, pts, params, settings, []);
   const dxf = await Promise.all(downloads.map(b => b.text()));
-  const drv = dxf.find(t => t.includes('TT_SHAFT_FLAT')), idl = dxf.filter(t => !t.includes('TT_SHAFT_FLAT'));
-  check('DXF：驅動輪檔含 TT_SHAFT_FLAT 聚合線、不含 CENTER_HOLE', drv && /LWPOLYLINE\n8\nTT_SHAFT_FLAT/.test(drv) && !drv.includes('CENTER_HOLE'));
-  check('DXF：從動輪檔仍有 CENTER_HOLE', idl.length === 1 && idl[0].includes('CENTER_HOLE'));
-  downloads.length = 0;
-  Ex.exportLinksAsSvg(comps, pts, params, settings, []);
-  const svg = await Promise.all(downloads.map(b => b.text()));
-  check('SVG：驅動輪以 path 畫出 TT_SHAFT_FLAT（閉合）', svg.some(t => /<path d="M[^"]+Z?"[^>]*data-layer="TT_SHAFT_FLAT"/.test(t)));
+  check('DXF：驅動輪檔含 TT_HUB_CENTER 與 TT_HUB_SCREW、不含 CENTER_HOLE', dxf.some(t => t.includes('TT_HUB_CENTER') && t.includes('TT_HUB_SCREW') && !t.includes('CENTER_HOLE\n')));
+  check('DXF：從動輪檔仍有 CENTER_HOLE', dxf.filter(t => !t.includes('TT_HUB')).every(t => t.includes('CENTER_HOLE')));
 }
 report('gear-drive-hole');

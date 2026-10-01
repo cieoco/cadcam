@@ -1920,11 +1920,17 @@ function cncFramePart(name, nodes, settings, mounts) {
 // 匯出後依刀徑顯示警告（前 3 條＋「…等 N 項」）；沒有警告就不動 banner。
 function showCncWarnings(parts) {
   const list = cncWarnings(parts.filter(Boolean), S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc);
+  // 輪轂／舵盤孔位若沒有作品明確設定，用的是常見預設值：提醒實量。
+  // 作品的 drive 數值若都還是常見預設值（使用者沒實量改過），提醒一次；S.fabrication 載入後一定完整，不能用「有沒有 drive」判斷。
+  const driveIsDefault = Object.entries(FABRICATION_DEFAULTS.drive).every(([k, v]) => (S.fabrication?.drive?.[k] ?? v) === v);
+  if (driveIsDefault && parts.some(p => p && (p.holes || []).some(h => /^(TT_HUB_|MG995_HORN_)/.test(h.layer || '')))) {
+    list.unshift('TT 輪轂／MG995 舵盤孔位用的是常見預設值，請實量後修改');
+  }
   if (!list.length) return;
   setBanner(`⚠ CNC：${list.slice(0, 3).join('；')}${list.length > 3 ? `；…等 ${list.length} 項` : ''}`);
 }
 function exportLinksSvg() {
-  const settings = Settings.exportSettings(), nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
+  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
   const stockWarnings = memberStockWarnings(S.comps, settings);
   if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
   // 有宿主機架桿的 mount 隨該桿匯出（特徵切進桿身）；剩下的才進 frame.svg；已安裝模組另出各自的機架檔。
@@ -1950,7 +1956,7 @@ function exportLinksSvg() {
   showCncWarnings(cncParts);
 }
 function exportLinksDxf() {
-  const settings = Settings.exportSettings(), nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
+  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
   const stockWarnings = memberStockWarnings(S.comps, settings);
   if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
   const freeMounts = splitFrameMounts(Exporters.splitMountsByHost(S.comps, mounts).free, S.comps, S.modules).world;

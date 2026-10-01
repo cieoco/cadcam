@@ -23,6 +23,11 @@ assert.deepEqual(FABRICATION_DEFAULTS, {
   },
   // L4（走通舉升＋夾取）：CNC 刀徑與板厚。使用者現場：3.175 mm 銑刀、3 mm 木板。
   cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 },
+  // L2b：馬達與齒輪的接法（常見值，請實量後修改）。TT 輪轂兩螺絲；MG995 圓舵盤 N 螺絲。
+  drive: {
+    ttHubCenterMm: 6, ttHubScrewMm: 3.2, ttHubScrewSpacingMm: 12,
+    hornCenterMm: 6, hornScrewMm: 2.2, hornScrewCount: 4, hornScrewCircleMm: 14,
+  },
 });
 assert.equal(Object.isFrozen(FABRICATION_DEFAULTS), true);
 assert.equal(Object.isFrozen(FABRICATION_DEFAULTS.cnc), true);
@@ -54,9 +59,19 @@ const full = normalizeFabricationProfile(nonDefault);
 assert.deepEqual(nonDefault, original, 'normalization must not mutate its input');
 assert.equal(full.ok, true);
 assert.equal(full.status, 'present');
-assert.deepEqual(full.profile, { ...nonDefault, cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 } },
-  'older three-group profiles round-trip and get the cnc defaults');
-assert.deepEqual(full.warnings, [], 'a missing cnc group (older works) is filled silently');
+assert.deepEqual(full.profile, { ...nonDefault, cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 }, drive: { ...FABRICATION_DEFAULTS.drive } },
+  'older three-group profiles round-trip and get the cnc and drive defaults');
+assert.deepEqual(full.warnings, [], 'missing cnc / drive groups (older works) are filled silently');
+
+// drive 群組：完整往返、範圍、螺絲數為整數
+const withDrive = { ...nonDefault, drive: { ttHubCenterMm: 7, ttHubScrewMm: 3, ttHubScrewSpacingMm: 14.5, hornCenterMm: 5, hornScrewMm: 2, hornScrewCount: 6, hornScrewCircleMm: 16 } };
+const driveFull = normalizeFabricationProfile(withDrive);
+assert.equal(driveFull.ok, true);
+assert.deepEqual(driveFull.profile.drive, withDrive.drive);
+assert.deepEqual(driveFull.warnings, []);
+assert.equal(normalizeFabricationProfile({ ...nonDefault, drive: { ...withDrive.drive, hornScrewCount: 2.5 } }).ok, false, 'screw count must be an integer');
+assert.equal(normalizeFabricationProfile({ ...nonDefault, drive: { ...withDrive.drive, hornScrewCount: 9 } }).ok, false, 'screw count 0..8');
+assert.equal(normalizeFabricationProfile({ ...nonDefault, drive: { ...withDrive.drive, ttHubScrewSpacingMm: 80 } }).ok, false, 'hub spacing range');
 assert.deepEqual(normalizeFabricationProfile(full.profile).profile, full.profile);
 
 // cnc 群組：保留到 0.001 mm（3.175 不可被四捨五入成 3.18）、範圍檢查、完整往返

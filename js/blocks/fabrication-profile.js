@@ -39,6 +39,17 @@ export const FABRICATION_DEFAULTS = Object.freeze({
     toolDiameterMm: 3.175,
     stockThicknessMm: 3,
   }),
+  // 馬達帶動齒輪的鎖固孔：TT 用附的輪轂鎖兩顆螺絲、MG995 用圓舵盤鎖 N 顆螺絲。
+  // 以下是常見值，請實量輪轂／舵盤後修改。
+  drive: freezeRecord({
+    ttHubCenterMm: 6,
+    ttHubScrewMm: 3.2,
+    ttHubScrewSpacingMm: 12,
+    hornCenterMm: 6,
+    hornScrewMm: 2.2,
+    hornScrewCount: 4,
+    hornScrewCircleMm: 14,
+  }),
 });
 
 const RANGES = Object.freeze({
@@ -73,6 +84,15 @@ const RANGES = Object.freeze({
     toolDiameterMm: [0.5, 12],
     stockThicknessMm: [0.5, 50],
   }),
+  drive: freezeRecord({
+    ttHubCenterMm: [1, 20],
+    ttHubScrewMm: [0.5, 8],
+    ttHubScrewSpacingMm: [0, 40],
+    hornCenterMm: [0, 20],
+    hornScrewMm: [0.5, 6],
+    hornScrewCount: [0, 8],
+    hornScrewCircleMm: [0, 40],
+  }),
 });
 
 const GROUPS = Object.freeze(Object.keys(FABRICATION_DEFAULTS).filter(key => key !== 'v'));
@@ -84,6 +104,7 @@ const cloneDefaults = () => ({
   ttMount: { ...FABRICATION_DEFAULTS.ttMount },
   mg995Mount: { ...FABRICATION_DEFAULTS.mg995Mount },
   cnc: { ...FABRICATION_DEFAULTS.cnc },
+  drive: { ...FABRICATION_DEFAULTS.drive },
 });
 const roundHundredth = value => Math.round((value + Number.EPSILON) * 100) / 100;
 const roundThousandth = value => Math.round((value + Number.EPSILON) * 1000) / 1000;
@@ -99,6 +120,9 @@ function validateKnownValue(group, key, value) {
   const [min, max] = RANGES[group][key];
   if (value < min || value > max) {
     return invalid(`${group}.${key} 必須介於 ${min}–${max} mm。`, `${group}.${key}`);
+  }
+  if (group === 'drive' && key === 'hornScrewCount' && !Number.isInteger(value)) {
+    return invalid('drive.hornScrewCount 必須是整數。', 'drive.hornScrewCount');
   }
   return { ok: true, value: group === 'cnc' ? roundThousandth(value) : roundHundredth(value) };
 }
@@ -139,8 +163,8 @@ export function normalizeFabricationProfile(raw) {
   const profile = cloneDefaults();
   for (const group of GROUPS) {
     if (!own(raw, group)) {
-      // 舊作品沒有 cnc 群組：靜默補預設，不算缺漏。
-      if (group === 'cnc') continue;
+      // 舊作品沒有 cnc／drive 群組：靜默補預設，不算缺漏。
+      if (group === 'cnc' || group === 'drive') continue;
       for (const key of Object.keys(FABRICATION_DEFAULTS[group])) {
         warnings.push(`缺少 fabrication.${group}.${key}，已使用 v1 固定預設。`);
       }
@@ -172,7 +196,7 @@ export function normalizeFabricationProfile(raw) {
 
 /**
  * Plan an immutable single-field edit. `group` is export, ttMount,
- * mg995Mount, or cnc. Numeric edits require actual finite numbers; invalid edits are
+ * mg995Mount, cnc, or drive. Numeric edits require actual finite numbers; invalid edits are
  * rejected without clamping or changing the supplied profile.
  */
 export function planFabricationProfile(current, group, key, rawValue) {
@@ -190,6 +214,7 @@ export function planFabricationProfile(current, group, key, rawValue) {
     ttMount: { ...normalized.profile.ttMount },
     mg995Mount: { ...normalized.profile.mg995Mount },
     cnc: { ...normalized.profile.cnc },
+    drive: { ...normalized.profile.drive },
   };
   profile[group][key] = checked.value;
 

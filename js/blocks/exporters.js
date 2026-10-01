@@ -1,6 +1,7 @@
 import { DEFAULT_PLATE_RADIUS_WORLD, createPlateGeometry } from './plate-geometry.js';
 import { createGearPath } from '../utils/gear-geometry.js';
 import { memberStock, memberStockLabel } from './member-stock.js';
+import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 
 export const DEFAULT_BAR_WIDTH_MM = DEFAULT_PLATE_RADIUS_WORLD * 2;
 export const DEFAULT_HOLE_DIAMETER_MM = DEFAULT_PLATE_RADIUS_WORLD * 2 * 0.72;
@@ -243,17 +244,33 @@ function gearGeometry(comp, params = {}, settings = {}) {
   const { holeDiameterMm } = normalizeExportSettings(settings);
   const centerR = holeDiameterMm / 2;
   const outputR = Math.max(0.5, Number(comp.pinHoleDiameter) > 0 ? Number(comp.pinHoleDiameter) / 2 : centerR);
-  // TT 驅動輪：中心改切 TT 扁軸孔（D-D），才能真的傳扭；從動輪與 MG995 驅動輪維持圓孔。
-  const ttDriven = Boolean(comp.p1 && comp.p1.physicalMotor && comp.motorType !== 'mg995');
+  // 馬達驅動輪（L2b）：CNC 3.175 刀做不出貼合 TT 軸的扁孔，改用 TT 附的輪轂鎖兩顆螺絲、
+  // MG995 用圓形舵盤鎖 N 顆螺絲；尺寸取 settings.drive（常見值，請實量）。從動輪與 MG995 外的圓孔不變。
+  const drive = { ...FABRICATION_DEFAULTS.drive, ...((settings && settings.drive) || {}) };
+  const driven = Boolean(comp.p1 && comp.p1.physicalMotor);
+  const ttDriven = driven && comp.motorType !== 'mg995';
+  const driveHoles = [];
+  if (ttDriven) {
+    driveHoles.push({ x: 0, y: 0, r: drive.ttHubCenterMm / 2, layer: 'TT_HUB_CENTER' });
+    const half = drive.ttHubScrewSpacingMm / 2;
+    // 螺絲孔沿輸出孔方向 angle 的垂直方向，對稱於中心。
+    const nx = -Math.sin(angle), ny = Math.cos(angle);
+    [1, -1].forEach(sgn => driveHoles.push({ x: sgn * half * nx, y: sgn * half * ny, r: drive.ttHubScrewMm / 2, layer: 'TT_HUB_SCREW' }));
+  } else if (driven) {
+    if (drive.hornCenterMm > 0) driveHoles.push({ x: 0, y: 0, r: drive.hornCenterMm / 2, layer: 'MG995_HORN_CENTER' });
+    const n = Math.max(0, Math.round(Number(drive.hornScrewCount) || 0));
+    for (let i = 0; i < n; i++) {
+      const a = angle + (2 * Math.PI * i) / n;
+      driveHoles.push({ x: drive.hornScrewCircleMm / 2 * Math.cos(a), y: drive.hornScrewCircleMm / 2 * Math.sin(a), r: drive.hornScrewMm / 2, layer: 'MG995_HORN_SCREW' });
+    }
+  }
   return {
     outline,
     holes: [
-      ...(ttDriven ? [] : [{ x: 0, y: 0, r: centerR, layer: 'CENTER_HOLE' }]),
+      ...(driven ? driveHoles : [{ x: 0, y: 0, r: centerR, layer: 'CENTER_HOLE' }]),
       { x: pinR * Math.cos(angle), y: pinR * Math.sin(angle), r: outputR, layer: 'PIN_HOLE' }
     ],
-    cutouts: ttDriven
-      ? [{ points: ttShaftFlatPoints(0, 0, settings, 18), layer: 'TT_SHAFT_FLAT' }]
-      : []
+    cutouts: []
   };
 }
 
