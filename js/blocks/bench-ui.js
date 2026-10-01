@@ -15,6 +15,7 @@ import * as Bench from './bench.js';
 import { resolveSpacers, findInterference, interferenceTimeline, hitPartNames } from './interference.js';
 import { setMountFlip, unmountModule } from './module-ops.js';
 import { pointKeysFor } from './part-types.js';
+import { applyMatrix4 } from '../blocks3d/orthogonal-3d.js';
 
 const SNAP_PX = 40;          // 拖曳吸附半徑（螢幕 px）
 const TAP_PX_MOUSE = 26;     // 點接口的命中半徑（滑鼠）
@@ -46,7 +47,8 @@ export function createBench(deps) {
     snapshotStr, restoreSnapshot, getViewer, is3DActive, set3D, push3D,
     interferenceArgs, setMotorAngles
   } = deps;
-  const saveComposite = deps.saveComposite || (() => null);   // B7：存成組合積木（由 app.js 接到模組編輯器的模組庫）
+  const saveComposite = deps.saveComposite || (() => null);
+  const exportComposite = deps.exportComposite || (() => null);   // 組合積木匯出 JSON   // B7：存成組合積木（由 app.js 接到模組編輯器的模組庫）
 
   const st = { moreOpen: false, selected: null, preview: null, showAll: false, snapId: null, msg: '', lastScene: null, wasIn3D: false, tilted: false, canvasBound: null };
   let listSig = '', panelSig = '';
@@ -74,10 +76,9 @@ export function createBench(deps) {
     const hostName = host ? host.name : mod.mount.to.module;
     let outName = mod.mount.to.output || '';
     if (mod.mount.orient) {
-      const side = mod.mount.orient.side;
-      const port = host ? Bench.autoPorts(S.comps, S.modules, host.id, S.topo.params)
-        .find(p => p.id === `edge:${mod.mount.to.body}:${side > 0 ? 'L' : 'R'}`) : null;
-      outName = port ? port.name : (mod.mount.to.body || '');
+      // C1：宿主邊可以是桿、三角板的邊或機架板的邊
+      const name = host ? Bench.mountPortName(S.comps, S.modules, mod.mount, S.topo.params) : null;
+      outName = name || mod.mount.to.body || (mod.mount.to.frame ? '機架' : '');
     } else if (host) {
       const o = (host.outputs || []).find(x => x.id === mod.mount.to.output);
       outName = o ? o.name : outName;
@@ -367,7 +368,17 @@ export function createBench(deps) {
   function computeMarkers() {
     const sc = st.lastScene;
     if (!sc || !st.selected) return [];
-    return Bench.portMarkers(S.comps, S.modules, st.selected, sc.pts, S.topo.params, { zOf: sc.zOf, thicknessMm: sc.thickness });
+    // C2：宿主可能在直角子平面上——標記點先用該平面的 z（子場景桿的 z）算出，再乘上該平面畫進主場景的矩陣。
+    const zOf = (id, plane) => {
+      const f = plane ? (sc.planes[plane] && sc.planes[plane].zOf) : sc.zOf;
+      return f ? f(id) : 0;
+    };
+    return Bench.portMarkers(S.comps, S.modules, st.selected, sc.ptsAll || sc.pts, S.topo.params, { zOf, thicknessMm: sc.thickness })
+      .map(m => {
+        const pl = m.plane ? sc.planes[m.plane] : null;
+        if (m.plane && !pl) return null;   // 該平面的子場景算不出來，沒辦法放進 3D
+        return pl ? { ...m, localPoints: m.points, points: m.points.map(p => applyMatrix4(pl.matrix, p)) } : m;
+      }).filter(Boolean);
   }
   // 要畫出來的標記（不相容的只在「顯示全部接口」時畫，暗色）。
   function visibleMarkers() {
@@ -409,12 +420,37 @@ export function createBench(deps) {
   }
 
   // 每次 push3D 之後（播放每幀也會）：記下這一幀的點與高度，標記跟著宿主走。
-  function afterScene({ pts, model }) {
+  // 某個場景模型（主場景或子平面的子場景）查零件高度的函式。
+  function makeZOf(model) {
     const sticks = (model && model.sticks) || [];
     const byId = new Map(sticks.map(s => [s.id, s]));
+    // 桿＝stick 的 z；三角板＝與它三個頂點相同的 plate 的 z；機架板＝'frame'（model.frame.z）
+    return id => {
+      const s = byId.get(id);
+      if (s && Number.isFinite(s.z)) return s.z;
+      if (id === 'frame') return model && model.frame && Number.isFinite(model.frame.z) ? model.frame.z : 0;
+      const c = S.comps.find(x => x && x.id === id);
+      if (c && c.type === 'triangle') {
+        const key = [c.p1, c.p2, c.p3].map(p => p && p.id).sort().join(',');
+        const pl = ((model && model.plates) || []).find(q => Array.isArray(q.ids) && [...q.ids].sort().join(',') === key);
+        if (pl && Number.isFinite(pl.z)) return pl.z;
+      }
+      return 0;
+    };
+  }
+  // ptsAll：所有平面的解（子平面的點是該平面自己的座標）；planes：每個直角子平面的 { matrix, zOf }，
+  // matrix 與 viewer 畫該平面子場景用的是同一個（model.orthogonal[].matrix，巢狀已逐層相乘）。
+  function afterScene({ pts, ptsAll, model }) {
+    const sticks = (model && model.sticks) || [];
+    const planes = {};
+    ((model && model.orthogonal) || []).forEach(ch => {
+      if (ch && ch.id && Array.isArray(ch.matrix) && ch.model) planes[ch.id] = { matrix: ch.matrix, zOf: makeZOf(ch.model), sticks: ch.model.sticks || [] };
+    });
     st.lastScene = {
       pts: pts || {},
-      zOf: id => { const s = byId.get(id); return s && Number.isFinite(s.z) ? s.z : 0; },
+      ptsAll: ptsAll || pts || {},
+      zOf: makeZOf(model),
+      planes,
       thickness: sticks.length && Number.isFinite(sticks[0].thickness) ? sticks[0].thickness : 3
     };
     if (isBench()) { drawMarkers(); liveCheck(); }
@@ -754,6 +790,9 @@ export function createBench(deps) {
       });
       b.id = 'benchSaveComposite';
       sec.appendChild(b);
+      const x = bigBtn('⬇ 匯出組合積木', () => { const t = exportComposite(mod.id); if (t) say(`已匯出組合積木「${t.name}」`, { toast: false }); });
+      x.id = 'benchExportComposite';
+      sec.appendChild(x);
       root.appendChild(sec);
     }
 
@@ -907,6 +946,14 @@ export function createBench(deps) {
       msg: st.msg,
       live: { ready: live.ready, hits: live.hits, keys: live.keys, findings: live.findings.length, checks: live.checks, planBuilds: live.planBuilds, ms: live.ms },
       timeline: tl.result ? { ms: tl.ms, summary: tl.summary.map(x => x.text) } : null,
+      // 方便測試（C2）：各直角子平面的桿，在螢幕上的中點（用畫該平面子場景的同一個矩陣）。
+      planeParts: Object.fromEntries(Object.entries((st.lastScene && st.lastScene.planes) || {}).map(([id, pl]) => {
+        const v = viewer();
+        return [id, v ? pl.sticks.map(sk => {
+          const q = v.project(applyMatrix4(pl.matrix, { x: (sk.a.x + sk.b.x) / 2, y: (sk.a.y + sk.b.y) / 2, z: Number.isFinite(sk.z) ? sk.z : 0 }));
+          return q ? { id: sk.id, x: q.x, y: q.y } : null;
+        }).filter(Boolean) : []];
+      })),
       // 方便測試：某個標記在螢幕上的位置（clientX/Y）。edge 取線段中點。
       screen: Object.fromEntries(all.map(m => {
         const v = viewer();

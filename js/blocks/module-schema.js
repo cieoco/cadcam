@@ -123,9 +123,12 @@ function validateOrient(raw) {
 function validateMount(rawMount, moduleId, outputsByModule, validModuleIds, warnings, compsByModule) {
   if (!rawMount || typeof rawMount !== 'object') return null;
   const to = rawMount.to;
-  // 直角安裝到任一根桿的邊：to＝{ module, body }（body 是宿主模組裡的桿），必須同時有合法的 orient。
-  if (to && typeof to === 'object' && to.body !== undefined) {
-    if (!safeId(to.module) || !safeId(to.body)) {
+  // 直角安裝到宿主的邊：to＝{ module, body[, edge] }（body 是宿主模組裡的桿或三角板，三角板另需 edge 0～2）
+  // 或 to＝{ module, frame: { edge } }（機架板外框第 edge 段直邊，edge 為非負整數）；必須同時有合法的 orient。
+  if (to && typeof to === 'object' && (to.body !== undefined || to.frame !== undefined)) {
+    const isFrame = to.frame !== undefined && to.body === undefined;
+    const frameEdge = isFrame && to.frame && typeof to.frame === 'object' ? to.frame.edge : undefined;
+    if (!safeId(to.module) || (isFrame ? !(Number.isInteger(frameEdge) && frameEdge >= 0) : !safeId(to.body))) {
       warnings.push(`模組 ${moduleId} 的 mount 目標不合法，已改為未安裝。`);
       return null;
     }
@@ -134,8 +137,10 @@ function validateMount(rawMount, moduleId, outputsByModule, validModuleIds, warn
       return null;
     }
     const hostComps = validModuleIds.has(to.module) && compsByModule ? (compsByModule.get(to.module) || []) : null;
-    if (!hostComps || !hostComps.some(c => c.id === to.body && c.type === 'bar')) {
-      warnings.push(`模組 ${moduleId} 的 mount 指向不存在的模組或桿件，已改為未安裝。`);
+    const bodyComp = !isFrame && hostComps ? hostComps.find(c => c.id === to.body) : null;
+    const edgeOk = bodyComp && bodyComp.type === 'triangle' ? (Number.isInteger(to.edge) && to.edge >= 0 && to.edge <= 2) : to.edge === undefined;
+    if (isFrame ? !validModuleIds.has(to.module) : !(bodyComp && (bodyComp.type === 'bar' || (bodyComp.type === 'triangle' && bodyComp.shape !== 'jaw')) && edgeOk)) {
+      warnings.push(`模組 ${moduleId} 的 mount 指向不存在的模組、桿件或板件，已改為未安裝。`);
       return null;
     }
     const bodyOrient = validateOrient(rawMount.orient);
@@ -154,7 +159,9 @@ function validateMount(rawMount, moduleId, outputsByModule, validModuleIds, warn
         if (safeId(k) && isFiniteNum(rawMount.home[k])) bodyHome[k] = Number(rawMount.home[k]);
       });
     }
-    const m = { to: { module: to.module, body: to.body }, ref: { x: Number(bodyRef.x), y: Number(bodyRef.y), a: Number(bodyRef.a) }, home: bodyHome };
+    const bodyTo = isFrame ? { module: to.module, frame: { edge: frameEdge } } : { module: to.module, body: to.body };
+    if (!isFrame && bodyComp.type === 'triangle') bodyTo.edge = to.edge;
+    const m = { to: bodyTo, ref: { x: Number(bodyRef.x), y: Number(bodyRef.y), a: Number(bodyRef.a) }, home: bodyHome };
     if (rawMount.flip === true) m.flip = true;
     m.orient = bodyOrient;
     return m;

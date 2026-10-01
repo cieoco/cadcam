@@ -7,6 +7,7 @@
 import { S } from './state.js';
 import { pointKeysFor } from './part-types.js';
 import { selectionModule, compsInPlane } from './assembly.js';
+import { mountPortName } from './bench.js';
 import {
   createModule, addOutput, inferOutput, mountModule, mountOrthogonal, unmountModule, dissolveModule, setMountFlip,
   moduleToTemplate, normalizeTemplate, instantiateTemplate, insertOffset, translateModule,
@@ -119,7 +120,8 @@ export function createModuleEditor(deps) {
   function buildMountLabel(mod) {
     const host = S.modules.find(m => m.id === mod.mount.to.module);
     const hostName = host ? host.name : mod.mount.to.module;
-    const outName = mod.mount.to.body
+    const hostEdgeName = mod.mount.to.frame || mod.mount.to.edge !== undefined ? mountPortName(S.comps, S.modules, mod.mount, S.topo.params) : null;   // C1：板／機架的邊
+    const outName = hostEdgeName ? hostEdgeName : mod.mount.to.frame ? '機架' : mod.mount.to.body
       ? ((host && (host.outputs || []).find(o => o.body && o.body.id === mod.mount.to.body) || {}).name || mod.mount.to.body)
       : (host ? outputNameOf(host, mod.mount.to.output) : mod.mount.to.output);
     const flip = mod.mount.flip ? '（翻面）' : '';
@@ -313,6 +315,14 @@ export function createModuleEditor(deps) {
     transient(`已存成組合積木「${template.name}」`);
     return template;
   }
+  // 組合積木匯出成 JSON 檔（可用「匯入模組」讀回，分享給別人）。
+  function exportComposite(moduleId) {
+    const template = compositeToTemplate(S.comps, S.modules, S.topo.params, moduleId);
+    if (!template) { transient('找不到要匯出的組合積木。'); return null; }
+    downloadJson(template, `${fileSafeName(template.name, moduleId)}.blocks-composite.json`);
+    transient(`已匯出組合積木「${template.name}」`);
+    return template;
+  }
   function exportTemplate() {
     const modId = currentModuleId();
     if (!modId) return;
@@ -494,6 +504,7 @@ export function createModuleEditor(deps) {
       if (ps.canSetOutput) addButton(el, '設為輸出端', () => setOutput());
       addButton(el, '💾 存到我的模組庫', () => { saveToLibrary(); renderLibrary(); });
       if (ps.hasChildren) addButton(el, '💾 存成組合積木', () => saveCompositeToLibrary(ps.moduleId));
+      if (ps.hasChildren) addButton(el, '⬇ 匯出組合積木', () => exportComposite(ps.moduleId));
       addButton(el, '⬇ 匯出模組', () => exportTemplate());
       if (ps.canDissolve) addButton(el, '解散模組', () => dissolve());
     }
@@ -512,6 +523,6 @@ export function createModuleEditor(deps) {
     insertBuiltin, insertLocal, insertComposite, insertTemplate,
     saveAsModule, rename,
     mountTo, mountOrthogonalTo, unmount, toggleFlip, setOutput, dissolve,
-    saveToLibrary, saveCompositeToLibrary, exportTemplate, importLibraryText, removeFromLibrary
+    saveToLibrary, saveCompositeToLibrary, exportComposite, exportTemplate, importLibraryText, removeFromLibrary
   };
 }

@@ -48,4 +48,14 @@ const motors = new Set(S.comps.flatMap(c => ['p1', 'p2'].map(k => c[k] && c[k].p
 check('再插一組：四個模組 id 不重複、四顆馬達編號不重複', S.modules.length === 4 && new Set(S.modules.map(m => m.id)).size === 4 && motors.size === 4);
 check('兩組的安裝關係各自指向自己的宿主', S.modules.filter(m => m.mount).every(m => S.modules.find(h => h.id === m.mount.to.module && !h.mount)) && new Set(S.modules.filter(m => m.mount).map(m => m.mount.to.module)).size === 2);
 check('第二組整組挪開（兩個宿主底座不在同一點）', (() => { const hs = S.modules.filter(m => !m.mount); const pt = m => S.comps.flatMap(c => ['p1', 'p2', 'p3'].map(k => c[k])).find(p => p && p.id === m.base); const a = pt(hs[0]), b2 = pt(hs[1]); return a && b2 && Math.hypot(a.x - b2.x, a.y - b2.y) > 30; })());
+// ---------- 3. 匯出／匯入 JSON ----------
+{
+  let dl = null, lib2 = '[]';
+  const ed2 = createModuleEditor({ pushUndo: q, rebuild: q, draw: q, transient: q, downloadJson: (obj, name) => { dl = { obj, name }; }, viewCenter: () => ({ x: 0, y: 0 }), loadLibraryText: () => lib2, saveLibraryText: t => { lib2 = t; }, setViewPlane: q });
+  const host = S.modules.find(m => !m.mount);
+  ed2.exportComposite(host.id);
+  check('匯出組合積木：下載 .blocks-composite.json、內容是組合積木', dl && /\.blocks-composite\.json$/.test(dl.name) && dl.obj.kind === 'blocks-composite' && dl.obj.modules.length === 2);
+  ed2.importLibraryText(JSON.stringify(dl.obj));
+  check('用「匯入模組」讀回：模組庫多一個組合積木', Ops.parseLibrary(lib2).some(t => t.kind === 'blocks-composite' && t.modules.length === 2));
+}
 report('bench-composite');

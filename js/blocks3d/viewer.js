@@ -1017,11 +1017,13 @@ export function createViewer(container) {
         const len = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) || 1;
         const th = 3 * tone.scale;
         const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 };
-        const ang = Math.atan2(b.y - a.y, b.x - a.x);
+        // C2：直角子平面上的邊在 3D 裡可能朝任何方向（含 z），用四元數把 x 軸轉到 a→b。
+        const dir = new THREE.Vector3(b.x - a.x, b.y - a.y, b.z - a.z).normalize();
+        const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
         [[th, tone.opacity], [th * 2.6, tone.opacity * 0.28]].forEach(([t, op]) => {
           const box = new THREE.Mesh(new THREE.BoxGeometry(len, t, t), mat(op));
           box.position.set(mid.x, mid.y, mid.z);
-          box.rotation.z = ang;
+          box.quaternion.copy(quat);
           box.renderOrder = 20;
           markerGroup.add(box);
         });

@@ -16,7 +16,7 @@ import {
 } from './exporters.js';
 import { frameConnectorNodes, motorPointIds, pointCoords, frameNodeIds, sliderMountInfo, isHiddenSliderRailPoint } from './model.js';
 import { worldFrameComps, moduleFrameExports, moduleFrameNodes, moduleOfPoint, splitFrameMounts, planeOf } from './assembly.js';
-import { orthogonalExportExtras, withAdapterNodes } from './orthogonal-joint.js';
+import { orthogonalExportExtras, withAdapterNodes, withWorldAdapterNodes } from './orthogonal-joint.js';
 import { buildMotorMounts } from './motor-mounts.js';
 import { computeBodyLayers } from '../blocks3d/scene-model.js';
 import { motorTypeAt } from './motor-tools.js';
@@ -131,6 +131,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
   // 直角安裝的轉接座孔（沒傳就依 comps／modules 自算）。
   const orthoExtras = extras || orthogonalExportExtras(list, modList, params, { stockMm });
   const extraHolesOf = comp => (orthoExtras.linkHoles && orthoExtras.linkHoles[comp.id]) || [];
+  const plateHolesOf = comp => (orthoExtras.plateHoles && orthoExtras.plateHoles[comp.id]) || [];   // C1：三角板上的轉接座孔
   const thicknessOf = comp => {
     const t = comp && comp.stock && comp.stock.thicknessMm;
     return finitePos(t) ? Number(t) : stockMm;
@@ -162,7 +163,9 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
   // 機架板：世界機架（不屬於已安裝模組的零件）與每個已安裝模組的 <moduleId>-frame。
   const worldNodes = frameConnectorNodes(worldFrameComps(list, modList));
   if (worldNodes.length) {
-    const part = { name: 'frame', kind: 'frame', compId: null, moduleId: null, plane: null, layer: 0, thicknessMm: stockMm, ...geomInfo(inspectFrameExport(worldNodes, exp, freeSplit.world)) };
+    // C1：直角安裝在機架板邊上的轉接座孔（不參與外框、不列入關節點）。
+    const worldCut = withWorldAdapterNodes(worldNodes, orthoExtras);
+    const part = { name: 'frame', kind: 'frame', compId: null, moduleId: null, plane: null, layer: 0, thicknessMm: stockMm, ...geomInfo(inspectFrameExport(worldCut, exp, freeSplit.world)) };
     addPart(part, worldNodes.map(n => ({ id: n.id, holeDiameterMm: finitePos(n.holeDiameterMm) ? Number(n.holeDiameterMm) : frameHole, mountBolt: n.holeLayer === 'MOUNT_BOLT' })));
     pushGroup(null, part);
   }
@@ -211,7 +214,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     addBody(key, part, [comp.p1.id, comp.p2.id], comp);
   });
   plates.forEach(({ comp, points }) => {
-    const part = memberPart(comp, 'member', inspectPlateExport(comp, points, exp, hosted.get(comp.id)));
+    const part = memberPart(comp, 'member', inspectPlateExport(comp, points, exp, hosted.get(comp.id), plateHolesOf(comp)));
     addPart(part, pointsOf(comp, ['p1', 'p2', 'p3'], linkHole));
     partByComp.set(comp.id, part);
     const key = groupKeyOf(comp, modById);
@@ -380,7 +383,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
 
   // 直角轉接座：每個直角模組一個關節，連宿主桿與子模組底板（STL 另外列印；孔已切進兩片板）。
   (orthoExtras.adapters || []).forEach(a => {
-    const hostPart = partByComp.get(a.hostCompId);
+    const hostPart = a.hostCompId ? partByComp.get(a.hostCompId) : parts.find(p => p.name === a.hostPartName);
     const childPart = parts.find(p => p.name === a.childPart);
     if (!hostPart || !childPart) return;
     joints.push({

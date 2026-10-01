@@ -23,7 +23,7 @@ const near = (a, b, t = 1e-6) => Math.abs(a - b) < t;
 
 const mk = B.portMarkers(S.comps, S.modules, G.id, pts, P, { zOf, thicknessMm: 3 });
 console.log('markers:', mk.map(m => `${m.portId}${m.suggested ? '*' : ''}${m.compatible ? '' : '(x)'}`).join(' '));
-check('拿著夾爪：列出四連桿的接口標記（每個接口一個）', mk.length === B.autoPorts(S.comps, S.modules, L.id, P).length && mk.every(m => m.module === L.id));
+check('拿著夾爪：列出四連桿的接口標記（每個接口一個）', mk.length === B.autoPorts(S.comps, S.modules, L.id, P, { childId: G.id }).length && mk.every(m => m.module === L.id));
 check('不列出夾爪自己的接口', mk.every(m => m.module !== G.id));
 const bottom = mk.find(m => m.portId === `edge:${brace.id}:R`);
 const w = memberStock(brace).widthMm;

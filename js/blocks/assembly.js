@@ -11,6 +11,8 @@ import { compileTopology } from '../core/topology.js';
 import { solveTopology, sweepTopology } from '../multilink/solver.js';
 import { pointKeysFor } from './part-types.js';
 import { memberStock } from './member-stock.js';
+import { frameOutlineEdges, safeName } from './exporters.js';   // C1：機架外框直邊、零件檔名
+import { frameConnectorNodes } from './model.js';
 
 const D2R = Math.PI / 180;
 const IDENTITY_POSE = { x: 0, y: 0, a: 0 };
@@ -135,6 +137,86 @@ export function orthogonalHostBody(comps, modules, mount) {
   return bar && bar.type === 'bar' && bar.p1 && bar.p2 ? bar : null;
 }
 
+// ---- C1：直角接口的宿主「邊」（桿的長邊／三角板的邊／機架板外框的直邊）----
+
+const EDGE_EPS = 1e-9;
+// m＝side·left(d)（left＝(−d.y, d.x)）：由外法線 m 反推 side。
+const sideOfM = (d, m) => (m.x * -d.y + m.y * d.x) >= 0 ? 1 : -1;
+
+// 世界機架（不屬於已安裝模組的零件）外框的每一段直邊；opts.exportSettings 缺省時用預設匯出設定。
+export function worldFrameEdges(comps, modules, opts = {}) {
+  const nodes = frameConnectorNodes(worldFrameComps(comps, modules));
+  return frameOutlineEdges(nodes, (opts && opts.exportSettings) || {});
+}
+
+// 直角安裝的宿主邊（mount.to 決定）：
+//   to.body（桿）＋ orient.side  → 桿的 L／R 長邊；
+//   to.body（三角板）＋ to.edge  → 三角板第 k 條邊（0＝p1→p2、1＝p2→p3、2＝p3→p1），side 取使 m 朝外（離開板心）的那一邊；
+//   to.frame.edge                → 世界機架板外框第 k 段直邊（每次由目前節點重算），m 朝外。
+// 回傳 { kind, a, b, d, m, side, lengthMm, partName, compId, moves, pose }：
+//   a→b＝邊線端點（已朝外挪半個板寬，即實際板外緣）、d＝沿邊單位向量、m＝外法線＝side·left(d)、
+//   partName＝宿主零件在製作清單的名稱（機架為 'frame'）、moves＝宿主是否會動、pose＝{ x, y, a }（mount.ref 用的宿主位姿）。
+// 找不到宿主、點未解出或邊不存在 → null。純函式。points 是世界座標點表（求解結果或靜態座標）。
+export function orthogonalHostEdge(comps, modules, mount, points, params, opts = {}) {
+  const list = Array.isArray(comps) ? comps : [];
+  const modList = Array.isArray(modules) ? modules : [];
+  const to = mount && mount.to;
+  if (!to) return null;
+  // to.module 為 null＝根（只給 autoPorts 推導接口用；真正的安裝一定指向某個模組）
+  if (to.module != null && !modList.some(m => m && m.id === to.module)) return null;
+  const angleOf = d => Math.atan2(d.y, d.x) / D2R;
+  if (to.frame !== undefined) {
+    const k = to.frame && to.frame.edge;
+    if (!Number.isInteger(k) || k < 0) return null;
+    const e = worldFrameEdges(list, modList, opts)[k];
+    if (!e) return null;
+    return {
+      kind: 'frame', a: e.a, b: e.b, d: e.d, m: e.m, side: sideOfM(e.d, e.m), lengthMm: e.lengthMm,
+      partName: 'frame', compId: null, moves: false, pose: { x: e.a.x, y: e.a.y, a: angleOf(e.d) }
+    };
+  }
+  const comp = to.body ? list.find(c => c && c.id === to.body) : orthogonalHostBody(list, modList, mount);
+  if (!comp) return null;
+  const pt = p => (p && p.id && points ? points[p.id] : null);
+  const isFixed = p => !!p && p.type === 'fixed';
+  if (comp.type === 'bar' && comp.p1 && comp.p2) {
+    const p1 = pt(comp.p1), p2 = pt(comp.p2);
+    if (!validPt(p1) || !validPt(p2)) return null;
+    const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    if (!(len > EDGE_EPS)) return null;
+    const d = { x: (p2.x - p1.x) / len, y: (p2.y - p1.y) / len };
+    const side = mount.orient && mount.orient.side === -1 ? -1 : 1;
+    const m = { x: side * -d.y, y: side * d.x };
+    const h = memberStock(comp).widthMm / 2;
+    const pv = comp.lenParam && params ? params[comp.lenParam] : undefined;
+    return {
+      kind: 'bar', a: { x: p1.x + m.x * h, y: p1.y + m.y * h }, b: { x: p2.x + m.x * h, y: p2.y + m.y * h },
+      d, m, side, lengthMm: Number.isFinite(pv) && pv > 0 ? pv : len, partName: safeName(comp.id), compId: comp.id,
+      moves: !(isFixed(comp.p1) && isFixed(comp.p2)), pose: { x: p1.x, y: p1.y, a: angleOf(d) }
+    };
+  }
+  if (comp.type === 'triangle' && comp.shape !== 'jaw' && comp.p1 && comp.p2 && comp.p3 && Number.isInteger(to.edge) && to.edge >= 0 && to.edge <= 2) {
+    const vs = [comp.p1, comp.p2, comp.p3];
+    const P = vs.map(pt);
+    if (!P.every(validPt)) return null;
+    const A = P[to.edge], B = P[(to.edge + 1) % 3];
+    const len = Math.hypot(B.x - A.x, B.y - A.y);
+    if (!(len > EDGE_EPS)) return null;
+    const d = { x: (B.x - A.x) / len, y: (B.y - A.y) / len };
+    const cx = (P[0].x + P[1].x + P[2].x) / 3, cy = (P[0].y + P[1].y + P[2].y) / 3;
+    const mid = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
+    const side = (-d.y * (mid.x - cx) + d.x * (mid.y - cy)) >= 0 ? 1 : -1;   // 外法線＝離開板心
+    const m = { x: side * -d.y, y: side * d.x };
+    const h = memberStock(comp).widthMm / 2;
+    return {
+      kind: 'triangle', a: { x: A.x + m.x * h, y: A.y + m.y * h }, b: { x: B.x + m.x * h, y: B.y + m.y * h },
+      d, m, side, lengthMm: len, partName: safeName(comp.id), compId: comp.id,
+      moves: !vs.every(isFixed), pose: { x: A.x, y: A.y, a: angleOf(d) }
+    };
+  }
+  return null;
+}
+
 export function solveAssembly(asm, params) {
   if (asm.single) return solveTopology(asm.single, params);
   const points = {};
@@ -145,12 +227,12 @@ export function solveAssembly(asm, params) {
     let ref = IDENTITY_POSE, now = IDENTITY_POSE;
     if (unit.mount) {
       const host = asm.units.find(u => u.id === unit.mount.to.module);
-      if (unit.mount.to.body) {
-        // 直角安裝到「任一根桿」的邊：宿主位姿＝桿 p1 的位置，方向取 p1→p2；兩個點都要解出來。
-        const bar = host && host.module && unit.mount.orient
-          ? orthogonalHostBody(host.comps, [host.module], unit.mount) : null;
-        const a = bar && points[bar.p1.id], b = bar && points[bar.p2.id];
-        now = validPt(a) && validPt(b) ? { x: a.x, y: a.y, a: Math.atan2(b.y - a.y, b.x - a.x) / D2R } : null;
+      if (unit.mount.to.body || unit.mount.to.frame) {
+        // 直角安裝到桿／三角板／機架板的邊：宿主位姿＝邊的起點與方向（桿＝p1 與 p1→p2）；宿主點都要解出來。
+        const allComps = asm.units.flatMap(u => u.comps || []);
+        const allMods = asm.units.filter(u => u.module).map(u => u.module);
+        const e = unit.mount.orient ? orthogonalHostEdge(allComps, allMods, unit.mount, points, params) : null;
+        now = e ? e.pose : null;
       } else {
         now = host && host.module ? outputPose(host.module, unit.mount.to.output, points, host.comps) : null;
       }
@@ -276,24 +358,18 @@ export function orthogonalFrame(comps, modules, moduleId, points) {
   const mod = modList.find(m => m.id === moduleId);
   const orient = mod && mod.mount && mod.mount.orient;
   if (!orient || orient.type !== 'orthogonal') return null;
-  const bodyComp = orthogonalHostBody(list, modList, mod.mount);
-  if (!bodyComp) return null;
-  const p1 = points && points[bodyComp.p1.id], p2 = points && points[bodyComp.p2.id];
+  const edge = orthogonalHostEdge(list, modList, mod.mount, points);
   const base = mod.base && points ? points[mod.base] : null;
-  if (!validPt(p1) || !validPt(p2) || !validPt(base)) return null;
-  const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-  if (!(len > 0)) return null;
-  const dx = (p2.x - p1.x) / len, dy = (p2.y - p1.y) / len;
-  const side = orient.side;
-  const w = memberStock(bodyComp).widthMm;
-  const mx = side * -dy, my = side * dx;   // m＝side·left，left＝(−d.y, d.x)
-  const off = Number.isFinite(orient.offsetMm) ? orient.offsetMm : 0;   // 沿 d 滑動的位置（從桿中點起算）
+  if (!edge || !validPt(base)) return null;
+  const { d, m, side } = edge;
+  const off = Number.isFinite(orient.offsetMm) ? orient.offsetMm : 0;   // 沿 d 滑動的位置（從邊中點起算）
+  const mid = { x: (edge.a.x + edge.b.x) / 2, y: (edge.a.y + edge.b.y) / 2 };
   const rad = orient.childAxisDeg * D2R;
   const e = { x: Math.cos(rad), y: Math.sin(rad) };
   return {
-    origin: { x: (p1.x + p2.x) / 2 + mx * w / 2 + off * dx, y: (p1.y + p2.y) / 2 + my * w / 2 + off * dy, z: 0 },
-    d: { x: dx, y: dy, z: 0 },
-    m: { x: mx, y: my, z: 0 },
+    origin: { x: mid.x + off * d.x, y: mid.y + off * d.y, z: 0 },
+    d: { x: d.x, y: d.y, z: 0 },
+    m: { x: m.x, y: m.y, z: 0 },
     n: { x: 0, y: 0, z: -side },
     base: { x: base.x, y: base.y },
     e,

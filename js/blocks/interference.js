@@ -12,7 +12,7 @@
  *   檢查宿主平面上、高度重疊的零件（宿主桿本身不算）。
  * 平面近似（桿＝膠囊、齒輪＝圓、機架板＝凸包），仍需實物確認。
  */
-import { compileAssembly, solveAssembly, moduleFrameExports, moduleFrameNodes, worldFrameComps, splitFrameMounts, planeOf, orthogonalFrame, orthogonalBand, orthogonalHostBody } from './assembly.js';
+import { compileAssembly, solveAssembly, moduleFrameExports, moduleFrameNodes, worldFrameComps, splitFrameMounts, planeOf, orthogonalFrame, orthogonalBand, orthogonalHostEdge } from './assembly.js';
 import { frameConnectorNodes } from './model.js';
 import { inspectFrameExport, inspectRackExport, splitMountsByHost, motorMountFeatures, isStaticPlate } from './exporters.js';
 import { jawCenterline } from './plate-geometry.js';
@@ -499,8 +499,9 @@ function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], 
     // 4. 跨平面：直角安裝的子模組（側影帶＋高度範圍）vs 宿主平面上的零件
     orthoMods.forEach(M => {
       const host = modById.get(M.mount.to && M.mount.to.module);
-      const hostBar = host ? orthogonalHostBody(list, modList, M.mount) : null;
-      const bodyPart = hostBar ? parts.find(p => p.compId === hostBar.id) : null;
+      // C1：宿主可以是桿、三角板或機架板（機架板的零件名為 'frame'）；宿主那一片不算撞。
+      const hostEdge = host ? orthogonalHostEdge(list, modList, M.mount, pose.points) : null;
+      const bodyPart = hostEdge ? parts.find(p => p.name === hostEdge.partName) : null;
       if (!bodyPart) return;
       const hostPlane = planeOf(list, modList, host.id);
       const childParts = parts.filter(p => p.plane === M.id);

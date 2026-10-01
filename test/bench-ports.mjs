@@ -54,7 +54,7 @@ console.log('ports:', ports.map(p => `${p.id}[${p.kind}${p.suggested ? '*' : ''}
   const up = ports.filter(p => p.kind === 'edge' && p.body.id === upright.id).map(p => p.name).join(',');
   check('直立的桿用「左緣／右緣」', /左緣/.test(up) && /右緣/.test(up));
   check('接口 id 唯一', new Set(ports.map(p => p.id)).size === ports.length);
-  check('不列出別的模組的零件', ports.every(p => p.kind !== 'edge' || S.comps.find(c => c.id === p.body.id).moduleId === L.id));
+  check('不列出別的模組的零件', ports.every(p => p.kind !== 'edge' || p.body.kind === 'frame' || S.comps.find(c => c.id === p.body.id).moduleId === L.id));   // C1：機架板的邊沒有零件 id
 }
 
 // ---------- 2. 相容性 ----------

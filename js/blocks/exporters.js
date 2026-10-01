@@ -1,4 +1,4 @@
-import { DEFAULT_PLATE_RADIUS_WORLD, createPlateGeometry } from './plate-geometry.js';
+import { DEFAULT_PLATE_RADIUS_WORLD, createPlateGeometry, localToWorld } from './plate-geometry.js';
 import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
 import { rackPhaseShift } from './gear-editor.js';
 import { memberStock, memberStockLabel } from './member-stock.js';
@@ -648,17 +648,29 @@ function svgPolyline(points) {
   return points.map((p, i) => `${i ? 'L' : 'M'} ${round(p.x)} ${round(p.y)}`).join(' ') + ' Z';
 }
 
-function plateGeometry(comp, points, settings, mounts = []) {
+// adapterHoles（C1）：直角轉接座開在板上的宿主孔 [{ x, y, u?, v?, diameterMm }]；
+// 有 u,v（板局部座標，以 p1→p2 為 u 軸）就用 points 換成世界座標，板會動時孔才跟著板走，否則用 x,y。
+function plateAdapterHoles(points, adapterHoles) {
+  return (Array.isArray(adapterHoles) ? adapterHoles : []).map(h => {
+    let w = (Number.isFinite(h.u) && Number.isFinite(h.v)) ? localToWorld(points, h) : null;
+    if (!w) w = { x: h.x, y: h.y };
+    return { x: w.x, y: w.y, r: (Number(h.diameterMm) || 3.2) / 2, layer: 'ADAPTER_HOLE' };
+  }).filter(h => Number.isFinite(h.x) && Number.isFinite(h.y));
+}
+
+function plateGeometry(comp, points, settings, mounts = [], adapterHoles = []) {
   const { holeDiameterMm } = normalizeExportSettings(settings);
-  return createPlateGeometry(comp, points, {
+  const g = createPlateGeometry(comp, points, {
     radius: memberStock(comp).widthMm / 2,
     holeRadius: holeDiameterMm / 2,
     ...plateMountExtras(mounts)
   });
+  const extra = plateAdapterHoles(points, adapterHoles);
+  return extra.length ? { ...g, holes: [...g.holes, ...extra] } : g;
 }
 
-export function inspectPlateExport(comp, points, settings, mounts = []) {
-  return plateGeometry(comp, points, settings, mounts);
+export function inspectPlateExport(comp, points, settings, mounts = [], adapterHoles = []) {
+  return plateGeometry(comp, points, settings, mounts, adapterHoles);
 }
 
 function boundsForGeometry(outlines, holes = []) {
@@ -677,8 +689,8 @@ function boundsForGeometry(outlines, holes = []) {
   };
 }
 
-function svgForPlate(comp, points, settings, mounts = []) {
-  const geometry = plateGeometry(comp, points, settings, mounts);
+function svgForPlate(comp, points, settings, mounts = [], adapterHoles = []) {
+  const geometry = plateGeometry(comp, points, settings, mounts, adapterHoles);
   const b = boundsForGeometry([...geometry.outlines, ...(geometry.cutouts || []).map(c => c.points)], geometry.holes);
   const width = round(b.maxX - b.minX);
   const height = round(b.maxY - b.minY);
@@ -697,8 +709,8 @@ ${cutouts ? cutouts + '\n' : ''}${geometry.holes.map(h => `    <circle cx="${rou
 `;
 }
 
-function dxfForPlate(comp, points, settings, mounts = []) {
-  const geometry = plateGeometry(comp, points, settings, mounts);
+function dxfForPlate(comp, points, settings, mounts = [], adapterHoles = []) {
+  const geometry = plateGeometry(comp, points, settings, mounts, adapterHoles);
   return [
     dxfPair(999, stockComment(comp)),
     dxfPair(0, 'SECTION'),
@@ -869,7 +881,9 @@ export function plateMountExtras(mounts = []) {
 }
 
 function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
-  const nodes = (frameNodes || []).filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
+  const allNodes = (frameNodes || []).filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
+  // C1：outlineExempt 的孔（直角轉接座開在機架板上的宿主孔）只開孔，不參與外框／凸包，否則外框會被孔撐大。
+  const nodes = allNodes.filter(p => !p.outlineExempt);
   const { barWidthMm, frameMarginMm, frameHoleDiameterMm } = normalizeExportSettings(settings);
   const holeR = frameHoleDiameterMm / 2;
   const frameR = barWidthMm / 2;
@@ -905,7 +919,7 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   }
 
   // holeLayer（字串）：模組螺絲孔等專用圖層，其餘節點照舊 PIVOT_HOLE。
-  nodes.forEach(p => addHole(p.x, p.y, Number.isFinite(p.holeDiameterMm) ? p.holeDiameterMm / 2 : holeR, typeof p.holeLayer === 'string' && p.holeLayer ? p.holeLayer : 'PIVOT_HOLE'));
+  allNodes.forEach(p => addHole(p.x, p.y, Number.isFinite(p.holeDiameterMm) ? p.holeDiameterMm / 2 : holeR, typeof p.holeLayer === 'string' && p.holeLayer ? p.holeLayer : 'PIVOT_HOLE'));
 
   motorMounts.forEach(mount => {
     const feats = motorMountFeatures(mount);
@@ -962,6 +976,44 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   // 固定孔貼近槽緣一樣是薄肉，警告時把槽邊當外緣一起檢查。
   const warnEdges = [...outlines, ...cutouts.map(c => c.points)];
   return { outlines, cutouts, holes, warnings: frameWarnings(warnEdges, holes) };
+}
+
+// C1：機架外框的每一段「直邊」（直角接口用）。與 frameGeometry 同一套規則：
+// 兩點或近共線（≤ 6 mm）＝等寬長條（兩條長邊，外擴 barWidth/2）；其餘＝凸包每邊外擴 max(frameMarginMm, barWidth/2)。
+// 回傳 [{ a, b, d, m, lengthMm }]：a→b 為外擴後的邊線端點，d 沿邊單位向量，m 朝外單位法向；單點機架或沒有節點回 []。
+// 不含馬達安裝座對外框的擴張（與 inspectFrameExport 傳空 mounts 的結果一致）。
+export function frameOutlineEdges(frameNodes, settings = {}) {
+  const nodes = (frameNodes || []).filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y) && !p.outlineExempt);
+  if (nodes.length < 2) return [];
+  const { barWidthMm, frameMarginMm } = normalizeExportSettings(settings);
+  const frameR = barWidthMm / 2;
+  const maxLineDist = nodes.length === 2 ? 0 : Math.max(...nodes.map(p => lineDistance(p, nodes[0], nodes[nodes.length - 1])));
+  let ring, radius;
+  if (nodes.length === 2 || maxLineDist < 6) {
+    const sorted = [...nodes].sort((a, b) => (a.x - b.x) || (a.y - b.y));
+    ring = [sorted[0], sorted[sorted.length - 1]];
+    radius = frameR;
+  } else {
+    ring = hull(nodes);
+    radius = Math.max(frameMarginMm, frameR);
+  }
+  if (ring.length < 2) return [];
+  const sign = ring.length >= 3 && signedArea(ring) < 0 ? -1 : 1;   // 順時針時外法線在左側
+  const edges = [];
+  ring.forEach((p, i) => {
+    const q = ring[(i + 1) % ring.length];
+    const dx = q.x - p.x, dy = q.y - p.y;
+    const len = Math.hypot(dx, dy);
+    if (!(len > 1e-6)) return;
+    const d = { x: dx / len, y: dy / len };
+    const m = { x: sign * d.y, y: -sign * d.x };   // 凸包逆時針：外法線在行進方向右側
+    edges.push({
+      a: { x: p.x + m.x * radius, y: p.y + m.y * radius },
+      b: { x: q.x + m.x * radius, y: q.y + m.y * radius },
+      d, m, lengthMm: len
+    });
+  });
+  return edges;
 }
 
 export function inspectFrameExport(frameNodes, settings, motorMounts = []) {
@@ -1165,6 +1217,7 @@ export function inspectLinkExport(comp, length, settings = {}, extraHoles = []) 
 export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extras = null) {
   const { hosted } = splitMountsByHost(comps, mounts);
   const extraOf = comp => (extras && extras.linkHoles && extras.linkHoles[comp.id]) || [];
+  const plateHolesOf = comp => (extras && extras.plateHoles && extras.plateHoles[comp.id]) || [];
   const links = exportableLinks(comps, pts, params);
   links.forEach(({ comp, length }) => {
     // 宿主機架桿：桿身直接帶馬達穿板特徵（同一塊料），其餘桿件走一般路徑。
@@ -1176,7 +1229,7 @@ export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extr
   });
   const plates = exportablePlates(comps, pts);
   plates.forEach(({ comp, points }) => {
-    downloadText(svgForPlate(comp, points, settings, hosted.get(comp.id)), `${safeName(comp.id)}.svg`, 'image/svg+xml');
+    downloadText(svgForPlate(comp, points, settings, hosted.get(comp.id), plateHolesOf(comp)), `${safeName(comp.id)}.svg`, 'image/svg+xml');
   });
   const gears = exportableGears(comps, params, settings);
   gears.forEach(({ comp, geometry }) => {
@@ -1192,6 +1245,7 @@ export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extr
 export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extras = null) {
   const { hosted } = splitMountsByHost(comps, mounts);
   const extraOf = comp => (extras && extras.linkHoles && extras.linkHoles[comp.id]) || [];
+  const plateHolesOf = comp => (extras && extras.plateHoles && extras.plateHoles[comp.id]) || [];
   const links = exportableLinks(comps, pts, params);
   links.forEach(({ comp, length }) => {
     const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id), extraOf(comp)) : null;
@@ -1202,7 +1256,7 @@ export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extr
   });
   const plates = exportablePlates(comps, pts);
   plates.forEach(({ comp, points }) => {
-    downloadText(dxfForPlate(comp, points, settings, hosted.get(comp.id)), `${safeName(comp.id)}.dxf`, 'application/dxf');
+    downloadText(dxfForPlate(comp, points, settings, hosted.get(comp.id), plateHolesOf(comp)), `${safeName(comp.id)}.dxf`, 'application/dxf');
   });
   const gears = exportableGears(comps, params, settings);
   gears.forEach(({ comp, geometry }) => {
@@ -1219,6 +1273,7 @@ export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extr
 export function cncPartsForExport(comps, pts, params, settings, mounts = [], extras = null) {
   const { hosted } = splitMountsByHost(comps, mounts);
   const extraOf = comp => (extras && extras.linkHoles && extras.linkHoles[comp.id]) || [];
+  const plateHolesOf = comp => (extras && extras.plateHoles && extras.plateHoles[comp.id]) || [];
   const holesOf = g => ((g && g.holes) || []).map(h => ({ ...h, layer: h.layer || 'HOLE' }));
   const cutoutsOf = g => (g && g.cutouts) || [];
   const parts = [];
@@ -1228,7 +1283,7 @@ export function cncPartsForExport(comps, pts, params, settings, mounts = [], ext
     parts.push({ name: safeName(comp.id), holes: holesOf(g), cutouts: cutoutsOf(g) });
   });
   exportablePlates(comps, pts).forEach(({ comp, points }) => {
-    const g = inspectPlateExport(comp, points, settings, hosted.get(comp.id));
+    const g = inspectPlateExport(comp, points, settings, hosted.get(comp.id), plateHolesOf(comp));
     parts.push({ name: safeName(comp.id), holes: holesOf(g), cutouts: cutoutsOf(g) });
   });
   exportableGears(comps, params, settings).forEach(({ comp, geometry }) => {

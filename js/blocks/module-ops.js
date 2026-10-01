@@ -4,7 +4,7 @@
  * 模組操作的純函式（SDD-ASSEMBLY-MODULES §4.3a、M1c 刀 1）：存成模組、宣告輸出端、
  * 安裝／拆下／解散、匯出模板、插入實例、模組庫序列化。不碰 DOM、不碰 localStorage。
  */
-import { compileAssembly, solveAssembly, outputPose, transformComp, planeOf } from './assembly.js';
+import { compileAssembly, solveAssembly, outputPose, transformComp, planeOf, orthogonalHostEdge } from './assembly.js';
 import { pointKeysFor } from './part-types.js';
 import { normalizeSnapshot } from './schema.js';
 import { normalizeModules, sanitizeName } from './module-schema.js';
@@ -246,8 +246,10 @@ export function mountModule(comps, modules, moduleId, target, params, motorState
 
 // 直角安裝（SDD-ORTHOGONAL-MOUNT O2）：子模組在垂直於宿主的平面，零件座標不動（不 2D 變換）；
 // 只記錄 ref＝輸出端目前位姿與 orient（接合軸取 base 指向子模組所有點重心的方向）。
-// target 兩種形式：{ module, output }（輸出端須標 orthogonal.side）；
-// { module, body, side }（組立台：宿主模組裡任一根桿的邊，side 為 1／-1；ref＝桿 p1 位置與 p1→p2 方向）。
+// target 形式：{ module, output }（輸出端須標 orthogonal.side）；
+// { module, body, side }（組立台：宿主模組裡任一根桿的邊，side 為 1／-1；ref＝桿 p1 位置與 p1→p2 方向）；
+// { module, body, edge, side }（C1：三角板第 edge 條邊，side 取朝外那一側，ref＝邊起點與方向）；
+// { module, frame: { edge }, side }（C1：世界機架板外框第 edge 段直邊，ref＝外擴邊線起點與方向）。
 export function mountOrthogonal(comps, modules, moduleId, target, params, motorState) {
   const list = Array.isArray(comps) ? comps : [];
   const modList = Array.isArray(modules) ? modules : [];
@@ -256,15 +258,27 @@ export function mountOrthogonal(comps, modules, moduleId, target, params, motorS
   if (!mod) return fail('no-module');
   if (mod.mount) return fail('already-mounted');
   if (!mod.base) return fail('no-base');
-  const byBody = !!(target && typeof target === 'object' && target.body);
-  if (!target || typeof target !== 'object' || !target.module || !(byBody || target.output)) return fail('no-target');
+  const byFrame = !!(target && typeof target === 'object' && target.frame && typeof target.frame === 'object');
+  const byBody = !!(target && typeof target === 'object' && target.body) && !byFrame;
+  if (!target || typeof target !== 'object' || !target.module || !(byBody || byFrame || target.output)) return fail('no-target');
   if (target.module === moduleId || isDescendantOf(modList, target.module, moduleId)) return fail('cycle');
   const hostMod = modList.find(m => m.id === target.module);
   if (!hostMod) return fail('no-host');
-  let output = null, hostBar = null, sideOut = 0;
-  if (byBody) {
-    hostBar = list.find(c => c.id === target.body && c.type === 'bar' && c.moduleId === hostMod.id);
-    if (!hostBar || !hostBar.p1 || !hostBar.p2) return fail('no-body');
+  // 直角安裝的宿主邊：桿（to.body）、三角板的邊（to.body＋to.edge）、機架板外框的邊（to.frame.edge）。
+  let output = null, hostComp = null, sideOut = 0, to = null;
+  if (byBody || byFrame) {
+    if (byFrame) {
+      if (!Number.isInteger(target.frame.edge) || target.frame.edge < 0) return fail('no-body');
+      to = { module: target.module, frame: { edge: target.frame.edge } };
+    } else {
+      hostComp = list.find(c => c.id === target.body && (c.type === 'bar' || c.type === 'triangle') && c.moduleId === hostMod.id);
+      if (!hostComp || !hostComp.p1 || !hostComp.p2) return fail('no-body');
+      to = { module: target.module, body: target.body };
+      if (hostComp.type === 'triangle') {
+        if (hostComp.shape === 'jaw' || !hostComp.p3 || !Number.isInteger(target.edge) || target.edge < 0 || target.edge > 2) return fail('no-body');
+        to.edge = target.edge;
+      }
+    }
     if (target.side !== 1 && target.side !== -1) return fail('not-orthogonal');
     sideOut = target.side;
   } else {
@@ -281,10 +295,14 @@ export function mountOrthogonal(comps, modules, moduleId, target, params, motorS
   if (!sol.isValid) return fail('unsolved');
   const basePos = sol.points[mod.base];
   let now = null;
-  if (byBody) {
-    const a = sol.points[hostBar.p1.id], b = sol.points[hostBar.p2.id];
-    if (!basePos || !Number.isFinite(basePos.x) || !a || !b || !Number.isFinite(a.x) || !Number.isFinite(b.x)) return fail('no-position');
-    now = { x: a.x, y: a.y, a: Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI };
+  if (byBody || byFrame) {
+    if (!basePos || !Number.isFinite(basePos.x)) return fail('no-position');
+    // 機架外框要在「子模組已安裝」的前提下算（安裝後它的零件不在世界機架裡），板／桿的邊直接用目前求解的點。
+    const asMounted = modList.map(m => m.id === moduleId ? { ...m, mount: { to, orient: { type: 'orthogonal', side: sideOut } } } : m);
+    const edge = orthogonalHostEdge(list, asMounted, { to, orient: { side: sideOut } }, sol.points, params);
+    if (!edge) return fail('no-position');
+    sideOut = edge.side;   // 板／機架：side 由外法線決定（朝外），桿：維持傳入的 L／R
+    now = edge.pose;
   } else {
     const atPos = sol.points[output.at];
     if (!atPos || !basePos || !Number.isFinite(atPos.x) || !Number.isFinite(basePos.x)) return fail('no-position');
@@ -313,7 +331,7 @@ export function mountOrthogonal(comps, modules, moduleId, target, params, motorS
     ? {
       ...m,
       mount: {
-        to: byBody ? { module: target.module, body: target.body } : { module: target.module, output: target.output },
+        to: (byBody || byFrame) ? to : { module: target.module, output: target.output },
         ref: { x: now.x, y: now.y, a: now.a },
         home: {},
         orient: {
@@ -868,6 +886,8 @@ export function instantiateComposite(template, ctx) {
       const to = { module: moduleMap.get(sm.to.module) };
       if (sm.to.output !== undefined) to.output = sm.to.output;          // 輸出端 id 是每個模組自己的，不改
       if (sm.to.body !== undefined) to.body = renameStr(sm.to.body);
+      if (sm.to.edge !== undefined) to.edge = sm.to.edge;                   // C1：三角板的邊序號
+      if (sm.to.frame !== undefined) to.frame = { ...sm.to.frame };         // C1：機架板外框的邊序號
       mount = { ...clone(sm), to };
       const home = {};
       Object.keys(sm.home || {}).forEach(k => { if (motorMap.has(String(k))) home[motorMap.get(String(k))] = sm.home[k]; });

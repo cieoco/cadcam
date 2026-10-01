@@ -10,7 +10,7 @@
  * 欄向量：Mx = e.x·d + f.x·n、My = e.y·d + f.y·n、Mw = m；平移 T = origin − base.x·Mx − base.y·My。
  */
 
-import { orthogonalFrame, orthogonalHostBody, planeOf, compsInPlane, pointIdsInPlane } from '../blocks/assembly.js';
+import { orthogonalFrame, orthogonalHostEdge, planeOf, compsInPlane, pointIdsInPlane } from '../blocks/assembly.js';
 
 export const IDENTITY_4 = Object.freeze([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
@@ -104,6 +104,22 @@ export function orthogonalModuleIds(modules) {
  * @returns {Array<{ id, matrix:number[16], model }>}
  *          巢狀（孫模組裝在子模組上）時矩陣已逐層相乘，全部相對於主場景。
  */
+// C1：宿主那一片（桿＝stick、三角板＝頂點相同的 plate、機架板＝model.frame）底面在宿主場景的 z；找不到回 0。
+function hostBodyZ(model, edge, comps) {
+  if (!edge || !model) return 0;
+  const fin = v => Number.isFinite(v) ? v : 0;
+  if (edge.kind === 'frame') return fin(model.frame && model.frame.z);
+  const stick = (model.sticks || []).find(s => s.id === edge.compId);
+  if (stick) return fin(stick.z);
+  const c = comps.find(x => x && x.id === edge.compId);
+  if (c && c.type === 'triangle') {
+    const key = [c.p1, c.p2, c.p3].map(p => p && p.id).sort().join(',');
+    const pl = (model.plates || []).find(q => Array.isArray(q.ids) && [...q.ids].sort().join(',') === key);
+    if (pl) return fin(pl.z);
+  }
+  return 0;
+}
+
 export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, buildModel }) {
   const ids = orthogonalModuleIds(modules);
   if (!ids.length) return [];
@@ -120,9 +136,7 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
       const hostPlane = planeOf(comps, modules, mod.mount.to.module);
       const host = hostPlane === null ? done.get(null) : solve(hostPlane, trail);
       if (host) {
-        const hostBar = orthogonalHostBody(comps, modules, mod.mount);
-        const body = hostBar && (host.model.sticks || []).find(s => s.id === hostBar.id);
-        const zOffset = body && Number.isFinite(body.z) ? body.z : 0;
+        const zOffset = hostBodyZ(host.model, orthogonalHostEdge(comps, modules, mod.mount, inputs.pts), comps);
         const model = buildModel(planeInputs(inputs, comps, modules, id));
         // 子場景最低層貼在宿主桿側面（w≥0），不要穿進桿身。
         const wOffset = Math.max(0, -modelMinZ(model));

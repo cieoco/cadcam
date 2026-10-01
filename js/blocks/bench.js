@@ -7,9 +7,9 @@
  * toggleAngle 在同平面與直角之間切換。
  */
 import { mountModule, mountOrthogonal, unmountModule } from './module-ops.js';
-import { orthogonalHostBody, planeOf } from './assembly.js';
-import { memberStock } from './member-stock.js';
+import { orthogonalHostBody, orthogonalHostEdge, worldFrameEdges, planeOf } from './assembly.js';
 import { ADAPTER_LENGTH_MM } from './orthogonal-joint.js';
+import { pointCoords, frameConnectorNodes } from './model.js';
 
 const SLIDE_STEP_MM = 5;   // 沿邊滑動一格（SDD-BENCH Q3）
 
@@ -40,25 +40,54 @@ function edgeWordOf(bar, side) {
   return mx > 0 ? '右緣' : '左緣';
 }
 
+// 由外法線 m 決定的白話名稱（上緣／下緣／左緣／右緣），規則同 edgeWordOf。
+function edgeWordOfM(m) {
+  if (Math.abs(m.y) >= Math.abs(m.x)) return m.y > 0 ? '上緣' : '下緣';
+  return m.x > 0 ? '右緣' : '左緣';
+}
+
+// 同一個宿主下名稱重複時（例如兩條邊都朝上），後面加序號（1）（2）…，避免清單上分不出來。
+function dedupeNames(ports) {
+  const count = new Map();
+  ports.forEach(p => count.set(p.name, (count.get(p.name) || 0) + 1));
+  const seen = new Map();
+  ports.forEach(p => {
+    if (count.get(p.name) < 2) return;
+    const n = (seen.get(p.name) || 0) + 1;
+    seen.set(p.name, n);
+    p.name = `${p.name}（${n}）`;
+  });
+}
+
+// 把 childId 視為「已安裝」的模組清單：機架外框要排除即將安裝的那個模組（安裝後它的零件就不在世界機架裡了）。
+function withVirtualMount(modList, childId) {
+  if (!childId) return modList;
+  return modList.map(m => m && m.id === childId && !m.mount ? { ...m, mount: { to: { module: null } } } : m);
+}
+
 // 某模組（moduleId 為 null＝根）的自動接口，不存檔、每次由零件算出。
-export function autoPorts(comps, modules, moduleId, params) {
+// opts.childId：準備安裝上來的模組 id；機架板的邊要排除它（安裝後世界機架就不含它的零件）。
+// 接口種類：bolt（輸出端）、edge＋body.kind 'bar'（桿的 L／R 長邊）、'triangle'（三角板的三條邊 e0～e2）、
+// 'frame'（未安裝模組／根的機架板外框直邊，每段一個）。
+export function autoPorts(comps, modules, moduleId, params, opts = {}) {
   const list = asList(comps);
   const modList = asList(modules);
   const mod = moduleId == null ? null : modList.find(m => m && m.id === moduleId);
   const outputs = mod ? asList(mod.outputs) : [];
   const ports = [];
+  const mid = moduleId == null ? null : moduleId;
   outputs.forEach(o => {
     ports.push({ id: `bolt:${o.id}`, kind: 'bolt', module: moduleId, output: o.id, name: o.name, suggested: true });
   });
   list.forEach(bar => {
     if (!bar || bar.type !== 'bar' || !bar.p1 || !bar.p2) return;
-    if ((bar.moduleId || null) !== (moduleId == null ? null : moduleId)) return;
+    if ((bar.moduleId || null) !== mid) return;
     const owners = outputs.filter(o => o.body && o.body.kind === 'bar' && o.body.id === bar.id);
     const label = owners.length ? owners[0].name : bar.id;
     const lengthMm = barLengthOf(bar, params);
     [1, -1].forEach(side => {
       const port = {
-        id: `edge:${bar.id}:${side > 0 ? 'L' : 'R'}`, kind: 'edge', module: moduleId == null ? null : moduleId,
+        id: `edge:${bar.id}:${side > 0 ? 'L' : 'R'}`, kind: 'edge', module: mid,
         body: { kind: 'bar', id: bar.id }, side,
         name: `${label}・${edgeWordOf(bar, side)}`, lengthMm,
         suggested: owners.some(o => !o.orthogonal || o.orthogonal.side === side)
@@ -67,8 +96,45 @@ export function autoPorts(comps, modules, moduleId, params) {
       ports.push(port);
     });
   });
+  // C1：三角板（不含夾爪板 shape 'jaw'）的三條邊；外法線一律朝外（離開板心）。
+  const staticPts = pointCoords(list);
+  list.forEach(plate => {
+    if (!plate || plate.type !== 'triangle' || plate.shape === 'jaw' || !plate.p1 || !plate.p2 || !plate.p3) return;
+    if ((plate.moduleId || null) !== mid) return;
+    const owners = outputs.filter(o => o.body && o.body.kind === 'triangle' && o.body.id === plate.id);
+    const label = owners.length ? owners[0].name : plate.id;
+    const group = [];
+    [0, 1, 2].forEach(k => {
+      const e = orthogonalHostEdge(list, modList, { to: { module: mid, body: plate.id, edge: k } }, staticPts, params);
+      if (!e) return;
+      group.push({
+        id: `edge:${plate.id}:e${k}`, kind: 'edge', module: mid,
+        body: { kind: 'triangle', id: plate.id, edge: k }, side: e.side,
+        name: `${label}・${edgeWordOfM(e.m)}`, lengthMm: e.lengthMm, suggested: false
+      });
+    });
+    dedupeNames(group);
+    ports.push(...group);
+  });
+  // C1：機架板外框的直邊。世界機架只有一塊（所有未安裝模組與根共用），歸給「擁有機架節點」的模組；已安裝的模組沒有靜止機架。
+  if ((mod ? !mod.mount : true) && list.length) {
+    const vmods = withVirtualMount(modList, opts && opts.childId);
+    const owns = frameConnectorNodes(list.filter(c => c && (c.moduleId || null) === mid)).length > 0;
+    if (owns) {
+      const group = worldFrameEdges(list, vmods).map((e, k) => ({
+        id: `edge:frame:${k}`, kind: 'edge', module: mid,
+        body: { kind: 'frame', module: mid, edge: k }, side: sideOf(e),
+        name: `機架・${edgeWordOfM(e.m)}`, lengthMm: e.lengthMm, suggested: false
+      }));
+      dedupeNames(group);
+      ports.push(...group);
+    }
+  }
   return ports;
 }
+
+// 邊的 side：m＝side·left(d)。
+function sideOf(e) { return (e.m.x * -e.d.y + e.m.y * e.d.x) >= 0 ? 1 : -1; }
 
 // candidate 是否為 ancestor 的子孫（沿安裝鏈往上會經過 ancestor）。
 function isDescendant(modules, candidateId, ancestorId) {
@@ -95,7 +161,7 @@ export function canConnect(comps, modules, childId, target, params) {
   if (isDescendant(modList, target.module, childId)) return { ok: false, reason: '會形成環：目標模組已經裝在這個模組上' };
   if (!child.base) return { ok: false, reason: '這個模組沒有基準點（base），不能安裝' };
   const host = modList.find(m => m && m.id === target.module);
-  const port = host ? autoPorts(comps, modList, host.id, params).find(p => p.id === target.port) : null;
+  const port = host ? autoPorts(comps, modList, host.id, params, { childId }).find(p => p.id === target.port) : null;
   if (!port) return { ok: false, reason: '找不到這個接口' };
   if (port.kind === 'edge' && port.lengthMm < ADAPTER_LENGTH_MM) {
     return { ok: false, reason: `這條邊只有 ${Math.round(port.lengthMm)} mm，轉接座需要至少 ${ADAPTER_LENGTH_MM} mm` };
@@ -114,7 +180,34 @@ const OPS_REASONS = {
 };
 const reasonText = code => OPS_REASONS[code] || `安裝失敗（${code}）`;
 
-// 接上：bolt 接口＝同平面安裝；edge 接口＝直角安裝（mount.to＝{ module, body }）。
+// 已安裝（直角）模組的宿主邊對應的接口 id；找不到回 null。
+export function mountPortId(mount) {
+  const to = mount && mount.to;
+  if (!to || !mount.orient) return null;
+  if (to.frame !== undefined) return to.frame && Number.isInteger(to.frame.edge) ? `edge:frame:${to.frame.edge}` : null;
+  if (!to.body) return null;
+  if (to.edge !== undefined) return `edge:${to.body}:e${to.edge}`;
+  return `edge:${to.body}:${mount.orient.side > 0 ? 'L' : 'R'}`;
+}
+
+// 已安裝（直角）模組的宿主邊的白話名稱（例「機架・下緣」）；算不出來回 null。
+export function mountPortName(comps, modules, mount, params) {
+  const id = mountPortId(mount);
+  if (!id) return null;
+  const hostId = mount.to.module;
+  const port = autoPorts(comps, modules, hostId, params).find(p => p.id === id);
+  return port ? port.name : null;
+}
+
+// edge 接口 → mountOrthogonal 的目標：桿＝{ body, side }、三角板＝{ body, edge, side }、機架板＝{ frame: { edge }, side }。
+function orthogonalTarget(module, port) {
+  const b = port.body;
+  if (b.kind === 'frame') return { module, frame: { edge: b.edge }, side: port.side };
+  if (b.kind === 'triangle') return { module, body: b.id, edge: b.edge, side: port.side };
+  return { module, body: b.id, side: port.side };
+}
+
+// 接上：bolt 接口＝同平面安裝；edge 接口＝直角安裝（mount.to＝{ module, body[, edge] } 或 { module, frame: { edge } }）。
 export function connect(comps, modules, childId, target, params, motorState) {
   const list = asList(comps), modList = asList(modules);
   const can = canConnect(list, modList, childId, target, params);
@@ -122,7 +215,7 @@ export function connect(comps, modules, childId, target, params, motorState) {
   const port = can.port;
   const r = port.kind === 'bolt'
     ? mountModule(list, modList, childId, { module: target.module, output: port.output }, params, motorState)
-    : mountOrthogonal(list, modList, childId, { module: target.module, body: port.body.id, side: port.side }, params, motorState);
+    : mountOrthogonal(list, modList, childId, orthogonalTarget(target.module, port), params, motorState);
   if (!r.ok) return { ok: false, comps: list, modules: modList, reason: reasonText(r.reason) };
   return { ok: true, comps: r.comps, modules: r.modules };
 }
@@ -147,17 +240,20 @@ export function benchAdjust(comps, modules, moduleId, action, params) {
   if (!orient || orient.type !== 'orthogonal') return fail('這個模組不是直角安裝，不能這樣調整');
   let next;
   if (action === 'side') {
+    // 板／機架的邊只有朝外那一側能裝（另一側是板身），所以不能換邊。
+    if (mod.mount.to.frame !== undefined || mod.mount.to.edge !== undefined) return fail('板件或機架的邊只有朝外那一側能裝，不能換邊');
     next = withOrient(orient, { side: -orient.side });
   } else if (action === 'reverse') {
     next = withOrient(orient, { childAxisDeg: normalizeDeg(orient.childAxisDeg + 180) });
   } else if (action === 'rotate') {
     next = withOrient(orient, { childAxisDeg: normalizeDeg(orient.childAxisDeg + 90) });
   } else if (action === 'slide+' || action === 'slide-') {
-    const bar = orthogonalHostBody(list, modList, mod.mount);
-    if (!bar) return fail('找不到宿主的桿');
-    const half = barLengthOf(bar, params) / 2;
-    const lo = -half, hi = half - ADAPTER_LENGTH_MM;   // 轉接座占 [offset, offset+20]，不能超出桿端
-    if (hi < lo) return fail('這根桿太短，不能沿邊滑動');
+    // C1：宿主可以是桿、三角板或機架板的邊；邊長取 lengthMm（桿＝求解用的桿長參數）。
+    const edge = orthogonalHostEdge(list, modList, mod.mount, pointCoords(list), params);
+    if (!edge) return fail('找不到宿主的邊');
+    const half = edge.lengthMm / 2;
+    const lo = -half, hi = half - ADAPTER_LENGTH_MM;   // 轉接座占 [offset, offset+20]，不能超出邊的兩端
+    if (hi < lo) return fail('這條邊太短，不能沿邊滑動');
     const cur = finiteNum(orient.offsetMm) ? orient.offsetMm : 0;
     const v = round1(Math.min(hi, Math.max(lo, cur + (action === 'slide+' ? SLIDE_STEP_MM : -SLIDE_STEP_MM))));
     next = withOrient(orient, { offsetMm: v });
@@ -180,7 +276,8 @@ export function toggleAngle(comps, modules, moduleId, params, motorState) {
   const outputs = asList(host.outputs);
 
   if (mod.mount.orient) {
-    // 直角 → 同平面
+    // 直角 → 同平面（只有「輸出端的桿」做得到；板件的邊與機架板的邊沒有對應的輸出端）
+    if (mod.mount.to.frame !== undefined || mod.mount.to.edge !== undefined) return fail('只有「輸出端的桿」能改成同平面；板件或機架的邊只能直角安裝');
     const bar = orthogonalHostBody(list, modList, mod.mount);
     const own = mod.mount.to.output ? outputs.find(o => o.id === mod.mount.to.output) : null;
     const out = (own && own.at ? own : null)
@@ -205,8 +302,10 @@ export function toggleAngle(comps, modules, moduleId, params, motorState) {
 }
 
 // ---- B3：3D 接口標記（純函式）----
-// 拿著子模組 childId 時，其他模組（不含自己與子孫、且在主平面）的每個接口畫在 3D 哪裡、能不能接。
-// 回傳 [{ portId, module, moduleName, kind, name, suggested, compatible, reason?, points }]。
+// 拿著子模組 childId 時，其他模組（不含自己與子孫；宿主可在主平面或任一直角子平面）的每個接口畫在 3D 哪裡、能不能接。
+// 回傳 [{ portId, module, moduleName, kind, name, suggested, compatible, plane, reason?, points }]。
+// plane＝宿主所在平面（主平面為 null）；points 用該平面自己的 2D 座標，z＝zOf(id, plane)＋板厚/2，
+// 畫進主 3D 場景前要乘上該平面的矩陣（C2，由 bench-ui 處理）。
 // edge：桿的兩個求解端點往外法線（side·左法線）挪半個板寬，z＝桿中間高度；bolt：輸出端 at 一個點。
 // 子模組不存在、已安裝、或沒有 base → []（已安裝的要先拆下，沒有基準點不能裝）。
 export function portMarkers(comps, modules, childId, points, params, { zOf, thicknessMm = 3 } = {}) {
@@ -214,36 +313,42 @@ export function portMarkers(comps, modules, childId, points, params, { zOf, thic
   const child = modList.find(m => m && m.id === childId);
   if (!child || child.mount || !child.base) return [];
   const pts = points || {};
-  const zBase = id => {
-    const z = typeof zOf === 'function' && id != null ? zOf(id) : undefined;
+  const zBase = (id, plane) => {
+    const z = typeof zOf === 'function' && id != null ? zOf(id, plane) : undefined;
     return (finiteNum(z) ? z : 0) + thicknessMm / 2;
   };
   const okPoint = p => p && finiteNum(p.x) && finiteNum(p.y);
   const out = [];
+  const seenFrame = new Set();
+  const vmods = withVirtualMount(modList, childId);   // 機架外框排除即將安裝的子模組
   modList.forEach(host => {
     if (!host || host.id === childId || isDescendant(modList, host.id, childId)) return;
-    if (planeOf(list, modList, host.id) !== null) return;   // 目前只處理主平面上的宿主
-    autoPorts(list, modList, host.id, params).forEach(port => {
+    const plane = planeOf(list, modList, host.id);   // 主平面為 null；直角子平面為該平面的模組 id
+    autoPorts(list, modList, host.id, params, { childId }).forEach(port => {
       let mpoints = null;
       if (port.kind === 'edge') {
-        const bar = list.find(c => c && c.type === 'bar' && c.id === port.body.id);
-        const p1 = bar && pts[bar.p1.id], p2 = bar && pts[bar.p2.id];
-        if (!okPoint(p1) || !okPoint(p2)) return;
-        const len = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
-        const half = memberStock(bar).widthMm / 2;
-        const mx = port.side * (-(p2.y - p1.y) / len) * half, my = port.side * ((p2.x - p1.x) / len) * half;
-        const z = zBase(bar.id);
-        mpoints = [{ x: p1.x + mx, y: p1.y + my, z }, { x: p2.x + mx, y: p2.y + my, z }];
+        // 邊線兩端點（已朝外挪到實際板外緣），z＝宿主那一片的中間高度（機架板用 'frame'）。
+        const b = port.body;
+        const to = b.kind === 'frame' ? { module: host.id, frame: { edge: b.edge } }
+          : b.kind === 'triangle' ? { module: host.id, body: b.id, edge: b.edge } : { module: host.id, body: b.id };
+        if (b.kind === 'frame') {
+          if (seenFrame.has(b.edge)) return;   // 世界機架只有一塊：多個模組共用時只標一次
+          seenFrame.add(b.edge);
+        }
+        const e = orthogonalHostEdge(list, vmods, { to, orient: { side: port.side } }, pts, params);
+        if (!e) return;
+        const z = zBase(b.kind === 'frame' ? 'frame' : b.id, plane);
+        mpoints = [{ x: e.a.x, y: e.a.y, z }, { x: e.b.x, y: e.b.y, z }];
       } else {
         const o = asList(host.outputs).find(x => x.id === port.output);
         const at = o && pts[o.at];
         if (!okPoint(at)) return;
-        mpoints = [{ x: at.x, y: at.y, z: zBase(o.body && o.body.id) }];
+        mpoints = [{ x: at.x, y: at.y, z: zBase(o.body && o.body.id, plane) }];
       }
       const can = canConnect(list, modList, childId, { module: host.id, port: port.id }, params);
       const marker = {
         portId: port.id, module: host.id, moduleName: host.name, kind: port.kind, name: port.name,
-        suggested: !!port.suggested, compatible: can.ok, points: mpoints
+        suggested: !!port.suggested, compatible: can.ok, plane, points: mpoints
       };
       if (!can.ok) marker.reason = can.reason;
       out.push(marker);
