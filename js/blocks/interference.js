@@ -12,7 +12,7 @@
  *   檢查宿主平面上、高度重疊的零件（宿主桿本身不算）。
  * 平面近似（桿＝膠囊、齒輪＝圓、機架板＝凸包），仍需實物確認。
  */
-import { compileAssembly, solveAssembly, moduleFrameExports, moduleFrameNodes, worldFrameComps, splitFrameMounts, planeOf, orthogonalFrame, orthogonalBand } from './assembly.js';
+import { compileAssembly, solveAssembly, moduleFrameExports, moduleFrameNodes, worldFrameComps, splitFrameMounts, planeOf, orthogonalFrame, orthogonalBand, orthogonalHostBody } from './assembly.js';
 import { frameConnectorNodes } from './model.js';
 import { inspectFrameExport, inspectRackExport, splitMountsByHost, motorMountFeatures, isStaticPlate } from './exporters.js';
 import { jawCenterline } from './plate-geometry.js';
@@ -136,7 +136,9 @@ const applyXf = (xf, p) => ({ x: p.x * xf.cos - p.y * xf.sin + xf.tx, y: p.x * x
 const IDENTITY_XF = { cos: 1, sin: 0, tx: 0, ty: 0, angleRad: 0 };
 
 // ---------- 主程式 ----------
-export function findInterference({ comps, modules = [], params = {}, plan, ranges = {}, samplesPerMotor = 9, exportSettings = {}, mounts } = {}) {
+// 建立檢查器：做完所有「與姿態無關」的準備（機架外形、剛體分組…），回傳 { solveWalk, solveMulti, runPose }。
+// runPose(pose, results, seen) 檢查單一姿態，把新發現的干涉 push 進 results（seen 用來去重）。
+function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], exportSettings = {}, mounts } = {}) {
   const list = Array.isArray(comps) ? comps : [];
   const modList = Array.isArray(modules) ? modules : [];
   const parts = (plan && plan.parts) || [];
@@ -157,24 +159,10 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
   const samePlane = (a, b) => ((a && a.plane) || null) === ((b && b.plane) || null);
   const mountedMod = id => { const m = id != null ? modById.get(id) : null; return m && m.mount ? m : null; };
 
-  // ---- 取樣姿態 ----
-  const motorIds = Object.keys(ranges || {});
-  const poseDefs = [{ motor: null, angleDeg: 0, motorAngles: {} }];
   const zeros = {};
   motorIds.forEach(id => { zeros[id] = 0; });
-  motorIds.forEach(id => {
-    const r = ranges[id] || {};
-    const lo = Number.isFinite(Number(r.lo)) ? Number(r.lo) : 0;
-    const hi = Number.isFinite(Number(r.hi)) ? Number(r.hi) : lo;
-    const n = Math.max(1, Math.round(Number(samplesPerMotor) || 1));
-    const count = (hi === lo || n === 1) ? 1 : n;
-    for (let i = 0; i < count; i++) {
-      const a = count === 1 ? lo : lo + (hi - lo) * i / (count - 1);
-      poseDefs.push({ motor: id, angleDeg: a, motorAngles: { ...zeros, [id]: a } });
-    }
-  });
   let asm = null;
-  try { asm = compileAssembly(list, modList, { params }); } catch (e) { return []; }
+  try { asm = compileAssembly(list, modList, { params }); } catch (e) { return null; }
   // 連續求解：從組裝姿態（全部 0°）沿著馬達角度每步 ≤ 5° 走過去，每步用上一步的點當種子，
   // 才不會跳到另一個組裝分支（例如平行四連桿在大角度時跳成交叉的反平行四連桿）。
   const STEP_DEG = 5;
@@ -204,13 +192,22 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
     }
     return sol;
   };
-  const poses = [];
-  poseDefs.forEach(def => {
-    const sol = solveWalk(def.motor, def.angleDeg);
-    if (sol && sol.isValid && sol.points) poses.push({ ...def, points: sol.points });
-  });
-  if (!poses.length) return [];
-
+  // 多顆馬達同時：全部一起從 0 線性內插到目標，每步最大角度 ≤ STEP_DEG（用上一步的點當種子）。
+  const solveMulti = target => {
+    if (!home || !home.isValid) return null;
+    const ids = Object.keys(target || {});
+    const big = Math.max(0, ...ids.map(id => Math.abs(Number(target[id]) || 0)));
+    if (big < 1e-9) return home;
+    const n = Math.max(1, Math.ceil(big / STEP_DEG - 1e-9));
+    let sol = home;
+    for (let i = 1; i <= n; i++) {
+      const ang = { ...zeros };
+      ids.forEach(id => { ang[id] = (Number(target[id]) || 0) * i / n; });
+      sol = solveOnce(ang, sol && sol.points);
+      if (!sol || !sol.isValid) return sol;
+    }
+    return sol;
+  };
   // ---- 剛體分組（union-find）：靜止機架一組；同一組 mount-bolt 關節穿過的零件併成同剛體 ----
   const parent = new Map(parts.map(p => [p.name, p.name]));
   const find = x => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
@@ -391,18 +388,21 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
   }
 
   // ---- 檢查 ----
-  const results = [];
-  const seen = new Set();
+  let results = [];
+  let seen = new Set();
   const keyOf = (kind, names) => kind + '|' + [...names].sort().join('|');
   const report = (kind, names, layer, pose, message, fix) => {
     const key = keyOf(kind, names);
     if (seen.has(key)) return;
     seen.add(key);
     const item = { kind, parts: names, layer, motor: pose.motor, angleDeg: pose.angleDeg, message };
+    if (pose.pose) item.pose = { ...pose.pose };
     if (fix) item.fix = fix;
     results.push(item);
   };
-  const when = pose => pose.motor == null
+  const when = pose => pose.pose
+    ? '在目前姿勢（' + (Object.keys(pose.pose).map(k => `馬達 ${k} ${Math.round(Number(pose.pose[k]) || 0)}°`).join('、') || '全部 0°') + '）'
+    : pose.motor == null
     ? '在組裝姿態（全部馬達 0°）'
     : `在馬達 ${pose.motor} 轉到 ${Math.round(pose.angleDeg)}° 時`;
 
@@ -411,7 +411,8 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
 
   const orthoMods = modList.filter(m => m && m.mount && m.mount.orient);
 
-  poses.forEach(pose => {
+  const runPose = (pose, outResults, outSeen) => {
+    results = outResults; seen = outSeen;
     // 1. 同層零件互撞
     layerOfParts.forEach((group, layer) => {
       for (let i = 0; i < group.length; i++) for (let j = i + 1; j < group.length; j++) {
@@ -498,8 +499,8 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
     // 4. 跨平面：直角安裝的子模組（側影帶＋高度範圍）vs 宿主平面上的零件
     orthoMods.forEach(M => {
       const host = modById.get(M.mount.to && M.mount.to.module);
-      const output = host && (host.outputs || []).find(o => o.id === M.mount.to.output);
-      const bodyPart = output && output.body ? parts.find(p => p.compId === output.body.id) : null;
+      const hostBar = host ? orthogonalHostBody(list, modList, M.mount) : null;
+      const bodyPart = hostBar ? parts.find(p => p.compId === hostBar.id) : null;
       if (!bodyPart) return;
       const hostPlane = planeOf(list, modList, host.id);
       const childParts = parts.filter(p => p.plane === M.id);
@@ -538,9 +539,90 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
         }
       });
     });
-  });
+  };
 
+  return { solveWalk, solveMulti, runPose, home };
+}
+
+const numOr = (v, d) => Number.isFinite(Number(v)) ? Number(v) : d;
+const rangeOf = r => {
+  const lo = numOr(r && r.lo, 0);
+  return { lo, hi: numOr(r && r.hi, lo) };
+};
+
+export function findInterference(args = {}) {
+  const { ranges = {}, samplesPerMotor = 9, pose } = args;
+  if (!((args.plan && args.plan.parts) || []).length) return [];
+  const results = [], seen = new Set();
+  // 單一組合姿勢（多顆馬達同時）：只檢查這一個姿勢。
+  if (pose && typeof pose === 'object') {
+    const ck = createChecker({ ...args, motorIds: Object.keys(pose) });
+    if (!ck) return [];
+    const sol = ck.solveMulti(pose);
+    if (!sol || !sol.isValid || !sol.points) return [];
+    ck.runPose({ motor: null, angleDeg: 0, motorAngles: { ...pose }, pose: { ...pose }, points: sol.points }, results, seen);
+    return results;
+  }
+  // ---- 取樣姿態 ----
+  const motorIds = Object.keys(ranges || {});
+  const ck = createChecker({ ...args, motorIds });
+  if (!ck) return [];
+  const zeros = {};
+  motorIds.forEach(id => { zeros[id] = 0; });
+  const poseDefs = [{ motor: null, angleDeg: 0, motorAngles: {} }];
+  motorIds.forEach(id => {
+    const { lo, hi } = rangeOf(ranges[id]);
+    const n = Math.max(1, Math.round(Number(samplesPerMotor) || 1));
+    const count = (hi === lo || n === 1) ? 1 : n;
+    for (let i = 0; i < count; i++) {
+      const a = count === 1 ? lo : lo + (hi - lo) * i / (count - 1);
+      poseDefs.push({ motor: id, angleDeg: a, motorAngles: { ...zeros, [id]: a } });
+    }
+  });
+  const poses = [];
+  poseDefs.forEach(def => {
+    const sol = ck.solveWalk(def.motor, def.angleDeg);
+    if (sol && sol.isValid && sol.points) poses.push({ ...def, points: sol.points });
+  });
+  poses.forEach(p => ck.runPose(p, results, seen));
   return results;
+}
+
+// ---------- B6：全行程時間軸 ----------
+// 每顆馬達從 lo 到 hi（含兩端，不重複）每 stepDeg 一格，其他馬達 0°；
+// 連續求解的路徑快取讓整條掃描是線性的。每格的 findings 各自獨立（不跨格去重）。
+export function interferenceTimeline(args = {}) {
+  const { ranges = {}, stepDeg = 5 } = args;
+  const out = { motors: {} };
+  const motorIds = Object.keys(ranges || {});
+  const ck = ((args.plan && args.plan.parts) || []).length ? createChecker({ ...args, motorIds }) : null;
+  const step = Math.max(0.5, Number(stepDeg) || 5);
+  motorIds.forEach(id => {
+    const { lo, hi } = rangeOf(ranges[id]);
+    const angles = [];
+    for (let a = lo; a < hi - 1e-9; a += step) angles.push(Math.round(a * 1e6) / 1e6);
+    angles.push(hi);
+    const row = angles.map(angleDeg => ({ angleDeg, findings: [] }));
+    out.motors[id] = row;
+    if (!ck) return;
+    // 由 0 往兩側走：依 |角度| 由小到大處理，路徑快取才會一路往前。
+    row.map((e, i) => i).sort((i, j) => Math.abs(row[i].angleDeg) - Math.abs(row[j].angleDeg)).forEach(i => {
+      const e = row[i];
+      const sol = ck.solveWalk(id, e.angleDeg);
+      if (!sol || !sol.isValid || !sol.points) return;
+      const found = [];
+      ck.runPose({ motor: id, angleDeg: e.angleDeg, motorAngles: { [id]: e.angleDeg }, points: sol.points }, found, new Set());
+      e.findings = found;
+    });
+  });
+  return out;
+}
+
+// 撞到的零件名稱（不重複，依第一次出現的順序）。
+export function hitPartNames(findings) {
+  const names = [];
+  (findings || []).forEach(f => (f.parts || []).forEach(n => { if (!names.includes(n)) names.push(n); }));
+  return names;
 }
 
 // ---------- L6a：自動加隔圈 ----------

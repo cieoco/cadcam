@@ -1,7 +1,7 @@
 # SDD — 組立台（把做好的模組「方便地」組起來並測試）
 
 > 上位文件：[SDD-ASSEMBLY-MODULES.md](SDD-ASSEMBLY-MODULES.md)（模組、安裝、各自求解）、[SDD-ORTHOGONAL-MOUNT.md](SDD-ORTHOGONAL-MOUNT.md)（直角安裝、轉接座）。
-> 施工記錄寫在 [FTC-LOOP.md](FTC-LOOP.md)。狀態：**§8 已由使用者決定（2026-10-01），待開工**。
+> 施工記錄寫在 [FTC-LOOP.md](FTC-LOOP.md)。狀態：**B1～B7 已完成（2026-10-02）**。接口目前只做「輸出端＝同平面」與「桿的邊＝直角」；板件邊、底板邊接口、跨平面宿主的接口標記留待後續。
 
 ## 0. 一句話
 

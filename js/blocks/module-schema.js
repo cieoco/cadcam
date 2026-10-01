@@ -109,15 +109,56 @@ function validateOrient(raw) {
   };
   const hv = joint.holesPerFlange;
   const holes = (hv === null || hv === '' || typeof hv === 'boolean' || !isFiniteNum(hv)) ? 2 : Math.min(4, Math.max(1, Math.round(Number(hv))));
-  return {
-    type: 'orthogonal', edge: 'host', side, childAxisDeg: Number(raw.childAxisDeg),
-    joint: { kind: 'printed', wallMm: clampNum(joint.wallMm, 1, 20, 4), holesPerFlange: holes }
-  };
+  const out = { type: 'orthogonal', edge: 'host', side, childAxisDeg: Number(raw.childAxisDeg) };
+  // offsetMm（選配）：沿宿主桿滑動的位置（mm，從桿中點起算），四捨五入到 0.1；0 或不合法就不寫入。
+  const ov = raw.offsetMm;
+  if (!(ov === null || ov === '' || typeof ov === 'boolean' || !isFiniteNum(ov))) {
+    const off = Math.round(Number(ov) * 10) / 10;
+    if (off !== 0) out.offsetMm = off;
+  }
+  out.joint = { kind: 'printed', wallMm: clampNum(joint.wallMm, 1, 20, 4), holesPerFlange: holes };
+  return out;
 }
 
-function validateMount(rawMount, moduleId, outputsByModule, validModuleIds, warnings) {
+function validateMount(rawMount, moduleId, outputsByModule, validModuleIds, warnings, compsByModule) {
   if (!rawMount || typeof rawMount !== 'object') return null;
   const to = rawMount.to;
+  // 直角安裝到任一根桿的邊：to＝{ module, body }（body 是宿主模組裡的桿），必須同時有合法的 orient。
+  if (to && typeof to === 'object' && to.body !== undefined) {
+    if (!safeId(to.module) || !safeId(to.body)) {
+      warnings.push(`模組 ${moduleId} 的 mount 目標不合法，已改為未安裝。`);
+      return null;
+    }
+    if (to.module === moduleId) {
+      warnings.push(`模組 ${moduleId} 的 mount 指向自己，已改為未安裝。`);
+      return null;
+    }
+    const hostComps = validModuleIds.has(to.module) && compsByModule ? (compsByModule.get(to.module) || []) : null;
+    if (!hostComps || !hostComps.some(c => c.id === to.body && c.type === 'bar')) {
+      warnings.push(`模組 ${moduleId} 的 mount 指向不存在的模組或桿件，已改為未安裝。`);
+      return null;
+    }
+    const bodyOrient = validateOrient(rawMount.orient);
+    if (!bodyOrient) {
+      warnings.push(`模組 ${moduleId} 的 mount 指向桿件但不是有效的直角安裝，已改為未安裝。`);
+      return null;
+    }
+    const bodyRef = rawMount.ref;
+    if (!bodyRef || typeof bodyRef !== 'object' || !isFiniteNum(bodyRef.x) || !isFiniteNum(bodyRef.y) || !isFiniteNum(bodyRef.a)) {
+      warnings.push(`模組 ${moduleId} 的 mount.ref 不是有效座標，已改為未安裝。`);
+      return null;
+    }
+    const bodyHome = {};
+    if (rawMount.home && typeof rawMount.home === 'object') {
+      Object.keys(rawMount.home).forEach(k => {
+        if (safeId(k) && isFiniteNum(rawMount.home[k])) bodyHome[k] = Number(rawMount.home[k]);
+      });
+    }
+    const m = { to: { module: to.module, body: to.body }, ref: { x: Number(bodyRef.x), y: Number(bodyRef.y), a: Number(bodyRef.a) }, home: bodyHome };
+    if (rawMount.flip === true) m.flip = true;
+    m.orient = bodyOrient;
+    return m;
+  }
   if (!to || typeof to !== 'object' || !safeId(to.module) || !safeId(to.output)) {
     warnings.push(`模組 ${moduleId} 的 mount 目標不合法，已改為未安裝。`);
     return null;
@@ -236,7 +277,7 @@ export function normalizeModules(rawModules, comps) {
   // mount：需要其他模組的最終輸出端清單，所以在 outputs 都處理完後才做。
   const withMount = partial.map(p => ({
     ...p,
-    mount: validateMount(p.raw.mount, p.id, outputsByModuleId, validModuleIds, warnings)
+    mount: validateMount(p.raw.mount, p.id, outputsByModuleId, validModuleIds, warnings, compsByModule)
   }));
 
   // 安裝迴圈：依陣列順序檢查，沿 mount 鏈回到自己就把「起點」那個模組的 mount 拆掉。

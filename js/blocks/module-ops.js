@@ -4,7 +4,7 @@
  * 模組操作的純函式（SDD-ASSEMBLY-MODULES §4.3a、M1c 刀 1）：存成模組、宣告輸出端、
  * 安裝／拆下／解散、匯出模板、插入實例、模組庫序列化。不碰 DOM、不碰 localStorage。
  */
-import { compileAssembly, solveAssembly, outputPose, transformComp } from './assembly.js';
+import { compileAssembly, solveAssembly, outputPose, transformComp, planeOf } from './assembly.js';
 import { pointKeysFor } from './part-types.js';
 import { normalizeSnapshot } from './schema.js';
 import { normalizeModules, sanitizeName } from './module-schema.js';
@@ -246,6 +246,8 @@ export function mountModule(comps, modules, moduleId, target, params, motorState
 
 // 直角安裝（SDD-ORTHOGONAL-MOUNT O2）：子模組在垂直於宿主的平面，零件座標不動（不 2D 變換）；
 // 只記錄 ref＝輸出端目前位姿與 orient（接合軸取 base 指向子模組所有點重心的方向）。
+// target 兩種形式：{ module, output }（輸出端須標 orthogonal.side）；
+// { module, body, side }（組立台：宿主模組裡任一根桿的邊，side 為 1／-1；ref＝桿 p1 位置與 p1→p2 方向）。
 export function mountOrthogonal(comps, modules, moduleId, target, params, motorState) {
   const list = Array.isArray(comps) ? comps : [];
   const modList = Array.isArray(modules) ? modules : [];
@@ -254,13 +256,23 @@ export function mountOrthogonal(comps, modules, moduleId, target, params, motorS
   if (!mod) return fail('no-module');
   if (mod.mount) return fail('already-mounted');
   if (!mod.base) return fail('no-base');
-  if (!target || typeof target !== 'object' || !target.module || !target.output) return fail('no-target');
+  const byBody = !!(target && typeof target === 'object' && target.body);
+  if (!target || typeof target !== 'object' || !target.module || !(byBody || target.output)) return fail('no-target');
   if (target.module === moduleId || isDescendantOf(modList, target.module, moduleId)) return fail('cycle');
   const hostMod = modList.find(m => m.id === target.module);
   if (!hostMod) return fail('no-host');
-  const output = (hostMod.outputs || []).find(o => o.id === target.output);
-  if (!output) return fail('no-output');
-  if (!output.orthogonal || (output.orthogonal.side !== 1 && output.orthogonal.side !== -1)) return fail('not-orthogonal');
+  let output = null, hostBar = null, sideOut = 0;
+  if (byBody) {
+    hostBar = list.find(c => c.id === target.body && c.type === 'bar' && c.moduleId === hostMod.id);
+    if (!hostBar || !hostBar.p1 || !hostBar.p2) return fail('no-body');
+    if (target.side !== 1 && target.side !== -1) return fail('not-orthogonal');
+    sideOut = target.side;
+  } else {
+    output = (hostMod.outputs || []).find(o => o.id === target.output);
+    if (!output) return fail('no-output');
+    if (!output.orthogonal || (output.orthogonal.side !== 1 && output.orthogonal.side !== -1)) return fail('not-orthogonal');
+    sideOut = output.orthogonal.side;
+  }
 
   const motor = motorState || {};
   const theta = Number(motor.theta) || 0;
@@ -268,10 +280,17 @@ export function mountOrthogonal(comps, modules, moduleId, target, params, motorS
   const sol = solveAssembly(compileAssembly(list, modList, { params }), { thetaDeg: theta, motorAngles: solveAngles });
   if (!sol.isValid) return fail('unsolved');
   const basePos = sol.points[mod.base];
-  const atPos = sol.points[output.at];
-  if (!atPos || !basePos || !Number.isFinite(atPos.x) || !Number.isFinite(basePos.x)) return fail('no-position');
-  const hostComps = list.filter(c => c.moduleId === hostMod.id);
-  const now = outputPose(hostMod, target.output, sol.points, hostComps);
+  let now = null;
+  if (byBody) {
+    const a = sol.points[hostBar.p1.id], b = sol.points[hostBar.p2.id];
+    if (!basePos || !Number.isFinite(basePos.x) || !a || !b || !Number.isFinite(a.x) || !Number.isFinite(b.x)) return fail('no-position');
+    now = { x: a.x, y: a.y, a: Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI };
+  } else {
+    const atPos = sol.points[output.at];
+    if (!atPos || !basePos || !Number.isFinite(atPos.x) || !Number.isFinite(basePos.x)) return fail('no-position');
+    const hostComps = list.filter(c => c.moduleId === hostMod.id);
+    now = outputPose(hostMod, target.output, sol.points, hostComps);
+  }
   if (!now) return fail('no-ref-pose');
 
   // childAxisDeg：base → 子模組所有點（p1,p2,p3,m1,m2，id 去重）重心的方向，四捨五入到 0.1°。
@@ -294,11 +313,11 @@ export function mountOrthogonal(comps, modules, moduleId, target, params, motorS
     ? {
       ...m,
       mount: {
-        to: { module: target.module, output: target.output },
+        to: byBody ? { module: target.module, body: target.body } : { module: target.module, output: target.output },
         ref: { x: now.x, y: now.y, a: now.a },
         home: {},
         orient: {
-          type: 'orthogonal', edge: 'host', side: output.orthogonal.side, childAxisDeg,
+          type: 'orthogonal', edge: 'host', side: sideOut, childAxisDeg,
           joint: { kind: 'printed', wallMm: 4, holesPerFlange: 2 }
         }
       }
@@ -497,6 +516,7 @@ export function moduleToTemplate(comps, modules, params, moduleId) {
 
 // 走 normalizeSnapshot（零件）＋ normalizeModules（base／outputs，用暫時 moduleId）同一套檢查。
 export function normalizeTemplate(raw) {
+  if (raw && typeof raw === 'object' && raw.kind === 'blocks-composite') return normalizeComposite(raw);
   if (!raw || typeof raw !== 'object' || raw.kind !== 'blocks-module') {
     return { ok: false, template: null, warnings: ['kind 必須是 blocks-module，已拒絕。'] };
   }
@@ -583,6 +603,22 @@ function findPointPos(list, id) {
   return null;
 }
 
+// 輸出端的 at／body／bolts 依 renameStr 改名（單一模組與組合積木共用）；輸出端 id 是每個模組自己的，不改。
+function renameOutputs(list, renameStr) {
+  return (Array.isArray(list) ? list : []).map(o => {
+    const body = o && o.body ? { ...o.body } : null;
+    if (body) {
+      if (typeof body.id === 'string') body.id = renameStr(body.id);
+      if (typeof body.a === 'string') body.a = renameStr(body.a);
+      if (typeof body.b === 'string') body.b = renameStr(body.b);
+    }
+    const out = { id: o.id, name: o.name, at: renameStr(o.at), body };
+    if (Array.isArray(o.bolts) && o.bolts.length) out.bolts = o.bolts.map(renameStr);
+    if (o.orthogonal && typeof o.orthogonal === 'object') out.orthogonal = { ...o.orthogonal };
+    return out;
+  });
+}
+
 // 插入模板實例：自有 token／param key 加後綴 _N（N 從 counter+1 起，撞 existingTokens 就重試）；
 // 馬達重新編號成未用過的最小正整數；整組平移讓 base（沒有則第一個接點）落在 place。
 export function instantiateTemplate(template, ctx) {
@@ -652,18 +688,7 @@ export function instantiateTemplate(template, ctx) {
     return moved;
   });
 
-  const outputs = (Array.isArray(t.outputs) ? t.outputs : []).map(o => {
-    const body = o && o.body ? { ...o.body } : null;
-    if (body) {
-      if (typeof body.id === 'string') body.id = renameStr(body.id);
-      if (typeof body.a === 'string') body.a = renameStr(body.a);
-      if (typeof body.b === 'string') body.b = renameStr(body.b);
-    }
-    const out = { id: o.id, name: o.name, at: renameStr(o.at), body };
-    if (Array.isArray(o.bolts) && o.bolts.length) out.bolts = o.bolts.map(renameStr);
-    if (o.orthogonal && typeof o.orthogonal === 'object') out.orthogonal = { ...o.orthogonal };
-    return out;
-  });
+  const outputs = renameOutputs(t.outputs, renameStr);
 
   const mod = { id: moduleId, name: (typeof t.name === 'string' && t.name) ? t.name : moduleId, outputs, mount: null };
   if (typeof t.source === 'string' && t.source) mod.source = t.source;
@@ -676,6 +701,203 @@ export function instantiateTemplate(template, ctx) {
   });
 
   return { comps: renamedComps, params: newParams, module: mod, counter: n };
+}
+
+// ---------------------------------------------------------------- B7 組合積木（SDD-ASSEMBLY-BENCH §2-7、Q4）
+export const COMPOSITE_MAX_MODULES = 16;   // 與 module-schema 的模組數上限一致
+
+// 以 rootModuleId 為根，沿「裝在它上面」往下收集整棵子樹（深度優先、根在前；任何安裝型態都算）。
+function compositeModuleIds(modList, rootId) {
+  const ids = [];
+  const seen = new Set();
+  const visit = id => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    ids.push(id);
+    modList.forEach(m => { if (m && m.mount && m.mount.to && m.mount.to.module === id) visit(m.id); });
+  };
+  visit(rootId);
+  return ids;
+}
+
+// 存成組合積木：根模組＋所有（遞迴）裝在它上面的模組；零件保留 moduleId；根自己的 mount 丟掉（範本裡根是未安裝）。
+export function compositeToTemplate(comps, modules, params, rootModuleId) {
+  const list = Array.isArray(comps) ? comps : [];
+  const modList = Array.isArray(modules) ? modules : [];
+  const root = modList.find(m => m && m.id === rootModuleId);
+  if (!root) return null;
+  const ids = compositeModuleIds(modList, root.id);
+  const idSet = new Set(ids);
+  const byId = new Map(modList.map(m => [m.id, m]));
+  const outModules = ids.map(id => {
+    const m = clone(byId.get(id));
+    if (id === root.id) m.mount = null;
+    else if (!m.mount) m.mount = null;
+    return m;
+  });
+  const outComps = clone(list.filter(c => c && idSet.has(c.moduleId)));
+  const refKeys = referencedParamKeys(outComps);
+  const srcParams = params || {};
+  const outParams = {};
+  refKeys.forEach(k => { if (k in srcParams) outParams[k] = srcParams[k]; });
+  return {
+    kind: 'blocks-composite', v: 1,
+    name: ids.map(id => byId.get(id).name || id).join('＋'),
+    modules: outModules, comps: outComps, params: outParams
+  };
+}
+
+// 組合積木的驗證：零件走 normalizeSnapshot、模組走 normalizeModules（含 mount）；
+// 只留「從唯一的根（未安裝）一路裝得上去」的模組，壞的連同它的零件一起捨棄。
+function normalizeComposite(raw) {
+  if (!Array.isArray(raw.comps) || !Array.isArray(raw.modules)) {
+    return { ok: false, template: null, warnings: ['組合積木的 comps／modules 必須是陣列，已拒絕。'] };
+  }
+  const warnings = [];
+  // normalizeSnapshot 會連 modules（含 mount、輸出端）一起走 normalizeModules；零件的 moduleId 也在這裡保留。
+  const snap = normalizeSnapshot({ kind: 'blocks', v: 1, comps: raw.comps, modules: raw.modules, params: raw.params });
+  if (!snap) return { ok: false, template: null, warnings: ['零件或模組格式不正確，已拒絕。'] };
+  warnings.push(...snap.warnings);
+  const modResult = { modules: snap.modules, comps: snap.comps };
+  const root = modResult.modules.find(m => !m.mount);
+  if (!root) return { ok: false, template: null, warnings: [...warnings, '組合積木找不到未安裝的根模組，已拒絕。'] };
+  const keep = new Set([root.id]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    modResult.modules.forEach(m => {
+      if (!keep.has(m.id) && m.mount && keep.has(m.mount.to.module)) { keep.add(m.id); grew = true; }
+    });
+  }
+  const rawById = new Map(raw.modules.filter(m => m && typeof m === 'object').map(m => [m.id, m]));
+  const modules = [root, ...modResult.modules.filter(m => m.id !== root.id && keep.has(m.id))].map(m => {
+    const out = { ...m };
+    const rp = rawById.get(m.id) && rawById.get(m.id).ports;
+    if (Array.isArray(rp)) out.ports = clone(rp);
+    return out;
+  });
+  modResult.modules.forEach(m => { if (!keep.has(m.id)) warnings.push(`組合積木的模組 ${m.id} 裝不回根模組，已捨棄。`); });
+  const comps = modResult.comps.filter(c => c.moduleId && keep.has(c.moduleId));
+  const template = { kind: 'blocks-composite', v: 1, name: sanitizeName(raw.name, '組合積木'), modules, comps, params: snap.params };
+  return { ok: true, template, warnings };
+}
+
+// 整組（組合積木實例）平移：只動主視圖平面的零件（planeOf 為 null）；直角子模組在自己平面的零件不動。
+// mount.ref 是宿主輸出端／桿在宿主座標下的位姿，宿主在主視圖時 ref 要跟著平移（同平面安裝的 ref 不跟會被 rebake 當成位移）。
+export function translateComposite(comps, modules, dx, dy) {
+  const list = Array.isArray(comps) ? comps : [];
+  const modList = Array.isArray(modules) ? modules : [];
+  if (!Number.isFinite(dx) || !Number.isFinite(dy) || (dx === 0 && dy === 0)) return { comps: list, modules: modList };
+  const move = { x: 0, y: 0, a: 0 }, to = { x: dx, y: dy, a: 0 };
+  const newComps = list.map(c => planeOf(list, modList, c) === null ? transformComp(c, move, to, 0) : c);
+  const newModules = modList.map(m => {
+    if (!m.mount || !m.mount.ref || planeOf(list, modList, m.mount.to.module) !== null) return m;
+    return { ...m, mount: { ...m.mount, ref: { ...m.mount.ref, x: m.mount.ref.x + dx, y: m.mount.ref.y + dy } } };
+  });
+  return { comps: newComps, modules: newModules };
+}
+
+// 插入組合積木實例：整組用同一個後綴 _N 改名（模組 id 取 Mod{N}…Mod{N+K-1}、零件／接點／孔／param key、
+// 馬達編號對 usedMotorIds 與組合內部都不重複），安裝關係（to.module／to.body／home 的馬達編號）與輸出端、base、ports 一併改；
+// 整組平移讓根模組的 base 落在 place（只動主視圖零件，見 translateComposite）。
+export function instantiateComposite(template, ctx) {
+  const t = template || {};
+  const srcMods = Array.isArray(t.modules) ? clone(t.modules) : [];
+  const srcComps = Array.isArray(t.comps) ? clone(t.comps) : [];
+  const srcParams = (t.params && typeof t.params === 'object') ? clone(t.params) : {};
+  const context = ctx || {};
+  const existing = context.existingTokens instanceof Set ? context.existingTokens : new Set(context.existingTokens || []);
+  const place = context.place || { x: 0, y: 0 };
+  const K = Math.max(1, srcMods.length);
+
+  const selfTokens = new Set();
+  srcComps.forEach(c => ownTokensOf(c).forEach(tok => selfTokens.add(tok)));
+  const paramKeys = new Set(Object.keys(srcParams));
+  const candidateNames = n => {
+    const names = new Set();
+    selfTokens.forEach(tok => names.add(`${tok}_${n}`));
+    paramKeys.forEach(k => names.add(`${k}_${n}`));
+    for (let i = 0; i < K; i++) names.add(`Mod${n + i}`);
+    return names;
+  };
+  let n = (Number(context.counter) || 0) + 1;
+  while ([...candidateNames(n)].some(name => existing.has(name))) n++;
+
+  const moduleMap = new Map(srcMods.map((m, i) => [m.id, `Mod${n + i}`]));
+  const renameMap = new Map();
+  selfTokens.forEach(tok => renameMap.set(tok, `${tok}_${n}`));
+  paramKeys.forEach(k => { if (!renameMap.has(k)) renameMap.set(k, `${k}_${n}`); });
+  const renameStr = s => (typeof s === 'string' && renameMap.has(s)) ? renameMap.get(s) : s;
+
+  // 馬達重新編號：整個組合依出現順序，取未用過的最小正整數。
+  const seenMotors = new Set();
+  const motorOrder = [];
+  srcComps.forEach(c => scanMotors(c, seenMotors, motorOrder));
+  const usedMotors = new Set((context.usedMotorIds || []).map(String));
+  const motorMap = new Map();
+  motorOrder.forEach(old => {
+    let m = 1;
+    while (usedMotors.has(String(m))) m++;
+    motorMap.set(old, String(m));
+    usedMotors.add(String(m));
+  });
+
+  let comps = srcComps.map(c => {
+    const out = renameMotors(renameStrings(c, renameMap), motorMap);
+    if (c.moduleId !== undefined) out.moduleId = moduleMap.get(c.moduleId) || c.moduleId;
+    return out;
+  });
+
+  const modules = srcMods.map(m => {
+    const out = { id: moduleMap.get(m.id), name: (typeof m.name === 'string' && m.name) ? m.name : moduleMap.get(m.id) };
+    if (typeof m.source === 'string' && m.source) out.source = m.source;
+    if (typeof m.base === 'string' && m.base) out.base = renameStr(m.base);
+    out.outputs = renameOutputs(m.outputs, renameStr);
+    if (Array.isArray(m.ports)) {
+      out.ports = m.ports.map(p => {
+        const q = { ...p };
+        if (q.body && typeof q.body === 'object') { q.body = { ...q.body }; if (typeof q.body.id === 'string') q.body.id = renameStr(q.body.id); }
+        if (Array.isArray(q.holes)) q.holes = q.holes.map(renameStr);
+        if (Array.isArray(q.bolts)) q.bolts = q.bolts.map(renameStr);
+        return q;
+      });
+    }
+    let mount = null;
+    const sm = m.mount;
+    if (sm && sm.to && moduleMap.has(sm.to.module)) {
+      const to = { module: moduleMap.get(sm.to.module) };
+      if (sm.to.output !== undefined) to.output = sm.to.output;          // 輸出端 id 是每個模組自己的，不改
+      if (sm.to.body !== undefined) to.body = renameStr(sm.to.body);
+      mount = { ...clone(sm), to };
+      const home = {};
+      Object.keys(sm.home || {}).forEach(k => { if (motorMap.has(String(k))) home[motorMap.get(String(k))] = sm.home[k]; });
+      mount.home = home;
+    }
+    out.mount = mount;
+    return out;
+  });
+
+  const newParams = {};
+  Object.keys(srcParams).forEach(k => { newParams[renameStr(k)] = srcParams[k]; });
+
+  // 根（未安裝）模組的 base 落在 place；沒有 base 就取根模組第一個接點。
+  const root = modules.find(m => !m.mount) || modules[0];
+  let basePos = null;
+  if (root) {
+    const rootComps = comps.filter(c => c.moduleId === root.id);
+    if (root.base) basePos = findPointPos(rootComps, root.base);
+    if (!basePos) {
+      outer: for (const c of rootComps) {
+        for (const k of pointKeysFor(c)) { if (c[k] && Number.isFinite(c[k].x)) { basePos = { x: c[k].x, y: c[k].y }; break outer; } }
+      }
+    }
+  }
+  if (basePos) {
+    const moved = translateComposite(comps, modules, (Number(place.x) || 0) - basePos.x, (Number(place.y) || 0) - basePos.y);
+    comps = moved.comps;
+    moved.modules.forEach((m, i) => { modules[i] = m; });
+  }
+  return { comps, params: newParams, modules, counter: n + K - 1 };
 }
 
 // 內建模組：齒條升降（輸出 carriage＝LiftOutput）、齒輪夾爪（base GCA；去掉夾爪任務 params）。

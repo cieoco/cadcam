@@ -6,10 +6,11 @@
  */
 import { S } from './state.js';
 import { pointKeysFor } from './part-types.js';
-import { selectionModule } from './assembly.js';
+import { selectionModule, compsInPlane } from './assembly.js';
 import {
   createModule, addOutput, inferOutput, mountModule, mountOrthogonal, unmountModule, dissolveModule, setMountFlip,
   moduleToTemplate, normalizeTemplate, instantiateTemplate, insertOffset, translateModule,
+  compositeToTemplate, instantiateComposite, translateComposite, COMPOSITE_MAX_MODULES,
   BUILTIN_MODULES, builtinTemplate, parseLibrary, serializeLibrary
 } from './module-ops.js';
 
@@ -118,7 +119,9 @@ export function createModuleEditor(deps) {
   function buildMountLabel(mod) {
     const host = S.modules.find(m => m.id === mod.mount.to.module);
     const hostName = host ? host.name : mod.mount.to.module;
-    const outName = host ? outputNameOf(host, mod.mount.to.output) : mod.mount.to.output;
+    const outName = mod.mount.to.body
+      ? ((host && (host.outputs || []).find(o => o.body && o.body.id === mod.mount.to.body) || {}).name || mod.mount.to.body)
+      : (host ? outputNameOf(host, mod.mount.to.output) : mod.mount.to.output);
     const flip = mod.mount.flip ? '（翻面）' : '';
     if (mod.mount.orient) return `⟂ 直角裝在 ${hostName}・${outName}${flip}`;
     return `裝在 ${hostName}・${outName}${flip}`;
@@ -140,7 +143,11 @@ export function createModuleEditor(deps) {
 
   function library() {
     const builtins = BUILTIN_MODULES.map(m => ({ kind: 'builtin', id: m.id, name: m.name }));
-    const locals = parseLibrary(loadLibraryText()).map((t, index) => ({ kind: 'local', index, name: t.name }));
+    const locals = parseLibrary(loadLibraryText()).map((t, index) => {
+      const item = { kind: 'local', index, name: t.name };
+      if (t.kind === 'blocks-composite') { item.composite = true; item.moduleCount = t.modules.length; }
+      return item;
+    });
     return [...builtins, ...locals];
   }
 
@@ -153,6 +160,7 @@ export function createModuleEditor(deps) {
     if (!mod) return { visible: false };
     const mounted = !!mod.mount;
     const canSetOutput = !!S.selectedNodeId && inferOutput(S.comps, mod, S.selectedNodeId).ok;
+    const hasChildren = S.modules.some(m => m.mount && m.mount.to.module === mod.id);
     const canDissolve = !mounted && !S.modules.some(m => m.mount && m.mount.to.module === mod.id);
     return {
       visible: true, kind: 'module', moduleId: mod.id, name: mod.name, mounted,
@@ -161,7 +169,7 @@ export function createModuleEditor(deps) {
       orthogonal: mounted && !!mod.mount.orient,
       viewing: S.viewPlane === mod.id,
       candidates: candidatesFor(mod),
-      canSetOutput, canUnmount: mounted, canDissolve
+      canSetOutput, canUnmount: mounted, canDissolve, hasChildren
     };
   }
 
@@ -181,8 +189,35 @@ export function createModuleEditor(deps) {
     Object.keys(S.topo.params || {}).forEach(k => s.add(k));
     return s;
   }
+  // B7：插入組合積木——整組改名、整組挪開（只動主視圖零件），一次 pushUndo，選到根模組的第一個零件。
+  function insertComposite(template) {
+    if (!template) return;
+    const count = Array.isArray(template.modules) ? template.modules.length : 0;
+    if (S.modules.length + count > COMPOSITE_MAX_MODULES) { transient(`模組數量會超過 ${COMPOSITE_MAX_MODULES} 個，無法插入這個組合積木。`); return; }
+    const existingTokens = existingTokensOfWork();
+    S.modules.forEach(m => existingTokens.add(m.id));
+    const r = instantiateComposite(template, {
+      counter: S.counter,
+      usedMotorIds: [...usedMotorIdsOfWork()],
+      existingTokens,
+      place: viewCenter()
+    });
+    const off = insertOffset(compsInPlane(S.comps, S.modules, null), compsInPlane(r.comps, r.modules, null), 30, { ...S.topo.params, ...r.params });
+    if (off.dx !== 0 || off.dy !== 0) { const moved = translateComposite(r.comps, r.modules, off.dx, off.dy); r.comps = moved.comps; r.modules = moved.modules; }
+    pushUndo();
+    S.comps = [...S.comps, ...r.comps];
+    Object.keys(r.params).forEach(k => { S.topo.params[k] = r.params[k]; });
+    S.modules = [...S.modules, ...r.modules];
+    S.counter = r.counter;
+    const root = r.modules.find(m => !m.mount) || r.modules[0];
+    const target = root && r.comps.find(c => c.moduleId === root.id && (c.type === 'bar' || c.type === 'triangle' || c.type === 'gear' || c.type === 'slider'));
+    if (target) select(target);
+    rebuild(); draw();
+    transient(`已加入組合積木「${template.name}」`);
+  }
   function insertTemplate(template) {
     if (!template) return;
+    if (template.kind === 'blocks-composite') { insertComposite(template); return; }
     const ctx = {
       counter: S.counter,
       usedMotorIds: [...usedMotorIdsOfWork()],
@@ -267,6 +302,17 @@ export function createModuleEditor(deps) {
     saveLibraryText(serializeLibrary(lib));
     transient(`已存入我的模組庫「${template.name}」。`);
   }
+  // B7：把選到的模組（含所有裝在它上面的模組）存成組合積木，進同一個本機模組庫。
+  function saveCompositeToLibrary(moduleId) {
+    const template = compositeToTemplate(S.comps, S.modules, S.topo.params, moduleId);
+    if (!template) { transient('找不到要存成組合積木的模組。'); return null; }
+    const lib = parseLibrary(loadLibraryText());
+    lib.push(template);
+    saveLibraryText(serializeLibrary(lib));
+    renderLibrary();
+    transient(`已存成組合積木「${template.name}」`);
+    return template;
+  }
   function exportTemplate() {
     const modId = currentModuleId();
     if (!modId) return;
@@ -300,13 +346,13 @@ export function createModuleEditor(deps) {
     div.setAttribute('class', 'block module-block');
     const ico = document.createElement('span');
     ico.setAttribute('class', 'ico');
-    ico.textContent = '🧩';
+    ico.textContent = item.composite ? '🧩🧩' : '🧩';
     const name = document.createElement('span');
     name.setAttribute('class', 'name');
     name.textContent = item.name;
     const role = document.createElement('span');
     role.setAttribute('class', 'role');
-    role.textContent = item.kind === 'builtin' ? '內建模組' : '我的模組';
+    role.textContent = item.kind === 'builtin' ? '內建模組' : (item.composite ? `組合積木（${item.moduleCount} 個模組）` : '我的模組');
     div.appendChild(ico); div.appendChild(name); div.appendChild(role);
     div.addEventListener('click', () => {
       if (item.kind === 'builtin') insertBuiltin(item.id);
@@ -447,6 +493,7 @@ export function createModuleEditor(deps) {
       }
       if (ps.canSetOutput) addButton(el, '設為輸出端', () => setOutput());
       addButton(el, '💾 存到我的模組庫', () => { saveToLibrary(); renderLibrary(); });
+      if (ps.hasChildren) addButton(el, '💾 存成組合積木', () => saveCompositeToLibrary(ps.moduleId));
       addButton(el, '⬇ 匯出模組', () => exportTemplate());
       if (ps.canDissolve) addButton(el, '解散模組', () => dissolve());
     }
@@ -462,9 +509,9 @@ export function createModuleEditor(deps) {
 
   return {
     library, panelState, sync,
-    insertBuiltin, insertLocal,
+    insertBuiltin, insertLocal, insertComposite, insertTemplate,
     saveAsModule, rename,
     mountTo, mountOrthogonalTo, unmount, toggleFlip, setOutput, dissolve,
-    saveToLibrary, exportTemplate, importLibraryText, removeFromLibrary
+    saveToLibrary, saveCompositeToLibrary, exportTemplate, importLibraryText, removeFromLibrary
   };
 }

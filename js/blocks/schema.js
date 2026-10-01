@@ -90,7 +90,8 @@ function normalizeBar(comp, index, params, warnings) {
     out.motorType = comp.motorType === 'mg995' ? 'mg995' : 'tt';
     if (out.motorType === 'mg995') {
       // 伺服來回擺的兩端角度（與 play 的 theta 同座標系），clamp 0..360。
-      const clampAng = v => Math.max(0, Math.min(360, Math.round(num(v, 0))));
+      // 伺服角度相對於組裝姿態，可以是負的（例如四連桿升降 −60～60°）。
+      const clampAng = v => Math.max(-360, Math.min(360, Math.round(num(v, 0))));
       out.servoStart = clampAng(comp.servoStart ?? 0);
       out.servoEnd = clampAng(comp.servoEnd ?? 90);
     }
@@ -356,7 +357,8 @@ function normalizeGear(comp, index, params, warnings) {
   if (comp.physicalMotor) out.physicalMotor = String(comp.physicalMotor);
   // 驅動輪可標 MG995 伺服（角度範圍內來回擺）；TT / 未標型號不輸出任何欄位，舊檔不變。
   if (comp.motorType === 'mg995') {
-    const clampAng = v => Math.max(0, Math.min(360, Math.round(num(v, 0))));
+    // 伺服角度相對於組裝姿態，可以是負的（例如四連桿升降 −60～60°）。
+      const clampAng = v => Math.max(-360, Math.min(360, Math.round(num(v, 0))));
     out.motorType = 'mg995';
     out.servoStart = clampAng(comp.servoStart ?? 0);
     out.servoEnd = clampAng(comp.servoEnd ?? 90);

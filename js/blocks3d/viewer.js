@@ -372,8 +372,70 @@ export function createViewer(container) {
     return ghostMatCache.get(mat.uuid);
   }
 
-  function ghostify(obj) {
-    obj.traverse(o => { if (o.isMesh) o.material = ghostMaterialFor(o.material); });
+  // 組立台預覽用的「半透明」：比使用者點選隱藏（0.16）濃一些，仍看得出形狀。
+  const previewGhostMatCache = new Map();
+  function previewGhostMaterialFor(mat) {
+    if (!previewGhostMatCache.has(mat.uuid)) {
+      const g = mat.clone();
+      g.transparent = true;
+      g.opacity = 0.42;
+      g.depthWrite = false;
+      previewGhostMatCache.set(mat.uuid, g);
+    }
+    return previewGhostMatCache.get(mat.uuid);
+  }
+
+  // B6 干涉高亮：把撞到的零件染紅（保留材質種類，只換顏色＋一點自發光）；快取複本避免逐幀重建。
+  const redMatCache = new Map();
+  function redMaterialFor(mat) {
+    if (!redMatCache.has(mat.uuid)) {
+      const r = mat.clone();
+      if (r.color) r.color.set(0xe5322d);
+      if (r.emissive) r.emissive.set(0x4a0805);
+      r.transparent = false; r.opacity = 1;
+      redMatCache.set(mat.uuid, r);
+    }
+    return redMatCache.get(mat.uuid);
+  }
+  function redify(obj) {
+    obj.traverse(o => { if (o.isMesh && o.material && !Array.isArray(o.material)) o.material = redMaterialFor(o.material); });
+  }
+  // highlight：{ keys:Set<完整 pickKey>, prefixes:[前綴字串] }（prefix 例：'M2/' 整個直角子模組）
+  let highlight = null;
+  function isHighlightKey(key) {
+    if (!highlight) return false;
+    if (highlight.keys.has(key)) return true;
+    return highlight.prefixes.some(p => key.startsWith(p));
+  }
+  // keys：陣列；以 '/*' 結尾的項目代表「該前綴底下全部」，其餘是完整 pickKey（例 'stick:LiftCrank_1'、'M2/gear:G1'、'frame'）。
+  function setHighlight(keys) {
+    const list = Array.isArray(keys) ? keys.filter(k => typeof k === 'string' && k) : [];
+    const sig = list.slice().sort().join('\n');
+    if (sig === (highlight ? highlight.sig : '')) return;
+    highlight = list.length ? {
+      sig, keys: new Set(list.filter(k => !k.endsWith('/*'))),
+      prefixes: list.filter(k => k.endsWith('/*')).map(k => k.slice(0, -1))
+    } : null;
+    if (lastModel) update(lastModel);
+  }
+
+  function ghostify(obj, preview = false) {
+    obj.traverse(o => { if (o.isMesh) o.material = preview ? previewGhostMaterialFor(o.material) : ghostMaterialFor(o.material); });
+  }
+
+  // 組立台預覽：{ prefix, ids } —— prefix＝直角安裝子模組的 id（其 Group 內全部半透明）；
+  // ids＝同平面子模組的零件／接點 id（pickKey 的 id 部分命中就半透明）。
+  let previewGhost = null;
+  function isPreviewGhostKey(rawKey) {
+    if (!previewGhost) return false;
+    if (previewGhost.prefix && keyPrefix === previewGhost.prefix + '/') return true;
+    if (keyPrefix || !previewGhost.ids || !previewGhost.ids.size) return false;
+    const rest = rawKey.slice(rawKey.indexOf(':') + 1);
+    return previewGhost.ids.has(rest) || rest.split('-').some(t => previewGhost.ids.has(t));
+  }
+  function setPreviewGhost(spec) {
+    previewGhost = spec && (spec.prefix || (spec.ids && spec.ids.size)) ? { prefix: spec.prefix || null, ids: spec.ids ? new Set(spec.ids) : new Set() } : null;
+    if (lastModel) update(lastModel);
   }
 
   // 統一的加入點：標上 pickKey 供點選判定；若該部件目前為 ghost 就套半透明材質。
@@ -384,7 +446,9 @@ export function createViewer(container) {
   function addPart(obj, rawKey) {
     const key = keyPrefix + rawKey;
     obj.userData.pickKey = key;
-    if (ghosted.has(key)) ghostify(obj);
+    if (isPreviewGhostKey(rawKey)) ghostify(obj, true);
+    else if (ghosted.has(key)) ghostify(obj);
+    else if (isHighlightKey(key)) redify(obj);
     sink.add(obj);
     return obj;
   }
@@ -789,6 +853,7 @@ export function createViewer(container) {
       const mesh = new THREE.Mesh(geo, p.ground ? groundMat : pinMat);
       mesh.rotation.x = Math.PI / 2;
       mesh.position.set(p.x, p.y, (p.z0 + p.z1) / 2);
+      if (previewGhost && previewGhost.prefix && keyPrefix === previewGhost.prefix + '/') ghostify(mesh, true);
       sink.add(mesh);
     });
 
@@ -897,7 +962,7 @@ export function createViewer(container) {
   let downX = 0, downY = 0;
   function onPointerDown(e) { downX = e.clientX; downY = e.clientY; }
   function onPointerUp(e) {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || !pickEnabled) return;
     if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return;   // 視為拖曳
     const key = pickAt(e.clientX, e.clientY);
     if (!key) return;
@@ -906,6 +971,98 @@ export function createViewer(container) {
   }
   renderer.domElement.addEventListener('pointerdown', onPointerDown);
   renderer.domElement.addEventListener('pointerup', onPointerUp);
+
+  // ---- 組立台：接口標記（疊在場景上、不被 update() 清掉）、螢幕投影、關閉點選隱藏 ----
+  let pickEnabled = true;
+  const markerGroup = new THREE.Group();
+  scene.add(markerGroup);
+  const labelTexCache = new Map();
+  function labelTexture(text) {
+    if (labelTexCache.has(text)) return labelTexCache.get(text);
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 64;
+    const g = c.getContext('2d');
+    g.fillStyle = 'rgba(15,20,32,0.82)';
+    g.beginPath(); g.roundRect ? g.roundRect(2, 8, 252, 48, 14) : g.rect(2, 8, 252, 48); g.fill();
+    g.fillStyle = '#fff'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(text.length > 11 ? text.slice(0, 10) + '…' : text, 128, 33);
+    const tex = new THREE.CanvasTexture(c);
+    labelTexCache.set(text, tex);
+    return tex;
+  }
+  function clearMarkers() {
+    for (let i = markerGroup.children.length - 1; i >= 0; i--) {
+      const o = markerGroup.children[i];
+      markerGroup.remove(o);
+      o.traverse(m => { if (m.geometry) m.geometry.dispose(); if (m.material) m.material.dispose(); });
+    }
+  }
+  // markers: [{ kind:'edge'|'bolt', points:[{x,y,z}], tone:'normal'|'suggested'|'dim'|'snap'|'selected', label? }]
+  const TONES = {
+    normal: { color: 0x22d3ee, opacity: 0.9, scale: 1 },
+    suggested: { color: 0x4ade80, opacity: 1, scale: 1.5 },
+    dim: { color: 0x94a3b8, opacity: 0.35, scale: 0.8 },
+    snap: { color: 0xffffff, opacity: 1, scale: 2.1 },
+    selected: { color: 0xfb923c, opacity: 1, scale: 1.9 }
+  };
+  function setMarkers(list) {
+    clearMarkers();
+    (list || []).forEach(mk => {
+      const tone = TONES[mk.tone] || TONES.normal;
+      const pts = mk.points || [];
+      const mat = (opacity) => new THREE.MeshBasicMaterial({ color: tone.color, transparent: true, opacity, depthTest: false, depthWrite: false });
+      let anchor = null;
+      if (mk.kind === 'edge' && pts.length === 2) {
+        const a = pts[0], b = pts[1];
+        const len = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) || 1;
+        const th = 3 * tone.scale;
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 };
+        const ang = Math.atan2(b.y - a.y, b.x - a.x);
+        [[th, tone.opacity], [th * 2.6, tone.opacity * 0.28]].forEach(([t, op]) => {
+          const box = new THREE.Mesh(new THREE.BoxGeometry(len, t, t), mat(op));
+          box.position.set(mid.x, mid.y, mid.z);
+          box.rotation.z = ang;
+          box.renderOrder = 20;
+          markerGroup.add(box);
+        });
+        anchor = mid;
+      } else if (pts.length >= 1) {
+        const p = pts[0], r = 6 * tone.scale;
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(r, r * 0.22, 10, 36), mat(tone.opacity));
+        ring.position.set(p.x, p.y, p.z); ring.renderOrder = 20; markerGroup.add(ring);
+        const ball = new THREE.Mesh(new THREE.SphereGeometry(r * 0.45, 14, 10), mat(tone.opacity * 0.9));
+        ball.position.set(p.x, p.y, p.z); ball.renderOrder = 20; markerGroup.add(ball);
+        const halo = new THREE.Mesh(new THREE.SphereGeometry(r * 1.25, 16, 12), mat(tone.opacity * 0.18));
+        halo.position.set(p.x, p.y, p.z); halo.renderOrder = 19; markerGroup.add(halo);
+        anchor = p;
+      }
+      if (anchor && mk.label) {
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(mk.label), transparent: true, depthTest: false, depthWrite: false }));
+        sprite.scale.set(110, 27.5, 1);
+        sprite.position.set(anchor.x, anchor.y - 14 * tone.scale, anchor.z + 6);
+        sprite.renderOrder = 30;
+        markerGroup.add(sprite);
+      }
+    });
+  }
+  // 場景座標 → 螢幕（clientX/Y）；在相機後方回 null。
+  function project(p) {
+    camera.updateMatrixWorld();
+    const v = new THREE.Vector3(p.x, p.y, p.z).project(camera);
+    if (!Number.isFinite(v.x) || v.z > 1) return null;
+    const rect = renderer.domElement.getBoundingClientRect();
+    return { x: rect.left + (v.x + 1) / 2 * rect.width, y: rect.top + (1 - v.y) / 2 * rect.height };
+  }
+  // 把相機繞目標點轉到斜上方（組立台第一次進來用，讓直角安裝的立體關係看得出來）。
+  function tiltView(azimuthDeg = -28, elevationDeg = 18) {
+    const t = controls.target;
+    const off = camera.position.clone().sub(t);
+    const r = off.length() * 0.75;   // 順便拉近一點，組立台的 3D 才是主角
+    const az = azimuthDeg * Math.PI / 180, el = elevationDeg * Math.PI / 180;
+    camera.position.set(t.x + r * Math.cos(el) * Math.sin(az), t.y + r * Math.sin(el), t.z + r * Math.cos(el) * Math.cos(az));
+    camera.lookAt(t);
+    controls.update();
+  }
 
   // 讓外部（如「全部顯示」按鈕）可清掉所有隱藏狀態。
   function showAll() {
@@ -920,6 +1077,10 @@ export function createViewer(container) {
   function dispose() {
     stop();
     clearDynamic();
+    clearMarkers();
+    labelTexCache.forEach(t => t.dispose());
+    previewGhostMatCache.forEach(m => m.dispose());
+    redMatCache.forEach(m => m.dispose());
     renderer.domElement.removeEventListener('pointerdown', onPointerDown);
     renderer.domElement.removeEventListener('pointerup', onPointerUp);
     ghostMatCache.forEach(m => m.dispose());
@@ -942,5 +1103,10 @@ export function createViewer(container) {
   resize();
   start();
 
-  return { update, resize, dispose, start, stop, showAll, get camera() { return camera; }, get controls() { return controls; } };
+  return {
+    update, resize, dispose, start, stop, showAll, setMarkers, setPreviewGhost, setHighlight, project, tiltView,
+    setPickEnabled(on) { pickEnabled = !!on; },
+    get canvas() { return renderer.domElement; },
+    get camera() { return camera; }, get controls() { return controls; }
+  };
 }

@@ -115,6 +115,26 @@ export function outputPose(module, outputId, points, comps) {
   return { x: posPt.x, y: posPt.y, a: angleDeg };
 }
 
+// 直角安裝的宿主桿：mount.to.body 有值就取該根桿（任一根桿的邊都能裝），
+// 否則取宿主輸出端的 body（必須是桿）。找不到或不是桿 → null。純函式。
+export function orthogonalHostBody(comps, modules, mount) {
+  const list = Array.isArray(comps) ? comps : [];
+  const modList = Array.isArray(modules) ? modules : [];
+  const to = mount && mount.to;
+  if (!to) return null;
+  const host = modList.find(m => m && m.id === to.module);
+  if (!host) return null;
+  let bodyId = null;
+  if (to.body) bodyId = to.body;
+  else {
+    const output = (host.outputs || []).find(o => o.id === to.output);
+    if (!output || !output.body || output.body.kind !== 'bar') return null;
+    bodyId = output.body.id;
+  }
+  const bar = list.find(c => c && c.id === bodyId);
+  return bar && bar.type === 'bar' && bar.p1 && bar.p2 ? bar : null;
+}
+
 export function solveAssembly(asm, params) {
   if (asm.single) return solveTopology(asm.single, params);
   const points = {};
@@ -125,7 +145,15 @@ export function solveAssembly(asm, params) {
     let ref = IDENTITY_POSE, now = IDENTITY_POSE;
     if (unit.mount) {
       const host = asm.units.find(u => u.id === unit.mount.to.module);
-      now = host && host.module ? outputPose(host.module, unit.mount.to.output, points, host.comps) : null;
+      if (unit.mount.to.body) {
+        // 直角安裝到「任一根桿」的邊：宿主位姿＝桿 p1 的位置，方向取 p1→p2；兩個點都要解出來。
+        const bar = host && host.module && unit.mount.orient
+          ? orthogonalHostBody(host.comps, [host.module], unit.mount) : null;
+        const a = bar && points[bar.p1.id], b = bar && points[bar.p2.id];
+        now = validPt(a) && validPt(b) ? { x: a.x, y: a.y, a: Math.atan2(b.y - a.y, b.x - a.x) / D2R } : null;
+      } else {
+        now = host && host.module ? outputPose(host.module, unit.mount.to.output, points, host.comps) : null;
+      }
       if (!now) { perModule[unit.id] = { isValid: false, reason: 'host-invalid' }; continue; }
       if (unit.mount.orient) {
         // 直角安裝：子模組在自己的平面求解，點座標維持原樣（ref＝now＝IDENTITY），位姿另外回報給 3D／側影帶用。
@@ -248,11 +276,8 @@ export function orthogonalFrame(comps, modules, moduleId, points) {
   const mod = modList.find(m => m.id === moduleId);
   const orient = mod && mod.mount && mod.mount.orient;
   if (!orient || orient.type !== 'orthogonal') return null;
-  const host = modList.find(m => m.id === mod.mount.to.module);
-  const output = host && (host.outputs || []).find(o => o.id === mod.mount.to.output);
-  if (!output || !output.body || output.body.kind !== 'bar') return null;
-  const bodyComp = list.find(c => c.id === output.body.id);
-  if (!bodyComp || !bodyComp.p1 || !bodyComp.p2) return null;
+  const bodyComp = orthogonalHostBody(list, modList, mod.mount);
+  if (!bodyComp) return null;
   const p1 = points && points[bodyComp.p1.id], p2 = points && points[bodyComp.p2.id];
   const base = mod.base && points ? points[mod.base] : null;
   if (!validPt(p1) || !validPt(p2) || !validPt(base)) return null;
@@ -262,10 +287,11 @@ export function orthogonalFrame(comps, modules, moduleId, points) {
   const side = orient.side;
   const w = memberStock(bodyComp).widthMm;
   const mx = side * -dy, my = side * dx;   // m＝side·left，left＝(−d.y, d.x)
+  const off = Number.isFinite(orient.offsetMm) ? orient.offsetMm : 0;   // 沿 d 滑動的位置（從桿中點起算）
   const rad = orient.childAxisDeg * D2R;
   const e = { x: Math.cos(rad), y: Math.sin(rad) };
   return {
-    origin: { x: (p1.x + p2.x) / 2 + mx * w / 2, y: (p1.y + p2.y) / 2 + my * w / 2, z: 0 },
+    origin: { x: (p1.x + p2.x) / 2 + mx * w / 2 + off * dx, y: (p1.y + p2.y) / 2 + my * w / 2 + off * dy, z: 0 },
     d: { x: dx, y: dy, z: 0 },
     m: { x: mx, y: my, z: 0 },
     n: { x: 0, y: 0, z: -side },

@@ -2,11 +2,12 @@
  * blocks / orthogonal-joint
  *
  * 直角安裝的 3D 列印 L 形轉接座（SDD-ORTHOGONAL-MOUNT O-D5）：純函式，不碰 DOM、不改輸入。
- * 轉接座一翼貼在宿主桿（output.body，kind 'bar'）的面上、另一翼貼在子模組底板上；
+ * 轉接座一翼貼在宿主桿（mount.to.body，或輸出端 output.body，kind 'bar'）的面上、另一翼貼在子模組底板上；
  * 這裡只算兩邊木板要鑽的孔位（3.2 mm），STL 另由 adapter-stl.js 產生。
  */
 import { memberStock } from './member-stock.js';
 import { pointCoords } from './model.js';
+import { orthogonalHostBody } from './assembly.js';
 
 const D2R = Math.PI / 180;
 
@@ -36,11 +37,8 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3 } 
   const mod = modList.find(m => m && m.id === moduleId);
   const orient = mod && mod.mount && mod.mount.orient;
   if (!orient || orient.type !== 'orthogonal') return null;
-  const host = modList.find(m => m && m.id === mod.mount.to.module);
-  const output = host && (host.outputs || []).find(o => o.id === mod.mount.to.output);
-  if (!output || !output.body || output.body.kind !== 'bar') return null;
-  const bar = list.find(c => c && c.id === output.body.id);
-  if (!bar || !bar.p1 || !bar.p2) return null;
+  const bar = orthogonalHostBody(list, modList, mod.mount);
+  if (!bar) return null;
   const pts = pointCoords(list);
   const base = mod.base ? pts[mod.base] : null;
   if (!base) return null;
@@ -52,6 +50,7 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3 } 
   const n = Number.isInteger(joint.holesPerFlange) && joint.holesPerFlange > 0 ? joint.holesPerFlange : DEFAULT_HOLES_PER_FLANGE;
   const lengthMm = ADAPTER_LENGTH_MM, flangeMm = ADAPTER_FLANGE_MM;
   const side = Number(orient.side) < 0 ? -1 : 1;
+  const offsetMm = Number.isFinite(Number(orient.offsetMm)) ? Number(orient.offsetMm) : 0;   // 沿桿滑動（從桿中點起算）
   // 翼孔距接合角＝壁厚＋(翼高−壁厚)/2（翼的外露段正中央）
   const flangeHole = wallMm + (flangeMm - wallMm) / 2;
   const barWidth = memberStock(bar).widthMm;
@@ -68,7 +67,7 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3 } 
     lengthMm, wallMm, flangeMm,
     holeDiameterMm: ADAPTER_HOLE_MM,
     holesPerFlange: n,
-    hostHoles: ss.map(s => ({ u: r3(barLength / 2 + s), v: r3(side * (barWidth / 2 - flangeHole)) })),
+    hostHoles: ss.map(s => ({ u: r3(barLength / 2 + offsetMm + s), v: r3(side * (barWidth / 2 - flangeHole)) })),
     childHoles: ss.map(s => ({ x: r3(base.x + s * e.x + t * f.x), y: r3(base.y + s * e.y + t * f.y) }))
   };
 }

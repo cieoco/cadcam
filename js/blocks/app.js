@@ -29,7 +29,7 @@ import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
 import * as Motion from './motion.js';
-import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand } from './assembly.js';
+import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostBody } from './assembly.js';
 import { normalizeModules } from './module-schema.js';
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
@@ -51,6 +51,7 @@ import { createPlateEditor } from './plate-editor.js';
 import { createNodeEditor } from './node-editor.js';
 import { createModuleEditor } from './module-editor.js';
 import { createModuleDrag } from './module-drag.js';
+import { createBench } from './bench-ui.js';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
 import { workRangeFromTrace, clampRangeFromTraces, currentPointDistance } from './measurement.js';
 import { circleRectCompression } from './intake-contact.js';
 import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
@@ -294,9 +295,11 @@ function viewBands(pts) {
     } else if (S.viewPlane === M.id) {
       // 子視圖：宿主在子平面裡畫成側影帶，點它回宿主平面。
       const host = S.modules.find(m => m.id === hostId);
+      const bodyComp = orthogonalHostBody(S.comps, S.modules, M.mount);
+      if (!bodyComp) return;
       const output = host && (host.outputs || []).find(o => o.id === M.mount.to.output);
-      const bodyComp = output && output.body ? S.comps.find(c => c.id === output.body.id) : null;
-      if (!bodyComp || !bodyComp.p1 || !bodyComp.p2) return;
+      const edgeName = output ? output.name : bodyComp.id;
+      const off = Number.isFinite(orient.offsetMm) ? orient.offsetMm : 0;   // 子模組沿桿滑動後，桿中點在 s = -off
       const t0 = orient.side === -1 ? 0 : -HOST_BAND_MM, t1 = orient.side === -1 ? HOST_BAND_MM : 0;
       const compute = P => {
         const f = orthogonalFrame(S.comps, S.modules, M.id, P);
@@ -304,10 +307,10 @@ function viewBands(pts) {
         if (!f || !a || !b) return null;
         const half = Math.hypot(b.x - a.x, b.y - a.y) / 2;
         const at = (sv, tv) => ({ x: f.base.x + sv * f.e.x + tv * f.f.x, y: f.base.y + sv * f.e.y + tv * f.f.y });
-        return [at(-half, t0), at(half, t0), at(half, t1), at(-half, t1)];
+        return [at(-off - half, t0), at(-off + half, t0), at(-off + half, t1), at(-off - half, t1)];
       };
       const polygon = compute(pts);
-      if (polygon) bands.push({ kind: 'host', id: M.id, label: `${host.name}・${output.name}（側影）`, polygon, compute, target: planeOf(S.comps, S.modules, hostId) });
+      if (polygon) bands.push({ kind: 'host', id: M.id, label: `${host.name}・${edgeName}（側影）`, polygon, compute, target: planeOf(S.comps, S.modules, hostId) });
     }
   });
   return bands;
@@ -591,6 +594,43 @@ const moduleEditor = createModuleEditor({
   saveLibraryText: text => { try { localStorage.setItem('cadcam.blocks.moduleLibrary', text); } catch (_) {} },
   select: (...a) => selectModuleTarget(...a),   // 延遲取用：selectLink 在後面才定義
   setViewPlane: id => setViewPlane(id)
+});
+// ---- 組立台（SDD-ASSEMBLY-BENCH B3～B5）：邏輯在 ./bench-ui.js；這裡只提供狀態與 3D 的接線 ----
+// 取消預覽時還原到接上前的快照；undoLen 之後（預覽與預覽中的調整）累積的復原紀錄一併丟掉。
+function restoreBenchSnapshot(snap, undoLen) {
+  const theta = S.theta;
+  const norm = Store.normalizeSnapshot(JSON.parse(snap));
+  if (norm) applySnapshot(norm, { recordUndo: false, fit: false, source: 'undo' });
+  if (Number.isFinite(undoLen)) S.undoStack.length = Math.min(S.undoStack.length, undoLen);
+  updateUndoBtn();
+  S.theta = theta; S.topo.params.theta = theta;   // 取消預覽不該把姿勢歸零
+  draw();
+}
+async function set3D(on) { if (view3DActive !== !!on) await toggle3D(); }
+const bench = createBench({
+  pushUndo, rebuild, draw, transient, setViewPlane: id => setViewPlane(id),
+  saveComposite: id => moduleEditor.saveCompositeToLibrary(id),   // B7
+  motorState: () => ({ activeMotor: String(S.activeMotor), theta: S.theta, motorAngles: S.motorAngles }),
+  snapshotStr, restoreSnapshot: restoreBenchSnapshot,
+  getViewer: () => viewer3D, is3DActive: () => view3DActive, set3D, push3D: () => push3D(),
+  // B6：即時干涉用——目前作品的檢查參數（含各馬達行程），以及全行程時間軸點擊後把全部馬達設到指定角度。
+  interferenceArgs: () => {
+    const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
+    return {
+      comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: settings,
+      cnc: S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc, mounts: homeMountsNow(), ranges: currentMotorRanges()
+    };
+  },
+  setMotorAngles: angles => {
+    pause();
+    Object.keys(angles).forEach(id => {
+      if (String(id) === String(S.activeMotor)) S.theta = angles[id]; else S.motorAngles[String(id)] = angles[id];
+    });
+    S.topo.params.theta = S.theta;
+    const tv = document.getElementById('thetaVal');
+    if (tv) tv.textContent = Math.round(norm360(S.theta));
+    draw();
+  }
 });
 // 依零件 type 把新插入模組的第一個零件選起來，沿用各域既有的 selectXxx。
 function selectModuleTarget(comp) {
@@ -1094,6 +1134,7 @@ function draw() {
   clearOffHomeModuleSelection();
   memberEditor.sync();
   moduleEditor.sync();
+  bench.syncUI();   // 組立台：模組清單與接法面板（非組立模式時直接略過）
   gripperController?.syncVisibility();
   while (svg.firstChild) svg.removeChild(svg.firstChild);
   drawFrameGrid();
@@ -1500,6 +1541,7 @@ function push3D() {
     });
   }
   viewer3D.update(model);
+  bench.afterScene({ pts: planesApi.pts, model });   // 組立台：接口標記跟著這一幀的宿主位置
 }
 
 function refresh3DView() {
@@ -2394,7 +2436,7 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { setViewPlane, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample };
+window.blocks = { setViewPlane, setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample };
 window.blocks.changeFrameGround = changeFrameGround;
 Object.assign(window.blocks, {
   setTriSide: memberEditor.selectDimension,

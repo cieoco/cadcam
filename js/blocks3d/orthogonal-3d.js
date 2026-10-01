@@ -10,7 +10,7 @@
  * 欄向量：Mx = e.x·d + f.x·n、My = e.y·d + f.y·n、Mw = m；平移 T = origin − base.x·Mx − base.y·My。
  */
 
-import { orthogonalFrame, planeOf, compsInPlane, pointIdsInPlane } from '../blocks/assembly.js';
+import { orthogonalFrame, orthogonalHostBody, planeOf, compsInPlane, pointIdsInPlane } from '../blocks/assembly.js';
 
 export const IDENTITY_4 = Object.freeze([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
@@ -120,9 +120,8 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
       const hostPlane = planeOf(comps, modules, mod.mount.to.module);
       const host = hostPlane === null ? done.get(null) : solve(hostPlane, trail);
       if (host) {
-        const hostMod = modules.find(m => m.id === mod.mount.to.module);
-        const output = hostMod && (hostMod.outputs || []).find(o => o.id === mod.mount.to.output);
-        const body = output && output.body && (host.model.sticks || []).find(s => s.id === output.body.id);
+        const hostBar = orthogonalHostBody(comps, modules, mod.mount);
+        const body = hostBar && (host.model.sticks || []).find(s => s.id === hostBar.id);
         const zOffset = body && Number.isFinite(body.z) ? body.z : 0;
         const model = buildModel(planeInputs(inputs, comps, modules, id));
         // 子場景最低層貼在宿主桿側面（w≥0），不要穿進桿身。

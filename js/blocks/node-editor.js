@@ -46,7 +46,7 @@ export function createNodeEditor({
     const field = (which === 'end') ? 'servoEnd' : 'servoStart';
     const cur = Number(bar[field]);
     const base = Number.isFinite(cur) ? cur : (field === 'servoEnd' ? 90 : 0);
-    bar[field] = Math.max(0, Math.min(360, Math.round(base + delta)));
+    bar[field] = Math.max(-360, Math.min(360, Math.round(base + delta)));   // 相對角，可為負
     Panels.updateServoEditor();
     scheduleAutosave();
   }
