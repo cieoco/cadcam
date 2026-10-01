@@ -63,6 +63,7 @@ import { renderLinks, renderNodes } from './mechanism-layer-render.js';
 import * as Settings from './settings.js';   // 作品級加工設定 + 舊 localStorage 偏好遷移 + 表單同步
 import { normalizeFabricationProfile, FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { cncWarnings } from './cnc-check.js';   // L4：依刀徑檢查匯出特徵
+import { buildPlan, buildPackHtml } from './build-plan.js';   // L5b：製作包（板件＋五金＋組裝步驟）
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('stageSvg');
@@ -1918,7 +1919,8 @@ function cncFramePart(name, nodes, settings, mounts) {
   return g ? { name, holes: g.holes || [], cutouts: g.cutouts || [] } : null;
 }
 // 匯出後依刀徑顯示警告（前 3 條＋「…等 N 項」）；沒有警告就不動 banner。
-function showCncWarnings(parts) {
+// 收集 CNC 警告文字（刀徑檢查＋輪轂／舵盤孔位預設值提醒）；匯出提示與製作包共用。
+function cncWarningList(parts) {
   const list = cncWarnings(parts.filter(Boolean), S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc);
   // 輪轂／舵盤孔位若沒有作品明確設定，用的是常見預設值：提醒實量。
   // 作品的 drive 數值若都還是常見預設值（使用者沒實量改過），提醒一次；S.fabrication 載入後一定完整，不能用「有沒有 drive」判斷。
@@ -1926,6 +1928,10 @@ function showCncWarnings(parts) {
   if (driveIsDefault && parts.some(p => p && (p.holes || []).some(h => /^(TT_HUB_|MG995_HORN_)/.test(h.layer || '')))) {
     list.unshift('TT 輪轂／MG995 舵盤孔位用的是常見預設值，請實量後修改');
   }
+  return list;
+}
+function showCncWarnings(parts) {
+  const list = cncWarningList(parts);
   if (!list.length) return;
   setBanner(`⚠ CNC：${list.slice(0, 3).join('；')}${list.length > 3 ? `；…等 ${list.length} 項` : ''}`);
 }
@@ -1979,6 +1985,46 @@ function exportLinksDxf() {
   });
   transient(count || frameCount || moduleFrameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} DXF${moduleFrameCount ? `＋ ${moduleFrameCount} 個模組底座` : ''}${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
   showCncWarnings(cncParts);
+}
+// 製作包用：與匯出相同的零件與機架幾何，只收集 CNC 檢查用的孔與開口（不下載檔案）。
+function collectCncPartsAndFrameWarnings(settings) {
+  const nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
+  const pts = lastModelInputs && lastModelInputs.pts;
+  const freeMounts = splitFrameMounts(Exporters.splitMountsByHost(S.comps, mounts).free, S.comps, S.modules).world;
+  const frameWarnings = Exporters.frameExportWarnings(nodes, settings, freeMounts);
+  const cncParts = [...Exporters.cncPartsForExport(S.comps, pts, S.topo.params, settings, mounts), cncFramePart('frame', nodes, settings, freeMounts)];
+  moduleFrameExports(S.comps, S.modules, S.topo.params).forEach(entry => {
+    const modNodes = moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps));
+    const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
+    const modFree = splitFrameMounts(Exporters.splitMountsByHost(S.comps, homeMounts).free, S.comps, S.modules).byModule[entry.moduleId] || [];
+    frameWarnings.push(...Exporters.frameExportWarnings(modNodes, settings, modFree));
+    cncParts.push(cncFramePart(entry.fileBase, modNodes, settings, modFree));
+  });
+  return { cncParts, frameWarnings };
+}
+// L5b：下載「製作包」HTML（板件清單＋五金清單＋組裝步驟，可列印）。
+function downloadBuildPack() {
+  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
+  const stockWarnings = memberStockWarnings(S.comps, settings);
+  if (stockWarnings.length) { transient(`尚未產生製作包：${stockWarnings[0]}`); return; }
+  const cnc = S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
+  const homeMounts = lastModelInputs ? motorFrameExportMounts({ ...lastModelInputs, pts: pointCoords() }) : undefined;
+  const plan = buildPlan({ comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: settings, cnc, mounts: homeMounts });
+  if (!plan.parts.length) { transient('沒有可匯出的零件或機架'); return; }
+  const { cncParts, frameWarnings } = collectCncPartsAndFrameWarnings(settings);
+  const warnings = [...frameWarnings, ...cncWarningList(cncParts)];
+  // 目前沒有作品名稱欄位：有模組就用模組名稱串起來，否則「機構作品」。
+  const title = (S.modules || []).map(m => m && m.name).filter(Boolean).join('＋') || '機構作品';
+  const html = buildPackHtml(plan, { title, cnc, warnings });
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${title.replace(/[\\/:*?"<>|]+/g, '_')}-製作包.html`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  transient(`已產生製作包（${plan.parts.length} 片板件）`);
 }
 function openFile() {
   const inp = document.createElement('input');
@@ -2061,7 +2107,7 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, exportLinksSvg, exportLinksDxf, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, openFile, share, loadExample };
 window.blocks.changeFrameGround = changeFrameGround;
 Object.assign(window.blocks, {
   setTriSide: memberEditor.selectDimension,
