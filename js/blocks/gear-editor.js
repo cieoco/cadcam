@@ -8,7 +8,7 @@
 
 import { S, activateMotor, nextMotorId } from './state.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
-import { rackGuideThetaRange } from './rack-limits.js';
+import { rackGuideThetaRange, rackGuideTravel } from './rack-limits.js';
 import { norm360 } from './motion.js';
 import { W, H, worldFromScreen } from './view.js';
 
@@ -227,6 +227,7 @@ export function createGearEditor({
     setRow('rackBodyHeightRow', !!rack);
     setRow('rackSlotLengthRow', !!rack);
     setRow('rackSlotWidthRow', !!rack);
+    setRow('rackStopRow', !!rack);
     if (rack) {
       const len = rackLength(rack);
       const bodyH = rackBodyHeight(rack, mod);
@@ -235,6 +236,8 @@ export function createGearEditor({
       setText('rackBodyHeightVal', Number(bodyH).toFixed(1).replace(/\.0$/, ''));
       setText('rackSlotLengthVal', Math.round(slot.length));
       setText('rackSlotWidthVal', Number(slot.width).toFixed(1).replace(/\.0$/, ''));
+      const fmt = v => Number(v).toFixed(1).replace(/\.0$/, '');
+      setText('rackStopVal', (slot.trimStart > 0 || slot.trimEnd > 0) ? [slot.trimStart > 0 ? `${(Number(rack.sign) < 0) ? '負' : '正'}角度端 ${fmt(slot.trimStart)}` : '', slot.trimEnd > 0 ? `${(Number(rack.sign) < 0) ? '正' : '負'}角度端 ${fmt(slot.trimEnd)}` : ''].filter(Boolean).join('、') + ' mm' : '無');
       const orientationBtn=document.getElementById('rackOrientationBtn');
       if(orientationBtn){ const vertical=Math.abs(Math.sin((Number(rack.axisDeg)||0)*Math.PI/180))>.7; orientationBtn.textContent=vertical?'↕ 垂直升降':'↔ 水平伸縮'; }
     }
@@ -267,6 +270,14 @@ export function createGearEditor({
     rack.slot.length = Math.max(8, Math.min(Math.max(8, length - 12), Math.round(Number(rack.slot.length) || Math.max(24, length - 40))));
     rack.slot.width = Number(Math.max(2, Math.min(20, Number(rack.slot.width) || 5)).toFixed(1));
     rack.slot.offset = Number(Number(rack.slot.offset) || 0);
+    // 長槽限位：縮短 -u／+u 端（mm，夾在 0～halfTravel、取 0.1）；沒有就不設欄位
+    const half = rackGuideTravel(rack.slot.length, rack.slot.width).halfTravel;
+    ['trimStart', 'trimEnd'].forEach(k => {
+      if (!(k in rack.slot)) return;
+      const v = Number(rack.slot[k]);
+      if (!Number.isFinite(v)) { delete rack.slot[k]; return; }
+      rack.slot[k] = Math.round(Math.max(0, Math.min(half, v)) * 10) / 10;
+    });
     return rack.slot;
   }
   function rackFramePinPositions(rack, pinion, { length, module, teeth, axisDeg }) {
@@ -479,6 +490,18 @@ export function createGearEditor({
     rebuild(); draw();
     updateGearEditor();
   }
+  // 清除選取齒條的長槽限位（兩端都不縮短）。
+  function clearRackStops() {
+    const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
+    const rack = rackForGear(gear);
+    if (!rack || !rack.slot || typeof rack.slot !== 'object') return;
+    if (!(rack.slot.trimStart > 0 || rack.slot.trimEnd > 0)) return;
+    pushUndo();
+    delete rack.slot.trimStart; delete rack.slot.trimEnd;
+    rebuild(); draw();
+    updateGearEditor(); scheduleAutosave();
+    transient('已清除齒條限位');
+  }
   function changeRackSlotWidth(delta) {
     const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
     const rack = rackForGear(gear);
@@ -557,7 +580,7 @@ export function createGearEditor({
       hi = Math.min(hi, Math.max(degA, degB));
       if(Array.isArray(rack.framePins)&&rack.framePins.length){
         const slot=ensureRackSlot(rack,L);
-        const guideRange=rackGuideThetaRange(R,slot.length,slot.width,sign);
+        const guideRange=rackGuideThetaRange(R,slot.length,slot.width,sign,slot.trimStart,slot.trimEnd);
         if(guideRange){ lo=Math.max(lo,guideRange.lo); hi=Math.min(hi,guideRange.hi); }
       }
       found = true;
@@ -575,7 +598,7 @@ export function createGearEditor({
     gearPitchRadius, gearPinRadius, gearDriveState,
     setGearManualAngle, startGearManualRotate, clampGearPinRadius,
     changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeGearModule,
-    changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth,
+    changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, clearRackStops,
     deleteGearChain, rackPinionThetaRange
   };
 }

@@ -4,8 +4,10 @@
  * L5c 干涉檢查：純函式，不碰 DOM、不改輸入。
  * 實物是一層層板疊起來的；匯出前依各馬達行程取樣若干姿態，用平面凸多邊形（SAT）近似找出：
  *   - same-layer：同一層、會相對運動的零件互撞。
- *   - hardware：關節的螺絲頭／防鬆螺帽凸出到相鄰一層，掃到那層的其他零件。
- *   - motor-body：MG995 機身穿過底板往後伸，撞到後面幾層的零件。
+ *   - hardware：關節的螺絲頭／防鬆螺帽凸出板外，掃到該高度（mm）上的其他零件；附 fix＝建議的隔圈。
+ *   - motor-body：MG995 機身穿過底板往後伸，撞到該高度範圍（mm）內的零件。
+ * L6：疊層改用 mm 高度（plan.parts[].zMm），隔圈（plan.gaps）拉開層間距離；resolveSpacers 自動加隔圈，
+ * suggestRackStops 建議齒條長槽限位。
  * 平面近似（桿＝膠囊、齒輪＝圓、機架板＝凸包），仍需實物確認。
  */
 import { compileAssembly, solveAssembly, moduleFrameExports, moduleFrameNodes, worldFrameComps, splitFrameMounts } from './assembly.js';
@@ -13,14 +15,20 @@ import { frameConnectorNodes } from './model.js';
 import { inspectFrameExport, inspectRackExport, splitMountsByHost, motorMountFeatures, isStaticPlate } from './exporters.js';
 import { jawCenterline } from './plate-geometry.js';
 import { memberStock } from './member-stock.js';
-import { deriveMotorMounts } from './build-plan.js';
+import { deriveMotorMounts, buildPlan, normalizeSpacers } from './build-plan.js';
+import { rackGuideThetaRange, rackStopTrims } from './rack-limits.js';
 
 const D2R = Math.PI / 180;
 // 重疊（最小穿透深度）超過這個值才算撞；貼邊、公差級的擦邊不算。
 const MIN_PENETRATION_MM = 0.5;
 const HEAD_RADIUS_MM = 2.8;      // M3 螺絲頭
 const NUT_RADIUS_MM = 3.2;       // M3 防鬆螺帽
-const MOTOR_BODY_LAYERS = 9;     // MG995 機身約 26 mm，約 9 層 3 mm 板
+const MOTOR_BODY_MM = 27;        // MG995 機身約 26 mm（舊版以 9 層 3 mm 板估算）
+const HEAD_HEIGHT_MM = 2.4;      // M3 圓頭螺絲頭高
+const NUT_HEIGHT_MM = 5;         // 尼龍防鬆螺帽 4 mm＋螺絲尾端外露 1 mm
+const Z_OVERLAP_MM = 0.1;        // 高度區間重疊超過這個值才算同一高度
+const HEAD_FIX_MM = 3;           // 螺絲頭側建議隔圈（≥ 螺絲頭高）
+const NUT_FIX_MM = 5;            // 螺帽側建議隔圈
 const CIRCLE_SEGMENTS = 24;
 const CAP_SEGMENTS = 8;
 
@@ -129,6 +137,11 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
   const joints = (plan && plan.joints) || [];
   const planMotors = (plan && plan.motors) || [];
   if (!parts.length) return [];
+
+  // 板的高度區間（mm）：[底面, 頂面]；舊呼叫端的 plan 沒有 zMm 時退回層號×板厚。
+  const zOf = p => Number.isFinite(Number(p.zMm)) ? Number(p.zMm) : p.layer * p.thicknessMm;
+  const zSpan = p => [zOf(p), zOf(p) + p.thicknessMm];
+  const zOverlap = (a0, a1, b0, b1) => Math.min(a1, b1) - Math.max(a0, b0) > Z_OVERLAP_MM;
 
   const compById = new Map(list.filter(c => c && c.id).map(c => [c.id, c]));
   const modById = new Map(modList.map(m => [m.id, m]));
@@ -239,12 +252,14 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
     const others = shaft ? shaft.parts.map(n => partByName.get(n)).filter(p => p && p.name !== plate.name) : [];
     const above = others.length ? others.some(p => p.layer > plate.layer) : true;
     const dir = above ? -1 : 1;
+    const pz = zOf(plate);
     bodies.push({
       motorId: m.centerId, plate: plate.name,
       poly: convexHull(slot.points.slice(0, 4)),
-      layers: Array.from({ length: MOTOR_BODY_LAYERS }, (_, i) => plate.layer + dir * (i + 1)),
-      lo: Math.min(plate.layer + dir, plate.layer + dir * MOTOR_BODY_LAYERS),
-      hi: Math.max(plate.layer + dir, plate.layer + dir * MOTOR_BODY_LAYERS)
+      // 機身的高度區間（mm）：在底板下方＝[plateZ-27, plateZ]；在上方＝[plateTop, plateTop+27]
+      z0: dir < 0 ? pz - MOTOR_BODY_MM : pz + plate.thicknessMm,
+      z1: dir < 0 ? pz : pz + plate.thicknessMm + MOTOR_BODY_MM,
+      dir
     });
   });
 
@@ -343,11 +358,13 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
   const results = [];
   const seen = new Set();
   const keyOf = (kind, names) => kind + '|' + [...names].sort().join('|');
-  const report = (kind, names, layer, pose, message) => {
+  const report = (kind, names, layer, pose, message, fix) => {
     const key = keyOf(kind, names);
     if (seen.has(key)) return;
     seen.add(key);
-    results.push({ kind, parts: names, layer, motor: pose.motor, angleDeg: pose.angleDeg, message });
+    const item = { kind, parts: names, layer, motor: pose.motor, angleDeg: pose.angleDeg, message };
+    if (fix) item.fix = fix;
+    results.push(item);
   };
   const when = pose => pose.motor == null
     ? '在組裝姿態（全部馬達 0°）'
@@ -370,23 +387,30 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
       }
     });
 
-    // 2. 螺絲頭／防鬆螺帽
+    // 2. 螺絲頭／防鬆螺帽：用 mm 高度找出被頭／帽掃到的零件
     joints.forEach(j => {
       if (j.kind === 'motor-shaft') return;
       const p = pose.points[j.id];
       if (!validPt(p)) return;
+      const jp = j.parts.map(n => partByName.get(n)).filter(Boolean);
+      if (!jp.length) return;
       const center = { x: Number(p.x), y: Number(p.y) };
+      const zBottom = Math.min(...jp.map(q => zOf(q)));
+      const zTop = Math.max(...jp.map(q => zSpan(q)[1]));
       [
-        { layer: j.layers[0] - 1, r: HEAD_RADIUS_MM, label: '螺絲頭' },
-        { layer: j.layers[1] + 1, r: NUT_RADIUS_MM, label: '防鬆螺帽' }
+        { z0: zBottom - HEAD_HEIGHT_MM, z1: zBottom, r: HEAD_RADIUS_MM, label: '螺絲頭', fix: { below: j.layers[0], mm: HEAD_FIX_MM } },
+        { z0: zTop, z1: zTop + NUT_HEIGHT_MM, r: NUT_RADIUS_MM, label: '防鬆螺帽', fix: { below: j.layers[1] + 1, mm: NUT_FIX_MM } }
       ].forEach(h => {
         const disc = [circlePoly(center, h.r)];
-        (layerOfParts.get(h.layer) || []).forEach(v => {
+        parts.forEach(v => {
           if (j.parts.includes(v.name) || j.parts.some(n => sameBody(n, v.name))) return;
+          const [v0, v1] = zSpan(v);
+          if (!zOverlap(h.z0, h.z1, v0, v1)) return;
           if (seen.has(keyOf('hardware', [...j.parts, v.name]))) return;
           if (polysOverlap(disc, partPolys(pose, v))) {
-            report('hardware', [...j.parts, v.name], h.layer, pose,
-              `關節 ${j.id}（${j.parts.join('、')}）的${h.label}凸出到第 ${h.layer} 層，${when(pose)}螺絲頭／螺帽會刮到 ${v.name}。建議：改用沉頭、加墊片拉開一層，或避開路徑。`);
+            report('hardware', [...j.parts, v.name], v.layer, pose,
+              `關節 ${j.id}（${j.parts.join('、')}）的${h.label}凸出到第 ${v.layer} 層，${when(pose)}螺絲頭／螺帽會刮到 ${v.name}。建議：在第 ${h.fix.below - 1}、${h.fix.below} 層之間加 ${h.fix.mm} mm 隔圈（或改用沉頭），或避開路徑。`,
+              { ...h.fix });
           }
         });
       });
@@ -397,18 +421,135 @@ export function findInterference({ comps, modules = [], params = {}, plan, range
       const xf = frameXf(pose, body.plate);
       if (!xf) return;
       const poly = [body.poly.map(q => applyXf(xf, q))];
-      body.layers.forEach(layer => {
-        (layerOfParts.get(layer) || []).forEach(v => {
-          if (v.name === body.plate || sameBody(body.plate, v.name)) return;
-          if (seen.has(keyOf('motor-body', [body.plate, v.name]))) return;
-          if (polysOverlap(poly, partPolys(pose, v))) {
-            report('motor-body', [body.plate, v.name], layer, pose,
-              `馬達軸 ${body.motorId} 的 MG995 機身（穿過 ${body.plate}，佔第 ${body.lo}～${body.hi} 層）${when(pose)}會撞到第 ${layer} 層的 ${v.name}。建議：調整安裝方向或位置。`);
-          }
-        });
+      parts.forEach(v => {
+        if (v.name === body.plate || sameBody(body.plate, v.name)) return;
+        const [v0, v1] = zSpan(v);
+        if (!zOverlap(body.z0, body.z1, v0, v1)) return;
+        if (seen.has(keyOf('motor-body', [body.plate, v.name]))) return;
+        if (polysOverlap(poly, partPolys(pose, v))) {
+          report('motor-body', [body.plate, v.name], v.layer, pose,
+            `馬達軸 ${body.motorId} 的 MG995 機身（穿過 ${body.plate}，往${body.dir < 0 ? '下' : '上'}佔 ${MOTOR_BODY_MM} mm 高）${when(pose)}會撞到第 ${v.layer} 層的 ${v.name}。建議：限制馬達行程（見長槽限位）、調整安裝方向或位置。`);
+        }
       });
     });
   });
 
   return results;
+}
+
+// ---------- L6a：自動加隔圈 ----------
+// 螺絲頭／螺帽刮到鄰層時，findInterference 的 hardware 項目附 fix（{ below, mm }）；
+// 把 fix 併入隔圈後重排疊層再檢查，最多 4 輪，直到沒有新的隔圈。
+// 回傳 { plan, interference, spacers }；spacers 與 plan.gaps 相同。
+export function resolveSpacers({ comps, modules = [], params = {}, exportSettings = {}, cnc, mounts, ranges = {}, samplesPerMotor = 9, spacers = [] } = {}) {
+  let current = normalizeSpacers(spacers);
+  let plan = null, interference = [];
+  for (let i = 0; i < 4; i++) {
+    plan = buildPlan({ comps, modules, params, exportSettings, cnc, mounts, spacers: current });
+    interference = findInterference({ comps, modules, params, exportSettings, mounts, plan, ranges, samplesPerMotor });
+    // 螺絲頭的隔圈先加：它會把上面各層一起抬高，常順便解掉螺帽那側的干涉；沒有螺絲頭問題才處理螺帽。
+    const hw = interference.filter(x => x.kind === 'hardware' && x.fix);
+    const heads = hw.filter(x => x.fix.mm === HEAD_FIX_MM);
+    const fixes = (heads.length ? heads : hw).map(x => x.fix);
+    const next = normalizeSpacers([...current, ...fixes]);
+    if (JSON.stringify(next) === JSON.stringify(current)) break;
+    current = next;
+  }
+  return { plan, interference, spacers: plan.gaps.map(g => ({ ...g })) };
+}
+
+// ---------- L6b：建議齒條長槽限位 ----------
+// 齒條行程超出無干涉範圍時，把長槽一端縮短（slot.trimStart／trimEnd），導銷碰到槽端就停。
+// 對每個由 ranges 內某馬達驅動的齒條：從 0° 往 lo、hi 逐步試單一角度，遇到第一個有干涉的角度就停，
+// 往內縮 marginDeg；再用逆公式換成要縮短的 mm。0° 本身就干涉、或整段都乾淨 → 不建議。
+export function suggestRackStops({ comps, modules = [], params = {}, plan, ranges = {}, exportSettings = {}, mounts, samplesPerMotor = 9, marginDeg = 2 } = {}) {
+  const list = Array.isArray(comps) ? comps : [];
+  const gearById = new Map(list.filter(c => c && c.type === 'gear').map(g => [g.id, g]));
+  // 沿 mesh 鏈往上找帶動小齒輪的馬達 id（回傳字串；沒有回 null）
+  const motorOfPinion = pinionId => {
+    const seen = new Set();
+    let g = gearById.get(pinionId);
+    while (g && !seen.has(g.id)) {
+      seen.add(g.id);
+      const m = g.p1 && (g.p1.physicalMotor || g.p1.physical_motor);
+      if (m) return String(m);
+      g = g.mesh ? gearById.get(g.mesh) : null;
+    }
+    return null;
+  };
+  const run = (motor, a) => findInterference({
+    comps: list, modules, params, exportSettings, mounts, plan, samplesPerMotor,
+    ranges: { ...ranges, [motor]: { lo: a, hi: a } }
+  });
+  const fmt1 = v => String(Number(Number(v).toFixed(1)));
+  const out = [];
+  list.forEach(rack => {
+    if (!rack || rack.type !== 'rack' || !rack.pinion || !rack.slot || typeof rack.slot !== 'object') return;
+    const motor = motorOfPinion(rack.pinion);
+    if (motor == null || !ranges[motor]) return;
+    const pinion = gearById.get(rack.pinion);
+    const R = Number(params[pinion.radiusParam]);
+    const sign = rack.sign === -1 ? -1 : 1;
+    const { length, width } = rack.slot;
+    const lo0 = Number(ranges[motor].lo), hi0 = Number(ranges[motor].hi);
+    if (!Number.isFinite(lo0) || !Number.isFinite(hi0) || !(R > 0) || !rackGuideThetaRange(R, length, width, sign)) return;
+    if (run(motor, 0).length) return;   // 組裝姿態（0°）本身就干涉：不是行程問題
+
+    // 從 0° 往 dir（-1＝lo、+1＝hi）找第一個干涉角度：先 5° 粗掃，再 1° 細掃。回傳 { clean, dirty, findings } 或 null。
+    const scan = dir => {
+      const limit = dir < 0 ? lo0 : hi0;
+      if (dir < 0 ? limit >= 0 : limit <= 0) return null;
+      let clean = 0, hit = null;
+      for (let a = 5; ; a += 5) {
+        const t = dir < 0 ? Math.max(-a, limit) : Math.min(a, limit);
+        const f = run(motor, t);
+        if (f.length) { hit = { angle: t, findings: f }; break; }
+        clean = t;
+        if (t === limit) return null;
+      }
+      for (let a = clean + dir; dir < 0 ? a > hit.angle : a < hit.angle; a += dir) {
+        const f = run(motor, a);
+        if (f.length) { hit = { angle: a, findings: f }; break; }
+        clean = a;
+      }
+      return { clean, dirty: hit.angle, findings: hit.findings };
+    };
+    const low = scan(-1), high = scan(1);
+    if (!low && !high) return;
+    const newLo = low ? Math.min(0, low.clean + marginDeg) : null;
+    const newHi = high ? Math.max(0, high.clean - marginDeg) : null;
+    const t = rackStopTrims(R, length, width, sign, newLo == null ? -1e9 : newLo, newHi == null ? 1e9 : newHi);
+    // 沒變的那一側保持原本的縮短量（沒有就 0）；有變的那一側取新算的（不小於原本）。
+    const oldS = Math.max(0, Number(rack.slot.trimStart) || 0), oldE = Math.max(0, Number(rack.slot.trimEnd) || 0);
+    const r1 = v => Math.round(v * 10) / 10;
+    const trimStart = r1(t.trimStart > 0 ? Math.max(t.trimStart, oldS) : oldS);
+    const trimEnd = r1(t.trimEnd > 0 ? Math.max(t.trimEnd, oldE) : oldE);
+    const range = rackGuideThetaRange(R, length, width, sign, trimStart, trimEnd);
+    if (!range) return;
+    const D = Math.PI / 180;
+    const travelMm = {
+      before: Math.round((hi0 - lo0) * D * R * 10) / 10,
+      after: Math.round((range.hi - range.lo) * D * R * 10) / 10
+    };
+    const why = hit => {
+      const names = [...new Set(hit.findings.flatMap(f => f.kind === 'motor-body' ? [f.parts[f.parts.length - 1]] : f.parts))].slice(0, 4);
+      return hit.findings.every(f => f.kind === 'motor-body') ? `MG995 機身會撞到 ${names.join('、')}` : `會與 ${names.join('、')} 干涉`;
+    };
+    const ang = v => `${Math.round(v * 10) / 10}°`;
+    const reasons = [], actions = [];
+    [low, high].forEach(side => {
+      if (!side) return;
+      const isLow = side === low;
+      reasons.push(`在 ${ang(side.dirty)} ${isLow ? '以下' : '以上'} ${why(side)}`);
+    });
+    // 用學生看得懂的說法：縮短的那一端擋的是馬達往正角度還是負角度那側（sign=1 時 trimStart 擋正角度、trimEnd 擋負角度）。
+    const act = [];
+    const sideOf = isStart => ((sign > 0) === isStart ? '正角度' : '負角度');
+    if (t.trimStart > 0) act.push(`擋${sideOf(true)}那端縮短 ${fmt1(trimStart)} mm`);
+    if (t.trimEnd > 0) act.push(`擋${sideOf(false)}那端縮短 ${fmt1(trimEnd)} mm`);
+    actions.push(act.join('、'));
+    const message = `馬達 ${motor} ${reasons.join('；')}：建議把齒條 ${rack.id} 長槽 ${actions[0]}，行程改為 ${ang(range.lo)}～${ang(range.hi)}（${fmt1(travelMm.before)} mm → ${fmt1(travelMm.after)} mm）。`;
+    out.push({ rackId: rack.id, motor, trimStart, trimEnd, range, travelMm, message });
+  });
+  return out;
 }

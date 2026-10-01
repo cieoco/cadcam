@@ -138,7 +138,9 @@ function drawRackSlot(parent, component, { length, module, bodyHeight, phaseShif
   const slotLen = Math.max(8, Math.min(length - module * 3, Number(slot.length) || Math.max(24, length - 32)));
   const slotW = Math.max(2, Math.min(bodyH * 0.7, Number(slot.width) || Math.max(4, module * 1.25)));
   const slotY = -module * 1.25 - bodyH / 2 + (Number(slot.offset) || 0);
-  const x1 = (-slotLen / 2 + phaseShift) * scale, x2 = (slotLen / 2 + phaseShift) * scale;
+  // 限位：trimStart 縮短 -u 端、trimEnd 縮短 +u 端
+  const trimS = Math.max(0, Number(slot.trimStart) || 0), trimE = Math.max(0, Number(slot.trimEnd) || 0);
+  const x1 = (-slotLen / 2 + trimS + phaseShift) * scale, x2 = (slotLen / 2 - trimE + phaseShift) * scale;
   const y = -slotY * scale, r = slotW * scale / 2;
   const hole = svgEl('path');
   hole.setAttribute('d', [`M ${x1.toFixed(2)} ${(y-r).toFixed(2)}`, `L ${x2.toFixed(2)} ${(y-r).toFixed(2)}`, `A ${r.toFixed(2)} ${r.toFixed(2)} 0 0 1 ${x2.toFixed(2)} ${(y+r).toFixed(2)}`, `L ${x1.toFixed(2)} ${(y+r).toFixed(2)}`, `A ${r.toFixed(2)} ${r.toFixed(2)} 0 0 1 ${x1.toFixed(2)} ${(y-r).toFixed(2)}`, 'Z'].join(' '));

@@ -311,7 +311,9 @@ function rackGeometry(comp, params = {}, pinion = null) {
     const slotLen = Math.max(8, Math.min(length - module * 3, Number(slot.length) || Math.max(24, length - 32)));
     const slotW = Math.max(2, Math.min(bodyH * 0.7, Number(slot.width) || Math.max(4, module * 1.25)));
     const slotY = -module * 1.25 - bodyH / 2 + (Number(slot.offset) || 0);
-    const r = slotW / 2, x1 = -slotLen / 2 + phaseShift, x2 = slotLen / 2 + phaseShift;
+    // 限位：trimStart 縮短 -u 端、trimEnd 縮短 +u 端（導銷碰到槽端就停）
+    const trimS = Math.max(0, Number(slot.trimStart) || 0), trimE = Math.max(0, Number(slot.trimEnd) || 0);
+    const r = slotW / 2, x1 = -slotLen / 2 + trimS + phaseShift, x2 = slotLen / 2 - trimE + phaseShift;
     // 兩端半圓長槽：右端半圓（-90°→+90°）接左端半圓（90°→270°），閉合
     const points = [...arcPoints(x2, slotY, r, -90, 90, 16), ...arcPoints(x1, slotY, r, 90, 270, 16)]
       .map(p => ({ x: round(p.x), y: round(p.y) }));

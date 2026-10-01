@@ -64,7 +64,7 @@ import * as Settings from './settings.js';   // 作品級加工設定 + 舊 loca
 import { normalizeFabricationProfile, FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { cncWarnings } from './cnc-check.js';   // L4：依刀徑檢查匯出特徵
 import { buildPlan, buildPackHtml } from './build-plan.js';   // L5b：製作包（板件＋五金＋組裝步驟）
-import { findInterference } from './interference.js';   // L5c：同層互撞／螺絲頭螺帽／MG995 機身干涉檢查
+import { resolveSpacers, suggestRackStops } from './interference.js';   // L5c／L6：干涉檢查、自動隔圈、齒條長槽限位建議
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('stageSvg');
@@ -1932,7 +1932,7 @@ function cncWarningList(parts) {
   return list;
 }
 // L5c：依各馬達實際播放範圍取樣檢查干涉；馬達範圍＝暫時把 activeMotor 設成該顆呼叫 inputRockRange()，連續轉（沒範圍）用 [-180, 180]。
-function computeInterference(plan, settings, mounts) {
+function currentMotorRanges() {
   const keep = S.activeMotor;
   const ranges = {};
   try {
@@ -1942,19 +1942,45 @@ function computeInterference(plan, settings, mounts) {
       ranges[id] = r && Number.isFinite(r.lo) && Number.isFinite(r.hi) ? { lo: r.lo, hi: r.hi } : { lo: -180, hi: 180 };
     });
   } finally { S.activeMotor = keep; }
-  try {
-    return findInterference({ comps: S.comps, modules: S.modules, params: S.topo.params, plan, ranges, exportSettings: settings, mounts });
-  } catch (e) { return []; }
+  return ranges;
 }
 const homeMountsNow = () => lastModelInputs ? motorFrameExportMounts({ ...lastModelInputs, pts: pointCoords() }) : undefined;
-function currentBuildPlan(settings, mounts) {
+// L6：疊層＋自動隔圈＋剩下的干涉；製作包與橫幅共用。失敗時回 { plan, interference: [], ranges }（plan 可能為 null）。
+function resolvedBuild(settings, mounts) {
   const cnc = S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
-  return buildPlan({ comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: settings, cnc, mounts });
+  const ranges = currentMotorRanges();
+  const args = { comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: settings, cnc, mounts };
+  try {
+    return { ...resolveSpacers({ ...args, ranges }), ranges };
+  } catch (e) {
+    return { plan: buildPlan(args), interference: [], spacers: [], ranges };
+  }
+}
+// L6b：目前作品各齒條的長槽限位建議（依干涉檢查）。
+function currentRackStopSuggestions(settings, mounts, build = resolvedBuild(settings, mounts)) {
+  try {
+    return suggestRackStops({ comps: S.comps, modules: S.modules, params: S.topo.params, plan: build.plan, ranges: build.ranges, exportSettings: settings, mounts });
+  } catch (e) { return []; }
+}
+// 套用建議：把各齒條長槽的縮短量寫進 slot.trimStart／trimEnd（>0 才寫，0 則移除）。
+function applyRackStops() {
+  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
+  const sug = currentRackStopSuggestions(settings, homeMountsNow());
+  if (!sug.length) { transient('目前沒有需要限位的齒條'); return; }
+  pushUndo(); pause();
+  sug.forEach(s => {
+    const rack = S.comps.find(c => c.type === 'rack' && c.id === s.rackId);
+    if (!rack || !rack.slot || typeof rack.slot !== 'object') return;
+    if (s.trimStart > 0) rack.slot.trimStart = s.trimStart; else delete rack.slot.trimStart;
+    if (s.trimEnd > 0) rack.slot.trimEnd = s.trimEnd; else delete rack.slot.trimEnd;
+  });
+  rebuild(); draw(); gearEditor.updateGearEditor(); scheduleAutosave();
+  transient(sug.map(s => s.message).join(' '));
 }
 function showCncWarnings(parts, settings) {
   const list = cncWarningList(parts);
   let found = [];
-  try { const m = homeMountsNow(); found = computeInterference(currentBuildPlan(settings, m), settings, m); } catch (e) { found = []; }
+  try { found = resolvedBuild(settings, homeMountsNow()).interference; } catch (e) { found = []; }
   if (found.length) list.unshift(`干涉 ${found.length} 項，詳見製作包`);
   if (!list.length) return;
   setBanner(`⚠ CNC：${list.slice(0, 3).join('；')}${list.length > 3 ? `；…等 ${list.length} 項` : ''}`);
@@ -2033,14 +2059,15 @@ function downloadBuildPack() {
   if (stockWarnings.length) { transient(`尚未產生製作包：${stockWarnings[0]}`); return; }
   const cnc = S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
   const homeMounts = homeMountsNow();
-  const plan = currentBuildPlan(settings, homeMounts);
+  const build = resolvedBuild(settings, homeMounts);
+  const { plan, interference } = build;
   if (!plan.parts.length) { transient('沒有可匯出的零件或機架'); return; }
-  const interference = computeInterference(plan, settings, homeMounts);
+  const suggestions = currentRackStopSuggestions(settings, homeMounts, build);
   const { cncParts, frameWarnings } = collectCncPartsAndFrameWarnings(settings);
   const warnings = [...frameWarnings, ...cncWarningList(cncParts)];
   // 目前沒有作品名稱欄位：有模組就用模組名稱串起來，否則「機構作品」。
   const title = (S.modules || []).map(m => m && m.name).filter(Boolean).join('＋') || '機構作品';
-  const html = buildPackHtml(plan, { title, cnc, warnings, interference });
+  const html = buildPackHtml(plan, { title, cnc, warnings, interference, suggestions });
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2132,7 +2159,7 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, openFile, share, loadExample };
+window.blocks = { placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, openFile, share, loadExample };
 window.blocks.changeFrameGround = changeFrameGround;
 Object.assign(window.blocks, {
   setTriSide: memberEditor.selectDimension,

@@ -41,6 +41,7 @@ const LAYER_SCREWS = {
   MG995_HORN_SCREW:  { spec: 'M2×6 自攻',   use: 'MG995 舵盤',  nut: false }
 };
 
+const fmtNum = v => String(Number(Number(v).toFixed(3)));
 const finitePos = v => Number.isFinite(Number(v)) && Number(v) > 0;
 
 // 群組鍵：已安裝模組（有 mount）用模組 id，其餘（根、未安裝模組、找不到的模組）＝null。
@@ -94,7 +95,20 @@ export function deriveMotorMounts(list) {
   return mounts;
 }
 
-export function buildPlan({ comps, modules = [], params = {}, exportSettings = {}, cnc, mounts } = {}) {
+// 隔圈輸入正規化：[{ below, mm }] → 依 below 合併（取最大 mm）、丟掉無效項、依 below 排序。
+// below＝L 表示在第 L-1 層與第 L 層之間留 mm 的間隙。
+export function normalizeSpacers(spacers) {
+  const byBelow = new Map();
+  (Array.isArray(spacers) ? spacers : []).forEach(s => {
+    if (!s || !Number.isInteger(s.below)) return;
+    const mm = Number(s.mm);
+    if (!Number.isFinite(mm) || mm <= 0) return;
+    byBelow.set(s.below, Math.max(byBelow.get(s.below) || 0, mm));
+  });
+  return [...byBelow.entries()].sort((a, b) => a[0] - b[0]).map(([below, mm]) => ({ below, mm }));
+}
+
+export function buildPlan({ comps, modules = [], params = {}, exportSettings = {}, cnc, mounts, spacers } = {}) {
   const list = Array.isArray(comps) ? comps : [];
   const modList = Array.isArray(modules) ? modules : [];
   const modById = new Map(modList.map(m => [m.id, m]));
@@ -267,11 +281,21 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
   // 每層厚度＝該層零件最大厚度；空層用墊片（CNC 板厚）。
   const layerThickness = new Map();
   parts.forEach(p => layerThickness.set(p.layer, Math.max(layerThickness.get(p.layer) || 0, p.thicknessMm)));
+  const r3 = v => Math.round(v * 1000) / 1000;
   const spanOf = (lo, hi) => {
     let sum = 0;
     for (let l = lo; l <= hi; l++) sum += layerThickness.get(l) || stockMm;
-    return Math.round(sum * 1000) / 1000;
+    return r3(sum);
   };
+  // 隔圈：層與層之間額外留的間隙（mm）。每片板的 zMm＝底面高度＝下面各層厚度＋跨過的隔圈。
+  const gaps = normalizeSpacers(spacers);
+  const minLayer = parts.length ? Math.min(...parts.map(p => p.layer)) : 0;
+  parts.forEach(p => {
+    let z = 0;
+    for (let l = minLayer; l < p.layer; l++) z += layerThickness.get(l) || stockMm;
+    gaps.forEach(g => { if (g.below > minLayer && g.below <= p.layer) z += g.mm; });
+    p.zMm = r3(z);
+  });
 
   const joints = [];
   byId.forEach((entries, id) => {
@@ -283,13 +307,15 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     else if (entries.some(e => e.info.mountBolt)) kind = 'mount-bolt';
     else if (motorIds.has(id)) kind = 'motor-shaft';
     const hole = entries.map(e => e.info.holeDiameterMm).find(v => finitePos(v));
+    const crossed = gaps.filter(g => g.below > lo && g.below <= hi).map(g => ({ ...g }));
     joints.push({
       id,
       kind,
       parts: entries.map(e => e.part.name),
       layers: [lo, hi],
       holeDiameterMm: hole === undefined ? null : Number(hole),
-      spanMm: spanOf(lo, hi)
+      spanMm: r3(spanOf(lo, hi) + crossed.reduce((s, g) => s + g.mm, 0)),
+      spacers: crossed
     });
   });
   joints.sort((a, b) => (a.layers[0] - b.layers[0]) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -302,7 +328,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     return { type: motorTypeAt(list, centerId), centerId, plate: partPoints.has(plateName) ? plateName : null };
   });
 
-  return { parts, joints, motors };
+  return { parts, joints, motors, gaps };
 }
 
 // ---- 五金清單 ----
@@ -332,9 +358,16 @@ export function hardwareList(plan) {
     row.uses.set(use, (row.uses.get(use) || 0) + n);
     if (nut) nuts += n;
   };
+  const spacerRows = new Map();   // mm -> { qty, belows:Set }（只算有螺絲的關節；馬達軸不算）
   joints.forEach(j => {
     const spec = jointScrewSpec(j);
-    if (spec) addScrew(spec, JOINT_USE_LABEL[j.kind], 1, true);
+    if (!spec) return;
+    addScrew(spec, JOINT_USE_LABEL[j.kind], 1, true);
+    (j.spacers || []).forEach(g => {
+      if (!spacerRows.has(g.mm)) spacerRows.set(g.mm, { qty: 0, belows: new Set() });
+      const row = spacerRows.get(g.mm);
+      row.qty += 1; row.belows.add(g.below);
+    });
   });
   parts.forEach(p => {
     Object.keys(p.holeLayers || {}).forEach(layer => {
@@ -354,6 +387,10 @@ export function hardwareList(plan) {
       .map(([use, n]) => `${use} ${n}`).join('、');
     return { spec, qty: row.qty, note };
   });
+  [...spacerRows.entries()].sort((a, b) => a[0] - b[0]).forEach(([mm, row]) => {
+    const between = [...row.belows].sort((a, b) => a - b).map(b => `第 ${b - 1}、${b} 層之間`).join('；');
+    rows.push({ spec: `M3 隔圈 ${fmtNum(mm)} mm`, qty: row.qty, note: `套在螺絲上，墊在${between}` });
+  });
   if (nuts > 0) rows.push({ spec: 'M3 防鬆螺帽', qty: nuts, note: '穿透式 M3 螺絲各一顆（鎖進輪轂的 M3×8 不需要）' });
   const ttCount = motors.filter(m => m.type === 'tt').length;
   const servoCount = motors.filter(m => m.type === 'mg995').length;
@@ -364,13 +401,13 @@ export function hardwareList(plan) {
 
 // ---- 製作包 HTML ----
 const escHtml = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const fmtNum = v => String(Number(Number(v).toFixed(3)));
 const KIND_LABEL = { frame: '機架板', gear: '齒輪', rack: '齒條', member: '桿件／板件' };
 
-export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = [], interference = [] } = {}) {
+export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = [], interference = [], suggestions = [] } = {}) {
   const parts = (plan && plan.parts) || [];
   const joints = (plan && plan.joints) || [];
   const motors = (plan && plan.motors) || [];
+  const gaps = (plan && plan.gaps) || [];
   const stock = finitePos(cnc && cnc.stockThicknessMm) ? Number(cnc.stockThicknessMm) : DEFAULT_STOCK_THICKNESS_MM;
   const tool = finitePos(cnc && cnc.toolDiameterMm) ? fmtNum(cnc.toolDiameterMm) : '未設定';
   const e = escHtml;
@@ -397,18 +434,28 @@ export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = []
       const how = j.kind === 'guide-pin' ? '導銷：不要鎖死，齒條要能滑動。'
         : j.kind === 'mount-bolt' ? '對鎖：鎖緊，把兩片固定在一起。'
         : '樞軸：防鬆螺帽鎖到不晃但可轉動。';
-      items.push(`<li>${spec ? e(spec) : '螺絲（孔徑不是 M3，請自行選配）'} 穿過 ${through}（關節 ${e(j.id)}，第 ${j.layers[0]}～${j.layers[1]} 層）。${how}</li>`);
+      const passSp = (j.spacers || []).length
+        ? `中間在${j.spacers.map(g => `第 ${g.below - 1}、${g.below} 層之間套 ${fmtNum(g.mm)} mm 隔圈`).join('、')}。` : '';
+      items.push(`<li>${spec ? e(spec) : '螺絲（孔徑不是 M3，請自行選配）'} 穿過 ${through}（關節 ${e(j.id)}，第 ${j.layers[0]}～${j.layers[1]} 層）。${passSp}${how}</li>`);
     });
     return `<section class="step"><h3>第 ${n} 層：${here.map(p => e(KIND_LABEL[p.kind] || p.kind)).filter((v, i, a) => a.indexOf(v) === i).join('、')}</h3><ol>${items.join('')}</ol></section>`;
   }).join('');
   const motorShafts = joints.filter(j => j.kind === 'motor-shaft');
   const shaftNote = motorShafts.length
     ? `<p class="muted">馬達軸（${motorShafts.map(j => e(j.id)).join('、')}）鎖在輪轂或舵盤上，不另配 M3 螺絲。</p>` : '';
+  const shaftSpacer = motorShafts.filter(j => (j.spacers || []).length)
+    .map(j => `<li>馬達軸 ${e(j.id)} 穿過隔圈層：輪轂／舵盤要墊高 ${fmtNum(j.spacers.reduce((s, g) => s + g.mm, 0))} mm，齒輪才會在正確高度。</li>`).join('');
+  const gapSection = gaps.length
+    ? `<h2>層間隔圈</h2>
+<ul>${gaps.map(g => `<li>第 ${g.below - 1}、${g.below} 層之間留 ${fmtNum(g.mm)} mm（用 M3 隔圈或墊片墊出空間，讓螺絲頭／螺帽不刮到鄰層）</li>`).join('')}${shaftSpacer}</ul>
+` : '';
   const warnList = (warnings || []).length
     ? `<ul>${warnings.map(w => `<li>${e(w)}</li>`).join('')}</ul>` : '<p class="muted">目前沒有 CNC 警告。</p>';
   const interferenceList = (interference || []).length
     ? `<ul>${interference.map(w => `<li>${e(w.message)}</li>`).join('')}</ul>`
     : '<p class="muted">已依各馬達行程取樣檢查，未發現干涉（仍需實物確認）。</p>';
+  const suggestList = (suggestions || []).length
+    ? `<ul>${suggestions.map(s => `<li>建議：${e(s.message)}</li>`).join('')}</ul>` : '';
 
   return `<!doctype html>
 <html lang="zh-Hant">
@@ -440,7 +487,7 @@ export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = []
 <h2>五金清單</h2>
 <table><thead><tr><th>規格</th><th>數量</th><th>用途</th></tr></thead><tbody>${hwRows}</tbody></table>
 
-<h2>組裝步驟</h2>
+${gapSection}<h2>組裝步驟</h2>
 <p class="muted">由第 0 層（最靠機架）往外逐層組裝。</p>
 ${steps}
 ${shaftNote}
@@ -450,12 +497,14 @@ ${warnList}
 
 <h2>干涉檢查</h2>
 ${interferenceList}
+${suggestList}
 
 <h2>尚未驗證</h2>
 <ul>
   <li>TT 輪轂與 MG995 舵盤的孔位用的是常見值，需實量後修改。</li>
   <li>干涉檢查為平面近似，仍需實物確認。</li>
   <li>螺絲長度為依關節厚度加防鬆螺帽的估算值，需實物驗證。</li>
+  <li>MG995 伺服頂面高出底板約 10 mm，舵盤上的齒輪實際高度需實物確認。</li>
 </ul>
 </body>
 </html>

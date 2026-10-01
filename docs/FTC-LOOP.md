@@ -40,6 +40,8 @@
 | L5a 實體疊層與關節（build plan） | Sonnet | 新檔 `build-plan.js`：群組起始層（裝在宿主構件層＋1）、群組內用 `computeBodyLayers`、齒條同小齒輪層；以點 id 彙整關節（guide-pin／mount-bolt／motor-shaft／pivot）、跨層總厚 spanMm。測試 `test/build-plan.mjs` 由主模型先寫。 | 測試全過：機架 0／小齒輪齒條 1／夾爪底板 2／夾爪齒輪 3／爪臂 4。 | 完成（Sonnet 一輪；主模型修正 GCB 穿三片板的期望） |
 | L5b 製作包 | Sonnet | `build-plan.js` 加零件外形尺寸與孔種類、`hardwareList`（螺絲長度＝跨層厚＋防鬆螺帽 4 mm 取標準長）、`buildPackHtml`（板件／五金／逐層組裝步驟／CNC 注意／尚未驗證）；匯出區「製作包」按鈕。測試 `test/build-pack.mjs` 由主模型先寫。 | 測試全過＋實際下載的製作包與手算五金一致。 | 完成（Sonnet 一輪） |
 | L5c 干涉檢查 | Sonnet | 新檔 `interference.js`：依各馬達播放範圍取樣，凸多邊形 SAT（穿透 > 0.5 mm），檢查同層互撞、螺絲頭／螺帽凸入鄰層、MG995 機身往後佔 9 層；製作包新增「干涉檢查」段落，匯出 banner 提示件數。測試 `test/interference.mjs` 由主模型先寫。 | 測試全過＋舉升＋夾取找出 5 項真實干涉。 | 完成（Sonnet 一輪；主模型接受機身方向朝遠離舵盤側的修正） |
+| L6a 層間隔圈 | Sonnet | 使用者決定「螺絲頭刮鄰層 → 加墊片／隔圈」。`buildPlan` 收 `spacers`，輸出 `gaps`、每片板 `zMm`、每個關節 `spacers` 並把隔圈算進 `spanMm`（螺絲跟著變長）；五金清單列「M3 隔圈」、製作包新增「層間隔圈」段與馬達軸墊高提醒；干涉檢查改用 mm 高度；`resolveSpacers` 依螺絲頭干涉自動加隔圈（先處理螺絲頭，螺帽為後備）。測試 `test/spacers.mjs` 由主模型先寫。 | 28/28＋全套通過；舉升＋夾取自動得到第 0／1、2／3 層間 3 mm 隔圈，螺絲頭干涉歸零。 | 完成（Sonnet 一輪） |
+| L6b 齒條長槽限位 | Sonnet＋主模型 | 使用者決定「MG995 機身撞小齒輪／機架 → 限制升降行程」。限位做成實體：齒條長槽一端縮短（`slot.trimStart／trimEnd`），行程公式、匯出、畫面、存檔一起改；`suggestRackStops` 由 0° 往外掃出不干涉區間並換算縮短量；齒條面板新增「限位：依干涉設定／清除」。主模型把訊息改成學生看得懂的「擋負角度那端」。測試 `test/rack-stop.mjs` 由主模型先寫。 | 20/20＋全套通過；瀏覽器：一鍵套用 → 長槽負角度端縮短 56.2 mm、行程 -4.9°～112.3°（117.6 → 61.4 mm）、製作包干涉 0 項、無 console 錯誤。 | 完成（Sonnet 一輪；代價：升降行程約減半） |
 
 建議順序：S1 → S2 → S3（暖身、互不相依）→ M0 → M1a → M1b → M1c → M1d。
 

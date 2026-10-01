@@ -383,11 +383,18 @@ function normalizeRack(comp, index, params, warnings) {
   if (safeId(comp.pinion)) out.pinion = comp.pinion;
   params[lenParam] = Math.max(1, Math.round(num(params[lenParam] ?? comp.len, 160)));
   if (Number.isFinite(Number(comp.bodyHeight))) out.bodyHeight = Math.max(4, roundTenth(comp.bodyHeight, 20));
-  const normalizeSlot = (slot) => ({
-    length: Math.max(1, roundMm(slot.length, Math.max(24, params[lenParam] - 32))),
-    width: Math.max(1, roundTenth(slot.width, 5)),
-    offset: roundTenth(slot.offset, 0)
-  });
+  const normalizeSlot = (slot) => {
+    const s = {
+      length: Math.max(1, roundMm(slot.length, Math.max(24, params[lenParam] - 32))),
+      width: Math.max(1, roundTenth(slot.width, 5)),
+      offset: roundTenth(slot.offset, 0)
+    };
+    // 長槽限位（縮短某一端，mm）：只在 > 0 時保留，舊檔不多欄位
+    const ts = roundTenth(slot.trimStart, 0), te = roundTenth(slot.trimEnd, 0);
+    if (ts > 0) s.trimStart = ts;
+    if (te > 0) s.trimEnd = te;
+    return s;
+  };
   if (comp.slot && typeof comp.slot === 'object') {
     out.slot = normalizeSlot(comp.slot);
   } else if (comp.slot === true || comp.rackHoleType === 'slot') {
