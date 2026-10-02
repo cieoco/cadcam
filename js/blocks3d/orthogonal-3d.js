@@ -11,7 +11,7 @@
  */
 
 import { orthogonalFrame, orthogonalHostEdge, planeOf, compsInPlane, pointIdsInPlane } from '../blocks/assembly.js';
-import { bracketBoxes } from '../blocks/orthogonal-joint.js';
+import { bracketBoxes, bracketScrews } from '../blocks/orthogonal-joint.js';
 
 export const IDENTITY_4 = Object.freeze([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
@@ -102,7 +102,7 @@ export function orthogonalModuleIds(modules) {
  * @param {Object} args.inputs     全域預覽輸入（pts 為所有平面的解）
  * @param {Object} args.mainModel  主平面的場景模型（找宿主本體的 z）
  * @param {(planeInputs:Object)=>Object} args.buildModel  以平面輸入建場景模型
- * @returns {Array<{ id, matrix:number[16], model, brackets:Array }>}  brackets＝金屬角碼方塊（F1，主場景座標）
+ * @returns {Array<{ id, matrix:number[16], model, brackets:Array, screws:Array }>}  brackets＝金屬角碼方塊（F1，主場景座標，G2 起帶 hole），screws＝鎖角碼的螺絲（G2）
  *          巢狀（孫模組裝在子模組上）時矩陣已逐層相乘，全部相對於主場景。
  */
 // C1：宿主那一片（桿＝stick、三角板＝頂點相同的 plate、機架板＝model.frame）底面在宿主場景的 z；找不到回 0。
@@ -173,7 +173,16 @@ function placeBox(matrix, zOffset, box, moduleId) {
     y: matrix[1] * a.x + matrix[5] * a.y + matrix[9] * a.z,
     z: matrix[2] * a.x + matrix[6] * a.y + matrix[10] * a.z
   });
-  return { moduleId, center: c, axes: box.axes.map(rot), size: { ...box.size } };
+  const out = { moduleId, center: c, axes: box.axes.map(rot), size: { ...box.size } };
+  // G2：螺牙孔（中心要平移、軸向只轉不平移）
+  if (box.hole) out.hole = { center: applyMatrix4(matrix, { x: box.hole.center.x, y: box.hole.center.y, z: box.hole.center.z + zOffset }), axis: rot(box.hole.axis), diameterMm: box.hole.diameterMm };
+  return out;
+}
+
+// G2：螺絲（頭座點、尖端）放進主場景，座標變換同 placeBox；尺寸欄位原樣帶過。
+function placeScrew(matrix, zOffset, screw, moduleId) {
+  const at = p => applyMatrix4(matrix, { x: p.x, y: p.y, z: p.z + zOffset });
+  return { ...screw, moduleId, head: at(screw.head), tip: at(screw.tip) };
 }
 
 export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, buildModel, asm = null, params, joint, stockMm = 3, plates = [], plan = null }) {
@@ -206,7 +215,9 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
         const own = model.modulePlates.find(p => p.moduleId === id);
         const seatPlan = own ? { parts: [{ name: `${id}-frame`, zMm: own.z + wOffset }] } : plan;
         const brackets = bracketBoxes(comps, modules, id, inputs.pts, params, { stockMm, joint, asm, plan: seatPlan }).map(b => placeBox(host.matrix, zOffset, b, id));
-        result = { model, matrix: multiply4(host.matrix, orthogonalMatrix(frame, zOffset, wOffset)), brackets };
+        // G2：鎖角碼的 M3 螺絲（頭在木板外側面、尖端穿出角碼），同一套座標與位姿。
+        const screws = bracketScrews(comps, modules, id, inputs.pts, params, { stockMm, joint, asm, plan: seatPlan }).map(sc => placeScrew(host.matrix, zOffset, sc, id));
+        result = { model, matrix: multiply4(host.matrix, orthogonalMatrix(frame, zOffset, wOffset)), brackets, screws };
       }
     }
     done.set(id, result);
@@ -214,6 +225,6 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
   };
   return ids.map(id => {
     const r = solve(id);
-    return r ? { id, matrix: r.matrix, model: r.model, brackets: r.brackets || [] } : null;
+    return r ? { id, matrix: r.matrix, model: r.model, brackets: r.brackets || [], screws: r.screws || [] } : null;
   }).filter(Boolean);
 }

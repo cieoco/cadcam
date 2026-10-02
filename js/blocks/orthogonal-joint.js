@@ -211,7 +211,21 @@ export function withWorldAdapterNodes(nodes, extras) {
 // 宿主面：站立（D3）時板面就是 t＝0；一般安裝時 n 朝上（+z）則板面在板厚 T 處、朝下則在 0（子模組長向宿主的那一側）。
 // G1：plan（buildPlan 的結果）給了就取子模組底板（<id>-frame）在子疊層的 zMm，短腳改貼在板的「朝宿主那一面」（w＝zMm），
 // 兩腳在這個內轉角相接、整片角碼沿 m 跟著挪；沒給 plan 時底板在第 0 層（zMm＝0）。
-export function bracketBoxes(comps, modules, moduleId, points, params, { stockMm = 3, joint: jointSettings, asm = null, plan = null } = {}) {
+export function bracketBoxes(comps, modules, moduleId, points, params, opts = {}) {
+  return bracketLegs(comps, modules, moduleId, points, params, opts).map(l => l.box);
+}
+
+// G2：市售 M3 螺絲標準長度（mm），與 build-plan 的 SCREW_LENGTHS_MM 相同（那邊不匯出，這裡避免循環匯入而複製一份）。
+const SCREW_LENGTHS_MM = [6, 8, 10, 12, 16, 20, 25, 30, 35, 40];
+export const BRACKET_SCREW_DIAMETER_MM = 3;
+export const BRACKET_SCREW_HEAD_DIAMETER_MM = 5.5;
+export const BRACKET_SCREW_HEAD_HEIGHT_MM = 2;
+
+// G2：每一翼的完整資料（方塊＋螺牙孔＋木板外側面的位置），bracketBoxes／bracketScrews 共用，確保孔、螺絲、方塊是同一套座標。
+// 孔：在該翼厚度中面上、離翼末端 holeEndMm、橫向（沿 d）置中，孔軸＝翼的厚度方向。
+// 木板在角碼的哪一邊：長腳貼宿主板（宿主在 −n 側，板外側面在 t＝tFace−T）；
+// 短腳貼子模組底板（底板在 +m 側，板外側面在 w＝w0＋底板厚）。screw.dir＝螺絲由外側穿向角碼的方向。
+function bracketLegs(comps, modules, moduleId, points, params, { stockMm = 3, joint: jointSettings, asm = null, plan = null } = {}) {
   const list = Array.isArray(comps) ? comps : [];
   const modList = Array.isArray(modules) ? modules : [];
   const mod = modList.find(m => m && m.id === moduleId);
@@ -230,16 +244,54 @@ export function bracketBoxes(comps, modules, moduleId, points, params, { stockMm
   const { d, m, n, origin } = frame;
   const at = (s, w, t) => ({ x: origin.x + s * d.x + w * m.x + t * n.x, y: origin.y + s * d.y + w * m.y + t * n.y, z: origin.z + s * d.z + w * m.z + t * n.z });
   const axes = [{ ...d }, { ...m }, { ...n }];
+  const neg = v => ({ x: -v.x, y: -v.y, z: -v.z });
   const count = K.count;
+  // 沿接合線的方向以宿主邊的 d 為準（木板上的孔都沿宿主 d 排）；站立（D3）時 frame.d 可能與宿主 d 反向，這時 s 要反過來數。
+  const sgn = edge && edge.d && (d.x * edge.d.x + d.y * edge.d.y) < 0 ? -1 : 1;
+  // 子模組底板的孔以板邊（離轉角 板厚 T）起算，所以非站立時短腳的 t 起點固定在 T（n 朝上時＝宿主上面，與 tFace 相同）；
+  // n 朝下時 tFace＝0 但木板上的孔仍在 T＋flangeHole 處，短腳以木板的孔為準。
+  const tShort = standing ? 0 : T;
   const plate = plan && Array.isArray(plan.parts) ? plan.parts.find(p => p && p.name === `${moduleId}-frame`) : null;
   const w0 = plate && Number.isFinite(Number(plate.zMm)) ? Number(plate.zMm) : 0;   // 底板朝宿主那一面的疊層高度（沿 m）
+  const childT = plate && Number(plate.thicknessMm) > 0 ? Number(plate.thicknessMm) : stockMm;
+  const th = K.thicknessMm, holeEnd = K.holeEndMm;
   const out = [];
   for (let k = 0; k < count; k++) {
-    const s = ADAPTER_LENGTH_MM * (k + 0.5) / count;
-    // 長腳：貼宿主板面（t 從 tFace 起、厚 thicknessMm），沿 −m 從轉角（w＝w0）伸 longLegMm。
-    out.push({ center: at(s, w0 - K.longLegMm / 2, tFace + K.thicknessMm / 2), axes, size: { x: K.widthMm, y: K.longLegMm, z: K.thicknessMm } });
+    const s = sgn * ADAPTER_LENGTH_MM * (k + 0.5) / count;
+    // 長腳：貼宿主板面（t 從 tFace 起、厚 thicknessMm），沿 −m 從轉角（w＝w0）伸 longLegMm；孔在離末端（w＝w0−longLegMm）holeEndMm 處。
+    out.push({
+      leg: 'long', woodMm: T,
+      box: {
+        center: at(s, w0 - K.longLegMm / 2, tFace + th / 2), axes, size: { x: K.widthMm, y: K.longLegMm, z: th },
+        hole: { center: at(s, w0 - K.longLegMm + holeEnd, tFace + th / 2), axis: { ...n }, diameterMm: BRACKET_SCREW_DIAMETER_MM }
+      },
+      seat: at(s, w0 - K.longLegMm + holeEnd, tFace - T), dir: { ...n }
+    });
     // 短腳：平貼子模組底板朝宿主的那一面（w 從 w0−thicknessMm 到 w0；與板中面相距 板厚/2＋角碼厚/2），沿 n 離開宿主面 shortLegMm。
-    out.push({ center: at(s, w0 - K.thicknessMm / 2, tFace + K.shortLegMm / 2), axes, size: { x: K.widthMm, y: K.thicknessMm, z: K.shortLegMm } });
+    out.push({
+      leg: 'short', woodMm: childT,
+      box: {
+        center: at(s, w0 - th / 2, tShort + K.shortLegMm / 2), axes, size: { x: K.widthMm, y: th, z: K.shortLegMm },
+        hole: { center: at(s, w0 - th / 2, tShort + K.shortLegMm - holeEnd), axis: { ...m }, diameterMm: BRACKET_SCREW_DIAMETER_MM }
+      },
+      seat: at(s, w0 + childT, tShort + K.shortLegMm - holeEnd), dir: neg(m)
+    });
   }
   return out;
+}
+
+// G2：M3 螺絲（每個角碼翼一支，一處兩片＝4 支）。從木板外側面（背對角碼的那一面）穿過木板、鎖進角碼螺牙，尖端略穿出角碼。
+// head＝螺絲頭座在木板外側面上的點；tip＝head ＋ lengthMm 沿孔軸朝角碼。長度＝（較厚的板厚＋角碼厚）向上取市售長度（同 build-plan，3 mm 板＋1.2 → 6）。
+// 回傳 []：模組不是直角安裝、接合件不是角碼、或找不到座標系。
+export function bracketScrews(comps, modules, moduleId, points, params, opts = {}) {
+  const legs = bracketLegs(comps, modules, moduleId, points, params, opts);
+  if (!legs.length) return [];
+  const th = jointSpec('bracket-m3', opts.joint).thicknessMm;
+  const need = Math.max(...legs.map(l => l.woodMm)) + th;
+  const lengthMm = SCREW_LENGTHS_MM.find(l => l >= need - 1e-9) || Math.ceil(need);
+  return legs.map(l => ({
+    head: { ...l.seat },
+    tip: { x: l.seat.x + l.dir.x * lengthMm, y: l.seat.y + l.dir.y * lengthMm, z: l.seat.z + l.dir.z * lengthMm },
+    lengthMm, diameterMm: BRACKET_SCREW_DIAMETER_MM, headDiameterMm: BRACKET_SCREW_HEAD_DIAMETER_MM, headHeightMm: BRACKET_SCREW_HEAD_HEIGHT_MM
+  }));
 }

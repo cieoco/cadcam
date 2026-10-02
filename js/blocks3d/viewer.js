@@ -325,6 +325,8 @@ export function createViewer(container) {
   const holeR = 3.4;   // 板上孔徑（視覺用）
   const pinMat = new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.6, roughness: 0.35 });
   const bracketMat = new THREE.MeshStandardMaterial({ color: 0xd9dee5, metalness: 0.35, roughness: 0.4 });   // F1：金屬角碼
+  const slotMat = new THREE.MeshStandardMaterial({ color: 0x14171b, metalness: 0.3, roughness: 0.7 });
+  const screwMat = new THREE.MeshStandardMaterial({ color: 0x3a3f47, metalness: 0.75, roughness: 0.38, side: THREE.DoubleSide });   // G2：M3 螺絲（深色鋼）
   const groundMat = new THREE.MeshStandardMaterial({ color: 0x34495e, metalness: 0.2, roughness: 0.8 });
   // TT 齒輪馬達：黃色齒輪箱 + 鐵灰色 DC 罐（與 2D drawTTMotor 同色系）
   const motorBoxMat = new THREE.MeshStandardMaterial({ color: 0xf7c948, metalness: 0.1, roughness: 0.55 });
@@ -455,6 +457,23 @@ export function createViewer(container) {
     return obj;
   }
 
+  // G2：角碼一翼的幾何。有 hole：板面（兩個大尺寸軸）的矩形擠出厚度、挖一個圓孔（孔心依 hole.center 換算到板面座標），
+  // 擠出後對中（z∈[−厚/2, +厚/2]）；沒有 hole：實心方塊（舊行為）。
+  function bracketLegGeometry(b, ax, dims) {
+    if (!b.hole || !b.hole.center) return new THREE.BoxGeometry(b.size.x, b.size.y, b.size.z);
+    const ti = dims.indexOf(Math.min(...dims)), [ia, ib] = [0, 1, 2].filter(k => k !== ti);
+    const hc = new THREE.Vector3(b.hole.center.x - b.center.x, b.hole.center.y - b.center.y, b.hole.center.z - b.center.z);
+    const hx = hc.dot(ax[ia]), hy = hc.dot(ax[ib]);
+    const w = dims[ia], h = dims[ib], th = dims[ti];
+    const shape = new THREE.Shape();
+    shape.moveTo(-w / 2, -h / 2); shape.lineTo(w / 2, -h / 2); shape.lineTo(w / 2, h / 2); shape.lineTo(-w / 2, h / 2); shape.closePath();
+    const r = Math.max(0.2, (b.hole.diameterMm || 3) / 2);
+    const hole = new THREE.Path(); hole.absarc(hx, hy, r, 0, Math.PI * 2, true); shape.holes.push(hole);
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: th, bevelEnabled: false, curveSegments: 24 });
+    geo.translate(0, 0, -th / 2);
+    return geo;
+  }
+
   function clearDynamic() {
     for (let i = dynamic.children.length - 1; i >= 0; i--) {
       const obj = dynamic.children[i];
@@ -486,16 +505,52 @@ export function createViewer(container) {
       try { renderModel(child.model); } finally { sink = dynamic; keyPrefix = ''; }
     });
     // F1：金屬角碼（每處兩片、每片兩翼各一塊薄板）：主場景座標、淺金屬灰，跟著位姿每幀重畫。
+    // G2：每一翼是「挖了圓孔的薄板」（擠出矩形＋圓孔），孔在翼的螺牙孔位置，看得到穿透；沒有 hole 資料時退回實心方塊。
     (model.brackets || []).forEach((b, i) => {
       if (!b || !b.center || !Array.isArray(b.axes) || b.axes.length !== 3 || !b.size) return;
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(b.size.x, b.size.y, b.size.z), bracketMat);
-      const [ux, uy, uz] = b.axes.map(a => new THREE.Vector3(a.x, a.y, a.z));
+      const ax = b.axes.map(a => new THREE.Vector3(a.x, a.y, a.z));
+      const dims = [b.size.x, b.size.y, b.size.z];
+      const mesh = new THREE.Mesh(bracketLegGeometry(b, ax, dims), bracketMat);
       mesh.matrixAutoUpdate = false;
-      mesh.matrix.makeBasis(ux, uy, uz).setPosition(b.center.x, b.center.y, b.center.z);
+      if (b.hole) {
+        // 薄軸＝最小尺寸；其餘兩軸當板面的 x、y，z＝x×y（擠出方向，已對中到 −厚/2…+厚/2）
+        const ti = dims.indexOf(Math.min(...dims)), [ia, ib] = [0, 1, 2].filter(k => k !== ti);
+        mesh.matrix.makeBasis(ax[ia], ax[ib], new THREE.Vector3().crossVectors(ax[ia], ax[ib])).setPosition(b.center.x, b.center.y, b.center.z);
+      } else {
+        mesh.matrix.makeBasis(ax[0], ax[1], ax[2]).setPosition(b.center.x, b.center.y, b.center.z);
+      }
       mesh.matrixWorldNeedsUpdate = true;
       // 帶模組 id 當 pickKey 前綴：組立台預覽整個子模組半透明時，角碼跟著半透明。
       keyPrefix = b.moduleId ? b.moduleId + '/' : '';
       try { addPart(mesh, `bracket:${i}`); } finally { keyPrefix = ''; }
+    });
+    // G2：鎖角碼的 M3 螺絲：頭座在木板外側面、軸沿孔軸穿過木板鎖進角碼，尖端略穿出；深色鋼，同樣帶模組 id 前綴。
+    (model.screws || []).forEach((sc, i) => {
+      if (!sc || !sc.head || !sc.tip) return;
+      const head = new THREE.Vector3(sc.head.x, sc.head.y, sc.head.z), tip = new THREE.Vector3(sc.tip.x, sc.tip.y, sc.tip.z);
+      const len = head.distanceTo(tip);
+      if (!(len > 1e-6)) return;
+      const dir = tip.clone().sub(head).divideScalar(len);   // 頭 → 尖端
+      const grp = new THREE.Group();
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry((sc.diameterMm || 3) / 2, (sc.diameterMm || 3) / 2, len, 16), screwMat);
+      shaft.position.set(0, len / 2, 0);   // 局部 +y＝頭 → 尖端
+      grp.add(shaft);
+      // 圓頂圓盤頭（pan head）：旋轉輪廓，底面貼在頭座點、往背離角碼的方向凸出 headHeightMm
+      const hr = (sc.headDiameterMm || 5.5) / 2, hh = sc.headHeightMm || 2;
+      const prof = [[0, 0], [hr, 0], [hr, hh * 0.55], [hr * 0.86, hh * 0.85], [hr * 0.5, hh], [0, hh]].map(([x, y]) => new THREE.Vector2(x, -y));
+      const headMesh = new THREE.Mesh(new THREE.LatheGeometry(prof, 20), screwMat);
+      grp.add(headMesh);
+      // 十字／一字槽：小的深色槽讓頭看起來像螺絲
+      const slot = new THREE.Mesh(new THREE.BoxGeometry(hr * 1.4, 0.35, 0.5), slotMat);
+      slot.position.set(0, -hh - 0.05, 0);
+      grp.add(slot);
+      grp.matrixAutoUpdate = false;
+      grp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+      grp.position.copy(head);
+      grp.updateMatrix();
+      grp.matrixWorldNeedsUpdate = true;
+      keyPrefix = sc.moduleId ? sc.moduleId + '/' : '';
+      try { addPart(grp, `screw:${i}`); } finally { keyPrefix = ''; }
     });
     focusCamera(model);
   }

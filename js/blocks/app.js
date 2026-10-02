@@ -1509,13 +1509,15 @@ function push3D() {
   const plateGeometries={};
   const barGeometries={};
   const memberStocks={};
+  // G2：直角安裝的轉接座宿主孔（ADAPTER_HOLE）也要鑽在 3D 的宿主桿上，和匯出的桿件孔一致。
+  const adapterBarHoles = allPlanes ? (orthoExtrasNow().linkHoles || {}) : {};
   S.comps.filter(c => c.type === 'bar').forEach(bar => {
     const barId = bar.id, mounts = mountSplit3d.hosted.get(barId);
     if (!bar || !geomPts[bar.p1.id] || !geomPts[bar.p2.id]) return;
     const a = geomPts[bar.p1.id], b = geomPts[bar.p2.id];
     const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    const geometry = mounts?.length ? Exporters.hostedBarGeometry(bar, geomPts, Settings.exportSettings(), mounts)
-      : Exporters.inspectLinkExport(bar, len, Settings.exportSettings());
+    const geometry = mounts?.length ? Exporters.hostedBarGeometry(bar, geomPts, Settings.exportSettings(), mounts, adapterBarHoles[barId] || [])
+      : Exporters.inspectLinkExport(bar, len, Settings.exportSettings(), adapterBarHoles[barId] || []);
     memberStocks[barId] = memberStock(bar);
     if (!geometry?.outlines?.length) return;
     const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
@@ -1562,6 +1564,9 @@ function push3D() {
     // F1：每個直角角碼接合的實體方塊（已在主場景座標），viewer 畫成金屬灰的薄板。
     const boxes = model.orthogonal.flatMap(child => child.brackets || []);
     if (boxes.length) model.brackets = boxes;
+    // G2：鎖角碼的 M3 螺絲（主場景座標）。
+    const screws = model.orthogonal.flatMap(child => child.screws || []);
+    if (screws.length) model.screws = screws;
   }
   viewer3D.update(model);
   bench.afterScene({ pts: planesApi.pts, ptsAll: allPlanes ? allPlanes.pts : planesApi.pts, model });   // 組立台：接口標記跟著這一幀的宿主位置
