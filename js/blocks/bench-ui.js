@@ -12,6 +12,8 @@
  */
 import { S, motorAnglesNow } from './state.js';
 import * as Bench from './bench.js';
+import * as Settings from './settings.js';
+import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { resolveSpacers, findInterference, interferenceTimeline, hitPartNames } from './interference.js';
 import { setMountFlip, unmountModule } from './module-ops.js';
 import { pointKeysFor } from './part-types.js';
@@ -61,6 +63,7 @@ export function createBench(deps) {
   const viewer = () => getViewer();
   const modOf = id => S.modules.find(m => m && m.id === id) || null;
   const isBench = () => S.mode === 'bench';
+  const defaultJointKind = () => (S.fabrication?.joint || FABRICATION_DEFAULTS.joint).defaultKind;   // F1：作品的預設直角接合件
   const hasChildren = mod => S.modules.some(m => m && m.mount && m.mount.to && m.mount.to.module === mod.id);
   const displayName = id => labels.get(id) || id;
 
@@ -542,7 +545,7 @@ export function createBench(deps) {
     const marker = all.find(m => m.key === portId) || all.find(m => m.portId === portId && m.compatible) || all.find(m => m.portId === portId);
     if (!marker) { say('找不到這個接口'); return false; }
     if (!marker.compatible) { say(marker.reason || '這個接口不能接'); return false; }
-    const r = Bench.connect(S.comps, S.modules, childId, { module: marker.module, port: marker.portId }, S.topo.params, motorState(), { joint: S.benchJoint });   // E1：用使用者最近選的接合件
+    const r = Bench.connect(S.comps, S.modules, childId, { module: marker.module, port: marker.portId }, S.topo.params, motorState(), { joint: defaultJointKind() });   // F1：用作品的預設接合件（fabrication.joint.defaultKind）
     if (!r.ok) { say(r.reason || '接不上'); return false; }
     const preSnap = snapshotStr();
     const undoLen = S.undoStack.length;
@@ -595,18 +598,18 @@ export function createBench(deps) {
     if (!mod.mount) { say('這個模組還沒安裝，請先接到宿主上'); return false; }
     if (action === 'unmount' && st.preview) { cancelPreview(); return true; }
     let r;
-    if (action === 'angle') r = Bench.toggleAngle(S.comps, S.modules, id, S.topo.params, motorState(), { joint: S.benchJoint });
+    if (action === 'angle') r = Bench.toggleAngle(S.comps, S.modules, id, S.topo.params, motorState(), { joint: defaultJointKind() });
     else if (action === 'flip') {
       r = setMountFlip(S.comps, S.modules, id, !mod.mount.flip);
       if (!r.ok) r = { ...r, reason: opsReason(r.reason) };
     } else if (action === 'unmount') {
       r = unmountModule(S.comps, S.modules, id, S.topo.params, motorState());
       if (!r.ok) r = { ...r, reason: opsReason(r.reason) };
-    } else r = Bench.benchAdjust(S.comps, S.modules, id, action, S.topo.params);
+    } else r = Bench.benchAdjust(S.comps, S.modules, id, action, S.topo.params, { joint: S.fabrication?.joint });
     if (!r.ok) { say(r.reason || '這個動作現在不能用'); return false; }
-    if (action === 'joint:printed' || action === 'joint:bracket-m3') S.benchJoint = action.slice(6);   // E1：記住使用者的選擇，之後新接的也用它
     pushUndo();
     S.comps = r.comps; S.modules = r.modules;
+    if (action === 'joint:printed' || action === 'joint:bracket-m3') Settings.setJointDefaultKind(action.slice(6));   // F1：記住使用者的選擇，存成作品的預設，之後新接的也用它（隨作品保存）
     applyGhost();
     rebuild(); draw();
     const after = modOf(id);
@@ -638,7 +641,7 @@ export function createBench(deps) {
   function adjustState(mod, action) {
     if (!mod || !mod.mount) return { ok: false, reason: '還沒安裝，請先接到宿主上' };
     if (action === 'angle' || action === 'flip' || action === 'unmount' || action === 'edit') return { ok: true };
-    const r = Bench.benchAdjust(S.comps, S.modules, mod.id, action, S.topo.params);
+    const r = Bench.benchAdjust(S.comps, S.modules, mod.id, action, S.topo.params, { joint: S.fabrication?.joint });
     if (!r.ok) return { ok: false, reason: r.reason };
     // 滑到頭時結果與現況相同：視為到端點
     if (action === 'slide+' || action === 'slide-') {

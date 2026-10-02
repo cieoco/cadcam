@@ -324,6 +324,7 @@ export function createViewer(container) {
 
   const holeR = 3.4;   // 板上孔徑（視覺用）
   const pinMat = new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.6, roughness: 0.35 });
+  const bracketMat = new THREE.MeshStandardMaterial({ color: 0xd9dee5, metalness: 0.35, roughness: 0.4 });   // F1：金屬角碼
   const groundMat = new THREE.MeshStandardMaterial({ color: 0x34495e, metalness: 0.2, roughness: 0.8 });
   // TT 齒輪馬達：黃色齒輪箱 + 鐵灰色 DC 罐（與 2D drawTTMotor 同色系）
   const motorBoxMat = new THREE.MeshStandardMaterial({ color: 0xf7c948, metalness: 0.1, roughness: 0.55 });
@@ -482,6 +483,18 @@ export function createViewer(container) {
       sink = group;
       keyPrefix = child.id + '/';
       try { renderModel(child.model); } finally { sink = dynamic; keyPrefix = ''; }
+    });
+    // F1：金屬角碼（每處兩片、每片兩翼各一塊薄板）：主場景座標、淺金屬灰，跟著位姿每幀重畫。
+    (model.brackets || []).forEach((b, i) => {
+      if (!b || !b.center || !Array.isArray(b.axes) || b.axes.length !== 3 || !b.size) return;
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(b.size.x, b.size.y, b.size.z), bracketMat);
+      const [ux, uy, uz] = b.axes.map(a => new THREE.Vector3(a.x, a.y, a.z));
+      mesh.matrixAutoUpdate = false;
+      mesh.matrix.makeBasis(ux, uy, uz).setPosition(b.center.x, b.center.y, b.center.z);
+      mesh.matrixWorldNeedsUpdate = true;
+      // 帶模組 id 當 pickKey 前綴：組立台預覽整個子模組半透明時，角碼跟著半透明。
+      keyPrefix = b.moduleId ? b.moduleId + '/' : '';
+      try { addPart(mesh, `bracket:${i}`); } finally { keyPrefix = ''; }
     });
     focusCamera(model);
   }

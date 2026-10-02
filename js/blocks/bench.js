@@ -8,7 +8,7 @@
  */
 import { mountModule, mountOrthogonal, unmountModule } from './module-ops.js';
 import { orthogonalHostBody, orthogonalHostEdge, worldFrameEdges, moduleFrameEdges, planeOf, defaultStandEdge, hostPlateThickness } from './assembly.js';
-import { ADAPTER_LENGTH_MM, JOINT_KINDS, jointKindOf } from './orthogonal-joint.js';
+import { ADAPTER_LENGTH_MM, JOINT_KINDS, jointKindOf, jointSpec } from './orthogonal-joint.js';
 import { pointCoords, frameConnectorNodes } from './model.js';
 import { memberStock } from './member-stock.js';
 
@@ -278,7 +278,7 @@ function withOrient(orient, patch) {
 
 // 直角安裝後的一鍵調整：'tilt+' ／ 'tilt-' 傾斜 ±15°（±60° 為限）、'side' 換邊、'reverse' 掉頭、'rotate' 轉 90°、'slide+' ／ 'slide-' 沿邊 ±5 mm；
 // D3：'stand' 壓在邊上（host）↔ 立在宿主板面上（child）、'face'（只在立著時）換宿主的另一面；立著時 'rotate'＝換站立邊、'reverse' 不適用。
-export function benchAdjust(comps, modules, moduleId, action, params) {
+export function benchAdjust(comps, modules, moduleId, action, params, opts = {}) {   // opts.joint：作品的接合件設定（FABRICATION.joint；F1，缺省用內建預設）
   const list = asList(comps), modList = asList(modules);
   const fail = reason => ({ ok: false, comps: list, modules: modList, reason });
   const idx = modList.findIndex(m => m && m.id === moduleId);
@@ -299,8 +299,8 @@ export function benchAdjust(comps, modules, moduleId, action, params) {
       if (edge0.kind === 'bar') {
         const bar = list.find(c => c && c.id === edge0.compId);
         const w = bar ? memberStock(bar).widthMm : 0;
-        // E1：角碼長腳 13 mm 要貼在板面上，板寬要 ≥ 板厚＋13；列印轉接座維持 ＋14。
-        const need = T + (jointKindOf(orient.joint) === 'printed' ? ADAPTER_STAND_MARGIN_MM : JOINT_KINDS['bracket-m3'].longLegMm);
+        // E1：角碼長腳（預設 13 mm）要貼在板面上，板寬要 ≥ 板厚＋13；列印轉接座維持 ＋14。
+        const need = T + (jointKindOf(orient.joint) === 'printed' ? ADAPTER_STAND_MARGIN_MM : jointSpec('bracket-m3', opts && opts.joint).longLegMm);
         if (w < need) return fail(`宿主這根桿的板寬只有 ${w} mm，太窄，站不住（至少要 ${need} mm 寬）`);
       }
       const k = defaultStandEdge(list, modList, moduleId, params, {});

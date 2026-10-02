@@ -29,7 +29,13 @@ assert.deepEqual(FABRICATION_DEFAULTS, {
     ttHubCenterMm: 6, ttHubScrewMm: 3.2, ttHubScrewSpacingMm: 12,
     hornCenterMm: 6, hornScrewMm: 2.2, hornScrewCount: 4, hornScrewCircleMm: 14,
   },
+  // F1：直角接合件——預設用 M3 帶牙金屬角碼（13×9.5×7、厚 1.2、孔心離腳端 3.5），規格存在作品裡可改。
+  joint: {
+    defaultKind: 'bracket-m3',
+    bracket: { widthMm: 7, thicknessMm: 1.2, longLegMm: 13, shortLegMm: 9.5, holeEndMm: 3.5 },
+  },
 });
+assert.equal(Object.isFrozen(FABRICATION_DEFAULTS.joint.bracket), true);
 assert.equal(Object.isFrozen(FABRICATION_DEFAULTS), true);
 assert.equal(Object.isFrozen(FABRICATION_DEFAULTS.cnc), true);
 assert.equal(Object.isFrozen(FABRICATION_DEFAULTS.export), true);
@@ -60,9 +66,9 @@ const full = normalizeFabricationProfile(nonDefault);
 assert.deepEqual(nonDefault, original, 'normalization must not mutate its input');
 assert.equal(full.ok, true);
 assert.equal(full.status, 'present');
-assert.deepEqual(full.profile, { ...nonDefault, cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 }, drive: { ...FABRICATION_DEFAULTS.drive } },
-  'older three-group profiles round-trip and get the cnc and drive defaults');
-assert.deepEqual(full.warnings, [], 'missing cnc / drive groups (older works) are filled silently');
+assert.deepEqual(full.profile, { ...nonDefault, cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 }, drive: { ...FABRICATION_DEFAULTS.drive }, joint: { defaultKind: 'bracket-m3', bracket: { ...FABRICATION_DEFAULTS.joint.bracket } } },
+  'older three-group profiles round-trip and get the cnc, drive and joint defaults');
+assert.deepEqual(full.warnings, [], 'missing cnc / drive / joint groups (older works) are filled silently');
 
 // drive 群組：完整往返、範圍、螺絲數為整數
 const withDrive = { ...nonDefault, drive: { ttHubCenterMm: 7, ttHubScrewMm: 3, ttHubScrewSpacingMm: 14.5, hornCenterMm: 5, hornScrewMm: 2, hornScrewCount: 6, hornScrewCircleMm: 16 } };

@@ -136,7 +136,7 @@ const IDENTITY_XF = { cos: 1, sin: 0, tx: 0, ty: 0, angleRad: 0 };
 // ---------- 主程式 ----------
 // 建立檢查器：做完所有「與姿態無關」的準備（機架外形、剛體分組…），回傳 { solveWalk, solveMulti, runPose }。
 // runPose(pose, results, seen) 檢查單一姿態，把新發現的干涉 push 進 results（seen 用來去重）。
-function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], exportSettings = {}, mounts } = {}) {
+function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], exportSettings = {}, mounts, joint } = {}) {
   const list = Array.isArray(comps) ? comps : [];
   const modList = Array.isArray(modules) ? modules : [];
   const parts = (plan && plan.parts) || [];
@@ -501,7 +501,7 @@ function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], 
     orthoMods.forEach(M => {
       const host = modById.get(M.mount.to && M.mount.to.module);
       // C1：宿主可以是桿、三角板或機架板（機架板的零件名為 'frame'）；宿主那一片不算撞。
-      const frameOpts = { asm, exportSettings: exp };   // 與零件多邊形（匯出外框）用同一套匯出設定，站立邊才對得上
+      const frameOpts = { asm, exportSettings: exp, joint };   // 與零件多邊形（匯出外框）用同一套匯出設定，站立邊才對得上
       const hostEdge = host ? orthogonalHostEdge(list, modList, M.mount, pose.points, params, frameOpts) : null;
       const bodyPart = hostEdge ? parts.find(p => p.name === hostEdge.partName) : null;
       if (!bodyPart) return;
@@ -660,12 +660,12 @@ export function hitPartNames(findings) {
 // 螺絲頭／螺帽刮到鄰層時，findInterference 的 hardware 項目附 fix（{ below, mm }）；
 // 把 fix 併入隔圈後重排疊層再檢查，最多 4 輪，直到沒有新的隔圈。
 // 回傳 { plan, interference, spacers }；spacers 與 plan.gaps 相同。
-export function resolveSpacers({ comps, modules = [], params = {}, exportSettings = {}, cnc, mounts, ranges = {}, samplesPerMotor = 9, spacers = [] } = {}) {
+export function resolveSpacers({ comps, modules = [], params = {}, exportSettings = {}, cnc, mounts, ranges = {}, samplesPerMotor = 9, spacers = [], joint } = {}) {
   let current = normalizeSpacers(spacers);
   let plan = null, interference = [];
   for (let i = 0; i < 4; i++) {
-    plan = buildPlan({ comps, modules, params, exportSettings, cnc, mounts, spacers: current });
-    interference = findInterference({ comps, modules, params, exportSettings, mounts, plan, ranges, samplesPerMotor });
+    plan = buildPlan({ comps, modules, params, exportSettings, cnc, mounts, spacers: current, joint });
+    interference = findInterference({ comps, modules, params, exportSettings, mounts, plan, ranges, samplesPerMotor, joint });
     // 螺絲頭的隔圈先加：它會把上面各層一起抬高，常順便解掉螺帽那側的干涉；沒有螺絲頭問題才處理螺帽。
     const hw = interference.filter(x => x.kind === 'hardware' && x.fix);
     const heads = hw.filter(x => x.fix.mm === HEAD_FIX_MM);

@@ -11,6 +11,7 @@
  */
 
 import { orthogonalFrame, orthogonalHostEdge, planeOf, compsInPlane, pointIdsInPlane } from '../blocks/assembly.js';
+import { bracketBoxes } from '../blocks/orthogonal-joint.js';
 
 export const IDENTITY_4 = Object.freeze([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
@@ -101,7 +102,7 @@ export function orthogonalModuleIds(modules) {
  * @param {Object} args.inputs     全域預覽輸入（pts 為所有平面的解）
  * @param {Object} args.mainModel  主平面的場景模型（找宿主本體的 z）
  * @param {(planeInputs:Object)=>Object} args.buildModel  以平面輸入建場景模型
- * @returns {Array<{ id, matrix:number[16], model }>}
+ * @returns {Array<{ id, matrix:number[16], model, brackets:Array }>}  brackets＝金屬角碼方塊（F1，主場景座標）
  *          巢狀（孫模組裝在子模組上）時矩陣已逐層相乘，全部相對於主場景。
  */
 // C1：宿主那一片（桿＝stick、三角板＝頂點相同的 plate、機架板＝model.frame）底面在宿主場景的 z；找不到回 0。
@@ -142,7 +143,19 @@ function hostBodyZ(model, edge, comps) {
   return 0;
 }
 
-export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, buildModel, asm = null, params }) {
+// F1：把角碼方塊（宿主平面座標，z 以宿主本體底面為 0）放進主場景：z 加上宿主本體的 z，再乘宿主平面的矩陣（巢狀時）。
+// 軸向只取矩陣的線性部分（剛體，不縮放）。
+function placeBox(matrix, zOffset, box, moduleId) {
+  const c = applyMatrix4(matrix, { x: box.center.x, y: box.center.y, z: box.center.z + zOffset });
+  const rot = a => ({
+    x: matrix[0] * a.x + matrix[4] * a.y + matrix[8] * a.z,
+    y: matrix[1] * a.x + matrix[5] * a.y + matrix[9] * a.z,
+    z: matrix[2] * a.x + matrix[6] * a.y + matrix[10] * a.z
+  });
+  return { moduleId, center: c, axes: box.axes.map(rot), size: { ...box.size } };
+}
+
+export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, buildModel, asm = null, params, joint, stockMm = 3 }) {
   const ids = orthogonalModuleIds(modules);
   if (!ids.length) return [];
   const done = new Map();   // plane id -> { model, matrix } | null（null＝算不出，後代也略過）
@@ -164,7 +177,9 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
         // D3：立在板面上（edge 'child'）時底板正面本來就貼齊宿主的邊，不能再往外抬，否則板會懸空離開邊。
         const standing = mod.mount.orient.edge === 'child';
         const wOffset = standing ? 0 : Math.max(0, -modelMinZ(model));
-        result = { model, matrix: multiply4(host.matrix, orthogonalMatrix(frame, zOffset, wOffset)) };
+        // F1：這個模組的金屬角碼方塊（主場景座標）；列印版接合沒有。
+        const brackets = bracketBoxes(comps, modules, id, inputs.pts, params, { stockMm, joint, asm }).map(b => placeBox(host.matrix, zOffset, b, id));
+        result = { model, matrix: multiply4(host.matrix, orthogonalMatrix(frame, zOffset, wOffset)), brackets };
       }
     }
     done.set(id, result);
@@ -172,6 +187,6 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
   };
   return ids.map(id => {
     const r = solve(id);
-    return r ? { id, matrix: r.matrix, model: r.model } : null;
+    return r ? { id, matrix: r.matrix, model: r.model, brackets: r.brackets || [] } : null;
   }).filter(Boolean);
 }

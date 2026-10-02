@@ -289,14 +289,14 @@ function viewBands(pts) {
     const hostId = M.mount.to.module;
     if (planeOf(S.comps, S.modules, hostId) === S.viewPlane) {
       // 主視圖（或宿主所在平面）：子模組投影成一條帶。
-      const compute = P => orthogonalBand(S.comps, S.modules, M.id, P, ORTHO_STACK_MM, S.topo.params, { asm: S.assembly });
+      const compute = P => orthogonalBand(S.comps, S.modules, M.id, P, ORTHO_STACK_MM, S.topo.params, { asm: S.assembly, joint: jointSettingsNow() });
       const polygon = compute(pts);
       if (polygon) bands.push({ kind: 'child', id: M.id, label: `${M.name}（側影）`, polygon, compute, target: M.id });
     } else if (S.viewPlane === M.id) {
       // 子視圖：宿主在子平面裡畫成側影帶，點它回宿主平面。
       const host = S.modules.find(m => m.id === hostId);
       // C1：宿主邊可以是桿、三角板的邊或機架板的邊
-      const hostEdge = orthogonalHostEdge(S.comps, S.modules, M.mount, pts, S.topo.params, { asm: S.assembly });
+      const hostEdge = orthogonalHostEdge(S.comps, S.modules, M.mount, pts, S.topo.params, { asm: S.assembly, joint: jointSettingsNow() });
       if (!hostEdge) return;
       const output = host && (host.outputs || []).find(o => o.id === M.mount.to.output);
       const edgeName = output ? output.name : (hostEdge.compId || '機架');
@@ -304,8 +304,8 @@ function viewBands(pts) {
       const standing = orient.edge === 'child';   // D3：子模組立在宿主板面上：宿主的板身在站立邊線下方（t∈[-板厚, 0]）
       const t0 = orient.side === -1 ? 0 : -HOST_BAND_MM, t1 = orient.side === -1 ? HOST_BAND_MM : 0;
       const compute = P => {
-        const f = orthogonalFrame(S.comps, S.modules, M.id, P, S.topo.params, { asm: S.assembly });
-        const he = orthogonalHostEdge(S.comps, S.modules, M.mount, P, S.topo.params, { asm: S.assembly });
+        const f = orthogonalFrame(S.comps, S.modules, M.id, P, S.topo.params, { asm: S.assembly, joint: jointSettingsNow() });
+        const he = orthogonalHostEdge(S.comps, S.modules, M.mount, P, S.topo.params, { asm: S.assembly, joint: jointSettingsNow() });
         if (!f || !he) return null;
         const half = Math.hypot(he.b.x - he.a.x, he.b.y - he.a.y) / 2;
         const at = (sv, tv) => ({ x: f.base.x + sv * f.e.x + tv * f.f.x, y: f.base.y + sv * f.e.y + tv * f.f.y });
@@ -626,7 +626,8 @@ const bench = createBench({
     const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
     return {
       comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: settings,
-      cnc: S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc, mounts: homeMountsNow(), ranges: currentMotorRanges()
+      cnc: S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc, mounts: homeMountsNow(), ranges: currentMotorRanges(),
+      joint: jointSettingsNow()   // F1：角碼規格
     };
   },
   setMotorAngles: angles => {
@@ -1541,12 +1542,16 @@ function push3D() {
     // 直角安裝的子模組：在自己的平面建場景（沒有世界機架），再以 4x4 立起來掛在宿主工具上。
     model.orthogonal = buildOrthogonalChildren({
       comps: S.comps, modules: S.modules, inputs: allPlanes, mainModel: model, asm: S.assembly, params: S.topo.params,
+      joint: jointSettingsNow(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) > 0 ? Number(S.fabrication.cnc.stockThicknessMm) : FABRICATION_DEFAULTS.cnc.stockThicknessMm,
       buildModel: inp => buildSceneModel(inp.links, inp.pts, {
         ...baseOpts, groundIds: inp.groundIds, motorCenters: inp.motorCenterIds, motorTypes: inp.motorTypes,
         motorMounts: inp.motorMounts, polygons: inp.polygons, sliders: inp.sliders, gears: inp.gears,
         racks: inp.racks, cams: inp.cams, pulleys: inp.pulleys, belts: inp.belts, frameGeometry: null
       })
     });
+    // F1：每個直角角碼接合的實體方塊（已在主場景座標），viewer 畫成金屬灰的薄板。
+    const boxes = model.orthogonal.flatMap(child => child.brackets || []);
+    if (boxes.length) model.brackets = boxes;
   }
   viewer3D.update(model);
   bench.afterScene({ pts: planesApi.pts, ptsAll: allPlanes ? allPlanes.pts : planesApi.pts, model });   // 組立台：接口標記跟著這一幀的宿主位置
@@ -2177,8 +2182,10 @@ function motorFrameExportMounts(inputs = lastModelInputs || {}) {
 // O4a：直角安裝轉接座的孔位（桿件孔＋子模組底板節點）；板厚用 CNC 設定的板材厚度。
 function orthoExtrasNow() {
   const stockMm = Number(S.fabrication?.cnc?.stockThicknessMm) > 0 ? Number(S.fabrication.cnc.stockThicknessMm) : FABRICATION_DEFAULTS.cnc.stockThicknessMm;
-  return orthogonalExportExtras(S.comps, S.modules, S.topo.params, { stockMm });
+  return orthogonalExportExtras(S.comps, S.modules, S.topo.params, { stockMm, joint: jointSettingsNow() });
 }
+// F1：作品目前的直角接合件設定（預設接合件種類與角碼規格）。
+function jointSettingsNow() { return S.fabrication?.joint || FABRICATION_DEFAULTS.joint; }
 // O4b：下載每個直角安裝的 3D 列印轉接座 STL（L 形，孔位與木板上的 ADAPTER_HOLE 對應）。
 function downloadAdapterStl() {
   const all = (orthoExtrasNow().adapters || []);
@@ -2234,7 +2241,7 @@ const homeMountsNow = () => lastModelInputs ? motorFrameExportMounts({ ...lastMo
 function resolvedBuild(settings, mounts) {
   const cnc = S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
   const ranges = currentMotorRanges();
-  const args = { comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: settings, cnc, mounts, extras: orthoExtrasNow() };
+  const args = { comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: settings, cnc, mounts, extras: orthoExtrasNow(), joint: jointSettingsNow() };
   try {
     return { ...resolveSpacers({ ...args, ranges }), ranges };
   } catch (e) {
@@ -2449,7 +2456,7 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { setViewPlane, setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample };
+window.blocks = { setViewPlane, setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample };
 window.blocks.changeFrameGround = changeFrameGround;
 Object.assign(window.blocks, {
   setTriSide: memberEditor.selectDimension,

@@ -225,6 +225,8 @@ export function orthogonalHostEdge(comps, modules, mount, points, params, opts =
 
 // ---- D2：已安裝模組自己的底板（<id>-frame）外框的邊 ----
 
+// F1：快取鍵要含接合件規格（角碼短腳孔距會改變子模組底板外框）。
+const jointCacheKey = joint => (joint && joint.bracket ? `${joint.bracket.shortLegMm}/${joint.bracket.holeEndMm}` : '');
 const ASM_FRAME_CACHE = new WeakMap();   // asm → Map（同一次編譯內底板外框不變，求解迴圈裡不必重算）
 
 // 模組 mod 的 home 姿態解：只解「未安裝的單元＋mod 的安裝鏈」，不含其他已安裝模組，
@@ -253,7 +255,7 @@ export function moduleFrameEdges(comps, modules, moduleId, params, opts = {}) {
   const cache = opts.asm ? (ASM_FRAME_CACHE.get(opts.asm) || ASM_FRAME_CACHE.set(opts.asm, new Map()).get(opts.asm)) : (opts.cache instanceof Map ? opts.cache : null);
   // D3：立在宿主板面上（edge 'child'）時，站立邊就是這個外框的一條邊，轉接座孔在外框之內，不能反過來參與外框（會循環）。
   const standing = !!(opts.noOwnHoles || (mod.mount.orient && mod.mount.orient.edge === 'child'));
-  const key = `${moduleId}|${opts.stockMm || ''}|${opts.exportSettings ? JSON.stringify(opts.exportSettings) : ''}|${standing ? 's' : ''}`;
+  const key = `${moduleId}|${opts.stockMm || ''}|${jointCacheKey(opts.joint)}|${opts.exportSettings ? JSON.stringify(opts.exportSettings) : ''}|${standing ? 's' : ''}`;
   if (cache && cache.has(key)) return cache.get(key);
   const entry = frameEntryOf(list, modList, mod, params || {}, () => solveHomeChain(list, modList, mod, opts.asm ? null : params, opts.asm));
   let nodes = moduleFrameNodes(entry, frameConnectorNodes(entry.comps));
@@ -261,7 +263,7 @@ export function moduleFrameEdges(comps, modules, moduleId, params, opts = {}) {
     const pts = pointCoords(list);
     const to = mod.mount.to;
     const bar = to && to.body ? list.find(c => c && c.id === to.body) : null;
-    const holes = adapterChildHoles({ base: pts[mod.base], orient: mod.mount.orient, bar, stockMm: opts.stockMm || 3 });
+    const holes = adapterChildHoles({ base: pts[mod.base], orient: mod.mount.orient, bar, stockMm: opts.stockMm || 3, joint: opts.joint });
     nodes = [...nodes, ...holes.map((h, i) => ({ id: `ADP_${moduleId}_${i}`, x: h.x, y: h.y }))];
   }
   const edges = frameOutlineEdges(nodes, opts.exportSettings || {});
@@ -496,7 +498,7 @@ export function hostPlateThickness(comps, edge, stockMm = 3) {
 function standEdgeOf(list, modList, mod, params, opts = {}) {
   const k = mod.mount.orient.childEdge;
   if (!Number.isInteger(k) || k < 0) return null;
-  const e = moduleFrameEdges(list, modList, mod.id, params, { asm: opts.asm, cache: opts.cache, stockMm: opts.stockMm, exportSettings: opts.exportSettings })[k];
+  const e = moduleFrameEdges(list, modList, mod.id, params, { asm: opts.asm, cache: opts.cache, stockMm: opts.stockMm, exportSettings: opts.exportSettings, joint: opts.joint })[k];
   return e ? standFrameOfEdge(e) : null;
 }
 function standFrameOfEdge(e) {

@@ -16,7 +16,7 @@ import {
 } from './exporters.js';
 import { frameConnectorNodes, motorPointIds, pointCoords, frameNodeIds, sliderMountInfo, isHiddenSliderRailPoint } from './model.js';
 import { worldFrameComps, moduleFrameExports, moduleFrameNodes, moduleOfPoint, splitFrameMounts, planeOf } from './assembly.js';
-import { orthogonalExportExtras, withAdapterNodes, withWorldAdapterNodes, JOINT_KINDS } from './orthogonal-joint.js';
+import { orthogonalExportExtras, withAdapterNodes, withWorldAdapterNodes, jointSpec } from './orthogonal-joint.js';
 import { buildMotorMounts } from './motor-mounts.js';
 import { computeBodyLayers } from '../blocks3d/scene-model.js';
 import { motorTypeAt } from './motor-tools.js';
@@ -122,14 +122,14 @@ const planeLabel = (modules, id) => { const m = (modules || []).find(x => x && x
 // 隔圈所屬平面（主平面＝null）。
 const gapPlane = g => (g && g.plane != null ? g.plane : null);
 
-export function buildPlan({ comps, modules = [], params = {}, exportSettings = {}, cnc, mounts, spacers, extras } = {}) {
+export function buildPlan({ comps, modules = [], params = {}, exportSettings = {}, cnc, mounts, spacers, extras, joint } = {}) {
   const list = Array.isArray(comps) ? comps : [];
   const modList = Array.isArray(modules) ? modules : [];
   const modById = new Map(modList.map(m => [m.id, m]));
   const stockMm = finitePos(cnc && cnc.stockThicknessMm) ? Number(cnc.stockThicknessMm) : DEFAULT_STOCK_THICKNESS_MM;
   const settings = normalizeExportSettings(exportSettings);
   // 直角安裝的轉接座孔（沒傳就依 comps／modules 自算）。
-  const orthoExtras = extras || orthogonalExportExtras(list, modList, params, { stockMm });
+  const orthoExtras = extras || orthogonalExportExtras(list, modList, params, { stockMm, joint });
   const extraHolesOf = comp => (orthoExtras.linkHoles && orthoExtras.linkHoles[comp.id]) || [];
   const plateHolesOf = comp => (orthoExtras.plateHoles && orthoExtras.plateHoles[comp.id]) || [];   // C1：三角板上的轉接座孔
   const thicknessOf = comp => {
@@ -386,6 +386,8 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     const hostPart = a.hostCompId ? partByComp.get(a.hostCompId) : parts.find(p => p.name === a.hostPartName);
     const childPart = parts.find(p => p.name === a.childPart);
     if (!hostPart || !childPart) return;
+    const spec = jointSpec(a.kind || 'printed', joint);   // F1：角碼規格取作品的加工設定
+    const bracketKind = !!a.kind && a.kind !== 'printed';
     joints.push({
       id: `ADP-${a.moduleId}`,
       kind: 'adapter',
@@ -395,7 +397,12 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
       holeDiameterMm: a.holeDiameterMm,
       // E1：角碼的螺絲只穿過木板、鎖進角碼厚 1.2 mm 的螺牙；列印版穿過板厚＋轉接座壁厚。
       jointKind: a.kind || 'printed',
-      spanMm: r3(Math.max(hostPart.thicknessMm, childPart.thicknessMm) + (a.kind && a.kind !== 'printed' ? JOINT_KINDS[a.kind].thicknessMm : a.wallMm)),
+      spanMm: r3(Math.max(hostPart.thicknessMm, childPart.thicknessMm) + (bracketKind ? spec.thicknessMm : a.wallMm)),
+      // F1：角碼的名稱與尺寸存在關節上，五金清單／製作包不必再查設定。
+      ...(bracketKind ? {
+        jointLabel: spec.label, thicknessMm: spec.thicknessMm, widthMm: spec.widthMm, longLegMm: spec.longLegMm,
+        shortLegMm: spec.shortLegMm, bracketCount: spec.count
+      } : {}),
       standoffMm: 0,
       spacers: [],
       holesPerFlange: a.holesPerFlange,
@@ -425,6 +432,17 @@ export function bracketAngleText(tiltDeg) {
 }
 
 const isBracketJoint = j => !!j && j.jointKind === 'bracket-m3';
+// F1：關節上存的角碼名稱與尺寸；舊計畫（沒有這些欄位）退回內建預設規格。
+const bracketOf = j => {
+  const d = jointSpec('bracket-m3');
+  const pick = (v, fallback) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : fallback);
+  return {
+    label: j && j.jointLabel ? j.jointLabel : d.label,
+    count: pick(j && j.bracketCount, d.count),
+    longLegMm: pick(j && j.longLegMm, d.longLegMm),
+    shortLegMm: pick(j && j.shortLegMm, d.shortLegMm)
+  };
+};
 // 直角轉接座的螺絲：穿過「板厚＋轉接座壁厚」再加防鬆螺帽；孔徑固定 3.2，一律是 M3。
 export function adapterScrewSpec(joint) {
   if (!joint || joint.kind !== 'adapter') return null;
@@ -463,13 +481,14 @@ export function hardwareList(plan, { modules = [] } = {}) {
   };
   const spacerRows = new Map();   // mm -> { qty, belows:Map(key -> {plane, below}) }（只算有螺絲的關節；馬達軸不算）
   const standoffRows = new Map(); // mm -> qty（L7 隔柱：螺絲中間沒有板的地方）
-  let adapters = 0, brackets = 0;
+  let adapters = 0;
+  const brackets = new Map();   // F1：角碼名稱（含尺寸）→ 片數
   const tiltNotes = [];   // D4：傾斜的轉接座
   joints.forEach(j => {
     if (j.kind === 'adapter' && isBracketJoint(j)) {
       // E1：每處兩片角碼、每片一顆 M3×6 穿過木板，宿主與子模組各 2 顆＝4 顆；直接鎖進螺牙，不用螺帽。
-      const K = JOINT_KINDS['bracket-m3'];
-      brackets += K.count;
+      const K = bracketOf(j);
+      brackets.set(K.label, (brackets.get(K.label) || 0) + K.count);
       addScrew(adapterScrewSpec(j), '角碼', 2 * K.count, false);
       return;
     }
@@ -519,7 +538,7 @@ export function hardwareList(plan, { modules = [] } = {}) {
     rows.push({ spec: `M3 隔柱 ${fmtNum(mm)} mm`, qty, note: '對鎖螺絲中間沒有板的地方用隔柱撐住' });
   });
   if (adapters > 0) rows.push({ spec: '3D 列印轉接座', qty: adapters, note: `L 形，STL 另外下載列印${tiltNotes.length ? '；' + tiltNotes.join('；') : ''}` });
-  if (brackets > 0) rows.push({ spec: JOINT_KINDS['bracket-m3'].label, qty: brackets, note: '直角接合，每處兩片' });
+  brackets.forEach((qty, label) => rows.push({ spec: label, qty, note: '直角接合，每處兩片' }));
   if (nuts > 0) rows.push({ spec: 'M3 防鬆螺帽', qty: nuts, note: '穿透式 M3 螺絲各一顆（鎖進輪轂的 M3×8 不需要）' });
   const ttCount = motors.filter(m => m.type === 'tt').length;
   const servoCount = motors.filter(m => m.type === 'mg995').length;
@@ -595,7 +614,7 @@ ${adapterJoints.map(j => {
     const n = Number(j.holesPerFlange) || 2;
     const [hostName, childName] = j.parts;
     if (isBracketJoint(j)) {
-      const K = JOINT_KINDS['bracket-m3'];
+      const K = bracketOf(j);
       return `<section class="step"><h3>角碼 ${e(j.id)}：${e(hostName)} ⟂ ${e(childName)}</h3><ol>
 ${j.stand ? `<li>子模組底板 ${e(childName)} 立在 ${e(hostName)} 的板面上（${j.stand.face === -1 ? '下面' : '上面'}），正面貼齊邊緣，板子與板面成 90°。</li>\n` : ''}<li>準備 ${K.count} 片 ${e(K.label)}，並排放在接合線上（兩片中心相距 10 mm，對準木板上的 ADAPTER_HOLE 孔）。</li>
 <li>長腳（${K.longLegMm} mm）貼在宿主 ${e(hostName)} 上，用 ${K.count} 顆 ${e(spec)} 從木板這一面穿過 3.2 mm 孔，直接鎖進角碼的螺牙，不用螺帽。</li>

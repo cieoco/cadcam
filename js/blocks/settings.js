@@ -45,7 +45,7 @@ export function init(deps) {
   if (deps.pause) pause = deps.pause;
   if (deps.scheduleAutosave) scheduleAutosave = deps.scheduleAutosave;
   if (deps.notify) notify = deps.notify;
-  document.querySelectorAll('[data-export-setting],[data-tt-mount-setting],[data-mg995-mount-setting],[data-cnc-setting],[data-drive-setting],#frameMarginInput,#frameHoleInput')
+  document.querySelectorAll('[data-export-setting],[data-tt-mount-setting],[data-mg995-mount-setting],[data-cnc-setting],[data-drive-setting],[data-joint-setting],#frameMarginInput,#frameHoleInput')
     .forEach(input => input.addEventListener('keydown', handleFabricationKey));
 }
 
@@ -131,6 +131,14 @@ function syncDriveSettingInputs() {
     document.querySelectorAll(`[data-drive-setting="${key}"]`).forEach(el => { el.value = value; });
   });
 }
+// F1：直角接合件——預設種類（select）與角碼規格（number）。
+function syncJointSettingInputs() {
+  const joint = S.fabrication?.joint || FABRICATION_DEFAULTS.joint;
+  const values = { defaultKind: joint.defaultKind, ...joint.bracket };
+  Object.entries(values).forEach(([key, value]) => {
+    document.querySelectorAll(`[data-joint-setting="${key}"]`).forEach(el => { el.value = value; });
+  });
+}
 function syncSourceLabel() {
   document.querySelectorAll('[data-fabrication-source]').forEach(el => { el.textContent = sourceLabel; });
 }
@@ -150,13 +158,13 @@ export function applyFabricationProfile(profile, { source = '目前作品的加�
   S.fabrication = result.profile;
   sourceLabel = source;
   applyLegacyMirrors(S.fabrication);
-  syncExportSettingInputs(); syncTtMountSettingInputs(); syncMg995MountSettingInputs(); syncCncSettingInputs(); syncDriveSettingInputs(); syncSourceLabel();
+  syncExportSettingInputs(); syncTtMountSettingInputs(); syncMg995MountSettingInputs(); syncCncSettingInputs(); syncDriveSettingInputs(); syncJointSettingInputs(); syncSourceLabel();
   return result;
 }
 export function defaultFabrication() { return JSON.parse(JSON.stringify(FABRICATION_DEFAULTS)); }
 export function legacyLocalFabrication() { return JSON.parse(JSON.stringify(legacyLocalProfile)); }
 export function syncFabricationInputs() {
-  syncExportSettingInputs(); syncTtMountSettingInputs(); syncMg995MountSettingInputs(); syncCncSettingInputs(); syncDriveSettingInputs(); syncSourceLabel();
+  syncExportSettingInputs(); syncTtMountSettingInputs(); syncMg995MountSettingInputs(); syncCncSettingInputs(); syncDriveSettingInputs(); syncJointSettingInputs(); syncSourceLabel();
 }
 export function loadExportSettings() {
   let saved = null;
@@ -181,7 +189,7 @@ export function loadMg995MountSettings() {
 function commit(group, key, value) {
   const raw = typeof value === 'string' ? value.trim() : value;
   const numeric = typeof raw === 'number' ? raw : (typeof raw === 'string' && raw !== '' ? Number(raw) : Number.NaN);
-  const result = planFabricationProfile(S.fabrication || FABRICATION_DEFAULTS, group, key, numeric);
+  const result = planFabricationProfile(S.fabrication || FABRICATION_DEFAULTS, group, key, group === 'joint' && key === 'defaultKind' ? raw : numeric);
   if (!result.ok) { notify(result.message); syncFabricationInputs(); return false; }
   if (!result.changed) { syncFabricationInputs(); return false; }
   pause(); pushUndo(); applyFabricationProfile(result.profile); scheduleAutosave(); draw(); return true;
@@ -198,6 +206,17 @@ export function setCncSetting(key, value) {
 }
 export function setDriveSetting(key, value) {
   return commit('drive', key, value);
+}
+// F1：key 為 'defaultKind'（'bracket-m3'｜'printed'）或角碼規格欄位（widthMm、thicknessMm、longLegMm、shortLegMm、holeEndMm）。
+export function setJointSetting(key, value) {
+  return commit('joint', key, value);
+}
+// 組立台切換單一模組的接合件時，順便把它記成作品的預設種類（已有復原點，不另外推一筆；由呼叫端負責重畫）。
+export function setJointDefaultKind(kind) {
+  const result = planFabricationProfile(S.fabrication || FABRICATION_DEFAULTS, 'joint', 'defaultKind', kind);
+  if (!result.ok || !result.changed) return false;
+  applyFabricationProfile(result.profile); scheduleAutosave();
+  return true;
 }
 export function handleFabricationKey(event) {
   if (event.key === 'Escape') { event.preventDefault(); syncFabricationInputs(); event.currentTarget?.blur(); }

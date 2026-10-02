@@ -51,6 +51,28 @@ export const FABRICATION_DEFAULTS = Object.freeze({
     hornScrewCount: 4,
     hornScrewCircleMm: 14,
   }),
+  // F1：直角接合件。預設用現成 M3 帶牙金屬角碼（13×9.5×7、厚 1.2、孔心離腳端 3.5）；
+  // 規格存在作品裡，實量後可改，孔位、五金清單、3D 都引用這裡。
+  joint: Object.freeze({
+    defaultKind: 'bracket-m3',
+    bracket: freezeRecord({
+      widthMm: 7,
+      thicknessMm: 1.2,
+      longLegMm: 13,
+      shortLegMm: 9.5,
+      holeEndMm: 3.5,
+    }),
+  }),
+});
+
+// 直角接合件的種類與角碼規格範圍（joint 群組非全數字，另外處理）。
+export const JOINT_KIND_IDS = Object.freeze(['bracket-m3', 'printed']);
+const JOINT_RANGES = Object.freeze({
+  widthMm: [3, 30],
+  thicknessMm: [0.5, 5],
+  longLegMm: [5, 60],
+  shortLegMm: [5, 60],
+  holeEndMm: [1.5, 20],
 });
 
 const RANGES = Object.freeze({
@@ -106,6 +128,16 @@ const cloneDefaults = () => ({
   mg995Mount: { ...FABRICATION_DEFAULTS.mg995Mount },
   cnc: { ...FABRICATION_DEFAULTS.cnc },
   drive: { ...FABRICATION_DEFAULTS.drive },
+  joint: { defaultKind: FABRICATION_DEFAULTS.joint.defaultKind, bracket: { ...FABRICATION_DEFAULTS.joint.bracket } },
+});
+const cloneProfile = profile => ({
+  v: FABRICATION_VERSION,
+  export: { ...profile.export },
+  ttMount: { ...profile.ttMount },
+  mg995Mount: { ...profile.mg995Mount },
+  cnc: { ...profile.cnc },
+  drive: { ...profile.drive },
+  joint: { defaultKind: profile.joint.defaultKind, bracket: { ...profile.joint.bracket } },
 });
 const roundHundredth = value => Math.round((value + Number.EPSILON) * 100) / 100;
 const roundThousandth = value => Math.round((value + Number.EPSILON) * 1000) / 1000;
@@ -126,6 +158,46 @@ function validateKnownValue(group, key, value) {
     return invalid('drive.hornScrewCount 必須是整數。', 'drive.hornScrewCount');
   }
   return { ok: true, value: group === 'cnc' ? roundThousandth(value) : roundHundredth(value) };
+}
+
+const clampTo = (value, [min, max]) => Math.min(max, Math.max(min, value));
+
+// 角碼規格的整理：缺少、非有限數字、<=0 一律回預設；其餘夾進範圍；孔心離腳端必須小於兩腳長。
+// 不合理的組合（孔端 >= 腳長）整組退回預設，不丟錯，因為舊檔或手改的檔都要能開。
+function normalizeJointSettings(source) {
+  const out = { defaultKind: FABRICATION_DEFAULTS.joint.defaultKind, bracket: { ...FABRICATION_DEFAULTS.joint.bracket } };
+  if (!isRecord(source)) return out;
+  if (JOINT_KIND_IDS.includes(source.defaultKind)) out.defaultKind = source.defaultKind;
+  const raw = isRecord(source.bracket) ? source.bracket : {};
+  for (const key of Object.keys(JOINT_RANGES)) {
+    const v = raw[key];
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) out.bracket[key] = roundHundredth(clampTo(v, JOINT_RANGES[key]));
+  }
+  const b = out.bracket;
+  if (!(b.holeEndMm < b.longLegMm && b.holeEndMm < b.shortLegMm)) {
+    b.holeEndMm = FABRICATION_DEFAULTS.joint.bracket.holeEndMm;
+    if (!(b.holeEndMm < b.longLegMm && b.holeEndMm < b.shortLegMm)) {
+      b.longLegMm = FABRICATION_DEFAULTS.joint.bracket.longLegMm;
+      b.shortLegMm = FABRICATION_DEFAULTS.joint.bracket.shortLegMm;
+    }
+  }
+  return out;
+}
+
+// 單一 joint 欄位的編輯檢查（設定面板用）：defaultKind 必須是已知種類；角碼數字必須在範圍內、孔端小於兩腳。
+function validateJointEdit(current, key, value) {
+  if (key === 'defaultKind') {
+    if (!JOINT_KIND_IDS.includes(value)) return invalid('joint.defaultKind 必須是 bracket-m3 或 printed。', 'joint.defaultKind');
+    return { ok: true, value };
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) return invalid(`joint.bracket.${key} 必須是有限數字。`, `joint.bracket.${key}`);
+  const [min, max] = JOINT_RANGES[key];
+  if (value < min || value > max) return invalid(`joint.bracket.${key} 必須介於 ${min}–${max} mm。`, `joint.bracket.${key}`);
+  const next = { ...current.bracket, [key]: roundHundredth(value) };
+  if (!(next.holeEndMm < next.longLegMm && next.holeEndMm < next.shortLegMm)) {
+    return invalid('角碼孔心離末端必須小於長邊與短邊。', `joint.bracket.${key}`);
+  }
+  return { ok: true, value: roundHundredth(value) };
 }
 
 function validateCrossFields(profile) {
@@ -152,7 +224,8 @@ export function normalizeFabricationProfile(raw) {
     };
   }
   if (!isRecord(raw)) return invalid('fabrication 必須是物件。', 'fabrication');
-  if (!own(raw, 'v') || raw.v !== FABRICATION_VERSION) {
+  // 沒有 v 欄位的物件視為 v1（test/joint-profile.mjs 以 {} 與 { joint } 呼叫）；有 v 但不是 1 仍拒絕。
+  if (own(raw, 'v') && raw.v !== FABRICATION_VERSION) {
     return invalid(`不支援的 fabrication 版本：${String(raw.v)}。`, 'fabrication.v');
   }
 
@@ -163,6 +236,11 @@ export function normalizeFabricationProfile(raw) {
 
   const profile = cloneDefaults();
   for (const group of GROUPS) {
+    if (group === 'joint') {
+      // F1：joint 靜默補預設（舊作品沒有），值不合理時回預設或夾進範圍，不拒絕載入。
+      profile.joint = normalizeJointSettings(raw.joint);
+      continue;
+    }
     if (!own(raw, group)) {
       // 舊作品沒有 cnc／drive 群組：靜默補預設，不算缺漏。
       if (group === 'cnc' || group === 'drive') continue;
@@ -197,27 +275,28 @@ export function normalizeFabricationProfile(raw) {
 
 /**
  * Plan an immutable single-field edit. `group` is export, ttMount,
- * mg995Mount, cnc, or drive. Numeric edits require actual finite numbers; invalid edits are
+ * mg995Mount, cnc, drive, or joint（joint 的 key 為 defaultKind 或角碼規格欄位）. Numeric edits require actual finite numbers; invalid edits are
  * rejected without clamping or changing the supplied profile.
  */
 export function planFabricationProfile(current, group, key, rawValue) {
   const normalized = normalizeFabricationProfile(current);
   if (!normalized.ok) return normalized;
-  if (!GROUPS.includes(group) || !own(FABRICATION_DEFAULTS[group], key)) {
+  const knownKey = group === 'joint' ? (key === 'defaultKind' || own(JOINT_RANGES, key)) : (GROUPS.includes(group) && own(FABRICATION_DEFAULTS[group], key));
+  if (!GROUPS.includes(group) || !knownKey) {
     return invalid(`不支援的 fabrication 欄位 ${String(group)}.${String(key)}。`, `${group}.${key}`);
   }
 
-  const checked = validateKnownValue(group, key, rawValue);
-  if (!checked.ok) return checked;
-  const profile = {
-    v: FABRICATION_VERSION,
-    export: { ...normalized.profile.export },
-    ttMount: { ...normalized.profile.ttMount },
-    mg995Mount: { ...normalized.profile.mg995Mount },
-    cnc: { ...normalized.profile.cnc },
-    drive: { ...normalized.profile.drive },
-  };
-  profile[group][key] = checked.value;
+  const profile = cloneProfile(normalized.profile);
+  if (group === 'joint') {
+    const checkedJoint = validateJointEdit(normalized.profile.joint, key, rawValue);
+    if (!checkedJoint.ok) return checkedJoint;
+    if (key === 'defaultKind') profile.joint.defaultKind = checkedJoint.value;
+    else profile.joint.bracket[key] = checkedJoint.value;
+  } else {
+    const checked = validateKnownValue(group, key, rawValue);
+    if (!checked.ok) return checked;
+    profile[group][key] = checked.value;
+  }
 
   const cross = validateCrossFields(profile);
   if (!cross.ok) return cross;

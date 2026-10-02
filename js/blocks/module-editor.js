@@ -5,6 +5,7 @@
  * ./module-ops.js 的純函式，這裡只做選取判讀、面板狀態組裝與 DOM 呈現。
  */
 import { S } from './state.js';
+import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { pointKeysFor } from './part-types.js';
 import { selectionModule, compsInPlane } from './assembly.js';
 import { mountPortName, moduleLabels } from './bench.js';
@@ -272,7 +273,7 @@ export function createModuleEditor(deps) {
   function mountOrthogonalTo(moduleId, outputId) {
     const selId = currentModuleId();
     if (!selId) { transient('請先選取要安裝的模組。'); return; }
-    applyResult(mountOrthogonal(S.comps, S.modules, selId, { module: moduleId, output: outputId }, S.topo.params, motorState(), { joint: S.benchJoint }));   // E1：接合件用目前的預設
+    applyResult(mountOrthogonal(S.comps, S.modules, selId, { module: moduleId, output: outputId }, S.topo.params, motorState(), { joint: (S.fabrication?.joint || FABRICATION_DEFAULTS.joint).defaultKind }));   // F1：接合件用作品的預設（fabrication.joint.defaultKind）
   }
   function unmount() {
     const modId = currentModuleId();
