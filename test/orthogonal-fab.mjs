@@ -32,6 +32,7 @@ const ed = createModuleEditor({ pushUndo: q, rebuild: q, draw: q, transient: q, 
 ed.insertBuiltin('fourbar-lift'); ed.insertBuiltin('gear-gripper');
 const L = S.modules[0], G = S.modules[1];
 S.selectedGearId = S.comps.find(c => c.moduleId === G.id && c.type === 'gear').id;
+S.benchJoint = 'printed';   // E1：這支測試驗證 3D 列印轉接座的孔位與五金，預設改為角碼後要明確指定
 ed.mountOrthogonalTo(L.id, 'tool');
 const P = S.topo.params;
 const near = (a, b, t = 1e-6) => Math.abs(a - b) < t;

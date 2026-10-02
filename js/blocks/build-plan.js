@@ -16,7 +16,7 @@ import {
 } from './exporters.js';
 import { frameConnectorNodes, motorPointIds, pointCoords, frameNodeIds, sliderMountInfo, isHiddenSliderRailPoint } from './model.js';
 import { worldFrameComps, moduleFrameExports, moduleFrameNodes, moduleOfPoint, splitFrameMounts, planeOf } from './assembly.js';
-import { orthogonalExportExtras, withAdapterNodes, withWorldAdapterNodes } from './orthogonal-joint.js';
+import { orthogonalExportExtras, withAdapterNodes, withWorldAdapterNodes, JOINT_KINDS } from './orthogonal-joint.js';
 import { buildMotorMounts } from './motor-mounts.js';
 import { computeBodyLayers } from '../blocks3d/scene-model.js';
 import { motorTypeAt } from './motor-tools.js';
@@ -393,7 +393,9 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
       parts: [hostPart.name, childPart.name],
       layers: [hostPart.layer, childPart.layer],   // 兩個平面各自的層號，僅供參考
       holeDiameterMm: a.holeDiameterMm,
-      spanMm: r3(Math.max(hostPart.thicknessMm, childPart.thicknessMm) + a.wallMm),
+      // E1：角碼的螺絲只穿過木板、鎖進角碼厚 1.2 mm 的螺牙；列印版穿過板厚＋轉接座壁厚。
+      jointKind: a.kind || 'printed',
+      spanMm: r3(Math.max(hostPart.thicknessMm, childPart.thicknessMm) + (a.kind && a.kind !== 'printed' ? JOINT_KINDS[a.kind].thicknessMm : a.wallMm)),
       standoffMm: 0,
       spacers: [],
       holesPerFlange: a.holesPerFlange,
@@ -422,9 +424,15 @@ export function bracketAngleText(tiltDeg) {
   return `轉接座兩翼夾角 ${90 + t}°（傾斜 ${t}°）`;
 }
 
+const isBracketJoint = j => !!j && j.jointKind === 'bracket-m3';
 // 直角轉接座的螺絲：穿過「板厚＋轉接座壁厚」再加防鬆螺帽；孔徑固定 3.2，一律是 M3。
 export function adapterScrewSpec(joint) {
   if (!joint || joint.kind !== 'adapter') return null;
+  // E1：角碼不用螺帽，螺絲穿過板（spanMm 已含角碼 1.2 mm 螺牙厚）後鎖進螺牙；一般板厚 3 mm → M3×6。
+  if (isBracketJoint(joint)) {
+    const need = Number(joint.spanMm);
+    return `M3×${SCREW_LENGTHS_MM.find(l => l >= need) || Math.ceil(need)}`;
+  }
   const need = Number(joint.spanMm) + NUT_THICKNESS_MM;
   return `M3×${SCREW_LENGTHS_MM.find(l => l >= need) || Math.ceil(need)}`;
 }
@@ -438,7 +446,7 @@ export function jointScrewSpec(joint) {
   return `M3×${len}`;
 }
 
-const USE_ORDER = ['導銷', '對鎖', '樞軸', '轉接座', 'TT 馬達固定', 'MG995 耳孔', 'TT 輪轂', 'MG995 舵盤'];
+const USE_ORDER = ['導銷', '對鎖', '樞軸', '轉接座', '角碼', 'TT 馬達固定', 'MG995 耳孔', 'TT 輪轂', 'MG995 舵盤'];
 
 export function hardwareList(plan, { modules = [] } = {}) {
   const joints = (plan && plan.joints) || [];
@@ -455,9 +463,16 @@ export function hardwareList(plan, { modules = [] } = {}) {
   };
   const spacerRows = new Map();   // mm -> { qty, belows:Map(key -> {plane, below}) }（只算有螺絲的關節；馬達軸不算）
   const standoffRows = new Map(); // mm -> qty（L7 隔柱：螺絲中間沒有板的地方）
-  let adapters = 0;
+  let adapters = 0, brackets = 0;
   const tiltNotes = [];   // D4：傾斜的轉接座
   joints.forEach(j => {
+    if (j.kind === 'adapter' && isBracketJoint(j)) {
+      // E1：每處兩片角碼、每片一顆 M3×6 穿過木板，宿主與子模組各 2 顆＝4 顆；直接鎖進螺牙，不用螺帽。
+      const K = JOINT_KINDS['bracket-m3'];
+      brackets += K.count;
+      addScrew(adapterScrewSpec(j), '角碼', 2 * K.count, false);
+      return;
+    }
     if (j.kind === 'adapter') {
       // 每個轉接座兩翼各 holesPerFlange 顆 M3，都穿透鎖防鬆螺帽。
       adapters += 1;
@@ -504,6 +519,7 @@ export function hardwareList(plan, { modules = [] } = {}) {
     rows.push({ spec: `M3 隔柱 ${fmtNum(mm)} mm`, qty, note: '對鎖螺絲中間沒有板的地方用隔柱撐住' });
   });
   if (adapters > 0) rows.push({ spec: '3D 列印轉接座', qty: adapters, note: `L 形，STL 另外下載列印${tiltNotes.length ? '；' + tiltNotes.join('；') : ''}` });
+  if (brackets > 0) rows.push({ spec: JOINT_KINDS['bracket-m3'].label, qty: brackets, note: '直角接合，每處兩片' });
   if (nuts > 0) rows.push({ spec: 'M3 防鬆螺帽', qty: nuts, note: '穿透式 M3 螺絲各一顆（鎖進輪轂的 M3×8 不需要）' });
   const ttCount = motors.filter(m => m.type === 'tt').length;
   const servoCount = motors.filter(m => m.type === 'mg995').length;
@@ -569,13 +585,25 @@ export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = []
     `<h3 class="plane">${e(planeName(id))}（${e(id)}，直角面）：由第 0 層往外逐層組裝</h3>${stepsOfPlane(id)}`).join('');
   // 直角組裝：3D 列印 L 形轉接座把兩個平面接成 90°。
   const adapterJoints = joints.filter(j => j.kind === 'adapter');
+  const anyPrinted = adapterJoints.some(j => !isBracketJoint(j));
+  const anyBracket = adapterJoints.some(isBracketJoint);
   const orthoSection = adapterJoints.length
     ? `<h2>直角組裝</h2>
-<p class="muted">兩個平面各自疊層組好後，用 3D 列印的轉接座把它們接成 90°。</p>
+<p class="muted">兩個平面各自疊層組好後，用${anyBracket && anyPrinted ? ' M3 帶牙金屬角碼或 3D 列印的轉接座' : anyBracket ? ' M3 帶牙金屬角碼' : ' 3D 列印的轉接座'}把它們接成 90°。</p>
 ${adapterJoints.map(j => {
     const spec = adapterScrewSpec(j);
     const n = Number(j.holesPerFlange) || 2;
     const [hostName, childName] = j.parts;
+    if (isBracketJoint(j)) {
+      const K = JOINT_KINDS['bracket-m3'];
+      return `<section class="step"><h3>角碼 ${e(j.id)}：${e(hostName)} ⟂ ${e(childName)}</h3><ol>
+${j.stand ? `<li>子模組底板 ${e(childName)} 立在 ${e(hostName)} 的板面上（${j.stand.face === -1 ? '下面' : '上面'}），正面貼齊邊緣，板子與板面成 90°。</li>\n` : ''}<li>準備 ${K.count} 片 ${e(K.label)}，並排放在接合線上（兩片中心相距 10 mm，對準木板上的 ADAPTER_HOLE 孔）。</li>
+<li>長腳（${K.longLegMm} mm）貼在宿主 ${e(hostName)} 上，用 ${K.count} 顆 ${e(spec)} 從木板這一面穿過 3.2 mm 孔，直接鎖進角碼的螺牙，不用螺帽。</li>
+<li>短腳（${K.shortLegMm} mm）貼在子模組底板 ${e(childName)} 上，同樣用 ${K.count} 顆 ${e(spec)} 穿過底板鎖進螺牙。</li>
+<li>注意：螺牙只有 1.2 mm 厚，不要鎖太緊（轉到貼平就停）。</li>
+<li>確認子模組與宿主成 90°（子模組的板面垂直於宿主的板面），再開始轉動測試。</li>
+</ol></section>`;
+    }
     return `<section class="step"><h3>轉接座 ${e(j.id)}：${e(hostName)} ⟂ ${e(childName)}</h3><ol>
 <li>用 3D 印表機印出轉接座（下載 STL），填充約 100%，孔徑 3.2 mm 不縮小；L 形兩翼各 ${n} 個 M3 穿孔。${j.tiltDeg ? e(bracketAngleText(j.tiltDeg)) + '。' : ''}</li>
 ${j.stand ? `<li>子模組底板 ${e(childName)} 立在 ${e(hostName)} 的板面上（${j.stand.face === -1 ? '下面' : '上面'}），正面貼齊邊緣，板子與板面成 90°。</li>\n` : ''}<li>翼 A 貼在宿主桿 ${e(hostName)} 上，用 ${n} 顆 ${e(spec)} 穿過桿與翼 A，鎖防鬆螺帽。</li>

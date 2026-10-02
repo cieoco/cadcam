@@ -2181,8 +2181,10 @@ function orthoExtrasNow() {
 }
 // O4b：下載每個直角安裝的 3D 列印轉接座 STL（L 形，孔位與木板上的 ADAPTER_HOLE 對應）。
 function downloadAdapterStl() {
-  const adapters = (orthoExtrasNow().adapters || []);
-  if (!adapters.length) { transient('沒有直角安裝，不需要轉接座'); return; }
+  const all = (orthoExtrasNow().adapters || []);
+  if (!all.length) { transient('沒有直角安裝，不需要轉接座'); return; }
+  const adapters = all.filter(a => a.kind !== 'bracket-m3');   // E1：金屬角碼是現成零件，不用列印
+  if (!adapters.length) { transient('金屬角碼不需要列印'); return; }
   adapters.forEach(a => {
     const name = `adapter-${a.moduleId}${a.tiltDeg ? `-tilt${a.tiltDeg}` : ''}`;   // D4：傾斜的轉接座檔名帶角度
     const stl = meshToStl(adapterMesh({ lengthMm: a.lengthMm, wallMm: a.wallMm, flangeMm: a.flangeMm, holeDiameterMm: a.holeDiameterMm, holesPerFlange: a.holesPerFlange, tiltDeg: a.tiltDeg }), name);

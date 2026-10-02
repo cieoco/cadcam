@@ -8,14 +8,14 @@
  */
 import { mountModule, mountOrthogonal, unmountModule } from './module-ops.js';
 import { orthogonalHostBody, orthogonalHostEdge, worldFrameEdges, moduleFrameEdges, planeOf, defaultStandEdge, hostPlateThickness } from './assembly.js';
-import { ADAPTER_LENGTH_MM } from './orthogonal-joint.js';
+import { ADAPTER_LENGTH_MM, JOINT_KINDS, jointKindOf } from './orthogonal-joint.js';
 import { pointCoords, frameConnectorNodes } from './model.js';
 import { memberStock } from './member-stock.js';
 
 const SLIDE_STEP_MM = 5;   // 沿邊滑動一格（SDD-BENCH Q3）
 const TILT_STEP_DEG = 15;   // D4：傾斜一格
 const TILT_MAX_DEG = 60;    // D4：傾斜上限（±）
-const ADAPTER_STAND_MARGIN_MM = 14;   // D3：站立時宿主桿的板寬要大於「板厚＋14」
+const ADAPTER_STAND_MARGIN_MM = 14;   // D3：站立時宿主桿的板寬要大於「板厚＋14」（列印轉接座；角碼用長腳 13）
 
 const asList = v => Array.isArray(v) ? v : [];
 const finiteNum = v => typeof v === 'number' && Number.isFinite(v);
@@ -250,14 +250,15 @@ function orthogonalTarget(module, port) {
 }
 
 // 接上：bolt 接口＝同平面安裝；edge 接口＝直角安裝（mount.to＝{ module, body[, edge] } 或 { module, frame: { edge } }）。
-export function connect(comps, modules, childId, target, params, motorState) {
+// opts.joint：直角接合件種類（'printed'｜'bracket-m3'，只對 edge 接口有效；預設 'printed'）。
+export function connect(comps, modules, childId, target, params, motorState, opts = {}) {
   const list = asList(comps), modList = asList(modules);
   const can = canConnect(list, modList, childId, target, params);
   if (!can.ok) return { ok: false, comps: list, modules: modList, reason: can.reason };
   const port = can.port;
   const r = port.kind === 'bolt'
     ? mountModule(list, modList, childId, { module: target.module, output: port.output }, params, motorState)
-    : mountOrthogonal(list, modList, childId, orthogonalTarget(target.module, port), params, motorState);
+    : mountOrthogonal(list, modList, childId, orthogonalTarget(target.module, port), params, motorState, { joint: opts && opts.joint === 'bracket-m3' ? 'bracket-m3' : 'printed' });
   if (!r.ok) return { ok: false, comps: list, modules: modList, reason: reasonText(r.reason) };
   return { ok: true, comps: r.comps, modules: r.modules };
 }
@@ -298,7 +299,9 @@ export function benchAdjust(comps, modules, moduleId, action, params) {
       if (edge0.kind === 'bar') {
         const bar = list.find(c => c && c.id === edge0.compId);
         const w = bar ? memberStock(bar).widthMm : 0;
-        if (w < T + ADAPTER_STAND_MARGIN_MM) return fail(`宿主這根桿的板寬只有 ${w} mm，太窄，站不住（至少要 ${T + ADAPTER_STAND_MARGIN_MM} mm 寬）`);
+        // E1：角碼長腳 13 mm 要貼在板面上，板寬要 ≥ 板厚＋13；列印轉接座維持 ＋14。
+        const need = T + (jointKindOf(orient.joint) === 'printed' ? ADAPTER_STAND_MARGIN_MM : JOINT_KINDS['bracket-m3'].longLegMm);
+        if (w < need) return fail(`宿主這根桿的板寬只有 ${w} mm，太窄，站不住（至少要 ${need} mm 寬）`);
       }
       const k = defaultStandEdge(list, modList, moduleId, params, {});
       if (k === null) return fail('算不出這個模組的底板邊，不能立在板面上');
@@ -330,7 +333,14 @@ export function benchAdjust(comps, modules, moduleId, action, params) {
     const cur = finiteNum(orient.offsetMm) ? orient.offsetMm : 0;
     const v = round1(Math.min(hi, Math.max(lo, cur + (action === 'slide+' ? SLIDE_STEP_MM : -SLIDE_STEP_MM))));
     next = withOrient(orient, { offsetMm: v });
+  } else if (action === 'joint:printed' || action === 'joint:bracket-m3') {
+    // E1：換接合件。金屬角碼只有 90°，已傾斜的要先回到 0°。
+    const kind = action.slice(6);
+    if (jointKindOf(orient.joint) === kind) return { ok: true, comps: list, modules: modList };
+    if (!JOINT_KINDS[kind].tiltable && finiteNum(orient.tiltDeg) && orient.tiltDeg !== 0) return fail('金屬角碼只有 90°，這個模組目前有傾斜；請先把傾斜調回 0°，或繼續用 3D 列印轉接座');
+    next = withOrient(orient, { joint: kind === 'bracket-m3' ? { kind } : { kind: 'printed', wallMm: 4, holesPerFlange: 2 } });
   } else if (action === 'tilt+' || action === 'tilt-') {
+    if (!JOINT_KINDS[jointKindOf(orient.joint)].tiltable) return fail('金屬角碼只有 90°，要傾斜請改用 3D 列印轉接座');
     // D4：繞接合線傾斜，15° 一格，範圍 ±60°。
     const cur = finiteNum(orient.tiltDeg) ? orient.tiltDeg : 0;
     const nv = cur + (action === 'tilt+' ? TILT_STEP_DEG : -TILT_STEP_DEG);
@@ -344,7 +354,7 @@ export function benchAdjust(comps, modules, moduleId, action, params) {
 }
 
 // 直角 ↔ 同平面。直角→同平面：宿主桿必須是有 at 的輸出端；同平面→直角：輸出端的 body 必須是桿。
-export function toggleAngle(comps, modules, moduleId, params, motorState) {
+export function toggleAngle(comps, modules, moduleId, params, motorState, opts = {}) {
   const list = asList(comps), modList = asList(modules);
   const fail = reason => ({ ok: false, comps: list, modules: modList, reason });
   const mod = modList.find(m => m && m.id === moduleId);
@@ -375,7 +385,7 @@ export function toggleAngle(comps, modules, moduleId, params, motorState) {
   const side = out.orthogonal && (out.orthogonal.side === 1 || out.orthogonal.side === -1) ? out.orthogonal.side : -1;
   const un = unmountModule(list, modList, moduleId, params, motorState);
   if (!un.ok) return fail(reasonText(un.reason));
-  const r = connect(un.comps, un.modules, moduleId, { module: host.id, port: `edge:${out.body.id}:${side > 0 ? 'L' : 'R'}` }, params, motorState);
+  const r = connect(un.comps, un.modules, moduleId, { module: host.id, port: `edge:${out.body.id}:${side > 0 ? 'L' : 'R'}` }, params, motorState, opts);
   if (!r.ok) return fail(r.reason);
   return r;
 }

@@ -20,6 +20,20 @@ export const ADAPTER_LAYER = 'ADAPTER_HOLE';
 const DEFAULT_WALL_MM = 4;
 const DEFAULT_HOLES_PER_FLANGE = 2;
 
+// E1：直角接合件的種類。printed＝3D 列印 L 形轉接座（孔距轉角＝壁厚＋(翼高−壁厚)/2＝9，用螺帽）；
+// bracket-m3＝現成不鏽鋼 M3 帶牙 L 角碼 13×9.5×7（厚 1.2、一腳一孔、孔心離腳端 3.5）：長腳貼宿主（孔離轉角 9.5）、
+// 短腳貼子模組底板（孔離轉角 6），M3×6 穿過 3 mm 木板直接鎖進角碼螺牙，不用螺帽。每處兩片並排，各在 s＝5、15 mm。
+export const JOINT_KINDS = {
+  printed: { label: '3D 列印轉接座', hostHoleMm: 9, childHoleMm: 9, count: 1, threaded: false, tiltable: true },
+  'bracket-m3': {
+    label: 'M3 帶牙金屬角碼 13×9.5×7', widthMm: 7, thicknessMm: 1.2, longLegMm: 13, shortLegMm: 9.5,
+    hostHoleMm: 9.5, childHoleMm: 6, count: 2, threaded: true, tiltable: false, screw: 'M3×6'
+  }
+};
+export const DEFAULT_JOINT_KIND = 'printed';
+// 讀出 joint 的種類 id（不認得的一律視為 printed，與舊存檔相容）。
+export const jointKindOf = joint => (joint && JOINT_KINDS[joint.kind] ? joint.kind : DEFAULT_JOINT_KIND);
+
 const finitePos = v => Number.isFinite(Number(v)) && Number(v) > 0;
 const r3 = v => Math.round(v * 1000) / 1000;
 
@@ -29,9 +43,12 @@ const r3 = v => Math.round(v * 1000) / 1000;
 export function adapterChildHoles({ base, orient, bar = null, stockMm = 3 }) {
   if (!base || !orient) return [];
   const joint = orient.joint || {};
+  const kind = jointKindOf(joint);
+  const bracket = kind !== 'printed';
   const wallMm = finitePos(joint.wallMm) ? Number(joint.wallMm) : DEFAULT_WALL_MM;
-  const n = Number.isInteger(joint.holesPerFlange) && joint.holesPerFlange > 0 ? joint.holesPerFlange : DEFAULT_HOLES_PER_FLANGE;
-  const flangeHole = wallMm + (ADAPTER_FLANGE_MM - wallMm) / 2;
+  const n = bracket ? JOINT_KINDS[kind].count : (Number.isInteger(joint.holesPerFlange) && joint.holesPerFlange > 0 ? joint.holesPerFlange : DEFAULT_HOLES_PER_FLANGE);
+  // 子模組端的孔離轉角：列印版＝翼孔距；角碼＝短腳孔距 6。
+  const flangeHole = bracket ? JOINT_KINDS[kind].childHoleMm : wallMm + (ADAPTER_FLANGE_MM - wallMm) / 2;
   const hostThickness = bar && finitePos(bar.stock && bar.stock.thicknessMm) ? Number(bar.stock.thicknessMm) : stockMm;
   const e = { x: Math.cos(orient.childAxisDeg * D2R), y: Math.sin(orient.childAxisDeg * D2R) };
   const f = { x: -e.y, y: e.x };
@@ -62,13 +79,17 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3 } 
   const bar = edge.compId ? list.find(c => c && c.id === edge.compId) : null;
 
   const joint = orient.joint || {};
+  const kind = jointKindOf(joint);
+  const bracket = kind !== 'printed';
+  const K = JOINT_KINDS[kind];
   const wallMm = finitePos(joint.wallMm) ? Number(joint.wallMm) : DEFAULT_WALL_MM;
-  const n = Number.isInteger(joint.holesPerFlange) && joint.holesPerFlange > 0 ? joint.holesPerFlange : DEFAULT_HOLES_PER_FLANGE;
+  const n = bracket ? K.count : (Number.isInteger(joint.holesPerFlange) && joint.holesPerFlange > 0 ? joint.holesPerFlange : DEFAULT_HOLES_PER_FLANGE);
   const lengthMm = ADAPTER_LENGTH_MM, flangeMm = ADAPTER_FLANGE_MM;
   const side = Number(orient.side) < 0 ? -1 : 1;
   const offsetMm = Number.isFinite(Number(orient.offsetMm)) ? Number(orient.offsetMm) : 0;   // 沿桿滑動（從桿中點起算）
-  // 翼孔距接合角＝壁厚＋(翼高−壁厚)/2（翼的外露段正中央）
-  const flangeHole = wallMm + (flangeMm - wallMm) / 2;
+  // 列印版：翼孔距接合角＝壁厚＋(翼高−壁厚)/2（翼的外露段正中央）＝9；角碼：長腳孔 9.5（宿主）、短腳孔 6（子模組）。
+  const flangeHole = bracket ? K.hostHoleMm : wallMm + (flangeMm - wallMm) / 2;
+  const childHole = bracket ? K.childHoleMm : flangeHole;
   const barWidth = bar ? memberStock(bar).widthMm : 0;
   const ss = Array.from({ length: n }, (_, k) => lengthMm * (k + 0.5) / n);
 
@@ -101,20 +122,21 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3 } 
     stand: orient.edge === 'child' ? { face: orient.face === -1 ? -1 : 1 } : null,   // D3：立在板面上（1＝上面、-1＝下面）
     hostModuleId: edge.frameModule || null,   // D2：宿主是已安裝模組的底板時為該模組 id，世界機架為 null
     childPart: `${moduleId}-frame`,
+    kind,
     lengthMm, wallMm, flangeMm,
     holeDiameterMm: ADAPTER_HOLE_MM,
     holesPerFlange: n,
     tiltDeg: Number(orient.tiltDeg) || 0,   // D4：兩翼夾角＝90°＋tiltDeg
     hostHoles,
-    childHoles: standing ? standHoles(list, modList, mod, params, edge, ss, flangeHole, stockMm) : adapterChildHoles({ base, orient, bar, stockMm })
+    childHoles: standing ? standHoles(list, modList, mod, params, edge, ss, childHole, stockMm) : adapterChildHoles({ base, orient, bar, stockMm })
   };
 }
 
 // D3：立在板面時子模組底板上的孔：離站立邊 flangeHole mm、沿邊位置與宿主孔對齊（frame.d 與宿主邊 d 可能反向）。
-function standHoles(list, modList, mod, params, edge, ss, flangeHole, stockMm) {
+function standHoles(list, modList, mod, params, edge, ss, childHole, stockMm) {
   // 用 home 姿態的宿主邊求 frame 即可：孔只和 base／e／f／d 的方向有關，不隨求解位姿變。
   const frame = orthogonalFrame(list, modList, mod.id, pointCoords(list), params, { home: true, stockMm });
-  return frame ? standChildHoles(frame, edge.d, ss, flangeHole) : [];
+  return frame ? standChildHoles(frame, edge.d, ss, childHole) : [];
 }
 
 // 全部直角模組的匯出附加資料：桿件孔（linkHoles）、三角板孔（plateHoles，世界座標＋板局部 u/v）、

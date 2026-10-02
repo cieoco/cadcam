@@ -102,7 +102,7 @@ function validateOrient(raw) {
   if (side !== 1 && side !== -1) return null;
   if (typeof raw.childAxisDeg === 'boolean' || raw.childAxisDeg === null || raw.childAxisDeg === '' || !isFiniteNum(raw.childAxisDeg)) return null;
   const joint = raw.joint;
-  if (!joint || typeof joint !== 'object' || joint.kind !== 'printed') return null;
+  if (!joint || typeof joint !== 'object' || (joint.kind !== 'printed' && joint.kind !== 'bracket-m3')) return null;   // E1：3D 列印轉接座或 M3 金屬角碼
   const clampNum = (v, lo, hi, dflt) => {
     if (v === null || v === '' || typeof v === 'boolean' || !isFiniteNum(v)) return dflt;
     return Math.min(hi, Math.max(lo, Number(v)));
@@ -130,7 +130,8 @@ function validateOrient(raw) {
     const tilt = Math.min(60, Math.max(-60, Math.round(Number(tv) / 15) * 15));
     if (tilt !== 0) out.tiltDeg = tilt;
   }
-  out.joint = { kind: 'printed', wallMm: clampNum(joint.wallMm, 1, 20, 4), holesPerFlange: holes };
+  // 角碼是現成零件，沒有壁厚／每翼孔數這些欄位，只留 kind。
+  out.joint = joint.kind === 'bracket-m3' ? { kind: 'bracket-m3' } : { kind: 'printed', wallMm: clampNum(joint.wallMm, 1, 20, 4), holesPerFlange: holes };
   return out;
 }
 

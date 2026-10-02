@@ -86,7 +86,7 @@ export function createBench(deps) {
       outName = o ? o.name : outName;
     }
     const o = mod.mount.orient;
-    const tilt = o && o.tiltDeg ? ` 傾斜 ${o.tiltDeg}°` : '';   // D4
+    const tilt = (o && o.tiltDeg ? ` 傾斜 ${o.tiltDeg}°` : '') + (o ? (o.joint && o.joint.kind === 'bracket-m3' ? '・角碼' : '・列印') : '');   // D4；E1：接合件
     if (o && o.edge === 'child') return `⟂ 立在 ${hostName}・${outName}（${o.face === -1 ? '下面' : '上面'}）${mod.mount.flip ? '（翻面）' : ''}${tilt}`;   // D3
     return `${o ? '⟂ 直角裝在' : '裝在'} ${hostName}・${outName}${mod.mount.flip ? '（翻面）' : ''}${tilt}`;
   }
@@ -542,7 +542,7 @@ export function createBench(deps) {
     const marker = all.find(m => m.key === portId) || all.find(m => m.portId === portId && m.compatible) || all.find(m => m.portId === portId);
     if (!marker) { say('找不到這個接口'); return false; }
     if (!marker.compatible) { say(marker.reason || '這個接口不能接'); return false; }
-    const r = Bench.connect(S.comps, S.modules, childId, { module: marker.module, port: marker.portId }, S.topo.params, motorState());
+    const r = Bench.connect(S.comps, S.modules, childId, { module: marker.module, port: marker.portId }, S.topo.params, motorState(), { joint: S.benchJoint });   // E1：用使用者最近選的接合件
     if (!r.ok) { say(r.reason || '接不上'); return false; }
     const preSnap = snapshotStr();
     const undoLen = S.undoStack.length;
@@ -595,7 +595,7 @@ export function createBench(deps) {
     if (!mod.mount) { say('這個模組還沒安裝，請先接到宿主上'); return false; }
     if (action === 'unmount' && st.preview) { cancelPreview(); return true; }
     let r;
-    if (action === 'angle') r = Bench.toggleAngle(S.comps, S.modules, id, S.topo.params, motorState());
+    if (action === 'angle') r = Bench.toggleAngle(S.comps, S.modules, id, S.topo.params, motorState(), { joint: S.benchJoint });
     else if (action === 'flip') {
       r = setMountFlip(S.comps, S.modules, id, !mod.mount.flip);
       if (!r.ok) r = { ...r, reason: opsReason(r.reason) };
@@ -604,6 +604,7 @@ export function createBench(deps) {
       if (!r.ok) r = { ...r, reason: opsReason(r.reason) };
     } else r = Bench.benchAdjust(S.comps, S.modules, id, action, S.topo.params);
     if (!r.ok) { say(r.reason || '這個動作現在不能用'); return false; }
+    if (action === 'joint:printed' || action === 'joint:bracket-m3') S.benchJoint = action.slice(6);   // E1：記住使用者的選擇，之後新接的也用它
     pushUndo();
     S.comps = r.comps; S.modules = r.modules;
     applyGhost();
@@ -612,6 +613,7 @@ export function createBench(deps) {
     const o = after && after.mount && after.mount.orient;
     let msg;
     if (action === 'slide+' || action === 'slide-') msg = `已沿邊滑動，位置 ${o && o.offsetMm ? (o.offsetMm > 0 ? '+' : '') + o.offsetMm : 0} mm`;
+    else if (action === 'joint:printed' || action === 'joint:bracket-m3') msg = action === 'joint:printed' ? '已改用 3D 列印轉接座（可以傾斜，要下載 STL 列印）' : '已改用 M3 金屬角碼（只有 90°，不用列印）';
     else if (action === 'tilt+' || action === 'tilt-') msg = o && o.tiltDeg ? `已傾斜 ${o.tiltDeg}°（兩翼夾角 ${90 + o.tiltDeg}°）` : '已回到直角（傾斜 0°）';
     else if (action === 'angle') msg = after && after.mount && after.mount.orient ? '已改成直角安裝（⟂）' : '已改成同平面安裝（═）';
     else if (action === 'flip') msg = after && after.mount && after.mount.flip ? '已翻面' : '已翻回';
@@ -716,7 +718,7 @@ export function createBench(deps) {
       mod && mod.id, mod && mod.name, mod ? statusOf(mod) : '', !!st.preview, st.showAll,
       shown.map(m => [m.key, m.compatible, m.suggested]),
       mod ? hasChildren(mod) : false,
-      mod && mod.mount ? ['adj', ['side', 'reverse', 'rotate', 'slide-', 'slide+', 'stand', 'face', 'tilt-', 'tilt+'].map(a => adjustState(mod, a).ok), !!mod.mount.orient, mod.mount.orient ? mod.mount.orient.edge : '', !!mod.mount.flip] : 0,
+      mod && mod.mount ? ['adj', ['side', 'reverse', 'rotate', 'slide-', 'slide+', 'stand', 'face', 'tilt-', 'tilt+'].map(a => adjustState(mod, a).ok), mod.mount.orient && mod.mount.orient.joint ? mod.mount.orient.joint.kind : '', !!mod.mount.orient, mod.mount.orient ? mod.mount.orient.edge : '', !!mod.mount.flip] : 0,
       st.msg
     ]);
     if (!force && sig === panelSig) return;
@@ -788,6 +790,21 @@ export function createBench(deps) {
     if (mod && mod.mount) {
       const sec = el('div', 'bench-section');
       sec.appendChild(el('div', 'bench-label', '調整'));
+      // E1：直角安裝的接合件（金屬角碼｜3D 列印）
+      if (mod.mount.orient) {
+        const cur = mod.mount.orient.joint && mod.mount.orient.joint.kind === 'bracket-m3' ? 'bracket-m3' : 'printed';
+        const seg = el('div', 'bench-seg');
+        seg.setAttribute('role', 'group');
+        seg.setAttribute('aria-label', '接合件');
+        seg.appendChild(el('span', 'bench-seg-label', '接合件：'));
+        [['bracket-m3', '🔩 金屬角碼'], ['printed', '🖨 3D 列印']].forEach(([kind, label]) => {
+          const b = bigBtn(label, () => adjust(`joint:${kind}`), 'bench-seg-btn' + (cur === kind ? ' is-on' : ''));
+          b.dataset.benchAction = `joint:${kind}`;
+          b.setAttribute('aria-pressed', cur === kind ? 'true' : 'false');
+          seg.appendChild(b);
+        });
+        sec.appendChild(seg);
+      }
       const grid = el('div', 'bench-grid');
       const standing = !!(mod.mount.orient && mod.mount.orient.edge === 'child');   // D3
       const defs = [

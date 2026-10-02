@@ -25,6 +25,7 @@ export const S = {
   modules: [],                                     // 作品的模組清單（SDD-ASSEMBLY-MODULES §3）
   assembly: null,                                  // 求解用的組合編譯結果，由 rebuild() 產生
   mode: 'design',                                  // 畫面模式：'design' 設計台（預設）／'bench' 組立台（不存檔；B3）
+  benchJoint: 'bracket-m3',                        // 直角接合件的預設種類：'bracket-m3' 金屬角碼／'printed' 3D 列印轉接座（不存檔；E1）
   viewPlane: null,                                 // 目前畫的平面：null＝主視圖，或直角安裝模組的 id（不存檔；O3）
 
   // ---- 選取 ----

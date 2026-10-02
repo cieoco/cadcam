@@ -251,7 +251,7 @@ export function mountModule(comps, modules, moduleId, target, params, motorState
 // { module, body, side }（組立台：宿主模組裡任一根桿的邊，side 為 1／-1；ref＝桿 p1 位置與 p1→p2 方向）；
 // { module, body, edge, side }（C1：三角板第 edge 條邊，side 取朝外那一側，ref＝邊起點與方向）；
 // { module, frame: { edge }, side }（C1：世界機架板外框第 edge 段直邊，ref＝外擴邊線起點與方向）。
-export function mountOrthogonal(comps, modules, moduleId, target, params, motorState) {
+export function mountOrthogonal(comps, modules, moduleId, target, params, motorState, opts = {}) {
   const list = Array.isArray(comps) ? comps : [];
   const modList = Array.isArray(modules) ? modules : [];
   const fail = reason => ({ ok: false, comps: list, modules: modList, reason });
@@ -345,7 +345,8 @@ export function mountOrthogonal(comps, modules, moduleId, target, params, motorS
         orient: {
           type: 'orthogonal', edge: 'host', side: sideOut, childAxisDeg,
           ...(offsetMm ? { offsetMm } : {}),
-          joint: { kind: 'printed', wallMm: 4, holesPerFlange: 2 }
+          // E1：接合件種類（opts.joint）；預設 3D 列印轉接座，角碼是現成零件不帶壁厚／孔數。
+          joint: opts && opts.joint === 'bracket-m3' ? { kind: 'bracket-m3' } : { kind: 'printed', wallMm: 4, holesPerFlange: 2 }
         }
       }
     }

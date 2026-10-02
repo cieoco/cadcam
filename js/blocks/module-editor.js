@@ -272,7 +272,7 @@ export function createModuleEditor(deps) {
   function mountOrthogonalTo(moduleId, outputId) {
     const selId = currentModuleId();
     if (!selId) { transient('請先選取要安裝的模組。'); return; }
-    applyResult(mountOrthogonal(S.comps, S.modules, selId, { module: moduleId, output: outputId }, S.topo.params, motorState()));
+    applyResult(mountOrthogonal(S.comps, S.modules, selId, { module: moduleId, output: outputId }, S.topo.params, motorState(), { joint: S.benchJoint }));   // E1：接合件用目前的預設
   }
   function unmount() {
     const modId = currentModuleId();
