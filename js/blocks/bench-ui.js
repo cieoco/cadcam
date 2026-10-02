@@ -143,7 +143,8 @@ export function createBench(deps) {
       if (fmod && fmod.mount && fmod.mount.orient) { keys.add(`${fmod.id}/*`); return; }
       const part = byName.get(n);
       if (!part) return;
-      if (part.kind === 'frame') { keys.add('frame'); return; }
+      // G1：同平面安裝的模組固定板（畫在它所在平面的場景）；世界機架板仍是 'frame'。
+      if (part.kind === 'frame') { keys.add(fmod ? `${part.plane ? part.plane + '/' : ''}modframe:${fmod.id}` : 'frame'); return; }
       const c = compById.get(part.compId);
       if (!c) return;
       const pre = part.plane ? `${part.plane}/` : '';
@@ -417,7 +418,7 @@ export function createBench(deps) {
     const mod = modOf(st.preview.moduleId);
     if (!mod || !mod.mount) return null;
     if (mod.mount.orient) return { prefix: mod.id };
-    const ids = new Set();
+    const ids = new Set([mod.id]);   // G1：模組固定板的 pickKey＝modframe:<模組 id>
     S.comps.filter(c => c.moduleId === mod.id).forEach(c => {
       ids.add(c.id);
       pointKeysFor(c).forEach(k => { if (c[k] && c[k].id) ids.add(c[k].id); });

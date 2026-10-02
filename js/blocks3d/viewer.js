@@ -345,6 +345,7 @@ export function createViewer(container) {
   };
   // MG995 標準伺服真實比例（mm）：本體 40×20×38、輸出軸距近端 10、舵盤 ⌀~20。
   const SERVO = { boxLen: 40, boxW: 20, boxThick: 38, hornR: 10, hornThick: 3, shaftInset: 10, gap: 1 };
+  const MODULE_PLATE_COLOR = '#6b7f95';   // G1：模組固定板（比世界機架板 #465568 淡一些、偏藍灰）
   const matCache = new Map(); // color -> material（避免每幀重建材質）
 
   function plateMaterial(color) {
@@ -515,6 +516,23 @@ export function createViewer(container) {
         const mesh=new THREE.Mesh(geo,plateMaterial(model.frame.color||'#465568')); mesh.position.z=model.frame.z; addPart(mesh,'frame');
       });
     }
+
+    // G1：已安裝模組的固定板（<id>-frame）：與世界機架板同一套擠出（外框＋圓孔＋MG995 開口），色調略不同；
+    // pickKey＝modframe:<模組 id>（直角子模組的子場景自動加 `${plane}/` 前綴）。z＝板底面（墊在該模組零件正下方）。
+    (model.modulePlates || []).forEach(pl => {
+      const outline = pl && pl.outline;
+      if (!Array.isArray(outline) || outline.length < 3) return;
+      const shape = new THREE.Shape(); shape.moveTo(outline[0].x, outline[0].y);
+      outline.slice(1).forEach(p => shape.lineTo(p.x, p.y)); shape.closePath();
+      (pl.holes || []).forEach(h => { const path = new THREE.Path(); path.absarc(h.x, h.y, Math.max(0.2, h.r), 0, Math.PI * 2, false); shape.holes.push(path); });
+      (pl.cutouts || []).forEach(c => {
+        const pts = c && c.points; if (!Array.isArray(pts) || pts.length < 3) return;
+        const path = new THREE.Path(); path.moveTo(pts[0].x, pts[0].y); pts.slice(1).forEach(p => path.lineTo(p.x, p.y)); path.closePath(); shape.holes.push(path);
+      });
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: pl.thicknessMm, bevelEnabled: false, curveSegments: 24 });
+      const mesh = new THREE.Mesh(geo, plateMaterial(MODULE_PLATE_COLOR)); mesh.position.z = pl.z;
+      addPart(mesh, `modframe:${pl.moduleId}`);
+    });
 
     // 桿件：擠出成扁板
     model.sticks.forEach(s => {
@@ -882,12 +900,18 @@ export function createViewer(container) {
     if (f) {
       if (!initialized) {
         controls.target.set(f.x, f.y, f.z);
-        // 計算整體 span（包括直角安裝子模組的轉換後邊界）
+        // 計算整體 span（包括直角安裝子模組的轉換後邊界與各模組固定板）
         let span = model.span;
+        const xs = [], ys = [];
+        const addPlates = (m, matrix) => (m.modulePlates || []).forEach(pl => (pl.outline || []).forEach(p => {
+          const t = matrix ? applyMatrix4(matrix, { x: p.x, y: p.y, z: Number.isFinite(pl.z) ? pl.z : 0 }) : p;
+          if (t && Number.isFinite(t.x) && Number.isFinite(t.y)) { xs.push(t.x); ys.push(t.y); }
+        }));
+        addPlates(model, null);   // G1：主平面上的模組固定板（含跟著滑台動的同平面模組）
         if (model.orthogonal && model.orthogonal.length > 0) {
-          const xs = [], ys = [];
           (model.orthogonal || []).forEach(child => {
             if (!child || !child.model || !Array.isArray(child.matrix) || child.matrix.length !== 16) return;
+            addPlates(child.model, child.matrix);
             // 從子模型蒐集所有點
             const collectPoints = (m) => {
               const pts = [];
@@ -919,13 +943,13 @@ export function createViewer(container) {
               if (Number.isFinite(t.x) && Number.isFinite(t.y)) { xs.push(t.x); ys.push(t.y); }
             });
           });
-          // 重新計算 span（只在有子模組時才做）
-          if (xs.length > 0 && ys.length > 0) {
-            const minX = Math.min(...xs), maxX = Math.max(...xs);
-            const minY = Math.min(...ys), maxY = Math.max(...ys);
-            const childSpan = Math.max(maxX - minX, maxY - minY, 1);
-            if (Number.isFinite(childSpan)) span = Math.max(Number.isFinite(span) ? span : 0, childSpan);
-          }
+        }
+        // 重新計算 span（有子模組或固定板時才做）
+        if (xs.length > 0 && ys.length > 0) {
+          const minX = Math.min(...xs), maxX = Math.max(...xs);
+          const minY = Math.min(...ys), maxY = Math.max(...ys);
+          const childSpan = Math.max(maxX - minX, maxY - minY, 1);
+          if (Number.isFinite(childSpan)) span = Math.max(Number.isFinite(span) ? span : 0, childSpan);
         }
         // 直向手機的水平視角較窄，初始距離需補償寬高比，否則兩側零件會被裁掉。
         const dist = Math.max(300, span * 2.2) / Math.min(1, camera.aspect);

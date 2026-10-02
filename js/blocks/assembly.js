@@ -869,3 +869,6 @@ export function moduleFrameNodes(entry, frameNodes) {
     ...bolts.map(b => ({ id: b.id, x: b.x, y: b.y, holeDiameterMm: b.diameter, holeLayer: 'MOUNT_BOLT' }))
   ];
 }
+
+// G1：已安裝模組固定板（<id>-frame）在目前位姿的幾何，給 3D／2D 畫（實作在 module-plates.js）。
+export { mountedFramePlates } from './module-plates.js';

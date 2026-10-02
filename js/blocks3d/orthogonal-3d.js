@@ -108,7 +108,8 @@ export function orthogonalModuleIds(modules) {
 // C1：宿主那一片（桿＝stick、三角板＝頂點相同的 plate、機架板＝model.frame）底面在宿主場景的 z；找不到回 0。
 // D2：已安裝模組的底板（<id>-frame）3D 裡沒有獨立的板：它墊在該模組所有零件的最下面，
 // 所以底面 z＝這個模組最低那一片的 z 再往下一個板厚。模組在這個場景裡找不到任何零件時回 null。
-export function moduleFrameZ(model, comps, moduleId) {
+// G1：模組零件在場景裡最低的 z（不含底板）；找不到零件回 null。
+export function moduleLowestZ(model, comps, moduleId) {
   if (!model || !Array.isArray(comps)) return null;
   const own = comps.filter(c => c && c.moduleId === moduleId);
   if (!own.length) return null;
@@ -120,9 +121,29 @@ export function moduleFrameZ(model, comps, moduleId) {
   take((model.gears || []).filter(q => ids.has(q.id)));
   take((model.racks || []).filter(q => ids.has(q.id)));
   take((model.plates || []).filter(q => Array.isArray(q.ids) && plateKeys.has([...q.ids].sort().join(','))));
-  if (!zs.length) return null;
+  return zs.length ? Math.min(...zs) : null;
+}
+
+export function moduleFrameZ(model, comps, moduleId) {
+  // G1：場景裡已經畫了這個模組的底板（model.modulePlates）就直接用它的底面 z。
+  const drawn = model && Array.isArray(model.modulePlates) ? model.modulePlates.find(p => p && p.moduleId === moduleId) : null;
+  if (drawn && Number.isFinite(drawn.z)) return drawn.z;
+  const low = moduleLowestZ(model, comps, moduleId);
+  if (low === null) return null;
   const t = Number.isFinite(model.plateThickness) ? model.plateThickness : 3;
-  return Math.min(...zs) - t;
+  return low - t;
+}
+
+// G1：把這個平面（plane＝null 為主平面）上已安裝模組的固定板放進場景模型（model.modulePlates）：
+// 板墊在該模組所有零件的正下面（頂面貼著最低那一片，底面 z＝最低零件 z − 板厚）。找不到零件的模組略過。
+// plates：mountedFramePlates 的結果（每片 { moduleId, plane, outline, holes, cutouts, thicknessMm }）。
+export function attachModulePlates(model, comps, plates, plane = null) {
+  if (!model) return model;
+  model.modulePlates = (Array.isArray(plates) ? plates : []).filter(p => p && (p.plane == null ? null : p.plane) === plane).map(p => {
+    const low = moduleLowestZ(model, comps, p.moduleId);
+    return low === null ? null : { ...p, z: low - p.thicknessMm };
+  }).filter(Boolean);
+  return model;
 }
 
 function hostBodyZ(model, edge, comps) {
@@ -155,7 +176,7 @@ function placeBox(matrix, zOffset, box, moduleId) {
   return { moduleId, center: c, axes: box.axes.map(rot), size: { ...box.size } };
 }
 
-export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, buildModel, asm = null, params, joint, stockMm = 3 }) {
+export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, buildModel, asm = null, params, joint, stockMm = 3, plates = [], plan = null }) {
   const ids = orthogonalModuleIds(modules);
   if (!ids.length) return [];
   const done = new Map();   // plane id -> { model, matrix } | null（null＝算不出，後代也略過）
@@ -173,12 +194,18 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
       if (host) {
         const zOffset = hostBodyZ(host.model, orthogonalHostEdge(comps, modules, mod.mount, inputs.pts, params, { asm }), comps);
         const model = buildModel(planeInputs(inputs, comps, modules, id));
+        // G1：這個平面上已安裝模組的固定板（含子模組自己的底板）；板要墊在零件正下面，所以 w 的起點改成板的底面。
+        attachModulePlates(model, comps, plates, id);
+        const lowest = Math.min(modelMinZ(model), ...model.modulePlates.map(p => p.z));
         // 子場景最低層貼在宿主桿側面（w≥0），不要穿進桿身。
-        // D3：立在板面上（edge 'child'）時底板正面本來就貼齊宿主的邊，不能再往外抬，否則板會懸空離開邊。
+        // D3：立在板面上（edge 'child'）時底板正面本來就貼齊宿主的邊，不能再往外抬，否則板會懸空離開邊；
+        //     但有畫底板時，底板（厚 T）正好佔 w∈[0,T]，零件疊在它上面，所以仍照最低點抬。
         const standing = mod.mount.orient.edge === 'child';
-        const wOffset = standing ? 0 : Math.max(0, -modelMinZ(model));
-        // F1：這個模組的金屬角碼方塊（主場景座標）；列印版接合沒有。
-        const brackets = bracketBoxes(comps, modules, id, inputs.pts, params, { stockMm, joint, asm }).map(b => placeBox(host.matrix, zOffset, b, id));
+        const wOffset = standing && !model.modulePlates.length ? 0 : Math.max(0, -lowest);
+        // F1／G1：這個模組的金屬角碼方塊（主場景座標）；列印版接合沒有。短腳貼在「畫出來的」底板朝宿主的那一面（w＝板底面）。
+        const own = model.modulePlates.find(p => p.moduleId === id);
+        const seatPlan = own ? { parts: [{ name: `${id}-frame`, zMm: own.z + wOffset }] } : plan;
+        const brackets = bracketBoxes(comps, modules, id, inputs.pts, params, { stockMm, joint, asm, plan: seatPlan }).map(b => placeBox(host.matrix, zOffset, b, id));
         result = { model, matrix: multiply4(host.matrix, orthogonalMatrix(frame, zOffset, wOffset)), brackets };
       }
     }

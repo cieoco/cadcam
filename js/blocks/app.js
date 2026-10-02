@@ -18,7 +18,7 @@ import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
 // computeBodyLayers：2D 疊放順序與 3D z 分層共用同一套，兩邊才一致。
 import { buildSceneModel, computeBodyLayers } from '../blocks3d/scene-model.js';
-import { buildOrthogonalChildren, planeInputs } from '../blocks3d/orthogonal-3d.js';   // O6：直角安裝子模組的 3D 位姿
+import { buildOrthogonalChildren, planeInputs, attachModulePlates } from '../blocks3d/orthogonal-3d.js';   // O6：直角安裝子模組的 3D 位姿
 // 純邏輯模組
 import * as View from './view.js';
 import * as Render from './render.js';   // SVG 繪製基元（純呈現）
@@ -58,7 +58,8 @@ import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualH
 import { drawCam as renderCam, drawWorkpiece as renderWorkpiece } from './special-part-render.js';
 import { drawPlate as renderPlate } from './plate-render.js';
 import { buildMotorMounts as planMotorMounts, computeMotorRotDeg as planMotorRotDeg, motorAssemblyLayerForBody } from './motor-mounts.js';
-import { drawFrameGeometry as renderFrameGeometry, drawMotorMountHoles as renderMotorMountHoles } from './motor-frame-render.js';
+import { drawFrameGeometry as renderFrameGeometry, drawMotorMountHoles as renderMotorMountHoles, drawModulePlates as renderModulePlates } from './motor-frame-render.js';
+import { createModulePlateSource } from './module-plates.js';   // G1：已安裝模組的固定板（<id>-frame）3D／2D
 import { collectSceneIds, prepareRenderScene } from './render-scene.js';
 import { buildPreviewModelInputs } from './preview-model-inputs.js';
 import { renderLinks, renderNodes } from './mechanism-layer-render.js';
@@ -1133,6 +1134,7 @@ const PART_DRAW = {
 };
 
 function draw() {
+  syncModulePlates();   // G1：作品內容變了才讓固定板 home 幾何作廢（θ 不算內容）
   validateViewPlane();
   const planeHint = document.getElementById('viewPlaneHint');
   if (planeHint) {
@@ -1201,6 +1203,11 @@ function draw() {
   const frameGeometry2d = S.viewPlane ? null : Exporters.inspectFrameExport(
     frameConnectorNodes(), Settings.exportSettings(), splitFrameMounts(mountSplit2d.free, S.comps, S.modules).world);
   drawGround(frameGeometry2d);
+  // G1：已安裝模組的固定板：主視圖畫同平面（plane null）的，「編輯這個模組」平面視圖畫該平面的；在所有零件之下，播放時跟著模組動。
+  if (S.modules.some(m => m && m.mount)) {
+    const platesNow = P => modulePlates.at(P, () => motorFrameExportMounts({ pts: pointCoords(), motorCenterIds: allModelMotorIds, motorMounts })).filter(pl => (pl.plane || null) === (S.viewPlane || null));
+    renderModulePlates({ plates: platesNow(allPts), svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), getPlates: platesNow, registerUpdate: fn => frameUpdaters.push(fn) });
+  }
   const renderScene = prepareRenderScene({
     compiled: viewCompiled, comps: vComps, points: pts, frameGeometry: frameGeometry2d, sceneIds,
     computeBodyLayers, motorAssemblyLayerForBody, motorMounts
@@ -1534,14 +1541,17 @@ function push3D() {
     if(g.outlines.length) plateGeometries[key]={outline:g.outlines[0],holes:g.holes,cutouts:g.cutouts||[]};
   });
   const baseOpts = { hullR: HULL_R_WORLD, plateGeometries, barGeometries, memberStocks };
+  // G1：已安裝模組的固定板（目前位姿）；主平面的放進主場景，直角子平面的由 buildOrthogonalChildren 放進各自的子場景。
+  const plates = modulePlates.at(geomPts, homeMountsNow);
   const model = buildSceneModel(links, pts, {
     ...baseOpts, groundIds, motorCenters: motorCenterIds, motorTypes, motorMounts,
     polygons, sliders, gears, racks, cams, pulleys, belts, frameGeometry
   });
+  attachModulePlates(model, S.comps, plates, null);
   if (allPlanes) {
     // 直角安裝的子模組：在自己的平面建場景（沒有世界機架），再以 4x4 立起來掛在宿主工具上。
     model.orthogonal = buildOrthogonalChildren({
-      comps: S.comps, modules: S.modules, inputs: allPlanes, mainModel: model, asm: S.assembly, params: S.topo.params,
+      comps: S.comps, modules: S.modules, inputs: allPlanes, mainModel: model, asm: S.assembly, params: S.topo.params, plates, plan: modulePlates.plan(),
       joint: jointSettingsNow(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) > 0 ? Number(S.fabrication.cnc.stockThicknessMm) : FABRICATION_DEFAULTS.cnc.stockThicknessMm,
       buildModel: inp => buildSceneModel(inp.links, inp.pts, {
         ...baseOpts, groundIds: inp.groundIds, motorCenters: inp.motorCenterIds, motorTypes: inp.motorTypes,
@@ -2186,6 +2196,21 @@ function orthoExtrasNow() {
 }
 // F1：作品目前的直角接合件設定（預設接合件種類與角碼規格）。
 function jointSettingsNow() { return S.fabrication?.joint || FABRICATION_DEFAULTS.joint; }
+// G1：作品內容的結構鍵（零件＋模組＋參數（不含 θ）＋加工／匯出設定）；沒有已安裝模組時不算。
+function syncModulePlates() {
+  if (!S.modules.some(m => m && m.mount)) { modulePlates.sync(''); return; }
+  const { theta, ...params } = S.topo.params || {};
+  modulePlates.sync(JSON.stringify([S.comps, S.modules, params, S.fabrication, Settings.exportSettings()]));
+}
+// G1：已安裝模組固定板的快取來源（home 幾何只在 draw() 重建時重算，播放每幀只做剛體變換）。
+const modulePlates = createModulePlateSource(() => {
+  const stockMm = Number(S.fabrication?.cnc?.stockThicknessMm) > 0 ? Number(S.fabrication.cnc.stockThicknessMm) : FABRICATION_DEFAULTS.cnc.stockThicknessMm;
+  const exportSettings = Settings.exportSettings();
+  return {
+    comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings, joint: jointSettingsNow(), stockMm,
+    planArgs: { comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings, cnc: S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc, extras: orthoExtrasNow(), joint: jointSettingsNow() }
+  };
+});
 // O4b：下載每個直角安裝的 3D 列印轉接座 STL（L 形，孔位與木板上的 ADAPTER_HOLE 對應）。
 function downloadAdapterStl() {
   const all = (orthoExtrasNow().adapters || []);

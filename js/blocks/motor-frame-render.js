@@ -29,6 +29,28 @@ export function drawFrameGeometry({ nodes, frameGeometry, svg, project, drawBase
   });
 }
 
+// G1：已安裝模組的固定板（<id>-frame）外框與開口，畫法同世界機架板但更淡（填色更亮、描邊更細），在零件之下。
+// plates：mountedFramePlates 的結果（已依目前視圖平面過濾）；getPlates(P)：播放時用新的點表重算（板跟著模組動）。
+export function drawModulePlates({ plates, svg, project, getPlates, registerUpdate }) {
+  const layer = svgEl('g'); layer.style.pointerEvents = 'none'; layer.setAttribute('data-module-plates', '1');
+  svg.appendChild(layer);
+  const poly = (points, fill, stroke, width) => {
+    const el = svgEl('polygon');
+    el.setAttribute('points', points.map(point => { const p = project(point); return `${p.x},${p.y}`; }).join(' '));
+    el.setAttribute('fill', fill); el.setAttribute('stroke', stroke); el.setAttribute('stroke-width', width); el.setAttribute('stroke-linejoin', 'round');
+    return el;
+  };
+  const render = list => {
+    while (layer.firstChild) layer.removeChild(layer.firstChild);
+    (list || []).forEach(pl => {
+      (pl.outlines || [pl.outline]).forEach(o => { if (Array.isArray(o) && o.length >= 3) layer.appendChild(poly(o, '#f5f8fc', '#d3dae4', 1.5)); });
+      (pl.cutouts || []).forEach(c => { if (Array.isArray(c.points) && c.points.length >= 3) layer.appendChild(poly(c.points, '#fbfcfe', '#d3dae4', 1.5)); });
+    });
+  };
+  render(plates);
+  if (registerUpdate && getPlates) registerUpdate(P => render(getPlates(P)));
+}
+
 export function drawMotorMountHoles({ motorIds, motorMounts, points, svg, scale, project, motorTypeForCenter, rotationForCenter, ttSettings, mg995Settings, mg995SlotOutline, registerUpdate }) {
   const layer = svgEl('g'); layer.style.pointerEvents = 'none'; svg.appendChild(layer);
   const addHole = (group, xMm, yMm, diameterMm, attrs = {}) => {

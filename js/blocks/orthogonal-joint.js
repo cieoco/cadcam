@@ -209,7 +209,9 @@ export function withWorldAdapterNodes(nodes, extras) {
 // 座標：宿主平面 mm，與 orthogonalFrame 同一套（origin＋s·d＋w·m＋t·n）；板厚方向的 z 以宿主板底面為 0，
 // 3D 端再加上宿主本體的 z。每塊 { center, axes:[d, m, n]（單位向量）, size:{ x:沿 d, y:沿 m, z:沿 n } }。
 // 宿主面：站立（D3）時板面就是 t＝0；一般安裝時 n 朝上（+z）則板面在板厚 T 處、朝下則在 0（子模組長向宿主的那一側）。
-export function bracketBoxes(comps, modules, moduleId, points, params, { stockMm = 3, joint: jointSettings, asm = null } = {}) {
+// G1：plan（buildPlan 的結果）給了就取子模組底板（<id>-frame）在子疊層的 zMm，短腳改貼在板的「朝宿主那一面」（w＝zMm），
+// 兩腳在這個內轉角相接、整片角碼沿 m 跟著挪；沒給 plan 時底板在第 0 層（zMm＝0）。
+export function bracketBoxes(comps, modules, moduleId, points, params, { stockMm = 3, joint: jointSettings, asm = null, plan = null } = {}) {
   const list = Array.isArray(comps) ? comps : [];
   const modList = Array.isArray(modules) ? modules : [];
   const mod = modList.find(m => m && m.id === moduleId);
@@ -229,13 +231,15 @@ export function bracketBoxes(comps, modules, moduleId, points, params, { stockMm
   const at = (s, w, t) => ({ x: origin.x + s * d.x + w * m.x + t * n.x, y: origin.y + s * d.y + w * m.y + t * n.y, z: origin.z + s * d.z + w * m.z + t * n.z });
   const axes = [{ ...d }, { ...m }, { ...n }];
   const count = K.count;
+  const plate = plan && Array.isArray(plan.parts) ? plan.parts.find(p => p && p.name === `${moduleId}-frame`) : null;
+  const w0 = plate && Number.isFinite(Number(plate.zMm)) ? Number(plate.zMm) : 0;   // 底板朝宿主那一面的疊層高度（沿 m）
   const out = [];
   for (let k = 0; k < count; k++) {
     const s = ADAPTER_LENGTH_MM * (k + 0.5) / count;
-    // 長腳：貼宿主板面（t 從 tFace 起、厚 thicknessMm），沿 −m 從轉角伸 longLegMm。
-    out.push({ center: at(s, -K.longLegMm / 2, tFace + K.thicknessMm / 2), axes, size: { x: K.widthMm, y: K.longLegMm, z: K.thicknessMm } });
-    // 短腳：貼子模組底板朝宿主的那一面（w 從 −thicknessMm 到 0），沿 n 離開宿主面 shortLegMm。
-    out.push({ center: at(s, -K.thicknessMm / 2, tFace + K.shortLegMm / 2), axes, size: { x: K.widthMm, y: K.thicknessMm, z: K.shortLegMm } });
+    // 長腳：貼宿主板面（t 從 tFace 起、厚 thicknessMm），沿 −m 從轉角（w＝w0）伸 longLegMm。
+    out.push({ center: at(s, w0 - K.longLegMm / 2, tFace + K.thicknessMm / 2), axes, size: { x: K.widthMm, y: K.longLegMm, z: K.thicknessMm } });
+    // 短腳：平貼子模組底板朝宿主的那一面（w 從 w0−thicknessMm 到 w0；與板中面相距 板厚/2＋角碼厚/2），沿 n 離開宿主面 shortLegMm。
+    out.push({ center: at(s, w0 - K.thicknessMm / 2, tFace + K.shortLegMm / 2), axes, size: { x: K.widthMm, y: K.thicknessMm, z: K.shortLegMm } });
   }
   return out;
 }
