@@ -498,12 +498,15 @@ export function createBench(deps) {
       cancelPreview({ silent: true });
       const v = viewer();
       if (v) { v.setMarkers([]); v.setPreviewGhost(null); v.setPickEnabled(true); }
+      const prevFocus = S.designFocus;
+      if (st.selected && modOf(st.selected)) S.designFocus = st.selected;   // H1：設計模式聚焦組立台選的模組，沒選就維持原本的分頁
       S.mode = 'design';
       resetLive(); clearTimeline();
       delete document.body.dataset.mode;
       st.snapId = null;
       syncModeButtons();
       if (!st.wasIn3D) await set3D(false);
+      if (deps.enterDesign) deps.enterDesign(prevFocus !== S.designFocus);
     }
   }
   function syncModeButtons() {

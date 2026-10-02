@@ -64,6 +64,9 @@ export function createModuleEditor(deps) {
   } = deps;
   // 切換視圖平面（id＝直角安裝模組；null＝主視圖）；由 app.js 注入，這裡不碰繪圖內部。
   const setViewPlane = deps.setViewPlane || (() => {});
+  // H1：設計模式一次只看一個設計。插入／存成模組後把焦點切到新模組（先 focusModule 指定、rebuild/draw 之後再 fitToFocus 置中）。
+  const focusModule = deps.focusModule || (() => {});
+  const fitToFocus = deps.fitToFocus || (() => {});
 
   // 依零件 type 設定選取欄位（沒有注入 deps.select 時的預設行為）。
   function defaultSelect(comp) {
@@ -217,8 +220,10 @@ export function createModuleEditor(deps) {
     S.counter = r.counter;
     const root = r.modules.find(m => !m.mount) || r.modules[0];
     const target = root && r.comps.find(c => c.moduleId === root.id && (c.type === 'bar' || c.type === 'triangle' || c.type === 'gear' || c.type === 'slider'));
+    if (root) focusModule(root.id);   // H1：先切到新積木的分頁，上一個設計就從畫面消失
     if (target) select(target);
     rebuild(); draw();
+    if (root) fitToFocus();
     transient(`已加入組合積木「${template.name}」`);
   }
   function insertTemplate(template) {
@@ -239,8 +244,10 @@ export function createModuleEditor(deps) {
     S.modules = [...S.modules, r.module];
     S.counter = r.counter;
     const target = r.comps.find(c => c.type === 'bar' || c.type === 'triangle' || c.type === 'gear' || c.type === 'slider');
+    focusModule(r.module.id);   // H1：先切到新模組的分頁，上一個設計就從畫面消失
     if (target) select(target);
     rebuild(); draw();
+    fitToFocus();
     transient(`已加入模組「${r.module.name}」，可在模組面板安裝或調整。`);
   }
   function insertBuiltin(id) { insertTemplate(builtinTemplate(id)); }
@@ -251,7 +258,11 @@ export function createModuleEditor(deps) {
     const compId = selectedCompId();
     if (!compId) return;
     const name = `模組 ${S.modules.length + 1}`;
-    applyResult(createModule(S.comps, S.modules, compId, name));
+    const before = new Set(S.modules.map(m => m.id));
+    if (applyResult(createModule(S.comps, S.modules, compId, name))) {
+      const made = S.modules.find(m => !before.has(m.id));
+      if (made) { focusModule(made.id); fitToFocus(); }   // H1：存成模組後切到它的分頁
+    }
   }
   function rename(name) {
     const modId = currentModuleId();

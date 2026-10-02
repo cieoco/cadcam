@@ -269,6 +269,25 @@
       .len-editor .le-row, .role-editor .re-row { align-items: center; }
     }
 
+
+    /* ---- 設計分頁列（H1）：設計模式一次只看一個設計，分頁列蓋在舞台最上緣；組立模式隱藏 ---- */
+    .design-tabs { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; gap: 6px; align-items: stretch;
+      padding: 6px 8px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+      background: rgba(246,248,251,0.96); border-bottom: 1px solid #d8dee6; }
+    .design-tab { flex: 0 0 auto; min-height: 44px; padding: 4px 14px; border: 2px solid #c9d6e6; border-radius: 10px; background: #fff; color: #34495e;
+      font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.2; white-space: nowrap; }
+    .design-tab.active { background: #2c5282; border-color: #2c5282; color: #fff; }
+    .design-tab-hint { font-size: 11px; font-weight: 700; color: #7b5ea7; }
+    .design-tab.active .design-tab-hint { color: #e3d7f5; }
+    .design-tab-new { border-style: dashed; color: #117a45; border-color: #9dddb8; background: #f1faf5; }
+    body[data-mode="bench"] .design-tabs { display: none !important; }
+    body:not([data-mode="bench"]) .view3d-hint { margin-top: 52px; }
+    .has-design-tabs .mode-banner { margin-top: 56px; }
+    .has-design-tabs .work-range-card { margin-top: 56px; }
+    @media (min-width: 1100px) {
+      .design-tabs { right: 320px; }
+    }
+
     /* ---- 組立台（B3～B5）：頂端模式切換、模組清單、接法面板 ---- */
     .mode-switch { display: flex; flex: 0 0 auto; margin-left: 12px; border: 2px solid #c9d6e6; border-radius: 12px; overflow: hidden; background: #fff; }
     .mode-seg { min-width: 92px; min-height: 44px; padding: 0 14px; border: 0; background: #fff; color: #5b6b7b; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; }
@@ -660,7 +679,8 @@
       </div>
     </div>
 
-    <div class="canvas-wrap canvas-area">
+    <div class="canvas-wrap canvas-area has-design-tabs">
+      <div class="design-tabs" id="designTabs" aria-label="設計分頁"></div>
       <svg id="stageSvg" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="hint" id="hint">
         <span class="desktop-hint">選🔵連桿，從起點拖到終點放開<br>靠近既有孔會直接接上</span>
@@ -1072,13 +1092,15 @@
       "./js/blocks/module-plates.js": "./js/blocks/module-plates.js?v=20261003_g1",
       "./js/blocks/motor-frame-render.js": "./js/blocks/motor-frame-render.js?v=20261003_g1",
       "./js/blocks/assembly.js": "./js/blocks/assembly.js?v=20261003_g1",
+      "./js/blocks/design-focus.js": "./js/blocks/design-focus.js?v=20261003_h1",
+      "./js/blocks/design-tabs-ui.js": "./js/blocks/design-tabs-ui.js?v=20261003_h1",
       "./js/blocks/tools.js": "./js/blocks/tools.js?v=20260930_m1b3",
       "./js/blocks/input.js": "./js/blocks/input.js?v=20260930_b2",
-      "./js/blocks/state.js": "./js/blocks/state.js?v=20261002_f1",
+      "./js/blocks/state.js": "./js/blocks/state.js?v=20261003_h1",
       "./js/blocks/panels.js": "./js/blocks/panels.js?v=20260930_p1",
-      "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=20261002_f1",
+      "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=20261003_h1",
       "./js/blocks/motor-tools.js": "./js/blocks/motor-tools.js?v=20261001_l1",
-      "./js/blocks/bench-ui.js": "./js/blocks/bench-ui.js?v=20261003_g1",
+      "./js/blocks/bench-ui.js": "./js/blocks/bench-ui.js?v=20261003_h1",
       "./js/blocks/bench.js": "./js/blocks/bench.js?v=20261002_f1",
       "./js/blocks/module-ops.js": "./js/blocks/module-ops.js?v=20261002_e1",
       "./js/blocks/module-schema.js": "./js/blocks/module-schema.js?v=20261002_e1",
@@ -1087,6 +1109,6 @@
       "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261003_g2"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20261003_g2"></script>
+  <script type="module" src="js/blocks/app.js?v=20261003_h1"></script>
 </body>
 </html>

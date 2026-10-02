@@ -31,6 +31,8 @@ import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示�
 import * as Motion from './motion.js';
 import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostEdge, hostPlateThickness } from './assembly.js';
 import { normalizeModules } from './module-schema.js';
+import { designTabs, resolveFocus, compsInFocus, assignNewComps, pointIdsOf, focusInputs, ROOT_TAB } from './design-focus.js';   // H1：設計模式一次只看一個設計（分頁）
+import { createDesignTabs } from './design-tabs-ui.js';
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
 import { drawMemberDimensions } from './member-dimension-render.js';
@@ -147,6 +149,8 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   Settings.syncFabricationInputs(); // 放棄尚未 change/blur 提交的表單草稿。
   S.comps = norm.comps;
   S.modules = Array.isArray(norm.modules) ? norm.modules : [];
+  knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組
+  if (source !== 'undo') S.designFocus = source === 'local-autosave' ? savedFocus() : null;   // 開檔／範例／分享 → 第一頁；自動還原 → 回到上次那頁
   S.topo = { params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '' };
   manualTrace = {};
   S.counter = Math.max(norm.counter || 0, Store.highestIdNum(S.comps));
@@ -243,13 +247,53 @@ const displayCoords = () => {
 const ORTHO_STACK_MM = 15;            // 側影帶的疊層高度（先固定 15 mm）
 const HOST_BAND_MM = 3;               // 子視圖裡宿主側影帶的厚度
 const hasOrthogonalModules = () => S.modules.some(m => m.mount && m.mount.orient);
-// 目前平面的零件；沒有直角安裝時原樣回 S.comps（零行為改變）。
+// ---- 設計模式的焦點分頁（H1）：設計模式一次只畫／只編一個設計，組立模式才全部顯示 ----
+const inDesign = () => S.mode === 'design';
+const focusOpts = () => ({ keepRoot: S.designFocus === ROOT_TAB });   // 剛按「新設計」時，空的「未命名設計」分頁要留著
+const focusModule = () => inDesign() ? (S.modules.find(m => m.id === S.designFocus) || null) : null;
+const FOCUS_KEY = 'cadcam.blocks.designFocus';   // 只記在這個瀏覽器：重新整理後回到同一頁（不進作品檔）
+function saveFocus() { try { localStorage.setItem(FOCUS_KEY, String(S.designFocus)); } catch (_) {} }
+function savedFocus() { try { return localStorage.getItem(FOCUS_KEY); } catch (_) { return null; } }
+// 上一次 rebuild 時的零件 id 集合：用來認出「這次新畫的零件」。載入／復原／清空時設 null，避免把還原的零件誤判成新零件。
+let knownCompIds = null;
+// 焦點是模組時，新畫（沒有 moduleId）的零件歸到那個模組。就地改原零件物件，保留各處持有的參照。
+function adoptNewComps() {
+  const ids = new Set(S.comps.map(c => c.id));
+  if (knownCompIds && inDesign() && S.designFocus !== ROOT_TAB && S.modules.some(m => m.id === S.designFocus)) {
+    const next = assignNewComps(S.comps, knownCompIds, S.designFocus);
+    if (next !== S.comps) next.forEach((c, i) => { if (c !== S.comps[i]) S.comps[i].moduleId = c.moduleId; });
+  }
+  knownCompIds = ids;
+}
+// 目前畫面要處理的零件：設計模式＝焦點分頁；組立模式＝目前平面（O3）。沒有模組／直角安裝時原樣回 S.comps（零行為改變）。
 function viewComps() {
+  if (inDesign() && S.modules.length) return compsInFocus(S.comps, S.modules, S.designFocus);
   return hasOrthogonalModules() ? compsInPlane(S.comps, S.modules, S.viewPlane) : S.comps;
 }
-// 目前平面用到的點 id；沒有直角安裝時回 null（代表全部）。
+// 目前畫面用到的點 id；沒有模組／直角安裝時回 null（代表全部）。
 function viewPointIds() {
+  if (inDesign() && S.modules.length) return pointIdsOf(viewComps());
   return hasOrthogonalModules() ? pointIdsInPlane(S.comps, S.modules, S.viewPlane) : null;
+}
+// 畫面用的機架固定銷：設計模式只算焦點分頁自己的（已安裝模組的底座由 drawModulePlates 畫）。
+function viewFrameNodes() {
+  return inDesign() && S.modules.length ? Model.frameConnectorNodes(worldFrameComps(viewComps(), S.modules)) : frameConnectorNodes();
+}
+// 馬達安裝孔位只留畫面上的馬達。
+function viewMounts(list) {
+  const ids = inDesign() && S.modules.length ? viewPointIds() : null;
+  return ids ? list.filter(m => ids.has(m.pointId)) : list;
+}
+// 焦點分頁擁有的馬達編號（設計模式只列這些）；組立模式／沒有模組＝全部。
+function designMotorIds() {
+  const all = usedMotorIds();
+  if (!(inDesign() && S.modules.length)) return all;
+  const own = new Set();
+  viewComps().forEach(c => [c, c.p1, c.p2, c.p3].forEach(o => {
+    const v = o && (o.physicalMotor || o.physical_motor);
+    if (v) own.add(String(v));
+  }));
+  return own;
 }
 function filterToView(map, ids = viewPointIds()) {
   if (!ids) return map;
@@ -257,33 +301,83 @@ function filterToView(map, ids = viewPointIds()) {
   for (const id in map) if (ids.has(id)) out[id] = map[id];
   return out;
 }
-// 模組已不存在或不再是直角安裝 → 回主視圖。
+// 設計模式：焦點要是現有的分頁，並把 S.viewPlane 對齊焦點模組所在的平面（直角子模組在自己的平面正視）。
+// 組立模式：模組已不存在或不再是直角安裝 → 回主視圖。
 function validateViewPlane() {
+  if (inDesign()) {
+    S.designFocus = resolveFocus(S.comps, S.modules, S.designFocus, focusOpts());
+    const mod = focusModule();
+    S.viewPlane = mod ? planeOf(S.comps, S.modules, mod.id) : null;
+    return;
+  }
   if (S.viewPlane && planeOf(S.comps, S.modules, S.viewPlane) !== S.viewPlane) S.viewPlane = null;
 }
+function clearSelectionAndEditors() {
+  S.selectedLinkId = S.selectedTriangleId = S.selectedSliderId = S.selectedNodeId = null;
+  deselectGear();
+  closeMobileEditPanel();
+  ['lenEditor', 'roleEditor', 'servoEditor', 'strokeEditor'].forEach(id2 => { const el = document.getElementById(id2); if (el) el.style.display = 'none'; });
+  const baseBtn = document.getElementById('sliderBaseBtn'); if (baseBtn) baseBtn.style.display = 'none';
+  const railBtn = document.getElementById('linkToRailBtn'); if (railBtn) railBtn.style.display = 'none';
+  setSliderDetailRows(false);
+}
+// 切換設計分頁：收掉畫圖工具、取消選取、馬達改成這頁的、置中。keepSelection＝保留現有選取（插入模組後選到新零件）。
+function setDesignFocus(id, { fit = true, keepSelection = false } = {}) {
+  S.designFocus = id;
+  saveFocus();
+  if (!inDesign()) return;
+  pause();
+  Tools.exitDrawLink(); Tools.exitDrawTriangle(); Tools.exitDrawPolygon();
+  cancelMotorMode();
+  validateViewPlane();
+  if (!keepSelection) clearSelectionAndEditors();
+  reconcileMotorState();
+  const thetaEl = document.getElementById('thetaVal');
+  if (thetaEl) thetaEl.textContent = Math.round(norm360(S.theta));
+  if (fit) fitView(); else draw();
+}
+// 預先指定焦點（插入模組時：資料還沒 rebuild，先不畫）；真正的繪製由呼叫端接著做。
+function presetDesignFocus(id) {
+  if (!inDesign()) return;
+  S.designFocus = id;
+  saveFocus();
+}
+// 「＋ 新設計」：沒有根零件就直接給一張空白畫布；已有根零件要先存成模組。
+function newDesign() {
+  const hasRootParts = compsInFocus(S.comps, S.modules, ROOT_TAB).length > 0;
+  setDesignFocus(ROOT_TAB);   // 先切換（會收掉畫圖工具與橫幅），再顯示提示
+  if (hasRootParts) transient('先把『未命名設計』存成模組（選取零件 → 🧩 存成模組），再開新設計');
+}
+const designTabsUi = createDesignTabs({
+  el: () => document.getElementById('designTabs'),
+  tabs: () => designTabs(S.comps, S.modules, focusOpts()),
+  focus: () => S.designFocus,
+  active: inDesign,
+  onFocus: id => setDesignFocus(id),
+  onNew: newDesign
+});
 function setViewPlane(id) {
+  if (inDesign()) {
+    // 設計模式沒有「平面」切換，只有分頁：進入某直角模組的平面＝聚焦那個模組；回主視圖＝聚焦它的宿主。
+    const mod = focusModule();
+    const host = mod && mod.mount && mod.mount.orient ? mod.mount.to.module : null;
+    setDesignFocus(id || host || S.designFocus);
+    return;
+  }
   const next = id || null;
   S.viewPlane = next;
   validateViewPlane();
   // 選取的零件若不在新平面就取消選取，避免面板指著看不到的零件。
   const selMod = selectionModule(S.comps, { linkId: S.selectedLinkId, triangleId: S.selectedTriangleId, sliderId: S.selectedSliderId, gearId: S.selectedGearId, nodeId: S.selectedNodeId });
   const hasSel = S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.selectedGearId || S.selectedNodeId;
-  if (hasSel && planeOf(S.comps, S.modules, selMod) !== S.viewPlane) {
-    S.selectedLinkId = S.selectedTriangleId = S.selectedSliderId = S.selectedNodeId = null;
-    deselectGear();
-    closeMobileEditPanel();
-    ['lenEditor', 'roleEditor'].forEach(id2 => { const el = document.getElementById(id2); if (el) el.style.display = 'none'; });
-    const baseBtn = document.getElementById('sliderBaseBtn'); if (baseBtn) baseBtn.style.display = 'none';
-    const railBtn = document.getElementById('linkToRailBtn'); if (railBtn) railBtn.style.display = 'none';
-    setSliderDetailRows(false);
-  }
+  if (hasSel && planeOf(S.comps, S.modules, selMod) !== S.viewPlane) clearSelectionAndEditors();
   draw();
   fitView();
 }
 // 目前視圖要畫的側影帶。compute(P) 以點表 P 重算多邊形（播放每幀更新用）；無法算出回 null。
 function viewBands(pts) {
   const bands = [];
-  if (!pts || !hasOrthogonalModules()) return bands;
+  if (!pts || !hasOrthogonalModules() || inDesign()) return bands;   // 設計模式只畫焦點分頁，不畫側影帶
   S.modules.forEach(M => {
     const orient = M.mount && M.mount.orient;
     if (!orient) return;
@@ -601,7 +695,9 @@ const moduleEditor = createModuleEditor({
   loadLibraryText: () => { try { return localStorage.getItem('cadcam.blocks.moduleLibrary'); } catch (_) { return null; } },
   saveLibraryText: text => { try { localStorage.setItem('cadcam.blocks.moduleLibrary', text); } catch (_) {} },
   select: (...a) => selectModuleTarget(...a),   // 延遲取用：selectLink 在後面才定義
-  setViewPlane: id => setViewPlane(id)
+  setViewPlane: id => setViewPlane(id),
+  focusModule: id => presetDesignFocus(id),   // H1：插入模組後設計模式切到新模組的分頁
+  fitToFocus: () => { validateViewPlane(); reconcileMotorState(); fitView(); }   // 新焦點的馬達清單也要跟著換
 });
 // ---- 組立台（SDD-ASSEMBLY-BENCH B3～B5）：邏輯在 ./bench-ui.js；這裡只提供狀態與 3D 的接線 ----
 // 取消預覽時還原到接上前的快照；undoLen 之後（預覽與預覽中的調整）累積的復原紀錄一併丟掉。
@@ -622,6 +718,8 @@ const bench = createBench({
   motorState: () => ({ activeMotor: String(S.activeMotor), theta: S.theta, motorAngles: S.motorAngles }),
   snapshotStr, restoreSnapshot: restoreBenchSnapshot, scheduleAutosave,
   getViewer: () => viewer3D, is3DActive: () => view3DActive, set3D, push3D: () => push3D(),
+  // H1：組立 → 設計：焦點換成組立台選的模組（沒有就維持原本的分頁）。
+  enterDesign: changed => { validateViewPlane(); reconcileMotorState(); saveFocus(); if (changed) fitView(); else draw(); },
   // B6：即時干涉用——目前作品的檢查參數（含各馬達行程），以及全行程時間軸點擊後把全部馬達設到指定角度。
   interferenceArgs: () => {
     const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
@@ -654,7 +752,7 @@ function selectModuleTarget(comp) {
 // 不是獨立物件，只是把散落的固定銷當成一組——拖機架把手時整組一起平移。
 // 點 key 的掃描集中在 model.js（依 part-types 表），app 只負責把結果畫出來。
 // 世界機架排除已安裝模組零件（SDD-ASSEMBLY-MODULES §4.2）：否則拖機架會把裝在宿主上的模組底座一起搬走。
-function frameNodeIds() { return Model.frameNodeIds(worldFrameComps(S.comps, S.modules)); }
+function frameNodeIds() { return Model.frameNodeIds(worldFrameComps(inDesign() && S.modules.length ? viewComps() : S.comps, S.modules)); }   // 設計模式只動焦點分頁自己的固定銷
 // 機架上各固定銷的座標（固定點不隨求解移動，直接用元件座標）。x 排序方便連線。
 function frameNodes() { return Model.frameNodes(worldFrameComps(S.comps, S.modules)); }
 // 機架「視覺」用的固定銷：排除滑塊自己的 rail 端點（p1/p2），保留 mount 點（m1/m2）。
@@ -666,6 +764,7 @@ function frameConnectorNodes() { return Model.frameConnectorNodes(worldFrameComp
 
 function rebuild() {
   syncSliderGeometries();
+  adoptNewComps();               // H1：焦點是模組時，新畫的零件歸到那個模組
   // 模組正規化：清掉零件已被刪光的模組、失效的輸出與安裝（只取 modules，comps 仍用 S.comps 原參照）。
   if (S.modules.length) {
     const nm = normalizeModules(S.modules, S.comps);
@@ -706,6 +805,12 @@ function reconcileMotorState() {
   used.forEach(id => {
     if (id !== String(S.activeMotor) && S.motorAngles[id] === undefined) S.motorAngles[id] = 0;
   });
+  // H1：設計模式只提供焦點分頁自己的馬達；控制中的不在其中就換成這頁的第一顆。
+  const own = designMotorIds();
+  if (own.size && !own.has(String(S.activeMotor))) {
+    const first = [...own].sort((a, b) => Number(a) - Number(b))[0];
+    activateMotor(first, Number(S.motorAngles[first]) || 0);
+  }
   updateMotorSwitcher();
 }
 
@@ -713,7 +818,7 @@ function reconcileMotorState() {
 function updateMotorSwitcher() {
   const box = document.getElementById('motorSwitch');
   if (!box) return;
-  const ids = [...usedMotorIds()].sort((a, b) => Number(a) - Number(b));
+  const ids = [...designMotorIds()].sort((a, b) => Number(a) - Number(b));
   if (ids.length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
   box.style.display = 'flex';
   box.innerHTML = '';
@@ -751,7 +856,7 @@ function getTrajectoryData() {
   // 快取鍵＝結構版本號 geomVersion，取代每幀 JSON.stringify 整份快照（零件多時字串化本身會變慢）。
   // 軌跡只取決於 S.compiled 與 traceIds，兩者都只在 rebuild / 切換軌跡點變動、那兩處都會 +1，
   // 故版本號是完整且正確的失效訊號。多馬達後軌跡還取決於「掃哪顆馬達＋其他馬達凍在哪」，一併入鍵。
-  const motorKey = String(S.activeMotor) + '|' + JSON.stringify(S.motorAngles) + '|' + (S.viewPlane || '') + '|' + ids.join(',');
+  const motorKey = String(S.activeMotor) + '|' + JSON.stringify(S.motorAngles) + '|' + (inDesign() ? 'f:' + S.designFocus : (S.viewPlane || '')) + '|' + ids.join(',');
   if (trajectoryCache && trajectoryCache.version === geomVersion && trajectoryCache.motorKey === motorKey) return trajectoryCache.data;
   // 伺服與線性致動器只在自己的有限行程內運動；量測不應誤把不存在的整圈算進去。
   const range = inputRockRange();
@@ -1136,6 +1241,8 @@ const PART_DRAW = {
 function draw() {
   syncModulePlates();   // G1：作品內容變了才讓固定板 home 幾何作廢（θ 不算內容）
   validateViewPlane();
+  designTabsUi.render();   // H1：設計分頁列
+  document.getElementById('hint').style.display = viewComps().length ? 'none' : 'block';   // 焦點分頁是空的也要提示
   const planeHint = document.getElementById('viewPlaneHint');
   if (planeHint) {
     const viewMod = S.viewPlane ? S.modules.find(m => m.id === S.viewPlane) : null;
@@ -1201,11 +1308,11 @@ function draw() {
   const mountSplit2d = Exporters.splitMountsByHost(S.comps,
     motorFrameExportMounts({ pts: allPts, motorCenterIds: allModelMotorIds, motorMounts }));
   const frameGeometry2d = S.viewPlane ? null : Exporters.inspectFrameExport(
-    frameConnectorNodes(), Settings.exportSettings(), splitFrameMounts(mountSplit2d.free, S.comps, S.modules).world);
+    viewFrameNodes(), Settings.exportSettings(), viewMounts(splitFrameMounts(mountSplit2d.free, S.comps, S.modules).world));
   drawGround(frameGeometry2d);
   // G1：已安裝模組的固定板：主視圖畫同平面（plane null）的，「編輯這個模組」平面視圖畫該平面的；在所有零件之下，播放時跟著模組動。
   if (S.modules.some(m => m && m.mount)) {
-    const platesNow = P => modulePlates.at(P, () => motorFrameExportMounts({ pts: pointCoords(), motorCenterIds: allModelMotorIds, motorMounts })).filter(pl => (pl.plane || null) === (S.viewPlane || null));
+    const platesNow = P => modulePlates.at(P, () => motorFrameExportMounts({ pts: pointCoords(), motorCenterIds: allModelMotorIds, motorMounts })).filter(pl => (pl.plane || null) === (S.viewPlane || null) && (!inDesign() || pl.moduleId === S.designFocus));   // 設計模式只畫焦點模組自己的底板
     renderModulePlates({ plates: platesNow(allPts), svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), getPlates: platesNow, registerUpdate: fn => frameUpdaters.push(fn) });
   }
   const renderScene = prepareRenderScene({
@@ -1249,7 +1356,7 @@ function draw() {
   // 注意：馬達記在「節點」上（point.type='motor'），曲柄那根桿的 isInput 通常仍是 false，
   // 光靠 !c.isInput 排不掉曲柄。改用 input_crank 步驟算出曲柄動端，明確把曲柄那根桿排除。
   // 多馬達：標籤加編號（M1/M2…），控制中的那顆用醒目色，一眼看出現在在動誰。
-  const multiMotor = usedMotorIds().size > 1;
+  const multiMotor = designMotorIds().size > 1;
   const motorIdForCenter = (nodeId) => {
     for (const c of S.comps) {
       for (const k of ['p1', 'p2', 'p3']) {
@@ -1390,7 +1497,7 @@ function draw() {
     sliderBodyLength, rackBodyHeight, rackPhaseShift, pulleyRadius, pulleyPinRadius
   });
   // O6：有直角安裝時另備一份「全平面」輸入（3D 預覽依平面各建場景、再把子平面立起來）。
-  lastModelInputsAll = !hasOrthogonalModules() ? null : buildPreviewModelInputs({
+  lastModelInputsAll = !(hasOrthogonalModules() || (inDesign() && vIds)) ? null : buildPreviewModelInputs({   // 設計模式的 3D 也要全域輸入，再依焦點過濾
     comps: S.comps, params: S.topo.params, theta: S.theta,
     links: [...(S.compiled.visualization.links || [])].sort((a, b) => (a.style === 'crank' ? 1 : 0) - (b.style === 'crank' ? 1 : 0)),
     points: allPts, groundIds: sceneIdsAll.groundIds, motorCenterIds: allModelMotorIds, motorTypes, motorMounts,
@@ -1495,11 +1602,13 @@ function renderFrame() {
 function push3D() {
   if (!viewer3D || !lastModelInputs) return;
   // 有直角安裝時，主平面場景只用主平面的輸入；其餘平面由 buildOrthogonalChildren 另建並立起來。
-  const allPlanes = hasOrthogonalModules() && lastModelInputsAll ? lastModelInputsAll : null;
-  const planesApi = allPlanes ? planeInputs(allPlanes, S.comps, S.modules, null) : lastModelInputs;
+  // H1：設計模式的 3D 只畫焦點分頁（直角子模組在自己的平面平放，不立起來）；組立模式照舊畫全部。
+  const designView = inDesign() && S.modules.length && lastModelInputsAll;
+  const allPlanes = !designView && hasOrthogonalModules() && lastModelInputsAll ? lastModelInputsAll : null;
+  const planesApi = designView ? focusInputs(lastModelInputsAll, viewComps()) : allPlanes ? planeInputs(allPlanes, S.comps, S.modules, null) : lastModelInputs;
   const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = planesApi;
   const mountSplit3d=Exporters.splitMountsByHost(S.comps,motorFrameExportMounts());
-  const frameGeometry=Exporters.inspectFrameExport(frameConnectorNodes(),Settings.exportSettings(),splitFrameMounts(mountSplit3d.free,S.comps,S.modules).world);
+  const frameGeometry=designView && S.viewPlane ? null : Exporters.inspectFrameExport(designView ? viewFrameNodes() : frameConnectorNodes(),Settings.exportSettings(),designView ? viewMounts(splitFrameMounts(mountSplit3d.free,S.comps,S.modules).world) : splitFrameMounts(mountSplit3d.free,S.comps,S.modules).world);
   // 三點桿板形：3D 直接沿用 2D/DXF 共用的 createPlateGeometry 外形（含 shapeMode——
   // 包絡板/多邊形板/折線桿——與 vertices 順序），孔位與加工輸出一致，三視圖不分歧。
   // 以孔序字串為鍵，供 scene-model 對應到各片板；找不到原 comp 的純視覺 polygon 退回夾爪近似。
@@ -1544,12 +1653,12 @@ function push3D() {
   });
   const baseOpts = { hullR: HULL_R_WORLD, plateGeometries, barGeometries, memberStocks };
   // G1：已安裝模組的固定板（目前位姿）；主平面的放進主場景，直角子平面的由 buildOrthogonalChildren 放進各自的子場景。
-  const plates = modulePlates.at(geomPts, homeMountsNow);
+  const plates = modulePlates.at(designView ? lastModelInputsAll.pts : geomPts, homeMountsNow).filter(pl => !designView || pl.moduleId === S.designFocus);
   const model = buildSceneModel(links, pts, {
     ...baseOpts, groundIds, motorCenters: motorCenterIds, motorTypes, motorMounts,
     polygons, sliders, gears, racks, cams, pulleys, belts, frameGeometry
   });
-  attachModulePlates(model, S.comps, plates, null);
+  attachModulePlates(model, S.comps, plates, designView ? (S.viewPlane || null) : null);
   if (allPlanes) {
     // 直角安裝的子模組：在自己的平面建場景（沒有世界機架），再以 4x4 立起來掛在宿主工具上。
     model.orthogonal = buildOrthogonalChildren({
@@ -1651,9 +1760,10 @@ async function toggle3D() {
 // 沒有足夠固定銷時，退回 render.js 的飄浮地面基線（純繪圖基元）。
 function drawGround(frameGeometry) {
   if (S.viewPlane) return;   // 子平面沒有世界機架
-  const nodes = frameConnectorNodes();
+  if (focusModule()?.mount) return;   // 已安裝模組的底座由 drawModulePlates 畫，沒有世界機架
+  const nodes = viewFrameNodes();
   const fg = frameGeometry || Exporters.inspectFrameExport(nodes, Settings.exportSettings(),
-    splitFrameMounts(Exporters.splitMountsByHost(S.comps, motorFrameExportMounts()).free, S.comps, S.modules).world);
+    viewMounts(splitFrameMounts(Exporters.splitMountsByHost(S.comps, motorFrameExportMounts()).free, S.comps, S.modules).world));
   renderFrameGeometry({ nodes, frameGeometry: fg, svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), drawBaseline: () => Render.drawGroundBaseline() });
 }
 
@@ -1712,7 +1822,7 @@ function changeFrameGround(kind, delta) {
 // 機架移動把手：固定銷形心放一顆「🏠 機架」鈕，拖它＝把所有固定銷整組平移。
 function drawFrameHandle() {
   if (S.viewPlane) return;
-  const nodes = frameConnectorNodes();
+  const nodes = viewFrameNodes();
   if (nodes.length < 2) return;
   const cx = nodes.reduce((s, p) => s + p.x, 0) / nodes.length;
   const cy = nodes.reduce((s, p) => s + p.y, 0) / nodes.length;
@@ -1760,6 +1870,7 @@ function clearAll() {
   pushUndo();
   pause();
   S.comps = []; S.theta = 0; S.counter = 0;
+  knownCompIds = null; S.designFocus = ROOT_TAB;
   S.activeMotor = '1'; S.motorAngles = {};
   S.selectedLinkId = null;
   S.selectedTriangleId = null;
@@ -2486,8 +2597,16 @@ function init() {
   syncFrameOptionButtons();
 }
 
-window.blocks = { setViewPlane, setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample };
+window.blocks = { setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample };
 window.blocks.changeFrameGround = changeFrameGround;
+// H1 除錯／測試：設計模式目前看得到的零件與點（畫面實際畫的那一份）。
+window.blocks.designDebug = () => ({
+  mode: S.mode, focus: S.designFocus, viewPlane: S.viewPlane,
+  comps: viewComps().map(c => c.id),
+  points: Object.keys(lastFramePts || {}),
+  hidden: S.comps.filter(c => !viewComps().includes(c)).map(c => c.id),
+  motors: [...designMotorIds()]
+});
 Object.assign(window.blocks, {
   setTriSide: memberEditor.selectDimension,
   setMemberDimension: memberEditor.setValue,
