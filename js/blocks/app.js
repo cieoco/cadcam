@@ -135,7 +135,7 @@ function undo() {
 }
 function scheduleAutosave() {
   clearTimeout(S.autosaveTimer);
-  S.autosaveTimer = setTimeout(() => Store.saveLocal(Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState())), 500);
+  S.autosaveTimer = setTimeout(() => Store.saveLocal(bench.autosaveSnapshot() || Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState())), 500);
 }
 
 // 套用一份 snapshot 到目前狀態。recordUndo 預設 true（外部開檔/分享要能 undo）。
@@ -619,7 +619,7 @@ const bench = createBench({
   saveComposite: id => moduleEditor.saveCompositeToLibrary(id),   // B7
   exportComposite: id => moduleEditor.exportComposite(id),
   motorState: () => ({ activeMotor: String(S.activeMotor), theta: S.theta, motorAngles: S.motorAngles }),
-  snapshotStr, restoreSnapshot: restoreBenchSnapshot,
+  snapshotStr, restoreSnapshot: restoreBenchSnapshot, scheduleAutosave,
   getViewer: () => viewer3D, is3DActive: () => view3DActive, set3D, push3D: () => push3D(),
   // B6：即時干涉用——目前作品的檢查參數（含各馬達行程），以及全行程時間軸點擊後把全部馬達設到指定角度。
   interferenceArgs: () => {

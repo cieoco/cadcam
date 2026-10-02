@@ -98,10 +98,10 @@ export function createBench(deps) {
   const tl = { result: null, ranges: null, key: '', summary: [], ms: 0 };
   let liveBox = null;
 
-  // 作品內容的便宜結構鍵：零件＋模組＋參數（theta 是姿勢不是作品內容，排除）。
+  // 作品內容的便宜結構鍵：零件＋模組＋參數＋加工設定（theta 是姿勢不是作品內容，排除）。
   function workKey() {
     const { theta, ...params } = S.topo.params || {};
-    return JSON.stringify([S.comps, S.modules, params]);
+    return JSON.stringify([S.comps, S.modules, params, S.fabrication]);
   }
   function ensurePlan() {
     const key = workKey();
@@ -560,6 +560,7 @@ export function createBench(deps) {
     if (!st.preview) { say('目前沒有要接上的預覽'); return false; }
     const mod = modOf(st.preview.moduleId);
     st.preview = null;
+    deps.scheduleAutosave?.();   // 預覽期間只保存確認前的作品；接上後才保存新接法。
     applyGhost();
     drawMarkers();
     say(`已接上「${mod ? displayName(mod.id) : ''}」`);
@@ -998,6 +999,7 @@ export function createBench(deps) {
 
   syncModeButtons();
   return {
+    autosaveSnapshot: () => st.preview ? JSON.parse(st.preview.preSnap) : null,
     setMode, select, pickPort, commit, cancel: () => cancelPreview(), adjust, syncUI, afterScene, debug,
     liveCheck: () => liveCheck(true), runTimeline, jumpTo,
     setShowAll(on) { st.showAll = !!on; syncUI(true); drawMarkers(); }

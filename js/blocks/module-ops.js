@@ -9,6 +9,7 @@ import { pointKeysFor } from './part-types.js';
 import { normalizeSnapshot } from './schema.js';
 import { normalizeModules, sanitizeName } from './module-schema.js';
 import { BLOCK_EXAMPLES } from './examples.js';
+import { ADAPTER_LENGTH_MM } from './orthogonal-joint.js';
 
 const clone = v => JSON.parse(JSON.stringify(v));
 
@@ -327,6 +328,13 @@ export function mountOrthogonal(comps, modules, moduleId, target, params, motorS
   const cx = cnt ? sx / cnt : basePos.x, cy = cnt ? sy / cnt : basePos.y;
   const childAxisDeg = Math.round(Math.atan2(cy - basePos.y, cx - basePos.x) * 180 / Math.PI * 10) / 10;
 
+  // 轉接座從邊中點往正向占一整段；短邊初裝也要套用滑動時的邊界。
+  const mountTo = (byBody || byFrame) ? to : { module: target.module, output: target.output };
+  const mounted = modList.map(m => m.id === moduleId ? { ...m, mount: { to: mountTo } } : m);
+  const hostEdge = orthogonalHostEdge(list, mounted, { to: mountTo, orient: { side: sideOut } }, sol.points, params);
+  if (!hostEdge || hostEdge.lengthMm < ADAPTER_LENGTH_MM) return fail('short-edge');
+  const offsetMm = Math.min(0, Math.floor((hostEdge.lengthMm / 2 - ADAPTER_LENGTH_MM) * 10) / 10);
+
   const newModules = modList.map(m => m.id === moduleId
     ? {
       ...m,
@@ -336,6 +344,7 @@ export function mountOrthogonal(comps, modules, moduleId, target, params, motorS
         home: {},
         orient: {
           type: 'orthogonal', edge: 'host', side: sideOut, childAxisDeg,
+          ...(offsetMm ? { offsetMm } : {}),
           joint: { kind: 'printed', wallMm: 4, holesPerFlange: 2 }
         }
       }

@@ -212,6 +212,7 @@ export function canConnect(comps, modules, childId, target, params) {
 
 // module-ops 回傳的原因代碼 → 白話。
 const OPS_REASONS = {
+  'short-edge': '這條邊太短，放不下轉接座',
   unsolved: '目前的姿勢解不出來，請先讓機構能動',
   'no-position': '算不出接合位置',
   'no-ref-pose': '算不出宿主的位姿',
