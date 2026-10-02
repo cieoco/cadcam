@@ -105,10 +105,32 @@ export function orthogonalModuleIds(modules) {
  *          巢狀（孫模組裝在子模組上）時矩陣已逐層相乘，全部相對於主場景。
  */
 // C1：宿主那一片（桿＝stick、三角板＝頂點相同的 plate、機架板＝model.frame）底面在宿主場景的 z；找不到回 0。
+// D2：已安裝模組的底板（<id>-frame）3D 裡沒有獨立的板：它墊在該模組所有零件的最下面，
+// 所以底面 z＝這個模組最低那一片的 z 再往下一個板厚。模組在這個場景裡找不到任何零件時回 null。
+export function moduleFrameZ(model, comps, moduleId) {
+  if (!model || !Array.isArray(comps)) return null;
+  const own = comps.filter(c => c && c.moduleId === moduleId);
+  if (!own.length) return null;
+  const ids = new Set(own.map(c => c.id));
+  const plateKeys = new Set(own.filter(c => c.type === 'triangle' && c.p1 && c.p2 && c.p3).map(c => [c.p1.id, c.p2.id, c.p3.id].sort().join(',')));
+  const zs = [];
+  const take = list => (list || []).forEach(q => { if (q && Number.isFinite(q.z)) zs.push(q.z); });
+  take((model.sticks || []).filter(q => ids.has(q.id)));
+  take((model.gears || []).filter(q => ids.has(q.id)));
+  take((model.racks || []).filter(q => ids.has(q.id)));
+  take((model.plates || []).filter(q => Array.isArray(q.ids) && plateKeys.has([...q.ids].sort().join(','))));
+  if (!zs.length) return null;
+  const t = Number.isFinite(model.plateThickness) ? model.plateThickness : 3;
+  return Math.min(...zs) - t;
+}
+
 function hostBodyZ(model, edge, comps) {
   if (!edge || !model) return 0;
   const fin = v => Number.isFinite(v) ? v : 0;
-  if (edge.kind === 'frame') return fin(model.frame && model.frame.z);
+  if (edge.kind === 'frame') {
+    const own = edge.frameModule ? moduleFrameZ(model, comps, edge.frameModule) : null;
+    return own !== null ? own : fin(model.frame && model.frame.z);
+  }
   const stick = (model.sticks || []).find(s => s.id === edge.compId);
   if (stick) return fin(stick.z);
   const c = comps.find(x => x && x.id === edge.compId);
@@ -120,7 +142,7 @@ function hostBodyZ(model, edge, comps) {
   return 0;
 }
 
-export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, buildModel }) {
+export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, buildModel, asm = null, params }) {
   const ids = orthogonalModuleIds(modules);
   if (!ids.length) return [];
   const done = new Map();   // plane id -> { model, matrix } | null（null＝算不出，後代也略過）
@@ -131,15 +153,17 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
     trail.add(id);
     let result = null;
     const mod = modules.find(m => m.id === id);
-    const frame = orthogonalFrame(comps, modules, id, inputs.pts);
+    const frame = orthogonalFrame(comps, modules, id, inputs.pts, params, { asm });
     if (mod && frame) {
       const hostPlane = planeOf(comps, modules, mod.mount.to.module);
       const host = hostPlane === null ? done.get(null) : solve(hostPlane, trail);
       if (host) {
-        const zOffset = hostBodyZ(host.model, orthogonalHostEdge(comps, modules, mod.mount, inputs.pts), comps);
+        const zOffset = hostBodyZ(host.model, orthogonalHostEdge(comps, modules, mod.mount, inputs.pts, params, { asm }), comps);
         const model = buildModel(planeInputs(inputs, comps, modules, id));
         // 子場景最低層貼在宿主桿側面（w≥0），不要穿進桿身。
-        const wOffset = Math.max(0, -modelMinZ(model));
+        // D3：立在板面上（edge 'child'）時底板正面本來就貼齊宿主的邊，不能再往外抬，否則板會懸空離開邊。
+        const standing = mod.mount.orient.edge === 'child';
+        const wOffset = standing ? 0 : Math.max(0, -modelMinZ(model));
         result = { model, matrix: multiply4(host.matrix, orthogonalMatrix(frame, zOffset, wOffset)) };
       }
     }

@@ -8,11 +8,11 @@
  *   - motor-body：MG995 機身穿過底板往後伸，撞到該高度範圍（mm）內的零件。
  * L6：疊層改用 mm 高度（plan.parts[].zMm），隔圈（plan.gaps）拉開層間距離；resolveSpacers 自動加隔圈，
  * suggestRackStops 建議齒條長槽限位。
- * cross-plane：直角安裝的子模組以「側影帶」（沿接合軸的範圍 × 疊層高度）加上它在宿主法向的高度範圍，
- *   檢查宿主平面上、高度重疊的零件（宿主桿本身不算）。
+ * cross-plane（D4）：直角安裝的子模組拆成「底板」與「其餘零件」兩塊立體板塊，各自的 8 個角投影到宿主平面取凸包，
+ *   並用角的高度區間，檢查宿主平面上、多邊形與高度都重疊的零件（宿主那一片本身不算）。
  * 平面近似（桿＝膠囊、齒輪＝圓、機架板＝凸包），仍需實物確認。
  */
-import { compileAssembly, solveAssembly, moduleFrameExports, moduleFrameNodes, worldFrameComps, splitFrameMounts, planeOf, orthogonalFrame, orthogonalBand, orthogonalHostEdge } from './assembly.js';
+import { compileAssembly, solveAssembly, moduleFrameExports, moduleFrameNodes, worldFrameComps, splitFrameMounts, planeOf, orthogonalFrame, orthogonalHostEdge, slabCorners3D } from './assembly.js';
 import { frameConnectorNodes } from './model.js';
 import { inspectFrameExport, inspectRackExport, splitMountsByHost, motorMountFeatures, isStaticPlate } from './exporters.js';
 import { jawCenterline } from './plate-geometry.js';
@@ -35,8 +35,6 @@ const NUT_FIX_MM = 5;            // 螺帽側建議隔圈
 const CIRCLE_SEGMENTS = 24;
 const CAP_SEGMENTS = 8;
 const POINT_KEYS = ['p1', 'p2', 'p3', 'm1', 'm2'];
-const CROSS_PAD_MM = 10;         // 跨平面：子模組零件在宿主法向的半寬容許（板寬的一半）
-const DEFAULT_STACK_MM = 9;      // 子模組疊層高度的後備值
 
 const finite = v => Number.isFinite(Number(v));
 const validPt = p => p && finite(p.x) && finite(p.y);
@@ -496,46 +494,78 @@ function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], 
       });
     });
 
-    // 4. 跨平面：直角安裝的子模組（側影帶＋高度範圍）vs 宿主平面上的零件
+    // 4. 跨平面（D4）：直角安裝的子模組拆成兩塊立體板塊——
+    //    P＝底板（外框範圍 × 底板厚）、S＝其餘零件（各零件多邊形的 s、t 範圍 × 這些零件的整段疊層高度）。
+    //    每塊的 8 個角經 3D 座標系投影到宿主平面取凸包（XY），再用角的 z 區間（宿主本體底面＝0）
+    //    與宿主平面上的零件比較：多邊形重疊（SAT）且高度區間重疊才算撞；宿主那一片不算。
     orthoMods.forEach(M => {
       const host = modById.get(M.mount.to && M.mount.to.module);
       // C1：宿主可以是桿、三角板或機架板（機架板的零件名為 'frame'）；宿主那一片不算撞。
-      const hostEdge = host ? orthogonalHostEdge(list, modList, M.mount, pose.points) : null;
+      const frameOpts = { asm, exportSettings: exp };   // 與零件多邊形（匯出外框）用同一套匯出設定，站立邊才對得上
+      const hostEdge = host ? orthogonalHostEdge(list, modList, M.mount, pose.points, params, frameOpts) : null;
       const bodyPart = hostEdge ? parts.find(p => p.name === hostEdge.partName) : null;
       if (!bodyPart) return;
       const hostPlane = planeOf(list, modList, host.id);
+      const frame = orthogonalFrame(list, modList, M.id, pose.points, params, frameOpts);
+      if (!frame) return;
       const childParts = parts.filter(p => p.plane === M.id);
-      const H = childParts.length ? Math.max(...childParts.map(p => zOf(p) + p.thicknessMm)) : DEFAULT_STACK_MM;
-      const band = orthogonalBand(list, modList, M.id, pose.points, H);
-      const frame = orthogonalFrame(list, modList, M.id, pose.points);
-      if (!band || !frame) return;
-      // 子模組各點在宿主法向上的高度（原點＝宿主桿底面）
-      let zMin = Infinity, zMax = -Infinity;
-      const seenPt = new Set();
-      list.forEach(c => {
-        if (c.moduleId !== M.id) return;
-        POINT_KEYS.forEach(k => {
-          const pt = c[k];
-          if (!pt || !pt.id || seenPt.has(pt.id)) return;
-          seenPt.add(pt.id);
-          const sp = pose.points[pt.id];
-          if (!validPt(sp)) return;
-          const t = (sp.x - frame.base.x) * frame.f.x + (sp.y - frame.base.y) * frame.f.y;
-          const z = t * frame.n.z;
-          if (z < zMin) zMin = z;
-          if (z > zMax) zMax = z;
+      const frameName = `${M.id}-frame`;
+      const standing = M.mount.orient.edge === 'child';
+      // 一組零件 → 板塊：多邊形頂點在子模組座標的 s、t 範圍＋疊層高度 w 範圍（flip 已反映在 plan 的 zMm）。
+      const slabOf = group => {
+        let smin = Infinity, smax = -Infinity, tmin = Infinity, tmax = -Infinity, w0 = Infinity, w1 = -Infinity;
+        group.forEach(part => {
+          let any = false;
+          partPolys(pose, part).forEach(poly => poly.forEach(p => {
+            if (!validPt(p)) return;
+            const s = (p.x - frame.base.x) * frame.e.x + (p.y - frame.base.y) * frame.e.y;
+            const t = (p.x - frame.base.x) * frame.f.x + (p.y - frame.base.y) * frame.f.y;
+            if (s < smin) smin = s;
+            if (s > smax) smax = s;
+            if (t < tmin) tmin = t;
+            if (t > tmax) tmax = t;
+            any = true;
+          }));
+          if (!any) return;
+          w0 = Math.min(w0, zOf(part));
+          w1 = Math.max(w1, zOf(part) + part.thicknessMm);
         });
-      });
-      if (!Number.isFinite(zMin)) return;
-      const z0 = zMin - CROSS_PAD_MM, z1 = zMax + CROSS_PAD_MM;
+        if (!Number.isFinite(smin) || !(w1 > w0)) return null;
+        // 立在宿主板面上（edge 'child'）：t＝0 就是站立邊（貼在宿主板面）。邊以下（t<0）的部分——外框估計比站立邊多出的邊緣、
+        // 或齒輪等零件垂到站立邊以下——已在宿主板的邊緣之外，不拿來和宿主下面幾層的零件比（限制：這種垂下去的真撞擊會漏報）。
+        if (standing) tmin = Math.min(Math.max(tmin, 0), tmax);
+        const corners = slabCorners3D(frame, { smin, smax, tmin, tmax }, w0, w1);
+        const zs = corners.map(c => c.z);
+        return { corners, hull: convexHull(corners.map(c => ({ x: c.x, y: c.y }))), z0: Math.min(...zs), z1: Math.max(...zs) };
+      };
+      // 板塊在高度區間 [za, zb] 內的 XY 投影凸包：長方體是凸的，所以取「落在區間內的角」加上「12 條邊與 z＝za、z＝zb 的交點」
+      // 的凸包就是準確的截面投影。沒傾斜時邊不是垂直就是水平，結果與整塊 8 角的凸包相同；傾斜時不會把斜向的整塊投影算進來而誤報。
+      const EDGE_PAIRS = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+      const hullAt = (sl, za, zb) => {
+        const pts = [];
+        sl.corners.forEach(c => { if (c.z >= za - 1e-9 && c.z <= zb + 1e-9) pts.push({ x: c.x, y: c.y }); });
+        EDGE_PAIRS.forEach(([i, j]) => {
+          const A = sl.corners[i], B = sl.corners[j];
+          [za, zb].forEach(zc => {
+            if ((A.z - zc) * (B.z - zc) < 0) { const k = (zc - A.z) / (B.z - A.z); pts.push({ x: A.x + k * (B.x - A.x), y: A.y + k * (B.y - A.y) }); }
+          });
+        });
+        return pts.length >= 3 ? convexHull(pts) : [];
+      };
+      const slabs = [slabOf(childParts.filter(p => p.name === frameName)), slabOf(childParts.filter(p => p.name !== frameName))].filter(sl => sl && sl.hull.length >= 3);
+      if (!slabs.length) return;
       const bodyZ = zOf(bodyPart);
       parts.forEach(v => {
         if (v.name === bodyPart.name || ((v.plane == null ? null : v.plane) !== hostPlane)) return;
         const vz = zOf(v) - bodyZ;
-        if (!zOverlap(z0, z1, vz, vz + v.thicknessMm)) return;
-        if (seen.has(keyOf('cross-plane', [M.id + '-frame', v.name]))) return;
-        if (polysOverlap([band], partPolys(pose, v))) {
-          report('cross-plane', [`${M.id}-frame`, v.name], v.layer, pose,
+        if (seen.has(keyOf('cross-plane', [frameName, v.name]))) return;
+        const hit = slabs.some(sl => {
+          if (!zOverlap(sl.z0, sl.z1, vz, vz + v.thicknessMm)) return false;
+          const hull = hullAt(sl, Math.max(sl.z0, vz), Math.min(sl.z1, vz + v.thicknessMm));
+          return hull.length >= 3 && polysOverlap([hull], partPolys(pose, v));
+        });
+        if (hit) {
+          report('cross-plane', [frameName, v.name], v.layer, pose,
             `${M.name || M.id}（直角安裝）${when(pose)}會撞到 ${v.name}。建議：調整升降行程或安裝位置。`);
         }
       });

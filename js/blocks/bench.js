@@ -7,15 +7,46 @@
  * toggleAngle 在同平面與直角之間切換。
  */
 import { mountModule, mountOrthogonal, unmountModule } from './module-ops.js';
-import { orthogonalHostBody, orthogonalHostEdge, worldFrameEdges, planeOf } from './assembly.js';
+import { orthogonalHostBody, orthogonalHostEdge, worldFrameEdges, moduleFrameEdges, planeOf, defaultStandEdge, hostPlateThickness } from './assembly.js';
 import { ADAPTER_LENGTH_MM } from './orthogonal-joint.js';
 import { pointCoords, frameConnectorNodes } from './model.js';
+import { memberStock } from './member-stock.js';
 
 const SLIDE_STEP_MM = 5;   // 沿邊滑動一格（SDD-BENCH Q3）
+const TILT_STEP_DEG = 15;   // D4：傾斜一格
+const TILT_MAX_DEG = 60;    // D4：傾斜上限（±）
+const ADAPTER_STAND_MARGIN_MM = 14;   // D3：站立時宿主桿的板寬要大於「板厚＋14」
 
 const asList = v => Array.isArray(v) ? v : [];
 const finiteNum = v => typeof v === 'number' && Number.isFinite(v);
 const round1 = v => Math.round(v * 10) / 10;
+
+// 同名模組的顯示標籤：有名稱用名稱，沒名稱用 id；同名的都加序號（ 1  2  3…）。
+export function moduleLabels(modules) {
+  if (!Array.isArray(modules)) return new Map();
+  const labelMap = new Map();   // id → initial label (name or id)
+  const count = new Map();      // label → count
+  modules.forEach(m => {
+    if (!m) return;
+    const label = m.name || m.id;
+    labelMap.set(m.id, label);
+    count.set(label, (count.get(label) || 0) + 1);
+  });
+  const final = new Map();      // id → final label (with number if duplicate)
+  const seen = new Map();       // label → order index
+  modules.forEach(m => {
+    if (!m) return;
+    const label = labelMap.get(m.id);
+    if (count.get(label) > 1) {
+      const n = (seen.get(label) || 0) + 1;
+      seen.set(label, n);
+      final.set(m.id, `${label} ${n}`);
+    } else {
+      final.set(m.id, label);
+    }
+  });
+  return final;
+}
 
 // 角度換算到 (-180, 180]，並四捨五入到 0.1°（與 mountOrthogonal 的 childAxisDeg 同精度，避免浮點誤差累積）。
 function normalizeDeg(v) {
@@ -68,7 +99,8 @@ function withVirtualMount(modList, childId) {
 // 某模組（moduleId 為 null＝根）的自動接口，不存檔、每次由零件算出。
 // opts.childId：準備安裝上來的模組 id；機架板的邊要排除它（安裝後世界機架就不含它的零件）。
 // 接口種類：bolt（輸出端）、edge＋body.kind 'bar'（桿的 L／R 長邊）、'triangle'（三角板的三條邊 e0～e2）、
-// 'frame'（未安裝模組／根的機架板外框直邊，每段一個）。
+// 'frame'（未安裝模組／根＝世界機架板、已安裝模組＝自己的底板 <id>-frame 的外框直邊，每段一個）。
+// opts.cache：Map，同一輪多次呼叫時共用底板外框的計算結果。
 export function autoPorts(comps, modules, moduleId, params, opts = {}) {
   const list = asList(comps);
   const modList = asList(modules);
@@ -129,6 +161,15 @@ export function autoPorts(comps, modules, moduleId, params, opts = {}) {
       dedupeNames(group);
       ports.push(...group);
     }
+  } else if (mod && mod.mount && mod.mount.to && mod.mount.to.module != null) {
+    // D2：已安裝模組有自己的底板（<id>-frame），外框每段直邊也是一個接口（home 座標算外框，位置隨模組移動）。
+    const group = moduleFrameEdges(list, modList, mod.id, params, { cache: opts && opts.cache }).map((e, k) => ({
+      id: `edge:frame:${k}`, kind: 'edge', module: mid,
+      body: { kind: 'frame', module: mid, edge: k }, side: sideOf(e),
+      name: `底板・${edgeWordOfM(e.m)}`, lengthMm: e.lengthMm, suggested: false
+    }));
+    dedupeNames(group);
+    ports.push(...group);
   }
   return ports;
 }
@@ -220,16 +261,21 @@ export function connect(comps, modules, childId, target, params, motorState) {
   return { ok: true, comps: r.comps, modules: r.modules };
 }
 
-// 重組 orient（維持存檔的鍵序 type, edge, side, childAxisDeg, offsetMm?, joint）；offsetMm 為 0 時不寫入。
+// 重組 orient（維持存檔的鍵序 type, edge, side, face?, childEdge?, childAxisDeg, offsetMm?, tiltDeg?, joint）；offsetMm／tiltDeg 為 0 時不寫入；
+// face／childEdge 只有 edge 'child'（立在宿主板面上）才寫入。
 function withOrient(orient, patch) {
   const o = { ...orient, ...patch };
-  const out = { type: o.type, edge: o.edge, side: o.side, childAxisDeg: o.childAxisDeg };
+  const out = { type: o.type, edge: o.edge, side: o.side };
+  if (o.edge === 'child') { out.face = o.face; out.childEdge = o.childEdge; }
+  out.childAxisDeg = o.childAxisDeg;
   if (o.offsetMm) out.offsetMm = o.offsetMm;
+  if (o.tiltDeg) out.tiltDeg = o.tiltDeg;
   out.joint = o.joint;
   return out;
 }
 
-// 直角安裝後的一鍵調整：'side' 換邊、'reverse' 掉頭、'rotate' 轉 90°、'slide+' ／ 'slide-' 沿邊 ±5 mm。
+// 直角安裝後的一鍵調整：'tilt+' ／ 'tilt-' 傾斜 ±15°（±60° 為限）、'side' 換邊、'reverse' 掉頭、'rotate' 轉 90°、'slide+' ／ 'slide-' 沿邊 ±5 mm；
+// D3：'stand' 壓在邊上（host）↔ 立在宿主板面上（child）、'face'（只在立著時）換宿主的另一面；立著時 'rotate'＝換站立邊、'reverse' 不適用。
 export function benchAdjust(comps, modules, moduleId, action, params) {
   const list = asList(comps), modList = asList(modules);
   const fail = reason => ({ ok: false, comps: list, modules: modList, reason });
@@ -239,17 +285,43 @@ export function benchAdjust(comps, modules, moduleId, action, params) {
   const orient = mod.mount && mod.mount.orient;
   if (!orient || orient.type !== 'orthogonal') return fail('這個模組不是直角安裝，不能這樣調整');
   let next;
-  if (action === 'side') {
+  const standing = orient.edge === 'child';
+  if (action === 'stand') {
+    if (standing) {
+      next = withOrient(orient, { edge: 'host' });
+    } else {
+      // 宿主是桿時，板寬要容得下「板厚＋轉接座翼孔」才站得住。
+      const edge0 = orthogonalHostEdge(list, modList, mod.mount, pointCoords(list), params, { home: true });
+      if (!edge0) return fail('找不到宿主的邊');
+      const T = hostPlateThickness(list, edge0, 3);
+      if (edge0.kind === 'bar') {
+        const bar = list.find(c => c && c.id === edge0.compId);
+        const w = bar ? memberStock(bar).widthMm : 0;
+        if (w < T + ADAPTER_STAND_MARGIN_MM) return fail(`宿主這根桿的板寬只有 ${w} mm，太窄，站不住（至少要 ${T + ADAPTER_STAND_MARGIN_MM} mm 寬）`);
+      }
+      const k = defaultStandEdge(list, modList, moduleId, params, {});
+      if (k === null) return fail('算不出這個模組的底板邊，不能立在板面上');
+      next = withOrient(orient, { edge: 'child', face: 1, childEdge: k });
+    }
+  } else if (action === 'face') {
+    if (!standing) return fail('只有「立在面上」時才能換面；先按「立在面上」');
+    next = withOrient(orient, { face: orient.face === -1 ? 1 : -1 });
+  } else if (action === 'side') {
     // 板／機架的邊只有朝外那一側能裝（另一側是板身），所以不能換邊。
-    if (mod.mount.to.frame !== undefined || mod.mount.to.edge !== undefined) return fail('板件或機架的邊只有朝外那一側能裝，不能換邊');
+    if (mod.mount.to.frame !== undefined || mod.mount.to.edge !== undefined) return fail('板件、機架或底板的邊只有朝外那一側能裝，不能換邊');
     next = withOrient(orient, { side: -orient.side });
   } else if (action === 'reverse') {
+    if (standing) return fail('立在面上時站立邊已決定方向，不能掉頭；想換邊請按「換站立邊」');
     next = withOrient(orient, { childAxisDeg: normalizeDeg(orient.childAxisDeg + 180) });
   } else if (action === 'rotate') {
-    next = withOrient(orient, { childAxisDeg: normalizeDeg(orient.childAxisDeg + 90) });
+    if (standing) {
+      const count = moduleFrameEdges(list, modList, moduleId, params, { noOwnHoles: true }).length;
+      if (count < 2) return fail('這個模組的底板只有一條邊，沒有別的站立邊可換');
+      next = withOrient(orient, { childEdge: ((Number.isInteger(orient.childEdge) ? orient.childEdge : 0) + 1) % count });
+    } else next = withOrient(orient, { childAxisDeg: normalizeDeg(orient.childAxisDeg + 90) });
   } else if (action === 'slide+' || action === 'slide-') {
     // C1：宿主可以是桿、三角板或機架板的邊；邊長取 lengthMm（桿＝求解用的桿長參數）。
-    const edge = orthogonalHostEdge(list, modList, mod.mount, pointCoords(list), params);
+    const edge = orthogonalHostEdge(list, modList, mod.mount, pointCoords(list), params, { home: true });   // D2：只要邊長，底板邊用 home 座標
     if (!edge) return fail('找不到宿主的邊');
     const half = edge.lengthMm / 2;
     const lo = -half, hi = half - ADAPTER_LENGTH_MM;   // 轉接座占 [offset, offset+20]，不能超出邊的兩端
@@ -257,6 +329,12 @@ export function benchAdjust(comps, modules, moduleId, action, params) {
     const cur = finiteNum(orient.offsetMm) ? orient.offsetMm : 0;
     const v = round1(Math.min(hi, Math.max(lo, cur + (action === 'slide+' ? SLIDE_STEP_MM : -SLIDE_STEP_MM))));
     next = withOrient(orient, { offsetMm: v });
+  } else if (action === 'tilt+' || action === 'tilt-') {
+    // D4：繞接合線傾斜，15° 一格，範圍 ±60°。
+    const cur = finiteNum(orient.tiltDeg) ? orient.tiltDeg : 0;
+    const nv = cur + (action === 'tilt+' ? TILT_STEP_DEG : -TILT_STEP_DEG);
+    if (Math.abs(nv) > TILT_MAX_DEG) return fail(`傾斜已到極限（±${TILT_MAX_DEG}°）`);
+    next = withOrient(orient, { tiltDeg: nv });
   } else {
     return fail('不認識的調整動作');
   }
@@ -277,7 +355,7 @@ export function toggleAngle(comps, modules, moduleId, params, motorState) {
 
   if (mod.mount.orient) {
     // 直角 → 同平面（只有「輸出端的桿」做得到；板件的邊與機架板的邊沒有對應的輸出端）
-    if (mod.mount.to.frame !== undefined || mod.mount.to.edge !== undefined) return fail('只有「輸出端的桿」能改成同平面；板件或機架的邊只能直角安裝');
+    if (mod.mount.to.frame !== undefined || mod.mount.to.edge !== undefined) return fail('只有「輸出端的桿」能改成同平面；板件、機架或底板的邊只能直角安裝');
     const bar = orthogonalHostBody(list, modList, mod.mount);
     const own = mod.mount.to.output ? outputs.find(o => o.id === mod.mount.to.output) : null;
     const out = (own && own.at ? own : null)
@@ -321,23 +399,26 @@ export function portMarkers(comps, modules, childId, points, params, { zOf, thic
   const out = [];
   const seenFrame = new Set();
   const vmods = withVirtualMount(modList, childId);   // 機架外框排除即將安裝的子模組
+  const labels = moduleLabels(modList);   // 同名模組的顯示標籤
+  const frameCache = new Map();           // D2：同一輪內共用已安裝模組底板外框的計算
   modList.forEach(host => {
     if (!host || host.id === childId || isDescendant(modList, host.id, childId)) return;
     const plane = planeOf(list, modList, host.id);   // 主平面為 null；直角子平面為該平面的模組 id
-    autoPorts(list, modList, host.id, params, { childId }).forEach(port => {
+    autoPorts(list, modList, host.id, params, { childId, cache: frameCache }).forEach(port => {
       let mpoints = null;
       if (port.kind === 'edge') {
         // 邊線兩端點（已朝外挪到實際板外緣），z＝宿主那一片的中間高度（機架板用 'frame'）。
         const b = port.body;
         const to = b.kind === 'frame' ? { module: host.id, frame: { edge: b.edge } }
           : b.kind === 'triangle' ? { module: host.id, body: b.id, edge: b.edge } : { module: host.id, body: b.id };
-        if (b.kind === 'frame') {
+        const ownFrame = b.kind === 'frame' && host.mount;   // D2：已安裝模組自己的底板，跟著宿主模組走
+        if (b.kind === 'frame' && !ownFrame) {
           if (seenFrame.has(b.edge)) return;   // 世界機架只有一塊：多個模組共用時只標一次
           seenFrame.add(b.edge);
         }
-        const e = orthogonalHostEdge(list, vmods, { to, orient: { side: port.side } }, pts, params);
+        const e = orthogonalHostEdge(list, vmods, { to, orient: { side: port.side } }, pts, params, { cache: frameCache });
         if (!e) return;
-        const z = zBase(b.kind === 'frame' ? 'frame' : b.id, plane);
+        const z = zBase(b.kind === 'frame' ? (ownFrame ? `${host.id}-frame` : 'frame') : b.id, plane);
         mpoints = [{ x: e.a.x, y: e.a.y, z }, { x: e.b.x, y: e.b.y, z }];
       } else {
         const o = asList(host.outputs).find(x => x.id === port.output);
@@ -347,7 +428,7 @@ export function portMarkers(comps, modules, childId, points, params, { zOf, thic
       }
       const can = canConnect(list, modList, childId, { module: host.id, port: port.id }, params);
       const marker = {
-        portId: port.id, module: host.id, moduleName: host.name, kind: port.kind, name: port.name,
+        portId: port.id, module: host.id, moduleName: labels.get(host.id) || host.id, kind: port.kind, name: port.name,
         suggested: !!port.suggested, compatible: can.ok, plane, points: mpoints
       };
       if (!can.ok) marker.reason = can.reason;

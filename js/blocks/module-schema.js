@@ -97,7 +97,7 @@ function validateBase(rawBase, moduleComps) {
 // 直角安裝 orient（SDD-ORTHOGONAL-MOUNT §4.1）：不合法就回 null（靜默丟掉，退回同平面安裝）。
 function validateOrient(raw) {
   if (!raw || typeof raw !== 'object') return null;
-  if (raw.type !== 'orthogonal' || raw.edge !== 'host') return null;
+  if (raw.type !== 'orthogonal' || (raw.edge !== 'host' && raw.edge !== 'child')) return null;
   const side = Number(raw.side);
   if (side !== 1 && side !== -1) return null;
   if (typeof raw.childAxisDeg === 'boolean' || raw.childAxisDeg === null || raw.childAxisDeg === '' || !isFiniteNum(raw.childAxisDeg)) return null;
@@ -109,12 +109,26 @@ function validateOrient(raw) {
   };
   const hv = joint.holesPerFlange;
   const holes = (hv === null || hv === '' || typeof hv === 'boolean' || !isFiniteNum(hv)) ? 2 : Math.min(4, Math.max(1, Math.round(Number(hv))));
-  const out = { type: 'orthogonal', edge: 'host', side, childAxisDeg: Number(raw.childAxisDeg) };
+  const out = { type: 'orthogonal', edge: raw.edge, side };
+  // D3：edge 'child'（子模組底板立在宿主板面上）必須有 face（1 上面／-1 下面）與整數 childEdge（子模組底板外框的邊編號）；'host' 不留這兩欄。
+  if (raw.edge === 'child') {
+    if (Number(raw.face) !== 1 && Number(raw.face) !== -1) return null;
+    if (typeof raw.childEdge === 'boolean' || raw.childEdge === null || raw.childEdge === '' || !Number.isInteger(Number(raw.childEdge)) || Number(raw.childEdge) < 0) return null;
+    out.face = Number(raw.face);
+    out.childEdge = Number(raw.childEdge);
+  }
+  out.childAxisDeg = Number(raw.childAxisDeg);
   // offsetMm（選配）：沿宿主桿滑動的位置（mm，從桿中點起算），四捨五入到 0.1；0 或不合法就不寫入。
   const ov = raw.offsetMm;
   if (!(ov === null || ov === '' || typeof ov === 'boolean' || !isFiniteNum(ov))) {
     const off = Math.round(Number(ov) * 10) / 10;
     if (off !== 0) out.offsetMm = off;
+  }
+  // tiltDeg（選配，D4）：整個子模組繞接合線傾斜的角度，15° 一格、夾在 ±60°；0 或不合法就不寫入。
+  const tv = raw.tiltDeg;
+  if (!(tv === null || tv === '' || typeof tv === 'boolean' || !isFiniteNum(tv))) {
+    const tilt = Math.min(60, Math.max(-60, Math.round(Number(tv) / 15) * 15));
+    if (tilt !== 0) out.tiltDeg = tilt;
   }
   out.joint = { kind: 'printed', wallMm: clampNum(joint.wallMm, 1, 20, 4), holesPerFlange: holes };
   return out;

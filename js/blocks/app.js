@@ -29,7 +29,7 @@ import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
 import * as Motion from './motion.js';
-import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostEdge } from './assembly.js';
+import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostEdge, hostPlateThickness } from './assembly.js';
 import { normalizeModules } from './module-schema.js';
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
@@ -289,25 +289,31 @@ function viewBands(pts) {
     const hostId = M.mount.to.module;
     if (planeOf(S.comps, S.modules, hostId) === S.viewPlane) {
       // 主視圖（或宿主所在平面）：子模組投影成一條帶。
-      const compute = P => orthogonalBand(S.comps, S.modules, M.id, P, ORTHO_STACK_MM);
+      const compute = P => orthogonalBand(S.comps, S.modules, M.id, P, ORTHO_STACK_MM, S.topo.params, { asm: S.assembly });
       const polygon = compute(pts);
       if (polygon) bands.push({ kind: 'child', id: M.id, label: `${M.name}（側影）`, polygon, compute, target: M.id });
     } else if (S.viewPlane === M.id) {
       // 子視圖：宿主在子平面裡畫成側影帶，點它回宿主平面。
       const host = S.modules.find(m => m.id === hostId);
       // C1：宿主邊可以是桿、三角板的邊或機架板的邊
-      const hostEdge = orthogonalHostEdge(S.comps, S.modules, M.mount, pts, S.topo.params);
+      const hostEdge = orthogonalHostEdge(S.comps, S.modules, M.mount, pts, S.topo.params, { asm: S.assembly });
       if (!hostEdge) return;
       const output = host && (host.outputs || []).find(o => o.id === M.mount.to.output);
       const edgeName = output ? output.name : (hostEdge.compId || '機架');
       const off = Number.isFinite(orient.offsetMm) ? orient.offsetMm : 0;   // 子模組沿邊滑動後，邊中點在 s = -off
+      const standing = orient.edge === 'child';   // D3：子模組立在宿主板面上：宿主的板身在站立邊線下方（t∈[-板厚, 0]）
       const t0 = orient.side === -1 ? 0 : -HOST_BAND_MM, t1 = orient.side === -1 ? HOST_BAND_MM : 0;
       const compute = P => {
-        const f = orthogonalFrame(S.comps, S.modules, M.id, P);
-        const he = orthogonalHostEdge(S.comps, S.modules, M.mount, P, S.topo.params);
+        const f = orthogonalFrame(S.comps, S.modules, M.id, P, S.topo.params, { asm: S.assembly });
+        const he = orthogonalHostEdge(S.comps, S.modules, M.mount, P, S.topo.params, { asm: S.assembly });
         if (!f || !he) return null;
         const half = Math.hypot(he.b.x - he.a.x, he.b.y - he.a.y) / 2;
         const at = (sv, tv) => ({ x: f.base.x + sv * f.e.x + tv * f.f.x, y: f.base.y + sv * f.e.y + tv * f.f.y });
+        if (standing) {
+          const sgn = (f.d.x * he.d.x + f.d.y * he.d.y) >= 0 ? 1 : -1;   // face -1 時子模組的 e 與宿主邊方向相反
+          const c = -off * sgn, T = hostPlateThickness(S.comps, he);
+          return [at(c - half, -T), at(c + half, -T), at(c + half, 0), at(c - half, 0)];
+        }
         return [at(-off - half, t0), at(-off + half, t0), at(-off + half, t1), at(-off - half, t1)];
       };
       const polygon = compute(pts);
@@ -1534,7 +1540,7 @@ function push3D() {
   if (allPlanes) {
     // 直角安裝的子模組：在自己的平面建場景（沒有世界機架），再以 4x4 立起來掛在宿主工具上。
     model.orthogonal = buildOrthogonalChildren({
-      comps: S.comps, modules: S.modules, inputs: allPlanes, mainModel: model,
+      comps: S.comps, modules: S.modules, inputs: allPlanes, mainModel: model, asm: S.assembly, params: S.topo.params,
       buildModel: inp => buildSceneModel(inp.links, inp.pts, {
         ...baseOpts, groundIds: inp.groundIds, motorCenters: inp.motorCenterIds, motorTypes: inp.motorTypes,
         motorMounts: inp.motorMounts, polygons: inp.polygons, sliders: inp.sliders, gears: inp.gears,
@@ -2178,8 +2184,8 @@ function downloadAdapterStl() {
   const adapters = (orthoExtrasNow().adapters || []);
   if (!adapters.length) { transient('沒有直角安裝，不需要轉接座'); return; }
   adapters.forEach(a => {
-    const name = `adapter-${a.moduleId}`;
-    const stl = meshToStl(adapterMesh({ lengthMm: a.lengthMm, wallMm: a.wallMm, flangeMm: a.flangeMm, holeDiameterMm: a.holeDiameterMm, holesPerFlange: a.holesPerFlange }), name);
+    const name = `adapter-${a.moduleId}${a.tiltDeg ? `-tilt${a.tiltDeg}` : ''}`;   // D4：傾斜的轉接座檔名帶角度
+    const stl = meshToStl(adapterMesh({ lengthMm: a.lengthMm, wallMm: a.wallMm, flangeMm: a.flangeMm, holeDiameterMm: a.holeDiameterMm, holesPerFlange: a.holesPerFlange, tiltDeg: a.tiltDeg }), name);
     const link = document.createElement('a');
     link.href = URL.createObjectURL(new Blob([stl], { type: 'model/stl' }));
     link.download = `${name}.stl`;

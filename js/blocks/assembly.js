@@ -12,7 +12,8 @@ import { solveTopology, sweepTopology } from '../multilink/solver.js';
 import { pointKeysFor } from './part-types.js';
 import { memberStock } from './member-stock.js';
 import { frameOutlineEdges, safeName } from './exporters.js';   // C1：機架外框直邊、零件檔名
-import { frameConnectorNodes } from './model.js';
+import { frameConnectorNodes, pointCoords } from './model.js';
+import { adapterChildHoles } from './orthogonal-joint.js';   // D2：子模組底板上的轉接座孔（只在呼叫時用，與本檔互相引用無妨）
 
 const D2R = Math.PI / 180;
 const IDENTITY_POSE = { x: 0, y: 0, a: 0 };
@@ -152,7 +153,9 @@ export function worldFrameEdges(comps, modules, opts = {}) {
 // 直角安裝的宿主邊（mount.to 決定）：
 //   to.body（桿）＋ orient.side  → 桿的 L／R 長邊；
 //   to.body（三角板）＋ to.edge  → 三角板第 k 條邊（0＝p1→p2、1＝p2→p3、2＝p3→p1），side 取使 m 朝外（離開板心）的那一邊；
-//   to.frame.edge                → 世界機架板外框第 k 段直邊（每次由目前節點重算），m 朝外。
+//   to.frame.edge                → 世界機架板外框第 k 段直邊（每次由目前節點重算），m 朝外；
+//                                  宿主模組已安裝時改為它自己的底板（<id>-frame）外框第 k 段（D2，見 mountedFrameEdge）。
+// opts.home＝true：已安裝宿主的底板邊用匯出（home）座標、不套目前位姿；opts.asm／opts.cache：底板外框的快取；opts.stockMm：板厚。
 // 回傳 { kind, a, b, d, m, side, lengthMm, partName, compId, moves, pose }：
 //   a→b＝邊線端點（已朝外挪半個板寬，即實際板外緣）、d＝沿邊單位向量、m＝外法線＝side·left(d)、
 //   partName＝宿主零件在製作清單的名稱（機架為 'frame'）、moves＝宿主是否會動、pose＝{ x, y, a }（mount.ref 用的宿主位姿）。
@@ -168,6 +171,9 @@ export function orthogonalHostEdge(comps, modules, mount, points, params, opts =
   if (to.frame !== undefined) {
     const k = to.frame && to.frame.edge;
     if (!Number.isInteger(k) || k < 0) return null;
+    // D2：宿主是「已安裝的模組」→ 它自己的底板（<id>-frame），隨模組剛體移動；否則是靜止的世界機架板。
+    const hostMod = to.module != null ? modList.find(m => m && m.id === to.module) : null;
+    if (hostMod && hostMod.mount && hostMod.mount.to && hostMod.mount.to.module != null) return mountedFrameEdge(list, modList, hostMod, k, points, params, opts);
     const e = worldFrameEdges(list, modList, opts)[k];
     if (!e) return null;
     return {
@@ -217,6 +223,77 @@ export function orthogonalHostEdge(comps, modules, mount, points, params, opts =
   return null;
 }
 
+// ---- D2：已安裝模組自己的底板（<id>-frame）外框的邊 ----
+
+const ASM_FRAME_CACHE = new WeakMap();   // asm → Map（同一次編譯內底板外框不變，求解迴圈裡不必重算）
+
+// 模組 mod 的 home 姿態解：只解「未安裝的單元＋mod 的安裝鏈」，不含其他已安裝模組，
+// 所以不會因為底板邊又回頭求解整個組合而無限遞迴（鏈上每一層都只依賴更上一層）。
+function solveHomeChain(list, modList, mod, topoParams, asm) {
+  const base = asm && asm.units ? asm : compileAssembly(list, modList, { params: topoParams || {} });
+  if (!base.units) return null;
+  const byId = new Map(modList.map(m => [m.id, m]));
+  const chain = new Set();
+  for (let cur = mod; cur && !chain.has(cur.id); cur = cur.mount && cur.mount.to ? byId.get(cur.mount.to.module) : null) chain.add(cur.id);
+  const sub = { ...base, units: base.units.filter(u => !u.mount || chain.has(u.id)) };
+  try {
+    const sol = solveAssembly(sub, { thetaDeg: 0, motorAngles: { ...((mod.mount && mod.mount.home) || {}) } });
+    return sol && sol.points ? sol.points : null;
+  } catch (e) { return null; }
+}
+
+// 已安裝模組底板的外框直邊（home／匯出座標，與 moduleFrameExports＋moduleFrameNodes＋frameGeometry 同一套規則）。
+// 轉接座孔是 outlineExempt、不撐大外框；本模組自己直角安裝用的子模組端轉接座孔不豁免（它確實在板上），一併算入。
+// 回傳 [{ a, b, d, m, lengthMm }]；找不到模組或沒有安裝 → []。
+export function moduleFrameEdges(comps, modules, moduleId, params, opts = {}) {
+  const list = Array.isArray(comps) ? comps : [];
+  const modList = Array.isArray(modules) ? modules : [];
+  const mod = modList.find(m => m && m.id === moduleId);
+  if (!mod || !mod.mount) return [];
+  const cache = opts.asm ? (ASM_FRAME_CACHE.get(opts.asm) || ASM_FRAME_CACHE.set(opts.asm, new Map()).get(opts.asm)) : (opts.cache instanceof Map ? opts.cache : null);
+  // D3：立在宿主板面上（edge 'child'）時，站立邊就是這個外框的一條邊，轉接座孔在外框之內，不能反過來參與外框（會循環）。
+  const standing = !!(opts.noOwnHoles || (mod.mount.orient && mod.mount.orient.edge === 'child'));
+  const key = `${moduleId}|${opts.stockMm || ''}|${opts.exportSettings ? JSON.stringify(opts.exportSettings) : ''}|${standing ? 's' : ''}`;
+  if (cache && cache.has(key)) return cache.get(key);
+  const entry = frameEntryOf(list, modList, mod, params || {}, () => solveHomeChain(list, modList, mod, opts.asm ? null : params, opts.asm));
+  let nodes = moduleFrameNodes(entry, frameConnectorNodes(entry.comps));
+  if (mod.mount.orient && mod.base && !standing) {
+    const pts = pointCoords(list);
+    const to = mod.mount.to;
+    const bar = to && to.body ? list.find(c => c && c.id === to.body) : null;
+    const holes = adapterChildHoles({ base: pts[mod.base], orient: mod.mount.orient, bar, stockMm: opts.stockMm || 3 });
+    nodes = [...nodes, ...holes.map((h, i) => ({ id: `ADP_${moduleId}_${i}`, x: h.x, y: h.y }))];
+  }
+  const edges = frameOutlineEdges(nodes, opts.exportSettings || {});
+  if (cache) cache.set(key, edges);
+  return edges;
+}
+
+// 已安裝模組底板的第 k 段邊在「目前位姿」的幾何：home 座標的邊套上與求解器相同的剛體變換。
+//   同平面安裝：宿主輸出端目前位姿 vs mount.ref（transformPoint）；直角安裝：模組在自己的平面靜止＝不變；
+//   巢狀時 points 已是各層求解後的座標，宿主輸出端的位姿自然包含上層的運動。
+function mountedFrameEdge(list, modList, mod, k, points, params, opts) {
+  const e = moduleFrameEdges(list, modList, mod.id, params, opts)[k];
+  if (!e) return null;
+  let ref = IDENTITY_POSE, now = IDENTITY_POSE;
+  if (!opts.home && !mod.mount.orient) {
+    const host = modList.find(m => m && m.id === mod.mount.to.module);
+    const p = host ? outputPose(host, mod.mount.to.output, points, list.filter(c => c && c.moduleId === host.id)) : null;
+    if (!p) return null;
+    now = p;
+    ref = mod.mount.ref || IDENTITY_POSE;
+  }
+  const rad = (now.a - ref.a) * D2R, cos = Math.cos(rad), sin = Math.sin(rad);
+  const rot = v => ({ x: v.x * cos - v.y * sin, y: v.x * sin + v.y * cos });
+  const a = transformPoint(e.a, ref, now), b = transformPoint(e.b, ref, now);
+  const d = rot(e.d), m = rot(e.m);
+  return {
+    kind: 'frame', a, b, d, m, side: sideOfM(d, m), lengthMm: e.lengthMm,
+    partName: `${mod.id}-frame`, compId: null, moves: true, frameModule: mod.id,
+    pose: { x: a.x, y: a.y, a: Math.atan2(d.y, d.x) / D2R }
+  };
+}
+
 export function solveAssembly(asm, params) {
   if (asm.single) return solveTopology(asm.single, params);
   const points = {};
@@ -231,7 +308,7 @@ export function solveAssembly(asm, params) {
         // 直角安裝到桿／三角板／機架板的邊：宿主位姿＝邊的起點與方向（桿＝p1 與 p1→p2）；宿主點都要解出來。
         const allComps = asm.units.flatMap(u => u.comps || []);
         const allMods = asm.units.filter(u => u.module).map(u => u.module);
-        const e = unit.mount.orient ? orthogonalHostEdge(allComps, allMods, unit.mount, points, params) : null;
+        const e = unit.mount.orient ? orthogonalHostEdge(allComps, allMods, unit.mount, points, params, { asm }) : null;
         now = e ? e.pose : null;
       } else {
         now = host && host.module ? outputPose(host.module, unit.mount.to.output, points, host.comps) : null;
@@ -352,21 +429,37 @@ const validPt = p => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 // 直角子模組的 3D 座標系：origin＝宿主構件那一側邊緣的中點；d＝構件方向；m＝離開宿主邊緣的外法線；
 // n＝子模組平面的法線（離開宿主平面）；base／e／f＝子模組平面上的基準點與接合軸（e）及其垂直軸（f）。
 // 不是直角安裝、輸出構件不是桿、或點未解出 → null。純函式。
-export function orthogonalFrame(comps, modules, moduleId, points) {
+// opts.asm：已編譯的組合（compileAssembly 的結果），已安裝宿主的底板外框用它快取，播放時才不必每幀重算。
+export function orthogonalFrame(comps, modules, moduleId, points, params, opts = {}) {
   const modList = Array.isArray(modules) ? modules : [];
   const list = Array.isArray(comps) ? comps : [];
   const mod = modList.find(m => m.id === moduleId);
   const orient = mod && mod.mount && mod.mount.orient;
   if (!orient || orient.type !== 'orthogonal') return null;
-  const edge = orthogonalHostEdge(list, modList, mod.mount, points);
-  const base = mod.base && points ? points[mod.base] : null;
-  if (!edge || !validPt(base)) return null;
+  const edge = orthogonalHostEdge(list, modList, mod.mount, points, params, opts);
+  if (!edge) return null;
   const { d, m, side } = edge;
   const off = Number.isFinite(orient.offsetMm) ? orient.offsetMm : 0;   // 沿 d 滑動的位置（從邊中點起算）
   const mid = { x: (edge.a.x + edge.b.x) / 2, y: (edge.a.y + edge.b.y) / 2 };
+  if (orient.edge === 'child') {
+    // D3：子模組的底板立在宿主板面上，正面貼齊宿主的邊；n＝板面法線（face 1＝上面 +z），d＝n×m。
+    const se = standEdgeOf(list, modList, mod, params, opts);
+    if (!se) return null;
+    const T = hostPlateThickness(list, edge, opts.stockMm);
+    const face = orient.face === -1 ? -1 : 1;
+    return tiltFrame({
+      origin: { x: mid.x + off * d.x - T * m.x, y: mid.y + off * d.y - T * m.y, z: face === 1 ? T : 0 },
+      d: { x: -face * m.y, y: face * m.x, z: 0 },
+      m: { x: m.x, y: m.y, z: 0 },
+      n: { x: 0, y: 0, z: face },
+      base: se.base, e: se.e, f: se.f
+    }, orient.tiltDeg);
+  }
+  const base = mod.base && points ? points[mod.base] : null;
+  if (!validPt(base)) return null;
   const rad = orient.childAxisDeg * D2R;
   const e = { x: Math.cos(rad), y: Math.sin(rad) };
-  return {
+  return tiltFrame({
     origin: { x: mid.x + off * d.x, y: mid.y + off * d.y, z: 0 },
     d: { x: d.x, y: d.y, z: 0 },
     m: { x: m.x, y: m.y, z: 0 },
@@ -374,7 +467,79 @@ export function orthogonalFrame(comps, modules, moduleId, points) {
     base: { x: base.x, y: base.y },
     e,
     f: { x: -e.y, y: e.x }
+  }, orient.tiltDeg);
+}
+
+// D4：傾斜——整個子模組繞接合線（過 origin、沿 d）轉 α＝tiltDeg：n′＝cosα·n＋sinα·m、m′＝cosα·m−sinα·n。
+// d、origin、base、e、f 都不變；tiltDeg 為 0／沒有時原樣回傳（與舊版一模一樣）。
+function tiltFrame(frame, tiltDeg) {
+  const a = Number(tiltDeg);
+  if (!Number.isFinite(a) || a === 0) return frame;
+  const c = Math.cos(a * D2R), s = Math.sin(a * D2R);
+  const { n, m } = frame;
+  return {
+    ...frame,
+    n: { x: c * n.x + s * m.x, y: c * n.y + s * m.y, z: c * n.z + s * m.z },
+    m: { x: c * m.x - s * n.x, y: c * m.y - s * n.y, z: c * m.z - s * n.z }
   };
+}
+
+// D3：宿主板厚（mm）：宿主零件 stock.thicknessMm，沒有就用 stockMm（預設 3；機架板沒有零件）。
+export function hostPlateThickness(comps, edge, stockMm = 3) {
+  const comp = edge && edge.compId ? (Array.isArray(comps) ? comps : []).find(c => c && c.id === edge.compId) : null;
+  const t = comp && comp.stock ? Number(comp.stock.thicknessMm) : NaN;
+  return Number.isFinite(t) && t > 0 ? t : (Number.isFinite(Number(stockMm)) && Number(stockMm) > 0 ? Number(stockMm) : 3);
+}
+
+// D3：子模組自己底板外框第 k 條邊（orient.childEdge）當作站立邊：base＝邊中點、e＝沿邊單位向量，
+// 使 f＝e 的左法線指向板內（＝−外法線）。找不到邊回 null。座標是子模組自己平面的座標。
+function standEdgeOf(list, modList, mod, params, opts = {}) {
+  const k = mod.mount.orient.childEdge;
+  if (!Number.isInteger(k) || k < 0) return null;
+  const e = moduleFrameEdges(list, modList, mod.id, params, { asm: opts.asm, cache: opts.cache, stockMm: opts.stockMm, exportSettings: opts.exportSettings })[k];
+  return e ? standFrameOfEdge(e) : null;
+}
+function standFrameOfEdge(e) {
+  return {
+    base: { x: (e.a.x + e.b.x) / 2, y: (e.a.y + e.b.y) / 2 },
+    e: { x: -e.m.y, y: e.m.x },
+    f: { x: -e.m.x, y: -e.m.y }
+  };
+}
+
+// D3：切到「立在板面上」時預設站哪一條底板邊：子模組所有點（p1,p2,p3,m1,m2）在該邊內側方向 f 上的最小距離最大者
+// （＝「背面」，最少幾何跑到宿主板面下方）；平手取編號小的。算不出回 null。
+export function defaultStandEdge(comps, modules, moduleId, params, opts = {}) {
+  const list = Array.isArray(comps) ? comps : [];
+  const modList = Array.isArray(modules) ? modules : [];
+  const mod = modList.find(m => m && m.id === moduleId);
+  if (!mod || !mod.mount) return null;
+  const edges = moduleFrameEdges(list, modList, moduleId, params, { ...opts, noOwnHoles: true });
+  if (!edges.length) return null;
+  const pts = [];
+  list.forEach(c => {
+    if (!c || c.moduleId !== moduleId) return;
+    POINT_KEYS.forEach(k => { const p = c[k]; if (p && validPt(p)) pts.push(p); });
+  });
+  if (!pts.length) return 0;
+  let best = 0, bestMin = -Infinity;
+  edges.forEach((e, i) => {
+    const s = standFrameOfEdge(e);
+    const lo = Math.min(...pts.map(p => (p.x - s.base.x) * s.f.x + (p.y - s.base.y) * s.f.y));
+    if (lo > bestMin + 1e-9) { bestMin = lo; best = i; }
+  });
+  return best;
+}
+
+// D3：立在板面時，子模組站立邊上的轉接座孔（子模組自己平面的座標）；孔沿 slide 方向的位置 ss（相對 origin 沿宿主邊的 d 方向）。
+// sgn＝frame.d 與宿主邊 d 的點積符號（face −1 時兩者反向）。孔離站立邊 flangeHole mm、沿邊相距由 ss 決定。
+export function standChildHoles(frame, hostD, ss, flangeHole) {
+  const sgn = (frame.d.x * hostD.x + frame.d.y * hostD.y) >= 0 ? 1 : -1;
+  const r3 = v => Math.round(v * 1000) / 1000;
+  return ss.map(k => ({
+    x: r3(frame.base.x + sgn * k * frame.e.x + flangeHole * frame.f.x),
+    y: r3(frame.base.y + sgn * k * frame.e.y + flangeHole * frame.f.y)
+  }));
 }
 
 // 子模組平面上的點 p（加上疊層高度 wMm，沿 m）→ 3D 世界座標。
@@ -389,13 +554,45 @@ export function toWorld3D(frame, p, wMm = 0) {
   };
 }
 
+// D4：子模組座標 (s, t, w)（沿 e 的距離、沿 f 的距離、疊層高度）→ 3D 世界座標：origin + s·d + t·n + w·m。
+export function stToWorld3D(frame, s, t, w = 0) {
+  return {
+    x: frame.origin.x + s * frame.d.x + t * frame.n.x + w * frame.m.x,
+    y: frame.origin.y + s * frame.d.y + t * frame.n.y + w * frame.m.y,
+    z: frame.origin.z + s * frame.d.z + t * frame.n.z + w * frame.m.z
+  };
+}
+
+// D4：一塊在子模組座標裡的長方體板塊（s∈[smin,smax] × t∈[tmin,tmax] × w∈[w0,w1]）的 8 個角（3D 世界座標）。
+export function slabCorners3D(frame, { smin, smax, tmin, tmax }, w0, w1) {
+  const out = [];
+  [smin, smax].forEach(s => [tmin, tmax].forEach(t => [w0, w1].forEach(w => out.push(stToWorld3D(frame, s, t, w)))));
+  return out;
+}
+
+// 平面點集的凸包（Andrew monotone chain，逆時針）；少於 3 個不同點時原樣（去重後）回傳。
+export function hull2D(points) {
+  const pts = points.map(p => ({ x: p.x, y: p.y })).sort((a, b) => a.x - b.x || a.y - b.y)
+    .filter((p, i, arr) => i === 0 || Math.abs(p.x - arr[i - 1].x) > 1e-9 || Math.abs(p.y - arr[i - 1].y) > 1e-9);
+  if (pts.length < 3) return pts;
+  const cr = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower = [], upper = [];
+  pts.forEach(p => { while (lower.length >= 2 && cr(lower[lower.length - 2], lower[lower.length - 1], p) <= 1e-9) lower.pop(); lower.push(p); });
+  [...pts].reverse().forEach(p => { while (upper.length >= 2 && cr(upper[upper.length - 2], upper[upper.length - 1], p) <= 1e-9) upper.pop(); upper.push(p); });
+  lower.pop(); upper.pop();
+  return lower.concat(upper);
+}
+
 // 宿主視圖的側影帶：子模組沿接合軸的範圍 × 疊層高度 stackMm，四個點依序
 // (smin,0)、(smax,0)、(smax,stack)、(smin,stack)。沒有直角座標系或沒有點 → null。
-export function orthogonalBand(comps, modules, moduleId, points, stackMm) {
-  const frame = orthogonalFrame(comps, modules, moduleId, points);
+// D4：有傾斜（orient.tiltDeg ≠ 0）時，改回傳「子模組外框長方體（s × t × w∈[0,stack]）8 個角投影到宿主 XY 的凸包」。
+export function orthogonalBand(comps, modules, moduleId, points, stackMm, params, opts = {}) {
+  const frame = orthogonalFrame(comps, modules, moduleId, points, params, opts);
   if (!frame) return null;
   const list = Array.isArray(comps) ? comps : [];
-  let smin = Infinity, smax = -Infinity;
+  const mod = (Array.isArray(modules) ? modules : []).find(m => m && m.id === moduleId);
+  const tilted = !!(mod && mod.mount && mod.mount.orient && Number(mod.mount.orient.tiltDeg));
+  let smin = Infinity, smax = -Infinity, tmin = Infinity, tmax = -Infinity;
   const seen = new Set();
   list.forEach(c => {
     if (c.moduleId !== moduleId) return;
@@ -406,11 +603,15 @@ export function orthogonalBand(comps, modules, moduleId, points, stackMm) {
       const sp = points[pt.id];
       if (!validPt(sp)) return;
       const s = (sp.x - frame.base.x) * frame.e.x + (sp.y - frame.base.y) * frame.e.y;
+      const t = (sp.x - frame.base.x) * frame.f.x + (sp.y - frame.base.y) * frame.f.y;
       if (s < smin) smin = s;
       if (s > smax) smax = s;
+      if (t < tmin) tmin = t;
+      if (t > tmax) tmax = t;
     });
   });
   if (!Number.isFinite(smin)) return null;
+  if (tilted) return hull2D(slabCorners3D(frame, { smin, smax, tmin, tmax }, 0, stackMm));
   const at = (s, w) => ({
     x: frame.origin.x + s * frame.d.x + w * frame.m.x,
     y: frame.origin.y + s * frame.d.y + w * frame.m.y
@@ -623,32 +824,36 @@ export function moduleFrameExports(comps, modules, params) {
   };
   return modList
     .filter(mod => mod && mod.mount)
-    .map(mod => {
-      const bolts = [];
-      const host = modList.find(m => m.id === mod.mount.to.module);
-      const output = host && (host.outputs || []).find(o => o.id === mod.mount.to.output);
-      if (params && output && Array.isArray(output.bolts) && output.bolts.length) {
-        const pts = solveHome(mod);
-        output.bolts.forEach(id => {
-          const p = pts && pts[id];
-          if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
-          let diameter = 3.2;
-          list.some(c => Array.isArray(c.holes) && c.holes.some(h => {
-            if (h.id !== id) return false;
-            if (Number.isFinite(Number(h.diameter)) && Number(h.diameter) > 0) diameter = Number(h.diameter);
-            return true;
-          }));
-          bolts.push({ id, x: p.x, y: p.y, diameter });
-        });
-      }
-      return {
-        moduleId: mod.id,
-        fileBase: `${mod.id}-frame`,
-        comps: list.filter(c => c.moduleId === mod.id),
-        bolts,
-        baseId: mod.base
-      };
+    .map(mod => frameEntryOf(list, modList, mod, params, () => solveHome(mod)));
+}
+
+// 單一已安裝模組的底板清單項：{ moduleId, fileBase, comps, bolts, baseId }（bolts 的算法見 moduleFrameExports）。
+// solveHome：回傳該模組 home 姿態的世界座標點表（只在宿主輸出端有 bolts 時才呼叫）。
+function frameEntryOf(list, modList, mod, params, solveHome) {
+  const bolts = [];
+  const host = modList.find(m => m.id === mod.mount.to.module);
+  const output = host && (host.outputs || []).find(o => o.id === mod.mount.to.output);
+  if (params && output && Array.isArray(output.bolts) && output.bolts.length) {
+    const pts = solveHome();
+    output.bolts.forEach(id => {
+      const p = pts && pts[id];
+      if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+      let diameter = 3.2;
+      list.some(c => Array.isArray(c.holes) && c.holes.some(h => {
+        if (h.id !== id) return false;
+        if (Number.isFinite(Number(h.diameter)) && Number(h.diameter) > 0) diameter = Number(h.diameter);
+        return true;
+      }));
+      bolts.push({ id, x: p.x, y: p.y, diameter });
     });
+  }
+  return {
+    moduleId: mod.id,
+    fileBase: `${mod.id}-frame`,
+    comps: list.filter(c => c.moduleId === mod.id),
+    bolts,
+    baseId: mod.base
+  };
 }
 
 // 模組底板的機架節點：去掉基準點（它只是安裝用的參考點，不再開大孔），改加每顆螺絲孔（小孔、MOUNT_BOLT 圖層）。

@@ -9,6 +9,15 @@
  *
  * 座標：x ∈ [0,L] 長度方向；翼 A＝水平板 y∈[0,F]、z∈[0,W]，孔軸沿 z；
  *       翼 B＝垂直板 y∈[0,W]、z∈[0,F]，孔軸沿 y；孔心 x_k＝L·(k+0.5)/n，離轉角 c＝W+(F−W)/2。
+ *
+ * D4 傾斜（tiltDeg，15° 一格、±60°；0＝原本的直角 L，輸出與舊版逐位元相同）：
+ *   兩翼夾角＝90°＋tiltDeg——正值把支架「打開」（夾角大於 90°，子模組往遠離宿主板的方向傾倒）、
+ *   負值「合起來」（夾角小於 90°）。作法：翼 B 繞 x 軸方向、通過內角 (y=W, z=W) 的軸轉 tiltDeg
+ *   （y→z 的右手方向為正；翼 B 的長邊方向由 (0,1) 轉到 (−sin α, cos α)），翼 A 不動。
+ *   輸出由兩個「各自封閉」的殼組成（翼 A 方塊帶孔、翼 B 方塊帶孔且已旋轉），兩殼互相重疊但不共用頂點索引，
+ *   切片軟體會取聯集：每條無向邊恰用兩次、沒有重複的有向邊、有向體積為正。
+ *   打開時翼 B 只取 z≥W 的上半段（下半段會轉到翼 A 底面以下、穿進宿主板），其下緣留在翼 A 內（疊在翼 A 裡面）；
+ *   合起來時用整片翼 B（轉入翼 A 與其上方，不會低於 z=0）。
  */
 
 const EPS = 1e-9;
@@ -17,7 +26,24 @@ function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
 function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
 function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
 
-export function adapterMesh({ lengthMm: L = 20, wallMm: W = 4, flangeMm: F = 14, holeDiameterMm: D = 3.2, holesPerFlange: n = 2, segments: N = 16 } = {}) {
+export function adapterMesh({ lengthMm: L = 20, wallMm: W = 4, flangeMm: F = 14, holeDiameterMm: D = 3.2, holesPerFlange: n = 2, segments: N = 16, tiltDeg = 0 } = {}) {
+  const tilt = Number(tiltDeg);
+  if (!Number.isFinite(tilt) || tilt === 0) return buildShell({ L, W, F, D, n, N, only: 'both' });
+  // D4：兩個各自封閉的殼，不共用頂點索引（各殼自己去重）。
+  const A = buildShell({ L, W, F, D, n, N, only: 'A' });
+  const B = buildShell({ L, W, F, D, n, N, only: 'B', fromZ: tilt > 0 ? W : -Infinity });
+  const a = tilt * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+  const round = v => Math.abs(v) < 1e-12 ? 0 : Math.round(v * 1e9) / 1e9;
+  const rot = ([x, y, z]) => [x, round(W + (y - W) * ca - (z - W) * sa), round(W + (y - W) * sa + (z - W) * ca)];
+  const base = A.vertices.length;
+  return {
+    vertices: [...A.vertices, ...B.vertices.map(rot)],
+    triangles: [...A.triangles, ...B.triangles.map(([i, j, k]) => [i + base, j + base, k + base])]
+  };
+}
+
+// only：'both'＝直角 L（翼 A∪翼 B）、'A'＝只有水平翼、'B'＝只有垂直翼（fromZ：只取 z≥fromZ 的格子）。
+function buildShell({ L, W, F, D, n, N, only, fromZ = -Infinity }) {
   const r = D / 2;
   const c = W + (F - W) / 2;
   const h = Math.min(r + 1.5, (F - W) / 2 - EPS, L / (2 * n) - EPS);   // 孔格半寬：留肉但不超出翼板與相鄰孔
@@ -33,8 +59,8 @@ export function adapterMesh({ lengthMm: L = 20, wallMm: W = 4, flangeMm: F = 14,
   const cellKind = (i, j, k) => {
     if (i < 0 || j < 0 || k < 0 || i >= X.length - 1 || j >= Y.length - 1 || k >= Z.length - 1) return 0;
     const y0 = Y[j], y1 = Y[j + 1], z0 = Z[k], z1 = Z[k + 1];
-    const inA = y1 <= F + EPS && z1 <= W + EPS;          // 水平板
-    const inB = y1 <= W + EPS && z1 <= F + EPS;          // 垂直板
+    const inA = only !== 'B' && y1 <= F + EPS && z1 <= W + EPS;          // 水平板
+    const inB = only !== 'A' && y1 <= W + EPS && z1 <= F + EPS && z0 >= fromZ - EPS;   // 垂直板
     if (!inA && !inB) return 0;
     const hx = inHoleX(X[i], X[i + 1]);
     if (hx !== undefined) {

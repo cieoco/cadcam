@@ -7,7 +7,7 @@
  */
 import { memberStock } from './member-stock.js';
 import { pointCoords } from './model.js';
-import { orthogonalHostEdge } from './assembly.js';
+import { orthogonalHostEdge, orthogonalFrame, hostPlateThickness, standChildHoles } from './assembly.js';
 import { worldToLocal } from './plate-geometry.js';
 
 const D2R = Math.PI / 180;
@@ -23,6 +23,25 @@ const DEFAULT_HOLES_PER_FLANGE = 2;
 const finitePos = v => Number.isFinite(Number(v)) && Number(v) > 0;
 const r3 = v => Math.round(v * 1000) / 1000;
 
+// D2：子模組底板上的轉接座孔（子模組平面座標）。只靠子模組的 base、orient 與宿主桿（取板厚），
+// 與宿主邊的幾何無關——所以宿主是「已安裝模組的底板」時，宿主底板外框可以直接算它，不必繞回求解。
+// bar＝宿主桿／三角板零件（機架板宿主傳 null）；回傳 [{ x, y }]。
+export function adapterChildHoles({ base, orient, bar = null, stockMm = 3 }) {
+  if (!base || !orient) return [];
+  const joint = orient.joint || {};
+  const wallMm = finitePos(joint.wallMm) ? Number(joint.wallMm) : DEFAULT_WALL_MM;
+  const n = Number.isInteger(joint.holesPerFlange) && joint.holesPerFlange > 0 ? joint.holesPerFlange : DEFAULT_HOLES_PER_FLANGE;
+  const flangeHole = wallMm + (ADAPTER_FLANGE_MM - wallMm) / 2;
+  const hostThickness = bar && finitePos(bar.stock && bar.stock.thicknessMm) ? Number(bar.stock.thicknessMm) : stockMm;
+  const e = { x: Math.cos(orient.childAxisDeg * D2R), y: Math.sin(orient.childAxisDeg * D2R) };
+  const f = { x: -e.y, y: e.x };
+  const t = hostThickness + flangeHole;
+  return Array.from({ length: n }, (_, k) => {
+    const s = ADAPTER_LENGTH_MM * (k + 0.5) / n;
+    return { x: r3(base.x + s * e.x + t * f.x), y: r3(base.y + s * e.y + t * f.y) };
+  });
+}
+
 // 單一模組的轉接座排版；不是「直角安裝」的模組回 null。
 // 宿主可以是桿（hostHoles＝桿局部 u/v）、三角板的邊或機架板外框的邊（hostHoles＝世界平面 { x, y }，
 // 在邊線中點往 d 方向 (offset + s) 處、往板內 flangeHole mm；板上的孔另附板局部 u/v，板會動時孔跟著板走）。
@@ -33,10 +52,11 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3 } 
   const orient = mod && mod.mount && mod.mount.orient;
   if (!orient || orient.type !== 'orthogonal') return null;
   const pts = pointCoords(list);
-  const edge = orthogonalHostEdge(list, modList, mod.mount, pts, params);
+  // D2：宿主是已安裝模組的底板時，孔位要用底板的匯出（home）座標，所以用 home 姿態（不套目前位姿的剛體變換）。
+  const edge = orthogonalHostEdge(list, modList, mod.mount, pts, params, { home: true, stockMm });
   if (!edge) return null;
   const base = mod.base ? pts[mod.base] : null;
-  if (!base) return null;
+  if (!base && orient.edge !== 'child') return null;
   const barLength = edge.lengthMm;
   if (!(barLength > 0)) return null;
   const bar = edge.compId ? list.find(c => c && c.id === edge.compId) : null;
@@ -50,22 +70,22 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3 } 
   // 翼孔距接合角＝壁厚＋(翼高−壁厚)/2（翼的外露段正中央）
   const flangeHole = wallMm + (flangeMm - wallMm) / 2;
   const barWidth = bar ? memberStock(bar).widthMm : 0;
-  const hostThickness = bar && finitePos(bar.stock && bar.stock.thicknessMm) ? Number(bar.stock.thicknessMm) : stockMm;
-  const e = { x: Math.cos(orient.childAxisDeg * D2R), y: Math.sin(orient.childAxisDeg * D2R) };
-  const f = { x: -e.y, y: e.x };
-  const t = hostThickness + flangeHole;
   const ss = Array.from({ length: n }, (_, k) => lengthMm * (k + 0.5) / n);
 
+  // D3：子模組立在宿主板面上（edge 'child'）：宿主孔在板面上、離邊 板厚＋flangeHole；壓在邊上則離邊 flangeHole（在板面的邊上）。
+  const standing = orient.edge === 'child';
+  const T = standing ? hostPlateThickness(list, edge, stockMm) : 0;
+  const inset = standing ? T + flangeHole : flangeHole;
   let hostHoles;
   if (edge.kind === 'bar') {
-    hostHoles = ss.map(k => ({ u: r3(barLength / 2 + offsetMm + k), v: r3(side * (barWidth / 2 - flangeHole)) }));
+    hostHoles = ss.map(k => ({ u: r3(barLength / 2 + offsetMm + k), v: r3(side * (barWidth / 2 - inset)) }));
   } else {
-    // 板／機架：邊線已是實際外緣；孔在中點 + (offset + s)·d、往板內 flangeHole mm（−m）。
+    // 板／機架：邊線已是實際外緣；孔在中點 + (offset + s)·d、往板內 inset mm（−m）。
     const mid = { x: (edge.a.x + edge.b.x) / 2, y: (edge.a.y + edge.b.y) / 2 };
     const plateRef = edge.kind === 'triangle' && bar ? [bar.p1, bar.p2].map(p => pts[p.id]) : null;
     hostHoles = ss.map(k => {
-      const x = mid.x + (offsetMm + k) * edge.d.x - edge.m.x * flangeHole;
-      const y = mid.y + (offsetMm + k) * edge.d.y - edge.m.y * flangeHole;
+      const x = mid.x + (offsetMm + k) * edge.d.x - edge.m.x * inset;
+      const y = mid.y + (offsetMm + k) * edge.d.y - edge.m.y * inset;
       const h = { x: r3(x), y: r3(y) };
       const uv = plateRef ? worldToLocal(plateRef, { x, y }) : null;
       if (uv) { h.u = r3(uv.u); h.v = r3(uv.v); }
@@ -78,13 +98,23 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3 } 
     hostKind: edge.kind,
     hostCompId: edge.compId,
     hostPartName: edge.partName,
+    stand: orient.edge === 'child' ? { face: orient.face === -1 ? -1 : 1 } : null,   // D3：立在板面上（1＝上面、-1＝下面）
+    hostModuleId: edge.frameModule || null,   // D2：宿主是已安裝模組的底板時為該模組 id，世界機架為 null
     childPart: `${moduleId}-frame`,
     lengthMm, wallMm, flangeMm,
     holeDiameterMm: ADAPTER_HOLE_MM,
     holesPerFlange: n,
+    tiltDeg: Number(orient.tiltDeg) || 0,   // D4：兩翼夾角＝90°＋tiltDeg
     hostHoles,
-    childHoles: ss.map(s => ({ x: r3(base.x + s * e.x + t * f.x), y: r3(base.y + s * e.y + t * f.y) }))
+    childHoles: standing ? standHoles(list, modList, mod, params, edge, ss, flangeHole, stockMm) : adapterChildHoles({ base, orient, bar, stockMm })
   };
+}
+
+// D3：立在板面時子模組底板上的孔：離站立邊 flangeHole mm、沿邊位置與宿主孔對齊（frame.d 與宿主邊 d 可能反向）。
+function standHoles(list, modList, mod, params, edge, ss, flangeHole, stockMm) {
+  // 用 home 姿態的宿主邊求 frame 即可：孔只和 base／e／f／d 的方向有關，不隨求解位姿變。
+  const frame = orthogonalFrame(list, modList, mod.id, pointCoords(list), params, { home: true, stockMm });
+  return frame ? standChildHoles(frame, edge.d, ss, flangeHole) : [];
 }
 
 // 全部直角模組的匯出附加資料：桿件孔（linkHoles）、三角板孔（plateHoles，世界座標＋板局部 u/v）、
@@ -102,12 +132,18 @@ export function orthogonalExportExtras(comps, modules, params, opts = {}) {
       (plateHoles[a.hostCompId] || (plateHoles[a.hostCompId] = []))
         .push(...a.hostHoles.map(h => ({ x: h.x, y: h.y, u: h.u, v: h.v, diameterMm: a.holeDiameterMm })));
     } else {
-      worldFrameNodes.push(...a.hostHoles.map((h, k) => ({
+      const hostNodes = a.hostHoles.map((h, k) => ({
         id: `ADP_${m.id}_h${k}`, x: h.x, y: h.y, holeDiameterMm: a.holeDiameterMm, holeLayer: ADAPTER_LAYER, outlineExempt: true
-      })));
+      }));
+      // D2：宿主是已安裝模組的底板 → 孔進該模組的底板節點（匯出座標），否則進世界機架。
+      if (a.hostModuleId) (frameNodes[a.hostModuleId] || (frameNodes[a.hostModuleId] = [])).push(...hostNodes);
+      else worldFrameNodes.push(...hostNodes);
     }
     (frameNodes[m.id] || (frameNodes[m.id] = []))
-      .push(...a.childHoles.map((h, k) => ({ id: `ADP_${m.id}_${k}`, x: h.x, y: h.y, holeDiameterMm: a.holeDiameterMm, holeLayer: ADAPTER_LAYER })));
+      .push(...a.childHoles.map((h, k) => ({
+        id: `ADP_${m.id}_${k}`, x: h.x, y: h.y, holeDiameterMm: a.holeDiameterMm, holeLayer: ADAPTER_LAYER,
+        ...(a.stand ? { outlineExempt: true } : {})   // D3：站立邊就是外框的邊，孔不撐大外框
+      })));
   });
   return { linkHoles, plateHoles, frameNodes, worldFrameNodes, adapters };
 }

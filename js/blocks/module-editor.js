@@ -7,7 +7,7 @@
 import { S } from './state.js';
 import { pointKeysFor } from './part-types.js';
 import { selectionModule, compsInPlane } from './assembly.js';
-import { mountPortName } from './bench.js';
+import { mountPortName, moduleLabels } from './bench.js';
 import {
   createModule, addOutput, inferOutput, mountModule, mountOrthogonal, unmountModule, dissolveModule, setMountFlip,
   moduleToTemplate, normalizeTemplate, instantiateTemplate, insertOffset, translateModule,
@@ -119,12 +119,14 @@ export function createModuleEditor(deps) {
   }
   function buildMountLabel(mod) {
     const host = S.modules.find(m => m.id === mod.mount.to.module);
-    const hostName = host ? host.name : mod.mount.to.module;
+    const labels = moduleLabels(S.modules);
+    const hostName = host ? labels.get(host.id) : mod.mount.to.module;
     const hostEdgeName = mod.mount.to.frame || mod.mount.to.edge !== undefined ? mountPortName(S.comps, S.modules, mod.mount, S.topo.params) : null;   // C1：板／機架的邊
     const outName = hostEdgeName ? hostEdgeName : mod.mount.to.frame ? '機架' : mod.mount.to.body
       ? ((host && (host.outputs || []).find(o => o.body && o.body.id === mod.mount.to.body) || {}).name || mod.mount.to.body)
       : (host ? outputNameOf(host, mod.mount.to.output) : mod.mount.to.output);
-    const flip = mod.mount.flip ? '（翻面）' : '';
+    const flip = (mod.mount.flip ? '（翻面）' : '') + (mod.mount.orient && mod.mount.orient.tiltDeg ? ` 傾斜 ${mod.mount.orient.tiltDeg}°` : '');   // D4：傾斜角
+    if (mod.mount.orient && mod.mount.orient.edge === 'child') return `⟂ 立在 ${hostName}・${outName}（${mod.mount.orient.face === -1 ? '下面' : '上面'}）${flip}`;   // D3
     if (mod.mount.orient) return `⟂ 直角裝在 ${hostName}・${outName}${flip}`;
     return `裝在 ${hostName}・${outName}${flip}`;
   }
@@ -132,10 +134,11 @@ export function createModuleEditor(deps) {
   function candidatesFor(mod) {
     if (mod.mount) return [];
     const list = [];
+    const labels = moduleLabels(S.modules);
     S.modules.forEach(m => {
       if (m.id === mod.id || isDescendant(S.modules, m.id, mod.id)) return;
       (m.outputs || []).forEach(o => {
-        const item = { module: m.id, output: o.id, label: `${m.name}・${o.name}` };
+        const item = { module: m.id, output: o.id, label: `${labels.get(m.id)}・${o.name}` };
         if (o.orthogonal && (o.orthogonal.side === 1 || o.orthogonal.side === -1)) item.orthogonal = true;
         list.push(item);
       });

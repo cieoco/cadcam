@@ -396,7 +396,9 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
       spanMm: r3(Math.max(hostPart.thicknessMm, childPart.thicknessMm) + a.wallMm),
       standoffMm: 0,
       spacers: [],
-      holesPerFlange: a.holesPerFlange
+      holesPerFlange: a.holesPerFlange,
+      ...(a.tiltDeg ? { tiltDeg: a.tiltDeg } : {}),   // D4：傾斜角（兩翼夾角＝90°＋tiltDeg）
+      ...(a.stand ? { stand: { face: a.stand.face } } : {})   // D3：子模組立在宿主板面上
     });
   });
 
@@ -414,6 +416,12 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
 // ---- 五金清單 ----
 // 回傳 [{ spec, qty, note }]：M3 螺絲（依關節總厚估長度）、孔圖層對應的固定螺絲、
 // 防鬆螺帽（穿透式 M3 螺絲各一顆）、馬達。同規格合併成一列，note 寫用途明細。
+// D4：傾斜的轉接座說明，例如「轉接座兩翼夾角 120°（傾斜 30°）」；兩翼夾角＝90°＋傾斜角。
+export function bracketAngleText(tiltDeg) {
+  const t = Number(tiltDeg) || 0;
+  return `轉接座兩翼夾角 ${90 + t}°（傾斜 ${t}°）`;
+}
+
 // 直角轉接座的螺絲：穿過「板厚＋轉接座壁厚」再加防鬆螺帽；孔徑固定 3.2，一律是 M3。
 export function adapterScrewSpec(joint) {
   if (!joint || joint.kind !== 'adapter') return null;
@@ -448,10 +456,12 @@ export function hardwareList(plan, { modules = [] } = {}) {
   const spacerRows = new Map();   // mm -> { qty, belows:Map(key -> {plane, below}) }（只算有螺絲的關節；馬達軸不算）
   const standoffRows = new Map(); // mm -> qty（L7 隔柱：螺絲中間沒有板的地方）
   let adapters = 0;
+  const tiltNotes = [];   // D4：傾斜的轉接座
   joints.forEach(j => {
     if (j.kind === 'adapter') {
       // 每個轉接座兩翼各 holesPerFlange 顆 M3，都穿透鎖防鬆螺帽。
       adapters += 1;
+      if (Number(j.tiltDeg)) tiltNotes.push(`${j.id.replace(/^ADP-/, '')}：${bracketAngleText(j.tiltDeg)}`);
       addScrew(adapterScrewSpec(j), '轉接座', 2 * (Number(j.holesPerFlange) || 2), true);
       return;
     }
@@ -493,7 +503,7 @@ export function hardwareList(plan, { modules = [] } = {}) {
   [...standoffRows.entries()].sort((a, b) => a[0] - b[0]).forEach(([mm, qty]) => {
     rows.push({ spec: `M3 隔柱 ${fmtNum(mm)} mm`, qty, note: '對鎖螺絲中間沒有板的地方用隔柱撐住' });
   });
-  if (adapters > 0) rows.push({ spec: '3D 列印轉接座', qty: adapters, note: 'L 形，STL 另外下載列印' });
+  if (adapters > 0) rows.push({ spec: '3D 列印轉接座', qty: adapters, note: `L 形，STL 另外下載列印${tiltNotes.length ? '；' + tiltNotes.join('；') : ''}` });
   if (nuts > 0) rows.push({ spec: 'M3 防鬆螺帽', qty: nuts, note: '穿透式 M3 螺絲各一顆（鎖進輪轂的 M3×8 不需要）' });
   const ttCount = motors.filter(m => m.type === 'tt').length;
   const servoCount = motors.filter(m => m.type === 'mg995').length;
@@ -567,10 +577,10 @@ ${adapterJoints.map(j => {
     const n = Number(j.holesPerFlange) || 2;
     const [hostName, childName] = j.parts;
     return `<section class="step"><h3>轉接座 ${e(j.id)}：${e(hostName)} ⟂ ${e(childName)}</h3><ol>
-<li>用 3D 印表機印出轉接座（下載 STL），填充約 100%，孔徑 3.2 mm 不縮小；L 形兩翼各 ${n} 個 M3 穿孔。</li>
-<li>翼 A 貼在宿主桿 ${e(hostName)} 上，用 ${n} 顆 ${e(spec)} 穿過桿與翼 A，鎖防鬆螺帽。</li>
+<li>用 3D 印表機印出轉接座（下載 STL），填充約 100%，孔徑 3.2 mm 不縮小；L 形兩翼各 ${n} 個 M3 穿孔。${j.tiltDeg ? e(bracketAngleText(j.tiltDeg)) + '。' : ''}</li>
+${j.stand ? `<li>子模組底板 ${e(childName)} 立在 ${e(hostName)} 的板面上（${j.stand.face === -1 ? '下面' : '上面'}），正面貼齊邊緣，板子與板面成 90°。</li>\n` : ''}<li>翼 A 貼在宿主桿 ${e(hostName)} 上，用 ${n} 顆 ${e(spec)} 穿過桿與翼 A，鎖防鬆螺帽。</li>
 <li>翼 B 貼在子模組底板 ${e(childName)} 上，用 ${n} 顆 ${e(spec)} 穿過底板與翼 B，鎖防鬆螺帽。</li>
-<li>確認子模組與宿主桿成 90°（子模組的板面垂直於宿主的板面），再開始轉動測試。</li>
+<li>${j.tiltDeg ? `確認子模組與宿主桿的夾角為 ${90 + Number(j.tiltDeg)}°（傾斜 ${j.tiltDeg}°，${j.tiltDeg > 0 ? '往外打開' : '往內合起'}）` : '確認子模組與宿主桿成 90°（子模組的板面垂直於宿主的板面）'}，再開始轉動測試。</li>
 </ol></section>`;
   }).join('')}
 ` : '';

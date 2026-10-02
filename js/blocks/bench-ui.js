@@ -15,7 +15,7 @@ import * as Bench from './bench.js';
 import { resolveSpacers, findInterference, interferenceTimeline, hitPartNames } from './interference.js';
 import { setMountFlip, unmountModule } from './module-ops.js';
 import { pointKeysFor } from './part-types.js';
-import { applyMatrix4 } from '../blocks3d/orthogonal-3d.js';
+import { applyMatrix4, moduleFrameZ } from '../blocks3d/orthogonal-3d.js';
 
 const SNAP_PX = 40;          // 拖曳吸附半徑（螢幕 px）
 const TAP_PX_MOUSE = 26;     // 點接口的命中半徑（滑鼠）
@@ -54,6 +54,7 @@ export function createBench(deps) {
   let listSig = '', panelSig = '';
   const cards = new Map();   // moduleId -> 卡片 DOM（就地更新，不重建，拖曳中的卡片才不會被換掉）
   let drag = null;
+  let labels = new Map();    // moduleId -> 顯示標籤（同名模組加編號）
 
   const listEl = () => document.getElementById('benchList');
   const panelEl = () => document.getElementById('benchPanel');
@@ -61,6 +62,7 @@ export function createBench(deps) {
   const modOf = id => S.modules.find(m => m && m.id === id) || null;
   const isBench = () => S.mode === 'bench';
   const hasChildren = mod => S.modules.some(m => m && m.mount && m.mount.to && m.mount.to.module === mod.id);
+  const displayName = id => labels.get(id) || id;
 
   function say(msg, { toast = true } = {}) {
     st.msg = msg;
@@ -73,7 +75,7 @@ export function createBench(deps) {
   function statusOf(mod) {
     if (!mod.mount) return '未安裝';
     const host = modOf(mod.mount.to.module);
-    const hostName = host ? host.name : mod.mount.to.module;
+    const hostName = host ? displayName(host.id) : mod.mount.to.module;
     let outName = mod.mount.to.output || '';
     if (mod.mount.orient) {
       // C1：宿主邊可以是桿、三角板的邊或機架板的邊
@@ -83,7 +85,10 @@ export function createBench(deps) {
       const o = (host.outputs || []).find(x => x.id === mod.mount.to.output);
       outName = o ? o.name : outName;
     }
-    return `${mod.mount.orient ? '⟂ 直角裝在' : '裝在'} ${hostName}・${outName}${mod.mount.flip ? '（翻面）' : ''}`;
+    const o = mod.mount.orient;
+    const tilt = o && o.tiltDeg ? ` 傾斜 ${o.tiltDeg}°` : '';   // D4
+    if (o && o.edge === 'child') return `⟂ 立在 ${hostName}・${outName}（${o.face === -1 ? '下面' : '上面'}）${mod.mount.flip ? '（翻面）' : ''}${tilt}`;   // D3
+    return `${o ? '⟂ 直角裝在' : '裝在'} ${hostName}・${outName}${mod.mount.flip ? '（翻面）' : ''}${tilt}`;
   }
 
 
@@ -378,7 +383,9 @@ export function createBench(deps) {
         const pl = m.plane ? sc.planes[m.plane] : null;
         if (m.plane && !pl) return null;   // 該平面的子場景算不出來，沒辦法放進 3D
         return pl ? { ...m, localPoints: m.points, points: m.points.map(p => applyMatrix4(pl.matrix, p)) } : m;
-      }).filter(Boolean);
+      }).filter(Boolean)
+      // D2：不同模組的接口 id 可能相同（例如每個已安裝模組的底板都有 edge:frame:0），所以每個標記另有唯一的 key＝`模組id|接口id`。
+      .map(m => ({ ...m, key: `${m.module}|${m.portId}` }));
   }
   // 要畫出來的標記（不相容的只在「顯示全部接口」時畫，暗色）。
   function visibleMarkers() {
@@ -386,7 +393,7 @@ export function createBench(deps) {
     return computeMarkers().filter(m => m.compatible || st.showAll);
   }
   function toneOf(m) {
-    if (m.portId === st.snapId) return 'snap';
+    if (m.key === st.snapId) return 'snap';
     if (!m.compatible) return 'dim';
     return m.suggested ? 'suggested' : 'normal';
   }
@@ -429,6 +436,13 @@ export function createBench(deps) {
       const s = byId.get(id);
       if (s && Number.isFinite(s.z)) return s.z;
       if (id === 'frame') return model && model.frame && Number.isFinite(model.frame.z) ? model.frame.z : 0;
+      // D2：已安裝模組的底板＝`${模組id}-frame`，墊在該模組零件的最下面
+      const fm = typeof id === 'string' ? /^(.+)-frame$/.exec(id) : null;
+      if (fm && modOf(fm[1])) {
+        const z = moduleFrameZ(model, S.comps, fm[1]);
+        if (z !== null) return z;
+        return model && model.frame && Number.isFinite(model.frame.z) ? model.frame.z : 0;
+      }
       const c = S.comps.find(x => x && x.id === id);
       if (c && c.type === 'triangle') {
         const key = [c.p1, c.p2, c.p3].map(p => p && p.id).sort().join(',');
@@ -506,9 +520,9 @@ export function createBench(deps) {
     st.snapId = null;
     const mod = next && modOf(next);
     if (mod) {
-      if (mod.mount) say(`選了「${mod.name}」：${statusOf(mod)}，下面可以調整。`, { toast: false });
-      else if (!mod.base) say(`「${mod.name}」沒有基準點（base），不能安裝。`);
-      else say(`選了「${mod.name}」：點 3D 裡發亮的接口，或按右邊的接口按鈕。`, { toast: false });
+      if (mod.mount) say(`選了「${displayName(mod.id)}」：${statusOf(mod)}，下面可以調整。`, { toast: false });
+      else if (!mod.base) say(`「${displayName(mod.id)}」沒有基準點（base），不能安裝。`);
+      else say(`選了「${displayName(mod.id)}」：點 3D 裡發亮的接口，或按右邊的接口按鈕。`, { toast: false });
     }
     syncUI(true);
     drawMarkers();
@@ -516,27 +530,29 @@ export function createBench(deps) {
   }
 
   // ---------------------------------------------------------------- 預覽（點兩下／拖吸附共用）
+  // portId 可以是 `模組id|接口id`（唯一）或單獨的接口 id（舊寫法；多個模組有同名接口時取第一個相容的）。
   function pickPort(portId) {
     if (!isBench()) return false;
     const childId = st.selected;
     if (!childId) { say('請先在清單選一個要安裝的模組'); return false; }
     if (st.preview) cancelPreview({ silent: true });
     const mod = modOf(childId);
-    if (mod && mod.mount) { say(`「${mod.name}」已經裝在別處，要先按「拆下」`); return false; }
-    const marker = computeMarkers().find(m => m.portId === portId);
+    if (mod && mod.mount) { say(`「${displayName(mod.id)}」已經裝在別處，要先按「拆下」`); return false; }
+    const all = computeMarkers();
+    const marker = all.find(m => m.key === portId) || all.find(m => m.portId === portId && m.compatible) || all.find(m => m.portId === portId);
     if (!marker) { say('找不到這個接口'); return false; }
     if (!marker.compatible) { say(marker.reason || '這個接口不能接'); return false; }
-    const r = Bench.connect(S.comps, S.modules, childId, { module: marker.module, port: portId }, S.topo.params, motorState());
+    const r = Bench.connect(S.comps, S.modules, childId, { module: marker.module, port: marker.portId }, S.topo.params, motorState());
     if (!r.ok) { say(r.reason || '接不上'); return false; }
     const preSnap = snapshotStr();
     const undoLen = S.undoStack.length;
     pushUndo();
     S.comps = r.comps; S.modules = r.modules;
-    st.preview = { moduleId: childId, portId, preSnap, undoLen };
+    st.preview = { moduleId: childId, portId: marker.portId, hostId: marker.module, preSnap, undoLen };
     st.snapId = null;
     applyGhost();
     rebuild(); draw();
-    say(`預覽：「${mod.name}」接到 ${marker.moduleName}・${marker.name}。可以先調整，滿意再按「✔ 接上」。`);
+    say(`預覽：「${displayName(mod.id)}」接到 ${displayName(marker.module)}・${marker.name}。可以先調整，滿意再按「✔ 接上」。`);
     syncUI(true);
     return true;
   }
@@ -546,7 +562,7 @@ export function createBench(deps) {
     st.preview = null;
     applyGhost();
     drawMarkers();
-    say(`已接上「${mod ? mod.name : ''}」`);
+    say(`已接上「${mod ? displayName(mod.id) : ''}」`);
     syncUI(true);
     return true;
   }
@@ -566,7 +582,8 @@ export function createBench(deps) {
   const ADJUST_DONE = {
     side: '已換到宿主的另一邊',
     reverse: '已掉頭（前後反過來）',
-    rotate: '已繞接合線轉 90°'
+    rotate: '已繞接合線轉 90°',
+    face: '已換到宿主板的另一面'
   };
   function adjust(action) {
     if (!isBench()) return false;
@@ -594,11 +611,14 @@ export function createBench(deps) {
     const o = after && after.mount && after.mount.orient;
     let msg;
     if (action === 'slide+' || action === 'slide-') msg = `已沿邊滑動，位置 ${o && o.offsetMm ? (o.offsetMm > 0 ? '+' : '') + o.offsetMm : 0} mm`;
+    else if (action === 'tilt+' || action === 'tilt-') msg = o && o.tiltDeg ? `已傾斜 ${o.tiltDeg}°（兩翼夾角 ${90 + o.tiltDeg}°）` : '已回到直角（傾斜 0°）';
     else if (action === 'angle') msg = after && after.mount && after.mount.orient ? '已改成直角安裝（⟂）' : '已改成同平面安裝（═）';
     else if (action === 'flip') msg = after && after.mount && after.mount.flip ? '已翻面' : '已翻回';
-    else if (action === 'unmount') msg = `已拆下「${mod.name}」，回到原位`;
+    else if (action === 'unmount') msg = `已拆下「${displayName(mod.id)}」，回到原位`;
+    else if (action === 'stand') msg = o && o.edge === 'child' ? '已改成立在宿主的板面上（⤒）' : '已改成壓在宿主的邊上';
+    else if (action === 'rotate' && o && o.edge === 'child') msg = `已換站立邊（第 ${o.childEdge} 條底板邊）`;
     else msg = ADJUST_DONE[action] || '完成';
-    if ((action === 'rotate' || action === 'reverse') && o) msg += `（方向 ${o.childAxisDeg}°）`;
+    if ((action === 'rotate' || action === 'reverse') && o && o.edge !== 'child') msg += `（方向 ${o.childAxisDeg}°）`;
     say(msg);
     syncUI(true);
     drawMarkers();
@@ -632,6 +652,7 @@ export function createBench(deps) {
     // 預覽中的模組若被復原／讀檔弄掉了，就丟掉預覽狀態
     if (st.preview) { const pm = modOf(st.preview.moduleId); if (!pm || !pm.mount) { st.preview = null; applyGhost(); } }
     if (st.selected && !modOf(st.selected)) st.selected = null;
+    labels = Bench.moduleLabels(S.modules);
     renderList();
     renderPanel(force);
     liveCheck();
@@ -655,7 +676,7 @@ export function createBench(deps) {
     S.modules.forEach(m => {
       const c = cards.get(m.id);
       if (!c) return;
-      c.querySelector('.bench-card-name').textContent = m.name;
+      c.querySelector('.bench-card-name').textContent = displayName(m.id);
       const status = statusOf(m);
       const sEl = c.querySelector('.bench-card-status');
       sEl.textContent = status;
@@ -692,9 +713,9 @@ export function createBench(deps) {
     const shown = markers.filter(m => m.compatible || st.showAll);
     const sig = JSON.stringify([
       mod && mod.id, mod && mod.name, mod ? statusOf(mod) : '', !!st.preview, st.showAll,
-      shown.map(m => [m.portId, m.compatible, m.suggested]),
+      shown.map(m => [m.key, m.compatible, m.suggested]),
       mod ? hasChildren(mod) : false,
-      mod && mod.mount ? ['adj', ['side', 'reverse', 'rotate', 'slide-', 'slide+'].map(a => adjustState(mod, a).ok), !!mod.mount.orient, !!mod.mount.flip] : 0,
+      mod && mod.mount ? ['adj', ['side', 'reverse', 'rotate', 'slide-', 'slide+', 'stand', 'face', 'tilt-', 'tilt+'].map(a => adjustState(mod, a).ok), !!mod.mount.orient, mod.mount.orient ? mod.mount.orient.edge : '', !!mod.mount.flip] : 0,
       st.msg
     ]);
     if (!force && sig === panelSig) return;
@@ -702,7 +723,7 @@ export function createBench(deps) {
     while (root.firstChild) root.removeChild(root.firstChild);
 
     const head = el('div', 'bench-head');
-    head.appendChild(el('div', 'bench-title', mod ? mod.name : '組立台'));
+    head.appendChild(el('div', 'bench-title', mod ? displayName(mod.id) : '組立台'));
     head.appendChild(el('div', 'bench-sub', mod ? statusOf(mod) : '先從清單選一個模組'));
     root.appendChild(head);
     root.appendChild(liveBox);   // B6：即時干涉狀態＋全行程測試（持久節點，面板重建時只是搬回來）
@@ -729,10 +750,11 @@ export function createBench(deps) {
           const b = el('button', 'bench-btn bench-port' + (m.suggested ? ' suggested' : '') + (m.compatible ? '' : ' incompatible'));
           b.type = 'button';
           b.dataset.port = m.portId;
-          b.appendChild(el('span', 'bench-port-name', `${m.suggested ? '★ ' : ''}${m.moduleName}・${m.name}`));
+          b.dataset.module = m.module;
+          b.appendChild(el('span', 'bench-port-name', `${m.suggested ? '★ ' : ''}${displayName(m.module)}・${m.name}`));
           b.appendChild(el('small', 'bench-port-kind', m.compatible ? (m.kind === 'bolt' ? '═ 同平面對鎖' : '⟂ 直角安裝') : (m.reason || '不能接')));
           if (!m.compatible) b.setAttribute('aria-disabled', 'true');
-          b.addEventListener('click', () => pickPort(m.portId));
+          b.addEventListener('click', () => pickPort(m.key));
           return b;
         };
         const list = el('div', 'bench-ports');
@@ -766,9 +788,11 @@ export function createBench(deps) {
       const sec = el('div', 'bench-section');
       sec.appendChild(el('div', 'bench-label', '調整'));
       const grid = el('div', 'bench-grid');
+      const standing = !!(mod.mount.orient && mod.mount.orient.edge === 'child');   // D3
       const defs = [
-        ['angle', '⟂/═ 直角↔同平面'], ['rotate', '↻ 轉 90°'], ['reverse', '⟲ 掉頭'], ['side', '⇅ 換邊'],
-        ['slide-', '◀ 5mm'], ['slide+', '5mm ▶'], ['flip', '翻面'], ['unmount', '拆下'], ['edit', '✏️ 編輯此模組']
+        ['angle', '⟂/═ 直角↔同平面'], ['rotate', standing ? '↻ 換站立邊' : '↻ 轉 90°'], ['reverse', '⟲ 掉頭'], ['side', '⇅ 換邊'],
+        ['stand', standing ? '⤒ 壓在邊上' : '⤒ 立在面上'], ['face', '⇵ 換面'],
+        ['slide-', '◀ 5mm'], ['slide+', '5mm ▶'], ['tilt-', '◣ 傾斜 −15°'], ['tilt+', '傾斜 +15° ◢'], ['flip', '翻面'], ['unmount', '拆下'], ['edit', '✏️ 編輯此模組']
       ];
       defs.forEach(([action, label]) => {
         const state = adjustState(mod, action);
@@ -850,7 +874,7 @@ export function createBench(deps) {
       const m = nearestMarker(e.clientX, e.clientY, e.pointerType === 'mouse' ? TAP_PX_MOUSE : TAP_PX_TOUCH, false);
       if (!m) return;
       if (!m.compatible) { say(m.reason || '這個接口不能接'); return; }
-      pickPort(m.portId);
+      pickPort(m.key);
     });
   }
 
@@ -870,9 +894,9 @@ export function createBench(deps) {
       if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < DRAG_START_PX) return;
       drag.active = true;
       const mod = modOf(drag.id);
-      if (mod && mod.mount) say(`「${mod.name}」已經裝上了，要先「拆下」才能重新拖到別處`);
+      if (mod && mod.mount) say(`「${displayName(mod.id)}」已經裝上了，要先「拆下」才能重新拖到別處`);
       else select(drag.id);
-      const proxy = el('div', 'bench-drag-proxy', mod ? `🧩 ${mod.name}` : '🧩');
+      const proxy = el('div', 'bench-drag-proxy', mod ? `🧩 ${displayName(mod.id)}` : '🧩');
       document.body.appendChild(proxy);
       drag.proxy = proxy;
       document.body.classList.add('bench-dragging');
@@ -884,7 +908,7 @@ export function createBench(deps) {
     let snap = null;
     if (mod && !mod.mount && !st.preview && viewer()) {
       const m = nearestMarker(e.clientX, e.clientY, SNAP_PX, true);
-      snap = m ? m.portId : null;
+      snap = m ? m.key : null;
     }
     if (snap !== st.snapId) { st.snapId = snap; drawMarkers(); }
     drag.proxy.classList.toggle('snapping', !!snap);
@@ -938,9 +962,10 @@ export function createBench(deps) {
       selected: st.selected,
       markers: vis.length,
       markersAll: all.length,
+      markerList: all.map(m => ({ key: m.key, portId: m.portId, module: m.module, compatible: m.compatible })),   // D2：含宿主模組，同名接口分得開
       compatible: all.filter(m => m.compatible).map(m => m.portId),
       suggested: all.filter(m => m.suggested && m.compatible).map(m => m.portId),
-      preview: st.preview ? { moduleId: st.preview.moduleId, portId: st.preview.portId } : null,
+      preview: st.preview ? { moduleId: st.preview.moduleId, portId: st.preview.portId, hostId: st.preview.hostId } : null,
       snap: st.snapId,
       showAll: st.showAll,
       msg: st.msg,
@@ -955,12 +980,19 @@ export function createBench(deps) {
         }).filter(Boolean) : []];
       })),
       // 方便測試：某個標記在螢幕上的位置（clientX/Y）。edge 取線段中點。
-      screen: Object.fromEntries(all.map(m => {
-        const v = viewer();
-        const ps = v ? m.points.map(p => v.project(p)) : [];
-        if (!ps.length || ps.some(p => !p)) return [m.portId, null];
-        return [m.portId, { x: ps.reduce((s, p) => s + p.x, 0) / ps.length, y: ps.reduce((s, p) => s + p.y, 0) / ps.length }];
-      }))
+      // key＝`模組id|接口id`（唯一）；舊的單獨接口 id 也保留（同名時留第一個）。
+      screen: (() => {
+        const out = {};
+        all.forEach(m => {
+          const v = viewer();
+          const ps = v ? m.points.map(p => v.project(p)) : [];
+          const at = !ps.length || ps.some(p => !p) ? null
+            : { x: ps.reduce((s, p) => s + p.x, 0) / ps.length, y: ps.reduce((s, p) => s + p.y, 0) / ps.length };
+          out[m.key] = at;
+          if (!(m.portId in out)) out[m.portId] = at;
+        });
+        return out;
+      })()
     };
   }
 
