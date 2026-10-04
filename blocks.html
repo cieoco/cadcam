@@ -539,29 +539,12 @@
       box-shadow: none; background: transparent; z-index: auto;
     }
   </style>
-  <link rel="stylesheet" href="js/blocks/teaching.css?v=20261005_course_r1">
+  <link rel="stylesheet" href="js/blocks/workspace-mobile.css?v=20261005_simple_r1">
   <script type="importmap">
     { "imports": { "three": "./js/vendor/three.module.js" } }
   </script>
 </head>
 <body>
-  <section class="teaching-tools" id="teachingTools" aria-label="教學與快速試錯">
-    <div class="teaching-bar">
-      <button id="lessonStart" type="button">開始第一課</button>
-      <button id="lessonToggle" type="button" aria-expanded="false" aria-controls="teachingPanel">教學任務</button>
-      <button id="lessonUndo" type="button" disabled>↩ 復原</button>
-      <button id="lessonReset" type="button" disabled title="重載本課初始範例；可復原回修改前">重設本課</button>
-      <button id="lessonHideEditor" type="button">收起面板</button>
-      <label><input id="lessonRoles" type="checkbox">角色標示</label>
-      <a href="teaching.html" target="_blank" rel="noopener">教案／學習單</a>
-    </div>
-    <div id="teachingPanel" hidden>
-      <strong id="teachingTitle"></strong>
-      <div id="teachingBody"></div>
-      <p class="teaching-caveat">模擬用於觀察運動關係；不代表已驗證負載、摩擦、夾持力或實體碰撞。教學可隨時收起，自由試錯。</p>
-    </div>
-    <p id="teachingFeedback" role="status"></p>
-  </section>
   <header class="appbar">
     <div class="app-identity">
       <h1>🧩 機構積木</h1>
@@ -572,6 +555,7 @@
       <button type="button" role="tab" id="modeBtnBench" class="mode-seg" aria-selected="false" onclick="window.blocks.setMode('bench')">🧩 組立</button>
     </div>
     <div class="toolbar project-actions">
+      <a class="tool-btn" href="teaching.html" target="_blank" rel="noopener">教學</a>
       <button class="tool-btn toolbar-icon" id="btnUndo" onclick="window.blocks.undo()" disabled title="復原上一步">↩</button>
       <button class="tool-btn toolbar-icon" onclick="window.blocks.saveFile()" title="存成檔案">💾</button>
       <button class="tool-btn toolbar-icon" onclick="window.blocks.openFile()" title="開啟檔案">📂</button>
@@ -1112,7 +1096,7 @@
       "./js/blocks/assembly.js": "./js/blocks/assembly.js?v=20261003_g1",
       "./js/blocks/design-focus.js": "./js/blocks/design-focus.js?v=20261003_h1",
       "./js/blocks/design-tabs-ui.js": "./js/blocks/design-tabs-ui.js?v=20261003_h1",
-      "./js/blocks/tools.js": "./js/blocks/tools.js?v=20261005_course_r1",
+      "./js/blocks/tools.js": "./js/blocks/tools.js?v=20261005_simple_r1",
       "./js/blocks/input.js": "./js/blocks/input.js?v=20260930_b2",
       "./js/blocks/state.js": "./js/blocks/state.js?v=20261003_h1",
       "./js/blocks/panels.js": "./js/blocks/panels.js?v=20260930_p1",
@@ -1127,6 +1111,6 @@
       "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261003_g2"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20261005_course_r1"></script>
+  <script type="module" src="js/blocks/app.js?v=20261005_simple_r1"></script>
 </body>
 </html>

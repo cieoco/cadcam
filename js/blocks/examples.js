@@ -262,6 +262,24 @@ const ALL_BLOCK_EXAMPLES = [
     }
   },
   {
+    id: 'fourbar-missing-coupler',
+    title: '四連桿：練習範例（補接浮桿）',
+    note: '先暫停，用連桿連接兩個活動端，再播放觀察。',
+    snapshot: {
+      kind: 'blocks', v: 1, counter: 6,
+      comps: [
+        { type: 'anchor', id: 'Anchor1', p1: pt('A', 'fixed', -80, 0) },
+        { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 20, 0) },
+        bar('Link1', pt('A', 'fixed', -80, 0, { physicalMotor: '1' }), pt('C', 'floating', -48, 0), 32, {
+          color: '#e74c3c', isInput: true, physicalMotor: '1', phaseOffset: 0
+        }),
+        // 與完整範例正規化後的姿勢一致：C–D = 104 mm，B–D = 80 mm。
+        bar('Link3', pt('B', 'fixed', 20, 0), pt('D', 'floating', 18.470588235294116, 79.98537928680453), 80)
+      ],
+      params: { LL1: 32, LL3: 80 }
+    }
+  },
+  {
     id: 'fourbar-double-crank',
     title: '四連桿：雙曲柄',
     note: '最短的機架帶動兩側曲柄都整圈旋轉；可觀察輸入和輸出如何同時連續轉動。',

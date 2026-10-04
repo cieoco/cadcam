@@ -668,7 +668,7 @@ export function finishDrawLink(e) {
   exitDrawLink();
   rebuild(); draw();
   selectLink('Link' + n);
-  if (connectedBoth) setBanner('已連接兩個接點；可檢查連接，再播放觀察。');
+  if (connectedBoth) setBanner('已連接兩個接點，可播放觀察。');
 }
 // 滑軌：軌道兩端釘地（fixed），中點放一個滑塊點（floating），沿軌道滑動。
 // 之後用🔵連桿把曲柄端接到滑塊點，compile 會自動把它解成 slider（滑塊曲柄）。

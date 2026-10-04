@@ -28,9 +28,8 @@ import * as Input from './input.js?v=20261004_fourbar_r1';     // 指標 / 手�
 import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
-import { createTeachingUI } from './teaching-ui.js?v=20261005_course_r1';
-import { getTeachingFeedback, teachingRoles } from './teaching-feedback.js';
-import { measureFourbarSwing } from './fourbar-measurement.js';
+import { offerExampleFromUrl } from './example-entry.js?v=20261005_simple_r1';
+import { getTeachingFeedback } from './teaching-feedback.js';
 import * as Motion from './motion.js';
 import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostEdge, hostPlateThickness } from './assembly.js';
 import { normalizeModules } from './module-schema.js';
@@ -46,7 +45,7 @@ import * as Store from './storage.js';
 import * as Exporters from './exporters.js';
 import { localToWorld, plateVertices, plateShapeMode, createPlateGeometry } from './plate-geometry.js';
 import { S, activateMotor, motorAnglesNow, frozenMotorAngles, usedMotorIds } from './state.js';  // 跨模組共享的可變狀態與多馬達 helper
-import { createExampleController } from './example-controller.js?v=20261004_fourbar_r1';
+import { createExampleController } from './example-controller.js?v=20261005_simple_r1';
 import { createGripperController } from './gripper-controller.js?v=20260925_r1b2';
 import { createGripperObject } from './gripper-object.js?v=20260925_r1b2';
 import { createGearEditor, rackPhaseShift } from './gear-editor.js?v=20261004_fourbar_r1';
@@ -117,8 +116,6 @@ const motorSnapshotState = () => ({
   modules: S.modules
 });
 let gripperController = null;
-let teachingUI = null;
-let teachingPointIds = [];
 const undoLessons = new Map();
 function snapshotStr() {
   return JSON.stringify(Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()));
@@ -142,7 +139,7 @@ function updateUndoBtn(recordLesson = false) {
     if (!count) undoLessons.delete(key);
     else if (lessons.length > count) lessons.splice(0, lessons.length - count);
   }
-  ['btnUndo', 'memberUndoBtn', 'lessonUndo'].forEach(id => {
+  ['btnUndo', 'memberUndoBtn'].forEach(id => {
     const btn = document.getElementById(id);
     if (btn) btn.disabled = S.undoStack.length === 0;
   });
@@ -163,7 +160,6 @@ function scheduleAutosave() {
 
 // 套用一份 snapshot 到目前狀態。recordUndo 預設 true（外部開檔/分享要能 undo）。
 function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external' } = {}) {
-  teachingUI?.snapshotApplied?.(source);
   if (recordUndo) pushUndo();
   pause();
   cancelMotorMode();
@@ -226,7 +222,6 @@ function normalizeIncomingSnapshot(raw) {
 
 const exampleController = createExampleController({
   applySnapshot, notify: transient, closeMobileMenu: closeMobileOpenMenu,
-  onLesson: example => { teachingUI?.lessonChanged(example); queueMicrotask(draw); },
   isMobile: () => mobilePrompt(), showBuildPanel: () => setMobilePanel('build')
 });
 const populateExamples = () => exampleController.populate();
@@ -1140,81 +1135,7 @@ function updateMechanismStatus(sol = null) {
   el.title = title;
   const feedback = getTeachingFeedback({ comps: S.comps, sol, compiled: S.compiled,
     hasDrive: hasDriveSource(), gearWarning: gearMeshHasWarning(), dof: mobility });
-  teachingPointIds = feedback.pointIds;
-  const help = document.getElementById('teachingFeedback');
-  const expectedAssembly = teachingUI?.expectedMissingLink && !(sol && sol.isValid === false);
-  const message = expectedAssembly ? (teachingUI.hintsEnabled ? '練習起點：請用連桿補接兩個活動端，再檢查連接。' : '考驗：請完成機構，再檢查連接並播放觀察。')
-    : ['error', 'warn', 'static'].includes(state) ? feedback.message : '';
-  if (expectedAssembly) {
-    teachingPointIds = [];
-    el.dataset.state = 'idle'; el.textContent = '待完成組裝'; el.title = message;
-  }
-  if (help && help.textContent !== message) help.textContent = message;
-}
-
-// 教學標籤不攔截拖曳；只標出求解器確實指出的接點，不猜測故障零件。
-function drawTeachingLabels(pts) {
-  svg.querySelector('[data-teaching-labels]')?.remove();
-  const fourbarLesson = teachingUI?.rolesEnabled && (teachingUI.courseActive || exampleController.activeExampleId.startsWith('fourbar-'));
-  const roles = teachingUI?.rolesEnabled && !fourbarLesson ? teachingRoles(viewComps(), S.topo.tracePoint) : {};
-  const ids = new Set([...Object.keys(roles), ...teachingPointIds]);
-  if (!ids.size && !fourbarLesson) return;
-  const group = document.createElementNS(SVG_NS, 'g');
-  group.dataset.teachingLabels = 'true'; group.style.pointerEvents = 'none';
-  const unit = 1 / (svg.getScreenCTM()?.a || 1);
-  if (teachingUI?.hintsEnabled && teachingUI.assemblyExpected) {
-    ['C', 'D'].forEach(id => {
-      const p = pts[id];
-      if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
-      const ring = document.createElementNS(SVG_NS, 'circle');
-      ring.setAttribute('cx', TX(p.x)); ring.setAttribute('cy', TY(p.y));
-      ring.setAttribute('r', 13 * unit); ring.setAttribute('fill', 'none');
-      ring.setAttribute('stroke', '#16835c'); ring.setAttribute('stroke-width', 3 * unit);
-      group.append(ring);
-      const hint = document.createElementNS(SVG_NS, 'text');
-      hint.setAttribute('x', TX(p.x) + 17 * unit); hint.setAttribute('y', TY(p.y) - 12 * unit);
-      hint.setAttribute('font-size', 13 * unit); hint.setAttribute('fill', '#116b4c');
-      hint.textContent = `${id} 連接處`; group.append(hint);
-    });
-  }
-  if (fourbarLesson) {
-    [['A', 'B', 'AB 固定桿（機架）', 0, -32], ['C', 'D', 'CD 浮桿', 0, -18],
-      ['A', 'C', 'AC 主動桿', -44, -12], ['B', 'D', 'BD 從動桿', 44, 0]].forEach(([a, b, text, dx, dy]) => {
-      if (a === 'C' && b === 'D' && teachingUI?.assemblyExpected) return;
-      const p = pts[a], q = pts[b];
-      if (!p || !q || ![p.x, p.y, q.x, q.y].every(Number.isFinite)) return;
-      const label = document.createElementNS(SVG_NS, 'text');
-      label.setAttribute('x', TX((p.x + q.x) / 2) + dx * unit);
-      label.setAttribute('y', TY((p.y + q.y) / 2) + dy * unit);
-      label.setAttribute('text-anchor', 'middle'); label.setAttribute('font-size', 12 * unit);
-      label.setAttribute('font-weight', 700); label.setAttribute('fill', '#16446b');
-      label.setAttribute('stroke', '#fff'); label.setAttribute('stroke-width', 3 * unit);
-      label.setAttribute('paint-order', 'stroke'); label.textContent = text; group.append(label);
-    });
-  }
-  ids.forEach(id => {
-    if (isHiddenSliderRailPoint(id)) return;
-    const p = pts[id];
-    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
-    const warning = teachingPointIds.includes(id);
-    if (warning) {
-      const ring = document.createElementNS(SVG_NS, 'circle');
-      ring.setAttribute('cx', TX(p.x)); ring.setAttribute('cy', TY(p.y));
-      ring.setAttribute('r', 17 * unit); ring.setAttribute('fill', 'none');
-      ring.setAttribute('stroke', '#b45309'); ring.setAttribute('stroke-width', 3);
-      ring.setAttribute('stroke-dasharray', '4 3'); group.append(ring);
-    }
-    const label = document.createElementNS(SVG_NS, 'text');
-    label.setAttribute('x', TX(p.x));
-    label.setAttribute('text-anchor', 'middle');
-    label.setAttribute('y', TY(p.y) + (roles[id]?.includes('輸入') || roles[id]?.includes('輸出') ? -34 : 34) * unit);
-    label.setAttribute('fill', warning ? '#92400e' : '#16446b');
-    label.setAttribute('font-size', 12 * unit); label.setAttribute('font-weight', 700);
-    label.setAttribute('stroke', '#fff'); label.setAttribute('stroke-width', 3 * unit);
-    label.setAttribute('paint-order', 'stroke');
-    label.textContent = `${id} ${warning ? '檢查連接' : roles[id]}`; group.append(label);
-  });
-  svg.append(group);
+  if (['error', 'warn', 'static'].includes(state)) el.title += '\n' + feedback.message;
 }
 
 // 算馬達本體的朝向（度）：對準接在中心、非曲柄的那根桿；沒有就朝滑軌另一固定孔；再沒有才朝最近地錨。
@@ -1606,7 +1527,6 @@ function draw() {
     polygons: S.compiled.visualization.polygons || [], sliderTravelStart, sliderTravelEnd,
     sliderBodyLength, rackBodyHeight, rackPhaseShift, pulleyRadius, pulleyPinRadius
   });
-  drawTeachingLabels(pts);
   if (view3DActive) push3D();
 }
 
@@ -1689,7 +1609,6 @@ function renderFrame() {
   }
   if (recountBanner) recountBanner(pts, sol);
   updateMechanismStatus(sol);
-  drawTeachingLabels(pts);
   // 3D 鏡像：沿用重建時算好的結構，只換這一幀的 pts
   if (view3DActive && lastModelInputs) {
     const cams = (lastModelInputs.cams || []).map(c => ({ ...c, thetaDeg: S.theta }));
@@ -2066,7 +1985,6 @@ function pause() {
   document.getElementById('playBtn').textContent = '▶';
 }
 function togglePlay() {
-  if (teachingUI?.assemblyExpected) { pause(); transient('請先完成連接，再播放觀察。'); return; }
   raf ? pause() : play();
 }
 
@@ -2682,40 +2600,7 @@ function init() {
   Settings.loadExportSettings();
   Settings.loadTtMountSettings();
   Settings.loadMg995MountSettings();
-  teachingUI = createTeachingUI({ loadExample, undo, saveFile, openFile, togglePlay, fitView,
-    getSnapshot: () => JSON.parse(snapshotStr()),
-    applyLessonSnapshot: raw => {
-      const norm = Store.normalizeSnapshot(raw);
-      if (!norm) return false;
-      applySnapshot(norm, { source: 'lesson', recordUndo: false });
-      S.undoStack.length = 0; undoLessons.clear(); updateUndoBtn();
-      return true;
-    },
-    startLink: () => { pause(); Tools.startDrawLink(); },
-    onCourseState: state => {
-      document.body.dataset.courseActive = String(!!state.active);
-      document.body.dataset.courseStage = state.stage || '';
-      if (!state.active) {
-        delete document.body.dataset.courseMore;
-        const more = document.getElementById('courseMoreParts');
-        if (more) { more.textContent = '更多零件'; more.setAttribute('aria-expanded', 'false'); }
-      }
-      queueMicrotask(draw);
-    },
-    selectMember: id => { pause(); selectLink(id); },
-    measureSwing: () => { pause(); return measureFourbarSwing(S.comps, S.topo.params); }
-  });
   populateExamples();
-  const moreParts = document.createElement('button');
-  moreParts.id = 'courseMoreParts'; moreParts.type = 'button';
-  moreParts.textContent = '更多零件'; moreParts.setAttribute('aria-expanded', 'false');
-  moreParts.onclick = () => {
-    const open = document.body.dataset.courseMore !== 'true';
-    document.body.dataset.courseMore = String(open);
-    moreParts.textContent = open ? '收起其他零件' : '更多零件';
-    moreParts.setAttribute('aria-expanded', String(open));
-  };
-  document.querySelector('.tray')?.append(moreParts);
   let loaded = false;
   try {
     const hashObj = Store.readShareFromHash();
@@ -2736,6 +2621,7 @@ function init() {
   setMobilePanel('build');
   updateUndoBtn();
   syncFrameOptionButtons();
+  offerExampleFromUrl({ loadExample, notify: transient });
 }
 
 window.blocks = { setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample };
