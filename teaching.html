@@ -15,6 +15,8 @@
 .support dl{display:grid;grid-template-columns:minmax(100px,150px) 1fr;gap:10px 16px}.support dt{font-weight:700}.support dd{margin:0}.entry-link:focus-visible,summary:focus-visible{outline:3px solid #df6b38;outline-offset:4px}
 @media(max-width:620px){.task-list{grid-template-columns:1fr}.task{padding:18px}h1{font-size:2rem}.support dl{grid-template-columns:1fr;gap:4px}.support dd{margin-bottom:10px}}
 @media print{.task-list{gap:10px}.task{padding:12px}.entry-link{background:none;color:var(--blue);border:1px solid var(--line)}.support:not([open]){display:none}}
+
+.task.challenge{grid-column:1/-1}.missions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}.mission{background:white;border:1px solid #e6bda3;border-radius:12px;padding:16px}.mission h3{font-size:1.08rem;margin:0 0 12px}.mission details{margin:12px 0}.mission summary{cursor:pointer;min-height:44px;padding:10px 0;color:var(--blue)}.mission-check{display:flex;align-items:flex-start;gap:10px;padding:12px 0;min-height:44px;font-weight:700;cursor:pointer}.mission-check input{flex:0 0 auto;width:20px;height:20px;margin-top:4px;accent-color:#16835c}.mission-question{border-top:1px dashed var(--line);padding-top:10px;font-size:.95rem}.mission-progress{font-weight:800;color:#116b4c}.mission:has(input:checked){border-color:#16835c;background:#f3fbf5}@media(max-width:800px){.missions{grid-template-columns:1fr}}@media print{.missions{grid-template-columns:1fr}.mission{break-inside:avoid}}
 </style></head>
 <body><main class="page">
 <p class="eyebrow">機構積木・第一單元</p>
@@ -38,10 +40,36 @@
 <p><strong>先猜，再改，再播放。</strong>結果和預測一樣嗎？</p>
 </section>
 <section class="task challenge" aria-labelledby="challenge-title">
-<h2 id="challenge-title"><span class="task-number">4</span>挑戰一下</h2>
-<p>把從動桿當作雨刷臂，讓它<strong>比原來擺得更小</strong>。</p>
-<p>一次只改一根桿，其他設定保持不變。改錯了就按「復原」再試。</p>
-<p class="record">改了哪裡？ → 結果如何？ → 下次怎麼改？</p>
+<h2 id="challenge-title"><span class="task-number">4</span>雨刷小工程師</h2>
+<p>先讓它動，再調出不同的擺動範圍。不限次數，隨時可以復原再試。</p>
+<p id="mission-progress" class="mission-progress" role="status" aria-live="polite">已完成 0 / 3 關</p>
+<div class="missions">
+<article class="mission">
+<h3>🟢 第一關｜讓雨刷動起來</h3>
+<p>補上缺少的浮桿，讓右側搖桿當雨刷臂。</p>
+<a class="entry-link" href="blocks.html?example=fourbar-missing-coupler" target="_blank" rel="noopener">開始組裝 ↗</a>
+<details><summary>卡住了？看提示</summary><p>選「連桿」，把兩個活動端的孔連起來，再按播放。</p></details>
+<label class="mission-check"><input type="checkbox" data-mission>雨刷臂能連續來回擺動</label>
+<p class="mission-question">想一想：哪根桿把動作傳到雨刷臂？</p>
+</article>
+<article class="mission">
+<h3>🟡 第二關｜小範圍模式</h3>
+<p>開啟完整範例，先截圖記住兩個擺動極限。只改一根桿，讓雨刷臂擺得更小。</p>
+<a class="entry-link" href="blocks.html?example=fourbar-crank-rocker" target="_blank" rel="noopener">開啟比較起點 ↗</a>
+<details><summary>卡住了？看提示</summary><p>先選右側搖桿，把孔距增加一次（＋8 mm），播放並和原來比較。</p></details>
+<label class="mission-check"><input type="checkbox" data-mission>比原來擺得小，而且仍能連續運動</label>
+<p class="mission-question">想一想：改了哪根桿？結果和預測一樣嗎？</p>
+</article>
+<article class="mission">
+<h3>🟠 第三關｜大範圍模式</h3>
+<p>先保存第二關作品，再開啟同一個完整範例。一次只改一根桿，讓雨刷臂擺得更大。</p>
+<details><summary>卡住了？看提示</summary><p>試試把右側搖桿改短一次，再觀察。若無法連續運動，先復原，換一種修改。</p></details>
+<label class="mission-check"><input type="checkbox" data-mission>比原來擺得大，而且仍能連續運動</label>
+<p class="mission-question">想一想：哪次修改有效？拿前後畫面說明。</p>
+</article>
+</div>
+<p class="record">🏁 任務成果：原始、小範圍、大範圍的對照截圖＋一句發現。</p>
+<p class="small">自己檢核，不比速度、不扣失敗分。勾選只記錄本頁進度，重新整理會清除；不會自動判定機構是否過關。本課比較擺動角度範圍。</p>
 </section>
 </div>
 <p class="small">完成後：存下作品，分享一張截圖和一句發現。</p>
@@ -74,4 +102,14 @@
 <div class="worksheet"><h3>E｜保存、提交與下一個單元</h3><p>下載作品 JSON、截圖與本學習單一起提交；重新開啟作品檢查存檔。作品檔名：<span class="write"></span>　提交位置：<span class="write"></span></p><p>接下來依序認識：<strong>平行四連桿 → 滑塊曲柄 → 齒輪對 → 齒輪齒條</strong>。</p><p>我最想先知道的是：</p><span class="longwrite"></span></div>
 </details>
 <p class="footer"><a href="blocks.html">回到機構積木</a> · 教師資料與學習單展開後可列印。</p>
-</main></body></html>
+</main>
+<script>
+const checks = [...document.querySelectorAll('[data-mission]')];
+checks.forEach(check => check.addEventListener('change', () => {
+  const done = checks.filter(item => item.checked).length;
+  document.getElementById('mission-progress').textContent = done === checks.length
+    ? '🏁 三關完成！準備用截圖分享你的發現。'
+    : `已完成 ${done} / ${checks.length} 關`;
+}));
+</script>
+</body></html>
