@@ -5,15 +5,59 @@
 <title>機構積木：四連桿單元</title>
 <style>
 :root{--ink:#18324b;--blue:#176b87;--pale:#eaf5f7;--line:#b8cbd2;--accent:#df6b38}*{box-sizing:border-box}body{margin:0;background:#eef3f4;color:#223746;font:17px/1.65 system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif}.page{max-width:900px;margin:auto;background:#fff;padding:clamp(20px,5vw,56px);box-shadow:0 8px 32px #18324b18}h1,h2,h3{color:var(--ink);line-height:1.25}h1{font-size:clamp(2rem,6vw,3.3rem);margin:.3em 0}h2{border-bottom:2px solid var(--line);padding-bottom:.35em;margin-top:1.7em}h3{margin-bottom:.3em}.eyebrow{color:var(--blue);font-weight:800;letter-spacing:.08em}.lead{font-size:1.15rem}.tag{display:inline-block;padding:.15em .65em;border-radius:99px;background:var(--pale);color:var(--blue);font-weight:700}.callout{border-left:5px solid var(--accent);background:#fff5ed;padding:12px 16px;margin:18px 0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.card{border:1px solid var(--line);border-radius:12px;padding:15px;break-inside:avoid}.timeline{display:grid;grid-template-columns:82px 1fr;border-top:1px solid var(--line)}.timeline div{padding:9px;border-bottom:1px solid var(--line)}.timeline .time{font-weight:800;color:var(--blue)}ol,ul{padding-left:1.4em}.steps li{padding:3px 0}.worksheet{background:#f7fafb;border:2px solid var(--ink);padding:18px;margin-top:18px}.write{display:inline-block;border-bottom:1px solid #526674;min-width:130px;height:1.7em}.longwrite{display:block;border-bottom:1px solid #526674;height:2em;margin:6px 0}.check{list-style:none;padding:0}.check li{margin:8px 0}.box{display:inline-block;width:1.1em;height:1.1em;border:1.5px solid #34495e;vertical-align:-.15em;margin-right:.5em}.measure{width:100%;border-collapse:collapse;margin:12px 0}.measure th,.measure td{border:1px solid #526674;padding:9px;text-align:left}.measure td{height:45px}.small{font-size:.92rem;color:#445b68}.script{background:#f2f6f8;padding:14px 18px;border-radius:10px}.pagebreak{break-before:page}.entry-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:24px 0}.entry-link{display:block;padding:18px 20px;border-radius:14px;background:var(--blue);color:#fff;text-decoration:none;font-weight:800;font-size:1.08rem;box-shadow:0 4px 12px #18324b20}.entry-link:hover,.entry-link:focus{background:#104e65}.entry-link span{display:block;font-size:.9rem;font-weight:500;opacity:.95;margin-top:4px}.footer{border-top:1px solid var(--line);margin-top:28px;padding-top:12px;font-size:.88rem;color:#526674}@media(max-width:620px){body{font-size:16px}.page{padding:20px 17px}.grid,.entry-links{grid-template-columns:1fr}.timeline{grid-template-columns:68px 1fr}.measure{font-size:.9rem}}@media print{@page{size:A4;margin:14mm}body{background:white;font-size:11pt;line-height:1.45}.page{max-width:none;padding:0;box-shadow:none}h1{font-size:25pt}h2{font-size:16pt;break-after:avoid}h3{font-size:12pt}.card,.callout,.worksheet,.script{break-inside:avoid}.pagebreak{break-before:page}.footer{margin-top:12px}}
+
+.task-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:24px 0}
+.task{border:1px solid var(--line);border-radius:16px;padding:22px;background:#fff;break-inside:avoid}
+.task h2{border:0;margin:0 0 12px;font-size:1.3rem}.task p{margin:10px 0}.task ol,.task ul{margin:10px 0;padding-left:1.4em}.task li{margin:7px 0}
+.task .entry-link{margin-top:18px;text-align:center;font-size:1rem;padding:12px 16px;box-shadow:none}.task.challenge{background:#fff5ed;border-color:#e6bda3}
+.task-number{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;margin-right:8px;border-radius:50%;background:var(--pale);color:var(--blue);font-size:1rem}
+.record{border-top:1px dashed #c6a993;padding-top:12px;font-weight:700}.support{border-top:1px solid var(--line);padding:14px 0}.support>summary{cursor:pointer;min-height:44px;display:list-item;padding:8px 0;font-weight:700;color:var(--blue)}
+.support dl{display:grid;grid-template-columns:minmax(100px,150px) 1fr;gap:10px 16px}.support dt{font-weight:700}.support dd{margin:0}.entry-link:focus-visible,summary:focus-visible{outline:3px solid #df6b38;outline-offset:4px}
+@media(max-width:620px){.task-list{grid-template-columns:1fr}.task{padding:18px}h1{font-size:2rem}.support dl{grid-template-columns:1fr;gap:4px}.support dd{margin-bottom:10px}}
+@media print{.task-list{gap:10px}.task{padding:12px}.entry-link{background:none;color:var(--blue);border:1px solid var(--line)}.support:not([open]){display:none}}
 </style></head>
 <body><main class="page">
-<p class="eyebrow">機構積木・四連桿單元</p><h1>四連桿：接起來、看運動、改出新點子</h1>
-<p class="lead">兩節課各 50 分鐘。先觀察完整機構，再補接缺少的浮桿、獨立再試一次；接著比較不同桿長的運動，最後回到完整範例改造。透過觀察與解釋理解四連桿如何運作。</p>
-<nav class="entry-links" aria-label="四連桿作品入口"><a class="entry-link" href="blocks.html?example=fourbar-crank-rocker" target="_blank" rel="noopener">開啟完整範例<span>觀察曲柄搖桿四連桿</span></a><a class="entry-link" href="blocks.html?example=fourbar-missing-coupler" target="_blank" rel="noopener">開啟補接浮桿練習<span>先跟著引導，再用同一練習獨立完成</span></a></nav>
-<p><span class="tag">2 節 × 50 分鐘</span>　<span class="tag">動手組裝</span>　<span class="tag">觀察與創意</span></p>
-<div class="callout"><strong>作品入口：</strong>上方兩個按鈕會在新分頁開啟完整範例或補接浮桿練習。進入工具後，網址入口會先顯示「載入此範例」確認；確認後才載入，取消則不會替換目前作品。工具會恢復原作品。請依本頁課程安排觀察、練習和記錄；作品仍可下載 JSON 保存。</div>
-<h2>先認零件與運動</h2><p>四根桿首尾相接成閉環。<strong>機架（固定桿）</strong>固定在底座；<strong>主動桿（輸入桿）</strong>接受操作或驅動；<strong>浮桿（聯接桿）</strong>連接主動桿和從動桿；<strong>從動桿（輸出桿）</strong>呈現機構傳出的運動。各桿相連的轉動接點稱為<strong>迴轉對</strong>。<strong>擺動角</strong>是從動桿在兩個極限位置之間掃過的角度範圍。</p>
-<p>曲柄可繞固定軸完整旋轉一圈，搖桿只能繞固定軸在一定角度內往復擺動。主動桿不一定是曲柄：它可能連續轉動，也可能只能來回擺動。要依實際運動判斷，不要只看它是輸入桿就認定可以整圈轉。</p>
+<p class="eyebrow">機構積木・第一單元</p>
+<h1>四連桿：接起來，動看看</h1>
+<p class="lead">看範例 → 自己接 → 想一想 → 改出不同動作</p>
+<div class="task-list">
+<section class="task" aria-labelledby="learn-title">
+<h2 id="learn-title"><span class="task-number">1</span>要學什麼？</h2>
+<p>認識四根桿，分辨<strong>整圈轉</strong>和<strong>來回擺</strong>。</p>
+<p>按播放，找找看：哪裡不動？哪根桿帶動其他桿？</p>
+<a class="entry-link" href="blocks.html?example=fourbar-crank-rocker" target="_blank" rel="noopener">開啟完整範例 ↗</a>
+</section>
+<section class="task" aria-labelledby="do-title">
+<h2 id="do-title"><span class="task-number">2</span>動手做</h2>
+<ol><li>開啟練習，選「連桿」。</li><li>把兩個活動端的孔連起來。</li><li>按播放，看看是否一起動。</li></ol>
+<a class="entry-link" href="blocks.html?example=fourbar-missing-coupler" target="_blank" rel="noopener">開啟練習範例 ↗</a>
+</section>
+<section class="task" aria-labelledby="reflect-title">
+<h2 id="reflect-title"><span class="task-number">3</span>想一想</h2>
+<ul><li>只有三根活動桿，為什麼叫<strong>四連桿</strong>？</li><li>把一根桿改長，動作會怎麼變？</li></ul>
+<p><strong>先猜，再改，再播放。</strong>結果和預測一樣嗎？</p>
+</section>
+<section class="task challenge" aria-labelledby="challenge-title">
+<h2 id="challenge-title"><span class="task-number">4</span>挑戰一下</h2>
+<p>把從動桿當作雨刷臂，讓它<strong>比原來擺得更小</strong>。</p>
+<p>一次只改一根桿，其他設定保持不變。改錯了就按「復原」再試。</p>
+<p class="record">改了哪裡？ → 結果如何？ → 下次怎麼改？</p>
+</section>
+</div>
+<p class="small">完成後：存下作品，分享一張截圖和一句發現。</p>
+<details class="support"><summary>需要時再看：名詞與操作</summary>
+<dl>
+<dt>機架（固定桿）</dt><dd>固定不動；兩個固定支點之間也算一桿。</dd>
+<dt>主動桿／從動桿</dt><dd>主動桿接受驅動，從動桿呈現輸出動作。</dd>
+<dt>浮桿（聯接桿）</dt><dd>連接兩根活動桿，沒有直接固定在機架上的轉軸。</dd>
+<dt>曲柄／搖桿</dt><dd>能整圈轉的是曲柄；只能來回擺的是搖桿。主動桿不一定是曲柄。</dd>
+<dt>迴轉對</dt><dd>讓相連桿件可以相對轉動的接頭。</dd>
+</dl>
+<p>範例在新分頁開啟。按「載入此範例」才會替換畫布；選「保留目前作品」則取消。重要作品先存檔。</p>
+<p>孔要真正接上，不能只是看起來碰到。想再練一次，可重新按上面的練習按鈕。</p>
+<p>比較雨刷臂的兩個極限方向，記錄擺動範圍變大或變小；不確定時寫「未測量」。</p>
+</details>
+<details class="support"><summary>教師資料與學習單</summary>
 <h2>第一節｜看懂並接好四連桿（50 分鐘）</h2><div class="timeline"><div class="time">0–5 分</div><div>由「開啟完整範例」觀察四根桿和四個迴轉對；教師示範操作主動桿，學生先說出預期動作。</div><div class="time">5–13 分</div><div>角色辨認：指出機架、主動桿、浮桿、從動桿，觀察主動桿與從動桿是整圈轉動或來回擺動。</div><div class="time">13–23 分</div><div>引導補接：開啟補接浮桿練習，查看兩個未連起來的接點、選擇「連桿」，從一個活動端連到另一個活動端，補成浮桿，使四桿形成閉環；操作主動桿確認可動，口頭說明各桿角色。</div><div class="time">23–38 分</div><div>獨立再試：重新開啟同一個補接浮桿練習，學生自行補接、操作並解釋四桿關係，不提供接法提示；卡住時可記下嘗試和兩次修改。</div><div class="time">38–46 分</div><div>同伴互看組裝成果，依「接點真實相連、機構可動、能解釋四桿角色」互相檢視並修正說明。</div><div class="time">46–50 分</div><div>記錄兩次修改（若有）及其觀察，整理第一節發現。</div></div>
 <h2>組裝觀察重點</h2><div class="grid"><section class="card"><h3>真實連接</h3><p>浮桿兩端分別接到正確的迴轉對，與相鄰桿件形成連續閉環，不只是畫面重疊或靠近。</p></section><section class="card"><h3>可以運動</h3><p>操作主動桿時，組裝後的機構能呈現連動；指出觀察到的運動情形。</p></section><section class="card"><h3>說得清四桿</h3><p>能指出機架（固定桿）、主動桿（輸入桿）、浮桿（聯接桿）、從動桿（輸出桿），並說明它們如何相連、傳遞運動。</p></section><section class="card"><h3>記錄修改</h3><p>簡述兩次修改各改了什麼、觀察到什麼。修改是學習歷程紀錄，不要求一定先失敗。</p></section></div>
 <div class="callout"><strong>教師觀察：</strong>依上述組裝證據與學生說明給予回饋。遇到暫時無法解算時，可觀察接點與操作方式並記錄修改，不必把失敗當成任務要求。</div>
@@ -28,5 +72,6 @@
 <div class="worksheet"><h3>C｜標準範例比較實驗</h3><table class="measure"><tr><th>步驟</th><th>我改了哪一根桿？</th><th>改前與改後的運動／極限方向／擺動範圍估計</th><th>觀察依據</th></tr><tr><td>基準</td><td>標準範例</td><td></td><td></td></tr><tr><td>修改一</td><td></td><td></td><td></td></tr><tr><td>修改二</td><td></td><td></td><td></td></tr></table><p>不填數值量測結果；記錄極限方向和擺動範圍估計，不確定時寫「未測量」。我目前的結論，以及證據：</p><span class="longwrite"></span><p>這些比較能否證明只改機架造成結果？為什麼？</p><span class="longwrite"></span></div>
 <div class="worksheet"><h3>D｜回到標準範例：創意設計</h3><p>我希望機構做出什麼動作？</p><span class="longwrite"></span><p>我改變了什麼？主動桿、從動桿和極限方向有什麼變化？</p><span class="longwrite"></span><p>我如何判斷作品接近目標？下一步想試什麼？</p><span class="longwrite"></span></div>
 <div class="worksheet"><h3>E｜保存、提交與下一個單元</h3><p>下載作品 JSON、截圖與本學習單一起提交；重新開啟作品檢查存檔。作品檔名：<span class="write"></span>　提交位置：<span class="write"></span></p><p>接下來依序認識：<strong>平行四連桿 → 滑塊曲柄 → 齒輪對 → 齒輪齒條</strong>。</p><p>我最想先知道的是：</p><span class="longwrite"></span></div>
-<p class="footer">機構積木：四連桿單元。請使用頁首的完整範例與補接浮桿練習入口。</p>
+</details>
+<p class="footer"><a href="blocks.html">回到機構積木</a> · 教師資料與學習單展開後可列印。</p>
 </main></body></html>
