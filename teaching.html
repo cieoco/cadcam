@@ -17,6 +17,7 @@
 @media print{.task-list{gap:10px}.task{padding:12px}.entry-link{background:none;color:var(--blue);border:1px solid var(--line)}.support:not([open]){display:none}}
 
 .task.challenge{grid-column:1/-1}.missions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}.mission{background:white;border:1px solid #e6bda3;border-radius:12px;padding:16px}.mission h3{font-size:1.08rem;margin:0 0 12px}.mission details{margin:12px 0}.mission summary{cursor:pointer;min-height:44px;padding:10px 0;color:var(--blue)}.mission-check{display:flex;align-items:flex-start;gap:10px;padding:12px 0;min-height:44px;font-weight:700;cursor:pointer}.mission-check input{flex:0 0 auto;width:20px;height:20px;margin-top:4px;accent-color:#16835c}.mission-question{border-top:1px dashed var(--line);padding-top:10px;font-size:.95rem}.mission-progress{font-weight:800;color:#116b4c}.mission:has(input:checked){border-color:#16835c;background:#f3fbf5}@media(max-width:800px){.missions{grid-template-columns:1fr}}@media print{.missions{grid-template-columns:1fr}.mission{break-inside:avoid}}
+.wiper-guide{margin:18px 0;background:#fff;border:1px solid #e6bda3;border-radius:12px;padding:12px}.wiper-guide svg{display:block;width:100%;max-width:580px;height:auto;margin:auto}.wiper-guide figcaption{font-size:.95rem;text-align:center;color:var(--ink)}
 </style></head>
 <body><main class="page">
 <p class="eyebrow">機構積木・第一單元</p>
@@ -42,11 +43,33 @@
 <section class="task challenge" aria-labelledby="challenge-title">
 <h2 id="challenge-title"><span class="task-number">4</span>雨刷小工程師</h2>
 <p>先讓它動，再調出不同的擺動範圍。不限次數，隨時可以復原再試。</p>
+<figure class="wiper-guide">
+<svg viewBox="0 0 480 270" role="img" aria-labelledby="wiper-map-title wiper-map-desc">
+<title id="wiper-map-title">哪根是雨刷臂？右側的 BD 搖桿</title>
+<desc id="wiper-map-desc">A、B 是固定支點。左側 AC 是馬達驅動的主動桿；C 到 D 的虛線是練習要補接的浮桿；右側 B 到 D 的藍色搖桿是本課的雨刷臂，繞 B 來回擺。</desc>
+<path d="M65 224 H290" fill="none" stroke="#82939d" stroke-width="7"/>
+<text x="130" y="257" font-size="17" fill="#526674">AB 機架（固定）</text>
+<path d="M75 214 L145 214" stroke="#e74c3c" stroke-width="17" stroke-linecap="round"/>
+<path d="M145 214 L290 45" stroke="#748a96" stroke-width="9" stroke-dasharray="9 8"/>
+<path d="M294 214 L290 45" stroke="#3498db" stroke-width="22" stroke-linecap="round"/>
+<g fill="white" stroke="#34495e" stroke-width="3"><circle cx="75" cy="214" r="6"/><circle cx="145" cy="214" r="6"/><circle cx="294" cy="214" r="6"/><circle cx="290" cy="45" r="6"/></g>
+<g font-size="18" font-weight="700" fill="#18324b"><text x="58" y="202">A</text><text x="139" y="242">C</text><text x="308" y="225">B</text><text x="276" y="29">D</text></g>
+<text x="24" y="171" font-size="17" fill="#a93226">AC 主動桿</text>
+<text x="40" y="91" font-size="17" fill="#526674">CD 浮桿</text>
+<text x="40" y="115" font-size="17" fill="#526674">練習要補這根</text>
+<path d="M163 107 L206 143" stroke="#748a96" stroke-width="2" fill="none"/>
+<path d="M307 117 H335" stroke="#176b87" stroke-width="3"/>
+<text x="340" y="110" font-size="20" font-weight="700" fill="#176b87">這根是</text>
+<text x="340" y="137" font-size="22" font-weight="700" fill="#176b87">雨刷臂！</text>
+<text x="337" y="164" font-size="17" fill="#176b87">BD 搖桿</text>
+</svg>
+<figcaption><strong>找右側一端固定、另一端來回擺的桿。</strong><br>本課把它當作雨刷臂；虛線是要補的浮桿，不是雨刷臂。圖為位置示意。</figcaption>
+</figure>
 <p id="mission-progress" class="mission-progress" role="status" aria-live="polite">已完成 0 / 3 關</p>
 <div class="missions">
 <article class="mission">
 <h3>🟢 第一關｜讓雨刷動起來</h3>
-<p>補上缺少的浮桿，讓右側搖桿當雨刷臂。</p>
+<p>補上圖中的 CD 浮桿，讓右側 BD 雨刷臂動起來。</p>
 <a class="entry-link" href="blocks.html?example=fourbar-missing-coupler" target="_blank" rel="noopener">開始組裝 ↗</a>
 <details><summary>卡住了？看提示</summary><p>選「連桿」，把兩個活動端的孔連起來，再按播放。</p></details>
 <label class="mission-check"><input type="checkbox" data-mission>雨刷臂能連續來回擺動</label>
@@ -56,14 +79,14 @@
 <h3>🟡 第二關｜小範圍模式</h3>
 <p>開啟完整範例，先截圖記住兩個擺動極限。只改一根桿，讓雨刷臂擺得更小。</p>
 <a class="entry-link" href="blocks.html?example=fourbar-crank-rocker" target="_blank" rel="noopener">開啟比較起點 ↗</a>
-<details><summary>卡住了？看提示</summary><p>先選右側搖桿，把孔距增加一次（＋8 mm），播放並和原來比較。</p></details>
+<details><summary>卡住了？看提示</summary><p>先選圖中的右側 BD 搖桿（雨刷臂），把孔距增加一次（＋8 mm），播放並和原來比較。</p></details>
 <label class="mission-check"><input type="checkbox" data-mission>比原來擺得小，而且仍能連續運動</label>
 <p class="mission-question">想一想：改了哪根桿？結果和預測一樣嗎？</p>
 </article>
 <article class="mission">
 <h3>🟠 第三關｜大範圍模式</h3>
 <p>先保存第二關作品，再開啟同一個完整範例。一次只改一根桿，讓雨刷臂擺得更大。</p>
-<details><summary>卡住了？看提示</summary><p>試試把右側搖桿改短一次，再觀察。若無法連續運動，先復原，換一種修改。</p></details>
+<details><summary>卡住了？看提示</summary><p>試試把右側 BD 搖桿（雨刷臂）改短一次，再觀察。若無法連續運動，先復原，換一種修改。</p></details>
 <label class="mission-check"><input type="checkbox" data-mission>比原來擺得大，而且仍能連續運動</label>
 <p class="mission-question">想一想：哪次修改有效？拿前後畫面說明。</p>
 </article>
