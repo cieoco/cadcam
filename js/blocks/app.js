@@ -31,6 +31,8 @@ import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示�
 import { offerExampleFromUrl } from './example-entry.js?v=20261005_simple_r1';
 import { getTeachingFeedback } from './teaching-feedback.js';
 import * as Motion from './motion.js';
+import { memberSweepSegments } from './member-sweep.js';
+let sweepMemberId = null; // 顯示偏好，不寫入作品格式。
 import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostEdge, hostPlateThickness } from './assembly.js';
 import { normalizeModules } from './module-schema.js';
 import { designTabs, resolveFocus, compsInFocus, assignNewComps, pointIdsOf, focusInputs, ROOT_TAB } from './design-focus.js';   // H1：設計模式一次只看一個設計（分頁）
@@ -161,6 +163,7 @@ function scheduleAutosave() {
 // 套用一份 snapshot 到目前狀態。recordUndo 預設 true（外部開檔/分享要能 undo）。
 function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external' } = {}) {
   if (recordUndo) pushUndo();
+  if (source !== 'undo') sweepMemberId = null;
   pause();
   cancelMotorMode();
   Settings.syncFabricationInputs(); // 放棄尚未 change/blur 提交的表單草稿。
@@ -869,11 +872,14 @@ function getTrajectoryData() {
   if (!ids.length && S.compiled) ids.push(...Motion.fallbackTraceIds(S.comps, S.compiled.tracePoint));
   const planeIds = viewPointIds();
   if (planeIds) ids = ids.filter(id => planeIds.has(id));   // 只畫目前平面的追蹤點
+  const normalIds = new Set(ids);
+  const swept = viewComps().find(c => c.id === sweepMemberId && c.type === 'bar');
+  if (swept && !ids.length) ids.push(swept.p1.id);
   if (!S.compiled || !ids.length || !S.comps.length) return null;
   // 快取鍵＝結構版本號 geomVersion，取代每幀 JSON.stringify 整份快照（零件多時字串化本身會變慢）。
   // 軌跡只取決於 S.compiled 與 traceIds，兩者都只在 rebuild / 切換軌跡點變動、那兩處都會 +1，
   // 故版本號是完整且正確的失效訊號。多馬達後軌跡還取決於「掃哪顆馬達＋其他馬達凍在哪」，一併入鍵。
-  const motorKey = String(S.activeMotor) + '|' + JSON.stringify(S.motorAngles) + '|' + (inDesign() ? 'f:' + S.designFocus : (S.viewPlane || '')) + '|' + ids.join(',');
+  const motorKey = String(S.activeMotor) + '|' + JSON.stringify(S.motorAngles) + '|' + (inDesign() ? 'f:' + S.designFocus : (S.viewPlane || '')) + '|' + ids.join(',') + '|' + [...normalIds].join(',');
   if (trajectoryCache && trajectoryCache.version === geomVersion && trajectoryCache.motorKey === motorKey) return trajectoryCache.data;
   // 伺服與線性致動器只在自己的有限行程內運動；量測不應誤把不存在的整圈算進去。
   const range = inputRockRange();
@@ -891,8 +897,27 @@ function getTrajectoryData() {
   } catch (_) {
     data = [];
   }
+  data.forEach(trace => { trace.sweepOnly = !normalIds.has(trace.id); });
   trajectoryCache = { version: geomVersion, motorKey, data };
   return data.length ? data : null;
+}
+
+function drawMemberSweep(data) {
+  const member = viewComps().find(c => c.id === sweepMemberId && c.type === 'bar');
+  if (!member) return;
+  const group = document.createElementNS(SVG_NS, 'g');
+  group.dataset.memberSweep = member.id;
+  group.style.pointerEvents = 'none';
+  group.setAttribute('stroke', member.color || '#3498db');
+  group.setAttribute('stroke-opacity', '0.14');
+  group.setAttribute('stroke-width', '3');
+  memberSweepSegments(data?.[0]?.results, member.p1.id, member.p2.id).forEach(({ a, b }) => {
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', TX(a.x)); line.setAttribute('y1', TY(a.y));
+    line.setAttribute('x2', TX(b.x)); line.setAttribute('y2', TY(b.y));
+    group.appendChild(line);
+  });
+  svg.appendChild(group);
 }
 
 function drawTraceTrajectory(trajectoryData) {
@@ -1274,6 +1299,11 @@ function draw() {
   }
   clearOffHomeModuleSelection();
   memberEditor.sync();
+  const sweepControl = document.getElementById('memberSweepControl');
+  const sweepSelected = viewComps().find(c => c.id === S.selectedLinkId && c.type === 'bar');
+  sweepControl.hidden = !sweepSelected;
+  document.getElementById('memberSweepToggle').checked = !!sweepSelected && sweepMemberId === sweepSelected.id;
+  if (sweepMemberId && !S.comps.some(c => c.id === sweepMemberId && c.type === 'bar')) sweepMemberId = null;
   moduleEditor.sync();
   bench.syncUI();   // 組立台：模組清單與接法面板（非組立模式時直接略過）
   gripperController?.syncVisibility();
@@ -1345,8 +1375,10 @@ function draw() {
   const { isGroundBar, triangleEdgeKeys, triangleKey: triKey, bodyLayers, linkLayer, triangleLayerByKey: triLayerByKey } = renderScene;
   drawMotorMountHoles(motorCenterIds, motorMounts, pts);
   const trajectoryData = getTrajectoryData();
-  drawTraceTrajectory(trajectoryData);
-  drawWorkRange(trajectoryData, pts);
+  const visibleTraces = trajectoryData?.filter(trace => !trace.sweepOnly);
+  drawMemberSweep(trajectoryData);
+  drawTraceTrajectory(visibleTraces);
+  drawWorkRange(visibleTraces, pts);
   drawManualTrace();
 
   // 馬達本體是固定在機架背後的動力源，必須先建立在機件 underlay 之下；
@@ -2600,6 +2632,10 @@ function init() {
   Settings.loadExportSettings();
   Settings.loadTtMountSettings();
   Settings.loadMg995MountSettings();
+  document.getElementById('memberSweepToggle').onchange = event => {
+    sweepMemberId = event.target.checked ? S.selectedLinkId : null;
+    draw();
+  };
   populateExamples();
   let loaded = false;
   try {
