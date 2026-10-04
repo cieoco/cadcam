@@ -4,7 +4,7 @@
  * 課堂範例選單、教學卡與 snapshot 載入流程。
  */
 
-import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js?v=20261005_simple_r1';
+import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js?v=20261005_wiper_r2';
 import { normalizeSnapshot } from './schema.js';
 
 export function createExampleController({ applySnapshot, notify, closeMobileMenu, isMobile, showBuildPanel, onLesson = () => {} }) {

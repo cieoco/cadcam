@@ -237,7 +237,33 @@ const EXAMPLE_LESSONS = {
   }
 };
 
+// 三孔雨刷臂：B 為中間固定孔，D 為下端驅動孔，E 為上端雨刷孔。
+// B、D、E 是同一剛體；沿用三點桿與現有作品格式。
+const wiperExample = practice => ({
+  id: practice ? 'wiper-missing-coupler' : 'wiper-single',
+  title: practice ? '單支雨刷：補接浮桿' : '單支雨刷：完整範例',
+  note: '黃色三孔桿繞中間 B 孔擺動；下端 D 接浮桿，上端 E 是雨刷端。',
+  snapshot: {
+    kind: 'blocks', v: 1, counter: 6,
+    comps: [
+      { type: 'anchor', id: 'Anchor1', p1: pt('A', 'fixed', -80, 0) },
+      { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 20, 0) },
+      bar('Link1', pt('A', 'fixed', -80, 0, { physicalMotor: '1' }), pt('C', 'floating', -48, 0), 32,
+        { color: '#e74c3c', isInput: true, physicalMotor: '1', phaseOffset: 0 }),
+      ...(!practice ? [bar('Link2', pt('C', 'floating', -48, 0), pt('D', 'floating', 18.470588235294116, -79.98537928680453, { solveSign: -1 }), 104)] : []),
+      triangle('WiperArm', pt('B', 'fixed', 20, 0),
+        pt('D', 'floating', 18.470588235294116, -79.98537928680453, { solveSign: -1 }),
+        pt('E', 'floating', 22.294117647058826, 119.9780689302068),
+        { color: '#c5a52b', shapeMode: 'polyline', gParam: 'WB', r1Param: 'WE', r2Param: 'WDE',
+          vertices: [{ solve: true, ref: 'p2' }, { solve: true, ref: 'p1' }, { solve: true, ref: 'p3' }] })
+    ],
+    params: { LL1: 32, ...(!practice ? { LL2: 104 } : {}), WB: 80, WE: 120, WDE: 200 }
+  }
+});
+
 const ALL_BLOCK_EXAMPLES = [
+  wiperExample(false),
+  wiperExample(true),
   {
     id: 'fourbar-crank-rocker',
     title: '四連桿：曲柄搖桿',

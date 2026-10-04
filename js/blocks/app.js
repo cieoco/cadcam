@@ -28,7 +28,7 @@ import * as Input from './input.js?v=20261004_fourbar_r1';     // 指標 / 手�
 import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
-import { offerExampleFromUrl } from './example-entry.js?v=20261005_simple_r1';
+import { offerExampleFromUrl } from './example-entry.js?v=20261005_wiper_r2';
 import { getTeachingFeedback } from './teaching-feedback.js';
 import * as Motion from './motion.js';
 import { memberSweepSegments } from './member-sweep.js';
@@ -47,7 +47,7 @@ import * as Store from './storage.js';
 import * as Exporters from './exporters.js';
 import { localToWorld, plateVertices, plateShapeMode, createPlateGeometry } from './plate-geometry.js';
 import { S, activateMotor, motorAnglesNow, frozenMotorAngles, usedMotorIds } from './state.js';  // 跨模組共享的可變狀態與多馬達 helper
-import { createExampleController } from './example-controller.js?v=20261005_simple_r1';
+import { createExampleController } from './example-controller.js?v=20261005_wiper_r2';
 import { createGripperController } from './gripper-controller.js?v=20260925_r1b2';
 import { createGripperObject } from './gripper-object.js?v=20260925_r1b2';
 import { createGearEditor, rackPhaseShift } from './gear-editor.js?v=20261004_fourbar_r1';
@@ -873,7 +873,7 @@ function getTrajectoryData() {
   const planeIds = viewPointIds();
   if (planeIds) ids = ids.filter(id => planeIds.has(id));   // 只畫目前平面的追蹤點
   const normalIds = new Set(ids);
-  const swept = viewComps().find(c => c.id === sweepMemberId && c.type === 'bar');
+  const swept = viewComps().find(c => c.id === sweepMemberId && ['bar', 'triangle'].includes(c.type));
   if (swept && !ids.length) ids.push(swept.p1.id);
   if (!S.compiled || !ids.length || !S.comps.length) return null;
   // 快取鍵＝結構版本號 geomVersion，取代每幀 JSON.stringify 整份快照（零件多時字串化本身會變慢）。
@@ -903,7 +903,7 @@ function getTrajectoryData() {
 }
 
 function drawMemberSweep(data) {
-  const member = viewComps().find(c => c.id === sweepMemberId && c.type === 'bar');
+  const member = viewComps().find(c => c.id === sweepMemberId && ['bar', 'triangle'].includes(c.type));
   if (!member) return;
   const group = document.createElementNS(SVG_NS, 'g');
   group.dataset.memberSweep = member.id;
@@ -911,7 +911,7 @@ function drawMemberSweep(data) {
   group.setAttribute('stroke', member.color || '#3498db');
   group.setAttribute('stroke-opacity', '0.14');
   group.setAttribute('stroke-width', '3');
-  memberSweepSegments(data?.[0]?.results, member.p1.id, member.p2.id).forEach(({ a, b }) => {
+  memberSweepSegments(data?.[0]?.results, member.p1.id, (member.type === 'triangle' ? member.p3 : member.p2).id).forEach(({ a, b }) => {
     const line = document.createElementNS(SVG_NS, 'line');
     line.setAttribute('x1', TX(a.x)); line.setAttribute('y1', TY(a.y));
     line.setAttribute('x2', TX(b.x)); line.setAttribute('y2', TY(b.y));
@@ -1300,10 +1300,12 @@ function draw() {
   clearOffHomeModuleSelection();
   memberEditor.sync();
   const sweepControl = document.getElementById('memberSweepControl');
-  const sweepSelected = viewComps().find(c => c.id === S.selectedLinkId && c.type === 'bar');
+  const sweepSelected = viewComps().find(c => (c.id === S.selectedLinkId && c.type === 'bar') || (c.id === S.selectedTriangleId && c.type === 'triangle'));
   sweepControl.hidden = !sweepSelected;
+  document.getElementById('memberSweepLabel').textContent = sweepSelected?.type === 'triangle' ? '顯示掃動範圍（第 1–3 孔）' : '顯示掃動範圍';
+  sweepControl.title = sweepSelected?.type === 'triangle' ? '顯示第 1 孔到第 3 孔的掃動範圍（雨刷範例為 B–E）；不是實體刷片面積。' : '顯示桿件兩端的掃動範圍；不是實體刷片面積。';
   document.getElementById('memberSweepToggle').checked = !!sweepSelected && sweepMemberId === sweepSelected.id;
-  if (sweepMemberId && !S.comps.some(c => c.id === sweepMemberId && c.type === 'bar')) sweepMemberId = null;
+  if (sweepMemberId && !S.comps.some(c => c.id === sweepMemberId && ['bar', 'triangle'].includes(c.type))) sweepMemberId = null;
   moduleEditor.sync();
   bench.syncUI();   // 組立台：模組清單與接法面板（非組立模式時直接略過）
   gripperController?.syncVisibility();
@@ -2633,7 +2635,7 @@ function init() {
   Settings.loadTtMountSettings();
   Settings.loadMg995MountSettings();
   document.getElementById('memberSweepToggle').onchange = event => {
-    sweepMemberId = event.target.checked ? S.selectedLinkId : null;
+    sweepMemberId = event.target.checked ? (S.selectedLinkId || S.selectedTriangleId) : null;
     draw();
   };
   populateExamples();

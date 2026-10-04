@@ -759,7 +759,7 @@
           <button class="clear-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除選取的桿件">🗑 刪除</button>
         </div>
         <div class="le-row" style="font-size:12px;line-height:1.5;flex-wrap:wrap">
-          <label id="memberSweepControl" hidden title="顯示目前桿件兩端在有效取樣姿勢的殘影；不是實體刷片面積。更換作品後清除。"><input id="memberSweepToggle" type="checkbox"> 顯示掃動範圍</label>
+          <label id="memberSweepControl" hidden title="顯示目前桿件兩端在有效取樣姿勢的殘影；不是實體刷片面積。更換作品後清除。"><input id="memberSweepToggle" type="checkbox"> <span id="memberSweepLabel">顯示掃動範圍</span></label>
           <span id="memberDimensionHint" style="display:none;color:#52677b"></span>
           <label id="memberMirrorLabel" style="display:none;white-space:nowrap"><input id="memberMirror" type="checkbox" checked onchange="window.blocks.setMemberMirror(this.checked)"> 同步左右</label>
           <label style="display:none;white-space:nowrap">材料 <select id="memberMaterial" class="tri-side" aria-label="零件材料" title="僅記錄材料，尚未驗證強度及加工參數" onchange="window.blocks.setMemberMaterial(this.value)"></select></label>
@@ -1112,6 +1112,6 @@
       "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261003_g2"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20261005_sweep_r1"></script>
+  <script type="module" src="js/blocks/app.js?v=20261005_wiper_r2"></script>
 </body>
 </html>
