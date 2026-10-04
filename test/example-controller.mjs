@@ -36,4 +36,10 @@ check('套用無任務 marker 的快照會清掉過期教學卡', ids.get('examp
 controller.snapshotApplied({ params: { gripperWorkflow: 1 } });
 check('套用夾爪任務快照不會把一般教學卡重新打開', ids.get('exampleLessonCard').style.display === 'none' && controller.activeExampleId === 'gear-gripper');
 
+controller.restoreLesson('slider-crank');
+check('復原能還原對應的課程身分', controller.activeExampleId === 'slider-crank');
+controller.snapshotApplied({ params: {} }, 'undo');
+check('復原作品過程不提前清除課程', controller.activeExampleId === 'slider-crank');
+controller.restoreLesson('');
+check('復原到非課程作品會清除任務', controller.activeExampleId === '');
 report('example-controller');

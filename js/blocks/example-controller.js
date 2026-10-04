@@ -4,10 +4,10 @@
  * 課堂範例選單、教學卡與 snapshot 載入流程。
  */
 
-import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js?v=20260925_r1b';
+import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js?v=20261004_fourbar_r1';
 import { normalizeSnapshot } from './schema.js';
 
-export function createExampleController({ applySnapshot, notify, closeMobileMenu, isMobile, showBuildPanel }) {
+export function createExampleController({ applySnapshot, notify, closeMobileMenu, isMobile, showBuildPanel, onLesson = () => {} }) {
   let activeExampleId = '';
 
   function renderLessonCard(example) {
@@ -40,6 +40,7 @@ export function createExampleController({ applySnapshot, notify, closeMobileMenu
     if (!snapshot) { notify('⚠️ 範例格式不正確'); return false; }
     applySnapshot(snapshot, { source: 'example' });
     activeExampleId = example.id;
+    onLesson(example);
     if (Number(snapshot.params?.gripperWorkflow) === 1) {
       const card = document.getElementById('exampleLessonCard');
       if (card) card.dataset.lessonVisible = 'false';
@@ -51,7 +52,9 @@ export function createExampleController({ applySnapshot, notify, closeMobileMenu
     return true;
   }
 
-  function snapshotApplied(snapshot) {
+  function snapshotApplied(snapshot, source) {
+    if (source === 'undo') return;
+    onLesson(null);
     if (Number(snapshot?.params?.gripperWorkflow) === 1) {
       activeExampleId = 'gear-gripper';
       const card = document.getElementById('exampleLessonCard');
@@ -93,5 +96,12 @@ export function createExampleController({ applySnapshot, notify, closeMobileMenu
     renderLessonCard(null);
   }
 
-  return { populate, load, renderLessonCard, snapshotApplied, get activeExampleId() { return activeExampleId; } };
+  function restoreLesson(id) {
+    const example = getExample(id);
+    activeExampleId = example?.id || '';
+    renderLessonCard(example);
+    onLesson(example || null);
+  }
+
+  return { populate, load, renderLessonCard, snapshotApplied, restoreLesson, get activeExampleId() { return activeExampleId; } };
 }

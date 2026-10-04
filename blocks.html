@@ -390,7 +390,7 @@
       .mobile-hint { display: inline; }
     }
     /* 手機：零件盤移到底部橫條，畫布吃滿上方 */
-    @media (max-width: 700px) {
+    @media (max-width: 700px), (max-width: 1099px) and (max-height: 500px) {
       html, body { overflow: hidden; width: 100%; }
       header { flex-wrap: wrap; gap: 8px; }
       .appbar { padding: 10px 14px; }
@@ -539,11 +539,29 @@
       box-shadow: none; background: transparent; z-index: auto;
     }
   </style>
+  <link rel="stylesheet" href="js/blocks/teaching.css?v=20261005_course_r1">
   <script type="importmap">
     { "imports": { "three": "./js/vendor/three.module.js" } }
   </script>
 </head>
 <body>
+  <section class="teaching-tools" id="teachingTools" aria-label="教學與快速試錯">
+    <div class="teaching-bar">
+      <button id="lessonStart" type="button">開始第一課</button>
+      <button id="lessonToggle" type="button" aria-expanded="false" aria-controls="teachingPanel">教學任務</button>
+      <button id="lessonUndo" type="button" disabled>↩ 復原</button>
+      <button id="lessonReset" type="button" disabled title="重載本課初始範例；可復原回修改前">重設本課</button>
+      <button id="lessonHideEditor" type="button">收起面板</button>
+      <label><input id="lessonRoles" type="checkbox">角色標示</label>
+      <a href="teaching.html" target="_blank" rel="noopener">教案／學習單</a>
+    </div>
+    <div id="teachingPanel" hidden>
+      <strong id="teachingTitle"></strong>
+      <div id="teachingBody"></div>
+      <p class="teaching-caveat">模擬用於觀察運動關係；不代表已驗證負載、摩擦、夾持力或實體碰撞。教學可隨時收起，自由試錯。</p>
+    </div>
+    <p id="teachingFeedback" role="status"></p>
+  </section>
   <header class="appbar">
     <div class="app-identity">
       <h1>🧩 機構積木</h1>
@@ -628,8 +646,8 @@
         <div class="tray-section-items">
           <div class="block anchor" onclick="window.blocks.addAnchor()">
             <span class="ico">📌</span>
-            <span class="name">機架固定點</span>
-            <span class="role">釘在地上</span>
+            <span class="name">固定支點</span>
+            <span class="role">位置固定，桿件可繞此轉動</span>
           </div>
           <div class="block link" onclick="window.blocks.openLinkMenu()">
             <span class="ico">🔵</span>
@@ -638,7 +656,7 @@
           </div>
           <div class="block triangle" onclick="window.blocks.startDrawPolygon()">
             <span class="ico">🟢</span>
-            <span class="name">多孔板</span>
+            <span class="name">多孔連接板</span>
             <span class="role">逐孔放置，右鍵完成</span>
           </div>
           <div class="block slider" onclick="window.blocks.startDrawRail()">
@@ -1094,7 +1112,7 @@
       "./js/blocks/assembly.js": "./js/blocks/assembly.js?v=20261003_g1",
       "./js/blocks/design-focus.js": "./js/blocks/design-focus.js?v=20261003_h1",
       "./js/blocks/design-tabs-ui.js": "./js/blocks/design-tabs-ui.js?v=20261003_h1",
-      "./js/blocks/tools.js": "./js/blocks/tools.js?v=20260930_m1b3",
+      "./js/blocks/tools.js": "./js/blocks/tools.js?v=20261005_course_r1",
       "./js/blocks/input.js": "./js/blocks/input.js?v=20260930_b2",
       "./js/blocks/state.js": "./js/blocks/state.js?v=20261003_h1",
       "./js/blocks/panels.js": "./js/blocks/panels.js?v=20260930_p1",
@@ -1109,6 +1127,6 @@
       "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261003_g2"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20261003_h1"></script>
+  <script type="module" src="js/blocks/app.js?v=20261005_course_r1"></script>
 </body>
 </html>

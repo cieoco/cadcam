@@ -304,7 +304,7 @@ function commitDragUndo() {
   if (snapshotStr() !== S.preDragSnap) {
     S.undoStack.push(S.preDragSnap);
     if (S.undoStack.length > 60) S.undoStack.shift();
-    updateUndoBtn();
+    updateUndoBtn(true);
   }
   S.preDragSnap = null;
 }
