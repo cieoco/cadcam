@@ -1086,6 +1086,7 @@
   <!-- 同一份共用模組只載入一個版本；避免重載時混用舊幾何或舊存檔 schema。 -->
   <script type="importmap">
     {"imports": {
+      "./js/multilink/solver.js": "./js/multilink/solver.js?v=20261006_1",
       "./js/blocks/plate-geometry.js": "./js/blocks/plate-geometry.js?v=20260925_stock1",
       "./js/blocks/plate-editor.js": "./js/blocks/plate-editor.js?v=20260925_members2",
       "./js/blocks/plate-render.js": "./js/blocks/plate-render.js?v=20260925_members1",
@@ -1133,5 +1134,6 @@
     }}
   </script>
   <script type="module" src="js/blocks/app.js?v=20261005_parallel"></script>
+<script type="module" src="js/version-info.js?v=20261006_1"></script>
 </body>
 </html>

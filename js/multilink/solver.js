@@ -1023,6 +1023,20 @@ function solveBodyJointTopology(topology, params) {
         seedPoint(c.p3);
     });
 
+    // 多餘的閉環約束可能沒有參與兩圓求交；完成後仍須核對每支桿，
+    // 避免把不符合設定長度的組裝回報為有效解。
+    components.forEach(c => {
+        if (c.type !== 'bar' || !c.lenParam) return;
+        const a = points[c.p1?.id], b = points[c.p2?.id];
+        const length = getParamVal(c.lenParam, 0);
+        if (!a || !b || !(length > 0)) return;
+        const actual = Math.hypot(b.x - a.x, b.y - a.y);
+        if (!Number.isFinite(actual) || Math.abs(actual - length) > tol) {
+            infeasible = true;
+            if (!infeasibleReason) infeasibleReason = `桿件 ${c.id} 無法保持設定長度 ${length} mm`;
+        }
+    });
+
     return {
         isValid: !infeasible,
         isUnderconstrained: !infeasible && !allResolved,
