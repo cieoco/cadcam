@@ -47,7 +47,7 @@ import * as Store from './storage.js';
 import * as Exporters from './exporters.js';
 import { localToWorld, plateVertices, plateShapeMode, createPlateGeometry } from './plate-geometry.js';
 import { S, activateMotor, motorAnglesNow, frozenMotorAngles, usedMotorIds } from './state.js';  // 跨模組共享的可變狀態與多馬達 helper
-import { createExampleController } from './example-controller.js?v=20261005_units345';
+import { createExampleController } from './example-controller.js?v=20261005_parallel';
 import { createGripperController } from './gripper-controller.js?v=20260925_r1b2';
 import { createGripperObject } from './gripper-object.js?v=20260925_r1b2';
 import { createGearEditor, rackPhaseShift } from './gear-editor.js?v=20261004_fourbar_r1';

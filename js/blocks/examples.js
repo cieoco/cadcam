@@ -1,4 +1,4 @@
-import { assemblyLessonSnapshot } from './assembly-lesson-example.js';
+import { assemblyLessonSnapshot } from './assembly-lesson-example.js?v=parallel';
 /**
  * blocks / examples
  *
@@ -905,7 +905,7 @@ ALL_BLOCK_EXAMPLES.push(sliderPractice);
 
 // 第五單元：完整接合與保留兩個模組的練習起點。
 ALL_BLOCK_EXAMPLES.push({ id: 'assembly-lift-gripper', title: '組立：升降與夾爪完整範例',
-  note: 'M1 控制齒條升降，M2 控制夾爪；切換組立查看滑台接點。', snapshot: assemblyLessonSnapshot });
+  note: 'M1 控制平行四連桿升降臂，M2 控制夾爪；切換組立查看工具架接點。', snapshot: assemblyLessonSnapshot });
 const assemblyPractice = JSON.parse(JSON.stringify(assemblyLessonSnapshot));
 assemblyPractice.modules.find(m => m.id === 'Grip1').mount = null;
 // 起點分開擺放，避免尚未接合就重疊，學生能辨識兩個模組。
@@ -913,7 +913,7 @@ assemblyPractice.comps.filter(c => c.moduleId === 'Grip1').forEach(c => {
   ['p1', 'p2', 'p3'].forEach(key => { if (c[key]) c[key].x += 240; });
 });
 ALL_BLOCK_EXAMPLES.push({ id: 'assembly-lift-gripper-practice', title: '組立：升降與夾爪接合練習',
-  note: '切換組立，選齒輪夾爪，再選齒條升降的滑台（同平面對鎖）。', snapshot: assemblyPractice });
+  note: '切換組立，選齒輪夾爪，再選平行四連桿升降臂的工具架（同平面對鎖）。', snapshot: assemblyPractice });
 
 export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES.filter(
   example => example.id !== 'competition-flywheel-shooter'

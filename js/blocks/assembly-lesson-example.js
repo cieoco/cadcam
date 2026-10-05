@@ -1,107 +1,98 @@
-// 第五單元：兩組獨立動力，夾爪接在齒條滑台的輸出點。
+// 第五單元：平行四連桿保持工具架姿態，M1 升降、M2 夾取。
 export const assemblyLessonSnapshot = {
   "kind": "blocks",
   "v": 1,
-  "counter": 20,
+  "counter": 30,
   "comps": [
     {
-      "type": "gear",
-      "id": "LiftPinion",
+      "type": "anchor",
+      "id": "Anchor1",
+      "p1": {
+        "id": "A",
+        "type": "fixed",
+        "x": -110,
+        "y": 0
+      },
+      "moduleId": "Lift1"
+    },
+    {
+      "type": "anchor",
+      "id": "Anchor2",
+      "p1": {
+        "id": "B",
+        "type": "fixed",
+        "x": -110,
+        "y": 72
+      },
+      "moduleId": "Lift1"
+    },
+    {
+      "type": "bar",
+      "id": "Link1",
       "color": "#e74c3c",
       "p1": {
-        "id": "LPC",
-        "type": "motor",
-        "x": 0,
+        "id": "A",
+        "type": "fixed",
+        "x": -110,
         "y": 0,
         "physicalMotor": "1"
       },
       "p2": {
-        "id": "LPP",
+        "id": "C",
         "type": "floating",
-        "x": 18,
+        "x": 50,
         "y": 0
       },
-      "radiusParam": "LPR",
-      "teeth": 15,
-      "module": 4,
-      "phase": 0,
-      "mountLocatorPoint": "LML",
-      "moduleId": "Lift1"
+      "lenParam": "LL1",
+      "fixedLen": true,
+      "isInput": true,
+      "physicalMotor": "1",
+      "phaseOffset": 0,
+      "moduleId": "Lift1",
+      "motorType": "mg995",
+      "servoStart": -40,
+      "servoEnd": 60
     },
     {
-      "type": "anchor",
-      "id": "MotorLocator",
+      "type": "bar",
+      "id": "Link2",
+      "color": "#3498db",
       "p1": {
-        "id": "LML",
+        "id": "B",
         "type": "fixed",
-        "x": 0,
-        "y": 11.18
+        "x": -110,
+        "y": 72
       },
-      "moduleId": "Lift1"
-    },
-    {
-      "type": "anchor",
-      "id": "LiftGuideA",
-      "p1": {
-        "id": "LGA",
-        "type": "fixed",
-        "x": 45,
-        "y": -5.2
-      },
-      "moduleId": "Lift1"
-    },
-    {
-      "type": "anchor",
-      "id": "LiftGuideB",
-      "p1": {
-        "id": "LGB",
-        "type": "fixed",
-        "x": 45,
-        "y": 17.8
-      },
-      "moduleId": "Lift1"
-    },
-    {
-      "type": "rack",
-      "id": "LiftRackGear",
-      "color": "#16a085",
-      "p1": {
-        "id": "LiftRack",
+      "p2": {
+        "id": "D",
         "type": "floating",
-        "x": 30,
+        "x": 50,
+        "y": 72
+      },
+      "lenParam": "LL2",
+      "fixedLen": true,
+      "isInput": false,
+      "moduleId": "Lift1"
+    },
+    {
+      "type": "bar",
+      "id": "Link3",
+      "color": "#3498db",
+      "p1": {
+        "id": "C",
+        "type": "floating",
+        "x": 50,
         "y": 0
       },
-      "pinion": "LiftPinion",
-      "lenParam": "LRL",
-      "axisDeg": 90,
-      "sign": 1,
-      "bodyHeight": 20,
-      "slot": {
-        "length": 144,
-        "width": 5,
-        "offset": 0
+      "p2": {
+        "id": "D",
+        "type": "floating",
+        "x": 50,
+        "y": 72
       },
-      "framePins": [
-        "LGA",
-        "LGB"
-      ],
-      "endMargin": 12,
-      "holes": [
-        {
-          "id": "LiftHoleA",
-          "role": "endA",
-          "u": 0,
-          "v": -15,
-          "diameter": 5
-        },
-        {
-          "id": "LiftOutput",
-          "role": "endB",
-          "u": 0,
-          "v": -15,
-          "diameter": 5
-        }
-      ],
+      "lenParam": "LL3",
+      "fixedLen": true,
+      "isInput": false,
       "moduleId": "Lift1"
     },
     {
@@ -111,15 +102,15 @@ export const assemblyLessonSnapshot = {
       "p1": {
         "id": "GCA",
         "type": "motor",
-        "x": 45,
-        "y": 88,
+        "x": 50,
+        "y": 0,
         "physicalMotor": "2"
       },
       "p2": {
         "id": "GPA",
         "type": "floating",
-        "x": 45,
-        "y": 106
+        "x": 50,
+        "y": 18
       },
       "radiusParam": "GRA",
       "pinRadiusParam": "GPRA",
@@ -136,14 +127,14 @@ export const assemblyLessonSnapshot = {
       "p1": {
         "id": "GCB",
         "type": "fixed",
-        "x": 105,
-        "y": 88
+        "x": 110,
+        "y": 0
       },
       "p2": {
         "id": "GPB",
         "type": "floating",
-        "x": 105,
-        "y": 106
+        "x": 110,
+        "y": 18
       },
       "radiusParam": "GRB",
       "pinRadiusParam": "GPRB",
@@ -161,21 +152,21 @@ export const assemblyLessonSnapshot = {
       "p1": {
         "id": "GCA",
         "type": "motor",
-        "x": 45,
-        "y": 88,
+        "x": 50,
+        "y": 0,
         "physicalMotor": "2"
       },
       "p2": {
         "id": "GPA",
         "type": "floating",
-        "x": 45,
-        "y": 106
+        "x": 50,
+        "y": 18
       },
       "p3": {
         "id": "LT",
         "type": "floating",
-        "x": -20,
-        "y": 3
+        "x": -15,
+        "y": -85
       },
       "gParam": "GPRA",
       "r1Param": "LJ_tip",
@@ -193,20 +184,20 @@ export const assemblyLessonSnapshot = {
       "p1": {
         "id": "GCB",
         "type": "fixed",
-        "x": 105,
-        "y": 88
+        "x": 110,
+        "y": 0
       },
       "p2": {
         "id": "GPB",
         "type": "floating",
-        "x": 105,
-        "y": 106
+        "x": 110,
+        "y": 18
       },
       "p3": {
         "id": "RT",
         "type": "floating",
-        "x": 170,
-        "y": 3
+        "x": 175,
+        "y": -85
       },
       "gParam": "GPRB",
       "r1Param": "RJ_tip",
@@ -219,8 +210,6 @@ export const assemblyLessonSnapshot = {
     }
   ],
   "params": {
-    "LPR": 30,
-    "LRL": 176,
     "theta": 0,
     "GRA": 30,
     "GRB": 30,
@@ -229,29 +218,25 @@ export const assemblyLessonSnapshot = {
     "LJ_tip": 107,
     "LJ_edge": 121.8,
     "RJ_tip": 107,
-    "RJ_edge": 121.8
-  },
-  "tracePoints": [
-    "LT",
-    "RT"
-  ],
-  "motorAngles": {
-    "2": 0
+    "RJ_edge": 121.8,
+    "LL1": 160,
+    "LL2": 160,
+    "LL3": 72
   },
   "modules": [
     {
       "id": "Lift1",
-      "name": "齒條升降",
-      "source": "competition-rack-lift",
-      "base": "LPC",
+      "name": "平行四連桿升降臂",
+      "source": "parallel-fourbar",
+      "base": "A",
       "outputs": [
         {
-          "id": "carriage",
-          "name": "滑台",
-          "at": "LiftOutput",
+          "id": "tool",
+          "name": "工具架",
+          "at": "C",
           "body": {
-            "kind": "rack",
-            "id": "LiftRackGear"
+            "kind": "bar",
+            "id": "Link3"
           }
         }
       ],
@@ -266,11 +251,11 @@ export const assemblyLessonSnapshot = {
       "mount": {
         "to": {
           "module": "Lift1",
-          "output": "carriage"
+          "output": "tool"
         },
         "ref": {
-          "x": 45.00000000000001,
-          "y": 88,
+          "x": 50,
+          "y": 0,
           "a": 90
         },
         "home": {
@@ -278,5 +263,12 @@ export const assemblyLessonSnapshot = {
         }
       }
     }
+  ],
+  "motorAngles": {
+    "2": 0
+  },
+  "tracePoints": [
+    "LT",
+    "RT"
   ]
 };
