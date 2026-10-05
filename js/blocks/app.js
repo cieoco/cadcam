@@ -51,7 +51,7 @@ import { createExampleController } from './example-controller.js?v=20261005_unit
 import { createGripperController } from './gripper-controller.js?v=20260925_r1b2';
 import { createGripperObject } from './gripper-object.js?v=20260925_r1b2';
 import { createGearEditor, rackPhaseShift } from './gear-editor.js?v=20261004_fourbar_r1';
-import { createSliderEditor } from './slider-editor.js';
+import { createSliderEditor } from './slider-editor.js?v=20261005_sliderui';
 import { createMotorTools } from './motor-tools.js';
 import { createPlateEditor } from './plate-editor.js';
 import { createNodeEditor } from './node-editor.js';

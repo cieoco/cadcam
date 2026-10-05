@@ -752,8 +752,6 @@
             <span class="le-value"><span id="lenValue">88</span><input id="memberDimensionInput" type="number" min="8" max="2000" step="0.1" style="display:none;width:76px;font:inherit;color:inherit;border:1px solid #cbd5e1;border-radius:6px;padding:5px" aria-label="孔距" onchange="window.blocks.setMemberDimension(this.value)" onkeydown="if(event.key==='Enter')this.blur()"><span class="le-unit">mm</span></span>
             <button class="le-step" id="lenPlusBtn" onclick="window.blocks.changeLen(8)" title="長 8mm（多一孔）">＋</button>
           </span>
-          <button class="lift-btn" id="sliderFlipBtn" style="display:none;" onclick="window.blocks.flipSlider()" title="被動滑塊由連桿和滑軌交點求解；若組裝結果跑到軌道另一側或連桿交叉，按這裡切換另一個幾何解。">🔄 翻面</button>
-          <button class="lift-btn" id="sliderBaseBtn" style="display:none;" onclick="window.blocks.toggleSliderBase()" title="線性致動器的本體固定端。A 表示從軌道 A 端往 B 端推出；B 表示從 B 端往 A 端推出。調整滑軌長度時固定端會留在原位。">固定端：A</button>
           <button class="lift-btn" id="linkToRailBtn" style="display:none;" onclick="window.blocks.convertLinkToSlider()" title="把這根連桿就地升級成滑軌：沿用連桿兩端的接點當固定孔，原本接好的連接與機架固定點都會保留。">🟩 變滑軌</button>
           <button class="clear-btn" id="memberUndoBtn" onclick="window.blocks.undo()" title="復原上一步" disabled>↩ 復原</button>
           <button class="clear-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除選取的桿件">🗑 刪除</button>
@@ -764,35 +762,48 @@
           <label id="memberMirrorLabel" style="display:none;white-space:nowrap"><input id="memberMirror" type="checkbox" checked onchange="window.blocks.setMemberMirror(this.checked)"> 同步左右</label>
           <label style="display:none;white-space:nowrap">材料 <select id="memberMaterial" class="tri-side" aria-label="零件材料" title="僅記錄材料，尚未驗證強度及加工參數" onchange="window.blocks.setMemberMaterial(this.value)"></select></label>
         </div>
-        <div class="le-row" id="sliderBodyRow" style="display:none;">
-          <span class="le-title">滑塊長度</span>
-          <button class="le-step" onclick="window.blocks.changeSliderBodyLen(-1)" title="滑塊本體短 1mm">−</button>
-          <span class="le-value"><span id="sliderBodyVal">32</span><span class="le-unit">mm</span></span>
-          <button class="le-step" onclick="window.blocks.changeSliderBodyLen(1)" title="滑塊本體長 1mm">＋</button>
-        </div>
-        <div class="le-row" id="sliderCarrierRow" style="display:none;">
-          <span class="le-title">桿件長度</span>
-          <button class="le-step" onclick="window.blocks.changeSliderCarrierLen(-1)" title="承載滑軌的實體桿件短 1mm；不改變可滑動的滑軌長度">−</button>
-          <span class="le-value"><span id="sliderCarrierVal">100</span><span class="le-unit">mm</span></span>
-          <button class="le-step" onclick="window.blocks.changeSliderCarrierLen(1)" title="承載滑軌的實體桿件長 1mm；不改變可滑動的滑軌長度">＋</button>
-        </div>
-        <div class="le-row" id="sliderRailOffsetRow" style="display:none;">
-          <span class="le-title">滑軌起點</span>
-          <button class="le-step" onclick="window.blocks.changeSliderRailOffset(-1)" title="滑軌可動區起點往固定孔 A 端移 1mm">−</button>
-          <span class="le-value"><span id="sliderRailOffsetVal">0</span><span class="le-unit">mm</span></span>
-          <button class="le-step" onclick="window.blocks.changeSliderRailOffset(1)" title="滑軌可動區起點往固定孔 B 端移 1mm">＋</button>
-        </div>
+        <div id="sliderSettings" style="display:none;flex-basis:100%;font-size:13px;line-height:1.6">
+          <p>滑軌決定可移動範圍；實際往復多遠由連接機構決定。想改推送行程，先調曲柄長度。</p>
+          <p id="sliderLengthLimit" role="status" hidden>已達底座可容納的長度。<button type="button" onclick="document.getElementById('sliderMountSettings').open=true">展開底座設定</button>，增加底座長度或減少軌道偏移。</p>
+          <details><summary style="cursor:pointer;padding:10px 0">移動限制</summary>
+          <p id="sliderRangeOrigin"></p>
         <div class="le-row" id="sliderStartRow" style="display:none;">
-          <span class="le-title">行程起點</span>
+          <span class="le-title">移動下限</span>
           <button class="le-step" onclick="window.blocks.changeSliderTravelStart(-1)" title="滑塊接孔從固定端量起的最小位置，退 1mm">−</button>
           <span class="le-value"><span id="sliderStartVal">0</span><span class="le-unit">mm</span></span>
           <button class="le-step" onclick="window.blocks.changeSliderTravelStart(1)" title="滑塊接孔從固定端量起的最小位置，進 1mm">＋</button>
         </div>
         <div class="le-row" id="sliderEndRow" style="display:none;">
-          <span class="le-title">行程終點</span>
+          <span class="le-title">移動上限</span>
           <button class="le-step" onclick="window.blocks.changeSliderTravelEnd(-1)" title="滑塊接孔從固定端量起的最大位置，退 1mm">−</button>
           <span class="le-value"><span id="sliderEndVal">64</span><span class="le-unit">mm</span></span>
           <button class="le-step" onclick="window.blocks.changeSliderTravelEnd(1)" title="滑塊接孔從固定端量起的最大位置，進 1mm">＋</button>
+        </div>
+          </details>
+          <details id="sliderMountSettings"><summary style="cursor:pointer;padding:10px 0">外形與安裝</summary>
+        <div class="le-row" id="sliderBodyRow" style="display:none;">
+          <span class="le-title">滑塊本體長度</span>
+          <button class="le-step" onclick="window.blocks.changeSliderBodyLen(-1)" title="滑塊本體短 1mm">−</button>
+          <span class="le-value"><span id="sliderBodyVal">32</span><span class="le-unit">mm</span></span>
+          <button class="le-step" onclick="window.blocks.changeSliderBodyLen(1)" title="滑塊本體長 1mm">＋</button>
+        </div>
+        <div class="le-row" id="sliderCarrierRow" style="display:none;">
+          <span class="le-title">底座長度</span>
+          <button class="le-step" onclick="window.blocks.changeSliderCarrierLen(-1)" title="承載滑軌的實體桿件短 1mm；不改變可滑動的滑軌長度">−</button>
+          <span class="le-value"><span id="sliderCarrierVal">100</span><span class="le-unit">mm</span></span>
+          <button class="le-step" onclick="window.blocks.changeSliderCarrierLen(1)" title="承載滑軌的實體桿件長 1mm；不改變可滑動的滑軌長度">＋</button>
+        </div>
+        <div class="le-row" id="sliderRailOffsetRow" style="display:none;">
+          <span class="le-title">軌道偏移</span>
+          <button class="le-step" onclick="window.blocks.changeSliderRailOffset(-1)" title="滑軌可動區起點往固定孔 A 端移 1mm">−</button>
+          <span class="le-value"><span id="sliderRailOffsetVal">0</span><span class="le-unit">mm</span></span>
+          <button class="le-step" onclick="window.blocks.changeSliderRailOffset(1)" title="滑軌可動區起點往固定孔 B 端移 1mm">＋</button>
+        </div>
+          </details>
+          <details><summary style="cursor:pointer;padding:10px 0">特殊操作</summary>
+          <button class="lift-btn" id="sliderFlipBtn" style="display:none;" onclick="window.blocks.flipSlider()" title="被動滑塊由連桿和滑軌交點求解；若組裝結果跑到軌道另一側或連桿交叉，按這裡切換另一個幾何解。">切換另一側位置</button>
+          <button class="lift-btn" id="sliderBaseBtn" style="display:none;" onclick="window.blocks.toggleSliderBase()" title="線性致動器的本體固定端。A 表示從軌道 A 端往 B 端推出；B 表示從 B 端往 A 端推出。調整滑軌長度時固定端會留在原位。">固定端：A</button>
+          </details>
         </div>
         <div class="le-row" id="zliftRow">
           <span class="le-title">疊放</span>
@@ -1112,6 +1123,6 @@
       "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261003_g2"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20261005_unit2"></script>
+  <script type="module" src="js/blocks/app.js?v=20261005_sliderui"></script>
 </body>
 </html>

@@ -54,7 +54,7 @@ export function createSliderEditor({
     document.getElementById('roleEditor').style.display = 'none';
     document.getElementById('servoEditor').style.display = 'none';
     document.getElementById('strokeEditor').style.display = 'none';
-    document.getElementById('lenTitle').textContent = '🟩 滑軌長度';
+    document.getElementById('lenTitle').textContent = '🟩 可滑動長度';
     setLenButtonTitles('滑軌短 1mm', '滑軌長 1mm');
     document.getElementById('triSideSelect').style.display = 'none';
     updatePlateShapeControls(null);
@@ -71,6 +71,11 @@ export function createSliderEditor({
     draw();
   }
   function setSliderDetailRows(show) {
+    const settings = document.getElementById('sliderSettings');
+    if (settings) {
+      settings.style.display = show ? 'block' : 'none';
+      if (!show) settings.querySelectorAll('details').forEach(detail => { detail.open = false; });
+    }
     const display = show ? 'flex' : 'none';
     const body = document.getElementById('sliderBodyRow');
     const carrier = document.getElementById('sliderCarrierRow');
@@ -115,10 +120,16 @@ export function createSliderEditor({
     if (railOffset) railOffset.textContent = sliderRailOffset(c);
     if (start) start.textContent = sliderTravelStart(c);
     if (end) end.textContent = sliderTravelEnd(c);
+    const limit = document.getElementById('sliderLengthLimit');
+    if (limit) limit.hidden = railLength(c) < sliderCarrierLength(c) - sliderRailOffset(c);
+    const origin = document.getElementById('sliderRangeOrigin');
+    if (origin) origin.textContent = `從軌道 ${c.baseEnd === 'p2' ? 'B' : 'A'} 端量起的允許位置（mm），不是實際往復行程。`;
+    renderSliderBaseButton(c);
   }
   function renderSliderBaseButton(c) {
     const btn = document.getElementById('sliderBaseBtn');
     if (!btn || !c) return;
+    btn.style.display = c.isInput ? '' : 'none';
     btn.textContent = c.baseEnd === 'p2' ? '固定端：B' : '固定端：A';
     btn.classList.toggle('lift-on', Boolean(c.isInput));
   }
