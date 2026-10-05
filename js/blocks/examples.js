@@ -887,6 +887,21 @@ const ALL_BLOCK_EXAMPLES = [
   }
 ];
 
+// 第二單元半成品：保留曲柄與滑軌，學生補接 A–P3 浮桿。
+const sliderPractice = JSON.parse(JSON.stringify(ALL_BLOCK_EXAMPLES.find(e => e.id === 'slider-crank')));
+sliderPractice.id = 'slider-crank-practice';
+sliderPractice.title = '滑塊曲柄：補接浮桿';
+sliderPractice.note = '用連桿接曲柄活動端 A 與滑塊孔 P3，再播放。';
+sliderPractice.snapshot.comps = sliderPractice.snapshot.comps.filter(c => c.id !== 'Link2');
+const practiceCrank = sliderPractice.snapshot.comps.find(c => c.id === 'Link1');
+practiceCrank.p2.x = 0;
+practiceCrank.p2.y = 32;
+practiceCrank.phaseOffset = 90;
+sliderPractice.snapshot.comps.find(c => c.id === 'Slider1').p3.x = Math.sqrt(88 ** 2 - 32 ** 2);
+sliderPractice.snapshot.params.LL1 = 32;
+delete sliderPractice.snapshot.params.LL2;
+ALL_BLOCK_EXAMPLES.push(sliderPractice);
+
 export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES.filter(
   example => example.id !== 'competition-flywheel-shooter'
 );
