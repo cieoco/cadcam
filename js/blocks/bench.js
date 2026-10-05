@@ -307,6 +307,12 @@ export function benchAdjust(comps, modules, moduleId, action, params, opts = {})
       if (k === null) return fail('算不出這個模組的底板邊，不能立在板面上');
       next = withOrient(orient, { edge: 'child', face: 1, childEdge: k });
     }
+  } else if (action.startsWith('child-edge:')) {
+    if (!standing) return fail('請先選宿主的板面');
+    const edge = Number(action.slice(11));
+    const edges = moduleFrameEdges(list, modList, moduleId, params, { noOwnHoles: true });
+    if (!Number.isInteger(edge) || edge < 0 || edge >= edges.length) return fail('找不到這個底板邊面');
+    next = withOrient(orient, { childEdge: edge });
   } else if (action === 'face') {
     if (!standing) return fail('只有「立在面上」時才能換面；先按「立在面上」');
     next = withOrient(orient, { face: orient.face === -1 ? 1 : -1 });
@@ -323,7 +329,7 @@ export function benchAdjust(comps, modules, moduleId, action, params, opts = {})
       if (count < 2) return fail('這個模組的底板只有一條邊，沒有別的站立邊可換');
       next = withOrient(orient, { childEdge: ((Number.isInteger(orient.childEdge) ? orient.childEdge : 0) + 1) % count });
     } else next = withOrient(orient, { childAxisDeg: normalizeDeg(orient.childAxisDeg + 90) });
-  } else if (action === 'slide+' || action === 'slide-') {
+  } else if (['slide+', 'slide-', 'align-start', 'align-center', 'align-end'].includes(action)) {
     // C1：宿主可以是桿、三角板或機架板的邊；邊長取 lengthMm（桿＝求解用的桿長參數）。
     const edge = orthogonalHostEdge(list, modList, mod.mount, pointCoords(list), params, { home: true });   // D2：只要邊長，底板邊用 home 座標
     if (!edge) return fail('找不到宿主的邊');
@@ -331,7 +337,10 @@ export function benchAdjust(comps, modules, moduleId, action, params, opts = {})
     const lo = -half, hi = half - ADAPTER_LENGTH_MM;   // 轉接座占 [offset, offset+20]，不能超出邊的兩端
     if (hi < lo) return fail('這條邊太短，不能沿邊滑動');
     const cur = finiteNum(orient.offsetMm) ? orient.offsetMm : 0;
-    const v = round1(Math.min(hi, Math.max(lo, cur + (action === 'slide+' ? SLIDE_STEP_MM : -SLIDE_STEP_MM))));
+    const target = action === 'align-start' ? lo : action === 'align-end' ? hi
+      : action === 'align-center' ? (lo + hi) / 2
+      : cur + (action === 'slide+' ? SLIDE_STEP_MM : -SLIDE_STEP_MM);
+    const v = Math.min(hi, Math.max(lo, round1(target)));
     next = withOrient(orient, { offsetMm: v });
   } else if (action === 'joint:printed' || action === 'joint:bracket-m3') {
     // E1：換接合件。金屬角碼只有 90°，已傾斜的要先回到 0°。

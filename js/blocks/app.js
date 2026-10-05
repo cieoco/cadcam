@@ -57,7 +57,7 @@ import { createPlateEditor } from './plate-editor.js';
 import { createNodeEditor } from './node-editor.js';
 import { createModuleEditor } from './module-editor.js';
 import { createModuleDrag } from './module-drag.js';
-import { createBench } from './bench-ui.js';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
+import { createBench } from './bench-ui.js?v=faces2-20261005';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
 import { workRangeFromTrace, clampRangeFromTraces, currentPointDistance } from './measurement.js';
 import { circleRectCompression } from './intake-contact.js';
 import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
@@ -758,7 +758,7 @@ function restoreBenchSnapshot(snap, undoLen) {
 }
 async function set3D(on) { if (view3DActive !== !!on) await toggle3D(); }
 const bench = createBench({
-  deleteDesign,
+  deleteDesign, pause,
   pushUndo, rebuild, draw, transient, setViewPlane: id => setViewPlane(id),
   saveComposite: id => moduleEditor.saveCompositeToLibrary(id),   // B7
   exportComposite: id => moduleEditor.exportComposite(id),
@@ -1826,7 +1826,7 @@ async function toggle3D() {
     document.getElementById('strokeEditor').style.display = 'none';
     overlay.style.display = 'block';
     if (!viewer3D) {
-      const { createViewer } = await import('../blocks3d/viewer.js');
+      const { createViewer } = await import('../blocks3d/viewer.js?v=faces-20261005');
       viewer3D = createViewer(overlay);
     }
     refresh3DView();

@@ -11,7 +11,8 @@
  *   showAll   是否把不相容的接口也畫出來（暗色、點了說原因）
  */
 import { S, motorAnglesNow } from './state.js';
-import * as Bench from './bench.js';
+import * as Bench from './bench.js?v=faces-20261005';
+import { moduleFrameEdges } from './assembly.js';
 import * as Settings from './settings.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { resolveSpacers, findInterference, interferenceTimeline, hitPartNames } from './interference.js';
@@ -52,7 +53,7 @@ export function createBench(deps) {
   const saveComposite = deps.saveComposite || (() => null);
   const exportComposite = deps.exportComposite || (() => null);   // 組合積木匯出 JSON   // B7：存成組合積木（由 app.js 接到模組編輯器的模組庫）
 
-  const st = { moreOpen: false, selected: null, preview: null, showAll: false, snapId: null, msg: '', lastScene: null, wasIn3D: false, tilted: false, canvasBound: null };
+  const st = { faceStep: null, moreOpen: false, selected: null, preview: null, showAll: false, snapId: null, msg: '', lastScene: null, wasIn3D: false, tilted: false, canvasBound: null };
   let listSig = '', panelSig = '';
   const cards = new Map();   // moduleId -> 卡片 DOM（就地更新，不重建，拖曳中的卡片才不會被換掉）
   let drag = null;
@@ -404,6 +405,10 @@ export function createBench(deps) {
   function drawMarkers() {
     const v = viewer();
     if (!v) return;
+    if (st.faceStep === 'child') {
+      v.setMarkers(childFaceEdges().map((edge, i) => ({ kind: 'edge', points: edge.points, tone: 'suggested', label: `底板邊 ${i + 1}` })));
+      return;
+    }
     const list = visibleMarkers().map(m => {
       const tone = toneOf(m);
       return {
@@ -478,6 +483,8 @@ export function createBench(deps) {
   async function setMode(mode) {
     if (mode !== 'design' && mode !== 'bench') return;
     if (S.mode === mode) return;
+    st.faceStep = null;
+    viewer()?.highlightSurface?.(null);
     if (mode === 'bench') {
       S.mode = 'bench';
       document.body.dataset.mode = 'bench';
@@ -523,6 +530,7 @@ export function createBench(deps) {
     if (!isBench()) return false;
     const next = moduleId && modOf(moduleId) ? moduleId : null;
     if (st.preview && next !== st.preview.moduleId) cancelPreview();
+    if (next !== st.selected) { st.faceStep = null; viewer()?.highlightSurface?.(null); }
     st.selected = next;
     st.snapId = null;
     const mod = next && modOf(next);
@@ -555,6 +563,7 @@ export function createBench(deps) {
     const undoLen = S.undoStack.length;
     pushUndo();
     S.comps = r.comps; S.modules = r.modules;
+    st.faceStep = null;
     st.preview = { moduleId: childId, portId: marker.portId, hostId: marker.module, preSnap, undoLen };
     st.snapId = null;
     applyGhost();
@@ -564,6 +573,7 @@ export function createBench(deps) {
     return true;
   }
   function commit() {
+    if (st.faceStep === 'child') { say('請先點選子模組底板的接觸邊面，或取消選面'); return false; }
     if (!st.preview) { say('目前沒有要接上的預覽'); return false; }
     const mod = modOf(st.preview.moduleId);
     st.preview = null;
@@ -578,6 +588,8 @@ export function createBench(deps) {
     if (!st.preview) return false;
     const { preSnap, undoLen } = st.preview;
     st.preview = null;
+    st.faceStep = null;
+    viewer()?.highlightSurface?.(null);
     applyGhost();
     restoreSnapshot(preSnap, undoLen);   // 還原接上前的狀態，並丟掉預覽期間（含調整）累積的復原紀錄
     if (!silent) say('已取消，模組回到原位');
@@ -620,6 +632,7 @@ export function createBench(deps) {
     const o = after && after.mount && after.mount.orient;
     let msg;
     if (action === 'slide+' || action === 'slide-') msg = `已沿邊滑動，位置 ${o && o.offsetMm ? (o.offsetMm > 0 ? '+' : '') + o.offsetMm : 0} mm`;
+    else if (action.startsWith('align-')) msg = '已對齊接合座，可繼續沿邊微調';
     else if (action === 'joint:printed' || action === 'joint:bracket-m3') msg = action === 'joint:printed' ? '已改用 3D 列印轉接座（可以傾斜，要下載 STL 列印）' : '已改用 M3 金屬角碼（只有 90°，不用列印）';
     else if (action === 'tilt+' || action === 'tilt-') msg = o && o.tiltDeg ? `已傾斜 ${o.tiltDeg}°（兩翼夾角 ${90 + o.tiltDeg}°）` : '已回到直角（傾斜 0°）';
     else if (action === 'angle') msg = after && after.mount && after.mount.orient ? '已改成直角安裝（⟂）' : '已改成同平面安裝（═）';
@@ -636,7 +649,7 @@ export function createBench(deps) {
   }
   async function editModule(id) {
     const mod = modOf(id);
-    if (st.preview) commit();
+    if (st.preview && !commit()) return;
     await setMode('design');
     if (mod && mod.mount && mod.mount.orient) setViewPlane(id);
   }
@@ -660,8 +673,8 @@ export function createBench(deps) {
   function syncUI(force = false) {
     if (!isBench()) return;
     // 預覽中的模組若被復原／讀檔弄掉了，就丟掉預覽狀態
-    if (st.preview) { const pm = modOf(st.preview.moduleId); if (!pm || !pm.mount) { st.preview = null; applyGhost(); } }
-    if (st.selected && !modOf(st.selected)) st.selected = null;
+    if (st.preview) { const pm = modOf(st.preview.moduleId); if (!pm || !pm.mount) { st.preview = null; st.faceStep = null; viewer()?.highlightSurface?.(null); applyGhost(); } }
+    if (st.selected && !modOf(st.selected)) { st.selected = null; st.faceStep = null; viewer()?.highlightSurface?.(null); }
     labels = Bench.moduleLabels(S.modules);
     renderList();
     renderPanel(force);
@@ -738,7 +751,7 @@ export function createBench(deps) {
       shown.map(m => [m.key, m.compatible, m.suggested]),
       mod ? hasChildren(mod) : false,
       mod && mod.mount ? ['adj', ['side', 'reverse', 'rotate', 'slide-', 'slide+', 'stand', 'face', 'tilt-', 'tilt+'].map(a => adjustState(mod, a).ok), mod.mount.orient && mod.mount.orient.joint ? mod.mount.orient.joint.kind : '', !!mod.mount.orient, mod.mount.orient ? mod.mount.orient.edge : '', !!mod.mount.flip] : 0,
-      st.msg
+      st.msg, st.faceStep
     ]);
     if (!force && sig === panelSig) return;
     panelSig = sig;
@@ -748,22 +761,21 @@ export function createBench(deps) {
     head.appendChild(el('div', 'bench-title', mod ? displayName(mod.id) : '組立台'));
     head.appendChild(el('div', 'bench-sub', mod ? statusOf(mod) : '先從清單選一個模組'));
     root.appendChild(head);
+    if (st.faceStep) {
+      root.appendChild(el('div', 'bench-preview-text', st.faceStep === 'host' ? '點選另一模組的板件正面或背面。' : '再點子模組底板上發亮的接觸邊面；可旋轉視角。'));
+      root.appendChild(bigBtn('取消選面', () => { st.faceStep = null; viewer()?.highlightSurface?.(null); if (st.preview) cancelPreview(); syncUI(true); }));
+    }
     root.appendChild(liveBox);   // B6：即時干涉狀態＋全行程測試（持久節點，面板重建時只是搬回來）
 
-    if (st.preview) {
-      const box = el('div', 'bench-preview');
-      box.appendChild(el('div', 'bench-preview-text', '預覽中（半透明）。可以先調整位置，滿意再接上。'));
-      const row = el('div', 'bench-row');
-      const ok = bigBtn('✔ 接上', () => commit(), 'primary'); ok.id = 'benchCommitBtn';
-      const no = bigBtn('✖ 取消', () => cancelPreview(), 'danger'); no.id = 'benchCancelBtn';
-      row.appendChild(ok); row.appendChild(no);
-      box.appendChild(row);
-      root.appendChild(box);
+    if (st.faceStep === 'child') {
+      root.appendChild(el('div', 'bench-note', '點選發亮的底板邊線，決定哪個邊面接觸宿主。選好後才進入位置微調。'));
+      return;
     }
 
     if (mod && !mod.mount) {
       const sec = el('div', 'bench-section');
-      sec.appendChild(el('div', 'bench-label', '接到哪裡'));
+      sec.appendChild(el('div', 'bench-label', '① 選相接的邊／面'));
+      sec.appendChild(bigBtn('點選 3D 接合面', () => beginFacePick()));
       if (!mod.base) {
         sec.appendChild(el('div', 'bench-note', '這個模組沒有基準點（base），不能安裝。'));
       } else {
@@ -808,38 +820,62 @@ export function createBench(deps) {
 
     if (mod && mod.mount) {
       const sec = el('div', 'bench-section');
-      sec.appendChild(el('div', 'bench-label', '調整'));
-      // E1：直角安裝的接合件（金屬角碼｜3D 列印）
+      const standing = !!(mod.mount.orient && mod.mount.orient.edge === 'child');
+      const addActions = (parent, defs) => {
+        const grid = el('div', 'bench-grid');
+        defs.forEach(([action, label]) => {
+          const state = adjustState(mod, action);
+          const b = bigBtn(label, () => adjust(action), action === 'unmount' ? 'danger' : '');
+          b.dataset.benchAction = action;
+          if (!state.ok) { b.disabled = true; b.title = state.reason || ''; b.classList.add('is-disabled'); }
+          grid.appendChild(b);
+        });
+        parent.appendChild(grid);
+      };
+      sec.appendChild(el('div', 'bench-label', '① 確認相接的邊／面'));
+      if (st.preview) sec.appendChild(bigBtn('重新點選接合面', () => beginFacePick()));
+      sec.appendChild(el('div', 'bench-note', `接到「${displayName(mod.mount.to.module)}」；${mod.mount.orient ? (standing ? '立在板面上' : '接在邊上') : '同平面對鎖'}。`));
+      addActions(sec, [['stand', standing ? '改接在邊上' : '改立在板面上'], ['face', '換到另一面']]);
+      const more = document.createElement('details');
+      more.appendChild(el('summary', 'bench-more-sum', '接合方向與其他調整'));
+      addActions(more, [['angle', '直角 ↔ 同平面'], ['rotate', standing ? '換站立邊' : '轉 90°'], ['reverse', '掉頭'], ['side', '換邊'], ['flip', '翻面']]);
+      sec.appendChild(more);
+      sec.appendChild(el('div', 'bench-label', '② 對齊與微調位置'));
       if (mod.mount.orient) {
-        const cur = mod.mount.orient.joint && mod.mount.orient.joint.kind === 'bracket-m3' ? 'bracket-m3' : 'printed';
+        sec.appendChild(el('div', 'bench-note', '沿接合邊移動；對齊的是接合座範圍，不是整個模組外形。'));
+        addActions(sec, [['align-start', '靠起點'], ['align-center', '置中'], ['align-end', '靠終點'], ['slide-', '往起點 5 mm'], ['slide+', '往終點 5 mm']]);
+      } else sec.appendChild(el('div', 'bench-note', '同平面對鎖以接點定位，不能沿邊滑動。'));
+      sec.appendChild(el('div', 'bench-label', '③ 選固定件並接上'));
+      // E1：直角安裝的接合件（金屬角碼｜3D 列印），放在定位之後選擇。
+      if (mod.mount.orient) {
+        const cur = mod.mount.orient.joint?.kind === 'bracket-m3' ? 'bracket-m3' : 'printed';
         const seg = el('div', 'bench-seg');
-        seg.setAttribute('role', 'group');
-        seg.setAttribute('aria-label', '接合件');
-        seg.appendChild(el('span', 'bench-seg-label', '接合件：'));
+        seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', '接合件');
         [['bracket-m3', '🔩 金屬角碼'], ['printed', '🖨 3D 列印']].forEach(([kind, label]) => {
           const b = bigBtn(label, () => adjust(`joint:${kind}`), 'bench-seg-btn' + (cur === kind ? ' is-on' : ''));
           b.dataset.benchAction = `joint:${kind}`;
-          b.setAttribute('aria-pressed', cur === kind ? 'true' : 'false');
+          b.setAttribute('aria-pressed', String(cur === kind));
           seg.appendChild(b);
         });
         sec.appendChild(seg);
-      }
-      const grid = el('div', 'bench-grid');
-      const standing = !!(mod.mount.orient && mod.mount.orient.edge === 'child');   // D3
-      const defs = [
-        ['angle', '⟂/═ 直角↔同平面'], ['rotate', standing ? '↻ 換站立邊' : '↻ 轉 90°'], ['reverse', '⟲ 掉頭'], ['side', '⇅ 換邊'],
-        ['stand', standing ? '⤒ 壓在邊上' : '⤒ 立在面上'], ['face', '⇵ 換面'],
-        ['slide-', '◀ 5mm'], ['slide+', '5mm ▶'], ['tilt-', '◣ 傾斜 −15°'], ['tilt+', '傾斜 +15° ◢'], ['flip', '翻面'], ['unmount', '拆下'], ['edit', '✏️ 編輯此模組']
-      ];
-      defs.forEach(([action, label]) => {
-        const state = adjustState(mod, action);
-        const b = bigBtn(label, () => adjust(action), action === 'unmount' ? 'danger' : '');
-        b.dataset.benchAction = action;
-        if (!state.ok) { b.setAttribute('aria-disabled', 'true'); b.title = state.reason || ''; b.classList.add('is-disabled'); }
-        grid.appendChild(b);
-      });
-      sec.appendChild(grid);
+        if (cur === 'printed') addActions(sec, [['tilt-', '傾斜 −15°'], ['tilt+', '傾斜 +15°']]);
+      } else sec.appendChild(el('div', 'bench-note', '同平面接點對鎖，不使用直角角碼。'));
       root.appendChild(sec);
+    if (st.preview) {
+      const box = el('div', 'bench-preview');
+      box.appendChild(el('div', 'bench-preview-text', '預覽中。確認位置與固定件後，再按接上。'));
+      const row = el('div', 'bench-row');
+      const ok = bigBtn('✔ 接上', () => commit(), 'primary'); ok.id = 'benchCommitBtn';
+      const no = bigBtn('✖ 取消', () => cancelPreview(), 'danger'); no.id = 'benchCancelBtn';
+      row.appendChild(ok); row.appendChild(no);
+      box.appendChild(row);
+      root.appendChild(box);
+    }
+
+      const maintenance = document.createElement('details');
+      maintenance.appendChild(el('summary', 'bench-more-sum', '拆下與編輯'));
+      addActions(maintenance, [['unmount', st.preview ? '重新選接合位置' : '拆下'], ['edit', '編輯此模組']]);
+      root.appendChild(maintenance);
     }
 
     // B7：有模組裝在它上面時，可以把整組存成組合積木（進模組庫，下次整組插入）。
@@ -895,17 +931,84 @@ export function createBench(deps) {
     return best;
   }
 
+  function childFaceEdges() {
+    const pl = st.lastScene?.planes?.[st.selected];
+    if (!pl) return [];
+    return moduleFrameEdges(S.comps, S.modules, st.selected, S.topo.params, { noOwnHoles: true }).map(edge => ({
+      ...edge, points: [edge.a, edge.b].map(p => applyMatrix4(pl.matrix, { x: p.x, y: p.y, z: 0 }))
+    }));
+  }
+  function chooseChildEdge(index) {
+    if (!adjust(`child-edge:${index}`)) return;
+    st.faceStep = null;
+    viewer()?.highlightSurface?.(null);
+    say('兩個接合面已選好，接著置中或微調位置。');
+    syncUI(true); drawMarkers();
+  }
+  function beginFacePick() {
+    deps.pause?.();
+    if (st.preview) cancelPreview({ silent: true });
+    st.faceStep = 'host';
+    say('請點選宿主板件的正面或背面；旋轉視角可選背面。');
+    syncUI(true);
+  }
+  function pickAssemblyFace(hit) {
+    if (!hit) { say('這裡不是可接合的板面，請點桿件或底板。'); return; }
+    const slash = hit.key.lastIndexOf('/');
+    const plane = slash < 0 ? null : hit.key.slice(0, slash);
+    const raw = hit.key.slice(slash + 1);
+    if (st.faceStep === 'child') {
+      if (plane !== st.selected || !['frame', `modframe:${st.selected}`].includes(raw)) {
+        say('請點半透明子模組的底板窄邊面，不是活動桿件。'); return;
+      }
+      const edges = moduleFrameEdges(S.comps, S.modules, st.selected, S.topo.params, { noOwnHoles: true });
+      let best = -1, distance = Infinity;
+      edges.forEach((edge, i) => {
+        const d = distSeg(hit.point.x, hit.point.y, edge.a, edge.b);
+        if (d < distance) { best = i; distance = d; }
+      });
+      if (best < 0 || distance > 12) { say('請靠近底板外框點選，指定要接觸的邊面。'); return; }
+      chooseChildEdge(best);
+      return;
+    }
+    if (Math.abs(hit.normal.z) < 0.9) { say('先點宿主寬的板面；子模組接觸邊面在下一步選。'); return; }
+    const candidates = computeMarkers().filter(m => m.compatible && m.kind === 'edge' && (m.plane || null) === plane
+      && (raw.startsWith('stick:') ? m.portId.startsWith(`edge:${raw.slice(6)}:`)
+        : raw === 'frame' ? m.portId.startsWith('edge:frame:')
+        : raw.startsWith('modframe:') && m.module === raw.slice(9) && m.portId.startsWith('edge:frame:')));
+    const p = viewer().project(hit.world);
+    candidates.sort((a, b) => screenDist(a, p.x, p.y) - screenDist(b, p.x, p.y));
+    const marker = candidates[0];
+    if (!marker) { say('這個板面沒有可用的接合位置，請選其他板件。'); return; }
+    if (!pickPort(marker.key)) return;
+    if (!adjust('stand')) { cancelPreview({ silent: true }); st.faceStep = 'host'; say('此板面空間不足，請選其他板面。'); syncUI(true); return; }
+    if (hit.normal.z < 0) adjust('face');
+    st.faceStep = 'child';
+    drawMarkers();
+    say('宿主板面已選好，再點半透明子模組底板靠近接觸邊的位置。');
+    syncUI(true);
+  }
+
   function bindCanvas(v) {
     const canvas = v.canvas;
     if (st.canvasBound === canvas) return;
     st.canvasBound = canvas;
     let down = null;
+    canvas.addEventListener('pointermove', e => {
+      if (isBench() && st.faceStep && !down) v.highlightSurface?.(v.pickSurface?.(e.clientX, e.clientY));
+    });
     canvas.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, id: e.pointerId }; });
     canvas.addEventListener('pointerup', e => {
       if (!isBench() || !down || e.button !== 0) return;
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
       down = null;
       if (moved > DRAG_START_PX || drag) return;   // 轉視角、或正在拖卡片
+      if (st.faceStep === 'child') {
+        const edges = childFaceEdges();
+        const choices = edges.map((edge, index) => ({ index, d: screenDist(edge, e.clientX, e.clientY) })).sort((a, b) => a.d - b.d);
+        if (choices[0]?.d <= (e.pointerType === 'mouse' ? 16 : 28)) { chooseChildEdge(choices[0].index); return; }
+      }
+      if (st.faceStep) { const hit = v.pickSurface?.(e.clientX, e.clientY); v.highlightSurface?.(hit); pickAssemblyFace(hit); return; }
       const mod = st.selected && modOf(st.selected);
       if (!mod || mod.mount || st.preview) return;
       const m = nearestMarker(e.clientX, e.clientY, e.pointerType === 'mouse' ? TAP_PX_MOUSE : TAP_PX_TOUCH, false);

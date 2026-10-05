@@ -1050,6 +1050,55 @@ export function createViewer(container) {
     return null;
   }
 
+  let surfaceOverlay = null;
+  function highlightSurface(hit) {
+    if (surfaceOverlay) { scene.remove(surfaceOverlay); surfaceOverlay.geometry.dispose(); surfaceOverlay.material.dispose(); surfaceOverlay = null; }
+    if (!hit) return;
+    let target;
+    dynamic.traverse(o => { if (o.userData.pickKey === hit.key && o.isMesh) target = o; });
+    if (!target) return;
+    const pos = target.geometry.attributes.position, index = target.geometry.index;
+    const n = new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z);
+    const point = new THREE.Vector3(hit.point.x, hit.point.y, hit.point.z);
+    const vertices = [], a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    for (let i = 0; i < (index ? index.count : pos.count); i += 3) {
+      a.fromBufferAttribute(pos, index ? index.getX(i) : i);
+      b.fromBufferAttribute(pos, index ? index.getX(i + 1) : i + 1);
+      c.fromBufferAttribute(pos, index ? index.getX(i + 2) : i + 2);
+      const normal = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+      if (normal.dot(n) < 0.99 || Math.abs(a.clone().sub(point).dot(n)) > 0.05) continue;
+      [a, b, c].forEach(v => vertices.push(v.x, v.y, v.z));
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    surfaceOverlay = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x22ddcc, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    surfaceOverlay.matrixAutoUpdate = false;
+    surfaceOverlay.matrix.copy(target.matrixWorld);
+    scene.add(surfaceOverlay);
+  }
+
+  // 組立選面：回傳命中的實際板面法向與板件座標，不以螢幕距離代替面命中。
+  function pickSurface(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.set((clientX - rect.left) / rect.width * 2 - 1, -(clientY - rect.top) / rect.height * 2 + 1);
+    dynamic.updateMatrixWorld(true);
+    raycaster.setFromCamera(pointer, camera);
+    for (const hit of raycaster.intersectObjects(dynamic.children, true)) {
+      let owner = hit.object;
+      while (owner && owner !== dynamic && owner.userData.pickKey === undefined) owner = owner.parent;
+      if (!owner || owner.userData.pickKey === undefined || !hit.face) continue;
+      const key = owner.userData.pickKey;
+      // 馬達、齒輪等實體也遮擋後面的板，不穿透選面。
+      if (!/(^|\/)(frame|modframe:|stick:)/.test(key)) return null;
+      const normal = hit.face.normal.clone();
+      const point = owner.worldToLocal(hit.point.clone());
+      return { key, point: { x: point.x, y: point.y, z: point.z },
+        normal: { x: normal.x, y: normal.y, z: normal.z },
+        world: { x: hit.point.x, y: hit.point.y, z: hit.point.z } };
+    }
+    return null;
+  }
+
   // 用 pointerdown/up 的位移量區分「點選」與「拖曳旋轉」，才不會在轉動視角時誤觸隱藏。
   let downX = 0, downY = 0;
   function onPointerDown(e) { downX = e.clientX; downY = e.clientY; }
@@ -1170,6 +1219,7 @@ export function createViewer(container) {
 
   function dispose() {
     stop();
+    highlightSurface(null);
     clearDynamic();
     clearMarkers();
     labelTexCache.forEach(t => t.dispose());
@@ -1198,7 +1248,7 @@ export function createViewer(container) {
   start();
 
   return {
-    update, resize, dispose, start, stop, showAll, setMarkers, setPreviewGhost, setHighlight, project, tiltView,
+    update, resize, dispose, start, stop, showAll, setMarkers, setPreviewGhost, setHighlight, project, tiltView, pickSurface, highlightSurface,
     setPickEnabled(on) { pickEnabled = !!on; },
     get canvas() { return renderer.domElement; },
     get camera() { return camera; }, get controls() { return controls; }
