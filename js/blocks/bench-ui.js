@@ -708,6 +708,18 @@ export function createBench(deps) {
     main.appendChild(el('b', 'bench-card-name'));
     main.appendChild(el('small', 'bench-card-status'));
     card.appendChild(grip); card.appendChild(main);
+    const close = el('button', 'bench-card-close', '×');
+    close.type = 'button';
+    close.title = `刪除「${displayName(id)}」整組設計`;
+    close.setAttribute('aria-label', close.title);
+    close.addEventListener('pointerdown', e => e.stopPropagation());
+    close.addEventListener('keydown', e => e.stopPropagation());
+    close.addEventListener('click', e => {
+      e.stopPropagation();
+      if (st.preview) cancelPreview({ silent: true });
+      deps.deleteDesign?.(id);
+    });
+    card.appendChild(close);
     card.addEventListener('click', () => { if (!card.dataset.justDragged) select(id); delete card.dataset.justDragged; });
     card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(id); } });
     card.addEventListener('pointerdown', e => startDrag(e, id, card));

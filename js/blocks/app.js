@@ -758,6 +758,7 @@ function restoreBenchSnapshot(snap, undoLen) {
 }
 async function set3D(on) { if (view3DActive !== !!on) await toggle3D(); }
 const bench = createBench({
+  deleteDesign,
   pushUndo, rebuild, draw, transient, setViewPlane: id => setViewPlane(id),
   saveComposite: id => moduleEditor.saveCompositeToLibrary(id),   // B7
   exportComposite: id => moduleEditor.exportComposite(id),
