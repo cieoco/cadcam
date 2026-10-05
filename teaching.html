@@ -21,24 +21,66 @@
 </style></head>
 <body><main class="page">
 <p class="eyebrow">機構積木・第一單元</p>
-<h1>四連桿：讓雨刷動起來</h1>
-<p class="lead">看影片 → 接好雨刷 → 改變範圍 → 說出發現</p>
+<h1>從零開始，設計會動的機構</h1>
+<p class="lead">會操作 → 看懂四種機構 → 補接 → 自己組 → 調雨刷 → 自己設計</p>
+<p>每次先猜、只改一項、看結果，再修正。完成一階段，再往下走。</p>
 <div class="task-list">
-<section class="task" aria-labelledby="learn-title">
-<h2 id="learn-title"><span class="task-number">1</span>看一看</h2>
-<p>要學會：用<strong>旋轉</strong>帶動雨刷<strong>來回擺動</strong>。</p>
-<a class="entry-link" href="https://www.youtube.com/watch?v=SoFUXU6jpnk" target="_blank" rel="noopener">觀看雨刷影片 ↗</a>
-<p>找一找：哪裡一直轉？哪裡來回擺？接著先做一支雨刷。</p>
+<section class="task" aria-labelledby="start-title">
+<h2 id="start-title"><span class="task-number">1</span>讓它動起來</h2>
+<p><strong>目標：</strong>會播放、選桿、改孔距與復原。</p>
+<a class="entry-link" href="blocks.html?example=fourbar-crank-rocker" target="_blank" rel="noopener">開啟第一個範例 ↗</a>
+<p><strong>動手：</strong>播放 → 暫停 → 點紅色桿身 → 孔距 32 改為 40 mm → 播放 → 復原。</p>
+<p><strong>觀察：</strong>紅色桿整圈轉，右側桿來回擺。</p>
+<p><strong>反思：</strong>我能自己改一次，再回到原來嗎？</p>
+<details><summary>先認識四根桿</summary><p>AB 是兩個固定支點間的機架；AC 是接受馬達驅動的主動桿；CD 是浮桿；BD 是輸出動作的從動桿。此例 AC 是曲柄，BD 是搖桿。主動桿不一定能整圈轉。</p><p>點桿身改孔距；點孔位看接點設定。接點位置固定，並不代表桿不能繞它轉。</p></details>
 </section>
-<section class="task" aria-labelledby="do-title">
-<h2 id="do-title"><span class="task-number">2</span>認識單支雨刷</h2>
-<p>黃色三孔桿是一整支雨刷臂：<strong>中間 B 固定、下端 D 接浮桿、上端 E 刷動</strong>。</p>
-<a class="entry-link" href="blocks.html?example=wiper-single" target="_blank" rel="noopener">開啟完整範例 ↗</a>
-<p>按播放，找到機架、曲柄、浮桿、搖桿。三個孔仍是同一根桿。</p>
+<section class="task" aria-labelledby="concept-title">
+<h2 id="concept-title"><span class="task-number">2</span>看懂四種機構</h2>
+<p><strong>目標：</strong>讀懂尺寸，預測修改後的動作。</p>
+<p>依序展開下面四張卡。尺寸單位都是 mm、量的是孔中心距；每次從原範例開始，AB 固定、AC 驅動，只改指定的一根。</p>
+<details class="support"><summary>① 曲柄搖桿｜一轉一擺</summary>
+<p><strong>尺寸：</strong>AB＝100、AC＝32、CD＝104、BD＝80。</p>
+<p><strong>看：</strong>AC 整圈轉，BD 來回擺。</p><p><strong>試：</strong>AC 32→40，其他不變。先猜 BD 擺幅，再播放比較。</p><p><strong>想：</strong>這一次擺幅變大了嗎？這能代表所有桿都越長越好嗎？</p>
+<a class="entry-link" href="blocks.html?example=fourbar-crank-rocker" target="_blank" rel="noopener">開啟曲柄搖桿 ↗</a></details>
+<details class="support"><summary>② 雙曲柄｜兩側都能轉</summary>
+<p><strong>尺寸：</strong>AB＝32、AC＝80、CD＝96、BD＝80。</p>
+<p><strong>看：</strong>此例最短桿 AB 固定，AC 與 BD 都能整圈轉。</p><p><strong>試：</strong>AC 80→88，其他不變；觀察兩側能否繼續轉滿一圈。</p><p><strong>想：</strong>長度改了，機構類型一定會改變嗎？</p>
+<a class="entry-link" href="blocks.html?example=fourbar-double-crank" target="_blank" rel="noopener">開啟雙曲柄 ↗</a></details>
+<details class="support"><summary>③ 雙搖桿｜兩側都會擺</summary>
+<p><strong>尺寸：</strong>AB＝100、AC＝64、CD＝48、BD＝72。</p>
+<p><strong>看：</strong>AC 與 BD 都只有有限擺動範圍。此例即使指定 AC 驅動，它也不是曲柄。</p><p><strong>試：</strong>AC 64→72，其他不變；比較兩侧擺動極限。</p><p><strong>想：</strong>一側擺幅縮小時，另一側也一定縮小嗎？</p>
+<a class="entry-link" href="blocks.html?example=fourbar-double-rocker" target="_blank" rel="noopener">開啟雙搖桿 ↗</a></details>
+<details class="support"><summary>④ 平行保持｜移動時保持方向</summary>
+<p><strong>尺寸：</strong>AB＝72、AC＝48、CD＝72、BD＝48。機架 AB 在左側直立。</p>
+<p><strong>看：</strong>兩組對邊等長；在平行組裝姿態下，浮桿 CD 保持與 AB 平行。</p><p><strong>試：</strong>上方 BD 48→56，觀察 CD 是否傾斜；再復原到 48。</p><p><strong>想：</strong>是哪兩組等長關係保持方向？此項描述幾何與姿態，和前三項的轉動分類不同。</p>
+<a class="entry-link" href="blocks.html?example=parallel-fourbar" target="_blank" rel="noopener">開啟平行保持 ↗</a></details>
+<p><strong>留下：</strong>每種一句「我改了＿＿，看到＿＿」。不同範例同時換了多個尺寸，不用它們證明單一桿長的影響。</p>
+</section>
+<section class="task" aria-labelledby="connect-title">
+<h2 id="connect-title"><span class="task-number">3</span>把機構接完整</h2>
+<p><strong>目標：</strong>知道動作如何經浮桿傳遞。</p>
+<a class="entry-link" href="blocks.html?example=fourbar-missing-coupler" target="_blank" rel="noopener">開啟缺桿練習 ↗</a>
+<p><strong>動手：</strong>先找少了哪根，再選「連桿」補接。</p>
+<p><strong>觀察：</strong>接點真的共用，還是只有外觀碰到？接好能連續運動嗎？</p>
+<details><summary>卡住了？</summary><p>從紅色桿活動端 C 接到右側桿活動端 D，補成 CD 浮桿，孔距 104 mm。</p></details>
+<p><strong>反思：</strong>沒有這根桿，哪個動作傳不過去？</p>
+</section>
+<section class="task" aria-labelledby="build-title">
+<h2 id="build-title"><span class="task-number">4</span>從空白自己組</h2>
+<p><strong>目標：</strong>不用現成作品，組出可動四連桿。</p>
+<p><strong>結構：</strong>A—C—D—B—A；A、B 固定，AC 裝馬達，AB 由機架表示。</p>
+<p><strong>尺寸：</strong>AB＝100、AC＝32、CD＝104、BD＝80。</p>
+<a class="entry-link" href="blocks.html?example=empty-challenge" target="_blank" rel="noopener">從空白開始 ↗</a>
+<p><strong>動手：</strong>放固定支點、接三根活動桿、設驅動，播放檢查。</p>
+<details><summary>需要組裝提示</summary><p>先建立 AC 與 BD，再用浮桿 CD 封閉。A、B 設固定；使用馬達工具選 A 與 AC。放點時可用接點 X／Y 微調位置；調整桿身孔距。</p><p>可參照初始位置：A（−80, 0）、B（20, 0）、C（−48, 0）、D 約（18.47, 79.99）。D 是姿態參考，最終以孔距與接點相連為準；不要求用拖曳精準定位小數。</p></details>
+<p><strong>驗證：</strong>能連續動、能指出四桿角色。存檔後重新開啟確認。</p>
 </section>
 <section class="task challenge" aria-labelledby="challenge-title">
-<h2 id="challenge-title"><span class="task-number">3</span>雨刷小工程師</h2>
-<p>先接好，再調整。不限次數，改錯可復原。</p>
+<h2 id="challenge-title"><span class="task-number">5</span>雨刷綜合驗證</h2>
+<p><strong>目標：</strong>把前面學會的組裝與調整用在單支雨刷。</p>
+<a class="entry-link" href="https://www.youtube.com/watch?v=SoFUXU6jpnk" target="_blank" rel="noopener">觀看雨刷影片 ↗</a>
+<p>找出旋轉與擺動，再看黃色三孔桿：中間 B 固定、下端 D 接浮桿、上端 E 刷動；它仍是一根剛性桿。</p>
+<details><summary>需要完整範例對照</summary><a class="entry-link" href="blocks.html?example=wiper-single" target="_blank" rel="noopener">開啟完整雨刷 ↗</a><p>AB＝100、AC＝32、CD＝104、BD＝80、BE＝120；D–B–E 共線。先保持雨刷臂形狀不變。</p></details>
 <figure class="wiper-guide">
 <svg viewBox="0 0 480 330" role="img" aria-labelledby="wiper-map-title wiper-map-desc">
 <title id="wiper-map-title">三孔雨刷臂：中間 B 固定，下端 D 驅動，上端 E 刷動</title>
@@ -69,7 +111,7 @@
 </article>
 <article class="mission">
 <h3>🟠 第三關｜刷得更廣</h3>
-<p>只改紅色 AC 曲柄的孔距，讓雨刷擺得更大，並保持連續運動。</p>
+<p>自己決定先改哪根驅動連桿的孔距，讓雨刷擺得更大。先保持黃色三孔臂不變，一次只改一項，並保持連續運動。</p>
 <details><summary>卡住了？看提示</summary><p>暫停，選紅色 AC 曲柄，孔距增加一次（＋8 mm），再播放。若卡住先復原。這一關先保持黃色三孔桿不變。</p></details>
 <label class="mission-check"><input type="checkbox" data-mission>比原來擺得大，而且仍能連續運動</label>
 </article>
@@ -78,11 +120,13 @@
 <p class="small">勾選是自我檢核，重新整理會清除，不會自動判定過關。殘影用來比較擺動角度，不代表實體刷片清潔面積。</p>
 </section>
 <section class="task" aria-labelledby="reflect-title">
-<h2 id="reflect-title"><span class="task-number">4</span>說出發現</h2>
-<p>「我把＿＿桿從＿＿改成＿＿，雨刷的擺動範圍變＿＿。」</p>
-<p>只有三根活動桿，為什麼叫四連桿？改長就一定擺得更大嗎？</p>
-<p><strong>先存下作品，再分享截圖和一句發現。</strong></p>
-<details><summary>還想挑戰？</summary><p>先試著讓單支雨刷擺得更小。完成後，再思考影片中的第二支雨刷如何跟著動。</p></details>
+<h2 id="reflect-title"><span class="task-number">6</span>設計自己的動作</h2>
+<p><strong>目標：</strong>自己選機構、定尺寸、測試與修正。</p>
+<p><strong>動手：</strong>選一個需求：來回揮手、兩側持續旋轉、移動時保持方向；或提出自己的想法。先畫草圖，標固定桿、輸入與輸出，再組裝。</p>
+<a class="entry-link" href="blocks.html?example=empty-challenge" target="_blank" rel="noopener">開始自己的設計 ↗</a>
+<p><strong>觀察：</strong>實際動作符合目標嗎？下一次只改哪一項？</p>
+<p><strong>成果：</strong>作品 JSON、改前／改後截圖，以及「我想要＿＿，所以改了＿＿，結果＿＿」。</p>
+<p><strong>自我檢核：</strong>能自行建立、能連續動、能解釋修改原因。遇到卡住可回前面範例找方法。</p>
 </section>
 </div>
 <details class="support"><summary>需要時再看：名詞與操作</summary>
@@ -98,20 +142,19 @@
 <p>比較雨刷臂的兩個極限方向，記錄擺動範圍變大或變小；不確定時寫「未測量」。</p>
 </details>
 <details class="support"><summary>教師資料與學習單</summary>
-<h2>第一節｜看懂並接好四連桿（50 分鐘）</h2><div class="timeline"><div class="time">0–5 分</div><div>先觀看頁首雨刷影片，找出旋轉與擺動，再由「開啟完整範例」觀察四根桿和四個迴轉對；教師示範操作主動桿，學生先說出預期動作。</div><div class="time">5–13 分</div><div>角色辨認：指出機架、主動桿、浮桿、從動桿，觀察主動桿與從動桿是整圈轉動或來回擺動。</div><div class="time">13–23 分</div><div>引導補接：開啟補接浮桿練習，查看兩個未連起來的接點、選擇「連桿」，從一個活動端連到另一個活動端，補成浮桿，使四桿形成閉環；操作主動桿確認可動，口頭說明各桿角色。</div><div class="time">23–38 分</div><div>獨立再試：重新開啟同一個補接浮桿練習，學生自行補接、操作並解釋四桿關係，不提供接法提示；卡住時可記下嘗試和兩次修改。</div><div class="time">38–46 分</div><div>同伴互看組裝成果，依「接點真實相連、機構可動、能解釋四桿角色」互相檢視並修正說明。</div><div class="time">46–50 分</div><div>記錄兩次修改（若有）及其觀察，整理第一節發現。</div></div>
-<h2>組裝觀察重點</h2><div class="grid"><section class="card"><h3>真實連接</h3><p>浮桿兩端分別接到正確的迴轉對，與相鄰桿件形成連續閉環，不只是畫面重疊或靠近。</p></section><section class="card"><h3>可以運動</h3><p>操作主動桿時，組裝後的機構能呈現連動；指出觀察到的運動情形。</p></section><section class="card"><h3>說得清四桿</h3><p>能指出機架（固定桿）、主動桿（輸入桿）、浮桿（聯接桿）、從動桿（輸出桿），並說明它們如何相連、傳遞運動。</p></section><section class="card"><h3>記錄修改</h3><p>簡述兩次修改各改了什麼、觀察到什麼。修改是學習歷程紀錄，不要求一定先失敗。</p></section></div>
-<div class="callout"><strong>教師觀察：</strong>依上述組裝證據與學生說明給予回饋。遇到暫時無法解算時，可觀察接點與操作方式並記錄修改，不必把失敗當成任務要求。</div>
-<div class="pagebreak"></div><h2>第二節｜比較、實驗與創意（50 分鐘）</h2><div class="timeline"><div class="time">0–8 分</div><div>重看標準範例，回顧四桿角色、迴轉對與擺動角。先預測改變桿長後可能出現的運動。</div><div class="time">8–20 分</div><div>比較實驗：以標準範例為起點，先只改紅色 AC 曲柄孔距，保持黃色三孔雨刷臂不變；記錄改動與主動桿、從動桿的運動變化。</div><div class="time">20–30 分</div><div>檢視證據：觀察主動桿與從動桿的運動，指出從動桿兩個極限方向並比較擺動範圍。記下估計或填寫「未測量」，不填造數值。</div><div class="time">30–43 分</div><div>創意任務：回到單支雨刷完整範例，調整紅色曲柄孔距，挑戰更大或更小的擺動範圍。先寫目標，再調整、觀察並說明設計選擇。</div><div class="time">43–50 分</div><div>小組分享實驗發現和創意作品；說明證據、限制，以及下一次想驗證的問題。</div></div>
-<h2>比較實驗與結論</h2><div class="grid"><section class="card"><h3>公平比較</h3><p>選定同一個標準範例作為基準，記錄改前狀態；一次只更動一根桿長，操作方式與觀察項目盡量一致。記下修改兩次的內容與結果。</p></section><section class="card"><h3>解讀證據</h3><p>比較主動桿能否整圈轉、從動桿是否來回擺，以及從動桿兩個極限方向和擺動範圍。記錄觀察或估計；無法判斷時填「未測量」，不要編造數值。</p></section></div>
-<div class="callout"><strong>解釋限制：</strong>不同範例可能同時改變多個條件，不能證明「只改機架」造成某種結果。要說明單一因素的影響，應固定其他條件、每次只改一項並比較；本單元的範例比較用來練習觀察，不能單獨證明機架選擇的因果關係。</div>
-<h2>教師提示</h2><p>本課使用三孔直桿 D–B–E 作為一個剛性雨刷臂，中孔 B 固定、下端 D 連接浮桿、上端 E 刷動。三孔不代表三根桿；本課先只改紅色 AC 曲柄，不單獨更改三孔桿的一條邊長。雙雨刷留作延伸。</p><p>使用理想剛性平面四連桿建立運動直覺，不要求公式。提醒學生主動桿未必能整圈轉，並以實際運動來判斷。本單元不使用數值擺動角量測。請觀察從動桿的兩個極限方向，記下估計；不確定時填「未測量」。組裝由教師依真實連接、可動和四桿解釋給予回饋。</p>
-<h2>教師口播稿</h2><div class="script"><p>「先看影片辨認旋轉和擺動，再從單支雨刷完整範例找出機架、主動桿、浮桿和從動桿。主動桿是輸入，並不表示它一定能整圈轉。每個接點都是迴轉對，四根桿接成閉環後，運動才能傳下去。」</p><p>「現在開啟補接浮桿練習，先跟著引導把兩端接回，再操作看看。接著重新開啟同一練習，自己再完成一次：確認接點真的相連、機構可以動，也能講清楚四根桿的角色。把兩次修改記下來；不需要刻意先做錯。」</p><p>「第二節觀察完整範例，一次改一根桿長做比較。指出從動桿的兩個極限方向，記錄擺動範圍的估計；不確定時寫未測量，不要編數值。最後回到完整範例改造，讓它做出你想要的動作。分享時說清楚目標、改動和觀察證據。」</p></div>
-<div class="pagebreak"></div><h2>學生工作紙｜組裝、比較與創意</h2><p>姓名 <span class="write"></span>　班級 <span class="write"></span>　日期 <span class="write"></span></p>
-<div class="worksheet"><h3>A｜完整範例：辨認角色</h3><table class="measure"><tr><th>角色</th><th>我找到的桿或接點</th><th>觀察記錄</th></tr><tr><td>機架（固定桿）</td><td></td><td></td></tr><tr><td>主動桿（輸入桿）</td><td></td><td>整圈轉動／來回擺動</td></tr><tr><td>浮桿（聯接桿）</td><td></td><td></td></tr><tr><td>從動桿（輸出桿）</td><td></td><td>整圈轉動／來回擺動</td></tr><tr><td>迴轉對</td><td>四個接點在哪裡？</td><td></td></tr></table></div>
-<div class="worksheet"><h3>B｜補接浮桿：引導與獨立考驗</h3><p>引導練習：浮桿的兩端應接到哪兩個接點？接好後怎麼確認形成閉環？</p><span class="longwrite"></span><p>獨立考驗自我檢視：</p><ul class="check"><li><span class="box"></span>浮桿兩端都實際連到迴轉對。</li><li><span class="box"></span>操作主動桿後可以觀察到連動。</li><li><span class="box"></span>我能解釋四根桿的角色和運動傳遞。</li></ul><p>修改紀錄：第一次改了什麼、看到什麼？</p><span class="longwrite"></span><p>第二次改了什麼、看到什麼？</p><span class="longwrite"></span><p>組裝說明：</p><span class="longwrite"></span></div>
-<div class="worksheet"><h3>C｜標準範例比較實驗</h3><table class="measure"><tr><th>步驟</th><th>我改了哪一根桿？</th><th>改前與改後的運動／極限方向／擺動範圍估計</th><th>觀察依據</th></tr><tr><td>基準</td><td>標準範例</td><td></td><td></td></tr><tr><td>修改一</td><td></td><td></td><td></td></tr><tr><td>修改二</td><td></td><td></td><td></td></tr></table><p>不填數值量測結果；記錄極限方向和擺動範圍估計，不確定時寫「未測量」。我目前的結論，以及證據：</p><span class="longwrite"></span><p>這些比較能否證明只改機架造成結果？為什麼？</p><span class="longwrite"></span></div>
-<div class="worksheet"><h3>D｜回到標準範例：創意設計</h3><p>我希望機構做出什麼動作？</p><span class="longwrite"></span><p>我改變了什麼？主動桿、從動桿和極限方向有什麼變化？</p><span class="longwrite"></span><p>我如何判斷作品接近目標？下一步想試什麼？</p><span class="longwrite"></span></div>
-<div class="worksheet"><h3>E｜保存、提交與下一個單元</h3><p>下載作品 JSON、截圖與本學習單一起提交；重新開啟作品檢查存檔。作品檔名：<span class="write"></span>　提交位置：<span class="write"></span></p><p>接下來依序認識：<strong>平行四連桿 → 滑塊曲柄 → 齒輪對 → 齒輪齒條</strong>。</p><p>我最想先知道的是：</p><span class="longwrite"></span></div>
+<h2>依完成證據前進，不趕進度</h2>
+<p>建議分多堂進行：操作與四種機構 → 補接與空白組裝 → 雨刷與自主設計。依學生操作速度調整；不把所有任務壓在一堂。前段示範，中段只給尺寸，後段由學生選方法。</p>
+<p>四組尺寸依程式載入後的實際值列出。曲柄搖桿 AC 32→40 擺幅增加；雙曲柄 AC 80→88 仍能整圈轉；雙搖桿 AC 64→72 時輸入擺幅縮小、輸出擺幅增加。先讓學生預測，再用觀察驗證，不把答案當通則。</p>
+<p>平行四連桿是特殊幾何配置；共線位置可能出現分支問題，不把奇異姿態當成軟體操作錯誤。先在非共線姿勢比較。換固定桿是另一項實驗，本輪不與改桿長混在一起。</p>
+<p>三孔雨刷臂是一剛體；不要單改其中一條邊長而破壞直桿形狀。先改外部驅動連桿，觀察 BE 掃動角度，不將殘影解讀成實際清潔面積。</p>
+<h2>工作紙｜預測、修改、證據</h2>
+<p>姓名 <span class="write"></span>　日期 <span class="write"></span></p>
+<div class="worksheet"><h3>A｜四種機構</h3>
+<table class="measure"><tr><th>機構</th><th>我預測的變化</th><th>改哪根／改前→改後</th><th>觀察與解釋</th></tr>
+<tr><td>曲柄搖桿</td><td></td><td></td><td></td></tr><tr><td>雙曲柄</td><td></td><td></td><td></td></tr><tr><td>雙搖桿</td><td></td><td></td><td></td></tr><tr><td>平行保持</td><td></td><td></td><td></td></tr></table></div>
+<div class="worksheet"><h3>B｜獨立組裝</h3><p>畫出四桿連接，標記固定支點、尺寸、驅動與輸出。說明如何確認接點真的相連。</p><span class="longwrite"></span><span class="longwrite"></span><p>□ 能自行組裝　□ 能連續動　□ 能解釋四桿角色　□ 存檔重新開啟成功</p></div>
+<div class="worksheet"><h3>C｜雨刷驗證</h3><p>我選擇修改＿＿桿，由＿＿改為＿＿。預測＿＿；前後殘影顯示＿＿。</p><span class="longwrite"></span><p>結果不如預期時，我如何修正？</p><span class="longwrite"></span></div>
+<div class="worksheet"><h3>D｜自己的設計</h3><p>目標動作與選用機構：</p><span class="longwrite"></span><p>固定哪根、各桿尺寸、第一次測試與後續修改：</p><span class="longwrite"></span><span class="longwrite"></span><p>用什麼證據判斷達標？下一步想試什麼？</p><span class="longwrite"></span><p>提交作品 JSON、前後截圖與說明。下一單元可延伸滑塊曲柄、齒輪對、齒輪齒條。</p></div>
 </details>
 <p class="footer"><a href="blocks.html">回到機構積木</a> · 教師資料與學習單展開後可列印。</p>
 </main>
