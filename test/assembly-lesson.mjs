@@ -18,4 +18,12 @@ for (const f of [full, {...practice, comps:r.comps, modules:r.modules}]) {
   check(`升降${m1} 夾爪${m2}保持接合`,sol.isValid && Math.abs(sol.points.D.x-sol.points.C.x)<1e-6 && Math.abs(sol.points.D.y-sol.points.C.y-72)<1e-6 && Math.hypot(sol.points.GCA.x-sol.points.C.x, sol.points.GCA.y-sol.points.C.y)<1e-6);
  }
 }
+// 組立操作會丟棄前幀種子：直接在當前角度重解仍須保持平行與定長。
+for (const angle of [-40, -26, 0, 20, 30, 45, 60]) {
+ const asm = compileAssembly(full.comps, full.modules, {params:full.params});
+ const sol = solveAssembly(asm, {thetaDeg:angle,motorAngles:{'1':angle,'2':30}});
+ const p = sol.points;
+ check(`無前幀重建 ${angle}° 保持平行`, sol.isValid && Math.abs(p.D.x-p.C.x)<1e-6 && Math.abs(p.D.y-p.C.y-72)<1e-6);
+ check(`無前幀重建 ${angle}° 保持桿長`, full.comps.filter(c=>c.type==='bar').every(c=>Math.abs(Math.hypot(p[c.p1.id].x-p[c.p2.id].x,p[c.p1.id].y-p[c.p2.id].y)-full.params[c.lenParam])<1e-6));
+}
 report('assembly-lesson');

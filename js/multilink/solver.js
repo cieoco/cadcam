@@ -595,9 +595,18 @@ function solveBodyJointTopology(topology, params) {
                     } else {
                         const seed = getInitialPoint(pid);
                         if (seed) {
-                            const d0 = Math.hypot(options[0].x - seed.x, options[0].y - seed.y);
-                            const d1 = options[1] ? Math.hypot(options[1].x - seed.x, options[1].y - seed.y) : Infinity;
-                            chosen = d0 <= d1 ? options[0] : options[1];
+                            // 重建／拆裝後沒有前幀：保持原組裝分支，不能以世界座標
+                            // 距離選解，否則升降到非零角度會突然翻成交叉四連桿。
+                            const a = getInitialPoint(c1.otherId), b = getInitialPoint(c2.otherId);
+                            const side = (a, b, p) => (b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);
+                            const initialSide = a && b ? side(a, b, seed) : 0;
+                            if (Math.abs(initialSide) > 1e-6 && options[1]) {
+                                chosen = initialSide * side(p1, p2, options[0]) >= 0 ? options[0] : options[1];
+                            } else {
+                                const d0 = Math.hypot(options[0].x - seed.x, options[0].y - seed.y);
+                                const d1 = options[1] ? Math.hypot(options[1].x - seed.x, options[1].y - seed.y) : Infinity;
+                                chosen = d0 <= d1 ? options[0] : options[1];
+                            }
                         } else {
                             chosen = options[0];
                         }
