@@ -488,6 +488,7 @@ export function createBench(deps) {
     if (mode === 'bench') {
       S.mode = 'bench';
       document.body.dataset.mode = 'bench';
+      deps.enterBench?.();
       syncModeButtons();
       if (S.viewPlane) setViewPlane(null);
       st.wasIn3D = is3DActive();
