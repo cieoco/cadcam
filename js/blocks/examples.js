@@ -309,20 +309,22 @@ const ALL_BLOCK_EXAMPLES = [
     id: 'fourbar-double-crank',
     title: '四連桿：雙曲柄',
     note: '最短的機架帶動兩側曲柄都整圈旋轉；可觀察輸入和輸出如何同時連續轉動。',
+    // University of Almería 教材比例 ground/input/coupler/output = 5/7/8/9，乘以 16 mm。
+    // https://ingmec.ual.es/tmm/L01_03a_four_bars.html
     snapshot: {
       kind: 'blocks',
       v: 1,
       counter: 6,
       comps: [
         { type: 'anchor', id: 'Anchor1', p1: pt('A', 'fixed', 0, 0) },
-        { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 32, 0) },
-        exactBar('Link1', pt('A', 'fixed', 0, 0, { physicalMotor: '1' }), pt('C', 'floating', 56.5685, 56.5685), 80, {
+        { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 80, 0) },
+        exactBar('Link1', pt('A', 'fixed', 0, 0, { physicalMotor: '1' }), pt('C', 'floating', 79.195959, 79.195959), 112, {
           lenParam: 'LL1', color: '#e74c3c', isInput: true, physicalMotor: '1', phaseOffset: 45
         }),
-        exactBar('Link2', pt('C', 'floating', 56.5685, 56.5685), pt('D', 'floating', -37.8201, 39.0532), 96, { lenParam: 'LL2' }),
-        exactBar('Link3', pt('B', 'fixed', 32, 0), pt('D', 'floating', -37.8201, 39.0532), 80, { lenParam: 'LL3' })
+        exactBar('Link2', pt('C', 'floating', 79.195959, 79.195959), pt('D', 'floating', 206.736888, 68.364912), 128, { lenParam: 'LL2' }),
+        exactBar('Link3', pt('B', 'fixed', 80, 0), pt('D', 'floating', 206.736888, 68.364912), 144, { lenParam: 'LL3' })
       ],
-      params: { LL1: 80, LL2: 96, LL3: 80, theta: 0 }
+      params: { LL1: 112, LL2: 128, LL3: 144, theta: 0 }
     }
   },
   {

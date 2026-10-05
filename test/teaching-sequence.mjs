@@ -66,7 +66,7 @@ function analyze(id) {
 }
 
 
-for (const [id,key,value] of [['fourbar-crank-rocker','LL1',40],['fourbar-double-crank','LL1',88],['fourbar-double-rocker','LL1',72]]) {
+for (const [id,key,value] of [['fourbar-crank-rocker','LL1',40],['fourbar-double-crank','LL1',120],['fourbar-double-rocker','LL1',72]]) {
  const before=analyze(id); fourbars[id].params[key]=value; const after=analyze(id);
  assert.equal(after.motion.mode,before.motion.mode);
  if(id==='fourbar-crank-rocker') assert.ok(after.outputSpanDeg>before.outputSpanDeg);

@@ -28,7 +28,7 @@ import * as Input from './input.js?v=20261004_fourbar_r1';     // 指標 / 手�
 import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
-import { offerExampleFromUrl } from './example-entry.js?v=20261005_wiper_r2';
+import { offerExampleFromUrl } from './example-entry.js?v=20261005_ratio5789';
 import { getTeachingFeedback } from './teaching-feedback.js';
 import * as Motion from './motion.js';
 import { memberSweepSegments } from './member-sweep.js';
@@ -47,7 +47,7 @@ import * as Store from './storage.js';
 import * as Exporters from './exporters.js';
 import { localToWorld, plateVertices, plateShapeMode, createPlateGeometry } from './plate-geometry.js';
 import { S, activateMotor, motorAnglesNow, frozenMotorAngles, usedMotorIds } from './state.js';  // 跨模組共享的可變狀態與多馬達 helper
-import { createExampleController } from './example-controller.js?v=20261005_wiper_r2';
+import { createExampleController } from './example-controller.js?v=20261005_ratio5789';
 import { createGripperController } from './gripper-controller.js?v=20260925_r1b2';
 import { createGripperObject } from './gripper-object.js?v=20260925_r1b2';
 import { createGearEditor, rackPhaseShift } from './gear-editor.js?v=20261004_fourbar_r1';

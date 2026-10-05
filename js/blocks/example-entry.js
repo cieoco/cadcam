@@ -1,5 +1,5 @@
 /** 教材深連結只選範例，不承載課程或作品進度。先還原原作品，確認後才替換。 */
-import { getExample } from './examples.js?v=20261005_wiper_r2';
+import { getExample } from './examples.js?v=20261005_ratio5789';
 
 export function requestedExample(href) {
   const url = new URL(href);
