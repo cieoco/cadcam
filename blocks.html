@@ -279,6 +279,12 @@
     .design-tab.active { background: #2c5282; border-color: #2c5282; color: #fff; }
     .design-tab-hint { font-size: 11px; font-weight: 700; color: #7b5ea7; }
     .design-tab.active .design-tab-hint { color: #e3d7f5; }
+    .design-tab-group { display:inline-flex; align-items:stretch; flex-shrink:0; border:2px solid #c9d6e6; border-radius:10px; background:#fff; color:#34495e; }
+    .design-tab-group.active { background:#2c5282; border-color:#2c5282; color:#fff; }
+    .design-tab-group .design-tab { border:0; background:transparent; color:inherit; border-radius:8px; }
+    .design-tab-close { border:0; border-radius:0 8px 8px 0; min-width:40px; padding:0 10px; background:transparent; color:inherit; font:inherit; font-size:22px; cursor:pointer; }
+    .design-tab-close:hover { background:rgba(128,128,128,.2); }
+    .design-tab-close:focus-visible,.design-tab-group .design-tab:focus-visible { outline:2px solid #e9a23b; outline-offset:-3px; }
     .design-tab-new { border-style: dashed; color: #117a45; border-color: #9dddb8; background: #f1faf5; }
     body[data-mode="bench"] .design-tabs { display: none !important; }
     body:not([data-mode="bench"]) .view3d-hint { margin-top: 52px; }
@@ -1123,6 +1129,6 @@
       "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261003_g2"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20261005_sliderui"></script>
+  <script type="module" src="js/blocks/app.js?v=20261005_tabclose"></script>
 </body>
 </html>

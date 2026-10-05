@@ -4,7 +4,7 @@
  * 設計模式舞台上方的分頁列：每個設計（模組／未命名設計）一個大按鈕，最後一顆「＋ 新設計」。
  * 只負責呈現與回呼；分頁清單與焦點由 app.js 提供（見 design-focus.js）。
  */
-export function createDesignTabs({ el, tabs, focus, active, onFocus, onNew }) {
+export function createDesignTabs({ el, tabs, focus, active, onFocus, onNew, onDelete }) {
   let sig = '';
   let lastFocus = null;
 
@@ -47,7 +47,17 @@ export function createDesignTabs({ el, tabs, focus, active, onFocus, onNew }) {
       }
       b.title = `${t.label}（${t.count} 個零件）`;
       b.onclick = () => onFocus(t.id);
-      box.appendChild(b);
+      const group = document.createElement('span');
+      group.className = 'design-tab-group' + (t.id === cur ? ' active' : '');
+      group.appendChild(b);
+      if (onDelete && (t.count || t.id !== '#root')) {
+        const close = button('design-tab-close', '×');
+        close.title = `刪除「${t.label}」整組設計`;
+        close.setAttribute('aria-label', close.title);
+        close.onclick = () => onDelete(t.id);
+        group.appendChild(close);
+      }
+      box.appendChild(group);
       if (t.id === cur) activeBtn = b;
     });
     const add = button('design-tab design-tab-new', '＋ 新設計');

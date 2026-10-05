@@ -36,7 +36,7 @@ let sweepMemberId = null; // 顯示偏好，不寫入作品格式。
 import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostEdge, hostPlateThickness } from './assembly.js';
 import { normalizeModules } from './module-schema.js';
 import { designTabs, resolveFocus, compsInFocus, assignNewComps, pointIdsOf, focusInputs, ROOT_TAB } from './design-focus.js';   // H1：設計模式一次只看一個設計（分頁）
-import { createDesignTabs } from './design-tabs-ui.js';
+import { createDesignTabs } from './design-tabs-ui.js?v=20261005_tabclose';
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
 import { drawMemberDimensions } from './member-dimension-render.js';
@@ -368,12 +368,38 @@ function newDesign() {
   setDesignFocus(ROOT_TAB);   // 先切換（會收掉畫圖工具與橫幅），再顯示提示
   if (hasRootParts) transient('先把『未命名設計』存成模組（選取零件 → 🧩 存成模組），再開新設計');
 }
+function deleteDesign(id) {
+  const tab = designTabs(S.comps, S.modules, focusOpts()).find(t => t.id === id);
+  if (!tab) return;
+  const mod = S.modules.find(m => m.id === id);
+  if (mod?.mount || S.modules.some(m => m.mount?.to?.module === id)) {
+    window.alert('這組設計已有組立連接。請先到組立台拆下它與相連模組，再刪除；其他設計不會被連帶刪除。');
+    return;
+  }
+  if (!window.confirm(`刪除「${tab.label}」及其 ${tab.count} 個零件？其他設計會保留，可按復原還原。`)) return;
+  pause(); pushUndo();
+  const removed = new Set(compsInFocus(S.comps, S.modules, id));
+  const remaining = S.comps.filter(c => !removed.has(c));
+  const retainedParams = new Set(remaining.flatMap(c => ownedParamKeys(c)));
+  removed.forEach(c => ownedParamKeys(c).forEach(k => { if (!retainedParams.has(k)) delete S.topo.params[k]; }));
+  S.comps = remaining;
+  S.modules = S.modules.filter(m => m.id !== id);
+  const points = pointIdsOf(remaining);
+  S.topo.tracePoints = (S.topo.tracePoints || []).filter(p => points.has(p));
+  if (!points.has(S.topo.tracePoint)) S.topo.tracePoint = '';
+  if (!points.has(S.topo.referencePoint)) S.topo.referencePoint = '';
+  knownCompIds = new Set(remaining.map(c => c.id));
+  S.designFocus = resolveFocus(S.comps, S.modules, S.designFocus);
+  clearSelectionAndEditors();
+  rebuild(); setDesignFocus(S.designFocus);
+}
 const designTabsUi = createDesignTabs({
   el: () => document.getElementById('designTabs'),
   tabs: () => designTabs(S.comps, S.modules, focusOpts()),
   focus: () => S.designFocus,
   active: inDesign,
   onFocus: id => setDesignFocus(id),
+  onDelete: deleteDesign,
   onNew: newDesign
 });
 function setViewPlane(id) {
