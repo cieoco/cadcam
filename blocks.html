@@ -20,6 +20,10 @@
       padding: 10px 16px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.06); z-index: 5;
     }
     .learning-actions { display:flex; align-items:center; gap:6px; margin-left:auto; flex-shrink:0; }
+    .gesture-help { position:relative; font-size:12px; }
+    .gesture-help summary { cursor:pointer; padding:9px; border:1px solid #b8cbd2; border-radius:7px; color:#176b87; white-space:nowrap; }
+    .gesture-help-content { position:absolute; right:0; top:100%; width:min(310px,85vw); max-height:60dvh; overflow:auto; padding:14px; background:white; border:1px solid #b8cbd2; border-radius:10px; box-shadow:0 8px 24px #18324b33; z-index:30; line-height:1.7; }
+    .gesture-help-content p { margin:0 0 8px; }
     .learning-actions > a { text-decoration:none; }
     .app-identity { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
     header h1, .appbar h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
@@ -72,7 +76,7 @@
     .mount-field input { width: 62px; border: 1px solid #d8dee6; border-radius: 6px; padding: 5px 6px;
       color: #2c3e50; font: inherit; font-weight: 700; }
     .stage, .workspace { flex: 1; display: flex; min-height: 0; }
-    .mobile-panel, .mobile-tabs, .mobile-example-list, .mobile-open-menu, .mobile-editor-done { display: none; }
+    .mobile-panel, .mobile-tabs, .mobile-example-list, .mobile-open-menu, .mobile-editor-done, .mobile-editor-more { display: none; }
 
     /* 零件盤 */
     .tray { width: 188px; background: #fff; border-right: 1px solid #e6e9f0; padding: 14px 10px;
@@ -411,6 +415,7 @@
       .project-actions { display: none; }
       .appbar { flex-shrink:0; }
       .learning-actions { max-width:100%; flex-wrap:wrap; }
+      .gesture-help-content { position:fixed; left:12px; right:12px; top:110px; width:auto; max-width:340px; margin:0 auto; }
       .learning-actions > button, .learning-actions > a { min-height:36px; }
       .tool-btn { padding: 7px 10px; font-size: 13px; }
       .stage { flex-direction: column-reverse; }
@@ -506,7 +511,6 @@
       .controls #btnMotorDirection { font-size:0; }
       .controls #btnMotorDirection::before { content:"↻"; font-size:17px; }
       .controls #btnMotorDirection.active::before { content:"↺"; }
-      .controls #btnFitView,
       .controls #btnFrameLock,
       .controls #btn3d,
       .controls #btnClearAll { display: none; }
@@ -521,6 +525,17 @@
       .mobile-editor-done { display:block; position:sticky; top:0; z-index:2; margin-left:auto;
         min-height:40px; padding:8px 14px; background:#176b87; color:white; border:0; border-radius:8px; }
       .inspector-panel .inspector-panel .mobile-editor-done { display:none; }
+      /* One compact editor: a selected member takes priority over a stale frame panel. */
+      .canvas-wrap:has(#lenEditor[style*="flex"]) .inspector-panel:not(#lenEditor) { display:none !important; }
+      #lenEditor:not([data-mobile-more="true"]) > :not(.mobile-editor-done):not(.mobile-editor-more):not(.le-row:first-of-type) { display:none !important; }
+      #lenEditor:not([data-mobile-more="true"]) > .le-row:first-of-type > :not(#lenTitle):not(#triSideSelect):not(#lenControls) { display:none !important; }
+      #lenEditor:not([data-mobile-more="true"]) { flex-direction:row; flex-wrap:wrap; align-items:center; gap:6px; }
+      #lenEditor:not([data-mobile-more="true"]) > .le-row:first-of-type { display:contents; }
+      #lenEditor .mobile-editor-done { order:3; position:static; }
+      #lenEditor .mobile-editor-more { order:4; }
+      #lenEditor #lenControls { width:auto; }
+      .mobile-editor-more { display:block; min-height:36px; padding:6px 10px; border:1px solid #ccd8e0; border-radius:8px; background:white; color:#52677b; }
+
       .role-editor .re-row, .len-editor .le-row, .servo-editor .se-row {
         width: 100%; min-width: 0;
       }
@@ -645,6 +660,14 @@
       </select>
     </div>
     <div class="learning-actions" aria-label="教學與回報">
+      <details class="gesture-help"><summary>操作說明</summary><div class="gesture-help-content">
+        <p><strong>選零件 → 改尺寸 → 完成 → 播放</strong></p>
+        <p>單指點零件：選取編輯，先暫停。<br>拖接點／自由桿：調整位置；固定點須先解鎖。<br>拖空白：移動畫布。<br>雙指張合：縮放；雙指同移：平移。</p>
+        <p>畫桿時，單指拖曳建立連桿；雙指仍可縮放移動，不會畫桿。</p>
+        <p>找不到機構？按播放旁的「⊡」置中。手動縮放後，修改尺寸不會強制置中。</p>
+        <button type="button" class="tool-btn" onclick="this.closest('details').open=false">知道了</button>
+      </div></details>
+
       <a class="tool-btn" href="teaching.html" target="_blank" rel="noopener">教學</a>
     </div>
   </header>
@@ -1155,6 +1178,6 @@
     }}
   </script>
   <script type="module" src="js/blocks/app.js?v=20261006_video"></script>
-<script type="module" src="js/version-info.js?v=20261006_5"></script>
+<script type="module" src="js/version-info.js?v=20261006_6"></script>
 </body>
 </html>

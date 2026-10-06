@@ -16,10 +16,11 @@ import * as View from './view.js';
 import * as Tools from './tools.js';
 import * as Panels from './panels.js';
 
-const NODE_TAP_PX = 34;   // 手機點接點的命中半徑（畫面 px，縮放下維持一致手感；與 app.js 同值）
+const NODE_TAP_PX = 22;   // 手機點接點的命中半徑（畫面 px，縮放下維持一致手感；與 app.js 同值）
 
 // ---- 縮放 / 平移手勢的指標帳本（畫布層級狀態）----
 const activePointers = new Map();   // pointerId -> { x, y }（client 座標）
+let backgroundPan = null;
 let pinchState = null;              // { dist, cx, cy }
 let pinchActive = false;            // 直到全部手指離開，才恢復單指編輯
 let pendingNodeDrag = null;         // 點擊先選取；超過門檻後才真正開始拖曳
@@ -352,6 +353,7 @@ function onDragEnd(e) {
 function abortSingleDrag() {
   // 第二指落下時，放棄正在進行的單指拖曳，避免與縮放打架
   commitDragUndo(); // 已完成的單指位移仍保留一筆復原，雙指本身不改機構。
+  backgroundPan = null;
   pendingNodeDrag = null;
   pendingMobileEdit = false;
   S.dragFrame = false;
@@ -360,6 +362,7 @@ function abortSingleDrag() {
 }
 
 function endPointer(e) {
+  if (backgroundPan?.id === e.pointerId) backgroundPan = null;
   activePointers.delete(e.pointerId);
   if (activePointers.size < 2) pinchState = null;
   if (activePointers.size === 0) pinchActive = false;
@@ -418,10 +421,14 @@ export function init(deps) {
   });
   svg.addEventListener('pointercancel', () => { pendingMobileEdit = false; });
   // 點空白處（背景/地面線，未 stopPropagation）取消選取
-  svg.addEventListener('pointerdown', () => {
+  svg.addEventListener('pointerdown', (e) => {
+    if (pinchActive) return;
     if (S.drawingLink || S.drawingTriangle || S.drawingPolygon) return; // 畫圖模式：交給工具處理
     if (S.placingMotor || S.pickBars) { cancelMotorMode(); draw(); return; }
-    if (S.dragId || S.dragLinkId) return;
+    if (S.dragId || S.dragLinkId || S.dragFrame) return;
+    if (e.button !== undefined && e.button !== 0) return;
+    backgroundPan = { id:e.pointerId, x:e.clientX, y:e.clientY };
+    try { svg.setPointerCapture(e.pointerId); } catch (_) {}
     S.selectedNodeId = null;
     closeMobileEditPanel();
     Panels.updateRoleEditor();
@@ -446,6 +453,11 @@ export function init(deps) {
   svg.addEventListener('pointermove', (e) => {
     if (!activePointers.has(e.pointerId)) return;
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (!pinchActive && backgroundPan?.id === e.pointerId) {
+      View.panByClient(svg, e.clientX-backgroundPan.x, e.clientY-backgroundPan.y);
+      backgroundPan = { id:e.pointerId, x:e.clientX, y:e.clientY };
+      draw();
+    }
     if (activePointers.size === 2 && pinchState) {
       const [p, q] = [...activePointers.values()];
       const dist = Math.hypot(q.x - p.x, q.y - p.y);

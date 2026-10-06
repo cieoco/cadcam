@@ -14,7 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261006_5';
+import { APP_VERSION } from '../version.js?v=20261006_6';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
@@ -1787,6 +1787,18 @@ for (const panel of document.querySelectorAll('.inspector-panel')) {
   done.type = 'button'; done.className = 'mobile-editor-done'; done.textContent = '完成／收合';
   done.addEventListener('click', () => setMobilePanel('view'));
   panel.prepend(done);
+  if (panel.id === 'lenEditor') {
+    const more = document.createElement('button');
+    more.type = 'button'; more.className = 'mobile-editor-more'; more.textContent = '更多設定';
+    more.addEventListener('click', () => {
+      const expanded = panel.dataset.mobileMore !== 'true';
+      panel.dataset.mobileMore = String(expanded);
+      more.textContent = expanded ? '收起設定' : '更多設定';
+      more.setAttribute('aria-expanded', String(expanded));
+    });
+    more.setAttribute('aria-expanded', 'false'); panel.append(more);
+  }
+
 }
 
 function setMobilePanel(panel) {
@@ -1795,7 +1807,7 @@ function setMobilePanel(panel) {
   if (next !== 'edit') closeMobileEditPanel();
   if (next !== 'project') closeMobileOpenMenu();
   syncMobilePanelTabs(next);
-  if (mobilePrompt() && S.mode === 'design') requestAnimationFrame(() => fitView());
+  // Switching panels preserves manual pan/zoom; the visible fit button resets it.
 }
 
 function openMobileEditPanel() {
@@ -1807,6 +1819,10 @@ function openMobileEditPanel() {
 
 function closeMobileEditPanel() {
   delete document.body.dataset.mobileEditor;
+  const editor = document.getElementById('lenEditor');
+  delete editor.dataset.mobileMore;
+  const more = editor.querySelector('.mobile-editor-more');
+  if (more) { more.textContent = '更多設定'; more.setAttribute('aria-expanded', 'false'); }
 }
 
 function mobileOpenMenuEl() { return document.getElementById('mobileOpenMenu'); }
