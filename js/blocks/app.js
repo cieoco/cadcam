@@ -1113,8 +1113,8 @@ function solveFrame() {
   const seed = extrapolateSeed(lastSolved, prevSolved);
   const frameParams = { thetaDeg: S.theta, motorAngles: motorAnglesNow(), _prevPoints: seed };
   try { sol = S.assembly ? solveAssembly(S.assembly, frameParams) : solveTopology(S.compiled, frameParams); } catch (_) {}
-  const solved = (sol && sol.points) ? sol.points : {};
-  // 位移歷史往前推一格：這幀沒解出來的點沿用上一幀的舊值（桿件就不會憑空消失）
+  const solved = (sol && sol.isValid !== false && sol.points) ? sol.points : {};
+  // 無效解整幀不採用，避免新舊接點混合而拉伸剛性零件；保留上一姿態。
   const newLast = { ...lastSolved };
   Object.keys(solved).forEach(id => {
     if (Number.isFinite(solved[id].x) && Number.isFinite(solved[id].y)) newLast[id] = solved[id];
@@ -2110,7 +2110,9 @@ function updateSolveBanner(sol, missingVisibleLinks) {
   const el = document.getElementById('solveBanner');
   if (!el) return;
   const show = missingVisibleLinks > 0 || (sol && sol.isValid === false);
-  el.textContent = show ? '這個姿勢到死點了：有些桿件重合，求解器暫時不知道要往哪邊翻' : '';
+  el.textContent = show ? (sol?.errorReason
+    ? `${sol.errorReason}；已保留原姿態，請檢查桿長與固定接點。`
+    : '目前姿勢無法求解，已保留原姿態；請檢查桿長與接點。') : '';
   el.style.display = show ? 'block' : 'none';
 }
 // cancelMotorMode 已隨動力來源域移到 ./motor-tools.js

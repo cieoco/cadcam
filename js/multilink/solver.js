@@ -1037,6 +1037,20 @@ function solveBodyJointTopology(topology, params) {
         }
     });
 
+    // A driven vertex can already be solved before triangle constraints run.
+    // Validate all three edges, including the edge not used for intersection.
+    constraints.filter(c => c.type === 'tri').forEach(c => {
+        // Ground-to-ground geometry is prescribed by anchors (legacy dimensions may be rounded).
+        if (fixedIds.has(c.a) && fixedIds.has(c.b)) return;
+        const a = points[c.a], b = points[c.b];
+        if (!a || !b) return;
+        const actual = Math.hypot(b.x - a.x, b.y - a.y);
+        if (!Number.isFinite(actual) || Math.abs(actual - c.len) > tol) {
+            infeasible = true;
+            if (!infeasibleReason) infeasibleReason = `三角板 ${c.triId} 無法保持設定孔距 ${c.len} mm`;
+        }
+    });
+
     return {
         isValid: !infeasible,
         isUnderconstrained: !infeasible && !allResolved,
