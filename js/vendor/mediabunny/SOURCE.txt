@@ -1,0 +1,3 @@
+Mediabunny 1.61.3
+https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.3.tgz
+Lazy-loaded MP4 export; MPL-2.0 license.

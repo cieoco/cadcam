@@ -619,6 +619,7 @@
           <label class="mount-field">孔心離末端<input data-joint-setting="holeEndMm" type="number" min="1.5" max="20" step="0.1" onchange="window.blocks.setJointSetting('holeEndMm', this.value)" title="螺絲孔中心離腳端的距離 mm（須小於兩邊長度）"></label>
         </div>
           </details>
+          <button class="tool-btn" onclick="window.blocks.exportVideo()">MP4 動畫（10 秒）</button>
           <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>
           <button class="tool-btn" onclick="window.blocks.exportLinksDxf()" title="逐一匯出所畫桿件為 DXF">匯出 DXF</button>
           <button class="tool-btn" onclick="window.blocks.downloadBuildPack()" title="板件清單＋五金清單＋組裝步驟（可列印）">製作包</button>
@@ -1049,7 +1050,8 @@
           <label class="mount-field">缺口深<input data-mg995-mount-setting="cableNotchDepthMm" type="number" min="0" max="20" step="0.5" onchange="window.blocks.setMg995MountSetting('cableNotchDepthMm', this.value)" title="線槽缺口深 mm（沿機身長向外擴）；0＝不開"></label>
         </div>
       </details>
-      <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>
+      <button class="tool-btn" onclick="window.blocks.exportVideo()">MP4 動畫（10 秒）</button>
+          <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="逐一匯出所畫桿件為 SVG">匯出 SVG</button>
       <button class="tool-btn" onclick="window.blocks.exportLinksDxf()" title="逐一匯出所畫桿件為 DXF">匯出 DXF</button>
       <button class="tool-btn" onclick="window.blocks.downloadBuildPack()" title="板件清單＋五金清單＋組裝步驟（可列印）">製作包</button>
           <button class="tool-btn" onclick="window.blocks.downloadAdapterStl()" title="直角安裝用的 3D 列印 L 形轉接座">轉接座 STL</button>
@@ -1133,7 +1135,7 @@
       "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261003_g2"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20261006_report"></script>
-<script type="module" src="js/version-info.js?v=20261006_2"></script>
+  <script type="module" src="js/blocks/app.js?v=20261006_video"></script>
+<script type="module" src="js/version-info.js?v=20261006_3"></script>
 </body>
 </html>
