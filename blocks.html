@@ -578,7 +578,7 @@
       box-shadow: none; background: transparent; z-index: auto;
     }
   </style>
-  <link rel="stylesheet" href="js/blocks/workspace-mobile.css?v=20261006_compact">
+  <link rel="stylesheet" href="js/blocks/workspace-mobile.css?v=20261006_twoline">
   <script type="importmap">
     { "imports": { "three": "./js/vendor/three.module.js" } }
   </script>
@@ -660,6 +660,8 @@
       </select>
     </div>
     <div class="learning-actions" aria-label="教學與回報">
+      <button type="button" class="tool-btn mobile-more-toggle" aria-expanded="false" aria-controls="learningMore" onclick="const open=this.getAttribute('aria-expanded')!=='true';this.setAttribute('aria-expanded',String(open));document.getElementById('learningMore').classList.toggle('is-open',open)">⋯ 更多</button>
+      <div id="learningMore" class="learning-more">
       <details class="gesture-help"><summary>操作說明</summary><div class="gesture-help-content">
         <p><strong>選零件 → 改尺寸 → 完成 → 播放</strong></p>
         <p>單指點零件：選取編輯，先暫停。<br>拖接點／自由桿：調整位置；固定點須先解鎖。<br>拖空白：移動畫布。<br>雙指張合：縮放；雙指同移：平移。</p>
@@ -667,6 +669,7 @@
         <p>找不到機構？按播放旁的「⊡」置中。手動縮放後，修改尺寸不會強制置中。</p>
         <button type="button" class="tool-btn" onclick="this.closest('details').open=false">知道了</button>
       </div></details>
+      </div>
 
       <a class="tool-btn" href="teaching.html" target="_blank" rel="noopener">教學</a>
     </div>

@@ -1,13 +1,22 @@
+.mobile-more-toggle { display:none; }
+.learning-more { display:contents; }
 /* 教材獨立於工具；保留夾爪工作流程及通用手機版面。 */
 #exampleLessonCard:not(.workflow-active) { display:none !important; }
 @media (max-width:700px), (max-width:1099px) and (max-height:500px) {
   /* Compact two-row header: keep touch targets, remove oversized padding. */
-  .appbar { padding:4px 8px; gap:4px 8px; }
+  .appbar { padding:4px 8px; gap:4px 8px; flex-wrap:nowrap; }
   .appbar h1 { font-size:15px; gap:4px; }
-  .app-identity { min-width:0; }
-  .mode-switch { margin-left:auto; border-radius:8px; }
+  .app-identity { display:none; }
+  .mode-switch { margin-left:0; border-radius:8px; }
   .mode-seg { min-width:60px; min-height:36px; padding:0 8px; font-size:13px; }
-  .learning-actions { flex-basis:100%; justify-content:flex-end; gap:4px; flex-wrap:nowrap; }
+  .learning-actions { position:relative; flex-basis:auto; justify-content:flex-end; gap:4px; flex-wrap:nowrap; }
+  .learning-actions > a { order:-1; }
+  .mobile-more-toggle { display:block; white-space:nowrap; }
+  .learning-more { display:none; }
+  .learning-more.is-open { display:flex; position:absolute; right:0; top:calc(100% + 8px); flex-direction:column; gap:8px; padding:10px; min-width:180px; background:white; border:1px solid #c9d6e6; border-radius:10px; box-shadow:0 4px 16px #18324b33; z-index:30; }
+  .learning-more .gesture-help summary { min-height:36px; }
+  .learning-more > button { min-height:36px; }
+
   .learning-actions > button, .learning-actions > a,
   .gesture-help summary { min-height:32px; padding:5px 7px; font-size:12px; }
   .gesture-help-content { top:84px; }

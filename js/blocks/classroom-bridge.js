@@ -10,7 +10,7 @@ export function initClassroomBridge(getSnapshot, version) {
   button.textContent = '回報問題';
   button.disabled = true;
   button.title = '確認學校帳號中';
-  const host = document.querySelector('.learning-actions') || document.querySelector('.appbar');
+  const host = document.querySelector('#learningMore') || document.querySelector('.learning-actions') || document.querySelector('.appbar');
   host.insertBefore(button, host.querySelector('.version-button'));
   let parentOrigin = null;
   button.addEventListener('click', () => {
