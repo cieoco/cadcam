@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {trustedClassroomOrigin,initClassroomBridge} from '../js/blocks/classroom-bridge.js';
+assert.ok(trustedClassroomOrigin('https://abc-script.googleusercontent.com'));
+for(const origin of ['null','http://abc-script.googleusercontent.com','https://evil.com','https://abc-script.googleusercontent.com.evil.com']) assert.equal(trustedClassroomOrigin(origin),false);
+let listener,replies=[];const parent={postMessage:(data,origin)=>replies.push({data,origin})};
+globalThis.location={search:'?classroom=1'};globalThis.window={parent,addEventListener:(_,fn)=>listener=fn};
+let snapshot={kind:'blocks',v:1,comps:[],params:{L:100}};
+initClassroomBridge(()=>snapshot,'test');
+const event={source:parent,origin:'https://abc-script.googleusercontent.com',data:{type:'cadcam:snapshot-request',id:'12345678-1234-1234-1234-123456789abc'}};
+listener({...event,source:{}});listener({...event,origin:'https://evil.com'});assert.equal(replies.length,0);
+listener(event);snapshot.params.L=200;assert.equal(JSON.parse(replies[0].data.snapshot).params.L,100);assert.equal(replies[0].origin,event.origin);
+console.log('classroom-bridge: source, origin, request and frozen snapshot verified');
