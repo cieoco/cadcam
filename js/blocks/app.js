@@ -14,7 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261006_4';
+import { APP_VERSION } from '../version.js?v=20261006_5';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
@@ -1781,16 +1781,26 @@ function syncMobilePanelTabs(active = document.body.dataset.mobilePanel || 'buil
   });
 }
 
+// Mobile editors use the canvas layout instead of covering the mechanism.
+for (const panel of document.querySelectorAll('.inspector-panel')) {
+  const done = document.createElement('button');
+  done.type = 'button'; done.className = 'mobile-editor-done'; done.textContent = '完成／收合';
+  done.addEventListener('click', () => setMobilePanel('view'));
+  panel.prepend(done);
+}
+
 function setMobilePanel(panel) {
   const next = ['build', 'edit', 'view', 'project'].includes(panel) ? panel : 'build';
   document.body.dataset.mobilePanel = next;
   if (next !== 'edit') closeMobileEditPanel();
   if (next !== 'project') closeMobileOpenMenu();
   syncMobilePanelTabs(next);
+  if (mobilePrompt() && S.mode === 'design') requestAnimationFrame(() => fitView());
 }
 
 function openMobileEditPanel() {
   if (!mobilePrompt()) return;
+  pause();
   document.body.dataset.mobileEditor = 'active';
   setMobilePanel('edit');
 }

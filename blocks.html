@@ -72,7 +72,7 @@
     .mount-field input { width: 62px; border: 1px solid #d8dee6; border-radius: 6px; padding: 5px 6px;
       color: #2c3e50; font: inherit; font-weight: 700; }
     .stage, .workspace { flex: 1; display: flex; min-height: 0; }
-    .mobile-panel, .mobile-tabs, .mobile-example-list, .mobile-open-menu { display: none; }
+    .mobile-panel, .mobile-tabs, .mobile-example-list, .mobile-open-menu, .mobile-editor-done { display: none; }
 
     /* 零件盤 */
     .tray { width: 188px; background: #fff; border-right: 1px solid #e6e9f0; padding: 14px 10px;
@@ -511,15 +511,16 @@
       .controls #btn3d,
       .controls #btnClearAll { display: none; }
       .ctrl-sub { min-width: 36px; padding: 0 5px; font-size: 11px; }
-      body[data-mobile-panel="edit"] .inspector-panel {
-        position: fixed; left: 8px; right: auto; bottom: calc(56px + env(safe-area-inset-bottom, 0px));
-        top: auto; width: calc(100% - 16px); max-width: none; max-height: min(42vh, 320px);
-        overflow-y: auto; gap: 6px; padding: 8px 10px; z-index: 8;
-        border-radius: 8px 8px 0 0; box-shadow: 0 -8px 24px rgba(44,62,80,0.16);
+      body:not([data-mode="bench"])[data-mobile-panel="edit"] .inspector-panel {
+        position:relative; left:auto; right:auto; bottom:auto; top:auto;
+        order:2; flex:0 0 auto; width:100%; max-width:none; max-height:26dvh;
+        overflow-y:auto; overscroll-behavior:contain; padding:8px 10px;
+        border-radius:8px 8px 0 0; box-shadow:none;
       }
-      body:not([data-mobile-panel="edit"]) .inspector-panel {
-        left: 8px; right: auto; top: 10px; width: calc(100% - 16px); max-width: none;
-      }
+      body:not([data-mobile-panel="edit"]) .inspector-panel { display:none !important; }
+      .mobile-editor-done { display:block; position:sticky; top:0; z-index:2; margin-left:auto;
+        min-height:40px; padding:8px 14px; background:#176b87; color:white; border:0; border-radius:8px; }
+      .inspector-panel .inspector-panel .mobile-editor-done { display:none; }
       .role-editor .re-row, .len-editor .le-row, .servo-editor .se-row {
         width: 100%; min-width: 0;
       }
@@ -562,7 +563,7 @@
       box-shadow: none; background: transparent; z-index: auto;
     }
   </style>
-  <link rel="stylesheet" href="js/blocks/workspace-mobile.css?v=20261005_simple_r1">
+  <link rel="stylesheet" href="js/blocks/workspace-mobile.css?v=20261006_edit">
   <script type="importmap">
     { "imports": { "three": "./js/vendor/three.module.js" } }
   </script>
@@ -884,8 +885,10 @@
         <div class="fe-row"><span class="fe-value">孔距 8 mm</span></div>
         <div class="fe-row"><span>軸距</span><button onclick="window.blocks.changeFrameGround('length',-8)">−</button><span class="fe-value" id="frameLengthVal"></span><button onclick="window.blocks.changeFrameGround('length',8)">＋</button></div>
         <div class="fe-row"><span>相對角</span><button onclick="window.blocks.changeFrameGround('angle',-5)">−</button><span class="fe-value" id="frameAngleVal"></span><button onclick="window.blocks.changeFrameGround('angle',5)">＋</button></div>
+        <details><summary>進階加工設定</summary>
         <div class="fe-row"><label>留邊 <input id="frameMarginInput" type="number" min="8" max="80" step="1" onchange="window.blocks.setExportSetting('frameMarginMm', this.value)"> mm</label></div>
         <div class="fe-row"><label>固定孔 <input id="frameHoleInput" type="number" min="0.5" max="30" step="0.5" onchange="window.blocks.setExportSetting('frameHoleDiameterMm', this.value)"> mm</label></div>
+        </details>
         <div class="fe-row"><button id="frameLockEditorBtn" onclick="window.blocks.toggleFrameLock()">8 mm 吸附</button></div>
       </div>
       <div class="inspector-panel servo-editor" id="servoEditor" style="display:none;">
@@ -1152,6 +1155,6 @@
     }}
   </script>
   <script type="module" src="js/blocks/app.js?v=20261006_video"></script>
-<script type="module" src="js/version-info.js?v=20261006_4"></script>
+<script type="module" src="js/version-info.js?v=20261006_5"></script>
 </body>
 </html>
