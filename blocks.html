@@ -415,6 +415,15 @@
       .tool-btn { padding: 7px 10px; font-size: 13px; }
       .stage { flex-direction: column-reverse; }
       .canvas-wrap { min-height: 0; overflow: hidden; }
+      /* Reserve real space for tabs/playback instead of covering the mechanism. */
+      body:not([data-mode="bench"]) .canvas-wrap { display:flex; flex-direction:column; }
+      body:not([data-mode="bench"]) .design-tabs { position:relative; flex:0 0 auto; }
+      body:not([data-mode="bench"]) #stageSvg { flex:1 1 0; min-height:0; height:0; }
+      body:not([data-mode="bench"]) .controls {
+        position:relative; left:auto; bottom:auto; transform:none; align-self:center;
+        flex:0 0 auto; margin:4px 0; box-shadow:none;
+      }
+
       .tray { width: 100%; flex-direction: row; gap: 6px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
         border-right: none; border-top: 1px solid #eee; overflow-x: hidden; }
       body[data-mobile-panel="edit"] .part-palette,
@@ -448,7 +457,7 @@
       .mobile-panel .mount-field { min-width: 0; justify-content: space-between; }
       .mobile-panel .mount-field input { width: 68px; }
       .mobile-panel-section[data-panel="project"] {
-        flex-wrap: wrap; align-items: stretch; max-height: min(42vh, 320px); overflow-y: auto;
+        flex-wrap: wrap; align-items: stretch; max-height: min(22dvh, 160px); overflow-y: auto; overscroll-behavior:contain;
       }
       .mobile-panel-section[data-panel="project"] .example-select { display: none; }
       .lesson-card { display: none !important; }
