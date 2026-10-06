@@ -19,6 +19,8 @@
       display: flex; align-items: center; gap: 12px;
       padding: 10px 16px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.06); z-index: 5;
     }
+    .learning-actions { display:flex; align-items:center; gap:6px; margin-left:auto; flex-shrink:0; }
+    .learning-actions > a { text-decoration:none; }
     .app-identity { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
     header h1, .appbar h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
     .app-status {
@@ -407,6 +409,9 @@
       .app-status { display:none; margin:0 0 0 auto; max-width:140px; overflow:hidden; text-overflow:ellipsis; }
       .app-status[data-state="warn"], .app-status[data-state="error"] { display:block; }
       .project-actions { display: none; }
+      .appbar { flex-shrink:0; }
+      .learning-actions { max-width:100%; flex-wrap:wrap; }
+      .learning-actions > button, .learning-actions > a { min-height:36px; }
       .tool-btn { padding: 7px 10px; font-size: 13px; }
       .stage { flex-direction: column-reverse; }
       .canvas-wrap { min-height: 0; overflow: hidden; }
@@ -564,7 +569,6 @@
       <button type="button" role="tab" id="modeBtnBench" class="mode-seg" aria-selected="false" onclick="window.blocks.setMode('bench')">🧩 組立</button>
     </div>
     <div class="toolbar project-actions">
-      <a class="tool-btn" href="teaching.html" target="_blank" rel="noopener">教學</a>
       <button class="tool-btn toolbar-icon" id="btnUndo" onclick="window.blocks.undo()" disabled title="復原上一步">↩</button>
       <button class="tool-btn toolbar-icon" onclick="window.blocks.saveFile()" title="存成檔案">💾</button>
       <button class="tool-btn toolbar-icon" onclick="window.blocks.openFile()" title="開啟檔案">📂</button>
@@ -629,6 +633,9 @@
       <select class="example-select" id="exampleSelect" onchange="window.blocks.loadExample(this.value)" title="載入課堂範例">
         <option value="">📘 範例</option>
       </select>
+    </div>
+    <div class="learning-actions" aria-label="教學與回報">
+      <a class="tool-btn" href="teaching.html" target="_blank" rel="noopener">教學</a>
     </div>
   </header>
 
