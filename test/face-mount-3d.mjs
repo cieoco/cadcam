@@ -1,0 +1,49 @@
+import assert from 'node:assert/strict';
+import { realMountExamples } from '../js/blocks/face-mate-examples.js';
+import { buildFacePlacement } from '../js/blocks/face-placement.js';
+import { mountFacePlacement } from '../js/blocks/face-mount.js';
+import { compileAssembly, solveAssembly, orthogonalFrame, moduleFrameExports, moduleFrameNodes } from '../js/blocks/assembly.js';
+import { buildOrthogonalChildren, applyMatrix4, orthogonalMatrix } from '../js/blocks3d/orthogonal-3d.js';
+import { frameConnectorNodes } from '../js/blocks/model.js';
+import { unmountModule, translateComposite, setMountFlip } from '../js/blocks/module-ops.js';
+import { buildPackHtml } from '../js/blocks/build-plan.js';
+const { hosts, children } = realMountExamples();
+const child = children[0];
+let count = 0;
+for (const host of hosts) for (const hostFace of ['top', 'bottom', 'left', 'right', 'front', 'back']) for (const childFace of ['top', 'bottom', 'left', 'right', 'front', 'back']) for (let quarterTurns = 0; quarterTurns < 4; quarterTurns++) {
+  const comps = [...host.instance.comps, ...child.instance.comps], params = { ...host.instance.params, ...child.instance.params };
+  let modules = [host.instance.module, child.instance.module];
+  const selection = { hostFace, childFace, quarterTurns, alignU: 1, alignV: -1, offsetU: -8.5, offsetV: 2, gap: 5 };
+  const record = buildFacePlacement({ host, child, selection }).record;
+  const face = { version: 1, ...record.transform, selection: record.selection, hostThicknessMm: 4, childThicknessMm: 4 };
+  const mounted = mountFacePlacement(comps, modules, child.surface.moduleId, { hostId: host.surface.moduleId, outputId: host.surface.outputId, face }, params);
+  assert.equal(mounted.ok, true);
+  modules = modules.map(m => m.id === child.surface.moduleId ? { ...m, mount: mounted.mount } : m);
+  const asm = compileAssembly(comps, modules, { params });
+  const sol = solveAssembly(asm, { thetaDeg: 0 });
+  const frame = orthogonalFrame(comps, modules, child.surface.moduleId, sol.points, params);
+  const childPlate = { moduleId: child.surface.moduleId, plane: child.surface.moduleId, thicknessMm: 4, outline: child.surface.outline };
+  const model = { sticks: [{ id: host.surface.compId, z: 12, thickness: 4 }], racks: [{ id: host.surface.compId, z: 12, thickness: 4 }] };
+  const result = buildOrthogonalChildren({ comps, modules, inputs: { pts: sol.points }, mainModel: model, plates: [childPlate], params,
+    buildModel: () => ({ sticks: child.instance.comps.filter(c => c.type === 'bar').map(c => ({ id: c.id, z: 0 })), gears: child.instance.comps.filter(c => c.type === 'gear').map(c => ({ id: c.id, z: 0 })) }) });
+  assert.equal(result.length, 1);
+  assert.deepEqual(result[0].brackets, []); assert.deepEqual(result[0].screws, []);
+  assert.equal(setMountFlip(comps, modules, child.surface.moduleId, true).ok, false);
+  const expectedMatrix = orthogonalMatrix(frame, 14, 2); // 宿主板中心14，子底板中心-2。
+  const p = { x: child.surface.box.min.x, y: child.surface.box.max.y, z: -4 };
+  assert.deepEqual(applyMatrix4(result[0].matrix, p), applyMatrix4(expectedMatrix, p));
+  const entry = moduleFrameExports(comps, modules, params).find(e => e.moduleId === child.surface.moduleId);
+  assert.deepEqual(entry.bolts, []);
+  assert.ok(moduleFrameNodes(entry, frameConnectorNodes(entry.comps)).some(n => n.id === entry.baseId));
+  const unmounted = unmountModule(comps, modules, child.surface.moduleId, params);
+  assert.equal(unmounted.ok, true); assert.equal(unmounted.comps, comps);
+  const moved = translateComposite(comps, modules, 20, -10);
+  const movedFace = moved.modules.find(m => m.mount?.face).mount.face;
+  assert.equal(movedFace.translation.x, face.translation.x + 20);
+  assert.equal(movedFace.translation.y, face.translation.y - 10);
+  const html = buildPackHtml({ parts: [], joints: [], motors: [], gaps: [] }, { modules });
+  assert.ok(html.includes('轉接件、配對固定孔與跨面干涉尚未驗證'));
+  assert.ok(!html.includes('未發現干涉'));
+  count++;
+}
+console.log(`face-mount-3d: ${count} 板面高度／旋轉、無虛構接件、原孔保留、拆下與組合平移通過`);

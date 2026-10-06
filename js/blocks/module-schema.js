@@ -5,6 +5,7 @@
  * 不 import solver／topology——保持 schema.js 這條載入路徑輕量。
  */
 import { pointKeysFor } from './part-types.js';
+import { normalizeFaceMountContract } from './face-mount-contract.js';
 
 const SAFE_ID = /^[\w.-]+$/u;
 const MAX_MODULES = 16;
@@ -138,6 +139,24 @@ function validateOrient(raw) {
 function validateMount(rawMount, moduleId, outputsByModule, validModuleIds, warnings, compsByModule) {
   if (!rawMount || typeof rawMount !== 'object') return null;
   const to = rawMount.to;
+  // Six-face installation preserves a complete rigid transform; malformed records
+  // are explicitly unmounted instead of falling through to a planar mount.
+  if (rawMount.face !== undefined) {
+    const fail = message => { warnings.push(`模組 ${moduleId} 的六面安裝${message}，已改為未安裝。`); return null; };
+    if (rawMount.orient !== undefined || rawMount.flip !== undefined) return fail('不能同時帶有 orient 或 flip');
+    if (!to || typeof to !== 'object' || !safeId(to.module) || !safeId(to.output)) return fail('目標不合法');
+    if (to.module === moduleId) return fail('不能指向自己');
+    if (!validModuleIds.has(to.module) || !(outputsByModule.get(to.module) || new Set()).has(to.output)) return fail('指向不存在的模組或輸出端');
+    const ref = rawMount.ref;
+    if (!ref || typeof ref !== 'object' || !isFiniteNum(ref.x) || !isFiniteNum(ref.y) || !isFiniteNum(ref.a)) return fail('mount.ref 不是有效座標');
+    const face = normalizeFaceMountContract(rawMount.face);
+    if (!face.ok) return fail(face.reason);
+    const home = {};
+    if (rawMount.home && typeof rawMount.home === 'object' && !Array.isArray(rawMount.home)) {
+      Object.keys(rawMount.home).forEach(k => { if (safeId(k) && isFiniteNum(rawMount.home[k])) home[k] = Number(rawMount.home[k]); });
+    }
+    return { to: { module: to.module, output: to.output }, ref: { x: Number(ref.x), y: Number(ref.y), a: Number(ref.a) }, home, face: face.value };
+  }
   // 直角安裝到宿主的邊：to＝{ module, body[, edge] }（body 是宿主模組裡的桿或三角板，三角板另需 edge 0～2）
   // 或 to＝{ module, frame: { edge } }（機架板外框第 edge 段直邊，edge 為非負整數）；必須同時有合法的 orient。
   if (to && typeof to === 'object' && (to.body !== undefined || to.frame !== undefined)) {
@@ -304,6 +323,15 @@ export function normalizeModules(rawModules, comps) {
 
   // 安裝迴圈：依陣列順序檢查，沿 mount 鏈回到自己就把「起點」那個模組的 mount 拆掉。
   const mountById = new Map(withMount.map(p => [p.id, p.mount]));
+  withMount.forEach(p => {
+    if (!p.mount?.face) return;
+    const host = withMount.find(h => h.id === p.mount.to.module);
+    const output = host?.outputs.find(o => o.id === p.mount.to.output);
+    if (!p.base || !['bar', 'triangle', 'rack'].includes(output?.body?.kind) || (host?.mount && !host.mount.face)) {
+      mountById.set(p.id, null);
+      warnings.push(`模組 ${p.id} 的六面安裝缺少支援的底座／承接板，或宿主使用舊式安裝，已改為未安裝。`);
+    }
+  });
   withMount.forEach(p => {
     let curId = p.id;
     const seen = new Set([curId]);

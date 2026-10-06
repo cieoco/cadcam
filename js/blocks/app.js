@@ -20,7 +20,7 @@ import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
 // computeBodyLayers：2D 疊放順序與 3D z 分層共用同一套，兩邊才一致。
 import { buildSceneModel, computeBodyLayers } from '../blocks3d/scene-model.js';
-import { buildOrthogonalChildren, planeInputs, attachModulePlates } from '../blocks3d/orthogonal-3d.js';   // O6：直角安裝子模組的 3D 位姿
+import { buildOrthogonalChildren, planeInputs, attachModulePlates } from '../blocks3d/orthogonal-3d.js?v=face-mount-20261007';   // O6：直角安裝子模組的 3D 位姿
 // 純邏輯模組
 import * as View from './view.js';
 import * as Render from './render.js';   // SVG 繪製基元（純呈現）
@@ -35,8 +35,9 @@ import { getTeachingFeedback } from './teaching-feedback.js';
 import * as Motion from './motion.js';
 import { memberSweepSegments } from './member-sweep.js';
 let sweepMemberId = null; // 顯示偏好，不寫入作品格式。
-import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostEdge, hostPlateThickness } from './assembly.js';
-import { normalizeModules } from './module-schema.js';
+import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostEdge, hostPlateThickness } from './assembly.js?v=face-mount-20261007';
+import { normalizeModules } from './module-schema.js?v=face-mount-20261007';
+import { refreshFaceMounts } from './face-mount-refresh.js';
 import { designTabs, resolveFocus, compsInFocus, assignNewComps, pointIdsOf, focusInputs, ROOT_TAB } from './design-focus.js';   // H1：設計模式一次只看一個設計（分頁）
 import { createDesignTabs } from './design-tabs-ui.js?v=20261005_tabclose';
 import { advanceRock } from './rock-motion.js';
@@ -45,7 +46,7 @@ import { drawMemberDimensions } from './member-dimension-render.js';
 import { memberStock, memberHoleDiameter, memberStockWarnings } from './member-stock.js';
 import { createJawTipHandle } from './jaw-tip-handle.js';
 import { analyzeDof } from './dof.js';
-import * as Store from './storage.js';
+import * as Store from './storage.js?v=face-mount-20261007';
 import * as Exporters from './exporters.js';
 import { localToWorld, plateVertices, plateShapeMode, createPlateGeometry } from './plate-geometry.js';
 import { S, activateMotor, motorAnglesNow, frozenMotorAngles, usedMotorIds } from './state.js';  // 跨模組共享的可變狀態與多馬達 helper
@@ -57,9 +58,9 @@ import { createSliderEditor } from './slider-editor.js?v=20261005_sliderui';
 import { createMotorTools } from './motor-tools.js';
 import { createPlateEditor } from './plate-editor.js';
 import { createNodeEditor } from './node-editor.js';
-import { createModuleEditor } from './module-editor.js';
+import { createModuleEditor } from './module-editor.js?v=face-mount-20261007';
 import { createModuleDrag } from './module-drag.js';
-import { createBench } from './bench-ui.js?v=faces2-20261005';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
+import { createBench } from './bench-ui.js?v=face-wizard-20261007_mobile';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
 import { workRangeFromTrace, clampRangeFromTraces, currentPointDistance } from './measurement.js';
 import { circleRectCompression } from './intake-contact.js';
 import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
@@ -67,7 +68,7 @@ import { drawCam as renderCam, drawWorkpiece as renderWorkpiece } from './specia
 import { drawPlate as renderPlate } from './plate-render.js';
 import { buildMotorMounts as planMotorMounts, computeMotorRotDeg as planMotorRotDeg, motorAssemblyLayerForBody } from './motor-mounts.js';
 import { drawFrameGeometry as renderFrameGeometry, drawMotorMountHoles as renderMotorMountHoles, drawModulePlates as renderModulePlates } from './motor-frame-render.js';
-import { createModulePlateSource } from './module-plates.js';   // G1：已安裝模組的固定板（<id>-frame）3D／2D
+import { createModulePlateSource } from './module-plates.js?v=face-mount-20261007';   // G1：已安裝模組的固定板（<id>-frame）3D／2D
 import { collectSceneIds, prepareRenderScene } from './render-scene.js';
 import { buildPreviewModelInputs } from './preview-model-inputs.js';
 import { renderLinks, renderNodes } from './mechanism-layer-render.js';
@@ -76,7 +77,7 @@ import { normalizeFabricationProfile, FABRICATION_DEFAULTS } from './fabrication
 import { cncWarnings } from './cnc-check.js';   // L4：依刀徑檢查匯出特徵
 import { orthogonalExportExtras, withAdapterNodes, withWorldAdapterNodes } from './orthogonal-joint.js';   // O4a：直角安裝轉接座孔位
 import { adapterMesh, meshToStl } from './adapter-stl.js';   // O4b：3D 列印轉接座 STL
-import { buildPlan, buildPackHtml } from './build-plan.js';   // L5b：製作包（板件＋五金＋組裝步驟）
+import { buildPlan, buildPackHtml } from './build-plan.js?v=face-mount-20261007';   // L5b：製作包（板件＋五金＋組裝步驟）
 import { resolveSpacers, suggestRackStops } from './interference.js';   // L5c／L6：干涉檢查、自動隔圈、齒條長槽限位建議
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -269,7 +270,7 @@ const displayCoords = () => {
 // ---- 視圖平面（O3、SDD-ORTHOGONAL-MOUNT §4.3）：一次只畫一個平面，solve 與播放仍是全域 ----
 const ORTHO_STACK_MM = 15;            // 側影帶的疊層高度（先固定 15 mm）
 const HOST_BAND_MM = 3;               // 子視圖裡宿主側影帶的厚度
-const hasOrthogonalModules = () => S.modules.some(m => m.mount && m.mount.orient);
+const hasOrthogonalModules = () => S.modules.some(m => m.mount && (m.mount.orient || m.mount.face));
 // ---- 設計模式的焦點分頁（H1）：設計模式一次只畫／只編一個設計，組立模式才全部顯示 ----
 const inDesign = () => S.mode === 'design';
 const focusOpts = () => ({ keepRoot: S.designFocus === ROOT_TAB });   // 剛按「新設計」時，空的「未命名設計」分頁要留著
@@ -409,7 +410,7 @@ function setViewPlane(id) {
   if (inDesign()) {
     // 設計模式沒有「平面」切換，只有分頁：進入某直角模組的平面＝聚焦那個模組；回主視圖＝聚焦它的宿主。
     const mod = focusModule();
-    const host = mod && mod.mount && mod.mount.orient ? mod.mount.to.module : null;
+    const host = mod && mod.mount && (mod.mount.orient || mod.mount.face) ? mod.mount.to.module : null;
     setDesignFocus(id || host || S.designFocus);
     return;
   }
@@ -830,6 +831,11 @@ function rebuild() {
     }
   }
   S.compiled = compileTopology(S.comps, S.topo, new Set());
+  if (S.modules.some(m => m.mount?.face)) {
+    const refreshed = refreshFaceMounts(S.comps, S.modules, S.topo.params, { exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm });
+    S.modules = refreshed.modules;
+    if (refreshed.warnings.length) transient(refreshed.warnings[0]);
+  }
   S.topo.params = S.compiled.params; // 沿用補齊後的參數
   // 雙軌：求解改讀這份，繪製仍讀 S.compiled；沒有模組時維持 null，求解走原本的 S.compiled（不重複編譯）。
   S.assembly = S.modules.length ? compileAssembly(S.comps, S.modules, S.topo) : null;
@@ -2721,7 +2727,7 @@ function init() {
                nodeDownEntry: guardedNodeDown,
                snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel, openFrameEditor: () => { S.frameEditorOpen = true; Panels.updateFrameEditor(); }, transient,
                isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, pointIsRackHole });
-  Settings.init({ draw, pushUndo, pause, scheduleAutosave, notify: transient });
+  Settings.init({ draw: () => { if (S.modules.some(m => m.mount?.face)) rebuild(); draw(); }, pushUndo, pause, scheduleAutosave, notify: transient });
   Settings.loadExportSettings();
   Settings.loadTtMountSettings();
   Settings.loadMg995MountSettings();

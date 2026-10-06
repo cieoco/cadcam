@@ -4,10 +4,10 @@
  * 模組操作的純函式（SDD-ASSEMBLY-MODULES §4.3a、M1c 刀 1）：存成模組、宣告輸出端、
  * 安裝／拆下／解散、匯出模板、插入實例、模組庫序列化。不碰 DOM、不碰 localStorage。
  */
-import { compileAssembly, solveAssembly, outputPose, transformComp, planeOf, orthogonalHostEdge } from './assembly.js';
+import { compileAssembly, solveAssembly, outputPose, transformComp, planeOf, orthogonalHostEdge } from './assembly.js?v=face-mount-20261007';
 import { pointKeysFor } from './part-types.js';
-import { normalizeSnapshot } from './schema.js';
-import { normalizeModules, sanitizeName } from './module-schema.js';
+import { normalizeSnapshot } from './schema.js?v=face-mount-20261007';
+import { normalizeModules, sanitizeName } from './module-schema.js?v=face-mount-20261007';
 import { BLOCK_EXAMPLES } from './examples.js';
 import { ADAPTER_LENGTH_MM } from './orthogonal-joint.js';
 
@@ -449,7 +449,7 @@ export function unmountModule(comps, modules, moduleId, params, motorState) {
   const mod = modList[idx];
   if (!mod.mount) return { ok: false, comps: list, modules: modList, reason: 'not-mounted' };
   // 直角安裝：零件座標本來就在自己的平面，拆下只清掉 mount。
-  if (mod.mount.orient) {
+  if (mod.mount.orient || mod.mount.face) {
     return { ok: true, comps: list, modules: modList.map((m, i) => i === idx ? { ...m, mount: null } : m), reason: 'ok' };
   }
 
@@ -481,6 +481,7 @@ export function setMountFlip(comps, modules, moduleId, flip) {
   const idx = modList.findIndex(m => m.id === moduleId);
   if (idx < 0) return { ok: false, comps: list, modules: modList, reason: 'no-module' };
   const mod = modList[idx];
+  if (mod.mount?.face) return { ok: false, comps: list, modules: modList, reason: 'face-mount' };
   if (!mod.mount) return { ok: false, comps: list, modules: modList, reason: 'not-mounted' };
   const { flip: _drop, ...rest } = mod.mount;
   const mount = flip ? { ...rest, flip: true } : rest;
@@ -820,7 +821,8 @@ export function translateComposite(comps, modules, dx, dy) {
   const newComps = list.map(c => planeOf(list, modList, c) === null ? transformComp(c, move, to, 0) : c);
   const newModules = modList.map(m => {
     if (!m.mount || !m.mount.ref || planeOf(list, modList, m.mount.to.module) !== null) return m;
-    return { ...m, mount: { ...m.mount, ref: { ...m.mount.ref, x: m.mount.ref.x + dx, y: m.mount.ref.y + dy } } };
+    return { ...m, mount: { ...m.mount, ref: { ...m.mount.ref, x: m.mount.ref.x + dx, y: m.mount.ref.y + dy },
+      ...(m.mount.face ? { face: { ...m.mount.face, translation: { ...m.mount.face.translation, x: m.mount.face.translation.x + dx, y: m.mount.face.translation.y + dy } } } : {}) } };
   });
   return { comps: newComps, modules: newModules };
 }

@@ -15,7 +15,7 @@ import {
   splitMountsByHost, hostedBarGeometry
 } from './exporters.js';
 import { frameConnectorNodes, motorPointIds, pointCoords, frameNodeIds, sliderMountInfo, isHiddenSliderRailPoint } from './model.js';
-import { worldFrameComps, moduleFrameExports, moduleFrameNodes, moduleOfPoint, splitFrameMounts, planeOf } from './assembly.js';
+import { worldFrameComps, moduleFrameExports, moduleFrameNodes, moduleOfPoint, splitFrameMounts, planeOf } from './assembly.js?v=face-mount-20261007';
 import { orthogonalExportExtras, withAdapterNodes, withWorldAdapterNodes, jointSpec } from './orthogonal-joint.js';
 import { buildMotorMounts } from './motor-mounts.js';
 import { computeBodyLayers } from '../blocks3d/scene-model.js';
@@ -242,7 +242,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     if (stack.has(key)) { baseOf.set(key, 0); layersDone.add(key); return; }   // 安裝鏈成環：保底
     stack.add(key);
     let B = 0;
-    if (key !== null && modById.get(key).mount.orient) {
+    if (key !== null && (modById.get(key).mount.orient || modById.get(key).mount.face)) {
       B = 0;   // 直角安裝：子模組在自己的平面疊層，從第 0 層起（O-D4）
     } else if (key !== null) {
       const mod = modById.get(key);
@@ -552,6 +552,7 @@ const escHtml = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '
 const KIND_LABEL = { frame: '機架板', gear: '齒輪', rack: '齒條', member: '桿件／板件' };
 
 export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = [], interference = [], suggestions = [], modules = [] } = {}) {
+  warnings = [...warnings, ...modules.filter(m => m?.mount?.face).map(m => `六面接合 ${m.name || m.id}：擺放姿態已保存；轉接件、配對固定孔與跨面干涉尚未驗證，不能直接依此製造組立。`)];
   const parts = (plan && plan.parts) || [];
   const joints = (plan && plan.joints) || [];
   const motors = (plan && plan.motors) || [];
@@ -644,7 +645,7 @@ ${j.stand ? `<li>子模組底板 ${e(childName)} 立在 ${e(hostName)} 的板面
     ? `<ul>${warnings.map(w => `<li>${e(w)}</li>`).join('')}</ul>` : '<p class="muted">目前沒有 CNC 警告。</p>';
   const interferenceList = (interference || []).length
     ? `<ul>${interference.map(w => `<li>${e(w.message)}</li>`).join('')}</ul>`
-    : '<p class="muted">已依各馬達行程取樣檢查，未發現干涉（仍需實物確認）。</p>';
+    : modules.some(m => m?.mount?.face) ? '<p class="muted">六面接合的跨面干涉尚未驗證。</p>' : '<p class="muted">已依各馬達行程取樣檢查，未發現干涉（仍需實物確認）。</p>';
   const suggestList = (suggestions || []).length
     ? `<ul>${suggestions.map(s => `<li>建議：${e(s.message)}</li>`).join('')}</ul>` : '';
 

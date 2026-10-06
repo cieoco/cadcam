@@ -10,7 +10,7 @@
  * 欄向量：Mx = e.x·d + f.x·n、My = e.y·d + f.y·n、Mw = m；平移 T = origin − base.x·Mx − base.y·My。
  */
 
-import { orthogonalFrame, orthogonalHostEdge, planeOf, compsInPlane, pointIdsInPlane } from '../blocks/assembly.js';
+import { orthogonalFrame, orthogonalHostEdge, planeOf, compsInPlane, pointIdsInPlane } from '../blocks/assembly.js?v=face-mount-20261007';
 import { bracketBoxes, bracketScrews } from '../blocks/orthogonal-joint.js';
 
 export const IDENTITY_4 = Object.freeze([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -91,7 +91,7 @@ export function modelMinZ(model) {
 
 export function orthogonalModuleIds(modules) {
   return (Array.isArray(modules) ? modules : [])
-    .filter(m => m && m.mount && m.mount.orient && m.mount.orient.type === 'orthogonal')
+    .filter(m => m && m.mount && (m.mount.face || (m.mount.orient && m.mount.orient.type === 'orthogonal')))
     .map(m => m.id);
 }
 
@@ -155,6 +155,8 @@ function hostBodyZ(model, edge, comps) {
   }
   const stick = (model.sticks || []).find(s => s.id === edge.compId);
   if (stick) return fin(stick.z);
+  const rack = (model.racks || []).find(s => s.id === edge.compId);
+  if (rack) return fin(rack.z);
   const c = comps.find(x => x && x.id === edge.compId);
   if (c && c.type === 'triangle') {
     const key = [c.p1, c.p2, c.p3].map(p => p && p.id).sort().join(',');
@@ -201,6 +203,21 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
       const hostPlane = planeOf(comps, modules, mod.mount.to.module);
       const host = hostPlane === null ? done.get(null) : solve(hostPlane, trail);
       if (host) {
+        if (mod.mount.face) {
+          const face = mod.mount.face;
+          const output = modules.find(m => m.id === mod.mount.to.module)?.outputs?.find(o => o.id === mod.mount.to.output);
+          // 齒條既有預覽採全域厚度；六面接合使用確認時的加工板厚，保持可見面與間距一致。
+          const hostRack = host.model.racks?.find(r => r.id === output?.body?.id);
+          if (hostRack) hostRack.thickness = face.hostThicknessMm;
+          const model = buildModel(planeInputs(inputs, comps, modules, id));
+          attachModulePlates(model, comps, plates, id);
+          const childZ = moduleFrameZ(model, comps, id);
+          if (childZ === null || !output?.body?.id) { done.set(id, null); return null; }
+          const hostCenterZ = hostBodyZ(host.model, { compId: output.body.id }, comps) + face.hostThicknessMm / 2;
+          const childCenterZ = childZ + face.childThicknessMm / 2;
+          result = { model, matrix: multiply4(host.matrix, orthogonalMatrix(frame, hostCenterZ, -childCenterZ)), brackets: [], screws: [] };
+          done.set(id, result); return result;
+        }
         const zOffset = hostBodyZ(host.model, orthogonalHostEdge(comps, modules, mod.mount, inputs.pts, params, { asm }), comps);
         const model = buildModel(planeInputs(inputs, comps, modules, id));
         // G1：這個平面上已安裝模組的固定板（含子模組自己的底板）；板要墊在零件正下面，所以 w 的起點改成板的底面。

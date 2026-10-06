@@ -8,7 +8,7 @@
  * 直角安裝的子模組在自己的平面靜止＝不變換。
  * 與 assembly.js 互相引用（只在呼叫時用函式，無頂層相依），assembly.js 再轉出 mountedFramePlates。
  */
-import { moduleFrameExports, moduleFrameNodes, splitFrameMounts, planeOf, outputPose } from './assembly.js';
+import { moduleFrameExports, moduleFrameNodes, splitFrameMounts, planeOf, outputPose } from './assembly.js?v=face-mount-20261007';
 import { deriveMotorMounts, buildPlan } from './build-plan.js';
 import { inspectFrameExport, splitMountsByHost } from './exporters.js';
 import { frameConnectorNodes } from './model.js';
@@ -61,7 +61,7 @@ export function placeFramePlates(homes, comps, modules, points, plan = null) {
     if (!mod || !mod.mount) return;
     // 同平面安裝：宿主輸出端目前位姿 vs mount.ref；直角安裝的子模組在自己的平面靜止＝不變換。宿主位姿算不出（宿主無效）就不畫。
     let ref = POSE0, now = POSE0;
-    if (!mod.mount.orient) {
+    if (!mod.mount.orient && !mod.mount.face) {
       const host = modList.find(m => m && m.id === mod.mount.to.module);
       const pose = host ? outputPose(host, mod.mount.to.output, points, list.filter(c => c && c.moduleId === host.id)) : null;
       if (!pose) return;

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>六面體組立精靈 · 操作原型</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f5f4ef; color: #253b46; font-family: system-ui, sans-serif; }
+    button, input { font: inherit; }
+    button { cursor: pointer; min-height: 46px; border: 1px solid #ccd5d6; border-radius: 12px; background: #fff; color: inherit; padding: 9px 12px; }
+    button:focus-visible, input:focus-visible { outline: 3px solid #268878; outline-offset: 2px; }
+    button[aria-pressed="true"] { background: #e1f3ed; border: 2px solid #268878; }
+    button:disabled { opacity: .4; cursor: default; }
+    header { padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid #ddd; }
+    h1 { font-size: 18px; margin: 0; }
+    .tag { font-size: 12px; color: #62767d; margin-top: 4px; }
+    .mode { display: flex; gap: 5px; }
+    .mode button { padding: 8px 10px; font-size: 13px; }
+    main { max-width: 1200px; margin: 0 auto; padding: 18px; display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 18px; }
+    .stage { background: #e9eeea; border-radius: 20px; overflow: hidden; min-width: 0; align-self: start; position: sticky; top: 15px; }
+    .stage-head { padding: 16px 18px 0; display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+    .key { display: flex; gap: 12px; }
+    .host-key { color: #376789; } .child-key { color: #207663; }
+    .scene-wrap { position: relative; width: 100%; }
+    svg { display: block; width: 100%; height: 390px; }
+    #scene { touch-action: none; cursor: grab; }
+    .mate-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+    .mate-arrow, .mate-center { position: absolute; width: 48px; height: 48px; min-height: 48px; padding: 0; display: grid; place-items: center; border-radius: 50%; background: #fffefaed; box-shadow: 0 2px 8px #173e4038; pointer-events: auto; touch-action: manipulation; }
+    .mate-arrow { font-size: 23px; }
+    .mate-center { width: 44px; height: 44px; min-height: 44px; font-size: 13px; font-weight: 700; }
+    .mate-tools { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; justify-content: center; gap: 5px; pointer-events: auto; }
+    .mate-tools button { min-height: 44px; padding: 5px 9px; font-size: 12px; border-radius: 11px; background: #fffefaed; box-shadow: 0 2px 8px #173e4038; white-space: nowrap; }
+    .mate-tools button[aria-pressed="true"] { background: #e1f3ed; border: 2px solid #268878; }
+    .view-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; padding: 8px; }
+    .view-actions button { min-width: 48px; font-size: 13px; }
+    details summary { cursor: pointer; min-height: 44px; padding: 12px 0; }
+    body[data-ui="wizard"] section > p, body[data-ui="wizard"] .note { display: none; }
+    body[data-ui="wizard"] #hostFaceMore { display: none; }
+    body[data-ui="wizard"] #childFaces { display: none; }
+    body[data-ui="wizard"]:not([data-step="3"]) .summary, body[data-ui="wizard"] .cards small { display: none; }
+    .summary { padding: 12px 18px; background: #fff9; font-size: 14px; line-height: 1.6; }
+    .note { padding: 12px 18px; font-size: 12px; line-height: 1.5; color: #60716e; }
+    .panel { min-width: 0; }
+    .progress { display: flex; gap: 5px; margin-bottom: 14px; }
+    .progress span { flex: 1; height: 5px; background: #dce3dd; border-radius: 4px; }
+    .progress span.current { background: #268878; }
+    section { border-radius: 16px; background: #fff; padding: 16px; margin-bottom: 12px; }
+    h2 { margin: 0 0 8px; font-size: 18px; }
+    p { font-size: 13px; color: #60767b; margin: 0 0 12px; line-height: 1.6; }
+    h3 { font-size: 13px; margin: 12px 0 8px; }
+    .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .cards button { text-align: left; }
+    .cards small { display: block; font-size: 11px; color: #667c81; margin-top: 4px; }
+    .faces { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .faces button { min-height: 62px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .face-symbol { width: 22px; height: 22px; display: inline-flex; justify-content: center; align-items: center; border: 1px solid #b8c9c8; border-radius: 5px; font-size: 14px; }
+    .align { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+    .align button { font-size: 12px; min-height: 49px; }
+    .adjust-row { display: grid; grid-template-columns: 1fr 48px 72px 48px; align-items: center; gap: 6px; margin: 8px 0; }
+    input { width: 100%; min-height: 46px; text-align: center; border: 1px solid #ccd5d6; border-radius: 10px; }
+    .turn { width: 100%; margin-top: 8px; }
+    .actions { display: flex; gap: 8px; padding: 10px 0; }
+    .actions button { flex: 1; }
+    .primary { background: #236e5e; color: white; border-color: #236e5e; font-weight: 700; }
+    .cancel { display: block; width: 100%; margin-top: 5px; background: transparent; }
+    .message { font-size: 13px; min-height: 24px; color: #236e5e; padding: 5px; }
+    .error { color: #b34436; }
+    dialog { width: min(340px, calc(100vw - 32px)); border: 0; border-radius: 18px; padding: 20px; color: inherit; box-shadow: 0 12px 50px #173e4050; }
+    dialog::backdrop { background: #14272966; }
+    dialog h2 { margin-bottom: 8px; }
+    dialog input { margin: 10px 0 14px; font-size: 20px; }
+    .dialog-actions { display: flex; gap: 8px; }
+    .dialog-actions button { flex: 1; }
+    [hidden] { display: none !important; }
+    @media (max-width: 760px) {
+      header { padding: 10px 12px; } h1 { font-size: 15px; } .tag { font-size: 10px; }
+      main { display: flex; flex-direction: column; padding: 10px; gap: 10px; }
+      .stage { position: static; width: 100%; } svg { height: 220px; }
+      .mate-arrow { width: 46px; height: 46px; min-height: 46px; }
+      .mate-tools { left: 4px; right: 4px; bottom: 4px; gap: 4px; }
+      .mate-tools button { flex: 1; min-width: 0; padding: 4px 5px; font-size: 11px; }
+      .stage-head { padding: 10px 12px 0; font-size: 12px; } .summary { padding: 9px 12px; font-size: 12px; }
+      .note { padding: 8px 12px; font-size: 11px; } section { padding: 12px; }
+      .panel { width: 100%; } .progress { margin-bottom: 10px; }
+      .actions { position: sticky; bottom: 0; background: #f5f4eff2; padding: 8px 0; }
+      .mode button { font-size: 12px; padding: 6px 8px; }
+      body[data-ui="wizard"] .summary, body[data-ui="wizard"] [data-step="3"] .align, body[data-ui="wizard"] [data-step="3"] #adjustments { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>六面體組立</h1><div class="tag">真實接合板預覽 · 不寫入作品</div></div>
+    <div class="mode" role="group" aria-label="操作方式"><button id="wizardMode">精靈</button><button id="workMode">工作</button></div>
+  </header>
+  <main>
+    <div class="stage">
+      <div class="stage-head"><b id="stageTitle">選擇兩個機構</b><div class="key"><span class="host-key">● 承接端</span><span class="child-key">● 安裝端</span></div></div>
+      <div class="scene-wrap" id="sceneWrap">
+        <svg id="scene" viewBox="0 0 600 390" role="group" aria-label="兩機構六面體擺放預覽"></svg>
+        <div class="mate-overlay" id="mateOverlay" role="group" aria-label="調整安裝位置" hidden>
+          <button class="mate-arrow" data-arrow="uPlus" aria-label="向左右正方向移動；面內 U+">↑</button>
+          <button class="mate-arrow" data-arrow="uMinus" aria-label="向左右負方向移動；面內 U−">↑</button>
+          <button class="mate-arrow" data-arrow="vPlus" aria-label="向上下正方向移動；面內 V+">↑</button>
+          <button class="mate-arrow" data-arrow="vMinus" aria-label="向上下負方向移動；面內 V−">↑</button>
+          <button class="mate-center" id="mateCenter" aria-label="置中，清除左右與上下偏移">置中</button>
+          <div class="mate-tools" role="group" aria-label="安裝尺寸與調整方式">
+            <button id="mateMode" aria-pressed="false">移動</button>
+            <button id="mateUChip" aria-label="設定左右偏移；面內 U offset">左右 0</button>
+            <button id="mateVChip" aria-label="設定上下偏移；面內 V offset">上下 0</button>
+            <button id="mateGapChip">間距 5</button>
+            <button id="mateStepChip">步距 5</button>
+          </div>
+        </div>
+      </div>
+      <div class="view-actions" role="group" aria-label="旋轉觀看角度">
+        <button id="viewLeft" aria-label="向左旋轉視角 90 度">↶</button><button id="viewRight" aria-label="向右旋轉視角 90 度">↷</button>
+        <button id="viewFlip">上下翻轉</button><button id="viewReset">重設視角</button><button id="turn" class="turn">轉 90° · 目前 0°</button>
+      </div>
+      <div class="summary" id="summary" aria-live="polite"></div>
+      <div class="note">藍色：承接端外框。綠色：安裝端外框。亮色標示所選面；被遮住的面以虛線標示。外框示意不代表實際固定孔。</div>
+    </div>
+    <div class="panel">
+      <div class="progress" id="progress" aria-label="步驟進度"></div>
+      <section data-step="0">
+        <h2>1 · 哪兩個機構？</h2><p>先選承接的位置，再選要安裝的機構。</p>
+        <h3>承接端</h3><div class="cards" id="hosts"></div>
+        <h3>安裝端</h3><div class="cards" id="children"></div>
+      </section>
+      <section data-step="1">
+        <h2>2 · 選承接面</h2><p>直接點藍色外框的大面，選到的面會變亮藍色；拖曳可旋轉視角。</p><details id="hostFaceMore"><summary>其他面</summary><div class="faces" id="hostFaces"></div></details>
+      </section>
+      <section data-step="2">
+        <h2>3 · 選安裝面</h2><p>旋轉後直接點安裝端的大面；下一步預覽接合。</p><div class="faces" id="childFaces"></div>
+      </section>
+      <section data-step="3">
+        <h2>4 · 怎麼對齊？</h2><p>九宮格相對承接面的方向；偏置以毫米微調。</p>
+        <div class="align" id="align"></div>
+        <div id="adjustments"></div>
+      </section>
+      <div class="actions"><button id="back">上一步</button><button id="next" class="primary">下一步</button></div>
+      <button id="cancel" class="cancel">取消修改，回到已確認結果</button>
+      <button id="placementRecord" hidden>下載已確認擺放</button>
+      <div class="message" id="message" role="status"></div>
+    </div>
+  </main>
+  <dialog id="dimensionDialog" aria-labelledby="dimensionTitle">
+    <form id="dimensionForm">
+      <h2 id="dimensionTitle">設定尺寸</h2>
+      <label id="dimensionLabel" for="dimensionValue">尺寸（mm）</label>
+      <input id="dimensionValue" type="number" step="any" inputmode="decimal" required>
+      <p id="dimensionError" class="error" role="alert" hidden>請輸入有效數字；步距須大於 0，間距不可小於 0。</p>
+      <div class="dialog-actions"><button type="button" id="dimensionCancel">取消</button><button type="submit" class="primary">確定</button></div>
+    </form>
+  </dialog>
+  <script type="module" src="./js/blocks/face-mate-prototype.js?v=20261007_mobile"></script>
+</body>
+</html>

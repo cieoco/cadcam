@@ -11,14 +11,15 @@
  *   showAll   是否把不相容的接口也畫出來（暗色、點了說原因）
  */
 import { S, motorAnglesNow } from './state.js';
+import { openFaceWizard } from './face-wizard-ui.js?v=20261007_mobile';
 import * as Bench from './bench.js?v=faces-20261005';
-import { moduleFrameEdges } from './assembly.js';
+import { moduleFrameEdges } from './assembly.js?v=face-mount-20261007';
 import * as Settings from './settings.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { resolveSpacers, findInterference, interferenceTimeline, hitPartNames } from './interference.js';
-import { setMountFlip, unmountModule } from './module-ops.js';
+import { setMountFlip, unmountModule } from './module-ops.js?v=face-mount-20261007';
 import { pointKeysFor } from './part-types.js';
-import { applyMatrix4, moduleFrameZ } from '../blocks3d/orthogonal-3d.js';
+import { applyMatrix4, moduleFrameZ } from '../blocks3d/orthogonal-3d.js?v=face-mount-20261007';
 
 const SNAP_PX = 40;          // 拖曳吸附半徑（螢幕 px）
 const TAP_PX_MOUSE = 26;     // 點接口的命中半徑（滑鼠）
@@ -80,6 +81,7 @@ export function createBench(deps) {
     if (!mod.mount) return '未安裝';
     const host = modOf(mod.mount.to.module);
     const hostName = host ? displayName(host.id) : mod.mount.to.module;
+    if (mod.mount.face) return `六面接合 · ${hostName}（轉接件待設計）`;
     let outName = mod.mount.to.output || '';
     if (mod.mount.orient) {
       // C1：宿主邊可以是桿、三角板的邊或機架板的邊
@@ -164,6 +166,9 @@ export function createBench(deps) {
     if (!liveBox) return;
     const box = liveBox.querySelector('#benchLive');
     if (!box) return;
+    if (S.modules.some(m => m?.mount?.face)) {
+      box.dataset.state = 'none'; box.textContent = '六面接合的跨面干涉尚未驗證'; return;
+    }
     if (!live.ready || !live.plan || !(live.plan.parts || []).length) {
       box.dataset.state = 'none';
       box.textContent = '尚無零件可檢查干涉';
@@ -244,6 +249,7 @@ export function createBench(deps) {
   const fmtDeg = a => `${Math.round(a * 10) / 10}°`;
   function runTimeline() {
     if (!isBench()) return null;
+    if (S.modules.some(m => m?.mount?.face)) { say('六面接合的跨面干涉尚未驗證'); return null; }
     const st0 = ensurePlan();
     if (!st0.plan) { say('目前沒有可檢查的零件'); return null; }
     const args = interferenceArgs();
@@ -613,6 +619,7 @@ export function createBench(deps) {
     if (!mod) { say('請先在清單選一個模組'); return false; }
     if (action === 'edit') { editModule(id); return true; }
     if (!mod.mount) { say('這個模組還沒安裝，請先接到宿主上'); return false; }
+    if (mod.mount.face && action !== 'unmount') { say('六面接合請拆下後重新選面與尺寸'); return false; }
     if (action === 'unmount' && st.preview) { cancelPreview(); return true; }
     let r;
     if (action === 'angle') r = Bench.toggleAngle(S.comps, S.modules, id, S.topo.params, motorState(), { joint: defaultJointKind() });
@@ -658,6 +665,7 @@ export function createBench(deps) {
   // 不實際套用，只問「這個調整現在能不能做」，給按鈕決定要不要灰掉。
   function adjustState(mod, action) {
     if (!mod || !mod.mount) return { ok: false, reason: '還沒安裝，請先接到宿主上' };
+    if (mod.mount.face && action !== 'unmount' && action !== 'edit') return { ok: false, reason: '六面接合請拆下後重新選面與尺寸' };
     if (action === 'angle' || action === 'flip' || action === 'unmount' || action === 'edit') return { ok: true };
     const r = Bench.benchAdjust(S.comps, S.modules, mod.id, action, S.topo.params, { joint: S.fabrication?.joint });
     if (!r.ok) return { ok: false, reason: r.reason };
@@ -767,6 +775,14 @@ export function createBench(deps) {
       root.appendChild(bigBtn('取消選面', () => { st.faceStep = null; viewer()?.highlightSurface?.(null); if (st.preview) cancelPreview(); syncUI(true); }));
     }
     root.appendChild(liveBox);   // B6：即時干涉狀態＋全行程測試（持久節點，面板重建時只是搬回來）
+    if (mod?.mount?.face) {
+      const selection = mod.mount.face.selection;
+      root.appendChild(el('div', 'bench-note', `間距 ${selection.gap} mm · 偏移 ${selection.offsetU} / ${selection.offsetV} mm`));
+      root.appendChild(bigBtn('拆下重新選面', () => adjust('unmount')));
+      root.appendChild(bigBtn('編輯機構', () => adjust('edit')));
+      root.appendChild(el('div', 'bench-note', '擺放已保存；轉接件與配對固定孔待設計。'));
+      return;
+    }
 
     if (st.faceStep === 'child') {
       root.appendChild(el('div', 'bench-note', '點選發亮的底板邊線，決定哪個邊面接觸宿主。選好後才進入位置微調。'));
@@ -776,6 +792,16 @@ export function createBench(deps) {
     if (mod && !mod.mount) {
       const sec = el('div', 'bench-section');
       sec.appendChild(el('div', 'bench-label', '① 選相接的邊／面'));
+      const wizardButton = bigBtn('六面體精靈', () => {
+        if (st.preview) cancelPreview({ silent: true });
+        const signature = JSON.stringify([S.comps, S.modules, S.topo.params]);
+        openFaceWizard({ comps: S.comps, modules: S.modules, params: S.topo.params, childId: mod.id,
+          exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,
+          isCurrent: () => signature === JSON.stringify([S.comps, S.modules, S.topo.params]), say,
+          commit: result => { pushUndo(); S.comps = result.comps; S.modules = result.modules; rebuild(); draw(); deps.scheduleAutosave?.(); say('已接上；轉接件與固定孔仍需設計。'); syncUI(true); }
+        });
+      });
+      wizardButton.id = 'benchFaceWizard'; sec.appendChild(wizardButton);
       sec.appendChild(bigBtn('點選 3D 接合面', () => beginFacePick()));
       if (!mod.base) {
         sec.appendChild(el('div', 'bench-note', '這個模組沒有基準點（base），不能安裝。'));

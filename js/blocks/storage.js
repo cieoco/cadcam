@@ -12,7 +12,7 @@
  */
 
 import { encodeSnapshot, decodeShareString } from '../share-codec.js';
-import { toSnapshot, normalizeSnapshot, highestIdNum } from './schema.js';
+import { toSnapshot, normalizeSnapshot, highestIdNum } from './schema.js?v=face-mount-20261007';
 
 const AUTOSAVE_KEY = 'cadcam.blocks.autosave';
 

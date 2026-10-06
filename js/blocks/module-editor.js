@@ -14,7 +14,7 @@ import {
   moduleToTemplate, normalizeTemplate, instantiateTemplate, insertOffset, translateModule,
   compositeToTemplate, instantiateComposite, translateComposite, COMPOSITE_MAX_MODULES,
   BUILTIN_MODULES, builtinTemplate, parseLibrary, serializeLibrary
-} from './module-ops.js';
+} from './module-ops.js?v=face-mount-20261007';
 
 // 操作失敗時的提示文字（module-ops 回傳的 reason code → 繁中訊息）。
 const REASON_MESSAGES = {
@@ -125,6 +125,7 @@ export function createModuleEditor(deps) {
     const host = S.modules.find(m => m.id === mod.mount.to.module);
     const labels = moduleLabels(S.modules);
     const hostName = host ? labels.get(host.id) : mod.mount.to.module;
+    if (mod.mount.face) return `六面接合 · ${hostName}（轉接件待設計）`;
     const hostEdgeName = mod.mount.to.frame || mod.mount.to.edge !== undefined ? mountPortName(S.comps, S.modules, mod.mount, S.topo.params) : null;   // C1：板／機架的邊
     const outName = hostEdgeName ? hostEdgeName : mod.mount.to.frame ? '機架' : mod.mount.to.body
       ? ((host && (host.outputs || []).find(o => o.body && o.body.id === mod.mount.to.body) || {}).name || mod.mount.to.body)
@@ -511,7 +512,7 @@ export function createModuleEditor(deps) {
         el.appendChild(sel);
       }
       if (ps.canUnmount) addButton(el, '拆下', () => unmount());
-      if (ps.mounted) addButton(el, ps.flipped ? '翻回' : '翻面', () => toggleFlip());
+      if (ps.mounted && !S.modules.find(m => m.id === ps.moduleId)?.mount?.face) addButton(el, ps.flipped ? '翻回' : '翻面', () => toggleFlip());
       if (ps.orthogonal) {
         if (ps.viewing) addButton(el, '↩ 回主視圖', () => setViewPlane(null));
         else addButton(el, '編輯此模組（正視）', () => setViewPlane(ps.moduleId));

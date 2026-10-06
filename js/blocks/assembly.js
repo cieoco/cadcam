@@ -272,13 +272,13 @@ export function moduleFrameEdges(comps, modules, moduleId, params, opts = {}) {
 }
 
 // 已安裝模組底板的第 k 段邊在「目前位姿」的幾何：home 座標的邊套上與求解器相同的剛體變換。
-//   同平面安裝：宿主輸出端目前位姿 vs mount.ref（transformPoint）；直角安裝：模組在自己的平面靜止＝不變；
+//   同平面安裝：宿主輸出端目前位姿 vs mount.ref（transformPoint）；直角／六面安裝：模組在自己的平面靜止＝不變；
 //   巢狀時 points 已是各層求解後的座標，宿主輸出端的位姿自然包含上層的運動。
 function mountedFrameEdge(list, modList, mod, k, points, params, opts) {
   const e = moduleFrameEdges(list, modList, mod.id, params, opts)[k];
   if (!e) return null;
   let ref = IDENTITY_POSE, now = IDENTITY_POSE;
-  if (!opts.home && !mod.mount.orient) {
+  if (!opts.home && !mod.mount.orient && !mod.mount.face) {
     const host = modList.find(m => m && m.id === mod.mount.to.module);
     const p = host ? outputPose(host, mod.mount.to.output, points, list.filter(c => c && c.moduleId === host.id)) : null;
     if (!p) return null;
@@ -300,7 +300,7 @@ export function solveAssembly(asm, params) {
   if (asm.single) return solveTopology(asm.single, params);
   const points = {};
   const perModule = {};
-  const orthogonal = {};   // 直角安裝的模組：{ host, now }（宿主輸出端目前位姿；子模組點不做 2D 變換）
+  const orthogonal = {};   // 直角／六面安裝模組：{ host, now }（子模組點不做 2D 變換）
   for (const unit of asm.units) {
     if (!unit.compiled) continue;
     let ref = IDENTITY_POSE, now = IDENTITY_POSE;
@@ -316,8 +316,8 @@ export function solveAssembly(asm, params) {
         now = host && host.module ? outputPose(host.module, unit.mount.to.output, points, host.comps) : null;
       }
       if (!now) { perModule[unit.id] = { isValid: false, reason: 'host-invalid' }; continue; }
-      if (unit.mount.orient) {
-        // 直角安裝：子模組在自己的平面求解，點座標維持原樣（ref＝now＝IDENTITY），位姿另外回報給 3D／側影帶用。
+      if (unit.mount.orient || unit.mount.face) {
+        // 直角／六面安裝：子模組在自己的平面求解，點座標維持原樣，位姿另外回報給 3D／側影帶用。
         orthogonal[unit.id] = { host: unit.mount.to.module, now };
         now = IDENTITY_POSE;
       } else {
@@ -404,7 +404,7 @@ export function rebakeModules(comps, modules, params) {
     const idx = curModules.findIndex(m => m.id === modId);
     const mod = curModules[idx];
     if (!mod || !mod.mount) continue;
-    if (mod.mount.orient) continue;   // 直角安裝：座標存在自己的平面，不 rebake
+    if (mod.mount.orient || mod.mount.face) continue;   // 直角／六面安裝：座標存在自己的平面，不 rebake
     const asm = compileAssembly(curComps, curModules, { params });
     const sol = solveAssembly(asm, { thetaDeg: 0, motorAngles: { ...(mod.mount.home || {}) } });
     const hostId = mod.mount.to.module;
@@ -436,6 +436,24 @@ export function orthogonalFrame(comps, modules, moduleId, points, params, opts =
   const modList = Array.isArray(modules) ? modules : [];
   const list = Array.isArray(comps) ? comps : [];
   const mod = modList.find(m => m.id === moduleId);
+  const face = mod && mod.mount && mod.mount.face;
+  if (face) {
+    const host = modList.find(m => m.id === mod.mount.to.module);
+    const hostPose = host ? outputPose(host, mod.mount.to.output, points, list.filter(c => c && c.moduleId === host.id)) : null;
+    if (!hostPose) return null;
+    const ref = mod.mount.ref || IDENTITY_POSE;
+    const angle = (hostPose.a - ref.a) * D2R, cos = Math.cos(angle), sin = Math.sin(angle);
+    const rotate = v => ({ x: cos * v[0] - sin * v[1], y: sin * v[0] + cos * v[1], z: v[2] });
+    const transform = face.rotation, t = face.translation;
+    const origin = transformPoint({ x: t.x, y: t.y }, ref, hostPose);
+    return {
+      origin: { ...origin, z: t.z },
+      d: rotate([transform[0][0], transform[1][0], transform[2][0]]),
+      n: rotate([transform[0][1], transform[1][1], transform[2][1]]),
+      m: rotate([transform[0][2], transform[1][2], transform[2][2]]),
+      base: { x: 0, y: 0 }, e: { x: 1, y: 0 }, f: { x: 0, y: 1 }
+    };
+  }
   const orient = mod && mod.mount && mod.mount.orient;
   if (!orient || orient.type !== 'orthogonal') return null;
   const edge = orthogonalHostEdge(list, modList, mod.mount, points, params, opts);
@@ -634,7 +652,7 @@ export function planeOf(comps, modules, compOrModuleId) {
     seen.add(id);
     const mod = modList.find(m => m.id === id);
     if (!mod || !mod.mount) return null;
-    if (mod.mount.orient) return mod.id;
+    if (mod.mount.orient || mod.mount.face) return mod.id;
     id = mod.mount.to && mod.mount.to.module;
   }
   return null;
@@ -835,7 +853,7 @@ function frameEntryOf(list, modList, mod, params, solveHome) {
   const bolts = [];
   const host = modList.find(m => m.id === mod.mount.to.module);
   const output = host && (host.outputs || []).find(o => o.id === mod.mount.to.output);
-  if (params && output && Array.isArray(output.bolts) && output.bolts.length) {
+  if (params && output && Array.isArray(output.bolts) && output.bolts.length && !mod.mount.face) {
     const pts = solveHome();
     output.bolts.forEach(id => {
       const p = pts && pts[id];
@@ -854,7 +872,8 @@ function frameEntryOf(list, modList, mod, params, solveHome) {
     fileBase: `${mod.id}-frame`,
     comps: list.filter(c => c.moduleId === mod.id),
     bolts,
-    baseId: mod.base
+    baseId: mod.base,
+    preserveBaseHole: !!(mod.mount && mod.mount.face)
   };
 }
 
@@ -865,10 +884,10 @@ export function moduleFrameNodes(entry, frameNodes) {
   const baseId = entry && entry.baseId;
   const bolts = entry && Array.isArray(entry.bolts) ? entry.bolts : [];
   return [
-    ...nodes.filter(n => !(baseId && n.id === baseId)),
+    ...nodes.filter(n => !(baseId && n.id === baseId && !entry.preserveBaseHole)),
     ...bolts.map(b => ({ id: b.id, x: b.x, y: b.y, holeDiameterMm: b.diameter, holeLayer: 'MOUNT_BOLT' }))
   ];
 }
 
 // G1：已安裝模組固定板（<id>-frame）在目前位姿的幾何，給 3D／2D 畫（實作在 module-plates.js）。
-export { mountedFramePlates } from './module-plates.js';
+export { mountedFramePlates } from './module-plates.js?v=face-mount-20261007';
