@@ -1,6 +1,6 @@
 import { createModuleEditor } from '../js/blocks/module-editor.js?v=20261007_import_spacing';
 import { S } from '../js/blocks/state.js';
-import { createBench } from '../js/blocks/bench-ui.js?v=20261007_m5b';
+import { createBench } from '../js/blocks/bench-ui.js?v=20261007_m6';
 import { realMountExamples } from '../js/blocks/face-mate-examples.js';
 import { compileAssembly, solveAssembly } from '../js/blocks/assembly.js?v=face-mount-20261007';
 import { toSnapshot, normalizeSnapshot } from '../js/blocks/schema.js?v=face-mount-20261007';

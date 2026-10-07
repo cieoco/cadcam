@@ -13,7 +13,7 @@
 import { S, motorAnglesNow } from './state.js';
 import { openFaceWizard } from './face-wizard-ui.js?v=20261007_mobile';
 import * as Bench from './bench.js?v=20261007_m5a';
-import { createMateWizard } from './mate-wizard-ui.js?v=20261007_m5b';
+import { createMateWizard } from './mate-wizard-ui.js?v=20261007_m6';
 import { moduleFrameEdges } from './assembly.js?v=20261007_m5a';
 import * as Settings from './settings.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
@@ -21,6 +21,7 @@ import { resolveSpacers, findInterference, interferenceTimeline, hitPartNames } 
 import { setMountFlip } from './module-ops.js?v=20261007_m5a';
 import { mateAdjust, mateDetach } from './mate-connect.js';   // M5a：滑動不能擠到鄰居；拆下時帶著底下整串
 import { pointKeysFor } from './part-types.js';
+import { hitLabels, relabelText } from './part-labels.js';   // M6：干涉訊息用「哪個機構的什麼」，不露零件內部名稱
 import { applyMatrix4, moduleFrameZ } from '../blocks3d/orthogonal-3d.js?v=20261007_m5a';
 
 const SNAP_PX = 40;          // 拖曳吸附半徑（螢幕 px）
@@ -74,6 +75,7 @@ export function createBench(deps) {
   const defaultJointKind = () => (S.fabrication?.joint || FABRICATION_DEFAULTS.joint).defaultKind;   // F1：作品的預設直角接合件
   const hasChildren = mod => S.modules.some(m => m && m.mount && m.mount.to && m.mount.to.module === mod.id);
   const displayName = id => labels.get(id) || id;
+  const labelOpts = { displayName: id => labels.get(id) || null };   // 同名機構用編號後的名字
 
   function say(msg, { toast = true } = {}) {
     st.msg = msg;
@@ -106,7 +108,7 @@ export function createBench(deps) {
 
   // ---------------------------------------------------------------- B6：即時干涉與全行程測試
   // live：目前姿勢的檢查結果；plan：疊層＋隔圈的快取（只在作品內容變了才重算）；tl：全行程時間軸結果。
-  const live = { plan: null, planKey: '', args: null, sig: '', findings: [], hits: [], keys: [], at: 0, timer: null, checks: 0, planBuilds: 0, ms: 0, ready: false };
+  const live = { plan: null, planKey: '', args: null, sig: '', findings: [], hits: [], labels: [], msg: '', keys: [], at: 0, timer: null, checks: 0, planBuilds: 0, ms: 0, ready: false };
   const tl = { result: null, ranges: null, key: '', summary: [], ms: 0 };
   let liveBox = null;
 
@@ -188,8 +190,8 @@ export function createBench(deps) {
     }
     box.dataset.state = 'hit';
     while (box.firstChild) box.removeChild(box.firstChild);
-    box.appendChild(el('div', 'bench-live-main', `✖ 撞到：${nameList(live.hits)}（共 ${live.findings.length} 項）`));
-    box.appendChild(el('div', 'bench-live-msg', live.findings[0].message));
+    box.appendChild(el('div', 'bench-live-main', `✖ 撞到：${nameList(live.labels)}（共 ${live.findings.length} 項）`));
+    box.appendChild(el('div', 'bench-live-msg', live.msg));
   }
 
   function applyHighlight() {
@@ -215,6 +217,7 @@ export function createBench(deps) {
     live.sig = sig; live.at = performance.now(); live.checks++; live.ready = true;
     live.findings = findings;
     live.hits = hitPartNames(findings);
+    live.labels = hitLabels(live.hits, S.comps, S.modules, labelOpts); live.msg = findings.length ? relabelText(findings[0].message, findings[0].parts, S.comps, S.modules, labelOpts) : '';
     live.keys = highlightKeys(findings, st0.plan);
     applyHighlight();
     renderLiveStatus();
@@ -229,7 +232,7 @@ export function createBench(deps) {
   }
   function resetLive() {
     if (live.timer) { clearTimeout(live.timer); live.timer = null; }
-    live.sig = ''; live.findings = []; live.hits = []; live.keys = []; live.ready = false;
+    live.sig = ''; live.findings = []; live.hits = []; live.labels = []; live.msg = ''; live.keys = []; live.ready = false;
     applyHighlight();
     renderLiveStatus();
   }
@@ -270,8 +273,9 @@ export function createBench(deps) {
     tl.summary = [];
     Object.keys(result.motors).forEach(id => {
       runsOf(result.motors[id]).forEach(r => {
-        tl.summary.push({ motor: id, from: r.from, to: r.to, names: r.names,
-          text: `${motorLabel(id)} 在 ${r.from === r.to ? fmtDeg(r.from) : `${fmtDeg(r.from)}～${fmtDeg(r.to)}`} 會撞到 ${nameList(r.names, 5)}` });
+        const names = hitLabels(r.names, S.comps, S.modules, labelOpts);
+        tl.summary.push({ motor: id, from: r.from, to: r.to, names,
+          text: `${motorLabel(id)} 在 ${r.from === r.to ? fmtDeg(r.from) : `${fmtDeg(r.from)}～${fmtDeg(r.to)}`} 會撞到 ${nameList(names, 5)}` });
       });
     });
     renderTimeline();
@@ -1183,7 +1187,7 @@ export function createBench(deps) {
   wiz = createMateWizard({
     el, bigBtn, st, deps, modOf, displayName, statusOf, say, select, syncUI, drawMarkers, computeMarkers, viewer, listEl, panelEl, liveBox, liveCheck,
     liveCount: () => live.ready ? live.findings.length : 0,
-    liveInfo: () => ({ ready: live.ready && !!live.plan && (live.plan.parts || []).length > 0, n: live.findings.length, hits: live.hits }), motorState, adjust, adjustState, editModule, ghostFor,
+    liveInfo: () => ({ ready: live.ready && !!live.plan && (live.plan.parts || []).length > 0, n: live.findings.length, hits: live.hits, labels: live.labels }), motorState, adjust, adjustState, editModule, ghostFor,
     clearGhost: () => viewer()?.setPreviewGhost(null), setGhost: spec => viewer()?.setPreviewGhost(spec), isBench,
     cancelAdvancedPreview: () => cancelPreview({ silent: true }),
     // 接上：一筆復原。comps／modules 是已整理好的候選，換成真的作品後照 adjust 的流程重建。

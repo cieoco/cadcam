@@ -444,7 +444,7 @@
     #mateTree { scrollbar-width: thin; background: linear-gradient(#fff 30%, rgba(255,255,255,0)), linear-gradient(rgba(255,255,255,0), #fff 70%) 0 100%, radial-gradient(farthest-side at 50% 0, rgba(44,62,80,.28), rgba(0,0,0,0)), radial-gradient(farthest-side at 50% 100%, rgba(44,62,80,.28), rgba(0,0,0,0)) 0 100%; background-repeat: no-repeat; background-color: #fff; background-size: 100% 36px, 100% 36px, 100% 10px, 100% 10px; background-attachment: local, local, scroll, scroll; }
     .mate-live { padding: 6px 10px; border-radius: 10px; font-size: 13px; font-weight: 700; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f1f5f9; color: #60717d; flex: 0 0 auto; }
     .mate-live[data-state="ok"] { background: #e8f7ee; color: #117a45; }
-    .mate-live[data-state="hit"] { background: #fdecea; color: #b42318; }
+    .mate-live[data-state="hit"] { white-space: normal; background: #fdecea; color: #b42318; }
     body.mate-wizard .bench-msg:empty { display: none; }
     body.mate-wizard .bench-panel > * { flex-shrink: 0; }   /* 面板內容多時改成捲動，不要互相疊在一起 */
     .mate-nope { padding: 2px 0; }
@@ -1250,10 +1250,11 @@
       "./js/blocks/panels.js": "./js/blocks/panels.js?v=20260930_p1",
       "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=20261003_h1",
       "./js/blocks/motor-tools.js": "./js/blocks/motor-tools.js?v=20261001_l1",
-      "./js/blocks/bench-ui.js": "./js/blocks/bench-ui.js?v=20261007_m5b",
+      "./js/blocks/bench-ui.js": "./js/blocks/bench-ui.js?v=20261007_m6",
       "./js/blocks/bench.js": "./js/blocks/bench.js?v=20261007_m5a",
       "./js/blocks/mate-connect.js": "./js/blocks/mate-connect.js?v=20261007_m5b",
-      "./js/blocks/mate-wizard-ui.js": "./js/blocks/mate-wizard-ui.js?v=20261007_m5b",
+      "./js/blocks/mate-wizard-ui.js": "./js/blocks/mate-wizard-ui.js?v=20261007_m6",
+      "./js/blocks/part-labels.js": "./js/blocks/part-labels.js?v=20261007_m6",
       "./js/blocks/module-ops.js": "./js/blocks/module-ops.js?v=20261002_e1",
       "./js/blocks/module-schema.js": "./js/blocks/module-schema.js?v=20261002_e1",
       "./js/blocks/module-drag.js": "./js/blocks/module-drag.js?v=20260930_d9",
@@ -1261,7 +1262,7 @@
       "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261003_g2"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20261007_m5b"></script>
-<script type="module" src="js/version-info.js?v=20261007_5"></script>
+  <script type="module" src="js/blocks/app.js?v=20261007_m6"></script>
+<script type="module" src="js/version-info.js?v=20261007_6"></script>
 </body>
 </html>

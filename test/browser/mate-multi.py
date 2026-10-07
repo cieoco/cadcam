@@ -59,6 +59,7 @@ with sync_playwright() as p:
     shot('three')
     # b. 四連桿接到滑台
     tap(f".mate-tree-row[data-module='{L['id']}']"); d1 = dbg()
+    ok('b0', '選未安裝的機構時，干涉狀態講的是目前這台機器，不出現「還沒接到底座」', '還沒接到底座' not in txt('#mateLive'))
     car = [t for t in d1['targets'] if '滑台' in t['name'] and t['ok']]
     ok('b1', '選四連桿：可接到齒條升降的滑台', d1['selected'] == L['id'] and d1['state'] == 'pick' and len(car) == 1)
     tap(f".mate-target[data-mate='{car[0]['mateId']}']"); tap('#mateCommit'); d2 = dbg()
@@ -71,6 +72,11 @@ with sync_playwright() as p:
     ok('c2', '三個都接好：深度 0／1／2、沒有未安裝、提醒消失', [role(d4, i)['depth'] for i in (A['id'], L['id'], G['id'])] == [0, 1, 2] and d4['spare'] == [] and not vis('#mateSpareNote'))
     ok('c3', '三列仍然都看得到、按鈕不重疊', all(pg.evaluate(INBOX)) and buttons_ok())
     shot('connected')
+    pg.evaluate("document.querySelector('#benchTlBtn').click()"); pg.wait_for_timeout(6000)
+    tl = txt('#benchPanel')
+    ok('c4', '全行程測試的結果用看得懂的零件名稱（沒有 Mod2-frame、frame、LiftPinion_1 這類內部名稱）', ('撞到' not in tl) or not pg.evaluate("t=>/[A-Za-z]+_\\d+|[A-Za-z0-9]+-frame|\\bframe\\b/.test(t)", tl))
+    ok('c5', '這個組合在齒條行程低處會撞（MG995 機身）：結果有講是哪個機構的什麼', '撞到' in tl and '的' in tl.split('撞到', 1)[1][:40])
+    shot('timeline')
     # d. 拆中間
     tap(f".mate-tree-row[data-module='{L['id']}']"); tap('#mateDetach'); d5 = dbg(); s5 = st()
     ok('d1', '拆下四連桿：它和夾爪整串變未安裝，夾爪仍縮排在四連桿底下；一筆復原', role(d5, L['id'])['role'] == 'spare' and role(d5, L['id'])['depth'] == 0 and role(d5, G['id'])['role'] == 'spare' and role(d5, G['id'])['depth'] == 1 and role(d5, G['id'])['parent'] == L['id'] and s5['undo'] == s4['undo'] + 1 and d5['root'] == A['id'])

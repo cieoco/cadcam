@@ -291,22 +291,15 @@ export function createMateWizard(h) {
     renderTree(); renderPanel(force);
     if (force) fit();
   }
-  // 一行干涉狀態：✔ 沒有干涉／✖ 撞到 n 處＋撞到的機構名稱（只用機構名，不露零件 id）。
+  // 一行干涉狀態：✔ 沒有干涉／✖ 撞到 n 處＋撞到的是哪個機構的什麼（名字由 bench 換好，不露零件 id）。
+  // 「還沒接到底座」只在預覽接到未安裝的宿主時說；其他時候講目前這台機器的狀況。
   function syncLive() {
-    const i = h.liveInfo(), comps = pv ? pv.cand.comps : S.comps, cur = pv ? pv.childId : st.selected;
+    const i = h.liveInfo();
     let state = 'none', text = '干涉檢查中…';
-    if (cur && assemblyRoles(pv ? pv.cand.modules : S.modules).spare.includes(cur)) text = '還沒接到底座，要接到底座上才會檢查干涉';   // 未安裝的串不進機器，也不進干涉檢查
+    if (pv && assemblyRoles(pv.cand.modules).spare.includes(pv.childId)) text = '還沒接到底座，要接到底座上才會檢查干涉';   // 未安裝的串不進機器，也不進干涉檢查
     else if (i.ready && !i.n) { state = 'ok'; text = '✔ 目前沒有干涉'; }
-    else if (i.ready) {
-      const names = new Set();
-      i.hits.forEach(n => {
-        const f = /^(.+)-frame$/.exec(n), c = f ? null : comps.find(x => x && (x.id === n || n.includes(x.id)));
-        const m = h.modOf(f ? f[1] : c && c.moduleId);
-        if (m) names.add(h.displayName(m.id));
-      });
-      state = 'hit'; text = `✖ 撞到 ${i.n} 處${names.size ? '：' + [...names].join('、') : ''}`;
-    }
-    liveLine.dataset.state = state; liveLine.textContent = text;
+    else if (i.ready) { state = 'hit'; text = `✖ 撞到 ${i.n} 處${i.labels.length ? '：' + i.labels.join('、') : ''}`; }
+    liveLine.dataset.state = state; liveLine.textContent = text; liveLine.title = state === 'hit' ? text : '';
   }
 
   // ---------------------------------------------------------------- 3D 鏡頭：框住相關的機構（保留視角，只調距離與目標）
