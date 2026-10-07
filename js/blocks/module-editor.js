@@ -14,7 +14,7 @@ import {
   moduleToTemplate, normalizeTemplate, instantiateTemplate, insertOffset, translateModule,
   compositeToTemplate, instantiateComposite, translateComposite, COMPOSITE_MAX_MODULES,
   BUILTIN_MODULES, builtinTemplate, parseLibrary, serializeLibrary
-} from './module-ops.js?v=face-mount-20261007';
+} from './module-ops.js?v=20261007_import_spacing';
 
 // 操作失敗時的提示文字（module-ops 回傳的 reason code → 繁中訊息）。
 const REASON_MESSAGES = {
@@ -212,7 +212,7 @@ export function createModuleEditor(deps) {
       existingTokens,
       place: viewCenter()
     });
-    const off = insertOffset(compsInPlane(S.comps, S.modules, null), compsInPlane(r.comps, r.modules, null), 30, { ...S.topo.params, ...r.params });
+    const off = insertOffset(compsInPlane(S.comps, S.modules, null), compsInPlane(r.comps, r.modules, null), 80, { ...S.topo.params, ...r.params }, { sideBySide: true });
     if (off.dx !== 0 || off.dy !== 0) { const moved = translateComposite(r.comps, r.modules, off.dx, off.dy); r.comps = moved.comps; r.modules = moved.modules; }
     pushUndo();
     S.comps = [...S.comps, ...r.comps];
@@ -237,7 +237,7 @@ export function createModuleEditor(deps) {
       place: viewCenter()
     };
     const r = instantiateTemplate(template, ctx);
-    const off = insertOffset(S.comps, r.comps, 30, { ...S.topo.params, ...r.params });
+    const off = insertOffset(compsInPlane(S.comps, S.modules, null), r.comps, 80, { ...S.topo.params, ...r.params }, { sideBySide: true });
     if (off.dx !== 0 || off.dy !== 0) r.comps = translateModule(r.comps, r.module.id, off.dx, off.dy);
     pushUndo();
     S.comps = [...S.comps, ...r.comps];

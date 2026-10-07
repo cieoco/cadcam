@@ -14,7 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261007_1';
+import { APP_VERSION } from '../version.js?v=20261007_2';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
@@ -58,7 +58,7 @@ import { createSliderEditor } from './slider-editor.js?v=20261005_sliderui';
 import { createMotorTools } from './motor-tools.js';
 import { createPlateEditor } from './plate-editor.js';
 import { createNodeEditor } from './node-editor.js';
-import { createModuleEditor } from './module-editor.js?v=face-mount-20261007';
+import { createModuleEditor } from './module-editor.js?v=20261007_import_spacing';
 import { createModuleDrag } from './module-drag.js';
 import { createBench } from './bench-ui.js?v=face-wizard-20261007_mobile';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
 import { workRangeFromTrace, clampRangeFromTraces, currentPointDistance } from './measurement.js';
@@ -1862,7 +1862,7 @@ async function toggle3D() {
     document.getElementById('strokeEditor').style.display = 'none';
     overlay.style.display = 'block';
     if (!viewer3D) {
-      const { createViewer } = await import('../blocks3d/viewer.js?v=faces-20261005');
+      const { createViewer } = await import('../blocks3d/viewer.js?v=20261007_import_spacing');
       viewer3D = createViewer(overlay);
     }
     refresh3DView();

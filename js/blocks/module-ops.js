@@ -365,7 +365,7 @@ export function translateModule(comps, moduleId, dx, dy) {
 
 // P2：插入新模組時避免與既有零件範圍重疊——回傳把新範圍挪到既有範圍外（相距 margin）所需的最小位移 { dx, dy }。
 // 範圍含接點，另納入齒輪齒頂圓與齒條外框（尺寸取自 params，規則同 app.js currentBounds／drawRack）。
-export function insertOffset(existingComps, newComps, margin, params) {
+export function insertOffset(existingComps, newComps, margin, params, { sideBySide = false } = {}) {
   const par = params || {};
   const boxOf = comps => {
     const b = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
@@ -397,6 +397,8 @@ export function insertOffset(existingComps, newComps, margin, params) {
   };
   const E = boxOf(existingComps), N = boxOf(newComps);
   if (!Number.isFinite(E.minX) || !Number.isFinite(N.minX)) return { dx: 0, dy: 0 };
+  // 匯入獨立套件時左右並列；避免最短避讓選上下，從 3D 看起來像已接合。
+  if (sideBySide) return { dx: E.maxX + margin - N.minX, dy: (E.minY + E.maxY - N.minY - N.maxY) / 2 };
   const dist = Math.max(N.minX - E.maxX, E.minX - N.maxX, N.minY - E.maxY, E.minY - N.maxY);
   if (dist >= margin) return { dx: 0, dy: 0 };
   const candidates = [

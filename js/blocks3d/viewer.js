@@ -141,11 +141,6 @@ function triPlateShape(corners, r, holeR) {
 }
 
 function jawPlateShape(corners, r, holeR, turnSign = 0) {
-  const addHole = (shape, p) => {
-    const h = new THREE.Path();
-    h.absarc(p.x, p.y, holeR, 0, Math.PI * 2, true);
-    shape.holes.push(h);
-  };
   const [pivot, drive, tip] = corners;
   const dx = tip.x - pivot.x;
   const dy = tip.y - pivot.y;
@@ -162,14 +157,10 @@ function jawPlateShape(corners, r, holeR, turnSign = 0) {
   const ey = ux * sin + uy * cos;
   const extend = Math.max(38, Math.min(84, len * 0.58));
   const end = { x: tip.x + ex * extend, y: tip.y + ey * extend };
-  const a = stickShape(drive, pivot, r);
-  addHole(a, drive);
-  addHole(a, pivot);
-  const b = stickShape(pivot, tip, r);
-  addHole(b, pivot);
-  addHole(b, tip);
-  const c = stickShape(tip, end, r);
-  addHole(c, tip);
+  const a = stadiumShape(drive, pivot, r, holeR);
+  const b = stadiumShape(pivot, tip, r, holeR);
+  const c = stadiumShape(tip, end, r, holeR);
+  c.holes.pop(); // 夾爪末端不鑽孔。
   return [a, b, c];
 }
 

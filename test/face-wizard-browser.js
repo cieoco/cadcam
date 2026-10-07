@@ -1,3 +1,4 @@
+import { createModuleEditor } from '../js/blocks/module-editor.js?v=20261007_import_spacing';
 import { S } from '../js/blocks/state.js';
 import { createBench } from '../js/blocks/bench-ui.js?v=face-wizard-20261007_mobile';
 import { realMountExamples } from '../js/blocks/face-mate-examples.js';
@@ -35,7 +36,7 @@ function render3d(points) {
 }
 document.getElementById('preview3d').onclick = async () => {
   document.getElementById('view3d').hidden = false;
-  if (!viewer) { const { createViewer } = await import('../js/blocks3d/viewer.js'); viewer = createViewer(document.getElementById('view3d')); }
+  if (!viewer) { const { createViewer } = await import('../js/blocks3d/viewer.js?v=20261007_import_spacing'); viewer = createViewer(document.getElementById('view3d')); }
   draw(); viewer.resize(); viewer.tiltView();
 };
 const bench = createBench({ pushUndo: () => S.undoStack.push(snapshot()), rebuild: draw, draw, transient: text => result.textContent += '\n' + text,
@@ -54,3 +55,13 @@ document.getElementById('rack').onclick = () => load(1);
 document.getElementById('undo').onclick = () => { if (S.undoStack.length) restore(S.undoStack.pop()); bench.syncUI(true); draw(); };
 document.getElementById('roundtrip').onclick = () => { const before = snapshot(); restore(JSON.stringify(decodeShareString(encodeSnapshot(JSON.parse(before))))); bench.syncUI(true); draw(); result.textContent += '\n分享往返：' + (before === snapshot() ? 'PASS' : 'FAIL'); };
 load(0);
+
+// 實際使用模組庫控制器，驗收匯入不自動接合且左右並列。
+document.getElementById('imports').onclick = () => {
+  S.comps = []; S.modules = []; S.topo.params = {}; S.counter = 0; S.undoStack = [];
+  const quiet = () => {};
+  const editor = createModuleEditor({ pushUndo: () => S.undoStack.push(snapshot()), rebuild: quiet, draw: quiet, transient: quiet,
+    downloadJson: quiet, viewCenter: () => ({ x: 0, y: 0 }), loadLibraryText: () => null, saveLibraryText: quiet });
+  editor.insertBuiltin('rack-lift'); editor.insertBuiltin('gear-gripper');
+  bench.syncUI(true); bench.select(S.modules[0].id); draw();
+};

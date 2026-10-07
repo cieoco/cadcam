@@ -107,6 +107,8 @@ const bar = (id, x1, y1, x2, y2) => ({ type: 'bar', id, p1: { id: id + 'a', x: x
   const liftBox = boxVis(S.comps.filter(c => c.moduleId === lift.id), P);
   const gripBox = boxVis(S.comps.filter(c => c.moduleId === grip.id), P);
   check('第二個模組：畫出來的範圍（含齒輪、齒條）不與第一個重疊（至少相距 margin 30）', gap(liftBox, gripBox) >= 30 - 1e-9);
+  check('匯入左右並列：安裝端在右側並留出 80 mm', gripBox.minX - liftBox.maxX >= 80 - 1e-9);
+  check('兩套件匯入後沒有自動接合', S.modules.every(m => m.mount === null));
   const gb = S.comps.flatMap(c => KEYS.map(k => c[k])).find(p => p && p.id === grip.base);
   check('兩個底座不在同一點', gb && Math.hypot(gb.x - liftBase.x, gb.y - liftBase.y) > 30);
   check('插入仍只記一筆 undo', undo === 2);
