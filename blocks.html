@@ -646,7 +646,10 @@
   </style>
   <link rel="stylesheet" href="js/blocks/workspace-mobile.css?v=20261006_twoline">
   <script type="importmap">
-    { "imports": { "three": "./js/vendor/three.module.js" } }
+    { "imports": {
+      "./js/blocks/face-mate.js": "./js/blocks/face-mate.js?v=20261007_angle",
+      "./js/blocks/face-placement.js": "./js/blocks/face-placement.js?v=20261007_angle",
+      "./js/blocks/face-mount-contract.js": "./js/blocks/face-mount-contract.js?v=20261007_angle", "three": "./js/vendor/three.module.js" } }
   </script>
 </head>
 <body>
@@ -1210,6 +1213,9 @@
   <!-- 同一份共用模組只載入一個版本；避免重載時混用舊幾何或舊存檔 schema。 -->
   <script type="importmap">
     {"imports": {
+      "./js/blocks/face-mate.js": "./js/blocks/face-mate.js?v=20261007_angle",
+      "./js/blocks/face-placement.js": "./js/blocks/face-placement.js?v=20261007_angle",
+      "./js/blocks/face-mount-contract.js": "./js/blocks/face-mount-contract.js?v=20261007_angle",
       "./js/multilink/solver.js": "./js/multilink/solver.js?v=20261006_1",
       "./js/blocks/plate-geometry.js": "./js/blocks/plate-geometry.js?v=20260925_stock1",
       "./js/blocks/plate-editor.js": "./js/blocks/plate-editor.js?v=20260925_members2",
@@ -1263,7 +1269,7 @@
       "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261003_g2"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20261007_facecolor"></script>
-<script type="module" src="js/version-info.js?v=20261007_facecolor"></script>
+  <script type="module" src="js/blocks/app.js?v=20261007_angle"></script>
+<script type="module" src="js/version-info.js?v=20261007_angle"></script>
 </body>
 </html>

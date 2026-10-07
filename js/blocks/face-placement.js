@@ -5,6 +5,7 @@ export function buildFacePlacement({ host, child, selection } = {}) {
   if (!host?.surface || !child?.surface || !selection) return { ok: false, reason: '缺少接合板或選面資料' };
   const keys = ['hostFace', 'childFace', 'alignU', 'alignV', 'offsetU', 'offsetV', 'gap', 'quarterTurns'];
   const chosen = Object.fromEntries(keys.map(k => [k, selection[k]]));
+  if (selection.rotationDeg !== undefined) chosen.rotationDeg = selection.rotationDeg;
   const mate = solveFaceMate({ ...chosen, hostBox: host.box, childBox: child.box });
   if (!mate.ok) return mate;
   const center = box => Object.fromEntries(['x', 'y', 'z'].map(k => [k, (box.min[k] + box.max[k]) / 2]));

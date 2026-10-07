@@ -76,7 +76,10 @@ for (const [field, label] of [['offsetU', '左右偏置'], ['offsetV', '上下�
   minus.setAttribute('aria-label', `${label}減少 5 mm`); plus.setAttribute('aria-label', `${label}增加 5 mm`);
   row.append(lab, minus, input, plus); $('adjustments').appendChild(row);
 }
-$('turn').addEventListener('click', () => update('quarterTurns', (draft.quarterTurns + 1) % 4));
+const angle = () => draft.rotationDeg ?? draft.quarterTurns * 90;
+$('turn').addEventListener('click', () => update('rotationDeg', (angle() + 90) % 360));
+$('turnMinus').addEventListener('click', () => update('rotationDeg', (angle() + 270) % 360));
+$('angleChip').addEventListener('click', () => openDimension('rotationDeg', angle()));
 $('mateMode').addEventListener('click', () => {
   edgeMode = !edgeMode;
   $('mateMode').textContent = edgeMode ? '靠邊' : '移動';
@@ -105,8 +108,8 @@ const dimensionText = {
 function openDimension(field, value, alignment = null) {
   dimensionField = field;
   dimensionAlignment = alignment;
-  $('dimensionTitle').textContent = field === 'offsetU' ? '設定左右偏移' : field === 'offsetV' ? '設定上下偏移' : field === 'gap' ? '設定面間距' : '設定移動步距';
-  $('dimensionLabel').textContent = `${$('dimensionTitle').textContent}（mm）`;
+  $('dimensionTitle').textContent = field === 'rotationDeg' ? '設定接合角度' : field === 'offsetU' ? '設定左右偏移' : field === 'offsetV' ? '設定上下偏移' : field === 'gap' ? '設定面間距' : '設定移動步距';
+  $('dimensionLabel').textContent = `${$('dimensionTitle').textContent}（${field === 'rotationDeg' ? '°' : 'mm'}）`;
   const input = $('dimensionValue');
   input.value = value;
   input.min = field === 'moveStep' || field === 'gap' ? '0' : '';
@@ -128,7 +131,7 @@ $('dimensionForm').addEventListener('submit', e => {
     input.setAttribute('aria-invalid', 'true'); $('dimensionError').hidden = false; input.focus(); return;
   }
   if (dimensionField === 'moveStep') moveStep = value;
-  else draft[dimensionField] = value;
+  else draft[dimensionField] = dimensionField === 'rotationDeg' ? ((value % 360) + 360) % 360 : value;
   if (dimensionAlignment) draft[dimensionAlignment[0]] = dimensionAlignment[1];
   $('dimensionDialog').close('confirm'); render();
 });
@@ -265,51 +268,16 @@ function positionMateOverlay(face, screen) {
     const client = q.matrixTransform(matrix);
     return { x: client.x - wrapRect.left, y: client.y - wrapRect.top };
   };
-  const center = point(screen(face.center));
-  const axis = basis => {
-    const origin = screen(face.center), end = screen(add(face.center, basis));
-    const a = point(origin), b = point(end), dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy);
-    return length < 0.01 ? null : { x: dx / length, y: dy / length };
-  };
-  const u = axis(face.u) || { x: 1, y: 0 };
-  let v = axis(face.v);
-  if (!v || Math.abs(u.x * v.y - u.y * v.x) < .45) {
-    const perpendicular = { x: -u.y, y: u.x };
-    if (v && perpendicular.x * v.x + perpendicular.y * v.y < 0) { perpendicular.x *= -1; perpendicular.y *= -1; }
-    v = perpendicular;
+  // Project the face axes onto the current view, but keep the controls off the model.
+  for (const [key, basis, sign] of [['uPlus', face.u, 1], ['uMinus', face.u, -1], ['vPlus', face.v, 1], ['vMinus', face.v, -1]]) {
+    const a = point(screen(face.center)), b = point(screen(add(face.center, basis)));
+    const direction = Math.atan2((b.y - a.y) * sign, (b.x - a.x) * sign) * 180 / Math.PI + 90;
+    const button = overlay.querySelector(`[data-arrow="${key}"]`);
+    const icon = document.createElement('span'); icon.textContent = '↑'; icon.style.transform = `rotate(${direction}deg)`;
+    button.replaceChildren(icon);
   }
-  const specs = [
-    ['uPlus', u], ['uMinus', { x: -u.x, y: -u.y }],
-    ['vPlus', v], ['vMinus', { x: -v.x, y: -v.y }]
-  ];
-  const centerLeft = Math.max(4, Math.min(wrapRect.width - 48, center.x - 22));
-  const centerTop = Math.max(4, Math.min(wrapRect.height - 54, center.y - 22));
-  const placed = [], centerBox = { left: centerLeft, top: centerTop, right: centerLeft + 44, bottom: centerTop + 44 };
-  const collides = box => [centerBox, ...placed].some(other => box.left < other.right + 4 && box.right + 4 > other.left && box.top < other.bottom + 4 && box.bottom + 4 > other.top);
-  for (const [key, dir] of specs) {
-    const b = overlay.querySelector(`[data-arrow="${key}"]`);
-    let chosen = null;
-    for (const radius of [62, 78, 94, 110]) {
-      const px = center.x + dir.x * radius, py = center.y + dir.y * radius;
-      const left = Math.max(4, Math.min(wrapRect.width - 52, px - 24));
-      const top = Math.max(4, Math.min(wrapRect.height - 52, py - 24));
-      const candidate = { left, top, right: left + 48, bottom: top + 48 };
-      if (!collides(candidate)) { chosen = candidate; break; }
-    }
-    if (!chosen) {
-      const fallback = { uPlus: [28, wrapRect.height / 2], uMinus: [wrapRect.width - 28, wrapRect.height / 2], vPlus: [wrapRect.width / 2, 74], vMinus: [wrapRect.width / 2, wrapRect.height - 74] }[key];
-      const left = Math.max(4, Math.min(wrapRect.width - 52, fallback[0] - 24));
-      const top = Math.max(4, Math.min(wrapRect.height - 52, fallback[1] - 24));
-      chosen = { left, top, right: left + 48, bottom: top + 48 };
-    }
-    placed.push(chosen);
-    const { left, top } = chosen;
-    b.style.left = `${left}px`; b.style.top = `${top}px`;
-    b.style.transform = `rotate(${Math.atan2(dir.y, dir.x) * 180 / Math.PI + 90}deg)`;
-  }
-  $('mateCenter').style.left = `${centerLeft}px`;
-  $('mateCenter').style.top = `${centerTop}px`;
 }
+
 function render() {
   document.body.dataset.ui = mode;
   document.body.dataset.step = step;
@@ -324,7 +292,8 @@ function render() {
   }
   $('align').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', Number(b.dataset.u) === draft.alignU && Number(b.dataset.v) === draft.alignV));
   ['offsetU', 'offsetV', 'gap'].forEach(field => { $(field).value = draft[field]; });
-  $('turn').textContent = `轉 90° · 目前 ${draft.quarterTurns * 90}°`;
+  $('angleChip').textContent = `接合角度 ${Number(angle().toFixed(2))}°`;
+  $('rotationActions').hidden = mode === 'wizard' && step !== 3;
   $('back').hidden = mode === 'work' || configured; $('back').disabled = step === 0;
   $('back').textContent = configured && step === 3 ? '選面輔助' : '上一步';
   $('next').textContent = mode === 'work' || step === 3 ? (integrated ? '接上' : '確認擺放') : '下一步';
@@ -356,7 +325,7 @@ if (integrated) {
     if (configured && hosts.length === 1) step = 3;
     if (configured && !document.getElementById('optionalView')) {
       const view = document.querySelector('.view-actions'), more = document.createElement('details'), label = document.createElement('summary');
-      more.id = 'optionalView'; label.textContent = '轉向與視角'; label.style.cssText = 'min-height:44px;display:flex;align-items:center;cursor:pointer;';
+      more.id = 'optionalView'; label.textContent = '觀看角度'; label.style.cssText = 'min-height:44px;display:flex;align-items:center;cursor:pointer;';
       view.before(more); more.append(label, view);
     }
     document.querySelector('h1').textContent = '接合預覽';

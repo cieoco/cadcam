@@ -72,6 +72,13 @@
     dialog input { margin: 10px 0 14px; font-size: 20px; }
     .dialog-actions { display: flex; gap: 8px; }
     .dialog-actions button { flex: 1; }
+    /* Controls stay below the drawing, so every part remains visible on phones. */
+    .mate-overlay { position: static; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; padding: 8px; }
+    .mate-arrow, .mate-center { position: static; width: 100%; height: 46px; min-height: 46px; border-radius: 10px; box-shadow: none; }
+    .mate-tools { position: static; grid-column: 1 / -1; display: flex; gap: 5px; }
+    .mate-tools button { flex: 1; box-shadow: none; }
+    .rotation-actions { display: grid; grid-template-columns: 64px 1fr 64px; gap: 6px; padding: 0 8px 8px; }
+    .rotation-actions button { padding: 8px 4px; white-space: nowrap; }
     [hidden] { display: none !important; }
     @media (max-width: 760px) {
       header { padding: 10px 12px; } h1 { font-size: 15px; } .tag { font-size: 10px; }
@@ -99,6 +106,7 @@
       <div class="stage-head"><b id="stageTitle">選擇兩個機構</b><div class="key"><span class="host-key">● 承接端</span><span class="child-key">● 安裝端</span></div></div>
       <div class="scene-wrap" id="sceneWrap">
         <svg id="scene" viewBox="0 0 600 390" role="group" aria-label="兩機構六面體擺放預覽"></svg>
+      </div>
         <div class="mate-overlay" id="mateOverlay" role="group" aria-label="調整安裝位置" hidden>
           <button class="mate-arrow" data-arrow="uPlus" aria-label="向左右正方向移動；面內 U+">↑</button>
           <button class="mate-arrow" data-arrow="uMinus" aria-label="向左右負方向移動；面內 U−">↑</button>
@@ -113,10 +121,10 @@
             <button id="mateStepChip">步距 5</button>
           </div>
         </div>
-      </div>
+      <div class="rotation-actions" id="rotationActions" role="group" aria-label="接合角度"><button id="turnMinus" aria-label="接合角度減少 90 度">−90°</button><button id="angleChip">接合角度 0°</button><button id="turn" aria-label="接合角度增加 90 度">＋90°</button></div>
       <div class="view-actions" role="group" aria-label="旋轉觀看角度">
         <button id="viewLeft" aria-label="向左旋轉視角 90 度">↶</button><button id="viewRight" aria-label="向右旋轉視角 90 度">↷</button>
-        <button id="viewFlip">上下翻轉</button><button id="viewReset">重設視角</button><button id="turn" class="turn">轉 90° · 目前 0°</button>
+        <button id="viewFlip">上下翻轉</button><button id="viewReset">重設視角</button>
       </div>
       <div class="summary" id="summary" aria-live="polite"></div>
       <div class="note">藍色：承接端外框。綠色：安裝端外框。亮色標示所選面；被遮住的面以虛線標示。外框示意不代表實際固定孔。</div>
@@ -154,7 +162,11 @@
       <div class="dialog-actions"><button type="button" id="dimensionCancel">取消</button><button type="submit" class="primary">確定</button></div>
     </form>
   </dialog>
-  <script type="module" src="./js/blocks/face-mate-prototype.js?v=20261007_singleface"></script>
-  <script type="module" src="./js/version-info.js?v=20261007_facecolor"></script>
+  <script type="importmap">{"imports": {
+      "./js/blocks/face-mate.js": "./js/blocks/face-mate.js?v=20261007_angle",
+      "./js/blocks/face-placement.js": "./js/blocks/face-placement.js?v=20261007_angle",
+      "./js/blocks/face-mount-contract.js": "./js/blocks/face-mount-contract.js?v=20261007_angle"}}</script>
+  <script type="module" src="./js/blocks/face-mate-prototype.js?v=20261007_angle"></script>
+  <script type="module" src="./js/version-info.js?v=20261007_angle"></script>
 </body>
 </html>

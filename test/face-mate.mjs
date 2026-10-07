@@ -101,5 +101,11 @@ const original = JSON.stringify({ hostBox, childBox });
 solveFaceMate({ hostBox, childBox, hostFace: 'front', childFace: 'right', quarterTurns: 3, offsetU: 5 });
 check('求解不修改輸入外框', JSON.stringify({ hostBox, childBox }) === original);
 
+for (const rotationDeg of [37.5, -22, 450]) {
+  const m = solveFaceMate({ hostBox, childBox, hostFace: 'top', childFace: 'bottom', rotationDeg, alignU: 1, gap: 5 });
+  const points = [[-24,-16],[24,-16],[24,16],[-24,16]].map(([x,y]) => transformMatePoint(m,{x,y,z:-12}));
+  check(`任意角 ${rotationDeg} 保持面間距與靠右邊`, points.every(p => close(p.z,25)) && close(Math.max(...points.map(p => p.x)),40));
+}
+check('拒絕非法角度', !solveFaceMate({ hostBox, childBox, hostFace:'top', childFace:'bottom', rotationDeg: NaN }).ok);
 console.log(`face-mate: ${passed} passed, ${failed} failed (${pairCount} 面配對朝向)`);
 if (failed) process.exitCode = 1;

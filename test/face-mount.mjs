@@ -48,6 +48,12 @@ const faceFor = (quarterTurns = 0) => {
   check('自由選面不可被誤認為已設計的平貼對鎖接法', mateStyle(modules, 'Grip1') === null && mateOfMount(fixture.comps, modules, 'Grip1', fixture.params) === null);
 }
 
+{
+  const face = faceFor(); face.selection.rotationDeg = 37.5;
+  const saved = { ...raw, modules: fixture.modules.map(m => m.id === 'Grip1' ? { ...m, mount: { to: {module:'Lift1',output:'carriage'}, ref: {x:0,y:0,a:0}, home: {}, face } } : m) };
+  const restored = normalizeSnapshot(JSON.parse(JSON.stringify(saved)));
+  check('自訂接合角度存檔還原後保留', restored.modules.find(m => m.id === 'Grip1').mount.face.selection.rotationDeg === 37.5);
+}
 // Every face pair and quarter-turn must produce a proper rotation accepted by the persisted contract.
 {
   let valid = 0;

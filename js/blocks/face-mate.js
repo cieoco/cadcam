@@ -73,7 +73,7 @@ function failure(reason) {
 /** 將 childFace 接到 hostFace；面內偏置與間距均以 mm 表示。 */
 export function solveFaceMate({
   hostBox, childBox, hostFace, childFace,
-  alignU = 0, alignV = 0, offsetU = 0, offsetV = 0, gap = 0, quarterTurns = 0,
+  alignU = 0, alignV = 0, offsetU = 0, offsetV = 0, gap = 0, quarterTurns = 0, rotationDeg = quarterTurns * 90,
 } = {}) {
   if (!validBox(hostBox) || !validBox(childBox)) return failure('兩個外框都必須有有限且大於零的長寬高');
   if (!Object.hasOwn(FACE_AXES, hostFace) || !Object.hasOwn(FACE_AXES, childFace)) return failure('請選擇有效的接合面');
@@ -82,14 +82,18 @@ export function solveFaceMate({
   if (!Number.isFinite(gap) || gap < 0) return failure('接合間距必須是大於或等於 0 的有限數值');
   if (!Number.isInteger(quarterTurns) || quarterTurns < 0 || quarterTurns > 3) return failure('轉向只能是 0 到 3 個四分之一圈');
 
+  if (!Number.isFinite(rotationDeg)) return failure('接合角度必須是有限數值');
+
   const host = makeFaces(hostBox).find(face => face.id === hostFace);
   const child = makeFaces(childBox).find(face => face.id === childFace);
   const hu = toArray(host.u), hv = toArray(host.v), hn = toArray(host.n);
   const cu = toArray(child.u), cv = toArray(child.v);
 
   // 零轉向時 child.u 對 host.u，child.v 對 -host.v，保持 child 法向指向 host。
-  const targetU = [hu, hv, scale(hu, -1), scale(hv, -1)][quarterTurns];
-  const targetV = [scale(hv, -1), hu, hv, scale(hu, -1)][quarterTurns];
+  const radians = (rotationDeg % 360) * Math.PI / 180;
+  const c = Math.cos(radians), s = Math.sin(radians);
+  const targetU = add(scale(hu, c), scale(hv, s));
+  const targetV = add(scale(hu, s), scale(hv, -c));
   const targetN = scale(hn, -1);
   const rotation = [0, 1, 2].map(row => [
     targetU[row] * cu[0] + targetV[row] * cv[0] + targetN[row] * toArray(child.n)[0],
