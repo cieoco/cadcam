@@ -300,6 +300,30 @@
       .design-tabs { right: 320px; }
     }
 
+    /* ---- 接合面工具（M2）：設計分頁左上的按鈕與說明，已標面的小選單 ---- */
+    .mate-dock { position: absolute; top: 64px; left: 12px; z-index: 3; display: flex; align-items: flex-start; gap: 6px; max-width: calc(100% - 24px); pointer-events: none; }
+    .mate-dock > * { pointer-events: auto; }
+    @media (min-width: 1100px) { .mate-dock { max-width: calc(100% - 344px); } }
+    body[data-mode="bench"] .mate-dock, body[data-mode="bench"] .mate-popover { display: none !important; }
+    .mate-tool-btn { flex: 0 0 auto; min-height: 44px; padding: 0 14px; border: 2px solid #9db7d8; border-radius: 10px; background: #fff; color: #1d4ed8; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; box-shadow: 0 2px 8px rgba(44,62,80,.12); }
+    .mate-tool-btn.active { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+    .mate-banner { background: rgba(255,255,255,.95); border: 1px solid #c9d6e6; border-radius: 10px; padding: 6px 10px; font-size: 13px; line-height: 1.45; color: #34495e; box-shadow: 0 2px 8px rgba(44,62,80,.12); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+    .mate-banner button { min-height: 40px; padding: 0 10px; white-space: nowrap; border: 1px solid #16a34a; border-radius: 8px; background: #f1faf5; color: #117a45; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+    #mateInvalid { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px; }
+    #mateInvalid button { border-color: #d97706; background: #fff7ed; color: #b45309; }
+    .mate-popover { position: absolute; z-index: 4; min-width: 200px; max-width: calc(100% - 12px); padding: 8px; border: 1px solid #b8cbd2; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px rgba(44,62,80,.28); }
+    .mate-pop-title { padding: 2px 4px 6px; font-size: 14px; font-weight: 800; color: #1d4ed8; }
+    .mate-pop-row { display: flex; gap: 6px; }
+    .mate-popover button { flex: 1 1 auto; min-height: 44px; padding: 0 12px; border: 1px solid #c9d6e6; border-radius: 8px; background: #f6f8fb; color: #34495e; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
+    .mate-popover button[data-act="remove"] { color: #b91c1c; border-color: #f0b4b4; background: #fff5f5; }
+    .mate-popover .mate-pop-x { flex: 0 0 44px; padding: 0; }
+    .mate-popover input { box-sizing: border-box; width: 100%; min-height: 44px; margin-bottom: 6px; padding: 0 10px; border: 2px solid #9db7d8; border-radius: 8px; font: inherit; font-size: 16px; }
+    @media (max-width: 700px), (max-width: 1099px) and (max-height: 500px) {
+      body:not([data-mode="bench"]) .mate-dock { top: 54px; left: 8px; max-width: calc(100% - 16px); }
+      .mate-banner { font-size: 12px; padding: 4px 8px; gap: 2px 6px; min-width: 0; }
+      .mate-banner button { font-size: 12px; padding: 0 8px; }
+    }
+
     /* ---- 組立台（B3～B5）：頂端模式切換、模組清單、接法面板 ---- */
     .mode-switch { display: flex; flex: 0 0 auto; margin-left: 12px; border: 2px solid #c9d6e6; border-radius: 12px; overflow: hidden; background: #fff; }
     .mode-seg { min-width: 92px; min-height: 44px; padding: 0 14px; border: 0; background: #fff; color: #5b6b7b; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; }
@@ -741,6 +765,16 @@
         <span class="desktop-hint">選🔵連桿，從起點拖到終點放開<br>靠近既有孔會直接接上</span>
         <span class="mobile-hint">選🔵連桿，從起點拖到終點放開<br>靠近既有孔會直接接上</span>
       </div>
+      <div class="mate-dock" id="mateDock" style="display:none;">
+        <button class="mate-tool-btn" id="mateToolBtn" type="button" aria-pressed="false" title="標示這個設計的安裝方向與承接面">🔗 接合面</button>
+        <div class="mate-banner" id="mateBanner" style="display:none;" aria-live="polite">
+          <span>點＋標承接面；點箭頭選安裝方向</span>
+          <button id="mateAll" type="button" aria-pressed="false">全部的邊</button>
+          <button id="mateAdopt" type="button" style="display:none;">採用建議</button>
+          <div id="mateInvalid" style="display:none;"></div>
+        </div>
+      </div>
+      <div class="mate-popover" id="matePopover" style="display:none;" role="dialog" aria-label="承接面"></div>
       <div class="mode-banner" id="modeBanner" style="display:none;"></div>
       <div class="mode-banner" id="solveBanner" style="display:none; top:58px;"></div>
       <div class="mode-banner" id="viewPlaneHint" style="display:none; top:98px; background:rgba(108,52,131,0.94);" aria-live="polite"></div>
@@ -1166,8 +1200,10 @@
       "./js/blocks/design-focus.js": "./js/blocks/design-focus.js?v=20261003_h1",
       "./js/blocks/design-tabs-ui.js": "./js/blocks/design-tabs-ui.js?v=20261003_h1",
       "./js/blocks/tools.js": "./js/blocks/tools.js?v=20261005_simple_r1",
-      "./js/blocks/input.js": "./js/blocks/input.js?v=20260930_b2",
-      "./js/blocks/state.js": "./js/blocks/state.js?v=20261003_h1",
+      "./js/blocks/input.js": "./js/blocks/input.js?v=20261007_m2b",
+      "./js/blocks/state.js": "./js/blocks/state.js?v=20261007_m2b",
+      "./js/blocks/mates.js": "./js/blocks/mates.js?v=20261007_m2b",
+      "./js/blocks/mates-view.js": "./js/blocks/mates-view.js?v=20261007_m2b",
       "./js/blocks/panels.js": "./js/blocks/panels.js?v=20260930_p1",
       "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=20261003_h1",
       "./js/blocks/motor-tools.js": "./js/blocks/motor-tools.js?v=20261001_l1",
@@ -1180,7 +1216,7 @@
       "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261003_g2"
     }}
   </script>
-  <script type="module" src="js/blocks/app.js?v=20261007_import_spacing"></script>
-<script type="module" src="js/version-info.js?v=20261007_2"></script>
+  <script type="module" src="js/blocks/app.js?v=20261007_m2b"></script>
+<script type="module" src="js/version-info.js?v=20261007_3"></script>
 </body>
 </html>

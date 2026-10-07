@@ -28,6 +28,8 @@ export const S = {
   designFocus: '#root',                            // 設計模式正在看的分頁：模組 id 或 '#root'（未命名設計）；不存檔（H1）
   viewPlane: null,                                 // 目前畫的平面：null＝主視圖，或直角安裝模組的 id（不存檔；O3）
 
+  mateMode: false,                                 // 設計分頁的「接合面」工具開著（舞台不接受拖曳／選取／畫圖；不存檔；M2）
+
   // ---- 選取 ----
   selectedLinkId: null,
   selectedTriangleId: null,

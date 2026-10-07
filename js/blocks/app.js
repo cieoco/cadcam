@@ -14,7 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261007_2';
+import { APP_VERSION } from '../version.js?v=20261007_3';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
@@ -26,7 +26,7 @@ import * as View from './view.js';
 import * as Render from './render.js';   // SVG 繪製基元（純呈現）
 import * as Panels from './panels.js';   // 編輯面板呈現（讀 S + 寫 DOM）
 import * as Tools from './tools.js';     // 工具模式互動（畫桿 / 畫滑軌 / 畫三點桿 / 連桿升級滑軌）
-import * as Input from './input.js?v=20261004_fourbar_r1';     // 指標 / 手勢互動（拖曳 + 吸附合併 + pinch 縮放）
+import * as Input from './input.js?v=20261007_m2b';     // 指標 / 手勢互動（拖曳 + 吸附合併 + pinch 縮放）
 import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
@@ -40,6 +40,7 @@ import { normalizeModules } from './module-schema.js?v=face-mount-20261007';
 import { refreshFaceMounts } from './face-mount-refresh.js';
 import { designTabs, resolveFocus, compsInFocus, assignNewComps, pointIdsOf, focusInputs, ROOT_TAB } from './design-focus.js';   // H1：設計模式一次只看一個設計（分頁）
 import { createDesignTabs } from './design-tabs-ui.js?v=20261005_tabclose';
+import { createMateTool } from './mate-tool.js?v=20261007_m2b';   // M2：設計分頁的「接合面」工具
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
 import { drawMemberDimensions } from './member-dimension-render.js';
@@ -167,7 +168,7 @@ function scheduleAutosave() {
 // 套用一份 snapshot 到目前狀態。recordUndo 預設 true（外部開檔/分享要能 undo）。
 function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external' } = {}) {
   if (recordUndo) pushUndo();
-  if (source !== 'undo') sweepMemberId = null;
+  if (source !== 'undo') { sweepMemberId = null; mateTool.reset(); }
   pause();
   cancelMotorMode();
   Settings.syncFabricationInputs(); // 放棄尚未 change/blur 提交的表單草稿。
@@ -396,6 +397,22 @@ function deleteDesign(id) {
   S.designFocus = resolveFocus(S.comps, S.modules, S.designFocus);
   clearSelectionAndEditors();
   rebuild(); setDesignFocus(S.designFocus);
+}
+// M2：接合面工具。啟動時舞台只接受點目標與平移／縮放（見 mate-tool.js）；換分頁、切模式、開始畫圖、載入／清空都會關掉。
+const mateTool = createMateTool({
+  svg, module: focusModule, points: () => lastFullPts, pushUndo, rebuild, draw, transient, pause,
+  clearSelection: clearSelectionAndEditors, fit: () => fitForMate(),
+  busy: () => !!(S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars || S.dragShape)
+});
+function fitForMate() {   // 置中時多留箭頭的位置：箭頭是固定畫面大小，邊界換成世界 mm 要隨縮放重算幾次
+  const b = currentBounds();
+  if (!b) { fitView(); return; }
+  let pad = 0;
+  for (let i = 0; i < 3; i++) {
+    View.fit({ minX: b.minX - 24 - pad, maxX: b.maxX + 24 + pad, minY: b.minY - 24 - pad, maxY: b.maxY + 24 + pad });
+    pad = (mateTool.reach() + 6) / (View.getScale() * (svg.getScreenCTM()?.a || 1));
+  }
+  draw();
 }
 const designTabsUi = createDesignTabs({
   el: () => document.getElementById('designTabs'),
@@ -771,7 +788,7 @@ const bench = createBench({
   getViewer: () => viewer3D, is3DActive: () => view3DActive, set3D, push3D: () => push3D(),
   // H1：組立 → 設計：焦點換成組立台選的模組（沒有就維持原本的分頁）。
   enterDesign: changed => { validateViewPlane(); reconcileMotorState(); saveFocus(); if (changed) fitView(); else draw(); },
-  enterBench: reconcileMotorState,   // 組立台要恢復所有模組的馬達控制。
+  enterBench: () => { mateTool.reset(); reconcileMotorState(); },   // 組立台要恢復所有模組的馬達控制；接合面工具只在設計模式
   // B6：即時干涉用——目前作品的檢查參數（含各馬達行程），以及全行程時間軸點擊後把全部馬達設到指定角度。
   interferenceArgs: () => {
     const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
@@ -1324,6 +1341,7 @@ const PART_DRAW = {
 };
 
 function draw() {
+  mateTool.sync();   // M2：換分頁／模式或開始畫圖時關掉接合面工具，並更新按鈕
   syncModulePlates();   // G1：作品內容變了才讓固定板 home 幾何作廢（θ 不算內容）
   validateViewPlane();
   designTabsUi.render();   // H1：設計分頁列
@@ -1573,6 +1591,8 @@ function draw() {
   if (updateModuleHandle) frameUpdaters.push(updateModuleHandle);
   const updateGripperObject = gripperObject.draw(pts);
   if (updateGripperObject) frameUpdaters.push(updateGripperObject);
+  const updateMates = mateTool.render();   // M2：接合面（工具開著＝可點；平常＝淡淡的已標記號）
+  if (updateMates) frameUpdaters.push(updateMates);
   Tools.drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
   Tools.drawTrianglePreview(); // 三點桿模式：疊在最上層的三角預覽
   Tools.drawPolygonPreview();  // 多邊形板模式：疊在最上層的預覽
@@ -1989,6 +2009,7 @@ function addAnchor() {
 function clearAll() {
   pushUndo();
   pause();
+  mateTool.reset();
   S.comps = []; S.theta = 0; S.counter = 0;
   knownCompIds = null; S.designFocus = ROOT_TAB;
   S.activeMotor = '1'; S.motorAngles = {};
@@ -2770,6 +2791,7 @@ window.blocks.designDebug = () => ({
   motors: [...designMotorIds()]
 });
 Object.assign(window.blocks, {
+  mateTool: on => mateTool.set(!!on), mateDebug: () => mateTool.debug(),
   setTriSide: memberEditor.selectDimension,
   setMemberDimension: memberEditor.setValue,
   setMemberMirror: memberEditor.setMirror,

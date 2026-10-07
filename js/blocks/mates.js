@@ -81,7 +81,7 @@ export function resolveRef(ports, ref) {
 }
 
 // 接口名稱 → 承接面名稱：去掉「・」；沒有輸出端名稱的桿／板以零件 id 當名稱，改用「連桿」「三角板」，不顯示內部 id。
-function tidyName(port) {
+export function tidyName(port) {
   const [label, ...rest] = String(port.name || '').split('・');
   const b = port.body, lab = b && b.id !== undefined && label === b.id ? (b.kind === 'triangle' ? '三角板' : '連桿') : label;
   return cleanMateName(lab + rest.join('')) || '承接面';

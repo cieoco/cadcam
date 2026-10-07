@@ -478,6 +478,7 @@ export function init(deps) {
   // 並擋住桿身的 pointerdown，避免它把選取搶去顯示長度。
   svg.addEventListener('pointerdown', (e) => {
     if (!mobilePrompt()) return;
+    if (S.mateMode) return;                                   // 接合面工具開著：舞台只接受點目標與平移（mate-tool.js）
     if (e.pointerType === 'mouse') return;
     if (S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.pickBars) return; // 這些模式各自有起點處理
     if (activePointers.size >= 2) return;                    // 第二指：交給縮放手勢
