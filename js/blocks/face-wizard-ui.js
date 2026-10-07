@@ -2,12 +2,15 @@
 import { buildMountSurfaces } from './mount-surfaces.js';
 import { buildFacePlacement } from './face-placement.js';
 import { mountFacePlacement } from './face-mount.js';
+import { pointCoords } from './model.js';
+import { inspectLinkExport, inspectPlateExport } from './exporters.js?v=20261007_9';
 
-function reference(surface, name) {
+function reference(surface, name, parts = []) {
   const axes = ['x', 'y', 'z'];
   const center = Object.fromEntries(axes.map(k => [k, (surface.box.min[k] + surface.box.max[k]) / 2]));
   const relative = p => ({ ...p, x: p.x - center.x, y: p.y - center.y });
   return { name, detail: surface.kind === 'frame' ? '固定底座' : '活動承接位置', surface,
+    parts: parts.map(p => ({ ...p, points: p.points.map(relative) })),
     box: { min: Object.fromEntries(axes.map(k => [k, surface.box.min[k] - center[k]])), max: Object.fromEntries(axes.map(k => [k, surface.box.max[k] - center[k]])) },
     outlines: (surface.outlines || [surface.outline]).map(r => r.map(relative)),
     holes: (surface.holes || []).map(relative), cutouts: (surface.cutouts || []).map(c => ({ ...c, points: c.points.map(relative) })) };
@@ -17,7 +20,32 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   const child = modules.find(m => m.id === childId);
   if (!child || child.mount || !child.base) { say('請選尚未安裝且有底座的機構。'); return; }
   const surfaces = id => buildMountSurfaces({ comps, modules, params, moduleId: id, exportSettings, thicknessMm: stockMm }).surfaces || [];
-  const childSurface = surfaces(childId).find(s => s.kind === 'frame');
+  // 唯讀機構輪廓隨接合板一起移動，選面時保留完整機構的空間脈絡。
+  const parts = id => {
+    const own = comps.filter(c => c.moduleId === id), pts = pointCoords(own), result = [];
+    for (const s of surfaces(id)) if (s.kind === 'frame') for (const points of s.outlines) result.push({ points, color: '#8799aa' });
+    for (const c of own) {
+      const a = pts[c.p1?.id] || c.p1, b = pts[c.p2?.id] || c.p2;
+      if (!a) continue;
+      let rings = [];
+      if (c.type === 'bar' && b) {
+        const len = Math.hypot(b.x - a.x, b.y - a.y);
+        if (len > 0) rings = (inspectLinkExport(c, len, exportSettings).outlines || []).map(r => r.map(p => ({ x: a.x + (p.x * (b.x - a.x) - p.y * (b.y - a.y)) / len, y: a.y + (p.x * (b.y - a.y) + p.y * (b.x - a.x)) / len })));
+      } else if (c.type === 'triangle') {
+        const ps = [c.p1, c.p2, c.p3].map(p => pts[p?.id] || p);
+        if (ps.every(Boolean)) rings = inspectPlateExport(c, ps, exportSettings).outlines || [];
+      } else if (c.type === 'gear') {
+        const r = Number(params[c.radiusParam]) || Number(c.r) || Number(c.radius) || 15;
+        rings = [Array.from({ length: 32 }, (_, i) => ({ x: a.x + r * Math.cos(i * Math.PI / 16), y: a.y + r * Math.sin(i * Math.PI / 16) }))];
+      }
+      for (const points of rings) result.push({ points, color: c.color || '#578cab' });
+    }
+    return result;
+  };
+  const chosenAttach = child.faceParts?.attach;
+  const attachComp = comps.find(c => c.moduleId === childId && c.id === chosenAttach && c.type === 'bar' && [c.p1, c.p2].every(p => p && (p.type === 'fixed' || p.type === 'motor')));
+  const childSurfaces = attachComp ? buildMountSurfaces({ comps, modules: modules.map(m => m.id === childId ? { ...m, outputs: [{ id: 'face-attach', name: attachComp.name || attachComp.id, at: attachComp.p1.id, body: { kind: 'bar', id: attachComp.id } }] } : m), params, moduleId: childId, exportSettings, thicknessMm: stockMm }).surfaces || [] : surfaces(childId);
+  const childSurface = childSurfaces.find(s => attachComp ? s.outputId === 'face-attach' : s.kind === 'frame');
   const eligible = m => {
     if (m.mount && !m.mount.face) return false;
     const visited = new Set();
@@ -27,11 +55,11 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     }
     return true;
   };
-  const hosts = modules.filter(eligible).flatMap(m => surfaces(m.id).filter(s => s.kind === 'output').map(s => reference(s, `${m.name} · ${s.name}`)));
+  const hosts = modules.filter(eligible).flatMap(m => surfaces(m.id).filter(s => s.kind === 'output' && (!m.faceParts?.receive || s.outputId === m.faceParts.receive)).map(s => reference(s, `${m.name} · ${s.name}`, parts(m.id))));
   if (!childSurface || !hosts.length) { say('需要另一個有承接板的機構，以及安裝端的固定底板。'); return; }
-  const children = [reference(childSurface, `${child.name} · 底板`)];
+  const children = [reference(childSurface, `${child.name} · ${attachComp ? attachComp.name || attachComp.id : '固定桿／底板'}`, parts(childId))];
   const dialog = document.createElement('dialog');
-  dialog.setAttribute('aria-label', '六面體組立精靈');
+  dialog.setAttribute('aria-label', '接合預覽');
   dialog.style.cssText = 'width:min(960px,100vw);height:94dvh;max-width:100vw;max-height:100dvh;padding:0;border:0;border-radius:14px;';
   const close = document.createElement('button'); close.textContent = '關閉'; close.setAttribute('aria-label', '關閉組立精靈');
   close.style.cssText = 'height:44px;min-width:64px;float:right;';
@@ -42,7 +70,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   close.addEventListener('click', () => dialog.close()); dialog.addEventListener('close', dispose);
   function receive(e) {
     if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
-    if (e.data?.type === 'face-wizard-ready') frame.contentWindow.postMessage({ type: 'face-wizard-init', hosts, children, mode: wizard || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
+    if (e.data?.type === 'face-wizard-ready') frame.contentWindow.postMessage({ type: 'face-wizard-init', hosts: hosts.map(h => ({ ...h, defaultFace: modules.find(m => m.id === h.surface.moduleId)?.faceParts?.receiveFace || 'top' })), children, configured: !!child.faceParts, mode: wizard || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: modules.find(m => m.id === hosts[0].surface.moduleId)?.faceParts?.receiveFace || 'top', childFace: child.faceParts?.attachFace || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
     if (e.data?.type === 'face-wizard-cancel') { dialog.close(); return; }
     if (e.data?.type !== 'face-wizard-confirm') return;
     if (!isCurrent()) { dialog.close(); say('作品已變動，請重新選擇接法。'); return; }

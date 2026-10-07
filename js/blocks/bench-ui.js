@@ -12,9 +12,9 @@ import { checkLiveInterference, liveInterferenceStatus } from './live-interferen
  *   showAll   是否把不相容的接口也畫出來（暗色、點了說原因）
  */
 import { S, motorAnglesNow } from './state.js';
-import { openFaceWizard } from './face-wizard-ui.js?v=20261007_8_final';
+import { openFaceWizard } from './face-wizard-ui.js?v=20261007_12';
 import * as Bench from './bench.js?v=20261007_m5a';
-import { createMateWizard } from './mate-wizard-ui.js?v=20261007_8';
+import { createMateWizard } from './mate-wizard-ui.js?v=20261007_12';
 import { moduleFrameEdges } from './assembly.js?v=20261007_m5a';
 import * as Settings from './settings.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';

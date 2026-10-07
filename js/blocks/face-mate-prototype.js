@@ -12,7 +12,7 @@ let { hosts, children } = realMountExamples();
 const initial = { host: 0, child: 0, hostFace: 'top', childFace: 'bottom', alignU: 0, alignV: 0, offsetU: 0, offsetV: 0, gap: 5, quarterTurns: 0 };
 let draft = { ...initial }, saved = { ...initial }, step = 0;
 let mode = matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work';
-let hasConfirmed = false;
+let hasConfirmed = false, roughPlaced = false, configured = false;
 let moveStep = 5, edgeMode = false, dimensionField = null, dimensionAlignment = null;
 const titles = ['選擇兩個機構', '選承接端的大面', '選安裝端的大面', '預覽對齊與偏置'];
 const add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
@@ -33,7 +33,7 @@ function button(label, action) {
   const b = document.createElement('button');
   b.type = 'button'; b.textContent = label; b.addEventListener('click', action); return b;
 }
-function update(field, value) { draft[field] = value; $('message').textContent = ''; render(); }
+function update(field, value) { draft[field] = value; if (field === 'childFace') roughPlaced = true; if (field === 'host' || field === 'child') { roughPlaced = configured; if (field === 'host' && hosts[value].defaultFace) draft.hostFace = hosts[value].defaultFace; } $('message').textContent = ''; render(); }
 function buildCards(root, items, field) {
   items.forEach((item, i) => {
     const b = button(item.name, () => update(field, i)); b.dataset.value = i;
@@ -136,7 +136,7 @@ $('wizardMode').addEventListener('click', () => { mode = 'wizard'; render(); });
 $('workMode').addEventListener('click', () => { mode = 'work'; render(); });
 $('back').addEventListener('click', () => { if (step > 0) step--; render(); });
 $('next').addEventListener('click', () => {
-  if (mode === 'wizard' && step < 3) { step++; render(); return; }
+  if (mode === 'wizard' && step < 3) { step = configured && step === 0 ? 3 : step + 1; render(); return; }
   if (!solve().ok) return;
   if (integrated) { parent.postMessage({ type: 'face-wizard-confirm', selection: { ...draft } }, location.origin); return; }
   saved = { ...draft }; hasConfirmed = true; render();
@@ -181,15 +181,17 @@ $('scene').addEventListener('lostpointercapture', endViewDrag);
 
 function scene(mate) {
   const svg = $('scene'); svg.replaceChildren();
-  const polygons = [], separate = mode === 'wizard' && step <= 2;
+  const polygons = [], objects = [], separate = mode === 'wizard' && step <= 2 && !roughPlaced;
   for (const [which, bounds, selected] of [['host', hosts[draft.host].box, draft.hostFace], ['child', children[draft.child].box, draft.childFace]]) {
-    // 手機選面只顯示當下的對象，並放大方向外框的薄邊；接合計算仍用真實板厚。
-    if (mode === 'wizard' && ((step === 1 && which !== 'host') || (step === 2 && which !== 'child'))) continue;
+    // 兩個實際機構同時保留，方向框貼在接合板上；選好兩面先預覽粗組位。
     const picking = mode === 'wizard' && (step === 1 || step === 2);
-    const halfZ = Math.max((bounds.max.z - bounds.min.z) / 2, 20, Math.min(bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y) / 3);
-    const faceBounds = picking ? { min: { ...bounds.min, z: -halfZ }, max: { ...bounds.max, z: halfZ } } : bounds;
-    const spacing = hosts[draft.host].box.max.x - children[draft.child].box.min.x + 40;
+    const halfZ = Math.max((bounds.max.z - bounds.min.z) / 2, 35, Math.min(bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y) / 3);
+    const faceBounds = picking ? { min: { x: bounds.min.x - 12, y: bounds.min.y - 12, z: -halfZ }, max: { x: bounds.max.x + 12, y: bounds.max.y + 12, z: halfZ } } : bounds;
+    const extent = (source, side) => Math[side === 'max' ? 'max' : 'min'](...[source.box[side].x, ...(source.parts || []).flatMap(p => p.points.map(q => q.x))]);
+    const spacing = extent(hosts[draft.host], 'max') - extent(children[draft.child], 'min') + 60;
     const transform = p => which === 'host' ? p : separate ? add(p, { x: spacing, y: 0, z: 10 }) : transformMatePoint(mate, p);
+    const source = which === 'host' ? hosts[draft.host] : children[draft.child];
+    for (const part of source.parts || []) objects.push({ ...part, which, points: part.points.map(p => transform({ ...p, z: 0 })) });
     for (const face of boxFaces(faceBounds)) {
       const points = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => transform(add(face.center, add(mul(face.u, u * face.width / 2), mul(face.v, v * face.height / 2)))));
       const center = transform(face.center);
@@ -199,14 +201,14 @@ function scene(mate) {
       polygons.push({ which, id: face.id, points, center, u: face.u, v: face.v, visible, selected: selected === face.id, depth: viewCoords(center).depth, transform, bounds });
     }
   }
-  const all = polygons.flatMap(p => p.points.map(project));
+  const all = [...polygons, ...objects].flatMap(p => p.points.map(project));
   const minX = Math.min(...all.map(p => p.x)), maxX = Math.max(...all.map(p => p.x));
   const minY = Math.min(...all.map(p => p.y)), maxY = Math.max(...all.map(p => p.y));
   const scale = Math.min(470 / Math.max(1, maxX - minX), 260 / Math.max(1, maxY - minY));
   const screen = p => { const q = project(p); return { x: 300 + (q.x - (minX + maxX) / 2) * scale, y: 180 + (q.y - (minY + maxY) / 2) * scale }; };
   const make = (name, attrs) => { const e = document.createElementNS('http://www.w3.org/2000/svg', name); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); svg.appendChild(e); return e; };
   polygons.filter(p => p.visible).sort((a, b) => a.depth - b.depth).forEach(p => {
-    const face = make('polygon', { points: p.points.map(screen).map(q => `${q.x},${q.y}`).join(' '), fill: p.selected ? (p.which === 'host' ? '#349ee8' : '#6cd9b0') : p.which === 'host' ? '#a9c4d3' : '#a9d0bc', stroke: p.which === 'host' ? '#44758c' : '#448876', 'stroke-width': p.selected ? 3 : 1.5, 'fill-opacity': p.which === 'child' ? .78 : .95 });
+    const face = make('polygon', { points: p.points.map(screen).map(q => `${q.x},${q.y}`).join(' '), fill: p.selected ? (p.which === 'host' ? '#349ee8' : '#6cd9b0') : p.which === 'host' ? '#a9c4d3' : '#a9d0bc', stroke: p.which === 'host' ? '#44758c' : '#448876', 'stroke-width': p.selected ? 3 : 1.5, 'fill-opacity': .18 });
     const selectable = mode === 'work' || (p.which === 'host' ? step === 1 : step === 2);
     if (selectable) {
       face.dataset[p.which === 'host' ? 'hostFace' : 'childFace'] = p.id;
@@ -236,6 +238,7 @@ function scene(mate) {
       }
     }
   });
+  for (const part of objects) make('polygon', { 'data-mechanism': part.which, points: part.points.map(screen).map(q => `${q.x},${q.y}`).join(' '), fill: part.color, 'fill-opacity': .7, stroke: part.color, 'stroke-width': 2, 'pointer-events': 'none' });
   polygons.filter(p => p.selected).forEach(p => {
     if (!p.visible) make('polygon', { points: p.points.map(screen).map(q => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: p.which === 'host' ? '#245c8a' : '#167553', 'stroke-width': 2.5, 'stroke-dasharray': '6 4', 'pointer-events': 'none' });
     const q = screen(p.center);
@@ -314,7 +317,8 @@ function render() {
   $('wizardMode').setAttribute('aria-pressed', mode === 'wizard'); $('workMode').setAttribute('aria-pressed', mode === 'work');
   document.querySelectorAll('[data-step]').forEach(s => { s.hidden = mode === 'wizard' && Number(s.dataset.step) !== step; });
   $('progress').hidden = mode === 'work'; $('progress').replaceChildren();
-  for (let i = 0; i < 4; i++) { const dot = document.createElement('span'); if (i <= step) dot.className = 'current'; $('progress').appendChild(dot); }
+  for (let i = 0; i < (configured ? 2 : 4); i++) { const dot = document.createElement('span'); if (i <= (configured ? step === 0 ? 0 : 1 : step)) dot.className = 'current'; $('progress').appendChild(dot); }
+  document.querySelector('[data-step="3"] h2').textContent = configured ? '2 · 微調接合' : '4 · 怎麼對齊？';
   for (const [root, field] of [['hosts', 'host'], ['children', 'child'], ['hostFaces', 'hostFace'], ['childFaces', 'childFace']]) {
     $(root).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.value) === String(draft[field])));
   }
@@ -322,6 +326,7 @@ function render() {
   ['offsetU', 'offsetV', 'gap'].forEach(field => { $(field).value = draft[field]; });
   $('turn').textContent = `轉 90° · 目前 ${draft.quarterTurns * 90}°`;
   $('back').hidden = mode === 'work'; $('back').disabled = step === 0;
+  $('back').textContent = configured && step === 3 ? '選面輔助' : '上一步';
   $('next').textContent = mode === 'work' || step === 3 ? (integrated ? '接上' : '確認擺放') : '下一步';
   if (integrated) $('cancel').textContent = '取消';
   $('stageTitle').textContent = mode === 'work' ? '工作模式 · 外框擺放預覽' : titles[step];
@@ -346,7 +351,8 @@ if (integrated) {
     if (e.data?.type !== 'face-wizard-init') return;
     if (!Array.isArray(e.data.hosts) || !e.data.hosts.length || !Array.isArray(e.data.children) || !e.data.children.length) return;
     mode = e.data.mode === 'work' ? 'work' : 'wizard';
-    hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0;
+    hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; configured = !!e.data.configured; roughPlaced = configured;
+    document.querySelector('h1').textContent = '接合預覽';
     $('hosts').replaceChildren(); $('children').replaceChildren();
     buildCards($('hosts'), hosts, 'host'); buildCards($('children'), children, 'child'); render();
   });

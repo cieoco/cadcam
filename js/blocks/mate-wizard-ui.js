@@ -219,8 +219,8 @@ export function createMateWizard(h) {
 
   function pickView(root, mod) {
     root.appendChild(head(`安裝「${h.displayName(mod.id)}」`));
-    const b = btn('六面體精靈', 'primary', () => h.openFaces(mod)); b.id = 'benchFaceWizard'; root.appendChild(b);
-    root.appendChild(el('div', 'bench-note', '旋轉選面 → 對齊尺寸 → 接上'));
+    const b = btn('接合預覽', 'primary', () => h.openFaces(mod)); b.id = 'benchFaceWizard'; root.appendChild(b);
+    root.appendChild(el('div', 'bench-note', '帶入接合設定 → 微調 → 接上'));
     if (assemblyRoles(S.modules).root !== mod.id) {
       const mk = btn('設為底座', 'mate-root', () => h.apply({ comps: S.comps, modules: setAssemblyRoot(S.modules, mod.id) }, `「${h.displayName(mod.id)}」現在是底座`));
       mk.id = 'mateMakeRoot'; root.appendChild(mk);

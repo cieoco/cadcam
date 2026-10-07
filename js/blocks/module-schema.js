@@ -359,6 +359,13 @@ export function normalizeModules(rawModules, comps) {
     out.outputs = p.outputs;
     out.mount = mountById.get(p.id);
     if (p.mates !== undefined) out.mates = p.mates;   // M1：接合面（舊檔沒有就不補欄位）
+    if (p.raw.faceParts && typeof p.raw.faceParts === 'object') {
+      const own = compsByModule.get(p.id), chosen = p.raw.faceParts;
+      const receive = p.outputs.some(o => o.id === chosen.receive) ? chosen.receive : undefined;
+      const attach = chosen.attach === 'frame' ? 'frame' : own.find(c => c.id === chosen.attach && c.type === 'bar' && [c.p1, c.p2].every(q => q && (q.type === 'fixed' || q.type === 'motor')))?.id;
+      const faces = ['top', 'bottom', 'front', 'back', 'left', 'right'];
+      if (receive || attach) out.faceParts = { ...(receive ? { receive } : {}), ...(attach ? { attach } : {}), ...(faces.includes(chosen.receiveFace) ? { receiveFace: chosen.receiveFace } : {}), ...(faces.includes(chosen.attachFace) ? { attachFace: chosen.attachFace } : {}) };
+    }
     return out;
   });
 

@@ -10,6 +10,12 @@ import { mateOfMount, mateStyle } from '../js/blocks/mate-connect.js';
 const clone = value => JSON.parse(JSON.stringify(value));
 const raw = JSON.parse(readFileSync(new URL('./fixtures/assembly/lift-gripper.json', import.meta.url), 'utf8'));
 const fixture = normalizeSnapshot(raw);
+{
+  const configured = normalizeSnapshot({ ...raw, modules: raw.modules.map(m => ({ ...m, faceParts: { receive: m.outputs?.[0]?.id, attach: 'frame', receiveFace: 'bottom', attachFace: 'top' } })) });
+  check('設計接合部位與接合面在存檔正規化後保留', configured.modules.every(m => m.faceParts?.attach === 'frame' && m.faceParts?.receiveFace === 'bottom' && m.faceParts?.attachFace === 'top'));
+  const invalid = normalizeSnapshot({ ...raw, modules: raw.modules.map(m => ({ ...m, faceParts: { receive: 'missing', attach: 'missing', receiveFace: 'north' } })) });
+  check('不存在的接合部位不保留', invalid.modules.every(m => !m.faceParts));
+}
 const near = (a, b, eps = 1e-5) => Math.abs(a - b) <= eps;
 const faceFor = (quarterTurns = 0) => {
   const mate = solveFaceMate({

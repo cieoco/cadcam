@@ -12,7 +12,7 @@
  */
 
 import { encodeSnapshot, decodeShareString } from '../share-codec.js';
-import { toSnapshot, normalizeSnapshot, highestIdNum } from './schema.js?v=20261007_m5a';
+import { toSnapshot, normalizeSnapshot, highestIdNum } from './schema.js?v=20261007_12';
 
 const AUTOSAVE_KEY = 'cadcam.blocks.autosave';
 

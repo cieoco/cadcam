@@ -14,7 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261007_9';
+import { APP_VERSION } from '../version.js?v=20261007_10';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
@@ -37,11 +37,11 @@ import { memberSweepSegments } from './member-sweep.js';
 let sweepMemberId = null; // 顯示偏好，不寫入作品格式。
 import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, machineFrameComps, machineMounts, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostEdge, hostPlateThickness } from './assembly.js?v=20261007_m5a';
 import { machineComps, machineModules } from './assembly-roles.js';   // M5a：製作／匯出只看機器（底座＋裝在它身上的）
-import { normalizeModules } from './module-schema.js?v=20261007_m5a';
+import { normalizeModules } from './module-schema.js?v=20261007_12';
 import { refreshFaceMounts } from './face-mount-refresh.js';
 import { designTabs, resolveFocus, compsInFocus, assignNewComps, pointIdsOf, focusInputs, ROOT_TAB } from './design-focus.js';   // H1：設計模式一次只看一個設計（分頁）
 import { createDesignTabs } from './design-tabs-ui.js?v=20261005_tabclose';
-import { createMateTool } from './mate-tool.js?v=20261007_m2b';   // M2：設計分頁的「接合面」工具
+import { createMateTool } from './mate-tool.js?v=20261007_12b';   // M2：設計分頁的「接合面」工具
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
 import { drawMemberDimensions } from './member-dimension-render.js';
@@ -62,7 +62,7 @@ import { createPlateEditor } from './plate-editor.js';
 import { createNodeEditor } from './node-editor.js';
 import { createModuleEditor } from './module-editor.js?v=20261007_import_spacing';
 import { createModuleDrag } from './module-drag.js';
-import { createBench } from './bench-ui.js?v=20261007_8_final';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
+import { createBench } from './bench-ui.js?v=20261007_12';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
 import { workRangeFromTrace, clampRangeFromTraces, currentPointDistance } from './measurement.js';
 import { circleRectCompression } from './intake-contact.js';
 import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
@@ -402,6 +402,7 @@ function deleteDesign(id) {
 }
 // M2：接合面工具。啟動時舞台只接受點目標與平移／縮放（見 mate-tool.js）；換分頁、切模式、開始畫圖、載入／清空都會關掉。
 const mateTool = createMateTool({
+  scheduleAutosave,
   svg, module: focusModule, points: () => lastFullPts, pushUndo, rebuild, draw, transient, pause,
   clearSelection: clearSelectionAndEditors, fit: () => fitForMate(),
   busy: () => !!(S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars || S.dragShape)

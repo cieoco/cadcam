@@ -6,8 +6,8 @@
  */
 import { compileAssembly, solveAssembly, outputPose, transformComp, planeOf, orthogonalHostEdge } from './assembly.js?v=20261007_m5a';
 import { pointKeysFor } from './part-types.js';
-import { normalizeSnapshot } from './schema.js?v=20261007_m5a';
-import { normalizeModules, sanitizeName } from './module-schema.js?v=20261007_m5a';
+import { normalizeSnapshot } from './schema.js?v=20261007_12';
+import { normalizeModules, sanitizeName } from './module-schema.js?v=20261007_12';
 import { BLOCK_EXAMPLES } from './examples.js';
 import { ADAPTER_LENGTH_MM } from './orthogonal-joint.js';
 
@@ -564,7 +564,7 @@ export function normalizeTemplate(raw) {
   const TEMPLATE_MODULE_ID = '__template__';
   const taggedComps = cleanComps.map(c => ({ ...c, moduleId: TEMPLATE_MODULE_ID }));
   const moduleDescriptor = {
-    id: TEMPLATE_MODULE_ID, name: raw.name, source: raw.source, base: raw.base, outputs: raw.outputs, mount: null, mates: raw.mates
+    id: TEMPLATE_MODULE_ID, name: raw.name, source: raw.source, base: raw.base, outputs: raw.outputs, mount: null, mates: raw.mates, faceParts: raw.faceParts
   };
   const modResult = normalizeModules([moduleDescriptor], taggedComps);
   warnings.push(...modResult.warnings);
