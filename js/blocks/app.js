@@ -842,9 +842,9 @@ function rebuild() {
   lastSolved = {};               // 拓撲變了：丟掉舊解，避免拿到不相干的種子
   prevSolved = {};
   geomVersion++;                 // 結構/參數變了：讓軌跡快取失效（getTrajectoryData 重算）
+  validateViewPlane();           // 先確定載入／刪除後的設計分頁，馬達控制才不會沿用隱藏模組。
   reconcileMotorState();         // 馬達被刪 / 改指派後：清掉殘留凍結角、控制權交回存在的馬達
   gripperController?.recompute();
-  validateViewPlane();           // 直角模組被拆下／刪除後，回主視圖
   document.getElementById('hint').style.display = S.comps.length ? 'none' : 'block';
   Panels.updateRoleEditor();
   scheduleAutosave();            // 任何結構變更都防丟（debounce，播放不觸發）

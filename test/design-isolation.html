@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-Hant"><meta charset="utf-8"><title>設計分頁瀏覽器回歸測試</title>
+<style>body{font:16px system-ui;margin:20px}iframe{width:1200px;height:760px;border:1px solid #aaa}pre{white-space:pre-wrap}.fail{color:#b00}</style>
+<h1>設計分頁瀏覽器回歸測試</h1>
+<p>透過 HTTP 開啟。本測試使用兩個重疊模組；測試結束會還原此來源的自存與分頁偏好。</p>
+<button id="run">執行測試</button><pre id="results">尚未執行</pre><iframe id="app" title="測試中的機構積木"></iframe>
+<script type="module">
+import { encodeSnapshot } from '../js/share-codec.js';
+const run = document.querySelector('#run'), results = document.querySelector('#results'), frame = document.querySelector('#app');
+run.onclick = async () => {
+  run.disabled = true; results.textContent = '執行中…';
+  const keys = ['cadcam.blocks.autosave', 'cadcam.blocks.designFocus'];
+  const saved = keys.map(k => localStorage.getItem(k));
+  const fixture = {
+    kind: 'blocks', v: 1, counter: 10, activeMotor: '2', motorAngles: { '1': 0 }, params: { LA: 80, LB: 80 },
+    comps: ['A', 'B'].map((id, i) => ({ id: `bar${id}`, type: 'bar', moduleId: id, fixedLen: true, isInput: true,
+      physicalMotor: String(i + 1), lenParam: `L${id}`, color: i ? '#ff8800' : '#3498db',
+      p1: { id: `${id}0`, type: 'motor', physicalMotor: String(i + 1), x: 0, y: 0 },
+      p2: { id: `${id}1`, type: 'floating', x: 80, y: 0 } })),
+    modules: ['A', 'B'].map(id => ({ id, name: `設計 ${id}`, base: `${id}0`, outputs: [] }))
+  };
+  fixture.comps.push(...['A', 'B'].map(id => ({ id: `anchor${id}`, type: 'anchor', moduleId: id,
+    p1: { id: `${id}2`, type: 'fixed', x: -40, y: 0 } })));
+  window.finishIsolationTest = text => {
+    // 移除 iframe 會停止它的 debounce／播放計時器，避免稍後覆蓋還原的自存。
+    frame.src = 'about:blank';
+    keys.forEach((k, i) => saved[i] === null ? localStorage.removeItem(k) : localStorage.setItem(k, saved[i]));
+    results.textContent = text; results.className = text.includes('FAIL') ? 'fail' : '';
+    run.disabled = false;
+  };
+  frame.onload = () => {
+    if (!frame.contentWindow.blocks) return;
+    const script = frame.contentDocument.createElement('script');
+    script.type = 'module'; script.src = new URL('./design-isolation-browser.js', location.href).href + '?run=' + Date.now();
+    frame.contentDocument.body.appendChild(script);
+  };
+  frame.src = '../blocks.html?isolationRun=' + Date.now() + '#m=' + encodeSnapshot(fixture);
+};
+</script></html>

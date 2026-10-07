@@ -245,6 +245,7 @@ function solveHomeChain(list, modList, mod, topoParams, asm) {
 }
 
 // 已安裝模組底板的外框直邊（home／匯出座標，與 moduleFrameExports＋moduleFrameNodes＋frameGeometry 同一套規則）。
+// 加入子模組孔前會解析宿主邊方向；巢狀時沿 mount 鏈往父模組計算，不會回到目前模組。
 // 轉接座孔是 outlineExempt、不撐大外框；本模組自己直角安裝用的子模組端轉接座孔不豁免（它確實在板上），一併算入。
 // 回傳 [{ a, b, d, m, lengthMm }]；找不到模組或沒有安裝 → []。
 export function moduleFrameEdges(comps, modules, moduleId, params, opts = {}) {
@@ -255,7 +256,10 @@ export function moduleFrameEdges(comps, modules, moduleId, params, opts = {}) {
   const cache = opts.asm ? (ASM_FRAME_CACHE.get(opts.asm) || ASM_FRAME_CACHE.set(opts.asm, new Map()).get(opts.asm)) : (opts.cache instanceof Map ? opts.cache : null);
   // D3：立在宿主板面上（edge 'child'）時，站立邊就是這個外框的一條邊，轉接座孔在外框之內，不能反過來參與外框（會循環）。
   const standing = !!(opts.noOwnHoles || (mod.mount.orient && mod.mount.orient.edge === 'child'));
-  const key = `${moduleId}|${opts.stockMm || ''}|${jointCacheKey(opts.joint)}|${opts.exportSettings ? JSON.stringify(opts.exportSettings) : ''}|${standing ? 's' : ''}`;
+  let hostEdge = null;
+  if (mod.mount.orient && mod.base && !standing) hostEdge = orthogonalHostEdge(list, modList, mod.mount, pointCoords(list), params, { ...opts, home: true });
+  const hostSide = hostEdge && hostEdge.side;
+  const key = `${moduleId}|${opts.stockMm || ''}|${jointCacheKey(opts.joint)}|${opts.exportSettings ? JSON.stringify(opts.exportSettings) : ''}|${standing ? 's' : hostSide ?? ''}`;
   if (cache && cache.has(key)) return cache.get(key);
   const entry = frameEntryOf(list, modList, mod, params || {}, () => solveHomeChain(list, modList, mod, opts.asm ? null : params, opts.asm));
   let nodes = moduleFrameNodes(entry, frameConnectorNodes(entry.comps));
@@ -263,7 +267,7 @@ export function moduleFrameEdges(comps, modules, moduleId, params, opts = {}) {
     const pts = pointCoords(list);
     const to = mod.mount.to;
     const bar = to && to.body ? list.find(c => c && c.id === to.body) : null;
-    const holes = adapterChildHoles({ base: pts[mod.base], orient: mod.mount.orient, bar, stockMm: opts.stockMm || 3, joint: opts.joint });
+    const holes = adapterChildHoles({ base: pts[mod.base], orient: mod.mount.orient, bar, hostSide: hostEdge ? hostEdge.side : undefined, stockMm: opts.stockMm || 3, joint: opts.joint });
     nodes = [...nodes, ...holes.map((h, i) => ({ id: `ADP_${moduleId}_${i}`, x: h.x, y: h.y }))];
   }
   const edges = frameOutlineEdges(nodes, opts.exportSettings || {});

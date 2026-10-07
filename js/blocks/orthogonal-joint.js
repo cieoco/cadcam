@@ -55,10 +55,9 @@ export function jointSpec(kind, jointSettings = FABRICATION_DEFAULTS.joint) {
   };
 }
 
-// D2：子模組底板上的轉接座孔（子模組平面座標）。只靠子模組的 base、orient 與宿主桿（取板厚），
-// 與宿主邊的幾何無關——所以宿主是「已安裝模組的底板」時，宿主底板外框可以直接算它，不必繞回求解。
+// D2：子模組底板上的轉接座孔（子模組平面座標）；角碼孔位依宿主外側面，printed 保留原有孔位算法。
 // bar＝宿主桿／三角板零件（機架板宿主傳 null）；回傳 [{ x, y }]。
-export function adapterChildHoles({ base, orient, bar = null, stockMm = 3, joint: jointSettings }) {
+export function adapterChildHoles({ base, orient, bar = null, hostSide, stockMm = 3, joint: jointSettings }) {
   if (!base || !orient) return [];
   const joint = orient.joint || {};
   const kind = jointKindOf(joint);
@@ -71,7 +70,10 @@ export function adapterChildHoles({ base, orient, bar = null, stockMm = 3, joint
   const hostThickness = bar && finitePos(bar.stock && bar.stock.thicknessMm) ? Number(bar.stock.thicknessMm) : stockMm;
   const e = { x: Math.cos(orient.childAxisDeg * D2R), y: Math.sin(orient.childAxisDeg * D2R) };
   const f = { x: -e.y, y: e.x };
-  const t = hostThickness + flangeHole;
+  // 子模組基準面在宿主板底面（side＝1）或頂面（side＝-1）；只有頂面側要跨過板厚。
+  const side = hostSide === undefined ? orient.side : hostSide;
+  const hostFace = kind === 'bracket-m3' ? (Number(side) < 0 ? hostThickness : 0) : hostThickness;
+  const t = hostFace + flangeHole;
   return Array.from({ length: n }, (_, k) => {
     const s = ADAPTER_LENGTH_MM * (k + 0.5) / n;
     return { x: r3(base.x + s * e.x + t * f.x), y: r3(base.y + s * e.y + t * f.y) };
@@ -147,7 +149,7 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3, j
     holesPerFlange: n,
     tiltDeg: Number(orient.tiltDeg) || 0,   // D4：兩翼夾角＝90°＋tiltDeg
     hostHoles,
-    childHoles: standing ? standHoles(list, modList, mod, params, edge, ss, childHole, stockMm, jointSettings) : adapterChildHoles({ base, orient, bar, stockMm, joint: jointSettings }),
+    childHoles: standing ? standHoles(list, modList, mod, params, edge, ss, childHole, stockMm, jointSettings) : adapterChildHoles({ base, orient, bar, hostSide: edge.side, stockMm, joint: jointSettings }),
     // F1：角碼外形（寬、厚、兩腳長），給 3D 與說明用；列印版沒有
     bracket: bracket ? { widthMm: K.widthMm, thicknessMm: K.thicknessMm, longLegMm: K.longLegMm, shortLegMm: K.shortLegMm } : undefined
   };
@@ -248,9 +250,8 @@ function bracketLegs(comps, modules, moduleId, points, params, { stockMm = 3, jo
   const count = K.count;
   // 沿接合線的方向以宿主邊的 d 為準（木板上的孔都沿宿主 d 排）；站立（D3）時 frame.d 可能與宿主 d 反向，這時 s 要反過來數。
   const sgn = edge && edge.d && (d.x * edge.d.x + d.y * edge.d.y) < 0 ? -1 : 1;
-  // 子模組底板的孔以板邊（離轉角 板厚 T）起算，所以非站立時短腳的 t 起點固定在 T（n 朝上時＝宿主上面，與 tFace 相同）；
-  // n 朝下時 tFace＝0 但木板上的孔仍在 T＋flangeHole 處，短腳以木板的孔為準。
-  const tShort = standing ? 0 : T;
+  // 子模組底板孔由宿主外側面起算；短腳也從同一面開始，確保能與長腳在轉角接合。
+  const tShort = standing ? 0 : tFace;
   const plate = plan && Array.isArray(plan.parts) ? plan.parts.find(p => p && p.name === `${moduleId}-frame`) : null;
   const w0 = plate && Number.isFinite(Number(plate.zMm)) ? Number(plate.zMm) : 0;   // 底板朝宿主那一面的疊層高度（沿 m）
   const childT = plate && Number(plate.thicknessMm) > 0 ? Number(plate.thicknessMm) : stockMm;
