@@ -89,15 +89,15 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     if (selection.brackets) {
       const drilling = planFaceBrackets(host.surface, childSurface, face, selection.brackets.offsets);
       if (host.surface.body?.kind === 'rack' || childSurface.body?.kind === 'rack' || !drilling.ok) {
-        frame.contentWindow.postMessage({type:'face-wizard-error',reason:drilling.reason || '齒條目前不支援角碼開孔'},location.origin); return;
+        delete face.selection.brackets;
       }
     }
     const mounted = mountFacePlacement(comps, modules, childId, { hostId: host.surface.moduleId, outputId: host.surface.outputId, face }, params);
     if (!mounted.ok) { frame.contentWindow.postMessage({ type: 'face-wizard-error', reason: mounted.reason }, location.origin); return; }
-    if (selection.brackets) {
+    if (face.selection.brackets) {
       const pending = { ...child, mount: mounted.mount };
       const checked = faceBracketPlan(comps, modules.map(m => m.id === childId ? pending : m), params, pending, { stockMm, exportSettings });
-      if (!checked?.ok) { frame.contentWindow.postMessage({type:'face-wizard-error',reason:checked?.reason || '孔位無法驗證'},location.origin); return; }
+      if (!checked?.ok) delete mounted.mount.face.selection.brackets;
     }
     commit({ comps, modules: modules.map(m => m.id === childId ? { ...m, mount: mounted.mount } : m) }); dialog.close();
   }

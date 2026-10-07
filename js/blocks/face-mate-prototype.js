@@ -11,7 +11,7 @@ const symbols = { top: '↑', bottom: '↓', front: '●', back: '○', left: '�
 const faceOrder = ['top', 'bottom', 'front', 'back', 'left', 'right'];
 const integrated = new URLSearchParams(location.search).get('integrated') === '1';
 let { hosts, children } = realMountExamples();
-const initial = { host: 0, child: 0, hostFace: 'top', childFace: 'bottom', alignU: 0, alignV: 0, offsetU: 0, offsetV: 0, gap: 5, quarterTurns: 0 };
+const initial = { host: 0, child: 0, hostFace: 'top', childFace: 'bottom', alignU: 0, alignV: 0, offsetU: 0, offsetV: 0, gap: 0, quarterTurns: 0 };
 let draft = { ...initial }, saved = { ...initial }, step = 0;
 let mode = 'wizard';
 let hasConfirmed = false, roughPlaced = false, configured = false;
@@ -147,7 +147,7 @@ $('workMode').addEventListener('click', () => { mode = 'work'; render(); });
 $('back').addEventListener('click', () => { if (step > 0) step--; render(); });
 $('next').addEventListener('click', () => {
   if (mode === 'wizard' && step < 3) { step = configured && step === 0 ? 3 : step + 1; render(); return; }
-  if (!solve().ok || (bracketPlan && !bracketPlan.ok)) return;
+  if (!solve().ok) return;
   if (bracketPlan?.ok) draft.brackets = { enabled: true, offsets: { ...bracketOffsets }, childPart: children[draft.child].surface?.compId || 'frame' };
   else delete draft.brackets;
   if (integrated) { parent.postMessage({ type: 'face-wizard-confirm', selection: { ...draft } }, location.origin); return; }
@@ -266,7 +266,7 @@ function scene(mate) {
     bracketPlan = perpendicular ? planFaceBrackets(hosts[draft.host], children[draft.child], mate, bracketOffsets) : null;
     bracketSpan = bracketPlan?.span || 0;
     bracketNote.style.color = bracketPlan && !bracketPlan.ok ? '#b34436' : '#206f63';
-    bracketNote.textContent = !perpendicular ? '非直角接合，未配置角碼孔。' : !bracketPlan.ok ? bracketPlan.reason : `角碼 ${bracketPlan.brackets.length} 顆 · 確認後生成兩板固定孔 Ø3.2`;
+    bracketNote.textContent = !perpendicular ? '非直角接合，未配置角碼孔。' : !bracketPlan.ok ? `可接上；角碼孔待調整（${bracketPlan.reason}）` : `角碼 ${bracketPlan.brackets.length} 顆 · 確認後生成兩板固定孔 Ø3.2`;
     for (const slot of bracketPlan?.brackets || []) {
       const active = selectedBracket === slot.id;
       const color = slot.reason ? '#c84436' : active ? '#d99821' : '#607d83';
@@ -377,7 +377,7 @@ function preview() {
   $('mateStepChip').textContent = dimensionText.moveStep(moveStep);
   $('summary').textContent = `${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
   const mate = solve(); $('next').disabled = !mate.ok || !!document.querySelector('input[aria-invalid="true"]');
-  if (mate.ok) { scene(mate); if (bracketPlan && !bracketPlan.ok) $('next').disabled = true; }
+  if (mate.ok) scene(mate);
   else { $('mateOverlay').hidden = true; $('message').textContent = mate.reason; $('message').classList.add('error'); }
 }
 if (integrated) {
