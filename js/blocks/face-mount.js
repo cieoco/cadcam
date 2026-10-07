@@ -1,5 +1,5 @@
 /** Pure creation of a six-face mount record from a confirmed face transform. */
-import { compileAssembly, outputPose, solveAssembly } from './assembly.js?v=face-mount-20261007';
+import { compileAssembly, outputPose, solveAssembly } from './assembly.js?v=20261007_m5a';
 import { normalizeFaceMountContract } from './face-mount-contract.js';
 
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);

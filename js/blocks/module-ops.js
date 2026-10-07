@@ -4,10 +4,10 @@
  * 模組操作的純函式（SDD-ASSEMBLY-MODULES §4.3a、M1c 刀 1）：存成模組、宣告輸出端、
  * 安裝／拆下／解散、匯出模板、插入實例、模組庫序列化。不碰 DOM、不碰 localStorage。
  */
-import { compileAssembly, solveAssembly, outputPose, transformComp, planeOf, orthogonalHostEdge } from './assembly.js?v=face-mount-20261007';
+import { compileAssembly, solveAssembly, outputPose, transformComp, planeOf, orthogonalHostEdge } from './assembly.js?v=20261007_m5a';
 import { pointKeysFor } from './part-types.js';
-import { normalizeSnapshot } from './schema.js?v=face-mount-20261007';
-import { normalizeModules, sanitizeName } from './module-schema.js?v=face-mount-20261007';
+import { normalizeSnapshot } from './schema.js?v=20261007_m5a';
+import { normalizeModules, sanitizeName } from './module-schema.js?v=20261007_m5a';
 import { BLOCK_EXAMPLES } from './examples.js';
 import { ADAPTER_LENGTH_MM } from './orthogonal-joint.js';
 

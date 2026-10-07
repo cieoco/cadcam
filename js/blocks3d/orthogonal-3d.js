@@ -10,7 +10,7 @@
  * 欄向量：Mx = e.x·d + f.x·n、My = e.y·d + f.y·n、Mw = m；平移 T = origin − base.x·Mx − base.y·My。
  */
 
-import { orthogonalFrame, orthogonalHostEdge, planeOf, compsInPlane, pointIdsInPlane } from '../blocks/assembly.js?v=face-mount-20261007';
+import { orthogonalFrame, orthogonalHostEdge, planeOf, compsInPlane, pointIdsInPlane } from '../blocks/assembly.js?v=20261007_m5a';
 import { bracketBoxes, bracketScrews } from '../blocks/orthogonal-joint.js';
 
 export const IDENTITY_4 = Object.freeze([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);

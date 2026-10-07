@@ -14,6 +14,7 @@ import { memberStock } from './member-stock.js';
 import { frameOutlineEdges, safeName } from './exporters.js';   // C1：機架外框直邊、零件檔名
 import { frameConnectorNodes, pointCoords } from './model.js';
 import { adapterChildHoles } from './orthogonal-joint.js';   // D2：子模組底板上的轉接座孔（只在呼叫時用，與本檔互相引用無妨）
+import { assemblyRoles, machineComps } from './assembly-roles.js';   // M5a：底座／機器／未安裝（純函式，不回頭引用本檔）
 
 const D2R = Math.PI / 180;
 const IDENTITY_POSE = { x: 0, y: 0, a: 0 };
@@ -145,8 +146,9 @@ const EDGE_EPS = 1e-9;
 const sideOfM = (d, m) => (m.x * -d.y + m.y * d.x) >= 0 ? 1 : -1;
 
 // 世界機架（不屬於已安裝模組的零件）外框的每一段直邊；opts.exportSettings 缺省時用預設匯出設定。
+// M5a：多個未安裝的機構時，機架板只算「那個宿主自己的」——opts.hostId 缺省＝底座（整台機器的機架）。
 export function worldFrameEdges(comps, modules, opts = {}) {
-  const nodes = frameConnectorNodes(worldFrameComps(comps, modules));
+  const nodes = frameConnectorNodes(hostFrameComps(comps, modules, opts && opts.hostId));
   return frameOutlineEdges(nodes, (opts && opts.exportSettings) || {});
 }
 
@@ -174,7 +176,7 @@ export function orthogonalHostEdge(comps, modules, mount, points, params, opts =
     // D2：宿主是「已安裝的模組」→ 它自己的底板（<id>-frame），隨模組剛體移動；否則是靜止的世界機架板。
     const hostMod = to.module != null ? modList.find(m => m && m.id === to.module) : null;
     if (hostMod && hostMod.mount && hostMod.mount.to && hostMod.mount.to.module != null) return mountedFrameEdge(list, modList, hostMod, k, points, params, opts);
-    const e = worldFrameEdges(list, modList, opts)[k];
+    const e = worldFrameEdges(list, modList, { ...opts, hostId: to.module })[k];
     if (!e) return null;
     return {
       kind: 'frame', a: e.a, b: e.b, d: e.d, m: e.m, side: sideOfM(e.d, e.m), lengthMm: e.lengthMm,
@@ -789,6 +791,27 @@ export function worldFrameComps(comps, modules) {
   });
 }
 
+// M5a：整台機器的機架零件＝世界機架去掉「未安裝」機構的零件（底座那串的零件＋沒有 moduleId 的零件）。
+// 製作包、干涉、匯出、組立台的機架板都用它；worldFrameComps 本身不變（ownPorts 要拿來配虛擬安裝）。
+export function machineFrameComps(comps, modules) {
+  return worldFrameComps(machineComps(comps, modules), modules);
+}
+
+// 只留機器的馬達安裝座（座所在的零件屬於未安裝機構的丟掉）。
+export function machineMounts(mounts, comps, modules) {
+  const spare = new Set(assemblyRoles(modules).spare);
+  if (!spare.size) return mounts;
+  return (Array.isArray(mounts) ? mounts : []).filter(m => !(m && m.pointId && spare.has(moduleOfPoint(comps, m.pointId))));
+}
+
+// 某個未安裝宿主自己的機架零件：其他未安裝機構的零件不算（底座或沒指定＝整台機器的機架）。
+export function hostFrameComps(comps, modules, hostId) {
+  const modList = Array.isArray(modules) ? modules : [];
+  if (hostId == null || hostId === assemblyRoles(modList).root) return machineFrameComps(comps, modList);
+  const others = new Set(modList.filter(m => m && !m.mount && m.id !== hostId).map(m => m.id));
+  return worldFrameComps(comps, modList).filter(c => !c.moduleId || !others.has(c.moduleId));
+}
+
 // 已安裝模組零件上，type 為 fixed 或 motor 的點 id（這些孔「鎖在宿主上」，外觀不畫地錨樣式）。
 export function mountedBaseIds(comps, modules) {
   const list = Array.isArray(comps) ? comps : [];
@@ -894,4 +917,4 @@ export function moduleFrameNodes(entry, frameNodes) {
 }
 
 // G1：已安裝模組固定板（<id>-frame）在目前位姿的幾何，給 3D／2D 畫（實作在 module-plates.js）。
-export { mountedFramePlates } from './module-plates.js?v=face-mount-20261007';
+export { mountedFramePlates } from './module-plates.js?v=20261007_m5a';

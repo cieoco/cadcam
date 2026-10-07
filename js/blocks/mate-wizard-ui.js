@@ -3,14 +3,14 @@
  *
  * 組立台的「接合精靈」（SDD-MATE-FACES §5.2，M4）：手機與電腦同一套，取代預設的接口面板；工程面板收進「進階」。
  * 結構清單（#mateTree）→ 選一個機構 → 選承接面（卡片或 3D 裡亮起的面）→ 預覽（換接法、微調、看干涉）→ 接上／取消。
- * 資料全部走 mate-connect.js（mateTargets／mateConnect／mateStyles／setMateStyle）與 bench.js（benchAdjust）。
+ * 資料全部走 mate-connect.js（mateTargets／mateConnect／mateAdjust／mateStyles／setMateStyle）。
  * 預覽的候選作品不寫進 S（沒有復原紀錄、不存檔）：由 app.js 的 setCandidate／withCandidate 暫時換進去重畫；
  * 接上時才經 bench-ui 的 commit（一筆復原，與工程面板同一條重建流程）。
  * bench-ui 把它需要的內部放在 h（見 createBench 結尾）；這裡不碰 3D 與 S 以外的全域。
  */
 import { S } from './state.js';
-import { mateTargets, mateConnect, mateOfMount, mateStyle, mateStyles, setMateStyle } from './mate-connect.js';
-import { benchAdjust } from './bench.js';
+import { assemblyRoles, setAssemblyRoot } from './assembly-roles.js';
+import { mateTargets, mateConnect, mateAdjust, mateOfMount, mateStyle, mateStyles, setMateStyle } from './mate-connect.js';
 
 const LS_KEY = 'blocks.mateAdvanced';
 const KIND = t => t.kind === 'bolt' ? '平貼對鎖' : '角碼直角';
@@ -54,7 +54,7 @@ export function createMateWizard(h) {
   const offsetOf = (modules, id) => { const m = modules.find(x => x.id === id); return (m && m.mount && m.mount.orient && m.mount.orient.offsetMm) || 0; };
   // 這個微調現在能不能做（滑到頭也算不能）；{ ok, reason? }。
   function canAdj(comps, modules, id, act) {
-    const r = benchAdjust(comps, modules, id, act, params(), opts());
+    const r = mateAdjust(comps, modules, id, act, params(), opts());   // M5a：滑到別人的位置會被擋下並說是誰
     if (!r.ok) return { ok: false, reason: r.reason || '這個動作現在不能用' };
     if ((act === 'slide+' || act === 'slide-') && offsetOf(r.modules, id) === offsetOf(modules, id)) return { ok: false, reason: NO_SLIDE };
     return { ok: true, r };
@@ -116,20 +116,16 @@ export function createMateWizard(h) {
   }
 
   // ---------------------------------------------------------------- 結構清單
+  // 清單順序＝assemblyRoles().order：底座那串在前，未安裝的各串在後；role＝root｜machine｜spare。
   function treeRows() {
-    const mods = S.modules.filter(Boolean), byId = new Map(mods.map(m => [m.id, m]));
-    const hostOf = m => (m.mount && m.mount.to && byId.get(m.mount.to.module)) || null;
-    const out = [], seen = new Set();
-    const walk = (m, depth) => { if (seen.has(m.id)) return; seen.add(m.id); out.push({ m, depth }); mods.filter(c => hostOf(c) === m).forEach(c => walk(c, depth + 1)); };
-    mods.filter(m => !hostOf(m)).forEach(m => walk(m, 0));
-    mods.forEach(m => walk(m, 0));   // 環狀等例外
-    return out;
+    const r = assemblyRoles(S.modules), spare = new Set(r.spare);
+    return r.order.map(id => ({ m: h.modOf(id), depth: r.depth[id], parent: r.parent[id], role: id === r.root ? 'root' : spare.has(id) ? 'spare' : 'machine' })).filter(x => x.m);
   }
-  function describe(m) {
+  function describe(m, role, depth) {
     const mate = m.mount ? mateOfMount(S.comps, S.modules, m.id, params()) : null;
     const sty = mate ? stylesOf(m.id).find(x => x.current) : null;
     const note = !m.mount ? '' : mate ? `→ ${[h.displayName(mate.module), mate.name, sty && sty.label].filter(Boolean).join('・\u200b')}` : h.statusOf(m);
-    return { mate, sty, note, tag: !m.mount && !hostsOthers(m) && m !== S.modules[0] ? '未安裝' : '' };
+    return { mate, sty, note, tag: role === 'root' ? '底座' : role === 'spare' && !depth ? '未安裝' : '' };
   }
   function renderTree() {
     let tree = document.getElementById('mateTree');
@@ -137,10 +133,15 @@ export function createMateWizard(h) {
       tree = el('div', 'mate-tree'); tree.id = 'mateTree'; tree.setAttribute('aria-label', '結構清單');
       h.listEl().prepend(tree);
     }
-    const rows = treeRows().map(({ m, depth }) => ({ m, depth, ...describe(m) }));
-    const sig = JSON.stringify([rows.map(r => [r.m.id, h.displayName(r.m.id), r.depth, r.note, r.tag]), st.selected]);
+    const rows = treeRows().map(r => ({ ...r, ...describe(r.m, r.role, r.depth) }));
+    const names = rows.filter(r => r.role === 'spare').map(r => h.displayName(r.m.id));
+    const sig = JSON.stringify([rows.map(r => [r.m.id, h.displayName(r.m.id), r.depth, r.note, r.tag]), st.selected, names]);
     if (sig === treeSig) return;
     treeSig = sig;
+    let note = document.getElementById('mateSpareNote');   // 還沒接上的提醒（沒有時整行藏起來）
+    if (!note) { note = el('div', 'mate-spare-note'); note.id = 'mateSpareNote'; tree.after(note); }
+    note.hidden = !names.length;
+    note.textContent = names.length ? `還沒接上：${names.join('、')}（不會進製作包）` : '';
     while (tree.firstChild) tree.removeChild(tree.firstChild);
     if (!rows.length) tree.appendChild(el('div', 'bench-empty', '作品裡還沒有機構。回「設計」從模組庫插入。'));
     rows.forEach(({ m, depth, note, tag }) => {
@@ -152,11 +153,26 @@ export function createMateWizard(h) {
       if (tag) top.appendChild(el('small', 'mate-tree-tag', tag));
       row.appendChild(top);
       if (note) row.appendChild(el('small', 'mate-tree-note', note));
-      const go = () => h.select(m.id);
+      const go = () => { h.say('', { toast: false }); h.select(m.id); };
       row.addEventListener('click', go);
       row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
       tree.appendChild(row);
     });
+    sizeTree(tree);
+  }
+  // 手機：清單最多長到 3 列，再多就在清單裡捲動（選中的列捲進來）；3D 畫面的上緣跟著清單的高度。
+  function sizeTree(tree) {
+    const rs = [...tree.children].filter(x => x.classList.contains('mate-tree-row')), list = h.listEl();
+    tree.style.removeProperty('--mate-tree-h');
+    if (rs.length > 3) { const t = tree.getBoundingClientRect(); tree.style.setProperty('--mate-tree-h', `${Math.round(rs[2].getBoundingClientRect().bottom - t.top + 2)}px`); }
+    const sel = rs.find(x => x.classList.contains('selected'));
+    if (sel) {
+      const t = tree.getBoundingClientRect(), r = sel.getBoundingClientRect();
+      if (r.top < t.top) tree.scrollTop -= t.top - r.top; else if (r.bottom > t.bottom) tree.scrollTop += r.bottom - t.bottom;
+    }
+    const set = () => document.documentElement.style.setProperty('--mate-list-h', `${Math.round(list.getBoundingClientRect().height)}px`);
+    set();
+    if (!listWatch && 'ResizeObserver' in window) { listWatch = new ResizeObserver(set); listWatch.observe(list); }
   }
 
   // ---------------------------------------------------------------- 面板
@@ -167,8 +183,8 @@ export function createMateWizard(h) {
     return d;
   }
   const btn = (text, cls, onClick) => { const b = el('button', 'bench-btn' + (cls ? ' ' + cls : ''), text); b.type = 'button'; b.addEventListener('click', onClick); return b; };
-  // 按不動的鈕不用 disabled（手指點了才看得到原因）：灰掉，點了在訊息列說明。
-  const soft = (b, c, onOk) => { b.addEventListener('click', () => { if (!c.ok) h.say(c.reason); else onOk(); }); if (!c.ok) { b.classList.add('is-disabled'); b.setAttribute('aria-disabled', 'true'); b.title = c.reason; } return b; };
+  // 按不動的鈕不用 disabled／aria-disabled（輔助工具會拒絕點它，就看不到原因了）：灰掉，點了在訊息列說明。
+  const soft = (b, c, onOk) => { b.addEventListener('click', () => { if (!c.ok) h.say(c.reason); else onOk(); }); if (!c.ok) { b.classList.add('is-disabled'); b.title = c.reason; } return b; };
 
   function styleBox(comps, modules, id, list) {
     if (!list.length) return null;
@@ -205,16 +221,23 @@ export function createMateWizard(h) {
     const ts = targetsOf(mod.id), ok = ts.filter(t => t.ok), no = ts.filter(t => !t.ok), name = h.displayName(mod.id);
     root.appendChild(ok.length ? head(`把「${name}」接到哪裡？`, '點下面的卡片，或直接點 3D 裡亮起來的承接面。') : head(name, '還沒安裝'));
     if (ok.length) {
-      const list = el('div', 'bench-ports');
-      ok.forEach(t => {
-        const b = btn('', 'bench-port mate-target', () => pickTarget(t));
-        b.dataset.module = t.module; b.dataset.mate = t.mateId;
-        b.appendChild(el('span', 'bench-port-name', `${h.displayName(t.module)}・${t.name}`));
-        b.appendChild(el('small', 'bench-port-kind', KIND(t)));
-        list.appendChild(b);
+      const hosts = [...new Set(ok.map(t => t.module))], list = el('div', 'bench-ports');
+      hosts.forEach(hid => {   // 不只一個宿主：每個宿主一個小標題，底下是它的承接面
+        if (hosts.length > 1) list.appendChild(el('div', 'bench-label mate-host-head', h.displayName(hid)));
+        ok.filter(t => t.module === hid).forEach(t => {
+          const b = btn('', 'bench-port mate-target', () => pickTarget(t));
+          b.dataset.module = t.module; b.dataset.mate = t.mateId;
+          b.appendChild(el('span', 'bench-port-name', hosts.length > 1 ? t.name : `${h.displayName(t.module)}・${t.name}`));
+          b.appendChild(el('small', 'bench-port-kind', KIND(t)));
+          list.appendChild(b);
+        });
       });
       root.appendChild(list);
-    } else root.appendChild(el('div', 'bench-note', hostsOthers(mod) ? `「${name}」是底座，別的機構會接在它上面。` : '沒有可以接的承接面。到「設計」分頁用「接合面」標出來。'));
+    } else root.appendChild(el('div', 'bench-note', assemblyRoles(S.modules).root === mod.id ? `「${name}」是底座，別的機構會接在它上面。` : '沒有可以接的承接面。到「設計」分頁用「接合面」標出來。'));
+    if (assemblyRoles(S.modules).root !== mod.id) {   // 不是底座：可以改設成底座（一筆復原）
+      const mk = btn('設為底座', 'mate-root', () => h.apply({ comps: S.comps, modules: setAssemblyRoot(S.modules, mod.id) }, `「${name}」現在是底座`));
+      mk.id = 'mateMakeRoot'; root.appendChild(mk);
+    }
     if (no.length) {
       const det = el('details', 'bench-more');
       det.appendChild(el('summary', 'bench-more-sum', `不能接的（${no.length}）`));
@@ -224,7 +247,6 @@ export function createMateWizard(h) {
   }
   function previewView(root, mod) {
     root.appendChild(head(`預覽：「${h.displayName(mod.id)}」`, `接到 ${h.displayName(pv.host)}・${pv.name}`));
-    root.appendChild(liveLine);
     const row = el('div', 'bench-row');
     const ok = btn('接上', 'primary', commit); ok.id = 'mateCommit';
     const no = btn('取消', '', () => cancel()); no.id = 'mateCancel';
@@ -235,7 +257,6 @@ export function createMateWizard(h) {
   function mountedView(root, mod) {
     const mate = mateOfMount(S.comps, S.modules, mod.id, params());
     root.appendChild(mate ? head(`接在：${h.displayName(mate.module)}・${mate.name}`, h.displayName(mod.id)) : head(h.displayName(mod.id), h.statusOf(mod)));
-    root.appendChild(liveLine);
     const row = el('div', 'bench-row');
     const off = btn('拆下', 'danger', () => h.adjust('unmount')); off.id = 'mateDetach';
     const edit = btn('回設計修改', '', () => h.adjust('edit')); edit.id = 'mateEdit';
@@ -258,9 +279,9 @@ export function createMateWizard(h) {
     if (s === 'preview') previewView(root, h.modOf(pv.childId));
     else if (s === 'pick') pickView(root, mod);
     else if (s === 'mounted') mountedView(root, mod);
-    else root.appendChild(head('接合精靈', '先從清單選一個要安裝的機構'));
+    else root.appendChild(head('接合精靈', matchMedia('(max-width: 640px)').matches ? '先點上面清單裡要裝的機構' : '先點左邊清單裡要裝的機構'));
     const msg = el('div', 'bench-msg', st.msg); msg.id = 'benchMsg'; msg.setAttribute('aria-live', 'polite');
-    root.appendChild(msg);
+    root.firstChild.after(liveLine, msg);   // 標題底下：一行干涉狀態，再來是訊息（拒絕的原因、拆下說明）
     root.appendChild(h.liveBox);   // 即時干涉＋全行程測試（預覽中檢查的是預覽的姿勢）
     ensureToggle(root);
   }
@@ -272,9 +293,10 @@ export function createMateWizard(h) {
   }
   // 一行干涉狀態：✔ 沒有干涉／✖ 撞到 n 處＋撞到的機構名稱（只用機構名，不露零件 id）。
   function syncLive() {
-    const i = h.liveInfo(), comps = pv ? pv.cand.comps : S.comps;
+    const i = h.liveInfo(), comps = pv ? pv.cand.comps : S.comps, cur = pv ? pv.childId : st.selected;
     let state = 'none', text = '干涉檢查中…';
-    if (i.ready && !i.n) { state = 'ok'; text = '✔ 目前沒有干涉'; }
+    if (cur && assemblyRoles(pv ? pv.cand.modules : S.modules).spare.includes(cur)) text = '還沒接到底座，要接到底座上才會檢查干涉';   // 未安裝的串不進機器，也不進干涉檢查
+    else if (i.ready && !i.n) { state = 'ok'; text = '✔ 目前沒有干涉'; }
     else if (i.ready) {
       const names = new Set();
       i.hits.forEach(n => {
@@ -300,7 +322,7 @@ export function createMateWizard(h) {
       return [...set].some(m => id === m || id === `${m}-frame`) || part.has(id) || id.split('-').some(t => part.has(t));
     };
   }
-  let watched = null, fitTimer = 0;
+  let watched = null, fitTimer = 0, listWatch = null;
   function bottomInset(v) {   // 播放列蓋住畫布下方的高度
     const bar = document.querySelector('.controls'), cr = bar && bar.getBoundingClientRect(), vr = v.canvas.getBoundingClientRect();
     return cr && cr.height > 0 && cr.top < vr.bottom && cr.bottom > vr.top ? Math.max(0, vr.bottom - cr.top + 4) : 0;
@@ -356,20 +378,22 @@ export function createMateWizard(h) {
       if (!t.ok) o.reason = t.reason; else Object.assign(o, at(ms.find(m => m.module === t.module && m.portId === t.portId)));
       return o;
     }) : [];
-    const tree = treeRows().map(({ m, depth }) => {
-      const d = describe(m), host = m.mount && m.mount.to ? m.mount.to.module : null;
-      return { id: m.id, name: h.displayName(m.id), depth, parent: host != null && S.modules.some(x => x.id === host) ? host : null, mateName: d.mate ? d.mate.name : '', style: mateStyle(S.modules, m.id), unmounted: !m.mount };
+    const roles = assemblyRoles(S.modules);
+    const tree = treeRows().map(({ m, depth, parent, role }) => {
+      const d = describe(m, role, depth);
+      return { id: m.id, name: h.displayName(m.id), role, depth, parent, mateName: d.mate ? d.mate.name : '', style: mateStyle(S.modules, m.id), unmounted: !m.mount };
     });
     const fill = v && v.viewFill ? v.viewFill(keyTest(fitIds())) || v.viewFill() : 0;
     return {
-      advanced: adv, selected: st.selected, state: s, targets, tree, view: { fill: Math.round(fill * 1000) / 1000 },
+      advanced: adv, selected: st.selected, state: s, root: roles.root, spare: roles.spare, targets, tree, view: { fill: Math.round(fill * 1000) / 1000 },
       preview: pv ? { mateId: pv.mateId, style: mateStyle(pv.cand.modules, pv.childId), offsetMm: offsetOf(pv.cand.modules, pv.childId), hits: pv.hits } : null
     };
   }
-  // 進組立：只有一個未安裝的機構有地方可接 → 直接選它。
+  // 進組立：只有一個未安裝的機構有地方可接 → 直接選它（沒選東西，或選的已經接好了）。
   function onEnter() {
     cache.key = ''; treeSig = ''; panelSig = '';
-    if (adv || st.selected) return;
+    const cur = st.selected && h.modOf(st.selected);
+    if (adv || (cur && !cur.mount)) return;   // 沒選、或選的已經接好了（沒事可做）才自動選
     const cs = S.modules.filter(m => m && !m.mount && okTargets(m.id).length);
     if (cs.length === 1) h.select(cs[0].id);
   }

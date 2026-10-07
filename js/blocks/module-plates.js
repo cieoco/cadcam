@@ -8,7 +8,7 @@
  * 直角安裝的子模組在自己的平面靜止＝不變換。
  * 與 assembly.js 互相引用（只在呼叫時用函式，無頂層相依），assembly.js 再轉出 mountedFramePlates。
  */
-import { moduleFrameExports, moduleFrameNodes, splitFrameMounts, planeOf, outputPose } from './assembly.js?v=face-mount-20261007';
+import { moduleFrameExports, moduleFrameNodes, splitFrameMounts, planeOf, outputPose } from './assembly.js?v=20261007_m5a';
 import { deriveMotorMounts, buildPlan } from './build-plan.js';
 import { inspectFrameExport, splitMountsByHost } from './exporters.js';
 import { frameConnectorNodes } from './model.js';

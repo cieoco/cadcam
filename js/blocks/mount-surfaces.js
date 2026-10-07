@@ -5,7 +5,7 @@
  * mounted in 3D.
  */
 import { autoPorts } from './bench.js';
-import { moduleFrameExports, moduleFrameNodes } from './assembly.js?v=face-mount-20261007';
+import { moduleFrameExports, moduleFrameNodes } from './assembly.js?v=20261007_m5a';
 import { inspectFrameExport, inspectLinkExport, inspectPlateExport, inspectRackExport } from './exporters.js';
 import { frameConnectorNodes, pointCoords } from './model.js';
 import { memberStock } from './member-stock.js';

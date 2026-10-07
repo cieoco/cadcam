@@ -12,7 +12,8 @@
  *   並用角的高度區間，檢查宿主平面上、多邊形與高度都重疊的零件（宿主那一片本身不算）。
  * 平面近似（桿＝膠囊、齒輪＝圓、機架板＝凸包），仍需實物確認。
  */
-import { compileAssembly, solveAssembly, moduleFrameExports, moduleFrameNodes, worldFrameComps, splitFrameMounts, planeOf, orthogonalFrame, orthogonalHostEdge, slabCorners3D } from './assembly.js';
+import { machineComps, machineModules } from './assembly-roles.js';
+import { compileAssembly, solveAssembly, moduleFrameExports, moduleFrameNodes, machineFrameComps, machineMounts, splitFrameMounts, planeOf, orthogonalFrame, orthogonalHostEdge, slabCorners3D } from './assembly.js';
 import { frameConnectorNodes } from './model.js';
 import { inspectFrameExport, inspectRackExport, splitMountsByHost, motorMountFeatures, isStaticPlate } from './exporters.js';
 import { jawCenterline } from './plate-geometry.js';
@@ -137,8 +138,10 @@ const IDENTITY_XF = { cos: 1, sin: 0, tx: 0, ty: 0, angleRad: 0 };
 // 建立檢查器：做完所有「與姿態無關」的準備（機架外形、剛體分組…），回傳 { solveWalk, solveMulti, runPose }。
 // runPose(pose, results, seen) 檢查單一姿態，把新發現的干涉 push 進 results（seen 用來去重）。
 function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], exportSettings = {}, mounts, joint } = {}) {
-  const list = Array.isArray(comps) ? comps : [];
-  const modList = Array.isArray(modules) ? modules : [];
+  // M5a：還沒接上的機構不參加檢查（只看底座＋裝在它身上的）。
+  const list = machineComps(Array.isArray(comps) ? comps : [], modules);
+  const modList = machineModules(Array.isArray(modules) ? modules : []);
+  if (Array.isArray(mounts)) mounts = machineMounts(mounts, comps, modules);
   const parts = (plan && plan.parts) || [];
   const joints = (plan && plan.joints) || [];
   const planMotors = (plan && plan.motors) || [];
@@ -245,7 +248,7 @@ function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], 
   const { free } = splitMountsByHost(list, allMounts);
   const freeSplit = splitFrameMounts(free, list, modList);
   const refFrames = new Map();   // part.name -> { hulls, anchors: [{id,x,y}], moduleId }
-  const worldNodes = frameConnectorNodes(worldFrameComps(list, modList));
+  const worldNodes = frameConnectorNodes(machineFrameComps(list, modList));
   if (worldNodes.length && partByName.has('frame')) {
     const g = inspectFrameExport(worldNodes, exp, freeSplit.world);
     refFrames.set('frame', { hulls: ((g && g.outlines) || []).map(convexHull).filter(h => h.length >= 3), anchors: [], moduleId: null });

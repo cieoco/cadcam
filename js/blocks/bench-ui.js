@@ -12,15 +12,16 @@
  */
 import { S, motorAnglesNow } from './state.js';
 import { openFaceWizard } from './face-wizard-ui.js?v=20261007_mobile';
-import * as Bench from './bench.js?v=20261007_m4';
-import { createMateWizard } from './mate-wizard-ui.js?v=20261007_m4b';
-import { moduleFrameEdges } from './assembly.js?v=face-mount-20261007';
+import * as Bench from './bench.js?v=20261007_m5a';
+import { createMateWizard } from './mate-wizard-ui.js?v=20261007_m5b';
+import { moduleFrameEdges } from './assembly.js?v=20261007_m5a';
 import * as Settings from './settings.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { resolveSpacers, findInterference, interferenceTimeline, hitPartNames } from './interference.js';
-import { setMountFlip, unmountModule } from './module-ops.js?v=face-mount-20261007';
+import { setMountFlip } from './module-ops.js?v=20261007_m5a';
+import { mateAdjust, mateDetach } from './mate-connect.js';   // M5a：滑動不能擠到鄰居；拆下時帶著底下整串
 import { pointKeysFor } from './part-types.js';
-import { applyMatrix4, moduleFrameZ } from '../blocks3d/orthogonal-3d.js?v=face-mount-20261007';
+import { applyMatrix4, moduleFrameZ } from '../blocks3d/orthogonal-3d.js?v=20261007_m5a';
 
 const SNAP_PX = 40;          // 拖曳吸附半徑（螢幕 px）
 const TAP_PX_MOUSE = 26;     // 點接口的命中半徑（滑鼠）
@@ -642,9 +643,8 @@ export function createBench(deps) {
       r = setMountFlip(S.comps, S.modules, id, !mod.mount.flip);
       if (!r.ok) r = { ...r, reason: opsReason(r.reason) };
     } else if (action === 'unmount') {
-      r = unmountModule(S.comps, S.modules, id, S.topo.params, motorState());
-      if (!r.ok) r = { ...r, reason: opsReason(r.reason) };
-    } else r = Bench.benchAdjust(S.comps, S.modules, id, action, S.topo.params, { joint: S.fabrication?.joint });
+      r = mateDetach(S.comps, S.modules, id, S.topo.params, motorState());
+    } else r = mateAdjust(S.comps, S.modules, id, action, S.topo.params, { joint: S.fabrication?.joint });
     if (!r.ok) { say(r.reason || '這個動作現在不能用'); return false; }
     pushUndo();
     S.comps = r.comps; S.modules = r.modules;
@@ -660,7 +660,7 @@ export function createBench(deps) {
     else if (action === 'tilt+' || action === 'tilt-') msg = o && o.tiltDeg ? `已傾斜 ${o.tiltDeg}°（兩翼夾角 ${90 + o.tiltDeg}°）` : '已回到直角（傾斜 0°）';
     else if (action === 'angle') msg = after && after.mount && after.mount.orient ? '已改成直角安裝（⟂）' : '已改成同平面安裝（═）';
     else if (action === 'flip') msg = after && after.mount && after.mount.flip ? '已翻面' : '已翻回';
-    else if (action === 'unmount') msg = `已拆下「${displayName(mod.id)}」，回到原位`;
+    else if (action === 'unmount') msg = `已拆下「${displayName(mod.id)}」，回到原位${r.moved ? `（裝在它身上的 ${r.moved} 個一起回到未安裝）` : ''}`;
     else if (action === 'stand') msg = o && o.edge === 'child' ? '已改成立在宿主的板面上（⤒）' : '已改成壓在宿主的邊上';
     else if (action === 'rotate' && o && o.edge === 'child') msg = `已換站立邊（第 ${o.childEdge} 條底板邊）`;
     else msg = ADJUST_DONE[action] || '完成';
@@ -682,7 +682,7 @@ export function createBench(deps) {
     if (!mod || !mod.mount) return { ok: false, reason: '還沒安裝，請先接到宿主上' };
     if (mod.mount.face && action !== 'unmount' && action !== 'edit') return { ok: false, reason: '六面接合請拆下後重新選面與尺寸' };
     if (action === 'angle' || action === 'flip' || action === 'unmount' || action === 'edit') return { ok: true };
-    const r = Bench.benchAdjust(S.comps, S.modules, mod.id, action, S.topo.params, { joint: S.fabrication?.joint });
+    const r = mateAdjust(S.comps, S.modules, mod.id, action, S.topo.params, { joint: S.fabrication?.joint });
     if (!r.ok) return { ok: false, reason: r.reason };
     // 滑到頭時結果與現況相同：視為到端點
     if (action === 'slide+' || action === 'slide-') {

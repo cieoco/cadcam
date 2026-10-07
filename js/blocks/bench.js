@@ -155,7 +155,7 @@ export function autoPorts(comps, modules, moduleId, params, opts = {}) {
     const vmods = withVirtualMount(modList, opts && opts.childId);
     const owns = frameConnectorNodes(list.filter(c => c && (c.moduleId || null) === mid)).length > 0;
     if (owns) {
-      const group = worldFrameEdges(list, vmods).map((e, k) => ({
+      const group = worldFrameEdges(list, vmods, { hostId: mid }).map((e, k) => ({
         id: `edge:frame:${k}`, kind: 'edge', module: mid,
         body: { kind: 'frame', module: mid, edge: k }, side: sideOf(e),
         name: `機架・${edgeWordOfM(e.m)}`, lengthMm: e.lengthMm, suggested: false
@@ -435,8 +435,9 @@ export function portMarkers(comps, modules, childId, points, params, { zOf, thic
           : b.kind === 'triangle' ? { module: host.id, body: b.id, edge: b.edge } : { module: host.id, body: b.id };
         const ownFrame = b.kind === 'frame' && host.mount;   // D2：已安裝模組自己的底板，跟著宿主模組走
         if (b.kind === 'frame' && !ownFrame) {
-          if (seenFrame.has(b.edge)) return;   // 世界機架只有一塊：多個模組共用時只標一次
-          seenFrame.add(b.edge);
+          const fk = `${host.id}:${b.edge}`;   // M5a：每個未安裝的宿主各有自己的機架板（不再共用一塊）
+          if (seenFrame.has(fk)) return;
+          seenFrame.add(fk);
         }
         const e = orthogonalHostEdge(list, vmods, { to, orient: { side: port.side } }, pts, params, { cache: frameCache });
         if (!e) return;

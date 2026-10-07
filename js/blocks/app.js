@@ -14,13 +14,13 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261007_4';
+import { APP_VERSION } from '../version.js?v=20261007_5';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
 // computeBodyLayers：2D 疊放順序與 3D z 分層共用同一套，兩邊才一致。
 import { buildSceneModel, computeBodyLayers } from '../blocks3d/scene-model.js';
-import { buildOrthogonalChildren, planeInputs, attachModulePlates } from '../blocks3d/orthogonal-3d.js?v=face-mount-20261007';   // O6：直角安裝子模組的 3D 位姿
+import { buildOrthogonalChildren, planeInputs, attachModulePlates } from '../blocks3d/orthogonal-3d.js?v=20261007_m5a';   // O6：直角安裝子模組的 3D 位姿
 // 純邏輯模組
 import * as View from './view.js';
 import * as Render from './render.js';   // SVG 繪製基元（純呈現）
@@ -35,8 +35,9 @@ import { getTeachingFeedback } from './teaching-feedback.js';
 import * as Motion from './motion.js';
 import { memberSweepSegments } from './member-sweep.js';
 let sweepMemberId = null; // 顯示偏好，不寫入作品格式。
-import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostEdge, hostPlateThickness } from './assembly.js?v=face-mount-20261007';
-import { normalizeModules } from './module-schema.js?v=face-mount-20261007';
+import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, machineFrameComps, machineMounts, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostEdge, hostPlateThickness } from './assembly.js?v=20261007_m5a';
+import { machineComps, machineModules } from './assembly-roles.js';   // M5a：製作／匯出只看機器（底座＋裝在它身上的）
+import { normalizeModules } from './module-schema.js?v=20261007_m5a';
 import { refreshFaceMounts } from './face-mount-refresh.js';
 import { designTabs, resolveFocus, compsInFocus, assignNewComps, pointIdsOf, focusInputs, ROOT_TAB } from './design-focus.js';   // H1：設計模式一次只看一個設計（分頁）
 import { createDesignTabs } from './design-tabs-ui.js?v=20261005_tabclose';
@@ -47,7 +48,7 @@ import { drawMemberDimensions } from './member-dimension-render.js';
 import { memberStock, memberHoleDiameter, memberStockWarnings } from './member-stock.js';
 import { createJawTipHandle } from './jaw-tip-handle.js';
 import { analyzeDof } from './dof.js';
-import * as Store from './storage.js?v=face-mount-20261007';
+import * as Store from './storage.js?v=20261007_m5a';
 import * as Exporters from './exporters.js';
 import { localToWorld, plateVertices, plateShapeMode, createPlateGeometry } from './plate-geometry.js';
 import { S, activateMotor, motorAnglesNow, frozenMotorAngles, usedMotorIds } from './state.js';  // 跨模組共享的可變狀態與多馬達 helper
@@ -61,7 +62,7 @@ import { createPlateEditor } from './plate-editor.js';
 import { createNodeEditor } from './node-editor.js';
 import { createModuleEditor } from './module-editor.js?v=20261007_import_spacing';
 import { createModuleDrag } from './module-drag.js';
-import { createBench } from './bench-ui.js?v=20261007_m4b';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
+import { createBench } from './bench-ui.js?v=20261007_m5b';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
 import { workRangeFromTrace, clampRangeFromTraces, currentPointDistance } from './measurement.js';
 import { circleRectCompression } from './intake-contact.js';
 import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
@@ -69,7 +70,7 @@ import { drawCam as renderCam, drawWorkpiece as renderWorkpiece } from './specia
 import { drawPlate as renderPlate } from './plate-render.js';
 import { buildMotorMounts as planMotorMounts, computeMotorRotDeg as planMotorRotDeg, motorAssemblyLayerForBody } from './motor-mounts.js';
 import { drawFrameGeometry as renderFrameGeometry, drawMotorMountHoles as renderMotorMountHoles, drawModulePlates as renderModulePlates } from './motor-frame-render.js';
-import { createModulePlateSource } from './module-plates.js?v=face-mount-20261007';   // G1：已安裝模組的固定板（<id>-frame）3D／2D
+import { createModulePlateSource } from './module-plates.js?v=20261007_m5a';   // G1：已安裝模組的固定板（<id>-frame）3D／2D
 import { collectSceneIds, prepareRenderScene } from './render-scene.js';
 import { buildPreviewModelInputs } from './preview-model-inputs.js';
 import { renderLinks, renderNodes } from './mechanism-layer-render.js';
@@ -78,7 +79,7 @@ import { normalizeFabricationProfile, FABRICATION_DEFAULTS } from './fabrication
 import { cncWarnings } from './cnc-check.js';   // L4：依刀徑檢查匯出特徵
 import { orthogonalExportExtras, withAdapterNodes, withWorldAdapterNodes } from './orthogonal-joint.js';   // O4a：直角安裝轉接座孔位
 import { adapterMesh, meshToStl } from './adapter-stl.js';   // O4b：3D 列印轉接座 STL
-import { buildPlan, buildPackHtml } from './build-plan.js?v=face-mount-20261007';   // L5b：製作包（板件＋五金＋組裝步驟）
+import { buildPlan, buildPackHtml } from './build-plan.js?v=20261007_m5a';   // L5b：製作包（板件＋五金＋組裝步驟）
 import { resolveSpacers, suggestRackStops } from './interference.js';   // L5c／L6：干涉檢查、自動隔圈、齒條長槽限位建議
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -857,7 +858,7 @@ function frameNodes() { return Model.frameNodes(worldFrameComps(S.comps, S.modul
 // 機架「視覺」用的固定銷：排除滑塊自己的 rail 端點（p1/p2），保留 mount 點（m1/m2）。
 // m1/m2 是真正鎖在機架上的孔；急回/滑塊範例需要把它們和曲柄軸畫成同一塊底座。
 // 注意：移動仍以 frameNodeIds() 為準，滑塊照樣跟著走。
-function frameConnectorNodes() { return Model.frameConnectorNodes(worldFrameComps(S.comps, S.modules)); }
+function frameConnectorNodes() { return Model.frameConnectorNodes(machineFrameComps(S.comps, S.modules)); }   // M5a：未安裝的機構不撐大機架板（設計分頁看自己的另走 viewFrameNodes）
 
 // syncSliderGeometries（滑軌幾何同步）已隨滑軌域移到 ./slider-editor.js
 
@@ -1449,7 +1450,7 @@ function drawNow() {
   const mountSplit2d = Exporters.splitMountsByHost(S.comps,
     motorFrameExportMounts({ pts: allPts, motorCenterIds: allModelMotorIds, motorMounts }));
   const frameGeometry2d = S.viewPlane ? null : Exporters.inspectFrameExport(
-    viewFrameNodes(), Settings.exportSettings(), viewMounts(splitFrameMounts(mountSplit2d.free, S.comps, S.modules).world));
+    viewFrameNodes(), Settings.exportSettings(), viewMounts(viewWorldMounts(mountSplit2d.free)));
   drawGround(frameGeometry2d);
   // G1：已安裝模組的固定板：主視圖畫同平面（plane null）的，「編輯這個模組」平面視圖畫該平面的；在所有零件之下，播放時跟著模組動。
   if (S.modules.some(m => m && m.mount)) {
@@ -1755,7 +1756,7 @@ function push3DNow() {
   const planesApi = designView ? focusInputs(lastModelInputsAll, viewComps()) : allPlanes ? planeInputs(allPlanes, S.comps, S.modules, null) : lastModelInputs;
   const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = planesApi;
   const mountSplit3d=Exporters.splitMountsByHost(S.comps,motorFrameExportMounts());
-  const frameGeometry=designView && S.viewPlane ? null : Exporters.inspectFrameExport(designView ? viewFrameNodes() : frameConnectorNodes(),Settings.exportSettings(),designView ? viewMounts(splitFrameMounts(mountSplit3d.free,S.comps,S.modules).world) : splitFrameMounts(mountSplit3d.free,S.comps,S.modules).world);
+  const frameGeometry=designView && S.viewPlane ? null : Exporters.inspectFrameExport(designView ? viewFrameNodes() : frameConnectorNodes(),Settings.exportSettings(),designView ? viewMounts(viewWorldMounts(mountSplit3d.free)) : viewWorldMounts(mountSplit3d.free));
   // 三點桿板形：3D 直接沿用 2D/DXF 共用的 createPlateGeometry 外形（含 shapeMode——
   // 包絡板/多邊形板/折線桿——與 vertices 順序），孔位與加工輸出一致，三視圖不分歧。
   // 以孔序字串為鍵，供 scene-model 對應到各片板；找不到原 comp 的純視覺 polygon 退回夾爪近似。
@@ -1936,7 +1937,7 @@ function drawGround(frameGeometry) {
   if (focusModule()?.mount) return;   // 已安裝模組的底座由 drawModulePlates 畫，沒有世界機架
   const nodes = viewFrameNodes();
   const fg = frameGeometry || Exporters.inspectFrameExport(nodes, Settings.exportSettings(),
-    viewMounts(splitFrameMounts(Exporters.splitMountsByHost(S.comps, motorFrameExportMounts()).free, S.comps, S.modules).world));
+    viewMounts(viewWorldMounts(Exporters.splitMountsByHost(S.comps, motorFrameExportMounts()).free)));
   renderFrameGeometry({ nodes, frameGeometry: fg, svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), drawBaseline: () => Render.drawGroundBaseline() });
 }
 
@@ -2485,9 +2486,15 @@ function motorFrameExportMounts(inputs = lastModelInputs || {}) {
   return mounts;
 }
 // O4a：直角安裝轉接座的孔位（桿件孔＋子模組底板節點）；板厚用 CNC 設定的板材厚度。
-function orthoExtrasNow() {
+// M5a：整台機器（底座＋裝在它身上的）；還沒接上的機構不進匯出、製作包與機架板。
+const machineNow = () => ({ comps: machineComps(S.comps, S.modules), modules: machineModules(S.modules) });
+const exportWorldMounts = free => machineMounts(splitFrameMounts(free, S.comps, S.modules).world, S.comps, S.modules);
+// 畫面用：設計模式看焦點分頁自己的（不過濾）；組立模式只算機器的。
+const viewWorldMounts = free => { const w = splitFrameMounts(free, S.comps, S.modules).world; return inDesign() && S.modules.length ? w : machineMounts(w, S.comps, S.modules); };
+function orthoExtrasNow(machine = false) {
   const stockMm = Number(S.fabrication?.cnc?.stockThicknessMm) > 0 ? Number(S.fabrication.cnc.stockThicknessMm) : FABRICATION_DEFAULTS.cnc.stockThicknessMm;
-  return orthogonalExportExtras(S.comps, S.modules, S.topo.params, { stockMm, joint: jointSettingsNow() });
+  const M = machine ? machineNow() : { comps: S.comps, modules: S.modules };
+  return orthogonalExportExtras(M.comps, M.modules, S.topo.params, { stockMm, joint: jointSettingsNow() });
 }
 // F1：作品目前的直角接合件設定（預設接合件種類與角碼規格）。
 function jointSettingsNow() { return S.fabrication?.joint || FABRICATION_DEFAULTS.joint; }
@@ -2630,23 +2637,23 @@ async function exportVideo() {
 }
 
 function exportLinksSvg() {
-  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
-  const stockWarnings = memberStockWarnings(S.comps, settings);
+  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), S.comps, S.modules), M = machineNow();
+  const stockWarnings = memberStockWarnings(M.comps, settings);
   if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
   // 有宿主機架桿的 mount 隨該桿匯出（特徵切進桿身）；剩下的才進 frame.svg；已安裝模組另出各自的機架檔。
-  const freeMounts = splitFrameMounts(Exporters.splitMountsByHost(S.comps, mounts).free, S.comps, S.modules).world;
-  const extras = orthoExtrasNow();
+  const freeMounts = exportWorldMounts(Exporters.splitMountsByHost(M.comps, mounts).free);
+  const extras = orthoExtrasNow(true);
   const cutNodes = withWorldAdapterNodes(nodes, extras);   // C1：機架板邊上的轉接座宿主孔
-  const count = Exporters.exportLinksAsSvg(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras);
+  const count = Exporters.exportLinksAsSvg(M.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras);
   const frameCount = Exporters.exportFrameAsSvg(cutNodes, settings, freeMounts);
   const warnings = Exporters.frameExportWarnings(cutNodes, settings, freeMounts);
-  const cncParts = [...Exporters.cncPartsForExport(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', cutNodes, settings, freeMounts)];
+  const cncParts = [...Exporters.cncPartsForExport(M.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', cutNodes, settings, freeMounts)];
   // 已安裝模組另出一份機架檔（SDD-ASSEMBLY-MODULES §4.2）；座標用 home 姿態重算安裝座。
   let moduleFrameCount = 0;
-  moduleFrameExports(S.comps, S.modules, S.topo.params).forEach(entry => {
+  moduleFrameExports(M.comps, M.modules, S.topo.params).forEach(entry => {
     const modNodes = withAdapterNodes(entry.moduleId, moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps)), extras);
     const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
-    const modFree = splitFrameMounts(Exporters.splitMountsByHost(S.comps, homeMounts).free, S.comps, S.modules).byModule[entry.moduleId] || [];
+    const modFree = splitFrameMounts(Exporters.splitMountsByHost(M.comps, homeMounts).free, M.comps, M.modules).byModule[entry.moduleId] || [];
     const n = Exporters.exportFrameAsSvg(modNodes, settings, modFree, entry.fileBase);
     moduleFrameCount += n;
     if (n) {
@@ -2658,22 +2665,22 @@ function exportLinksSvg() {
   showCncWarnings(cncParts, settings);
 }
 function exportLinksDxf() {
-  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
-  const stockWarnings = memberStockWarnings(S.comps, settings);
+  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), S.comps, S.modules), M = machineNow();
+  const stockWarnings = memberStockWarnings(M.comps, settings);
   if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
-  const freeMounts = splitFrameMounts(Exporters.splitMountsByHost(S.comps, mounts).free, S.comps, S.modules).world;
-  const extras = orthoExtrasNow();
+  const freeMounts = exportWorldMounts(Exporters.splitMountsByHost(M.comps, mounts).free);
+  const extras = orthoExtrasNow(true);
   const cutNodes = withWorldAdapterNodes(nodes, extras);   // C1：機架板邊上的轉接座宿主孔
-  const count = Exporters.exportLinksAsDxf(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras);
+  const count = Exporters.exportLinksAsDxf(M.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras);
   const frameCount = Exporters.exportFrameAsDxf(cutNodes, settings, freeMounts);
   const warnings = Exporters.frameExportWarnings(cutNodes, settings, freeMounts);
-  const cncParts = [...Exporters.cncPartsForExport(S.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', cutNodes, settings, freeMounts)];
+  const cncParts = [...Exporters.cncPartsForExport(M.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', cutNodes, settings, freeMounts)];
   // 已安裝模組另出一份機架檔（SDD-ASSEMBLY-MODULES §4.2）；座標用 home 姿態重算安裝座。
   let moduleFrameCount = 0;
-  moduleFrameExports(S.comps, S.modules, S.topo.params).forEach(entry => {
+  moduleFrameExports(M.comps, M.modules, S.topo.params).forEach(entry => {
     const modNodes = withAdapterNodes(entry.moduleId, moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps)), extras);
     const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
-    const modFree = splitFrameMounts(Exporters.splitMountsByHost(S.comps, homeMounts).free, S.comps, S.modules).byModule[entry.moduleId] || [];
+    const modFree = splitFrameMounts(Exporters.splitMountsByHost(M.comps, homeMounts).free, M.comps, M.modules).byModule[entry.moduleId] || [];
     const n = Exporters.exportFrameAsDxf(modNodes, settings, modFree, entry.fileBase);
     moduleFrameCount += n;
     if (n) {
@@ -2686,16 +2693,16 @@ function exportLinksDxf() {
 }
 // 製作包用：與匯出相同的零件與機架幾何，只收集 CNC 檢查用的孔與開口（不下載檔案）。
 function collectCncPartsAndFrameWarnings(settings) {
-  const nodes = frameConnectorNodes(), mounts = motorFrameExportMounts();
-  const pts = lastModelInputs && lastModelInputs.pts, extras = orthoExtrasNow();
+  const nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), S.comps, S.modules), M = machineNow();
+  const pts = lastModelInputs && lastModelInputs.pts, extras = orthoExtrasNow(true);
   const cutNodes = withWorldAdapterNodes(nodes, extras);   // C1：機架板邊上的轉接座宿主孔
-  const freeMounts = splitFrameMounts(Exporters.splitMountsByHost(S.comps, mounts).free, S.comps, S.modules).world;
+  const freeMounts = exportWorldMounts(Exporters.splitMountsByHost(M.comps, mounts).free);
   const frameWarnings = Exporters.frameExportWarnings(cutNodes, settings, freeMounts);
-  const cncParts = [...Exporters.cncPartsForExport(S.comps, pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', cutNodes, settings, freeMounts)];
-  moduleFrameExports(S.comps, S.modules, S.topo.params).forEach(entry => {
+  const cncParts = [...Exporters.cncPartsForExport(M.comps, pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', cutNodes, settings, freeMounts)];
+  moduleFrameExports(M.comps, M.modules, S.topo.params).forEach(entry => {
     const modNodes = withAdapterNodes(entry.moduleId, moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps)), extras);
     const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
-    const modFree = splitFrameMounts(Exporters.splitMountsByHost(S.comps, homeMounts).free, S.comps, S.modules).byModule[entry.moduleId] || [];
+    const modFree = splitFrameMounts(Exporters.splitMountsByHost(M.comps, homeMounts).free, M.comps, M.modules).byModule[entry.moduleId] || [];
     frameWarnings.push(...Exporters.frameExportWarnings(modNodes, settings, modFree));
     cncParts.push(cncFramePart(entry.fileBase, modNodes, settings, modFree));
   });
@@ -2704,7 +2711,7 @@ function collectCncPartsAndFrameWarnings(settings) {
 // L5b：下載「製作包」HTML（板件清單＋五金清單＋組裝步驟，可列印）。
 function downloadBuildPack() {
   const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
-  const stockWarnings = memberStockWarnings(S.comps, settings);
+  const stockWarnings = memberStockWarnings(machineNow().comps, settings);
   if (stockWarnings.length) { transient(`尚未產生製作包：${stockWarnings[0]}`); return; }
   const cnc = S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
   const homeMounts = homeMountsNow();

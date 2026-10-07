@@ -7,7 +7,7 @@
 
 import { normalizeMemberStock } from './member-stock.js';
 import { normalizeFabricationProfile } from './fabrication-profile.js';
-import { normalizeModules } from './module-schema.js?v=face-mount-20261007';
+import { normalizeModules } from './module-schema.js?v=20261007_m5a';
 
 const KIND = 'blocks';
 const VERSION = 1;

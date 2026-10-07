@@ -27,7 +27,8 @@ const P = S.topo.params;
   const raw = B.autoPorts(S.comps, S.modules, L2.id, S.topo.params).filter(p => /frame/.test(p.id));
   const own = M.ownPorts(S.comps, S.modules, L2.id, S.topo.params).filter(p => p.body && p.body.kind === 'frame');
   console.log('raw frame edges:', raw.map(p => Math.round(p.lengthMm)).join(','), ' own:', own.map(p => Math.round(p.lengthMm)).join(','));
-  check('自己的機架邊不含別的模組撐出來的長邊（最長邊 < 合併機架的最長邊）', own.length > 0 && Math.max(...own.map(p => p.lengthMm)) < Math.max(...raw.map(p => p.lengthMm)));
+  // M5a：autoPorts 的機架邊也改成宿主自己的（不再是所有未安裝模組合併的那一塊），和 ownPorts 的邊編號一致
+  check('自己的機架邊不含別的模組撐出來的長邊（autoPorts 與 ownPorts 的機架邊一致）', own.length > 0 && JSON.stringify(own.map(p => Math.round(p.lengthMm))) === JSON.stringify(raw.map(p => Math.round(p.lengthMm))));
   check('ownPorts 每個接口都帶 module＝自己、kind 是 edge 或 bolt', M.ownPorts(S.comps, S.modules, L2.id, S.topo.params).every(p => p.module === L2.id && ['edge', 'bolt'].includes(p.kind)));
 }
 

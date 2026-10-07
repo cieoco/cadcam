@@ -15,7 +15,8 @@ import {
   splitMountsByHost, hostedBarGeometry
 } from './exporters.js';
 import { frameConnectorNodes, motorPointIds, pointCoords, frameNodeIds, sliderMountInfo, isHiddenSliderRailPoint } from './model.js';
-import { worldFrameComps, moduleFrameExports, moduleFrameNodes, moduleOfPoint, splitFrameMounts, planeOf } from './assembly.js?v=face-mount-20261007';
+import { machineFrameComps, machineMounts, moduleFrameExports, moduleFrameNodes, moduleOfPoint, splitFrameMounts, planeOf } from './assembly.js?v=20261007_m5a';
+import { machineComps, machineModules, spareModules } from './assembly-roles.js';
 import { orthogonalExportExtras, withAdapterNodes, withWorldAdapterNodes, jointSpec } from './orthogonal-joint.js';
 import { buildMotorMounts } from './motor-mounts.js';
 import { computeBodyLayers } from '../blocks3d/scene-model.js';
@@ -123,8 +124,12 @@ const planeLabel = (modules, id) => { const m = (modules || []).find(x => x && x
 const gapPlane = g => (g && g.plane != null ? g.plane : null);
 
 export function buildPlan({ comps, modules = [], params = {}, exportSettings = {}, cnc, mounts, spacers, extras, joint } = {}) {
-  const list = Array.isArray(comps) ? comps : [];
-  const modList = Array.isArray(modules) ? modules : [];
+  // M5a：只有「機器」（底座＋裝在它身上的）進製作計畫；還沒接上的機構與它們的底板都不算，只列在 plan.spare。
+  const spare = spareModules(modules);
+  const allComps = Array.isArray(comps) ? comps : [], allMods = Array.isArray(modules) ? modules : [];
+  const list = machineComps(allComps, allMods);
+  const modList = machineModules(allMods);
+  if (spare.length) { mounts = Array.isArray(mounts) ? machineMounts(mounts, allComps, allMods) : mounts; extras = undefined; }   // 傳進來的馬達座／接合孔可能含未安裝機構的，重算
   const modById = new Map(modList.map(m => [m.id, m]));
   const stockMm = finitePos(cnc && cnc.stockThicknessMm) ? Number(cnc.stockThicknessMm) : DEFAULT_STOCK_THICKNESS_MM;
   const settings = normalizeExportSettings(exportSettings);
@@ -161,7 +166,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
   const seedPts = pointCoords(list);
 
   // 機架板：世界機架（不屬於已安裝模組的零件）與每個已安裝模組的 <moduleId>-frame。
-  const worldNodes = frameConnectorNodes(worldFrameComps(list, modList));
+  const worldNodes = frameConnectorNodes(machineFrameComps(list, modList));
   if (worldNodes.length) {
     // C1：直角安裝在機架板邊上的轉接座孔（不參與外框、不列入關節點）。
     const worldCut = withWorldAdapterNodes(worldNodes, orthoExtras);
@@ -419,7 +424,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     return { type: motorTypeAt(list, centerId), centerId, plate: partPoints.has(plateName) ? plateName : null };
   });
 
-  return { parts, joints, motors, gaps };
+  return { parts, joints, motors, gaps, spare };
 }
 
 // ---- 五金清單 ----
@@ -552,7 +557,8 @@ const escHtml = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '
 const KIND_LABEL = { frame: '機架板', gear: '齒輪', rack: '齒條', member: '桿件／板件' };
 
 export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = [], interference = [], suggestions = [], modules = [] } = {}) {
-  warnings = [...warnings, ...modules.filter(m => m?.mount?.face).map(m => `六面接合 ${m.name || m.id}：擺放姿態已保存；轉接件、配對固定孔與跨面干涉尚未驗證，不能直接依此製造組立。`)];
+  const spare = plan && Array.isArray(plan.spare) ? plan.spare : spareModules(modules);   // M5a：還沒接上的機構不在製作包內，提醒一聲
+  warnings = [...warnings, ...(spare.length ? [`還沒接上、不在製作包內：${spare.map(m => m.name).join('、')}`] : []), ...modules.filter(m => m?.mount?.face).map(m => `六面接合 ${m.name || m.id}：擺放姿態已保存；轉接件、配對固定孔與跨面干涉尚未驗證，不能直接依此製造組立。`)];
   const parts = (plan && plan.parts) || [];
   const joints = (plan && plan.joints) || [];
   const motors = (plan && plan.motors) || [];
