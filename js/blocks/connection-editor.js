@@ -5,6 +5,7 @@ import { inspectFrameExport, inspectLinkExport, inspectPlateExport, inspectRackE
 
 const NS = 'http://www.w3.org/2000/svg';
 const faces = [['top', '上面'], ['bottom', '下面'], ['front', '前面'], ['back', '後面'], ['left', '左面'], ['right', '右面']];
+const faceColors = { top: '#16a085', bottom: '#9754cb', front: '#de791b', back: '#de791b', left: '#de791b', right: '#de791b' };
 
 export function openConnectionEditor({ mod, comps, params, settings, commit }) {
   const own = comps.filter(c => c.moduleId === mod.id), candidates = [];
@@ -51,15 +52,37 @@ export function openConnectionEditor({ mod, comps, params, settings, commit }) {
     for (const item of candidates) {
       for (const ring of item.rings) {
         const p = element('polygon', { points: ring.map(xy).map(q => `${q.x},${q.y}`).join(' '), fill: selected === item.id ? '#238bd0' : item.color, 'fill-opacity': selected === item.id ? .9 : .5, stroke: selected === item.id ? '#075689' : item.color, 'stroke-width': selected === item.id ? 3 : 1, role: 'button', tabindex: 0, 'aria-label': `選桿件 ${item.name}`, 'aria-pressed': selected === item.id });
-        p.style.cursor = 'pointer';
+        p.style.cursor = 'pointer'; p.style.outlineColor = '#238bd0';
         const choose = () => { selected = item.id; paint(); };
         p.addEventListener('click', choose); p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); } });
       }
       for (const h of item.holes) { const p = xy(h); element('circle', { cx: p.x, cy: p.y, r: Math.max(1.5, h.r * scale), fill: '#fff', 'pointer-events': 'none' }); }
     }
+    // 以面著色：上下大面填色，背面的下面以虛線標示；側面沿對應方向的外緣著色。
+    const chosen = candidates.find(c => c.id === selected);
+    if (chosen) {
+      const color = faceColors[face];
+      for (const ring of chosen.rings) {
+        if (face === 'top' || face === 'bottom') {
+          element('polygon', { 'data-selected-face': face, points: ring.map(xy).map(p => `${p.x},${p.y}`).join(' '), fill: color, 'fill-opacity': .7, stroke: color, 'stroke-width': 3, 'stroke-dasharray': face === 'bottom' ? '6 3' : 'none', 'pointer-events': 'none' });
+        } else {
+          const axis = face === 'left' || face === 'right' ? 'x' : 'y';
+          const positive = face === 'right' || face === 'front';
+          const values = ring.map(p => p[axis]), low = Math.min(...values), high = Math.max(...values);
+          const threshold = Math.max((high - low) * .2, .01);
+          ring.forEach((p, i) => {
+            const q = ring[(i + 1) % ring.length], middle = (p[axis] + q[axis]) / 2;
+            if (positive ? middle < high - threshold : middle > low + threshold) return;
+            const a = xy(p), b = xy(q);
+            element('line', { 'data-selected-face': face, x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: color, 'stroke-width': 7, 'stroke-linecap': 'round', 'pointer-events': 'none' });
+          });
+        }
+      }
+      if (face === 'top' || face === 'bottom') for (const hole of chosen.holes) { const p = xy(hole); element('circle', { cx: p.x, cy: p.y, r: Math.max(1.5, hole.r * scale), fill: '#fff', 'pointer-events': 'none' }); }
+    }
     status.textContent = selected ? `${candidates.find(c => c.id === selected).name} · ${faces.find(f => f[0] === face)[1]}` : '點選要接合的桿件';
     done.disabled = !selected;
-    group.querySelectorAll('button').forEach(b => { const active = b.dataset.face === face; b.disabled = !selected; b.setAttribute('aria-pressed', active); b.style.background = active ? '#d5eee7' : '#fff'; b.style.borderColor = active ? '#207966' : '#c8d6df'; });
+    group.querySelectorAll('button').forEach(b => { const active = b.dataset.face === face; b.disabled = !selected; b.setAttribute('aria-pressed', active); b.style.background = active && selected ? faceColors[face] : '#fff'; b.style.color = active && selected ? '#fff' : '#18364b'; b.style.borderColor = active && selected ? faceColors[face] : '#c8d6df'; });
   };
   for (const [value, name] of faces) { const b = document.createElement('button'); b.textContent = name; b.dataset.face = value; b.style.cssText = 'min-height:46px;font:inherit;border:1px solid;border-radius:10px;'; b.onclick = () => { face = value; paint(); }; group.append(b); }
   done.onclick = () => {

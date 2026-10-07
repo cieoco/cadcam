@@ -9,7 +9,7 @@
  * 版面都在「畫面 px」算：每個目標有 44 px 的隱形點擊區，任兩個目標至少相距 SEP px。
  */
 import { S } from './state.js';
-import { openConnectionEditor } from './connection-editor.js';
+import { openConnectionEditor } from './connection-editor.js?v=20261007_facecolor';
 import * as View from './view.js';
 import { mateOverlay, ARROW_GAP_PX, ARROW_LEN_PX } from './mates-view.js';
 import { effectiveMates, suggestMates, setAttach, addReceive, removeReceive, renameReceive } from './mates.js';

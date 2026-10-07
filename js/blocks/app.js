@@ -14,7 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261007_singleface';
+import { APP_VERSION } from '../version.js?v=20261007_facecolor';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
@@ -41,7 +41,7 @@ import { normalizeModules } from './module-schema.js?v=20261007_singleface';
 import { refreshFaceMounts } from './face-mount-refresh.js';
 import { designTabs, resolveFocus, compsInFocus, assignNewComps, pointIdsOf, focusInputs, ROOT_TAB } from './design-focus.js';   // H1：設計模式一次只看一個設計（分頁）
 import { createDesignTabs } from './design-tabs-ui.js?v=20261005_tabclose';
-import { createMateTool } from './mate-tool.js?v=20261007_singleface';   // M2：設計分頁的「接合面」工具
+import { createMateTool } from './mate-tool.js?v=20261007_facecolor';   // M2：設計分頁的「接合面」工具
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
 import { drawMemberDimensions } from './member-dimension-render.js';
