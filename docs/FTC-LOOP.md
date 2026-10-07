@@ -398,3 +398,13 @@
 - 3D 板中心、288 種姿態、孔保留、拆下、移動與加工厚度更新通過；HTTP 正式介面手機／桌面驗收，主入口 console error 空。實證 formal-wizard.jpg／formal-3d.jpg。
 - 全測試以 --no-experimental-webstorage 執行；三項既有失敗 assembly-schema／solve-health／trace-fallback 在 HEAD 基線結果相同。未納入本輪前已存在的其他修改。
 - 設計組立完成；轉接件、跨面固定孔與跨面干涉未驗證，介面與製作包明示，未宣稱加工完成。
+
+## M 接合面與手機精靈（2026-10-07 起）
+
+- 規格：[SDD-MATE-FACES.md](SDD-MATE-FACES.md)。使用者確認：精靈終點為可製作接合、配不出的組合不提供、封閉環不做、程式只由本流程更新。
+- 分工：主模型寫規格、先失敗的合約測試、獨立驗收；Sonnet 實作；照抄型工作給 Haiku；兩輪沒過主模型接手。
+- M0 盤點（主模型）：用現有 `connect`／`benchAdjust` 把夾爪接到四連桿與齒條升降的每種接口。直角（壓在邊上、立在面上）全部產生角碼×2、兩邊各 2 孔、M3×6×4；對鎖只有齒條滑台（2 孔）可製作，四連桿工具架輸出端（1 點）沒有孔與五金。另發現 `edge:frame:<k>` 編號不穩定、未安裝模組共用一塊機架板、底板形狀依接法而定——據此把子模組端改為「安裝方向」、承接面改為穩定參照。詳見 SDD §10。
+- 先行收尾：電腦上未提交的角碼換邊修正與設計隔離檢查驗證後提交 `2b3050f`（`bracket-holes` 46/46，全套僅 3 支既有失敗）。
+- M1 資料模型（Sonnet，一輪通過）：新增 `mates.js`、`mates-schema.js`；`module-schema` 保留 `mates`、舊檔不補欄位；三個內建模組預標；範本與組合積木實體化時參照跟著新零件 id。主模型獨立重跑：`test/mates.mjs` 42/42、全套僅 `assembly-schema`／`solve-health`／`trace-fallback` 三支開工前既有失敗、`test_blocks_schema` 94 passed。未動任何介面檔。
+- 下一包 M2：設計分頁的「接合面」標記工具。
+

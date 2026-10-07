@@ -542,6 +542,7 @@ export function moduleToTemplate(comps, modules, params, moduleId) {
   if (mod && mod.source) template.source = mod.source;
   if (mod && mod.base) template.base = mod.base;
   template.outputs = mod && Array.isArray(mod.outputs) ? clone(mod.outputs) : [];
+  if (mod && mod.mates) template.mates = clone(mod.mates);   // M1：接合面跟著範本走
   return template;
 }
 
@@ -563,7 +564,7 @@ export function normalizeTemplate(raw) {
   const TEMPLATE_MODULE_ID = '__template__';
   const taggedComps = cleanComps.map(c => ({ ...c, moduleId: TEMPLATE_MODULE_ID }));
   const moduleDescriptor = {
-    id: TEMPLATE_MODULE_ID, name: raw.name, source: raw.source, base: raw.base, outputs: raw.outputs, mount: null
+    id: TEMPLATE_MODULE_ID, name: raw.name, source: raw.source, base: raw.base, outputs: raw.outputs, mount: null, mates: raw.mates
   };
   const modResult = normalizeModules([moduleDescriptor], taggedComps);
   warnings.push(...modResult.warnings);
@@ -575,6 +576,7 @@ export function normalizeTemplate(raw) {
   if (typeof raw.source === 'string' && /^[\w.-]+$/u.test(raw.source)) template.source = raw.source;
   if (modNorm.base) template.base = modNorm.base;
   template.outputs = modNorm.outputs || [];
+  if (modNorm.mates) template.mates = modNorm.mates;
   return { ok: true, template, warnings };
 }
 
@@ -648,6 +650,14 @@ function renameOutputs(list, renameStr) {
     if (o.orthogonal && typeof o.orthogonal === 'object') out.orthogonal = { ...o.orthogonal };
     return out;
   });
+}
+
+// M1：接合面的參照跟著零件改名（bar／triangle 的零件 id）；輸出端 id 是每個模組自己的，不改。
+function renameMates(mates, renameStr) {
+  if (!mates || typeof mates !== 'object') return undefined;
+  const m = clone(mates);
+  (Array.isArray(m.receive) ? m.receive : []).forEach(r => { if (r && r.ref && (r.ref.kind === 'bar' || r.ref.kind === 'triangle')) r.ref.id = renameStr(r.ref.id); });
+  return m;
 }
 
 // 插入模板實例：自有 token／param key 加後綴 _N（N 從 counter+1 起，撞 existingTokens 就重試）；
@@ -724,6 +734,7 @@ export function instantiateTemplate(template, ctx) {
   const mod = { id: moduleId, name: (typeof t.name === 'string' && t.name) ? t.name : moduleId, outputs, mount: null };
   if (typeof t.source === 'string' && t.source) mod.source = t.source;
   if (baseId) mod.base = baseId;
+  if (t.mates) mod.mates = renameMates(t.mates, renameStr);
 
   const newParams = {};
   Object.keys(srcParams).forEach(k => {
@@ -908,6 +919,7 @@ export function instantiateComposite(template, ctx) {
       mount.home = home;
     }
     out.mount = mount;
+    if (m.mates) out.mates = renameMates(m.mates, renameStr);
     return out;
   });
 
@@ -961,6 +973,7 @@ export function builtinTemplate(id) {
       rackComp.holes.push({ id: 'LiftOutputB', type: 'floating', u: 96, v: -15, diameter: 3.2 });
     }
     template.outputs = [{ id: 'carriage', name: '滑台', at: 'LiftOutput', body: { kind: 'rack', id: 'LiftRackGear' }, bolts: ['LiftOutput', 'LiftOutputB'] }];
+    template.mates = { attach: { normalDeg: 180 }, receive: [{ id: 'r1', name: '滑台', ref: { kind: 'bolt', output: 'carriage' } }] };   // M1：與 suggestMates 規則一致（有 2 個對鎖孔的輸出端）
   } else if (id === 'fourbar-lift') {
     // 拿掉手腕馬達：工具架 ToolPlate 變成一般桿，靠平行四連桿保持水平；補斜撐 ToolDiag（B–D）避免 A-B-C-D 晃動。
     const plate = comps.find(c => c.id === 'ToolPlate');
@@ -991,11 +1004,15 @@ export function builtinTemplate(id) {
     if (crank) { crank.motorType = 'mg995'; crank.servoStart = -60; crank.servoEnd = 60; }
     template.base = 'O1';
     template.outputs = [{ id: 'tool', name: '工具架', at: 'D', body: { kind: 'bar', id: 'ToolBrace' }, orthogonal: { side: -1 } }];
+    template.mates = { attach: { normalDeg: 180 }, receive: [
+      { id: 'r1', name: '工具架上緣', ref: { kind: 'bar', id: 'ToolBrace', side: 1 } },
+      { id: 'r2', name: '工具架下緣', ref: { kind: 'bar', id: 'ToolBrace', side: -1 } }] };
   } else if (id === 'gear-gripper') {
     // 專用安裝點 GripMount：避開伺服軸（GCA 是 MG995 輸出軸心，鎖不了），夾爪以它為基準裝到滑台孔上。
     comps.push({ type: 'anchor', id: 'GripMount', p1: { id: 'GripMount', type: 'fixed', x: 0, y: 40 } });
     template.base = 'GripMount';
     template.outputs = [];
+    template.mates = { attach: { normalDeg: 90 }, receive: [] };   // 爪往 −y 伸，朝宿主的那一側是 +90°
     // 以實際爪尖（jawCenterline 末端）扣板寬量淨距：0° 約 134 mm，24° 約 9 mm，約 25.7° 兩爪相碰、之後交錯；
     // 故夾爪馬達用 MG995 限 0～24°（接點 p3 是折彎處，不是爪尖，不能拿來量）。
     // 爪臂接齒輪用 M3

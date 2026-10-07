@@ -91,9 +91,11 @@ function dedupeNames(ports) {
 }
 
 // 把 childId 視為「已安裝」的模組清單：機架外框要排除即將安裝的那個模組（安裝後它的零件就不在世界機架裡了）。
-function withVirtualMount(modList, childId) {
-  if (!childId) return modList;
-  return modList.map(m => m && m.id === childId && !m.mount ? { ...m, mount: { to: { module: null } } } : m);
+// childId 可以是單一 id 或 id 陣列（M1 ownPorts：把其他所有未安裝模組都排除）。
+export function withVirtualMount(modList, childId) {
+  const ids = Array.isArray(childId) ? childId : childId ? [childId] : [];
+  if (!ids.length) return modList;
+  return modList.map(m => m && ids.includes(m.id) && !m.mount ? { ...m, mount: { to: { module: null } } } : m);
 }
 
 // 某模組（moduleId 為 null＝根）的自動接口，不存檔、每次由零件算出。

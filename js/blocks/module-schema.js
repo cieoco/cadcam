@@ -6,6 +6,7 @@
  */
 import { pointKeysFor } from './part-types.js';
 import { normalizeFaceMountContract } from './face-mount-contract.js';
+import { normalizeMates } from './mates-schema.js';
 
 const SAFE_ID = /^[\w.-]+$/u;
 const MAX_MODULES = 16;
@@ -312,7 +313,7 @@ export function normalizeModules(rawModules, comps) {
     if (m.base !== undefined && base === null) {
       warnings.push(`模組 ${m.id} 的 base 不是本模組的固定或馬達接點，已移除。`);
     }
-    return { raw: m, id: m.id, name, source, base, outputs };
+    return { raw: m, id: m.id, name, source, base, outputs, mates: normalizeMates(m.mates) };
   });
 
   // mount：需要其他模組的最終輸出端清單，所以在 outputs 都處理完後才做。
@@ -357,6 +358,7 @@ export function normalizeModules(rawModules, comps) {
     if (p.base) out.base = p.base;
     out.outputs = p.outputs;
     out.mount = mountById.get(p.id);
+    if (p.mates !== undefined) out.mates = p.mates;   // M1：接合面（舊檔沒有就不補欄位）
     return out;
   });
 
