@@ -398,6 +398,20 @@ function roundPadOutline(center, radius) {
   return arcPoints(center.x, center.y, radius, 0, 360, 32).slice(0, -1);
 }
 
+// 固定桿保留原有長寬與孔位，四角採小圓角，提供較長的直邊方便組立。
+function frameBarOutline(a, b, halfWidth) {
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len, r = Math.min(4, halfWidth);
+  const corners = [
+    [-halfWidth + r, -halfWidth + r, 180, 270],
+    [len + halfWidth - r, -halfWidth + r, 270, 360],
+    [len + halfWidth - r, halfWidth - r, 0, 90],
+    [-halfWidth + r, halfWidth - r, 90, 180]
+  ];
+  return corners.flatMap(([x, y, start, end]) => arcPoints(x, y, r, start, end, 6))
+    .map(p => ({ x: a.x + p.x * ux - p.y * uy, y: a.y + p.x * uy + p.y * ux }));
+}
+
 function signedArea(points) {
   return points.reduce((sum, p, index) => {
     const q = points[(index + 1) % points.length];
@@ -912,7 +926,7 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
       const len = Math.hypot(dx, dy);
       if (len > 1e-6) {
         barAxis = { a, ux: dx / len, uy: dy / len, len };
-        outlines.push(barOutline(a, b, frameR));
+        outlines.push(frameBarOutline(a, b, frameR));
       }
     } else {
     const baseHull = hull(nodes);
@@ -943,10 +957,8 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   }
 
   if (mountOutlines.length && barAxis) {
-    // 兩點機架＝明確的主桿。長樑：沿主桿方向延長／加寬成等寬膠囊，讓馬達孔落在同一條
-    // 連續機架桿內（取凸包會變一大片梯形板）。但短桿＋垂直大馬達座時，等寬膠囊會爆成
-    // 巨大圓端板——改成兩案並比：膠囊 vs「節點＋馬達座角點」圓角凸包，取面積小者。
-    // 凸包案自然形成「馬達端寬、另一端收窄」的錐形支架板（伺服支架掛軸轂的典型形狀）。
+    // 兩點機架＝明確的固定桿，沿桿方向延長／加寬圓角矩形，包住馬達安裝孔與切口。
+    // 維持平直的組立邊，不再自動收窄成錐形支架板。
     let minAlong = 0, maxAlong = barAxis.len, halfWidth = frameR;
     mountOutlines.flat().forEach(p => {
       const dx = p.x - barAxis.a.x, dy = p.y - barAxis.a.y;
@@ -958,14 +970,8 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
     });
     const start = { x: barAxis.a.x + barAxis.ux * minAlong, y: barAxis.a.y + barAxis.uy * minAlong };
     const end = { x: barAxis.a.x + barAxis.ux * maxAlong, y: barAxis.a.y + barAxis.uy * maxAlong };
-    const capsule = barOutline(start, end, halfWidth);
-    const base = hull([...nodes, ...mountOutlines.flat()]);
-    const taperedPlate = base.length >= 3 ? roundedOffsetHull(base, Math.max(18, frameR)) : null;
-    const area = pts => Math.abs(signedArea(pts));
     outlines.length = 0;
-    // 凸包要「明顯」較小（<75%）才捨棄膠囊——長樑上的馬達座兩案面積接近時，
-    // 維持等寬連續樑的可製造外形，避免抖動成梯形板。
-    outlines.push(taperedPlate && area(taperedPlate) < area(capsule) * 0.75 ? taperedPlate : capsule);
+    outlines.push(frameBarOutline(start, end, halfWidth));
   } else if (mountOutlines.length) {
     // 有馬達座（非兩點主桿）：把機架節點與馬達座角點一起取凸包，再做一次圓角等距外擴。
     // 不對「已外擴的外形」再取尖角凸包，才不會產生歪斜尖楔。

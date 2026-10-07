@@ -14,7 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261007_8';
+import { APP_VERSION } from '../version.js?v=20261007_9';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
@@ -49,7 +49,7 @@ import { memberStock, memberHoleDiameter, memberStockWarnings } from './member-s
 import { createJawTipHandle } from './jaw-tip-handle.js';
 import { analyzeDof } from './dof.js';
 import * as Store from './storage.js?v=20261007_m5a';
-import * as Exporters from './exporters.js?v=20261007_7';
+import * as Exporters from './exporters.js?v=20261007_9';
 import { localToWorld, plateVertices, plateShapeMode, createPlateGeometry } from './plate-geometry.js';
 import { S, activateMotor, motorAnglesNow, frozenMotorAngles, usedMotorIds } from './state.js';  // 跨模組共享的可變狀態與多馬達 helper
 import { createExampleController } from './example-controller.js?v=20261005_parallel';

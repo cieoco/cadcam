@@ -21,7 +21,9 @@ check('非共線固定點產生圓角外擴底板', Boolean(triangle && triangle
 
 const plainBar = inspectFrameExport([{ x: 0, y: 0 }, { x: 100, y: 0 }], settings);
 const barXs = plainBar?.outlines[0].map(p => p.x) || [];
-check('桿狀機架兩端都向外圓弧封口', Math.min(...barXs) < -7.9 && Math.max(...barXs) > 107.9);
+check('圓角矩形固定桿保留原有長寬', Math.min(...barXs) < -7.9 && Math.max(...barXs) > 107.9);
+const endPoints = plainBar.outlines[0].filter(p => Math.abs(p.x + 8) < 1e-5);
+check('固定桿端部有直邊，四角圓角而非半圓端', endPoints.some(p => p.y < -3.9) && endPoints.some(p => p.y > 3.9));
 
 const cramped = inspectFrameExport([{ x: 0, y: 0 }, { x: 6, y: 0 }], settings);
 check('過近固定孔會產生製造警告', cramped?.warnings.some(text => text.includes('固定孔')));
