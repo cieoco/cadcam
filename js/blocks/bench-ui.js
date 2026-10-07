@@ -12,7 +12,8 @@
  */
 import { S, motorAnglesNow } from './state.js';
 import { openFaceWizard } from './face-wizard-ui.js?v=20261007_mobile';
-import * as Bench from './bench.js?v=faces-20261005';
+import * as Bench from './bench.js?v=20261007_m4';
+import { createMateWizard } from './mate-wizard-ui.js?v=20261007_m4b';
 import { moduleFrameEdges } from './assembly.js?v=face-mount-20261007';
 import * as Settings from './settings.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
@@ -52,7 +53,11 @@ export function createBench(deps) {
     interferenceArgs, setMotorAngles
   } = deps;
   const saveComposite = deps.saveComposite || (() => null);
-  const exportComposite = deps.exportComposite || (() => null);   // 組合積木匯出 JSON   // B7：存成組合積木（由 app.js 接到模組編輯器的模組庫）
+  const exportComposite = deps.exportComposite || (() => null);   // 組合積木匯出 JSON
+  const inCand = deps.withCandidate || (fn => fn());   // M4：接合精靈預覽中，干涉檢查看的是候選作品（見 app.js withCandidate）
+  const isCand = deps.inCandidate || (() => false);
+  let wiz = null;   // M4：接合精靈（mate-wizard-ui.js）；非進階模式時由它畫清單、面板與 3D 承接面標記
+  const wizardOn = () => !!wiz && !wiz.advanced();   // B7：存成組合積木（由 app.js 接到模組編輯器的模組庫）
 
   const st = { faceStep: null, moreOpen: false, selected: null, preview: null, showAll: false, snapId: null, msg: '', lastScene: null, wasIn3D: false, tilted: false, canvasBound: null };
   let listSig = '', panelSig = '';
@@ -162,7 +167,8 @@ export function createBench(deps) {
     return names.length > max ? `${names.slice(0, max).join('、')} 等 ${names.length} 件` : names.join('、');
   }
 
-  function renderLiveStatus() {
+  function renderLiveStatus() { renderLiveBox(); if (wiz) wiz.syncLive(); }
+  function renderLiveBox() {
     if (!liveBox) return;
     const box = liveBox.querySelector('#benchLive');
     if (!box) return;
@@ -191,7 +197,8 @@ export function createBench(deps) {
   }
 
   // 檢查目前姿勢。force：忽略節流與「沒變」判斷。
-  function runLive(force = false) {
+  function runLive(force = false) { return inCand(() => runLiveNow(force)); }
+  function runLiveNow(force) {
     if (!isBench()) return;
     live.timer = null;
     const st0 = ensurePlan();
@@ -247,7 +254,8 @@ export function createBench(deps) {
     return runs;
   }
   const fmtDeg = a => `${Math.round(a * 10) / 10}°`;
-  function runTimeline() {
+  function runTimeline() { return inCand(runTimelineNow); }
+  function runTimelineNow() {
     if (!isBench()) return null;
     if (S.modules.some(m => m?.mount?.face)) { say('六面接合的跨面干涉尚未驗證'); return null; }
     const st0 = ensurePlan();
@@ -400,7 +408,9 @@ export function createBench(deps) {
   }
   // 要畫出來的標記（不相容的只在「顯示全部接口」時畫，暗色）。
   function visibleMarkers() {
-    if (!isBench() || st.preview) return [];
+    if (!isBench()) return [];
+    if (wizardOn()) return wiz.markers();   // 精靈：只亮可接的承接面
+    if (st.preview) return [];
     return computeMarkers().filter(m => m.compatible || st.showAll);
   }
   function toneOf(m) {
@@ -419,18 +429,18 @@ export function createBench(deps) {
       const tone = toneOf(m);
       return {
         kind: m.kind, points: m.points, tone,
-        label: (tone === 'snap' || tone === 'suggested') ? m.name : ''
+        label: (tone === 'snap' || tone === 'suggested') ? m.name : '',
+        labelPx: m.labelPx, labelDir: m.labelDir   // 精靈的承接面標籤：固定螢幕大小，上下錯開
       };
     });
     v.setMarkers(list);
   }
-  function ghostSpec() {
-    if (!st.preview) return null;
-    const mod = modOf(st.preview.moduleId);
+  function ghostSpec() { return st.preview ? ghostFor(modOf(st.preview.moduleId), S.comps) : null; }
+  function ghostFor(mod, comps) {
     if (!mod || !mod.mount) return null;
     if (mod.mount.orient) return { prefix: mod.id };
     const ids = new Set([mod.id]);   // G1：模組固定板的 pickKey＝modframe:<模組 id>
-    S.comps.filter(c => c.moduleId === mod.id).forEach(c => {
+    comps.filter(c => c.moduleId === mod.id).forEach(c => {
       ids.add(c.id);
       pointKeysFor(c).forEach(k => { if (c[k] && c[k].id) ids.add(c[k].id); });
     });
@@ -497,6 +507,7 @@ export function createBench(deps) {
       deps.enterBench?.();
       syncModeButtons();
       if (S.viewPlane) setViewPlane(null);
+      wiz.onEnter();   // M4：精靈模式、只有一個機構有地方可接 → 自動選它
       st.wasIn3D = is3DActive();
       await set3D(true);
       const v = viewer();
@@ -508,10 +519,12 @@ export function createBench(deps) {
       syncUI(true);
       push3D();
       liveCheck(true);
+      wiz.fit();   // M4：精靈把相機拉到剛好框住全部機構
     } else {
       cancelPreview({ silent: true });
+      wiz.cancel({ silent: true });
       const v = viewer();
-      if (v) { v.setMarkers([]); v.setPreviewGhost(null); v.setPickEnabled(true); }
+      if (v) { v.releaseFit && v.releaseFit(); v.setMarkers([]); v.setPreviewGhost(null); v.setPickEnabled(true); }
       const prevFocus = S.designFocus;
       if (st.selected && modOf(st.selected)) S.designFocus = st.selected;   // H1：設計模式聚焦組立台選的模組，沒選就維持原本的分頁
       S.mode = 'design';
@@ -537,11 +550,12 @@ export function createBench(deps) {
     if (!isBench()) return false;
     const next = moduleId && modOf(moduleId) ? moduleId : null;
     if (st.preview && next !== st.preview.moduleId) cancelPreview();
+    if (wiz.previewOf() && next !== wiz.previewOf()) wiz.cancel();
     if (next !== st.selected) { st.faceStep = null; viewer()?.highlightSurface?.(null); }
     st.selected = next;
     st.snapId = null;
     const mod = next && modOf(next);
-    if (mod) {
+    if (mod && !wizardOn()) {
       if (mod.mount) say(`選了「${displayName(mod.id)}」：${statusOf(mod)}，下面可以調整。`, { toast: false });
       else if (!mod.base) say(`「${displayName(mod.id)}」沒有基準點（base），不能安裝。`);
       else say(`選了「${displayName(mod.id)}」：點 3D 裡發亮的接口，或按右邊的接口按鈕。`, { toast: false });
@@ -555,6 +569,7 @@ export function createBench(deps) {
   // portId 可以是 `模組id|接口id`（唯一）或單獨的接口 id（舊寫法；多個模組有同名接口時取第一個相容的）。
   function pickPort(portId) {
     if (!isBench()) return false;
+    if (wizardOn()) return wiz.pickKey(portId);
     const childId = st.selected;
     if (!childId) { say('請先在清單選一個要安裝的模組'); return false; }
     if (st.preview) cancelPreview({ silent: true });
@@ -681,12 +696,13 @@ export function createBench(deps) {
   // ---------------------------------------------------------------- 畫面：清單與面板
   function syncUI(force = false) {
     if (!isBench()) return;
+    if (isCand()) { liveCheck(); return; }   // 預覽中的重畫（S 暫時換成候選）：只更新干涉，不重畫面板
     // 預覽中的模組若被復原／讀檔弄掉了，就丟掉預覽狀態
     if (st.preview) { const pm = modOf(st.preview.moduleId); if (!pm || !pm.mount) { st.preview = null; st.faceStep = null; viewer()?.highlightSurface?.(null); applyGhost(); } }
     if (st.selected && !modOf(st.selected)) { st.selected = null; st.faceStep = null; viewer()?.highlightSurface?.(null); }
     labels = Bench.moduleLabels(S.modules);
-    renderList();
-    renderPanel(force);
+    if (wizardOn()) wiz.render(force);
+    else { renderList(); renderPanel(force); wiz.ensureToggle(panelEl()); }
     liveCheck();
   }
 
@@ -1108,7 +1124,7 @@ export function createBench(deps) {
   }
 
   // Esc：取消預覽
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && isBench() && st.preview) cancelPreview(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && isBench()) { if (st.preview) cancelPreview(); else wiz.cancel(); } });
 
   // 手機底部面板的高度 → CSS 變數，讓 3D 畫面與控制列避開它
   const panel = panelEl();
@@ -1163,8 +1179,28 @@ export function createBench(deps) {
     };
   }
 
+  // 精靈要用到的內部（接上／取消都走這裡，不另寫一套）
+  wiz = createMateWizard({
+    el, bigBtn, st, deps, modOf, displayName, statusOf, say, select, syncUI, drawMarkers, computeMarkers, viewer, listEl, panelEl, liveBox, liveCheck,
+    liveCount: () => live.ready ? live.findings.length : 0,
+    liveInfo: () => ({ ready: live.ready && !!live.plan && (live.plan.parts || []).length > 0, n: live.findings.length, hits: live.hits }), motorState, adjust, adjustState, editModule, ghostFor,
+    clearGhost: () => viewer()?.setPreviewGhost(null), setGhost: spec => viewer()?.setPreviewGhost(spec), isBench,
+    cancelAdvancedPreview: () => cancelPreview({ silent: true }),
+    // 接上：一筆復原。comps／modules 是已整理好的候選，換成真的作品後照 adjust 的流程重建。
+    commit(comps, modules, msg) {
+      deps.setCandidate(null); viewer()?.setPreviewGhost(null);
+      pushUndo(); S.comps = comps; S.modules = modules;
+      rebuild(); draw(); say(msg, { toast: false }); syncUI(true); drawMarkers();
+    },
+    // 已接好的機構換接法（一筆復原）。
+    apply(r, msg) {
+      pushUndo(); S.comps = r.comps; S.modules = r.modules;
+      rebuild(); draw(); say(msg, { toast: false }); syncUI(true); drawMarkers();
+    }
+  });
   syncModeButtons();
   return {
+    mateWizardDebug: () => wiz.debug(),
     autosaveSnapshot: () => st.preview ? JSON.parse(st.preview.preSnap) : null,
     setMode, select, pickPort, commit, cancel: () => cancelPreview(), adjust, syncUI, afterScene, debug,
     liveCheck: () => liveCheck(true), runTimeline, jumpTo,

@@ -49,7 +49,7 @@ export function moduleLabels(modules) {
 }
 
 // 角度換算到 (-180, 180]，並四捨五入到 0.1°（與 mountOrthogonal 的 childAxisDeg 同精度，避免浮點誤差累積）。
-function normalizeDeg(v) {
+export function normalizeDeg(v) {
   let x = ((v % 360) + 360) % 360;
   if (x > 180) x -= 360;
   return round1(x);
@@ -180,7 +180,7 @@ export function autoPorts(comps, modules, moduleId, params, opts = {}) {
 function sideOf(e) { return (e.m.x * -e.d.y + e.m.y * e.d.x) >= 0 ? 1 : -1; }
 
 // candidate 是否為 ancestor 的子孫（沿安裝鏈往上會經過 ancestor）。
-function isDescendant(modules, candidateId, ancestorId) {
+export function isDescendant(modules, candidateId, ancestorId) {
   const byId = new Map(modules.map(m => [m.id, m]));
   const seen = new Set();
   let cur = byId.get(candidateId);
@@ -267,7 +267,7 @@ export function connect(comps, modules, childId, target, params, motorState, opt
 
 // 重組 orient（維持存檔的鍵序 type, edge, side, face?, childEdge?, childAxisDeg, offsetMm?, tiltDeg?, joint）；offsetMm／tiltDeg 為 0 時不寫入；
 // face／childEdge 只有 edge 'child'（立在宿主板面上）才寫入。
-function withOrient(orient, patch) {
+export function withOrient(orient, patch) {
   const o = { ...orient, ...patch };
   const out = { type: o.type, edge: o.edge, side: o.side };
   if (o.edge === 'child') { out.face = o.face; out.childEdge = o.childEdge; }

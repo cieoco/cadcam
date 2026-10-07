@@ -1001,7 +1001,7 @@ export function createViewer(container) {
         const dist = Math.max(300, span * 2.2) / Math.min(1, camera.aspect);
         camera.position.set(f.x, f.y, dist);
         initialized = true;
-      } else if (model.anchored) {
+      } else if (model.anchored && !fitHeld) {   // 精靈框過鏡頭後（fitHeld）目標不再每幀被拉回地錨
         controls.target.set(f.x, f.y, f.z);
       }
     }
@@ -1171,9 +1171,16 @@ export function createViewer(container) {
         anchor = p;
       }
       if (anchor && mk.label) {
-        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(mk.label), transparent: true, depthTest: false, depthWrite: false }));
-        sprite.scale.set(110, 27.5, 1);
-        sprite.position.set(anchor.x, anchor.y - 14 * tone.scale, anchor.z + 6);
+        const px = mk.labelPx;   // 接合精靈：標籤固定螢幕大小（高 labelPx px），貼在標記上方（labelDir > 0）或下方，手機上才讀得到
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(mk.label), transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: !px }));
+        if (px) {
+          const s = px * 2 * Math.tan(camera.fov * Math.PI / 360) / (renderer.domElement.clientHeight || 1);
+          sprite.scale.set(s * 4, s, 1); sprite.center.set(0.5, mk.labelDir > 0 ? 0 : 1);
+          sprite.position.set(anchor.x, anchor.y, anchor.z + 6);
+        } else {
+          sprite.scale.set(110, 27.5, 1);
+          sprite.position.set(anchor.x, anchor.y - 14 * tone.scale, anchor.z + 6);
+        }
         sprite.renderOrder = 30;
         markerGroup.add(sprite);
       }
@@ -1196,6 +1203,76 @@ export function createViewer(container) {
     camera.position.set(t.x + r * Math.cos(el) * Math.sin(az), t.y + r * Math.sin(el), t.z + r * Math.cos(el) * Math.cos(az));
     camera.lookAt(t);
     controls.update();
+  }
+
+  // ---- 組立台精靈：把相機拉到剛好框住符合 filter(pickKey) 的零件（沒給＝全部）；保留目前的視角，只改距離與目標 ----
+  let fitHeld = false;       // fitTo 設定過目標：focusCamera 不再把目標拉回地錨（releaseFit 還原）
+  let interacting = false;   // 使用者正在拖曳／捏合：不要搶鏡頭
+  controls.addEventListener('start', () => { interacting = true; });
+  controls.addEventListener('end', () => { interacting = false; });
+  function partsBox(filter) {
+    scene.updateMatrixWorld(true);
+    const box = new THREE.Box3(), tmp = new THREE.Box3();
+    let n = 0;
+    const visit = o => {
+      if (o.userData.pickKey === undefined) { o.children.forEach(visit); return; }
+      if (filter && !filter(o.userData.pickKey)) return;
+      tmp.setFromObject(o);
+      if (!tmp.isEmpty()) { box.union(tmp); n++; }
+    };
+    dynamic.children.forEach(visit);
+    return n ? box : null;
+  }
+  // 外框投影到畫面的範圍（px，相對畫布）；有角落在相機後方回 null。
+  function boxPx(box) {
+    camera.updateMatrixWorld(true);
+    const W = renderer.domElement.clientWidth || 1, H = renderer.domElement.clientHeight || 1;
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (let i = 0; i < 8; i++) {
+      const v = new THREE.Vector3(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).project(camera);
+      if (!Number.isFinite(v.x) || v.z > 1) return null;
+      const x = (v.x + 1) / 2 * W, y = (1 - v.y) / 2 * H;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    }
+    return { x0, x1, y0, y1, w: x1 - x0, h: y1 - y0, W, H };
+  }
+  // 零件外框佔畫布寬或高的比例（0..1），給測試與精靈判斷「夠不夠大」。
+  function viewFill(filter) {
+    const box = partsBox(filter), e = box && boxPx(box);
+    return e ? Math.max(e.w / e.W, e.h / e.H) : 0;
+  }
+  // fill＝目標佔比；insetBottom＝畫面下方被播放列等蓋住的 px（機構放在剩下的區域中央）。回傳是否真的調整了。
+  function fitTo(filter, { fill = 0.66, insetBottom = 0 } = {}) {
+    if (interacting) return false;
+    const box = partsBox(filter);
+    if (!box) return false;
+    resize();
+    const c = box.getCenter(new THREE.Vector3());
+    const dir = camera.position.clone().sub(controls.target);
+    if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
+    dir.normalize();
+    let dist = Math.min(15000, Math.max(60, camera.position.distanceTo(controls.target) || 600));
+    const place = () => { camera.position.copy(c).addScaledVector(dir, dist); camera.lookAt(c); };
+    controls.target.copy(c); fitHeld = true;
+    for (let i = 0; i < 8; i++) {
+      place();
+      const e = boxPx(box);
+      if (!e) { dist *= 1.5; continue; }
+      const s = Math.max(e.w / (fill * e.W), e.h / Math.min(fill * e.H, Math.max(40, e.H - insetBottom - 16)));
+      if (Math.abs(s - 1) < 0.01) break;
+      dist = Math.min(15000, Math.max(60, dist * s));
+    }
+    place();
+    const e = boxPx(box);
+    if (e && insetBottom > 0) {   // 往上推：機構放在播放列上方的區域中央
+      const dy = (e.H - insetBottom) / 2 - (e.y0 + e.y1) / 2;
+      const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+      const shift = up.multiplyScalar(dy * 2 * dist * Math.tan(camera.fov * Math.PI / 360) / e.H);
+      controls.target.add(shift); camera.position.add(shift);
+    }
+    camera.lookAt(controls.target);
+    controls.update();
+    return true;
   }
 
   // 讓外部（如「全部顯示」按鈕）可清掉所有隱藏狀態。
@@ -1239,9 +1316,10 @@ export function createViewer(container) {
   start();
 
   return {
-    update, resize, dispose, start, stop, showAll, setMarkers, setPreviewGhost, setHighlight, project, tiltView, pickSurface, highlightSurface,
+    update, resize, dispose, start, stop, showAll, fitTo, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, project, tiltView, pickSurface, highlightSurface,
     setPickEnabled(on) { pickEnabled = !!on; },
     get canvas() { return renderer.domElement; },
+    get interacting() { return interacting; },
     get camera() { return camera; }, get controls() { return controls; }
   };
 }

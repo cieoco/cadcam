@@ -1,6 +1,6 @@
 import { createModuleEditor } from '../js/blocks/module-editor.js?v=20261007_import_spacing';
 import { S } from '../js/blocks/state.js';
-import { createBench } from '../js/blocks/bench-ui.js?v=face-wizard-20261007_mobile';
+import { createBench } from '../js/blocks/bench-ui.js?v=20261007_m4b';
 import { realMountExamples } from '../js/blocks/face-mate-examples.js';
 import { compileAssembly, solveAssembly } from '../js/blocks/assembly.js?v=face-mount-20261007';
 import { toSnapshot, normalizeSnapshot } from '../js/blocks/schema.js?v=face-mount-20261007';
@@ -39,6 +39,7 @@ document.getElementById('preview3d').onclick = async () => {
   if (!viewer) { const { createViewer } = await import('../js/blocks3d/viewer.js?v=20261007_import_spacing'); viewer = createViewer(document.getElementById('view3d')); }
   draw(); viewer.resize(); viewer.tiltView();
 };
+try { localStorage.setItem('blocks.mateAdvanced', '1'); } catch (e) { /* 這個頁面驗的是工程面板（六面體精靈按鈕） */ }
 const bench = createBench({ pushUndo: () => S.undoStack.push(snapshot()), rebuild: draw, draw, transient: text => result.textContent += '\n' + text,
   setViewPlane: () => {}, motorState: () => ({ theta: 0, motorAngles: {} }), snapshotStr: snapshot,
   restoreSnapshot: text => restore(text), getViewer: () => null, is3DActive: () => false, set3D: async () => {}, push3D: () => {},

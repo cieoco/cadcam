@@ -14,7 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261007_3';
+import { APP_VERSION } from '../version.js?v=20261007_4';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
@@ -61,7 +61,7 @@ import { createPlateEditor } from './plate-editor.js';
 import { createNodeEditor } from './node-editor.js';
 import { createModuleEditor } from './module-editor.js?v=20261007_import_spacing';
 import { createModuleDrag } from './module-drag.js';
-import { createBench } from './bench-ui.js?v=face-wizard-20261007_mobile';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
+import { createBench } from './bench-ui.js?v=20261007_m4b';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
 import { workRangeFromTrace, clampRangeFromTraces, currentPointDistance } from './measurement.js';
 import { circleRectCompression } from './intake-contact.js';
 import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
@@ -98,6 +98,7 @@ const roundMm = v => Math.round(Number(v) || 0);
 const SERVO_STEP = 15;                 // 伺服角度面板的每步度數
 // 以下為 render / 播放迴圈 / 3D 的內部狀態，待各自模組抽出時再搬，暫留本檔。
 let raf = null;
+let candidate = null, inCandidate = false, candidateOf = null;   // M4 接合精靈預覽的候選作品（見 setCandidate）
 let lastSolved = {};           // 上一幀求解成功的點位：給求解器挑「連續」分支 + 死點暫態回退
 let prevSolved = {};           // 再上一幀：和 lastSolved 一起外插出「帶動量」的預測種子
 let trajectoryCache = null;    // 沿用 multilink sweepTopology 的軌跡資料格式
@@ -777,9 +778,38 @@ function restoreBenchSnapshot(snap, undoLen) {
   S.theta = theta; S.topo.params.theta = theta;   // 取消預覽不該把姿勢歸零
   draw();
 }
+// ---- M4 接合精靈的預覽：候選的零件／模組不寫進 S（不進復原、不存檔），只在重畫與干涉檢查的當下暫時換進去 ----
+const derivedNow = () => ({ comps: S.comps, modules: S.modules, compiled: S.compiled, assembly: S.assembly, params: S.topo.params });
+const putDerived = d => { S.comps = d.comps; S.modules = d.modules; S.compiled = d.compiled; S.assembly = d.assembly; S.topo.params = d.params; };
+// 設定候選；回傳整理過（正規化、剛體重算，與 rebuild 同順序）的 { comps, modules }。null＝取消預覽。
+function setCandidate(c) {
+  lastSolved = {}; prevSolved = {}; geomVersion++;
+  if (!c) { candidate = null; return null; }
+  const comps = structuredClone(c.comps);   // 複製：rebake 會就地改零件，不能動到真的作品
+  let modules = structuredClone(c.modules);
+  const nm = normalizeModules(modules, comps);
+  if (nm.ok) modules = nm.modules;
+  const rb = rebakeModules(comps, modules, S.topo.params);
+  if (rb.changed) { rb.comps.forEach((x, i) => Object.assign(comps[i], x)); modules = rb.modules; }
+  const compiled = compileTopology(comps, S.topo, new Set());
+  candidateOf = { comps: S.comps, modules: S.modules };   // 預覽是從哪份真作品算出來的
+  candidate = { comps, modules, compiled, assembly: modules.length ? compileAssembly(comps, modules, S.topo) : null, params: { ...compiled.params, theta: S.topo.params.theta } };
+  return { comps, modules };
+}
+function withCandidate(fn) {
+  if (!candidate || inCandidate) return fn();
+  if (S.comps !== candidateOf.comps || S.modules !== candidateOf.modules) {   // 預覽期間真作品被復原／讀檔／刪除換掉了：預覽作廢
+    candidate = null; lastSolved = {}; prevSolved = {}; geomVersion++;
+    const r = fn(); bench.syncUI(true); return r;
+  }
+  const real = derivedNow(), theta = real.params.theta;
+  putDerived(candidate); S.topo.params.theta = theta; inCandidate = true;
+  try { return fn(); }
+  finally { candidate = derivedNow(); real.params.theta = S.topo.params.theta; inCandidate = false; putDerived(real); }
+}
 async function set3D(on) { if (view3DActive !== !!on) await toggle3D(); }
 const bench = createBench({
-  deleteDesign, pause,
+  deleteDesign, pause, setCandidate, withCandidate, inCandidate: () => inCandidate,
   pushUndo, rebuild, draw, transient, setViewPlane: id => setViewPlane(id),
   saveComposite: id => moduleEditor.saveCompositeToLibrary(id),   // B7
   exportComposite: id => moduleEditor.exportComposite(id),
@@ -1340,7 +1370,8 @@ const PART_DRAW = {
   triangle: { phase: 'layered',  draw: drawTrianglePart },
 };
 
-function draw() {
+function draw() { return withCandidate(drawNow); }   // M4：接合精靈預覽中，重畫看的是候選的作品
+function drawNow() {
   mateTool.sync();   // M2：換分頁／模式或開始畫圖時關掉接合面工具，並更新按鈕
   syncModulePlates();   // G1：作品內容變了才讓固定板 home 幾何作廢（θ 不算內容）
   validateViewPlane();
@@ -1684,7 +1715,8 @@ function drawSliders(pts, parent) {
 
 // 播放快路徑：只重解 + 跑各更新器就地改幾何，不拆 DOM 結構。只有 play() 迴圈會呼叫。
 // 結構（零件/選取/縮放/拖曳）在播放期間不變，故安全；任何結構變更都走 draw() 完整重建。
-function renderFrame() {
+function renderFrame(...a) { return withCandidate(() => renderFrameNow(...a)); }
+function renderFrameNow() {
   if (clearOffHomeModuleSelection()) { draw(); return; }
   if (!S.compiled || !S.comps.length || !frameUpdaters.length) { draw(); return; }
   const { pts: allPts, sol } = solveFrame();
@@ -1713,7 +1745,8 @@ function renderFrame() {
 }
 
 // 用最近一幀的求解結果建場景模型，推進 3D viewer
-function push3D() {
+function push3D() { return withCandidate(push3DNow); }
+function push3DNow() {
   if (!viewer3D || !lastModelInputs) return;
   // 有直角安裝時，主平面場景只用主平面的輸入；其餘平面由 buildOrthogonalChildren 另建並立起來。
   // H1：設計模式的 3D 只畫焦點分頁（直角子模組在自己的平面平放，不立起來）；組立模式照舊畫全部。
@@ -1882,7 +1915,7 @@ async function toggle3D() {
     document.getElementById('strokeEditor').style.display = 'none';
     overlay.style.display = 'block';
     if (!viewer3D) {
-      const { createViewer } = await import('../blocks3d/viewer.js?v=20261007_import_spacing');
+      const { createViewer } = await import('../blocks3d/viewer.js?v=20261007_m4b');
       viewer3D = createViewer(overlay);
     }
     refresh3DView();
@@ -2780,7 +2813,7 @@ function init() {
   offerExampleFromUrl({ loadExample, notify: transient });
 }
 
-window.blocks = { exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample };
+window.blocks = { exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample };
 window.blocks.changeFrameGround = changeFrameGround;
 // H1 除錯／測試：設計模式目前看得到的零件與點（畫面實際畫的那一份）。
 window.blocks.designDebug = () => ({

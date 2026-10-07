@@ -9,6 +9,7 @@ globalThis.document = {
   getElementById: () => null, addEventListener() {},
   createElement: () => ({ dataset: {}, style: {}, appendChild() {}, setAttribute() {}, addEventListener() {}, querySelector: () => null, querySelectorAll: () => [] })
 };
+globalThis.localStorage = { getItem: () => '1', setItem() {} };   // 這支驗的是工程面板（進階）的預覽／保存流程；預設的接合精靈另有 test/browser/mate-wizard.py
 S.mode = 'bench'; S.undoStack = [];
 S.fabrication = { cnc: { ...cnc }, export: { ...ex } };
 let saves = 0, argsCalls = 0;
