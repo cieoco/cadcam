@@ -14,7 +14,7 @@ import { checkLiveInterference, liveInterferenceStatus } from './live-interferen
 import { S, motorAnglesNow } from './state.js';
 import { openFaceWizard } from './face-wizard-ui.js?v=20261007_singleface';
 import * as Bench from './bench.js?v=20261007_m5a';
-import { createMateWizard } from './mate-wizard-ui.js?v=20261007_singleface';
+import { createMateWizard } from './mate-wizard-ui.js?v=20261008_brackets';
 import { moduleFrameEdges } from './assembly.js?v=20261007_m5a';
 import * as Settings from './settings.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';

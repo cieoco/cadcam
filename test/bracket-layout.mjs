@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { bracketLayout } from '../js/blocks/bracket-layout.js';
+assert.deepEqual(bracketLayout(29), []);
+assert.deepEqual(bracketLayout(Infinity), []);
+const small = bracketLayout(48), large = bracketLayout(90);
+assert.equal(small.length, 2);
+assert.deepEqual(small.map(p => p.side), [-1, 1]);
+assert.ok(small[0].at < small[1].at);
+assert.equal(large.length, 3);
+assert.deepEqual(large.map(p => p.side), [-1, 1, -1]);
+assert.equal(large[1].at, 0);
+assert.equal(large[0].at, -large[2].at);
+assert.equal(bracketLayout(48, { L1: 2 })[0].at, small[0].at + 2);
+assert.deepEqual(bracketLayout(48, { L1: 100 }), []);
+assert.deepEqual(bracketLayout(90, { L1: 49 }), []);
+console.log('bracket-layout: small/large, stagger, spacing and offsets passed');

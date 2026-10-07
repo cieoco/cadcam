@@ -1,3 +1,4 @@
+import { bracketLayout } from './bracket-layout.js';
 /** 六面體組立操作原型；獨立記憶體草稿，不讀寫 blocks 作品。 */
 import { boxFaces, solveFaceMate, transformMatePoint } from './face-mate.js';
 import { realMountExamples } from './face-mate-examples.js';
@@ -11,8 +12,9 @@ const integrated = new URLSearchParams(location.search).get('integrated') === '1
 let { hosts, children } = realMountExamples();
 const initial = { host: 0, child: 0, hostFace: 'top', childFace: 'bottom', alignU: 0, alignV: 0, offsetU: 0, offsetV: 0, gap: 5, quarterTurns: 0 };
 let draft = { ...initial }, saved = { ...initial }, step = 0;
-let mode = matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work';
+let mode = 'wizard';
 let hasConfirmed = false, roughPlaced = false, configured = false;
+let bracketOffsets = {}, selectedBracket = null, bracketSpan = 0;
 let moveStep = 5, edgeMode = false, dimensionField = null, dimensionAlignment = null;
 const titles = ['選擇兩個機構', '選承接端的大面', '選安裝端的大面', '預覽對齊與偏置'];
 const add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
@@ -33,7 +35,7 @@ function button(label, action) {
   const b = document.createElement('button');
   b.type = 'button'; b.textContent = label; b.addEventListener('click', action); return b;
 }
-function update(field, value) { draft[field] = value; if (field === 'childFace') roughPlaced = true; if (field === 'host' || field === 'child') { roughPlaced = configured; if (field === 'host' && hosts[value].defaultFace) draft.hostFace = hosts[value].defaultFace; } $('message').textContent = ''; render(); }
+function update(field, value) { bracketOffsets = {}; selectedBracket = null; draft[field] = value; if (field === 'childFace') roughPlaced = true; if (field === 'host' || field === 'child') { roughPlaced = configured; if (field === 'host' && hosts[value].defaultFace) draft.hostFace = hosts[value].defaultFace; } $('message').textContent = ''; render(); }
 function buildCards(root, items, field) {
   items.forEach((item, i) => {
     const b = button(item.name, () => update(field, i)); b.dataset.value = i;
@@ -108,12 +110,13 @@ const dimensionText = {
 function openDimension(field, value, alignment = null) {
   dimensionField = field;
   dimensionAlignment = alignment;
-  $('dimensionTitle').textContent = field === 'rotationDeg' ? '設定接合角度' : field === 'offsetU' ? '設定左右偏移' : field === 'offsetV' ? '設定上下偏移' : field === 'gap' ? '設定面間距' : '設定移動步距';
+  $('dimensionTitle').textContent = field === 'bracket' ? '角碼位置偏移（試作）' : field === 'rotationDeg' ? '設定接合角度' : field === 'offsetU' ? '設定左右偏移' : field === 'offsetV' ? '設定上下偏移' : field === 'gap' ? '設定面間距' : '設定移動步距';
   $('dimensionLabel').textContent = `${$('dimensionTitle').textContent}（${field === 'rotationDeg' ? '°' : 'mm'}）`;
   const input = $('dimensionValue');
   input.value = value;
   input.min = field === 'moveStep' || field === 'gap' ? '0' : '';
   input.removeAttribute('aria-invalid');
+  $('dimensionError').textContent = field === 'bracket' ? '位置超出接合區，或與另一顆角碼太接近。' : '請輸入有效數字；步距須大於 0，間距不可小於 0。';
   $('dimensionError').hidden = true;
   $('dimensionDialog').showModal(); input.focus();
 }
@@ -127,12 +130,14 @@ $('dimensionDialog').addEventListener('close', () => {
 $('dimensionForm').addEventListener('submit', e => {
   e.preventDefault();
   const input = $('dimensionValue'), value = input.value.trim() === '' ? NaN : Number(input.value);
-  if (!Number.isFinite(value) || (dimensionField === 'moveStep' && value <= 0) || (dimensionField === 'gap' && value < 0)) {
+  if ((dimensionField === 'bracket' && !bracketLayout(bracketSpan, { ...bracketOffsets, [selectedBracket]: value }).length) || !Number.isFinite(value) || (dimensionField === 'moveStep' && value <= 0) || (dimensionField === 'gap' && value < 0)) {
     input.setAttribute('aria-invalid', 'true'); $('dimensionError').hidden = false; input.focus(); return;
   }
-  if (dimensionField === 'moveStep') moveStep = value;
+  if (dimensionField === 'bracket') bracketOffsets[selectedBracket] = value;
+  else if (dimensionField === 'moveStep') moveStep = value;
   else draft[dimensionField] = dimensionField === 'rotationDeg' ? ((value % 360) + 360) % 360 : value;
   if (dimensionAlignment) draft[dimensionAlignment[0]] = dimensionAlignment[1];
+  input.removeAttribute('aria-invalid');
   $('dimensionDialog').close('confirm'); render();
 });
 $('wizardMode').addEventListener('click', () => { mode = 'wizard'; render(); });
@@ -250,6 +255,28 @@ function scene(mate) {
     const text = make('text', { x: labelX, y: labelY, 'text-anchor': 'middle', 'font-size': 20, 'font-weight': 700, fill: '#173e40', stroke: '#fff', 'stroke-width': 4, 'paint-order': 'stroke', 'pointer-events': 'none' });
     text.textContent = `${p.which === 'host' ? '承接' : '安裝'} ${names[p.id]}`;
   });
+  // 以接合面的長軸試排角碼，未做材料／孔槽檢查，故不產生加工資料。
+  const bracketNote = $('bracketNote'); bracketNote.hidden = separate || step !== 3;
+  if (!bracketNote.hidden) {
+    const perpendicular = Math.abs(mate.rotation[2][2]) < 1e-6;
+    const face = mate.host;
+    const along = face.width >= face.height ? face.u : face.v;
+    const across = face.width >= face.height ? face.v : face.u;
+    const span = Math.max(face.width, face.height); bracketSpan = span;
+    const slots = perpendicular ? bracketLayout(span, bracketOffsets) : [];
+    bracketNote.textContent = !perpendicular ? '目前板面不是直角，未配置角碼。' : !slots.length ? '接合區太小，未配置角碼。' : `角碼試排（不存檔） · ${slots.length === 2 ? '左右各一顆' : '左二右一'} · 尚未產生孔位`;
+    for (const slot of slots) {
+      const corner = add(face.center, add(mul(along, slot.at), mul(across, slot.side * 5)));
+      const vertices = [corner, add(corner, mul(across, slot.side * 13)), add(add(corner, mul(across, slot.side * 13)), mul(along, slot.width)), add(corner, mul(along, slot.width)), add(add(corner, mul(along, slot.width)), mul(face.n, 9.5)), add(corner, mul(face.n, 9.5))];
+      const active = selectedBracket === slot.id;
+      make('polygon', { points: vertices.map(screen).map(q => `${q.x},${q.y}`).join(' '), fill: active ? '#e5a024' : '#667e84', 'fill-opacity': active ? .6 : .22, stroke: active ? '#b97200' : '#607d83', 'stroke-opacity': .7, 'stroke-width': 2, 'pointer-events': 'none' });
+      const q = screen(corner);
+      const target = make('circle', { cx:q.x, cy:q.y, r:24, fill:'transparent', role:'button', tabindex:0, 'aria-label':`角碼 ${slot.id}，調整位置`, 'aria-pressed':active });
+      const choose = () => { if (draggedView) return; selectedBracket = slot.id; preview(); openDimension('bracket', bracketOffsets[slot.id] || 0); };
+      target.style.cursor = 'pointer'; target.addEventListener('pointerdown', e => e.stopPropagation()); target.addEventListener('click', choose);
+      target.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); } });
+    }
+  }
   const axis = make('text', { x: 300, y: 370, 'text-anchor': 'middle', 'font-size': 13, fill: '#516d69' });
   axis.textContent = step === 1 || step === 2 ? '方向外框 · 點面選取' : separate ? '接合板 · 真實輪廓與固定孔' : '接合板擺放預覽';
   const hostFace = polygons.find(p => p.which === 'host' && p.id === draft.hostFace);
@@ -355,7 +382,7 @@ if (integrated) {
     if (e.data?.type === 'face-wizard-error') { $('message').textContent = e.data.reason; return; }
     if (e.data?.type !== 'face-wizard-init') return;
     if (!Array.isArray(e.data.hosts) || !e.data.hosts.length || !Array.isArray(e.data.children) || !e.data.children.length) return;
-    mode = e.data.mode === 'work' ? 'work' : 'wizard';
+    mode = 'wizard';
     hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; configured = !!e.data.configured; roughPlaced = configured;
     if (configured && hosts.length === 1) step = 3;
     if (configured && !document.getElementById('optionalView')) {

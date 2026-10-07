@@ -100,7 +100,7 @@
 <body>
   <header>
     <div><h1>六面體組立</h1><div id="learningMore"></div><div class="tag">真實接合板預覽 · 不寫入作品</div></div>
-    <div class="mode" role="group" aria-label="操作方式"><button id="wizardMode">精靈</button><button id="workMode">工作</button></div>
+    <div class="mode" hidden role="group" aria-label="操作方式"><button id="wizardMode">精靈</button><button id="workMode">工作</button></div>
   </header>
   <main>
     <div class="stage">
@@ -122,6 +122,7 @@
             <button id="mateGapChip">間距 5</button>
             <button id="mateStepChip">步距 5</button>
           </div>
+      <div id="bracketNote" style="padding:4px 12px 10px;font-size:12px;color:#60716e" hidden></div>
       <div class="rotation-actions" id="rotationActions" role="group" aria-label="接合角度"><button id="turnMinus" aria-label="接合角度減少 90 度">−90°</button><button id="angleChip">接合角度 0°</button><button id="turn" aria-label="接合角度增加 90 度">＋90°</button></div>
       <div class="view-actions" role="group" aria-label="旋轉觀看角度">
         <button id="viewLeft" aria-label="向左旋轉視角 90 度">↶</button><button id="viewRight" aria-label="向右旋轉視角 90 度">↷</button>
@@ -164,10 +165,11 @@
     </form>
   </dialog>
   <script type="importmap">{"imports": {
+      "./js/multilink/solver.js": "./js/multilink/solver.js?v=20261007_solverguard",
       "./js/blocks/face-mate.js": "./js/blocks/face-mate.js?v=20261007_angle",
       "./js/blocks/face-placement.js": "./js/blocks/face-placement.js?v=20261007_angle",
       "./js/blocks/face-mount-contract.js": "./js/blocks/face-mount-contract.js?v=20261007_angle"}}</script>
-  <script type="module" src="./js/blocks/face-mate-prototype.js?v=20261007_softarrows"></script>
-  <script type="module" src="./js/version-info.js?v=20261007_solverguard"></script>
+  <script type="module" src="./js/blocks/face-mate-prototype.js?v=20261008_brackets"></script>
+  <script type="module" src="./js/version-info.js?v=20261008_brackets"></script>
 </body>
 </html>

@@ -21,7 +21,7 @@ const NO_SLIDE = '已經滑到邊的盡頭了';
 export function createMateWizard(h) {
   const { el, st, deps } = h;
   let adv = false;
-  try { adv = localStorage.getItem(LS_KEY) === '1'; } catch (e) { /* 沒有儲存空間：預設精靈 */ }
+  // 統一使用精靈，不再沿用舊工程模式偏好。
   const body = () => document.body && document.body.classList;
   body()?.toggle('mate-wizard', !adv);
   let pv = null;   // 預覽：{ childId, mateId, host, name, refs, cand:{comps,modules}, hits, rev }
@@ -332,7 +332,7 @@ export function createMateWizard(h) {
   toggle.addEventListener('click', () => setAdvanced(!adv));
   function ensureToggle(root) {
     toggle.textContent = adv ? '回到精靈' : '進階（工程模式）';
-    if (root && root.lastChild !== toggle) root.appendChild(toggle);
+    toggle.remove();
   }
 
   // ---------------------------------------------------------------- 3D 承接面標記
