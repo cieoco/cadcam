@@ -13,7 +13,7 @@ import {
   exportableLinks, exportablePlates, exportableGears, exportableRacks,
   inspectLinkExport, inspectPlateExport, inspectFrameExport,
   splitMountsByHost, hostedBarGeometry
-} from './exporters.js';
+} from './exporters.js?v=20261007_7';
 import { frameConnectorNodes, motorPointIds, pointCoords, frameNodeIds, sliderMountInfo, isHiddenSliderRailPoint } from './model.js';
 import { machineFrameComps, machineMounts, moduleFrameExports, moduleFrameNodes, moduleOfPoint, splitFrameMounts, planeOf } from './assembly.js?v=20261007_m5a';
 import { machineComps, machineModules, spareModules } from './assembly-roles.js';
@@ -586,6 +586,10 @@ export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = []
         items.push(m.type === 'mg995'
           ? `<li>安裝 MG995 伺服（${e(m.centerId)}）：從 ${e(plate.name)} 的槽穿入，用 M3 螺絲鎖耳孔。</li>`
           : `<li>安裝 TT 馬達（${e(m.centerId)}）：裝在 ${e(plate.name)} 背面，用 M3×30 螺絲鎖固定孔。</li>`);
+      });
+      here.forEach(part => {
+        const n = part.holeLayers?.MG995_HORN_SCREW || 0;
+        if (n) items.push(`<li>把 ${e(part.name)} 鎖到 MG995 舵盤：用 ${n} 顆 M2×6 自攻螺絲，對準舵盤螺絲孔固定。</li>`);
       });
       planeJoints.filter(j => j.layers[1] === n && j.kind !== 'motor-shaft').forEach(j => {
         const spec = jointScrewSpec(j);

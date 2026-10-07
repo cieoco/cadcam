@@ -5,7 +5,7 @@
  * 純函式，不碰 DOM。製作包本身仍用檔名，只有畫面上的干涉訊息用這裡的名字。
  */
 import { assemblyRoles } from './assembly-roles.js';
-import { safeName } from './exporters.js';
+import { safeName } from './exporters.js?v=20261007_7';
 
 const asList = v => Array.isArray(v) ? v : [];
 const TYPE_WHAT = { gear: '齒輪', rack: '齒條', bar: '連桿', slider: '滑塊' };

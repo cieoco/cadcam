@@ -295,10 +295,8 @@ export function createMateWizard(h) {
   // 「還沒接到底座」只在預覽接到未安裝的宿主時說；其他時候講目前這台機器的狀況。
   function syncLive() {
     const i = h.liveInfo();
-    let state = 'none', text = '干涉檢查中…';
-    if (pv && assemblyRoles(pv.cand.modules).spare.includes(pv.childId)) text = '還沒接到底座，要接到底座上才會檢查干涉';   // 未安裝的串不進機器，也不進干涉檢查
-    else if (i.ready && !i.n) { state = 'ok'; text = '✔ 目前沒有干涉'; }
-    else if (i.ready) { state = 'hit'; text = `✖ 撞到 ${i.n} 處${i.labels.length ? '：' + i.labels.join('、') : ''}`; }
+    let state = i.state, text = i.message;
+    if (pv && assemblyRoles(pv.cand.modules).spare.includes(pv.childId)) { state = 'none'; text = '還沒接到底座，要接到底座上才會檢查干涉'; }
     liveLine.dataset.state = state; liveLine.textContent = text; liveLine.title = state === 'hit' ? text : '';
   }
 

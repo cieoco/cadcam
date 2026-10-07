@@ -1,3 +1,4 @@
+import { checkLiveInterference, liveInterferenceStatus } from './live-interference-status.js';
 /**
  * blocks / bench-ui
  *
@@ -13,7 +14,7 @@
 import { S, motorAnglesNow } from './state.js';
 import { openFaceWizard } from './face-wizard-ui.js?v=20261007_mobile';
 import * as Bench from './bench.js?v=20261007_m5a';
-import { createMateWizard } from './mate-wizard-ui.js?v=20261007_m6';
+import { createMateWizard } from './mate-wizard-ui.js?v=20261007_7';
 import { moduleFrameEdges } from './assembly.js?v=20261007_m5a';
 import * as Settings from './settings.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
@@ -108,7 +109,7 @@ export function createBench(deps) {
 
   // ---------------------------------------------------------------- B6：即時干涉與全行程測試
   // live：目前姿勢的檢查結果；plan：疊層＋隔圈的快取（只在作品內容變了才重算）；tl：全行程時間軸結果。
-  const live = { plan: null, planKey: '', args: null, sig: '', findings: [], hits: [], labels: [], msg: '', keys: [], at: 0, timer: null, checks: 0, planBuilds: 0, ms: 0, ready: false };
+  const live = { plan: null, planKey: '', args: null, sig: '', findings: [], hits: [], labels: [], msg: '', keys: [], at: 0, timer: null, checks: 0, planBuilds: 0, ms: 0, ready: false, error: false };
   const tl = { result: null, ranges: null, key: '', summary: [], ms: 0 };
   let liveBox = null;
 
@@ -121,13 +122,13 @@ export function createBench(deps) {
     const key = workKey();
     if (live.plan && live.planKey === key) return live;
     live.planKey = key;
-    live.plan = null;
+    live.plan = null; live.error = false;
     live.planBuilds++;
     try {
       const args = interferenceArgs();
       const { plan } = resolveSpacers(args);
       live.plan = plan; live.args = args;
-    } catch (e) { live.plan = null; live.args = null; }
+    } catch (e) { live.plan = null; live.args = null; live.error = true; }
     live.sig = '';              // 作品變了：目前姿勢要重查
     clearTimeline();            // 全行程結果跟著作品失效
     return live;
@@ -170,24 +171,16 @@ export function createBench(deps) {
     return names.length > max ? `${names.slice(0, max).join('、')} 等 ${names.length} 件` : names.join('、');
   }
 
+  function currentLiveStatus() {
+    return liveInterferenceStatus({ hasFace: S.modules.some(m => m?.mount?.face), ready: live.ready, hasParts: !!live.plan?.parts?.length, error: live.error, n: live.findings.length, labels: live.labels });
+  }
   function renderLiveStatus() { renderLiveBox(); if (wiz) wiz.syncLive(); }
   function renderLiveBox() {
     if (!liveBox) return;
     const box = liveBox.querySelector('#benchLive');
     if (!box) return;
-    if (S.modules.some(m => m?.mount?.face)) {
-      box.dataset.state = 'none'; box.textContent = '六面接合的跨面干涉尚未驗證'; return;
-    }
-    if (!live.ready || !live.plan || !(live.plan.parts || []).length) {
-      box.dataset.state = 'none';
-      box.textContent = '尚無零件可檢查干涉';
-      return;
-    }
-    if (!live.findings.length) {
-      box.dataset.state = 'ok';
-      box.textContent = '✔ 目前姿勢沒有干涉';
-      return;
-    }
+    const status = currentLiveStatus();
+    if (status.state !== 'hit') { box.dataset.state = status.state; box.textContent = status.message; return; }
     box.dataset.state = 'hit';
     while (box.firstChild) box.removeChild(box.firstChild);
     box.appendChild(el('div', 'bench-live-main', `✖ 撞到：${nameList(live.labels)}（共 ${live.findings.length} 項）`));
@@ -209,12 +202,10 @@ export function createBench(deps) {
     const sig = JSON.stringify(pose);
     if (!force && sig === live.sig && live.ready) { updateCursors(); return; }
     const t0 = performance.now();
-    let findings = [];
-    if (st0.plan && st0.args) {
-      try { findings = findInterference({ ...st0.args, plan: st0.plan, pose }); } catch (e) { findings = []; }
-    }
+    const result = st0.plan && st0.args ? checkLiveInterference(() => findInterference({ ...st0.args, plan: st0.plan, pose })) : { findings: [], ready: false, error: live.error };
+    const findings = result.findings;
     live.ms = performance.now() - t0;
-    live.sig = sig; live.at = performance.now(); live.checks++; live.ready = true;
+    live.sig = sig; live.at = performance.now(); live.checks++; live.ready = result.ready; live.error = result.error;
     live.findings = findings;
     live.hits = hitPartNames(findings);
     live.labels = hitLabels(live.hits, S.comps, S.modules, labelOpts); live.msg = findings.length ? relabelText(findings[0].message, findings[0].parts, S.comps, S.modules, labelOpts) : '';
@@ -232,7 +223,7 @@ export function createBench(deps) {
   }
   function resetLive() {
     if (live.timer) { clearTimeout(live.timer); live.timer = null; }
-    live.sig = ''; live.findings = []; live.hits = []; live.labels = []; live.msg = ''; live.keys = []; live.ready = false;
+    live.sig = ''; live.findings = []; live.hits = []; live.labels = []; live.msg = ''; live.keys = []; live.ready = false; live.error = false;
     applyHighlight();
     renderLiveStatus();
   }
@@ -267,7 +258,7 @@ export function createBench(deps) {
     const args = interferenceArgs();
     const t0 = performance.now();
     let result;
-    try { result = interferenceTimeline({ ...args, plan: st0.plan, ranges: args.ranges, stepDeg: TL_STEP_DEG }); } catch (e) { result = { motors: {} }; }
+    try { result = interferenceTimeline({ ...args, plan: st0.plan, ranges: args.ranges, stepDeg: TL_STEP_DEG }); } catch (e) { clearTimeline(); say('全行程干涉檢查失敗，請重新檢查；目前無法判定'); return null; }
     tl.ms = performance.now() - t0;
     tl.result = result; tl.ranges = args.ranges;
     tl.summary = [];
@@ -1187,7 +1178,7 @@ export function createBench(deps) {
   wiz = createMateWizard({
     el, bigBtn, st, deps, modOf, displayName, statusOf, say, select, syncUI, drawMarkers, computeMarkers, viewer, listEl, panelEl, liveBox, liveCheck,
     liveCount: () => live.ready ? live.findings.length : 0,
-    liveInfo: () => ({ ready: live.ready && !!live.plan && (live.plan.parts || []).length > 0, n: live.findings.length, hits: live.hits, labels: live.labels }), motorState, adjust, adjustState, editModule, ghostFor,
+    liveInfo: () => ({ ...currentLiveStatus(), ready: live.ready && !!live.plan && (live.plan.parts || []).length > 0, n: live.findings.length, hits: live.hits, labels: live.labels }), motorState, adjust, adjustState, editModule, ghostFor,
     clearGhost: () => viewer()?.setPreviewGhost(null), setGhost: spec => viewer()?.setPreviewGhost(spec), isBench,
     cancelAdvancedPreview: () => cancelPreview({ silent: true }),
     // 接上：一筆復原。comps／modules 是已整理好的候選，換成真的作品後照 adjust 的流程重建。

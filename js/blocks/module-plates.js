@@ -9,8 +9,8 @@
  * 與 assembly.js 互相引用（只在呼叫時用函式，無頂層相依），assembly.js 再轉出 mountedFramePlates。
  */
 import { moduleFrameExports, moduleFrameNodes, splitFrameMounts, planeOf, outputPose } from './assembly.js?v=20261007_m5a';
-import { deriveMotorMounts, buildPlan } from './build-plan.js';
-import { inspectFrameExport, splitMountsByHost } from './exporters.js';
+import { deriveMotorMounts, buildPlan } from './build-plan.js?v=20261007_7';
+import { inspectFrameExport, splitMountsByHost } from './exporters.js?v=20261007_7';
 import { frameConnectorNodes } from './model.js';
 import { orthogonalExportExtras, withAdapterNodes } from './orthogonal-joint.js';
 

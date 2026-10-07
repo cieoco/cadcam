@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import { builtinTemplate, instantiateTemplate } from '../js/blocks/module-ops.js';
+import { inspectLinkExport, exportLinksAsSvg, exportLinksAsDxf } from '../js/blocks/exporters.js';
+import { buildPlan, hardwareList, buildPackHtml } from '../js/blocks/build-plan.js';
+const inst = instantiateTemplate(builtinTemplate('fourbar-lift'), { counter: 0 });
+const crank = inst.comps.find(c => c.isInput && c.motorType === 'mg995');
+const geometry = inspectLinkExport(crank, 48);
+assert.equal(geometry.holes.filter(h => h.layer === 'MG995_HORN_SCREW').length, 4);
+assert.equal(geometry.holes.filter(h => h.layer === 'MG995_HORN_CENTER')[0].r, 3);
+assert.equal(geometry.holes.filter(h => h.layer === 'HOLE').length, 1);
+const custom = inspectLinkExport(crank, 48, { drive: { hornScrewCount: 6, hornScrewCircleMm: 12 } });
+assert.equal(custom.holes.filter(h => h.layer === 'MG995_HORN_SCREW').length, 6);
+const reversed = { ...crank, p1: { ...crank.p1, physicalMotor: undefined }, p2: { ...crank.p2, physicalMotor: '1' } };
+assert.equal(inspectLinkExport(reversed, 48).holes.find(h => h.layer === 'MG995_HORN_CENTER').x, 48);
+const passive = { ...crank, isInput: false };
+assert.equal(inspectLinkExport(passive, 48).holes.length, 2);
+const plan = buildPlan({ comps: inst.comps, modules: [inst.module], params: inst.params });
+assert.equal(plan.parts.find(p => p.compId === crank.id).holeLayers.MG995_HORN_SCREW, 4);
+assert.equal(hardwareList(plan).find(r => r.spec === 'M2×6 自攻').qty, 4);
+assert.match(buildPackHtml(plan, { modules: [inst.module] }), /鎖到 MG995 舵盤/);
+console.log('servo-crank-holes: PASS');
+
+// 驗證真正的下載路徑也帶入孔圖層，不只 inspect 的幾何。
+const blobs = [];
+const oldCreate = URL.createObjectURL, oldRevoke = URL.revokeObjectURL;
+URL.createObjectURL = blob => { blobs.push(blob); return 'blob:test'; };
+URL.revokeObjectURL = () => {};
+globalThis.document = { body: { appendChild() {} }, createElement: () => ({ click() {}, remove() {} }) };
+exportLinksAsSvg([crank], {}, inst.params, {});
+exportLinksAsDxf([crank], {}, inst.params, {});
+const [svg, dxf] = await Promise.all(blobs.map(b => b.text()));
+assert.equal((svg.match(/data-layer="MG995_HORN_SCREW"/g) || []).length, 4);
+assert.equal((dxf.match(/MG995_HORN_SCREW/g) || []).length, 4);
+URL.createObjectURL = oldCreate; URL.revokeObjectURL = oldRevoke;
+console.log('servo-crank SVG/DXF download: PASS');

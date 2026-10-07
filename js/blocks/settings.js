@@ -5,7 +5,7 @@
  */
 
 import { S } from './state.js';
-import * as Exporters from './exporters.js';
+import * as Exporters from './exporters.js?v=20261007_7';
 import { FABRICATION_DEFAULTS, normalizeFabricationProfile, planFabricationProfile } from './fabrication-profile.js';
 
 const EXPORT_SETTINGS_KEY = 'cadcam.blocks.exportSettings';

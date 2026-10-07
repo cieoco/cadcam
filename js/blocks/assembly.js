@@ -11,7 +11,7 @@ import { compileTopology } from '../core/topology.js';
 import { solveTopology, sweepTopology } from '../multilink/solver.js';
 import { pointKeysFor } from './part-types.js';
 import { memberStock } from './member-stock.js';
-import { frameOutlineEdges, safeName } from './exporters.js';   // C1：機架外框直邊、零件檔名
+import { frameOutlineEdges, safeName } from './exporters.js?v=20261007_7';   // C1：機架外框直邊、零件檔名
 import { frameConnectorNodes, pointCoords } from './model.js';
 import { adapterChildHoles } from './orthogonal-joint.js';   // D2：子模組底板上的轉接座孔（只在呼叫時用，與本檔互相引用無妨）
 import { assemblyRoles, machineComps } from './assembly-roles.js';   // M5a：底座／機器／未安裝（純函式，不回頭引用本檔）

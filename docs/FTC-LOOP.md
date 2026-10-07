@@ -417,3 +417,9 @@
 - M6 試行收尾：主模型以手機尺寸把齒條升降←四連桿←夾爪從插入走到製作包，逐條點數組裝步驟與五金清單（9 類全部相符），記錄於 [PILOT-MATE-WIZARD.md](PILOT-MATE-WIZARD.md)。試行找到並修正：干涉訊息出現內部零件名稱（新增 `part-labels.js`，改為「哪個機構的什麼」）、選未安裝機構時狀態列誤寫「還沒接到底座」（Sonnet，一輪）；教學單元與範例說明改為配合精靈（Haiku）。試行找到但未在本案處理：四連桿搖臂沒有舵盤螺絲孔（開工前就存在，實作前必須補）、教學用的同平面練習因輸出端只有 1 個點而不在精靈裡（教材改指向「進階」）。主模型最終獨立重跑：node 測試 130 支中僅 `assembly-schema`／`solve-health`／`trace-fallback` 三支開工前既有失敗；`part-labels` 9/9、`mates` 42/42、`mates-view` 19/19、`mate-connect` 123/123、`mate-multi` 65/65；瀏覽器合約手機與電腦：`mates-design` 21/21、`mate-wizard` 33/33、`mate-multi` 28/28；schema 94 passed。版本 2026.10.07.6。
 - 本案（SDD-MATE-FACES M0～M6）完成。未做實體切割與組裝。
 
+
+## M6 修正：舵盤與干涉狀態（2026-10-07，2026.10.07.7）
+
+- MG995 輸入搖臂與齒輪共用舵盤孔設定，補齊 SVG／DXF、製作計畫孔圖層、M2×6 五金數量與逐層固定步驟；未改作品格式。
+- 即時干涉與精靈共用狀態判斷，六面接合仍明示未驗證；例外／非法檢查結果不再視為零碰撞。全行程例外也回報無法判定。
+- 新增 servo-crank-holes 與 live-interference-status 測試。全套 132 支：129 通過，assembly-schema／solve-health／trace-fallback 三項既有失敗相同。HTTP 驗收加工孔示意與失敗狀態，正式主入口版本 2026.10.07.7 且 console error 空。未做實物加工／舵盤實測。

@@ -162,19 +162,28 @@ function adapterHoleSpecs(extraHoles) {
     .map(h => ({ kind: 'circle', x: round(Number(h.u), 3), y: round(Number(h.v), 3), r: round(Number(h.diameterMm) / 2, 3), layer: 'ADAPTER_HOLE' }));
 }
 
+// 舵盤孔以零件局部座標輸出；齒輪與搖臂共用同一套加工設定。
+function servoHornHoles(settings, x = 0, angle = 0) {
+  const drive = { ...FABRICATION_DEFAULTS.drive, ...(settings?.drive || {}) };
+  const holes = [];
+  if (drive.hornCenterMm > 0) holes.push({ kind: 'circle', x, y: 0, r: drive.hornCenterMm / 2, layer: 'MG995_HORN_CENTER' });
+  const n = Math.max(0, Math.round(Number(drive.hornScrewCount) || 0));
+  for (let i = 0; i < n; i++) {
+    const a = angle + 2 * Math.PI * i / n;
+    holes.push({ kind: 'circle', x: x + drive.hornScrewCircleMm / 2 * Math.cos(a), y: drive.hornScrewCircleMm / 2 * Math.sin(a), r: drive.hornScrewMm / 2, layer: 'MG995_HORN_SCREW' });
+  }
+  return holes;
+}
+
 function linkHoleSpecs(comp, length, settings, extraHoles = []) {
   const { holeDiameterMm, ttShaftFlatDiameterMm, ttShaftFlatThicknessMm } = normalizeExportSettings(settings);
   const holeR = round(holeDiameterMm / 2, 3);
   const flat = { ttShaftFlatDiameterMm, ttShaftFlatThicknessMm };
-  return [
-    isTtMotorEnd(comp, 'p1')
-      ? { kind: 'tt-shaft-flat', x: 0, y: 0, settings: flat }
-      : { kind: 'circle', x: 0, y: 0, r: holeR },
-    isTtMotorEnd(comp, 'p2')
-      ? { kind: 'tt-shaft-flat', x: length, y: 0, settings: flat }
-      : { kind: 'circle', x: length, y: 0, r: holeR },
-    ...adapterHoleSpecs(extraHoles)
-  ];
+  const endHoles = (key, x) => {
+    if (comp.isInput && comp.motorType === 'mg995' && comp[key]?.physicalMotor) return servoHornHoles(settings, x);
+    return [isTtMotorEnd(comp, key) ? { kind: 'tt-shaft-flat', x, y: 0, settings: flat } : { kind: 'circle', x, y: 0, r: holeR }];
+  };
+  return [...endHoles('p1', 0), ...endHoles('p2', length), ...adapterHoleSpecs(extraHoles)];
 }
 
 function svgForLink(comp, length, settings, extraHoles = []) {
@@ -276,12 +285,7 @@ function gearGeometry(comp, params = {}, settings = {}) {
     const nx = -Math.sin(angle), ny = Math.cos(angle);
     [1, -1].forEach(sgn => driveHoles.push({ x: sgn * half * nx, y: sgn * half * ny, r: drive.ttHubScrewMm / 2, layer: 'TT_HUB_SCREW' }));
   } else if (driven) {
-    if (drive.hornCenterMm > 0) driveHoles.push({ x: 0, y: 0, r: drive.hornCenterMm / 2, layer: 'MG995_HORN_CENTER' });
-    const n = Math.max(0, Math.round(Number(drive.hornScrewCount) || 0));
-    for (let i = 0; i < n; i++) {
-      const a = angle + (2 * Math.PI * i) / n;
-      driveHoles.push({ x: drive.hornScrewCircleMm / 2 * Math.cos(a), y: drive.hornScrewCircleMm / 2 * Math.sin(a), r: drive.hornScrewMm / 2, layer: 'MG995_HORN_SCREW' });
-    }
+    driveHoles.push(...servoHornHoles(settings, 0, angle).map(({ kind, ...hole }) => hole));
   }
   return {
     outline,
@@ -1076,6 +1080,14 @@ export function hostedBarGeometry(comp, pts, settings, mounts = [], extraHoles =
     ...normalized,
     barWidthMm: memberStock(comp).widthMm
   }, localMounts);
+  if (comp.isInput && comp.motorType === 'mg995') {
+    ['p1', 'p2'].forEach((key, i) => {
+      if (!comp[key]?.physicalMotor) return;
+      const x = i ? len : 0;
+      geometry.holes = geometry.holes.filter(h => !(h.layer === 'HOLE' && Math.hypot(h.x - x, h.y) < 1e-6));
+      geometry.holes.push(...servoHornHoles(settings, x).map(({ kind, ...hole }) => hole));
+    });
+  }
   const extra = adapterHoleSpecs(extraHoles);
   // 轉接座孔：桿局部座標（p1 在原點、+X 沿桿軸）；不改 frameGeometry 回傳物件的其他欄位。
   return geometry && extra.length

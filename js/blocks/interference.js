@@ -15,10 +15,10 @@
 import { machineComps, machineModules } from './assembly-roles.js';
 import { compileAssembly, solveAssembly, moduleFrameExports, moduleFrameNodes, machineFrameComps, machineMounts, splitFrameMounts, planeOf, orthogonalFrame, orthogonalHostEdge, slabCorners3D } from './assembly.js';
 import { frameConnectorNodes } from './model.js';
-import { inspectFrameExport, inspectRackExport, splitMountsByHost, motorMountFeatures, isStaticPlate } from './exporters.js';
+import { inspectFrameExport, inspectRackExport, splitMountsByHost, motorMountFeatures, isStaticPlate } from './exporters.js?v=20261007_7';
 import { jawCenterline } from './plate-geometry.js';
 import { memberStock } from './member-stock.js';
-import { deriveMotorMounts, buildPlan, normalizeSpacers } from './build-plan.js';
+import { deriveMotorMounts, buildPlan, normalizeSpacers } from './build-plan.js?v=20261007_7';
 import { rackGuideThetaRange, rackStopTrims } from './rack-limits.js';
 
 const D2R = Math.PI / 180;

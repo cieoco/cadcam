@@ -6,7 +6,7 @@
  */
 import { autoPorts } from './bench.js';
 import { moduleFrameExports, moduleFrameNodes } from './assembly.js?v=20261007_m5a';
-import { inspectFrameExport, inspectLinkExport, inspectPlateExport, inspectRackExport } from './exporters.js';
+import { inspectFrameExport, inspectLinkExport, inspectPlateExport, inspectRackExport } from './exporters.js?v=20261007_7';
 import { frameConnectorNodes, pointCoords } from './model.js';
 import { memberStock } from './member-stock.js';
 

@@ -1,0 +1,18 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>舵盤孔與干涉提示驗收</title>
+<style>body{font:16px system-ui;padding:16px;color:#18324b}svg{width:100%;max-width:600px;border:1px solid #ccc}.status{padding:12px;margin:10px 0;background:#eef1f3;border-radius:8px}.status[data-state=ok]{background:#e0f5e8}button{min-height:44px}#pack{white-space:pre-wrap}</style>
+<h1>舵盤孔與干涉提示驗收</h1><p>四連桿升降臂的 MG995 搖臂：中心 Ø6、四孔 Ø2.2／孔圓 Ø14。</p><div id="shape"></div><p id="hardware"></p>
+<button id="normal">正常完成</button><button id="face">六面接合</button><button id="failed">模擬檢查失敗</button><div id="status" class="status" role="status"></div><div id="pack"></div>
+<script type="module">
+import { builtinTemplate, instantiateTemplate } from '../js/blocks/module-ops.js';
+import { inspectLinkExport } from '../js/blocks/exporters.js?v=20261007_7';
+import { buildPlan, hardwareList, buildPackHtml } from '../js/blocks/build-plan.js?v=20261007_7';
+import { checkLiveInterference, liveInterferenceStatus } from '../js/blocks/live-interference-status.js';
+const t=instantiateTemplate(builtinTemplate('fourbar-lift'),{counter:0}),c=t.comps.find(c=>c.isInput&&c.motorType==='mg995'),g=inspectLinkExport(c,48);
+const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','-12 -12 72 24');
+const p=document.createElementNS(ns,'path');p.setAttribute('d','M'+g.outlines[0].map(p=>p.x+','+p.y).join(' L')+' Z');p.setAttribute('fill','#dcece7');p.setAttribute('stroke','#176b87');p.setAttribute('stroke-width','.3');svg.append(p);
+g.holes.forEach(h=>{const e=document.createElementNS(ns,'circle');for(const [k,v] of Object.entries({cx:h.x,cy:h.y,r:h.r,fill:'white',stroke:'#176b87','stroke-width':'.2'}))e.setAttribute(k,v);svg.append(e)});document.getElementById('shape').append(svg);
+const plan=buildPlan({comps:t.comps,modules:[t.module],params:t.params}),hw=hardwareList(plan).find(r=>r.spec==='M2×6 自攻');document.getElementById('hardware').textContent=hw.spec+'：'+hw.qty+' 顆';
+const html=new DOMParser().parseFromString(buildPackHtml(plan,{modules:[t.module]}),'text/html');document.getElementById('pack').textContent=[...html.querySelectorAll('li')].find(e=>e.textContent.includes('鎖到 MG995 舵盤'))?.textContent;
+function show(extra){const s=liveInterferenceStatus({ready:true,hasParts:true,...extra}),e=document.getElementById('status');e.dataset.state=s.state;e.textContent=s.message}
+document.getElementById('normal').onclick=()=>show({});document.getElementById('face').onclick=()=>show({hasFace:true});document.getElementById('failed').onclick=()=>show(checkLiveInterference(()=>{throw Error('test')}));show({hasFace:true});
+</script></html>

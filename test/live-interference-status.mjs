@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { checkLiveInterference, liveInterferenceStatus as status } from '../js/blocks/live-interference-status.js';
+const good = { ready: true, hasParts: true };
+assert.equal(status(good).state, 'ok');
+assert.equal(status({ ...good, n: 1, labels: ['升降臂底板'] }).state, 'hit');
+assert.equal(status({ ...good, hasFace: true }).state, 'none');
+assert.match(status({ ...good, hasFace: true }).message, /尚未驗證/);
+const failure = checkLiveInterference(() => { throw new Error('solver'); });
+assert.equal(failure.ready, false); assert.equal(failure.error, true);
+assert.equal(status({ ...good, ...failure }).state, 'none');
+assert.match(status({ ...good, ...failure }).message, /失敗/);
+assert.equal(checkLiveInterference(() => null).ready, false);
+assert.equal(status({ ...good, hasParts: false }).state, 'none');
+assert.equal(checkLiveInterference(() => []).ready, true);
+console.log('live-interference-status: PASS');
