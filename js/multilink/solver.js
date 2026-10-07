@@ -586,6 +586,25 @@ function solveBodyJointTopology(topology, params) {
                     }
                 }
 
+                // 平行升降臂經過共線點後，最近前幀或固定側向都可能選成交叉解。
+                // 僅對明確標記的升降臂，以原設計的平行四邊形和實際桿長確認分支。
+                if (!chosen) {
+                    const lift = components.find(c => c.assemblyType === 'parallel-fourbar-lift' &&
+                        c.p1?.type === 'fixed' && [c1.otherId, c2.otherId].includes(c.p2?.id));
+                    if (lift && points[lift.p1.id]) {
+                        const a = getInitialPoint(c1.otherId), b = getInitialPoint(c2.otherId);
+                        const origin = getInitialPoint(lift.p1.id), seed = getInitialPoint(pid);
+                        const base = points[lift.p1.id];
+                        const candidate = { x: p1.x + p2.x - base.x, y: p1.y + p2.y - base.y };
+                        if (a && b && origin && seed &&
+                            Math.hypot(a.x + b.x - origin.x - seed.x, a.y + b.y - origin.y - seed.y) < 1e-6 &&
+                            Math.abs(Math.hypot(candidate.x - p1.x, candidate.y - p1.y) - c1.len) < 1e-6 &&
+                            Math.abs(Math.hypot(candidate.x - p2.x, candidate.y - p2.y) - c2.len) < 1e-6) {
+                            chosen = candidate;
+                        }
+                    }
+                }
+
                 if (!chosen) {
                     const prev = prevPoints ? prevPoints[pid] : null;
                     if (prev) {

@@ -26,4 +26,22 @@ for (const angle of [-40, -26, 0, 20, 30, 45, 60]) {
  check(`無前幀重建 ${angle}° 保持平行`, sol.isValid && Math.abs(p.D.x-p.C.x)<1e-6 && Math.abs(p.D.y-p.C.y-72)<1e-6);
  check(`無前幀重建 ${angle}° 保持桿長`, full.comps.filter(c=>c.type==='bar').every(c=>Math.abs(Math.hypot(p[c.p1.id].x-p[c.p2.id].x,p[c.p1.id].y-p[c.p2.id].y)-full.params[c.lenParam])<1e-6));
 }
+// 升降臂工具箱範例：穿越共線點、反轉、重建以及 309° 都不可翻成交叉分支。
+const lift = normalizeSnapshot(getExample('competition-fourbar-lift').snapshot);
+const liftAsm = compileAssembly(lift.comps, lift.modules, {params:lift.params});
+for (const direction of [1, -1]) {
+ let prev = null, stable = true;
+ for (let i=0; i<=720; i++) {
+  const angle = direction * i;
+  const sol = solveAssembly(liftAsm, {thetaDeg:angle,motorAngles:{'1':angle,'2':0},_prevPoints:prev});
+  const p = sol.points;
+  stable &&= sol.isValid && Math.abs(p.B.x-p.A.x)<1e-6 && Math.abs(p.B.y-p.A.y-72)<1e-6;
+  prev = p;
+ }
+ check(`升降臂方向 ${direction} 連續兩圈維持平行`,stable);
+}
+for(const angle of [90,180,270,309]) {
+ const sol=solveAssembly(liftAsm,{thetaDeg:angle,motorAngles:{'1':angle,'2':0}}), p=sol.points;
+ check(`升降臂 ${angle}° 無前幀仍平行`,sol.isValid && Math.abs(p.B.x-p.A.x)<1e-6 && Math.abs(p.B.y-p.A.y-72)<1e-6);
+}
 report('assembly-lesson');
