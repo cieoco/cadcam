@@ -13,7 +13,7 @@ function reference(surface, name) {
     holes: (surface.holes || []).map(relative), cutouts: (surface.cutouts || []).map(c => ({ ...c, points: c.points.map(relative) })) };
 }
 
-export function openFaceWizard({ comps, modules, params, childId, exportSettings, stockMm, isCurrent, commit, say }) {
+export function openFaceWizard({ comps, modules, params, childId, exportSettings, stockMm, isCurrent, commit, say, wizard = false, initialMount = null }) {
   const child = modules.find(m => m.id === childId);
   if (!child || child.mount || !child.base) { say('請選尚未安裝且有底座的機構。'); return; }
   const surfaces = id => buildMountSurfaces({ comps, modules, params, moduleId: id, exportSettings, thicknessMm: stockMm }).surfaces || [];
@@ -42,7 +42,8 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   close.addEventListener('click', () => dialog.close()); dialog.addEventListener('close', dispose);
   function receive(e) {
     if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
-    if (e.data?.type === 'face-wizard-ready') frame.contentWindow.postMessage({ type: 'face-wizard-init', hosts, children, mode: matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work' }, location.origin);
+    if (e.data?.type === 'face-wizard-ready') frame.contentWindow.postMessage({ type: 'face-wizard-init', hosts, children, mode: wizard || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
+    if (e.data?.type === 'face-wizard-cancel') { dialog.close(); return; }
     if (e.data?.type !== 'face-wizard-confirm') return;
     if (!isCurrent()) { dialog.close(); say('作品已變動，請重新選擇接法。'); return; }
     const selection = e.data.selection;

@@ -152,6 +152,7 @@ $('placementRecord').addEventListener('click', () => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 $('cancel').addEventListener('click', () => {
+  if (integrated) { parent.postMessage({ type: 'face-wizard-cancel' }, location.origin); return; }
   draft = { ...saved }; render(); $('message').textContent = hasConfirmed ? '已回到上次確認的擺放。' : '已回到初始示例。';
 });
 $('viewLeft').addEventListener('click', () => { viewYaw -= 90; preview(); });
@@ -182,9 +183,14 @@ function scene(mate) {
   const svg = $('scene'); svg.replaceChildren();
   const polygons = [], separate = mode === 'wizard' && step <= 2;
   for (const [which, bounds, selected] of [['host', hosts[draft.host].box, draft.hostFace], ['child', children[draft.child].box, draft.childFace]]) {
+    // 手機選面只顯示當下的對象，並放大方向外框的薄邊；接合計算仍用真實板厚。
+    if (mode === 'wizard' && ((step === 1 && which !== 'host') || (step === 2 && which !== 'child'))) continue;
+    const picking = mode === 'wizard' && (step === 1 || step === 2);
+    const halfZ = Math.max((bounds.max.z - bounds.min.z) / 2, 20, Math.min(bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y) / 3);
+    const faceBounds = picking ? { min: { ...bounds.min, z: -halfZ }, max: { ...bounds.max, z: halfZ } } : bounds;
     const spacing = hosts[draft.host].box.max.x - children[draft.child].box.min.x + 40;
     const transform = p => which === 'host' ? p : separate ? add(p, { x: spacing, y: 0, z: 10 }) : transformMatePoint(mate, p);
-    for (const face of boxFaces(bounds)) {
+    for (const face of boxFaces(faceBounds)) {
       const points = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => transform(add(face.center, add(mul(face.u, u * face.width / 2), mul(face.v, v * face.height / 2)))));
       const center = transform(face.center);
       const normalPoint = transform(add(face.center, face.n));
@@ -239,7 +245,7 @@ function scene(mate) {
     text.textContent = `${p.which === 'host' ? '承接' : '安裝'} ${names[p.id]}`;
   });
   const axis = make('text', { x: 300, y: 370, 'text-anchor': 'middle', 'font-size': 13, fill: '#516d69' });
-  axis.textContent = separate ? '接合板 · 真實輪廓與固定孔' : '接合板擺放預覽';
+  axis.textContent = step === 1 || step === 2 ? '方向外框 · 點面選取' : separate ? '接合板 · 真實輪廓與固定孔' : '接合板擺放預覽';
   const hostFace = polygons.find(p => p.which === 'host' && p.id === draft.hostFace);
   if (hostFace && !separate) positionMateOverlay(hostFace, screen);
   else $('mateOverlay').hidden = true;
@@ -316,7 +322,8 @@ function render() {
   ['offsetU', 'offsetV', 'gap'].forEach(field => { $(field).value = draft[field]; });
   $('turn').textContent = `轉 90° · 目前 ${draft.quarterTurns * 90}°`;
   $('back').hidden = mode === 'work'; $('back').disabled = step === 0;
-  $('next').textContent = mode === 'work' || step === 3 ? '確認擺放' : '下一步';
+  $('next').textContent = mode === 'work' || step === 3 ? (integrated ? '接上' : '確認擺放') : '下一步';
+  if (integrated) $('cancel').textContent = '取消';
   $('stageTitle').textContent = mode === 'work' ? '工作模式 · 外框擺放預覽' : titles[step];
   preview();
 }
@@ -339,7 +346,7 @@ if (integrated) {
     if (e.data?.type !== 'face-wizard-init') return;
     if (!Array.isArray(e.data.hosts) || !e.data.hosts.length || !Array.isArray(e.data.children) || !e.data.children.length) return;
     mode = e.data.mode === 'work' ? 'work' : 'wizard';
-    hosts = e.data.hosts; children = e.data.children; draft = { ...initial }; saved = { ...initial }; step = 0;
+    hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0;
     $('hosts').replaceChildren(); $('children').replaceChildren();
     buildCards($('hosts'), hosts, 'host'); buildCards($('children'), children, 'child'); render();
   });

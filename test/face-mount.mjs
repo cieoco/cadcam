@@ -5,6 +5,7 @@ import { normalizeSnapshot } from '../js/blocks/schema.js';
 import { compileAssembly, orthogonalFrame, solveAssembly } from '../js/blocks/assembly.js';
 import { mountFacePlacement } from '../js/blocks/face-mount.js';
 import { solveFaceMate } from '../js/blocks/face-mate.js';
+import { mateOfMount, mateStyle } from '../js/blocks/mate-connect.js';
 
 const clone = value => JSON.parse(JSON.stringify(value));
 const raw = JSON.parse(readFileSync(new URL('./fixtures/assembly/lift-gripper.json', import.meta.url), 'utf8'));
@@ -20,6 +21,11 @@ const faceFor = (quarterTurns = 0) => {
     selection: { hostFace: 'top', childFace: 'bottom', alignU: 0, alignV: 0, offsetU: 0, offsetV: 0, gap: 0, quarterTurns },
     hostThicknessMm: 4, childThicknessMm: 4 };
 };
+
+{
+  const modules = fixture.modules.map(m => m.id === 'Grip1' ? { ...m, mount: { to: { module: 'Lift1', output: 'carriage' }, face: faceFor() } } : m);
+  check('自由選面不可被誤認為已設計的平貼對鎖接法', mateStyle(modules, 'Grip1') === null && mateOfMount(fixture.comps, modules, 'Grip1', fixture.params) === null);
+}
 
 // Every face pair and quarter-turn must produce a proper rotation accepted by the persisted contract.
 {

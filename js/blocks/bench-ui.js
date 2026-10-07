@@ -12,15 +12,15 @@ import { checkLiveInterference, liveInterferenceStatus } from './live-interferen
  *   showAll   是否把不相容的接口也畫出來（暗色、點了說原因）
  */
 import { S, motorAnglesNow } from './state.js';
-import { openFaceWizard } from './face-wizard-ui.js?v=20261007_mobile';
+import { openFaceWizard } from './face-wizard-ui.js?v=20261007_8_final';
 import * as Bench from './bench.js?v=20261007_m5a';
-import { createMateWizard } from './mate-wizard-ui.js?v=20261007_7';
+import { createMateWizard } from './mate-wizard-ui.js?v=20261007_8';
 import { moduleFrameEdges } from './assembly.js?v=20261007_m5a';
 import * as Settings from './settings.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { resolveSpacers, findInterference, interferenceTimeline, hitPartNames } from './interference.js';
 import { setMountFlip } from './module-ops.js?v=20261007_m5a';
-import { mateAdjust, mateDetach } from './mate-connect.js';   // M5a：滑動不能擠到鄰居；拆下時帶著底下整串
+import { mateAdjust, mateDetach } from './mate-connect.js?v=20261007_8_final';   // M5a：滑動不能擠到鄰居；拆下時帶著底下整串
 import { pointKeysFor } from './part-types.js';
 import { hitLabels, relabelText } from './part-labels.js';   // M6：干涉訊息用「哪個機構的什麼」，不露零件內部名稱
 import { applyMatrix4, moduleFrameZ } from '../blocks3d/orthogonal-3d.js?v=20261007_m5a';
@@ -803,15 +803,7 @@ export function createBench(deps) {
     if (mod && !mod.mount) {
       const sec = el('div', 'bench-section');
       sec.appendChild(el('div', 'bench-label', '① 選相接的邊／面'));
-      const wizardButton = bigBtn('六面體精靈', () => {
-        if (st.preview) cancelPreview({ silent: true });
-        const signature = JSON.stringify([S.comps, S.modules, S.topo.params]);
-        openFaceWizard({ comps: S.comps, modules: S.modules, params: S.topo.params, childId: mod.id,
-          exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,
-          isCurrent: () => signature === JSON.stringify([S.comps, S.modules, S.topo.params]), say,
-          commit: result => { pushUndo(); S.comps = result.comps; S.modules = result.modules; rebuild(); draw(); deps.scheduleAutosave?.(); say('已接上；轉接件與固定孔仍需設計。'); syncUI(true); }
-        });
-      });
+      const wizardButton = bigBtn('六面體精靈', () => openDefaultFaceWizard(mod));
       wizardButton.id = 'benchFaceWizard'; sec.appendChild(wizardButton);
       sec.appendChild(bigBtn('點選 3D 接合面', () => beginFacePick()));
       if (!mod.base) {
@@ -1175,8 +1167,20 @@ export function createBench(deps) {
   }
 
   // 精靈要用到的內部（接上／取消都走這裡，不另寫一套）
+  // 預設精靈與進階面板共用同一條六面選面流程，確認前不改作品。
+  function openDefaultFaceWizard(mod, reselect = false) {
+    if (st.preview) cancelPreview({ silent: true });
+    const signature = JSON.stringify([S.comps, S.modules, S.topo.params]);
+    const modules = reselect ? S.modules.map(m => m.id === mod.id ? { ...m, mount: null } : m) : S.modules;
+    openFaceWizard({ comps: S.comps, modules, params: S.topo.params, childId: mod.id, wizard: true,
+      initialMount: reselect ? mod.mount : null,
+      exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,
+      isCurrent: () => signature === JSON.stringify([S.comps, S.modules, S.topo.params]), say,
+      commit: result => { pushUndo(); S.comps = result.comps; S.modules = result.modules; rebuild(); draw(); deps.scheduleAutosave?.(); say('已接上；轉接件與固定孔仍需設計。'); syncUI(true); }
+    });
+  }
   wiz = createMateWizard({
-    el, bigBtn, st, deps, modOf, displayName, statusOf, say, select, syncUI, drawMarkers, computeMarkers, viewer, listEl, panelEl, liveBox, liveCheck,
+    el, bigBtn, st, deps, openFaces: openDefaultFaceWizard, modOf, displayName, statusOf, say, select, syncUI, drawMarkers, computeMarkers, viewer, listEl, panelEl, liveBox, liveCheck,
     liveCount: () => live.ready ? live.findings.length : 0,
     liveInfo: () => ({ ...currentLiveStatus(), ready: live.ready && !!live.plan && (live.plan.parts || []).length > 0, n: live.findings.length, hits: live.hits, labels: live.labels }), motorState, adjust, adjustState, editModule, ghostFor,
     clearGhost: () => viewer()?.setPreviewGhost(null), setGhost: spec => viewer()?.setPreviewGhost(spec), isBench,

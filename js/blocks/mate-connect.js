@@ -183,7 +183,7 @@ export function mateDetach(comps, modules, childId, params, motorState) {
 // 已接好的機構接在誰的哪個承接面；沒安裝或找不到回 null。
 export function mateOfMount(comps, modules, childId, params) {
   const child = findMod(modules, childId), mount = child && child.mount, to = mount && mount.to;
-  if (!to || to.module == null) return null;
+  if (!to || to.module == null || mount.face) return null;
   const host = findMod(modules, to.module);
   const portId = mountPortId(mount) || (to.output ? `bolt:${to.output}` : null);
   if (!host || !portId) return null;
@@ -194,7 +194,7 @@ export function mateOfMount(comps, modules, childId, params) {
 // 目前的接法：'hang' 壓在邊上｜'stand-top' 立在上面｜'stand-bottom' 立在下面｜'bolt' 平貼對鎖｜null（沒安裝）。
 export function mateStyle(modules, childId) {
   const m = findMod(modules, childId), mount = m && m.mount;
-  if (!mount || !mount.to) return null;
+  if (!mount || !mount.to || mount.face) return null;
   const o = mount.orient;
   if (!o) return mount.to.output ? 'bolt' : null;
   if (o.type !== 'orthogonal') return null;

@@ -10,7 +10,7 @@
  */
 import { S } from './state.js';
 import { assemblyRoles, setAssemblyRoot } from './assembly-roles.js';
-import { mateTargets, mateConnect, mateAdjust, mateOfMount, mateStyle, mateStyles, setMateStyle } from './mate-connect.js';
+import { mateTargets, mateConnect, mateAdjust, mateOfMount, mateStyle, mateStyles, setMateStyle } from './mate-connect.js?v=20261007_8_final';
 
 const LS_KEY = 'blocks.mateAdvanced';
 const KIND = t => t.kind === 'bolt' ? '平貼對鎖' : '角碼直角';
@@ -218,33 +218,15 @@ export function createMateWizard(h) {
   }
 
   function pickView(root, mod) {
-    const ts = targetsOf(mod.id), ok = ts.filter(t => t.ok), no = ts.filter(t => !t.ok), name = h.displayName(mod.id);
-    root.appendChild(ok.length ? head(`把「${name}」接到哪裡？`, '點下面的卡片，或直接點 3D 裡亮起來的承接面。') : head(name, '還沒安裝'));
-    if (ok.length) {
-      const hosts = [...new Set(ok.map(t => t.module))], list = el('div', 'bench-ports');
-      hosts.forEach(hid => {   // 不只一個宿主：每個宿主一個小標題，底下是它的承接面
-        if (hosts.length > 1) list.appendChild(el('div', 'bench-label mate-host-head', h.displayName(hid)));
-        ok.filter(t => t.module === hid).forEach(t => {
-          const b = btn('', 'bench-port mate-target', () => pickTarget(t));
-          b.dataset.module = t.module; b.dataset.mate = t.mateId;
-          b.appendChild(el('span', 'bench-port-name', hosts.length > 1 ? t.name : `${h.displayName(t.module)}・${t.name}`));
-          b.appendChild(el('small', 'bench-port-kind', KIND(t)));
-          list.appendChild(b);
-        });
-      });
-      root.appendChild(list);
-    } else root.appendChild(el('div', 'bench-note', assemblyRoles(S.modules).root === mod.id ? `「${name}」是底座，別的機構會接在它上面。` : '沒有可以接的承接面。到「設計」分頁用「接合面」標出來。'));
-    if (assemblyRoles(S.modules).root !== mod.id) {   // 不是底座：可以改設成底座（一筆復原）
-      const mk = btn('設為底座', 'mate-root', () => h.apply({ comps: S.comps, modules: setAssemblyRoot(S.modules, mod.id) }, `「${name}」現在是底座`));
+    root.appendChild(head(`安裝「${h.displayName(mod.id)}」`));
+    const b = btn('六面體精靈', 'primary', () => h.openFaces(mod)); b.id = 'benchFaceWizard'; root.appendChild(b);
+    root.appendChild(el('div', 'bench-note', '旋轉選面 → 對齊尺寸 → 接上'));
+    if (assemblyRoles(S.modules).root !== mod.id) {
+      const mk = btn('設為底座', 'mate-root', () => h.apply({ comps: S.comps, modules: setAssemblyRoot(S.modules, mod.id) }, `「${h.displayName(mod.id)}」現在是底座`));
       mk.id = 'mateMakeRoot'; root.appendChild(mk);
     }
-    if (no.length) {
-      const det = el('details', 'bench-more');
-      det.appendChild(el('summary', 'bench-more-sum', `不能接的（${no.length}）`));
-      no.forEach(t => det.appendChild(el('div', 'bench-note mate-nope', `${h.displayName(t.module)}・${t.name}：${t.reason}`)));
-      root.appendChild(det);
-    }
   }
+
   function previewView(root, mod) {
     root.appendChild(head(`預覽：「${h.displayName(mod.id)}」`, `接到 ${h.displayName(pv.host)}・${pv.name}`));
     const row = el('div', 'bench-row');
@@ -261,6 +243,12 @@ export function createMateWizard(h) {
     const off = btn('拆下', 'danger', () => h.adjust('unmount')); off.id = 'mateDetach';
     const edit = btn('回設計修改', '', () => h.adjust('edit')); edit.id = 'mateEdit';
     row.appendChild(off); row.appendChild(edit); root.appendChild(row);
+    if (mod.mount?.face) {
+      const change = btn('重新選面與尺寸', 'primary', () => h.openFaces(mod, true)); root.appendChild(change);
+      const f = mod.mount.face.selection;
+      root.appendChild(el('div', 'bench-note', `間距 ${f.gap} mm · 偏移 ${f.offsetU} / ${f.offsetV} mm`));
+      root.appendChild(el('div', 'bench-note', '姿態已保存；轉接件與固定孔待設計。')); return;
+    }
     if (mate) [styleBox(S.comps, S.modules, mod.id, stylesOf(mod.id)), adjustBox(S.comps, S.modules, mod.id)].forEach(x => x && root.appendChild(x));
     else root.appendChild(el('div', 'bench-note', '這是用工程模式接上的，要微調請按最下面的「進階」。'));
   }
