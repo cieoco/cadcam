@@ -1,3 +1,4 @@
+import { APP_VERSION } from '../version.js?v=20261008_framecache';
 import { faceBracketPlan } from './face-bracket-extras.js';
 import { planFaceBrackets } from './face-bracket-geometry.js';
 /** 正式組立台的隔離選面草稿。確認前不改作品。 */
@@ -68,7 +69,11 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   dialog.style.cssText = 'width:min(960px,100vw);height:94dvh;max-width:100vw;max-height:100dvh;padding:0;border:0;border-radius:14px;';
   const close = document.createElement('button'); close.textContent = '關閉'; close.setAttribute('aria-label', '關閉組立精靈');
   close.style.cssText = 'height:44px;min-width:64px;float:right;';
-  const frame = document.createElement('iframe'); frame.title = '選面與尺寸'; frame.src = new URL('../../assembly-wizard-prototype.html?integrated=1', import.meta.url).href;
+  const frame = document.createElement('iframe'); frame.title = '選面與尺寸';
+  const frameUrl = new URL('../../assembly-wizard-prototype.html', import.meta.url);
+  frameUrl.searchParams.set('integrated', '1');
+  frameUrl.searchParams.set('v', APP_VERSION);
+  frame.src = frameUrl.href;
   frame.style.cssText = 'width:100%;height:calc(100% - 44px);border:0;display:block;';
   dialog.append(close, frame); document.body.append(dialog);
   const dispose = () => { window.removeEventListener('message', receive); dialog.remove(); };
