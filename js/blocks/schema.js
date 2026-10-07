@@ -7,7 +7,7 @@
 
 import { normalizeMemberStock } from './member-stock.js';
 import { normalizeFabricationProfile } from './fabrication-profile.js';
-import { normalizeModules } from './module-schema.js?v=20261007_12';
+import { normalizeModules } from './module-schema.js?v=20261007_singleface';
 
 const KIND = 'blocks';
 const VERSION = 1;

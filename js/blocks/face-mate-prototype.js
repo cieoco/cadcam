@@ -316,19 +316,20 @@ function render() {
   $('hostFaceMore').open = mode === 'work';
   $('wizardMode').setAttribute('aria-pressed', mode === 'wizard'); $('workMode').setAttribute('aria-pressed', mode === 'work');
   document.querySelectorAll('[data-step]').forEach(s => { s.hidden = mode === 'wizard' && Number(s.dataset.step) !== step; });
-  $('progress').hidden = mode === 'work'; $('progress').replaceChildren();
+  $('progress').hidden = mode === 'work' || configured; $('progress').replaceChildren();
   for (let i = 0; i < (configured ? 2 : 4); i++) { const dot = document.createElement('span'); if (i <= (configured ? step === 0 ? 0 : 1 : step)) dot.className = 'current'; $('progress').appendChild(dot); }
-  document.querySelector('[data-step="3"] h2').textContent = configured ? '2 · 微調接合' : '4 · 怎麼對齊？';
+  document.querySelector('section[data-step="3"] h2').textContent = configured ? '調整接合位置' : '4 · 怎麼對齊？';
   for (const [root, field] of [['hosts', 'host'], ['children', 'child'], ['hostFaces', 'hostFace'], ['childFaces', 'childFace']]) {
     $(root).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.value) === String(draft[field])));
   }
   $('align').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', Number(b.dataset.u) === draft.alignU && Number(b.dataset.v) === draft.alignV));
   ['offsetU', 'offsetV', 'gap'].forEach(field => { $(field).value = draft[field]; });
   $('turn').textContent = `轉 90° · 目前 ${draft.quarterTurns * 90}°`;
-  $('back').hidden = mode === 'work'; $('back').disabled = step === 0;
+  $('back').hidden = mode === 'work' || configured; $('back').disabled = step === 0;
   $('back').textContent = configured && step === 3 ? '選面輔助' : '上一步';
   $('next').textContent = mode === 'work' || step === 3 ? (integrated ? '接上' : '確認擺放') : '下一步';
   if (integrated) $('cancel').textContent = '取消';
+  if (integrated && configured) { $('wizardMode').parentElement.hidden = true; document.querySelector('header .tag').hidden = true; $('mateStepChip').hidden = true; }
   $('stageTitle').textContent = mode === 'work' ? '工作模式 · 外框擺放預覽' : titles[step];
   preview();
 }
@@ -352,6 +353,12 @@ if (integrated) {
     if (!Array.isArray(e.data.hosts) || !e.data.hosts.length || !Array.isArray(e.data.children) || !e.data.children.length) return;
     mode = e.data.mode === 'work' ? 'work' : 'wizard';
     hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; configured = !!e.data.configured; roughPlaced = configured;
+    if (configured && hosts.length === 1) step = 3;
+    if (configured && !document.getElementById('optionalView')) {
+      const view = document.querySelector('.view-actions'), more = document.createElement('details'), label = document.createElement('summary');
+      more.id = 'optionalView'; label.textContent = '轉向與視角'; label.style.cssText = 'min-height:44px;display:flex;align-items:center;cursor:pointer;';
+      view.before(more); more.append(label, view);
+    }
     document.querySelector('h1').textContent = '接合預覽';
     $('hosts').replaceChildren(); $('children').replaceChildren();
     buildCards($('hosts'), hosts, 'host'); buildCards($('children'), children, 'child'); render();

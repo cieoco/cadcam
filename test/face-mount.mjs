@@ -6,10 +6,25 @@ import { compileAssembly, orthogonalFrame, solveAssembly } from '../js/blocks/as
 import { mountFacePlacement } from '../js/blocks/face-mount.js';
 import { solveFaceMate } from '../js/blocks/face-mate.js';
 import { mateOfMount, mateStyle } from '../js/blocks/mate-connect.js';
+import { connectionSelection } from '../js/blocks/connection-selection.js';
+import { moduleToTemplate, normalizeTemplate, instantiateTemplate } from '../js/blocks/module-ops.js';
 
 const clone = value => JSON.parse(JSON.stringify(value));
 const raw = JSON.parse(readFileSync(new URL('./fixtures/assembly/lift-gripper.json', import.meta.url), 'utf8'));
 const fixture = normalizeSnapshot(raw);
+{
+  const mod = fixture.modules.find(m => m.outputs?.some(o => o.body?.id));
+  const part = mod.outputs.find(o => o.body?.id).body.id;
+  const snap = normalizeSnapshot({ ...raw, modules: raw.modules.map(m => m.id === mod.id ? { ...m, faceParts: { part, face: 'bottom' } } : m) });
+  const selected = snap.modules.find(m => m.id === mod.id);
+  check('每個設計只保存一個桿件與一個面', JSON.stringify(selected.faceParts) === JSON.stringify({ part, face: 'bottom' }));
+  check('同一接合面不因安裝角色改變', JSON.stringify(connectionSelection(selected, 'host')) === JSON.stringify(connectionSelection(selected, 'child')));
+  const template = normalizeTemplate(moduleToTemplate(snap.comps, snap.modules, snap.params, mod.id)).template;
+  const instance = instantiateTemplate(template, {});
+  check('匯出模組再插入仍選到同一桿件的面', template.faceParts?.part === part && instance.module.faceParts?.face === 'bottom' && instance.comps.some(c => c.id === instance.module.faceParts.part));
+  const removed = normalizeSnapshot({ ...raw, modules: raw.modules.map(m => ({ ...m, faceParts: { part: 'deleted-part', face: 'top' } })) });
+  check('已刪除桿件的單一選面被清除', removed.modules.every(m => !m.faceParts));
+}
 {
   const configured = normalizeSnapshot({ ...raw, modules: raw.modules.map(m => ({ ...m, faceParts: { receive: m.outputs?.[0]?.id, attach: 'frame', receiveFace: 'bottom', attachFace: 'top' } })) });
   check('設計接合部位與接合面在存檔正規化後保留', configured.modules.every(m => m.faceParts?.attach === 'frame' && m.faceParts?.receiveFace === 'bottom' && m.faceParts?.attachFace === 'top'));

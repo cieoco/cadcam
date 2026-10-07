@@ -9,6 +9,7 @@
  * 版面都在「畫面 px」算：每個目標有 44 px 的隱形點擊區，任兩個目標至少相距 SEP px。
  */
 import { S } from './state.js';
+import { openConnectionEditor } from './connection-editor.js';
 import * as View from './view.js';
 import { mateOverlay, ARROW_GAP_PX, ARROW_LEN_PX } from './mates-view.js';
 import { effectiveMates, suggestMates, setAttach, addReceive, removeReceive, renameReceive } from './mates.js';
@@ -291,57 +292,12 @@ export function createMateTool(deps) {
   $('facePartsBtn')?.addEventListener('click', () => {
     const mod = focusModule(); if (!mod) return;
     pause();
-    const own = S.comps.filter(c => c.moduleId === mod.id);
-    const candidates = own.filter(c => ['bar', 'triangle', 'rack'].includes(c.type));
-    const dialog = document.createElement('dialog'); dialog.setAttribute('aria-label', '接合設定');
-    dialog.style.cssText = 'width:min(340px,85vw);border:0;border-radius:14px;padding:20px;';
-    const title = document.createElement('h3'); title.textContent = '接合設定'; dialog.append(title);
-    const field = (label, choices, selected) => {
-      const row = document.createElement('label'); row.textContent = label;
-      const select = document.createElement('select'); select.setAttribute('aria-label', label);
-      select.style.cssText = 'display:block;width:100%;min-height:44px;margin:8px 0 18px;font:inherit;';
-      choices.forEach(([value, text]) => { const option = new Option(text, value); select.add(option); });
-      select.value = selected || ''; row.append(select); dialog.append(row); return select;
-    };
-    const labelOf = c => (mod.outputs || []).find(o => o.body?.id === c.id)?.name || c.name || `${c.type === 'bar' ? '桿件' : c.type === 'triangle' ? '板件' : '滑台'} ${candidates.indexOf(c) + 1}`;
-    const receive = field('裝到這裡', [['', '不設定'], ...candidates.map(c => [c.id, labelOf(c)])], (mod.outputs || []).find(o => o.id === mod.faceParts?.receive)?.body?.id);
-    const preview = document.createElementNS(NS, 'svg'); preview.setAttribute('viewBox', '0 0 320 150'); preview.setAttribute('aria-label', '點選接合部位'); preview.style.cssText = 'width:100%;height:150px;background:#f3f7fa;border-radius:10px;';
-    receive.parentElement.before(preview);
-    const ps = candidates.flatMap(c => [c.p1, c.p2, c.p3].filter(Boolean));
-    const loX = Math.min(...ps.map(p => p.x)), hiX = Math.max(...ps.map(p => p.x)), loY = Math.min(...ps.map(p => p.y)), hiY = Math.max(...ps.map(p => p.y));
-    const scale = Math.min(280 / Math.max(1, hiX - loX), 110 / Math.max(1, hiY - loY));
-    const xy = p => ({ x: 160 + (p.x - (loX + hiX) / 2) * scale, y: 75 - (p.y - (loY + hiY) / 2) * scale });
-    const paint = () => {
-      preview.replaceChildren();
-      candidates.forEach(c => {
-        const a = xy(c.p1), b = c.p2 && xy(c.p2), selected = receive.value === c.id;
-        const end = b || { x: a.x + 1, y: a.y }, len = Math.hypot(end.x - a.x, end.y - a.y) || 1;
-        const nx = -(end.y - a.y) / len * 8, ny = (end.x - a.x) / len * 8;
-        const outline = c.type === 'triangle' && c.p3 ? [c.p1, c.p2, c.p3].map(xy) : [{ x: a.x + nx, y: a.y + ny }, { x: end.x + nx, y: end.y + ny }, { x: end.x - nx, y: end.y - ny }, { x: a.x - nx, y: a.y - ny }];
-        const shape = el('polygon', { points: outline.map(p => `${p.x},${p.y}`).join(' '), fill: selected ? '#349ee8' : c.color || '#9cb9c8', 'fill-opacity': selected ? 1 : .7 }, preview);
-        shape.setAttribute('role', 'button'); shape.setAttribute('tabindex', '0'); shape.setAttribute('aria-label', `選部位 ${labelOf(c)}`); shape.setAttribute('aria-pressed', String(selected)); shape.style.cursor = 'pointer';
-        const choose = () => { receive.value = c.id; paint(); };
-        shape.addEventListener('click', choose); shape.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); } });
-      });
-    };
-    receive.addEventListener('change', paint); paint();
-    const fixed = candidates.filter(c => c.type === 'bar' && [c.p1, c.p2].every(p => p && (p.type === 'fixed' || p.type === 'motor')));
-    const attach = field('用這裡安裝', [['frame', '固定桿／底板'], ...fixed.map(c => [c.id, labelOf(c)])], mod.faceParts?.attach || 'frame');
-    const faces = [['top', '上面'], ['bottom', '下面'], ['front', '前面'], ['back', '後面'], ['left', '左面'], ['right', '右面']];
-    const receiveFace = field('接收面', faces, mod.faceParts?.receiveFace || 'top');
-    const attachFace = field('安裝面', faces, mod.faceParts?.attachFace || 'bottom');
-    const note = document.createElement('p'); note.textContent = '組立時帶入這兩處，直接預覽；尺寸可再微調。'; dialog.append(note);
-    const save = document.createElement('button'); save.textContent = '確定'; save.style.cssText = 'min-height:44px;min-width:90px;font:inherit;';
-    save.onclick = () => {
-      const body = candidates.find(c => c.id === receive.value);
-      const existing = body && (mod.outputs || []).find(o => o.body?.id === body.id && o.body.kind === body.type);
-      const output = existing || (body ? { id: `face-${body.id}`, name: labelOf(body), at: body.p1.id, body: { kind: body.type, id: body.id } } : null);
-      pushUndo(); S.modules = S.modules.map(m => m.id === mod.id ? { ...m, outputs: !output || existing ? m.outputs : [...(m.outputs || []), output], faceParts: { ...(output ? { receive: output.id } : {}), attach: attach.value, receiveFace: receiveFace.value, attachFace: attachFace.value } } : m);
-      rebuild(); draw(); deps.scheduleAutosave?.(); transient('已保存接合設定'); dialog.close();
-    };
-    const cancel = document.createElement('button'); cancel.textContent = '取消'; cancel.style.cssText = save.style.cssText; cancel.onclick = () => dialog.close();
-    const advanced = document.createElement('button'); advanced.textContent = '進階接合面'; advanced.style.cssText = 'display:block;margin-top:14px;min-height:44px;font:inherit;'; advanced.onclick = () => { dialog.close(); set(true); };
-    dialog.append(save, cancel, advanced); dialog.addEventListener('close', () => dialog.remove()); document.body.append(dialog); dialog.showModal();
+    openConnectionEditor({ mod, comps: S.comps, params: S.topo.params, settings: S.fabrication?.export || {},
+      commit: changed => {
+        pushUndo(); S.modules = S.modules.map(m => m.id === mod.id ? changed : m);
+        rebuild(); draw(); deps.scheduleAutosave?.(); transient('已選定接合面');
+      }
+    });
   });
   if (btn) btn.addEventListener('click', () => set(!on));
   if (adoptBtn) adoptBtn.addEventListener('click', adopt);

@@ -364,7 +364,9 @@ export function normalizeModules(rawModules, comps) {
       const receive = p.outputs.some(o => o.id === chosen.receive) ? chosen.receive : undefined;
       const attach = chosen.attach === 'frame' ? 'frame' : own.find(c => c.id === chosen.attach && c.type === 'bar' && [c.p1, c.p2].every(q => q && (q.type === 'fixed' || q.type === 'motor')))?.id;
       const faces = ['top', 'bottom', 'front', 'back', 'left', 'right'];
-      if (receive || attach) out.faceParts = { ...(receive ? { receive } : {}), ...(attach ? { attach } : {}), ...(faces.includes(chosen.receiveFace) ? { receiveFace: chosen.receiveFace } : {}), ...(faces.includes(chosen.attachFace) ? { attachFace: chosen.attachFace } : {}) };
+      if (chosen.part !== undefined) {
+        if (faces.includes(chosen.face) && (chosen.part === 'frame' || own.some(c => c.id === chosen.part && ['bar', 'triangle', 'rack'].includes(c.type)))) out.faceParts = { part: chosen.part, face: chosen.face };
+      } else if (receive || attach) out.faceParts = { ...(receive ? { receive } : {}), ...(attach ? { attach } : {}), ...(faces.includes(chosen.receiveFace) ? { receiveFace: chosen.receiveFace } : {}), ...(faces.includes(chosen.attachFace) ? { attachFace: chosen.attachFace } : {}) };
     }
     return out;
   });

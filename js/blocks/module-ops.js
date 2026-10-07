@@ -6,8 +6,8 @@
  */
 import { compileAssembly, solveAssembly, outputPose, transformComp, planeOf, orthogonalHostEdge } from './assembly.js?v=20261007_m5a';
 import { pointKeysFor } from './part-types.js';
-import { normalizeSnapshot } from './schema.js?v=20261007_12';
-import { normalizeModules, sanitizeName } from './module-schema.js?v=20261007_12';
+import { normalizeSnapshot } from './schema.js?v=20261007_singleface';
+import { normalizeModules, sanitizeName } from './module-schema.js?v=20261007_singleface';
 import { BLOCK_EXAMPLES } from './examples.js';
 import { ADAPTER_LENGTH_MM } from './orthogonal-joint.js';
 
@@ -543,6 +543,7 @@ export function moduleToTemplate(comps, modules, params, moduleId) {
   if (mod && mod.base) template.base = mod.base;
   template.outputs = mod && Array.isArray(mod.outputs) ? clone(mod.outputs) : [];
   if (mod && mod.mates) template.mates = clone(mod.mates);   // M1：接合面跟著範本走
+  if (mod && mod.faceParts) template.faceParts = clone(mod.faceParts);
   return template;
 }
 
@@ -577,6 +578,7 @@ export function normalizeTemplate(raw) {
   if (modNorm.base) template.base = modNorm.base;
   template.outputs = modNorm.outputs || [];
   if (modNorm.mates) template.mates = modNorm.mates;
+  if (modNorm.faceParts) template.faceParts = modNorm.faceParts;
   return { ok: true, template, warnings };
 }
 
@@ -735,6 +737,7 @@ export function instantiateTemplate(template, ctx) {
   if (typeof t.source === 'string' && t.source) mod.source = t.source;
   if (baseId) mod.base = baseId;
   if (t.mates) mod.mates = renameMates(t.mates, renameStr);
+  if (t.faceParts) mod.faceParts = { ...t.faceParts, ...(t.faceParts.part && t.faceParts.part !== 'frame' ? { part: renameStr(t.faceParts.part) } : {}), ...(t.faceParts.attach && t.faceParts.attach !== 'frame' ? { attach: renameStr(t.faceParts.attach) } : {}) };
 
   const newParams = {};
   Object.keys(srcParams).forEach(k => {

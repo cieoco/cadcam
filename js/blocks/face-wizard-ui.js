@@ -4,6 +4,7 @@ import { buildFacePlacement } from './face-placement.js';
 import { mountFacePlacement } from './face-mount.js';
 import { pointCoords } from './model.js';
 import { inspectLinkExport, inspectPlateExport } from './exporters.js?v=20261007_9';
+import { connectionSelection } from './connection-selection.js';
 
 function reference(surface, name, parts = []) {
   const axes = ['x', 'y', 'z'];
@@ -42,8 +43,10 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     }
     return result;
   };
-  const chosenAttach = child.faceParts?.attach;
+  const childSelection = connectionSelection(child, 'child');
+  const chosenAttach = childSelection?.part;
   const attachComp = comps.find(c => c.moduleId === childId && c.id === chosenAttach && c.type === 'bar' && [c.p1, c.p2].every(p => p && (p.type === 'fixed' || p.type === 'motor')));
+  if (chosenAttach && chosenAttach !== 'frame' && !attachComp) { say('這個接合面在活動桿上；請把它作為承接機構，另一個機構選固定桿的面。'); return; }
   const childSurfaces = attachComp ? buildMountSurfaces({ comps, modules: modules.map(m => m.id === childId ? { ...m, outputs: [{ id: 'face-attach', name: attachComp.name || attachComp.id, at: attachComp.p1.id, body: { kind: 'bar', id: attachComp.id } }] } : m), params, moduleId: childId, exportSettings, thicknessMm: stockMm }).surfaces || [] : surfaces(childId);
   const childSurface = childSurfaces.find(s => attachComp ? s.outputId === 'face-attach' : s.kind === 'frame');
   const eligible = m => {
@@ -55,7 +58,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     }
     return true;
   };
-  const hosts = modules.filter(eligible).flatMap(m => surfaces(m.id).filter(s => s.kind === 'output' && (!m.faceParts?.receive || s.outputId === m.faceParts.receive)).map(s => reference(s, `${m.name} · ${s.name}`, parts(m.id))));
+  const hosts = modules.filter(eligible).flatMap(m => { const selected = connectionSelection(m, 'host'); return surfaces(m.id).filter(s => s.kind === 'output' && (!selected || s.compId === selected.part)).map(s => reference(s, `${m.name} · ${s.name}`, parts(m.id))); });
   if (!childSurface || !hosts.length) { say('需要另一個有承接板的機構，以及安裝端的固定底板。'); return; }
   const children = [reference(childSurface, `${child.name} · ${attachComp ? attachComp.name || attachComp.id : '固定桿／底板'}`, parts(childId))];
   const dialog = document.createElement('dialog');
@@ -70,7 +73,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   close.addEventListener('click', () => dialog.close()); dialog.addEventListener('close', dispose);
   function receive(e) {
     if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
-    if (e.data?.type === 'face-wizard-ready') frame.contentWindow.postMessage({ type: 'face-wizard-init', hosts: hosts.map(h => ({ ...h, defaultFace: modules.find(m => m.id === h.surface.moduleId)?.faceParts?.receiveFace || 'top' })), children, configured: !!child.faceParts, mode: wizard || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: modules.find(m => m.id === hosts[0].surface.moduleId)?.faceParts?.receiveFace || 'top', childFace: child.faceParts?.attachFace || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
+    if (e.data?.type === 'face-wizard-ready') frame.contentWindow.postMessage({ type: 'face-wizard-init', hosts: hosts.map(h => ({ ...h, defaultFace: connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, configured: !!childSelection, mode: wizard || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
     if (e.data?.type === 'face-wizard-cancel') { dialog.close(); return; }
     if (e.data?.type !== 'face-wizard-confirm') return;
     if (!isCurrent()) { dialog.close(); say('作品已變動，請重新選擇接法。'); return; }

@@ -14,7 +14,7 @@ import {
   moduleToTemplate, normalizeTemplate, instantiateTemplate, insertOffset, translateModule,
   compositeToTemplate, instantiateComposite, translateComposite, COMPOSITE_MAX_MODULES,
   BUILTIN_MODULES, builtinTemplate, parseLibrary, serializeLibrary
-} from './module-ops.js?v=20261007_import_spacing';
+} from './module-ops.js?v=20261007_singleface';
 
 // 操作失敗時的提示文字（module-ops 回傳的 reason code → 繁中訊息）。
 const REASON_MESSAGES = {
