@@ -1,3 +1,5 @@
+import { faceBracketPlan } from './face-bracket-extras.js';
+import { planFaceBrackets } from './face-bracket-geometry.js';
 /** 正式組立台的隔離選面草稿。確認前不改作品。 */
 import { buildMountSurfaces } from './mount-surfaces.js';
 import { buildFacePlacement } from './face-placement.js';
@@ -20,7 +22,7 @@ function reference(surface, name, parts = []) {
 export function openFaceWizard({ comps, modules, params, childId, exportSettings, stockMm, isCurrent, commit, say, wizard = false, initialMount = null }) {
   const child = modules.find(m => m.id === childId);
   if (!child || child.mount || !child.base) { say('請選尚未安裝且有底座的機構。'); return; }
-  const surfaces = id => buildMountSurfaces({ comps, modules, params, moduleId: id, exportSettings, thicknessMm: stockMm }).surfaces || [];
+  const surfaces = id => buildMountSurfaces({ comps, modules, params, moduleId: id, exportSettings, thicknessMm: stockMm, drilling: true }).surfaces || [];
   // 唯讀機構輪廓隨接合板一起移動，選面時保留完整機構的空間脈絡。
   const parts = id => {
     const own = comps.filter(c => c.moduleId === id), pts = pointCoords(own), result = [];
@@ -47,7 +49,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   const chosenAttach = childSelection?.part;
   const attachComp = comps.find(c => c.moduleId === childId && c.id === chosenAttach && c.type === 'bar' && [c.p1, c.p2].every(p => p && (p.type === 'fixed' || p.type === 'motor')));
   if (chosenAttach && chosenAttach !== 'frame' && !attachComp) { say('這個接合面在活動桿上；請把它作為承接機構，另一個機構選固定桿的面。'); return; }
-  const childSurfaces = attachComp ? buildMountSurfaces({ comps, modules: modules.map(m => m.id === childId ? { ...m, outputs: [{ id: 'face-attach', name: attachComp.name || attachComp.id, at: attachComp.p1.id, body: { kind: 'bar', id: attachComp.id } }] } : m), params, moduleId: childId, exportSettings, thicknessMm: stockMm }).surfaces || [] : surfaces(childId);
+  const childSurfaces = attachComp ? buildMountSurfaces({ comps, modules: modules.map(m => m.id === childId ? { ...m, outputs: [{ id: 'face-attach', name: attachComp.name || attachComp.id, at: attachComp.p1.id, body: { kind: 'bar', id: attachComp.id } }] } : m), params, moduleId: childId, exportSettings, thicknessMm: stockMm, drilling: true }).surfaces || [] : surfaces(childId);
   const childSurface = childSurfaces.find(s => attachComp ? s.outputId === 'face-attach' : s.kind === 'frame');
   const eligible = m => {
     if (m.mount && !m.mount.face) return false;
@@ -84,8 +86,19 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     const face = { version: 1, ...result.record.transform, selection: result.record.selection,
       hostThicknessMm: host.surface.box.max.z - host.surface.box.min.z,
       childThicknessMm: childSurface.box.max.z - childSurface.box.min.z };
+    if (selection.brackets) {
+      const drilling = planFaceBrackets(host.surface, childSurface, face, selection.brackets.offsets);
+      if (host.surface.body?.kind === 'rack' || childSurface.body?.kind === 'rack' || !drilling.ok) {
+        frame.contentWindow.postMessage({type:'face-wizard-error',reason:drilling.reason || '齒條目前不支援角碼開孔'},location.origin); return;
+      }
+    }
     const mounted = mountFacePlacement(comps, modules, childId, { hostId: host.surface.moduleId, outputId: host.surface.outputId, face }, params);
     if (!mounted.ok) { frame.contentWindow.postMessage({ type: 'face-wizard-error', reason: mounted.reason }, location.origin); return; }
+    if (selection.brackets) {
+      const pending = { ...child, mount: mounted.mount };
+      const checked = faceBracketPlan(comps, modules.map(m => m.id === childId ? pending : m), params, pending, { stockMm, exportSettings });
+      if (!checked?.ok) { frame.contentWindow.postMessage({type:'face-wizard-error',reason:checked?.reason || '孔位無法驗證'},location.origin); return; }
+    }
     commit({ comps, modules: modules.map(m => m.id === childId ? { ...m, mount: mounted.mount } : m) }); dialog.close();
   }
   window.addEventListener('message', receive); dialog.showModal();

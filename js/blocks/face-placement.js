@@ -1,3 +1,4 @@
+import { normalizeBracketSelection } from './face-bracket-geometry.js';
 /** 接合板擺放記錄；不把未支援的 3D 姿態寫成舊 mount。 */
 import { solveFaceMate } from './face-mate.js';
 
@@ -6,6 +7,10 @@ export function buildFacePlacement({ host, child, selection } = {}) {
   const keys = ['hostFace', 'childFace', 'alignU', 'alignV', 'offsetU', 'offsetV', 'gap', 'quarterTurns'];
   const chosen = Object.fromEntries(keys.map(k => [k, selection[k]]));
   if (selection.rotationDeg !== undefined) chosen.rotationDeg = selection.rotationDeg;
+  if (selection.brackets !== undefined) {
+    chosen.brackets = normalizeBracketSelection(selection.brackets);
+    if (!chosen.brackets) return { ok: false, reason: '角碼固定設定不合法' };
+  }
   const mate = solveFaceMate({ ...chosen, hostBox: host.box, childBox: child.box });
   if (!mate.ok) return mate;
   const center = box => Object.fromEntries(['x', 'y', 'z'].map(k => [k, (box.min[k] + box.max[k]) / 2]));

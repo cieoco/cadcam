@@ -1,3 +1,4 @@
+import { deriveMotorMounts } from './build-plan.js?v=20261007_7';
 /**
  * Read-only, bounded mounting-surface descriptors derived from the same geometry
  * used by the blocks part exporters. These descriptors describe stock in the
@@ -6,7 +7,7 @@
  */
 import { autoPorts } from './bench.js';
 import { moduleFrameExports, moduleFrameNodes } from './assembly.js?v=20261007_m5a';
-import { inspectFrameExport, inspectLinkExport, inspectPlateExport, inspectRackExport } from './exporters.js?v=20261007_7';
+import { inspectFrameExport, inspectLinkExport, inspectPlateExport, inspectRackExport, splitMountsByHost, hostedBarGeometry } from './exporters.js?v=20261007_7';
 import { frameConnectorNodes, pointCoords } from './model.js';
 import { memberStock } from './member-stock.js';
 
@@ -87,7 +88,7 @@ function validInput({ comps, modules, moduleId, params, exportSettings, thicknes
  * plate-thickness coordinates. Only exporter-backed bar, triangle, and rack
  * outputs are supported in this first bounded surface mapping.
  */
-export function buildMountSurfaces({ comps, modules, moduleId, params, exportSettings = {}, thicknessMm = 3 } = {}) {
+export function buildMountSurfaces({ comps, modules, moduleId, params, exportSettings = {}, thicknessMm = 3, drilling = false, partId = null } = {}) {
   const reason = validInput({ comps, modules, moduleId, params, exportSettings, thicknessMm });
   if (reason) return { ok: false, reason };
 
@@ -116,7 +117,10 @@ export function buildMountSurfaces({ comps, modules, moduleId, params, exportSet
     }
 
     const modulePorts = autoPorts(comps, modules, moduleId, params);
-    for (const output of Array.isArray(module.outputs) ? module.outputs : []) {
+    const part = partId && ownComps.find(c => c.id === partId && c.type === 'bar' && [c.p1,c.p2].every(p => p && ['fixed','motor'].includes(p.type)));
+    if (partId && partId !== 'frame' && !part) return {ok:false,reason:'找不到指定的固定桿'};
+    const outputs = part ? [{id:'face-attach',name:part.name || part.id,at:part.p1.id,body:{kind:'bar',id:part.id}}] : module.outputs;
+    for (const output of Array.isArray(outputs) ? outputs : []) {
       const body = output && output.body;
       if (!body || !['bar', 'triangle', 'rack'].includes(body.kind)) {
         return { ok: false, reason: `輸出「${output?.name || output?.id || '未命名'}」目前沒有支援的真實外框。` };
@@ -156,6 +160,19 @@ export function buildMountSurfaces({ comps, modules, moduleId, params, exportSet
       });
     }
 
+    if (drilling) {
+      const mounts = splitMountsByHost(ownComps, deriveMotorMounts(ownComps));
+      for (const surface of surfaces) {
+        const comp = ownComps.find(c => c.id === surface.compId);
+        let exact;
+        if (surface.kind === 'frame') exact = inspectFrameExport(frameNodes, exportSettings, mounts.free);
+        else if (comp?.type === 'bar') {
+          const raw = hostedBarGeometry(comp, pts, exportSettings, mounts.hosted.get(comp.id) || []);
+          if (raw) exact = geometryFromBar(raw, comp, pts);
+        } else if (comp?.type === 'triangle') exact = inspectPlateExport(comp,[comp.p1,comp.p2,comp.p3].map(p=>pts[p.id] || p),exportSettings,mounts.hosted.get(comp.id) || []);
+        if (exact) { surface.holes = exact.holes || []; surface.cutouts = exact.cutouts || []; }
+      }
+    }
     if (!surfaces.length) return { ok: false, reason: '這個機構目前沒有可描述的固定底板或支援的輸出零件外框。' };
     return { ok: true, surfaces };
   } catch (_) {

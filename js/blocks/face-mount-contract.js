@@ -1,3 +1,4 @@
+import { normalizeBracketSelection } from './face-bracket-geometry.js';
 /** Pure validation for the persisted six-face module mount contract. */
 const FACE_IDS = new Set(['right', 'left', 'front', 'back', 'top', 'bottom']);
 const SELECT_KEYS = ['hostFace', 'childFace', 'alignU', 'alignV', 'offsetU', 'offsetV', 'gap', 'quarterTurns'];
@@ -28,6 +29,8 @@ export function normalizeFaceMountContract(raw) {
       !finite(s.offsetU) || !finite(s.offsetV) || !finite(s.gap) || s.gap < 0 || !Number.isInteger(s.quarterTurns) || s.quarterTurns < 0 || s.quarterTurns > 3) {
     return fail('face.selection 的面、對齊、偏置、間距或轉向不合法。');
   }
+  const brackets = s.brackets === undefined ? null : normalizeBracketSelection(s.brackets);
+  if (s.brackets !== undefined && !brackets) return fail('角碼固定設定不合法。');
   if (s.rotationDeg !== undefined && !finite(s.rotationDeg)) return fail('接合角度必須是有限數值。');
   if (!finite(raw.hostThicknessMm) || raw.hostThicknessMm <= 0 || !finite(raw.childThicknessMm) || raw.childThicknessMm <= 0) {
     return fail('face.hostThicknessMm 與 face.childThicknessMm 必須是正的有限數值。');
@@ -36,7 +39,7 @@ export function normalizeFaceMountContract(raw) {
     version: 1,
     rotation: raw.rotation.map(row => row.slice()),
     translation: { x: t.x, y: t.y, z: t.z },
-    selection: { ...Object.fromEntries(SELECT_KEYS.map(k => [k, s[k]])), ...(s.rotationDeg !== undefined ? { rotationDeg: s.rotationDeg } : {}) },
+    selection: { ...(brackets ? { brackets } : {}), ...Object.fromEntries(SELECT_KEYS.map(k => [k, s[k]])), ...(s.rotationDeg !== undefined ? { rotationDeg: s.rotationDeg } : {}) },
     hostThicknessMm: raw.hostThicknessMm,
     childThicknessMm: raw.childThicknessMm
   }};

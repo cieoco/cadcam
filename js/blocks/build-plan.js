@@ -134,7 +134,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
   const stockMm = finitePos(cnc && cnc.stockThicknessMm) ? Number(cnc.stockThicknessMm) : DEFAULT_STOCK_THICKNESS_MM;
   const settings = normalizeExportSettings(exportSettings);
   // 直角安裝的轉接座孔（沒傳就依 comps／modules 自算）。
-  const orthoExtras = extras || orthogonalExportExtras(list, modList, params, { stockMm, joint });
+  const orthoExtras = extras || orthogonalExportExtras(list, modList, params, { stockMm, joint, exportSettings: settings });
   const extraHolesOf = comp => (orthoExtras.linkHoles && orthoExtras.linkHoles[comp.id]) || [];
   const plateHolesOf = comp => (orthoExtras.plateHoles && orthoExtras.plateHoles[comp.id]) || [];   // C1：三角板上的轉接座孔
   const thicknessOf = comp => {
@@ -558,7 +558,7 @@ const KIND_LABEL = { frame: '機架板', gear: '齒輪', rack: '齒條', member:
 
 export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = [], interference = [], suggestions = [], modules = [] } = {}) {
   const spare = plan && Array.isArray(plan.spare) ? plan.spare : spareModules(modules);   // M5a：還沒接上的機構不在製作包內，提醒一聲
-  warnings = [...warnings, ...(spare.length ? [`還沒接上、不在製作包內：${spare.map(m => m.name).join('、')}`] : []), ...modules.filter(m => m?.mount?.face).map(m => `六面接合 ${m.name || m.id}：擺放姿態已保存；轉接件、配對固定孔與跨面干涉尚未驗證，不能直接依此製造組立。`)];
+  warnings = [...warnings, ...(spare.length ? [`還沒接上、不在製作包內：${spare.map(m => m.name).join('、')}`] : []), ...modules.filter(m => m?.mount?.face).map(m => `六面接合 ${m.name || m.id}：${m.mount.face.selection.brackets ? '角碼孔依目前板件幾何重新驗證；不合格孔位停止輸出。跨面干涉與承重仍需驗證。' : '擺放姿態已保存；轉接件、配對固定孔與跨面干涉尚未驗證，不能直接依此製造組立。'}`)];
   const parts = (plan && plan.parts) || [];
   const joints = (plan && plan.joints) || [];
   const motors = (plan && plan.motors) || [];

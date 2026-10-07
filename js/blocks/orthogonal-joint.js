@@ -1,3 +1,4 @@
+import { appendFaceBracketHoles } from './face-bracket-extras.js';
 /**
  * blocks / orthogonal-joint
  *
@@ -190,7 +191,7 @@ export function orthogonalExportExtras(comps, modules, params, opts = {}) {
         ...(a.stand ? { outlineExempt: true } : {})   // D3：站立邊就是外框的邊，孔不撐大外框
       })));
   });
-  return { linkHoles, plateHoles, frameNodes, worldFrameNodes, adapters };
+  return appendFaceBracketHoles({ linkHoles, plateHoles, frameNodes, worldFrameNodes, adapters }, comps, modules, params, opts);
 }
 
 // 把轉接座孔節點併進模組底板節點（不改輸入）；extras 缺省或沒有該模組時原樣回傳。

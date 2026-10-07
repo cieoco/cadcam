@@ -1,3 +1,4 @@
+import { faceBracketPlan } from './face-bracket-extras.js';
 /**
  * blocks / mate-wizard-ui
  *
@@ -247,7 +248,8 @@ export function createMateWizard(h) {
       const change = btn('重新選面與尺寸', 'primary', () => h.openFaces(mod, true)); root.appendChild(change);
       const f = mod.mount.face.selection;
       root.appendChild(el('div', 'bench-note', `間距 ${f.gap} mm · 偏移 ${f.offsetU} / ${f.offsetV} mm`));
-      root.appendChild(el('div', 'bench-note', '姿態已保存；轉接件與固定孔待設計。')); return;
+      const drilling = faceBracketPlan(S.comps, S.modules, params(), mod, { exportSettings: S.fabrication?.export || {}, stockMm: S.fabrication?.cnc?.stockThicknessMm || 3 });
+      root.appendChild(el('div', 'bench-note', drilling ? (drilling.ok ? `角碼 ${drilling.brackets.length} 顆 · 兩板固定孔已生成 Ø3.2 mm` : `角碼孔暫停輸出：${drilling.reason}`) : '姿態已保存；轉接件與固定孔待設計。')); return;
     }
     if (mate) [styleBox(S.comps, S.modules, mod.id, stylesOf(mod.id)), adjustBox(S.comps, S.modules, mod.id)].forEach(x => x && root.appendChild(x));
     else root.appendChild(el('div', 'bench-note', '這是用工程模式接上的，要微調請按最下面的「進階」。'));

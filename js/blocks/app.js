@@ -14,7 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261008_brackets';
+import { APP_VERSION } from '../version.js?v=20261008_drilling';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
@@ -2495,7 +2495,7 @@ const viewWorldMounts = free => { const w = splitFrameMounts(free, S.comps, S.mo
 function orthoExtrasNow(machine = false) {
   const stockMm = Number(S.fabrication?.cnc?.stockThicknessMm) > 0 ? Number(S.fabrication.cnc.stockThicknessMm) : FABRICATION_DEFAULTS.cnc.stockThicknessMm;
   const M = machine ? machineNow() : { comps: S.comps, modules: S.modules };
-  return orthogonalExportExtras(M.comps, M.modules, S.topo.params, { stockMm, joint: jointSettingsNow() });
+  return orthogonalExportExtras(M.comps, M.modules, S.topo.params, { stockMm, joint: jointSettingsNow(), exportSettings: Settings.exportSettings() });
 }
 // F1：作品目前的直角接合件設定（預設接合件種類與角碼規格）。
 function jointSettingsNow() { return S.fabrication?.joint || FABRICATION_DEFAULTS.joint; }

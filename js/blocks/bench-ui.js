@@ -90,7 +90,7 @@ export function createBench(deps) {
     if (!mod.mount) return '未安裝';
     const host = modOf(mod.mount.to.module);
     const hostName = host ? displayName(host.id) : mod.mount.to.module;
-    if (mod.mount.face) return `六面接合 · ${hostName}（轉接件待設計）`;
+    if (mod.mount.face) return `六面接合 · ${hostName}${mod.mount.face.selection.brackets ? '（角碼固定）' : '（轉接件待設計）'}`;
     let outName = mod.mount.to.output || '';
     if (mod.mount.orient) {
       // C1：宿主邊可以是桿、三角板的邊或機架板的邊
@@ -1176,7 +1176,7 @@ export function createBench(deps) {
       initialMount: reselect ? mod.mount : null,
       exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,
       isCurrent: () => signature === JSON.stringify([S.comps, S.modules, S.topo.params]), say,
-      commit: result => { pushUndo(); S.comps = result.comps; S.modules = result.modules; rebuild(); draw(); deps.scheduleAutosave?.(); say('已接上；轉接件與固定孔仍需設計。'); syncUI(true); }
+      commit: result => { pushUndo(); S.comps = result.comps; S.modules = result.modules; rebuild(); draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? '已接上，角碼固定孔已生成。' : '已接上；轉接件與固定孔仍需設計。'); syncUI(true); }
     });
   }
   wiz = createMateWizard({

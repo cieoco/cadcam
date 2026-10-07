@@ -13,9 +13,10 @@ export function refreshFaceMounts(comps, modules, params, { exportSettings = {},
   const updated = modules.map(mod => {
     if (!mod.mount?.face) return mod;
     const target = mod.mount.to;
-    const describe = id => buildMountSurfaces({ comps, modules, params, moduleId: id, exportSettings, thicknessMm: stockMm }).surfaces || [];
+    const describe = (id, partId) => buildMountSurfaces({ comps, modules, params, moduleId: id, partId, exportSettings, thicknessMm: stockMm }).surfaces || [];
     const host = describe(target.module).find(s => s.outputId === target.output && s.kind === 'output');
-    const child = describe(mod.id).find(s => s.kind === 'frame');
+    const part = mod.mount.face.selection.brackets?.childPart;
+    const child = describe(mod.id, part).find(s => part && part !== 'frame' ? s.compId === part : s.kind === 'frame');
     if (!host || !child) { warnings.push(`${mod.name}接合板已改變，請重新選面。`); return { ...mod, mount: null }; }
     const placement = buildFacePlacement({ host: reference(host), child: reference(child), selection: mod.mount.face.selection });
     if (!placement.ok) { warnings.push(placement.reason); return { ...mod, mount: null }; }

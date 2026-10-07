@@ -1,3 +1,4 @@
+import { planFaceBrackets, FACE_BRACKET_SPEC } from './face-bracket-geometry.js';
 import { bracketLayout } from './bracket-layout.js';
 /** 六面體組立操作原型；獨立記憶體草稿，不讀寫 blocks 作品。 */
 import { boxFaces, solveFaceMate, transformMatePoint } from './face-mate.js';
@@ -14,6 +15,7 @@ const initial = { host: 0, child: 0, hostFace: 'top', childFace: 'bottom', align
 let draft = { ...initial }, saved = { ...initial }, step = 0;
 let mode = 'wizard';
 let hasConfirmed = false, roughPlaced = false, configured = false;
+let bracketPlan = null;
 let bracketOffsets = {}, selectedBracket = null, bracketSpan = 0;
 let moveStep = 5, edgeMode = false, dimensionField = null, dimensionAlignment = null;
 const titles = ['選擇兩個機構', '選承接端的大面', '選安裝端的大面', '預覽對齊與偏置'];
@@ -110,7 +112,7 @@ const dimensionText = {
 function openDimension(field, value, alignment = null) {
   dimensionField = field;
   dimensionAlignment = alignment;
-  $('dimensionTitle').textContent = field === 'bracket' ? '角碼位置偏移（試作）' : field === 'rotationDeg' ? '設定接合角度' : field === 'offsetU' ? '設定左右偏移' : field === 'offsetV' ? '設定上下偏移' : field === 'gap' ? '設定面間距' : '設定移動步距';
+  $('dimensionTitle').textContent = field === 'bracket' ? '角碼位置偏移' : field === 'rotationDeg' ? '設定接合角度' : field === 'offsetU' ? '設定左右偏移' : field === 'offsetV' ? '設定上下偏移' : field === 'gap' ? '設定面間距' : '設定移動步距';
   $('dimensionLabel').textContent = `${$('dimensionTitle').textContent}（${field === 'rotationDeg' ? '°' : 'mm'}）`;
   const input = $('dimensionValue');
   input.value = value;
@@ -145,12 +147,14 @@ $('workMode').addEventListener('click', () => { mode = 'work'; render(); });
 $('back').addEventListener('click', () => { if (step > 0) step--; render(); });
 $('next').addEventListener('click', () => {
   if (mode === 'wizard' && step < 3) { step = configured && step === 0 ? 3 : step + 1; render(); return; }
-  if (!solve().ok) return;
+  if (!solve().ok || (bracketPlan && !bracketPlan.ok)) return;
+  if (bracketPlan?.ok) draft.brackets = { enabled: true, offsets: { ...bracketOffsets }, childPart: children[draft.child].surface?.compId || 'frame' };
+  else delete draft.brackets;
   if (integrated) { parent.postMessage({ type: 'face-wizard-confirm', selection: { ...draft } }, location.origin); return; }
   saved = { ...draft }; hasConfirmed = true; render();
   const placement = buildFacePlacement({ host: hosts[saved.host], child: children[saved.child], selection: saved });
   $('placementRecord').hidden = !placement.ok;
-  $('message').textContent = placement.ok ? '已確認擺放；此接法仍需轉接設計。' : placement.reason;
+  $('message').textContent = placement.ok ? (bracketPlan?.ok ? '已確認角碼孔位配置。' : '已確認擺放；此接法仍需轉接設計。') : placement.reason;
 });
 $('placementRecord').addEventListener('click', () => {
   const result = buildFacePlacement({ host: hosts[saved.host], child: children[saved.child], selection: saved });
@@ -255,26 +259,27 @@ function scene(mate) {
     const text = make('text', { x: labelX, y: labelY, 'text-anchor': 'middle', 'font-size': 20, 'font-weight': 700, fill: '#173e40', stroke: '#fff', 'stroke-width': 4, 'paint-order': 'stroke', 'pointer-events': 'none' });
     text.textContent = `${p.which === 'host' ? '承接' : '安裝'} ${names[p.id]}`;
   });
-  // 以接合面的長軸試排角碼，未做材料／孔槽檢查，故不產生加工資料。
   const bracketNote = $('bracketNote'); bracketNote.hidden = separate || step !== 3;
+  bracketPlan = null;
   if (!bracketNote.hidden) {
     const perpendicular = Math.abs(mate.rotation[2][2]) < 1e-6;
-    const face = mate.host;
-    const along = face.width >= face.height ? face.u : face.v;
-    const across = face.width >= face.height ? face.v : face.u;
-    const span = Math.max(face.width, face.height); bracketSpan = span;
-    const slots = perpendicular ? bracketLayout(span, bracketOffsets) : [];
-    bracketNote.textContent = !perpendicular ? '目前板面不是直角，未配置角碼。' : !slots.length ? '接合區太小，未配置角碼。' : `角碼試排（不存檔） · ${slots.length === 2 ? '左右各一顆' : '左二右一'} · 尚未產生孔位`;
-    for (const slot of slots) {
-      const corner = add(face.center, add(mul(along, slot.at), mul(across, slot.side * 5)));
-      const vertices = [corner, add(corner, mul(across, slot.side * 13)), add(add(corner, mul(across, slot.side * 13)), mul(along, slot.width)), add(corner, mul(along, slot.width)), add(add(corner, mul(along, slot.width)), mul(face.n, 9.5)), add(corner, mul(face.n, 9.5))];
+    bracketPlan = perpendicular ? planFaceBrackets(hosts[draft.host], children[draft.child], mate, bracketOffsets) : null;
+    bracketSpan = bracketPlan?.span || 0;
+    bracketNote.style.color = bracketPlan && !bracketPlan.ok ? '#b34436' : '#206f63';
+    bracketNote.textContent = !perpendicular ? '非直角接合，未配置角碼孔。' : !bracketPlan.ok ? bracketPlan.reason : `角碼 ${bracketPlan.brackets.length} 顆 · 確認後生成兩板固定孔 Ø3.2`;
+    for (const slot of bracketPlan?.brackets || []) {
       const active = selectedBracket === slot.id;
-      make('polygon', { points: vertices.map(screen).map(q => `${q.x},${q.y}`).join(' '), fill: active ? '#e5a024' : '#667e84', 'fill-opacity': active ? .6 : .22, stroke: active ? '#b97200' : '#607d83', 'stroke-opacity': .7, 'stroke-width': 2, 'pointer-events': 'none' });
-      const q = screen(corner);
-      const target = make('circle', { cx:q.x, cy:q.y, r:24, fill:'transparent', role:'button', tabindex:0, 'aria-label':`角碼 ${slot.id}，調整位置`, 'aria-pressed':active });
-      const choose = () => { if (draggedView) return; selectedBracket = slot.id; preview(); openDimension('bracket', bracketOffsets[slot.id] || 0); };
-      target.style.cursor = 'pointer'; target.addEventListener('pointerdown', e => e.stopPropagation()); target.addEventListener('click', choose);
-      target.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); } });
+      const color = slot.reason ? '#c84436' : active ? '#d99821' : '#607d83';
+      for (const wing of slot.wings) make('polygon', { points: wing.map(screen).map(q => `${q.x},${q.y}`).join(' '), fill:color,'fill-opacity':active?.55:.2,stroke:color,'stroke-width':2,'pointer-events':'none' });
+      for (const point of [slot.hostHole,slot.childHoleWorld]) {
+        const q=screen(point);
+        make('circle',{cx:q.x,cy:q.y,r:FACE_BRACKET_SPEC.diameter/2*scale,fill:'none',stroke:slot.reason?'#c84436':'#167553','stroke-width':2,'pointer-events':'none'});
+      }
+      const q = screen(slot.corner);
+      const target=make('circle',{cx:q.x,cy:q.y,r:24,fill:'transparent',role:'button',tabindex:0,'aria-label':`角碼 ${slot.id}，調整位置`,'aria-pressed':active});
+      const choose=()=>{if(draggedView)return;selectedBracket=slot.id;preview();openDimension('bracket',bracketOffsets[slot.id]||0);};
+      target.style.cursor='pointer';target.addEventListener('pointerdown',e=>e.stopPropagation());target.addEventListener('click',choose);
+      target.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}});
     }
   }
   const axis = make('text', { x: 300, y: 370, 'text-anchor': 'middle', 'font-size': 13, fill: '#516d69' });
@@ -372,7 +377,7 @@ function preview() {
   $('mateStepChip').textContent = dimensionText.moveStep(moveStep);
   $('summary').textContent = `${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
   const mate = solve(); $('next').disabled = !mate.ok || !!document.querySelector('input[aria-invalid="true"]');
-  if (mate.ok) scene(mate);
+  if (mate.ok) { scene(mate); if (bracketPlan && !bracketPlan.ok) $('next').disabled = true; }
   else { $('mateOverlay').hidden = true; $('message').textContent = mate.reason; $('message').classList.add('error'); }
 }
 if (integrated) {
@@ -384,6 +389,7 @@ if (integrated) {
     if (!Array.isArray(e.data.hosts) || !e.data.hosts.length || !Array.isArray(e.data.children) || !e.data.children.length) return;
     mode = 'wizard';
     hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; configured = !!e.data.configured; roughPlaced = configured;
+    bracketOffsets = { ...(draft.brackets?.offsets || {}) };
     if (configured && hosts.length === 1) step = 3;
     if (configured && !document.getElementById('optionalView')) {
       const view = document.querySelector('.view-actions'), more = document.createElement('details'), label = document.createElement('summary');
