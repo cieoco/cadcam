@@ -14,7 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261007_parallel';
+import { APP_VERSION } from '../version.js?v=20261007_solverguard';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
@@ -35,7 +35,7 @@ import { getTeachingFeedback } from './teaching-feedback.js';
 import * as Motion from './motion.js';
 import { memberSweepSegments } from './member-sweep.js';
 let sweepMemberId = null; // 顯示偏好，不寫入作品格式。
-import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, machineFrameComps, machineMounts, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostEdge, hostPlateThickness } from './assembly.js?v=20261007_m5a';
+import { compileAssembly, solveAssembly, sweepAssembly, rebakeModules, worldFrameComps, machineFrameComps, machineMounts, splitFrameMounts, moduleFrameExports, moduleFrameNodes, mountedBaseIds as moduleMountedBaseIds, canMergePoints, homeAdjustment, moduleOfPoint, selectionModule, planeOf, compsInPlane, pointIdsInPlane, orthogonalFrame, orthogonalBand, orthogonalHostEdge, hostPlateThickness } from './assembly.js?v=20261007_solverguard';
 import { machineComps, machineModules } from './assembly-roles.js';   // M5a：製作／匯出只看機器（底座＋裝在它身上的）
 import { normalizeModules } from './module-schema.js?v=20261007_singleface';
 import { refreshFaceMounts } from './face-mount-refresh.js';

@@ -8,7 +8,7 @@
  * solver／topology 一行不改。
  */
 import { compileTopology } from '../core/topology.js';
-import { solveTopology, sweepTopology } from '../multilink/solver.js';
+import { solveTopology, sweepTopology, validateSweepRange } from '../multilink/solver.js';
 import { pointKeysFor } from './part-types.js';
 import { memberStock } from './member-stock.js';
 import { frameOutlineEdges, safeName } from './exporters.js?v=20261007_7';   // C1：機架外框直邊、零件檔名
@@ -352,6 +352,7 @@ export function solveAssembly(asm, params) {
 }
 
 export function sweepAssembly(asm, params, startDeg, endDeg, stepDeg) {
+  validateSweepRange(startDeg, endDeg, stepDeg);
   if (asm.single) return sweepTopology(asm.single, params, startDeg, endDeg, stepDeg);
   const results = [];
   const validRanges = [];

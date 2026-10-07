@@ -1047,8 +1047,16 @@ function solveBodyJointTopology(topology, params) {
     components.forEach(c => {
         if (c.type !== 'bar' || !c.lenParam) return;
         const a = points[c.p1?.id], b = points[c.p2?.id];
-        const length = getParamVal(c.lenParam, 0);
-        if (!a || !b || !(length > 0)) return;
+        const baseLength = getParamVal(c.lenParam, 0);
+        // 伸縮輸入的約束長度包含行程，不能以收回時的桿長驗證。
+        const length = c.isInput && c.style === 'piston'
+            ? baseLength + getLinearShift(c.physicalMotor || c.physical_motor) : baseLength;
+        if (!Number.isFinite(length) || length <= 0) {
+            infeasible = true;
+            if (!infeasibleReason) infeasibleReason = `桿件 ${c.id} 的有效長度必須是有限正數`;
+            return;
+        }
+        if (!a || !b) return;
         const actual = Math.hypot(b.x - a.x, b.y - a.y);
         if (!Number.isFinite(actual) || Math.abs(actual - length) > tol) {
             infeasible = true;
@@ -1069,6 +1077,13 @@ function solveBodyJointTopology(topology, params) {
             if (!infeasibleReason) infeasibleReason = `三角板 ${c.triId} 無法保持設定孔距 ${c.len} mm`;
         }
     });
+
+    for (const [id, point] of Object.entries(points)) {
+        if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+            infeasible = true;
+            if (!infeasibleReason) infeasibleReason = `接點 ${id} 的座標不是有限數值`;
+        }
+    }
 
     return {
         isValid: !infeasible,
@@ -1546,7 +1561,7 @@ export function solveTopology(topologyOrParams, params) {
     }
 
     return {
-        isValid: allResolved,
+        isValid: allResolved && Object.values(points).every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y)),
         points,
         B
     };
@@ -1555,7 +1570,17 @@ export function solveTopology(topologyOrParams, params) {
 /**
  * 掃描 Helper
  */
+/** 掃描共用防護：避免零步距、浮點不前進或過密取樣鎖住 UI。 */
+export function validateSweepRange(startDeg, endDeg, stepDeg) {
+    if (![startDeg, endDeg, stepDeg].every(Number.isFinite) || stepDeg <= 0 ||
+        (startDeg <= endDeg && (startDeg + stepDeg <= startDeg || endDeg + stepDeg <= endDeg ||
+            (endDeg - startDeg) / stepDeg > 100000))) {
+        throw new RangeError('掃描起訖必須是有限數值，步距須為正數且可前進，取樣間隔不得超過 100000 個');
+    }
+}
+
 export function sweepTopology(topology, params, startDeg, endDeg, stepDeg) {
+    validateSweepRange(startDeg, endDeg, stepDeg);
     const results = [];
     const validRanges = [];
     const invalidRanges = [];
