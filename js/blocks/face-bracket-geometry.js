@@ -49,7 +49,7 @@ function footprintFits(surface, corner, along, across, length, toLocal) {
 }
 
 /** Uses actual stock planes. Returns invalid candidates for red UI markers; never exports partial drilling. */
-export function planFaceBrackets(host, child, transform, offsets={}) {
+export function planFaceBrackets(host, child, transform, offsets={}, allowReverse=true) {
   const fail=reason=>({ok:false,reason,brackets:[],hostHoles:[],childHoles:[]});
   if (!host?.box || !child?.box || !transform?.rotation || !transform?.translation) return fail('缺少接合板資料');
   const R=transform.rotation,T=transform.translation,K=FACE_BRACKET_SPEC;
@@ -67,7 +67,19 @@ export function planFaceBrackets(host, child, transform, offsets={}) {
   if (!slots.length) return {...fail('接合區太小，或角碼偏移超出可用範圍'),span:hi-lo};
   const minZ=Math.min(...childPts.map(p=>p.z)),maxZ=Math.max(...childPts.map(p=>p.z));
   const sign=Math.abs(minZ-host.box.max.z)<=.05 ? 1 : Math.abs(maxZ-host.box.min.z)<=.05 ? -1 : 0;
-  if (!sign) return fail('兩板未貼齊或互相穿入；請調整接合位置與間距');
+  if (!sign) {
+    if (allowReverse) {
+      const rotation=R[0].map((_,i)=>R.map(row=>row[i]));
+      const translation=local({x:0,y:0,z:0});
+      const reverse=planFaceBrackets(child,host,{rotation,translation},offsets,false);
+      if(reverse.brackets.length)return {...reverse,
+        hostHoles:reverse.childHoles,childHoles:reverse.hostHoles,
+        brackets:reverse.brackets.map(b=>({...b,corner:world(b.corner),
+          hostHole:b.childHole,childHole:b.hostHole,childHoleWorld:world(b.hostHole),
+          wings:b.wings.map(r=>r.map(world))}))};
+    }
+    return fail('兩板未貼齊或互相穿入；請調整接合位置與間距');
+  }
   const z=sign>0?host.box.max.z:host.box.min.z, up={x:0,y:0,z:sign};
   const hostHoles=[],childHoles=[],brackets=[];
   for(const slot of slots) {

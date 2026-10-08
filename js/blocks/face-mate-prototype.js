@@ -1,5 +1,5 @@
-import { autoFitFaces } from './face-auto-fit.js';
-import { planFaceBrackets, FACE_BRACKET_SPEC } from './face-bracket-geometry.js';
+import { autoFitFaces } from './face-auto-fit.js?v=20261008_edgefit';
+import { planFaceBrackets, FACE_BRACKET_SPEC } from './face-bracket-geometry.js?v=20261008_edgefit';
 import { bracketLayout } from './bracket-layout.js';
 /** 六面體組立操作原型；獨立記憶體草稿，不讀寫 blocks 作品。 */
 import { boxFaces, solveFaceMate, transformMatePoint } from './face-mate.js';
@@ -36,7 +36,7 @@ const fitButton = button('自動貼齊', () => {
   const result = autoFitFaces(hosts[draft.host], children[draft.child], draft);
   if (!result.ok) { $('message').textContent = result.reason; return; }
   draft = result.selection; bracketOffsets = {}; selectedBracket = null; render();
-  $('message').textContent = '已自動貼齊，請確認預覽與角碼孔位後再接上。';
+  $('message').textContent = '兩板已直角貼齊；角碼孔位另行檢查，確認預覽後再接上。';
 });
 $('bracketNote').after(fitButton);
 const solve = () => solveFaceMate({ ...draft, hostBox: hosts[draft.host].box, childBox: children[draft.child].box });
@@ -380,9 +380,9 @@ function render() {
 }
 function preview() {
   const align = grid.find(([u, v]) => u === draft.alignU && v === draft.alignV)[2];
-  $('mateUChip').textContent = dimensionText.offsetU(draft.offsetU);
-  $('mateVChip').textContent = dimensionText.offsetV(draft.offsetV);
-  $('mateGapChip').textContent = dimensionText.gap(draft.gap);
+  $('mateUChip').textContent = dimensionText.offsetU(Number(draft.offsetU.toFixed(2)));
+  $('mateVChip').textContent = dimensionText.offsetV(Number(draft.offsetV.toFixed(2)));
+  $('mateGapChip').textContent = dimensionText.gap(Number(draft.gap.toFixed(2)));
   $('mateStepChip').textContent = dimensionText.moveStep(moveStep);
   $('summary').textContent = `${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
   const mate = solve(); $('next').disabled = !mate.ok || !!document.querySelector('input[aria-invalid="true"]');
