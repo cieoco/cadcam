@@ -396,7 +396,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     const hostPart = a.hostCompId ? partByComp.get(a.hostCompId) : parts.find(p => p.name === a.hostPartName);
     const childPart = parts.find(p => p.name === a.childPart);
     if (!hostPart || !childPart) return;
-    const spec = jointSpec(a.kind || 'printed', joint);   // F1：角碼規格取作品的加工設定
+    const spec = a.spec || jointSpec(a.kind || 'printed', joint);   // F1：角碼規格取作品的加工設定
     const bracketKind = !!a.kind && a.kind !== 'printed';
     joints.push({
       id: `ADP-${a.moduleId}`,
@@ -411,7 +411,8 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
       // F1：角碼的名稱與尺寸存在關節上，五金清單／製作包不必再查設定。
       ...(bracketKind ? {
         jointLabel: spec.label, thicknessMm: spec.thicknessMm, widthMm: spec.widthMm, longLegMm: spec.longLegMm,
-        shortLegMm: spec.shortLegMm, bracketCount: spec.count
+        shortLegMm: spec.shortLegMm, bracketCount: a.physical?.length || spec.count,
+        ...(a.physical ? { connectionId:a.connectionId,physical:a.physical,hardware:a.physical.flatMap(b=>b.hardware) } : {})
       } : {}),
       standoffMm: 0,
       spacers: [],
@@ -499,7 +500,8 @@ export function hardwareList(plan, { modules = [] } = {}) {
       // E1：每處兩片角碼、每片一顆 M3×6 穿過木板，宿主與子模組各 2 顆＝4 顆；直接鎖進螺牙，不用螺帽。
       const K = bracketOf(j);
       brackets.set(K.label, (brackets.get(K.label) || 0) + K.count);
-      addScrew(adapterScrewSpec(j), '角碼', 2 * K.count, false);
+      if(j.hardware) j.hardware.filter(h=>h.kind==='screw').forEach(h=>addScrew(h.spec,'角碼',1,false));
+      else addScrew(adapterScrewSpec(j), '角碼', 2 * K.count, false);
       return;
     }
     if (j.kind === 'adapter') {
@@ -548,7 +550,7 @@ export function hardwareList(plan, { modules = [] } = {}) {
     rows.push({ spec: `M3 隔柱 ${fmtNum(mm)} mm`, qty, note: '對鎖螺絲中間沒有板的地方用隔柱撐住' });
   });
   if (adapters > 0) rows.push({ spec: '3D 列印轉接座', qty: adapters, note: `L 形，STL 另外下載列印${tiltNotes.length ? '；' + tiltNotes.join('；') : ''}` });
-  brackets.forEach((qty, label) => rows.push({ spec: label, qty, note: '直角接合，每處兩片' }));
+  brackets.forEach((qty, label) => rows.push({ spec: label, qty, note: '直角接合，依實際配置數量' }));
   if (nuts > 0) rows.push({ spec: 'M3 防鬆螺帽', qty: nuts, note: '穿透式 M3 螺絲各一顆（鎖進輪轂的 M3×8 不需要）' });
   const ttCount = motors.filter(m => m.type === 'tt').length;
   const servoCount = motors.filter(m => m.type === 'mg995').length;
@@ -631,6 +633,15 @@ ${adapterJoints.map(j => {
     const [hostName, childName] = j.parts;
     if (isBracketJoint(j)) {
       const K = bracketOf(j);
+      if(j.physical) {
+        const wingSteps=['host','child'].map((role,i)=>{
+          const wings=j.physical.flatMap(b=>b.wings).filter(w=>w.role===role),bySpec=new Map();
+          wings.forEach(w=>bySpec.set(w.screw.spec,(bySpec.get(w.screw.spec)||0)+1));
+          const screws=[...bySpec].map(([spec,n])=>`${n} 顆 ${e(spec)}`).join('、');
+          return `<li>${i===0?'宿主':'子模組'} ${e(j.parts[i])}：角碼翼貼板，用 ${screws} 從板材外側穿過 Ø3.2 mm 板孔，鎖入角碼 M3 牙孔，不用螺帽。</li>`;
+        }).join('');
+        return `<section class="step"><h3>角碼 ${e(j.id)}：${e(hostName)} ⟂ ${e(childName)}</h3><ol><li>準備 ${K.count} 片 ${e(K.label)}，依實際配置槽位對準 ADAPTER_HOLE 孔。</li>${wingSteps}<li>角碼螺牙厚 ${fmtNum(j.thicknessMm)} mm，鎖到貼平即可；確認兩翼貼板後再開始運動測試。</li></ol></section>`;
+      }
       return `<section class="step"><h3>角碼 ${e(j.id)}：${e(hostName)} ⟂ ${e(childName)}</h3><ol>
 ${j.stand ? `<li>子模組底板 ${e(childName)} 立在 ${e(hostName)} 的板面上（${j.stand.face === -1 ? '下面' : '上面'}），正面貼齊邊緣，板子與板面成 90°。</li>\n` : ''}<li>準備 ${K.count} 片 ${e(K.label)}，並排放在接合線上（兩片中心相距 10 mm，對準木板上的 ADAPTER_HOLE 孔）。</li>
 <li>長腳（${K.longLegMm} mm）貼在宿主 ${e(hostName)} 上，用 ${K.count} 顆 ${e(spec)} 從木板這一面穿過 3.2 mm 孔，直接鎖進角碼的螺牙，不用螺帽。</li>

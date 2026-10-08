@@ -1,6 +1,6 @@
 import { faceBracketPlan } from '../blocks/face-bracket-extras.js';
 import { readConnectionDescriptor } from '../blocks/connection-descriptor.js';
-import { faceBracketBoxes } from './face-brackets.js';
+import { faceBracketBoxes, faceBracketScrews } from './face-brackets.js';
 /**
  * blocks3d / orthogonal-3d（O6）
  *
@@ -178,9 +178,9 @@ function placeBox(matrix, zOffset, box, moduleId) {
     y: matrix[1] * a.x + matrix[5] * a.y + matrix[9] * a.z,
     z: matrix[2] * a.x + matrix[6] * a.y + matrix[10] * a.z
   });
-  const out = { moduleId, center: c, axes: box.axes.map(rot), size: { ...box.size } };
+  const out = { ...box, moduleId, center: c, axes: box.axes.map(rot), size: { ...box.size } };
   // G2：螺牙孔（中心要平移、軸向只轉不平移）
-  if (box.hole) out.hole = { center: applyMatrix4(matrix, { x: box.hole.center.x, y: box.hole.center.y, z: box.hole.center.z + zOffset }), axis: rot(box.hole.axis), diameterMm: box.hole.diameterMm };
+  if (box.hole) out.hole = { ...box.hole, center: applyMatrix4(matrix, { x: box.hole.center.x, y: box.hole.center.y, z: box.hole.center.z + zOffset }), axis: rot(box.hole.axis), diameterMm: box.hole.diameterMm };
   return out;
 }
 
@@ -225,12 +225,13 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
           const childCenterZ = childZ + face.childThicknessMm / 2;
           result = { model, matrix: multiply4(host.matrix, orthogonalMatrix(frame, hostCenterZ, -childCenterZ)), brackets: [], screws: [] };
           if (legacyDisplay) { result.displayAnchor = { kind: 'legacy-frame', resolvedEndpoint: false }; result.diagnostics = connection.diagnostics; }
-          const drilling=faceBracketPlan(comps,modules,params,mod,{stockMm,exportSettings});
+          const drilling=faceBracketPlan(comps,modules,params,mod,{stockMm,exportSettings,joint});
           const R=face.rotation,T=face.translation;
           const inverse=[R[0][0],R[0][1],R[0][2],0,R[1][0],R[1][1],R[1][2],0,R[2][0],R[2][1],R[2][2],0,
             -(R[0][0]*T.x+R[1][0]*T.y+R[2][0]*T.z),-(R[0][1]*T.x+R[1][1]*T.y+R[2][1]*T.z),-(R[0][2]*T.x+R[1][2]*T.y+R[2][2]*T.z),1];
           const placement=multiply4(multiply4(host.matrix,orthogonalMatrix(frame,hostCenterZ,0)),inverse);
           result.brackets=faceBracketBoxes(drilling).map(b=>placeBox(placement,0,b,id));
+          result.screws=faceBracketScrews(drilling).map(s=>placeScrew(placement,0,s,id));
           done.set(id, result); return result;
         }
         const zOffset = hostBodyZ(host.model, orthogonalHostEdge(comps, modules, mod.mount, inputs.pts, params, { asm }), comps);

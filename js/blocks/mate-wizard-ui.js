@@ -245,7 +245,7 @@ export function createMateWizard(h) {
     const edit = btn('回設計修改', '', () => h.adjust('edit')); edit.id = 'mateEdit';
     row.appendChild(off); row.appendChild(edit); root.appendChild(row);
     if (mod.mount?.face) {
-      const status = faceBracketStatus(S.comps,S.modules,params(),mod,{exportSettings:S.fabrication?.export || {},stockMm:S.fabrication?.cnc?.stockThicknessMm || 3});
+      const status = faceBracketStatus(S.comps,S.modules,params(),mod,{exportSettings:S.fabrication?.export || {},stockMm:S.fabrication?.cnc?.stockThicknessMm || 3,joint:S.fabrication?.joint});
       root.appendChild(el('div','bench-note',status.fixed?'角碼與固定孔已確認':'已定位，尚未固定'));
       root.appendChild(el('div','bench-note',status.reason));
       if(!status.fixed)root.appendChild(btn('配置角碼','primary',()=>h.openFaces(mod,true,true)));

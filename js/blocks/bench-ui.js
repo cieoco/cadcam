@@ -91,7 +91,7 @@ export function createBench(deps) {
     if (!mod.mount) return '未安裝';
     const host = modOf(mod.mount.to.module);
     const hostName = host ? displayName(host.id) : mod.mount.to.module;
-    if (mod.mount.face) return `六面接合 · ${hostName}${faceBracketStatus(S.comps,S.modules,S.topo.params,mod,{exportSettings:Settings.exportSettings()}).fixed ? '（角碼固定）' : '（已定位，尚未固定）'}`;
+    if (mod.mount.face) return `六面接合 · ${hostName}${faceBracketStatus(S.comps,S.modules,S.topo.params,mod,{exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint}).fixed ? '（角碼固定）' : '（已定位，尚未固定）'}`;
     let outName = mod.mount.to.output || '';
     if (mod.mount.orient) {
       // C1：宿主邊可以是桿、三角板的邊或機架板的邊
@@ -1174,7 +1174,7 @@ export function createBench(deps) {
     const signature = JSON.stringify([S.comps, S.modules, S.topo.params]);
     const modules = reselect ? S.modules.map(m => m.id === mod.id ? { ...m, mount: null } : m) : S.modules;
     openFaceWizard({ comps: S.comps, modules, params: S.topo.params, childId: mod.id, wizard: true,
-      initialMount: reselect ? mod.mount : null, startAtPlacement,
+      initialMount: reselect ? mod.mount : null, startAtPlacement, joint: S.fabrication?.joint,
       exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,
       isCurrent: () => signature === JSON.stringify([S.comps, S.modules, S.topo.params]), say,
       commit: result => { pushUndo(); S.comps = result.comps; S.modules = result.modules; rebuild(); draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? '已接上，角碼固定孔已生成。' : '已定位，尚未固定。請按「配置角碼」檢查並確認孔位。'); syncUI(true); }

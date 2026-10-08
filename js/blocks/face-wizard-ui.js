@@ -23,7 +23,7 @@ function reference(surface, name, parts = []) {
     holes: (surface.holes || []).map(relative), cutouts: (surface.cutouts || []).map(c => ({ ...c, points: c.points.map(relative) })) };
 }
 
-export function openFaceWizard({ comps, modules, params, childId, exportSettings, stockMm, isCurrent, commit, say, wizard = false, initialMount = null, startAtPlacement = false }) {
+export function openFaceWizard({ comps, modules, params, childId, exportSettings, stockMm, joint, isCurrent, commit, say, wizard = false, initialMount = null, startAtPlacement = false }) {
   const child = modules.find(m => m.id === childId);
   if (!child || child.mount || !child.base) { say('請選尚未安裝且有底座的機構。'); return; }
   const surfaces = id => buildMountSurfaces({ comps, modules, params, moduleId: id, exportSettings, thicknessMm: stockMm, drilling: true }).surfaces || [];
@@ -104,7 +104,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     };
     if (e.data?.type === 'face-wizard-ready') {
       if (!loadSession.receiveReady(e.data.loadGraph)) { rejectLoad(); return; }
-      frame.contentWindow.postMessage({ type: 'face-wizard-init', loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement: startAtPlacement && !needsChoice, hosts: hosts.map(h => ({ ...h, defaultFace: saved && h.surface.moduleId === saved.host.moduleId && h.surface.outputId === saved.host.source.outputId ? saved.host.face : connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, configured: !!childSelection && !needsChoice, mode: wizard || needsChoice || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
+      frame.contentWindow.postMessage({ type: 'face-wizard-init', joint, loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement: startAtPlacement && !needsChoice, hosts: hosts.map(h => ({ ...h, defaultFace: saved && h.surface.moduleId === saved.host.moduleId && h.surface.outputId === saved.host.source.outputId ? saved.host.face : connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, configured: !!childSelection && !needsChoice, mode: wizard || needsChoice || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
     }
     if (e.data?.type !== 'face-wizard-confirm') return;
     if (!loadSession.allowConfirm(e.data.loadGraph)) { rejectLoad(); return; }
@@ -118,7 +118,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
       hostThicknessMm: host.surface.box.max.z - host.surface.box.min.z,
       childThicknessMm: childSurface.box.max.z - childSurface.box.min.z };
     if (selection.brackets) {
-      const drilling = planFaceBrackets(host.surface, childSurface, face, selection.brackets.offsets);
+      const drilling = planFaceBrackets(host.surface, childSurface, face, selection.brackets.offsets,true,{joint});
       if (host.surface.body?.kind === 'rack' || childSurface.body?.kind === 'rack' || !drilling.ok) {
         delete face.selection.brackets;
       }
@@ -127,7 +127,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     if (!mounted.ok) { frame.contentWindow.postMessage({ type: 'face-wizard-error', reason: mounted.reason }, location.origin); return; }
     if (face.selection.brackets) {
       const pending = { ...child, mount: mounted.mount };
-      const checked = faceBracketPlan(comps, modules.map(m => m.id === childId ? pending : m), params, pending, { stockMm, exportSettings });
+      const checked = faceBracketPlan(comps, modules.map(m => m.id === childId ? pending : m), params, pending, { stockMm, exportSettings, joint });
       if (!checked?.ok) delete mounted.mount.face.selection.brackets;
     }
     commit({ comps, modules: modules.map(m => m.id === childId ? { ...m, mount: mounted.mount } : m) }); dialog.close();

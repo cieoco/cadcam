@@ -174,11 +174,14 @@ export function mg995SlotOutline(m = {}) {
   ];
 }
 
+// Keep derived identity through representation changes; these fields never enter saved stock settings.
+const holeMetadata = h => Object.fromEntries(['id','holePairId','wingId','connectionId','partId','role'].filter(k=>h[k]!==undefined).map(k=>[k,h[k]]));
+
 // 直角安裝轉接座孔（桿件座標：u 沿桿從 p1 起算、v 沿左法線）→ 圓孔規格，圖層 ADAPTER_HOLE。
 function adapterHoleSpecs(extraHoles) {
   return (Array.isArray(extraHoles) ? extraHoles : [])
     .filter(h => h && Number.isFinite(Number(h.u)) && Number.isFinite(Number(h.v)) && Number(h.diameterMm) > 0)
-    .map(h => ({ kind: 'circle', x: round(Number(h.u), 3), y: round(Number(h.v), 3), r: round(Number(h.diameterMm) / 2, 3), layer: 'ADAPTER_HOLE' }));
+    .map(h => ({ ...holeMetadata(h), kind: 'circle', x: round(Number(h.u), 3), y: round(Number(h.v), 3), r: round(Number(h.diameterMm) / 2, 3), layer: 'ADAPTER_HOLE' }));
 }
 
 // 舵盤孔以零件局部座標輸出；齒輪與搖臂共用同一套加工設定。
@@ -732,7 +735,7 @@ function plateAdapterHoles(points, adapterHoles) {
   return (Array.isArray(adapterHoles) ? adapterHoles : []).map(h => {
     let w = (Number.isFinite(h.u) && Number.isFinite(h.v)) ? localToWorld(points, h) : null;
     if (!w) w = { x: h.x, y: h.y };
-    return { x: w.x, y: w.y, r: (Number(h.diameterMm) || 3.2) / 2, layer: 'ADAPTER_HOLE' };
+    return { ...holeMetadata(h), x: w.x, y: w.y, r: (Number(h.diameterMm) || 3.2) / 2, layer: 'ADAPTER_HOLE' };
   }).filter(h => Number.isFinite(h.x) && Number.isFinite(h.y));
 }
 
@@ -970,8 +973,8 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   const cutouts = [];   // 非圓形的內部切割（MG995 穿板槽），與 holes 一樣屬於板內開孔
   const holes = [];
   let barAxis = null;
-  const addHole = (x, y, r, layer = 'HOLE') => {
-    const q = { x: round(x), y: round(y), r: round(r), layer };
+  const addHole = (x, y, r, layer = 'HOLE', metadata = {}) => {
+    const q = { ...holeMetadata(metadata), x: round(x), y: round(y), r: round(r), layer };
     const duplicate = holes.some(h => Math.hypot(h.x - q.x, h.y - q.y) < 0.05 && Math.abs(h.r - q.r) < 0.05 && h.layer === q.layer);
     if (!duplicate) holes.push(q);
   };
@@ -997,7 +1000,7 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   }
 
   // holeLayer（字串）：模組螺絲孔等專用圖層，其餘節點照舊 PIVOT_HOLE。
-  allNodes.forEach(p => addHole(p.x, p.y, Number.isFinite(p.holeDiameterMm) ? p.holeDiameterMm / 2 : holeR, typeof p.holeLayer === 'string' && p.holeLayer ? p.holeLayer : 'PIVOT_HOLE'));
+  allNodes.forEach(p => addHole(p.x, p.y, Number.isFinite(p.holeDiameterMm) ? p.holeDiameterMm / 2 : holeR, typeof p.holeLayer === 'string' && p.holeLayer ? p.holeLayer : 'PIVOT_HOLE', p));
 
   motorMounts.forEach(mount => {
     const feats = motorMountFeatures(mount);
@@ -1254,7 +1257,7 @@ export function inspectLinkExport(comp, length, settings = {}, extraHoles = []) 
     if (hole.kind === 'tt-shaft-flat') {
       cutouts.push({ points: ttShaftFlatPoints(hole.x, hole.y, hole.settings), layer: 'TT_SHAFT_FLAT' });
     } else {
-      holes.push({ x: hole.x, y: hole.y, r: hole.r, layer: hole.layer || 'HOLE' });
+      holes.push({ ...holeMetadata(hole), x: hole.x, y: hole.y, r: hole.r, layer: hole.layer || 'HOLE' });
     }
   });
   return { outlines: [outline], holes, cutouts };

@@ -5,7 +5,7 @@
 ## 接手資訊
 
 - 分支：`codex/framework-stabilization`；起點：`1537242`（應用 `2026.10.08.13`）。
-- 唯一寫入者：`endpoint_audit`（Sol high）；W2 `89a19ded` 正式交棒施工 W3a，`w1_safety` 已停止寫入，主代理 `/root` 只讀審阅與 HTTP 驗收。
+- 唯一寫入者：`w4a_physical`（Sol high）；W3a `308d3ab` 正式交棒施工 W4a 第一個 LOOP；前 writer 已停止，主代理 `/root` 只讀審閱與 HTTP 驗收。
 - 本機：Windows、Node `v25.2.0`、Python `3.13.5`。CI 的 Node 版本在 W1 固定並驗證。
 - 使用者原有未追蹤附件、`Claude outputs/`、截圖及框架檢討文件保留。提交只選本包檔案。
 - Astra 僅 low；更高推理強度須另獲確認。主聊天不宣稱自行切換模型。
@@ -19,7 +19,7 @@
 | W1 | done | 九項失敗完成分類／修正；Node 22.14.0 全套 143/143；cold HTTP 通過，舊快取混載轉 W2 修復 |
 | W2 | done | 120 模組／15 頁同圖生成與 CI check；主頁／iframe 握手拒絕異批確認；Node 22.14.0 全套 144/144 與 HTTP 通過 |
 | W3a | done | F1 六面純讀取／保存／重選／真 bar 層高；同圖 check、Node22 全套 146/146、主代理 HTTP 通過 |
-| W4a–W5a／G1 | planned | F1 實體、干涉、預覽、保存與輸出貫通 |
+| W4a–W5a／G1 | implementing | W4a-1 共用角碼／板孔／螺絲與 BOM Node147/147；干涉、快取及 W5a 交易流程尚待後續 LOOP |
 | W3b–W5b | planned | 其餘格式、多接合位置、教材與效能 |
 | W6 | planned | 全面驗收、提交推送與發布核對 |
 
@@ -108,3 +108,17 @@
 - Node 22.14.0 完整 manifest 144/144：`output/framework-stabilization/w2-verified-node22/results.json`（49dabcd＋本包 tracked changes）；actionlint 1.7.7 無診斷。完整 gate 後只移除舊 map 留下的空白尾空格並更新生成 token，功能 JS 未改；提交後再跑 check 與 load-graph 定向，結果留 `w2-committed-node22/`，不把 dirty 全套結果說成 clean commit 全套。
 - 主代理 HTTP：原出錯 origin 一般 reload 後組立清單／接合預覽恢復；精靈下一步至選承接面正常，主頁與 iframe 實際圖 token 相同、badge 都13、無新 console error。fresh standalone wizard cold pass，step1 按鈕可用、無 warn／error。完整操作 token `1543946e0a225d0fb953`；空白整理後 `a1d3221aaa84109625f8` 再 reload 抽核同圖且 next enabled。最後只移除另一行舊 map 留下的尾空格，提交 token 為 `ab04050dbe2bab318832`，功能來源相同。
 - 回交 checkpoint：本地 scoped commit，不 push／merge／deploy；下一寫入者由主代理交給 endpoint_audit 施工 W3a。後續 source 或選定 HTML 變更先 regenerate，再 check、suite；正式 Linux CI／部署 SHA 與 OPPO 實機效能仍待 W6，不宣稱全案完成。
+
+### LOOP W4a-1／F1 角碼實體＋板孔＋螺絲/BOM（done）
+
+- 唯一寫入者 w4a_physical，Sol high；起點 `308d3ab`。共用 plain-data 實體核心，F1 消費端與孔 metadata；沿邊配置委派留 W4b，SAT／快取留 W4a 後續 LOOP。
+- 新 target `test/face-bracket-physical.mjs` 在 Node22 真實紅燈：3 顆角碼應有 6 支螺絲，實際 0；完整證據 `output/framework-stabilization/w4a-physical/red.log`。
+- 純 `bracket-spec.js` 委派現有 fabrication joint.bracket，沿邊 jointSpec 取同一規格；`bracket-physical.js` 依 slot／corner／seamAxis／各翼 runAxis、朝材料外 contactNormal、板厚與 plain local transform 建構兩翼、接觸面、牙孔／板孔配對、螺絲與硬體實例。connection／slot／wing／holePair ID 與 geometryVersion 不持久化；W4b 尚需把沿邊實體建構委派此核心。
+- F1 layout 及 reverse 長短翼策略保留；3D／孔／製作包使用同一 physical。板孔 Ø3.2、M3 牙孔 Ø3；螺絲沿板外側穿入，標準長度按每翼實際板厚與角碼厚決定，BOM 數量按實際 slots。製作包按兩端實際螺絲规格敘述，無每處固定兩片的假設。盒體明帶 thicknessAxis，viewer 留旧盒體相容 fallback。
+- SVG/DXF 數值／格式相容，link/frame/plate 表示轉換與 frame pose 保留孔配對 ID。精靈 iframe preview／confirm、正式 3D、樹與面板狀態皆傳同加工 joint；HTTP 初驗找到樹漏板厚造成「尚未固定／已確認」矛盾，已補。
+- 新純參數 audit 在 `test/fixtures/bracket-physical-audit.mjs`，舊 `_bracket-audit.mjs` 斷言原樣保留。72 組覆蓋2/3角碼、上下板面、反向長短翼、3/4/6 mm＋兩端不同板厚、非預設規格（含 thickness5/width3）、多層獨立 pose 與實際 scene 遞迴；真实 F1 0/20/40° 以板面、盒體區間、孔軸及 BOM 獨立量測。殘差1e-6 mm，加工3位小數0.005 mm；缺孔、錯軸、離板、跨板、翼重疊過量、孔超翼材、錯螺絲與錯BOM均有負例。production plan 貼齊容許收斂具名1e-6，拒絕±0.02 mm間隙／穿入及牙孔超翼材。
+- 定向5/5；generate/check `f759f9fbc83768096886`（123 modules／15 pages）。完整 manifest 一次 Node22.14.0 `147/147 passed`，無失敗／逾時；完整 stdout/stderr／exit code／環境與起點SHA保留 `output/framework-stabilization/w4a-physical/full/results.json` 及逐支 log。未更改 APP_VERSION/main，未 push/deploy。
+- 正式 toSnapshot UI fixtures：`output/framework-stabilization/w4a-physical/ui-{unmounted,mounted,custom-spec}.blocks.json`，custom 14×10×7／厚1.5。最初 direct concat 兩個独立 realMountExamples 造成 physicalMotor1 重複；僅 output 生成器改用正常 instantiateTemplate 的 usedMotorIds 分配 motor2，保存冻结角0，0/20/40有效；不擴產品 solver。
+- 回交：本包 scoped 本地提交後 w4a_physical 停止寫入；主代理接手／指定下一唯一寫入者；W4a 材料SAT／單一姿態干涉與播放快取、W5a 草稿交易／全部流向、W4b 沿邊核心委派仍未完成，不宣稱 W4a 或 G1 完工。模型精確 token 無可取得資料，記實際 Sol high 與一次全suite，不虛報用量。
+- 最終 HTTP：主代理確認 token `f759f9fbc83768096886` 主頁／iframe 相同；更正 fixture 顯示 M1/M2 兩組動力就緒，樹與面板均角碼固定／3顆。實際 M1 播放後停在325°（−35°），模型、角碼與真螺絲保持可見。實際下載製作包 default 13×9.5×7／厚1.2 ×3、M3×6 ×6；custom 14×10×7／厚1.5 ×3、M3×6 ×6，各板3支。custom 精靈開啟／取消正常，無新 console 錯誤；截圖 `output/framework-stabilization/w4a-physical/http-mounted.jpg`（不提交）。
+- 收尾只補測試側的規格期望：custom／預設尺寸直接由測試輸入獨立列值，audit 不以 production.spec 當規格期望；新 target 再跑1/1及同 token check通過（`independent-spec/`）。生產程式未改，不重跑無變更全suite。

@@ -452,7 +452,7 @@ export function createViewer(container) {
   // 擠出後對中（z∈[−厚/2, +厚/2]）；沒有 hole：實心方塊（舊行為）。
   function bracketLegGeometry(b, ax, dims) {
     if (!b.hole || !b.hole.center) return new THREE.BoxGeometry(b.size.x, b.size.y, b.size.z);
-    const ti = dims.indexOf(Math.min(...dims)), [ia, ib] = [0, 1, 2].filter(k => k !== ti);
+    const ti = Number.isInteger(b.thicknessAxis) ? b.thicknessAxis : dims.indexOf(Math.min(...dims)), [ia, ib] = [0, 1, 2].filter(k => k !== ti);
     const hc = new THREE.Vector3(b.hole.center.x - b.center.x, b.hole.center.y - b.center.y, b.hole.center.z - b.center.z);
     const hx = hc.dot(ax[ia]), hy = hc.dot(ax[ib]);
     const w = dims[ia], h = dims[ib], th = dims[ti];
@@ -504,8 +504,8 @@ export function createViewer(container) {
       const mesh = new THREE.Mesh(bracketLegGeometry(b, ax, dims), bracketMat);
       mesh.matrixAutoUpdate = false;
       if (b.hole) {
-        // 薄軸＝最小尺寸；其餘兩軸當板面的 x、y，z＝x×y（擠出方向，已對中到 −厚/2…+厚/2）
-        const ti = dims.indexOf(Math.min(...dims)), [ia, ib] = [0, 1, 2].filter(k => k !== ti);
+        // 共用實體指定薄軸；舊盒體退回最小尺寸，其餘兩軸當板面的 x、y，z＝x×y（擠出方向，已對中到 −厚/2…+厚/2）
+        const ti = Number.isInteger(b.thicknessAxis) ? b.thicknessAxis : dims.indexOf(Math.min(...dims)), [ia, ib] = [0, 1, 2].filter(k => k !== ti);
         mesh.matrix.makeBasis(ax[ia], ax[ib], new THREE.Vector3().crossVectors(ax[ia], ax[ib])).setPosition(b.center.x, b.center.y, b.center.z);
       } else {
         mesh.matrix.makeBasis(ax[0], ax[1], ax[2]).setPosition(b.center.x, b.center.y, b.center.z);

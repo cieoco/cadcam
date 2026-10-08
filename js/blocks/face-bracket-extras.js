@@ -1,7 +1,7 @@
 import { readConnectionDescriptor } from './connection-descriptor.js';
 /** Recompute confirmed drilling against current stock; stale/invalid plans produce no holes. */
 import { buildMountSurfaces } from './mount-surfaces.js';
-import { planFaceBrackets, FACE_BRACKET_SPEC } from './face-bracket-geometry.js?v=20261008_bracket3d';
+import { planFaceBrackets } from './face-bracket-geometry.js?v=20261008_bracket3d';
 
 function rawPlan(comps, modules, params, mod, opts={}) {
   if (!mod?.mount?.face?.selection?.brackets?.enabled) return null;
@@ -12,7 +12,7 @@ function rawPlan(comps, modules, params, mod, opts={}) {
   const part=descriptor.child.partId, own=surfaces(mod.id,part);
   const child=own.find(s=>part && part!=='frame'?s.compId===part:s.kind==='frame');
   if (!host || !child || host.body?.kind==='rack' || child.body?.kind==='rack') return {ok:false,reason:'找不到支援開孔的接合板'};
-  return {...planFaceBrackets(host,child,mod.mount.face,mod.mount.face.selection.brackets.offsets),host,child};
+  return {...planFaceBrackets(host,child,mod.mount.face,mod.mount.face.selection.brackets.offsets,true,{joint:opts.joint,connectionId:descriptor.id}),host,child};
 }
 
 export function faceBracketPlan(comps, modules, params, mod, opts={}) {
@@ -24,7 +24,7 @@ export function faceBracketPlan(comps, modules, params, mod, opts={}) {
     if(!p?.ok) continue;
     for(const [surface,holes] of [[plan.host,plan.hostHoles],[plan.child,plan.childHoles]]) {
       for(const [target,existing] of [[p.host,p.hostHoles],[p.child,p.childHoles]]) {
-        if(surface.moduleId===target.moduleId && surface.compId===target.compId && holes.some(h=>existing.some(q=>Math.hypot(h.x-q.x,h.y-q.y)<FACE_BRACKET_SPEC.diameter+FACE_BRACKET_SPEC.web)))
+        if(surface.moduleId===target.moduleId && surface.compId===target.compId && holes.some(h=>existing.some(q=>Math.hypot(h.x-q.x,h.y-q.y)<plan.spec.diameter+plan.spec.web)))
           return {...plan,ok:false,reason:'孔位與另一組角碼太接近',hostHoles:[],childHoles:[]};
       }
     }
@@ -33,21 +33,26 @@ export function faceBracketPlan(comps, modules, params, mod, opts={}) {
 }
 
 export function appendFaceBracketHoles(extras, comps, modules, params, opts={}) {
+  extras.adapters ||= [];
   for(const mod of modules || []) {
     const plan=faceBracketPlan(comps,modules,params,mod,opts);
     if (!plan?.ok) continue;
+    extras.adapters.push({moduleId:mod.id,connectionId:`connection:${mod.id}`,kind:'bracket-m3',
+      hostCompId:plan.host.compId,hostPartName:plan.host.kind==='frame'?`${plan.host.moduleId}-frame`:null,
+      childPart:plan.child.kind==='frame'?`${mod.id}-frame`:plan.child.compId,
+      holesPerFlange:plan.physical.length,holeDiameterMm:plan.spec.diameter,physical:plan.physical,spec:plan.spec});
     for(const [surface,holes] of [[plan.host,plan.hostHoles],[plan.child,plan.childHoles]]) {
       if(surface.kind==='frame') {
-        const nodes=holes.map((p,i)=>({id:`BRK_${mod.id}_${surface.moduleId}_${i}`,x:p.x,y:p.y,holeDiameterMm:FACE_BRACKET_SPEC.diameter,holeLayer:'ADAPTER_HOLE',outlineExempt:true}));
+        const nodes=holes.map(p=>({...p,holeDiameterMm:p.diameterMm,holeLayer:'ADAPTER_HOLE',outlineExempt:true}));
         const owner=modules.find(m=>m.id===surface.moduleId);
         if(owner?.mount) (extras.frameNodes[surface.moduleId] ||= []).push(...nodes);
         else extras.worldFrameNodes.push(...nodes);
       } else if(surface.body?.kind==='bar') {
         const c=comps.find(c=>c.id===surface.compId),a=c.p1,b=c.p2,len=Math.hypot(b.x-a.x,b.y-a.y);
         if(!len) continue;
-        (extras.linkHoles[c.id] ||= []).push(...holes.map(p=>({u:((p.x-a.x)*(b.x-a.x)+(p.y-a.y)*(b.y-a.y))/len,v:((p.y-a.y)*(b.x-a.x)-(p.x-a.x)*(b.y-a.y))/len,diameterMm:FACE_BRACKET_SPEC.diameter})));
+        (extras.linkHoles[c.id] ||= []).push(...holes.map(p=>({...p,u:((p.x-a.x)*(b.x-a.x)+(p.y-a.y)*(b.y-a.y))/len,v:((p.y-a.y)*(b.x-a.x)-(p.x-a.x)*(b.y-a.y))/len,diameterMm:p.diameterMm})));
       } else if(surface.body?.kind==='triangle') {
-        (extras.plateHoles[surface.compId] ||= []).push(...holes.map(p=>({x:p.x,y:p.y,diameterMm:FACE_BRACKET_SPEC.diameter})));
+        (extras.plateHoles[surface.compId] ||= []).push(...holes.map(p=>({...p,x:p.x,y:p.y,diameterMm:p.diameterMm})));
       }
     }
   }

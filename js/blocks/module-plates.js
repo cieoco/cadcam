@@ -77,7 +77,7 @@ export function placeFramePlates(homes, comps, modules, points, plan = null) {
       plane: h.plane,
       outline: g.outlines[0].map(mv),
       outlines: g.outlines.map(o => o.map(mv)),
-      holes: g.holes.map(q => ({ ...mv(q), r: q.r, layer: q.layer })),
+      holes: g.holes.map(q => ({ ...q, ...mv(q) })),
       cutouts: g.cutouts.map(c => ({ layer: c.layer, points: c.points.map(mv) })),
       thicknessMm: part && Number(part.thicknessMm) > 0 ? Number(part.thicknessMm) : h.stockMm,
       zMm: part && Number.isFinite(Number(part.zMm)) ? Number(part.zMm) : 0

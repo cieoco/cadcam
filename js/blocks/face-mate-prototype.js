@@ -19,7 +19,7 @@ const initial = { host: 0, child: 0, hostFace: 'top', childFace: 'bottom', align
 let draft = { ...initial }, saved = { ...initial }, step = 0;
 let mode = 'wizard';
 let hasConfirmed = false, roughPlaced = false, configured = false;
-let bracketPlan = null;
+let bracketPlan = null, jointSettings;
 let bracketOffsets = {}, selectedBracket = null, bracketSpan = 0;
 let moveStep = 5, edgeMode = false, dimensionField = null, dimensionAlignment = null;
 const titles = ['選擇兩個機構', '選承接端的大面', '選安裝端的大面', '預覽對齊與偏置'];
@@ -278,7 +278,7 @@ function scene(mate) {
   bracketPlan = null;
   if (!bracketNote.hidden) {
     const perpendicular = Math.abs(mate.rotation[2][2]) < 1e-6;
-    bracketPlan = perpendicular ? planFaceBrackets(hosts[draft.host], children[draft.child], mate, bracketOffsets) : null;
+    bracketPlan = perpendicular ? planFaceBrackets(hosts[draft.host], children[draft.child], mate, bracketOffsets,true,{joint:jointSettings}) : null;
     bracketSpan = bracketPlan?.span || 0;
     bracketNote.style.color = bracketPlan && !bracketPlan.ok ? '#b34436' : '#206f63';
     bracketNote.textContent = !perpendicular ? '非直角接合，未配置角碼孔。' : !bracketPlan.ok ? `可接上；角碼孔待調整（${bracketPlan.reason}）` : `角碼 ${bracketPlan.brackets.length} 顆 · 確認後生成兩板固定孔 Ø3.2`;
@@ -407,7 +407,7 @@ if (integrated) {
     if (!loadSession.receiveReady(e.data.loadGraph)) { $('message').textContent = LOAD_MISMATCH_MESSAGE; $('next').disabled = true; return; }
     if (!Array.isArray(e.data.hosts) || !e.data.hosts.length || !Array.isArray(e.data.children) || !e.data.children.length) return;
     mode = 'wizard';
-    hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; configured = !!e.data.configured; roughPlaced = configured;
+    jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; configured = !!e.data.configured; roughPlaced = configured;
     bracketOffsets = { ...(draft.brackets?.offsets || {}) };
     if (e.data.startAtPlacement || (configured && hosts.length === 1)) step = 3;
     if (configured && !document.getElementById('optionalView')) {

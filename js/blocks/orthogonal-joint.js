@@ -11,6 +11,7 @@ import { pointCoords } from './model.js';
 import { orthogonalHostEdge, orthogonalFrame, hostPlateThickness, standChildHoles } from './assembly.js';
 import { worldToLocal } from './plate-geometry.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
+import { metalBracketSpec } from './bracket-spec.js';
 
 const D2R = Math.PI / 180;
 
@@ -38,22 +39,13 @@ export const jointKindOf = joint => (joint && JOINT_KINDS[joint.kind] ? joint.ki
 
 const finitePos = v => Number.isFinite(Number(v)) && Number(v) > 0;
 const r3 = v => Math.round(v * 1000) / 1000;
-const trimNum = v => String(Number(Number(v).toFixed(2)));   // 13 → '13'、9.5 → '9.5'
 
 // F1：接合件規格。printed 與 JOINT_KINDS 相同；bracket-m3 的尺寸取作品加工設定的 joint.bracket
 // （孔距轉角：宿主＝長腳−孔心離末端、子模組＝短腳−孔心離末端），沒給設定時用內建預設（13×9.5×7）。
 export function jointSpec(kind, jointSettings = FABRICATION_DEFAULTS.joint) {
   const k = JOINT_KINDS[kind] ? kind : DEFAULT_JOINT_KIND;
   if (k === 'printed') return JOINT_KINDS.printed;
-  const b = (jointSettings && jointSettings.bracket) || FABRICATION_DEFAULTS.joint.bracket;
-  const pick = key => (Number.isFinite(Number(b[key])) && Number(b[key]) > 0 ? Number(b[key]) : FABRICATION_DEFAULTS.joint.bracket[key]);
-  const widthMm = pick('widthMm'), thicknessMm = pick('thicknessMm'), longLegMm = pick('longLegMm'), shortLegMm = pick('shortLegMm'), holeEndMm = pick('holeEndMm');
-  return {
-    ...JOINT_KINDS[k],
-    label: `M3 帶牙金屬角碼 ${trimNum(longLegMm)}×${trimNum(shortLegMm)}×${trimNum(widthMm)}`,
-    widthMm, thicknessMm, longLegMm, shortLegMm, holeEndMm,
-    hostHoleMm: r3(longLegMm - holeEndMm), childHoleMm: r3(shortLegMm - holeEndMm)
-  };
+  return { ...JOINT_KINDS[k], ...metalBracketSpec(jointSettings) };
 }
 
 // D2：子模組底板上的轉接座孔（子模組平面座標）；角碼孔位依宿主外側面，printed 保留原有孔位算法。

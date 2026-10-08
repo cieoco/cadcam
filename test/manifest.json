@@ -64,6 +64,7 @@
     "test/fabrication-ui.mjs",
     "test/face-auto-fit.mjs",
     "test/face-bracket-alignment.mjs",
+    "test/face-bracket-physical.mjs",
     "test/face-bracket-holes.mjs",
     "test/face-mate-examples.mjs",
     "test/face-mate.mjs",
