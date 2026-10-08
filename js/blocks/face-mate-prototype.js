@@ -1,3 +1,4 @@
+import { autoFitFaces } from './face-auto-fit.js';
 import { planFaceBrackets, FACE_BRACKET_SPEC } from './face-bracket-geometry.js';
 import { bracketLayout } from './bracket-layout.js';
 /** 六面體組立操作原型；獨立記憶體草稿，不讀寫 blocks 作品。 */
@@ -31,6 +32,13 @@ const viewCoords = p => {
   };
 };
 const project = p => viewCoords(p);
+const fitButton = button('自動貼齊', () => {
+  const result = autoFitFaces(hosts[draft.host], children[draft.child], draft);
+  if (!result.ok) { $('message').textContent = result.reason; return; }
+  draft = result.selection; bracketOffsets = {}; selectedBracket = null; render();
+  $('message').textContent = '已自動貼齊，請確認預覽與角碼孔位後再接上。';
+});
+$('bracketNote').after(fitButton);
 const solve = () => solveFaceMate({ ...draft, hostBox: hosts[draft.host].box, childBox: children[draft.child].box });
 
 function button(label, action) {
@@ -260,6 +268,7 @@ function scene(mate) {
     text.textContent = `${p.which === 'host' ? '承接' : '安裝'} ${names[p.id]}`;
   });
   const bracketNote = $('bracketNote'); bracketNote.hidden = separate || step !== 3;
+  fitButton.hidden = bracketNote.hidden;
   bracketPlan = null;
   if (!bracketNote.hidden) {
     const perpendicular = Math.abs(mate.rotation[2][2]) < 1e-6;
