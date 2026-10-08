@@ -26,10 +26,10 @@ export function sizeFrameOutline(outlines, nodes) {
   const minLength=x1-x0,minWidth=y1-y0;
   const lengthMm=Math.max(minLength,stock.lengthMm || 0),widthMm=Math.max(minWidth,stock.widthMm || 0);
   const dimensions={lengthMm,widthMm,minLength,minWidth};
-  if (!stock.lengthMm && !stock.widthMm) return {outlines,dimensions,...(stock.thicknessMm ? {thicknessMm:stock.thicknessMm} : {})};
   const cx=(x0+x1)/2,cy=(y0+y1)/2;
-  // Expand by a small corner radius so the rounded rectangle contains the entire natural envelope.
-  const r=Math.min(2,Math.max(0,(lengthMm-minLength)/2),Math.max(0,(widthMm-minWidth)/2));
+  // Both automatic and explicit sizes use the same regular outline. The natural
+  // envelope already includes stock around the holes and motor features.
+  const r=Math.min(2,lengthMm/4,widthMm/4);
   const ring=[];
   for (let corner=0;corner<4;corner++) {
     const angle=corner*Math.PI/2, sx=corner===0 || corner===3 ? 1 : -1, sy=corner<2 ? 1 : -1;

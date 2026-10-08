@@ -2,7 +2,7 @@ import { DEFAULT_PLATE_RADIUS_WORLD, createPlateGeometry, localToWorld } from '.
 import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
 import { rackPhaseShift } from './gear-editor.js';
 import { memberStock, memberStockLabel } from './member-stock.js';
-import { sizeFrameOutline, frameStockOf } from './frame-stock.js';
+import { sizeFrameOutline } from './frame-stock.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 
 export const DEFAULT_BAR_WIDTH_MM = DEFAULT_PLATE_RADIUS_WORLD * 2;
@@ -990,51 +990,14 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   return { ...sized, cutouts, holes, warnings: frameWarnings(warnEdges, holes) };
 }
 
-// C1：機架外框的每一段「直邊」（直角接口用）。與 frameGeometry 同一套規則：
-// 兩點或近共線（≤ 6 mm）＝等寬長條（兩條長邊，外擴 barWidth/2）；其餘＝凸包每邊外擴 max(frameMarginMm, barWidth/2)。
-// 回傳 [{ a, b, d, m, lengthMm }]：a→b 為外擴後的邊線端點，d 沿邊單位向量，m 朝外單位法向；單點機架或沒有節點回 []。
-// 不含馬達安裝座對外框的擴張（與 inspectFrameExport 傳空 mounts 的結果一致）。
+// 接合邊沿用實際圓角矩形外框；自動與手動尺寸使用同一幾何。
 export function frameOutlineEdges(frameNodes, settings = {}) {
-  const nodes = (frameNodes || []).filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y) && !p.outlineExempt);
-  const stock = frameStockOf(nodes);
-  if (stock.lengthMm || stock.widthMm) {
-    const ring = frameGeometry(nodes,settings)?.outlines[0] || [];
-    return ring.map((a,i) => {
-      const b=ring[(i+1)%ring.length],lengthMm=Math.hypot(b.x-a.x,b.y-a.y);
-      const d={x:(b.x-a.x)/lengthMm,y:(b.y-a.y)/lengthMm};
-      return {a,b,d,m:{x:d.y,y:-d.x},lengthMm};
-    }).filter(e=>e.lengthMm>1e-6);
-  }
-  if (nodes.length < 2) return [];
-  const { barWidthMm, frameMarginMm } = normalizeExportSettings(settings);
-  const frameR = barWidthMm / 2;
-  const maxLineDist = nodes.length === 2 ? 0 : Math.max(...nodes.map(p => lineDistance(p, nodes[0], nodes[nodes.length - 1])));
-  let ring, radius;
-  if (nodes.length === 2 || maxLineDist < 6) {
-    const sorted = [...nodes].sort((a, b) => (a.x - b.x) || (a.y - b.y));
-    ring = [sorted[0], sorted[sorted.length - 1]];
-    radius = frameR;
-  } else {
-    ring = hull(nodes);
-    radius = Math.max(frameMarginMm, frameR);
-  }
-  if (ring.length < 2) return [];
-  const sign = ring.length >= 3 && signedArea(ring) < 0 ? -1 : 1;   // 順時針時外法線在左側
-  const edges = [];
-  ring.forEach((p, i) => {
-    const q = ring[(i + 1) % ring.length];
-    const dx = q.x - p.x, dy = q.y - p.y;
-    const len = Math.hypot(dx, dy);
-    if (!(len > 1e-6)) return;
-    const d = { x: dx / len, y: dy / len };
-    const m = { x: sign * d.y, y: -sign * d.x };   // 凸包逆時針：外法線在行進方向右側
-    edges.push({
-      a: { x: p.x + m.x * radius, y: p.y + m.y * radius },
-      b: { x: q.x + m.x * radius, y: q.y + m.y * radius },
-      d, m, lengthMm: len
-    });
-  });
-  return edges;
+  const ring = frameGeometry(frameNodes,settings)?.outlines[0] || [];
+  return ring.map((a,i) => {
+    const b=ring[(i+1)%ring.length],lengthMm=Math.hypot(b.x-a.x,b.y-a.y);
+    const d={x:(b.x-a.x)/lengthMm,y:(b.y-a.y)/lengthMm};
+    return {a,b,d,m:{x:d.y,y:-d.x},lengthMm};
+  }).filter(e=>e.lengthMm>1e-6);
 }
 
 export function inspectFrameExport(frameNodes, settings, motorMounts = []) {

@@ -9,10 +9,19 @@ import { buildSceneModel } from '../js/blocks3d/scene-model.js';
 import { buildPlan } from '../js/blocks/build-plan.js';
 const f=bracketFixture(), comps=f.comps.filter(c=>c.moduleId==='Child');
 const original=inspectFrameExport(frameConnectorNodes(comps),{});
+// Automatic and explicit sizes both have exactly four long, perpendicular sides.
+function rectangleSides(geometry) {
+  const ring=geometry.outlines[0];
+  const sides=ring.map((p,i)=>({x:ring[(i+1)%ring.length].x-p.x,y:ring[(i+1)%ring.length].y-p.y})).filter(d=>Math.hypot(d.x,d.y)>5);
+  assert.equal(sides.length,4);
+  for(let i=0;i<4;i++) assert.ok(Math.abs(sides[i].x*sides[(i+1)%4].x+sides[i].y*sides[(i+1)%4].y)<1e-5);
+}
+rectangleSides(original);
 for(const c of comps) c.p1.frameStock={lengthMm:180,widthMm:120,thicknessMm:6};
 const saved=normalizeSnapshot(JSON.parse(JSON.stringify(f)));
 const nodes=frameConnectorNodes(saved.comps.filter(c=>c.moduleId==='Child'));
 const g=inspectFrameExport(nodes,{});
+rectangleSides(g);
 assert.deepEqual(g.holes,original.holes);
 assert.equal(g.dimensions.lengthMm,180);assert.equal(g.dimensions.widthMm,120);assert.equal(g.thicknessMm,6);
 assert.equal(buildSceneModel([],Object.fromEntries(nodes.map(p=>[p.id,p])),{frameGeometry:g}).frame.thickness,6);
