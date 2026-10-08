@@ -70,6 +70,23 @@ ed.mountTo(L.id, L.outputs[0].id);
 
 const cnc = { toolDiameterMm: 3.175, stockThicknessMm: 3 };
 const ex = { holeDiameterMm: 3.2, frameHoleDiameterMm: 3.2 };
+// 現在的整片矩形機架在原 176 mm 齒條的 0° 已碰到夾爪馬達。
+// 限位不能修復組裝姿態本身的干涉；保留此負例，不能靠縮短長槽假裝解決。
+{
+  const shortRack = S.comps.find(c => c.type === 'rack'), pinion = S.comps.find(c => c.id === shortRack.pinion);
+  const ranges = { '1': RL.rackGuideThetaRange(S.topo.params[pinion.radiusParam], shortRack.slot.length, shortRack.slot.width, shortRack.sign), '2': { lo: 0, hi: 24 } };
+  const args = { comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: ex, cnc, ranges };
+  const { plan } = IF.resolveSpacers(args);
+  const zero = IF.findInterference({ ...args, plan, ranges: { ...ranges, '1': { lo: 0, hi: 0 } } });
+  check('原短齒條的組裝姿態確實有馬達機身撞機架', zero.some(f => f.kind === 'motor-body' && f.parts.includes('frame')));
+  check('組裝姿態已干涉：不提出無效限位', IF.suggestRackStops({ ...args, plan }).length === 0);
+  ed.unmount(G.id);
+  // 加長實體齒條 30 mm，tip 孔跟著移高 15 mm；槽與導銷行程保持不變。
+  // 重新用正式接口安裝，保留對孔，而不是把夾爪任意移離接點。
+  S.topo.params[shortRack.lenParam] += 30;
+  S.selectedGearId = S.comps.find(c => c.moduleId === G.id && c.type === 'gear').id;
+  ed.mountTo(L.id, L.outputs[0].id);
+}
 const base = { comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: ex, cnc };
 const rack = S.comps.find(c => c.type === 'rack');
 const pinion = S.comps.find(c => c.id === rack.pinion);

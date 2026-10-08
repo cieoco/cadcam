@@ -1051,12 +1051,7 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
 
 // 接合邊沿用實際圓角矩形外框；自動與手動尺寸使用同一幾何。
 export function frameOutlineEdges(frameNodes, settings = {}) {
-  const ring = frameGeometry(frameNodes,settings)?.outlines[0] || [];
-  return ring.map((a,i) => {
-    const b=ring[(i+1)%ring.length],lengthMm=Math.hypot(b.x-a.x,b.y-a.y);
-    const d={x:(b.x-a.x)/lengthMm,y:(b.y-a.y)/lengthMm};
-    return {a,b,d,m:{x:d.y,y:-d.x},lengthMm};
-  }).filter(e=>e.lengthMm>1e-6);
+  return frameGeometry(frameNodes,settings)?.straightEdges || [];
 }
 
 export function inspectFrameExport(frameNodes, settings, motorMounts = []) {

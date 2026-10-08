@@ -29,7 +29,7 @@ check('滑軌的承載孔 m1（fixed）→ 不畫', same(fallbackTraceIds([
     m1: { id: 'm1', type: 'fixed' }, m2: { id: 'm2', type: 'fixed' } }
 ], 'm1'), []));
 
-// 所有沒指定軌跡點的範例：compile 預設點都是固定或馬達軸心 → 一律不畫（2026-09-29 盤點共 9 個）
+// 所有沒指定軌跡點的範例：逐一檢查預設點，不把歷史範例數當成產品契約。
 let fallbackExamples = 0;
 for (const ex of BLOCK_EXAMPLES) {
   const s = ex.snapshot;
@@ -38,6 +38,7 @@ for (const ex of BLOCK_EXAMPLES) {
   fallbackExamples++;
   check(`${ex.id}：預設點 ${compiled.tracePoint} 不畫`, same(fallbackTraceIds(s.comps, compiled.tracePoint), []));
 }
-check('盤點到 9 個沒指定軌跡點的範例', fallbackExamples === 9, String(fallbackExamples));
+check('預設點驗收涵蓋現有所有未指定軌跡的範例且非空', fallbackExamples > 0 && fallbackExamples ===
+  BLOCK_EXAMPLES.filter(e => e.snapshot?.comps?.length && !e.snapshot.tracePoints && !e.snapshot.tracePoint).length, String(fallbackExamples));
 
 report('trace-fallback');

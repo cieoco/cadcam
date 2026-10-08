@@ -93,7 +93,9 @@ linkage/
 
 作品由 `js/blocks/schema.js` 正規化，`storage.js` 提供 `blocks.json` 存取、自動還原與分享。blocks 的加工匯出為 SVG／DXF，目前包含連桿、板件、齒輪與機架；滑軌本體不在零件匯出清單內。舊版 `mechanism.json` ARM 交換格式不等同於 blocks 作品格式。
 
-Node 22 以上可直接執行 `node test/<name>.mjs`；例如 `node test/slider-crank.mjs`、`node test/gear-pair.mjs`。作品與範例正規化另跑 `node test_blocks_schema.mjs`。沒有 npm test runner，UI 還須在 HTTP 網站實際操作驗收。
+Node 22 以上可直接執行 `node test/<name>.mjs`；例如 `node test/slider-crank.mjs`、`node test/gear-pair.mjs`。完整驗收執行 `node tools/test-runner.mjs`，不需 npm／build；CI 固定使用已驗證的 Node `22.14.0`。清單在 `test/manifest.json`，包含頂層驗收與根目錄 schema／分享／hull 腳本；helpers 僅供匯入，fixtures 與瀏覽器驗收不獨立當成 Node 腳本。
+
+Runner 依清單順序、每支獨立程序執行，任一失敗／例外／90 秒逾時會回傳非零 exit code；新增或刪除頂層測試須同步清單。完整 log 與 commit／環境／結果在 `output/acceptance/`，可用 `--output <目錄>` 指定位置，或重複 `--test test/<name>.mjs` 做定向驗收。PR 與每個分支 push 均跑同一清單；Pages 只在 main push 或手動 main 執行，且必須先通過同一 commit 的測試。UI 仍須在 HTTP 網站實際操作驗收。
 
 本批驗證範圍、證據與限制見 [第一批收尾紀錄](docs/CLOSEOUT-BATCH-1.md)。
 

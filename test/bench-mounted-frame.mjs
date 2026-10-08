@@ -4,6 +4,7 @@ import { S, B, Asm, ed, fresh, motor, near, solveAt, cnc, ex } from './_bench-se
 const BP = await import('../js/blocks/build-plan.js');
 const IF = await import('../js/blocks/interference.js');
 const Sch = await import('../js/blocks/schema.js');
+const Mates = await import('../js/blocks/mates.js');
 
 // ---------- 1. 同平面安裝的夾爪（裝在齒條滑台）→ 它的底板邊 ----------
 {
@@ -33,6 +34,31 @@ const Sch = await import('../js/blocks/schema.js');
   check('干涉檢查跑得動', Array.isArray(IF.findInterference({ comps: r.comps, modules: r.modules, params: P, plan, pose: { '1': 0, '2': 0, '3': 0 }, exportSettings: ex })));
   const mk = B.portMarkers(S.comps, S.modules, G2.id, s0.points, P, { zOf: () => 3 });
   check('接口標記包含已安裝模組的底板邊', mk.some(m => m.module === G.id && m.portId.startsWith('edge:frame:')));
+  // v1 曾直接保存外框線段索引。真正的長直邊 6/13 不能重新編成 0/1，
+  // 否則合法舊接法會換面。圓角小段 0 則需拒絕，不能靜默改接。
+  for (const k of [6,13]) {
+    const legacy = B.connect(S.comps, S.modules, G2.id, { module: G.id, port: `edge:frame:${k}` }, P, motor);
+    const saved = Sch.normalizeSnapshot(JSON.parse(JSON.stringify({ kind:'blocks',v:1,comps:legacy.comps,modules:legacy.modules,params:P })));
+    const stored = saved?.modules.find(m=>m.id===G2.id).mount;
+    const solved = saved && solveAt(saved.comps,saved.modules,saved.params,{'1':40});
+    const expected = Asm.moduleFrameEdges(legacy.comps,legacy.modules,G.id,P)[k];
+    const actual = saved && Asm.orthogonalHostEdge(saved.comps,saved.modules,stored,solved.points,saved.params,{home:true});
+    check(`舊直邊 ${k} 重開保留邊、材料端點及有效非零姿態`, legacy.ok && stored?.to.frame.edge===k && solved.isValid && actual && expected &&
+      near(actual.a.x,expected.a.x) && near(actual.a.y,expected.a.y) && near(actual.b.x,expected.b.x) && near(actual.b.y,expected.b.y));
+  }
+  check('舊圓角取樣段不得改接其他直邊', !B.connect(S.comps,S.modules,G2.id,{module:G.id,port:'edge:frame:0'},P,motor).ok);
+  const invalidLegacy = JSON.parse(JSON.stringify({kind:'blocks',v:1,comps:r.comps,modules:r.modules,params:P}));
+  invalidLegacy.modules.find(m=>m.id===G2.id).mount.to.frame.edge=0;
+  const invalidSaved=Sch.normalizeSnapshot(invalidLegacy);
+  const invalidSol=solveAt(invalidSaved.comps,invalidSaved.modules,invalidSaved.params);
+  check('舊圓角接法保留紀錄，但求解回報宿主失效', invalidSaved.modules.find(m=>m.id===G2.id).mount.to.frame.edge===0 &&
+    !invalidSol.isValid && invalidSol.perModule[G2.id]?.reason==='host-invalid');
+  const own = Mates.ownPorts(S.comps,S.modules,G.id,P);
+  const frameRefs = own.filter(p=>p.body?.kind==='frame').map(p=>({p,ref:Mates.portRef(p,own)}));
+  check('舊外法線參照往返仍解析原直邊', frameRefs.length===4 && frameRefs.every(({p,ref})=>
+    ref.order===0 && Mates.resolveRef(own,JSON.parse(JSON.stringify(ref)))?.id===p.id));
+  const arcNormal=(frameRefs[0].ref.normalDeg+8)%360;
+  check('舊圓角外法線參照失效，不猜成其他面', Mates.resolveRef(own,{kind:'frame',normalDeg:arcNormal,order:0})===null);
 }
 
 // ---------- 2. 直角安裝的夾爪 → 它的底板邊（在它自己的平面） ----------

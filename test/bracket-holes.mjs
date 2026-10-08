@@ -57,7 +57,8 @@ const nestedEditor = createModuleEditor({ pushUndo: () => {}, rebuild: () => {},
 nestedEditor.insertBuiltin('gear-gripper');
 const N = S.modules.find(m => m.id !== L.id && m.id !== G.id);
 const nestedComps = [...hang.comps, ...S.comps.filter(c => c.moduleId === N.id)];
-const nestedMount = B.connect(nestedComps, [...hang.modules, N], N.id, { module: G.id, port: 'edge:frame:0' }, P, motor, { joint: 'bracket-m3' });
+const nestedPort = B.autoPorts(nestedComps, [...hang.modules, N], G.id, P).find(p => p.body?.kind === 'frame');
+const nestedMount = B.connect(nestedComps, [...hang.modules, N], N.id, { module: G.id, port: nestedPort?.id }, P, motor, { joint: 'bracket-m3' });
 check('巢狀宿主測試透過正式接口安裝成功', nestedMount.ok === true);
 const nestedModules = nestedMount.modules;
 const connectedNestedComps = nestedMount.comps;

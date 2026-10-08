@@ -159,7 +159,7 @@ export function autoPorts(comps, modules, moduleId, params, opts = {}) {
         id: `edge:frame:${k}`, kind: 'edge', module: mid,
         body: { kind: 'frame', module: mid, edge: k }, side: sideOf(e),
         name: `機架・${edgeWordOfM(e.m)}`, lengthMm: e.lengthMm, suggested: false
-      }));
+      })).filter(Boolean);
       dedupeNames(group);
       ports.push(...group);
     }
@@ -169,7 +169,7 @@ export function autoPorts(comps, modules, moduleId, params, opts = {}) {
       id: `edge:frame:${k}`, kind: 'edge', module: mid,
       body: { kind: 'frame', module: mid, edge: k }, side: sideOf(e),
       name: `底板・${edgeWordOfM(e.m)}`, lengthMm: e.lengthMm, suggested: false
-    }));
+    })).filter(Boolean);
     dedupeNames(group);
     ports.push(...group);
   }
@@ -313,7 +313,7 @@ export function benchAdjust(comps, modules, moduleId, action, params, opts = {})
     if (!standing) return fail('請先選宿主的板面');
     const edge = Number(action.slice(11));
     const edges = moduleFrameEdges(list, modList, moduleId, params, { noOwnHoles: true });
-    if (!Number.isInteger(edge) || edge < 0 || edge >= edges.length) return fail('找不到這個底板邊面');
+    if (!Number.isInteger(edge) || !edges[edge]) return fail('找不到這個底板邊面');
     next = withOrient(orient, { childEdge: edge });
   } else if (action === 'face') {
     if (!standing) return fail('只有「立在面上」時才能換面；先按「立在面上」');
@@ -327,9 +327,10 @@ export function benchAdjust(comps, modules, moduleId, action, params, opts = {})
     next = withOrient(orient, { childAxisDeg: normalizeDeg(orient.childAxisDeg + 180) });
   } else if (action === 'rotate') {
     if (standing) {
-      const count = moduleFrameEdges(list, modList, moduleId, params, { noOwnHoles: true }).length;
-      if (count < 2) return fail('這個模組的底板只有一條邊，沒有別的站立邊可換');
-      next = withOrient(orient, { childEdge: ((Number.isInteger(orient.childEdge) ? orient.childEdge : 0) + 1) % count });
+      const edges = moduleFrameEdges(list, modList, moduleId, params, { noOwnHoles: true });
+      const keys = Object.keys(edges).map(Number);
+      if (keys.length < 2) return fail('這個模組的底板只有一條邊，沒有別的站立邊可換');
+      next = withOrient(orient, { childEdge: keys[(keys.indexOf(orient.childEdge) + 1) % keys.length] });
     } else next = withOrient(orient, { childAxisDeg: normalizeDeg(orient.childAxisDeg + 90) });
   } else if (['slide+', 'slide-', 'align-start', 'align-center', 'align-end'].includes(action)) {
     // C1：宿主可以是桿、三角板或機架板的邊；邊長取 lengthMm（桿＝求解用的桿長參數）。

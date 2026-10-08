@@ -5,9 +5,11 @@ import { toSnapshot } from '../js/blocks/schema.js';
 
 const [host, child] = fresh('fourbar-lift', 'gear-gripper');
 // 本測試走真正的組立控制器；畫面容器省略，只驗證快取及交易狀態。
+const created = [];
 globalThis.document = {
   getElementById: () => null, addEventListener() {},
-  createElement: () => ({ dataset: {}, style: {}, appendChild() {}, setAttribute() {}, addEventListener() {}, querySelector: () => null, querySelectorAll: () => [] })
+  createElement: () => { const el = { dataset: {}, style: {}, listeners: {}, appendChild() {}, remove() {}, setAttribute() {},
+    addEventListener(type, fn) { this.listeners[type] = fn; }, querySelector: () => null, querySelectorAll: () => [] }; created.push(el); return el; }
 };
 globalThis.localStorage = { getItem: () => '1', setItem() {} };   // 這支驗的是工程面板（進階）的預覽／保存流程；預設的接合精靈另有 test/browser/mate-wizard.py
 S.mode = 'bench'; S.undoStack = [];
@@ -21,6 +23,9 @@ const bench = createBench({
   getViewer: () => null, scheduleAutosave: () => saves++,
   interferenceArgs: () => { argsCalls++; return { comps: S.comps, modules: S.modules, params: S.topo.params, cnc: S.fabrication.cnc, exportSettings: S.fabrication.export, ranges: {} }; }
 });
+// 舊工程控制器仍保留相容能力，但已不讀 localStorage 偏好。明確啟動
+// 既有切換 handler；主流程精靈的候選交易由 browser/mate-wizard.py 驗收。
+created.find(el => el.id === 'mateAdvanced').listeners.click();
 bench.liveCheck();
 const initial = argsCalls;
 bench.liveCheck();

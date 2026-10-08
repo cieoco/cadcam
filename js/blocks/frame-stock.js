@@ -30,7 +30,7 @@ export function sizeFrameOutline(outlines, nodes) {
   // Both automatic and explicit sizes use the same regular outline. The natural
   // envelope already includes stock around the holes and motor features.
   const r=Math.min(2,lengthMm/4,widthMm/4);
-  const ring=[];
+  const ring=[], straightEdges=[];
   for (let corner=0;corner<4;corner++) {
     const angle=corner*Math.PI/2, sx=corner===0 || corner===3 ? 1 : -1, sy=corner<2 ? 1 : -1;
     for(let i=0;i<=6;i++) {const t=angle+i*Math.PI/12;
@@ -38,5 +38,16 @@ export function sizeFrameOutline(outlines, nodes) {
       ring.push({x:x*u.x+y*v.x,y:x*u.y+y*v.y});
     }
   }
-  return {outlines:[ring],dimensions,...(stock.thicknessMm ? {thicknessMm:stock.thicknessMm} : {})};
+  // Only the tangent-to-tangent spans are material straight edges. Arc samples
+  // remain in the export outline, but are not individual mounting interfaces.
+  for (let corner=0;corner<4;corner++) {
+    const a=ring[corner*7+6],b=ring[((corner+1)*7)%ring.length];
+    const lengthMm=Math.hypot(b.x-a.x,b.y-a.y);
+    if (lengthMm<=1e-6) continue;
+    const d={x:(b.x-a.x)/lengthMm,y:(b.y-a.y)/lengthMm};
+    // Keep the original outline-segment index: existing v1 mounts store 6/13/20/27.
+    // Empty arc slots are intentionally unavailable, never retargeted to a side.
+    straightEdges[corner*7+6]={a,b,d,m:{x:d.y,y:-d.x},lengthMm};
+  }
+  return {outlines:[ring],straightEdges,dimensions,...(stock.thicknessMm ? {thicknessMm:stock.thicknessMm} : {})};
 }

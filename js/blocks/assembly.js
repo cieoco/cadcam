@@ -553,7 +553,7 @@ export function defaultStandEdge(comps, modules, moduleId, params, opts = {}) {
     if (!c || c.moduleId !== moduleId) return;
     POINT_KEYS.forEach(k => { const p = c[k]; if (p && validPt(p)) pts.push(p); });
   });
-  if (!pts.length) return 0;
+  if (!pts.length) return Number(Object.keys(edges)[0]);
   let best = 0, bestMin = -Infinity;
   edges.forEach((e, i) => {
     const s = standFrameOfEdge(e);

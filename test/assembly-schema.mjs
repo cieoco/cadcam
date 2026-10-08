@@ -42,6 +42,8 @@ const acyclic = modules => modules.every(m => {
 {
   let bad = '';
   for (const ex of BLOCK_EXAMPLES) {
+    // 組立範例另走上面的模組往返契約；此段只驗證沒有模組的舊檔。
+    if (ex.snapshot.modules?.length) continue;
     const n = norm(ex.snapshot);
     if (!n) { bad ||= `${ex.id} 正規化失敗`; continue; }
     if (!Array.isArray(n.modules) || n.modules.length) bad ||= `${ex.id} modules 應為 []`;
@@ -50,7 +52,12 @@ const acyclic = modules => modules.every(m => {
     const without = toSnapshot(n.comps, { params: n.params }, n.counter, { activeMotor: n.activeMotor, motorAngles: n.motorAngles });
     if ('modules' in withEmpty || JSON.stringify(withEmpty) !== JSON.stringify(without)) bad ||= `${ex.id} 空 modules 改變了輸出`;
   }
-  check('所有範例：modules 為 []、無 moduleId、空 modules 不輸出且逐位元組相同', !bad, bad);
+  check('無模組範例：modules 為 []、無 moduleId、空 modules 不輸出且逐位元組相同', !bad, bad);
+  for (const ex of BLOCK_EXAMPLES.filter(e => e.snapshot.modules?.length)) {
+    const n = norm(ex.snapshot), back = n && norm(snapOf(n));
+    check(`${ex.id}：模組範例保存往返不變`, !!back && JSON.stringify(back.modules) === JSON.stringify(n.modules)
+      && JSON.stringify(back.comps) === JSON.stringify(n.comps));
+  }
   check('modules 不是陣列時當作 []', (() => { const n = norm({ ...fixture, modules: 'x', comps: fixture.comps.map(c => ({ ...c, moduleId: undefined })) }); return n && n.modules.length === 0; })());
 }
 

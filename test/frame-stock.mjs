@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { bracketFixture } from './fixtures/face-bracket-fixture.mjs';
 import { normalizeSnapshot } from '../js/blocks/schema.js';
 import { frameConnectorNodes } from '../js/blocks/model.js';
-import { inspectFrameExport, exportFrameAsSvg, exportFrameAsDxf } from '../js/blocks/exporters.js';
+import { inspectFrameExport, frameOutlineEdges, exportFrameAsSvg, exportFrameAsDxf } from '../js/blocks/exporters.js';
 import { buildMountSurfaces } from '../js/blocks/mount-surfaces.js';
 import { sizeFrameOutline, normalizeFrameStock } from '../js/blocks/frame-stock.js';
 import { buildSceneModel } from '../js/blocks3d/scene-model.js';
@@ -17,6 +17,14 @@ function rectangleSides(geometry) {
   for(let i=0;i<4;i++) assert.ok(Math.abs(sides[i].x*sides[(i+1)%4].x+sides[i].y*sides[(i+1)%4].y)<1e-5);
 }
 rectangleSides(original);
+const edges = frameOutlineEdges(frameConnectorNodes(comps), {});
+assert.deepEqual(Object.keys(edges).map(Number), [6,13,20,27], 'retain saved straight edge indices; arcs unavailable');
+for (const e of edges.filter(Boolean)) {
+  const ring = original.outlines[0];
+  const i = ring.findIndex(p => p.x === e.a.x && p.y === e.a.y);
+  assert.deepEqual(e.b, ring[(i + 1) % ring.length], 'straight span follows the material boundary');
+  assert.ok(e.lengthMm > 5);
+}
 for(const c of comps) c.p1.frameStock={lengthMm:180,widthMm:120,thicknessMm:6};
 const saved=normalizeSnapshot(JSON.parse(JSON.stringify(f)));
 const nodes=frameConnectorNodes(saved.comps.filter(c=>c.moduleId==='Child'));
@@ -38,6 +46,8 @@ assert.equal(normalizeFrameStock({lengthMm:NaN,widthMm:-1}),undefined);
 const diagonal=nodes.map(p=>({...p,x:(p.x-p.y)/Math.sqrt(2),y:(p.x+p.y)/Math.sqrt(2)}));
 const rotated=sizeFrameOutline(original.outlines.map(r=>r.map(p=>({x:(p.x-p.y)/Math.sqrt(2),y:(p.x+p.y)/Math.sqrt(2)}))),diagonal);
 assert.equal(rotated.dimensions.lengthMm,180);
+assert.equal(rotated.straightEdges.filter(Boolean).length,4);
+assert.ok(rotated.straightEdges.every(e=>Math.abs(e.d.x*e.m.x+e.d.y*e.m.y)<1e-10));
 const blobs=[];globalThis.document={createElement:()=>({click(){},remove(){}}),body:{appendChild(){}}};
 globalThis.URL.createObjectURL=b=>{blobs.push(b);return 'blob:test';};globalThis.URL.revokeObjectURL=()=>{};
 exportFrameAsSvg(nodes,{});exportFrameAsDxf(nodes,{});
