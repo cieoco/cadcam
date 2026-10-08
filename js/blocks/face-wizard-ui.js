@@ -1,4 +1,6 @@
 import { APP_VERSION } from '../version.js?v=20261008_bracketalign';
+import { LOAD_GRAPH_TOKEN } from '../module-url.js';
+import { createLoadSession, LOAD_MISMATCH_MESSAGE } from './load-session.js';
 import { faceBracketPlan } from './face-bracket-extras.js';
 import { planFaceBrackets } from './face-bracket-geometry.js?v=20261008_bracketalign';
 /** 正式組立台的隔離選面草稿。確認前不改作品。 */
@@ -70,9 +72,11 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   const close = document.createElement('button'); close.textContent = '關閉'; close.setAttribute('aria-label', '關閉組立精靈');
   close.style.cssText = 'height:44px;min-width:64px;float:right;';
   const frame = document.createElement('iframe'); frame.title = '選面與尺寸';
+  const loadSession = createLoadSession(LOAD_GRAPH_TOKEN);
   const frameUrl = new URL('../../assembly-wizard-prototype.html', import.meta.url);
   frameUrl.searchParams.set('integrated', '1');
   frameUrl.searchParams.set('v', APP_VERSION);
+  frameUrl.searchParams.set('load', LOAD_GRAPH_TOKEN);
   frame.src = frameUrl.href;
   frame.style.cssText = 'width:100%;height:calc(100% - 44px);border:0;display:block;';
   dialog.append(close, frame); document.body.append(dialog);
@@ -80,9 +84,17 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   close.addEventListener('click', () => dialog.close()); dialog.addEventListener('close', dispose);
   function receive(e) {
     if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
-    if (e.data?.type === 'face-wizard-ready') frame.contentWindow.postMessage({ type: 'face-wizard-init', startAtPlacement, hosts: hosts.map(h => ({ ...h, defaultFace: connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, configured: !!childSelection, mode: wizard || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
     if (e.data?.type === 'face-wizard-cancel') { dialog.close(); return; }
+    const rejectLoad = () => {
+      say(LOAD_MISMATCH_MESSAGE);
+      frame.contentWindow.postMessage({type:'face-wizard-error',loadMismatch:true,reason:LOAD_MISMATCH_MESSAGE},location.origin);
+    };
+    if (e.data?.type === 'face-wizard-ready') {
+      if (!loadSession.receiveReady(e.data.loadGraph)) { rejectLoad(); return; }
+      frame.contentWindow.postMessage({ type: 'face-wizard-init', loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement, hosts: hosts.map(h => ({ ...h, defaultFace: connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, configured: !!childSelection, mode: wizard || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
+    }
     if (e.data?.type !== 'face-wizard-confirm') return;
+    if (!loadSession.allowConfirm(e.data.loadGraph)) { rejectLoad(); return; }
     if (!isCurrent()) { dialog.close(); say('作品已變動，請重新選擇接法。'); return; }
     const selection = e.data.selection;
     if (!selection || !Number.isInteger(selection.host) || selection.host < 0 || selection.host >= hosts.length || selection.child !== 0) return;

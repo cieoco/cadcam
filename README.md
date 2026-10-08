@@ -97,6 +97,18 @@ Node 22 以上可直接執行 `node test/<name>.mjs`；例如 `node test/slider-
 
 Runner 依清單順序、每支獨立程序執行，任一失敗／例外／90 秒逾時會回傳非零 exit code；新增或刪除頂層測試須同步清單。完整 log 與 commit／環境／結果在 `output/acceptance/`，可用 `--output <目錄>` 指定位置，或重複 `--test test/<name>.mjs` 做定向驗收。PR 與每個分支 push 均跑同一清單；Pages 只在 main push 或手動 main 執行，且必須先通過同一 commit 的測試。UI 仍須在 HTTP 網站實際操作驗收。
 
+blocks 主頁、組立精靈與相關測試 HTML 的 import map／入口版本由 `tools/load-graph.mjs` 產生。修改載入圖中的 JS、HTML，或新增 blocks／blocks3d 模組、測試 HTML 後，依序執行：
+
+```bash
+node tools/load-graph.mjs
+node tools/load-graph.mjs --check
+node tools/test-runner.mjs
+```
+
+生成區塊與 `js/load-graph.js`／`js/load-graph.json` 應一併提交；不要手改 import map。CI 先執行 `--check`，缺檔、重複 map 或過期生成會阻擋驗收。版本來自整張圖的內容 hash，queryless 與既有 `?v=` import 均導向同一模組；`three` 裸 specifier 也包含在圖中。模組 import 限靜態字串（動態 `import('…')` 可帶 options），computed import 會被拒絕；模組 import 的非 `v` query／fragment 也會被拒絕，以免產生另一個 state 單例。程式建立 module script 時使用 `moduleEntryUrl(specifier, import.meta.url)`，其他入口 query／fragment 仍保留。新測試頁放在 `test/` 頂層並使用 module script 即可被納入。
+
+整圖 token 與 UI 發布版本分開：badge 仍由 `js/version-info.js` 管理，施工期間不自動增加。主頁與 iframe 的 ready／init／confirm 會核對整圖 token，異批載入時提示重新整理並拒絕確認。舊版 `mechanism.html` 維持凍結，不納入這張圖。
+
 本批驗證範圍、證據與限制見 [第一批收尾紀錄](docs/CLOSEOUT-BATCH-1.md)。
 
 ### 舊版 Engine Facade 架構（歷史查考）

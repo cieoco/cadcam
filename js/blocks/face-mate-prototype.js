@@ -1,3 +1,5 @@
+import { LOAD_GRAPH_TOKEN } from '../module-url.js';
+import { createLoadSession, LOAD_MISMATCH_MESSAGE } from './load-session.js';
 import { autoFitFaces } from './face-auto-fit.js?v=20261008_bracket3d';
 import { planFaceBrackets, FACE_BRACKET_SPEC } from './face-bracket-geometry.js?v=20261008_bracket3d';
 import { bracketLayout } from './bracket-layout.js';
@@ -11,6 +13,7 @@ const names = { top: '上面', bottom: '下面', front: '前面', back: '後面'
 const symbols = { top: '↑', bottom: '↓', front: '●', back: '○', left: '←', right: '→' };
 const faceOrder = ['top', 'bottom', 'front', 'back', 'left', 'right'];
 const integrated = new URLSearchParams(location.search).get('integrated') === '1';
+const loadSession = createLoadSession(LOAD_GRAPH_TOKEN);
 let { hosts, children } = realMountExamples();
 const initial = { host: 0, child: 0, hostFace: 'top', childFace: 'bottom', alignU: 0, alignV: 0, offsetU: 0, offsetV: 0, gap: 0, quarterTurns: 0 };
 let draft = { ...initial }, saved = { ...initial }, step = 0;
@@ -158,7 +161,10 @@ $('next').addEventListener('click', () => {
   if (!solve().ok) return;
   if (bracketPlan?.ok) draft.brackets = { enabled: true, offsets: { ...bracketOffsets }, childPart: children[draft.child].surface?.compId || 'frame' };
   else delete draft.brackets;
-  if (integrated) { parent.postMessage({ type: 'face-wizard-confirm', selection: { ...draft } }, location.origin); return; }
+  if (integrated) {
+    if (!loadSession.allowConfirm(LOAD_GRAPH_TOKEN)) { $('message').textContent = LOAD_MISMATCH_MESSAGE; return; }
+    parent.postMessage({ type: 'face-wizard-confirm', loadGraph: LOAD_GRAPH_TOKEN, selection: { ...draft } }, location.origin); return;
+  }
   saved = { ...draft }; hasConfirmed = true; render();
   const placement = buildFacePlacement({ host: hosts[saved.host], child: children[saved.child], selection: saved });
   $('placementRecord').hidden = !placement.ok;
@@ -385,7 +391,7 @@ function preview() {
   $('mateGapChip').textContent = dimensionText.gap(Number(draft.gap.toFixed(2)));
   $('mateStepChip').textContent = dimensionText.moveStep(moveStep);
   $('summary').textContent = `${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
-  const mate = solve(); $('next').disabled = !mate.ok || !!document.querySelector('input[aria-invalid="true"]');
+  const mate = solve(); $('next').disabled = !mate.ok || (integrated && !loadSession.ready) || !!document.querySelector('input[aria-invalid="true"]');
   if (mate.ok) scene(mate);
   else { $('mateOverlay').hidden = true; $('message').textContent = mate.reason; $('message').classList.add('error'); }
 }
@@ -393,8 +399,12 @@ if (integrated) {
   document.querySelector('header .tag').textContent = '選接合面，設定尺寸，再確認組立';
   window.addEventListener('message', e => {
     if (e.source !== parent || e.origin !== location.origin) return;
-    if (e.data?.type === 'face-wizard-error') { $('message').textContent = e.data.reason; return; }
+    if (e.data?.type === 'face-wizard-error') {
+      if (e.data.loadMismatch) { loadSession.receiveReady(null); $('next').disabled = true; }
+      $('message').textContent = e.data.reason; return;
+    }
     if (e.data?.type !== 'face-wizard-init') return;
+    if (!loadSession.receiveReady(e.data.loadGraph)) { $('message').textContent = LOAD_MISMATCH_MESSAGE; $('next').disabled = true; return; }
     if (!Array.isArray(e.data.hosts) || !e.data.hosts.length || !Array.isArray(e.data.children) || !e.data.children.length) return;
     mode = 'wizard';
     hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; configured = !!e.data.configured; roughPlaced = configured;
@@ -409,7 +419,7 @@ if (integrated) {
     $('hosts').replaceChildren(); $('children').replaceChildren();
     buildCards($('hosts'), hosts, 'host'); buildCards($('children'), children, 'child'); render();
   });
-  parent.postMessage({ type: 'face-wizard-ready' }, location.origin);
+  parent.postMessage({ type: 'face-wizard-ready', loadGraph: LOAD_GRAPH_TOKEN }, location.origin);
 }
 window.addEventListener('resize', () => { if (!$('mateOverlay').hidden) preview(); });
 render();

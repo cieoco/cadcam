@@ -9,15 +9,15 @@
 - 本機：Windows、Node `v25.2.0`、Python `3.13.5`。CI 的 Node 版本在 W1 固定並驗證。
 - 使用者原有未追蹤附件、`Claude outputs/`、截圖及框架檢討文件保留。提交只選本包檔案。
 - Astra 僅 low；更高推理強度須另獲確認。主聊天不宣稱自行切換模型。
-- 實體手機尚未連線／量測；桌面手機尺寸驗收不代表實機效能通過。W6 必須補足或取得明確範圍調整。
+- 實體手機候選品牌為 OPPO，確切型號／SoC 尚未提供，尚未連線／量測；桌面手機尺寸驗收不代表實機效能通過。W6 必須補足或取得明確範圍調整。
 
 ## 工作包
 
 | ID | 狀態 | 本輪結果與下一步 |
 | --- | --- | --- |
 | W0 | reproducing | 重新登錄並執行測試；核對 D1 端點保存能力與教材缺口 |
-| W1 | verifying | 九項失敗完成分類／修正；Node 22.14.0 全套 143/143；HTTP 瀏覽器驗收由主代理補核 |
-| W2 | planned | 統一載入版本與 check |
+| W1 | done | 九項失敗完成分類／修正；Node 22.14.0 全套 143/143；cold HTTP 通過，舊快取混載轉 W2 修復 |
+| W2 | done | 120 模組／15 頁同圖生成與 CI check；主頁／iframe 握手拒絕異批確認；Node 22.14.0 全套 144/144 與 HTTP 通過 |
 | W3a–W5a／G1 | planned | F1 端點、實體、干涉、預覽、保存與輸出貫通 |
 | W3b–W5b | planned | 其餘格式、多接合位置、教材與效能 |
 | W6 | planned | 全面驗收、提交推送與發布核對 |
@@ -64,7 +64,7 @@
 
 - 使用者已批准後續 W3 加可選 `mount.face.childPart`，保留 `blocks v1`；舊資料端點歧義時保留姿態並提示重選，不從目前 faceParts 猜 child 零件。
 - 使用者已批准六面宿主底板沿用既有 `mount.to.frame` 形狀。兩項由主代理在 W3 施工；W1 未修改 schema 或持久化契約。
-- 原附件 `C:/Users/user/Downloads/blocks (13).json` 可用：14 零件、Mod9 四連桿＋Mod7 夾爪、宿主 4 mm／子板 3 mm、90°／三個角碼；原附件不提交。
+- 使用者原始組立附件可用（僅本機）：14 零件、Mod9 四連桿＋Mod7 夾爪、宿主 4 mm／子板 3 mm、90°／三個角碼；原附件不提交。
 - 主代理 HTTP 基準（127.0.0.1:8010）已看到練習範例 main／iframe 都為版本13、單一精靈可開，但教材仍指示已不存在的工程入口；教材缺口歸 W5b。
 
 ### W1 回交 checkpoint
@@ -73,3 +73,20 @@
 - 提交後跑同清單，結果留 `output/framework-stabilization/w1-committed-node22/`，其中 commit 欄位為驗證對象；最後 commit 由交棒訊息附上，避免文件自指 commit hash。
 - 回交後唯一寫入者恢復 `/root`；下一步 W1 HTTP 補核、W2 載入一致。長期純幾何來源共用與 D1 欄位是後續包，未以本包測試通過宣稱全案完工。
 - 本包模型用量沒有可取得的精確 token；一次施工子任務、零再委派、Sol high；測試與工具結果均 file-backed，未虛報 token。
+
+### W1 HTTP 補核／W2 問題重現
+
+- W1 提交 `49dabcd` 後同清單 143/143，`w1-committed-node22/results.json` 記錄該 commit、trackedChanges=false。
+- 主代理在 fresh `localhost:8010` 載入組立練習並開組立台通過；原 `127.0.0.1:8010` 一般 reload 卻混用舊 bench 與新 frame-stock，mates ownPorts 遇到 undefined，清單／預覽空白。這是實際載入回歸，不能以 Node 或 fresh origin 通過抵銷；轉入 W2 修復。
+
+### W2 / L–O–O–P：統一載入圖
+
+- 唯一寫入者 `w1_safety`（Sol high），起點 `49dabcd`；主代理只讀 HTTP 審閱，未新增寫入者。mechanism 凍結、作品 schema／solver／發布版本均未改。
+- `tools/load-graph.mjs` 追蹤 blocks／blocks3d 與實際依賴、root 教材／版本入口、test 頂層 module HTML，共 120 模組／15 頁。literal static import、re-export、dynamic import（含 options）、原始帶 query alias、queryless、`three` 均由同圖內容 hash 產生；相關 HTML 的入口 src 直接版本化。生成區塊、入口版本與 token 檔先 normalize 再 hash，重複生成穩定，CRLF／LF 不改 token。
+- 移除各頁手工 import map，提交生成區塊及 `js/load-graph.js`／`.json`；根目錄與 test 相對路徑適用 Pages 子目錄。src／type 屬性順序不影響入口重寫；程式建立 module script 的 `moduleEntryUrl` 保留其他 query／fragment，只更新 `v`。新增 source／query alias 使過期 check 失敗，CI 先 check 再 suite。
+- module import 非 `v` query／fragment 明確拒絕，避免不同 state instance；computed import 也明確拒絕，不把首字串誤當完整 literal。這是目前純靜態圖的限制，README 明列後續 regeneration → check → suite 維護步驟。
+- 主頁與 iframe 的 ready／init／confirm 攜带實際 `LOAD_GRAPH_TOKEN`；握手未完成／缺 token／異批時拒絕確認並提示重新整理。iframe URL 的 load 參數只供追溯，不能保證 server 資產不可變，真正判斷採双方載入模組 token。畫面 badge 仍由原 `APP_VERSION` 顯示13。
+- 新 `test/load-graph.mjs` 驗缺生成／缺來源／重複區塊／衝突 map／過期圖／新檔／新 query alias，驗 scanner comments／strings／regex／template／computed，驗 src 屬性排序與 query 保留。VM 評估真實 state 與 geometry：不同 queryless／canonical state specifier 共用同一 S，既有 geometry query alias 共用同一 function。真實主頁 receiver 正例可 commit，無握手／異批負例零 commit且草稿未改作品。
+- Node 22.14.0 完整 manifest 144/144：`output/framework-stabilization/w2-verified-node22/results.json`（49dabcd＋本包 tracked changes）；actionlint 1.7.7 無診斷。完整 gate 後只移除舊 map 留下的空白尾空格並更新生成 token，功能 JS 未改；提交後再跑 check 與 load-graph 定向，結果留 `w2-committed-node22/`，不把 dirty 全套結果說成 clean commit 全套。
+- 主代理 HTTP：原出錯 origin 一般 reload 後組立清單／接合預覽恢復；精靈下一步至選承接面正常，主頁與 iframe 實際圖 token 相同、badge 都13、無新 console error。fresh standalone wizard cold pass，step1 按鈕可用、無 warn／error。完整操作 token `1543946e0a225d0fb953`；空白整理後 `a1d3221aaa84109625f8` 再 reload 抽核同圖且 next enabled。最後只移除另一行舊 map 留下的尾空格，提交 token 為 `ab04050dbe2bab318832`，功能來源相同。
+- 回交 checkpoint：本地 scoped commit，不 push／merge／deploy；下一寫入者由主代理交給 endpoint_audit 施工 W3a。後續 source 或選定 HTML 變更先 regenerate，再 check、suite；正式 Linux CI／部署 SHA 與 OPPO 實機效能仍待 W6，不宣稱全案完成。

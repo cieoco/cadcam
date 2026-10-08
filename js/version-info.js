@@ -1,4 +1,4 @@
-// 發布時更新版本與紀錄，並同步各 HTML 的 script 版本參數。
+// 發布時更新版本與紀錄，再執行 node tools/load-graph.mjs 同步 HTML 載入圖。
 import { APP_VERSION as version } from './version.js?v=20261008_bracketalign';
 const releases = [
   ['2026.10.08.13', '2026-10-08', ['修正設計姿態與求解姿態不同時角碼偏離板孔；角碼兩翼隨板材同步貼合與對孔，既有六面接合存檔亦適用。']],

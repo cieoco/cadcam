@@ -93,6 +93,7 @@
     "test/joint-profile.mjs",
     "test/link-length-audit.mjs",
     "test/live-interference-status.mjs",
+    "test/load-graph.mjs",
     "test/mate-connect.mjs",
     "test/mate-multi.mjs",
     "test/mates-view.mjs",

@@ -30,7 +30,9 @@ jobs:
         with:
           node-version: '22.14.0'
       - name: Acceptance suite (zero npm)
-        run: node tools/test-runner.mjs
+        run: |
+          node tools/load-graph.mjs --check
+          node tools/test-runner.mjs
       - name: Preserve acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4
