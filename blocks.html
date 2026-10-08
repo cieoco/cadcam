@@ -658,8 +658,8 @@
     "./js/blocks/build-plan.js": "./js/blocks/build-plan.js?v=20261008_fusion",
     "./js/blocks/build-plan.js?v=20261007_7": "./js/blocks/build-plan.js?v=20261008_fusion",
     "./js/blocks/face-mount-refresh.js": "./js/blocks/face-mount-refresh.js?v=20261008_fusion",
-    "./js/blocks/face-wizard-ui.js": "./js/blocks/face-wizard-ui.js?v=20261008_fusion",
-    "./js/blocks/face-wizard-ui.js?v=20261007_singleface": "./js/blocks/face-wizard-ui.js?v=20261008_fusion",
+    "./js/blocks/face-wizard-ui.js": "./js/blocks/face-wizard-ui.js?v=20261008_mobilelabels",
+    "./js/blocks/face-wizard-ui.js?v=20261007_singleface": "./js/blocks/face-wizard-ui.js?v=20261008_mobilelabels",
     "./js/blocks/mate-wizard-ui.js": "./js/blocks/mate-wizard-ui.js?v=20261008_fusion",
     "./js/blocks/mate-wizard-ui.js?v=20261008_brackets": "./js/blocks/mate-wizard-ui.js?v=20261008_fusion",
     "./js/blocks/module-plates.js": "./js/blocks/module-plates.js?v=20261008_fusion",
@@ -712,7 +712,7 @@
     "./js/blocks/module-drag.js": "./js/blocks/module-drag.js?v=20260930_d9",
     "./js/blocks3d/viewer.js": "./js/blocks3d/viewer.js?v=20261007_m4b",
     "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261003_g2",
-    "./js/blocks/app.js": "./js/blocks/app.js?v=20261008_fusion",
+    "./js/blocks/app.js": "./js/blocks/app.js?v=20261008_mobilelabels",
     "./js/blocks/model.js": "./js/blocks/model.js?v=20261008_fusion",
     "./js/blocks/exporters.js?v=20261007_9": "./js/blocks/exporters.js?v=20261008_fusion",
     "./js/blocks/exporters.js?v=20261007_7": "./js/blocks/exporters.js?v=20261008_fusion",
@@ -1209,7 +1209,7 @@
 
   <div class="mobile-panel" aria-label="手機工具面板">
     <div class="mobile-panel-section" data-panel="edit">
-      <span class="mobile-panel-title">編輯</span>
+      <span class="mobile-panel-title">調整</span>
       <button class="tool-btn" onclick="window.blocks.fitView()" title="置中畫布">⊡ 置中</button>
       <button class="tool-btn" onclick="window.blocks.undo()" title="復原上一步">↩ 復原</button>
       <button class="tool-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除選取零件">🗑 刪除選取</button>
@@ -1274,10 +1274,10 @@
 
   <nav class="mobile-tabs" aria-label="手機模式切換">
     <button class="mobile-tab active" data-tab="build" onclick="window.blocks.setMobilePanel('build')" type="button">
-      <span class="mt-ico">▦</span><span>建構</span>
+      <span class="mt-ico">▦</span><span>新增</span>
     </button>
     <button class="mobile-tab" data-tab="edit" onclick="window.blocks.setMobilePanel('edit')" type="button">
-      <span class="mt-ico">✎</span><span>編輯</span>
+      <span class="mt-ico">✎</span><span>調整</span>
     </button>
     <button class="mobile-tab" data-tab="view" onclick="window.blocks.setMobilePanel('view')" type="button">
       <span class="mt-ico">◉</span><span>視圖</span>
@@ -1289,7 +1289,7 @@
 
   <!-- 同一份共用模組只載入一個版本；避免重載時混用舊幾何或舊存檔 schema。 -->
 
-  <script type="module" src="js/blocks/app.js?v=20261008_fusion"></script>
-<script type="module" src="js/version-info.js?v=20261008_fusion"></script>
+  <script type="module" src="js/blocks/app.js?v=20261008_mobilelabels"></script>
+<script type="module" src="js/version-info.js?v=20261008_mobilelabels"></script>
 </body>
 </html>
