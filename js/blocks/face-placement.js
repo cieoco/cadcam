@@ -1,4 +1,4 @@
-import { normalizeBracketSelection } from './face-bracket-geometry.js?v=20261008_edgefit';
+import { normalizeBracketSelection } from './face-bracket-geometry.js?v=20261008_bracket3d';
 /** 接合板擺放記錄；不把未支援的 3D 姿態寫成舊 mount。 */
 import { solveFaceMate } from './face-mate.js';
 

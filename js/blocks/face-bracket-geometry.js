@@ -76,7 +76,7 @@ export function planFaceBrackets(host, child, transform, offsets={}, allowRevers
         hostHoles:reverse.childHoles,childHoles:reverse.hostHoles,
         brackets:reverse.brackets.map(b=>({...b,corner:world(b.corner),
           hostHole:b.childHole,childHole:b.hostHole,childHoleWorld:world(b.hostHole),
-          wings:b.wings.map(r=>r.map(world))}))};
+          wings:[...b.wings].reverse().map(r=>r.map(world))}))};
     }
     return fail('兩板未貼齊或互相穿入；請調整接合位置與間距');
   }

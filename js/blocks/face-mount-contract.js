@@ -1,4 +1,4 @@
-import { normalizeBracketSelection } from './face-bracket-geometry.js?v=20261008_edgefit';
+import { normalizeBracketSelection } from './face-bracket-geometry.js?v=20261008_bracket3d';
 /** Pure validation for the persisted six-face module mount contract. */
 const FACE_IDS = new Set(['right', 'left', 'front', 'back', 'top', 'bottom']);
 const SELECT_KEYS = ['hostFace', 'childFace', 'alignU', 'alignV', 'offsetU', 'offsetV', 'gap', 'quarterTurns'];

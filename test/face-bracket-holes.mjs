@@ -1,3 +1,4 @@
+import { buildOrthogonalChildren, applyMatrix4 } from '../js/blocks3d/orthogonal-3d.js';
 import assert from 'node:assert/strict';
 import { bracketFixture } from './fixtures/face-bracket-fixture.mjs';
 import { buildMountSurfaces } from '../js/blocks/mount-surfaces.js';
@@ -26,6 +27,17 @@ assert.equal(drilling.childHoles.length,3);
 const mounted=mountFacePlacement(f.comps,f.modules,'Child',{hostId:'Host',outputId:'plate',face},f.params);
 assert.equal(mounted.ok,true,mounted.reason);
 f.modules[1].mount=mounted.mount;
+const scene=buildOrthogonalChildren({comps:f.comps,modules:f.modules,params:f.params,
+  inputs:{pts:pointCoords(f.comps)},mainModel:{sticks:[{id:'HostBar',z:12}]},
+  plates:[{moduleId:'Child',plane:'Child',thicknessMm:3}],
+  buildModel:()=>({gears:[{id:'Anchor0',z:0}]})})[0];
+assert.equal(scene.brackets.length,6,'confirmed face joint renders both wings of all three brackets');
+for(let i=0;i<drilling.childHoles.length;i++) {
+  const p=applyMatrix4(scene.matrix,{...drilling.childHoles[i],z:-1.5});
+  const hole=scene.brackets[i*2+1].hole,delta={x:p.x-hole.center.x,y:p.y-hole.center.y,z:p.z-hole.center.z};
+  for(const axis of scene.brackets[i*2+1].axes.slice(0,2))assert.ok(Math.abs(delta.x*axis.x+delta.y*axis.y+delta.z*axis.z)<1e-6,'scene bracket hole and child stock hole remain coaxial after layer transform');
+}
+
 assert.equal(faceBracketStatus(f.comps,f.modules,f.params,f.modules[1]).fixed,true);
 const unconfirmed=structuredClone(f.modules[1]);delete unconfirmed.mount.face.selection.brackets;
 const prior=JSON.stringify(unconfirmed);

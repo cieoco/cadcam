@@ -1,5 +1,5 @@
-import { autoFitFaces } from './face-auto-fit.js?v=20261008_edgefit';
-import { planFaceBrackets, FACE_BRACKET_SPEC } from './face-bracket-geometry.js?v=20261008_edgefit';
+import { autoFitFaces } from './face-auto-fit.js?v=20261008_bracket3d';
+import { planFaceBrackets, FACE_BRACKET_SPEC } from './face-bracket-geometry.js?v=20261008_bracket3d';
 import { bracketLayout } from './bracket-layout.js';
 /** 六面體組立操作原型；獨立記憶體草稿，不讀寫 blocks 作品。 */
 import { boxFaces, solveFaceMate, transformMatePoint } from './face-mate.js';

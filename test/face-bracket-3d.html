@@ -1,5 +1,4 @@
-<!doctype html><html lang="zh-Hant"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>角碼固定孔驗收</title>
-<style>body{font:16px system-ui;margin:16px;background:#f3f7f5;color:#24423b}button{padding:12px;margin:4px;border:1px solid #acc8bf;border-radius:9px;background:white}svg{width:100%;height:190px;background:white;border-radius:12px}h2{font-size:18px}</style>
+<!doctype html><meta charset="utf-8"><title>角碼與板孔同軸驗證</title>
 <script type="importmap">
 {
   "imports": {
@@ -66,7 +65,7 @@
     "../js/blocks/module-drag.js": "../js/blocks/module-drag.js?v=20260930_d9",
     "../js/blocks3d/viewer.js": "../js/blocks3d/viewer.js?v=20261007_m4b",
     "../js/blocks3d/orthogonal-3d.js": "../js/blocks3d/orthogonal-3d.js?v=20261008_bracket3d",
-    "../js/blocks/app.js": "../js/blocks/app.js?v=20261008_fusion",
+    "../js/blocks/app.js": "../js/blocks/app.js?v=20261008_bracket3d",
     "../js/blocks/model.js": "../js/blocks/model.js?v=20261008_fusion",
     "../js/blocks/exporters.js?v=20261007_9": "../js/blocks/exporters.js?v=20261008_fusion",
     "../js/blocks/exporters.js?v=20261007_7": "../js/blocks/exporters.js?v=20261008_fusion",
@@ -79,27 +78,20 @@
     "../js/blocks/face-bracket-extras.js": "../js/blocks/face-bracket-extras.js?v=20261008_bracket3d"
   }
 }
-</script><h1>角碼固定孔驗收</h1><p>使用獨立測試板件，不修改您的作品。</p><button id="open">組立並生成孔位</button><button id="restore" disabled>存檔還原驗證</button><p id="status">尚未開孔</p><div id="parts"></div>
+</script>
+<style>body{margin:0;background:#101521;color:#eee;font:16px sans-serif}#view{height:80vh}h1,p{margin:12px}</style>
+<h1>直角接合：角碼與板孔</h1><p id="status"></p><div id="view"></div>
 <script type="module">
-import {bracketFixture} from './fixtures/face-bracket-fixture.mjs';
-import {openFaceWizard} from '../js/blocks/face-wizard-ui.js';
-import {orthogonalExportExtras,withAdapterNodes} from '../js/blocks/orthogonal-joint.js';
-import {inspectLinkExport,inspectFrameExport} from '../js/blocks/exporters.js';
-import {frameConnectorNodes} from '../js/blocks/model.js';
-import {normalizeSnapshot} from '../js/blocks/schema.js?v=20261007_singleface';
-let f=bracketFixture();
-const $=id=>document.getElementById(id);
-function show(){
- const extras=orthogonalExportExtras(f.comps,f.modules,f.params,{stockMm:3});
- const a=extras.linkHoles.HostBar || [],b=extras.frameNodes.Child || [];
- $('status').textContent=`${f.modules[1].mount ? '接合已保存 · ' : ''}承接桿 ${a.length} 孔 · 直立底板 ${b.length} 孔（Ø3.2 mm）`;
- const geometries=[['承接桿',inspectLinkExport(f.comps[0],120,{},a)],['直立底板',inspectFrameExport(withAdapterNodes('Child',frameConnectorNodes(f.comps.filter(c=>c.moduleId==='Child')),extras),{})]];
- $('parts').replaceChildren();
- for(const [name,g] of geometries){const h=document.createElement('h2');h.textContent=name;$('parts').append(h);const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','-80 -70 250 150');
- for(const ring of g.outlines){const p=document.createElementNS(svg.namespaceURI,'polygon');p.setAttribute('points',ring.map(p=>`${p.x},${-p.y}`).join(' '));p.setAttribute('fill','#e1e8e5');p.setAttribute('stroke','#477867');svg.append(p);}
- for(const hole of g.holes){const c=document.createElementNS(svg.namespaceURI,'circle');c.setAttribute('cx',hole.x);c.setAttribute('cy',-hole.y);c.setAttribute('r',hole.r);c.setAttribute('fill',hole.layer==='ADAPTER_HOLE'?'#df9122':'white');svg.append(c);}$('parts').append(svg);}
-}
-$('open').onclick=()=>{const initialMount=f.modules[1].mount || {face:{selection:{hostFace:location.search==='?reverse'?'back':'top',childFace:location.search==='?reverse'?'top':'back',alignU:0,alignV:0,offsetU:0,offsetV:0,gap:0,quarterTurns:location.search==='?reverse'?3:0}}};openFaceWizard({...f,modules:f.modules.map(m=>({...m,mount:null})),childId:'Child',stockMm:3,exportSettings:{},wizard:true,initialMount,isCurrent:()=>true,say:text=>$('status').textContent=text,commit:r=>{f={...f,...r};$('restore').disabled=false;show();}});};
-$('restore').onclick=()=>{f=normalizeSnapshot(JSON.parse(JSON.stringify(f)));show();$('status').textContent+=' · 存檔還原成功';};
-show();
-</script></html>
+import {createViewer} from '../js/blocks3d/viewer.js';
+import {solveFaceMate} from '../js/blocks/face-mate.js';
+import {planFaceBrackets} from '../js/blocks/face-bracket-geometry.js?v=20261008_bracket3d';
+import {faceBracketBoxes} from '../js/blocks3d/face-brackets.js';
+const plate={box:{min:{x:-30,y:-20,z:-1.5},max:{x:30,y:20,z:1.5}},outlines:[[{x:-30,y:-20},{x:30,y:-20},{x:30,y:20},{x:-30,y:20}]]};
+const mate=solveFaceMate({hostBox:plate.box,childBox:plate.box,hostFace:'front',childFace:'bottom'});
+const plan=planFaceBrackets(plate,plate,mate),R=mate.rotation,T=mate.translation;
+const model=holes=>({sticks:[],pins:[],bounds:{minX:-50,maxX:50,minY:-50,maxY:50},frame:{outlines:plate.outlines,holes,thickness:3,z:-1.5}});
+const root=model(plan.hostHoles);root.brackets=faceBracketBoxes(plan);
+root.orthogonal=[{id:'child',matrix:[R[0][0],R[1][0],R[2][0],0,R[0][1],R[1][1],R[2][1],0,R[0][2],R[1][2],R[2][2],0,T.x,T.y,T.z,1],model:model(plan.childHoles)}];
+createViewer(document.querySelector('#view')).update(root);
+document.querySelector('#status').textContent=plan.ok?`${plan.brackets.length} 顆角碼，兩板與角碼使用同一組孔軸；可拖曳旋轉檢查。`:plan.reason;
+</script>

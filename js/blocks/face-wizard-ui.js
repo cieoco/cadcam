@@ -1,6 +1,6 @@
-import { APP_VERSION } from '../version.js?v=20261008_edgefit';
+import { APP_VERSION } from '../version.js?v=20261008_bracket3d';
 import { faceBracketPlan } from './face-bracket-extras.js';
-import { planFaceBrackets } from './face-bracket-geometry.js?v=20261008_edgefit';
+import { planFaceBrackets } from './face-bracket-geometry.js?v=20261008_bracket3d';
 /** 正式組立台的隔離選面草稿。確認前不改作品。 */
 import { buildMountSurfaces } from './mount-surfaces.js';
 import { buildFacePlacement } from './face-placement.js';

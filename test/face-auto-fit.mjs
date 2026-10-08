@@ -27,3 +27,13 @@ for(const b of drilling.brackets){
  const world=transformMatePoint(fitted.mate,b.childHole);
  for(const k of ['x','y','z'])assert.ok(Math.abs(world[k]-b.childHoleWorld[k])<1e-6,'reverse drilling coordinates must agree');
 }
+import { faceBracketBoxes } from '../js/blocks3d/face-brackets.js';
+const boxes=faceBracketBoxes(drilling);
+assert.equal(boxes.length,drilling.brackets.length*2);
+for(let i=0;i<boxes.length;i++){
+ const box=boxes[i],b=drilling.brackets[Math.floor(i/2)],p=i%2?b.childHoleWorld:b.hostHole;
+ const d={x:box.hole.center.x-p.x,y:box.hole.center.y-p.y,z:box.hole.center.z-p.z};
+ for(const a of box.axes.slice(0,2))assert.ok(Math.abs(d.x*a.x+d.y*a.y+d.z*a.z)<1e-6,'plate and bracket holes coaxial');
+ const wing=b.wings[i%2],n=box.hole.axis;
+ assert.ok(Math.abs((p.x-wing[0].x)*n.x+(p.y-wing[0].y)*n.y+(p.z-wing[0].z)*n.z)<1e-6,'hole belongs to this wing');
+}

@@ -14,13 +14,13 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261008_edgefit';
+import { APP_VERSION } from '../version.js?v=20261008_bracket3d';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
 // computeBodyLayers：2D 疊放順序與 3D z 分層共用同一套，兩邊才一致。
 import { buildSceneModel, computeBodyLayers } from '../blocks3d/scene-model.js';
-import { buildOrthogonalChildren, planeInputs, attachModulePlates } from '../blocks3d/orthogonal-3d.js?v=20261007_m5a';   // O6：直角安裝子模組的 3D 位姿
+import { buildOrthogonalChildren, planeInputs, attachModulePlates } from '../blocks3d/orthogonal-3d.js?v=20261008_bracket3d';   // O6：直角安裝子模組的 3D 位姿
 // 純邏輯模組
 import * as View from './view.js';
 import { createFusionEditor, drawFusion } from './fusion-editor.js';
@@ -1832,7 +1832,7 @@ function push3DNow() {
     // 直角安裝的子模組：在自己的平面建場景（沒有世界機架），再以 4x4 立起來掛在宿主工具上。
     model.orthogonal = buildOrthogonalChildren({
       comps: S.comps, modules: S.modules, inputs: allPlanes, mainModel: model, asm: S.assembly, params: S.topo.params, plates, plan: modulePlates.plan(),
-      joint: jointSettingsNow(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) > 0 ? Number(S.fabrication.cnc.stockThicknessMm) : FABRICATION_DEFAULTS.cnc.stockThicknessMm,
+      exportSettings: Settings.exportSettings(), joint: jointSettingsNow(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) > 0 ? Number(S.fabrication.cnc.stockThicknessMm) : FABRICATION_DEFAULTS.cnc.stockThicknessMm,
       buildModel: inp => buildSceneModel(inp.links, inp.pts, {
         ...baseOpts, groundIds: inp.groundIds, motorCenters: inp.motorCenterIds, motorTypes: inp.motorTypes,
         motorMounts: inp.motorMounts, polygons: inp.polygons, sliders: inp.sliders, gears: inp.gears,

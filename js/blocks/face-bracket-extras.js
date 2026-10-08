@@ -1,7 +1,7 @@
 import { connectionSelection } from './connection-selection.js';
 /** Recompute confirmed drilling against current stock; stale/invalid plans produce no holes. */
 import { buildMountSurfaces } from './mount-surfaces.js';
-import { planFaceBrackets, FACE_BRACKET_SPEC } from './face-bracket-geometry.js?v=20261008_edgefit';
+import { planFaceBrackets, FACE_BRACKET_SPEC } from './face-bracket-geometry.js?v=20261008_bracket3d';
 
 function rawPlan(comps, modules, params, mod, opts={}) {
   if (!mod?.mount?.face?.selection?.brackets?.enabled) return null;
