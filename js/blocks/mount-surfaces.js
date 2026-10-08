@@ -106,7 +106,7 @@ export function buildMountSurfaces({ comps, modules, moduleId, params, exportSet
     if (frameNodes.length) {
       const geometry = inspectFrameExport(frameNodes, exportSettings, []);
       const transformed = transformedGeometry(geometry, p => ({ x: p.x, y: p.y }));
-      const frameThickness = stockThickness(null, exportSettings, thicknessMm);
+      const frameThickness = geometry?.thicknessMm || stockThickness(null, exportSettings, thicknessMm);
       const box = transformed && surfaceBox(transformed.outlines, frameThickness);
       if (box) surfaces.push({
         id: `${moduleId}-frame`, name: `${module.name || moduleId} 底板`, moduleId,

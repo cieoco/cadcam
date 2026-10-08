@@ -646,26 +646,79 @@
   </style>
   <link rel="stylesheet" href="js/blocks/workspace-mobile.css?v=20261006_twoline">
   <script type="importmap">
-    {"imports": {
-      "./js/blocks/face-mate.js": "./js/blocks/face-mate.js?v=20261007_angle",
-      "./js/blocks/face-placement.js": "./js/blocks/face-placement.js?v=20261008_framecache",
-      "./js/blocks/face-mount-contract.js": "./js/blocks/face-mount-contract.js?v=20261008_framecache",
-      "three": "./js/vendor/three.module.js",
-      "./js/blocks/bench-ui.js": "./js/blocks/bench-ui.js?v=20261008_framecache",
-      "./js/blocks/bench-ui.js?v=20261008_brackets": "./js/blocks/bench-ui.js?v=20261008_framecache",
-      "./js/blocks/build-plan.js": "./js/blocks/build-plan.js?v=20261008_framecache",
-      "./js/blocks/build-plan.js?v=20261007_7": "./js/blocks/build-plan.js?v=20261008_framecache",
-      "./js/blocks/face-mount-refresh.js": "./js/blocks/face-mount-refresh.js?v=20261008_framecache",
-      "./js/blocks/face-wizard-ui.js": "./js/blocks/face-wizard-ui.js?v=20261008_framecache",
-      "./js/blocks/face-wizard-ui.js?v=20261007_singleface": "./js/blocks/face-wizard-ui.js?v=20261008_framecache",
-      "./js/blocks/mate-wizard-ui.js": "./js/blocks/mate-wizard-ui.js?v=20261008_framecache",
-      "./js/blocks/mate-wizard-ui.js?v=20261008_brackets": "./js/blocks/mate-wizard-ui.js?v=20261008_framecache",
-      "./js/blocks/module-plates.js": "./js/blocks/module-plates.js?v=20261008_framecache",
-      "./js/blocks/module-plates.js?v=20261007_m5a": "./js/blocks/module-plates.js?v=20261008_framecache",
-      "./js/blocks/mount-surfaces.js": "./js/blocks/mount-surfaces.js?v=20261008_framecache",
-      "./js/blocks/orthogonal-joint.js": "./js/blocks/orthogonal-joint.js?v=20261008_framecache"
-    }}
-  </script>
+{
+  "imports": {
+    "./js/blocks/face-mate.js": "./js/blocks/face-mate.js?v=20261007_angle",
+    "./js/blocks/face-placement.js": "./js/blocks/face-placement.js?v=20261008_framesize",
+    "./js/blocks/face-mount-contract.js": "./js/blocks/face-mount-contract.js?v=20261008_framesize",
+    "three": "./js/vendor/three.module.js",
+    "./js/blocks/bench-ui.js": "./js/blocks/bench-ui.js?v=20261008_framesize",
+    "./js/blocks/bench-ui.js?v=20261008_brackets": "./js/blocks/bench-ui.js?v=20261008_framesize",
+    "./js/blocks/build-plan.js": "./js/blocks/build-plan.js?v=20261008_framesize",
+    "./js/blocks/build-plan.js?v=20261007_7": "./js/blocks/build-plan.js?v=20261008_framesize",
+    "./js/blocks/face-mount-refresh.js": "./js/blocks/face-mount-refresh.js?v=20261008_framesize",
+    "./js/blocks/face-wizard-ui.js": "./js/blocks/face-wizard-ui.js?v=20261008_framesize",
+    "./js/blocks/face-wizard-ui.js?v=20261007_singleface": "./js/blocks/face-wizard-ui.js?v=20261008_framesize",
+    "./js/blocks/mate-wizard-ui.js": "./js/blocks/mate-wizard-ui.js?v=20261008_framesize",
+    "./js/blocks/mate-wizard-ui.js?v=20261008_brackets": "./js/blocks/mate-wizard-ui.js?v=20261008_framesize",
+    "./js/blocks/module-plates.js": "./js/blocks/module-plates.js?v=20261008_framesize",
+    "./js/blocks/module-plates.js?v=20261007_m5a": "./js/blocks/module-plates.js?v=20261008_framesize",
+    "./js/blocks/mount-surfaces.js": "./js/blocks/mount-surfaces.js?v=20261008_framesize",
+    "./js/blocks/orthogonal-joint.js": "./js/blocks/orthogonal-joint.js?v=20261008_framesize",
+    "./js/multilink/solver.js": "./js/multilink/solver.js?v=20261007_solverguard",
+    "./js/blocks/plate-geometry.js": "./js/blocks/plate-geometry.js?v=20260925_stock1",
+    "./js/blocks/plate-editor.js": "./js/blocks/plate-editor.js?v=20260925_members2",
+    "./js/blocks/plate-render.js": "./js/blocks/plate-render.js?v=20260925_members1",
+    "./js/blocks/fabrication-profile.js": "./js/blocks/fabrication-profile.js?v=20261002_f1",
+    "./js/blocks/cnc-check.js": "./js/blocks/cnc-check.js?v=20261001_l50",
+    "./js/blocks/schema.js": "./js/blocks/schema.js?v=20261008_framesize",
+    "./js/blocks/settings.js": "./js/blocks/settings.js?v=20261007_9",
+    "./js/blocks/member-editor.js": "./js/blocks/member-editor.js?v=20260925_stock2",
+    "./js/blocks/member-dimensions.js": "./js/blocks/member-dimensions.js?v=20260925_stock1",
+    "./js/blocks/member-dimension-render.js": "./js/blocks/member-dimension-render.js?v=20260925_stock1",
+    "./js/blocks/member-stock.js": "./js/blocks/member-stock.js?v=20260925_stock2",
+    "./js/blocks/jaw-tip-handle.js": "./js/blocks/jaw-tip-handle.js?v=20260925_stock1",
+    "./js/blocks/view.js": "./js/blocks/view.js?v=20260925_stock1",
+    "./js/blocks/mechanism-layer-render.js": "./js/blocks/mechanism-layer-render.js?v=20260930_m1b2",
+    "./js/blocks/rack-limits.js": "./js/blocks/rack-limits.js?v=20261001_l6",
+    "./js/blocks/gear-editor.js": "./js/blocks/gear-editor.js?v=20261001_l6",
+    "./js/blocks/transmission-render.js": "./js/blocks/transmission-render.js?v=20261001_l6",
+    "./js/blocks/exporters.js": "./js/blocks/exporters.js?v=20261008_framesize",
+    "./js/blocks/adapter-stl.js": "./js/blocks/adapter-stl.js?v=20261002_d4",
+    "./js/blocks/interference.js": "./js/blocks/interference.js?v=20261007_m5a",
+    "./js/blocks3d/scene-model.js": "./js/blocks3d/scene-model.js?v=20261008_framesize",
+    "./js/blocks/gripper-workflow.js": "./js/blocks/gripper-workflow.js?v=20260925_stock1",
+    "./js/blocks/gripper-workflow.js?v=20260925_r1b": "./js/blocks/gripper-workflow.js?v=20260925_stock1",
+    "./js/blocks/motion.js": "./js/blocks/motion.js?v=20260930_m1b1",
+    "./js/blocks/motor-frame-render.js": "./js/blocks/motor-frame-render.js?v=20261003_g1",
+    "./js/blocks/assembly.js": "./js/blocks/assembly.js?v=20261007_solverguard",
+    "./js/blocks/assembly-roles.js": "./js/blocks/assembly-roles.js?v=20261007_m5a",
+    "./js/blocks/design-focus.js": "./js/blocks/design-focus.js?v=20261003_h1",
+    "./js/blocks/design-tabs-ui.js": "./js/blocks/design-tabs-ui.js?v=20261003_h1",
+    "./js/blocks/tools.js": "./js/blocks/tools.js?v=20261005_simple_r1",
+    "./js/blocks/input.js": "./js/blocks/input.js?v=20261007_m2b",
+    "./js/blocks/state.js": "./js/blocks/state.js?v=20261007_m2b",
+    "./js/blocks/mates.js": "./js/blocks/mates.js?v=20261007_m2b",
+    "./js/blocks/mates-view.js": "./js/blocks/mates-view.js?v=20261007_m2b",
+    "./js/blocks/panels.js": "./js/blocks/panels.js?v=20261008_framesize",
+    "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=20261003_h1",
+    "./js/blocks/motor-tools.js": "./js/blocks/motor-tools.js?v=20261001_l1",
+    "./js/blocks/bench.js": "./js/blocks/bench.js?v=20261007_m5a",
+    "./js/blocks/mate-connect.js": "./js/blocks/mate-connect.js?v=20261007_8_final",
+    "./js/blocks/part-labels.js": "./js/blocks/part-labels.js?v=20261007_m6",
+    "./js/blocks/module-ops.js": "./js/blocks/module-ops.js?v=20261007_singleface",
+    "./js/blocks/module-schema.js": "./js/blocks/module-schema.js?v=20261007_singleface",
+    "./js/blocks/module-drag.js": "./js/blocks/module-drag.js?v=20260930_d9",
+    "./js/blocks3d/viewer.js": "./js/blocks3d/viewer.js?v=20261007_m4b",
+    "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261003_g2",
+    "./js/blocks/app.js": "./js/blocks/app.js?v=20261008_framesize",
+    "./js/blocks/model.js": "./js/blocks/model.js?v=20261008_framesize",
+    "./js/blocks/exporters.js?v=20261007_9": "./js/blocks/exporters.js?v=20261008_framesize",
+    "./js/blocks/exporters.js?v=20261007_7": "./js/blocks/exporters.js?v=20261008_framesize",
+    "./js/blocks/schema.js?v=20261007_singleface": "./js/blocks/schema.js?v=20261008_framesize"
+  }
+}
+</script>
 </head>
 <body>
   <header class="appbar">
@@ -1003,6 +1056,10 @@
       </div>
       <div class="inspector-panel frame-editor" id="frameEditor" style="display:none;">
         <div class="fe-row"><span class="fe-title">機架</span><span class="fe-value" id="frameHoleCount"></span></div>
+        <div class="fe-row"><label>外框長 <input id="frameSize-lengthMm" aria-label="機架外框長" type="number" min="2" max="2000" step="1" style="width:80px;min-height:40px;font-size:16px" onchange="window.blocks.setFrameSize('lengthMm',this.value)"> mm</label></div>
+        <div class="fe-row"><label>外框寬 <input id="frameSize-widthMm" aria-label="機架外框寬" type="number" min="2" max="2000" step="1" style="width:80px;min-height:40px;font-size:16px" onchange="window.blocks.setFrameSize('widthMm',this.value)"> mm</label></div>
+        <div class="fe-row"><label>板厚 <input id="frameSize-thicknessMm" aria-label="機架板厚" type="number" min="0.5" max="30" step="0.5" style="width:80px;min-height:40px;font-size:16px" onchange="window.blocks.setFrameSize('thicknessMm',this.value)"> mm</label><button onclick="window.blocks.setFrameSize('auto')">自動外框</button></div>
+        <div class="fe-row"><small>長沿固定孔方向；改長寬不移動孔位。</small></div>
         <div class="fe-row"><span class="fe-value">孔距 8 mm</span></div>
         <div class="fe-row"><span>軸距</span><button onclick="window.blocks.changeFrameGround('length',-8)">−</button><span class="fe-value" id="frameLengthVal"></span><button onclick="window.blocks.changeFrameGround('length',8)">＋</button></div>
         <div class="fe-row"><span>相對角</span><button onclick="window.blocks.changeFrameGround('angle',-5)">−</button><span class="fe-value" id="frameAngleVal"></span><button onclick="window.blocks.changeFrameGround('angle',5)">＋</button></div>
@@ -1226,73 +1283,8 @@
   </nav>
 
   <!-- 同一份共用模組只載入一個版本；避免重載時混用舊幾何或舊存檔 schema。 -->
-  <script type="importmap">
-    {"imports": {
-      "./js/blocks/face-mate.js": "./js/blocks/face-mate.js?v=20261007_angle",
-      "./js/blocks/face-placement.js": "./js/blocks/face-placement.js?v=20261008_framecache",
-      "./js/blocks/face-mount-contract.js": "./js/blocks/face-mount-contract.js?v=20261008_framecache",
-      "./js/multilink/solver.js": "./js/multilink/solver.js?v=20261007_solverguard",
-      "./js/blocks/plate-geometry.js": "./js/blocks/plate-geometry.js?v=20260925_stock1",
-      "./js/blocks/plate-editor.js": "./js/blocks/plate-editor.js?v=20260925_members2",
-      "./js/blocks/plate-render.js": "./js/blocks/plate-render.js?v=20260925_members1",
-      "./js/blocks/fabrication-profile.js": "./js/blocks/fabrication-profile.js?v=20261002_f1",
-      "./js/blocks/cnc-check.js": "./js/blocks/cnc-check.js?v=20261001_l50",
-      "./js/blocks/schema.js": "./js/blocks/schema.js?v=20261002_b6b",
-      "./js/blocks/settings.js": "./js/blocks/settings.js?v=20261007_9",
-      "./js/blocks/member-editor.js": "./js/blocks/member-editor.js?v=20260925_stock2",
-      "./js/blocks/member-dimensions.js": "./js/blocks/member-dimensions.js?v=20260925_stock1",
-      "./js/blocks/member-dimension-render.js": "./js/blocks/member-dimension-render.js?v=20260925_stock1",
-      "./js/blocks/member-stock.js": "./js/blocks/member-stock.js?v=20260925_stock2",
-      "./js/blocks/jaw-tip-handle.js": "./js/blocks/jaw-tip-handle.js?v=20260925_stock1",
-      "./js/blocks/view.js": "./js/blocks/view.js?v=20260925_stock1",
-      "./js/blocks/mechanism-layer-render.js": "./js/blocks/mechanism-layer-render.js?v=20260930_m1b2",
-      "./js/blocks/rack-limits.js": "./js/blocks/rack-limits.js?v=20261001_l6",
-      "./js/blocks/gear-editor.js": "./js/blocks/gear-editor.js?v=20261001_l6",
-      "./js/blocks/transmission-render.js": "./js/blocks/transmission-render.js?v=20261001_l6",
-      "./js/blocks/exporters.js": "./js/blocks/exporters.js?v=20261007_9",
-      "./js/blocks/adapter-stl.js": "./js/blocks/adapter-stl.js?v=20261002_d4",
-      "./js/blocks/orthogonal-joint.js": "./js/blocks/orthogonal-joint.js?v=20261008_framecache",
-      "./js/blocks/build-plan.js": "./js/blocks/build-plan.js?v=20261008_framecache",
-      "./js/blocks/interference.js": "./js/blocks/interference.js?v=20261007_m5a",
-      "./js/blocks3d/scene-model.js": "./js/blocks3d/scene-model.js?v=20260925_stock2",
-      "./js/blocks/gripper-workflow.js": "./js/blocks/gripper-workflow.js?v=20260925_stock1",
-      "./js/blocks/gripper-workflow.js?v=20260925_r1b": "./js/blocks/gripper-workflow.js?v=20260925_stock1",
-      "./js/blocks/motion.js": "./js/blocks/motion.js?v=20260930_m1b1",
-      "./js/blocks/module-plates.js": "./js/blocks/module-plates.js?v=20261008_framecache",
-      "./js/blocks/motor-frame-render.js": "./js/blocks/motor-frame-render.js?v=20261003_g1",
-      "./js/blocks/assembly.js": "./js/blocks/assembly.js?v=20261007_solverguard",
-      "./js/blocks/assembly-roles.js": "./js/blocks/assembly-roles.js?v=20261007_m5a",
-      "./js/blocks/design-focus.js": "./js/blocks/design-focus.js?v=20261003_h1",
-      "./js/blocks/design-tabs-ui.js": "./js/blocks/design-tabs-ui.js?v=20261003_h1",
-      "./js/blocks/tools.js": "./js/blocks/tools.js?v=20261005_simple_r1",
-      "./js/blocks/input.js": "./js/blocks/input.js?v=20261007_m2b",
-      "./js/blocks/state.js": "./js/blocks/state.js?v=20261007_m2b",
-      "./js/blocks/mates.js": "./js/blocks/mates.js?v=20261007_m2b",
-      "./js/blocks/mates-view.js": "./js/blocks/mates-view.js?v=20261007_m2b",
-      "./js/blocks/panels.js": "./js/blocks/panels.js?v=20260930_p1",
-      "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=20261003_h1",
-      "./js/blocks/motor-tools.js": "./js/blocks/motor-tools.js?v=20261001_l1",
-      "./js/blocks/bench-ui.js": "./js/blocks/bench-ui.js?v=20261008_framecache",
-      "./js/blocks/bench.js": "./js/blocks/bench.js?v=20261007_m5a",
-      "./js/blocks/mate-connect.js": "./js/blocks/mate-connect.js?v=20261007_8_final",
-      "./js/blocks/mate-wizard-ui.js": "./js/blocks/mate-wizard-ui.js?v=20261008_framecache",
-      "./js/blocks/part-labels.js": "./js/blocks/part-labels.js?v=20261007_m6",
-      "./js/blocks/module-ops.js": "./js/blocks/module-ops.js?v=20261007_singleface",
-      "./js/blocks/module-schema.js": "./js/blocks/module-schema.js?v=20261007_singleface",
-      "./js/blocks/module-drag.js": "./js/blocks/module-drag.js?v=20260930_d9",
-      "./js/blocks3d/viewer.js": "./js/blocks3d/viewer.js?v=20261007_m4b",
-      "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=20261003_g2",
-      "./js/blocks/bench-ui.js?v=20261008_brackets": "./js/blocks/bench-ui.js?v=20261008_framecache",
-      "./js/blocks/build-plan.js?v=20261007_7": "./js/blocks/build-plan.js?v=20261008_framecache",
-      "./js/blocks/face-mount-refresh.js": "./js/blocks/face-mount-refresh.js?v=20261008_framecache",
-      "./js/blocks/face-wizard-ui.js": "./js/blocks/face-wizard-ui.js?v=20261008_framecache",
-      "./js/blocks/face-wizard-ui.js?v=20261007_singleface": "./js/blocks/face-wizard-ui.js?v=20261008_framecache",
-      "./js/blocks/mate-wizard-ui.js?v=20261008_brackets": "./js/blocks/mate-wizard-ui.js?v=20261008_framecache",
-      "./js/blocks/module-plates.js?v=20261007_m5a": "./js/blocks/module-plates.js?v=20261008_framecache",
-      "./js/blocks/mount-surfaces.js": "./js/blocks/mount-surfaces.js?v=20261008_framecache"
-    }}
-  </script>
-  <script type="module" src="js/blocks/app.js?v=20261008_framecache"></script>
-<script type="module" src="js/version-info.js?v=20261008_framecache"></script>
+
+  <script type="module" src="js/blocks/app.js?v=20261008_framesize"></script>
+<script type="module" src="js/version-info.js?v=20261008_framesize"></script>
 </body>
 </html>

@@ -119,7 +119,7 @@ export function buildSceneModel(links, points, opts = {}) {
   const hullR = opts.hullR ?? 9;
   const plateThickness = opts.plateThickness ?? 4;
   const memberStocks = opts.memberStocks || {};
-  const maxThickness = Math.max(plateThickness, ...Object.values(memberStocks).map(s => s.thicknessMm));
+  const maxThickness = Math.max(plateThickness, opts.frameGeometry?.thicknessMm || 0, ...Object.values(memberStocks).map(s => s.thicknessMm));
   const plateGap = Math.max(opts.plateGap ?? 6, maxThickness + 2);
   const pinR = opts.pinR ?? 3.2;
   const groundIds = opts.groundIds || new Set();
@@ -658,6 +658,6 @@ export function buildSceneModel(links, points, opts = {}) {
   if (anchored && xs.length) span = Math.max(span,
     ...xs.map(x => 2 * Math.abs(x - focus.x)), ...ys.map(y => 2 * Math.abs(y - focus.y)));
 
-  const frame = frameGeometry ? { ...frameGeometry, z: frameBackZ, thickness: plateThickness, color:'#465568' } : null;
+  const frame = frameGeometry ? { ...frameGeometry, z: frameBackZ, thickness: frameGeometry.thicknessMm || plateThickness, color:'#465568' } : null;
   return { sticks, plates, pins, grounds, motors, rails, carriages, gears, racks, pulleys, belts, cams, frame, plateGap, plateThickness, span, focus, anchored };
 }

@@ -44,7 +44,7 @@ export function framePlateHomes(comps, modules, params, { exportSettings = {}, m
     const g = inspectFrameExport(nodes, exportSettings || {}, freeSplit.byModule[entry.moduleId] || []);
     if (!g || !g.outlines || !g.outlines.length) return;
     out.push({
-      moduleId: entry.moduleId, name: entry.fileBase, plane: planeOf(list, modList, entry.moduleId), stockMm: T,
+      moduleId: entry.moduleId, name: entry.fileBase, plane: planeOf(list, modList, entry.moduleId), stockMm: g.thicknessMm || T,
       geometry: { outlines: g.outlines, holes: g.holes || [], cutouts: g.cutouts || [] }
     });
   });

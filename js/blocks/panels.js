@@ -12,10 +12,10 @@
 import { S } from './state.js';
 
 // ---- 注入的查詢 helper（由 app 在啟動時提供）----
-let pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked;
+let pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked, frameSizeInfo;
 
 export function init(deps) {
-  ({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked } = deps);
+  ({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked, frameSizeInfo } = deps);
 }
 
 // 更新長度顯示（用上方的 − / + 以 8mm 為單位調整）
@@ -108,6 +108,11 @@ export function updateFrameEditor() {
   const points = pointCoords();
   const grounds = Object.entries(points).filter(([id]) => pointIsGround?.(id)).map(([id, point]) => ({ id, ...point }));
   if (!grounds.length || !S.frameEditorOpen) { panel.style.display = 'none'; if (roleEditor) placeFrameEditor(panel, roleEditor); return; }
+  const sizes=frameSizeInfo?.();
+  for(const key of ['lengthMm','widthMm','thicknessMm']) {
+    const input=document.getElementById(`frameSize-${key}`);
+    if(input && sizes) input.value=Number((sizes[key] || 0).toFixed(1));
+  }
   const xs = grounds.map(point => point.x), ys = grounds.map(point => point.y);
   const width = Math.round(Math.max(...xs) - Math.min(...xs));
   const height = Math.round(Math.max(...ys) - Math.min(...ys));

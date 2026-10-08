@@ -123,8 +123,10 @@ export function frameNodeIds(comps) {
 
 export function frameNodes(comps) {
   const m = pointCoords(comps);
+  const stocks = new Map();
+  comps.forEach(c => pointKeysFor(c).forEach(k => { if (c[k]?.frameStock) stocks.set(c[k].id,c[k].frameStock); }));
   return [...frameNodeIds(comps)]
-    .map(id => ({ id, ...(m[id] || {}) }))
+    .map(id => ({ id, ...(m[id] || {}), ...(stocks.has(id) ? {frameStock:stocks.get(id)} : {}) }))
     .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
     .sort((a, b) => (a.x - b.x) || (a.y - b.y));
 }

@@ -2,6 +2,7 @@ import { DEFAULT_PLATE_RADIUS_WORLD, createPlateGeometry, localToWorld } from '.
 import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
 import { rackPhaseShift } from './gear-editor.js';
 import { memberStock, memberStockLabel } from './member-stock.js';
+import { sizeFrameOutline, frameStockOf } from './frame-stock.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 
 export const DEFAULT_BAR_WIDTH_MM = DEFAULT_PLATE_RADIUS_WORLD * 2;
@@ -984,8 +985,9 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
 
   if (!outlines.length) return null;
   // 固定孔貼近槽緣一樣是薄肉，警告時把槽邊當外緣一起檢查。
-  const warnEdges = [...outlines, ...cutouts.map(c => c.points)];
-  return { outlines, cutouts, holes, warnings: frameWarnings(warnEdges, holes) };
+  const sized = sizeFrameOutline(outlines,nodes);
+  const warnEdges = [...sized.outlines, ...cutouts.map(c => c.points)];
+  return { ...sized, cutouts, holes, warnings: frameWarnings(warnEdges, holes) };
 }
 
 // C1：機架外框的每一段「直邊」（直角接口用）。與 frameGeometry 同一套規則：
@@ -994,6 +996,15 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
 // 不含馬達安裝座對外框的擴張（與 inspectFrameExport 傳空 mounts 的結果一致）。
 export function frameOutlineEdges(frameNodes, settings = {}) {
   const nodes = (frameNodes || []).filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y) && !p.outlineExempt);
+  const stock = frameStockOf(nodes);
+  if (stock.lengthMm || stock.widthMm) {
+    const ring = frameGeometry(nodes,settings)?.outlines[0] || [];
+    return ring.map((a,i) => {
+      const b=ring[(i+1)%ring.length],lengthMm=Math.hypot(b.x-a.x,b.y-a.y);
+      const d={x:(b.x-a.x)/lengthMm,y:(b.y-a.y)/lengthMm};
+      return {a,b,d,m:{x:d.y,y:-d.x},lengthMm};
+    }).filter(e=>e.lengthMm>1e-6);
+  }
   if (nodes.length < 2) return [];
   const { barWidthMm, frameMarginMm } = normalizeExportSettings(settings);
   const frameR = barWidthMm / 2;

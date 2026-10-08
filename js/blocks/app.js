@@ -14,7 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261008_framecache';
+import { APP_VERSION } from '../version.js?v=20261008_framesize';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
@@ -79,7 +79,9 @@ import { normalizeFabricationProfile, FABRICATION_DEFAULTS } from './fabrication
 import { cncWarnings } from './cnc-check.js';   // L4：依刀徑檢查匯出特徵
 import { orthogonalExportExtras, withAdapterNodes, withWorldAdapterNodes } from './orthogonal-joint.js';   // O4a：直角安裝轉接座孔位
 import { adapterMesh, meshToStl } from './adapter-stl.js';   // O4b：3D 列印轉接座 STL
-import { buildPlan, buildPackHtml } from './build-plan.js?v=20261007_7';   // L5b：製作包（板件＋五金＋組裝步驟）
+import { buildPlan, buildPackHtml, deriveMotorMounts } from './build-plan.js?v=20261007_7';   // L5b：製作包（板件＋五金＋組裝步驟）
+import { frameStockOf } from './frame-stock.js';
+import { pointKeysFor } from './part-types.js';
 import { resolveSpacers, suggestRackStops } from './interference.js';   // L5c／L6：干涉檢查、自動隔圈、齒條長槽限位建議
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -1973,6 +1975,31 @@ function toggleFrameLock() {
   draw();
 }
 
+function frameSizeInfo() {
+  const comps = viewComps(), nodes = Model.frameConnectorNodes(comps);
+  const mounts = Exporters.splitMountsByHost(comps,deriveMotorMounts(comps)).free;
+  const geometry = Exporters.inspectFrameExport(nodes,Settings.exportSettings(),mounts);
+  return {...geometry?.dimensions,thicknessMm:geometry?.thicknessMm || S.fabrication?.cnc?.stockThicknessMm || 3};
+}
+function setFrameSize(key, raw) {
+  if (!['lengthMm','widthMm','thicknessMm','auto'].includes(key)) return;
+  const value=Number(raw), comps=viewComps(), nodes=Model.frameConnectorNodes(comps);
+  if (!nodes.length) return;
+  if (key!=='auto' && (!Number.isFinite(value) || value < (key==='thicknessMm'?.5:2) || value > (key==='thicknessMm'?30:2000))) {
+    transient('請輸入有效尺寸：長寬 2–2000 mm，板厚 0.5–30 mm。'); Panels.updateFrameEditor(); return;
+  }
+  const stock={...frameStockOf(nodes)};
+  if(key==='auto') {delete stock.lengthMm;delete stock.widthMm;}
+  else {
+    const info=frameSizeInfo(),minimum=key==='lengthMm'?info.minLength:key==='widthMm'?info.minWidth:0;
+    stock[key]=Math.round(Math.max(value,minimum || 0)*10)/10;
+    if(value<minimum) transient('已保留容納固定孔與馬達座的最小尺寸。');
+  }
+  pause();pushUndo();
+  const ids=new Set(nodes.map(p=>p.id));
+  comps.forEach(c=>pointKeysFor(c).forEach(k=>{if(ids.has(c[k]?.id))c[k].frameStock={...stock};}));
+  rebuild();draw();Panels.updateFrameEditor();scheduleAutosave();
+}
 function changeFrameGround(kind, delta) {
   const points = pointCoords();
   const nodes = [...frameNodeIds()].map(id => ({ id, ...points[id] })).filter(point => Number.isFinite(point.x) && Number.isFinite(point.y))
@@ -2776,7 +2803,7 @@ async function share() {
 // ---- 啟動：分享連結優先，其次 localStorage 自動還原，否則空白 ----
 function init() {
   Render.init({ svg, onNodeDown: guardedNodeDown });   // 注入繪製基元的外部依賴（預設 parent + 固定孔互動）
-  Panels.init({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked });
+  Panels.init({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked, frameSizeInfo });
   Tools.init({ svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
                setBanner, clearBanner, worldFromEvent, pointCoords, nearestDisplayToPoint, snapWorld,
                mobilePrompt, promptText, displayPointCoords: displayCoords, notify: transient });
@@ -2823,6 +2850,7 @@ function init() {
 
 window.blocks = { exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample };
 window.blocks.changeFrameGround = changeFrameGround;
+window.blocks.setFrameSize = setFrameSize;
 // H1 除錯／測試：設計模式目前看得到的零件與點（畫面實際畫的那一份）。
 window.blocks.designDebug = () => ({
   mode: S.mode, focus: S.designFocus, viewPlane: S.viewPlane,

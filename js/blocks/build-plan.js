@@ -1,3 +1,4 @@
+import { frameStockOf } from './frame-stock.js';
 /**
  * blocks / build-plan
  *
@@ -170,7 +171,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
   if (worldNodes.length) {
     // C1：直角安裝在機架板邊上的轉接座孔（不參與外框、不列入關節點）。
     const worldCut = withWorldAdapterNodes(worldNodes, orthoExtras);
-    const part = { name: 'frame', kind: 'frame', compId: null, moduleId: null, plane: null, layer: 0, thicknessMm: stockMm, ...geomInfo(inspectFrameExport(worldCut, exp, freeSplit.world)) };
+    const part = { name: 'frame', kind: 'frame', compId: null, moduleId: null, plane: null, layer: 0, thicknessMm: frameStockOf(worldCut).thicknessMm || stockMm, ...geomInfo(inspectFrameExport(worldCut, exp, freeSplit.world)) };
     addPart(part, worldNodes.map(n => ({ id: n.id, holeDiameterMm: finitePos(n.holeDiameterMm) ? Number(n.holeDiameterMm) : frameHole, mountBolt: n.holeLayer === 'MOUNT_BOLT' })));
     pushGroup(null, part);
   }
@@ -178,7 +179,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     const baseNodes = moduleFrameNodes(entry, frameConnectorNodes(entry.comps));
     if (!baseNodes.length) return;
     const nodes = withAdapterNodes(entry.moduleId, baseNodes, orthoExtras);
-    const part = { name: entry.fileBase, kind: 'frame', compId: null, moduleId: entry.moduleId, plane: planeOf(list, modList, entry.moduleId), layer: 0, thicknessMm: stockMm, ...geomInfo(inspectFrameExport(nodes, exp, freeSplit.byModule[entry.moduleId] || [])) };
+    const part = { name: entry.fileBase, kind: 'frame', compId: null, moduleId: entry.moduleId, plane: planeOf(list, modList, entry.moduleId), layer: 0, thicknessMm: frameStockOf(nodes).thicknessMm || stockMm, ...geomInfo(inspectFrameExport(nodes, exp, freeSplit.byModule[entry.moduleId] || [])) };
     // 轉接座孔只是板上的孔，不是關節：不列入關節點。
     addPart(part, nodes.filter(n => n.holeLayer !== 'ADAPTER_HOLE').map(n => ({ id: n.id, holeDiameterMm: finitePos(n.holeDiameterMm) ? Number(n.holeDiameterMm) : frameHole, mountBolt: n.holeLayer === 'MOUNT_BOLT' })));
     pushGroup(entry.moduleId, part);

@@ -6,6 +6,7 @@
  */
 
 import { normalizeMemberStock } from './member-stock.js';
+import { normalizeFrameStock } from './frame-stock.js';
 import { normalizeFabricationProfile } from './fabrication-profile.js';
 import { normalizeModules } from './module-schema.js?v=20261007_singleface';
 
@@ -41,6 +42,8 @@ function normalizePoint(point, fallbackId, warnings) {
   };
   if (point.physicalMotor) out.physicalMotor = String(point.physicalMotor);
   if (Number(point.solveSign) === -1) out.solveSign = -1;
+  const frameStock = normalizeFrameStock(point.frameStock);
+  if (frameStock) out.frameStock = frameStock;
   return out;
 }
 
