@@ -9,6 +9,7 @@
  */
 
 import { createRackPath } from '../utils/gear-geometry.js';
+import { gearMeshPhaseDeg } from '../blocks/transmission-geometry.js';
 import { camRadius } from '../utils/cam-profile.js';
 
 /**
@@ -314,28 +315,6 @@ export function buildSceneModel(links, points, opts = {}) {
   const gears = [];
   const gearLayer = -1;
   const gearZ = gearLayer * plateGap;
-  const gearById = new Map(gearDefs.map(g => [g.id, g]));
-  const gearMeshPhase = (g, memo = new Map()) => {
-    if (!g || !g.mesh) return 0;
-    if (memo.has(g.id)) return memo.get(g.id);
-    const driver = gearById.get(g.mesh);
-    if (!driver || !driver.center || !driver.pin || !g.center || !g.pin) return 0;
-    const CA = points[driver.center], CB = points[g.center];
-    const PA = points[driver.pin], PB = points[g.pin];
-    if (![CA, CB, PA, PB].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))) return 0;
-    const NA = Math.max(6, Math.round(Number(driver.teeth) || 12));
-    const NB = Math.max(6, Math.round(Number(g.teeth) || 12));
-    const betaA = Math.atan2(CB.y - CA.y, CB.x - CA.x);
-    const betaB = Math.atan2(CA.y - CB.y, CA.x - CB.x);
-    const angleA = Math.atan2(PA.y - CA.y, PA.x - CA.x);
-    const angleB = Math.atan2(PB.y - CB.y, PB.x - CB.x);
-    const phaseA = gearMeshPhase(driver, memo);
-    let q = (NA * (betaA - angleA - phaseA) + NB * (betaB - angleB)) / (2 * Math.PI);
-    q -= Math.floor(q);
-    const phase = (q - 0.5) * (2 * Math.PI / NB);
-    memo.set(g.id, phase);
-    return phase;
-  };
   gearDefs.forEach(g => {
     const center = points[g.center];
     const pin = points[g.pin];
@@ -344,7 +323,8 @@ export function buildSceneModel(links, points, opts = {}) {
     const radius = Math.max(1, Number(g.radius) || Math.hypot(pin.x - center.x, pin.y - center.y) || 40);
     const module = Math.max(0.1, Number(g.module) || (2 * radius / teeth));
     const angle = Math.atan2(pin.y - center.y, pin.x - center.x);
-    const meshPhase = gearMeshPhase(g);
+    const definitions=new Map(gearDefs.map(d=>[d.id,{...d,p1:{id:d.center},p2:{id:d.pin}}]));
+    const meshPhase=gearMeshPhaseDeg(definitions.get(g.id),points,definitions)*Math.PI/180;
     const fused=opts.fusedParts?.[g.id];
     if(fused) {
       plates.push({ids:fused.ids,corners:fused.ids.map(id=>points[id]),layer:gearLayer,z:gearZ,r:hullR,
@@ -354,6 +334,7 @@ export function buildSceneModel(links, points, opts = {}) {
     }
     gears.push({
       id: g.id,
+      partGeometry:opts.gearGeometries?.[g.id] || null,
       center: { x: center.x, y: center.y },
       pin: { x: pin.x, y: pin.y },
       radius,
@@ -363,7 +344,7 @@ export function buildSceneModel(links, points, opts = {}) {
       meshPhase,
       z: gearZ,
       layer: gearLayer,
-      thickness: plateThickness,
+      thickness: opts.gearGeometries?.[g.id]?.thicknessMm || plateThickness,
       color: g.color || '#b0772e',
       pinHoleDiameter: Math.max(1, Number(g.pinHoleDiameter) || 5),
     });

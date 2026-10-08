@@ -481,6 +481,7 @@ export function createViewer(container) {
     clearDynamic();
     if (!model) return;
     lastModel = model;
+    renderMaterialParts(model.materialParts || []);
     renderModel(model);
     // 直角安裝的子模組：各自的場景模型包進一個帶 4x4 矩陣的 Group（子平面 → 宿主座標）。
     (model.orthogonal || []).forEach(child => {
@@ -498,6 +499,7 @@ export function createViewer(container) {
     // F1：金屬角碼（每處兩片、每片兩翼各一塊薄板）：主場景座標、淺金屬灰，跟著位姿每幀重畫。
     // G2：每一翼是「挖了圓孔的薄板」（擠出矩形＋圓孔），孔在翼的螺牙孔位置，看得到穿透；沒有 hole 資料時退回實心方塊。
     (model.brackets || []).forEach((b, i) => {
+      if(b.materialPartId)return;
       if (!b || !b.center || !Array.isArray(b.axes) || b.axes.length !== 3 || !b.size) return;
       const ax = b.axes.map(a => new THREE.Vector3(a.x, a.y, a.z));
       const dims = [b.size.x, b.size.y, b.size.z];
@@ -517,6 +519,7 @@ export function createViewer(container) {
     });
     // G2：鎖角碼的 M3 螺絲：頭座在木板外側面、軸沿孔軸穿過木板鎖進角碼，尖端略穿出；深色鋼，同樣帶模組 id 前綴。
     (model.screws || []).forEach((sc, i) => {
+      if(sc.materialPartId)return;
       if (!sc || !sc.head || !sc.tip) return;
       const head = new THREE.Vector3(sc.head.x, sc.head.y, sc.head.z), tip = new THREE.Vector3(sc.tip.x, sc.tip.y, sc.tip.z);
       const len = head.distanceTo(tip);
@@ -546,10 +549,41 @@ export function createViewer(container) {
     focusCamera(model);
   }
 
+  // Representation only: every material island and machining feature comes from
+  // the shared local catalog; pose matrices are already complete world poses.
+  function renderMaterialParts(parts) {
+    const inside=(p,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+      const a=ring[i],b=ring[j];if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)hit=!hit;
+    }return hit;};
+    for(const part of parts) {
+      const g=part.geometry;
+      if(g.solid?.kind==='pan-head') {
+        const group=new THREE.Group(),profile=g.solid.profile.map(([r,z])=>new THREE.Vector2(r,z));
+        const head=new THREE.Mesh(new THREE.LatheGeometry(profile,20),screwMat);
+        head.rotation.x=Math.PI/2;group.add(head);
+        const slot=new THREE.Mesh(new THREE.BoxGeometry(g.solid.radiusMm*1.4,.5,.35),slotMat);
+        slot.position.z=-.05;group.add(slot);
+        group.matrixAutoUpdate=false;group.matrix.fromArray(part.pose.matrix);group.matrixWorldNeedsUpdate=true;
+        group.userData.partId=part.partId;group.userData.geometryVersion=g.geometryVersion;
+        addPart(group,part.pickKey);continue;
+      }
+      for(const ring of g.outlines) {
+        const shape=new THREE.Shape();shape.moveTo(ring[0].x,ring[0].y);ring.slice(1).forEach(p=>shape.lineTo(p.x,p.y));shape.closePath();
+        for(const h of g.holes)if(inside(h,ring)){const path=new THREE.Path();path.absarc(h.x,h.y,h.r,0,Math.PI*2,true);shape.holes.push(path);}
+        for(const c of g.cutouts)if(c.points.length&&inside(c.points[0],ring)){const path=new THREE.Path();path.moveTo(c.points[0].x,c.points[0].y);c.points.slice(1).forEach(p=>path.lineTo(p.x,p.y));path.closePath();shape.holes.push(path);}
+        const geo=new THREE.ExtrudeGeometry(shape,{depth:g.thicknessMm,bevelEnabled:false,curveSegments:24});
+        const material=g.kind==='bracket-wing'?bracketMat:g.kind.startsWith('screw')?gearBoltMat:plateMaterial(part.color || '#8799aa');
+        const mesh=new THREE.Mesh(geo,material);mesh.matrixAutoUpdate=false;mesh.matrix.fromArray(part.pose.matrix);mesh.matrixWorldNeedsUpdate=true;
+        mesh.userData.partId=part.partId;mesh.userData.geometryVersion=g.geometryVersion;
+        addPart(mesh,part.pickKey);
+      }
+    }
+  }
+
   function renderModel(model) {
 
     // 機架：直接使用 2D / DXF 共用的 frameGeometry，孔位與加工輸出完全一致。
-    if (model.frame && Array.isArray(model.frame.outlines)) {
+    if (model.frame && !model.frame.materialPartId && Array.isArray(model.frame.outlines)) {
       model.frame.outlines.forEach((outline,index)=>{
         if(!Array.isArray(outline)||outline.length<3)return;
         const shape=new THREE.Shape(); shape.moveTo(outline[0].x,outline[0].y);
@@ -566,6 +600,7 @@ export function createViewer(container) {
     // G1：已安裝模組的固定板（<id>-frame）：與世界機架板同一套擠出（外框＋圓孔＋MG995 開口），色調略不同；
     // pickKey＝modframe:<模組 id>（直角子模組的子場景自動加 `${plane}/` 前綴）。z＝板底面（墊在該模組零件正下方）。
     (model.modulePlates || []).forEach(pl => {
+      if(pl.materialPartId)return;
       const outline = pl && pl.outline;
       if (!Array.isArray(outline) || outline.length < 3) return;
       const shape = new THREE.Shape(); shape.moveTo(outline[0].x, outline[0].y);
@@ -582,6 +617,7 @@ export function createViewer(container) {
 
     // 桿件：擠出成扁板
     model.sticks.forEach(s => {
+      if(s.materialPartId)return;
       let shape;
       if (s.outline && s.outline.length >= 3) {
         shape = new THREE.Shape();
@@ -609,6 +645,7 @@ export function createViewer(container) {
 
     // 三點桿：擠出成實心三角板（取代它三條邊各自的桿）
     (model.plates || []).forEach(pl => {
+      if(pl.materialPartId)return;
       let shape;
       if (pl.outline && pl.outline.length >= 3) {
         // 共用板形（world 座標）：夾爪等直接沿用 2D/DXF 外形與孔位，形狀完全一致。
@@ -688,6 +725,7 @@ export function createViewer(container) {
     // 齒輪：和 2D 共用齒形產生器，整條嚙合鏈在同一個內側 z 平面。
     // 齒形本體套 meshPhase 讓齒對齒隙；輪緣輸出銷另依 solver p2 畫在真實位置。
     (model.gears || []).forEach(g => {
+      if(!g.materialPartId) {
       const group = new THREE.Group();
       group.position.set(g.center.x, g.center.y, 0);
       group.rotation.z = g.angle + g.meshPhase;
@@ -702,6 +740,7 @@ export function createViewer(container) {
       body.position.z = g.z;
       group.add(body);
       addPart(group, 'gear:' + g.id);
+      }
 
       const boltH = Math.max(1, g.thickness * 0.35);
       const pinR = Math.max(0.5, Number(g.pinHoleDiameter || 5) / 2);

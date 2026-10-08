@@ -71,9 +71,9 @@ export function gearMeshPhaseDeg(gear, points, gearById, memo = new Map()) {
   const angleA = Math.atan2(pinA.y - centerA.y, pinA.x - centerA.x);
   const angleB = Math.atan2(pinB.y - centerB.y, pinB.x - centerB.x);
   const parentPhase = gearMeshPhaseDeg(driver, points, gearById, memo) * Math.PI / 180;
-  let q = (teethA * (betaA + angleA + parentPhase) + teethB * (betaB + angleB)) / (2 * Math.PI);
+  let q = (teethA * (betaA - angleA - parentPhase) + teethB * (betaB - angleB)) / (2 * Math.PI);
   q -= Math.floor(q);
-  const phase = (0.5 - q) * (360 / teethB);
+  const phase = (q - 0.5) * (360 / teethB);
   memo.set(gear.id, phase);
   return phase;
 }

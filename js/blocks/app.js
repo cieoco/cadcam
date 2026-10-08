@@ -24,7 +24,9 @@ import { buildOrthogonalChildren, planeInputs, attachModulePlates } from '../blo
 // 純邏輯模組
 import * as View from './view.js';
 import { createFusionEditor, drawFusion } from './fusion-editor.js';
-import { transformFusion } from './part-fusion.js';
+import { createPartGeometrySource } from './part-geometry.js';
+import { attachPartMaterials } from '../blocks3d/part-pose.js';
+const partGeometrySource=createPartGeometrySource();
 import * as Render from './render.js';   // SVG 繪製基元（純呈現）
 import * as Panels from './panels.js';   // 編輯面板呈現（讀 S + 寫 DOM）
 import * as Tools from './tools.js';     // 工具模式互動（畫桿 / 畫滑軌 / 畫三點桿 / 連桿升級滑軌）
@@ -1771,59 +1773,17 @@ function push3DNow() {
   const allPlanes = !designView && hasOrthogonalModules() && lastModelInputsAll ? lastModelInputsAll : null;
   const planesApi = designView ? focusInputs(lastModelInputsAll, viewComps()) : allPlanes ? planeInputs(allPlanes, S.comps, S.modules, null) : lastModelInputs;
   const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = planesApi;
-  const mountSplit3d=Exporters.splitMountsByHost(S.comps,motorFrameExportMounts());
-  const frameGeometry=designView && S.viewPlane ? null : Exporters.inspectFrameExport(designView ? viewFrameNodes() : frameConnectorNodes(),Settings.exportSettings(),designView ? viewMounts(viewWorldMounts(mountSplit3d.free)) : viewWorldMounts(mountSplit3d.free));
-  // 三點桿板形：3D 直接沿用 2D/DXF 共用的 createPlateGeometry 外形（含 shapeMode——
-  // 包絡板/多邊形板/折線桿——與 vertices 順序），孔位與加工輸出一致，三視圖不分歧。
-  // 以孔序字串為鍵，供 scene-model 對應到各片板；找不到原 comp 的純視覺 polygon 退回夾爪近似。
-  // 幾何表以 id 為鍵，各平面的場景共用；有直角安裝時用全平面的點／板，子平面的桿與板才有外形。
-  const geomPts = allPlanes ? allPlanes.pts : pts;
-  const geomPolygons = allPlanes ? allPlanes.polygons : polygons;
-  const plateGeometries={};
-  const barGeometries={};
-  const memberStocks={};
-  // G2：直角安裝的轉接座宿主孔（ADAPTER_HOLE）也要鑽在 3D 的宿主桿上，和匯出的桿件孔一致。
-  const adapterBarHoles = allPlanes ? (orthoExtrasNow().linkHoles || {}) : {};
-  S.comps.filter(c => c.type === 'bar').forEach(bar => {
-    const barId = bar.id, mounts = mountSplit3d.hosted.get(barId);
-    if (!bar || !geomPts[bar.p1.id] || !geomPts[bar.p2.id]) return;
-    const a = geomPts[bar.p1.id], b = geomPts[bar.p2.id];
-    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    const geometry = mounts?.length ? Exporters.hostedBarGeometry(bar, geomPts, Settings.exportSettings(), mounts, adapterBarHoles[barId] || [])
-      : Exporters.inspectLinkExport(bar, len, Settings.exportSettings(), adapterBarHoles[barId] || []);
-    memberStocks[barId] = memberStock(bar);
-    if (!geometry?.outlines?.length) return;
-    const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
-    const world = point => ({ x: a.x + point.x * ux - point.y * uy, y: a.y + point.x * uy + point.y * ux });
-    barGeometries[barId] = {
-      outline: geometry.outlines[0].map(world),
-      holes: geometry.holes.map(hole => ({ ...world(hole), r: hole.r })),
-      cutouts: (geometry.cutouts || []).map(cutout => ({ ...cutout, points: cutout.points.map(world) }))
-    };
-  });
-  (geomPolygons||[]).forEach(poly=>{
-    const world=poly.points.map(id=>geomPts[id]).filter(p=>p&&Number.isFinite(p.x));
-    if(world.length<3) return;
-    const key=poly.points.join(',');
-    const comp=S.comps.find(c=>c.type==='triangle'&&c.p1&&c.p2&&c.p3&&[c.p1.id,c.p2.id,c.p3.id].join(',')===key)
-      || (poly.shape==='jaw' ? {shape:'jaw',jawTurnSign:poly.jawTurnSign} : null);
-    if(!comp) return;
-    // 靜態結構板承載的馬達穿板特徵一併切進 3D 板身（同 2D/DXF）。
-    const hostedPlateMounts=comp.id?mountSplit3d.hosted.get(comp.id):null;
-    const extras=(hostedPlateMounts&&hostedPlateMounts.length)?Exporters.plateMountExtras(hostedPlateMounts):null;
-    memberStocks[key] = memberStock(comp);
-    const g=createPlateGeometry(comp,world,{radius:HULL_R_WORLD,holeRadius:Settings.exportSettings().holeDiameterMm/2,...(extras||{})});
-    if(g.outlines.length) plateGeometries[key]={outline:g.outlines[0],holes:g.holes,cutouts:g.cutouts||[]};
-  });
-  const fusedParts={};
-  S.comps.filter(c=>c.fusedWith).forEach(plate=>{
-    const f=Exporters.inspectFusion(S.comps,plate,S.topo.params,Settings.exportSettings());
-    if(f.ok)fusedParts[f.gear.id]={...f,geometry:transformFusion(f.geometry,f.gear,geomPts),ids:[plate.p1.id,plate.p2.id,plate.p3.id]};
-  });
-  const baseOpts = { hullR: HULL_R_WORLD, plateGeometries, barGeometries, memberStocks, fusedParts };
-  // G1：已安裝模組的固定板（目前位姿）；主平面的放進主場景，直角子平面的由 buildOrthogonalChildren 放進各自的子場景。
-  const plates = modulePlates.at(designView ? lastModelInputsAll.pts : geomPts, homeMountsNow).filter(pl => !designView || pl.moduleId === S.designFocus);
-  const model = buildSceneModel(links, pts, {
+  const stockMm=Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;
+  const catalog=partGeometrySource.get({comps:S.comps,modules:S.modules,params:S.topo.params,fabrication:S.fabrication || {},
+    exportSettings:Settings.exportSettings(),frameNodes:designView?viewFrameNodes():frameConnectorNodes(),mounts:homeMountsNow(),
+    frameMounts:designView?viewMounts(viewWorldMounts(Exporters.splitMountsByHost(S.comps,homeMountsNow()).free)):undefined});
+  const geomPts=allPlanes?allPlanes.pts:pts;
+  const frameGeometry=designView&&S.viewPlane?null:catalog.parts.frame || null;
+  const baseOpts={hullR:HULL_R_WORLD,plateThickness:stockMm,memberStocks:catalog.memberStocks,gearGeometries:catalog.parts,fusedParts:catalog.fusedParts};
+  // Home frame material stays local. The shared pose adapter moves it once.
+  const plates=catalog.frameHomes.filter(h=>!designView || h.moduleId===S.designFocus).map(h=>({moduleId:h.moduleId,plane:h.plane,
+    outlines:h.geometry.outlines,outline:h.geometry.outlines[0],holes:h.geometry.holes,cutouts:h.geometry.cutouts,thicknessMm:catalog.parts[h.name]?.thicknessMm || h.stockMm}));
+  let model = buildSceneModel(links, pts, {
     ...baseOpts, groundIds, motorCenters: motorCenterIds, motorTypes, motorMounts,
     polygons, sliders, gears, racks, cams, pulleys, belts, frameGeometry
   });
@@ -1846,6 +1806,7 @@ function push3DNow() {
     const screws = model.orthogonal.flatMap(child => child.screws || []);
     if (screws.length) model.screws = screws;
   }
+  model=attachPartMaterials(model,catalog,{comps:S.comps,modules:S.modules,points:allPlanes?allPlanes.pts:designView?lastModelInputsAll.pts:pts});
   viewer3D.update(model);
   bench.afterScene({ pts: planesApi.pts, ptsAll: allPlanes ? allPlanes.pts : planesApi.pts, model });   // 組立台：接口標記跟著這一幀的宿主位置
 }

@@ -5,7 +5,7 @@
 ## 接手資訊
 
 - 分支：`codex/framework-stabilization`；起點：`1537242`（應用 `2026.10.08.13`）。
-- 唯一寫入者：`w4a_physical`（Sol high）；W3a `308d3ab` 正式交棒施工 W4a 第一個 LOOP；前 writer 已停止，主代理 `/root` 只讀審閱與 HTTP 驗收。
+- 唯一寫入者：`w4a_physical`（Sol high）；W4a-1 `a863232` 正式交棒施工 W4a 第二個 LOOP；前 writer 已停止，主代理 `/root` 只讀審閱與 HTTP 驗收。
 - 本機：Windows、Node `v25.2.0`、Python `3.13.5`。CI 的 Node 版本在 W1 固定並驗證。
 - 使用者原有未追蹤附件、`Claude outputs/`、截圖及框架檢討文件保留。提交只選本包檔案。
 - Astra 僅 low；更高推理強度須另獲確認。主聊天不宣稱自行切換模型。
@@ -122,3 +122,19 @@
 - 回交：本包 scoped 本地提交後 w4a_physical 停止寫入；主代理接手／指定下一唯一寫入者；W4a 材料SAT／單一姿態干涉與播放快取、W5a 草稿交易／全部流向、W4b 沿邊核心委派仍未完成，不宣稱 W4a 或 G1 完工。模型精確 token 無可取得資料，記實際 Sol high 與一次全suite，不虛報用量。
 - 最終 HTTP：主代理確認 token `f759f9fbc83768096886` 主頁／iframe 相同；更正 fixture 顯示 M1/M2 兩組動力就緒，樹與面板均角碼固定／3顆。實際 M1 播放後停在325°（−35°），模型、角碼與真螺絲保持可見。實際下載製作包 default 13×9.5×7／厚1.2 ×3、M3×6 ×6；custom 14×10×7／厚1.5 ×3、M3×6 ×6，各板3支。custom 精靈開啟／取消正常，無新 console 錯誤；截圖 `output/framework-stabilization/w4a-physical/http-mounted.jpg`（不提交）。
 - 收尾只補測試側的規格期望：custom／預設尺寸直接由測試輸入獨立列值，audit 不以 production.spec 當規格期望；新 target 再跑1/1及同 token check通過（`independent-spec/`）。生產程式未改，不重跑無變更全suite。
+
+### LOOP W4a-2／F1 材料幾何與姿態（done）
+
+- 唯一寫入者 w4a_physical，Sol high；起點 `a863232`。純局部 PartGeometry catalog、PartPose 與正式3D加工幾何；不改存檔／solver，不實作SAT／viewer mesh快取。
+- 新紅燈 `test/material-geometry.mjs`：3D缺實際齒輪輸出孔；另用23°中心線／15,19齒獨立齒距及剛體旋轉驗齒相，證據 `output/framework-stabilization/w4a-material/`。
+
+- 共用 `part-geometry.js` 由既有 fabrication inspectors 建立穩定局部輪廓（全部 islands）、孔用途／pairID／cutouts／板厚／sourceIds／geometryVersion。clone 全輸入，無模組 compileTopology 的既有原地修改亦不污染呼叫者；形狀 catalog key 包含 params（除 theta）、comps/modules/fabrication/export/spec、frame scope 與 home mounts，播放保留相同形狀物件。未增存檔欄位。
+- `part-pose.js` 在正式 app.push3DNow 接入 frame、mounted-frame、bar、triangle、gear/fusion、F1 bracket wings 與 screw shaft/head；全部 materialParts 攜带 stable partId/moduleId/pickKey、geometry 與 world4x4。sticks.z為底面、frame.z為背面；巢狀 child.matrix 已完整世界矩陣，只套一次。孔 metadata 保留，bracket 孔由 actual box.hole.center 投影局部 axes，不重算 holeEnd。沿邊角碼仍是具名 legacy bridge，W4b 才委派共同核心。
+- 齒相獨立條件 `NA(βA−θA−φA)+NB(βB−θB−φB)≡π` 與剛體旋轉紅測證明舊 beta+angle 式錯誤；共享 transmission phase 改採減角，2D／3D／gear exporter 同源，不改 solver。加工齒形以 seed機械角＋phase 轉一次；輸出／舵盤孔只沿機械角。fusion 不再二次旋轉齒形。3D 消費 export 的8段齒形與所有實際孔，移除 F1 每幀重新加工輪廓／round 的路徑。
+- Viewer 僅把共同 material 輪廓擠出與 world pose 表示；保留原 pan-head lathe profile／槽形外觀（共享 solid profile）。多outline／holes／cutouts 使用同一幾何；未支持的 rails/carriages/racks/cams/pulleys/belts/motors/pins/grounds 逐項 geometryDiagnostics，缺 material／pose 明確診斷，不當成材料檢查成功。main frame moduleId=null 為 global固定板，SAT package 依 source owners 增補需要的歸屬；本包沒有實作材料SAT。
+- 新 committed 純 fixture `test/fixtures/f1-assembly-fixture.mjs` 依正常 instantiateTemplate usedMotorIds 分配1/2。target 覆蓋 frozen inputs（有／無modules）、key尺寸／厚度／theta／重開／取消、未裝／已裝各設計frame加工來源、0/20/40 F1實際世界板孔、牙孔、gear輸出／horn孔、fusion板孔與真正二層遞迴nested。逆變換殘差1e-6 mm、加工孔0.005 mm，unsupported負例。既有 fusion／gear定向維持。
+- generate/check token `7ff40db17bfe09c6a5ac`（125 modules／15 pages）；完整 manifest 一次 Node22.14.0 `148/148 passed`，無失败／逾時。起點a863232＋tracked changes、逐支stdout/stderr/exit code、實際manifest SHA留 `output/framework-stabilization/w4a-material/full/results.json`。收尾只恢復manifest既有順序，內容仍148支，未重跑無變更全suite。
+- HTTP fixtures 沿用 `output/framework-stabilization/w4a-physical/ui-{unmounted,mounted,custom-spec}.blocks.json`；ignored手機CSS wrapper `output/framework-stabilization/mobile-check.html` 內嵌390×844真正blocks頁，供主代理HTTP操作。OPPO實機尚未量測，不宣稱效能通過。
+- 下一包 W4a-3：使用目前 materialParts actual outlines/holes/cutouts 建材料AABB→triangular prism SAT、合法配對與coverage/UI；W4a-4 才做viewer mesh復用／播放效能量測。W4b 沿邊 bridge、W5a交易與完整UIcoverage仍未完成，不宣稱W4a或G1完工。未push/deploy/version；scoped commit後停止寫入。
+
+- 主代理最終HTTP token `7ff40db17bfe09c6a5ac`：custom mounted正式3D可見齒輪／輸出孔／舵機／角碼，轉相機後M1播放暫停35°仍跟板；tree/panel皆3角碼確認。切夾爪設計頁再3D只顯示自己的frame／雙齒輪，未誤帶根固定板。390×844 wrapper實際走組立→選夾爪→重選面→preview→取消，iframe同token、3角碼標記，無新console error。證據 `output/framework-stabilization/w4a-physical/http-materials-35.jpg`／`http-materials-mobile.jpg`（不提交）。nested手機底部水平scroll列W5a UI檢查，未擴本包。完成scoped commit後唯一writer停止，主代理指定下一LOOP。

@@ -114,7 +114,7 @@ export function exportableGears(comps, params, settings) {
     .filter(c => c && c.type === 'gear' && c.p1 && c.p2)
     .map(c => {
       const plate=comps.find(p=>p.fusedWith===c.id);
-      if(!plate)return {comp:c,geometry:gearGeometry(c,params,settings)};
+      if(!plate)return {comp:c,geometry:gearGeometry(c,params,settings,comps)};
       const fused=inspectFusion(comps,plate,params,settings);
       if(!fused.ok)throw Error(`合成零件 ${plate.id}：${fused.reason}`);
       return {comp:c,geometry:fused.geometry,fusedPlate:plate};
@@ -276,13 +276,12 @@ function dxfCircle(x, y, radius, layer) {
   ].join('\n');
 }
 
-function gearGeometry(comp, params = {}, settings = {}) {
+function gearGeometry(comp, params = {}, settings = {}, comps = []) {
   const teeth = Math.max(6, Math.round(Number(comp.teeth) || 12));
   const pitchR = Number(params && comp.radiusParam ? params[comp.radiusParam] : NaN) ||
     (Number(comp.module) > 0 ? teeth * Number(comp.module) / 2 : 36);
   const module = Math.max(0.1, 2 * pitchR / teeth);
-  const outline = createGearPath({ teeth, module, segmentsPerTooth: 8 })
-    .map(p => ({ x: round(p.x), y: round(p.y) }));
+  const ring = createGearPath({ teeth, module, segmentsPerTooth: 8 });
   const pinR = Number(params && comp.pinRadiusParam ? params[comp.pinRadiusParam] : NaN) ||
     Number(comp.pinRadius) ||
     Math.max(4, pitchR * 0.6);
@@ -291,6 +290,10 @@ function gearGeometry(comp, params = {}, settings = {}) {
   const dx = Number(seedPin.x) - Number(seedCenter.x);
   const dy = Number(seedPin.y) - Number(seedCenter.y);
   const angle = Math.hypot(dx, dy) > 1e-6 ? Math.atan2(dy, dx) : 0;
+  // Machine coordinates share the seed pin orientation. Teeth include the mesh
+  // phase; output and horn holes keep the mechanical pin angle only.
+  const toothAngle=angle+gearMeshPhaseDeg(comp,{},new Map(comps.map(c=>[c.id,c])))*Math.PI/180;
+  const outline=ring.map(p=>({x:round(p.x*Math.cos(toothAngle)-p.y*Math.sin(toothAngle)),y:round(p.x*Math.sin(toothAngle)+p.y*Math.cos(toothAngle))}));
   const { holeDiameterMm } = normalizeExportSettings(settings);
   const centerR = holeDiameterMm / 2;
   const outputR = Math.max(0.5, Number(comp.pinHoleDiameter) > 0 ? Number(comp.pinHoleDiameter) / 2 : centerR);
@@ -319,8 +322,8 @@ function gearGeometry(comp, params = {}, settings = {}) {
   };
 }
 
-export function inspectGearExport(comp, params = {}, settings = {}) {
-  const { outline, holes, cutouts } = gearGeometry(comp, params, settings);
+export function inspectGearExport(comp, params = {}, settings = {}, comps = []) {
+  const { outline, holes, cutouts } = gearGeometry(comp, params, settings, comps);
   return { outline, holes, cutouts };
 }
 
@@ -328,7 +331,7 @@ export function inspectFusion(comps, plate, params={}, settings={}) {
   const gear=comps.find(c=>c.id===plate?.fusedWith);
   if(!gear || !fusionCandidates(comps,plate).includes(gear))return {ok:false,reason:'原齒輪或共用連接孔已改變，請解除合成後重新選擇'};
   try {
-    const gg=gearGeometry(gear,params,settings);
+    const gg=gearGeometry(gear,params,settings,comps);
     // Reconstruct the plate from its dimensions and the gear-controlled shared holes.
     // Home coordinates are branch hints, not current dimensions after editing gear parameters.
     const original=[plate.p1,plate.p2,plate.p3], ps=original.map(p=>({...p}));
@@ -343,9 +346,8 @@ export function inspectFusion(comps, plate, params={}, settings={}) {
     ps[ib]={...ps[ib],x:gear.p1.x+pin.x,y:gear.p1.y+pin.y};
     ps[ic]={...ps[ic],x:gear.p1.x+x*ux-sign*Math.sqrt(h2)*uy,y:gear.p1.y+x*uy+sign*Math.sqrt(h2)*ux};
     const pg=inspectPlateExport(plate,ps,settings);
-    const phase=(Math.atan2(gear.p2.y-gear.p1.y,gear.p2.x-gear.p1.x)*180/Math.PI+gearMeshPhaseDeg(gear,{},id=>comps.find(c=>c.id===id)))*Math.PI/180;
-    const c=Math.cos(phase),s=Math.sin(phase),relative=p=>({x:p.x-gear.p1.x,y:p.y-gear.p1.y});
-    const gearRing=gg.outline.map(p=>({x:p.x*c-p.y*s,y:p.x*s+p.y*c}));
+    const relative=p=>({x:p.x-gear.p1.x,y:p.y-gear.p1.y});
+    const gearRing=gg.outline;
     const plateRings=pg.outlines.map(r=>r.map(relative));
     const loops=unionOutlines([gearRing,...plateRings]),outer=loops.filter(r=>area(r)>0);
     if(outer.length!==1)return {ok:false,reason:'兩個外形沒有連成一片，請調整板寬或孔距'};

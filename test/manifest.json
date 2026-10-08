@@ -99,6 +99,7 @@
     "test/load-graph.mjs",
     "test/mate-connect.mjs",
     "test/mate-multi.mjs",
+    "test/material-geometry.mjs",
     "test/mates-view.mjs",
     "test/mates.mjs",
     "test/measurement.mjs",
