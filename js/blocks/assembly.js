@@ -448,7 +448,12 @@ export function orthogonalFrame(comps, modules, moduleId, points, params, opts =
     const host = modList.find(m => m.id === mod.mount.to.module);
     const hostPose = host ? outputPose(host, mod.mount.to.output, points, list.filter(c => c && c.moduleId === host.id)) : null;
     if (!hostPose) return null;
-    const ref = mod.mount.ref || IDENTITY_POSE;
+    // Face transforms and drilling are authored in the design geometry, not the
+    // solved theta-zero pose stored by older mounts. Use the same design frame
+    // as the stock holes; this also repairs existing saved face placements.
+    const hostComps = list.filter(c => c && c.moduleId === host.id);
+    const ref = outputPose(host, mod.mount.to.output, pointCoords(hostComps), hostComps);
+    if (!ref) return null;
     const angle = (hostPose.a - ref.a) * D2R, cos = Math.cos(angle), sin = Math.sin(angle);
     const rotate = v => ({ x: cos * v[0] - sin * v[1], y: sin * v[0] + cos * v[1], z: v[2] });
     const transform = face.rotation, t = face.translation;
