@@ -10,6 +10,7 @@ import { mountFacePlacement } from './face-mount.js';
 import { pointCoords } from './model.js';
 import { inspectLinkExport, inspectPlateExport } from './exporters.js?v=20261007_9';
 import { connectionSelection } from './connection-selection.js';
+import { readConnectionDescriptor } from './connection-descriptor.js';
 
 function reference(surface, name, parts = []) {
   const axes = ['x', 'y', 'z'];
@@ -48,11 +49,22 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     }
     return result;
   };
-  const childSelection = connectionSelection(child, 'child');
+  const saved = initialMount?.face ? readConnectionDescriptor({ comps, modules, childId, mount: initialMount }) : null;
+  // Reselect starts from the saved endpoints. Current design presets are only
+  // defaults for a new connection; ambiguous legacy records require a choice.
+  if (saved && (!saved.host || !saved.child || saved.host.source.kind === 'frame')) {
+    say(saved.diagnostics[0]?.message || '原接合端點無法使用，請先修復缺少的零件。'); return;
+  }
+  const repairChild = saved && !saved.child.available;
+  const repairHost = saved && !saved.host.available;
+  const needsChoice = repairChild || repairHost;
+  if (needsChoice) say(saved.diagnostics[0]?.message || '請重新選取接合端點。');
+  const childSelection = saved ? (repairChild ? null : { part: saved.child.partId, face: saved.child.face }) : connectionSelection(child, 'child');
   const chosenAttach = childSelection?.part;
   const attachComp = comps.find(c => c.moduleId === childId && c.id === chosenAttach && c.type === 'bar' && [c.p1, c.p2].every(p => p && (p.type === 'fixed' || p.type === 'motor')));
   if (chosenAttach && chosenAttach !== 'frame' && !attachComp) { say('這個接合面在活動桿上；請把它作為承接機構，另一個機構選固定桿的面。'); return; }
-  const childSurfaces = attachComp ? buildMountSurfaces({ comps, modules: modules.map(m => m.id === childId ? { ...m, outputs: [{ id: 'face-attach', name: attachComp.name || attachComp.id, at: attachComp.p1.id, body: { kind: 'bar', id: attachComp.id } }] } : m), params, moduleId: childId, exportSettings, thicknessMm: stockMm, drilling: true }).surfaces || [] : surfaces(childId);
+  const partSurfaces = partId => buildMountSurfaces({ comps, modules, params, moduleId: childId, partId, exportSettings, thicknessMm: stockMm, drilling: true }).surfaces || [];
+  const childSurfaces = attachComp ? partSurfaces(attachComp.id) : surfaces(childId);
   const childSurface = childSurfaces.find(s => attachComp ? s.outputId === 'face-attach' : s.kind === 'frame');
   const eligible = m => {
     if (m.mount && !m.mount.face) return false;
@@ -63,9 +75,10 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     }
     return true;
   };
-  const hosts = modules.filter(eligible).flatMap(m => { const selected = connectionSelection(m, 'host'); return surfaces(m.id).filter(s => s.kind === 'output' && (!selected || s.compId === selected.part)).map(s => reference(s, `${m.name} · ${s.name}`, parts(m.id))); });
+  const hosts = modules.filter(eligible).flatMap(m => { const selected = connectionSelection(m, 'host'); return surfaces(m.id).filter(s => s.kind === 'output' && (repairHost || !selected || s.compId === selected.part || (saved && s.moduleId === saved.host.moduleId && s.outputId === saved.host.source.outputId))).map(s => reference(s, `${m.name} · ${s.name}`, parts(m.id))); });
   if (!childSurface || !hosts.length) { say('需要另一個有承接板的機構，以及安裝端的固定底板。'); return; }
-  const children = [reference(childSurface, `${child.name} · ${attachComp ? attachComp.name || attachComp.id : '固定桿／底板'}`, parts(childId))];
+  const candidates = repairChild ? [childSurface, ...comps.filter(c => c.moduleId === childId && c.type === 'bar' && [c.p1, c.p2].every(p => p && ['fixed', 'motor'].includes(p.type))).map(c => partSurfaces(c.id).find(s => s.compId === c.id))].filter(Boolean) : [childSurface];
+  const children = candidates.map(s => reference(s, `${child.name} · ${s.kind === 'frame' ? '固定桿／底板' : s.name}`, parts(childId)));
   const dialog = document.createElement('dialog');
   dialog.setAttribute('aria-label', '接合預覽');
   dialog.style.cssText = 'width:min(960px,100vw);height:94dvh;max-width:100vw;max-height:100dvh;padding:0;border:0;border-radius:14px;';
@@ -91,16 +104,17 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     };
     if (e.data?.type === 'face-wizard-ready') {
       if (!loadSession.receiveReady(e.data.loadGraph)) { rejectLoad(); return; }
-      frame.contentWindow.postMessage({ type: 'face-wizard-init', loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement, hosts: hosts.map(h => ({ ...h, defaultFace: connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, configured: !!childSelection, mode: wizard || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
+      frame.contentWindow.postMessage({ type: 'face-wizard-init', loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement: startAtPlacement && !needsChoice, hosts: hosts.map(h => ({ ...h, defaultFace: saved && h.surface.moduleId === saved.host.moduleId && h.surface.outputId === saved.host.source.outputId ? saved.host.face : connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, configured: !!childSelection && !needsChoice, mode: wizard || needsChoice || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
     }
     if (e.data?.type !== 'face-wizard-confirm') return;
     if (!loadSession.allowConfirm(e.data.loadGraph)) { rejectLoad(); return; }
     if (!isCurrent()) { dialog.close(); say('作品已變動，請重新選擇接法。'); return; }
     const selection = e.data.selection;
-    if (!selection || !Number.isInteger(selection.host) || selection.host < 0 || selection.host >= hosts.length || selection.child !== 0) return;
-    const host = hosts[selection.host], result = buildFacePlacement({ host, child: children[0], selection });
+    if (!selection || !Number.isInteger(selection.host) || selection.host < 0 || selection.host >= hosts.length || !Number.isInteger(selection.child) || selection.child < 0 || selection.child >= children.length) return;
+    const host = hosts[selection.host], selectedChild = children[selection.child], childSurface = selectedChild.surface;
+    const result = buildFacePlacement({ host, child: selectedChild, selection });
     if (!result.ok) { frame.contentWindow.postMessage({ type: 'face-wizard-error', reason: result.reason }, location.origin); return; }
-    const face = { version: 1, ...result.record.transform, selection: result.record.selection,
+    const face = { version: 1, childPart: childSurface.compId || 'frame', ...result.record.transform, selection: result.record.selection,
       hostThicknessMm: host.surface.box.max.z - host.surface.box.min.z,
       childThicknessMm: childSurface.box.max.z - childSurface.box.min.z };
     if (selection.brackets) {

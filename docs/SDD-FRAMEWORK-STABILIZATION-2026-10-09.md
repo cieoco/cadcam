@@ -123,6 +123,10 @@ flowchart TD
 
 禁止靜默猜測無法轉換的舊接合。保留來源紀錄並回傳可理解的原因；缺失接面不能自行替換成另一個零件。現有 JSON 讀寫與 round-trip 保留必要欄位；本輪衍生模型不寫入存檔。
 
+2026-10-09 使用者已核准 W0 最小反例後的兩項相容補充，維持 `blocks v1`：`mount.face.childPart` 可選欄位保存 `frame` 或固定桿穩定 ID，不依賴角碼啟用；六面宿主底板沿用既有 `mount.to.frame: { edge }`，不另加格式。新建立／精靈確認明確保存 childPart。schema 只保留，不補猜舊資料；舊角碼已保存的 childPart 可唯讀相容解讀，無法確定時診斷 `legacy_child_endpoint_ambiguous` 並保留原紀錄／轉換，要求可見重新選面。沒有新增其他存檔欄位。
+
+W3a 的 `connection-descriptor.js` 先接入 F1 六面來源，端點、placement、fastener 與能力分開，refresh／角碼／重選共用端點；其他來源明確 `connection_format_not_supported`。六面 `to.frame` 能保存與讀取，但幾何完整接入列 W3b（G1 後），暫回報 `host_frame_not_supported`，禁止改成輸出桿猜算。缺失端點仍保留格式合法的接合紀錄；宿主不存在時不承諾可求解世界姿態。歧義舊 child 的 3D 沿用既有顯示 anchor，明確標示未解析端點，不作有效固定或開孔依據。
+
 多位置的相容規則：
 
 - `mates.attach` 目前只有 `normalDeg`，它是安裝方向提示，不能憑方向猜成特定桿件的一面。`mates.receive[]` 保留既有 ID、名稱與有效參照，不淘汰、不壓成一筆 `faceParts`；依現行契約最多 8 筆命名承接位置，本輪不擴充此上限。

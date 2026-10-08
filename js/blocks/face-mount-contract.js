@@ -35,8 +35,10 @@ export function normalizeFaceMountContract(raw) {
   if (!finite(raw.hostThicknessMm) || raw.hostThicknessMm <= 0 || !finite(raw.childThicknessMm) || raw.childThicknessMm <= 0) {
     return fail('face.hostThicknessMm 與 face.childThicknessMm 必須是正的有限數值。');
   }
+  if (raw.childPart !== undefined && (typeof raw.childPart !== 'string' || !/^[\w.-]+$/.test(raw.childPart))) return fail('face.childPart 必須是底板或安全的零件 ID。');
   return { ok: true, value: {
     version: 1,
+    ...(raw.childPart !== undefined ? { childPart: raw.childPart } : {}),
     rotation: raw.rotation.map(row => row.slice()),
     translation: { x: t.x, y: t.y, z: t.z },
     selection: { ...(brackets ? { brackets } : {}), ...Object.fromEntries(SELECT_KEYS.map(k => [k, s[k]])), ...(s.rotationDeg !== undefined ? { rotationDeg: s.rotationDeg } : {}) },

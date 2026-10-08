@@ -1,13 +1,15 @@
-import { connectionSelection } from './connection-selection.js';
+import { readConnectionDescriptor } from './connection-descriptor.js';
 /** Recompute confirmed drilling against current stock; stale/invalid plans produce no holes. */
 import { buildMountSurfaces } from './mount-surfaces.js';
 import { planFaceBrackets, FACE_BRACKET_SPEC } from './face-bracket-geometry.js?v=20261008_bracket3d';
 
 function rawPlan(comps, modules, params, mod, opts={}) {
   if (!mod?.mount?.face?.selection?.brackets?.enabled) return null;
+  const descriptor=readConnectionDescriptor({comps,modules,childId:mod.id,mount:mod.mount});
+  if(!descriptor.capabilities.drilling)return {ok:false,reason:descriptor.diagnostics[0]?.message || '找不到支援開孔的接合板',diagnostics:descriptor.diagnostics};
   const surfaces=(id,partId)=>buildMountSurfaces({comps,modules,params,moduleId:id,partId,exportSettings:opts.exportSettings || {},thicknessMm:opts.stockMm || 3,drilling:true}).surfaces || [];
   const host=surfaces(mod.mount.to.module).find(s=>s.outputId===mod.mount.to.output);
-  const part=mod.mount.face.selection.brackets.childPart, own=surfaces(mod.id,part);
+  const part=descriptor.child.partId, own=surfaces(mod.id,part);
   const child=own.find(s=>part && part!=='frame'?s.compId===part:s.kind==='frame');
   if (!host || !child || host.body?.kind==='rack' || child.body?.kind==='rack') return {ok:false,reason:'找不到支援開孔的接合板'};
   return {...planFaceBrackets(host,child,mod.mount.face,mod.mount.face.selection.brackets.offsets),host,child};
@@ -57,8 +59,10 @@ export function faceBracketStatus(comps, modules, params, mod, opts={}) {
   const confirmed=faceBracketPlan(comps,modules,params,mod,opts);
   if(confirmed)return {fixed:confirmed.ok,reason:confirmed.ok?`角碼 ${confirmed.brackets.length} 顆 · 兩板固定孔已生成 Ø3.2 mm`:`角碼孔暫停輸出：${confirmed.reason}`};
   if(!mod?.mount?.face)return {fixed:false,reason:'尚未設定接合面'};
+  const descriptor=readConnectionDescriptor({comps,modules,childId:mod.id,mount:mod.mount});
+  if(!descriptor.capabilities.drilling)return {fixed:false,reason:descriptor.diagnostics[0]?.message || '找不到支援開孔的接合板',diagnostics:descriptor.diagnostics};
   const selection=mod.mount.face.selection;
-  const candidate={...mod,mount:{...mod.mount,face:{...mod.mount.face,selection:{...selection,brackets:{enabled:true,childPart:connectionSelection(mod,'child')?.part || 'frame',offsets:{}}}}}};
+  const candidate={...mod,mount:{...mod.mount,face:{...mod.mount.face,selection:{...selection,brackets:{enabled:true,childPart:descriptor.child.partId,offsets:{}}}}}};
   const plan=faceBracketPlan(comps,modules.map(m=>m.id===mod.id?candidate:m),params,candidate,opts);
   return {fixed:false,reason:plan?.ok?'此位置可配置角碼，尚未確認生成固定孔。':`無法配置角碼：${plan?.reason || '找不到接合板，請重新選面'}`};
 }

@@ -1,4 +1,5 @@
 import { faceBracketPlan } from '../blocks/face-bracket-extras.js';
+import { readConnectionDescriptor } from '../blocks/connection-descriptor.js';
 import { faceBracketBoxes } from './face-brackets.js';
 /**
  * blocks3d / orthogonal-3d（O6）
@@ -207,17 +208,23 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
       if (host) {
         if (mod.mount.face) {
           const face = mod.mount.face;
+          const connection = readConnectionDescriptor({ comps, modules, childId: id });
+          // Legacy display keeps the old visual anchor without resolving or
+          // validating that anchor as a persisted connection endpoint.
+          const legacyDisplay = connection.host?.available && connection.host.source.kind === 'output' && connection.child?.reason?.code === 'legacy_child_endpoint_ambiguous';
+          if (!connection.ok && !legacyDisplay) { done.set(id, null); return null; }
           const output = modules.find(m => m.id === mod.mount.to.module)?.outputs?.find(o => o.id === mod.mount.to.output);
           // 齒條既有預覽採全域厚度；六面接合使用確認時的加工板厚，保持可見面與間距一致。
           const hostRack = host.model.racks?.find(r => r.id === output?.body?.id);
           if (hostRack) hostRack.thickness = face.hostThicknessMm;
           const model = buildModel(planeInputs(inputs, comps, modules, id));
           attachModulePlates(model, comps, plates, id);
-          const childZ = moduleFrameZ(model, comps, id);
-          if (childZ === null || !output?.body?.id) { done.set(id, null); return null; }
+          const childZ = legacyDisplay || connection.child.partId === 'frame' ? moduleFrameZ(model, comps, id) : model.sticks?.find(s => s.id === connection.child.partId)?.z;
+          if (!Number.isFinite(childZ) || !output?.body?.id) { done.set(id, null); return null; }
           const hostCenterZ = hostBodyZ(host.model, { compId: output.body.id }, comps) + face.hostThicknessMm / 2;
           const childCenterZ = childZ + face.childThicknessMm / 2;
           result = { model, matrix: multiply4(host.matrix, orthogonalMatrix(frame, hostCenterZ, -childCenterZ)), brackets: [], screws: [] };
+          if (legacyDisplay) { result.displayAnchor = { kind: 'legacy-frame', resolvedEndpoint: false }; result.diagnostics = connection.diagnostics; }
           const drilling=faceBracketPlan(comps,modules,params,mod,{stockMm,exportSettings});
           const R=face.rotation,T=face.translation;
           const inverse=[R[0][0],R[0][1],R[0][2],0,R[1][0],R[1][1],R[1][2],0,R[2][0],R[2][1],R[2][2],0,
@@ -250,6 +257,6 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
   };
   return ids.map(id => {
     const r = solve(id);
-    return r ? { id, matrix: r.matrix, model: r.model, brackets: r.brackets || [], screws: r.screws || [] } : null;
+    return r ? { id, matrix: r.matrix, model: r.model, brackets: r.brackets || [], screws: r.screws || [], ...(r.displayAnchor ? { displayAnchor: r.displayAnchor, diagnostics: r.diagnostics } : {}) } : null;
   }).filter(Boolean);
 }

@@ -17,13 +17,13 @@ const fixture = normalizeSnapshot(raw);
   const part = mod.outputs.find(o => o.body?.id).body.id;
   const snap = normalizeSnapshot({ ...raw, modules: raw.modules.map(m => m.id === mod.id ? { ...m, faceParts: { part, face: 'bottom' } } : m) });
   const selected = snap.modules.find(m => m.id === mod.id);
-  check('每個設計只保存一個桿件與一個面', JSON.stringify(selected.faceParts) === JSON.stringify({ part, face: 'bottom' }));
-  check('同一接合面不因安裝角色改變', JSON.stringify(connectionSelection(selected, 'host')) === JSON.stringify(connectionSelection(selected, 'child')));
+  check('每個設計保存一個桿件與一個面的預選', JSON.stringify(selected.faceParts) === JSON.stringify({ part, face: 'bottom' }));
+  check('同一預選面不因安裝角色改變', JSON.stringify(connectionSelection(selected, 'host')) === JSON.stringify(connectionSelection(selected, 'child')));
   const template = normalizeTemplate(moduleToTemplate(snap.comps, snap.modules, snap.params, mod.id)).template;
   const instance = instantiateTemplate(template, {});
   check('匯出模組再插入仍選到同一桿件的面', template.faceParts?.part === part && instance.module.faceParts?.face === 'bottom' && instance.comps.some(c => c.id === instance.module.faceParts.part));
   const removed = normalizeSnapshot({ ...raw, modules: raw.modules.map(m => ({ ...m, faceParts: { part: 'deleted-part', face: 'top' } })) });
-  check('已刪除桿件的單一選面被清除', removed.modules.every(m => !m.faceParts));
+  check('已刪除桿件的預選面被清除', removed.modules.every(m => !m.faceParts));
 }
 {
   const configured = normalizeSnapshot({ ...raw, modules: raw.modules.map(m => ({ ...m, faceParts: { receive: m.outputs?.[0]?.id, attach: 'frame', receiveFace: 'bottom', attachFace: 'top' } })) });

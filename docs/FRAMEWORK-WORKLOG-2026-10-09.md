@@ -5,7 +5,7 @@
 ## 接手資訊
 
 - 分支：`codex/framework-stabilization`；起點：`1537242`（應用 `2026.10.08.13`）。
-- 唯一寫入者：`w1_safety`（Sol high）；主代理 `/root` 交棒後只讀審阅，`endpoint_audit`（Sol high）只讀審閱 D1 保存契約。
+- 唯一寫入者：`endpoint_audit`（Sol high）；W2 `89a19ded` 正式交棒施工 W3a，`w1_safety` 已停止寫入，主代理 `/root` 只讀審阅與 HTTP 驗收。
 - 本機：Windows、Node `v25.2.0`、Python `3.13.5`。CI 的 Node 版本在 W1 固定並驗證。
 - 使用者原有未追蹤附件、`Claude outputs/`、截圖及框架檢討文件保留。提交只選本包檔案。
 - Astra 僅 low；更高推理強度須另獲確認。主聊天不宣稱自行切換模型。
@@ -18,11 +18,29 @@
 | W0 | reproducing | 重新登錄並執行測試；核對 D1 端點保存能力與教材缺口 |
 | W1 | done | 九項失敗完成分類／修正；Node 22.14.0 全套 143/143；cold HTTP 通過，舊快取混載轉 W2 修復 |
 | W2 | done | 120 模組／15 頁同圖生成與 CI check；主頁／iframe 握手拒絕異批確認；Node 22.14.0 全套 144/144 與 HTTP 通過 |
-| W3a–W5a／G1 | planned | F1 端點、實體、干涉、預覽、保存與輸出貫通 |
+| W3a | done | F1 六面純讀取／保存／重選／真 bar 層高；同圖 check、Node22 全套 146/146、主代理 HTTP 通過 |
+| W4a–W5a／G1 | planned | F1 實體、干涉、預覽、保存與輸出貫通 |
 | W3b–W5b | planned | 其餘格式、多接合位置、教材與效能 |
 | W6 | planned | 全面驗收、提交推送與發布核對 |
 
 ## LOOP 紀錄
+
+### W2 回交 HTTP 補驗（89a19ded）
+
+- 主代理在原 `127.0.0.1:8010` 一般 reload 後補驗最終提交：主頁／iframe token 均 `ab04050dbe2bab318832`，next enabled，modal 已關；並非只驗先前功能相同的來源。
+
+### LOOP W3a-1／端點與重選（done）
+
+- 唯一寫入者 endpoint_audit，Sol high；起點 `89a19ded`，主代理只讀審閱。依 §3.2 與已核准 optional childPart／既有 to.frame 兩項例外，沒有擴大其他存檔格式、版本或 W4 實體範圍。
+- 先在 Node 22.14.0 跑新 target：固定桿 C（40 mm）不啟用角碼、offsetU=5，原接合 x=45，改預選後 refresh 變 x=-15，assert 真實失敗。純 reader 保存每筆 host output／child part／面／selection，mates 全部合法資料保留；explicit childPart 優先於相衝突的 legacy 角碼 childPart。
+- schema 保存 optional childPart 與六面 to.frame，格式合法的 dangling 端點不清 mount；reader 回傳缺件原因。refresh 與角碼計畫／狀態共用 reader，失敗保留接合紀錄，舊資料相容讀取不靜默補欄位。
+- 新建 API 與精靈確認明確保存端點且不依賴角碼；reselect 可用端點優先於當前預選，缺失／歧義端點列候選回到可見選擇，確認前無替換。to.frame 幾何暫明確 unsupported，留 W3b；取消零 commit。3D 固定桿用實際 stick z，舊歧義 child 保留原顯示 anchor 與診斷，沒有當成已解析端點或開孔來源。
+- targeted 通過：新 descriptor／receiver、原六面 mount／refresh／288 種 3D、成對開孔 SVG/DXF 與 0/20/40° 貼合對孔。新增回歸涵蓋 JSON/share、改預選／尺寸、F1 內建四桿＋夾爪、雙子同 host、缺件 normalize→refresh→snapshot、schema 負例、legacy 未遷移與 3D 子場景不消失。
+- 驗收：generate／check token `49f161c74bc1bd856f0e`，121 modules／15 pages；完整 manifest suite 只跑一次，Node 22.14.0 `146/146 passed`，無失敗／逾時。證據 `output/framework-stabilization/w3a-verified-node22/results.json` 與逐支 log（ignored）。
+- HTTP fixture `output/framework-stabilization/w3a-ui/` 提供未接合固定桿、已接合但預選 frame、legacy ambiguous、missing child 四檔。最初誤存 normalized 結果的 fabrication:null，被正式匯入器正確拒絕；已全部改用 toSnapshot 真存檔並重新驗證，未放寬 schema。原附件不提交。
+- 主代理 HTTP token `49f161c74bc1bd856f0e` 通過：實際開 mounted-preset-frame → 組立 → 子模組 → 重新選面與尺寸，摘要 C・下面 → H・上面、右邊／偏置5／間距0；接上後按下載，JSON 仍保留預選 frame/left，但 mount.face.childPart=C、translation={45,0,4}、無 brackets。legacy ambiguous 顯示原因，重選可見 frame/C、明確選 C 後摘要正確，取消保留原歧義；missing child 同樣可開候選、取消保留缺失診斷。沒有新 console error。
+- 唯讀 HTTP另發現：相同模組 ID 的檔案重載會沿用前一次操作 notice 到重新點選；列 W5a UI 狀態失效修正，不擴本包。私人下載路徑與原附件不記入／提交。
+- 回交：scoped 本地提交，未 push／merge／deploy；endpoint_audit 停止寫入，下一唯一寫入者由主代理正式指定。W3a 尚不宣稱 G1 或全框架完成。
 
 ### W0 / L–O：建立基準
 

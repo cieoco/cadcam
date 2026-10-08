@@ -29,8 +29,14 @@ export function mountFacePlacement(comps, modules, childId, { hostId, outputId, 
     if (seen.has(current.id)) return fail('安裝會形成模組迴圈。');
     seen.add(current.id);
   }
-  const normalized = normalizeFaceMountContract(face);
+  // New operations use an explicit part (the old API's default is the frame).
+  // Reading a persisted legacy mount never applies this creation default.
+  const normalized = normalizeFaceMountContract({ ...face, childPart: face?.childPart !== undefined ? face.childPart : face?.selection?.brackets?.childPart ?? 'frame' });
   if (!normalized.ok) return fail(normalized.reason);
+  const childPart = normalized.value.childPart;
+  if (childPart !== 'frame' && !list.some(c => c.moduleId === childId && c.id === childPart && c.type === 'bar' && [c.p1, c.p2].every(p => p && ['fixed', 'motor'].includes(p.type)))) {
+    return fail('安裝端接合桿已不存在或不是固定桿，請重新選面。');
+  }
 
   try {
     const asm = compileAssembly(list, modList, { params: isRecord(params) ? params : {} });
