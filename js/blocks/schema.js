@@ -541,6 +541,7 @@ export function normalizeSnapshot(obj) {
     else if (raw.type === 'belt') comps.push(normalizeBelt(raw, index, params, warnings));
     else { warnings.push(`不支援的零件 ${raw.type || '(unknown)'}，已略過。`); return; }
     // 模組標記：只在這裡加一次，不動十個 normalizeXxx（SDD-ASSEMBLY-MODULES §3.3）。
+    if(raw.type==='triangle' && safeId(raw.fusedWith)) comps[comps.length-1].fusedWith=raw.fusedWith;
     if (safeId(raw.moduleId)) {
       const last = comps[comps.length - 1];
       if (last) last.moduleId = raw.moduleId;

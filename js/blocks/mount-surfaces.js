@@ -1,3 +1,4 @@
+import { transformFusion } from './part-fusion.js';
 import { deriveMotorMounts } from './build-plan.js?v=20261007_7';
 /**
  * Read-only, bounded mounting-surface descriptors derived from the same geometry
@@ -7,7 +8,7 @@ import { deriveMotorMounts } from './build-plan.js?v=20261007_7';
  */
 import { autoPorts } from './bench.js';
 import { moduleFrameExports, moduleFrameNodes } from './assembly.js?v=20261007_m5a';
-import { inspectFrameExport, inspectLinkExport, inspectPlateExport, inspectRackExport, splitMountsByHost, hostedBarGeometry } from './exporters.js?v=20261007_7';
+import { inspectFrameExport, inspectLinkExport, inspectPlateExport, inspectFusion, inspectRackExport, splitMountsByHost, hostedBarGeometry } from './exporters.js?v=20261007_7';
 import { frameConnectorNodes, pointCoords } from './model.js';
 import { memberStock } from './member-stock.js';
 
@@ -137,7 +138,12 @@ export function buildMountSurfaces({ comps, modules, moduleId, params, exportSet
       } else if (body.kind === 'triangle') {
         const points = [comp.p1, comp.p2, comp.p3].map(p => p && (pts[p.id] || p));
         if (points.every(p => p && finite(p.x) && finite(p.y))) {
-          geometry = transformedGeometry(inspectPlateExport(comp, points, exportSettings), p => ({ x: p.x, y: p.y }));
+          if(comp.fusedWith) {
+            const f=inspectFusion(ownComps,comp,params,exportSettings);
+            if(!f.ok)return {ok:false,reason:f.reason};
+            const g=transformFusion(f.geometry,f.gear,pts);
+            geometry={...g,outlines:[g.outline]};
+          } else geometry = transformedGeometry(inspectPlateExport(comp, points, exportSettings), p => ({ x: p.x, y: p.y }));
         }
       } else {
         const pinion = comp.pinion ? ownComps.find(c => c && c.type === 'gear' && c.id === comp.pinion) || null : null;
@@ -169,6 +175,9 @@ export function buildMountSurfaces({ comps, modules, moduleId, params, exportSet
         else if (comp?.type === 'bar') {
           const raw = hostedBarGeometry(comp, pts, exportSettings, mounts.hosted.get(comp.id) || []);
           if (raw) exact = geometryFromBar(raw, comp, pts);
+        } else if (comp?.fusedWith) {
+          // The union already contains both source hole sets.
+          continue;
         } else if (comp?.type === 'triangle') exact = inspectPlateExport(comp,[comp.p1,comp.p2,comp.p3].map(p=>pts[p.id] || p),exportSettings,mounts.hosted.get(comp.id) || []);
         if (exact) { surface.holes = exact.holes || []; surface.cutouts = exact.cutouts || []; }
       }

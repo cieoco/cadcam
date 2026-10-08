@@ -184,7 +184,7 @@ export function buildSceneModel(links, points, opts = {}) {
       motorDriven: l.style === 'crank' && (motorCenters.has(l.p1) || motorCenters.has(l.p2)),
       assemblyLayer: assemblyLayerForBody(l.id),
     })),
-    ...triPlates.map(poly => ({ kind: 'plate', src: poly, joints: [...poly.points], lift: poly._zlift || 0 })),
+    ...triPlates.filter(poly=>!Object.values(opts.fusedParts || {}).some(f=>f.ids.join(',')===poly.points.join(','))).map(poly => ({ kind: 'plate', src: poly, joints: [...poly.points], lift: poly._zlift || 0 })),
   ];
 
   // 分層（離地深度，2D 疊放順序與此共用同一套 → 兩邊一致）
@@ -345,6 +345,13 @@ export function buildSceneModel(links, points, opts = {}) {
     const module = Math.max(0.1, Number(g.module) || (2 * radius / teeth));
     const angle = Math.atan2(pin.y - center.y, pin.x - center.x);
     const meshPhase = gearMeshPhase(g);
+    const fused=opts.fusedParts?.[g.id];
+    if(fused) {
+      plates.push({ids:fused.ids,corners:fused.ids.map(id=>points[id]),layer:gearLayer,z:gearZ,r:hullR,
+        thickness:fused.thicknessMm,color:g.color || '#b0772e',shape:'triangle',...fused.geometry});
+      fused.ids.forEach(id=>touch(id,gearLayer,fused.thicknessMm));
+      return;
+    }
     gears.push({
       id: g.id,
       center: { x: center.x, y: center.y },

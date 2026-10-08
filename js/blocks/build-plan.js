@@ -1,3 +1,4 @@
+import { memberStock } from './member-stock.js';
 import { frameStockOf } from './frame-stock.js';
 /**
  * blocks / build-plan
@@ -10,7 +11,7 @@ import { frameStockOf } from './frame-stock.js';
  * 每個已安裝模組另有 <moduleId>-frame）。
  */
 import {
-  safeName, normalizeExportSettings,
+  safeName, normalizeExportSettings, assertFusionFeatures,
   exportableLinks, exportablePlates, exportableGears, exportableRacks,
   inspectLinkExport, inspectPlateExport, inspectFrameExport,
   splitMountsByHost, hostedBarGeometry
@@ -159,6 +160,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
   const exp = { ...exportSettings };
   const allMounts = Array.isArray(mounts) ? mounts : deriveMotorMounts(list);
   const { hosted, free } = splitMountsByHost(list, allMounts);
+  assertFusionFeatures(list,allMounts,orthoExtras);
   const freeSplit = splitFrameMounts(free, list, modList);
   const geomInfo = g => ({
     ...boundsOf(g ? (g.outlines || (g.outline ? [g.outline] : [])) : []),
@@ -201,14 +203,16 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
   const plates = exportablePlates(list, seedPts);
   const racks = exportableRacks(list, params);
 
-  gears.forEach(({ comp, geometry }) => {
+  gears.forEach(({ comp, geometry, fusedPlate }) => {
     const part = memberPart(comp, 'gear', geometry);
+    if(fusedPlate){part.thicknessMm=memberStock(fusedPlate).thicknessMm;part.fusedMembers=[comp.id,fusedPlate.id];partByComp.set(fusedPlate.id,part);}
     const pinHole = finitePos(comp.pinHoleDiameter) ? Number(comp.pinHoleDiameter) : linkHole;
-    addPart(part, [{ id: comp.p1.id, holeDiameterMm: linkHole }, { id: comp.p2.id, holeDiameterMm: pinHole }]);
+    const joints=fusedPlate?pointsOf(fusedPlate,['p1','p2','p3'],linkHole).map(p=>({...p,holeDiameterMm:p.id===comp.p2.id?Math.max(pinHole,linkHole):p.holeDiameterMm})):[{ id: comp.p1.id, holeDiameterMm: linkHole }, { id: comp.p2.id, holeDiameterMm: pinHole }];
+    addPart(part,joints);
     partByComp.set(comp.id, part);
     const key = groupKeyOf(comp, modById);
     pushGroup(key, part);
-    addBody(key, part, [comp.p1.id, comp.p2.id], comp);
+    addBody(key, part, joints.map(p=>p.id), comp);
   });
   links.forEach(({ comp, length }) => {
     const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, seedPts, exp, hosted.get(comp.id), extraHolesOf(comp)) : null;

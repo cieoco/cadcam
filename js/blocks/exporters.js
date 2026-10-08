@@ -3,6 +3,8 @@ import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
 import { rackPhaseShift } from './gear-editor.js';
 import { memberStock, memberStockLabel } from './member-stock.js';
 import { sizeFrameOutline } from './frame-stock.js';
+import { unionOutlines, area, inside, fusionCandidates } from './part-fusion.js';
+import { gearMeshPhaseDeg } from './transmission-geometry.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 
 export const DEFAULT_BAR_WIDTH_MM = DEFAULT_PLATE_RADIUS_WORLD * 2;
@@ -92,15 +94,31 @@ function pointForExport(comp, key, pts) {
 
 export function exportablePlates(comps, pts) {
   return comps
-    .filter(c => c && c.type === 'triangle' && c.p1 && c.p2 && c.p3)
+    .filter(c => c && c.type === 'triangle' && !c.fusedWith && c.p1 && c.p2 && c.p3)
     .map(c => ({ comp: c, points: [pointForExport(c, 'p1', pts), pointForExport(c, 'p2', pts), pointForExport(c, 'p3', pts)] }))
     .filter(item => item.points.every(Boolean));
 }
 
+export function assertFusionFeatures(comps, mounts=[], extras=null) {
+  const {hosted}=splitMountsByHost(comps,mounts);
+  if(comps.some(c=>c.fusedWith && (hosted.has(c.id) || extras?.plateHoles?.[c.id]?.length)))
+    throw Error('合成板件含角碼孔或馬達安裝槽；請先解除合成再匯出，避免遺漏加工特徵');
+}
+
 export function exportableGears(comps, params, settings) {
+  for(const plate of comps.filter(c=>c.fusedWith)) {
+    const f=inspectFusion(comps,plate,params,settings);
+    if(!f.ok)throw Error(`合成零件 ${plate.id}：${f.reason}`);
+  }
   return comps
     .filter(c => c && c.type === 'gear' && c.p1 && c.p2)
-    .map(c => ({ comp: c, geometry: gearGeometry(c, params, settings) }))
+    .map(c => {
+      const plate=comps.find(p=>p.fusedWith===c.id);
+      if(!plate)return {comp:c,geometry:gearGeometry(c,params,settings)};
+      const fused=inspectFusion(comps,plate,params,settings);
+      if(!fused.ok)throw Error(`合成零件 ${plate.id}：${fused.reason}`);
+      return {comp:c,geometry:fused.geometry,fusedPlate:plate};
+    })
     .filter(item => item.geometry && item.geometry.outline.length >= 3);
 }
 
@@ -301,6 +319,47 @@ function gearGeometry(comp, params = {}, settings = {}) {
 export function inspectGearExport(comp, params = {}, settings = {}) {
   const { outline, holes, cutouts } = gearGeometry(comp, params, settings);
   return { outline, holes, cutouts };
+}
+
+export function inspectFusion(comps, plate, params={}, settings={}) {
+  const gear=comps.find(c=>c.id===plate?.fusedWith);
+  if(!gear || !fusionCandidates(comps,plate).includes(gear))return {ok:false,reason:'原齒輪或共用連接孔已改變，請解除合成後重新選擇'};
+  try {
+    const gg=gearGeometry(gear,params,settings);
+    // Reconstruct the plate from its dimensions and the gear-controlled shared holes.
+    // Home coordinates are branch hints, not current dimensions after editing gear parameters.
+    const original=[plate.p1,plate.p2,plate.p3], ps=original.map(p=>({...p}));
+    const ia=ps.findIndex(p=>p.id===gear.p1.id),ib=ps.findIndex(p=>p.id===gear.p2.id),ic=3-ia-ib;
+    const length=(i,j)=>Number(params[[[null,plate.gParam,plate.r1Param],[plate.gParam,null,plate.r2Param],[plate.r1Param,plate.r2Param,null]][i][j]]) || Math.hypot(ps[i].x-ps[j].x,ps[i].y-ps[j].y);
+    const ra=length(ia,ic),rb=length(ib,ic),pin=gg.holes.find(h=>h.layer==='PIN_HOLE');
+    const d=Math.hypot(pin.x,pin.y),x=(ra*ra-rb*rb+d*d)/(2*d),h2=ra*ra-x*x;
+    if(!(d>0)||h2<=1e-6)return {ok:false,reason:'孔距無法形成有效板件，請調整齒輪輸出孔或板件尺寸'};
+    const ux=pin.x/d,uy=pin.y/d;
+    const sign=((original[ib].x-original[ia].x)*(original[ic].y-original[ia].y)-(original[ib].y-original[ia].y)*(original[ic].x-original[ia].x))<0?-1:1;
+    ps[ia]={...ps[ia],x:gear.p1.x,y:gear.p1.y};
+    ps[ib]={...ps[ib],x:gear.p1.x+pin.x,y:gear.p1.y+pin.y};
+    ps[ic]={...ps[ic],x:gear.p1.x+x*ux-sign*Math.sqrt(h2)*uy,y:gear.p1.y+x*uy+sign*Math.sqrt(h2)*ux};
+    const pg=inspectPlateExport(plate,ps,settings);
+    const phase=(Math.atan2(gear.p2.y-gear.p1.y,gear.p2.x-gear.p1.x)*180/Math.PI+gearMeshPhaseDeg(gear,{},id=>comps.find(c=>c.id===id)))*Math.PI/180;
+    const c=Math.cos(phase),s=Math.sin(phase),relative=p=>({x:p.x-gear.p1.x,y:p.y-gear.p1.y});
+    const gearRing=gg.outline.map(p=>({x:p.x*c-p.y*s,y:p.x*s+p.y*c}));
+    const plateRings=pg.outlines.map(r=>r.map(relative));
+    const loops=unionOutlines([gearRing,...plateRings]),outer=loops.filter(r=>area(r)>0);
+    if(outer.length!==1)return {ok:false,reason:'兩個外形沒有連成一片，請調整板寬或孔距'};
+    const holes=[];
+    for(const h of [...gg.holes,...pg.holes.map(h=>({...h,...relative(h)}))]) {
+      const match=holes.find(q=>Math.hypot(h.x-q.x,h.y-q.y)<.05);
+      if(match){if(h.r>match.r)Object.assign(match,h);continue;}
+      if(holes.some(q=>Math.hypot(h.x-q.x,h.y-q.y)<h.r+q.r-.05))return {ok:false,reason:'不同孔位互相重疊，請調整孔徑'};
+      holes.push({...h});
+    }
+    if(holes.some(h=>Array.from({length:24},(_,i)=>({x:h.x+h.r*Math.cos(i*Math.PI/12),y:h.y+h.r*Math.sin(i*Math.PI/12)})).some(p=>!inside(p,outer[0]))))return {ok:false,reason:'孔位超出合成外框，請調整孔徑或板寬'};
+    const cutouts=[...gg.cutouts,...(pg.cutouts || []).map(h=>({...h,points:h.points.map(relative)})),...loops.filter(r=>area(r)<0).map(points=>({points,layer:'FUSION_CUTOUT'}))];
+    const warnings=[];
+    const pitchR=Number(params[gear.radiusParam]) || Number(gear.module)*Number(gear.teeth)/2;
+    if(plateRings.some(r=>r.some(p=>Math.hypot(p.x,p.y)>pitchR)))warnings.push('夾爪伸出齒輪節圓；請確認全行程不遮擋另一顆齒輪');
+    return {ok:true,gear,plate,warnings,geometry:{outline:outer[0],holes,cutouts},thicknessMm:memberStock(plate).thicknessMm};
+  } catch(e) {return {ok:false,reason:e.message};}
 }
 
 // 齒條局部座標：x 沿齒條軸 u、y 沿法向 n＝(-uy,ux)，原點＝rack.p1（θ=0 放置位置）。
@@ -1207,6 +1266,8 @@ export function inspectLinkExport(comp, length, settings = {}, extraHoles = []) 
 }
 
 export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extras = null) {
+  assertFusionFeatures(comps,mounts,extras);
+  exportableGears(comps,params,settings);
   const { hosted } = splitMountsByHost(comps, mounts);
   const extraOf = comp => (extras && extras.linkHoles && extras.linkHoles[comp.id]) || [];
   const plateHolesOf = comp => (extras && extras.plateHoles && extras.plateHoles[comp.id]) || [];
@@ -1224,8 +1285,8 @@ export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extr
     downloadText(svgForPlate(comp, points, settings, hosted.get(comp.id), plateHolesOf(comp)), `${safeName(comp.id)}.svg`, 'image/svg+xml');
   });
   const gears = exportableGears(comps, params, settings);
-  gears.forEach(({ comp, geometry }) => {
-    downloadText(svgForGear(comp, geometry), `${safeName(comp.id)}.svg`, 'image/svg+xml');
+  gears.forEach(({ comp, geometry, fusedPlate }) => {
+    downloadText(fusedPlate ? addSvgStockDescription(svgForGear(comp,geometry),fusedPlate) : svgForGear(comp, geometry), `${safeName(comp.id)}.svg`, 'image/svg+xml');
   });
   const racks = exportableRacks(comps, params);
   racks.forEach(({ comp, geometry }) => {
@@ -1235,6 +1296,8 @@ export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extr
 }
 
 export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extras = null) {
+  assertFusionFeatures(comps,mounts,extras);
+  exportableGears(comps,params,settings);
   const { hosted } = splitMountsByHost(comps, mounts);
   const extraOf = comp => (extras && extras.linkHoles && extras.linkHoles[comp.id]) || [];
   const plateHolesOf = comp => (extras && extras.plateHoles && extras.plateHoles[comp.id]) || [];
@@ -1251,8 +1314,8 @@ export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extr
     downloadText(dxfForPlate(comp, points, settings, hosted.get(comp.id), plateHolesOf(comp)), `${safeName(comp.id)}.dxf`, 'application/dxf');
   });
   const gears = exportableGears(comps, params, settings);
-  gears.forEach(({ comp, geometry }) => {
-    downloadText(dxfForGear(comp, geometry), `${safeName(comp.id)}.dxf`, 'application/dxf');
+  gears.forEach(({ comp, geometry, fusedPlate }) => {
+    downloadText(fusedPlate ? addDxfStockComment(dxfForGear(comp,geometry),fusedPlate) : dxfForGear(comp, geometry), `${safeName(comp.id)}.dxf`, 'application/dxf');
   });
   const racks = exportableRacks(comps, params);
   racks.forEach(({ comp, geometry }) => {
@@ -1263,6 +1326,7 @@ export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extr
 
 // L4 CNC 檢查用：與 exportLinksAsDxf 輸出同一批零件（桿件含宿主桿、板件、齒輪）的孔與開口。
 export function cncPartsForExport(comps, pts, params, settings, mounts = [], extras = null) {
+  assertFusionFeatures(comps,mounts,extras);
   const { hosted } = splitMountsByHost(comps, mounts);
   const extraOf = comp => (extras && extras.linkHoles && extras.linkHoles[comp.id]) || [];
   const plateHolesOf = comp => (extras && extras.plateHoles && extras.plateHoles[comp.id]) || [];

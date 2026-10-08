@@ -523,6 +523,7 @@ export function createGearEditor({
   function deleteGearChain(id) {
     const start = gearById(id);
     if (!start) return;
+    if(gearMeshChain(start).some(g=>S.comps.some(p=>p.fusedWith===g.id))){transient('請先解除合成，再刪除齒輪');return;}
     pushUndo();
     pause();
     const chain = gearMeshChain(start);

@@ -359,7 +359,8 @@ function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], 
       if (!c) return [];
       const teeth = Math.max(6, Math.round(Number(comp.teeth) || 12));
       const R = Number(comp.radiusParam ? params[comp.radiusParam] : NaN) || (Number(comp.module) > 0 ? teeth * Number(comp.module) / 2 : 36);
-      return [circlePoly(c, R + 2 * R / teeth)];
+      const plateId=part.fusedMembers?.find(id=>id!==comp.id);
+      return [circlePoly(c, R + 2 * R / teeth),...(plateId?buildPolys(pose,{...part,compId:plateId,fusedMembers:null}):[])];
     }
     if (comp.type === 'rack') {
       const p1 = pt('p1');
@@ -418,9 +419,14 @@ function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], 
     layerOfParts.forEach((group, layer) => {
       for (let i = 0; i < group.length; i++) for (let j = i + 1; j < group.length; j++) {
         const a = group[i], b = group[j];
-        if (!samePlane(a, b) || sameBody(a.name, b.name) || meshPairs.has(pairKey(a.name, b.name))) continue;
+        if (!samePlane(a, b) || sameBody(a.name, b.name)) continue;
+        const meshPair=meshPairs.has(pairKey(a.name,b.name));
+        if(meshPair && !a.fusedMembers && !b.fusedMembers)continue;
         if (seen.has(keyOf('same-layer', [a.name, b.name]))) continue;
-        if (polysOverlap(partPolys(pose, a), partPolys(pose, b))) {
+        const ap=partPolys(pose,a),bp=partPolys(pose,b);
+        // Meshing tooth envelopes may overlap; fused arms must still be checked.
+        const overlap=meshPair?(polysOverlap(ap.slice(1),bp)||polysOverlap(ap,bp.slice(1))):polysOverlap(ap,bp);
+        if (overlap) {
           report('same-layer', [a.name, b.name], layer, pose,
             `${a.name} 與 ${b.name} 同在第 ${layer} 層，${when(pose)}會互相重疊。建議：改到不同層（上移一層）或調整位置。`);
         }

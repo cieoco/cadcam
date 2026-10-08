@@ -14,7 +14,7 @@
 // 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
-import { APP_VERSION } from '../version.js?v=20261008_framerect';
+import { APP_VERSION } from '../version.js?v=20261008_fusion';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
@@ -23,6 +23,8 @@ import { buildSceneModel, computeBodyLayers } from '../blocks3d/scene-model.js';
 import { buildOrthogonalChildren, planeInputs, attachModulePlates } from '../blocks3d/orthogonal-3d.js?v=20261007_m5a';   // O6：直角安裝子模組的 3D 位姿
 // 純邏輯模組
 import * as View from './view.js';
+import { createFusionEditor, drawFusion } from './fusion-editor.js';
+import { transformFusion } from './part-fusion.js';
 import * as Render from './render.js';   // SVG 繪製基元（純呈現）
 import * as Panels from './panels.js';   // 編輯面板呈現（讀 S + 寫 DOM）
 import * as Tools from './tools.js';     // 工具模式互動（畫桿 / 畫滑軌 / 畫三點桿 / 連桿升級滑軌）
@@ -1279,6 +1281,14 @@ function buildMotorMounts(motorIds, groundIds) {
 // svg / TX / TY / frameUpdaters / pointCoords / selectGear / selectTriangle / gearMeshOff 等。
 // 目前有 gear / triangle；bar / slider / 馬達之後逐刀填表（每刀瀏覽器驗證）。
 function drawGearPart(c, pts) {
+  const plate=S.comps.find(p=>p.fusedWith===c.id);
+  const fusion=plate && Exporters.inspectFusion(S.comps,plate,S.topo.params,Settings.exportSettings());
+  if(fusion?.ok) {
+    frameUpdaters.push(drawFusion({svg,fusion,points:pts,project:p=>({x:TX(p.x),y:TY(p.y)}),
+      blocked:()=>Boolean(S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars),
+      select:id=>{if(!ensureModuleHome(compModuleId(id)))selectTriangle(id);}}));
+    return;
+  }
   const update = renderGear({
     component: c, points: pts, svg, scale: View.getScale(),
     project: p => ({ x: TX(p.x), y: TY(p.y) }), params: S.topo.params,
@@ -1300,6 +1310,7 @@ function drawGearManualHandles(pts) {
 // draw() 依 zlift 算好的疊放層（透過 ctx.groupForLayer/triLayerByKey/triKey 取得對應 <g>）。
 // 函式體照搬自原 draw() 內聯三角板迴圈、零行為改變（內部解構改名 a,b,d 以免遮蔽參數 c）。
 function drawTrianglePart(c, pts, ctx) {
+  if(c.fusedWith && Exporters.inspectFusion(S.comps,c,S.topo.params,Settings.exportSettings()).ok)return;
   c = memberEditor.displayComp(c);
   const hostedPlateMounts = ctx.hostedMounts ? ctx.hostedMounts.get(c.id) : null;
   const plateExtras = (hostedPlateMounts && hostedPlateMounts.length)
@@ -1375,7 +1386,9 @@ const PART_DRAW = {
 };
 
 function draw() { return withCandidate(drawNow); }   // M4：接合精靈預覽中，重畫看的是候選的作品
+const fusionEditor=createFusionEditor({settings:Settings.exportSettings,pause,pushUndo,rebuild,draw,save:scheduleAutosave,selectGear,selectTriangle});
 function drawNow() {
+  fusionEditor.sync();
   mateTool.sync();   // M2：換分頁／模式或開始畫圖時關掉接合面工具，並更新按鈕
   syncModulePlates();   // G1：作品內容變了才讓固定板 home 幾何作廢（θ 不算內容）
   validateViewPlane();
@@ -1802,7 +1815,12 @@ function push3DNow() {
     const g=createPlateGeometry(comp,world,{radius:HULL_R_WORLD,holeRadius:Settings.exportSettings().holeDiameterMm/2,...(extras||{})});
     if(g.outlines.length) plateGeometries[key]={outline:g.outlines[0],holes:g.holes,cutouts:g.cutouts||[]};
   });
-  const baseOpts = { hullR: HULL_R_WORLD, plateGeometries, barGeometries, memberStocks };
+  const fusedParts={};
+  S.comps.filter(c=>c.fusedWith).forEach(plate=>{
+    const f=Exporters.inspectFusion(S.comps,plate,S.topo.params,Settings.exportSettings());
+    if(f.ok)fusedParts[f.gear.id]={...f,geometry:transformFusion(f.geometry,f.gear,geomPts),ids:[plate.p1.id,plate.p2.id,plate.p3.id]};
+  });
+  const baseOpts = { hullR: HULL_R_WORLD, plateGeometries, barGeometries, memberStocks, fusedParts };
   // G1：已安裝模組的固定板（目前位姿）；主平面的放進主場景，直角子平面的由 buildOrthogonalChildren 放進各自的子場景。
   const plates = modulePlates.at(designView ? lastModelInputsAll.pts : geomPts, homeMountsNow).filter(pl => !designView || pl.moduleId === S.designFocus);
   const model = buildSceneModel(links, pts, {
@@ -2355,6 +2373,7 @@ function deselectLink() {
   draw();
 }
 function deleteSelectedPart() {
+  if(S.comps.some(c=>c.id===S.selectedTriangleId && c.fusedWith)){transient('請先解除合成，再刪除板件');return;}
   if (S.selectedGearId) { deleteGearChain(S.selectedGearId); return; }
   const id = S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId;
   if (!id) return;
@@ -2665,12 +2684,15 @@ async function exportVideo() {
 }
 
 function exportLinksSvg() {
+  const invalid=S.comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(S.comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
+  if(invalid){transient(`尚未匯出：${invalid.reason}`);return;}
   const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), S.comps, S.modules), M = machineNow();
   const stockWarnings = memberStockWarnings(M.comps, settings);
   if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
   // 有宿主機架桿的 mount 隨該桿匯出（特徵切進桿身）；剩下的才進 frame.svg；已安裝模組另出各自的機架檔。
   const freeMounts = exportWorldMounts(Exporters.splitMountsByHost(M.comps, mounts).free);
   const extras = orthoExtrasNow(true);
+  try { Exporters.assertFusionFeatures(M.comps,mounts,extras); } catch(e) { transient(e.message);return; }
   const cutNodes = withWorldAdapterNodes(nodes, extras);   // C1：機架板邊上的轉接座宿主孔
   const count = Exporters.exportLinksAsSvg(M.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras);
   const frameCount = Exporters.exportFrameAsSvg(cutNodes, settings, freeMounts);
@@ -2693,11 +2715,14 @@ function exportLinksSvg() {
   showCncWarnings(cncParts, settings);
 }
 function exportLinksDxf() {
+  const invalid=S.comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(S.comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
+  if(invalid){transient(`尚未匯出：${invalid.reason}`);return;}
   const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), S.comps, S.modules), M = machineNow();
   const stockWarnings = memberStockWarnings(M.comps, settings);
   if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
   const freeMounts = exportWorldMounts(Exporters.splitMountsByHost(M.comps, mounts).free);
   const extras = orthoExtrasNow(true);
+  try { Exporters.assertFusionFeatures(M.comps,mounts,extras); } catch(e) { transient(e.message);return; }
   const cutNodes = withWorldAdapterNodes(nodes, extras);   // C1：機架板邊上的轉接座宿主孔
   const count = Exporters.exportLinksAsDxf(M.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras);
   const frameCount = Exporters.exportFrameAsDxf(cutNodes, settings, freeMounts);
@@ -2738,11 +2763,14 @@ function collectCncPartsAndFrameWarnings(settings) {
 }
 // L5b：下載「製作包」HTML（板件清單＋五金清單＋組裝步驟，可列印）。
 function downloadBuildPack() {
+  const invalid=S.comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(S.comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
+  if(invalid){transient(`尚未匯出：${invalid.reason}`);return;}
   const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
   const stockWarnings = memberStockWarnings(machineNow().comps, settings);
   if (stockWarnings.length) { transient(`尚未產生製作包：${stockWarnings[0]}`); return; }
   const cnc = S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
   const homeMounts = homeMountsNow();
+  try { Exporters.assertFusionFeatures(S.comps,homeMounts,orthoExtrasNow()); } catch(e) { transient(e.message);return; }
   const build = resolvedBuild(settings, homeMounts);
   const { plan, interference } = build;
   if (!plan.parts.length) { transient('沒有可匯出的零件或機架'); return; }

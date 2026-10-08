@@ -1,4 +1,4 @@
-import { APP_VERSION } from '../version.js?v=20261008_framerect';
+import { APP_VERSION } from '../version.js?v=20261008_fusion';
 import { faceBracketPlan } from './face-bracket-extras.js';
 import { planFaceBrackets } from './face-bracket-geometry.js';
 /** 正式組立台的隔離選面草稿。確認前不改作品。 */
