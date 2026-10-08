@@ -1,4 +1,4 @@
-import { faceBracketPlan } from './face-bracket-extras.js';
+import { faceBracketStatus } from './face-bracket-extras.js';
 /**
  * blocks / mate-wizard-ui
  *
@@ -245,11 +245,14 @@ export function createMateWizard(h) {
     const edit = btn('回設計修改', '', () => h.adjust('edit')); edit.id = 'mateEdit';
     row.appendChild(off); row.appendChild(edit); root.appendChild(row);
     if (mod.mount?.face) {
+      const status = faceBracketStatus(S.comps,S.modules,params(),mod,{exportSettings:S.fabrication?.export || {},stockMm:S.fabrication?.cnc?.stockThicknessMm || 3});
+      root.appendChild(el('div','bench-note',status.fixed?'角碼與固定孔已確認':'已定位，尚未固定'));
+      root.appendChild(el('div','bench-note',status.reason));
+      if(!status.fixed)root.appendChild(btn('配置角碼','primary',()=>h.openFaces(mod,true,true)));
       const change = btn('重新選面與尺寸', 'primary', () => h.openFaces(mod, true)); root.appendChild(change);
       const f = mod.mount.face.selection;
       root.appendChild(el('div', 'bench-note', `間距 ${f.gap} mm · 偏移 ${f.offsetU} / ${f.offsetV} mm`));
-      const drilling = faceBracketPlan(S.comps, S.modules, params(), mod, { exportSettings: S.fabrication?.export || {}, stockMm: S.fabrication?.cnc?.stockThicknessMm || 3 });
-      root.appendChild(el('div', 'bench-note', drilling ? (drilling.ok ? `角碼 ${drilling.brackets.length} 顆 · 兩板固定孔已生成 Ø3.2 mm` : `角碼孔暫停輸出：${drilling.reason}`) : '姿態已保存；轉接件與固定孔待設計。')); return;
+      return;
     }
     if (mate) [styleBox(S.comps, S.modules, mod.id, stylesOf(mod.id)), adjustBox(S.comps, S.modules, mod.id)].forEach(x => x && root.appendChild(x));
     else root.appendChild(el('div', 'bench-note', '這是用工程模式接上的，要微調請按最下面的「進階」。'));

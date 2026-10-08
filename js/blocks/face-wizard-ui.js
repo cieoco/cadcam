@@ -1,4 +1,4 @@
-import { APP_VERSION } from '../version.js?v=20261008_mobilelabels';
+import { APP_VERSION } from '../version.js?v=20261008_bracketstatus';
 import { faceBracketPlan } from './face-bracket-extras.js';
 import { planFaceBrackets } from './face-bracket-geometry.js';
 /** 正式組立台的隔離選面草稿。確認前不改作品。 */
@@ -20,7 +20,7 @@ function reference(surface, name, parts = []) {
     holes: (surface.holes || []).map(relative), cutouts: (surface.cutouts || []).map(c => ({ ...c, points: c.points.map(relative) })) };
 }
 
-export function openFaceWizard({ comps, modules, params, childId, exportSettings, stockMm, isCurrent, commit, say, wizard = false, initialMount = null }) {
+export function openFaceWizard({ comps, modules, params, childId, exportSettings, stockMm, isCurrent, commit, say, wizard = false, initialMount = null, startAtPlacement = false }) {
   const child = modules.find(m => m.id === childId);
   if (!child || child.mount || !child.base) { say('請選尚未安裝且有底座的機構。'); return; }
   const surfaces = id => buildMountSurfaces({ comps, modules, params, moduleId: id, exportSettings, thicknessMm: stockMm, drilling: true }).surfaces || [];
@@ -80,7 +80,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   close.addEventListener('click', () => dialog.close()); dialog.addEventListener('close', dispose);
   function receive(e) {
     if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
-    if (e.data?.type === 'face-wizard-ready') frame.contentWindow.postMessage({ type: 'face-wizard-init', hosts: hosts.map(h => ({ ...h, defaultFace: connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, configured: !!childSelection, mode: wizard || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
+    if (e.data?.type === 'face-wizard-ready') frame.contentWindow.postMessage({ type: 'face-wizard-init', startAtPlacement, hosts: hosts.map(h => ({ ...h, defaultFace: connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, configured: !!childSelection, mode: wizard || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
     if (e.data?.type === 'face-wizard-cancel') { dialog.close(); return; }
     if (e.data?.type !== 'face-wizard-confirm') return;
     if (!isCurrent()) { dialog.close(); say('作品已變動，請重新選擇接法。'); return; }

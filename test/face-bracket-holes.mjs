@@ -6,7 +6,7 @@ import { mountFacePlacement } from '../js/blocks/face-mount.js';
 import { refreshFaceMounts } from '../js/blocks/face-mount-refresh.js';
 import { normalizeSnapshot } from '../js/blocks/schema.js';
 import { planFaceBrackets } from '../js/blocks/face-bracket-geometry.js';
-import { faceBracketPlan } from '../js/blocks/face-bracket-extras.js';
+import { faceBracketPlan, faceBracketStatus } from '../js/blocks/face-bracket-extras.js';
 import { orthogonalExportExtras, withAdapterNodes } from '../js/blocks/orthogonal-joint.js';
 import { inspectLinkExport, inspectFrameExport, exportLinksAsSvg, exportLinksAsDxf, exportFrameAsSvg, exportFrameAsDxf } from '../js/blocks/exporters.js';
 import { frameConnectorNodes, pointCoords } from '../js/blocks/model.js';
@@ -26,6 +26,17 @@ assert.equal(drilling.childHoles.length,3);
 const mounted=mountFacePlacement(f.comps,f.modules,'Child',{hostId:'Host',outputId:'plate',face},f.params);
 assert.equal(mounted.ok,true,mounted.reason);
 f.modules[1].mount=mounted.mount;
+assert.equal(faceBracketStatus(f.comps,f.modules,f.params,f.modules[1]).fixed,true);
+const unconfirmed=structuredClone(f.modules[1]);delete unconfirmed.mount.face.selection.brackets;
+const prior=JSON.stringify(unconfirmed);
+const status=faceBracketStatus(f.comps,f.modules,f.params,unconfirmed);
+assert.equal(status.fixed,false);assert.match(status.reason,/尚未確認/);
+assert.equal(JSON.stringify(unconfirmed),prior,'diagnosis must not confirm or modify drilling');
+unconfirmed.mount.face.selection.gap=99;
+// Geometry is authoritative: changing the stored transform must report a real failure.
+unconfirmed.mount.face.translation.z+=99;
+assert.match(faceBracketStatus(f.comps,f.modules,f.params,unconfirmed).reason,/無法配置/);
+
 const saved=normalizeSnapshot(JSON.parse(JSON.stringify(f)));
 assert.equal(saved.modules[1].mount.face.selection.brackets.offsets.L1,2);
 const extras=orthogonalExportExtras(saved.comps,saved.modules,saved.params,{stockMm:3,exportSettings:settings});

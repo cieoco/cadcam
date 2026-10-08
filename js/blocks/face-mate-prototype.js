@@ -390,7 +390,7 @@ if (integrated) {
     mode = 'wizard';
     hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; configured = !!e.data.configured; roughPlaced = configured;
     bracketOffsets = { ...(draft.brackets?.offsets || {}) };
-    if (configured && hosts.length === 1) step = 3;
+    if (e.data.startAtPlacement || (configured && hosts.length === 1)) step = 3;
     if (configured && !document.getElementById('optionalView')) {
       const view = document.querySelector('.view-actions'), more = document.createElement('details'), label = document.createElement('summary');
       more.id = 'optionalView'; label.textContent = '觀看角度'; label.style.cssText = 'min-height:44px;display:flex;align-items:center;cursor:pointer;';

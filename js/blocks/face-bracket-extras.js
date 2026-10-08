@@ -1,3 +1,4 @@
+import { connectionSelection } from './connection-selection.js';
 /** Recompute confirmed drilling against current stock; stale/invalid plans produce no holes. */
 import { buildMountSurfaces } from './mount-surfaces.js';
 import { planFaceBrackets, FACE_BRACKET_SPEC } from './face-bracket-geometry.js';
@@ -49,4 +50,15 @@ export function appendFaceBracketHoles(extras, comps, modules, params, opts={}) 
     }
   }
   return extras;
+}
+
+/** Read-only diagnosis also covers older placements without confirmed drilling. */
+export function faceBracketStatus(comps, modules, params, mod, opts={}) {
+  const confirmed=faceBracketPlan(comps,modules,params,mod,opts);
+  if(confirmed)return {fixed:confirmed.ok,reason:confirmed.ok?`角碼 ${confirmed.brackets.length} 顆 · 兩板固定孔已生成 Ø3.2 mm`:`角碼孔暫停輸出：${confirmed.reason}`};
+  if(!mod?.mount?.face)return {fixed:false,reason:'尚未設定接合面'};
+  const selection=mod.mount.face.selection;
+  const candidate={...mod,mount:{...mod.mount,face:{...mod.mount.face,selection:{...selection,brackets:{enabled:true,childPart:connectionSelection(mod,'child')?.part || 'frame',offsets:{}}}}}};
+  const plan=faceBracketPlan(comps,modules.map(m=>m.id===mod.id?candidate:m),params,candidate,opts);
+  return {fixed:false,reason:plan?.ok?'此位置可配置角碼，尚未確認生成固定孔。':`無法配置角碼：${plan?.reason || '找不到接合板，請重新選面'}`};
 }
