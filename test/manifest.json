@@ -159,6 +159,7 @@
     "test/slider-crank.mjs",
     "test/slider-editor.mjs",
     "test/slider-lesson.mjs",
+    "test/snapshot-dimensions.mjs",
     "test/solve-health.mjs",
     "test/solver-boundaries.mjs",
     "test/spacers.mjs",

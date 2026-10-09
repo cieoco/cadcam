@@ -120,15 +120,16 @@ for(const work of [fixtures[0],fixtures[1]]){
  assert.ok(trace.physical.every(j=>j.parts.every(id=>result.plan.parts.some(p=>p.name===id))));assert.equal(trace.physical.length,2);assert.equal(trace.validation.poseRevision,result.poseRevision);
 }
 mkdirSync('output/framework-stabilization/w4b-frame',{recursive:true});
-// Preserve the real built-in → planar → frame → save/open failure. The normal
-// schema's 8mm grid changes 140/107.629 to 144/104; the rebaked frame rotates.
-// The shared physical path must reject this result, not silently emit holes.
+mkdirSync('output/framework-stabilization/w4b-dimensions',{recursive:true});
+// The original built-in → planar → frame save/open negative is now a positive
+// precision regression: rebuilding its frame must not rotate from snapped
+// dimensions. W4b-2's historical before/after evidence remains in its worklog.
 const originalPlanar=installedFrameFixture('planar',{stablePlanar:false}),originalSaved=normalizeSnapshot(toSnapshot(originalPlanar.comps,originalPlanar.topo,0,{modules:originalPlanar.modules,fabrication:originalPlanar.fabrication}));
-assert.equal(originalPlanar.params.LIFT_ARM_1,140);assert.equal(originalSaved.params.LIFT_ARM_1,144);assert.equal(originalSaved.params.LIFT_TOOL_DIAG_1,104);
+assert.equal(originalPlanar.params.LIFT_ARM_1,140);assert.equal(originalSaved.params.LIFT_ARM_1,140);assert.equal(originalSaved.params.LIFT_TOOL_DIAG_1,originalPlanar.params.LIFT_TOOL_DIAG_1);
 const badReopen={...originalSaved,topo:{params:originalSaved.params}},badScene=faceCandidateModel({work:badReopen},{theta:20,motorAngles:{'1':20,'2':0,'3':0}});
-assert.ok(badScene.catalog.diagnostics.some(d=>d.code==='face_fastener_invalid'));
-assert.equal((await validateFaceExport(badReopen,{theta:20})).ok,false);
-writeFileSync('output/framework-stabilization/w4b-frame/builtin-planar-snap-negative.json',JSON.stringify({beforeParams:originalPlanar.params,afterParams:originalSaved.params,diagnostics:badScene.catalog.diagnostics},null,2));
+assert.deepEqual(badScene.catalog.diagnostics,[]);
+assert.equal((await validateFaceExport(badReopen,{theta:20})).ok,true);
+writeFileSync('output/framework-stabilization/w4b-dimensions/builtin-planar-roundtrip.json',JSON.stringify({beforeParams:originalPlanar.params,afterParams:originalSaved.params,diagnostics:badScene.catalog.diagnostics},null,2));
 for(const [name,work] of [['root-mounted',fixtures[0]],['installed-mounted',fixtures[1]],['two-claws',fixtures[4]]]){
  writeFileSync(`output/framework-stabilization/w4b-frame/ui-${name}.blocks.json`,JSON.stringify(toSnapshot(work.comps,work.topo,0,{modules:work.modules,fabrication:work.fabrication}),null,2));
  const unmounted=structuredClone(work);unmounted.modules.at(-1).mount=null;
@@ -146,4 +147,4 @@ openFaceWizard({...ui,params:ui.params,childId:armId,stockMm:4,initialMount,expo
 receiver({origin:location.origin,source:iframe.contentWindow,data:{type:'face-wizard-ready',loadGraph:LOAD_GRAPH_TOKEN}});
 const init=messages.at(-1);assert.equal(init.type,'face-wizard-init');assert.equal(init.hosts.filter(h=>h.surface.moduleId==='Base'&&h.surface.kind==='frame').length,1);
 assert.equal(init.hosts[init.host].surface.frameEdge,13);assert.ok(!init.hosts.some(h=>/直邊\s*\d/.test(h.name)));assert.deepEqual(notices,[]);iframe.listeners={};
-console.log('host-frame five real scenarios, two nonzero poses, independent stock/axes/BOM, stable refresh/reopen/detach, actual public output, wizard receiver and known builtin snap rejection passed');
+console.log('host-frame five real scenarios, two nonzero poses, independent stock/axes/BOM, stable refresh/reopen/detach, actual public output, wizard receiver and original builtin precision roundtrip passed');

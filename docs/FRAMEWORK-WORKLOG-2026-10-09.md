@@ -5,7 +5,7 @@
 ## 接手資訊
 
 - 分支：`codex/framework-stabilization`；起點：`1537242`（應用 `2026.10.08.13`）。
-- 唯一寫入者：`w4a_physical`（Sol high）；W4b-2六面宿主底板／F3多接合scoped驗收通過，root只讀review／HTTP已批准本地提交；提交後STOP，不再委派。
+- 唯一寫入者：`w4a_physical`（Sol high）；W4b-3保存尺寸精度＋已批准3b缺省馬達方向相容性施工中，root只讀review／HTTP；不再委派，待驗收批准scoped提交後STOP。
 - 本機：Windows、Node `v25.2.0`、Python `3.13.5`。CI 的 Node 版本在 W1 固定並驗證。
 - 使用者原有未追蹤附件、`Claude outputs/`、截圖及框架檢討文件保留。提交只選本包檔案。
 - Astra 僅 low；更高推理強度須另獲確認。主聊天不宣稱自行切換模型。
@@ -260,3 +260,17 @@ G1內部F1門檻已貫通，可接續W3b→W4b→W5b；這不是發布或全格�
 
 - root製作包頁實際打開補核：frame.dxf厚6、Mod1-frame4、Mod3-frame4，6角碼、9支M3×6＋3支M3×8，逐翼連到真實檔名；`http-two-claws-restored.jpg`。735895無新增產品console error，僅已修d8c735歷史紀錄。
 - 最終完整manifest唯一一次 **158/158通過，Node22.14.0**，無fail／timeout，逐支logs／manifest hash留 `output/framework-stabilization/w4b-frame/full/`；最終graph check同 `735895a216ff6107f489`／138modules／16pages通過。已獲root批准scoped本地提交，writer提交後STOP；不push／deploy／改版本，保留全部使用者原untracked。下一包須正式派發保存尺寸精度／原builtin planar→frame roundtrip修正，不把這個負例列成已解；F2材料、教材交易、W5b側欄／沿邊preview bridge與OPPO實機仍後續。
+
+### W4b-3／3b — 保存尺寸精度與缺省馬達方向
+
+- 起點 `f75e6e411cc576c701e2fd08e23f470b4c620ed1`，唯一writer `w4a_physical`（Sol high）。LOOP：原builtin planar→frame紅例→schema長度最小修正→獨立尺寸／pose／孔槽／實際serialized輸出→必要定向→graph generate／check→正常UI重開HTTP→唯一一次full→root批准scoped提交。保留v1、原builtin參數與求解算法，沒有版本或部署。
+- `w4b-dimensions/red.log` 首先證實公開normalizeSnapshot把有效140改144；同函式將三點桿diag107.6289923765897取整／0.1化，爪邊121.8變122。現在bar／triangle的正有限明確長度原精度保留（包括小於8的合法既有資料）；缺失／非法值以有效端點距離修復，重合／無法量測才用8mm並給尺寸警告。沒有放寬其他shape或改schema原有stock／角色／ID安全限制。
+- 建立吸附仍留tools真互動：兩個自由點29mm經finishPolygonDraw建立32mm桿，一次undo；member-editor既有一位小數提交及8–2000mm限制不改。schema原29→32測試改為還原29，吸附另以真tools入口驗證。舊W4b-2原builtin negative已轉正回歸，歷史吸附證據不改寫為當時已通過。
+- 擴充回歸曾揭露另一個真UI存檔差異：createModuleEditor.insertBuiltin('fourbar-lift')→正式prepareConnectionWork沒有motorMount；normalize卻新增horizontal，使MG995槽由x−31.2轉為+31.2。root因此批准有限W4b-3b修復，`red-motor.log`先紅。現在缺motorMount保持缺省；已有center／reversed但缺orientation也不補新方向，由原buildMotorMounts共用fallback解析，不在schema複製方向算法、不新增auto枚舉／持久欄位。明確horizontal／vertical／follow-frame／reversed、motorCarrier與共點M2 source均回歸。
+- `test/snapshot-dimensions.mjs` 真raw F1、原builtin planar-hostframe、F3 root-frame在0／20／40（M2=10、第三軸15）驗證：frozen不mutation、normalize冪等、實際storage Blob／local／分享與app undo函式的還原路徑、獨立各剛體邊長對原參數、raw與reopen求解點／local材料／世界pose／全部孔槽一致1e-6mm。真正public SVG／DXF全Blob逐bytes相同，paired板孔另從世界角碼孔逆投影到serialized圈0.005mm，沒有用明確mount替換原source掩蓋馬達差異。3b修後legacy-motor-orientation.json保留真入口before／after，孔槽相同。
+- 範圍仍限bar／triangle長度及這個缺省方向保存相容性；slider／rack／gear等其他尺寸量化沒有順便改。F1原材料真撞誠實保留；F2材料、W5b教材／沿邊preview全域S交易與舊側欄plane狀態bridge、fulltravel與OPPO實機仍後續。正常UI raw／reopened三組fixtures及精確LJ／RJ參數清單在ignored `w4b-dimensions/`，不提交私人路徑／附件。
+- 定向14/14通過（Node22.14.0，target-final逐支log）。首輪target13/14僅新增測試把缺省共點來源也假定Second，但原planner同樣選First；已分成明確center共點與合法缺省單來源，獨立原／normalize planner比對，無產品算法改動。最終source freeze與HTTP／full結果待收尾，未commit。
+- 最終source `536f71a07f4306263285`，138modules／16pages generate/check通過。子任務於source freeze後遇使用量限制停止；root確認其已errored，接回唯一writer進行HTTP／full／收尾，未改用其他帳號或提高模型設定。
+- root正式HTTP：正常開ui-builtin-planar-frame-raw→另存→正常開實際下載檔→再次另存，兩次作品JSON deepStrictEqual；所有bar／triangle尺寸等於原source，arm140、diag107.6289923765897、jaw121.8，implicit motorMount仍未被補成horizontal。實際製作包成功產生；重選保留Mod3底板back／childbottom／90°／offset10／gap0與2角碼，15處真撞誠實顯示，取消後不變。證據http-{saved,reopened}.blocks.json、http-reopened-pack.html、http-reopened-preview.jpg；無本版產品console error，舊d8c紀錄未誤當新錯誤。
+- root唯一一次full：158/159，唯一失敗example-controller仍假定原30mm範例會被吸附32；已將該斷言改為原30mm保存。無產品source改動，target-compat 2/2（example-controller、snapshot-dimensions）與graph check通過，不為測試預期更正重跑全部。完整證據在w4b-dimensions/full與target-compat；W6仍須發布同commit全套。
+- root批准本包scoped本地提交。未push／deploy／改app版本，未包含私人附件或其他原untracked。下一步W4b-F2齒條能力與W5b單一精靈／沿邊候選交易／干涉狀態／教材；OPPO實機仍待，整案不宣稱完成。手機效能需固定共同比較snapshot，避免本包新舊normalize差異令基準作品尺寸不同，已記ignored w5b-baseline/w6-notes.txt。

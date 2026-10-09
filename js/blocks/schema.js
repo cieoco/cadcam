@@ -19,12 +19,21 @@ const SAFE_COLOR = /^#[0-9a-fA-F]{6}$/;
 const POINT_TYPES = new Set(['floating', 'fixed', 'motor', 'linear']);
 
 const clone = value => JSON.parse(JSON.stringify(value));
-const snapLego = value => Math.max(LEGO_STEP, Math.round((Number(value) || 0) / LEGO_STEP) * LEGO_STEP);
 const num = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const roundMm = (value, fallback = 0) => Math.round(num(value, fallback));
 const roundTenth = (value, fallback = 0) => Number(num(value, fallback).toFixed(1));
 const safeId = value => typeof value === 'string' && SAFE_ID.test(value);
 const uniqueSafeIds = values => Array.from(new Set((values || []).filter(safeId)));
+
+// 存檔長度是已提交的幾何，不再套用建立/編輯時的吸附或小數位數。
+// 缺失/非法值以可用端點距離補回；重合端點則使用最小繪製孔距。
+function restoredLength(value, inferred, key, warnings) {
+  const numeric = typeof value === 'number' || (typeof value === 'string' && value.trim()) ? Number(value) : NaN;
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  const repaired = Number.isFinite(inferred) && inferred > 0 ? inferred : LEGO_STEP;
+  warnings.push(`尺寸 ${key} 遺失或不是有效正長度，已修復為 ${repaired} mm。`);
+  return repaired;
+}
 
 function normalizePoint(point, fallbackId, warnings) {
   if (!point || typeof point !== 'object') {
@@ -98,19 +107,20 @@ function normalizeBar(comp, index, params, warnings) {
       out.servoStart = clampAng(comp.servoStart ?? 0);
       out.servoEnd = clampAng(comp.servoEnd ?? 90);
     }
-    // Explicit assembly semantics.  Older files only have motorCarrier, so
-    // synthesize the equivalent mount while preserving backwards compatibility.
+    // Explicit assembly semantics. Older files may only have motorCarrier or
+    // an implicit direction: preserve that input for buildMotorMounts' shared
+    // fallback, rather than changing its direction by synthesizing horizontal.
     const rawMount = comp.motorMount && typeof comp.motorMount === 'object' ? comp.motorMount : {};
     const center = safeId(rawMount.center) ? rawMount.center : (p1.physicalMotor ? p1.id : (p2.physicalMotor ? p2.id : ''));
     const frameBody = safeId(rawMount.frameBody) ? rawMount.frameBody : out.motorCarrier;
-    if (center) {
+    if (center && comp.motorMount && typeof comp.motorMount === 'object') {
       out.motorMount = {
         motor: String(rawMount.motor || out.physicalMotor),
         center,
         outputBody: id,
         ...(frameBody ? { frameBody } : {}),
-        orientation: ['horizontal', 'vertical', 'follow-frame'].includes(rawMount.orientation)
-          ? rawMount.orientation : (frameBody ? 'follow-frame' : 'horizontal'),
+        ...(['horizontal', 'vertical', 'follow-frame'].includes(rawMount.orientation)
+          ? { orientation: rawMount.orientation } : {}),
         reversed: Boolean(rawMount.reversed),
         order: frameBody ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody']
       };
@@ -128,10 +138,7 @@ function normalizeBar(comp, index, params, warnings) {
     if (holes.length) out.holes = holes;
   }
 
-  const rawLen = params[lenParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y);
-  params[lenParam] = out.snapLength === false
-    ? roundTenth(rawLen)
-    : (out.fixedLen ? snapLego(rawLen) : Math.round(num(rawLen, 0)));
+  params[lenParam] = restoredLength(params[lenParam], Math.hypot(p2.x - p1.x, p2.y - p1.y), lenParam, warnings);
   return out;
 }
 
@@ -155,7 +162,7 @@ function normalizeTriangle(comp, index, params, warnings) {
     r2Param,
     sign: Number(comp.sign) < 0 ? -1 : 1
   };
-  if (comp.snapLength === false) out.snapLength = false;   // 與 bar 同義：邊長取 0.1mm，不取整數
+  if (comp.snapLength === false) out.snapLength = false;   // 與 bar 同義：保留編輯吸附設定；存檔邊長不再取整數或 0.1mm
   const stock = normalizeMemberStock(comp.stock);
   if (stock) out.stock = stock;
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0)))); // 手動疊放相對位移
@@ -215,12 +222,9 @@ function normalizeTriangle(comp, index, params, warnings) {
   if (comp.visualOnly) out.visualOnly = true;
   if (comp.snapLength === false) out.snapLength = false;
 
-  const normalizeLen = out.snapLength === false
-    ? value => roundTenth(value)
-    : value => Math.round(num(value, 0));
-  params[gParam] = normalizeLen(params[gParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y));
-  params[r1Param] = normalizeLen(params[r1Param] ?? Math.hypot(p3.x - p1.x, p3.y - p1.y));
-  params[r2Param] = normalizeLen(params[r2Param] ?? Math.hypot(p3.x - p2.x, p3.y - p2.y));
+  params[gParam] = restoredLength(params[gParam], Math.hypot(p2.x - p1.x, p2.y - p1.y), gParam, warnings);
+  params[r1Param] = restoredLength(params[r1Param], Math.hypot(p3.x - p1.x, p3.y - p1.y), r1Param, warnings);
+  params[r2Param] = restoredLength(params[r2Param], Math.hypot(p3.x - p2.x, p3.y - p2.y), r2Param, warnings);
   return out;
 }
 

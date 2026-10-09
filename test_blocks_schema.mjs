@@ -51,7 +51,7 @@ const messy = normalizeSnapshot({
   params: { LLX: 29 }
 });
 ok('schema accepts UI bar shape', messy && messy.comps.length === 1);
-ok('schema snaps fixed link length to LEGO pitch', messy && messy.params.LLX === 32);
+ok('schema restores the saved fixed link length without drawing-grid snap', messy && messy.params.LLX === 29);
 ok('schema repairs invalid color', messy && messy.comps[0].color === '#3498db');
 
 const withHole = normalizeSnapshot({
