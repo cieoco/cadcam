@@ -5,7 +5,7 @@
 ## 接手資訊
 
 - 分支：`codex/framework-stabilization`；起點：`1537242`（應用 `2026.10.08.13`）。
-- 唯一寫入者：`w4a_physical`（Sol high）；W4a-4 scoped commit後停止，下一writer由root正式指定。root只讀review／HTTP；無再委派。
+- 唯一寫入者：`w4a_physical`（Sol high）；W5a-2已驗收，root只讀review／HTTP；scoped commit後STOP，下一writer由root正式交棒，無再委派。
 - 本機：Windows、Node `v25.2.0`、Python `3.13.5`。CI 的 Node 版本在 W1 固定並驗證。
 - 使用者原有未追蹤附件、`Claude outputs/`、截圖及框架檢討文件保留。提交只選本包檔案。
 - Astra 僅 low；更高推理強度須另獲確認。主聊天不宣稱自行切換模型。
@@ -19,7 +19,7 @@
 | W1 | done | 九項失敗完成分類／修正；Node 22.14.0 全套 143/143；cold HTTP 通過，舊快取混載轉 W2 修復 |
 | W2 | done | 120 模組／15 頁同圖生成與 CI check；主頁／iframe 握手拒絕異批確認；Node 22.14.0 全套 144/144 與 HTTP 通過 |
 | W3a | done | F1 六面純讀取／保存／重選／真 bar 層高；同圖 check、Node22 全套 146/146、主代理 HTTP 通過 |
-| W4a–W5a／G1 | implementing | W4a-1 共用角碼147、W4a-2局部材料148、W4a-3單一姿態SAT151、W4a-4 viewer復用153支與HTTP／桌面12run完成；F1真撞保留。W5a交易、完整F3與OPPO實機gate待後續 |
+| W4a–W5a／G1 | done (F1) | W4a共用角碼／材料／單姿態SAT／快取，W5a純候選交易／實際SVG-DXF-製作包trace已貫通；G1內部門檻通過，F1真撞如實保留。其他格式留b階段，完整F3及OPPO實機仍限制W6 |
 | W3b–W5b | planned | 其餘格式、多接合位置、教材與效能 |
 | W6 | planned | 全面驗收、提交推送與發布核對 |
 
@@ -188,3 +188,29 @@
 - invalid fastener保留有效placement的材料模型；專用display copy不生成未確認孔／角碼，candidate.work仍保留requested brackets且saveable=false，禁止靜默降級。參數等待檢查時保留上一圖、明示『此圖為上次候選；目前設定待檢查』並清舊red；invalid／pending主鈕停用、僅『接上』，完整材料真撞且可保存時才『接上（有干涉）』。target-invalid-view3/3，最終token868227fc7b1eee379916 generate／check，full-invalid-view154/154 Node22.14.0，無fail／timeout，完整logs同ignored目錄。
 - root最終HTTP868227：default0遇L2槽固定失敗仍有無角碼模型／disabled『接上』；+90 gap1待檢保留舊圖、invalid仍可見；auto-fit回gap0有3角碼／2真撞，可保存有干涉設計。正式confirm→一次undo回原狀且Undo disabled，實際下載前後raw完全相同9799bytes。390×844主頁client／scroll390、nested375／375，開啟→+90→confirm→重選gap1尺寸dialog→cancel後正式仍gap0／3角碼／2hits；1280×800 ignored desktop wrapper新開讀手機保存成果亦一致、cancel不改作品。所有頁source token一致，ignored w5a-candidate/http-{invalid-after-fix,mobile,desktop}.jpg。nested CUA有無source MutationObserver工具錯誤，產品無新增console來源錯誤，不宣稱所有工具logs為零。
 - root批准scoped本地commit後writer STOP；未push／deploy／改app版本，原附件、Claude outputs、REVIEW與截圖保留。下一W5a-2：SVG／DXF circle輸出trace IDs、buildpack同ValidationReport／單姿態coverage（現warning仍硬寫跨面未驗證）；W5b處理沿邊withCandidate／putDerived bridge。等待明確下一交棒，不宣稱W5a／G1全完工。
+
+### W5a-2 — F1 實際加工檔追蹤與單一姿態製作包
+
+- 起點 `2f799fdf685eafbe8b62ae2b7a23bbebffc4e6ec`；唯一writer `w4a_physical`（Sol high），root只讀review／HTTP。LOOP條件：actual public SVG／DXF解析先紅→最小共同identity／source adapter→獨立座標／軸／spec驗算→graph generate／check→完整manifest一次→root實際下載批准→scoped commit STOP；無schema／solver／app版本／push／deploy變更。
+- 紅證據 ignored `output/framework-stabilization/w5a-export/red.log`：原public module-frame SVG circle没有holePairID。共同 `identifiedHoles` 保留已有ID／fallback規則，catalog與SVG data attributes、DXF CIRCLE的999單行 `HOLE_TRACE` JSON共用；frame／link／plate／gear／fusion／hosted bar皆經原serializer，原三位小數與格式保留。外部ID引號／XML符號／換行以安全attrs／JSON保持值；不新增持久化欄位。
+- 製作包每一角碼／翼列出板件、板孔、牙孔、holePairID、螺絲ID／規格／長度／geometryVersion；逐件資料另在非可見manufacturingTrace JSON。可見文字僅角度／結果／雙方名稱／具名coverage，長sourceRevision／geometryKey不灌入文字。既有同平面finding與跨面finding分列；螺桿和頭分別具名，真撞不改成安全結論。
+- 正式downloadBuildPack的F1路徑停播→clone作品與完整active motor姿態／分支seed→共用faceCandidateModel與validateFaceCandidate重驗→guard source／pose／play／報告geometry revision→才下載。拒絕連按、過期及無效解；不讀旧UI report、不更改作品／undo／autosave。有效但有真撞的CAD仍可出包，報告明示單一有效姿態／全行程未支援；缺report或revision不符為not_checked。
+- 實際輸出對照抓到既有差異：candidate把馬達方向Map當加工mount陣列，且app primary inputs漏nested child IDs。最小抽出原motorFrameExportMounts公式（保留carrier/world與pointId註解）供正式／candidate共同使用 fabrication.ttMount／mg995Mount；F1 homeMounts取all inputs，檔案共用catalog home points／mounts，避免非零triangle加工姿態再旋轉。buildPlan同傳scene.mounts，無預設mount回退。沒有另寫輪廓或孔心算法。
+- target-ready 5/5 Node22.14.0；`face-export-trace` parse真正public下載Blob和HTML：default／custom角碼、custom MG995／TT槽孔、尺寸變動＋normalizeSnapshot保存重開、0／20／40／M2非零與真nested、fusion；板孔逆world與盒體孔軸獨立比對，未round軸／螺絲残差1e-6、既有加工round容許0.005mm。6翼／6螺絲逐列對BOM、Ø3.2板孔／Ø3牙孔；F1原2／3真撞維持。缺requested孔／invalid geometry整批停止，XML／DXF換行惡意ID、缺／舊report、同平面only fail與async source／pose／play／duplicate負例確實拒絕。相關舊geometry測試對新增partId另驗歸屬，原座標斷言保留。
+- Bridge：非F1製作包／其他格式仍原入口；沿邊withCandidate／putDerived全域S交換與共同實體接入具名留W5b／W4b，W6前移除兩套幾何。完整F3 gate與OPPO實機留W6；本包不宣稱全行程、全五金或跨格式完成，G1的F1結論見下。
+- 生產source freeze `d8c73563ba5d7827a167`，138modules／16pages generate／check通過；完整manifest一次結果153/155（full/results.json）。兩項只因serialized trace／新狀態文案而失敗：face-mount-3d改驗『固定孔尚未確認』＋『沒有目前有效姿態報告』＋not_checked；servo-crank-holes改解析DXF group8實際圖層4孔，不把trace JSON重複字串算成孔。修後target-compat 2/2，原target-ready 5/5，未更改生產source。root明確同意保留full及補驗證據，不重跑無source變更155支；W6同commit最終整合驗收仍待。
+- ignored UI fixtures `w5a-export/ui-{default,custom}.blocks.json` 均經正式toSnapshot／normalizeSnapshot、M1=20°／M2=0；custom含尺寸修改、14×10×7/th1.5角碼與自訂MG995耳孔／槽。golden實際SVG／DXF／HTML亦在同目錄；私有附件／下載路徑不提交。已交root頂層正式blocks頁HTTP actual download，待批准，尚未commit。
+- 初次HTTP凍結d8c735抓到app 2D drawMotorMountHoles.rotationForCenter仍用已抽走的motorMountPatternRotDegForCenter名稱，正常開檔拋ReferenceError。已補回app相容wrapper委派共用pure pattern函式，export mounts亦委派同函式，沒有再算一套公式；新增實際app wrapper／consumer binding及carrier／world兩例回歸，原source缺symbol會先紅。target-http-fix 7/7，最終source token `c78095578e2177e77ae3` 138/16 generate／check通過；HTTP重驗已開檔／3D正常、實際下載首件SVG／DXF與完整HTML，root同意此生產修正後再跑full-final。IAB多檔只落首件為工具限制，Node public全檔bytes保留；不在本包新加zip或改下載流程。UI fixture保存20°，正式open既有流程會回0°，非零HTTP由正式play／pause驗，不混稱fixtures載入就是20°。
+- full-final完整155/155 Node22.14.0，無fail／timeout，逐支logs／manifest hash留同ignored目錄。root c780 HTTP：default實際製作包3角碼／6翼／6螺絲M3×6、2hits／14具名未查；首SVG／DXF bytes與golden精確相同。custom實際播放停M1 11.464°／M2=0，首SVG／DXF bytes精確等custom golden、pack.physical整段亦相同、報告記11.464°／2hits；重選面iframe同token、3角碼／2hits，取消仍gap0與3角碼。證據 `w5a-export/http-{default,custom}-*`、http-physical-trace.jpg、http-custom-preview.jpg；使用者下載路徑不提交。IAB多檔僅首檔落地，沒有permission提示，故全批bytes由Node真正public download Blob解析驗，無聲稱IAB已逐件落地。
+- HTTP收尾只修CNC孔用途顯示 `layer || purpose || HOLE`，不改geometry／孔／report計算；target-text 3/3（actual export、cnc-check、build-pack），final source `f101d282add26a9313b8` 138/16 generate／check通過。依root指示不重跑文字修正後的155支。root最終實際下載http-final-pack.html核LeftJaw_3（HOLE）、無（undefined）且trace保留；批准scoped本地commit後writer STOP，無push／deploy／bump。
+
+### G1 — F1 第一條完整流程集中結論
+
+| SDD §7 條件 | 證據／結論 |
+| --- | --- |
+| 未接升降臂＋夾爪→90°貼齊／角碼孔／真單姿態結果 | W5a-1 HTTP868227從未接F1操作，default0失敗仍可觀察，+90 auto-fit回gap0／3角碼／2真撞；W4a-1獨立貼板／孔軸／螺絲audit、W4a-3純SAT與root獨立point-in-material witness，coverage逐項具名。真撞保留，不把有效固定寫成安全。 |
+| 取消零副作用／確認一次undo／重開／尺寸與非零姿態 | W5a-1實際bench receiver/rebuild/save:false／首解seed回歸；HTTP前後undo的實際JSON bytes完全相同9799，390×844／1280×800操作確認。W5a-2尺寸變更＋normalizeSnapshot重開、0/20/40與M2非零／nested解析；正式custom 11.464°取消仍原接合。 |
+| 3D→SVG／DXF／製作包同記錄、孔位／輪廓／五金獨立核對 | W4a-2 inspector局部geometry＋world pose／多outline／孔槽，W4a-1 physical IDs／螺絲；W5a-2 actual public全件Blob解析和逆world孔／軸/spec、6翼逐列pair IDs、default/custom首檔HTTP精確bytes與physical JSON相同。CNC依同snapshot加工特徵。 |
+| 手機尺寸／桌面／回歸／F1效能快取 | W5a-1手機390主client/scroll390、nested375/375，桌面1280×800；W4a-4同桌面12runs量測與geometry build/dispose播放不變，F1完成版p95CPU3.9–4.3ms且細節增加，原版差異如實記；本包完整155/155＋文字定向3/3，root最終HTTP通過。 |
+
+G1內部F1門檻已貫通，可接續W3b→W4b→W5b；這不是發布或全格式驗收。OPPO型號／SoC／RAM／OS／瀏覽器／刷新率仍待提供，未連線量測；390尺寸不代替實體手機，W6受SDD§4.5限制。F3目前效能fixture是provisional真二層，完整多接合位置gate待b階段；舊沿邊全域S交換與重複實體bridge須於W4b/W5b移除。最終同commit完整整合／發布驗收留W6，未push／deploy／改版本。

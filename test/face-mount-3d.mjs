@@ -42,7 +42,9 @@ for (const host of hosts) for (const hostFace of ['top', 'bottom', 'left', 'righ
   assert.equal(movedFace.translation.x, face.translation.x + 20);
   assert.equal(movedFace.translation.y, face.translation.y - 10);
   const html = buildPackHtml({ parts: [], joints: [], motors: [], gaps: [] }, { modules });
-  assert.ok(html.includes('轉接件、配對固定孔與跨面干涉尚未驗證'));
+  assert.ok(html.includes('轉接件與配對固定孔尚未確認'));
+  assert.ok(html.includes('沒有目前有效姿態報告'));
+  assert.ok(html.includes('data-status="not_checked"'));
   assert.ok(!html.includes('未發現干涉'));
   count++;
 }

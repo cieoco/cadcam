@@ -118,7 +118,7 @@ for(const mounted of [false,true])for(const moduleId of f.modules.map(m=>m.id)) 
  const frameMounts=splitFrameMounts(Ex.splitMountsByHost(scope.comps,allMounts).free,scope.comps,scope.modules).world.filter(m=>ids.has(m.pointId));
  const local=buildPartGeometryCatalog({...scope,frameNodes:nodes,frameMounts});
  const expected=Ex.inspectFrameExport(nodes,scope.fabrication.export,frameMounts);
- if(expected){assert.deepEqual(local.parts.frame.cutouts.map(c=>c.points),expected.cutouts.map(c=>c.points));assert.deepEqual(local.parts.frame.holes.filter(h=>h.layer!=='ADAPTER_HOLE').map(({id,purpose,...h})=>h),expected.holes.filter(h=>h.layer!=='ADAPTER_HOLE').map(({id,...h})=>h));}
+ if(expected){assert.deepEqual(local.parts.frame.cutouts.map(c=>c.points),expected.cutouts.map(c=>c.points));assert.ok(local.parts.frame.holes.every(h=>h.partId==='frame'),'serialized part identity belongs to this frame scope');assert.deepEqual(local.parts.frame.holes.filter(h=>h.layer!=='ADAPTER_HOLE').map(({id,purpose,partId,...h})=>h),expected.holes.filter(h=>h.layer!=='ADAPTER_HOLE').map(({id,partId,...h})=>h));}
 }
 // Fusion body shares the exporter once; the pose follows mechanical pins independently.
 import {fusionCandidates} from '../js/blocks/part-fusion.js';

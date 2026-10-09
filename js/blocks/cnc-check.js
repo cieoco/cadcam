@@ -82,15 +82,16 @@ export function cncWarnings(parts, cnc) {
     const name = part && part.name;
     for (const h of (part && part.holes) || []) {
       const dia = 2 * Number(h.r);
+      const layer = h.layer || h.purpose || 'HOLE';
       if (!Number.isFinite(dia)) continue;
       if (dia < tool - EPS) {
-        const key = `${name}\u0000${h.layer}\u0000${fmt(dia)}`;
-        const g = holeGroups.get(key) || { name, layer: h.layer, dia, count: 0 };
+        const key = `${name}\u0000${layer}\u0000${fmt(dia)}`;
+        const g = holeGroups.get(key) || { name, layer, dia, count: 0 };
         g.count++;
         holeGroups.set(key, g);
       } else if (dia >= tool - EPS && dia < tool + 0.5) {
-        const key = `${name}\u0000${h.layer}\u0000${fmt(dia)}`;
-        const g = tinyMoreHoles.get(key) || { name, layer: h.layer, dia, count: 0, tool };
+        const key = `${name}\u0000${layer}\u0000${fmt(dia)}`;
+        const g = tinyMoreHoles.get(key) || { name, layer, dia, count: 0, tool };
         g.count++;
         tinyMoreHoles.set(key, g);
       }

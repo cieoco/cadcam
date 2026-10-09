@@ -1,4 +1,5 @@
 import {prepareConnectionWork} from './connection-work.js';
+import {usesFaceExport,faceFileExportData,createFaceExportCoordinator,faceBuildPackHtml} from './face-export.js';
 import {materialSolveValidity} from './material-pose-status.js';
 import {createPlaybackProbe} from './playback-probe.js';
 import {createAsyncResource} from '../blocks3d/scene-reuse.js';
@@ -81,7 +82,7 @@ import { circleRectCompression } from './intake-contact.js';
 import { drawGear as renderGear, drawPulley, drawBelt, drawRack, drawGearManualHandles as renderGearManualHandles } from './transmission-render.js';
 import { drawCam as renderCam, drawWorkpiece as renderWorkpiece } from './special-part-render.js';
 import { drawPlate as renderPlate } from './plate-render.js';
-import { buildMotorMounts as planMotorMounts, computeMotorRotDeg as planMotorRotDeg, motorAssemblyLayerForBody } from './motor-mounts.js';
+import { buildMotorMounts as planMotorMounts, computeMotorRotDeg as planMotorRotDeg, motorAssemblyLayerForBody,buildMotorExportMounts,motorMountPatternRotDegForCenter as planMotorPatternRotDeg } from './motor-mounts.js';
 import { drawFrameGeometry as renderFrameGeometry, drawMotorMountHoles as renderMotorMountHoles, drawModulePlates as renderModulePlates } from './motor-frame-render.js';
 import { createModulePlateSource } from './module-plates.js?v=20261007_m5a';   // G1：已安裝模組的固定板（<id>-frame）3D／2D
 import { collectSceneIds, prepareRenderScene } from './render-scene.js';
@@ -2449,45 +2450,13 @@ function transient(msg) {
   setBanner(msg);
   setTimeout(() => { if (document.getElementById('modeBanner').textContent === msg) clearBanner(); }, 1600);
 }
-function motorMountPatternRotDegForCenter(id, pts, mount = null) {
-  // drawTTMotor / drawMG995Servo's local long axis is +Y, while mount/CAD coordinates use +X as the motor long axis.
-  const inputBar = S.comps.find(comp => comp.type === 'bar' && comp.isInput && comp.p1 && comp.p2 &&
-    ((comp.p1.id === id && comp.p1.physicalMotor) || (comp.p2.id === id && comp.p2.physicalMotor)));
-  const carrier = inputBar?.motorCarrier && S.comps.find(comp => comp.type === 'bar' && comp.id === inputBar.motorCarrier);
-  const center = pts?.[id];
-  const farId = carrier?.p1?.id === id ? carrier.p2.id : carrier?.p2?.id === id ? carrier.p1.id : null;
-  const far = farId && pts?.[farId];
-  // A riding motor's holes rotate with its carrier; a world-frame motor keeps
-  // the mount orientation planned at draw time.
-  const visualRotDeg = center && far && Number.isFinite(far.x)
-    ? Math.atan2(-(far.x - center.x), -(far.y - center.y)) * 180 / Math.PI
-    : (mount ? mount.rotDeg : computeMotorRotDeg(id, pts || {}, new Set()));
-  return visualRotDeg - 90;
+function motorMountPatternRotDegForCenter(id,pts,mount=null){
+  return planMotorPatternRotDeg({id,pts,comps:S.comps,mount,fallbackRotDeg:()=>computeMotorRotDeg(id,pts || {},new Set())});
 }
 // 機架板上所有動力來源的加工孔位：TT＝軸孔＋螺絲孔＋定位孔、MG995＝穿板槽＋耳孔。
-function motorFrameExportMounts(inputs = lastModelInputs || {}) {
-  const pts = inputs.pts || {};
-  const motorIds = inputs.motorCenterIds || new Set();
-  const motorTypes = inputs.motorTypes || new Map();
-  const motorMounts = inputs.motorMounts || new Map();
-  const ttSettings = Settings.ttMountSettings();
-  const mg995Settings = Settings.mg995MountSettings();
-  const mounts = [];
-  motorIds.forEach(id => {
-    const type = motorTypes.get(id) || motorTypeForCenter(id);
-    const center = pts[id];
-    if (!center || !Number.isFinite(center.x) || !Number.isFinite(center.y)) return;
-    const mount = motorMounts.get(id);
-    mounts.push({
-      kind: type === 'mg995' ? 'mg995' : 'tt',
-      pointId: id,   // 供 splitMountsByHost 對應 bar.motorMountPoint（宿主機架桿）
-      frameBody: mount?.frameBody,
-      center,
-      rotDeg: motorMountPatternRotDegForCenter(id, pts, mount),
-      settings: type === 'mg995' ? mg995Settings : ttSettings
-    });
-  });
-  return mounts;
+function motorFrameExportMounts(inputs = null) {
+  inputs ||= (S.modules.some(m=>m.mount?.face)?lastModelInputsAll || lastModelInputs:lastModelInputs) || {};
+  return buildMotorExportMounts({...inputs,comps:S.comps,ttSettings:Settings.ttMountSettings(),mg995Settings:Settings.mg995MountSettings(),typeForCenter:motorTypeForCenter,fallbackRotDeg:id=>computeMotorRotDeg(id,inputs.pts || {},new Set())});
 }
 // O4a：直角安裝轉接座的孔位（桿件孔＋子模組底板節點）；板厚用 CNC 設定的板材厚度。
 // M5a：整台機器（底座＋裝在它身上的）；還沒接上的機構不進匯出、製作包與機架板。
@@ -2567,7 +2536,7 @@ function currentMotorRanges() {
   } finally { S.activeMotor = keep; }
   return ranges;
 }
-const homeMountsNow = () => lastModelInputs ? motorFrameExportMounts({ ...lastModelInputs, pts: pointCoords() }) : undefined;
+const homeMountsNow = () => {const inputs=S.modules.some(m=>m.mount?.face)?lastModelInputsAll || lastModelInputs:lastModelInputs;return inputs?motorFrameExportMounts({...inputs,pts:pointCoords()}):undefined;};
 // L6：疊層＋自動隔圈＋剩下的干涉；製作包與橫幅共用。失敗時回 { plan, interference: [], ranges }（plan 可能為 null）。
 function resolvedBuild(settings, mounts) {
   const cnc = S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
@@ -2640,7 +2609,20 @@ async function exportVideo() {
   finally { videoExportLoading = false; }
 }
 
+function exportFaceFiles(format) {
+  try{
+    const data=faceFileExportData(facePackSource(),{theta:S.theta,motorAngles:motorAnglesNow(),_prevPoints:lastFullPts});
+    const stockWarnings=memberStockWarnings(data.comps,data.settings);
+    if(stockWarnings.length){transient(`尚未匯出：${stockWarnings[0]}`);return;}
+    const links=format==='svg'?Exporters.exportLinksAsSvg:Exporters.exportLinksAsDxf,frame=format==='svg'?Exporters.exportFrameAsSvg:Exporters.exportFrameAsDxf;
+    const count=links(data.comps,data.points,data.params,data.settings,data.mounts,data.extras);
+    const frames=data.frames.reduce((n,f)=>n+frame(f.nodes,data.settings,f.mounts,f.name),0);
+    showCncWarnings(Object.values(data.catalog.parts).filter(p=>['frame','mounted-frame','bar','triangle','gear','fusion'].includes(p.kind)).map(p=>({...p,name:p.id})),data.settings);
+    transient(`已匯出 ${count} 個零件＋${frames} 片機架 ${format.toUpperCase()}`);
+  }catch(e){transient(`尚未匯出：${e.message}`);}
+}
 function exportLinksSvg() {
+  if(usesFaceExport(facePackSource()))return exportFaceFiles('svg');
   const invalid=S.comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(S.comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
   if(invalid){transient(`尚未匯出：${invalid.reason}`);return;}
   const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), S.comps, S.modules), M = machineNow();
@@ -2649,7 +2631,7 @@ function exportLinksSvg() {
   // 有宿主機架桿的 mount 隨該桿匯出（特徵切進桿身）；剩下的才進 frame.svg；已安裝模組另出各自的機架檔。
   const freeMounts = exportWorldMounts(Exporters.splitMountsByHost(M.comps, mounts).free);
   const extras = orthoExtrasNow(true);
-  try { Exporters.assertFusionFeatures(M.comps,mounts,extras); } catch(e) { transient(e.message);return; }
+  try { Exporters.assertAdapterFeatures(extras);Exporters.assertFusionFeatures(M.comps,mounts,extras); } catch(e) { transient(e.message);return; }
   const cutNodes = withWorldAdapterNodes(nodes, extras);   // C1：機架板邊上的轉接座宿主孔
   const count = Exporters.exportLinksAsSvg(M.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras);
   const frameCount = Exporters.exportFrameAsSvg(cutNodes, settings, freeMounts);
@@ -2659,7 +2641,7 @@ function exportLinksSvg() {
   let moduleFrameCount = 0;
   moduleFrameExports(M.comps, M.modules, S.topo.params).forEach(entry => {
     const modNodes = withAdapterNodes(entry.moduleId, moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps)), extras);
-    const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
+    const homeMounts = homeMountsNow();
     const modFree = splitFrameMounts(Exporters.splitMountsByHost(M.comps, homeMounts).free, M.comps, M.modules).byModule[entry.moduleId] || [];
     const n = Exporters.exportFrameAsSvg(modNodes, settings, modFree, entry.fileBase);
     moduleFrameCount += n;
@@ -2672,6 +2654,7 @@ function exportLinksSvg() {
   showCncWarnings(cncParts, settings);
 }
 function exportLinksDxf() {
+  if(usesFaceExport(facePackSource()))return exportFaceFiles('dxf');
   const invalid=S.comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(S.comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
   if(invalid){transient(`尚未匯出：${invalid.reason}`);return;}
   const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), S.comps, S.modules), M = machineNow();
@@ -2679,7 +2662,7 @@ function exportLinksDxf() {
   if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
   const freeMounts = exportWorldMounts(Exporters.splitMountsByHost(M.comps, mounts).free);
   const extras = orthoExtrasNow(true);
-  try { Exporters.assertFusionFeatures(M.comps,mounts,extras); } catch(e) { transient(e.message);return; }
+  try { Exporters.assertAdapterFeatures(extras);Exporters.assertFusionFeatures(M.comps,mounts,extras); } catch(e) { transient(e.message);return; }
   const cutNodes = withWorldAdapterNodes(nodes, extras);   // C1：機架板邊上的轉接座宿主孔
   const count = Exporters.exportLinksAsDxf(M.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras);
   const frameCount = Exporters.exportFrameAsDxf(cutNodes, settings, freeMounts);
@@ -2689,7 +2672,7 @@ function exportLinksDxf() {
   let moduleFrameCount = 0;
   moduleFrameExports(M.comps, M.modules, S.topo.params).forEach(entry => {
     const modNodes = withAdapterNodes(entry.moduleId, moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps)), extras);
-    const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
+    const homeMounts = homeMountsNow();
     const modFree = splitFrameMounts(Exporters.splitMountsByHost(M.comps, homeMounts).free, M.comps, M.modules).byModule[entry.moduleId] || [];
     const n = Exporters.exportFrameAsDxf(modNodes, settings, modFree, entry.fileBase);
     moduleFrameCount += n;
@@ -2711,7 +2694,7 @@ function collectCncPartsAndFrameWarnings(settings) {
   const cncParts = [...Exporters.cncPartsForExport(M.comps, pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', cutNodes, settings, freeMounts)];
   moduleFrameExports(M.comps, M.modules, S.topo.params).forEach(entry => {
     const modNodes = withAdapterNodes(entry.moduleId, moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps)), extras);
-    const homeMounts = motorFrameExportMounts({ ...(lastModelInputs || {}), pts: pointCoords() });
+    const homeMounts = homeMountsNow();
     const modFree = splitFrameMounts(Exporters.splitMountsByHost(M.comps, homeMounts).free, M.comps, M.modules).byModule[entry.moduleId] || [];
     frameWarnings.push(...Exporters.frameExportWarnings(modNodes, settings, modFree));
     cncParts.push(cncFramePart(entry.fileBase, modNodes, settings, modFree));
@@ -2719,7 +2702,28 @@ function collectCncPartsAndFrameWarnings(settings) {
   return { cncParts, frameWarnings };
 }
 // L5b：下載「製作包」HTML（板件清單＋五金清單＋組裝步驟，可列印）。
-function downloadBuildPack() {
+function saveBuildPack(html,title,partCount) {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${title.replace(/[\\/:*?"<>|]+/g, '_')}-製作包.html`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  transient(`已產生製作包（${partCount} 片板件）`);
+}
+const facePackSource=()=>({comps:S.comps,modules:S.modules,topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings(),stockMm:S.fabrication?.cnc?.stockThicknessMm || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint || FABRICATION_DEFAULTS.joint});
+const facePackDownload=createFaceExportCoordinator({readSource:facePackSource,readPose:()=>({theta:S.theta,motorAngles:motorAnglesNow(),_prevPoints:lastFullPts}),isPlaying:()=>playbackActive,pause,notify:transient,download:result=>{
+  const title=result.work.modules.map(m=>m.name).filter(Boolean).join('＋') || '機構作品';
+  saveBuildPack(faceBuildPackHtml(result),title,result.plan.parts.length);
+}});
+async function downloadBuildPack() {
+  if(usesFaceExport(facePackSource())){
+    const result=await facePackDownload.run();
+    if(!result.ok)transient(`尚未產生製作包：${result.reason}`);
+    return;
+  }
   const invalid=S.comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(S.comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
   if(invalid){transient(`尚未匯出：${invalid.reason}`);return;}
   const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
@@ -2737,15 +2741,7 @@ function downloadBuildPack() {
   // 目前沒有作品名稱欄位：有模組就用模組名稱串起來，否則「機構作品」。
   const title = (S.modules || []).map(m => m && m.name).filter(Boolean).join('＋') || '機構作品';
   const html = buildPackHtml(plan, { title, cnc, warnings, interference, suggestions, modules: S.modules });
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${title.replace(/[\\/:*?"<>|]+/g, '_')}-製作包.html`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  transient(`已產生製作包（${plan.parts.length} 片板件）`);
+  saveBuildPack(html,title,plan.parts.length);
 }
 function openFile() {
   const inp = document.createElement('input');

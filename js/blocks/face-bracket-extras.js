@@ -36,7 +36,7 @@ export function appendFaceBracketHoles(extras, comps, modules, params, opts={}) 
   extras.adapters ||= [];
   for(const mod of modules || []) {
     const plan=faceBracketPlan(comps,modules,params,mod,opts);
-    if (!plan?.ok) continue;
+    if (!plan?.ok) {if(plan)(extras.diagnostics ||= []).push({status:'fail',code:'face_fastener_invalid',moduleId:mod.id,reason:plan.reason});continue;}
     extras.adapters.push({moduleId:mod.id,connectionId:`connection:${mod.id}`,kind:'bracket-m3',
       hostCompId:plan.host.compId,hostPartName:plan.host.kind==='frame'?`${plan.host.moduleId}-frame`:null,
       childPart:plan.child.kind==='frame'?`${mod.id}-frame`:plan.child.compId,

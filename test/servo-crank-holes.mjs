@@ -30,6 +30,9 @@ exportLinksAsSvg([crank], {}, inst.params, {});
 exportLinksAsDxf([crank], {}, inst.params, {});
 const [svg, dxf] = await Promise.all(blobs.map(b => b.text()));
 assert.equal((svg.match(/data-layer="MG995_HORN_SCREW"/g) || []).length, 4);
-assert.equal((dxf.match(/MG995_HORN_SCREW/g) || []).length, 4);
+// Count actual DXF layer groups; the same name also appears in semantic trace JSON.
+const lines=dxf.trimEnd().split(/\r?\n/),layers=[];
+for(let i=0;i<lines.length;i+=2)if(Number(lines[i])===8)layers.push(lines[i+1]);
+assert.equal(layers.filter(layer=>layer==='MG995_HORN_SCREW').length, 4);
 URL.createObjectURL = oldCreate; URL.revokeObjectURL = oldRevoke;
 console.log('servo-crank SVG/DXF download: PASS');

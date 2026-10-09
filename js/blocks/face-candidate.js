@@ -11,7 +11,7 @@ import {buildMaterialScene} from '../blocks3d/material-scene.js';
 import {planeInputs} from '../blocks3d/orthogonal-3d.js';
 import {motorPointIds,pointCoords} from './model.js';
 import {motorTypeAt} from './motor-tools.js';
-import {buildMotorMounts} from './motor-mounts.js';
+import {buildMotorMounts,buildMotorExportMounts} from './motor-mounts.js';
 import {FABRICATION_DEFAULTS} from './fabrication-profile.js';
 import {materialSolveValidity} from './material-pose-status.js';
 import {DEFAULT_PLATE_RADIUS_WORLD} from './plate-geometry.js';
@@ -60,17 +60,18 @@ export function faceCandidateModel(candidate,pose={}){
  const validity=materialSolveValidity(work.comps,sol);if(!validity.valid)return {solveValidity:validity};
  const ids=motorPointIds(work.comps),groundIds=new Set(work.comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(p=>p&&['fixed','motor'].includes(p.type)).map(p=>p.id)));
  const mounts=buildMotorMounts({motorIds:ids,groundIds,staticPoints:pointCoords(work.comps),comps:work.comps,compiledSteps:prepared.compiled.steps,sliderMountInfo:()=>null,isHiddenSliderRailPoint:()=>false,motorTypeForCenter:id=>motorTypeAt(work.comps,id)});
- const catalog=buildPartGeometryCatalog({...work,mounts});
+ const exportMounts=buildMotorExportMounts({comps:work.comps,pts:pointCoords(work.comps),motorCenterIds:ids,motorMounts:mounts,typeForCenter:id=>motorTypeAt(work.comps,id),ttSettings:work.fabrication?.ttMount || FABRICATION_DEFAULTS.ttMount,mg995Settings:work.fabrication?.mg995Mount || FABRICATION_DEFAULTS.mg995Mount});
+ const catalog=buildPartGeometryCatalog({...work,mounts:exportMounts});
  const inputs=buildPreviewModelInputs({comps:work.comps,params:work.params,theta:pose.theta || 0,links:prepared.compiled.visualization.links,polygons:prepared.compiled.visualization.polygons || [],points:sol.points,groundIds,motorCenterIds:ids,motorTypes:new Map([...ids].map(id=>[id,motorTypeAt(work.comps,id)])),motorMounts:mounts,
   sliderTravelStart:c=>c.travelStart || 0,sliderTravelEnd:c=>c.travelEnd || 100,sliderBodyLength:c=>c.bodyLen || 60,rackBodyHeight:c=>c.bodyHeight || 20,rackPhaseShift:()=>0,pulleyRadius:()=>32,pulleyPinRadius:()=>20});
  const model=buildMaterialScene({...work,catalog,inputs:planeInputs(inputs,work.comps,work.modules,null),allPlanes:inputs,points:sol.points,asm,hullR:DEFAULT_PLATE_RADIUS_WORLD,solveValidity:validity});
  const hostGeometry=catalog.parts[candidate.hostSurface?.compId],homeIds=hostGeometry?.binding.pointIds || [],[a,b]=homeIds.map(id=>catalog.homePoints[id]);
  const hostReference=a&&b?{origin:a,angle:Math.atan2(b.y-a.y,b.x-a.x)}:null;
- return {model,work,mounts,points:sol.points,hostReference,solveValidity:validity};
+ return {model,work,mounts:exportMounts,catalog,points:sol.points,hostReference,solveValidity:validity};
 }
-export async function validateFaceCandidate(candidate,pose={},compute){
+export async function validateFaceCandidate(candidate,pose={},compute,sceneInput){
  if(!candidate.ok&&!candidate.displayWork)return candidate;
- const poseRevision=facePoseRevision(pose),scene=faceCandidateModel(candidate,pose),checks=[...candidate.validation.checks];
+ const poseRevision=facePoseRevision(pose),scene=sceneInput || faceCandidateModel(candidate,pose),checks=[...candidate.validation.checks];
  if(!scene.solveValidity.valid)return freezeData({...candidate,saveable:false,validation:{...candidate.validation,status:'not_checked',poseRevision,checks:[...checks,{status:'not_checked',code:scene.solveValidity.reason}],coverage:{scope:'single_pose',notSupported:[]}}});
  checks.push({status:'pass',code:'solve_valid'});
  const model={...scene.model,poseRevision};

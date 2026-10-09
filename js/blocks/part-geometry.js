@@ -7,6 +7,7 @@ import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { compileAssembly, solveAssembly, machineFrameComps, machineMounts, outputPose, splitFrameMounts } from './assembly.js';
 import { deriveMotorMounts } from './build-plan.js';
 import { framePlateHomes } from './module-plates.js';
+import {identifiedHoles} from './part-hole-trace.js';
 import { orthogonalExportExtras, withWorldAdapterNodes } from './orthogonal-joint.js';
 
 export const PART_GEOMETRY_VERSION = 1;
@@ -40,7 +41,7 @@ export function buildPartGeometryCatalog(args={}) {
     const geometry=mapGeometry(g,identityPoint);
     if(!geometry.outlines.length){diagnostics.push({status:'not_supported',code:'material_outline_missing',sourceIds});return;}
     const record={id,partId:id,kind,moduleId,sourceIds,geometryVersion:PART_GEOMETRY_VERSION,thicknessMm,...geometry,binding};
-    record.holes=record.holes.map((h,i)=>({...h,id:h.id || `${id}/hole:${h.layer || 'HOLE'}:${i}`,purpose:h.layer || 'HOLE'}));
+    record.holes=identifiedHoles(id,record.holes);
     record.cutouts=record.cutouts.map((c,i)=>({...c,id:c.id || `${id}/cutout:${c.layer || 'CUTOUT'}:${i}`,purpose:c.layer || 'CUTOUT'}));
     parts[id]=record;
   };

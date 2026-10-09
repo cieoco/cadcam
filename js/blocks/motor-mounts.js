@@ -14,6 +14,26 @@ import { resolveMotorOrientation } from './motor-orientation.js';
 export function motorRotDegFromDir(dir) {
   return dir ? Math.atan2(-dir.x, -dir.y) * 180 / Math.PI : 0;
 }
+// drawTTMotor / drawMG995Servo's local long axis is +Y, while mount/CAD coordinates use +X as the motor long axis.
+export function motorMountPatternRotDegForCenter({id,pts,comps,mount=null,fallbackRotDeg=()=>0}){
+ const inputBar=comps.find(c=>c.type==='bar'&&c.isInput&&c.p1&&c.p2&&((c.p1.id===id&&c.p1.physicalMotor)||(c.p2.id===id&&c.p2.physicalMotor)));
+ const carrier=inputBar?.motorCarrier&&comps.find(c=>c.id===inputBar.motorCarrier);
+ const center=pts?.[id],farId=carrier?.p1?.id===id?carrier.p2.id:carrier?.p2?.id===id?carrier.p1.id:null,far=farId&&pts?.[farId];
+ // A riding motor's holes rotate with its carrier; a world-frame motor keeps
+ // the mount orientation planned at draw time.
+ const visual=center&&far&&Number.isFinite(far.x)?Math.atan2(-(far.x-center.x),-(far.y-center.y))*180/Math.PI:mount?mount.rotDeg:fallbackRotDeg(id);
+ return visual-90;
+}
+export function buildMotorExportMounts({comps,pts={},motorCenterIds=new Set(),motorTypes=new Map(),motorMounts=new Map(),ttSettings={},mg995Settings={},typeForCenter=()=> 'tt',fallbackRotDeg=()=>0}){
+ const out=[];
+ motorCenterIds.forEach(id=>{
+  const center=pts[id];if(!center||!Number.isFinite(center.x)||!Number.isFinite(center.y))return;
+  const type=motorTypes.get(id) || typeForCenter(id),mount=motorMounts.get(id);
+  // pointId：供 splitMountsByHost 對應 bar.motorMountPoint（宿主機架桿）。
+  out.push({kind:type==='mg995'?'mg995':'tt',pointId:id,frameBody:mount?.frameBody,center,rotDeg:motorMountPatternRotDegForCenter({id,pts,comps,mount,fallbackRotDeg}),settings:type==='mg995'?mg995Settings:ttSettings});
+ });
+ return out;
+}
 
 function oppositeTarget(origin, point) {
   return origin && point && Number.isFinite(origin.x) && Number.isFinite(point.x)

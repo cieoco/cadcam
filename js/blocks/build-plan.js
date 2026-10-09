@@ -24,6 +24,7 @@ import { buildMotorMounts } from './motor-mounts.js';
 import { computeBodyLayers } from '../blocks3d/scene-model.js';
 import { motorTypeAt } from './motor-tools.js';
 import { pointKeysFor } from './part-types.js';
+import {partLabel} from './part-labels.js';
 
 const DEFAULT_STOCK_THICKNESS_MM = 3;
 
@@ -430,7 +431,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     return { type: motorTypeAt(list, centerId), centerId, plate: partPoints.has(plateName) ? plateName : null };
   });
 
-  return { parts, joints, motors, gaps, spare };
+  return { parts, joints, motors, gaps, spare,diagnostics:orthoExtras.diagnostics || [] };
 }
 
 // ---- 五金清單 ----
@@ -563,9 +564,11 @@ export function hardwareList(plan, { modules = [] } = {}) {
 const escHtml = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const KIND_LABEL = { frame: '機架板', gear: '齒輪', rack: '齒條', member: '桿件／板件' };
 
-export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = [], interference = [], suggestions = [], modules = [] } = {}) {
+export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = [], interference = [], suggestions = [], modules = [],comps=[],validation,validationRevision } = {}) {
+  const invalid=plan?.diagnostics?.find(d=>d.code==='face_fastener_invalid');if(invalid)throw Error(`角碼孔暫停輸出：${invalid.reason}`);
+  const currentReport=validation?.scope==='single_pose'&&['pass','fail','not_supported'].includes(validation.status)&&validationRevision&&['sourceRevision','geometryKey','poseRevision'].every(k=>typeof validation[k]==='string'&&validation[k]===validationRevision[k]);
   const spare = plan && Array.isArray(plan.spare) ? plan.spare : spareModules(modules);   // M5a：還沒接上的機構不在製作包內，提醒一聲
-  warnings = [...warnings, ...(spare.length ? [`還沒接上、不在製作包內：${spare.map(m => m.name).join('、')}`] : []), ...modules.filter(m => m?.mount?.face).map(m => `六面接合 ${m.name || m.id}：${m.mount.face.selection.brackets ? '角碼孔依目前板件幾何重新驗證；不合格孔位停止輸出。跨面干涉與承重仍需驗證。' : '擺放姿態已保存；轉接件、配對固定孔與跨面干涉尚未驗證，不能直接依此製造組立。'}`)];
+  warnings = [...warnings, ...(spare.length ? [`還沒接上、不在製作包內：${spare.map(m => m.name).join('、')}`] : []), ...modules.filter(m => m?.mount?.face).map(m => `六面接合 ${m.name || m.id}：${m.mount.face.selection.brackets ? `角碼孔依目前板件幾何重新驗證；不合格孔位停止輸出。${currentReport?'目前單一姿態材料結果見下方；全行程與承重仍未驗證。':'跨面干涉與承重仍需驗證。'}` : '擺放姿態已保存；轉接件與配對固定孔尚未確認，不能直接依此製造組立。'}`)];
   const parts = (plan && plan.parts) || [];
   const joints = (plan && plan.joints) || [];
   const motors = (plan && plan.motors) || [];
@@ -578,6 +581,15 @@ export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = []
   const partRows = partsSorted.map(p => `<tr><td>${p.layer}</td><td>${e(p.name)}.dxf</td><td>${e(KIND_LABEL[p.kind] || p.kind)}</td><td>${fmtNum(p.widthMm || 0)} × ${fmtNum(p.heightMm || 0)} mm</td><td>${fmtNum(p.thicknessMm)} mm</td></tr>`).join('');
   const hw = hardwareList(plan, { modules });
   const hwRows = hw.map(r => `<tr><td>${e(r.spec)}</td><td>${r.qty}</td><td>${e(r.note)}</td></tr>`).join('');
+  const attribute=value=>e(value).replace(/\r/g,'&#13;').replace(/\n/g,'&#10;').replace(/\t/g,'&#9;');
+  const traceRows=joints.filter(j=>j.physical).flatMap(j=>j.physical.flatMap(b=>b.wings.map(w=>{
+    const plate=j.parts[w.role==='host'?0:1],thread=w.box.hole,hole=w.plateHole,screw=w.screw;
+    const attrs={'connection-id':b.connectionId,'instance-id':b.id,'wing-id':w.id,'hole-pair-id':hole.holePairId,'part-id':plate,'plate-hole-id':hole.id,'thread-hole-id':thread.id,'screw-id':screw.id,'screw-spec':screw.spec,'plate-diameter-mm':hole.diameterMm,'thread-diameter-mm':thread.diameterMm,'screw-length-mm':screw.lengthMm,'geometry-version':b.geometryVersion};
+    return `<tr${Object.entries(attrs).map(([k,v])=>` data-${k}="${attribute(v)}"`).join('')}><td>${e(b.slotId)}／${w.role==='host'?'宿主':'子模組'}翼<br>${e(w.id)}</td><td>${e(plate)}.dxf<br>Ø${fmtNum(hole.diameterMm)} · ${e(hole.id)}</td><td>M3 牙孔 Ø${fmtNum(thread.diameterMm)}<br>${e(thread.id)}</td><td>${e(screw.spec)} ×1<br>${e(screw.id)}</td></tr>`;
+  }))).join('');
+  const traceSection=traceRows?`<h2>角碼、板孔與螺絲逐件對照</h2><table id="physicalTrace"><thead><tr><th>角碼／翼 ID</th><th>板件／板孔 ID</th><th>角碼牙孔 ID</th><th>螺絲規格／ID</th></tr></thead><tbody>${traceRows}</tbody></table>`:'';
+  const machineJson=value=>JSON.stringify(value).replace(/</g,'\\u003c');
+  const traceData=`<script type="application/json" id="manufacturingTrace">${machineJson({physical:joints.filter(j=>j.physical).map(j=>({connectionId:j.connectionId,parts:j.parts,instances:j.physical})),validation:currentReport?validation:{status:'not_checked',scope:'single_pose',reason:validation?'report_revision_mismatch':'report_missing'}})}</script>`;
 
   // 組裝步驟依平面分組：主平面照舊；每個直角子模組平面另起一段，標題寫子模組名稱。
   const stepsOfPlane = plane => {
@@ -669,9 +681,14 @@ ${j.stand ? `<li>子模組底板 ${e(childName)} 立在 ${e(hostName)} 的板面
 ` : '';
   const warnList = (warnings || []).length
     ? `<ul>${warnings.map(w => `<li>${e(w)}</li>`).join('')}</ul>` : '<p class="muted">目前沒有 CNC 警告。</p>';
-  const interferenceList = (interference || []).length
+  const unsupported=validation?.coverage?.notSupported || [];
+  const hardwareOnly=unsupported.every(r=>r.code==='material_representation_not_supported'&&['motors','pins','grounds'].includes(r.kind));
+  const materialFindings=validation?.material?.findings || [],planeFindings=validation?.checks?.find(c=>c.code==='in_plane_interference')?.findings || [];
+  const label=id=>id.endsWith('/head')?'固定螺絲頭':id.includes('/screw')?'固定螺桿':partLabel(id,comps,modules);
+  const materialReport=currentReport?`<p id="materialValidation" data-status="${attribute(validation.status)}">${validation.status==='fail'?`此姿態有干涉：跨面材料 ${materialFindings.length} 處、同平面 ${planeFindings.length} 處，需調整作品。`:validation.status==='not_supported'?(hardwareOnly?'板件未發現穿入；部分五金未檢查。':'部分板件材料或姿態尚未驗證。'):'此姿態：已檢查範圍無干涉。'}</p><p class="muted">已驗角度：${e(Object.entries(validation.motorAngles || {}).map(([id,a])=>`M${id} ${fmtNum(a)}°`).join('、') || `${fmtNum(validation.theta || 0)}°`)}；僅目前單一有效求解姿態，全行程尚未支援。</p>${materialFindings.length?`<h3>跨面材料</h3><ul>${materialFindings.map(f=>`<li>${e(f.partIds.map(label).join(' ↔ '))}</li>`).join('')}</ul>`:''}${planeFindings.length?`<h3>同平面</h3><ul>${planeFindings.map(f=>`<li>${e(f.message || f.reason || '同平面干涉')}</li>`).join('')}</ul>`:''}${unsupported.length?`<details><summary>未檢查項目 ${unsupported.length}</summary><ul>${unsupported.map(r=>`<li>${e(({motors:'馬達機身',pins:'關節銷',grounds:'固定接點'}[r.kind] || '材料')+'：'+(r.sourceIds || [r.partId || r.moduleId || '未具名']).map(id=>partLabel(id,comps,modules)).join('、'))}</li>`).join('')}</ul></details>`:''}`:null;
+  const interferenceList = materialReport || ((interference || []).length
     ? `<ul>${interference.map(w => `<li>${e(w.message)}</li>`).join('')}</ul>`
-    : modules.some(m => m?.mount?.face) ? '<p class="muted">六面接合的跨面干涉尚未驗證。</p>' : '<p class="muted">已依各馬達行程取樣檢查，未發現干涉（仍需實物確認）。</p>';
+    : modules.some(m => m?.mount?.face) ? '<p id="materialValidation" data-status="not_checked" class="muted">六面接合的跨面材料尚未驗證；沒有目前有效姿態報告。</p>' : '<p class="muted">已依各馬達行程取樣檢查，未發現干涉（仍需實物確認）。</p>');
   const suggestList = (suggestions || []).length
     ? `<ul>${suggestions.map(s => `<li>建議：${e(s.message)}</li>`).join('')}</ul>` : '';
 
@@ -688,7 +705,7 @@ ${j.stand ? `<li>子模組底板 ${e(childName)} 立在 ${e(hostName)} 的板面
   h3 { font-size: 15px; margin: 0 0 4px; }
   h3.plane { margin: 16px 0 4px; }
   table { border-collapse: collapse; width: 100%; font-size: 14px; }
-  th, td { border: 1px solid #aaa; padding: 4px 8px; text-align: left; vertical-align: top; }
+  th, td { border: 1px solid #aaa; padding: 4px 8px; text-align: left; vertical-align: top; overflow-wrap:anywhere; }
   th { background: #eee; }
   .muted { color: #555; font-size: 14px; }
   .step { break-inside: avoid; border: 1px solid #ccc; border-radius: 6px; padding: 8px 12px; margin: 8px 0; }
@@ -705,6 +722,7 @@ ${j.stand ? `<li>子模組底板 ${e(childName)} 立在 ${e(hostName)} 的板面
 
 <h2>五金清單</h2>
 <table><thead><tr><th>規格</th><th>數量</th><th>用途</th></tr></thead><tbody>${hwRows}</tbody></table>
+${traceSection}
 
 ${gapSection}<h2>組裝步驟</h2>
 <p class="muted">由第 0 層（最靠機架）往外逐層組裝。</p>
@@ -721,10 +739,11 @@ ${suggestList}
 <h2>尚未驗證</h2>
 <ul>
   <li>TT 輪轂與 MG995 舵盤的孔位用的是常見值，需實量後修改。</li>
-  <li>干涉檢查為平面近似，仍需實物確認。</li>
+  <li>${currentReport?'同平面檢查仍採既有近似；跨面材料結果僅涵蓋上述單一姿態。':'干涉檢查為平面近似，仍需實物確認。'}</li>
   <li>螺絲長度為依關節厚度加防鬆螺帽的估算值，需實物驗證。</li>
   <li>MG995 伺服頂面高出底板約 10 mm，舵盤上的齒輪實際高度需實物確認。</li>
 </ul>
+${traceData}
 </body>
 </html>
 `;

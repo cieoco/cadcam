@@ -6,6 +6,7 @@ import { sizeFrameOutline } from './frame-stock.js';
 import { unionOutlines, area, inside, fusionCandidates } from './part-fusion.js';
 import { gearMeshPhaseDeg } from './transmission-geometry.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
+import {identifiedHoles,holeTrace} from './part-hole-trace.js';
 
 export const DEFAULT_BAR_WIDTH_MM = DEFAULT_PLATE_RADIUS_WORLD * 2;
 export const DEFAULT_HOLE_DIAMETER_MM = DEFAULT_PLATE_RADIUS_WORLD * 2 * 0.72;
@@ -24,6 +25,9 @@ const round = (v, digits = 3) => {
 const esc = s => String(s).replace(/[&<>"']/g, ch => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'
 }[ch]));
+const attr=s=>esc(s).replace(/\r/g,'&#13;').replace(/\n/g,'&#10;').replace(/\t/g,'&#9;');
+const traceAttrs=h=>Object.entries(holeTrace(h)).map(([k,v])=>` data-${k==='id'?'hole-id':k.replace(/[A-Z]/g,c=>'-'+c.toLowerCase())}="${attr(v)}"`).join('');
+const tracedSvgCircle=h=>`    <circle cx="${round(h.x)}" cy="${round(h.y)}" r="${round(h.r)}"${h.layer?` data-layer="${attr(h.layer)}"`:''}${traceAttrs(h)} />`;
 
 export const safeName = s => String(s || 'link').replace(/[^\w.-]+/g, '_');
 
@@ -176,6 +180,7 @@ export function mg995SlotOutline(m = {}) {
 
 // Keep derived identity through representation changes; these fields never enter saved stock settings.
 const holeMetadata = h => Object.fromEntries(['id','holePairId','wingId','connectionId','partId','role'].filter(k=>h[k]!==undefined).map(k=>[k,h[k]]));
+export function assertAdapterFeatures(extras){const invalid=extras?.diagnostics?.find(d=>d.code==='face_fastener_invalid');if(invalid)throw Error(`角碼孔暫停輸出：${invalid.reason}`);}
 
 // 直角安裝轉接座孔（桿件座標：u 沿桿從 p1 起算、v 沿左法線）→ 圓孔規格，圖層 ADAPTER_HOLE。
 function adapterHoleSpecs(extraHoles) {
@@ -212,6 +217,7 @@ function svgForLink(comp, length, settings, extraHoles = []) {
   const stock = memberStock(comp);
   const r = round(stock.widthMm / 2, 3);
   const holes = linkHoleSpecs(comp, length, settings, extraHoles);
+  const circles=identifiedHoles(comp.id,holes.filter(h=>h.kind!=='tt-shaft-flat'));let circleIndex=0;
   const width = round(length + r * 2, 3);
   const height = round(r * 2, 3);
   const d = [
@@ -230,7 +236,7 @@ function svgForLink(comp, length, settings, extraHoles = []) {
     <path d="${d}" />
 ${holes.map(h => h.kind === 'tt-shaft-flat'
     ? `    <path d="${svgTtShaftFlatPath(h.x, h.y, h.settings)}" data-hole="TT_SHAFT_FLAT" />`
-    : `    <circle cx="${h.x}" cy="${h.y}" r="${h.r}"${h.layer ? ` data-layer="${h.layer}"` : ''} />`).join('\n')}
+    : tracedSvgCircle(circles[circleIndex++])).join('\n')}
   </g>
 </svg>
 `;
@@ -265,14 +271,15 @@ function dxfPolyline(points, layer) {
   return rows.join('\n');
 }
 
-function dxfCircle(x, y, radius, layer) {
+function dxfCircle(x, y, radius, layer,trace) {
   return [
     dxfPair(0, 'CIRCLE'),
     dxfPair(8, layer),
     dxfPair(10, round(x)),
     dxfPair(20, round(y)),
     dxfPair(30, 0),
-    dxfPair(40, round(radius))
+    dxfPair(40, round(radius)),
+    ...(trace?[dxfPair(999,'HOLE_TRACE '+JSON.stringify({...holeTrace(trace),axis:{x:0,y:0,z:1},diameterMm:round(radius*2)}))]:[])
   ].join('\n');
 }
 
@@ -786,7 +793,7 @@ function svgForPlate(comp, points, settings, mounts = [], adapterHoles = []) {
   <desc>${esc(stockDescription(comp))}</desc>
   <g fill="none" stroke="#000" stroke-width="0.25">
 ${paths}
-${cutouts ? cutouts + '\n' : ''}${geometry.holes.map(h => `    <circle cx="${round(h.x)}" cy="${round(h.y)}" r="${round(h.r)}" />`).join('\n')}
+${cutouts ? cutouts + '\n' : ''}${identifiedHoles(comp.id,geometry.holes).map(tracedSvgCircle).join('\n')}
   </g>
 </svg>
 `;
@@ -805,7 +812,7 @@ function dxfForPlate(comp, points, settings, mounts = [], adapterHoles = []) {
     dxfPair(2, 'ENTITIES'),
     ...geometry.outlines.map(outline => dxfPolyline(outline, 'CUT')),
     ...(geometry.cutouts || []).map(c => dxfPolyline(c.points, c.layer)),
-    ...geometry.holes.map(h => dxfCircle(h.x, h.y, h.r, h.layer || 'HOLE')),
+    ...identifiedHoles(comp.id,geometry.holes).map(h => dxfCircle(h.x, h.y, h.r, h.layer || 'HOLE',h)),
     dxfPair(0, 'ENDSEC'),
     dxfPair(0, 'EOF')
   ].join('\n') + '\n';
@@ -822,7 +829,7 @@ function svgForGear(comp, geometry) {
   <title>${esc(comp.id || 'gear')}</title>
   <g fill="none" stroke="#000" stroke-width="0.25">
     <path d="${svgPolyline(geometry.outline)}" data-layer="GEAR_CUT" />
-${gearCutouts ? gearCutouts + '\n' : ''}${geometry.holes.map(h => `    <circle cx="${round(h.x)}" cy="${round(h.y)}" r="${round(h.r)}" data-layer="${esc(h.layer)}" />`).join('\n')}
+${gearCutouts ? gearCutouts + '\n' : ''}${identifiedHoles(comp.id,geometry.holes).map(tracedSvgCircle).join('\n')}
   </g>
 </svg>
 `;
@@ -838,7 +845,7 @@ function dxfForGear(comp, geometry) {
     dxfPair(0, 'SECTION'),
     dxfPair(2, 'ENTITIES'),
     dxfPolyline(geometry.outline, 'GEAR_CUT'),
-    ...geometry.holes.map(h => dxfCircle(h.x, h.y, h.r, h.layer)),
+    ...identifiedHoles(comp.id,geometry.holes).map(h => dxfCircle(h.x, h.y, h.r, h.layer,h)),
     ...(geometry.cutouts || []).map(c => dxfPolyline(c.points, c.layer)),
     dxfPair(0, 'ENDSEC'),
     dxfPair(0, 'EOF')
@@ -856,7 +863,7 @@ function svgForRack(comp, geometry) {
   <title>${esc(comp.id || 'rack')}</title>
   <g fill="none" stroke="#000" stroke-width="0.25">
     <path d="${svgPolyline(geometry.outline)}" data-layer="RACK_CUT" />
-${rackCutouts ? rackCutouts + '\n' : ''}${geometry.holes.map(h => `    <circle cx="${round(h.x)}" cy="${round(h.y)}" r="${round(h.r)}" data-layer="${esc(h.layer)}" />`).join('\n')}
+${rackCutouts ? rackCutouts + '\n' : ''}${identifiedHoles(comp.id,geometry.holes).map(tracedSvgCircle).join('\n')}
   </g>
 </svg>
 `;
@@ -872,7 +879,7 @@ function dxfForRack(comp, geometry) {
     dxfPair(0, 'SECTION'),
     dxfPair(2, 'ENTITIES'),
     dxfPolyline(geometry.outline, 'RACK_CUT'),
-    ...geometry.holes.map(h => dxfCircle(h.x, h.y, h.r, h.layer)),
+    ...identifiedHoles(comp.id,geometry.holes).map(h => dxfCircle(h.x, h.y, h.r, h.layer,h)),
     ...(geometry.cutouts || []).map(c => dxfPolyline(c.points, c.layer)),
     dxfPair(0, 'ENDSEC'),
     dxfPair(0, 'EOF')
@@ -1155,10 +1162,10 @@ function boundsForFrame(geometry) {
   };
 }
 
-function svgForFrame(frameNodes, settings, motorMounts) {
+function svgForFrame(frameNodes, settings, motorMounts,name='frame') {
   const geometry = frameGeometry(frameNodes, settings, motorMounts);
   if (!geometry) return null;
-  return svgForFrameGeometry(geometry, 'frame');
+  return svgForFrameGeometry(geometry, name);
 }
 
 function svgForFrameGeometry(geometry, title) {
@@ -1168,8 +1175,7 @@ function svgForFrameGeometry(geometry, title) {
   const paths = geometry.outlines.map(points => `    <path d="${svgPolyline(points)}" />`).join('\n');
   const cutouts = (geometry.cutouts || []).map(c =>
     `    <path d="${svgPolyline(c.points)}" data-layer="${esc(c.layer)}" />`).join('\n');
-  const holes = geometry.holes.map(h =>
-    `    <circle cx="${h.x}" cy="${h.y}" r="${h.r}" data-layer="${esc(h.layer)}" />`).join('\n');
+  const holes = identifiedHoles(title,geometry.holes).map(tracedSvgCircle).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${round(b.minX)} ${round(b.minY)} ${width} ${height}">
   <title>${esc(title)}</title>
@@ -1198,13 +1204,13 @@ function addDxfStockComment(dxf, comp) {
   return `${dxfPair(999, stockComment(comp))}\n${dxf}`;
 }
 
-function dxfForFrame(frameNodes, settings, motorMounts) {
+function dxfForFrame(frameNodes, settings, motorMounts,name='frame') {
   const geometry = frameGeometry(frameNodes, settings, motorMounts);
   if (!geometry) return null;
-  return dxfForFrameGeometry(geometry);
+  return dxfForFrameGeometry(geometry,name);
 }
 
-function dxfForFrameGeometry(geometry) {
+function dxfForFrameGeometry(geometry,partId='frame') {
   return [
     dxfPair(0, 'SECTION'),
     dxfPair(2, 'HEADER'),
@@ -1215,7 +1221,7 @@ function dxfForFrameGeometry(geometry) {
     dxfPair(2, 'ENTITIES'),
     ...geometry.outlines.map(points => dxfPolyline(points, 'FRAME_CUT')),
     ...(geometry.cutouts || []).map(c => dxfPolyline(c.points, c.layer)),
-    ...geometry.holes.map(h => dxfCircle(h.x, h.y, h.r, h.layer)),
+    ...identifiedHoles(partId,geometry.holes).map(h => dxfCircle(h.x, h.y, h.r, h.layer,h)),
     dxfPair(0, 'ENDSEC'),
     dxfPair(0, 'EOF')
   ].join('\n') + '\n';
@@ -1225,6 +1231,7 @@ function dxfForLink(comp, length, settings, extraHoles = []) {
   const stock = memberStock(comp);
   const r = round(stock.widthMm / 2, 3);
   const holes = linkHoleSpecs(comp, length, settings, extraHoles);
+  const circles=identifiedHoles(comp.id,holes.filter(h=>h.kind!=='tt-shaft-flat'));let circleIndex=0;
   const outline = [
     { x: 0, y: r },
     { x: length, y: r },
@@ -1244,7 +1251,7 @@ function dxfForLink(comp, length, settings, extraHoles = []) {
     dxfPolyline(outline, 'CUT'),
     ...holes.map(h => h.kind === 'tt-shaft-flat'
       ? dxfPolyline(ttShaftFlatPoints(h.x, h.y, h.settings, 18), 'TT_SHAFT_FLAT')
-      : dxfCircle(h.x, h.y, h.r, h.layer || 'HOLE')),
+      : dxfCircle(h.x, h.y, h.r, h.layer || 'HOLE',circles[circleIndex++])),
     dxfPair(0, 'ENDSEC'),
     dxfPair(0, 'EOF')
   ].join('\n') + '\n';
@@ -1266,6 +1273,7 @@ export function inspectLinkExport(comp, length, settings = {}, extraHoles = []) 
 }
 
 export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extras = null) {
+  assertAdapterFeatures(extras);
   assertFusionFeatures(comps,mounts,extras);
   exportableGears(comps,params,settings);
   const { hosted } = splitMountsByHost(comps, mounts);
@@ -1296,6 +1304,7 @@ export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extr
 }
 
 export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extras = null) {
+  assertAdapterFeatures(extras);
   assertFusionFeatures(comps,mounts,extras);
   exportableGears(comps,params,settings);
   const { hosted } = splitMountsByHost(comps, mounts);
@@ -1305,7 +1314,7 @@ export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extr
   links.forEach(({ comp, length }) => {
     const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id), extraOf(comp)) : null;
     const text = hostGeometry
-      ? addDxfStockComment(dxfForFrameGeometry(hostGeometry), comp)
+      ? addDxfStockComment(dxfForFrameGeometry(hostGeometry,comp.id), comp)
       : dxfForLink(comp, length, settings, extraOf(comp));
     downloadText(text, `${safeName(comp.id)}.dxf`, 'application/dxf');
   });
@@ -1352,14 +1361,14 @@ export function cncPartsForExport(comps, pts, params, settings, mounts = [], ext
 }
 
 export function exportFrameAsSvg(frameNodes, settings, motorMounts = [], name = 'frame') {
-  const svg = svgForFrame(frameNodes, settings, motorMounts);
+  const svg = svgForFrame(frameNodes, settings, motorMounts,name);
   if (!svg) return 0;
   downloadText(svg, `${name}.svg`, 'image/svg+xml');
   return 1;
 }
 
 export function exportFrameAsDxf(frameNodes, settings, motorMounts = [], name = 'frame') {
-  const dxf = dxfForFrame(frameNodes, settings, motorMounts);
+  const dxf = dxfForFrame(frameNodes, settings, motorMounts,name);
   if (!dxf) return 0;
   downloadText(dxf, `${name}.dxf`, 'application/dxf');
   return 1;
