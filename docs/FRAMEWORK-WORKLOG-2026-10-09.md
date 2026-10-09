@@ -287,3 +287,10 @@ G1內部F1門檻已貫通，可接續W3b→W4b→W5b；這不是發布或全格�
 - 齒條已知不支援鑽孔時 status.configurable=false，隱藏無法完成的配置角碼按鈕；確認後訊息改引導讀固定能力說明，不假稱可鑽孔。其他可調整位置的角碼入口保留。
 - 定向 6/6 通過（bench-material-interference、live-interference-status、material-pose-status、rack-face-candidate、face-bracket-holes、bench-interference），330771d9c8d38b5901c5 graph generate/check 通過。HTTP 正常重開齒條配置入口已移除；正常開沿邊 custom 作品側欄顯示 10 處真材料碰撞，取代舊 plane-only 綠燈，無 console error；http-orient.jpg 留 w5b-status。
 - 原包全套已 160/160，本包只有相關狀態／提示變更做定向，最終 W6 仍需同 commit 全套。下一輪接舊候選預覽不交換 S、單一精靈教材；未發布。
+
+### W5b-2 — 舊接法獨立候選與同平面檢查（done）
+- 起點 4790598，root 唯一 writer。刪除 app withCandidate／putDerived 全域交換；mate-candidate 只持有複製作品、獨立 scene、source／pose revision 及非同步材料結果。正式 2D、求解快取與存檔不讀候選。取消丟棄候選；過期／未完成檢查不能確認，take 只成功一次，確認仍走原一筆 undo。
+- 新增 mate-candidate 真材料測試：frozen source、face 與沿邊候選、pending／cancel／late result／pose／same-ID 參數變更。定向 6/6 與初次完整 161/161 通過。HTTP 找到舊 syncUI 因為假定 S 已交換而提前返回，已刪除該判斷。
+- HTTP 從未接齒條作品直接點滑台標記，正常呈現預覽／接上／取消。實際 blocks29（預覽中保存）＝30（取消後）＝32（確認一次undo），31才包含正式接合；undo 後按鈕 disabled，沒有多筆復原。下載檔保留本機、不加入 repo。
+- 整合另發現 planar 預覽含材料、正式只有平面檢查。擴大材料 gate 至所有 mount，支援的 planar 製作包也走共用 export，預覽加計平面 findings。首次 planar 測試用了不存在的 port:'tool'，修為實際 bolt:output ID，非產品變更。後續定向 5/5 通過。HTTP 同姿態預覽／接上皆 5 處碰撞；http-confirmed.jpg，無 console error。
+- 最終 graph ffe06fc3ba11e657cc7d（139 modules／16 pages）；完整 161/161 是 planar gate 補修前，補修後採相關定向，發布前仍須完整驗收。瀏覽器一度連續逾時，重設控制連線再正常 reload 後恢復，未把逾時算通過。下一項 F4 單一精靈教材與有效雙孔；未 push／發布。

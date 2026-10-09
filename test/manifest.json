@@ -15,6 +15,7 @@
   ],
   "timeoutMs": 90000,
   "tests": [
+    "test/mate-candidate.mjs",
     "test/rack-face-candidate.mjs",
     "test/face-host-frame.mjs",
     "test/connection-formats.mjs",

@@ -40,3 +40,9 @@ assert.ok(bench.debug().live.material.report,'along-edge mount cannot fall back 
 playing=true;bench.liveCheck();assert.equal(bench.debug().live.material.report,null);
 playing=false;S.topo.params={...S.topo.params,changedDimension:20};bench.liveCheck();
 assert.equal(bench.debug().live.material.report,null,'same module IDs with changed work cannot reuse a material result');
+const flat=structuredClone(original);flat.modules.find(m=>m.id===child.id).mount=null;
+const planar=connect(flat.comps,flat.modules,child.id,{module:host.id,port:'bolt:'+host.outputs[0].id},flat.params,{activeMotor:'1',theta:0,motorAngles:{'2':0}});
+assert.ok(planar.ok,planar.reason);Object.assign(f,{comps:planar.comps,modules:planar.modules});S.comps=f.comps;S.modules=f.modules;S.topo.params=f.params;
+bench.workReplaced();const flatScene=f1MaterialScene(0,f);flatScene.model.solveValidity={valid:true};
+bench.afterScene({pts:flatScene.points,ptsAll:flatScene.points,model:flatScene.model});bench.liveCheck();await new Promise(r=>setTimeout(r,400));
+assert.ok(bench.debug().live.material.report,'planar assembly also checks materials after confirmation');

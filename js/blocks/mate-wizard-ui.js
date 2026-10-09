@@ -5,7 +5,7 @@ import { faceBracketStatus } from './face-bracket-extras.js';
  * 組立台的「接合精靈」（SDD-MATE-FACES §5.2，M4）：手機與電腦同一套，取代預設的接口面板；工程面板收進「進階」。
  * 結構清單（#mateTree）→ 選一個機構 → 選承接面（卡片或 3D 裡亮起的面）→ 預覽（換接法、微調、看干涉）→ 接上／取消。
  * 資料全部走 mate-connect.js（mateTargets／mateConnect／mateAdjust／mateStyles／setMateStyle）。
- * 預覽的候選作品不寫進 S（沒有復原紀錄、不存檔）：由 app.js 的 setCandidate／withCandidate 暫時換進去重畫；
+ * 預覽的候選作品不寫進 S（沒有復原紀錄、不存檔）：由 app.js 的 setCandidate 持有獨立場景；
  * 接上時才經 bench-ui 的 commit（一筆復原，與工程面板同一條重建流程）。
  * bench-ui 把它需要的內部放在 h（見 createBench 結尾）；這裡不碰 3D 與 S 以外的全域。
  */
@@ -72,6 +72,7 @@ export function createMateWizard(h) {
   function pickTarget(t) {
     const mod = sel();
     if (!mod || mod.mount) { h.say('請先在清單選一個還沒安裝的機構'); return false; }
+    deps.pause?.();
     const r = mateConnect(S.comps, S.modules, mod.id, { module: t.module, mate: t.mateId }, params(), h.motorState());
     if (!r.ok) { h.say(r.reason || '接不上'); return false; }
     pv = { childId: mod.id, mateId: t.mateId, host: t.module, name: t.name, refs: { comps: S.comps, modules: S.modules }, cand: null, hits: 0, rev: 0 };
@@ -95,8 +96,9 @@ export function createMateWizard(h) {
   function commit() {
     if (!pv) return false;
     if (stale()) { cancel({ silent: true }); return false; }
-    const p = pv; pv = null;
-    h.commit(p.cand.comps, p.cand.modules, `已接上「${h.displayName(p.childId)}」：${h.displayName(p.host)}・${p.name}`);
+    const p = pv;
+    if(h.commit(p.cand.comps, p.cand.modules, `已接上「${h.displayName(p.childId)}」：${h.displayName(p.host)}・${p.name}`)===false)return false;
+    pv = null;h.syncUI(true);
     return true;
   }
   // 預覽中調整：換接法、微調（都只改候選）。已接好的則直接生效（各一筆復原）。

@@ -59,7 +59,6 @@ export function createBench(deps) {
   } = deps;
   const saveComposite = deps.saveComposite || (() => null);
   const exportComposite = deps.exportComposite || (() => null);   // 組合積木匯出 JSON
-  const inCand = deps.withCandidate || (fn => fn());   // M4：接合精靈預覽中，干涉檢查看的是候選作品（見 app.js withCandidate）
   const isCand = deps.inCandidate || (() => false);
   let wiz = null;   // M4：接合精靈（mate-wizard-ui.js）；非進階模式時由它畫清單、面板與 3D 承接面標記
   const wizardOn = () => !!wiz && !wiz.advanced();   // B7：存成組合積木（由 app.js 接到模組編輯器的模組庫）
@@ -113,7 +112,7 @@ export function createBench(deps) {
   // live：目前姿勢的檢查結果；plan：疊層＋隔圈的快取（只在作品內容變了才重算）；tl：全行程時間軸結果。
   const materialPose=createMaterialPoseStatus();
   const playing=()=>!!deps.isPlaying?.();
-  const hasMaterialMount=()=>S.modules.some(m=>m?.mount?.face || m?.mount?.orient);
+  const hasMaterialMount=()=>S.modules.some(m=>m?.mount);
   const live = { plan: null, planKey: '', args: null, sig: '', findings: [], hits: [], labels: [], msg: '', keys: [], at: 0, timer: null, checks: 0, planBuilds: 0, ms: 0, ready: false, error: false };
   const tl = { result: null, ranges: null, key: '', summary: [], ms: 0 };
   let liveBox = null;
@@ -185,6 +184,13 @@ export function createBench(deps) {
   }
   function materialLabels(){return [...new Set((materialPose.snapshot().report?.findings || []).flatMap(f=>f.partIds.map(materialName)))];}
   function currentLiveStatus() {
+    const preview=deps.candidateSnapshot?.();
+    if(preview){
+      const r=preview.result,findings=[...(r?.validation?.material?.findings || []),...(r?.validation?.checks?.find(c=>c.code==='in_plane_interference')?.findings || [])];
+      if(!r)return {state:'none',message:'候選材料檢查中…'};
+      if(!r.saveable)return {state:'none',message:r.reason || '候選尚未通過檢查，不能接上'};
+      return {state:findings.length?'hit':'none',message:findings.length?`✖ 預覽此姿態撞到 ${findings.length} 處`:'預覽已檢查；未檢查範圍請見製作包'};
+    }
     const m=materialPose.snapshot();
     return liveInterferenceStatus({hasFace:hasMaterialMount(),ready:live.ready,hasParts:!!live.plan?.parts?.length,error:live.error,n:live.findings.length,labels:[...new Set([...live.labels,...materialLabels()])],material:m.report,playing:playing(),candidate:m.candidate,solveValidity:m.solveValidity});
   }
@@ -241,10 +247,11 @@ export function createBench(deps) {
   }
 
   // 檢查目前姿勢。force：忽略節流與「沒變」判斷。
-  function runLive(force = false) { return inCand(() => runLiveNow(force)); }
+  function runLive(force = false) { return runLiveNow(force); }
   function runLiveNow(force) {
     if (!isBench()) return;
     live.timer = null;
+    if(isCand()){renderLiveStatus();return;}
     if(hasMaterialMount()){syncMaterialPose();if(playing()){live.ready=false;live.keys=[];applyHighlight();renderLiveStatus();return;}runMaterialCheck();}
     const st0 = ensurePlan();
     const pose = currentPose();
@@ -266,6 +273,7 @@ export function createBench(deps) {
   // 每幀／每次變動都可以呼叫：播放時節流成每 LIVE_MIN_MS 一次，最後一個姿勢用尾端計時器補查。
   function liveCheck(force = false) {
     if (!isBench()) return;
+    if(isCand()){renderLiveStatus();return;}
     if(hasMaterialMount()) {
       syncMaterialPose();
       if(playing()){if(live.timer){clearTimeout(live.timer);live.timer=null;}live.ready=false;live.keys=[];applyHighlight();renderLiveStatus();return;}
@@ -304,7 +312,7 @@ export function createBench(deps) {
     return runs;
   }
   const fmtDeg = a => `${Math.round(a * 10) / 10}°`;
-  function runTimeline() { return inCand(runTimelineNow); }
+  function runTimeline() { if(isCand()){say('請先確認或取消預覽，再檢查全行程');return null;}return runTimelineNow(); }
   function runTimelineNow() {
     if (!isBench()) return null;
     if (S.modules.some(m => m?.mount?.face)) { say('六面接合僅支援目前單一姿態；全行程尚未支援'); return null; }
@@ -750,7 +758,6 @@ export function createBench(deps) {
   // ---------------------------------------------------------------- 畫面：清單與面板
   function syncUI(force = false) {
     if (!isBench()) return;
-    if (isCand()) { liveCheck(); return; }   // 預覽中的重畫（S 暫時換成候選）：只更新干涉，不重畫面板
     // 預覽中的模組若被復原／讀檔弄掉了，就丟掉預覽狀態
     if (st.preview) { const pm = modOf(st.preview.moduleId); if (!pm || !pm.mount) { st.preview = null; st.faceStep = null; viewer()?.highlightSurface?.(null); applyGhost(); } }
     if (st.selected && !modOf(st.selected)) { st.selected = null; st.faceStep = null; viewer()?.highlightSurface?.(null); }
@@ -1247,9 +1254,13 @@ export function createBench(deps) {
     cancelAdvancedPreview: () => cancelPreview({ silent: true }),
     // 接上：一筆復原。comps／modules 是已整理好的候選，換成真的作品後照 adjust 的流程重建。
     commit(comps, modules, msg) {
+      const checked=deps.takeCandidate?.();
+      if(deps.takeCandidate&&!checked){say('候選尚未完成檢查或作品已變動，請重新預覽');return false;}
+      if(checked){comps=checked.work.comps;modules=checked.work.modules;}
       deps.setCandidate(null); viewer()?.setPreviewGhost(null);
       pushUndo(); S.comps = comps; S.modules = modules;
       rebuild(); draw(); say(msg, { toast: false }); syncUI(true); drawMarkers();
+      return true;
     },
     // 已接好的機構換接法（一筆復原）。
     apply(r, msg) {
@@ -1259,7 +1270,7 @@ export function createBench(deps) {
   });
   syncModeButtons();
   return {
-    workReplaced(){st.msg='';st.preview=null;st.faceStep=null;st.snapId=null;panelSig='';listSig='';resetLive();clearTimeline();const msg=document.getElementById('benchMsg');if(msg)msg.textContent='';},
+    workReplaced(){deps.setCandidate?.(null);st.msg='';st.preview=null;st.faceStep=null;st.snapId=null;panelSig='';listSig='';resetLive();clearTimeline();const msg=document.getElementById('benchMsg');if(msg)msg.textContent='';},
     mateWizardDebug: () => wiz.debug(),
     autosaveSnapshot: () => st.preview ? JSON.parse(st.preview.preSnap) : null,
     setMode, select, pickPort, commit, cancel: () => cancelPreview(), adjust, syncUI, afterScene, debug,

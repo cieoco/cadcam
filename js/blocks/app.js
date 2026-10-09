@@ -1,3 +1,4 @@
+import {createMateCandidate} from './mate-candidate.js';
 import {prepareConnectionWork} from './connection-work.js';
 import {usesFaceExport,faceFileExportData,createFaceExportCoordinator,faceBuildPackHtml} from './face-export.js';
 import {materialSolveValidity} from './material-pose-status.js';
@@ -117,7 +118,7 @@ const SERVO_STEP = 15;                 // 伺服角度面板的每步度數
 let raf = null;
 let playbackActive=false;
 let onPlaybackChange=()=>{};
-let candidate = null, inCandidate = false, candidateOf = null;   // M4 接合精靈預覽的候選作品（見 setCandidate）
+// 接合預覽由 mateCandidate 持有獨立作品，不交換 S。
 let lastSolveValidity={valid:false,reason:'not_solved'};
 let lastSolved = {};           // 上一幀求解成功的點位：給求解器挑「連續」分支 + 死點暫態回退
 let prevSolved = {};           // 再上一幀：和 lastSolved 一起外插出「帶動量」的預測種子
@@ -801,39 +802,22 @@ function restoreBenchSnapshot(snap, undoLen) {
   S.theta = theta; S.topo.params.theta = theta;   // 取消預覽不該把姿勢歸零
   draw();
 }
-// ---- M4 接合精靈的預覽：候選的零件／模組不寫進 S（不進復原、不存檔），只在重畫與干涉檢查的當下暫時換進去 ----
-const derivedNow = () => ({ comps: S.comps, modules: S.modules, compiled: S.compiled, assembly: S.assembly, params: S.topo.params });
-const putDerived = d => { S.comps = d.comps; S.modules = d.modules; S.compiled = d.compiled; S.assembly = d.assembly; S.topo.params = d.params; };
-// 設定候選；回傳整理過（正規化、剛體重算，與 rebuild 同順序）的 { comps, modules }。null＝取消預覽。
-function setCandidate(c) {
-  lastSolved = {}; prevSolved = {}; geomVersion++;
-  if (!c) { candidate = null; return null; }
-  const comps = structuredClone(c.comps);   // 複製：rebake 會就地改零件，不能動到真的作品
-  let modules = structuredClone(c.modules);
-  const nm = normalizeModules(modules, comps);
-  if (nm.ok) modules = nm.modules;
-  const rb = rebakeModules(comps, modules, S.topo.params);
-  if (rb.changed) { rb.comps.forEach((x, i) => Object.assign(comps[i], x)); modules = rb.modules; }
-  const compiled = compileTopology(comps, S.topo, new Set());
-  candidateOf = { comps: S.comps, modules: S.modules };   // 預覽是從哪份真作品算出來的
-  candidate = { comps, modules, compiled, assembly: modules.length ? compileAssembly(comps, modules, S.topo) : null, params: { ...compiled.params, theta: S.topo.params.theta } };
-  return { comps, modules };
-}
-function withCandidate(fn) {
-  if (!candidate || inCandidate) return fn();
-  if (S.comps !== candidateOf.comps || S.modules !== candidateOf.modules) {   // 預覽期間真作品被復原／讀檔／刪除換掉了：預覽作廢
-    candidate = null; lastSolved = {}; prevSolved = {}; geomVersion++;
-    const r = fn(); bench.syncUI(true); return r;
-  }
-  const real = derivedNow(), theta = real.params.theta;
-  putDerived(candidate); S.topo.params.theta = theta; inCandidate = true;
-  try { return fn(); }
-  finally { candidate = derivedNow(); real.params.theta = S.topo.params.theta; inCandidate = false; putDerived(real); }
+// 舊接法也以獨立作品建立場景；正式 2D、求解快取、存檔不受預覽影響。
+const mateCandidate=createMateCandidate({
+  readSource:()=>({comps:S.comps,modules:S.modules,topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings()}),
+  readPose:()=>({theta:S.theta,motorAngles:motorAnglesNow()}),
+  onChange:()=>{renderMateCandidate();bench.syncUI(true);bench.liveCheck();}
+});
+function setCandidate(c) { return mateCandidate.set(c); }
+function renderMateCandidate() {
+  const preview=mateCandidate.snapshot();if(!preview)return false;
+  if(viewer3D&&preview.scene.model){viewer3D.update(preview.scene.model);viewer3D.setHighlight((preview.result?.validation?.material?.findings || []).flatMap(f=>f.pickKeys || []));}
+  return true;
 }
 const viewerSource=createAsyncResource(async()=>{const {createViewer}=await import('../blocks3d/viewer.js?v=20261007_m4b');return createViewer(document.getElementById('view3d'));});
 async function set3D(on) { if (view3DActive !== !!on) await toggle3D();else if(on)viewer3D=await viewerSource.get(); }
 const bench = createBench({
-  deleteDesign, pause, isPlaying:()=>playbackActive, setCandidate, withCandidate, inCandidate: () => inCandidate,
+  deleteDesign, pause, isPlaying:()=>playbackActive, setCandidate, inCandidate: () => !!mateCandidate.snapshot(), candidateSnapshot:()=>mateCandidate.snapshot(), takeCandidate:()=>mateCandidate.take(),
   pushUndo, rebuild, draw, transient, setViewPlane: id => setViewPlane(id),
   saveComposite: id => moduleEditor.saveCompositeToLibrary(id),   // B7
   exportComposite: id => moduleEditor.exportComposite(id),
@@ -1391,7 +1375,7 @@ const PART_DRAW = {
   triangle: { phase: 'layered',  draw: drawTrianglePart },
 };
 
-function draw() { return withCandidate(drawNow); }   // M4：接合精靈預覽中，重畫看的是候選的作品
+function draw() { if(renderMateCandidate())return;return drawNow(); }   // M4：接合精靈預覽中，重畫看的是候選的作品
 const fusionEditor=createFusionEditor({settings:Settings.exportSettings,pause,pushUndo,rebuild,draw,save:scheduleAutosave,selectGear,selectTriangle});
 function drawNow() {
   fusionEditor.sync();
@@ -1738,7 +1722,7 @@ function drawSliders(pts, parent) {
 
 // 播放快路徑：只重解 + 跑各更新器就地改幾何，不拆 DOM 結構。只有 play() 迴圈會呼叫。
 // 結構（零件/選取/縮放/拖曳）在播放期間不變，故安全；任何結構變更都走 draw() 完整重建。
-function renderFrame(...a) { return withCandidate(() => renderFrameNow(...a)); }
+function renderFrame(...a) { if(renderMateCandidate())return;return renderFrameNow(...a); }
 function renderFrameNow() {
   const measuring=playbackProbe?.active(),started=measuring?performance.now():0;
   frame3dCpu={poseMs:0,submit3dMs:0};frameCpu=null;
@@ -1773,7 +1757,7 @@ function renderFrameNow() {
 }
 
 // 用最近一幀的求解結果建場景模型，推進 3D viewer
-function push3D() { return withCandidate(push3DNow); }
+function push3D() { if(renderMateCandidate())return;return push3DNow(); }
 function push3DNow() {
   const measuring=playbackProbe?.active(),started=measuring?performance.now():0;
   if (!viewer3D || !lastModelInputs) return;
