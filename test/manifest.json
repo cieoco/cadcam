@@ -98,6 +98,8 @@
     "test/gripper-controller.mjs",
     "test/gripper-download.mjs",
     "test/gripper-object.mjs",
+    "test/gripper-operations.mjs",
+    "test/motion-range-validation.mjs",
     "test/gripper-workflow.mjs",
     "test/input-gestures.mjs",
     "test/intake-contact.mjs",

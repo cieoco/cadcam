@@ -1,10 +1,12 @@
-<!doctype html>
-<html lang="zh-Hant"><meta charset="utf-8"><title>設計分頁瀏覽器回歸測試</title>
-<style>body{font:16px system-ui;margin:20px}iframe{width:1200px;height:760px;border:1px solid #aaa}pre{white-space:pre-wrap}.fail{color:#b00}</style>
-<h1>設計分頁瀏覽器回歸測試</h1>
-<p>透過 HTTP 開啟。本測試使用兩個重疊模組；測試結束會還原此來源的自存與分頁偏好。</p>
-<button id="run">執行測試</button><pre id="results">尚未執行</pre><iframe id="app" title="測試中的機構積木"></iframe>
-<!-- BEGIN GENERATED LOAD MAP -->
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>夾爪結構化操作驗收</title><style>
+body{font:16px system-ui;margin:16px;background:#f4f7fb;color:#17263d}main{max-width:1100px;margin:auto}textarea{box-sizing:border-box;width:100%;height:150px;font:14px monospace}button{padding:10px;margin:4px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;padding:12px}iframe{width:100%;height:720px;border:1px solid #ccd}#poses{display:flex;flex-wrap:wrap}#poses svg{width:min(100%,450px);height:250px;background:white;margin:4px}label{display:block}</style></head><body><main>
+<h1>雙齒輪夾爪：共用操作驗收</h1><p>開發驗收頁，不讀寫正式作品自動存檔。JSON 候選須有效才可確認；確認會取代下方隔離作品，可用原工具復原。</p>
+<label for="request">結構化請求</label><textarea id="request">{"operationVersion":1,"action":"createFromExample","exampleId":"gear-gripper","parameters":{"gripperObjectWidth":50,"gripperClearance":10}}</textarea>
+<button id="prepare">預覽候選與差異</button><button id="confirm" disabled>確認取代隔離作品</button><button id="cancel">取消候選</button><button id="save">保存至本頁記憶</button><button id="reopen">重開記憶作品</button>
+<pre id="result" role="status">等待下方工具載入。</pre><details><summary>完整候選 JSON</summary><pre id="fullResult"></pre></details><div id="poses"></div>
+<iframe id="workspace" title="隔離機構工具" src="../blocks.html?gripperPilot=1"></iframe>
+<p>學什麼：寬度與單側餘量影響所需開口。實操：建立 50／10，改用 updateTask 請求輸入 80／10，每次只改一個變數。反思：比較張開角與閉合角。解決問題：試 150／40，讀取 UNREACHABLE，縮小物件或餘量再驗證。這是雙側旋轉夾爪，不是平行夾爪；淨距符合目標不代表已抓住物件。</p>
+</main><!-- BEGIN GENERATED LOAD MAP -->
 <script type="importmap" data-load-graph="8428b726f2e1635c56f1">
 {
   "imports": {
@@ -199,38 +201,4 @@
 }
 </script>
 <!-- END GENERATED LOAD MAP -->
-<script type="module">
-import { encodeSnapshot } from '../js/share-codec.js';
-import { moduleEntryUrl } from '../js/module-url.js';
-const run = document.querySelector('#run'), results = document.querySelector('#results'), frame = document.querySelector('#app');
-run.onclick = async () => {
-  run.disabled = true; results.textContent = '執行中…';
-  const keys = ['cadcam.blocks.autosave', 'cadcam.blocks.designFocus'];
-  const saved = keys.map(k => localStorage.getItem(k));
-  const fixture = {
-    kind: 'blocks', v: 1, counter: 10, activeMotor: '2', motorAngles: { '1': 0 }, params: { LA: 80, LB: 80 },
-    comps: ['A', 'B'].map((id, i) => ({ id: `bar${id}`, type: 'bar', moduleId: id, fixedLen: true, isInput: true,
-      physicalMotor: String(i + 1), lenParam: `L${id}`, color: i ? '#ff8800' : '#3498db',
-      p1: { id: `${id}0`, type: 'motor', physicalMotor: String(i + 1), x: 0, y: 0 },
-      p2: { id: `${id}1`, type: 'floating', x: 80, y: 0 } })),
-    modules: ['A', 'B'].map(id => ({ id, name: `設計 ${id}`, base: `${id}0`, outputs: [] }))
-  };
-  fixture.comps.push(...['A', 'B'].map(id => ({ id: `anchor${id}`, type: 'anchor', moduleId: id,
-    p1: { id: `${id}2`, type: 'fixed', x: -40, y: 0 } })));
-  window.finishIsolationTest = text => {
-    // 移除 iframe 會停止它的 debounce／播放計時器，避免稍後覆蓋還原的自存。
-    frame.src = 'about:blank';
-    keys.forEach((k, i) => saved[i] === null ? localStorage.removeItem(k) : localStorage.setItem(k, saved[i]));
-    results.textContent = text; results.className = text.includes('FAIL') ? 'fail' : '';
-    run.disabled = false;
-  };
-  frame.onload = () => {
-    if (!frame.contentWindow.blocks) return;
-    const script = frame.contentDocument.createElement('script');
-    const entry = moduleEntryUrl('./design-isolation-browser.js', location.href); entry.searchParams.set('run', Date.now());
-    script.type = 'module'; script.src = entry.href;
-    frame.contentDocument.body.appendChild(script);
-  };
-  frame.src = '../blocks.html?isolationRun=' + Date.now() + '#m=' + encodeSnapshot(fixture);
-};
-</script></html>
+<script type="module" src="./gripper-pilot.js?v=8428b726f2e1635c56f1"></script></body></html>

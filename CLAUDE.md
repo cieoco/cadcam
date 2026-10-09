@@ -2,9 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 共用規則入口
+
+@AGENTS.md
+
+開工時先讀根目錄 `AGENTS.md`；若執行工具不支援上面的引用語法，請直接開啟該檔。產品方向、範例驅動流程與 AI／教學界限只在該檔維護。下文保留 Claude 的技術導航；歷史描述與共用規則不一致時，以共用規則及當次使用者授權為準。
+
+具體新方向見 [Blocks／AI／教學 SDD](docs/SDD-BLOCKS-AI-TEACHING.md)。舊 `SDD-AI-FOUNDATION.md` 是 mechanism 流程的歷史文件，不是 Blocks 的生成契約。
+
 ## 這是什麼
 
-一個瀏覽器端、零相依的**積木式機構設計工具**（`blocks.html`）：拖放零件（桿 / 結構板 / 齒輪 / 滑軌 / 馬達）直接組閉環連桿機構，含 2D 物理模擬、3D 唯讀預覽、教學範例與 DXF / SVG 輸出。UI 文字以繁體中文為主。
+一個瀏覽器端、無需建置的**積木式機構設計工具**（`blocks.html`）：拖放零件（桿 / 結構板 / 齒輪 / 滑軌 / 馬達）直接組閉環連桿機構，含 2D 運動模擬、3D 唯讀預覽、教學範例與 DXF / SVG 輸出。UI 文字以繁體中文為主。
 
 repo 內另有一個**已凍結的舊應用** `mechanism.html`（表單式的 four-bar / slider-crank / multilink wizard 設計器）——2026-07 起棄置：bug 不修、功能不加，檔案保留只為了不讓舊連結 404。除非明確要求，**不要動 mechanism 側的程式碼**（範圍見下方「已凍結」章節）。
 
@@ -18,7 +26,7 @@ repo 內另有一個**已凍結的舊應用** `mechanism.html`（表單式的 fo
 python -m http.server 8000   # 然後開啟 http://localhost:8000
 ```
 
-`index.html` 只是導向 `blocks.html` 的極簡轉址頁，後者才是真正的進入點（進入點模組 `js/blocks/app.js`）。
+`index.html` 與 `teaching.html` 提供學習目錄；`blocks.html` 是工具入口（進入點模組 `js/blocks/app.js`）。
 
 測試在 `test/*.mjs`，每支都是獨立的 Node 腳本（`node test/<name>.mjs`，Node ≥22 免旗標），共用 `test/_harness.mjs` 的 `check` / `report`；跑的是真正的核心（`core/topology.js` 編譯 + `multilink/solver.js` 求解）或以假 DOM 驅動的 blocks 域模組。改動 blocks 邏輯時：先跑相關測試、必要時補一支，再開瀏覽器操作驗證。`test_hull.js`（repo 根目錄）是臨時幾何驗證腳本，不屬於套件。
 
@@ -82,6 +90,8 @@ multilink 機構是使用者自訂的通用 topology，topology 可用兩種方�
 - **保留現有風格與註解**（包含既有的中英文註解）——不要為了簡潔而刪除。
 
 ## 開發流程（模型分工）
+
+> 以下 Opus／Sonnet 配置保留為既有工作包的歷史分工，不強制套用所有新任務。新任務遵守 `AGENTS.md` 的 LOOP 原則與當次模型授權；框架穩定化工作仍以其 SDD 的單一寫入者、模型與發布規則為準。
 
 較大的功能或修正照「SDD → 交辦 → 審查」的 LOOP 進行；完整規則與歷次證據見 `docs/FTC-LOOP.md`「模型分工與升級規則」。
 

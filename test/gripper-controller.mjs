@@ -50,6 +50,10 @@ const controller = createGripperController({
 
 controller.sync();
 check('marker 啟用夾爪任務卡並求出預設計畫', controller.isActive() && controller.currentPlan().ok && ids.get('gripperObjectWidth').value === 50);
+const cached = controller.currentPlan();
+params.theta = 25; controller.recompute();
+check('播放角改變重用已驗證行程，不每render掃描',controller.currentPlan()===cached);
+params.theta = 0; controller.recompute();
 ids.get('gripperOpenBtn').click();
 check('張開按鈕使用計畫角度與馬達', pose?.theta === controller.currentPlan().open.theta && pose?.motor === controller.currentPlan().motor);
 const before = params.gripperObjectWidth;

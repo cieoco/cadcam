@@ -8,6 +8,19 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 本專案是**純 ES6 modules 靜態載入**——沒有 build step、沒有 bundler、沒有 `package.json`、不需 npm 安裝，全部直接在瀏覽器執行。3D 使用 `js/vendor/` 內附的 Three.js，並非完全沒有第三方程式。
 
+## 產品方向與共同開發原則（2026-10-10）
+
+本節是 Codex 與 Claude 共用的方向規則；`CLAUDE.md` 引用本檔，不另外維護一套產品目標。具體契約、階段與驗收見 [Blocks／AI／教學 SDD](docs/SDD-BLOCKS-AI-TEACHING.md)。既有 FTC 模組與框架穩定化 SDD 的有效契約、相容要求及已授權工作仍適用；本節不代表重做或取消那些工作。
+
+- **目標：** 面向零基礎學生與機構設計者，以有來源的 FTC 應用案例，建立能修改、模擬、組立及逐步製作的機構。優先選擇可用 2D 輪廓／孔／槽加工板件，再以角碼、轉軸及現成零件組成的 2.5D 實作；不等同任意 3D CAD。
+- **同一作品、同一規則：** 圖形介面、教學與未來 AI 使用 Blocks snapshot 與共同操作／驗證語意。`comps`／`params` 等持久化資料經既有正規化與編譯；不要讓 AI 另寫一套求解器，或用舊版 steps 格式取代可編輯的 Blocks 作品。
+- **範例驅動：** 一次貫通一個實際案例，先列輸入、預期動作、反例及能力缺口，再最小實作、驗證、整理證據。第一個新案例為單伺服夾爪；單側活動、雙側連動等結構須明確標示，不能混稱平行夾爪。候選圖不等於已確認施工規格。
+- **逐步抽出操作介面：** 優先重用既有域模組；只有案例需要時才抽出建立／修改／驗證的共同入口。預覽不改正式作品，確認沿用復原與保存流程。MCP 是後續接頭，不先為它重寫全域狀態、存檔格式或增加依賴。
+- **簡潔與教學：** 工具維持少量、直覺的操作；教程採「學什麼 → 實操 → 反思 → 解決一個問題」，每次先改一個變數。長說明放教程，不堆到畫布上。
+- **完成證據：** 依案例驗證幾何／孔距、有效運動範圍、失敗回饋、修改復原、保存重開與適用輸出；UI 改動另做瀏覽器驗收。不能用動畫順暢代替加工就緒或實物成功。
+- **誠實界限：** 分別標示概念示意、模擬已驗證、加工資料已核對、實物已測。來源案例、板材化改製推論、未驗證尺寸分開記錄；板厚、刀具與外購件規格缺失時，不聲稱可直接加工。接觸、摩擦、承載、全行程干涉與 AI／MCP 僅按實際覆蓋範圍說明。
+- **LOOP 與省 token：** 定向盤點 → 小包實作 → 定向測試 → 必要整合／瀏覽器驗收 → 記錄。小修改直接完成；只有有邊界且值得分工的工作才依使用者授權交辦，遵守現行單一寫入者要求。模型選擇依當次授權與環境能力，不把歷史模型名稱當成所有任務的強制設定；發布遵守當次授權及適用 SDD，不因文件提及 MCP 就部署服務。
+
 ## 執行與測試
 
 必須透過 HTTP 提供（ES6 `import` 無法在 `file://` 下運作）：
@@ -16,7 +29,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 python -m http.server 8000   # 然後開啟 http://localhost:8000
 ```
 
-`index.html` 是導向 `blocks.html` 的極簡轉址頁。舊版 `mechanism.html` 沒有 `?type=` 參數時顯示機構 chooser；帶 `?type=fourbar`（等）時載入舊機構工作頁。`?mode=wizard` 與 `?template=<id>` 也是舊版 multilink 設計器的參數，不是 blocks 的入口。
+`index.html` 與 `teaching.html` 提供學習目錄；機構工具入口是 `blocks.html`。舊版 `mechanism.html` 沒有 `?type=` 參數時顯示機構 chooser；帶 `?type=fourbar`（等）時載入舊機構工作頁。`?mode=wizard` 與 `?template=<id>` 也是舊版 multilink 設計器的參數，不是 blocks 的入口。
 
 沒有 npm test runner，但已有 `test/*.mjs` Node 驗收腳本，共用 `test/_harness.mjs`；Node 22 以上可直接執行，例如 `node test/slider-crank.mjs`。`node test_blocks_schema.mjs` 驗證 blocks 範例與作品正規化。`test_hull.js` 是獨立幾何腳本。UI 改動仍須透過 HTTP 在瀏覽器實際操作；Node 通過不能替代瀏覽器驗收。
 
@@ -84,6 +97,9 @@ multilink 三角形參數命名：`gParam` = 底邊（P1-P2）、`r1Param` = P1-
 
 ## 參考文件
 
+- `docs/SDD-BLOCKS-AI-TEACHING.md` — 範例驗證、共用操作與 AI／教學分階段規格
+- `docs/SDD-FTC-MODULES.md` — FTC 快速原型與可重組模組的產品原則
+- `docs/SDD-FRAMEWORK-STABILIZATION-2026-10-09.md` — 現行組立穩定化契約；狀態另見工作紀錄
 - `CORE-SCHEMA.md` — engine 輸入 / 輸出形狀（PreviewState、ViewState、SweepState、ExportBundle）
 - `docs/mechanism-schema.md` — 匯出給 `arm` 的 `mechanism.json` 交換格式
 - `.agent/workflows/how_to_add_complex_mechanism.md` — 新增固定 topology 機構的做法

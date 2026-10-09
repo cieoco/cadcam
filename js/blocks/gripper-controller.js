@@ -2,13 +2,15 @@
  * R1 對稱雙齒輪夾爪任務卡。所有求解交由純 planner，這裡只管理表單、姿態與下載。
  */
 import { planGripper, gripperBuildRecord } from './gripper-workflow.js?v=20260925_r1b';
+import { prepareGripperOperation, createGripperOperationSession, gripperSnapshotKey } from './gripper-operations.js';
 import { downloadGripperRecord, gripperRecordLink } from './gripper-download.js?v=20260925_r1b2';
 
-export function createGripperController({ getComps, getParams, rebuild, draw, pause, pushUndo, setPose, fitView, getSnapshot, isEditing }) {
+export function createGripperController({ getComps, getParams, rebuild, draw, pause, pushUndo, setPose, fitView, getSnapshot, isEditing, applySnapshot }) {
   let plan = { ok: false, message: '尚未載入夾爪任務。' };
   let active = false;
   let draft = {};
   let referenceCenter = null;
+  let validationKey = null;
 
   const el = id => document.getElementById(id);
   const taskEnabled = params => Number(params?.gripperWorkflow) === 1;
@@ -37,10 +39,10 @@ export function createGripperController({ getComps, getParams, rebuild, draw, pa
     const status = el('gripperPlanStatus');
     const gap = el('gripperEstimatedGap');
     if (status) {
-      status.textContent = plan.ok ? '整段開合可求解，淨距變化連續。' : plan.message;
+      status.textContent = plan.ok ? `指定行程 ${plan.validation.sampleCount} 個採樣通過；未驗證樣本間、干涉或承載。` : plan.message;
       status.dataset.state = plan.ok ? 'ok' : 'error';
     }
-    if (gap) gap.textContent = plan.ok ? plan.message : '預估淨開口：—';
+    if (gap) gap.textContent = plan.ok ? `${plan.message} · ${plan.validation.sampleCount} 點採樣` : '預估淨開口：—';
     ['gripperOpenBtn', 'gripperCloseBtn', 'gripperDownloadBtn'].forEach(id => { const button = el(id); if (button) { button.disabled = !plan.ok; button.setAttribute?.('aria-disabled', String(!plan.ok)); } });
     // 手機沿用同一卡片，但把畫布排在卡片下方，不能遮住機構與可選孔位。
     canvas?.style.setProperty('--gripper-card-space', `${(card.offsetHeight || 0) + 16}px`);
@@ -50,14 +52,22 @@ export function createGripperController({ getComps, getParams, rebuild, draw, pa
     const params = getParams() || {};
     active = taskEnabled(params);
     if (active) {
-      const requested = { ...params, ...draft };
-      plan = planGripper(getComps() || [], requested);
-      // 不可達的尺寸仍能拖回；結構不符則不顯示似乎已驗證的任務物件。
-      const referencePlan = plan.ok ? plan : planGripper(getComps() || [], { ...params, gripperObjectWidth: 50, gripperClearance: 10 });
-      referenceCenter = referencePlan.ok ? referencePlan.closed.center : null;
+      const snapshot = getSnapshot();
+      // 單馬達自主行程掃描不依賴目前播放角，幾何／任務與凍結角仍列入 cache。
+      const key = gripperSnapshotKey({ ...snapshot, params: { ...snapshot.params, theta: 0 }, draft });
+      if (key !== validationKey) {
+        validationKey = key;
+        const result = prepareGripperOperation(snapshot, { operationVersion: 1, action: 'updateTask', parameters: draft });
+        plan = result.ok ? { ...result.plan, validation: result.validation } : { ok: false, code: result.issues[0]?.code, message: result.issues[0]?.message };
+        // 人工允許保存無效設計再修正；動作／下載仍由相同驗證結果阻擋。
+        // 不可達的尺寸仍能拖回；結構不符則不顯示似乎已驗證的任務物件。
+        const referencePlan = plan.ok ? plan : planGripper(getComps() || [], { ...params, gripperObjectWidth: 50, gripperClearance: 10 });
+        referenceCenter = referencePlan.ok ? referencePlan.closed.center : null;
+      }
     } else {
       plan = { ok: false, message: '尚未載入夾爪任務。' };
       draft = {};
+      validationKey = null;
       referenceCenter = null;
     }
     render();
@@ -135,5 +145,10 @@ export function createGripperController({ getComps, getParams, rebuild, draw, pa
   el('gripperCloseBtn')?.addEventListener('click', () => moveTo('closed'));
   el('gripperDownloadBtn')?.addEventListener('click', download);
 
-  return { sync, recompute, isActive, currentPlan, range, moveToOpen, syncVisibility: render, reference, previewWidth, commitWidth, cancelPreview };
+  const operations = createGripperOperationSession({ getSnapshot, applySnapshot: snapshot => {
+    if (!applySnapshot) throw new Error('宿主未提供作品套用入口。');
+    applySnapshot(snapshot); sync();
+  } });
+
+  return { operations, sync, recompute, isActive, currentPlan, range, moveToOpen, syncVisibility: render, reference, previewWidth, commitWidth, cancelPreview };
 }

@@ -17,11 +17,11 @@ export function gripperTips(comps, points) {
 }
 
 export function planGripper(comps, params) {
-  const fail = message => ({ ok: false, message });
+  const fail = (message, code = 'UNSUPPORTED_STRUCTURE') => ({ ok: false, message, code });
   const width = Number(params.gripperObjectWidth);
   const clearance = Number(params.gripperClearance);
   if (!Number.isFinite(width) || width < 10 || width > 150 || !Number.isFinite(clearance) || clearance < 2 || clearance > 40)
-    return fail('物件寬度請填 10–150 mm；單側餘量請填 2–40 mm。');
+    return fail('物件寬度請填 10–150 mm；單側餘量請填 2–40 mm。', 'INVALID_DIMENSIONS');
   const byId = Object.fromEntries(comps.map(c => [c.id, c]));
   const plainJaw = c => !c?.vertices || (c.vertices.length === 3 && c.vertices.every((v, i) => v.solve && v.ref === ['p1', 'p2', 'p3'][i]));
   const a = byId.GearA, b = byId.GearB, left = byId.LeftJaw, right = byId.RightJaw;
@@ -59,7 +59,7 @@ export function planGripper(comps, params) {
     const start = sample(0);
     if (!start || Math.abs(a.p1.y - b.p1.y) > 0.1) return fail('目前夾爪不是水平對稱配置，無法規劃方形物件開口。');
     const targetOpen = width + 2 * clearance;
-    if (targetOpen > start.gap) return fail(`需要 ${targetOpen.toFixed(1)} mm 開口，超過此夾爪約 ${start.gap.toFixed(1)} mm；請縮小物件／餘量，或改造爪臂。`);
+    if (targetOpen > start.gap) return fail(`需要 ${targetOpen.toFixed(1)} mm 開口，超過此夾爪約 ${start.gap.toFixed(1)} mm；請縮小物件／餘量，或改造爪臂。`, 'UNREACHABLE');
     let previous = start;
     let bracket = null;
     for (let theta = 0.5; theta <= 90; theta += 0.5) {
@@ -68,7 +68,7 @@ export function planGripper(comps, params) {
       if (current.gap <= width) { bracket = theta; break; }
       previous = current;
     }
-    if (bracket === null) return fail('目前幾何無法在連續閉合區間內到達物件寬度。');
+    if (bracket === null) return fail('目前幾何無法在連續閉合區間內到達物件寬度。', 'UNREACHABLE');
     const atGap = target => {
       let lo = 0, hi = bracket;
       for (let i = 0; i < 32; i++) {
@@ -105,7 +105,10 @@ export function gripperBuildRecord(plan, snapshot) {
     '- 馬達、軸／軸承、隔套、螺絲、夾持墊：待選型。',
     '- 加工前需確認軸與齒輪／夾爪的傳扭固定方式；目前共孔關係不代表已設計好固定件。', '',
     '## 驗收', '',
-    '- [x] 求解器找到連續、對稱的目標開合區間。',
+    ...(plan.validation ? [
+      `- [x] 指定角區間 ${angle(plan.open.theta)}–${angle(plan.closed.theta)}°：${plan.validation.sampleCount} 個採樣通過（實際步距 ${plan.validation.actualStepDeg.toFixed(3)}°）。`,
+      '- 採樣檢查有限解、剛性孔距、相鄰姿態門檻與端點淨距；不證明樣本間連續可解。'
+    ] : ['- [x] 規劃器找到目標開合角；此記錄未附指定行程採樣驗證。']),
     '- [ ] 全部板件掃掠與物件碰撞檢查（目前僅圓頭橫向淨距）。',
     '- [ ] 孔位、板厚、疊放與實際硬體核對。',
     '- [ ] 馬達扭矩、速度、限位及夾持力確認。',

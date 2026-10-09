@@ -5,6 +5,7 @@ import {materialSolveValidity} from './material-pose-status.js';
 import {createPlaybackProbe} from './playback-probe.js';
 import {createAsyncResource} from '../blocks3d/scene-reuse.js';
 import {LOAD_GRAPH_TOKEN} from '../load-graph.js';
+const gripperPilotSession=new URLSearchParams(location.search).get('gripperPilot')==='1';
 const benchmarkSession=new URLSearchParams(location.search).get('benchmark')==='1';
 const playbackProbe=benchmarkSession?createPlaybackProbe():null;
 let frameCpu=null,frame3dCpu={poseMs:0,submit3dMs:0};
@@ -183,7 +184,7 @@ function undo() {
   updateUndoBtn();
 }
 function scheduleAutosave() {
-  if(benchmarkSession)return;
+  if(benchmarkSession || gripperPilotSession)return;
   clearTimeout(S.autosaveTimer);
   S.autosaveTimer = setTimeout(() => Store.saveLocal(bench.autosaveSnapshot() || Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState())), 500);
 }
@@ -301,7 +302,7 @@ const inDesign = () => S.mode === 'design';
 const focusOpts = () => ({ keepRoot: S.designFocus === ROOT_TAB });   // 剛按「新設計」時，空的「未命名設計」分頁要留著
 const focusModule = () => inDesign() ? (S.modules.find(m => m.id === S.designFocus) || null) : null;
 const FOCUS_KEY = 'cadcam.blocks.designFocus';   // 只記在這個瀏覽器：重新整理後回到同一頁（不進作品檔）
-function saveFocus() { if(benchmarkSession)return;try { localStorage.setItem(FOCUS_KEY, String(S.designFocus)); } catch (_) {} }
+function saveFocus() { if(benchmarkSession || gripperPilotSession)return;try { localStorage.setItem(FOCUS_KEY, String(S.designFocus)); } catch (_) {} }
 function savedFocus() { try { return localStorage.getItem(FOCUS_KEY); } catch (_) { return null; } }
 // 上一次 rebuild 時的零件 id 集合：用來認出「這次新畫的零件」。載入／復原／清空時設 null，避免把還原的零件誤判成新零件。
 let knownCompIds = null;
@@ -725,6 +726,7 @@ gripperController = createGripperController({
     draw();
   },
   getSnapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
+  applySnapshot: snapshot => applySnapshot(Store.normalizeSnapshot(snapshot), { source: 'gripper-operation' }),
   notify: transient
 });
 const inputRockRange = () => gripperController?.isActive()
@@ -2802,7 +2804,7 @@ function init() {
     console.warn('share link load failed:', e);
     transient('⚠️ 分享連結讀取失敗');
   }
-  if (!loaded && !benchmarkSession) {
+  if (!loaded && !benchmarkSession && !gripperPilotSession) {
     const local = Store.normalizeSnapshot(Store.loadLocal());
     if (local && local.comps.length) { applySnapshot(local, { recordUndo: false, source: 'local-autosave' }); loaded = true; }
   }
@@ -2831,6 +2833,13 @@ Object.assign(window.blocks, {
   setMemberMirror: memberEditor.setMirror,
   setMemberMaterial: memberEditor.setMaterial
 });
+if (gripperPilotSession) window.blocks.gripperPilot = {
+  prepare: request => gripperController.operations.prepare(request),
+  confirm: () => gripperController.operations.confirm(),
+  cancel: () => gripperController.operations.cancel(),
+  snapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
+  reopen: snapshot => { const norm = Store.normalizeSnapshot(snapshot); if (!norm) throw Error('作品格式無效'); applySnapshot(norm, { source: 'gripper-pilot' }); },
+};
 init();
 if(benchmarkSession){
  Object.assign(window.blocks,{benchmark:{identity:{source:'current',token:LOAD_GRAPH_TOKEN},async load(snapshot){playbackProbe.abort('work_changed');const norm=Store.normalizeSnapshot(snapshot);if(!norm)throw Error('無效量測作品');applySnapshot(norm,{recordUndo:false,source:'benchmark'});bench.setMode('bench');await set3D(true);viewer3D.stop();return benchmarkCoverage;},
