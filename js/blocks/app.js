@@ -1,3 +1,4 @@
+import {prepareConnectionWork} from './connection-work.js';
 import {materialSolveValidity} from './material-pose-status.js';
 import {createPlaybackProbe} from './playback-probe.js';
 import {createAsyncResource} from '../blocks3d/scene-reuse.js';
@@ -27,13 +28,13 @@ import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
 // 3D 唯讀預覽（懶載入 THREE，平面路徑完全不受影響）
 // computeBodyLayers：2D 疊放順序與 3D z 分層共用同一套，兩邊才一致。
-import { buildSceneModel, computeBodyLayers } from '../blocks3d/scene-model.js';
-import { buildOrthogonalChildren, planeInputs, attachModulePlates } from '../blocks3d/orthogonal-3d.js?v=20261008_bracketalign';   // O6：直角安裝子模組的 3D 位姿
+import { computeBodyLayers } from '../blocks3d/scene-model.js';
+import { planeInputs } from '../blocks3d/orthogonal-3d.js?v=20261008_bracketalign';   // O6：直角安裝子模組的 3D 位姿
 // 純邏輯模組
 import * as View from './view.js';
 import { createFusionEditor, drawFusion } from './fusion-editor.js';
 import { createPartGeometrySource } from './part-geometry.js';
-import { attachPartMaterials } from '../blocks3d/part-pose.js';
+import {buildMaterialScene} from '../blocks3d/material-scene.js';
 const partGeometrySource=createPartGeometrySource();
 import * as Render from './render.js';   // SVG 繪製基元（純呈現）
 import * as Panels from './panels.js';   // 編輯面板呈現（讀 S + 寫 DOM）
@@ -188,6 +189,7 @@ function scheduleAutosave() {
 // 套用一份 snapshot 到目前狀態。recordUndo 預設 true（外部開檔/分享要能 undo）。
 function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external' } = {}) {
   if (recordUndo) pushUndo();
+  bench.workReplaced?.();
   if (source !== 'undo') { sweepMemberId = null; mateTool.reset(); }
   pause();
   cancelMotorMode();
@@ -836,6 +838,8 @@ const bench = createBench({
   exportComposite: id => moduleEditor.exportComposite(id),
   motorState: () => ({ activeMotor: String(S.activeMotor), theta: S.theta, motorAngles: S.motorAngles }),
   snapshotStr, restoreSnapshot: restoreBenchSnapshot, scheduleAutosave,
+  connectionPose:()=>({theta:S.theta,motorAngles:motorAnglesNow(),_prevPoints:lastFullPts}),
+  adoptConnectionPose:points=>{lastSolved=structuredClone(points);prevSolved={};},
   getViewer: () => viewer3D, is3DActive: () => view3DActive, set3D, push3D: () => push3D(),
   // H1：組立 → 設計：焦點換成組立台選的模組（沒有就維持原本的分頁）。
   enterDesign: changed => { validateViewPlane(); reconcileMotorState(); saveFocus(); if (changed) fitView(); else draw(); },
@@ -883,29 +887,13 @@ function frameConnectorNodes() { return Model.frameConnectorNodes(machineFrameCo
 
 // syncSliderGeometries（滑軌幾何同步）已隨滑軌域移到 ./slider-editor.js
 
-function rebuild() {
+function rebuild({save=true}={}) {
   syncSliderGeometries();
   adoptNewComps();               // H1：焦點是模組時，新畫的零件歸到那個模組
-  // 模組正規化：清掉零件已被刪光的模組、失效的輸出與安裝（只取 modules，comps 仍用 S.comps 原參照）。
-  if (S.modules.length) {
-    const nm = normalizeModules(S.modules, S.comps);
-    if (nm.ok) S.modules = nm.modules;
-  }
-  // rebake：宿主位姿變了就把子模組座標剛體平移／旋轉，維持 I1（就地寫回，保留零件物件參照）。
-  if (S.modules.length) {
-    const rb = rebakeModules(S.comps, S.modules, S.topo.params);
-    if (rb.changed) {
-      rb.comps.forEach((c, i) => Object.assign(S.comps[i], c));
-      S.modules = rb.modules;
-    }
-  }
-  S.compiled = compileTopology(S.comps, S.topo, new Set());
-  if (S.modules.some(m => m.mount?.face)) {
-    const refreshed = refreshFaceMounts(S.comps, S.modules, S.topo.params, { exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm });
-    S.modules = refreshed.modules;
-    if (refreshed.warnings.length) transient(refreshed.warnings[0]);
-  }
-  S.topo.params = S.compiled.params; // 沿用補齊後的參數
+  // 六面候選與正式作品共用normalize → rebake → compile → refresh次序。
+  const prepared=prepareConnectionWork(S.comps,S.modules,S.topo,{exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm});
+  S.modules=prepared.modules;S.compiled=prepared.compiled;
+  if(prepared.warnings.length)transient(prepared.warnings[0]);
   // 雙軌：求解改讀這份，繪製仍讀 S.compiled；沒有模組時維持 null，求解走原本的 S.compiled（不重複編譯）。
   S.assembly = S.modules.length ? compileAssembly(S.comps, S.modules, S.topo) : null;
   lastSolved = {};               // 拓撲變了：丟掉舊解，避免拿到不相干的種子
@@ -916,7 +904,7 @@ function rebuild() {
   gripperController?.recompute();
   document.getElementById('hint').style.display = S.comps.length ? 'none' : 'block';
   Panels.updateRoleEditor();
-  scheduleAutosave();            // 任何結構變更都防丟（debounce，播放不觸發）
+  if(save)scheduleAutosave();    // 任何結構變更都防丟（debounce，播放不觸發）
 }
 
 // 多馬達狀態與零件實況對齊：凍結表只留還存在的馬達；active 不存在時交棒給編號最小的那顆；
@@ -1798,37 +1786,12 @@ function push3DNow() {
   const catalog=partGeometrySource.get({comps:S.comps,modules:S.modules,params:S.topo.params,fabrication:S.fabrication || {},
     exportSettings:Settings.exportSettings(),frameNodes:designView?viewFrameNodes():frameConnectorNodes(),mounts:homeMountsNow(),
     frameMounts:designView?viewMounts(viewWorldMounts(Exporters.splitMountsByHost(S.comps,homeMountsNow()).free)):undefined});
-  const geomPts=allPlanes?allPlanes.pts:pts;
   const frameGeometry=designView&&S.viewPlane?null:catalog.parts.frame || null;
-  const baseOpts={hullR:HULL_R_WORLD,plateThickness:stockMm,memberStocks:catalog.memberStocks,gearGeometries:catalog.parts,fusedParts:catalog.fusedParts};
-  // Home frame material stays local. The shared pose adapter moves it once.
   const plates=catalog.frameHomes.filter(h=>!designView || h.moduleId===S.designFocus).map(h=>({moduleId:h.moduleId,plane:h.plane,
     outlines:h.geometry.outlines,outline:h.geometry.outlines[0],holes:h.geometry.holes,cutouts:h.geometry.cutouts,thicknessMm:catalog.parts[h.name]?.thicknessMm || h.stockMm}));
-  let model = buildSceneModel(links, pts, {
-    ...baseOpts, groundIds, motorCenters: motorCenterIds, motorTypes, motorMounts,
-    polygons, sliders, gears, racks, cams, pulleys, belts, frameGeometry
-  });
-  attachModulePlates(model, S.comps, plates, designView ? (S.viewPlane || null) : null);
-  if (allPlanes) {
-    // 直角安裝的子模組：在自己的平面建場景（沒有世界機架），再以 4x4 立起來掛在宿主工具上。
-    model.orthogonal = buildOrthogonalChildren({
-      comps: S.comps, modules: S.modules, inputs: allPlanes, mainModel: model, asm: S.assembly, params: S.topo.params, plates, plan: modulePlates.plan(),connectionGeometry:catalog.extras,
-      exportSettings: Settings.exportSettings(), joint: jointSettingsNow(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) > 0 ? Number(S.fabrication.cnc.stockThicknessMm) : FABRICATION_DEFAULTS.cnc.stockThicknessMm,
-      buildModel: inp => buildSceneModel(inp.links, inp.pts, {
-        ...baseOpts, groundIds: inp.groundIds, motorCenters: inp.motorCenterIds, motorTypes: inp.motorTypes,
-        motorMounts: inp.motorMounts, polygons: inp.polygons, sliders: inp.sliders, gears: inp.gears,
-        racks: inp.racks, cams: inp.cams, pulleys: inp.pulleys, belts: inp.belts, frameGeometry: null
-      })
-    });
-    // F1：每個直角角碼接合的實體方塊（已在主場景座標），viewer 畫成金屬灰的薄板。
-    const boxes = model.orthogonal.flatMap(child => child.brackets || []);
-    if (boxes.length) model.brackets = boxes;
-    // G2：鎖角碼的 M3 螺絲（主場景座標）。
-    const screws = model.orthogonal.flatMap(child => child.screws || []);
-    if (screws.length) model.screws = screws;
-  }
-  model=attachPartMaterials(model,catalog,{comps:S.comps,modules:S.modules,points:allPlanes?allPlanes.pts:designView?lastModelInputsAll.pts:pts,assemblyScope:!designView});
-  model.solveValidity=lastSolveValidity;
+  const model=buildMaterialScene({comps:S.comps,modules:S.modules,params:S.topo.params,catalog,inputs:planesApi,allPlanes,
+    points:allPlanes?allPlanes.pts:designView?lastModelInputsAll.pts:pts,stockMm,frameGeometry,plates,plane:designView?(S.viewPlane || null):null,
+    assemblyScope:!designView,asm:S.assembly,plan:modulePlates.plan(),exportSettings:Settings.exportSettings(),joint:jointSettingsNow(),hullR:HULL_R_WORLD,solveValidity:lastSolveValidity});
   if(benchmarkSession&&!playbackProbe.active())benchmarkCoverage={materialParts:model.materialParts.length,holes:model.materialParts.reduce((n,p)=>n+p.geometry.holes.length,0),cutouts:model.materialParts.reduce((n,p)=>n+p.geometry.cutouts.length,0),bracketWings:model.materialParts.filter(p=>p.geometry.kind==='bracket-wing').length,screwInstances:model.materialParts.filter(p=>p.geometry.kind==='screw').length,legacyHardware:[model,...(model.orthogonal || []).map(c=>c.model)].map(m=>({motors:m.motors?.length || 0,pins:m.pins?.length || 0})),geometryCounters:viewer3D.cacheStats()};
   const posedAt=measuring?performance.now():0;
   viewer3D.update(model);

@@ -117,7 +117,8 @@ const selection={alignU:0,alignV:0,offsetU:0,offsetV:0,gap:0,quarterTurns:0,...i
 send({type:'face-wizard-confirm',loadGraph:'stale',selection});assert.equal(commits,0);
 send({type:'face-wizard-confirm',loadGraph:LOAD_GRAPH_TOKEN,selection});assert.equal(commits,0,'mismatch invalidates the handshake');
 send({type:'face-wizard-ready',loadGraph:LOAD_GRAPH_TOKEN});
-send({type:'face-wizard-confirm',loadGraph:LOAD_GRAPH_TOKEN,selection});assert.equal(commits,1,JSON.stringify(messages.at(-1)));
+await send({type:'face-wizard-preview',loadGraph:LOAD_GRAPH_TOKEN,requestId:1,selection});const candidate=messages.at(-1).candidate;assert.ok(candidate?.saveable,JSON.stringify(candidate));
+await send({type:'face-wizard-confirm',loadGraph:LOAD_GRAPH_TOKEN,candidateId:candidate.candidateId,selectionRevision:candidate.selectionRevision});assert.equal(commits,1,JSON.stringify(messages.at(-1)));
 assert.equal(JSON.stringify(fixture),before);assert.ok(notices.some(t=>t.includes('重新整理')));
 
 // Evaluate real ES modules with the generated import-map resolver, not just URL

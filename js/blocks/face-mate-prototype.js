@@ -1,3 +1,6 @@
+import {candidateMaterialFaces,candidateHostFace,candidateCoverageText,candidateConfirmLabel} from './face-candidate-view.js';
+import {applyMatrix4} from '../blocks3d/orthogonal-3d.js';
+import {hitLabels} from './part-labels.js';
 import { LOAD_GRAPH_TOKEN } from '../module-url.js';
 import { createLoadSession, LOAD_MISMATCH_MESSAGE } from './load-session.js';
 import { autoFitFaces } from './face-auto-fit.js?v=20261008_bracket3d';
@@ -20,6 +23,31 @@ let draft = { ...initial }, saved = { ...initial }, step = 0;
 let mode = 'wizard';
 let hasConfirmed = false, roughPlaced = false, configured = false;
 let bracketPlan = null, jointSettings;
+let parentCandidate=null,previewRequest=0,previewSignature='',previewTimer=null,candidateClosed=false;
+function integratedSelection(mate){const selected={...draft};if(Math.abs(mate.rotation[2][2])<1e-6)selected.brackets={enabled:true,offsets:{...bracketOffsets},childPart:children[draft.child].surface?.compId || 'frame'};else delete selected.brackets;return selected;}
+function requestCandidate(mate){
+ if(!integrated||step!==3||!loadSession.ready)return;
+ const selection=integratedSelection(mate),signature=JSON.stringify(selection);
+ if(signature===previewSignature)return;
+ previewSignature=signature;const requestId=++previewRequest;clearTimeout(previewTimer);
+ $('next').disabled=true;
+ const report=document.getElementById('faceValidation');if(report)report.textContent='目前候選：檢查中…';
+ previewTimer=setTimeout(()=>parent.postMessage({type:'face-wizard-preview',loadGraph:LOAD_GRAPH_TOKEN,requestId,selection},location.origin),150);
+}
+function candidateLabel(id,candidate){if(id.includes('/screw'))return '固定螺絲頭';return hitLabels([id],candidate.work?.comps || [],candidate.work?.modules || [])[0] || '板件';}
+function showCandidate(candidate){
+ let box=document.getElementById('faceValidation');
+ if(!box){box=document.createElement('div');box.id='faceValidation';box.style.cssText='padding:8px;overflow-wrap:anywhere;';box.setAttribute('aria-live','polite');$('message').after(box);}
+ box.replaceChildren();const v=candidate.validation;
+ box.dataset.status=v?.status || 'not_checked';box.dataset.candidateId=candidate.candidateId || '';box.dataset.poseRevision=v?.poseRevision || '';
+ const coverageText=candidateCoverageText(candidate);
+ const line=document.createElement('div');line.textContent=!candidate.saveable?(candidate.reason || '目前姿態無法驗證，不能確認。'):v.status==='fail'?`此姿態有干涉；可保存接合後調整作品。`:v.status==='not_supported'?coverageText.summary:'此姿態：已檢查範圍無干涉。';
+ line.style.color=v?.status==='fail'?'#b34436':'#425e60';box.append(line);
+ const collisions=v?.material?.findings || [],coverage=v?.coverage?.notSupported || [];
+ if(collisions.length){const details=document.createElement('details'),title=document.createElement('summary');title.textContent=`干涉 ${collisions.length} 處`;details.append(title);for(const f of collisions){const row=document.createElement('div');row.textContent=f.partIds.map(id=>candidateLabel(id,candidate)).join(' ↔ ');details.append(row);}box.append(details);}
+ if(coverage.length){const details=document.createElement('details'),title=document.createElement('summary');title.textContent=coverageText.title;details.append(title);const labels={motors:'馬達機身',pins:'關節銷',grounds:'固定接點'};for(const row of coverage){const item=document.createElement('div');item.textContent=labels[row.kind] || '部分材料輪廓尚無法驗證';details.append(item);}box.append(details);}
+}
+window.addEventListener('pagehide',()=>{candidateClosed=true;clearTimeout(previewTimer);});
 let bracketOffsets = {}, selectedBracket = null, bracketSpan = 0;
 let moveStep = 5, edgeMode = false, dimensionField = null, dimensionAlignment = null;
 const titles = ['選擇兩個機構', '選承接端的大面', '選安裝端的大面', '預覽對齊與偏置'];
@@ -159,11 +187,12 @@ $('back').addEventListener('click', () => { if (step > 0) step--; render(); });
 $('next').addEventListener('click', () => {
   if (mode === 'wizard' && step < 3) { step = configured && step === 0 ? 3 : step + 1; render(); return; }
   if (!solve().ok) return;
-  if (bracketPlan?.ok) draft.brackets = { enabled: true, offsets: { ...bracketOffsets }, childPart: children[draft.child].surface?.compId || 'frame' };
-  else delete draft.brackets;
+  if (!integrated && bracketPlan?.ok) draft.brackets = { enabled: true, offsets: { ...bracketOffsets }, childPart: children[draft.child].surface?.compId || 'frame' };
+  else if(!integrated)delete draft.brackets;
   if (integrated) {
     if (!loadSession.allowConfirm(LOAD_GRAPH_TOKEN)) { $('message').textContent = LOAD_MISMATCH_MESSAGE; return; }
-    parent.postMessage({ type: 'face-wizard-confirm', loadGraph: LOAD_GRAPH_TOKEN, selection: { ...draft } }, location.origin); return;
+    if(!parentCandidate?.saveable)return;
+    $('next').disabled=true;parent.postMessage({type:'face-wizard-confirm',loadGraph:LOAD_GRAPH_TOKEN,candidateId:parentCandidate.candidateId,selectionRevision:parentCandidate.selectionRevision},location.origin);return;
   }
   saved = { ...draft }; hasConfirmed = true; render();
   const placement = buildFacePlacement({ host: hosts[saved.host], child: children[saved.child], selection: saved });
@@ -205,7 +234,31 @@ $('scene').addEventListener('pointerup', endViewDrag);
 $('scene').addEventListener('pointercancel', endViewDrag);
 $('scene').addEventListener('lostpointercapture', endViewDrag);
 
+function drawCandidateScene(mate){
+ const svg=$('scene');svg.replaceChildren();$('bracketNote').hidden=false;fitButton.hidden=false;
+ bracketPlan=parentCandidate?.bracket || null;bracketSpan=bracketPlan?.span || 0;
+ const pending=parentCandidate?.selectionRevision!==previewSignature;
+ $('bracketNote').textContent=pending?'此圖為上次候選；目前設定待檢查。':bracketPlan?.ok?`角碼 ${bracketPlan.brackets.length} 顆 · 固定孔 Ø3.2`:parentCandidate?.reason || '未配置角碼固定孔。';
+ if(!parentCandidate?.model){$('mateOverlay').hidden=true;return;}
+ const faces=candidateMaterialFaces(parentCandidate.model),points=faces.flatMap(f=>f.rings.flat()),projected=points.map(viewCoords);
+ const minX=Math.min(...projected.map(p=>p.x)),maxX=Math.max(...projected.map(p=>p.x)),minY=Math.min(...projected.map(p=>p.y)),maxY=Math.max(...projected.map(p=>p.y));
+ const scale=Math.min(500/Math.max(1,maxX-minX),300/Math.max(1,maxY-minY));
+ const screen=p=>{const q=viewCoords(p);return {x:300+(q.x-(minX+maxX)/2)*scale,y:180+(q.y-(minY+maxY)/2)*scale};};
+ const make=(name,attrs)=>{const e=document.createElementNS('http://www.w3.org/2000/svg',name);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));svg.appendChild(e);return e;};
+ const red=new Set((pending?[]:parentCandidate.validation.material?.findings || []).flatMap(f=>f.pickKeys));
+ faces.map(f=>({...f,depth:f.rings.flat().reduce((n,p)=>n+viewCoords(p).depth,0)/f.rings.flat().length})).sort((a,b)=>a.depth-b.depth).forEach(f=>{
+  const d=f.rings.map(r=>r.map(screen).map((p,i)=>`${i?'L':'M'}${p.x},${p.y}`).join(' ')+'Z').join(' ');
+  make('path',{d,'fill-rule':'evenodd',fill:f.unsupported?'none':red.has(f.pickKey)?'#cf5046':f.color,stroke:f.unsupported?'#ca8b31':red.has(f.pickKey)?'#932b26':'#47636a','stroke-width':red.has(f.pickKey)?2:1,'fill-opacity':.8,'data-part-id':f.partId,'data-pick-key':f.pickKey});
+ });
+ const model=parentCandidate.model,face=candidateHostFace(parentCandidate,parentCandidate.placement.selection.hostFace);
+ if(face)positionMateOverlay(face,screen);else $('mateOverlay').hidden=true;
+ for(const slot of bracketPlan?.brackets || []){const wing=model.materialParts.find(p=>p.bracketId?.endsWith('/slot:'+slot.id));if(!wing)continue;const local=wing.geometry.outlines[0],center=applyMatrix4(wing.pose.matrix,{x:local.reduce((n,p)=>n+p.x,0)/local.length,y:local.reduce((n,p)=>n+p.y,0)/local.length,z:wing.geometry.thicknessMm/2}),q=screen(center);
+  const button=make('circle',{cx:q.x,cy:q.y,r:17,fill:'transparent',stroke:selectedBracket===slot.id?'#d99821':'none',role:'button',tabindex:0,'aria-label':`角碼 ${slot.id}，調整位置`});
+  const choose=()=>{selectedBracket=slot.id;openDimension('bracket',bracketOffsets[slot.id] || 0);};button.addEventListener('click',choose);button.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}});
+ }
+}
 function scene(mate) {
+  if(integrated&&step===3){drawCandidateScene(mate);return;}
   const svg = $('scene'); svg.replaceChildren();
   const polygons = [], objects = [], separate = mode === 'wizard' && step <= 2 && !roughPlaced;
   for (const [which, bounds, selected] of [['host', hosts[draft.host].box, draft.hostFace], ['child', children[draft.child].box, draft.childFace]]) {
@@ -278,10 +331,11 @@ function scene(mate) {
   bracketPlan = null;
   if (!bracketNote.hidden) {
     const perpendicular = Math.abs(mate.rotation[2][2]) < 1e-6;
-    bracketPlan = perpendicular ? planFaceBrackets(hosts[draft.host], children[draft.child], mate, bracketOffsets,true,{joint:jointSettings}) : null;
+    bracketPlan = integrated?parentCandidate?.bracket || null:perpendicular?planFaceBrackets(hosts[draft.host],children[draft.child],mate,bracketOffsets,true,{joint:jointSettings}):null;
+    if(integrated&&bracketPlan){const box=hosts[draft.host].surface.box,center=Object.fromEntries(['x','y','z'].map(k=>[k,(box.min[k]+box.max[k])/2]));const move=p=>Object.fromEntries(['x','y','z'].map(k=>[k,p[k]-center[k]]));bracketPlan={...bracketPlan,brackets:bracketPlan.brackets.map(b=>({...b,corner:move(b.corner),wings:b.wings.map(r=>r.map(move)),hostHole:move(b.hostHole),childHoleWorld:move(b.childHoleWorld)}))};}
     bracketSpan = bracketPlan?.span || 0;
     bracketNote.style.color = bracketPlan && !bracketPlan.ok ? '#b34436' : '#206f63';
-    bracketNote.textContent = !perpendicular ? '非直角接合，未配置角碼孔。' : !bracketPlan.ok ? `可接上；角碼孔待調整（${bracketPlan.reason}）` : `角碼 ${bracketPlan.brackets.length} 顆 · 確認後生成兩板固定孔 Ø3.2`;
+    bracketNote.textContent = !perpendicular ? '非直角接合，未配置角碼孔。' : !bracketPlan?.ok ? `角碼孔待調整（${bracketPlan?.reason || '正在驗證候選'}）` : `角碼 ${bracketPlan.brackets.length} 顆 · 確認後生成兩板固定孔 Ø3.2`;
     for (const slot of bracketPlan?.brackets || []) {
       const active = selectedBracket === slot.id;
       const color = slot.reason ? '#c84436' : active ? '#d99821' : '#607d83';
@@ -391,7 +445,8 @@ function preview() {
   $('mateGapChip').textContent = dimensionText.gap(Number(draft.gap.toFixed(2)));
   $('mateStepChip').textContent = dimensionText.moveStep(moveStep);
   $('summary').textContent = `${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
-  const mate = solve(); $('next').disabled = !mate.ok || (integrated && !loadSession.ready) || !!document.querySelector('input[aria-invalid="true"]');
+  const mate = solve();if(mate.ok)requestCandidate(mate);$('next').disabled = !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || !!document.querySelector('input[aria-invalid="true"]');
+  if(integrated&&step===3)$('next').textContent=candidateConfirmLabel(parentCandidate,parentCandidate?.selectionRevision!==previewSignature);
   if (mate.ok) scene(mate);
   else { $('mateOverlay').hidden = true; $('message').textContent = mate.reason; $('message').classList.add('error'); }
 }
@@ -399,9 +454,13 @@ if (integrated) {
   document.querySelector('header .tag').textContent = '選接合面，設定尺寸，再確認組立';
   window.addEventListener('message', e => {
     if (e.source !== parent || e.origin !== location.origin) return;
+    if(e.data?.type==='face-wizard-preview-result'){
+      if(e.data.requestId!==previewRequest || e.data.loadGraph!==LOAD_GRAPH_TOKEN)return;
+      parentCandidate=e.data.candidate;preview();showCandidate(parentCandidate);return;
+    }
     if (e.data?.type === 'face-wizard-error') {
       if (e.data.loadMismatch) { loadSession.receiveReady(null); $('next').disabled = true; }
-      $('message').textContent = e.data.reason; return;
+      $('message').textContent=e.data.reason;parentCandidate=null;previewSignature='';$('next').disabled=true;return;
     }
     if (e.data?.type !== 'face-wizard-init') return;
     if (!loadSession.receiveReady(e.data.loadGraph)) { $('message').textContent = LOAD_MISMATCH_MESSAGE; $('next').disabled = true; return; }

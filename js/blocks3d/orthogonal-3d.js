@@ -144,7 +144,8 @@ export function attachModulePlates(model, comps, plates, plane = null) {
   if (!model) return model;
   model.modulePlates = (Array.isArray(plates) ? plates : []).filter(p => p && (p.plane == null ? null : p.plane) === plane).map(p => {
     const low = moduleLowestZ(model, comps, p.moduleId);
-    return low === null ? null : { ...p, z: low - p.thicknessMm };
+    const floor=low === null&&model.fixedFrameModuleIds?.has(p.moduleId)?0:low;
+    return floor === null ? null : { ...p, z: floor - p.thicknessMm };
   }).filter(Boolean);
   return model;
 }

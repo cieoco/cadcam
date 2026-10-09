@@ -1229,13 +1229,14 @@ export function createBench(deps) {
   // 預設精靈與進階面板共用同一條六面選面流程，確認前不改作品。
   function openDefaultFaceWizard(mod, reselect = false, startAtPlacement = false) {
     if (st.preview) cancelPreview({ silent: true });
-    const signature = JSON.stringify([S.comps, S.modules, S.topo.params]);
+    deps.pause?.();
     const modules = reselect ? S.modules.map(m => m.id === mod.id ? { ...m, mount: null } : m) : S.modules;
     openFaceWizard({ comps: S.comps, modules, params: S.topo.params, childId: mod.id, wizard: true,
       initialMount: reselect ? mod.mount : null, startAtPlacement, joint: S.fabrication?.joint,
       exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,
-      isCurrent: () => signature === JSON.stringify([S.comps, S.modules, S.topo.params]), say,
-      commit: result => { pushUndo(); S.comps = result.comps; S.modules = result.modules; rebuild(); draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? '已接上，角碼固定孔已生成。' : '已定位，尚未固定。請按「配置角碼」檢查並確認孔位。'); syncUI(true); }
+      fabrication:S.fabrication,readSource:()=>({comps:S.comps,modules:S.modules,topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint}),
+      readPose:()=>deps.connectionPose?.() || ({theta:S.theta,motorAngles:motorAnglesNow()}),say,
+      commit: (result,validation,candidate) => { const mutable=structuredClone(result);pushUndo(); S.comps=mutable.comps;S.modules=mutable.modules;S.topo=mutable.topo;rebuild({save:false});deps.adoptConnectionPose?.(candidate.points);draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? (validation?.status==='fail'?'已接上（有干涉），角碼固定孔已生成；請調整作品。':'已接上，角碼固定孔已生成；部分五金仍未檢查。') : '已定位，尚未固定。請按「配置角碼」檢查並確認孔位。'); syncUI(true); }
     });
   }
   wiz = createMateWizard({
@@ -1258,6 +1259,7 @@ export function createBench(deps) {
   });
   syncModeButtons();
   return {
+    workReplaced(){st.msg='';st.preview=null;st.faceStep=null;st.snapId=null;panelSig='';listSig='';resetLive();clearTimeline();const msg=document.getElementById('benchMsg');if(msg)msg.textContent='';},
     mateWizardDebug: () => wiz.debug(),
     autosaveSnapshot: () => st.preview ? JSON.parse(st.preview.preSnap) : null,
     setMode, select, pickPort, commit, cancel: () => cancelPreview(), adjust, syncUI, afterScene, debug,

@@ -29,6 +29,7 @@ const args = { comps, modules, params: { HL: 80, CL: 40 }, childId: 'Child', exp
   isCurrent: () => true, commit: draft => { committed = draft; }, say: text => notices.push(text) };
 const before = JSON.stringify(args);
 const send = data => receiver({ origin: location.origin, source: iframe.contentWindow, data });
+const confirmSelection=async selection=>{await send({type:'face-wizard-preview',loadGraph:LOAD_GRAPH_TOKEN,requestId:1,selection});const candidate=messages.at(-1).candidate;assert.ok(candidate?.saveable,JSON.stringify(candidate));await send({type:'face-wizard-confirm',loadGraph:LOAD_GRAPH_TOKEN,candidateId:candidate.candidateId,selectionRevision:candidate.selectionRevision});};
 openFaceWizard(args);
 send({ type: 'face-wizard-ready', loadGraph: LOAD_GRAPH_TOKEN });
 let init = messages.at(-1);
@@ -37,7 +38,7 @@ assert.equal(init.hosts[init.host].surface.compId, 'H', '原宿主不因預選 f
 assert.equal(init.hosts[init.host].defaultFace, 'top');
 assert.equal(init.children[0].surface.compId, 'C'); assert.equal(init.selection.childFace, 'bottom');
 assert.equal(init.configured, true); assert.equal(init.startAtPlacement, true);
-send({ type: 'face-wizard-confirm', loadGraph: LOAD_GRAPH_TOKEN, selection: { ...init.selection, host: init.host, child: 0 } });
+await confirmSelection({ ...init.selection, host: init.host, child: 0 });
 assert.equal(committed.modules[1].mount.face.childPart, 'C');
 assert.equal(committed.modules[1].mount.face.selection.brackets, undefined);
 assert.equal(committed.modules[1].mount.face.translation.x, 45);
@@ -50,7 +51,7 @@ send({ type: 'face-wizard-ready', loadGraph: LOAD_GRAPH_TOKEN }); init = message
 assert.equal(init.startAtPlacement, false); assert.equal(init.configured, false);
 assert.ok(init.children.some(c => c.surface.kind === 'frame'));
 const selected = init.children.findIndex(c => c.surface.compId === 'C'); assert.ok(selected >= 0);
-send({ type: 'face-wizard-confirm', loadGraph: LOAD_GRAPH_TOKEN, selection: { ...init.selection, host: init.host, child: selected } });
+await confirmSelection({ ...init.selection, host: init.host, child: selected });
 assert.equal(committed.modules[1].mount.face.childPart, 'C', '舊紀錄必須經可見選擇後明確保存');
 assert.equal(legacy.face.childPart, undefined);
 
@@ -63,7 +64,7 @@ send({ type: 'face-wizard-ready', loadGraph: LOAD_GRAPH_TOKEN }); init = message
 assert.equal(init.startAtPlacement, false); assert.equal(init.configured, false);
 assert.ok(notices.at(-1).includes('不存在'));
 assert.equal(committed, undefined);
-send({ type: 'face-wizard-confirm', loadGraph: LOAD_GRAPH_TOKEN, selection: { ...init.selection, host: init.host, child: init.children.findIndex(c => c.surface.compId === 'C') } });
+await confirmSelection({ ...init.selection, host: init.host, child: init.children.findIndex(c => c.surface.compId === 'C') });
 assert.equal(committed.modules[1].mount.face.childPart, 'C'); assert.equal(bad.face.childPart, 'deleted');
 committed = undefined;
 const badHost = structuredClone(initialMount); badHost.to.output = 'deleted';
@@ -72,7 +73,7 @@ send({ type: 'face-wizard-ready', loadGraph: LOAD_GRAPH_TOKEN }); init = message
 assert.equal(init.host, -1); assert.equal(init.configured, false); assert.equal(init.startAtPlacement, false);
 assert.equal(init.children[0].surface.compId, 'C'); assert.equal(init.hosts[0].surface.compId, 'H');
 assert.equal(committed, undefined);
-send({ type: 'face-wizard-confirm', loadGraph: LOAD_GRAPH_TOKEN, selection: { ...init.selection, host: 0, child: 0 } });
+await confirmSelection({ ...init.selection, host: 0, child: 0 });
 assert.equal(committed.modules[1].mount.to.output, 'out'); assert.equal(badHost.to.output, 'deleted');
 assert.equal(JSON.stringify(args), before);
 console.log('connection-reselect: saved host/child, explicit no-fastener confirm, legacy choice, cancellation and missing endpoint passed');
