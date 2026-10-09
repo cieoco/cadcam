@@ -309,3 +309,6 @@ G1內部F1門檻已貫通，可接續W3b→W4b→W5b；這不是發布或全格�
 - performance-phone 只複製公開程式、樣式、量測 fixtures 與基準程式到專用目錄，未暴露 workspace／原始 archive。HTTP 實查 bundle 與 fixture 200；docs、.git/config、私人附件路徑均 404；未變更防火牆。
 - 已請使用者用同網路 OPPO 開量測頁並提供型號；桌面量測正在驗證入口，不能當作 OPPO 通過。正式版本仍 2026.10.08.13，未發布。
 - 最終能力盤點：planar 定位仍使用既有 base/output 解算器，材料／雙孔已共用；descriptor 的 legacy bridge 表示未提供共用接件實體驗證，不等同整個 planar 教材失效。非金屬轉接件、同平面固定螺絲、馬達／銷與全行程材料驗證不宣稱已建模；齒條角碼開孔仍不可用。金屬沿邊與六面角碼已共用實體，沒有第二份角碼核心。
+- 本包提交 **546e924** 並推送施工分支；[Linux CI 37902017378](https://github.com/cieoco/cadcam/actions/runs/37902017378) test success，build／deploy skipped，確認非 main 不部署。正式 main 仍 1537242。
+- 桌面同條件入口完成 F1／F3 各三次：CPU p95 4.7–5.7ms、rAF p95 16.8ms，每次約3600樣本，>100ms間隔0次。F1播放中geometryBuilds維持55、F3維持114，沒有重建。實際下載保存在 `w6-phone/desktop-current.json`；不是 OPPO 實測或手機速度承諾。瀏覽器曾記一筆無來源 URL 的 MutationObserver.observe 例外，repo 沒有該 API；未將它擅自判為產品錯誤或宣称零 console error，量測六輪皆 complete。
+- 實機步驟與重建命令見 `PERFORMANCE-ACCEPTANCE-2026-10-09.md`。下一個必要輸入為 OPPO 量測資料；取得後對照門檻，再做版本紀錄、最終同 commit CI、main／Pages 發布核對。不得為省事用桌面通過替代實機或靜默放寬 SDD。
