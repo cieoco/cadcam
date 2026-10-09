@@ -49,6 +49,8 @@ for(const source of [{comps,modules},{comps,modules:along},{comps,modules:standi
 // Two confirmed children on one named tool, independent of current presets/order.
 const child2={...copy(along[1]),id:'Child2',base:'D0',mount:{...copy(along[1].mount),orient:{...orient,offsetMm:-45}}};
 const siblingParts=[...copy(comps),{id:'OtherChild',type:'bar',moduleId:'Child2',p1:point('D0',0),p2:point('D1',40)}],siblings=[...copy(along),child2];
+for(const m of siblings)if(m.mount?.orient)m.mount.orient.tiltDeg=0;
+const supported=read(siblings,siblingParts);assert.equal(supported.capabilities.geometry,true);assert.equal(supported.capabilities.drilling,true);assert.equal(supported.capabilities.refresh,false,'shared metal geometry capability is not face refresh or a validation pass');
 siblings[0].mates={attach:{normalDeg:180},receive:[{id:'left',name:'左位',ref:{kind:'bar',id:'HostBar',side:-1}},{id:'right',name:'右位',ref:{kind:'bar',id:'HostBar',side:1}}]};
 const both=readConnectionDescriptors({comps:siblingParts,modules:siblings}),mutated=copy(siblings);mutated.reverse();for(const m of mutated){m.faceParts={part:'frame',face:'left'};if(m.mates){m.mates.attach.normalDeg=90;m.mates.receive.reverse();}}
 const sorted=readConnectionDescriptors({comps:siblingParts,modules:mutated}).sort((a,b)=>a.id.localeCompare(b.id));assert.deepEqual(sorted,both.sort((a,b)=>a.id.localeCompare(b.id)),'presets and list order do not rebind saved connections');

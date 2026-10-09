@@ -14,7 +14,7 @@ import { faceBracketBoxes, faceBracketScrews } from './face-brackets.js';
  */
 
 import { orthogonalFrame, orthogonalHostEdge, planeOf, compsInPlane, pointIdsInPlane } from '../blocks/assembly.js?v=20261007_m5a';
-import { bracketBoxes, bracketScrews } from '../blocks/orthogonal-joint.js';
+import { bracketPhysical } from '../blocks/orthogonal-joint.js';
 
 export const IDENTITY_4 = Object.freeze([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
@@ -202,7 +202,7 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
     trail.add(id);
     let result = null;
     const mod = modules.find(m => m.id === id);
-    const frame = orthogonalFrame(comps, modules, id, inputs.pts, params, { asm });
+    const frame = orthogonalFrame(comps, modules, id, inputs.pts, params, { asm,stockMm,joint });
     if (mod && frame) {
       const hostPlane = planeOf(comps, modules, mod.mount.to.module);
       const host = hostPlane === null ? done.get(null) : solve(hostPlane, trail);
@@ -249,9 +249,11 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
         // F1／G1：這個模組的金屬角碼方塊（主場景座標）；列印版接合沒有。短腳貼在「畫出來的」底板朝宿主的那一面（w＝板底面）。
         const own = model.modulePlates.find(p => p.moduleId === id);
         const seatPlan = own ? { parts: [{ name: `${id}-frame`, zMm: own.z + wOffset }] } : plan;
-        const brackets = bracketBoxes(comps, modules, id, inputs.pts, params, { stockMm, joint, asm, plan: seatPlan }).map(b => placeBox(host.matrix, zOffset, b, id));
+        const adapter=connectionGeometry?.adapters?.find(a=>a.moduleId===id&&a.physical);
+        const physical=bracketPhysical(comps,modules,id,inputs.pts,params,{stockMm,joint,asm,plan:seatPlan,...(adapter?{adapter}:{})});
+        const brackets = physical.flatMap(b=>b.wings.map(w=>placeBox(host.matrix,zOffset,w.box,id)));
         // G2：鎖角碼的 M3 螺絲（頭在木板外側面、尖端穿出角碼），同一套座標與位姿。
-        const screws = bracketScrews(comps, modules, id, inputs.pts, params, { stockMm, joint, asm, plan: seatPlan }).map(sc => placeScrew(host.matrix, zOffset, sc, id));
+        const screws = physical.flatMap(b=>b.wings.map(w=>placeScrew(host.matrix,zOffset,w.screw,id)));
         result = { model, matrix: multiply4(host.matrix, orthogonalMatrix(frame, zOffset, wOffset)), brackets, screws };
       }
     }

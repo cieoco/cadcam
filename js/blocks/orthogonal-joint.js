@@ -7,11 +7,13 @@ import { appendFaceBracketHoles } from './face-bracket-extras.js';
  * 這裡只算兩邊木板要鑽的孔位（3.2 mm），STL 另由 adapter-stl.js 產生。
  */
 import { memberStock } from './member-stock.js';
-import { pointCoords } from './model.js';
+import { pointCoords, frameConnectorNodes } from './model.js';
+import { frameStockOf } from './frame-stock.js';
 import { orthogonalHostEdge, orthogonalFrame, hostPlateThickness, standChildHoles } from './assembly.js';
 import { worldToLocal } from './plate-geometry.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { metalBracketSpec } from './bracket-spec.js';
+import { buildBracketInstance, transformBracketInstance } from './bracket-physical.js';
 
 const D2R = Math.PI / 180;
 
@@ -50,7 +52,7 @@ export function jointSpec(kind, jointSettings = FABRICATION_DEFAULTS.joint) {
 
 // D2：子模組底板上的轉接座孔（子模組平面座標）；角碼孔位依宿主外側面，printed 保留原有孔位算法。
 // bar＝宿主桿／三角板零件（機架板宿主傳 null）；回傳 [{ x, y }]。
-export function adapterChildHoles({ base, orient, bar = null, hostSide, stockMm = 3, joint: jointSettings }) {
+export function adapterChildHoles({ base, orient, bar = null, hostSide, hostThicknessMm,stockMm = 3, joint: jointSettings }) {
   if (!base || !orient) return [];
   const joint = orient.joint || {};
   const kind = jointKindOf(joint);
@@ -60,12 +62,22 @@ export function adapterChildHoles({ base, orient, bar = null, hostSide, stockMm 
   const n = bracket ? K.count : (Number.isInteger(joint.holesPerFlange) && joint.holesPerFlange > 0 ? joint.holesPerFlange : DEFAULT_HOLES_PER_FLANGE);
   // 子模組端的孔離轉角：列印版＝翼孔距；角碼＝短腳孔距（預設 6，由規格算出）。
   const flangeHole = bracket ? K.childHoleMm : wallMm + (ADAPTER_FLANGE_MM - wallMm) / 2;
-  const hostThickness = bar && finitePos(bar.stock && bar.stock.thicknessMm) ? Number(bar.stock.thicknessMm) : stockMm;
+  const hostThickness = finitePos(hostThicknessMm)?Number(hostThicknessMm):bar && finitePos(bar.stock && bar.stock.thicknessMm) ? Number(bar.stock.thicknessMm) : stockMm;
   const e = { x: Math.cos(orient.childAxisDeg * D2R), y: Math.sin(orient.childAxisDeg * D2R) };
   const f = { x: -e.y, y: e.x };
   // 子模組基準面在宿主板底面（side＝1）或頂面（side＝-1）；只有頂面側要跨過板厚。
   const side = hostSide === undefined ? orient.side : hostSide;
   const hostFace = kind === 'bracket-m3' ? (Number(side) < 0 ? hostThickness : 0) : hostThickness;
+  if(bracket) {
+    // Low-level configuration must not call layout/frame: moduleFrameEdges uses
+    // these own holes while constructing that very frame (standing is separate).
+    const E={...e,z:0},F={...f,z:0},Z={x:0,y:0,z:1};
+    return Array.from({length:n},(_,k)=>buildBracketInstance({connectionId:'configuration',slotId:String(k),
+      corner:{x:base.x+ADAPTER_LENGTH_MM*(k+.5)/n*e.x+hostFace*f.x,y:base.y+ADAPTER_LENGTH_MM*(k+.5)/n*e.y+hostFace*f.y,z:0},seamAxis:E,spec:K,
+      wings:[{role:'host',runAxis:Z,contactNormal:F,lengthMm:K.longLegMm,holeOffsetMm:K.hostHoleMm,plateThicknessMm:hostThickness},
+        {role:'child',runAxis:F,contactNormal:{x:0,y:0,z:-1},lengthMm:K.shortLegMm,holeOffsetMm:K.childHoleMm,plateThicknessMm:stockMm}]
+    }).wings[1].plateHole.local).map(p=>({x:r3(p.x),y:r3(p.y)}));
+  }
   const t = hostFace + flangeHole;
   return Array.from({ length: n }, (_, k) => {
     const s = ADAPTER_LENGTH_MM * (k + 0.5) / n;
@@ -112,7 +124,8 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3, j
   const T = standing ? hostPlateThickness(list, edge, stockMm) : 0;
   const inset = standing ? T + flangeHole : flangeHole;
   let hostHoles;
-  if (edge.kind === 'bar') {
+  if(bracket)hostHoles=[];
+  else if (edge.kind === 'bar') {
     hostHoles = ss.map(k => ({ u: r3(barLength / 2 + offsetMm + k), v: r3(side * (barWidth / 2 - inset)) }));
   } else {
     // 板／機架：邊線已是實際外緣；孔在中點 + (offset + s)·d、往板內 inset mm（−m）。
@@ -128,7 +141,7 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3, j
     });
   }
 
-  return {
+  const layout = {
     moduleId,
     hostKind: edge.kind,
     hostCompId: edge.compId,
@@ -142,10 +155,64 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3, j
     holesPerFlange: n,
     tiltDeg: Number(orient.tiltDeg) || 0,   // D4：兩翼夾角＝90°＋tiltDeg
     hostHoles,
-    childHoles: standing ? standHoles(list, modList, mod, params, edge, ss, childHole, stockMm, jointSettings) : adapterChildHoles({ base, orient, bar, hostSide: edge.side, stockMm, joint: jointSettings }),
+    childHoles: bracket ? [] : standing ? standHoles(list, modList, mod, params, edge, ss, childHole, stockMm, jointSettings) : adapterChildHoles({ base, orient, bar, hostSide: edge.side, stockMm, joint: jointSettings }),
     // F1：角碼外形（寬、厚、兩腳長），給 3D 與說明用；列印版沒有
     bracket: bracket ? { widthMm: K.widthMm, thicknessMm: K.thicknessMm, longLegMm: K.longLegMm, shortLegMm: K.shortLegMm } : undefined
   };
+  if(bracket) {
+    if(Number(orient.tiltDeg))return {...layout,physical:[],diagnostics:[{status:'fail',code:'metal_bracket_tilt_unsupported',moduleId,reason:'金屬角碼只支援直角；傾斜接合請使用列印轉接座。'}]};
+    const frame=orthogonalFrame(list,modList,moduleId,pts,params,{home:true,stockMm,joint:jointSettings});
+    if(!frame)return null;
+    const childT=frameStockOf(frameConnectorNodes(list.filter(c=>c.moduleId===moduleId))).thicknessMm || stockMm;
+    layout.connectionId=`connection:${moduleId}`;layout.spec=K;layout.coordinateFrame=frame;
+    try {
+      const a=bar&&pts[bar.p1.id],b=bar&&pts[bar.p2.id],len=a&&b?Math.hypot(b.x-a.x,b.y-a.y):0;
+      const dx=len?(b.x-a.x)/len:0,dy=len?(b.y-a.y)/len:0;
+      const hostToLocal=len?{rotation:[[dx,dy,0],[-dy,dx,0],[0,0,1]],translation:{x:-a.x*dx-a.y*dy,y:a.x*dy-a.y*dx,z:0}}:null;
+      layout.physical=buildOrientInstances(layout,frame,edge,hostPlateThickness(list,edge,stockMm),childT,hostToLocal);
+      // Both drilling projections consume the shared contact-hole result once.
+      layout.hostHoles=layout.physical.map(b=>{
+        const h=b.wings[0].plateHole,p=h.center;
+        const uv=bar?{u:h.local.x,v:h.local.y}:null;
+        return {...h,axis:{x:0,y:0,z:1},x:r3(p.x),y:r3(p.y),...(uv?{u:r3(uv.u),v:r3(uv.v)}:{})};
+      });
+      layout.childHoles=layout.physical.map(b=>{const h=b.wings[1].plateHole;return {...h,axis:{x:0,y:0,z:1},x:r3(h.local.x),y:r3(h.local.y)};});
+    }catch(error){layout.physical=[];layout.hostHoles=[];layout.childHoles=[];layout.diagnostics=[{status:'fail',code:'orient_fastener_invalid',moduleId,reason:error.message}];}
+  }
+  return layout;
+}
+
+const dot3=(a,b)=>a.x*b.x+a.y*b.y+a.z*b.z;
+const minus3=(a,b)=>({x:a.x-b.x,y:a.y-b.y,z:a.z-b.z});
+const neg3=v=>({x:-v.x,y:-v.y,z:-v.z});
+/** Configuration only: seam slots/contact frames delegate all solids to core. */
+function buildOrientInstances(layout,frame,edge,hostT,childT,hostToLocal) {
+  const {d,m,n,origin,base,e,f}=frame,K=layout.spec;
+  const tFace=layout.stand?0:(n.z>0?hostT:0),sgn=edge?.d&&(d.x*edge.d.x+d.y*edge.d.y)<0?-1:1;
+  const toChild={};
+  toChild.rotation=['x','y'].map(k=>({x:e[k]*d.x+f[k]*n.x,y:e[k]*d.y+f[k]*n.y,z:e[k]*d.z+f[k]*n.z}));
+  const rows=toChild.rotation;
+  toChild.rotation=rows.map(r=>[r.x,r.y,r.z]);toChild.rotation.push([m.x,m.y,m.z]);
+  toChild.translation={x:base.x-dot3(rows[0],origin),y:base.y-dot3(rows[1],origin),z:-dot3(m,origin)};
+  return Array.from({length:layout.holesPerFlange},(_,k)=>{
+    const s=sgn*layout.lengthMm*(k+.5)/layout.holesPerFlange;
+    return buildBracketInstance({connectionId:layout.connectionId,slotId:String(k),seamAxis:d,spec:K,
+      corner:{x:origin.x+s*d.x+tFace*n.x,y:origin.y+s*d.y+tFace*n.y,z:origin.z+s*d.z+tFace*n.z},
+      wings:[{role:'host',partId:layout.hostCompId || layout.hostPartName,runAxis:neg3(m),contactNormal:n,lengthMm:K.longLegMm,holeOffsetMm:K.hostHoleMm,plateThicknessMm:hostT,plateToLocal:hostToLocal},
+        {role:'child',partId:layout.childPart,runAxis:n,contactNormal:neg3(m),lengthMm:K.shortLegMm,holeOffsetMm:K.childHoleMm,plateThicknessMm:childT,plateToLocal:toChild}]});
+  });
+}
+
+/** Saved home solids -> current host plane; no rebuilt geometry or hole math. */
+export function poseAdapterPhysical(layout,frame,w0=0) {
+  if(!layout?.physical?.length||!frame)return [];
+  const home=layout.coordinateFrame;
+  const vector=v=>{
+    const s=dot3(v,home.d),w=dot3(v,home.m),t=dot3(v,home.n);
+    return {x:s*frame.d.x+w*frame.m.x+t*frame.n.x,y:s*frame.d.y+w*frame.m.y+t*frame.n.y,z:s*frame.d.z+w*frame.m.z+t*frame.n.z};
+  };
+  const point=p=>{const v=vector(minus3(p,home.origin));return {x:frame.origin.x+v.x+w0*frame.m.x,y:frame.origin.y+v.y+w0*frame.m.y,z:frame.origin.z+v.z+w0*frame.m.z};};
+  return layout.physical.map(b=>transformBracketInstance(b,point,vector));
 }
 
 // D3：立在板面時子模組底板上的孔：離站立邊 flangeHole mm、沿邊位置與宿主孔對齊（frame.d 與宿主邊 d 可能反向）。
@@ -158,20 +225,25 @@ function standHoles(list, modList, mod, params, edge, ss, childHole, stockMm, jo
 // 全部直角模組的匯出附加資料：桿件孔（linkHoles）、三角板孔（plateHoles，世界座標＋板局部 u/v）、
 // 世界機架板孔（worldFrameNodes，不參與外框）、子模組底板的額外節點（frameNodes）、轉接座排版清單。
 export function orthogonalExportExtras(comps, modules, params, opts = {}) {
-  const linkHoles = {}, plateHoles = {}, frameNodes = {}, worldFrameNodes = [], adapters = [];
+  const linkHoles = {}, plateHoles = {}, frameNodes = {}, worldFrameNodes = [], adapters = [], extrasDiagnostics = [];
   (Array.isArray(modules) ? modules : []).forEach(m => {
     const a = m && m.mount && m.mount.orient ? adapterLayout(comps, modules, m.id, params, opts) : null;
-    if (!a) return;
+    if (!a) {
+      if(m?.mount?.orient&&jointKindOf(m.mount.orient.joint)==='bracket-m3')extrasDiagnostics.push({status:'fail',code:'orient_fastener_unavailable',moduleId:m.id,reason:'無法解析接合邊或固定板，角碼孔暫停輸出。'});
+      return;
+    }
     adapters.push(a);
+    if(a.diagnostics)(extrasDiagnostics.push(...a.diagnostics));
+    if(a.kind==='printed')extrasDiagnostics.push({status:'not_supported',code:'printed_adapter_material_bridge',kind:'printed-adapter',moduleId:m.id,sourceIds:[`connection:${m.id}`],reason:'列印轉接座的材料形狀尚未接入檢查。'});
     if (a.hostKind === 'bar') {
       (linkHoles[a.hostCompId] || (linkHoles[a.hostCompId] = []))
-        .push(...a.hostHoles.map(h => ({ u: h.u, v: h.v, diameterMm: a.holeDiameterMm })));
+        .push(...a.hostHoles.map(h => ({ ...h, u: h.u, v: h.v, diameterMm: a.holeDiameterMm })));
     } else if (a.hostKind === 'triangle') {
       (plateHoles[a.hostCompId] || (plateHoles[a.hostCompId] = []))
-        .push(...a.hostHoles.map(h => ({ x: h.x, y: h.y, u: h.u, v: h.v, diameterMm: a.holeDiameterMm })));
+        .push(...a.hostHoles.map(h => ({ ...h, x: h.x, y: h.y, u: h.u, v: h.v, diameterMm: a.holeDiameterMm })));
     } else {
       const hostNodes = a.hostHoles.map((h, k) => ({
-        id: `ADP_${m.id}_h${k}`, x: h.x, y: h.y, holeDiameterMm: a.holeDiameterMm, holeLayer: ADAPTER_LAYER, outlineExempt: true
+        ...h, id: h.id || `ADP_${m.id}_h${k}`, x: h.x, y: h.y, holeDiameterMm: a.holeDiameterMm, holeLayer: ADAPTER_LAYER, outlineExempt: true
       }));
       // D2：宿主是已安裝模組的底板 → 孔進該模組的底板節點（匯出座標），否則進世界機架。
       if (a.hostModuleId) (frameNodes[a.hostModuleId] || (frameNodes[a.hostModuleId] = [])).push(...hostNodes);
@@ -179,11 +251,11 @@ export function orthogonalExportExtras(comps, modules, params, opts = {}) {
     }
     (frameNodes[m.id] || (frameNodes[m.id] = []))
       .push(...a.childHoles.map((h, k) => ({
-        id: `ADP_${m.id}_${k}`, x: h.x, y: h.y, holeDiameterMm: a.holeDiameterMm, holeLayer: ADAPTER_LAYER,
+        ...h, id: h.id || `ADP_${m.id}_${k}`, x: h.x, y: h.y, holeDiameterMm: a.holeDiameterMm, holeLayer: ADAPTER_LAYER,
         ...(a.stand ? { outlineExempt: true } : {})   // D3：站立邊就是外框的邊，孔不撐大外框
       })));
   });
-  return appendFaceBracketHoles({ linkHoles, plateHoles, frameNodes, worldFrameNodes, adapters }, comps, modules, params, opts);
+  return appendFaceBracketHoles({ linkHoles, plateHoles, frameNodes, worldFrameNodes, adapters, diagnostics:extrasDiagnostics }, comps, modules, params, opts);
 }
 
 // 把轉接座孔節點併進模組底板節點（不改輸入）；extras 缺省或沒有該模組時原樣回傳。
@@ -202,90 +274,30 @@ export function withWorldAdapterNodes(nodes, extras) {
 // 每處兩片（count＝2，沿接合線 d 各在 s＝5、15 mm），每片兩翼各一塊薄板：
 //   長腳貼宿主板面（沿 −m 從轉角往宿主板內伸 longLegMm），短腳貼子模組底板朝宿主那一面（沿 n 離開宿主面 shortLegMm）。
 // 座標：宿主平面 mm，與 orthogonalFrame 同一套（origin＋s·d＋w·m＋t·n）；板厚方向的 z 以宿主板底面為 0，
-// 3D 端再加上宿主本體的 z。每塊 { center, axes:[d, m, n]（單位向量）, size:{ x:沿 d, y:沿 m, z:沿 n } }。
+// 3D 端再加上宿主本體的 z。共用盒體 axes:[接合線, 翼伸展方向, 接觸面外法線]，size:{ x:寬, y:腳長, z:厚 }。
 // 宿主面：站立（D3）時板面就是 t＝0；一般安裝時 n 朝上（+z）則板面在板厚 T 處、朝下則在 0（子模組長向宿主的那一側）。
 // G1：plan（buildPlan 的結果）給了就取子模組底板（<id>-frame）在子疊層的 zMm，短腳改貼在板的「朝宿主那一面」（w＝zMm），
 // 兩腳在這個內轉角相接、整片角碼沿 m 跟著挪；沒給 plan 時底板在第 0 層（zMm＝0）。
 export function bracketBoxes(comps, modules, moduleId, points, params, opts = {}) {
-  return bracketLegs(comps, modules, moduleId, points, params, opts).map(l => l.box);
+  return bracketPhysical(comps,modules,moduleId,points,params,opts).flatMap(b=>b.wings.map(w=>w.box));
 }
 
-// G2：市售 M3 螺絲標準長度（mm），與 build-plan 的 SCREW_LENGTHS_MM 相同（那邊不匯出，這裡避免循環匯入而複製一份）。
-const SCREW_LENGTHS_MM = [6, 8, 10, 12, 16, 20, 25, 30, 35, 40];
 export const BRACKET_SCREW_DIAMETER_MM = 3;
 export const BRACKET_SCREW_HEAD_DIAMETER_MM = 5.5;
 export const BRACKET_SCREW_HEAD_HEIGHT_MM = 2;
 
-// G2：每一翼的完整資料（方塊＋螺牙孔＋木板外側面的位置），bracketBoxes／bracketScrews 共用，確保孔、螺絲、方塊是同一套座標。
-// 孔：在該翼厚度中面上、離翼末端 holeEndMm、橫向（沿 d）置中，孔軸＝翼的厚度方向。
-// 木板在角碼的哪一邊：長腳貼宿主板（宿主在 −n 側，板外側面在 t＝tFace−T）；
-// 短腳貼子模組底板（底板在 +m 側，板外側面在 w＝w0＋底板厚）。screw.dir＝螺絲由外側穿向角碼的方向。
-function bracketLegs(comps, modules, moduleId, points, params, { stockMm = 3, joint: jointSettings, asm = null, plan = null } = {}) {
-  const list = Array.isArray(comps) ? comps : [];
-  const modList = Array.isArray(modules) ? modules : [];
-  const mod = modList.find(m => m && m.id === moduleId);
-  const orient = mod && mod.mount && mod.mount.orient;
-  if (!orient || orient.type !== 'orthogonal') return [];
-  const kind = jointKindOf(orient.joint);
-  if (kind === 'printed') return [];
-  const K = jointSpec(kind, jointSettings);
-  const opts = { stockMm, joint: jointSettings, asm };
-  const frame = orthogonalFrame(list, modList, moduleId, points, params, opts);
-  if (!frame) return [];
-  const edge = orthogonalHostEdge(list, modList, mod.mount, points, params, opts);
-  const standing = orient.edge === 'child';
-  const T = hostPlateThickness(list, edge, stockMm);
-  const tFace = standing ? 0 : (frame.n.z > 0 ? T : 0);
-  const { d, m, n, origin } = frame;
-  const at = (s, w, t) => ({ x: origin.x + s * d.x + w * m.x + t * n.x, y: origin.y + s * d.y + w * m.y + t * n.y, z: origin.z + s * d.z + w * m.z + t * n.z });
-  const axes = [{ ...d }, { ...m }, { ...n }];
-  const neg = v => ({ x: -v.x, y: -v.y, z: -v.z });
-  const count = K.count;
-  // 沿接合線的方向以宿主邊的 d 為準（木板上的孔都沿宿主 d 排）；站立（D3）時 frame.d 可能與宿主 d 反向，這時 s 要反過來數。
-  const sgn = edge && edge.d && (d.x * edge.d.x + d.y * edge.d.y) < 0 ? -1 : 1;
-  // 子模組底板孔由宿主外側面起算；短腳也從同一面開始，確保能與長腳在轉角接合。
-  const tShort = standing ? 0 : tFace;
-  const plate = plan && Array.isArray(plan.parts) ? plan.parts.find(p => p && p.name === `${moduleId}-frame`) : null;
-  const w0 = plate && Number.isFinite(Number(plate.zMm)) ? Number(plate.zMm) : 0;   // 底板朝宿主那一面的疊層高度（沿 m）
-  const childT = plate && Number(plate.thicknessMm) > 0 ? Number(plate.thicknessMm) : stockMm;
-  const th = K.thicknessMm, holeEnd = K.holeEndMm;
-  const out = [];
-  for (let k = 0; k < count; k++) {
-    const s = sgn * ADAPTER_LENGTH_MM * (k + 0.5) / count;
-    // 長腳：貼宿主板面（t 從 tFace 起、厚 thicknessMm），沿 −m 從轉角（w＝w0）伸 longLegMm；孔在離末端（w＝w0−longLegMm）holeEndMm 處。
-    out.push({
-      leg: 'long', woodMm: T,
-      box: {
-        center: at(s, w0 - K.longLegMm / 2, tFace + th / 2), axes, size: { x: K.widthMm, y: K.longLegMm, z: th },
-        hole: { center: at(s, w0 - K.longLegMm + holeEnd, tFace + th / 2), axis: { ...n }, diameterMm: BRACKET_SCREW_DIAMETER_MM }
-      },
-      seat: at(s, w0 - K.longLegMm + holeEnd, tFace - T), dir: { ...n }
-    });
-    // 短腳：平貼子模組底板朝宿主的那一面（w 從 w0−thicknessMm 到 w0；與板中面相距 板厚/2＋角碼厚/2），沿 n 離開宿主面 shortLegMm。
-    out.push({
-      leg: 'short', woodMm: childT,
-      box: {
-        center: at(s, w0 - th / 2, tShort + K.shortLegMm / 2), axes, size: { x: K.widthMm, y: th, z: K.shortLegMm },
-        hole: { center: at(s, w0 - th / 2, tShort + K.shortLegMm - holeEnd), axis: { ...m }, diameterMm: BRACKET_SCREW_DIAMETER_MM }
-      },
-      seat: at(s, w0 + childT, tShort + K.shortLegMm - holeEnd), dir: neg(m)
-    });
-  }
-  return out;
+// G2：每一翼的方塊／螺牙孔／板外螺頭由共用實體核心產生；這裡只適配目前宿主平面姿態。
+export function bracketPhysical(comps,modules,moduleId,points,params,opts={}) {
+  const layout=opts.adapter || adapterLayout(comps,modules,moduleId,params,opts);
+  if(!layout?.physical?.length)return [];
+  const frame=orthogonalFrame(comps,modules,moduleId,points,params,opts);
+  const plate=opts.plan?.parts?.find(p=>p.name===`${moduleId}-frame`);
+  return poseAdapterPhysical(layout,frame,Number(plate?.zMm)||0);
 }
 
 // G2：M3 螺絲（每個角碼翼一支，一處兩片＝4 支）。從木板外側面（背對角碼的那一面）穿過木板、鎖進角碼螺牙，尖端略穿出角碼。
-// head＝螺絲頭座在木板外側面上的點；tip＝head ＋ lengthMm 沿孔軸朝角碼。長度＝（較厚的板厚＋角碼厚）向上取市售長度（同 build-plan，3 mm 板＋1.2 → 6）。
+// head＝螺絲頭座在木板外側面上的點；tip＝head ＋ lengthMm 沿孔軸朝角碼。長度＝各翼實際板厚＋角碼厚，交共用核心向上取市售長度（3 mm 板＋1.2 → 6）。
 // 回傳 []：模組不是直角安裝、接合件不是角碼、或找不到座標系。
 export function bracketScrews(comps, modules, moduleId, points, params, opts = {}) {
-  const legs = bracketLegs(comps, modules, moduleId, points, params, opts);
-  if (!legs.length) return [];
-  const th = jointSpec('bracket-m3', opts.joint).thicknessMm;
-  const need = Math.max(...legs.map(l => l.woodMm)) + th;
-  const lengthMm = SCREW_LENGTHS_MM.find(l => l >= need - 1e-9) || Math.ceil(need);
-  return legs.map(l => ({
-    head: { ...l.seat },
-    tip: { x: l.seat.x + l.dir.x * lengthMm, y: l.seat.y + l.dir.y * lengthMm, z: l.seat.z + l.dir.z * lengthMm },
-    lengthMm, diameterMm: BRACKET_SCREW_DIAMETER_MM, headDiameterMm: BRACKET_SCREW_HEAD_DIAMETER_MM, headHeightMm: BRACKET_SCREW_HEAD_HEIGHT_MM
-  }));
+  return bracketPhysical(comps,modules,moduleId,points,params,opts).flatMap(b=>b.wings.map(w=>w.screw));
 }

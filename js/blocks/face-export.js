@@ -8,14 +8,14 @@ import {machineFrameComps,machineMounts,moduleFrameExports,moduleFrameNodes,spli
 import {frameConnectorNodes} from './model.js';
 import {withWorldAdapterNodes,withAdapterNodes} from './orthogonal-joint.js';
 import {splitMountsByHost} from './exporters.js';
-export const usesFaceExport=source=>source.modules.some(m=>m.mount?.face)&&source.comps.every(c=>['anchor','bar','triangle','gear'].includes(c.type));
+export const usesFaceExport=source=>source.comps.every(c=>['anchor','bar','triangle','gear'].includes(c.type))&&(source.modules.some(m=>m.mount?.face)||(source.modules.some(m=>m.mount?.orient?.joint?.kind==='bracket-m3')&&source.modules.every(m=>!m.mount?.orient||m.mount.orient.joint?.kind==='bracket-m3')));
 function exportScene(source,pose){
  const sourceRevision=faceSourceRevision(source),work=structuredClone(source);
  work.topo ||= {params:work.params || {}};work.params=work.topo.params;
  work.stockMm ||= Number(work.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;
  work.exportSettings ||= work.fabrication?.export || {};work.joint ||= work.fabrication?.joint || FABRICATION_DEFAULTS.joint;
  const candidate={ok:true,work,sourceRevision,selectionRevision:null,validation:{checks:[{status:'pass',code:'requested_fasteners_valid'}]}};
- const scene=faceCandidateModel(candidate,pose),invalid=scene.catalog?.extras.diagnostics?.find(d=>d.code==='face_fastener_invalid');
+ const scene=faceCandidateModel(candidate,pose),invalid=scene.catalog?.extras.diagnostics?.find(d=>d.status==='fail');
  if(invalid)throw Error(`角碼孔暫停輸出：${invalid.reason}`);
  if(!scene.solveValidity.valid)throw Error('目前姿態無有效解，材料尚未驗證。');
  return {candidate,scene};

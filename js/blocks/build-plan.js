@@ -460,6 +460,7 @@ export function adapterScrewSpec(joint) {
   if (!joint || joint.kind !== 'adapter') return null;
   // E1：角碼不用螺帽，螺絲穿過板（spanMm 已含角碼 1.2 mm 螺牙厚）後鎖進螺牙；一般板厚 3 mm → M3×6。
   if (isBracketJoint(joint)) {
+    if(joint.physical)return [...new Set(joint.physical.flatMap(b=>b.wings.map(w=>w.screw.spec)))].join('／');
     const need = Number(joint.spanMm);
     return `M3×${SCREW_LENGTHS_MM.find(l => l >= need) || Math.ceil(need)}`;
   }
@@ -652,7 +653,7 @@ ${adapterJoints.map(j => {
           const screws=[...bySpec].map(([spec,n])=>`${n} 顆 ${e(spec)}`).join('、');
           return `<li>${i===0?'宿主':'子模組'} ${e(j.parts[i])}：角碼翼貼板，用 ${screws} 從板材外側穿過 Ø3.2 mm 板孔，鎖入角碼 M3 牙孔，不用螺帽。</li>`;
         }).join('');
-        return `<section class="step"><h3>角碼 ${e(j.id)}：${e(hostName)} ⟂ ${e(childName)}</h3><ol><li>準備 ${K.count} 片 ${e(K.label)}，依實際配置槽位對準 ADAPTER_HOLE 孔。</li>${wingSteps}<li>角碼螺牙厚 ${fmtNum(j.thicknessMm)} mm，鎖到貼平即可；確認兩翼貼板後再開始運動測試。</li></ol></section>`;
+        return `<section class="step"><h3>角碼 ${e(j.id)}：${e(hostName)} ⟂ ${e(childName)}</h3><ol><li>準備 ${K.count} 片 ${e(K.label)}，依實際配置槽位對準 ADAPTER_HOLE 孔。</li>${wingSteps}<li>角碼螺牙厚 ${fmtNum(j.thicknessMm)} mm，不要鎖太緊，鎖到貼平即可；確認兩翼貼板後再開始運動測試。</li></ol></section>`;
       }
       return `<section class="step"><h3>角碼 ${e(j.id)}：${e(hostName)} ⟂ ${e(childName)}</h3><ol>
 ${j.stand ? `<li>子模組底板 ${e(childName)} 立在 ${e(hostName)} 的板面上（${j.stand.face === -1 ? '下面' : '上面'}），正面貼齊邊緣，板子與板面成 90°。</li>\n` : ''}<li>準備 ${K.count} 片 ${e(K.label)}，並排放在接合線上（兩片中心相距 10 mm，對準木板上的 ADAPTER_HOLE 孔）。</li>

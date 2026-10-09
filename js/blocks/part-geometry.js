@@ -32,7 +32,7 @@ export function buildPartGeometryCatalog(args={}) {
   const joint=fabrication.joint || FABRICATION_DEFAULTS.joint;
   const mounts=input.mounts || deriveMotorMounts(comps),split=Exporters.splitMountsByHost(comps,mounts);
   const extras=orthogonalExportExtras(comps,modules,params,{stockMm,joint,exportSettings:settings});
-  const parts={},diagnostics=[],memberStocks={},fusedParts={};
+  const parts={},diagnostics=[...(extras.diagnostics || [])],memberStocks={},fusedParts={};
   const motors=Object.fromEntries(comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(p=>p?.physicalMotor).map(p=>[p.physicalMotor,0])));
   const solved=solveAssembly(compileAssembly(comps,modules,{params}),{thetaDeg:0,motorAngles:motors});
   const homePoints={...pointCoords(comps),...(solved.isValid?solved.points:{})};

@@ -16,6 +16,7 @@ import { frameConnectorNodes, pointCoords } from './model.js';
 import { adapterChildHoles } from './orthogonal-joint.js';   // D2：子模組底板上的轉接座孔（只在呼叫時用，與本檔互相引用無妨）
 import { assemblyRoles, machineComps } from './assembly-roles.js';   // M5a：底座／機器／未安裝（純函式，不回頭引用本檔）
 import {readConnectionHost} from './connection-descriptor.js';
+import {frameStockOf} from './frame-stock.js';
 
 const D2R = Math.PI / 180;
 const IDENTITY_POSE = { x: 0, y: 0, a: 0 };
@@ -152,7 +153,7 @@ const sideOfM = (d, m) => (m.x * -d.y + m.y * d.x) >= 0 ? 1 : -1;
 // M5a：多個未安裝的機構時，機架板只算「那個宿主自己的」——opts.hostId 缺省＝底座（整台機器的機架）。
 export function worldFrameEdges(comps, modules, opts = {}) {
   const nodes = frameConnectorNodes(hostFrameComps(comps, modules, opts && opts.hostId));
-  return frameOutlineEdges(nodes, (opts && opts.exportSettings) || {});
+  return frameOutlineEdges(nodes, (opts && opts.exportSettings) || {}).map(e=>({...e,stockThicknessMm:frameStockOf(nodes).thicknessMm}));
 }
 
 // 直角安裝的宿主邊（mount.to 決定）：
@@ -186,7 +187,7 @@ export function orthogonalHostEdge(comps, modules, mount, points, params, opts =
     if (!e) return null;
     return {
       kind: 'frame', a: e.a, b: e.b, d: e.d, m: e.m, side: sideOfM(e.d, e.m), lengthMm: e.lengthMm,
-      partName: 'frame', compId: null, moves: false, pose: { x: e.a.x, y: e.a.y, a: angleOf(e.d) }
+      partName: 'frame', compId: null, moves: false, stockThicknessMm:e.stockThicknessMm,pose: { x: e.a.x, y: e.a.y, a: angleOf(e.d) }
     };
   }
   const comp = to.body ? list.find(c => c && c.id === to.body) : orthogonalHostBody(list, modList, mount);
@@ -275,7 +276,7 @@ export function moduleFrameEdges(comps, modules, moduleId, params, opts = {}) {
     const pts = pointCoords(list);
     const to = mod.mount.to;
     const bar = to && to.body ? list.find(c => c && c.id === to.body) : null;
-    const holes = adapterChildHoles({ base: pts[mod.base], orient: mod.mount.orient, bar, hostSide: hostEdge ? hostEdge.side : undefined, stockMm: opts.stockMm || 3, joint: opts.joint });
+    const holes = adapterChildHoles({ base: pts[mod.base], orient: mod.mount.orient, bar, hostSide: hostEdge ? hostEdge.side : undefined, hostThicknessMm:hostPlateThickness(list,hostEdge,opts.stockMm),stockMm: opts.stockMm || 3, joint: opts.joint });
     nodes = [...nodes, ...holes.map((h, i) => ({ id: `ADP_${moduleId}_${i}`, x: h.x, y: h.y }))];
   }
   const edges = frameOutlineEdges(nodes, opts.exportSettings || {});
@@ -303,7 +304,7 @@ function mountedFrameEdge(list, modList, mod, k, points, params, opts) {
   const d = rot(e.d), m = rot(e.m);
   return {
     kind: 'frame', a, b, d, m, side: sideOfM(d, m), lengthMm: e.lengthMm,
-    partName: `${mod.id}-frame`, compId: null, moves: true, frameModule: mod.id,
+    partName: `${mod.id}-frame`, compId: null, moves: true, frameModule: mod.id,stockThicknessMm:frameStockOf(frameConnectorNodes(list.filter(c=>c.moduleId===mod.id))).thicknessMm,
     pose: { x: a.x, y: a.y, a: Math.atan2(d.y, d.x) / D2R }
   };
 }
@@ -525,7 +526,7 @@ function tiltFrame(frame, tiltDeg) {
 // D3：宿主板厚（mm）：宿主零件 stock.thicknessMm，沒有就用 stockMm（預設 3；機架板沒有零件）。
 export function hostPlateThickness(comps, edge, stockMm = 3) {
   const comp = edge && edge.compId ? (Array.isArray(comps) ? comps : []).find(c => c && c.id === edge.compId) : null;
-  const t = comp && comp.stock ? Number(comp.stock.thicknessMm) : NaN;
+  const t = edge?.kind==='frame'?Number(edge.stockThicknessMm):comp && comp.stock ? Number(comp.stock.thicknessMm) : NaN;
   return Number.isFinite(t) && t > 0 ? t : (Number.isFinite(Number(stockMm)) && Number(stockMm) > 0 ? Number(stockMm) : 3);
 }
 

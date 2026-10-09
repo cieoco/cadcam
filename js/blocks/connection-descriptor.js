@@ -112,9 +112,10 @@ export function readConnectionDescriptor({ comps = [], modules = [], childId, mo
  for(const endpoint of [host,child])if(endpoint.reason)diagnostics.push({...endpoint.reason,moduleId:endpoint.moduleId,partId:endpoint.partId});
  result.capabilities.endpoints=host.available&&child.available;result.ok=valid&&result.capabilities.endpoints;
  const commonFace=result.ok&&saved.face&&host.source.kind==='output';
- result.capabilities.refresh=!!commonFace;result.capabilities.drilling=!!commonFace&&host.partKind!=='rack';result.capabilities.geometry=result.capabilities.drilling;
+ const commonOrient=result.ok&&saved.orient?.joint?.kind==='bracket-m3'&&(saved.orient.tiltDeg===undefined||Number(saved.orient.tiltDeg)===0);
+ result.capabilities.refresh=!!commonFace;result.capabilities.drilling=!!commonOrient||!!commonFace&&host.partKind!=='rack';result.capabilities.geometry=result.capabilities.drilling;
  if(saved.face&&host.source?.kind==='frame')diagnostics.push({...reason('host_frame_not_supported','已保留原安裝姿態；此底板接法尚未支援重新定位與固定孔。'),package:'W4b',capabilities:['refresh','drilling','geometry']});
- else if(!saved.face)diagnostics.push({...reason('legacy_connection_geometry_bridge','接合定位沿用原流程；此接法尚未接入共用接件與固定孔驗證。'),package:'W4b',capabilities:['refresh','drilling','geometry']});
+ else if(!saved.face&&!commonOrient)diagnostics.push({...reason('legacy_connection_geometry_bridge','接合定位沿用原流程；此接法尚未接入共用接件與固定孔驗證。'),package:'W4b',capabilities:['refresh','drilling','geometry']});
  return result;
 }
 

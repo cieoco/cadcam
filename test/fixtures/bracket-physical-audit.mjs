@@ -6,7 +6,7 @@ const length=v=>Math.hypot(v.x,v.y,v.z);
 const offAxis=(a,b,n)=>{const q=sub(a,b),d=dot(q,n);return length({x:q.x-d*n.x,y:q.y-d*n.y,z:q.z-d*n.z});};
 const interval=(box,n)=>{const c=dot(box.center,n),h=['x','y','z'].reduce((s,k,i)=>s+Math.abs(dot(box.axes[i],n))*box.size[k]/2,0);return [c-h,c+h];};
 
-export function auditBracketPhysical({boxes,screws,plates,holes,hardware,count,spec,tolerance=1e-6}) {
+export function auditBracketPhysical({boxes,screws,plates,holes,hardware,count,spec,tolerance=1e-6,machiningTolerance=tolerance}) {
   const errors=[],check=(ok,label)=>{if(!ok)errors.push(label);};
   check(boxes.length===count*2,'wing count'); check(screws.length===count*2,'screw count');
   check(holes.length===count*2,'paired drilling count');
@@ -24,7 +24,7 @@ export function auditBracketPhysical({boxes,screws,plates,holes,hardware,count,s
     }),'thread circle within wing material');
     const h=holes.find(h=>h.holePairId===box.holePairId);
     check(!!h,'missing paired hole');
-    if(h){check(h.diameterMm===3.2,'stock clearance diameter');check(Math.abs(Math.abs(dot(h.axis,n))-1)<tolerance,'stock hole axis');check(offAxis(box.hole.center,h.center,n)<tolerance,'paired coaxial holes');}
+    if(h){check(h.diameterMm===3.2,'stock clearance diameter');check(Math.abs(Math.abs(dot(h.axis,n))-1)<tolerance,'stock hole axis');check(offAxis(box.hole.center,h.center,n)<machiningTolerance,'paired coaxial holes');}
     const screw=screws.find(s=>s.holePairId===box.holePairId);
     check(!!screw,'missing screw');
     if(screw){

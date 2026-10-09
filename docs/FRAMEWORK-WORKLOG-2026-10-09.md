@@ -5,7 +5,7 @@
 ## 接手資訊
 
 - 分支：`codex/framework-stabilization`；起點：`1537242`（應用 `2026.10.08.13`）。
-- 唯一寫入者：`w4a_physical`（Sol high）；W3b共同唯讀契約已驗收，root只讀review／HTTP並批准scoped commit，回交後STOP，無再委派。
+- 唯一寫入者：`w4a_physical`（Sol high）；W4b-1沿邊金屬角碼共用實體已驗收，root只讀review／HTTP並批准scoped commit；提交後STOP，無再委派。
 - 本機：Windows、Node `v25.2.0`、Python `3.13.5`。CI 的 Node 版本在 W1 固定並驗證。
 - 使用者原有未追蹤附件、`Claude outputs/`、截圖及框架檢討文件保留。提交只選本包檔案。
 - Astra 僅 low；更高推理強度須另獲確認。主聊天不宣稱自行切換模型。
@@ -21,7 +21,8 @@
 | W3a | done | F1 六面純讀取／保存／重選／真 bar 層高；同圖 check、Node22 全套 146/146、主代理 HTTP 通過 |
 | W4a–W5a／G1 | done (F1) | W4a共用角碼／材料／單姿態SAT／快取，W5a純候選交易／實際SVG-DXF-製作包trace已貫通；G1內部門檻通過，F1真撞如實保留。其他格式留b階段，完整F3及OPPO實機仍限制W6 |
 | W3b | done | planar／orient／face共同唯讀契約，宿主frame／body／output身分分離；Node22 156/156＋F1 HTTP通過，共用實體接入留W4b |
-| W4b–W5b | planned | 其餘格式實體、多接合位置、教材與效能 |
+| W4b | LOOP 1 done | 沿邊金屬角碼配置→共同physical，Node22 157/157＋HTTP；host-frame新六面及完整F3幾何待下一LOOP |
+| W5b | planned | 其餘格式交易、多接合位置、教材與效能 |
 | W6 | planned | 全面驗收、提交推送與發布核對 |
 
 ## LOOP 紀錄
@@ -225,3 +226,16 @@ G1內部F1門檻已貫通，可接續W3b→W4b→W5b；這不是發布或全格�
 - target-final Node22.14.0 7/7：三來源完整frozen輸入零mutation與v1 JSON往返；合法命名加工孔／points輸出及錯body at、missing／duplicate／kind／edge／floating-base負例；Base←四桿lift←齒輪夾爪讀planar＋orient；同工具架兩筆端點在mates.receive排序／attach normal／faceParts預選／模組排序與尺寸修改後不重綁。實際unmount一筆後另一descriptor及既有orthogonalExportExtras仍用孔完全相同，mates多筆往返保留。F3本包只驗讀取及既有孔隔離，完整新共用geometry gate留W4b，未宣稱已完成。
 - source freeze `8c73f04ee6812d2a21e9`，138 modules／16 pages generate與check通過；完整manifest一次Node22.14.0 156/156，無fail／timeout。全部證據與逐支logs留ignored `w3b-read`，使用者附件／REVIEW／Claude outputs／截圖不提交。W4b接共同沿邊實體／hostframe與多接合consumer；W5b接舊withCandidate／putDerived交易bridge及教材，OPPO／完整發布gate仍留W6。
 - root唯讀review與HTTP同token一般reload通過：custom F1仍3角碼／2真撞，重選面iframe同token及可用『接上（有干涉）』，取消保持gap0。無新版console error（只有先前d8c已修舊紀錄）；ignored `w3b-read/http-f1-regression.jpg`。root在full156/156後批准scoped本地commit，writer提交後STOP；沒有push／deploy／bump，後續待正式交棒。
+
+### W4b-1 — 沿邊金屬角碼委派共同實體
+
+- 起點 `40bd0d52fb806555bf4e732dc8ad741337b1e5b2`；唯一writer `w4a_physical`（Sol high），root只讀review／HTTP。LOOP：缺physical／混合板厚螺絲紅測→最小沿邊配置adapter→獨立stock-plane／孔軸／BOM及真輸出量測→定向→generate／check→HTTP→完整manifest一次→批准後scoped commit STOP。printed沿用専屬幾何；host-frame新六面／F3新UI／沿邊preview交易與教材不在本包，不改schema／solver演算法／版本。
+- 紅證據 ignored `w4b-orient/red.log`：沿邊adapterLayout沒有physical。新版配置保留沿邊／站立、方向／面與槽位策略，實際角碼／牙孔／板孔／螺頭／螺桿交同一buildBracketInstance；移除bracketLegs及沿邊複製SCREW_LENGTHS。低階adapterChildHoles仍為moduleFrameEdges的純配置入口，直接委派核心、不呼叫完整frame／layout，沒有以空孔打斷有效遞迴。
+- adapterLayout／extras攜帶兩筆physical與穩定connection／slot／wing／holePair IDs；加工孔投影／metadata、PartGeometry、BOM與HTML逐件trace共同消費。正式3D取catalog.extras已算physical，僅home→current host plane→nested完整矩陣與宿主底面z各轉換一次；盒體明帶thicknessAxis與接觸法線，兩翼短長不以最小尺寸猜。各翼按自己的真板厚選M3長度，6/3 mm板為8/6，不以最大板厚全套8；printed螺帽／傾斜規則保留。
+- 獨立量測從正式scene的stock material pose／板厚與實際加工孔建期望平面，不用production.ok當期望；沿邊／站立、上下／反面、3/4/6 mm、default/custom 14×10×7/th1.5、0/20/40共72例。真二層遞迴0/20/40及frameStock6／全域3在父／孫兩接合均驗surface flush、翼bend重疊上限／不穿另一板、孔軸、螺頭板外與逐翼BOM。transform tolerance1e-6、三位加工孔0.005；缺孔／錯軸／.02離板／錯spec／錯BOM負例確實失敗。新增純參數auditPhysical，舊audit呼叫／a–e斷言保持並可傳params／points／joint；舊盒體假定尺寸軸改用實際軸投影，混板厚『所有螺絲同長』改逐翼材料要求，未放寬貼板／轉角／對孔。
+- frame宿主厚度原一律fallback stockMm，現沿既有frameStock來源傳給edge／hostPlateThickness；子底板也取真frameStock。此為沿邊既有frame接法的板厚修正，未新增六面host-frame幾何。合法直角metal descriptor宣告drilling／geometry可計算但refresh仍false；printed／tilt／缺端點保留能力診斷，可計算不代表已驗通過。
+- public SVG／DXF真正download Blob全部bytes解析與HTML manufacturingTrace：custom、nested、different frameStock，在0/20/40逐pair ID／位置／Ø及實際stock／盒孔逆向量測一致。既有face guard保留，新增已支持形狀的orient-only guarded輸出；invalid requested牙孔規格／金屬tilt明確拒絕files與pack。extras診斷傳至共同catalog／scene；printed材料representation具名not_supported，不默默當材料已查。F1真2/3撞、無解與stale/play語意定向保持。
+- target Node22.14.0 13/13、fixture收尾1/1；原bracket-holes46/46、mate-connect123/123，含material與F1actual export回歸。證據及正常toSnapshot UI fixtures在ignored `output/framework-stabilization/w4b-orient/`：ui-default（3mm/default規格）、ui-custom（站立下面、host6／child frame4／global3、自訂規格）、ui-invalid-metal-tilt。source freeze／HTTP與full結果待回交；不提交私人路徑／原附件，W4b-2接續host-frame新六面／完整多接合幾何，W5b仍處理沿邊withCandidate／putDerived與教材。
+- 初次HTTP `3bbc4090d8b0f24e7991`抓到測試fixture誤標：測試直接改原bar.stock=6，st共享引用且18mm寬不足以站立（至少19），benchAdjust站立／換面回false而測試漏assert，變體仍為沿邊。已撤掉原bar mutation、明確assert每筆ok／edge child／face±1；6mm/custom站立採合法24mm寬專用fixture，不改原F1產品參數或真撞。修後 `target-standing` 13/13，真正站立72矩陣及nested／different frameStock／actual file parse均通過；physical trace的宿主板孔local亦交核心plateToLocal，與serialized局部孔0.005mm一致。
+- 初次正常沿邊HTTP仍有有效證據：custom實停−17.008°（UI343°），實際pack single_pose fail、2角碼、host6／child4、兩M3×8＋兩M3×6；SVG／DXF首件LiftCrank_1各6circle／6trace，ignored http-custom-pack.html與http-custom-LiftCrank_1.*。IAB多檔仍只落首件，全public Blob由Node parse，無宣稱瀏覽器全件落檔。側欄仍用舊沿邊檢查而顯『目前姿勢沒有干涉』，與pack新材料報告不同；此既有consumer接入缺口具名留W5b，不宣稱所有沿邊UI干涉已一致。
+- 最終source freeze `cac6c7c3345d5c3266b7`，138 modules／16 pages generate／check通過；root HTTP正常開新custom確為『立在下面』，實際播放停theta57.644°，下載pack的trace2角碼、板厚6／4、螺絲8／6／8／6與single_pose fail保留真撞，ignored http-standing-pack.html／http-standing.jpg。invalid-metal-tilt可正常開，製作包及SVG明確阻擋並提示金屬角碼只支援直角，http-invalid.jpg；無新版產品console error（只有歷史d8c）。完整manifest唯一一次Node22.14.0 157/157，無fail／timeout，results與逐支logs在w4b-orient/full；來源保持cac6，未重跑無變更suite。root已批准scoped本地commit，writer提交後STOP，保留全部原untracked附件／REVIEW／Claude outputs／截圖；未push／deploy／bump，不宣稱整個W4b或F3 gate完成。

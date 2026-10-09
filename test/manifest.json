@@ -129,6 +129,7 @@
     "test/motor-tools.mjs",
     "test/mount-surfaces.mjs",
     "test/node-editor.mjs",
+    "test/orient-bracket-physical.mjs",
     "test/orthogonal-3d.mjs",
     "test/orthogonal-fab.mjs",
     "test/orthogonal-interference.mjs",

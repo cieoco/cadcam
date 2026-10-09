@@ -31,11 +31,11 @@ const run = (st, label) => {
   check(`${label}：短邊的孔對準固定板上的孔`, childW.every(h => shortLegs.some(b => offAxis(b.hole.center, h, b.hole.axis) < 0.05)));
   const screws = OJ.bracketScrews(st.comps, st.modules, G.id, pts, P, { stockMm: T, plan });
   const screwLength = memberStock(st.comps.find(c => c.id === brace.id)).thicknessMm > 4 ? 8 : 6;
-  check(`${label}：4 支螺絲，從木板外側穿進角碼（頭在木板的另一面）、長 ${screwLength}`, screws.length === 4 && screws.every(s => near(s.lengthMm, screwLength) && s.head && s.tip && near(Math.hypot(s.tip.x - s.head.x, s.tip.y - s.head.y, s.tip.z - s.head.z), screwLength, 0.01)) &&
+  check(`${label}：4 支螺絲，從木板外側穿進角碼（頭在木板的另一面）、各翼所需長度`, screws.length === 4 && screws.every(s => near(s.lengthMm,s.id.includes('wing:host')?screwLength:6) && s.head && s.tip && near(Math.hypot(s.tip.x - s.head.x, s.tip.y - s.head.y, s.tip.z - s.head.z), s.lengthMm, 0.01)) &&
     boxes.every(b => screws.some(s => offAxis(s.head, b.hole.center, b.hole.axis) < 0.05 && Math.abs(dot({ x: s.head.x - b.hole.center.x, y: s.head.y - b.hole.center.y, z: s.head.z - b.hole.center.z }, b.hole.axis)) > T)));
   // 長、短腳要在接合角重疊至少一個角碼厚度；只驗孔位會漏掉 side=1 時兩翼相隔一片宿主板厚的錯誤。
   const alongN = p => (p.x - f.origin.x) * f.n.x + (p.y - f.origin.y) * f.n.y + (p.z - f.origin.z) * f.n.z;
-  const legSpan = b => { const c = alongN(b.center), h = b.size.z / 2; return [c - h, c + h]; };
+  const legSpan = b => { const c = alongN(b.center), h = ['x','y','z'].reduce((s,k,i)=>s+Math.abs(dot(b.axes[i],f.n))*b.size[k]/2,0); return [c - h, c + h]; };
   const cornersMeet = [0, 1].every(k => { const a = legSpan(boxes[k * 2]), b = legSpan(boxes[k * 2 + 1]); return Math.min(a[1], b[1]) - Math.max(a[0], b[0]) >= 1.19; });
   check(`${label}：長短腳在轉角重疊角碼厚度 1.2 mm`, cornersMeet);
 };
@@ -67,7 +67,7 @@ const nestedPts = solveAt(connectedNestedComps, nestedModules, P).points;
 const nestedFrame = Asm.orthogonalFrame(connectedNestedComps, nestedModules, N.id, nestedPts, P);
 const nestedLayout = OJ.adapterLayout(connectedNestedComps, nestedModules, N.id, P, { stockMm: T });
 const nestedBoxes = OJ.bracketBoxes(connectedNestedComps, nestedModules, N.id, nestedPts, P, { stockMm: T });
-const nestedLong = nestedBoxes.filter(b => near(b.size.y, 13)), nestedShort = nestedBoxes.filter(b => near(b.size.z, 9.5));
+const nestedLong = nestedBoxes.filter(b => near(b.size.y, 13)), nestedShort = nestedBoxes.filter(b => near(b.size.y, 9.5));
 const nestedHostAligned = nestedLayout && nestedLayout.hostKind === 'frame' && nestedLayout.hostModuleId === G.id &&
   nestedLayout.hostHoles.every(h => nestedLong.some(b => Math.hypot(b.hole.center.x - h.x, b.hole.center.y - h.y) < 0.05));
 const nestedChildWorld = nestedLayout && nestedFrame ? nestedLayout.childHoles.map(h => Asm.toWorld3D(nestedFrame, h, 0)) : [];
@@ -76,7 +76,7 @@ const nestedChildAligned = nestedChildWorld.length === nestedShort.length && nes
 check('巢狀宿主底板：角碼孔仍對準宿主框架與子模組底板', !!nestedHostAligned && nestedChildAligned);
 check(`巢狀宿主 side ${nestedSide}：長短腳仍在轉角接合`, nestedBoxes.length === 4 && [0, 1].every(k => {
   const along = p => (p.x - nestedFrame.origin.x) * nestedFrame.n.x + (p.y - nestedFrame.origin.y) * nestedFrame.n.y + (p.z - nestedFrame.origin.z) * nestedFrame.n.z;
-  const span = box => { const c = along(box.center), h = box.size.z / 2; return [c - h, c + h]; };
+  const span = box => { const c = along(box.center), h = ['x','y','z'].reduce((sum,k,i)=>sum+Math.abs(box.axes[i].x*nestedFrame.n.x+box.axes[i].y*nestedFrame.n.y+box.axes[i].z*nestedFrame.n.z)*box.size[k]/2,0); return [c - h, c + h]; };
   const a = span(nestedBoxes[k * 2]), b = span(nestedBoxes[k * 2 + 1]);
   return Math.min(a[1], b[1]) - Math.max(a[0], b[0]) >= 1.19;
 }));
