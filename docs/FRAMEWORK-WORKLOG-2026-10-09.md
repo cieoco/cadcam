@@ -312,3 +312,8 @@ G1內部F1門檻已貫通，可接續W3b→W4b→W5b；這不是發布或全格�
 - 本包提交 **546e924** 並推送施工分支；[Linux CI 37902017378](https://github.com/cieoco/cadcam/actions/runs/37902017378) test success，build／deploy skipped，確認非 main 不部署。正式 main 仍 1537242。
 - 桌面同條件入口完成 F1／F3 各三次：CPU p95 4.7–5.7ms、rAF p95 16.8ms，每次約3600樣本，>100ms間隔0次。F1播放中geometryBuilds維持55、F3維持114，沒有重建。實際下載保存在 `w6-phone/desktop-current.json`；不是 OPPO 實測或手機速度承諾。瀏覽器曾記一筆無來源 URL 的 MutationObserver.observe 例外，repo 沒有該 API；未將它擅自判為產品錯誤或宣称零 console error，量測六輪皆 complete。
 - 實機步驟與重建命令見 `PERFORMANCE-ACCEPTANCE-2026-10-09.md`。下一個必要輸入為 OPPO 量測資料；取得後對照門檻，再做版本紀錄、最終同 commit CI、main／Pages 發布核對。不得為省事用桌面通過替代實機或靜默放寬 SDD。
+
+### W6-2 — 2026-10-10 使用者範圍修訂與發布
+- 使用者明確表示不做手機效能量測、重視操作功能完整；SDD 與量測文件已記錄免測決策，並停止臨時 LAN 量測服務。這不是 OPPO 實測通過。
+- 本輪操作範圍完成，功能與已知界限列於 `FRAMEWORK-DELIVERY-2026-10-10.md`。版本更新為2026.10.10.1，graph為6a4b69d2acfca33e9d03。HTTP正常重新整理已驗UI版本紀錄、教材平貼對鎖接合面板與未檢查五金提示。
+- 2e6fa83為發布程式提交；後續交付文件提交不變更程式。正式main以fast-forward推送，同一commit的test通過後才build/deploy；實際執行狀態以GitHub Actions為準，發佈核對另留本機 `w6-release/` 證據。
