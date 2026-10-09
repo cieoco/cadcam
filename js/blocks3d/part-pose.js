@@ -40,8 +40,9 @@ export function attachPartMaterials(model,catalog,{comps=[],modules=[],points={}
       const id=`${p.moduleId}-frame`,geometry=catalog.parts[id];
       return add(id,geometry&&moduleFramePose(geometry,modules,comps,points,p.z),parent,`${prefix}modframe:${p.moduleId}`,p.color || '#8799aa')?{...p,materialPartId:id}:p;
     });
-    for(const key of ['rails','carriages','racks','cams','pulleys','belts','motors','pins','grounds'])for(const [i,p] of (scene[key] || []).entries())diagnostics.push({status:'not_supported',code:'material_representation_not_supported',kind:key,sourceIds:[p.id || `${prefix}${key}:${i}`]});
-    return {...scene,frame,sticks,plates,gears,modulePlates};
+    const racks=(scene.racks || []).map(r=>add(r.id,poseMatrix(r.ref,r.axisDeg*Math.PI/180,r.z),parent,`${prefix}rack:${r.id}`,r.color)?{...r,materialPartId:r.id}:r);
+    for(const key of ['rails','carriages','cams','pulleys','belts','motors','pins','grounds'])for(const [i,p] of (scene[key] || []).entries())diagnostics.push({status:'not_supported',code:'material_representation_not_supported',kind:key,sourceIds:[p.id || `${prefix}${key}:${i}`]});
+    return {...scene,frame,sticks,plates,gears,modulePlates,racks};
   };
   const main=visit(model,IDENTITY_4);
   main.orthogonal=(model.orthogonal || []).map(child=>{

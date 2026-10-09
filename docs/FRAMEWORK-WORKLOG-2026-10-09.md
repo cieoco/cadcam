@@ -274,3 +274,10 @@ G1內部F1門檻已貫通，可接續W3b→W4b→W5b；這不是發布或全格�
 - root正式HTTP：正常開ui-builtin-planar-frame-raw→另存→正常開實際下載檔→再次另存，兩次作品JSON deepStrictEqual；所有bar／triangle尺寸等於原source，arm140、diag107.6289923765897、jaw121.8，implicit motorMount仍未被補成horizontal。實際製作包成功產生；重選保留Mod3底板back／childbottom／90°／offset10／gap0與2角碼，15處真撞誠實顯示，取消後不變。證據http-{saved,reopened}.blocks.json、http-reopened-pack.html、http-reopened-preview.jpg；無本版產品console error，舊d8c紀錄未誤當新錯誤。
 - root唯一一次full：158/159，唯一失敗example-controller仍假定原30mm範例會被吸附32；已將該斷言改為原30mm保存。無產品source改動，target-compat 2/2（example-controller、snapshot-dimensions）與graph check通過，不為測試預期更正重跑全部。完整證據在w4b-dimensions/full與target-compat；W6仍須發布同commit全套。
 - root批准本包scoped本地提交。未push／deploy／改app版本，未包含私人附件或其他原untracked。下一步W4b-F2齒條能力與W5b單一精靈／沿邊候選交易／干涉狀態／教材；OPPO實機仍待，整案不宣稱完成。手機效能需固定共同比較snapshot，避免本包新舊normalize差異令基準作品尺寸不同，已記ignored w5b-baseline/w6-notes.txt。
+
+### W4b-F2 — 齒條共用材料（施工中）
+- root 唯一 writer，依原 SDD LOOP 續作。齒條使用加工來源的輪廓、孔槽、板厚，跟隨實際求解姿態；3D 不再重複繪製舊齒條實體。六面定位可用，齒條角碼開孔仍明示未支援並阻擋不適用輸出。
+- 新增 rack-face-candidate 驗證，納入 manifest；viewer-reuse 加入齒條播放時保留幾何、與全新場景矩陣／尺寸／數量相同的檢查。Node22 定向 6/6 通過，證據 w4b-rack/target。
+- Load graph 43881e1a55e18f2efdc2（138 modules／16 pages）。HTTP 正常開啟 mounted fixture，側欄正確呈現「已定位，尚未固定」及齒條角碼未支援原因，無 console error。尚待未接作品完整操作、畫面與下載驗收；未 commit／push，不能視為 F2 完工。
+- 本輪完整 160/160 通過（Node22.14.0），graph check 同 43881e1a55e18f2efdc2。HTTP 從未接 fixture 依序選滑台／底板、上面／下面、置中 gap0→接上→播放／暫停→實際製作包下載成功；畫面及實際下載保存在 w4b-rack/http-mounted.jpg、http-pack.html。播放即清除舊材料結果。尚未支援齒條角碼鑽孔，沒有假稱固定。
+- 瀏覽器另發現未支援角碼時仍出現配置按鈕與成功後引導文字，列入下一 W5b 狀態一致性包；本包材料能力完成，F2 最終適用流程仍須 W5b。下一步沿邊與六面共用干涉提示、未支援種類及固定能力提示，不改 solver 或存檔格式。

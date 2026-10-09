@@ -7,6 +7,9 @@ import {f1AssemblyFixture,f1NestedFixture} from './fixtures/f1-assembly-fixture.
 import {f1MaterialScene} from './fixtures/f1-material-scene.mjs';
 import {buildPartGeometryCatalog} from '../js/blocks/part-geometry.js';
 import {createAsyncResource} from '../js/blocks3d/scene-reuse.js';
+import {builtinTemplate,instantiateTemplate} from '../js/blocks/module-ops.js';
+import {buildFaceCandidate,faceCandidateModel} from '../js/blocks/face-candidate.js';
+import {FABRICATION_DEFAULTS} from '../js/blocks/fabrication-profile.js';
 let loaded=0,resolveViewer;const lazy=createAsyncResource(()=>{loaded++;return new Promise(r=>{resolveViewer=r;});});
 const opening=lazy.get(),racing=lazy.get();assert.equal(opening,racing,'parallel open waits for the same resource');
 await Promise.resolve();assert.equal(loaded,1);const resource={ready:true};resolveViewer(resource);assert.equal(await racing,resource);assert.equal(await lazy.get(),resource);
@@ -49,6 +52,19 @@ for(const fixture of [f1AssemblyFixture(),f1NestedFixture()]){
  viewer.update(f1MaterialScene(0,fixture,catalog,{includeMotors:true}).model);assert.equal(editDisposed,edited.length,'undo/cancel retires preview geometry once');
  assert.ok(geometries().every(g=>!first.includes(g)),'reappearing design never reuses disposed geometries');
  const reopened=geometries();viewer.update(f1MaterialScene(40,structuredClone(fixture),catalog,{includeMotors:true}).model);assert.deepEqual(geometries(),reopened,'same opened design retains shape while changing pose');
+}
+const rackHost=instantiateTemplate(builtinTemplate('rack-lift'),{counter:0,place:{x:0,y:0}});
+const rackChild=instantiateTemplate(builtinTemplate('gear-gripper'),{counter:2,place:{x:250,y:0},usedMotorIds:['1']});
+const rackSource={comps:[...rackHost.comps,...rackChild.comps],modules:[rackHost.module,rackChild.module],params:{...rackHost.params,...rackChild.params},fabrication:structuredClone(FABRICATION_DEFAULTS)};
+const rackCandidate=buildFaceCandidate(rackSource,{childId:rackChild.module.id,hostEndpoint:{moduleId:rackHost.module.id,outputId:'carriage'},childEndpoint:{partId:'frame'},selection:{hostFace:'top',childFace:'bottom',alignU:0,alignV:0,offsetU:0,offsetV:0,gap:0,quarterTurns:0}});
+assert.ok(rackCandidate.ok,rackCandidate.reason);
+viewer.update(faceCandidateModel(rackCandidate,{theta:0}).model);
+const rackGeometries=geometries();
+for(const theta of [20,40]){
+ const model=faceCandidateModel(rackCandidate,{theta}).model;viewer.update(model);
+ assert.deepEqual(geometries(),rackGeometries,'rack travel retains geometry');
+ let freshScene;const fresh=createViewer(el(),{rendererFactory:()=>({...renderer,domElement:el(),render(s){freshScene=s;}}),controlsFactory:()=>({...controls,target:new THREE.Vector3()})});fresh.update(model);
+ assert.deepEqual(represented(scene),represented(freshScene),'rack retained and fresh meshes have identical poses and geometry');fresh.dispose();
 }
 const last=geometries();let disposed=0;last.forEach(g=>g.addEventListener('dispose',()=>disposed++));viewer.dispose();assert.equal(disposed,last.length);
 console.log('production viewer: F1/nested pose, hardware, world matrices, appearance, camera, invalidation, dispose');

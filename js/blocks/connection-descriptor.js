@@ -113,7 +113,8 @@ export function readConnectionDescriptor({ comps = [], modules = [], childId, mo
  result.capabilities.endpoints=host.available&&child.available;result.ok=valid&&result.capabilities.endpoints;
  const commonFace=result.ok&&saved.face&&['output','frame'].includes(host.source.kind);
  const commonOrient=result.ok&&saved.orient?.joint?.kind==='bracket-m3'&&(saved.orient.tiltDeg===undefined||Number(saved.orient.tiltDeg)===0);
- result.capabilities.refresh=!!commonFace;result.capabilities.drilling=!!commonOrient||!!commonFace&&host.partKind!=='rack';result.capabilities.geometry=result.capabilities.drilling;
+ result.capabilities.refresh=!!commonFace;result.capabilities.drilling=!!commonOrient||!!commonFace&&host.partKind!=='rack';result.capabilities.geometry=!!commonOrient||!!commonFace;
+ if(commonFace&&host.partKind==='rack')diagnostics.push({...reason('rack_drilling_not_supported','齒條接面可定位；齒條角碼開孔尚未支援。'),capabilities:['drilling']});
  if(!saved.face&&!commonOrient)diagnostics.push({...reason('legacy_connection_geometry_bridge','接合定位沿用原流程；此接法尚未接入共用接件與固定孔驗證。'),package:'W4b',capabilities:['refresh','drilling','geometry']});
  return result;
 }

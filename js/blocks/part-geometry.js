@@ -68,6 +68,10 @@ export function buildPartGeometryCatalog(args={}) {
           add(comp.id,'fusion',f.geometry,Number(plate.stock?.thicknessMm) || stockMm,[comp.id,plate.id],{kind:'gear',pointIds:[comp.p1.id,comp.p2.id],seedAngle:angle(comp.p1,comp.p2)},comp.moduleId);
           fusedParts[comp.id]={...f,ids:[plate.p1.id,plate.p2.id,plate.p3.id],thicknessMm:parts[comp.id].thicknessMm};
         } else add(comp.id,'gear',Exporters.inspectGearExport(comp,params,settings,comps),stock.thicknessMm,[comp.id],{kind:'gear',pointIds:[comp.p1.id,comp.p2.id],seedAngle:angle(comp.p1,comp.p2)},comp.moduleId);
+      } else if(comp.type==='rack') {
+        const pinion=comps.find(c=>c.type==='gear'&&c.id===comp.pinion);
+        add(comp.id,'rack',Exporters.inspectRackExport(comp,params,pinion),stock.thicknessMm,[comp.id],{kind:'rack',pointIds:[comp.p1.id],axisDeg:Number(comp.axisDeg) || 0},comp.moduleId);
+        memberStocks[comp.id]=stock;
       } else if(!['anchor','motor','triangle'].includes(comp.type))diagnostics.push({status:'not_supported',code:'material_kind_not_supported',sourceIds:[comp.id],kind:comp.type});
     } catch(e){diagnostics.push({status:'not_supported',code:'material_geometry_unavailable',sourceIds:[comp.id],reason:e.message});}
   }

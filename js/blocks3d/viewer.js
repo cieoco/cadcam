@@ -794,6 +794,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
 
     // 齒條：和齒輪同在內側傳動平面，齒形本身擠出成一片有厚度的齒桿。
     (model.racks || []).forEach(r => {
+      if(r.materialPartId)return; // Common fabrication material already includes its holes and slot.
       const group = new THREE.Group();
       group.position.set(r.ref.x, r.ref.y, 0);
       group.rotation.z = (r.axisDeg || 0) * Math.PI / 180;

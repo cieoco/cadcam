@@ -23,7 +23,7 @@ export function centeredFaceSurface(surface){const center=Object.fromEntries(['x
 const failed=(code,reason,sourceRevision)=>freezeData({ok:false,reason,validation:{status:'fail',sourceRevision,checks:[{status:'fail',code,reason}],coverage:{scope:'face_candidate'}}});
 export function buildFaceCandidate(source,{childId,hostEndpoint,childEndpoint,selection,reselect=false}={}){
  const sourceRevision=faceSourceRevision(source),work=structuredClone(source);
- if(work.comps.some(c=>!['anchor','bar','triangle','gear'].includes(c.type)))return failed('candidate_format_not_supported','此候選材料流程目前僅支援桿件、板件與齒輪；其他格式留後續接入。',sourceRevision);
+ if(work.comps.some(c=>!['anchor','bar','triangle','gear','rack'].includes(c.type)))return failed('candidate_format_not_supported','此候選材料流程目前支援桿件、板件、齒輪與齒條；其他材料尚未接入。',sourceRevision);
  work.topo=work.topo || {params:work.params || {}};
  work.params=work.topo.params;
  const stockMm=work.stockMm || Number(work.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;
@@ -70,7 +70,7 @@ export function faceCandidateModel(candidate,pose={}){
   sliderTravelStart:c=>c.travelStart || 0,sliderTravelEnd:c=>c.travelEnd || 100,sliderBodyLength:c=>c.bodyLen || 60,rackBodyHeight:c=>c.bodyHeight || 20,rackPhaseShift:()=>0,pulleyRadius:()=>32,pulleyPinRadius:()=>20});
  const model=buildMaterialScene({...work,catalog,inputs:planeInputs(inputs,work.comps,work.modules,null),allPlanes:inputs,points:sol.points,asm,hullR:DEFAULT_PLATE_RADIUS_WORLD,solveValidity:validity});
  const hostGeometry=catalog.parts[candidate.hostSurface?.framePartId || candidate.hostSurface?.compId],homeIds=hostGeometry?.binding.pointIds || [],[a,b]=homeIds.map(id=>catalog.homePoints[id]);
- const hostReference=candidate.hostSurface?.kind==='frame'?{origin:{x:0,y:0},angle:0}:a&&b?{origin:a,angle:Math.atan2(b.y-a.y,b.x-a.x)}:null;
+ const hostReference=candidate.hostSurface?.kind==='frame'?{origin:{x:0,y:0},angle:0}:hostGeometry?.binding.kind==='rack'&&a?{origin:a,angle:hostGeometry.binding.axisDeg*Math.PI/180}:a&&b?{origin:a,angle:Math.atan2(b.y-a.y,b.x-a.x)}:null;
  return {model,work,mounts:exportMounts,catalog,points:sol.points,hostReference,solveValidity:validity};
 }
 export async function validateFaceCandidate(candidate,pose={},compute,sceneInput){
