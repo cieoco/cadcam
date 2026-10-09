@@ -5,7 +5,7 @@
 ## 接手資訊
 
 - 分支：`codex/framework-stabilization`；起點：`1537242`（應用 `2026.10.08.13`）。
-- 唯一寫入者：`w4a_physical`（Sol high）；W4a-1 `a863232` 正式交棒施工 W4a 第二個 LOOP；前 writer 已停止，主代理 `/root` 只讀審閱與 HTTP 驗收。
+- 唯一寫入者：`w4a_physical`（Sol high）；W4a-3 完成 scoped commit 後停止寫入，主代理 `/root` 指定下一 LOOP 才交棒。前 writer 已停止，未新增 writer。
 - 本機：Windows、Node `v25.2.0`、Python `3.13.5`。CI 的 Node 版本在 W1 固定並驗證。
 - 使用者原有未追蹤附件、`Claude outputs/`、截圖及框架檢討文件保留。提交只選本包檔案。
 - Astra 僅 low；更高推理強度須另獲確認。主聊天不宣稱自行切換模型。
@@ -19,7 +19,7 @@
 | W1 | done | 九項失敗完成分類／修正；Node 22.14.0 全套 143/143；cold HTTP 通過，舊快取混載轉 W2 修復 |
 | W2 | done | 120 模組／15 頁同圖生成與 CI check；主頁／iframe 握手拒絕異批確認；Node 22.14.0 全套 144/144 與 HTTP 通過 |
 | W3a | done | F1 六面純讀取／保存／重選／真 bar 層高；同圖 check、Node22 全套 146/146、主代理 HTTP 通過 |
-| W4a–W5a／G1 | implementing | W4a-1 共用角碼／板孔／螺絲與 BOM Node147/147；干涉、快取及 W5a 交易流程尚待後續 LOOP |
+| W4a–W5a／G1 | implementing | W4a-1 共用角碼147、W4a-2局部材料148、W4a-3單一姿態SAT151支驗收及HTTP完成；F1真撞保留。快取與W5a交易流程待後續 LOOP |
 | W3b–W5b | planned | 其餘格式、多接合位置、教材與效能 |
 | W6 | planned | 全面驗收、提交推送與發布核對 |
 
@@ -138,3 +138,20 @@
 - 下一包 W4a-3：使用目前 materialParts actual outlines/holes/cutouts 建材料AABB→triangular prism SAT、合法配對與coverage/UI；W4a-4 才做viewer mesh復用／播放效能量測。W4b 沿邊 bridge、W5a交易與完整UIcoverage仍未完成，不宣稱W4a或G1完工。未push/deploy/version；scoped commit後停止寫入。
 
 - 主代理最終HTTP token `7ff40db17bfe09c6a5ac`：custom mounted正式3D可見齒輪／輸出孔／舵機／角碼，轉相機後M1播放暫停35°仍跟板；tree/panel皆3角碼確認。切夾爪設計頁再3D只顯示自己的frame／雙齒輪，未誤帶根固定板。390×844 wrapper實際走組立→選夾爪→重選面→preview→取消，iframe同token、3角碼標記，無新console error。證據 `output/framework-stabilization/w4a-physical/http-materials-35.jpg`／`http-materials-mobile.jpg`（不提交）。nested手機底部水平scroll列W5a UI檢查，未擴本包。完成scoped commit後唯一writer停止，主代理指定下一LOOP。
+
+
+### LOOP W4a-3／F1 單一有效姿態實際材料干涉（done）
+
+- 唯一writer w4a_physical（Sol high），起點8332960；root只讀review/HTTP。本包純 checker＋正式bench目前姿態／紅色highlight；不做mesh cache、full travel、W4b、候選交易。W4a-2補核：root於舊freeze token切未安裝夾爪設計分頁，自己的frame／雙齒輪顯示亦正常。
+- 紅測1e-4 mm材料穿入應fail，尚無checker回not_checked；`output/framework-stabilization/w4a-sat/red.log`。純 checker 以實際 islands／凹形／holes／cutouts 加板厚，使用bundled Three ShapeUtils/Earcut三角化成prisms，世界AABB廣相→全face normals及edge crosses SAT；僅正穿入（1e-7 mm數值分離容許）算碰撞，flush接觸與gap不算。
+- 圓孔以inscribed/circumscribed兩组扣除材料，圓螺桿与pan-head輪廓分段使用inner/outer保守邊界；inner仍重疊才fail，只有outer重疊則circular_boundary_uncertain，不給pass。不可三角化／輪廓越界或缺pose逐項not_supported。具名配對shaft要求同holePairId、孔軸、孔徑、螺頭在板外且完整穿過板厚／牙翼；只豁免該具名孔材，不豁免它碰其他板或另一角碼翼。合法bend需同bracket/connection、法向垂直、重疊體積≤width×兩翼厚度乘積且位於翼端；同shaft/head是同顆五金，其餘硬體含自己child板仍檢。
+- 補plain mainframe sourceModuleIds，單一owner帶moduleId，防根板誤當不同模組內部件。scene adapter組立scope核預期part IDs，合併child顯示anchor／connection能力diagnostics；被filter掉的child板或歧義端點不得變成『僅五金未查』，設計focus有意略過的非當頁件不報缺席。
+- F1原fixture真實穿入照實保留：0／20° GearA_3↔L1 child screw head、GearB_3↔R1 child screw head；40°另有LiftCrank_1↔Mod3-frame。root独立未import checker/Three，以matrix轉置逆投影、winding number、精確circle孔及pan-head線性radius核對：0° witness(196.894803,−14.1,8.25)在GearA與頭內，餘量[1.1,.08823]mm；40°(109.334961,80.290265,6.1)在曲柄與子固定板內，兩材質餘量[.1,.1]mm。已把這些硬編世界witness作獨立回歸，未為綠燈修參數。完整materialParts/reports：`w4a-sat/f1-scene-{0,40}.json`（ignored）。report位置採相交convexprism頂點／edge-plane intersection平均，另記minProjectionOverlapMm，非加工接觸量測。
+- bench literal dynamic import checker保持Three懶載入。純pose coordinator在await後再核geometryKey/revision/playing/candidate/solve validity；播放不跑narrow phase，清過期highlight／report，暫停與變更重驗，相機／hover同geometry＋pose沿用report。solveFrame明傳當次sol validity與未解活動點；無效／throw保留舊顯示但not_checked『目前姿態無解；畫面保留上一有效姿態』。原同平面checker/readiness保留，六面fulltravel明示未支援，純preview候選檢查留W5a。
+- UI材料結果攜geometryKey/poseRevision、pair IDs/pickKeys、位置、reason、coverage；撞到双方紅標。未建模motor/pins等提供可展開具名清單；清空無穿入但五金缺coverage時中性『板件未發現穿入；部分五金未檢查』，不宣稱全檢通過。
+- HTTP抓到正常開檔的加工槽來源差異：frame／Mod3-frame的MG995凸耳槽與r1.6固定孔部分相交，單獨丟給Earcut會有非法重疊void。新純material-voids使用現有unionOutlines建扣除聯集，SAT內外保守邊界與viewer共用；語意hole IDs／用途／配對不動。新增正常normalizeSnapshot＋fabrication mount設定回歸，0/20/40全31材料可準備，原F1真撞維持。完全包含void消去冗餘表示；聯集若形成尚未支援的材料島回not_supported。
+- void聯集另用opt-in precision1e-9 mm／sampling1e-9 mm／splitScale1e14，不略過小面積loop；fusion原預設key／sampling／area／splitScale均保留。1e-6 mm²材料島不得被面積簡化消失、1e-6 mm狹縫內正穿入仍fail。viewer無法表示void時保留橙色線框輪廓與具名可見notice／geometryDiagnostic，不靜默漏板；notice和共用材質在dispose釋放。
+- 最終source圖generate/check token `453ba8316372f4a741e3`（128 modules／15 pages）；target4/4與完整manifest Node22.14.0 151/151，無fail／timeout。逐支stdout/stderr/exit與manifest SHA、起點8332960＋tracked changes留 `output/framework-stabilization/w4a-sat/{target-precision,full-precision}/results.json`。此前freeze完整亦151/151，後續只因HTTP孔槽及精度／fallback實際修正才重驗。
+- 主代理HTTP初freeze8db50：0°兩gear／screw head紅標；播放顯示本姿態材料待檢查且清舊紅標；暫停359°重新兩hit；全行程按鈕明示六面僅單一姿態、全行程未支援。孔槽fix token203563：兩板／角碼可見、原2hits、未檢查項目14僅原motors／pins／grounds，frame及Mod3-frame無unsupported。ignored證據 `w4a-sat/http-{collision-0,playing-pending,void-union}.jpg`。
+- 本包只完成F1目前有效姿態材料檢查；真碰撞未修作品尺寸，未宣稱F1可製作或整個W4a／G1完成。W4a-4 viewer mesh復用／桌面與OPPO實機效能、W4b沿邊bridge、W5a純preview候選與確認交易／全流程coverage待後續。root桌面單次checker量測約60–260 ms僅profiling，播放不做narrow phase，未當作phone gate。
+- 最終HTTP token453ba8316372f4a741e3：桌面同origin reload→bench→child通過，2處真撞與coverage14不含板件；390×844 wrapper同token、同2碰撞及3角碼固定，面板可讀。ignored證據 `w4a-sat/http-sat-mobile.jpg`。主頁無新增console error；mobile工具logs有兩則無來源MutationObserver observe-not-Node，時間對應frame-locator click的No node found，repo blocks/viewer無MutationObserver，記為wrapper／工具限制，未宣稱完全零log。正式操作正常。scoped commit後writer停止；未push／deploy／改版本，附件及私人路徑不提交。

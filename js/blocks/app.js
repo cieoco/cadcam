@@ -1,3 +1,4 @@
+import {materialSolveValidity} from './material-pose-status.js';
 /**
  * blocks / app
  *
@@ -105,7 +106,10 @@ const roundMm = v => Math.round(Number(v) || 0);
 const SERVO_STEP = 15;                 // 伺服角度面板的每步度數
 // 以下為 render / 播放迴圈 / 3D 的內部狀態，待各自模組抽出時再搬，暫留本檔。
 let raf = null;
+let playbackActive=false;
+let onPlaybackChange=()=>{};
 let candidate = null, inCandidate = false, candidateOf = null;   // M4 接合精靈預覽的候選作品（見 setCandidate）
+let lastSolveValidity={valid:false,reason:'not_solved'};
 let lastSolved = {};           // 上一幀求解成功的點位：給求解器挑「連續」分支 + 死點暫態回退
 let prevSolved = {};           // 再上一幀：和 lastSolved 一起外插出「帶動量」的預測種子
 let trajectoryCache = null;    // 沿用 multilink sweepTopology 的軌跡資料格式
@@ -817,7 +821,7 @@ function withCandidate(fn) {
 }
 async function set3D(on) { if (view3DActive !== !!on) await toggle3D(); }
 const bench = createBench({
-  deleteDesign, pause, setCandidate, withCandidate, inCandidate: () => inCandidate,
+  deleteDesign, pause, isPlaying:()=>playbackActive, setCandidate, withCandidate, inCandidate: () => inCandidate,
   pushUndo, rebuild, draw, transient, setViewPlane: id => setViewPlane(id),
   saveComposite: id => moduleEditor.saveCompositeToLibrary(id),   // B7
   exportComposite: id => moduleEditor.exportComposite(id),
@@ -847,6 +851,7 @@ const bench = createBench({
     draw();
   }
 });
+onPlaybackChange=()=>bench.liveCheck();
 // 依零件 type 把新插入模組的第一個零件選起來，沿用各域既有的 selectXxx。
 function selectModuleTarget(comp) {
   if (comp.type === 'bar') selectLink(comp.id);
@@ -1174,6 +1179,7 @@ function solveFrame() {
   const seed = extrapolateSeed(lastSolved, prevSolved);
   const frameParams = { thetaDeg: S.theta, motorAngles: motorAnglesNow(), _prevPoints: seed };
   try { sol = S.assembly ? solveAssembly(S.assembly, frameParams) : solveTopology(S.compiled, frameParams); } catch (_) {}
+  lastSolveValidity=materialSolveValidity(S.comps,sol);
   const solved = (sol && sol.isValid !== false && sol.points) ? sol.points : {};
   // 無效解整幀不採用，避免新舊接點混合而拉伸剛性零件；保留上一姿態。
   const newLast = { ...lastSolved };
@@ -1806,7 +1812,8 @@ function push3DNow() {
     const screws = model.orthogonal.flatMap(child => child.screws || []);
     if (screws.length) model.screws = screws;
   }
-  model=attachPartMaterials(model,catalog,{comps:S.comps,modules:S.modules,points:allPlanes?allPlanes.pts:designView?lastModelInputsAll.pts:pts});
+  model=attachPartMaterials(model,catalog,{comps:S.comps,modules:S.modules,points:allPlanes?allPlanes.pts:designView?lastModelInputsAll.pts:pts,assemblyScope:!designView});
+  model.solveValidity=lastSolveValidity;
   viewer3D.update(model);
   bench.afterScene({ pts: planesApi.pts, ptsAll: allPlanes ? allPlanes.pts : planesApi.pts, model });   // 組立台：接口標記跟著這一幀的宿主位置
 }
@@ -2107,6 +2114,7 @@ function play() {
     return;
   }
   if (!hasDriveSource()) { transient('先把動力來源放到轉軸，才能播放'); return; }
+  playbackActive=true;onPlaybackChange();
   document.getElementById('playBtn').classList.add('playing');
   document.getElementById('playBtn').textContent = '⏸';
   playPlan = planMotion();
@@ -2139,7 +2147,8 @@ function play() {
 }
 function pause() {
   if (raf) cancelAnimationFrame(raf);
-  raf = null;
+  raf = null;playbackActive=false;
+  onPlaybackChange();
   document.getElementById('playBtn').classList.remove('playing');
   document.getElementById('playBtn').textContent = '▶';
 }

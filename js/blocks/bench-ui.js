@@ -1,3 +1,4 @@
+import {createMaterialPoseStatus} from './material-pose-status.js';
 import { faceBracketStatus } from './face-bracket-extras.js';
 import { checkLiveInterference, liveInterferenceStatus } from './live-interference-status.js';
 /**
@@ -110,6 +111,9 @@ export function createBench(deps) {
 
   // ---------------------------------------------------------------- B6：即時干涉與全行程測試
   // live：目前姿勢的檢查結果；plan：疊層＋隔圈的快取（只在作品內容變了才重算）；tl：全行程時間軸結果。
+  const materialPose=createMaterialPoseStatus();
+  const playing=()=>!!deps.isPlaying?.();
+  const hasFace=()=>S.modules.some(m=>m?.mount?.face);
   const live = { plan: null, planKey: '', args: null, sig: '', findings: [], hits: [], labels: [], msg: '', keys: [], at: 0, timer: null, checks: 0, planBuilds: 0, ms: 0, ready: false, error: false };
   const tl = { result: null, ranges: null, key: '', summary: [], ms: 0 };
   let liveBox = null;
@@ -172,25 +176,68 @@ export function createBench(deps) {
     return names.length > max ? `${names.slice(0, max).join('、')} 等 ${names.length} 件` : names.join('、');
   }
 
+  function materialName(id){
+    const part=st.materialModel?.materialParts?.find(p=>p.partId===id);
+    if(!part)return id;
+    if(part.geometry.kind==='bracket-wing')return `${displayName(part.moduleId)}的角碼`;
+    if(part.geometry.kind.startsWith('screw'))return `${displayName(part.moduleId)}的固定螺絲`;
+    return hitLabels([id],S.comps,S.modules,labelOpts)[0] || id;
+  }
+  function materialLabels(){return [...new Set((materialPose.snapshot().report?.findings || []).flatMap(f=>f.partIds.map(materialName)))];}
   function currentLiveStatus() {
-    return liveInterferenceStatus({ hasFace: S.modules.some(m => m?.mount?.face), ready: live.ready, hasParts: !!live.plan?.parts?.length, error: live.error, n: live.findings.length, labels: live.labels });
+    const m=materialPose.snapshot();
+    return liveInterferenceStatus({hasFace:hasFace(),ready:live.ready,hasParts:!!live.plan?.parts?.length,error:live.error,n:live.findings.length,labels:[...new Set([...live.labels,...materialLabels()])],material:m.report,playing:playing(),candidate:m.candidate,solveValidity:m.solveValidity});
+  }
+  function syncMaterialPose(){
+    const candidate=isCand() || !!st.preview;
+    const current=st.materialWorkKey===workKey()&&st.materialPoseKey===JSON.stringify(motorAnglesNow());
+    return materialPose.observe(current?st.materialModel:null,{isPlaying:playing(),isCandidate:candidate});
+  }
+  function runMaterialCheck(){
+    syncMaterialPose();
+    // Three and Earcut stay lazy. The controller revalidates after import/await.
+    materialPose.check(async model=>{
+      const {checkMaterialInterference}=await import('./material-interference.js');
+      const state=materialPose.snapshot();
+      if(state.playing||state.candidate||state.poseRevision!==model.poseRevision||state.geometryKey!==model.geometryKey)return {status:'not_checked',geometryKey:model.geometryKey,poseRevision:model.poseRevision};
+      return checkMaterialInterference(model);
+    }).then(()=>{if(isBench()){applyHighlight();renderLiveStatus();}});
   }
   function renderLiveStatus() { renderLiveBox(); if (wiz) wiz.syncLive(); }
   function renderLiveBox() {
     if (!liveBox) return;
+    const coverage=liveBox.querySelector('#benchMaterialCoverage');
+    if(coverage){
+      const rows=materialPose.snapshot().report?.coverage?.notSupported || [];
+      const sig=JSON.stringify(rows);
+      if(coverage.dataset.sig!==sig){
+        coverage.dataset.sig=sig;coverage.hidden=!hasFace()||!rows.length;
+        while(coverage.firstChild)coverage.removeChild(coverage.firstChild);
+        coverage.appendChild(el('summary','',`未檢查項目（${rows.length}）`));
+        const list=el('ul');
+        const kinds={motors:'馬達本體',pins:'樞軸／銷柱',grounds:'固定銷',rails:'滑軌',carriages:'滑塊',racks:'齒條',cams:'凸輪',pulleys:'皮帶輪',belts:'皮帶'};
+        for(const row of rows){
+          const ids=row.partIds || row.sourceIds || [row.partId];
+          const label=row.kind?kinds[row.kind] || row.kind:'材料';
+          const reason=row.reason==='circular_boundary_uncertain'?'圓弧邊界無法確證':row.code==='material_representation_not_supported'?'精確材料尚未建模':'輪廓或姿態無法驗證';
+          list.appendChild(el('li','',`${label}：${ids.filter(Boolean).join('、')} — ${reason}`));
+        }
+        coverage.appendChild(list);
+      }
+    }
     const box = liveBox.querySelector('#benchLive');
     if (!box) return;
     const status = currentLiveStatus();
     if (status.state !== 'hit') { box.dataset.state = status.state; box.textContent = status.message; return; }
     box.dataset.state = 'hit';
     while (box.firstChild) box.removeChild(box.firstChild);
-    box.appendChild(el('div', 'bench-live-main', `✖ 撞到：${nameList(live.labels)}（共 ${live.findings.length} 項）`));
+    box.appendChild(el('div', 'bench-live-main', status.message));
     box.appendChild(el('div', 'bench-live-msg', live.msg));
   }
 
   function applyHighlight() {
     const v = viewer();
-    if (v && v.setHighlight) v.setHighlight(isBench() ? live.keys : []);
+    if (v && v.setHighlight) v.setHighlight(isBench() ? [...new Set([...live.keys,...(materialPose.snapshot().report?.findings || []).flatMap(f=>f.pickKeys)])] : []);
   }
 
   // 檢查目前姿勢。force：忽略節流與「沒變」判斷。
@@ -198,6 +245,7 @@ export function createBench(deps) {
   function runLiveNow(force) {
     if (!isBench()) return;
     live.timer = null;
+    if(hasFace()){syncMaterialPose();if(playing()){live.ready=false;live.keys=[];applyHighlight();renderLiveStatus();return;}runMaterialCheck();}
     const st0 = ensurePlan();
     const pose = currentPose();
     const sig = JSON.stringify(pose);
@@ -218,12 +266,18 @@ export function createBench(deps) {
   // 每幀／每次變動都可以呼叫：播放時節流成每 LIVE_MIN_MS 一次，最後一個姿勢用尾端計時器補查。
   function liveCheck(force = false) {
     if (!isBench()) return;
+    if(hasFace()) {
+      syncMaterialPose();
+      if(playing()){if(live.timer){clearTimeout(live.timer);live.timer=null;}live.ready=false;live.keys=[];applyHighlight();renderLiveStatus();return;}
+      if(!materialPose.snapshot().report){live.keys=[];applyHighlight();renderLiveStatus();}
+    }
     const wait = LIVE_MIN_MS - (performance.now() - live.at);
     if (force || wait <= 0) { if (live.timer) { clearTimeout(live.timer); live.timer = null; } runLive(force); return; }
     if (!live.timer) live.timer = setTimeout(() => runLive(), wait);
   }
   function resetLive() {
     if (live.timer) { clearTimeout(live.timer); live.timer = null; }
+    materialPose.observe(null);
     live.sig = ''; live.findings = []; live.hits = []; live.labels = []; live.msg = ''; live.keys = []; live.ready = false; live.error = false;
     applyHighlight();
     renderLiveStatus();
@@ -253,7 +307,7 @@ export function createBench(deps) {
   function runTimeline() { return inCand(runTimelineNow); }
   function runTimelineNow() {
     if (!isBench()) return null;
-    if (S.modules.some(m => m?.mount?.face)) { say('六面接合的跨面干涉尚未驗證'); return null; }
+    if (S.modules.some(m => m?.mount?.face)) { say('六面接合僅支援目前單一姿態；全行程尚未支援'); return null; }
     const st0 = ensurePlan();
     if (!st0.plan) { say('目前沒有可檢查的零件'); return null; }
     const args = interferenceArgs();
@@ -382,6 +436,7 @@ export function createBench(deps) {
     return box;
   }
   liveBox = makeLiveBox();
+  const materialCoverage=el('details');materialCoverage.id='benchMaterialCoverage';materialCoverage.hidden=true;liveBox.appendChild(materialCoverage);
   renderLiveStatus();
 
   // ---------------------------------------------------------------- 標記
@@ -477,6 +532,9 @@ export function createBench(deps) {
   // ptsAll：所有平面的解（子平面的點是該平面自己的座標）；planes：每個直角子平面的 { matrix, zOf }，
   // matrix 與 viewer 畫該平面子場景用的是同一個（model.orthogonal[].matrix，巢狀已逐層相乘）。
   function afterScene({ pts, ptsAll, model }) {
+    st.materialModel=isBench()&&!isCand()?model:null;
+    st.materialWorkKey=workKey();st.materialPoseKey=JSON.stringify(motorAnglesNow());
+    if(hasFace()){syncMaterialPose();applyHighlight();renderLiveStatus();}
     const sticks = (model && model.sticks) || [];
     const planes = {};
     ((model && model.orthogonal) || []).forEach(ch => {
@@ -1140,7 +1198,7 @@ export function createBench(deps) {
       snap: st.snapId,
       showAll: st.showAll,
       msg: st.msg,
-      live: { ready: live.ready, hits: live.hits, keys: live.keys, findings: live.findings.length, checks: live.checks, planBuilds: live.planBuilds, ms: live.ms },
+      live: { ready: live.ready, hits: live.hits, keys: live.keys, findings: live.findings.length, material:materialPose.snapshot(),checks: live.checks, planBuilds: live.planBuilds, ms: live.ms },
       timeline: tl.result ? { ms: tl.ms, summary: tl.summary.map(x => x.text) } : null,
       // 方便測試（C2）：各直角子平面的桿，在螢幕上的中點（用畫該平面子場景的同一個矩陣）。
       planeParts: Object.fromEntries(Object.entries((st.lastScene && st.lastScene.planes) || {}).map(([id, pl]) => {

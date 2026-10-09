@@ -13,7 +13,8 @@ const lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
 const key=p=>`${Math.round(p.x*1e6)},${Math.round(p.y*1e6)}`;
 
 /** Polygon boundary union: split crossings, retain only exterior edges, stitch closed loops. */
-export function unionOutlines(input) {
+export function unionOutlines(input, {precisionMm=1e-6,sampleMm=1e-5,minAreaMm2=1e-5,splitScale=1e10}={}) {
+  const pointKey=p=>precisionMm===1e-6?key(p):`${Math.round(p.x/precisionMm)},${Math.round(p.y/precisionMm)}`;
   const rings=input.map(r=>area(r)<0?[...r].reverse():r);
   if(rings.some(r=>r.length<3 || r.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y)))) throw Error('外形座標無效');
   const edges=rings.flatMap((r,owner)=>r.map((a,i)=>({a,b:r[(i+1)%r.length],owner,ts:[0,1]})));
@@ -31,23 +32,23 @@ export function unionOutlines(input) {
   }
   const boundary=new Map(), occupied=p=>rings.some(r=>inside(p,r));
   for(const e of edges) {
-    const ts=[...new Set(e.ts.map(t=>Math.round(t*1e10)/1e10))].sort((a,b)=>a-b);
+    const ts=[...new Set(e.ts.map(t=>Math.round(t*splitScale)/splitScale))].sort((a,b)=>a-b);
     for(let i=1;i<ts.length;i++) {
       const a=lerp(e.a,e.b,ts[i-1]),b=lerp(e.a,e.b,ts[i]),d=sub(b,a),len=Math.hypot(d.x,d.y);
-      if(len<1e-6)continue;
-      const m=lerp(a,b,.5),eps=Math.min(1e-5,len/10),n={x:-d.y/len*eps,y:d.x/len*eps};
-      if(occupied({x:m.x+n.x,y:m.y+n.y})&&!occupied({x:m.x-n.x,y:m.y-n.y}))boundary.set(`${key(a)}>${key(b)}`,{a,b});
+      if(len<precisionMm)continue;
+      const m=lerp(a,b,.5),eps=Math.min(sampleMm,len/10),n={x:-d.y/len*eps,y:d.x/len*eps};
+      if(occupied({x:m.x+n.x,y:m.y+n.y})&&!occupied({x:m.x-n.x,y:m.y-n.y}))boundary.set(`${pointKey(a)}>${pointKey(b)}`,{a,b});
     }
   }
   const remaining=[...boundary.values()], loops=[];
   while(remaining.length) {
-    const first=remaining.pop(),ring=[first.a],start=key(first.a);let end=first.b;
-    while(key(end)!==start) {
-      ring.push(end);const i=remaining.findIndex(e=>key(e.a)===key(end));
+    const first=remaining.pop(),ring=[first.a],start=pointKey(first.a);let end=first.b;
+    while(pointKey(end)!==start) {
+      ring.push(end);const i=remaining.findIndex(e=>pointKey(e.a)===pointKey(end));
       if(i<0)throw Error('合成外框未閉合，請調整重疊位置');
       end=remaining.splice(i,1)[0].b;
     }
-    if(Math.abs(area(ring))>1e-5)loops.push(ring);
+    if(Math.abs(area(ring))>minAreaMm2)loops.push(ring);
   }
   return loops;
 }

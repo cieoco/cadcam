@@ -1,3 +1,4 @@
+import {normalizeMaterialVoids,materialCircleContour} from '../blocks/material-voids.js';
 /**
  * blocks3d / viewer
  *
@@ -283,6 +284,10 @@ export function createViewer(container) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   container.appendChild(renderer.domElement);
+  const materialNotice=document.createElement('div');
+  materialNotice.style.cssText='position:absolute;left:8px;bottom:8px;max-width:90%;padding:4px 7px;background:#fff3cd;color:#754b00;font-size:12px;pointer-events:none;display:none';
+  container.appendChild(materialNotice);
+  const unsupportedMaterial=new THREE.MeshBasicMaterial({color:0xd58a16,wireframe:true});
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -552,6 +557,7 @@ export function createViewer(container) {
   // Representation only: every material island and machining feature comes from
   // the shared local catalog; pose matrices are already complete world poses.
   function renderMaterialParts(parts) {
+    const unverified=[];
     const inside=(p,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){
       const a=ring[i],b=ring[j];if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)hit=!hit;
     }return hit;};
@@ -569,15 +575,22 @@ export function createViewer(container) {
       }
       for(const ring of g.outlines) {
         const shape=new THREE.Shape();shape.moveTo(ring[0].x,ring[0].y);ring.slice(1).forEach(p=>shape.lineTo(p.x,p.y));shape.closePath();
-        for(const h of g.holes)if(inside(h,ring)){const path=new THREE.Path();path.absarc(h.x,h.y,h.r,0,Math.PI*2,true);shape.holes.push(path);}
-        for(const c of g.cutouts)if(c.points.length&&inside(c.points[0],ring)){const path=new THREE.Path();path.moveTo(c.points[0].x,c.points[0].y);c.points.slice(1).forEach(p=>path.lineTo(p.x,p.y));path.closePath();shape.holes.push(path);}
+        const rawVoids=[...g.holes.filter(h=>inside(h,ring)).map(h=>({circle:h,points:materialCircleContour(h,true)})),...g.cutouts.filter(c=>c.points.length&&inside(c.points[0],ring)).map(c=>({points:c.points}))];
+        let voids,diagnostic=null;
+        try{voids=normalizeMaterialVoids(rawVoids);}catch(e){
+          voids=[];diagnostic=e.message;unverified.push(part.partId);
+        } // Keep a visible wireframe outline when machining voids cannot be represented.
+        for(const v of voids){const path=new THREE.Path();if(v.circle){const h=v.circle;path.absarc(h.x,h.y,h.r,0,Math.PI*2,true);}else{path.moveTo(v.points[0].x,v.points[0].y);v.points.slice(1).forEach(p=>path.lineTo(p.x,p.y));path.closePath();}shape.holes.push(path);}
         const geo=new THREE.ExtrudeGeometry(shape,{depth:g.thicknessMm,bevelEnabled:false,curveSegments:24});
-        const material=g.kind==='bracket-wing'?bracketMat:g.kind.startsWith('screw')?gearBoltMat:plateMaterial(part.color || '#8799aa');
+        const material=diagnostic?unsupportedMaterial:g.kind==='bracket-wing'?bracketMat:g.kind.startsWith('screw')?gearBoltMat:plateMaterial(part.color || '#8799aa');
         const mesh=new THREE.Mesh(geo,material);mesh.matrixAutoUpdate=false;mesh.matrix.fromArray(part.pose.matrix);mesh.matrixWorldNeedsUpdate=true;
         mesh.userData.partId=part.partId;mesh.userData.geometryVersion=g.geometryVersion;
+        if(diagnostic)mesh.userData.geometryDiagnostic=diagnostic;
         addPart(mesh,part.pickKey);
       }
     }
+    materialNotice.textContent=unverified.length?`材料輪廓尚無法驗證（橙色線框）：${[...new Set(unverified)].join('、')}`:'';
+    materialNotice.style.display=unverified.length?'':'none';
   }
 
   function renderModel(model) {
@@ -1325,6 +1338,8 @@ export function createViewer(container) {
   if (resizeObserver) resizeObserver.observe(container);
 
   function dispose() {
+    materialNotice.remove();
+    unsupportedMaterial.dispose();
     stop();
     highlightSurface(null);
     clearDynamic();

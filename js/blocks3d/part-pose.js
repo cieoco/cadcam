@@ -1,11 +1,13 @@
 /** Scene structure supplies heights; catalog supplies material. No shape reconstruction. */
 import { IDENTITY_4, multiply4 } from './orthogonal-3d.js';
+import {assemblyRoles} from '../blocks/assembly-roles.js';
+import {readConnectionDescriptor} from '../blocks/connection-descriptor.js';
 import { poseMatrix, moduleFramePose } from '../blocks/part-geometry.js';
 const unit=v=>{const n=Math.hypot(v.x,v.y,v.z);return {x:v.x/n,y:v.y/n,z:v.z/n};};
 const basis=(u,v,n,p)=>[u.x,u.y,u.z,0,v.x,v.y,v.z,0,n.x,n.y,n.z,0,p.x,p.y,p.z,1];
 
 /** Child matrices already include all ancestors. Never compose a second parent. */
-export function attachPartMaterials(model,catalog,{comps=[],modules=[],points={}}={}) {
+export function attachPartMaterials(model,catalog,{comps=[],modules=[],points={},assemblyScope=false}={}) {
   const materialParts=[],diagnostics=[...catalog.diagnostics];
   const add=(id,localMatrix,parent,pickKey,color)=>{
     const geometry=catalog.parts[id];
@@ -42,7 +44,11 @@ export function attachPartMaterials(model,catalog,{comps=[],modules=[],points={}
     return {...scene,frame,sticks,plates,gears,modulePlates};
   };
   const main=visit(model,IDENTITY_4);
-  main.orthogonal=(model.orthogonal || []).map(child=>({...child,model:visit(child.model,child.matrix,`${child.id}/`)}));
+  main.orthogonal=(model.orthogonal || []).map(child=>{
+    for(const d of child.diagnostics || [])diagnostics.push({...d,status:'not_supported',sourceIds:[d.partId || child.id]});
+    if(child.displayAnchor?.resolvedEndpoint===false)diagnostics.push({status:'not_supported',code:'material_endpoint_unresolved',sourceIds:[child.id]});
+    return {...child,model:visit(child.model,child.matrix,`${child.id}/`)};
+  });
   for(const [i,b] of (model.brackets || []).entries()) {
     const ax=b.axes,p={x:b.center.x-ax[2].x*b.size.z/2,y:b.center.y-ax[2].y*b.size.z/2,z:b.center.z-ax[2].z*b.size.z/2};
     if(!add(b.id,basis(ax[0],ax[1],ax[2],p),IDENTITY_4,`${b.moduleId}/bracket:${i}`,'#a8afb5'))diagnostics.push({status:'not_supported',code:'legacy_bracket_material_bridge',sourceIds:[b.id || b.moduleId]});
@@ -57,5 +63,14 @@ export function attachPartMaterials(model,catalog,{comps=[],modules=[],points={}
   }
   main.brackets=(model.brackets || []).map(b=>({...b,materialPartId:catalog.parts[b.id]?b.id:null}));
   main.screws=(model.screws || []).map(s=>({...s,materialPartId:catalog.parts[s.id]?s.id:null}));
+  if(assemblyScope){
+    const active=new Set(assemblyRoles(modules).machine);
+    const shown=new Set(materialParts.map(p=>p.partId));
+    for(const geometry of Object.values(catalog.parts))if((geometry.moduleId==null || active.has(geometry.moduleId))&&!shown.has(geometry.partId))diagnostics.push({status:'not_supported',code:'expected_material_pose_missing',sourceIds:[geometry.partId],moduleId:geometry.moduleId});
+    for(const mod of modules.filter(m=>m.mount?.face)){
+      const connection=readConnectionDescriptor({comps,modules,childId:mod.id});
+      if(!connection.ok)for(const d of connection.diagnostics)diagnostics.push({...d,status:'not_supported',sourceIds:[d.partId || mod.id]});
+    }
+  }
   return {...main,materialParts,geometryDiagnostics:diagnostics,geometryKey:catalog.key};
 }

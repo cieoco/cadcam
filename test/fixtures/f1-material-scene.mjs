@@ -1,0 +1,24 @@
+import {compileAssembly,solveAssembly} from '../../js/blocks/assembly.js';
+import {buildPartGeometryCatalog} from '../../js/blocks/part-geometry.js';
+import {buildPreviewModelInputs} from '../../js/blocks/preview-model-inputs.js';
+import {buildSceneModel} from '../../js/blocks3d/scene-model.js';
+import {buildOrthogonalChildren,attachModulePlates,planeInputs} from '../../js/blocks3d/orthogonal-3d.js';
+import {attachPartMaterials} from '../../js/blocks3d/part-pose.js';
+import {deriveMotorMounts} from '../../js/blocks/build-plan.js';
+import assert from 'node:assert/strict';
+export const f1MaterialScene=(thetaDeg,fixture,shape=buildPartGeometryCatalog(fixture))=>{
+ const input=structuredClone(fixture),asm=compileAssembly(input.comps,input.modules,{params:input.params});
+ const sol=solveAssembly(asm,{thetaDeg,motorAngles:{'2':0}});assert.ok(sol.isValid);
+ const compiled=asm.compiled || asm;
+ const links=input.comps.filter(c=>c.type==='bar').map(c=>({id:c.id,p1:c.p1.id,p2:c.p2.id}));
+ const polygons=input.comps.filter(c=>c.type==='triangle').map(c=>({points:[c.p1.id,c.p2.id,c.p3.id]}));
+ const inputs=buildPreviewModelInputs({comps:input.comps,params:input.params,theta:thetaDeg,links,points:sol.points,groundIds:new Set(input.comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(p=>p?.type==='fixed').map(p=>p.id))),motorCenterIds:new Set(),motorTypes:new Map(),motorMounts:deriveMotorMounts(input.comps),polygons});
+ const opts={plateThickness:4,memberStocks:shape.memberStocks,gearGeometries:shape.parts,fusedParts:shape.fusedParts};
+ const create=(inp,frameGeometry=null)=>buildSceneModel(inp.links,inp.pts,{...opts,...inp,motorCenters:inp.motorCenterIds,frameGeometry});
+ const main=create(planeInputs(inputs,input.comps,input.modules,null),shape.parts.frame);
+ const plates=shape.frameHomes.map(h=>({...h,...h.geometry,outline:h.geometry.outlines[0],thicknessMm:h.stockMm}));
+ attachModulePlates(main,input.comps,plates);
+ main.orthogonal=buildOrthogonalChildren({...input,inputs,mainModel:main,plates,stockMm:4,joint:fixture.fabrication.joint,buildModel:inp=>create(inp)});
+ main.brackets=main.orthogonal.flatMap(c=>c.brackets || []);main.screws=main.orthogonal.flatMap(c=>c.screws || []);
+ return {model:attachPartMaterials(main,shape,{...input,points:sol.points,assemblyScope:true}),points:sol.points};
+};

@@ -73,7 +73,12 @@ export function buildPartGeometryCatalog(args={}) {
   const mainNodes=withWorldAdapterNodes(frameNodes || frameConnectorNodes(machineFrameComps(comps,modules)),extras);
   const worldMounts=input.frameMounts || machineMounts(splitFrameMounts(split.free,comps,modules).world,comps,modules);
   const frame=Exporters.inspectFrameExport(mainNodes,settings,worldMounts);
-  if(frame?.outlines?.length)add('frame','frame',frame,frameStockOf(mainNodes).thicknessMm || stockMm,['frame'],{kind:'frame'});
+  if(frame?.outlines?.length){
+    const nodeIds=new Set(mainNodes.map(n=>n.id));
+    const owners=[...new Set(comps.filter(c=>[c.p1,c.p2,c.p3].some(p=>p&&nodeIds.has(p.id))).map(c=>c.moduleId || null))];
+    add('frame','frame',frame,frameStockOf(mainNodes).thicknessMm || stockMm,['frame'],{kind:'frame'},owners.length===1?owners[0]:null);
+    parts.frame.sourceModuleIds=owners;
+  }
   const homes=framePlateHomes(comps,modules,params,{exportSettings:settings,mounts,joint,stockMm});
   for(const h of homes)add(h.name,'mounted-frame',h.geometry,h.stockMm,[h.moduleId,'frame'],{kind:'module-frame'},h.moduleId);
   for(const adapter of extras.adapters)for(const b of adapter.physical || [])for(const w of b.wings) {
