@@ -15,6 +15,7 @@
   ],
   "timeoutMs": 90000,
   "tests": [
+    "test/performance-fixtures.mjs",
     "test/assembly-lesson-wizard.mjs",
     "test/mate-candidate.mjs",
     "test/rack-face-candidate.mjs",

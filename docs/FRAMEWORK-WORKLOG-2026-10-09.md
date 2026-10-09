@@ -5,7 +5,7 @@
 ## 接手資訊
 
 - 分支：`codex/framework-stabilization`；起點：`1537242`（應用 `2026.10.08.13`）。
-- 唯一寫入者：`w4a_physical`（Sol high）；W4b-3保存尺寸精度＋已批准3b缺省馬達方向相容性施工中，root只讀review／HTTP；不再委派，待驗收批准scoped提交後STOP。
+- 唯一寫入者：`root`；W4b-3 子任務停止後已接回施工，現進行 W6。持續 LOOP，不在工作包邊界等待批准；不再委派。
 - 本機：Windows、Node `v25.2.0`、Python `3.13.5`。CI 的 Node 版本在 W1 固定並驗證。
 - 使用者原有未追蹤附件、`Claude outputs/`、截圖及框架檢討文件保留。提交只選本包檔案。
 - Astra 僅 low；更高推理強度須另獲確認。主聊天不宣稱自行切換模型。
@@ -15,15 +15,15 @@
 
 | ID | 狀態 | 本輪結果與下一步 |
 | --- | --- | --- |
-| W0 | reproducing | 重新登錄並執行測試；核對 D1 端點保存能力與教材缺口 |
+| W0 | baseline recorded | 測試與 D1／D2 基準已記錄；實機資料待 OPPO 使用者提供 |
 | W1 | done | 九項失敗完成分類／修正；Node 22.14.0 全套 143/143；cold HTTP 通過，舊快取混載轉 W2 修復 |
 | W2 | done | 120 模組／15 頁同圖生成與 CI check；主頁／iframe 握手拒絕異批確認；Node 22.14.0 全套 144/144 與 HTTP 通過 |
 | W3a | done | F1 六面純讀取／保存／重選／真 bar 層高；同圖 check、Node22 全套 146/146、主代理 HTTP 通過 |
 | W4a–W5a／G1 | done (F1) | W4a共用角碼／材料／單姿態SAT／快取，W5a純候選交易／實際SVG-DXF-製作包trace已貫通；G1內部門檻通過，F1真撞如實保留。其他格式留b階段，完整F3及OPPO實機仍限制W6 |
 | W3b | done | planar／orient／face共同唯讀契約，宿主frame／body／output身分分離；Node22 156/156＋F1 HTTP通過，共用實體接入留W4b |
-| W4b | LOOP 2 done (scoped) | 金屬共用physical及六面host frame／F3多接合貫通；Node22 158/158＋HTTP。原builtin保存尺寸吸附缺口另包必做，F2／教材／W5b／W6仍待 |
-| W5b | planned | 其餘格式交易、多接合位置、教材與效能 |
-| W6 | planned | 全面驗收、提交推送與發布核對 |
+| W4b | done (supported scope) | 金屬角碼同源、F2 齒條材料、F3 串接／雙夾爪、尺寸與馬達方向保存均有回歸；齒條鑽孔不支援仍明示 |
+| W5b | done | 舊接法獨立候選、狀態一致、F4 雙孔精靈教材、390×844 操作與實際製作包完成 |
+| W6 | in progress | 最新本地 163/163；固定共同效能作品與公開資產量測包完成，Linux CI、OPPO 實機與正式發布尚待 |
 
 ## LOOP 紀錄
 
@@ -301,3 +301,11 @@ G1內部F1門檻已貫通，可接續W3b→W4b→W5b；這不是發布或全格�
 - 新 assembly-lesson-wizard 驗證真兩孔、兩板 Ø3.2、0／20／40世界孔軸一致1e-6、v1往返、碰孔／出界拒絕。定向6/6。完整161/162，唯一 orient-bracket-physical 發現上包擴充 planar export 遺漏 face+printed 必須仍走受檢出口；已恢復 face 優先 guard，定向最終5/5。graph 5b9fe6370057e26d5649，139modules／16pages。
 - HTTP 從下拉教材練習→組立→雙孔對鎖→預覽→接上→M1播放；390×844拆下／預覽／取消／再接上全部可操作，clientWidth=scrollWidth=390。http-desktop.jpg、http-phone.jpg、實際下載 http-pack.html 留 w5b-lesson。播放標記待檢查，未假稱五金全驗證。
 - 手機驗收另修拆下後未檢查清單殘留：coverage可見性不再只跟 rows hash 更新；afterScene 即使沒有mount也清掉過期材料狀態。最終發布完整回歸留 W6。下一步同條件效能 fixtures、OPPO量測入口及發布收尾；未push／部署。
+
+### W6-1 — 同條件效能入口與整合回歸
+- root 持續唯一 writer。新舊 schema 的尺寸正規化不同，量測改使用基準版先正規化的固定 F1／F3 JSON；產生器驗證兩版 comps／modules／params 完全一致，每筆樣本帶 fixture SHA256。正式產品尺寸保存修正沒有回退。
+- 新 performance-fixtures 納入 manifest；Node22 定向 3/3、最新完整 **163/163** 通過，證據 `w6-phone/full/results.json`。此輪 commit 尚含工作中差異，最後發布仍以同 commit CI 為準。graph **61ff8d9759071311a34a**（138 modules／16 pages）check 通過。
+- LAN HTTP 的 UUID 改以 getRandomValues 相容，不依賴 secure-context randomUUID。量測使用隔離工作頁，全部完成與 invalid 紀錄保留，不載入使用者 autosave。
+- performance-phone 只複製公開程式、樣式、量測 fixtures 與基準程式到專用目錄，未暴露 workspace／原始 archive。HTTP 實查 bundle 與 fixture 200；docs、.git/config、私人附件路徑均 404；未變更防火牆。
+- 已請使用者用同網路 OPPO 開量測頁並提供型號；桌面量測正在驗證入口，不能當作 OPPO 通過。正式版本仍 2026.10.08.13，未發布。
+- 最終能力盤點：planar 定位仍使用既有 base/output 解算器，材料／雙孔已共用；descriptor 的 legacy bridge 表示未提供共用接件實體驗證，不等同整個 planar 教材失效。非金屬轉接件、同平面固定螺絲、馬達／銷與全行程材料驗證不宣稱已建模；齒條角碼開孔仍不可用。金屬沿邊與六面角碼已共用實體，沒有第二份角碼核心。

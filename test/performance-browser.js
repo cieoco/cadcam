@@ -1,5 +1,3 @@
-import {f1AssemblyFixture,f1NestedFixture} from './fixtures/f1-assembly-fixture.mjs';
-import {toSnapshot} from '../js/blocks/schema.js';
 import {LOAD_GRAPH_TOKEN} from '../js/load-graph.js';
 const $=id=>document.getElementById(id),frame=$('work'),key='cadcam.performance.runs.v1';
 let running=false,stopped=false,records=[],sourceLoaded=frame.contentDocument?.readyState==='complete';
@@ -7,6 +5,7 @@ frame.addEventListener('load',()=>{sourceLoaded=true;});
 const database=new Promise((resolve,reject)=>{const request=indexedDB.open('cadcam.performance',1);request.onupgradeneeded=()=>request.result.createObjectStore('runs',{keyPath:'runId'});request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
 const history=database.then(db=>new Promise((resolve,reject)=>{const r=db.transaction('runs').objectStore('runs').getAll();r.onsuccess=()=>{records=r.result;try{const interrupted=JSON.parse(localStorage.getItem(key+'.interrupted') || 'null');if(interrupted&&!records.some(r=>r.runId===interrupted.runId))records.push(interrupted);}catch(_){}render();resolve();};r.onerror=()=>reject(r.error);}));
 const status=text=>$('status').textContent=text;
+$('sourceToken').textContent='施工版本：'+LOAD_GRAPH_TOKEN;
 const persist=()=>database.then(db=>{const tx=db.transaction('runs','readwrite');for(const r of records)tx.objectStore('runs').put(r);tx.oncomplete=()=>localStorage.removeItem(key+'.interrupted');tx.onerror=()=>status('紀錄儲存失敗，請下載保存；目前紀錄仍在此頁。');}).catch(()=>status('IndexedDB無法儲存，請下載全部紀錄。'));
 const displayCoverage=coverage=>coverage?.geometryCounters?{...coverage,geometryCounters:Object.fromEntries(Object.entries(coverage.geometryCounters).filter(([name])=>name!=='key'))}:coverage;
 const render=()=>$('results').textContent=JSON.stringify(records.map(r=>({source:r.source,fixture:r.fixture,run:r.run,status:r.status,reason:r.invalidReason,summary:r.summary,geometry:r.samples?.at(-1)?.geometryCounters,coverage:displayCoverage(r.coverage)})),null,2);
@@ -21,13 +20,13 @@ $('start').onclick=async()=>{
  if(running)return;running=true;stopped=false;$('start').disabled=true;
  try{
   await history;const b=await ready();
-  for(const [name,make] of [['F1',f1AssemblyFixture],['F3-provisional-nested',f1NestedFixture]]){
+  const fixtures=await (await fetch('./fixtures/performance/common.json')).json();
+  for(const {name,snapshot,sha256} of fixtures.fixtures){
    for(let run=1;run<=3&&!stopped;run++){
-    const f=make(),snapshot=toSnapshot(f.comps,{params:f.params},3,{modules:f.modules,fabrication:f.fabrication,activeMotor:'1',motorAngles:{'2':0}});
     const coverage=await b.load(snapshot);
     if(stopped)break;
-    b.start({runId:crypto.randomUUID(),fixture:name,source:$('source').value,run,deviceNote:$('device').value || '未提供型號／硬體資料',parentSourceToken:LOAD_GRAPH_TOKEN,coverage,
-     physicalDeviceRequired:true,fixtureProvisional:name!=='F1',motion:{activeMotor:'1',otherMotorDeg:0,input:f.comps.filter(c=>c.isInput).map(c=>({id:c.id,type:c.motorType,start:c.servoStart,end:c.servoEnd}))}});
+    b.start({runId:typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint32Array(4)),n=>n.toString(16)).join('-'),fixture:name,fixtureSha256:sha256,baselineSha:fixtures.baselineSha,source:$('source').value,run,deviceNote:$('device').value || '未提供型號／硬體資料',parentSourceToken:LOAD_GRAPH_TOKEN,coverage,
+     physicalDeviceRequired:true,fixtureProvisional:false,motion:{activeMotor:'1',otherMotorDeg:0,input:snapshot.comps.filter(c=>c.isInput).map(c=>({id:c.id,type:c.motorType,start:c.servoStart,end:c.servoEnd}))}});
     while(!stopped&&b.status().status!=='idle'){const s=b.status();status(`${name} 第${run}/3次：${s.status} · ${(s.elapsedMs/1000).toFixed(0)}秒 · ${s.samples} samples`);await delay(1000);}
     const last=b.result().runs.at(-1);saveRun(last);b.abort('run_finished');if(last?.status!=='complete'){stopped=true;break;}
    }

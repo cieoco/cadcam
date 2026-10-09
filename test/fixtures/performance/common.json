@@ -1,0 +1,1205 @@
+{
+  "version": 1,
+  "baselineSha": "153724267f360ac04141c04989b520be09bbc241",
+  "normalization": "Canonical baseline dimensions and explicit motor defaults; same input for both releases",
+  "fixtures": [
+    {
+      "name": "F1",
+      "sha256": "c9c2f0fe52860d57430b082d69f70ae3fb002f294516a5a0c673cf9336383056",
+      "snapshot": {
+        "kind": "blocks",
+        "v": 1,
+        "counter": 3,
+        "comps": [
+          {
+            "type": "anchor",
+            "id": "Anchor1_1",
+            "p1": {
+              "id": "O1_1",
+              "type": "fixed",
+              "x": 0,
+              "y": 0
+            },
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "anchor",
+            "id": "Anchor2_1",
+            "p1": {
+              "id": "O2_1",
+              "type": "fixed",
+              "x": 0,
+              "y": 72
+            },
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "LiftCrank_1",
+            "color": "#e74c3c",
+            "p1": {
+              "id": "O1_1",
+              "type": "fixed",
+              "x": 0,
+              "y": 0,
+              "physicalMotor": "1"
+            },
+            "p2": {
+              "id": "A_1",
+              "type": "floating",
+              "x": 140,
+              "y": 0
+            },
+            "lenParam": "LIFT_ARM_1",
+            "isInput": true,
+            "fixedLen": true,
+            "assemblyType": "parallel-fourbar-lift",
+            "phaseOffset": 0,
+            "physicalMotor": "1",
+            "motorType": "mg995",
+            "servoStart": -60,
+            "servoEnd": 60,
+            "motorMount": {
+              "motor": "1",
+              "center": "O1_1",
+              "outputBody": "LiftCrank_1",
+              "orientation": "horizontal",
+              "reversed": false,
+              "order": [
+                "motor",
+                "outputBody"
+              ]
+            },
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "LiftFollower_1",
+            "color": "#3498db",
+            "p1": {
+              "id": "O2_1",
+              "type": "fixed",
+              "x": 0,
+              "y": 72
+            },
+            "p2": {
+              "id": "B_1",
+              "type": "floating",
+              "x": 140,
+              "y": 72
+            },
+            "lenParam": "LIFT_ARM_2_1",
+            "isInput": false,
+            "fixedLen": true,
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "LiftUpright_1",
+            "color": "#27ae60",
+            "p1": {
+              "id": "A_1",
+              "type": "floating",
+              "x": 140,
+              "y": 0
+            },
+            "p2": {
+              "id": "B_1",
+              "type": "floating",
+              "x": 140,
+              "y": 72
+            },
+            "lenParam": "LIFT_UPRIGHT_1",
+            "isInput": false,
+            "fixedLen": true,
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "ToolPlate_1",
+            "color": "#f39c12",
+            "p1": {
+              "id": "B_1",
+              "type": "floating",
+              "x": 140,
+              "y": 72
+            },
+            "p2": {
+              "id": "C_1",
+              "type": "floating",
+              "x": 220,
+              "y": 72
+            },
+            "lenParam": "LIFT_TOOL_TOP_1",
+            "isInput": false,
+            "fixedLen": true,
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "ToolBrace_1",
+            "color": "#f39c12",
+            "p1": {
+              "id": "A_1",
+              "type": "floating",
+              "x": 140,
+              "y": 0
+            },
+            "p2": {
+              "id": "D_1",
+              "type": "floating",
+              "x": 220,
+              "y": 0
+            },
+            "lenParam": "LIFT_TOOL_BOTTOM_1",
+            "isInput": false,
+            "fixedLen": true,
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "ToolFront_1",
+            "color": "#f39c12",
+            "p1": {
+              "id": "D_1",
+              "type": "floating",
+              "x": 220,
+              "y": 0
+            },
+            "p2": {
+              "id": "C_1",
+              "type": "floating",
+              "x": 220,
+              "y": 72
+            },
+            "lenParam": "LIFT_TOOL_FRONT_1",
+            "isInput": false,
+            "fixedLen": true,
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "ToolDiag_1",
+            "color": "#f39c12",
+            "p1": {
+              "id": "B_1",
+              "type": "floating",
+              "x": 140,
+              "y": 72
+            },
+            "p2": {
+              "id": "D_1",
+              "type": "floating",
+              "x": 220,
+              "y": 0
+            },
+            "lenParam": "LIFT_TOOL_DIAG_1",
+            "isInput": false,
+            "fixedLen": true,
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "gear",
+            "id": "GearA_3",
+            "color": "#e74c3c",
+            "p1": {
+              "id": "GCA_3",
+              "type": "motor",
+              "x": -30,
+              "y": -40,
+              "physicalMotor": "2"
+            },
+            "p2": {
+              "id": "GPA_3",
+              "type": "floating",
+              "x": -30,
+              "y": -22
+            },
+            "radiusParam": "GRA_3",
+            "teeth": 15,
+            "module": 4,
+            "phase": 90,
+            "pinRadiusParam": "GPRA_3",
+            "pinHoleDiameter": 3.2,
+            "motorType": "mg995",
+            "servoStart": 0,
+            "servoEnd": 24,
+            "moduleId": "Mod3"
+          },
+          {
+            "type": "gear",
+            "id": "GearB_3",
+            "color": "#2c6fbb",
+            "p1": {
+              "id": "GCB_3",
+              "type": "fixed",
+              "x": 30,
+              "y": -40
+            },
+            "p2": {
+              "id": "GPB_3",
+              "type": "floating",
+              "x": 30,
+              "y": -22
+            },
+            "radiusParam": "GRB_3",
+            "teeth": 15,
+            "module": 4,
+            "phase": 90,
+            "pinRadiusParam": "GPRB_3",
+            "pinHoleDiameter": 3.2,
+            "mesh": "GearA_3",
+            "moduleId": "Mod3"
+          },
+          {
+            "type": "triangle",
+            "id": "LeftJaw_3",
+            "color": "#ff6b35",
+            "p1": {
+              "id": "GCA_3",
+              "type": "motor",
+              "x": -30,
+              "y": -40,
+              "physicalMotor": "2"
+            },
+            "p2": {
+              "id": "GPA_3",
+              "type": "floating",
+              "x": -30,
+              "y": -22
+            },
+            "p3": {
+              "id": "LT_3",
+              "type": "floating",
+              "x": -95,
+              "y": -125
+            },
+            "gParam": "GPRA_3",
+            "r1Param": "LJ_tip_3",
+            "r2Param": "LJ_edge_3",
+            "sign": 1,
+            "shape": "jaw",
+            "shapeMode": "polyline",
+            "jawTurnSign": 1,
+            "vertices": [
+              {
+                "solve": true,
+                "ref": "p1"
+              },
+              {
+                "solve": true,
+                "ref": "p2"
+              },
+              {
+                "solve": true,
+                "ref": "p3"
+              }
+            ],
+            "moduleId": "Mod3"
+          },
+          {
+            "type": "triangle",
+            "id": "RightJaw_3",
+            "color": "#ff6b35",
+            "p1": {
+              "id": "GCB_3",
+              "type": "fixed",
+              "x": 30,
+              "y": -40
+            },
+            "p2": {
+              "id": "GPB_3",
+              "type": "floating",
+              "x": 30,
+              "y": -22
+            },
+            "p3": {
+              "id": "RT_3",
+              "type": "floating",
+              "x": 95,
+              "y": -125
+            },
+            "gParam": "GPRB_3",
+            "r1Param": "RJ_tip_3",
+            "r2Param": "RJ_edge_3",
+            "sign": -1,
+            "shape": "jaw",
+            "shapeMode": "polyline",
+            "jawTurnSign": -1,
+            "vertices": [
+              {
+                "solve": true,
+                "ref": "p1"
+              },
+              {
+                "solve": true,
+                "ref": "p2"
+              },
+              {
+                "solve": true,
+                "ref": "p3"
+              }
+            ],
+            "moduleId": "Mod3"
+          },
+          {
+            "type": "anchor",
+            "id": "GripMount_3",
+            "p1": {
+              "id": "GripMount_3",
+              "type": "fixed",
+              "x": 0,
+              "y": 0
+            },
+            "moduleId": "Mod3"
+          }
+        ],
+        "params": {
+          "LIFT_ARM_1": 144,
+          "LIFT_ARM_2_1": 144,
+          "LIFT_UPRIGHT_1": 72,
+          "LIFT_TOOL_TOP_1": 80,
+          "LIFT_TOOL_BOTTOM_1": 80,
+          "LIFT_TOOL_FRONT_1": 72,
+          "LIFT_TOOL_DIAG_1": 104,
+          "GRA_3": 30,
+          "GPRA_3": 18,
+          "GRB_3": 30,
+          "GPRB_3": 18,
+          "LJ_tip_3": 107,
+          "LJ_edge_3": 122,
+          "RJ_tip_3": 107,
+          "RJ_edge_3": 122
+        },
+        "motorAngles": {
+          "2": 0
+        },
+        "fabrication": {
+          "v": 1,
+          "export": {
+            "barWidthMm": 18,
+            "holeDiameterMm": 3.2,
+            "frameMarginMm": 18,
+            "frameHoleDiameterMm": 3.2,
+            "ttShaftFlatDiameterMm": 5.4,
+            "ttShaftFlatThicknessMm": 3.7
+          },
+          "ttMount": {
+            "shaftDiameterMm": 6,
+            "screwDiameterMm": 3,
+            "screwOffsetXMm": -20.6,
+            "screwSpacingMm": 17.3,
+            "locatorDiameterMm": 4,
+            "locatorOffsetXMm": -11.18,
+            "locatorOffsetYMm": 0
+          },
+          "mg995Mount": {
+            "bodyLengthMm": 41.2,
+            "bodyWidthMm": 20.2,
+            "shaftOffsetMm": 10,
+            "screwDiameterMm": 3.2,
+            "screwSpanMm": 49.5,
+            "screwSpacingMm": 10,
+            "cableNotchWidthMm": 8,
+            "cableNotchDepthMm": 4
+          },
+          "cnc": {
+            "toolDiameterMm": 3.175,
+            "stockThicknessMm": 4
+          },
+          "drive": {
+            "ttHubCenterMm": 6,
+            "ttHubScrewMm": 3.2,
+            "ttHubScrewSpacingMm": 12,
+            "hornCenterMm": 6,
+            "hornScrewMm": 2.2,
+            "hornScrewCount": 4,
+            "hornScrewCircleMm": 14
+          },
+          "joint": {
+            "defaultKind": "bracket-m3",
+            "bracket": {
+              "widthMm": 7,
+              "thicknessMm": 1.2,
+              "longLegMm": 13,
+              "shortLegMm": 9.5,
+              "holeEndMm": 3.5
+            }
+          }
+        },
+        "modules": [
+          {
+            "id": "Mod1",
+            "name": "四連桿升降臂",
+            "source": "competition-fourbar-lift",
+            "base": "O1_1",
+            "outputs": [
+              {
+                "id": "tool",
+                "name": "工具架",
+                "at": "D_1",
+                "body": {
+                  "kind": "bar",
+                  "id": "ToolBrace_1"
+                },
+                "orthogonal": {
+                  "side": -1
+                }
+              }
+            ],
+            "mount": null,
+            "mates": {
+              "attach": {
+                "normalDeg": 180
+              },
+              "receive": [
+                {
+                  "id": "r1",
+                  "name": "工具架上緣",
+                  "ref": {
+                    "kind": "bar",
+                    "id": "ToolBrace_1",
+                    "side": 1
+                  }
+                },
+                {
+                  "id": "r2",
+                  "name": "工具架下緣",
+                  "ref": {
+                    "kind": "bar",
+                    "id": "ToolBrace_1",
+                    "side": -1
+                  }
+                }
+              ]
+            },
+            "faceParts": {
+              "part": "ToolBrace_1",
+              "face": "back"
+            }
+          },
+          {
+            "id": "Mod3",
+            "name": "齒輪夾爪",
+            "source": "gear-gripper",
+            "base": "GripMount_3",
+            "outputs": [],
+            "mount": {
+              "to": {
+                "module": "Mod1",
+                "output": "tool"
+              },
+              "ref": {
+                "x": 220,
+                "y": -1.2631870857957336e-14,
+                "a": -9.046911093940669e-15
+              },
+              "home": {},
+              "face": {
+                "version": 1,
+                "rotation": [
+                  [
+                    6.123233995736766e-17,
+                    -1,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    -1
+                  ],
+                  [
+                    1,
+                    6.123233995736766e-17,
+                    0
+                  ]
+                ],
+                "translation": {
+                  "x": 159.92114717086884,
+                  "y": -11,
+                  "z": 1.2294751423873125e-15
+                },
+                "selection": {
+                  "brackets": {
+                    "enabled": true,
+                    "offsets": {
+                      "L1": 0,
+                      "R1": 0,
+                      "L2": 0
+                    },
+                    "childPart": "frame"
+                  },
+                  "hostFace": "back",
+                  "childFace": "bottom",
+                  "alignU": 0,
+                  "alignV": 0,
+                  "offsetU": 0,
+                  "offsetV": 0,
+                  "gap": 0,
+                  "quarterTurns": 1
+                },
+                "hostThicknessMm": 4,
+                "childThicknessMm": 4
+              }
+            },
+            "mates": {
+              "attach": {
+                "normalDeg": 90
+              },
+              "receive": []
+            },
+            "faceParts": {
+              "part": "frame",
+              "face": "bottom"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "F3",
+      "sha256": "d378c8cf0c4c85010b320f7a5cdd4863e83d154c02892ecb03d07d88dbeebd4d",
+      "snapshot": {
+        "kind": "blocks",
+        "v": 1,
+        "counter": 3,
+        "comps": [
+          {
+            "type": "bar",
+            "id": "BaseBar",
+            "color": "#3498db",
+            "p1": {
+              "id": "Base0",
+              "type": "fixed",
+              "x": -180,
+              "y": 0
+            },
+            "p2": {
+              "id": "Base1",
+              "type": "fixed",
+              "x": 180,
+              "y": 0
+            },
+            "lenParam": "LL1",
+            "isInput": false,
+            "fixedLen": true,
+            "stock": {
+              "widthMm": 120,
+              "thicknessMm": 4,
+              "material": "unspecified"
+            },
+            "moduleId": "Base"
+          },
+          {
+            "type": "anchor",
+            "id": "Anchor1_1",
+            "p1": {
+              "id": "O1_1",
+              "type": "fixed",
+              "x": 0,
+              "y": 0
+            },
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "anchor",
+            "id": "Anchor2_1",
+            "p1": {
+              "id": "O2_1",
+              "type": "fixed",
+              "x": 0,
+              "y": 72
+            },
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "LiftCrank_1",
+            "color": "#e74c3c",
+            "p1": {
+              "id": "O1_1",
+              "type": "fixed",
+              "x": 0,
+              "y": 0,
+              "physicalMotor": "1"
+            },
+            "p2": {
+              "id": "A_1",
+              "type": "floating",
+              "x": 140,
+              "y": 0
+            },
+            "lenParam": "LIFT_ARM_1",
+            "isInput": true,
+            "fixedLen": true,
+            "assemblyType": "parallel-fourbar-lift",
+            "phaseOffset": 0,
+            "physicalMotor": "1",
+            "motorType": "mg995",
+            "servoStart": -60,
+            "servoEnd": 60,
+            "motorMount": {
+              "motor": "1",
+              "center": "O1_1",
+              "outputBody": "LiftCrank_1",
+              "orientation": "horizontal",
+              "reversed": false,
+              "order": [
+                "motor",
+                "outputBody"
+              ]
+            },
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "LiftFollower_1",
+            "color": "#3498db",
+            "p1": {
+              "id": "O2_1",
+              "type": "fixed",
+              "x": 0,
+              "y": 72
+            },
+            "p2": {
+              "id": "B_1",
+              "type": "floating",
+              "x": 140,
+              "y": 72
+            },
+            "lenParam": "LIFT_ARM_2_1",
+            "isInput": false,
+            "fixedLen": true,
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "LiftUpright_1",
+            "color": "#27ae60",
+            "p1": {
+              "id": "A_1",
+              "type": "floating",
+              "x": 140,
+              "y": 0
+            },
+            "p2": {
+              "id": "B_1",
+              "type": "floating",
+              "x": 140,
+              "y": 72
+            },
+            "lenParam": "LIFT_UPRIGHT_1",
+            "isInput": false,
+            "fixedLen": true,
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "ToolPlate_1",
+            "color": "#f39c12",
+            "p1": {
+              "id": "B_1",
+              "type": "floating",
+              "x": 140,
+              "y": 72
+            },
+            "p2": {
+              "id": "C_1",
+              "type": "floating",
+              "x": 220,
+              "y": 72
+            },
+            "lenParam": "LIFT_TOOL_TOP_1",
+            "isInput": false,
+            "fixedLen": true,
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "ToolBrace_1",
+            "color": "#f39c12",
+            "p1": {
+              "id": "A_1",
+              "type": "floating",
+              "x": 140,
+              "y": 0
+            },
+            "p2": {
+              "id": "D_1",
+              "type": "floating",
+              "x": 220,
+              "y": 0
+            },
+            "lenParam": "LIFT_TOOL_BOTTOM_1",
+            "isInput": false,
+            "fixedLen": true,
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "ToolFront_1",
+            "color": "#f39c12",
+            "p1": {
+              "id": "D_1",
+              "type": "floating",
+              "x": 220,
+              "y": 0
+            },
+            "p2": {
+              "id": "C_1",
+              "type": "floating",
+              "x": 220,
+              "y": 72
+            },
+            "lenParam": "LIFT_TOOL_FRONT_1",
+            "isInput": false,
+            "fixedLen": true,
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "bar",
+            "id": "ToolDiag_1",
+            "color": "#f39c12",
+            "p1": {
+              "id": "B_1",
+              "type": "floating",
+              "x": 140,
+              "y": 72
+            },
+            "p2": {
+              "id": "D_1",
+              "type": "floating",
+              "x": 220,
+              "y": 0
+            },
+            "lenParam": "LIFT_TOOL_DIAG_1",
+            "isInput": false,
+            "fixedLen": true,
+            "moduleId": "Mod1"
+          },
+          {
+            "type": "gear",
+            "id": "GearA_3",
+            "color": "#e74c3c",
+            "p1": {
+              "id": "GCA_3",
+              "type": "motor",
+              "x": -30,
+              "y": -40,
+              "physicalMotor": "2"
+            },
+            "p2": {
+              "id": "GPA_3",
+              "type": "floating",
+              "x": -30,
+              "y": -22
+            },
+            "radiusParam": "GRA_3",
+            "teeth": 15,
+            "module": 4,
+            "phase": 90,
+            "pinRadiusParam": "GPRA_3",
+            "pinHoleDiameter": 3.2,
+            "motorType": "mg995",
+            "servoStart": 0,
+            "servoEnd": 24,
+            "moduleId": "Mod3"
+          },
+          {
+            "type": "gear",
+            "id": "GearB_3",
+            "color": "#2c6fbb",
+            "p1": {
+              "id": "GCB_3",
+              "type": "fixed",
+              "x": 30,
+              "y": -40
+            },
+            "p2": {
+              "id": "GPB_3",
+              "type": "floating",
+              "x": 30,
+              "y": -22
+            },
+            "radiusParam": "GRB_3",
+            "teeth": 15,
+            "module": 4,
+            "phase": 90,
+            "pinRadiusParam": "GPRB_3",
+            "pinHoleDiameter": 3.2,
+            "mesh": "GearA_3",
+            "moduleId": "Mod3"
+          },
+          {
+            "type": "triangle",
+            "id": "LeftJaw_3",
+            "color": "#ff6b35",
+            "p1": {
+              "id": "GCA_3",
+              "type": "motor",
+              "x": -30,
+              "y": -40,
+              "physicalMotor": "2"
+            },
+            "p2": {
+              "id": "GPA_3",
+              "type": "floating",
+              "x": -30,
+              "y": -22
+            },
+            "p3": {
+              "id": "LT_3",
+              "type": "floating",
+              "x": -95,
+              "y": -125
+            },
+            "gParam": "GPRA_3",
+            "r1Param": "LJ_tip_3",
+            "r2Param": "LJ_edge_3",
+            "sign": 1,
+            "shape": "jaw",
+            "shapeMode": "polyline",
+            "jawTurnSign": 1,
+            "vertices": [
+              {
+                "solve": true,
+                "ref": "p1"
+              },
+              {
+                "solve": true,
+                "ref": "p2"
+              },
+              {
+                "solve": true,
+                "ref": "p3"
+              }
+            ],
+            "moduleId": "Mod3"
+          },
+          {
+            "type": "triangle",
+            "id": "RightJaw_3",
+            "color": "#ff6b35",
+            "p1": {
+              "id": "GCB_3",
+              "type": "fixed",
+              "x": 30,
+              "y": -40
+            },
+            "p2": {
+              "id": "GPB_3",
+              "type": "floating",
+              "x": 30,
+              "y": -22
+            },
+            "p3": {
+              "id": "RT_3",
+              "type": "floating",
+              "x": 95,
+              "y": -125
+            },
+            "gParam": "GPRB_3",
+            "r1Param": "RJ_tip_3",
+            "r2Param": "RJ_edge_3",
+            "sign": -1,
+            "shape": "jaw",
+            "shapeMode": "polyline",
+            "jawTurnSign": -1,
+            "vertices": [
+              {
+                "solve": true,
+                "ref": "p1"
+              },
+              {
+                "solve": true,
+                "ref": "p2"
+              },
+              {
+                "solve": true,
+                "ref": "p3"
+              }
+            ],
+            "moduleId": "Mod3"
+          },
+          {
+            "type": "anchor",
+            "id": "GripMount_3",
+            "p1": {
+              "id": "GripMount_3",
+              "type": "fixed",
+              "x": 0,
+              "y": 0
+            },
+            "moduleId": "Mod3"
+          }
+        ],
+        "params": {
+          "LIFT_ARM_1": 144,
+          "LIFT_ARM_2_1": 144,
+          "LIFT_UPRIGHT_1": 72,
+          "LIFT_TOOL_TOP_1": 80,
+          "LIFT_TOOL_BOTTOM_1": 80,
+          "LIFT_TOOL_FRONT_1": 72,
+          "LIFT_TOOL_DIAG_1": 104,
+          "GRA_3": 30,
+          "GPRA_3": 18,
+          "GRB_3": 30,
+          "GPRB_3": 18,
+          "LJ_tip_3": 107,
+          "LJ_edge_3": 122,
+          "RJ_tip_3": 107,
+          "RJ_edge_3": 122,
+          "LL1": 360
+        },
+        "motorAngles": {
+          "2": 0
+        },
+        "fabrication": {
+          "v": 1,
+          "export": {
+            "barWidthMm": 18,
+            "holeDiameterMm": 3.2,
+            "frameMarginMm": 18,
+            "frameHoleDiameterMm": 3.2,
+            "ttShaftFlatDiameterMm": 5.4,
+            "ttShaftFlatThicknessMm": 3.7
+          },
+          "ttMount": {
+            "shaftDiameterMm": 6,
+            "screwDiameterMm": 3,
+            "screwOffsetXMm": -20.6,
+            "screwSpacingMm": 17.3,
+            "locatorDiameterMm": 4,
+            "locatorOffsetXMm": -11.18,
+            "locatorOffsetYMm": 0
+          },
+          "mg995Mount": {
+            "bodyLengthMm": 41.2,
+            "bodyWidthMm": 20.2,
+            "shaftOffsetMm": 10,
+            "screwDiameterMm": 3.2,
+            "screwSpanMm": 49.5,
+            "screwSpacingMm": 10,
+            "cableNotchWidthMm": 8,
+            "cableNotchDepthMm": 4
+          },
+          "cnc": {
+            "toolDiameterMm": 3.175,
+            "stockThicknessMm": 4
+          },
+          "drive": {
+            "ttHubCenterMm": 6,
+            "ttHubScrewMm": 3.2,
+            "ttHubScrewSpacingMm": 12,
+            "hornCenterMm": 6,
+            "hornScrewMm": 2.2,
+            "hornScrewCount": 4,
+            "hornScrewCircleMm": 14
+          },
+          "joint": {
+            "defaultKind": "bracket-m3",
+            "bracket": {
+              "widthMm": 7,
+              "thicknessMm": 1.2,
+              "longLegMm": 13,
+              "shortLegMm": 9.5,
+              "holeEndMm": 3.5
+            }
+          }
+        },
+        "modules": [
+          {
+            "id": "Base",
+            "name": "基座",
+            "base": "Base0",
+            "outputs": [
+              {
+                "id": "out",
+                "name": "out",
+                "at": "Base0",
+                "body": {
+                  "kind": "bar",
+                  "id": "BaseBar"
+                }
+              }
+            ],
+            "mount": null
+          },
+          {
+            "id": "Mod1",
+            "name": "四連桿升降臂",
+            "source": "competition-fourbar-lift",
+            "base": "O1_1",
+            "outputs": [
+              {
+                "id": "tool",
+                "name": "工具架",
+                "at": "D_1",
+                "body": {
+                  "kind": "bar",
+                  "id": "ToolBrace_1"
+                },
+                "orthogonal": {
+                  "side": -1
+                }
+              }
+            ],
+            "mount": {
+              "to": {
+                "module": "Base",
+                "output": "out"
+              },
+              "ref": {
+                "x": -180,
+                "y": 0,
+                "a": 0
+              },
+              "home": {},
+              "face": {
+                "version": 1,
+                "rotation": [
+                  [
+                    6.123233995736766e-17,
+                    -1,
+                    0
+                  ],
+                  [
+                    1,
+                    6.123233995736766e-17,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    1
+                  ]
+                ],
+                "translation": {
+                  "x": 36,
+                  "y": -2.204364238465236e-15,
+                  "z": 4
+                },
+                "selection": {
+                  "hostFace": "top",
+                  "childFace": "bottom",
+                  "alignU": 0,
+                  "alignV": 0,
+                  "offsetU": 0,
+                  "offsetV": 0,
+                  "gap": 0,
+                  "quarterTurns": 1
+                },
+                "hostThicknessMm": 4,
+                "childThicknessMm": 4
+              }
+            },
+            "mates": {
+              "attach": {
+                "normalDeg": 180
+              },
+              "receive": [
+                {
+                  "id": "r1",
+                  "name": "工具架上緣",
+                  "ref": {
+                    "kind": "bar",
+                    "id": "ToolBrace_1",
+                    "side": 1
+                  }
+                },
+                {
+                  "id": "r2",
+                  "name": "工具架下緣",
+                  "ref": {
+                    "kind": "bar",
+                    "id": "ToolBrace_1",
+                    "side": -1
+                  }
+                }
+              ]
+            },
+            "faceParts": {
+              "part": "ToolBrace_1",
+              "face": "back"
+            }
+          },
+          {
+            "id": "Mod3",
+            "name": "齒輪夾爪",
+            "source": "gear-gripper",
+            "base": "GripMount_3",
+            "outputs": [],
+            "mount": {
+              "to": {
+                "module": "Mod1",
+                "output": "tool"
+              },
+              "ref": {
+                "x": 220,
+                "y": -1.2631870857957336e-14,
+                "a": -9.046911093940669e-15
+              },
+              "home": {},
+              "face": {
+                "version": 1,
+                "rotation": [
+                  [
+                    6.123233995736766e-17,
+                    -1,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    -1
+                  ],
+                  [
+                    1,
+                    6.123233995736766e-17,
+                    0
+                  ]
+                ],
+                "translation": {
+                  "x": 159.92114717086884,
+                  "y": -11,
+                  "z": 1.2294751423873125e-15
+                },
+                "selection": {
+                  "brackets": {
+                    "enabled": true,
+                    "offsets": {
+                      "L1": 0,
+                      "R1": 0,
+                      "L2": 0
+                    },
+                    "childPart": "frame"
+                  },
+                  "hostFace": "back",
+                  "childFace": "bottom",
+                  "alignU": 0,
+                  "alignV": 0,
+                  "offsetU": 0,
+                  "offsetV": 0,
+                  "gap": 0,
+                  "quarterTurns": 1
+                },
+                "hostThicknessMm": 4,
+                "childThicknessMm": 4
+              }
+            },
+            "mates": {
+              "attach": {
+                "normalDeg": 90
+              },
+              "receive": []
+            },
+            "faceParts": {
+              "part": "frame",
+              "face": "bottom"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
