@@ -5,7 +5,7 @@
 ## 接手資訊
 
 - 分支：`codex/framework-stabilization`；起點：`1537242`（應用 `2026.10.08.13`）。
-- 唯一寫入者：`root`；W4b-3 子任務停止後已接回施工，現進行 W6。持續 LOOP，不在工作包邊界等待批准；不再委派。
+- 唯一寫入者：`root`；W0–W6 本輪支援範圍已交付，2026-10-10 完成正式發布；後續新增能力另立工作項。
 - 本機：Windows、Node `v25.2.0`、Python `3.13.5`。CI 的 Node 版本在 W1 固定並驗證。
 - 使用者原有未追蹤附件、`Claude outputs/`、截圖及框架檢討文件保留。提交只選本包檔案。
 - Astra 僅 low；更高推理強度須另獲確認。主聊天不宣稱自行切換模型。
@@ -23,7 +23,7 @@
 | W3b | done | planar／orient／face共同唯讀契約，宿主frame／body／output身分分離；Node22 156/156＋F1 HTTP通過，共用實體接入留W4b |
 | W4b | done (supported scope) | 金屬角碼同源、F2 齒條材料、F3 串接／雙夾爪、尺寸與馬達方向保存均有回歸；齒條鑽孔不支援仍明示 |
 | W5b | done | 舊接法獨立候選、狀態一致、F4 雙孔精靈教材、390×844 操作與實際製作包完成 |
-| W6 | release in progress | 本地163/163與093892e Linux CI通過；使用者取消OPPO實測條件，準備2026.10.10.1並核對正式發布 |
+| W6 | done | 使用者取消OPPO實測條件；2026.10.10.1已發布，b41d9fd同commit test／build／deploy成功，正式頁面與精靈載入圖一致 |
 
 ## LOOP 紀錄
 
@@ -317,3 +317,4 @@ G1內部F1門檻已貫通，可接續W3b→W4b→W5b；這不是發布或全格�
 - 使用者明確表示不做手機效能量測、重視操作功能完整；SDD 與量測文件已記錄免測決策，並停止臨時 LAN 量測服務。這不是 OPPO 實測通過。
 - 本輪操作範圍完成，功能與已知界限列於 `FRAMEWORK-DELIVERY-2026-10-10.md`。版本更新為2026.10.10.1，graph為6a4b69d2acfca33e9d03。HTTP正常重新整理已驗UI版本紀錄、教材平貼對鎖接合面板與未檢查五金提示。
 - 2e6fa83為發布程式提交；後續交付文件提交不變更程式。正式main以fast-forward推送，同一commit的test通過後才build/deploy；實際執行狀態以GitHub Actions為準，發佈核對另留本機 `w6-release/` 證據。
+- 正式main **b41d9fd** 的 [37987933623](https://github.com/cieoco/cadcam/actions/runs/37987933623) test／build／deploy全部成功。線上version.js為2026.10.10.1，blocks與wizard皆6a4b69d2acfca33e9d03；正式瀏覽器開啟更新紀錄成功，未見console error，截圖online-version.jpg。此收尾紀錄不修改產品程式；後續文件提交仍經相同發布workflow。
