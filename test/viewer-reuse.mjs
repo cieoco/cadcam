@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict';
+import {register} from 'node:module';
+register('data:text/javascript,'+encodeURIComponent(`export function resolve(s,c,next){return next(s==='three'?${JSON.stringify(new URL('../js/vendor/three.module.js',import.meta.url).href)}:s,c);}`),import.meta.url);
+const THREE=await import('../js/vendor/three.module.js');
+const {createViewer}=await import('../js/blocks3d/viewer.js');
+import {f1AssemblyFixture,f1NestedFixture} from './fixtures/f1-assembly-fixture.mjs';
+import {f1MaterialScene} from './fixtures/f1-material-scene.mjs';
+import {buildPartGeometryCatalog} from '../js/blocks/part-geometry.js';
+import {createAsyncResource} from '../js/blocks3d/scene-reuse.js';
+let loaded=0,resolveViewer;const lazy=createAsyncResource(()=>{loaded++;return new Promise(r=>{resolveViewer=r;});});
+const opening=lazy.get(),racing=lazy.get();assert.equal(opening,racing,'parallel open waits for the same resource');
+await Promise.resolve();assert.equal(loaded,1);const resource={ready:true};resolveViewer(resource);assert.equal(await racing,resource);assert.equal(await lazy.get(),resource);
+const el=()=>({style:{},children:[],clientWidth:1280,clientHeight:720,appendChild(o){this.children.push(o);o.parentNode=this;},removeChild(o){this.children=this.children.filter(v=>v!==o);},remove(){this.parentNode?.removeChild(this);},addEventListener(){},removeEventListener(){},getBoundingClientRect:()=>({left:0,top:0,width:1280,height:720})});
+globalThis.window={devicePixelRatio:1,innerWidth:1280,innerHeight:720};globalThis.document={createElement:el};
+globalThis.requestAnimationFrame=()=>1;globalThis.cancelAnimationFrame=()=>{};
+let scene;
+const renderer={domElement:el(),setPixelRatio(){},setSize(){},render(s){scene=s;},dispose(){}};
+const controls={target:new THREE.Vector3(),update(){},dispose(){},addEventListener(){}};
+const viewer=createViewer(el(),{rendererFactory:()=>renderer,controlsFactory:()=>controls});
+const dynamic=()=>scene.children.find(g=>g.isGroup),geometries=()=>{const rows=[];dynamic().traverse(o=>{if(o.geometry)rows.push(o.geometry);});return rows;};
+const represented=s=>{s.updateMatrixWorld(true);const out=[];s.children.find(g=>g.isGroup).traverse(o=>{if(!o.geometry)return;o.geometry.computeBoundingBox();const b=o.geometry.boundingBox;out.push({key:o.userData.pickKey || null,type:o.geometry.type,world:o.matrixWorld.elements.map(n=>Math.round(n*1e6)/1e6),bounds:[...b.min.toArray(),...b.max.toArray()].map(n=>Math.round(n*1e6)/1e6),vertices:o.geometry.attributes.position.count});});return out;};
+for(const fixture of [f1AssemblyFixture(),f1NestedFixture()]){
+ const catalog=buildPartGeometryCatalog(fixture);
+ viewer.update(f1MaterialScene(0,fixture,catalog,{includeMotors:true}).model);
+ const first=geometries();assert.ok(first.length>31,'material and legacy F1 hardware represented');
+ const next=f1MaterialScene(20,fixture,catalog,{includeMotors:true}).model;viewer.update(next);
+ assert.deepEqual(geometries(),first,'ordinary pose must retain every material and legacy hardware geometry');
+ for(const theta of [20,40]){
+  const current=f1MaterialScene(theta,fixture,catalog,{includeMotors:true}).model;viewer.update(current);
+  let freshScene;const freshRenderer={...renderer,domElement:el(),render(s){freshScene=s;}};
+  const fresh=createViewer(el(),{rendererFactory:()=>freshRenderer,controlsFactory:()=>({...controls,target:new THREE.Vector3()})});fresh.update(current);
+  assert.deepEqual(represented(scene),represented(freshScene),'retained vs fresh world matrices / size / count includes all legacy hardware');fresh.dispose();
+ }
+ viewer.update(next);
+ const byId=new Map();dynamic().traverse(o=>{if(o.userData.partId)byId.set(o.userData.partId,o);});
+ for(const p of next.materialParts)assert.deepEqual(byId.get(p.partId).matrix.elements,p.pose.matrix,'world matrix follows actual pose once');
+ const pickKeys=dynamic().children.flatMap(o=>o.userData.pickKey?[o.userData.pickKey]:o.children.map(c=>c.userData.pickKey));
+ const gear=byId.get('GearA_3'),base=gear.material;
+ viewer.setHighlight(['Mod3/gear:GearA_3']);assert.deepEqual(geometries(),first,'highlight retains geometry');assert.equal(gear.material.color.getHex(),0xe5322d);
+ viewer.setPreviewGhost({prefix:'Mod3'});assert.deepEqual(geometries(),first,'preview ghost retains geometry');
+ assert.equal(gear.material.opacity,.42,'preview ghost precedes collision red');
+ viewer.setHighlight([]);viewer.setPreviewGhost(null);viewer.tiltView();viewer.resize();assert.deepEqual(geometries(),first,'camera retains geometry');
+ assert.equal(gear.material,base,'play/cleared highlight restores original base material');
+ assert.deepEqual(dynamic().children.flatMap(o=>o.userData.pickKey?[o.userData.pickKey]:o.children.map(c=>c.userData.pickKey)),pickKeys,'pick keys remain stable');
+ let disposed=0;first.forEach(g=>g.addEventListener('dispose',()=>disposed++));
+ const edit=structuredClone(fixture);edit.fabrication.cnc.stockThicknessMm=6;
+ viewer.update(f1MaterialScene(20,edit).model);assert.equal(disposed,first.length,'invalidating design disposes each retired geometry once');
+ const edited=geometries();let editDisposed=0;edited.forEach(g=>g.addEventListener('dispose',()=>editDisposed++));
+ viewer.update(f1MaterialScene(0,fixture,catalog,{includeMotors:true}).model);assert.equal(editDisposed,edited.length,'undo/cancel retires preview geometry once');
+ assert.ok(geometries().every(g=>!first.includes(g)),'reappearing design never reuses disposed geometries');
+ const reopened=geometries();viewer.update(f1MaterialScene(40,structuredClone(fixture),catalog,{includeMotors:true}).model);assert.deepEqual(geometries(),reopened,'same opened design retains shape while changing pose');
+}
+const last=geometries();let disposed=0;last.forEach(g=>g.addEventListener('dispose',()=>disposed++));viewer.dispose();assert.equal(disposed,last.length);
+console.log('production viewer: F1/nested pose, hardware, world matrices, appearance, camera, invalidation, dispose');

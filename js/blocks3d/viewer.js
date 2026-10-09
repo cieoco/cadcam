@@ -1,4 +1,5 @@
 import {normalizeMaterialVoids,materialCircleContour} from '../blocks/material-voids.js';
+import {retainedSceneKey,createSceneLifetime} from './scene-reuse.js';
 /**
  * blocks3d / viewer
  *
@@ -274,14 +275,14 @@ function openBeltPoints(c1, r1, c2, r2) {
   ];
 }
 
-export function createViewer(container) {
+export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRenderer({antialias:true}),controlsFactory=(camera,canvas)=>new OrbitControls(camera,canvas)}={}) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#0f1420');
 
   const camera = new THREE.PerspectiveCamera(45, 1, 1, 20000);
   camera.position.set(0, 0, 600);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = rendererFactory();
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   container.appendChild(renderer.domElement);
   const materialNotice=document.createElement('div');
@@ -289,7 +290,7 @@ export function createViewer(container) {
   container.appendChild(materialNotice);
   const unsupportedMaterial=new THREE.MeshBasicMaterial({color:0xd58a16,wireframe:true});
 
-  const controls = new OrbitControls(camera, renderer.domElement);
+  const controls = controlsFactory(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
 
@@ -317,6 +318,10 @@ export function createViewer(container) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   let lastModel = null;
+  let poseRevision=0;
+  const lifetime=createSceneLifetime(),poseBindings=[],partObjects=[],childGroups=new Map();
+  let bindingScope='';
+  let geometryBuilds=0,geometryReuses=0,geometryDisposals=0;
 
   const holeR = 3.4;   // 板上孔徑（視覺用）
   const pinMat = new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.6, roughness: 0.35 });
@@ -426,10 +431,10 @@ export function createViewer(container) {
   // 組立台預覽：{ prefix, ids } —— prefix＝直角安裝子模組的 id（其 Group 內全部半透明）；
   // ids＝同平面子模組的零件／接點 id（pickKey 的 id 部分命中就半透明）。
   let previewGhost = null;
-  function isPreviewGhostKey(rawKey) {
+  function isPreviewGhostKey(rawKey, prefix=keyPrefix) {
     if (!previewGhost) return false;
-    if (previewGhost.prefix && keyPrefix === previewGhost.prefix + '/') return true;
-    if (keyPrefix || !previewGhost.ids || !previewGhost.ids.size) return false;
+    if (previewGhost.prefix && (prefix+rawKey).startsWith(previewGhost.prefix + '/')) return true;
+    if (prefix || !previewGhost.ids || !previewGhost.ids.size) return false;
     const rest = rawKey.slice(rawKey.indexOf(':') + 1);
     return previewGhost.ids.has(rest) || rest.split('-').some(t => previewGhost.ids.has(t));
   }
@@ -443,14 +448,30 @@ export function createViewer(container) {
   // 並用模組 id 當 pickKey 前綴，點選隱藏時不會與宿主同名零件互撞。
   let sink = dynamic;
   let keyPrefix = '';
-  function addPart(obj, rawKey) {
+  function addPart(obj, rawKey, {pickable=true}={}) {
     const key = keyPrefix + rawKey;
-    obj.userData.pickKey = key;
+    if(pickable)obj.userData.pickKey = key;
+    obj.traverse(o=>{if(o.isMesh)o.userData.baseMaterial=o.material;if(o.geometry)geometryBuilds++;});
+    partObjects.push({obj,key,rawKey,prefix:keyPrefix});
     if (isPreviewGhostKey(rawKey)) ghostify(obj, true);
     else if (ghosted.has(key)) ghostify(obj);
     else if (isHighlightKey(key)) redify(obj);
     sink.add(obj);
     return obj;
+  }
+  function bindPose(obj,update){poseBindings.push({obj,scope:bindingScope,update});}
+  function applyAppearance(){
+    for(const {obj,key,rawKey,prefix} of partObjects){
+      obj.traverse(o=>{if(o.isMesh)o.material=o.userData.baseMaterial;});
+      if(isPreviewGhostKey(rawKey,prefix))ghostify(obj,true);else if(ghosted.has(key))ghostify(obj);else if(isHighlightKey(key))redify(obj);
+    }
+  }
+  function updateRetainedPose(model){
+    const scopes=new Map([['',model],...(model.orthogonal || []).map(c=>[c.id,c.model])]);
+    for(const c of model.orthogonal || []){const group=childGroups.get(c.id);group.matrix.fromArray(c.matrix);group.matrixWorldNeedsUpdate=true;}
+    for(const b of poseBindings)b.update(b.obj,scopes.get(b.scope),model);
+    geometryReuses+=partObjects.reduce((n,p)=>{p.obj.traverse(o=>{if(o.geometry)n++;});return n;},0);
+    applyAppearance();
   }
 
   // G2：角碼一翼的幾何。有 hole：板面（兩個大尺寸軸）的矩形擠出厚度、挖一個圓孔（孔心依 hole.center 換算到板面座標），
@@ -475,17 +496,20 @@ export function createViewer(container) {
       const obj = dynamic.children[i];
       dynamic.remove(obj);
       // 含 group（馬達）：把底下每個 mesh 的 geometry 都釋放掉，避免逐幀洩漏
-      obj.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+      obj.traverse(o => { if (o.geometry) {o.geometry.dispose();geometryDisposals++;} });
       // 材質有快取共用，不在這裡 dispose
     }
+    poseBindings.length=0;partObjects.length=0;childGroups.clear();
   }
 
   let initialized = false;
 
   function update(model) {
-    clearDynamic();
-    if (!model) return;
+    poseRevision++;
+    if(!model){clearDynamic();lifetime.retire();lastModel=null;return;}
     lastModel = model;
+    if(lifetime.begin(retainedSceneKey(model))){updateRetainedPose(model);focusCamera(model);return;}
+    clearDynamic();bindingScope='';
     renderMaterialParts(model.materialParts || []);
     renderModel(model);
     // 直角安裝的子模組：各自的場景模型包進一個帶 4x4 矩陣的 Group（子平面 → 宿主座標）。
@@ -496,10 +520,12 @@ export function createViewer(container) {
       group.matrix.fromArray(child.matrix);
       group.matrixWorldNeedsUpdate = true;
       group.userData.orthogonalId = child.id;
+      childGroups.set(child.id,group);
       dynamic.add(group);
       sink = group;
       keyPrefix = child.id + '/';
-      try { renderModel(child.model); } finally { sink = dynamic; keyPrefix = ''; }
+      bindingScope=child.id;
+      try { renderModel(child.model); } finally { sink = dynamic; keyPrefix = '';bindingScope=''; }
     });
     // F1：金屬角碼（每處兩片、每片兩翼各一塊薄板）：主場景座標、淺金屬灰，跟著位姿每幀重畫。
     // G2：每一翼是「挖了圓孔的薄板」（擠出矩形＋圓孔），孔在翼的螺牙孔位置，看得到穿透；沒有 hole 資料時退回實心方塊。
@@ -571,7 +597,8 @@ export function createViewer(container) {
         slot.position.z=-.05;group.add(slot);
         group.matrixAutoUpdate=false;group.matrix.fromArray(part.pose.matrix);group.matrixWorldNeedsUpdate=true;
         group.userData.partId=part.partId;group.userData.geometryVersion=g.geometryVersion;
-        addPart(group,part.pickKey);continue;
+        addPart(group,part.pickKey);
+        bindPose(group,(o,m,root)=>{const next=root.materialParts.find(p=>p.partId===part.partId);o.matrix.fromArray(next.pose.matrix);o.matrixWorldNeedsUpdate=true;});continue;
       }
       for(const ring of g.outlines) {
         const shape=new THREE.Shape();shape.moveTo(ring[0].x,ring[0].y);ring.slice(1).forEach(p=>shape.lineTo(p.x,p.y));shape.closePath();
@@ -587,6 +614,7 @@ export function createViewer(container) {
         mesh.userData.partId=part.partId;mesh.userData.geometryVersion=g.geometryVersion;
         if(diagnostic)mesh.userData.geometryDiagnostic=diagnostic;
         addPart(mesh,part.pickKey);
+        bindPose(mesh,(o,m,root)=>{const next=root.materialParts.find(p=>p.partId===part.partId);o.matrix.fromArray(next.pose.matrix);o.matrixWorldNeedsUpdate=true;});
       }
     }
     materialNotice.textContent=unverified.length?`材料輪廓尚無法驗證（橙色線框）：${[...new Set(unverified)].join('、')}`:'';
@@ -761,6 +789,7 @@ export function createViewer(container) {
       bolt.rotation.x = Math.PI / 2;
       bolt.position.set(g.pin.x, g.pin.y, g.z + g.thickness + boltH / 2 + 0.2);
       addPart(bolt, 'gear:' + g.id);
+      bindPose(bolt,(o,m)=>{const next=m.gears.find(p=>p.id===g.id);o.position.set(next.pin.x,next.pin.y,next.z+next.thickness+boltH/2+.2);});
     });
 
     // 齒條：和齒輪同在內側傳動平面，齒形本身擠出成一片有厚度的齒桿。
@@ -924,6 +953,7 @@ export function createViewer(container) {
         g.add(shaft);
 
         addPart(g, 'motor:' + m.id);
+        bindPose(g,(o,scene)=>{const next=scene.motors.find(p=>p.id===m.id);o.position.x=next.x;o.position.y=next.y;o.rotation.z=Math.atan2(next.dir?next.dir.y:-1,next.dir?next.dir.x:0);});
         return;
       }
 
@@ -973,17 +1003,18 @@ export function createViewer(container) {
       g.add(shaft);
 
       addPart(g, 'motor:' + m.id);
+      bindPose(g,(o,scene)=>{const next=scene.motors.find(p=>p.id===m.id);o.position.x=next.x;o.position.y=next.y;o.rotation.z=Math.atan2(next.dir?next.dir.y:-1,next.dir?next.dir.x:0);});
     });
 
     // 關節：銷柱（圓柱預設沿 Y 軸，轉成沿 Z）
-    model.pins.forEach(p => {
+    model.pins.forEach((p,index) => {
       const h = Math.max(1, p.z1 - p.z0);
       const geo = new THREE.CylinderGeometry(p.r, p.r, h, 16);
       const mesh = new THREE.Mesh(geo, p.ground ? groundMat : pinMat);
       mesh.rotation.x = Math.PI / 2;
       mesh.position.set(p.x, p.y, (p.z0 + p.z1) / 2);
-      if (previewGhost && previewGhost.prefix && keyPrefix === previewGhost.prefix + '/') ghostify(mesh, true);
-      sink.add(mesh);
+      addPart(mesh,'pin:'+(p.id || index),{pickable:false});
+      bindPose(mesh,(o,m)=>{const next=m.pins[index];o.position.set(next.x,next.y,(next.z0+next.z1)/2);});
     });
 
     // 地錨是「固定」的慣例（接點本身的銷柱已標示），不另外畫立柱實體。
@@ -1070,9 +1101,9 @@ export function createViewer(container) {
   }
 
   let raf = null;
+  function renderNow(timestamp=null){const at=timestamp===null?0:performance.now();controls.update();renderer.render(scene,camera);return timestamp===null?null:{cpuMs:performance.now()-at,poseRevision,rendererRafTimestamp:timestamp};}
   function loop() {
-    controls.update();
-    renderer.render(scene, camera);
+    renderNow();
     raf = requestAnimationFrame(loop);
   }
   function start() { if (!raf) loop(); }
@@ -1338,6 +1369,7 @@ export function createViewer(container) {
   if (resizeObserver) resizeObserver.observe(container);
 
   function dispose() {
+    lifetime.retire();
     materialNotice.remove();
     unsupportedMaterial.dispose();
     stop();
@@ -1370,6 +1402,8 @@ export function createViewer(container) {
   start();
 
   return {
+    renderNow,
+    cacheStats:()=>({...lifetime.stats(),geometryBuilds,geometryReuses,geometryDisposals}),
     update, resize, dispose, start, stop, showAll, fitTo, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, project, tiltView, pickSurface, highlightSurface,
     setPickEnabled(on) { pickEnabled = !!on; },
     get canvas() { return renderer.domElement; },

@@ -190,7 +190,7 @@ function placeScrew(matrix, zOffset, screw, moduleId) {
   return { ...screw, moduleId, head: at(screw.head), tip: at(screw.tip) };
 }
 
-export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, buildModel, asm = null, params, joint, stockMm = 3, plates = [], plan = null, exportSettings = {} }) {
+export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, buildModel, asm = null, params, joint, stockMm = 3, plates = [], plan = null, exportSettings = {}, connectionGeometry=null }) {
   const ids = orthogonalModuleIds(modules);
   if (!ids.length) return [];
   const done = new Map();   // plane id -> { model, matrix } | null（null＝算不出，後代也略過）
@@ -225,7 +225,8 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
           const childCenterZ = childZ + face.childThicknessMm / 2;
           result = { model, matrix: multiply4(host.matrix, orthogonalMatrix(frame, hostCenterZ, -childCenterZ)), brackets: [], screws: [] };
           if (legacyDisplay) { result.displayAnchor = { kind: 'legacy-frame', resolvedEndpoint: false }; result.diagnostics = connection.diagnostics; }
-          const drilling=faceBracketPlan(comps,modules,params,mod,{stockMm,exportSettings,joint});
+          const saved=connectionGeometry?.adapters?.find(a=>a.moduleId===mod.id&&a.physical);
+          const drilling=connectionGeometry?{ok:!!saved,physical:saved?.physical || []}:faceBracketPlan(comps,modules,params,mod,{stockMm,exportSettings,joint});
           const R=face.rotation,T=face.translation;
           const inverse=[R[0][0],R[0][1],R[0][2],0,R[1][0],R[1][1],R[1][2],0,R[2][0],R[2][1],R[2][2],0,
             -(R[0][0]*T.x+R[1][0]*T.y+R[2][0]*T.z),-(R[0][1]*T.x+R[1][1]*T.y+R[2][1]*T.z),-(R[0][2]*T.x+R[1][2]*T.y+R[2][2]*T.z),1];

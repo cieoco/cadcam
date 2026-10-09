@@ -5,7 +5,7 @@
 ## 接手資訊
 
 - 分支：`codex/framework-stabilization`；起點：`1537242`（應用 `2026.10.08.13`）。
-- 唯一寫入者：`w4a_physical`（Sol high）；W4a-3 完成 scoped commit 後停止寫入，主代理 `/root` 指定下一 LOOP 才交棒。前 writer 已停止，未新增 writer。
+- 唯一寫入者：`w4a_physical`（Sol high）；W4a-4 scoped commit後停止，下一writer由root正式指定。root只讀review／HTTP；無再委派。
 - 本機：Windows、Node `v25.2.0`、Python `3.13.5`。CI 的 Node 版本在 W1 固定並驗證。
 - 使用者原有未追蹤附件、`Claude outputs/`、截圖及框架檢討文件保留。提交只選本包檔案。
 - Astra 僅 low；更高推理強度須另獲確認。主聊天不宣稱自行切換模型。
@@ -19,7 +19,7 @@
 | W1 | done | 九項失敗完成分類／修正；Node 22.14.0 全套 143/143；cold HTTP 通過，舊快取混載轉 W2 修復 |
 | W2 | done | 120 模組／15 頁同圖生成與 CI check；主頁／iframe 握手拒絕異批確認；Node 22.14.0 全套 144/144 與 HTTP 通過 |
 | W3a | done | F1 六面純讀取／保存／重選／真 bar 層高；同圖 check、Node22 全套 146/146、主代理 HTTP 通過 |
-| W4a–W5a／G1 | implementing | W4a-1 共用角碼147、W4a-2局部材料148、W4a-3單一姿態SAT151支驗收及HTTP完成；F1真撞保留。快取與W5a交易流程待後續 LOOP |
+| W4a–W5a／G1 | implementing | W4a-1 共用角碼147、W4a-2局部材料148、W4a-3單一姿態SAT151、W4a-4 viewer復用153支與HTTP／桌面12run完成；F1真撞保留。W5a交易、完整F3與OPPO實機gate待後續 |
 | W3b–W5b | planned | 其餘格式、多接合位置、教材與效能 |
 | W6 | planned | 全面驗收、提交推送與發布核對 |
 
@@ -155,3 +155,21 @@
 - 主代理HTTP初freeze8db50：0°兩gear／screw head紅標；播放顯示本姿態材料待檢查且清舊紅標；暫停359°重新兩hit；全行程按鈕明示六面僅單一姿態、全行程未支援。孔槽fix token203563：兩板／角碼可見、原2hits、未檢查項目14僅原motors／pins／grounds，frame及Mod3-frame無unsupported。ignored證據 `w4a-sat/http-{collision-0,playing-pending,void-union}.jpg`。
 - 本包只完成F1目前有效姿態材料檢查；真碰撞未修作品尺寸，未宣稱F1可製作或整個W4a／G1完成。W4a-4 viewer mesh復用／桌面與OPPO實機效能、W4b沿邊bridge、W5a純preview候選與確認交易／全流程coverage待後續。root桌面單次checker量測約60–260 ms僅profiling，播放不做narrow phase，未當作phone gate。
 - 最終HTTP token453ba8316372f4a741e3：桌面同origin reload→bench→child通過，2處真撞與coverage14不含板件；390×844 wrapper同token、同2碰撞及3角碼固定，面板可讀。ignored證據 `w4a-sat/http-sat-mobile.jpg`。主頁無新增console error；mobile工具logs有兩則無來源MutationObserver observe-not-Node，時間對應frame-locator click的No node found，repo blocks/viewer無MutationObserver，記為wrapper／工具限制，未宣稱完全零log。正式操作正常。scoped commit後writer停止；未push／deploy／改版本，附件及私人路徑不提交。
+
+### LOOP W4a-4／F1 viewer復用與可重跑量測（done）
+
+- 唯一writer w4a_physical（Sol high），起點4baca884；root只讀review／HTTP，無再委派。範圍F1與真正二層F3 provisional，其他機構保留具名重建bridge；不改solver、存檔或W5a交易。條件：普通pose／相機不得建局部材料與硬體、設計／接合／undo／open／cancel須正確失效、retire與dispose一次且不復用已釋放資料、pickKeys／base／red／ghost外觀保持。
+- 生產createViewer headless renderer seam使用真bundled Three Geometry，紅測普通20°pose所有Geometry身份更換，`w4a-cache/red.log`。新版整場shape lifetime與局部pose bindings保留材料＋馬達／銷柱／gear輸出銷；真正nested完整world矩陣只套一次。20／40° retained vs fresh對所有mesh的matrixWorld、geometry尺寸／頂點数／總數獨立比較（先updateMatrixWorld true），包含兩顆真motor與pins。退場、重現、材質恢復／ghost優先及相機／dispose回歸。
+- App六面child直接消費catalog.extras已算physical，不每幀faceBracketPlan；沿邊仍留W4b bridge。viewer關閉時停止自己的rAF，重新顯示時resume；未增加每幀SAT。
+- opt-in `test/performance.html`可視化一鍵入口，隔離`?benchmark=1`工作頁跳過使用者autosave載入／保存；F1原servo範圍−60..60、M2凍0，F3是Base→lift→gripper真二層fixture，正式F3 gate待W4b。每件10s暖機＋60s×3，全部samples/runs保存在專用IndexedDB，invalid中断另存同步emergency紀錄；下載保留所有run及裝置備註／UA／viewport／DPR／source token／coverage與geometry計數，不挑最好一次。
+- CPU分solve／2D／pose／3D提交與合計、rAF間隔／>100ms；benchmark單一app rAF呼叫viewer與正常viewer rAF相同renderNow，包含renderer.render發WebGL命令CPU及同timestamp／poseRevision。GPU完成未量、rAF非FPS保證。source切換等真正iframe load＋期望identity/token才ready，abort／page hidden／reload／無效解／缺metrics不得當complete。
+- 可重跑baseline工具 `tools/performance-baseline.mjs`在ignored隔離目錄還原153724267f360ac04141c04989b520be09bbc241，僅加同計時／單rAF與存檔隔離；原始與patched source SHA／完整original source、patch summary留measurement-patch.json，未移植新幾何／cache。使用既有localhost HTTP；固定同fixture／device/settings，原版缺加工孔／face五金等差異如實列coverage，不能降完成版細節或宣稱完全同幾何。桌面run與實機OPPO gate待實際量測，尚未宣稱效能達門檻。
+- 初次HTTP抓到setMode非同步開3D與set3D(true)的競態：active flag先置true、viewer尚null，量測不能讀stop。共用async resource Promise，所有並行開啟等真正ready、只建一個viewer；已加並發get／resolve回歸，不用sleep。baseline僅為量測啟動加入同pending import等待。source切換／abort若發生於await load期間，停止後不再啟動舊iframe run。
+- 修正後source freeze `8ec7949f85e3d443d2e0`，132modules／16pages generate/check；target-ready5/5、full-ready完整manifest153/153 Node22.14.0，無fail／timeout，逐支logs／SHA留 `w4a-cache/{target-ready,full-ready}/results.json`。此前full亦153/153，僅因正式HTTP啟動blocker修正才重驗。root冷啟動HTTP已開始F1 warming/play，六run前景量測期间writer不跑suite或其他CPU重負載；source不變。
+- 正式桌面 current token8ec794 六run前景完成：F1 p95合計CPU 4.1／4.3／3.9 ms，rAF 19.2／19.3／19.2 ms（samples3258／3251／3257）；F3 provisional p95 CPU 4.7／4.7／4.9 ms，rAF三次19.4 ms（samples3220／3218／3215）。播放期geometry builds／disposals皆不變：F1 55／0，切二層fixture後111／55。F1 material31／holes55／cutouts2、F3 material32／holes57／cutouts2，均6翼／6螺絲與兩motor。原始全samples在ignored w4a-cache/performance-current.json，精簡current-summary.json；同装置原版正在量測，writer保持source凍結、不跑CPU重負載。這是桌面證據，未視為OPPO手機gate。
+- 同裝置原版153724267f360ac04141c04989b520be09bbc241六run亦complete：F1 p95 CPU18.4／18.7／18.6 ms、rAF19.3／36.2／36.3 ms、samples3153／3097／3088；二層provisional CPU19.0／19.1／18.9 ms、rAF36.0／19.7／19.5 ms、samples3110／3115／3120。十二run >100 ms rAF均0；原版播放期builds／disposals持續增加、完成版不變。裝置備註Intel Core i7-14700／RAM約32GB／Windows11 Pro 10.0.26100／Codex IAB，Chrome155 UA、工作iframe1241×504、DPR1、antialias true、pixelRatio1、相同單app-rAF正常renderNow與M1 −60..60／M2凍0；更新率未查、不是OPPO實機。原版補丁hash與source保存在baseline-1537242/measurement-patch.json，未移植新geometry。
+- 形狀差異如實保留：原版F1 boards13／boardHoles41／visibleGearBores2／6翼／0螺絲，二層14／43／2／6／0；完成版31／32 materialParts（含五金），總孔55／57、2cutouts、6翼與6螺絲。原版gear僅中心孔、完成版含正式加工孔，計數語意也有差異，故未把百分比稱為完全相同幾何的回歸gate；固定同作品設定桌面CPU數值變小，全部run低於絕對33.3 ms／rAF50 ms門檻。不減細節與播放零重建已驗；OPPO實機與完整F3仍未通過門檻。
+- 正式下載合併十二run原始全samples留ignored w4a-cache/performance-combined.json，摘要combined-summary.json；不提交個人下載路徑。量測source token8ec794後僅將#results展示的coverage.geometryCounters.key移除，原始records／JSON／hotpath不變。最後圖46f5571c8cd53c8556ba generate/check、target-summary5/5及perfbrowser syntax通過；完整套件沿用hotpath凍結full-ready153/153，不為摘要顯示重跑全suite或12run。最終正常HTTP抽核已由root完成。
+
+- 最終HTTP token46f5571c8cd53c8556ba：正常tab一般reload保留原F1兩模組／M1 M2／3角碼；bench兩處真碰撞。M1播放清舊red並顯待檢查，暫停25°重新兩hits；重選面iframe同token、3角碼預覽→取消仍25°與原設定，Undo disabled。無新增console error，僅10/08歷史cache訊息；ignored w4a-cache/http-normal.jpg、http-benchmark.jpg。量測頁reload保留十二run且摘要無key；短abort為invalid aborted、warming reload為invalid reload_or_navigation，總14record，沒有誤算complete。
+- 回交：本地scoped commit後w4a_physical停止寫入，未push／deploy／改app版本；原untracked附件、Claude outputs、REVIEW及截圖保留。W4a-4限定F1／F3 provisional形狀與硬體cache完成，其他rail/rack/cam/pulley/belt仍明確重建bridge，沿邊幾何W4b、preview交易W5a、完整F3與OPPO實機W6尚未完成；F1實際材料穿入未遮掩。

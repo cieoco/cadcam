@@ -18,7 +18,7 @@ if(mounted)f.modules[1].mount=mountFacePlacement(f.comps,f.modules,c.surface.mod
 return {...f,fabrication};
 }
 
-import assert from 'node:assert/strict';
+const requireFixture=(ok,message)=>{if(!ok)throw Error(message || 'Invalid nested performance fixture');};
 import {buildMountSurfaces} from '../../js/blocks/mount-surfaces.js';
 export function f1NestedFixture(){
 const nested=f1AssemblyFixture();
@@ -28,8 +28,8 @@ const hostSurface=buildMountSurfaces({...nested,moduleId:'Base',drilling:true,th
 const childSurface=buildMountSurfaces({...nested,moduleId:nested.modules[1].id,drilling:true,thicknessMm:4}).surfaces.find(s=>s.kind==='frame');
 const ref=surface=>({surface,box:{min:Object.fromEntries(['x','y','z'].map(k=>[k,surface.box.min[k]-(surface.box.min[k]+surface.box.max[k])/2])),max:Object.fromEntries(['x','y','z'].map(k=>[k,surface.box.max[k]-(surface.box.min[k]+surface.box.max[k])/2]))}});
 const selection={hostFace:'top',childFace:'bottom',quarterTurns:1,alignU:0,alignV:0,offsetU:0,offsetV:0,gap:0};
-const placement=buildFacePlacement({host:ref(hostSurface),child:ref(childSurface),selection});assert.ok(placement.ok,placement.reason);
+const placement=buildFacePlacement({host:ref(hostSurface),child:ref(childSurface),selection});requireFixture(placement.ok,placement.reason);
 const face={version:1,childPart:'frame',...placement.record.transform,selection:placement.record.selection,hostThicknessMm:4,childThicknessMm:4};
-const mounted=mountFacePlacement(nested.comps,nested.modules,nested.modules[1].id,{hostId:'Base',outputId:'out',face},nested.params);assert.ok(mounted.ok,mounted.reason);nested.modules[1].mount=mounted.mount;
+const mounted=mountFacePlacement(nested.comps,nested.modules,nested.modules[1].id,{hostId:'Base',outputId:'out',face},nested.params);requireFixture(mounted.ok,mounted.reason);nested.modules[1].mount=mounted.mount;
 return nested;
 }

@@ -1,6 +1,12 @@
-<!doctype html><html lang="zh-Hant"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>角碼固定孔驗收</title>
-<style>body{font:16px system-ui;margin:16px;background:#f3f7f5;color:#24423b}button{padding:12px;margin:4px;border:1px solid #acc8bf;border-radius:9px;background:white}svg{width:100%;height:190px;background:white;border-radius:12px}h2{font-size:18px}</style>
-<h1>角碼固定孔驗收</h1><p>使用獨立測試板件，不修改您的作品。</p><button id="open">組立並生成孔位</button><button id="restore" disabled>存檔還原驗證</button><p id="status">尚未開孔</p><div id="parts"></div>
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>機構積木播放量測</title>
+<style>body{font:15px system-ui;margin:12px;background:#f2f5f8;color:#172536}button,select,input{font:inherit;padding:7px;margin:3px}iframe{width:100%;height:70vh;border:1px solid #789}pre{white-space:pre-wrap}#status{padding:8px;background:white}</style>
+<h1>播放效能量測（隔離作品）</h1>
+<p>使用正式播放路徑、完整3D與2D。每件暖機10秒＋播放60秒，共3次；F1與二層F3 fixture共約7分鐘。F3為暫定fixture，正式F3 gate待W4b。量測的是CPU提交與rAF間隔，沒有測GPU完成時間或保證FPS。</p>
+<label>版本 <select id="source"><option value="current">完成版</option><option value="baseline">原版1537242（須先準備本機鏡像）</option></select></label>
+<label>裝置／OS／瀏覽器備註 <input id="device" placeholder="桌面或手機型號、SoC、RAM、更新率"></label>
+<button id="start">一鍵執行F1＋F3各3次</button><button id="abort">中止</button><button id="download">下載全部紀錄</button>
+<p id="status" aria-live="polite">尚未執行。使用者作品不會被載入或自動存檔；只有此頁量測紀錄保存在專用key。</p>
+<iframe id="work" title="隔離量測工作頁" src="../blocks.html?benchmark=1"></iframe><pre id="results"></pre>
 <!-- BEGIN GENERATED LOAD MAP -->
 <script type="importmap" data-load-graph="46f5571c8cd53c8556ba">
 {
@@ -187,26 +193,4 @@
 }
 </script>
 <!-- END GENERATED LOAD MAP -->
-<script type="module">
-import {bracketFixture} from './fixtures/face-bracket-fixture.mjs';
-import {openFaceWizard} from '../js/blocks/face-wizard-ui.js';
-import {orthogonalExportExtras,withAdapterNodes} from '../js/blocks/orthogonal-joint.js';
-import {inspectLinkExport,inspectFrameExport} from '../js/blocks/exporters.js';
-import {frameConnectorNodes} from '../js/blocks/model.js';
-import {normalizeSnapshot} from '../js/blocks/schema.js?v=20261007_singleface';
-let f=bracketFixture();
-const $=id=>document.getElementById(id);
-function show(){
- const extras=orthogonalExportExtras(f.comps,f.modules,f.params,{stockMm:3});
- const a=extras.linkHoles.HostBar || [],b=extras.frameNodes.Child || [];
- $('status').textContent=`${f.modules[1].mount ? '接合已保存 · ' : ''}承接桿 ${a.length} 孔 · 直立底板 ${b.length} 孔（Ø3.2 mm）`;
- const geometries=[['承接桿',inspectLinkExport(f.comps[0],120,{},a)],['直立底板',inspectFrameExport(withAdapterNodes('Child',frameConnectorNodes(f.comps.filter(c=>c.moduleId==='Child')),extras),{})]];
- $('parts').replaceChildren();
- for(const [name,g] of geometries){const h=document.createElement('h2');h.textContent=name;$('parts').append(h);const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','-80 -70 250 150');
- for(const ring of g.outlines){const p=document.createElementNS(svg.namespaceURI,'polygon');p.setAttribute('points',ring.map(p=>`${p.x},${-p.y}`).join(' '));p.setAttribute('fill','#e1e8e5');p.setAttribute('stroke','#477867');svg.append(p);}
- for(const hole of g.holes){const c=document.createElementNS(svg.namespaceURI,'circle');c.setAttribute('cx',hole.x);c.setAttribute('cy',-hole.y);c.setAttribute('r',hole.r);c.setAttribute('fill',hole.layer==='ADAPTER_HOLE'?'#df9122':'white');svg.append(c);}$('parts').append(svg);}
-}
-$('open').onclick=()=>{const initialMount=f.modules[1].mount || {face:{selection:{hostFace:location.search==='?reverse'?'back':'top',childFace:location.search==='?reverse'?'top':'back',alignU:0,alignV:0,offsetU:0,offsetV:0,gap:0,quarterTurns:location.search==='?reverse'?3:0}}};openFaceWizard({...f,modules:f.modules.map(m=>({...m,mount:null})),childId:'Child',stockMm:3,exportSettings:{},wizard:true,initialMount,isCurrent:()=>true,say:text=>$('status').textContent=text,commit:r=>{f={...f,...r};$('restore').disabled=false;show();}});};
-$('restore').onclick=()=>{f=normalizeSnapshot(JSON.parse(JSON.stringify(f)));show();$('status').textContent+=' · 存檔還原成功';};
-show();
-</script></html>
+<script type="module" src="./performance-browser.js?v=46f5571c8cd53c8556ba"></script></html>

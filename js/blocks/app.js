@@ -1,4 +1,11 @@
 import {materialSolveValidity} from './material-pose-status.js';
+import {createPlaybackProbe} from './playback-probe.js';
+import {createAsyncResource} from '../blocks3d/scene-reuse.js';
+import {LOAD_GRAPH_TOKEN} from '../load-graph.js';
+const benchmarkSession=new URLSearchParams(location.search).get('benchmark')==='1';
+const playbackProbe=benchmarkSession?createPlaybackProbe():null;
+let frameCpu=null,frame3dCpu={poseMs:0,submit3dMs:0};
+let benchmarkCoverage=null,benchmarkShapeKey=null;
 /**
  * blocks / app
  *
@@ -173,6 +180,7 @@ function undo() {
   updateUndoBtn();
 }
 function scheduleAutosave() {
+  if(benchmarkSession)return;
   clearTimeout(S.autosaveTimer);
   S.autosaveTimer = setTimeout(() => Store.saveLocal(bench.autosaveSnapshot() || Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState())), 500);
 }
@@ -289,7 +297,7 @@ const inDesign = () => S.mode === 'design';
 const focusOpts = () => ({ keepRoot: S.designFocus === ROOT_TAB });   // 剛按「新設計」時，空的「未命名設計」分頁要留著
 const focusModule = () => inDesign() ? (S.modules.find(m => m.id === S.designFocus) || null) : null;
 const FOCUS_KEY = 'cadcam.blocks.designFocus';   // 只記在這個瀏覽器：重新整理後回到同一頁（不進作品檔）
-function saveFocus() { try { localStorage.setItem(FOCUS_KEY, String(S.designFocus)); } catch (_) {} }
+function saveFocus() { if(benchmarkSession)return;try { localStorage.setItem(FOCUS_KEY, String(S.designFocus)); } catch (_) {} }
 function savedFocus() { try { return localStorage.getItem(FOCUS_KEY); } catch (_) { return null; } }
 // 上一次 rebuild 時的零件 id 集合：用來認出「這次新畫的零件」。載入／復原／清空時設 null，避免把還原的零件誤判成新零件。
 let knownCompIds = null;
@@ -819,7 +827,8 @@ function withCandidate(fn) {
   try { return fn(); }
   finally { candidate = derivedNow(); real.params.theta = S.topo.params.theta; inCandidate = false; putDerived(real); }
 }
-async function set3D(on) { if (view3DActive !== !!on) await toggle3D(); }
+const viewerSource=createAsyncResource(async()=>{const {createViewer}=await import('../blocks3d/viewer.js?v=20261007_m4b');return createViewer(document.getElementById('view3d'));});
+async function set3D(on) { if (view3DActive !== !!on) await toggle3D();else if(on)viewer3D=await viewerSource.get(); }
 const bench = createBench({
   deleteDesign, pause, isPlaying:()=>playbackActive, setCandidate, withCandidate, inCandidate: () => inCandidate,
   pushUndo, rebuild, draw, transient, setViewPlane: id => setViewPlane(id),
@@ -1742,9 +1751,12 @@ function drawSliders(pts, parent) {
 // 結構（零件/選取/縮放/拖曳）在播放期間不變，故安全；任何結構變更都走 draw() 完整重建。
 function renderFrame(...a) { return withCandidate(() => renderFrameNow(...a)); }
 function renderFrameNow() {
+  const measuring=playbackProbe?.active(),started=measuring?performance.now():0;
+  frame3dCpu={poseMs:0,submit3dMs:0};frameCpu=null;
   if (clearOffHomeModuleSelection()) { draw(); return; }
   if (!S.compiled || !S.comps.length || !frameUpdaters.length) { draw(); return; }
   const { pts: allPts, sol } = solveFrame();
+  const solvedAt=measuring?performance.now():0;
   lastFullPts = allPts;
   const pts = filterToView(allPts);
   lastFramePts = pts;
@@ -1757,6 +1769,7 @@ function renderFrameNow() {
   }
   if (recountBanner) recountBanner(pts, sol);
   updateMechanismStatus(sol);
+  const drawnAt=measuring?performance.now():0;
   // 3D 鏡像：沿用重建時算好的結構，只換這一幀的 pts
   if (view3DActive && lastModelInputs) {
     const cams = (lastModelInputs.cams || []).map(c => ({ ...c, thetaDeg: S.theta }));
@@ -1767,11 +1780,13 @@ function renderFrameNow() {
     }
     push3D();
   }
+  if(measuring)frameCpu={solveMs:solvedAt-started,draw2dMs:drawnAt-solvedAt,...frame3dCpu,valid:lastSolveValidity.valid};
 }
 
 // 用最近一幀的求解結果建場景模型，推進 3D viewer
 function push3D() { return withCandidate(push3DNow); }
 function push3DNow() {
+  const measuring=playbackProbe?.active(),started=measuring?performance.now():0;
   if (!viewer3D || !lastModelInputs) return;
   // 有直角安裝時，主平面場景只用主平面的輸入；其餘平面由 buildOrthogonalChildren 另建並立起來。
   // H1：設計模式的 3D 只畫焦點分頁（直角子模組在自己的平面平放，不立起來）；組立模式照舊畫全部。
@@ -1797,7 +1812,7 @@ function push3DNow() {
   if (allPlanes) {
     // 直角安裝的子模組：在自己的平面建場景（沒有世界機架），再以 4x4 立起來掛在宿主工具上。
     model.orthogonal = buildOrthogonalChildren({
-      comps: S.comps, modules: S.modules, inputs: allPlanes, mainModel: model, asm: S.assembly, params: S.topo.params, plates, plan: modulePlates.plan(),
+      comps: S.comps, modules: S.modules, inputs: allPlanes, mainModel: model, asm: S.assembly, params: S.topo.params, plates, plan: modulePlates.plan(),connectionGeometry:catalog.extras,
       exportSettings: Settings.exportSettings(), joint: jointSettingsNow(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) > 0 ? Number(S.fabrication.cnc.stockThicknessMm) : FABRICATION_DEFAULTS.cnc.stockThicknessMm,
       buildModel: inp => buildSceneModel(inp.links, inp.pts, {
         ...baseOpts, groundIds: inp.groundIds, motorCenters: inp.motorCenterIds, motorTypes: inp.motorTypes,
@@ -1814,7 +1829,10 @@ function push3DNow() {
   }
   model=attachPartMaterials(model,catalog,{comps:S.comps,modules:S.modules,points:allPlanes?allPlanes.pts:designView?lastModelInputsAll.pts:pts,assemblyScope:!designView});
   model.solveValidity=lastSolveValidity;
+  if(benchmarkSession&&!playbackProbe.active())benchmarkCoverage={materialParts:model.materialParts.length,holes:model.materialParts.reduce((n,p)=>n+p.geometry.holes.length,0),cutouts:model.materialParts.reduce((n,p)=>n+p.geometry.cutouts.length,0),bracketWings:model.materialParts.filter(p=>p.geometry.kind==='bracket-wing').length,screwInstances:model.materialParts.filter(p=>p.geometry.kind==='screw').length,legacyHardware:[model,...(model.orthogonal || []).map(c=>c.model)].map(m=>({motors:m.motors?.length || 0,pins:m.pins?.length || 0})),geometryCounters:viewer3D.cacheStats()};
+  const posedAt=measuring?performance.now():0;
   viewer3D.update(model);
+  if(measuring)frame3dCpu={poseMs:posedAt-started,submit3dMs:performance.now()-posedAt};
   bench.afterScene({ pts: planesApi.pts, ptsAll: allPlanes ? allPlanes.pts : planesApi.pts, model });   // 組立台：接口標記跟著這一幀的宿主位置
 }
 
@@ -1905,14 +1923,16 @@ async function toggle3D() {
     document.getElementById('strokeEditor').style.display = 'none';
     overlay.style.display = 'block';
     if (!viewer3D) {
-      const { createViewer } = await import('../blocks3d/viewer.js?v=20261007_m4b');
-      viewer3D = createViewer(overlay);
+      viewer3D=await viewerSource.get();
     }
+    if(!view3DActive){viewer3D.stop();return;}
+    viewer3D.start();
     refresh3DView();
     requestAnimationFrame(refresh3DView);
     setTimeout(refresh3DView, 120);
     setTimeout(refresh3DView, 360);
   } else {
+    viewer3D?.stop();
     overlay.style.display = 'none';
   }
   gripperController.syncVisibility();
@@ -2129,6 +2149,7 @@ function play() {
   draw();   // 先完整重建一次以建立場景與更新器，之後每幀走 renderFrame() 只更新幾何（不拆 DOM）
   let lastTs = null;
   const step = (ts) => {
+    const measuring=playbackProbe?.active(),cpuStart=measuring?performance.now():0;
     const dt = lastTs == null ? NOMINAL_FRAME_DT_MS : ts - lastTs; // 第一幀用名目幀長，按下播放立即有反應
     lastTs = ts;
     if (playPlan.mode === 'rock') {
@@ -2141,6 +2162,9 @@ function play() {
     }
     document.getElementById('thetaVal').textContent = Math.round(norm360(S.theta));
     renderFrame();
+    const rendered=measuring?viewer3D.renderNow(ts):null;
+    if(measuring&&benchmarkShapeKey!==viewer3D?.cacheStats?.().key)playbackProbe.abort('geometry_changed');
+    if(measuring)playbackProbe.record({...frameCpu,submit3dMs:(frameCpu?.submit3dMs || 0)+rendered.cpuMs,rendererCpuMs:rendered.cpuMs,poseRevision:rendered.poseRevision,appRafTimestamp:ts,rendererRafTimestamp:rendered.rendererRafTimestamp,totalMs:performance.now()-cpuStart,rafIntervalMs:dt,theta:S.theta,geometryCounters:viewer3D?.cacheStats?.() && (({geometryBuilds,geometryReuses,geometryDisposals})=>({geometryBuilds,geometryReuses,geometryDisposals}))(viewer3D.cacheStats())});
     raf = requestAnimationFrame(step);
   };
   raf = requestAnimationFrame(step);
@@ -2835,7 +2859,7 @@ function init() {
     console.warn('share link load failed:', e);
     transient('⚠️ 分享連結讀取失敗');
   }
-  if (!loaded) {
+  if (!loaded && !benchmarkSession) {
     const local = Store.normalizeSnapshot(Store.loadLocal());
     if (local && local.comps.length) { applySnapshot(local, { recordUndo: false, source: 'local-autosave' }); loaded = true; }
   }
@@ -2865,3 +2889,10 @@ Object.assign(window.blocks, {
   setMemberMaterial: memberEditor.setMaterial
 });
 init();
+if(benchmarkSession){
+ Object.assign(window.blocks,{benchmark:{identity:{source:'current',token:LOAD_GRAPH_TOKEN},async load(snapshot){playbackProbe.abort('work_changed');const norm=Store.normalizeSnapshot(snapshot);if(!norm)throw Error('無效量測作品');applySnapshot(norm,{recordUndo:false,source:'benchmark'});bench.setMode('bench');await set3D(true);viewer3D.stop();return benchmarkCoverage;},
+  start(meta){pause();viewer3D.stop();benchmarkShapeKey=viewer3D?.cacheStats?.().key;playbackProbe.start({...meta,sourceToken:LOAD_GRAPH_TOKEN,userAgent:navigator.userAgent,viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},renderer:{antialias:true,pixelRatio:Math.min(devicePixelRatio || 1,2),schedule:'app rAF calls the same renderNow as viewer rAF; one submission per pose'},cpuOnly:true});play();},
+  abort(reason){playbackProbe.abort(reason);pause();},result:()=>playbackProbe.snapshot(),status:()=>playbackProbe.status(),cache:()=>viewer3D?.cacheStats?.()}});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden){playbackProbe.abort('page_hidden');pause();}});
+ window.addEventListener('pagehide',()=>playbackProbe.abort('reload_or_navigation'));
+}

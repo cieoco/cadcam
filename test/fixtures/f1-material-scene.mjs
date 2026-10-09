@@ -6,19 +6,25 @@ import {buildOrthogonalChildren,attachModulePlates,planeInputs} from '../../js/b
 import {attachPartMaterials} from '../../js/blocks3d/part-pose.js';
 import {deriveMotorMounts} from '../../js/blocks/build-plan.js';
 import assert from 'node:assert/strict';
-export const f1MaterialScene=(thetaDeg,fixture,shape=buildPartGeometryCatalog(fixture))=>{
+import {motorPointIds,pointCoords} from '../../js/blocks/model.js';
+import {motorTypeAt} from '../../js/blocks/motor-tools.js';
+import {buildMotorMounts} from '../../js/blocks/motor-mounts.js';
+export const f1MaterialScene=(thetaDeg,fixture,shape=buildPartGeometryCatalog(fixture),{includeMotors=false}={})=>{
  const input=structuredClone(fixture),asm=compileAssembly(input.comps,input.modules,{params:input.params});
  const sol=solveAssembly(asm,{thetaDeg,motorAngles:{'2':0}});assert.ok(sol.isValid);
  const compiled=asm.compiled || asm;
- const links=input.comps.filter(c=>c.type==='bar').map(c=>({id:c.id,p1:c.p1.id,p2:c.p2.id}));
+ const links=input.comps.filter(c=>c.type==='bar').map(c=>({id:c.id,p1:c.p1.id,p2:c.p2.id,...(includeMotors?{style:c.isInput?'crank':undefined}:{} )}));
  const polygons=input.comps.filter(c=>c.type==='triangle').map(c=>({points:[c.p1.id,c.p2.id,c.p3.id]}));
- const inputs=buildPreviewModelInputs({comps:input.comps,params:input.params,theta:thetaDeg,links,points:sol.points,groundIds:new Set(input.comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(p=>p?.type==='fixed').map(p=>p.id))),motorCenterIds:new Set(),motorTypes:new Map(),motorMounts:deriveMotorMounts(input.comps),polygons});
+ const groundIds=new Set(input.comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(p=>p?.type==='fixed').map(p=>p.id))),motorCenterIds=includeMotors?motorPointIds(input.comps):new Set();
+ const motorTypes=new Map([...motorCenterIds].map(id=>[id,motorTypeAt(input.comps,id)]));
+ const motorMounts=includeMotors?buildMotorMounts({motorIds:motorCenterIds,groundIds,staticPoints:pointCoords(input.comps),comps:input.comps,compiledSteps:compiled.steps || [],sliderMountInfo:()=>null,isHiddenSliderRailPoint:()=>false,motorTypeForCenter:id=>motorTypeAt(input.comps,id)}):deriveMotorMounts(input.comps);
+ const inputs=buildPreviewModelInputs({comps:input.comps,params:input.params,theta:thetaDeg,links,points:sol.points,groundIds,motorCenterIds,motorTypes,motorMounts,polygons});
  const opts={plateThickness:4,memberStocks:shape.memberStocks,gearGeometries:shape.parts,fusedParts:shape.fusedParts};
  const create=(inp,frameGeometry=null)=>buildSceneModel(inp.links,inp.pts,{...opts,...inp,motorCenters:inp.motorCenterIds,frameGeometry});
  const main=create(planeInputs(inputs,input.comps,input.modules,null),shape.parts.frame);
  const plates=shape.frameHomes.map(h=>({...h,...h.geometry,outline:h.geometry.outlines[0],thicknessMm:h.stockMm}));
  attachModulePlates(main,input.comps,plates);
- main.orthogonal=buildOrthogonalChildren({...input,inputs,mainModel:main,plates,stockMm:4,joint:fixture.fabrication.joint,buildModel:inp=>create(inp)});
+ main.orthogonal=buildOrthogonalChildren({...input,inputs,mainModel:main,plates,stockMm:4,joint:fixture.fabrication.joint,connectionGeometry:shape.extras,buildModel:inp=>create(inp)});
  main.brackets=main.orthogonal.flatMap(c=>c.brackets || []);main.screws=main.orthogonal.flatMap(c=>c.screws || []);
  return {model:attachPartMaterials(main,shape,{...input,points:sol.points,assemblyScope:true}),points:sol.points};
 };
