@@ -3,7 +3,7 @@ import { APP_VERSION } from '../version.js?v=20261008_bracketalign';
 import { LOAD_GRAPH_TOKEN } from '../module-url.js';
 import { createLoadSession, LOAD_MISMATCH_MESSAGE } from './load-session.js';
 /** 正式組立台的隔離選面草稿。確認前不改作品。 */
-import { buildMountSurfaces } from './mount-surfaces.js';
+import { buildMountSurfaces, findMountSurface } from './mount-surfaces.js';
 import { pointCoords } from './model.js';
 import { inspectLinkExport, inspectPlateExport } from './exporters.js?v=20261007_9';
 import { connectionSelection } from './connection-selection.js';
@@ -50,11 +50,11 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   const saved = initialMount?.face ? readConnectionDescriptor({ comps, modules, childId, mount: initialMount }) : null;
   // Reselect starts from the saved endpoints. Current design presets are only
   // defaults for a new connection; ambiguous legacy records require a choice.
-  if (saved && (!saved.host || !saved.child || saved.host.source.kind === 'frame')) {
+  if (saved && (!saved.host || !saved.child)) {
     say(saved.diagnostics[0]?.message || '原接合端點無法使用，請先修復缺少的零件。'); return;
   }
   const repairChild = saved && !saved.child.available;
-  const repairHost = saved && !saved.host.available;
+  const repairHost = saved && (!saved.host.available || !findMountSurface(surfaces(saved.host.moduleId),initialMount.to));
   const needsChoice = repairChild || repairHost;
   if (needsChoice) say(saved.diagnostics[0]?.message || '請重新選取接合端點。');
   const childSelection = saved ? (repairChild ? null : { part: saved.child.partId, face: saved.child.face }) : connectionSelection(child, 'child');
@@ -65,7 +65,6 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   const childSurfaces = attachComp ? partSurfaces(attachComp.id) : surfaces(childId);
   const childSurface = childSurfaces.find(s => attachComp ? s.outputId === 'face-attach' : s.kind === 'frame');
   const eligible = m => {
-    if (m.mount && !m.mount.face) return false;
     const visited = new Set();
     for (let p = m; p; p = modules.find(x => x.id === p.mount?.to?.module)) {
       if (p.id === childId || visited.has(p.id)) return false;
@@ -73,7 +72,20 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     }
     return true;
   };
-  const hosts = modules.filter(eligible).flatMap(m => { const selected = connectionSelection(m, 'host'); return surfaces(m.id).filter(s => s.kind === 'output' && (repairHost || !selected || s.compId === selected.part || (saved && s.moduleId === saved.host.moduleId && s.outputId === saved.host.source.outputId))).map(s => reference(s, `${m.name} · ${s.name}`, parts(m.id))); });
+  const matchesSaved = s => saved && s.moduleId === saved.host.moduleId && (saved.host.source.kind === 'frame' ? s.kind === 'frame' && s.frameEdge === saved.host.edge : s.kind === 'output' && s.outputId === saved.host.source.outputId);
+  const hosts = modules.filter(eligible).flatMap(m => {
+    const selected = connectionSelection(m, 'host'), ownParts = parts(m.id);
+    // A straight edge is only the frame's rigid-pose reference, not a second
+    // face choice. New mounts use the first valid stable edge; reselect keeps
+    // the saved edge exactly. An unavailable saved edge requires a new choice.
+    return surfaces(m.id).slice().sort((a,b)=>selected?.part==='frame'?Number(b.kind==='frame')-Number(a.kind==='frame'):Number(a.kind==='frame')-Number(b.kind==='frame')).flatMap(s => {
+      if(s.kind!=='frame')return [s];
+      const edge=saved?.host.moduleId===m.id&&saved.host.source.kind==='frame'&&!repairHost?saved.host.edge:s.edges?.[0]?.edge;
+      return s.edges?.some(e=>e.edge===edge)?[{...s,frameEdge:edge}]:[];
+    })
+      .filter(s => s.kind === 'frame' || repairHost || !selected || s.compId === selected.part || matchesSaved(s))
+      .map(s => reference(s, `${m.name} · ${s.name}`, ownParts));
+  });
   if (!childSurface || !hosts.length) { say('需要另一個有承接板的機構，以及安裝端的固定底板。'); return; }
   const candidates = repairChild ? [childSurface, ...comps.filter(c => c.moduleId === childId && c.type === 'bar' && [c.p1, c.p2].every(p => p && ['fixed', 'motor'].includes(p.type))).map(c => partSurfaces(c.id).find(s => s.compId === c.id))].filter(Boolean) : [childSurface];
   const children = candidates.map(s => reference(s, `${child.name} · ${s.kind === 'frame' ? '固定桿／底板' : s.name}`, parts(childId)));
@@ -102,7 +114,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     };
     if (e.data?.type === 'face-wizard-ready') {
       if (!loadSession.receiveReady(e.data.loadGraph)) { rejectLoad(); return; }
-      frame.contentWindow.postMessage({ type: 'face-wizard-init', sourceRevision:transaction.snapshot().sourceRevision, joint, loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement: startAtPlacement && !needsChoice, hosts: hosts.map(h => ({ ...h, defaultFace: saved && h.surface.moduleId === saved.host.moduleId && h.surface.outputId === saved.host.source.outputId ? saved.host.face : connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, configured: !!childSelection && !needsChoice, mode: wizard || needsChoice || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && h.surface.outputId === initialMount?.to?.output) }, location.origin);
+      frame.contentWindow.postMessage({ type: 'face-wizard-init', sourceRevision:transaction.snapshot().sourceRevision, joint, loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement: startAtPlacement && !needsChoice, hosts: hosts.map(h => ({ ...h, defaultFace: matchesSaved(h.surface) ? saved.host.face : connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, configured: !!childSelection && !needsChoice, mode: wizard || needsChoice || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && (initialMount?.to?.frame ? h.surface.frameEdge === initialMount.to.frame.edge : h.surface.outputId === initialMount?.to?.output && h.surface.kind === 'output')) }, location.origin);
     }
     if(!['face-wizard-preview','face-wizard-confirm'].includes(e.data?.type))return;
     if(!loadSession.allowConfirm(e.data.loadGraph)){rejectLoad();return;}
@@ -111,7 +123,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
       const selection=e.data.selection;
       if(!selection||!Number.isInteger(selection.host)||!hosts[selection.host]||!Number.isInteger(selection.child)||!children[selection.child])return;
       const host=hosts[selection.host].surface,selectedChild=children[selection.child].surface;
-      const result=await transaction.preview({childId,reselect:!!initialMount,selection,hostEndpoint:{moduleId:host.moduleId,outputId:host.outputId,partId:host.compId},childEndpoint:{partId:selectedChild.compId || 'frame'}});
+      const result=await transaction.preview({childId,reselect:!!initialMount,selection,hostEndpoint:{moduleId:host.moduleId,outputId:host.outputId,frameEdge:host.frameEdge,partId:host.compId},childEndpoint:{partId:selectedChild.compId || 'frame'}});
       if(transaction.snapshot().closed)return;
       frame.contentWindow.postMessage({type:'face-wizard-preview-result',requestId:e.data.requestId,loadGraph:LOAD_GRAPH_TOKEN,candidate:result},location.origin);return;
     }

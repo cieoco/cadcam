@@ -8,8 +8,15 @@ import {machineFrameComps,machineMounts,moduleFrameExports,moduleFrameNodes,spli
 import {frameConnectorNodes} from './model.js';
 import {withWorldAdapterNodes,withAdapterNodes} from './orthogonal-joint.js';
 import {splitMountsByHost} from './exporters.js';
+import {readConnectionDescriptor} from './connection-descriptor.js';
 export const usesFaceExport=source=>source.comps.every(c=>['anchor','bar','triangle','gear'].includes(c.type))&&(source.modules.some(m=>m.mount?.face)||(source.modules.some(m=>m.mount?.orient?.joint?.kind==='bracket-m3')&&source.modules.every(m=>!m.mount?.orient||m.mount.orient.joint?.kind==='bracket-m3')));
 function exportScene(source,pose){
+ // Validate the requested identity before normalization can discard a malformed
+ // mount. Losing an invalid requested connection must never enable export.
+ for(const mod of source.modules.filter(m=>m.mount?.face)){
+  const connection=readConnectionDescriptor({...source,childId:mod.id});
+  if(!connection.ok)throw Error(`角碼孔暫停輸出：${connection.diagnostics[0]?.message || '接合端點無法驗證'}`);
+ }
  const sourceRevision=faceSourceRevision(source),work=structuredClone(source);
  work.topo ||= {params:work.params || {}};work.params=work.topo.params;
  work.stockMm ||= Number(work.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;

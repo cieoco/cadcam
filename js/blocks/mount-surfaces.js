@@ -7,7 +7,7 @@ import { deriveMotorMounts } from './build-plan.js?v=20261007_7';
  * mounted in 3D.
  */
 import { autoPorts } from './bench.js';
-import { moduleFrameExports, moduleFrameNodes } from './assembly.js?v=20261007_m5a';
+import { moduleFrameExports, moduleFrameNodes, orthogonalHostEdge } from './assembly.js?v=20261007_m5a';
 import { inspectFrameExport, inspectLinkExport, inspectPlateExport, inspectFusion, inspectRackExport, splitMountsByHost, hostedBarGeometry } from './exporters.js?v=20261007_7';
 import { frameConnectorNodes, pointCoords } from './model.js';
 import { memberStock } from './member-stock.js';
@@ -15,6 +15,14 @@ import { memberStock } from './member-stock.js';
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const finite = value => typeof value === 'number' && Number.isFinite(value);
 const rad = degrees => degrees * Math.PI / 180;
+
+/** Resolve an explicit saved endpoint; frame edges never fall back to outputs. */
+export function findMountSurface(surfaces, endpoint = {}) {
+  const edge = endpoint.frame?.edge ?? endpoint.frameEdge;
+  if (edge !== undefined) return surfaces?.find(s => s.kind === 'frame' && s.edges?.some(e => e.edge === edge));
+  const output = endpoint.output ?? endpoint.outputId;
+  return output === undefined ? undefined : surfaces?.find(s => s.kind === 'output' && s.outputId === output && (!endpoint.partId || s.compId === endpoint.partId));
+}
 
 function stockThickness(comp, exportSettings, fallback) {
   const raw = comp && isRecord(comp.stock) ? comp.stock.thicknessMm : undefined;
@@ -111,8 +119,14 @@ export function buildMountSurfaces({ comps, modules, moduleId, params, exportSet
       const box = transformed && surfaceBox(transformed.outlines, frameThickness);
       if (box) surfaces.push({
         id: `${moduleId}-frame`, name: `${module.name || moduleId} 底板`, moduleId,
-        compId: null, kind: 'frame', box, outline: transformed.outlines[0], outlines: transformed.outlines,
+        compId: null, kind: 'frame', framePartId:entry ? `${moduleId}-frame` : 'frame', box, outline: transformed.outlines[0], outlines: transformed.outlines,
         holes: transformed.holes, ports: [],
+        // These are the existing rounded-frame straight-edge identities. Arcs
+        // and degenerate edges are deliberately absent, never renumbered.
+        edges: [6, 13, 20, 27].flatMap(edge => {
+          const e = orthogonalHostEdge(comps, modules, {to:{module:moduleId,frame:{edge}}}, pts, params, {home:true,stockMm:thicknessMm});
+          return e ? [{edge, pose:e.pose, a:e.a, b:e.b}] : [];
+        }),
         warnings: ['底板尚未合併馬達安裝特徵與轉接座孔；此描述不等同完整製作包。']
       });
     }

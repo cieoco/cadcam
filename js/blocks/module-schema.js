@@ -331,8 +331,8 @@ export function normalizeModules(rawModules, comps) {
     if (!p.mount?.face) return;
     const host = withMount.find(h => h.id === p.mount.to.module);
     const output = host?.outputs.find(o => o.id === p.mount.to.output);
-    if (!p.base || (!p.mount.to.frame && !['bar', 'triangle', 'rack'].includes(output?.body?.kind)) || (host?.mount && !host.mount.face)) {
-      warnings.push(`模組 ${p.id} 的六面安裝缺少支援的底座／承接板，或宿主使用舊式安裝，已保留原接合紀錄，請重新選面。`);
+    if (!p.base || (!p.mount.to.frame && !['bar', 'triangle', 'rack'].includes(output?.body?.kind))) {
+      warnings.push(`模組 ${p.id} 的六面安裝缺少支援的底座／承接板，已保留原接合紀錄，請重新選面。`);
     }
   });
   withMount.forEach(p => {

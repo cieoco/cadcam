@@ -323,7 +323,7 @@ export function solveAssembly(asm, params) {
         // 直角安裝到桿／三角板／機架板的邊：宿主位姿＝邊的起點與方向（桿＝p1 與 p1→p2）；宿主點都要解出來。
         const allComps = asm.units.flatMap(u => u.comps || []);
         const allMods = asm.units.filter(u => u.module).map(u => u.module);
-        const e = unit.mount.orient ? orthogonalHostEdge(allComps, allMods, unit.mount, points, params, { asm }) : null;
+        const e = unit.mount.orient || unit.mount.face ? orthogonalHostEdge(allComps, allMods, unit.mount, points, params, { asm }) : null;
         now = e ? e.pose : null;
       } else {
         now = host && host.module ? outputPose(host.module, unit.mount.to.output, points, host.comps) : null;
@@ -453,13 +453,13 @@ export function orthogonalFrame(comps, modules, moduleId, points, params, opts =
   const face = mod && mod.mount && mod.mount.face;
   if (face) {
     const host = modList.find(m => m.id === mod.mount.to.module);
-    const hostPose = host ? outputPose(host, mod.mount.to.output, points, list.filter(c => c && c.moduleId === host.id)) : null;
+    const hostPose = host ? (mod.mount.to.frame ? orthogonalHostEdge(list,modList,mod.mount,points,params,opts)?.pose : outputPose(host, mod.mount.to.output, points, list.filter(c => c && c.moduleId === host.id))) : null;
     if (!hostPose) return null;
     // Face transforms and drilling are authored in the design geometry, not the
     // solved theta-zero pose stored by older mounts. Use the same design frame
     // as the stock holes; this also repairs existing saved face placements.
     const hostComps = list.filter(c => c && c.moduleId === host.id);
-    const ref = outputPose(host, mod.mount.to.output, pointCoords(hostComps), hostComps);
+    const ref = mod.mount.to.frame ? orthogonalHostEdge(list,modList,mod.mount,pointCoords(list),params,{...opts,home:true})?.pose : outputPose(host, mod.mount.to.output, pointCoords(hostComps), hostComps);
     if (!ref) return null;
     const angle = (hostPose.a - ref.a) * D2R, cos = Math.cos(angle), sin = Math.sin(angle);
     const rotate = v => ({ x: cos * v[0] - sin * v[1], y: sin * v[0] + cos * v[1], z: v[2] });

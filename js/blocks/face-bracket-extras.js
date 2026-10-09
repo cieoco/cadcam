@@ -1,6 +1,6 @@
 import { readConnectionDescriptor } from './connection-descriptor.js';
 /** Recompute confirmed drilling against current stock; stale/invalid plans produce no holes. */
-import { buildMountSurfaces } from './mount-surfaces.js';
+import { buildMountSurfaces, findMountSurface } from './mount-surfaces.js';
 import { planFaceBrackets } from './face-bracket-geometry.js?v=20261008_bracket3d';
 
 function rawPlan(comps, modules, params, mod, opts={}) {
@@ -8,7 +8,7 @@ function rawPlan(comps, modules, params, mod, opts={}) {
   const descriptor=readConnectionDescriptor({comps,modules,childId:mod.id,mount:mod.mount});
   if(!descriptor.capabilities.drilling)return {ok:false,reason:descriptor.diagnostics[0]?.message || '找不到支援開孔的接合板',diagnostics:descriptor.diagnostics};
   const surfaces=(id,partId)=>buildMountSurfaces({comps,modules,params,moduleId:id,partId,exportSettings:opts.exportSettings || {},thicknessMm:opts.stockMm || 3,drilling:true}).surfaces || [];
-  const host=surfaces(mod.mount.to.module).find(s=>s.outputId===mod.mount.to.output);
+  const host=findMountSurface(surfaces(mod.mount.to.module),mod.mount.to);
   const part=descriptor.child.partId, own=surfaces(mod.id,part);
   const child=own.find(s=>part && part!=='frame'?s.compId===part:s.kind==='frame');
   if (!host || !child || host.body?.kind==='rack' || child.body?.kind==='rack') return {ok:false,reason:'找不到支援開孔的接合板'};
@@ -38,7 +38,7 @@ export function appendFaceBracketHoles(extras, comps, modules, params, opts={}) 
     const plan=faceBracketPlan(comps,modules,params,mod,opts);
     if (!plan?.ok) {if(plan)(extras.diagnostics ||= []).push({status:'fail',code:'face_fastener_invalid',moduleId:mod.id,reason:plan.reason});continue;}
     extras.adapters.push({moduleId:mod.id,connectionId:`connection:${mod.id}`,kind:'bracket-m3',
-      hostCompId:plan.host.compId,hostPartName:plan.host.kind==='frame'?`${plan.host.moduleId}-frame`:null,
+      hostCompId:plan.host.compId,hostPartName:plan.host.kind==='frame'?plan.host.framePartId:null,
       childPart:plan.child.kind==='frame'?`${mod.id}-frame`:plan.child.compId,
       holesPerFlange:plan.physical.length,holeDiameterMm:plan.spec.diameter,physical:plan.physical,spec:plan.spec});
     for(const [surface,holes] of [[plan.host,plan.hostHoles],[plan.child,plan.childHoles]]) {

@@ -15,6 +15,7 @@
   ],
   "timeoutMs": 90000,
   "tests": [
+    "test/face-host-frame.mjs",
     "test/connection-formats.mjs",
     "test/face-export-trace.mjs",
     "test/face-candidate.mjs",

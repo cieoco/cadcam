@@ -1,5 +1,5 @@
 /** Plain F1 candidate and once-only transaction; no S, DOM, undo or storage access. */
-import {buildMountSurfaces} from './mount-surfaces.js';
+import {buildMountSurfaces,findMountSurface} from './mount-surfaces.js';
 import {buildFacePlacement} from './face-placement.js';
 import {mountFacePlacement} from './face-mount.js';
 import {faceBracketPlan} from './face-bracket-extras.js';
@@ -31,13 +31,13 @@ export function buildFaceCandidate(source,{childId,hostEndpoint,childEndpoint,se
  if(!selection||!['hostFace','childFace'].every(k=>['top','bottom','front','back','left','right'].includes(selection[k]))||!['alignU','alignV','offsetU','offsetV','gap','quarterTurns'].every(k=>typeof selection[k]==='number'&&Number.isFinite(selection[k]))||selection.gap<0||!Number.isInteger(selection.quarterTurns)||selection.rotationDeg!==undefined&&!Number.isFinite(selection.rotationDeg)||selection.brackets&&Object.values(selection.brackets.offsets || {}).some(n=>!Number.isFinite(n)))return failed('invalid_selection','選面或尺寸輸入不合法。',sourceRevision);
  if(reselect)work.modules=work.modules.map(m=>m.id===childId?{...m,mount:null}:m);
  const opts={comps:work.comps,modules:work.modules,params:work.params,exportSettings,thicknessMm:stockMm,drilling:true};
- const host=buildMountSurfaces({...opts,moduleId:hostEndpoint?.moduleId}).surfaces?.find(s=>s.outputId===hostEndpoint?.outputId&&(!hostEndpoint.partId||s.compId===hostEndpoint.partId));
+ const host=findMountSurface(buildMountSurfaces({...opts,moduleId:hostEndpoint?.moduleId}).surfaces,hostEndpoint);
  const child=buildMountSurfaces({...opts,moduleId:childId,...(childEndpoint?.partId&&childEndpoint.partId!=='frame'?{partId:childEndpoint.partId}:{})}).surfaces?.find(s=>childEndpoint?.partId==='frame'?s.kind==='frame':s.compId===childEndpoint?.partId);
  if(!host||!child)return failed('endpoint_missing','接合端點已不存在，請重新選面。',sourceRevision);
  const placement=buildFacePlacement({host:centeredFaceSurface(host),child:centeredFaceSurface(child),selection});
  if(!placement.ok)return failed('placement_invalid',placement.reason,sourceRevision);
  const face={version:1,childPart:child.compId || 'frame',...placement.record.transform,selection:placement.record.selection,hostThicknessMm:host.box.max.z-host.box.min.z,childThicknessMm:child.box.max.z-child.box.min.z};
- const mounted=mountFacePlacement(work.comps,work.modules,childId,{hostId:host.moduleId,outputId:host.outputId,face},work.params);
+ const mounted=mountFacePlacement(work.comps,work.modules,childId,{hostId:host.moduleId,outputId:host.outputId,frameEdge:hostEndpoint?.frame?.edge ?? hostEndpoint?.frameEdge,face},work.params);
  if(!mounted.ok)return failed('mount_invalid',mounted.reason,sourceRevision);
  work.modules=work.modules.map(m=>m.id===childId?{...m,mount:mounted.mount}:m);
  const prepared=prepareConnectionWork(work.comps,work.modules,work.topo,{stockMm,exportSettings});work.modules=prepared.modules;work.params=work.topo.params;
@@ -55,7 +55,11 @@ export function buildFaceCandidate(source,{childId,hostEndpoint,childEndpoint,se
   validation:{status:'not_checked',sourceRevision,checks:[{status:'pass',code:'placement_valid'},{status:bracket?'pass':'not_checked',code:bracket?'fastener_valid':'fastener_not_requested'}],coverage:{scope:'face_candidate'}}});
 }
 export function faceCandidateModel(candidate,pose={}){
- const work=structuredClone(candidate.displayWork || candidate.work);work.topo.params.theta=pose.theta || 0;const prepared=prepareConnectionWork(work.comps,work.modules,work.topo,{stockMm:work.stockMm,exportSettings:work.exportSettings});work.modules=prepared.modules;work.params=work.topo.params;
+ const work=structuredClone(candidate.displayWork || candidate.work);
+ work.topo ||= {params:work.params || {}};
+ work.stockMm ||= Number(work.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;
+ work.exportSettings ||= work.fabrication?.export || {};work.joint ||= work.fabrication?.joint || FABRICATION_DEFAULTS.joint;
+ work.topo.params.theta=pose.theta || 0;const prepared=prepareConnectionWork(work.comps,work.modules,work.topo,{stockMm:work.stockMm,exportSettings:work.exportSettings});work.modules=prepared.modules;work.params=work.topo.params;
  const asm=compileAssembly(work.comps,work.modules,work.topo),sol=solveAssembly(asm,{thetaDeg:pose.theta || 0,motorAngles:pose.motorAngles || {},_prevPoints:pose._prevPoints});
  const validity=materialSolveValidity(work.comps,sol);if(!validity.valid)return {solveValidity:validity};
  const ids=motorPointIds(work.comps),groundIds=new Set(work.comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(p=>p&&['fixed','motor'].includes(p.type)).map(p=>p.id)));
@@ -65,8 +69,8 @@ export function faceCandidateModel(candidate,pose={}){
  const inputs=buildPreviewModelInputs({comps:work.comps,params:work.params,theta:pose.theta || 0,links:prepared.compiled.visualization.links,polygons:prepared.compiled.visualization.polygons || [],points:sol.points,groundIds,motorCenterIds:ids,motorTypes:new Map([...ids].map(id=>[id,motorTypeAt(work.comps,id)])),motorMounts:mounts,
   sliderTravelStart:c=>c.travelStart || 0,sliderTravelEnd:c=>c.travelEnd || 100,sliderBodyLength:c=>c.bodyLen || 60,rackBodyHeight:c=>c.bodyHeight || 20,rackPhaseShift:()=>0,pulleyRadius:()=>32,pulleyPinRadius:()=>20});
  const model=buildMaterialScene({...work,catalog,inputs:planeInputs(inputs,work.comps,work.modules,null),allPlanes:inputs,points:sol.points,asm,hullR:DEFAULT_PLATE_RADIUS_WORLD,solveValidity:validity});
- const hostGeometry=catalog.parts[candidate.hostSurface?.compId],homeIds=hostGeometry?.binding.pointIds || [],[a,b]=homeIds.map(id=>catalog.homePoints[id]);
- const hostReference=a&&b?{origin:a,angle:Math.atan2(b.y-a.y,b.x-a.x)}:null;
+ const hostGeometry=catalog.parts[candidate.hostSurface?.framePartId || candidate.hostSurface?.compId],homeIds=hostGeometry?.binding.pointIds || [],[a,b]=homeIds.map(id=>catalog.homePoints[id]);
+ const hostReference=candidate.hostSurface?.kind==='frame'?{origin:{x:0,y:0},angle:0}:a&&b?{origin:a,angle:Math.atan2(b.y-a.y,b.x-a.x)}:null;
  return {model,work,mounts:exportMounts,catalog,points:sol.points,hostReference,solveValidity:validity};
 }
 export async function validateFaceCandidate(candidate,pose={},compute,sceneInput){

@@ -25,7 +25,7 @@ export function readConnectionHost({comps=[],modules=[],mount}={}){
  if(!mod){host.reason=reason(found.ambiguous?'host_module_ambiguous':'host_module_missing','宿主模組不存在或身分不唯一，請重新選取接合位置。');return host;}
  if(kind==='frame'){
   host.partId='frame';host.edge=target.frame?.edge;
-  if(!edgeValid(host.edge))host.reason=reason('host_edge_invalid','宿主底板邊參照不合法。');
+  if(![6,13,20,27].includes(host.edge))host.reason=reason('host_edge_invalid','宿主底板直邊參照不存在，不能改選另一條邊。');
   else if(!frameExists(comps,mod.id))host.reason=reason('host_frame_missing','宿主底板固定接點已不存在。');
   else host.available=true;
   return host;
@@ -111,11 +111,10 @@ export function readConnectionDescriptor({ comps = [], modules = [], childId, mo
  }
  for(const endpoint of [host,child])if(endpoint.reason)diagnostics.push({...endpoint.reason,moduleId:endpoint.moduleId,partId:endpoint.partId});
  result.capabilities.endpoints=host.available&&child.available;result.ok=valid&&result.capabilities.endpoints;
- const commonFace=result.ok&&saved.face&&host.source.kind==='output';
+ const commonFace=result.ok&&saved.face&&['output','frame'].includes(host.source.kind);
  const commonOrient=result.ok&&saved.orient?.joint?.kind==='bracket-m3'&&(saved.orient.tiltDeg===undefined||Number(saved.orient.tiltDeg)===0);
  result.capabilities.refresh=!!commonFace;result.capabilities.drilling=!!commonOrient||!!commonFace&&host.partKind!=='rack';result.capabilities.geometry=result.capabilities.drilling;
- if(saved.face&&host.source?.kind==='frame')diagnostics.push({...reason('host_frame_not_supported','已保留原安裝姿態；此底板接法尚未支援重新定位與固定孔。'),package:'W4b',capabilities:['refresh','drilling','geometry']});
- else if(!saved.face&&!commonOrient)diagnostics.push({...reason('legacy_connection_geometry_bridge','接合定位沿用原流程；此接法尚未接入共用接件與固定孔驗證。'),package:'W4b',capabilities:['refresh','drilling','geometry']});
+ if(!saved.face&&!commonOrient)diagnostics.push({...reason('legacy_connection_geometry_bridge','接合定位沿用原流程；此接法尚未接入共用接件與固定孔驗證。'),package:'W4b',capabilities:['refresh','drilling','geometry']});
  return result;
 }
 

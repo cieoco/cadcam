@@ -113,9 +113,9 @@ const frameHost = clone(modules); frameHost[1].mount.to = { module: 'Host', fram
 const frameSaved = normalizeSnapshot(toSnapshot(comps, { params }, 0, { modules: frameHost }));
 assert.deepEqual(frameSaved.modules[1].mount.to, frameHost[1].mount.to);
 assert.equal(read(frameSaved.modules).host.partId, 'frame');
-assert.equal(read(frameSaved.modules).capabilities.refresh, false);
-assert.ok(read(frameSaved.modules).diagnostics.some(d => d.code === 'host_frame_not_supported'));
-assert.deepEqual(refreshFaceMounts(comps, frameSaved.modules, params, opts).modules, frameSaved.modules);
+assert.equal(read(frameSaved.modules).capabilities.refresh, true);
+assert.ok(!read(frameSaved.modules).diagnostics.some(d => d.code === 'host_frame_not_supported'));
+assert.deepEqual(refreshFaceMounts(comps, frameSaved.modules, params, opts).modules[1].mount.to, frameSaved.modules[1].mount.to);
 for (const edge of [-1, 1.5, '6']) {
   const invalid = clone(frameHost); invalid[1].mount.to.frame.edge = edge;
   assert.equal(normalizeSnapshot(toSnapshot(comps, { params }, 0, { modules: invalid })).modules[1].mount, null);

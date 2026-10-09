@@ -10,7 +10,7 @@ export function candidateCoverageText(candidate){
 export const candidateConfirmLabel=(candidate,pending=false)=>!pending&&candidate?.saveable&&candidate.validation?.status==='fail'?'接上（有干涉）':'接上';
 /** Face names and U/V belong to the selected home XY box, not a member AABB. */
 export function candidateHostFace(candidate,faceId){
- const part=candidate.model?.materialParts.find(p=>p.partId===candidate.hostSurface?.compId);
+ const part=candidate.model?.materialParts.find(p=>p.partId===(candidate.hostSurface?.framePartId || candidate.hostSurface?.compId));
  const face=candidate.hostSurface&&boxFaces(candidate.hostSurface.box).find(f=>f.id===faceId);
  if(!part||!face||!candidate.hostReference)return null;
  const {origin,angle}=candidate.hostReference,c=Math.cos(angle),s=Math.sin(angle),t=part.geometry.thicknessMm;

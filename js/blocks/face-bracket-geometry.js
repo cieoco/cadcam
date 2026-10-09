@@ -98,8 +98,8 @@ export function planFaceBrackets(host, child, transform, offsets={}, allowRevers
     const plane=world({x:0,y:0,z:cz}), outward=mul(normal,side);
     const corner=add(add(mul(normal,dot(normal,plane)),mul(along,(lo+hi)/2+slot.at)),{x:0,y:0,z});
     const entity=buildBracketInstance({connectionId,slotId:slot.id,corner,seamAxis:along,spec:K,wings:[
-      {role:roles[0],partId:host.compId || 'frame',runAxis:outward,contactNormal:up,lengthMm:K.hostLeg,holeOffsetMm:K.hostHole,plateThicknessMm:host.box.max.z-host.box.min.z},
-      {role:roles[1],partId:child.compId || 'frame',runAxis:up,contactNormal:outward,lengthMm:K.childLeg,holeOffsetMm:K.childHole,plateThicknessMm:child.box.max.z-child.box.min.z,plateToLocal:{rotation:R[0].map((_,i)=>R.map(row=>row[i])),translation:local({x:0,y:0,z:0})}}
+      {role:roles[0],partId:host.compId || host.framePartId || 'frame',runAxis:outward,contactNormal:up,lengthMm:K.hostLeg,holeOffsetMm:K.hostHole,plateThicknessMm:host.box.max.z-host.box.min.z},
+      {role:roles[1],partId:child.compId || child.framePartId || (child.moduleId?`${child.moduleId}-frame`:'frame'),runAxis:up,contactNormal:outward,lengthMm:K.childLeg,holeOffsetMm:K.childHole,plateThicknessMm:child.box.max.z-child.box.min.z,plateToLocal:{rotation:R[0].map((_,i)=>R.map(row=>row[i])),translation:local({x:0,y:0,z:0})}}
     ]});
     const [hw,cw]=entity.wings, hp=hw.plateHole.local, cp=cw.plateHole.local;
     let reason=holeReason(host,hp,hostHoles,K) || holeReason(child,cp,childHoles,K);

@@ -1,5 +1,5 @@
 /** 尺寸與加工設定修改後，維持使用者選定的面／對齊／間距。純函式。 */
-import { buildMountSurfaces } from './mount-surfaces.js';
+import { buildMountSurfaces, findMountSurface } from './mount-surfaces.js';
 import { buildFacePlacement } from './face-placement.js';
 import { mountFacePlacement } from './face-mount.js';
 import { readConnectionDescriptor } from './connection-descriptor.js';
@@ -26,7 +26,7 @@ export function refreshFaceMounts(comps, modules, params, { exportSettings = {},
     }
     const target = mod.mount.to;
     const describe = (id, partId) => buildMountSurfaces({ comps, modules, params, moduleId: id, partId, exportSettings, thicknessMm: stockMm }).surfaces || [];
-    const host = describe(target.module).find(s => s.outputId === target.output && s.kind === 'output');
+    const host = findMountSurface(describe(target.module), target);
     const part = descriptor.child.partId;
     const child = describe(mod.id, part).find(s => part && part !== 'frame' ? s.compId === part : s.kind === 'frame');
     if (!host || !child) return retain('endpoint_geometry_unavailable', '接合板已改變，請重新選面；已保留原安裝姿態。');
@@ -36,7 +36,7 @@ export function refreshFaceMounts(comps, modules, params, { exportSettings = {},
       ...(mod.mount.face.childPart !== undefined ? { childPart: part } : {}),
       hostThicknessMm: host.box.max.z - host.box.min.z, childThicknessMm: child.box.max.z - child.box.min.z };
     const unmounted = modules.map(m => m.id === mod.id ? { ...m, mount: null } : m);
-    const result = mountFacePlacement(comps, unmounted, mod.id, { hostId: target.module, outputId: target.output, face }, params);
+    const result = mountFacePlacement(comps, unmounted, mod.id, { hostId: target.module, outputId: target.output, frameEdge:target.frame?.edge, face }, params);
     if (!result.ok) return retain('face_mount_refresh_failed', result.reason);
     // Legacy bracket identity is an immutable read fallback, not a migration.
     if (mod.mount.face.childPart === undefined) delete result.mount.face.childPart;

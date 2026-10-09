@@ -5,7 +5,7 @@
 ## 接手資訊
 
 - 分支：`codex/framework-stabilization`；起點：`1537242`（應用 `2026.10.08.13`）。
-- 唯一寫入者：`w4a_physical`（Sol high）；W4b-1沿邊金屬角碼共用實體已驗收，root只讀review／HTTP並批准scoped commit；提交後STOP，無再委派。
+- 唯一寫入者：`w4a_physical`（Sol high）；W4b-2六面宿主底板／F3多接合scoped驗收通過，root只讀review／HTTP已批准本地提交；提交後STOP，不再委派。
 - 本機：Windows、Node `v25.2.0`、Python `3.13.5`。CI 的 Node 版本在 W1 固定並驗證。
 - 使用者原有未追蹤附件、`Claude outputs/`、截圖及框架檢討文件保留。提交只選本包檔案。
 - Astra 僅 low；更高推理強度須另獲確認。主聊天不宣稱自行切換模型。
@@ -21,7 +21,7 @@
 | W3a | done | F1 六面純讀取／保存／重選／真 bar 層高；同圖 check、Node22 全套 146/146、主代理 HTTP 通過 |
 | W4a–W5a／G1 | done (F1) | W4a共用角碼／材料／單姿態SAT／快取，W5a純候選交易／實際SVG-DXF-製作包trace已貫通；G1內部門檻通過，F1真撞如實保留。其他格式留b階段，完整F3及OPPO實機仍限制W6 |
 | W3b | done | planar／orient／face共同唯讀契約，宿主frame／body／output身分分離；Node22 156/156＋F1 HTTP通過，共用實體接入留W4b |
-| W4b | LOOP 1 done | 沿邊金屬角碼配置→共同physical，Node22 157/157＋HTTP；host-frame新六面及完整F3幾何待下一LOOP |
+| W4b | LOOP 2 done (scoped) | 金屬共用physical及六面host frame／F3多接合貫通；Node22 158/158＋HTTP。原builtin保存尺寸吸附缺口另包必做，F2／教材／W5b／W6仍待 |
 | W5b | planned | 其餘格式交易、多接合位置、教材與效能 |
 | W6 | planned | 全面驗收、提交推送與發布核對 |
 
@@ -239,3 +239,24 @@ G1內部F1門檻已貫通，可接續W3b→W4b→W5b；這不是發布或全格�
 - 初次HTTP `3bbc4090d8b0f24e7991`抓到測試fixture誤標：測試直接改原bar.stock=6，st共享引用且18mm寬不足以站立（至少19），benchAdjust站立／換面回false而測試漏assert，變體仍為沿邊。已撤掉原bar mutation、明確assert每筆ok／edge child／face±1；6mm/custom站立採合法24mm寬專用fixture，不改原F1產品參數或真撞。修後 `target-standing` 13/13，真正站立72矩陣及nested／different frameStock／actual file parse均通過；physical trace的宿主板孔local亦交核心plateToLocal，與serialized局部孔0.005mm一致。
 - 初次正常沿邊HTTP仍有有效證據：custom實停−17.008°（UI343°），實際pack single_pose fail、2角碼、host6／child4、兩M3×8＋兩M3×6；SVG／DXF首件LiftCrank_1各6circle／6trace，ignored http-custom-pack.html與http-custom-LiftCrank_1.*。IAB多檔仍只落首件，全public Blob由Node parse，無宣稱瀏覽器全件落檔。側欄仍用舊沿邊檢查而顯『目前姿勢沒有干涉』，與pack新材料報告不同；此既有consumer接入缺口具名留W5b，不宣稱所有沿邊UI干涉已一致。
 - 最終source freeze `cac6c7c3345d5c3266b7`，138 modules／16 pages generate／check通過；root HTTP正常開新custom確為『立在下面』，實際播放停theta57.644°，下載pack的trace2角碼、板厚6／4、螺絲8／6／8／6與single_pose fail保留真撞，ignored http-standing-pack.html／http-standing.jpg。invalid-metal-tilt可正常開，製作包及SVG明確阻擋並提示金屬角碼只支援直角，http-invalid.jpg；無新版產品console error（只有歷史d8c）。完整manifest唯一一次Node22.14.0 157/157，無fail／timeout，results與逐支logs在w4b-orient/full；來源保持cac6，未重跑無變更suite。root已批准scoped本地commit，writer提交後STOP，保留全部原untracked附件／REVIEW／Claude outputs／截圖；未push／deploy／bump，不宣稱整個W4b或F3 gate完成。
+
+
+### W4b-2 — 六面宿主底板與 F3 多接合
+
+- 起點 `33ceaeec29e91bd1a96e3a32cd10877fb62bc0c0`，唯一writer `w4a_physical`（Sol high），root只讀review／HTTP。LOOP：合法saved frame能力先紅→真直邊ref／表面／求解／候選／刷新／physical／正式3D與輸出入口→獨立板面／孔軸／逐翼BOM＋公開serialized trace→graph generate／check→HTTP→完整manifest一次→批准scoped本地commit後STOP。沒有新持久欄位、solver演算法、工程模式、版本或發布。
+- 紅證據 `output/framework-stabilization/w4b-frame/red.log`：合法 `to.frame.edge=6` 可讀但geometry／drilling／refresh均false。現在根底板（測例沒有任何output）和已face／orient／planar安裝的底板用原有效直邊6／13／20／27作真rigid-pose reference；弧段／失效邊不改編號、不借另一零件。位置保存在既有v1 face transform與childPart，host-frame求解／3D只組合一次parent世界矩陣。
+- UI仍只有一個底板入口，六面在圖上選；edge是內部位姿基準，不是新增工程選項。新接合用第一條有效穩定直邊，重選保留saved edge；實體邊缺失要求重新選取。原設計預選仍作新接合預設，但不覆蓋已存端點。取消與確認沿用W5a純候選交易。
+- 共用surface查找沿to.frame或output精確解析；face mount clone完整comps／modules／params求參考解，refresh保持原端點，shared bracket physical／catalog／PartPose／SVG-DXF／pack仍同來源。根板canonical partName是 `frame`，已裝板仍 `Module-frame`，不引用不存在的根模組frame檔；public輸出先讀requested descriptor，防正規化丟失invalid mount後誤輸出成功。
+- `test/face-host-frame.mjs` 的5真配置：Base←arm←claw、已face／orient／planar板再接夾爪、同ToolBrace兩爪，各於20／40有效姿態（M2=10／第三軸15）。fixture connect／adjust逐次assert.ok與實際mount；世界板面／孔軸／頭外側／逐翼螺絲BOM用獨立audit，frame鏈另手算一個parent plate pose＋saved R/T，抓共同錯乘矩陣。root frameStock6／child4／加工全域4；frozen無mutation、4個stable edge、refresh兩次冪等、設計預選／排序不改端點、改根板尺寸、改共用承接桿厚度、拆一爪保留另一接合／孔、v1重開均有回歸。厚度改變令一爪孔碰既有孔時明示失敗／停止該鑽孔，保留另一爪；不為驗收放寬。
+- nested root-frame及mounted-frame真public SVG／DXF全Blob逐孔ID／pair與world孔逆投影（0.005mm加工容許）解析；pack JSON與逐件parts必須對應實際plan檔，來源／姿態report正確。同F1的既有兩處真撞保留，沒有以有效固定宣稱無干涉。
+- **保存尺寸另包缺口**：原normal builtin fourbar-lift→planar→frame合法接合，schema `normalizeBar` 的8mm吸附會將140→144、diag107.629→104，rebake的宿主板home旋轉約3.82°，home XY AABB所選側面不再是材料直邊。最小負例仍保留：`builtin-planar-snap-negative.json` 記before／after params與fastener_invalid，重開後固定孔／pack拒絕，不能假通過。專用planar正例先正規化48／64／80幾何，再assert保存前後params完整一致；此正例不代表原builtin roundtrip已修。尺寸吸附／朝向處置須全案完成前獨立包解決，不在此包改schema策略。
+- Bridge：F2齒條精確材料／教材／沿邊preview交易及正式沿邊側欄舊plane狀態與真材料結果整合仍留W5b；W4b-1已記HTTP側欄與pack結果不一致。全行程、完整五金與OPPO實機不在此包宣稱完成。ignored正常UI fixtures `ui-root-{unmounted,mounted}.blocks.json`、`ui-installed-{unmounted,mounted}.blocks.json`、`ui-two-claws.blocks.json` 供root正常開檔／選面／拆接，不依console或私人附件。
+
+- Source freeze `735895a216ff6107f489`，138modules／16pages generate／check通過。target-suite 7/7；擴大target-ready 12/13，唯一失敗為舊reselect測試硬把host index0當H（新frame預選入口現在可見），已改為依H身分找修復選項並驗底板一個入口；source不變，target-reselect 3/3、最終frame獨立target通過。HTTP交root後full待一次執行，尚未commit。
+
+- root正式HTTP `735895` scoped acceptance通過：正常installed-unmounted→Mod4接Mod3底板edge6、front／childbottom／+90／auto-fit gap0／3角碼，21處真撞誠實可存；一次undo回未裝，Mod3 record完全不變、尺寸params一致（confirm新增theta0，undo移除，不是尺寸修改）。`http-installed-frame-{connected,undone}.blocks.json`與截圖留ignored。raw fixture與連接後檔的140→144／diag107.629→104及ref3.82255°差異，READ-ONLY已證等於open normalize＋正式prepareConnectionWork結果，不是本次confirm改另一接合（`http-open-diff.log`）。
+- root Base←arm←claw重選：Base top／child back／+90／3角碼，取消正常；實際下載 `http-root-frame-pack.html` 兩接合各3實例，真single_pose fail／3碰撞，canonical parts／wing partIds是frame→Mod1-frame與ToolBrace_1→Mod3-frame，沒有Base-frame幽靈檔。`http-root-frame-reselect.jpg`。two-claws normalopen→拆Mod4→undo，HTTP三筆JSON逐項deepStrictEqual前／undo完全相同，拆下後Mod3 record完整保留（`http-verification.log`亦獨立重核）。本包不把IAB首件多檔下載限制說成全件落地；全件serialized SVG／DXF仍由Node真正public Blob解析。
+- HTTP通過後root已批准完整manifest通過即scoped本地commit；source持續凍結，完整158支正在唯一一次Node22執行，沒有重跑已過的全套。
+
+- root製作包頁實際打開補核：frame.dxf厚6、Mod1-frame4、Mod3-frame4，6角碼、9支M3×6＋3支M3×8，逐翼連到真實檔名；`http-two-claws-restored.jpg`。735895無新增產品console error，僅已修d8c735歷史紀錄。
+- 最終完整manifest唯一一次 **158/158通過，Node22.14.0**，無fail／timeout，逐支logs／manifest hash留 `output/framework-stabilization/w4b-frame/full/`；最終graph check同 `735895a216ff6107f489`／138modules／16pages通過。已獲root批准scoped本地提交，writer提交後STOP；不push／deploy／改版本，保留全部使用者原untracked。下一包須正式派發保存尺寸精度／原builtin planar→frame roundtrip修正，不把這個負例列成已解；F2材料、教材交易、W5b側欄／沿邊preview bridge與OPPO實機仍後續。
