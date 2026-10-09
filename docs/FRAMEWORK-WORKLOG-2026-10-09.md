@@ -5,7 +5,7 @@
 ## 接手資訊
 
 - 分支：`codex/framework-stabilization`；起點：`1537242`（應用 `2026.10.08.13`）。
-- 唯一寫入者：`w4a_physical`（Sol high）；W5a-2已驗收，root只讀review／HTTP；scoped commit後STOP，下一writer由root正式交棒，無再委派。
+- 唯一寫入者：`w4a_physical`（Sol high）；W3b共同唯讀契約已驗收，root只讀review／HTTP並批准scoped commit，回交後STOP，無再委派。
 - 本機：Windows、Node `v25.2.0`、Python `3.13.5`。CI 的 Node 版本在 W1 固定並驗證。
 - 使用者原有未追蹤附件、`Claude outputs/`、截圖及框架檢討文件保留。提交只選本包檔案。
 - Astra 僅 low；更高推理強度須另獲確認。主聊天不宣稱自行切換模型。
@@ -20,7 +20,8 @@
 | W2 | done | 120 模組／15 頁同圖生成與 CI check；主頁／iframe 握手拒絕異批確認；Node 22.14.0 全套 144/144 與 HTTP 通過 |
 | W3a | done | F1 六面純讀取／保存／重選／真 bar 層高；同圖 check、Node22 全套 146/146、主代理 HTTP 通過 |
 | W4a–W5a／G1 | done (F1) | W4a共用角碼／材料／單姿態SAT／快取，W5a純候選交易／實際SVG-DXF-製作包trace已貫通；G1內部門檻通過，F1真撞如實保留。其他格式留b階段，完整F3及OPPO實機仍限制W6 |
-| W3b–W5b | planned | 其餘格式、多接合位置、教材與效能 |
+| W3b | done | planar／orient／face共同唯讀契約，宿主frame／body／output身分分離；Node22 156/156＋F1 HTTP通過，共用實體接入留W4b |
+| W4b–W5b | planned | 其餘格式實體、多接合位置、教材與效能 |
 | W6 | planned | 全面驗收、提交推送與發布核對 |
 
 ## LOOP 紀錄
@@ -214,3 +215,13 @@
 | 手機尺寸／桌面／回歸／F1效能快取 | W5a-1手機390主client/scroll390、nested375/375，桌面1280×800；W4a-4同桌面12runs量測與geometry build/dispose播放不變，F1完成版p95CPU3.9–4.3ms且細節增加，原版差異如實記；本包完整155/155＋文字定向3/3，root最終HTTP通過。 |
 
 G1內部F1門檻已貫通，可接續W3b→W4b→W5b；這不是發布或全格式驗收。OPPO型號／SoC／RAM／OS／瀏覽器／刷新率仍待提供，未連線量測；390尺寸不代替實體手機，W6受SDD§4.5限制。F3目前效能fixture是provisional真二層，完整多接合位置gate待b階段；舊沿邊全域S交換與重複實體bridge須於W4b/W5b移除。最終同commit完整整合／發布驗收留W6，未push／deploy／改版本。
+
+### W3b — 三種來源的共同唯讀接合契約
+
+- 起點 `e4f37aec38f70ab72f642fc44f82f9c7a58e3992`，唯一writer `w4a_physical`（Sol high），root只讀review／HTTP。LOOP：合法planar來源先紅→最小reader／身分consumer修正→frozen與v1往返／多接合隔離→graph generate／check→完整manifest一次→review批准後scoped commit STOP。沒有新增schema、改solver、沿邊實體公式或教材UI。
+- 紅證據 `output/framework-stabilization/w3b-read/red.log`：既有reader拒絕合法已存planar base/output。新版分開讀planar定位點、orient子底板／邊與face端點；兩端模組／零件／輸出或frame／face／edge及cloned source保存，ref／home／flip／方向／fastener不由目前預選推導。缺失或歧義保持原參照及姿態，不猜另一桿。planar base只有原fixed／motor定位點身分，partId保持null。
+- 宿主frame／body／output身分明確分離；點池與module-schema一致使用pointKeysFor＋命名holes，output.at必屬指定body；points body保留兩個方向點，不能冒充接合板。既有orthogonalHostBody／Edge使用共同唯讀身分guard，不能借用別模組同ID的桿；所有原沿邊數學保持。part-pose按geometry capability傳遞缺能力診斷，已解析frame身分不等於已支持實體。
+- placement／endpoints與共用refresh／drilling／geometry分開：合法planar／orient保留既有定位流程，共同實體與重算具名W4b bridge；face host-frame可讀v1身分但共用重算／孔仍待W4b。package只作metadata，不在使用者提示露施工代號。F1既有output-host六面能力與純候選／實際輸出保持。
+- target-final Node22.14.0 7/7：三來源完整frozen輸入零mutation與v1 JSON往返；合法命名加工孔／points輸出及錯body at、missing／duplicate／kind／edge／floating-base負例；Base←四桿lift←齒輪夾爪讀planar＋orient；同工具架兩筆端點在mates.receive排序／attach normal／faceParts預選／模組排序與尺寸修改後不重綁。實際unmount一筆後另一descriptor及既有orthogonalExportExtras仍用孔完全相同，mates多筆往返保留。F3本包只驗讀取及既有孔隔離，完整新共用geometry gate留W4b，未宣稱已完成。
+- source freeze `8c73f04ee6812d2a21e9`，138 modules／16 pages generate與check通過；完整manifest一次Node22.14.0 156/156，無fail／timeout。全部證據與逐支logs留ignored `w3b-read`，使用者附件／REVIEW／Claude outputs／截圖不提交。W4b接共同沿邊實體／hostframe與多接合consumer；W5b接舊withCandidate／putDerived交易bridge及教材，OPPO／完整發布gate仍留W6。
+- root唯讀review與HTTP同token一般reload通過：custom F1仍3角碼／2真撞，重選面iframe同token及可用『接上（有干涉）』，取消保持gap0。無新版console error（只有先前d8c已修舊紀錄）；ignored `w3b-read/http-f1-regression.jpg`。root在full156/156後批准scoped本地commit，writer提交後STOP；沒有push／deploy／bump，後續待正式交棒。

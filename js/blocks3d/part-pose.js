@@ -69,7 +69,7 @@ export function attachPartMaterials(model,catalog,{comps=[],modules=[],points={}
     for(const geometry of Object.values(catalog.parts))if((geometry.moduleId==null || active.has(geometry.moduleId))&&!shown.has(geometry.partId))diagnostics.push({status:'not_supported',code:'expected_material_pose_missing',sourceIds:[geometry.partId],moduleId:geometry.moduleId});
     for(const mod of modules.filter(m=>m.mount?.face)){
       const connection=readConnectionDescriptor({comps,modules,childId:mod.id});
-      if(!connection.ok)for(const d of connection.diagnostics)diagnostics.push({...d,status:'not_supported',sourceIds:[d.partId || mod.id]});
+      if(!connection.capabilities.geometry)for(const d of connection.diagnostics)diagnostics.push({...d,status:'not_supported',sourceIds:[d.partId || mod.id]});
     }
   }
   return {...main,materialParts,geometryDiagnostics:diagnostics,geometryKey:catalog.key};

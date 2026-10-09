@@ -15,6 +15,7 @@ import { frameOutlineEdges, safeName } from './exporters.js?v=20261007_7';   // 
 import { frameConnectorNodes, pointCoords } from './model.js';
 import { adapterChildHoles } from './orthogonal-joint.js';   // D2：子模組底板上的轉接座孔（只在呼叫時用，與本檔互相引用無妨）
 import { assemblyRoles, machineComps } from './assembly-roles.js';   // M5a：底座／機器／未安裝（純函式，不回頭引用本檔）
+import {readConnectionHost} from './connection-descriptor.js';
 
 const D2R = Math.PI / 180;
 const IDENTITY_POSE = { x: 0, y: 0, a: 0 };
@@ -126,6 +127,8 @@ export function orthogonalHostBody(comps, modules, mount) {
   const modList = Array.isArray(modules) ? modules : [];
   const to = mount && mount.to;
   if (!to) return null;
+  const identity=readConnectionHost({comps:list,modules:modList,mount});
+  if(!identity.available || identity.partKind!=='bar')return null;
   const host = modList.find(m => m && m.id === to.module);
   if (!host) return null;
   let bodyId = null;
@@ -135,7 +138,7 @@ export function orthogonalHostBody(comps, modules, mount) {
     if (!output || !output.body || output.body.kind !== 'bar') return null;
     bodyId = output.body.id;
   }
-  const bar = list.find(c => c && c.id === bodyId);
+  const bar = list.find(c => c && c.id === bodyId && c.moduleId===identity.moduleId);
   return bar && bar.type === 'bar' && bar.p1 && bar.p2 ? bar : null;
 }
 
@@ -169,6 +172,9 @@ export function orthogonalHostEdge(comps, modules, mount, points, params, opts =
   if (!to) return null;
   // to.module 為 null＝根（只給 autoPorts 推導接口用；真正的安裝一定指向某個模組）
   if (to.module != null && !modList.some(m => m && m.id === to.module)) return null;
+  // Persisted host identity is shared with face reads; never borrow another
+  // module's equally named body. null-module frame ports are unsaved autoPorts.
+  if(to.module!=null&&!readConnectionHost({comps:list,modules:modList,mount}).available)return null;
   const angleOf = d => Math.atan2(d.y, d.x) / D2R;
   if (to.frame !== undefined) {
     const k = to.frame && to.frame.edge;
