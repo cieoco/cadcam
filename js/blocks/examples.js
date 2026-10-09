@@ -368,7 +368,7 @@ const ALL_BLOCK_EXAMPLES = [
         bar('Link2', pt('B', 'fixed', -110, 72), pt('D', 'floating', -62, 72), 48),
         bar('Link3', pt('C', 'floating', -62, 0), pt('D', 'floating', -62, 72), 72)
       ],
-      params: { LL1: 48, LL2: 48, LL3: 72 }
+      params: { LL1: 48, LL2: 48, LL3: 72, parallelWorkflow: 1, parallelStartHeight: 10, parallelEndHeight: 35 }
     }
   },
   {

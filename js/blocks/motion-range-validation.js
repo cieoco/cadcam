@@ -28,6 +28,8 @@ export function validateMotionRange(snapshot, options = {}) {
   if(motorIds.size!==1||!motorIds.has(motorId)){issue('UNSUPPORTED_MOTOR_CONFIGURATION','目前只驗證一個指定驅動馬達，其他馬達配置尚未覆蓋。');return finish();}
   const endpoints=options.endpointChecks??[];
   if(!Array.isArray(endpoints)||endpoints.some(c=>!c||typeof c.measure!=='function'||!finite(c.startMm)||!finite(c.endMm))){issue('INVALID_RANGE','端點量測需要純量測函式與有限目標值。');return finish();}
+  const sampleChecks=options.sampleChecks??[];
+  if(!Array.isArray(sampleChecks)||sampleChecks.some(c=>!c||typeof c.test!=='function')){issue('INVALID_RANGE','逐樣本檢查需要可信域純函式。');return finish();}
   const edges=[],pointOwners=new Map();
   for(const c of comps){
     const add=(a,b,param)=>edges.push({a:c[a]?.id,b:c[b]?.id,expected:snapshot.params[param],componentId:c.id});
@@ -58,6 +60,10 @@ export function validateMotionRange(snapshot, options = {}) {
       }
     }
     if(previous)for(const [id,owner]of pointOwners)if(distance(points[id],previous[id])>policy.maxPointTravelMmPerDeg*Math.abs(angleDeg-previousAngle)+policy.pointTravelSlackMm)issue('SUSPECTED_POSE_JUMP','相鄰採樣位移超過跳動門檻；需核對分支或加密檢查。',angleDeg,owner,[id]);
+    for(const c of sampleChecks){
+      let passed=false;try{passed=c.test(points,angleDeg)===true;}catch(_){}
+      if(!passed)issue(c.code||'SAMPLE_CONSTRAINT_FAILED',c.message||'此採樣未符合任務姿態條件。',angleDeg,c.componentId??null,c.targets||[]);
+    }
     if(i===0||i===count-1)for(const c of endpoints){
       let value;try{value=c.measure(points);}catch(_){}
       const expected=i===0?c.startMm:c.endMm;
@@ -68,5 +74,6 @@ export function validateMotionRange(snapshot, options = {}) {
     previous=points;previousAngle=angleDeg;
   }
   scope.endpointChecks=endpoints.length;
+  scope.sampleChecks=sampleChecks.length;
   return finish();
 }

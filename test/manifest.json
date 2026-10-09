@@ -100,6 +100,8 @@
     "test/gripper-object.mjs",
     "test/gripper-operations.mjs",
     "test/motion-range-validation.mjs",
+    "test/parallel-lift.mjs",
+    "test/parallel-lift-controller.mjs",
     "test/gripper-workflow.mjs",
     "test/input-gestures.mjs",
     "test/intake-contact.mjs",

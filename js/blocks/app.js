@@ -69,6 +69,7 @@ import * as Exporters from './exporters.js?v=20261007_9';
 import { localToWorld, plateVertices, plateShapeMode, createPlateGeometry } from './plate-geometry.js';
 import { S, activateMotor, motorAnglesNow, frozenMotorAngles, usedMotorIds } from './state.js';  // 跨模組共享的可變狀態與多馬達 helper
 import { createExampleController } from './example-controller.js?v=20261005_parallel';
+import { createParallelLiftController } from './parallel-lift-controller.js';
 import { createGripperController } from './gripper-controller.js?v=20260925_r1b2';
 import { createGripperObject } from './gripper-object.js?v=20260925_r1b2';
 import { createGearEditor, rackPhaseShift } from './gear-editor.js?v=20261004_fourbar_r1';
@@ -145,6 +146,7 @@ const motorSnapshotState = () => ({
   modules: S.modules
 });
 let gripperController = null;
+let parallelLiftController = null;
 const undoLessons = new Map();
 function snapshotStr() {
   return JSON.stringify(Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()));
@@ -237,8 +239,10 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   updateMotorDirectionButton();
   exampleController.snapshotApplied(norm, source);
   gripperController?.sync();
+  parallelLiftController?.sync();
   rebuild(); draw();
   if (gripperController?.isActive() && gripperController.currentPlan().ok) gripperController.moveToOpen();
+  if (parallelLiftController?.isActive() && parallelLiftController.currentPlan().ok) parallelLiftController.moveToStart();
   if (fit) fitView();
   if (missingFabrication) transient(source === 'local-autosave'
     ? '舊本機自存已帶入本機加工偏好；下次保存會隨作品帶走'
@@ -729,7 +733,14 @@ gripperController = createGripperController({
   applySnapshot: snapshot => applySnapshot(Store.normalizeSnapshot(snapshot), { source: 'gripper-operation' }),
   notify: transient
 });
-const inputRockRange = () => gripperController?.isActive()
+parallelLiftController = createParallelLiftController({
+  getSnapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
+  applySnapshot: snapshot => applySnapshot(Store.normalizeSnapshot(snapshot), { source: 'parallel-lift-operation' }),
+  pause, draw, fitView,
+  isEditing: () => Boolean(view3DActive || S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.selectedGearId || S.selectedNodeId),
+  setPose: theta => { activateMotor('1', theta); S.topo.params.theta = theta; document.getElementById('thetaVal').textContent = Math.round(norm360(theta)); draw(); }
+});
+const inputRockRange = () => parallelLiftController?.isActive() ? parallelLiftController.range() : gripperController?.isActive()
   ? gripperController.range()
   : baseInputRockRange();
 const gripperObject = createGripperObject({
@@ -889,6 +900,7 @@ function rebuild({save=true}={}) {
   validateViewPlane();           // 先確定載入／刪除後的設計分頁，馬達控制才不會沿用隱藏模組。
   reconcileMotorState();         // 馬達被刪 / 改指派後：清掉殘留凍結角、控制權交回存在的馬達
   gripperController?.recompute();
+  parallelLiftController?.recompute();
   document.getElementById('hint').style.display = S.comps.length ? 'none' : 'block';
   Panels.updateRoleEditor();
   if(save)scheduleAutosave();    // 任何結構變更都防丟（debounce，播放不觸發）
@@ -1404,6 +1416,7 @@ function drawNow() {
   moduleEditor.sync();
   bench.syncUI();   // 組立台：模組清單與接法面板（非組立模式時直接略過）
   gripperController?.syncVisibility();
+  parallelLiftController?.syncVisibility();
   while (svg.firstChild) svg.removeChild(svg.firstChild);
   drawFrameGrid();
   frameUpdaters = [];
@@ -1886,6 +1899,7 @@ async function toggle3D() {
     overlay.style.display = 'none';
   }
   gripperController.syncVisibility();
+  parallelLiftController?.syncVisibility();
 }
 
 // 機架（隱性）：把所有固定銷用淡連接線＋陰影斜線串起來，讀作「同一個固定底座」。
@@ -2078,6 +2092,7 @@ function toggleMotorDirection() {
 
 function play() {
   if (raf) return;
+  if (parallelLiftController?.isActive() && !parallelLiftController.currentPlan().ok) { transient(parallelLiftController.currentPlan().message); return; }
   if (!S.comps.length) { transient('先放一個零件，再開始組裝'); return; }
   if (gripperController?.isActive() && !gripperController.currentPlan().ok) {
     transient(gripperController.currentPlan().message || '夾爪任務目前無法播放，請先修正尺寸或機構。');
@@ -2127,6 +2142,7 @@ function pause() {
   document.getElementById('playBtn').textContent = '▶';
 }
 function togglePlay() {
+  if (parallelLiftController?.isActive() && !parallelLiftController.currentPlan().ok) { transient(parallelLiftController.currentPlan().message); return; }
   raf ? pause() : play();
 }
 
@@ -2569,6 +2585,7 @@ async function exportVideo() {
   if (S.mode !== 'design' || view3DActive) { transient('請先切回 2D 設計畫面，再匯出動畫'); return; }
   if (!S.comps.length || !hasDriveSource()) { transient('請先建立有動力的機構，再匯出動畫'); return; }
   if (gripperController?.isActive() && !gripperController.currentPlan().ok) { transient('請先修正夾爪任務，再匯出動畫'); return; }
+  if (parallelLiftController?.isActive() && !parallelLiftController.currentPlan().ok) { transient('請先確認、取消或修正平行四連桿任務，再匯出動畫'); return; }
   videoExportLoading = true;
   try {
     const { exportAnimation } = await import('./video-export.js');
@@ -2837,6 +2854,9 @@ if (gripperPilotSession) window.blocks.gripperPilot = {
   prepare: request => gripperController.operations.prepare(request),
   confirm: () => gripperController.operations.confirm(),
   cancel: () => gripperController.operations.cancel(),
+  parallelPrepare: request => parallelLiftController.operations.prepare(request),
+  parallelConfirm: () => parallelLiftController.operations.confirm(),
+  parallelCancel: () => parallelLiftController.operations.cancel(),
   snapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
   reopen: snapshot => { const norm = Store.normalizeSnapshot(snapshot); if (!norm) throw Error('作品格式無效'); applySnapshot(norm, { source: 'gripper-pilot' }); },
 };

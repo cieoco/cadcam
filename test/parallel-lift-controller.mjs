@@ -1,0 +1,23 @@
+import { createParallelLiftController } from '../js/blocks/parallel-lift-controller.js';
+import { createGripperController } from '../js/blocks/gripper-controller.js';
+import { getExample } from '../js/blocks/examples.js';
+import { check, report } from './_harness.mjs';
+class Element{constructor(){this.style={setProperty:(k,v)=>this.style[k]=v};this.dataset={};this.handlers={};this.offsetHeight=260;const classes=new Set();this.classList={toggle:(k,on)=>on?classes.add(k):classes.delete(k),contains:k=>classes.has(k)};}addEventListener(k,fn){this.handlers[k]=fn;}}
+const ids=new Map(['exampleLessonCard','exampleLessonContent','gripperWorkflowContent','parallelWorkflowContent','workRangeCard','parallelArmLength','parallelStartHeight','parallelEndHeight','parallelDraftActions','parallelStatus','parallelConfirm','parallelCancel','parallelStart','parallelEnd'].map(id=>[id,new Element()]));
+const canvas=new Element();ids.get('workRangeCard').parentElement=canvas;globalThis.document={getElementById:id=>ids.get(id),activeElement:null};
+const clone=v=>JSON.parse(JSON.stringify(v));let current=clone(getExample('parallel-fourbar').snapshot),undo=[],pose=null,editing=false;
+const controller=createParallelLiftController({getSnapshot:()=>current,applySnapshot:s=>{undo.push(clone(current));current=s;controller.sync();},pause:()=>{},draw:()=>{},setPose:a=>{pose=a;current.params.theta=a;},isEditing:()=>editing});
+controller.sync();check('原範例任務卡啟用且常態無確認取消',controller.isActive()&&controller.currentPlan().ok&&ids.get('parallelDraftActions').style.display==='none');
+const cached=controller.currentPlan();current.params.theta=15;controller.recompute();check('播放角重用已驗證計畫',controller.currentPlan()===cached);
+controller.preview('parallelArmLength','64');check('預览不改兩臂且禁播放/起終',current.params.LL1===48&&undo.length===0&&!controller.currentPlan().ok&&ids.get('parallelStart').disabled);
+controller.cancel();check('取消回原作品零undo',current.params.LL1===48&&undo.length===0&&controller.currentPlan().ok);
+controller.preview('parallelArmLength','64');const applied=controller.confirm();check('確認兩臂一筆undo',applied.applied&&current.params.LL1===64&&current.params.LL2===64&&undo.length===1);
+controller.preview('parallelEndHeight','120');check('不可達診斷不准確認',ids.get('parallelConfirm').disabled&&ids.get('parallelStatus').textContent.includes('可達'));
+controller.preview('parallelEndHeight','45');check('修正可重新確認',!ids.get('parallelConfirm').disabled);controller.confirm();check('高度批次確認保持長度',current.params.parallelEndHeight===45&&current.params.LL1===64);
+controller.preview('parallelArmLength','80');current.params.LL2=70;check('過期確認保留較新作品',controller.confirm().issues[0].code==='STALE_SOURCE'&&current.params.LL2===70);controller.cancel();
+editing=true;controller.syncVisibility();check('編輯零件釋放任務卡與畫布',ids.get('exampleLessonCard').classList.contains('workflow-hidden')&&!canvas.classList.contains('gripper-card-visible'));editing=false;
+const gripper=createGripperController({getComps:()=>current.comps,getParams:()=>current.params,getSnapshot:()=>current,pause:()=>{},draw:()=>{},pushUndo:()=>{},rebuild:()=>{},setPose:()=>{}});
+current=clone(getExample('gear-gripper').snapshot);gripper.sync();controller.sync();check('切夾爪無平行任務覆蓋',ids.get('gripperWorkflowContent').style.display===''&&ids.get('parallelWorkflowContent').style.display==='none'&&ids.get('exampleLessonCard').dataset.taskOwner==='gripper');
+current=clone(getExample('parallel-fourbar').snapshot);gripper.sync();controller.sync();check('切回平行任務無夾爪卡殘留',ids.get('parallelWorkflowContent').style.display===''&&ids.get('gripperWorkflowContent').style.display==='none'&&canvas.classList.contains('gripper-card-visible'));
+current=clone(getExample('fourbar-crank-rocker').snapshot);gripper.sync();controller.sync();check('一般範例還原普通卡片與畫布',ids.get('parallelWorkflowContent').style.display==='none'&&!canvas.classList.contains('gripper-card-visible')&&ids.get('exampleLessonContent').style.display==='');
+report('parallel-lift-controller');

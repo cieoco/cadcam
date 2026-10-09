@@ -30,6 +30,7 @@ export function createGripperController({ getComps, getParams, rebuild, draw, pa
     workflow.style.display = active ? '' : 'none';
     card.style.display = active ? (editing ? 'none' : '') : card.dataset.lessonVisible === 'true' ? '' : 'none';
     if (!active) return;
+    card.dataset.taskOwner = 'gripper';
 
     const params = getParams() || {};
     const width = el('gripperObjectWidth');
