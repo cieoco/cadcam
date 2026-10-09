@@ -223,6 +223,7 @@ export function createMateWizard(h) {
   function pickView(root, mod) {
     root.appendChild(head(`安裝「${h.displayName(mod.id)}」`));
     const b = btn('接合預覽', 'primary', () => h.openFaces(mod)); b.id = 'benchFaceWizard'; root.appendChild(b);
+    for(const target of okTargets(mod.id).filter(t=>t.kind==='bolt'))root.appendChild(btn(`${target.moduleName} · ${target.name} · 雙孔對鎖`,'',()=>pickTarget(target)));
     root.appendChild(el('div', 'bench-note', '帶入接合設定 → 微調 → 接上'));
     if (assemblyRoles(S.modules).root !== mod.id) {
       const mk = btn('設為底座', 'mate-root', () => h.apply({ comps: S.comps, modules: setAssemblyRoot(S.modules, mod.id) }, `「${h.displayName(mod.id)}」現在是底座`));

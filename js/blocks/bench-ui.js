@@ -214,10 +214,11 @@ export function createBench(deps) {
     if (!liveBox) return;
     const coverage=liveBox.querySelector('#benchMaterialCoverage');
     if(coverage){
-      const rows=materialPose.snapshot().report?.coverage?.notSupported || [];
+      const rows=(deps.candidateSnapshot?.()?.result?.validation?.coverage || materialPose.snapshot().report?.coverage)?.notSupported || [];
+      coverage.hidden=(!hasMaterialMount()&&!isCand())||!rows.length;
       const sig=JSON.stringify(rows);
       if(coverage.dataset.sig!==sig){
-        coverage.dataset.sig=sig;coverage.hidden=!hasMaterialMount()||!rows.length;
+        coverage.dataset.sig=sig;
         while(coverage.firstChild)coverage.removeChild(coverage.firstChild);
         coverage.appendChild(el('summary','',`未檢查項目（${rows.length}）`));
         const list=el('ul');
@@ -542,7 +543,7 @@ export function createBench(deps) {
   function afterScene({ pts, ptsAll, model }) {
     st.materialModel=isBench()&&!isCand()?model:null;
     st.materialWorkKey=workKey();st.materialPoseKey=JSON.stringify(motorAnglesNow());
-    if(hasMaterialMount()){syncMaterialPose();applyHighlight();renderLiveStatus();}
+    if(isBench()){syncMaterialPose();applyHighlight();renderLiveStatus();}
     const sticks = (model && model.sticks) || [];
     const planes = {};
     ((model && model.orthogonal) || []).forEach(ch => {

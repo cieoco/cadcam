@@ -913,7 +913,7 @@ assemblyPractice.comps.filter(c => c.moduleId === 'Grip1').forEach(c => {
   ['p1', 'p2', 'p3'].forEach(key => { if (c[key]) c[key].x += 240; });
 });
 ALL_BLOCK_EXAMPLES.push({ id: 'assembly-lift-gripper-practice', title: '組立：升降與夾爪接合練習',
-  note: '切換組立，按最下面的「進階」，選齒輪夾爪，再選平行四連桿升降臂的工具架（同平面對鎖）。', snapshot: assemblyPractice });
+  note: '切換組立，選齒輪夾爪，按「工具架 · 雙孔對鎖」，預覽後接上；M1 升降時夾爪整組跟著移動。', snapshot: assemblyPractice });
 
 export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES.filter(
   example => example.id !== 'competition-flywheel-shooter'

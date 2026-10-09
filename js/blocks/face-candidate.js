@@ -56,6 +56,7 @@ export function buildFaceCandidate(source,{childId,hostEndpoint,childEndpoint,se
 }
 export function faceCandidateModel(candidate,pose={}){
  const work=structuredClone(candidate.displayWork || candidate.work);
+ work.fabrication ||= structuredClone(FABRICATION_DEFAULTS);
  work.topo ||= {params:work.params || {}};
  work.stockMm ||= Number(work.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;
  work.exportSettings ||= work.fabrication?.export || {};work.joint ||= work.fabrication?.joint || FABRICATION_DEFAULTS.joint;

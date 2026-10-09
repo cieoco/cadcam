@@ -226,6 +226,22 @@ function standHoles(list, modList, mod, params, edge, ss, childHole, stockMm, jo
 // 世界機架板孔（worldFrameNodes，不參與外框）、子模組底板的額外節點（frameNodes）、轉接座排版清單。
 export function orthogonalExportExtras(comps, modules, params, opts = {}) {
   const linkHoles = {}, plateHoles = {}, frameNodes = {}, worldFrameNodes = [], adapters = [], extrasDiagnostics = [];
+  // Named output bolt holes are real features of the host bar, even before a
+  // child is attached. Use the same named points as moduleFrameExports.
+  for(const mod of modules || [])for(const output of mod.outputs || []){
+    const bar=(comps || []).find(c=>c.moduleId===mod.id&&c.type==='bar'&&c.id===output.body?.id);
+    if(!bar)continue;
+    for(const id of output.bolts || []){
+      const hole=bar.holes?.find(h=>h.id===id),u=Number(params?.[hole?.distParam]);
+      if(!hole||!Number.isFinite(u))continue;
+      const rows=linkHoles[bar.id] ||= [];
+      const radius=(Number(hole.diameter) || 3.2)/2,length=Number(params?.[bar.lenParam]),width=memberStock(bar).widthMm;
+      if(u-radius<0||u+radius>length||radius>width/2||rows.some(h=>h.id!==id&&Math.abs(h.u-u)<h.diameterMm/2+radius)){
+        extrasDiagnostics.push({status:'fail',code:'output_bolt_invalid',moduleId:mod.id,reason:'對鎖孔重疊或超出工具架材料，請調整孔位'});continue;
+      }
+      if(!rows.some(h=>h.id===id))rows.push({id,u,v:0,diameterMm:Number(hole.diameter) || 3.2,layer:'MOUNT_BOLT'});
+    }
+  }
   (Array.isArray(modules) ? modules : []).forEach(m => {
     const a = m && m.mount && m.mount.orient ? adapterLayout(comps, modules, m.id, params, opts) : null;
     if (!a) {

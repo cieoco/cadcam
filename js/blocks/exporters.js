@@ -186,7 +186,7 @@ export function assertAdapterFeatures(extras){const invalid=extras?.diagnostics?
 function adapterHoleSpecs(extraHoles) {
   return (Array.isArray(extraHoles) ? extraHoles : [])
     .filter(h => h && Number.isFinite(Number(h.u)) && Number.isFinite(Number(h.v)) && Number(h.diameterMm) > 0)
-    .map(h => ({ ...holeMetadata(h), kind: 'circle', x: round(Number(h.u), 3), y: round(Number(h.v), 3), r: round(Number(h.diameterMm) / 2, 3), layer: 'ADAPTER_HOLE' }));
+    .map(h => ({ ...holeMetadata(h), kind: 'circle', x: round(Number(h.u), 3), y: round(Number(h.v), 3), r: round(Number(h.diameterMm) / 2, 3), layer: h.layer==='MOUNT_BOLT'?'MOUNT_BOLT':'ADAPTER_HOLE' }));
 }
 
 // 舵盤孔以零件局部座標輸出；齒輪與搖臂共用同一套加工設定。

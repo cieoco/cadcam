@@ -77,6 +77,7 @@ export const assemblyLessonSnapshot = {
     {
       "type": "bar",
       "id": "Link3",
+      "holes": [{"id":"ToolBolt1","distParam":"ToolBoltDist1"},{"id":"ToolBolt2","distParam":"ToolBoltDist2"}],
       "color": "#3498db",
       "p1": {
         "id": "C",
@@ -221,7 +222,9 @@ export const assemblyLessonSnapshot = {
     "RJ_edge": 121.8,
     "LL1": 160,
     "LL2": 160,
-    "LL3": 72
+    "LL3": 72,
+    "ToolBoltDist1": 24,
+    "ToolBoltDist2": 48
   },
   "modules": [
     {
@@ -234,6 +237,7 @@ export const assemblyLessonSnapshot = {
           "id": "tool",
           "name": "工具架",
           "at": "C",
+          "bolts": ["ToolBolt1", "ToolBolt2"],
           "body": {
             "kind": "bar",
             "id": "Link3"

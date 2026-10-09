@@ -294,3 +294,10 @@ G1內部F1門檻已貫通，可接續W3b→W4b→W5b；這不是發布或全格�
 - HTTP 從未接齒條作品直接點滑台標記，正常呈現預覽／接上／取消。實際 blocks29（預覽中保存）＝30（取消後）＝32（確認一次undo），31才包含正式接合；undo 後按鈕 disabled，沒有多筆復原。下載檔保留本機、不加入 repo。
 - 整合另發現 planar 預覽含材料、正式只有平面檢查。擴大材料 gate 至所有 mount，支援的 planar 製作包也走共用 export，預覽加計平面 findings。首次 planar 測試用了不存在的 port:'tool'，修為實際 bolt:output ID，非產品變更。後續定向 5/5 通過。HTTP 同姿態預覽／接上皆 5 處碰撞；http-confirmed.jpg，無 console error。
 - 最終 graph ffe06fc3ba11e657cc7d（139 modules／16 pages）；完整 161/161 是 planar gate 補修前，補修後採相關定向，發布前仍須完整驗收。瀏覽器一度連續逾時，重設控制連線再正常 reload 後恢復，未把逾時算通過。下一項 F4 單一精靈教材與有效雙孔；未 push／發布。
+
+### W5b-3 — F4 雙孔精靈與教材（done）
+- 起點 3f1eeaa，root 唯一 writer。教材工具架 Link3 使用既有 bar.holes／distParam、output.bolts：ToolBolt1／2 位於24／48mm，不占旋轉端點。共同 extras 生成宿主真孔，底板沿用 moduleFrameExports 同 ID／直徑；MOUNT_BOLT 圖層保留。重疊或出界孔阻擋輸出，不新增存檔欄位。
+- 單一精靈提供可點的大「雙孔對鎖」選項，保留六面接合入口；教材與範例提示取消工程模式依賴，歷史說明加現行規格，區分定位、固定與材料檢查。缺 fabrication 的舊教材作品使用既有預設，避免候選 catalog null 例外。
+- 新 assembly-lesson-wizard 驗證真兩孔、兩板 Ø3.2、0／20／40世界孔軸一致1e-6、v1往返、碰孔／出界拒絕。定向6/6。完整161/162，唯一 orient-bracket-physical 發現上包擴充 planar export 遺漏 face+printed 必須仍走受檢出口；已恢復 face 優先 guard，定向最終5/5。graph 5b9fe6370057e26d5649，139modules／16pages。
+- HTTP 從下拉教材練習→組立→雙孔對鎖→預覽→接上→M1播放；390×844拆下／預覽／取消／再接上全部可操作，clientWidth=scrollWidth=390。http-desktop.jpg、http-phone.jpg、實際下載 http-pack.html 留 w5b-lesson。播放標記待檢查，未假稱五金全驗證。
+- 手機驗收另修拆下後未檢查清單殘留：coverage可見性不再只跟 rows hash 更新；afterScene 即使沒有mount也清掉過期材料狀態。最終發布完整回歸留 W6。下一步同條件效能 fixtures、OPPO量測入口及發布收尾；未push／部署。
