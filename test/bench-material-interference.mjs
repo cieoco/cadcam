@@ -3,6 +3,7 @@ import {S} from '../js/blocks/state.js';
 import {createBench} from '../js/blocks/bench-ui.js';
 import {f1AssemblyFixture} from './fixtures/f1-assembly-fixture.mjs';
 import {f1MaterialScene} from './fixtures/f1-material-scene.mjs';
+import {connect} from '../js/blocks/bench.js';
 const f=f1AssemblyFixture();S.comps=f.comps;S.modules=f.modules;S.topo={params:f.params};S.fabrication=f.fabrication;S.mode='bench';S.theta=0;S.motorAngles={'2':0};S.activeMotor='1';
 globalThis.document={getElementById:()=>null,addEventListener(){},createElement:()=>({dataset:{},style:{},appendChild(){},addEventListener(){},setAttribute(){},querySelector:()=>null,querySelectorAll:()=>[]})};
 let playing=false,highlight=[];
@@ -24,3 +25,18 @@ playing=false;bench.afterScene({pts:points,ptsAll:points,model:{...model,solveVa
 await new Promise(r=>setTimeout(r,10));assert.equal(bench.debug().live.material.report,null,'retained old geometry cannot validate invalid solve');
 bench.afterScene({pts:points,ptsAll:points,model});bench.liveCheck();await new Promise(r=>setTimeout(r,200));assert.equal(bench.debug().live.material.report.status,'fail');
 console.log('production bench: real lazy SAT, pause/revision/invalid solve, exact pickKey highlight');
+// Legacy along-edge mounts must receive the same material check as face mounts.
+const original=structuredClone(f),child=original.modules.find(m=>m.mount),host=original.modules.find(m=>m.id===child.mount.to.module);
+child.mount=null;
+const brace=original.comps.find(c=>c.moduleId===host.id&&c.id.startsWith('ToolBrace'));
+const joined=connect(original.comps,original.modules,child.id,{module:host.id,port:`edge:${brace.id}:R`},original.params,{activeMotor:'1',theta:0,motorAngles:{'2':0}},{joint:'bracket-m3'});
+assert.ok(joined.ok,joined.reason);
+Object.assign(f,{comps:joined.comps,modules:joined.modules});S.comps=f.comps;S.modules=f.modules;
+bench.workReplaced();
+const legacy=f1MaterialScene(0,f);legacy.model.solveValidity={valid:true};
+bench.afterScene({pts:legacy.points,ptsAll:legacy.points,model:legacy.model});bench.liveCheck();
+await new Promise(r=>setTimeout(r,500));
+assert.ok(bench.debug().live.material.report,'along-edge mount cannot fall back to an unchecked planar-only green state');
+playing=true;bench.liveCheck();assert.equal(bench.debug().live.material.report,null);
+playing=false;S.topo.params={...S.topo.params,changedDimension:20};bench.liveCheck();
+assert.equal(bench.debug().live.material.report,null,'same module IDs with changed work cannot reuse a material result');

@@ -113,7 +113,7 @@ export function createBench(deps) {
   // live：目前姿勢的檢查結果；plan：疊層＋隔圈的快取（只在作品內容變了才重算）；tl：全行程時間軸結果。
   const materialPose=createMaterialPoseStatus();
   const playing=()=>!!deps.isPlaying?.();
-  const hasFace=()=>S.modules.some(m=>m?.mount?.face);
+  const hasMaterialMount=()=>S.modules.some(m=>m?.mount?.face || m?.mount?.orient);
   const live = { plan: null, planKey: '', args: null, sig: '', findings: [], hits: [], labels: [], msg: '', keys: [], at: 0, timer: null, checks: 0, planBuilds: 0, ms: 0, ready: false, error: false };
   const tl = { result: null, ranges: null, key: '', summary: [], ms: 0 };
   let liveBox = null;
@@ -186,7 +186,7 @@ export function createBench(deps) {
   function materialLabels(){return [...new Set((materialPose.snapshot().report?.findings || []).flatMap(f=>f.partIds.map(materialName)))];}
   function currentLiveStatus() {
     const m=materialPose.snapshot();
-    return liveInterferenceStatus({hasFace:hasFace(),ready:live.ready,hasParts:!!live.plan?.parts?.length,error:live.error,n:live.findings.length,labels:[...new Set([...live.labels,...materialLabels()])],material:m.report,playing:playing(),candidate:m.candidate,solveValidity:m.solveValidity});
+    return liveInterferenceStatus({hasFace:hasMaterialMount(),ready:live.ready,hasParts:!!live.plan?.parts?.length,error:live.error,n:live.findings.length,labels:[...new Set([...live.labels,...materialLabels()])],material:m.report,playing:playing(),candidate:m.candidate,solveValidity:m.solveValidity});
   }
   function syncMaterialPose(){
     const candidate=isCand() || !!st.preview;
@@ -211,7 +211,7 @@ export function createBench(deps) {
       const rows=materialPose.snapshot().report?.coverage?.notSupported || [];
       const sig=JSON.stringify(rows);
       if(coverage.dataset.sig!==sig){
-        coverage.dataset.sig=sig;coverage.hidden=!hasFace()||!rows.length;
+        coverage.dataset.sig=sig;coverage.hidden=!hasMaterialMount()||!rows.length;
         while(coverage.firstChild)coverage.removeChild(coverage.firstChild);
         coverage.appendChild(el('summary','',`未檢查項目（${rows.length}）`));
         const list=el('ul');
@@ -245,7 +245,7 @@ export function createBench(deps) {
   function runLiveNow(force) {
     if (!isBench()) return;
     live.timer = null;
-    if(hasFace()){syncMaterialPose();if(playing()){live.ready=false;live.keys=[];applyHighlight();renderLiveStatus();return;}runMaterialCheck();}
+    if(hasMaterialMount()){syncMaterialPose();if(playing()){live.ready=false;live.keys=[];applyHighlight();renderLiveStatus();return;}runMaterialCheck();}
     const st0 = ensurePlan();
     const pose = currentPose();
     const sig = JSON.stringify(pose);
@@ -266,7 +266,7 @@ export function createBench(deps) {
   // 每幀／每次變動都可以呼叫：播放時節流成每 LIVE_MIN_MS 一次，最後一個姿勢用尾端計時器補查。
   function liveCheck(force = false) {
     if (!isBench()) return;
-    if(hasFace()) {
+    if(hasMaterialMount()) {
       syncMaterialPose();
       if(playing()){if(live.timer){clearTimeout(live.timer);live.timer=null;}live.ready=false;live.keys=[];applyHighlight();renderLiveStatus();return;}
       if(!materialPose.snapshot().report){live.keys=[];applyHighlight();renderLiveStatus();}
@@ -534,7 +534,7 @@ export function createBench(deps) {
   function afterScene({ pts, ptsAll, model }) {
     st.materialModel=isBench()&&!isCand()?model:null;
     st.materialWorkKey=workKey();st.materialPoseKey=JSON.stringify(motorAnglesNow());
-    if(hasFace()){syncMaterialPose();applyHighlight();renderLiveStatus();}
+    if(hasMaterialMount()){syncMaterialPose();applyHighlight();renderLiveStatus();}
     const sticks = (model && model.sticks) || [];
     const planes = {};
     ((model && model.orthogonal) || []).forEach(ch => {
@@ -1236,7 +1236,7 @@ export function createBench(deps) {
       exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,
       fabrication:S.fabrication,readSource:()=>({comps:S.comps,modules:S.modules,topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint}),
       readPose:()=>deps.connectionPose?.() || ({theta:S.theta,motorAngles:motorAnglesNow()}),say,
-      commit: (result,validation,candidate) => { const mutable=structuredClone(result);pushUndo(); S.comps=mutable.comps;S.modules=mutable.modules;S.topo=mutable.topo;rebuild({save:false});deps.adoptConnectionPose?.(candidate.points);draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? (validation?.status==='fail'?'已接上（有干涉），角碼固定孔已生成；請調整作品。':'已接上，角碼固定孔已生成；部分五金仍未檢查。') : '已定位，尚未固定。請按「配置角碼」檢查並確認孔位。'); syncUI(true); }
+      commit: (result,validation,candidate) => { const mutable=structuredClone(result);pushUndo(); S.comps=mutable.comps;S.modules=mutable.modules;S.topo=mutable.topo;rebuild({save:false});deps.adoptConnectionPose?.(candidate.points);draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? (validation?.status==='fail'?'已接上（有干涉），角碼固定孔已生成；請調整作品。':'已接上，角碼固定孔已生成；部分五金仍未檢查。') : '已定位，尚未固定。請查看下方固定方式說明。'); syncUI(true); }
     });
   }
   wiz = createMateWizard({

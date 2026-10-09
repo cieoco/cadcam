@@ -65,7 +65,7 @@ export function faceBracketStatus(comps, modules, params, mod, opts={}) {
   if(confirmed)return {fixed:confirmed.ok,reason:confirmed.ok?`角碼 ${confirmed.brackets.length} 顆 · 兩板固定孔已生成 Ø3.2 mm`:`角碼孔暫停輸出：${confirmed.reason}`};
   if(!mod?.mount?.face)return {fixed:false,reason:'尚未設定接合面'};
   const descriptor=readConnectionDescriptor({comps,modules,childId:mod.id,mount:mod.mount});
-  if(!descriptor.capabilities.drilling)return {fixed:false,reason:descriptor.diagnostics[0]?.message || '找不到支援開孔的接合板',diagnostics:descriptor.diagnostics};
+  if(!descriptor.capabilities.drilling)return {fixed:false,configurable:false,reason:descriptor.diagnostics[0]?.message || '找不到支援開孔的接合板',diagnostics:descriptor.diagnostics};
   const selection=mod.mount.face.selection;
   const candidate={...mod,mount:{...mod.mount,face:{...mod.mount.face,selection:{...selection,brackets:{enabled:true,childPart:descriptor.child.partId,offsets:{}}}}}};
   const plan=faceBracketPlan(comps,modules.map(m=>m.id===mod.id?candidate:m),params,candidate,opts);

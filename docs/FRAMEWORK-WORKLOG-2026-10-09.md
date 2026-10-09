@@ -281,3 +281,9 @@ G1內部F1門檻已貫通，可接續W3b→W4b→W5b；這不是發布或全格�
 - Load graph 43881e1a55e18f2efdc2（138 modules／16 pages）。HTTP 正常開啟 mounted fixture，側欄正確呈現「已定位，尚未固定」及齒條角碼未支援原因，無 console error。尚待未接作品完整操作、畫面與下載驗收；未 commit／push，不能視為 F2 完工。
 - 本輪完整 160/160 通過（Node22.14.0），graph check 同 43881e1a55e18f2efdc2。HTTP 從未接 fixture 依序選滑台／底板、上面／下面、置中 gap0→接上→播放／暫停→實際製作包下載成功；畫面及實際下載保存在 w4b-rack/http-mounted.jpg、http-pack.html。播放即清除舊材料結果。尚未支援齒條角碼鑽孔，沒有假稱固定。
 - 瀏覽器另發現未支援角碼時仍出現配置按鈕與成功後引導文字，列入下一 W5b 狀態一致性包；本包材料能力完成，F2 最終適用流程仍須 W5b。下一步沿邊與六面共用干涉提示、未支援種類及固定能力提示，不改 solver 或存檔格式。
+
+### W5b-1 — 接合能力與即時檢查一致性（done）
+- 起點 fa352b0，root 唯一 writer。先以 production bench 加入真沿邊金屬角碼負例，確認舊 gate 不啟動材料檢查；另證 rails 未建模被誤稱為五金。修正 gate 同時接受 face／orient，既有 pose revision 與 source key 繼續防止播放／同 ID 修改重用舊結果；未支援材料不混稱五金。
+- 齒條已知不支援鑽孔時 status.configurable=false，隱藏無法完成的配置角碼按鈕；確認後訊息改引導讀固定能力說明，不假稱可鑽孔。其他可調整位置的角碼入口保留。
+- 定向 6/6 通過（bench-material-interference、live-interference-status、material-pose-status、rack-face-candidate、face-bracket-holes、bench-interference），330771d9c8d38b5901c5 graph generate/check 通過。HTTP 正常重開齒條配置入口已移除；正常開沿邊 custom 作品側欄顯示 10 處真材料碰撞，取代舊 plane-only 綠燈，無 console error；http-orient.jpg 留 w5b-status。
+- 原包全套已 160/160，本包只有相關狀態／提示變更做定向，最終 W6 仍需同 commit 全套。下一輪接舊候選預覽不交換 S、單一精靈教材；未發布。

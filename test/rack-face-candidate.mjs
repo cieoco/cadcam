@@ -5,6 +5,7 @@ import {buildFaceCandidate,faceCandidateModel,validateFaceCandidate} from '../js
 import {inspectRackExport} from '../js/blocks/exporters.js';
 import * as Exporters from '../js/blocks/exporters.js';
 import {readConnectionDescriptor} from '../js/blocks/connection-descriptor.js';
+import {faceBracketStatus} from '../js/blocks/face-bracket-extras.js';
 import {faceFileExportData,validateFaceExport,faceBuildPackHtml,usesFaceExport} from '../js/blocks/face-export.js';
 import {toSnapshot,normalizeSnapshot} from '../js/blocks/schema.js';
 import {retainedSceneKey} from '../js/blocks3d/scene-reuse.js';
@@ -41,6 +42,7 @@ for(const theta of [0,20,40]){
 const descriptor=readConnectionDescriptor({...candidate.work,childId:child.module.id});
 assert.equal(descriptor.capabilities.geometry,true);assert.equal(descriptor.capabilities.drilling,false);
 assert.ok(descriptor.diagnostics.some(d=>d.code==='rack_drilling_not_supported'));
+assert.equal(faceBracketStatus(candidate.work.comps,candidate.work.modules,candidate.work.params,candidate.work.modules.find(m=>m.id===child.module.id)).configurable,false,'unsupported rack drilling must not offer a configure action');
 const unsupported=buildFaceCandidate(source,{...request,selection:{...request.selection,hostFace:'back',quarterTurns:1,brackets:{enabled:true,offsets:{},childPart:'frame'}}});
 assert.equal(unsupported.ok,false);assert.match(unsupported.reason,/齒條角碼開孔尚未支援/);
 assert.equal((await validateFaceCandidate(unsupported)).saveable,false);

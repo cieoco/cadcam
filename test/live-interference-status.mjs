@@ -17,6 +17,7 @@ console.log('live-interference-status: PASS');
 const partial={status:'not_supported',findings:[],coverage:{notSupported:[{code:'material_representation_not_supported',kind:'motors'}]}};
 assert.equal(status({...good,hasFace:true,material:partial}).state,'none');
 assert.match(status({...good,hasFace:true,material:partial}).message,/部分五金未檢查/);
+assert.match(status({...good,hasFace:true,material:{...partial,coverage:{notSupported:[{code:'material_representation_not_supported',kind:'rails'}]}}}).message,/部分材料未能驗證/);
 assert.equal(status({...good,hasFace:true,material:{...partial,findings:[{status:'fail'}]}}).state,'hit');
 assert.equal(status({...good,hasFace:true,material:partial,playing:true}).state,'none');
 assert.match(status({...good,hasFace:true,material:partial,solveValidity:{valid:false}}).message,/無解.*保留/);

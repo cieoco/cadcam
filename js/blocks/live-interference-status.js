@@ -17,7 +17,7 @@ export function liveInterferenceStatus({ hasFace = false, ready = false, hasPart
     if(error)return {state:'none',message:'同平面檢查失敗；目前無法完整判定'};
     if(!ready||!hasParts)return {state:'none',message:'此姿態的部分檢查尚未完成'};
     const unsupported=material.coverage?.notSupported || [];
-    if(unsupported.some(d=>d.code!=='material_representation_not_supported'))return {state:'none',message:'部分材料未能驗證；目前無法完整判定'};
+    if(unsupported.some(d=>d.code!=='material_representation_not_supported'||!['motors','pins','grounds'].includes(d.kind)))return {state:'none',message:'部分材料未能驗證；目前無法完整判定'};
     if(unsupported.length)return {state:'none',message:'板件未發現穿入；部分五金未檢查'};
     if(material.status!=='pass')return {state:'none',message:'此姿態材料待檢查'};
     return {state:'ok',message:'此姿態：已檢查範圍無干涉'};
