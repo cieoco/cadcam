@@ -16,7 +16,7 @@ export function createParallelLiftController({getSnapshot,applySnapshot,pause,dr
     card.classList.toggle('workflow-active',true);card.classList.toggle('workflow-hidden',editing);card.style.display=editing?'none':'';
     el('exampleLessonContent').style.display='none';el('gripperWorkflowContent').style.display='none';
     const p=getSnapshot().params;
-    const caveat=content.querySelector?.('.gripper-caveat');if(caveat)caveat.textContent=Number(p.liftBucket)===1?'運動示範：托斗沿弧升降；此配置有板件干涉，尚不可直接加工。':'CD保持垂直，沿弧移動。0–80°僅教學分支；採樣不證明連續、干涉或承載。';
+    const caveat=content.querySelector?.('.gripper-caveat');if(caveat)caveat.textContent=Number(p.liftBucket)===1?'托斗沿弧升降；材料僅離散採樣，間隔件鎖固與承載仍待核對。':'CD保持垂直，沿弧移動。0–80°僅教學分支；採樣不證明連續、干涉或承載。';
     const title=content.querySelector?.('.lesson-card-title');if(title)title.textContent=Number(p.liftBucket)===1?'平行升降托斗':'平行四連桿：姿態保持';
     for(const [id,k]of Object.entries(fields)){const input=el(id);if(input&&document.activeElement!==input)input.value=draft[k]??(k==='armLengthMm'?p.LL1:k==='startHeightMm'?p.parallelStartHeight:p.parallelEndHeight);}
     const pending=Object.keys(draft).length>0;

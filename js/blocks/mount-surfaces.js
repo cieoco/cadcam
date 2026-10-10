@@ -1,3 +1,4 @@
+import { isFixedMountPart } from './part-types.js';
 import { transformFusion } from './part-fusion.js';
 import { deriveMotorMounts } from './build-plan.js?v=20261007_7';
 /**
@@ -132,9 +133,9 @@ export function buildMountSurfaces({ comps, modules, moduleId, params, exportSet
     }
 
     const modulePorts = autoPorts(comps, modules, moduleId, params);
-    const part = partId && ownComps.find(c => c.id === partId && c.type === 'bar' && [c.p1,c.p2].every(p => p && ['fixed','motor'].includes(p.type)));
+    const part = partId && ownComps.find(c => c.id === partId && isFixedMountPart(c));
     if (partId && partId !== 'frame' && !part) return {ok:false,reason:'找不到指定的固定桿'};
-    const outputs = part ? [{id:'face-attach',name:part.name || part.id,at:part.p1.id,body:{kind:'bar',id:part.id}}] : module.outputs;
+    const outputs = part ? [{id:'face-attach',name:part.name || part.id,at:part.p1.id,body:{kind:part.type,id:part.id}}] : module.outputs;
     for (const output of Array.isArray(outputs) ? outputs : []) {
       const body = output && output.body;
       if (!body || !['bar', 'triangle', 'rack'].includes(body.kind)) {

@@ -1,4 +1,5 @@
 import {createMateCandidate} from './mate-candidate.js';
+import {validateSupports} from './support-validation.js';
 import {prepareConnectionWork} from './connection-work.js';
 import {usesFaceExport,faceFileExportData,createFaceExportCoordinator,faceBuildPackHtml} from './face-export.js';
 import {materialSolveValidity} from './material-pose-status.js';
@@ -1275,6 +1276,12 @@ function updateMechanismStatus(sol = null) {
       text = '還有未控制的活動部分，請補連接或動力';
     }
   }
+  const support = validateSupports({comps:S.comps,modules:S.modules});
+  if (state === 'ready') {
+    state = support.ok ? 'warn' : 'error';
+    text = support.ok ? '可模擬｜實體固定待驗證' : '動力支撐有誤，請至組立查看';
+  }
+  title += '\n' + support.issues.map(i=>i.message).join('\n');
   el.dataset.state = state;
   el.textContent = text;
   el.title = title;

@@ -186,7 +186,9 @@
     "test/wiper-practice.mjs",
     "test/tipping-bucket-assembly.mjs",
     "test/rigid-group-interface.mjs",
-    "test/lift-bucket.mjs"
+    "test/lift-bucket.mjs",
+    "test/lift-bucket-clearance.mjs",
+    "test/support-validation.mjs"
   ],
   "version": 1
 }

@@ -6,10 +6,10 @@ import { rigidGroupCandidates, inspectRigidGroup, createRigidGroup, dissolveRigi
 export function createRigidGroupsUI(h) {
   let selected = '', editing = false, signature = '', pending = null;
   const session = createRigidGroupInterfaceSession({ getSnapshot: h.getSnapshot, applySnapshot: h.applySnapshot });
-  function prepare(entry, action, target) {
+  function prepare(entry, action, target, faceGapMm) {
     if (h.busy()) { h.say('請先確認或取消接合預覽'); return; }
     h.pause();
-    const result = session.prepare({ operationVersion: 1, action, hostId: entry.host.id, groupId: entry.group.id, ...(target ? { target } : {}) });
+    const result = session.prepare({ operationVersion: 1, action, hostId: entry.host.id, groupId: entry.group.id, ...(target ? { target, ...(faceGapMm !== undefined ? {faceGapMm} : {}) } : {}) });
     if (!result.ok) { h.say(result.issues[0].message); return; }
     pending = { action, key: entry.key }; signature = ''; h.sync();
   }
@@ -67,13 +67,15 @@ export function createRigidGroupsUI(h) {
               signature = ''; h.sync();
             }), button('取消', () => { session.cancel(); pending = null; signature = ''; h.sync(); }));
           } else if (!info.independent) mount.append(button('獨立為可安裝群組', () => prepare(entry, 'extract')));
-          else if (info.mode === 'coplanar' && info.mounted) mount.append(button('拆下並回位', () => prepare(entry, 'detach')));
+          else if (!info.host.mount?.orient && info.mounted) mount.append(button('拆下並回位', () => prepare(entry, 'detach')));
           else if (info.mode === 'coplanar') {
             const targets = document.createElement('select'); targets.setAttribute('aria-label', '群組安裝輸出端');
             S.modules.filter(m => m.id !== host.id && !group.members.includes(m.id)).forEach(m => (m.outputs || []).forEach(o => {
               const option = document.createElement('option'); option.value = JSON.stringify({ module: m.id, output: o.id }); option.textContent = `${m.name || m.id}／${o.name || o.id}`; targets.append(option);
             }));
-            const attach = button('準備安裝', () => prepare(entry, 'attach', JSON.parse(targets.value))); attach.disabled = !targets.options.length;
+            const gap=Number(S.topo.params.liftBucket)===1?document.createElement('input'):null;
+            if(gap){gap.type='number';gap.min='0';gap.max='50';gap.value='12';gap.setAttribute('aria-label','板面間距（mm）');const label=document.createElement('label');label.textContent='板面間距（mm）';label.append(gap);mount.append(label);}
+            const attach = button('準備安裝', () => prepare(entry, 'attach', JSON.parse(targets.value), gap ? Number(gap.value) : undefined)); attach.disabled = !targets.options.length;
             mount.append(targets, attach);
           }
           box.append(mount);

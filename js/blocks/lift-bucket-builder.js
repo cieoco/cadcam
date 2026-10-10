@@ -18,7 +18,9 @@ export function liftBucketSnapshot(liftSource) {
   work.modules.unshift({ id: 'Lift', name: '平行升降臂', base: 'A', outputs: [{ id: 'tool', name: '保持姿態工具架', at: 'C', body: { kind: 'bar', id: 'Link3' } }], mount: null });
   work.params = { ...work.params, ...lift.params, liftBucket: 1 };
   delete work.params.bucketAssembly;
-  const r = prepareRigidGroupInterface(work, { operationVersion: 1, action: 'attach', hostId: 'RigidGroup', groupId: group.group.id, target: { module: 'Lift', output: 'tool' } });
+  // 明確記錄示範板厚，避免選面與材料模型各自套用不同預設值。
+  for (const comp of work.comps) if (comp.type === 'bar' || comp.type === 'triangle') comp.stock = { ...comp.stock, thicknessMm: 3 };
+  const r = prepareRigidGroupInterface(work, { operationVersion: 1, action: 'attach', hostId: 'RigidGroup', groupId: group.group.id, target: { module: 'Lift', output: 'tool' }, faceGapMm: 12 });
   if (!r.ok) throw Error(r.issues[0].message);
   return r.candidateSnapshot;
 }

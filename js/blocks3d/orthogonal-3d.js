@@ -220,7 +220,9 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
           if (hostRack) hostRack.thickness = face.hostThicknessMm;
           const model = buildModel(planeInputs(inputs, comps, modules, id));
           attachModulePlates(model, comps, plates, id);
-          const childZ = legacyDisplay || connection.child.partId === 'frame' ? moduleFrameZ(model, comps, id) : model.sticks?.find(s => s.id === connection.child.partId)?.z;
+          const childComp = comps.find(c => c.id === connection.child.partId && c.moduleId === id);
+          const childPlate = childComp?.type === 'triangle' ? model.plates?.find(p => [childComp.p1.id,childComp.p2.id,childComp.p3.id].every(point => p.ids?.includes(point))) : null;
+          const childZ = legacyDisplay || connection.child.partId === 'frame' ? moduleFrameZ(model, comps, id) : childPlate?.z ?? model.sticks?.find(s => s.id === connection.child.partId)?.z;
           const hostEdge = mod.mount.to.frame ? orthogonalHostEdge(comps,modules,mod.mount,inputs.pts,params,{asm,stockMm}) : {compId:output?.body?.id};
           if (!Number.isFinite(childZ) || !hostEdge || !mod.mount.to.frame && !output?.body?.id) { done.set(id, null); return null; }
           const hostCenterZ = hostBodyZ(host.model, hostEdge, comps) + face.hostThicknessMm / 2;

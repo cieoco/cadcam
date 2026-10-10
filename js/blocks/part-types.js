@@ -48,3 +48,6 @@ export function ownedParamKeys(c) {
   if (!t || !t.paramProps) return [];
   return t.paramProps.map(prop => c[prop]).filter(Boolean);
 }
+
+// 固定桿或兩個固定孔定位的剛性多孔板，可作選面安裝端。
+export const isFixedMountPart = c => !!c && (c.type === 'bar' && [c.p1,c.p2].every(p => p && ['fixed','motor'].includes(p.type)) || c.type === 'triangle' && !c.isInput && !c.physicalMotor && !c.physical_motor && c.p3?.type !== 'motor' && [c.p1,c.p2].every(p => p?.type === 'fixed' && !p.physicalMotor && !p.physical_motor));

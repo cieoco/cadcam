@@ -1,9 +1,10 @@
+import { isFixedMountPart } from './part-types.js';
 /** Immutable connection reads. Design defaults (faceParts / mates) are never a saved endpoint. */
 import { normalizeFaceMountContract } from './face-mount-contract.js';
 import {pointKeysFor} from './part-types.js';
 
 const clone = value => structuredClone(value);
-const fixedBar = comp => comp?.type === 'bar' && [comp.p1, comp.p2].every(p => p && ['fixed', 'motor'].includes(p.type));
+const fixedBar = isFixedMountPart;
 const reason = (code, message) => ({ code, message });
 const jointPointsOf = c => pointKeysFor(c).map(k=>c[k]).filter(Boolean);
 const pointsOf = c => [...jointPointsOf(c),...(c.holes || [])];

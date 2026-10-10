@@ -10,6 +10,7 @@ import { faceBracketStatus } from './face-bracket-extras.js';
  * bench-ui 把它需要的內部放在 h（見 createBench 結尾）；這裡不碰 3D 與 S 以外的全域。
  */
 import { S } from './state.js';
+import { validateSupports } from './support-validation.js';
 import { assemblyRoles, setAssemblyRoot } from './assembly-roles.js';
 import { mateTargets, mateConnect, mateAdjust, mateOfMount, mateStyle, mateStyles, setMateStyle } from './mate-connect.js?v=20261007_8_final';
 
@@ -279,6 +280,13 @@ export function createMateWizard(h) {
     const msg = el('div', 'bench-msg', st.msg); msg.id = 'benchMsg'; msg.setAttribute('aria-live', 'polite');
     root.firstChild.after(liveLine, msg);   // 標題底下：一行干涉狀態，再來是訊息（拒絕的原因、拆下說明）
     root.appendChild(h.liveBox);   // 即時干涉＋全行程測試（預覽中檢查的是預覽的姿勢）
+    const support=validateSupports({comps:S.comps,modules:S.modules});
+    if(support.fixedPoints.length || support.motors.length){
+      const details=document.createElement('details'),summary=document.createElement('summary');
+      details.id='supportValidation';summary.textContent=support.ok?'實體固定待驗證':'動力支撐有誤';details.appendChild(summary);
+      for(const item of support.issues){const p=document.createElement('p');p.textContent=`${item.targets.join('、')}：${item.message}`;details.appendChild(p);}
+      root.appendChild(details);
+    }
     ensureToggle(root);
   }
   function render(force) {

@@ -1,3 +1,4 @@
+import { isFixedMountPart } from './part-types.js';
 /** Pure creation of a six-face mount record from a confirmed face transform. */
 import { compileAssembly, outputPose, solveAssembly, orthogonalHostEdge } from './assembly.js?v=20261007_m5a';
 import { normalizeFaceMountContract } from './face-mount-contract.js';
@@ -34,7 +35,7 @@ export function mountFacePlacement(comps, modules, childId, { hostId, outputId, 
   const normalized = normalizeFaceMountContract({ ...face, childPart: face?.childPart !== undefined ? face.childPart : face?.selection?.brackets?.childPart ?? 'frame' });
   if (!normalized.ok) return fail(normalized.reason);
   const childPart = normalized.value.childPart;
-  if (childPart !== 'frame' && !list.some(c => c.moduleId === childId && c.id === childPart && c.type === 'bar' && [c.p1, c.p2].every(p => p && ['fixed', 'motor'].includes(p.type)))) {
+  if (childPart !== 'frame' && !list.some(c => c.moduleId === childId && c.id === childPart && isFixedMountPart(c))) {
     return fail('安裝端接合桿已不存在或不是固定桿，請重新選面。');
   }
 

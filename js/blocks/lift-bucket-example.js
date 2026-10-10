@@ -1,4 +1,4 @@
-/** 由共同群組操作產生的靜態範例；test/lift-bucket.mjs 核對 builder 結果，避免載入期循環。 */
+/** 共同群組選面接合產生；12mm板面間距，非五金承載保證。 */
 export const liftBucketSnapshot = {
   "kind": "blocks",
   "v": 1,
@@ -11,19 +11,19 @@ export const liftBucketSnapshot = {
       "p1": {
         "id": "RigidGroup-O",
         "type": "fixed",
-        "x": -62,
+        "x": 0,
         "y": 0
       },
       "p2": {
         "id": "RigidGroup-P",
         "type": "fixed",
-        "x": 18,
+        "x": 80,
         "y": 0
       },
       "p3": {
         "id": "RigidGroup-L",
         "type": "floating",
-        "x": -62.00000000000001,
+        "x": -5.684341886080802e-15,
         "y": 20
       },
       "gParam": "RigidGroup-BucketBase",
@@ -190,7 +190,10 @@ export const liftBucketSnapshot = {
       "isInput": true,
       "physicalMotor": "1",
       "phaseOffset": 0,
-      "moduleId": "Lift"
+      "moduleId": "Lift",
+      "stock": {
+        "thicknessMm": 3
+      }
     },
     {
       "type": "bar",
@@ -211,7 +214,10 @@ export const liftBucketSnapshot = {
       "lenParam": "LL2",
       "fixedLen": true,
       "isInput": false,
-      "moduleId": "Lift"
+      "moduleId": "Lift",
+      "stock": {
+        "thicknessMm": 3
+      }
     },
     {
       "type": "bar",
@@ -232,7 +238,10 @@ export const liftBucketSnapshot = {
       "lenParam": "LL3",
       "fixedLen": true,
       "isInput": false,
-      "moduleId": "Lift"
+      "moduleId": "Lift",
+      "stock": {
+        "thicknessMm": 3
+      }
     }
   ],
   "modules": [
@@ -331,7 +340,7 @@ export const liftBucketSnapshot = {
           "output": "side"
         },
         "ref": {
-          "x": -62,
+          "x": 0,
           "y": 0,
           "a": 0
         },
@@ -357,7 +366,7 @@ export const liftBucketSnapshot = {
             ]
           ],
           "translation": {
-            "x": -22,
+            "x": 39.99999999999999,
             "y": -26.5,
             "z": 31.5
           },
@@ -489,8 +498,44 @@ export const liftBucketSnapshot = {
           "y": 0,
           "a": 90
         },
-        "home": {
-          "1": 0
+        "home": {},
+        "face": {
+          "version": 1,
+          "childPart": "LeftSide",
+          "rotation": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ],
+          "translation": {
+            "x": -61.99999999999999,
+            "y": 0,
+            "z": 15
+          },
+          "selection": {
+            "hostFace": "top",
+            "childFace": "bottom",
+            "alignU": 0,
+            "alignV": 0,
+            "offsetU": 40,
+            "offsetV": -36,
+            "gap": 12,
+            "quarterTurns": 0
+          },
+          "hostThicknessMm": 3,
+          "childThicknessMm": 3
         }
       }
     }

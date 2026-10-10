@@ -1,3 +1,6 @@
+import { planParallelLift } from './parallel-lift-workflow.js';
+import { buildFaceCandidate } from './face-candidate.js';
+import { buildMountSurfaces, findMountSurface } from './mount-surfaces.js';
 /** 可安裝剛性群組：以既有模組的 base / output / mount 表達，不另存姿態。 */
 import { inspectRigidGroup } from './rigid-groups.js';
 import { compileAssembly, solveAssembly, outputPose, planeOf } from './assembly.js';
@@ -77,7 +80,7 @@ function prepareInterface(source, request) {
   let result = { ok: true, hostId: request.hostId, groupId: request.groupId };
   if (request.action === 'extract') result = extract(work, info);
   else {
-    if (!info.independent || info.mode !== 'coplanar') return fail('請先將群組獨立；此入口只處理同平面轉軸安裝。');
+    if (!info.independent || info.host.mount?.orient) return fail('請先將群組獨立；此入口只處理同平面轉軸安裝。');
     if (request.action === 'detach') {
       if (!info.mounted) return fail('群組尚未安裝。');
       // 回到板件設計姿態拆下，不旋轉任何內部板面選擇或清除子接合。
@@ -87,9 +90,15 @@ function prepareInterface(source, request) {
       const target = request.target;
       if (!target || typeof target.module !== 'string' || typeof target.output !== 'string') return fail('請選擇有效輸出端。');
       if (planeOf(work.comps, work.modules, target.module) != null) return fail('本輪尚不支援跨平面的轉軸安裝。');
+      if (request.faceGapMm !== undefined) {
+        const r = prepareGroupFaceMount(work, info.host.id, target, request.faceGapMm);
+        if (!r.ok) return fail(r.reason);
+        work.comps = r.work.comps; work.modules = r.work.modules;
+      } else {
       const r = mountModule(work.comps, work.modules, info.host.id, target, work.params, { activeMotor: source.activeMotor || '1', theta: 0, motorAngles: {} });
       if (!r.ok) return fail(`無法安裝群組（${r.reason}）。`);
       work.comps = r.comps; work.modules = r.modules;
+      }
     }
   }
   if (!result.ok) return result;
@@ -99,6 +108,9 @@ function prepareInterface(source, request) {
   work.modules = connected.modules; work.params = connected.topo.params;
   const after = rigidGroupInterface(work.comps, work.modules, result.hostId, result.groupId);
   if (!after.ok || !solve(work).isValid) return fail('操作後群組無法求解，原作品保持不變。');
+  if(request.action==='attach' && Number(work.params.liftBucket)===1){
+    const checked=planParallelLift(work);if(!checked.ok)return {ok:false,issues:checked.issues};
+  }
   return { ...result, issues: [], candidateSnapshot: work,
     validation: { scope: 'structural_connection_and_reference_pose', unchecked: ['collision', 'fastener_fit', 'load'] } };
 }
@@ -109,3 +121,18 @@ export function prepareRigidGroupInterface(source, request) {
 }
 
 export const createRigidGroupInterfaceSession = adapter => createTaskOperationSession({ ...adapter, prepareOperation: prepareRigidGroupInterface });
+
+/** 以既有六面接合分層；對準基準孔投影，間距不是五金承載保證。 */
+export function prepareGroupFaceMount(work, childId, target, gap) {
+  if (!Number.isFinite(gap) || gap < 0 || gap > 50) return {ok:false,reason:'板面間距須為0–50mm。'};
+  const child=work.modules.find(m=>m.id===childId), body=work.comps.find(c=>c.moduleId===childId&&c.type==='triangle');
+  const opts={...work,thicknessMm:work.fabrication?.cnc?.stockThicknessMm||3,exportSettings:work.fabrication?.export||{}};
+  const host=findMountSurface(buildMountSurfaces({...opts,moduleId:target.module}).surfaces,{output:target.output});
+  const part=body&&buildMountSurfaces({...opts,moduleId:childId,partId:body.id}).surfaces?.find(s=>s.compId===body.id);
+  const mod=work.modules.find(m=>m.id===target.module),output=mod?.outputs.find(o=>o.id===target.output);
+  const hp=work.comps.filter(c=>c.moduleId===mod?.id).flatMap(c=>pointKeysFor(c).map(k=>c[k])).find(p=>p?.id===output?.at);
+  const cp=body&&[body.p1,body.p2,body.p3].find(p=>p.id===child.base);
+  if(!host||!part||!hp||!cp)return {ok:false,reason:'找不到基準板面或安裝孔。'};
+  const offset=k=>(part.box.min[k]+part.box.max[k])/2-cp[k]-((host.box.min[k]+host.box.max[k])/2-hp[k]);
+  return buildFaceCandidate(work,{childId,hostEndpoint:{moduleId:target.module,outputId:target.output,partId:host.compId},childEndpoint:{partId:body.id},selection:{hostFace:'top',childFace:'bottom',alignU:0,alignV:0,offsetU:offset('x'),offsetV:offset('y'),gap,quarterTurns:0}});
+}

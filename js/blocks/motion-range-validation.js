@@ -2,6 +2,7 @@
 import { plateVertexWorldPoints, MAX_PLATE_POINTS } from './plate-geometry.js';
 import { compileTopology } from '../core/topology.js';
 import { solveTopology } from '../multilink/solver.js';
+import { validateSupports } from './support-validation.js';
 export const MOTION_RANGE_POLICY = Object.freeze({stepDeg:0.5,maxSamples:721,distanceToleranceMm:0.1,maxPointTravelMmPerDeg:20,pointTravelSlackMm:0.05,maxDirectionJumpDeg:15,endpointToleranceMm:0.1});
 const record = v => v && typeof v==='object' && !Array.isArray(v);
 const finite = v => typeof v === 'number' && Number.isFinite(v);
@@ -11,7 +12,8 @@ export function validateMotionRange(snapshot, options = {}) {
   const scope={method:'discrete-samples',holes:'primary-solver-points-only',supportedTypes:['anchor','bar','triangle','gear'],unchecked:['between_samples','interference','contact','load','hardware']};
   let sampleCount=0, count=0;
   const issue=(code,message,angleDeg=null,componentId=null,targets=[])=>issues.push({code,severity:'error',message,angleDeg,componentId,targets});
-  const finish=()=>({ok:issues.length===0,issues,range:{startDeg:options?.startDeg,endDeg:options?.endDeg},sampleCount,plannedSampleCount:count,actualStepDeg:count>1?Math.abs(options.endDeg-options.startDeg)/(count-1):0,policy,scope});
+  const support = validateSupports(snapshot);
+  const finish=()=>({ok:issues.length===0,issues,support,range:{startDeg:options?.startDeg,endDeg:options?.endDeg},sampleCount,plannedSampleCount:count,actualStepDeg:count>1?Math.abs(options.endDeg-options.startDeg)/(count-1):0,policy,scope});
   if (!options || typeof options!=='object' || Array.isArray(options)) {issue('INVALID_RANGE','行程選項格式不正確。');return finish();}
   for(const k of Object.keys(policy)) if(options[k]!==undefined) policy[k]=options[k];
   if(!finite(options.startDeg)||!finite(options.endDeg)||Math.abs(options.startDeg)>1e6||Math.abs(options.endDeg)>1e6||Object.values(policy).some(v=>!finite(v)||v<=0)||!Number.isInteger(policy.maxSamples)||policy.maxSamples>10001){issue('INVALID_RANGE','起訖必須為有限角度，步距與容差須為正數，最多10001幀。');return finish();}
@@ -19,6 +21,7 @@ export function validateMotionRange(snapshot, options = {}) {
   if(count>policy.maxSamples){issue('SAMPLE_LIMIT','指定步距超過取樣上限，請縮小區間或調整步距。');return finish();}
   if(!snapshot||!Array.isArray(snapshot.comps)||!snapshot.comps.length||!record(snapshot.params)||snapshot.comps.some(c=>!record(c))||snapshot.modules?.length){issue('UNSUPPORTED_MOTION_STRUCTURE','行程驗證需要未組立的非空作品。');return finish();}
   const comps=snapshot.comps, motorIds=new Set();
+  issues.push(...support.issues.filter(i=>i.severity==='error'));
   for(const c of comps){
     const required=c.type==='anchor'?['p1']:c.type==='triangle'?['p1','p2','p3']:['p1','p2'];
     if(required.some(k=>!record(c[k])||typeof c[k].id!=='string'||!c[k].id))issue('UNSUPPORTED_MOTION_STRUCTURE','零件缺少有效主孔資料。',null,c.id,[c.id]);

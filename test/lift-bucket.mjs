@@ -16,7 +16,7 @@ check('不可達高度拒絕',!prepare(w,request({endHeightMm:100})).ok);
 for(const change of [s=>s.params.LL2=32,s=>s.modules[0].outputs[0].at='D',s=>s.modules.find(m=>m.id==='Floor').mount=null,s=>s.modules.find(m=>m.id==='RigidGroup').mount.to.output='missing']){const bad=structuredClone(w);change(bad);check('不等長／錯輸出／斷接拒絕',!planParallelLift(bad).ok);}
 const detached=prepareRigidGroupInterface(w,{operationVersion:1,action:'detach',hostId:'RigidGroup',groupId:'group-side'});
 check('拆下仍可動升降臂且明列未安裝',detached.ok&&planParallelLift(detached.candidateSnapshot).validation.groupMount==='detached');
-const attached=prepareRigidGroupInterface(detached.candidateSnapshot,{operationVersion:1,action:'attach',hostId:'RigidGroup',groupId:'group-side',target:{module:'Lift',output:'tool'}});
+const attached=prepareRigidGroupInterface(detached.candidateSnapshot,{operationVersion:1,action:'attach',hostId:'RigidGroup',groupId:'group-side',target:{module:'Lift',output:'tool'},faceGapMm:12});
 check('装回恢復跟隨驗證',attached.ok&&planParallelLift(attached.candidateSnapshot).ok);
 check('保存／分享重開',planParallelLift(normalizeSnapshot(decodeShareString(encodeSnapshot(w)))).ok);
 check('來源不被修改',JSON.stringify(w)===before);

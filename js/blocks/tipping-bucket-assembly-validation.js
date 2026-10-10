@@ -5,6 +5,7 @@ import {validateMotionRange} from './motion-range-validation.js';
 import {taskIssue} from './task-operation-support.js';
 import {faceBracketPlan} from './face-bracket-extras.js';
 import {checkMaterialInterference} from './material-interference.js';
+import {validateSupports} from './support-validation.js';
 const ids=['LeftSide','RightSide-frame','Floor-frame','Back-frame'],eps=1e-5;
 const fail=(code,message,targets=[],angle)=>({ok:false,issues:[{...taskIssue(code,message,targets),...(angle===undefined?{}:{angleDeg:angle})}]});
 const world=(m,p,z)=>[0,1,2].map(i=>m[i]*p.x+m[4+i]*p.y+m[8+i]*z+m[12+i]);
@@ -13,6 +14,8 @@ const bound=ps=>[0,1,2].map(i=>[Math.min(...ps.map(p=>p[i])),Math.max(...ps.map(
 export function validateTippingBucketAssembly(snapshot){
   if(!snapshot||!Array.isArray(snapshot.comps)||snapshot.comps.some(c=>!c||typeof c!=='object')||!Array.isArray(snapshot.modules)||!snapshot.params||typeof snapshot.params!=='object')return fail('UNSUPPORTED_STRUCTURE','需要完整四板料斗組立。');
   const driver=snapshot.comps.find(c=>c.id==='Drive'),left=snapshot.comps.find(c=>c.id==='LeftSide'),support=snapshot.comps.find(c=>c.id==='Support');
+  const supportReport=validateSupports(snapshot);
+  if(!supportReport.ok)return {ok:false,issues:supportReport.issues.filter(i=>i.severity==='error'),support:supportReport};
   const modules=snapshot.modules;
   const root=modules.find(m=>m?.id===left?.moduleId);
   const independent=root?.id!=='Driver' && root?.base===left?.p1?.id && left?.p1?.type==='fixed' && left?.p2?.type==='fixed'
@@ -52,5 +55,6 @@ export function validateTippingBucketAssembly(snapshot){
     if(Object.values(cavityMm).some(v=>v<=0))return fail('INVALID_CAVITY','內腔尺寸非正值。',ids,angle);
   }
   const validation={...motion,scope:{...motion.scope,assembly:'four_exported_plates_and_confirmed_bracket_geometry',support:'single_side',groupMount:independent?(root.mount?'mounted':'detached'):'integrated',unchecked:[...motion.scope.unchecked,'assembly_between_samples','assembly_interference','material_discharge','fastener_strength','opposite_bearing','hardware_pwm']},cavityMm,maximumRigidErrorMm,assemblySampleCount:sampleCount,assemblyStepDeg:sampleCount>1?Math.abs(end-start)/(sampleCount-1):0};
+  validation.support=supportReport;
   return {ok:true,issues:[],start:{theta:start},end:{theta:end},range:{lo:Math.min(start,end),hi:Math.max(start,end)},motor:motorId,validation};
 }

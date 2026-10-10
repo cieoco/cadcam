@@ -1,3 +1,4 @@
+import { isFixedMountPart } from './part-types.js';
 import {createFaceCandidateTransaction} from './face-candidate.js';
 import { APP_VERSION } from '../version.js?v=20261008_bracketalign';
 import { LOAD_GRAPH_TOKEN } from '../module-url.js';
@@ -59,7 +60,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   if (needsChoice) say(saved.diagnostics[0]?.message || '請重新選取接合端點。');
   const childSelection = saved ? (repairChild ? null : { part: saved.child.partId, face: saved.child.face }) : connectionSelection(child, 'child');
   const chosenAttach = childSelection?.part;
-  const attachComp = comps.find(c => c.moduleId === childId && c.id === chosenAttach && c.type === 'bar' && [c.p1, c.p2].every(p => p && (p.type === 'fixed' || p.type === 'motor')));
+  const attachComp = comps.find(c => c.moduleId === childId && c.id === chosenAttach && isFixedMountPart(c));
   if (chosenAttach && chosenAttach !== 'frame' && !attachComp) { say('這個接合面在活動桿上；請把它作為承接機構，另一個機構選固定桿的面。'); return; }
   const partSurfaces = partId => buildMountSurfaces({ comps, modules, params, moduleId: childId, partId, exportSettings, thicknessMm: stockMm, drilling: true }).surfaces || [];
   const childSurfaces = attachComp ? partSurfaces(attachComp.id) : surfaces(childId);
@@ -87,7 +88,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
       .map(s => reference(s, `${m.name} · ${s.name}`, ownParts));
   });
   if (!childSurface || !hosts.length) { say('需要另一個有承接板的機構，以及安裝端的固定底板。'); return; }
-  const candidates = repairChild ? [childSurface, ...comps.filter(c => c.moduleId === childId && c.type === 'bar' && [c.p1, c.p2].every(p => p && ['fixed', 'motor'].includes(p.type))).map(c => partSurfaces(c.id).find(s => s.compId === c.id))].filter(Boolean) : [childSurface];
+  const candidates = repairChild ? [childSurface, ...comps.filter(c => c.moduleId === childId && isFixedMountPart(c)).map(c => partSurfaces(c.id).find(s => s.compId === c.id))].filter(Boolean) : [childSurface];
   const children = candidates.map(s => reference(s, `${child.name} · ${s.kind === 'frame' ? '固定桿／底板' : s.name}`, parts(childId)));
   const dialog = document.createElement('dialog');
   dialog.setAttribute('aria-label', '接合預覽');
