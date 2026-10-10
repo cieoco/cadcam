@@ -1,3 +1,4 @@
+import { liftBucketSnapshot } from './lift-bucket-example.js';
 import { tippingBucketSnapshot } from './tipping-bucket-example.js';
 import { assemblyLessonSnapshot } from './assembly-lesson-example.js?v=parallel';
 /**
@@ -77,6 +78,7 @@ const EXAMPLE_LESSONS = {
     measure: '播放並觀察兩根桿的往返端點；記下哪一根會改變方向、開始反向擺回。',
     explain: '比較四根桿的長短，說明這組尺寸為什麼讓輸入與輸出都呈現來回擺動。'
   },
+  'lift-bucket': { group: 'lift-motion', level: '整合', use: '平行升降臂帶動四板托斗。', learn: '區分剛性群組與活動機構；保持姿態仍沿圓弧移動。', try: ['先改共同臂長，再設定目標高度', '切到組立，選托斗整組拆裝'], predict: '托斗上升時會往哪一側移動？', measure: '比較起終高度與托斗方向。', explain: '姿態保持不代表直線升降；安裝五金與承載尚未驗證。' },
   'tipping-bucket': { group: 'manipulator', level: '基礎', use: '四片可輸出板件、角碼與單側MG995組立。', learn: '以水平參考與正負角觀察開口方向。', try: ['只改傾倒角再回位'], predict: '負角會讓開口轉向哪裡？', measure: '比較0°與−100°的開口方向。', explain: '姿態達標不等於物件能倒出。' },
   'parallel-fourbar': {
     group: 'starter',
@@ -920,6 +922,8 @@ assemblyPractice.comps.filter(c => c.moduleId === 'Grip1').forEach(c => {
 });
 ALL_BLOCK_EXAMPLES.push({ id: 'assembly-lift-gripper-practice', title: '組立：升降與夾爪接合練習',
   note: '切換組立，選齒輪夾爪，按「工具架 · 雙孔對鎖」，預覽後接上；M1 升降時夾爪整組跟著移動。', snapshot: assemblyPractice });
+
+ALL_BLOCK_EXAMPLES.push({ id: 'lift-bucket', title: '組立：平行升降托斗', note: '單馬達保持料斗方向，沿圓弧升降；組立可整組拆裝。尚未驗證承載及安裝五金。', snapshot: liftBucketSnapshot });
 
 export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES.filter(
   example => example.id !== 'competition-flywheel-shooter'

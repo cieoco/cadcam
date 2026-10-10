@@ -1,3 +1,4 @@
+import { planLiftBucket } from './lift-bucket-workflow.js';
 /** 平行四連桿窄教學任務。求角只在原solver上作高度二分，未另造幾何求解。 */
 import { compileTopology } from '../core/topology.js';
 import { solveTopology } from '../multilink/solver.js';
@@ -5,6 +6,7 @@ import { validateMotionRange } from './motion-range-validation.js';
 import { taskIssue } from './task-operation-support.js';
 export const PARALLEL_LIFT_LIMITS=Object.freeze({minArmMm:32,maxArmMm:120,startDeg:0,endDeg:80,poseToleranceDeg:0.1});
 export function planParallelLift(snapshot){
+  if(Number(snapshot?.params?.liftBucket)===1)return planLiftBucket(snapshot,planParallelLift);
   const fail=(code,message,targets=[])=>({ok:false,issues:[taskIssue(code,message,targets)]});
   const comps=snapshot?.comps,p=snapshot?.params;
   if(!Array.isArray(comps)||!p||typeof p!=='object'||Array.isArray(p)||comps.length!==5||comps.some(c=>!c||typeof c!=='object'||Array.isArray(c)))return fail('UNSUPPORTED_STRUCTURE','此任務僅適用既有平行四連桿五零件作品。');

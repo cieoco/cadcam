@@ -80,6 +80,7 @@ export function createBench(deps) {
   const displayName = id => labels.get(id) || id;
   const labelOpts = { displayName: id => labels.get(id) || null };   // 同名機構用編號後的名字
   const rigidGroups = createRigidGroupsUI({
+    getSnapshot: () => JSON.parse(snapshotStr()), applySnapshot: deps.applyGroupSnapshot, pause: deps.pause,
     pushUndo, rebuild, draw, say, sync: () => syncUI(true),
     busy: () => isCand() || !!st.preview || !!wiz?.previewOf(),
     clearSelection: () => { st.selected = null; st.snapId = null; drawMarkers(); },

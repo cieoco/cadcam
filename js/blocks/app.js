@@ -861,6 +861,7 @@ const bench = createBench({
   exportComposite: id => moduleEditor.exportComposite(id),
   motorState: () => ({ activeMotor: String(S.activeMotor), theta: S.theta, motorAngles: S.motorAngles }),
   snapshotStr, restoreSnapshot: restoreBenchSnapshot, scheduleAutosave,
+  applyGroupSnapshot: snapshot => applySnapshot(Store.normalizeSnapshot(snapshot), { source: 'rigid-group-operation' }),
   connectionPose:()=>({theta:S.theta,motorAngles:motorAnglesNow(),_prevPoints:lastFullPts}),
   adoptConnectionPose:points=>{lastSolved=structuredClone(points);prevSolved={};},
   getViewer: () => viewer3D, is3DActive: () => view3DActive, set3D, push3D: () => push3D(),

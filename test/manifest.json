@@ -184,7 +184,9 @@
     "test/units345.mjs",
     "test/video-export.mjs",
     "test/wiper-practice.mjs",
-    "test/tipping-bucket-assembly.mjs"
+    "test/tipping-bucket-assembly.mjs",
+    "test/rigid-group-interface.mjs",
+    "test/lift-bucket.mjs"
   ],
   "version": 1
 }

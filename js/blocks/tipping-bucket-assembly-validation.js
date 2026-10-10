@@ -1,4 +1,5 @@
 /** 窄域四板料斗驗證：從 snapshot 的真實輸出幾何與組立姿態取樣；無新求解器。 */
+import {inspectRigidGroup} from './rigid-groups.js';
 import {faceCandidateModel} from './face-candidate.js';
 import {validateMotionRange} from './motion-range-validation.js';
 import {taskIssue} from './task-operation-support.js';
@@ -13,14 +14,19 @@ export function validateTippingBucketAssembly(snapshot){
   if(!snapshot||!Array.isArray(snapshot.comps)||snapshot.comps.some(c=>!c||typeof c!=='object')||!Array.isArray(snapshot.modules)||!snapshot.params||typeof snapshot.params!=='object')return fail('UNSUPPORTED_STRUCTURE','需要完整四板料斗組立。');
   const driver=snapshot.comps.find(c=>c.id==='Drive'),left=snapshot.comps.find(c=>c.id==='LeftSide'),support=snapshot.comps.find(c=>c.id==='Support');
   const modules=snapshot.modules;
-  if(modules.length!==4||snapshot.comps.length!==9||!driver||!left||!support||driver.motorType!=='mg995'||driver.moduleId!=='Driver'||driver.motorCarrier||String(driver.physicalMotor)!=='1'||driver.motorMount?.frameBody!=='Support'||driver.motorMount?.outputBody!=='Drive'||left.type!=='triangle'||left.moduleId!=='Driver'||!driver.p1||!driver.p2||!support.p1||!support.p2||snapshot.comps.some(c=>c.moduleId!=='Driver'&&c.type!=='anchor'))return fail('UNSUPPORTED_STRUCTURE','此入口僅覆蓋單 MG995、單側支架與四板料斗。');
-  for(const [id,parent]of [['Floor','Driver'],['RightSide','Floor'],['Back','Floor']]){const m=modules.find(m=>m?.id===id);if(m?.mount?.to?.module!==parent||!m.mount.face?.selection?.brackets?.enabled||m.mount.face.childPart!=='frame')return fail('UNSUPPORTED_CONNECTION','底板、側板與背板需要既定接合樹及有效角碼。',[id]);}
+  const root=modules.find(m=>m?.id===left?.moduleId);
+  const independent=root?.id!=='Driver' && root?.base===left?.p1?.id && left?.p1?.type==='fixed' && left?.p2?.type==='fixed'
+    && snapshot.comps.filter(c=>c.moduleId===root?.id).length===1
+    && inspectRigidGroup(snapshot.comps,modules,root?.id,{id:'bucket-check',output:'side',members:['Floor','RightSide','Back']}).ok;
+  if(root?.id!=='Driver'&&!independent)return fail('UNSUPPORTED_STRUCTURE','料斗基準板須保留有效剛性群組。');
+  if(modules.length!==(independent?5:4)||snapshot.comps.length!==9||!driver||!left||!support||driver.motorType!=='mg995'||driver.moduleId!=='Driver'||driver.motorCarrier||String(driver.physicalMotor)!=='1'||driver.motorMount?.frameBody!=='Support'||driver.motorMount?.outputBody!=='Drive'||left.type!=='triangle'||!driver.p1||!driver.p2||!support.p1||!support.p2||snapshot.comps.some(c=>c.moduleId!=='Driver'&&c.id!=='LeftSide'&&c.type!=='anchor'))return fail('UNSUPPORTED_STRUCTURE','此入口僅覆蓋單 MG995、單側支架與四板料斗。');
+  for(const [id,parent]of [['Floor',root.id],['RightSide','Floor'],['Back','Floor']]){const m=modules.find(m=>m?.id===id);if(m?.mount?.to?.module!==parent||!m.mount.face?.selection?.brackets?.enabled||m.mount.face.childPart!=='frame')return fail('UNSUPPORTED_CONNECTION','底板、側板與背板需要既定接合樹及有效角碼。',[id]);}
   for(const id of ['Floor','RightSide','Back']){let bracket;try{bracket=faceBracketPlan(snapshot.comps,modules,snapshot.params,modules.find(m=>m.id===id),{stockMm:snapshot.fabrication?.cnc?.stockThicknessMm,joint:snapshot.fabrication?.joint,exportSettings:snapshot.fabrication?.export});}catch(_){return fail('INVALID_FASTENER','無法核對角碼。',[id]);}if(!bracket?.ok)return fail('INVALID_FASTENER',bracket?.reason||'角碼孔位無效。',[id]);}
   const start=driver.servoStart,end=driver.servoEnd;
   if(Math.hypot(driver.p1.x,driver.p1.y,support.p2.x,support.p2.y)>eps||driver.p1.id!=='O'||support.p2.id==='O'||support.p2.type!=='fixed')return fail('FIXED_AXIS_MOVED','單側固定支架軸孔須與 O 同座標、保留獨立固定點。',['Support','O']);
   if([start,end].some(v=>!Number.isInteger(v)||v<-120||v>0))return fail('ANGLE_OUT_OF_RANGE','立體料斗模型起／終角須為−120～0°整數；這是避開固定支架的教學分支。',['Drive']);
   const motorId='1',unit={comps:snapshot.comps.filter(c=>c.moduleId==='Driver').map(c=>{const v=structuredClone(c);delete v.moduleId;return v;}),params:snapshot.params};
-  const motion=validateMotionRange(unit,{startDeg:start,endDeg:end,motorId,sampleChecks:[{code:'FIXED_AXIS_MOVED',message:'固定轉軸 O 移動。',componentId:'Drive',targets:['O'],test:q=>q.O&&Math.hypot(q.O.x,q.O.y)<.001},{code:'ANGLE_NOT_FOLLOWED',message:'活動側板未跟隨模型角。',componentId:'LeftSide',targets:['O','P'],test:(q,a)=>q.O&&q.P&&Math.abs(((Math.atan2(q.P.y-q.O.y,q.P.x-q.O.x)*180/Math.PI-a+540)%360)-180)<=.1}]});
+  const motion=validateMotionRange(unit,{startDeg:start,endDeg:end,motorId,sampleChecks:[{code:'FIXED_AXIS_MOVED',message:'固定轉軸 O 移動。',componentId:'Drive',targets:['O'],test:q=>q.O&&Math.hypot(q.O.x,q.O.y)<.001},{code:'ANGLE_NOT_FOLLOWED',message:'驅動桿未跟隨模型角。',componentId:'LeftSide',targets:['O','P'],test:(q,a)=>q.O&&q.P&&Math.abs(((Math.atan2(q.P.y-q.O.y,q.P.x-q.O.x)*180/Math.PI-a+540)%360)-180)<=.1}]});
   if(!motion.ok)return {ok:false,issues:motion.issues,validation:motion};
   // 主孔0.5°；完整材料組立最多5°，分別報告，避免每次編輯重建201份材料目錄。
   let reference=null,cavityMm=null,maximumRigidErrorMm=0;const sampleCount=Math.ceil(Math.abs(end-start)/5)+1;
@@ -45,6 +51,6 @@ export function validateTippingBucketAssembly(snapshot){
     cavityMm={depth:Math.min(l[0][1],r[0][1])-b[0][1],height:Math.min(l[1][1],r[1][1])-f[1][1],width:r[2][0]-l[2][1]};
     if(Object.values(cavityMm).some(v=>v<=0))return fail('INVALID_CAVITY','內腔尺寸非正值。',ids,angle);
   }
-  const validation={...motion,scope:{...motion.scope,assembly:'four_exported_plates_and_confirmed_bracket_geometry',support:'single_side',unchecked:[...motion.scope.unchecked,'assembly_between_samples','assembly_interference','material_discharge','fastener_strength','opposite_bearing','hardware_pwm']},cavityMm,maximumRigidErrorMm,assemblySampleCount:sampleCount,assemblyStepDeg:sampleCount>1?Math.abs(end-start)/(sampleCount-1):0};
+  const validation={...motion,scope:{...motion.scope,assembly:'four_exported_plates_and_confirmed_bracket_geometry',support:'single_side',groupMount:independent?(root.mount?'mounted':'detached'):'integrated',unchecked:[...motion.scope.unchecked,'assembly_between_samples','assembly_interference','material_discharge','fastener_strength','opposite_bearing','hardware_pwm']},cavityMm,maximumRigidErrorMm,assemblySampleCount:sampleCount,assemblyStepDeg:sampleCount>1?Math.abs(end-start)/(sampleCount-1):0};
   return {ok:true,issues:[],start:{theta:start},end:{theta:end},range:{lo:Math.min(start,end),hi:Math.max(start,end)},motor:motorId,validation};
 }
