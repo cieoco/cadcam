@@ -1,3 +1,4 @@
+import { tippingBucketSnapshot } from './tipping-bucket-example.js';
 import { assemblyLessonSnapshot } from './assembly-lesson-example.js?v=parallel';
 /**
  * blocks / examples
@@ -76,6 +77,7 @@ const EXAMPLE_LESSONS = {
     measure: '播放並觀察兩根桿的往返端點；記下哪一根會改變方向、開始反向擺回。',
     explain: '比較四根桿的長短，說明這組尺寸為什麼讓輸入與輸出都呈現來回擺動。'
   },
+  'tipping-bucket': { group: 'manipulator', level: '基礎', use: '四片可輸出板件、角碼與單側MG995組立。', learn: '以水平參考與正負角觀察開口方向。', try: ['只改傾倒角再回位'], predict: '負角會讓開口轉向哪裡？', measure: '比較0°與−100°的開口方向。', explain: '姿態達標不等於物件能倒出。' },
   'parallel-fourbar': {
     group: 'starter',
     level: '基礎',
@@ -347,6 +349,10 @@ const ALL_BLOCK_EXAMPLES = [
       ],
       params: { LL1: 64, LL2: 48, LL3: 72, theta: 0 }
     }
+  },
+  {
+    id: 'tipping-bucket', title: '單軸翻斗', note: '四板料斗與單側 MG995 支架；開前上，模型負角順時針。底板外伸翼供角碼固定；單側支承、圓角非密封。',
+    snapshot: tippingBucketSnapshot
   },
   {
     id: 'parallel-fourbar',

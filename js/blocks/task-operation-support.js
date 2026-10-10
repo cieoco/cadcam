@@ -27,14 +27,14 @@ function changedProvided(before, after, path, changes) {
   } else if (!Object.is(before, after)) changes.push({path, before, after});
 }
 
-export function prepareTaskSnapshot(source) {
+export function prepareTaskSnapshot(source, { allowAssembly = false } = {}) {
   const fail=(code,message,targets=[],changes=[])=>({ok:false,issues:[taskIssue(code,message,targets)],changes});
   if (!record(source) || source.kind !== 'blocks' || source.v !== 1 || !Array.isArray(source.comps) || !record(source.params)) return fail('INVALID_REQUEST', '修改需要完整 blocks v1 來源作品。');
   if (!jsonSafe(source)) return fail('INVALID_REQUEST', '來源包含非 JSON 資料，請先修復作品。');
   const snapshotKeys = ['kind','v','counter','comps','params','tracePoint','tracePoints','referencePoint','activeMotor','motorAngles','fabrication','modules'];
   const unknown = Object.keys(source).filter(k => !snapshotKeys.includes(k));
   if (unknown.length) return fail('NORMALIZATION_CHANGED', '目前作品保存流程不支援額外頂層欄位，確認可能丟失資料。', unknown);
-  if (source.modules?.length || source.comps.some(c => c?.moduleId)) return fail('UNSUPPORTED_STRUCTURE', '組立作品不在此任務操作範圍；原作品已保留。');
+  if (!allowAssembly && (source.modules?.length || source.comps.some(c => c?.moduleId))) return fail('UNSUPPORTED_STRUCTURE', '組立作品不在此任務操作範圍；原作品已保留。');
   let candidate, norm;
   try { candidate = clone(source); norm = normalizeSnapshot(candidate); } catch (_) { return fail('INVALID_REQUEST', '來源必須是可序列化的作品。'); }
   if (!norm) return fail('NORMALIZATION_CHANGED', '來源無法正規化，請先修復作品。');

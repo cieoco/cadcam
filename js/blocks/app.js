@@ -69,6 +69,10 @@ import * as Exporters from './exporters.js?v=20261007_9';
 import { localToWorld, plateVertices, plateShapeMode, createPlateGeometry } from './plate-geometry.js';
 import { S, activateMotor, motorAnglesNow, frozenMotorAngles, usedMotorIds } from './state.js';  // 跨模組共享的可變狀態與多馬達 helper
 import { createExampleController } from './example-controller.js?v=20261005_parallel';
+import { planTippingBucket } from './tipping-bucket-workflow.js';
+import { taskSnapshotKey } from './task-operation-support.js';
+import { createTippingBucketOperationSession } from './tipping-bucket-operations.js';
+
 import { createParallelLiftController } from './parallel-lift-controller.js';
 import { createGripperController } from './gripper-controller.js?v=20260925_r1b2';
 import { createGripperObject } from './gripper-object.js?v=20260925_r1b2';
@@ -147,6 +151,22 @@ const motorSnapshotState = () => ({
 });
 let gripperController = null;
 let parallelLiftController = null;
+let tippingBucketOperations = null;
+let bucketOperationPending = false, bucketValidationKey = null, bucketValidationResult = null;
+function bucketPlaybackIssue(){
+  if(bucketOperationPending)return '請先確認或取消候選再播放。';
+  if(Number(S.topo?.params?.bucketAssembly)!==1)return null;
+  const snapshot=Store.toSnapshot(S.comps,S.topo,S.counter,motorSnapshotState());
+  const key=taskSnapshotKey({...snapshot,params:{...snapshot.params,theta:0},motorAngles:{}});
+  if(key!==bucketValidationKey){bucketValidationKey=key;bucketValidationResult=planTippingBucket(snapshot);}
+  return bucketValidationResult.ok?null:bucketValidationResult.issues[0]?.message;
+}
+// 共用伺服顯示有號模型角；TT 持續旋轉仍顯示0–360讀值。
+function angleLabel(theta){
+  const servo=S.comps.some(c=>c.motorType==='mg995'&&String(c.physicalMotor||c.physical_motor||c.p1?.physicalMotor||c.p1?.physical_motor||'1')===String(S.activeMotor||'1'));
+  return Math.round(servo?theta:norm360(theta));
+}
+
 const undoLessons = new Map();
 function snapshotStr() {
   return JSON.stringify(Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()));
@@ -238,6 +258,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   document.getElementById('thetaVal').textContent = '0';
   updateMotorDirectionButton();
   exampleController.snapshotApplied(norm, source);
+  bucketOperationPending=false; tippingBucketOperations?.cancel();
   gripperController?.sync();
   parallelLiftController?.sync();
   rebuild(); draw();
@@ -387,7 +408,7 @@ function setDesignFocus(id, { fit = true, keepSelection = false } = {}) {
   if (!keepSelection) clearSelectionAndEditors();
   reconcileMotorState();
   const thetaEl = document.getElementById('thetaVal');
-  if (thetaEl) thetaEl.textContent = Math.round(norm360(S.theta));
+  if (thetaEl) thetaEl.textContent = angleLabel(S.theta);
   if (fit) fitView(); else draw();
 }
 // 預先指定焦點（插入模組時：資料還沒 rebuild，先不畫）；真正的繪製由呼叫端接著做。
@@ -631,7 +652,7 @@ function rotateInputCrankToPoint(bar, target) {
   }
   S.theta = Math.atan2(target.y-center.y,target.x-center.x) * 180 / Math.PI - carrierAng - (Number(bar.phaseOffset) || 0);
   S.topo.params.theta = S.theta;
-  const thetaEl=document.getElementById('thetaVal'); if(thetaEl)thetaEl.textContent=Math.round(norm360(S.theta));
+  const thetaEl=document.getElementById('thetaVal'); if(thetaEl)thetaEl.textContent=angleLabel(S.theta);
   return true;
 }
 const updatePointCoordsById = (id, x, y) => Model.updatePointCoordsById(S.comps, id, x, y);
@@ -726,7 +747,7 @@ gripperController = createGripperController({
     if (String(S.activeMotor) !== String(motor)) activateMotor(motor, theta);
     else S.theta = theta;
     S.topo.params.theta = theta;
-    document.getElementById('thetaVal').textContent = Math.round(norm360(theta));
+    document.getElementById('thetaVal').textContent = angleLabel(theta);
     draw();
   },
   getSnapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
@@ -738,7 +759,11 @@ parallelLiftController = createParallelLiftController({
   applySnapshot: snapshot => applySnapshot(Store.normalizeSnapshot(snapshot), { source: 'parallel-lift-operation' }),
   pause, draw, fitView,
   isEditing: () => Boolean(view3DActive || S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.selectedGearId || S.selectedNodeId),
-  setPose: theta => { activateMotor('1', theta); S.topo.params.theta = theta; document.getElementById('thetaVal').textContent = Math.round(norm360(theta)); draw(); }
+  setPose: theta => { activateMotor('1', theta); S.topo.params.theta = theta; document.getElementById('thetaVal').textContent = angleLabel(theta); draw(); }
+});
+tippingBucketOperations = createTippingBucketOperationSession({
+  getSnapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
+  applySnapshot: snapshot => applySnapshot(Store.normalizeSnapshot(snapshot), { source: 'tipping-bucket-operation' })
 });
 const inputRockRange = () => parallelLiftController?.isActive() ? parallelLiftController.range() : gripperController?.isActive()
   ? gripperController.range()
@@ -858,7 +883,7 @@ const bench = createBench({
     });
     S.topo.params.theta = S.theta;
     const tv = document.getElementById('thetaVal');
-    if (tv) tv.textContent = Math.round(norm360(S.theta));
+    if (tv) tv.textContent = angleLabel(S.theta);
     draw();
   }
 });
@@ -950,7 +975,7 @@ function switchActiveMotor(id) {
   pause();                                   // 換手先停播，避免播放迴圈直接推進新馬達
   activateMotor(id, Number(S.motorAngles[id]) || 0);
   const thetaEl = document.getElementById('thetaVal');
-  if (thetaEl) thetaEl.textContent = Math.round(norm360(S.theta));
+  if (thetaEl) thetaEl.textContent = angleLabel(S.theta);
   updateMotorSwitcher();
   draw();                                    // 各馬達角度值不變，姿勢不動，只換控制權與軌跡掃描對象
 }
@@ -2091,6 +2116,7 @@ function toggleMotorDirection() {
 }
 
 function play() {
+  const bucketIssue=bucketPlaybackIssue(); if(bucketIssue){transient(bucketIssue);return;}
   if (raf) return;
   if (parallelLiftController?.isActive() && !parallelLiftController.currentPlan().ok) { transient(parallelLiftController.currentPlan().message); return; }
   if (!S.comps.length) { transient('先放一個零件，再開始組裝'); return; }
@@ -2125,7 +2151,7 @@ function play() {
       // 曲柄／平行四邊形：順向整圈轉
       S.theta = advanceByTime(S.theta, dt, PLAY_SPEED_DEG_PER_SEC, playDir);
     }
-    document.getElementById('thetaVal').textContent = Math.round(norm360(S.theta));
+    document.getElementById('thetaVal').textContent = angleLabel(S.theta);
     renderFrame();
     const rendered=measuring?viewer3D.renderNow(ts):null;
     if(measuring&&benchmarkShapeKey!==viewer3D?.cacheStats?.().key)playbackProbe.abort('geometry_changed');
@@ -2142,6 +2168,7 @@ function pause() {
   document.getElementById('playBtn').textContent = '▶';
 }
 function togglePlay() {
+  const bucketIssue=bucketPlaybackIssue(); if(bucketIssue){transient(bucketIssue);return;}
   if (parallelLiftController?.isActive() && !parallelLiftController.currentPlan().ok) { transient(parallelLiftController.currentPlan().message); return; }
   raf ? pause() : play();
 }
@@ -2288,7 +2315,7 @@ function ensureModuleHome(moduleId) {
   pause();
   S.theta = adj.theta;
   S.motorAngles = adj.motorAngles;
-  document.getElementById('thetaVal').textContent = Math.round(norm360(S.theta));
+  document.getElementById('thetaVal').textContent = angleLabel(S.theta);
   draw();
   transient('已回到組裝姿態，請再點一次進行修改');
   return true;
@@ -2581,6 +2608,7 @@ function showCncWarnings(parts, settings) {
 }
 let videoExportLoading = false;
 async function exportVideo() {
+  const bucketIssue=bucketPlaybackIssue(); if(bucketIssue){transient(bucketIssue);return;}
   if (videoExportLoading) return;
   if (S.mode !== 'design' || view3DActive) { transient('請先切回 2D 設計畫面，再匯出動畫'); return; }
   if (!S.comps.length || !hasDriveSource()) { transient('請先建立有動力的機構，再匯出動畫'); return; }
@@ -2854,6 +2882,9 @@ if (gripperPilotSession) window.blocks.gripperPilot = {
   prepare: request => gripperController.operations.prepare(request),
   confirm: () => gripperController.operations.confirm(),
   cancel: () => gripperController.operations.cancel(),
+  bucketPrepare: request => { const r=tippingBucketOperations.prepare(request); bucketOperationPending=r.ok; return r; },
+  bucketConfirm: () => { const r=tippingBucketOperations.confirm(); bucketOperationPending=false; return r; },
+  bucketCancel: () => { tippingBucketOperations.cancel(); bucketOperationPending=false; },
   parallelPrepare: request => parallelLiftController.operations.prepare(request),
   parallelConfirm: () => parallelLiftController.operations.confirm(),
   parallelCancel: () => parallelLiftController.operations.cancel(),

@@ -1,4 +1,5 @@
 /** 指定行程的有限採樣檢查。重用原 solver，不是連續性／碰撞／承載證明。 */
+import { plateVertexWorldPoints, MAX_PLATE_POINTS } from './plate-geometry.js';
 import { compileTopology } from '../core/topology.js';
 import { solveTopology } from '../multilink/solver.js';
 export const MOTION_RANGE_POLICY = Object.freeze({stepDeg:0.5,maxSamples:721,distanceToleranceMm:0.1,maxPointTravelMmPerDeg:20,pointTravelSlackMm:0.05,maxDirectionJumpDeg:15,endpointToleranceMm:0.1});
@@ -21,7 +22,7 @@ export function validateMotionRange(snapshot, options = {}) {
   for(const c of comps){
     const required=c.type==='anchor'?['p1']:c.type==='triangle'?['p1','p2','p3']:['p1','p2'];
     if(required.some(k=>!record(c[k])||typeof c[k].id!=='string'||!c[k].id))issue('UNSUPPORTED_MOTION_STRUCTURE','零件缺少有效主孔資料。',null,c.id,[c.id]);
-    if(!scope.supportedTypes.includes(c.type)||c.moduleId||(c.vertices!==undefined && (!Array.isArray(c.vertices)||c.vertices.length!==3||c.vertices.some((v,i)=>!v?.solve||v.ref!==['p1','p2','p3'][i]))))issue('UNSUPPORTED_MOTION_STRUCTURE','此零件型態或額外孔形尚未納入行程驗證。',null,c.id,[c.id]);
+    if(!scope.supportedTypes.includes(c.type)||c.moduleId||(c.vertices!==undefined && (c.type!=='triangle'||!Array.isArray(c.vertices)||c.vertices.length<3||c.vertices.length>MAX_PLATE_POINTS||['p1','p2','p3'].some(ref=>c.vertices.filter(v=>v?.solve===true&&v.ref===ref).length!==1)||c.vertices.some(v=>!record(v)||(v.solve===true?!['p1','p2','p3'].includes(v.ref):v.solve!==false||!finite(v.u)||!finite(v.v)||v.hole===true)))))issue('UNSUPPORTED_MOTION_STRUCTURE','此零件型態或額外孔形尚未納入行程驗證。',null,c.id,[c.id]);
     for(const p of [c,c.p1,c.p2,c.p3])if(p?.physicalMotor||p?.physical_motor)motorIds.add(String(p.physicalMotor||p.physical_motor));
   }
   const motorId=String(options.motorId??snapshot.activeMotor??'1');
@@ -40,8 +41,12 @@ export function validateMotionRange(snapshot, options = {}) {
   }
   for(const e of edges)if(!e.a||!e.b||!finite(e.expected)||e.expected<=0)issue('INVALID_RIGID_DIMENSION','剛性孔距參數必須是有效正長度。',options.startDeg,e.componentId,[e.a,e.b].filter(Boolean));
   if(issues.length)return finish();
-  let topo, previous=null, previousAngle=null;
+  let topo, referencePoints=null, previous=null, previousAngle=null;
   try{topo=compileTopology(comps,{params:{...snapshot.params}},new Set());}catch(_){issue('MOTION_COMPILE_FAILED','作品編譯失敗。');return finish();}
+  // 造形點基準由原 solver 按當前 params 求得，不能用尚未同步的浮點設計座標。
+  if(comps.some(c=>c.type==='triangle'&&c.vertices?.some(v=>v.solve===false))){
+    try{referencePoints=solveTopology(topo,{thetaDeg:options.startDeg,motorAngles:{...(snapshot.motorAngles||{}),[motorId]:options.startDeg}})?.points;}catch(_){}
+  }
   for(let i=0;i<count;i++){
     const angleDeg=count===1?options.startDeg:options.startDeg+(options.endDeg-options.startDeg)*i/(count-1);
     sampleCount++;
@@ -59,6 +64,12 @@ export function validateMotionRange(snapshot, options = {}) {
         if(turn>policy.maxDirectionJumpDeg)issue('SUSPECTED_POSE_JUMP','相鄰採樣方向超過跳動門檻；可能為分支變化，需加密檢查。',angleDeg,e.componentId,[e.a,e.b]);
       }
     }
+    for(const c of comps.filter(c=>c.type==='triangle'&&c.vertices?.some(v=>v.solve===false))){
+      const refs=['p1','p2','p3'].map(k=>points[c[k].id]);
+      const world=plateVertexWorldPoints(c,refs), local=plateVertexWorldPoints(c,['p1','p2','p3'].map(k=>referencePoints?.[c[k].id]));
+      if(world.length!==c.vertices.length||local.length!==c.vertices.length)issue('INVALID_RIGID_VERTICES','造形點缺少有效剛體基準。',angleDeg,c.id);
+      else for(let a=0;a<world.length;a++)for(let b=a+1;b<world.length;b++)if(Math.abs(distance(world[a],world[b])-distance(local[a],local[b]))>policy.distanceToleranceMm)issue('RIGID_VERTEX_DISTANCE_MISMATCH','造形點距離不符合局部剛體定義。',angleDeg,c.id);
+    }
     if(previous)for(const [id,owner]of pointOwners)if(distance(points[id],previous[id])>policy.maxPointTravelMmPerDeg*Math.abs(angleDeg-previousAngle)+policy.pointTravelSlackMm)issue('SUSPECTED_POSE_JUMP','相鄰採樣位移超過跳動門檻；需核對分支或加密檢查。',angleDeg,owner,[id]);
     for(const c of sampleChecks){
       let passed=false;try{passed=c.test(points,angleDeg)===true;}catch(_){}
@@ -73,6 +84,7 @@ export function validateMotionRange(snapshot, options = {}) {
     if(issues.length)break;
     previous=points;previousAngle=angleDeg;
   }
+  scope.rigidLocalVertices='shape-vertices-relative-to-primary-holes; not-all-machining-holes';
   scope.endpointChecks=endpoints.length;
   scope.sampleChecks=sampleChecks.length;
   return finish();

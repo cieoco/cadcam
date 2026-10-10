@@ -13,6 +13,8 @@ export function createExampleController({ applySnapshot, notify, closeMobileMenu
   function renderLessonCard(example) {
     const card = document.getElementById('exampleLessonCard');
     if (!card) return;
+    // 翻斗使用共用驅動／組立 UI；短教學由學習目錄開啟，不常駐遮住畫布。
+    if (example?.id === 'tipping-bucket') { card.dataset.lessonVisible = 'false'; card.style.display = 'none'; return; }
     if (!example) { activeExampleId = ''; card.dataset.lessonVisible = 'false'; if (!card.classList?.contains('workflow-active')) card.style.display = 'none'; return; }
     const lesson = getExampleLesson(example.id);
     const group = EXAMPLE_GROUPS.find(item => item.id === lesson.group);

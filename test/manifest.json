@@ -15,6 +15,7 @@
   ],
   "timeoutMs": 90000,
   "tests": [
+    "test/rigid-groups.mjs",
     "test/performance-fixtures.mjs",
     "test/assembly-lesson-wizard.mjs",
     "test/mate-candidate.mjs",
@@ -101,6 +102,7 @@
     "test/gripper-operations.mjs",
     "test/motion-range-validation.mjs",
     "test/parallel-lift.mjs",
+    "test/tipping-bucket.mjs",
     "test/parallel-lift-controller.mjs",
     "test/gripper-workflow.mjs",
     "test/input-gestures.mjs",
@@ -181,7 +183,8 @@
     "test/triangle-rigidity.mjs",
     "test/units345.mjs",
     "test/video-export.mjs",
-    "test/wiper-practice.mjs"
+    "test/wiper-practice.mjs",
+    "test/tipping-bucket-assembly.mjs"
   ],
   "version": 1
 }

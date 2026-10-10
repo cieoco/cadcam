@@ -7,6 +7,7 @@
 import { pointKeysFor } from './part-types.js';
 import { normalizeFaceMountContract } from './face-mount-contract.js';
 import { normalizeMates } from './mates-schema.js';
+import { normalizeRigidGroups } from './rigid-groups.js';
 
 const SAFE_ID = /^[\w.-]+$/u;
 const MAX_MODULES = 16;
@@ -356,6 +357,8 @@ export function normalizeModules(rawModules, comps) {
 
   const modules = withMount.map(p => {
     const out = { id: p.id, name: p.name };
+    const groups = normalizeRigidGroups(p.raw.rigidGroups);
+    if (groups.length) out.rigidGroups = groups;
     if (p.source !== undefined) out.source = p.source;
     if (p.base) out.base = p.base;
     out.outputs = p.outputs;

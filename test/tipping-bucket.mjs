@@ -1,0 +1,38 @@
+import {tippingBucketLegacy} from '../js/blocks/tipping-bucket-legacy.js';
+import {prepareTippingBucketOperation as prepare,createTippingBucketOperationSession} from '../js/blocks/tipping-bucket-operations.js';
+import {prepareGripperOperation} from '../js/blocks/gripper-operations.js';
+import {planTippingBucket} from '../js/blocks/tipping-bucket-workflow.js';
+import {getExample} from '../js/blocks/examples.js';
+import {validateMotionRange} from '../js/blocks/motion-range-validation.js';
+import {compileTopology} from '../js/core/topology.js';
+import {solveTopology} from '../js/multilink/solver.js';
+import {createPlateGeometry,plateVertexWorldPoints} from '../js/blocks/plate-geometry.js';
+import {normalizeSnapshot,toSnapshot} from '../js/blocks/schema.js';
+import {encodeSnapshot,decodeShareString} from '../js/share-codec.js';
+import {check,report} from './_harness.mjs';
+const clone=v=>JSON.parse(JSON.stringify(v)),source=clone(tippingBucketLegacy),before=JSON.stringify(source);
+const request=(parameters={},action='createFromExample')=>({operationVersion:1,action,...(action==='createFromExample'?{exampleId:'tipping-bucket'}:{}),parameters});
+const create=p=>prepare(source,request(p,'updateTask'));
+check('原單軸U形201點採樣有效',create().ok&&create().validation.sampleCount===201);
+for(const p of [{dumpAngleDeg:-121},{stowAngleDeg:31},{dumpAngleDeg:NaN},{dumpAngleDeg:Infinity},{dumpAngleDeg:'-80'},{unknown:1},null])check('非法參數拒絕且沒有候選',!create(p).ok&&!create(p).candidateSnapshot);
+for(const r of [{...request(),operationVersion:2},{...request(),exampleId:'gear-gripper'},{...request(),extra:1}])check('未知操作拒絕',!prepare(source,r).ok);
+check('正反向與零行程',create({stowAngleDeg:-100,dumpAngleDeg:0}).ok&&create({stowAngleDeg:-60,dumpAngleDeg:-60}).validation.sampleCount===1);
+check('正角教學範圍端點有效',create({stowAngleDeg:-120,dumpAngleDeg:30}).ok);
+const fix=create({dumpAngleDeg:-80});check('錯→修正→重驗',!create({dumpAngleDeg:-150}).ok&&fix.ok);
+for(const mutate of [s=>s.params.BucketBase=81,s=>s.comps[0].p1.x=1,s=>s.comps[1].phaseOffset=10,s=>s.comps[2].sign=-1,s=>s.comps[2].vertices[3].hole=true,s=>s.comps[2].vertices[3].u=110,s=>s.comps[2].physicalMotor='2']){const bad=clone(source);mutate(bad);check('改造结构明拒',!prepare(bad,request({},'updateTask')).ok);}
+for(const s of [null,{...source,comps:[null]},{...source,params:null}])check('公共planner malformed不throw',!planTippingBucket(s).ok);
+const topo=compileTopology(source.comps,{params:source.params},new Set()),bucket=source.comps[2],pose=a=>solveTopology(topo,{thetaDeg:a,motorAngles:{'1':a}}).points;
+for(const a of [0,-100,30]){const q=pose(a),g=createPlateGeometry(bucket,[q.O,q.P,q.L]);check(`侧形${a}跟随且造形末点不是孔`,g.sourcePoints.length===4&&g.holes.length===3&&g.outlines[0].length>10&&Math.hypot(q.O.x,q.O.y)<1e-8);const v=plateVertexWorldPoints(bucket,[q.O,q.P,q.L])[3];check(`局部造形点${a}刚体位置`,Math.abs(Math.hypot(v.x,v.y)-Math.hypot(100,40))<1e-8);}
+let seen=[];const exact=validateMotionRange(source,{startDeg:0,endDeg:-1.2,sampleChecks:[{test:(_p,a)=>{seen.push(a);return true;}}]});check('非整除精确终点',exact.ok&&seen.at(-1)===-1.2&&exact.sampleCount===4);
+const badVertex=clone(source);badVertex.comps[2].vertices[3].u=NaN;check('非法局部点仍拒绝',!validateMotionRange(badVertex,{startDeg:0,endDeg:1}).ok);
+const hole=clone(source);hole.comps[2].vertices[3].hole=true;check('额外孔未覆盖拒绝',!validateMotionRange(hole,{startDeg:0,endDeg:1}).ok);
+check('来源不变',JSON.stringify(source)===before);
+const norm=normalizeSnapshot(fix.candidateSnapshot),saved=toSnapshot(norm.comps,{params:norm.params,tracePoints:['P']},norm.counter);check('下载保存重开两角及侧形',prepare(saved,request({},'updateTask')).ok&&saved.params.bucketDumpAngle===-80&&saved.comps[2].vertices.length===4);
+check('分享重开同一任务',prepare(decodeShareString(encodeSnapshot(saved)),request({},'updateTask')).ok);
+let current=clone(source),undo=[];const session=createTippingBucketOperationSession({getSnapshot:()=>current,applySnapshot:s=>{undo.push(clone(current));current=s;}});
+session.prepare(request({dumpAngleDeg:-80},'updateTask'));check('预览不写作品',JSON.stringify(current)===before&&undo.length===0);check('确认一笔undo',session.confirm().applied&&undo.length===1&&current.params.bucketDumpAngle===-80);current=undo.pop();check('undo完整恢复',JSON.stringify(current)===before);
+session.prepare(request({dumpAngleDeg:-70},'updateTask'));session.cancel();check('取消不提交',!session.confirm().ok&&JSON.stringify(current)===before);
+session.prepare(request({dumpAngleDeg:-70},'updateTask'));current.params.bucketDumpAngle=-60;check('过期保持新作品',session.confirm().issues[0].code==='STALE_SOURCE'&&current.params.bucketDumpAngle===-60);
+const gripper=clone(getExample('gear-gripper').snapshot);for(const key of ['LJ_tip','RJ_tip'])gripper.params[key]=110;for(const key of ['LJ_edge','RJ_edge'])gripper.params[key]=124;
+check('原夾爪改幾何params而未同步浮點coords仍可prepare',prepareGripperOperation(gripper,{operationVersion:1,action:'updateTask',parameters:{gripperObjectWidth:50,gripperClearance:10}}).ok);
+report('tipping-bucket');

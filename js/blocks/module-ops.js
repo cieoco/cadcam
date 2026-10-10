@@ -923,6 +923,8 @@ export function instantiateComposite(template, ctx) {
     }
     out.mount = mount;
     if (m.mates) out.mates = renameMates(m.mates, renameStr);
+    // 群組 id／output 屬於宿主；成員是作品層級模組 id，複製時必須一起改號。
+    if (m.rigidGroups) out.rigidGroups = m.rigidGroups.map(g => ({ ...g, members: g.members.map(id => moduleMap.get(id) || id) }));
     return out;
   });
 

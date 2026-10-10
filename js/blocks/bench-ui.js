@@ -14,6 +14,7 @@ import { checkLiveInterference, liveInterferenceStatus } from './live-interferen
  *   showAll   是否把不相容的接口也畫出來（暗色、點了說原因）
  */
 import { S, motorAnglesNow } from './state.js';
+import { createRigidGroupsUI } from './rigid-groups-ui.js';
 import { openFaceWizard } from './face-wizard-ui.js?v=20261007_singleface';
 import * as Bench from './bench.js?v=20261007_m5a';
 import { createMateWizard } from './mate-wizard-ui.js?v=20261008_brackets';
@@ -78,6 +79,12 @@ export function createBench(deps) {
   const hasChildren = mod => S.modules.some(m => m && m.mount && m.mount.to && m.mount.to.module === mod.id);
   const displayName = id => labels.get(id) || id;
   const labelOpts = { displayName: id => labels.get(id) || null };   // 同名機構用編號後的名字
+  const rigidGroups = createRigidGroupsUI({
+    pushUndo, rebuild, draw, say, sync: () => syncUI(true),
+    busy: () => isCand() || !!st.preview || !!wiz?.previewOf(),
+    clearSelection: () => { st.selected = null; st.snapId = null; drawMarkers(); },
+    edit: id => { st.selected = id; editModule(id); }
+  });
 
   function say(msg, { toast = true } = {}) {
     st.msg = msg;
@@ -244,7 +251,7 @@ export function createBench(deps) {
 
   function applyHighlight() {
     const v = viewer();
-    if (v && v.setHighlight) v.setHighlight(isBench() ? [...new Set([...live.keys,...(materialPose.snapshot().report?.findings || []).flatMap(f=>f.pickKeys)])] : []);
+    if (v && v.setHighlight) v.setHighlight(isBench() ? [...new Set([...rigidGroups.keys(),...live.keys,...(materialPose.snapshot().report?.findings || []).flatMap(f=>f.pickKeys)])] : []);
   }
 
   // 檢查目前姿勢。force：忽略節流與「沒變」判斷。
@@ -615,6 +622,7 @@ export function createBench(deps) {
     const next = moduleId && modOf(moduleId) ? moduleId : null;
     if (st.preview && next !== st.preview.moduleId) cancelPreview();
     if (wiz.previewOf() && next !== wiz.previewOf()) wiz.cancel();
+    if (rigidGroups.memberSelected(next)) { st.selected = null; syncUI(true); drawMarkers(); return true; }
     if (next !== st.selected) { st.faceStep = null; viewer()?.highlightSurface?.(null); }
     st.selected = next;
     st.snapId = null;
@@ -765,6 +773,8 @@ export function createBench(deps) {
     labels = Bench.moduleLabels(S.modules);
     if (wizardOn()) wiz.render(force);
     else { renderList(); renderPanel(force); wiz.ensureToggle(panelEl()); }
+    rigidGroups.render();
+    applyHighlight();
     liveCheck();
   }
 
@@ -1271,7 +1281,7 @@ export function createBench(deps) {
   });
   syncModeButtons();
   return {
-    workReplaced(){deps.setCandidate?.(null);st.msg='';st.preview=null;st.faceStep=null;st.snapId=null;panelSig='';listSig='';resetLive();clearTimeline();const msg=document.getElementById('benchMsg');if(msg)msg.textContent='';},
+    workReplaced(){rigidGroups.reset();deps.setCandidate?.(null);st.msg='';st.preview=null;st.faceStep=null;st.snapId=null;panelSig='';listSig='';resetLive();clearTimeline();const msg=document.getElementById('benchMsg');if(msg)msg.textContent='';},
     mateWizardDebug: () => wiz.debug(),
     autosaveSnapshot: () => st.preview ? JSON.parse(st.preview.preSnap) : null,
     setMode, select, pickPort, commit, cancel: () => cancelPreview(), adjust, syncUI, afterScene, debug,
