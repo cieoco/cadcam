@@ -190,7 +190,8 @@
     "test/lift-bucket-clearance.mjs",
     "test/support-validation.mjs",
     "test/startup-size.mjs",
-    "test/shape-utils.mjs"
+    "test/shape-utils.mjs",
+    "test/touch-link-creation.mjs"
   ],
   "version": 1
 }
