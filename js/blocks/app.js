@@ -2228,8 +2228,8 @@ function linkMenuEl() { return document.getElementById('linkMenu'); }
 function openLinkMenu() {
   const power = powerMenuEl();
   if (power) power.style.display = 'none';
-  closeLinkMenu();
-  Tools.startDrawLink();
+  const m = linkMenuEl();
+  if (m) m.style.display = m.style.display === 'flex' ? 'none' : 'flex';
 }
 function closeLinkMenu() {
   const m = linkMenuEl();
@@ -2238,6 +2238,7 @@ function closeLinkMenu() {
 function pickLinkTool(type) {
   closeLinkMenu();
   if (type === 'triangle') Tools.startDrawTriangle('triangle');
+  else if (type === 'polyline') Tools.startDrawTriangle('polyline');
   else if (type === 'jaw') Tools.startDrawTriangle('jaw');
   else Tools.startDrawLink();
 }

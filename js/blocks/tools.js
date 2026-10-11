@@ -78,7 +78,7 @@ function beginDraw(kind) {
   const noun = kind === 'rail' ? '滑軌' : '連桿';
   setBanner(promptText(
     `${noun}：點起點，拖到終點放開；也可點兩下`,
-    kind === 'rail' ? '按住起點拖出滑軌，放開建立' : '按住起點拖到終點，放開建立連桿'
+    kind === 'rail' ? '按住起點拖出滑軌，放開建立' : '依序點起點、終點；也可按住起點拖到終點'
   ));
   draw();
 }
@@ -183,7 +183,7 @@ export function startDrawTriangle(shape = 'triangle') {
   exitDrawPolygon();
   deselectLink();
   S.drawingTriangle = true;
-  S.triangleShape = shape === 'jaw' ? 'jaw' : 'triangle';
+  S.triangleShape = ['jaw', 'polyline'].includes(shape) ? shape : 'triangle';
   // 三點桿統一改成「左鍵點三下」：第一點也由使用者自己點，不再自動落位。
   S.triangleStage = 'first';
   S.trianglePoints = [];
@@ -307,7 +307,7 @@ export function drawTrianglePreview() {
     const path = document.createElementNS(SVG_NS, 'path');
     const isJaw = S.triangleShape === 'jaw';
     const d = pts.length >= 3
-      ? (isJaw ? jawPlatePath(pts[0], pts[1], pts[2], jawTurnSign(pts[0], pts[1], pts[2])) : roundedTriangleHullPath(pts[0], pts[1], pts[2]))
+      ? (S.triangleShape === 'polyline' ? View.platePath({shapeMode:'polyline'}, pts) : (isJaw ? jawPlatePath(pts[0], pts[1], pts[2], jawTurnSign(pts[0], pts[1], pts[2])) : roundedTriangleHullPath(pts[0], pts[1], pts[2])))
       : `M ${TX(pts[0].x)} ${TY(pts[0].y)} L ${TX(pts[1].x)} ${TY(pts[1].y)}`;
     path.setAttribute('d', d);
     path.setAttribute('fill', pts.length >= 3 ? (isJaw ? '#ff704322' : '#27ae6022') : 'none');
@@ -421,6 +421,7 @@ function finishTriangleFromPoints() {
     comp.shapeMode = 'polyline';
     comp.jawTurnSign = jawTurnSign(pts[0], pts[1], pts[2]);
   }
+  if (S.triangleShape === 'polyline') comp.shapeMode = 'polyline';
   if (conn.moduleId) comp.moduleId = conn.moduleId;
   S.comps.push(comp);
   S.topo.params[gParam] = dist(pts[0], pts[1]);
@@ -627,7 +628,7 @@ export function startLinkAt(cur) {
   S.drawPreview = { x: S.drawStart.x + LINK_DEFAULT_LEN, y: S.drawStart.y };
   S.drawActive = true;
   const noun = S.drawKind === 'rail' ? '滑軌' : '連桿';
-  setBanner(promptText(`${noun}：拖到終點放開，或再點一下完成`, `${noun}：拖到終點放開`));
+  setBanner(promptText(`${noun}：拖到終點放開，或再點一下完成`, S.drawKind === 'rail' ? `${noun}：拖到終點放開` : '連桿：再點終點完成，或拖到終點放開'));
   draw();
 }
 export function placeLinkPoint(e) {
@@ -642,6 +643,10 @@ export function placeLinkPoint(e) {
 export function finishDrawLink(e) {
   if (!S.drawStart) return;
   const cur = worldFromEvent(e) || S.drawPreview || S.drawStart;
+  if (S.drawKind === 'link' && Math.hypot(cur.x-S.drawStart.x,cur.y-S.drawStart.y)<6) {
+    setBanner('請在離起點較遠的位置選擇終點');
+    return;
+  }
   const res = resolveDrawEnd(S.drawStart, cur, S.drawStartNodeId, S.drawKind !== 'rail');
   if (S.drawKind === 'rail') { finishDrawRail(res); return; }
   const conn = connectionModule(S.comps, [S.drawStartNodeId, res.nodeId]);

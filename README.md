@@ -268,4 +268,9 @@ python -m http.server 8000
 
 ## 📄 授權
 
-本專案採用 MIT 授權條款。
+本專案原創程式碼採用 [MIT 授權條款](LICENSE)。第三方元件依各自授權條款使用，不因本專案的 MIT 宣告而變更：
+
+- Three.js 與擷取的 ShapeUtils／Earcut：MIT，保留原始碼中的授權聲明及 [授權文件](js/vendor/shape-utils.LICENSE.txt)。
+- Mediabunny（MP4 錄影匯出）：[MPL-2.0](js/vendor/mediabunny/LICENSE)，版本與來源見 [SOURCE.txt](js/vendor/mediabunny/SOURCE.txt)。
+
+使用或散布第三方元件時，請保留其著作權與授權聲明，並遵循各元件所附條款。

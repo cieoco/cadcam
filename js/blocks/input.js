@@ -310,6 +310,7 @@ function commitDragUndo() {
   S.preDragSnap = null;
 }
 function onDragEnd(e) {
+  if (e?.type === 'pointercancel' && (S.drawingLink || S.drawingTriangle || S.drawingPolygon)) { linkPointerStart = null; return; }
   if (pinchActive) return;
   if (S.dragShape) return;   // 造形點拖曳由 app 的專用監聽處理
   if (S.drawingPolygon) {
@@ -324,7 +325,10 @@ function onDragEnd(e) {
     if (e?.pointerType === 'mouse') {
       if (linkPointerStart && Math.hypot(e.clientX - linkPointerStart.x, e.clientY - linkPointerStart.y) >= 6) Tools.finishDrawLink(e);
       linkPointerStart = null;
-    } else if (e?.pointerType) Tools.finishDrawLink(e);
+    } else if (e?.pointerType) {
+      if (S.drawKind === 'rail' || (linkPointerStart && (!linkPointerStart.starting || Math.hypot(e.clientX-linkPointerStart.x,e.clientY-linkPointerStart.y)>=12))) Tools.finishDrawLink(e);
+      linkPointerStart = null;
+    }
     return;
   }
   if (S.dragFrame) {
@@ -505,15 +509,18 @@ export function init(deps) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const w = worldFromEvent(e); if (!w) return;
     e.preventDefault();
-    if (e.pointerType === 'mouse' && !mobilePrompt()) {
+    if (e.pointerType === 'mouse') {
       const starting = !S.drawActive;
       Tools.placeLinkPoint(e);
       linkPointerStart = starting ? { x: e.clientX, y: e.clientY } : null;
       if (starting) try { svg.setPointerCapture(e.pointerId); } catch (_) {}
       return;
     }
-    // 觸控 / 觸控筆：按下起點、拖曳、放開建立（維持一筆完成的手勢）
-    Tools.startLinkAt(w);
+    // 觸控 / 觸控筆：首次輕點保留起點；第二次點選或首次拖放完成。滑軌維持拖放。
+    const starting = !S.drawActive;
+    if (starting || S.drawKind === 'rail') Tools.startLinkAt(w);
+    else S.drawPreview = w;
+    linkPointerStart = { x:e.clientX, y:e.clientY, starting };
     try { svg.setPointerCapture(e.pointerId); } catch (_) {}
   });
   svg.addEventListener('pointerdown', (e) => {
