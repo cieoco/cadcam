@@ -346,9 +346,13 @@ function onDragEnd(e) {
   if (!S.dragId) { pendingNodeDrag=null; S.preDragSnap = null; return; }
   const did = S.dragId, tgt = S.snapTarget;
   S.dragId = null; S.snapTarget = null;
-  if (tgt) mergePoints(did, tgt);
+  if (tgt && mergePoints(did, tgt) === false) {
+    S.preDragSnap=null;
+    rebuild(); draw();
+    return;
+  }
   if (tgt && S.selectedNodeId === did) S.selectedNodeId = tgt;
-  recomputeLengths();
+  if (!tgt) recomputeLengths();
   rebuild(); recordManualTrace(); draw();
   commitDragUndo();
   if (pointIsGround(did)) relockGroundPosition(did);

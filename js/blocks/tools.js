@@ -104,7 +104,7 @@ function resolveDrawEnd(start, cur, startNodeId, snapToHoles = true) {
     const nodeId = nearestNodeId(cur, startNodeId ? [startNodeId] : []);
     const p = nodeId && displayPointCoords()[nodeId];
     if (p && Math.hypot(p.x - start.x, p.y - start.y) >= 6) {
-      return { pos: { x: p.x, y: p.y }, len: Math.round(Math.hypot(p.x - start.x, p.y - start.y)), nodeId };
+      return { pos: { x: p.x, y: p.y }, len: Math.hypot(p.x - start.x, p.y - start.y), nodeId };
     }
   }
   const dx = cur.x - start.x, dy = cur.y - start.y;
@@ -116,7 +116,7 @@ function resolveDrawEnd(start, cur, startNodeId, snapToHoles = true) {
 }
 function linkLenLabel(len, nodeId = null) {
   const holes = (Math.abs(len % LEGO_STEP) < 0.01) ? ` / ${Math.round(len / LEGO_STEP) + 1}孔` : '';
-  return len + 'mm' + holes + (nodeId ? ' 🔗' : '');
+  return Number(len.toFixed(2)) + 'mm' + holes + (nodeId ? ' 🔗' : '');
 }
 export function drawDrawPreview() {
   if (!S.drawingLink || !S.drawActive || !S.drawStart || !S.drawPreview) return;
@@ -380,7 +380,7 @@ function finishTriangleAsLink() {
   const lp = 'LL' + n;
   const a = S.trianglePoints[0];
   const b = S.trianglePoints[1];
-  const len = Math.round(Math.hypot(b.pos.x - a.pos.x, b.pos.y - a.pos.y));
+  const len = Math.hypot(b.pos.x - a.pos.x, b.pos.y - a.pos.y);
   const comp = {
     type: 'bar', id: 'Link' + n, color: '#3498db',
     p1: { id: a.nodeId || 'P' + n + 'a', type: 'floating', x: a.pos.x, y: a.pos.y },
@@ -408,7 +408,7 @@ function finishTriangleFromPoints() {
     x: p.pos.x,
     y: p.pos.y
   }));
-  const dist = (a, b) => Math.round(Math.hypot(b.x - a.x, b.y - a.y));
+  const dist = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
   const gParam = 'TG' + n, r1Param = 'TR1_' + n, r2Param = 'TR2_' + n;
   const isJaw = S.triangleShape === 'jaw';
   const comp = {
@@ -542,7 +542,7 @@ function buildBarFromPolygonPoints() {
   };
   if (conn.moduleId) comp.moduleId = conn.moduleId;
   S.comps.push(comp);
-  S.topo.params[param] = Math.round(Math.hypot(end.x - first.pos.x, end.y - first.pos.y));
+  S.topo.params[param] = Math.hypot(end.x - first.pos.x, end.y - first.pos.y);
   exitDrawPolygon();
   rebuild(); draw();
   selectLink(comp.id);
@@ -569,7 +569,7 @@ function buildPolygonPlate() {
     const local = worldToLocal(basis, p.pos);
     return { solve: false, u: Number((local && local.u || 0).toFixed(1)), v: Number((local && local.v || 0).toFixed(1)) };
   });
-  const dist = (a, b) => Math.round(Math.hypot(b.x - a.x, b.y - a.y));
+  const dist = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
   const gParam = 'TG' + n, r1Param = 'TR1_' + n, r2Param = 'TR2_' + n;
   const comp = {
     type: 'triangle', id: 'Tri' + n, color: '#27ae60',

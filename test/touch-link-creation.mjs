@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { S } from '../js/blocks/state.js';
 import * as Tools from '../js/blocks/tools.js';
 import * as Input from '../js/blocks/input.js';
+import { compileTopology } from '../js/core/topology.js';
+import { solveTopology } from '../js/multilink/solver.js';
+import { normalizeSnapshot } from '../js/blocks/schema.js';
 const handlers=[];
 const noop=()=>{};
 const svg={style:{},setPointerCapture:noop,addEventListener(type,fn,capture){handlers.push({type,fn,capture:capture===true});}};
@@ -28,3 +31,18 @@ Tools.startDrawTriangle(); fire('pointerdown',0,0);fire('pointercancel',0,0);
 assert.equal(S.trianglePoints.length,0,'pointer cancellation must not add a point');Tools.exitDrawTriangle();
 Tools.startDrawLink();tap(0,0);Tools.exitDrawLink();assert.equal(S.comps.length,4,'cancel must not create a bar');
 console.log('PASS touch taps, drag, both rigid three-point shapes and cancellation');
+// Closing a linkage on existing holes must preserve their exact separation.
+const a={x:-191.20863591782165,y:-56.31810152035371};
+const b={x:-114.84447885009033,y:-52.85522294151475};
+const points={A:a,B:b};
+Tools.init({...deps,pointCoords:()=>points,displayPointCoords:()=>points,
+  nearestDisplayToPoint:(p,exclude=[])=>Object.keys(points).find(id=>!exclude.includes(id)&&Math.hypot(p.x-points[id].x,p.y-points[id].y)<1)});
+S.comps=[{type:'anchor',id:'a',p1:{id:'A',type:'fixed',...a}},{type:'anchor',id:'b',p1:{id:'B',type:'fixed',...b}}];
+S.topo={params:{}};
+Tools.startDrawLink();tap(a.x,a.y);tap(b.x,b.y);
+const c=S.comps.at(-1),length=Math.hypot(b.x-a.x,b.y-a.y);
+assert.equal(S.topo.params[c.lenParam],length);
+assert.equal(solveTopology(compileTopology(S.comps,S.topo,new Set()),{thetaDeg:0}).isValid,true);
+const reopened=normalizeSnapshot({kind:'blocks',v:1,comps:S.comps,params:S.topo.params});
+assert.equal(reopened.params[c.lenParam],length);
+console.log('PASS snapped closing bar retains exact length through save normalization');

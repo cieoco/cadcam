@@ -14,6 +14,7 @@
 
 import { solveTopology } from '../multilink/solver.js';
 import { pointKeysFor } from './part-types.js';
+import { connectionModule } from './assembly.js';
 
 export const LEGO_FRAME_STEP = 8;
 
@@ -217,6 +218,28 @@ export function mergePoints(comps, fromId, toId) {
   return comps.filter(c => !(c.type === 'bar' && c.p1 && c.p2 && c.p1.id === c.p2.id));
 }
 
+// Drag connections are candidates: never change the live work or its dimensions on failure.
+export function previewPointConnection(comps, topo, fromId, toId) {
+  const fail = message => ({ ok:false, message });
+  const points = pointCoords(comps), source=points[fromId], target=points[toId];
+  if (!source || !target || fromId===toId) return fail('請選擇兩個不同接點');
+  if (!connectionModule(comps,[fromId,toId]).ok) return fail('不同模組請使用組立接口接合');
+  const ids=new Set([fromId,toId]);
+  let changed=true;
+  while(changed){changed=false;for(const c of comps){const keys=pointKeysFor(c).map(k=>c[k]?.id).filter(Boolean);if(keys.some(id=>ids.has(id)))for(const id of keys)if(!ids.has(id)){ids.add(id);changed=true;}}}
+  const affected=comps.filter(c=>pointKeysFor(c).some(k=>ids.has(c[k]?.id)));
+  if(affected.some(c=>!['bar','triangle','anchor'].includes(c.type))) return fail('此接合包含傳動件，尚不支援拖曳接合驗證；請使用組立接口');
+  if(affected.some(c=>pointKeysFor(c).some(k=>c[k]?.id===fromId)&&pointKeysFor(c).some(k=>c[k]?.id===toId))) return fail('不能合併同一零件的兩個孔');
+  if(pointIsGround(comps,fromId)&&Math.hypot(source.x-target.x,source.y-target.y)>1e-6) return fail('固定孔不能移到另一孔；請先調整機架');
+  const candidate=structuredClone(comps);
+  // Translate an unattached rigid part before identifying its hole with the target.
+  const free=freeLinkForPoint(candidate,fromId)||freeTriangleForPoint(candidate,fromId);
+  if(free)for(const k of pointKeysFor(free)){const p=free[k];p.x+=target.x-source.x;p.y+=target.y-source.y;}
+  const merged=mergePoints(candidate,fromId,toId);
+  if(!solvePinnedConstraints(merged,topo,toId,target,{iterations:1200,tolerance:1e-6,allowFree:true})) return fail('無法在保持設定桿長與固定孔位置下接合；請調整姿態或明確修改尺寸');
+  return {ok:true,comps:merged};
+}
+
 export function recomputeLengths(comps, topo) {
   // 固定長度的連桿不跟著拉伸；其餘桿（如曲柄）長度跟著畫面更新
   comps.forEach(c => {
@@ -290,7 +313,7 @@ export function solvePinnedConstraints(comps, topo, pinId, target, options = {})
     });
   }
   const hasGround = Array.from(relevant).some(id => pinned.has(id) && id !== pinId);
-  if (!hasGround) return false;
+  if (!hasGround && !options.allowFree) return false;
 
   points[pinId] = { x: target.x, y: target.y };
   const original = pointCoords(comps);

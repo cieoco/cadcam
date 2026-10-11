@@ -191,7 +191,8 @@
     "test/support-validation.mjs",
     "test/startup-size.mjs",
     "test/shape-utils.mjs",
-    "test/touch-link-creation.mjs"
+    "test/touch-link-creation.mjs",
+    "test/point-connection.mjs"
   ],
   "version": 1
 }

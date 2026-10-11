@@ -678,7 +678,18 @@ const removeAnchorsAtPoint = (id) => { S.comps = Model.removeAnchorsAtPoint(S.co
 const setPointType = (id, type) => Model.setPointType(S.comps, id, type);
 const roleLabel = (id) => Model.roleLabel(S.comps, id);
 const hasPoint = (id) => Model.hasPoint(S.comps, id);
-const mergePoints = (fromId, toId) => { S.comps = Model.mergePoints(S.comps, fromId, toId); };
+const mergePoints = (fromId, toId) => {
+  const seed=structuredClone(S.comps);
+  for(const [id,p] of Object.entries(displayCoords())) Model.updatePointCoordsById(seed,id,p.x,p.y);
+  const candidate=Model.previewPointConnection(seed,S.topo,fromId,toId);
+  if(!candidate.ok){
+    if(S.preDragSnap){const norm=Store.normalizeSnapshot(JSON.parse(S.preDragSnap));if(norm)applySnapshot(norm,{recordUndo:false,fit:false,source:'undo'});}
+    transient(candidate.message);
+    return false;
+  }
+  S.comps=candidate.comps;
+  return true;
+};
 const recomputeLengths = () => Model.recomputeLengths(S.comps, S.topo);
 const fixedLinkFor = (id) => Model.fixedLinkFor(S.comps, id);
 const freeLinkForPoint = (id) => Model.freeLinkForPoint(S.comps, id);
