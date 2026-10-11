@@ -188,7 +188,9 @@
     "test/rigid-group-interface.mjs",
     "test/lift-bucket.mjs",
     "test/lift-bucket-clearance.mjs",
-    "test/support-validation.mjs"
+    "test/support-validation.mjs",
+    "test/startup-size.mjs",
+    "test/shape-utils.mjs"
   ],
   "version": 1
 }

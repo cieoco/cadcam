@@ -1,6 +1,6 @@
 /** Single solved pose: exact polygon material, conservative circular bounds. No S/DOM. */
 import {normalizeMaterialVoids,materialCircleContour} from './material-voids.js';
-import {ShapeUtils,Vector2} from '../vendor/three.module.js';
+import {ShapeUtils} from '../vendor/shape-utils.js';
 import {applyMatrix4} from '../blocks3d/orthogonal-3d.js';
 export const MATERIAL_TOLERANCE_MM=1e-7;
 const E=MATERIAL_TOLERANCE_MM,N=64;
@@ -23,7 +23,7 @@ function ringOf(raw){
 }
 const circle=materialCircleContour;
 function triangles(ring,holes){
- const contour=ring.map(p=>new Vector2(p.x,p.y)),cuts=holes.map(r=>r.map(p=>new Vector2(p.x,p.y)));
+ const contour=ring.map(p=>({x:p.x,y:p.y})),cuts=holes.map(r=>r.map(p=>({x:p.x,y:p.y})));
  const faces=ShapeUtils.triangulateShape(contour,cuts),points=[...contour,...cuts.flat()];
  const tris=faces.map(f=>f.map(i=>({x:points[i].x,y:points[i].y}))).filter(t=>area(t)>E*E);
  const expected=area(ring)-holes.reduce((n,r)=>n+area(r),0),actual=tris.reduce((n,t)=>n+area(t),0);

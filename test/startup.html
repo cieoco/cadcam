@@ -1,0 +1,9 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>首次載入量測</title>
+<style>body{font:14px sans-serif;margin:12px}iframe{width:100%;height:72vh;border:1px solid #abc}pre{white-space:pre-wrap}</style>
+<h1>首次載入量測</h1><p>本機觀測，不代表冷快取或學生網路速度。使用目前作品；可在下方開 3D，再更新紀錄。</p><button id="refresh">更新紀錄</button><pre id="result">載入中…</pre><iframe id="app" title="機構工具驗收" src="../blocks.html"></iframe>
+<script>
+const app=document.querySelector('#app'),result=document.querySelector('#result');let firstFramesMs=null;
+function report(){const w=app.contentWindow,entries=w.performance.getEntriesByType('resource');result.textContent=JSON.stringify({loadAndTwoFramesMs:firstFramesMs,resourceCount:entries.length,observedTransferBytes:entries.reduce((n,e)=>n+e.transferSize,0),threeRequested:entries.some(e=>e.name.includes('/three.module.js')),recordingRequested:entries.some(e=>e.name.includes('/mediabunny.mjs')),status:w.document.querySelector('#mechanismStatus')?.textContent},null,2);}
+app.addEventListener('load',()=>app.contentWindow.requestAnimationFrame(()=>app.contentWindow.requestAnimationFrame(()=>{firstFramesMs=Math.round(app.contentWindow.performance.now());report();})));
+document.querySelector('#refresh').onclick=report;
+</script></html>
