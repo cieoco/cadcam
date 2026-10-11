@@ -1,5 +1,6 @@
 import {createMateCandidate} from './mate-candidate.js';
 import {createCreationPalette} from './creation-palette.js';
+import {createDesignGuide,guideFrameCandidate} from './design-guide.js';
 import {validateSupports} from './support-validation.js';
 import {prepareConnectionWork} from './connection-work.js';
 import {usesFaceExport,faceFileExportData,createFaceExportCoordinator,faceBuildPackHtml} from './face-export.js';
@@ -287,6 +288,22 @@ const exampleController = createExampleController({
 });
 const populateExamples = () => exampleController.populate();
 const creationPalette=createCreationPalette({cancel:()=>{Tools.exitDrawLink();Tools.exitDrawTriangle();Tools.exitDrawPolygon();cancelMotorMode();draw();}});
+const designGuide=createDesignGuide({frame:setGuideFrame,next:stage=>{
+  if(stage==='frame'){setGuideFrame();return;}
+  if(stage==='try'){togglePlay();return;}
+  setMobilePanel('build');document.getElementById('creationTools').open=true;
+  if(stage==='draw')openLinkMenu();else openPowerMenu();
+}});
+function setGuideFrame(){
+  const comps=viewComps(),nodeId=S.selectedNodeId;
+  const result=guideFrameCandidate(comps,{nodeId,componentId:S.selectedLinkId||S.selectedTriangleId,positions:displayCoords()});
+  if(!result.ok){transient(result.message);return;}
+  pause();pushUndo();
+  const replacements=new Map(result.comps.map(c=>[c.id,c]));
+  S.comps=S.comps.map(c=>replacements.get(c.id)||c);
+  rebuild();draw();scheduleAutosave();
+  transient(nodeId?'已將所選孔設為固定點':'已將所選桿件設為機架；實體支架仍需設計');
+}
 const loadExample = id => exampleController.load(id);
 
 // ---- 綁定層：把純模組綁到本檔狀態，維持原呼叫端不變 ----
@@ -1445,6 +1462,7 @@ function drawNow() {
   validateViewPlane();
   designTabsUi.render();   // H1：設計分頁列
   creationPalette.sync({key:S.designFocus || ROOT_TAB,count:viewComps().length,drawing:!!(S.drawingLink||S.drawingTriangle||S.drawingPolygon)});
+  designGuide.sync(viewComps(),S.selectedNodeId||S.selectedLinkId||S.selectedTriangleId,S.mode);
   document.getElementById('hint').style.display = viewComps().length ? 'none' : 'block';   // 焦點分頁是空的也要提示
   const planeHint = document.getElementById('viewPlaneHint');
   if (planeHint) {
