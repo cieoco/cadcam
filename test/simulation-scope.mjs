@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {createSimulationScope} from '../js/blocks/simulation-scope.js';
+import {normalizeSnapshot} from '../js/blocks/schema.js';
+import {compileTopology} from '../js/core/topology.js';
+import {solveTopology} from '../js/multilink/solver.js';
+import {planMotion} from '../js/blocks/motion.js';
+import {planTippingBucket} from '../js/blocks/tipping-bucket-workflow.js';
+const fixture=normalizeSnapshot(JSON.parse(readFileSync(new URL('./fixtures/design-simulation.json',import.meta.url))));
+const before=JSON.stringify(fixture);
+const state={...fixture,topo:{params:fixture.params},mode:'design',designFocus:'#root',assembly:{sentinel:true}};
+state.compiled=compileTopology(state.comps,state.topo,new Set());
+const root=createSimulationScope(state);
+assert.equal(root.comps.length,4);
+assert.equal(root.assembly,null);
+assert.equal(root.wholeWork,false);
+assert.equal(planTippingBucket(fixture).ok,false,'whole-work bucket contract rejects this mixed work');
+let sol=solveTopology(root.compiled,{thetaDeg:0,motorAngles:{'2':0}});
+assert.equal(sol.isValid,true);
+const plan=planMotion(root.compiled,state.topo,0,sol.points,{active:'2',frozen:{'1':0}});
+assert.equal(plan.mode,'rock','user four-bar is not a full-rotation linkage');
+assert.ok(plan.lo<0&&plan.hi>0);
+for(let a=plan.lo;a<=plan.hi;a+=2){
+  sol=solveTopology(root.compiled,{thetaDeg:a,motorAngles:{'2':a},_prevPoints:sol.points});
+  assert.equal(sol.isValid,true,`local angle ${a}`);
+  for(const c of root.comps)assert.ok(Math.abs(Math.hypot(sol.points[c.p1.id].x-sol.points[c.p2.id].x,sol.points[c.p1.id].y-sol.points[c.p2.id].y)-fixture.params[c.lenParam])<.001);
+}
+const broken=structuredClone(state);broken.topo.params.BucketBase=-1;
+assert.equal(solveTopology(createSimulationScope(broken).compiled,{thetaDeg:0,motorAngles:{'2':0}}).isValid,true);
+const side=createSimulationScope({...state,designFocus:'RightSide'});
+assert.ok(side.comps.every(c=>c.moduleId==='RightSide'));
+assert.ok(side.comps.every(c=>!c.isInput));
+const bench=createSimulationScope({...state,mode:'bench'});
+assert.equal(bench.compiled,state.compiled);assert.equal(bench.assembly,state.assembly);assert.equal(bench.wholeWork,true);
+assert.equal(JSON.stringify(fixture),before,'scope must not mutate saved work');
+console.log('PASS isolated user four-bar, rigid lengths, hidden invalid module, static tab and bench boundary');

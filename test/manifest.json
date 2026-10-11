@@ -193,7 +193,8 @@
     "test/shape-utils.mjs",
     "test/touch-link-creation.mjs",
     "test/point-connection.mjs",
-    "test/design-guide.mjs"
+    "test/design-guide.mjs",
+    "test/simulation-scope.mjs"
   ],
   "version": 1
 }

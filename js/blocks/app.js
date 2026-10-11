@@ -1,3 +1,4 @@
+import {createSimulationScope} from './simulation-scope.js';
 import {createMateCandidate} from './mate-candidate.js';
 import {createCreationPalette} from './creation-palette.js';
 import {createDesignGuide,guideFrameCandidate} from './design-guide.js';
@@ -155,10 +156,10 @@ const motorSnapshotState = () => ({
 let gripperController = null;
 let parallelLiftController = null;
 let tippingBucketOperations = null;
-let bucketOperationPending = false, bucketValidationKey = null, bucketValidationResult = null;
+let bucketOperationPending = false, bucketOperationFocus = null, bucketValidationKey = null, bucketValidationResult = null;
 function bucketPlaybackIssue(){
-  if(bucketOperationPending)return '請先確認或取消候選再播放。';
-  if(Number(S.topo?.params?.bucketAssembly)!==1)return null;
+  if(bucketOperationPending && (simulationScope().wholeWork || S.designFocus===bucketOperationFocus))return '請先確認或取消候選再播放。';
+  if(!simulationScope().wholeWork || Number(S.topo?.params?.bucketAssembly)!==1)return null;
   const snapshot=Store.toSnapshot(S.comps,S.topo,S.counter,motorSnapshotState());
   const key=taskSnapshotKey({...snapshot,params:{...snapshot.params,theta:0},motorAngles:{}});
   if(key!==bucketValidationKey){bucketValidationKey=key;bucketValidationResult=planTippingBucket(snapshot);}
@@ -266,8 +267,8 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   gripperController?.sync();
   parallelLiftController?.sync();
   rebuild(); draw();
-  if (gripperController?.isActive() && gripperController.currentPlan().ok) gripperController.moveToOpen();
-  if (parallelLiftController?.isActive() && parallelLiftController.currentPlan().ok) parallelLiftController.moveToStart();
+  if (taskApplies(gripperController) && gripperController.currentPlan().ok) gripperController.moveToOpen();
+  if (taskApplies(parallelLiftController) && parallelLiftController.currentPlan().ok) parallelLiftController.moveToStart();
   if (fit) fitView();
   if (missingFabrication) transient(source === 'local-autosave'
     ? '舊本機自存已帶入本機加工偏好；下次保存會隨作品帶走'
@@ -319,9 +320,9 @@ const PLAY_SPEED_DEG_PER_SEC = Motion.PLAY_SPEED_DEG_PER_SEC;
 const NOMINAL_FRAME_DT_MS = Motion.NOMINAL_FRAME_DT_MS;
 const playStepDeg = Motion.playStepDeg;
 const advanceByTime = Motion.advanceByTime;
-const planMotion = () => Motion.planMotion(S.compiled, S.topo, S.theta, lastSolved,
+const planMotion = () => Motion.planMotion(simulationScope().compiled, S.topo, S.theta, lastSolved,
   { active: String(S.activeMotor), frozen: frozenMotorAngles() },
-  S.assembly ? p => solveAssembly(S.assembly, p) : undefined);
+  simulationScope().assembly ? p => solveAssembly(simulationScope().assembly, p) : undefined);
 const mobilePrompt = () => window.matchMedia('(hover: none), (pointer: coarse), (max-width: 700px), (max-width: 1099px) and (max-height: 500px)').matches;
 const promptText = (desktop, mobile) => mobilePrompt() ? mobile : desktop;
 const snapWorld = () => View.snapWorld() * (mobilePrompt() ? 2.35 : 1);
@@ -366,6 +367,18 @@ function viewComps() {
   if (inDesign() && S.modules.length) return compsInFocus(S.comps, S.modules, S.designFocus);
   return hasOrthogonalModules() ? compsInPlane(S.comps, S.modules, S.viewPlane) : S.comps;
 }
+// 結構、模式或分頁改變才重編譯；不能沿用上一頁的連續姿態種子。
+let simulationCache=null,simulationKey=null;
+function simulationScope(){
+  const key=`${geomVersion}|${S.mode}|${S.designFocus}`;
+  if(key!==simulationKey){
+    simulationKey=key;
+    simulationCache=createSimulationScope(S);
+    lastSolved={};prevSolved={};trajectoryCache=null;
+  }
+  return simulationCache;
+}
+function taskApplies(controller){return simulationScope().wholeWork&&controller?.isActive();}
 // 目前畫面用到的點 id；沒有模組／直角安裝時回 null（代表全部）。
 function viewPointIds() {
   if (inDesign() && S.modules.length) return pointIdsOf(viewComps());
@@ -774,7 +787,7 @@ gripperController = createGripperController({
   pause,
   pushUndo,
   fitView,
-  isEditing: () => Boolean(view3DActive || S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.selectedGearId || S.selectedNodeId),
+  isEditing: () => Boolean(!simulationScope().wholeWork || view3DActive || S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.selectedGearId || S.selectedNodeId),
   setPose: (theta, motor) => {
     if (String(S.activeMotor) !== String(motor)) activateMotor(motor, theta);
     else S.theta = theta;
@@ -790,19 +803,19 @@ parallelLiftController = createParallelLiftController({
   getSnapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
   applySnapshot: snapshot => applySnapshot(Store.normalizeSnapshot(snapshot), { source: 'parallel-lift-operation' }),
   pause, draw, fitView,
-  isEditing: () => Boolean(view3DActive || S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.selectedGearId || S.selectedNodeId),
+  isEditing: () => Boolean(!simulationScope().wholeWork || view3DActive || S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.selectedGearId || S.selectedNodeId),
   setPose: theta => { activateMotor('1', theta); S.topo.params.theta = theta; document.getElementById('thetaVal').textContent = angleLabel(theta); draw(); }
 });
 tippingBucketOperations = createTippingBucketOperationSession({
   getSnapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
   applySnapshot: snapshot => applySnapshot(Store.normalizeSnapshot(snapshot), { source: 'tipping-bucket-operation' })
 });
-const inputRockRange = () => parallelLiftController?.isActive() ? parallelLiftController.range() : gripperController?.isActive()
+const inputRockRange = () => taskApplies(parallelLiftController) ? parallelLiftController.range() : taskApplies(gripperController)
   ? gripperController.range()
-  : baseInputRockRange();
+  : baseInputRockRange(simulationScope().comps);
 const gripperObject = createGripperObject({
   svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
-  getReference: () => gripperController.reference(), getComps: () => S.comps,
+  getReference: () => taskApplies(gripperController) ? gripperController.reference() : null, getComps: () => S.comps,
   isEditing: () => Boolean(S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.selectedGearId || S.selectedNodeId || S.drawingLink || S.drawingTriangle || S.drawingPolygon),
   previewWidth: value => gripperController.previewWidth(value), commitWidth: value => gripperController.commitWidth(value),
   cancelPreview: () => gripperController.cancelPreview(), pause
@@ -1020,15 +1033,15 @@ function getTrajectoryData() {
   if (S.dragId || S.dragFrame || S.dragLinkId) return null;
   let ids = traceIds();
   // S4：預設點是固定／馬達軸心就不畫，避免「工作範圍 0 mm」的假量測。
-  if (!ids.length && S.compiled) ids.push(...Motion.fallbackTraceIds(S.comps, S.compiled.tracePoint));
+  if (!ids.length && simulationScope().compiled) ids.push(...Motion.fallbackTraceIds(S.comps, simulationScope().compiled.tracePoint));
   const planeIds = viewPointIds();
   if (planeIds) ids = ids.filter(id => planeIds.has(id));   // 只畫目前平面的追蹤點
   const normalIds = new Set(ids);
   const swept = viewComps().find(c => c.id === sweepMemberId && ['bar', 'triangle'].includes(c.type));
   if (swept && !ids.length) ids.push(swept.p1.id);
-  if (!S.compiled || !ids.length || !S.comps.length) return null;
+  if (!simulationScope().compiled || !ids.length || !S.comps.length) return null;
   // 快取鍵＝結構版本號 geomVersion，取代每幀 JSON.stringify 整份快照（零件多時字串化本身會變慢）。
-  // 軌跡只取決於 S.compiled 與 traceIds，兩者都只在 rebuild / 切換軌跡點變動、那兩處都會 +1，
+  // 軌跡只取決於 simulationScope().compiled 與 traceIds，兩者都只在 rebuild / 切換軌跡點變動、那兩處都會 +1，
   // 故版本號是完整且正確的失效訊號。多馬達後軌跡還取決於「掃哪顆馬達＋其他馬達凍在哪」，一併入鍵。
   const motorKey = String(S.activeMotor) + '|' + JSON.stringify(S.motorAngles) + '|' + (inDesign() ? 'f:' + S.designFocus : (S.viewPlane || '')) + '|' + ids.join(',') + '|' + [...normalIds].join(',');
   if (trajectoryCache && trajectoryCache.version === geomVersion && trajectoryCache.motorKey === motorKey) return trajectoryCache.data;
@@ -1037,14 +1050,14 @@ function getTrajectoryData() {
   const thetaStart = range ? range.lo : 0;
   const thetaEnd = range ? range.hi : 360;
   // S2：軌跡點共用同一份 compiled，只 sweep 一次（traceSweeps 內部處理），不再逐點各掃一次。
-  const params = { ...(S.compiled.params || S.topo.params || {}), motorAngles: frozenMotorAngles(), sweepMotor: String(S.activeMotor) };
+  const params = { ...(simulationScope().compiled.params || S.topo.params || {}), motorAngles: frozenMotorAngles(), sweepMotor: String(S.activeMotor) };
   let data;
   try {
     // S2b：範圍太窄（如夾爪 3.8°）時 5° 取不到足夠取樣點，改用 traceSweepRange 算出的步長。
     const { start, end, step } = Motion.traceSweepRange(thetaStart, thetaEnd);
-    data = S.assembly
-      ? Motion.traceSweeps(S.compiled, params, ids, start, end, step, (c, p, s, e, st) => sweepAssembly(S.assembly, p, s, e, st))
-      : Motion.traceSweeps(S.compiled, params, ids, start, end, step);
+    data = simulationScope().assembly
+      ? Motion.traceSweeps(simulationScope().compiled, params, ids, start, end, step, (c, p, s, e, st) => sweepAssembly(simulationScope().assembly, p, s, e, st))
+      : Motion.traceSweeps(simulationScope().compiled, params, ids, start, end, step);
   } catch (_) {
     data = [];
   }
@@ -1228,12 +1241,13 @@ let recountBanner = null;      // (pts, sol)=>void：播放時重算死點橫幅
 
 // 解這一幀 + 推進位移歷史，回傳合併後的「點 id -> 畫面位置」。draw 與 renderFrame 共用同一套求解語意。
 function solveFrame() {
+  const scope=simulationScope();
   let sol = null;
   // 帶「外插（上一幀＋速度）」的預測當種子：靠動量挑連續分支，平行四邊形不會翻成交叉。
   const seed = extrapolateSeed(lastSolved, prevSolved);
   const frameParams = { thetaDeg: S.theta, motorAngles: motorAnglesNow(), _prevPoints: seed };
-  try { sol = S.assembly ? solveAssembly(S.assembly, frameParams) : solveTopology(S.compiled, frameParams); } catch (_) {}
-  lastSolveValidity=materialSolveValidity(S.comps,sol);
+  try { sol = scope.assembly ? solveAssembly(scope.assembly, frameParams) : solveTopology(scope.compiled, frameParams); } catch (_) {}
+  lastSolveValidity=materialSolveValidity(scope.comps,sol);
   const solved = (sol && sol.isValid !== false && sol.points) ? sol.points : {};
   // 無效解整幀不採用，避免新舊接點混合而拉伸剛性零件；保留上一姿態。
   const newLast = { ...lastSolved };
@@ -1249,11 +1263,11 @@ function solveFrame() {
 }
 
 function hasDriveSource() {
-  return S.comps.some(c => c && c.isInput) || Model.motorPointIds(S.comps).size > 0;
+  return simulationScope().comps.some(c => c && c.isInput) || Model.motorPointIds(simulationScope().comps).size > 0;
 }
 
 function gearMeshHasWarning() {
-  return S.comps.some(c => c && c.type === 'gear' && gearMeshOff(c));
+  return simulationScope().comps.some(c => c && c.type === 'gear' && gearMeshOff(c));
 }
 
 function updateMechanismStatus(sol = null) {
@@ -1262,13 +1276,13 @@ function updateMechanismStatus(sol = null) {
   let state = 'idle';
   let text = '尚未建立機構';
   let title = '';
-  const mobility = S.comps.length ? analyzeDof(S.comps) : null;
-  if (S.comps.length) {
+  const mobility = simulationScope().comps.length ? analyzeDof(simulationScope().comps) : null;
+  if (simulationScope().comps.length) {
     title = mobility.mobilityOverride
       ? `組裝自由度：F = ${mobility.dof}（一般公式 ${mobility.formulaDof}；平行冗餘約束已校正）`
       : `理論自由度：F = ${mobility.dof}（剛體 ${mobility.bodies}、低副 ${mobility.lowerPairs}、高副 ${mobility.higherPairs}）`;
-    const unsolvedIds = sol !== null ? unsolvedMovingPoints(S.comps, sol) : [];   // S3 漏解警示：只算一次
-    if (gripperController?.isActive() && !gripperController.currentPlan().ok) {
+    const unsolvedIds = sol !== null ? unsolvedMovingPoints(simulationScope().comps, sol) : [];   // S3 漏解警示：只算一次
+    if (taskApplies(gripperController) && !gripperController.currentPlan().ok) {
       state = 'error';
       text = '夾爪任務待修正，請查看任務卡';
       title = gripperController.currentPlan().message;
@@ -1287,7 +1301,7 @@ function updateMechanismStatus(sol = null) {
     } else if (!hasDriveSource()) {
       state = 'warn';
       text = mobility.dof === 1 ? '可以活動了：把動力來源放到轉軸' : '還太鬆：固定接點，或把孔接起來';
-    } else if (S.compiled && sol === null && (S.compiled.steps || []).length) {
+    } else if (simulationScope().compiled && sol === null && (simulationScope().compiled.steps || []).length) {
       state = 'error';
       text = '目前解不出動作，請檢查接點';
     } else if (unsolvedIds.length) {
@@ -1307,16 +1321,17 @@ function updateMechanismStatus(sol = null) {
       text = '還有未控制的活動部分，請補連接或動力';
     }
   }
-  const support = validateSupports({comps:S.comps,modules:S.modules});
+  const support = validateSupports({comps:simulationScope().comps,modules:simulationScope().modules});
   if (state === 'ready') {
     state = support.ok ? 'warn' : 'error';
     text = support.ok ? '可模擬｜實體固定待驗證' : '動力支撐有誤，請至組立查看';
   }
+  if(inDesign())title += '\n僅檢查目前設計；組立連接請至組立模式驗證。';
   title += '\n' + support.issues.map(i=>i.message).join('\n');
   el.dataset.state = state;
   el.textContent = text;
   el.title = title;
-  const feedback = getTeachingFeedback({ comps: S.comps, sol, compiled: S.compiled,
+  const feedback = getTeachingFeedback({ comps: simulationScope().comps, sol, compiled: simulationScope().compiled,
     hasDrive: hasDriveSource(), gearWarning: gearMeshHasWarning(), dof: mobility });
   if (['error', 'warn', 'static'].includes(state)) el.title += '\n' + feedback.message;
 }
@@ -2160,9 +2175,9 @@ function toggleMotorDirection() {
 function play() {
   const bucketIssue=bucketPlaybackIssue(); if(bucketIssue){transient(bucketIssue);return;}
   if (raf) return;
-  if (parallelLiftController?.isActive() && !parallelLiftController.currentPlan().ok) { transient(parallelLiftController.currentPlan().message); return; }
-  if (!S.comps.length) { transient('先放一個零件，再開始組裝'); return; }
-  if (gripperController?.isActive() && !gripperController.currentPlan().ok) {
+  if (taskApplies(parallelLiftController) && !parallelLiftController.currentPlan().ok) { transient(parallelLiftController.currentPlan().message); return; }
+  if (!simulationScope().comps.length) { transient('先放一個零件，再開始組裝'); return; }
+  if (taskApplies(gripperController) && !gripperController.currentPlan().ok) {
     transient(gripperController.currentPlan().message || '夾爪任務目前無法播放，請先修正尺寸或機構。');
     return;
   }
@@ -2211,7 +2226,7 @@ function pause() {
 }
 function togglePlay() {
   const bucketIssue=bucketPlaybackIssue(); if(bucketIssue){transient(bucketIssue);return;}
-  if (parallelLiftController?.isActive() && !parallelLiftController.currentPlan().ok) { transient(parallelLiftController.currentPlan().message); return; }
+  if (taskApplies(parallelLiftController) && !parallelLiftController.currentPlan().ok) { transient(parallelLiftController.currentPlan().message); return; }
   raf ? pause() : play();
 }
 
@@ -2473,8 +2488,8 @@ function currentBounds() {
       minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
     }
   });
-  const plan = gripperController?.isActive() ? gripperController.currentPlan() : null;
-  const object = gripperController?.reference();
+  const plan = taskApplies(gripperController) ? gripperController.currentPlan() : null;
+  const object = taskApplies(gripperController) ? gripperController.reference() : null;
   if (object) {
     minX = Math.min(minX, object.center.x - object.width / 2 - 15);
     maxX = Math.max(maxX, object.center.x + object.width / 2 + 15);
@@ -2655,8 +2670,8 @@ async function exportVideo() {
   if (videoExportLoading) return;
   if (S.mode !== 'design' || view3DActive) { transient('請先切回 2D 設計畫面，再匯出動畫'); return; }
   if (!S.comps.length || !hasDriveSource()) { transient('請先建立有動力的機構，再匯出動畫'); return; }
-  if (gripperController?.isActive() && !gripperController.currentPlan().ok) { transient('請先修正夾爪任務，再匯出動畫'); return; }
-  if (parallelLiftController?.isActive() && !parallelLiftController.currentPlan().ok) { transient('請先確認、取消或修正平行四連桿任務，再匯出動畫'); return; }
+  if (taskApplies(gripperController) && !gripperController.currentPlan().ok) { transient('請先修正夾爪任務，再匯出動畫'); return; }
+  if (taskApplies(parallelLiftController) && !parallelLiftController.currentPlan().ok) { transient('請先確認、取消或修正平行四連桿任務，再匯出動畫'); return; }
   videoExportLoading = true;
   try {
     const { exportAnimation } = await import('./video-export.js');
@@ -2925,7 +2940,7 @@ if (gripperPilotSession) window.blocks.gripperPilot = {
   prepare: request => gripperController.operations.prepare(request),
   confirm: () => gripperController.operations.confirm(),
   cancel: () => gripperController.operations.cancel(),
-  bucketPrepare: request => { const r=tippingBucketOperations.prepare(request); bucketOperationPending=r.ok; return r; },
+  bucketPrepare: request => { const r=tippingBucketOperations.prepare(request); bucketOperationPending=r.ok; bucketOperationFocus=S.designFocus; return r; },
   bucketConfirm: () => { const r=tippingBucketOperations.confirm(); bucketOperationPending=false; return r; },
   bucketCancel: () => { tippingBucketOperations.cancel(); bucketOperationPending=false; },
   parallelPrepare: request => parallelLiftController.operations.prepare(request),

@@ -548,8 +548,8 @@ export function createGearEditor({
 
   // 有限齒條不是無限長齒條：接觸點跑到齒條端部之外時，真實機構就會脫離嚙合。
   // 播放時把 theta 限在接觸點仍落在齒條齒面內的範圍，讓齒條齒輪範例推到端點前反向。
-  function rackPinionThetaRange() {
-    const racks = S.comps.filter(c => c.type === 'rack' && c.p1?.id && c.pinion);
+  function rackPinionThetaRange(comps = S.comps) {
+    const racks = comps.filter(c => c.type === 'rack' && c.p1?.id && c.pinion);
     if (!racks.length) return null;
     let lo = -Infinity;
     let hi = Infinity;

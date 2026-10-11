@@ -120,4 +120,7 @@ motorTools.driveGearAt(driver.id);
 // 註：現行 driveGearAt 先 setBanner 再 cancelMotorMode（會清 banner），警告實際不會停留——照現行為驗收。
 check('線性致動器不能驅動齒輪（僅取消放置、不指派）', !driver.p1.physicalMotor && S.placingMotor === false);
 
+S.comps=[bar]; S.activeMotor='1';
+check('局部分頁不借用隱藏伺服行程', motorTools.inputRockRange([])===null);
+check('局部分頁仍採用自身伺服行程', JSON.stringify(motorTools.inputRockRange([bar]))==='{"lo":0,"hi":90}');
 report('motor-tools');

@@ -342,19 +342,19 @@ export function createMotorTools({
   // 目前「控制中的馬達」若是有限行程的輸入（MG995 伺服角度範圍，或線性致動器的行程），
   // 回它來回擺的兩端（S.theta 座標系）；否則 null。play() 用它把整圈轉覆寫成來回擺。
   // 多馬達時只看 active 那顆——其他馬達凍結不動，不該影響播放範圍。
-  function inputRockRange() {
+  function inputRockRange(comps = S.comps) {
     const active = String(S.activeMotor || '1');
     const motorIdOf = (c) => String(c.physicalMotor || c.physical_motor || '1');
-    const servo = servoRange(S.comps, active);
+    const servo = servoRange(comps, active);
     if (servo) return servo;
-    const slider = S.comps.find(c => c.type === 'slider' && c.isInput && motorIdOf(c) === active);
+    const slider = comps.find(c => c.type === 'slider' && c.isInput && motorIdOf(c) === active);
     if (slider) {
       const stroke = Math.max(0, sliderTravelEnd(slider) - sliderTravelStart(slider));
       return { lo: 0, hi: stroke };
     }
     // 齒條行程只在 active 馬達帶動齒條的小齒輪（含嚙合鏈）時才適用
-    if (rackDrivenBy(S.comps, active)) {
-      const rackRange = rackPinionThetaRange();
+    if (rackDrivenBy(comps, active)) {
+      const rackRange = rackPinionThetaRange(comps);
       if (rackRange) return rackRange;
     }
     return null;
