@@ -39,3 +39,21 @@
 .example-entry-dialog { max-width: min(420px, 85vw); border:1px solid #b8c9db; border-radius:12px; padding:20px; color:#24496e; }
 .example-entry-dialog::backdrop { background:#0005; }
 .example-entry-dialog button { margin:6px 8px 0 0; min-height:44px; padding:8px 16px; cursor:pointer; }
+/* 新增工具與作品修改分開；工具收合時保留可見入口。 */
+.part-palette:has(#creationTools:not([open])) { width:100px; }
+#creationTools { width:100%; min-width:0; }
+#creationTools summary { cursor:pointer; min-height:40px; padding:10px 6px; font-weight:700; color:#24496e; }
+.creation-hint { margin:4px 0 10px; color:#60758a; font-size:12px; line-height:1.5; }
+.creation-items { display:grid; grid-template-columns:1fr; gap:8px; margin-bottom:8px; }
+.creation-items .block { width:100%; font-family:inherit; color:inherit; }
+.creation-category { border-top:1px solid #e6e9f0; margin-top:6px; }
+#cancelCreation { position:sticky; bottom:0; flex-shrink:0; min-height:40px; border:1px solid #bccbdb; border-radius:8px; background:white; color:#24496e; cursor:pointer; }
+@media (max-width:700px), (max-width:1099px) and (max-height:500px) {
+  .part-palette, .part-palette:has(#creationTools:not([open])) { width:100%; flex:0 0 auto; max-height:30vh; flex-direction:column; overflow-y:auto; }
+  .part-palette:has(#creationTools:not([open])) { padding-top:0; padding-bottom:0; }
+  #creationTools summary { min-height:40px; padding:8px; }
+  .creation-items, #creationModules .tray-section-items { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+  .creation-items .block, #creationModules .block { width:100%; min-width:0; min-height:44px; padding:8px 4px; }
+  .creation-items .ico { font-size:18px; }
+  .creation-hint { margin:0 8px 6px; }
+}

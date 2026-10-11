@@ -1,4 +1,5 @@
 import {createMateCandidate} from './mate-candidate.js';
+import {createCreationPalette} from './creation-palette.js';
 import {validateSupports} from './support-validation.js';
 import {prepareConnectionWork} from './connection-work.js';
 import {usesFaceExport,faceFileExportData,createFaceExportCoordinator,faceBuildPackHtml} from './face-export.js';
@@ -259,6 +260,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   document.getElementById('thetaVal').textContent = '0';
   updateMotorDirectionButton();
   exampleController.snapshotApplied(norm, source);
+  if(source!=='undo')creationPalette.reset();
   bucketOperationPending=false; tippingBucketOperations?.cancel();
   gripperController?.sync();
   parallelLiftController?.sync();
@@ -281,9 +283,10 @@ function normalizeIncomingSnapshot(raw) {
 
 const exampleController = createExampleController({
   applySnapshot, notify: transient, closeMobileMenu: closeMobileOpenMenu,
-  isMobile: () => mobilePrompt(), showBuildPanel: () => setMobilePanel('build')
+  isMobile: () => mobilePrompt(), showBuildPanel: () => setMobilePanel('build', {expandTools:false})
 });
 const populateExamples = () => exampleController.populate();
+const creationPalette=createCreationPalette({cancel:()=>{Tools.exitDrawLink();Tools.exitDrawTriangle();Tools.exitDrawPolygon();cancelMotorMode();draw();}});
 const loadExample = id => exampleController.load(id);
 
 // ---- 綁定層：把純模組綁到本檔狀態，維持原呼叫端不變 ----
@@ -1430,6 +1433,7 @@ function drawNow() {
   syncModulePlates();   // G1：作品內容變了才讓固定板 home 幾何作廢（θ 不算內容）
   validateViewPlane();
   designTabsUi.render();   // H1：設計分頁列
+  creationPalette.sync({key:S.designFocus || ROOT_TAB,count:viewComps().length,drawing:!!(S.drawingLink||S.drawingTriangle||S.drawingPolygon)});
   document.getElementById('hint').style.display = viewComps().length ? 'none' : 'block';   // 焦點分頁是空的也要提示
   const planeHint = document.getElementById('viewPlaneHint');
   if (planeHint) {
@@ -1864,9 +1868,10 @@ for (const panel of document.querySelectorAll('.inspector-panel')) {
 
 }
 
-function setMobilePanel(panel) {
+function setMobilePanel(panel, {expandTools=true} = {}) {
   const next = ['build', 'edit', 'view', 'project'].includes(panel) ? panel : 'build';
   document.body.dataset.mobilePanel = next;
+  if(next==='build' && expandTools)document.getElementById('creationTools').open=true;
   if (next !== 'edit') closeMobileEditPanel();
   if (next !== 'project') closeMobileOpenMenu();
   syncMobilePanelTabs(next);
@@ -2862,7 +2867,7 @@ function init() {
     if (local && local.comps.length) { applySnapshot(local, { recordUndo: false, source: 'local-autosave' }); loaded = true; }
   }
   if (!loaded) { rebuild(); draw(); }
-  setMobilePanel('build');
+  setMobilePanel('build', {expandTools:false});
   updateUndoBtn();
   syncFrameOptionButtons();
   offerExampleFromUrl({ loadExample, notify: transient });

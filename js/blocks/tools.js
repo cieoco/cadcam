@@ -475,8 +475,8 @@ export function startDrawPolygon() {
   S.polygonPreview = View.worldFromScreen(W * 0.5, H * 0.5);
   svg.style.cursor = 'crosshair';
   setBanner(promptText(
-    '桿件：左鍵放孔，右鍵完成（2 孔＝連桿、3 孔＝三點桿）',
-    '桿件：點一下放孔；點回第一孔完成'
+    '板件：前三點放主孔，後續加外形；右鍵完成（2 孔為連桿）',
+    '板件：前三點放主孔，後續加外形；點回第一孔完成'
   ));
   draw();
 }
