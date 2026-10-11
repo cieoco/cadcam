@@ -6,6 +6,7 @@
  */
 
 import { normalizeMemberStock } from './member-stock.js';
+import { normalizeProjectName } from './project-name.js';
 import { normalizeFrameStock } from './frame-stock.js';
 import { normalizeFabricationProfile } from './fabrication-profile.js';
 import { normalizeModules } from './module-schema.js?v=20261007_singleface';
@@ -305,6 +306,10 @@ export function toSnapshot(comps, topo, counter, motor) {
     comps: clone(comps || []),
     params: clone((topo && topo.params) ? topo.params : {})
   };
+  const projectName=normalizeProjectName(topo?.projectName);
+  if(projectName)snapshot.projectName=projectName;
+  const rootDesignName=normalizeProjectName(topo?.rootDesignName);
+  if(rootDesignName)snapshot.rootDesignName=rootDesignName;
   // 多馬達：目前控制中的馬達編號與其他馬達的凍結角度（度）。單馬達檔案兩者皆省略。
   if (motor && safeId(String(motor.activeMotor || '')) && String(motor.activeMotor) !== '1') {
     snapshot.activeMotor = String(motor.activeMotor);
@@ -566,7 +571,8 @@ export function normalizeSnapshot(obj) {
       if (safeId(k) && Number.isFinite(Number(obj.motorAngles[k]))) motorAngles[k] = Number(obj.motorAngles[k]);
     });
   }
-  return { comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
+  const projectName=normalizeProjectName(obj.projectName);
+  return { ...(projectName?{projectName}:{}), ...(normalizeProjectName(obj.rootDesignName)?{rootDesignName:normalizeProjectName(obj.rootDesignName)}:{}), comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
     fabrication: fabricationResult.status === 'present' ? fabricationResult.profile : null, modules: modulesResult.modules, warnings };
 }
 

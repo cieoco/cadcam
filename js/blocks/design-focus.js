@@ -35,7 +35,7 @@ export function designTabs(comps, modules, opts = {}) {
   }));
   const rootCount = counts.get(ROOT_TAB) || 0;
   if (rootCount > 0 || list.length === 0 || (opts && opts.keepRoot)) {
-    tabs.push({ id: ROOT_TAB, label: ROOT_LABEL, count: rootCount, mounted: false, orthogonal: false });
+    tabs.push({ id: ROOT_TAB, label: opts.rootName || ROOT_LABEL, count: rootCount, mounted: false, orthogonal: false });
   }
   return tabs;
 }

@@ -1,0 +1,21 @@
+import {prepareTaskSnapshot} from '../js/blocks/task-operation-support.js';
+import assert from 'node:assert/strict';
+import {normalizeProjectName} from '../js/blocks/project-name.js';
+import {toSnapshot,normalizeSnapshot} from '../js/blocks/schema.js';
+import {encodeSnapshot,decodeShareString} from '../js/share-codec.js';
+assert.equal(normalizeProjectName(' 一年13班 王同學.JSON '),'一年13班 王同學');
+assert.equal(normalizeProjectName('../CON:翻斗<>'), '.._CON_翻斗__');
+assert.equal(normalizeProjectName('CON'),'_CON');
+assert.equal(normalizeProjectName(' ... '),'');
+assert.equal(normalizeProjectName(null),'');
+assert.equal(normalizeProjectName('甲'.repeat(100)).length,40);
+const work=toSnapshot([],{params:{theta:0},projectName:'一年13班 王同學'},0);
+assert.equal(normalizeSnapshot(JSON.parse(JSON.stringify(work))).projectName,'一年13班 王同學');
+assert.equal(normalizeSnapshot(decodeShareString(encodeSnapshot(work))).projectName,work.projectName);
+assert.equal('projectName' in toSnapshot([],{params:{}},0),false);
+assert.equal('projectName' in normalizeSnapshot({comps:[],params:{}}),false);
+console.log('PASS name normalization, JSON/share round trip and unnamed legacy compatibility');
+
+const named=toSnapshot([],{params:{},projectName:'整體作品',rootDesignName:'底座'},0);
+assert.equal(normalizeSnapshot(decodeShareString(encodeSnapshot(named))).rootDesignName,'底座');
+assert.equal(prepareTaskSnapshot(named).ok,true);

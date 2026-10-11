@@ -86,6 +86,28 @@ try {
   await api.setMode('bench');
   api.togglePlay();
   check('組立仍保留完整範例契約拒絕不支援混合結構',!document.getElementById('playBtn').classList.contains('playing'));
+  await api.setMode('design');
+  api.gripperPilot.reopen({kind:'blocks',v:1,comps:[],params:{}});
+  const renameTo=name=>{
+    document.querySelector('[aria-label="重新命名設計"]').click();
+    document.getElementById('saveProjectName').value=name;
+    document.getElementById('saveProjectForm').requestSubmit();
+  };
+  renameTo('四連桿練習');
+  check('單頁改名同步作品與分頁',S.topo.projectName==='四連桿練習'&&api.designTabs()[0].label==='四連桿練習');
+  const named=api.gripperPilot.snapshot();api.gripperPilot.reopen(named);
+  check('保存重開保留名稱',api.designTabs()[0].label==='四連桿練習');
+  renameTo('另一個名字');api.undo();
+  check('改名一次復原',S.topo.projectName==='四連桿練習'&&api.designTabs()[0].label==='四連桿練習');
+  api.gripperPilot.reopen({...work,projectName:'升降作品'});api.setDesignFocus('#root');
+  renameTo('獨立四連桿');
+  check('多頁改名不改整份作品名',S.topo.projectName==='升降作品'&&api.designTabs().find(t=>t.id==='#root').label==='獨立四連桿');
+  api.setDesignFocus('Driver');renameTo('翻斗支架');
+  check('模組改名保留ID與接合',S.modules.find(m=>m.id==='Driver').name==='翻斗支架'&&S.modules.find(m=>m.id==='Floor').mount.to.module==='Driver');
+  const multi=api.gripperPilot.snapshot();api.gripperPilot.reopen(multi);
+  check('多頁重開保留作品和個別名稱',S.topo.projectName==='升降作品'&&S.topo.rootDesignName==='獨立四連桿'&&S.modules.find(m=>m.id==='Driver').name==='翻斗支架');
+  document.querySelector('[aria-label="重新命名設計"]').click();document.getElementById('saveProjectName').value='取消草稿';document.querySelector('#saveProjectDialog button[type="button"]').click();
+  check('取消不改名',S.modules.find(m=>m.id==='Driver').name==='翻斗支架');
 } catch (e) { check('測試執行完成：' + e.stack, false); }
 clearTimeout(S.autosaveTimer);
 window.parent.finishIsolationTest(`${lines.join('\n')}\n\n${passed} passed, ${failed} failed`);

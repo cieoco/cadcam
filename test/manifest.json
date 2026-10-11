@@ -194,7 +194,8 @@
     "test/touch-link-creation.mjs",
     "test/point-connection.mjs",
     "test/design-guide.mjs",
-    "test/simulation-scope.mjs"
+    "test/simulation-scope.mjs",
+    "test/project-name.mjs"
   ],
   "version": 1
 }

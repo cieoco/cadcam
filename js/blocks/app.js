@@ -1,4 +1,5 @@
 import {createSimulationScope} from './simulation-scope.js';
+import {normalizeProjectName} from './project-name.js';
 import {createMateCandidate} from './mate-candidate.js';
 import {createCreationPalette} from './creation-palette.js';
 import {createDesignGuide,guideFrameCandidate} from './design-guide.js';
@@ -227,7 +228,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   S.modules = Array.isArray(norm.modules) ? norm.modules : [];
   knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組
   if (source !== 'undo') S.designFocus = source === 'local-autosave' ? savedFocus() : null;   // 開檔／範例／分享 → 第一頁；自動還原 → 回到上次那頁
-  S.topo = { params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '' };
+  S.topo = { projectName: norm.projectName || '', rootDesignName: norm.rootDesignName || (!S.modules.length ? norm.projectName : '') || '', params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '' };
   manualTrace = {};
   S.counter = Math.max(norm.counter || 0, Store.highestIdNum(S.comps));
   S.theta = 0;
@@ -346,7 +347,7 @@ const HOST_BAND_MM = 3;               // 子視圖裡宿主側影帶的厚度
 const hasOrthogonalModules = () => S.modules.some(m => m.mount && (m.mount.orient || m.mount.face));
 // ---- 設計模式的焦點分頁（H1）：設計模式一次只畫／只編一個設計，組立模式才全部顯示 ----
 const inDesign = () => S.mode === 'design';
-const focusOpts = () => ({ keepRoot: S.designFocus === ROOT_TAB });   // 剛按「新設計」時，空的「未命名設計」分頁要留著
+const focusOpts = () => ({ keepRoot: S.designFocus === ROOT_TAB, rootName: S.topo.rootDesignName });   // 剛按「新設計」時，空的「未命名設計」分頁要留著
 const focusModule = () => inDesign() ? (S.modules.find(m => m.id === S.designFocus) || null) : null;
 const FOCUS_KEY = 'cadcam.blocks.designFocus';   // 只記在這個瀏覽器：重新整理後回到同一頁（不進作品檔）
 function saveFocus() { if(benchmarkSession || gripperPilotSession)return;try { localStorage.setItem(FOCUS_KEY, String(S.designFocus)); } catch (_) {} }
@@ -454,8 +455,9 @@ function presetDesignFocus(id) {
 // 「＋ 新設計」：沒有根零件就直接給一張空白畫布；已有根零件要先存成模組。
 function newDesign() {
   const hasRootParts = compsInFocus(S.comps, S.modules, ROOT_TAB).length > 0;
+  if(!hasRootParts && S.modules.length && S.topo.rootDesignName){pushUndo();S.topo.rootDesignName='';scheduleAutosave();}
   setDesignFocus(ROOT_TAB);   // 先切換（會收掉畫圖工具與橫幅），再顯示提示
-  if (hasRootParts) transient('先把『未命名設計』存成模組（選取零件 → 🧩 存成模組），再開新設計');
+  if (hasRootParts) transient('先把目前設計存成模組（選取零件 → 🧩 存成模組），再開新設計');
 }
 function deleteDesign(id) {
   const tab = designTabs(S.comps, S.modules, focusOpts()).find(t => t.id === id);
@@ -506,6 +508,7 @@ const designTabsUi = createDesignTabs({
   active: inDesign,
   onFocus: id => setDesignFocus(id),
   onDelete: deleteDesign,
+  onRename: renameDesign,
   onNew: newDesign
 });
 function setViewPlane(id) {
@@ -962,6 +965,11 @@ function rebuild({save=true}={}) {
   // 六面候選與正式作品共用normalize → rebake → compile → refresh次序。
   const prepared=prepareConnectionWork(S.comps,S.modules,S.topo,{exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm});
   S.modules=prepared.modules;S.compiled=prepared.compiled;
+  const namedTabs=designTabs(S.comps,S.modules,focusOpts());
+  if(namedTabs.length===1){
+    const only=namedTabs[0],name=only.id===ROOT_TAB?S.topo.rootDesignName:only.label;
+    if(name)S.topo.projectName=normalizeProjectName(name);
+  }
   if(prepared.warnings.length)transient(prepared.warnings[0]);
   // 雙軌：求解改讀這份，繪製仍讀 S.compiled；沒有模組時維持 null，求解走原本的 S.compiled（不重複編譯）。
   S.assembly = S.modules.length ? compileAssembly(S.comps, S.modules, S.topo) : null;
@@ -2590,9 +2598,42 @@ function downloadAdapterStl() {
   });
   transient(`已下載 ${adapters.length} 個轉接座 STL`);
 }
-function saveFile() {
-  Store.downloadJson(Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()), 'blocks.json');
+let nameTarget=null;
+function openNameDialog(target){
+  nameTarget=target;
+  const dialog=document.getElementById('saveProjectDialog');
+  const input=document.getElementById('saveProjectName');
+  const tabs=designTabs(S.comps,S.modules,focusOpts());
+  input.value=target ? tabs.find(t=>t.id===target)?.label || '設計' : S.topo.projectName || (tabs.length===1?tabs[0].label:'機構作品');
+  document.getElementById('saveProjectTitle').textContent=target?'重新命名設計':'儲存作品';
+  document.getElementById('saveNameLabel').textContent=target?'分頁名稱':'作品名稱';
+  document.getElementById('saveNameHint').textContent=tabs.length===1?'單一設計：分頁名稱與作品檔名同步。':target?'只修改此分頁名稱，作品名稱維持不變。':'包含所有設計分頁，下載為 .json 檔。';
+  document.getElementById('saveNameSubmit').textContent=target?'確認改名':'下載存檔';
+  dialog.showModal();input.focus();input.select();
 }
+function renameDesign(id){openNameDialog(id);}
+function saveFile(){openNameDialog(null);}
+function setDesignName(id,name){
+  if(id===ROOT_TAB)S.topo.rootDesignName=name;
+  else S.modules=S.modules.map(m=>m.id===id?{...m,name}:m);
+}
+document.getElementById('saveProjectForm').addEventListener('submit',event=>{
+  event.preventDefault();
+  const name=normalizeProjectName(document.getElementById('saveProjectName').value);
+  if(!name){document.getElementById('saveNameHint').textContent='請輸入有效名稱。';return;}
+  const tabs=designTabs(S.comps,S.modules,focusOpts());
+  const changesProject=(!nameTarget||tabs.length===1)&&S.topo.projectName!==name;
+  const tabToRename=nameTarget || (tabs.length===1?tabs[0].id:null);
+  const changesTab=tabToRename && tabs.find(t=>t.id===tabToRename)?.label!==name;
+  if(changesProject||changesTab)pushUndo();
+  if(nameTarget)setDesignName(nameTarget,name);
+  else S.topo.projectName=name;
+  if(tabs.length===1){S.topo.projectName=name;setDesignName(tabs[0].id,name);}
+  scheduleAutosave();draw();
+  if(!nameTarget)Store.downloadJson(Store.toSnapshot(S.comps,S.topo,S.counter,motorSnapshotState()),name+'.json');
+  document.getElementById('saveProjectDialog').close();
+  transient(nameTarget?'已更新分頁名稱':`已下載 ${name}.json`);
+});
 // L4：機架（世界／模組）的孔與開口轉成 cnc-check 的零件形狀；無機架幾何回 null。
 function cncFramePart(name, nodes, settings, mounts) {
   const g = Exporters.inspectFrameExport(nodes, settings, mounts);
@@ -2845,6 +2886,7 @@ function openFile() {
         const incoming = normalizeIncomingSnapshot(JSON.parse(r.result));
         const norm = incoming.norm;
         if (!norm) { transient('⚠️ ' + incoming.error); return; }
+        if(!norm.projectName)norm.projectName=normalizeProjectName(f.name);
         applySnapshot(norm, { source: 'external' });
         // applySnapshot 已清除舊教學卡，或依任務 marker 恢復夾爪；不再覆寫其狀態。
         transient('📂 已開啟');

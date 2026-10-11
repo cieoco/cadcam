@@ -31,7 +31,7 @@ export function prepareTaskSnapshot(source, { allowAssembly = false } = {}) {
   const fail=(code,message,targets=[],changes=[])=>({ok:false,issues:[taskIssue(code,message,targets)],changes});
   if (!record(source) || source.kind !== 'blocks' || source.v !== 1 || !Array.isArray(source.comps) || !record(source.params)) return fail('INVALID_REQUEST', '修改需要完整 blocks v1 來源作品。');
   if (!jsonSafe(source)) return fail('INVALID_REQUEST', '來源包含非 JSON 資料，請先修復作品。');
-  const snapshotKeys = ['kind','v','counter','comps','params','tracePoint','tracePoints','referencePoint','activeMotor','motorAngles','fabrication','modules'];
+  const snapshotKeys = ['kind','v','counter','comps','params','tracePoint','tracePoints','referencePoint','activeMotor','motorAngles','fabrication','modules','projectName','rootDesignName'];
   const unknown = Object.keys(source).filter(k => !snapshotKeys.includes(k));
   if (unknown.length) return fail('NORMALIZATION_CHANGED', '目前作品保存流程不支援額外頂層欄位，確認可能丟失資料。', unknown);
   if (!allowAssembly && (source.modules?.length || source.comps.some(c => c?.moduleId))) return fail('UNSUPPORTED_STRUCTURE', '組立作品不在此任務操作範圍；原作品已保留。');
