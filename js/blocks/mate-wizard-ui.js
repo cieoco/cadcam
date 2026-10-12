@@ -31,6 +31,7 @@ export function createMateWizard(h) {
   let pv = null;   // 預覽：{ childId, mateId, host, name, refs, cand:{comps,modules}, hits, rev }
   let cache = { key: '', targets: new Map(), styles: new Map() };
   let treeSig = '', panelSig = '', panelAt = '';
+  const collapsedBranches = new Set(); // 僅收合清單，不改作品、3D 可見性或組立成員。
   const liveLine = el('div', 'mate-live'); liveLine.id = 'mateLive'; liveLine.setAttribute('aria-live', 'polite');   // 一行的干涉狀態（接上／拆下的上方）
   const sel = () => assemblyWork(S.comps,S.modules,S.topo).modules.find(m=>m.id===st.selected) || null;
   const params = () => S.topo.params;
@@ -141,7 +142,19 @@ export function createMateWizard(h) {
     }
     const rows = treeRows().map(r => ({ ...r, ...describe(r.m, r.role, r.depth) }));
     const names = rows.filter(r => r.role === 'spare').map(r => h.displayName(r.m.id));
-    const sig = JSON.stringify([rows.map(r => [r.m.id, h.displayName(r.m.id), r.depth, r.note, r.tag]), st.selected, names, S.topo.assemblyMembers, S.topo.rootDesignName, [...closedAssemblies]]);
+    const parents = new Map(rows.map(r => [r.m.id, r.parent]));
+    const ancestors = id => {
+      const chain = [], seen = new Set([id]);
+      for (let p = parents.get(id); p && !seen.has(p); p = parents.get(p)) { chain.push(p); seen.add(p); }
+      return chain;
+    };
+    // 從 3D 或其他入口選取時，自動展開通往該板件的路徑。
+    if (tree.dataset.selection !== (st.selected || '')) {
+      ancestors(st.selected).forEach(id => collapsedBranches.delete(id));
+      tree.dataset.selection = st.selected || '';
+    }
+    for (const id of collapsedBranches) if (!parents.has(id)) collapsedBranches.delete(id);
+    const sig = JSON.stringify([rows.map(r => [r.m.id, h.displayName(r.m.id), r.parent, r.depth, r.note, r.tag]), st.selected, names, S.topo.assemblyMembers, S.topo.rootDesignName, [...closedAssemblies], [...collapsedBranches]]);
     if (sig === treeSig) return;
     treeSig = sig;
     let note = document.getElementById('mateSpareNote');   // 還沒接上的提醒（沒有時整行藏起來）
@@ -171,16 +184,33 @@ export function createMateWizard(h) {
     if (!rows.length&&!active.comps.some(c=>!c.moduleId)) tree.appendChild(el('div', 'bench-empty', closed.length?'組立已收起，可由下方重新開啟。':'組立是空的，請按「加入設計」。'));
     rows.forEach(({ m, depth, note, tag }) => {
       const row = el('div', 'mate-tree-row' + (m.id === st.selected ? ' selected' : ''));
-      row.dataset.module = m.id; row.tabIndex = 0;
-      row.setAttribute('role', 'button'); row.setAttribute('aria-pressed', m.id === st.selected ? 'true' : 'false');
+      row.dataset.module = m.id;
+      row.hidden = ancestors(m.id).some(id => collapsedBranches.has(id));
       row.style.marginLeft = `${Math.min(depth, 4) * 14}px`;
+      const children = rows.filter(r => r.parent === m.id);
+      if (children.length) {
+        const toggle = el('button', 'mate-tree-toggle', collapsedBranches.has(m.id) ? '▸' : '▾');
+        toggle.type = 'button'; toggle.dataset.branch = m.id;
+        toggle.setAttribute('aria-label', `${collapsedBranches.has(m.id) ? '展開' : '收合'} ${h.displayName(m.id)}的子件`);
+        toggle.setAttribute('aria-expanded', String(!collapsedBranches.has(m.id)));
+        toggle.onclick = e => {
+          e.stopPropagation();
+          if (collapsedBranches.has(m.id)) collapsedBranches.delete(m.id); else collapsedBranches.add(m.id);
+          h.syncUI(true);
+          [...tree.querySelectorAll('[data-branch]')].find(b => b.dataset.branch === m.id)?.focus();
+        };
+        row.append(toggle);
+      } else row.append(el('span', 'mate-tree-leaf', '·'));
+      const content = el('div', 'mate-tree-content'); content.tabIndex = 0;
+      content.setAttribute('role', 'button'); content.setAttribute('aria-pressed', m.id === st.selected ? 'true' : 'false');
       const top = el('span', 'mate-tree-name'); top.appendChild(el('b', null, (depth ? '└ ' : '') + h.displayName(m.id)));
       if (tag) top.appendChild(el('small', 'mate-tree-tag', tag));
-      row.appendChild(top);
-      if (note) row.appendChild(el('small', 'mate-tree-note', note));
+      content.appendChild(top);
+      if (note) content.appendChild(el('small', 'mate-tree-note', note));
+      row.append(content);
       const go = () => { h.say('', { toast: false }); h.select(m.id); };
       row.addEventListener('click', go);
-      row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+      content.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
       tree.appendChild(row);
       const more=el('details');more.append(el('summary',null,'更多'));
       if(m.id===st.selected){
@@ -197,7 +227,7 @@ export function createMateWizard(h) {
   }
   // 手機：清單最多長到 3 列，再多就在清單裡捲動（選中的列捲進來）；3D 畫面的上緣跟著清單的高度。
   function sizeTree(tree) {
-    const rs = [...tree.children].filter(x => x.classList.contains('mate-tree-row')), list = h.listEl();
+    const rs = [...tree.children].filter(x => x.classList.contains('mate-tree-row') && !x.hidden), list = h.listEl();
     tree.style.removeProperty('--mate-tree-h');
     if (rs.length > 3) { const t = tree.getBoundingClientRect(); tree.style.setProperty('--mate-tree-h', `${Math.round(rs[2].getBoundingClientRect().bottom - t.top + 2)}px`); }
     const sel = rs.find(x => x.classList.contains('selected'));
@@ -424,5 +454,5 @@ export function createMateWizard(h) {
     if (cs.length === 1) h.select(cs[0].id);
   }
 
-  return { advanced: () => adv, render, markers, pickKey, cancel, previewOf: () => pv ? pv.childId : null, ensureToggle, onEnter, debug, fit, syncLive };
+  return { resetTree() { collapsedBranches.clear(); treeSig = ''; }, advanced: () => adv, render, markers, pickKey, cancel, previewOf: () => pv ? pv.childId : null, ensureToggle, onEnter, debug, fit, syncLive };
 }

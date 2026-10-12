@@ -118,9 +118,7 @@ export function createRigidGroupsUI(h) {
         }
       }
     }
-    // 收合群組只隱藏其結構板列；包含馬達／支架的宿主模組保持獨立。
-    const hidden = new Set(all.filter(e => !(e.key === selected && editing)).flatMap(e => (e.saved && rigidGroupInterface(S.comps, S.modules, e.host.id, e.group.id).independent) ? [e.host.id, ...e.group.members] : e.group.members));
-    list.querySelectorAll('[data-module]').forEach(row => { row.hidden = hidden.has(row.dataset.module); });
+    // 組件操作與結構樹並存；板件可見性由結構樹的展開／收合控制。
     const panel = document.getElementById('benchPanel');
     if (panel) panel.hidden = !!current() && !editing;
   }
@@ -128,9 +126,7 @@ export function createRigidGroupsUI(h) {
     render,
     reset() { selected = ''; editing = false; signature = ''; pending = null; session.cancel(); },
     memberSelected(id) {
-      const entry = entries().find(e => e.group.members.includes(id));
-      if (entry && !editing) { selected = entry.key; return true; }
-      if (!editing) selected = '';
+      selected = ''; editing = false;
       return false;
     },
     keys() {

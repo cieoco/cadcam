@@ -1321,7 +1321,7 @@ export function createBench(deps) {
   syncModeButtons();
   return {
     inCandidate:()=>isCand() || !!st.preview || !!wiz?.previewOf(),
-    workReplaced(){rigidGroups.reset();deps.setCandidate?.(null);st.msg='';st.preview=null;st.faceStep=null;st.snapId=null;panelSig='';listSig='';resetLive();clearTimeline();const msg=document.getElementById('benchMsg');if(msg)msg.textContent='';},
+    workReplaced(){rigidGroups.reset();wiz.resetTree();deps.setCandidate?.(null);st.msg='';st.preview=null;st.faceStep=null;st.snapId=null;panelSig='';listSig='';resetLive();clearTimeline();const msg=document.getElementById('benchMsg');if(msg)msg.textContent='';},
     mateWizardDebug: () => wiz.debug(),
     autosaveSnapshot: () => st.preview ? JSON.parse(st.preview.preSnap) : null,
     setMode, select, pickPort, commit, cancel: () => cancelPreview(), adjust, syncUI, afterScene, debug,
