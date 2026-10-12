@@ -4,7 +4,7 @@
  * 設計模式舞台上方的分頁列：每個設計（模組／未命名設計）一個大按鈕，最後一顆「＋ 新設計」。
  * 只負責呈現與回呼；分頁清單與焦點由 app.js 提供（見 design-focus.js）。
  */
-export function createDesignTabs({ el, tabs, focus, active, onFocus, onNew, onDelete, onRename }) {
+export function createDesignTabs({ el, tabs, focus, active, onFocus, onNew, onClose, onRename, onList }) {
   let sig = '';
   let lastFocus = null;
 
@@ -56,16 +56,17 @@ export function createDesignTabs({ el, tabs, focus, active, onFocus, onNew, onDe
         rename.title='重新命名設計';rename.setAttribute('aria-label','重新命名設計');
         rename.onclick=()=>onRename(t.id);group.appendChild(rename);
       }
-      if (onDelete && (t.count || t.id !== '#root')) {
+      if (onClose && (t.count || t.id !== '#root')) {
         const close = button('design-tab-close', '×');
-        close.title = `刪除「${t.label}」整組設計`;
+        close.title = `關閉「${t.label}」分頁（保留設計）`;
         close.setAttribute('aria-label', close.title);
-        close.onclick = () => onDelete(t.id);
+        close.onclick = () => onClose(t.id);
         group.appendChild(close);
       }
       box.appendChild(group);
       if (t.id === cur) activeBtn = b;
     });
+    if(onList){const manage=button('design-tab','設計清單');manage.onclick=onList;box.appendChild(manage);}
     const add = button('design-tab design-tab-new', '＋ 新設計');
     add.dataset.tabId = '+new';
     add.title = '開一張空白設計';

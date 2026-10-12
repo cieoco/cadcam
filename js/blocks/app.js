@@ -227,6 +227,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   S.comps = norm.comps;
   S.modules = Array.isArray(norm.modules) ? norm.modules : [];
   knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組
+  if(source!=='undo')closedDesignTabs.clear();
   if (source !== 'undo') S.designFocus = source === 'local-autosave' ? savedFocus() : null;   // 開檔／範例／分享 → 第一頁；自動還原 → 回到上次那頁
   S.topo = { projectName: norm.projectName || '', rootDesignName: norm.rootDesignName || (!S.modules.length ? norm.projectName : '') || '', params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '' };
   manualTrace = {};
@@ -353,6 +354,7 @@ const FOCUS_KEY = 'cadcam.blocks.designFocus';   // 只記在這個瀏覽器：�
 function saveFocus() { if(benchmarkSession || gripperPilotSession)return;try { localStorage.setItem(FOCUS_KEY, String(S.designFocus)); } catch (_) {} }
 function savedFocus() { try { return localStorage.getItem(FOCUS_KEY); } catch (_) { return null; } }
 // 上一次 rebuild 時的零件 id 集合：用來認出「這次新畫的零件」。載入／復原／清空時設 null，避免把還原的零件誤判成新零件。
+const closedDesignTabs=new Set();
 let knownCompIds = null;
 // 焦點是模組時，新畫（沒有 moduleId）的零件歸到那個模組。就地改原零件物件，保留各處持有的參照。
 function adoptNewComps() {
@@ -433,6 +435,7 @@ function clearSelectionAndEditors() {
 }
 // 切換設計分頁：收掉畫圖工具、取消選取、馬達改成這頁的、置中。keepSelection＝保留現有選取（插入模組後選到新零件）。
 function setDesignFocus(id, { fit = true, keepSelection = false } = {}) {
+  closedDesignTabs.delete(id);
   S.designFocus = id;
   saveFocus();
   if (!inDesign()) return;
@@ -449,6 +452,7 @@ function setDesignFocus(id, { fit = true, keepSelection = false } = {}) {
 // 預先指定焦點（插入模組時：資料還沒 rebuild，先不畫）；真正的繪製由呼叫端接著做。
 function presetDesignFocus(id) {
   if (!inDesign()) return;
+  closedDesignTabs.delete(id);
   S.designFocus = id;
   saveFocus();
 }
@@ -458,6 +462,27 @@ function newDesign() {
   if(!hasRootParts && S.modules.length && S.topo.rootDesignName){pushUndo();S.topo.rootDesignName='';scheduleAutosave();}
   setDesignFocus(ROOT_TAB);   // 先切換（會收掉畫圖工具與橫幅），再顯示提示
   if (hasRootParts) transient('先把目前設計存成模組（選取零件 → 🧩 存成模組），再開新設計');
+}
+// 分頁開關只管理編輯視窗，不改作品、接合或 undo。
+async function closeDesignTab(id){
+  const tabs=designTabs(S.comps,S.modules,focusOpts());
+  closedDesignTabs.add(id);
+  if(id===S.designFocus){
+    const next=tabs.find(t=>!closedDesignTabs.has(t.id));
+    if(next)setDesignFocus(next.id);
+    else {pause();clearSelectionAndEditors();await bench.setMode('bench');closedDesignTabs.add(id);}
+  }
+  designTabsUi.render();
+}
+function openDesignList(){
+  const list=document.getElementById('designListItems');list.replaceChildren();
+  for(const tab of designTabs(S.comps,S.modules,focusOpts())){
+    const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;align-items:center;margin:8px 0;';
+    const label=document.createElement('span');label.textContent=tab.label+(closedDesignTabs.has(tab.id)?'（已關閉）':'');label.style.cssText='flex:1;min-width:0;overflow-wrap:anywhere;';row.append(label);
+    const open=document.createElement('button');open.textContent='開啟';open.style.cssText='min-height:44px;flex-shrink:0;';open.onclick=async()=>{document.getElementById('designListDialog').close();await bench.setMode('design');setDesignFocus(tab.id);};row.append(open);
+    const remove=document.createElement('button');remove.textContent='刪除設計';remove.style.cssText='min-height:44px;flex-shrink:0;';remove.disabled=!!S.modules.find(m=>m.id===tab.id)?.mount || S.modules.some(m=>m.mount?.to?.module===tab.id);remove.title=remove.disabled?'已有組立連接，請先到組立台拆下':'刪除資料（可復原）';remove.onclick=()=>{deleteDesign(tab.id);openDesignList();};row.append(remove);list.append(row);
+  }
+  const dialog=document.getElementById('designListDialog');if(!dialog.open)dialog.showModal();
 }
 function deleteDesign(id) {
   const tab = designTabs(S.comps, S.modules, focusOpts()).find(t => t.id === id);
@@ -503,11 +528,12 @@ function fitForMate() {   // 置中時多留箭頭的位置：箭頭是固定畫
 }
 const designTabsUi = createDesignTabs({
   el: () => document.getElementById('designTabs'),
-  tabs: () => designTabs(S.comps, S.modules, focusOpts()),
+  tabs: () => {closedDesignTabs.delete(S.designFocus);return designTabs(S.comps, S.modules, focusOpts()).filter(t=>!closedDesignTabs.has(t.id));},
   focus: () => S.designFocus,
   active: inDesign,
   onFocus: id => setDesignFocus(id),
-  onDelete: deleteDesign,
+  onClose: closeDesignTab,
+  onList: openDesignList,
   onRename: renameDesign,
   onNew: newDesign
 });
@@ -1483,6 +1509,7 @@ function drawNow() {
   mateTool.sync();   // M2：換分頁／模式或開始畫圖時關掉接合面工具，並更新按鈕
   syncModulePlates();   // G1：作品內容變了才讓固定板 home 幾何作廢（θ 不算內容）
   validateViewPlane();
+  document.getElementById('designListBench').style.display=inDesign()?'none':'';
   designTabsUi.render();   // H1：設計分頁列
   creationPalette.sync({key:S.designFocus || ROOT_TAB,count:viewComps().length,drawing:!!(S.drawingLink||S.drawingTriangle||S.drawingPolygon)});
   designGuide.sync(viewComps(),S.selectedNodeId||S.selectedLinkId||S.selectedTriangleId,S.mode);
@@ -2132,6 +2159,7 @@ function clearAll() {
   pushUndo();
   pause();
   mateTool.reset();
+  closedDesignTabs.clear();
   S.comps = []; S.theta = 0; S.counter = 0;
   knownCompIds = null; S.designFocus = ROOT_TAB;
   S.activeMotor = '1'; S.motorAngles = {};
@@ -2960,7 +2988,7 @@ function init() {
   offerExampleFromUrl({ loadExample, notify: transient });
 }
 
-window.blocks = { exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample };
+window.blocks = { openDesignList, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample };
 window.blocks.changeFrameGround = changeFrameGround;
 window.blocks.setFrameSize = setFrameSize;
 // H1 除錯／測試：設計模式目前看得到的零件與點（畫面實際畫的那一份）。

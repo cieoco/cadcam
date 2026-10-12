@@ -108,6 +108,21 @@ try {
   check('多頁重開保留作品和個別名稱',S.topo.projectName==='升降作品'&&S.topo.rootDesignName==='獨立四連桿'&&S.modules.find(m=>m.id==='Driver').name==='翻斗支架');
   document.querySelector('[aria-label="重新命名設計"]').click();document.getElementById('saveProjectName').value='取消草稿';document.querySelector('#saveProjectDialog button[type="button"]').click();
   check('取消不改名',S.modules.find(m=>m.id==='Driver').name==='翻斗支架');
+  const beforeClose=JSON.stringify(api.gripperPilot.snapshot()),undoCount=S.undoStack.length;
+  const closeActive=async()=>{document.querySelector('.design-tab-group.active button[aria-label^="關閉"]').click();await new Promise(resolve=>setTimeout(resolve,60));};
+  await closeActive();
+  check('關閉已組立分頁不改作品或undo',JSON.stringify(api.gripperPilot.snapshot())===beforeClose&&S.undoStack.length===undoCount);
+  check('關閉分頁從編輯列移除',!document.querySelector('[role="tab"][data-tab-id="Driver"]'));
+  api.openDesignList();
+  const row=[...document.querySelectorAll('#designListItems > div')].find(r=>r.textContent.includes('翻斗支架'));
+  row.querySelector('button').click();await new Promise(resolve=>setTimeout(resolve,60));
+  check('清單重開已關閉子設計',S.designFocus==='Driver'&&!!document.querySelector('[role="tab"][data-tab-id="Driver"]'));
+  while(S.mode==='design'&&document.querySelector('.design-tab-group.active button[aria-label^="關閉"]'))await closeActive();
+  check('最後分頁關閉回組立，接合資料保留',S.mode==='bench'&&['comps','modules','params','fabrication','projectName','rootDesignName'].every(k=>JSON.stringify(api.gripperPilot.snapshot()[k])===JSON.stringify(JSON.parse(beforeClose)[k])));
+  api.openDesignList();check('組立清單仍有全部子設計',document.querySelectorAll('#designListItems > div').length===5);
+  document.querySelector('#designListDialog > button').click();
+  api.gripperPilot.reopen(JSON.parse(beforeClose));await api.setMode('design');
+  check('保存重開恢復全部分頁入口',document.querySelectorAll('#designTabs [role="tab"]').length===5);
 } catch (e) { check('測試執行完成：' + e.stack, false); }
 clearTimeout(S.autosaveTimer);
 window.parent.finishIsolationTest(`${lines.join('\n')}\n\n${passed} passed, ${failed} failed`);
