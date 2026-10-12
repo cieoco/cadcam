@@ -1,4 +1,4 @@
-import {assemblyWork,designIds,changeAssemblyMembership,normalizeAssemblyMembers} from './assembly-membership.js';
+import {assemblyWork,designIds,assemblyFamily,changeAssemblyMembership,normalizeAssemblyMembers} from './assembly-membership.js';
 import {faceCandidateModel} from './face-candidate.js';
 import {validateAssemblyTask} from './assembly-task-validation.js';
 import {closedAssemblies, closedAssemblyIds} from './assembly-view.js';
@@ -483,8 +483,8 @@ function newDesign() {
   setDesignFocus(ROOT_TAB);   // 先切換（會收掉畫圖工具與橫幅），再顯示提示
   if (hasRootParts) transient('先把目前設計存成模組（選取零件 → 🧩 存成模組），再開新設計');
 }
-// 分頁開關只管理編輯視窗，不改作品、接合或 undo。
-async function closeDesignTab(id){
+// 有組立引用時可明確選擇僅關閉編輯頁；一般「關閉」會卸載工作區資料。
+async function hideDesignEditor(id){
   const tabs=designTabs(S.comps,S.modules,focusOpts());
   closedDesignTabs.add(id);
   if(id===S.designFocus){
@@ -494,18 +494,59 @@ async function closeDesignTab(id){
   }
   designTabsUi.render();
 }
+function closeDesignTab(id){
+  if(bench.inCandidate?.()){transient('請先確認或取消接合預覽');return;}
+  if(document.getElementById('closeDesignDialog'))return;
+  const tabs=designTabs(S.comps,S.modules,focusOpts()),tab=tabs.find(t=>t.id===id);
+  if(!tab)return;
+  pause();
+  const family=assemblyFamily(S.modules,id),joined=assemblyWork(S.comps,S.modules,S.topo);
+  const referenced=family.length>1 || (id===ROOT_TAB?joined.comps.some(c=>!c.moduleId):joined.modules.some(m=>m.id===id));
+  const before=snapshotStr();
+  const dialog=document.createElement('dialog');dialog.id='closeDesignDialog';dialog.setAttribute('aria-label','關閉設計');
+  dialog.style.cssText='width:min(440px,calc(100vw - 48px));max-height:80vh;overflow:auto;border:1px solid #bacddd;border-radius:12px;padding:20px;';
+  const title=document.createElement('h3');title.textContent=`關閉「${tab.label}」`;
+  const note=document.createElement('p');note.textContent='關閉後會退出目前工作區，之後存檔也不再包含它。尚未另存的內容請先存檔；不會刪除電腦上的檔案。';
+  dialog.append(title,note);
+  if(referenced){const info=document.createElement('p');info.textContent=family.length>1?'此設計有接合關係。為保留完整結構，退出工作區需連同下列設計一起關閉：':'此設計仍在目前組立中；關閉時也會從組立移除。';dialog.append(info);}
+  const names=document.createElement('ul');family.forEach(key=>{const item=document.createElement('li');item.textContent=tabs.find(t=>t.id===key)?.label || key;names.append(item);});dialog.append(names);
+  const valid=()=>{if(snapshotStr()===before)return true;dialog.close();transient('作品已變更，請重新選擇要關閉的設計');return false;};
+  const button=(text,action)=>{const b=document.createElement('button');b.textContent=text;b.type='button';b.onclick=action;dialog.append(b);return b;};
+  button('取消',()=>dialog.close());
+  button('先存檔…',()=>{if(!valid())return;dialog.close();saveFile();});
+  if(referenced)button('保留組立，只關閉編輯頁',()=>{if(!valid())return;dialog.close();hideDesignEditor(id);});
+  const close=button(family.length>1?'關閉整組並退出工作區':'關閉並退出工作區',()=>{if(!valid())return;dialog.close();unloadDesigns(family);transient('已退出工作區，可按復原還原；要再次使用也可重新讀入檔案。');});close.dataset.action='unload';
+  const undoNote=document.createElement('small');undoNote.textContent='退出工作區後，本次工作階段可按「復原」還原。先存檔只開啟存檔視窗，不會自動關閉設計。';undoNote.style.cssText='display:block;margin-top:12px;';dialog.append(undoNote);
+  dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
+}
 function openDesignList(){
   const list=document.getElementById('designListItems');list.replaceChildren();
-  for(const tab of designTabs(S.comps,S.modules,focusOpts())){
+  const joined=assemblyWork(S.comps,S.modules,S.topo);
+  const includedIds=new Set(joined.modules.map(m=>m.id));
+  if(joined.comps.some(c=>!c.moduleId))includedIds.add(ROOT_TAB);
+  const tabs=designTabs(S.comps,S.modules,focusOpts());
+  const active=document.createElement('section');active.setAttribute('aria-label','目前組立中的設計');
+  const heading=document.createElement('h3');heading.textContent=`目前組立（${tabs.filter(t=>includedIds.has(t.id)).length}）`;active.append(heading);
+  const retained=document.createElement('details');retained.id='retainedDesigns';
+  const summary=document.createElement('summary');summary.textContent=`未加入組立的設計（${tabs.filter(t=>!includedIds.has(t.id)).length}）`;summary.style.cssText='cursor:pointer;padding:12px 0;';retained.append(summary);
+  const hint=document.createElement('p');hint.textContent='這些圖稿仍保存在作品中，不會出現在組立模型，也不參與組立模擬。';retained.append(hint);
+  list.append(active,retained);
+  retained.open=inDesign();
+  if(!includedIds.size){const empty=document.createElement('p');empty.textContent='目前組立沒有設計。可展開下方清單加入。';active.append(empty);}
+  for(const tab of tabs){
     const row=document.createElement('div');row.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;';
+    row.dataset.designId=tab.id;
     row.style.borderBottom='1px solid #e2e8ef';row.style.paddingBottom='8px';
     const label=document.createElement('b');label.textContent=tab.label;label.style.cssText='flex-basis:100%;overflow-wrap:anywhere;';row.append(label);
-    const open=document.createElement('button');open.textContent='編輯';open.style.cssText='min-height:44px;flex-shrink:0;';open.onclick=async()=>{document.getElementById('designListDialog').close();await bench.setMode('design');setDesignFocus(tab.id);};row.append(open);
-    const joined=assemblyWork(S.comps,S.modules,S.topo);const included=tab.id===ROOT_TAB?joined.comps.some(c=>!c.moduleId):joined.modules.some(m=>m.id===tab.id);
+    const status=document.createElement('small');status.textContent=closedDesignTabs.has(tab.id)?'編輯分頁已關閉':'編輯分頁開啟中';status.style.cssText='flex-basis:100%;color:#60717d;';row.append(status);
+    const open=document.createElement('button');open.textContent=closedDesignTabs.has(tab.id)?'重新開啟編輯':'編輯';open.style.cssText='min-height:44px;flex-shrink:0;';open.onclick=async()=>{document.getElementById('designListDialog').close();await bench.setMode('design');setDesignFocus(tab.id);};row.append(open);
+    const included=includedIds.has(tab.id);
     const member=document.createElement('button');member.textContent=included?'從組立移除':'加入組立';member.style.cssText='min-height:44px;flex-shrink:0;';member.onclick=()=>{document.getElementById('designListDialog').close();requestAssemblyMembership(tab.id,!included);};row.append(member);
+    const close=document.createElement('button');close.textContent='關閉設計…';close.style.minHeight='44px';close.onclick=()=>{document.getElementById('designListDialog').close();closeDesignTab(tab.id);};row.append(close);
     const remove=document.createElement('button');remove.textContent='刪除設計';remove.style.cssText='min-height:44px;flex-shrink:0;';remove.disabled=!!S.modules.find(m=>m.id===tab.id)?.mount || S.modules.some(m=>m.mount?.to?.module===tab.id);remove.title=remove.disabled?'已有組立連接，請先到組立台拆下':'刪除資料（可復原）';remove.onclick=()=>{deleteDesign(tab.id);openDesignList();};
-    const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='更多';summary.style.cssText='min-height:44px;line-height:44px;cursor:pointer;';more.append(summary,remove);row.append(more);list.append(row);
+    const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='更多';summary.style.cssText='min-height:44px;line-height:44px;cursor:pointer;';more.append(summary,remove);row.append(more);(included?active:retained).append(row);
   }
+  retained.hidden=!tabs.some(t=>!includedIds.has(t.id));
   const dialog=document.getElementById('designListDialog');if(!dialog.open)dialog.showModal();
 }
 function requestAssemblyMembership(id,include){
@@ -531,14 +572,23 @@ function deleteDesign(id) {
     return;
   }
   if (!window.confirm(`刪除「${tab.label}」及其 ${tab.count} 個零件？其他設計會保留，可按復原還原。`)) return;
+  unloadDesigns([id]);
+}
+// 共用卸載入口：確認後一次復原，僅移除指定設計；不碰磁碟上的原始檔案。
+function unloadDesigns(ids) {
   pause(); pushUndo();
-  const removed = new Set(compsInFocus(S.comps, S.modules, id));
+  bench.workReplaced();
+  const targets=new Set(ids);
+  const removed = new Set(ids.flatMap(id=>compsInFocus(S.comps, S.modules, id)));
   const remaining = S.comps.filter(c => !removed.has(c));
   const retainedParams = new Set(remaining.flatMap(c => ownedParamKeys(c)));
   removed.forEach(c => ownedParamKeys(c).forEach(k => { if (!retainedParams.has(k)) delete S.topo.params[k]; }));
   S.comps = remaining;
-  S.modules = S.modules.filter(m => m.id !== id);
-  S.topo.assemblyMembers=(S.topo.assemblyMembers || []).filter(key=>key!==id);
+  S.modules = S.modules.filter(m => !targets.has(m.id));
+  S.topo.assemblyMembers=(S.topo.assemblyMembers || []).filter(key=>!targets.has(key));
+  ids.forEach(id=>{closedDesignTabs.delete(id);closedAssemblies.delete(id);});
+  if(targets.has(ROOT_TAB))S.topo.rootDesignName='';
+  if(!S.comps.length&&!S.modules.length){S.topo.params={theta:0};S.topo.projectName='';}
   const points = pointIdsOf(remaining);
   S.topo.tracePoints = (S.topo.tracePoints || []).filter(p => points.has(p));
   if (!points.has(S.topo.tracePoint)) S.topo.tracePoint = '';

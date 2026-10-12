@@ -58,7 +58,7 @@ export function createDesignTabs({ el, tabs, focus, active, onFocus, onNew, onCl
       }
       if (onClose && (t.count || t.id !== '#root')) {
         const close = button('design-tab-close', '×');
-        close.title = `關閉「${t.label}」分頁（保留設計）`;
+        close.title = `關閉設計「${t.label}」`;
         close.setAttribute('aria-label', close.title);
         close.onclick = () => onClose(t.id);
         group.appendChild(close);
