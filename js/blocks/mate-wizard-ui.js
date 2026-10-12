@@ -179,7 +179,7 @@ export function createMateWizard(h) {
       }
       if(m.id===st.selected && (m.mount || S.modules.some(child=>child.mount?.to?.module===m.id))){
         const remove=btn(m.mount?'從組立拆下…':'解除整組接合…','danger',()=>h.requestDetach(m.id));
-        remove.style.minHeight='44px';actions.appendChild(remove);
+        remove.style.minHeight='44px';const more=el('details');more.append(el('summary',null,'更多'),remove);actions.appendChild(more);
       }
     });
     sizeTree(tree);

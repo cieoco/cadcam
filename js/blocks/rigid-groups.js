@@ -84,3 +84,19 @@ export function dissolveRigidGroup(modules, hostId, groupId) {
     return next.length ? { ...rest, rigidGroups: next } : rest;
   }) };
 }
+
+// 人與 AI 共用的組件目錄；未命名候選由固定接合推得，不修改作品。
+export function rigidComponents(comps, modules) {
+  if(!Array.isArray(comps)||!Array.isArray(modules)||modules.some(m=>!m||typeof m!=='object'))return [];
+  const saved = modules.flatMap(host => (host.rigidGroups || []).map(group => ({host, group, key:`${host.id}/${group.id}`, saved:true})));
+  return [...saved, ...rigidGroupCandidates(comps, modules).map(c => ({host:modules.find(m=>m.id===c.hostId),group:c.group,key:`${c.hostId}/${c.group.id}`,saved:false}))];
+}
+
+export function nameRigidComponent(comps, modules, hostId, outputId, name) {
+  const value=cleanName(name);
+  if(!value)return {ok:false,reason:'請輸入組件名稱'};
+  const entry=rigidComponents(comps,modules).find(e=>e.host.id===hostId&&e.group.output===outputId);
+  if(!entry)return {ok:false,reason:'接合已變更，請重新選取組件'};
+  if(!entry.saved)return createRigidGroup(comps,modules,hostId,outputId,value);
+  return {ok:true,group:{...entry.group,name:value},modules:modules.map(m=>m.id===hostId?{...m,rigidGroups:m.rigidGroups.map(g=>g.id===entry.group.id?{...g,name:value}:g)}:m)};
+}

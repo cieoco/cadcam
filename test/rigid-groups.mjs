@@ -1,5 +1,5 @@
 import { tippingBucketSnapshot } from '../js/blocks/tipping-bucket-example.js';
-import { createRigidGroup, dissolveRigidGroup, inspectRigidGroup, rigidGroupCandidates, normalizeRigidGroups } from '../js/blocks/rigid-groups.js';
+import { rigidComponents, nameRigidComponent, createRigidGroup, dissolveRigidGroup, inspectRigidGroup, rigidGroupCandidates, normalizeRigidGroups } from '../js/blocks/rigid-groups.js';
 import { normalizeSnapshot, toSnapshot } from '../js/blocks/schema.js';
 import { encodeSnapshot, decodeShareString } from '../js/share-codec.js';
 import { faceCandidateModel } from '../js/blocks/face-candidate.js';
@@ -42,4 +42,13 @@ for (const angle of [0, -50, -100]) {
   const pose = w => faceCandidateModel({ work: w }, { theta: angle, motorAngles: { '1': angle } }).model.materialParts;
   check(`成組前後${angle}°材料／孔位／姿態完全相同`, JSON.stringify(pose(source)) === JSON.stringify(pose(work)));
 }
+const auto=rigidComponents(source.comps,source.modules);
+check('固定接合自動辨識，不修改snapshot',auto.length===1&&!auto[0].saved&&JSON.stringify(source)===before);
+const named=nameRigidComponent(source.comps,source.modules,'Driver','side','料斗');
+check('命名沿用既有群組格式',named.ok&&rigidComponents(source.comps,named.modules).length===1&&rigidComponents(source.comps,named.modules)[0].saved);
+check('空白名稱拒絕',!nameRigidComponent(source.comps,source.modules,'Driver','side','  ').ok);
+const renamed=nameRigidComponent(source.comps,named.modules,'Driver','side','新料斗');
+check('改名不改接合或重複成組',renamed.ok&&renamed.modules.find(m=>m.id==='Driver').rigidGroups.length===1&&renamed.modules.every((m,i)=>JSON.stringify(m.mount)===JSON.stringify(source.modules[i].mount)));
+const bad=structuredClone(source);bad.comps.find(c=>c.moduleId==='Back').p1.type='motor';
+check('含活動件不自動成組',rigidComponents(bad.comps,bad.modules).every(e=>!e.group.members.includes('Back')));
 report('rigid-groups');
