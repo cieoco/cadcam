@@ -25,7 +25,7 @@
 | 範例與教程 | `examples.js`、`example-controller.js`、`teaching*.html` | 已有；新 FTC 案例逐個加入，不一次擴充九類 |
 | AI 生成、共同命令契約、MCP | 本文件後續階段 | 規劃中；不得列為已可使用或已部署 |
 
-舊 [AI foundation](SDD-AI-FOUNDATION.md) 的 steps 導向契約只保留為歷史參考。AI 產生的 Blocks 草稿必須可用既有開啟流程編輯，不只在求解器中播放。
+舊 mechanism 的 [steps 格式規格](mechanism-format.md) 僅供相容性查考，不作為 Blocks 的生成契約。AI 產生的 Blocks 草稿必須可用既有開啟流程編輯，不只在求解器中播放。
 
 ## 3. 目標架構（逐案實現）
 

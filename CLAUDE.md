@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 開工時先讀根目錄 `AGENTS.md`；若執行工具不支援上面的引用語法，請直接開啟該檔。產品方向、範例驅動流程與 AI／教學界限只在該檔維護。下文保留 Claude 的技術導航；歷史描述與共用規則不一致時，以共用規則及當次使用者授權為準。
 
-具體新方向見 [Blocks／AI／教學 SDD](docs/SDD-BLOCKS-AI-TEACHING.md)。舊 `SDD-AI-FOUNDATION.md` 是 mechanism 流程的歷史文件，不是 Blocks 的生成契約。
+具體新方向見 [Blocks／AI／教學 SDD](docs/SDD-BLOCKS-AI-TEACHING.md)。舊 mechanism 的 steps 格式僅供相容性查考，見 [舊格式規格](docs/mechanism-format.md)，不是 Blocks 的生成契約。
 
 ## 這是什麼
 
