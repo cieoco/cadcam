@@ -1,3 +1,4 @@
+import {assemblyWork} from './assembly-membership.js';
 import { closedAssemblyIds } from './assembly-view.js';
 import { rigidGroupInterface, createRigidGroupInterfaceSession } from './rigid-group-interface.js';
 import { S } from './state.js';
@@ -14,7 +15,7 @@ export function createRigidGroupsUI(h) {
     if (!result.ok) { h.say(result.issues[0].message); return; }
     pending = { action, key: entry.key }; signature = ''; h.sync();
   }
-  const entries = () => rigidComponents(S.comps,S.modules).filter(e=>!closedAssemblyIds(S.modules).has(e.host.id));
+  const entries = () => rigidComponents(S.comps,S.modules).filter(e=>assemblyWork(S.comps,S.modules,S.topo).modules.some(m=>m.id===e.host.id)&&!closedAssemblyIds(S.modules).has(e.host.id));
   const current = () => entries().find(e => e.key === selected);
   const button = (text, action) => {
     const b = document.createElement('button'); b.type = 'button'; b.textContent = text;
@@ -47,7 +48,7 @@ export function createRigidGroupsUI(h) {
     const all = entries(), active = current();
     if (!active) { selected = ''; editing = false; }
 
-    const sig = JSON.stringify([S.comps, S.modules, selected, editing, pending, h.busy(), [...closedAssemblyIds(S.modules)]]);
+    const sig = JSON.stringify([S.comps, S.modules, selected, editing, pending, h.busy(), S.topo.assemblyMembers, [...closedAssemblyIds(S.modules)]]);
     if (sig !== signature) {
       signature = sig; box.replaceChildren(); box.hidden = !all.length;
       for (const entry of all) {
@@ -90,7 +91,7 @@ export function createRigidGroupsUI(h) {
           else if (!info.host.mount?.orient && info.mounted) mount.append(button('拆下並回位', () => prepare(entry, 'detach')));
           else if (info.mode === 'coplanar') {
             const targets = document.createElement('select'); targets.setAttribute('aria-label', '群組安裝輸出端');
-            S.modules.filter(m => m.id !== host.id && !group.members.includes(m.id)).forEach(m => (m.outputs || []).forEach(o => {
+            assemblyWork(S.comps,S.modules,S.topo).modules.filter(m => m.id !== host.id && !group.members.includes(m.id)).forEach(m => (m.outputs || []).forEach(o => {
               const option = document.createElement('option'); option.value = JSON.stringify({ module: m.id, output: o.id }); option.textContent = `${m.name || m.id}／${o.name || o.id}`; targets.append(option);
             }));
             const gap=Number(S.topo.params.liftBucket)===1?document.createElement('input'):null;

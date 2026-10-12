@@ -1,3 +1,4 @@
+import {assemblyWork} from './assembly-membership.js';
 import {closedAssemblies, closedAssemblyIds} from './assembly-view.js';
 import { faceBracketStatus } from './face-bracket-extras.js';
 /**
@@ -31,7 +32,7 @@ export function createMateWizard(h) {
   let cache = { key: '', targets: new Map(), styles: new Map() };
   let treeSig = '', panelSig = '', panelAt = '';
   const liveLine = el('div', 'mate-live'); liveLine.id = 'mateLive'; liveLine.setAttribute('aria-live', 'polite');   // 一行的干涉狀態（接上／拆下的上方）
-  const sel = () => (st.selected && h.modOf(st.selected)) || null;
+  const sel = () => assemblyWork(S.comps,S.modules,S.topo).modules.find(m=>m.id===st.selected) || null;
   const params = () => S.topo.params;
   const opts = () => ({ joint: S.fabrication?.joint });
   const hostsOthers = m => S.modules.some(x => x && x.mount && x.mount.to && x.mount.to.module === m.id);
@@ -46,7 +47,7 @@ export function createMateWizard(h) {
   function targetsOf(id) {
     fresh();
     if (!cache.targets.has(id)) cache.targets.set(id, mateTargets(S.comps, S.modules, id, params()));
-    return cache.targets.get(id).filter(t=>!closedAssemblyIds(S.modules).has(t.module));
+    return cache.targets.get(id).filter(t=>assemblyWork(S.comps,S.modules,S.topo).modules.some(m=>m.id===t.module)&&!closedAssemblyIds(S.modules).has(t.module));
   }
   const okTargets = id => targetsOf(id).filter(t => t.ok);
   function stylesOf(id) {
@@ -123,7 +124,7 @@ export function createMateWizard(h) {
   // ---------------------------------------------------------------- 結構清單
   // 清單順序＝assemblyRoles().order：底座那串在前，未安裝的各串在後；role＝root｜machine｜spare。
   function treeRows() {
-    const r = assemblyRoles(S.modules), spare = new Set(r.spare);
+    const r = assemblyRoles(assemblyWork(S.comps,S.modules,S.topo).modules), spare = new Set(r.spare);
     return r.order.map(id => ({ m: h.modOf(id), depth: r.depth[id], parent: r.parent[id], role: id === r.root ? 'root' : spare.has(id) ? 'spare' : 'machine' })).filter(x => x.m && !closedAssemblyIds(S.modules).has(x.m.id));
   }
   function describe(m, role, depth) {
@@ -140,7 +141,7 @@ export function createMateWizard(h) {
     }
     const rows = treeRows().map(r => ({ ...r, ...describe(r.m, r.role, r.depth) }));
     const names = rows.filter(r => r.role === 'spare').map(r => h.displayName(r.m.id));
-    const sig = JSON.stringify([rows.map(r => [r.m.id, h.displayName(r.m.id), r.depth, r.note, r.tag]), st.selected, names, [...closedAssemblies]]);
+    const sig = JSON.stringify([rows.map(r => [r.m.id, h.displayName(r.m.id), r.depth, r.note, r.tag]), st.selected, names, S.topo.assemblyMembers, S.topo.rootDesignName, [...closedAssemblies]]);
     if (sig === treeSig) return;
     treeSig = sig;
     let note = document.getElementById('mateSpareNote');   // 還沒接上的提醒（沒有時整行藏起來）
@@ -150,16 +151,24 @@ export function createMateWizard(h) {
     let actions=document.getElementById('mateTreeActions');
     if(!actions){actions=el('div');actions.id='mateTreeActions';tree.after(actions);}
     actions.replaceChildren();
-    const closed=S.modules.filter(m=>closedAssemblies.has(m.id));
+    let membership=document.getElementById('assemblyMembership');
+    if(!membership){membership=el('div');membership.id='assemblyMembership';tree.before(membership);}
+    membership.replaceChildren();
+    const active=assemblyWork(S.comps,S.modules,S.topo);
+    if(active.comps.some(c=>!c.moduleId)){
+      const root=el('div');root.append(el('b',null,S.topo.rootDesignName || '未命名設計'),btn('從組立移除…','',()=>h.deps.changeMembership('#root',false)));membership.append(root);
+    }
+    membership.append(btn('加入設計…','',()=>h.deps.openDesignList()));
+    const closed=active.modules.filter(m=>closedAssemblies.has(m.id));
     if(closed.length){
       const list=el('details');list.id='closedAssemblyList';
       list.appendChild(el('summary',null,`已關閉組立（${closed.length}）`));
-      list.appendChild(el('p',null,'僅收起畫面；存檔、驗證與輸出仍包含全部作品。'));
+      list.appendChild(el('p',null,'僅收起畫面；仍參與組立驗證與輸出。'));
       closed.forEach(m=>list.appendChild(btn(`重新開啟：${h.displayName(m.id)}`,'',()=>h.reopenAssembly(m.id))));
       actions.appendChild(list);
     }
     while (tree.firstChild) tree.removeChild(tree.firstChild);
-    if (!rows.length) tree.appendChild(el('div', 'bench-empty', closed.length?'組立已關閉，可由下方重新開啟。':'作品裡還沒有機構。回「設計」從模組庫插入。'));
+    if (!rows.length&&!active.comps.some(c=>!c.moduleId)) tree.appendChild(el('div', 'bench-empty', closed.length?'組立已收起，可由下方重新開啟。':'組立是空的，請按「加入設計」。'));
     rows.forEach(({ m, depth, note, tag }) => {
       const row = el('div', 'mate-tree-row' + (m.id === st.selected ? ' selected' : ''));
       row.dataset.module = m.id; row.tabIndex = 0;
@@ -173,14 +182,16 @@ export function createMateWizard(h) {
       row.addEventListener('click', go);
       row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
       tree.appendChild(row);
-      if(m.id===st.selected && !m.mount){
-        const close=btn('關閉此組立','',()=>h.closeAssembly(m.id));close.style.minHeight='44px';
-        close.title='收起整組畫面，保留設計與接合';actions.appendChild(close);
+      const more=el('details');more.append(el('summary',null,'更多'));
+      if(m.id===st.selected){
+        const removeMember=btn('從組立移除…','',()=>h.deps.changeMembership(m.id,false));removeMember.style.minHeight='44px';actions.appendChild(removeMember);
+        if(!m.mount){const close=btn('收起畫面','',()=>h.closeAssembly(m.id));close.style.minHeight='44px';close.title='僅隱藏，仍參與模擬與檢查';more.append(close);}
       }
       if(m.id===st.selected && (m.mount || S.modules.some(child=>child.mount?.to?.module===m.id))){
         const remove=btn(m.mount?'從組立拆下…':'解除整組接合…','danger',()=>h.requestDetach(m.id));
-        remove.style.minHeight='44px';const more=el('details');more.append(el('summary',null,'更多'),remove);actions.appendChild(more);
+        remove.style.minHeight='44px';more.append(remove);
       }
+      if(more.children.length>1)actions.appendChild(more);
     });
     sizeTree(tree);
   }
@@ -246,7 +257,7 @@ export function createMateWizard(h) {
     const b = btn('接合預覽', 'primary', () => h.openFaces(mod)); b.id = 'benchFaceWizard'; root.appendChild(b);
     for(const target of okTargets(mod.id).filter(t=>t.kind==='bolt'))root.appendChild(btn(`${target.moduleName} · ${target.name} · 雙孔對鎖`,'',()=>pickTarget(target)));
     root.appendChild(el('div', 'bench-note', '帶入接合設定 → 微調 → 接上'));
-    if (assemblyRoles(S.modules).root !== mod.id) {
+    if (assemblyRoles(assemblyWork(S.comps,S.modules,S.topo).modules).root !== mod.id) {
       const mk = btn('設為底座', 'mate-root', () => h.apply({ comps: S.comps, modules: setAssemblyRoot(S.modules, mod.id) }, `「${h.displayName(mod.id)}」現在是底座`));
       mk.id = 'mateMakeRoot'; root.appendChild(mk);
     }
@@ -300,7 +311,7 @@ export function createMateWizard(h) {
     const msg = el('div', 'bench-msg', st.msg); msg.id = 'benchMsg'; msg.setAttribute('aria-live', 'polite');
     root.firstChild.after(liveLine, msg);   // 標題底下：一行干涉狀態，再來是訊息（拒絕的原因、拆下說明）
     root.appendChild(h.liveBox);   // 即時干涉＋全行程測試（預覽中檢查的是預覽的姿勢）
-    const support=validateSupports({comps:S.comps,modules:S.modules});
+    const support=validateSupports(assemblyWork(S.comps,S.modules,S.topo));
     if(support.fixedPoints.length || support.motors.length){
       const details=document.createElement('details'),summary=document.createElement('summary');
       details.id='supportValidation';summary.textContent=support.ok?'實體固定待驗證':'動力支撐有誤';details.appendChild(summary);
@@ -393,7 +404,7 @@ export function createMateWizard(h) {
       if (!t.ok) o.reason = t.reason; else Object.assign(o, at(ms.find(m => m.module === t.module && m.portId === t.portId)));
       return o;
     }) : [];
-    const roles = assemblyRoles(S.modules);
+    const roles = assemblyRoles(assemblyWork(S.comps,S.modules,S.topo).modules);
     const tree = treeRows().map(({ m, depth, parent, role }) => {
       const d = describe(m, role, depth);
       return { id: m.id, name: h.displayName(m.id), role, depth, parent, mateName: d.mate ? d.mate.name : '', style: mateStyle(S.modules, m.id), unmounted: !m.mount };
@@ -409,7 +420,7 @@ export function createMateWizard(h) {
     cache.key = ''; treeSig = ''; panelSig = '';
     const cur = st.selected && h.modOf(st.selected);
     if (adv || (cur && !cur.mount)) return;   // 沒選、或選的已經接好了（沒事可做）才自動選
-    const cs = S.modules.filter(m => m && !m.mount && okTargets(m.id).length);
+    const cs = assemblyWork(S.comps,S.modules,S.topo).modules.filter(m => m && !m.mount && okTargets(m.id).length);
     if (cs.length === 1) h.select(cs[0].id);
   }
 

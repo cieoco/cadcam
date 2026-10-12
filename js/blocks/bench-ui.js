@@ -1,3 +1,4 @@
+import {assemblyWork,mergeAssemblyWork} from './assembly-membership.js';
 import {closedAssemblies, closedAssemblyIds} from './assembly-view.js';
 import {createMaterialPoseStatus} from './material-pose-status.js';
 import { faceBracketStatus } from './face-bracket-extras.js';
@@ -121,7 +122,7 @@ export function createBench(deps) {
   // live：目前姿勢的檢查結果；plan：疊層＋隔圈的快取（只在作品內容變了才重算）；tl：全行程時間軸結果。
   const materialPose=createMaterialPoseStatus();
   const playing=()=>!!deps.isPlaying?.();
-  const hasMaterialMount=()=>S.modules.some(m=>m?.mount);
+  const hasMaterialMount=()=>assemblyWork(S.comps,S.modules,S.topo).modules.some(m=>m?.mount);
   const live = { plan: null, planKey: '', args: null, sig: '', findings: [], hits: [], labels: [], msg: '', keys: [], at: 0, timer: null, checks: 0, planBuilds: 0, ms: 0, ready: false, error: false };
   const tl = { result: null, ranges: null, key: '', summary: [], ms: 0 };
   let liveBox = null;
@@ -129,7 +130,7 @@ export function createBench(deps) {
   // 作品內容的便宜結構鍵：零件＋模組＋參數＋加工設定（theta 是姿勢不是作品內容，排除）。
   function workKey() {
     const { theta, ...params } = S.topo.params || {};
-    return JSON.stringify([S.comps, S.modules, params, S.fabrication]);
+    return JSON.stringify([S.comps, S.modules, params, S.fabrication,S.topo.assemblyMembers]);
   }
   function ensurePlan() {
     const key = workKey();
@@ -325,7 +326,7 @@ export function createBench(deps) {
   function runTimeline() { if(isCand()){say('請先確認或取消預覽，再檢查全行程');return null;}return runTimelineNow(); }
   function runTimelineNow() {
     if (!isBench()) return null;
-    if (S.modules.some(m => m?.mount?.face)) { say('六面接合僅支援目前單一姿態；全行程尚未支援'); return null; }
+    if (assemblyWork(S.comps,S.modules,S.topo).modules.some(m => m?.mount?.face)) { say('六面接合僅支援目前單一姿態；全行程尚未支援'); return null; }
     const st0 = ensurePlan();
     if (!st0.plan) { say('目前沒有可檢查的零件'); return null; }
     const args = interferenceArgs();
@@ -481,7 +482,7 @@ export function createBench(deps) {
     if (!isBench()) return [];
     if (wizardOn()) return wiz.markers();   // 精靈：只亮可接的承接面
     if (st.preview) return [];
-    return computeMarkers().filter(m => !closedAssemblyIds(S.modules).has(m.module) && (m.compatible || st.showAll));
+    return computeMarkers().filter(m => !closedAssemblyIds(S.modules).has(m.module) && assemblyWork(S.comps,S.modules,S.topo).modules.some(x=>x.id===m.module) && (m.compatible || st.showAll));
   }
   function toneOf(m) {
     if (m.key === st.snapId) return 'snap';
@@ -878,7 +879,7 @@ export function createBench(deps) {
     const mod = st.selected ? modOf(st.selected) : null;
     const markers = mod && !mod.mount ? computeMarkers() : [];
     const compat = markers.filter(m => m.compatible);
-    const shown = markers.filter(m => !closedAssemblyIds(S.modules).has(m.module) && (m.compatible || st.showAll));
+    const shown = markers.filter(m => !closedAssemblyIds(S.modules).has(m.module) && assemblyWork(S.comps,S.modules,S.topo).modules.some(x=>x.id===m.module) && (m.compatible || st.showAll));
     const sig = JSON.stringify([
       mod && mod.id, mod && mod.name, mod ? statusOf(mod) : '', !!st.preview, st.showAll,
       shown.map(m => [m.key, m.compatible, m.suggested]),
@@ -1285,13 +1286,14 @@ export function createBench(deps) {
   function openDefaultFaceWizard(mod, reselect = false, startAtPlacement = false) {
     if (st.preview) cancelPreview({ silent: true });
     deps.pause?.();
-    const modules = reselect ? S.modules.map(m => m.id === mod.id ? { ...m, mount: null } : m) : S.modules;
-    openFaceWizard({ comps: S.comps, modules, params: S.topo.params, childId: mod.id, wizard: true,
+    const active=assemblyWork(S.comps,S.modules,S.topo);
+    const modules = reselect ? active.modules.map(m => m.id === mod.id ? { ...m, mount: null } : m) : active.modules;
+    openFaceWizard({ comps: active.comps, modules, params: S.topo.params, childId: mod.id, wizard: true,
       initialMount: reselect ? mod.mount : null, startAtPlacement, joint: S.fabrication?.joint,
       exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,
-      fabrication:S.fabrication,readSource:()=>({comps:S.comps,modules:S.modules,topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint}),
+      fabrication:S.fabrication,readSource:()=>({...assemblyWork(S.comps,S.modules,S.topo),topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint}),
       readPose:()=>deps.connectionPose?.() || ({theta:S.theta,motorAngles:motorAnglesNow()}),say,
-      commit: (result,validation,candidate) => { const mutable=structuredClone(result);pushUndo(); S.comps=mutable.comps;S.modules=mutable.modules;S.topo=mutable.topo;rebuild({save:false});deps.adoptConnectionPose?.(candidate.points);draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? (validation?.status==='fail'?'已接上（有干涉），角碼固定孔已生成；請調整作品。':'已接上，角碼固定孔已生成；部分五金仍未檢查。') : '已定位，尚未固定。請查看下方固定方式說明。'); syncUI(true); }
+      commit: (result,validation,candidate) => { const mutable=mergeAssemblyWork(S.comps,S.modules,S.topo,structuredClone(result));pushUndo(); S.comps=mutable.comps;S.modules=mutable.modules;S.topo=mutable.topo;rebuild({save:false});deps.adoptConnectionPose?.(candidate.points);draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? (validation?.status==='fail'?'已接上（有干涉），角碼固定孔已生成；請調整作品。':'已接上，角碼固定孔已生成；部分五金仍未檢查。') : '已定位，尚未固定。請查看下方固定方式說明。'); syncUI(true); }
     });
   }
   wiz = createMateWizard({
@@ -1318,6 +1320,7 @@ export function createBench(deps) {
   });
   syncModeButtons();
   return {
+    inCandidate:()=>isCand() || !!st.preview || !!wiz?.previewOf(),
     workReplaced(){rigidGroups.reset();deps.setCandidate?.(null);st.msg='';st.preview=null;st.faceStep=null;st.snapId=null;panelSig='';listSig='';resetLive();clearTimeline();const msg=document.getElementById('benchMsg');if(msg)msg.textContent='';},
     mateWizardDebug: () => wiz.debug(),
     autosaveSnapshot: () => st.preview ? JSON.parse(st.preview.preSnap) : null,

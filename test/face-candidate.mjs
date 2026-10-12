@@ -90,7 +90,7 @@ class FE extends Element {
  constructor(tag='div'){super(tag);this.style={removeProperty(){},setProperty(){}};this.tag=tag;this.children=[];this.dataset={};this.textContent='';this.classList={add(){},remove(){},toggle(){},contains:name=>(this.className || '').split(' ').includes(name)};if(tag==='dialog')dialog=this;}
  set id(id){this._id=id;elements.set(id,this);}get id(){return this._id;}
  get firstChild(){return this.children[0] || null;}appendChild(c){this.children.push(c);return c;}append(...cs){cs.forEach(c=>this.appendChild(c));}
- prepend(c){this.children.unshift(c);}removeChild(c){this.children=this.children.filter(x=>x!==c);return c;}replaceChildren(...cs){this.children=cs;}after(){}contains(c){return this.children.includes(c);}querySelector(){return null;}querySelectorAll(){return [];}getBoundingClientRect(){return {width:390,height:844};}
+ prepend(c){this.children.unshift(c);}removeChild(c){this.children=this.children.filter(x=>x!==c);return c;}replaceChildren(...cs){this.children=cs;}after(){}before(){}contains(c){return this.children.includes(c);}querySelector(){return null;}querySelectorAll(){return [];}getBoundingClientRect(){return {width:390,height:844};}
 }
 globalThis.document={documentElement:new FE(),body:new FE(),createElement:t=>new FE(t),getElementById:id=>elements.get(id) || null,addEventListener(){},querySelector:()=>null};
 for(const id of ['benchList','benchPanel']){const node=new FE();node.id=id;}

@@ -1,3 +1,6 @@
+import {assemblyWork,designIds,changeAssemblyMembership,normalizeAssemblyMembers} from './assembly-membership.js';
+import {faceCandidateModel} from './face-candidate.js';
+import {validateAssemblyTask} from './assembly-task-validation.js';
 import {closedAssemblies, closedAssemblyIds} from './assembly-view.js';
 import {createSimulationScope} from './simulation-scope.js';
 import {normalizeProjectName} from './project-name.js';
@@ -160,10 +163,23 @@ let gripperController = null;
 let parallelLiftController = null;
 let tippingBucketOperations = null;
 let bucketOperationPending = false, bucketOperationFocus = null, bucketValidationKey = null, bucketValidationResult = null;
+let assemblyTaskKey=null,assemblyTaskResult=null;
+function scopedAssemblyTask(){
+  const scope=simulationScope();
+  if(inDesign()||scope.wholeWork)return null;
+  const snapshot=Store.toSnapshot(scope.comps,S.topo,S.counter,{...motorSnapshotState(),modules:scope.modules});
+  const key=taskSnapshotKey({...snapshot,params:{...snapshot.params,theta:0},motorAngles:{}});
+  if(key!==assemblyTaskKey){assemblyTaskKey=key;assemblyTaskResult=validateAssemblyTask(snapshot);}
+  return assemblyTaskResult;
+}
 function bucketPlaybackIssue(){
+  const task=scopedAssemblyTask();if(task&&!task.ok)return task.issues?.[0]?.message || '目前組立的教學任務尚未通過驗證。';
   if(bucketOperationPending && (simulationScope().wholeWork || S.designFocus===bucketOperationFocus))return '請先確認或取消候選再播放。';
-  if(!simulationScope().wholeWork || Number(S.topo?.params?.bucketAssembly)!==1)return null;
-  const snapshot=Store.toSnapshot(S.comps,S.topo,S.counter,motorSnapshotState());
+  const scope=simulationScope();
+  if(inDesign()&&!scope.wholeWork || Number(S.topo?.params?.bucketAssembly)!==1)return null;
+  // 被移出的翻斗不再限制其他設計；保留下來的翻斗仍須走原任務驗證。
+  if(!scope.modules.some(m=>m.id==='Driver')&&!scope.comps.some(c=>c.id==='LeftSide'))return null;
+  const snapshot=Store.toSnapshot(scope.comps,S.topo,S.counter,{...motorSnapshotState(),modules:scope.modules});
   const key=taskSnapshotKey({...snapshot,params:{...snapshot.params,theta:0},motorAngles:{}});
   if(key!==bucketValidationKey){bucketValidationKey=key;bucketValidationResult=planTippingBucket(snapshot);}
   return bucketValidationResult.ok?null:bucketValidationResult.issues[0]?.message;
@@ -231,7 +247,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組
   if(source!=='undo'){closedDesignTabs.clear();closedAssemblies.clear();}
   if (source !== 'undo') S.designFocus = source === 'local-autosave' ? savedFocus() : null;   // 開檔／範例／分享 → 第一頁；自動還原 → 回到上次那頁
-  S.topo = { projectName: norm.projectName || '', rootDesignName: norm.rootDesignName || (!S.modules.length ? norm.projectName : '') || '', params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '' };
+  S.topo = { assemblyMembers: norm.assemblyMembers ?? designIds(S.comps,S.modules), projectName: norm.projectName || '', rootDesignName: norm.rootDesignName || (!S.modules.length ? norm.projectName : '') || '', params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '' };
   manualTrace = {};
   S.counter = Math.max(norm.counter || 0, Store.highestIdNum(S.comps));
   S.theta = 0;
@@ -370,7 +386,8 @@ function adoptNewComps() {
 // 目前畫面要處理的零件：設計模式＝焦點分頁；組立模式＝目前平面（O3）。沒有模組／直角安裝時原樣回 S.comps（零行為改變）。
 function viewComps() {
   if (inDesign() && S.modules.length) return compsInFocus(S.comps, S.modules, S.designFocus);
-  return hasOrthogonalModules() ? compsInPlane(S.comps, S.modules, S.viewPlane) : S.comps;
+  const work=inDesign()?{comps:S.comps,modules:S.modules}:assemblyWork(S.comps,S.modules,S.topo);
+  return hasOrthogonalModules() ? compsInPlane(work.comps,work.modules,S.viewPlane) : work.comps;
 }
 // 結構、模式或分頁改變才重編譯；不能沿用上一頁的連續姿態種子。
 let simulationCache=null,simulationKey=null;
@@ -387,6 +404,7 @@ function taskApplies(controller){return simulationScope().wholeWork&&controller?
 // 目前畫面用到的點 id；沒有模組／直角安裝時回 null（代表全部）。
 function viewPointIds() {
   if (inDesign() && S.modules.length) return pointIdsOf(viewComps());
+  if(!inDesign())return pointIdsOf(viewComps());
   return hasOrthogonalModules() ? pointIdsInPlane(S.comps, S.modules, S.viewPlane) : null;
 }
 // 畫面用的機架固定銷：設計模式只算焦點分頁自己的（已安裝模組的底座由 drawModulePlates 畫）。
@@ -401,9 +419,9 @@ function viewMounts(list) {
 // 焦點分頁擁有的馬達編號（設計模式只列這些）；組立模式／沒有模組＝全部。
 function designMotorIds() {
   const all = usedMotorIds();
-  if (!(inDesign() && S.modules.length)) return all;
+  if (inDesign() && !S.modules.length) return all;
   const own = new Set();
-  viewComps().forEach(c => [c, c.p1, c.p2, c.p3].forEach(o => {
+  (inDesign()?viewComps():assemblyWork(S.comps,S.modules,S.topo).comps).forEach(c => [c, c.p1, c.p2, c.p3].forEach(o => {
     const v = o && (o.physicalMotor || o.physical_motor);
     if (v) own.add(String(v));
   }));
@@ -479,12 +497,30 @@ async function closeDesignTab(id){
 function openDesignList(){
   const list=document.getElementById('designListItems');list.replaceChildren();
   for(const tab of designTabs(S.comps,S.modules,focusOpts())){
-    const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;align-items:center;margin:8px 0;';
-    const label=document.createElement('span');label.textContent=tab.label+(closedDesignTabs.has(tab.id)?'（已關閉）':'');label.style.cssText='flex:1;min-width:0;overflow-wrap:anywhere;';row.append(label);
-    const open=document.createElement('button');open.textContent='開啟';open.style.cssText='min-height:44px;flex-shrink:0;';open.onclick=async()=>{document.getElementById('designListDialog').close();await bench.setMode('design');setDesignFocus(tab.id);};row.append(open);
-    const remove=document.createElement('button');remove.textContent='刪除設計';remove.style.cssText='min-height:44px;flex-shrink:0;';remove.disabled=!!S.modules.find(m=>m.id===tab.id)?.mount || S.modules.some(m=>m.mount?.to?.module===tab.id);remove.title=remove.disabled?'已有組立連接，請先到組立台拆下':'刪除資料（可復原）';remove.onclick=()=>{deleteDesign(tab.id);openDesignList();};row.append(remove);list.append(row);
+    const row=document.createElement('div');row.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;';
+    row.style.borderBottom='1px solid #e2e8ef';row.style.paddingBottom='8px';
+    const label=document.createElement('b');label.textContent=tab.label;label.style.cssText='flex-basis:100%;overflow-wrap:anywhere;';row.append(label);
+    const open=document.createElement('button');open.textContent='編輯';open.style.cssText='min-height:44px;flex-shrink:0;';open.onclick=async()=>{document.getElementById('designListDialog').close();await bench.setMode('design');setDesignFocus(tab.id);};row.append(open);
+    const joined=assemblyWork(S.comps,S.modules,S.topo);const included=tab.id===ROOT_TAB?joined.comps.some(c=>!c.moduleId):joined.modules.some(m=>m.id===tab.id);
+    const member=document.createElement('button');member.textContent=included?'從組立移除':'加入組立';member.style.cssText='min-height:44px;flex-shrink:0;';member.onclick=()=>{document.getElementById('designListDialog').close();requestAssemblyMembership(tab.id,!included);};row.append(member);
+    const remove=document.createElement('button');remove.textContent='刪除設計';remove.style.cssText='min-height:44px;flex-shrink:0;';remove.disabled=!!S.modules.find(m=>m.id===tab.id)?.mount || S.modules.some(m=>m.mount?.to?.module===tab.id);remove.title=remove.disabled?'已有組立連接，請先到組立台拆下':'刪除資料（可復原）';remove.onclick=()=>{deleteDesign(tab.id);openDesignList();};
+    const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='更多';summary.style.cssText='min-height:44px;line-height:44px;cursor:pointer;';more.append(summary,remove);row.append(more);list.append(row);
   }
   const dialog=document.getElementById('designListDialog');if(!dialog.open)dialog.showModal();
+}
+function requestAssemblyMembership(id,include){
+  if(bench.inCandidate?.()){transient('請先確認或取消接合預覽');return;}
+  const result=changeAssemblyMembership(S.comps,S.modules,S.topo,id,include);if(!result.ok){transient(result.reason);return;}
+  pause();
+  const commit=()=>{pushUndo();S.topo.assemblyMembers=result.members;if(include)result.affected.forEach(key=>closedAssemblies.delete(key));bench.workReplaced();rebuild();draw();transient(include?'已加入組立':'已從組立移除，設計仍保留');};
+  if(include){commit();return;}
+  const before=snapshotStr();
+  const dialog=document.createElement('dialog');dialog.id='assemblyMembershipDialog';dialog.style.cssText='width:min(420px,calc(100vw - 64px));border:1px solid #bacddd;border-radius:12px;padding:20px;';
+  const title=document.createElement('h3');title.textContent='從目前組立移除';
+  const note=document.createElement('p');const tabs=designTabs(S.comps,S.modules,focusOpts());note.textContent='移除：'+result.affected.map(key=>tabs.find(t=>t.id===key)?.label||key).join('、')+'。退出組立畫面、模擬與檢查；設計與內部接合保留，可重新加入或復原。';
+  const cancel=document.createElement('button');cancel.textContent='取消';cancel.style.minHeight='44px';cancel.onclick=()=>dialog.close();
+  const confirm=document.createElement('button');confirm.textContent='確認移除';confirm.style.minHeight='44px';confirm.onclick=()=>{if(snapshotStr()!==before){transient('作品已變更，請重新選取');dialog.close();return;}dialog.close();commit();};
+  dialog.append(title,note,cancel,confirm);dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
 }
 function deleteDesign(id) {
   const tab = designTabs(S.comps, S.modules, focusOpts()).find(t => t.id === id);
@@ -502,6 +538,7 @@ function deleteDesign(id) {
   removed.forEach(c => ownedParamKeys(c).forEach(k => { if (!retainedParams.has(k)) delete S.topo.params[k]; }));
   S.comps = remaining;
   S.modules = S.modules.filter(m => m.id !== id);
+  S.topo.assemblyMembers=(S.topo.assemblyMembers || []).filter(key=>key!==id);
   const points = pointIdsOf(remaining);
   S.topo.tracePoints = (S.topo.tracePoints || []).filter(p => points.has(p));
   if (!points.has(S.topo.tracePoint)) S.topo.tracePoint = '';
@@ -841,9 +878,9 @@ tippingBucketOperations = createTippingBucketOperationSession({
   getSnapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
   applySnapshot: snapshot => applySnapshot(Store.normalizeSnapshot(snapshot), { source: 'tipping-bucket-operation' })
 });
-const inputRockRange = () => taskApplies(parallelLiftController) ? parallelLiftController.range() : taskApplies(gripperController)
+const inputRockRange = () => scopedAssemblyTask()?.plan?.range || (taskApplies(parallelLiftController) ? parallelLiftController.range() : taskApplies(gripperController)
   ? gripperController.range()
-  : baseInputRockRange(simulationScope().comps);
+  : baseInputRockRange(simulationScope().comps));
 const gripperObject = createGripperObject({
   svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
   getReference: () => taskApplies(gripperController) ? gripperController.reference() : null, getComps: () => S.comps,
@@ -919,6 +956,7 @@ function restoreBenchSnapshot(snap, undoLen) {
 // 舊接法也以獨立作品建立場景；正式 2D、求解快取、存檔不受預覽影響。
 const mateCandidate=createMateCandidate({
   readSource:()=>({comps:S.comps,modules:S.modules,topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings()}),
+  model:(candidate,pose)=>faceCandidateModel({...candidate,work:{...candidate.work,...assemblyWork(candidate.work.comps,candidate.work.modules,candidate.work.topo)}},pose),
   readPose:()=>({theta:S.theta,motorAngles:motorAnglesNow()}),
   onChange:()=>{renderMateCandidate();bench.syncUI(true);bench.liveCheck();}
 });
@@ -931,7 +969,7 @@ function renderMateCandidate() {
 const viewerSource=createAsyncResource(async()=>{const {createViewer}=await import('../blocks3d/viewer.js?v=20261007_m4b');return createViewer(document.getElementById('view3d'));});
 async function set3D(on) { if (view3DActive !== !!on) await toggle3D();else if(on)viewer3D=await viewerSource.get(); }
 const bench = createBench({
-  deleteDesign, pause, isPlaying:()=>playbackActive, setCandidate, inCandidate: () => !!mateCandidate.snapshot(), candidateSnapshot:()=>mateCandidate.snapshot(), takeCandidate:()=>mateCandidate.take(),
+  deleteDesign, openDesignList, changeMembership:requestAssemblyMembership, pause, isPlaying:()=>playbackActive, setCandidate, inCandidate: () => !!mateCandidate.snapshot(), candidateSnapshot:()=>mateCandidate.snapshot(), takeCandidate:()=>mateCandidate.take(),
   pushUndo, rebuild, draw, transient, setViewPlane: id => setViewPlane(id),
   saveComposite: id => moduleEditor.saveCompositeToLibrary(id),   // B7
   exportComposite: id => moduleEditor.exportComposite(id),
@@ -948,7 +986,7 @@ const bench = createBench({
   interferenceArgs: () => {
     const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
     return {
-      comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: settings,
+      ...assemblyWork(S.comps,S.modules,S.topo), params: S.topo.params, exportSettings: settings,
       cnc: S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc, mounts: homeMountsNow(), ranges: currentMotorRanges(),
       joint: jointSettingsNow()   // F1：角碼規格
     };
@@ -983,7 +1021,7 @@ function frameNodes() { return Model.frameNodes(worldFrameComps(S.comps, S.modul
 // 機架「視覺」用的固定銷：排除滑塊自己的 rail 端點（p1/p2），保留 mount 點（m1/m2）。
 // m1/m2 是真正鎖在機架上的孔；急回/滑塊範例需要把它們和曲柄軸畫成同一塊底座。
 // 注意：移動仍以 frameNodeIds() 為準，滑塊照樣跟著走。
-function frameConnectorNodes() { return Model.frameConnectorNodes(machineFrameComps(S.comps, S.modules)); }   // M5a：未安裝的機構不撐大機架板（設計分頁看自己的另走 viewFrameNodes）
+function frameConnectorNodes() { const w=inDesign()?{comps:S.comps,modules:S.modules}:assemblyWork(S.comps,S.modules,S.topo);return Model.frameConnectorNodes(machineFrameComps(w.comps,w.modules)); }   // M5a：未安裝的機構不撐大機架板（設計分頁看自己的另走 viewFrameNodes）
 
 // syncSliderGeometries（滑軌幾何同步）已隨滑軌域移到 ./slider-editor.js
 
@@ -993,6 +1031,7 @@ function rebuild({save=true}={}) {
   // 六面候選與正式作品共用normalize → rebake → compile → refresh次序。
   const prepared=prepareConnectionWork(S.comps,S.modules,S.topo,{exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm});
   S.modules=prepared.modules;S.compiled=prepared.compiled;
+  S.topo.assemblyMembers=normalizeAssemblyMembers(S.topo.assemblyMembers,S.comps,S.modules) ?? designIds(S.comps,S.modules);
   const namedTabs=designTabs(S.comps,S.modules,focusOpts());
   if(namedTabs.length===1){
     const only=namedTabs[0],name=only.id===ROOT_TAB?S.topo.rootDesignName:only.label;
@@ -1898,22 +1937,24 @@ function push3DNow() {
   // H1：設計模式的 3D 只畫焦點分頁（直角子模組在自己的平面平放，不立起來）；組立模式照舊畫全部。
   const designView = inDesign() && S.modules.length && lastModelInputsAll;
   function sceneFor(hidden) {
-    const sceneComps = hidden.size ? S.comps.filter(c=>!hidden.has(c.moduleId)) : S.comps;
-    const sceneModules = hidden.size ? S.modules.filter(m=>!hidden.has(m.id)) : S.modules;
-    const visibleInputs = input => hidden.size ? focusInputs(input,sceneComps) : input;
+    const work=inDesign()?{comps:S.comps,modules:S.modules}:assemblyWork(S.comps,S.modules,S.topo);
+    const sceneComps = hidden.size ? work.comps.filter(c=>!hidden.has(c.moduleId)) : work.comps;
+    const sceneModules = hidden.size ? work.modules.filter(m=>!hidden.has(m.id)) : work.modules;
+    const scoped=hidden.size || work.comps.length!==S.comps.length;
+    const visibleInputs = input => scoped ? focusInputs(input,sceneComps) : input;
     const allPlanes = !designView && hasOrthogonalModules() && lastModelInputsAll ? visibleInputs(lastModelInputsAll) : null;
     const planesApi = designView ? focusInputs(lastModelInputsAll, viewComps()) : allPlanes ? planeInputs(allPlanes, sceneComps, sceneModules, null) : visibleInputs(lastModelInputs);
     const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = planesApi;
     const stockMm=Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;
     const catalog=(hidden.size?assemblyViewGeometrySource:partGeometrySource).get({comps:sceneComps,modules:sceneModules,params:S.topo.params,fabrication:S.fabrication || {},
-      exportSettings:Settings.exportSettings(),frameNodes:designView?viewFrameNodes():Model.frameConnectorNodes(machineFrameComps(sceneComps,sceneModules)),mounts:hidden.size?undefined:homeMountsNow(),
+      exportSettings:Settings.exportSettings(),frameNodes:designView?viewFrameNodes():Model.frameConnectorNodes(machineFrameComps(sceneComps,sceneModules)),mounts:scoped?undefined:homeMountsNow(),
       frameMounts:designView?viewMounts(viewWorldMounts(Exporters.splitMountsByHost(S.comps,homeMountsNow()).free)):undefined});
     const frameGeometry=designView&&S.viewPlane?null:catalog.parts.frame || null;
     const plates=catalog.frameHomes.filter(h=>!designView || h.moduleId===S.designFocus).map(h=>({moduleId:h.moduleId,plane:h.plane,
       outlines:h.geometry.outlines,outline:h.geometry.outlines[0],holes:h.geometry.holes,cutouts:h.geometry.cutouts,thicknessMm:catalog.parts[h.name]?.thicknessMm || h.stockMm}));
     const model=buildMaterialScene({comps:sceneComps,modules:sceneModules,params:S.topo.params,catalog,inputs:planesApi,allPlanes,
       points:allPlanes?allPlanes.pts:designView?lastModelInputsAll.pts:pts,stockMm,frameGeometry,plates,plane:designView?(S.viewPlane || null):null,
-      assemblyScope:!designView,asm:S.assembly,plan:modulePlates.plan(),exportSettings:Settings.exportSettings(),joint:jointSettingsNow(),hullR:HULL_R_WORLD,solveValidity:lastSolveValidity});
+      assemblyScope:!designView,asm:inDesign()?S.assembly:simulationScope().assembly,plan:modulePlates.plan(),exportSettings:Settings.exportSettings(),joint:jointSettingsNow(),hullR:HULL_R_WORLD,solveValidity:lastSolveValidity});
     return {model,planesApi,allPlanes};
   }
   const hidden=inDesign()?new Set():closedAssemblyIds(S.modules);
@@ -2188,7 +2229,7 @@ function clearAll() {
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
   document.getElementById('solveBanner').style.display = 'none';
-  S.topo = { params: { theta: 0 }, tracePoint: '', tracePoints: [], referencePoint: '' };
+  S.topo = { assemblyMembers: [], params: { theta: 0 }, tracePoint: '', tracePoints: [], referencePoint: '' };
   Settings.applyFabricationProfile(Settings.legacyLocalFabrication(), { source: '新作品：已帶入此瀏覽器的舊加工偏好' });
   manualTrace = {};
   document.getElementById('thetaVal').textContent = '0';
@@ -2590,34 +2631,38 @@ function motorMountPatternRotDegForCenter(id,pts,mount=null){
 // 機架板上所有動力來源的加工孔位：TT＝軸孔＋螺絲孔＋定位孔、MG995＝穿板槽＋耳孔。
 function motorFrameExportMounts(inputs = null) {
   inputs ||= (S.modules.some(m=>m.mount?.face)?lastModelInputsAll || lastModelInputs:lastModelInputs) || {};
-  return buildMotorExportMounts({...inputs,comps:S.comps,ttSettings:Settings.ttMountSettings(),mg995Settings:Settings.mg995MountSettings(),typeForCenter:motorTypeForCenter,fallbackRotDeg:id=>computeMotorRotDeg(id,inputs.pts || {},new Set())});
+  const work=representationWork();
+  if(!inDesign())inputs=focusInputs(inputs,work.comps);
+  return buildMotorExportMounts({...inputs,comps:work.comps,ttSettings:Settings.ttMountSettings(),mg995Settings:Settings.mg995MountSettings(),typeForCenter:motorTypeForCenter,fallbackRotDeg:id=>computeMotorRotDeg(id,inputs.pts || {},new Set())});
 }
 // O4a：直角安裝轉接座的孔位（桿件孔＋子模組底板節點）；板厚用 CNC 設定的板材厚度。
 // M5a：整台機器（底座＋裝在它身上的）；還沒接上的機構不進匯出、製作包與機架板。
-const machineNow = () => ({ comps: machineComps(S.comps, S.modules), modules: machineModules(S.modules) });
-const exportWorldMounts = free => machineMounts(splitFrameMounts(free, S.comps, S.modules).world, S.comps, S.modules);
+function representationWork(){return inDesign()?{comps:S.comps,modules:S.modules}:assemblyWork(S.comps,S.modules,S.topo);}
+const machineNow = () => {const w=representationWork();return {comps:machineComps(w.comps,w.modules),modules:machineModules(w.modules)};};
+const exportWorldMounts = free => {const w=representationWork();return machineMounts(splitFrameMounts(free,w.comps,w.modules).world,w.comps,w.modules);};
 // 畫面用：設計模式看焦點分頁自己的（不過濾）；組立模式只算機器的。
-const viewWorldMounts = free => { const w = splitFrameMounts(free, S.comps, S.modules).world; return inDesign() && S.modules.length ? w : machineMounts(w, S.comps, S.modules); };
+const viewWorldMounts = free => { const active=representationWork(),w = splitFrameMounts(free,active.comps,active.modules).world; return inDesign() && S.modules.length ? w : machineMounts(w,active.comps,active.modules); };
 function orthoExtrasNow(machine = false) {
   const stockMm = Number(S.fabrication?.cnc?.stockThicknessMm) > 0 ? Number(S.fabrication.cnc.stockThicknessMm) : FABRICATION_DEFAULTS.cnc.stockThicknessMm;
-  const M = machine ? machineNow() : { comps: S.comps, modules: S.modules };
+  const M = machine ? machineNow() : representationWork();
   return orthogonalExportExtras(M.comps, M.modules, S.topo.params, { stockMm, joint: jointSettingsNow(), exportSettings: Settings.exportSettings() });
 }
 // F1：作品目前的直角接合件設定（預設接合件種類與角碼規格）。
 function jointSettingsNow() { return S.fabrication?.joint || FABRICATION_DEFAULTS.joint; }
 // G1：作品內容的結構鍵（零件＋模組＋參數（不含 θ）＋加工／匯出設定）；沒有已安裝模組時不算。
 function syncModulePlates() {
-  if (!S.modules.some(m => m && m.mount)) { modulePlates.sync(''); return; }
+  const work=representationWork();
+  if (!work.modules.some(m => m && m.mount)) { modulePlates.sync(''); return; }
   const { theta, ...params } = S.topo.params || {};
-  modulePlates.sync(JSON.stringify([S.comps, S.modules, params, S.fabrication, Settings.exportSettings()]));
+  modulePlates.sync(JSON.stringify([work.comps,work.modules, params, S.fabrication, Settings.exportSettings()]));
 }
 // G1：已安裝模組固定板的快取來源（home 幾何只在 draw() 重建時重算，播放每幀只做剛體變換）。
 const modulePlates = createModulePlateSource(() => {
   const stockMm = Number(S.fabrication?.cnc?.stockThicknessMm) > 0 ? Number(S.fabrication.cnc.stockThicknessMm) : FABRICATION_DEFAULTS.cnc.stockThicknessMm;
   const exportSettings = Settings.exportSettings();
   return {
-    comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings, joint: jointSettingsNow(), stockMm,
-    planArgs: { comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings, cnc: S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc, extras: orthoExtrasNow(), joint: jointSettingsNow() }
+    ...representationWork(), params: S.topo.params, exportSettings, joint: jointSettingsNow(), stockMm,
+    planArgs: { ...representationWork(), params: S.topo.params, exportSettings, cnc: S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc, extras: orthoExtrasNow(), joint: jointSettingsNow() }
   };
 });
 // O4b：下載每個直角安裝的 3D 列印轉接座 STL（L 形，孔位與木板上的 ADAPTER_HOLE 對應）。
@@ -2646,7 +2691,7 @@ function openNameDialog(target){
   input.value=target ? tabs.find(t=>t.id===target)?.label || '設計' : S.topo.projectName || (tabs.length===1?tabs[0].label:'機構作品');
   document.getElementById('saveProjectTitle').textContent=target?'重新命名設計':'儲存作品';
   document.getElementById('saveNameLabel').textContent=target?'分頁名稱':'作品名稱';
-  document.getElementById('saveNameHint').textContent=tabs.length===1?'單一設計：分頁名稱與作品檔名同步。':target?'只修改此分頁名稱，作品名稱維持不變。':'包含全部設計、未安裝件與組立接合，下載為 .json 檔。';
+  document.getElementById('saveNameHint').textContent=target?(tabs.length===1?'單一設計：分頁名稱與作品檔名同步。':'只修改此分頁名稱，作品名稱維持不變。'):'包含全部設計、未安裝件、組立成員與接合，下載為 .json 檔。';
   document.getElementById('saveNameSubmit').textContent=target?'確認改名':'下載存檔';
   dialog.showModal();input.focus();input.select();
 }
@@ -2695,7 +2740,7 @@ function currentMotorRanges() {
   const keep = S.activeMotor;
   const ranges = {};
   try {
-    [...usedMotorIds()].sort((a, b) => Number(a) - Number(b)).forEach(id => {
+    [...designMotorIds()].sort((a, b) => Number(a) - Number(b)).forEach(id => {
       S.activeMotor = id;
       const r = inputRockRange();
       ranges[id] = r && Number.isFinite(r.lo) && Number.isFinite(r.hi) ? { lo: r.lo, hi: r.hi } : { lo: -180, hi: 180 };
@@ -2708,7 +2753,7 @@ const homeMountsNow = () => {const inputs=S.modules.some(m=>m.mount?.face)?lastM
 function resolvedBuild(settings, mounts) {
   const cnc = S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
   const ranges = currentMotorRanges();
-  const args = { comps: S.comps, modules: S.modules, params: S.topo.params, exportSettings: settings, cnc, mounts, extras: orthoExtrasNow(), joint: jointSettingsNow() };
+  const args = { ...representationWork(), params: S.topo.params, exportSettings: settings, cnc, mounts, extras: orthoExtrasNow(), joint: jointSettingsNow() };
   try {
     return { ...resolveSpacers({ ...args, ranges }), ranges };
   } catch (e) {
@@ -2718,7 +2763,7 @@ function resolvedBuild(settings, mounts) {
 // L6b：目前作品各齒條的長槽限位建議（依干涉檢查）。
 function currentRackStopSuggestions(settings, mounts, build = resolvedBuild(settings, mounts)) {
   try {
-    return suggestRackStops({ comps: S.comps, modules: S.modules, params: S.topo.params, plan: build.plan, ranges: build.ranges, exportSettings: settings, mounts });
+    return suggestRackStops({ ...representationWork(), params: S.topo.params, plan: build.plan, ranges: build.ranges, exportSettings: settings, mounts });
   } catch (e) { return []; }
 }
 // 套用建議：把各齒條長槽的縮短量寫進 slot.trimStart／trimEnd（>0 才寫，0 則移除）。
@@ -2792,9 +2837,9 @@ function exportFaceFiles(format) {
 }
 function exportLinksSvg() {
   if(usesFaceExport(facePackSource()))return exportFaceFiles('svg');
-  const invalid=S.comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(S.comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
+  const invalid=representationWork().comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(representationWork().comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
   if(invalid){transient(`尚未匯出：${invalid.reason}`);return;}
-  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), S.comps, S.modules), M = machineNow();
+  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), representationWork().comps, representationWork().modules), M = machineNow();
   const stockWarnings = memberStockWarnings(M.comps, settings);
   if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
   // 有宿主機架桿的 mount 隨該桿匯出（特徵切進桿身）；剩下的才進 frame.svg；已安裝模組另出各自的機架檔。
@@ -2824,9 +2869,9 @@ function exportLinksSvg() {
 }
 function exportLinksDxf() {
   if(usesFaceExport(facePackSource()))return exportFaceFiles('dxf');
-  const invalid=S.comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(S.comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
+  const invalid=representationWork().comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(representationWork().comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
   if(invalid){transient(`尚未匯出：${invalid.reason}`);return;}
-  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), S.comps, S.modules), M = machineNow();
+  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), representationWork().comps, representationWork().modules), M = machineNow();
   const stockWarnings = memberStockWarnings(M.comps, settings);
   if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
   const freeMounts = exportWorldMounts(Exporters.splitMountsByHost(M.comps, mounts).free);
@@ -2855,7 +2900,7 @@ function exportLinksDxf() {
 }
 // 製作包用：與匯出相同的零件與機架幾何，只收集 CNC 檢查用的孔與開口（不下載檔案）。
 function collectCncPartsAndFrameWarnings(settings) {
-  const nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), S.comps, S.modules), M = machineNow();
+  const nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), representationWork().comps, representationWork().modules), M = machineNow();
   const pts = lastModelInputs && lastModelInputs.pts, extras = orthoExtrasNow(true);
   const cutNodes = withWorldAdapterNodes(nodes, extras);   // C1：機架板邊上的轉接座宿主孔
   const freeMounts = exportWorldMounts(Exporters.splitMountsByHost(M.comps, mounts).free);
@@ -2882,7 +2927,7 @@ function saveBuildPack(html,title,partCount) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   transient(`已產生製作包（${partCount} 片板件）`);
 }
-const facePackSource=()=>({comps:S.comps,modules:S.modules,topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings(),stockMm:S.fabrication?.cnc?.stockThicknessMm || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint || FABRICATION_DEFAULTS.joint});
+const facePackSource=()=>({...representationWork(),topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings(),stockMm:S.fabrication?.cnc?.stockThicknessMm || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint || FABRICATION_DEFAULTS.joint});
 const facePackDownload=createFaceExportCoordinator({readSource:facePackSource,readPose:()=>({theta:S.theta,motorAngles:motorAnglesNow(),_prevPoints:lastFullPts}),isPlaying:()=>playbackActive,pause,notify:transient,download:result=>{
   const title=result.work.modules.map(m=>m.name).filter(Boolean).join('＋') || '機構作品';
   saveBuildPack(faceBuildPackHtml(result),title,result.plan.parts.length);
@@ -2893,14 +2938,14 @@ async function downloadBuildPack() {
     if(!result.ok)transient(`尚未產生製作包：${result.reason}`);
     return;
   }
-  const invalid=S.comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(S.comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
+  const invalid=representationWork().comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(representationWork().comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
   if(invalid){transient(`尚未匯出：${invalid.reason}`);return;}
   const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
   const stockWarnings = memberStockWarnings(machineNow().comps, settings);
   if (stockWarnings.length) { transient(`尚未產生製作包：${stockWarnings[0]}`); return; }
   const cnc = S.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
   const homeMounts = homeMountsNow();
-  try { Exporters.assertFusionFeatures(S.comps,homeMounts,orthoExtrasNow()); } catch(e) { transient(e.message);return; }
+  try { Exporters.assertFusionFeatures(representationWork().comps,homeMounts,orthoExtrasNow()); } catch(e) { transient(e.message);return; }
   const build = resolvedBuild(settings, homeMounts);
   const { plan, interference } = build;
   if (!plan.parts.length) { transient('沒有可匯出的零件或機架'); return; }
@@ -2908,8 +2953,8 @@ async function downloadBuildPack() {
   const { cncParts, frameWarnings } = collectCncPartsAndFrameWarnings(settings);
   const warnings = [...frameWarnings, ...cncWarningList(cncParts)];
   // 目前沒有作品名稱欄位：有模組就用模組名稱串起來，否則「機構作品」。
-  const title = (S.modules || []).map(m => m && m.name).filter(Boolean).join('＋') || '機構作品';
-  const html = buildPackHtml(plan, { title, cnc, warnings, interference, suggestions, modules: S.modules });
+  const title = representationWork().modules.map(m => m && m.name).filter(Boolean).join('＋') || '機構作品';
+  const html = buildPackHtml(plan, { title, cnc, warnings, interference, suggestions, modules: representationWork().modules });
   saveBuildPack(html,title,plan.parts.length);
 }
 function openFile() {

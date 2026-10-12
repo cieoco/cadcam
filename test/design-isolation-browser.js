@@ -142,7 +142,7 @@ try {
   api.gripperPilot.reopen(JSON.parse(autoSnap));await api.setMode('bench');api.benchSelect('Driver');
   const closeSnap=JSON.stringify(api.gripperPilot.snapshot()),closeUndo=S.undoStack.length;
   const visibleBefore=api.benchDebug().visiblePartIds;
-  document.querySelector('#mateTreeActions button').click();
+  [...document.querySelectorAll('#mateTreeActions button')].find(b=>b.textContent==='收起畫面').click();
   check('關閉組立保留作品與復原紀錄',JSON.stringify(api.gripperPilot.snapshot())===closeSnap&&S.undoStack.length===closeUndo);
   check('關閉組立不殘留組件卡',!componentButton());
   check('整組從組立清單收起',!document.querySelector('#mateTree [data-module="Driver"]')&&!document.querySelector('#mateTree [data-module="Floor"]'));
@@ -168,6 +168,46 @@ try {
   document.querySelector('#openWorkDialog button:last-child').click();check('取消開啟保留作品',S.modules.length===4);
   api.saveFile();check('存檔說明包含接合與未安裝件',document.getElementById('saveNameHint').textContent.includes('未安裝件'));
   document.querySelector('#saveProjectDialog button[type="button"]').click();
+
+  api.gripperPilot.reopen({...work,rootDesignName:'四連桿'});await api.setMode('bench');
+  const memberSnap=api.gripperPilot.snapshot(),memberUndo=S.undoStack.length;
+  const memberButton=()=>document.querySelector('#assemblyMembership button');
+  memberButton().click();
+  check('移除確認列出四連桿且保留設計',document.getElementById('assemblyMembershipDialog').textContent.includes('四連桿')&&document.getElementById('assemblyMembershipDialog').textContent.includes('設計與內部接合保留'));
+  document.querySelector('#assemblyMembershipDialog button').click();
+  check('取消移除不改成員或復原',JSON.stringify(api.gripperPilot.snapshot())===JSON.stringify(memberSnap)&&S.undoStack.length===memberUndo);
+  await new Promise(resolve=>setTimeout(resolve,50));memberButton().click();document.querySelector('#assemblyMembershipDialog button:last-child').click();
+  check('移除四連桿只退出組立，零件與翻斗接合保留',!S.topo.assemblyMembers.includes('#root')&&S.comps.length===work.comps.length&&JSON.stringify(S.modules)===JSON.stringify(memberSnap.modules));
+  check('3D四連桿消失、翻斗保留',!api.benchDebug().visiblePartIds.includes('Link22')&&api.benchDebug().visiblePartIds.includes('Floor-frame'));
+  check('組立不再控制被移出的M2',api.designDebug().motors.join(',')==='1');
+  api.togglePlay();await new Promise(resolve=>setTimeout(resolve,60));
+  check('移除四連桿後翻斗仍經任務檢查並可播放',document.getElementById('playBtn').classList.contains('playing'));api.togglePlay();
+  const removedSnap=api.gripperPilot.snapshot();api.gripperPilot.reopen(removedSnap);
+  check('保存重開保留組立成員、不刪除設計',!S.topo.assemblyMembers.includes('#root')&&S.comps.some(c=>c.id==='Link22'));
+  api.openDesignList();let memberRow=[...document.querySelectorAll('#designListItems > div')].find(r=>r.textContent.includes('四連桿'));
+  [...memberRow.querySelectorAll('button')].find(b=>b.textContent==='加入組立').click();
+  check('重新加入恢復四連桿3D',S.topo.assemblyMembers.includes('#root')&&api.benchDebug().visiblePartIds.includes('Link22'));
+  api.undo();check('一次復原重新加入',!S.topo.assemblyMembers.includes('#root')&&!api.benchDebug().visiblePartIds.includes('Link22'));
+  await api.setMode('design');api.setDesignFocus('#root');
+  check('退出組立的圖稿仍可獨立編輯',!!document.querySelector('[data-link-id="Link22"]'));
+  api.togglePlay();await new Promise(resolve=>setTimeout(resolve,60));
+  check('退出組立的四連桿仍可在設計分頁播放',document.getElementById('playBtn').classList.contains('playing'));api.togglePlay();
+  await api.setMode('bench');api.benchSelect('Driver');
+  [...document.querySelectorAll('#mateTreeActions button')].find(b=>b.textContent==='從組立移除…').click();
+  check('整組移除列出所有連接子件',['Floor','RightSide','Back'].every(id=>document.getElementById('assemblyMembershipDialog').textContent.includes(id)));
+  document.querySelector('#assemblyMembershipDialog button:last-child').click();
+  check('全部移除後組立為空，原設計仍保留',S.topo.assemblyMembers.length===0&&api.benchDebug().visiblePartIds.length===0&&S.comps.length===work.comps.length);
+  check('空組立沒有已移除的組件卡',!componentButton());
+  api.togglePlay();check('空組立不能借用保留圖稿的動力',!document.getElementById('playBtn').classList.contains('playing'));
+  api.undo();check('整組移除可一次復原',S.topo.assemblyMembers.length===4&&api.benchDebug().visiblePartIds.includes('Floor-frame'));
+  api.benchSelect('Driver');[...document.querySelectorAll('#mateTreeActions button')].find(b=>b.textContent==='收起畫面').click();
+  const driverLabel=api.designTabs().find(t=>t.id==='Driver').label;
+  const memberAction=text=>{api.openDesignList();const r=[...document.querySelectorAll('#designListItems > div')].find(row=>row.querySelector('b').textContent===driverLabel);[...r.querySelectorAll('button')].find(b=>b.textContent===text).click();};
+  await new Promise(resolve=>setTimeout(resolve,50));memberAction('從組立移除');document.querySelector('#assemblyMembershipDialog button:last-child').click();
+  memberAction('加入組立');
+  check('原本收起的組立，重新加入後確實顯示',api.benchDebug().visiblePartIds.includes('Floor-frame')&&!!componentButton());
+  api.gripperPilot.reopen({kind:'blocks',v:1,comps:[],params:{}});await api.setMode('design');api.addLink();await api.setMode('bench');
+  check('新畫的設計不自動加入組立',S.comps.length>0&&S.topo.assemblyMembers.length===0&&api.benchDebug().visiblePartIds.length===0);
 
 } catch (e) { check('測試執行完成：' + e.stack, false); }
 clearTimeout(S.autosaveTimer);

@@ -1,3 +1,4 @@
+import {normalizeAssemblyMembers} from './assembly-membership.js';
 /**
  * blocks / schema
  *
@@ -328,6 +329,7 @@ export function toSnapshot(comps, topo, counter, motor) {
   if (motor?.fabrication) snapshot.fabrication = clone(motor.fabrication);
   // 模組（選配）：沒有模組時不輸出，舊檔逐位元組不變（SDD-ASSEMBLY-MODULES §3.1／§4.1）。
   if (Array.isArray(motor?.modules) && motor.modules.length) snapshot.modules = clone(motor.modules);
+  if(Array.isArray(topo?.assemblyMembers))snapshot.assemblyMembers=normalizeAssemblyMembers(topo.assemblyMembers,comps,motor?.modules || []);
   return snapshot;
 }
 
@@ -572,7 +574,7 @@ export function normalizeSnapshot(obj) {
     });
   }
   const projectName=normalizeProjectName(obj.projectName);
-  return { ...(projectName?{projectName}:{}), ...(normalizeProjectName(obj.rootDesignName)?{rootDesignName:normalizeProjectName(obj.rootDesignName)}:{}), comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
+  return { ...(Array.isArray(obj.assemblyMembers)?{assemblyMembers:normalizeAssemblyMembers(obj.assemblyMembers,cleanComps,modulesResult.modules)}:{}), ...(projectName?{projectName}:{}), ...(normalizeProjectName(obj.rootDesignName)?{rootDesignName:normalizeProjectName(obj.rootDesignName)}:{}), comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
     fabrication: fabricationResult.status === 'present' ? fabricationResult.profile : null, modules: modulesResult.modules, warnings };
 }
 
