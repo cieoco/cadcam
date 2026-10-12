@@ -9,6 +9,7 @@ import {
 assert.equal(FABRICATION_VERSION, 1);
 assert.deepEqual(FABRICATION_DEFAULTS, {
   v: 1,
+  syringeMount: {clearanceMm:0.5,marginMm:8,strapSpacingMm:24},
   export: {
     // L5-0：使用者現場決定關節一律 M3 螺絲＋防鬆螺帽 → 新作品的連接孔／機架孔預設 3.2。
     barWidthMm: 18, holeDiameterMm: 3.2, frameMarginMm: 18, frameHoleDiameterMm: 3.2,
@@ -66,7 +67,7 @@ const full = normalizeFabricationProfile(nonDefault);
 assert.deepEqual(nonDefault, original, 'normalization must not mutate its input');
 assert.equal(full.ok, true);
 assert.equal(full.status, 'present');
-assert.deepEqual(full.profile, { ...nonDefault, cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 }, drive: { ...FABRICATION_DEFAULTS.drive }, joint: { defaultKind: 'bracket-m3', bracket: { ...FABRICATION_DEFAULTS.joint.bracket } } },
+assert.deepEqual(full.profile, { ...nonDefault, syringeMount: {...FABRICATION_DEFAULTS.syringeMount}, cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 }, drive: { ...FABRICATION_DEFAULTS.drive }, joint: { defaultKind: 'bracket-m3', bracket: { ...FABRICATION_DEFAULTS.joint.bracket } } },
   'older three-group profiles round-trip and get the cnc, drive and joint defaults');
 assert.deepEqual(full.warnings, [], 'missing cnc / drive / joint groups (older works) are filled silently');
 

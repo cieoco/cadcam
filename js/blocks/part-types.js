@@ -19,6 +19,7 @@
 // 每筆：pointKeys = 該型別用到的接點 key；paramProps = 元件上「存著 topo.params key 的欄位」
 // 名稱（用來在刪除元件時把它佔用的參數一併清掉）。
 export const PART_TYPES = {
+  syringe:  { pointKeys: [], paramProps: [] }, // 安裝點以所屬零件＋局部 mm 座標保存。
   anchor:   { pointKeys: ['p1'],                          paramProps: [] },                          // 地錨：單一固定銷、無參數
   bar:      { pointKeys: ['p1', 'p2'],                    paramProps: ['lenParam'] },                // 連桿：兩端 + 長度
   triangle: { pointKeys: ['p1', 'p2', 'p3'],             paramProps: ['gParam', 'r1Param', 'r2Param'] }, // 三點桿：三頂點 + 三邊

@@ -1,3 +1,4 @@
+import {expandSyringes} from './syringe.js';
 /**
  * Topology Compiler
  * 將 Wizard 組件轉換為可求解的拓撲結構
@@ -72,6 +73,12 @@ function compileRegisteredParts(components, phase, ctx) {
 }
 
 export function compileTopology(components, topology, solvedPoints) {
+    if(components.some(c=>c.type==='syringe')){
+        const expanded=expandSyringes(components,topology.params || {});
+        const compiled=compileTopology(expanded.comps,{...topology,params:expanded.params},solvedPoints);
+        compiled._syringes={comps:components,params:topology.params || {},issues:expanded.issues};
+        return compiled;
+    }
     const steps = [];
     const visualization = { links: [], polygons: [], joints: [] };
     const params = (topology && topology.params) ? topology.params : { theta: 0 };

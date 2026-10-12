@@ -1,4 +1,5 @@
 import {normalizeAssemblyMembers} from './assembly-membership.js';
+import {normalizeSyringe} from '../core/syringe.js';
 /**
  * blocks / schema
  *
@@ -540,7 +541,8 @@ export function normalizeSnapshot(obj) {
       warnings.push(`第 ${index + 1} 個零件格式不正確，已略過。`);
       return;
     }
-    if (raw.type === 'anchor') comps.push(normalizeAnchor(raw, index, warnings));
+    if (raw.type === 'syringe') comps.push(normalizeSyringe({...raw,id:safeId(raw.id)?raw.id:`Syringe${index+1}`}));
+    else if (raw.type === 'anchor') comps.push(normalizeAnchor(raw, index, warnings));
     else if (raw.type === 'bar') comps.push(normalizeBar(raw, index, params, warnings));
     else if (raw.type === 'triangle') comps.push(normalizeTriangle(raw, index, params, warnings));
     else if (raw.type === 'slider') comps.push(normalizeSlider(raw, index, params, warnings));

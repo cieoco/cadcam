@@ -1168,7 +1168,7 @@ function svgForFrame(frameNodes, settings, motorMounts,name='frame') {
   return svgForFrameGeometry(geometry, name);
 }
 
-function svgForFrameGeometry(geometry, title) {
+export function svgForFrameGeometry(geometry, title) {
   const b = boundsForFrame(geometry);
   const width = round(b.maxX - b.minX);
   const height = round(b.maxY - b.minY);
@@ -1210,7 +1210,7 @@ function dxfForFrame(frameNodes, settings, motorMounts,name='frame') {
   return dxfForFrameGeometry(geometry,name);
 }
 
-function dxfForFrameGeometry(geometry,partId='frame') {
+export function dxfForFrameGeometry(geometry,partId='frame') {
   return [
     dxfPair(0, 'SECTION'),
     dxfPair(2, 'HEADER'),

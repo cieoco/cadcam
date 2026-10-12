@@ -1,3 +1,4 @@
+import {validateSyringePose} from '../core/syringe.js';
 /**
  * Generic Multilink Solver Engine
  * 通用多連桿求解核心
@@ -1238,7 +1239,15 @@ export function solveTopology(topologyOrParams, params) {
         }
     }
     if (topology && topology._wizard_data && topology.bodyJoint !== false) {
-        return solveBodyJointTopology(topology, actualParams);
+        const result=solveBodyJointTopology(topology, actualParams);
+        if(topology._syringes){
+            const source=topology._syringes;
+            const check=validateSyringePose(source.comps,source.params,result.points);
+            result.syringeValidation=check;
+            if(result.isUnderconstrained){result.isValid=false;result.reason='仍有未受約束的活動接點，請檢查機架與連接。';}
+            if(!check.ok||source.issues.length){result.isValid=false;result.reason=[...source.issues,...check.issues].join(' ');}
+        }
+        return result;
     }
 
 

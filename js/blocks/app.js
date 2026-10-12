@@ -1,3 +1,5 @@
+import {createSyringeUI} from './syringe-ui.js';
+let hydraulic=null;
 import {assemblyWork,designIds,assemblyFamily,changeAssemblyMembership,normalizeAssemblyMembers} from './assembly-membership.js';
 import {faceCandidateModel} from './face-candidate.js';
 import {validateAssemblyTask} from './assembly-task-validation.js';
@@ -32,7 +34,7 @@ let benchmarkCoverage=null,benchmarkShapeKey=null;
  * 的大函式本體維持原樣、呼叫端不變。
  */
 
-// 重用既有引擎：角色→步驟編譯 + 求解。求解器一行都不改。
+// 重用既有引擎：角色→步驟編譯 + 求解。針筒僅擴充距離約束編譯與結果驗證，沿用求解數學。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
 import { APP_VERSION } from '../version.js?v=20261008_bracketalign';
@@ -1152,6 +1154,7 @@ function switchActiveMotor(id) {
 }
 
 function getTrajectoryData() {
+  if(simulationScope().comps.some(c=>c.type==='syringe'))return null; // Hydraulic input is mm, not the rotary theta sweep.
   // 拖曳中不掃軌跡：每次移動 rebuild() 都讓快取失效，整段 sweepTopology（每個追蹤點 72 步）
   // 會把拖曳拖到掉幀。拖曳中軌跡本來就持續失真，乾脆不畫；放開時 drag end 走完整
   // rebuild+draw，軌跡即恢復。（shapeDrag 只改造形孔、不動 geomVersion，走快取即可不必跳過。）
@@ -1398,6 +1401,11 @@ function gearMeshHasWarning() {
 function updateMechanismStatus(sol = null) {
   const el = document.getElementById('mechanismStatus');
   if (!el) return;
+  if(simulationScope().comps.some(c=>c.type==='syringe')){
+    el.dataset.state=sol?.isValid?'warn':'error';
+    el.textContent=sol?.isValid?'液壓幾何可行｜干涉與承重未驗證':'液壓姿勢待修正';
+    el.title='針筒長度約束求解；3D 尚未呈現針筒與托架，不代表完整裝配驗證。';return;
+  }
   let state = 'idle';
   let text = '尚未建立機構';
   let title = '';
@@ -1596,6 +1604,7 @@ const PART_DRAW = {
 function draw() { if(renderMateCandidate())return;return drawNow(); }   // M4：接合精靈預覽中，重畫看的是候選的作品
 const fusionEditor=createFusionEditor({settings:Settings.exportSettings,pause,pushUndo,rebuild,draw,save:scheduleAutosave,selectGear,selectTriangle});
 function drawNow() {
+  hydraulic?.sync(lastFullPts);
   fusionEditor.sync();
   mateTool.sync();   // M2：換分頁／模式或開始畫圖時關掉接合面工具，並更新按鈕
   syncModulePlates();   // G1：作品內容變了才讓固定板 home 幾何作廢（θ 不算內容）
@@ -1856,6 +1865,7 @@ function drawNow() {
   Tools.drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
   Tools.drawTrianglePreview(); // 三點桿模式：疊在最上層的三角預覽
   Tools.drawPolygonPreview();  // 多邊形板模式：疊在最上層的預覽
+  hydraulic?.render(allPts,sol?.isValid===true);
 
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
   // polygons 一併帶上：3D 用它把三點桿畫成實心板，並過濾掉與三角板邊重疊的桿（避免分身）。
@@ -2091,6 +2101,7 @@ function openMobileFile() {
 
 // 切換 3D 唯讀預覽：首次開啟才動態載入 THREE viewer。
 async function toggle3D() {
+  if(hydraulic?.active())transient('3D 僅預覽板件；針筒與托架尚未呈現，完整裝配與干涉未驗證。');
   view3DActive = !view3DActive;
   const overlay = document.getElementById('view3d');
   const btn = document.getElementById('btn3d');
@@ -2311,6 +2322,7 @@ function toggleMotorDirection() {
 }
 
 function play() {
+  if(hydraulic?.active())return hydraulic.play();
   const bucketIssue=bucketPlaybackIssue(); if(bucketIssue){transient(bucketIssue);return;}
   if (raf) return;
   if (taskApplies(parallelLiftController) && !parallelLiftController.currentPlan().ok) { transient(parallelLiftController.currentPlan().message); return; }
@@ -2356,6 +2368,7 @@ function play() {
   raf = requestAnimationFrame(step);
 }
 function pause() {
+  hydraulic?.stop();
   if (raf) cancelAnimationFrame(raf);
   raf = null;playbackActive=false;
   onPlaybackChange();
@@ -2363,6 +2376,7 @@ function pause() {
   document.getElementById('playBtn').textContent = '▶';
 }
 function togglePlay() {
+  if(hydraulic?.active()){hydraulic.isPlaying()?pause():hydraulic.play();return;}
   const bucketIssue=bucketPlaybackIssue(); if(bucketIssue){transient(bucketIssue);return;}
   if (taskApplies(parallelLiftController) && !parallelLiftController.currentPlan().ok) { transient(parallelLiftController.currentPlan().message); return; }
   raf ? pause() : play();
@@ -2841,6 +2855,7 @@ function showCncWarnings(parts, settings) {
 }
 let videoExportLoading = false;
 async function exportVideo() {
+  if(hydraulic?.active()){transient('針筒目前請以行程滑桿或往返播放觀察；MP4 尚未支援液壓行程錄製。');return;}
   const bucketIssue=bucketPlaybackIssue(); if(bucketIssue){transient(bucketIssue);return;}
   if (videoExportLoading) return;
   if (S.mode !== 'design' || view3DActive) { transient('請先切回 2D 設計畫面，再匯出動畫'); return; }
@@ -2886,6 +2901,7 @@ function exportFaceFiles(format) {
   }catch(e){transient(`尚未匯出：${e.message}`);}
 }
 function exportLinksSvg() {
+  if(hydraulic?.active())return hydraulic.exportWork('svg');
   if(usesFaceExport(facePackSource()))return exportFaceFiles('svg');
   const invalid=representationWork().comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(representationWork().comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
   if(invalid){transient(`尚未匯出：${invalid.reason}`);return;}
@@ -2918,6 +2934,7 @@ function exportLinksSvg() {
   showCncWarnings(cncParts, settings);
 }
 function exportLinksDxf() {
+  if(hydraulic?.active())return hydraulic.exportWork('dxf');
   if(usesFaceExport(facePackSource()))return exportFaceFiles('dxf');
   const invalid=representationWork().comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(representationWork().comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
   if(invalid){transient(`尚未匯出：${invalid.reason}`);return;}
@@ -2983,6 +3000,7 @@ const facePackDownload=createFaceExportCoordinator({readSource:facePackSource,re
   saveBuildPack(faceBuildPackHtml(result),title,result.plan.parts.length);
 }});
 async function downloadBuildPack() {
+  if(hydraulic?.active())return hydraulic.exportWork('pack');
   if(usesFaceExport(facePackSource())){
     const result=await facePackDownload.run();
     if(!result.ok)transient(`尚未產生製作包：${result.reason}`);
@@ -3137,6 +3155,10 @@ if (gripperPilotSession) window.blocks.gripperPilot = {
   snapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
   reopen: snapshot => { const norm = Store.normalizeSnapshot(snapshot); if (!norm) throw Error('作品格式無效'); applySnapshot(norm, { source: 'gripper-pilot' }); },
 };
+hydraulic=createSyringeUI({svg,comps:viewComps,points:()=>lastFullPts,seed:pts=>{lastSolved={...pts};prevSolved={...pts};},pushUndo,pause,rebuild,draw,save:scheduleAutosave,notify:transient,applyFabrication:Settings.applyFabricationProfile,
+  playing:on=>{playbackActive=on;const b=document.getElementById('playBtn');b.classList.toggle('playing',on);b.textContent=on?'⏸':'▶';}
+});
+window.blocks.addSyringe=hydraulic.add;
 init();
 if(benchmarkSession){
  Object.assign(window.blocks,{benchmark:{identity:{source:'current',token:LOAD_GRAPH_TOKEN},async load(snapshot){playbackProbe.abort('work_changed');const norm=Store.normalizeSnapshot(snapshot);if(!norm)throw Error('無效量測作品');applySnapshot(norm,{recordUndo:false,source:'benchmark'});bench.setMode('bench');await set3D(true);viewer3D.stop();return benchmarkCoverage;},

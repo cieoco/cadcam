@@ -1,3 +1,4 @@
+import { hydraulicSnapshot } from './hydraulic-example.js';
 import { liftBucketSnapshot } from './lift-bucket-example.js';
 import { tippingBucketSnapshot } from './tipping-bucket-example.js';
 import { assemblyLessonSnapshot } from './assembly-lesson-example.js?v=parallel';
@@ -48,6 +49,10 @@ export const EXAMPLE_GROUPS = [
 ];
 
 const EXAMPLE_LESSONS = {
+  'hydraulic-h01': {group:'lift-motion',level:'入門液壓',use:'用兩端可擺動的針筒抬起單臂；尺寸未依實物校正。',
+    learn:'針筒孔距約束決定臂角；安裝孔越靠近支點不代表越能承重。',
+    try:['任務1：推動行程滑桿並掃描，找出可用範圍。','任務2：設定中只改 B 為 60、80、100 mm，預測再比較。','任務3：分別存檔修改前後兩個版本，記錄改變、預測與觀察。'],
+    predict:'保持其他條件相同，B 靠近 O 時，手臂轉角會如何改變？',measure:'記錄 s=0 和最大行程的臂角與 C 點座標。',explain:'比較模擬與實物；干涉、摩擦、承重與水路尚未驗證。'},
   'fourbar-crank-rocker': {
     group: 'starter',
     level: '基礎',
@@ -267,6 +272,7 @@ const wiperExample = practice => ({
 });
 
 const ALL_BLOCK_EXAMPLES = [
+  {id:'hydraulic-h01',title:'H01｜10cc針筒單臂抬升',note:'兩端鉸接；伸出量以 mm 控制，示範尺寸未校正。',snapshot:hydraulicSnapshot},
   wiperExample(false),
   wiperExample(true),
   {

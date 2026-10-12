@@ -6,6 +6,7 @@ const freezeRecord = record => Object.freeze(record);
 
 export const FABRICATION_DEFAULTS = Object.freeze({
   v: FABRICATION_VERSION,
+  syringeMount: freezeRecord({clearanceMm:0.5,marginMm:8,strapSpacingMm:24}),
   export: freezeRecord({
     // These match normalizeExportSettings({}) after the three preference loaders run.
     barWidthMm: 18,
@@ -76,6 +77,7 @@ const JOINT_RANGES = Object.freeze({
 });
 
 const RANGES = Object.freeze({
+  syringeMount: freezeRecord({clearanceMm:[0,5],marginMm:[4,30],strapSpacingMm:[8,80]}),
   export: freezeRecord({
     barWidthMm: [2, 120],
     holeDiameterMm: [0.5, 119],
@@ -123,6 +125,7 @@ const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const cloneDefaults = () => ({
   v: FABRICATION_VERSION,
+  syringeMount: {...FABRICATION_DEFAULTS.syringeMount},
   export: { ...FABRICATION_DEFAULTS.export },
   ttMount: { ...FABRICATION_DEFAULTS.ttMount },
   mg995Mount: { ...FABRICATION_DEFAULTS.mg995Mount },
@@ -132,6 +135,7 @@ const cloneDefaults = () => ({
 });
 const cloneProfile = profile => ({
   v: FABRICATION_VERSION,
+  syringeMount: {...profile.syringeMount},
   export: { ...profile.export },
   ttMount: { ...profile.ttMount },
   mg995Mount: { ...profile.mg995Mount },
@@ -243,7 +247,7 @@ export function normalizeFabricationProfile(raw) {
     }
     if (!own(raw, group)) {
       // 舊作品沒有 cnc／drive 群組：靜默補預設，不算缺漏。
-      if (group === 'cnc' || group === 'drive') continue;
+      if (group === 'cnc' || group === 'drive' || group === 'syringeMount') continue;
       for (const key of Object.keys(FABRICATION_DEFAULTS[group])) {
         warnings.push(`缺少 fabrication.${group}.${key}，已使用 v1 固定預設。`);
       }
