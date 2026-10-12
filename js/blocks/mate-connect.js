@@ -169,6 +169,21 @@ const DETACH_REASONS = {
   'host-invalid': '宿主目前解不出來，拆不下來',
   unsolved: '目前的姿勢解不出來，請先讓機構能動'
 };
+// 批次拆接合：深層先拆，任何一步失敗都不提交部分結果。
+export function detachAssembly(comps, modules, id, params, motorState, scope = 'branch') {
+  const roles = assemblyRoles(modules), ids = new Set([id]);
+  if (!modules.some(m => m.id === id)) return { ok: false, reason: '找不到這個機構' };
+  for (let n = 0; n < modules.length; n++) modules.forEach(m => { if (ids.has(roles.parent[m.id])) ids.add(m.id); });
+  const targets = scope === 'branch' ? [id] : [...ids].sort((a,b) => roles.depth[b] - roles.depth[a]);
+  let result = { ok: true, comps, modules };
+  for (const target of targets) {
+    if (!result.modules.find(m => m.id === target)?.mount) continue;
+    const next = mateDetach(result.comps, result.modules, target, params, motorState);
+    if (!next.ok) return { ok: false, comps, modules, reason: next.reason };
+    result = next;
+  }
+  return result;
+}
 // 拆下：同 unmountModule，另回 moved＝跟著它一起回到「未安裝」的子孫數（它們彼此的接法保留）。
 // 底座不變：拆下的若排在底座前面，不能因此搶走底座。
 export function mateDetach(comps, modules, childId, params, motorState) {

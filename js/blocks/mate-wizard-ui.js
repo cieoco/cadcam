@@ -146,6 +146,9 @@ export function createMateWizard(h) {
     if (!note) { note = el('div', 'mate-spare-note'); note.id = 'mateSpareNote'; tree.after(note); }
     note.hidden = !names.length;
     note.textContent = names.length ? `還沒接上：${names.join('、')}（不會進製作包）` : '';
+    let actions=document.getElementById('mateTreeActions');
+    if(!actions){actions=el('div');actions.id='mateTreeActions';tree.after(actions);}
+    actions.replaceChildren();
     while (tree.firstChild) tree.removeChild(tree.firstChild);
     if (!rows.length) tree.appendChild(el('div', 'bench-empty', '作品裡還沒有機構。回「設計」從模組庫插入。'));
     rows.forEach(({ m, depth, note, tag }) => {
@@ -161,6 +164,10 @@ export function createMateWizard(h) {
       row.addEventListener('click', go);
       row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
       tree.appendChild(row);
+      if(m.id===st.selected && (m.mount || S.modules.some(child=>child.mount?.to?.module===m.id))){
+        const remove=btn(m.mount?'從組立拆下…':'解除整組接合…','danger',()=>h.requestDetach(m.id));
+        remove.style.minHeight='44px';actions.appendChild(remove);
+      }
     });
     sizeTree(tree);
   }
@@ -245,7 +252,7 @@ export function createMateWizard(h) {
     const mate = mateOfMount(S.comps, S.modules, mod.id, params());
     root.appendChild(mate ? head(`接在：${h.displayName(mate.module)}・${mate.name}`, h.displayName(mod.id)) : head(h.displayName(mod.id), h.statusOf(mod)));
     const row = el('div', 'bench-row');
-    const off = btn('拆下', 'danger', () => h.adjust('unmount')); off.id = 'mateDetach';
+    const off = btn('拆下', 'danger', () => h.requestDetach(st.selected)); off.id = 'mateDetach';
     const edit = btn('回設計修改', '', () => h.adjust('edit')); edit.id = 'mateEdit';
     row.appendChild(off); row.appendChild(edit); root.appendChild(row);
     if (mod.mount?.face) {

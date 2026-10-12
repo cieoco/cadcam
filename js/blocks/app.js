@@ -2635,7 +2635,7 @@ function openNameDialog(target){
   input.value=target ? tabs.find(t=>t.id===target)?.label || '設計' : S.topo.projectName || (tabs.length===1?tabs[0].label:'機構作品');
   document.getElementById('saveProjectTitle').textContent=target?'重新命名設計':'儲存作品';
   document.getElementById('saveNameLabel').textContent=target?'分頁名稱':'作品名稱';
-  document.getElementById('saveNameHint').textContent=tabs.length===1?'單一設計：分頁名稱與作品檔名同步。':target?'只修改此分頁名稱，作品名稱維持不變。':'包含所有設計分頁，下載為 .json 檔。';
+  document.getElementById('saveNameHint').textContent=tabs.length===1?'單一設計：分頁名稱與作品檔名同步。':target?'只修改此分頁名稱，作品名稱維持不變。':'包含全部設計、未安裝件與組立接合，下載為 .json 檔。';
   document.getElementById('saveNameSubmit').textContent=target?'確認改名':'下載存檔';
   dialog.showModal();input.focus();input.select();
 }
@@ -2902,6 +2902,18 @@ async function downloadBuildPack() {
   saveBuildPack(html,title,plan.parts.length);
 }
 function openFile() {
+  if(!S.comps.length && !S.modules.length){pickWorkFile();return;}
+  const dialog=document.createElement('dialog');dialog.id='openWorkDialog';
+  dialog.style.cssText='max-width:400px;width:calc(100vw - 64px);border:1px solid #bacddd;border-radius:12px;padding:20px;';
+  const title=document.createElement('h3');title.textContent='開啟另一份作品';dialog.append(title);
+  const note=document.createElement('p');note.textContent='選擇並成功讀取檔案後，會替換目前全部設計與組立接合，不是加入零件。需要保留目前作品，請先存檔。';dialog.append(note);
+  const button=(label,fn)=>{const b=document.createElement('button');b.textContent=label;b.style.cssText='min-height:44px;margin:4px;';b.onclick=fn;dialog.append(b);};
+  button('先存檔',()=>{dialog.close();saveFile();});
+  button('選擇作品檔',()=>{dialog.close();pickWorkFile();});
+  button('取消',()=>dialog.close());
+  dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
+}
+function pickWorkFile() {
   const inp = document.createElement('input');
   inp.type = 'file';
   inp.accept = 'application/json,.json';

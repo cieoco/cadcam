@@ -23,7 +23,7 @@ import * as Settings from './settings.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { resolveSpacers, findInterference, interferenceTimeline, hitPartNames } from './interference.js';
 import { setMountFlip } from './module-ops.js?v=20261007_m5a';
-import { mateAdjust, mateDetach } from './mate-connect.js?v=20261007_8_final';   // M5a：滑動不能擠到鄰居；拆下時帶著底下整串
+import { mateAdjust, mateDetach, detachAssembly } from './mate-connect.js?v=20261007_8_final';   // M5a：滑動不能擠到鄰居；拆下時帶著底下整串
 import { pointKeysFor } from './part-types.js';
 import { hitLabels, relabelText } from './part-labels.js';   // M6：干涉訊息用「哪個機構的什麼」，不露零件內部名稱
 import { applyMatrix4, moduleFrameZ } from '../blocks3d/orthogonal-3d.js?v=20261007_m5a';
@@ -700,6 +700,31 @@ export function createBench(deps) {
     rotate: '已繞接合線轉 90°',
     face: '已換到宿主板的另一面'
   };
+  function requestDetach(id) {
+    if (!isBench()) return;
+    if (st.preview) { say('請先確認或取消接合預覽'); return; }
+    const mod=modOf(id);if(!mod)return;
+    deps.pause?.();
+    const before=JSON.stringify([S.comps,S.modules,S.topo.params]);
+    const dialog=document.createElement('dialog');dialog.id='assemblyDetachDialog';
+    dialog.style.cssText='max-width:420px;width:calc(100vw - 64px);border:1px solid #bacddd;border-radius:12px;padding:20px;';
+    dialog.append(el('h3',null,`拆下「${displayName(id)}」`));
+    dialog.append(el('p',null,'保留所有設計與尺寸，拆下後可重新接合；可按復原還原。'));
+    const descendants=new Set([id]);
+    for(let n=0;n<S.modules.length;n++)S.modules.forEach(m=>{if(descendants.has(m.mount?.to?.module))descendants.add(m.id);});
+    dialog.append(el('p',null,'此組包含：'+S.modules.filter(m=>descendants.has(m.id)).map(m=>displayName(m.id)).join('、')));
+    const run=scope=>{
+      if(before!==JSON.stringify([S.comps,S.modules,S.topo.params])){dialog.close();say('作品已變動，請重新選取');return;}
+      const r=detachAssembly(S.comps,S.modules,id,S.topo.params,motorState(),scope);
+      if(!r.ok){say(r.reason);return;}
+      pushUndo();S.comps=r.comps;S.modules=r.modules;dialog.close();
+      rebuild();draw();say('已解除接合，設計仍保留在作品中。');syncUI(true);drawMarkers();
+    };
+    if(mod.mount)dialog.appendChild(bigBtn('整組拆下（保留子件接合）',()=>run('branch')));
+    if(descendants.size>1)dialog.appendChild(bigBtn('解除此組全部接合',()=>run('all'),'danger'));
+    dialog.appendChild(bigBtn('取消',()=>dialog.close()));
+    dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
+  }
   function adjust(action) {
     if (!isBench()) return false;
     const id = st.selected;
@@ -1261,7 +1286,7 @@ export function createBench(deps) {
   wiz = createMateWizard({
     el, bigBtn, st, deps, openFaces: openDefaultFaceWizard, modOf, displayName, statusOf, say, select, syncUI, drawMarkers, computeMarkers, viewer, listEl, panelEl, liveBox, liveCheck,
     liveCount: () => live.ready ? live.findings.length : 0,
-    liveInfo: () => ({ ...currentLiveStatus(), ready: live.ready && !!live.plan && (live.plan.parts || []).length > 0, n: live.findings.length, hits: live.hits, labels: live.labels }), motorState, adjust, adjustState, editModule, ghostFor,
+    liveInfo: () => ({ ...currentLiveStatus(), ready: live.ready && !!live.plan && (live.plan.parts || []).length > 0, n: live.findings.length, hits: live.hits, labels: live.labels }), motorState, adjust, requestDetach, adjustState, editModule, ghostFor,
     clearGhost: () => viewer()?.setPreviewGhost(null), setGhost: spec => viewer()?.setPreviewGhost(spec), isBench,
     cancelAdvancedPreview: () => cancelPreview({ silent: true }),
     // 接上：一筆復原。comps／modules 是已整理好的候選，換成真的作品後照 adjust 的流程重建。

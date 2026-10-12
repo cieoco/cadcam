@@ -123,6 +123,26 @@ try {
   document.querySelector('#designListDialog > button').click();
   api.gripperPilot.reopen(JSON.parse(beforeClose));await api.setMode('design');
   check('保存重開恢復全部分頁入口',document.querySelectorAll('#designTabs [role="tab"]').length===5);
+  await api.setMode('bench');api.benchSelect('Floor');
+  const detach=[...document.querySelectorAll('#mateTreeActions button')].find(b=>b.textContent.includes('從組立拆下'));
+  check('組立清單提供直接拆下入口',!!detach);detach.click();
+  check('拆下列出受影響子件',document.getElementById('assemblyDetachDialog').textContent.includes('RightSide'));
+  const beforeDetach=JSON.stringify(S.modules),beforeParts=JSON.stringify(S.comps),detachUndoCount=S.undoStack.length;
+  document.querySelector('#assemblyDetachDialog button:last-child').click();
+  check('取消拆下不改作品',JSON.stringify(S.modules)===beforeDetach&&S.undoStack.length===detachUndoCount);
+  await new Promise(resolve=>setTimeout(resolve,50));detach.click();document.querySelector('#assemblyDetachDialog button').click();
+  check('整組拆下保留子件接合與設計',!S.modules.find(m=>m.id==='Floor').mount&&S.modules.find(m=>m.id==='RightSide').mount.to.module==='Floor'&&JSON.stringify(S.comps)===beforeParts);
+  api.undo();check('拆下一次復原',JSON.stringify(S.modules)===beforeDetach);await new Promise(resolve=>setTimeout(resolve,50));
+  api.benchSelect('Driver');[...document.querySelectorAll('#mateTreeActions button')].find(b=>b.textContent.includes('解除整組')).click();
+  document.querySelector('#assemblyDetachDialog button').click();
+  check('底座解除整組接合保留全部設計',S.modules.length===4&&S.modules.every(m=>!m.mount)&&JSON.stringify(S.comps)===beforeParts);
+  const detached=api.gripperPilot.snapshot();api.gripperPilot.reopen(detached);
+  check('保存重開保留拆下狀態',S.modules.length===4&&S.modules.every(m=>!m.mount));
+  api.openFile();check('開啟先說明替換整份作品',document.getElementById('openWorkDialog').textContent.includes('不是加入零件'));
+  document.querySelector('#openWorkDialog button:last-child').click();check('取消開啟保留作品',S.modules.length===4);
+  api.saveFile();check('存檔說明包含接合與未安裝件',document.getElementById('saveNameHint').textContent.includes('未安裝件'));
+  document.querySelector('#saveProjectDialog button[type="button"]').click();
+
 } catch (e) { check('測試執行完成：' + e.stack, false); }
 clearTimeout(S.autosaveTimer);
 window.parent.finishIsolationTest(`${lines.join('\n')}\n\n${passed} passed, ${failed} failed`);
