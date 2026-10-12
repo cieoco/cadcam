@@ -34,3 +34,12 @@ const bench=createSimulationScope({...state,mode:'bench'});
 assert.equal(bench.compiled,state.compiled);assert.equal(bench.assembly,state.assembly);assert.equal(bench.wholeWork,true);
 assert.equal(JSON.stringify(fixture),before,'scope must not mutate saved work');
 console.log('PASS isolated user four-bar, rigid lengths, hidden invalid module, static tab and bench boundary');
+
+const {assemblyBranch,closedAssemblies,closedAssemblyIds}=await import('../js/blocks/assembly-view.js');
+assert.deepEqual([...assemblyBranch(fixture.modules,'Driver')].sort(),['Back','Driver','Floor','RightSide']);
+closedAssemblies.add('Driver');
+assert.equal(closedAssemblyIds(fixture.modules).size,4);
+assert.equal(createSimulationScope({...state,mode:'bench'}).comps.length,state.comps.length,'closing a view must not change validation scope');
+assert.equal(JSON.stringify(fixture),before,'closing preserves snapshot');
+closedAssemblies.clear();assert.equal(closedAssemblyIds(fixture.modules).size,0);
+console.log('PASS assembly view close/reopen preserves work and validation scope');

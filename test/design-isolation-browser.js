@@ -123,7 +123,16 @@ try {
   document.querySelector('#designListDialog > button').click();
   api.gripperPilot.reopen(JSON.parse(beforeClose));await api.setMode('design');
   check('保存重開恢復全部分頁入口',document.querySelectorAll('#designTabs [role="tab"]').length===5);
-  await api.setMode('bench');api.benchSelect('Floor');
+  await api.setMode('bench');api.benchSelect('Driver');
+  const closeSnap=JSON.stringify(api.gripperPilot.snapshot()),closeUndo=S.undoStack.length;
+  const visibleBefore=api.benchDebug().visiblePartIds;
+  document.querySelector('#mateTreeActions button').click();
+  check('關閉組立保留作品與復原紀錄',JSON.stringify(api.gripperPilot.snapshot())===closeSnap&&S.undoStack.length===closeUndo);
+  check('整組從組立清單收起',!document.querySelector('#mateTree [data-module="Driver"]')&&!document.querySelector('#mateTree [data-module="Floor"]'));
+  check('關閉組立從3D移除板件但保留其他機構',!api.benchDebug().visiblePartIds.includes('Floor-frame')&&api.benchDebug().visiblePartIds.length>0&&api.benchDebug().visiblePartIds.length<visibleBefore.length);
+  document.querySelector('#closedAssemblyList button').click();
+  check('重新開啟恢復接合與3D板件',JSON.stringify(api.gripperPilot.snapshot())===closeSnap&&api.benchDebug().visiblePartIds.length===visibleBefore.length&&!!document.querySelector('#mateTree [data-module="Floor"]'));
+  api.benchSelect('Floor');
   const detach=[...document.querySelectorAll('#mateTreeActions button')].find(b=>b.textContent.includes('從組立拆下'));
   check('組立清單提供直接拆下入口',!!detach);detach.click();
   check('拆下列出受影響子件',document.getElementById('assemblyDetachDialog').textContent.includes('RightSide'));

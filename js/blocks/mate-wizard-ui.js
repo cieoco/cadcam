@@ -1,3 +1,4 @@
+import {closedAssemblies, closedAssemblyIds} from './assembly-view.js';
 import { faceBracketStatus } from './face-bracket-extras.js';
 /**
  * blocks / mate-wizard-ui
@@ -45,7 +46,7 @@ export function createMateWizard(h) {
   function targetsOf(id) {
     fresh();
     if (!cache.targets.has(id)) cache.targets.set(id, mateTargets(S.comps, S.modules, id, params()));
-    return cache.targets.get(id);
+    return cache.targets.get(id).filter(t=>!closedAssemblyIds(S.modules).has(t.module));
   }
   const okTargets = id => targetsOf(id).filter(t => t.ok);
   function stylesOf(id) {
@@ -123,7 +124,7 @@ export function createMateWizard(h) {
   // 清單順序＝assemblyRoles().order：底座那串在前，未安裝的各串在後；role＝root｜machine｜spare。
   function treeRows() {
     const r = assemblyRoles(S.modules), spare = new Set(r.spare);
-    return r.order.map(id => ({ m: h.modOf(id), depth: r.depth[id], parent: r.parent[id], role: id === r.root ? 'root' : spare.has(id) ? 'spare' : 'machine' })).filter(x => x.m);
+    return r.order.map(id => ({ m: h.modOf(id), depth: r.depth[id], parent: r.parent[id], role: id === r.root ? 'root' : spare.has(id) ? 'spare' : 'machine' })).filter(x => x.m && !closedAssemblyIds(S.modules).has(x.m.id));
   }
   function describe(m, role, depth) {
     const mate = m.mount ? mateOfMount(S.comps, S.modules, m.id, params()) : null;
@@ -139,7 +140,7 @@ export function createMateWizard(h) {
     }
     const rows = treeRows().map(r => ({ ...r, ...describe(r.m, r.role, r.depth) }));
     const names = rows.filter(r => r.role === 'spare').map(r => h.displayName(r.m.id));
-    const sig = JSON.stringify([rows.map(r => [r.m.id, h.displayName(r.m.id), r.depth, r.note, r.tag]), st.selected, names]);
+    const sig = JSON.stringify([rows.map(r => [r.m.id, h.displayName(r.m.id), r.depth, r.note, r.tag]), st.selected, names, [...closedAssemblies]]);
     if (sig === treeSig) return;
     treeSig = sig;
     let note = document.getElementById('mateSpareNote');   // 還沒接上的提醒（沒有時整行藏起來）
@@ -149,8 +150,16 @@ export function createMateWizard(h) {
     let actions=document.getElementById('mateTreeActions');
     if(!actions){actions=el('div');actions.id='mateTreeActions';tree.after(actions);}
     actions.replaceChildren();
+    const closed=S.modules.filter(m=>closedAssemblies.has(m.id));
+    if(closed.length){
+      const list=el('details');list.id='closedAssemblyList';
+      list.appendChild(el('summary',null,`已關閉組立（${closed.length}）`));
+      list.appendChild(el('p',null,'僅收起畫面；存檔、驗證與輸出仍包含全部作品。'));
+      closed.forEach(m=>list.appendChild(btn(`重新開啟：${h.displayName(m.id)}`,'',()=>h.reopenAssembly(m.id))));
+      actions.appendChild(list);
+    }
     while (tree.firstChild) tree.removeChild(tree.firstChild);
-    if (!rows.length) tree.appendChild(el('div', 'bench-empty', '作品裡還沒有機構。回「設計」從模組庫插入。'));
+    if (!rows.length) tree.appendChild(el('div', 'bench-empty', closed.length?'組立已關閉，可由下方重新開啟。':'作品裡還沒有機構。回「設計」從模組庫插入。'));
     rows.forEach(({ m, depth, note, tag }) => {
       const row = el('div', 'mate-tree-row' + (m.id === st.selected ? ' selected' : ''));
       row.dataset.module = m.id; row.tabIndex = 0;
@@ -164,6 +173,10 @@ export function createMateWizard(h) {
       row.addEventListener('click', go);
       row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
       tree.appendChild(row);
+      if(m.id===st.selected && !m.mount){
+        const close=btn('關閉此組立','',()=>h.closeAssembly(m.id));close.style.minHeight='44px';
+        close.title='收起整組畫面，保留設計與接合';actions.appendChild(close);
+      }
       if(m.id===st.selected && (m.mount || S.modules.some(child=>child.mount?.to?.module===m.id))){
         const remove=btn(m.mount?'從組立拆下…':'解除整組接合…','danger',()=>h.requestDetach(m.id));
         remove.style.minHeight='44px';actions.appendChild(remove);

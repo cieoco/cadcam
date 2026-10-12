@@ -1,3 +1,4 @@
+import {closedAssemblies, closedAssemblyIds} from './assembly-view.js';
 import {createMaterialPoseStatus} from './material-pose-status.js';
 import { faceBracketStatus } from './face-bracket-extras.js';
 import { checkLiveInterference, liveInterferenceStatus } from './live-interference-status.js';
@@ -480,7 +481,7 @@ export function createBench(deps) {
     if (!isBench()) return [];
     if (wizardOn()) return wiz.markers();   // 精靈：只亮可接的承接面
     if (st.preview) return [];
-    return computeMarkers().filter(m => m.compatible || st.showAll);
+    return computeMarkers().filter(m => !closedAssemblyIds(S.modules).has(m.module) && (m.compatible || st.showAll));
   }
   function toneOf(m) {
     if (m.key === st.snapId) return 'snap';
@@ -548,7 +549,8 @@ export function createBench(deps) {
   }
   // ptsAll：所有平面的解（子平面的點是該平面自己的座標）；planes：每個直角子平面的 { matrix, zOf }，
   // matrix 與 viewer 畫該平面子場景用的是同一個（model.orthogonal[].matrix，巢狀已逐層相乘）。
-  function afterScene({ pts, ptsAll, model }) {
+  function afterScene({ pts, ptsAll, model, shown=model }) {
+    st.visiblePartIds=(shown?.materialParts || []).map(p=>p.partId);
     st.materialModel=isBench()&&!isCand()?model:null;
     st.materialWorkKey=workKey();st.materialPoseKey=JSON.stringify(motorAnglesNow());
     if(isBench()){syncMaterialPose();applyHighlight();renderLiveStatus();}
@@ -700,6 +702,14 @@ export function createBench(deps) {
     rotate: '已繞接合線轉 90°',
     face: '已換到宿主板的另一面'
   };
+  function closeAssembly(id) {
+    if(st.preview || isCand()){say('請先確認或取消接合預覽');return;}
+    deps.pause?.();closedAssemblies.add(id);st.selected=null;
+    applyHighlight();syncUI(true);draw();drawMarkers();
+  }
+  function reopenAssembly(id) {
+    closedAssemblies.delete(id);syncUI(true);draw();select(id);
+  }
   function requestDetach(id) {
     if (!isBench()) return;
     if (st.preview) { say('請先確認或取消接合預覽'); return; }
@@ -868,7 +878,7 @@ export function createBench(deps) {
     const mod = st.selected ? modOf(st.selected) : null;
     const markers = mod && !mod.mount ? computeMarkers() : [];
     const compat = markers.filter(m => m.compatible);
-    const shown = markers.filter(m => m.compatible || st.showAll);
+    const shown = markers.filter(m => !closedAssemblyIds(S.modules).has(m.module) && (m.compatible || st.showAll));
     const sig = JSON.stringify([
       mod && mod.id, mod && mod.name, mod ? statusOf(mod) : '', !!st.preview, st.showAll,
       shown.map(m => [m.key, m.compatible, m.suggested]),
@@ -1233,6 +1243,7 @@ export function createBench(deps) {
     return {
       mode: S.mode,
       selected: st.selected,
+      visiblePartIds: st.visiblePartIds || [],
       markers: vis.length,
       markersAll: all.length,
       markerList: all.map(m => ({ key: m.key, portId: m.portId, module: m.module, compatible: m.compatible })),   // D2：含宿主模組，同名接口分得開
@@ -1286,7 +1297,7 @@ export function createBench(deps) {
   wiz = createMateWizard({
     el, bigBtn, st, deps, openFaces: openDefaultFaceWizard, modOf, displayName, statusOf, say, select, syncUI, drawMarkers, computeMarkers, viewer, listEl, panelEl, liveBox, liveCheck,
     liveCount: () => live.ready ? live.findings.length : 0,
-    liveInfo: () => ({ ...currentLiveStatus(), ready: live.ready && !!live.plan && (live.plan.parts || []).length > 0, n: live.findings.length, hits: live.hits, labels: live.labels }), motorState, adjust, requestDetach, adjustState, editModule, ghostFor,
+    liveInfo: () => ({ ...currentLiveStatus(), ready: live.ready && !!live.plan && (live.plan.parts || []).length > 0, n: live.findings.length, hits: live.hits, labels: live.labels }), motorState, adjust, requestDetach, closeAssembly, reopenAssembly, adjustState, editModule, ghostFor,
     clearGhost: () => viewer()?.setPreviewGhost(null), setGhost: spec => viewer()?.setPreviewGhost(spec), isBench,
     cancelAdvancedPreview: () => cancelPreview({ silent: true }),
     // 接上：一筆復原。comps／modules 是已整理好的候選，換成真的作品後照 adjust 的流程重建。

@@ -1,3 +1,4 @@
+import {closedAssemblies, closedAssemblyIds} from './assembly-view.js';
 import {createSimulationScope} from './simulation-scope.js';
 import {normalizeProjectName} from './project-name.js';
 import {createMateCandidate} from './mate-candidate.js';
@@ -44,6 +45,7 @@ import { createFusionEditor, drawFusion } from './fusion-editor.js';
 import { createPartGeometrySource } from './part-geometry.js';
 import {buildMaterialScene} from '../blocks3d/material-scene.js';
 const partGeometrySource=createPartGeometrySource();
+const assemblyViewGeometrySource=createPartGeometrySource();
 import * as Render from './render.js';   // SVG 繪製基元（純呈現）
 import * as Panels from './panels.js';   // 編輯面板呈現（讀 S + 寫 DOM）
 import * as Tools from './tools.js';     // 工具模式互動（畫桿 / 畫滑軌 / 畫三點桿 / 連桿升級滑軌）
@@ -227,7 +229,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   S.comps = norm.comps;
   S.modules = Array.isArray(norm.modules) ? norm.modules : [];
   knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組
-  if(source!=='undo')closedDesignTabs.clear();
+  if(source!=='undo'){closedDesignTabs.clear();closedAssemblies.clear();}
   if (source !== 'undo') S.designFocus = source === 'local-autosave' ? savedFocus() : null;   // 開檔／範例／分享 → 第一頁；自動還原 → 回到上次那頁
   S.topo = { projectName: norm.projectName || '', rootDesignName: norm.rootDesignName || (!S.modules.length ? norm.projectName : '') || '', params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '' };
   manualTrace = {};
@@ -1895,24 +1897,33 @@ function push3DNow() {
   // 有直角安裝時，主平面場景只用主平面的輸入；其餘平面由 buildOrthogonalChildren 另建並立起來。
   // H1：設計模式的 3D 只畫焦點分頁（直角子模組在自己的平面平放，不立起來）；組立模式照舊畫全部。
   const designView = inDesign() && S.modules.length && lastModelInputsAll;
-  const allPlanes = !designView && hasOrthogonalModules() && lastModelInputsAll ? lastModelInputsAll : null;
-  const planesApi = designView ? focusInputs(lastModelInputsAll, viewComps()) : allPlanes ? planeInputs(allPlanes, S.comps, S.modules, null) : lastModelInputs;
-  const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = planesApi;
-  const stockMm=Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;
-  const catalog=partGeometrySource.get({comps:S.comps,modules:S.modules,params:S.topo.params,fabrication:S.fabrication || {},
-    exportSettings:Settings.exportSettings(),frameNodes:designView?viewFrameNodes():frameConnectorNodes(),mounts:homeMountsNow(),
-    frameMounts:designView?viewMounts(viewWorldMounts(Exporters.splitMountsByHost(S.comps,homeMountsNow()).free)):undefined});
-  const frameGeometry=designView&&S.viewPlane?null:catalog.parts.frame || null;
-  const plates=catalog.frameHomes.filter(h=>!designView || h.moduleId===S.designFocus).map(h=>({moduleId:h.moduleId,plane:h.plane,
-    outlines:h.geometry.outlines,outline:h.geometry.outlines[0],holes:h.geometry.holes,cutouts:h.geometry.cutouts,thicknessMm:catalog.parts[h.name]?.thicknessMm || h.stockMm}));
-  const model=buildMaterialScene({comps:S.comps,modules:S.modules,params:S.topo.params,catalog,inputs:planesApi,allPlanes,
-    points:allPlanes?allPlanes.pts:designView?lastModelInputsAll.pts:pts,stockMm,frameGeometry,plates,plane:designView?(S.viewPlane || null):null,
-    assemblyScope:!designView,asm:S.assembly,plan:modulePlates.plan(),exportSettings:Settings.exportSettings(),joint:jointSettingsNow(),hullR:HULL_R_WORLD,solveValidity:lastSolveValidity});
+  function sceneFor(hidden) {
+    const sceneComps = hidden.size ? S.comps.filter(c=>!hidden.has(c.moduleId)) : S.comps;
+    const sceneModules = hidden.size ? S.modules.filter(m=>!hidden.has(m.id)) : S.modules;
+    const visibleInputs = input => hidden.size ? focusInputs(input,sceneComps) : input;
+    const allPlanes = !designView && hasOrthogonalModules() && lastModelInputsAll ? visibleInputs(lastModelInputsAll) : null;
+    const planesApi = designView ? focusInputs(lastModelInputsAll, viewComps()) : allPlanes ? planeInputs(allPlanes, sceneComps, sceneModules, null) : visibleInputs(lastModelInputs);
+    const { links, pts, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts } = planesApi;
+    const stockMm=Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;
+    const catalog=(hidden.size?assemblyViewGeometrySource:partGeometrySource).get({comps:sceneComps,modules:sceneModules,params:S.topo.params,fabrication:S.fabrication || {},
+      exportSettings:Settings.exportSettings(),frameNodes:designView?viewFrameNodes():Model.frameConnectorNodes(machineFrameComps(sceneComps,sceneModules)),mounts:hidden.size?undefined:homeMountsNow(),
+      frameMounts:designView?viewMounts(viewWorldMounts(Exporters.splitMountsByHost(S.comps,homeMountsNow()).free)):undefined});
+    const frameGeometry=designView&&S.viewPlane?null:catalog.parts.frame || null;
+    const plates=catalog.frameHomes.filter(h=>!designView || h.moduleId===S.designFocus).map(h=>({moduleId:h.moduleId,plane:h.plane,
+      outlines:h.geometry.outlines,outline:h.geometry.outlines[0],holes:h.geometry.holes,cutouts:h.geometry.cutouts,thicknessMm:catalog.parts[h.name]?.thicknessMm || h.stockMm}));
+    const model=buildMaterialScene({comps:sceneComps,modules:sceneModules,params:S.topo.params,catalog,inputs:planesApi,allPlanes,
+      points:allPlanes?allPlanes.pts:designView?lastModelInputsAll.pts:pts,stockMm,frameGeometry,plates,plane:designView?(S.viewPlane || null):null,
+      assemblyScope:!designView,asm:S.assembly,plan:modulePlates.plan(),exportSettings:Settings.exportSettings(),joint:jointSettingsNow(),hullR:HULL_R_WORLD,solveValidity:lastSolveValidity});
+    return {model,planesApi,allPlanes};
+  }
+  const hidden=inDesign()?new Set():closedAssemblyIds(S.modules);
+  const {model,planesApi,allPlanes}=sceneFor(new Set());
+  const shown=hidden.size?sceneFor(hidden).model:model;
   if(benchmarkSession&&!playbackProbe.active())benchmarkCoverage={materialParts:model.materialParts.length,holes:model.materialParts.reduce((n,p)=>n+p.geometry.holes.length,0),cutouts:model.materialParts.reduce((n,p)=>n+p.geometry.cutouts.length,0),bracketWings:model.materialParts.filter(p=>p.geometry.kind==='bracket-wing').length,screwInstances:model.materialParts.filter(p=>p.geometry.kind==='screw').length,legacyHardware:[model,...(model.orthogonal || []).map(c=>c.model)].map(m=>({motors:m.motors?.length || 0,pins:m.pins?.length || 0})),geometryCounters:viewer3D.cacheStats()};
   const posedAt=measuring?performance.now():0;
-  viewer3D.update(model);
+  viewer3D.update(shown);
   if(measuring)frame3dCpu={poseMs:posedAt-started,submit3dMs:performance.now()-posedAt};
-  bench.afterScene({ pts: planesApi.pts, ptsAll: allPlanes ? allPlanes.pts : planesApi.pts, model });   // 組立台：接口標記跟著這一幀的宿主位置
+  bench.afterScene({ pts: planesApi.pts, ptsAll: allPlanes ? allPlanes.pts : planesApi.pts, model, shown });   // 組立台：接口標記跟著這一幀的宿主位置
 }
 
 function refresh3DView() {
