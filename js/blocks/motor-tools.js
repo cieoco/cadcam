@@ -21,6 +21,14 @@ export function motorTypeAt(comps, centerId) {
   if (gear) return gear.motorType === 'mg995' ? 'mg995' : 'tt';
   return 'tt';
 }
+// 角度面板與編輯共用同一查詢；馬達裝配的桿件查詢仍保持原用途。
+export function servoInputAt(comps, centerId) {
+  return comps.find(c => c.motorType === 'mg995' && (
+    (c.type === 'gear' && c.p1?.id === centerId && c.p1.physicalMotor) ||
+    (c.type === 'bar' && c.isInput && [c.p1, c.p2].some(p => p?.id === centerId && p.physicalMotor))
+  )) || null;
+}
+
 // active 馬達若是 MG995 伺服（桿件或齒輪），回它來回擺的 {lo, hi}；否則 null。
 export function servoRange(comps, activeMotor) {
   const active = String(activeMotor);

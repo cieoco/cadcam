@@ -145,6 +145,7 @@ export function createGripperController({ getComps, getParams, rebuild, draw, pa
   el('gripperOpenBtn')?.addEventListener('click', () => moveTo('open'));
   el('gripperCloseBtn')?.addEventListener('click', () => moveTo('closed'));
   el('gripperDownloadBtn')?.addEventListener('click', download);
+  el('gripperTaskDetails')?.addEventListener('toggle', () => { if (active) { render(); draw(); } });
 
   const operations = createGripperOperationSession({ getSnapshot, applySnapshot: snapshot => {
     if (!applySnapshot) throw new Error('宿主未提供作品套用入口。');

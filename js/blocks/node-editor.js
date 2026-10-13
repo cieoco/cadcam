@@ -10,6 +10,7 @@
 import { S } from './state.js';
 import * as Panels from './panels.js';
 import { LEGO_FRAME_STEP as LEGO_STEP } from './model.js';
+import { servoInputAt } from './motor-tools.js';
 
 export function createNodeEditor({
   pushUndo, pause, rebuild, draw, setBanner, transient, scheduleAutosave,
@@ -40,7 +41,7 @@ export function createNodeEditor({
     rebuild(); draw();
   }
   function changeServoAngle(which, delta) {
-    const bar = S.selectedNodeId && hasPoint(S.selectedNodeId) ? motorBarForCenter(S.selectedNodeId) : null;
+    const bar = S.selectedNodeId && hasPoint(S.selectedNodeId) ? servoInputAt(S.comps, S.selectedNodeId) : null;
     if (!bar || bar.motorType !== 'mg995') return;
     pushUndo();
     const field = (which === 'end') ? 'servoEnd' : 'servoStart';

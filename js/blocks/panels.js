@@ -10,6 +10,7 @@
  */
 
 import { S } from './state.js';
+import { servoInputAt } from './motor-tools.js';
 
 // ---- 注入的查詢 helper（由 app 在啟動時提供）----
 let pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked, frameSizeInfo;
@@ -65,7 +66,7 @@ export function updateZliftButtons() {
 export function updateServoEditor() {
   const panel = document.getElementById('servoEditor');
   if (!panel) return;
-  const bar = S.selectedNodeId && hasPoint(S.selectedNodeId) ? motorBarForCenter(S.selectedNodeId) : null;
+  const bar = S.selectedNodeId && hasPoint(S.selectedNodeId) ? servoInputAt(S.comps, S.selectedNodeId) : null;
   if (!bar || bar.motorType !== 'mg995') {
     panel.style.display = 'none';
     return;

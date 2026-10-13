@@ -128,4 +128,24 @@ const pt = (id, extra = {}) => ({ id, x: 0, y: 0, type: 'floating', ...extra });
   check('存檔往返：TT 齒輪不多出 motorType／servo 欄位（舊檔不變）', lg && !('motorType' in lg) && !('servoStart' in lg) && !('servoEnd' in lg));
 }
 
+// Teaching: selecting a servo gear center must expose and edit its own range.
+{
+  const Panels = await import('../js/blocks/panels.js');
+  const { createNodeEditor } = await import('../js/blocks/node-editor.js');
+  const gear = { type: 'gear', id: 'LessonGear', motorType: 'mg995', servoStart: 0, servoEnd: 90, p1: pt('LessonCenter', { physicalMotor: '1' }) };
+  const tt = { type: 'gear', id: 'OtherGear', p1: pt('OtherCenter', { physicalMotor: '2' }) };
+  S.comps = [gear, tt]; S.selectedNodeId = 'LessonCenter';
+  Panels.init({ hasPoint: id => ['LessonCenter', 'OtherCenter'].includes(id), motorBarForCenter: () => null });
+  Panels.updateServoEditor();
+  check('齒輪中心選取後顯示角度面板', els.get('servoEditor').style.display === 'flex' && els.get('servoEndVal').textContent === 90);
+  let undo = 0, saves = 0;
+  const editor = createNodeEditor({ hasPoint: () => true, pushUndo: () => undo++, scheduleAutosave: () => saves++ });
+  editor.changeServoAngle('end', -15);
+  check('齒輪終角修改使用原復原與保存入口', gear.servoEnd === 75 && undo === 1 && saves === 1 && MT.servoRange(S.comps, '1').hi === 75);
+  S.selectedNodeId = 'OtherCenter'; Panels.updateServoEditor(); editor.changeServoAngle('end', -15);
+  check('換選 TT 不顯示、不寫入伺服角度', els.get('servoEditor').style.display === 'none' && tt.servoEnd === undefined && undo === 1);
+  const bar = { type: 'bar', isInput: true, motorType: 'mg995', p1: pt('Far'), p2: pt('BarCenter', { physicalMotor: '3' }) };
+  check('保留馬達在桿件第二端的查詢', MT.servoInputAt([bar], 'BarCenter') === bar);
+}
+
 report('gear-servo');
