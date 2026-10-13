@@ -196,7 +196,8 @@
     "test/point-connection.mjs",
     "test/design-guide.mjs",
     "test/simulation-scope.mjs",
-    "test/project-name.mjs"
+    "test/project-name.mjs",
+    "test/export-scope.mjs"
   ],
   "version": 1
 }

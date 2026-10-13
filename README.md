@@ -97,6 +97,8 @@ linkage/
 
 `js/blocks/app.js` 是目前主入口的 UI 控制器，直接使用 `js/core/topology.js` 編譯與 `js/multilink/solver.js` 求解。編輯、輸入、繪製分在 `js/blocks/` 的對應模組；`js/blocks3d/` 提供唯讀 3D 預覽，使用內附的 Three.js，無需 npm 安裝或 build。
 
+DXF／SVG 匯出先選「目前設計」「所選零件」或「目前組立」，核對檔名與數量後再下載。設計模式預設目前分頁；組立模式預設目前組立。手機可直接在匯出視窗選零件，聯集件保持整片輸出；所選零件不額外加入機架。取消不下載；多檔下載遭阻擋時可使用逐一下載按鈕。
+
 作品由 `js/blocks/schema.js` 正規化，`storage.js` 提供 `blocks.json` 存取、自動還原與分享。blocks 的加工匯出為 SVG／DXF，目前包含連桿、板件、齒輪與機架；滑軌本體不在零件匯出清單內。舊版 `mechanism.json` ARM 交換格式不等同於 blocks 作品格式。
 
 Node 22 以上可直接執行 `node test/<name>.mjs`；例如 `node test/slider-crank.mjs`、`node test/gear-pair.mjs`。完整驗收執行 `node tools/test-runner.mjs`，不需 npm／build；CI 固定使用已驗證的 Node `22.14.0`。清單在 `test/manifest.json`，包含頂層驗收與根目錄 schema／分享／hull 腳本；helpers 僅供匯入，fixtures 與瀏覽器驗收不獨立當成 Node 腳本。

@@ -59,7 +59,7 @@ export function normalizeExportSettings(settings = {}) {
   };
 }
 
-function downloadText(text, filename, mime) {
+export function downloadText(text, filename, mime) {
   const blob = new Blob([text], { type: `${mime};charset=utf-8` });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1272,7 +1272,7 @@ export function inspectLinkExport(comp, length, settings = {}, extraHoles = []) 
   return { outlines: [outline], holes, cutouts };
 }
 
-export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extras = null) {
+export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extras = null, emit = downloadText) {
   assertAdapterFeatures(extras);
   assertFusionFeatures(comps,mounts,extras);
   exportableGears(comps,params,settings);
@@ -1286,24 +1286,24 @@ export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extr
     const text = hostGeometry
       ? addSvgStockDescription(svgForFrameGeometry(hostGeometry, comp.id), comp)
       : svgForLink(comp, length, settings, extraOf(comp));
-    downloadText(text, `${safeName(comp.id)}.svg`, 'image/svg+xml');
+    emit(text, `${safeName(comp.id)}.svg`, 'image/svg+xml', [comp.id]);
   });
   const plates = exportablePlates(comps, pts);
   plates.forEach(({ comp, points }) => {
-    downloadText(svgForPlate(comp, points, settings, hosted.get(comp.id), plateHolesOf(comp)), `${safeName(comp.id)}.svg`, 'image/svg+xml');
+    emit(svgForPlate(comp, points, settings, hosted.get(comp.id), plateHolesOf(comp)), `${safeName(comp.id)}.svg`, 'image/svg+xml', [comp.id]);
   });
   const gears = exportableGears(comps, params, settings);
   gears.forEach(({ comp, geometry, fusedPlate }) => {
-    downloadText(fusedPlate ? addSvgStockDescription(svgForGear(comp,geometry),fusedPlate) : svgForGear(comp, geometry), `${safeName(comp.id)}.svg`, 'image/svg+xml');
+    emit(fusedPlate ? addSvgStockDescription(svgForGear(comp,geometry),fusedPlate) : svgForGear(comp, geometry), `${safeName(comp.id)}.svg`, 'image/svg+xml', fusedPlate ? [comp.id, fusedPlate.id] : [comp.id]);
   });
   const racks = exportableRacks(comps, params);
   racks.forEach(({ comp, geometry }) => {
-    downloadText(svgForRack(comp, geometry), `${safeName(comp.id)}.svg`, 'image/svg+xml');
+    emit(svgForRack(comp, geometry), `${safeName(comp.id)}.svg`, 'image/svg+xml', [comp.id]);
   });
   return links.length + plates.length + gears.length + racks.length;
 }
 
-export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extras = null) {
+export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extras = null, emit = downloadText) {
   assertAdapterFeatures(extras);
   assertFusionFeatures(comps,mounts,extras);
   exportableGears(comps,params,settings);
@@ -1316,19 +1316,19 @@ export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extr
     const text = hostGeometry
       ? addDxfStockComment(dxfForFrameGeometry(hostGeometry,comp.id), comp)
       : dxfForLink(comp, length, settings, extraOf(comp));
-    downloadText(text, `${safeName(comp.id)}.dxf`, 'application/dxf');
+    emit(text, `${safeName(comp.id)}.dxf`, 'application/dxf', [comp.id]);
   });
   const plates = exportablePlates(comps, pts);
   plates.forEach(({ comp, points }) => {
-    downloadText(dxfForPlate(comp, points, settings, hosted.get(comp.id), plateHolesOf(comp)), `${safeName(comp.id)}.dxf`, 'application/dxf');
+    emit(dxfForPlate(comp, points, settings, hosted.get(comp.id), plateHolesOf(comp)), `${safeName(comp.id)}.dxf`, 'application/dxf', [comp.id]);
   });
   const gears = exportableGears(comps, params, settings);
   gears.forEach(({ comp, geometry, fusedPlate }) => {
-    downloadText(fusedPlate ? addDxfStockComment(dxfForGear(comp,geometry),fusedPlate) : dxfForGear(comp, geometry), `${safeName(comp.id)}.dxf`, 'application/dxf');
+    emit(fusedPlate ? addDxfStockComment(dxfForGear(comp,geometry),fusedPlate) : dxfForGear(comp, geometry), `${safeName(comp.id)}.dxf`, 'application/dxf', fusedPlate ? [comp.id, fusedPlate.id] : [comp.id]);
   });
   const racks = exportableRacks(comps, params);
   racks.forEach(({ comp, geometry }) => {
-    downloadText(dxfForRack(comp, geometry), `${safeName(comp.id)}.dxf`, 'application/dxf');
+    emit(dxfForRack(comp, geometry), `${safeName(comp.id)}.dxf`, 'application/dxf', [comp.id]);
   });
   return links.length + plates.length + gears.length + racks.length;
 }
@@ -1360,16 +1360,16 @@ export function cncPartsForExport(comps, pts, params, settings, mounts = [], ext
   return parts;
 }
 
-export function exportFrameAsSvg(frameNodes, settings, motorMounts = [], name = 'frame') {
+export function exportFrameAsSvg(frameNodes, settings, motorMounts = [], name = 'frame', emit = downloadText) {
   const svg = svgForFrame(frameNodes, settings, motorMounts,name);
   if (!svg) return 0;
-  downloadText(svg, `${name}.svg`, 'image/svg+xml');
+  emit(svg, `${name}.svg`, 'image/svg+xml');
   return 1;
 }
 
-export function exportFrameAsDxf(frameNodes, settings, motorMounts = [], name = 'frame') {
+export function exportFrameAsDxf(frameNodes, settings, motorMounts = [], name = 'frame', emit = downloadText) {
   const dxf = dxfForFrame(frameNodes, settings, motorMounts,name);
   if (!dxf) return 0;
-  downloadText(dxf, `${name}.dxf`, 'application/dxf');
+  emit(dxf, `${name}.dxf`, 'application/dxf');
   return 1;
 }

@@ -2888,83 +2888,20 @@ async function exportVideo() {
   finally { videoExportLoading = false; }
 }
 
-function exportFaceFiles(format) {
-  try{
-    const data=faceFileExportData(facePackSource(),{theta:S.theta,motorAngles:motorAnglesNow(),_prevPoints:lastFullPts});
-    const stockWarnings=memberStockWarnings(data.comps,data.settings);
-    if(stockWarnings.length){transient(`尚未匯出：${stockWarnings[0]}`);return;}
-    const links=format==='svg'?Exporters.exportLinksAsSvg:Exporters.exportLinksAsDxf,frame=format==='svg'?Exporters.exportFrameAsSvg:Exporters.exportFrameAsDxf;
-    const count=links(data.comps,data.points,data.params,data.settings,data.mounts,data.extras);
-    const frames=data.frames.reduce((n,f)=>n+frame(f.nodes,data.settings,f.mounts,f.name),0);
-    showCncWarnings(Object.values(data.catalog.parts).filter(p=>['frame','mounted-frame','bar','triangle','gear','fusion'].includes(p.kind)).map(p=>({...p,name:p.id})),data.settings);
-    transient(`已匯出 ${count} 個零件＋${frames} 片機架 ${format.toUpperCase()}`);
-  }catch(e){transient(`尚未匯出：${e.message}`);}
+let scopedExportLoading=false;
+async function exportScopedFiles(format) {
+  if(scopedExportLoading)return;
+  scopedExportLoading=true;pause();hydraulic?.stop();
+  try {
+    const {openScopedExport}=await import('./export-dialog.js');
+    openScopedExport({format,notify:transient,
+      readSource:()=>({...facePackSource(),comps:S.comps,modules:S.modules}),
+      readOptions:()=>({mode:S.mode,focus:S.designFocus,selectedId:
+        [S.selectedTriangleId,S.selectedGearId,S.selectedLinkId,S.selectedSliderId].find(id=>viewComps().some(c=>c.id===id)) || null})});
+  } catch(e){transient(`尚未匯出：${e.message}`);}finally{scopedExportLoading=false;}
 }
-function exportLinksSvg() {
-  if(hydraulic?.active())return hydraulic.exportWork('svg');
-  if(usesFaceExport(facePackSource()))return exportFaceFiles('svg');
-  const invalid=representationWork().comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(representationWork().comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
-  if(invalid){transient(`尚未匯出：${invalid.reason}`);return;}
-  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), representationWork().comps, representationWork().modules), M = machineNow();
-  const stockWarnings = memberStockWarnings(M.comps, settings);
-  if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
-  // 有宿主機架桿的 mount 隨該桿匯出（特徵切進桿身）；剩下的才進 frame.svg；已安裝模組另出各自的機架檔。
-  const freeMounts = exportWorldMounts(Exporters.splitMountsByHost(M.comps, mounts).free);
-  const extras = orthoExtrasNow(true);
-  try { Exporters.assertAdapterFeatures(extras);Exporters.assertFusionFeatures(M.comps,mounts,extras); } catch(e) { transient(e.message);return; }
-  const cutNodes = withWorldAdapterNodes(nodes, extras);   // C1：機架板邊上的轉接座宿主孔
-  const count = Exporters.exportLinksAsSvg(M.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras);
-  const frameCount = Exporters.exportFrameAsSvg(cutNodes, settings, freeMounts);
-  const warnings = Exporters.frameExportWarnings(cutNodes, settings, freeMounts);
-  const cncParts = [...Exporters.cncPartsForExport(M.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', cutNodes, settings, freeMounts)];
-  // 已安裝模組另出一份機架檔（SDD-ASSEMBLY-MODULES §4.2）；座標用 home 姿態重算安裝座。
-  let moduleFrameCount = 0;
-  moduleFrameExports(M.comps, M.modules, S.topo.params).forEach(entry => {
-    const modNodes = withAdapterNodes(entry.moduleId, moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps)), extras);
-    const homeMounts = homeMountsNow();
-    const modFree = splitFrameMounts(Exporters.splitMountsByHost(M.comps, homeMounts).free, M.comps, M.modules).byModule[entry.moduleId] || [];
-    const n = Exporters.exportFrameAsSvg(modNodes, settings, modFree, entry.fileBase);
-    moduleFrameCount += n;
-    if (n) {
-      warnings.push(...Exporters.frameExportWarnings(modNodes, settings, modFree));
-      cncParts.push(cncFramePart(entry.fileBase, modNodes, settings, modFree));
-    }
-  });
-  transient(count || frameCount || moduleFrameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} SVG${moduleFrameCount ? `＋ ${moduleFrameCount} 個模組底座` : ''}${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
-  showCncWarnings(cncParts, settings);
-}
-function exportLinksDxf() {
-  if(hydraulic?.active())return hydraulic.exportWork('dxf');
-  if(usesFaceExport(facePackSource()))return exportFaceFiles('dxf');
-  const invalid=representationWork().comps.filter(c=>c.fusedWith).map(c=>Exporters.inspectFusion(representationWork().comps,c,S.topo.params,Settings.exportSettings())).find(f=>!f.ok);
-  if(invalid){transient(`尚未匯出：${invalid.reason}`);return;}
-  const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive }, nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), representationWork().comps, representationWork().modules), M = machineNow();
-  const stockWarnings = memberStockWarnings(M.comps, settings);
-  if (stockWarnings.length) { transient(`尚未匯出：${stockWarnings[0]}`); return; }
-  const freeMounts = exportWorldMounts(Exporters.splitMountsByHost(M.comps, mounts).free);
-  const extras = orthoExtrasNow(true);
-  try { Exporters.assertAdapterFeatures(extras);Exporters.assertFusionFeatures(M.comps,mounts,extras); } catch(e) { transient(e.message);return; }
-  const cutNodes = withWorldAdapterNodes(nodes, extras);   // C1：機架板邊上的轉接座宿主孔
-  const count = Exporters.exportLinksAsDxf(M.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras);
-  const frameCount = Exporters.exportFrameAsDxf(cutNodes, settings, freeMounts);
-  const warnings = Exporters.frameExportWarnings(cutNodes, settings, freeMounts);
-  const cncParts = [...Exporters.cncPartsForExport(M.comps, lastModelInputs && lastModelInputs.pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', cutNodes, settings, freeMounts)];
-  // 已安裝模組另出一份機架檔（SDD-ASSEMBLY-MODULES §4.2）；座標用 home 姿態重算安裝座。
-  let moduleFrameCount = 0;
-  moduleFrameExports(M.comps, M.modules, S.topo.params).forEach(entry => {
-    const modNodes = withAdapterNodes(entry.moduleId, moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps)), extras);
-    const homeMounts = homeMountsNow();
-    const modFree = splitFrameMounts(Exporters.splitMountsByHost(M.comps, homeMounts).free, M.comps, M.modules).byModule[entry.moduleId] || [];
-    const n = Exporters.exportFrameAsDxf(modNodes, settings, modFree, entry.fileBase);
-    moduleFrameCount += n;
-    if (n) {
-      warnings.push(...Exporters.frameExportWarnings(modNodes, settings, modFree));
-      cncParts.push(cncFramePart(entry.fileBase, modNodes, settings, modFree));
-    }
-  });
-  transient(count || frameCount || moduleFrameCount ? `已匯出 ${count} 個零件 + ${frameCount ? '機架' : '無機架'} DXF${moduleFrameCount ? `＋ ${moduleFrameCount} 個模組底座` : ''}${warnings.length ? `；⚠ ${warnings[0]}` : ''}` : '沒有可匯出的零件或機架');
-  showCncWarnings(cncParts, settings);
-}
+function exportLinksSvg(){return exportScopedFiles('svg');}
+function exportLinksDxf(){return exportScopedFiles('dxf');}
 // 製作包用：與匯出相同的零件與機架幾何，只收集 CNC 檢查用的孔與開口（不下載檔案）。
 function collectCncPartsAndFrameWarnings(settings) {
   const nodes = frameConnectorNodes(), mounts = machineMounts(motorFrameExportMounts(), representationWork().comps, representationWork().modules), M = machineNow();
