@@ -57,7 +57,7 @@ import * as Tools from './tools.js';     // 工具模式互動（畫桿 / 畫滑
 import * as Input from './input.js?v=20261007_m2b';     // 指標 / 手勢互動（拖曳 + 吸附合併 + pinch 縮放）
 import * as Model from './model.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
-import { unsolvedMovingPoints } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
+import { unsolvedMovingPoints, motionPoseIssue, inspectMotionRange } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
 import { offerExampleFromUrl } from './example-entry.js?v=20261005_unit2';
 import { getTeachingFeedback } from './teaching-feedback.js';
 import * as Motion from './motion.js';
@@ -1368,6 +1368,7 @@ let sliderLayer = null;        // 滑軌動態層：播放時就地清空重畫�
 let recountBanner = null;      // (pts, sol)=>void：播放時重算死點橫幅（沿用重建時的桿件清單）
 
 // 解這一幀 + 推進位移歷史，回傳合併後的「點 id -> 畫面位置」。draw 與 renderFrame 共用同一套求解語意。
+let lastFrameIssue = null;
 function solveFrame() {
   const scope=simulationScope();
   let sol = null;
@@ -1375,6 +1376,8 @@ function solveFrame() {
   const seed = extrapolateSeed(lastSolved, prevSolved);
   const frameParams = { thetaDeg: S.theta, motorAngles: motorAnglesNow(), _prevPoints: seed };
   try { sol = scope.assembly ? solveAssembly(scope.assembly, frameParams) : solveTopology(scope.compiled, frameParams); } catch (_) {}
+  lastFrameIssue = motionPoseIssue(scope.comps, sol);
+  if (lastFrameIssue) sol = { ...sol, isValid: false, errorReason: lastFrameIssue.message };
   lastSolveValidity=materialSolveValidity(scope.comps,sol);
   const solved = (sol && sol.isValid !== false && sol.points) ? sol.points : {};
   // 無效解整幀不採用，避免新舊接點混合而拉伸剛性零件；保留上一姿態。
@@ -2332,10 +2335,12 @@ function play() {
     return;
   }
   if (!hasDriveSource()) { transient('先把動力來源放到轉軸，才能播放'); return; }
+  const checked = checkPlaybackMotion();
+  if (!checked.ok) { showMotionWarning(checked.message); return; }
   playbackActive=true;onPlaybackChange();
   document.getElementById('playBtn').classList.add('playing');
   document.getElementById('playBtn').textContent = '⏸';
-  playPlan = planMotion();
+  playPlan = checked.plan;
   // 有限行程輸入（MG995 角度範圍 / 線性致動器行程）：覆寫成在兩端間來回擺。
   const ranged = inputRockRange();
   if (ranged && Number.isFinite(ranged.lo) && Number.isFinite(ranged.hi) && ranged.hi >= ranged.lo) {
@@ -2350,6 +2355,7 @@ function play() {
     const measuring=playbackProbe?.active(),cpuStart=measuring?performance.now():0;
     const dt = lastTs == null ? NOMINAL_FRAME_DT_MS : ts - lastTs; // 第一幀用名目幀長，按下播放立即有反應
     lastTs = ts;
+    const previousTheta = S.theta;
     if (playPlan.mode === 'rock') {
       // 搖桿：在 lo..hi 間來回擺，到極限就反向（真實的搖桿物理）
       const next = advanceRock(S.theta, playDir, playStepDeg(dt), playPlan.lo, playPlan.hi);
@@ -2360,6 +2366,10 @@ function play() {
     }
     document.getElementById('thetaVal').textContent = angleLabel(S.theta);
     renderFrame();
+    if (lastFrameIssue) {
+      const message = `${S.theta.toFixed(1)}°：${lastFrameIssue.message}`;
+      S.theta = previousTheta; pause(); draw(); showMotionWarning(message); return;
+    }
     const rendered=measuring?viewer3D.renderNow(ts):null;
     if(measuring&&benchmarkShapeKey!==viewer3D?.cacheStats?.().key)playbackProbe.abort('geometry_changed');
     if(measuring)playbackProbe.record({...frameCpu,submit3dMs:(frameCpu?.submit3dMs || 0)+rendered.cpuMs,rendererCpuMs:rendered.cpuMs,poseRevision:rendered.poseRevision,appRafTimestamp:ts,rendererRafTimestamp:rendered.rendererRafTimestamp,totalMs:performance.now()-cpuStart,rafIntervalMs:dt,theta:S.theta,geometryCounters:viewer3D?.cacheStats?.() && (({geometryBuilds,geometryReuses,geometryDisposals})=>({geometryBuilds,geometryReuses,geometryDisposals}))(viewer3D.cacheStats())});
@@ -2374,6 +2384,28 @@ function pause() {
   onPlaybackChange();
   document.getElementById('playBtn').classList.remove('playing');
   document.getElementById('playBtn').textContent = '▶';
+}
+
+function showMotionWarning(message) {
+  clearBanner();
+  const el = document.getElementById('solveBanner');
+  el.textContent = `暫停模擬：${message}`;
+  el.style.display = 'block';
+  el.setAttribute('role', 'status');
+}
+function checkPlaybackMotion() {
+  const scope = simulationScope();
+  const solveAt = (angle, seed) => {
+    const p = { thetaDeg: angle, motorAngles: { ...motorAnglesNow(), [String(S.activeMotor)]: angle }, _prevPoints: seed };
+    return scope.assembly ? solveAssembly(scope.assembly, p) : solveTopology(scope.compiled, p);
+  };
+  let current = null;
+  try { current = solveAt(S.theta, lastSolved); } catch (_) {}
+  const issue = motionPoseIssue(scope.comps, current);
+  if (issue) return { ok: false, ...issue };
+  const range = inputRockRange();
+  const plan = range ? { mode: 'rock', lo: range.lo, hi: range.hi } : planMotion();
+  return { ...inspectMotionRange({ comps: scope.comps, solveAt, theta: S.theta, plan, seed: lastSolved }), plan };
 }
 function togglePlay() {
   if(hydraulic?.active()){hydraulic.isPlaying()?pause():hydraulic.play();return;}
@@ -2413,7 +2445,7 @@ function updateSolveBanner(sol, missingVisibleLinks) {
   const el = document.getElementById('solveBanner');
   if (!el) return;
   const show = missingVisibleLinks > 0 || (sol && sol.isValid === false);
-  el.textContent = show ? (sol?.errorReason
+  el.textContent = show ? (lastFrameIssue ? `暫停模擬：${lastFrameIssue.message}` : sol?.errorReason
     ? `${sol.errorReason}；已保留原姿態，請檢查桿長與固定接點。`
     : '目前姿勢無法求解，已保留原姿態；請檢查桿長與接點。') : '';
   el.style.display = show ? 'block' : 'none';
@@ -2862,10 +2894,14 @@ async function exportVideo() {
   if (!S.comps.length || !hasDriveSource()) { transient('請先建立有動力的機構，再匯出動畫'); return; }
   if (taskApplies(gripperController) && !gripperController.currentPlan().ok) { transient('請先修正夾爪任務，再匯出動畫'); return; }
   if (taskApplies(parallelLiftController) && !parallelLiftController.currentPlan().ok) { transient('請先確認、取消或修正平行四連桿任務，再匯出動畫'); return; }
+  const checked = checkPlaybackMotion();
+  if (!checked.ok) { showMotionWarning(checked.message); return; }
   videoExportLoading = true;
   try {
     const { exportAnimation } = await import('./video-export.js');
     await exportAnimation({ svg, begin: () => {
+      const fresh = checkPlaybackMotion();
+      if (!fresh.ok) { showMotionWarning(fresh.message); throw new Error(fresh.message); }
       const theta = S.theta, direction = playDir, wasPlaying = !!raf;
       const savedLast = lastSolved, savedPrev = prevSolved;
       pause();
@@ -2880,6 +2916,7 @@ async function exportVideo() {
             S.theta = next.theta; directionNow = next.direction;
           } else S.theta = advanceByTime(S.theta, dt, PLAY_SPEED_DEG_PER_SEC, directionNow);
           renderFrame();
+          if (lastFrameIssue) throw new Error(`停止錄影：${lastFrameIssue.message}`);
         },
         restore() { S.theta = theta; playDir = direction; lastSolved = savedLast; prevSolved = savedPrev; draw(); if (wasPlaying) play(); }
       };

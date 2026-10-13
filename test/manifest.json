@@ -197,7 +197,8 @@
     "test/design-guide.mjs",
     "test/simulation-scope.mjs",
     "test/project-name.mjs",
-    "test/export-scope.mjs"
+    "test/export-scope.mjs",
+    "test/motion-preflight.mjs"
   ],
   "version": 1
 }
