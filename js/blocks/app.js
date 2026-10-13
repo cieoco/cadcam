@@ -1846,7 +1846,7 @@ function drawNow() {
     gearPinIds, pulleyPinIds, camFollowerIds, workpieceIds, dragId: S.dragId,
     sliderMountInfo, project: p => ({ x: TX(p.x), y: TY(p.y) }),
     onPointerDown: guardedNodeDown, registerUpdate: update => frameUpdaters.push(update),
-    mountedBaseIds: moduleMountedBaseIds(S.comps, S.modules)
+    mountedBaseIds: moduleMountedBaseIds(S.comps, S.modules), touchTargets: mobilePrompt()
   });
 
   drawGearManualHandles(pts);

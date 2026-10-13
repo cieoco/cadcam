@@ -493,7 +493,8 @@ export function init(deps) {
     const w = worldFromEvent(e); if (!w) return;
     const ctm = svg.getScreenCTM();
     const pxToWorld = ctm && ctm.a ? 1 / (ctm.a * View.getScale()) : 1 / View.getScale();
-    const id = Tools.nearestNodeId(w, [], NODE_TAP_PX * pxToWorld);
+    // 點在軸心的可見觸控圓環內，應選該軸心，不讓附近機架孔搶走。
+    const id = e.target?.getAttribute?.('data-motor-hit') || Tools.nearestNodeId(w, [], NODE_TAP_PX * pxToWorld);
     if (!id) return;
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); // 維持縮放偵測的指標帳本
     e.stopPropagation();   // 攔住桿身/三角板的 pointerdown，避免被搶去選長度

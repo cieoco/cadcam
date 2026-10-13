@@ -25,9 +25,9 @@ const svg = {
   setPointerCapture: noop,
   getScreenCTM: () => ({ a: 1, d: 1, inverse: () => ({}) })
 };
-function emit(type, id, x, y, target = noop) {
+function emit(type, id, x, y, target = noop, targetElement = null) {
   const event = { pointerId: id, pointerType: 'touch', clientX: x, clientY: y,
-    preventDefault: noop, stopPropagation() { this.stopped = true; },
+    target: targetElement, preventDefault: noop, stopPropagation() { this.stopped = true; },
     stopImmediatePropagation() { this.stopped = true; this.immediate = true; } };
   const list = listeners.get(type) || [];
   for (const item of list.filter(item => item.capture)) { item.fn(event); if (event.immediate) break; }
@@ -109,4 +109,12 @@ S.drawActive=true;
 emit('pointerdown',23,200,100);
 check('第二指會取消未完成畫桿', S.drawActive===false);
 emit('pointerup',22,100,100);emit('pointerup',23,200,100);
+mobile = true;
+let bodyPicked = false;
+const motorTarget = { getAttribute: name => name === 'data-motor-hit' ? 'ServoO' : null };
+emit('pointerdown', 30, 120, 100, () => bodyPicked = true, motorTarget);
+check('觸控圓環直接選軸心，不落到後面的板件', S.selectedNodeId === 'ServoO' && !bodyPicked);
+emit('pointerdown', 31, 200, 100, () => bodyPicked = true, motorTarget);
+check('圓環上的第二指仍優先縮放，不啟動第二次零件選取', !bodyPicked && S.dragId === null);
+emit('pointerup', 30, 120, 100); emit('pointerup', 31, 200, 100);
 report('input-gestures');

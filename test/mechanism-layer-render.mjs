@@ -34,4 +34,20 @@ check('節點層略過隱藏點並區分固定方塊與活動圓點', svg.childr
 updates.forEach(update => update({ O: { x: 2, y: 3 }, A: { x: 42, y: 3 }, Hidden: points.Hidden }));
 check('連桿與節點 updater 可更新座標', layer.children[0].style.display === '' && svg.children[0].getAttribute('x') === '-5');
 
+// 手機軸心點擊範圍固定 48 CSS px，變換縮放不縮小手指目標。
+const touchSvg = new FakeElement('svg'), touchUpdates = [];
+touchSvg.getScreenCTM = () => ({ a: 0.5, b: 0 });
+let picked = null;
+renderNodes({ points: { O: points.O }, svg: touchSvg, groundIds: new Set(['O']), motorCenterIds: new Set(['O']),
+  camCenterIds: new Set(), hiddenPointIds: new Set(), gearPinIds: new Set(), pulleyPinIds: new Set(),
+  camFollowerIds: new Set(), workpieceIds: new Set(), sliderMountInfo: () => null, project: p => p,
+  onPointerDown: (_e, id) => picked = id, registerUpdate: fn => touchUpdates.push(fn), touchTargets: true });
+const [hit, red] = touchSvg.children;
+check('手機紅點保留精確位置，外圈為 48 CSS px', red.getAttribute('r') === '6' && Number(hit.getAttribute('r')) * 0.5 * 2 === 48);
+hit.listeners.get('pointerdown')({});
+check('點圓環仍選同一軸心', picked === 'O' && hit.getAttribute('data-motor-hit') === 'O');
+touchUpdates[0]({ O: { x: 20, y: 30 } });
+check('活動馬達圓環隨軸心更新', hit.getAttribute('cx') === red.getAttribute('cx') && hit.getAttribute('cy') === '30');
+touchUpdates[0]({});
+check('軸心無座標時一併移除命中區', hit.style.display === 'none' && red.style.display === 'none');
 report('mechanism-layer-render');
