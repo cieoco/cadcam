@@ -54,12 +54,20 @@ export function unionOutlines(input, {precisionMm=1e-6,sampleMm=1e-5,minAreaMm2=
 }
 
 export function fusionPartner(comps, plate) {return comps.find(c=>c.id===plate?.fusedWith && c.type==='gear');}
+// Shared eligibility contract: coincident screen positions never imply a rigid connection.
+export function fusionPairReason(comps, plate, gear) {
+  if(plate?.type!=='triangle'||gear?.type!=='gear')return '目前支援齒輪＋三點板件；此配對尚未支援。';
+  if(plate.moduleId!==gear.moduleId)return '兩件必須在同一設計內。';
+  if(plate.fusedWith && plate.fusedWith!==gear.id)return '板件已合成；請先解除合成。';
+  const ids=[plate.p1?.id,plate.p2?.id,plate.p3?.id];
+  if(!gear.p1?.id||!gear.p2?.id||gear.p1.id===gear.p2.id||!ids.includes(gear.p1.id)||!ids.includes(gear.p2.id))return '須共用軸心與定位孔，確定兩件一起轉動；只有重疊或共用一孔不夠。';
+  if(comps.some(p=>p.id!==plate.id && p.fusedWith===gear.id))return '齒輪已和另一板件合成。';
+  if(comps.some(p=>p.type==='rack' && p.pinion===gear.id))return '齒輪已配對齒條，目前不支援這種聯集。';
+  return '';
+}
 export function fusionCandidates(comps, plate) {
   if(plate?.type!=='triangle')return [];
-  const ids=[plate.p1?.id,plate.p2?.id,plate.p3?.id];
-  return comps.filter(c=>c.type==='gear' && c.moduleId===plate.moduleId && ids.includes(c.p1?.id)&&ids.includes(c.p2?.id)
-    && !comps.some(p=>p.id!==plate.id && p.fusedWith===c.id)
-    && !comps.some(p=>p.type==='rack' && p.pinion===c.id));
+  return comps.filter(c=>!fusionPairReason(comps,plate,c));
 }
 export function transformFusion(geometry, gear, points) {
   const a=points[gear.p1.id] || gear.p1,b=points[gear.p2.id] || gear.p2;

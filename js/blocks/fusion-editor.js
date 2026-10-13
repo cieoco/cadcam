@@ -1,6 +1,7 @@
 import { S } from './state.js';
 import { inspectFusion } from './exporters.js';
 import { fusionCandidates, transformFusion } from './part-fusion.js';
+import { openFusionPreview, planFusionPair } from './fusion-preview.js';
 
 const NS='http://www.w3.org/2000/svg';
 export function drawFusion({svg, fusion, points, project, select, blocked=()=>false}) {
@@ -28,6 +29,18 @@ export function drawFusion({svg, fusion, points, project, select, blocked=()=>fa
 /** Reuses the original editors; only the manufacturing relationship is changed. */
 export function createFusionEditor({settings,pause,pushUndo,rebuild,draw,save,selectGear,selectTriangle}) {
   const hosts=['lenEditor','gearEditor'];
+  let preview=null,context='';
+  const fingerprint=()=>JSON.stringify([S.mode,S.designFocus,S.comps,S.topo.params,settings()]);
+  const start=selected=>{
+    pause();preview?.close();context=fingerprint();
+    preview=openFusionPreview({first:selected,comps:S.comps,params:S.topo.params,settings:settings(),
+      onClose:()=>{preview=null;},onConfirm:(firstId,secondId)=>{
+        if(context!==fingerprint())return '作品已變更，請取消後重新選取。';
+        const plan=planFusionPair(S.comps,firstId,secondId,S.topo.params,settings());
+        if(!plan.ok)return plan.reason;
+        change(S.comps.find(c=>c.id===plan.plate.id),plan.gear);return '';
+      }});
+  };
   const change=(plate,gear)=>{
     pause();pushUndo();
     if(gear)plate.fusedWith=gear.id;else delete plate.fusedWith;
@@ -35,6 +48,7 @@ export function createFusionEditor({settings,pause,pushUndo,rebuild,draw,save,se
   };
   let lastKey='',lastSelected=null;
   function sync() {
+    if(preview && context!==fingerprint())preview.close();
     const selected=S.comps.find(c=>c.id===(S.selectedTriangleId || S.selectedGearId));
     const key=JSON.stringify([selected?.id,S.comps.filter(c=>c.type==='triangle').map(p=>[p.id,p.fusedWith,p.fusedWith?inspectFusion(S.comps,p,S.topo.params,settings()).reason:fusionCandidates(S.comps,p).map(g=>[g.id,inspectFusion(S.comps,{...p,fusedWith:g.id},S.topo.params,settings()).reason])])]);
     if(key===lastKey && selected===lastSelected)return;
@@ -42,7 +56,6 @@ export function createFusionEditor({settings,pause,pushUndo,rebuild,draw,save,se
     hosts.forEach(id=>document.getElementById(id)?.querySelector('[data-fusion-controls]')?.remove());
     if(!selected)return;
     const plates=selected.type==='triangle'?[selected]:S.comps.filter(p=>p.type==='triangle' && (p.fusedWith===selected.id || fusionCandidates(S.comps,p).includes(selected)));
-    if(!plates.length)return;
     const host=document.getElementById(selected.type==='triangle'?'lenEditor':'gearEditor');
     if(!host)return;
     const box=document.createElement('div');box.dataset.fusionControls='';
@@ -57,16 +70,9 @@ export function createFusionEditor({settings,pause,pushUndo,rebuild,draw,save,se
         if(selected.type==='gear')button('夾爪／板件設定',()=>selectTriangle(plate.id));
         button('解除合成',()=>change(plate,null));
         if(f.ok && f.warnings.length){const note=document.createElement('small');note.className='fusion-warning';note.textContent=f.warnings[0];box.append(note);}
-      } else {
-        const candidates=fusionCandidates(S.comps,plate).filter(g=>selected.type!=='gear'||g.id===selected.id);
-        for(const gear of candidates) {
-          const f=inspectFusion(S.comps,{...plate,fusedWith:gear.id},S.topo.params,settings());
-          const b=button('合成一片',()=>change(plate,gear));b.disabled=!f.ok;
-          b.title=f.ok?'齒輪與板件合成，保留參數；可復原或解除':f.reason;
-          if(!f.ok){const note=document.createElement('small');note.textContent=f.reason;box.append(note);}
-        }
       }
     }
+    if(!plates.some(p=>p.fusedWith))button('聯集／合成一片…',()=>start(selected));
     if(box.childNodes.length) {
       if(host.id==='lenEditor')host.querySelector('.le-row').after(box);
       else host.prepend(box);

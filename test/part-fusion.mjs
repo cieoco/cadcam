@@ -5,6 +5,7 @@ import {inspectFusion,exportableGears,exportablePlates} from '../js/blocks/expor
 import {normalizeSnapshot,toSnapshot} from '../js/blocks/schema.js';
 import {buildPlan} from '../js/blocks/build-plan.js';
 import {buildSceneModel} from '../js/blocks3d/scene-model.js';
+import {planFusionPair} from '../js/blocks/fusion-preview.js';
 const rect=(x,y,w,h)=>[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];
 assert.equal(area(unionOutlines([rect(0,0,10,10),rect(5,0,10,10)])[0]),150);
 assert.equal(area(unionOutlines([rect(0,0,10,10),rect(2,2,3,3)])[0]),100);
@@ -12,6 +13,19 @@ assert.equal(unionOutlines([rect(0,0,10,10),rect(20,0,10,10)]).length,2);
 assert.equal(area(unionOutlines([rect(0,0,10,10),rect(0,0,10,10)])[0]),100);
 fresh('gear-gripper');
 const before=JSON.stringify(S.comps),plates=S.comps.filter(c=>c.shape==='jaw');
+const leftGear=fusionCandidates(S.comps,plates[0])[0],rightGear=fusionCandidates(S.comps,plates[1])[0];
+const candidatePlan=planFusionPair(S.comps,plates[0].id,leftGear.id,S.topo.params,ex);
+assert.ok(candidatePlan.ok);
+assert.ok(candidatePlan.sourceOutlines.gear.length>10);
+assert.equal(JSON.stringify(S.comps),before,'preview must not change the work');
+assert.ok(planFusionPair(S.comps,leftGear.id,plates[0].id,S.topo.params,ex).ok,'either selection order');
+assert.match(planFusionPair(S.comps,plates[0].id,rightGear.id,S.topo.params,ex).reason,/共用/);
+assert.equal(planFusionPair(S.comps,leftGear.id,rightGear.id,S.topo.params,ex).ok,false,'meshing gears cannot be fused');
+assert.equal(planFusionPair(S.comps,plates[0].id,plates[0].id,S.topo.params,ex).ok,false);
+const moved=structuredClone(S.comps);moved.find(c=>c.id===leftGear.id).moduleId='other';
+assert.match(planFusionPair(moved,plates[0].id,leftGear.id,S.topo.params,ex).reason,/同一設計/);
+const oneHole=structuredClone(S.comps);oneHole.find(c=>c.id===leftGear.id).p2.id='different';
+assert.match(planFusionPair(oneHole,plates[0].id,leftGear.id,S.topo.params,ex).reason,/共用/,'same coordinates are not a connection');
 for(const plate of plates) {
   const candidate=fusionCandidates(S.comps,plate);assert.equal(candidate.length,1);
   plate.fusedWith=candidate[0].id;

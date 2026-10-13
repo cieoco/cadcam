@@ -370,7 +370,7 @@ export function inspectFusion(comps, plate, params={}, settings={}) {
     const warnings=[];
     const pitchR=Number(params[gear.radiusParam]) || Number(gear.module)*Number(gear.teeth)/2;
     if(plateRings.some(r=>r.some(p=>Math.hypot(p.x,p.y)>pitchR)))warnings.push('夾爪伸出齒輪節圓；請確認全行程不遮擋另一顆齒輪');
-    return {ok:true,gear,plate,warnings,geometry:{outline:outer[0],holes,cutouts},thicknessMm:memberStock(plate).thicknessMm};
+    return {ok:true,gear,plate,warnings,sourceOutlines:{gear:gearRing,plate:plateRings},geometry:{outline:outer[0],holes,cutouts},thicknessMm:memberStock(plate).thicknessMm};
   } catch(e) {return {ok:false,reason:e.message};}
 }
 
