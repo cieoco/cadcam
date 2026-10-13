@@ -30,7 +30,12 @@ export function createDesignGuide({next,frame}) {
   const title=document.getElementById('guideTitle'),text=document.getElementById('guideText');
   const action=document.getElementById('guideNext'),fix=document.getElementById('guideFrame');
   let step;
-  action.addEventListener('click',()=>{root.open=false;next(step.stage);});
+  action.addEventListener('click',()=>{
+    root.open=false;
+    document.getElementById('learningMore')?.classList.remove('is-open');
+    document.querySelector('.mobile-more-toggle')?.setAttribute('aria-expanded','false');
+    next(step.stage);
+  });
   fix.addEventListener('click',()=>{frame();});
   return {sync(comps,selection,mode){
     root.hidden=mode==='bench';step=designGuideStep(comps);

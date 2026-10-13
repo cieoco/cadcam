@@ -7,18 +7,18 @@
   .appbar { padding:4px 8px; gap:4px 8px; flex-wrap:nowrap; }
   .appbar h1 { font-size:15px; gap:4px; }
   .app-identity { display:none; }
-  .mode-switch { margin-left:0; border-radius:8px; }
-  .mode-seg { min-width:60px; min-height:36px; padding:0 8px; font-size:13px; }
+  .mode-switch { margin-left:0; border-radius:8px; flex-shrink:0; }
+  .mode-seg { min-width:60px; min-height:44px; padding:0 8px; font-size:13px; }
   .learning-actions { position:relative; flex-basis:auto; justify-content:flex-end; gap:4px; flex-wrap:nowrap; }
   .learning-actions > a { order:-1; }
   .mobile-more-toggle { display:block; white-space:nowrap; }
   .learning-more { display:none; }
-  .learning-more.is-open { display:flex; position:absolute; right:0; top:calc(100% + 8px); flex-direction:column; gap:8px; padding:10px; min-width:180px; background:white; border:1px solid #c9d6e6; border-radius:10px; box-shadow:0 4px 16px #18324b33; z-index:30; }
-  .learning-more .gesture-help summary { min-height:36px; }
-  .learning-more > button { min-height:36px; }
+  .learning-more.is-open { display:flex; position:absolute; right:0; top:calc(100% + 8px); flex-direction:column; gap:8px; padding:10px; width:min(310px,calc(100vw - 24px)); max-height:calc(100dvh - 100px); overflow-y:auto; background:white; border:1px solid #c9d6e6; border-radius:10px; box-shadow:0 4px 16px #18324b33; z-index:30; }
+  .learning-more .gesture-help-content { position:static; width:auto; max-width:none; max-height:none; margin:6px 0 0; box-shadow:none; }
+  .learning-more .gesture-help summary, .learning-more button { min-height:44px; }
 
   .learning-actions > button, .learning-actions > a,
-  .gesture-help summary { min-height:32px; padding:5px 7px; font-size:12px; }
+  .gesture-help summary { min-height:44px; padding:10px 7px; font-size:12px; }
   .gesture-help-content { top:84px; }
   body:not([data-mode="bench"]) .design-tabs { padding:3px 6px; gap:4px; }
   .design-tabs .design-tab { min-height:34px; padding:3px 8px; font-size:13px; }
