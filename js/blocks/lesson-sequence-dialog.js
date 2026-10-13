@@ -1,35 +1,54 @@
 import { DEFAULT_SEQUENCE, prepareLessonSequence, sequenceAnglesAt } from './lesson-sequence.js';
 import { motionPoseIssue } from './solve-health.js';
 let open=false;
-export function openLessonSequence({readSource,readAngles,applyAngles,restore}) {
+export function openLessonSequence({readSource,readAngles,applyAngles,restore,initialSteps,saveSteps,capture,version}) {
   if(open)return; open=true;
   const dialog=document.createElement('dialog');
   dialog.setAttribute('aria-label','第七課模擬動作序列');
   dialog.style.cssText='box-sizing:border-box;width:min(94vw,460px);max-height:55vh;overflow:auto;margin:auto auto 12px;border:1px solid #b8cbd2;border-radius:12px;padding:14px;color:#18324b';
   const title=document.createElement('h2');title.textContent='第七課：模擬動作序列';
   const note=document.createElement('p');note.textContent='M1 −40～60°，M2 0～30°。TT 馬達不具實體角度定位；此處只模擬順序，不驗證抓取或碰撞。';
-  const status=document.createElement('p');status.setAttribute('role','status');status.textContent='改角度與秒數後播放；結束或停止都回到原姿態。此輪設定不存入作品。';
+  const status=document.createElement('p');status.setAttribute('role','status');status.textContent='改角度與秒數後播放；結束或停止都回到原姿態。按「保存序列」可隨作品保存。';
   const rows=DEFAULT_SEQUENCE.map((step,index)=>{
     const row=document.createElement('label');row.style.cssText='display:flex;align-items:center;gap:6px;margin:6px 0;flex-wrap:wrap';
     const label=document.createElement('span');label.textContent=`${index+1}. ${step.name} M${step.motor}`;label.style.flex='1';
     const angle=document.createElement('input'),seconds=document.createElement('input');
     for(const input of [angle,seconds]){input.type='number';input.style.cssText='width:65px;min-height:44px;box-sizing:border-box';}
-    angle.value=step.angle;angle.step='1';angle.min=step.motor==='1'?'-40':'0';angle.max=step.motor==='1'?'60':'30';angle.setAttribute('aria-label',`第${index+1}步角度`);
-    seconds.value=step.seconds;seconds.min='0.5';seconds.max='5';seconds.step='0.5';seconds.setAttribute('aria-label',`第${index+1}步秒數`);
+    angle.value=initialSteps?.[index]?.angle ?? step.angle;angle.step='1';angle.min=step.motor==='1'?'-40':'0';angle.max=step.motor==='1'?'60':'30';angle.setAttribute('aria-label',`第${index+1}步角度`);
+    seconds.value=initialSteps?.[index]?.seconds ?? step.seconds;seconds.min='0.5';seconds.max='5';seconds.step='0.5';seconds.setAttribute('aria-label',`第${index+1}步秒數`);
     row.append(label,angle,document.createTextNode('°'),seconds,document.createTextNode('秒'));
     return {row,angle,seconds,step};
   });
   const play=document.createElement('button'),stop=document.createElement('button'),close=document.createElement('button');
   play.textContent='驗證並播放';stop.textContent='停止並回位';close.textContent='關閉';
   for(const b of [play,stop,close])b.style.cssText='min-height:44px;margin:4px';
+  const save=document.createElement('button'),exportBtn=document.createElement('button');
+  save.textContent='保存序列';exportBtn.textContent='匯出序列 MP4';
+  for(const b of [save,exportBtn])b.style.cssText='min-height:44px;margin:4px';
+  const readSteps=()=>rows.map(r=>({...r.step,angle:r.angle.value.trim()?Number(r.angle.value):NaN,seconds:r.seconds.value.trim()?Number(r.seconds.value):NaN}));
+  save.onclick=()=>{const steps=readSteps(),plan=prepareLessonSequence(readSource(),steps,readAngles());if(!plan.ok){status.textContent=plan.message;return;}saveSteps(steps);status.textContent='序列已保存到作品，可復原；下載作品 JSON 可備份。';};
+  exportBtn.onclick=async()=>{
+    const source=readSource(),signature=JSON.stringify(source),plan=prepareLessonSequence(source,readSteps(),readAngles());
+    if(!plan.ok){status.textContent=plan.message;return;}
+    exportBtn.disabled=true;
+    try {
+      const {exportAnimation}=await import('./video-export.js');
+      await exportAnimation({begin:()=>{let elapsed=0;return {
+        duration:plan.duration+1/24,
+        evidence:{lines:['第七課：升降與夾爪動作序列',`六步／${plan.duration} 秒；取樣求解通過`,plan.steps.map((s,i)=>`${i+1}: M${s.motor} ${s.angle}°`).join('  →  '),`${version}；不代表抓取、碰撞或承載驗證`]},
+        frame:dt=>{if(JSON.stringify(readSource())!==signature)throw Error('作品已變更，請重新驗證。');elapsed+=dt;applyAngles(sequenceAnglesAt(plan,elapsed/1000).angles);},
+        capture,restore
+      };}});
+    }catch(e){status.textContent=e.message;}finally{exportBtn.disabled=false;}
+  };
   let raf=0,running=false;
-  function finish(message){cancelAnimationFrame(raf);if(running)restore();running=false;play.disabled=false;rows.forEach(r=>{r.angle.disabled=false;r.seconds.disabled=false;});if(message)status.textContent=message;}
+  function finish(message){cancelAnimationFrame(raf);if(running)restore();running=false;play.disabled=false;save.disabled=false;exportBtn.disabled=false;rows.forEach(r=>{r.angle.disabled=false;r.seconds.disabled=false;});if(message)status.textContent=message;}
   play.onclick=()=>{
     const source=readSource(),signature=JSON.stringify(source),start=readAngles();
     const steps=rows.map(r=>({...r.step,angle:r.angle.value.trim()?Number(r.angle.value):NaN,seconds:r.seconds.value.trim()?Number(r.seconds.value):NaN}));
     const plan=prepareLessonSequence(source,steps,start);
     if(!plan.ok){status.textContent=plan.message;return;}
-    running=true;play.disabled=true;rows.forEach(r=>{r.angle.disabled=true;r.seconds.disabled=true;});
+    running=true;play.disabled=true;save.disabled=true;exportBtn.disabled=true;rows.forEach(r=>{r.angle.disabled=true;r.seconds.disabled=true;});
     const began=performance.now();
     function frame(now){
       if(JSON.stringify(readSource())!==signature){finish('作品已變更，已停止並回位。');return;}
@@ -43,5 +62,5 @@ export function openLessonSequence({readSource,readAngles,applyAngles,restore}) 
   };
   stop.onclick=()=>finish('已停止，回到原姿態。');close.onclick=()=>dialog.close();
   dialog.addEventListener('close',()=>{finish();dialog.remove();open=false;});
-  dialog.append(title,note,...rows.map(r=>r.row),status,play,stop,close);document.body.append(dialog);dialog.showModal();
+  dialog.append(title,note,...rows.map(r=>r.row),status,play,stop,save,exportBtn,close);document.body.append(dialog);dialog.showModal();
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 const code = (await readFile(new URL('../js/blocks/video-export.js', import.meta.url),'utf8')).replace(/^import .*;\r?\n/, 'const { Output, Mp4OutputFormat, BufferTarget, CanvasSource, canEncodeVideo } = globalThis.videoMocks;\n');
-for (const mode of ['success','unsupported','cancel','encode-error']) {
+for (const mode of ['success','canvas','unsupported','cancel','encode-error']) {
  let restored=0, frames=0, cancelled=0, finalized=0, labels=0;
  const nodes={};const node=key=>nodes[key] ||= {style:{},hidden:true,textContent:'',addEventListener(){},prepend(){},setAttribute(){}};
  const dialog={style:{},querySelector:node,addEventListener(type,fn){this[type]=fn;},showModal(){},close(){this.closeEvent?.();},remove(){}};
@@ -15,8 +15,9 @@ for (const mode of ['success','unsupported','cancel','encode-error']) {
   CanvasSource:class {async add(t,d){assert.equal(t,frames/24);assert.equal(d,1/24);frames++;if(mode==='cancel')node('button').onclick();if(mode==='encode-error')throw Error('test encoder error');}}
  };
  const module=await import('data:text/javascript;base64,'+Buffer.from(code+'\n// '+mode).toString('base64'));
- await module.exportAnimation({svg:{cloneNode:()=>node('svg')},begin:()=>({evidence:{lines:["Evidence 80 mm"]},frame(){},restore(){restored++;}})});
+ await module.exportAnimation({svg:{cloneNode:()=>node('svg')},begin:()=>({...mode==='canvas'?{duration:2,capture:()=>({width:390,height:600})}:{},evidence:{lines:["Evidence 80 mm"]},frame(){},restore(){restored++;}})});
  if(mode==='success'){assert.equal(frames,240);assert.equal(labels,240);assert.equal(finalized,1);assert.equal(node('a').hidden,false);}
+ if(mode==='canvas'){assert.equal(frames,48);assert.equal(labels,48);assert.equal(finalized,1);}
  if(mode==='unsupported'){assert.equal(frames,0);assert.equal(restored,0);}
  else assert.equal(restored,1);
  if(mode==='cancel'||mode==='encode-error')assert.equal(cancelled,1);

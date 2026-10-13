@@ -1,3 +1,4 @@
+import { normalizeLessonSequence } from './sequence-schema.js';
 import {normalizeAssemblyMembers} from './assembly-membership.js';
 import {normalizeSyringe} from '../core/syringe.js';
 /**
@@ -308,6 +309,8 @@ export function toSnapshot(comps, topo, counter, motor) {
     comps: clone(comps || []),
     params: clone((topo && topo.params) ? topo.params : {})
   };
+  const sequence=normalizeLessonSequence(topo?.lessonSequence);
+  if(sequence)snapshot.lessonSequence=sequence;
   const projectName=normalizeProjectName(topo?.projectName);
   if(projectName)snapshot.projectName=projectName;
   const rootDesignName=normalizeProjectName(topo?.rootDesignName);
@@ -576,7 +579,7 @@ export function normalizeSnapshot(obj) {
     });
   }
   const projectName=normalizeProjectName(obj.projectName);
-  return { ...(Array.isArray(obj.assemblyMembers)?{assemblyMembers:normalizeAssemblyMembers(obj.assemblyMembers,cleanComps,modulesResult.modules)}:{}), ...(projectName?{projectName}:{}), ...(normalizeProjectName(obj.rootDesignName)?{rootDesignName:normalizeProjectName(obj.rootDesignName)}:{}), comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
+  return { lessonSequence:normalizeLessonSequence(obj.lessonSequence), ...(Array.isArray(obj.assemblyMembers)?{assemblyMembers:normalizeAssemblyMembers(obj.assemblyMembers,cleanComps,modulesResult.modules)}:{}), ...(projectName?{projectName}:{}), ...(normalizeProjectName(obj.rootDesignName)?{rootDesignName:normalizeProjectName(obj.rootDesignName)}:{}), comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
     fabrication: fabricationResult.status === 'present' ? fabricationResult.profile : null, modules: modulesResult.modules, warnings };
 }
 

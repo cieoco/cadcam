@@ -33,13 +33,22 @@ export async function exportAnimation({ svg, begin }) {
     output.addVideoTrack(source, { frameRate: VIDEO_FPS });
     await output.start();
     const motion = begin(); restore = motion.restore;
+    const duration=motion.duration ?? VIDEO_SECONDS;
+    if(!Number.isFinite(duration)||duration<=0||duration>60)throw Error("影片長度無效");
+    const frameCount=Math.ceil(VIDEO_FPS*duration);
     const evidenceLines = [...(motion.evidence?.lines || [])];
     const footerHeight = evidenceLines.length ? 16 + evidenceLines.length * 22 : 0;
     const drawingHeight = height - footerHeight;
     const css = [...document.styleSheets].flatMap(sheet => { try { return [...sheet.cssRules].map(r => r.cssText); } catch { return []; } }).join('\n');
-    for (let frame = 0; frame < VIDEO_FPS * VIDEO_SECONDS; frame++) {
+    for (let frame = 0; frame < frameCount; frame++) {
       if (cancelled) return;
       motion.frame(frame === 0 ? 0 : 1000 / VIDEO_FPS);
+      if(motion.capture) {
+        const image=motion.capture();
+        ctx.fillStyle='#f5f7fa';ctx.fillRect(0,0,width,height);
+        const scale=Math.min(width/image.width,drawingHeight/image.height),w=image.width*scale,h=image.height*scale;
+        ctx.drawImage(image,(width-w)/2,(drawingHeight-h)/2,w,h);
+      } else {
       const clone = svg.cloneNode(true);
       clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
       clone.setAttribute('width', width); clone.setAttribute('height', drawingHeight);
@@ -50,14 +59,11 @@ export async function exportAnimation({ svg, begin }) {
       try {
         const img = new Image(); img.src = frameUrl; await img.decode();
         ctx.fillStyle = '#f5f7fa'; ctx.fillRect(0, 0, width, height); ctx.drawImage(img, 0, 0, width, drawingHeight);
-        if (footerHeight) {
-          ctx.fillStyle = '#18324b'; ctx.fillRect(0, drawingHeight, width, footerHeight);
-          ctx.fillStyle = '#ffffff'; ctx.font = '16px sans-serif'; ctx.textBaseline = 'top';
-          evidenceLines.forEach((line, index) => ctx.fillText(line, 16, drawingHeight + 8 + index * 22, width - 32));
-        }
       } finally { URL.revokeObjectURL(frameUrl); }
+      }
+      if(footerHeight){ctx.fillStyle='#18324b';ctx.fillRect(0,drawingHeight,width,footerHeight);ctx.fillStyle='#ffffff';ctx.font='16px sans-serif';ctx.textBaseline='top';evidenceLines.forEach((line,index)=>ctx.fillText(line,16,drawingHeight+8+index*22,width-32));}
       await source.add(frame / VIDEO_FPS, 1 / VIDEO_FPS);
-      status.textContent = `正在產生 10 秒動畫… ${Math.round((frame + 1) / (VIDEO_FPS * VIDEO_SECONDS) * 100)}%`;
+      status.textContent = `正在產生 ${duration.toFixed(1)} 秒動畫… ${Math.round((frame + 1) / frameCount * 100)}%`;
       // Yield so cancel and mobile rendering stay responsive.
       await new Promise(resolve => setTimeout(resolve, 0));
     }

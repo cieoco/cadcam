@@ -17,3 +17,12 @@ const broken=structuredClone(source);broken.params.LL3=10;assert.equal(prepareLe
 const narrow=structuredClone(source);narrow.comps.find(c=>c.id==='Link1').servoEnd=10;assert.equal(prepareLessonSequence(narrow,steps,start).ok,false);
 assert.equal(prepareLessonSequence(source,steps,{'1':0,'2':80}).ok,false);
 console.log('PASS sequence endpoint/interpolation, invalid targets/durations, detached/broken assembly, servo limits and nonmutation');
+
+const {toSnapshot,normalizeSnapshot}=await import('../js/blocks/schema.js');
+const {encodeSnapshot,decodeShareString}=await import('../js/share-codec.js');
+const snap=toSnapshot(source.comps,{params:source.params,lessonSequence:steps},0,{modules:source.modules});
+const reopened=normalizeSnapshot(decodeShareString(encodeSnapshot(snap)));
+assert.deepEqual(reopened.lessonSequence,steps.map(({motor,angle,seconds})=>({motor,angle,seconds})));
+assert.equal(normalizeSnapshot({...snap,lessonSequence:[{}]}).lessonSequence,null);
+assert.equal(normalizeSnapshot({...snap,lessonSequence:undefined}).lessonSequence,null);
+console.log('PASS sequence JSON/share roundtrip and invalid/legacy normalization');
