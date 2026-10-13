@@ -40,7 +40,7 @@ export function resolveExportScope(source,{scope='design',focus=ROOT_TAB,selecte
 export function prepareScopedExport(source,options,format) {
   if(!['svg','dxf'].includes(format))throw Error('不支援的格式');
   const work=structuredClone(source),{context,targets,scope}=resolveExportScope(work,options);
-  const targetIds=new Set(targets.map(c=>c.id)),files=[],warnings=[];
+  const targetIds=new Set(targets.map(c=>c.id)),files=[],warnings=[],notices=[];
   const emit=(text,name,mime,ids=[])=>{if(scope!=='selected'||ids.some(id=>targetIds.has(id)))files.push({text,name,mime,sourceIds:ids});};
   if(context.comps.some(c=>c.type==='syringe')) {
     const plan=syringeManufacturing(context.comps,work.topo.params,work.fabrication);
@@ -80,9 +80,9 @@ export function prepareScopedExport(source,options,format) {
     }
     warnings.push(...cncWarnings(cncParts,work.fabrication?.cnc||FABRICATION_DEFAULTS.cnc));
     const skipped=targets.filter(c=>!['anchor','bar','triangle','gear','rack'].includes(c.type));
-    if(skipped.length)warnings.push(`未提供獨立板材檔：${skipped.map(c=>c.id).join('、')}`);
+    if(skipped.length){const notice=`未提供獨立板材檔：${skipped.map(c=>c.id).join('、')}`;warnings.push(notice);notices.push(notice);}
   }
   if(!files.length)throw Error('這個範圍沒有可匯出的板材零件；請選板身，不是接點。');
   if(new Set(files.map(f=>f.name)).size!==files.length)throw Error('零件檔名重複，請調整零件名稱後再匯出。');
-  return {files,warnings:[...new Set(warnings)],scope};
+  return {files,warnings:[...new Set(warnings)],notices,scope};
 }

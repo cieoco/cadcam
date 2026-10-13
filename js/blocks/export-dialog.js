@@ -44,7 +44,8 @@ export function openScopedExport({readSource,readOptions,format,notify}) {
       paragraph('每個板材零件一份檔案；聯集件合為一片。馬達等外購件不輸出。');
       if(select.value==='assembly')paragraph('依目前組立成員及已安裝範圍匯出，不含未加入或備用設計。');
       if(select.value==='selected')paragraph('只輸出所選板身；不額外加入機架。聯集件會保留完整外形。');
-      prepared.warnings.forEach(paragraph);confirm.disabled=false;
+      // DXF 下載只呈現輸出範圍資訊；加工細節不占用下載操作畫面。
+      (format==='dxf'?prepared.notices:prepared.warnings).forEach(paragraph);confirm.disabled=false;
     } catch(e){paragraph(`尚未匯出：${e.message}`);}
   };
   select.onchange=render;
