@@ -141,3 +141,13 @@ P2 不以先完成 MCP 為前提。首例僅需某個局部操作時，不預做
 5. **驗收案例**：同一片板含機構接點與額外加工孔，移動時孔距保持；測試板外孔、重複孔、孔超出邊界、自交外形與不支援接點。驗證取消無變更、確認單筆復原、保存重開、2D／3D 及 DXF 孔位一致。以一個實際支架案例貫通後，再考慮孔列及更多運動接點。
 
 現有 startDrawPolygon 的第四點起為局部外形點，預設不鑽孔、不參與求解；不能只改名稱就宣稱已支援多孔板。
+
+
+## 教材同步與指定成果試點（2026-10-13）
+
+- 第一輪僅 80 mm 推送器：設計模式「匯出」／手機「專案」提供檢查入口，純函式 checkSliderLesson 只讀目前設計 comps／params，重開作品也可重新檢查，不保存過時的通過標記。
+- 限單 TT 曲柄、單浮桿、單滑塊，核對接點 ID 後沿用 compileTopology、solveTopology 與 inspectMotionRange；整圈每 1° 取樣並沿滑軌方向投影量測。80 ±0.2 mm 為本課的取樣容許差，不是加工公差。
+- 達成／尚未達成／無法判定分開；達成可接既有 MP4 匯出，修改後重新檢查。額外桿件不判定為物理上不可能，僅超出本課範圍。未驗證連續極值、碰撞、承載與實物。
+- tools/capture-slider-lesson.mjs 在 CUA 瀏覽器環境檢查半成品的新增入口／無法判定，再重跑完整範例的 60 → 80 mm 檢查操作，依 APP_VERSION 產生候選圖與 manifest；按鈕／選取／成果不符則停止。這是檢查入口的示範，不代替半成品補接教學。
+- 截圖需人工核對後才複製至 media/tutorials/keyshots；不自動覆蓋教材，不每次版本無差別重錄影片。其餘六課尚未自動化。
+- 重跑方式：先啟動 HTTP server，於 cua_repl 讀取瀏覽器操作文件，建立獨立本機測試分頁與對應 browser／DOM tab；匯入此腳本並呼叫 captureSliderLesson({ ui, tab, browser, baseURL, outputRoot })。ui 是 cua.createBrowserTab 的回傳，tab 為 browser.tabs.get(ui.id)，outputRoot 建議 output/lesson-candidates；使用測試用 origin，因載入範例會替換該 origin 的自動保存。輸出於版本／slider，需主機支援 AX stepper 設值；不支援時明確失敗，不跳過驗收。
