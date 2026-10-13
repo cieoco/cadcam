@@ -201,7 +201,8 @@
     "test/motion-preflight.mjs",
     "test/lesson-check.mjs",
     "test/video-evidence.mjs",
-    "test/lesson-sequence.mjs"
+    "test/lesson-sequence.mjs",
+    "test/fixed-syringe.mjs"
   ],
   "version": 1
 }

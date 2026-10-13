@@ -1,3 +1,4 @@
+import {syringeShapes} from './syringe-shape.js';
 import {createSyringeUI} from './syringe-ui.js';
 let hydraulic=null;
 import {assemblyWork,designIds,assemblyFamily,changeAssemblyMembership,normalizeAssemblyMembers} from './assembly-membership.js';
@@ -2025,6 +2026,7 @@ function push3DNow() {
   const shown=hidden.size?sceneFor(hidden).model:model;
   if(benchmarkSession&&!playbackProbe.active())benchmarkCoverage={materialParts:model.materialParts.length,holes:model.materialParts.reduce((n,p)=>n+p.geometry.holes.length,0),cutouts:model.materialParts.reduce((n,p)=>n+p.geometry.cutouts.length,0),bracketWings:model.materialParts.filter(p=>p.geometry.kind==='bracket-wing').length,screwInstances:model.materialParts.filter(p=>p.geometry.kind==='screw').length,legacyHardware:[model,...(model.orthogonal || []).map(c=>c.model)].map(m=>({motors:m.motors?.length || 0,pins:m.pins?.length || 0})),geometryCounters:viewer3D.cacheStats()};
   const posedAt=measuring?performance.now():0;
+  shown.syringes=inDesign()?syringeShapes(viewComps(),S.topo.params,lastFullPts):[];
   viewer3D.update(shown);
   if(measuring)frame3dCpu={poseMs:posedAt-started,submit3dMs:performance.now()-posedAt};
   bench.afterScene({ pts: planesApi.pts, ptsAll: allPlanes ? allPlanes.pts : planesApi.pts, model, shown });   // 組立台：接口標記跟著這一幀的宿主位置
@@ -2104,7 +2106,7 @@ function openMobileFile() {
 
 // 切換 3D 唯讀預覽：首次開啟才動態載入 THREE viewer。
 async function toggle3D() {
-  if(hydraulic?.active())transient('3D 僅預覽板件；針筒與托架尚未呈現，完整裝配與干涉未驗證。');
+  if(hydraulic?.active())transient('3D 含針筒外形參考；完整裝配與干涉未驗證。');
   view3DActive = !view3DActive;
   const overlay = document.getElementById('view3d');
   const btn = document.getElementById('btn3d');
@@ -2700,6 +2702,14 @@ function currentBounds() {
     minX = Math.min(minX, p.x - outerRadius); maxX = Math.max(maxX, p.x + outerRadius);
     minY = Math.min(minY, p.y - outerRadius); maxY = Math.max(maxY, p.y + outerRadius);
   });
+  // 針筒筒尾及自由夾片超出求解接點；置中也必須納入外形。
+  for (const shape of syringeShapes(viewComps(), S.topo.params, allPts)) {
+    const extent=Math.max(shape.r+5,shape.clampSpacing/2+4),cos=Math.cos(shape.angle),sin=Math.sin(shape.angle);
+    const corners=[shape.start-5,shape.end+5,shape.length+5].flatMap(u=>[-extent,extent].map(v=>({x:shape.a.x+u*cos-v*sin,y:shape.a.y+u*sin+v*cos})));
+    for(const p of [...corners,...shape.tips.flatMap(t=>[t.a,t.b])]){
+      any=true;minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);
+    }
+  }
   return any ? { minX, maxX, minY, maxY } : null;
 }
 function fitView() {
@@ -2918,7 +2928,7 @@ async function checkSliderTask() {
 }
 let videoExportLoading = false;
 async function exportVideo(lessonId = null) {
-  if(hydraulic?.active()){transient('針筒目前請以行程滑桿或往返播放觀察；MP4 尚未支援液壓行程錄製。');return;}
+  if(hydraulic?.active())return hydraulic.exportVideo();
   const bucketIssue=bucketPlaybackIssue(); if(bucketIssue){transient(bucketIssue);return;}
   if (videoExportLoading) return;
   if (S.mode !== 'design' || view3DActive) { transient('請先切回 2D 設計畫面，再匯出動畫'); return; }
@@ -3164,7 +3174,7 @@ if (gripperPilotSession) window.blocks.gripperPilot = {
   snapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
   reopen: snapshot => { const norm = Store.normalizeSnapshot(snapshot); if (!norm) throw Error('作品格式無效'); applySnapshot(norm, { source: 'gripper-pilot' }); },
 };
-hydraulic=createSyringeUI({svg,comps:viewComps,points:()=>lastFullPts,seed:pts=>{lastSolved={...pts};prevSolved={...pts};},pushUndo,pause,rebuild,draw,save:scheduleAutosave,notify:transient,applyFabrication:Settings.applyFabricationProfile,
+hydraulic=createSyringeUI({is3D:()=>view3DActive,capture:()=>{viewer3D.renderNow();return viewer3D.canvas;},svg,comps:viewComps,points:()=>lastFullPts,seed:pts=>{lastSolved={...pts};prevSolved={...pts};},pushUndo,pause,rebuild,draw,save:scheduleAutosave,notify:transient,applyFabrication:Settings.applyFabricationProfile,
   playing:on=>{playbackActive=on;const b=document.getElementById('playBtn');b.classList.toggle('playing',on);b.textContent=on?'⏸':'▶';}
 });
 window.blocks.addSyringe=hydraulic.add;

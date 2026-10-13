@@ -311,6 +311,31 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   // 動態內容都掛在這個 group，update() 時整批換掉
   const dynamic = new THREE.Group();
   scene.add(dynamic);
+  const syringeGroup=new THREE.Group();scene.add(syringeGroup);
+  function clearSyringes(){syringeGroup.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});syringeGroup.clear();}
+  function renderSyringes(items){
+    clearSyringes();
+    for(const s of items||[]){
+      for(const tip of s.tips||[]){const sh=stadiumShape(tip.a,tip.b,4.5,1.5),m=new THREE.Mesh(new THREE.ExtrudeGeometry(sh,{depth:2,bevelEnabled:false}),new THREE.MeshStandardMaterial({color:'#dd9b39'}));m.position.z=12;syringeGroup.add(m);}
+      const group=new THREE.Group();group.position.set(s.a.x,s.a.y,16);group.rotation.z=s.angle;syringeGroup.add(group);
+      const mesh=(geo,color,x,y=0,z=0)=>{const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color,roughness:.6}));m.position.set(x,y,z);group.add(m);return m;};
+      const cylinder=(r,len,x,color)=>{const m=mesh(new THREE.CylinderGeometry(r,r,len,24),color,x);m.rotation.z=Math.PI/2;};
+      cylinder(s.r,s.end-s.start,(s.end+s.start)/2,'#d6e9e5');
+      cylinder(1.5,8,s.start-4,'#e5ded0');
+      mesh(new THREE.BoxGeometry(2,s.r*2+10,s.r*2),'#bac4b6',s.end);
+      mesh(new THREE.BoxGeometry(Math.max(1,s.length-s.end),s.rodWidth,3),'#a89f92',(s.end+s.length)/2);
+      const shape=new THREE.Shape();shape.moveTo(s.length-12,-5);shape.lineTo(s.length,-5);shape.absarc(s.length,0,5,-Math.PI/2,Math.PI/2,false);shape.lineTo(s.length-12,5);shape.closePath();
+      const hole=new THREE.Path();hole.absarc(s.length,0,1.7,0,Math.PI*2,true);shape.holes.push(hole);
+      mesh(new THREE.ExtrudeGeometry(shape,{depth:3,bevelEnabled:false}),'#b3ab9f',0,0,-1.5);
+      if(s.fixed){
+        const arc=new THREE.TorusGeometry(s.r+1.5,2,8,32,Math.PI);const clamp=mesh(arc,'#647574',-3);clamp.rotation.y=Math.PI/2;
+        for(const y of [-s.clampSpacing/2,s.clampSpacing/2]){
+          const sh=new THREE.Shape();sh.moveTo(-9,y-4);sh.lineTo(3,y-4);sh.lineTo(3,y+4);sh.lineTo(-9,y+4);sh.closePath();const h=new THREE.Path();h.absarc(-3,y,1.75,0,Math.PI*2,true);sh.holes.push(h);
+          mesh(new THREE.ExtrudeGeometry(sh,{depth:2,bevelEnabled:false}),'#647574',0,0,-s.r-2);
+        }
+      }
+    }
+  }
 
   // 點選變半透明（ghost）：因為 update() 每幀重建 dynamic，隱藏狀態不能存在 mesh 上，
   // 改存在這個以 pickKey 為索引的 Set，重建時再套用。ghost 的部件仍可被點回實體。
@@ -508,6 +533,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     poseRevision++;
     if(!model){clearDynamic();lifetime.retire();lastModel=null;return;}
     lastModel = model;
+    renderSyringes(model.syringes);
     if(lifetime.begin(retainedSceneKey(model))){updateRetainedPose(model);focusCamera(model);return;}
     clearDynamic();bindingScope='';
     renderMaterialParts(model.materialParts || []);
@@ -1032,6 +1058,10 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
         controls.target.set(f.x, f.y, f.z);
         // 計算整體 span（包括直角安裝子模組的轉換後邊界與各模組固定板）
         let span = model.span;
+        if(model.syringes?.length){
+          const bounds=new THREE.Box3().setFromObject(syringeGroup);
+          if(!bounds.isEmpty())span=Math.max(span,2*Math.max(Math.abs(bounds.min.x-f.x),Math.abs(bounds.max.x-f.x),Math.abs(bounds.min.y-f.y),Math.abs(bounds.max.y-f.y)));
+        }
         const xs = [], ys = [];
         const addPlates = (m, matrix) => (m.modulePlates || []).forEach(pl => (pl.outline || []).forEach(p => {
           const t = matrix ? applyMatrix4(matrix, { x: p.x, y: p.y, z: Number.isFinite(pl.z) ? pl.z : 0 }) : p;
@@ -1085,6 +1115,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
         const dist = Math.max(300, span * 2.2) / Math.min(1, camera.aspect);
         camera.position.set(f.x, f.y, dist);
         initialized = true;
+        if(model.syringes?.length)fitTo(null,{fill:0.7,insetBottom:80});
       } else if (model.anchored && !fitHeld) {   // 精靈框過鏡頭後（fitHeld）目標不再每幀被拉回地錨
         controls.target.set(f.x, f.y, f.z);
       }
@@ -1305,6 +1336,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       if (!tmp.isEmpty()) { box.union(tmp); n++; }
     };
     dynamic.children.forEach(visit);
+    if(!filter&&syringeGroup.children.length){tmp.setFromObject(syringeGroup);if(!tmp.isEmpty()){box.union(tmp);n++;}}
     return n ? box : null;
   }
   // 外框投影到畫面的範圍（px，相對畫布）；有角落在相機後方回 null。
@@ -1370,6 +1402,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   if (resizeObserver) resizeObserver.observe(container);
 
   function dispose() {
+    clearSyringes();
     lifetime.retire();
     materialNotice.remove();
     unsupportedMaterial.dispose();

@@ -15,8 +15,10 @@ export function solveSyringe(comps,params,previous=null,motion={}) {
 }
 export function syringeReading(c,comps,params,points) {
   const a=attachmentPoint(c.a,comps,params,points),b=attachmentPoint(c.b,comps,params,points);
-  const arm=comps.find(o=>o.id===c.b.componentId),o=points?.[arm?.p1?.id],end=points?.[arm?.p2?.id];
-  return {a,b,length:a&&b?Math.hypot(b.x-a.x,b.y-a.y):NaN,
+  const arm=comps.find(o=>o.id===(c.outputId||c.b.componentId)),o=points?.[arm?.p1?.id],end=points?.[(c.id==='H2Syringe'?arm?.p3:arm?.p2)?.id];
+  const tips=(c.passiveTips||[]).map(t=>points?.[comps.find(o=>o.id===t.hostId)?.p3?.id]);
+  const mountGap=tips.length===2&&tips.every(Boolean)?Math.hypot(tips[0].x-tips[1].x,tips[0].y-tips[1].y):null;
+  return {a,b,mountGap,length:a&&b?Math.hypot(b.x-a.x,b.y-a.y):NaN,
     angle:o&&end?Math.atan2(end.y-o.y,end.x-o.x)*180/Math.PI:NaN,end,
     branch:a&&b&&o?Math.sign((a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x)):0};
 }
@@ -45,7 +47,7 @@ export function scanSyringe(comps,params,id,step=0.5,motion={}) {
     previous=result.points;maxResidualMm=Math.max(maxResidualMm,result.result.syringeValidation.residualMm);
     samples.push({extension,...syringeReading(c,comps,params,previous)});
   }
-  return {ok:true,samples,maxResidualMm,message:`${samples.length} 點幾何採樣通過；干涉、承重與水路未驗證。`};
+  return {ok:true,samples,maxResidualMm,message:`${samples.length} 點${c.passiveTips?.length?'主傳動':'幾何'}採樣通過；${c.passiveTips?.length?'夾片角度手動，接觸未求解；':''}干涉、承重與水路未驗證。`};
 }
 // Reflect at both limits, including long frames. mm/s, independent of refresh rate.
 export function advanceSyringe(extension,direction,seconds,stroke,speed=8){

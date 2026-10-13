@@ -20,6 +20,7 @@ export function syringeSeatGeometry(spec,fabrication,end='a') {
     ...[m.marginMm,m.marginMm+m.strapSpacingMm].flatMap(x=>[-1,1].map(sign=>({x,y:sign*(diameter/2+m.clearanceMm+m.marginMm/2),r,layer:'STRAP_BOLT'})))]};
 }
 export function syringeManufacturing(comps,params,fabrication) {
+  if(comps.some(c=>c.type==='syringe'&&c.mountMode==='fixed-axis'))throw Error('管夾固定案例的板件、隔圈與固定孔尚待核對，本輪不輸出加工檔。');
   const checked=normalizeFabricationProfile(fabrication);if(!checked.ok)throw Error(checked.message);
   const f=checked.profile,result=solveSyringe(comps,params);
   if(!result.ok)throw Error(result.message);

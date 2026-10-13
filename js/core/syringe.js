@@ -9,7 +9,7 @@ export function normalizeSyringe(c) {
   for(const k of ['capacityMl','outerDiameter','bodyLength','rodDiameter','lmin','stroke']){spec[k]=finite(c.spec?.[k],SYRINGE_DEMO[k]);if(!Number.isFinite(c.spec?.[k]))restored=true;}
   spec.name=String(c.spec?.name || spec.name).slice(0,80);spec.calibrated=c.spec?.calibrated===true&&!restored;
   const endpoint=r=>({componentId:String(r?.componentId || ''),u:finite(r?.u,0),v:finite(r?.v,0)});
-  return {type:'syringe',id:String(c.id),color:'#0891b2',a:endpoint(c.a),b:endpoint(c.b),spec,extension:finite(c.extension,0),branch:c.branch===-1?-1:1};
+  return {type:'syringe',id:String(c.id),color:'#0891b2',...(c.mountMode==='fixed-axis'?{mountMode:'fixed-axis',axisDeg:finite(c.axisDeg,NaN),appearance:'flat-rod',outputId:String(c.outputId||''),...(Array.isArray(c.passiveTips)?{passiveTips:c.passiveTips.slice(0,2).map(t=>({hostId:String(t.hostId||''),length:finite(t.length,NaN),angleDeg:finite(t.angleDeg,NaN)}))}:{})}:{}),a:endpoint(c.a),b:endpoint(c.b),spec,extension:finite(c.extension,0),branch:c.branch===-1?-1:1};
 }
 export function attachmentFrame(owner,params,points=null) {
   if(!owner?.p1)return null;
@@ -28,7 +28,7 @@ export function attachmentPoint(ref,comps,params,points=null) {
 export function syringeIssues(c,comps,params) {
   const s=c.spec,issues=[];
   if(!s||['capacityMl','outerDiameter','bodyLength','rodDiameter','lmin','stroke'].some(k=>!Number.isFinite(s[k])||s[k]<=0))issues.push('針筒尺寸與有效行程必須是正數。');
-  if(s?.bodyLength>s?.lmin||s?.rodDiameter>=s?.outerDiameter)issues.push('外形示範需要筒身長度不超過最短孔距，且推桿寬度小於筒身外徑。');
+  if((c.mountMode!=='fixed-axis'&&s?.bodyLength>s?.lmin)||s?.rodDiameter>=s?.outerDiameter)issues.push('外形示範需要筒身長度不超過最短孔距，且推桿寬度小於筒身外徑。');
   if(!Number.isFinite(c.extension)||c.extension<0||c.extension>s?.stroke)issues.push('目前伸出量超出針筒有效行程。');
   for(const [key,label] of [['a','A'],['b','B']]){
     const ref=c[key],owner=comps.find(o=>o.id===ref?.componentId);
@@ -37,6 +37,15 @@ export function syringeIssues(c,comps,params) {
     if(owner?.type==='bar'&&(ref.u<0||ref.u>Number(params[owner.lenParam])||Math.abs(ref.v)>0.000001))issues.push(`${label}端須在桿件中心線與有效孔距內；偏置安裝請用板件。`);
   }
   if(c.a?.componentId===c.b?.componentId)issues.push('兩端不能安裝在同一剛性零件上。');
+  for(const t of c.passiveTips||[])if(!comps.some(o=>o.id===t.hostId&&o.p3)||!Number.isFinite(t.length)||t.length<=0||!Number.isFinite(t.angleDeg))issues.push('活動夾片的宿主、長度或手動角度無效。');
+  if(c.mountMode==='fixed-axis'){
+    const owner=comps.find(o=>o.id===c.a?.componentId);
+    if(!owner||![owner.p1,...(owner.type==='anchor'?[]:[owner.p2,owner.p3].filter(Boolean))].every(p=>p?.type==='fixed'))issues.push('固定筒身必須安裝在固定機架，不能只鎖定一個轉軸點。');
+    if(!Number.isFinite(c.axisDeg))issues.push('固定筒身缺少有效軸向。');
+    if(c.b?.u!==0||c.b?.v!==0)issues.push('固定筒身推桿須接活動連桿的第一孔。');
+    const rod=comps.find(o=>o.id===c.b?.componentId);
+    if(rod?.p1?.type==='fixed')issues.push('推桿接孔不能同時設成固定點。');
+  }
   return issues;
 }
 // Compile into the existing fixed-distance constraint graph, never a prescribed arm-angle animation.
@@ -57,6 +66,12 @@ export function expandSyringes(comps,params) {
         output.push({id,type:'bar',p1:base,p2:p,lenParam,hidden:true,fixedLen:true,...(c.moduleId?{moduleId:c.moduleId}:{})});
       }
     }
+    if(c.mountMode==='fixed-axis'&&ends.every(Boolean)&&!syringeIssues(c,comps,params).length){
+      const angle=c.axisDeg*Math.PI/180,length=c.spec.lmin+c.extension;
+      const target={x:ends[0].x+Math.cos(angle)*length,y:ends[0].y+Math.sin(angle)*length};
+      for(const part of output)for(const key of ['p1','p2','p3','m1','m2'])if(part[key]?.id===ends[1].id)part[key]={...part[key],...target,type:'fixed'};
+      continue;
+    }
     if(ends.every(Boolean)){
       const lenParam=`${c.id}_length`;values[lenParam]=c.spec.lmin+c.extension;
       output.push({id:c.id,type:'bar',p1:ends[0],p2:ends[1],lenParam,hidden:true,fixedLen:true,...(c.moduleId?{moduleId:c.moduleId}:{})});
@@ -71,6 +86,13 @@ export function validateSyringePose(comps,params,points) {
     const a=attachmentPoint(c.a,comps,params,points),b=attachmentPoint(c.b,comps,params,points);
     if(!a||!b){issues.push('針筒安裝點缺失。');continue;}
     residual=Math.max(residual,Math.abs(Math.hypot(a.x-b.x,a.y-b.y)-c.spec.lmin-c.extension));
+    if(c.mountMode==='fixed-axis'){
+      const angle=c.axisDeg*Math.PI/180,L=c.spec.lmin+c.extension;
+      residual=Math.max(residual,Math.hypot(b.x-a.x-Math.cos(angle)*L,b.y-a.y-Math.sin(angle)*L));
+      const driven=[c.outputId,...(c.passiveTips||[]).map(t=>t.hostId)].filter((v,i,a)=>v&&a.indexOf(v)===i);
+      for(const id of driven){const host=comps.find(o=>o.id===id),pivot=points?.[host?.p1?.id],end=points?.[host?.p2?.id];if(pivot&&end){const d=Math.hypot(b.x-end.x,b.y-end.y),lever=d?Math.abs((b.x-end.x)*(pivot.y-end.y)-(b.y-end.y)*(pivot.x-end.x))/d:0;if(lever<0.5)issues.push('短連桿作用線接近活動臂支點，請避開死點附近姿態。');}}
+      continue;
+    }
     const owner=comps.find(o=>o.id===c.b.componentId),o=points?.[owner?.p1?.id];
     if(o){const length=Math.hypot(b.x-a.x,b.y-a.y),lever=Math.abs((b.x-a.x)*(o.y-a.y)-(b.y-a.y)*(o.x-a.x))/length;
       if(lever<0.5)issues.push('針筒推力作用線接近通過關節中心，請避開奇異姿勢。');}
