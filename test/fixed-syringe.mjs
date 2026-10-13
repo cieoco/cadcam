@@ -1,3 +1,4 @@
+import {hydraulicSnapshot} from '../js/blocks/hydraulic-example.js';
 import {createPlateGeometry,plateVertexWorldPoints} from '../js/blocks/plate-geometry.js';
 import assert from 'node:assert/strict';
 import {fixedLiftSnapshot,fixedGripSnapshot} from '../js/blocks/fixed-syringe-examples.js';
@@ -6,7 +7,7 @@ import {normalizeSnapshot,toSnapshot} from '../js/blocks/schema.js';
 import {encodeSnapshot,decodeShareString} from '../js/share-codec.js';
 import {syringeShapes,syringeClampShape} from '../js/blocks/syringe-shape.js';
 import {syringeManufacturing} from '../js/blocks/syringe-manufacturing.js';
-for(const original of [fixedLiftSnapshot,fixedGripSnapshot]){
+for(const original of [hydraulicSnapshot,fixedLiftSnapshot,fixedGripSnapshot]){
  const before=JSON.stringify(original),n=normalizeSnapshot(original),c=n.comps.find(c=>c.type==='syringe');
  const r=scanSyringe(n.comps,n.params,c.id);assert.equal(r.ok,true,r.message);assert.equal(r.samples.length,41);
  for(const sample of r.samples){const a=c.axisDeg*Math.PI/180;assert.ok(Math.abs(sample.b.x-sample.a.x-Math.cos(a)*(c.spec.lmin+sample.extension))<.001);assert.ok(Math.abs(sample.b.y-sample.a.y-Math.sin(a)*(c.spec.lmin+sample.extension))<.001);}
@@ -85,3 +86,16 @@ const volume=area(clamp.profile.map(p=>({x:p.y,y:p.z})))*clamp.width
  -2*clamp.width*clamp.thickness**2; // subtract overlapping wall/foot material
 assert.ok(Math.abs(volume-1066.2692984351563)<.6,`saddle volume ${volume} must match Fusion within tessellation tolerance`);
 console.log('PASS saddle clamp: Fusion dimensions, symmetric holes, joined walls and reference volume');
+
+for(const arm of [60,80,100]){
+ const h=hydraulicSnapshot,p={...h.params,H1Arm:arm},scan=scanSyringe(h.comps,p,'H1Syringe');
+ assert.ok(scan.ok,scan.message);assert.equal(scan.samples.length,41);
+ for(const sample of scan.samples){
+  assert.ok(Math.abs(sample.b.y+60)<.001,'fixed H01 plunger stays horizontal');
+  assert.ok(Math.abs(Math.hypot(sample.end.x,sample.end.y)-arm)<.001,'rocker retains chosen length');
+  assert.ok(Math.abs(Math.hypot(sample.b.x-sample.end.x,sample.b.y-sample.end.y)-80)<.001,'pinned coupler retains length');
+ }
+ assert.ok(scan.samples.at(-1).angle>scan.samples[0].angle,'extension raises the arm');
+}
+assert.equal(scanSyringe(hydraulicSnapshot.comps,{...hydraulicSnapshot.params,H1Arm:200},'H1Syringe').ok,false);
+console.log('PASS fixed H01: three arm comparisons, straight plunger, rigid coupler and unreachable arm');

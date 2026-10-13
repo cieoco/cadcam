@@ -52,10 +52,10 @@ export const EXAMPLE_GROUPS = [
 const EXAMPLE_LESSONS = {
   'hydraulic-h03': {group:'lift-motion',level:'入門液壓',use:'固定筒身驅動左右一體式三點夾臂；末端造形與交叉臂保持剛性。'},
   'hydraulic-h02': {group:'lift-motion',level:'入門液壓',use:'管夾固定筒身，短連桿把直線輸入轉成抬臂擺動。'},
-  'hydraulic-h01': {group:'lift-motion',level:'入門液壓',use:'用兩端可擺動的針筒抬起單臂；尺寸未依實物校正。',
-    learn:'針筒孔距約束決定臂角；安裝孔越靠近支點不代表越能承重。',
-    try:['任務1：推動行程滑桿並掃描，找出可用範圍。','任務2：設定中只改 B 為 60、80、100 mm，預測再比較。','任務3：分別存檔修改前後兩個版本，記錄改變、預測與觀察。'],
-    predict:'保持其他條件相同，B 靠近 O 時，手臂轉角會如何改變？',measure:'記錄 s=0 和最大行程的臂角與 C 點座標。',explain:'比較模擬與實物；干涉、摩擦、承重與水路尚未驗證。'},
+  'hydraulic-h01': {group:'lift-motion',level:'入門液壓',use:'固定筒身，經短連桿把推桿直線運動轉成單臂擺動。',
+    learn:'辨識固定管夾、直線推桿與兩端可轉動的短連桿。',
+    try:['任務1：推動行程滑桿並掃描，找出可用範圍。','任務2：設定中只改活動臂長 60、80、100 mm，預測再比較。','任務3：分別存檔修改前後兩個版本，記錄改變、預測與觀察。'],
+    predict:'相同的直線行程，改變活動臂長會如何影響擺角？',measure:'記錄 s=0 和最大行程的臂角與 C 點座標。',explain:'比較模擬與實物；干涉、摩擦、承重與水路尚未驗證。'},
   'fourbar-crank-rocker': {
     group: 'starter',
     level: '基礎',
@@ -275,7 +275,7 @@ const wiperExample = practice => ({
 });
 
 const ALL_BLOCK_EXAMPLES = [
-  {id:'hydraulic-h01',title:'H01｜10cc針筒單臂抬升',note:'兩端鉸接；伸出量以 mm 控制，示範尺寸未校正。',snapshot:hydraulicSnapshot},
+  {id:'hydraulic-h01',title:'H01｜固定針筒單臂抬升',note:'管夾固定筒身，短連桿帶動單臂；20 mm 為教學區間。',snapshot:hydraulicSnapshot},
   {id:'hydraulic-h02',title:'H02｜管夾固定針筒抬臂',note:'F3D 尺寸參考；20 mm 教學區間未實測，短桿兩端可轉。',snapshot:fixedLiftSnapshot},
   {id:'hydraulic-h03',title:'H03｜針筒夾具與一體式夾臂',note:'交叉臂與末端同一片；接觸、承載未驗證。',snapshot:fixedGripSnapshot},
   wiperExample(false),

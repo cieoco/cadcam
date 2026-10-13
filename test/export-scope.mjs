@@ -5,7 +5,7 @@ import {fusionCandidates} from '../js/blocks/part-fusion.js';
 import {f1AssemblyFixture} from './fixtures/f1-assembly-fixture.mjs';
 import {faceFileExportData} from '../js/blocks/face-export.js';
 import {exportLinksAsDxf} from '../js/blocks/exporters.js';
-import {hydraulicSnapshot} from '../js/blocks/hydraulic-example.js';
+import {hydraulicSnapshot} from './fixtures/hinged-syringe.mjs';
 const source=()=>({comps:S.comps,modules:S.modules,topo:S.topo,exportSettings:ex});
 fresh('gear-gripper','fourbar-lift');
 const initial=JSON.stringify(source()),focus=S.modules[1].id;

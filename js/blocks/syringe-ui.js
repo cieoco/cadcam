@@ -126,8 +126,8 @@ export function createSyringeUI(h){
     el('p',c.mountMode==='fixed-axis'?'管夾固定筒身；A 為固定參考點，B 為片狀推桿孔。軸向固定，接孔保留轉動。':'mm；A 為筒身托架轉軸，B 為推桿轉接座。孔位沿所屬零件第 1 孔→第 2 孔量測。',form);
     let section=form;
     const fields={},input=(key,text,value,type='number')=>{const label=el('label',text,section),n=el('input',null,label);n.type=type;n.name=key;if(type==='number')n.step='any';n.value=value;fields[key]=n;return n;};
-    const tasks=el('details',null,form);el('summary',c.mountMode==='fixed-axis'?'固定筒身教學任務':'H01 教學任務',tasks);
-    el('p',c.mountMode==='fixed-axis'?'只改伸出量 0–20 mm。H02 比較驅動孔位；H03 觀察一體式夾臂的端孔距；末端與交叉臂同片、一起轉動，不含接觸求解。':'① 推動滑桿、掃描並記錄可用行程。② 其他條件不變，只改 B 孔位，先預測再比較臂角與 C 位置。③ 修改前後分別存檔，寫下「改了什麼／預測／觀察」，最後與實物比較。',tasks);
+    const tasks=el('details',null,form);el('summary',c.mountMode==='fixed-axis'?'固定筒身教學任務':'兩端鉸接教學任務',tasks);
+    el('p',c.id==='H1Syringe'?'管夾固定筒身，推桿經短連桿帶動單臂。先觀察 0–20 mm 往返，再只改活動臂長 60、80、100 mm，掃描後比較擺角。':c.mountMode==='fixed-axis'?'只改伸出量 0–20 mm。H02 比較驅動孔位；H03 觀察一體式夾臂的端孔距；末端與交叉臂同片、一起轉動，不含接觸求解。':'① 推動滑桿、掃描並記錄可用行程。② 其他條件不變，只改 B 孔位，先預測再比較臂角與 C 位置。③ 修改前後分別存檔，寫下「改了什麼／預測／觀察」，最後與實物比較。',tasks);
     for(const key of ['a','b']){
       const label=el('label',`${key.toUpperCase()} 所屬零件`,form),select=el('select',null,label);select.name=`${key}Owner`;fields[select.name]=select;
       for(const owner of h.comps().filter(o=>attachmentFrame(o,params()))){const option=el('option',owner.id,select);option.value=owner.id;}
@@ -139,6 +139,7 @@ export function createSyringeUI(h){
       const presets=el('div',null,form);for(const u of [60,80,100]){const btn=el('button',`B = ${u} mm`,presets);btn.type='button';btn.onclick=()=>{fields.bU.value=u;};}
       el('small','比較只改 B：示範三組均以 0–40 mm、0.5 mm 間隔通過幾何採樣。修改其他條件後請重新掃描。',form);
     }
+    if(c.id==='H1Syringe'){const presets=el('div',null,form);for(const length of [60,80,100]){const btn=el('button',`臂長 ${length} mm`,presets);btn.type='button';btn.onclick=()=>{fields.armLength.value=length;};}}
     if(c.id==='H2Syringe'){const presets=el('div',null,form);for(const length of [145.892,172.422,198.958]){const b=el('button',`孔位 ${length} mm`,presets);b.type='button';b.onclick=()=>{fields.armLength.value=length;};}}
     (c.passiveTips||[]).forEach((t,i)=>input(`tip${i}`,`夾片 ${i+1} 手動相對角度 (°，不含接觸求解)`,t.angleDeg));
     input('extension','目前伸出量 s (mm)',c.extension);
@@ -218,7 +219,7 @@ export function createSyringeUI(h){
       await exportAnimation({svg:h.svg,begin:()=>{
         const saved=S.comps,points={...h.points()},ids=new Set(source.map(o=>o.id));let elapsed=0,previous=points;
         clearTimeout(S.autosaveTimer);
-        return {duration:10+1/24,evidence:{lines:[`${c.id} 針筒行程比較`, `伸出量 0–${c.spec.stroke} mm；${scan.samples.length} 點${c.passiveTips?.length?'主傳動':'幾何'}採樣通過`,c.id==='H2Syringe'?`驅動孔距 ${sourceParams.H2Arm.toFixed(3)} mm；臂角 ${scan.samples[0].angle.toFixed(1)}° → ${scan.samples.at(-1).angle.toFixed(1)}°`:c.jawIds?.length?`一體式夾臂端孔距 ${scan.samples[0].tipGap.toFixed(1)} → ${scan.samples.at(-1).tipGap.toFixed(1)} mm`:c.passiveTips?.length?`夾片安裝軸距 ${scan.samples[0].mountGap.toFixed(1)} → ${scan.samples.at(-1).mountGap.toFixed(1)} mm；夾片角度手動`:'臂角／行程為幾何結果；未模擬抓取接觸',`${APP_VERSION}；干涉、承載、水路未驗證`]},
+        return {duration:10+1/24,evidence:{lines:[`${c.id} 針筒行程比較`, `伸出量 0–${c.spec.stroke} mm；${scan.samples.length} 點${c.passiveTips?.length?'主傳動':'幾何'}採樣通過`,c.id==='H1Syringe'?`活動臂長 ${sourceParams.H1Arm.toFixed(1)} mm；臂角 ${scan.samples[0].angle.toFixed(1)}° → ${scan.samples.at(-1).angle.toFixed(1)}°`:c.id==='H2Syringe'?`驅動孔距 ${sourceParams.H2Arm.toFixed(3)} mm；臂角 ${scan.samples[0].angle.toFixed(1)}° → ${scan.samples.at(-1).angle.toFixed(1)}°`:c.jawIds?.length?`一體式夾臂端孔距 ${scan.samples[0].tipGap.toFixed(1)} → ${scan.samples.at(-1).tipGap.toFixed(1)} mm`:c.passiveTips?.length?`夾片安裝軸距 ${scan.samples[0].mountGap.toFixed(1)} → ${scan.samples.at(-1).mountGap.toFixed(1)} mm；夾片角度手動`:'臂角／行程為幾何結果；未模擬抓取接觸',`${APP_VERSION}；干涉、承載、水路未驗證`]},
           frame:dt=>{elapsed+=dt;const fraction=Math.min(1,elapsed/10000),extension=c.spec.stroke*(fraction<=.5?fraction*2:(1-fraction)*2),r=planSyringeStroke(source,sourceParams,c.id,extension,previous,motion());if(!r.ok)throw Error(r.message);previous=r.points;S.comps=[...saved.filter(o=>!ids.has(o.id)),...r.comps];h.rebuild();h.seed(r.points);h.draw();},
           ...(h.is3D?.()?{capture:h.capture}:{}),
           restore:()=>{S.comps=saved;h.rebuild();h.seed(points);h.draw();h.save();}

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {hydraulicSnapshot} from '../js/blocks/hydraulic-example.js';
+import {hydraulicSnapshot} from './fixtures/hinged-syringe.mjs';
 import {solveSyringe,scanSyringe,planSyringeStroke,syringeReading,advanceSyringe} from '../js/blocks/syringe-operations.js';
 import {attachmentPoint,SYRINGE_TOLERANCE_MM} from '../js/core/syringe.js';
 import {normalizeSnapshot,toSnapshot} from '../js/blocks/schema.js';
