@@ -199,7 +199,8 @@
     "test/project-name.mjs",
     "test/export-scope.mjs",
     "test/motion-preflight.mjs",
-    "test/lesson-check.mjs"
+    "test/lesson-check.mjs",
+    "test/video-evidence.mjs"
   ],
   "version": 1
 }

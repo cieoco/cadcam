@@ -2891,10 +2891,10 @@ async function checkSliderTask() {
   if (S.mode !== 'design') { transient('請切回設計，選擇要檢查的推送器。'); return; }
   pause();
   const { checkSliderLesson, showSliderLessonResult } = await import('./lesson-check-dialog.js');
-  showSliderLessonResult(checkSliderLesson({ comps: viewComps(), params: S.topo.params }), exportVideo);
+  showSliderLessonResult(checkSliderLesson({ comps: viewComps(), params: S.topo.params }), () => exportVideo('slider80'));
 }
 let videoExportLoading = false;
-async function exportVideo() {
+async function exportVideo(lessonId = null) {
   if(hydraulic?.active()){transient('針筒目前請以行程滑桿或往返播放觀察；MP4 尚未支援液壓行程錄製。');return;}
   const bucketIssue=bucketPlaybackIssue(); if(bucketIssue){transient(bucketIssue);return;}
   if (videoExportLoading) return;
@@ -2906,10 +2906,12 @@ async function exportVideo() {
   if (!checked.ok) { showMotionWarning(checked.message); return; }
   videoExportLoading = true;
   try {
-    const { exportAnimation } = await import('./video-export.js');
+    const [{ exportAnimation }, { buildVideoEvidence }] = await Promise.all([import('./video-export.js'), import('./video-evidence.js')]);
     await exportAnimation({ svg, begin: () => {
       const fresh = checkPlaybackMotion();
       if (!fresh.ok) { showMotionWarning(fresh.message); throw new Error(fresh.message); }
+      const evidence = buildVideoEvidence({ comps: viewComps(), params: S.topo.params, version: APP_VERSION, lessonId });
+      const evidenceSource = JSON.stringify({ comps: viewComps(), params: S.topo.params });
       const theta = S.theta, direction = playDir, wasPlaying = !!raf;
       const savedLast = lastSolved, savedPrev = prevSolved;
       pause();
@@ -2918,7 +2920,9 @@ async function exportVideo() {
       let directionNow = direction;
       draw();
       return {
+        evidence,
         frame(dt) {
+          if (JSON.stringify({ comps: viewComps(), params: S.topo.params }) !== evidenceSource) throw new Error('作品已變更，請重新驗證並錄影。');
           if (range || plan.mode === 'rock') {
             const next = advanceRock(S.theta, directionNow, playStepDeg(dt), plan.lo, plan.hi);
             S.theta = next.theta; directionNow = next.direction;
