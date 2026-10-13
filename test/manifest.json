@@ -200,7 +200,8 @@
     "test/export-scope.mjs",
     "test/motion-preflight.mjs",
     "test/lesson-check.mjs",
-    "test/video-evidence.mjs"
+    "test/video-evidence.mjs",
+    "test/lesson-sequence.mjs"
   ],
   "version": 1
 }
