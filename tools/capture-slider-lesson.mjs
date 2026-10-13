@@ -54,4 +54,3 @@ export async function captureSliderLesson({ ui, tab, browser, baseURL, outputRoo
     return report;
   } finally { await viewport.reset(); }
 }
-

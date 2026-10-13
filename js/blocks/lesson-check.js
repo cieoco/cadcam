@@ -41,4 +41,3 @@ export function checkSliderLesson({ comps = [], params = {} }) {
         : `尚未達成：取樣行程 ${strokeMm.toFixed(1)} mm，目標 80 mm。請調整曲柄孔距，再檢查一次。` };
   } catch (_) { return unknown('無法判定：請檢查機架、浮桿連接及滑軌設定。'); }
 }
-
