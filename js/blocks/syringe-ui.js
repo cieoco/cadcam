@@ -19,7 +19,8 @@ export function createSyringeUI(h){
   const row=el('div',null,bar),label=el('label','伸出量 ',row),range=el('input',null,label);range.type='range';range.min=0;range.step='0.1';range.setAttribute('aria-label','針筒伸出量 mm');
   const value=el('output',null,row),settings=el('button','針筒設定',row),readout=el('div',null,bar),note=el('div',null,bar);
   readout.id='syringeReadout';note.id='syringeNotice';note.setAttribute('aria-live','polite');
-  h.svg.before(bar);
+  // Give feedback its own row before the stroke control instead of overlaying it.
+  h.svg.before(document.getElementById('modeBanner'),document.getElementById('solveBanner'),bar);
   const warning3d=el('div','針筒／管夾為外形參考；完整裝配、干涉與承重未驗證。',document.getElementById('view3d'));
   warning3d.style.cssText='position:absolute;bottom:72px;left:8px;right:8px;padding:8px;background:#fff3cd;color:#664d03;z-index:6;font-size:13px;pointer-events:none';warning3d.hidden=true;
   let id=null,raf=null,last=null,direction=1,dragUndo=false,picking=null,scopeKey=null,message='';

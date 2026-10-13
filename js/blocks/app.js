@@ -2738,7 +2738,7 @@ document.addEventListener('visibilitychange', () => {
 // ---- 課堂閉環：存檔 / 開啟 / 分享 ----
 function transient(msg) {
   setBanner(msg);
-  setTimeout(() => { if (document.getElementById('modeBanner').textContent === msg) clearBanner(); }, 1600);
+  setTimeout(() => { if (document.getElementById('modeBanner').textContent === msg) clearBanner(); }, hydraulic?.active() ? Math.max(4000,Math.min(8000,msg.length*80)) : 1600);
 }
 function motorMountPatternRotDegForCenter(id,pts,mount=null){
   return planMotorPatternRotDeg({id,pts,comps:S.comps,mount,fallbackRotDeg:()=>computeMotorRotDeg(id,pts || {},new Set())});
