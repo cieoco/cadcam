@@ -2458,10 +2458,12 @@ function openLinkMenu() {
   if (power) power.style.display = 'none';
   const m = linkMenuEl();
   if (m) m.style.display = m.style.display === 'flex' ? 'none' : 'flex';
+  document.getElementById('linkMenuToggle')?.setAttribute('aria-expanded', String(m?.style.display === 'flex'));
 }
 function closeLinkMenu() {
   const m = linkMenuEl();
   if (m) m.style.display = 'none';
+  document.getElementById('linkMenuToggle')?.setAttribute('aria-expanded', 'false');
 }
 function pickLinkTool(type) {
   closeLinkMenu();

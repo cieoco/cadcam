@@ -23,6 +23,8 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## 執行與測試
 
+- **持續發布授權（2026-10-13）：** 使用者要求完成修正並通過適用測試與 UI 驗收後，直接 commit／push，不必逐次等待提醒。只提交本次工作的檔案，不夾帶無關變更；如使用者另有暫停或不發布指示則優先遵守。回報提交與推送結果，部署狀態須另行確認，不將 push 成功當成已上線。
+
 必須透過 HTTP 提供（ES6 `import` 無法在 `file://` 下運作）：
 
 ```bash
