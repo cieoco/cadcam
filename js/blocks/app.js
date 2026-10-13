@@ -2711,7 +2711,7 @@ function currentBounds() {
   }
   // 針筒筒尾及自由夾片超出求解接點；置中也必須納入外形。
   for (const shape of syringeShapes(viewComps(), S.topo.params, allPts)) {
-    const extent=Math.max(shape.r+5,shape.clampSpacing/2+4),cos=Math.cos(shape.angle),sin=Math.sin(shape.angle);
+    const extent=Math.max(shape.r+5,shape.clamp?.extent||0),cos=Math.cos(shape.angle),sin=Math.sin(shape.angle);
     const corners=[shape.start-5,shape.end+5,shape.length+5].flatMap(u=>[-extent,extent].map(v=>({x:shape.a.x+u*cos-v*sin,y:shape.a.y+u*sin+v*cos})));
     for(const p of [...corners,...shape.tips.flatMap(t=>[t.a,t.b])]){
       any=true;minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);

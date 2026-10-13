@@ -80,8 +80,15 @@ export function createSyringeUI(h){
       line(at(shape.end,-shape.r-5),at(shape.end,shape.r+5),2,'#a3a69b');
       line(at(length-12),b,10,'#b3ab9f');
       if(shape.fixed){
-        line(at(-3,-shape.clampSpacing/2),at(-3,shape.clampSpacing/2),7,'#6b7b7a');
-        for(const v of [-shape.clampSpacing/2,shape.clampSpacing/2]){const q=at(-3,v);node('circle',{cx:View.TX(q.x),cy:View.TY(q.y),r:1.75*View.getScale(),fill:'white',stroke:'#475569'});}
+        const clamp=shape.clamp;
+        const polygon=(pts,fill)=>node('polygon',{points:pts.map(p=>{const q=at(p.x,p.y);return `${View.TX(q.x)},${View.TY(q.y)}`;}).join(' '),fill,stroke:'#475569','stroke-width':.5*View.getScale()});
+        for(const foot of clamp.feet){
+          polygon(foot.outline,'#859391');
+          const q=at(foot.hole.x,foot.hole.y);node('circle',{cx:View.TX(q.x),cy:View.TY(q.y),r:foot.hole.r*View.getScale(),fill:'white',stroke:'#475569'});
+        }
+        const half=clamp.width/2,outer=clamp.innerRadius+clamp.thickness;
+        polygon([{x:-half,y:-outer},{x:half,y:-outer},{x:half,y:outer},{x:-half,y:outer}],'#6b7b7a');
+        for(const v of [-clamp.innerRadius,clamp.innerRadius])node('line',{x1:View.TX(at(-half,v).x),y1:View.TY(at(-half,v).y),x2:View.TX(at(half,v).x),y2:View.TY(at(half,v).y),stroke:'#c5cfcb','stroke-width':.5*View.getScale()});
         node('circle',{cx:View.TX(b.x),cy:View.TY(b.y),r:1.7*View.getScale(),fill:'white',stroke:'#475569'});
       }
       for(const [key,p] of [['a',a],['b',b]]){

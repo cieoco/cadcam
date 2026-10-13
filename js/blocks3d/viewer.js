@@ -328,10 +328,16 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       const hole=new THREE.Path();hole.absarc(s.length,0,1.7,0,Math.PI*2,true);shape.holes.push(hole);
       mesh(new THREE.ExtrudeGeometry(shape,{depth:3,bevelEnabled:false}),'#b3ab9f',0,0,-1.5);
       if(s.fixed){
-        const arc=new THREE.TorusGeometry(s.r+1.5,2,8,32,Math.PI);const clamp=mesh(arc,'#647574',-3);clamp.rotation.y=Math.PI/2;
-        for(const y of [-s.clampSpacing/2,s.clampSpacing/2]){
-          const sh=new THREE.Shape();sh.moveTo(-9,y-4);sh.lineTo(3,y-4);sh.lineTo(3,y+4);sh.lineTo(-9,y+4);sh.closePath();const h=new THREE.Path();h.absarc(-3,y,1.75,0,Math.PI*2,true);sh.holes.push(h);
-          mesh(new THREE.ExtrudeGeometry(sh,{depth:2,bevelEnabled:false}),'#647574',0,0,-s.r-2);
+        const c=s.clamp,sh=new THREE.Shape();
+        c.profile.forEach((p,i)=>i?sh.lineTo(p.y,p.z):sh.moveTo(p.y,p.z));sh.closePath();
+        const band=new THREE.ExtrudeGeometry(sh,{depth:c.width,bevelEnabled:false});
+        // The profile lives in YZ; extrude along the syringe axis X.
+        band.rotateY(Math.PI/2);band.rotateX(Math.PI/2);band.translate(-c.width/2,0,0);
+        mesh(band,'#647574',0);
+        for(const foot of c.feet){
+          const f=new THREE.Shape();foot.outline.forEach((p,i)=>i?f.lineTo(p.x,p.y):f.moveTo(p.x,p.y));f.closePath();
+          const h=new THREE.Path();h.absarc(foot.hole.x,foot.hole.y,foot.hole.r,0,Math.PI*2,true);f.holes.push(h);
+          mesh(new THREE.ExtrudeGeometry(f,{depth:c.thickness,bevelEnabled:false}),'#647574',0,0,c.baseZ);
         }
       }
     }
