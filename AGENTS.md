@@ -99,6 +99,8 @@ multilink 三角形參數命名：`gParam` = 底邊（P1-P2）、`r1Param` = P1-
 
 ## 參考文件
 
+- [文件總索引](docs/README.md) 收錄規格、教學及工作紀錄。新增、移動或刪除文件時同步更新索引；`TEACHING-TRIAL.md` 只替換一段現況，詳細更新與驗證記入 `docs/TEACHING-CHANGELOG.md`，不再新增「目前狀態」段落。
+
 - `docs/SDD-BLOCKS-AI-TEACHING.md` — 範例驗證、共用操作與 AI／教學分階段規格
 - `docs/SDD-FTC-MODULES.md` — FTC 快速原型與可重組模組的產品原則
 - `docs/SDD-FRAMEWORK-STABILIZATION-2026-10-09.md` — 現行組立穩定化契約；狀態另見工作紀錄

@@ -7,6 +7,8 @@ Linkage 閉環機構拓樸工具
 
 ## 試用方式
 
+文件入口：[文件總索引](docs/README.md) · [教學現況](docs/TEACHING-TRIAL.md) · [教學更新紀錄](docs/TEACHING-CHANGELOG.md)。
+
 ### 線上試用
 
 - 目前可用：
