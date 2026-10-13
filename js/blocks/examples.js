@@ -50,7 +50,7 @@ export const EXAMPLE_GROUPS = [
 ];
 
 const EXAMPLE_LESSONS = {
-  'hydraulic-h03': {group:'lift-motion',level:'入門液壓',use:'固定筒身驅動左右夾臂；末端夾片角度手動，未做接觸求解。'},
+  'hydraulic-h03': {group:'lift-motion',level:'入門液壓',use:'固定筒身驅動左右一體式三點夾臂；末端造形與交叉臂保持剛性。'},
   'hydraulic-h02': {group:'lift-motion',level:'入門液壓',use:'管夾固定筒身，短連桿把直線輸入轉成抬臂擺動。'},
   'hydraulic-h01': {group:'lift-motion',level:'入門液壓',use:'用兩端可擺動的針筒抬起單臂；尺寸未依實物校正。',
     learn:'針筒孔距約束決定臂角；安裝孔越靠近支點不代表越能承重。',
@@ -277,7 +277,7 @@ const wiperExample = practice => ({
 const ALL_BLOCK_EXAMPLES = [
   {id:'hydraulic-h01',title:'H01｜10cc針筒單臂抬升',note:'兩端鉸接；伸出量以 mm 控制，示範尺寸未校正。',snapshot:hydraulicSnapshot},
   {id:'hydraulic-h02',title:'H02｜管夾固定針筒抬臂',note:'F3D 尺寸參考；20 mm 教學區間未實測，短桿兩端可轉。',snapshot:fixedLiftSnapshot},
-  {id:'hydraulic-h03',title:'H03｜針筒夾具與活動夾片',note:'僅主傳動求解；末端夾片可轉動，姿態手動示意。',snapshot:fixedGripSnapshot},
+  {id:'hydraulic-h03',title:'H03｜針筒夾具與一體式夾臂',note:'交叉臂與末端同一片；接觸、承載未驗證。',snapshot:fixedGripSnapshot},
   wiperExample(false),
   wiperExample(true),
   {

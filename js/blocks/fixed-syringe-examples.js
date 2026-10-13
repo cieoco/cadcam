@@ -1,3 +1,4 @@
+import {rigidGripVertices} from './rigid-gripper.js';
 // Measured F3D geometry; stroke 20 mm is a teaching interval, not a syringe specification.
 import {SYRINGE_DEMO} from '../core/syringe.js';
 const p=(id,x,y,type='floating')=>({id,x,y,type});
@@ -14,8 +15,10 @@ export const fixedLiftSnapshot={kind:'blocks',v:1,projectName:'H02 管夾固定�
 const G=p('H3O',125.8323,253.3701,'fixed'),R=p('H3P',67.031,254.3706),GA=p('H3A',-26,253.36805,'fixed');
 const U=p('H3U',104.4572,301.267),V=p('H3V',102.8402,206.2281),F=p('H3F',147.2073,205.4733),T=p('H3T',148.8243,300.5121);
 const tri=(id,a,b,c)=>({id,type:'triangle',p1:a,p2:b,p3:c,gParam:id+'g',r1Param:id+'r',r2Param:id+'d',shapeMode:'polyline',vertices:[{solve:true,ref:'p2'},{solve:true,ref:'p1'},{solve:true,ref:'p3'}],color:'#728b86',stock:{thicknessMm:2}});
-export const fixedGripSnapshot={kind:'blocks',v:1,projectName:'H03 針筒夾具／被動夾片',counter:30,params:{H3Frame:distance(GA,G),H3Upper:60,H3Lower:60,H3JawAg:52.45,H3JawAr:52.45,H3JawAd:104.9,H3JawBg:52.45,H3JawBr:52.45,H3JawBd:104.9},comps:[
+export const fixedGripSnapshot={kind:'blocks',v:1,projectName:'H03 針筒夾具／一體式夾臂',counter:30,params:{H3Frame:distance(GA,G),H3Upper:60,H3Lower:60,H3JawAg:52.45,H3JawAr:52.45,H3JawAd:104.9,H3JawBg:52.45,H3JawBr:52.45,H3JawBd:104.9},comps:[
  bar('H3Frame',GA,G,'H3Frame'),bar('H3Upper',R,U,'H3Upper'),bar('H3Lower',R,V,'H3Lower'),tri('H3JawA',G,U,F),tri('H3JawB',G,V,T),
  {id:'H3Syringe',type:'syringe',mountMode:'fixed-axis',axisDeg:Math.atan2(R.y-GA.y,R.x-GA.x)*180/Math.PI,outputId:'H3JawA',a:{componentId:'H3Frame',u:0,v:0},b:{componentId:'H3Upper',u:0,v:0},spec:{...SYRINGE_DEMO,name:'F3D 夾具參考／20 mm 教學區間（未實測）',outerDiameter:17.5,bodyLength:72,rodDiameter:8,lmin:83,stroke:20,calibrated:false},extension:distance(GA,R)-83,branch:1,
- passiveTips:[{hostId:'H3JawA',length:40,angleDeg:70},{hostId:'H3JawB',length:40,angleDeg:-70}]}
+ jawIds:['H3JawA','H3JawB']}
 ]};
+
+for(const [id,angle] of [['H3JawA',70],['H3JawB',-70]]){const arm=fixedGripSnapshot.comps.find(c=>c.id===id);arm.vertices=rigidGripVertices(arm,40,angle);}

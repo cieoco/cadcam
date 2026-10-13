@@ -1,3 +1,4 @@
+import {migrateH03RigidGrip} from './rigid-gripper.js';
 import { normalizeLessonSequence } from './sequence-schema.js';
 import {normalizeAssemblyMembers} from './assembly-membership.js';
 import {normalizeSyringe} from '../core/syringe.js';
@@ -539,7 +540,7 @@ export function normalizeSnapshot(obj) {
   const referencePoint = safeId(obj.referencePoint) ? obj.referencePoint : '';
   const comps = [];
 
-  sourceComps.forEach((raw, index) => {
+  migrateH03RigidGrip(sourceComps).forEach((raw, index) => {
     if (!raw || typeof raw !== 'object') {
       warnings.push(`第 ${index + 1} 個零件格式不正確，已略過。`);
       return;
@@ -578,8 +579,8 @@ export function normalizeSnapshot(obj) {
       if (safeId(k) && Number.isFinite(Number(obj.motorAngles[k]))) motorAngles[k] = Number(obj.motorAngles[k]);
     });
   }
-  const projectName=normalizeProjectName(obj.projectName);
-  return { lessonSequence:normalizeLessonSequence(obj.lessonSequence), ...(Array.isArray(obj.assemblyMembers)?{assemblyMembers:normalizeAssemblyMembers(obj.assemblyMembers,cleanComps,modulesResult.modules)}:{}), ...(projectName?{projectName}:{}), ...(normalizeProjectName(obj.rootDesignName)?{rootDesignName:normalizeProjectName(obj.rootDesignName)}:{}), comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
+  const projectName=normalizeProjectName(obj.projectName==='H03 針筒夾具／被動夾片'?'H03 針筒夾具／一體式夾臂':obj.projectName);
+  return { lessonSequence:normalizeLessonSequence(obj.lessonSequence), ...(Array.isArray(obj.assemblyMembers)?{assemblyMembers:normalizeAssemblyMembers(obj.assemblyMembers,cleanComps,modulesResult.modules)}:{}), ...(projectName?{projectName}:{}), ...(normalizeProjectName(obj.rootDesignName)?{rootDesignName:normalizeProjectName(obj.rootDesignName==='H03 針筒夾具／被動夾片'?'H03 針筒夾具／一體式夾臂':obj.rootDesignName)}:{}), comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
     fabrication: fabricationResult.status === 'present' ? fabricationResult.profile : null, modules: modulesResult.modules, warnings };
 }
 

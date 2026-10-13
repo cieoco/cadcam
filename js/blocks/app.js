@@ -2702,6 +2702,13 @@ function currentBounds() {
     minX = Math.min(minX, p.x - outerRadius); maxX = Math.max(maxX, p.x + outerRadius);
     minY = Math.min(minY, p.y - outerRadius); maxY = Math.max(maxY, p.y + outerRadius);
   });
+  // 一體式夾臂的末端造形超出三個求解點；納入完整輪廓。
+  for(const id of viewComps().filter(c=>c.type==='syringe').flatMap(c=>c.jawIds||[])){
+    const arm=viewComps().find(c=>c.id===id);if(!arm)continue;
+    for(const p of createPlateGeometry(arm,[arm.p1,arm.p2,arm.p3].map(p=>allPts[p.id]||p)).outlines.flat()){
+      any=true;minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);
+    }
+  }
   // 針筒筒尾及自由夾片超出求解接點；置中也必須納入外形。
   for (const shape of syringeShapes(viewComps(), S.topo.params, allPts)) {
     const extent=Math.max(shape.r+5,shape.clampSpacing/2+4),cos=Math.cos(shape.angle),sin=Math.sin(shape.angle);

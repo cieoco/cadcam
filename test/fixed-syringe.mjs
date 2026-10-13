@@ -1,4 +1,4 @@
-import {createPlateGeometry} from '../js/blocks/plate-geometry.js';
+import {createPlateGeometry,plateVertexWorldPoints} from '../js/blocks/plate-geometry.js';
 import assert from 'node:assert/strict';
 import {fixedLiftSnapshot,fixedGripSnapshot} from '../js/blocks/fixed-syringe-examples.js';
 import {solveSyringe,scanSyringe,planSyringeStroke} from '../js/blocks/syringe-operations.js';
@@ -25,10 +25,27 @@ assert.equal(scanSyringe(s.comps,{...s.params,H2Arm:145.892,H2Tail:250-145.892},
 assert.equal(scanSyringe(s.comps,{...s.params,H2Arm:198.958,H2Tail:250-198.958},'H2Syringe').ok,false);
 console.log('PASS fixed syringe: axis, bidirectional stroke, JSON/share, passive-tip metadata, invalid mounting and machining guard');
 
-const grip=structuredClone(fixedGripSnapshot),tip=grip.comps.find(c=>c.type==='syringe');
-const initial=solveSyringe(grip.comps,grip.params);tip.passiveTips[0].angleDeg=40;
-const adjusted=solveSyringe(grip.comps,grip.params);assert.deepEqual(adjusted.points,initial.points);
-assert.notDeepEqual(syringeShapes(grip.comps,grip.params,adjusted.points)[0].tips,syringeShapes(fixedGripSnapshot.comps,grip.params,initial.points)[0].tips);
+const grip=normalizeSnapshot(fixedGripSnapshot),gripper=grip.comps.find(c=>c.type==='syringe');
+assert.equal(gripper.passiveTips,undefined);assert.deepEqual(gripper.jawIds,['H3JawA','H3JawB']);
+const old=structuredClone(fixedGripSnapshot),oldS=old.comps.find(c=>c.type==='syringe');
+oldS.passiveTips=[{hostId:'H3JawA',length:40,angleDeg:70},{hostId:'H3JawB',length:40,angleDeg:-70}];delete oldS.jawIds;
+for(const a of old.comps.filter(c=>c.type==='triangle'))a.vertices=a.vertices.filter(v=>v.solve);
+const oldJson=JSON.stringify(old),converted=normalizeSnapshot(old);
+assert.equal(JSON.stringify(old),oldJson,'migration cannot mutate input');
+assert.deepEqual(converted.comps,grip.comps);
+assert.deepEqual(normalizeSnapshot(toSnapshot(converted.comps,{params:converted.params},30)).comps,grip.comps);
+const refs=new Map();
+for(let extension=0;extension<=20;extension+=.5){
+ const r=planSyringeStroke(grip.comps,grip.params,gripper.id,extension);assert.ok(r.ok,r.message);
+ for(const a of grip.comps.filter(c=>c.type==='triangle')){
+  const pts=plateVertexWorldPoints(a,[a.p1,a.p2,a.p3].map(p=>r.points[p.id]));
+  assert.equal(pts.length,4);
+  const distances=pts.slice(0,-1).map(p=>Math.hypot(p.x-pts.at(-1).x,p.y-pts.at(-1).y));
+  if(!refs.has(a.id))refs.set(a.id,distances);
+  distances.forEach((d,i)=>assert.ok(Math.abs(d-refs.get(a.id)[i])<.001,'integral tip must stay rigid'));
+  assert.equal(createPlateGeometry(a,[a.p1,a.p2,a.p3].map(p=>r.points[p.id])).outlines.length,1);
+ }
+}
 for(const length of [145.892,172.422]){
  const p={...s.params,H2Arm:length,H2Tail:250-length};
  for(const sample of scanSyringe(s.comps,p,'H2Syringe').samples)assert.ok(Math.abs(Math.hypot(sample.end.x-134.1527,sample.end.y-209.5479)-250)<.001);
@@ -36,9 +53,9 @@ for(const length of [145.892,172.422]){
 
 for(const comp of normalizeSnapshot(fixedGripSnapshot).comps.filter(c=>c.type==='triangle')){
  const geometry=createPlateGeometry(comp,[comp.p1,comp.p2,comp.p3]);
- for(const q of geometry.outlines.flat())assert.ok(Math.hypot(q.x-comp.p1.x,q.y-comp.p1.y)<70,'collinear plate outline must not overshoot');
+ for(const q of geometry.outlines.flat())assert.ok(Math.hypot(q.x-comp.p1.x,q.y-comp.p1.y)<110,'collinear plate outline must not overshoot');
 }
-console.log('PASS fixed syringe: constant reach, passive angle isolation and bounded plate outline');
+console.log('PASS fixed syringe: constant reach, rigid tip and legacy migration and bounded plate outline');
 
 const lost=s.comps.filter(c=>c.id!=='H2Coupler');assert.equal(solveSyringe(lost,s.params).ok,false);
 const arm=s.comps.find(c=>c.id==='H2Arm'),rod=s.comps.find(c=>c.id==='H2Coupler');
