@@ -2446,7 +2446,9 @@ function clearBanner() { setBanner(''); }
 function updateSolveBanner(sol, missingVisibleLinks) {
   const el = document.getElementById('solveBanner');
   if (!el) return;
-  const show = missingVisibleLinks > 0 || (sol && sol.isValid === false);
+  // Incomplete geometry is normal while drawing. Explicit play/export checks
+  // use showMotionWarning; passive redraws only report failures during playback.
+  const show = playbackActive && (missingVisibleLinks > 0 || (sol && sol.isValid === false));
   el.textContent = show ? (lastFrameIssue ? `暫停模擬：${lastFrameIssue.message}` : sol?.errorReason
     ? `${sol.errorReason}；已保留原姿態，請檢查桿長與固定接點。`
     : '目前姿勢無法求解，已保留原姿態；請檢查桿長與接點。') : '';
