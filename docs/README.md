@@ -29,7 +29,7 @@
 - [SDD-FRAMEWORK-STABILIZATION-2026-10-09.md](SDD-FRAMEWORK-STABILIZATION-2026-10-09.md) — SDD — 機構積木框架穩定化與 LOOP 施工
 - [SDD-FTC-MODULES.md](SDD-FTC-MODULES.md) — FTC 功能模組：快速原型＋數位樂高
 - [SDD-GRIPPER-AI-PILOT.md](SDD-GRIPPER-AI-PILOT.md) — SDD — 首例：沿用雙齒輪夾爪，驗證人工與 AI 共用操作
-- [SDD-H01-HYDRAULIC.md](SDD-H01-HYDRAULIC.md) — H01：兩端鉸接針筒與單臂抬升
+- [SDD-H01-HYDRAULIC.md](SDD-H01-HYDRAULIC.md) — H01 兩端鉸接針筒；H02／H03 管夾固定抬臂與夾具規劃
 - [SDD-KID-BLOCKS.md](SDD-KID-BLOCKS.md) — SDD — 角色優先的機構積木環境（給小朋友的機構學）
 - [SDD-LIFT-BUCKET.md](SDD-LIFT-BUCKET.md) — 平行升降托斗 SDD
 - [SDD-MATE-FACES.md](SDD-MATE-FACES.md) — SDD — 接合面：設計時先決定「從哪裡接」，手機精靈一次接一個
