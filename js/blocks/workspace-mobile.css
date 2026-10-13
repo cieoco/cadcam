@@ -57,3 +57,11 @@
   .creation-items .ico { font-size:18px; }
   .creation-hint { margin:0 8px 6px; }
 }
+/* 工具列不足一列時換行，不能把按鈕壓窄到文字互相覆蓋。 */
+.appbar { flex-wrap:wrap; }
+.appbar .toolbar { flex-wrap:wrap; flex-shrink:0; }
+.appbar .toolbar > * { flex-shrink:0; white-space:nowrap; }
+@media (min-width:701px) and (max-width:1399px) and (min-height:501px) {
+  .appbar .project-actions { order:3; flex-basis:100%; margin-left:0; }
+  .appbar .app-status { display:none; }
+}
