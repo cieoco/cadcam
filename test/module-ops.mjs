@@ -1,6 +1,6 @@
 // M1c 刀 1：模組操作的純函式（SDD-ASSEMBLY-MODULES §4.3a、E-M6）。
 import { BLOCK_EXAMPLES } from '../js/blocks/examples.js';
-import { compileAssembly, solveAssembly, rebakeModules } from '../js/blocks/assembly.js';
+import { compileAssembly, solveAssembly, rebakeModules, outputPose } from '../js/blocks/assembly.js';
 import { normalizeSnapshot } from '../js/blocks/schema.js';
 import {
   connectedRootComps, createModule, inferOutput, addOutput, mountModule, unmountModule, dissolveModule,
@@ -55,6 +55,30 @@ const solveWorld = (comps, modules, params, angles) => solveAssembly(compileAsse
   const g = createModule(grip.comps, [], 'GearA', '夾爪');
   const gp = inferOutput(g.comps, g.modules[0], 'GPA');
   check('inferOutput：齒輪銷 GPA 選三角板 LeftJaw 當 body（齒輪不是可用 body）', gp.ok && gp.output.body.kind === 'triangle' && gp.output.body.id === 'LeftJaw');
+}
+
+// ---------- 共用接點的輸出方向必須能明確指定 ----------
+{
+  const source = snap('parallel-fourbar');
+  const made = createModule(source.comps, [], 'Link1', '平行升降');
+  const mod = made.modules[0];
+  check('舊 inferOutput API 保留第一個引用接點的零件', inferOutput(made.comps, mod, 'C').output.body.id === 'Link1');
+  const arm = addOutput(made.comps, made.modules, mod.id, 'C', '活動臂', 'Link1');
+  const upright = addOutput(made.comps, made.modules, mod.id, 'C', '保持架', 'Link3');
+  check('共用接點可指定輸出直桿而非先出現的活動臂', upright.ok && upright.modules[0].outputs[0].body.id === 'Link3' && upright.modules[0].outputs[0].name === '保持架');
+  const poseAt = (result, theta) => {
+    const solved = solveWorld(made.comps, result.modules, source.params, { '1': theta });
+    return outputPose(result.modules[0], 'out1', solved.points, made.comps);
+  };
+  check('選活動臂時輸出方向隨馬達旋轉', near(poseAt(arm, 30).a - poseAt(arm, 0).a, 30));
+  check('選輸出直桿時跨角度保持方向且位置移動', near(poseAt(upright, 0).a, 90) && near(poseAt(upright, 30).a, 90)
+    && Math.hypot(poseAt(upright, 30).x - poseAt(upright, 0).x, poseAt(upright, 30).y - poseAt(upright, 0).y) > 10);
+  const foreign = { ...made.comps.find(c => c.id === 'Link3'), id: 'Foreign', moduleId: 'Other' };
+  for (const bodyId of ['Foreign', 'Link2', 'Anchor1', '', 'Missing']) {
+    const r = addOutput([...made.comps, foreign], made.modules, mod.id, 'C', undefined, bodyId);
+    check(`明確選擇 ${bodyId || '空白'} 不可退回第一件：拒絕外模組／非接點／非剛體`, !r.ok && r.reason === 'invalid-output-body' && r.modules === made.modules);
+  }
+  check('明確指定不會讓固定點成為輸出', !inferOutput(made.comps, mod, 'A', 'Link1').ok);
 }
 
 // ---------- 內建模組與插入實例（E-M6） ----------

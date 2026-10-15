@@ -46,3 +46,22 @@ assert.equal(solveTopology(compileTopology(S.comps,S.topo,new Set()),{thetaDeg:0
 const reopened=normalizeSnapshot({kind:'blocks',v:1,comps:S.comps,params:S.topo.params});
 assert.equal(reopened.params[c.lenParam],length);
 console.log('PASS snapped closing bar retains exact length through save normalization');
+// Gear output holes need not lie on the LEGO grid. Snapping must connect,
+// rather than silently drawing a different, unconnected point nearby.
+points.C = { x: -150.25, y: 15.75 };
+Tools.init({...deps, pointCoords:()=>({A:{x:0,y:0},B:{x:80,y:0},C:{x:40,y:80}}),
+  displayPointCoords:()=>points,
+  nearestDisplayToPoint:(p,exclude=[])=>Object.keys(points).find(id=>!exclude.includes(id)&&Math.hypot(p.x-points[id].x,p.y-points[id].y)<1)});
+for (const shape of ['triangle', 'polyline']) {
+  Tools.startDrawTriangle(shape);
+  tap(a.x, a.y); tap(b.x, b.y); tap(points.C.x, points.C.y);
+  const plate = S.comps.at(-1);
+  assert.equal(plate.p1.id, 'A'); assert.equal(plate.p2.id, 'B'); assert.equal(plate.p3.id, 'C');
+  assert.equal(S.topo.params[plate.gParam], length);
+  assert.equal(S.topo.params[plate.r1Param], Math.hypot(points.C.x-a.x, points.C.y-a.y));
+  assert.equal(S.topo.params[plate.r2Param], Math.hypot(points.C.x-b.x, points.C.y-b.y));
+  const saved = normalizeSnapshot({kind:'blocks',v:1,comps:S.comps,params:S.topo.params});
+  assert.equal(saved.comps.at(-1).p2.id, 'B');
+  assert.equal(saved.params[plate.gParam], length);
+}
+console.log('PASS three-point plates preserve off-grid hole IDs and exact lengths');

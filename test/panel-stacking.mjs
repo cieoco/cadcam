@@ -34,11 +34,12 @@ const els = new Map();
 const byId = id => { if (!els.has(id)) els.set(id, new FakeElement(id)); return els.get(id); };
 globalThis.document = { getElementById: byId, createElement: () => new FakeElement() };
 
-// 對照 blocks.html：同一個容器內 roleEditor 之後緊接 frameEditor，再之後是 servoEditor。
+// 對照 blocks.html：伺服角度為接點設定的一段，機架面板仍可獨立顯示。
 const container = new FakeElement('stage');
 const role = byId('roleEditor'), frame = byId('frameEditor'), servo = byId('servoEditor');
 const moduleRow = byId('moduleEditor');
-[byId('lenEditor'), moduleRow, role, frame, servo].forEach(el => container.appendChild(el));
+[byId('lenEditor'), moduleRow, role, frame].forEach(el => container.appendChild(el));
+role.appendChild(servo);
 role.style.display = 'none'; frame.style.display = 'none';
 
 const { S } = await import('../js/blocks/state.js');

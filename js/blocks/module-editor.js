@@ -10,7 +10,7 @@ import { pointKeysFor } from './part-types.js';
 import { selectionModule, compsInPlane } from './assembly.js';
 import { mountPortName, moduleLabels } from './bench.js';
 import {
-  createModule, addOutput, inferOutput, mountModule, mountOrthogonal, unmountModule, dissolveModule, setMountFlip,
+  createModule, addOutput, inferOutput, outputBodies, mountModule, mountOrthogonal, unmountModule, dissolveModule, setMountFlip,
   moduleToTemplate, normalizeTemplate, instantiateTemplate, insertOffset, translateModule,
   compositeToTemplate, instantiateComposite, translateComposite, COMPOSITE_MAX_MODULES,
   BUILTIN_MODULES, builtinTemplate, parseLibrary, serializeLibrary
@@ -20,6 +20,7 @@ import {
 const REASON_MESSAGES = {
   'not-found': '找不到可存成模組的零件。',
   'no-module': '找不到目標模組。',
+  'invalid-output-body': '請選擇輸出端跟隨的零件。',
   'already-mounted': '這個模組已經裝好了。',
   'no-base': '模組沒有固定點，無法安裝。',
   'no-target': '請先選擇安裝目標。',
@@ -179,7 +180,8 @@ export function createModuleEditor(deps) {
       orthogonal: mounted && !!mod.mount.orient,
       viewing: S.viewPlane === mod.id,
       candidates: candidatesFor(mod),
-      canSetOutput, canUnmount: mounted, canDissolve, hasChildren
+      canSetOutput, outputBodies: canSetOutput ? outputBodies(S.comps, mod, S.selectedNodeId) : [],
+      canUnmount: mounted, canDissolve, hasChildren
     };
   }
 
@@ -299,10 +301,14 @@ export function createModuleEditor(deps) {
     const mod = S.modules.find(m => m.id === modId);
     applyResult(setMountFlip(S.comps, S.modules, modId, !(mod && mod.mount && mod.mount.flip)));
   }
-  function setOutput() {
+  function setOutput(preferredBodyId) {
     const modId = currentModuleId();
     if (!modId || !S.selectedNodeId) { transient('請先選取模組內要設為輸出端的接點。'); return; }
-    applyResult(addOutput(S.comps, S.modules, modId, S.selectedNodeId));
+    const mod = S.modules.find(m => m.id === modId);
+    if (preferredBodyId === undefined && outputBodies(S.comps, mod, S.selectedNodeId).length > 1) {
+      transient('請選擇輸出端跟隨的零件。'); return;
+    }
+    applyResult(addOutput(S.comps, S.modules, modId, S.selectedNodeId, undefined, preferredBodyId));
   }
   function dissolve() {
     const modId = currentModuleId();
@@ -527,7 +533,27 @@ export function createModuleEditor(deps) {
         if (ps.viewing) addButton(el, '↩ 回主視圖', () => setViewPlane(null));
         else addButton(el, '編輯此模組（正視）', () => setViewPlane(ps.moduleId));
       }
-      if (ps.canSetOutput) addButton(el, '設為輸出端', () => setOutput());
+      if (ps.canSetOutput) {
+        if (ps.outputBodies.length > 1) {
+          const sel = document.createElement('select');
+          sel.setAttribute('aria-label', '輸出端跟隨哪個零件');
+          const placeholder = document.createElement('option');
+          placeholder.textContent = '輸出端跟隨哪個零件…';
+          placeholder.setAttribute('value', '');
+          sel.appendChild(placeholder);
+          const names = { bar: '連桿', triangle: '三點桿', rack: '齒條', slider: '滑塊' };
+          ps.outputBodies.forEach(body => {
+            const opt = document.createElement('option');
+            opt.textContent = `${names[body.kind]} ${body.id}`;
+            opt.setAttribute('value', body.id);
+            sel.appendChild(opt);
+          });
+          el.appendChild(sel);
+          const btn = addButton(el, '設為輸出端', () => setOutput(sel.value));
+          btn.disabled = true;
+          sel.addEventListener('change', () => { btn.disabled = !sel.value; });
+        } else addButton(el, '設為輸出端', () => setOutput());
+      }
       addButton(el, '💾 存到我的模組庫', () => { saveToLibrary(); renderLibrary(); });
       if (ps.hasChildren) addButton(el, '💾 存成組合積木', () => saveCompositeToLibrary(ps.moduleId));
       if (ps.hasChildren) addButton(el, '⬇ 匯出組合積木', () => exportComposite(ps.moduleId));

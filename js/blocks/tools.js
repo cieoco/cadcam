@@ -209,7 +209,7 @@ function resolveTrianglePointAt(world, exclude = []) {
   const used = exclude.filter(Boolean);
   const nodeId = nearestNodeId(world, used);
   if (nodeId) {
-    const p = pointCoords()[nodeId];
+    const p = displayPointCoords()[nodeId];
     return { nodeId, pos: { x: p.x, y: p.y } };
   }
   return { nodeId: null, pos: { x: world.x, y: world.y } };
@@ -227,10 +227,10 @@ function resolveTriangleBaseEnd(cur) {
   if (!start) return null;
   const endNodeId = nearestNodeId(cur, start.nodeId ? [start.nodeId] : []);
   if (endNodeId) {
-    const p = pointCoords()[endNodeId];
+    const p = displayPointCoords()[endNodeId];
     const d = Math.hypot(p.x - start.pos.x, p.y - start.pos.y);
-    const L = legoLength(d);
-    if (Math.abs(d - L) < 0.75) return { nodeId: endNodeId, pos: { x: p.x, y: p.y }, len: L };
+    // 接既有孔必須保留 ID 與精確孔距；8mm 格距只用於自由畫新孔。
+    if (d > 1e-6) return { nodeId: endNodeId, pos: { x: p.x, y: p.y }, len: d };
   }
   const dx = cur.x - start.pos.x, dy = cur.y - start.pos.y;
   const dist = Math.hypot(dx, dy);
@@ -256,11 +256,11 @@ function resolveTriangleThirdPoint(cur) {
   const exclude = S.trianglePoints.map(p => p.nodeId).filter(Boolean);
   const nodeId = nearestNodeId(cur, exclude);
   if (nodeId) {
-    const p = pointCoords()[nodeId];
+    const p = displayPointCoords()[nodeId];
     const d1 = Math.hypot(p.x - a.x, p.y - a.y);
     const d2 = Math.hypot(p.x - b.x, p.y - b.y);
-    if (Math.abs(d1 - legoLength(d1)) < 0.75 && Math.abs(d2 - legoLength(d2)) < 0.75) {
-      return { nodeId, pos: { x: p.x, y: p.y }, r1: legoLength(d1), r2: legoLength(d2) };
+    if (d1 > 1e-6 && d2 > 1e-6) {
+      return { nodeId, pos: { x: p.x, y: p.y }, r1: d1, r2: d2 };
     }
   }
 

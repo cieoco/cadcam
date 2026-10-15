@@ -105,9 +105,17 @@ export function createModule(comps, modules, compId, name) {
   return { ok: true, comps: outComps, modules: [...modList, newModule], moduleId, reason: 'ok' };
 }
 
-// 推論輸出端：點須屬於本模組、不可是固定點；body＝模組內第一個引用該點（pointKeysFor 或 holes）
-// 且 type 為 bar／triangle／rack／slider 的零件。
-export function inferOutput(comps, module, pointId) {
+// 引用此接點（或孔）的可用輸出零件，供面板在共用接點時明確選擇方向來源。
+export function outputBodies(comps, module, pointId) {
+  return (Array.isArray(comps) ? comps : []).filter(c => c && module && c.moduleId === module.id && BODY_COMP_TYPES.has(c.type)
+    && (pointKeysFor(c).some(k => c[k] && c[k].id === pointId)
+      || (Array.isArray(c.holes) && c.holes.some(h => h && h.id === pointId))))
+    .map(c => ({ kind: c.type, id: c.id }));
+}
+
+// 推論輸出端：點須屬於本模組、不可是固定點；指定 body 時必須引用該點。
+// 未指定時保留舊 API：取第一個 bar／triangle／rack／slider。
+export function inferOutput(comps, module, pointId, preferredBodyId) {
   const list = Array.isArray(comps) ? comps : [];
   const modComps = list.filter(c => module && c.moduleId === module.id);
   let found = false;
@@ -126,24 +134,20 @@ export function inferOutput(comps, module, pointId) {
   }
   if (!found) return { ok: false, output: null, reason: 'not-in-module' };
   if (isFixed) return { ok: false, output: null, reason: 'fixed-point' };
-  let body = null;
-  for (const c of modComps) {
-    if (!BODY_COMP_TYPES.has(c.type)) continue;
-    const viaPoint = pointKeysFor(c).some(k => c[k] && c[k].id === pointId);
-    const viaHole = Array.isArray(c.holes) && c.holes.some(h => h && h.id === pointId);
-    if (viaPoint || viaHole) { body = { kind: c.type, id: c.id }; break; }
-  }
+  const bodies = outputBodies(list, module, pointId);
+  const body = preferredBodyId === undefined ? bodies[0] : bodies.find(b => b.id === preferredBodyId);
+  if (preferredBodyId !== undefined && !body) return { ok: false, output: null, reason: 'invalid-output-body' };
   if (!body) return { ok: false, output: null, reason: 'no-body' };
   return { ok: true, output: { at: pointId, body }, reason: 'ok' };
 }
 
 // 新增輸出端：id 為 out1、out2…不重複；名稱預設「輸出 N」。
-export function addOutput(comps, modules, moduleId, pointId, name) {
+export function addOutput(comps, modules, moduleId, pointId, name, preferredBodyId) {
   const modList = Array.isArray(modules) ? modules : [];
   const idx = modList.findIndex(m => m.id === moduleId);
   if (idx < 0) return { ok: false, modules: modList, reason: 'no-module' };
   const mod = modList[idx];
-  const inferred = inferOutput(comps, mod, pointId);
+  const inferred = inferOutput(comps, mod, pointId, preferredBodyId);
   if (!inferred.ok) return { ok: false, modules: modList, reason: inferred.reason };
   const existing = Array.isArray(mod.outputs) ? mod.outputs : [];
   const usedIds = new Set(existing.map(o => o.id));

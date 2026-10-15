@@ -486,6 +486,7 @@ function newDesign() {
   if(!hasRootParts && S.modules.length && S.topo.rootDesignName){pushUndo();S.topo.rootDesignName='';scheduleAutosave();}
   setDesignFocus(ROOT_TAB);   // 先切換（會收掉畫圖工具與橫幅），再顯示提示
   if (hasRootParts) transient('先把目前設計存成模組（選取零件 → 🧩 存成模組），再開新設計');
+  else if (mobilePrompt()) setMobilePanel('build');
 }
 // 有組立引用時可明確選擇僅關閉編輯頁；一般「關閉」會卸載工作區資料。
 async function hideDesignEditor(id){

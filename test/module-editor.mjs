@@ -168,4 +168,36 @@ const liftOut = S.modules[0].outputs[0];
   keydown({ target: block, key: 'Enter', preventDefault() {} });
   check('Enter 加入新模組並保留舊模組', S.modules.length === count + 1);
 }
+// 共用接點：面板要求選跟隨的零件，控制器也不會默認先出現的活動臂。
+{
+  reset();
+  const p = (id, x, y) => ({ id, x, y, type: 'floating' });
+  S.comps = [
+    { type: 'bar', id: 'Arm', moduleId: 'Choice', p1: p('A', 0, 0), p2: p('C', 50, 0) },
+    { type: 'bar', id: 'Upright', moduleId: 'Choice', p1: p('C', 50, 0), p2: p('D', 50, 50) }
+  ];
+  S.modules = [{ id: 'Choice', name: '平行升降', outputs: [], mount: null }];
+  select({ selectedNodeId: 'C' });
+  check('共用接點列出兩個方向來源', editor.panelState().outputBodies.map(b => b.id).join(',') === 'Arm,Upright');
+  const before = log.undo;
+  editor.setOutput();
+  check('控制器缺少共用接點的選擇時提示且不修改／不加 undo', S.modules[0].outputs.length === 0 && log.undo === before && /請選擇/.test(log.toasts.at(-1)));
+  editor.sync();
+  const panel = document.getElementById('moduleEditor');
+  const sel = panel.children.find(c => c.attrs['aria-label'] === '輸出端跟隨哪個零件');
+  const btn = panel.children.find(c => c.textContent === '設為輸出端');
+  check('共用接點提供空白提示選項，按鈕尚未啟用', sel && sel.children[0].attrs.value === '' && btn.disabled === true);
+  sel.value = 'Upright';
+  sel.listeners.change[0]();
+  check('選好方向來源後啟用按鈕', btn.disabled === false);
+  btn.listeners.click[0]();
+  check('UI 選擇傳到輸出端 body 並只加一筆 undo', S.modules[0].outputs[0].body.id === 'Upright' && log.undo === before + 1);
+  editor.setOutput('Missing');
+  check('控制器拒絕不存在的 body 而不默認第一件', S.modules[0].outputs.length === 1 && log.undo === before + 1);
+  select({ selectedNodeId: 'D' });
+  editor.sync();
+  check('只有一個方向來源時不顯示選單，保留直接設定', !panel.children.some(c => c.attrs['aria-label'] === '輸出端跟隨哪個零件'));
+  editor.setOutput();
+  check('單一方向來源可沿用無參數控制器 API', S.modules[0].outputs.length === 2 && S.modules[0].outputs[1].body.id === 'Upright');
+}
 report('module-editor');
