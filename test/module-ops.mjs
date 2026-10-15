@@ -84,7 +84,7 @@ const solveWorld = (comps, modules, params, angles) => solveAssembly(compileAsse
 // ---------- 內建模組與插入實例（E-M6） ----------
 let work;
 {
-  check('內建模組含升降、雙爪、單側夾爪與手腕', BUILTIN_MODULES.map(m => m.id).join(',') === 'rack-lift,gear-gripper,fourbar-lift,single-servo-claw,single-axis-wrist,swing-intake');
+  check('內建模組含升降、雙爪、單側夾爪與手腕', BUILTIN_MODULES.map(m => m.id).join(',') === 'rack-lift,gear-gripper,fourbar-lift,single-servo-claw,single-axis-wrist,swing-intake,tipping-bucket,lift-bucket');
   const tLift = builtinTemplate('rack-lift'), tGrip = builtinTemplate('gear-gripper');
   check('內建模組是合法模板', normalizeTemplate(tLift).ok && normalizeTemplate(tGrip).ok);
   check('齒條升降模板帶滑台輸出端', tLift.outputs.length === 1 && tLift.outputs[0].at === 'LiftOutput');

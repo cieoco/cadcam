@@ -138,6 +138,8 @@
     "test/module-ops.mjs",
     "test/common-manipulators.mjs",
     "test/swing-intake-module.mjs",
+    "test/example-library.mjs",
+    "test/bucket-library.mjs",
     "test/module-plates.mjs",
     "test/motor-frame-modules.mjs",
     "test/motor-tools.mjs",

@@ -52,8 +52,14 @@ export const EXAMPLE_GROUPS = [
 
 const EXAMPLE_LESSONS = {
   ...Object.fromEntries(COMMON_MANIPULATOR_EXAMPLES.map(example => [example.id, example.lesson])),
-  'hydraulic-h03': {group:'lift-motion',level:'入門液壓',use:'固定筒身驅動左右一體式三點夾臂；末端造形與交叉臂保持剛性。'},
-  'hydraulic-h02': {group:'lift-motion',level:'入門液壓',use:'管夾固定筒身，短連桿把直線輸入轉成抬臂擺動。'},
+  'hydraulic-h03': {group:'lift-motion',level:'入門液壓',use:'固定筒身驅動左右一體式三點夾臂；末端造形與交叉臂保持剛性。',try:['改針筒伸出量並掃描可用行程','比較左右夾臂的開口；接觸與夾持力未驗證']},
+  'hydraulic-h02': {group:'lift-motion',level:'入門液壓',use:'管夾固定筒身，短連桿把直線輸入轉成抬臂擺動。',try:['改針筒伸出量並觀察末端高度','修改前先存檔，再比較安裝孔位的影響']},
+  'wiper-single': {group:'challenge',level:'探索',use:'曲柄經浮桿帶動三孔雨刷臂往復擺動。',try:['選浮桿改孔距，再試播比較掃掠範圍']},
+  'wiper-missing-coupler': {group:'challenge',level:'練習',use:'尚未補接浮桿的雨刷骨架，不是完成機構。',try:['先用連桿接上兩個活動端，再播放']},
+  'fourbar-missing-coupler': {group:'challenge',level:'練習',use:'尚未閉合的四連桿骨架，供練習接點連接。',try:['先補接兩側活動端，再試播與改孔距']},
+  'slider-crank-practice': {group:'challenge',level:'練習',use:'曲柄與滑塊尚未相連；曲柄能轉不表示滑塊已被帶動。',try:['用連桿接曲柄端 A 與滑塊孔 P3，再觀察滑塊是否往復']},
+  'assembly-lift-gripper': {group:'challenge',level:'整合',use:'已接好的升降與夾爪，分別控制升降及開合。',try:['切換組立，分別選 M1 與 M2 試動，再修改尺寸']},
+  'assembly-lift-gripper-practice': {group:'challenge',level:'練習',use:'升降與夾爪分開，供練習安裝、取消與復原。',try:['切到組立，選夾爪並預覽工具架雙孔對鎖，再確認接合']},
   'hydraulic-h01': {group:'lift-motion',level:'入門液壓',use:'固定筒身，經短連桿把推桿直線運動轉成單臂擺動。',
     learn:'辨識固定管夾、直線推桿與兩端可轉動的短連桿。',
     try:['任務1：推動行程滑桿並掃描，找出可用範圍。','任務2：設定中只改活動臂長 60、80、100 mm，預測再比較。','任務3：分別存檔修改前後兩個版本，記錄改變、預測與觀察。'],
@@ -451,6 +457,7 @@ const ALL_BLOCK_EXAMPLES = [
   {
     id: 'pantograph',
     title: '縮放儀：2 倍放大',
+    adjustmentNote: '這是手動拖曳範例，沒有馬達；拖曳末端 R 操作，先比較 P 與 R 的位置。播放檢查會提示未受約束，不代表手動操作已驗證為自動機構。',
     note: '左下 O 固定，拖曳右端 R 操作縮放儀；中點 P 與右端 R 會留下不同色軌跡，R 永遠是 B→P 方向的 2 倍輸出。',
     snapshot: {
       kind: 'blocks',

@@ -28,15 +28,16 @@ export function offerExample({ example, loadExample, onDismiss = () => {}, docum
   dialog.setAttribute('aria-label', '載入機構範例');
   const heading = document.createElement('h2'); heading.textContent = example.title;
   const message = document.createElement('p');
-  message.textContent = '載入會替換整份作品（所有設計分頁與組立），可按復原找回。若要保留作品並加入機構，請取消後使用「新增 → 加入模組」。';
+  message.textContent = '載入會替換整份作品（所有設計分頁與組立），可按復原找回。若要保留作品，請取消後查看「新增 → 加入模組」的可用機構；並非所有範例都有內建模組。';
   const use = document.createElement('p');
-  use.textContent = getExampleLesson(example.id).use || example.note || '';
+  const lesson = getExampleLesson(example.id);
+  use.textContent = lesson.use || example.note || '';
   const scope = document.createElement('p');
   scope.textContent = example.adjustmentNote || (example.id === 'parallel-fourbar'
     ? '可調：活動臂長、起終高度。工具架保持姿態，但沿圓弧移動；承載與實物尚未驗證。'
     : example.id === 'gear-gripper'
       ? '可調：目標物寬度、開口餘量。雙齒輪帶動兩爪轉動，並非平行夾爪；接觸與夾持力尚未驗證。'
-      : '載入後可修改尺寸與試播；模擬結果不代表可直接加工或實物已驗證。');
+      : `${lesson.try?.[0] ? `先試：${lesson.try[0]}。` : '載入後可修改尺寸與試播。'}模擬結果不代表可直接加工或實物已驗證。`);
   const accept = document.createElement('button'); accept.type = 'button'; accept.textContent = '載入此範例';
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '保留目前作品';
   const dismiss = () => { onDismiss(); dialog.close(); dialog.remove(); };

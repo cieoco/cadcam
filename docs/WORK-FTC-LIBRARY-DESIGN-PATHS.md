@@ -180,3 +180,68 @@ W2 已開始真實空白繪製：以四根一般連桿接成閉環，兩活動�
 `test/swing-intake-module.mjs` 20/20：來源不變、排除示範物件、模板正規化、連桿 64／68／72 mm 各 181 姿態可解、1 mm 不可達反例、馬達重編、接合／JSON 往返／拆下與九組宿主姿態。使用底層既有求解器取樣；目前通用 `validateMotionRange` 對此結構回報不支援，不將它說成通用檢查已通過。孔距 68 mm 為域測試輸入，UI 實測使用 72 mm。
 
 入口及模組回歸通過；`NODE_OPTIONS=--no-webstorage node tools/test-runner.mjs --output output/swing-intake/full` 全套 190/190（Node 25.2，環境選項理由同前包）。之後僅補版本說明與文件並重新生成載入圖。證據在本機 `output/swing-intake/`：`mobile.png`、`assembly.png`、`scratch.png`、`scratch.json`、`full/results.json`。接觸、摩擦、支承、全行程實體碰撞及實物仍未驗證。
+
+## W5d — 2026-10-16 全公開庫核對與組合重用（2026.10.16.1）
+
+本輪依持續 LOOP 授權連續完成公開庫盤點、缺口修正、模組接入、全套與瀏覽器驗收。範圍為目前 32 個公開入口；不是宣稱未實作的所有 FTC 家族已完成。共 8 個內建模組，新增兩項都由既有 snapshot 衍生，不新增重複範例。
+
+### 本輪變更
+
+- 翻斗 `tipping-bucket` 與升降托斗 `lift-bucket` 使用既有 compositeToTemplate／insertComposite；分別保留 9 件／4 模組、12 件／5 模組及內部接合。插入時重編零件、孔位、參數與動力 ID。未安裝的組合須另加入組立／接到宿主，加入庫中模組不等於自動接上原作品。
+- 原進料例中的環境 workpiece 曾被 body-joint solver 收入待解接點，造成機構完整卻被判約束不足。本輪只排除環境物件獨有的接點；真實桿件使用的同 ID 仍由桿件收集。新增鬆桿反例仍攔截，沒有全面關閉約束檢查。
+- 補齊 8 筆用途／試改提示；確認視窗使用各例第一個操作建議。縮放儀說明手動拖曳；缺桿／接合練習明示未完成。模組入口說明不再暗示全部範例均有內建模組。
+
+### 32 個入口的核對表
+
+每項都已由瀏覽器選單確認載入；資料測試皆核對來源不變、snapshot／分享往返保留 comps 與 modules。下表「播放」指 UI 啟動及純函式各動力軸的適用角度取樣，不代表所有多軸組合姿態、接觸、材料或實物通過。圖檔數是原 snapshot「目前組立」各格式的檔案數，並非所有零件皆有獨立板材圖。
+
+| 入口 ID | 操作／動作驗收 | SVG / DXF 各格式 |
+| --- | --- | --- |
+| fourbar-crank-rocker | 播放、旋轉取樣 | 4 |
+| fourbar-double-crank | 播放、旋轉取樣 | 4 |
+| fourbar-double-rocker | 播放、可解擺角取樣 | 4 |
+| parallel-fourbar | 播放；既有等臂任務與空白流程見 W2–W4 | 4 |
+| gear-pair | 播放、傳動取樣 | 3 |
+| reduction-gear-train | 播放、傳動取樣 | 4 |
+| pulley-belt | 播放、傳動取樣 | 1；皮帶輪／皮帶無獨立板材檔 |
+| tipping-bucket | 播放；本輪整組加入、復原、重開 | 7 |
+| pantograph | 手動範例；自動播放受約束檢查阻擋 | 5 |
+| gear-gripper | 播放；可調開口、負例與接口見 W2–W4 | 5 |
+| competition-roller-intake | 本輪修正後播放；W5c 自建與模組流程 | 5；示範物件不輸出 |
+| single-servo-claw | 播放；改長與復原見 W5a | 4 |
+| single-axis-wrist | 播放；改角、接夾爪與重開見 W5a | 3 |
+| hydraulic-h01 | 播放、針筒可用行程掃描 | 既有製作規格限制，拒絕輸出 |
+| hydraulic-h02 | 播放、針筒可用行程掃描 | 既有製作規格限制，拒絕輸出 |
+| hydraulic-h03 | 播放、針筒可用行程掃描 | 既有製作規格限制，拒絕輸出 |
+| chebyshev-linkage | 播放、旋轉取樣 | 5 |
+| slider-crank | 播放、旋轉取樣 | 3；滑塊無獨立板材檔 |
+| quick-return | 播放、旋轉取樣 | 3；滑塊無獨立板材檔 |
+| rack-pinion | 播放、齒條行程取樣 | 3 |
+| cam-follower | 播放、從動運動取樣 | 1；凸輪無獨立板材檔 |
+| competition-fourbar-lift | 播放；M1 / M2 分別取樣 | 7 |
+| competition-rack-lift | 播放；共用組立見 W4 | 3 |
+| lift-bucket | 播放；本輪手機加入與組立 M3 試播 | 8 |
+| jansen-leg | 播放、腿部幾何取樣 | 14 |
+| wiper-single | 播放、搖臂取樣 | 4 |
+| wiper-missing-coupler | 試播提示未受約束，需補桿 | 3；只輸出已有件 |
+| fourbar-missing-coupler | 試播提示未受約束，需補桿 | 3；只輸出已有件 |
+| empty-challenge | 空白保留，無動作 | 無零件，拒絕輸出 |
+| slider-crank-practice | 曲柄可轉；滑塊未被連桿帶動，非完成機構 | 2；滑塊無獨立板材檔 |
+| assembly-lift-gripper | 播放；兩動力分別取樣 | 9 |
+| assembly-lift-gripper-practice | 分離機構可播放；須完成接合 | 4；依目前組立成員輸出 |
+
+### 整合與 UI 證據
+
+- 獨立 localhost:8016 桌面遍歷 32 項；28 項啟動播放，其餘 4 項為兩個缺桿例、縮放儀及空白。啟動不取代整段取樣，亦未把兩個可局部播放的練習稱為完整機構。
+- 從原 7 件進料作品插入翻斗，新增 4 設計並保留原設計；一次復原回原分頁，再加入。經設計清單加入整個翻斗鏈，M1 擺臂與 M2 翻斗皆可啟動播放；混合環境物件不再誤報約束不足。
+- 390×844 加入升降托斗，新增 5 設計並保留前 5 設計，手機播放可啟動，頁寬與 scrollWidth 皆 390。此為瀏覽器尺寸驗收，不是實機觸控。
+- 重新整理仍保留 10 分頁及 7 個內部接合；以存檔視窗下載「機構庫整組重用驗收.json」，再由一般開檔確認視窗選檔重開。之後將升降托斗加入組立，M3 可試播。托斗與翻斗是分開的機構，沒有假裝兩根基座已互接。
+- 組立 3D 有顯示內部板件，保留材料未驗證／未檢查項目；沒有降低警告門檻。瀏覽器 error log 為空。畫面與逐項紀錄位於本機 `output/library-completion/`，主證據 `three-mechanisms.png`、`ui-catalog.json`、`export-results.json`。
+
+### 測試與仍存在的能力界限
+
+新增 `test/example-library.mjs` 強制列舉完整公開集合，核對各類動作／預期失敗、分享、來源不變、適用 SVG／DXF 與拒絕輸出原因。新增 `test/bucket-library.mjs` 核對兩個組合來源、ID 碰撞重編、接合保存及指定角度取樣。`test/motion-preflight.mjs` 覆蓋環境物件與真正鬆桿的差別、混合組立。
+
+`NODE_OPTIONS=--no-webstorage node tools/test-runner.mjs --output output/library-completion/full`：192/192 支通過（Node 25.2）。之後僅擴充公開庫輸出斷言並定向重跑通過，再補版本說明與文件／重建載入圖；沒有把純文件更新當成新的全套測試。28 個非空白、非液壓入口輸出有效數值；液壓三例沿既有限制拒絕，空白拒絕。未替它們偽造加工資料。
+
+現有公開庫這一輪盤點及上述改善完成。仍未實作真正平行夾爪、多級繩索滑軌、輪地接觸、滾輪收料物理、射出彈道、懸掛承載及電控；飛輪維持未公開。這些是 SDD 獨立能力清單，不計入已完成項目。各例仍可依既有通用尺寸工具編輯；本輪沒有逐一從空白重畫 32 項，空白建立證據以 W2–W4 與 W5c 三類骨架為準。

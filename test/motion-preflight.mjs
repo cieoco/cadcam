@@ -49,4 +49,17 @@ assert.equal(motionPoseIssue(loose.comps, asmSol).code, 'underconstrained');
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/assembly/lift-gripper.json', import.meta.url)));
 const validAsm = compileAssembly(fixture.comps, fixture.modules, { params: fixture.params });
 assert.equal(motionPoseIssue(fixture.comps, solveAssembly(validAsm, { thetaDeg: 0, motorAngles: { '1': 30, '2': 0 } })), null);
+// Environmental targets must not make a complete mechanism underconstrained.
+const intake = structuredClone(BLOCK_EXAMPLES.find(e => e.id === 'competition-roller-intake').snapshot);
+const intakeSetup = setup(intake);
+assert.equal(motionPoseIssue(intake.comps, intakeSetup.solveAt(0)), null);
+assert.equal(inspectMotionRange({...intakeSetup,plan:{mode:'rock',lo:0,hi:90}}).ok,true);
+const withLoose = structuredClone(intake);
+withLoose.comps.push({type:'bar',id:'LooseArm',lenParam:'LooseLength',p1:{...intake.comps.find(c=>c.id==='IntakeArm').p3},p2:{id:'LooseEnd',type:'floating',x:70,y:150}});
+withLoose.params.LooseLength=30;
+assert.equal(inspectMotionRange({...setup(withLoose),plan:{mode:'rock',lo:0,hi:90}}).code,'underconstrained');
+const mixed = structuredClone(intake);
+mixed.comps.push(...good.comps.map(c=>({...c,moduleId:'Slider'})));
+const mixedAssembly=compileAssembly(mixed.comps,[{id:'Slider',name:'Slider',base:'O',outputs:[]}],{params:{...mixed.params,...good.params}});
+assert.equal(motionPoseIssue(mixed.comps,solveAssembly(mixedAssembly,{thetaDeg:0})),null);
 console.log('motion-preflight: passed');

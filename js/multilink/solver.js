@@ -164,7 +164,9 @@ function solveBodyJointTopology(topology, params) {
             return;
         }
 
-        ['p1', 'p2', 'p3'].forEach(k => addPointId(c[k]));
+        // Workpieces are environmental targets, not unconstrained mechanism joints.
+        // A shared ID used by a real member is still collected from that member.
+        if (c.type !== 'workpiece') ['p1', 'p2', 'p3'].forEach(k => addPointId(c[k]));
         if (c.holes) {
             c.holes.forEach(h => {
                 if (h && h.id) holeIds.add(h.id);
