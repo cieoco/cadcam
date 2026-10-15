@@ -134,3 +134,25 @@ W2 已開始真實空白繪製：以四根一般連桿接成閉環，兩活動�
 - 桌面 UI：載入單側夾爪，80→96 mm，工作範圍 61→73 mm，試播／暫停、一次復原回原範圍。確認只有 MG995、一側固定指保持可見。
 - 390×844 UI：載入手腕，終角 60→75→90°，試播／暫停；innerWidth=scrollWidth=390。由模組庫加入手腕、再加入單側夾爪，原設計仍保留。桌面將夾爪接到工具端，下載作品並經一般開檔流程重開，「已安裝」及設計分頁仍在。非實機觸控或實物測試。
 - 本機證據：`output/common-manipulators/claw-desktop.png`、`wrist-mobile.png`；下載作品 `常用機構手腕夾爪驗收.json`。尚未補真正平行夾爪、多級滑軌、接觸進料與硬體電控，不將兩例擴充稱為全部 FTC 機構完成。
+
+## W5b — 2026-10-15 既有範例查重與重用決策
+
+依使用者要求，在繼續補機構前重新核對 `cb4f14b` 的公開登錄、模組來源及組合內部結構。直接匯入 `examples.js`／`module-ops.js` 得到 32 個公開入口、5 個內建模組。前者含空白、補接練習及組合版本，不當成不同機構家族數；有定義不等於公開，也不等於完成實物驗證。
+
+| 用途 | 已有來源 | 決策與差異 |
+| --- | --- | --- |
+| 平行升降 | `parallel-fourbar`、`competition-fourbar-lift`、內建 `fourbar-lift`、組立 Lift1 | 優先完善既有操作；各例尺寸、馬達及工具架約束不同，不另建同名模板 |
+| 手腕翻轉 | `competition-fourbar-lift` 的 ToolPlate 已有 M2／motorCarrier；W5a `single-axis-wrist` | 新例是固定基準、單臂 MG995、可獨立插入的簡化版本；原例是移動機架上的工具架。不能宣稱新發明手腕能力，也不能直接把整份升降例當獨立手腕插入。保留已發布 ID，後續先重用此模組 |
+| 雙側夾取／單側夾取 | `gear-gripper`、內建同源模組；`hydraulic-h03`；W5a `single-servo-claw` | 齒輪雙爪、針筒交叉臂與一固定指一活動指結構不同，可共存；均不改稱真正平行夾爪 |
+| 直線推送／升降 | `slider-crank`、`quick-return`、`rack-pinion`、`competition-rack-lift`／內建 `rack-lift` | 依往復或齒條用途選既有例；補接練習不是新機構 |
+| 翻斗與升降托斗 | `tipping-bucket`、`lift-bucket` | 已有單體及組合，先核對接口與可調範圍；不再新增一份翻斗作品 |
+| 進料臂 | `competition-roller-intake`，實際標題為競賽擺臂進料機構 | 已有曲柄、連桿及彎折取物臂。優先評估抽成模組；ID 含 roller 不代表已有柔性滾輪接觸求解 |
+| 傳動與其他運動 | `gear-pair`、`reduction-gear-train`、`pulley-belt`、`cam-follower`、四連桿三型、雨刷、切比雪夫、縮放儀、Jansen、H01/H02 | 已有原理範例；換成 FTC 用途說明不算新結構。皮帶輪傳動不直接等於多級繩索滑軌 |
+| 完整組合與練習 | `assembly-lift-gripper`、其 practice、`lift-bucket` | 沿既有來源與組立流程重用；完整／待接是操作起點差別 |
+| 飛輪 | `competition-flywheel-shooter` 定義存在、公開清單排除 | 不重寫或解除排除；先查既有排除理由與驗證缺口 |
+
+內建 `fourbar-lift` 由升降例產生時，刻意移除 ToolPlate 手腕動力並補 ToolDiag；它與原雙動力範例不能混稱。五個內建模板都從 `BUILTIN_MODULES.source` 指向公開範例，再由既有 `builtinTemplate` 處理接口與必要變體，沒有另維護五份獨立 snapshot。
+
+下一包優先順序：先評估既有擺臂進料的模組接口與修改操作，再核對翻斗重用；只有真正平行夾爪等不同拓撲才進入新增候選。這是查重後的施工順序，不代表上述抽取已完成。多級滑軌、滾輪接觸與懸掛負載仍需各自的能力評估。
+
+本包只更新規格及盤點紀錄，沒有新增範例、改 ID 或變更求解器。驗證為實際匯入登錄、對照來源及文件 diff 檢查；沒有以這次讀碼代替新的動作或 UI 驗收，產品版本維持 `2026.10.15.3`。
