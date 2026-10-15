@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { requestedExample, offerExampleFromUrl } from '../js/blocks/example-entry.js';
+import { requestedExample, offerExampleFromUrl, offerExample } from '../js/blocks/example-entry.js';
+import { getExample } from '../js/blocks/examples.js';
 
 class Element {
   constructor(tag) { this.tag = tag; this.children = []; this.events = {}; }
@@ -39,4 +40,13 @@ assert.equal(setup('').dialog, undefined);
 assert.equal(setup('?example=not-a-real-example').notices.length, 1);
 assert.equal(setup('?example=fourbar-crank-rocker#shared-work').dialog, undefined);
 assert.equal(requestedExample('https://example.org/?example=invalid'), null);
+const failedDocument = { body: new Element('body'), createElement: tag => new Element(tag) };
+let dismissed = false;
+const failed = offerExample({ example: getExample('gear-gripper'), document: failedDocument,
+  loadExample: () => false, onDismiss: () => { dismissed = true; } });
+failed.children.find(e => e.textContent === '載入此範例').onclick();
+assert.equal(failed.open, true, 'Failed loads retain the dialog and current work');
+assert.equal(dismissed, false);
+assert.ok(failed.children.some(e => e.textContent?.includes('並非平行夾爪')));
+assert.ok(failed.children.some(e => e.textContent?.includes('所有設計分頁與組立')));
 console.log('example-entry: confirmed loading, cancellation, Escape, invalid IDs, URL cleanup and share priority passed');

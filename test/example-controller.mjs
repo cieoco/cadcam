@@ -5,7 +5,13 @@ import { check, report } from './_harness.mjs';
 class FakeElement {
   constructor(tag = 'div') { this.tag = tag; this.children = []; this.style = {}; this.dataset = {}; this.textContent = ''; this.value = ''; }
   appendChild(child) { this.children.push(child); return child; }
-  addEventListener() {}
+  addEventListener(name, fn) { (this.events ||= {})[name] = fn; }
+  setAttribute() {}
+  append(...children) { this.children.push(...children); }
+  showModal() { this.open = true; }
+  close() { this.open = false; }
+  remove() { this.removed = true; }
+  focus() {}
 }
 const ids = new Map([
   ['exampleSelect', new FakeElement('select')], ['exampleLessonCard', new FakeElement()],
@@ -14,6 +20,7 @@ const ids = new Map([
   ['exampleLessonTasks', new FakeElement('ul')]
 ]);
 globalThis.document = {
+  body: new FakeElement('body'),
   getElementById: id => ids.get(id) || null,
   createElement: tag => new FakeElement(tag)
 };
@@ -42,4 +49,15 @@ controller.snapshotApplied({ params: {} }, 'undo');
 check('復原作品過程不提前清除課程', controller.activeExampleId === 'slider-crank');
 controller.restoreLesson('');
 check('復原到非課程作品會清除任務', controller.activeExampleId === '');
+globalThis.window = { document: globalThis.document };
+const previous = applied;
+ids.get('exampleSelect').value = 'parallel-fourbar';
+check('選單要求載入時不套用且清空選項', controller.requestLoad() && applied === previous && ids.get('exampleSelect').value === '');
+check('對話框開啟時不重複建立', controller.requestLoad('gear-gripper') === false && document.body.children.length === 1);
+const pending = document.body.children[0];
+pending.children.find(e => e.textContent === '保留目前作品').onclick();
+check('取消保留作品', applied === previous && pending.removed);
+controller.requestLoad('parallel-fourbar');
+document.body.children[1].children.find(e => e.textContent === '載入此範例').onclick();
+check('取消後可重選同一範例並確認載入', applied !== previous && controller.activeExampleId === 'parallel-fourbar');
 report('example-controller');

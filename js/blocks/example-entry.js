@@ -1,5 +1,5 @@
 /** 教材深連結只選範例，不承載課程或作品進度。先還原原作品，確認後才替換。 */
-import { getExample } from './examples.js?v=20261005_unit2';
+import { getExample, getExampleLesson } from './examples.js?v=20261005_unit2';
 
 export function requestedExample(href) {
   const url = new URL(href);
@@ -18,18 +18,32 @@ export function offerExampleFromUrl({ loadExample, notify = () => {},
     history.replaceState(history.state, '', url.href);
   };
   if (!example) { consume(); notify('找不到指定範例，已保留目前作品。'); return; }
+  return offerExample({ example, loadExample, onDismiss: consume, document });
+}
+
+/** 選單與深連結共用同一個整份作品載入入口；確認前不修改作品。 */
+export function offerExample({ example, loadExample, onDismiss = () => {}, document = window.document }) {
   const dialog = document.createElement('dialog');
   dialog.className = 'example-entry-dialog';
-  dialog.setAttribute('aria-label', '載入教學範例');
+  dialog.setAttribute('aria-label', '載入機構範例');
   const heading = document.createElement('h2'); heading.textContent = example.title;
   const message = document.createElement('p');
-  message.textContent = '載入會替換目前畫布，可按復原找回原作品。重要作品請先取消並存檔。';
+  message.textContent = '載入會替換整份作品（所有設計分頁與組立），可按復原找回。若要保留作品並加入機構，請取消後使用「新增 → 加入模組」。';
+  const use = document.createElement('p');
+  use.textContent = getExampleLesson(example.id).use || example.note || '';
+  const scope = document.createElement('p');
+  scope.textContent = example.id === 'parallel-fourbar'
+    ? '可調：活動臂長、起終高度。工具架保持姿態，但沿圓弧移動；承載與實物尚未驗證。'
+    : example.id === 'gear-gripper'
+      ? '可調：目標物寬度、開口餘量。雙齒輪帶動兩爪轉動，並非平行夾爪；接觸與夾持力尚未驗證。'
+      : '載入後可修改尺寸與試播；模擬結果不代表可直接加工或實物已驗證。';
   const accept = document.createElement('button'); accept.type = 'button'; accept.textContent = '載入此範例';
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '保留目前作品';
-  const dismiss = () => { consume(); dialog.close(); dialog.remove(); };
+  const dismiss = () => { onDismiss(); dialog.close(); dialog.remove(); };
   accept.onclick = () => { if (loadExample(example.id) !== false) dismiss(); };
   cancel.onclick = dismiss;
   dialog.addEventListener('cancel', event => { event.preventDefault(); dismiss(); });
-  dialog.append(heading, message, accept, cancel);
+  dialog.append(heading, use, scope, message, accept, cancel);
   document.body.append(dialog); dialog.showModal(); cancel.focus();
+  return dialog;
 }

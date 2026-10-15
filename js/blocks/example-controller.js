@@ -6,9 +6,20 @@
 
 import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js?v=20261005_parallel';
 import { normalizeSnapshot } from './schema.js';
+import { offerExample } from './example-entry.js';
 
 export function createExampleController({ applySnapshot, notify, closeMobileMenu, isMobile, showBuildPanel, onLesson = () => {} }) {
   let activeExampleId = '';
+  let pendingDialog = null;
+
+  function requestLoad(id) {
+    const select = document.getElementById('exampleSelect');
+    const example = getExample(id || select?.value);
+    if (select) select.value = '';
+    if (!example || pendingDialog) return false;
+    pendingDialog = offerExample({ example, loadExample: load, onDismiss: () => { pendingDialog = null; } });
+    return true;
+  }
 
   function renderLessonCard(example) {
     const card = document.getElementById('exampleLessonCard');
@@ -92,7 +103,7 @@ export function createExampleController({ applySnapshot, notify, closeMobileMenu
           section.appendChild(title); mobileList.appendChild(section);
         }
         const button = document.createElement('button'); button.type = 'button'; button.className = 'mobile-example-btn'; button.textContent = example.title;
-        button.title = lesson.use || example.note || ''; button.addEventListener('click', () => load(example.id)); section.appendChild(button);
+        button.title = lesson.use || example.note || ''; button.addEventListener('click', () => requestLoad(example.id)); section.appendChild(button);
       }
     });
     renderLessonCard(null);
@@ -105,5 +116,5 @@ export function createExampleController({ applySnapshot, notify, closeMobileMenu
     onLesson(example || null);
   }
 
-  return { populate, load, renderLessonCard, snapshotApplied, restoreLesson, get activeExampleId() { return activeExampleId; } };
+  return { populate, load, requestLoad, renderLessonCard, snapshotApplied, restoreLesson, get activeExampleId() { return activeExampleId; } };
 }

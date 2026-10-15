@@ -152,7 +152,7 @@ export function createModuleEditor(deps) {
   }
 
   function library() {
-    const builtins = BUILTIN_MODULES.map(m => ({ kind: 'builtin', id: m.id, name: m.name }));
+    const builtins = BUILTIN_MODULES.map(m => ({ kind: 'builtin', id: m.id, name: m.name, description: m.description }));
     const locals = parseLibrary(loadLibraryText()).map((t, index) => {
       const item = { kind: 'local', index, name: t.name };
       if (t.kind === 'blocks-composite') { item.composite = true; item.moduleCount = t.modules.length; }
@@ -370,6 +370,10 @@ export function createModuleEditor(deps) {
   function buildLibraryBlock(item) {
     const div = document.createElement('div');
     div.setAttribute('class', 'block module-block');
+    div.setAttribute('role', 'button');
+    div.setAttribute('tabindex', '0');
+    div.setAttribute('aria-label', `加入${item.name}（保留現有作品）`);
+    div.setAttribute('title', `${item.description || item.name} 加入新模組，保留現有作品。`);
     const ico = document.createElement('span');
     ico.setAttribute('class', 'ico');
     ico.textContent = item.composite ? '🧩🧩' : '🧩';
@@ -381,6 +385,12 @@ export function createModuleEditor(deps) {
     role.textContent = item.kind === 'builtin' ? '內建模組' : (item.composite ? `組合積木（${item.moduleCount} 個模組）` : '我的模組');
     div.appendChild(ico); div.appendChild(name); div.appendChild(role);
     div.addEventListener('click', () => {
+      if (item.kind === 'builtin') insertBuiltin(item.id);
+      else insertLocal(item.index);
+    });
+    div.addEventListener('keydown', event => {
+      if (event.target !== div || !['Enter', ' '].includes(event.key)) return;
+      event.preventDefault();
       if (item.kind === 'builtin') insertBuiltin(item.id);
       else insertLocal(item.index);
     });

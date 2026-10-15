@@ -156,4 +156,16 @@ const liftOut = S.modules[0].outputs[0];
   check('sync：模組庫區塊列出項目', document.getElementById('moduleLibrary').children.length >= 2);
 }
 
+// 鍵盤加入與巢狀移除按鈕不應誤觸加入。
+{
+  editor.sync();
+  const block = document.getElementById('moduleLibrary').children[0];
+  check('加入入口說明保留現有作品且可聚焦', block.attrs.role === 'button' && block.attrs.tabindex === '0' && block.attrs['aria-label'].includes('保留現有作品'));
+  const count = S.modules.length;
+  const keydown = block.listeners.keydown[0];
+  keydown({ target: {}, key: 'Enter', preventDefault() {} });
+  check('子按鈕按鍵不觸發加入', S.modules.length === count);
+  keydown({ target: block, key: 'Enter', preventDefault() {} });
+  check('Enter 加入新模組並保留舊模組', S.modules.length === count + 1);
+}
 report('module-editor');
