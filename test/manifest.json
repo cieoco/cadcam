@@ -136,6 +136,7 @@
     "test/module-flip.mjs",
     "test/module-insert-place.mjs",
     "test/module-ops.mjs",
+    "test/common-manipulators.mjs",
     "test/module-plates.mjs",
     "test/motor-frame-modules.mjs",
     "test/motor-tools.mjs",

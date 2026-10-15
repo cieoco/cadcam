@@ -959,7 +959,9 @@ export function instantiateComposite(template, ctx) {
 export const BUILTIN_MODULES = [
   { id: 'rack-lift', name: '齒條升降', source: 'competition-rack-lift', description: '小齒輪帶動垂直齒條升降。' },
   { id: 'gear-gripper', name: '齒輪夾爪', source: 'gear-gripper', description: '雙齒輪同步開合夾爪。' },
-  { id: 'fourbar-lift', name: '四連桿升降臂', source: 'competition-fourbar-lift', description: '平行四連桿升降，工具架保持水平。' }
+  { id: 'fourbar-lift', name: '四連桿升降臂', source: 'competition-fourbar-lift', description: '平行四連桿升降，工具架保持水平。' },
+  { id: 'single-servo-claw', name: '單側活動夾爪', source: 'single-servo-claw', description: '一側固定、一側旋轉；可改爪長與角度，夾持力未驗證。' },
+  { id: 'single-axis-wrist', name: '單軸手腕', source: 'single-axis-wrist', description: '調整末端朝向；可改臂長與角度，支承與扭力未驗證。' }
 ];
 
 export function builtinTemplate(id) {
@@ -1030,6 +1032,12 @@ export function builtinTemplate(id) {
     });
     const drive = comps.find(c => c.type === 'gear' && c.p1 && c.p1.physicalMotor);
     if (drive) { drive.motorType = 'mg995'; drive.servoStart = 0; drive.servoEnd = 24; }
+  } else if (id === 'single-servo-claw') {
+    template.base = 'ClawMount';
+    template.outputs = [];
+  } else if (id === 'single-axis-wrist') {
+    template.base = 'WristMount';
+    template.outputs = [{ id: 'tool', name: '工具端', at: 'WristTip', body: { kind: 'bar', id: 'WristArm' } }];
   } else {
     template.outputs = [];
   }

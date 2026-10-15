@@ -32,11 +32,11 @@ export function offerExample({ example, loadExample, onDismiss = () => {}, docum
   const use = document.createElement('p');
   use.textContent = getExampleLesson(example.id).use || example.note || '';
   const scope = document.createElement('p');
-  scope.textContent = example.id === 'parallel-fourbar'
+  scope.textContent = example.adjustmentNote || (example.id === 'parallel-fourbar'
     ? '可調：活動臂長、起終高度。工具架保持姿態，但沿圓弧移動；承載與實物尚未驗證。'
     : example.id === 'gear-gripper'
       ? '可調：目標物寬度、開口餘量。雙齒輪帶動兩爪轉動，並非平行夾爪；接觸與夾持力尚未驗證。'
-      : '載入後可修改尺寸與試播；模擬結果不代表可直接加工或實物已驗證。';
+      : '載入後可修改尺寸與試播；模擬結果不代表可直接加工或實物已驗證。');
   const accept = document.createElement('button'); accept.type = 'button'; accept.textContent = '載入此範例';
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '保留目前作品';
   const dismiss = () => { onDismiss(); dialog.close(); dialog.remove(); };

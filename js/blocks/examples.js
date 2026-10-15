@@ -1,3 +1,4 @@
+import { COMMON_MANIPULATOR_EXAMPLES } from './common-manipulator-examples.js';
 import {fixedLiftSnapshot,fixedGripSnapshot} from './fixed-syringe-examples.js';
 import { hydraulicSnapshot } from './hydraulic-example.js';
 import { liftBucketSnapshot } from './lift-bucket-example.js';
@@ -50,6 +51,7 @@ export const EXAMPLE_GROUPS = [
 ];
 
 const EXAMPLE_LESSONS = {
+  ...Object.fromEntries(COMMON_MANIPULATOR_EXAMPLES.map(example => [example.id, example.lesson])),
   'hydraulic-h03': {group:'lift-motion',level:'入門液壓',use:'固定筒身驅動左右一體式三點夾臂；末端造形與交叉臂保持剛性。'},
   'hydraulic-h02': {group:'lift-motion',level:'入門液壓',use:'管夾固定筒身，短連桿把直線輸入轉成抬臂擺動。'},
   'hydraulic-h01': {group:'lift-motion',level:'入門液壓',use:'固定筒身，經短連桿把推桿直線運動轉成單臂擺動。',
@@ -935,6 +937,8 @@ ALL_BLOCK_EXAMPLES.push({ id: 'assembly-lift-gripper-practice', title: '組立�
   note: '切換組立，選齒輪夾爪，按「工具架 · 雙孔對鎖」，預覽後接上；M1 升降時夾爪整組跟著移動。', snapshot: assemblyPractice });
 
 ALL_BLOCK_EXAMPLES.push({ id: 'lift-bucket', title: '組立：平行升降托斗', note: '單馬達保持料斗方向，沿圓弧升降；組立可整組拆裝。尚未驗證承載及安裝五金。', snapshot: liftBucketSnapshot });
+
+ALL_BLOCK_EXAMPLES.push(...COMMON_MANIPULATOR_EXAMPLES);
 
 export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES.filter(
   example => example.id !== 'competition-flywheel-shooter'

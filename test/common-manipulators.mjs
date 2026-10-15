@@ -1,0 +1,53 @@
+import {getExample,getExampleLesson} from '../js/blocks/examples.js';
+import {normalizeSnapshot} from '../js/blocks/schema.js';
+import {validateMotionRange} from '../js/blocks/motion-range-validation.js';
+import {compileTopology} from '../js/core/topology.js';
+import {solveTopology} from '../js/multilink/solver.js';
+import {builtinTemplate,normalizeTemplate,instantiateTemplate,mountModule,unmountModule} from '../js/blocks/module-ops.js';
+import {compileAssembly,solveAssembly,outputPose} from '../js/blocks/assembly.js';
+import {exportLinksAsSvg,exportLinksAsDxf} from '../js/blocks/exporters.js';
+import {check,report} from './_harness.mjs';
+const clone=x=>JSON.parse(JSON.stringify(x)),near=(a,b)=>Math.abs(a-b)<1e-6;
+for(const id of ['single-servo-claw','single-axis-wrist']){
+ const example=getExample(id), s=clone(example.snapshot), original=JSON.stringify(s), d=s.comps.find(c=>c.isInput);
+ const run=v=>validateMotionRange(v,{startDeg:d.servoStart,endDeg:d.servoEnd});
+ const r=run(s);
+ check(`${id}: advertised range every .5deg`,r.ok&&r.sampleCount===(id==='single-servo-claw'?91:211));
+ check(`${id}: limits remain explicit`,r.scope.unchecked.includes('contact')&&!r.support.physicalVerified);
+ check(`${id}: clear use and adjustments`,getExampleLesson(id).group==='manipulator'&&getExampleLesson(id).try.length===3&&!!example.adjustmentNote);
+ const changed=clone(s);changed.params[d.lenParam]=96;
+ check(`${id}: longer moving member remains solvable`,run(changed).ok);
+ const invalid=clone(s);invalid.params[d.lenParam]=0;
+ check(`${id}: zero length rejected`,run(invalid).issues.some(i=>i.code==='INVALID_RIGID_DIMENSION'));
+ const wrong=clone(s);delete wrong.comps.find(c=>c.isInput).p2;
+ check(`${id}: missing moving endpoint rejected`,!run(wrong).ok);
+ const restored=normalizeSnapshot(JSON.parse(JSON.stringify(s)));
+ check(`${id}: save roundtrip retains range/length`,restored.comps.find(c=>c.isInput).servoEnd===d.servoEnd&&restored.params[d.lenParam]===s.params[d.lenParam]);
+ const topo=compileTopology(s.comps,{params:s.params},new Set());
+ check(`${id}: exactly one driven crank, frame never becomes a second motor`,topo.steps.filter(step=>step.type==='input_crank').length===1);
+ const p=solveTopology(topo,{thetaDeg:30,motorAngles:{'1':30}}).points;
+ if(id==='single-servo-claw')check('single claw: fixed finger stays still, moving finger rotates',near(p.FixedTip.x,40)&&near(p.FixedTip.y,80)&&near(p.ClawTip.x,-40)&&near(p.ClawTip.y,80*Math.cos(Math.PI/6)));
+ else check('wrist: expected tool radius and angle',near(Math.hypot(p.WristTip.x,p.WristTip.y),64)&&near(p.WristTip.y,32));
+ const files=[];const emit=(text,name)=>files.push({text,name});
+ exportLinksAsSvg(s.comps,p,s.params,{},[],null,emit);exportLinksAsDxf(s.comps,p,s.params,{},[],null,emit);
+ check(`${id}: SVG/DXF generated without nonfinite coordinates`,files.some(f=>f.name.endsWith('.svg'))&&files.some(f=>f.name.endsWith('.dxf'))&&files.every(f=>!/(NaN|Infinity)/.test(f.text)));
+ check(`${id}: source remains unchanged`,JSON.stringify(s)===original);
+ check(`${id}: insertable module normalizes`,normalizeTemplate(builtinTemplate(id)).ok);
+}
+const wrist=instantiateTemplate(builtinTemplate('single-axis-wrist'),{counter:0,usedMotorIds:[],existingTokens:new Set(),place:{x:0,y:0}});
+const tokens=new Set([...wrist.comps.flatMap(c=>[c.id,c.p1.id,c.p2.id]),...Object.keys(wrist.params)]);
+const claw=instantiateTemplate(builtinTemplate('single-servo-claw'),{counter:wrist.counter,usedMotorIds:['1'],existingTokens:tokens,place:{x:200,y:0}});
+const comps=[...wrist.comps,...claw.comps], modules=[wrist.module,claw.module],params={...wrist.params,...claw.params};
+check('new modules have distinct motors and ids',claw.comps.find(c=>c.isInput).physicalMotor==='2'&&claw.comps.every(c=>!tokens.has(c.id)));
+const mounted=mountModule(comps,modules,claw.module.id,{module:wrist.module.id,output:'tool'},params,{activeMotor:'1',theta:0,motorAngles:{'1':0,'2':0}});
+check('claw mounts on wrist output',mounted.ok);
+const asm=compileAssembly(mounted.comps,mounted.modules,{params});
+for(const angle of [-45,0,60]){
+ const r=solveAssembly(asm,{thetaDeg:0,motorAngles:{'1':angle,'2':20}});
+ const o=outputPose(wrist.module,'tool',r.points,mounted.comps),b=r.points[claw.module.base];
+ check(`mounted wrist ${angle}: child follows output and orientation`,r.isValid&&near(o.a,angle)&&near(o.x,b.x)&&near(o.y,b.y));
+}
+const saved=normalizeSnapshot({kind:'blocks',v:1,comps:mounted.comps,modules:mounted.modules,params});
+check('mount survives JSON normalization',saved.modules.find(m=>m.id===claw.module.id).mount.to.module===wrist.module.id);
+check('detach restores independent module',unmountModule(mounted.comps,mounted.modules,claw.module.id,params,{activeMotor:'1',theta:0,motorAngles:{'1':0,'2':0}}).ok);
+report('common-manipulators');

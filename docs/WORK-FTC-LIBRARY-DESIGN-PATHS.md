@@ -109,3 +109,28 @@ W2 已開始真實空白繪製：以四根一般連桿接成閉環，兩活動�
 - 發布前全套：`NODE_OPTIONS=--no-webstorage node tools/test-runner.mjs --output output/ftc-library-loop/w2-w4-full`，188/188 支通過，Node v25.2.0。環境參數避開 Node 25 本機 Web Storage getter，產品未為測試改寫。
 - 本輪 W1–W4 的入口、空白繪製、模組共用與第二組流程已完成上述範圍；W5 是逐例擴充的後續清單，本包未新增新家族。加工孔群、分層、扭力、接觸、實物與電控仍需各自驗證。
 - 精簡分工：Luna 做只讀盤點；Sol 中等推理只負責四個輸出 body 檔案及定向測試，其餘修改由主模型處理，未同時寫同一檔案。未虛報 token 節省量。
+
+## W5a — 2026-10-15 常用末端機構增量
+
+版本 `2026.10.15.3`，補上兩個獨立可載入範例及同源可插入模組（內建模組由 3 增為 5），沿用 Blocks snapshot、MG995 角度設定、既有接合與匯出，未新增求解器或存檔欄位。
+
+| 機構 | 輸入與預期 | 可調內容／初值 | 接口與界限 |
+| --- | --- | --- | --- |
+| 單側活動夾爪 `single-servo-claw` | 單一舵機；一指固定、一指轉動 | 活動夾指 80 mm；相對角 -15～30°（初始方向 90°） | 基準 ClawMount；不是平行夾爪，沒有接觸／夾持力模型 |
+| 單軸手腕 `single-axis-wrist` | 單一舵機；末端位置及朝向一起轉動 | 工具臂 64 mm；-45～60° | 基準 WristMount；工具端 WristTip 跟隨 WristArm，不保持水平；支承／扭力未驗證 |
+
+操作：範例選單「實戰：夾取與物件操作」選取並確認載入；點紅色活動桿改孔距，點馬達改起終角，再試播。保留原作品時使用「新增 → 加入模組」，手腕有工具端，夾爪可用模組面板的「安裝到」接上。定位接口不代表實體螺絲／軸承已定規格。固定桿以 frameSeparate 保留可見板件，動力點使用 fixed＋指定輸入桿，避免共享接點被誤判為另一曲柄；測試明查只有一個 input_crank。
+
+### 來源與板件化推論
+
+2026-10-15 查閱 [REV INTO THE DEEP Starter Bot](https://docs.revrobotics.com/ftc-kickoff-concepts/into-the-deep-2024-25/starter-bot-into-the-deep) 與 [Build Tips & Tricks](https://docs.revrobotics.com/ftc-kickoff-concepts/into-the-deep-2024-25/build-tips-and-tricks)。來源支持 FTC 的腕部姿態控制、有限角度夾爪及連續轉動進料之功能區分。原案例手腕為 Core Hex motor，不是本例 MG995；不把產品模型視為原廠配置。
+
+本次「一固定指＋一旋轉指」、直臂手腕及 40／48／64／80 mm 尺寸都是本專案為快速幾何驗證所作的簡化與示範值，並非來源施工圖。材料、軸套、伺服固定、層差、摩擦、夾持力、全行程干涉和實物未核對。SVG／DXF 成功只證明圖檔可生成。
+
+### 驗證
+
+- `test/common-manipulators.mjs`：31 項通過。原始孔距與運動端點、改長 96 mm、非法零長與缺端點拒絕；夾爪 91／手腕 211 個 0.5° 姿態取樣；JSON 正規化、模組重編、手腕帶夾爪的三角度位置與朝向、拆下、SVG／DXF 有效數值。
+- 定向入口／模組 4/4 支；全套 `NODE_OPTIONS=--no-webstorage node tools/test-runner.mjs --output output/common-manipulators/full`：189/189 支通過（Node 25.2，環境選項理由同 W2–W4）。
+- 桌面 UI：載入單側夾爪，80→96 mm，工作範圍 61→73 mm，試播／暫停、一次復原回原範圍。確認只有 MG995、一側固定指保持可見。
+- 390×844 UI：載入手腕，終角 60→75→90°，試播／暫停；innerWidth=scrollWidth=390。由模組庫加入手腕、再加入單側夾爪，原設計仍保留。桌面將夾爪接到工具端，下載作品並經一般開檔流程重開，「已安裝」及設計分頁仍在。非實機觸控或實物測試。
+- 本機證據：`output/common-manipulators/claw-desktop.png`、`wrist-mobile.png`；下載作品 `常用機構手腕夾爪驗收.json`。尚未補真正平行夾爪、多級滑軌、接觸進料與硬體電控，不將兩例擴充稱為全部 FTC 機構完成。
