@@ -774,6 +774,7 @@ const ALL_BLOCK_EXAMPLES = [
   {
     id: 'competition-roller-intake',
     title: '競賽擺臂進料機構',
+    adjustmentNote: '選取連桿可改孔距，選馬達可改起終角；每次改一項再試播。要保留目前作品，請用「新增 → 加入模組 → 擺臂進料」。取物端軌跡不代表物件已被收進。',
     note: '機架全部用結構板組成：伺服板承載 MG995（穿板槽直接開在板上）與擺臂樞軸，折線立柱板連到地面。曲柄經連桿推拉黑色彎折臂，取物端沿地面掃過，把黃色物件耙入機架。',
     snapshot: {
       kind: 'blocks',

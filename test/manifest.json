@@ -137,6 +137,7 @@
     "test/module-insert-place.mjs",
     "test/module-ops.mjs",
     "test/common-manipulators.mjs",
+    "test/swing-intake-module.mjs",
     "test/module-plates.mjs",
     "test/motor-frame-modules.mjs",
     "test/motor-tools.mjs",

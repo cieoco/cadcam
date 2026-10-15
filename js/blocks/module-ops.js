@@ -961,7 +961,8 @@ export const BUILTIN_MODULES = [
   { id: 'gear-gripper', name: '齒輪夾爪', source: 'gear-gripper', description: '雙齒輪同步開合夾爪。' },
   { id: 'fourbar-lift', name: '四連桿升降臂', source: 'competition-fourbar-lift', description: '平行四連桿升降，工具架保持水平。' },
   { id: 'single-servo-claw', name: '單側活動夾爪', source: 'single-servo-claw', description: '一側固定、一側旋轉；可改爪長與角度，夾持力未驗證。' },
-  { id: 'single-axis-wrist', name: '單軸手腕', source: 'single-axis-wrist', description: '調整末端朝向；可改臂長與角度，支承與扭力未驗證。' }
+  { id: 'single-axis-wrist', name: '單軸手腕', source: 'single-axis-wrist', description: '調整末端朝向；可改臂長與角度，支承與扭力未驗證。' },
+  { id: 'swing-intake', name: '擺臂進料', source: 'competition-roller-intake', description: '沿用進料臂範例；可改連桿與擺角，不含示範物件，收料接觸未驗證。' }
 ];
 
 export function builtinTemplate(id) {
@@ -1032,6 +1033,11 @@ export function builtinTemplate(id) {
     });
     const drive = comps.find(c => c.type === 'gear' && c.p1 && c.p1.physicalMotor);
     if (drive) { drive.motorType = 'mg995'; drive.servoStart = 0; drive.servoEnd = 24; }
+  } else if (id === 'swing-intake') {
+    // 示範物件屬於工作環境，不隨機構安裝；基準取底座端點，避免把馬達軸當安裝孔。
+    template.comps = comps.filter(c => c.type !== 'workpiece');
+    template.base = 'FRAME_BL';
+    template.outputs = [{ id: 'tip', name: '取物端', at: 'INTAKE_TIP', body: { kind: 'triangle', id: 'IntakeArm' } }];
   } else if (id === 'single-servo-claw') {
     template.base = 'ClawMount';
     template.outputs = [];
