@@ -206,7 +206,8 @@
     "test/lesson-check.mjs",
     "test/video-evidence.mjs",
     "test/lesson-sequence.mjs",
-    "test/fixed-syringe.mjs"
+    "test/fixed-syringe.mjs",
+    "test/parallel-gripper.mjs"
   ],
   "version": 1
 }

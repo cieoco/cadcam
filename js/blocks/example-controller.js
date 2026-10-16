@@ -8,7 +8,7 @@ import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './
 import { normalizeSnapshot } from './schema.js';
 import { offerExample } from './example-entry.js';
 
-export function createExampleController({ applySnapshot, notify, closeMobileMenu, isMobile, showBuildPanel, onLesson = () => {} }) {
+export function createExampleController({ applySnapshot, insertModule, notify, closeMobileMenu, isMobile, showBuildPanel, onLesson = () => {} }) {
   let activeExampleId = '';
   let pendingDialog = null;
 
@@ -17,7 +17,7 @@ export function createExampleController({ applySnapshot, notify, closeMobileMenu
     const example = getExample(id || select?.value);
     if (select) select.value = '';
     if (!example || pendingDialog) return false;
-    pendingDialog = offerExample({ example, loadExample: load, onDismiss: () => { pendingDialog = null; } });
+    pendingDialog = offerExample({ example, loadExample: load, insertModule, onDismiss: () => { pendingDialog = null; } });
     return true;
   }
 

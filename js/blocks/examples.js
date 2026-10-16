@@ -1,3 +1,4 @@
+import { PARALLEL_GRIPPER_EXAMPLE } from './parallel-gripper-example.js';
 import { COMMON_MANIPULATOR_EXAMPLES } from './common-manipulator-examples.js';
 import {fixedLiftSnapshot,fixedGripSnapshot} from './fixed-syringe-examples.js';
 import { hydraulicSnapshot } from './hydraulic-example.js';
@@ -51,6 +52,7 @@ export const EXAMPLE_GROUPS = [
 ];
 
 const EXAMPLE_LESSONS = {
+  'parallel-gripper': PARALLEL_GRIPPER_EXAMPLE.lesson,
   ...Object.fromEntries(COMMON_MANIPULATOR_EXAMPLES.map(example => [example.id, example.lesson])),
   'hydraulic-h03': {group:'lift-motion',level:'入門液壓',use:'固定筒身驅動左右一體式三點夾臂；末端造形與交叉臂保持剛性。',try:['改針筒伸出量並掃描可用行程','比較左右夾臂的開口；接觸與夾持力未驗證']},
   'hydraulic-h02': {group:'lift-motion',level:'入門液壓',use:'管夾固定筒身，短連桿把直線輸入轉成抬臂擺動。',try:['改針筒伸出量並觀察末端高度','修改前先存檔，再比較安裝孔位的影響']},
@@ -283,6 +285,7 @@ const wiperExample = practice => ({
 });
 
 const ALL_BLOCK_EXAMPLES = [
+  PARALLEL_GRIPPER_EXAMPLE,
   {id:'hydraulic-h01',title:'H01｜固定針筒單臂抬升',note:'管夾固定筒身，短連桿帶動單臂；20 mm 為教學區間。',snapshot:hydraulicSnapshot},
   {id:'hydraulic-h02',title:'H02｜管夾固定針筒抬臂',note:'F3D 尺寸參考；20 mm 教學區間未實測，短桿兩端可轉。',snapshot:fixedLiftSnapshot},
   {id:'hydraulic-h03',title:'H03｜針筒夾具與一體式夾臂',note:'交叉臂與末端同一片；接觸、承載未驗證。',snapshot:fixedGripSnapshot},

@@ -50,3 +50,15 @@ assert.equal(dismissed, false);
 assert.ok(failed.children.some(e => e.textContent?.includes('並非平行夾爪')));
 assert.ok(failed.children.some(e => e.textContent?.includes('所有設計分頁與組立')));
 console.log('example-entry: confirmed loading, cancellation, Escape, invalid IDs, URL cleanup and share priority passed');
+
+for (const [source, module] of [['gear-gripper','gear-gripper'],['competition-fourbar-lift','fourbar-lift'],['parallel-gripper','parallel-gripper']]) {
+  const document = { body: new Element('body'), createElement: tag => new Element(tag) };
+  const added=[];
+  let ok=false;
+  const dialog=offerExample({example:getExample(source),document,loadExample:()=>assert.fail('Add must not replace work'),insertModule:id=>{added.push(id);return ok;}});
+  const add=dialog.children.find(e=>e.textContent==='＋ 加入目前作品');
+  add.onclick();assert.equal(dialog.open,true,'Rejected insert keeps dialog');
+  ok=true;add.onclick();assert.deepEqual(added,[module,module]);assert.ok(dialog.removed);
+}
+const unsupported=offerExample({example:getExample('wiper-single'),document:failedDocument,loadExample:()=>{},insertModule:()=>assert.fail()});
+assert.ok(!unsupported.children.some(e=>e.textContent==='＋ 加入目前作品'));

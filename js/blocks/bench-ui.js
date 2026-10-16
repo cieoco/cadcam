@@ -1,3 +1,4 @@
+import { appendCollisionActions } from './collision-actions.js';
 import {assemblyWork,mergeAssemblyWork} from './assembly-membership.js';
 import {closedAssemblies, closedAssemblyIds} from './assembly-view.js';
 import {createMaterialPoseStatus} from './material-pose-status.js';
@@ -250,6 +251,40 @@ export function createBench(deps) {
     while (box.firstChild) box.removeChild(box.firstChild);
     box.appendChild(el('div', 'bench-live-main', status.message));
     box.appendChild(el('div', 'bench-live-msg', live.msg));
+    collisionActions(box);
+  }
+
+  // Only current, paused, confirmed findings may navigate. Preview never commits here.
+  function collisionRows() {
+    if (!isBench() || playing() || isCand() || st.preview || wiz?.previewOf() || currentLiveStatus().state !== 'hit') return [];
+    const material = hasMaterialMount();
+    const findings = material ? materialPose.snapshot().report?.findings || [] : live.findings;
+    return findings.map((f, index) => {
+      const ids = material ? f.partIds || [] : f.parts || [];
+      const keys = material ? f.pickKeys || [] : highlightKeys([f], live.plan);
+      const moduleIds = ids.map(id => {
+        if (material) return st.materialModel?.materialParts?.find(p => p.partId === id)?.moduleId;
+        const part = live.plan?.parts.find(p => p.name === id);
+        return S.comps.find(c => c.id === part?.compId)?.moduleId || S.modules.find(m => `${m.id}-frame` === id)?.id;
+      });
+      return { id: String(index), keys, label: material ? ids.map(materialName).join(' ↔ ') : hitLabels(ids, S.comps, S.modules, labelOpts).join(' ↔ '),
+        modules: [...new Set(moduleIds)].filter(id => modOf(id)).map(id => ({ id, name: displayName(id) })) };
+    });
+  }
+  function collisionActions(container) {
+    const signature = JSON.stringify([workKey(), motorAnglesNow()]);
+    const current = row => signature === JSON.stringify([workKey(), motorAnglesNow()]) && collisionRows().some(r => JSON.stringify(r) === JSON.stringify(row));
+    appendCollisionActions(container, collisionRows(), {
+      locate: row => {
+        if (!current(row)) return;
+        const v = viewer(); v?.setHighlight?.(row.keys);
+        v?.fitTo?.(key => row.keys.some(k => k.endsWith('/*') ? key.startsWith(k.slice(0, -1)) : key === k));
+      },
+      edit: (row, id) => {
+        if (!current(row) || !row.modules.some(m => m.id === id)) return;
+        st.selected = id; editModule(id);
+      }
+    });
   }
 
   function applyHighlight() {
@@ -1299,6 +1334,7 @@ export function createBench(deps) {
   wiz = createMateWizard({
     el, bigBtn, st, deps, openFaces: openDefaultFaceWizard, modOf, displayName, statusOf, say, select, syncUI, drawMarkers, computeMarkers, viewer, listEl, panelEl, liveBox, liveCheck,
     liveCount: () => live.ready ? live.findings.length : 0,
+    collisionActions,
     liveInfo: () => ({ ...currentLiveStatus(), ready: live.ready && !!live.plan && (live.plan.parts || []).length > 0, n: live.findings.length, hits: live.hits, labels: live.labels }), motorState, adjust, requestDetach, closeAssembly, reopenAssembly, adjustState, editModule, ghostFor,
     clearGhost: () => viewer()?.setPreviewGhost(null), setGhost: spec => viewer()?.setPreviewGhost(spec), isBench,
     cancelAdvancedPreview: () => cancelPreview({ silent: true }),

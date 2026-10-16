@@ -203,9 +203,9 @@ export function createModuleEditor(deps) {
   }
   // B7：插入組合積木——整組改名、整組挪開（只動主視圖零件），一次 pushUndo，選到根模組的第一個零件。
   function insertComposite(template) {
-    if (!template) return;
+    if (!template) return false;
     const count = Array.isArray(template.modules) ? template.modules.length : 0;
-    if (S.modules.length + count > COMPOSITE_MAX_MODULES) { transient(`模組數量會超過 ${COMPOSITE_MAX_MODULES} 個，無法插入這個組合積木。`); return; }
+    if (S.modules.length + count > COMPOSITE_MAX_MODULES) { transient(`模組數量會超過 ${COMPOSITE_MAX_MODULES} 個，無法插入這個組合積木。`); return false; }
     const existingTokens = existingTokensOfWork();
     S.modules.forEach(m => existingTokens.add(m.id));
     const r = instantiateComposite(template, {
@@ -228,10 +228,11 @@ export function createModuleEditor(deps) {
     rebuild(); draw();
     if (root) fitToFocus();
     transient(`已加入組合積木「${template.name}」`);
+    return true;
   }
   function insertTemplate(template) {
-    if (!template) return;
-    if (template.kind === 'blocks-composite') { insertComposite(template); return; }
+    if (!template) return false;
+    if (template.kind === 'blocks-composite') return insertComposite(template);
     const ctx = {
       counter: S.counter,
       usedMotorIds: [...usedMotorIdsOfWork()],
@@ -252,8 +253,9 @@ export function createModuleEditor(deps) {
     rebuild(); draw();
     fitToFocus();
     transient(`已加入模組「${r.module.name}」，可在模組面板安裝或調整。`);
+    return true;
   }
-  function insertBuiltin(id) { insertTemplate(builtinTemplate(id)); }
+  function insertBuiltin(id) { return insertTemplate(builtinTemplate(id)); }
   function insertLocal(index) { insertTemplate(parseLibrary(loadLibraryText())[index] || null); }
 
   // ---- 存成模組／改名 ----

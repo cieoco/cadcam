@@ -363,6 +363,7 @@ export function createMateWizard(h) {
     let state = i.state, text = i.message;
     if (pv && assemblyRoles(pv.cand.modules).spare.includes(pv.childId)) { state = 'none'; text = '還沒接到底座，要接到底座上才會檢查干涉'; }
     liveLine.dataset.state = state; liveLine.textContent = text; liveLine.title = state === 'hit' ? text : '';
+    if (state === 'hit' && !pv) h.collisionActions?.(liveLine);
   }
 
   // ---------------------------------------------------------------- 3D 鏡頭：框住相關的機構（保留視角，只調距離與目標）
