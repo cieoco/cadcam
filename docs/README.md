@@ -1,6 +1,6 @@
 # 文件總索引
 
-先看 [專案 README](../README.md) 了解入口，再看 [AGENTS.md](../AGENTS.md) 與 [Blocks／AI／教學 SDD](SDD-BLOCKS-AI-TEACHING.md) 掌握現行方向。備課從 [教學現況](TEACHING-TRIAL.md) 與 [教學網頁](../teaching.html) 開始。
+先看 [專案 README](../README.md) 了解入口，再看 [AGENTS.md](../AGENTS.md) 與 [Blocks／AI／教學 SDD](SDD-BLOCKS-AI-TEACHING.md) 掌握現行方向。備課從 [教學現況](TEACHING-TRIAL.md) 與 [教學網頁](../teaching.html) 開始；自學實作見 [從空白建立到獨立專題](../teaching-build.html)。
 
 本索引涵蓋 Git 追蹤的 Markdown 文件（包含根目錄與 `.agent`），不收錄未追蹤草稿、輸出截圖及暫存資料。分類是閱讀用途，不代表規格全部已實作；完成程度以文件內狀態和相應驗收證據為準。歷史紀錄不覆蓋現行契約，舊版 mechanism 仍為凍結查考。
 

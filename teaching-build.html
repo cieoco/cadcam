@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>機構積木：從空白建立到自己的升降夾爪</title>
+<style>
+:root{color-scheme:light;--ink:#18324b;--blue:#176b87;--line:#b8cbd2}*{box-sizing:border-box}body{margin:0;background:#eef3f4;color:#223746;font:17px/1.75 system-ui,"Microsoft JhengHei",sans-serif}main{max-width:940px;margin:auto;padding:clamp(20px,5vw,54px);background:white}h1,h2,h3{color:var(--ink);line-height:1.35}h1{font-size:clamp(1.9rem,5vw,3rem)}h2{margin-top:2em;border-bottom:2px solid var(--line);padding-bottom:.4em}a{color:var(--blue);overflow-wrap:anywhere}nav,.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}nav a,.card{padding:14px;border:1px solid var(--line);border-radius:12px}nav a{display:block}section{scroll-margin-top:20px}li{margin:10px 0}ol,ul{padding-left:1.5em}.check{border-left:5px solid #16835c;padding:12px 18px;background:#f1faf4}.note{border-left:5px solid #df6b38;padding:12px 18px;background:#fff5ed}details{border-top:1px solid var(--line);margin:18px 0;padding:10px 0}summary{cursor:pointer;color:var(--blue);font-weight:700;padding:10px 0;min-height:44px}svg{display:block;width:100%;max-width:680px;margin:auto}figure{margin:20px 0}figcaption,.small{font-size:.93rem;color:#445b68}.entry{display:inline-block;padding:12px 18px;background:var(--blue);color:white;border-radius:10px}a:focus-visible,summary:focus-visible{outline:3px solid #df6b38;outline-offset:4px}footer{margin-top:36px;border-top:1px solid var(--line)}@media(max-width:620px){nav,.grid{grid-template-columns:1fr}body{font-size:16px}}@media print{body{background:white}main{padding:0;max-width:none}details{break-inside:avoid}}
+</style>
+</head>
+<body><main>
+<p><a href="teaching.html">← 學習目錄</a></p>
+<p class="small">自學實作主線・可分次完成，不必一節課做完</p>
+<h1>從空白建立，做到自己的升降夾爪</h1>
+<p>最後，你要能自己建立升降臂與夾爪，讓兩者各自動，再接起來完成指定動作。下面把需要的操作拆小：先讓一根桿動，再建立閉環、傳動與接口。七個單元提供用途與對照範例；這一頁帶你親手建立。</p>
+<p class="note"><strong>每段都做三次：</strong>第一次看步驟做；第二次收起步驟重做；第三次只改一個需求，說明為什麼這樣改。卡住就看該段排錯，不必等老師解答。先保存舊作品；「載入範例」會替換整份作品，「＋ 新設計」則保留其他分頁。若提示先存成模組，選目前機構的一根桿或齒輪，按「存成模組」後再新增；下載 JSON 是整份作品備份，與存成模組用途不同。</p>
+<nav aria-label="自學實作路徑">
+<a href="#first-arm">A．畫桿、固定與驅動</a><a href="#parallel">B．建立平行四連桿</a>
+<a href="#gripper">C．從齒輪對做出夾指</a><a href="#slider">D．建立直線推送器</a>
+<a href="#rack">E．建立齒條傳動</a><a href="#plate">F．板件與單軸翻轉</a>
+<a href="#interfaces">G．自己的模組與接合</a><a href="#project">H．獨立應用專題</a>
+</nav>
+<section id="first-arm"><h2>A．先讓自己畫的一根桿動起來</h2>
+<p><strong>先懂：</strong>孔是轉動或連接的位置，桿身把孔距保持不變。固定一個孔後，桿仍能繞它轉；兩端都固定，桿才成為機架。馬達指定輸入，並不會替所有沒接好的零件找出運動方式。</p>
+<a class="entry" href="blocks.html?example=empty-challenge" target="_blank" rel="noopener">保存舊作品後，開啟空白挑戰 ↗</a>
+<ol>
+<li>確認畫面是「設計」。手機點「新增」；桌面展開「＋ 新增」。點「連桿」主按鈕，在空白處依序點兩個位置，畫一根向右的桿。先不加其他零件。</li>
+<li>點桿身，選「孔距 A–B」，輸入 80 mm 後按 Enter 或離開輸入欄，核對顯示值；板寬與板厚是外形，不是孔距。手機先切「調整」。</li>
+<li>點「新增 → 動力來源 → MG995 伺服」，再點左端孔。這裡直接用固定的馬達軸作基準。若出現選桿提示，點要轉動的桿身。</li>
+<li>選馬達軸心，在「伺服角度」保持起始 0°，結束由 90°按三次「−」到 45°。手機按「完成／收合」後再播放。</li>
+<li>看兩次往返後暫停。將孔距改為 96 mm，預測桿尖移動範圍，再播放；按復原，核對回到 80 mm。用儲存按鈕下載作品 JSON，再用開啟作品重開核對。</li>
+</ol>
+<p class="check"><strong>自己驗收：</strong>左端不移、右端繞圈弧擺動；桿變長但角度設定不變；重開仍能動。能指出點桿身改尺寸、點軸心改動力，才進下一段。</p>
+<details><summary>畫了卻不動／改錯東西？</summary><p>先暫停。沒有馬達就補動力；兩端都設成機架會不能轉，保留軸心固定，活動端應為自由。只有一個固定點、沒有驅動，也不能指定運動。選到孔而非桿身時會出現接點面板；縮放後重選，別靠反覆拖曳碰運氣。可回看<a href="teaching.html#member-operations">桿件操作圖</a>。</p></details>
+<p><strong>不看步驟重做：</strong>另開「＋ 新設計」，做一支不同長度的擺臂。說明它適合翻門還是直線推送，以及還缺什麼約束。</p>
+</section>
+<section id="parallel"><h2>B．四根桿，讓末端保持方向</h2>
+<p><strong>先懂：</strong>平行四連桿的兩組對邊等長，非交叉組裝時，末端桿與固定機架保持平行。末端整根移動而不轉向，但每個孔仍走圓弧。它和第一單元的雨刷四連桿用途不同。</p>
+<figure><svg viewBox="0 0 680 280" role="img" aria-labelledby="parallel-title parallel-desc"><title id="parallel-title">平行四連桿的四個孔與四根桿</title><desc id="parallel-desc">左側 A B 是機架，右側 C D 是輸出架，上下兩臂等長。繪製順序 A C、C D、D B、B A，最後把左側桿設為機架，馬達裝 A 並驅動 A C。</desc><g fill="none" stroke-width="14" stroke-linecap="round"><path d="M130 220V60" stroke="#64748b"/><path d="M130 220H480" stroke="#df6b38"/><path d="M130 60H480" stroke="#176b87"/><path d="M480 60V220" stroke="#16835c"/></g><g fill="white" stroke="#18324b" stroke-width="3"><circle cx="130" cy="220" r="9"/><circle cx="130" cy="60" r="9"/><circle cx="480" cy="220" r="9"/><circle cx="480" cy="60" r="9"/></g><g fill="#18324b" font-size="20"><text x="90" y="250">A</text><text x="90" y="45">B</text><text x="495" y="250">C</text><text x="495" y="45">D</text><text x="255" y="250">下臂：輸入</text><text x="255" y="40">上臂：等長</text><text x="15" y="140">固定機架</text><text x="510" y="140">輸出架</text></g></svg><figcaption>A、B、C、D 是此圖的教學代號；軟體會自動命名接點，不必改成相同 ID。示意圖不按比例。</figcaption></figure>
+<ol>
+<li>「＋ 新設計」，用四次「新增 → 連桿」依序畫 A–C、C–D、D–B、B–A，形成非交叉的長方形。每次都吸附既有孔；最後一根必須接回第一根的 A。</li>
+<li>逐根點桿身核對對邊孔距：上下兩臂相等，左右兩根也相等。可用上、下臂 192 mm，機架、輸出架 136 mm 作練習尺寸。先核對兩組，不要只憑外觀看起來平行。</li>
+<li>選左側 B–A 桿，展開「設計引導」，依提示設定所選機架；也可分別選 A、B 孔，按「設為機架點」。C、D 保持活動。</li>
+<li>在 A 裝 MG995。共用孔有多根桿時，依提示再點下臂 A–C，<strong>不要選固定機架</strong>。設定 0°～45°，先小範圍播放。</li>
+<li>觀察 C–D 是否一直和 A–B 平行。暫停，分別將兩條臂增加相同長度後再播放；中途只改一條可能暫時無解，兩條核對完成才試動。</li>
+</ol>
+<p class="check"><strong>自己驗收：</strong>四根桿閉合、兩固定孔不動、右側桿方向不變，無求解失敗。能說出「保持方向」和「沿直線升降」的差別。保存這份升降臂，G 段會使用。</p>
+<details><summary>末端傾斜、機構散開或卡住？</summary><p>傾斜先查兩組對邊孔距與是否畫成交叉形；散開先查是否真正共用孔，而非兩孔疊在一起；不能動先查選對輸入桿、C／D 沒被固定。不要把擺角擴到桿件拉直或重疊的位置；幾何求解不等於能穿過死點。回到較小角度找出第一個出問題的位置。</p></details>
+<p><strong>反思：</strong>想直上直下應考慮滑軌；想讓托盤保持朝向可用平行四連桿。對照<a href="teaching-fourbar.html">雨刷單元</a>，說明為什麼不是所有四連桿都保持平行。</p>
+</section>
+<section id="gripper"><h2>C．從齒輪對畫出自己的雙爪</h2>
+<p><strong>先懂：</strong>兩個外齒輪反向轉，等齒數時轉角大小相同。夾指只接軸心一孔仍可能轉動；同時共用軸心與偏心定位孔，才能在這個工具中確定跟隨齒輪。折線桿的彎角是剛性外形，不是多了一個鉸鏈。</p>
+<ol>
+<li>開「＋ 新設計」，展開「新增 → 傳動 → 齒輪對」。這是建立兩顆嚙合零件，不是載入整份夾爪範例。點各輪齒面，將兩輪設為相同齒數，模數保持一致。此工具新增的兩輪中心尚未固定，不能省略下一步。</li>
+<li>在左輪中心裝 MG995，使輸入軸固定；再選右輪中心按「設為機架點」。兩輪中心都固定後，選馬達軸設定 0°～15°小範圍，再試播確認反向傳動；不要在從動輪再加一顆馬達。</li>
+<li>暫停。點「連桿」旁 ▾ →「折線桿（不填滿）」。依序點左輪<strong>中心孔、偏心定位孔、向前伸出的新爪尖</strong>。前兩孔必須吸附，第三孔決定夾指外形。右側重做一次，向同一取物方向伸出，留出中央開口。</li>
+<li>先試動，確認每側夾指跟自己的齒輪一起轉，再調爪尖位置、孔距或板寬。左右外形可先鏡像安排；先看會向內收還是向外張，不要直接套用別份作品的角度。</li>
+<li>依<a href="teaching-gripper.html#union">第四單元的聯集步驟</a>，分別把各側齒輪與夾指合成一片。預覽不符合時先修正孔位或外形，不把左右齒輪聯成一件。保存自己的夾爪。</li>
+</ol>
+<p class="check"><strong>自己驗收：</strong>兩側反向、每側齒輪與夾指同步；可指出張開與收攏姿態。自建版本用馬達角度試動，<strong>不會自動得到範例專屬的「張開／閉合」任務按鈕或物件開口檢查</strong>。</p>
+<details><summary>夾指沒跟著轉，或不能合成？</summary><p>先確認兩顆齒輪中心都已固定，再放大核對中心孔及偏心孔都吸附到同一輪。只共用一孔不能固定相對方向；只畫在相同位置也不等於共用接點。復原錯的板件再畫；外形不連通或配對不符時，讀聯集視窗的原因。若兩爪互穿，縮小角度或修改爪形，不能拿穿透動畫當抓取成功。</p></details>
+<p><strong>不看步驟再做：</strong>做短爪與長爪各一版，比較同角度下爪尖範圍與占用空間。這是旋轉夾爪，夾指方向會改變；不能把左右對稱稱為平行夾爪。摩擦、夾持力與物件是否留住仍需實測。</p>
+</section>
+<section id="slider"><h2>D．把旋轉變成直線推送</h2>
+<p><strong>先懂：</strong>滑軌限制方向，連桿傳遞運動，曲柄決定往返幅度。對心配置中，連桿長於曲柄且能完整旋轉時，理論行程為兩倍曲柄孔距；偏置配置不能直接套用。</p>
+<ol>
+<li>另開新設計，畫一根 40 mm 曲柄，在一端 O 裝 TT；先暫停。保留自由活動孔供連接。</li>
+<li>新增 → 傳動 → 滑軌。桌面點兩下畫水平軌道，手機拖出軌道後放開。將滑軌方向配置為通過 O；用接點位置與網格核對同高，不用目測斜線冒充對心。</li>
+<li>點軌道查看滑塊可動範圍。可用區間必須涵蓋沿軌距 O 48～128 mm，兩端再留一些餘量；滑軌欄位是相對軌道固定端的距離，若軌道起點不在 O，先換算，不能直接抄 48／128。</li>
+<li>用「連桿」連曲柄活動孔與<strong>滑塊活動孔</strong>，孔距設為 88 mm，不接到滑軌固定孔。滑塊由連桿帶動，不再加線性致動器。</li>
+<li>播放整圈，沿<a href="teaching-slider.html#task-check">第二單元成果檢查</a>核對 80 mm。若顯示無法判定，先依原因檢查結構和動力；不能把無法判定當作通過。</li>
+</ol>
+<p class="check"><strong>自己驗收：</strong>同一滑塊孔往返，行程是最遠位置減最近位置。先存檔，再把目標改為 64 mm，自己算曲柄孔距、核對軌道是否仍足夠。80 mm 專用檢查不會替 64 mm 任務改目標。</p>
+<details><summary>轉到一半卡住？</summary><p>看滑塊是否超出可用區間、連桿是否太短、軌道是否偏置，並確認沒有多加第二個驅動。若尚不熟悉滑軌定位，先完成<a href="teaching-slider.html">缺桿練習</a>，逐項查看它的固定孔與可動範圍，再回空白重建。</p></details>
+</section>
+<section id="rack"><h2>E．用齒輪齒條建立另一種直線輸出</h2>
+<ol><li>新設計 → 新增 → 傳動 → 齒輪齒條。先觀察內建的固定導向、轉動齒輪與活動齒條，確認哪個零件限制移動方向。</li><li>點齒面查看模數、齒數與導軌槽長；先保留預設值，播放並記下同一活動孔的兩端位置。新增工具的預設尺寸可能與第五單元範例不同，不照抄其行程結果。</li><li>暫停，只縮短導軌槽長一格，再播放比較可用行程。復原，核對兩端是否恢復。若要達到指定行程，參考<a href="teaching-rack.html">第五單元</a>逐次修改並量測。</li></ol>
+<p class="check"><strong>自己驗收：</strong>能自己新增傳動、指出固定導向，分清齒條總長、導軌槽長、實際行程。與 D 比較：同樣是直線輸出，曲柄滑塊靠曲柄繞圈往復，齒條靠齒輪的轉動量與可用導程決定位移。</p>
+<details><summary>為什麼長槽 128 mm 不代表能走 128 mm？</summary><p>導向點間距、端部餘量與機構配置會占掉空間；看同一活動孔的兩端差，而不是把槽長當答案。發生超程提示，先恢復上一個可用設定，再一次改一個值。</p></details>
+</section>
+<section id="plate"><h2>F．把運動骨架變成板件與翻轉工具</h2>
+<p><strong>先懂：</strong>三角板上的孔距固定，整片是一個剛體；多根桿用鉸鏈相接則可能相對轉動。畫出一片側板不等於做出四面料斗，模擬固定點也不等於有實體軸承座。</p>
+<ol><li>新設計 → 連桿旁 ▾ → 三角板（填滿），依序點三個不共線位置。點板身比較三組孔距，再設定板寬／板厚等可用尺寸。</li><li>在其中一個孔裝 MG995，設定 0°～45°；試播觀察三孔與板面一起轉，沒有任何一個角自行折動。</li><li>若需自訂外框，用「新增 → 板件」。前三點是主孔，後續點是外形點，桌面右鍵完成，手機點回第一孔完成。第四點不是新轉軸；需要新的活動關節時應建立另一機件。</li><li>儲存自己的單軸板件，再開<a href="teaching-tipping-bucket.html">第六單元翻斗</a>對照：左／右／底／背板怎麼相接、角碼在哪裡、哪些接合應保持剛性。先完成單軸板件，再使用現有翻斗模組練習多板組立；本段不把載入四板範例算作從零畫完料斗。</li></ol>
+<p class="check"><strong>自己驗收：</strong>能新建板件、控制單軸翻轉，分清主孔與外形點。開 3D 核對厚度和前後層，列出仍需確認的轉軸、支承與干涉。姿態向下不代表物件一定能滑出。</p>
+<details><summary>多畫一個點，為什麼不能拿來接活動桿？</summary><p>目前板件以前三個主孔描述運動，後續點定義外形。不要用外形點假裝新的運動孔；回到需求，把需要相對運動的部分拆成獨立桿件。完整多孔結構板不是這個教程已提供的功能。</p></details>
+</section>
+<section id="interfaces"><h2>G．讓自己做的兩個機構接得起來</h2>
+<p><strong>先懂：</strong>分頁管理設計；模組把一組機構包成可重用單位；輸出端說明別的模組要跟隨哪個活動零件。接在固定機架，夾爪就不會跟著升降。</p>
+<ol>
+<li>回 B 的升降臂作品，確認單獨能動。選其中一根桿，在編輯面板按「存成模組」，命名「我的升降臂」。已是模組時直接使用現有模組面板。</li>
+<li>選右側輸出架上的 C 或 D 孔。若出現「輸出端跟隨哪個零件」，選<strong>右側輸出架</strong>，再按「設為輸出端」。記下剛剛選取的零件 ID，別猜清單第一項；選上下活動臂會得到不同的跟隨方向。</li>
+<li>按「存到我的模組庫」。回 C 的夾爪設計，也存成模組及存入庫中。模組庫是目前瀏覽器的重用入口，另下載 JSON 備份，不把本機庫當雲端保存。</li>
+<li>在同一份作品中準備升降臂與夾爪兩個設計；若分別存在檔案，使用「新增 → 加入模組（保留作品）」從我的模組庫加入。不要開另一份作品把前一份替換掉。</li>
+<li>選夾爪模組，在「安裝到…」選自己的升降臂輸出。這個設計面板選項會直接套用，可復原；不是第七單元雙孔接口的候選預覽。先看位置與方向，錯了就復原或拆下。</li>
+<li>從「設計清單」把需要的設計加入組立，選升降臂作底座，再切「組立」。分別選升降與夾爪馬達試動；依目前清單辨認 ID，不假定永遠是 M1／M2。</li>
+<li>下載整份作品 JSON、重開，重新確認接合與兩軸動作。若夾爪跟著臂轉而非保持方向，回第 2 步核對輸出端所跟隨零件。</li>
+</ol>
+<p class="check"><strong>自己驗收：</strong>升降時夾爪整組跟隨；只動夾爪時升降姿態保持。自建接口提供定位／方向，<strong>不會自動生成已核對的雙孔螺絲接合</strong>。先用<a href="teaching-assembly.html">第七單元內建接口</a>熟悉預覽，再比較兩種接法的差異。</p>
+<details><summary>找不到安裝目標／加進來卻沒跟著動？</summary><p>先查宿主是否存成模組且有輸出端，兩個模組是否都在同一作品。再查夾爪是否真的安裝到該輸出，而非只加入分頁或組立。接口正確但板件重疊時，讀干涉提示回相關設計修改；換層後還要核對軸長與支承，不能只消掉警告。</p></details>
+</section>
+<section id="project"><h2>H．獨立專題：提出需求，做出自己的方案</h2>
+<p>完成七個單元與 A～G 後，把教學步驟收起來。自行選擇「升降夾爪」「直線推送」「翻轉卸料」其中一題，或提出同等規模的用途。可以重用模組，但至少有一個機構由自己建立，並說明其他部分重用了什麼。</p>
+<div class="grid"><article class="card"><h3>先寫四句需求</h3><ul><li>要處理的物件或動作是什麼？</li><li>需要多少開口、行程或轉角？</li><li>哪裡固定、哪裡不能超出？</li><li>怎樣觀察或量測才算達成？</li></ul></article><article class="card"><h3>再決定怎麼做</h3><ul><li>畫出固定、輸入、輸出與傳動關係。</li><li>選連桿、滑軌或齒輪，說明理由。</li><li>先單獨試動，再接合；一次改一項。</li><li>保留改前／改後作品，說明改進證據。</li></ul></article></div>
+<h3>完成標準：自己能回答，也能重做</h3>
+<ul><li><strong>建立：</strong>不用完整範例，能建立至少一個有固定、驅動、輸出的機構，並說明每個零件用途。</li><li><strong>修改：</strong>需求換了，能找到該改的尺寸或角度，先預測，再以數值或姿態對照；不把畫面縮放當行程改變。</li><li><strong>排錯：</strong>遇到未連接、輸入選錯或超程，能指出原因、復原並修好。可用自己的副本做一個錯接反例。</li><li><strong>整合：</strong>多模組作品須分軸試動，接合保持；有動作順序就說出每一步該動哪一軸。第七課六步序列的預設與檢查範圍以該課作品為準，自建作品先逐軸手動驗證。</li><li><strong>保存：</strong>留下可重新編輯的 JSON 與完整動作影片；重新開啟仍能操作。自己學習不需 Classroom 帳號，班級作業才依老師要求上傳。</li><li><strong>界限：</strong>列出尚未證實的接觸、摩擦、負載、全行程碰撞與加工條件。SVG／DXF 成功匯出只表示有圖檔；準備製作時另外核對尺寸、單位、板厚、孔位與五金。</li></ul>
+<p class="note">把「我會調範例」提升為「我能為自己的需求建立、驗證、修正」。不必第一次就做複雜作品；能解釋並重做一個小機構，比無法理解的大組合更能幫助下一個專題。</p>
+</section>
+<footer><p><a href="teaching.html">回學習目錄</a> · <a href="teaching-assembly.html">第七單元：組立與動作順序</a></p></footer>
+</main></body></html>
