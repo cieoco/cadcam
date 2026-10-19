@@ -17,10 +17,15 @@ for(const c of liftUpright.comps){
 }
 // zlift：夾爪整組桿／板往外抬 3 層（疊放相對位移，同組同抬，組內相對層序與組裝計畫不變），夾爪疊在升降臂與連接桿前面，各自一層、不穿模。
 const tag=(snapshot,moduleId,zlift=0)=>structuredClone(snapshot.comps).map(c=>({...c,moduleId,...(zlift&&['bar','triangle'].includes(c.type)?{zlift}:{})}));
+// H03 單例回復原版；組合範例保留已驗收的接合分支，不回寫共用單例。
+const assemblyGrip=structuredClone(fixedGripSnapshot);
+for(const c of assemblyGrip.comps)if(c.type==='triangle'){
+  const [a,b,p]=[c.p1,c.p2,c.p3];c.sign=Math.sign((b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x))||1;
+}
 const grip=fixedGripSnapshot.comps.find(c=>c.id==='H3Frame');
 export const hydraulicLiftGripSnapshot={kind:'blocks',v:1,projectName:'H05 液壓升降＋夾爪（側視組立）',rootDesignName:'H05 液壓升降＋夾爪',counter:50,
  params:{...structuredClone(fixedLiftSnapshot.params),...structuredClone(fixedGripSnapshot.params)},tracePoint:'H2C',
- comps:[...tag(liftUpright,'Lift'),...tag(fixedGripSnapshot,'Grip',3)],
+ comps:[...tag(liftUpright,'Lift'),...tag(assemblyGrip,'Grip',3)],
  modules:[
   {id:'Lift',name:'升降',base:'H2O',outputs:[{id:'tool',name:'工具端',at:'H2C',body:{kind:'triangle',id:'H2Arm'}}],mount:null},
   {id:'Grip',name:'夾爪',base:'H3O',outputs:[],mount:{to:{module:'Lift',output:'tool'},ref:{x:grip.p2.x,y:grip.p2.y,a:0},home:{}}}
@@ -35,7 +40,7 @@ export const hydraulicLiftGripSnapshot={kind:'blocks',v:1,projectName:'H05 液�
 // 轉盤條寬 16 mm：轉接座／角碼的孔離邊 9–9.5 mm，原 10 mm 條寬孔會破邊。夾爪疊 3 層：直角平面的場景要靠它與升降臂分層。
 const arm=(()=>{
   const turn=fixedBaseSnapshot.comps.find(c=>c.id==='H4Turn');
-  const comps=[...tag(fixedBaseSnapshot,'Base'),...tag(liftUpright,'Lift'),...tag(fixedGripSnapshot,'Grip',3)];
+  const comps=[...tag(fixedBaseSnapshot,'Base'),...tag(liftUpright,'Lift'),...tag(assemblyGrip,'Grip',3)];
   comps.find(c=>c.id===turn.id).stock={...turn.stock,widthMm:16};
   const params={...structuredClone(fixedBaseSnapshot.params),...structuredClone(fixedLiftSnapshot.params),...structuredClone(fixedGripSnapshot.params)};
   const edgeIndex=1,to={module:'Base',body:turn.id,edge:edgeIndex};

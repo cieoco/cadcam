@@ -16,7 +16,7 @@ export const fixedLiftSnapshot={kind:'blocks',v:1,projectName:'H02 管夾固定�
 // 每支夾臂不交叉：後端連桿點與前端夾指在同一側，推桿前進時後端外擺、前端內收。
 const G=p('H3O',125.8323,253.368,'fixed'),R=p('H3P',67.031,253.368),GA=p('H3A',-26,253.368,'fixed');
 const U=p('H3U',103.6509,300.8968),V=p('H3V',103.6509,205.8392),F=p('H3F',155.9027,296.3421),T=p('H3T',155.9027,210.3939);
-const tri=(id,a,b,c)=>({id,type:'triangle',p1:a,p2:b,p3:c,sign:Math.sign((b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x))||1,gParam:id+'g',r1Param:id+'r',r2Param:id+'d',shapeMode:'polyline',vertices:[{solve:true,ref:'p2'},{solve:true,ref:'p1'},{solve:true,ref:'p3'}],color:'#728b86',stock:{thicknessMm:2}});
+const tri=(id,a,b,c)=>({id,type:'triangle',p1:a,p2:b,p3:c,gParam:id+'g',r1Param:id+'r',r2Param:id+'d',shapeMode:'polyline',vertices:[{solve:true,ref:'p2'},{solve:true,ref:'p1'},{solve:true,ref:'p3'}],color:'#728b86',stock:{thicknessMm:2}});
 export const fixedGripSnapshot={kind:'blocks',v:1,projectName:'H03 針筒夾具／一體式夾臂',counter:30,params:{H3Frame:distance(GA,G),H3Upper:60,H3Lower:60,H3JawAg:52.45,H3JawAr:52.45,H3JawAd:52.45,H3JawBg:52.45,H3JawBr:52.45,H3JawBd:52.45},comps:[
  bar('H3Frame',GA,G,'H3Frame'),bar('H3Upper',R,U,'H3Upper'),bar('H3Lower',R,V,'H3Lower'),tri('H3JawA',G,U,F),tri('H3JawB',G,V,T),
  {id:'H3Syringe',type:'syringe',mountMode:'fixed-axis',axisDeg:Math.atan2(R.y-GA.y,R.x-GA.x)*180/Math.PI,outputId:'H3JawA',a:{componentId:'H3Frame',u:0,v:0},b:{componentId:'H3Upper',u:0,v:0},spec:{...SYRINGE_DEMO,name:'F3D 夾具參考／20 mm 教學區間（未實測）',outerDiameter:17.5,bodyLength:72,rodDiameter:8,lmin:83,stroke:20,calibrated:false},extension:distance(GA,R)-83,branch:1,
