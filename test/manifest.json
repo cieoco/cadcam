@@ -197,6 +197,7 @@
     "test/startup-size.mjs",
     "test/shape-utils.mjs",
     "test/touch-link-creation.mjs",
+    "test/overlap-picker.mjs",
     "test/point-connection.mjs",
     "test/design-guide.mjs",
     "test/simulation-scope.mjs",
