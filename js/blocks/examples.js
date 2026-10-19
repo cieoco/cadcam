@@ -1,7 +1,7 @@
 import { PARALLEL_GRIPPER_EXAMPLE } from './parallel-gripper-example.js';
 import { COMMON_MANIPULATOR_EXAMPLES } from './common-manipulator-examples.js';
 import {fixedLiftSnapshot,fixedGripSnapshot,fixedBaseSnapshot} from './fixed-syringe-examples.js';
-import {hydraulicLiftGripSnapshot} from './hydraulic-assembly-example.js';
+import {hydraulicLiftGripSnapshot,hydraulicArmSnapshot} from './hydraulic-assembly-example.js';
 import { hydraulicSnapshot } from './hydraulic-example.js';
 import { liftBucketSnapshot } from './lift-bucket-example.js';
 import { tippingBucketSnapshot } from './tipping-bucket-example.js';
@@ -56,6 +56,7 @@ const EXAMPLE_LESSONS = {
   'parallel-gripper': PARALLEL_GRIPPER_EXAMPLE.lesson,
   ...Object.fromEntries(COMMON_MANIPULATOR_EXAMPLES.map(example => [example.id, example.lesson])),
   'hydraulic-h05': {group:'lift-motion',level:'入門液壓',use:'側視組立：升降臂與夾爪各有一支針筒，夾爪模組裝在升降臂工具端隨臂轉；一個動作一個驅動。',try:['切到組立，用「升降針筒」「夾爪針筒」兩個切換鈕分別推','練習順序：先升再夾、先夾再升，記錄夾爪開口與臂角；接觸、承載與水路未驗證']},
+  'hydraulic-h06': {group:'lift-motion',level:'進階液壓',use:'三軸手臂：升降總成直角立在轉盤上，轉盤轉時整組升降與夾爪跟著轉；三支針筒各管一軸（轉、升降、夾）。',try:['切到組立，用三個切換鈕分別推：轉盤針筒轉整條臂、升降針筒抬臂、夾爪針筒開合','按「動作序列」看預設取放：轉到取物方向→張開→降→夾緊→升→轉到放置方向→放開；3D 暫不畫針筒外形，接觸、承載與水路未驗證']},
   'hydraulic-h04': {group:'lift-motion',level:'入門液壓',use:'俯視：管夾固定筒身推短連桿，連桿帶動轉盤繞垂直軸轉動；轉盤安裝點之後可放升降總成。',try:['改針筒伸出量，讀「每推 1 mm」轉幾度','只改曲柄半徑或連桿長，掃描後比較總轉角與傳動角；太斜會推不動']},
   'hydraulic-h03': {group:'lift-motion',level:'入門液壓',use:'固定筒身驅動左右對稱的一體式三點夾臂；推出即夾緊，末端造形與夾臂同片、保持剛性。',try:['改針筒伸出量並掃描可用行程','觀察推出時夾臂端孔距變小；接觸與夾持力未驗證']},
   'hydraulic-h02': {group:'lift-motion',level:'入門液壓',use:'管夾固定筒身，短連桿把直線輸入轉成抬臂擺動。',try:['改針筒伸出量並觀察末端高度','修改前先存檔，再比較安裝孔位的影響']},
@@ -294,6 +295,7 @@ const ALL_BLOCK_EXAMPLES = [
   {id:'hydraulic-h03',title:'H03｜針筒夾具與一體式夾臂',note:'左右對稱、推出夾緊；夾臂與末端同一片，接觸、承載未驗證。',snapshot:fixedGripSnapshot},
   {id:'hydraulic-h04',title:'H04｜管夾固定針筒旋轉底盤',note:'俯視：針筒經短連桿帶動轉盤；20 mm 教學區間未實測，轉盤安裝點供之後放升降總成。',snapshot:fixedBaseSnapshot},
   {id:'hydraulic-h05',title:'H05｜液壓升降＋夾爪（側視組立）',note:'升降與夾爪各一支針筒，切到組立分別控制；夾爪隨升降臂轉。幾何結果，接觸與承載未驗證。',snapshot:hydraulicLiftGripSnapshot},
+  {id:'hydraulic-h06',title:'H06｜液壓三軸手臂',note:'轉盤＋直角立在轉盤上的升降＋夾爪，三支針筒各管一軸；切到組立分別控制或排動作序列。幾何結果，接觸與承載未驗證。',snapshot:hydraulicArmSnapshot},
   wiperExample(false),
   wiperExample(true),
   {

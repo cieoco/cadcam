@@ -15,6 +15,19 @@ export function collectSceneIds({ compiled, comps, motorPointIds }) {
   return { groundIds, motorCenterIds, modelMotorCenterIds, camCenterIds };
 }
 
+// 手動疊放層（zlift）標到「所有平面」的連桿與三角板上：prepareRenderScene 只標目前視圖那一頁的，
+// 直角安裝的子平面（3D 場景另建）會漏掉。純函式，只寫 _zlift（值與 prepareRenderScene 相同）；回傳傳入的 links。
+export function markAllPlaneZlift(links, polygons, comps) {
+  const list = Array.isArray(comps) ? comps : [];
+  const byId = new Map(list.filter(c => c && c.id != null).map(c => [c.id, c]));
+  (links || []).forEach(link => { if (link) link._zlift = (link.id ? byId.get(link.id)?.zlift : 0) || 0; });
+  const key = ids => [...ids].sort().join('|');
+  const lift = new Map();
+  list.forEach(c => { if (c && c.type === 'triangle' && c.p1 && c.p2 && c.p3) lift.set(key([c.p1.id, c.p2.id, c.p3.id]), c.zlift || 0); });
+  (polygons || []).forEach(polygon => { if (polygon && Array.isArray(polygon.points)) polygon._zlift = lift.get(key(polygon.points)) || 0; });
+  return links;
+}
+
 export function prepareRenderScene({ compiled, comps, points, frameGeometry, sceneIds, computeBodyLayers, motorAssemblyLayerForBody, motorMounts }) {
   const visualization = compiled.visualization || { links: [], polygons: [] };
   const { groundIds, motorCenterIds, modelMotorCenterIds, camCenterIds } = sceneIds;

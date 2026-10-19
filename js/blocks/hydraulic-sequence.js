@@ -6,24 +6,32 @@ const syringesOf=source=>(source?.comps||[]).filter(c=>c.type==='syringe');
 const solveAt=(source,extensions,previous)=>planAssemblyExtensions(source.comps,source.modules||[],source.params||{},extensions,previous);
 
 // H05 預設：張開 → 降到取物位 → 夾緊 → 升起 → 放開。升降針筒推出＝臂升高、夾爪針筒推出＝夾緊（用解算器確認，不靠猜）。
+// H06（三軸）：依安裝鏈分角色——夾爪＝有 jawIds 的針筒；升降＝夾爪所裝的那個模組的針筒；底盤＝升降所裝的那個模組的針筒。
+// 有底盤時前後各加一步轉動：轉到取物方向（0 mm）→…→轉到放置方向（行程末端）→放開。沒有底盤時與 H05 完全相同。
 export function DEFAULT_HYDRAULIC_SEQUENCE(source){
-  const syringes=syringesOf(source),lift=syringes.find(c=>!c.jawIds?.length),grip=syringes.find(c=>c.jawIds?.length);
-  if(!lift||!grip)return [];
-  const module=(source.modules||[]).find(m=>m.id===lift.moduleId),tool=module?.outputs?.[0]?.at;
+  const syringes=syringesOf(source),modules=source?.modules||[],grip=syringes.find(c=>c.jawIds?.length);
+  if(!grip)return [];
+  const gripModule=modules.find(m=>m.id===grip.moduleId),hostId=gripModule?.mount?.to?.module;
+  const lift=syringes.find(c=>!c.jawIds?.length&&c.moduleId===hostId)||syringes.find(c=>!c.jawIds?.length);
+  if(!lift)return [];
+  const liftModule=modules.find(m=>m.id===lift.moduleId),baseId=liftModule?.mount?.to?.module;
+  const base=baseId?syringes.find(c=>!c.jawIds?.length&&c.id!==lift.id&&c.moduleId===baseId):null,tool=liftModule?.outputs?.[0]?.at;
   const height=extension=>{
-    const r=solveAt(source,{[lift.id]:extension,[grip.id]:grip.extension},null),p=r.ok?r.points?.[tool]:null;
+    const r=solveAt(source,{...(base?{[base.id]:base.extension}:{}),[lift.id]:extension,[grip.id]:grip.extension},null),p=r.ok?r.points?.[tool]:null;
     return p&&Number.isFinite(p.y)?p.y:null;
   };
   const low=height(0),high=height(lift.spec.stroke);
   const lowered=low!==null&&high!==null&&high<low?lift.spec.stroke:0,raised=lowered===0?lift.spec.stroke:0;
   const open=0,closed=grip.spec.stroke;
-  return [
+  const steps=[
     {name:'張開',syringe:grip.id,extension:open,seconds:2},
     {name:'降到取物位',syringe:lift.id,extension:lowered,seconds:2.5},
     {name:'夾緊',syringe:grip.id,extension:closed,seconds:2},
     {name:'升起',syringe:lift.id,extension:raised,seconds:2.5},
     {name:'放開',syringe:grip.id,extension:open,seconds:2}
   ];
+  if(!base)return steps;
+  return [{name:'轉到取物方向',syringe:base.id,extension:0,seconds:2.5},...steps.slice(0,4),{name:'轉到放置方向',syringe:base.id,extension:base.spec.stroke,seconds:3},steps[4]];
 }
 
 export function prepareHydraulicSequence(source,steps,start){

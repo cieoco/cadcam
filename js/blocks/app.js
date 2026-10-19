@@ -105,7 +105,7 @@ import { drawPlate as renderPlate } from './plate-render.js';
 import { buildMotorMounts as planMotorMounts, computeMotorRotDeg as planMotorRotDeg, motorAssemblyLayerForBody,buildMotorExportMounts,motorMountPatternRotDegForCenter as planMotorPatternRotDeg } from './motor-mounts.js';
 import { drawFrameGeometry as renderFrameGeometry, drawMotorMountHoles as renderMotorMountHoles, drawModulePlates as renderModulePlates } from './motor-frame-render.js';
 import { createModulePlateSource } from './module-plates.js?v=20261007_m5a';   // G1：已安裝模組的固定板（<id>-frame）3D／2D
-import { collectSceneIds, prepareRenderScene } from './render-scene.js';
+import { collectSceneIds, prepareRenderScene, markAllPlaneZlift } from './render-scene.js';
 import { buildPreviewModelInputs } from './preview-model-inputs.js';
 import { renderLinks, renderNodes } from './mechanism-layer-render.js';
 import * as Settings from './settings.js';   // 作品級加工設定 + 舊 localStorage 偏好遷移 + 表單同步
@@ -1886,6 +1886,8 @@ function drawNow() {
     polygons: S.compiled.visualization.polygons || [], sliderTravelStart, sliderTravelEnd,
     sliderBodyLength, rackBodyHeight, rackPhaseShift, pulleyRadius, pulleyPinRadius
   });
+  // 直角子平面的 3D 場景另建：疊放層（zlift）要標到所有平面的連桿與三角板，不只目前視圖那一頁。
+  if (hasOrthogonalModules()) markAllPlaneZlift(S.compiled.visualization.links, S.compiled.visualization.polygons || [], S.comps);
   // O6：有直角安裝時另備一份「全平面」輸入（3D 預覽依平面各建場景、再把子平面立起來）。
   lastModelInputsAll = !(hasOrthogonalModules() || (inDesign() && vIds)) ? null : buildPreviewModelInputs({   // 設計模式的 3D 也要全域輸入，再依焦點過濾
     comps: S.comps, params: S.topo.params, theta: S.theta,

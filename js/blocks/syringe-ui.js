@@ -30,7 +30,8 @@ export function createSyringeUI(h){
   warning3d.style.cssText='position:absolute;bottom:72px;left:8px;right:8px;padding:8px;background:#fff3cd;color:#664d03;z-index:6;font-size:13px;pointer-events:none';warning3d.hidden=true;
   let id=null,raf=null,last=null,direction=1,dragUndo=false,picking=null,scopeKey=null,message='';
   const inAssembly=()=>S.mode!=='design';
-  const list=()=>h.comps().filter(c=>c.type==='syringe');
+  // 組立：針筒清單含直角平面上的針筒（切換鈕與伸出量不受目前視圖平面限制）；設計模式仍只看目前視圖。
+  const list=()=>(inAssembly()?assemblyWork(S.comps,S.modules,S.topo).comps:h.comps()).filter(c=>c.type==='syringe');
   const active=()=>list().find(c=>c.id===id)||list()[0];
   const params=()=>S.topo.params;
   const motion=()=>({thetaDeg:S.theta,motorAngles:motorAnglesNow()});
@@ -117,7 +118,9 @@ export function createSyringeUI(h){
   }
   function render(points,valid){
     sync(points,valid);
+    const inView=new Set(h.comps().map(c=>c.id));
     for(const c of list()){
+      if(!inView.has(c.id))continue;   // 組立：其他平面的針筒只出現在控制列，不畫在這一頁的 2D
       const a=attachmentPoint(c.a,h.comps(),params(),points),b=attachmentPoint(c.b,h.comps(),params(),points);if(!a||!b)continue;
       const g=document.createElementNS(ns,'g');g.setAttribute('data-syringe',c.id);h.svg.append(g);
       const node=(tag,attrs)=>{const n=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v));g.append(n);return n;};
