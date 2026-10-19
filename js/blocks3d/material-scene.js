@@ -3,6 +3,7 @@ import {buildSceneModel} from './scene-model.js';
 import {buildOrthogonalChildren,attachModulePlates} from './orthogonal-3d.js';
 import {attachPartMaterials} from './part-pose.js';
 import {assemblySyringeShapes} from './syringe-scene.js';
+import {assemblyRoles} from '../blocks/assembly-roles.js';
 export function buildMaterialScene({comps,modules,params,catalog,inputs,allPlanes=null,points=inputs.pts,stockMm,frameGeometry=catalog.parts.frame || null,
  plates=catalog.frameHomes.map(h=>({moduleId:h.moduleId,plane:h.plane,outlines:h.geometry.outlines,outline:h.geometry.outlines[0],holes:h.geometry.holes,cutouts:h.geometry.cutouts,thicknessMm:catalog.parts[h.name]?.thicknessMm || h.stockMm})),
  plane=null,assemblyScope=true,asm,plan,exportSettings={},joint,hullR=8,solveValidity}={}){
@@ -32,6 +33,10 @@ export function buildMaterialScene({comps,modules,params,catalog,inputs,allPlane
  const result={...attachPartMaterials(model,catalog,{comps,modules,points,assemblyScope}),solveValidity};
  if(assemblyScope){
   result.syringes=assemblySyringeShapes(result,comps,modules,params,points);
+  // H04 is authored in top view: its XY plane is the floor, not a vertical wall.
+  // Source survives module renaming/insertion; this is a view hint, not a pose transform.
+  const root=modules.find(m=>m.id===assemblyRoles(modules).root);
+  result.viewUp=root?.source==='hydraulic-h04'?'z':'y';
  }
  return result;
 }

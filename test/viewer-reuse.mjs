@@ -16,10 +16,11 @@ await Promise.resolve();assert.equal(loaded,1);const resource={ready:true};resol
 const el=()=>({style:{},children:[],clientWidth:1280,clientHeight:720,appendChild(o){this.children.push(o);o.parentNode=this;},removeChild(o){this.children=this.children.filter(v=>v!==o);},remove(){this.parentNode?.removeChild(this);},addEventListener(){},removeEventListener(){},getBoundingClientRect:()=>({left:0,top:0,width:1280,height:720})});
 globalThis.window={devicePixelRatio:1,innerWidth:1280,innerHeight:720};globalThis.document={createElement:el};
 globalThis.requestAnimationFrame=()=>1;globalThis.cancelAnimationFrame=()=>{};
-let scene;
-const renderer={domElement:el(),setPixelRatio(){},setSize(){},render(s){scene=s;},dispose(){}};
+let scene,renderCamera;
+const renderer={domElement:el(),setPixelRatio(){},setSize(){},render(s,c){scene=s;renderCamera=c;},dispose(){}};
 const controls={target:new THREE.Vector3(),update(){},dispose(){},addEventListener(){}};
-const viewer=createViewer(el(),{rendererFactory:()=>renderer,controlsFactory:()=>controls});
+const controlAxes=[];
+const viewer=createViewer(el(),{rendererFactory:()=>renderer,controlsFactory:camera=>{controlAxes.push(camera.up.toArray());return controls;}});
 const dynamic=()=>scene.children.find(g=>g.isGroup),geometries=()=>{const rows=[];dynamic().traverse(o=>{if(o.geometry)rows.push(o.geometry);});return rows;};
 const represented=s=>{s.updateMatrixWorld(true);const out=[];s.children.find(g=>g.isGroup).traverse(o=>{if(!o.geometry)return;o.geometry.computeBoundingBox();const b=o.geometry.boundingBox;out.push({key:o.userData.pickKey || null,type:o.geometry.type,world:o.matrixWorld.elements.map(n=>Math.round(n*1e6)/1e6),bounds:[...b.min.toArray(),...b.max.toArray()].map(n=>Math.round(n*1e6)/1e6),vertices:o.geometry.attributes.position.count});});return out;};
 for(const fixture of [f1AssemblyFixture(),f1NestedFixture()]){
@@ -66,5 +67,15 @@ for(const theta of [20,40]){
  let freshScene;const fresh=createViewer(el(),{rendererFactory:()=>({...renderer,domElement:el(),render(s){freshScene=s;}}),controlsFactory:()=>({...controls,target:new THREE.Vector3()})});fresh.update(model);
  assert.deepEqual(represented(scene),represented(freshScene),'rack retained and fresh meshes have identical poses and geometry');fresh.dispose();
 }
+const axesModel=faceCandidateModel(rackCandidate,{theta:0}).model;
+viewer.update({...axesModel,viewUp:'z'});viewer.tiltView();
+assert.deepEqual(renderCamera.up.toArray(),[0,0,1]);
+assert.deepEqual(controlAxes.at(-1),[0,0,1],'orbit controls are initialized with the horizontal-floor up axis');
+assert.ok(Math.abs(scene.children.find(c=>c.type==='GridHelper').rotation.x-Math.PI/2)<1e-9,'turntable floor is XY');
+assert.ok(renderCamera.position.z>controls.target.z,'camera views turntable from above');
+viewer.update(axesModel);
+assert.deepEqual(renderCamera.up.toArray(),[0,1,0],'ordinary side-view designs restore Y up');
+assert.deepEqual(controlAxes.at(-1),[0,1,0],'orbit controls also restore the ordinary basis');
+assert.equal(scene.children.find(c=>c.type==='GridHelper').rotation.x,0);
 const last=geometries();let disposed=0;last.forEach(g=>g.addEventListener('dispose',()=>disposed++));viewer.dispose();assert.equal(disposed,last.length);
 console.log('production viewer: F1/nested pose, hardware, world matrices, appearance, camera, invalidation, dispose');

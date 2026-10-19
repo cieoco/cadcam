@@ -47,6 +47,7 @@ function panel(n,ext,{zlift=true}={}){
 import {assemblySyringeShapes} from '../js/blocks3d/syringe-scene.js';
 import {applyMatrix4} from '../js/blocks3d/orthogonal-3d.js';
 import {attachmentPoint} from '../js/core/syringe.js';
+import {plateVertexWorldPoints} from '../js/blocks/plate-geometry.js';
 const n=load(SNAP),seen=[];
 for(const ext of [{H4Syringe:0,H2Syringe:0,H3Syringe:0},{H4Syringe:20,H2Syringe:0,H3Syringe:0},{H4Syringe:20,H2Syringe:20,H3Syringe:20}]){
  const {model,work,points}=panel(n,ext),before=JSON.stringify(work);
@@ -87,3 +88,37 @@ for(const lift of [0,10,20])for(const grip of [0,10,20]){
  assert.equal(report.findings.length,0,JSON.stringify({lift,grip,findings:report.findings}));
 }
 console.log('H05: two visible syringes and their fixed supports, nine poses without checked-material penetration');
+
+// Product contract: bottom yaw, middle lift, top grasp, measured in WORLD z.
+// Merely changing local y or making a valid loop does not establish this contract.
+const poses=new Map(),eps=1e-6;
+for(const yaw of [0,10,20])for(const lift of [0,10,20])for(const grip of [0,20]){
+ const r=panel(n,{H4Syringe:yaw,H2Syringe:lift,H3Syringe:grip});
+ assert.equal(r.model.viewUp,'z','top-view turntable uses a horizontal XY floor');
+ const matrix=r.model.orthogonal.find(p=>p.id==='Lift').matrix;
+ const world=id=>applyMatrix4(matrix,{...r.points[id],z:0});
+ const points=Object.fromEntries(['H2A','H2O','H2C','H3F','H3T'].map(id=>[id,world(id)]));
+ for(const id of ['H3JawA','H3JawB']){
+  const jaw=r.work.comps.find(c=>c.id===id);
+  const tip=plateVertexWorldPoints(jaw,[jaw.p1,jaw.p2,jaw.p3].map(p=>r.points[p.id])).at(-1);
+  points[id]=applyMatrix4(matrix,{...tip,z:0});
+  assert.ok(points[id].z>points.H2O.z,'actual gripping tips stay above the lift support');
+ }
+ assert.ok(points.H2C.z>points.H2O.z+70,'working end is ABOVE the lift pivot');
+ for(const id of ['H3F','H3T'])assert.ok(points[id].z>points.H2O.z+30,'both jaws stay above the middle support');
+ poses.set(`${yaw}/${lift}/${grip}`,points);
+}
+for(const lift of [0,10,20]){
+ const a=poses.get(`0/${lift}/0`),b=poses.get(`20/${lift}/0`),c=poses.get(`20/${lift}/20`);
+ for(const id of Object.keys(a))assert.ok(Math.abs(a[id].z-b[id].z)<eps,'yaw does not change upper-stage height');
+ assert.ok(Math.hypot(a.H2C.x-b.H2C.x,a.H2C.y-b.H2C.y)>20,'bottom yaw carries the upper working end sideways');
+ for(const id of ['H2A','H2O','H2C'])for(const k of ['x','y','z'])assert.ok(Math.abs(b[id][k]-c[id][k])<eps,'grasp does not move base/lift');
+ const gap=p=>Math.hypot(p.H3JawA.x-p.H3JawB.x,p.H3JawA.y-p.H3JawB.y,p.H3JawA.z-p.H3JawB.z);
+ assert.ok(gap(c)<gap(b)-20,'top jaws close when their syringe extends');
+}
+for(const yaw of [0,10,20]){
+ const a=poses.get(`${yaw}/0/0`),b=poses.get(`${yaw}/20/0`);
+ assert.ok(b.H2C.z-a.H2C.z>25,'middle syringe raises the upper end in WORLD height');
+ for(const id of ['H2A','H2O'])for(const k of ['x','y','z'])assert.ok(Math.abs(a[id][k]-b[id][k])<eps,'lift does not move its fixed support');
+}
+console.log('H06 world axes: 18 poses, bottom yaw / middle rise / top grasp, jaws above support');

@@ -290,12 +290,13 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   container.appendChild(materialNotice);
   const unsupportedMaterial=new THREE.MeshBasicMaterial({color:0xd58a16,wireframe:true});
 
-  const controls = controlsFactory(camera, renderer.domElement);
+  let controls = controlsFactory(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
 
   // 燈光：半球補光 + 主方向光，板面才有立體層次
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x2a2f3a, 1.0));
+  const hemisphere=new THREE.HemisphereLight(0xffffff, 0x2a2f3a, 1.0);
+  scene.add(hemisphere);
   const key = new THREE.DirectionalLight(0xffffff, 1.1);
   key.position.set(0.5, 0.8, 1);
   scene.add(key);
@@ -536,10 +537,26 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   }
 
   let initialized = false;
+  let viewUp='y';
 
   function update(model) {
     poseRevision++;
     if(!model){clearDynamic();lifetime.retire();lastModel=null;return;}
+    const nextUp=model.viewUp==='z'?'z':'y';
+    if(nextUp!==viewUp){
+      viewUp=nextUp;camera.up.set(0,viewUp==='y'?1:0,viewUp==='z'?1:0);
+      // OrbitControls captures its up-axis quaternion in the constructor.
+      // Recreate on basis changes so touch orbit/pan uses the same floor as the camera.
+      const target=controls.target.clone();controls.dispose();
+      controls=controlsFactory(camera,renderer.domElement);controls.target.copy(target);
+      controls.enableDamping=true;controls.dampingFactor=.08;
+      controls.addEventListener('start',beginInteraction);controls.addEventListener('end',endInteraction);
+      grid.rotation.x=viewUp==='z'?Math.PI/2:0;
+      hemisphere.position.set(0,viewUp==='y'?1:0,viewUp==='z'?1:0);
+      key.position.set(.5,viewUp==='z'?-1:.8,viewUp==='z'?.8:1);
+      fill.position.set(-.6,viewUp==='z'?.8:-.3,viewUp==='z'?-.3:-.8);
+      initialized=false;fitHeld=false;
+    }
     lastModel = model;
     renderSyringes(model.syringes);
     if(lifetime.begin(retainedSceneKey(model))){updateRetainedPose(model);focusCamera(model);return;}
@@ -1121,7 +1138,8 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
         }
         // 直向手機的水平視角較窄，初始距離需補償寬高比，否則兩側零件會被裁掉。
         const dist = Math.max(300, span * 2.2) / Math.min(1, camera.aspect);
-        camera.position.set(f.x, f.y, dist);
+        if(viewUp==='z')camera.position.set(f.x+dist*.45,f.y-dist*.8,(f.z||0)+dist*.55);
+        else camera.position.set(f.x, f.y, dist);
         initialized = true;
         if(model.syringes?.length)fitTo(null,{fill:0.7,insetBottom:80});
       } else if (model.anchored && !fitHeld) {   // 精靈框過鏡頭後（fitHeld）目標不再每幀被拉回地錨
@@ -1318,12 +1336,13 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     return { x: rect.left + (v.x + 1) / 2 * rect.width, y: rect.top + (1 - v.y) / 2 * rect.height };
   }
   // 把相機繞目標點轉到斜上方（組立台第一次進來用，讓直角安裝的立體關係看得出來）。
-  function tiltView(azimuthDeg = -28, elevationDeg = 18) {
+  function tiltView(azimuthDeg = -28, elevationDeg = viewUp==='z'?28:18) {
     const t = controls.target;
     const off = camera.position.clone().sub(t);
     const r = off.length() * 0.75;   // 順便拉近一點，組立台的 3D 才是主角
     const az = azimuthDeg * Math.PI / 180, el = elevationDeg * Math.PI / 180;
-    camera.position.set(t.x + r * Math.cos(el) * Math.sin(az), t.y + r * Math.sin(el), t.z + r * Math.cos(el) * Math.cos(az));
+    if(viewUp==='z')camera.position.set(t.x+r*Math.cos(el)*Math.sin(az),t.y-r*Math.cos(el)*Math.cos(az),t.z+r*Math.sin(el));
+    else camera.position.set(t.x + r * Math.cos(el) * Math.sin(az), t.y + r * Math.sin(el), t.z + r * Math.cos(el) * Math.cos(az));
     camera.lookAt(t);
     controls.update();
   }
@@ -1331,8 +1350,9 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   // ---- 組立台精靈：把相機拉到剛好框住符合 filter(pickKey) 的零件（沒給＝全部）；保留目前的視角，只改距離與目標 ----
   let fitHeld = false;       // fitTo 設定過目標：focusCamera 不再把目標拉回地錨（releaseFit 還原）
   let interacting = false;   // 使用者正在拖曳／捏合：不要搶鏡頭
-  controls.addEventListener('start', () => { interacting = true; });
-  controls.addEventListener('end', () => { interacting = false; });
+  const beginInteraction=()=>{interacting=true;},endInteraction=()=>{interacting=false;};
+  controls.addEventListener('start',beginInteraction);
+  controls.addEventListener('end',endInteraction);
   function partsBox(filter) {
     scene.updateMatrixWorld(true);
     const box = new THREE.Box3(), tmp = new THREE.Box3();

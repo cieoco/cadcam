@@ -1,12 +1,26 @@
 // H05（前半）：升降（H02）＋夾爪（H03）兩支針筒組成側視組立。尺寸全部取自 H02／H03 範例，不另抄數字。
 // 夾爪模組裝在升降臂工具端（H2C），隨臂一起轉；兩支針筒各自獨立控制。
 import {fixedLiftSnapshot,fixedGripSnapshot,fixedBaseSnapshot} from './fixed-syringe-examples.js';
+// 組合時將 H02 整組朝上安裝；只改剛體安裝姿態，不改孔距、行程或支點。
+// 原側視姿態的工具端低於主軸，直立組裝後會讓一側夾指落到轉盤以下。
+const liftUpright=structuredClone(fixedLiftSnapshot);
+const liftOrigin=liftUpright.comps.find(c=>c.id==='H2Frame').p1;
+const liftX=liftOrigin.x,liftY=liftOrigin.y,liftAngle=-40*Math.PI/180;
+const rotatedPoints=new Set();
+for(const c of liftUpright.comps){
+  for(const p of [c.p1,c.p2,c.p3].filter(Boolean))if(!rotatedPoints.has(p)){
+    rotatedPoints.add(p);const x=p.x-liftX,y=p.y-liftY;
+    p.x=liftX+x*Math.cos(liftAngle)-y*Math.sin(liftAngle);
+    p.y=liftY+x*Math.sin(liftAngle)+y*Math.cos(liftAngle);
+  }
+  if(c.type==='syringe')c.axisDeg-=40;
+}
 // zlift：夾爪整組桿／板往外抬 3 層（疊放相對位移，同組同抬，組內相對層序與組裝計畫不變），夾爪疊在升降臂與連接桿前面，各自一層、不穿模。
 const tag=(snapshot,moduleId,zlift=0)=>structuredClone(snapshot.comps).map(c=>({...c,moduleId,...(zlift&&['bar','triangle'].includes(c.type)?{zlift}:{})}));
 const grip=fixedGripSnapshot.comps.find(c=>c.id==='H3Frame');
 export const hydraulicLiftGripSnapshot={kind:'blocks',v:1,projectName:'H05 液壓升降＋夾爪（側視組立）',rootDesignName:'H05 液壓升降＋夾爪',counter:50,
  params:{...structuredClone(fixedLiftSnapshot.params),...structuredClone(fixedGripSnapshot.params)},tracePoint:'H2C',
- comps:[...tag(fixedLiftSnapshot,'Lift'),...tag(fixedGripSnapshot,'Grip',3)],
+ comps:[...tag(liftUpright,'Lift'),...tag(fixedGripSnapshot,'Grip',3)],
  modules:[
   {id:'Lift',name:'升降',base:'H2O',outputs:[{id:'tool',name:'工具端',at:'H2C',body:{kind:'triangle',id:'H2Arm'}}],mount:null},
   {id:'Grip',name:'夾爪',base:'H3O',outputs:[],mount:{to:{module:'Lift',output:'tool'},ref:{x:grip.p2.x,y:grip.p2.y,a:0},home:{}}}
@@ -21,12 +35,12 @@ export const hydraulicLiftGripSnapshot={kind:'blocks',v:1,projectName:'H05 液�
 // 轉盤條寬 16 mm：轉接座／角碼的孔離邊 9–9.5 mm，原 10 mm 條寬孔會破邊。夾爪疊 3 層：直角平面的場景要靠它與升降臂分層。
 const arm=(()=>{
   const turn=fixedBaseSnapshot.comps.find(c=>c.id==='H4Turn');
-  const comps=[...tag(fixedBaseSnapshot,'Base'),...tag(fixedLiftSnapshot,'Lift'),...tag(fixedGripSnapshot,'Grip',3)];
+  const comps=[...tag(fixedBaseSnapshot,'Base'),...tag(liftUpright,'Lift'),...tag(fixedGripSnapshot,'Grip',3)];
   comps.find(c=>c.id===turn.id).stock={...turn.stock,widthMm:16};
   const params={...structuredClone(fixedBaseSnapshot.params),...structuredClone(fixedLiftSnapshot.params),...structuredClone(fixedGripSnapshot.params)};
   const edgeIndex=1,to={module:'Base',body:turn.id,edge:edgeIndex};
   const modules=[
-    {id:'Base',name:'旋轉底盤',base:'H4O',outputs:[],mount:null},
+    {id:'Base',name:'旋轉底盤',source:'hydraulic-h04',base:'H4O',outputs:[],mount:null},
     {id:'Lift',name:'升降',base:'H2A',outputs:[{id:'tool',name:'工具端',at:'H2C',body:{kind:'triangle',id:'H2Arm'}}],mount:null},
     {id:'Grip',name:'夾爪',base:'H3O',outputs:[],mount:{to:{module:'Lift',output:'tool'},ref:{x:grip.p2.x,y:grip.p2.y,a:0},home:{}}}
   ];
