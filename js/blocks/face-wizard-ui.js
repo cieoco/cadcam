@@ -4,7 +4,7 @@ import { APP_VERSION } from '../version.js?v=20261008_bracketalign';
 import { LOAD_GRAPH_TOKEN } from '../module-url.js';
 import { createLoadSession, LOAD_MISMATCH_MESSAGE } from './load-session.js';
 /** 正式組立台的隔離選面草稿。確認前不改作品。 */
-import { buildMountSurfaces, findMountSurface } from './mount-surfaces.js';
+import { buildMountSurfaces, findMountSurface, selectableMountSurfaces } from './mount-surfaces.js';
 import { pointCoords } from './model.js';
 import { inspectLinkExport, inspectPlateExport } from './exporters.js?v=20261007_9';
 import { connectionSelection } from './connection-selection.js';
@@ -14,7 +14,7 @@ function reference(surface, name, parts = []) {
   const axes = ['x', 'y', 'z'];
   const center = Object.fromEntries(axes.map(k => [k, (surface.box.min[k] + surface.box.max[k]) / 2]));
   const relative = p => ({ ...p, x: p.x - center.x, y: p.y - center.y });
-  return { name, detail: surface.kind === 'frame' ? '固定底座' : '活動承接位置', surface,
+  return { name, designId:surface.moduleId, designName:name.split(' · ')[0], partName:surface.kind==='frame'?'機架底板':surface.name, detail: surface.kind === 'frame' ? '固定底座' : '活動承接位置', surface,
     parts: parts.map(p => ({ ...p, points: p.points.map(relative) })),
     box: { min: Object.fromEntries(axes.map(k => [k, surface.box.min[k] - center[k]])), max: Object.fromEntries(axes.map(k => [k, surface.box.max[k] - center[k]])) },
     outlines: (surface.outlines || [surface.outline]).map(r => r.map(relative)),
@@ -25,7 +25,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   const transaction=createFaceCandidateTransaction({readSource:readSource || (()=>({comps,modules,params,fabrication,exportSettings,stockMm,joint})),readPose:readPose || (()=>({theta:params.theta || 0})),commit});
   const child = modules.find(m => m.id === childId);
   if (!child || child.mount || !child.base) { say('請選尚未安裝且有底座的機構。'); return; }
-  const surfaces = id => buildMountSurfaces({ comps, modules, params, moduleId: id, exportSettings, thicknessMm: stockMm, drilling: true }).surfaces || [];
+  const surfaces = id => selectableMountSurfaces({ comps, modules, params, moduleId: id, exportSettings, thicknessMm: stockMm, drilling: true });
   // 唯讀機構輪廓隨接合板一起移動，選面時保留完整機構的空間脈絡。
   const parts = id => {
     const own = comps.filter(c => c.moduleId === id), pts = pointCoords(own), result = [];
@@ -61,10 +61,10 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   const childSelection = saved ? (repairChild ? null : { part: saved.child.partId, face: saved.child.face }) : connectionSelection(child, 'child');
   const chosenAttach = childSelection?.part;
   const attachComp = comps.find(c => c.moduleId === childId && c.id === chosenAttach && isFixedMountPart(c));
-  if (chosenAttach && chosenAttach !== 'frame' && !attachComp) { say('這個接合面在活動桿上；請把它作為承接機構，另一個機構選固定桿的面。'); return; }
+
   const partSurfaces = partId => buildMountSurfaces({ comps, modules, params, moduleId: childId, partId, exportSettings, thicknessMm: stockMm, drilling: true }).surfaces || [];
   const childSurfaces = attachComp ? partSurfaces(attachComp.id) : surfaces(childId);
-  const childSurface = childSurfaces.find(s => attachComp ? s.outputId === 'face-attach' : s.kind === 'frame');
+  const childSurface = childSurfaces.find(s => attachComp ? s.outputId === 'face-attach' : s.kind === 'frame') || comps.filter(c=>c.moduleId===childId && isFixedMountPart(c)).flatMap(c=>partSurfaces(c.id)).find(s=>s.kind==='output');
   const eligible = m => {
     const visited = new Set();
     for (let p = m; p; p = modules.find(x => x.id === p.mount?.to?.module)) {
@@ -79,16 +79,16 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     // A straight edge is only the frame's rigid-pose reference, not a second
     // face choice. New mounts use the first valid stable edge; reselect keeps
     // the saved edge exactly. An unavailable saved edge requires a new choice.
-    return surfaces(m.id).slice().sort((a,b)=>selected?.part==='frame'?Number(b.kind==='frame')-Number(a.kind==='frame'):Number(a.kind==='frame')-Number(b.kind==='frame')).flatMap(s => {
+    return surfaces(m.id).slice().sort((a,b)=>{const preferred=s=>selected?.part==='frame'?s.kind==='frame':s.compId===selected?.part;return Number(preferred(b))-Number(preferred(a)) || Number(a.kind==='frame')-Number(b.kind==='frame');}).flatMap(s => {
       if(s.kind!=='frame')return [s];
       const edge=saved?.host.moduleId===m.id&&saved.host.source.kind==='frame'&&!repairHost?saved.host.edge:s.edges?.[0]?.edge;
       return s.edges?.some(e=>e.edge===edge)?[{...s,frameEdge:edge}]:[];
     })
-      .filter(s => s.kind === 'frame' || repairHost || !selected || s.compId === selected.part || matchesSaved(s))
+
       .map(s => reference(s, `${m.name} · ${s.name}`, ownParts));
   });
   if (!childSurface || !hosts.length) { say('需要另一個有承接板的機構，以及安裝端的固定底板。'); return; }
-  const candidates = repairChild ? [childSurface, ...comps.filter(c => c.moduleId === childId && isFixedMountPart(c)).map(c => partSurfaces(c.id).find(s => s.compId === c.id))].filter(Boolean) : [childSurface];
+  const candidates = [childSurface, surfaces(childId).find(s=>s.kind==='frame'), ...comps.filter(c => c.moduleId === childId && isFixedMountPart(c)).map(c => partSurfaces(c.id).find(s => s.compId === c.id))].filter((s,i,a)=>s && a.findIndex(x=>x?.compId===s.compId && x?.kind===s.kind)===i);
   const children = candidates.map(s => reference(s, `${child.name} · ${s.kind === 'frame' ? '固定桿／底板' : s.name}`, parts(childId)));
   const dialog = document.createElement('dialog');
   dialog.setAttribute('aria-label', '接合預覽');

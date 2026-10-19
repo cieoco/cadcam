@@ -98,7 +98,7 @@ function validInput({ comps, modules, moduleId, params, exportSettings, thicknes
  * plate-thickness coordinates. Only exporter-backed bar, triangle, and rack
  * outputs are supported in this first bounded surface mapping.
  */
-export function buildMountSurfaces({ comps, modules, moduleId, params, exportSettings = {}, thicknessMm = 3, drilling = false, partId = null } = {}) {
+export function buildMountSurfaces({ comps, modules, moduleId, params, exportSettings = {}, thicknessMm = 3, drilling = false, partId = null, outputIds = null } = {}) {
   const reason = validInput({ comps, modules, moduleId, params, exportSettings, thicknessMm });
   if (reason) return { ok: false, reason };
 
@@ -136,7 +136,7 @@ export function buildMountSurfaces({ comps, modules, moduleId, params, exportSet
     const part = partId && ownComps.find(c => c.id === partId && isFixedMountPart(c));
     if (partId && partId !== 'frame' && !part) return {ok:false,reason:'找不到指定的固定桿'};
     const outputs = part ? [{id:'face-attach',name:part.name || part.id,at:part.p1.id,body:{kind:part.type,id:part.id}}] : module.outputs;
-    for (const output of Array.isArray(outputs) ? outputs : []) {
+    for (const output of (Array.isArray(outputs) ? outputs : []).filter(o=>!outputIds || outputIds.includes(o.id))) {
       const body = output && output.body;
       if (!body || !['bar', 'triangle', 'rack'].includes(body.kind)) {
         return { ok: false, reason: `輸出「${output?.name || output?.id || '未命名'}」目前沒有支援的真實外框。` };
@@ -202,4 +202,26 @@ export function buildMountSurfaces({ comps, modules, moduleId, params, exportSet
   } catch (_) {
     return { ok: false, reason: '無法從目前機構資料計算真實零件外框。' };
   }
+}
+
+// 選零件即可建立跟隨描述；純查詢，不要求使用者先宣告輸出端。
+export function partMountOutput(comps,module,partId) {
+  const c=comps.find(c=>c.moduleId===module?.id && c.id===partId);
+  if(!c || !['bar','triangle','rack'].includes(c.type) || !c.p1)return null;
+  const existing=module.outputs?.find(o=>o.body?.id===c.id && o.body.kind===c.type);
+  if(existing)return existing;
+  let id=`face-part-${c.id}`,n=1;
+  while(module.outputs?.some(o=>o.id===id))id=`face-part-${c.id}-${n++}`;
+  return {id,name:c.name || `${{bar:'連桿',triangle:'板件',rack:'齒條'}[c.type]} ${c.id}`,at:c.p1.id,body:{kind:c.type,id:c.id}};
+}
+export function selectableMountSurfaces(args) {
+  const module=args.modules.find(m=>m.id===args.moduleId);
+  if(!module)return [];
+  const build=outputs=>buildMountSurfaces({...args,outputIds:outputs.map(o=>o.id),modules:args.modules.map(m=>m===module?{...m,outputs:[...(m.outputs || []),...outputs.filter(o=>!m.outputs?.some(old=>old.id===o.id))]}:m)}).surfaces || [];
+  const result=build([]).filter(s=>s.kind==='frame');
+  for(const c of args.comps.filter(c=>c.moduleId===module.id)) {
+    const output=partMountOutput(args.comps,module,c.id);
+    if(output)result.push(...build([output]).filter(s=>s.kind==='output'));
+  }
+  return result;
 }

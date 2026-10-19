@@ -1,5 +1,5 @@
 /** Plain F1 candidate and once-only transaction; no S, DOM, undo or storage access. */
-import {buildMountSurfaces,findMountSurface} from './mount-surfaces.js';
+import {buildMountSurfaces,findMountSurface,partMountOutput} from './mount-surfaces.js';
 import {buildFacePlacement} from './face-placement.js';
 import {mountFacePlacement} from './face-mount.js';
 import {faceBracketPlan} from './face-bracket-extras.js';
@@ -30,6 +30,14 @@ export function buildFaceCandidate(source,{childId,hostEndpoint,childEndpoint,se
  const joint=work.joint || work.fabrication?.joint,exportSettings=work.exportSettings || work.fabrication?.export || {};
  if(!selection||!['hostFace','childFace'].every(k=>['top','bottom','front','back','left','right'].includes(selection[k]))||!['alignU','alignV','offsetU','offsetV','gap','quarterTurns'].every(k=>typeof selection[k]==='number'&&Number.isFinite(selection[k]))||selection.gap<0||!Number.isInteger(selection.quarterTurns)||selection.rotationDeg!==undefined&&!Number.isFinite(selection.rotationDeg)||selection.brackets&&Object.values(selection.brackets.offsets || {}).some(n=>!Number.isFinite(n)))return failed('invalid_selection','選面或尺寸輸入不合法。',sourceRevision);
  if(reselect)work.modules=work.modules.map(m=>m.id===childId?{...m,mount:null}:m);
+ // 新選取的承接零件只在隔離候選中建立輸出端；確認時隨作品保存。
+ const hostModule=work.modules.find(m=>m.id===hostEndpoint?.moduleId);
+ if(hostEndpoint?.partId && hostModule) {
+   const output=partMountOutput(work.comps,hostModule,hostEndpoint.partId);
+   if(!output)return failed('unsupported_host_part','此零件目前不支援作為承接板，請選連桿、板件或齒條。',sourceRevision);
+   if(!hostModule.outputs?.some(o=>o.id===output.id))hostModule.outputs=[...(hostModule.outputs || []),output];
+   if(!hostEndpoint.outputId && !hostEndpoint.output)hostEndpoint={...hostEndpoint,outputId:output.id};
+ }
  const opts={comps:work.comps,modules:work.modules,params:work.params,exportSettings,thicknessMm:stockMm,drilling:true};
  const host=findMountSurface(buildMountSurfaces({...opts,moduleId:hostEndpoint?.moduleId}).surfaces,hostEndpoint);
  const child=buildMountSurfaces({...opts,moduleId:childId,...(childEndpoint?.partId&&childEndpoint.partId!=='frame'?{partId:childEndpoint.partId}:{})}).surfaces?.find(s=>childEndpoint?.partId==='frame'?s.kind==='frame':s.compId===childEndpoint?.partId);

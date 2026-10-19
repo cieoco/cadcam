@@ -79,11 +79,26 @@ function button(label, action) {
 function update(field, value) { bracketOffsets = {}; selectedBracket = null; draft[field] = value; if (field === 'childFace') roughPlaced = true; if (field === 'host' || field === 'child') { roughPlaced = configured; if (field === 'host' && hosts[value].defaultFace) draft.hostFace = hosts[value].defaultFace; } $('message').textContent = ''; render(); }
 function buildCards(root, items, field) {
   items.forEach((item, i) => {
-    const b = button(item.name, () => update(field, i)); b.dataset.value = i;
+    const b = button(item.partName || item.name, () => update(field, i)); b.dataset.value = i;
     const small = document.createElement('small'); small.textContent = item.detail; b.appendChild(small); root.appendChild(b);
   });
 }
+function buildDesignChoice() {
+  if(integrated && hosts.some(h=>h.designId)) {
+    $('hostDesignLabel').hidden=false;
+    $('hostDesign').replaceChildren();
+    for(const id of new Set(hosts.map(h=>h.designId))) {
+      const option=document.createElement('option');option.value=id;option.textContent=hosts.find(h=>h.designId===id).designName;
+      $('hostDesign').appendChild(option);
+    }
+    $('hostDesign').onchange=()=>update('host',hosts.findIndex(h=>h.designId===$('hostDesign').value));
+    $('childDesignLabel').textContent=`設計：${children[0].designName}（在組立清單選擇）`;
+    $('childDesignLabel').style.display='block';
+  }
+}
 buildCards($('hosts'), hosts, 'host'); buildCards($('children'), children, 'child');
+buildDesignChoice();
+
 for (const [root, field] of [['hostFaces', 'hostFace'], ['childFaces', 'childFace']]) {
   faceOrder.forEach(id => {
     const b = button(names[id], () => update(field, id)); b.dataset.value = id;
@@ -435,6 +450,11 @@ function render() {
   $('next').textContent = mode === 'work' || step === 3 ? (integrated ? '接上' : '確認擺放') : '下一步';
   if (integrated) $('cancel').textContent = '取消';
   if (integrated && configured) { $('wizardMode').parentElement.hidden = true; document.querySelector('header .tag').hidden = true; $('mateStepChip').hidden = true; }
+  if(integrated && hosts[draft.host]?.designId) {
+    $('hostDesign').value=hosts[draft.host].designId;
+    $('hosts').querySelectorAll('button').forEach(b=>{b.style.display=hosts[Number(b.dataset.value)].designId===hosts[draft.host].designId?'':'none';});
+  }
+  $('selectedParts').textContent=integrated ? `承接：${hosts[draft.host].name} → 安裝：${children[draft.child].name}` : '';
   $('stageTitle').textContent = mode === 'work' ? '工作模式 · 外框擺放預覽' : titles[step];
   preview();
 }
@@ -477,7 +497,9 @@ if (integrated) {
     }
     document.querySelector('h1').textContent = '接合預覽';
     $('hosts').replaceChildren(); $('children').replaceChildren();
-    buildCards($('hosts'), hosts, 'host'); buildCards($('children'), children, 'child'); render();
+    buildCards($('hosts'), hosts, 'host'); buildCards($('children'), children, 'child');
+buildDesignChoice();
+ render();
   });
   parent.postMessage({ type: 'face-wizard-ready', loadGraph: LOAD_GRAPH_TOKEN }, location.origin);
 }

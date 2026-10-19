@@ -44,3 +44,35 @@ for(const work of [full,joined.work]){
  assert.ok(faceCandidateModel({work:opened}).solveValidity.valid);
 }
 console.log('Lesson 7: spare frame, forward horizontal claw, lift/close samples, brackets, exports and roundtrip passed');
+
+// 自創路徑：沒有 faceParts／outputs，也可直接依所選零件建立接合。
+const custom=structuredClone(source);
+for(const m of custom.modules){m.outputs=[];delete m.faceParts;}
+const untouched=JSON.stringify(custom);
+const {selectableMountSurfaces}=await import('../js/blocks/mount-surfaces.js');
+const options=selectableMountSurfaces({...custom,moduleId:'Lift1'});
+assert.ok(options.some(s=>s.compId==='Link1'));
+assert.ok(options.some(s=>s.compId==='Link3'));
+for(const partId of ['Link1','Link3']) {
+ const request={childId:'Grip1',hostEndpoint:{moduleId:'Lift1',partId},childEndpoint:{partId:'frame'},selection:{...selection,brackets:undefined,gap:20}};
+ const result=buildFaceCandidate(custom,request);
+ assert.ok(result.ok,result.reason);
+ const host=result.work.modules.find(m=>m.id==='Lift1');
+ assert.equal(host.outputs.length,1,'only the confirmed candidate endpoint is added');
+ assert.equal(host.outputs[0].body.id,partId);
+ assert.equal(JSON.stringify(custom),untouched,'listing and previews never mutate source');
+ const norm=normalizeSnapshot(toSnapshot(result.work.comps,{params:result.work.params},0,{modules:result.work.modules}));
+ assert.equal(norm.modules.find(m=>m.id==='Lift1').outputs[0].body.id,partId);
+ assert.ok(faceCandidateModel({work:result.work},{theta:20}).solveValidity.valid);
+}
+const bad=buildFaceCandidate(custom,{childId:'Grip1',hostEndpoint:{moduleId:'Lift1',partId:'missing'},childEndpoint:{partId:'frame'},selection});
+assert.equal(bad.ok,false);
+console.log('Custom design without outputs: part choices, isolated output creation, two distinct follow bodies and roundtrip passed');
+
+const fixed=structuredClone(custom),a=fixed.comps.find(c=>c.id==='GearA').p1,b=fixed.comps.find(c=>c.id==='GearB').p1;
+fixed.comps.push({id:'CustomBase',moduleId:'Grip1',type:'bar',p1:{...a},p2:{...b},lenParam:'CustomBaseLength'});
+fixed.params.CustomBaseLength=Math.hypot(b.x-a.x,b.y-a.y);
+const attached=buildFaceCandidate(fixed,{childId:'Grip1',hostEndpoint:{moduleId:'Lift1',partId:'Link3'},childEndpoint:{partId:'CustomBase'},selection:{...selection,brackets:undefined,gap:20}});
+assert.ok(attached.ok,attached.reason);
+assert.equal(attached.work.modules.find(m=>m.id==='Grip1').mount.face.childPart,'CustomBase');
+console.log('Custom fixed member can be selected as installation part');
