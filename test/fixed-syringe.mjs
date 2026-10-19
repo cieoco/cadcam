@@ -32,7 +32,7 @@ console.log('PASS fixed syringe: axis, bidirectional stroke, JSON/share, passive
 const grip=normalizeSnapshot(fixedGripSnapshot),gripper=grip.comps.find(c=>c.type==='syringe');
 assert.equal(gripper.passiveTips,undefined);assert.deepEqual(gripper.jawIds,['H3JawA','H3JawB']);
 const old=structuredClone(fixedGripSnapshot),oldS=old.comps.find(c=>c.type==='syringe');
-oldS.passiveTips=[{hostId:'H3JawA',length:40,angleDeg:-70},{hostId:'H3JawB',length:40,angleDeg:70}];delete oldS.jawIds;
+oldS.passiveTips=[{hostId:'H3JawA',length:40,angleDeg:70},{hostId:'H3JawB',length:40,angleDeg:-70}];delete oldS.jawIds;
 for(const a of old.comps.filter(c=>c.type==='triangle'))a.vertices=a.vertices.filter(v=>v.solve);
 const oldJson=JSON.stringify(old),converted=normalizeSnapshot(old);
 assert.equal(JSON.stringify(old),oldJson,'migration cannot mutate input');
@@ -102,3 +102,10 @@ for(const arm of [60,80,100]){
 }
 assert.equal(scanSyringe(hydraulicSnapshot.comps,{...hydraulicSnapshot.params,H1Arm:200},'H1Syringe').ok,false);
 console.log('PASS fixed H01: three arm comparisons, straight plunger, rigid coupler and unreachable arm');
+
+// 回復的 H03 是交叉臂：推出張開，不能被組合用推出夾緊變體覆蓋。
+const restoredScan=scanSyringe(grip.comps,grip.params,gripper.id);
+assert.ok(restoredScan.ok);
+assert.ok(restoredScan.samples.at(-1).tipGap-restoredScan.samples[0].tipGap>30);
+assert.equal(grip.params.H3JawAd,104.9);
+assert.equal(grip.params.H3JawBd,104.9);

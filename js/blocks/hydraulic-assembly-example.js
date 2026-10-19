@@ -1,6 +1,6 @@
 // H05（前半）：升降（H02）＋夾爪（H03）兩支針筒組成側視組立。尺寸全部取自 H02／H03 範例，不另抄數字。
 // 夾爪模組裝在升降臂工具端（H2C），隨臂一起轉；兩支針筒各自獨立控制。
-import {fixedLiftSnapshot,fixedGripSnapshot,fixedBaseSnapshot} from './fixed-syringe-examples.js';
+import {fixedLiftSnapshot,assemblyGripSnapshot as fixedGripSnapshot,fixedBaseSnapshot} from './fixed-syringe-examples.js';
 // 組合時將 H02 整組朝上安裝；只改剛體安裝姿態，不改孔距、行程或支點。
 // 原側視姿態的工具端低於主軸，直立組裝後會讓一側夾指落到轉盤以下。
 const liftUpright=structuredClone(fixedLiftSnapshot);

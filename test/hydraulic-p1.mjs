@@ -1,13 +1,13 @@
-// 液壓第一期（PLAN-HYDRAULIC-ARM P1-1）：H03 推出＝夾緊且左右對稱；H02 顯示「每推 1 mm」的比例；教材說明。
+// 液壓第一期：保留 H05／H06 推出夾緊變體的驗證（獨立 H03 已回復交叉臂）；H02 顯示「每推 1 mm」的比例；教材說明。
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {fixedLiftSnapshot,fixedGripSnapshot} from '../js/blocks/fixed-syringe-examples.js';
+import {fixedLiftSnapshot,assemblyGripSnapshot as fixedGripSnapshot} from '../js/blocks/fixed-syringe-examples.js';
 import * as Op from '../js/blocks/syringe-operations.js';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
 import {plateVertexWorldPoints} from '../js/blocks/plate-geometry.js';
 let pass=0;const ok=(cond,msg)=>{assert.ok(cond,msg);pass++;console.log('PASS',msg);};
 
-// ---------- H03：推出＝夾緊、左右對稱 ----------
+// ---------- H05／H06 使用的推出夾緊變體（H03 已依要求回復）：推出＝夾緊、左右對稱 ----------
 {
   const before=JSON.stringify(fixedGripSnapshot);
   const n=normalizeSnapshot(fixedGripSnapshot),c=n.comps.find(x=>x.type==='syringe');
@@ -37,7 +37,7 @@ let pass=0;const ok=(cond,msg)=>{assert.ok(cond,msg);pass++;console.log('PASS',m
   ok(JSON.stringify(fixedGripSnapshot)===before,'不改範例原始資料');
 }
 
-// ---------- H03：每推 1 mm 端孔距縮多少 ----------
+// ---------- H05／H06 使用的推出夾緊變體（H03 已依要求回復）：每推 1 mm 端孔距縮多少 ----------
 {
   const n=normalizeSnapshot(fixedGripSnapshot),c=n.comps.find(x=>x.type==='syringe');
   const comps=structuredClone(n.comps);comps.find(x=>x.id===c.id).extension=10;
@@ -79,7 +79,6 @@ ok(typeof Op.syringeGain==='function','syringe-operations 匯出 syringeGain(com
   ok(/曲柄滑塊/.test(html),'H01 說明針筒推連桿與曲柄滑塊（第二單元）的關係');
   ok(/每推 ?1 ?mm/.test(html),'H02 以「每推 1 mm」比較孔位');
   ok(/(折返|死點)/.test(html),'H02 說明 145.892 孔會在行程中折返（死點附近）');
-  ok(/推.{0,12}夾緊/.test(html),'H03 說明推出夾緊');
-  ok(/拉.{0,30}(氣泡|吸)/.test(html),'說明液壓用拉的比較不可靠（氣泡／吸力）');
+  ok(/第三課：針筒夾具 H03[\s\S]*?左右交叉臂/.test(html),'H03 教材恢復交叉臂說明');
 }
 console.log(`hydraulic-p1: ${pass} checks passed`);

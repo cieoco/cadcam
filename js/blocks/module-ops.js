@@ -958,7 +958,7 @@ export function instantiateComposite(template, ctx) {
 // 內建模組：齒條升降（輸出 carriage＝LiftOutput）、齒輪夾爪（base GCA；去掉夾爪任務 params）。
 export const BUILTIN_MODULES = [
   { id: 'hydraulic-lift', name: '針筒升降臂', source: 'hydraulic-h02', description: '沿用 H02 桿件與針筒，保留原作品加入；可改孔距並以伸出量試動。' },
-  { id: 'hydraulic-gripper', name: '針筒夾爪', source: 'hydraulic-h03', description: '沿用 H03 對稱夾臂，推出夾緊；選自己的固定板、面與位置組立。' },
+  { id: 'hydraulic-gripper', name: '針筒夾爪', source: 'hydraulic-h03', description: '沿用 H03 交叉夾臂；選自己的固定板、面與位置組立。' },
   { id: 'hydraulic-base', name: '針筒旋轉底盤', source: 'hydraulic-h04', description: '沿用 H04 旋轉底盤；可選轉盤零件承接升降臂，接合後再試動。' },
   { id: 'rack-lift', name: '齒條升降', source: 'competition-rack-lift', description: '小齒輪帶動垂直齒條升降。' },
   { id: 'gear-gripper', variantNote: '增加安裝基準，改用 MG995 0°～24°；不保留依物件寬度自動算開口的任務。', name: '齒輪夾爪', source: 'gear-gripper', description: '雙齒輪同步開合夾爪。' },
