@@ -20,6 +20,7 @@ export function drawGear({ component, points, svg, scale, project, params, gearB
   const meshPhase = gearMeshPhaseDeg(component, points, gearById);
   const color = component.color || '#b0772e';
   const group = svgEl('g'), polygon = svgEl('polygon');
+  polygon.setAttribute('data-pick-component', component.id);
   polygon.setAttribute('points', polygonPoints);
   polygon.setAttribute('fill', color + (selected ? '55' : '33'));
   polygon.setAttribute('stroke', meshOff ? '#e74c3c' : (selected ? '#e67e22' : color));

@@ -29,6 +29,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
     stick.setAttribute('fill', color + '33'); stick.setAttribute('stroke', color); stick.setAttribute('stroke-width', selected || pickCandidate ? 2.5 : 2); stick.setAttribute('stroke-linejoin', 'round');
     if (pickCandidate) stick.setAttribute('stroke-dasharray', '10 7');
     if (editable || pickCandidate) {
+      stick.setAttribute('data-pick-component', link.id);
       stick.setAttribute('data-link-id', link.id); stick.style.cursor = 'pointer';
       stick.addEventListener('pointerdown', event => {
         if (interactionBlocked()) return;

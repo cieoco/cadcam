@@ -15,6 +15,7 @@ import { S } from './state.js';
 import * as View from './view.js';
 import * as Tools from './tools.js';
 import * as Panels from './panels.js';
+import { collectPickCandidates, openOverlapPicker } from './overlap-picker.js';
 
 const NODE_TAP_PX = 22;   // 手機點接點的命中半徑（畫面 px，縮放下維持一致手感；與 app.js 同值）
 
@@ -25,6 +26,7 @@ let pinchState = null;              // { dist, cx, cy }
 let pinchActive = false;            // 直到全部手指離開，才恢復單指編輯
 let pendingNodeDrag = null;         // 點擊先選取；超過門檻後才真正開始拖曳
 let linkPointerStart = null;        // 桌機畫桿可按住拖放，也保留點兩下
+let pendingOverlap = null;
 let pendingMobileEdit = false;      // 放開接點後再展開面板，避免拖曳途中畫布高度改變
 
 // ---- 注入的外部依賴（由 app 在啟動時提供）----
@@ -34,6 +36,7 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
     movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
     isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
     handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
+    selectOverlapComponent = () => {},
     nodeDownEntry = null,               // 手機接點優先命中的入口（app 注入模組守門版；未注入用 onNodeDown）
     openMobileEditPanel = () => {},
     closeMobileEditPanel = () => {},
@@ -363,6 +366,7 @@ function abortSingleDrag() {
   commitDragUndo(); // 已完成的單指位移仍保留一筆復原，雙指本身不改機構。
   backgroundPan = null;
   pendingNodeDrag = null;
+  pendingOverlap = null;
   pendingMobileEdit = false;
   S.dragFrame = false;
   S.drawActive = false;
@@ -394,6 +398,7 @@ export function init(deps) {
      snapFrameNodesToGrid = (() => {}),
      isGroundPositionUnlocked = (() => false),
      relockGroundPosition = (() => {}),
+     selectOverlapComponent = (() => {}),
      nodeDownEntry = null,
      rotateInputCrankToPoint = (() => false),
      pointIsRackHole = (() => false) } = deps);
@@ -478,6 +483,49 @@ export function init(deps) {
   });
   svg.addEventListener('pointerup', endPointer);
   svg.addEventListener('pointercancel', endPointer);
+
+  // Ambiguous taps wait until release; a drag, cancellation or second finger never opens a menu.
+  svg.addEventListener('pointermove', e => {
+    if (pendingOverlap && Math.hypot(e.clientX-pendingOverlap.x,e.clientY-pendingOverlap.y)>12) {
+      const pick=pendingOverlap; pendingOverlap=null;
+      // Continue the original target's drag instead of swallowing a deliberate movement.
+      if (pick.nodeId) (nodeDownEntry || onNodeDown)(pick.event,pick.nodeId);
+      else if (pick.componentId) selectOverlapComponent(pick.componentId,pick.event);
+    }
+  }, true);
+  svg.addEventListener('pointercancel', () => { pendingOverlap=null; }, true);
+  svg.addEventListener('pointerup', e => {
+    const pick=pendingOverlap; pendingOverlap=null;
+    if (!pick || pick.pointerId!==e.pointerId || pinchActive || Math.hypot(e.clientX-pick.x,e.clientY-pick.y)>12) return;
+    openOverlapPicker(pick.items, item => {
+      if (item.kind==='component') selectOverlapComponent(item.id);
+      else {
+        (nodeDownEntry || onNodeDown)(pick.event,item.id);
+        pendingMobileEdit=false; pendingNodeDrag=null;
+        openMobileEditPanel();
+        document.getElementById('servoEditor')?.scrollIntoView?.({block:'nearest'});
+      }
+    });
+  });
+  svg.addEventListener('pointerdown', e => {
+    if (!mobilePrompt() || S.mode !== 'design' || S.mateMode || S.placingMotor || S.pickBars || S.drawingLink || S.drawingTriangle || S.drawingPolygon || activePointers.size>=2) return;
+    if (e.button !== undefined && e.button !== 0) return;
+    // Leave dedicated handles (shape vertices, gear output pins, task sliders) to their own handlers.
+    if (e.target!==svg && !['data-id','data-motor-hit','data-pick-component'].some(key=>e.target?.getAttribute?.(key))) return;
+    const items=collectPickCandidates(svg,e.clientX,e.clientY,S.comps);
+    if (items.length===1 && items[0].motor) {
+      e.stopImmediatePropagation();
+      (nodeDownEntry || onNodeDown)(e,items[0].id);
+      return;
+    }
+    if (items.length<2) return;
+    pause();
+    const nodeId=e.target?.getAttribute?.('data-motor-hit') || e.target?.getAttribute?.('data-id');
+    const componentId=e.target?.getAttribute?.('data-pick-component');
+    pendingOverlap={items,nodeId,componentId,event:e,pointerId:e.pointerId,x:e.clientX,y:e.clientY};
+    e.preventDefault(); e.stopImmediatePropagation();
+    try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+  }, true);
 
   // 手機：接點優先命中（capture 階段先攔）。
   // 觸控目標常比手指小，落點容易偏到接點旁邊的桿身，結果只跳出長度面板、

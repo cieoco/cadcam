@@ -3120,6 +3120,13 @@ function init() {
                isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
                handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround, recordManualTrace, solvePinnedConstraints,
                nodeDownEntry: guardedNodeDown,
+               selectOverlapComponent: (id, dragEvent) => {
+                 if (ensureModuleHome(compModuleId(id))) return;
+                 const comp = S.comps.find(c => c.id === id);
+                 if (!comp) return;
+                 if (dragEvent && comp.type === 'bar' && Input.startFreeLinkDrag(dragEvent, id)) return;
+                 selectModuleTarget(comp);
+               },
                snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel, openFrameEditor: () => { S.frameEditorOpen = true; Panels.updateFrameEditor(); }, transient,
                isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, pointIsRackHole });
   Settings.init({ draw: () => { if (S.modules.some(m => m.mount?.face)) rebuild(); draw(); }, pushUndo, pause, scheduleAutosave, notify: transient });

@@ -18,6 +18,7 @@ const noop = () => {};
 let mobile = false, openedEditor = 0, mergeCount = 0;
 const listeners = new Map();
 const svg = {
+  getBoundingClientRect: () => ({left:0,right:1000,top:0,bottom:1000}), querySelectorAll: () => [], contains: () => false, ownerDocument: {elementsFromPoint: () => []},
   addEventListener(type, fn, options) {
     const list = listeners.get(type) || [];
     list.push({ fn, capture: options === true || options?.capture === true }); listeners.set(type, list);

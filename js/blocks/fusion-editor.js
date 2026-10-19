@@ -12,6 +12,7 @@ export function drawFusion({svg, fusion, points, project, select, blocked=()=>fa
   path.setAttribute('stroke-width','1.5');
   path.setAttribute('fill-rule','evenodd');
   path.dataset.fusionPart=fusion.plate.id;
+  path.setAttribute('data-pick-component', fusion.plate.id);
   path.style.cursor='pointer';
   path.addEventListener('pointerdown',e=>{if(blocked())return;e.stopPropagation();select(fusion.plate.id);});
   svg.appendChild(path);

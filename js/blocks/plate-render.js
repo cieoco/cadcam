@@ -46,6 +46,7 @@ export function drawPlate({ component, points, ctx, svg, scale, project, selecte
   if (!component.p1 || !component.p2 || !component.p3) return;
   const ids = [component.p1.id, component.p2.id, component.p3.id];
   const path = svgEl('path');
+  path.setAttribute('data-pick-component', component.id);
   const color = component.color || '#27ae60';
   const selected = component.id === selectedId;
   path.setAttribute('fill', color + '33');

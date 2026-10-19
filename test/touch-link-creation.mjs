@@ -7,7 +7,7 @@ import { solveTopology } from '../js/multilink/solver.js';
 import { normalizeSnapshot } from '../js/blocks/schema.js';
 const handlers=[];
 const noop=()=>{};
-const svg={style:{},setPointerCapture:noop,addEventListener(type,fn,capture){handlers.push({type,fn,capture:capture===true});}};
+const svg={getBoundingClientRect:()=>({left:0,right:1000,top:0,bottom:1000}),querySelectorAll:()=>[],contains:()=>false,ownerDocument:{elementsFromPoint:()=>[]},style:{},setPointerCapture:noop,addEventListener(type,fn,capture){handlers.push({type,fn,capture:capture===true});}};
 const deps={svg,draw:noop,rebuild:noop,pushUndo:noop,pause:noop,cancelMotorMode:noop,deselectLink:noop,selectLink:noop,selectTriangle:noop,
   setBanner:noop,clearBanner:noop,worldFromEvent:e=>({x:e.clientX,y:e.clientY}),pointCoords:()=>({}),displayPointCoords:()=>({}),nearestDisplayToPoint:()=>null,
   snapWorld:()=>10,mobilePrompt:()=>true,promptText:(a,b)=>b};
