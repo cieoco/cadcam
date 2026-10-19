@@ -1057,10 +1057,13 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   if (!outlines.length) return null;
   // 固定孔貼近槽緣一樣是薄肉，警告時把槽邊當外緣一起檢查。
   const sized = sizeFrameOutline(outlines,nodes);
-  // Add local lands under pipe-clamp ears, without widening the WHOLE frame
+  // Add a round-ended bar under each pipe clamp, without widening the WHOLE frame
   // into neighbouring moving modules. Use the same outline for all consumers.
-  const clampLands=allNodes.filter(p=>p.holeLayer==='SYRINGE_CLAMP'&&p.mountRadiusMm>0)
-    .map(p=>roundPadOutline(p,p.mountRadiusMm));
+  const clampNodes=allNodes.filter(p=>p.holeLayer==='SYRINGE_CLAMP'&&p.mountRadiusMm>0);
+  const clampLands=clampNodes.filter(p=>p.id.endsWith('_clamp_0')).flatMap(a=>{
+    const b=clampNodes.find(p=>p.id===a.id.slice(0,-1)+'1');
+    return b?[hull([...roundPadOutline(a,a.mountRadiusMm),...roundPadOutline(b,b.mountRadiusMm)])]:[];
+  });
   if(clampLands.length){
     // Preserve convex pieces for the coarse collision checker; taking a convex
     // hull of their union would fill the empty space beside the clamp lands.

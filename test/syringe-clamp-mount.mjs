@@ -15,6 +15,11 @@ for(const name of ['hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h0
   const holes=g.holes.filter(h=>h.layer==='SYRINGE_CLAMP');assert.equal(holes.length,2,name);
   near(Math.hypot(holes[0].x-holes[1].x,holes[0].y-holes[1].y),28);
   const a=attachmentPoint(s.a,own,n.params),angle=s.axisDeg*Math.PI/180;
+  // Both holes sit on one constant-width, round-ended bar; no waist between pads.
+  for(const u of [-9,0,9])for(const v of [-14,-7,0,7,14]){
+   const q={x:a.x+Math.cos(angle)*u-Math.sin(angle)*v,y:a.y+Math.sin(angle)*u+Math.cos(angle)*v};
+   assert.ok(g.outlines.some(r=>inside(q,r)),`${name}: continuous clamp support`);
+  }
   syringeClampShape().feet.forEach((f,i)=>{
    const h=holes.find(h=>h.id===`${s.id}_clamp_${i}`);near(h.r,1.75);
    near(h.x,a.x-Math.sin(angle)*f.hole.y);near(h.y,a.y+Math.cos(angle)*f.hole.y);
