@@ -26,6 +26,11 @@ export function createSyringeUI(h){
   readout.id='syringeReadout';gainLine.id='syringeGain';note.id='syringeNotice';note.setAttribute('aria-live','polite');
   // Give feedback its own row before the stroke control instead of overlaying it.
   h.svg.before(document.getElementById('modeBanner'),document.getElementById('solveBanner'),bar);
+  // 桌機尺寸面板以畫布頂端定位，須避開分頁與可換行的針筒控制列。
+  // 讀取實際高度，讓窄螢幕、組立多針筒及狀態訊息換行都能更新。
+  const positionInspectors=()=>wrap.style.setProperty('--hydraulic-header-height',`${Math.max(0,h.svg.getBoundingClientRect().top-wrap.getBoundingClientRect().top)}px`);
+  const headerObserver=new ResizeObserver(positionInspectors);
+  headerObserver.observe(bar);headerObserver.observe(h.svg);
   const warning3d=el('div','針筒／管夾為外形參考；完整裝配、干涉與承重未驗證。',document.getElementById('view3d'));
   warning3d.style.cssText='position:absolute;bottom:72px;left:8px;right:8px;padding:8px;background:#fff3cd;color:#664d03;z-index:6;font-size:13px;pointer-events:none';warning3d.hidden=true;
   let id=null,raf=null,last=null,direction=1,dragUndo=false,picking=null,scopeKey=null,message='';
