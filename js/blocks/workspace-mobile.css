@@ -58,6 +58,59 @@
   .creation-hint { margin:0 8px 6px; }
 }
 /* 工具列不足一列時換行，不能把按鈕壓窄到文字互相覆蓋。 */
+/* 組立手機版：上下面板各自捲動，保留至少 48% 工作區給 3D。
+   高度含 padding/border；沿用 ResizeObserver 的實際高度定位控制列。 */
+@media (max-width:700px) and (orientation:portrait) {
+  body[data-mode="bench"] .mobile-tabs, body[data-mode="bench"] .mobile-panel { display:none !important; }
+  body[data-mode="bench"] .bench-list,
+  body[data-mode="bench"].mate-wizard .bench-list {
+    box-sizing:border-box; left:0; right:0; top:0; bottom:auto; width:auto;
+    height:auto; max-height:22%; padding:6px 8px; gap:4px;
+    flex-direction:column; overflow:auto; overscroll-behavior:contain;
+    border-right:0; border-bottom:1px solid #e6e9f0;
+  }
+  body[data-mode="bench"] .bench-list > * { flex-shrink:0; }
+  body[data-mode="bench"].mate-wizard #mateTree { max-height:none; overflow:visible; }
+  body[data-mode="bench"] .bench-panel,
+  body[data-mode="bench"].mate-wizard .bench-panel {
+    box-sizing:border-box; left:0; right:0; top:auto; bottom:0; width:auto;
+    max-height:30%; overflow-y:auto; overscroll-behavior:contain;
+    border-left:0; border-top:1px solid #d8dee6;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  body[data-mode="bench"] .bench-panel > * { flex-shrink:0; }
+  body[data-mode="bench"] #view3d,
+  body[data-mode="bench"].mate-wizard #view3d { left:0; right:0; top:22%; bottom:var(--bench-sheet-h, 30%); }
+  body[data-mode="bench"].mate-wizard #view3d { top:var(--mate-list-h, 22%); }
+  body[data-mode="bench"] .controls,
+  body[data-mode="bench"].mate-wizard .controls { left:50%; bottom:calc(var(--bench-sheet-h, 30%) + 8px); }
+  body[data-mode="bench"] .mode-banner,
+  body[data-mode="bench"].mate-wizard .mode-banner { left:50%; top:calc(22% + 8px); }
+}
+/* 橫放手機避免再上下切割；窄側欄仍保有完整高度的模型操作區。 */
+@media (max-width:1099px) and (max-height:500px) and (orientation:landscape) {
+  body[data-mode="bench"] .mobile-tabs, body[data-mode="bench"] .mobile-panel { display:none !important; }
+  body[data-mode="bench"] .bench-list,
+  body[data-mode="bench"].mate-wizard .bench-list { box-sizing:border-box; left:0; right:auto; top:0; bottom:0; width:140px; height:auto; max-height:none; flex-direction:column; overflow:auto; padding:6px; }
+  body[data-mode="bench"].mate-wizard #mateTree { max-height:none; overflow:visible; }
+  body[data-mode="bench"] .bench-list > * { flex-shrink:0; }
+  body[data-mode="bench"] .bench-panel,
+  body[data-mode="bench"].mate-wizard .bench-panel { box-sizing:border-box; left:auto; right:0; top:0; bottom:0; width:200px; max-height:none; border-radius:0; padding:8px; }
+  body[data-mode="bench"] .bench-panel > * { flex-shrink:0; }
+  body[data-mode="bench"] #view3d,
+  body[data-mode="bench"].mate-wizard #view3d { left:140px; right:200px; top:0; bottom:0; }
+  body[data-mode="bench"] .controls,
+  body[data-mode="bench"].mate-wizard .controls { left:calc(140px + (100% - 340px) / 2); bottom:8px; }
+  body[data-mode="bench"] .mode-banner,
+  body[data-mode="bench"].mate-wizard .mode-banner { left:calc(140px + (100% - 340px) / 2); top:8px; }
+}
+@media (max-width:640px) and (max-height:500px) and (orientation:landscape) {
+  body[data-mode="bench"] .bench-list, body[data-mode="bench"].mate-wizard .bench-list { width:110px; }
+  body[data-mode="bench"] .bench-panel, body[data-mode="bench"].mate-wizard .bench-panel { width:170px; }
+  body[data-mode="bench"] #view3d, body[data-mode="bench"].mate-wizard #view3d { left:110px; right:170px; }
+  body[data-mode="bench"] .controls, body[data-mode="bench"].mate-wizard .controls,
+  body[data-mode="bench"] .mode-banner, body[data-mode="bench"].mate-wizard .mode-banner { left:calc(110px + (100% - 280px) / 2); }
+}
 .appbar { flex-wrap:wrap; }
 .appbar .toolbar { flex-wrap:wrap; flex-shrink:0; }
 .appbar .toolbar > * { flex-shrink:0; white-space:nowrap; }
