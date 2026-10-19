@@ -1,6 +1,6 @@
 import { PARALLEL_GRIPPER_EXAMPLE } from './parallel-gripper-example.js';
 import { COMMON_MANIPULATOR_EXAMPLES } from './common-manipulator-examples.js';
-import {fixedLiftSnapshot,fixedGripSnapshot} from './fixed-syringe-examples.js';
+import {fixedLiftSnapshot,fixedGripSnapshot,fixedBaseSnapshot} from './fixed-syringe-examples.js';
 import { hydraulicSnapshot } from './hydraulic-example.js';
 import { liftBucketSnapshot } from './lift-bucket-example.js';
 import { tippingBucketSnapshot } from './tipping-bucket-example.js';
@@ -54,7 +54,8 @@ export const EXAMPLE_GROUPS = [
 const EXAMPLE_LESSONS = {
   'parallel-gripper': PARALLEL_GRIPPER_EXAMPLE.lesson,
   ...Object.fromEntries(COMMON_MANIPULATOR_EXAMPLES.map(example => [example.id, example.lesson])),
-  'hydraulic-h03': {group:'lift-motion',level:'入門液壓',use:'固定筒身驅動左右一體式三點夾臂；末端造形與交叉臂保持剛性。',try:['改針筒伸出量並掃描可用行程','比較左右夾臂的開口；接觸與夾持力未驗證']},
+  'hydraulic-h04': {group:'lift-motion',level:'入門液壓',use:'俯視：管夾固定筒身推短連桿，連桿帶動轉盤繞垂直軸轉動；轉盤安裝點之後可放升降總成。',try:['改針筒伸出量，讀「每推 1 mm」轉幾度','只改曲柄半徑或連桿長，掃描後比較總轉角與傳動角；太斜會推不動']},
+  'hydraulic-h03': {group:'lift-motion',level:'入門液壓',use:'固定筒身驅動左右對稱的一體式三點夾臂；推出即夾緊，末端造形與夾臂同片、保持剛性。',try:['改針筒伸出量並掃描可用行程','觀察推出時夾臂端孔距變小；接觸與夾持力未驗證']},
   'hydraulic-h02': {group:'lift-motion',level:'入門液壓',use:'管夾固定筒身，短連桿把直線輸入轉成抬臂擺動。',try:['改針筒伸出量並觀察末端高度','修改前先存檔，再比較安裝孔位的影響']},
   'wiper-single': {group:'challenge',level:'探索',use:'曲柄經浮桿帶動三孔雨刷臂往復擺動。',try:['選浮桿改孔距，再試播比較掃掠範圍']},
   'wiper-missing-coupler': {group:'challenge',level:'練習',use:'尚未補接浮桿的雨刷骨架，不是完成機構。',try:['先用連桿接上兩個活動端，再播放']},
@@ -288,7 +289,8 @@ const ALL_BLOCK_EXAMPLES = [
   PARALLEL_GRIPPER_EXAMPLE,
   {id:'hydraulic-h01',title:'H01｜固定針筒單臂抬升',note:'管夾固定筒身，短連桿帶動單臂；20 mm 為教學區間。',snapshot:hydraulicSnapshot},
   {id:'hydraulic-h02',title:'H02｜管夾固定針筒抬臂',note:'F3D 尺寸參考；20 mm 教學區間未實測，短桿兩端可轉。',snapshot:fixedLiftSnapshot},
-  {id:'hydraulic-h03',title:'H03｜針筒夾具與一體式夾臂',note:'交叉臂與末端同一片；接觸、承載未驗證。',snapshot:fixedGripSnapshot},
+  {id:'hydraulic-h03',title:'H03｜針筒夾具與一體式夾臂',note:'左右對稱、推出夾緊；夾臂與末端同一片，接觸、承載未驗證。',snapshot:fixedGripSnapshot},
+  {id:'hydraulic-h04',title:'H04｜管夾固定針筒旋轉底盤',note:'俯視：針筒經短連桿帶動轉盤；20 mm 教學區間未實測，轉盤安裝點供之後放升降總成。',snapshot:fixedBaseSnapshot},
   wiperExample(false),
   wiperExample(true),
   {

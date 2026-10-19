@@ -24,3 +24,16 @@ export const fixedGripSnapshot={kind:'blocks',v:1,projectName:'H03 針筒夾具�
 ]};
 
 for(const [id,angle] of [['H3JawA',-70],['H3JawB',70]]){const arm=fixedGripSnapshot.comps.find(c=>c.id===id);arm.vertices=rigidGripVertices(arm,40,angle);}
+
+// H04 旋轉底盤（俯視）：管夾固定針筒推短連桿，連桿另一端接在轉盤的曲柄銷上，轉盤繞垂直軸（圖面中心 O）轉動。
+// 曲柄半徑 15 mm；針筒軸線偏離轉軸 15 mm，使 0–20 mm 行程以「連桿垂直曲柄（傳動角 90°）」的中點為對稱。M 在距轉軸 60 mm、與曲柄銷夾 120° 處，是轉盤安裝點，之後放升降總成。
+{
+  const r=15,L=60,half=Math.asin(10/r),s=Math.sqrt(L*L-r*r*(1-Math.cos(half))**2);
+  var O4=p('H4O',0,0,'fixed'),B4=p('H4B',0,r),M4=p('H4M',60*Math.cos(-Math.PI/6),60*Math.sin(-Math.PI/6)),R4=p('H4P',-s,r),A4=p('H4A',-s-80,r,'fixed');
+}
+const stick={widthMm:10,thicknessMm:2};
+export const fixedBaseSnapshot={kind:'blocks',v:1,projectName:'H04 管夾固定針筒旋轉底盤',counter:20,params:{H4Frame:distance(A4,O4),H4Coupler:distance(R4,B4),H4Crank:distance(O4,B4),H4Mount:distance(O4,M4),H4Pin:distance(B4,M4)},tracePoint:'H4M',comps:[
+ {...bar('H4Frame',A4,O4,'H4Frame'),stock:stick},{...bar('H4Coupler',R4,B4,'H4Coupler'),stock:stick},
+ {id:'H4Turn',type:'triangle',p1:O4,p2:B4,p3:M4,gParam:'H4Crank',r1Param:'H4Mount',r2Param:'H4Pin',shapeMode:'polyline',sign:-1,color:'#d99b35',stock:stick},
+ {id:'H4Syringe',type:'syringe',mountMode:'fixed-axis',appearance:'flat-rod',axisDeg:0,outputId:'H4Turn',a:{componentId:'H4Frame',u:0,v:0},b:{componentId:'H4Coupler',u:0,v:0},spec:{...SYRINGE_DEMO,name:'F3D 外形參考／20 mm 教學區間（未實測）',outerDiameter:17.5,bodyLength:72,rodDiameter:8,lmin:70,stroke:20,calibrated:false},extension:10,branch:1}
+]};
