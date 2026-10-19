@@ -62,7 +62,7 @@ export function createSyringeUI(h){
     const r=syringeReading(c,h.comps(),params(),points);
     readout.textContent=`${valid?(c.passiveTips?.length?'主傳動可解／夾片角度手動':'幾何可行'):'姿勢無解'}${r.tipGap!==null?` · 夾臂端孔距 ${r.tipGap.toFixed(1)} mm`:''}${r.mountGap!==null?` · 夾片安裝軸距 ${r.mountGap.toFixed(1)} mm`:''} · AB ${r.length.toFixed(2)} mm · 臂角 ${r.angle.toFixed(1)}°${r.end?` · C (${r.end.x.toFixed(1)}, ${r.end.y.toFixed(1)}) mm`:''}`;
     const gain=valid?syringeGain(h.comps(),params(),c.id,points):null;
-    gainLine.hidden=!gain;gainLine.textContent=gain?`每推 1 mm：臂轉 ${gain.degPerMm.toFixed(2)}°、臂端移 ${gain.endMmPerMm.toFixed(1)} mm`:'';
+    gainLine.hidden=!gain;gainLine.textContent=gain?(gain.tipGapMmPerMm!==null?`每推 1 mm：夾臂端孔距縮 ${gain.tipGapMmPerMm.toFixed(1)} mm`:`每推 1 mm：臂轉 ${gain.degPerMm.toFixed(2)}°、臂端移 ${gain.endMmPerMm.toFixed(1)} mm`):'';
     note.textContent=message||(c.spec.calibrated?'規格已實測；':'示範尺寸，未依實物校正；')+'干涉未檢查、承重未驗證。';
     const theta=document.getElementById('thetaVal');if(theta)theta.textContent=`${c.extension.toFixed(1)} mm`;
   }

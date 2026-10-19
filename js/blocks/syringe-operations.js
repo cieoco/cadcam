@@ -46,7 +46,8 @@ export function syringeGain(comps,params,id,points) {
   const a=read(e0),b=read(e1);
   if(!a||!b||!Number.isFinite(a.angle)||!Number.isFinite(b.angle)||!a.end||!b.end)return null;
   const dAngle=((b.angle-a.angle+540)%360+360)%360-180,dEnd=Math.hypot(b.end.x-a.end.x,b.end.y-a.end.y),span=e1-e0;
-  return {degPerMm:Math.abs(dAngle)/span,endMmPerMm:dEnd/span};
+  const tipGapMmPerMm=Number.isFinite(a.tipGap)&&Number.isFinite(b.tipGap)?(a.tipGap-b.tipGap)/span:null; // 夾爪：每推 1 mm 端距縮小量（縮小為正）
+  return {degPerMm:Math.abs(dAngle)/span,endMmPerMm:dEnd/span,tipGapMmPerMm};
 }
 export function scanSyringe(comps,params,id,step=0.5,motion={}) {
   const c=comps.find(c=>c.id===id&&c.type==='syringe');

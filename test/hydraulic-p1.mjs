@@ -37,6 +37,18 @@ let pass=0;const ok=(cond,msg)=>{assert.ok(cond,msg);pass++;console.log('PASS',m
   ok(JSON.stringify(fixedGripSnapshot)===before,'不改範例原始資料');
 }
 
+// ---------- H03：每推 1 mm 端孔距縮多少 ----------
+{
+  const n=normalizeSnapshot(fixedGripSnapshot),c=n.comps.find(x=>x.type==='syringe');
+  const comps=structuredClone(n.comps);comps.find(x=>x.id===c.id).extension=10;
+  const r=Op.solveSyringe(comps,n.params),g=Op.syringeGain(comps,n.params,c.id,r.points);
+  const s=Op.scanSyringe(n.comps,n.params,c.id,0.5).samples,i=s.findIndex(x=>x.extension===10),fd=(s[i-1].tipGap-s[i+1].tipGap)/1;
+  console.log('H03 tipGap gain at 10 mm:',g.tipGapMmPerMm,'scan',fd);
+  ok(g.tipGapMmPerMm>0&&Math.abs(g.tipGapMmPerMm-fd)/fd<0.05,`H03 tipGapMmPerMm（縮為正）與行程掃描一致（${g.tipGapMmPerMm.toFixed(3)} vs ${fd.toFixed(3)}）`);
+  const h2=normalizeSnapshot(fixedLiftSnapshot),c2=h2.comps.find(x=>x.type==='syringe'),r2=Op.solveSyringe(h2.comps,h2.params);
+  ok(Op.syringeGain(h2.comps,h2.params,c2.id,r2.points).tipGapMmPerMm===null,'無夾臂的針筒 tipGapMmPerMm 為 null');
+}
+
 // ---------- H02：每推 1 mm 轉幾度 ----------
 ok(typeof Op.syringeGain==='function','syringe-operations 匯出 syringeGain(comps, params, id, points)');
 {
