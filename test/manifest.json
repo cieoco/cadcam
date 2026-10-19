@@ -16,6 +16,8 @@
   "timeoutMs": 90000,
   "tests": [
     "test/syringe.mjs",
+    "test/rod-syringe-creation.mjs",
+    "test/syringe-assembly-scene.mjs",
     "test/rigid-groups.mjs",
     "test/performance-fixtures.mjs",
     "test/assembly-lesson-wizard.mjs",

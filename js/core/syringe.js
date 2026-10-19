@@ -2,6 +2,11 @@
 // These demonstration dimensions are not a manufacturer specification.
 export const SYRINGE_DEMO = Object.freeze({name:'10mL 教學示範（未校正）',capacityMl:10,outerDiameter:16,bodyLength:70,rodDiameter:6,lmin:95,stroke:40,calibrated:false});
 export const SYRINGE_TOLERANCE_MM = 0.001;
+// A shared node can be declared fixed by another member. Drawing a new bar
+// reuses its ID with a floating local copy; match compileTopology's node roles.
+export function fixedSyringePointIds(comps){
+  return new Set(comps.flatMap(o=>[o.p1,o.p2,o.p3].filter(p=>p?.type==='fixed').map(p=>p.id)));
+}
 export function normalizeSyringe(c) {
   const spec={...SYRINGE_DEMO};
   const finite=(n,f)=>Number.isFinite(Number(n))?Number(n):f;
@@ -40,14 +45,15 @@ export function syringeIssues(c,comps,params) {
   for(const id of c.jawIds||[])if(!comps.some(o=>o.id===id&&o.type==='triangle'))issues.push('一體式夾臂缺失。');
   for(const t of c.passiveTips||[])if(!comps.some(o=>o.id===t.hostId&&o.p3)||!Number.isFinite(t.length)||t.length<=0||!Number.isFinite(t.angleDeg))issues.push('活動夾片的宿主、長度或手動角度無效。');
   if(c.mountMode==='fixed-axis'){
+    const fixedIds=fixedSyringePointIds(comps);
     const owner=comps.find(o=>o.id===c.a?.componentId);
-    if(!owner||![owner.p1,...(owner.type==='anchor'?[]:[owner.p2,owner.p3].filter(Boolean))].every(p=>p?.type==='fixed'))issues.push('固定筒身必須安裝在固定機架，不能只鎖定一個轉軸點。');
+    if(!owner||![owner.p1,...(owner.type==='anchor'?[]:[owner.p2,owner.p3].filter(Boolean))].every(p=>fixedIds.has(p?.id)))issues.push('固定筒身必須安裝在固定機架，不能只鎖定一個轉軸點。');
     if(!Number.isFinite(c.axisDeg))issues.push('固定筒身缺少有效軸向。');
     // 推桿接活動連桿的任一端孔：第一孔（u=0）或桿件第二孔（u=桿長、v=0）。
     const rod=comps.find(o=>o.id===c.b?.componentId),rodLength=Number(params[rod?.lenParam]);
     const atEnd2=rod?.type==='bar'&&rodLength>0&&Math.abs(c.b?.u-rodLength)<1e-6&&c.b?.v===0;
     if(!(c.b?.u===0&&c.b?.v===0)&&!atEnd2)issues.push('固定筒身推桿須接活動連桿的端孔（第一孔或桿件第二孔）。');
-    if((atEnd2?rod?.p2:rod?.p1)?.type==='fixed')issues.push('推桿接孔不能同時設成固定點。');
+    if(fixedIds.has((atEnd2?rod?.p2:rod?.p1)?.id))issues.push('推桿接孔不能同時設成固定點。');
   }
   return issues;
 }

@@ -23,7 +23,7 @@ export function centeredFaceSurface(surface){const center=Object.fromEntries(['x
 const failed=(code,reason,sourceRevision)=>freezeData({ok:false,reason,validation:{status:'fail',sourceRevision,checks:[{status:'fail',code,reason}],coverage:{scope:'face_candidate'}}});
 export function buildFaceCandidate(source,{childId,hostEndpoint,childEndpoint,selection,reselect=false}={}){
  const sourceRevision=faceSourceRevision(source),work=structuredClone(source);
- if(work.comps.some(c=>!['anchor','bar','triangle','gear','rack'].includes(c.type)))return failed('candidate_format_not_supported','此候選材料流程目前支援桿件、板件、齒輪與齒條；其他材料尚未接入。',sourceRevision);
+ if(work.comps.some(c=>!['anchor','bar','triangle','gear','rack','syringe'].includes(c.type)))return failed('candidate_format_not_supported','此候選材料流程目前支援桿件、板件、齒輪、齒條及針筒機構；其他材料尚未接入。',sourceRevision);
  work.topo=work.topo || {params:work.params || {}};
  work.params=work.topo.params;
  const stockMm=work.stockMm || Number(work.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;
@@ -90,7 +90,9 @@ export async function validateFaceCandidate(candidate,pose={},compute,sceneInput
  const model={...scene.model,poseRevision};
  const material=compute?await compute(model):(await import('./material-interference.js')).checkMaterialInterference(model);
  if(!material||material.geometryKey!==model.geometryKey||material.poseRevision!==poseRevision||!['pass','fail','not_supported'].includes(material.status))return freezeData({...candidate,saveable:false,validation:{...candidate.validation,status:'not_checked',poseRevision,checks:[...checks,{status:'not_checked',code:'material_check_failed'}]}});
- const materialUnsupported=(material.coverage?.notSupported || []).some(r=>r.code!=='material_representation_not_supported'||!['motors','pins','grounds'].includes(r.kind));
+ // Syringe kinematics are solved, but its reference appearance is not collision material.
+ // Permit assembly with that explicit limitation; missing board geometry still blocks.
+ const materialUnsupported=(material.coverage?.notSupported || []).some(r=>!(r.code==='material_kind_not_supported'&&r.kind==='syringe')&&(r.code!=='material_representation_not_supported'||!['motors','pins','grounds'].includes(r.kind)));
  const args={comps:scene.work.comps,modules:scene.work.modules,params:scene.work.params,exportSettings:{...scene.work.exportSettings,drive:scene.work.fabrication?.drive || FABRICATION_DEFAULTS.drive},cnc:scene.work.fabrication?.cnc,mounts:scene.mounts,joint:scene.work.joint};
  const {plan}=resolveSpacers(args),plane=findInterference({...args,plan,pose:{...(pose.motorAngles || {}),'1':pose.motorAngles?.['1'] ?? pose.theta ?? 0}});
  checks.push({status:plane.length?'fail':'pass',code:'in_plane_interference',findings:plane},{status:material.status,code:'material_interference',findings:material.findings});

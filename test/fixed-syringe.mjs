@@ -16,7 +16,10 @@ for(const original of [hydraulicSnapshot,fixedLiftSnapshot,fixedGripSnapshot]){
  const round=normalizeSnapshot(decodeShareString(encodeSnapshot(toSnapshot(n.comps,{params:n.params},n.counter))));assert.equal(round.comps.find(o=>o.type==='syringe').mountMode,'fixed-axis');assert.equal(scanSyringe(round.comps,round.params,c.id).ok,true);
  const shapes=syringeShapes(n.comps,n.params,prior);assert.equal(shapes[0].end-shapes[0].start,72);assert.equal(shapes[0].tips.length,c.passiveTips?.length||0);
  assert.equal(planSyringeStroke(n.comps,n.params,c.id,21,prior).ok,false);
- const bad=structuredClone(n.comps);bad.find(o=>o.id===c.a.componentId).p2.type='floating';assert.equal(solveSyringe(bad,n.params).ok,false);
+ // A shared joint stays fixed while any of its members supplies the fixed role.
+ const bad=structuredClone(n.comps),releasedId=bad.find(o=>o.id===c.a.componentId).p2.id;
+ for(const part of bad)for(const p of [part.p1,part.p2,part.p3])if(p?.id===releasedId)p.type='floating';
+ assert.equal(solveSyringe(bad,n.params).ok,false,'releasing the joint on all members invalidates the frame');
  const axis=structuredClone(n.comps);axis.find(o=>o.id===c.id).axisDeg=NaN;assert.equal(solveSyringe(axis,n.params).ok,false);
  assert.throws(()=>syringeManufacturing(n.comps,n.params,null),/本輪不輸出/);
  assert.equal(JSON.stringify(original),before);

@@ -16,6 +16,8 @@
 
 ## 產品與功能規格
 
+- [SDD-ROD-SYRINGE-CREATION.md](SDD-ROD-SYRINGE-CREATION.md) — 桿件自由創作、針筒選取與組立可見性 LOOP
+
 - [SDD-ASSEMBLY-BENCH.md](SDD-ASSEMBLY-BENCH.md) — SDD — 組立台（把做好的模組「方便地」組起來並測試）
 - [SDD-ASSEMBLY-MODULES.md](SDD-ASSEMBLY-MODULES.md) — SDD — 模擬補齊與模組組裝（數位樂高 M1）
 - [SDD-ASSEMBLY-WIZARD.md](SDD-ASSEMBLY-WIZARD.md) — SDD — 六面體組立精靈

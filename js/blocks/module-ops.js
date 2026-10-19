@@ -957,6 +957,9 @@ export function instantiateComposite(template, ctx) {
 
 // 內建模組：齒條升降（輸出 carriage＝LiftOutput）、齒輪夾爪（base GCA；去掉夾爪任務 params）。
 export const BUILTIN_MODULES = [
+  { id: 'hydraulic-lift', name: '針筒升降臂', source: 'hydraulic-h02', description: '沿用 H02 桿件與針筒，保留原作品加入；可改孔距並以伸出量試動。' },
+  { id: 'hydraulic-gripper', name: '針筒夾爪', source: 'hydraulic-h03', description: '沿用 H03 對稱夾臂，推出夾緊；選自己的固定板、面與位置組立。' },
+  { id: 'hydraulic-base', name: '針筒旋轉底盤', source: 'hydraulic-h04', description: '沿用 H04 旋轉底盤；可選轉盤零件承接升降臂，接合後再試動。' },
   { id: 'rack-lift', name: '齒條升降', source: 'competition-rack-lift', description: '小齒輪帶動垂直齒條升降。' },
   { id: 'gear-gripper', variantNote: '增加安裝基準，改用 MG995 0°～24°；不保留依物件寬度自動算開口的任務。', name: '齒輪夾爪', source: 'gear-gripper', description: '雙齒輪同步開合夾爪。' },
   { id: 'fourbar-lift', variantNote: '模組取消原範例的手腕馬達並加斜撐，活動臂為 140 mm，舵機範圍 −60°～60°；不是原範例的雙動力配置。', name: '四連桿升降臂', source: 'competition-fourbar-lift', description: '平行四連桿升降，工具架保持水平。' },
@@ -1051,6 +1054,15 @@ export function builtinTemplate(id) {
   } else if (id === 'single-servo-claw') {
     template.base = 'ClawMount';
     template.outputs = [];
+  } else if (id === 'hydraulic-lift') {
+    template.base = 'H2A';
+    template.outputs = [{id:'tool',name:'臂端',at:'H2C',body:{kind:'triangle',id:'H2Arm'}}];
+  } else if (id === 'hydraulic-gripper') {
+    template.base = 'H3O';
+    template.outputs = [];
+  } else if (id === 'hydraulic-base') {
+    template.base = 'H4O';
+    template.outputs = [{id:'turn',name:'轉盤',at:'H4M',body:{kind:'triangle',id:'H4Turn'}}];
   } else if (id === 'single-axis-wrist') {
     template.base = 'WristMount';
     template.outputs = [{ id: 'tool', name: '工具端', at: 'WristTip', body: { kind: 'bar', id: 'WristArm' } }];

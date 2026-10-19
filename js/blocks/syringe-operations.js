@@ -1,7 +1,7 @@
 import {plateVertexWorldPoints} from './plate-geometry.js';
 import {compileTopology} from '../core/topology.js';
 import {solveTopology} from '../multilink/solver.js';
-import {attachmentPoint, syringeIssues} from '../core/syringe.js';
+import {attachmentPoint, syringeIssues,fixedSyringePointIds} from '../core/syringe.js';
 
 // Candidates are pure data; callers commit only successful results through normal undo/save.
 export function solveSyringe(comps,params,previous=null,motion={}) {
@@ -16,13 +16,17 @@ export function solveSyringe(comps,params,previous=null,motion={}) {
 }
 export function syringeReading(c,comps,params,points) {
   const a=attachmentPoint(c.a,comps,params,points),b=attachmentPoint(c.b,comps,params,points);
-  const arm=comps.find(o=>o.id===(c.outputId||c.b.componentId)),o=points?.[arm?.p1?.id],end=points?.[(c.id==='H2Syringe'?arm?.p3:arm?.p2)?.id];
+  const arm=comps.find(o=>o.id===(c.outputId||c.b.componentId));
+  const fixedIds=fixedSyringePointIds(comps);
+  const pivot=[arm?.p1,arm?.p2,arm?.p3].find(p=>fixedIds.has(p?.id)) || arm?.p1;
+  const tip=c.id==='H2Syringe'?arm?.p3:[arm?.p2,arm?.p1,arm?.p3].find(p=>p&&p.id!==pivot?.id);
+  const o=points?.[pivot?.id],end=points?.[tip?.id];
   const tips=(c.passiveTips||[]).map(t=>points?.[comps.find(o=>o.id===t.hostId)?.p3?.id]);
   const mountGap=tips.length===2&&tips.every(Boolean)?Math.hypot(tips[0].x-tips[1].x,tips[0].y-tips[1].y):null;
   const ends=(c.jawIds||[]).map(id=>{const arm=comps.find(o=>o.id===id);return arm?plateVertexWorldPoints(arm,[arm.p1,arm.p2,arm.p3].map(p=>points?.[p.id]||p)).at(-1):null;});
   const tipGap=ends.length===2&&ends.every(Boolean)?Math.hypot(ends[0].x-ends[1].x,ends[0].y-ends[1].y):null;
   return {a,b,mountGap,tipGap,length:a&&b?Math.hypot(b.x-a.x,b.y-a.y):NaN,
-    angle:o&&end?Math.atan2(end.y-o.y,end.x-o.x)*180/Math.PI:NaN,end,
+    origin:o,angle:o&&end?Math.atan2(end.y-o.y,end.x-o.x)*180/Math.PI:NaN,end,
     branch:a&&b&&o?Math.sign((a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x)):0};
 }
 export function planSyringeStroke(comps,params,id,extension,previous=null,motion={}) {

@@ -28,9 +28,10 @@ $('previewToggle').addEventListener('click', () => {
   requestAnimationFrame(preview);
 });
 let hasConfirmed = false, roughPlaced = false, configured = false, childConfirmed = false;
-let bracketPlan = null, jointSettings;
+let bracketPlan = null, jointSettings, useBracketHoles=true;
+$('bracketHoles').addEventListener('change',()=>{useBracketHoles=$('bracketHoles').checked;render();});
 let parentCandidate=null,previewRequest=0,previewSignature='',previewTimer=null,candidateClosed=false;
-function integratedSelection(mate){const selected={...draft};if(Math.abs(mate.rotation[2][2])<1e-6)selected.brackets={enabled:true,offsets:{...bracketOffsets},childPart:children[draft.child].surface?.compId || 'frame'};else delete selected.brackets;return selected;}
+function integratedSelection(mate){const selected={...draft};if(useBracketHoles&&Math.abs(mate.rotation[2][2])<1e-6)selected.brackets={enabled:true,offsets:{...bracketOffsets},childPart:children[draft.child].surface?.compId || 'frame'};else delete selected.brackets;return selected;}
 function requestCandidate(mate){
  if(!integrated||step!==3||!loadSession.ready)return;
  const selection=integratedSelection(mate),signature=JSON.stringify(selection);
@@ -259,7 +260,7 @@ function drawCandidateScene(mate){
  const svg=$('scene');svg.replaceChildren();$('bracketNote').hidden=false;fitButton.hidden=false;
  bracketPlan=parentCandidate?.bracket || null;bracketSpan=bracketPlan?.span || 0;
  const pending=parentCandidate?.selectionRevision!==previewSignature;
- $('bracketNote').textContent=pending?'此圖為上次候選；目前設定待檢查。':bracketPlan?.ok?`角碼 ${bracketPlan.brackets.length} 顆 · 固定孔 Ø3.2`:parentCandidate?.reason || '未配置角碼固定孔。';
+ $('bracketNote').textContent=pending?'此圖為上次候選；目前設定待檢查。':bracketPlan?.ok?`角碼 ${bracketPlan.brackets.length} 顆 · 固定孔 Ø3.2`:parentCandidate?.reason || '僅幾何定位，尚未配置固定五金。';
  if(!parentCandidate?.model){$('mateOverlay').hidden=true;return;}
  const faces=candidateMaterialFaces(parentCandidate.model),points=faces.flatMap(f=>f.rings.flat()),projected=points.map(viewCoords);
  const minX=Math.min(...projected.map(p=>p.x)),maxX=Math.max(...projected.map(p=>p.x)),minY=Math.min(...projected.map(p=>p.y)),maxY=Math.max(...projected.map(p=>p.y));
@@ -478,7 +479,7 @@ function preview() {
   $('mateStepChip').textContent = dimensionText.moveStep(moveStep);
   $('summary').textContent = `${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
   const blocked=integrated && (step > 0 || choosingChild) && (!childConfirmed || !!children[draft.child].blockedReason);
-  const mate = solve();if(mate.ok && !blocked)requestCandidate(mate);$('next').disabled = blocked || !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || !!document.querySelector('input[aria-invalid="true"]');
+  const mate = solve();$('bracketChoice').hidden=!integrated||step!==3||!mate.ok||Math.abs(mate.rotation[2][2])>=1e-6;$('bracketHoles').checked=useBracketHoles;if(mate.ok && !blocked)requestCandidate(mate);$('next').disabled = blocked || !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || !!document.querySelector('input[aria-invalid="true"]');
   if(integrated&&step===3)$('next').textContent=candidateConfirmLabel(parentCandidate,parentCandidate?.selectionRevision!==previewSignature);
   if (mate.ok) scene(mate);
   else { $('mateOverlay').hidden = true; $('message').textContent = mate.reason; $('message').classList.add('error'); }
@@ -501,6 +502,7 @@ if (integrated) {
     mode = 'wizard';
     jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; choosingChild = false; configured = !!e.data.configured; childConfirmed=!!e.data.childConfirmed; roughPlaced = configured;
     bracketOffsets = { ...(draft.brackets?.offsets || {}) };
+    useBracketHoles=!configured||!!draft.brackets;
     // 預設面僅作預選；只有明確重新調整位置才略過選面。
     if (e.data.startAtPlacement) step = 3;
     if (configured && !document.getElementById('optionalView')) {

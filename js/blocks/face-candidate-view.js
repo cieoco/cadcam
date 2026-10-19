@@ -4,8 +4,9 @@ import {materialCircleContour,normalizeMaterialVoids} from './material-voids.js'
 import {boxFaces} from './face-mate.js';
 export function candidateCoverageText(candidate){
  const rows=candidate.validation?.coverage?.notSupported || [];
- const hardwareOnly=rows.every(r=>r.code==='material_representation_not_supported'&&['motors','pins','grounds'].includes(r.kind));
- return {hardwareOnly,summary:hardwareOnly?'板件未發現穿入；部分五金未檢查。':'部分板件材料或姿態尚未驗證。',title:`未檢查${hardwareOnly?'五金':'材料'} ${rows.length} 項`};
+ const isSyringe=r=>r.code==='material_kind_not_supported'&&r.kind==='syringe',hasSyringe=rows.some(isSyringe);
+ const hardwareOnly=rows.every(r=>isSyringe(r)||r.code==='material_representation_not_supported'&&['motors','pins','grounds'].includes(r.kind));
+ return {hardwareOnly,summary:hardwareOnly?(hasSyringe?'板件已檢查；針筒／管夾與部分五金干涉未驗證。':'板件未發現穿入；部分五金未檢查。'):'部分板件材料或姿態尚未驗證。',title:`未檢查${hardwareOnly?(hasSyringe?'針筒／五金':'五金'):'材料'} ${rows.length} 項`};
 }
 export const candidateConfirmLabel=(candidate,pending=false)=>!pending&&candidate?.saveable&&candidate.validation?.status==='fail'?'接上（有干涉）':'接上';
 /** Face names and U/V belong to the selected home XY box, not a member AABB. */
