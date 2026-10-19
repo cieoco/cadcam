@@ -3196,6 +3196,7 @@ hydraulic=createSyringeUI({is3D:()=>view3DActive,capture:()=>{viewer3D.renderNow
   playing:on=>{playbackActive=on;const b=document.getElementById('playBtn');b.classList.toggle('playing',on);b.textContent=on?'⏸':'▶';}
 });
 window.blocks.addSyringe=hydraulic.add;
+window.blocks.addFixedSyringe=hydraulic.addFixed;
 init();
 if(benchmarkSession){
  Object.assign(window.blocks,{benchmark:{identity:{source:'current',token:LOAD_GRAPH_TOKEN},async load(snapshot){playbackProbe.abort('work_changed');const norm=Store.normalizeSnapshot(snapshot);if(!norm)throw Error('無效量測作品');applySnapshot(norm,{recordUndo:false,source:'benchmark'});bench.setMode('bench');await set3D(true);viewer3D.stop();return benchmarkCoverage;},

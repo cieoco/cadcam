@@ -1,6 +1,7 @@
 import {S} from '../js/blocks/state.js';
 import * as View from '../js/blocks/view.js';
-import {hydraulicSnapshot} from '../js/blocks/hydraulic-example.js';
+import {hydraulicSnapshot} from './fixtures/hinged-syringe.mjs';
+import {hydraulicSnapshot as h01Snapshot} from '../js/blocks/hydraulic-example.js';
 import {decodeShareString,encodeSnapshot} from '../js/share-codec.js';
 const b=window.blocks,api=b.gripperPilot,lines=[],q=s=>document.querySelector(s.replace('#syringeDialog','#syringeDialog[open]')),click=s=>q(s).click();
 const assert=(condition,name)=>{if(!condition)throw Error(name);lines.push('PASS '+name);};
@@ -29,6 +30,22 @@ try{
  const svg=q('#stageSvg'),ctm=svg.getScreenCTM(),point=(x,y)=>new DOMPoint(View.TX(x),View.TY(y)).matrixTransform(ctm);
  const tap=(x,y)=>{const p=point(x,y);svg.dispatchEvent(new PointerEvent('pointerdown',{clientX:p.x,clientY:p.y,bubbles:true,pointerType:'touch'}));};
  tap(0,-80);tap(80,0);assert(!!q('#syringeDialog'),'touch A/B picking opens candidate');button('確認套用');assert(S.comps.some(c=>c.type==='syringe'&&c.a.componentId==='HFrame'&&c.b.componentId==='HArm'),'new actuator retains real owners');
+ // 從空白做出 H01：選單「管夾固定」→ 點機架、點短連桿端孔 → 掃描 → 確認套用；不合理的點法說明原因並留在選點。
+ {
+  const blank=structuredClone(h01Snapshot);blank.comps=blank.comps.filter(c=>c.type!=='syringe');api.reopen(blank);
+  assert(!S.comps.some(c=>c.type==='syringe')&&typeof b.addFixedSyringe==='function','blank H01-like mechanism and fixed-syringe menu action');
+  b.addFixedSyringe();
+  const svg=q('#stageSvg'),ctm=svg.getScreenCTM(),point=(x,y)=>new DOMPoint(View.TX(x),View.TY(y)).matrixTransform(ctm);
+  const tap=(x,y)=>{const p=point(x,y);svg.dispatchEvent(new PointerEvent('pointerdown',{clientX:p.x,clientY:p.y,bubbles:true,pointerType:'touch'}));};
+  tap(30,-26.6);assert(q('#syringeNotice').textContent.includes('固定的機架')&&!q('#syringeDialog'),'A must be a fixed frame (moving rocker rejected)');
+  tap(-100,-60);assert(q('#syringeNotice').textContent.includes('已選管夾位置'),'A picked on the frame');
+  tap(-10,-30);assert(!q('#syringeDialog')&&q('#syringeNotice').textContent.includes('短連桿'),'rod on a shared end with no valid coupler explains and stays picking');
+  tap(-20,-60);assert(!!q('#syringeDialog'),'B on coupler end opens candidate dialog');
+  button('掃描候選全行程');assert(q('#syringeDialog [role=status]').textContent.includes('41'),'candidate scans 41 points');
+  button('確認套用');const placed=S.comps.find(c=>c.type==='syringe');
+  assert(placed&&placed.mountMode==='fixed-axis'&&placed.outputId==='H1Arm'&&placed.b.componentId==='H1Coupler','placed fixed syringe finds output arm');
+  window.__placed=placed.id;
+ }
  initial();b.togglePlay();await new Promise(resolve=>setTimeout(resolve,400));b.togglePlay();assert(S.comps[2].extension>20,'time based play advances extension');
  const held=S.comps[2].extension;await new Promise(resolve=>setTimeout(resolve,150));assert(S.comps[2].extension===held,'pause stops hydraulic frame loop');
  initial();b.exportLinksSvg();b.exportLinksDxf();await b.downloadBuildPack();assert(saved.filter(f=>f.name.endsWith('.svg')).length===4&&saved.filter(f=>f.name.endsWith('.dxf')).length===4&&saved.some(f=>f.name.endsWith('.html')),'existing export actions produce hydraulic files and pack');

@@ -3,6 +3,7 @@ import {syringeShape} from './syringe-shape.js';
 import {SYRINGE_DEMO,attachmentFrame,attachmentPoint} from '../core/syringe.js';
 import {solveSyringe,planSyringeStroke,scanSyringe,syringeReading,syringeGain,advanceSyringe} from './syringe-operations.js';
 import {syringeSeatGeometry,syringeManufacturing,syringeFiles,syringeBuildPack} from './syringe-manufacturing.js';
+import {placeFixedSyringe,isFixedFrame} from './syringe-placement.js';
 import {normalizeFabricationProfile} from './fabrication-profile.js';
 import {S,motorAnglesNow} from './state.js';
 import * as View from './view.js';
@@ -183,15 +184,44 @@ export function createSyringeUI(h){
     document.getElementById('powerMenu').style.display='none';picking={a:null};bar.hidden=false;wrap.classList.add('hydraulic-active');notify('點選 A 筒身端安裝位置；Esc 或「取消選點」取消。');
     cancelPick.hidden=false;
   }
+  // 管夾固定針筒：先點機架上的管夾位置，再點短連桿的端孔；不合理的放法留在選點並說明原因。
+  function addFixed(){
+    h.pause();if(S.mode!=='design'){h.notify('請先到設計模式，再選管夾位置。');return;}
+    if(!h.comps().some(isFixedFrame)){h.notify('請先畫出固定的機架、擺臂與短連桿，再放管夾固定針筒。');return;}
+    document.getElementById('powerMenu').style.display='none';picking={a:null,fixed:true};bar.hidden=false;wrap.classList.add('hydraulic-active');
+    notify('點選管夾位置：點在固定的機架上；Esc 或「取消選點」取消。');cancelPick.hidden=false;
+  }
   const cancelPick=el('button','取消選點',row);cancelPick.hidden=true;
   const cancelPicking=()=>{picking=null;cancelPick.hidden=true;message='';h.draw();};cancelPick.onclick=cancelPicking;
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&picking)cancelPicking();});
   h.svg.addEventListener('pointerdown',e=>{
     if(!picking)return;e.preventDefault();e.stopImmediatePropagation();
     const q=View.worldFromEvent(h.svg,e);if(!q)return;
+    if(picking.fixed&&picking.a){
+      // B：吸附到最近的短連桿端孔；多個端孔重疊時，選第一個放得成的。
+      const ctm=h.svg.getScreenCTM(),found=[];
+      for(const owner of h.comps()){
+        if(owner.type!=='bar'||isFixedFrame(owner))continue;
+        for(const u of [0,Number(params()[owner.lenParam])]){
+          const ref={componentId:owner.id,u,v:0},p=attachmentPoint(ref,h.comps(),params(),h.points());if(!p)continue;
+          const pt=new DOMPoint(View.TX(p.x),View.TY(p.y)).matrixTransform(ctm),distance=Math.hypot(pt.x-e.clientX,pt.y-e.clientY);
+          if(distance<32)found.push({ref,distance});
+        }
+      }
+      found.sort((x,y)=>x.distance-y.distance);
+      if(!found.length){notify('請點在短連桿的端孔附近。');return;}
+      let first=null;
+      for(const f of found.filter(f=>f.distance<found[0].distance+4)){
+        const r=placeFixedSyringe(h.comps(),params(),h.points(),picking.a,f.ref);
+        if(r.ok){cancelPicking();open(r.syringe);return;}
+        first=first||r;
+      }
+      notify(first.message);return;
+    }
     let best=null;
     for(const owner of h.comps()){
       const f=attachmentFrame(owner,params(),h.points());if(!f)continue;
+      if(picking.fixed&&!isFixedFrame(owner))continue;
       if(owner.type==='triangle'){
         const points=[owner.p1,owner.p2,owner.p3].map(p=>h.points()?.[p.id]||p);
         if(!createPlateGeometry(owner,points).outlines.some(poly=>inside(q,poly)))continue;
@@ -201,8 +231,8 @@ export function createSyringeUI(h){
       const ctm=h.svg.getScreenCTM(),pt=new DOMPoint(View.TX(p.x),View.TY(p.y)).matrixTransform(ctm),distance=Math.hypot(pt.x-e.clientX,pt.y-e.clientY);
       if(distance<24&&(!best||distance<best.distance))best={ref,distance};
     }
-    if(!best){notify('請點在機架、桿件或板件上。');return;}
-    if(!picking.a){picking.a=best.ref;notify('已選 A；接著點選 B 推桿端的活動桿件位置。');return;}
+    if(!best){notify(picking.fixed?'請點在固定的機架上（管夾位置）。':'請點在機架、桿件或板件上。');return;}
+    if(!picking.a){picking.a=best.ref;notify(picking.fixed?'已選管夾位置；接著點短連桿的端孔（推桿接點）。':'已選 A；接著點選 B 推桿端的活動桿件位置。');return;}
     if(picking.a.componentId===best.ref.componentId){notify('A、B 不能在同一剛性零件上。');return;}
     const a=picking.a,b=best.ref,pa=attachmentPoint(a,h.comps(),params(),h.points()),pb=attachmentPoint(b,h.comps(),params(),h.points());
     const length=Math.hypot(pa.x-pb.x,pa.y-pb.y);let counter=S.counter+1;while(S.comps.some(c=>c.id===`Syringe${counter}`))counter++;
@@ -236,5 +266,5 @@ export function createSyringeUI(h){
       h.notify(`僅匯出目前液壓設計。${plan.warnings[0]}`);
     }catch(e){h.notify(`尚未輸出：${e.message}`);}
   }
-    return {active,add,open,render,sync,stop,play,stroke,exportWork,exportVideo,isPlaying:()=>!!raf};
+    return {active,add,addFixed:addFixed,open,render,sync,stop,play,stroke,exportWork,exportVideo,isPlaying:()=>!!raf};
 }

@@ -43,9 +43,11 @@ export function syringeIssues(c,comps,params) {
     const owner=comps.find(o=>o.id===c.a?.componentId);
     if(!owner||![owner.p1,...(owner.type==='anchor'?[]:[owner.p2,owner.p3].filter(Boolean))].every(p=>p?.type==='fixed'))issues.push('固定筒身必須安裝在固定機架，不能只鎖定一個轉軸點。');
     if(!Number.isFinite(c.axisDeg))issues.push('固定筒身缺少有效軸向。');
-    if(c.b?.u!==0||c.b?.v!==0)issues.push('固定筒身推桿須接活動連桿的第一孔。');
-    const rod=comps.find(o=>o.id===c.b?.componentId);
-    if(rod?.p1?.type==='fixed')issues.push('推桿接孔不能同時設成固定點。');
+    // 推桿接活動連桿的任一端孔：第一孔（u=0）或桿件第二孔（u=桿長、v=0）。
+    const rod=comps.find(o=>o.id===c.b?.componentId),rodLength=Number(params[rod?.lenParam]);
+    const atEnd2=rod?.type==='bar'&&rodLength>0&&Math.abs(c.b?.u-rodLength)<1e-6&&c.b?.v===0;
+    if(!(c.b?.u===0&&c.b?.v===0)&&!atEnd2)issues.push('固定筒身推桿須接活動連桿的端孔（第一孔或桿件第二孔）。');
+    if((atEnd2?rod?.p2:rod?.p1)?.type==='fixed')issues.push('推桿接孔不能同時設成固定點。');
   }
   return issues;
 }
