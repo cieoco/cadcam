@@ -29,7 +29,7 @@ console.log('PASS fixed syringe: axis, bidirectional stroke, JSON/share, passive
 const grip=normalizeSnapshot(fixedGripSnapshot),gripper=grip.comps.find(c=>c.type==='syringe');
 assert.equal(gripper.passiveTips,undefined);assert.deepEqual(gripper.jawIds,['H3JawA','H3JawB']);
 const old=structuredClone(fixedGripSnapshot),oldS=old.comps.find(c=>c.type==='syringe');
-oldS.passiveTips=[{hostId:'H3JawA',length:40,angleDeg:70},{hostId:'H3JawB',length:40,angleDeg:-70}];delete oldS.jawIds;
+oldS.passiveTips=[{hostId:'H3JawA',length:40,angleDeg:-70},{hostId:'H3JawB',length:40,angleDeg:70}];delete oldS.jawIds;
 for(const a of old.comps.filter(c=>c.type==='triangle'))a.vertices=a.vertices.filter(v=>v.solve);
 const oldJson=JSON.stringify(old),converted=normalizeSnapshot(old);
 assert.equal(JSON.stringify(old),oldJson,'migration cannot mutate input');

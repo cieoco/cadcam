@@ -36,6 +36,18 @@ export function planSyringeStroke(comps,params,id,extension,previous=null,motion
   }
   return {...result,comps:candidate};
 }
+// 目前伸出量下的比例：每推 1 mm，輸出臂轉幾度、臂端移幾 mm（取大小，不含轉向）。以 ±0.25 mm 中央差分，重用原分支；不改傳入資料。
+export function syringeGain(comps,params,id,points) {
+  const c=comps.find(o=>o.id===id&&o.type==='syringe'),stroke=c?.spec?.stroke;
+  if(!c||!points||!Number.isFinite(c.extension)||!(stroke>0))return null;
+  const e0=Math.max(0,c.extension-.25),e1=Math.min(stroke,c.extension+.25);
+  if(!(e1>e0))return null;
+  const read=e=>{const r=planSyringeStroke(comps,params,id,e,points);return r.ok?syringeReading(c,r.comps,params,r.points):null;};
+  const a=read(e0),b=read(e1);
+  if(!a||!b||!Number.isFinite(a.angle)||!Number.isFinite(b.angle)||!a.end||!b.end)return null;
+  const dAngle=((b.angle-a.angle+540)%360+360)%360-180,dEnd=Math.hypot(b.end.x-a.end.x,b.end.y-a.end.y),span=e1-e0;
+  return {degPerMm:Math.abs(dAngle)/span,endMmPerMm:dEnd/span};
+}
 export function scanSyringe(comps,params,id,step=0.5,motion={}) {
   const c=comps.find(c=>c.id===id&&c.type==='syringe');
   if(!c||!(step>0)||!Number.isFinite(step)||c.spec.stroke>10000)return {ok:false,message:'無法掃描這個行程。',samples:[]};

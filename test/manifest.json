@@ -207,6 +207,7 @@
     "test/video-evidence.mjs",
     "test/lesson-sequence.mjs",
     "test/fixed-syringe.mjs",
+    "test/hydraulic-p1.mjs",
     "test/parallel-gripper.mjs"
   ],
   "version": 1

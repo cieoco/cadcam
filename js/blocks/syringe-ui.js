@@ -1,7 +1,7 @@
 import {APP_VERSION} from '../version.js';
 import {syringeShape} from './syringe-shape.js';
 import {SYRINGE_DEMO,attachmentFrame,attachmentPoint} from '../core/syringe.js';
-import {solveSyringe,planSyringeStroke,scanSyringe,syringeReading,advanceSyringe} from './syringe-operations.js';
+import {solveSyringe,planSyringeStroke,scanSyringe,syringeReading,syringeGain,advanceSyringe} from './syringe-operations.js';
 import {syringeSeatGeometry,syringeManufacturing,syringeFiles,syringeBuildPack} from './syringe-manufacturing.js';
 import {normalizeFabricationProfile} from './fabrication-profile.js';
 import {S,motorAnglesNow} from './state.js';
@@ -17,8 +17,8 @@ function inside(q,polygon){let hit=false;for(let i=0,j=polygon.length-1;i<polygo
 export function createSyringeUI(h){
   const wrap=h.svg.parentElement,bar=el('section');bar.id='syringeControls';bar.hidden=true;
   const row=el('div',null,bar),label=el('label','伸出量 ',row),range=el('input',null,label);range.type='range';range.min=0;range.step='0.1';range.setAttribute('aria-label','針筒伸出量 mm');
-  const value=el('output',null,row),settings=el('button','針筒設定',row),readout=el('div',null,bar),note=el('div',null,bar);
-  readout.id='syringeReadout';note.id='syringeNotice';note.setAttribute('aria-live','polite');
+  const value=el('output',null,row),settings=el('button','針筒設定',row),readout=el('div',null,bar),gainLine=el('div',null,bar),note=el('div',null,bar);
+  readout.id='syringeReadout';gainLine.id='syringeGain';note.id='syringeNotice';note.setAttribute('aria-live','polite');
   // Give feedback its own row before the stroke control instead of overlaying it.
   h.svg.before(document.getElementById('modeBanner'),document.getElementById('solveBanner'),bar);
   const warning3d=el('div','針筒／管夾為外形參考；完整裝配、干涉與承重未驗證。',document.getElementById('view3d'));
@@ -61,6 +61,8 @@ export function createSyringeUI(h){
     id=c.id;range.max=c.spec.stroke;range.value=c.extension;value.textContent=`${c.extension.toFixed(1)} / ${c.spec.stroke} mm`;
     const r=syringeReading(c,h.comps(),params(),points);
     readout.textContent=`${valid?(c.passiveTips?.length?'主傳動可解／夾片角度手動':'幾何可行'):'姿勢無解'}${r.tipGap!==null?` · 夾臂端孔距 ${r.tipGap.toFixed(1)} mm`:''}${r.mountGap!==null?` · 夾片安裝軸距 ${r.mountGap.toFixed(1)} mm`:''} · AB ${r.length.toFixed(2)} mm · 臂角 ${r.angle.toFixed(1)}°${r.end?` · C (${r.end.x.toFixed(1)}, ${r.end.y.toFixed(1)}) mm`:''}`;
+    const gain=valid?syringeGain(h.comps(),params(),c.id,points):null;
+    gainLine.hidden=!gain;gainLine.textContent=gain?`每推 1 mm：臂轉 ${gain.degPerMm.toFixed(2)}°、臂端移 ${gain.endMmPerMm.toFixed(1)} mm`:'';
     note.textContent=message||(c.spec.calibrated?'規格已實測；':'示範尺寸，未依實物校正；')+'干涉未檢查、承重未驗證。';
     const theta=document.getElementById('thetaVal');if(theta)theta.textContent=`${c.extension.toFixed(1)} mm`;
   }
@@ -127,7 +129,7 @@ export function createSyringeUI(h){
     let section=form;
     const fields={},input=(key,text,value,type='number')=>{const label=el('label',text,section),n=el('input',null,label);n.type=type;n.name=key;if(type==='number')n.step='any';n.value=value;fields[key]=n;return n;};
     const tasks=el('details',null,form);el('summary',c.mountMode==='fixed-axis'?'固定筒身教學任務':'兩端鉸接教學任務',tasks);
-    el('p',c.id==='H1Syringe'?'管夾固定筒身，推桿經短連桿帶動單臂。先觀察 0–20 mm 往返，再只改活動臂長 60、80、100 mm，掃描後比較擺角。':c.mountMode==='fixed-axis'?'只改伸出量 0–20 mm。H02 比較驅動孔位；H03 觀察一體式夾臂的端孔距；末端與交叉臂同片、一起轉動，不含接觸求解。':'① 推動滑桿、掃描並記錄可用行程。② 其他條件不變，只改 B 孔位，先預測再比較臂角與 C 位置。③ 修改前後分別存檔，寫下「改了什麼／預測／觀察」，最後與實物比較。',tasks);
+    el('p',c.id==='H1Syringe'?'管夾固定筒身，推桿經短連桿帶動單臂。先觀察 0–20 mm 往返，再只改活動臂長 60、80、100 mm，掃描後比較擺角。':c.mountMode==='fixed-axis'?'只改伸出量 0–20 mm。H02 比較驅動孔位；H03 推出即夾緊，觀察一體式夾臂的端孔距；末端與夾臂同片、一起轉動，不含接觸求解。':'① 推動滑桿、掃描並記錄可用行程。② 其他條件不變，只改 B 孔位，先預測再比較臂角與 C 位置。③ 修改前後分別存檔，寫下「改了什麼／預測／觀察」，最後與實物比較。',tasks);
     for(const key of ['a','b']){
       const label=el('label',`${key.toUpperCase()} 所屬零件`,form),select=el('select',null,label);select.name=`${key}Owner`;fields[select.name]=select;
       for(const owner of h.comps().filter(o=>attachmentFrame(o,params()))){const option=el('option',owner.id,select);option.value=owner.id;}
