@@ -4,6 +4,8 @@ import {SYRINGE_DEMO,attachmentFrame,attachmentPoint} from '../core/syringe.js';
 import {solveSyringe,planSyringeStroke,scanSyringe,syringeReading,syringeGain,advanceSyringe} from './syringe-operations.js';
 import {syringeSeatGeometry,syringeManufacturing,syringeFiles,syringeBuildPack} from './syringe-manufacturing.js';
 import {placeFixedSyringe,isFixedFrame} from './syringe-placement.js';
+import {assemblySyringeControls,planAssemblySyringe} from './assembly-syringe.js';
+import {assemblyWork} from './assembly-membership.js';
 import {normalizeFabricationProfile} from './fabrication-profile.js';
 import {S,motorAnglesNow} from './state.js';
 import * as View from './view.js';
@@ -17,14 +19,17 @@ function inside(q,polygon){let hit=false;for(let i=0,j=polygon.length-1;i<polygo
 
 export function createSyringeUI(h){
   const wrap=h.svg.parentElement,bar=el('section');bar.id='syringeControls';bar.hidden=true;
-  const row=el('div',null,bar),label=el('label','伸出量 ',row),range=el('input',null,label);range.type='range';range.min=0;range.step='0.1';range.setAttribute('aria-label','針筒伸出量 mm');
+  const chips=el('nav',null,bar),row=el('div',null,bar),label=el('label','伸出量 ',row),range=el('input',null,label);range.type='range';range.min=0;range.step='0.1';range.setAttribute('aria-label','針筒伸出量 mm');
   const value=el('output',null,row),settings=el('button','針筒設定',row),readout=el('div',null,bar),gainLine=el('div',null,bar),note=el('div',null,bar);
+  row.style.cssText='display:flex;align-items:center;gap:8px';
+  chips.id='syringeChips';chips.className='motor-switch';chips.style.cssText='display:none;gap:6px;margin-bottom:4px;flex-wrap:wrap';
   readout.id='syringeReadout';gainLine.id='syringeGain';note.id='syringeNotice';note.setAttribute('aria-live','polite');
   // Give feedback its own row before the stroke control instead of overlaying it.
   h.svg.before(document.getElementById('modeBanner'),document.getElementById('solveBanner'),bar);
   const warning3d=el('div','針筒／管夾為外形參考；完整裝配、干涉與承重未驗證。',document.getElementById('view3d'));
   warning3d.style.cssText='position:absolute;bottom:72px;left:8px;right:8px;padding:8px;background:#fff3cd;color:#664d03;z-index:6;font-size:13px;pointer-events:none';warning3d.hidden=true;
   let id=null,raf=null,last=null,direction=1,dragUndo=false,picking=null,scopeKey=null,message='';
+  const inAssembly=()=>S.mode!=='design';
   const list=()=>h.comps().filter(c=>c.type==='syringe');
   const active=()=>list().find(c=>c.id===id)||list()[0];
   const params=()=>S.topo.params;
@@ -42,8 +47,17 @@ export function createSyringeUI(h){
     if(fabrication)h.applyFabrication(fabrication);
     h.rebuild();h.seed(result.points);h.draw();h.save();
   }
+  // 組立：只推選取的那支針筒（模組各自的伸出量），整份組立重新求解；其他針筒維持原位。座標留在各模組自己的圖面，不寫回世界座標。
+  function assemblyStroke(c,extension,undo){
+    const work=assemblyWork(S.comps,S.modules,S.topo),result=planAssemblySyringe(work.comps,work.modules,params(),c.id,extension,h.points());
+    if(!result.ok){stop();range.value=c.extension;notify(result.message);return false;}
+    if(undo)h.pushUndo();
+    const next=result.comps.find(o=>o.id===c.id);S.comps=S.comps.map(o=>o.id===c.id?next:o);
+    message='';h.rebuild();h.seed(result.points);h.draw();h.save();return true;
+  }
   function stroke(extension,undo=true){
     const c=active();if(!c)return false;
+    if(inAssembly())return assemblyStroke(c,extension,undo);
     const result=planSyringeStroke(h.comps(),params(),c.id,extension,h.points(),motion());
     if(!result.ok){stop();range.value=c.extension;notify(result.message);return false;}
     message='';commit(result.comps,params(),result,{undo});return true;
@@ -52,14 +66,48 @@ export function createSyringeUI(h){
   range.oninput=()=>{if(stroke(Number(range.value),!dragUndo))dragUndo=true;};
   range.onchange=()=>{dragUndo=false;h.save();};
   settings.onclick=()=>open();
+  // 組立台：控制列貼在 3D 視圖上緣，3D 視圖往下讓出這一列；離開組立或沒有針筒就還原。
+  let layoutTimer=null,layoutTries=0;
+  function layoutBar(on){
+    const v=document.getElementById('view3d');
+    for(const k of ['position','left','top','width','boxSizing','zIndex','marginTop'])bar.style[k]='';
+    if(v)v.style.top='';
+    clearTimeout(layoutTimer);
+    if(!on)return;
+    if(v&&v.offsetParent!==null){
+      layoutTries=0;
+      const wr=wrap.getBoundingClientRect(),vr=v.getBoundingClientRect();
+      Object.assign(bar.style,{position:'absolute',left:`${vr.left-wr.left}px`,top:`${vr.top-wr.top}px`,width:`${vr.width}px`,boxSizing:'border-box',zIndex:'5'});
+      v.style.top=`${vr.top-wr.top+bar.offsetHeight}px`;return;
+    }
+    // 2D 組立（或 3D 視圖還沒顯示）：留在畫布流程中，推到浮動的模組清單下面並蓋過它。
+    const list=document.getElementById('benchList');
+    if(list&&list.offsetParent!==null){bar.style.position='relative';bar.style.zIndex='5';bar.style.marginTop=`${Math.max(0,Math.ceil(list.getBoundingClientRect().bottom-bar.getBoundingClientRect().top)+4)}px`;}
+    if(layoutTries++<20)layoutTimer=setTimeout(()=>layoutBar(inAssembly()&&!bar.hidden),100);   // 進組立台後 3D 視圖才顯示
+  }
   function sync(points,valid=true){
     const key=`${S.mode}:${S.designFocus}`;
     if(key!==scopeKey){stop();picking=null;message='';scopeKey=key;}
-    const c=active(),visible=!!c&&S.mode==='design';
-    warning3d.hidden=!c;
+    const c=active(),visible=!!c;
+    warning3d.hidden=!c;warning3d.textContent=inAssembly()?'3D 組立目前不顯示針筒外形；針筒只用長度約束帶動機構，干涉與承重未驗證。':'針筒／管夾為外形參考；完整裝配、干涉與承重未驗證。';
     bar.hidden=!visible&&!picking;wrap.classList.toggle('hydraulic-active',visible||!!picking);
+    if(!(visible&&inAssembly()))layoutBar(false);
     if(!visible){if(raf)stop();return;}
-    id=c.id;range.max=c.spec.stroke;range.value=c.extension;value.textContent=`${c.extension.toFixed(1)} / ${c.spec.stroke} mm`;
+    id=c.id;
+    settings.hidden=inAssembly();if(!inAssembly())chips.style.display='none';
+    if(inAssembly()){
+      // 組立：每支針筒一顆切換鈕；每推 1 mm 的比例與針筒設定只在設計模式提供（組立裡改尺寸請回設計）。
+      const work=assemblyWork(S.comps,S.modules,S.topo),controls=assemblySyringeControls(work.comps,work.modules);
+      chips.style.display=controls.length<2?'none':'flex';chips.textContent='';
+      for(const control of controls){const b=el('button',control.label,chips);b.type='button';b.className='motor-chip'+(control.id===c.id?' active':'');b.setAttribute('aria-pressed',String(control.id===c.id));b.onclick=()=>{stop();id=control.id;message='';sync(h.points(),valid);};}
+      const label=controls.find(x=>x.id===c.id)?.label||'針筒',r=syringeReading(c,work.comps,params(),points);
+      range.max=c.spec.stroke;range.value=c.extension;value.textContent=`${c.extension.toFixed(1)} / ${c.spec.stroke} mm`;
+      readout.textContent=`${valid?'幾何可行':'姿勢無解'}${r.tipGap!==null?` · 夾臂端孔距 ${r.tipGap.toFixed(1)} mm`:Number.isFinite(r.angle)?` · 臂角 ${r.angle.toFixed(1)}°`:''} · AB ${r.length.toFixed(1)} mm`;
+      gainLine.hidden=true;gainLine.textContent='';
+      note.textContent=message||'一次推一支，其餘維持原位。';
+      layoutBar(true);return;
+    }
+    settings.hidden=false;range.max=c.spec.stroke;range.value=c.extension;value.textContent=`${c.extension.toFixed(1)} / ${c.spec.stroke} mm`;
     const r=syringeReading(c,h.comps(),params(),points);
     readout.textContent=`${valid?(c.passiveTips?.length?'主傳動可解／夾片角度手動':'幾何可行'):'姿勢無解'}${r.tipGap!==null?` · 夾臂端孔距 ${r.tipGap.toFixed(1)} mm`:''}${r.mountGap!==null?` · 夾片安裝軸距 ${r.mountGap.toFixed(1)} mm`:''} · AB ${r.length.toFixed(2)} mm · 臂角 ${r.angle.toFixed(1)}°${r.end?` · C (${r.end.x.toFixed(1)}, ${r.end.y.toFixed(1)}) mm`:''}`;
     const gain=valid?syringeGain(h.comps(),params(),c.id,points):null;
@@ -111,9 +159,9 @@ export function createSyringeUI(h){
   }
   function play(){
     const c=active();if(!c)return;
-    if(S.mode!=='design'){h.notify('液壓播放目前在設計的 2D 畫布操作；組立 3D 尚未支援針筒。');return;}
-    h.pause();const scan=scanSyringe(h.comps(),params(),c.id,0.5,motion());
-    if(!scan.ok){notify(`行程 ${scan.atMm??c.extension} mm：${scan.message}`);return;}
+    h.pause();
+    if(!inAssembly()){const scan=scanSyringe(h.comps(),params(),c.id,0.5,motion());
+    if(!scan.ok){notify(`行程 ${scan.atMm??c.extension} mm：${scan.message}`);return;}}
     h.pushUndo();h.playing(true);last=null;
     const step=ts=>{
       const current=active();if(!current){stop();return;}

@@ -407,6 +407,7 @@ export function transformComp(comp, ref, now, deltaDeg) {
   else if (comp.type === 'pulley' && Number.isFinite(comp.phase)) out.phase = comp.phase + deltaDeg;
   else if (comp.type === 'rack' && Number.isFinite(comp.axisDeg)) out.axisDeg = comp.axisDeg + deltaDeg;
   else if (comp.type === 'cam' && Number.isFinite(comp.axisDeg)) out.axisDeg = comp.axisDeg + deltaDeg;
+  else if (comp.type === 'syringe' && Number.isFinite(comp.axisDeg)) out.axisDeg = comp.axisDeg + deltaDeg;   // 固定筒身針筒的軸向是世界方向
   if (comp.type === 'bar' && Number.isFinite(comp.phaseOffset) && !comp.motorCarrier) out.phaseOffset = comp.phaseOffset + deltaDeg;
   return out;
 }

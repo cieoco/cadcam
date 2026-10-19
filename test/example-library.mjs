@@ -11,7 +11,7 @@ import {encodeSnapshot,decodeShareString} from '../js/share-codec.js';
 import {prepareScopedExport} from '../js/blocks/export-scope.js';
 import {FABRICATION_DEFAULTS} from '../js/blocks/fabrication-profile.js';
 const groups={
- hydraulic:['hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h04'],
+ hydraulic:['hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h04','hydraulic-h05'],
  incomplete:['wiper-missing-coupler','fourbar-missing-coupler'],
  manual:['pantograph'],empty:['empty-challenge'],
  motion:['parallel-gripper','wiper-single','fourbar-crank-rocker','fourbar-double-crank','fourbar-double-rocker','tipping-bucket','parallel-fourbar','chebyshev-linkage','slider-crank','quick-return','gear-pair','reduction-gear-train','rack-pinion','gear-gripper','cam-follower','pulley-belt','jansen-leg','competition-fourbar-lift','competition-roller-intake','competition-rack-lift','slider-crank-practice','assembly-lift-gripper','assembly-lift-gripper-practice','lift-bucket','single-servo-claw','single-axis-wrist']

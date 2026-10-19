@@ -1036,7 +1036,7 @@ const bench = createBench({
   getViewer: () => viewer3D, is3DActive: () => view3DActive, set3D, push3D: () => push3D(),
   // H1：組立 → 設計：焦點換成組立台選的模組（沒有就維持原本的分頁）。
   enterDesign: changed => { validateViewPlane(); reconcileMotorState(); saveFocus(); if (changed) fitView(); else draw(); },
-  enterBench: () => { mateTool.reset(); reconcileMotorState(); },   // 組立台要恢復所有模組的馬達控制；接合面工具只在設計模式
+  enterBench: () => { mateTool.reset(); reconcileMotorState(); if(hydraulic?.active())draw(); },   // 液壓：進組立台後讓針筒控制列同步   // 組立台要恢復所有模組的馬達控制；接合面工具只在設計模式
   // B6：即時干涉用——目前作品的檢查參數（含各馬達行程），以及全行程時間軸點擊後把全部馬達設到指定角度。
   interferenceArgs: () => {
     const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
