@@ -185,7 +185,7 @@ $('wizardMode').addEventListener('click', () => { mode = 'wizard'; render(); });
 $('workMode').addEventListener('click', () => { mode = 'work'; render(); });
 $('back').addEventListener('click', () => { if (step > 0) step--; render(); });
 $('next').addEventListener('click', () => {
-  if (mode === 'wizard' && step < 3) { step = configured && step === 0 ? 3 : step + 1; render(); return; }
+  if (mode === 'wizard' && step < 3) { step = step + 1; render(); return; }
   if (!solve().ok) return;
   if (!integrated && bracketPlan?.ok) draft.brackets = { enabled: true, offsets: { ...bracketOffsets }, childPart: children[draft.child].surface?.compId || 'frame' };
   else if(!integrated)delete draft.brackets;
@@ -417,11 +417,11 @@ function positionMateOverlay(face, screen) {
 function render() {
   document.body.dataset.ui = mode;
   document.body.dataset.step = step;
-  $('hostFaceMore').open = mode === 'work';
+  $('hostFaceMore').open = mode === 'work' || step === 1;
   $('wizardMode').setAttribute('aria-pressed', mode === 'wizard'); $('workMode').setAttribute('aria-pressed', mode === 'work');
   document.querySelectorAll('[data-step]').forEach(s => { s.hidden = mode === 'wizard' && Number(s.dataset.step) !== step; });
-  $('progress').hidden = mode === 'work' || configured; $('progress').replaceChildren();
-  for (let i = 0; i < (configured ? 2 : 4); i++) { const dot = document.createElement('span'); if (i <= (configured ? step === 0 ? 0 : 1 : step)) dot.className = 'current'; $('progress').appendChild(dot); }
+  $('progress').hidden = mode === 'work'; $('progress').replaceChildren();
+  for (let i = 0; i < 4; i++) { const dot = document.createElement('span'); if (i <= step) dot.className = 'current'; $('progress').appendChild(dot); }
   document.querySelector('section[data-step="3"] h2').textContent = configured ? '調整接合位置' : '4 · 怎麼對齊？';
   for (const [root, field] of [['hosts', 'host'], ['children', 'child'], ['hostFaces', 'hostFace'], ['childFaces', 'childFace']]) {
     $(root).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.value) === String(draft[field])));
@@ -430,8 +430,8 @@ function render() {
   ['offsetU', 'offsetV', 'gap'].forEach(field => { $(field).value = draft[field]; });
   $('angleChip').textContent = `接合角度 ${Number(angle().toFixed(2))}°`;
   $('rotationActions').hidden = mode === 'wizard' && step !== 3;
-  $('back').hidden = mode === 'work' || configured; $('back').disabled = step === 0;
-  $('back').textContent = configured && step === 3 ? '選面輔助' : '上一步';
+  $('back').hidden = mode === 'work'; $('back').disabled = step === 0;
+  $('back').textContent = '上一步';
   $('next').textContent = mode === 'work' || step === 3 ? (integrated ? '接上' : '確認擺放') : '下一步';
   if (integrated) $('cancel').textContent = '取消';
   if (integrated && configured) { $('wizardMode').parentElement.hidden = true; document.querySelector('header .tag').hidden = true; $('mateStepChip').hidden = true; }
@@ -468,7 +468,8 @@ if (integrated) {
     mode = 'wizard';
     jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; configured = !!e.data.configured; roughPlaced = configured;
     bracketOffsets = { ...(draft.brackets?.offsets || {}) };
-    if (e.data.startAtPlacement || (configured && hosts.length === 1)) step = 3;
+    // 預設面僅作預選；只有明確重新調整位置才略過選面。
+    if (e.data.startAtPlacement) step = 3;
     if (configured && !document.getElementById('optionalView')) {
       const view = document.querySelector('.view-actions'), more = document.createElement('details'), label = document.createElement('summary');
       more.id = 'optionalView'; label.textContent = '觀看角度'; label.style.cssText = 'min-height:44px;display:flex;align-items:center;cursor:pointer;';
