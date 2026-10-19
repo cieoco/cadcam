@@ -39,6 +39,8 @@ function panel(n,ext,{zlift=true}={}){
   const catalog=buildPartGeometryCatalog({...work,mounts:exportMounts});
   const sceneIds=collectSceneIds({compiled:prepared.compiled,comps:work.comps,motorPointIds:ids});
   prepareRenderScene({compiled:prepared.compiled,comps:work.comps,points:sol.points,frameGeometry:catalog.parts.frame||null,sceneIds,computeBodyLayers,motorAssemblyLayerForBody:()=>null,motorMounts:mounts});
+  // 對照組模擬 app 修正前：只有目前檢視平面有疊放層，直角平面全部 0。
+  if(!zlift)[...prepared.compiled.visualization.links,...(prepared.compiled.visualization.polygons||[])].forEach(o=>{o._zlift=0;});
   if(zlift)markAllPlaneZlift(prepared.compiled.visualization.links,prepared.compiled.visualization.polygons||[],work.comps);
   const inputs=buildPreviewModelInputs({comps:work.comps,params:work.params,theta:0,links:prepared.compiled.visualization.links,polygons:prepared.compiled.visualization.polygons||[],points:sol.points,groundIds,motorCenterIds:ids,motorTypes:new Map([...ids].map(id=>[id,motorTypeAt(work.comps,id)])),motorMounts:mounts,
     sliderTravelStart:c=>c.travelStart||0,sliderTravelEnd:c=>c.travelEnd||100,sliderBodyLength:c=>c.bodyLen||60,rackBodyHeight:c=>c.bodyHeight||20,rackPhaseShift:()=>0,pulleyRadius:()=>32,pulleyPinRadius:()=>20});
