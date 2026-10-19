@@ -151,6 +151,10 @@ export function updateRoleEditor() {
   }
   document.getElementById('roleStatus').textContent = nodeRoleLabel(S.selectedNodeId);
   editor.dataset.nodeId = S.selectedNodeId;
+  const powerRow=document.getElementById('nodePowerRow');
+  if(powerRow)powerRow.style.display=S.comps.some(c=>
+    (c.type==='gear' && c.p1?.id===S.selectedNodeId && c.p1.physicalMotor) ||
+    (c.type==='bar' && c.isInput && [c.p1,c.p2].some(p=>p?.id===S.selectedNodeId && p.physicalMotor)))?'flex':'none';
   renderNodePosition(S.selectedNodeId);
   const motorMountRow = document.getElementById('motorMountRow');
   const motorMountStatus = document.getElementById('motorMountStatus');

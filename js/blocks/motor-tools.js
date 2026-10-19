@@ -61,6 +61,19 @@ export function rackDrivenBy(comps, activeMotor) {
   });
 }
 
+// 齒輪面板明示實際輸入輪，與放置馬達共用嚙合鏈方向。
+export function gearDriver(comps, gearId) {
+  let g=comps.find(c=>c.type==='gear' && c.id===gearId);
+  const seen=new Set();
+  while(g?.mesh && !seen.has(g.id)) {
+    seen.add(g.id);
+    const next=comps.find(c=>c.type==='gear' && c.id===g.mesh);
+    if(!next?.p1)return null;
+    g=next;
+  }
+  return g?.p1 && !g.mesh ? g : null;
+}
+
 export function createMotorTools({
   svg, pushUndo, pause, rebuild, draw, setBanner, clearBanner, promptText,
   exitDrawTools, deselectLink, openMobileEditPanel, updateRoleEditor,
@@ -336,6 +349,33 @@ export function createMotorTools({
     if (ungrounded.length) setBanner('驅動輪已上馬達並固定；記得把另一個齒輪中心也設為機架點，整對才會轉');
   }
 
+  // 原軸直接換型號：保留編號、機架、相位與輸出桿，不走拆除／重裝。
+  function changeMotorTypeAt(nodeId,type) {
+    if(!['tt','mg995'].includes(type))return null;
+    const c=motorBarForCenter(nodeId) || S.comps.find(c=>c.type==='gear' && c.p1?.id===nodeId && c.p1.physicalMotor);
+    if(!c)return null;
+    pause();
+    if((c.motorType || 'tt')!==type) {
+      pushUndo();
+      c.motorType=type;
+      if(type==='mg995') {
+        if(c.servoStart==null)c.servoStart=0;
+        if(c.servoEnd==null)c.servoEnd=90;
+      }
+    }
+    const motor=c.type==='gear'?c.p1.physicalMotor:c.physicalMotor;
+    activateMotor(String(motor || '1'));
+    cancelMotorMode(); rebuild(); draw();
+    return nodeId;
+  }
+  function setGearMotorType(gearId,type) {
+    const g=gearDriver(S.comps,gearId);
+    if(!g || !['tt','mg995'].includes(type))return null;
+    if(g.p1.physicalMotor)return changeMotorTypeAt(g.p1.id,type);
+    pause(); S.pendingMotorType=type; driveGearAt(g.id);
+    return g.p1.id;
+  }
+
   // ---- 動力來源型號查詢 ----
   // 找以此接點為馬達中心（physicalMotor 端）的輸入桿。
   function motorBarForCenter(id) {
@@ -370,7 +410,7 @@ export function createMotorTools({
 
   return {
     cancelMotorMode, motorTypeLabel, placeMotor, handleMotorOnNode, tryPickBar,
-    driveBarAt, driveSliderAt, driveGearAt, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse,
+    changeMotorTypeAt, setGearMotorType, driveBarAt, driveSliderAt, driveGearAt, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse,
     motorBarForCenter, motorTypeForCenter, inputRockRange
   };
 }

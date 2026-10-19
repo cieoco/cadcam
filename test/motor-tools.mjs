@@ -123,4 +123,22 @@ check('線性致動器不能驅動齒輪（僅取消放置、不指派）', !dri
 S.comps=[bar]; S.activeMotor='1';
 check('局部分頁不借用隱藏伺服行程', motorTools.inputRockRange([])===null);
 check('局部分頁仍採用自身伺服行程', JSON.stringify(motorTools.inputRockRange([bar]))==='{"lo":0,"hi":90}');
+// 面板更換保留同一動力與機構幾何；移掉後可從整片齒輪重裝。
+S.comps=[driver,driven]; driver.p1.physicalMotor='7';
+const before=JSON.stringify({p1:driver.p1,mesh:driver.mesh,teeth:driver.teeth});
+check('從動輪面板更換同一輸入軸',motorTools.setGearMotorType(driven.id,'mg995')===driver.p1.id);
+check('更換保留編號與幾何',before===JSON.stringify({p1:driver.p1,mesh:driver.mesh,teeth:driver.teeth}) && S.activeMotor==='7');
+check('更換後提供預設伺服角度',driver.motorType==='mg995' && driver.servoStart===0 && driver.servoEnd===90);
+driver.servoEnd=30;
+motorTools.changeMotorTypeAt(driver.p1.id,'tt');
+motorTools.changeMotorTypeAt(driver.p1.id,'mg995');
+check('往返切換保留使用者伺服範圍',driver.servoEnd===30);
+delete driver.p1.physicalMotor;
+check('拆掉後從齒輪面板重裝',motorTools.setGearMotorType(driver.id,'mg995')===driver.p1.id && !!driver.p1.physicalMotor);
+S.comps=[bar];
+const original=JSON.stringify(bar);
+motorTools.changeMotorTypeAt(bar.p1.physicalMotor?bar.p1.id:bar.p2.id,'tt');
+motorTools.changeMotorTypeAt(bar.p1.physicalMotor?bar.p1.id:bar.p2.id,'mg995');
+check('桿件更換不重建安裝或相位',JSON.stringify(bar)===original);
+check('無效目標不更動作品',motorTools.changeMotorTypeAt('missing','mg995')===null && JSON.stringify(bar)===original);
 report('motor-tools');
