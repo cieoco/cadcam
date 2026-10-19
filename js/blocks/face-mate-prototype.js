@@ -20,7 +20,13 @@ const loadSession = createLoadSession(LOAD_GRAPH_TOKEN);
 let { hosts, children } = realMountExamples();
 const initial = { host: 0, child: 0, hostFace: 'top', childFace: 'bottom', alignU: 0, alignV: 0, offsetU: 0, offsetV: 0, gap: 0, quarterTurns: 0 };
 let draft = { ...initial }, saved = { ...initial }, step = 0;
-let mode = 'wizard';
+let mode = 'wizard', choosingChild = false;
+$('previewToggle').addEventListener('click', () => {
+  const collapsed = document.body.classList.toggle('panel-collapsed');
+  $('previewToggle').textContent = collapsed ? '顯示選項' : '放大預覽';
+  $('previewToggle').setAttribute('aria-expanded', String(!collapsed));
+  requestAnimationFrame(preview);
+});
 let hasConfirmed = false, roughPlaced = false, configured = false, childConfirmed = false;
 let bracketPlan = null, jointSettings;
 let parentCandidate=null,previewRequest=0,previewSignature='',previewTimer=null,candidateClosed=false;
@@ -198,9 +204,9 @@ $('dimensionForm').addEventListener('submit', e => {
 });
 $('wizardMode').addEventListener('click', () => { mode = 'wizard'; render(); });
 $('workMode').addEventListener('click', () => { mode = 'work'; render(); });
-$('back').addEventListener('click', () => { if (step > 0) step--; render(); });
+$('back').addEventListener('click', () => { if (step === 0) choosingChild = false; else { step--; if(step === 0) choosingChild = true; } render(); $('panelScroll').scrollTop=0; });
 $('next').addEventListener('click', () => {
-  if (mode === 'wizard' && step < 3) { step = step + 1; render(); return; }
+  if (mode === 'wizard' && step < 3) { if(step === 0 && !choosingChild) choosingChild = true; else step++; render(); $('panelScroll').scrollTop=0; return; }
   if (!solve().ok) return;
   if (!integrated && bracketPlan?.ok) draft.brackets = { enabled: true, offsets: { ...bracketOffsets }, childPart: children[draft.child].surface?.compId || 'frame' };
   else if(!integrated)delete draft.brackets;
@@ -437,8 +443,12 @@ function render() {
   $('wizardMode').setAttribute('aria-pressed', mode === 'wizard'); $('workMode').setAttribute('aria-pressed', mode === 'work');
   document.querySelectorAll('[data-step]').forEach(s => { s.hidden = mode === 'wizard' && Number(s.dataset.step) !== step; });
   $('progress').hidden = mode === 'work'; $('progress').replaceChildren();
-  for (let i = 0; i < 4; i++) { const dot = document.createElement('span'); if (i <= step) dot.className = 'current'; $('progress').appendChild(dot); }
-  document.querySelector('section[data-step="3"] h2').textContent = configured ? '調整接合位置' : '4 · 怎麼對齊？';
+  const progressStep = step === 0 ? Number(choosingChild) : step + 1;
+  $('hostChoice').hidden = mode === 'wizard' && choosingChild;
+  $('childChoice').hidden = mode === 'wizard' && !choosingChild;
+  document.querySelector('section[data-step="0"] h2').textContent = choosingChild ? '2 · 選安裝零件' : '1 · 選承接設計與零件';
+  for (let i = 0; i < 5; i++) { const dot = document.createElement('span'); if (i <= progressStep) dot.className = 'current'; $('progress').appendChild(dot); }
+  document.querySelector('section[data-step="3"] h2').textContent = configured ? '調整接合位置' : '5 · 調整接合位置';
   for (const [root, field] of [['hosts', 'host'], ['children', 'child'], ['hostFaces', 'hostFace'], ['childFaces', 'childFace']]) {
     $(root).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.value) === String(draft[field]) && (field!=='child' || !integrated || childConfirmed)));
   }
@@ -446,7 +456,7 @@ function render() {
   ['offsetU', 'offsetV', 'gap'].forEach(field => { $(field).value = draft[field]; });
   $('angleChip').textContent = `接合角度 ${Number(angle().toFixed(2))}°`;
   $('rotationActions').hidden = mode === 'wizard' && step !== 3;
-  $('back').hidden = mode === 'work'; $('back').disabled = step === 0;
+  $('back').hidden = mode === 'work'; $('back').disabled = step === 0 && !choosingChild;
   $('back').textContent = '上一步';
   $('next').textContent = mode === 'work' || step === 3 ? (integrated ? '接上' : '確認擺放') : '下一步';
   if (integrated) $('cancel').textContent = '取消';
@@ -457,7 +467,7 @@ function render() {
   }
   $('installationStatus').textContent=integrated ? (!childConfirmed?'請選擇安裝零件；底板只是建議預覽，尚未確認。':children[draft.child].blockedReason || `已選：${children[draft.child].partName}。確認接合後，此設計整組跟隨承接零件。`) : '';
   $('selectedParts').textContent=integrated ? `承接：${hosts[draft.host].name} → 安裝：${childConfirmed ? children[draft.child].name : '尚未選擇（底板為建議預覽）'}` : '';
-  $('stageTitle').textContent = mode === 'work' ? '工作模式 · 外框擺放預覽' : titles[step];
+  $('stageTitle').textContent = mode === 'work' ? '工作模式 · 外框擺放預覽' : step === 0 ? (choosingChild ? '選安裝零件' : '選承接零件') : titles[step];
   preview();
 }
 function preview() {
@@ -467,7 +477,7 @@ function preview() {
   $('mateGapChip').textContent = dimensionText.gap(Number(draft.gap.toFixed(2)));
   $('mateStepChip').textContent = dimensionText.moveStep(moveStep);
   $('summary').textContent = `${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
-  const blocked=integrated && (!childConfirmed || !!children[draft.child].blockedReason);
+  const blocked=integrated && (step > 0 || choosingChild) && (!childConfirmed || !!children[draft.child].blockedReason);
   const mate = solve();if(mate.ok && !blocked)requestCandidate(mate);$('next').disabled = blocked || !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || !!document.querySelector('input[aria-invalid="true"]');
   if(integrated&&step===3)$('next').textContent=candidateConfirmLabel(parentCandidate,parentCandidate?.selectionRevision!==previewSignature);
   if (mate.ok) scene(mate);
@@ -489,7 +499,7 @@ if (integrated) {
     if (!loadSession.receiveReady(e.data.loadGraph)) { $('message').textContent = LOAD_MISMATCH_MESSAGE; $('next').disabled = true; return; }
     if (!Array.isArray(e.data.hosts) || !e.data.hosts.length || !Array.isArray(e.data.children) || !e.data.children.length) return;
     mode = 'wizard';
-    jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; configured = !!e.data.configured; childConfirmed=!!e.data.childConfirmed; roughPlaced = configured;
+    jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; choosingChild = false; configured = !!e.data.configured; childConfirmed=!!e.data.childConfirmed; roughPlaced = configured;
     bracketOffsets = { ...(draft.brackets?.offsets || {}) };
     // 預設面僅作預選；只有明確重新調整位置才略過選面。
     if (e.data.startAtPlacement) step = 3;
