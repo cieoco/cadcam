@@ -51,9 +51,13 @@ ok(typeof Op.syringeGain==='function','syringe-operations 匯出 syringeGain(com
   ok(Math.abs(g.degPerMm-fd)/fd<0.05,`degPerMm 與行程掃描的差分一致（${g.degPerMm.toFixed(3)} vs ${fd.toFixed(3)}）`);
   const reach=n.params.H2Reach;
   ok(Math.abs(g.endMmPerMm-g.degPerMm*Math.PI/180*reach)/g.endMmPerMm<0.02,'臂端每 mm 位移＝角度×臂端半徑');
-  const gainFor=arm=>{const p={...n.params,H2Arm:arm,H2Tail:reach-arm};const q=at(p,10);return Op.syringeGain(q.comps,p,c.id,q.points).degPerMm;};
+  const gainFor=(arm,ext=10)=>{const p={...n.params,H2Arm:arm,H2Tail:reach-arm};const q=at(p,ext);return Op.syringeGain(q.comps,p,c.id,q.points).degPerMm;};
   const near=gainFor(145.892),far=gainFor(172.422);
-  ok(near>far,`驅動孔離支點較近（145.892）每 mm 轉得較多：${near.toFixed(3)} > ${far.toFixed(3)}`);
+  ok(far>near,`本例的連桿配置下，172.422 孔每 mm 轉得較多：${far.toFixed(3)} > ${near.toFixed(3)}（不是「離支點近就轉得多」）`);
+  const nearScan=Op.scanSyringe(n.comps,{...n.params,H2Arm:145.892,H2Tail:reach-145.892},c.id,0.5).samples.map(x=>x.angle);
+  const d=nearScan.slice(1).map((a,i)=>a-nearScan[i]);
+  ok(d.some(x=>x>1e-6)&&d.some(x=>x<-1e-6),'145.892 孔在 0–20 mm 內擺臂會折返（經過死點附近）');
+  ok(Math.min(...[0,4,8,12,14,15,16,17,18,20].map(e=>gainFor(145.892,e)))<0.03,'折返處每 mm 轉角接近 0');
   ok(Op.syringeGain(comps,n.params,'nope',points)===null,'找不到針筒回 null');
 }
 
@@ -62,6 +66,7 @@ ok(typeof Op.syringeGain==='function','syringe-operations 匯出 syringeGain(com
   const html=readFileSync(new URL('../teaching-hydraulic.html',import.meta.url),'utf8').replace(/<[^>]+>/g,'');
   ok(/曲柄滑塊/.test(html),'H01 說明針筒推連桿與曲柄滑塊（第二單元）的關係');
   ok(/每推 ?1 ?mm/.test(html),'H02 以「每推 1 mm」比較孔位');
+  ok(/(折返|死點)/.test(html),'H02 說明 145.892 孔會在行程中折返（死點附近）');
   ok(/推.{0,12}夾緊/.test(html),'H03 說明推出夾緊');
   ok(/拉.{0,30}(氣泡|吸)/.test(html),'說明液壓用拉的比較不可靠（氣泡／吸力）');
 }
