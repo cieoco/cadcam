@@ -342,6 +342,26 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
           const h=new THREE.Path();h.absarc(foot.hole.x,foot.hole.y,foot.hole.r,0,Math.PI*2,true);f.holes.push(h);
           mesh(new THREE.ExtrudeGeometry(f,{depth:c.thickness,bevelEnabled:false}),'#647574',0,0,c.baseZ);
         }
+        // M3 reference hardware: washer + clamp + tube spacer + frame + nut.
+        // Only draw a fastener when its frame hole and height were resolved.
+        const ring=(outer,inner,height,x,y,z,color)=>{
+          if(height<=.001)return;
+          const sh=new THREE.Shape();sh.absarc(0,0,outer,0,Math.PI*2,false);
+          const hole=new THREE.Path();hole.absarc(0,0,inner,0,Math.PI*2,true);sh.holes.push(hole);
+          mesh(new THREE.ExtrudeGeometry(sh,{depth:height,bevelEnabled:false}),color,x,y,z);
+        };
+        for(const f of s.mount?.fasteners || []){
+          const cap=c.baseZ+c.thickness,washerZ=cap;
+          ring(4,f.diameter/2+.25,f.spacerHeight,f.x,f.y,f.frameTopZ,'#b6bdc5');
+          ring(f.washerDiameter/2,f.diameter/2+.1,f.washerThickness,f.x,f.y,washerZ,'#bdc7d0');
+          ring(f.washerDiameter/2,f.diameter/2+.1,f.washerThickness,f.x,f.y,f.frameBottomZ-f.washerThickness,'#bdc7d0');
+          const tip=f.frameBottomZ-f.washerThickness-f.nutHeight-1.2;
+          const shaft=mesh(new THREE.CylinderGeometry(f.diameter/2,f.diameter/2,cap+f.washerThickness-tip,16),'#596575',f.x,f.y,(tip+cap+f.washerThickness)/2);shaft.rotation.x=Math.PI/2;
+          const head=mesh(new THREE.CylinderGeometry(f.headDiameter/2,f.headDiameter/2,f.headHeight,6),'#475569',f.x,f.y,cap+f.washerThickness+f.headHeight/2);head.rotation.x=Math.PI/2;
+          const nut=new THREE.Shape();for(let j=0;j<6;j++){const a=j*Math.PI/3,x=Math.cos(a)*f.nutDiameter/2,y=Math.sin(a)*f.nutDiameter/2;j?nut.lineTo(x,y):nut.moveTo(x,y);}nut.closePath();
+          const bore=new THREE.Path();bore.absarc(0,0,f.diameter/2,0,Math.PI*2,true);nut.holes.push(bore);
+          mesh(new THREE.ExtrudeGeometry(nut,{depth:f.nutHeight,bevelEnabled:false}),'#64748b',f.x,f.y,f.frameBottomZ-f.washerThickness-f.nutHeight);
+        }
       }
     }
   }

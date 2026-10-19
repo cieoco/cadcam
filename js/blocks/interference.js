@@ -251,7 +251,7 @@ function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], 
   const worldNodes = frameConnectorNodes(machineFrameComps(list, modList));
   if (worldNodes.length && partByName.has('frame')) {
     const g = inspectFrameExport(worldNodes, exp, freeSplit.world);
-    refFrames.set('frame', { hulls: ((g && g.outlines) || []).map(convexHull).filter(h => h.length >= 3), anchors: [], moduleId: null });
+    refFrames.set('frame', { hulls: (g?.collisionOutlines || g?.outlines || []).map(convexHull).filter(h => h.length >= 3), anchors: [], moduleId: null });
   }
   moduleFrameExports(list, modList, params).forEach(entry => {
     const name = entry.fileBase;
@@ -260,13 +260,15 @@ function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], 
     if (!nodes.length) return;
     const g = inspectFrameExport(nodes, exp, freeSplit.byModule[entry.moduleId] || []);
     // 取距離最遠的兩個節點當剛體變換的基準。
-    let pair = [nodes[0], null], best = -1;
-    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
-      const d = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y);
-      if (d > best) { best = d; pair = [nodes[i], nodes[j]]; }
+    const anchors = nodes.filter(p => !p.outlineExempt); // 派生加工孔不是求解器接點。
+    let pair = [anchors[0], null], best = -1;
+    for (let i = 0; i < anchors.length; i++) for (let j = i + 1; j < anchors.length; j++) {
+      const d = Math.hypot(anchors[i].x - anchors[j].x, anchors[i].y - anchors[j].y);
+      if (d > best) { best = d; pair = [anchors[i], anchors[j]]; }
     }
     refFrames.set(name, {
-      hulls: ((g && g.outlines) || []).map(convexHull).filter(h => h.length >= 3),
+      hulls: (g?.collisionOutlines || g?.outlines || []).map(convexHull).filter(h => h.length >= 3),
+      splitSlabs: Boolean(g?.collisionOutlines),
       anchors: pair[1] && best > 1e-6 ? pair : [pair[0]],
       moduleId: entry.moduleId
     });
@@ -521,11 +523,11 @@ function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], 
       const frameName = `${M.id}-frame`;
       const standing = M.mount.orient.edge === 'child';
       // 一組零件 → 板塊：多邊形頂點在子模組座標的 s、t 範圍＋疊層高度 w 範圍（flip 已反映在 plan 的 zMm）。
-      const slabOf = group => {
+      const slabOf = (group, polygons = null) => {
         let smin = Infinity, smax = -Infinity, tmin = Infinity, tmax = -Infinity, w0 = Infinity, w1 = -Infinity;
         group.forEach(part => {
           let any = false;
-          partPolys(pose, part).forEach(poly => poly.forEach(p => {
+          (polygons || partPolys(pose, part)).forEach(poly => poly.forEach(p => {
             if (!validPt(p)) return;
             const s = (p.x - frame.base.x) * frame.e.x + (p.y - frame.base.y) * frame.e.y;
             const t = (p.x - frame.base.x) * frame.f.x + (p.y - frame.base.y) * frame.f.y;
@@ -561,7 +563,12 @@ function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], 
         });
         return pts.length >= 3 ? convexHull(pts) : [];
       };
-      const slabs = [slabOf(childParts.filter(p => p.name === frameName)), slabOf(childParts.filter(p => p.name !== frameName))].filter(sl => sl && sl.hull.length >= 3);
+      // Local mounting lands must not widen the entire cross-plane frame slab.
+      const frameParts = childParts.filter(p => p.name === frameName);
+      const frameSlabs = refFrames.get(frameName)?.splitSlabs
+        ? frameParts.flatMap(p => partPolys(pose,p).map(poly => slabOf([p],[poly])))
+        : [slabOf(frameParts)];
+      const slabs = [...frameSlabs, slabOf(childParts.filter(p => p.name !== frameName))].filter(sl => sl && sl.hull.length >= 3);
       if (!slabs.length) return;
       const bodyZ = zOf(bodyPart);
       parts.forEach(v => {

@@ -15,6 +15,7 @@
 import { solveTopology } from '../multilink/solver.js';
 import { pointKeysFor } from './part-types.js';
 import { connectionModule } from './assembly.js';
+import { syringeClampFrameNodes } from './syringe-shape.js';
 
 export const LEGO_FRAME_STEP = 8;
 
@@ -152,8 +153,9 @@ export function frameConnectorNodes(comps) {
   const pinHoleById = new Map();
   (comps||[]).filter(c=>c?.type==='rack'&&Number.isFinite(c.pinHoleDiameterMm)&&Array.isArray(c.framePins))
     .forEach(c=>c.framePins.forEach(id=>pinHoleById.set(id,c.pinHoleDiameterMm)));
-  return frameNodes(comps).filter(p => !isHiddenSliderRailPoint(comps, p.id) && !locators.has(p.id) && !separateIds.has(p.id))
+  const nodes = frameNodes(comps).filter(p => !isHiddenSliderRailPoint(comps, p.id) && !locators.has(p.id) && !separateIds.has(p.id))
     .map(p => pinHoleById.has(p.id) ? { ...p, holeDiameterMm: pinHoleById.get(p.id) } : p);
+  return [...nodes, ...syringeClampFrameNodes(comps,nodes)];
 }
 
 export function snapFrameCoord(v, step = LEGO_FRAME_STEP) {

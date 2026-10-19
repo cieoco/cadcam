@@ -10,6 +10,7 @@ import {normalizeFabricationProfile} from './fabrication-profile.js';
 import {S,motorAnglesNow} from './state.js';
 import * as View from './view.js';
 import {createPlateGeometry} from './plate-geometry.js';
+import {frameConnectorNodes} from './model.js';
 const ns='http://www.w3.org/2000/svg';
 const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(parent)parent.append(n);return n;};
 const clone=structuredClone;
@@ -33,7 +34,14 @@ export function createSyringeUI(h){
   headerObserver.observe(bar);headerObserver.observe(h.svg);
   const warning3d=el('div','針筒／管夾為外形參考；完整裝配、干涉與承重未驗證。',document.getElementById('view3d'));
   warning3d.style.cssText='position:absolute;bottom:72px;left:8px;right:8px;padding:8px;background:#fff3cd;color:#664d03;z-index:6;font-size:13px;pointer-events:none';warning3d.hidden=true;
-  let id=null,raf=null,last=null,direction=1,dragUndo=false,picking=null,scopeKey=null,message='';
+  let id=null,raf=null,last=null,direction=1,dragUndo=false,picking=null,scopeKey=null,message='',mountNotice='';
+  const mountReference='水管固定夾、M3 螺絲與套筒為參考尺寸；夾持力、完整干涉、承重與水路未驗證。';
+  function setMountPreview(shapes){
+    const failed=shapes.find(s=>s.mount?.status==='unverified');
+    const reasons={missing_frame_holes:'機架缺少管夾配對孔',frame_alignment:'管夾與機架孔未對齊',barrel_clearance:'筒身與機架高度不足，請調整疊放層',clamp_diameter:'筒身大於參考管夾內徑，需更換管夾'};
+    mountNotice=failed?`固定座待調整：${reasons[failed.mount.reason] || '尚未核對'}。`:'';
+    warning3d.textContent=mountNotice+mountReference;
+  }
   const inAssembly=()=>S.mode!=='design';
   // 組立：針筒清單含直角平面上的針筒（切換鈕與伸出量不受目前視圖平面限制）；設計模式仍只看目前視圖。
   const list=()=>(inAssembly()?assemblyWork(S.comps,S.modules,S.topo).comps:h.comps()).filter(c=>c.type==='syringe');
@@ -101,7 +109,7 @@ export function createSyringeUI(h){
     const key=`${S.mode}:${S.designFocus}`;
     if(key!==scopeKey){stop();picking=null;message='';scopeKey=key;}
     const c=active(),visible=!!c;
-    warning3d.hidden=!c||inAssembly();warning3d.textContent='針筒／管夾為外形參考；固定座、完整干涉、承重與水路未驗證。';
+    warning3d.hidden=!c||inAssembly();warning3d.textContent=mountNotice+mountReference;
     bar.hidden=!visible&&!picking;wrap.classList.toggle('hydraulic-active',visible||!!picking);
     if(!(visible&&inAssembly()))layoutBar(false);
     if(!visible){if(raf)stop();return;}
@@ -146,10 +154,15 @@ export function createSyringeUI(h){
       line(at(length-12),b,10,'#b3ab9f');
       if(shape.fixed){
         const clamp=shape.clamp;
+        const supported=frameConnectorNodes(h.comps()).some(n=>n.id===`${c.id}_clamp_0`);
         const polygon=(pts,fill)=>node('polygon',{points:pts.map(p=>{const q=at(p.x,p.y);return `${View.TX(q.x)},${View.TY(q.y)}`;}).join(' '),fill,stroke:'#475569','stroke-width':.5*View.getScale()});
         for(const foot of clamp.feet){
           polygon(foot.outline,'#859391');
-          const q=at(foot.hole.x,foot.hole.y);node('circle',{cx:View.TX(q.x),cy:View.TY(q.y),r:foot.hole.r*View.getScale(),fill:'white',stroke:'#475569'});
+          const q=at(foot.hole.x,foot.hole.y);node('circle',{cx:View.TX(q.x),cy:View.TY(q.y),r:(supported?3.25:foot.hole.r)*View.getScale(),fill:supported?'#bdc7d0':'white',stroke:'#475569'});
+          if(supported){
+            polygon(Array.from({length:6},(_,i)=>({x:foot.hole.x+2.75*Math.cos(i*Math.PI/3),y:foot.hole.y+2.75*Math.sin(i*Math.PI/3)})),'#475569');
+            line(at(foot.hole.x-1.4,foot.hole.y),at(foot.hole.x+1.4,foot.hole.y),.5,'#e2e8f0');
+          }
         }
         const half=clamp.width/2,outer=clamp.innerRadius+clamp.thickness;
         polygon([{x:-half,y:-outer},{x:half,y:-outer},{x:half,y:outer},{x:-half,y:outer}],'#6b7b7a');
@@ -189,6 +202,9 @@ export function createSyringeUI(h){
     const dialog=el('dialog');dialog.id='syringeDialog';dialog.className='syringe-dialog';const form=el('form',null,dialog);
     el('h3',candidate?'新增 10cc 液壓針筒':'針筒與安裝設定',form);
     el('p',c.mountMode==='fixed-axis'?'管夾固定筒身；A 為固定參考點，B 為片狀推桿孔。軸向固定，接孔保留轉動。':'mm；A 為筒身托架轉軸，B 為推桿轉接座。孔位沿所屬零件第 1 孔→第 2 孔量測。',form);
+    if(c.mountMode==='fixed-axis')el('p',frameConnectorNodes(h.comps()).some(n=>n.id===`${c.id}_clamp_0`)
+      ?'雙耳水管固定夾：機架配對孔距 28 mm、孔徑 3.5 mm；M3 螺絲穿過夾腳、套筒及機架，以螺帽固定。套筒高度依 3D 層位推算；夾具、螺絲長度與止滑襯墊須依實物核對。'
+      :'此固定零件尚未產生水管夾配對孔，請人工設計安裝座；不會顯示已鎖上的螺絲。',form);
     let section=form;
     const fields={},input=(key,text,value,type='number')=>{const label=el('label',text,section),n=el('input',null,label);n.type=type;n.name=key;if(type==='number')n.step='any';n.value=value;fields[key]=n;return n;};
     const tasks=el('details',null,form);el('summary',c.mountMode==='fixed-axis'?'固定筒身教學任務':'兩端鉸接教學任務',tasks);
@@ -358,5 +374,5 @@ export function createSyringeUI(h){
     }catch(e){h.notify(`尚未輸出：${e.message}`);}
   }
     const select=sid=>{if(list().some(c=>c.id===sid))id=sid;};   // 動作序列播放時，讓控制列跟著正在動的針筒
-    return {active,select,add,addFixed:addFixed,open,render,sync,stop,play,stroke,exportWork,exportVideo,isPlaying:()=>!!raf};
+    return {active,select,add,addFixed:addFixed,open,render,sync,stop,play,stroke,setMountPreview,exportWork,exportVideo,isPlaying:()=>!!raf};
 }

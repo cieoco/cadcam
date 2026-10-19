@@ -86,7 +86,7 @@ ok(turn.stock?.widthMm>=13,`轉盤條寬 ≥ 13 mm，角碼孔不破邊（${turn
 const rows=[];for(const b of [0,10,20])for(const l of [0,20])for(const g of [0,20])rows.push(panel(n,{[sB.id]:b,[sL.id]:l,[sG.id]:g}));
 ok(rows.every(r=>r.validity.valid),'面板路徑 12 個姿態都可解');
 ok(rows.every(r=>r.material.findings.length===0&&r.material.status!=='fail'),'材料干涉（含直角平面疊放層）都沒有撞到');
-ok(rows.every(r=>r.plane.length===0),'平面干涉都沒有撞到');
+ok(rows.every(r=>r.plane.length===0),`平面干涉都沒有撞到 ${JSON.stringify(rows.flatMap(r=>r.plane))}`);
 const ctrl=[0,10,20].map(b=>panel(n,{[sB.id]:b,[sL.id]:0,[sG.id]:0},{zlift:false}));
 ok(ctrl.some(r=>r.material.findings.length>0),'對照：不套用直角平面疊放層時確實會報撞（測試不是空檢查）');
 

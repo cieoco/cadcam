@@ -1,4 +1,5 @@
 import {syringeShapes} from './syringe-shape.js';
+import {assemblySyringeShapes} from '../blocks3d/syringe-scene.js';
 import {createSyringeUI} from './syringe-ui.js';
 let hydraulic=null;
 import {assemblyWork,designIds,assemblyFamily,changeAssemblyMembership,normalizeAssemblyMembers} from './assembly-membership.js';
@@ -2030,7 +2031,8 @@ function push3DNow() {
   const shown=hidden.size?sceneFor(hidden).model:model;
   if(benchmarkSession&&!playbackProbe.active())benchmarkCoverage={materialParts:model.materialParts.length,holes:model.materialParts.reduce((n,p)=>n+p.geometry.holes.length,0),cutouts:model.materialParts.reduce((n,p)=>n+p.geometry.cutouts.length,0),bracketWings:model.materialParts.filter(p=>p.geometry.kind==='bracket-wing').length,screwInstances:model.materialParts.filter(p=>p.geometry.kind==='screw').length,legacyHardware:[model,...(model.orthogonal || []).map(c=>c.model)].map(m=>({motors:m.motors?.length || 0,pins:m.pins?.length || 0})),geometryCounters:viewer3D.cacheStats()};
   const posedAt=measuring?performance.now():0;
-  if(inDesign())shown.syringes=syringeShapes(viewComps(),S.topo.params,lastFullPts);
+  if(inDesign())shown.syringes=assemblySyringeShapes(shown,viewComps(),S.modules,S.topo.params,lastFullPts,{flatten:true});
+  hydraulic?.setMountPreview(shown.syringes || []);
   viewer3D.update(shown);
   if(measuring)frame3dCpu={poseMs:posedAt-started,submit3dMs:performance.now()-posedAt};
   bench.afterScene({ pts: planesApi.pts, ptsAll: allPlanes ? allPlanes.pts : planesApi.pts, model, shown });   // 組立台：接口標記跟著這一幀的宿主位置

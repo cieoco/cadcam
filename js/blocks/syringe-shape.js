@@ -14,6 +14,21 @@ export function syringeClampShape(){
  });
  return {width,thickness,innerRadius,spacing,holeRadius,baseZ,profile,feet,extent:20};
 }
+// Two-ear pipe clamp: manufacturing holes, not kinematic joints. Keep them
+// out of the frame's reference axis; each ear needs its own supporting land.
+export function syringeClampFrameNodes(comps,nodes){
+ const ids=new Set(nodes.map(p=>p.id)),clamp=syringeClampShape(),out=[];
+ for(const c of comps.filter(c=>c.type==='syringe'&&c.mountMode==='fixed-axis')){
+  const owner=comps.find(o=>o.id===c.a.componentId);
+  if(!owner?.p1||!ids.has(owner.p1.id)||owner.p2&&!ids.has(owner.p2.id))continue;
+  const params=owner.p2?{[owner.lenParam||owner.gParam]:Math.hypot(owner.p2.x-owner.p1.x,owner.p2.y-owner.p1.y)}:{};
+  const a=attachmentPoint(c.a,comps,params),angle=c.axisDeg*Math.PI/180;
+  if(!a||!Number.isFinite(angle))continue;
+  clamp.feet.forEach((foot,i)=>out.push({id:`${c.id}_clamp_${i}`,x:a.x-Math.sin(angle)*foot.hole.y,y:a.y+Math.cos(angle)*foot.hole.y,
+   holeDiameterMm:foot.hole.r*2,holeLayer:'SYRINGE_CLAMP',outlineExempt:true,mountRadiusMm:10}));
+ }
+ return out;
+}
 // Shared mm appearance for 2D and 3D. Mount offset is an illustrative clamp layout.
 export function syringeShape(c,comps,params,points){
  const a=attachmentPoint(c.a,comps,params,points),b=attachmentPoint(c.b,comps,params,points);if(!a||!b)return null;

@@ -1057,6 +1057,42 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   if (!outlines.length) return null;
   // 固定孔貼近槽緣一樣是薄肉，警告時把槽邊當外緣一起檢查。
   const sized = sizeFrameOutline(outlines,nodes);
+  // Add local lands under pipe-clamp ears, without widening the WHOLE frame
+  // into neighbouring moving modules. Use the same outline for all consumers.
+  const clampLands=allNodes.filter(p=>p.holeLayer==='SYRINGE_CLAMP'&&p.mountRadiusMm>0)
+    .map(p=>roundPadOutline(p,p.mountRadiusMm));
+  if(clampLands.length){
+    // Preserve convex pieces for the coarse collision checker; taking a convex
+    // hull of their union would fill the empty space beside the clamp lands.
+    sized.collisionOutlines=[...sized.outlines,...clampLands];
+    // Tolerance stays below the 0.001 mm export rounding, including rebaked
+    // module coordinates whose intersections can straddle the stitch grid.
+    sized.outlines=unionOutlines([...sized.outlines,...clampLands],{precisionMm:1e-4,sampleMm:1e-3}).filter(r=>area(r)>0);
+    // Keep the longest exposed span of each original side available for mating.
+    // A local land hides only part of a side, not the entire mounting face.
+    sized.straightEdges=sized.straightEdges.map(e=>{
+      if(!e)return e;
+      let spans=[[0,e.lengthMm]];
+      for(const ring of clampLands){
+        const hits=[];
+        ring.forEach((p,i)=>{
+          const q=ring[(i+1)%ring.length],d=(p.x-e.a.x)*e.m.x+(p.y-e.a.y)*e.m.y;
+          const f=(q.x-e.a.x)*e.m.x+(q.y-e.a.y)*e.m.y;
+          if(Math.abs(d)<1e-8)hits.push((p.x-e.a.x)*e.d.x+(p.y-e.a.y)*e.d.y);
+          if(d*f<0){const t=d/(d-f);hits.push((p.x+(q.x-p.x)*t-e.a.x)*e.d.x+(p.y+(q.y-p.y)*t-e.a.y)*e.d.y);}
+        });
+        if(hits.length<2)continue;
+        const lo=Math.min(...hits),hi=Math.max(...hits);
+        spans=spans.flatMap(([a,b])=>hi<=a||lo>=b?[[a,b]]:[[a,Math.min(b,lo)],[Math.max(a,hi),b]].filter(([x,y])=>y-x>1e-6));
+      }
+      const span=spans.sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]))[0];
+      if(!span)return undefined;
+      const at=t=>({x:e.a.x+e.d.x*t,y:e.a.y+e.d.y*t});
+      return {...e,a:at(span[0]),b:at(span[1]),lengthMm:span[1]-span[0]};
+    });
+    // Existing edge consumers rely on sparse unavailable indices (arc slots).
+    sized.straightEdges.forEach((e,i)=>{if(!e)delete sized.straightEdges[i];});
+  }
   const warnEdges = [...sized.outlines, ...cutouts.map(c => c.points)];
   return { ...sized, cutouts, holes, warnings: frameWarnings(warnEdges, holes) };
 }
