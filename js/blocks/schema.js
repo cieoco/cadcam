@@ -1,5 +1,5 @@
 import {migrateH03RigidGrip} from './rigid-gripper.js';
-import { normalizeLessonSequence } from './sequence-schema.js';
+import { normalizeLessonSequence, normalizeHydraulicSequence } from './sequence-schema.js';
 import {normalizeAssemblyMembers} from './assembly-membership.js';
 import {normalizeSyringe} from '../core/syringe.js';
 /**
@@ -312,6 +312,8 @@ export function toSnapshot(comps, topo, counter, motor) {
   };
   const sequence=normalizeLessonSequence(topo?.lessonSequence);
   if(sequence)snapshot.lessonSequence=sequence;
+  const hydraulicSequence=normalizeHydraulicSequence(topo?.hydraulicSequence,snapshot.comps.filter(c=>c?.type==='syringe').map(c=>c.id));
+  if(hydraulicSequence)snapshot.hydraulicSequence=hydraulicSequence;
   const projectName=normalizeProjectName(topo?.projectName);
   if(projectName)snapshot.projectName=projectName;
   const rootDesignName=normalizeProjectName(topo?.rootDesignName);
@@ -580,7 +582,8 @@ export function normalizeSnapshot(obj) {
     });
   }
   const projectName=normalizeProjectName(obj.projectName==='H03 針筒夾具／被動夾片'?'H03 針筒夾具／一體式夾臂':obj.projectName);
-  return { lessonSequence:normalizeLessonSequence(obj.lessonSequence), ...(Array.isArray(obj.assemblyMembers)?{assemblyMembers:normalizeAssemblyMembers(obj.assemblyMembers,cleanComps,modulesResult.modules)}:{}), ...(projectName?{projectName}:{}), ...(normalizeProjectName(obj.rootDesignName)?{rootDesignName:normalizeProjectName(obj.rootDesignName==='H03 針筒夾具／被動夾片'?'H03 針筒夾具／一體式夾臂':obj.rootDesignName)}:{}), comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
+  const hydraulicSequence=normalizeHydraulicSequence(obj.hydraulicSequence,cleanComps.filter(c=>c.type==='syringe').map(c=>c.id));
+  return { lessonSequence:normalizeLessonSequence(obj.lessonSequence), ...(hydraulicSequence?{hydraulicSequence}:{}), ...(Array.isArray(obj.assemblyMembers)?{assemblyMembers:normalizeAssemblyMembers(obj.assemblyMembers,cleanComps,modulesResult.modules)}:{}), ...(projectName?{projectName}:{}), ...(normalizeProjectName(obj.rootDesignName)?{rootDesignName:normalizeProjectName(obj.rootDesignName==='H03 針筒夾具／被動夾片'?'H03 針筒夾具／一體式夾臂':obj.rootDesignName)}:{}), comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
     fabrication: fabricationResult.status === 'present' ? fabricationResult.profile : null, modules: modulesResult.modules, warnings };
 }
 

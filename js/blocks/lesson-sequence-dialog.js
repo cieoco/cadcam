@@ -1,7 +1,10 @@
 import { DEFAULT_SEQUENCE, prepareLessonSequence, sequenceAnglesAt } from './lesson-sequence.js';
 import { motionPoseIssue } from './solve-health.js';
 let open=false;
-export function openLessonSequence({readSource,readAngles,applyAngles,restore,initialSteps,saveSteps,capture,version}) {
+export function openLessonSequence(options) {
+  // 液壓組立（有針筒、沒有第七課馬達）：改開針筒序列編輯器，第七課流程不動。
+  if(options.hydraulic){import('./hydraulic-sequence-dialog.js').then(m=>m.openHydraulicSequence(options.hydraulic));return;}
+  const {readSource,readAngles,applyAngles,restore,initialSteps,saveSteps,capture,version}=options;
   if(open)return; open=true;
   const dialog=document.createElement('dialog');
   dialog.setAttribute('aria-label','第七課模擬動作序列');

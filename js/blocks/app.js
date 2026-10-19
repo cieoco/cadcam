@@ -250,7 +250,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組
   if(source!=='undo'){closedDesignTabs.clear();closedAssemblies.clear();}
   if (source !== 'undo') S.designFocus = source === 'local-autosave' ? savedFocus() : null;   // 開檔／範例／分享 → 第一頁；自動還原 → 回到上次那頁
-  S.topo = { lessonSequence: norm.lessonSequence || null, assemblyMembers: norm.assemblyMembers ?? designIds(S.comps,S.modules), projectName: norm.projectName || '', rootDesignName: norm.rootDesignName || (!S.modules.length ? norm.projectName : '') || '', params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '' };
+  S.topo = { lessonSequence: norm.lessonSequence || null, hydraulicSequence: norm.hydraulicSequence || null, assemblyMembers: norm.assemblyMembers ?? designIds(S.comps,S.modules), projectName: norm.projectName || '', rootDesignName: norm.rootDesignName || (!S.modules.length ? norm.projectName : '') || '', params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '' };
   manualTrace = {};
   S.counter = Math.max(norm.counter || 0, Store.highestIdNum(S.comps));
   S.theta = 0;
@@ -2929,6 +2929,27 @@ async function openAssemblySequence() {
   Store.saveLocal(bench.autosaveSnapshot() || Store.toSnapshot(S.comps,S.topo,S.counter,motorSnapshotState()));
   const { openLessonSequence } = await import('./lesson-sequence-dialog.js');
   const saved = { theta: S.theta, motorAngles: { ...S.motorAngles }, activeMotor: S.activeMotor, lastSolved, prevSolved };
+  const work0 = assemblyWork(S.comps,S.modules,S.topo);
+  const hasMotor = work0.comps.some(c => (c.type === 'bar' && c.isInput) || (c.type === 'gear' && c.p1?.type === 'motor'));
+  if (work0.comps.some(c => c.type === 'syringe') && !hasMotor) {
+    const savedComps = S.comps;
+    const savedPoints = { ...lastFullPts }, savedFocus = hydraulic?.active()?.id;
+    const apply = (comps, points) => { S.comps = comps; rebuild({ save: false }); lastSolved = { ...points }; prevSolved = { ...points }; draw(); };
+    openLessonSequence({ hydraulic: {
+      readSource: () => ({ ...assemblyWork(S.comps,S.modules,S.topo), params: { ...S.topo.params } }),
+      initialSequence: S.topo.hydraulicSequence,
+      saveSequence: sequence => { pushUndo(); S.topo.hydraulicSequence = sequence; Store.saveLocal(Store.toSnapshot(S.comps,S.topo,S.counter,motorSnapshotState())); },
+      svg,
+      version: APP_VERSION,
+      applyExtensions: (extensions, focusId) => {
+        if (focusId) hydraulic?.select(focusId);
+        apply(S.comps.map(c => c.type === 'syringe' && extensions[c.id] !== undefined ? { ...c, extension: extensions[c.id] } : c), lastFullPts);
+        if (lastFrameIssue) throw new Error(lastFrameIssue.message);
+      },
+      restore: () => { hydraulic?.select(savedFocus); apply(savedComps, savedPoints); }
+    } });
+    return;
+  }
   openLessonSequence({
     readSource: () => ({ ...assemblyWork(S.comps,S.modules,S.topo), params: { ...S.topo.params } }),
     readAngles: motorAnglesNow,

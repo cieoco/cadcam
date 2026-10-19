@@ -314,5 +314,6 @@ export function createSyringeUI(h){
       h.notify(`僅匯出目前液壓設計。${plan.warnings[0]}`);
     }catch(e){h.notify(`尚未輸出：${e.message}`);}
   }
-    return {active,add,addFixed:addFixed,open,render,sync,stop,play,stroke,exportWork,exportVideo,isPlaying:()=>!!raf};
+    const select=sid=>{if(list().some(c=>c.id===sid))id=sid;};   // 動作序列播放時，讓控制列跟著正在動的針筒
+    return {active,select,add,addFixed:addFixed,open,render,sync,stop,play,stroke,exportWork,exportVideo,isPlaying:()=>!!raf};
 }
