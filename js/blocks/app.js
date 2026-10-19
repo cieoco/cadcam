@@ -2014,7 +2014,7 @@ function push3DNow() {
     const stockMm=Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;
     const catalog=(hidden.size?assemblyViewGeometrySource:partGeometrySource).get({comps:sceneComps,modules:sceneModules,params:S.topo.params,fabrication:S.fabrication || {},
       exportSettings:Settings.exportSettings(),frameNodes:designView?viewFrameNodes():Model.frameConnectorNodes(machineFrameComps(sceneComps,sceneModules)),mounts:scoped?undefined:homeMountsNow(),
-      frameMounts:designView?viewMounts(viewWorldMounts(Exporters.splitMountsByHost(S.comps,homeMountsNow()).free)):undefined});
+      frameMounts:designView?viewMounts(viewWorldMounts(Exporters.splitMountsByHost(S.comps,homeMountsNow()).free)):undefined,includeSpareFrames:!inDesign()});
     const frameGeometry=designView&&S.viewPlane?null:catalog.parts.frame || null;
     const plates=catalog.frameHomes.filter(h=>!designView || h.moduleId===S.designFocus).map(h=>({moduleId:h.moduleId,plane:h.plane,
       outlines:h.geometry.outlines,outline:h.geometry.outlines[0],holes:h.geometry.holes,cutouts:h.geometry.cutouts,thicknessMm:catalog.parts[h.name]?.thicknessMm || h.stockMm}));

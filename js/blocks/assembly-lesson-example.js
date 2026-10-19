@@ -1,4 +1,4 @@
-// 第五單元：平行四連桿保持工具架姿態，M1 升降、M2 夾取。
+// 第七單元：側面升降、水平向前夾取；接合記錄由現有選面／角碼流程產生。
 export const assemblyLessonSnapshot = {
   "kind": "blocks",
   "v": 1,
@@ -75,9 +75,8 @@ export const assemblyLessonSnapshot = {
       "moduleId": "Lift1"
     },
     {
-      "type": "bar",
+      "type": "triangle",
       "id": "Link3",
-      "holes": [{"id":"ToolBolt1","distParam":"ToolBoltDist1"},{"id":"ToolBolt2","distParam":"ToolBoltDist2"}],
       "color": "#3498db",
       "p1": {
         "id": "C",
@@ -91,10 +90,37 @@ export const assemblyLessonSnapshot = {
         "x": 50,
         "y": 72
       },
-      "lenParam": "LL3",
-      "fixedLen": true,
-      "isInput": false,
-      "moduleId": "Lift1"
+      "moduleId": "Lift1",
+      "p3": {
+        "id": "E",
+        "type": "floating",
+        "x": 104,
+        "y": 72
+      },
+      "gParam": "LL3",
+      "r1Param": "ToolDiagonal",
+      "r2Param": "ToolTop",
+      "sign": -1,
+      "shapeMode": "polygon",
+      "vertices": [
+        {
+          "solve": true,
+          "ref": "p1"
+        },
+        {
+          "solve": true,
+          "ref": "p2"
+        },
+        {
+          "solve": true,
+          "ref": "p3"
+        },
+        {
+          "solve": false,
+          "u": 0,
+          "v": -54
+        }
+      ]
     },
     {
       "type": "gear",
@@ -105,7 +131,12 @@ export const assemblyLessonSnapshot = {
         "type": "motor",
         "x": 50,
         "y": 0,
-        "physicalMotor": "2"
+        "physicalMotor": "2",
+        "frameStock": {
+          "lengthMm": 110,
+          "widthMm": 120,
+          "thicknessMm": 3
+        }
       },
       "p2": {
         "id": "GPA",
@@ -129,7 +160,12 @@ export const assemblyLessonSnapshot = {
         "id": "GCB",
         "type": "fixed",
         "x": 110,
-        "y": 0
+        "y": 0,
+        "frameStock": {
+          "lengthMm": 110,
+          "widthMm": 120,
+          "thicknessMm": 3
+        }
       },
       "p2": {
         "id": "GPB",
@@ -155,7 +191,12 @@ export const assemblyLessonSnapshot = {
         "type": "motor",
         "x": 50,
         "y": 0,
-        "physicalMotor": "2"
+        "physicalMotor": "2",
+        "frameStock": {
+          "lengthMm": 110,
+          "widthMm": 120,
+          "thicknessMm": 3
+        }
       },
       "p2": {
         "id": "GPA",
@@ -186,7 +227,12 @@ export const assemblyLessonSnapshot = {
         "id": "GCB",
         "type": "fixed",
         "x": 110,
-        "y": 0
+        "y": 0,
+        "frameStock": {
+          "lengthMm": 110,
+          "widthMm": 120,
+          "thicknessMm": 3
+        }
       },
       "p2": {
         "id": "GPB",
@@ -223,8 +269,8 @@ export const assemblyLessonSnapshot = {
     "LL1": 160,
     "LL2": 160,
     "LL3": 72,
-    "ToolBoltDist1": 24,
-    "ToolBoltDist2": 48
+    "ToolDiagonal": 90,
+    "ToolTop": 54
   },
   "modules": [
     {
@@ -237,14 +283,31 @@ export const assemblyLessonSnapshot = {
           "id": "tool",
           "name": "工具架",
           "at": "C",
-          "bolts": ["ToolBolt1", "ToolBolt2"],
           "body": {
-            "kind": "bar",
+            "kind": "triangle",
             "id": "Link3"
           }
         }
       ],
-      "mount": null
+      "mount": null,
+      "mates": {
+        "attach": null,
+        "receive": [
+          {
+            "id": "tool-forward",
+            "name": "工具架上緣（水平夾取）",
+            "ref": {
+              "kind": "triangle",
+              "id": "Link3",
+              "edge": 1
+            }
+          }
+        ]
+      },
+      "faceParts": {
+        "part": "Link3",
+        "face": "front"
+      }
     },
     {
       "id": "Grip1",
@@ -262,9 +325,64 @@ export const assemblyLessonSnapshot = {
           "y": 0,
           "a": 90
         },
-        "home": {
-          "1": 0
+        "home": {},
+        "face": {
+          "version": 1,
+          "childPart": "frame",
+          "rotation": [
+            [
+              1.8369701987210297e-16,
+              -1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ],
+            [
+              -1,
+              -1.8369701987210297e-16,
+              0
+            ]
+          ],
+          "translation": {
+            "x": 136.99999999999997,
+            "y": 82.5,
+            "z": 80
+          },
+          "selection": {
+            "brackets": {
+              "enabled": true,
+              "offsets": {
+                "L1": 0,
+                "R1": 0,
+                "L2": 0
+              },
+              "childPart": "frame"
+            },
+            "hostFace": "front",
+            "childFace": "bottom",
+            "alignU": 0,
+            "alignV": 0,
+            "offsetU": -60,
+            "offsetV": 0,
+            "gap": 0,
+            "quarterTurns": 3
+          },
+          "hostThicknessMm": 4,
+          "childThicknessMm": 3
         }
+      },
+      "mates": {
+        "attach": {
+          "normalDeg": 90
+        },
+        "receive": []
+      },
+      "faceParts": {
+        "part": "frame",
+        "face": "bottom"
       }
     }
   ],

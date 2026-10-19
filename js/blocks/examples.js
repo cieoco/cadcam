@@ -62,7 +62,7 @@ const EXAMPLE_LESSONS = {
   'fourbar-missing-coupler': {group:'challenge',level:'練習',use:'尚未閉合的四連桿骨架，供練習接點連接。',try:['先補接兩側活動端，再試播與改孔距']},
   'slider-crank-practice': {group:'challenge',level:'練習',use:'曲柄與滑塊尚未相連；曲柄能轉不表示滑塊已被帶動。',try:['用連桿接曲柄端 A 與滑塊孔 P3，再觀察滑塊是否往復']},
   'assembly-lift-gripper': {group:'challenge',level:'整合',use:'已接好的升降與夾爪，分別控制升降及開合。',try:['切換組立，分別選 M1 與 M2 試動，再修改尺寸']},
-  'assembly-lift-gripper-practice': {group:'challenge',level:'練習',use:'升降與夾爪分開，供練習安裝、取消與復原。',try:['切到組立，選夾爪並預覽工具架雙孔對鎖，再確認接合']},
+  'assembly-lift-gripper-practice': {group:'challenge',level:'練習',use:'升降與夾爪分開，供練習安裝、取消與復原。',try:['切到組立，選夾爪按接合預覽，旋轉至水平朝前再接合']},
   'hydraulic-h01': {group:'lift-motion',level:'入門液壓',use:'固定筒身，經短連桿把推桿直線運動轉成單臂擺動。',
     learn:'辨識固定管夾、直線推桿與兩端可轉動的短連桿。',
     try:['任務1：推動行程滑桿並掃描，找出可用範圍。','任務2：設定中只改活動臂長 60、80、100 mm，預測再比較。','任務3：分別存檔修改前後兩個版本，記錄改變、預測與觀察。'],
@@ -947,7 +947,7 @@ assemblyPractice.comps.filter(c => c.moduleId === 'Grip1').forEach(c => {
   ['p1', 'p2', 'p3'].forEach(key => { if (c[key]) c[key].x += 240; });
 });
 ALL_BLOCK_EXAMPLES.push({ id: 'assembly-lift-gripper-practice', title: '組立：升降與夾爪接合練習',
-  note: '切換組立，選齒輪夾爪，按「工具架 · 雙孔對鎖」，預覽後接上；M1 升降時夾爪整組跟著移動。', snapshot: assemblyPractice });
+  note: '切換組立，選齒輪夾爪按「接合預覽」；工具架前面接夾爪底板下面，角度 270°、左右 −60 mm，預覽後接上。M1 升降，M2 水平開合。', snapshot: assemblyPractice });
 
 ALL_BLOCK_EXAMPLES.push({ id: 'lift-bucket', title: '組立：平行升降托斗', note: '單馬達保持料斗方向，沿圓弧升降；組立可整組拆裝。尚未驗證承載及安裝五金。', snapshot: liftBucketSnapshot });
 

@@ -8,6 +8,7 @@ import { compileAssembly, solveAssembly, machineFrameComps, machineMounts, outpu
 import { deriveMotorMounts } from './build-plan.js';
 import { framePlateHomes } from './module-plates.js';
 import {identifiedHoles} from './part-hole-trace.js';
+import {assemblyRoles} from './assembly-roles.js';
 import { orthogonalExportExtras, withWorldAdapterNodes } from './orthogonal-joint.js';
 
 export const PART_GEOMETRY_VERSION = 1;
@@ -19,9 +20,9 @@ const identityPoint=p=>({x:p.x,y:p.y});
 const circle=r=>Array.from({length:48},(_,i)=>({x:r*Math.cos(i*Math.PI/24),y:r*Math.sin(i*Math.PI/24)}));
 
 /** Key intentionally excludes drive angle and camera. All shape dependencies remain. */
-export function partGeometryKey({comps=[],modules=[],params={},fabrication={},exportSettings={},frameNodes,mounts,frameMounts}={}) {
+export function partGeometryKey({comps=[],modules=[],params={},fabrication={},exportSettings={},frameNodes,mounts,frameMounts,includeSpareFrames=false}={}) {
   const {theta,...designParams}=params;
-  return JSON.stringify([PART_GEOMETRY_VERSION,comps,modules,designParams,fabrication,exportSettings,frameNodes,mounts,frameMounts]);
+  return JSON.stringify([PART_GEOMETRY_VERSION,comps,modules,designParams,fabrication,exportSettings,frameNodes,mounts,frameMounts,includeSpareFrames]);
 }
 
 export function buildPartGeometryCatalog(args={}) {
@@ -85,6 +86,14 @@ export function buildPartGeometryCatalog(args={}) {
     parts.frame.sourceModuleIds=owners;
   }
   const homes=framePlateHomes(comps,modules,params,{exportSettings:settings,mounts,joint,stockMm});
+  // 未接合機構在組立預覽仍有自己的底板；不併入世界機架，也不改製作包範圍。
+  if(input.includeSpareFrames)for(const id of assemblyRoles(modules).spare){
+    const own=comps.filter(c=>c.moduleId===id),nodes=frameConnectorNodes(own);
+    const ids=new Set(own.flatMap(c=>[c.p1,c.p2,c.p3].filter(Boolean).map(p=>p.id)));
+    const g=Exporters.inspectFrameExport(nodes,settings,split.free.filter(m=>ids.has(m.pointId)));
+    if(g?.outlines?.length)homes.push({moduleId:id,name:`${id}-frame`,plane:null,stockMm:g.thicknessMm || stockMm,
+      geometry:{outlines:g.outlines,holes:g.holes || [],cutouts:g.cutouts || []}});
+  }
   for(const h of homes)add(h.name,'mounted-frame',h.geometry,h.stockMm,[h.moduleId,'frame'],{kind:'module-frame'},h.moduleId);
   for(const adapter of extras.adapters)for(const b of adapter.physical || [])for(const w of b.wings) {
     const box=w.box,th=box.size.z;
