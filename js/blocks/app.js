@@ -2022,7 +2022,7 @@ function push3DNow() {
       outlines:h.geometry.outlines,outline:h.geometry.outlines[0],holes:h.geometry.holes,cutouts:h.geometry.cutouts,thicknessMm:catalog.parts[h.name]?.thicknessMm || h.stockMm}));
     const model=buildMaterialScene({comps:sceneComps,modules:sceneModules,params:S.topo.params,catalog,inputs:planesApi,allPlanes,
       points:allPlanes?allPlanes.pts:designView?lastModelInputsAll.pts:pts,stockMm,frameGeometry,plates,plane:designView?(S.viewPlane || null):null,
-      assemblyScope:!designView,asm:inDesign()?S.assembly:simulationScope().assembly,plan:modulePlates.plan(),exportSettings:Settings.exportSettings(),joint:jointSettingsNow(),hullR:HULL_R_WORLD,solveValidity:lastSolveValidity});
+      assemblyScope:!designView,combineSyringeFrame:inDesign(),asm:inDesign()?S.assembly:simulationScope().assembly,plan:modulePlates.plan(),exportSettings:Settings.exportSettings(),joint:jointSettingsNow(),hullR:HULL_R_WORLD,solveValidity:lastSolveValidity});
     return {model,planesApi,allPlanes};
   }
   const hidden=inDesign()?new Set():closedAssemblyIds(S.modules);

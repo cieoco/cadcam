@@ -20,7 +20,7 @@ import {resolveSpacers} from '../js/blocks/interference.js';
 import {collectSceneIds,prepareRenderScene} from '../js/blocks/render-scene.js';
 const load=snap=>{const n=normalizeSnapshot(snap),rb=rebakeModules(n.comps,n.modules,n.params);return {...n,comps:rb.comps,modules:rb.modules};};
 // 組立台「目前姿態」的干涉檢查：照 app.js push3DNow／bench-ui 的順序建材料場景（含 render-scene 的疊放層），再跑兩種檢查。
-function panel(n,ext,{zlift=true}={}){
+function panel(n,ext,{zlift=true,combineSyringeFrame=false}={}){
   const work={comps:structuredClone(n.comps),modules:structuredClone(n.modules),params:{...n.params},fabrication:structuredClone(FABRICATION_DEFAULTS)};
   for(const [id,e] of Object.entries(ext))work.comps.find(c=>c.id===id).extension=e;
   work.topo={params:work.params};work.stockMm=Number(work.fabrication.cnc.stockThicknessMm);work.exportSettings=work.fabrication.export||{};work.joint=work.fabrication.joint;
@@ -40,7 +40,7 @@ function panel(n,ext,{zlift=true}={}){
     sliderTravelStart:c=>c.travelStart||0,sliderTravelEnd:c=>c.travelEnd||100,sliderBodyLength:c=>c.bodyLen||60,rackBodyHeight:c=>c.bodyHeight||20,rackPhaseShift:()=>0,pulleyRadius:()=>32,pulleyPinRadius:()=>20});
   const args={comps:work.comps,modules:work.modules,params:work.params,exportSettings:{...work.exportSettings,drive:work.fabrication.drive||FABRICATION_DEFAULTS.drive},cnc:work.fabrication.cnc,mounts:exportMounts,joint:work.joint};
   const {plan}=resolveSpacers(args);
-  const model=buildMaterialScene({...work,catalog,inputs:planeInputs(inputs,work.comps,work.modules,null),allPlanes:inputs,points:sol.points,asm,plan,hullR:DEFAULT_PLATE_RADIUS_WORLD,solveValidity:validity});
+  const model=buildMaterialScene({...work,catalog,inputs:planeInputs(inputs,work.comps,work.modules,null),allPlanes:inputs,points:sol.points,asm,plan,combineSyringeFrame,hullR:DEFAULT_PLATE_RADIUS_WORLD,solveValidity:validity});
   return {model,work,points:sol.points};
 }
 
@@ -122,3 +122,18 @@ for(const yaw of [0,10,20]){
  for(const id of ['H2A','H2O'])for(const k of ['x','y','z'])assert.ok(Math.abs(a[id][k]-b[id][k])<eps,'lift does not move its fixed support');
 }
 console.log('H06 world axes: 18 poses, bottom yaw / middle rise / top grasp, jaws above support');
+
+// A single design's generated ground plate already represents its fixed support.
+// Do not reinsert a second copy merely because a syringe is clamped to that bar.
+import {fixedGripSnapshot,fixedLiftSnapshot} from '../js/blocks/fixed-syringe-examples.js';
+for(const [snapshot,id,drive] of [[fixedGripSnapshot,'H3Frame','H3Syringe'],[fixedLiftSnapshot,'H2Frame','H2Syringe']]){
+ const single=load(snapshot),before=JSON.stringify(single);
+ for(const extension of [0,20]){
+  const {model}=panel(single,{[drive]:extension},{combineSyringeFrame:true});
+  assert.ok(model.frame?.materialPartId,'generated frame stays visible');
+  assert.equal(model.sticks.some(s=>s.id===id),false,'root support is represented once by the frame');
+  assert.equal(model.materialParts.filter(p=>p.partId==='frame'||p.partId===id).length,1);
+ }
+ assert.equal(JSON.stringify(single),before,'display correction never edits the accepted design');
+}
+console.log('H03/H02: one root frame in both end poses; accepted snapshots unchanged');

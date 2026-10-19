@@ -6,7 +6,7 @@ import {assemblySyringeShapes} from './syringe-scene.js';
 import {assemblyRoles} from '../blocks/assembly-roles.js';
 export function buildMaterialScene({comps,modules,params,catalog,inputs,allPlanes=null,points=inputs.pts,stockMm,frameGeometry=catalog.parts.frame || null,
  plates=catalog.frameHomes.map(h=>({moduleId:h.moduleId,plane:h.plane,outlines:h.geometry.outlines,outline:h.geometry.outlines[0],holes:h.geometry.holes,cutouts:h.geometry.cutouts,thicknessMm:catalog.parts[h.name]?.thicknessMm || h.stockMm})),
- plane=null,assemblyScope=true,asm,plan,exportSettings={},joint,hullR=8,solveValidity}={}){
+ plane=null,assemblyScope=true,combineSyringeFrame=false,asm,plan,exportSettings={},joint,hullR=8,solveValidity}={}){
  const base={hullR,plateThickness:stockMm,memberStocks:catalog.memberStocks,gearGeometries:catalog.parts,fusedParts:catalog.fusedParts};
  // Fixed members selected as connection endpoints remain separate material,
  // even when the usual preview combines other ground bars into the frame.
@@ -14,11 +14,15 @@ export function buildMaterialScene({comps,modules,params,catalog,inputs,allPlane
   const host=modules.find(h=>h.id===m.mount.to.module),output=host?.outputs?.find(o=>o.id===m.mount.to.output);
   return [output?.body?.id,m.mount.face.childPart].filter(id=>id&&id!=='frame');
  }));
- // A clamped syringe has an explicit fixed frame member, not just the generated ground plate.
- for(const c of comps)if(c.type==='syringe'&&c.mountMode==='fixed-axis')endpointIds.add(c.a.componentId);
+ // Keep syringe supports that have no main frame representation (e.g. mounted children).
+ // In a design preview a root bar already represented by the frame is not drawn twice.
+ // Assembly/candidate material keeps explicit members for their connection references.
+ const syringeFrames=new Set(comps.filter(c=>c.type==='syringe'&&c.mountMode==='fixed-axis').map(c=>c.a.componentId));
  const create=(i,frame=null)=>{
-  const links=(i.links || []).map(l=>endpointIds.has(l.id)?{...l,_frameSeparate:true}:l);
-  for(const c of comps)if(c.type==='bar'&&endpointIds.has(c.id)&&i.pts[c.p1.id]&&i.pts[c.p2.id]&&!links.some(l=>l.id===c.id))links.push({id:c.id,p1:c.p1.id,p2:c.p2.id,color:c.color,_zlift:c.zlift||0,_frameSeparate:true});
+  const separate=new Set(endpointIds);
+  for(const c of comps)if(syringeFrames.has(c.id)&&!(combineSyringeFrame&&frame&&catalog.parts.frame?.sourceModuleIds?.includes(c.moduleId||null)))separate.add(c.id);
+  const links=(i.links || []).map(l=>separate.has(l.id)?{...l,_frameSeparate:true}:l);
+  for(const c of comps)if(c.type==='bar'&&separate.has(c.id)&&i.pts[c.p1.id]&&i.pts[c.p2.id]&&!links.some(l=>l.id===c.id))links.push({id:c.id,p1:c.p1.id,p2:c.p2.id,color:c.color,_zlift:c.zlift||0,_frameSeparate:true});
   const model=buildSceneModel(links,i.pts,{...base,...i,motorCenters:i.motorCenterIds,frameGeometry:frame});
   // A fixed-only module still owns its catalog frame; its material floor is 0.
   model.fixedFrameModuleIds=new Set(plates.filter(p=>comps.some(c=>c.moduleId===p.moduleId&&[c.p1,c.p2,c.p3].some(q=>q&&i.pts[q.id]))).map(p=>p.moduleId));
