@@ -52,3 +52,10 @@ export function ownedParamKeys(c) {
 
 // 固定桿或兩個固定孔定位的剛性多孔板，可作選面安裝端。
 export const isFixedMountPart = c => !!c && (c.type === 'bar' && [c.p1,c.p2].every(p => p && ['fixed','motor'].includes(p.type)) || c.type === 'triangle' && !c.isInput && !c.physicalMotor && !c.physical_motor && c.p3?.type !== 'motor' && [c.p1,c.p2].every(p => p?.type === 'fixed' && !p.physicalMotor && !p.physical_motor));
+
+// 安裝端清單保留所有零件；無法重設固定基準的活動件只供辨認，不可確認。
+export function installationPartStatus(c, hasSurface = true) {
+  if(!isFixedMountPart(c))return {available:false,reason:'此零件不是此設計的固定基準。改以它固定會改變機構運動，目前尚不支援；可改選固定板／底板，或交換承接與安裝角色。'};
+  if(!hasSurface)return {available:false,reason:'此固定零件尚無可用的接合幾何，請回設計檢查板件與尺寸。'};
+  return {available:true,reason:''};
+}

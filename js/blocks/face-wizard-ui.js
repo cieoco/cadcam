@@ -1,4 +1,4 @@
-import { isFixedMountPart } from './part-types.js';
+import { isFixedMountPart, installationPartStatus } from './part-types.js';
 import {createFaceCandidateTransaction} from './face-candidate.js';
 import { APP_VERSION } from '../version.js?v=20261008_bracketalign';
 import { LOAD_GRAPH_TOKEN } from '../module-url.js';
@@ -29,7 +29,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   // 唯讀機構輪廓隨接合板一起移動，選面時保留完整機構的空間脈絡。
   const parts = id => {
     const own = comps.filter(c => c.moduleId === id), pts = pointCoords(own), result = [];
-    for (const s of surfaces(id)) if (s.kind === 'frame') for (const points of s.outlines) result.push({ points, color: '#8799aa' });
+    for (const s of surfaces(id)) if (s.kind === 'frame') for (const points of s.outlines) result.push({ points, partId:'frame', color: '#8799aa' });
     for (const c of own) {
       const a = pts[c.p1?.id] || c.p1, b = pts[c.p2?.id] || c.p2;
       if (!a) continue;
@@ -44,7 +44,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
         const r = Number(params[c.radiusParam]) || Number(c.r) || Number(c.radius) || 15;
         rings = [Array.from({ length: 32 }, (_, i) => ({ x: a.x + r * Math.cos(i * Math.PI / 16), y: a.y + r * Math.sin(i * Math.PI / 16) }))];
       }
-      for (const points of rings) result.push({ points, color: c.color || '#578cab' });
+      for (const points of rings) result.push({ points, partId:c.id, color: c.color || '#578cab' });
     }
     return result;
   };
@@ -89,7 +89,14 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   });
   if (!childSurface || !hosts.length) { say('需要另一個有承接板的機構，以及安裝端的固定底板。'); return; }
   const candidates = [childSurface, surfaces(childId).find(s=>s.kind==='frame'), ...comps.filter(c => c.moduleId === childId && isFixedMountPart(c)).map(c => partSurfaces(c.id).find(s => s.compId === c.id))].filter((s,i,a)=>s && a.findIndex(x=>x?.compId===s.compId && x?.kind===s.kind)===i);
-  const children = candidates.map(s => reference(s, `${child.name} · ${s.kind === 'frame' ? '固定桿／底板' : s.name}`, parts(childId)));
+  const childParts=parts(childId);
+  const children = candidates.map(s => ({...reference(s, `${child.name} · ${s.kind === 'frame' ? '固定桿／底板' : s.name}`, childParts),partId:s.compId || 'frame',recommended:s.kind==='frame'}));
+  for(const c of comps.filter(c=>c.moduleId===childId)) {
+    if(children.some(item=>item.partId===c.id))continue;
+    const status=installationPartStatus(c,false),label=c.name || `${{bar:'連桿',triangle:'板件',gear:'齒輪',anchor:'固定點',rack:'齒條',slider:'滑軌'}[c.type] || '零件'} ${c.id}`;
+    const item=reference(childSurface,`${child.name} · ${label}`,childParts);
+    children.push({...item,partName:label,partId:c.id,blockedReason:status.reason});
+  }
   const dialog = document.createElement('dialog');
   dialog.setAttribute('aria-label', '接合預覽');
   dialog.style.cssText = 'width:min(960px,100vw);height:94dvh;max-width:100vw;max-height:100dvh;padding:0;border:0;border-radius:14px;overflow-x:hidden;';
@@ -115,7 +122,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     };
     if (e.data?.type === 'face-wizard-ready') {
       if (!loadSession.receiveReady(e.data.loadGraph)) { rejectLoad(); return; }
-      frame.contentWindow.postMessage({ type: 'face-wizard-init', sourceRevision:transaction.snapshot().sourceRevision, joint, loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement: startAtPlacement && !needsChoice, hosts: hosts.map(h => ({ ...h, defaultFace: matchesSaved(h.surface) ? saved.host.face : connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, configured: !!childSelection && !needsChoice, mode: wizard || needsChoice || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && (initialMount?.to?.frame ? h.surface.frameEdge === initialMount.to.frame.edge : h.surface.outputId === initialMount?.to?.output && h.surface.kind === 'output')) }, location.origin);
+      frame.contentWindow.postMessage({ type: 'face-wizard-init', sourceRevision:transaction.snapshot().sourceRevision, joint, loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement: startAtPlacement && !needsChoice, hosts: hosts.map(h => ({ ...h, defaultFace: matchesSaved(h.surface) ? saved.host.face : connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, childConfirmed:!!saved, configured: !!childSelection && !needsChoice, mode: wizard || needsChoice || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && (initialMount?.to?.frame ? h.surface.frameEdge === initialMount.to.frame.edge : h.surface.outputId === initialMount?.to?.output && h.surface.kind === 'output')) }, location.origin);
     }
     if(!['face-wizard-preview','face-wizard-confirm'].includes(e.data?.type))return;
     if(!loadSession.allowConfirm(e.data.loadGraph)){rejectLoad();return;}
@@ -123,6 +130,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     if(e.data.type==='face-wizard-preview'){
       const selection=e.data.selection;
       if(!selection||!Number.isInteger(selection.host)||!hosts[selection.host]||!Number.isInteger(selection.child)||!children[selection.child])return;
+      if(children[selection.child].blockedReason){frame.contentWindow.postMessage({type:'face-wizard-error',reason:children[selection.child].blockedReason},location.origin);return;}
       const host=hosts[selection.host].surface,selectedChild=children[selection.child].surface;
       const result=await transaction.preview({childId,reselect:!!initialMount,selection,hostEndpoint:{moduleId:host.moduleId,outputId:host.outputId,frameEdge:host.frameEdge,partId:host.compId},childEndpoint:{partId:selectedChild.compId || 'frame'}});
       if(transaction.snapshot().closed)return;

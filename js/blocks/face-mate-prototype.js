@@ -21,7 +21,7 @@ let { hosts, children } = realMountExamples();
 const initial = { host: 0, child: 0, hostFace: 'top', childFace: 'bottom', alignU: 0, alignV: 0, offsetU: 0, offsetV: 0, gap: 0, quarterTurns: 0 };
 let draft = { ...initial }, saved = { ...initial }, step = 0;
 let mode = 'wizard';
-let hasConfirmed = false, roughPlaced = false, configured = false;
+let hasConfirmed = false, roughPlaced = false, configured = false, childConfirmed = false;
 let bracketPlan = null, jointSettings;
 let parentCandidate=null,previewRequest=0,previewSignature='',previewTimer=null,candidateClosed=false;
 function integratedSelection(mate){const selected={...draft};if(Math.abs(mate.rotation[2][2])<1e-6)selected.brackets={enabled:true,offsets:{...bracketOffsets},childPart:children[draft.child].surface?.compId || 'frame'};else delete selected.brackets;return selected;}
@@ -76,10 +76,10 @@ function button(label, action) {
   const b = document.createElement('button');
   b.type = 'button'; b.textContent = label; b.addEventListener('click', action); return b;
 }
-function update(field, value) { bracketOffsets = {}; selectedBracket = null; draft[field] = value; if (field === 'childFace') roughPlaced = true; if (field === 'host' || field === 'child') { roughPlaced = configured; if (field === 'host' && hosts[value].defaultFace) draft.hostFace = hosts[value].defaultFace; } $('message').textContent = ''; render(); }
+function update(field, value) { if(field==='child')childConfirmed=true; bracketOffsets = {}; selectedBracket = null; draft[field] = value; if (field === 'childFace') roughPlaced = true; if (field === 'host' || field === 'child') { roughPlaced = configured; if (field === 'host' && hosts[value].defaultFace) draft.hostFace = hosts[value].defaultFace; } $('message').textContent = ''; render(); }
 function buildCards(root, items, field) {
   items.forEach((item, i) => {
-    const b = button(item.partName || item.name, () => update(field, i)); b.dataset.value = i;
+    const b = button((item.partName || item.name)+(item.blockedReason ? '（尚不支援）' : item.recommended ? '（建議）' : ''), () => update(field, i)); b.dataset.value = i;
     const small = document.createElement('small'); small.textContent = item.detail; b.appendChild(small); root.appendChild(b);
   });
 }
@@ -275,7 +275,7 @@ function drawCandidateScene(mate){
 function scene(mate) {
   if(integrated&&step===3){drawCandidateScene(mate);return;}
   const svg = $('scene'); svg.replaceChildren();
-  const polygons = [], objects = [], separate = mode === 'wizard' && step <= 2 && !roughPlaced;
+  const polygons = [], objects = [], separate = !!children[draft.child].blockedReason || (mode === 'wizard' && step <= 2 && !roughPlaced);
   for (const [which, bounds, selected] of [['host', hosts[draft.host].box, draft.hostFace], ['child', children[draft.child].box, draft.childFace]]) {
     // 兩個實際機構同時保留，方向框貼在接合板上；選好兩面先預覽粗組位。
     const picking = mode === 'wizard' && (step === 1 || step === 2);
@@ -286,6 +286,7 @@ function scene(mate) {
     const transform = p => which === 'host' ? p : separate ? add(p, { x: spacing, y: 0, z: 10 }) : transformMatePoint(mate, p);
     const source = which === 'host' ? hosts[draft.host] : children[draft.child];
     for (const part of source.parts || []) objects.push({ ...part, which, points: part.points.map(p => transform({ ...p, z: 0 })) });
+    if(which==='child' && children[draft.child].blockedReason)continue;
     for (const face of boxFaces(faceBounds)) {
       const points = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => transform(add(face.center, add(mul(face.u, u * face.width / 2), mul(face.v, v * face.height / 2)))));
       const center = transform(face.center);
@@ -332,7 +333,7 @@ function scene(mate) {
       }
     }
   });
-  for (const part of objects) make('polygon', { 'data-mechanism': part.which, points: part.points.map(screen).map(q => `${q.x},${q.y}`).join(' '), fill: part.color, 'fill-opacity': .7, stroke: part.color, 'stroke-width': 2, 'pointer-events': 'none' });
+  for (const part of objects) make('polygon', { 'data-mechanism': part.which, points: part.points.map(screen).map(q => `${q.x},${q.y}`).join(' '), fill: part.color, 'fill-opacity': part.which==='child' && childConfirmed && part.partId===children[draft.child].partId ? 1 : .45, stroke: part.which==='child' && childConfirmed && part.partId===children[draft.child].partId ? '#e99b00' : part.color, 'stroke-width': part.which==='child' && childConfirmed && part.partId===children[draft.child].partId ? 5 : 2, 'pointer-events': 'none' });
   polygons.filter(p => p.selected).forEach(p => {
     if (!p.visible) make('polygon', { points: p.points.map(screen).map(q => `${q.x},${q.y}`).join(' '), fill: 'none', stroke: p.which === 'host' ? '#245c8a' : '#167553', 'stroke-width': 2.5, 'stroke-dasharray': '6 4', 'pointer-events': 'none' });
     const q = screen(p.center);
@@ -439,7 +440,7 @@ function render() {
   for (let i = 0; i < 4; i++) { const dot = document.createElement('span'); if (i <= step) dot.className = 'current'; $('progress').appendChild(dot); }
   document.querySelector('section[data-step="3"] h2').textContent = configured ? '調整接合位置' : '4 · 怎麼對齊？';
   for (const [root, field] of [['hosts', 'host'], ['children', 'child'], ['hostFaces', 'hostFace'], ['childFaces', 'childFace']]) {
-    $(root).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.value) === String(draft[field])));
+    $(root).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.value) === String(draft[field]) && (field!=='child' || !integrated || childConfirmed)));
   }
   $('align').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', Number(b.dataset.u) === draft.alignU && Number(b.dataset.v) === draft.alignV));
   ['offsetU', 'offsetV', 'gap'].forEach(field => { $(field).value = draft[field]; });
@@ -454,7 +455,8 @@ function render() {
     $('hostDesign').value=hosts[draft.host].designId;
     $('hosts').querySelectorAll('button').forEach(b=>{b.style.display=hosts[Number(b.dataset.value)].designId===hosts[draft.host].designId?'':'none';});
   }
-  $('selectedParts').textContent=integrated ? `承接：${hosts[draft.host].name} → 安裝：${children[draft.child].name}` : '';
+  $('installationStatus').textContent=integrated ? (!childConfirmed?'請選擇安裝零件；底板只是建議預覽，尚未確認。':children[draft.child].blockedReason || `已選：${children[draft.child].partName}。確認接合後，此設計整組跟隨承接零件。`) : '';
+  $('selectedParts').textContent=integrated ? `承接：${hosts[draft.host].name} → 安裝：${childConfirmed ? children[draft.child].name : '尚未選擇（底板為建議預覽）'}` : '';
   $('stageTitle').textContent = mode === 'work' ? '工作模式 · 外框擺放預覽' : titles[step];
   preview();
 }
@@ -465,7 +467,8 @@ function preview() {
   $('mateGapChip').textContent = dimensionText.gap(Number(draft.gap.toFixed(2)));
   $('mateStepChip').textContent = dimensionText.moveStep(moveStep);
   $('summary').textContent = `${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
-  const mate = solve();if(mate.ok)requestCandidate(mate);$('next').disabled = !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || !!document.querySelector('input[aria-invalid="true"]');
+  const blocked=integrated && (!childConfirmed || !!children[draft.child].blockedReason);
+  const mate = solve();if(mate.ok && !blocked)requestCandidate(mate);$('next').disabled = blocked || !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || !!document.querySelector('input[aria-invalid="true"]');
   if(integrated&&step===3)$('next').textContent=candidateConfirmLabel(parentCandidate,parentCandidate?.selectionRevision!==previewSignature);
   if (mate.ok) scene(mate);
   else { $('mateOverlay').hidden = true; $('message').textContent = mate.reason; $('message').classList.add('error'); }
@@ -486,7 +489,7 @@ if (integrated) {
     if (!loadSession.receiveReady(e.data.loadGraph)) { $('message').textContent = LOAD_MISMATCH_MESSAGE; $('next').disabled = true; return; }
     if (!Array.isArray(e.data.hosts) || !e.data.hosts.length || !Array.isArray(e.data.children) || !e.data.children.length) return;
     mode = 'wizard';
-    jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; configured = !!e.data.configured; roughPlaced = configured;
+    jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; configured = !!e.data.configured; childConfirmed=!!e.data.childConfirmed; roughPlaced = configured;
     bracketOffsets = { ...(draft.brackets?.offsets || {}) };
     // 預設面僅作預選；只有明確重新調整位置才略過選面。
     if (e.data.startAtPlacement) step = 3;

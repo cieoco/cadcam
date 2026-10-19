@@ -76,3 +76,14 @@ const attached=buildFaceCandidate(fixed,{childId:'Grip1',hostEndpoint:{moduleId:
 assert.ok(attached.ok,attached.reason);
 assert.equal(attached.work.modules.find(m=>m.id==='Grip1').mount.face.childPart,'CustomBase');
 console.log('Custom fixed member can be selected as installation part');
+
+const {installationPartStatus}=await import('../js/blocks/part-types.js');
+for(const id of ['GearA','GearB','LeftJaw','RightJaw']) {
+ const c=custom.comps.find(c=>c.id===id);
+ assert.ok(c,id);
+ assert.equal(installationPartStatus(c).available,false);
+ assert.ok(installationPartStatus(c).reason.includes('固定基準'));
+}
+assert.equal(installationPartStatus(fixed.comps.find(c=>c.id==='CustomBase')).available,true);
+assert.equal(installationPartStatus(fixed.comps.find(c=>c.id==='CustomBase'),false).available,false);
+console.log('Installation choices distinguish movable parts, supported fixed members and missing geometry');
