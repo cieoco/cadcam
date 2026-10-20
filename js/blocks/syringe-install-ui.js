@@ -5,13 +5,14 @@ import {syringeShape} from './syringe-shape.js';
 import {frameConnectorNodes} from './model.js';
 import {inspectFrameExport} from './exporters.js';
 import {createPlateGeometry} from './plate-geometry.js';
+import {actuatorSteps} from './actuator-installation.js';
 
 const ns='http://www.w3.org/2000/svg';
 const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textContent=text;parent?.append(n);return n;};
 const labelOf=c=>c.name || c.id;
 export function openSyringeInstallation({source,points,existing=null,newId,motion={},confirm,remove,advancedSettings}){
  const base=structuredClone(source),choices=installationChoices(base.comps,base.params);
- let step=0,result=null,closed=false,revision=0,viewer=null,sceneTimer=null,preview3d=false,dragging=false;
+ let step=existing&&source.comps.some(c=>c.id===existing.id)?3:0,furthest=step,result=null,closed=false,revision=0,viewer=null,sceneTimer=null,preview3d=false,dragging=false;
  const request={id:existing&&base.comps.some(c=>c.id===existing.id)?existing.id:null,newId:newId || existing?.id,
   a:existing?.a?{...existing.a}:null,b:existing?.b?{...existing.b}:null,face:existing?.installation?.face || 'front',spacerMm:existing?.installation?.spacerMm ?? null,extension:existing?.extension ?? 10,position:existing?attachmentPoint(existing.a,base.comps,base.params,points):null,axisDeg:existing?.axisDeg ?? 0,frameId:existing?.a?.componentId || ''};
  // A canvas-picked candidate retains its custom specification before insertion.
@@ -20,8 +21,8 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  dialog.setAttribute('aria-label','針筒安裝');
  const head=el('header',null,dialog),title=el('strong','針筒安裝',head),cancel=el('button','取消',head);
  const nav=el('nav',null,dialog);nav.setAttribute('aria-label','安裝步驟');
- const names=['選機架','位置角度','接推桿','固定試動'];
- const tabs=names.map((name,i)=>{const b=el('button',`${i+1} ${name}`,nav);b.onclick=()=>{if(i<=step){step=i;update();}};return b;});
+ const names=actuatorSteps;
+ const tabs=names.map((name,i)=>{const b=el('button',`${i+1} ${name}`,nav);b.onclick=()=>{if(i<=furthest){step=i;update();}};return b;});
  const preview=el('section',null,dialog);preview.className='install-preview';preview.setAttribute('aria-label','安裝預覽');
  const svg=document.createElementNS(ns,'svg');preview.append(svg);svg.setAttribute('aria-label','放置針筒、拖動位置與方向把手');svg.setAttribute('role','img');
  const space=el('div',null,preview);space.className='install-three';space.hidden=true;
@@ -41,9 +42,9 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  choices.frames.forEach(c=>option(frame,labelOf(c),c.id));frame.value=request.frameId;
  const frameSummary=el('p','',panels[3]);
  const snap=el('button','移到所選機架',panels[1]);
- const faceRow=el('div',null,panels[3]);faceRow.className='install-faces';
+ const faceRow=el('div',null,panels[0]);faceRow.className='install-faces';
  const faces=['front','back'].map((face,i)=>{const b=el('button',i?'背面':'正面',faceRow);b.onclick=()=>{request.face=face;update();};return b;});
- el('p','管夾孔距 28 mm、孔徑 3.5 mm；正反面及套筒可在 3D 核對。',panels[3]);
+ el('p','外殼以管夾固定在所選面。此針筒目前支援固定機架，活動承載零件尚未支援。管夾孔距 28 mm、孔徑 3.5 mm 為參考尺寸。',panels[0]);
  const rod=field(panels[2],'推桿接哪個短連桿？');option(rod,'請選活動短連桿','');choices.rods.forEach(c=>option(rod,labelOf(c),c.id));rod.value=request.b?.componentId || '';
  const end=field(panels[2],'連接端孔');option(end,'第一孔','0');option(end,'第二孔','1');
  end.value=request.b?.u>0?'1':'0';
@@ -67,7 +68,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  const error=el('p','',body);error.setAttribute('role','status');error.className='install-error';
  const footer=el('footer',null,dialog),back=el('button','上一步',footer),next=el('button','下一步',footer);
  cancel.onclick=()=>dialog.close();back.onclick=()=>{step--;update();};
- next.onclick=()=>{if(step<3){step++;update();}else if(result?.ok&&!result.temporary){const accepted=confirm(result);if(accepted!==false)dialog.close();else error.textContent='作品已變更，請關閉後重新安裝。';}};
+ next.onclick=()=>{if(step<3){step++;furthest=Math.max(furthest,step);update();}else if(result?.ok&&!result.temporary){const accepted=confirm(result);if(accepted!==false)dialog.close();else error.textContent='作品已變更，請關閉後重新安裝。';}};
  const changed=()=>{scanStatus.textContent='設定已變更，請重新檢查全行程。';};
  frame.onchange=()=>{request.frameId=frame.value;changed();update();};
  const setPosition=()=>{request.position={x:px.value.trim()===''?NaN:Number(px.value),y:py.value.trim()===''?NaN:Number(py.value)};changed();update();};
@@ -139,7 +140,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  }
  function update(){
   revision++;clearTimeout(sceneTimer);title.textContent=`針筒安裝 · ${step+1}/4`;
-  panels.forEach((p,i)=>p.hidden=i!==step);tabs.forEach((b,i)=>{b.disabled=i>step;b.setAttribute('aria-current',i===step?'step':'false');});
+  panels.forEach((p,i)=>p.hidden=i!==step);tabs.forEach((b,i)=>{b.disabled=i>furthest;b.setAttribute('aria-current',i===step?'step':'false');});
   faces.forEach((b,i)=>b.setAttribute('aria-pressed',String(request.face===(i?'back':'front'))));
   for(const [input,value] of [[px,request.position?.x],[py,request.position?.y],[angle,request.axisDeg]])if(document.activeElement!==input)input.value=Number.isFinite(value)?Number(value.toFixed(3)):'';
   const positionOK=request.position&&[request.position.x,request.position.y,request.axisDeg].every(Number.isFinite);

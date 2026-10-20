@@ -16,6 +16,8 @@
 
 ## 產品與功能規格
 
+- [SDD-ACTUATOR-INSTALLATION.md](SDD-ACTUATOR-INSTALLATION.md) — 致動元件共同安裝流程、候選與驗收。
+
 - [SDD-ROD-SYRINGE-CREATION.md](SDD-ROD-SYRINGE-CREATION.md) — 桿件自由創作、針筒選取與組立可見性 LOOP
 
 - [SDD-ASSEMBLY-BENCH.md](SDD-ASSEMBLY-BENCH.md) — SDD — 組立台（把做好的模組「方便地」組起來並測試）

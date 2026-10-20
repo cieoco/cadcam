@@ -997,6 +997,11 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       const g = new THREE.Group();
       g.position.set(m.x, m.y, 0);
       g.rotation.z = Math.atan2(m.dir ? m.dir.y : -1, m.dir ? m.dir.x : 0);
+      if(m.face){
+        const gap=m.type==='mg995'?SERVO.gap:MOTOR.gap;
+        g.scale.z=m.shaftDirection;
+        g.position.z=m.mountZ+m.shaftDirection*gap;
+      }
 
       if (m.type === 'mg995') {
         // MG995 伺服：藍色扁方殼沉在背面、輸出軸近端有白色舵盤
@@ -1016,7 +1021,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
 
         // 輸出軸：沿 z，從舵盤頂到原動件外側；末端略突出，讓「軸接到原動件」看得見。
         const topZ = -SERVO.gap;
-        const shaftTop = m.shaftTopZ + 3.5;
+        const shaftTop = m.face?(m.shaftEndZ-g.position.z)/m.shaftDirection:m.shaftTopZ + 3.5;
         const sLen = Math.max(1, shaftTop - topZ);
         const shaft = new THREE.Mesh(
           new THREE.CylinderGeometry(MOTOR.shaftR, MOTOR.shaftR, sLen, 16), pinMat);
@@ -1055,7 +1060,9 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       // 有機架時：齒輪箱正面(boxTopZ)貼齊機架背面(mountZ)，輸出軸改為可變長度橋接到被驅動件(baseZ)，
       // 讓馬達實際「坐」在機架上，不再因被驅動件所在層數不同而懸空。無機架則沿用固定軸長、軸頂落在 baseZ。
       let shaftLen;
-      if (Number.isFinite(m.mountZ)) {
+      if(m.face){
+        shaftLen=Math.max(2,(m.shaftEndZ-g.position.z)/m.shaftDirection-shaftBaseZ);
+      } else if (Number.isFinite(m.mountZ)) {
         g.position.z = m.mountZ - boxTopZ;
         const reach = Number.isFinite(m.baseZ) ? m.baseZ : m.mountZ + shaftBaseZ + MOTOR.shaftLen;
         shaftLen = Math.max(2, reach - g.position.z - shaftBaseZ);

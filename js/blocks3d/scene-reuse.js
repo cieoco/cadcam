@@ -8,7 +8,7 @@ export function retainedSceneKey(model){
   if(!m)return null;
   if(['rails','carriages','cams','pulleys','belts'].some(k=>m[k]?.length))return null;
   if(['sticks','plates','modulePlates','gears','racks'].some(k=>m[k]?.some(p=>!p.materialPartId))||m.frame&&!m.frame.materialPartId)return null;
-  records.push([id,(m.motors || []).map(p=>[p.id,p.type,p.mountZ,p.baseZ,p.shaftTopZ]),
+  records.push([id,(m.motors || []).map(p=>[p.id,p.type,p.mountZ,p.baseZ,p.shaftTopZ,p.face,p.shaftDirection,p.shaftEndZ]),
    (m.pins || []).map(p=>[p.id,p.r,p.z0,p.z1,p.ground]),(m.gears || []).map(g=>[g.id,g.thickness,g.pinHoleDiameter,g.z])]);
  }
  if((model.brackets || []).some(p=>!p.materialPartId)||(model.screws || []).some(p=>!p.materialPartId))return null;

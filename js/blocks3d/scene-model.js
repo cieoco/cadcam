@@ -59,7 +59,10 @@ export function computeBodyLayers(bodies, groundIds = new Set(), opts = {}) {
   const floorOf = opts.floorOf || ((i) => {
     const natural = ranks[i] + (bodies[i].lift || 0);
     if (typeof bodies[i].assemblyLayer === 'number' && Number.isFinite(bodies[i].assemblyLayer)) {
-      return Math.max(0, bodies[i].assemblyLayer + (bodies[i].lift || 0));
+      // Explicit front-face installations place the output behind the carrier.
+      // Keep legacy non-negative assembly layers' manual-lift clamp unchanged.
+      const layer=bodies[i].assemblyLayer + (bodies[i].lift || 0);
+      return bodies[i].assemblyLayer<0?layer:Math.max(0,layer);
     }
     return bodies[i].motorDriven ? Math.max(0, natural - 1) : natural;
   });
@@ -168,8 +171,8 @@ export function buildSceneModel(links, points, opts = {}) {
     motorMounts.forEach(mount => {
       if (found !== null || !mount) return;
       const hasFrame = !!mount.frameBody;
-      if (hasFrame && bodyId === mount.frameBody) found = 0;
-      else if (bodyId === mount.outputBody) found = hasFrame ? 1 : 0;
+      if (hasFrame && bodyId === mount.frameBody) found = mount.face==='back'&&mount.outputType==='gear'?-2:0;
+      else if (bodyId === mount.outputBody) found = hasFrame ? (mount.face==='front'?-1:1) : 0;
     });
     return found;
   };
@@ -570,7 +573,13 @@ export function buildSceneModel(links, points, opts = {}) {
       const dy = ty !== null ? ty - j.y : -1;
       const dl = Math.hypot(dx, dy) || 1;
       const type = motorTypes.get(j.id) === 'mg995' ? 'mg995' : 'tt';
-      motors.push({ id: j.id, x: j.x, y: j.y, baseZ: z0, shaftTopZ: z1 + 1.5, dir: { x: dx / dl, y: dy / dl }, type, mountZ: frameBackZ });
+      const hostPart=mount?.face&&sticks.find(s=>s.id===mount.frameBody);
+      const face=mount?.face,shaftDirection=face==='front'?-1:1;
+      const hostZ=hostPart?hostPart.layer*plateGap:(frameBackZ??0);
+      const hostTop=hostZ+(hostPart?.thickness??plateThickness);
+      motors.push({ id: j.id, x: j.x, y: j.y, baseZ: z0, shaftTopZ: z1 + 1.5, dir: { x: dx / dl, y: dy / dl }, type,
+        mountZ:face?(face==='front'?hostTop:hostZ):frameBackZ,
+        ...(face?{face,shaftDirection,shaftEndZ:face==='front'?z0-1.5:z1+1.5}: {}) });
       return;
     }
     pins.push({

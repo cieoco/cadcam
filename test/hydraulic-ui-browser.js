@@ -67,14 +67,14 @@ try{
   assert(q('#syringeInstallation').textContent.includes('固定後才能試動'),'assembly confirmation precedes trial');
   assert(q('#syringeInstallation svg [data-install-member="H1Coupler"]'),'coupler remains drawn');
   assert(JSON.stringify(api.snapshot())===original,'placement, direction and trial do not edit the work');
-  ib('下一步');input('試動伸出量 (mm)','20');ib('檢查全行程');assert(q('#syringeInstallation').textContent.includes('41 點'),'fixed connected actuator full stroke passes');ib('背面');ib('取消');await new Promise(resolve=>setTimeout(resolve,0));assert(JSON.stringify(api.snapshot())===original,'cancel preserves original work');
+  ib('下一步');input('試動伸出量 (mm)','20');ib('檢查全行程');assert(q('#syringeInstallation').textContent.includes('41 點'),'fixed connected actuator full stroke passes');ib('1 固定外殼');ib('背面');ib('取消');await new Promise(resolve=>setTimeout(resolve,0));assert(JSON.stringify(api.snapshot())===original,'cancel preserves original work');
   b.addFixedSyringe();connect();ib('下一步');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
   const placed=S.comps.find(c=>c.type==='syringe');assert(placed?.b.componentId==='H1Coupler'&&placed.installation.face==='front'&&placed.axisDeg===0,'confirm preserves placement, angle and real owners');
   assert(!S.comps.some(c=>c.id.startsWith('SyringePlacementReference')),'temporary placement reference never saved');
   b.undo();assert(!S.comps.some(c=>c.type==='syringe'),'one undo removes the entire installation');
-  b.addFixedSyringe();connect();ib('下一步');ib('背面');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
+  b.addFixedSyringe();connect();ib('1 固定外殼');ib('背面');ib('3 連接輸出');ib('下一步');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
   api.reopen(decodeShareString(encodeSnapshot(api.snapshot())));assert(S.comps.find(c=>c.type==='syringe').installation.face==='back','face survives save/share/reopen');
-  click('#syringeControls button');ib('下一步');ib('下一步');ib('下一步');ib('其他尺寸與加工設定');await new Promise(resolve=>setTimeout(resolve,0));assert(!!q('#syringeDialog'),'existing advanced dimensions and fabrication remain available');close();
+  click('#syringeControls button');ib('其他尺寸與加工設定');await new Promise(resolve=>setTimeout(resolve,0));assert(!!q('#syringeDialog'),'existing advanced dimensions and fabrication remain available');close();
  }
  initial();b.togglePlay();await new Promise(resolve=>setTimeout(resolve,400));b.togglePlay();assert(S.comps[2].extension>20,'time based play advances extension');
  const held=S.comps[2].extension;await new Promise(resolve=>setTimeout(resolve,150));assert(S.comps[2].extension===held,'pause stops hydraulic frame loop');

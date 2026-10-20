@@ -127,6 +127,7 @@ function normalizeBar(comp, index, params, warnings) {
         ...(['horizontal', 'vertical', 'follow-frame'].includes(rawMount.orientation)
           ? { orientation: rawMount.orientation } : {}),
         reversed: Boolean(rawMount.reversed),
+        ...(['front','back'].includes(rawMount.face) ? {face:rawMount.face} : {}),
         order: frameBody ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody']
       };
     }
@@ -376,6 +377,14 @@ function normalizeGear(comp, index, params, warnings) {
   if (safeId(comp.mesh)) out.mesh = comp.mesh;
   if (safeId(comp.mountLocatorPoint)) out.mountLocatorPoint = comp.mountLocatorPoint;
   if (comp.physicalMotor) out.physicalMotor = String(comp.physicalMotor);
+  if(comp.motorMount&&p1.physicalMotor){
+    const m=comp.motorMount;
+    out.motorMount={motor:String(p1.physicalMotor),center:p1.id,outputBody:id,
+      ...(safeId(m.frameBody)?{frameBody:m.frameBody}:{}),
+      ...(['front','back'].includes(m.face)?{face:m.face}:{}),
+      ...(['horizontal','vertical','follow-frame'].includes(m.orientation)?{orientation:m.orientation}:{}),
+      reversed:!!m.reversed,order:m.frameBody?['motor','frameBody','outputBody']:['motor','outputBody']};
+  }
   // 驅動輪可標 MG995 伺服（角度範圍內來回擺）；TT / 未標型號不輸出任何欄位，舊檔不變。
   if (comp.motorType === 'mg995') {
     // 伺服角度相對於組裝姿態，可以是負的（例如四連桿升降 −60～60°）。

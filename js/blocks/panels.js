@@ -158,7 +158,7 @@ export function updateRoleEditor() {
   renderNodePosition(S.selectedNodeId);
   const motorMountRow = document.getElementById('motorMountRow');
   const motorMountStatus = document.getElementById('motorMountStatus');
-  const motorBar = motorBarForCenter(S.selectedNodeId);
+  const motorBar = motorBarForCenter(S.selectedNodeId) || S.comps.find(c=>c.type==='gear'&&c.p1?.id===S.selectedNodeId&&c.p1.physicalMotor);
   if (motorMountRow) {
     motorMountRow.style.display = motorBar ? 'flex' : 'none';
     motorMountRow.dataset.nodeId = S.selectedNodeId;
@@ -169,7 +169,7 @@ export function updateRoleEditor() {
     const orientation = mount.orientation || (frameBody ? 'follow-frame' : 'horizontal');
     const effectiveOrientation = orientation === 'follow-frame' && !frameBody ? 'horizontal' : orientation;
     const orientationLabel = effectiveOrientation === 'horizontal' ? '水平' : effectiveOrientation === 'vertical' ? '垂直' : '沿機架';
-    motorMountStatus.textContent = `${frameBody ? `機架：${frameBody}` : '機架：世界固定'}・${orientationLabel}`;
+    motorMountStatus.textContent = `${frameBody ? `承載：${frameBody}` : '承載：自動機架'}・${mount.face==='front'?'正面':'背面'}・${orientationLabel} → ${motorBar.id}`;
   }
   const traceBtn = document.getElementById('traceBtn');
   if (traceBtn) {

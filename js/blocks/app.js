@@ -2,6 +2,7 @@ import {syringeShapes} from './syringe-shape.js';
 import {planSyringeAttachmentResize} from '../core/syringe.js';
 import {assemblySyringeShapes} from '../blocks3d/syringe-scene.js';
 import {createSyringeUI} from './syringe-ui.js';
+import {openMotorInstallation} from './actuator-install-ui.js';
 let hydraulic=null;
 import {assemblyWork,designIds,assemblyFamily,changeAssemblyMembership,normalizeAssemblyMembers} from './assembly-membership.js';
 import {faceCandidateModel} from './face-candidate.js';
@@ -82,7 +83,7 @@ import { analyzeDof } from './dof.js';
 import * as Store from './storage.js?v=20261007_singleface';
 import * as Exporters from './exporters.js?v=20261007_9';
 import { localToWorld, plateVertices, plateShapeMode, createPlateGeometry } from './plate-geometry.js';
-import { S, activateMotor, motorAnglesNow, frozenMotorAngles, usedMotorIds } from './state.js';  // 跨模組共享的可變狀態與多馬達 helper
+import { S, activateMotor, motorAnglesNow, frozenMotorAngles, usedMotorIds, nextMotorId } from './state.js';  // 跨模組共享的可變狀態與多馬達 helper
 import { createExampleController } from './example-controller.js?v=20261005_parallel';
 import { planTippingBucket } from './tipping-bucket-workflow.js';
 import { taskSnapshotKey } from './task-operation-support.js';
@@ -93,7 +94,7 @@ import { createGripperController } from './gripper-controller.js?v=20260925_r1b2
 import { createGripperObject } from './gripper-object.js?v=20260925_r1b2';
 import { createGearEditor, rackPhaseShift } from './gear-editor.js?v=20261004_fourbar_r1';
 import { createSliderEditor } from './slider-editor.js?v=20261005_sliderui';
-import { createMotorTools } from './motor-tools.js';
+import { createMotorTools, gearDriver } from './motor-tools.js';
 import { createPlateEditor } from './plate-editor.js';
 import { createNodeEditor } from './node-editor.js';
 import { createModuleEditor } from './module-editor.js?v=20261007_singleface';
@@ -901,9 +902,33 @@ const motorTools = createMotorTools({
   gearById, gearMeshChain, selectGear, rackPinionThetaRange,
   sliderProjectedDistance, railLength, sliderTravelStart, sliderTravelEnd
 });
-const { cancelMotorMode, placeMotor, handleMotorOnNode, tryPickBar,
+const { cancelMotorMode, placeMotor: placeLegacyMotor, handleMotorOnNode, tryPickBar,
         driveBarAt, driveSliderAt, driveGearAt,
-        motorBarForCenter, motorTypeForCenter, inputRockRange: baseInputRockRange, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse } = motorTools;
+        motorBarForCenter, motorTypeForCenter, inputRockRange: baseInputRockRange, setMotorWorldMount, setMotorOrientation, toggleMotorReverse } = motorTools;
+
+function placeMotor() {
+  if(S.pendingMotorType==='linear'){placeLegacyMotor();return;}
+  configureMotorMount();
+}
+function configureMotorMount(nodeId=null,initialOutputId='') {
+  if(S.mode!=='design')return;
+  pause();cancelMotorMode();
+  Tools.exitDrawLink();Tools.exitDrawTriangle();Tools.exitDrawPolygon();
+  const scoped=viewComps(),existing=scoped.find(c=>
+    (c.type==='bar'&&c.isInput&&[c.p1,c.p2].some(p=>p?.id===nodeId&&p.physicalMotor))||
+    (c.type==='gear'&&c.p1?.id===nodeId&&c.p1.physicalMotor));
+  if(!scoped.some(c=>['bar','gear'].includes(c.type))){transient('請先畫連桿或加入齒輪，再安裝致動元件。');return;}
+  const before=snapshotStr(),focus=S.designFocus,ids=new Set(scoped.map(c=>c.id));
+  openMotorInstallation({source:{comps:scoped,params:S.topo.params},points:displayCoords(),
+    motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()},type:S.pendingMotorType,
+    existingId:existing?.id,initialOutputId,motorId:nextMotorId(),confirm:plan=>{
+      if(snapshotStr()!==before||S.designFocus!==focus)return false;
+      pushUndo();const byId=new Map(plan.comps.map(c=>[c.id,c]));
+      S.comps=S.comps.map(c=>ids.has(c.id)?byId.get(c.id):c);S.topo.params={...S.topo.params,...plan.params};
+      activateMotor(plan.motor,plan.angle);S.selectedNodeId=plan.center;S.selectedLinkId=null;S.selectedTriangleId=null;S.selectedGearId=null;
+      rebuild();draw();Panels.updateRoleEditor();openMobileEditPanel();scheduleAutosave();return true;
+    }});
+}
 gripperController = createGripperController({
   getComps: () => S.comps,
   getParams: () => S.topo.params,
@@ -2495,6 +2520,10 @@ function closePowerMenu() {
 }
 function setSelectedMotorType(type, source = 'node') {
   if(S.mode!=='design')return;
+  if(source==='gear'){
+    const g=gearDriver(S.comps,S.selectedGearId);
+    if(g&&!g.p1?.physicalMotor){S.pendingMotorType=type;configureMotorMount(null,g.id);return;}
+  }
   const id=source==='gear' ? motorTools.setGearMotorType(S.selectedGearId,type) : motorTools.changeMotorTypeAt(S.selectedNodeId,type);
   if(!id)return;
   deselectLink();

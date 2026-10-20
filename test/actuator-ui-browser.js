@@ -1,0 +1,45 @@
+import {S} from '../js/blocks/state.js';
+import {actuatorSource} from './fixtures/actuator-installation.mjs';
+import {encodeSnapshot,decodeShareString} from '../js/share-codec.js';
+const b=window.blocks,api=b.gripperPilot,lines=[];
+const assert=(condition,name)=>{if(!condition)throw Error(name);lines.push('PASS '+name);};
+const dialog=()=>document.querySelector('#motorInstallation[open]');
+const button=text=>[...dialog().querySelectorAll('button')].find(n=>n.textContent===text).click();
+const field=(label,value,event='change')=>{const n=dialog().querySelector(`[aria-label="${label}"]`);n.value=value;n.dispatchEvent(new Event(event,{bubbles:true}));};
+const next=()=>button('下一步');
+const configure=()=>{
+ field('外殼固定在哪個零件？','Frame');button('正面');next();field('軸心位置','p1');next();field('輸出軸帶動哪個零件？','Arm');next();
+};
+try{
+ api.reopen(structuredClone(actuatorSource));const before=JSON.stringify(api.snapshot());
+ b.pickMotorType('mg995');assert(!!dialog()?.open,'new servo enters installation before changing work');
+ assert([...dialog().querySelectorAll('button')].find(n=>n.textContent==='下一步').disabled,'requires explicit carrier choice');
+ configure();field('試動角度 (°)','45','input');button('檢查動作範圍');
+ assert(dialog().textContent.includes('91 個角度採樣通過'),'servo range solved in candidate');
+ assert(JSON.stringify(api.snapshot())===before,'mount, face, connection and trial leave work intact');
+ button('查看 3D');
+ for(let i=0;i<50&&!dialog().querySelector('canvas');i++)await new Promise(resolve=>setTimeout(resolve,100));
+ const canvas=dialog().querySelector('canvas'),box=canvas?.getBoundingClientRect(),preview=dialog().querySelector('.install-preview').getBoundingClientRect();
+ assert(!!canvas&&box.height>100&&box.top>=preview.top&&box.bottom<=preview.bottom+1,'candidate 3D viewer renders inside visible preview');button('取消');
+ assert(JSON.stringify(api.snapshot())===before,'cancel leaves original work intact');
+ b.pickMotorType('mg995');configure();field('試動角度 (°)','45','input');button('確認安裝');
+ const arm=S.comps.find(c=>c.id==='Arm'),frame=S.comps.find(c=>c.id==='Frame');
+ assert(!dialog()&&arm.isInput&&arm.motorCarrier==='Frame'&&arm.motorMount.face==='front','confirm installs servo on real carrier and selected face');
+ assert(arm.p1.id===frame.p1.id&&frame.motorMountPoint==='A','loose output connects real shared point and explicit mount host: '+JSON.stringify({arm:arm.p1,frame:frame.p1,mount:frame.motorMountPoint}));
+ assert(S.theta===45,'confirmed trial angle remains visible');
+ const saved=api.snapshot();b.undo();assert(JSON.stringify(api.snapshot())===before,'one undo restores entire installation');
+ api.reopen(decodeShareString(encodeSnapshot(saved)));assert(S.comps.find(c=>c.id==='Arm').motorMount.face==='front','save/share/reopen preserves face');
+ b.configureMotorMount('A');assert(dialog().querySelector('h3').closest('section').hidden,'existing motor opens direct settings at trial summary');
+ button('1 固定外殼');button('背面');button('4 試動確認');button('確認安裝');assert(S.comps.find(c=>c.id==='Arm').motorMount.face==='back','edit can jump directly to face and confirm');
+ b.undo();assert(S.comps.find(c=>c.id==='Arm').motorMount.face==='front','mount edit undo');
+ api.reopen(structuredClone(actuatorSource));b.pickMotorType('tt');configure();button('檢查動作範圍');assert(dialog().textContent.includes('361 個角度採樣通過'),'TT continuous rotation shares the same flow');button('確認安裝');
+ assert(S.comps.find(c=>c.id==='Arm').motorType==='tt','TT installed');
+ b.configureMotorMount('A');button('3 連接輸出');field('輸出軸帶動哪個零件？','Frame');
+ assert([...dialog().querySelectorAll('button')].find(n=>n.textContent==='下一步').disabled,'same carrier/output cannot advance');button('取消');
+ api.reopen({kind:'blocks',v:1,params:{GR:20,PR:12},comps:[{type:'gear',id:'Gear',p1:{id:'G',type:'floating',x:0,y:0},p2:{id:'P',type:'floating',x:12,y:0},radiusParam:'GR',pinRadiusParam:'PR',teeth:20,module:2}]});
+ S.selectedGearId='Gear';b.setSelectedMotorType('tt','gear');
+ assert(!!dialog()&&!S.comps[0].p1.physicalMotor,'gear face shortcut opens candidate instead of immediately installing');
+ field('外殼固定在哪個零件？','world');next();next();next();button('確認安裝');
+ assert(S.comps[0].p1.physicalMotor&&S.comps[0].motorMount.face==='back','gear shortcut confirms through shared installation');
+ b.fitView();parent.actuatorResult(lines.join('\n')+`\n${lines.length}/${lines.length} passed`);
+}catch(e){parent.actuatorResult(lines.join('\n')+'\nFAIL '+e.stack);}
