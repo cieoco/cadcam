@@ -150,6 +150,8 @@ export function updateRoleEditor() {
     return;
   }
   document.getElementById('roleStatus').textContent = nodeRoleLabel(S.selectedNodeId);
+  const advanced = document.getElementById('nodeAdvanced');
+  if (advanced && editor.dataset.nodeId !== S.selectedNodeId) advanced.open = false;
   editor.dataset.nodeId = S.selectedNodeId;
   const powerRow=document.getElementById('nodePowerRow');
   if(powerRow)powerRow.style.display=S.comps.some(c=>
@@ -159,6 +161,19 @@ export function updateRoleEditor() {
   const motorMountRow = document.getElementById('motorMountRow');
   const motorMountStatus = document.getElementById('motorMountStatus');
   const motorBar = motorBarForCenter(S.selectedNodeId) || S.comps.find(c=>c.type==='gear'&&c.p1?.id===S.selectedNodeId&&c.p1.physicalMotor);
+  const powered = !!motorBar || S.comps.some(c=>c.type==='slider'&&c.isInput&&c.p3?.id===S.selectedNodeId);
+  const fixedBtn = document.getElementById('nodeFixedBtn');
+  if (fixedBtn) {
+    const ground = pointIsGround?.(S.selectedNodeId), mount = sliderMountInfo(S.selectedNodeId);
+    fixedBtn.style.display = powered ? 'none' : '';
+    fixedBtn.dataset.role = ground ? 'floating' : 'fixed';
+    fixedBtn.textContent = mount ? '滑軌固定孔' : ground ? '取消固定' : '固定在底座';
+    fixedBtn.disabled = !!mount;
+  }
+  const adjustBtn = document.getElementById('nodeMotorAdjustBtn');
+  if (adjustBtn) adjustBtn.style.display = motorBar ? '' : 'none';
+  const removeBtn = document.getElementById('nodeRemoveMotorBtn');
+  if (removeBtn) removeBtn.style.display = powered ? '' : 'none';
   if (motorMountRow) {
     motorMountRow.style.display = motorBar ? 'flex' : 'none';
     motorMountRow.dataset.nodeId = S.selectedNodeId;
@@ -188,6 +203,7 @@ export function updateRoleEditor() {
     const isReference = S.topo.referencePoint === S.selectedNodeId;
     referenceBtn.textContent = isReference ? '取消量測基準' : '設量測基準';
     referenceBtn.classList.toggle('trace-on', isReference);
+    referenceBtn.style.display = pointIsGround?.(S.selectedNodeId) ? '' : 'none';
   }
   const lockBtn = document.getElementById('positionLockBtn');
   if (lockBtn) {

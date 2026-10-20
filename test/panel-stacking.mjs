@@ -96,4 +96,20 @@ S.frameEditorOpen = true;
 Panels.updateFrameEditor();
 check('只開機架：獨立顯示，不塞進隱藏的節點面板', frame.style.display === 'flex' && frame.parentNode === container);
 
+S.selectedNodeId = 'C';
+Panels.updateRoleEditor();
+check('自由接點只提供固定，沒有移除動力及量測基準', byId('nodeFixedBtn').dataset.role === 'fixed'
+  && byId('nodeRemoveMotorBtn').style.display === 'none' && byId('referenceBtn').style.display === 'none');
+byId('nodeAdvanced').open = true;
+Panels.updateRoleEditor();
+check('同接點重繪保留展開狀態', byId('nodeAdvanced').open);
+S.selectedNodeId = 'B';
+Panels.updateRoleEditor();
+check('切換接點收合進階，固定點提供取消固定', !byId('nodeAdvanced').open && byId('nodeFixedBtn').dataset.role === 'floating');
+S.comps = [{ type:'gear', id:'G', p1:{id:'A',physicalMotor:'1'} }];
+S.selectedNodeId = 'A';
+Panels.updateRoleEditor();
+check('馬達接點提供安裝調整，不以固定切換誤刪動力', byId('nodeFixedBtn').style.display === 'none'
+  && byId('nodeMotorAdjustBtn').style.display !== 'none' && byId('nodeRemoveMotorBtn').style.display !== 'none');
+
 report('panel-stacking');

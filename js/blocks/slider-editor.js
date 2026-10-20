@@ -9,7 +9,7 @@
 import { S } from './state.js';
 
 export function createSliderEditor({
-  pushUndo, rebuild, draw, cancelMotorMode, deselectGear, openMobileEditPanel,
+  pushUndo, rebuild, draw, pause = () => {}, notify = () => {}, cancelMotorMode, deselectGear, openMobileEditPanel,
   updatePointCoordsById, roundMm, renderLenEditor, setLenButtonTitles, updatePlateShapeControls
 }) {
 
@@ -110,6 +110,7 @@ export function createSliderEditor({
     return Math.max(sliderTravelStart(c), Math.min(L, roundMm(fallback)));
   }
   function renderSliderDetails(c) {
+    syncLengthInput();
     const body = document.getElementById('sliderBodyVal');
     const carrier = document.getElementById('sliderCarrierVal');
     const railOffset = document.getElementById('sliderRailOffsetVal');
@@ -150,14 +151,38 @@ export function createSliderEditor({
     c.travelStart = sliderTravelStart(c);
     c.travelEnd = sliderTravelEnd(c);
   }
+  function syncLengthInput() {
+    const input = document.getElementById('sliderLengthInput');
+    if (!input) return;
+    const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
+    input.style.display = c ? '' : 'none';
+    if (!c) return;
+    document.getElementById('lenValue').style.display = 'none';
+    input.value = railLength(c);
+    input.max = sliderCarrierLength(c) - sliderRailOffset(c);
+  }
+  function setRailLength(raw) {
+    const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
+    if (!c) return;
+    const value = String(raw).trim() === '' ? NaN : Number(raw);
+    const max = sliderCarrierLength(c) - sliderRailOffset(c);
+    if (!Number.isFinite(value) || !Number.isInteger(value) || value < 1 || value > max) {
+      notify(`可滑動長度請輸入 1～${max} mm 的整數；需要更長時，請在「外形與安裝」增加底座長度或減少軌道偏移。`);
+      syncLengthInput();
+      return;
+    }
+    const d = Math.hypot(c.p2.x - c.p1.x, c.p2.y - c.p1.y);
+    changeRailLen(value - d);
+  }
   // 改軌道長度：沿軌道方向伸縮，保留本體固定端不動（p3 仍在線上由 solver 接手）。
   function changeRailLen(delta) {
     const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
     if (!c) return;
-    pushUndo();
     const dx = (c.p2.x || 0) - (c.p1.x || 0), dy = (c.p2.y || 0) - (c.p1.y || 0);
     const d = Math.hypot(dx, dy) || 1;
     const L = Math.max(1, Math.min(sliderCarrierLength(c) - sliderRailOffset(c), roundMm(d + delta)));
+    if (L === railLength(c)) { syncLengthInput(); return; }
+    pause(); pushUndo();
     // 用 updatePointCoordsById 更新所有共用此接點 id 的副本（見 setLen 說明；軌道端可能被 merge 共用）
     if (c.baseEnd === 'p2') {
       updatePointCoordsById(c.p1.id, (c.p2.x || 0) - dx / d * L, (c.p2.y || 0) - dy / d * L);
@@ -247,7 +272,7 @@ export function createSliderEditor({
     railLength, sliderBodyLength, sliderCarrierLength, sliderRailOffset,
     sliderTravelStart, sliderTravelEnd,
     renderSliderDetails, renderSliderBaseButton, sliderProjectedDistance, normalizeSliderRange,
-    changeRailLen, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset,
+    syncLengthInput, setRailLength, changeRailLen, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset,
     changeSliderTravelStart, changeSliderTravelEnd, toggleSliderBase, flipSlider
   };
 }

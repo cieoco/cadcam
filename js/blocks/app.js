@@ -2,7 +2,6 @@ import {syringeShapes} from './syringe-shape.js';
 import {planSyringeAttachmentResize} from '../core/syringe.js';
 import {assemblySyringeShapes} from '../blocks3d/syringe-scene.js';
 import {createSyringeUI} from './syringe-ui.js';
-import {openMotorInstallation} from './actuator-install-ui.js';
 let hydraulic=null;
 import {assemblyWork,designIds,assemblyFamily,changeAssemblyMembership,normalizeAssemblyMembers} from './assembly-membership.js';
 import {faceCandidateModel} from './face-candidate.js';
@@ -881,7 +880,7 @@ const { gearById, gearMeshChain, gearMeshOff, syncGearMeshAnchoredAt, selectGear
 
 // ---- 滑軌域：邏輯抽到 ./slider-editor.js，同樣注入 app 能力並綁回原名 ----
 const sliderEditor = createSliderEditor({
-  pushUndo, rebuild, draw,
+  pushUndo, rebuild, draw, pause, notify: transient,
   cancelMotorMode: (...a) => cancelMotorMode(...a),   // 延遲取用：motorTools 在下方才建立
   deselectGear, openMobileEditPanel,
   updatePointCoordsById, roundMm,
@@ -911,8 +910,9 @@ function placeMotor() {
   if(S.pendingMotorType==='linear'){placeLegacyMotor();return;}
   configureMotorMount();
 }
-function configureMotorMount(nodeId=null,initialOutputId='') {
-  if(S.mode!=='design')return;
+let motorInstallationLoading=false;
+async function configureMotorMount(nodeId=null,initialOutputId='') {
+  if(S.mode!=='design'||motorInstallationLoading)return;
   pause();cancelMotorMode();
   Tools.exitDrawLink();Tools.exitDrawTriangle();Tools.exitDrawPolygon();
   const scoped=viewComps(),existing=scoped.find(c=>
@@ -920,6 +920,12 @@ function configureMotorMount(nodeId=null,initialOutputId='') {
     (c.type==='gear'&&c.p1?.id===nodeId&&c.p1.physicalMotor));
   if(!scoped.some(c=>['bar','gear'].includes(c.type))){transient('請先畫連桿或加入齒輪，再安裝致動元件。');return;}
   const before=snapshotStr(),focus=S.designFocus,ids=new Set(scoped.map(c=>c.id));
+  let openMotorInstallation;
+  motorInstallationLoading=true;
+  try { ({openMotorInstallation}=await import('./actuator-install-ui.js')); }
+  catch { transient('安裝介面載入失敗，請再試一次。');return; }
+  finally { motorInstallationLoading=false; }
+  if(S.mode!=='design'||snapshotStr()!==before||S.designFocus!==focus){transient('作品已變更，請重新選擇安裝。');return;}
   openMotorInstallation({source:{comps:scoped,params:S.topo.params},points:displayCoords(),
     motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()},type:S.pendingMotorType,
     existingId:existing?.id,initialOutputId,motorId:nextMotorId(),confirm:plan=>{
@@ -1667,6 +1673,7 @@ function drawNow() {
   }
   clearOffHomeModuleSelection();
   memberEditor.sync();
+  sliderEditor.syncLengthInput();
   const sweepControl = document.getElementById('memberSweepControl');
   const sweepSelected = viewComps().find(c => (c.id === S.selectedLinkId && c.type === 'bar') || (c.id === S.selectedTriangleId && c.type === 'triangle'));
   sweepControl.hidden = !sweepSelected;
@@ -3258,6 +3265,7 @@ Object.assign(window.blocks, {
   mateTool: on => mateTool.set(!!on), mateDebug: () => mateTool.debug(),
   setTriSide: memberEditor.selectDimension,
   setMemberDimension: memberEditor.setValue,
+  setRailLength: sliderEditor.setRailLength,
   setMemberMirror: memberEditor.setMirror,
   setMemberMaterial: memberEditor.setMaterial
 });

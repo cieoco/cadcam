@@ -17,8 +17,10 @@ const Model = await import('../js/blocks/model.js');
 const { createSliderEditor } = await import('../js/blocks/slider-editor.js');
 
 const noop = () => {};
+let undoCount = 0, warning = '';
 const editor = createSliderEditor({
-  pushUndo: noop, rebuild: noop, draw: noop, cancelMotorMode: noop, deselectGear: noop,
+  pushUndo: () => undoCount++, notify: message => { warning = message; },
+  rebuild: noop, draw: noop, cancelMotorMode: noop, deselectGear: noop,
   openMobileEditPanel: noop,
   updatePointCoordsById: (id, x, y) => Model.updatePointCoordsById(S.comps, id, x, y),
   roundMm: v => Math.round(Number(v) || 0),
@@ -64,5 +66,22 @@ check('固定端切到 B 且行程以 p3 投影重算', slider.baseEnd === 'p2' 
 // ---- 翻面 ----
 editor.flipSlider();
 check('翻面切換滑塊解的一側', slider.sign === -1);
+
+// 直接輸入沿用幾何及固定端規則；錯誤不得改作品或消耗復原。
+const fixedEnd = { ...slider.p2 }, before = undoCount;
+editor.setRailLength('80');
+check('輸入一次更新長度、保留 B 端並只記一筆復原',
+  editor.railLength(slider) === 80 && slider.p2.x === fixedEnd.x && slider.p2.y === fixedEnd.y && undoCount === before + 1);
+check('輸入後行程仍在軌道內', slider.travelStart <= slider.travelEnd && slider.travelEnd <= 80);
+const saved = JSON.stringify(slider), unchanged = undoCount;
+for (const invalid of ['', ' ', 'abc', 'Infinity', '-1', '0', '12.5', '10000']) editor.setRailLength(invalid);
+editor.setRailLength('80');
+check('空白、非法值、超出底座與相同值不改作品或復原', JSON.stringify(slider) === saved && undoCount === unchanged);
+check('超出底座時提供修正方向', warning.includes('底座'));
+check('無效輸入還原顯示值', Number(document.getElementById('sliderLengthInput').value) === 80);
+slider.baseEnd = 'p1';
+const fixedStart = { ...slider.p1 };
+editor.setRailLength('60');
+check('A 端固定也維持原位', editor.railLength(slider) === 60 && slider.p1.x === fixedStart.x && slider.p1.y === fixedStart.y);
 
 report('slider-editor');
