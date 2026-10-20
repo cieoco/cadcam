@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {actuatorSource as source} from './fixtures/actuator-installation.mjs';
-import {planMotorInstallation} from '../js/blocks/actuator-installation.js';
+import {planMotorInstallation,quickMotorChoices} from '../js/blocks/actuator-installation.js';
 import {motorInstallationScene} from '../js/blocks/actuator-install-scene.js';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
 import {compileTopology} from '../js/core/topology.js';
@@ -53,3 +53,13 @@ const horizontal=planMotorInstallation(source,{...request,orientation:'horizonta
 const mounts=buildMotorMounts({motorIds:new Set(['A']),groundIds:new Set(['A','B']),staticPoints:horizontal.points,comps:horizontal.comps,compiledSteps:[],sliderMountInfo:()=>null,isHiddenSliderRailPoint:()=>false,motorTypeForCenter:()=> 'mg995'});
 const mount=mounts.get('A');assert.equal(motorMountPatternRotDegForCenter({id:'A',pts:horizontal.points,comps:horizontal.comps,mount}),mount.rotDeg-90,'export holes retain explicit orientation/reverse');
 console.log('Actuator installation: fixed/riding motor, TT/servo, both ends/faces, gear, pure candidates, roundtrip, phase, 3D and holes passed');
+
+const loose=quickMotorChoices(source.comps);
+assert.equal(loose.length,2,'loose bar has two endpoints; neither is guessed');
+assert.ok(loose.every(c=>c.hostId==='world'&&c.outputId==='Arm'));
+const shared=structuredClone(source);shared.comps[1].p1={...shared.comps[0].p1};
+const unique=quickMotorChoices(shared.comps);
+assert.deepEqual(unique.map(c=>[c.outputId,c.hostId,c.nodeId]),[['Arm','Frame','A']],'shared fixed host is inferred without moving or grounding another joint');
+assert.equal(quickMotorChoices(base.comps).length,0,'existing input is edited, not replaced');
+assert.ok(quickMotorChoices(moving.comps).some(c=>c.outputId==='Tool'&&c.hostId==='Arm'&&c.nodeId===moving.comps[1].p2.id),'moving carrier stays attached');
+assert.equal(JSON.stringify(source),original,'quick choices do not mutate source');

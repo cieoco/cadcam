@@ -8,6 +8,27 @@ export const actuatorPoint=(c,key,points={})=>points[c?.[key]?.id] || c?.[key];
 export function actuatorChoices(comps){
   return {hosts:comps.filter(c=>c.type==='bar'),outputs:comps.filter(c=>c.type==='bar'||c.type==='gear'&&!c.mesh)};
 }
+// Infer only existing shared joints. A loose endpoint can explicitly preview a
+// world mount; never guess an endpoint or translate a connected part here.
+export function quickMotorChoices(comps,outputId=''){
+  const fixed=new Set(comps.flatMap(c=>keys.map(k=>c[k])).filter(p=>p?.type==='fixed').map(p=>p.id));
+  const result=[];
+  for(const out of actuatorChoices(comps).outputs){
+    if(outputId&&out.id!==outputId||out.isInput||out.physicalMotor||keys.some(k=>out[k]?.physicalMotor))continue;
+    if(out.type==='bar'&&[out.p1,out.p2].every(p=>fixed.has(p.id)))continue;
+    for(const end of out.type==='gear'?['p1']:['p1','p2']){
+      const node=out[end];if(!node)continue;
+      if(out.type==='bar'&&fixed.has(out[end==='p1'?'p2':'p1'].id))continue;
+      const shared=comps.filter(c=>c!==out&&keys.some(k=>c[k]?.id===node.id));
+      const hosts=shared.filter(c=>c.type==='bar'&&['p1','p2'].some(k=>c[k]?.id===node.id));
+      for(const host of hosts)result.push({nodeId:node.id,outputId:out.id,outputEnd:end,hostId:host.id,
+        hostEnd:host.p1.id===node.id?'p1':'p2',orientation:'follow-frame',face:'back'});
+      if(!shared.length)result.push({nodeId:node.id,outputId:out.id,outputEnd:end,hostId:'world',
+        hostEnd:'p1',orientation:'horizontal',face:'back'});
+    }
+  }
+  return result;
+}
 export function planMotorInstallation(source,request,points={},motion={}){
   const comps=structuredClone(source.comps),params={...source.params};
   const fail=message=>({ok:false,message});
