@@ -30,7 +30,7 @@ export function openHydraulicSequence({readSource,applyExtensions,restore,initia
   dialog.setAttribute('aria-label','液壓動作序列');
   const body=el('div',null,shell,'padding:12px 12px 4px;overflow:auto;flex:1 1 auto;min-height:0');
   el('h2','液壓動作序列',body,'font-size:18px;margin:0 0 4px');
-  const note=el('p','一步推一支針筒，從目前位置等速移到目標。推出量 0 mm 為縮回；夾爪推出為夾緊。這是幾何動作，不驗證抓取或碰撞。',body,'margin:0 0 6px;font-size:13px');
+  const note=el('p','一步推一支針筒，從目前位置等速移到目標。伸出量 0 mm 為縮回；張開或收攏請依自己的夾爪試動結果設定。這是幾何動作，不驗證抓取或碰撞。',body,'margin:0 0 6px;font-size:13px');
   const status=el('p','改好步驟後按「驗證」，再按「播放」。結束或停止都會回到原姿勢。',body,'margin:0 0 6px;font-weight:600;font-size:14px');
   status.setAttribute('role','status');status.setAttribute('aria-live','polite');
   const list=el('div',null,body);

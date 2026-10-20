@@ -12,7 +12,7 @@ import {prepareScopedExport} from '../js/blocks/export-scope.js';
 import {FABRICATION_DEFAULTS} from '../js/blocks/fabrication-profile.js';
 const groups={
  hydraulic:['hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h04','hydraulic-h05','hydraulic-h06'],
- incomplete:['wiper-missing-coupler','fourbar-missing-coupler'],
+ incomplete:['hydraulic-h01-practice','hydraulic-h02-practice','hydraulic-h03-practice','wiper-missing-coupler','fourbar-missing-coupler'],
  manual:['pantograph'],empty:['empty-challenge'],
  motion:['parallel-gripper','wiper-single','fourbar-crank-rocker','fourbar-double-crank','fourbar-double-rocker','tipping-bucket','parallel-fourbar','chebyshev-linkage','slider-crank','quick-return','gear-pair','reduction-gear-train','rack-pinion','gear-gripper','cam-follower','pulley-belt','jansen-leg','competition-fourbar-lift','competition-roller-intake','competition-rack-lift','slider-crank-practice','assembly-lift-gripper','assembly-lift-gripper-practice','lift-bucket','single-servo-claw','single-axis-wrist']
 };
@@ -28,6 +28,7 @@ for(const e of BLOCK_EXAMPLES){
  const pose=solveAssembly(assembly,{thetaDeg:0});
  const issue=motionPoseIssue(s.comps,pose);
  if(groups.empty.includes(e.id))assert.equal(issue.code,'invalid_pose');
+ else if(e.id==='hydraulic-h03-practice')assert.equal(issue.code,'missing_points'); // No input yet: both jaw branches lack solved points.
  else if([...groups.incomplete,...groups.manual].includes(e.id))assert.equal(issue.code,'underconstrained');
  else if(groups.hydraulic.includes(e.id)){
    const c=s.comps.find(c=>c.type==='syringe');assert.ok(scanSyringe(s.comps,s.params,c.id).ok,e.id+' stroke');

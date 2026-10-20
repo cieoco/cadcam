@@ -63,7 +63,7 @@ ok(n.comps.find(c=>c.id===grip.id).extension===grip.extension,'不改傳入資�
 const ex=readFileSync(new URL('../js/blocks/examples.js',import.meta.url),'utf8');
 ok(/id:'hydraulic-h05'/.test(ex)&&/hydraulicLiftGripSnapshot/.test(ex),'範例清單登錄 hydraulic-h05');
 const t=readFileSync(new URL('../teaching-hydraulic.html',import.meta.url),'utf8');
-ok(/blocks\.html\?example=hydraulic-h05/.test(t)&&/第五課/.test(t),'教材第五課有開啟 H05 的連結');
+ok(/blocks\.html\?example=hydraulic-h05/.test(t)&&/第十單元/.test(t),'教材第十單元有開啟 H05 的連結');
 const ui=readFileSync(new URL('../js/blocks/syringe-ui.js',import.meta.url),'utf8');
 ok(/assemblySyringeControls/.test(ui)&&/planAssemblySyringe/.test(ui),'針筒介面在組立模式使用多針筒控制');
 ok(!/組立 3D 尚未支援針筒/.test(ui),'組立模式可以操作針筒（移除「尚未支援」提示）');

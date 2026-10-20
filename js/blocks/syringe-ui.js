@@ -228,13 +228,13 @@ export function createSyringeUI(h){
       select.value=c[key].componentId;input(`${key}U`,`${key.toUpperCase()} 沿桿位置 u (mm)`,c[key].u);input(`${key}V`,`${key.toUpperCase()} 偏置 v (板件用，mm)`,c[key].v);
     }
     if(c.mountMode==='fixed-axis')input('axisDeg','固定筒身軸向 (°)',c.axisDeg);
-    const arm=h.comps().find(o=>o.id===(c.outputId||c.b.componentId)&&['bar','triangle'].includes(o.type));if(arm&&!c.passiveTips?.length&&!c.jawIds?.length)input('armLength',c.id==='H2Syringe'?'驅動孔距主軸 (mm)':'活動臂長度 (mm)',params()[arm.lenParam||arm.gParam]);
+    const arm=h.comps().find(o=>o.id===(c.outputId||c.b.componentId)&&['bar','triangle'].includes(o.type));if(arm&&!c.passiveTips?.length&&!c.jawIds?.length)input('armLength',c.outputId==='H2Arm'?'驅動孔距主軸 (mm)':'活動臂長度 (mm)',params()[arm.lenParam||arm.gParam]);
     if(c.id==='HSyringe'){
       const presets=el('div',null,form);for(const u of [60,80,100]){const btn=el('button',`B = ${u} mm`,presets);btn.type='button';btn.onclick=()=>{fields.bU.value=u;};}
       el('small','比較只改 B：示範三組均以 0–40 mm、0.5 mm 間隔通過幾何採樣。修改其他條件後請重新掃描。',form);
     }
     if(c.id==='H1Syringe'){const presets=el('div',null,form);for(const length of [60,80,100]){const btn=el('button',`臂長 ${length} mm`,presets);btn.type='button';btn.onclick=()=>{fields.armLength.value=length;};}}
-    if(c.id==='H2Syringe'){const presets=el('div',null,form);for(const length of [145.892,172.422,198.958]){const b=el('button',`孔位 ${length} mm`,presets);b.type='button';b.onclick=()=>{fields.armLength.value=length;};}}
+    if(c.outputId==='H2Arm'){const presets=el('div',null,form);for(const length of [145.892,172.422,198.958]){const b=el('button',`孔位 ${length} mm`,presets);b.type='button';b.onclick=()=>{fields.armLength.value=length;};}}
     (c.passiveTips||[]).forEach((t,i)=>input(`tip${i}`,`夾片 ${i+1} 手動相對角度 (°，不含接觸求解)`,t.angleDeg));
     input('extension','目前伸出量 s (mm)',c.extension);
     const specs=el('details',null,form);el('summary','針筒規格與實測校正',specs);section=specs;
@@ -256,7 +256,7 @@ export function createSyringeUI(h){
       (next.passiveTips||[]).forEach((t,i)=>{t.angleDeg=Number(fields[`tip${i}`].value);});
       if(fields.axisDeg)next.axisDeg=Number(fields.axisDeg.value);
       next.spec.name=fields.name.value;next.spec.calibrated=calibration.checked;next.extension=Number(fields.extension.value);
-      if(fields.armLength){if(!(Number(fields.armLength.value)>0))return {ok:false,message:'臂長必須大於零。'};p[arm.lenParam||arm.gParam]=Number(fields.armLength.value);if(c.id==='H2Syringe'){p.H2Tail=p.H2Reach-p.H2Arm;if(p.H2Tail<=0)return {ok:false,message:'驅動孔必須位於臂端內側。'};}}
+      if(fields.armLength){if(!(Number(fields.armLength.value)>0))return {ok:false,message:'臂長必須大於零。'};p[arm.lenParam||arm.gParam]=Number(fields.armLength.value);if(c.outputId==='H2Arm'){p.H2Tail=p.H2Reach-p.H2Arm;if(p.H2Tail<=0)return {ok:false,message:'驅動孔必須位於臂端內側。'};}}
       const index=comps.findIndex(o=>o.id===next.id);if(index<0)comps.push(next);else comps[index]=next;
       const fabrication=clone(f);Object.assign(fabrication.cnc,{stockThicknessMm:Number(fields.thickness.value)});Object.assign(fabrication.export,{holeDiameterMm:Number(fields.pin.value),frameHoleDiameterMm:Number(fields.bolt.value)});Object.assign(fabrication.syringeMount,{clearanceMm:Number(fields.clearance.value),marginMm:Number(fields.margin.value),strapSpacingMm:Number(fields.spacing.value)});
       const norm=normalizeFabricationProfile(fabrication);if(!norm.ok)return norm;
@@ -371,7 +371,7 @@ export function createSyringeUI(h){
       await exportAnimation({svg:h.svg,begin:()=>{
         const saved=S.comps,points={...h.points()},ids=new Set(source.map(o=>o.id));let elapsed=0,previous=points;
         clearTimeout(S.autosaveTimer);
-        return {duration:10+1/24,evidence:{lines:[`${c.id} 針筒行程比較`, `伸出量 0–${c.spec.stroke} mm；${scan.samples.length} 點${c.passiveTips?.length?'主傳動':'幾何'}採樣通過`,c.id==='H1Syringe'?`活動臂長 ${sourceParams.H1Arm.toFixed(1)} mm；臂角 ${scan.samples[0].angle.toFixed(1)}° → ${scan.samples.at(-1).angle.toFixed(1)}°`:c.id==='H2Syringe'?`驅動孔距 ${sourceParams.H2Arm.toFixed(3)} mm；臂角 ${scan.samples[0].angle.toFixed(1)}° → ${scan.samples.at(-1).angle.toFixed(1)}°`:c.jawIds?.length?`一體式夾臂端孔距 ${scan.samples[0].tipGap.toFixed(1)} → ${scan.samples.at(-1).tipGap.toFixed(1)} mm`:c.passiveTips?.length?`夾片安裝軸距 ${scan.samples[0].mountGap.toFixed(1)} → ${scan.samples.at(-1).mountGap.toFixed(1)} mm；夾片角度手動`:'臂角／行程為幾何結果；未模擬抓取接觸',`${APP_VERSION}；干涉、承載、水路未驗證`]},
+        return {duration:10+1/24,evidence:{lines:[`${c.id} 針筒行程比較`, `伸出量 0–${c.spec.stroke} mm；${scan.samples.length} 點${c.passiveTips?.length?'主傳動':'幾何'}採樣通過`,c.id==='H1Syringe'?`活動臂長 ${sourceParams.H1Arm.toFixed(1)} mm；臂角 ${scan.samples[0].angle.toFixed(1)}° → ${scan.samples.at(-1).angle.toFixed(1)}°`:c.outputId==='H2Arm'?`驅動孔距 ${sourceParams.H2Arm.toFixed(3)} mm；臂角 ${scan.samples[0].angle.toFixed(1)}° → ${scan.samples.at(-1).angle.toFixed(1)}°`:c.jawIds?.length?`一體式夾臂端孔距 ${scan.samples[0].tipGap.toFixed(1)} → ${scan.samples.at(-1).tipGap.toFixed(1)} mm`:c.passiveTips?.length?`夾片安裝軸距 ${scan.samples[0].mountGap.toFixed(1)} → ${scan.samples.at(-1).mountGap.toFixed(1)} mm；夾片角度手動`:'臂角／行程為幾何結果；未模擬抓取接觸',`${APP_VERSION}；干涉、承載、水路未驗證`]},
           frame:dt=>{elapsed+=dt;const fraction=Math.min(1,elapsed/10000),extension=c.spec.stroke*(fraction<=.5?fraction*2:(1-fraction)*2),r=planSyringeStroke(source,sourceParams,c.id,extension,previous,motion());if(!r.ok)throw Error(r.message);previous=r.points;S.comps=[...saved.filter(o=>!ids.has(o.id)),...r.comps];h.rebuild();h.seed(r.points);h.draw();},
           ...(h.is3D?.()?{capture:h.capture}:{}),
           restore:()=>{S.comps=saved;h.rebuild();h.seed(points);h.draw();h.save();}

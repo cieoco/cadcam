@@ -958,6 +958,22 @@ ALL_BLOCK_EXAMPLES.push({ id: 'lift-bucket', title: '組立：平行升降托斗
 
 ALL_BLOCK_EXAMPLES.push(...COMMON_MANIPULATOR_EXAMPLES);
 
+// 第八、九單元：直接從既有幾何開始安裝，不重製 H01–H03，也不要求學生先開成品再拆除。
+for(const [id,label,snapshot] of [
+  ['hydraulic-h01','單臂',hydraulicSnapshot],
+  ['hydraulic-h02','升降',fixedLiftSnapshot],
+  ['hydraulic-h03','夾具',fixedGripSnapshot]
+]){
+  const practice=structuredClone(snapshot);
+  practice.comps=practice.comps.filter(c=>c.type!=='syringe');
+  practice.projectName=`${label}：自己安裝針筒`;
+  const practiceId=`${id}-practice`;
+  ALL_BLOCK_EXAMPLES.push({id:practiceId,title:`${id.slice(-3).toUpperCase()}｜${label}針筒安裝練習`,
+    note:'連桿已接好、尚未安裝針筒。先選固定機架，再放置、接孔並檢查行程。',snapshot:practice});
+  EXAMPLE_LESSONS[practiceId]={group:'challenge',level:'練習',use:'親手安裝針筒，完成後才能試動。',
+    try:['新增 → 動力來源 → 10cc液壓針筒（管夾固定）','固定外殼 → 位置方向 → 連接輸出 → 試動確認；依第八、九單元檢查並保存']};
+}
+
 export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES.filter(
   example => example.id !== 'competition-flywheel-shooter'
 );

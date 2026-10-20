@@ -19,7 +19,7 @@ export function syringeReading(c,comps,params,points) {
   const arm=comps.find(o=>o.id===(c.outputId||c.b.componentId));
   const fixedIds=fixedSyringePointIds(comps);
   const pivot=[arm?.p1,arm?.p2,arm?.p3].find(p=>fixedIds.has(p?.id)) || arm?.p1;
-  const tip=c.id==='H2Syringe'?arm?.p3:[arm?.p2,arm?.p1,arm?.p3].find(p=>p&&p.id!==pivot?.id);
+  const tip=c.outputId==='H2Arm'?arm?.p3:[arm?.p2,arm?.p1,arm?.p3].find(p=>p&&p.id!==pivot?.id);
   const o=points?.[pivot?.id],end=points?.[tip?.id];
   const tips=(c.passiveTips||[]).map(t=>points?.[comps.find(o=>o.id===t.hostId)?.p3?.id]);
   const mountGap=tips.length===2&&tips.every(Boolean)?Math.hypot(tips[0].x-tips[1].x,tips[0].y-tips[1].y):null;

@@ -57,7 +57,7 @@ const place=(comps,a,b,opt)=>placeFixedSyringe(comps,params,pts,a,b,opt);
   const app=readFileSync(new URL('../js/blocks/app.js',import.meta.url),'utf8');
   ok(/window\.blocks\.addFixedSyringe\s*=/.test(app),'window.blocks.addFixedSyringe 可呼叫');
   const t=readFileSync(new URL('../teaching-hydraulic.html',import.meta.url),'utf8');
-  const h1=t.slice(t.indexOf('第一課'),t.indexOf('第二課'));
+  const h1=t.slice(t.indexOf('第八單元'),t.indexOf('第九單元'));
   ok(/從空白/.test(h1)&&/管夾固定/.test(h1),'H01 有「從空白用選單放管夾固定針筒」的練習');
 }
 console.log(`hydraulic-p1-3: ${pass} passed`);

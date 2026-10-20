@@ -47,7 +47,7 @@ function panel(n,ext){
 const n=load(SNAP);
 const lift=n.comps.find(c=>c.id==='H2Syringe'),grip=n.comps.find(c=>c.id==='H3Syringe');
 const gripComps=n.comps.filter(c=>c.moduleId==='Grip'&&['bar','triangle'].includes(c.type)),liftComps=n.comps.filter(c=>c.moduleId==='Lift'&&['bar','triangle'].includes(c.type));
-ok(gripComps.length===5&&gripComps.every(c=>c.zlift===2),'夾爪模組的桿與板整組往外抬 2 層（疊在升降臂前面）');
+ok(gripComps.length===5&&gripComps.every(c=>c.zlift===3),'夾爪模組的桿與板整組往外抬 3 層（疊在升降臂前面）');
 ok(liftComps.length===3&&liftComps.every(c=>!c.zlift),'升降模組不抬層（臂與連接桿留在原層）');
 
 const sweep=(snap)=>{const m=load(snap),rows=[];

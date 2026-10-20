@@ -44,5 +44,5 @@ ok(/id:'hydraulic-h04'/.test(ex)&&/fixedBaseSnapshot/.test(ex),'範例清單登�
 ok(!/hydraulic-h03[^\n]*交叉/.test(ex),'H03 範例說明不再寫「交叉臂」（已改為對稱不交叉）');
 const html=readFileSync(new URL('../teaching-hydraulic.html',import.meta.url),'utf8');
 ok(/blocks\.html\?example=hydraulic-h04/.test(html),'教材有開啟 H04 的連結');
-ok(/第四課/.test(html)&&/俯視/.test(html)&&/轉盤/.test(html),'第四課以俯視說明轉盤');
+ok(/第十一單元/.test(html)&&/俯視/.test(html)&&/轉盤/.test(html),'第十一單元以俯視說明轉盤');
 console.log(`hydraulic-p1-2: ${pass} passed`);

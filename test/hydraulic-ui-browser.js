@@ -5,6 +5,7 @@ import {hydraulicSnapshot as h01Snapshot} from '../js/blocks/hydraulic-example.j
 import {snapshot as resizeSnapshot} from './fixtures/syringe-end-resize.mjs';
 import {scanSyringe} from '../js/blocks/syringe-operations.js';
 import {decodeShareString,encodeSnapshot} from '../js/share-codec.js';
+import {getExample} from '../js/blocks/examples.js';
 const b=window.blocks,api=b.gripperPilot,lines=[],q=s=>document.querySelector(s.replace('#syringeDialog','#syringeDialog[open]')),click=s=>q(s).click();
 const assert=(condition,name)=>{if(!condition)throw Error(name);lines.push('PASS '+name);};
 const field=(name,value)=>{const n=q(`#syringeDialog [name="${name}"]`);n.value=value;n.dispatchEvent(new Event('input',{bubbles:true}));};
@@ -15,6 +16,30 @@ const initial=()=>api.reopen(structuredClone(hydraulicSnapshot));
 const saved=[];const originalClick=HTMLAnchorElement.prototype.click;
 HTMLAnchorElement.prototype.click=function(){if(this.download){saved.push({name:this.download,url:this.href});return;}originalClick.call(this);};
 try{
+ // Follow the actual unit 8/9 install flow with new actuator IDs, not the completed examples.
+ for(const [num,x,y,angle] of [[1,-100,-60,0],[2,59.2699,100.61565,153.57],[3,-26,253.36805,.62]]){
+  api.reopen(structuredClone(getExample(`hydraulic-h0${num}-practice`).snapshot));
+  assert(!S.comps.some(c=>c.type==='syringe'),`unit practice H0${num} starts unpowered`);
+  b.addFixedSyringe();
+  const install=()=>document.querySelector('#syringeInstallation[open]');
+  const choose=(label,value)=>{const n=install().querySelector(`[aria-label="${label}"]`);n.value=value;n.dispatchEvent(new Event(n.tagName==='SELECT'?'change':'input',{bubbles:true}));};
+  const press=text=>[...install().querySelectorAll('button')].find(b=>b.textContent===text).click();
+  choose('筒身固定在哪個零件？',`H${num}Frame`);press('下一步');
+  choose('筒身位置 X (mm)',x);choose('筒身位置 Y (mm)',y);choose('推進方向角度 (°)',angle);press('移到所選機架');press('下一步');
+  choose('推桿接哪個短連桿？',num===3?'H3Upper':`H${num}Coupler`);choose('連接端孔','0');press('下一步');press('檢查全行程');
+  assert(install().textContent.includes('41 點幾何採樣通過'),`H0${num} student placement full stroke`);press('確認安裝');
+  assert(S.comps.filter(c=>c.type==='syringe').length===1,`H0${num} student installation committed`);
+  api.reopen(decodeShareString(encodeSnapshot(api.snapshot())));
+  assert(scanSyringe(S.comps,S.topo.params,S.comps.find(c=>c.type==='syringe').id).ok,`H0${num} student work reopens`);
+  if(num===2){
+   click('#syringeControls button');install().querySelector('details').open=true;press('其他尺寸與加工設定');
+   button('孔位 145.892 mm');button('掃描候選全行程');
+   assert(q('#syringeDialog [role=status]').textContent.includes('41'),'H02 new actuator retains lesson hole presets');
+   button('確認套用');
+   assert(S.topo.params.H2Arm===145.892&&Math.abs(S.topo.params.H2Arm+S.topo.params.H2Tail-250)<1e-6,'H02 hole comparison preserves 250 mm reach');
+   b.undo();assert(S.topo.params.H2Arm!==145.892,'H02 hole comparison undo');
+  }
+ }
  api.reopen(structuredClone(resizeSnapshot));b.selectLink('Link13');
  const resize=value=>{const n=q('#memberDimensionInput');n.value=value;n.dispatchEvent(new Event('change',{bubbles:true}));};
  resize('48');
@@ -47,27 +72,27 @@ try{
  // Four-step fixed installation: draft/cancel/confirm use the same work and undo.
  {
   const blank=structuredClone(h01Snapshot);blank.comps=blank.comps.filter(c=>c.type!=='syringe');api.reopen(blank);
-  const original=JSON.stringify(api.snapshot()),ib=text=>[...document.querySelectorAll('#syringeInstallation button')].find(n=>n.textContent===text).click();
-  const select=(label,value)=>{const n=q('#syringeInstallation').querySelector(`[aria-label="${label}"]`);n.value=value;n.dispatchEvent(new Event('change',{bubbles:true}));};
-  const input=(label,value)=>{const n=q('#syringeInstallation').querySelector(`[aria-label="${label}"]`);n.value=value;n.dispatchEvent(new Event('input',{bubbles:true}));};
+  const original=JSON.stringify(api.snapshot()),ib=text=>[...document.querySelectorAll('#syringeInstallation[open] button')].find(n=>n.textContent===text).click();
+  const select=(label,value)=>{const n=q('#syringeInstallation[open]').querySelector(`[aria-label="${label}"]`);n.value=value;n.dispatchEvent(new Event('change',{bubbles:true}));};
+  const input=(label,value)=>{const n=q('#syringeInstallation[open]').querySelector(`[aria-label="${label}"]`);n.value=value;n.dispatchEvent(new Event('input',{bubbles:true}));};
   const put=()=>{
-   const canvas=q('#syringeInstallation svg'),seat=blank.comps.find(c=>c.id==='H1Frame').p1,p=new DOMPoint(seat.x,-seat.y).matrixTransform(canvas.getScreenCTM());
+   const canvas=q('#syringeInstallation[open] svg'),seat=blank.comps.find(c=>c.id==='H1Frame').p1,p=new DOMPoint(seat.x,-seat.y).matrixTransform(canvas.getScreenCTM());
    canvas.dispatchEvent(new PointerEvent('pointerdown',{clientX:p.x,clientY:p.y,pointerId:17,pointerType:'touch',bubbles:true}));
    canvas.dispatchEvent(new PointerEvent('pointerup',{pointerId:17,bubbles:true}));
   };
   const connect=()=>{select('筒身固定在哪個零件？','H1Frame');ib('下一步');put();input('推進方向角度 (°)','0');ib('下一步');select('推桿接哪個短連桿？','H1Coupler');select('連接端孔','0');};
   b.addFixedSyringe();assert(!!q('#syringeInstallation[open]'),'new fixed syringe opens actuator placement');
-  assert(!q('#syringeInstallation [aria-label="筒身固定在哪個零件？"]').closest('section').hidden,'frame selection is the first step');
-  assert([...q('#syringeInstallation').querySelectorAll('button')].find(n=>n.textContent==='下一步').disabled,'cannot place actuator before selecting frame');
+  assert(!q('#syringeInstallation[open] [aria-label="筒身固定在哪個零件？"]').closest('section').hidden,'frame selection is the first step');
+  assert([...q('#syringeInstallation[open]').querySelectorAll('button')].find(n=>n.textContent==='下一步').disabled,'cannot place actuator before selecting frame');
   connect();
-  const draftSvg=q('#syringeInstallation svg').innerHTML;
-  assert(q('#syringeInstallation [aria-label="試動伸出量 (mm)"]').disabled,'unmounted actuator cannot be trial driven');
-  assert([...q('#syringeInstallation').querySelectorAll('button')].find(n=>n.textContent==='檢查全行程').disabled,'unmounted actuator cannot pass a scan');
-  input('試動伸出量 (mm)','20');assert(q('#syringeInstallation svg').innerHTML===draftSvg,'unmounted trial cannot move the links');
-  assert(q('#syringeInstallation').textContent.includes('固定後才能試動'),'assembly confirmation precedes trial');
-  assert(q('#syringeInstallation svg [data-install-member="H1Coupler"]'),'coupler remains drawn');
+  const draftSvg=q('#syringeInstallation[open] svg').innerHTML;
+  assert(q('#syringeInstallation[open] [aria-label="試動伸出量 (mm)"]').disabled,'unmounted actuator cannot be trial driven');
+  assert([...q('#syringeInstallation[open]').querySelectorAll('button')].find(n=>n.textContent==='檢查全行程').disabled,'unmounted actuator cannot pass a scan');
+  input('試動伸出量 (mm)','20');assert(q('#syringeInstallation[open] svg').innerHTML===draftSvg,'unmounted trial cannot move the links');
+  assert(q('#syringeInstallation[open]').textContent.includes('固定後才能試動'),'assembly confirmation precedes trial');
+  assert(q('#syringeInstallation[open] svg [data-install-member="H1Coupler"]'),'coupler remains drawn');
   assert(JSON.stringify(api.snapshot())===original,'placement, direction and trial do not edit the work');
-  ib('下一步');input('試動伸出量 (mm)','20');ib('檢查全行程');assert(q('#syringeInstallation').textContent.includes('41 點'),'fixed connected actuator full stroke passes');ib('1 固定外殼');ib('背面');ib('取消');await new Promise(resolve=>setTimeout(resolve,0));assert(JSON.stringify(api.snapshot())===original,'cancel preserves original work');
+  ib('下一步');input('試動伸出量 (mm)','20');ib('檢查全行程');assert(q('#syringeInstallation[open]').textContent.includes('41 點'),'fixed connected actuator full stroke passes');ib('1 固定外殼');ib('背面');ib('取消');await new Promise(resolve=>setTimeout(resolve,0));assert(JSON.stringify(api.snapshot())===original,'cancel preserves original work');
   b.addFixedSyringe();connect();ib('下一步');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
   const placed=S.comps.find(c=>c.type==='syringe');assert(placed?.b.componentId==='H1Coupler'&&placed.installation.face==='front'&&placed.axisDeg===0,'confirm preserves placement, angle and real owners');
   assert(!S.comps.some(c=>c.id.startsWith('SyringePlacementReference')),'temporary placement reference never saved');
