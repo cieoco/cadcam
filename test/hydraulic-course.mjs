@@ -10,6 +10,7 @@ import {compileAssembly,solveAssembly} from '../js/blocks/assembly.js';
 import {selectableMountSurfaces,buildMountSurfaces} from '../js/blocks/mount-surfaces.js';
 import {buildFaceCandidate,faceCandidateModel} from '../js/blocks/face-candidate.js';
 import {applyMatrix4} from '../js/blocks3d/orthogonal-3d.js';
+import {attachmentFrame} from '../js/core/syringe.js';
 // The two actual stock faces remain parallel at the requested gap, after save/reopen
 // and while both syringes move. Cover the photographed coupler and the lesson's arm.
 {
@@ -85,8 +86,11 @@ for(const n of [1,2,3]){
  assert.deepEqual(practice.comps,complete.comps.filter(c=>c.type!=='syringe'));
  const c=complete.comps.find(c=>c.type==='syringe'),f=source.comps.find(part=>part.id===c.a.componentId);
  // Rounded angles match the hints students actually enter, not exact hidden values.
- const angle=[0,153.57,.62][n-1],request={newId:'StudentSyringe',frameId:f.id,
-  position:{x:f.p1.x,y:f.p1.y},axisDeg:angle,b:c.b};
+ const angle=[0,153.57,.62][n-1],typed=[{x:f.p1.x,y:f.p1.y},{x:59.27,y:100.62},{x:-26,y:253.37}][n-1];
+ // Follow the rounded lesson values and the real "move to frame" projection.
+ const frame=attachmentFrame(f,source.params),along=Math.max(0,Math.min(frame.length,(typed.x-frame.p.x)*frame.x+(typed.y-frame.p.y)*frame.y));
+ const request={newId:'StudentSyringe',frameId:f.id,
+  position:{x:frame.p.x+along*frame.x,y:frame.p.y+along*frame.y},axisDeg:angle,b:c.b};
  const plan=planPlacedSyringe(source,request);
  assert.ok(plan.ok,plan.message);
  assert.ok(scanSyringe(plan.comps,plan.params,plan.syringe.id).ok);
@@ -107,6 +111,7 @@ for(const n of [1,2,3]){
  console.log('PASS',id,'install, stroke, persistence and reference preservation');
 }
 const html=readFileSync('teaching-hydraulic.html','utf8');
+assert.ok(!/\d+\.\d{3,}/.test(html),'lesson values use at most two decimals');
 for(const id of ['unit-8','unit-9','unit-10','unit-11']){
  assert.equal((html.match(new RegExp(`id="${id}"`,'g'))||[]).length,1);
  assert.ok(readFileSync('teaching.html','utf8').includes('teaching-hydraulic.html#'+id));

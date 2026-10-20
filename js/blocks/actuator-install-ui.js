@@ -1,4 +1,5 @@
 import {actuatorSteps,actuatorChoices,actuatorPoint,planMotorInstallation} from './actuator-installation.js';
+import {signedNumberInput,showNumber,readNumber} from './numeric-input.js';
 import {resolveMotorOrientation} from './motor-orientation.js';
 const ns='http://www.w3.org/2000/svg';
 const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textContent=text;parent?.append(n);return n;};
@@ -40,7 +41,8 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
   const end=field(panels[2],'輸出連接孔');option(end,'第一孔／齒輪軸心','p1');option(end,'第二孔','p2');end.value=request.outputEnd;
   el('p','橘色是輸出零件。獨立連桿可平移對孔；已接好的機構保留共同接點，不會自動拆開或拉動其他零件。',panels[2]);
   const summary=el('p',null,panels[3]);
-  const start=field(panels[3],'起始角度 (°)','input'),finish=field(panels[3],'結束角度 (°)','input');start.value=request.start;finish.value=request.end;
+  const start=field(panels[3],'起始角度 (°)','input'),finish=field(panels[3],'結束角度 (°)','input');
+  for(const [n,value] of [[start,request.start],[finish,request.end]]){signedNumberInput(n);showNumber(n,value);}
   const trial=field(panels[3],'試動角度 (°)','input');trial.type='range';trial.value=request.angle;
   const reading=el('output',null,panels[3]),toggle=el('button','查看 3D',panels[3]);
   const scan=el('button','檢查動作範圍',panels[3]),scanText=el('p','尚未檢查動作範圍。',panels[3]);
@@ -55,7 +57,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
   orientation.onchange=()=>{request.orientation=orientation.value;update();};
   output.onchange=()=>{request.outputId=output.value;if(choices.outputs.find(c=>c.id===output.value)?.type==='gear'){request.outputEnd='p1';end.value='p1';}update();};
   end.onchange=()=>{request.outputEnd=end.value;update();};
-  start.onchange=()=>{request.start=start.value;update();};finish.onchange=()=>{request.end=finish.value;update();};
+  start.onchange=()=>{request.start=readNumber(start);update();};finish.onchange=()=>{request.end=readNumber(finish);update();};
   trial.oninput=()=>{request.angle=Number(trial.value);update(true);};
   toggle.onclick=()=>{three=!three;update(true);};
   scan.onclick=()=>{
@@ -112,7 +114,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     faces.forEach((b,i)=>{b.setAttribute('aria-pressed',String(request.face===(i?'back':'front')));b.disabled=i===0&&request.hostId==='world';});reverse.setAttribute('aria-pressed',String(request.reversed));
     hostNote.textContent=request.hostId==='world'?'外殼固定在圖面基準；自動機架不代表實際固定座已完成。':'外殼相對承載零件固定；若承載零件會動，外殼也跟著動。';
     location.disabled=request.hostId==='world';end.disabled=choices.outputs.find(c=>c.id===request.outputId)?.type==='gear';
-    start.parentElement.hidden=finish.parentElement.hidden=request.type!=='mg995';
+    start.closest('label').hidden=finish.closest('label').hidden=request.type!=='mg995';
     trial.min=request.type==='mg995'?Math.min(Number(request.start),Number(request.end)):0;trial.max=request.type==='mg995'?Math.max(Number(request.start),Number(request.end)):360;trial.value=request.angle;
     summary.textContent=`固定：${request.hostId==='world'?'自動機架':request.hostId}・${request.face==='front'?'正面':'背面'} → 帶動：${request.outputId}`;
     reading.textContent=`${request.angle}°${result?.ok?' · 幾何可解':''}`;

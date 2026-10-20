@@ -14,7 +14,13 @@ try{
  api.reopen(structuredClone(actuatorSource));const before=JSON.stringify(api.snapshot());
  b.pickMotorType('mg995');assert(!!dialog()?.open,'new servo enters installation before changing work');
  assert([...dialog().querySelectorAll('button')].find(n=>n.textContent==='下一步').disabled,'requires explicit carrier choice');
- configure();field('試動角度 (°)','45','input');button('檢查動作範圍');
+ configure();
+ field('起始角度 (°)','+30','input');dialog().querySelector('[aria-label="起始角度 (°)切換正負"]').click();
+ assert(dialog().querySelector('[aria-label="起始角度 (°)"]').value==='-30','servo sign button changes +30 to -30');
+ field('結束角度 (°)','+30');button('檢查動作範圍');
+ assert(dialog().textContent.includes('61 個角度採樣通過'),'signed servo range is accepted');
+ field('起始角度 (°)','0');field('結束角度 (°)','90');
+ field('試動角度 (°)','45','input');button('檢查動作範圍');
  assert(dialog().textContent.includes('91 個角度採樣通過'),'servo range solved in candidate');
  assert(JSON.stringify(api.snapshot())===before,'mount, face, connection and trial leave work intact');
  button('查看 3D');

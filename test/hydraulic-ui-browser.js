@@ -19,14 +19,16 @@ const saved=[];const originalClick=HTMLAnchorElement.prototype.click;
 HTMLAnchorElement.prototype.click=function(){if(this.download){saved.push({name:this.download,url:this.href});return;}originalClick.call(this);};
 try{
  // Follow the actual unit 8/9 install flow with new actuator IDs, not the completed examples.
- for(const [num,x,y,angle] of [[1,-100,-60,0],[2,59.2699,100.61565,153.57],[3,-26,253.36805,.62]]){
+ for(const [num,x,y,angle] of [[1,-100,-60,0],[2,59.27,100.62,153.57],[3,-26,253.37,.62]]){
   api.reopen(structuredClone(getExample(`hydraulic-h0${num}-practice`).snapshot));
   assert(!S.comps.some(c=>c.type==='syringe'),`unit practice H0${num} starts unpowered`);
   b.addFixedSyringe();
   const install=()=>document.querySelector('#syringeInstallation[open]');
-  const choose=(label,value)=>{const n=install().querySelector(`[aria-label="${label}"]`);n.value=value;n.dispatchEvent(new Event(n.tagName==='SELECT'?'change':'input',{bubbles:true}));};
+  const choose=(label,value)=>{const n=install().querySelector(`[aria-label="${label}"]`);n.focus();n.value=value;n.dispatchEvent(new Event(n.tagName==='SELECT'?'change':'input',{bubbles:true}));};
   const press=text=>[...install().querySelectorAll('button')].find(b=>b.textContent===text).click();
   choose('筒身固定在哪個零件？',`H${num}Frame`);press('下一步');
+  choose('筒身位置 X (mm)','-');
+  assert(install().querySelector('[aria-label="筒身位置 X (mm)"]').value==='-','partial minus survives editing');
   choose('筒身位置 X (mm)',x);choose('筒身位置 Y (mm)',y);choose('推進方向角度 (°)',angle);press('移到所選機架');press('下一步');
   choose('推桿接哪個短連桿？',num===3?'H3Upper':`H${num}Coupler`);choose('連接端孔','0');press('下一步');press('檢查全行程');
   assert(install().textContent.includes('41 點幾何採樣通過'),`H0${num} student placement full stroke`);press('確認安裝');
@@ -35,9 +37,11 @@ try{
   assert(scanSyringe(S.comps,S.topo.params,S.comps.find(c=>c.type==='syringe').id).ok,`H0${num} student work reopens`);
   if(num===2){
    settings();install().querySelector('details').open=true;press('其他尺寸與加工設定');
-   button('孔位 145.892 mm');button('掃描候選全行程');
+   const originalMin=S.comps.find(c=>c.type==='syringe').spec.lmin;
+   button('孔位 145.89 mm');button('掃描候選全行程');
    assert(q('#syringeDialog [role=status]').textContent.includes('41'),'H02 new actuator retains lesson hole presets');
    button('確認套用');
+   assert(S.comps.find(c=>c.type==='syringe').spec.lmin===originalMin,'rounded display preserves untouched syringe precision');
    assert(S.topo.params.H2Arm===145.892&&Math.abs(S.topo.params.H2Arm+S.topo.params.H2Tail-250)<1e-6,'H02 hole comparison preserves 250 mm reach');
    b.undo();assert(S.topo.params.H2Arm!==145.892,'H02 hole comparison undo');
   }

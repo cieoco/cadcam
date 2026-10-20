@@ -6,6 +6,7 @@ import {frameConnectorNodes} from './model.js';
 import {inspectFrameExport} from './exporters.js';
 import {createPlateGeometry} from './plate-geometry.js';
 import {actuatorSteps} from './actuator-installation.js';
+import {signedNumberInput,showNumber,readNumber} from './numeric-input.js';
 
 const ns='http://www.w3.org/2000/svg';
 const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textContent=text;parent?.append(n);return n;};
@@ -35,6 +36,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  el('p','在所選機架上點一下放針筒，拖藍點移動、拖橘點旋轉。選機架只設定基準，不會代替你決定角度。',panels[1]);
  const px=field(panels[1],'筒身位置 X (mm)','input'),py=field(panels[1],'筒身位置 Y (mm)','input');
  const angle=field(panels[1],'推進方向角度 (°)','input');angle.step='1';
+ for(const n of [px,py,angle])signedNumberInput(n);
  const directionRow=el('div',null,panels[1]);directionRow.className='install-faces';
  for(const [text,value] of [['向右',0],['向上',90],['向左',180],['向下',-90]]){const b=el('button',text,directionRow);b.onclick=()=>{request.axisDeg=value;changed();update();};}
  el('p','拖橘色方向把手旋轉，或輸入角度。箭頭是推桿伸出的方向；接上連桿時不會自動改成另一個角度。',panels[1]);
@@ -59,7 +61,8 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  const advancedFields={};
  for(const [key,text] of [['outerDiameter','筒身外徑 (mm)'],['bodyLength','筒身長度 (mm)'],['rodDiameter','推桿寬度 (mm)'],['lmin','最短安裝距離 (mm)'],['stroke','有效行程 (mm)'],['axisDeg','固定軸向 (°)']]){
   const input=field(advanced,text,'input');advancedFields[key]=input;
-  input.onchange=()=>{const value=input.value.trim()===''?NaN:Number(input.value);if(key==='axisDeg')request.axisDeg=value;else request.spec={...request.spec,[key]:value};changed();update();};
+  if(key==='axisDeg')signedNumberInput(input);
+  input.onchange=()=>{const value=readNumber(input);if(key==='axisDeg')request.axisDeg=value;else request.spec={...request.spec,[key]:value};changed();update();};
  }
  el('p','此處檢查幾何運動與安裝高度；管夾、五金、完整干涉與承載仍需實物核對。',panels[3]);
  const more=advancedSettings?el('button','其他尺寸與加工設定',advanced):null;
@@ -71,9 +74,9 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  next.onclick=()=>{if(step<3){step++;furthest=Math.max(furthest,step);update();}else if(result?.ok&&!result.temporary){const accepted=confirm(result);if(accepted!==false)dialog.close();else error.textContent='作品已變更，請關閉後重新安裝。';}};
  const changed=()=>{scanStatus.textContent='設定已變更，請重新檢查全行程。';};
  frame.onchange=()=>{request.frameId=frame.value;changed();update();};
- const setPosition=()=>{request.position={x:px.value.trim()===''?NaN:Number(px.value),y:py.value.trim()===''?NaN:Number(py.value)};changed();update();};
+ const setPosition=()=>{request.position={x:readNumber(px),y:readNumber(py)};changed();update();};
  px.oninput=py.oninput=setPosition;
- angle.oninput=()=>{request.axisDeg=angle.value.trim()===''?NaN:Number(angle.value);changed();update();};
+ angle.oninput=()=>{request.axisDeg=readNumber(angle);changed();update();};
  snap.onclick=()=>{const owner=choices.frames.find(c=>c.id===request.frameId),f=owner&&attachmentFrame(owner,base.params,points);if(!f||!request.position)return;
   const t=Math.max(0,Math.min(f.length,(request.position.x-f.p.x)*f.x+(request.position.y-f.p.y)*f.y));request.position={x:f.p.x+f.x*t,y:f.p.y+f.y*t};changed();update();};
  const setRod=()=>{const c=choices.rods.find(c=>c.id===rod.value);request.b=c?{componentId:c.id,u:end.value==='1'?Number(base.params[c.lenParam]):0,v:0}:null;changed();update();};
@@ -142,7 +145,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   revision++;clearTimeout(sceneTimer);title.textContent=`針筒安裝 · ${step+1}/4`;
   panels.forEach((p,i)=>p.hidden=i!==step);tabs.forEach((b,i)=>{b.disabled=i>furthest;b.setAttribute('aria-current',i===step?'step':'false');});
   faces.forEach((b,i)=>b.setAttribute('aria-pressed',String(request.face===(i?'back':'front'))));
-  for(const [input,value] of [[px,request.position?.x],[py,request.position?.y],[angle,request.axisDeg]])if(document.activeElement!==input)input.value=Number.isFinite(value)?Number(value.toFixed(3)):'';
+  for(const [input,value] of [[px,request.position?.x],[py,request.position?.y],[angle,request.axisDeg]])if(document.activeElement!==input)showNumber(input,value);
   const positionOK=request.position&&[request.position.x,request.position.y,request.axisDeg].every(Number.isFinite);
   const owner=choices.frames.find(c=>c.id===request.frameId),f=owner&&attachmentFrame(owner,base.params,points);
   let onSelectedFrame=!!(positionOK&&f);
@@ -156,7 +159,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   snap.disabled=!request.frameId||!request.position;
   if(step===3&&(!result?.ok||result.temporary))mountStatus.textContent=request.frameId?'固定位置尚未有效，請調整後查看 3D。':'請選擇管夾固定的機架。';
   toggle.disabled=stroke.disabled=scan.disabled=!result?.ok;if(more)more.disabled=!result?.ok||result.temporary;spacer.parentElement.hidden=auto.value==='auto';reading.textContent=`伸出 ${request.extension.toFixed(1)} / ${result?.syringe?.spec.stroke ?? stroke.max} mm`;
-  if(result?.syringe){stroke.max=result.syringe.spec.stroke;for(const [key,input] of Object.entries(advancedFields))if(document.activeElement!==input)input.value=key==='axisDeg'?result.syringe.axisDeg:result.syringe.spec[key];}
+  if(result?.syringe){stroke.max=result.syringe.spec.stroke;for(const [key,input] of Object.entries(advancedFields))if(document.activeElement!==input)showNumber(input,key==='axisDeg'?result.syringe.axisDeg:result.syringe.spec[key]);}
   const show3d=step===3&&preview3d&&result?.ok&&!result.temporary;space.hidden=!show3d;svg.toggleAttribute('hidden',!!show3d);toggle.textContent=preview3d?'回到平面':'查看 3D';
   hint.textContent=step===0?'先選固定機架，再放置針筒':step===1?'藍點沿所選機架移動；橘點調推進方向':step===2?'只選連接孔；第 4 步確認固定後試動':'選固定機架後才能試動；確認後才更改作品';
   if(step>=2&&result&&!result.ok)hint.textContent=result.temporary?'尚未固定：保留原連桿姿態，不模擬驅動':'連接或固定無效：保留原姿態，不能試動。';

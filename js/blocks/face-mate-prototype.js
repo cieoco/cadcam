@@ -10,6 +10,7 @@ import { bracketLayout } from './bracket-layout.js';
 import { boxFaces, solveFaceMate, transformMatePoint } from './face-mate.js';
 import { realMountExamples } from './face-mate-examples.js';
 import { buildFacePlacement } from './face-placement.js';
+import {signedNumberInput,showNumber,readNumber} from './numeric-input.js';
 
 const $ = id => document.getElementById(id);
 const names = { top: '上面（板面）', bottom: '下面（板面）', front: '前面（外框邊）', back: '後面（外框邊）', left: '左面（外框邊）', right: '右面（外框邊）' };
@@ -138,7 +139,7 @@ for (const [field, label] of [['offsetU', '左右偏置'], ['offsetV', '上下�
   const input = document.createElement('input'); input.id = field; input.type = 'number'; input.step = '0.1'; input.setAttribute('aria-label', `${label}（mm）`);
   if (field === 'gap') input.min = '0';
   input.addEventListener('input', () => {
-    const value = input.value === '' ? NaN : Number(input.value);
+    const value = readNumber(input);
     if (!Number.isFinite(value) || (field === 'gap' && value < 0)) {
       input.setAttribute('aria-invalid', 'true'); $('next').disabled = true;
       $('message').textContent = '請輸入有效距離；面間距離不能小於 0。'; return;
@@ -152,7 +153,9 @@ for (const [field, label] of [['offsetU', '左右偏置'], ['offsetV', '上下�
   const minus = button('−', () => shift(-5)), plus = button('+', () => shift(5));
   minus.setAttribute('aria-label', `${label}減少 5 mm`); plus.setAttribute('aria-label', `${label}增加 5 mm`);
   row.append(lab, minus, input, plus); $('adjustments').appendChild(row);
+  if(field !== 'gap')signedNumberInput(input);
 }
+const dimensionSign = signedNumberInput($('dimensionValue'));
 const angle = () => draft.rotationDeg ?? draft.quarterTurns * 90;
 $('turn').addEventListener('click', () => update('rotationDeg', (angle() + 90) % 360));
 $('turnMinus').addEventListener('click', () => update('rotationDeg', (angle() + 270) % 360));
@@ -188,8 +191,9 @@ function openDimension(field, value, alignment = null) {
   $('dimensionTitle').textContent = field === 'bracket' ? '角碼位置偏移' : field === 'rotationDeg' ? '設定接合角度' : field === 'offsetU' ? '設定左右偏移' : field === 'offsetV' ? '設定上下偏移' : field === 'gap' ? '設定面間距' : '設定移動步距';
   $('dimensionLabel').textContent = `${$('dimensionTitle').textContent}（${field === 'rotationDeg' ? '°' : 'mm'}）`;
   const input = $('dimensionValue');
-  input.value = value;
+  showNumber(input, value);
   input.min = field === 'moveStep' || field === 'gap' ? '0' : '';
+  dimensionSign.hidden = field === 'moveStep' || field === 'gap';
   input.removeAttribute('aria-invalid');
   $('dimensionError').textContent = field === 'bracket' ? '位置超出接合區，或與另一顆角碼太接近。' : '請輸入有效數字；步距須大於 0，間距不可小於 0。';
   $('dimensionError').hidden = true;
@@ -204,7 +208,7 @@ $('dimensionDialog').addEventListener('close', () => {
 });
 $('dimensionForm').addEventListener('submit', e => {
   e.preventDefault();
-  const input = $('dimensionValue'), value = input.value.trim() === '' ? NaN : Number(input.value);
+  const input = $('dimensionValue'), value = readNumber(input);
   if ((dimensionField === 'bracket' && !bracketLayout(bracketSpan, { ...bracketOffsets, [selectedBracket]: value }).length) || !Number.isFinite(value) || (dimensionField === 'moveStep' && value <= 0) || (dimensionField === 'gap' && value < 0)) {
     input.setAttribute('aria-invalid', 'true'); $('dimensionError').hidden = false; input.focus(); return;
   }
@@ -466,7 +470,7 @@ function render() {
     $(root).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.value) === String(draft[field]) && (field!=='child' || !integrated || childConfirmed)));
   }
   $('align').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', Number(b.dataset.u) === draft.alignU && Number(b.dataset.v) === draft.alignV));
-  ['offsetU', 'offsetV', 'gap'].forEach(field => { $(field).value = draft[field]; });
+  ['offsetU', 'offsetV', 'gap'].forEach(field => { if(document.activeElement!==$(field))showNumber($(field), draft[field]); });
   $('angleChip').textContent = `接合角度 ${Number(angle().toFixed(2))}°`;
   $('rotationActions').hidden = mode === 'wizard' && step !== 3;
   $('back').hidden = mode === 'work'; $('back').disabled = step === 0 && !choosingChild;
