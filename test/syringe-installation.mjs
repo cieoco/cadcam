@@ -43,9 +43,21 @@ console.log('Syringe installation: H01–H04 isolated candidates, front/back geo
 const seat=source.comps.find(c=>c.id===s.a.componentId).p1;
 const position={x:seat.x,y:seat.y};
 const request={position,axisDeg:0,b:s.b,newId:'Placed',extension:10};
-const loose=planPlacedSyringe(source,request,points);assert.ok(loose.ok,loose.message);assert.ok(loose.temporary);
-const rotated=planPlacedSyringe(source,{...request,axisDeg:5},points);assert.ok(rotated.ok,rotated.message);assert.equal(rotated.syringe.axisDeg,5,'connecting does not overwrite chosen angle');
+const loose=planPlacedSyringe(source,request,points);assert.equal(loose.ok,false);assert.equal(loose.reasonCode,'unmounted');assert.equal(loose.points,undefined,'unmounted actuator has no solved motion');assert.equal(loose.comps,undefined,'no hidden fixed reference created');
+const rotated=planPlacedSyringe(source,{...request,axisDeg:5,frameId:s.a.componentId},points);assert.ok(rotated.ok,rotated.message);assert.equal(rotated.syringe.axisDeg,5,'connecting does not overwrite chosen angle');
 const fixed=planPlacedSyringe(source,{...request,frameId:s.a.componentId},points);assert.ok(fixed.ok,fixed.message);assert.equal(fixed.temporary,false);
 assert.ok(!fixed.comps.some(c=>c.id.startsWith('SyringePlacementReference')));
 assert.equal(fixed.syringe.moduleId,'StudentDesign');
 assert.deepEqual(fixed.syringe.a,s.a);
+
+for(const name of ['hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h04']){
+ const work=normalizeSnapshot(getExample(name).snapshot),c=work.comps.find(o=>o.type==='syringe');
+ for(const id of [c.a.componentId,c.b.componentId,c.outputId]){
+  const comps=work.comps.filter(o=>o.id!==id);
+  assert.equal(solveSyringe(comps,work.params).ok,false,`${name}: deleting ${id} cannot move`);
+  assert.equal(scanSyringe(comps,work.params,c.id).ok,false,`${name}: incomplete structure cannot pass scan`);
+ }
+ const broken=structuredClone(work.comps),output=broken.find(o=>o.id===c.outputId);output.p2.id+='Disconnected';
+ assert.equal(solveSyringe(broken,work.params).ok,false,`${name}: unjoined output cannot move`);
+}
+console.log('Unfixed, missing frame/coupler/output and disconnected output correctly reject motion');

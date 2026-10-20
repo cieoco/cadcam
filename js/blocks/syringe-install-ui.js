@@ -20,7 +20,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  dialog.setAttribute('aria-label','針筒安裝');
  const head=el('header',null,dialog),title=el('strong','針筒安裝',head),cancel=el('button','取消',head);
  const nav=el('nav',null,dialog);nav.setAttribute('aria-label','安裝步驟');
- const names=['放針筒','方向角度','接桿試動','固定確認'];
+ const names=['放針筒','方向角度','接連桿','固定試動'];
  const tabs=names.map((name,i)=>{const b=el('button',`${i+1} ${name}`,nav);b.onclick=()=>{if(i<=step){step=i;update();}};return b;});
  const preview=el('section',null,dialog);preview.className='install-preview';preview.setAttribute('aria-label','安裝預覽');
  const svg=document.createElementNS(ns,'svg');preview.append(svg);svg.setAttribute('aria-label','放置針筒、拖動位置與方向把手');svg.setAttribute('role','img');
@@ -46,13 +46,13 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  const rod=field(panels[2],'推桿接哪個短連桿？');option(rod,'請選活動短連桿','');choices.rods.forEach(c=>option(rod,labelOf(c),c.id));rod.value=request.b?.componentId || '';
  const end=field(panels[2],'連接端孔');option(end,'第一孔','0');option(end,'第二孔','1');
  end.value=request.b?.u>0?'1':'0';
- el('p','推桿與短連桿用轉軸連接，保留轉動。可直接點預覽中短連桿的端孔。',panels[2]);
+ el('p','選推桿接孔；此時只標記連接位置。完成下一步的機架固定後才能試動。',panels[2]);
  const toggle=el('button','查看 3D',panels[3]);toggle.onclick=()=>{preview3d=!preview3d;update();};
  const auto=field(panels[3],'套筒高度');option(auto,'自動估算（優先對齊）','auto');option(auto,'自行輸入套筒長度','manual');auto.value=request.spacerMm===null?'auto':'manual';
  const spacer=field(panels[3],'套筒長度 (mm)','input');spacer.min=0;spacer.max=100;spacer.value=request.spacerMm ?? 5;
- const stroke=field(panels[2],'試動伸出量 (mm)','input');stroke.type='range';stroke.min=0;stroke.step='.1';stroke.max=existing?.spec.stroke ?? 20;stroke.value=request.extension;
- const reading=el('output','',panels[2]),mountStatus=el('p','',panels[3]);mountStatus.setAttribute('role','status');
- const scan=el('button','檢查全行程',panels[2]),scanStatus=el('p','尚未檢查全行程。',panels[2]);scanStatus.setAttribute('role','status');
+ const stroke=field(panels[3],'試動伸出量 (mm)','input');stroke.type='range';stroke.min=0;stroke.step='.1';stroke.max=existing?.spec.stroke ?? 20;stroke.value=request.extension;
+ const reading=el('output','',panels[3]),mountStatus=el('p','',panels[3]);mountStatus.setAttribute('role','status');
+ const scan=el('button','檢查全行程',panels[3]),scanStatus=el('p','尚未檢查全行程。',panels[3]);scanStatus.setAttribute('role','status');
  const advanced=el('details',null,panels[3]);el('summary','進階：針筒規格與軸向',advanced);
  const advancedFields={};
  for(const [key,text] of [['outerDiameter','筒身外徑 (mm)'],['bodyLength','筒身長度 (mm)'],['rodDiameter','推桿寬度 (mm)'],['lmin','最短安裝距離 (mm)'],['stroke','有效行程 (mm)'],['axisDeg','固定軸向 (°)']]){
@@ -77,7 +77,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  const setRod=()=>{const c=choices.rods.find(c=>c.id===rod.value);request.b=c?{componentId:c.id,u:end.value==='1'?Number(base.params[c.lenParam]):0,v:0}:null;changed();update();};
  rod.onchange=setRod;end.onchange=setRod;
  auto.onchange=spacer.oninput=()=>{request.spacerMm=auto.value==='auto'?null:spacer.value.trim()===''?NaN:Number(spacer.value);changed();update();};
- stroke.oninput=()=>{request.extension=Number(stroke.value);update();};
+ stroke.oninput=()=>{if(!result?.ok)return;request.extension=Number(stroke.value);update();};
  scan.onclick=()=>{if(!result?.ok)return;const r=scanSyringe(result.comps,result.params,result.syringe.id,.5,motion);scanStatus.textContent=r.ok?r.message:`${r.atMm??''} mm：${r.message}`;};
  let viewBox=null;
  function renderDrawing(){
@@ -90,15 +90,17 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   if(!viewBox&&bounds.length){const xs=bounds.map(p=>p.x),ys=bounds.map(p=>-p.y),x=Math.min(...xs)-70,y=Math.min(...ys)-45;viewBox=[x,y,Math.max(...xs)-x+55,Math.max(...ys)-y+45];}
   if(viewBox)svg.setAttribute('viewBox',viewBox.join(' '));
   try{const g=inspectFrameExport(frameConnectorNodes(cs),base.fabrication?.export || {});g?.outlines.forEach(r=>poly(r,'#e2e8f0'));}catch{/* Candidate failure is shown in the status, never applied. */}
+  const firstMemberIndex=svg.childNodes.length;
   for(const c of cs.filter(c=>['bar','triangle'].includes(c.type))){
    const selected=step===3?c.id===request.frameId:step===2&&c.id===request.b?.componentId,color=selected?'#0284c7':c.type==='bar'?'#94a3b8':'#f3b35a';
    const members=c.type==='bar'?[line(pos(c.p1),pos(c.p2),8,color)]:createPlateGeometry(c,[c.p1,c.p2,c.p3].map(pos)).outlines.map(r=>poly(r,color));
-   members.forEach(n=>{n.style.cursor='pointer';n.onclick=()=>{if(step===3&&choices.frames.some(f=>f.id===c.id)){frame.value=c.id;frame.onchange();}};});
+   members.forEach(n=>{n.setAttribute('data-install-member',c.id);n.style.cursor='pointer';n.onclick=()=>{if(step===3&&choices.frames.some(f=>f.id===c.id)){frame.value=c.id;frame.onchange();}};});
    for(const [i,p] of [c.p1,c.p2].entries()){
     const q=pos(p),dot=draw('circle',{cx:q.x,cy:-q.y,r:3,fill:'white',stroke:color,'stroke-width':1});
     if(step===2&&choices.rods.some(r=>r.id===c.id)){const hit=draw('circle',{cx:q.x,cy:-q.y,r:9,fill:'transparent',stroke:'none'});hit.style.cursor='pointer';hit.onclick=()=>{rod.value=c.id;end.value=String(i);setRod();};}
    }
   }
+  const firstMember=svg.childNodes[firstMemberIndex],actuatorStart=svg.childNodes.length;
   const posDraft=request.position&&[request.position.x,request.position.y].every(Number.isFinite)?request.position: (viewBox?{x:viewBox[0]+70,y:-(viewBox[1]+viewBox[3]/2)}:{x:0,y:0});
   const theta=(Number.isFinite(request.axisDeg)?request.axisDeg:0)*Math.PI/180;
   const shape=step>=2&&result?.ok?syringeShape(result.syringe,cs,result.params,P):null;
@@ -107,6 +109,8 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   const bodyLength=request.spec?.bodyLength ?? existing?.spec.bodyLength ?? 72,diameter=request.spec?.outerDiameter ?? existing?.spec.outerDiameter ?? 17.5;
   line(A,tip,request.spec?.rodDiameter ?? existing?.spec.rodDiameter ?? 8,'#a89f92');line(at(-bodyLength*.7),at(bodyLength*.3),diameter,request.position?'#b4d6d0':'#d7e5e4');
   if(step===3&&shape){const side={x:-Math.sin(theta)*14,y:Math.cos(theta)*14};line({x:A.x-side.x,y:A.y-side.y},{x:A.x+side.x,y:A.y+side.y},8,'#647574');}
+  if(firstMember)for(const node of [...svg.childNodes].slice(actuatorStart))svg.insertBefore(node,firstMember);
+  if(step===2&&request.b){const c=cs.find(c=>c.id===request.b.componentId);if(c){const mid={x:(pos(c.p1).x+pos(c.p2).x)/2,y:(pos(c.p1).y+pos(c.p2).y)/2};const label=draw('text',{x:mid.x,y:-mid.y-7,'font-size':8,fill:'#0369a1',stroke:'white','stroke-width':2,'paint-order':'stroke','text-anchor':'middle'});label.textContent=labelOf(c);}}
   const dot=(p,color,data)=>{draw('circle',{cx:p.x,cy:-p.y,r:6,fill:color,stroke:'white','stroke-width':2});draw('circle',{cx:p.x,cy:-p.y,r:14,fill:'transparent',[data]:'true'});};
   if(step<2){dot(A,'#0284c7','data-install-position');if(step===1){const handle=at(65);line(A,handle,1.5,'#e87911');const arrow=at(55),normal={x:-Math.sin(theta)*5,y:Math.cos(theta)*5};poly([handle,{x:arrow.x+normal.x,y:arrow.y+normal.y},{x:arrow.x-normal.x,y:arrow.y-normal.y}],'#e87911');dot(handle,'#e87911','data-install-angle');}}
  }
@@ -135,16 +139,16 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   for(const [input,value] of [[px,request.position?.x],[py,request.position?.y],[angle,request.axisDeg]])if(document.activeElement!==input)input.value=Number.isFinite(value)?value:'';
   const positionOK=request.position&&[request.position.x,request.position.y,request.axisDeg].every(Number.isFinite);
   result=positionOK&&request.b?planPlacedSyringe(base,{...request,frameId:step===3?request.frameId:''},points,motion):null;
-  error.textContent=result&&!result.ok?result.message+(step===3?' 可回前面調整位置，或按「移到所選機架」。':''):'';
+  error.textContent=step>=2&&result&&!result.ok?result.message+(step===3&&!result.temporary?' 可回前面調整位置，或按「移到所選機架」。':''):'';
   back.disabled=step===0;next.textContent=step===3?'確認安裝':'下一步';
-  next.disabled=step<2?!positionOK:step===2?!result?.ok:!result?.ok||result.temporary;
+  next.disabled=step<2?!positionOK:step===2?!request.b:!result?.ok||result.temporary;
   snap.disabled=!request.frameId;
   if(step===3&&(!result?.ok||result.temporary))mountStatus.textContent=request.frameId?'固定位置尚未有效，請調整後查看 3D。':'請選擇管夾固定的機架。';
-  scan.disabled=!result?.ok;if(more)more.disabled=!result?.ok||result.temporary;spacer.parentElement.hidden=auto.value==='auto';reading.textContent=`伸出 ${request.extension.toFixed(1)} / ${result?.syringe?.spec.stroke ?? stroke.max} mm`;
+  toggle.disabled=stroke.disabled=scan.disabled=!result?.ok;if(more)more.disabled=!result?.ok||result.temporary;spacer.parentElement.hidden=auto.value==='auto';reading.textContent=`伸出 ${request.extension.toFixed(1)} / ${result?.syringe?.spec.stroke ?? stroke.max} mm`;
   if(result?.syringe){stroke.max=result.syringe.spec.stroke;for(const [key,input] of Object.entries(advancedFields))if(document.activeElement!==input)input.value=key==='axisDeg'?result.syringe.axisDeg:result.syringe.spec[key];}
   const show3d=step===3&&preview3d&&result?.ok&&!result.temporary;space.hidden=!show3d;svg.toggleAttribute('hidden',!!show3d);toggle.textContent=preview3d?'回到平面':'查看 3D';
-  hint.textContent=step===0?'點一下放針筒；藍點為筒身定位基準':step===1?'拖橘點調角度；箭頭朝推桿伸出方向':step===2?'接端孔後試動；機架固定尚待設定':'最後設定管夾固定；確認後才更改作品';
-  if(result&&!result.ok)hint.textContent='設定無法求解，顯示原機構；尚未套用。';
+  hint.textContent=step===0?'點一下放針筒；藍點為筒身定位基準':step===1?'拖橘點調角度；箭頭朝推桿伸出方向':step===2?'只選連接孔；固定完成前不試動':'選固定機架後才能試動；確認後才更改作品';
+  if(step>=2&&result&&!result.ok)hint.textContent=result.temporary?'尚未固定：保留原連桿姿態，不模擬驅動':'連接或固定無效：保留原姿態，不能試動。';
   if(!show3d)renderDrawing();if(step===3&&result?.ok&&!result.temporary){mountStatus.textContent='正在核對安裝高度…';const token=revision;sceneTimer=setTimeout(()=>scene(token),100);}
  }
  dialog.onclose=()=>{closed=true;revision++;clearTimeout(sceneTimer);viewer?.dispose();dialog.remove();};

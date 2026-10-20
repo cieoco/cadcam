@@ -44,9 +44,15 @@ try{
   const connect=()=>{put();ib('下一步');input('推進方向角度 (°)','0');ib('下一步');select('推桿接哪個短連桿？','H1Coupler');select('連接端孔','0');};
   b.addFixedSyringe();assert(!!q('#syringeInstallation[open]'),'new fixed syringe opens actuator placement');
   assert(q('#syringeInstallation [aria-label="筒身固定在哪個零件？"]').closest('section').hidden,'frame selection deferred until final step');
-  connect();input('試動伸出量 (mm)','20');ib('檢查全行程');assert(q('#syringeInstallation').textContent.includes('41 點'),'unmounted actuator candidate full stroke passes');
+  connect();
+  const draftSvg=q('#syringeInstallation svg').innerHTML;
+  assert(q('#syringeInstallation [aria-label="試動伸出量 (mm)"]').disabled,'unmounted actuator cannot be trial driven');
+  assert([...q('#syringeInstallation').querySelectorAll('button')].find(n=>n.textContent==='檢查全行程').disabled,'unmounted actuator cannot pass a scan');
+  input('試動伸出量 (mm)','20');assert(q('#syringeInstallation svg').innerHTML===draftSvg,'unmounted trial cannot move the links');
+  assert(q('#syringeInstallation').textContent.includes('針筒尚未固定'),'unmounted state is explained');
+  assert(q('#syringeInstallation svg [data-install-member="H1Coupler"]'),'coupler remains drawn');
   assert(JSON.stringify(api.snapshot())===original,'placement, direction and trial do not edit the work');
-  ib('下一步');select('筒身固定在哪個零件？','H1Frame');ib('背面');ib('取消');await new Promise(resolve=>setTimeout(resolve,0));assert(JSON.stringify(api.snapshot())===original,'cancel preserves original work');
+  ib('下一步');select('筒身固定在哪個零件？','H1Frame');input('試動伸出量 (mm)','20');ib('檢查全行程');assert(q('#syringeInstallation').textContent.includes('41 點'),'fixed connected actuator full stroke passes');ib('背面');ib('取消');await new Promise(resolve=>setTimeout(resolve,0));assert(JSON.stringify(api.snapshot())===original,'cancel preserves original work');
   b.addFixedSyringe();connect();ib('下一步');select('筒身固定在哪個零件？','H1Frame');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
   const placed=S.comps.find(c=>c.type==='syringe');assert(placed?.b.componentId==='H1Coupler'&&placed.installation.face==='front'&&placed.axisDeg===0,'confirm preserves placement, angle and real owners');
   assert(!S.comps.some(c=>c.id.startsWith('SyringePlacementReference')),'temporary placement reference never saved');

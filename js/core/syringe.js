@@ -54,6 +54,10 @@ export function syringeIssues(c,comps,params) {
     const atEnd2=rod?.type==='bar'&&rodLength>0&&Math.abs(c.b?.u-rodLength)<1e-6&&c.b?.v===0;
     if(!(c.b?.u===0&&c.b?.v===0)&&!atEnd2)issues.push('固定筒身推桿須接活動連桿的端孔（第一孔或桿件第二孔）。');
     if(fixedIds.has((atEnd2?rod?.p2:rod?.p1)?.id))issues.push('推桿接孔不能同時設成固定點。');
+    const other=atEnd2?rod?.p1:rod?.p2,output=comps.find(o=>o.id===c.outputId);
+    if(rod?.type!=='bar'||!rod.p1||!rod.p2)issues.push('缺少推桿連接的短連桿，請補回並重新連接。');
+    if(!output||!['bar','triangle'].includes(output.type)||output.id===rod?.id)issues.push('缺少輸出連桿／擺臂，不能只靠針筒端點運動。');
+    else if(!other||fixedIds.has(other.id)||![output.p1,output.p2,output.p3].some(p=>p?.id===other.id)||![output.p1,output.p2,output.p3].some(p=>fixedIds.has(p?.id)))issues.push('短連桿須接到有固定支點的輸出連桿；目前接點未接妥。');
   }
   return issues;
 }

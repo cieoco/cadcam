@@ -35,8 +35,8 @@ export function planSyringeInstallation(source,request,points=null,motion={}){
  return {...result,comps,params,syringe:next};
 }
 
-// A loose actuator uses a temporary reference for candidate solving only.
-// It is never committed before the user chooses a real frame.
+// Placement is visual only until a real fixed frame has been selected.
+// Never manufacture a hidden ground constraint to make a loose actuator move.
 export function planPlacedSyringe(source,request,points=null,motion={}){
  const pos=request.position;
  if(!pos||![pos.x,pos.y,request.axisDeg].every(Number.isFinite))return {ok:false,message:'請放置針筒並設定方向角度。'};
@@ -49,11 +49,8 @@ export function planPlacedSyringe(source,request,points=null,motion={}){
   a={componentId:owner.id,u:dx*f.x+dy*f.y,v:-dx*f.y+dy*f.x};
   for(const k of ['u','v'])if(Math.abs(a[k])<1e-6)a[k]=0;
   if(Math.abs(a.u-f.length)<1e-6)a.u=f.length;
- }else{
-  temporary=true;let id='SyringePlacementReference';while(draft.comps.some(c=>c.id===id))id+='X';
-  draft.comps.push({id,type:'anchor',p1:{id:id+'Point',type:'fixed',...pos}});
-  a={componentId:id,u:0,v:0};
- }
+ }else return {ok:false,temporary:true,reasonCode:'unmounted',message:'針筒尚未固定，不能帶動機構；請到第 4 步選擇固定機架。'};
+
  const old=source.comps.find(c=>c.id===request.id),oldPoint=old&&attachmentPoint(old.a,source.comps,source.params,points);
  const spec=oldPoint&&Math.hypot(pos.x-oldPoint.x,pos.y-oldPoint.y)<1e-6?{lmin:old.spec.lmin,...request.spec}:request.spec;
  const result=planSyringeInstallation(draft,{...request,a,spec},points,motion);
