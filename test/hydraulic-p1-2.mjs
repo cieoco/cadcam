@@ -41,7 +41,8 @@ ok(g&&g.degPerMm>=2&&g.degPerMm<=8,`10 mm 處每推 1 mm 轉 2–8°（實際 ${
 ok(JSON.stringify(snap)===before,'不改範例原始資料');
 const ex=readFileSync(new URL('../js/blocks/examples.js',import.meta.url),'utf8');
 ok(/id:'hydraulic-h04'/.test(ex)&&/fixedBaseSnapshot/.test(ex),'範例清單登錄 hydraulic-h04');
-ok(!/hydraulic-h03[^\n]*交叉/.test(ex),'H03 範例說明不再寫「交叉臂」（已改為對稱不交叉）');
+// H03 已依使用者要求回復交叉臂；不能用 H05／H06 組合變體覆蓋它。
+ok(/hydraulic-h03[^\n]*交叉/.test(ex),'H03 範例明示交叉夾臂，保留已確認的版本');
 const html=readFileSync(new URL('../teaching-hydraulic.html',import.meta.url),'utf8');
 ok(/blocks\.html\?example=hydraulic-h04/.test(html),'教材有開啟 H04 的連結');
 ok(/第十一單元/.test(html)&&/俯視/.test(html)&&/轉盤/.test(html),'第十一單元以俯視說明轉盤');

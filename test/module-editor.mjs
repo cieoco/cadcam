@@ -1,3 +1,4 @@
+import { BUILTIN_MODULES } from '../js/blocks/module-ops.js';
 // M1c 刀 2：模組面板與模組庫控制器（SDD-ASSEMBLY-MODULES §4.3、D8）。DOM 以極簡假件替身。
 import { check, report } from './_harness.mjs';
 
@@ -44,7 +45,7 @@ reset();
 // ---------- 模組庫清單與插入 ----------
 {
   const lib = editor.library();
-  check('模組庫：九個內建模組在前', lib.length === 9 && lib.every(x => x.kind === 'builtin') && lib[0].name === '齒條升降' && lib[1].name === '齒輪夾爪' && lib[2].name === '四連桿升降臂');
+  check('模組庫：依登錄順序列出全部內建模組', lib.length === BUILTIN_MODULES.length && lib.every((x, i) => x.kind === 'builtin' && x.name === BUILTIN_MODULES[i].name));
   const u0 = log.undo;
   editor.insertBuiltin('rack-lift');
   check('插入齒條升降：5 件、1 個模組、一次 undo、重建與重畫', S.comps.length === 5 && S.modules.length === 1 && log.undo === u0 + 1 && log.rebuild >= 1 && log.draw >= 1);
@@ -128,7 +129,7 @@ const liftOut = S.modules[0].outputs[0];
   editor.saveToLibrary();
   check('saveToLibrary：寫入本機模組庫', log.saved.length === 1 && JSON.parse(libraryText).length === 1);
   const lib = editor.library();
-  check('模組庫清單：內建 9 ＋ 我的 1', lib.length === 10 && lib[9].kind === 'local' && lib[9].name === '新夾爪');
+  check('模組庫清單：全部內建 ＋ 我的 1', lib.length === BUILTIN_MODULES.length + 1 && lib.at(-1).kind === 'local' && lib.at(-1).name === '新夾爪');
   const n = S.comps.length;
   editor.insertLocal(0);
   check('從我的模組庫插入：多 4 件與新模組', S.comps.length === n + 4 && S.modules.length === 3);
@@ -142,7 +143,7 @@ const liftOut = S.modules[0].outputs[0];
   editor.removeFromLibrary(0);
   check('從模組庫移除', JSON.parse(libraryText).length === 1);
   libraryText = '{壞掉';
-  check('本機模組庫損壞時清單只剩內建', editor.library().length === 9);
+  check('本機模組庫損壞時清單只剩內建', editor.library().length === BUILTIN_MODULES.length);
 }
 
 // ---------- 繪製不出錯 ----------

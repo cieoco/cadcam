@@ -501,3 +501,10 @@
 - 12/12 定向 Node 驗收通過：`output/hydraulic-course-final/results.json`，涵蓋練習完成路徑、全行程、保存、H05/H06 組立及序列、範例庫與載入圖。更新 H05 舊測試殘留的 2 層預期為既有 3 層配置，保留九姿態干涉與無疊層反例斷言。
 - 實際瀏覽器 60/60 通過（`output/hydraulic-course-final/browser-results.txt`），新增三份練習安裝、H02 新 ID 孔位比較、保存重開與復原；既有播放／匯出回歸仍保留。測試選擇器只操作 open dialog，避免已關閉待移除視窗被誤選；播放驗收在獨立分頁執行，避免切頁暫停動畫。
 - 桌機目錄與直達第十一單元、390×844／360×640 手機教材均實際檢視；無橫向溢出、參考預設收合。證據 `output/hydraulic-course-final/course-index.png`、`unit8-mobile.png`。手機截圖更新於 `assets/teaching/hydraulic/installation-*.png`。這是瀏覽器尺寸驗收，不代表實體手機／實物製作驗證。
+
+## 2026-10-20｜修復發布驗收阻擋（2026.10.20.14）
+
+- GitHub Actions 最近發布在完整驗收階段失敗，建置與部署被跳過；不能把推送成功或 queued 當作部署完成。發布須追蹤同一 commit 的 test／build／deploy 結果，再核對正式網站版本。
+- 修正模組庫驗收的舊九項清單，覆蓋現有十二項及本機模組排序；H03 待安裝練習應明確回報 H3P 漏解，完成範例仍不得誤報。H03 教材預期配合使用者確認的交叉夾臂版本，不改 H05／H06 變體。
+- 歷史更新紀錄抽至 version-history.js，開啟視窗才載入；保留關閉、重開與載入失敗重試。首次 JS 原始碼由 1,918,973 bytes 降至約 1,894,000 bytes，維持原 1.9 MB 上限；未降低驗收門檻或略過部署檢查。
+- 瀏覽器確認工具與教學入口、目前版本、完整歷史紀錄及關閉重開不重複項目。完整驗收證據：output/deployment-final/results.json；定向六組：output/deployment-repaired-blockers/results.json。

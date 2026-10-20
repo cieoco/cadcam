@@ -28,9 +28,14 @@ for (const ex of BLOCK_EXAMPLES) {
     const sol = solveTopology(compiled, angles ? { thetaDeg: deg, motorAngles: angles } : { thetaDeg: deg });
     const miss = unsolvedMovingPoints(s.comps, sol);
     if (!Array.isArray(miss)) { bad = '回傳不是陣列'; break; }
+    // H03 練習刻意移除針筒，H3P 缺少輸入；應保留漏解警告。
+    if (ex.id === 'hydraulic-h03-practice') {
+      if (miss.join(',') !== 'H3P') { bad = `${deg}°：預期 H3P 漏解，實際 ${miss}`; break; }
+      continue;
+    }
     if (sol.isValid !== false && miss.length) { bad = `${deg}°：${miss.join(',')}`; break; }
   }
-  check(`${ex.id}：不誤報`, !bad, bad);
+  check(`${ex.id}：${ex.id === 'hydraulic-h03-practice' ? '待安裝練習保留漏解警告' : '不誤報'}`, !bad, bad);
 }
 
 // 2. L0 的錯誤接法：夾爪齒輪中心直接共用升降滑台的點。
