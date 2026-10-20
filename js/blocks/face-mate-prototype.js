@@ -17,6 +17,12 @@ const names = { top: '上面（板面）', bottom: '下面（板面）', front: 
 const symbols = { top: '↑', bottom: '↓', front: '●', back: '○', left: '←', right: '→' };
 const faceOrder = ['top', 'bottom', 'front', 'back', 'left', 'right'];
 const integrated = new URLSearchParams(location.search).get('integrated') === '1';
+document.body.dataset.integrated = String(integrated);
+const compactLayout = matchMedia('(max-width:760px), (max-height:540px) and (orientation:landscape)');
+const syncSelectionDetails = () => { $('selectedPartsDetails').open = !compactLayout.matches; };
+syncSelectionDetails();
+compactLayout.addEventListener('change', syncSelectionDetails);
+$('selectedPartsDetails').hidden = !integrated;
 const loadSession = createLoadSession(LOAD_GRAPH_TOKEN);
 let { hosts, children } = realMountExamples();
 const initial = { host: 0, child: 0, hostFace: 'top', childFace: 'bottom', alignU: 0, alignV: 0, offsetU: 0, offsetV: 0, gap: 0, quarterTurns: 0 };
@@ -484,6 +490,7 @@ function render() {
   }
   $('installationStatus').textContent=integrated ? (!childConfirmed?'請選擇安裝零件；底板只是建議預覽，尚未確認。':children[draft.child].blockedReason || `已選：${children[draft.child].partName}。確認接合後，此設計整組跟隨承接零件。`) : '';
   $('selectedParts').textContent=integrated ? `承接：${hosts[draft.host].name} → 安裝：${childConfirmed ? children[draft.child].name : '尚未選擇（底板為建議預覽）'}` : '';
+  $('selectedPartsSummary').textContent=childConfirmed ? '已選零件' : '已選零件 · 安裝端待選';
   $('stageTitle').textContent = mode === 'work' ? '工作模式 · 外框擺放預覽' : step === 0 ? (choosingChild ? '選安裝零件' : '選承接零件') : titles[step];
   preview();
 }

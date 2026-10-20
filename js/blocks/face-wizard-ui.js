@@ -100,6 +100,17 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   const dialog = document.createElement('dialog');
   dialog.setAttribute('aria-label', '接合預覽');
   dialog.style.cssText = 'width:min(960px,100vw);height:94dvh;max-width:100vw;max-height:100dvh;padding:0;border:0;border-radius:14px;overflow-x:hidden;';
+  dialog.className = 'face-wizard-dialog';
+  const layout = document.createElement('style');
+  layout.textContent = `
+    .face-wizard-heading{display:none}
+    @media(max-width:760px),(max-height:540px) and (orientation:landscape){
+      .face-wizard-dialog .face-wizard-bar{display:flex;align-items:center;justify-content:space-between;height:44px;padding-left:12px}
+      .face-wizard-dialog .face-wizard-heading{display:block;margin:0;font:600 15px system-ui}
+      .face-wizard-dialog .face-wizard-bar button{box-sizing:border-box;margin:0;min-height:44px;padding:4px 12px;font:14px system-ui}
+    }`;
+  const bar = document.createElement('div'); bar.className = 'face-wizard-bar';
+  const heading = document.createElement('h2'); heading.className = 'face-wizard-heading'; heading.textContent = '接合預覽';
   const close = document.createElement('button'); close.textContent = '關閉'; close.setAttribute('aria-label', '關閉組立精靈');
   close.style.cssText = 'height:44px;min-width:64px;float:right;';
   const frame = document.createElement('iframe'); frame.title = '選面與尺寸';
@@ -110,7 +121,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   frameUrl.searchParams.set('load', LOAD_GRAPH_TOKEN);
   frame.src = frameUrl.href;
   frame.style.cssText = 'width:100%;height:calc(100% - 44px);border:0;display:block;';
-  dialog.append(close, frame); document.body.append(dialog);
+  bar.append(heading, close); dialog.append(layout, bar, frame); document.body.append(dialog);
   const dispose = () => {transaction.cancel();window.removeEventListener('message', receive);dialog.remove();};
   close.addEventListener('click', () => dialog.close()); dialog.addEventListener('close', dispose);
   async function receive(e) {
