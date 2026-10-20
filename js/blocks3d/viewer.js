@@ -320,7 +320,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       const plane=new THREE.Group();syringeGroup.add(plane);
       if(s.matrix){plane.matrixAutoUpdate=false;plane.matrix.fromArray(s.matrix);}
       for(const tip of s.tips||[]){const sh=stadiumShape(tip.a,tip.b,4.5,1.5),m=new THREE.Mesh(new THREE.ExtrudeGeometry(sh,{depth:2,bevelEnabled:false}),new THREE.MeshStandardMaterial({color:'#dd9b39'}));m.position.z=s.z??12;plane.add(m);}
-      const group=new THREE.Group();group.position.set(s.a.x,s.a.y,s.z??16);group.rotation.z=s.angle;plane.add(group);
+      const group=new THREE.Group();group.position.set(s.a.x,s.a.y,s.z??16);group.rotation.z=s.angle;group.scale.z=s.mountSide || 1;plane.add(group);
       const mesh=(geo,color,x,y=0,z=0)=>{const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color,roughness:.6}));m.position.set(x,y,z);group.add(m);return m;};
       const cylinder=(r,len,x,color)=>{const m=mesh(new THREE.CylinderGeometry(r,r,len,24),color,x);m.rotation.z=Math.PI/2;};
       cylinder(s.r,s.end-s.start,(s.end+s.start)/2,'#d6e9e5');

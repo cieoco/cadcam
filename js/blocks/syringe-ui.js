@@ -11,6 +11,7 @@ import {S,motorAnglesNow} from './state.js';
 import * as View from './view.js';
 import {createPlateGeometry} from './plate-geometry.js';
 import {frameConnectorNodes} from './model.js';
+import {openSyringeInstallation} from './syringe-install-ui.js';
 const ns='http://www.w3.org/2000/svg';
 const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(parent)parent.append(n);return n;};
 const clone=structuredClone;
@@ -37,9 +38,9 @@ export function createSyringeUI(h){
   let id=null,raf=null,last=null,direction=1,dragUndo=false,picking=null,scopeKey=null,message='',mountNotice='';
   const mountReference='水管固定夾、M3 螺絲與套筒為參考尺寸；夾持力、完整干涉、承重與水路未驗證。';
   function setMountPreview(shapes){
-    const failed=shapes.find(s=>s.mount?.status==='unverified');
+    const failed=shapes.find(s=>s.mount?.status==='unverified'),misaligned=shapes.find(s=>Number.isFinite(s.alignmentMm)&&Math.abs(s.alignmentMm)>.1);
     const reasons={missing_frame_holes:'機架缺少管夾配對孔',frame_alignment:'管夾與機架孔未對齊',barrel_clearance:'筒身與機架高度不足，請調整疊放層',clamp_diameter:'筒身大於參考管夾內徑，需更換管夾'};
-    mountNotice=failed?`固定座待調整：${reasons[failed.mount.reason] || '尚未核對'}。`:'';
+    mountNotice=failed?`固定座待調整：${reasons[failed.mount.reason] || '尚未核對'}。`:misaligned?`推桿與短連桿不同層，相差 ${Math.abs(misaligned.alignmentMm).toFixed(1)} mm。`:'';
     warning3d.textContent=mountNotice+mountReference;
   }
   const inAssembly=()=>S.mode!=='design';
@@ -197,10 +198,22 @@ export function createSyringeUI(h){
       h.playing(true);raf=requestAnimationFrame(step);
     };raf=requestAnimationFrame(step);
   }
-  function open(candidate=null){
+  function install(candidate=null){
+    h.pause();stop();
+    const source={comps:clone(h.comps()),params:{...params()},fabrication:clone(S.fabrication)};
+    const revision=JSON.stringify([S.comps,S.topo.params,S.designFocus]);
+    let counter=1;while(S.comps.some(c=>c.id===`Syringe${counter}`))counter++;
+    openSyringeInstallation({source,points:clone(h.points()),existing:candidate,newId:`Syringe${counter}`,motion:motion(),
+      advancedSettings:c=>open(c,true),
+      confirm:r=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus]))return false;message='';commit(r.comps,r.params,r);return true;},
+      remove:candidate&&S.comps.some(c=>c.id===candidate.id)?()=>{h.pushUndo();S.comps=S.comps.filter(c=>c.id!==candidate.id);h.rebuild();h.draw();h.save();}:null});
+  }
+  function open(candidate=null,advanced=false){
+    const current=candidate || active();
+    if(current?.mountMode==='fixed-axis'&&!advanced){install(current);return;}
     h.pause();const c=clone(candidate||active());if(!c)return;
     const dialog=el('dialog');dialog.id='syringeDialog';dialog.className='syringe-dialog';const form=el('form',null,dialog);
-    el('h3',candidate?'新增 10cc 液壓針筒':'針筒與安裝設定',form);
+    el('h3',candidate&&!h.comps().some(o=>o.id===candidate.id)?'新增 10cc 液壓針筒':'針筒與安裝設定',form);
     el('p',c.mountMode==='fixed-axis'?'管夾固定筒身；A 為固定參考點，B 為片狀推桿孔。軸向固定，接孔保留轉動。':'mm；A 為筒身托架轉軸，B 為推桿轉接座。孔位沿所屬零件第 1 孔→第 2 孔量測。',form);
     if(c.mountMode==='fixed-axis')el('p',frameConnectorNodes(h.comps()).some(n=>n.id===`${c.id}_clamp_0`)
       ?'雙耳水管固定夾：機架配對孔距 28 mm、孔徑 3.5 mm；M3 螺絲穿過夾腳、套筒及機架，以螺帽固定。套筒高度依 3D 層位推算；夾具、螺絲長度與止滑襯墊須依實物核對。'
@@ -208,7 +221,7 @@ export function createSyringeUI(h){
     let section=form;
     const fields={},input=(key,text,value,type='number')=>{const label=el('label',text,section),n=el('input',null,label);n.type=type;n.name=key;if(type==='number')n.step='any';n.value=value;fields[key]=n;return n;};
     const tasks=el('details',null,form);el('summary',c.mountMode==='fixed-axis'?'固定筒身教學任務':'兩端鉸接教學任務',tasks);
-    el('p',c.id==='H1Syringe'?'管夾固定筒身，推桿經短連桿帶動單臂。先觀察 0–20 mm 往返，再只改活動臂長 60、80、100 mm，掃描後比較擺角。':c.mountMode==='fixed-axis'?'只改伸出量 0–20 mm。H02 比較驅動孔位；H03 推出即夾緊，觀察一體式夾臂的端孔距；末端與夾臂同片、一起轉動，不含接觸求解；H04 讀轉盤每推 1 mm 轉幾度。':'① 推動滑桿、掃描並記錄可用行程。② 其他條件不變，只改 B 孔位，先預測再比較臂角與 C 位置。③ 修改前後分別存檔，寫下「改了什麼／預測／觀察」，最後與實物比較。',tasks);
+    el('p',c.id==='H1Syringe'?'管夾固定筒身，推桿經短連桿帶動單臂。先觀察 0–20 mm 往返，再只改活動臂長 60、80、100 mm，掃描後比較擺角。':c.mountMode==='fixed-axis'?'只改伸出量 0–20 mm。H02 比較驅動孔位；H03 推出張開、縮回夾合，觀察一體式夾臂的端孔距；末端與夾臂同片、一起轉動，不含接觸求解；H04 讀轉盤每推 1 mm 轉幾度。':'① 推動滑桿、掃描並記錄可用行程。② 其他條件不變，只改 B 孔位，先預測再比較臂角與 C 位置。③ 修改前後分別存檔，寫下「改了什麼／預測／觀察」，最後與實物比較。',tasks);
     for(const key of ['a','b']){
       const label=el('label',`${key.toUpperCase()} 所屬零件`,form),select=el('select',null,label);select.name=`${key}Owner`;fields[select.name]=select;
       for(const owner of h.comps().filter(o=>attachmentFrame(o,params()))){const option=el('option',owner.id,select);option.value=owner.id;}
@@ -267,7 +280,7 @@ export function createSyringeUI(h){
     h.pause();if(S.mode!=='design'){h.notify('請先到設計模式，再選管夾位置。');return;}
     if(!h.comps().some(o=>isFixedFrame(o,h.comps()))){h.notify('請先畫出固定的機架、擺臂與短連桿，再放管夾固定針筒。');return;}
     document.getElementById('powerMenu').style.display='none';
-    chooseFixedParts();
+    install();
   }
   // 清單選件與畫布選點共用同一候選；手機不必精準命中重疊的小孔。
   function chooseFixedParts(seedA=null,rodChoices=null){

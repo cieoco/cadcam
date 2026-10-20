@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import {getExample} from '../js/blocks/examples.js';
+import {normalizeSnapshot} from '../js/blocks/schema.js';
+import {planSyringeInstallation,installationChoices} from '../js/blocks/syringe-installation.js';
+import {buildSyringeInstallPreview} from '../js/blocks/syringe-install-preview.js';
+import {solveSyringe,scanSyringe} from '../js/blocks/syringe-operations.js';
+for(const name of ['hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h04']){
+ const source=normalizeSnapshot(getExample(name).snapshot),original=JSON.stringify(source);
+ const c=source.comps.find(c=>c.type==='syringe'),points=solveSyringe(source.comps,source.params).points;
+ const request={id:c.id,a:c.a,b:c.b,face:'front',spacerMm:null,extension:c.extension};
+ const front=planSyringeInstallation(source,request,points);assert.ok(front.ok,front.message);
+ const preview=buildSyringeInstallPreview(front),f=preview.model.syringes[0];
+ assert.equal(f.mount.status,'reference',name);assert.ok(Math.abs(f.alignmentMm)<.1,name);
+ assert.equal(preview.model.materialParts.filter(p=>p.partId==='frame'||p.partId===c.a.componentId).length,1);
+ assert.ok(scanSyringe(front.comps,front.params,c.id).ok);
+ const back=planSyringeInstallation(source,{...request,face:'back'},points);assert.ok(back.ok);
+ const b=buildSyringeInstallPreview(back).model.syringes[0];
+ assert.equal(b.mountSide,-1);assert.equal(b.mount.status,'reference');assert.ok(b.z<f.z);assert.ok(Math.abs(b.alignmentMm)>1,'back must expose rod misalignment');
+ const manual=planSyringeInstallation(source,{...request,spacerMm:f.mount.fasteners[0].spacerHeight+3},points);
+ const m=buildSyringeInstallPreview(manual).model.syringes[0];assert.ok(Math.abs(m.z-f.z-3)<.001);assert.ok(Math.abs(m.alignmentMm-3)<.001);
+ const saved=normalizeSnapshot(JSON.parse(JSON.stringify({kind:'blocks',v:1,comps:back.comps,params:back.params})));
+ assert.deepEqual(saved.comps.find(item=>item.id===c.id).installation,{face:'back',spacerMm:null});
+ assert.equal(JSON.stringify(source),original,'preview and cancel never mutate original');
+ assert.equal(planSyringeInstallation(source,{...request,spacerMm:-1},points).ok,false);
+ assert.equal(planSyringeInstallation(source,{...request,a:{...c.a,u:1e5}},points).ok,false);
+}
+const source=normalizeSnapshot(getExample('hydraulic-h01').snapshot),s=source.comps.find(c=>c.type==='syringe'),points=solveSyringe(source.comps,source.params).points;
+source.comps=source.comps.filter(c=>c!==s);
+const choices=installationChoices(source.comps,source.params);assert.ok(choices.frames.some(c=>c.id===s.a.componentId));
+const created=planSyringeInstallation(source,{a:s.a,b:s.b,face:'front',spacerMm:null,newId:'NewSyringe'},points);
+assert.ok(created.ok,created.message);assert.equal(created.syringe.id,'NewSyringe');assert.ok(scanSyringe(created.comps,created.params,'NewSyringe').ok);
+const trial=planSyringeInstallation(source,{a:s.a,b:s.b,face:'front',spacerMm:null,newId:'NewSyringe',extension:20},points);
+assert.ok(trial.ok);assert.equal(trial.syringe.spec.lmin,created.syringe.spec.lmin);
+assert.ok(Math.hypot(trial.points.H1C.x-created.points.H1C.x,trial.points.H1C.y-created.points.H1C.y)>1,'new candidate trial slider moves the arm');
+assert.equal(planSyringeInstallation(source,{a:s.b,b:s.b},points).ok,false,'moving member cannot become a fixed clamp host');
+source.comps.forEach(c=>c.moduleId='StudentDesign');
+assert.equal(planSyringeInstallation(source,{a:s.a,b:s.b,newId:'Inserted'},points).syringe.moduleId,'StudentDesign','new syringe belongs to the current design');
+console.log('Syringe installation: H01–H04 isolated candidates, front/back geometry, spacer/rod alignment, new placement, full stroke and save/reopen passed');
