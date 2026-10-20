@@ -4,20 +4,24 @@ import { planSyringeAttachmentResize } from '../core/syringe.js';
 import { memberDimensions, memberDimensionValue, planMemberDimension, mirroredJaw, dimensionLock } from './member-dimensions.js';
 import { MATERIALS, memberStock, planMemberStock } from './member-stock.js';
 
-export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTriangle, updatePointCoordsById, notify, holeDiameter = () => 12.96 }) {
+export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTriangle, updatePointCoordsById, notify, openMobileEditPanel = () => {}, holeDiameter = () => 12.96 }) {
   let mirror = true;
   let tipDraft = null;
+  let lastSelectedId = null;
   const el = id => document.getElementById(id);
   const selected = () => S.comps.find(c => c.id === (S.selectedTriangleId || S.selectedLinkId));
   const displayComp = comp => comp && tipDraft?.ids.includes(comp.id) ? { ...comp, jawTipLength: tipDraft.value } : comp;
   const dimensionId = () => S.triSide || 'g';
   function sync() {
     const comp = selected();
+    if(lastSelectedId!==comp?.id){const more=el('memberMore');if(more)more.open=false;lastSelectedId=comp?.id;}
     if (tipDraft && tipDraft.selectedId !== comp?.id) tipDraft = null;
     const dimensions = memberDimensions(comp);
     const active = dimensions.length > 0;
     const input = el('memberDimensionInput'), hint = el('memberDimensionHint');
     if (!input) return;
+    const dimensionLabel=el('memberDimensionLabel');if(dimensionLabel)dimensionLabel.hidden=!active;
+    const lockNotice=el('memberDimensionLock');if(lockNotice&&!active)lockNotice.hidden=true;
     input.style.display = active ? '' : 'none';
     el('lenValue').style.display = active ? 'none' : '';
     hint.style.display = active ? '' : 'none';
@@ -35,6 +39,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if (!dimensions.some(d => d.id === dimensionId())) S.triSide = 'g';
     const id = dimensionId();
     const dimension = dimensions.find(d => d.id === id);
+    if(dimensionLabel)dimensionLabel.textContent=dimension.label;
     const selector = el('triSideSelect');
     selector.replaceChildren(...dimensions.map(d => {
       const option = document.createElement('option'); option.value = d.id; option.textContent = d.label;
@@ -48,6 +53,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     input.max = String(dimension.max ?? (id === 'tip' ? 160 : 2000));
     input.setAttribute('aria-label', dimension.label);
     const lock = dimensionLock(comp, S.comps, id);
+    if(lockNotice){lockNotice.textContent=lock || '';lockNotice.hidden=!lock;}
     input.disabled = Boolean(lock);
     ['lenMinusBtn', 'lenPlusBtn'].forEach(key => { el(key).disabled = Boolean(lock); });
     el('lenMinusBtn').title = `${dimension.label} 減少 ${dimension.step ?? 8} mm`;
@@ -66,7 +72,8 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
   function selectDimension(id) {
     if (!memberDimensions(selected()).some(d => d.id === id)) return;
     S.triSide = id;
-    pause(); draw();
+    pause(); openMobileEditPanel(); draw();
+    const input=el('memberDimensionInput');input?.focus?.();input?.select?.();
   }
   function setValue(raw) {
     const comp = selected();

@@ -23,7 +23,7 @@ export function quickMotorChoices(comps,outputId=''){
       const hosts=shared.filter(c=>c.type==='bar'&&['p1','p2'].some(k=>c[k]?.id===node.id));
       for(const host of hosts)result.push({nodeId:node.id,outputId:out.id,outputEnd:end,hostId:host.id,
         hostEnd:host.p1.id===node.id?'p1':'p2',orientation:'follow-frame',face:'back'});
-      if(!shared.length)result.push({nodeId:node.id,outputId:out.id,outputEnd:end,hostId:'world',
+      if(!shared.length||shared.every(c=>c.type==='anchor'&&fixed.has(c.p1.id)))result.push({nodeId:node.id,outputId:out.id,outputEnd:end,hostId:'world',
         hostEnd:'p1',orientation:'horizontal',face:'back'});
     }
   }

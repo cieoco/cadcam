@@ -10,6 +10,9 @@ class FakeElement {
   addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); }
   setAttribute(k, v) { this.attrs[k] = String(v); }
   getAttribute(k) { return this.attrs[k] ?? null; }
+  querySelector(selector) {
+    return this.children.find(c => selector.startsWith('.') && (c.attrs.class || '').split(' ').includes(selector.slice(1))) || null;
+  }
 }
 const els = new Map();
 globalThis.document = {

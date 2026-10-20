@@ -22,7 +22,7 @@ try{
  for(const [num,x,y,angle] of [[1,-100,-60,0],[2,59.27,100.62,153.57],[3,-26,253.37,.62]]){
   api.reopen(structuredClone(getExample(`hydraulic-h0${num}-practice`).snapshot));
   assert(!S.comps.some(c=>c.type==='syringe'),`unit practice H0${num} starts unpowered`);
-  b.addFixedSyringe();
+  b.addFixedSyringe();[...document.querySelectorAll('#syringeInstallation[open] button')].find(n=>n.textContent==='調整安裝').click();
   const install=()=>document.querySelector('#syringeInstallation[open]');
   const choose=(label,value)=>{const n=install().querySelector(`[aria-label="${label}"]`);n.focus();n.value=value;n.dispatchEvent(new Event(n.tagName==='SELECT'?'change':'input',{bubbles:true}));};
   const press=text=>[...install().querySelectorAll('button')].find(b=>b.textContent===text).click();
@@ -91,6 +91,12 @@ try{
  const svg=q('#stageSvg'),ctm=svg.getScreenCTM(),point=(x,y)=>new DOMPoint(View.TX(x),View.TY(y)).matrixTransform(ctm);
  const tap=(x,y)=>{const p=point(x,y);svg.dispatchEvent(new PointerEvent('pointerdown',{clientX:p.x,clientY:p.y,bubbles:true,pointerType:'touch'}));};
  tap(0,-80);tap(80,0);assert(!!q('#syringeDialog'),'touch A/B picking opens candidate');button('確認套用');assert(S.comps.some(c=>c.type==='syringe'&&c.a.componentId==='HFrame'&&c.b.componentId==='HArm'),'new actuator retains real owners');
+ initial();const beforeRepick=JSON.stringify(api.snapshot()),originalSpec=structuredClone(S.comps[2].spec);
+ settings();button('在圖上換孔位');tap(0,-80);tap(60,0);
+ assert(JSON.stringify(api.snapshot())===beforeRepick,'hinged repick is only a candidate');button('確認套用');
+ assert(S.comps.filter(c=>c.type==='syringe').length===1&&S.comps[2].id==='HSyringe'&&Math.abs(S.comps[2].b.u-60)<0.1,'hinged repick keeps the existing actuator instead of duplicating it');
+ assert(S.comps[2].spec.outerDiameter===originalSpec.outerDiameter&&!S.comps[2].spec.calibrated,'repick keeps measured body dimensions but clears calibration');
+ b.undo();assert(JSON.stringify(api.snapshot())===beforeRepick,'hinged repick has one undo');
  // Four-step fixed installation: draft/cancel/confirm use the same work and undo.
  {
   const blank=structuredClone(h01Snapshot);blank.comps=blank.comps.filter(c=>c.type!=='syringe');api.reopen(blank);
@@ -103,7 +109,17 @@ try{
    canvas.dispatchEvent(new PointerEvent('pointerup',{pointerId:17,bubbles:true}));
   };
   const connect=()=>{select('筒身固定在哪個零件？','H1Frame');ib('下一步');put();input('推進方向角度 (°)','0');ib('下一步');select('推桿接哪個短連桿？','H1Coupler');select('連接端孔','0');};
-  b.addFixedSyringe();assert(!!q('#syringeInstallation[open]'),'new fixed syringe opens actuator placement');
+  b.addFixedSyringe();
+  const quickSvg=q('#syringeInstallation[open] svg'),seat=blank.comps.find(c=>c.id==='H1Frame').p1;
+  const screen=new DOMPoint(seat.x,-seat.y).matrixTransform(quickSvg.getScreenCTM());
+  quickSvg.querySelector('[data-install-member="H1Frame"]').dispatchEvent(new PointerEvent('pointerdown',{clientX:screen.x,clientY:screen.y,bubbles:true}));
+  const coupler=blank.comps.find(c=>c.id==='H1Coupler');
+  quickSvg.querySelector(`[data-quick-output="${coupler.p1.id}"]`).dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
+  assert(![...q('#syringeInstallation[open]').querySelectorAll('button')].find(n=>n.textContent==='確認安裝').disabled,'two graphical picks produce a valid fixed syringe candidate');
+  assert(JSON.stringify(api.snapshot())===original,'quick syringe preview leaves source intact');ib('確認安裝');
+  assert(Math.abs(S.comps.find(c=>c.type==='syringe')?.axisDeg)<1e-6,'quick direction follows the picked hole');b.undo();
+  assert(JSON.stringify(api.snapshot())===original,'quick syringe installation has one undo');
+  b.addFixedSyringe();[...document.querySelectorAll('#syringeInstallation[open] button')].find(n=>n.textContent==='調整安裝').click();assert(!!q('#syringeInstallation[open]'),'new fixed syringe opens actuator placement');
   assert(!q('#syringeInstallation[open] [aria-label="筒身固定在哪個零件？"]').closest('section').hidden,'frame selection is the first step');
   assert([...q('#syringeInstallation[open]').querySelectorAll('button')].find(n=>n.textContent==='下一步').disabled,'cannot place actuator before selecting frame');
   connect();
@@ -115,15 +131,15 @@ try{
   assert(q('#syringeInstallation[open] svg [data-install-member="H1Coupler"]'),'coupler remains drawn');
   assert(JSON.stringify(api.snapshot())===original,'placement, direction and trial do not edit the work');
   ib('下一步');input('試動伸出量 (mm)','20');ib('檢查全行程');assert(q('#syringeInstallation[open]').textContent.includes('41 點'),'fixed connected actuator full stroke passes');ib('1 固定外殼');ib('背面');ib('取消');await new Promise(resolve=>setTimeout(resolve,0));assert(JSON.stringify(api.snapshot())===original,'cancel preserves original work');
-  b.addFixedSyringe();connect();ib('下一步');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
+  b.addFixedSyringe();[...document.querySelectorAll('#syringeInstallation[open] button')].find(n=>n.textContent==='調整安裝').click();connect();ib('下一步');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
   const placed=S.comps.find(c=>c.type==='syringe');assert(placed?.b.componentId==='H1Coupler'&&placed.installation.face==='front'&&placed.axisDeg===0,'confirm preserves placement, angle and real owners');
   assert(!S.comps.some(c=>c.id.startsWith('SyringePlacementReference')),'temporary placement reference never saved');
   b.undo();assert(!S.comps.some(c=>c.type==='syringe'),'one undo removes the entire installation');
-  b.addFixedSyringe();connect();ib('1 固定外殼');ib('背面');ib('3 連接輸出');ib('下一步');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
+  b.addFixedSyringe();[...document.querySelectorAll('#syringeInstallation[open] button')].find(n=>n.textContent==='調整安裝').click();connect();ib('1 固定外殼');ib('背面');ib('3 連接輸出');ib('下一步');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
   api.reopen(decodeShareString(encodeSnapshot(api.snapshot())));assert(S.comps.find(c=>c.type==='syringe').installation.face==='back','face survives save/share/reopen');
   settings();ib('其他尺寸與加工設定');await new Promise(resolve=>setTimeout(resolve,0));assert(!!q('#syringeDialog'),'existing advanced dimensions and fabrication remain available');close();
  }
- initial();b.togglePlay();await new Promise(resolve=>setTimeout(resolve,400));b.togglePlay();assert(S.comps[2].extension>20,'time based play advances extension');
+ initial();await new Promise(resolve=>setTimeout(resolve,0));b.togglePlay();for(let i=0;i<20&&S.comps[2].extension===20;i++)await new Promise(resolve=>setTimeout(resolve,100));b.togglePlay();assert(S.comps[2].extension!==20,'time based play advances extension');
  const held=S.comps[2].extension;await new Promise(resolve=>setTimeout(resolve,150));assert(S.comps[2].extension===held,'pause stops hydraulic frame loop');
  initial();
  for(const action of [b.exportLinksSvg,b.exportLinksDxf]){

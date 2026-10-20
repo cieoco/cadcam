@@ -223,8 +223,14 @@ export function createSyringeUI(h){
     const fields={},input=(key,text,value,type='number')=>{const label=el('label',text,section),n=el('input',null,label);n.type=type;n.name=key;n.setAttribute('aria-label',text);if(type==='number'){n.step='any';n.dataset.numeric='true';if(/^[ab][UV]$|^axisDeg$|^tip\d+$/.test(key))signedNumberInput(n);showNumber(n,value);}else n.value=value;fields[key]=n;return n;};
     const tasks=el('details',null,form);el('summary',c.mountMode==='fixed-axis'?'固定筒身教學任務':'兩端鉸接教學任務',tasks);
     el('p',c.id==='H1Syringe'?'管夾固定筒身，推桿經短連桿帶動單臂。先觀察 0–20 mm 往返，再只改活動臂長 60、80、100 mm，掃描後比較擺角。':c.mountMode==='fixed-axis'?'只改伸出量 0–20 mm。H02 比較驅動孔位；H03 推出張開、縮回夾合，觀察一體式夾臂的端孔距；末端與夾臂同片、一起轉動，不含接觸求解；H04 讀轉盤每推 1 mm 轉幾度。':'① 推動滑桿、掃描並記錄可用行程。② 其他條件不變，只改 B 孔位，先預測再比較臂角與 C 位置。③ 修改前後分別存檔，寫下「改了什麼／預測／觀察」，最後與實物比較。',tasks);
+    if(c.mountMode!=='fixed-axis'){
+      el('p',`筒身端：${c.a.componentId} → 推桿端：${c.b.componentId}`,form);
+      const pick=el('button','在圖上換孔位',form);pick.type='button';
+      pick.onclick=()=>{dialog.close();picking={a:null,existing:clone(c)};cancelPick.hidden=false;bar.hidden=false;wrap.classList.add('hydraulic-active');notify('先點筒身端，再點推桿端；確認前不修改作品。');};
+    }
+    const attachments=el('details',null,form);el('summary','更多：孔位與連桿尺寸',attachments);section=attachments;
     for(const key of ['a','b']){
-      const label=el('label',`${key.toUpperCase()} 所屬零件`,form),select=el('select',null,label);select.name=`${key}Owner`;fields[select.name]=select;
+      const label=el('label',`${key.toUpperCase()} 所屬零件`,attachments),select=el('select',null,label);select.name=`${key}Owner`;fields[select.name]=select;
       for(const owner of h.comps().filter(o=>attachmentFrame(o,params()))){const option=el('option',owner.id,select);option.value=owner.id;}
       select.value=c[key].componentId;input(`${key}U`,`${key.toUpperCase()} 沿桿位置 u (mm)`,c[key].u);input(`${key}V`,`${key.toUpperCase()} 偏置 v (板件用，mm)`,c[key].v);
     }
@@ -237,7 +243,7 @@ export function createSyringeUI(h){
     if(c.id==='H1Syringe'){const presets=el('div',null,form);for(const length of [60,80,100]){const btn=el('button',`臂長 ${length} mm`,presets);btn.type='button';btn.onclick=()=>{showNumber(fields.armLength,length);};}}
     if(c.outputId==='H2Arm'){const presets=el('div',null,form);for(const length of [145.892,172.422,198.958]){const b=el('button',`孔位 ${formatNumber(length)} mm`,presets);b.type='button';b.onclick=()=>{showNumber(fields.armLength,length);};}}
     (c.passiveTips||[]).forEach((t,i)=>input(`tip${i}`,`夾片 ${i+1} 手動相對角度 (°，不含接觸求解)`,t.angleDeg));
-    input('extension','目前伸出量 s (mm)',c.extension);
+    section=form;input('extension','目前伸出量 s (mm)',c.extension);
     const specs=el('details',null,form);el('summary','針筒規格與實測校正',specs);section=specs;
     input('name','規格名稱',c.spec.name,'text');
     for(const [key,text] of [['capacityMl','標稱容量 (mL)'],['outerDiameter','筒身外徑 (mm)'],['bodyLength','筒身外形長度 (mm)'],['rodDiameter','推桿外形寬度 (mm)'],['lmin','最短 A–B 安裝孔距 Lmin (mm)'],['stroke','有效行程 S (mm)']])input(key,text,c.spec[key]);
@@ -357,7 +363,9 @@ export function createSyringeUI(h){
     if(picking.a.componentId===best.ref.componentId){notify('A、B 不能在同一剛性零件上。');return;}
     const a=picking.a,b=best.ref,pa=attachmentPoint(a,h.comps(),params(),h.points()),pb=attachmentPoint(b,h.comps(),params(),h.points());
     const length=Math.hypot(pa.x-pb.x,pa.y-pb.y);let counter=S.counter+1;while(S.comps.some(c=>c.id===`Syringe${counter}`))counter++;
-    const c={type:'syringe',id:`Syringe${counter}`,a,b,spec:{...SYRINGE_DEMO,lmin:Math.max(1,length-20)},extension:Math.min(20,length-1),branch:1};
+    const previous=picking.existing,extension=previous?.extension??Math.min(20,length-1);
+    const c={...(previous||{type:'syringe',id:`Syringe${counter}`,branch:1}),a,b,
+      spec:{...(previous?.spec||SYRINGE_DEMO),lmin:Math.max(1,length-extension),calibrated:false},extension};
     cancelPicking();open(c);
   },true);
   let exporting=false;

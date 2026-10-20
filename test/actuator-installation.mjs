@@ -63,3 +63,8 @@ assert.deepEqual(unique.map(c=>[c.outputId,c.hostId,c.nodeId]),[['Arm','Frame','
 assert.equal(quickMotorChoices(base.comps).length,0,'existing input is edited, not replaced');
 assert.ok(quickMotorChoices(moving.comps).some(c=>c.outputId==='Tool'&&c.hostId==='Arm'&&c.nodeId===moving.comps[1].p2.id),'moving carrier stays attached');
 assert.equal(JSON.stringify(source),original,'quick choices do not mutate source');
+const ambiguous=structuredClone(shared);
+ambiguous.comps.push({...structuredClone(shared.comps[0]),id:'OtherFrame',p2:{id:'F',type:'fixed',x:0,y:-80}});
+assert.equal(quickMotorChoices(ambiguous.comps).length,2,'two real carriers remain an explicit choice');
+const anchored={...structuredClone(source),comps:[{type:'anchor',id:'Base',p1:{...shared.comps[0].p1}},structuredClone(shared.comps[1])]};
+assert.equal(quickMotorChoices(anchored.comps)[0].hostId,'world','an existing ideal anchor can use the explicit world mount');

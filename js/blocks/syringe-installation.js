@@ -49,7 +49,7 @@ export function planPlacedSyringe(source,request,points=null,motion={}){
   a={componentId:owner.id,u:dx*f.x+dy*f.y,v:-dx*f.y+dy*f.x};
   for(const k of ['u','v'])if(Math.abs(a[k])<1e-6)a[k]=0;
   if(Math.abs(a.u-f.length)<1e-6)a.u=f.length;
- }else return {ok:false,temporary:true,reasonCode:'unmounted',message:'針筒尚未固定，不能帶動機構；請到第 4 步選擇固定機架。'};
+ }else return {ok:false,temporary:true,reasonCode:'unmounted',message:'針筒尚未固定，不能帶動機構；請先選擇固定機架。'};
 
  const old=source.comps.find(c=>c.id===request.id),oldPoint=old&&attachmentPoint(old.a,source.comps,source.params,points);
  const spec=oldPoint&&Math.hypot(pos.x-oldPoint.x,pos.y-oldPoint.y)<1e-6?{lmin:old.spec.lmin,...request.spec}:request.spec;

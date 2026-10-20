@@ -987,6 +987,7 @@ const { selectTriangle, startShapeDrag, deleteShapeVertex, updatePlateShapeContr
         setTriangleShapeMode, addTriangleOutlinePoint,
         triParamFor, setTriSide, changeTriSide } = plateEditor;
 const memberEditor = createMemberEditor({
+  openMobileEditPanel,
   pause, pushUndo, rebuild, draw, reshapeTriangle: plateEditor.reshapeTriangle,
   updatePointCoordsById, notify: transient, holeDiameter: comp => memberHoleDiameter(comp, Settings.exportSettings())
 });
@@ -2101,17 +2102,6 @@ for (const panel of document.querySelectorAll('.inspector-panel')) {
   done.type = 'button'; done.className = 'mobile-editor-done'; done.textContent = '完成／收合';
   done.addEventListener('click', () => setMobilePanel('view'));
   panel.prepend(done);
-  if (panel.id === 'lenEditor') {
-    const more = document.createElement('button');
-    more.type = 'button'; more.className = 'mobile-editor-more'; more.textContent = '更多設定';
-    more.addEventListener('click', () => {
-      const expanded = panel.dataset.mobileMore !== 'true';
-      panel.dataset.mobileMore = String(expanded);
-      more.textContent = expanded ? '收起設定' : '更多設定';
-      more.setAttribute('aria-expanded', String(expanded));
-    });
-    more.setAttribute('aria-expanded', 'false'); panel.append(more);
-  }
 
 }
 
@@ -2134,10 +2124,8 @@ function openMobileEditPanel() {
 
 function closeMobileEditPanel() {
   delete document.body.dataset.mobileEditor;
-  const editor = document.getElementById('lenEditor');
-  delete editor.dataset.mobileMore;
-  const more = editor.querySelector('.mobile-editor-more');
-  if (more) { more.textContent = '更多設定'; more.setAttribute('aria-expanded', 'false'); }
+  const more = document.getElementById('memberMore');
+  if (more) more.open = false;
 }
 
 function mobileOpenMenuEl() { return document.getElementById('mobileOpenMenu'); }

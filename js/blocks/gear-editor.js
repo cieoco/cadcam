@@ -214,6 +214,7 @@ export function createGearEditor({
     if (!panel) return;
     const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
     if (!c) { panel.style.display = 'none'; return; }
+    if(panel.dataset.selected!==c.id){const more=document.getElementById('gearMore');if(more)more.open=false;panel.dataset.selected=c.id;}
     const mod = Number(c.module) || GEAR_MODULE;
     const rack = rackForGear(c);
     const setText = (elId, v) => { const el = document.getElementById(elId); if (el) el.textContent = v; };

@@ -34,7 +34,7 @@ export function createMateWizard(h) {
   const collapsedBranches = new Set(); // 僅收合清單，不改作品、3D 可見性或組立成員。
   const liveLine = el('details', 'mate-live'); liveLine.id = 'mateLive';   // 摘要與檢查細節共用一個入口。
   const liveSummary=el('summary'),liveMessage=el('div','mate-live-message');
-  liveSummary.setAttribute('aria-live','polite');liveLine.append(liveSummary,liveMessage);
+  liveSummary.setAttribute('aria-live','polite');liveLine.appendChild(liveSummary);liveLine.appendChild(liveMessage);
   const sel = () => assemblyWork(S.comps,S.modules,S.topo).modules.find(m=>m.id===st.selected) || null;
   const params = () => S.topo.params;
   const opts = () => ({ joint: S.fabrication?.joint });
