@@ -221,8 +221,14 @@ export function createBench(deps) {
     }).then(()=>{if(isBench()){applyHighlight();renderLiveStatus();}});
   }
   function renderLiveStatus() { renderLiveBox(); if (wiz) wiz.syncLive(); }
+  function timelineSupported(){
+    const work=assemblyWork(S.comps,S.modules,S.topo);
+    return !work.modules.some(m=>m?.mount?.face)&&!work.comps.some(c=>c.type==='syringe');
+  }
   function renderLiveBox() {
     if (!liveBox) return;
+    const timeline=liveBox.querySelector('#benchTlBtn');
+    if(timeline)timeline.hidden=!timelineSupported();
     const coverage=liveBox.querySelector('#benchMaterialCoverage');
     if(coverage){
       const rows=(deps.candidateSnapshot?.()?.result?.validation?.coverage || materialPose.snapshot().report?.coverage)?.notSupported || [];
@@ -238,7 +244,12 @@ export function createBench(deps) {
           const ids=row.partIds || row.sourceIds || [row.partId];
           const label=row.kind?kinds[row.kind] || row.kind:'材料';
           const reason=row.reason==='circular_boundary_uncertain'?'圓弧邊界無法確證':row.code==='material_representation_not_supported'?'精確材料尚未建模':'輪廓或姿態無法驗證';
-          list.appendChild(el('li','',`${label}：${ids.filter(Boolean).join('、')} — ${reason}`));
+          const names=ids.filter(Boolean).map(id=>{
+            const owners=S.comps.filter(c=>c.id===id||pointKeysFor(c).some(k=>c[k]?.id===id));
+            if(owners.length)return [...new Set(owners.map(c=>c.moduleId?displayName(c.moduleId):c.name || ({bar:'連桿',triangle:'板件',syringe:'針筒',gear:'齒輪'}[c.type] || '零件')))].join('／');
+            const name=materialName(id);return name===id?label:name;
+          });
+          list.appendChild(el('li','',`${label}：${[...new Set(names)].join('、')} — ${reason}`));
         }
         coverage.appendChild(list);
       }
@@ -361,7 +372,7 @@ export function createBench(deps) {
   function runTimeline() { if(isCand()){say('請先確認或取消預覽，再檢查全行程');return null;}return runTimelineNow(); }
   function runTimelineNow() {
     if (!isBench()) return null;
-    if (assemblyWork(S.comps,S.modules,S.topo).modules.some(m => m?.mount?.face)) { say('六面接合僅支援目前單一姿態；全行程尚未支援'); return null; }
+    if (!timelineSupported()) { say('此組立僅支援目前單一姿態；全行程干涉尚未支援'); return null; }
     const st0 = ensurePlan();
     if (!st0.plan) { say('目前沒有可檢查的零件'); return null; }
     const args = interferenceArgs();

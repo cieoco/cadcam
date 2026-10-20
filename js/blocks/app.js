@@ -1454,8 +1454,8 @@ function updateMechanismStatus(sol = null) {
   if (!el) return;
   if(simulationScope().comps.some(c=>c.type==='syringe')){
     el.dataset.state=sol?.isValid?'warn':'error';
-    el.textContent=sol?.isValid?'液壓幾何可行｜干涉與承重未驗證':'液壓姿勢待修正';
-    el.title='針筒長度約束求解；3D 尚未呈現針筒與托架，不代表完整裝配驗證。';return;
+    el.textContent=sol?.isValid?'液壓幾何可行 · 製作待核對':'液壓姿勢待修正';
+    el.title='針筒長度約束求解；干涉、固定與承重未驗證，不代表完整裝配驗證。';return;
   }
   let state = 'idle';
   let text = '尚未建立機構';
@@ -1508,7 +1508,7 @@ function updateMechanismStatus(sol = null) {
   const support = validateSupports({comps:simulationScope().comps,modules:simulationScope().modules});
   if (state === 'ready') {
     state = support.ok ? 'warn' : 'error';
-    text = support.ok ? '可模擬｜實體固定待驗證' : '動力支撐有誤，請至組立查看';
+    text = support.ok ? '可模擬 · 製作待核對' : '動力支撐有誤，請至組立查看';
   }
   if(inDesign())title += '\n僅檢查目前設計；組立連接請至組立模式驗證。';
   title += '\n' + support.issues.map(i=>i.message).join('\n');

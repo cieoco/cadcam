@@ -32,7 +32,9 @@ export function createMateWizard(h) {
   let cache = { key: '', targets: new Map(), styles: new Map() };
   let treeSig = '', panelSig = '', panelAt = '';
   const collapsedBranches = new Set(); // 僅收合清單，不改作品、3D 可見性或組立成員。
-  const liveLine = el('div', 'mate-live'); liveLine.id = 'mateLive'; liveLine.setAttribute('aria-live', 'polite');   // 一行的干涉狀態（接上／拆下的上方）
+  const liveLine = el('details', 'mate-live'); liveLine.id = 'mateLive';   // 摘要與檢查細節共用一個入口。
+  const liveSummary=el('summary'),liveMessage=el('div','mate-live-message');
+  liveSummary.setAttribute('aria-live','polite');liveLine.append(liveSummary,liveMessage);
   const sel = () => assemblyWork(S.comps,S.modules,S.topo).modules.find(m=>m.id===st.selected) || null;
   const params = () => S.topo.params;
   const opts = () => ({ joint: S.fabrication?.joint });
@@ -323,7 +325,7 @@ export function createMateWizard(h) {
       return;
     }
     if (mate) [styleBox(S.comps, S.modules, mod.id, stylesOf(mod.id)), adjustBox(S.comps, S.modules, mod.id)].forEach(x => x && root.appendChild(x));
-    else root.appendChild(el('div', 'bench-note', '這是用工程模式接上的，要微調請按最下面的「進階」。'));
+    else root.appendChild(el('div', 'bench-note', '此接合保留原安裝資料；可拆下重新接合，或回設計修改零件。'));
   }
 
   function renderPanel(force) {
@@ -343,13 +345,14 @@ export function createMateWizard(h) {
     else root.appendChild(head('接合精靈', matchMedia('(max-width: 640px)').matches ? '先點上面清單裡要裝的機構' : '先點左邊清單裡要裝的機構'));
     const msg = el('div', 'bench-msg', st.msg); msg.id = 'benchMsg'; msg.setAttribute('aria-live', 'polite');
     root.firstChild.after(liveLine, msg);   // 標題底下：一行干涉狀態，再來是訊息（拒絕的原因、拆下說明）
-    root.appendChild(h.liveBox);   // 即時干涉＋全行程測試（預覽中檢查的是預覽的姿勢）
+    liveLine.appendChild(h.liveBox);   // 點摘要後才展開檢查與行程；錯誤時自動展開。
+    liveLine.querySelector('#supportValidation')?.remove();
     const support=validateSupports(assemblyWork(S.comps,S.modules,S.topo));
     if(support.fixedPoints.length || support.motors.length){
       const details=document.createElement('details'),summary=document.createElement('summary');
       details.id='supportValidation';summary.textContent=support.ok?'實體固定待驗證':'動力支撐有誤';details.appendChild(summary);
       for(const item of support.issues){const p=document.createElement('p');p.textContent=`${item.targets.join('、')}：${item.message}`;details.appendChild(p);}
-      root.appendChild(details);
+      liveLine.appendChild(details);
     }
     ensureToggle(root);
   }
@@ -365,8 +368,11 @@ export function createMateWizard(h) {
     const i = h.liveInfo();
     let state = i.state, text = i.message;
     if (pv && assemblyRoles(pv.cand.modules).spare.includes(pv.childId)) { state = 'none'; text = '還沒接到底座，要接到底座上才會檢查干涉'; }
-    liveLine.dataset.state = state; liveLine.textContent = text; liveLine.title = state === 'hit' ? text : '';
-    if (state === 'hit' && !pv) h.collisionActions?.(liveLine);
+    if(state==='hit'&&liveLine.dataset.state!=='hit')liveLine.open=true;
+    liveLine.dataset.state = state;
+    liveSummary.textContent=state==='hit'?'！有干涉，點開查看':state==='ok'?'目前姿態：已檢查範圍無干涉':'檢查摘要 · 尚有待核對項目';
+    liveMessage.textContent=text;
+    if (state === 'hit' && !pv) h.collisionActions?.(liveMessage);
   }
 
   // ---------------------------------------------------------------- 3D 鏡頭：框住相關的機構（保留視角，只調距離與目標）

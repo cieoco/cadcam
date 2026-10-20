@@ -716,6 +716,12 @@
     .syringe-dialog button{min-height:44px;margin:5px;padding:6px 12px}
     .syringe-dialog p,.syringe-dialog small{font-size:13px}
     .syringe-dialog summary{cursor:pointer;padding:10px 0;font-weight:bold}
+    .fabrication-dialog{box-sizing:border-box;width:min(700px,96vw);max-height:90dvh;overflow:auto;border:1px solid #aac2d1;border-radius:14px;padding:16px;color:#19354c;background:white}
+    .fabrication-dialog::backdrop{background:#18344c66}.fabrication-dialog header{display:flex;align-items:center;justify-content:space-between;position:sticky;top:-16px;background:white;z-index:1;padding:8px 0;gap:16px}
+    .fabrication-dialog h2{margin:0;font-size:20px}.fabrication-dialog p{font-size:14px;line-height:1.6}.fabrication-group{border-bottom:1px solid #dae5ec}.fabrication-group summary{padding:14px 0;cursor:pointer;font-weight:600;min-height:20px}
+    .fabrication-dialog .mount-grid{position:static;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));padding:0 0 12px;border:0;box-shadow:none}
+    .fabrication-dialog .mount-field{justify-content:space-between;white-space:normal;min-width:0}.fabrication-dialog input,.fabrication-dialog select{min-height:44px;font-size:16px;box-sizing:border-box;width:100px;max-width:50%}.fabrication-exports{display:flex;gap:8px;flex-wrap:wrap;padding-bottom:12px}.fabrication-exports h3{width:100%}
+    .bench-panel .mate-live>summary{cursor:pointer;min-height:32px;padding:6px 0;font-weight:600}.bench-panel .mate-live-message{font-size:12px;line-height:1.5}.bench-panel .mate-live details{margin-top:8px}
     .syringe-install{box-sizing:border-box;width:min(900px,96vw);height:min(820px,94dvh);padding:0;border:1px solid #aac2d1;border-radius:14px;color:#19354c;overflow:hidden}
     .syringe-install[open]{display:grid;grid-template-rows:auto auto minmax(180px,1fr) minmax(160px,1fr) auto}
     .syringe-install.install-quick[open]{grid-template-rows:auto minmax(180px,1fr) auto auto}
@@ -763,59 +769,13 @@
       <details class="toolbar-menu">
         <summary class="tool-btn">匯出</summary>
         <div class="toolbar-menu-content">
-          <details class="mount-settings fabrication-settings">
-        <summary>加工設定</summary>
-        <div class="mount-grid">
-          <div class="settings-heading" data-fabrication-source style="grid-column:1/-1">目前作品的加工設定</div>
-          <div class="settings-heading">桿件</div>
-          <label class="mount-field">機架樑寬<input data-export-setting="barWidthMm" type="number" min="2" max="120" step="0.5" onchange="window.blocks.setExportSetting('barWidthMm', this.value)" title="只設定自動機架樑寬；桿件及夾爪板寬請選取零件調整"></label>
-          <label class="mount-field">連接孔<input data-export-setting="holeDiameterMm" type="number" min="0.5" max="119" step="0.5" onchange="window.blocks.setExportSetting('holeDiameterMm', this.value)" title="一般連接孔直徑 mm"></label>
-          <div class="settings-heading">TT 機架孔</div>
-          <label class="mount-field">軸孔<input data-tt-mount-setting="shaftDiameterMm" type="number" min="0.5" max="30" step="0.1" onchange="window.blocks.setTtMountSetting('shaftDiameterMm', this.value)" title="馬達輸出軸孔直徑 mm"></label>
-          <label class="mount-field">螺絲孔<input data-tt-mount-setting="screwDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('screwDiameterMm', this.value)" title="固定螺絲孔直徑 mm"></label>
-          <label class="mount-field">螺絲X<input data-tt-mount-setting="screwOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('screwOffsetXMm', this.value)" title="螺絲孔中心相對輸出軸 X mm"></label>
-          <label class="mount-field">螺絲距<input data-tt-mount-setting="screwSpacingMm" type="number" min="0" max="80" step="0.1" onchange="window.blocks.setTtMountSetting('screwSpacingMm', this.value)" title="上下兩螺絲孔中心距 mm"></label>
-          <label class="mount-field">定位孔<input data-tt-mount-setting="locatorDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('locatorDiameterMm', this.value)" title="定位孔直徑 mm"></label>
-          <label class="mount-field">定位X<input data-tt-mount-setting="locatorOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetXMm', this.value)" title="定位孔相對輸出軸 X mm"></label>
-          <label class="mount-field">定位Y<input data-tt-mount-setting="locatorOffsetYMm" type="number" min="-80" max="80" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetYMm', this.value)" title="定位孔相對輸出軸 Y mm"></label>
-          <div class="settings-heading">TT 輸出軸</div>
-          <label class="mount-field">扁軸外徑<input data-export-setting="ttShaftFlatDiameterMm" type="number" min="1" max="30" step="0.1" onchange="window.blocks.setExportSetting('ttShaftFlatDiameterMm', this.value)" title="曲柄扁軸孔外徑 mm"></label>
-          <label class="mount-field">削邊厚<input data-export-setting="ttShaftFlatThicknessMm" type="number" min="0.5" max="30" step="0.1" onchange="window.blocks.setExportSetting('ttShaftFlatThicknessMm', this.value)" title="曲柄扁軸孔雙切邊間距 mm"></label>
-          <div class="settings-heading">MG995 機架槽</div>
-          <label class="mount-field">槽長<input data-mg995-mount-setting="bodyLengthMm" type="number" min="20" max="80" step="0.1" onchange="window.blocks.setMg995MountSetting('bodyLengthMm', this.value)" title="伺服本體穿板槽長 mm（本體 40.7 含公差）"></label>
-          <label class="mount-field">槽寬<input data-mg995-mount-setting="bodyWidthMm" type="number" min="10" max="40" step="0.1" onchange="window.blocks.setMg995MountSetting('bodyWidthMm', this.value)" title="伺服本體穿板槽寬 mm（本體 19.7 含公差）"></label>
-          <label class="mount-field">軸偏移<input data-mg995-mount-setting="shaftOffsetMm" type="number" min="0" max="40" step="0.1" onchange="window.blocks.setMg995MountSetting('shaftOffsetMm', this.value)" title="輸出軸心到槽近端距離 mm"></label>
-          <label class="mount-field">耳孔徑<input data-mg995-mount-setting="screwDiameterMm" type="number" min="0.5" max="10" step="0.1" onchange="window.blocks.setMg995MountSetting('screwDiameterMm', this.value)" title="凸緣耳螺絲孔直徑 mm（M3 通孔 3.2）"></label>
-          <label class="mount-field">耳孔距<input data-mg995-mount-setting="screwSpanMm" type="number" min="20" max="80" step="0.1" onchange="window.blocks.setMg995MountSetting('screwSpanMm', this.value)" title="兩耳螺絲孔沿機身長向的中心距 mm"></label>
-          <label class="mount-field">孔間距<input data-mg995-mount-setting="screwSpacingMm" type="number" min="0" max="30" step="0.1" onchange="window.blocks.setMg995MountSetting('screwSpacingMm', this.value)" title="同一耳上下兩孔中心距 mm；0＝每耳單孔"></label>
-          <label class="mount-field">缺口寬<input data-mg995-mount-setting="cableNotchWidthMm" type="number" min="0" max="20" step="0.5" onchange="window.blocks.setMg995MountSetting('cableNotchWidthMm', this.value)" title="機身尾端線槽缺口寬 mm（出線口兼 180° 反裝防呆）；0＝不開"></label>
-          <label class="mount-field">缺口深<input data-mg995-mount-setting="cableNotchDepthMm" type="number" min="0" max="20" step="0.5" onchange="window.blocks.setMg995MountSetting('cableNotchDepthMm', this.value)" title="線槽缺口深 mm（沿機身長向外擴）；0＝不開"></label>
-          <div class="settings-heading">CNC 加工</div>
-          <label class="mount-field">刀徑<input data-cnc-setting="toolDiameterMm" type="number" min="0.5" max="12" step="0.001" onchange="window.blocks.setCncSetting('toolDiameterMm', this.value)" title="銑刀直徑 mm（例：3.175）"></label>
-          <label class="mount-field">板厚<input data-cnc-setting="stockThicknessMm" type="number" min="0.5" max="50" step="0.1" onchange="window.blocks.setCncSetting('stockThicknessMm', this.value)" title="板材厚度 mm"></label>
-          <div class="settings-heading">TT 輪轂 / MG995 舵盤（請實量）</div>
-          <label class="mount-field">輪轂中心孔<input data-drive-setting="ttHubCenterMm" type="number" min="1" max="20" step="0.1" onchange="window.blocks.setDriveSetting('ttHubCenterMm', this.value)" title="TT 馬達輪轂中心孔直徑 mm"></label>
-          <label class="mount-field">輪轂螺絲孔<input data-drive-setting="ttHubScrewMm" type="number" min="0.5" max="8" step="0.1" onchange="window.blocks.setDriveSetting('ttHubScrewMm', this.value)" title="輪轂螺絲孔直徑 mm"></label>
-          <label class="mount-field">輪轂孔距<input data-drive-setting="ttHubScrewSpacingMm" type="number" min="0" max="40" step="0.1" onchange="window.blocks.setDriveSetting('ttHubScrewSpacingMm', this.value)" title="輪轂上下兩孔中心距 mm"></label>
-          <label class="mount-field">舵盤中心孔<input data-drive-setting="hornCenterMm" type="number" min="0" max="20" step="0.1" onchange="window.blocks.setDriveSetting('hornCenterMm', this.value)" title="MG995 舵盤中心孔直徑 mm"></label>
-          <label class="mount-field">舵盤螺絲孔<input data-drive-setting="hornScrewMm" type="number" min="0.5" max="6" step="0.1" onchange="window.blocks.setDriveSetting('hornScrewMm', this.value)" title="舵盤螺絲孔直徑 mm"></label>
-          <label class="mount-field">舵盤螺絲數<input data-drive-setting="hornScrewCount" type="number" min="0" max="8" step="1" onchange="window.blocks.setDriveSetting('hornScrewCount', this.value)" title="舵盤螺絲孔數（整數）"></label>
-          <label class="mount-field">舵盤孔圓徑<input data-drive-setting="hornScrewCircleMm" type="number" min="0" max="40" step="0.1" onchange="window.blocks.setDriveSetting('hornScrewCircleMm', this.value)" title="舵盤螺絲孔圓周直徑 mm"></label>
-          <div class="settings-heading">直角接合件（金屬角碼請實量）</div>
-          <label class="mount-field">預設接合件<select data-joint-setting="defaultKind" onchange="window.blocks.setJointSetting('defaultKind', this.value)" title="新接的直角安裝預設用哪一種接合件"><option value="bracket-m3">金屬角碼</option><option value="printed">3D 列印</option></select></label>
-          <label class="mount-field">角碼寬<input data-joint-setting="widthMm" type="number" min="3" max="30" step="0.1" onchange="window.blocks.setJointSetting('widthMm', this.value)" title="M3 帶牙金屬角碼的寬度 mm（沿接合線）"></label>
-          <label class="mount-field">角碼厚<input data-joint-setting="thicknessMm" type="number" min="0.5" max="5" step="0.1" onchange="window.blocks.setJointSetting('thicknessMm', this.value)" title="角碼板厚 mm（螺牙厚度）"></label>
-          <label class="mount-field">長邊<input data-joint-setting="longLegMm" type="number" min="5" max="60" step="0.1" onchange="window.blocks.setJointSetting('longLegMm', this.value)" title="長腳長度 mm，貼在宿主板面上"></label>
-          <label class="mount-field">短邊<input data-joint-setting="shortLegMm" type="number" min="5" max="60" step="0.1" onchange="window.blocks.setJointSetting('shortLegMm', this.value)" title="短腳長度 mm，貼在子模組底板上"></label>
-          <label class="mount-field">孔心離末端<input data-joint-setting="holeEndMm" type="number" min="1.5" max="20" step="0.1" onchange="window.blocks.setJointSetting('holeEndMm', this.value)" title="螺絲孔中心離腳端的距離 mm（須小於兩邊長度）"></label>
-        </div>
-          </details>
-          <button class="tool-btn" onclick="window.blocks.checkSliderTask()">檢查 80 mm 推送器</button>
+          <button class="tool-btn" onclick="document.getElementById('fabricationDialog').showModal();this.closest('details.toolbar-menu')?.removeAttribute('open')">製作設定與零件輸出</button>
+          
           <button class="tool-btn" onclick="window.blocks.exportVideo()">MP4 動畫（10 秒）</button>
-          <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="選擇範圍、核對零件清單後匯出 SVG">匯出 SVG</button>
-          <button class="tool-btn" onclick="window.blocks.exportLinksDxf()" title="選擇範圍、核對零件清單後匯出 DXF">匯出 DXF</button>
+          
+          
           <button class="tool-btn" onclick="window.blocks.downloadBuildPack()" title="板件清單＋五金清單＋組裝步驟（可列印）">製作包</button>
-          <button class="tool-btn" onclick="window.blocks.downloadAdapterStl()" title="直角安裝用的 3D 列印 L 形轉接座">轉接座 STL</button>
+          
         </div>
       </details>
       <select class="example-select" id="exampleSelect" onchange="window.blocks.requestExample(this.value)" title="選擇機構範例（可載入或加入模組）">
@@ -1253,7 +1213,6 @@
   <div class="mobile-panel" aria-label="手機工具面板">
     <div class="mobile-panel-section" data-panel="edit">
       <span class="mobile-panel-title">調整</span>
-      <button class="tool-btn" onclick="window.blocks.fitView()" title="置中畫布">⊡ 置中</button>
       <button class="tool-btn" onclick="window.blocks.undo()" title="復原上一步">↩ 復原</button>
       <button class="tool-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除選取零件">🗑 刪除選取</button>
     </div>
@@ -1266,41 +1225,13 @@
     <div class="mobile-panel-section" data-panel="project">
       <span class="mobile-panel-title">專案</span>
       <button class="tool-btn" onclick="window.blocks.saveFile()" title="儲存整份作品（所有設計與組立接合）">💾 存檔</button>
-      <details class="mount-settings fabrication-settings">
-        <summary>加工設定</summary>
-        <div class="mount-grid">
-          <div class="settings-heading" data-fabrication-source style="grid-column:1/-1">目前作品的加工設定</div>
-          <div class="settings-heading">桿件</div>
-          <label class="mount-field">機架樑寬<input data-export-setting="barWidthMm" type="number" min="2" max="120" step="0.5" onchange="window.blocks.setExportSetting('barWidthMm', this.value)" title="只設定自動機架樑寬；桿件及夾爪板寬請選取零件調整"></label>
-          <label class="mount-field">連接孔<input data-export-setting="holeDiameterMm" type="number" min="0.5" max="119" step="0.5" onchange="window.blocks.setExportSetting('holeDiameterMm', this.value)" title="一般連接孔直徑 mm"></label>
-          <div class="settings-heading">TT 機架孔</div>
-          <label class="mount-field">軸孔<input data-tt-mount-setting="shaftDiameterMm" type="number" min="0.5" max="30" step="0.1" onchange="window.blocks.setTtMountSetting('shaftDiameterMm', this.value)" title="馬達輸出軸孔直徑 mm"></label>
-          <label class="mount-field">螺絲孔<input data-tt-mount-setting="screwDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('screwDiameterMm', this.value)" title="固定螺絲孔直徑 mm"></label>
-          <label class="mount-field">螺絲X<input data-tt-mount-setting="screwOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('screwOffsetXMm', this.value)" title="螺絲孔中心相對輸出軸 X mm"></label>
-          <label class="mount-field">螺絲距<input data-tt-mount-setting="screwSpacingMm" type="number" min="0" max="80" step="0.1" onchange="window.blocks.setTtMountSetting('screwSpacingMm', this.value)" title="上下兩螺絲孔中心距 mm"></label>
-          <label class="mount-field">定位孔<input data-tt-mount-setting="locatorDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('locatorDiameterMm', this.value)" title="定位孔直徑 mm"></label>
-          <label class="mount-field">定位X<input data-tt-mount-setting="locatorOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetXMm', this.value)" title="定位孔相對輸出軸 X mm"></label>
-          <label class="mount-field">定位Y<input data-tt-mount-setting="locatorOffsetYMm" type="number" min="-80" max="80" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetYMm', this.value)" title="定位孔相對輸出軸 Y mm"></label>
-          <div class="settings-heading">TT 輸出軸</div>
-          <label class="mount-field">扁軸外徑<input data-export-setting="ttShaftFlatDiameterMm" type="number" min="1" max="30" step="0.1" onchange="window.blocks.setExportSetting('ttShaftFlatDiameterMm', this.value)" title="曲柄扁軸孔外徑 mm"></label>
-          <label class="mount-field">削邊厚<input data-export-setting="ttShaftFlatThicknessMm" type="number" min="0.5" max="30" step="0.1" onchange="window.blocks.setExportSetting('ttShaftFlatThicknessMm', this.value)" title="曲柄扁軸孔雙切邊間距 mm"></label>
-          <div class="settings-heading">MG995 機架槽</div>
-          <label class="mount-field">槽長<input data-mg995-mount-setting="bodyLengthMm" type="number" min="20" max="80" step="0.1" onchange="window.blocks.setMg995MountSetting('bodyLengthMm', this.value)" title="伺服本體穿板槽長 mm（本體 40.7 含公差）"></label>
-          <label class="mount-field">槽寬<input data-mg995-mount-setting="bodyWidthMm" type="number" min="10" max="40" step="0.1" onchange="window.blocks.setMg995MountSetting('bodyWidthMm', this.value)" title="伺服本體穿板槽寬 mm（本體 19.7 含公差）"></label>
-          <label class="mount-field">軸偏移<input data-mg995-mount-setting="shaftOffsetMm" type="number" min="0" max="40" step="0.1" onchange="window.blocks.setMg995MountSetting('shaftOffsetMm', this.value)" title="輸出軸心到槽近端距離 mm"></label>
-          <label class="mount-field">耳孔徑<input data-mg995-mount-setting="screwDiameterMm" type="number" min="0.5" max="10" step="0.1" onchange="window.blocks.setMg995MountSetting('screwDiameterMm', this.value)" title="凸緣耳螺絲孔直徑 mm（M3 通孔 3.2）"></label>
-          <label class="mount-field">耳孔距<input data-mg995-mount-setting="screwSpanMm" type="number" min="20" max="80" step="0.1" onchange="window.blocks.setMg995MountSetting('screwSpanMm', this.value)" title="兩耳螺絲孔沿機身長向的中心距 mm"></label>
-          <label class="mount-field">孔間距<input data-mg995-mount-setting="screwSpacingMm" type="number" min="0" max="30" step="0.1" onchange="window.blocks.setMg995MountSetting('screwSpacingMm', this.value)" title="同一耳上下兩孔中心距 mm；0＝每耳單孔"></label>
-          <label class="mount-field">缺口寬<input data-mg995-mount-setting="cableNotchWidthMm" type="number" min="0" max="20" step="0.5" onchange="window.blocks.setMg995MountSetting('cableNotchWidthMm', this.value)" title="機身尾端線槽缺口寬 mm（出線口兼 180° 反裝防呆）；0＝不開"></label>
-          <label class="mount-field">缺口深<input data-mg995-mount-setting="cableNotchDepthMm" type="number" min="0" max="20" step="0.5" onchange="window.blocks.setMg995MountSetting('cableNotchDepthMm', this.value)" title="線槽缺口深 mm（沿機身長向外擴）；0＝不開"></label>
-        </div>
-      </details>
-      <button class="tool-btn" onclick="window.blocks.checkSliderTask()">檢查 80 mm 推送器</button>
+      <button class="tool-btn" onclick="document.getElementById('fabricationDialog').showModal();this.closest('details.toolbar-menu')?.removeAttribute('open')">製作設定與零件輸出</button>
+      
           <button class="tool-btn" onclick="window.blocks.exportVideo()">MP4 動畫（10 秒）</button>
-          <button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="選擇範圍、核對零件清單後匯出 SVG">匯出 SVG</button>
-      <button class="tool-btn" onclick="window.blocks.exportLinksDxf()" title="選擇範圍、核對零件清單後匯出 DXF">匯出 DXF</button>
+          
+      
       <button class="tool-btn" onclick="window.blocks.downloadBuildPack()" title="板件清單＋五金清單＋組裝步驟（可列印）">製作包</button>
-          <button class="tool-btn" onclick="window.blocks.downloadAdapterStl()" title="直角安裝用的 3D 列印 L 形轉接座">轉接座 STL</button>
+          
       <button class="tool-btn" onclick="window.blocks.openMobileOpenMenu()" title="開啟舊檔或機構範例">📂 開啟</button>
       <button class="tool-btn" onclick="window.blocks.share()" title="複製分享連結">🔗 分享</button>
       <button class="tool-btn danger-btn" onclick="window.blocks.confirmClearAll()" title="清空目前全部零件">🗑 清空全部</button>
@@ -1331,273 +1262,329 @@
     </button>
   </nav>
 
+  <dialog id="fabricationDialog" class="fabrication-dialog" aria-labelledby="fabricationTitle">
+    <header><h2 id="fabricationTitle">製作設定</h2><button class="tool-btn" onclick="this.closest('dialog').close()">完成</button></header>
+    <p>準備製作時再核對尺寸與五金。設定隨作品保存，可復原；模擬能動不代表可直接加工。</p>
+    <div class="settings-heading" data-fabrication-source style="grid-column:1/-1">目前作品的加工設定</div><details class="fabrication-group"><summary>桿件</summary><div class="mount-grid">
+          <label class="mount-field">機架樑寬<input data-export-setting="barWidthMm" type="number" min="2" max="120" step="0.5" onchange="window.blocks.setExportSetting('barWidthMm', this.value)" title="只設定自動機架樑寬；桿件及夾爪板寬請選取零件調整"></label>
+          <label class="mount-field">連接孔<input data-export-setting="holeDiameterMm" type="number" min="0.5" max="119" step="0.5" onchange="window.blocks.setExportSetting('holeDiameterMm', this.value)" title="一般連接孔直徑 mm"></label>
+          </div></details>
+<details class="fabrication-group"><summary>TT 機架孔</summary><div class="mount-grid">
+          <label class="mount-field">軸孔<input data-tt-mount-setting="shaftDiameterMm" type="number" min="0.5" max="30" step="0.1" onchange="window.blocks.setTtMountSetting('shaftDiameterMm', this.value)" title="馬達輸出軸孔直徑 mm"></label>
+          <label class="mount-field">螺絲孔<input data-tt-mount-setting="screwDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('screwDiameterMm', this.value)" title="固定螺絲孔直徑 mm"></label>
+          <label class="mount-field">螺絲X<input data-tt-mount-setting="screwOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('screwOffsetXMm', this.value)" title="螺絲孔中心相對輸出軸 X mm"></label>
+          <label class="mount-field">螺絲距<input data-tt-mount-setting="screwSpacingMm" type="number" min="0" max="80" step="0.1" onchange="window.blocks.setTtMountSetting('screwSpacingMm', this.value)" title="上下兩螺絲孔中心距 mm"></label>
+          <label class="mount-field">定位孔<input data-tt-mount-setting="locatorDiameterMm" type="number" min="0.5" max="20" step="0.1" onchange="window.blocks.setTtMountSetting('locatorDiameterMm', this.value)" title="定位孔直徑 mm"></label>
+          <label class="mount-field">定位X<input data-tt-mount-setting="locatorOffsetXMm" type="number" min="-120" max="120" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetXMm', this.value)" title="定位孔相對輸出軸 X mm"></label>
+          <label class="mount-field">定位Y<input data-tt-mount-setting="locatorOffsetYMm" type="number" min="-80" max="80" step="0.1" onchange="window.blocks.setTtMountSetting('locatorOffsetYMm', this.value)" title="定位孔相對輸出軸 Y mm"></label>
+          </div></details>
+<details class="fabrication-group"><summary>TT 輸出軸</summary><div class="mount-grid">
+          <label class="mount-field">扁軸外徑<input data-export-setting="ttShaftFlatDiameterMm" type="number" min="1" max="30" step="0.1" onchange="window.blocks.setExportSetting('ttShaftFlatDiameterMm', this.value)" title="曲柄扁軸孔外徑 mm"></label>
+          <label class="mount-field">削邊厚<input data-export-setting="ttShaftFlatThicknessMm" type="number" min="0.5" max="30" step="0.1" onchange="window.blocks.setExportSetting('ttShaftFlatThicknessMm', this.value)" title="曲柄扁軸孔雙切邊間距 mm"></label>
+          </div></details>
+<details class="fabrication-group"><summary>MG995 機架槽</summary><div class="mount-grid">
+          <label class="mount-field">槽長<input data-mg995-mount-setting="bodyLengthMm" type="number" min="20" max="80" step="0.1" onchange="window.blocks.setMg995MountSetting('bodyLengthMm', this.value)" title="伺服本體穿板槽長 mm（本體 40.7 含公差）"></label>
+          <label class="mount-field">槽寬<input data-mg995-mount-setting="bodyWidthMm" type="number" min="10" max="40" step="0.1" onchange="window.blocks.setMg995MountSetting('bodyWidthMm', this.value)" title="伺服本體穿板槽寬 mm（本體 19.7 含公差）"></label>
+          <label class="mount-field">軸偏移<input data-mg995-mount-setting="shaftOffsetMm" type="number" min="0" max="40" step="0.1" onchange="window.blocks.setMg995MountSetting('shaftOffsetMm', this.value)" title="輸出軸心到槽近端距離 mm"></label>
+          <label class="mount-field">耳孔徑<input data-mg995-mount-setting="screwDiameterMm" type="number" min="0.5" max="10" step="0.1" onchange="window.blocks.setMg995MountSetting('screwDiameterMm', this.value)" title="凸緣耳螺絲孔直徑 mm（M3 通孔 3.2）"></label>
+          <label class="mount-field">耳孔距<input data-mg995-mount-setting="screwSpanMm" type="number" min="20" max="80" step="0.1" onchange="window.blocks.setMg995MountSetting('screwSpanMm', this.value)" title="兩耳螺絲孔沿機身長向的中心距 mm"></label>
+          <label class="mount-field">孔間距<input data-mg995-mount-setting="screwSpacingMm" type="number" min="0" max="30" step="0.1" onchange="window.blocks.setMg995MountSetting('screwSpacingMm', this.value)" title="同一耳上下兩孔中心距 mm；0＝每耳單孔"></label>
+          <label class="mount-field">缺口寬<input data-mg995-mount-setting="cableNotchWidthMm" type="number" min="0" max="20" step="0.5" onchange="window.blocks.setMg995MountSetting('cableNotchWidthMm', this.value)" title="機身尾端線槽缺口寬 mm（出線口兼 180° 反裝防呆）；0＝不開"></label>
+          <label class="mount-field">缺口深<input data-mg995-mount-setting="cableNotchDepthMm" type="number" min="0" max="20" step="0.5" onchange="window.blocks.setMg995MountSetting('cableNotchDepthMm', this.value)" title="線槽缺口深 mm（沿機身長向外擴）；0＝不開"></label>
+          </div></details>
+<details class="fabrication-group"><summary>CNC 加工</summary><div class="mount-grid">
+          <label class="mount-field">刀徑<input data-cnc-setting="toolDiameterMm" type="number" min="0.5" max="12" step="0.001" onchange="window.blocks.setCncSetting('toolDiameterMm', this.value)" title="銑刀直徑 mm（例：3.175）"></label>
+          <label class="mount-field">板厚<input data-cnc-setting="stockThicknessMm" type="number" min="0.5" max="50" step="0.1" onchange="window.blocks.setCncSetting('stockThicknessMm', this.value)" title="板材厚度 mm"></label>
+          </div></details>
+<details class="fabrication-group"><summary>TT 輪轂 / MG995 舵盤（請實量）</summary><div class="mount-grid">
+          <label class="mount-field">輪轂中心孔<input data-drive-setting="ttHubCenterMm" type="number" min="1" max="20" step="0.1" onchange="window.blocks.setDriveSetting('ttHubCenterMm', this.value)" title="TT 馬達輪轂中心孔直徑 mm"></label>
+          <label class="mount-field">輪轂螺絲孔<input data-drive-setting="ttHubScrewMm" type="number" min="0.5" max="8" step="0.1" onchange="window.blocks.setDriveSetting('ttHubScrewMm', this.value)" title="輪轂螺絲孔直徑 mm"></label>
+          <label class="mount-field">輪轂孔距<input data-drive-setting="ttHubScrewSpacingMm" type="number" min="0" max="40" step="0.1" onchange="window.blocks.setDriveSetting('ttHubScrewSpacingMm', this.value)" title="輪轂上下兩孔中心距 mm"></label>
+          <label class="mount-field">舵盤中心孔<input data-drive-setting="hornCenterMm" type="number" min="0" max="20" step="0.1" onchange="window.blocks.setDriveSetting('hornCenterMm', this.value)" title="MG995 舵盤中心孔直徑 mm"></label>
+          <label class="mount-field">舵盤螺絲孔<input data-drive-setting="hornScrewMm" type="number" min="0.5" max="6" step="0.1" onchange="window.blocks.setDriveSetting('hornScrewMm', this.value)" title="舵盤螺絲孔直徑 mm"></label>
+          <label class="mount-field">舵盤螺絲數<input data-drive-setting="hornScrewCount" type="number" min="0" max="8" step="1" onchange="window.blocks.setDriveSetting('hornScrewCount', this.value)" title="舵盤螺絲孔數（整數）"></label>
+          <label class="mount-field">舵盤孔圓徑<input data-drive-setting="hornScrewCircleMm" type="number" min="0" max="40" step="0.1" onchange="window.blocks.setDriveSetting('hornScrewCircleMm', this.value)" title="舵盤螺絲孔圓周直徑 mm"></label>
+          </div></details>
+<details class="fabrication-group"><summary>直角接合件（金屬角碼請實量）</summary><div class="mount-grid">
+          <label class="mount-field">預設接合件<select data-joint-setting="defaultKind" onchange="window.blocks.setJointSetting('defaultKind', this.value)" title="新接的直角安裝預設用哪一種接合件"><option value="bracket-m3">金屬角碼</option><option value="printed">3D 列印</option></select></label>
+          <label class="mount-field">角碼寬<input data-joint-setting="widthMm" type="number" min="3" max="30" step="0.1" onchange="window.blocks.setJointSetting('widthMm', this.value)" title="M3 帶牙金屬角碼的寬度 mm（沿接合線）"></label>
+          <label class="mount-field">角碼厚<input data-joint-setting="thicknessMm" type="number" min="0.5" max="5" step="0.1" onchange="window.blocks.setJointSetting('thicknessMm', this.value)" title="角碼板厚 mm（螺牙厚度）"></label>
+          <label class="mount-field">長邊<input data-joint-setting="longLegMm" type="number" min="5" max="60" step="0.1" onchange="window.blocks.setJointSetting('longLegMm', this.value)" title="長腳長度 mm，貼在宿主板面上"></label>
+          <label class="mount-field">短邊<input data-joint-setting="shortLegMm" type="number" min="5" max="60" step="0.1" onchange="window.blocks.setJointSetting('shortLegMm', this.value)" title="短腳長度 mm，貼在子模組底板上"></label>
+          <label class="mount-field">孔心離末端<input data-joint-setting="holeEndMm" type="number" min="1.5" max="20" step="0.1" onchange="window.blocks.setJointSetting('holeEndMm', this.value)" title="螺絲孔中心離腳端的距離 mm（須小於兩邊長度）"></label>
+        </div></details><section class="fabrication-exports" aria-label="零件輸出"><h3>零件輸出與檢查</h3><button class="tool-btn" onclick="window.blocks.checkSliderTask()">檢查 80 mm 推送器</button>
+<button class="tool-btn" onclick="window.blocks.exportLinksSvg()" title="選擇範圍、核對零件清單後匯出 SVG">匯出 SVG</button>
+<button class="tool-btn" onclick="window.blocks.exportLinksDxf()" title="選擇範圍、核對零件清單後匯出 DXF">匯出 DXF</button>
+<button class="tool-btn" onclick="window.blocks.downloadAdapterStl()" title="直角安裝用的 3D 列印 L 形轉接座">轉接座 STL</button></section>
+  </dialog>
+
   <!-- 同一份共用模組只載入一個版本；避免重載時混用舊幾何或舊存檔 schema。 -->
 
   <!-- BEGIN GENERATED LOAD MAP -->
-<script type="importmap" data-load-graph="96ce5f3bac6ae2580e59">
+<script type="importmap" data-load-graph="2b4ef62d7d9d51ac7958">
 {
   "imports": {
-    "./js/blocks/actuator-install-scene.js": "./js/blocks/actuator-install-scene.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/actuator-install-ui.js": "./js/blocks/actuator-install-ui.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/actuator-installation.js": "./js/blocks/actuator-installation.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/adapter-stl.js": "./js/blocks/adapter-stl.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/app.js": "./js/blocks/app.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/assembly-lesson-example.js": "./js/blocks/assembly-lesson-example.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/assembly-lesson-example.js?v=parallel": "./js/blocks/assembly-lesson-example.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/assembly-membership.js": "./js/blocks/assembly-membership.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/assembly-roles.js": "./js/blocks/assembly-roles.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/assembly-syringe.js": "./js/blocks/assembly-syringe.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/assembly-task-validation.js": "./js/blocks/assembly-task-validation.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/assembly-view.js": "./js/blocks/assembly-view.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/assembly.js": "./js/blocks/assembly.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/assembly.js?v=20261007_m5a": "./js/blocks/assembly.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/assembly.js?v=20261007_solverguard": "./js/blocks/assembly.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/assembly.js?v=face-mount-20261007": "./js/blocks/assembly.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/bench-ui.js": "./js/blocks/bench-ui.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/bench-ui.js?v=20261007_8_final": "./js/blocks/bench-ui.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/bench-ui.js?v=20261008_brackets": "./js/blocks/bench-ui.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/bench.js": "./js/blocks/bench.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/bench.js?v=20261007_m5a": "./js/blocks/bench.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/bracket-layout.js": "./js/blocks/bracket-layout.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/bracket-physical.js": "./js/blocks/bracket-physical.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/bracket-spec.js": "./js/blocks/bracket-spec.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/build-plan.js": "./js/blocks/build-plan.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/build-plan.js?v=20261007_7": "./js/blocks/build-plan.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/classroom-bridge.js": "./js/blocks/classroom-bridge.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/cnc-check.js": "./js/blocks/cnc-check.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/collision-actions.js": "./js/blocks/collision-actions.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/common-manipulator-examples.js": "./js/blocks/common-manipulator-examples.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/connection-descriptor.js": "./js/blocks/connection-descriptor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/connection-editor.js": "./js/blocks/connection-editor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/connection-editor.js?v=20261007_facecolor": "./js/blocks/connection-editor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/connection-selection.js": "./js/blocks/connection-selection.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/connection-work.js": "./js/blocks/connection-work.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/creation-palette.js": "./js/blocks/creation-palette.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/design-focus.js": "./js/blocks/design-focus.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/design-guide.js": "./js/blocks/design-guide.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/design-tabs-ui.js": "./js/blocks/design-tabs-ui.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/design-tabs-ui.js?v=20261005_tabclose": "./js/blocks/design-tabs-ui.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/dof.js": "./js/blocks/dof.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/example-controller.js": "./js/blocks/example-controller.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/example-controller.js?v=20261005_parallel": "./js/blocks/example-controller.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/example-entry.js": "./js/blocks/example-entry.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/example-entry.js?v=20261005_unit2": "./js/blocks/example-entry.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/examples.js": "./js/blocks/examples.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/examples.js?v=20261005_parallel": "./js/blocks/examples.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/examples.js?v=20261005_unit2": "./js/blocks/examples.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/export-dialog.js": "./js/blocks/export-dialog.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/export-scope.js": "./js/blocks/export-scope.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/exporters.js": "./js/blocks/exporters.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/exporters.js?v=20261007_7": "./js/blocks/exporters.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/exporters.js?v=20261007_9": "./js/blocks/exporters.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/fabrication-profile.js": "./js/blocks/fabrication-profile.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-auto-fit.js": "./js/blocks/face-auto-fit.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-auto-fit.js?v=20261008_bracket3d": "./js/blocks/face-auto-fit.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-bracket-extras.js": "./js/blocks/face-bracket-extras.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-bracket-geometry.js": "./js/blocks/face-bracket-geometry.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-bracket-geometry.js?v=20261008_bracket3d": "./js/blocks/face-bracket-geometry.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-bracket-geometry.js?v=20261008_bracketalign": "./js/blocks/face-bracket-geometry.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-candidate-view.js": "./js/blocks/face-candidate-view.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-candidate.js": "./js/blocks/face-candidate.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-export.js": "./js/blocks/face-export.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-mate-examples.js": "./js/blocks/face-mate-examples.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-mate-prototype.js": "./js/blocks/face-mate-prototype.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-mate.js": "./js/blocks/face-mate.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-mount-contract.js": "./js/blocks/face-mount-contract.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-mount-refresh.js": "./js/blocks/face-mount-refresh.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-mount.js": "./js/blocks/face-mount.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-placement.js": "./js/blocks/face-placement.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-wizard-ui.js": "./js/blocks/face-wizard-ui.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/face-wizard-ui.js?v=20261007_singleface": "./js/blocks/face-wizard-ui.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/fixed-syringe-examples.js": "./js/blocks/fixed-syringe-examples.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/fourbar-measurement.js": "./js/blocks/fourbar-measurement.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/frame-stock.js": "./js/blocks/frame-stock.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/fusion-editor.js": "./js/blocks/fusion-editor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/fusion-preview.js": "./js/blocks/fusion-preview.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/gear-editor.js": "./js/blocks/gear-editor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/gear-editor.js?v=20261004_fourbar_r1": "./js/blocks/gear-editor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/gripper-controller.js": "./js/blocks/gripper-controller.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/gripper-controller.js?v=20260925_r1b2": "./js/blocks/gripper-controller.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/gripper-download.js": "./js/blocks/gripper-download.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/gripper-download.js?v=20260925_r1b2": "./js/blocks/gripper-download.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/gripper-object.js": "./js/blocks/gripper-object.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/gripper-object.js?v=20260925_r1b2": "./js/blocks/gripper-object.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/gripper-operations.js": "./js/blocks/gripper-operations.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/gripper-workflow.js": "./js/blocks/gripper-workflow.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/gripper-workflow.js?v=20260925_r1b": "./js/blocks/gripper-workflow.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/hydraulic-assembly-example.js": "./js/blocks/hydraulic-assembly-example.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/hydraulic-example.js": "./js/blocks/hydraulic-example.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/hydraulic-sequence-dialog.js": "./js/blocks/hydraulic-sequence-dialog.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/hydraulic-sequence.js": "./js/blocks/hydraulic-sequence.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/input.js": "./js/blocks/input.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/input.js?v=20261007_m2b": "./js/blocks/input.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/intake-contact.js": "./js/blocks/intake-contact.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/interference.js": "./js/blocks/interference.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/jaw-tip-handle.js": "./js/blocks/jaw-tip-handle.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/lesson-check-dialog.js": "./js/blocks/lesson-check-dialog.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/lesson-check.js": "./js/blocks/lesson-check.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/lesson-sequence-dialog.js": "./js/blocks/lesson-sequence-dialog.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/lesson-sequence.js": "./js/blocks/lesson-sequence.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/lift-bucket-builder.js": "./js/blocks/lift-bucket-builder.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/lift-bucket-example.js": "./js/blocks/lift-bucket-example.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/lift-bucket-workflow.js": "./js/blocks/lift-bucket-workflow.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/live-interference-status.js": "./js/blocks/live-interference-status.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/load-session.js": "./js/blocks/load-session.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/mate-candidate.js": "./js/blocks/mate-candidate.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/mate-connect.js": "./js/blocks/mate-connect.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/mate-connect.js?v=20261007_8_final": "./js/blocks/mate-connect.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/mate-tool.js": "./js/blocks/mate-tool.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/mate-tool.js?v=20261007_facecolor": "./js/blocks/mate-tool.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/mate-wizard-ui.js": "./js/blocks/mate-wizard-ui.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/mate-wizard-ui.js?v=20261008_brackets": "./js/blocks/mate-wizard-ui.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/material-interference.js": "./js/blocks/material-interference.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/material-pose-status.js": "./js/blocks/material-pose-status.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/material-voids.js": "./js/blocks/material-voids.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/mates-schema.js": "./js/blocks/mates-schema.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/mates-view.js": "./js/blocks/mates-view.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/mates.js": "./js/blocks/mates.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/measurement.js": "./js/blocks/measurement.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/mechanism-layer-render.js": "./js/blocks/mechanism-layer-render.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/member-dimension-render.js": "./js/blocks/member-dimension-render.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/member-dimensions.js": "./js/blocks/member-dimensions.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/member-editor.js": "./js/blocks/member-editor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/member-stock.js": "./js/blocks/member-stock.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/member-sweep.js": "./js/blocks/member-sweep.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/model.js": "./js/blocks/model.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/module-drag.js": "./js/blocks/module-drag.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/module-editor.js?v=20261007_import_spacing": "./js/blocks/module-editor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/module-editor.js?v=20261007_singleface": "./js/blocks/module-editor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/module-ops.js": "./js/blocks/module-ops.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/module-ops.js?v=20261007_m5a": "./js/blocks/module-ops.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/module-ops.js?v=20261007_singleface": "./js/blocks/module-ops.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/module-plates.js": "./js/blocks/module-plates.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/module-plates.js?v=20261007_m5a": "./js/blocks/module-plates.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/module-schema.js": "./js/blocks/module-schema.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/module-schema.js?v=20261007_singleface": "./js/blocks/module-schema.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/motion-range-validation.js": "./js/blocks/motion-range-validation.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/motion.js": "./js/blocks/motion.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/motor-frame-render.js": "./js/blocks/motor-frame-render.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/motor-mounts.js": "./js/blocks/motor-mounts.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/motor-orientation.js": "./js/blocks/motor-orientation.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/motor-tools.js": "./js/blocks/motor-tools.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/mount-surfaces.js": "./js/blocks/mount-surfaces.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/node-editor.js": "./js/blocks/node-editor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/numeric-input.js": "./js/blocks/numeric-input.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/orthogonal-joint.js": "./js/blocks/orthogonal-joint.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/overlap-picker.js": "./js/blocks/overlap-picker.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/panels.js": "./js/blocks/panels.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/parallel-gripper-example.js": "./js/blocks/parallel-gripper-example.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/parallel-lift-controller.js": "./js/blocks/parallel-lift-controller.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/parallel-lift-operations.js": "./js/blocks/parallel-lift-operations.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/parallel-lift-workflow.js": "./js/blocks/parallel-lift-workflow.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/part-fusion.js": "./js/blocks/part-fusion.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/part-geometry.js": "./js/blocks/part-geometry.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/part-hole-trace.js": "./js/blocks/part-hole-trace.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/part-labels.js": "./js/blocks/part-labels.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/part-types.js": "./js/blocks/part-types.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/plate-editor.js": "./js/blocks/plate-editor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/plate-geometry.js": "./js/blocks/plate-geometry.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/plate-render.js": "./js/blocks/plate-render.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/playback-probe.js": "./js/blocks/playback-probe.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/preview-model-inputs.js": "./js/blocks/preview-model-inputs.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/project-name.js": "./js/blocks/project-name.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/rack-limits.js": "./js/blocks/rack-limits.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/render-scene.js": "./js/blocks/render-scene.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/render.js": "./js/blocks/render.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/rigid-gripper.js": "./js/blocks/rigid-gripper.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/rigid-group-interface.js": "./js/blocks/rigid-group-interface.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/rigid-groups-ui.js": "./js/blocks/rigid-groups-ui.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/rigid-groups.js": "./js/blocks/rigid-groups.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/rock-motion.js": "./js/blocks/rock-motion.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/schema.js": "./js/blocks/schema.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/schema.js?v=20261007_singleface": "./js/blocks/schema.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/schema.js?v=face-mount-20261007": "./js/blocks/schema.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/sequence-schema.js": "./js/blocks/sequence-schema.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/settings.js": "./js/blocks/settings.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/simulation-scope.js": "./js/blocks/simulation-scope.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/slider-editor.js": "./js/blocks/slider-editor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/slider-editor.js?v=20261005_sliderui": "./js/blocks/slider-editor.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/solve-health.js": "./js/blocks/solve-health.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/special-part-render.js": "./js/blocks/special-part-render.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/state.js": "./js/blocks/state.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/storage.js": "./js/blocks/storage.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/storage.js?v=20261007_singleface": "./js/blocks/storage.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/support-validation.js": "./js/blocks/support-validation.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/syringe-install-preview.js": "./js/blocks/syringe-install-preview.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/syringe-install-ui.js": "./js/blocks/syringe-install-ui.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/syringe-installation.js": "./js/blocks/syringe-installation.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/syringe-manufacturing.js": "./js/blocks/syringe-manufacturing.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/syringe-operations.js": "./js/blocks/syringe-operations.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/syringe-placement.js": "./js/blocks/syringe-placement.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/syringe-shape.js": "./js/blocks/syringe-shape.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/syringe-ui.js": "./js/blocks/syringe-ui.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/task-operation-support.js": "./js/blocks/task-operation-support.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/teaching-feedback.js": "./js/blocks/teaching-feedback.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/tipping-bucket-assembly-validation.js": "./js/blocks/tipping-bucket-assembly-validation.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/tipping-bucket-example.js": "./js/blocks/tipping-bucket-example.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/tipping-bucket-legacy.js": "./js/blocks/tipping-bucket-legacy.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/tipping-bucket-operations.js": "./js/blocks/tipping-bucket-operations.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/tipping-bucket-workflow.js": "./js/blocks/tipping-bucket-workflow.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/tools.js": "./js/blocks/tools.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/transmission-geometry.js": "./js/blocks/transmission-geometry.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/transmission-render.js": "./js/blocks/transmission-render.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/video-evidence.js": "./js/blocks/video-evidence.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/video-export.js": "./js/blocks/video-export.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks/view.js": "./js/blocks/view.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks3d/face-brackets.js": "./js/blocks3d/face-brackets.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks3d/material-scene.js": "./js/blocks3d/material-scene.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks3d/orthogonal-3d.js?v=20261007_m5a": "./js/blocks3d/orthogonal-3d.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks3d/orthogonal-3d.js?v=20261008_bracketalign": "./js/blocks3d/orthogonal-3d.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks3d/orthogonal-3d.js?v=face-mount-20261007": "./js/blocks3d/orthogonal-3d.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks3d/part-pose.js": "./js/blocks3d/part-pose.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks3d/scene-model.js": "./js/blocks3d/scene-model.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks3d/scene-reuse.js": "./js/blocks3d/scene-reuse.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks3d/syringe-scene.js": "./js/blocks3d/syringe-scene.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks3d/viewer.js": "./js/blocks3d/viewer.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks3d/viewer.js?v=20261007_import_spacing": "./js/blocks3d/viewer.js?v=96ce5f3bac6ae2580e59",
-    "./js/blocks3d/viewer.js?v=20261007_m4b": "./js/blocks3d/viewer.js?v=96ce5f3bac6ae2580e59",
-    "./js/core/syringe.js": "./js/core/syringe.js?v=96ce5f3bac6ae2580e59",
-    "./js/core/topology.js": "./js/core/topology.js?v=96ce5f3bac6ae2580e59",
-    "./js/core/validation/health-report.js": "./js/core/validation/health-report.js?v=96ce5f3bac6ae2580e59",
-    "./js/core/validation/validate-mechanism.js": "./js/core/validation/validate-mechanism.js?v=96ce5f3bac6ae2580e59",
-    "./js/load-graph.js": "./js/load-graph.js?v=96ce5f3bac6ae2580e59",
-    "./js/module-url.js": "./js/module-url.js?v=96ce5f3bac6ae2580e59",
-    "./js/multilink/solver.js": "./js/multilink/solver.js?v=96ce5f3bac6ae2580e59",
-    "./js/share-codec.js": "./js/share-codec.js?v=96ce5f3bac6ae2580e59",
-    "./js/utils.js": "./js/utils.js?v=96ce5f3bac6ae2580e59",
-    "./js/utils/cam-profile.js": "./js/utils/cam-profile.js?v=96ce5f3bac6ae2580e59",
-    "./js/utils/gear-geometry.js": "./js/utils/gear-geometry.js?v=96ce5f3bac6ae2580e59",
-    "./js/vendor/OrbitControls.js": "./js/vendor/OrbitControls.js?v=96ce5f3bac6ae2580e59",
-    "./js/vendor/mediabunny/mediabunny.mjs": "./js/vendor/mediabunny/mediabunny.mjs?v=96ce5f3bac6ae2580e59",
-    "./js/vendor/shape-utils.js": "./js/vendor/shape-utils.js?v=96ce5f3bac6ae2580e59",
-    "./js/vendor/three.module.js": "./js/vendor/three.module.js?v=96ce5f3bac6ae2580e59",
-    "./js/version-history.js": "./js/version-history.js?v=96ce5f3bac6ae2580e59",
-    "./js/version-info.js": "./js/version-info.js?v=96ce5f3bac6ae2580e59",
-    "./js/version.js": "./js/version.js?v=96ce5f3bac6ae2580e59",
-    "./js/version.js?v=20261008_bracketalign": "./js/version.js?v=96ce5f3bac6ae2580e59",
-    "./test/actuator-ui-browser.js": "./test/actuator-ui-browser.js?v=96ce5f3bac6ae2580e59",
-    "./test/actuator-ui-browser.js?run=": "./test/actuator-ui-browser.js?run=&v=96ce5f3bac6ae2580e59",
-    "./test/design-isolation-browser.js": "./test/design-isolation-browser.js?v=96ce5f3bac6ae2580e59",
-    "./test/face-wizard-browser.js": "./test/face-wizard-browser.js?v=96ce5f3bac6ae2580e59",
-    "./test/fixtures/actuator-installation.mjs": "./test/fixtures/actuator-installation.mjs?v=96ce5f3bac6ae2580e59",
-    "./test/fixtures/face-bracket-fixture.mjs": "./test/fixtures/face-bracket-fixture.mjs?v=96ce5f3bac6ae2580e59",
-    "./test/fixtures/hinged-syringe.mjs": "./test/fixtures/hinged-syringe.mjs?v=96ce5f3bac6ae2580e59",
-    "./test/fixtures/syringe-end-resize.mjs": "./test/fixtures/syringe-end-resize.mjs?v=96ce5f3bac6ae2580e59",
-    "./test/gripper-pilot.js": "./test/gripper-pilot.js?v=96ce5f3bac6ae2580e59",
-    "./test/hydraulic-ui-browser.js": "./test/hydraulic-ui-browser.js?v=96ce5f3bac6ae2580e59",
-    "./test/hydraulic-ui-browser.js?run=": "./test/hydraulic-ui-browser.js?run=&v=96ce5f3bac6ae2580e59",
-    "./test/parallel-lift-pilot.js": "./test/parallel-lift-pilot.js?v=96ce5f3bac6ae2580e59",
-    "./test/performance-browser.js": "./test/performance-browser.js?v=96ce5f3bac6ae2580e59",
-    "./test/tipping-bucket-pilot.js": "./test/tipping-bucket-pilot.js?v=96ce5f3bac6ae2580e59",
-    "three": "./js/vendor/three.module.js?v=96ce5f3bac6ae2580e59"
+    "./js/blocks/actuator-install-scene.js": "./js/blocks/actuator-install-scene.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/actuator-install-ui.js": "./js/blocks/actuator-install-ui.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/actuator-installation.js": "./js/blocks/actuator-installation.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/adapter-stl.js": "./js/blocks/adapter-stl.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/app.js": "./js/blocks/app.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/assembly-lesson-example.js": "./js/blocks/assembly-lesson-example.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/assembly-lesson-example.js?v=parallel": "./js/blocks/assembly-lesson-example.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/assembly-membership.js": "./js/blocks/assembly-membership.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/assembly-roles.js": "./js/blocks/assembly-roles.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/assembly-syringe.js": "./js/blocks/assembly-syringe.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/assembly-task-validation.js": "./js/blocks/assembly-task-validation.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/assembly-view.js": "./js/blocks/assembly-view.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/assembly.js": "./js/blocks/assembly.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/assembly.js?v=20261007_m5a": "./js/blocks/assembly.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/assembly.js?v=20261007_solverguard": "./js/blocks/assembly.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/assembly.js?v=face-mount-20261007": "./js/blocks/assembly.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/bench-ui.js": "./js/blocks/bench-ui.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/bench-ui.js?v=20261007_8_final": "./js/blocks/bench-ui.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/bench-ui.js?v=20261008_brackets": "./js/blocks/bench-ui.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/bench.js": "./js/blocks/bench.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/bench.js?v=20261007_m5a": "./js/blocks/bench.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/bracket-layout.js": "./js/blocks/bracket-layout.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/bracket-physical.js": "./js/blocks/bracket-physical.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/bracket-spec.js": "./js/blocks/bracket-spec.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/build-plan.js": "./js/blocks/build-plan.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/build-plan.js?v=20261007_7": "./js/blocks/build-plan.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/classroom-bridge.js": "./js/blocks/classroom-bridge.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/cnc-check.js": "./js/blocks/cnc-check.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/collision-actions.js": "./js/blocks/collision-actions.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/common-manipulator-examples.js": "./js/blocks/common-manipulator-examples.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/connection-descriptor.js": "./js/blocks/connection-descriptor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/connection-editor.js": "./js/blocks/connection-editor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/connection-editor.js?v=20261007_facecolor": "./js/blocks/connection-editor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/connection-selection.js": "./js/blocks/connection-selection.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/connection-work.js": "./js/blocks/connection-work.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/creation-palette.js": "./js/blocks/creation-palette.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/design-focus.js": "./js/blocks/design-focus.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/design-guide.js": "./js/blocks/design-guide.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/design-tabs-ui.js": "./js/blocks/design-tabs-ui.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/design-tabs-ui.js?v=20261005_tabclose": "./js/blocks/design-tabs-ui.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/dof.js": "./js/blocks/dof.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/example-controller.js": "./js/blocks/example-controller.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/example-controller.js?v=20261005_parallel": "./js/blocks/example-controller.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/example-entry.js": "./js/blocks/example-entry.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/example-entry.js?v=20261005_unit2": "./js/blocks/example-entry.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/examples.js": "./js/blocks/examples.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/examples.js?v=20261005_parallel": "./js/blocks/examples.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/examples.js?v=20261005_unit2": "./js/blocks/examples.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/export-dialog.js": "./js/blocks/export-dialog.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/export-scope.js": "./js/blocks/export-scope.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/exporters.js": "./js/blocks/exporters.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/exporters.js?v=20261007_7": "./js/blocks/exporters.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/exporters.js?v=20261007_9": "./js/blocks/exporters.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/fabrication-profile.js": "./js/blocks/fabrication-profile.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-auto-fit.js": "./js/blocks/face-auto-fit.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-auto-fit.js?v=20261008_bracket3d": "./js/blocks/face-auto-fit.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-bracket-extras.js": "./js/blocks/face-bracket-extras.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-bracket-geometry.js": "./js/blocks/face-bracket-geometry.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-bracket-geometry.js?v=20261008_bracket3d": "./js/blocks/face-bracket-geometry.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-bracket-geometry.js?v=20261008_bracketalign": "./js/blocks/face-bracket-geometry.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-candidate-view.js": "./js/blocks/face-candidate-view.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-candidate.js": "./js/blocks/face-candidate.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-export.js": "./js/blocks/face-export.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-mate-examples.js": "./js/blocks/face-mate-examples.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-mate-prototype.js": "./js/blocks/face-mate-prototype.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-mate.js": "./js/blocks/face-mate.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-mount-contract.js": "./js/blocks/face-mount-contract.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-mount-refresh.js": "./js/blocks/face-mount-refresh.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-mount.js": "./js/blocks/face-mount.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-placement.js": "./js/blocks/face-placement.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-wizard-ui.js": "./js/blocks/face-wizard-ui.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/face-wizard-ui.js?v=20261007_singleface": "./js/blocks/face-wizard-ui.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/fixed-syringe-examples.js": "./js/blocks/fixed-syringe-examples.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/fourbar-measurement.js": "./js/blocks/fourbar-measurement.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/frame-stock.js": "./js/blocks/frame-stock.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/fusion-editor.js": "./js/blocks/fusion-editor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/fusion-preview.js": "./js/blocks/fusion-preview.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/gear-editor.js": "./js/blocks/gear-editor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/gear-editor.js?v=20261004_fourbar_r1": "./js/blocks/gear-editor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/gripper-controller.js": "./js/blocks/gripper-controller.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/gripper-controller.js?v=20260925_r1b2": "./js/blocks/gripper-controller.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/gripper-download.js": "./js/blocks/gripper-download.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/gripper-download.js?v=20260925_r1b2": "./js/blocks/gripper-download.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/gripper-object.js": "./js/blocks/gripper-object.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/gripper-object.js?v=20260925_r1b2": "./js/blocks/gripper-object.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/gripper-operations.js": "./js/blocks/gripper-operations.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/gripper-workflow.js": "./js/blocks/gripper-workflow.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/gripper-workflow.js?v=20260925_r1b": "./js/blocks/gripper-workflow.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/hydraulic-assembly-example.js": "./js/blocks/hydraulic-assembly-example.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/hydraulic-example.js": "./js/blocks/hydraulic-example.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/hydraulic-sequence-dialog.js": "./js/blocks/hydraulic-sequence-dialog.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/hydraulic-sequence.js": "./js/blocks/hydraulic-sequence.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/input.js": "./js/blocks/input.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/input.js?v=20261007_m2b": "./js/blocks/input.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/intake-contact.js": "./js/blocks/intake-contact.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/interference.js": "./js/blocks/interference.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/jaw-tip-handle.js": "./js/blocks/jaw-tip-handle.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/lesson-check-dialog.js": "./js/blocks/lesson-check-dialog.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/lesson-check.js": "./js/blocks/lesson-check.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/lesson-sequence-dialog.js": "./js/blocks/lesson-sequence-dialog.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/lesson-sequence.js": "./js/blocks/lesson-sequence.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/lift-bucket-builder.js": "./js/blocks/lift-bucket-builder.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/lift-bucket-example.js": "./js/blocks/lift-bucket-example.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/lift-bucket-workflow.js": "./js/blocks/lift-bucket-workflow.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/live-interference-status.js": "./js/blocks/live-interference-status.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/load-session.js": "./js/blocks/load-session.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/mate-candidate.js": "./js/blocks/mate-candidate.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/mate-connect.js": "./js/blocks/mate-connect.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/mate-connect.js?v=20261007_8_final": "./js/blocks/mate-connect.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/mate-tool.js": "./js/blocks/mate-tool.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/mate-tool.js?v=20261007_facecolor": "./js/blocks/mate-tool.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/mate-wizard-ui.js": "./js/blocks/mate-wizard-ui.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/mate-wizard-ui.js?v=20261008_brackets": "./js/blocks/mate-wizard-ui.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/material-interference.js": "./js/blocks/material-interference.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/material-pose-status.js": "./js/blocks/material-pose-status.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/material-voids.js": "./js/blocks/material-voids.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/mates-schema.js": "./js/blocks/mates-schema.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/mates-view.js": "./js/blocks/mates-view.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/mates.js": "./js/blocks/mates.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/measurement.js": "./js/blocks/measurement.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/mechanism-layer-render.js": "./js/blocks/mechanism-layer-render.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/member-dimension-render.js": "./js/blocks/member-dimension-render.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/member-dimensions.js": "./js/blocks/member-dimensions.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/member-editor.js": "./js/blocks/member-editor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/member-stock.js": "./js/blocks/member-stock.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/member-sweep.js": "./js/blocks/member-sweep.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/model.js": "./js/blocks/model.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/module-drag.js": "./js/blocks/module-drag.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/module-editor.js?v=20261007_import_spacing": "./js/blocks/module-editor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/module-editor.js?v=20261007_singleface": "./js/blocks/module-editor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/module-ops.js": "./js/blocks/module-ops.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/module-ops.js?v=20261007_m5a": "./js/blocks/module-ops.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/module-ops.js?v=20261007_singleface": "./js/blocks/module-ops.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/module-plates.js": "./js/blocks/module-plates.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/module-plates.js?v=20261007_m5a": "./js/blocks/module-plates.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/module-schema.js": "./js/blocks/module-schema.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/module-schema.js?v=20261007_singleface": "./js/blocks/module-schema.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/motion-range-validation.js": "./js/blocks/motion-range-validation.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/motion.js": "./js/blocks/motion.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/motor-frame-render.js": "./js/blocks/motor-frame-render.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/motor-mounts.js": "./js/blocks/motor-mounts.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/motor-orientation.js": "./js/blocks/motor-orientation.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/motor-tools.js": "./js/blocks/motor-tools.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/mount-surfaces.js": "./js/blocks/mount-surfaces.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/node-editor.js": "./js/blocks/node-editor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/numeric-input.js": "./js/blocks/numeric-input.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/orthogonal-joint.js": "./js/blocks/orthogonal-joint.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/overlap-picker.js": "./js/blocks/overlap-picker.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/panels.js": "./js/blocks/panels.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/parallel-gripper-example.js": "./js/blocks/parallel-gripper-example.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/parallel-lift-controller.js": "./js/blocks/parallel-lift-controller.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/parallel-lift-operations.js": "./js/blocks/parallel-lift-operations.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/parallel-lift-workflow.js": "./js/blocks/parallel-lift-workflow.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/part-fusion.js": "./js/blocks/part-fusion.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/part-geometry.js": "./js/blocks/part-geometry.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/part-hole-trace.js": "./js/blocks/part-hole-trace.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/part-labels.js": "./js/blocks/part-labels.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/part-types.js": "./js/blocks/part-types.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/plate-editor.js": "./js/blocks/plate-editor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/plate-geometry.js": "./js/blocks/plate-geometry.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/plate-render.js": "./js/blocks/plate-render.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/playback-probe.js": "./js/blocks/playback-probe.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/preview-model-inputs.js": "./js/blocks/preview-model-inputs.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/project-name.js": "./js/blocks/project-name.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/rack-limits.js": "./js/blocks/rack-limits.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/render-scene.js": "./js/blocks/render-scene.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/render.js": "./js/blocks/render.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/rigid-gripper.js": "./js/blocks/rigid-gripper.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/rigid-group-interface.js": "./js/blocks/rigid-group-interface.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/rigid-groups-ui.js": "./js/blocks/rigid-groups-ui.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/rigid-groups.js": "./js/blocks/rigid-groups.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/rock-motion.js": "./js/blocks/rock-motion.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/schema.js": "./js/blocks/schema.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/schema.js?v=20261007_singleface": "./js/blocks/schema.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/schema.js?v=face-mount-20261007": "./js/blocks/schema.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/sequence-schema.js": "./js/blocks/sequence-schema.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/settings.js": "./js/blocks/settings.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/simulation-scope.js": "./js/blocks/simulation-scope.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/slider-editor.js": "./js/blocks/slider-editor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/slider-editor.js?v=20261005_sliderui": "./js/blocks/slider-editor.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/solve-health.js": "./js/blocks/solve-health.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/special-part-render.js": "./js/blocks/special-part-render.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/state.js": "./js/blocks/state.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/storage.js": "./js/blocks/storage.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/storage.js?v=20261007_singleface": "./js/blocks/storage.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/support-validation.js": "./js/blocks/support-validation.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/syringe-install-preview.js": "./js/blocks/syringe-install-preview.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/syringe-install-ui.js": "./js/blocks/syringe-install-ui.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/syringe-installation.js": "./js/blocks/syringe-installation.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/syringe-manufacturing.js": "./js/blocks/syringe-manufacturing.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/syringe-operations.js": "./js/blocks/syringe-operations.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/syringe-placement.js": "./js/blocks/syringe-placement.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/syringe-shape.js": "./js/blocks/syringe-shape.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/syringe-ui.js": "./js/blocks/syringe-ui.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/task-operation-support.js": "./js/blocks/task-operation-support.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/teaching-feedback.js": "./js/blocks/teaching-feedback.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/tipping-bucket-assembly-validation.js": "./js/blocks/tipping-bucket-assembly-validation.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/tipping-bucket-example.js": "./js/blocks/tipping-bucket-example.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/tipping-bucket-legacy.js": "./js/blocks/tipping-bucket-legacy.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/tipping-bucket-operations.js": "./js/blocks/tipping-bucket-operations.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/tipping-bucket-workflow.js": "./js/blocks/tipping-bucket-workflow.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/tools.js": "./js/blocks/tools.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/transmission-geometry.js": "./js/blocks/transmission-geometry.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/transmission-render.js": "./js/blocks/transmission-render.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/video-evidence.js": "./js/blocks/video-evidence.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/video-export.js": "./js/blocks/video-export.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks/view.js": "./js/blocks/view.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks3d/face-brackets.js": "./js/blocks3d/face-brackets.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks3d/material-scene.js": "./js/blocks3d/material-scene.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks3d/orthogonal-3d.js?v=20261007_m5a": "./js/blocks3d/orthogonal-3d.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks3d/orthogonal-3d.js?v=20261008_bracketalign": "./js/blocks3d/orthogonal-3d.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks3d/orthogonal-3d.js?v=face-mount-20261007": "./js/blocks3d/orthogonal-3d.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks3d/part-pose.js": "./js/blocks3d/part-pose.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks3d/scene-model.js": "./js/blocks3d/scene-model.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks3d/scene-reuse.js": "./js/blocks3d/scene-reuse.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks3d/syringe-scene.js": "./js/blocks3d/syringe-scene.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks3d/viewer.js": "./js/blocks3d/viewer.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks3d/viewer.js?v=20261007_import_spacing": "./js/blocks3d/viewer.js?v=2b4ef62d7d9d51ac7958",
+    "./js/blocks3d/viewer.js?v=20261007_m4b": "./js/blocks3d/viewer.js?v=2b4ef62d7d9d51ac7958",
+    "./js/core/syringe.js": "./js/core/syringe.js?v=2b4ef62d7d9d51ac7958",
+    "./js/core/topology.js": "./js/core/topology.js?v=2b4ef62d7d9d51ac7958",
+    "./js/core/validation/health-report.js": "./js/core/validation/health-report.js?v=2b4ef62d7d9d51ac7958",
+    "./js/core/validation/validate-mechanism.js": "./js/core/validation/validate-mechanism.js?v=2b4ef62d7d9d51ac7958",
+    "./js/load-graph.js": "./js/load-graph.js?v=2b4ef62d7d9d51ac7958",
+    "./js/module-url.js": "./js/module-url.js?v=2b4ef62d7d9d51ac7958",
+    "./js/multilink/solver.js": "./js/multilink/solver.js?v=2b4ef62d7d9d51ac7958",
+    "./js/share-codec.js": "./js/share-codec.js?v=2b4ef62d7d9d51ac7958",
+    "./js/utils.js": "./js/utils.js?v=2b4ef62d7d9d51ac7958",
+    "./js/utils/cam-profile.js": "./js/utils/cam-profile.js?v=2b4ef62d7d9d51ac7958",
+    "./js/utils/gear-geometry.js": "./js/utils/gear-geometry.js?v=2b4ef62d7d9d51ac7958",
+    "./js/vendor/OrbitControls.js": "./js/vendor/OrbitControls.js?v=2b4ef62d7d9d51ac7958",
+    "./js/vendor/mediabunny/mediabunny.mjs": "./js/vendor/mediabunny/mediabunny.mjs?v=2b4ef62d7d9d51ac7958",
+    "./js/vendor/shape-utils.js": "./js/vendor/shape-utils.js?v=2b4ef62d7d9d51ac7958",
+    "./js/vendor/three.module.js": "./js/vendor/three.module.js?v=2b4ef62d7d9d51ac7958",
+    "./js/version-history.js": "./js/version-history.js?v=2b4ef62d7d9d51ac7958",
+    "./js/version-info.js": "./js/version-info.js?v=2b4ef62d7d9d51ac7958",
+    "./js/version.js": "./js/version.js?v=2b4ef62d7d9d51ac7958",
+    "./js/version.js?v=20261008_bracketalign": "./js/version.js?v=2b4ef62d7d9d51ac7958",
+    "./test/actuator-ui-browser.js": "./test/actuator-ui-browser.js?v=2b4ef62d7d9d51ac7958",
+    "./test/actuator-ui-browser.js?run=": "./test/actuator-ui-browser.js?run=&v=2b4ef62d7d9d51ac7958",
+    "./test/design-isolation-browser.js": "./test/design-isolation-browser.js?v=2b4ef62d7d9d51ac7958",
+    "./test/face-wizard-browser.js": "./test/face-wizard-browser.js?v=2b4ef62d7d9d51ac7958",
+    "./test/fixtures/actuator-installation.mjs": "./test/fixtures/actuator-installation.mjs?v=2b4ef62d7d9d51ac7958",
+    "./test/fixtures/face-bracket-fixture.mjs": "./test/fixtures/face-bracket-fixture.mjs?v=2b4ef62d7d9d51ac7958",
+    "./test/fixtures/hinged-syringe.mjs": "./test/fixtures/hinged-syringe.mjs?v=2b4ef62d7d9d51ac7958",
+    "./test/fixtures/syringe-end-resize.mjs": "./test/fixtures/syringe-end-resize.mjs?v=2b4ef62d7d9d51ac7958",
+    "./test/gripper-pilot.js": "./test/gripper-pilot.js?v=2b4ef62d7d9d51ac7958",
+    "./test/hydraulic-ui-browser.js": "./test/hydraulic-ui-browser.js?v=2b4ef62d7d9d51ac7958",
+    "./test/hydraulic-ui-browser.js?run=": "./test/hydraulic-ui-browser.js?run=&v=2b4ef62d7d9d51ac7958",
+    "./test/parallel-lift-pilot.js": "./test/parallel-lift-pilot.js?v=2b4ef62d7d9d51ac7958",
+    "./test/performance-browser.js": "./test/performance-browser.js?v=2b4ef62d7d9d51ac7958",
+    "./test/tipping-bucket-pilot.js": "./test/tipping-bucket-pilot.js?v=2b4ef62d7d9d51ac7958",
+    "three": "./js/vendor/three.module.js?v=2b4ef62d7d9d51ac7958"
   }
 }
 </script>
 <!-- END GENERATED LOAD MAP -->
-<script type="module" src="./js/blocks/app.js?v=96ce5f3bac6ae2580e59"></script>
-<script type="module" src="./js/version-info.js?v=96ce5f3bac6ae2580e59"></script>
+<script type="module" src="./js/blocks/app.js?v=2b4ef62d7d9d51ac7958"></script>
+<script type="module" src="./js/version-info.js?v=2b4ef62d7d9d51ac7958"></script>
 <dialog id="saveProjectDialog" aria-labelledby="saveProjectTitle" style="border:1px solid #bacddd;border-radius:12px;padding:20px;width:min(360px,calc(100vw - 64px));color:#19354c;">
   <form id="saveProjectForm">
     <h2 id="saveProjectTitle" style="margin:0 0 12px;font-size:20px;">儲存作品</h2>
