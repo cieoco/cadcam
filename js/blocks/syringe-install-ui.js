@@ -20,7 +20,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  dialog.setAttribute('aria-label','針筒安裝');
  const head=el('header',null,dialog),title=el('strong','針筒安裝',head),cancel=el('button','取消',head);
  const nav=el('nav',null,dialog);nav.setAttribute('aria-label','安裝步驟');
- const names=['放針筒','方向角度','接連桿','固定試動'];
+ const names=['選機架','位置角度','接推桿','固定試動'];
  const tabs=names.map((name,i)=>{const b=el('button',`${i+1} ${name}`,nav);b.onclick=()=>{if(i<=step){step=i;update();}};return b;});
  const preview=el('section',null,dialog);preview.className='install-preview';preview.setAttribute('aria-label','安裝預覽');
  const svg=document.createElementNS(ns,'svg');preview.append(svg);svg.setAttribute('aria-label','放置針筒、拖動位置與方向把手');svg.setAttribute('role','img');
@@ -30,16 +30,17 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  const panels=names.map((name,i)=>{const p=el('section',null,body);el('h3',`${i+1} · ${name}`,p);return p;});
  const field=(p,text,type='select')=>{const label=el('label',text,p),n=el(type,null,label);n.setAttribute('aria-label',text);if(type==='input'){n.type='number';n.step='0.1';}return n;};
  const option=(s,text,value)=>{const o=el('option',text,s);o.value=value;};
- el('p','先在上方點一下放置筒身，再拖動藍點調位置。這一步不用選機架。',panels[0]);
- const px=field(panels[0],'筒身位置 X (mm)','input'),py=field(panels[0],'筒身位置 Y (mm)','input');
+ el('p','先選針筒的固定機架，可點預覽中的零件或使用清單；下一步再放針筒、調位置與角度。',panels[0]);
+ el('p','在所選機架上點一下放針筒，拖藍點移動、拖橘點旋轉。選機架只設定基準，不會代替你決定角度。',panels[1]);
+ const px=field(panels[1],'筒身位置 X (mm)','input'),py=field(panels[1],'筒身位置 Y (mm)','input');
  const angle=field(panels[1],'推進方向角度 (°)','input');angle.step='1';
  const directionRow=el('div',null,panels[1]);directionRow.className='install-faces';
  for(const [text,value] of [['向右',0],['向上',90],['向左',180],['向下',-90]]){const b=el('button',text,directionRow);b.onclick=()=>{request.axisDeg=value;changed();update();};}
  el('p','拖橘色方向把手旋轉，或輸入角度。箭頭是推桿伸出的方向；接上連桿時不會自動改成另一個角度。',panels[1]);
- const frame=field(panels[3],'筒身固定在哪個零件？');option(frame,'請選固定機架','');
+ const frame=field(panels[0],'筒身固定在哪個零件？');option(frame,'請選固定機架','');
  choices.frames.forEach(c=>option(frame,labelOf(c),c.id));frame.value=request.frameId;
- el('p','先前已放好針筒，現在才決定管夾鎖在哪。選機架不會偷偷移動針筒。',panels[3]);
- const snap=el('button','移到所選機架',panels[3]);
+ const frameSummary=el('p','',panels[3]);
+ const snap=el('button','移到所選機架',panels[1]);
  const faceRow=el('div',null,panels[3]);faceRow.className='install-faces';
  const faces=['front','back'].map((face,i)=>{const b=el('button',i?'背面':'正面',faceRow);b.onclick=()=>{request.face=face;update();};return b;});
  el('p','管夾孔距 28 mm、孔徑 3.5 mm；正反面及套筒可在 3D 核對。',panels[3]);
@@ -92,16 +93,18 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   try{const g=inspectFrameExport(frameConnectorNodes(cs),base.fabrication?.export || {});g?.outlines.forEach(r=>poly(r,'#e2e8f0'));}catch{/* Candidate failure is shown in the status, never applied. */}
   const firstMemberIndex=svg.childNodes.length;
   for(const c of cs.filter(c=>['bar','triangle'].includes(c.type))){
-   const selected=step===3?c.id===request.frameId:step===2&&c.id===request.b?.componentId,color=selected?'#0284c7':c.type==='bar'?'#94a3b8':'#f3b35a';
+   const selected=step!==2?c.id===request.frameId:c.id===request.b?.componentId,color=selected?'#0284c7':c.type==='bar'?'#94a3b8':'#f3b35a';
    const members=c.type==='bar'?[line(pos(c.p1),pos(c.p2),8,color)]:createPlateGeometry(c,[c.p1,c.p2,c.p3].map(pos)).outlines.map(r=>poly(r,color));
-   members.forEach(n=>{n.setAttribute('data-install-member',c.id);n.style.cursor='pointer';n.onclick=()=>{if(step===3&&choices.frames.some(f=>f.id===c.id)){frame.value=c.id;frame.onchange();}};});
+   members.forEach(n=>{n.setAttribute('data-install-member',c.id);n.style.cursor='pointer';n.onclick=()=>{if(step===0&&choices.frames.some(f=>f.id===c.id)){frame.value=c.id;frame.onchange();}};});
    for(const [i,p] of [c.p1,c.p2].entries()){
     const q=pos(p),dot=draw('circle',{cx:q.x,cy:-q.y,r:3,fill:'white',stroke:color,'stroke-width':1});
+    if(step===0&&choices.frames.some(f=>f.id===c.id))dot.onclick=()=>{frame.value=c.id;frame.onchange();};
     if(step===2&&choices.rods.some(r=>r.id===c.id)){const hit=draw('circle',{cx:q.x,cy:-q.y,r:9,fill:'transparent',stroke:'none'});hit.style.cursor='pointer';hit.onclick=()=>{rod.value=c.id;end.value=String(i);setRod();};}
    }
   }
+  if(step===0&&!existing)return;
   const firstMember=svg.childNodes[firstMemberIndex],actuatorStart=svg.childNodes.length;
-  const posDraft=request.position&&[request.position.x,request.position.y].every(Number.isFinite)?request.position: (viewBox?{x:viewBox[0]+70,y:-(viewBox[1]+viewBox[3]/2)}:{x:0,y:0});
+  const posDraft=request.position&&[request.position.x,request.position.y].every(Number.isFinite)?request.position: (attachmentFrame(choices.frames.find(c=>c.id===request.frameId),base.params,points)?.p || {x:0,y:0});
   const theta=(Number.isFinite(request.axisDeg)?request.axisDeg:0)*Math.PI/180;
   const shape=step>=2&&result?.ok?syringeShape(result.syringe,cs,result.params,P):null;
   const A=shape?.a || posDraft,at=t=>({x:A.x+Math.cos(theta)*t,y:A.y+Math.sin(theta)*t});
@@ -112,12 +115,14 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   if(firstMember)for(const node of [...svg.childNodes].slice(actuatorStart))svg.insertBefore(node,firstMember);
   if(step===2&&request.b){const c=cs.find(c=>c.id===request.b.componentId);if(c){const mid={x:(pos(c.p1).x+pos(c.p2).x)/2,y:(pos(c.p1).y+pos(c.p2).y)/2};const label=draw('text',{x:mid.x,y:-mid.y-7,'font-size':8,fill:'#0369a1',stroke:'white','stroke-width':2,'paint-order':'stroke','text-anchor':'middle'});label.textContent=labelOf(c);}}
   const dot=(p,color,data)=>{draw('circle',{cx:p.x,cy:-p.y,r:6,fill:color,stroke:'white','stroke-width':2});draw('circle',{cx:p.x,cy:-p.y,r:14,fill:'transparent',[data]:'true'});};
-  if(step<2){dot(A,'#0284c7','data-install-position');if(step===1){const handle=at(65);line(A,handle,1.5,'#e87911');const arrow=at(55),normal={x:-Math.sin(theta)*5,y:Math.cos(theta)*5};poly([handle,{x:arrow.x+normal.x,y:arrow.y+normal.y},{x:arrow.x-normal.x,y:arrow.y-normal.y}],'#e87911');dot(handle,'#e87911','data-install-angle');}}
+  if(step===1){dot(A,'#0284c7','data-install-position');if(step===1){const handle=at(65);line(A,handle,1.5,'#e87911');const arrow=at(55),normal={x:-Math.sin(theta)*5,y:Math.cos(theta)*5};poly([handle,{x:arrow.x+normal.x,y:arrow.y+normal.y},{x:arrow.x-normal.x,y:arrow.y-normal.y}],'#e87911');dot(handle,'#e87911','data-install-angle');}}
  }
  const pointer=e=>{const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());return {x:p.x,y:-p.y};};
- const drag=e=>{const p=pointer(e);if(dragging==='position')request.position={x:Math.round(p.x*10)/10,y:Math.round(p.y*10)/10};else if(dragging==='angle'&&request.position)request.axisDeg=Math.round(Math.atan2(p.y-request.position.y,p.x-request.position.x)*180/Math.PI);changed();update();};
- svg.onpointerdown=e=>{if(step===0)dragging='position';else if(step===1&&e.target.hasAttribute('data-install-angle'))dragging='angle';else if(step===1&&e.target.hasAttribute('data-install-position'))dragging='position';else return;if(e.isTrusted)svg.setPointerCapture(e.pointerId);drag(e);};
- svg.onpointermove=e=>{if(dragging)drag(e);else if(step===0&&!request.position&&e.pointerType==='mouse'){request.position=pointer(e);renderDrawing();request.position=null;}};
+ const onFrame=p=>{const owner=choices.frames.find(c=>c.id===request.frameId),f=owner&&attachmentFrame(owner,base.params,points);if(!f)return p;if(owner.type==='triangle')return p;
+  const t=Math.max(0,Math.min(f.length,(p.x-f.p.x)*f.x+(p.y-f.p.y)*f.y));return {x:f.p.x+f.x*t,y:f.p.y+f.y*t};};
+ const drag=e=>{const p=pointer(e);if(dragging==='position')request.position=onFrame(p);else if(dragging==='angle'&&request.position)request.axisDeg=Math.round(Math.atan2(p.y-request.position.y,p.x-request.position.x)*180/Math.PI);changed();update();};
+ svg.onpointerdown=e=>{if(step!==1)return;if(e.target.hasAttribute('data-install-angle')&&request.position)dragging='angle';else dragging='position';if(e.isTrusted)svg.setPointerCapture(e.pointerId);drag(e);};
+ svg.onpointermove=e=>{if(dragging)drag(e);else if(step===1&&!request.position&&e.pointerType==='mouse'){request.position=onFrame(pointer(e));renderDrawing();request.position=null;}};
  svg.onpointerup=svg.onpointercancel=()=>{dragging=false;};
  async function scene(token){
   if(!result?.ok)return;const candidate=result;
@@ -136,18 +141,23 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   revision++;clearTimeout(sceneTimer);title.textContent=`針筒安裝 · ${step+1}/4`;
   panels.forEach((p,i)=>p.hidden=i!==step);tabs.forEach((b,i)=>{b.disabled=i>step;b.setAttribute('aria-current',i===step?'step':'false');});
   faces.forEach((b,i)=>b.setAttribute('aria-pressed',String(request.face===(i?'back':'front'))));
-  for(const [input,value] of [[px,request.position?.x],[py,request.position?.y],[angle,request.axisDeg]])if(document.activeElement!==input)input.value=Number.isFinite(value)?value:'';
+  for(const [input,value] of [[px,request.position?.x],[py,request.position?.y],[angle,request.axisDeg]])if(document.activeElement!==input)input.value=Number.isFinite(value)?Number(value.toFixed(3)):'';
   const positionOK=request.position&&[request.position.x,request.position.y,request.axisDeg].every(Number.isFinite);
-  result=positionOK&&request.b?planPlacedSyringe(base,{...request,frameId:step===3?request.frameId:''},points,motion):null;
-  error.textContent=step>=2&&result&&!result.ok?result.message+(step===3&&!result.temporary?' 可回前面調整位置，或按「移到所選機架」。':''):'';
+  const owner=choices.frames.find(c=>c.id===request.frameId),f=owner&&attachmentFrame(owner,base.params,points);
+  let onSelectedFrame=!!(positionOK&&f);
+  if(onSelectedFrame&&owner.type!=='triangle'){const dx=request.position.x-f.p.x,dy=request.position.y-f.p.y,t=dx*f.x+dy*f.y;onSelectedFrame=t>=-1e-6&&t<=f.length+1e-6&&Math.abs(-dx*f.y+dy*f.x)<1e-6;}
+  result=step===3&&onSelectedFrame&&request.b?planPlacedSyringe(base,request,points,motion):null;
+  frameSummary.textContent=`固定機架：${owner?labelOf(owner):'尚未選擇'}（要更換請回第 1 步）`;
+  error.textContent=step>=2&&result&&!result.ok?result.message+(step===3&&!result.temporary?' 請回第 2 步調整位置與角度，或第 3 步檢查接孔。':''):'';
+  if(step===1&&positionOK&&!onSelectedFrame)error.textContent='位置不在所選機架上，請拖動藍點或按「移到所選機架」。';
   back.disabled=step===0;next.textContent=step===3?'確認安裝':'下一步';
-  next.disabled=step<2?!positionOK:step===2?!request.b:!result?.ok||result.temporary;
-  snap.disabled=!request.frameId;
+  next.disabled=step===0?!f:step===1?!onSelectedFrame:step===2?!request.b:!result?.ok||result.temporary;
+  snap.disabled=!request.frameId||!request.position;
   if(step===3&&(!result?.ok||result.temporary))mountStatus.textContent=request.frameId?'固定位置尚未有效，請調整後查看 3D。':'請選擇管夾固定的機架。';
   toggle.disabled=stroke.disabled=scan.disabled=!result?.ok;if(more)more.disabled=!result?.ok||result.temporary;spacer.parentElement.hidden=auto.value==='auto';reading.textContent=`伸出 ${request.extension.toFixed(1)} / ${result?.syringe?.spec.stroke ?? stroke.max} mm`;
   if(result?.syringe){stroke.max=result.syringe.spec.stroke;for(const [key,input] of Object.entries(advancedFields))if(document.activeElement!==input)input.value=key==='axisDeg'?result.syringe.axisDeg:result.syringe.spec[key];}
   const show3d=step===3&&preview3d&&result?.ok&&!result.temporary;space.hidden=!show3d;svg.toggleAttribute('hidden',!!show3d);toggle.textContent=preview3d?'回到平面':'查看 3D';
-  hint.textContent=step===0?'點一下放針筒；藍點為筒身定位基準':step===1?'拖橘點調角度；箭頭朝推桿伸出方向':step===2?'只選連接孔；固定完成前不試動':'選固定機架後才能試動；確認後才更改作品';
+  hint.textContent=step===0?'先選固定機架，再放置針筒':step===1?'藍點沿所選機架移動；橘點調推進方向':step===2?'只選連接孔；第 4 步確認固定後試動':'選固定機架後才能試動；確認後才更改作品';
   if(step>=2&&result&&!result.ok)hint.textContent=result.temporary?'尚未固定：保留原連桿姿態，不模擬驅動':'連接或固定無效：保留原姿態，不能試動。';
   if(!show3d)renderDrawing();if(step===3&&result?.ok&&!result.temporary){mountStatus.textContent='正在核對安裝高度…';const token=revision;sceneTimer=setTimeout(()=>scene(token),100);}
  }
