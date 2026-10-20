@@ -1,7 +1,7 @@
 // Isolated installation candidates. Geometry and full-stroke checks reuse the
 // existing syringe operations; only the UI's confirm action changes the work.
 import {placeFixedSyringe,isFixedFrame} from './syringe-placement.js';
-import {attachmentFrame} from '../core/syringe.js';
+import {attachmentFrame,attachmentPoint} from '../core/syringe.js';
 import {solveSyringe} from './syringe-operations.js';
 
 export function installationChoices(comps,params){
@@ -33,4 +33,29 @@ export function planSyringeInstallation(source,request,points=null,motion={}){
  const index=comps.findIndex(c=>c.id===next.id);if(index<0)comps.push(next);else comps[index]=next;
  const result=solveSyringe(comps,params,points,motion);
  return {...result,comps,params,syringe:next};
+}
+
+// A loose actuator uses a temporary reference for candidate solving only.
+// It is never committed before the user chooses a real frame.
+export function planPlacedSyringe(source,request,points=null,motion={}){
+ const pos=request.position;
+ if(!pos||![pos.x,pos.y,request.axisDeg].every(Number.isFinite))return {ok:false,message:'請放置針筒並設定方向角度。'};
+ const draft=structuredClone(source),owner=draft.comps.find(c=>c.id===request.frameId);
+ let a,temporary=false;
+ if(owner){
+  const f=attachmentFrame(owner,draft.params,points);
+  if(!f||!isFixedFrame(owner,draft.comps))return {ok:false,message:'請選固定機架。'};
+  const dx=pos.x-f.p.x,dy=pos.y-f.p.y;
+  a={componentId:owner.id,u:dx*f.x+dy*f.y,v:-dx*f.y+dy*f.x};
+  for(const k of ['u','v'])if(Math.abs(a[k])<1e-6)a[k]=0;
+  if(Math.abs(a.u-f.length)<1e-6)a.u=f.length;
+ }else{
+  temporary=true;let id='SyringePlacementReference';while(draft.comps.some(c=>c.id===id))id+='X';
+  draft.comps.push({id,type:'anchor',p1:{id:id+'Point',type:'fixed',...pos}});
+  a={componentId:id,u:0,v:0};
+ }
+ const old=source.comps.find(c=>c.id===request.id),oldPoint=old&&attachmentPoint(old.a,source.comps,source.params,points);
+ const spec=oldPoint&&Math.hypot(pos.x-oldPoint.x,pos.y-oldPoint.y)<1e-6?{lmin:old.spec.lmin,...request.spec}:request.spec;
+ const result=planSyringeInstallation(draft,{...request,a,spec},points,motion);
+ return {...result,temporary};
 }

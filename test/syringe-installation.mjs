@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict';
 import {getExample} from '../js/blocks/examples.js';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
-import {planSyringeInstallation,installationChoices} from '../js/blocks/syringe-installation.js';
+import {planSyringeInstallation,installationChoices,planPlacedSyringe} from '../js/blocks/syringe-installation.js';
 import {buildSyringeInstallPreview} from '../js/blocks/syringe-install-preview.js';
 import {solveSyringe,scanSyringe} from '../js/blocks/syringe-operations.js';
 for(const name of ['hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h04']){
  const source=normalizeSnapshot(getExample(name).snapshot),original=JSON.stringify(source);
  const c=source.comps.find(c=>c.type==='syringe'),points=solveSyringe(source.comps,source.params).points;
  const request={id:c.id,a:c.a,b:c.b,face:'front',spacerMm:null,extension:c.extension};
+ const seat=source.comps.find(p=>p.id===c.a.componentId).p1;
+ const placement=planPlacedSyringe(source,{...request,position:{x:seat.x,y:seat.y},axisDeg:c.axisDeg,frameId:c.a.componentId},points);
+ assert.ok(placement.ok,placement.message);assert.equal(placement.syringe.axisDeg,c.axisDeg);
  const front=planSyringeInstallation(source,request,points);assert.ok(front.ok,front.message);
  const preview=buildSyringeInstallPreview(front),f=preview.model.syringes[0];
  assert.equal(f.mount.status,'reference',name);assert.ok(Math.abs(f.alignmentMm)<.1,name);
@@ -36,3 +39,13 @@ assert.equal(planSyringeInstallation(source,{a:s.b,b:s.b},points).ok,false,'movi
 source.comps.forEach(c=>c.moduleId='StudentDesign');
 assert.equal(planSyringeInstallation(source,{a:s.a,b:s.b,newId:'Inserted'},points).syringe.moduleId,'StudentDesign','new syringe belongs to the current design');
 console.log('Syringe installation: H01–H04 isolated candidates, front/back geometry, spacer/rod alignment, new placement, full stroke and save/reopen passed');
+
+const seat=source.comps.find(c=>c.id===s.a.componentId).p1;
+const position={x:seat.x,y:seat.y};
+const request={position,axisDeg:0,b:s.b,newId:'Placed',extension:10};
+const loose=planPlacedSyringe(source,request,points);assert.ok(loose.ok,loose.message);assert.ok(loose.temporary);
+const rotated=planPlacedSyringe(source,{...request,axisDeg:5},points);assert.ok(rotated.ok,rotated.message);assert.equal(rotated.syringe.axisDeg,5,'connecting does not overwrite chosen angle');
+const fixed=planPlacedSyringe(source,{...request,frameId:s.a.componentId},points);assert.ok(fixed.ok,fixed.message);assert.equal(fixed.temporary,false);
+assert.ok(!fixed.comps.some(c=>c.id.startsWith('SyringePlacementReference')));
+assert.equal(fixed.syringe.moduleId,'StudentDesign');
+assert.deepEqual(fixed.syringe.a,s.a);

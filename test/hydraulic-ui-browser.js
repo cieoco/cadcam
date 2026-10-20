@@ -34,17 +34,24 @@ try{
  {
   const blank=structuredClone(h01Snapshot);blank.comps=blank.comps.filter(c=>c.type!=='syringe');api.reopen(blank);
   const original=JSON.stringify(api.snapshot()),ib=text=>[...document.querySelectorAll('#syringeInstallation button')].find(n=>n.textContent===text).click();
-  const select=(index,value)=>{const n=q('#syringeInstallation').querySelectorAll('select')[index];n.value=value;n.dispatchEvent(new Event('change',{bubbles:true}));};
-  b.addFixedSyringe();assert(!!q('#syringeInstallation[open]'),'new fixed syringe opens four-step installation');
-  select(0,'H1Frame');ib('下一步');ib('背面');ib('下一步');select(1,'H1Coupler');select(2,'0');ib('下一步');
-  const trial=q('#syringeInstallation').querySelectorAll('input[type=range]')[1];trial.value=20;trial.dispatchEvent(new Event('input',{bubbles:true}));
-  ib('檢查全行程');assert(q('#syringeInstallation').textContent.includes('41 點'),'new candidate full stroke passes');
-  assert(JSON.stringify(api.snapshot())===original,'selection, face and trial do not edit the work');
-  ib('取消');await new Promise(resolve=>setTimeout(resolve,0));assert(JSON.stringify(api.snapshot())===original,'cancel preserves original work');
-  b.addFixedSyringe();select(0,'H1Frame');ib('下一步');ib('下一步');select(1,'H1Coupler');select(2,'0');ib('下一步');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
-  const placed=S.comps.find(c=>c.type==='syringe');assert(placed?.b.componentId==='H1Coupler'&&placed.installation.face==='front','confirm inserts selected fixed installation');
+  const select=(label,value)=>{const n=q('#syringeInstallation').querySelector(`[aria-label="${label}"]`);n.value=value;n.dispatchEvent(new Event('change',{bubbles:true}));};
+  const input=(label,value)=>{const n=q('#syringeInstallation').querySelector(`[aria-label="${label}"]`);n.value=value;n.dispatchEvent(new Event('input',{bubbles:true}));};
+  const put=()=>{
+   const canvas=q('#syringeInstallation svg'),seat=blank.comps.find(c=>c.id==='H1Frame').p1,p=new DOMPoint(seat.x,-seat.y).matrixTransform(canvas.getScreenCTM());
+   canvas.dispatchEvent(new PointerEvent('pointerdown',{clientX:p.x,clientY:p.y,pointerId:17,pointerType:'touch',bubbles:true}));
+   canvas.dispatchEvent(new PointerEvent('pointerup',{pointerId:17,bubbles:true}));
+  };
+  const connect=()=>{put();ib('下一步');input('推進方向角度 (°)','0');ib('下一步');select('推桿接哪個短連桿？','H1Coupler');select('連接端孔','0');};
+  b.addFixedSyringe();assert(!!q('#syringeInstallation[open]'),'new fixed syringe opens actuator placement');
+  assert(q('#syringeInstallation [aria-label="筒身固定在哪個零件？"]').closest('section').hidden,'frame selection deferred until final step');
+  connect();input('試動伸出量 (mm)','20');ib('檢查全行程');assert(q('#syringeInstallation').textContent.includes('41 點'),'unmounted actuator candidate full stroke passes');
+  assert(JSON.stringify(api.snapshot())===original,'placement, direction and trial do not edit the work');
+  ib('下一步');select('筒身固定在哪個零件？','H1Frame');ib('背面');ib('取消');await new Promise(resolve=>setTimeout(resolve,0));assert(JSON.stringify(api.snapshot())===original,'cancel preserves original work');
+  b.addFixedSyringe();connect();ib('下一步');select('筒身固定在哪個零件？','H1Frame');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
+  const placed=S.comps.find(c=>c.type==='syringe');assert(placed?.b.componentId==='H1Coupler'&&placed.installation.face==='front'&&placed.axisDeg===0,'confirm preserves placement, angle and real owners');
+  assert(!S.comps.some(c=>c.id.startsWith('SyringePlacementReference')),'temporary placement reference never saved');
   b.undo();assert(!S.comps.some(c=>c.type==='syringe'),'one undo removes the entire installation');
-  b.addFixedSyringe();select(0,'H1Frame');ib('下一步');ib('背面');ib('下一步');select(1,'H1Coupler');select(2,'0');ib('下一步');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
+  b.addFixedSyringe();connect();ib('下一步');select('筒身固定在哪個零件？','H1Frame');ib('背面');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
   api.reopen(decodeShareString(encodeSnapshot(api.snapshot())));assert(S.comps.find(c=>c.type==='syringe').installation.face==='back','face survives save/share/reopen');
   click('#syringeControls button');ib('下一步');ib('下一步');ib('下一步');ib('其他尺寸與加工設定');await new Promise(resolve=>setTimeout(resolve,0));assert(!!q('#syringeDialog'),'existing advanced dimensions and fabrication remain available');close();
  }

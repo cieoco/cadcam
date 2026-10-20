@@ -278,7 +278,7 @@ export function createSyringeUI(h){
   // 管夾固定針筒：先點機架上的管夾位置，再點短連桿的端孔；不合理的放法留在選點並說明原因。
   function addFixed(){
     h.pause();if(S.mode!=='design'){h.notify('請先到設計模式，再選管夾位置。');return;}
-    if(!h.comps().some(o=>isFixedFrame(o,h.comps()))){h.notify('請先畫出固定的機架、擺臂與短連桿，再放管夾固定針筒。');return;}
+    if(!h.comps().some(o=>o.type==='bar')){h.notify('請先畫出連桿，再放置針筒。');return;}
     document.getElementById('powerMenu').style.display='none';
     install();
   }
