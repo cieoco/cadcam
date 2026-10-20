@@ -5,6 +5,49 @@ import {getExample} from '../js/blocks/examples.js';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
 import {planPlacedSyringe} from '../js/blocks/syringe-installation.js';
 import {scanSyringe,syringeReading,solveSyringe} from '../js/blocks/syringe-operations.js';
+import {prepareRootDesign,builtinTemplate,instantiateTemplate,mountModule} from '../js/blocks/module-ops.js';
+import {compileAssembly,solveAssembly} from '../js/blocks/assembly.js';
+import {selectableMountSurfaces,buildMountSurfaces} from '../js/blocks/mount-surfaces.js';
+// Unit 10 starts with the student's root design, not the already assembled H05.
+{
+ const grip=normalizeSnapshot(getExample('hydraulic-h03').snapshot);
+ const lift=instantiateTemplate(builtinTemplate('hydraulic-lift'),{counter:100,existingTokens:[],usedMotorIds:[],place:{x:500,y:0}});
+ const comps=[...grip.comps,...lift.comps],modules=[lift.module];
+ const topo={params:{...grip.params,...lift.params},rootDesignName:'我的夾爪',assemblyMembers:['#root',lift.module.id]};
+ const before=JSON.stringify({comps,modules,topo});
+ const ready=prepareRootDesign(comps,modules,topo),id=ready.moduleId;
+ assert.ok(ready.ok);
+ assert.equal(ready.modules.find(m=>m.id===id).name,'我的夾爪');
+ assert.deepEqual(ready.topo.assemblyMembers,[id,lift.module.id]);
+ assert.deepEqual(ready.comps.slice(0,grip.comps.length).map(({moduleId,...c})=>c),grip.comps);
+ assert.deepEqual(ready.comps.slice(grip.comps.length),lift.comps);
+ assert.equal(JSON.stringify({comps,modules,topo}),before,'preparation is pure and keeps undo source');
+ assert.equal(prepareRootDesign(ready.comps,ready.modules,ready.topo).ok,false,'cannot duplicate prepared design');
+ const surfaces=selectableMountSurfaces({comps:ready.comps,modules:ready.modules,params:topo.params,moduleId:lift.module.id});
+ assert.ok(surfaces.some(s=>s.kind==='output'&&s.name==='臂端'),'actual host option exists');
+ assert.ok(buildMountSurfaces({comps:ready.comps,modules:ready.modules,params:topo.params,moduleId:id,partId:'H3Frame'}).surfaces.some(s=>s.compId==='H3Frame'),'actual installation part exists');
+ const joined=mountModule(ready.comps,ready.modules,id,{module:lift.module.id,output:'tool'},topo.params,{theta:0,motorAngles:{}});
+ assert.ok(joined.ok,joined.reason);
+ const reopened=normalizeSnapshot({kind:'blocks',v:1,...joined,params:topo.params,assemblyMembers:ready.topo.assemblyMembers});
+ const liftS=reopened.comps.find(c=>c.moduleId===lift.module.id&&c.type==='syringe');
+ const gripS=reopened.comps.find(c=>c.id==='H3Syringe'),host=reopened.modules.find(m=>m.id===lift.module.id);
+ const child=reopened.modules.find(m=>m.id===id),tool=host.outputs.find(o=>o.id==='tool');
+ const positions=[];
+ for(const le of [0,10,20])for(const ge of [0,10,20]){
+  const cs=structuredClone(reopened.comps);cs.find(c=>c.id===liftS.id).extension=le;cs.find(c=>c.id===gripS.id).extension=ge;
+  const sol=solveAssembly(compileAssembly(cs,reopened.modules,{params:reopened.params}),{thetaDeg:0,motorAngles:{}});
+  assert.ok(sol.isValid,sol.errorReason);
+  assert.ok(Math.hypot(sol.points[child.base].x-sol.points[tool.at].x,sol.points[child.base].y-sol.points[tool.at].y)<1e-6,'gripper follows lift endpoint');
+  if(ge===0)positions.push(sol.points[child.base]);
+ }
+ assert.ok(Math.hypot(positions[0].x-positions[2].x,positions[0].y-positions[2].y)>1,'lift actually moves child');
+ const excluded=prepareRootDesign(comps,modules,{...topo,assemblyMembers:[lift.module.id]});
+ assert.deepEqual(excluded.topo.assemblyMembers,[lift.module.id],'does not rejoin excluded root');
+ const loose={type:'anchor',id:'Loose',p1:{id:'LooseP',type:'fixed',x:999,y:999}};
+ const whole=prepareRootDesign([...comps,loose],modules,topo);
+ assert.equal(whole.comps.at(-1).moduleId,whole.moduleId,'whole design retained including disconnected parts');
+ console.log('PASS unit 10 root preparation, endpoint options, motion, persistence and membership');
+}
 for(const n of [1,2,3]){
  const id=`hydraulic-h0${n}`,complete=getExample(id).snapshot,before=JSON.stringify(complete);
  const practice=getExample(id+'-practice').snapshot,source=normalizeSnapshot(practice);

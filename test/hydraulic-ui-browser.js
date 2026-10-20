@@ -6,11 +6,13 @@ import {snapshot as resizeSnapshot} from './fixtures/syringe-end-resize.mjs';
 import {scanSyringe} from '../js/blocks/syringe-operations.js';
 import {decodeShareString,encodeSnapshot} from '../js/share-codec.js';
 import {getExample} from '../js/blocks/examples.js';
+import {builtinTemplate,instantiateTemplate} from '../js/blocks/module-ops.js';
 const b=window.blocks,api=b.gripperPilot,lines=[],q=s=>document.querySelector(s.replace('#syringeDialog','#syringeDialog[open]')),click=s=>q(s).click();
 const assert=(condition,name)=>{if(!condition)throw Error(name);lines.push('PASS '+name);};
 const field=(name,value)=>{const n=q(`#syringeDialog [name="${name}"]`);n.value=value;n.dispatchEvent(new Event('input',{bubbles:true}));};
 const button=text=>[...document.querySelectorAll('#syringeDialog[open] button')].find(n=>n.textContent===text).click();
 const close=()=>button('取消');
+const settings=()=>[...document.querySelectorAll('#syringeControls button')].find(n=>n.textContent==='針筒設定').click();
 const stroke=value=>{const n=q('#syringeControls input');n.value=value;n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}));};
 const initial=()=>api.reopen(structuredClone(hydraulicSnapshot));
 const saved=[];const originalClick=HTMLAnchorElement.prototype.click;
@@ -32,7 +34,7 @@ try{
   api.reopen(decodeShareString(encodeSnapshot(api.snapshot())));
   assert(scanSyringe(S.comps,S.topo.params,S.comps.find(c=>c.type==='syringe').id).ok,`H0${num} student work reopens`);
   if(num===2){
-   click('#syringeControls button');install().querySelector('details').open=true;press('其他尺寸與加工設定');
+   settings();install().querySelector('details').open=true;press('其他尺寸與加工設定');
    button('孔位 145.892 mm');button('掃描候選全行程');
    assert(q('#syringeDialog [role=status]').textContent.includes('41'),'H02 new actuator retains lesson hole presets');
    button('確認套用');
@@ -40,6 +42,22 @@ try{
    b.undo();assert(S.topo.params.H2Arm!==145.892,'H02 hole comparison undo');
   }
  }
+ // Unit 10: ordinary student design must be selectable without loading a replacement gripper.
+ const grip=structuredClone(getExample('hydraulic-h03').snapshot);
+ const lift=instantiateTemplate(builtinTemplate('hydraulic-lift'),{counter:100,existingTokens:[],usedMotorIds:[],place:{x:500,y:0}});
+ api.reopen({...grip,comps:[...grip.comps,...lift.comps],modules:[lift.module],params:{...grip.params,...lift.params},rootDesignName:'學生夾爪',assemblyMembers:['#root',lift.module.id]});
+ await b.setMode('bench');
+ const prepare=()=>[...document.querySelectorAll('#assemblyMembership button')].find(n=>n.textContent==='準備接合');
+ assert(!!prepare(),'unit 10 root design exposes prepare connection');
+ const beforePrepare=api.snapshot();prepare().click();
+ const ready=api.snapshot(),gm=S.modules.find(m=>m.name==='學生夾爪');
+ assert(!!gm&&S.comps.filter(c=>grip.comps.some(g=>g.id===c.id)).every(c=>c.moduleId===gm.id),'prepare retains whole student gripper');
+ assert(!!q('#benchFaceWizard')&&q('#mateTree').textContent.includes('學生夾爪'),'prepared gripper is selected and connection preview available');
+ b.undo();
+ assert(JSON.stringify(api.snapshot())===JSON.stringify(beforePrepare)&&!!prepare(),'one undo restores original root and membership');
+ api.reopen(decodeShareString(encodeSnapshot(ready)));await b.setMode('bench');
+ assert(S.modules.some(m=>m.name==='學生夾爪')&&!prepare(),'prepared design survives save and reopen');
+ await b.setMode('design');
  api.reopen(structuredClone(resizeSnapshot));b.selectLink('Link13');
  const resize=value=>{const n=q('#memberDimensionInput');n.value=value;n.dispatchEvent(new Event('change',{bubbles:true}));};
  resize('48');
@@ -55,17 +73,17 @@ try{
  initial();assert(!!q('[data-syringe="HSyringe"]'),'H01 visible in real app');
  const r0=q('#syringeReadout').textContent;stroke(40);assert(S.comps.find(c=>c.type==='syringe').extension===40&&q('#syringeReadout').textContent!==r0,'slider drives solved pose');
  b.undo();assert(S.comps.find(c=>c.type==='syringe').extension===20,'stroke undo restores accepted value');
- click('#syringeControls button');field('bU','60');close();assert(S.comps[2].b.u===80,'cancel leaves model intact');
- click('#syringeControls button');field('bU','60');button('掃描候選全行程');assert(q('#syringeDialog [role=status]').textContent.includes('81'),'scan candidate only');button('確認套用');assert(S.comps[2].b.u===60,'confirm changes local attachment');
+ settings();field('bU','60');close();assert(S.comps[2].b.u===80,'cancel leaves model intact');
+ settings();field('bU','60');button('掃描候選全行程');assert(q('#syringeDialog [role=status]').textContent.includes('81'),'scan candidate only');button('確認套用');assert(S.comps[2].b.u===60,'confirm changes local attachment');
  b.undo();assert(S.comps[2].b.u===80,'attachment undo');
- click('#syringeControls button');field('bU','5');button('確認套用');assert(q('#syringeDialog')&&S.comps[2].b.u===80,'unreachable candidate rejected');close();
- click('#syringeControls button');field('stroke','100');field('outerDiameter','15.873');field('aU','10.123');field('clearance','0.73');button('確認套用');
+ settings();field('bU','5');button('確認套用');assert(q('#syringeDialog')&&S.comps[2].b.u===80,'unreachable candidate rejected');close();
+ settings();field('stroke','100');field('outerDiameter','15.873');field('aU','10.123');field('clearance','0.73');button('確認套用');
  const before=api.snapshot();stroke(100);assert(S.comps[2].extension===before.comps[2].extension&&Number(q('#syringeControls input').value)===before.comps[2].extension,'invalid stroke retains actual extension and slider');
  assert(q('#syringeNotice').textContent.length>10,'invalid stroke explains failure');
  api.reopen(decodeShareString(encodeSnapshot(api.snapshot())));assert(S.comps[2].spec.outerDiameter===15.873&&S.comps[2].a.u===10.123&&S.fabrication.syringeMount.clearanceMm===0.73,'save/share/reopen preserves measurements and local attachments');
- click('#syringeControls button');button('刪除針筒');assert(!S.comps.some(c=>c.type==='syringe')&&q('#syringeControls').hidden,'delete removes actuator and controls');
+ settings();button('刪除針筒');assert(!S.comps.some(c=>c.type==='syringe')&&q('#syringeControls').hidden,'delete removes actuator and controls');
  b.undo();assert(S.comps.some(c=>c.type==='syringe'),'delete undo restores actuator');
- initial();click('#syringeControls button');button('刪除針筒');b.addSyringe();
+ initial();settings();button('刪除針筒');b.addSyringe();
  const svg=q('#stageSvg'),ctm=svg.getScreenCTM(),point=(x,y)=>new DOMPoint(View.TX(x),View.TY(y)).matrixTransform(ctm);
  const tap=(x,y)=>{const p=point(x,y);svg.dispatchEvent(new PointerEvent('pointerdown',{clientX:p.x,clientY:p.y,bubbles:true,pointerType:'touch'}));};
  tap(0,-80);tap(80,0);assert(!!q('#syringeDialog'),'touch A/B picking opens candidate');button('確認套用');assert(S.comps.some(c=>c.type==='syringe'&&c.a.componentId==='HFrame'&&c.b.componentId==='HArm'),'new actuator retains real owners');
@@ -99,7 +117,7 @@ try{
   b.undo();assert(!S.comps.some(c=>c.type==='syringe'),'one undo removes the entire installation');
   b.addFixedSyringe();connect();ib('1 固定外殼');ib('背面');ib('3 連接輸出');ib('下一步');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
   api.reopen(decodeShareString(encodeSnapshot(api.snapshot())));assert(S.comps.find(c=>c.type==='syringe').installation.face==='back','face survives save/share/reopen');
-  click('#syringeControls button');ib('其他尺寸與加工設定');await new Promise(resolve=>setTimeout(resolve,0));assert(!!q('#syringeDialog'),'existing advanced dimensions and fabrication remain available');close();
+  settings();ib('其他尺寸與加工設定');await new Promise(resolve=>setTimeout(resolve,0));assert(!!q('#syringeDialog'),'existing advanced dimensions and fabrication remain available');close();
  }
  initial();b.togglePlay();await new Promise(resolve=>setTimeout(resolve,400));b.togglePlay();assert(S.comps[2].extension>20,'time based play advances extension');
  const held=S.comps[2].extension;await new Promise(resolve=>setTimeout(resolve,150));assert(S.comps[2].extension===held,'pause stops hydraulic frame loop');

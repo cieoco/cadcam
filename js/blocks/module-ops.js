@@ -105,6 +105,27 @@ export function createModule(comps, modules, compId, name) {
   return { ok: true, comps: outComps, modules: [...modList, newModule], moduleId, reason: 'ok' };
 }
 
+// 組立入口：將整張根設計準備為可接合模組，不要求學生重新從模組庫載入。
+// 保留同頁尚未相連的零件與所有 ID；此處只建立設計歸屬，不新增接點或改幾何。
+export function prepareRootDesign(comps, modules, topo = {}) {
+  const known = new Set(modules.map(m => m.id));
+  const roots = comps.filter(c => !known.has(c.moduleId));
+  if (!roots.length) return { ok: false, reason: '沒有待準備的設計' };
+  const seed = roots.find(c => pointKeysFor(c).some(k => ['fixed', 'motor'].includes(c[k]?.type))) || roots[0];
+  const clean = comps.map(c => roots.includes(c) ? { ...c, moduleId: undefined } : c);
+  const r = createModule(clean, modules, seed.id, topo.rootDesignName || '未命名設計');
+  if (!r.ok) return r;
+  const ids = new Set(roots.map(c => c.id));
+  return { ...r,
+    comps: comps.map(c => ids.has(c.id) ? { ...c, moduleId: r.moduleId } : c),
+    topo: { ...topo, rootDesignName: '',
+      ...(Array.isArray(topo.assemblyMembers) ? {
+        assemblyMembers: topo.assemblyMembers.map(id => id === '#root' ? r.moduleId : id)
+      } : {})
+    }
+  };
+}
+
 // 引用此接點（或孔）的可用輸出零件，供面板在共用接點時明確選擇方向來源。
 export function outputBodies(comps, module, pointId) {
   return (Array.isArray(comps) ? comps : []).filter(c => c && module && c.moduleId === module.id && BODY_COMP_TYPES.has(c.type)

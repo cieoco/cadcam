@@ -169,7 +169,10 @@ export function createMateWizard(h) {
     membership.replaceChildren();
     const active=assemblyWork(S.comps,S.modules,S.topo);
     if(active.comps.some(c=>!c.moduleId)){
-      const root=el('div');root.append(el('b',null,S.topo.rootDesignName || '未命名設計'),btn('從組立移除…','',()=>h.deps.changeMembership('#root',false)));membership.append(root);
+      const root=el('div');root.append(el('b',null,S.topo.rootDesignName || '未命名設計'));
+      const prepare=btn('準備接合','primary',()=>h.deps.prepareRoot?.());
+      prepare.style.minHeight='44px';prepare.title='保留這個設計的尺寸與動力，建立可選取的接合項目';
+      root.append(prepare,btn('從組立移除…','',()=>h.deps.changeMembership('#root',false)));membership.append(root);
     }
     membership.append(btn('加入設計…','',()=>h.deps.openDesignList()));
     const closed=active.modules.filter(m=>closedAssemblies.has(m.id));

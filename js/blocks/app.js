@@ -98,6 +98,7 @@ import { createMotorTools, gearDriver } from './motor-tools.js';
 import { createPlateEditor } from './plate-editor.js';
 import { createNodeEditor } from './node-editor.js';
 import { createModuleEditor } from './module-editor.js?v=20261007_singleface';
+import { prepareRootDesign } from './module-ops.js';
 import { createModuleDrag } from './module-drag.js';
 import { createBench } from './bench-ui.js?v=20261008_brackets';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
 import { workRangeFromTrace, clampRangeFromTraces, currentPointDistance } from './measurement.js';
@@ -1051,6 +1052,17 @@ function renderMateCandidate() {
 const viewerSource=createAsyncResource(async()=>{const {createViewer}=await import('../blocks3d/viewer.js?v=20261007_m4b');return createViewer(document.getElementById('view3d'));});
 async function set3D(on) { if (view3DActive !== !!on) await toggle3D();else if(on)viewer3D=await viewerSource.get(); }
 const bench = createBench({
+  prepareRoot: () => {
+    if (bench.inCandidate()) return;
+    const r = prepareRootDesign(S.comps, S.modules, S.topo);
+    if (!r.ok) { transient(r.reason); return; }
+    pause(); pushUndo();
+    S.comps = r.comps; S.modules = r.modules; S.topo = r.topo;
+    if (S.designFocus === ROOT_TAB) S.designFocus = r.moduleId;
+    clearSelectionAndEditors();
+    rebuild(); draw(); bench.select(r.moduleId);
+    transient('已準備接合；原尺寸與動力設定保留，可按復原。接著選「接合預覽」。');
+  },
   deleteDesign, openDesignList, changeMembership:requestAssemblyMembership, pause, isPlaying:()=>playbackActive, setCandidate, inCandidate: () => !!mateCandidate.snapshot(), candidateSnapshot:()=>mateCandidate.snapshot(), takeCandidate:()=>mateCandidate.take(),
   pushUndo, rebuild, draw, transient, setViewPlane: id => setViewPlane(id),
   saveComposite: id => moduleEditor.saveCompositeToLibrary(id),   // B7
