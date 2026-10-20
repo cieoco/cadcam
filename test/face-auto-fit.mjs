@@ -1,8 +1,21 @@
 import assert from 'node:assert/strict';
-import { autoFitFaces } from '../js/blocks/face-auto-fit.js';
+import { autoFitFaces, fitParallelFaces } from '../js/blocks/face-auto-fit.js';
 import { transformMatePoint } from '../js/blocks/face-mate.js';
 const plate={box:{min:{x:-30,y:-20,z:-1.5},max:{x:30,y:20,z:1.5}},outlines:[[{x:-30,y:-20},{x:30,y:-20},{x:30,y:20},{x:-30,y:20}]]};
 const broad=f=>['top','bottom'].includes(f);
+for(const hostFace of ['top','bottom','front'])for(const childFace of ['top','bottom','right'])for(const rotationDeg of [0,37,90,180,270]){
+ const selection={hostFace,childFace,rotationDeg,quarterTurns:0,offsetU:40,offsetV:-12,gap:5,brackets:{enabled:true}};
+ const before=JSON.stringify(selection),result=fitParallelFaces(plate,plate,selection);
+ assert.ok(result.ok);assert.equal(JSON.stringify(selection),before);
+ assert.ok(broad(result.selection.hostFace)&&broad(result.selection.childFace));
+ assert.equal(result.selection.brackets,undefined);assert.equal(result.selection.rotationDeg,rotationDeg);
+ const mate=result.mate,n=mate.child.n;
+ const normal=mate.rotation.map(row=>row[0]*n.x+row[1]*n.y+row[2]*n.z);
+ for(const [i,k] of ['x','y','z'].entries())assert.ok(Math.abs(normal[i]+mate.host.n[k])<1e-9,'chosen face normals oppose');
+ const p=transformMatePoint(mate,mate.child.center);
+ for(const k of ['x','y','z'])assert.ok(Math.abs(p[k]-mate.host.center[k])<1e-9,'faces centered at zero gap');
+ assert.deepEqual(fitParallelFaces(plate,plate,result.selection).selection,result.selection);
+}
 for(const hostFace of ['top','bottom','left','right','front','back']) for(const childFace of ['top','bottom','left','right','front','back']) for(const quarterTurns of [0,1,2,3]) {
  const selection={hostFace,childFace,quarterTurns,gap:5,offsetU:0,offsetV:0};
  const before=JSON.stringify(selection),result=autoFitFaces(plate,plate,selection);

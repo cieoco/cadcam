@@ -8,6 +8,35 @@ import {scanSyringe,syringeReading,solveSyringe} from '../js/blocks/syringe-oper
 import {prepareRootDesign,builtinTemplate,instantiateTemplate,mountModule} from '../js/blocks/module-ops.js';
 import {compileAssembly,solveAssembly} from '../js/blocks/assembly.js';
 import {selectableMountSurfaces,buildMountSurfaces} from '../js/blocks/mount-surfaces.js';
+import {buildFaceCandidate,faceCandidateModel} from '../js/blocks/face-candidate.js';
+import {applyMatrix4} from '../js/blocks3d/orthogonal-3d.js';
+// The two actual stock faces remain parallel at the requested gap, after save/reopen
+// and while both syringes move. Cover the photographed coupler and the lesson's arm.
+{
+ const lift=instantiateTemplate(builtinTemplate('hydraulic-lift'),{counter:100,place:{x:0,y:0},usedMotorIds:[]});
+ const grip=instantiateTemplate(builtinTemplate('hydraulic-gripper'),{counter:200,place:{x:500,y:0},usedMotorIds:[]});
+ const source={comps:[...lift.comps,...grip.comps],modules:[lift.module,grip.module],params:{...lift.params,...grip.params}};
+ const child=grip.comps.find(c=>c.id.startsWith('H3Frame'));
+ for(const host of lift.comps.filter(c=>/^H2(Coupler|Arm)_/.test(c.id)))for(const hostFace of ['top','bottom'])for(const childFace of ['top','bottom']){
+  const gap=hostFace==='top'?0:3,sign=hostFace==='top'?1:-1;
+  const candidate=buildFaceCandidate(source,{childId:grip.module.id,hostEndpoint:{moduleId:lift.module.id,partId:host.id},childEndpoint:{partId:child.id},
+   selection:{hostFace,childFace,alignU:0,alignV:0,offsetU:12,offsetV:-8,gap,quarterTurns:0,rotationDeg:37}});
+  assert.ok(candidate.ok,candidate.reason);
+  const reopened=normalizeSnapshot({kind:'blocks',v:1,...candidate.work,params:candidate.work.params});
+  for(const extension of [0,10,20]){
+   const work=structuredClone(candidate.work);work.comps=reopened.comps;work.modules=reopened.modules;
+   work.comps=work.comps.map(c=>c.type==='syringe'?{...c,extension}:c);
+   const scene=faceCandidateModel({...candidate,work});assert.ok(scene.solveValidity.valid);
+   const [a,b]=[host,child].map(c=>scene.model.materialParts.find(p=>p.partId===c.id));
+   const hn=a.pose.matrix.slice(8,11).map(v=>v*sign),cn=b.pose.matrix.slice(8,11).map(v=>v*(childFace==='top'?1:-1));
+   assert.ok(Math.abs(hn.reduce((sum,v,i)=>sum+v*cn[i],0)+1)<1e-8,'actual board face normals oppose');
+   const point=(p,face)=>applyMatrix4(p.pose.matrix,{...p.geometry.outlines[0][0],z:face==='top'?p.geometry.thicknessMm:0});
+   const pa=point(a,hostFace),pb=point(b,childFace);
+   assert.ok(Math.abs(hn.reduce((sum,v,i)=>sum+v*(pb[['x','y','z'][i]]-pa[['x','y','z'][i]]),0)-gap)<1e-7,'actual selected planes keep requested separation');
+  }
+ }
+ console.log('PASS hydraulic face mating: parallel normals, actual gap, both host parts, motion and reopen');
+}
 // Unit 10 starts with the student's root design, not the already assembled H05.
 {
  const grip=normalizeSnapshot(getExample('hydraulic-h03').snapshot);

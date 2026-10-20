@@ -3,7 +3,7 @@ import {applyMatrix4} from '../blocks3d/orthogonal-3d.js';
 import {hitLabels} from './part-labels.js';
 import { LOAD_GRAPH_TOKEN } from '../module-url.js';
 import { createLoadSession, LOAD_MISMATCH_MESSAGE } from './load-session.js';
-import { autoFitFaces } from './face-auto-fit.js?v=20261008_bracket3d';
+import { autoFitFaces, fitParallelFaces } from './face-auto-fit.js?v=20261008_bracket3d';
 import { planFaceBrackets, FACE_BRACKET_SPEC } from './face-bracket-geometry.js?v=20261008_bracket3d';
 import { bracketLayout } from './bracket-layout.js';
 /** 六面體組立操作原型；獨立記憶體草稿，不讀寫 blocks 作品。 */
@@ -12,7 +12,7 @@ import { realMountExamples } from './face-mate-examples.js';
 import { buildFacePlacement } from './face-placement.js';
 
 const $ = id => document.getElementById(id);
-const names = { top: '上面', bottom: '下面', front: '前面', back: '後面', left: '左面', right: '右面' };
+const names = { top: '上面（板面）', bottom: '下面（板面）', front: '前面（外框邊）', back: '後面（外框邊）', left: '左面（外框邊）', right: '右面（外框邊）' };
 const symbols = { top: '↑', bottom: '↓', front: '●', back: '○', left: '←', right: '→' };
 const faceOrder = ['top', 'bottom', 'front', 'back', 'left', 'right'];
 const integrated = new URLSearchParams(location.search).get('integrated') === '1';
@@ -57,7 +57,7 @@ function showCandidate(candidate){
 window.addEventListener('pagehide',()=>{candidateClosed=true;clearTimeout(previewTimer);});
 let bracketOffsets = {}, selectedBracket = null, bracketSpan = 0;
 let moveStep = 5, edgeMode = false, dimensionField = null, dimensionAlignment = null;
-const titles = ['選擇兩個機構', '選承接端的大面', '選安裝端的大面', '預覽對齊與偏置'];
+const titles = ['選擇兩個機構', '選承接端的面', '選安裝端的面', '預覽對齊與偏置'];
 const add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
 const mul = (p, n) => ({ x: p.x * n, y: p.y * n, z: p.z * n });
 let viewYaw = 45, viewElevation = 30, viewDrag = null, draggedView = false;
@@ -70,13 +70,22 @@ const viewCoords = p => {
   };
 };
 const project = p => viewCoords(p);
-const fitButton = button('自動貼齊', () => {
+const fitButton = button('直角貼齊', () => {
   const result = autoFitFaces(hosts[draft.host], children[draft.child], draft);
   if (!result.ok) { $('message').textContent = result.reason; return; }
   draft = result.selection; bracketOffsets = {}; selectedBracket = null; render();
   $('message').textContent = '兩板已直角貼齊；角碼孔位另行檢查，確認預覽後再接上。';
 });
-$('bracketNote').after(fitButton);
+const parallelButton = button('板面平貼並置中', () => {
+  const result = fitParallelFaces(hosts[draft.host], children[draft.child], draft);
+  if (!result.ok) { $('message').textContent = result.reason; return; }
+  draft = result.selection; bracketOffsets = {}; selectedBracket = null; render();
+  $('message').textContent = '已改成兩個板面相向平貼、間距 0；可再調整面內位置與角度。';
+});
+const fitControls = document.createElement('div'); fitControls.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
+const faceRelation = document.createElement('div'); faceRelation.style.width='100%'; faceRelation.setAttribute('aria-live','polite');
+fitControls.append(faceRelation, parallelButton, fitButton);
+$('bracketNote').after(fitControls);
 const solve = () => solveFaceMate({ ...draft, hostBox: hosts[draft.host].box, childBox: children[draft.child].box });
 
 function button(label, action) {
@@ -107,6 +116,9 @@ buildCards($('hosts'), hosts, 'host'); buildCards($('children'), children, 'chil
 buildDesignChoice();
 
 for (const [root, field] of [['hostFaces', 'hostFace'], ['childFaces', 'childFace']]) {
+  const note = document.createElement('p');
+  note.textContent = '板面平貼：兩端都選「上面／下面（板面）」。外框邊是方向參考；板邊配板面會成直角。';
+  $(root).before(note);
   faceOrder.forEach(id => {
     const b = button(names[id], () => update(field, id)); b.dataset.value = id;
     const icon = document.createElement('span'); icon.className = 'face-symbol'; icon.textContent = symbols[id]; icon.setAttribute('aria-hidden', 'true'); b.prepend(icon); $(root).appendChild(b);
@@ -257,7 +269,7 @@ $('scene').addEventListener('pointercancel', endViewDrag);
 $('scene').addEventListener('lostpointercapture', endViewDrag);
 
 function drawCandidateScene(mate){
- const svg=$('scene');svg.replaceChildren();$('bracketNote').hidden=false;fitButton.hidden=false;
+ const svg=$('scene');svg.replaceChildren();$('bracketNote').hidden=false;fitControls.hidden=false;
  bracketPlan=parentCandidate?.bracket || null;bracketSpan=bracketPlan?.span || 0;
  const pending=parentCandidate?.selectionRevision!==previewSignature;
  $('bracketNote').textContent=pending?'此圖為上次候選；目前設定待檢查。':bracketPlan?.ok?`角碼 ${bracketPlan.brackets.length} 顆 · 固定孔 Ø3.2`:parentCandidate?.reason || '僅幾何定位，尚未配置固定五金。';
@@ -350,7 +362,7 @@ function scene(mate) {
     text.textContent = `${p.which === 'host' ? '承接' : '安裝'} ${names[p.id]}`;
   });
   const bracketNote = $('bracketNote'); bracketNote.hidden = separate || step !== 3;
-  fitButton.hidden = bracketNote.hidden;
+  fitControls.hidden = bracketNote.hidden;
   bracketPlan = null;
   if (!bracketNote.hidden) {
     const perpendicular = Math.abs(mate.rotation[2][2]) < 1e-6;
@@ -477,7 +489,10 @@ function preview() {
   $('mateVChip').textContent = dimensionText.offsetV(Number(draft.offsetV.toFixed(2)));
   $('mateGapChip').textContent = dimensionText.gap(Number(draft.gap.toFixed(2)));
   $('mateStepChip').textContent = dimensionText.moveStep(moveStep);
-  $('summary').textContent = `${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
+  const broad = f => f === 'top' || f === 'bottom';
+  const relation = broad(draft.hostFace) && broad(draft.childFace) ? '板面平行' : broad(draft.hostFace) !== broad(draft.childFace) ? '板面垂直' : '外框邊對齊';
+  faceRelation.textContent = `${relation} · 間距 ${draft.gap} mm`;
+  $('summary').textContent = `${relation}：${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
   const blocked=integrated && (step > 0 || choosingChild) && (!childConfirmed || !!children[draft.child].blockedReason);
   const mate = solve();$('bracketChoice').hidden=!integrated||step!==3||!mate.ok||Math.abs(mate.rotation[2][2])>=1e-6;$('bracketHoles').checked=useBracketHoles;if(mate.ok && !blocked)requestCandidate(mate);$('next').disabled = blocked || !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || !!document.querySelector('input[aria-invalid="true"]');
   if(integrated&&step===3)$('next').textContent=candidateConfirmLabel(parentCandidate,parentCandidate?.selectionRevision!==previewSignature);

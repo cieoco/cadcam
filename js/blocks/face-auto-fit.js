@@ -1,6 +1,15 @@
 import { solveFaceMate, transformMatePoint } from './face-mate.js';
 
 const broad = face => face === 'top' || face === 'bottom';
+/** Broad stock faces oppose each other; keep the in-plane angle, reset placement offsets. */
+export function fitParallelFaces(host, child, selection) {
+  const next = { ...selection, hostFace: broad(selection.hostFace) ? selection.hostFace : 'top',
+    childFace: broad(selection.childFace) ? selection.childFace : 'bottom',
+    alignU: 0, alignV: 0, offsetU: 0, offsetV: 0, gap: 0 };
+  delete next.brackets;
+  const mate = solveFaceMate({ ...next, hostBox: host.box, childBox: child.box });
+  return mate.ok ? { ok: true, selection: next, mate } : mate;
+}
 const dot = (a,b) => a.x*b.x+a.y*b.y+a.z*b.z;
 const inside = (p, rings) => rings.some(ring => {
   let hit=false;
