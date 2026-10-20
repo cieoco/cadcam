@@ -24,7 +24,7 @@ export function syringeManufacturing(comps,params,fabrication) {
   const checked=normalizeFabricationProfile(fabrication);if(!checked.ok)throw Error(checked.message);
   const f=checked.profile,result=solveSyringe(comps,params);
   if(!result.ok)throw Error(result.message);
-  if(comps.some(c=>!['syringe','bar','triangle','anchor'].includes(c.type)||c.moduleId||c.fusedWith))throw Error('液壓製作包目前支援同一平面的桿件／三角板；請單獨開啟液壓設計再輸出。');
+  if(comps.some(c=>!['syringe','bar','triangle','anchor'].includes(c.type)||c.moduleId||c.fusedWith||c.barFusionRoot))throw Error('液壓製作包目前支援同一平面的桿件／三角板；請單獨開啟液壓設計再輸出。');
   const syringes=comps.filter(c=>c.type==='syringe'),parts=[];
   for(const c of comps.filter(c=>['bar','triangle'].includes(c.type))){
     const refs=syringes.flatMap(s=>[s.a,s.b]).filter(r=>r.componentId===c.id);

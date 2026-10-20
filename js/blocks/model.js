@@ -146,6 +146,9 @@ export function frameConnectorNodes(comps) {
   const locators = mountLocatorPointIds(comps);
   const separateIds=new Set();
   (comps||[]).filter(c=>c?.frameSeparate).forEach(c=>pointKeysFor(c).forEach(k=>{if(c[k]?.id)separateIds.add(c[k].id);}));
+  const fixedIds=frameNodeIds(comps);
+  (comps||[]).filter(c=>c.barFusion?.points.filter(p=>fixedIds.has(p.id)).length>=2)
+    .forEach(c=>c.barFusion.points.forEach(p=>separateIds.add(p.id)));
   // 靜態結構板（三點桿、≥2 個機架固定點）＝使用者畫的機架本體：
   // 它的接點不再餵給自動地基，否則會生成第二塊重複的機架板。
   (comps||[]).filter(c=>c?.type==='triangle'&&['p1','p2','p3'].filter(k=>c[k]&&isGroundPoint(c[k])).length>=2)

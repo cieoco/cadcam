@@ -71,6 +71,7 @@ export function mirroredJaw(comp, comps, params) {
 }
 
 export function dimensionLock(comp, comps, id) {
+  if(comp?.barFusionRoot)return '已合成一片；請先解除合成再調整尺寸。';
   const dimension = memberDimensions(comp).find(d => d.id === id);
   if (!dimension || dimension.property || dimension.stockKey) return '';
   const ids = dimension.refs.map(ref => comp[ref]?.id);

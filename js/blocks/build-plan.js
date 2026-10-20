@@ -1,3 +1,4 @@
+import {inspectBarFusion} from './bar-fusion-geometry.js';
 import { memberStock } from './member-stock.js';
 import { frameStockOf } from './frame-stock.js';
 /**
@@ -216,13 +217,15 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     addBody(key, part, joints.map(p=>p.id), comp);
   });
   links.forEach(({ comp, length }) => {
-    const hostGeometry = hosted.has(comp.id) ? hostedBarGeometry(comp, seedPts, exp, hosted.get(comp.id), extraHolesOf(comp)) : null;
+    const hostGeometry = comp.barFusion ? inspectBarFusion(list,comp,params,exp).geometry : hosted.has(comp.id) ? hostedBarGeometry(comp, seedPts, exp, hosted.get(comp.id), extraHolesOf(comp)) : null;
     const part = memberPart(comp, 'member', hostGeometry || inspectLinkExport(comp, length, exp, extraHolesOf(comp)));
-    addPart(part, pointsOf(comp, ['p1', 'p2'], linkHole));
+    const joints=comp.barFusion ? comp.barFusion.points.map(p=>({id:p.id,holeDiameterMm:linkHole})) : pointsOf(comp, ['p1','p2'],linkHole);
+    if(comp.barFusion){part.fusedMembers=comp.barFusion.members;for(const id of part.fusedMembers)partByComp.set(id,part);}
+    addPart(part, joints);
     partByComp.set(comp.id, part);
     const key = groupKeyOf(comp, modById);
     pushGroup(key, part);
-    addBody(key, part, [comp.p1.id, comp.p2.id], comp);
+    addBody(key, part, joints.map(p=>p.id), comp);
   });
   plates.forEach(({ comp, points }) => {
     const part = memberPart(comp, 'member', inspectPlateExport(comp, points, exp, hosted.get(comp.id), plateHolesOf(comp)));

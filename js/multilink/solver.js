@@ -1,3 +1,4 @@
+import {expandBarFusions,validateBarFusionPose,barFusionSide} from '../core/bar-fusion.js';
 import {validateSyringePose} from '../core/syringe.js';
 /**
  * Generic Multilink Solver Engine
@@ -566,7 +567,10 @@ function solveBodyJointTopology(topology, params) {
                         const otherId = c.a === pid ? c.b : c.a;
                         return { ...c, otherId };
                     })
-                    .filter(c => points[c.otherId]);
+                    .filter(c => points[c.otherId])
+                    // Rigid unions repeat member edges as triangle constraints.
+                    // Circle intersection needs two distinct centres.
+                    .filter((c,i,list) => list.findIndex(q => q.otherId === c.otherId) === i);
 
                 if (related.length < 2) continue;
 
@@ -581,8 +585,13 @@ function solveBodyJointTopology(topology, params) {
                 }
 
                 let chosen = null;
+                const fusedSide=barFusionSide(components,pid,c1.otherId,c2.otherId);
+                if (Math.abs(fusedSide)>1e-6 && options[1]) {
+                    const side=(p2.x-p1.x)*(options[0].y-p1.y)-(p2.y-p1.y)*(options[0].x-p1.x);
+                    chosen=fusedSide*side>=0?options[0]:options[1];
+                }
                 const triKey = c1.triId && c1.triId === c2.triId ? c1.triId : null;
-                if (triKey && triangles.has(triKey)) {
+                if (!chosen && triKey && triangles.has(triKey)) {
                     const tri = triangles.get(triKey);
                     if (pid === tri.p3 && ((c1.role === 'r1' && c2.role === 'r2') || (c1.role === 'r2' && c2.role === 'r1'))) {
                         chosen = tri.sign === -1 && options[1] ? options[1] : options[0];
@@ -1241,7 +1250,11 @@ export function solveTopology(topologyOrParams, params) {
         }
     }
     if (topology && topology._wizard_data && topology.bodyJoint !== false) {
-        const result=solveBodyJointTopology(topology, actualParams);
+        const expanded=expandBarFusions(topology._wizard_data,{...topology.params,...actualParams});
+        if(!expanded.ok)return {isValid:false,isUnderconstrained:false,points:{},errorReason:expanded.reason};
+        const result=solveBodyJointTopology({...topology,_wizard_data:expanded.comps}, actualParams);
+        const fusionError=validateBarFusionPose(topology._wizard_data,result.points);
+        if(fusionError){result.isValid=false;result.errorReason=fusionError;}
         if(topology._syringes){
             const source=topology._syringes;
             const check=validateSyringePose(source.comps,source.params,result.points);

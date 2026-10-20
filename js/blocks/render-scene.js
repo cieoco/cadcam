@@ -31,7 +31,7 @@ export function markAllPlaneZlift(links, polygons, comps) {
 export function prepareRenderScene({ compiled, comps, points, frameGeometry, sceneIds, computeBodyLayers, motorAssemblyLayerForBody, motorMounts }) {
   const visualization = compiled.visualization || { links: [], polygons: [] };
   const { groundIds, motorCenterIds, modelMotorCenterIds, camCenterIds } = sceneIds;
-  const isGroundBar = link => Boolean(frameGeometry) && !comps.some(comp => comp.id === link.id && comp.frameSeparate) && groundIds.has(link.p1) && groundIds.has(link.p2);
+  const isGroundBar = link => Boolean(frameGeometry) && !comps.some(comp => comp.id === link.id && (comp.frameSeparate || comp.barFusionRoot)) && groundIds.has(link.p1) && groundIds.has(link.p2);
   const triangleEdgeKeys = new Set();
   (visualization.polygons || []).forEach(polygon => {
     if (!polygon.points || polygon.points.length !== 3) return;
@@ -46,7 +46,7 @@ export function prepareRenderScene({ compiled, comps, points, frameGeometry, sce
   (visualization.links || []).forEach(link => {
     const comp = link.id ? comps.find(item => item.id === link.id) : null;
     link._zlift = comp?.zlift || 0;
-    link._frameSeparate = Boolean(comp?.frameSeparate);
+    link._frameSeparate = Boolean(comp?.frameSeparate || comp?.barFusionRoot);
   });
   (visualization.polygons || []).forEach(polygon => {
     const key = triangleKey(polygon.points);
@@ -54,7 +54,7 @@ export function prepareRenderScene({ compiled, comps, points, frameGeometry, sce
     polygon._zlift = triangle?.zlift || 0;
   });
   const bodyLayers = computeBodyLayers([
-    ...layerLinks.map(link => ({ joints: [link.p1, link.p2], lift: link._zlift || 0,
+    ...layerLinks.map(link => ({ joints: link._fusionJoints || [link.p1, link.p2], lift: link._zlift || 0,
       motorDriven: link.style === 'crank' && (motorCenterIds.has(link.p1) || motorCenterIds.has(link.p2)),
       assemblyLayer: motorAssemblyLayerForBody(link.id, motorMounts) })),
     ...triangleComps.map(comp => ({ joints: [comp.p1.id, comp.p2.id, comp.p3.id], lift: comp.zlift || 0 }))

@@ -277,7 +277,7 @@ export function compileTopology(components, topology, solvedPoints) {
         const p2 = allPointsMap.get(c.p2.id);
 
         const isLinear = (p1 && p1.type === 'linear') || (p2 && p2.type === 'linear') || (c.isInput && c.style === 'piston');
-        const isCrank = !isLinear && ((p1 && p1.type === 'motor') || (p2 && p2.type === 'motor') || (c.isInput && c.style !== 'piston'));
+        const isCrank = !isLinear && ((!c.barFusionRoot && ((p1 && p1.type === 'motor') || (p2 && p2.type === 'motor'))) || (c.isInput && c.style !== 'piston'));
 
         if (isCrank) {
             // Determine which point is the fixed center
@@ -500,7 +500,9 @@ export function compileTopology(components, topology, solvedPoints) {
                 color: c.color,
                 style: c.isInput ? 'crank' : 'normal',
                 lenParam: c.lenParam,
-                hidden: Boolean(c.hidden)
+                hidden: Boolean(c.hidden || (c.barFusionRoot && !c.barFusion)),
+                _frameSeparate: Boolean(c.frameSeparate || c.barFusionRoot),
+                _fusionJoints: c.barFusion?.points.map(p=>p.id)
             });
         } else if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
             if (c.gParam) {

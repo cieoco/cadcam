@@ -1,4 +1,5 @@
 import {prepareScopedExport,resolveExportScope} from './export-scope.js';
+import {fusionRoot} from '../core/bar-fusion.js';
 import {downloadText} from './exporters.js';
 
 export function openScopedExport({readSource,readOptions,format,notify}) {
@@ -21,8 +22,8 @@ export function openScopedExport({readSource,readOptions,format,notify}) {
   const partLabel=document.createElement('label');partLabel.textContent='選擇零件';
   const partSelect=document.createElement('select');partSelect.setAttribute('aria-label','選擇匯出的零件');partSelect.style.cssText=select.style.cssText;
   const empty=document.createElement('option');empty.value='';empty.textContent='請選擇零件';partSelect.append(empty);
-  for(const c of available){const item=document.createElement('option');item.value=c.id;item.textContent=`${c.name||c.id}${c.fusedWith?'（聯集件）':''}`;partSelect.append(item);}
-  partSelect.value=options.selectedId||'';partLabel.append(partSelect);dialog.append(partLabel);
+  for(const c of available.filter(c=>!c.barFusionRoot||c.barFusion)){const item=document.createElement('option');item.value=c.id;item.textContent=`${c.name||c.id}${c.fusedWith||c.barFusion?'（聯集件）':''}`;partSelect.append(item);}
+  partSelect.value=fusionRoot(available,options.selectedId)?.id||options.selectedId||'';partLabel.append(partSelect);dialog.append(partLabel);
   const result=document.createElement('div');result.setAttribute('aria-live','polite');dialog.append(result);
   const footer=document.createElement('div');footer.style.cssText='display:flex;gap:8px;position:sticky;bottom:-16px;background:white;padding:12px 0';
   const cancel=document.createElement('button'),confirm=document.createElement('button');

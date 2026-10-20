@@ -73,6 +73,11 @@ export function analyzeDof(comps = []) {
   const groundPoints = allGroundPointIds(comps);
   const uf = new UnionFind([GROUND, ...bodies.map(body => body.id)]);
 
+  for(const root of comps.filter(c=>c.barFusion)){
+    const members=bodies.filter(b=>root.barFusion.members.includes(b.comp.id));
+    for(const b of members)uf.union(members[0].id,b.id);
+    if(new Set(members.flatMap(b=>[...b.points].filter(id=>groundPoints.has(id)))).size>=2)uf.union(GROUND,members[0].id);
+  }
   // 兩個以上共用銷代表兩個零件沒有相對運動，合成同一剛體。
   for (let i = 0; i < bodies.length; i++) {
     if (sharedCount(bodies[i].points, groundPoints) >= 2) uf.union(GROUND, bodies[i].id);

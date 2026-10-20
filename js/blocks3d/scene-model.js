@@ -183,7 +183,7 @@ export function buildSceneModel(links, points, opts = {}) {
     ...visible.map(l => ({
       kind: 'stick',
       src: l,
-      joints: [l.p1, l.p2],
+      joints: l._fusionJoints || [l.p1, l.p2],
       lift: l._zlift || 0,
       motorDriven: l.style === 'crank' && (motorCenters.has(l.p1) || motorCenters.has(l.p2)),
       assemblyLayer: assemblyLayerForBody(l.id),
@@ -209,6 +209,7 @@ export function buildSceneModel(links, points, opts = {}) {
         id: l.id,
         p1: l.p1,
         p2: l.p2,
+        joints: body.joints,
         a: { x: a.x, y: a.y },
         b: { x: b.x, y: b.y },
         layer,
@@ -259,7 +260,7 @@ export function buildSceneModel(links, points, opts = {}) {
       j.top = Math.max(j.top, layer * plateGap + thickness);
     }
   };
-  sticks.forEach(s => { touch(s.p1, s.layer, s.thickness); touch(s.p2, s.layer, s.thickness); });
+  sticks.forEach(s => s.joints.forEach(id => touch(id, s.layer, s.thickness)));
   plates.forEach(pl => pl.ids.forEach(id => touch(id, pl.layer, pl.thickness)));
 
   // 滑塊（無動力）＝開槽連桿 + 帶兩根導引螺絲的滑件：

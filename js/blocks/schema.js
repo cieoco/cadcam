@@ -1,3 +1,4 @@
+import {normalizeBarFusion,inspectBarFusionData} from '../core/bar-fusion.js';
 import {migrateH03RigidGrip} from './rigid-gripper.js';
 import { normalizeLessonSequence, normalizeHydraulicSequence } from './sequence-schema.js';
 import {normalizeAssemblyMembers} from './assembly-membership.js';
@@ -83,6 +84,8 @@ function normalizeBar(comp, index, params, warnings) {
     isInput: Boolean(comp.isInput),
     fixedLen: comp.fixedLen !== false
   };
+  if(comp.barFusion) { out.barFusion=normalizeBarFusion(comp.barFusion); if(!out.barFusion)throw Error('合成資料格式無效'); }
+  if(comp.barFusionRoot) { if(!safeId(comp.barFusionRoot))throw Error('合成基準無效'); out.barFusionRoot=comp.barFusionRoot; }
   if (comp.snapLength === false) out.snapLength = false;
   if (comp.frameSeparate === true) out.frameSeparate = true;
   const stock = normalizeMemberStock(comp.stock);
@@ -100,7 +103,8 @@ function normalizeBar(comp, index, params, warnings) {
   // 馬達的機架桿：騎乘馬達的殼鎖在這根桿上（那根桿＝這顆馬達的機架），
   // 曲柄角與 phaseOffset 都是相對它；沒有此欄＝世界機架。
   if (safeId(comp.motorCarrier)) out.motorCarrier = comp.motorCarrier;
-  if (comp.isInput || comp.physicalMotor || p1.physicalMotor || p2.physicalMotor) {
+  // A shared motor hole does not make every member of one rigid union a driver.
+  if (comp.isInput || comp.physicalMotor || (!comp.barFusionRoot && (p1.physicalMotor || p2.physicalMotor))) {
     out.isInput = true;
     out.physicalMotor = String(comp.physicalMotor || p1.physicalMotor || p2.physicalMotor || '1');
     // 動力來源型號：TT 馬達（整圈轉）或 MG995 伺服（角度範圍內來回擺）。
@@ -581,6 +585,10 @@ export function normalizeSnapshot(obj) {
   if (!modulesResult.ok) return null;
   cleanComps = modulesResult.comps;
   warnings.push(...modulesResult.warnings);
+  for(const c of cleanComps){
+    if(c.barFusion && !inspectBarFusionData(cleanComps,c,params).ok)return null;
+    if(c.barFusionRoot && !cleanComps.some(r=>r.id===c.barFusionRoot && r.barFusion?.members.includes(c.id)))return null;
+  }
   const counter = Math.max(Number(obj.counter) || 0, highestIdNum(cleanComps));
   // 多馬達欄位（選配）：activeMotor = 目前控制中的馬達編號；motorAngles = 其他馬達的凍結角度。
   const activeMotor = safeId(String(obj.activeMotor || '')) ? String(obj.activeMotor) : '1';

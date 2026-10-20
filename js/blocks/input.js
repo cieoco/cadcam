@@ -1,3 +1,4 @@
+import {fusionRoot,fusionAtPoint} from '../core/bar-fusion.js';
 /**
  * blocks / input
  *
@@ -52,6 +53,7 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
     pointIsRackHole = () => false;
 
 export function startFreeLinkDrag(e, linkId) {
+  if(fusionRoot(S.comps,linkId))return false;
   const c = S.comps.find(x => x.id === linkId && isFreeLink(x));
   if (!c) return false;
   const w = worldFromEvent(e);
@@ -115,7 +117,7 @@ export function onNodeDown(e, id) {
   if (!pendingMobileEdit) openMobileEditPanel();
   Panels.updateRoleEditor();
   S.dragId = null; S.snapTarget = null;
-  pendingNodeDrag = pointIsGround(id) && !isGroundPositionUnlocked(id) ? null : {
+  pendingNodeDrag = fusionAtPoint(S.comps,id) || (pointIsGround(id) && !isGroundPositionUnlocked(id)) ? null : {
     id, x:e.clientX, y:e.clientY, pointerType:e.pointerType || 'mouse'
   };
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}

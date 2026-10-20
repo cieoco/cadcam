@@ -112,6 +112,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if (comp) setValue(memberDimensionValue(comp, S.topo.params, dimensionId()) + (dimension?.step ? Math.sign(delta) * dimension.step : delta));
   }
   function setStock(key, raw) {
+    if(selected()?.barFusionRoot){notify('請先解除合成再修改材料。');return;}
     const comp = selected();
     if (!comp || !['bar', 'triangle'].includes(comp.type)) return;
     const partner = mirror && mirroredJaw(comp, S.comps, S.topo.params);

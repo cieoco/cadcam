@@ -1,3 +1,4 @@
+import {fusionAtPoint} from '../core/bar-fusion.js';
 /**
  * blocks / node-editor
  *
@@ -79,6 +80,7 @@ export function createNodeEditor({
     rebuild(); draw();
   }
   function changeNodePos(axis, delta) {
+    if(fusionAtPoint(S.comps,S.selectedNodeId)){transient('請先解除合成，再修改孔位。');return;}
     if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) return;
     const p = pointCoords()[S.selectedNodeId];
     if (!p) return;
@@ -106,6 +108,7 @@ export function createNodeEditor({
   // 分離：把鎖在同一點（共用同一 id）的多個端點拆開，各給新 id 並向外稍微散開，方便個別拖曳。
   // 保留非桿件（地錨／馬達座）或第一個端點維持原 id，其餘分出去並轉為自由點。
   function splitNode() {
+    if(fusionAtPoint(S.comps,S.selectedNodeId)){transient('請先解除合成，再修改孔位。');return;}
     if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) return;
     const id = S.selectedNodeId;
     const refs = pointRefs(id);

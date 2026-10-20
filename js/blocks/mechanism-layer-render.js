@@ -1,3 +1,4 @@
+import {inspectBarFusion,worldFusionGeometry} from './bar-fusion-geometry.js';
 /**
  * blocks / mechanism-layer-render
  *
@@ -11,7 +12,7 @@ const svgEl = tag => document.createElementNS(SVG_NS, tag);
 
 export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBar, selectedLinkId, pickBars, interactionBlocked,
   onTryPick, onFreeDrag, onSelect, groupForLayer, linkLayer, groundIds, hullRadius, scale, barHullPath, project,
-  hostedMounts, inspectHostedFrame, registerUpdate, holeRadius = hullRadius * 0.72 }) {
+  hostedMounts, inspectHostedFrame, registerUpdate, holeRadius = hullRadius * 0.72, params = {}, exportSettings = {} }) {
   const linksToDraw = [...links].sort((a, b) => (a.style === 'crank' ? 1 : 0) - (b.style === 'crank' ? 1 : 0));
   const eligible = linksToDraw.filter(link => !link.hidden && !triangleEdgeKeys.has([link.p1, link.p2].sort().join('|')) && !isGroundBar(link));
   const countMissing = current => eligible.reduce((count, link) => {
@@ -22,6 +23,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
     const selected = link.id && link.id === selectedLinkId;
     const component = comps.find(comp => comp.id === link.id && comp.type === 'bar');
     const editable = component?.fixedLen;
+    const fusion=component?.barFusion && inspectBarFusion(comps,component,params,exportSettings);
     const radius = component ? memberStock(component).widthMm / 2 : hullRadius;
     const pickCandidate = pickBars && pickBars.ids.includes(link.id);
     const color = pickCandidate ? '#f39c12' : (selected ? '#e67e22' : (link.style === 'crank' ? '#e74c3c' : (link.color || '#3498db')));
@@ -68,7 +70,10 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       const valid = a && b && Number.isFinite(a.x) && Number.isFinite(b.x);
       stick.style.display = valid ? '' : 'none'; holes.forEach(hole => { hole.element.style.display = valid ? '' : 'none'; });
       if (!valid) return;
-      stick.setAttribute('d', mounts?.length ? (hostedPath(a, b, current) || barHullPath(a, b, radius)) : barHullPath(a, b, radius));
+      if(fusion?.ok){
+        const g=worldFusionGeometry(fusion,current),ring=ps=>'M '+ps.map(p=>{const q=project(p);return q.x+','+q.y;}).join(' L ')+' Z';
+        stick.setAttribute('fill-rule','evenodd');stick.setAttribute('d',[...g.outlines,...g.cutouts.map(c=>c.points)].map(ring).join(' '));
+      }else stick.setAttribute('d', mounts?.length ? (hostedPath(a, b, current) || barHullPath(a, b, radius)) : barHullPath(a, b, radius));
       holes.forEach(hole => { const point = current[hole.pointId]; if (point && Number.isFinite(point.x)) { const p = project(point); hole.element.setAttribute('cx', p.x); hole.element.setAttribute('cy', p.y); } });
     };
     update(points); registerUpdate(update);

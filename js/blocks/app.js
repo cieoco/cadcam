@@ -1,3 +1,4 @@
+import {fusionRoot} from '../core/bar-fusion.js';
 import {syringeShapes} from './syringe-shape.js';
 import {planSyringeAttachmentResize} from '../core/syringe.js';
 import {assemblySyringeShapes} from '../blocks3d/syringe-scene.js';
@@ -1654,7 +1655,7 @@ const PART_DRAW = {
 };
 
 function draw() { if(renderMateCandidate())return;return drawNow(); }   // M4：接合精靈預覽中，重畫看的是候選的作品
-const fusionEditor=createFusionEditor({settings:Settings.exportSettings,pause,pushUndo,rebuild,draw,save:scheduleAutosave,selectGear,selectTriangle});
+const fusionEditor=createFusionEditor({settings:Settings.exportSettings,pause,pushUndo,rebuild,draw,save:scheduleAutosave,selectGear,selectTriangle,positions:displayCoords,notify:transient});
 function drawNow() {
   hydraulic?.sync(lastFullPts);
   fusionEditor.sync();
@@ -1845,6 +1846,7 @@ function drawNow() {
 
   // 桿件：依層級放進對應的 <g>（內層在底、外層在上）；同層內紅色曲柄最後畫不被蓋住。
   const { linksToDraw, countMissing: countMissingLinks } = renderLinks({
+    params:S.topo.params,exportSettings:Settings.exportSettings(),
     links: viewCompiled.visualization.links || [], comps: S.comps, points: pts, triangleEdgeKeys, isGroundBar,
     selectedLinkId: S.selectedLinkId, pickBars: S.pickBars,
     interactionBlocked: () => Boolean(S.drawingLink || S.drawingTriangle || S.drawingPolygon),
@@ -2578,7 +2580,7 @@ function selectLink(id) {
   updatePlateShapeControls(null);
   document.getElementById('sliderFlipBtn').style.display = 'none';
   document.getElementById('sliderBaseBtn').style.display = 'none';
-  document.getElementById('linkToRailBtn').style.display = '';
+  document.getElementById('linkToRailBtn').style.display = c.barFusionRoot ? 'none' : '';
   setSliderDetailRows(false);
   document.getElementById('zliftRow').style.display = 'flex';
   document.getElementById('lenControls').style.display = 'flex';
@@ -2599,7 +2601,8 @@ function bringPart(dir) {
   if (!c) return;
   pushUndo();
   const step = dir === 'up' ? 1 : -1;
-  c.zlift = Math.max(-4, Math.min(4, (c.zlift || 0) + step));
+  const root=fusionRoot(S.comps,c.id),next=Math.max(-4,Math.min(4,(c.zlift||0)+step));
+  (root?S.comps.filter(p=>p.barFusionRoot===root.id):[c]).forEach(p=>{p.zlift=next;});
   if (!c.zlift) delete c.zlift;
   scheduleAutosave();
   Panels.updateZliftButtons();
@@ -2664,6 +2667,7 @@ function deselectLink() {
   draw();
 }
 function deleteSelectedPart() {
+  if(fusionRoot(S.comps,S.selectedLinkId)){transient('請先解除合成，再刪除其中的連桿。');return;}
   if(S.comps.some(c=>c.id===S.selectedTriangleId && c.fusedWith)){transient('請先解除合成，再刪除板件');return;}
   if (S.selectedGearId) { deleteGearChain(S.selectedGearId); return; }
   const id = S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId;
@@ -2690,6 +2694,7 @@ function deleteSelectedPart() {
   rebuild(); draw();
 }
 function setLen(v) {
+  if(fusionRoot(S.comps,S.selectedLinkId)){transient('請先解除合成，再修改尺寸。');return;}
   const c = S.comps.find(x => x.id === S.selectedLinkId);
   if (!c) return;
   pushUndo();
