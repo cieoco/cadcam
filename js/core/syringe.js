@@ -16,6 +16,21 @@ export function normalizeSyringe(c) {
   const endpoint=r=>({componentId:String(r?.componentId || ''),u:finite(r?.u,0),v:finite(r?.v,0)});
   return {type:'syringe',id:String(c.id),color:'#0891b2',...(c.mountMode==='fixed-axis'?{mountMode:'fixed-axis',axisDeg:finite(c.axisDeg,NaN),appearance:'flat-rod',outputId:String(c.outputId||''),...(Array.isArray(c.jawIds)?{jawIds:c.jawIds.slice(0,2).map(String)}:{}),...(Array.isArray(c.passiveTips)?{passiveTips:c.passiveTips.slice(0,2).map(t=>({hostId:String(t.hostId||''),length:finite(t.length,NaN),angleDeg:finite(t.angleDeg,NaN)}))}:{})}:{}),...(c.mountMode==='fixed-axis'&&c.installation?{installation:{face:c.installation.face==='back'?'back':'front',spacerMm:c.installation.spacerMm===null||c.installation.spacerMm===undefined?null:Math.max(0,Math.min(100,finite(c.installation.spacerMm,0)))}}:{}),a:endpoint(c.a),b:endpoint(c.b),spec,extension:finite(c.extension,0),branch:c.branch===-1?-1:1};
 }
+// Length edits preserve attachments at the second end hole. Interior mounts keep
+// their measured offset; never stretch a clamp position or infer a broken joint.
+export function planSyringeAttachmentResize(comps,owner,before,after) {
+  if(owner?.type!=='bar'||!(before>0)||!(after>0)||!Number.isFinite(after))return [];
+  return comps.filter(c=>c.type==='syringe').flatMap(c=>{
+    const patch={};
+    for(const key of ['a','b']){
+      const ref=c[key];
+      if(ref?.componentId===owner.id&&Math.abs(ref.u-before)<1e-6&&ref.v===0)
+        patch[key]={...ref,u:after};
+    }
+    return Object.keys(patch).length?[{id:c.id,...patch}]:[];
+  });
+}
+
 export function attachmentFrame(owner,params,points=null) {
   if(!owner?.p1)return null;
   const p=points?.[owner.p1.id] || owner.p1;

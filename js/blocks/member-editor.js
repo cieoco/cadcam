@@ -1,5 +1,6 @@
 /** 共用剛性桿件尺寸列：選取 → 預檢整筆修改 → 一次復原 → 重算。 */
 import { S } from './state.js';
+import { planSyringeAttachmentResize } from '../core/syringe.js';
 import { memberDimensions, memberDimensionValue, planMemberDimension, mirroredJaw, dimensionLock } from './member-dimensions.js';
 import { MATERIALS, memberStock, planMemberStock } from './member-stock.js';
 
@@ -83,6 +84,10 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if (targets.every(c => Math.abs(memberDimensionValue(c, S.topo.params, id) - plans[0].value) < 0.001)) { sync(); return; }
     pause(); pushUndo();
     targets.forEach((c, index) => {
+      if (c.type === 'bar' && id === 'g') {
+        const patches = planSyringeAttachmentResize(S.comps, c, Number(S.topo.params[c.lenParam]), plans[index].value);
+        patches.forEach(({ id, ...patch }) => Object.assign(S.comps.find(c => c.id === id), patch));
+      }
       Object.assign(S.topo.params, plans[index].params);
       Object.assign(c, plans[index].properties);
       if (id === 'tip') return;

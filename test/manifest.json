@@ -20,6 +20,7 @@
     "test/syringe-assembly-scene.mjs",
     "test/syringe-clamp-mount.mjs",
     "test/syringe-installation.mjs",
+    "test/syringe-end-resize.mjs",
     "test/rigid-groups.mjs",
     "test/performance-fixtures.mjs",
     "test/assembly-lesson-wizard.mjs",

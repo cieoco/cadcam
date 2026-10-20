@@ -16,6 +16,7 @@ import { solveTopology } from '../multilink/solver.js';
 import { pointKeysFor } from './part-types.js';
 import { connectionModule } from './assembly.js';
 import { syringeClampFrameNodes } from './syringe-shape.js';
+import { planSyringeAttachmentResize } from '../core/syringe.js';
 
 export const LEGO_FRAME_STEP = 8;
 
@@ -246,8 +247,11 @@ export function recomputeLengths(comps, topo) {
   // 固定長度的連桿不跟著拉伸；其餘桿（如曲柄）長度跟著畫面更新
   comps.forEach(c => {
     if (c.type === 'bar' && !c.fixedLen && c.lenParam && c.p1 && c.p2) {
-      topo.params[c.lenParam] = Math.round(
+      const length = Math.round(
         Math.hypot((c.p2.x || 0) - (c.p1.x || 0), (c.p2.y || 0) - (c.p1.y || 0)));
+      planSyringeAttachmentResize(comps, c, Number(topo.params[c.lenParam]), length)
+        .forEach(({ id, ...patch }) => Object.assign(comps.find(c => c.id === id), patch));
+      topo.params[c.lenParam] = length;
     }
   });
 }

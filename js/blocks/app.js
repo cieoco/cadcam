@@ -1,4 +1,5 @@
 import {syringeShapes} from './syringe-shape.js';
+import {planSyringeAttachmentResize} from '../core/syringe.js';
 import {assemblySyringeShapes} from '../blocks3d/syringe-scene.js';
 import {createSyringeUI} from './syringe-ui.js';
 let hydraulic=null;
@@ -2657,6 +2658,8 @@ function setLen(v) {
   if (!c) return;
   pushUndo();
   const L = snapLego(v);     // 對齊 8mm 樂高格
+  planSyringeAttachmentResize(S.comps, c, Number(S.topo.params[c.lenParam]), L)
+    .forEach(({ id, ...patch }) => Object.assign(S.comps.find(c => c.id === id), patch));
   S.topo.params[c.lenParam] = L;
   // 把 b 端重新擺到半徑 L。用 updatePointCoordsById 更新「所有」共用此接點 id 的元件副本，
   // 不要只改 c.p2 一份：接點被別的桿共用時，只動本桿副本會讓其他副本留舊值；當這幀重解失敗
