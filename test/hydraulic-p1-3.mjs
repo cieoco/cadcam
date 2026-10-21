@@ -53,7 +53,7 @@ const place=(comps,a,b,opt)=>placeFixedSyringe(comps,params,pts,a,b,opt);
 {
   const html=readFileSync(new URL('../blocks.html',import.meta.url),'utf8');
   ok(/addFixedSyringe\(\)/.test(html)&&/管夾固定/.test(html),'動力來源選單有「管夾固定」針筒');
-  ok(/addSyringe\(\)[\s\S]{0,300}兩端鉸接/.test(html),'原本的兩端鉸接選項保留');
+  ok(!/onclick="window\.blocks\.addSyringe\(\)"/.test(html),'新增清單不提供沒有管夾的兩端鉸接針筒');
   const app=readFileSync(new URL('../js/blocks/app.js',import.meta.url),'utf8');
   ok(/window\.blocks\.addFixedSyringe\s*=/.test(app),'window.blocks.addFixedSyringe 可呼叫');
   const t=readFileSync(new URL('../teaching-hydraulic.html',import.meta.url),'utf8');

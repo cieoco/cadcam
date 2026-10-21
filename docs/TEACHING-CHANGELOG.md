@@ -591,3 +591,11 @@
 - 原第一～十一單元順延為第二～十二單元。同步目錄、課程標題、複習／前後課提示、範例提示與組立動作序列名稱。保留原 HTML 路徑及液壓 unit-8～unit-11 錨點，既有書籤仍指向原內容；範例 ID、作品格式與操作邏輯不變。既往紀錄保留當時單元編號。
 - Node 24 定向 12/12 通過：hydraulic-course、hydraulic-p1、hydraulic-p1-2、hydraulic-p1-3、hydraulic-p2-1、hydraulic-p2-2、hydraulic-p2-3、hydraulic-p2-3b、units345、lesson-sequence、startup-size、load-graph。結果：output/lesson-renumber/tests/results.json。
 - HTTP 瀏覽器驗收桌面及 390×844、360×640：第一單元／完成入口、第二單元返回入門、液壓第九～十二單元前後銜接正確，手機無水平溢出。截圖：output/lesson-renumber/desktop.png、mobile-unit-one.png、mobile-unit-twelve.png。手機尺寸模擬不等同實體裝置驗收。
+
+
+## 2026-10-21｜針筒新增入口只保留管夾固定型（2026.10.21.3）
+
+- 依使用者指出的實際零件選擇，移除動力來源清單中「10cc液壓針筒／兩端鉸接」，只保留「10cc液壓針筒（管夾固定）」。桌機與手機共用同一清單。
+- 僅移除新增按鈕；兩端鉸接型的既有作品正規化、求解及編輯支援不變，不改作品格式或已有零件。
+- 調整既有 hydraulic-p1-3 選單驗收期待；Node 24 的 hydraulic-p1-3、syringe、fixed-syringe、load-graph、startup-size 共 5/5 通過。結果 output/syringe-menu/tests/results.json。
+- HTTP 瀏覽器確認桌機與 390×844 手機清單僅有管夾固定針筒；點選仍執行原有缺連桿檢查，取消可關閉。截圖 output/syringe-menu/mobile.png、desktop.png。
