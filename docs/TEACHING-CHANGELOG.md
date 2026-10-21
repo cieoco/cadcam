@@ -583,3 +583,11 @@
 - HTTP Chrome 實操：桌機、390×844、360×640、844×390；三支選取／取消／確認、合成復原、解除與解除復原、自動存檔重開、播放／暫停、3D、所選零件只一份 SVG 均確認。手機選項不橫向溢出，44px 按鈕可點；橫放可獨立捲動選到第三支。原分享連結重整會重新讀其原作品，因此存檔重開驗收改由不帶分享 hash 的主頁確認。
 - 本機前後截圖與證據：output/bar-fusion/{desktop-before,mobile-before,mobile-after,mobile-preview,mobile-360-preview,mobile-landscape-preview,desktop-3d,export-one-part}.png；節點測試與載入檢查另見同目錄 final-tests。合成編輯控制與預覽按需載入，維持既有 1.9 MB 首次 JS 上限。
 - 最終 Node 24.19.0 全套 211/211 通過；整理匯出來源與共用孔分支後，bar-fusion／part-fusion／export-scope／startup-size／load-graph 5/5 再驗通過。既有齒輪＋三點板件聯集視窗亦經瀏覽器開啟／取消回歸，console 無錯誤。
+
+
+## 2026-10-21｜入門正式列為第一單元（2026.10.21.2）
+
+- 第一單元為「認識機構與基本操作」，先完成孔距 80 mm 的單桿、安裝馬達、播放、改尺寸／復原及保存重開；明列學習目標、指定成果與完成檢查，再連到第二單元四連桿雨刷。
+- 原第一～十一單元順延為第二～十二單元。同步目錄、課程標題、複習／前後課提示、範例提示與組立動作序列名稱。保留原 HTML 路徑及液壓 unit-8～unit-11 錨點，既有書籤仍指向原內容；範例 ID、作品格式與操作邏輯不變。既往紀錄保留當時單元編號。
+- Node 24 定向 12/12 通過：hydraulic-course、hydraulic-p1、hydraulic-p1-2、hydraulic-p1-3、hydraulic-p2-1、hydraulic-p2-2、hydraulic-p2-3、hydraulic-p2-3b、units345、lesson-sequence、startup-size、load-graph。結果：output/lesson-renumber/tests/results.json。
+- HTTP 瀏覽器驗收桌面及 390×844、360×640：第一單元／完成入口、第二單元返回入門、液壓第九～十二單元前後銜接正確，手機無水平溢出。截圖：output/lesson-renumber/desktop.png、mobile-unit-one.png、mobile-unit-twelve.png。手機尺寸模擬不等同實體裝置驗收。

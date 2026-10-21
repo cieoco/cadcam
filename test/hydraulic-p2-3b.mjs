@@ -81,5 +81,5 @@ const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const info=read('../js/version-history.js');
 ok(info.split('\n').some(l=>/^\s*\['2026\./.test(l)&&/H06/.test(l)),'更新紀錄有一筆提到 H06');
 const t=read('../teaching-hydraulic.html');
-ok(/第十一單元/.test(t)&&/H06/.test(t)&&/動作序列/.test(t)&&/13\s*mm/.test(t)&&/h06-mobile\.png/.test(t),'教材第十一單元：動作序列、轉盤條寬 ≥ 13 mm 的限制、手機截圖');
+ok(/第十二單元/.test(t)&&/H06/.test(t)&&/動作序列/.test(t)&&/13\s*mm/.test(t)&&/h06-mobile\.png/.test(t),'教材第十二單元：動作序列、轉盤條寬 ≥ 13 mm 的限制、手機截圖');
 console.log(`hydraulic-p2-3b: ${pass} passed`);

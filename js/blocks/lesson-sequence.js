@@ -21,8 +21,8 @@ export function prepareLessonSequence(source, steps, start) {
   const fail=message=>({ok:false,message});
   const lift=source.modules?.find(m=>m.id==='Lift1'),grip=source.modules?.find(m=>m.id==='Grip1');
   if (!lift || !grip || grip.mount?.to?.module !== lift.id || grip.mount?.to?.output !== 'tool')
-    return fail('請載入第七課範例，並先把夾爪接到升降臂的工具架。');
-  if (source.modules.length!==2) return fail('這輪只支援第七課的兩個組件，請使用獨立的教學組立。');
+    return fail('請載入第八課範例，並先把夾爪接到升降臂的工具架。');
+  if (source.modules.length!==2) return fail('這輪只支援第八課的兩個組件，請使用獨立的教學組立。');
   const drives=source.comps.filter(c=>(c.type==='bar'&&c.isInput)||(c.type==='gear'&&c.p1?.type==='motor'));
   if(drives.length!==2 || !drives.some(c=>c.moduleId==='Lift1'&&String(c.physicalMotor||c.p1?.physicalMotor)==='1') || !drives.some(c=>c.moduleId==='Grip1'&&String(c.physicalMotor||c.p1?.physicalMotor)==='2')) return fail('本課需要 M1 控制升降、M2 控制夾爪。');
   const limits={'1':[-40,60],'2':[0,30]};

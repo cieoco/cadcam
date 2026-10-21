@@ -2,14 +2,14 @@ import { DEFAULT_SEQUENCE, prepareLessonSequence, sequenceAnglesAt } from './les
 import { motionPoseIssue } from './solve-health.js';
 let open=false;
 export function openLessonSequence(options) {
-  // 液壓組立（有針筒、沒有第七課馬達）：改開針筒序列編輯器，第七課流程不動。
+  // 液壓組立（有針筒、沒有第八課馬達）：改開針筒序列編輯器，第八課流程不動。
   if(options.hydraulic){import('./hydraulic-sequence-dialog.js').then(m=>m.openHydraulicSequence(options.hydraulic));return;}
   const {readSource,readAngles,applyAngles,restore,initialSteps,saveSteps,capture,version}=options;
   if(open)return; open=true;
   const dialog=document.createElement('dialog');
-  dialog.setAttribute('aria-label','第七課模擬動作序列');
+  dialog.setAttribute('aria-label','第八課模擬動作序列');
   dialog.style.cssText='box-sizing:border-box;width:min(94vw,460px);max-height:55vh;overflow:auto;margin:auto auto 12px;border:1px solid #b8cbd2;border-radius:12px;padding:14px;color:#18324b';
-  const title=document.createElement('h2');title.textContent='第七課：模擬動作序列';
+  const title=document.createElement('h2');title.textContent='第八課：模擬動作序列';
   const note=document.createElement('p');note.textContent='M1 −40～60°，M2 0～30°。TT 馬達不具實體角度定位；此處只模擬順序，不驗證抓取或碰撞。';
   const status=document.createElement('p');status.setAttribute('role','status');status.textContent='改角度與秒數後播放；結束或停止都回到原姿態。按「保存序列」可隨作品保存。';
   const rows=DEFAULT_SEQUENCE.map((step,index)=>{
@@ -38,7 +38,7 @@ export function openLessonSequence(options) {
       const {exportAnimation}=await import('./video-export.js');
       await exportAnimation({begin:()=>{let elapsed=0;return {
         duration:plan.duration+1/24,
-        evidence:{lines:['第七課：升降與夾爪動作序列',`六步／${plan.duration} 秒；取樣求解通過`,plan.steps.map((s,i)=>`${i+1}: M${s.motor} ${s.angle}°`).join('  →  '),`${version}；不代表抓取、碰撞或承載驗證`]},
+        evidence:{lines:['第八課：升降與夾爪動作序列',`六步／${plan.duration} 秒；取樣求解通過`,plan.steps.map((s,i)=>`${i+1}: M${s.motor} ${s.angle}°`).join('  →  '),`${version}；不代表抓取、碰撞或承載驗證`]},
         frame:dt=>{if(JSON.stringify(readSource())!==signature)throw Error('作品已變更，請重新驗證。');elapsed+=dt;applyAngles(sequenceAnglesAt(plan,elapsed/1000).angles);},
         capture,restore
       };}});

@@ -1,4 +1,4 @@
-// 第七單元：側面升降、水平向前夾取；接合記錄由現有選面／角碼流程產生。
+// 第八單元：側面升降、水平向前夾取；接合記錄由現有選面／角碼流程產生。
 export const assemblyLessonSnapshot = {
   "kind": "blocks",
   "v": 1,

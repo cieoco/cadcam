@@ -98,5 +98,5 @@ ok(/assemblyWork\(/.test(ui),'組立模式的針筒清單包含直角平面上�
 const ex=readFileSync(new URL('../js/blocks/examples.js',import.meta.url),'utf8');
 ok(/id:'hydraulic-h06'/.test(ex)&&/hydraulicArmSnapshot/.test(ex),'範例清單登錄 hydraulic-h06（三軸手臂）');
 const t=readFileSync(new URL('../teaching-hydraulic.html',import.meta.url),'utf8');
-ok(/blocks\.html\?example=hydraulic-h06/.test(t)&&/第十一單元/.test(t)&&/直角/.test(t),'教材第十一單元：升降直角立在轉盤上');
+ok(/blocks\.html\?example=hydraulic-h06/.test(t)&&/第十二單元/.test(t)&&/直角/.test(t),'教材第十二單元：升降直角立在轉盤上');
 console.log(`hydraulic-p2-3: ${pass} passed`);

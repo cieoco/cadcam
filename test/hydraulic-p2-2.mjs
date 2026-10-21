@@ -71,7 +71,7 @@ ok(JSON.stringify(src)===before,'不改傳入資料');
   const dlg=readFileSync(new URL('../js/blocks/lesson-sequence-dialog.js',import.meta.url),'utf8');
   ok(/hydraulic-sequence/.test(dlg),'「動作序列」對液壓組立改用針筒序列');
   const t=readFileSync(new URL('../teaching-hydraulic.html',import.meta.url),'utf8');
-  const h5=t.slice(t.indexOf('第十單元'));
-  ok(/動作序列/.test(h5)&&/MP4/i.test(h5),'第十單元教用動作序列排出「張開→降→夾→升→放」並輸出 MP4');
+  const h5=t.slice(t.indexOf('第十一單元'));
+  ok(/動作序列/.test(h5)&&/MP4/i.test(h5),'第十一單元教用動作序列排出「張開→降→夾→升→放」並輸出 MP4');
 }
 console.log(`hydraulic-p2-2: ${pass} passed`);

@@ -76,7 +76,7 @@ ok(typeof Op.syringeGain==='function','syringe-operations 匯出 syringeGain(com
 // ---------- 教材 ----------
 {
   const html=readFileSync(new URL('../teaching-hydraulic.html',import.meta.url),'utf8').replace(/<[^>]+>/g,'');
-  ok(/曲柄滑塊/.test(html),'H01 說明針筒推連桿與曲柄滑塊（第二單元）的關係');
+  ok(/曲柄滑塊/.test(html),'H01 說明針筒推連桿與曲柄滑塊（第三單元）的關係');
   ok(/每推 ?1 ?mm/.test(html),'H02 以「每推 1 mm」比較孔位');
   ok(/(折返|死點)/.test(html),'H02 說明 145.892 孔會在行程中折返（死點附近）');
   ok(/針筒夾具 H03[\s\S]*?左右交叉臂/.test(html),'H03 教材恢復交叉臂說明');

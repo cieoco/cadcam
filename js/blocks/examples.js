@@ -927,7 +927,7 @@ const ALL_BLOCK_EXAMPLES = [
   }
 ];
 
-// 第二單元半成品：保留曲柄與滑軌，學生補接 A–P3 浮桿。
+// 第三單元半成品：保留曲柄與滑軌，學生補接 A–P3 浮桿。
 const sliderPractice = JSON.parse(JSON.stringify(ALL_BLOCK_EXAMPLES.find(e => e.id === 'slider-crank')));
 sliderPractice.id = 'slider-crank-practice';
 sliderPractice.title = '滑塊曲柄：補接浮桿';
@@ -942,7 +942,7 @@ sliderPractice.snapshot.params.LL1 = 32;
 delete sliderPractice.snapshot.params.LL2;
 ALL_BLOCK_EXAMPLES.push(sliderPractice);
 
-// 第五單元：完整接合與保留兩個模組的練習起點。
+// 第八單元：完整接合與保留兩個模組的練習起點。
 ALL_BLOCK_EXAMPLES.push({ id: 'assembly-lift-gripper', title: '組立：升降與夾爪完整範例',
   note: 'M1 控制平行四連桿升降臂，M2 控制夾爪；切換組立查看工具架接點。', snapshot: assemblyLessonSnapshot });
 const assemblyPractice = JSON.parse(JSON.stringify(assemblyLessonSnapshot));
@@ -958,7 +958,7 @@ ALL_BLOCK_EXAMPLES.push({ id: 'lift-bucket', title: '組立：平行升降托斗
 
 ALL_BLOCK_EXAMPLES.push(...COMMON_MANIPULATOR_EXAMPLES);
 
-// 第八、九單元：直接從既有幾何開始安裝，不重製 H01–H03，也不要求學生先開成品再拆除。
+// 第九、十單元：直接從既有幾何開始安裝，不重製 H01–H03，也不要求學生先開成品再拆除。
 for(const [id,label,snapshot] of [
   ['hydraulic-h01','單臂',hydraulicSnapshot],
   ['hydraulic-h02','升降',fixedLiftSnapshot],
@@ -971,7 +971,7 @@ for(const [id,label,snapshot] of [
   ALL_BLOCK_EXAMPLES.push({id:practiceId,title:`${id.slice(-3).toUpperCase()}｜${label}針筒安裝練習`,
     note:'連桿已接好、尚未安裝針筒。先選固定機架，再放置、接孔並檢查行程。',snapshot:practice});
   EXAMPLE_LESSONS[practiceId]={group:'challenge',level:'練習',use:'親手安裝針筒，完成後才能試動。',
-    try:['新增 → 動力來源 → 10cc液壓針筒（管夾固定）','固定外殼 → 位置方向 → 連接輸出 → 試動確認；依第八、九單元檢查並保存']};
+    try:['新增 → 動力來源 → 10cc液壓針筒（管夾固定）','固定外殼 → 位置方向 → 連接輸出 → 試動確認；依第九、十單元檢查並保存']};
 }
 
 export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES.filter(
