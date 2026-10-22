@@ -2102,7 +2102,7 @@ for (const panel of document.querySelectorAll('.inspector-panel')) {
   const done = document.createElement('button');
   done.type = 'button'; done.className = 'mobile-editor-done'; done.textContent = '完成／收合';
   done.addEventListener('click', () => setMobilePanel('view'));
-  panel.prepend(done);
+  (panel.querySelector('.le-head')||panel).prepend(done);
 
 }
 

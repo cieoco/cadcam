@@ -609,3 +609,12 @@
 - 視窗尺寸變更同步重繪 2D，避免手機橫直切換後殘留舊觸控尺寸；刪除 app 中未使用的舊接點半徑常數。首次 JS 大小仍在既有 1.9 MB 預算內。
 - Node 24 定向 7/7 通過：mechanism-layer-render、overlap-picker、input-gestures、touch-link-creation、assembly-frame、startup-size、load-graph。新增回歸涵蓋普通孔觸控區、動態位置／隱藏、23px 偏移直選、25px 桿身選取、相鄰孔及無關零件；原馬達／縮放／畫桿測試保留。結果 output/node-touch/final-tests/results.json。
 - HTTP 瀏覽器 390×844、360×640、844×390 與桌機驗收：32 mm 斜桿，A 固定後點 B，偏離孔中心約 20px 仍開啟自由接點面板、沒有多餘選單；橫直切換後仍為 48px。證據 output/node-touch/before.png、mobile-b-selected.png、desktop-b-selected.png。指標 touch 路由以事件回歸驗證；瀏覽器尺寸測試不代表實體手機手指驗收。
+
+
+## 2026-10-23｜手機桿件參數面板減少留白（2026.10.23.2）
+
+- 連桿／板件共用尺寸面板新增標題列：手機將名稱與完成同列，桌機以 display:contents 保留原列。減少列間距，孔距輸入維持 16px、輸入與加減至少 44px；數字欄寬度隨放大字體增加。
+- 手機的連桿／板件合成控制移入既有「更多」，旋轉或切回桌機時同一控制移回原位置，不複製按鈕或改合成規則。齒輪面板原入口不變。樣式網址同步更新以避免快取舊版排版。
+- HTTP 瀏覽器 390×844、360×640：一般連桿面板由 225px 降至 160px（約 29%），標題與完成同列；主欄無水平溢出，更多內合成可開啟／取消。實際鍵盤輸入 32mm、加減、復原、刪除與復原、完成收合通過。1200×900 桌機合成控制仍在原本主面板。
+- 360px 寬的獨立驗收頁將面板文字設為 200%，數字輸入為 32px，欄位自動加寬、內容換行，面板內可捲動且無水平溢出。此為文字放大模擬，不等同實體 Android 系統字型設定。證據 output/member-density/before.png、after-390.png、after-360.png、large-text-360.png、desktop.png。
+- Node 24 定向 7/7 通過：member-editor、member-dimensions、bar-fusion、part-fusion、numeric-input、startup-size、load-graph；結果 output/member-density/tests/results.json。未變更作品格式、幾何、保存及復原邏輯。
