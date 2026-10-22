@@ -18,7 +18,7 @@ import * as Tools from './tools.js';
 import * as Panels from './panels.js';
 import { collectPickCandidates, openOverlapPicker } from './overlap-picker.js';
 
-const NODE_TAP_PX = 22;   // 手機點接點的命中半徑（畫面 px，縮放下維持一致手感；與 app.js 同值）
+const NODE_TAP_PX = 24;   // 手機點接點的命中半徑（畫面 px，縮放下維持一致手感）
 
 // ---- 縮放 / 平移手勢的指標帳本（畫布層級狀態）----
 const activePointers = new Map();   // pointerId -> { x, y }（client 座標）
@@ -515,7 +515,7 @@ export function init(deps) {
     // Leave dedicated handles (shape vertices, gear output pins, task sliders) to their own handlers.
     if (e.target!==svg && !['data-id','data-motor-hit','data-pick-component'].some(key=>e.target?.getAttribute?.(key))) return;
     const items=collectPickCandidates(svg,e.clientX,e.clientY,S.comps);
-    if (items.length===1 && items[0].motor) {
+    if (items.length===1 && items[0].kind==='node') {
       e.stopImmediatePropagation();
       (nodeDownEntry || onNodeDown)(e,items[0].id);
       return;

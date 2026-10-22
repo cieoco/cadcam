@@ -10,7 +10,7 @@ export function collectPickCandidates(svg, x, y, comps) {
     if (!r.width || !r.height) continue;
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     const motor = el.getAttribute('data-motor-hit');
-    if (Math.hypot(x - cx, y - cy) > (motor ? 28 : 22)) continue;
+    if (Math.hypot(x - cx, y - cy) > (motor ? 28 : 24)) continue;
     const id = motor || el.getAttribute('data-id');
     const servo = comps.some(c => c.motorType === 'mg995' && [c.p1, c.p2].some(p => p?.id === id));
     add({ kind:'node', id, motor:!!motor, label:motor ? `${servo ? '舵機' : '馬達'}軸心 · ${id}（動力／角度）` : `接點 · ${id}` });
@@ -20,6 +20,7 @@ export function collectPickCandidates(svg, x, y, comps) {
     const id = el.getAttribute('data-pick-component');
     const c = id && comps.find(c => c.id === id);
     if (!c) continue;
+    if (result.length===1 && !result[0].motor && result[0].kind==='node' && c.type==='bar' && [c.p1,c.p2].some(p=>p?.id===result[0].id)) continue;
     const name = c.fusedWith ? '合成夾指' : ({gear:'齒輪',triangle:'夾指／板件',bar:'連桿'})[c.type];
     if (name) add({kind:'component', id, label:`${name} · ${id}（尺寸／外形）`});
   }

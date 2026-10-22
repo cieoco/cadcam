@@ -55,4 +55,16 @@ fire('pointerdown');fire('pointercancel');assert.equal(body.children.length,coun
 fire('pointerdown');fire('pointerdown',2,130,100);fire('pointerup');fire('pointerup',2,130,100);assert.equal(body.children.length,count,'pinch must not open picker');
 fire('pointerdown');fire('pointermove',1,120,100);fire('pointerup',1,120,100);assert.equal(selected,'node:O','deliberate drag resumes node routing');assert.equal(body.children.length,count);
 hit=[];selected='';fire('pointerdown');fire('pointerup');assert.equal(selected,'node:O');assert.equal(body.children.length,count,'single motor selects directly');
+
+const endpoint=new Element({'data-id':'B'}), ownBar=new Element({'data-pick-component':'L'});
+comps.push({id:'L',type:'bar',p1:{id:'A'},p2:{id:'B'}});
+nodes=[endpoint];hit=[ownBar];selected='';
+assert.deepEqual(collectPickCandidates(svg,123,100,comps).map(c=>c.id),['B'],'near endpoint prefers its own hole over its bar');
+assert.deepEqual(collectPickCandidates(svg,125,100,comps).map(c=>c.id),['L'],'bar body remains selectable outside hole tolerance');
+fire('pointerdown',1,123,100,ownBar);fire('pointerup',1,123,100,ownBar);
+assert.equal(selected,'node:B');assert.equal(body.children.length,count,'plain endpoint opens directly, without ambiguity dialog');
+nodes=[endpoint,new Element({'data-id':'C'})];
+assert.equal(collectPickCandidates(svg,100,100,comps).filter(c=>c.kind==='node').length,2,'nearby holes remain separate choices');
+nodes=[endpoint];hit=[ownBar,gear];
+assert.deepEqual(collectPickCandidates(svg,100,100,comps).map(c=>c.id),['B','G'],'unrelated overlapping component stays selectable');
 console.log('PASS overlapping motor/body candidates, deduplication, selection, cancel, touch release, pinch and drag routing');

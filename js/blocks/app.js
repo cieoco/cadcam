@@ -354,7 +354,6 @@ const planMotion = () => Motion.planMotion(simulationScope().compiled, S.topo, S
 const mobilePrompt = () => window.matchMedia('(hover: none), (pointer: coarse), (max-width: 700px), (max-width: 1099px) and (max-height: 500px)').matches;
 const promptText = (desktop, mobile) => mobilePrompt() ? mobile : desktop;
 const snapWorld = () => View.snapWorld() * (mobilePrompt() ? 2.35 : 1);
-const NODE_TAP_PX = 34;   // 手機點接點的命中半徑（畫面 px，縮放下維持一致手感）
 
 const pointCoords = () => Model.pointCoords(S.comps);
 // 接點「畫面上實際位置」：元件座標打底，再用最近一次求解結果覆蓋（與 draw() 的 pts 同源）。
@@ -2791,7 +2790,7 @@ function fitView() {
   draw();
 }
 
-window.addEventListener('resize', refresh3DView);
+window.addEventListener('resize', () => { refresh3DView(); draw(); });
 window.addEventListener('orientationchange', () => {
   setTimeout(refresh3DView, 120);
   setTimeout(refresh3DView, 360);

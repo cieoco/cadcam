@@ -599,3 +599,13 @@
 - 僅移除新增按鈕；兩端鉸接型的既有作品正規化、求解及編輯支援不變，不改作品格式或已有零件。
 - 調整既有 hydraulic-p1-3 選單驗收期待；Node 24 的 hydraulic-p1-3、syringe、fixed-syringe、load-graph、startup-size 共 5/5 通過。結果 output/syringe-menu/tests/results.json。
 - HTTP 瀏覽器確認桌機與 390×844 手機清單僅有管夾固定針筒；點選仍執行原有缺連桿檢查，取消可關閉。截圖 output/syringe-menu/mobile.png、desktop.png。
+
+
+## 2026-10-23｜手機一般端孔可點範圍與選取（2026.10.23.1）
+
+- 依 B 孔難以點選的回報，重現手機精準點端孔仍跳出「接點／連桿」重疊選單；普通孔原顯示約 6 CSS px，沒有馬達軸心的獨立大觸控區。
+- 普通節點沿用軸心的螢幕尺寸換算，提供直徑 48 CSS px 的透明可點區，原孔外觀不變。可點區跟隨位置更新、無座標時隱藏；手機接點捕捉半徑同步為 24 px。桌機仍使用原節點外觀與點選。
+- 僅一個普通端孔及其所屬連桿時直接選孔；相鄰孔、馬達與其他重疊零件仍保留選單。沒有放大尺寸標籤或零件幾何，不改作品、保存或復原格式。畫圖、接合與雙指手勢沿用既有優先順序。
+- 視窗尺寸變更同步重繪 2D，避免手機橫直切換後殘留舊觸控尺寸；刪除 app 中未使用的舊接點半徑常數。首次 JS 大小仍在既有 1.9 MB 預算內。
+- Node 24 定向 7/7 通過：mechanism-layer-render、overlap-picker、input-gestures、touch-link-creation、assembly-frame、startup-size、load-graph。新增回歸涵蓋普通孔觸控區、動態位置／隱藏、23px 偏移直選、25px 桿身選取、相鄰孔及無關零件；原馬達／縮放／畫桿測試保留。結果 output/node-touch/final-tests/results.json。
+- HTTP 瀏覽器 390×844、360×640、844×390 與桌機驗收：32 mm 斜桿，A 固定後點 B，偏離孔中心約 20px 仍開啟自由接點面板、沒有多餘選單；橫直切換後仍為 48px。證據 output/node-touch/before.png、mobile-b-selected.png、desktop-b-selected.png。指標 touch 路由以事件回歸驗證；瀏覽器尺寸測試不代表實體手機手指驗收。

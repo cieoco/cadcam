@@ -50,4 +50,20 @@ touchUpdates[0]({ O: { x: 20, y: 30 } });
 check('活動馬達圓環隨軸心更新', hit.getAttribute('cx') === red.getAttribute('cx') && hit.getAttribute('cy') === '30');
 touchUpdates[0]({});
 check('軸心無座標時一併移除命中區', hit.style.display === 'none' && red.style.display === 'none');
+
+const plainSvg = new FakeElement('svg'), plainUpdates=[];
+plainSvg.getScreenCTM=()=>({a:0.25,b:0});
+renderNodes({points:{B:{x:32,y:0}},svg:plainSvg,groundIds:new Set(),motorCenterIds:new Set(),
+  camCenterIds:new Set(),hiddenPointIds:new Set(),gearPinIds:new Set(),pulleyPinIds:new Set(),
+  camFollowerIds:new Set(),workpieceIds:new Set(),sliderMountInfo:()=>null,project:p=>p,
+  onPointerDown:(_e,id)=>picked=id,registerUpdate:fn=>plainUpdates.push(fn),touchTargets:true});
+const [plainHit,plainDot]=plainSvg.children;
+check('一般 B 孔也有 48 CSS px 觸控區，保留原孔外觀',Number(plainHit.getAttribute('r'))*0.25*2===48 && plainHit.getAttribute('fill')==='transparent' && plainDot.getAttribute('r')==='7');
+check('一般孔不誤標為馬達',plainHit.getAttribute('data-id')==='B' && plainDot.getAttribute('data-motor-hit')===null);
+plainHit.listeners.get('pointerdown')({});
+check('擴大的普通孔觸控區選到 B',picked==='B');
+plainUpdates[0]({B:{x:70,y:15}});
+check('普通孔觸控區隨動態位置更新',plainHit.getAttribute('cx')===plainDot.getAttribute('cx') && plainHit.getAttribute('cy')==='15');
+plainUpdates[0]({});
+check('不存在的普通孔不留透明攔截區',plainHit.style.display==='none');
 report('mechanism-layer-render');

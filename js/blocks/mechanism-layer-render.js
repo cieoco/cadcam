@@ -90,18 +90,18 @@ export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterI
     const rectangle = ground && !motor && !cam && !mount;
     // 已安裝模組的固定孔：鎖在宿主上，畫成虛線圓環而非地錨方塊。
     const mountedBase = rectangle && mountedBaseIds.has(id);
-    // 手機軸心可點區使用螢幕像素，不隨模型縮小；保留原來的小紅點作精確位置標記。
-    const motorHit = motor && touchTargets ? svgEl('circle') : null;
-    if (motorHit) {
-      motorHit.setAttribute('fill', 'rgba(231,76,60,0.08)');
-      motorHit.setAttribute('stroke', 'rgba(146,43,33,0.45)');
-      motorHit.setAttribute('stroke-width', 1);
-      motorHit.setAttribute('data-motor-hit', id);
-      motorHit.setAttribute('role', 'button');
-      motorHit.setAttribute('aria-label', `動力軸心 ${id}：設定馬達或伺服角度`);
-      motorHit.style.pointerEvents = 'all'; motorHit.style.cursor = 'pointer';
-      motorHit.addEventListener('pointerdown', event => onPointerDown(event, id));
-      svg.appendChild(motorHit);
+    // 手機接點可點區使用螢幕像素，不隨模型縮小；保留原來的小點作精確位置標記。
+    const touchHit = touchTargets ? svgEl('circle') : null;
+    if (touchHit) {
+      touchHit.setAttribute('fill', motor ? 'rgba(231,76,60,0.08)' : 'transparent');
+      touchHit.setAttribute('stroke', motor ? 'rgba(146,43,33,0.45)' : 'none');
+      touchHit.setAttribute('stroke-width', 1);
+      touchHit.setAttribute(motor ? 'data-motor-hit' : 'data-id', id);
+      touchHit.setAttribute('role', 'button');
+      touchHit.setAttribute('aria-label', motor ? `動力軸心 ${id}：設定馬達或伺服角度` : `接點 ${id}`);
+      touchHit.style.pointerEvents = 'all'; touchHit.style.cursor = 'pointer';
+      touchHit.addEventListener('pointerdown', event => onPointerDown(event, id));
+      svg.appendChild(touchHit);
     }
     const node = svgEl((rectangle && !mountedBase) ? 'rect' : 'circle');
     if (cam) { node.setAttribute('r', id === dragId ? 7 : 5); node.setAttribute('fill', '#fff'); node.setAttribute('stroke', '#9b59b6'); node.setAttribute('stroke-width', 2.4); }
@@ -110,19 +110,19 @@ export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterI
     else if (mountedBase) { node.setAttribute('r', id === dragId ? 9 : 7); node.setAttribute('fill', '#eef6ff'); node.setAttribute('stroke', id === dragId ? '#2ecc71' : '#2c6fbb'); node.setAttribute('stroke-width', 3); node.setAttribute('stroke-dasharray', '3 2'); const title = svgEl('title'); title.textContent = '安裝孔：鎖在宿主模組上（隨宿主移動）'; node.appendChild(title); }
     else if (rectangle) { node.setAttribute('width', size); node.setAttribute('height', size); node.setAttribute('rx', 3); node.setAttribute('fill', '#34495e'); }
     else { node.setAttribute('r', id === dragId ? 9 : 7); node.setAttribute('fill', '#fff'); node.setAttribute('stroke', id === dragId ? '#2ecc71' : '#34495e'); node.setAttribute('stroke-width', 3); }
-    node.setAttribute('data-id', id); if (motorHit) node.setAttribute('data-motor-hit', id);
+    node.setAttribute('data-id', id); if (motor && touchHit) node.setAttribute('data-motor-hit', id);
     node.style.cursor = 'grab'; node.addEventListener('pointerdown', event => onPointerDown(event, id)); svg.appendChild(node);
     const update = current => {
       const point = current[id], valid = point && Number.isFinite(point.x) && Number.isFinite(point.y);
-      node.style.display = valid ? '' : 'none'; if (motorHit) motorHit.style.display = node.style.display;
+      node.style.display = valid ? '' : 'none'; if (touchHit) touchHit.style.display = node.style.display;
       if (!valid) return;
       const p = project(point);
       if (rectangle && !mountedBase) { node.setAttribute('x', p.x - size / 2); node.setAttribute('y', p.y - size / 2); }
       else { node.setAttribute('cx', p.x); node.setAttribute('cy', p.y); }
-      if (motorHit) {
+      if (touchHit) {
         const ctm = svg.getScreenCTM?.(), screenScale = ctm ? Math.hypot(ctm.a, ctm.b) : 1;
-        motorHit.setAttribute('cx', p.x); motorHit.setAttribute('cy', p.y);
-        motorHit.setAttribute('r', 24 / (screenScale || 1));
+        touchHit.setAttribute('cx', p.x); touchHit.setAttribute('cy', p.y);
+        touchHit.setAttribute('r', 24 / (screenScale || 1));
       }
     };
     update(points); registerUpdate(update);
