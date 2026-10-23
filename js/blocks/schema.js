@@ -3,6 +3,7 @@ import {migrateH03RigidGrip} from './rigid-gripper.js';
 import { normalizeLessonSequence, normalizeHydraulicSequence } from './sequence-schema.js';
 import {normalizeAssemblyMembers} from './assembly-membership.js';
 import {normalizeSyringe} from '../core/syringe.js';
+import {pitchDiameter,TEETH_MIN,TEETH_MAX,checkChainDrive} from '../core/chain-drive.js';
 /**
  * blocks / schema
  *
@@ -492,8 +493,19 @@ function normalizePulley(comp, index, params, warnings) {
   const p1 = normalizePoint(comp.p1, `PLC${index + 1}`, warnings);
   const p2 = normalizePoint(comp.p2, `PLP${index + 1}`, warnings);
   const radiusParam = safeId(comp.radiusParam) ? comp.radiusParam : `PLR${index + 1}`;
-  const rawR = params[radiusParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y);
-  const R = Math.max(1, Math.round(num(rawR, 32)));
+  // 鏈輪（kind:'sprocket'）：齒數 9～40，節圓半徑由齒數算出、不四捨五入；一般皮帶輪維持整數半徑。
+  const isSprocket = comp.kind === 'sprocket';
+  let teeth = 0;
+  let R;
+  if (isSprocket) {
+    const rawTeeth = Math.round(num(comp.teeth, 12));
+    teeth = Math.max(TEETH_MIN, Math.min(TEETH_MAX, rawTeeth));
+    if (teeth !== rawTeeth) warnings.push(`鏈輪 ${id} 的齒數要在 ${TEETH_MIN}～${TEETH_MAX} 之間，已改成 ${teeth} 齒。`);
+    R = pitchDiameter(teeth) / 2;
+  } else {
+    const rawR = params[radiusParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    R = Math.max(1, Math.round(num(rawR, 32)));
+  }
   params[radiusParam] = R;
   const pinRadiusParam = safeId(comp.pinRadiusParam) ? comp.pinRadiusParam : '';
   if (pinRadiusParam) {
@@ -508,6 +520,7 @@ function normalizePulley(comp, index, params, warnings) {
     radiusParam,
     phase: num(comp.phase, 0)
   };
+  if (isSprocket) { out.kind = 'sprocket'; out.teeth = teeth; }
   if (pinRadiusParam) out.pinRadiusParam = pinRadiusParam;
   else if (Number.isFinite(Number(comp.pinRadius))) out.pinRadius = Math.max(1, Math.round(num(comp.pinRadius, R * 0.65)));
   if (safeId(comp.mountLocatorPoint)) out.mountLocatorPoint = comp.mountLocatorPoint;
@@ -529,11 +542,30 @@ function normalizeBelt(comp, index, params, warnings) {
     driven: safeId(comp.driven) ? comp.driven : '',
     crossed: false
   };
+  // 滾子鏈條（kind:'chain'）：目前只有 #25；鏈節數缺少時由 normalizeSnapshot 依兩輪中心距補上。
+  if (comp.kind === 'chain') {
+    out.kind = 'chain';
+    out.standard = '25';
+    if (Number.isFinite(Number(comp.links)) && Number(comp.links) >= 2) out.links = Math.round(Number(comp.links));
+  }
   if (!out.driver || !out.driven || out.driver === out.driven) {
     warnings.push(`皮帶 ${id} 需要兩個不同的 pulley id。`);
   }
   if (comp.zlift) out.zlift = Math.max(-4, Math.min(4, Math.round(num(comp.zlift, 0))));
   return out;
+}
+
+// 鏈條沒存鏈節數時，用兩個鏈輪的中心距算出最接近的偶數鏈節。
+function fillChainLinks(comps, warnings) {
+  comps.forEach(chain => {
+    if (chain.type !== 'belt' || chain.kind !== 'chain' || Number.isInteger(chain.links)) return;
+    const a = comps.find(c => c.type === 'pulley' && c.id === chain.driver && c.kind === 'sprocket');
+    const b = comps.find(c => c.type === 'pulley' && c.id === chain.driven && c.kind === 'sprocket');
+    if (!a || !b) { warnings.push(`鏈條 ${chain.id} 要連接兩個鏈輪。`); return; }
+    const center = Math.hypot(b.p1.x - a.p1.x, b.p1.y - a.p1.y);
+    const check = checkChainDrive({ center, teeth1: a.teeth, teeth2: b.teeth });
+    if (Number.isInteger(check.links)) chain.links = check.links;
+  });
 }
 
 function normalizeWorkpiece(comp,index,warnings){
@@ -580,6 +612,7 @@ export function normalizeSnapshot(obj) {
     }
   });
 
+  fillChainLinks(comps, warnings);
   let cleanComps = dropZeroBars(comps);
   const modulesResult = normalizeModules(obj.modules, cleanComps);
   if (!modulesResult.ok) return null;

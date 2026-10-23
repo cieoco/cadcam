@@ -1,3 +1,4 @@
+import { centerForLinks } from '../core/chain-drive.js';
 import { PARALLEL_GRIPPER_EXAMPLE } from './parallel-gripper-example.js';
 import { COMMON_MANIPULATOR_EXAMPLES } from './common-manipulator-examples.js';
 import {fixedLiftSnapshot,fixedGripSnapshot,fixedBaseSnapshot} from './fixed-syringe-examples.js';
@@ -42,6 +43,8 @@ const triangle = (id, p1, p2, p3, extra = {}) => ({
 });
 
 const pt = (id, type, x, y, extra = {}) => ({ id, type, x, y, ...extra });
+// 鏈輪鏈條範例：12 齒帶 24 齒，40 節（偶數）#25 鏈條；中心距由鏈節數反算，取到 0.01 mm（誤差遠小於 0.05 mm 容許）。
+const SPROCKET_HALF = Number((centerForLinks(40, 12, 24) / 2).toFixed(2));
 
 export const EXAMPLE_GROUPS = [
   { id: 'starter', label: '入門：先讓它動' },
@@ -211,6 +214,16 @@ const EXAMPLE_LESSONS = {
     predict: '開口皮帶帶動時，兩輪轉向相同；如果從動輪半徑變大，它轉得會比較快還是比較慢？',
     measure: '播放並比較兩輪轉向與圈數；改變從動輪半徑後再比較。',
     explain: '用半徑比說明理想無滑動條件下的速度差異，並說明開口皮帶為何讓兩輪同向。'
+  },
+  'sprocket-chain': {
+    group: 'transmission',
+    level: '基礎',
+    use: '跨距較遠又不能打滑的同向減速，例如輪子、捲線或升降機構的傳動。',
+    learn: '鏈輪速比等於齒數比；#25 鏈條節距 6.35 mm，鏈節數取偶數，中心距才能剛好繃緊。',
+    try: ['改從動鏈輪齒數（9～40）', '把兩輪拉近或拉遠，看鏈節數變化', '觀察從動輪的輪緣銷如何帶動搖桿'],
+    predict: '12 齒帶 24 齒：從動輪轉一圈時，馬達鏈輪會轉幾圈？兩輪轉向相同嗎？',
+    measure: '播放並數兩輪各轉幾圈；再把從動輪改成 18 齒，比較速比與搖桿擺動。',
+    explain: '用齒數比說明速度與力矩的取捨，並說明鏈條為何兩輪同向、為何鏈節要取偶數。'
   },
   'jansen-leg': {
     group: 'mobility',
@@ -675,6 +688,32 @@ const ALL_BLOCK_EXAMPLES = [
           driver: 'PulleyA', driven: 'PulleyB' }
       ],
       params: { PRA: 24, PRB: 48, theta: 0 }
+    }
+  },
+  {
+    id: 'sprocket-chain',
+    title: '鏈輪鏈條：同向減速（#25）',
+    note: 'TT 馬達帶動 12 齒鏈輪，#25 鏈條（40 節）帶動 24 齒鏈輪，兩輪同向、速度減半；從動鏈輪的輪緣銷再推動曲柄搖桿。',
+    snapshot: {
+      kind: 'blocks',
+      v: 1,
+      counter: 8,
+      comps: [
+        { type: 'pulley', id: 'SprocketA', kind: 'sprocket', teeth: 12, color: '#e74c3c',
+          p1: pt('SKA', 'motor', -SPROCKET_HALF, 0, { physicalMotor: '1' }),
+          p2: pt('SKAP', 'floating', -SPROCKET_HALF + 8, 0),
+          radiusParam: 'SKRA', phase: 0 },
+        { type: 'pulley', id: 'SprocketB', kind: 'sprocket', teeth: 24, color: '#2c6fbb',
+          p1: pt('SKB', 'fixed', SPROCKET_HALF, 0),
+          p2: pt('SKBP', 'floating', SPROCKET_HALF + 16, 0),
+          radiusParam: 'SKRB', pinRadius: 16, phase: 0 },
+        { type: 'belt', id: 'Chain1', kind: 'chain', standard: '25', links: 40, color: '#34495e',
+          driver: 'SprocketA', driven: 'SprocketB' },
+        { type: 'anchor', id: 'Anchor1', p1: pt('SKF', 'fixed', SPROCKET_HALF + 55, 40) },
+        bar('Coupler1', pt('SKBP', 'floating', SPROCKET_HALF + 16, 0), pt('SKE', 'floating', SPROCKET_HALF + 14.68, 59.99), 60, { lenParam: 'SKL1' }),
+        bar('Rocker1', pt('SKF', 'fixed', SPROCKET_HALF + 55, 40), pt('SKE', 'floating', SPROCKET_HALF + 14.68, 59.99), 45, { lenParam: 'SKL2' })
+      ],
+      params: { SKL1: 60, SKL2: 45, theta: 0 }
     }
   },
   {

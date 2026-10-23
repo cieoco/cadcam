@@ -5,7 +5,8 @@
  * 本模組因此不持有 Blocks 狀態，也不依賴 app.js。
  */
 
-import { buildOpenBeltPath, gearMeshPhaseDeg } from './transmission-geometry.js';
+import { buildOpenBeltPath, gearMeshPhaseDeg, sprocketOutline } from './transmission-geometry.js';
+import { CHAIN_25 } from '../core/chain-drive.js';
 import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -77,8 +78,15 @@ export function drawPulley({ component, points, svg, scale, project, radius, pin
     Object.entries(attrs).forEach(([name, value]) => el.setAttribute(name, value));
     group.appendChild(el);
   };
-  add('circle', { r: Math.max(1, R * scale), fill: color + '26', stroke: color, 'stroke-width': Math.max(1.8, 2.4 * scale) });
-  add('circle', { r: Math.max(1, (R - 3) * scale), fill: 'none', stroke: '#7f4a17', 'stroke-width': Math.max(0.9, 1.2 * scale), opacity: '0.55' });
+  if (component.kind === 'sprocket') {
+    // 鏈輪：外形是一圈滾子槽與齒尖；節圓畫成細虛線（鏈條中心走的位置）。
+    const outline = sprocketOutline(component.teeth).map(q => `${(q.x * scale).toFixed(2)},${(-q.y * scale).toFixed(2)}`).join(' ');
+    add('polygon', { points: outline, fill: color + '26', stroke: color, 'stroke-width': Math.max(1, 1.2 * scale), 'stroke-linejoin': 'round' });
+    add('circle', { r: Math.max(1, R * scale), fill: 'none', stroke: '#475569', 'stroke-width': Math.max(0.7, 0.9 * scale), 'stroke-dasharray': `${(2 * scale).toFixed(1)},${(2 * scale).toFixed(1)}`, opacity: '0.6' });
+  } else {
+    add('circle', { r: Math.max(1, R * scale), fill: color + '26', stroke: color, 'stroke-width': Math.max(1.8, 2.4 * scale) });
+    add('circle', { r: Math.max(1, (R - 3) * scale), fill: 'none', stroke: '#7f4a17', 'stroke-width': Math.max(0.9, 1.2 * scale), opacity: '0.55' });
+  }
   add('line', { x1: '0', y1: '0', x2: (pinR * scale).toFixed(2), y2: '0', stroke: color, 'stroke-width': Math.max(1.2, 1.8 * scale), 'stroke-linecap': 'round' });
   add('circle', { r: Math.max(3, 4 * scale), fill: '#ffffff', stroke: color, 'stroke-width': Math.max(1.4, 1.8 * scale) });
   svg.appendChild(group);
@@ -111,20 +119,44 @@ export function drawBelt({ component, points, comps, theta, svg, scale, project,
   const driven = component.driven ? comps.find(part => part.type === 'pulley' && part.id === component.driven) : null;
   if (!driver?.p1 || !driven?.p1) return null;
   const color = component.color || '#2c3e50';
+  const isChain = component.kind === 'chain';
+  const style = (el, attrs) => { Object.entries(attrs).forEach(([name, value]) => el.setAttribute(name, value)); el.style.pointerEvents = 'none'; svg.appendChild(el); };
   const path = svgEl('path');
   const motion = svgEl('path');
-  [[path, { fill: 'none', stroke: color, 'stroke-width': Math.max(2.8, 4.4 * scale), 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: '0.82' }],
-   [motion, { fill: 'none', stroke: '#f8fafc', 'stroke-width': Math.max(0.8, 1.2 * scale), 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-dasharray': `${(5 * scale).toFixed(1)},${(13 * scale).toFixed(1)}`, opacity: '0.62' }]]
-    .forEach(([el, attrs]) => { Object.entries(attrs).forEach(([name, value]) => el.setAttribute(name, value)); el.style.pointerEvents = 'none'; svg.appendChild(el); });
+  // 鏈條：深色鏈板當底、淺色細線形成雙線、每一節一個滾子圓點（點距＝路徑長 ÷ 鏈節數，所以接縫處不會擠在一起）。
+  const plateW = Math.max(3.4, CHAIN_25.plateHeight * scale);
+  if (isChain) {
+    style(path, { fill: 'none', stroke: color, 'stroke-width': plateW, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: '0.95' });
+    style(motion, { fill: 'none', stroke: '#e2e8f0', 'stroke-width': plateW * 0.42, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: '0.9' });
+  } else {
+    style(path, { fill: 'none', stroke: color, 'stroke-width': Math.max(2.8, 4.4 * scale), 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: '0.82' });
+    style(motion, { fill: 'none', stroke: '#f8fafc', 'stroke-width': Math.max(0.8, 1.2 * scale), 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-dasharray': `${(5 * scale).toFixed(1)},${(13 * scale).toFixed(1)}`, opacity: '0.62' });
+  }
+  const rollers = isChain ? svgEl('path') : null;
+  if (rollers) style(rollers, { fill: 'none', stroke: '#0f172a', 'stroke-width': Math.max(2.2, CHAIN_25.rollerDiameter * scale), 'stroke-linecap': 'round' });
+  const links = Math.max(2, Math.round(Number(component.links) || 0));
   const update = current => {
     const a = current[driver.p1.id], b = current[driven.p1.id];
     const valid = a && b && Number.isFinite(a.x) && Number.isFinite(b.x);
-    path.style.display = valid ? '' : 'none'; motion.style.display = valid ? '' : 'none';
+    const nodes = rollers ? [path, motion, rollers] : [path, motion];
+    nodes.forEach(el => { el.style.display = valid ? '' : 'none'; });
     if (!valid) return;
     const d = buildOpenBeltPath(a, radius(driver), b, radius(driven), project);
-    path.style.display = d ? '' : 'none'; motion.style.display = d ? '' : 'none';
+    nodes.forEach(el => { el.style.display = d ? '' : 'none'; });
     if (!d) return;
     path.setAttribute('d', d); motion.setAttribute('d', d);
+    if (rollers) {
+      rollers.setAttribute('d', d);
+      const total = typeof path.getTotalLength === 'function' ? path.getTotalLength() : 0;
+      if (total > 0 && links) {
+        const gap = total / links;
+        // 鏈條走的距離＝馬達鏈輪轉過的齒數 × 節距，換成「第幾節」再乘點距。
+        const turned = (Number(driver.teeth) || 12) * Number(theta()) / 360;
+        rollers.setAttribute('stroke-dasharray', `0 ${gap.toFixed(3)}`);
+        rollers.setAttribute('stroke-dashoffset', (-turned * gap).toFixed(2));
+      }
+      return;
+    }
     const beltTravel = radius(driver) * Number(theta()) * Math.PI / 180 * scale;
     motion.setAttribute('stroke-dashoffset', (-beltTravel).toFixed(2));
   };

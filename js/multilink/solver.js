@@ -390,8 +390,10 @@ function solveBodyJointTopology(topology, params) {
             if (!driver || !driver.p1) return null;
             const parent = driveState(driver, seen);
             if (!parent) return null;
-            const rDriver = getParamVal(driver.radiusParam, pitchR);
-            const rDriven = getParamVal(pulley.radiusParam, pitchR);
+            // 鏈輪：鏈條每走一節就轉過一齒，所以速比恰為齒數比 N1/N2（不是節圓半徑比；兩者差約 0.4%）。
+            const bySprocket = driver.kind === 'sprocket' && pulley.kind === 'sprocket' && driver.teeth >= 3 && pulley.teeth >= 3;
+            const rDriver = bySprocket ? driver.teeth : getParamVal(driver.radiusParam, pitchR);
+            const rDriven = bySprocket ? pulley.teeth : getParamVal(pulley.radiusParam, pitchR);
             const sign = belt.crossed ? -1 : 1;
             return {
                 driverPt: parent.driverPt,

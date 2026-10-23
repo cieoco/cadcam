@@ -17,6 +17,7 @@ const cases = [
   ['gear-gripper', 1],
   ['cam-follower', 1],
   ['pulley-belt', 1],
+  ['sprocket-chain', 1],
   ['jansen-leg', 1],
   ['pantograph', 2],
   ['competition-fourbar-lift', 2],   // 雙馬達版：升降 + 手腕兩個自由度，各配一顆馬達

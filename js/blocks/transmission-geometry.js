@@ -4,6 +4,25 @@
  * 傳動零件共用的純幾何：不碰 SVG、DOM 或 Blocks 狀態。
  */
 
+import { CHAIN_25, outsideDiameter, pitchDiameter } from '../core/chain-drive.js';
+
+// 鏈輪外形（簡化示意）：每一節距一個滾子槽，槽底在節圓內一個滾子半徑，齒尖在外徑。回傳 mm 座標、軸心為原點、第 0 個槽在 +x。
+export function sprocketOutline(teeth, pitch = CHAIN_25.pitch) {
+  const n = Math.max(3, Math.round(Number(teeth) || 12));
+  const rPitch = pitchDiameter(n, pitch) / 2;
+  const rTip = Math.min(outsideDiameter(n, pitch) / 2, rPitch + pitch * 0.45);
+  const rRoot = Math.max(1, rPitch - CHAIN_25.rollerDiameter / 2);
+  const step = Math.PI * 2 / n;
+  const at = (angle, r) => ({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
+  const points = [];
+  for (let i = 0; i < n; i++) {
+    const seat = i * step;          // 滾子槽中心
+    const tip = seat + step / 2;    // 齒尖
+    points.push(at(seat - step * 0.16, rRoot), at(seat + step * 0.16, rRoot), at(tip - step * 0.09, rTip), at(tip + step * 0.09, rTip));
+  }
+  return points;
+}
+
 export function openBeltTangents(c1, r1, c2, r2) {
   const dx = c2.x - c1.x;
   const dy = c2.y - c1.y;
