@@ -16,6 +16,8 @@
 
 ## 產品與功能規格
 
+- [SDD-MECHANISM-BOX.md](SDD-MECHANISM-BOX.md) — 機構用五片式參數盒體、組立與加工輸出契約。
+
 - [SDD-LASER-TAB-NUT-JOINT.md](SDD-LASER-TAB-NUT-JOINT.md) — 3 mm 板材／M3 榫槽與螺母鎖固接合試作；含相容契約、輸出與試片，實物試切待驗證。
 
 - [SDD-ACTUATOR-INSTALLATION.md](SDD-ACTUATOR-INSTALLATION.md) — 致動元件共同安裝流程、候選與驗收。

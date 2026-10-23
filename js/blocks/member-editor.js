@@ -18,7 +18,11 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if (tipDraft && tipDraft.selectedId !== comp?.id) tipDraft = null;
     const dimensions = memberDimensions(comp);
     const active = dimensions.length > 0;
-    const copyActions=el('memberCopyActions');if(copyActions)copyActions.hidden=!active;
+    const copyActions=el('memberCopyActions');if(copyActions)copyActions.hidden=!active||!!comp?.boxPanel;
+    const boxEdit=el('boxEditButton');if(boxEdit)boxEdit.hidden=!comp?.boxPanel;
+    const actions=el('memberActions');if(actions)actions.style.display=comp?.boxPanel?'none':'';
+    if(comp?.boxPanel&&el('memberOperations'))el('memberOperations').hidden=true;
+    const memberMore=el('memberMore');if(memberMore)memberMore.hidden=!!comp?.boxPanel;
     const input = el('memberDimensionInput'), hint = el('memberDimensionHint');
     if (!input) return;
     const dimensionLabel=el('memberDimensionLabel');if(dimensionLabel)dimensionLabel.hidden=!active;
@@ -70,7 +74,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
       el('memberMirrorLabel').style.display = '';
       el('memberMirror').checked = mirror;
     }
-    el('lenTitle').textContent = comp.type === 'bar' ? '連桿' : comp.shape === 'jaw' ? '夾爪板' : '桿件／板件';
+    el('lenTitle').textContent = comp.boxPanel ? '盒體板件' : comp.type === 'bar' ? '連桿' : comp.shape === 'jaw' ? '夾爪板' : '桿件／板件';
   }
   function selectDimension(id) {
     if (!memberDimensions(selected()).some(d => d.id === id)) return;

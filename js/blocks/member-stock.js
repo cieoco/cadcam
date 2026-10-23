@@ -1,3 +1,4 @@
+import {normalizeBoxPanel,boxPanelSize} from './box-config.js';
 // Shared physical stock metadata for rigid bar and plate members.
 // This is descriptive data only; it does not make strength or fabrication claims.
 
@@ -45,6 +46,8 @@ export function normalizeMemberStock(raw) {
 
 export function memberStock(comp) {
   const normalized = normalizeMemberStock(isRecord(comp) ? comp.stock : undefined);
+  const box=normalizeBoxPanel(comp?.boxPanel);
+  if(box)return {...(normalized || DEFAULT_STOCK),widthMm:boxPanelSize(box).width,thicknessMm:box.settings.thicknessMm};
   return normalized || { ...DEFAULT_STOCK };
 }
 
@@ -56,6 +59,7 @@ export function memberStockLabel(comp) {
 }
 
 export function planMemberStock(comp, key, raw, { holeDiameterMm = 12.96 } = {}) {
+  if(comp?.boxPanel && key!=='material')return {ok:false,message:'盒體板件尺寸請從「卡榫盒子」統一修改。'};
   if (!['widthMm', 'thicknessMm', 'material'].includes(key)) {
     return { ok: false, message: '不支援的實體資料欄位。' };
   }
@@ -96,6 +100,6 @@ export function memberHoleDiameter(comp, settings = {}) {
 
 // 匯入舊檔或稍後放大全域孔徑仍可能讓孔超出板寬；匯出前明確攔下，不偷偷改孔。
 export function memberStockWarnings(comps, settings = {}) {
-  return comps.filter(c => ['bar', 'triangle'].includes(c.type) && memberStock(c).widthMm < memberHoleDiameter(c, settings) + 0.5)
+  return comps.filter(c => !c.boxPanel && ['bar', 'triangle'].includes(c.type) && memberStock(c).widthMm < memberHoleDiameter(c, settings) + 0.5)
     .map(c => `${c.id} 板寬不足以容納目前孔徑與 0.5 mm 留量；請增加板寬或縮小連接孔。`);
 }

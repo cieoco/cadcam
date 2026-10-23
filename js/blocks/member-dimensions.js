@@ -8,7 +8,7 @@ const stockDimensions = () => [
 ];
 
 export function memberDimensions(comp) {
-  if (comp?.type === 'bar') return [{ id: 'g', label: '孔距 A–B', refs: ['p1', 'p2'], param: comp.lenParam }, ...stockDimensions()];
+  if (comp?.type === 'bar') return [{ id: 'g', label: comp.boxPanel?'板件長度':'孔距 A–B', refs: ['p1', 'p2'], param: comp.lenParam }, ...stockDimensions()];
   if (comp?.type !== 'triangle') return [];
   const dimensions = [
     { id: 'g', label: '孔距 A–B', refs: ['p1', 'p2'], param: comp.gParam },
@@ -30,6 +30,7 @@ export function memberDimensionValue(comp, params, id = 'g') {
 }
 
 export function planMemberDimension(comp, params, id, raw) {
+  if(comp?.boxPanel)return {ok:false,message:'盒體板件尺寸請從「卡榫盒子」統一修改。'};
   const dimension = memberDimensions(comp).find(d => d.id === id);
   if (dimension?.stockKey) {
     const plan = planMemberStock(comp, dimension.stockKey, raw);
@@ -71,6 +72,7 @@ export function mirroredJaw(comp, comps, params) {
 }
 
 export function dimensionLock(comp, comps, id) {
+  if(comp?.boxPanel)return '盒體板件尺寸請從「卡榫盒子」統一修改。';
   if(comp?.barFusionRoot)return '已合成一片；請先解除合成再調整尺寸。';
   const dimension = memberDimensions(comp).find(d => d.id === id);
   if (!dimension || dimension.property || dimension.stockKey) return '';

@@ -4,11 +4,13 @@
  */
 export function storedProject(snapshot){
   if(snapshot?.kind==='blocks-envelope')return snapshot;
-  if(!snapshot?.modules?.some(m=>m.mount?.face?.selection?.fastener))return snapshot;
-  return {kind:'blocks-envelope',v:1,requires:['tab-nut-m3-v1'],project:snapshot};
+  const requires=[];
+  if(snapshot?.modules?.some(m=>m.mount?.face?.selection?.fastener))requires.push('tab-nut-m3-v1');
+  if(snapshot?.comps?.some(c=>c.boxPanel))requires.push('box-panel-v1');
+  return requires.length?{kind:'blocks-envelope',v:1,requires,project:snapshot}:snapshot;
 }
 export function readStoredProject(value){
   if(value?.kind!=='blocks-envelope')return value;
-  if(value.v!==1||!Array.isArray(value.requires)||value.requires.length!==1||value.requires[0]!=='tab-nut-m3-v1'||!Array.isArray(value.project?.comps)||!['blocks','blocks-composite'].includes(value.project.kind))return null;
+  if(value.v!==1||!Array.isArray(value.requires)||!value.requires.length||value.requires.some(k=>!['tab-nut-m3-v1','box-panel-v1'].includes(k))||!Array.isArray(value.project?.comps)||!['blocks','blocks-composite'].includes(value.project.kind))return null;
   return value.project;
 }

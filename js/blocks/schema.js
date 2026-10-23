@@ -1,4 +1,5 @@
 import {readStoredProject} from './project-envelope.js';
+import {normalizeBoxPanel,boxPanelSize} from './box-config.js';
 import {normalizeBarFusion,inspectBarFusionData} from '../core/bar-fusion.js';
 import {migrateH03RigidGrip} from './rigid-gripper.js';
 import { normalizeLessonSequence, normalizeHydraulicSequence } from './sequence-schema.js';
@@ -90,8 +91,10 @@ function normalizeBar(comp, index, params, warnings) {
   if(comp.barFusionRoot) { if(!safeId(comp.barFusionRoot))throw Error('合成基準無效'); out.barFusionRoot=comp.barFusionRoot; }
   if (comp.snapLength === false) out.snapLength = false;
   if (comp.frameSeparate === true) out.frameSeparate = true;
+  if(comp.boxPanel)out.boxPanel=normalizeBoxPanel(comp.boxPanel);
   const stock = normalizeMemberStock(comp.stock);
   if (stock) out.stock = stock;
+  if(out.boxPanel)out.stock={...stock,widthMm:boxPanelSize(out.boxPanel).width,thicknessMm:out.boxPanel.settings.thicknessMm,material:stock?.material || 'unspecified'};
   // 宿主機架桿：此桿承載該馬達接點的穿板安裝特徵（MG995 槽/耳孔、TT 孔位），
   // 匯出時特徵切進桿身、不再進自動地基 frame.dxf。
   if (safeId(comp.motorMountPoint)) out.motorMountPoint = comp.motorMountPoint;
@@ -580,6 +583,7 @@ export function normalizeSnapshot(obj) {
   if (!obj || typeof obj !== 'object') return null;
   const sourceComps = Array.isArray(obj.comps) ? obj.comps : null;
   if (!sourceComps) return null;
+  if(sourceComps.some(c=>c?.boxPanel && (c.type!=='bar'||!normalizeBoxPanel(c.boxPanel))))return null;
 
   const warnings = [];
   const fabricationResult = normalizeFabricationProfile(obj.fabrication);

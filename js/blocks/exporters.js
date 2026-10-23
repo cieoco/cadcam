@@ -1,4 +1,5 @@
 import {tabNutPartGeometry} from './tab-nut-plan.js';
+import {boxPanelGeometry} from './box-config.js';
 import {inspectBarFusion} from './bar-fusion-geometry.js';
 import { DEFAULT_PLATE_RADIUS_WORLD, createPlateGeometry, localToWorld } from './plate-geometry.js';
 import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
@@ -1317,6 +1318,7 @@ function dxfForLink(comp, length, settings, extraHoles = []) {
 }
 
 export function inspectLinkExport(comp, length, settings = {}, extraHoles = []) {
+  if(comp.boxPanel){const g=boxPanelGeometry(comp);if(!g)throw Error('盒體板件資料無效');return {...g,holes:adapterHoleSpecs(extraHoles)};}
   const safeLength = Number.isFinite(Number(length)) && Number(length) > 0 ? Number(length) : 1;
   const outline = barOutline({ x: 0, y: 0 }, { x: safeLength, y: 0 }, memberStock(comp).widthMm / 2);
   const holes = [];

@@ -3,6 +3,7 @@ import {buildMountSurfaces,findMountSurface} from './mount-surfaces.js';
 import {planTabNutGeometry,ringDistance} from './tab-nut-geometry.js';
 import {isFixedMountPart} from './part-types.js';
 import {readConnectionDescriptor} from './connection-descriptor.js';
+import {boxPanelGeometry} from './box-config.js';
 
 export const hasTabNut=modules=>(modules||[]).some(m=>m.mount?.face?.selection?.fastener);
 function rawPlan(comps,modules,params,mod,opts){
@@ -50,7 +51,13 @@ export function appendTabNutFeatures(extras,comps,modules,params,opts={}){
 }
 /** Export geometry is expressed in the module's home XY; bar catalogs use p1-local XY. */
 export function tabNutPartGeometry(extras,comp,{local=false}={}){
-  const raw=extras?.tabNutGeometry?.[comp.id];if(!raw)return null;
+  let raw=extras?.tabNutGeometry?.[comp.id];
+  if(!raw && comp.boxPanel){
+    const g=boxPanelGeometry(comp);if(!g)return null;if(local)return g;
+    const a=comp.p1,b=comp.p2,t=Math.atan2(b.y-a.y,b.x-a.x),c=Math.cos(t),s=Math.sin(t);
+    raw={...g,outlines:g.outlines.map(r=>r.map(p=>({x:a.x+p.x*c-p.y*s,y:a.y+p.x*s+p.y*c})))};
+  }
+  if(!raw)return null;
   const g=structuredClone(raw);if(!local)return g;
   const a=comp.p1,b=comp.p2,t=Math.atan2(b.y-a.y,b.x-a.x),c=Math.cos(t),s=Math.sin(t),move=p=>({x:(p.x-a.x)*c+(p.y-a.y)*s,y:-(p.x-a.x)*s+(p.y-a.y)*c});
   return {...g,outlines:g.outlines.map(r=>r.map(move)),holes:g.holes.map(h=>({...h,...move(h)})),cutouts:g.cutouts.map(h=>({...h,points:h.points.map(move)}))};

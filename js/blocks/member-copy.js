@@ -22,6 +22,7 @@ export function planMemberCopy({comps, params, modules = [], counter = 0, id, po
   const fail = reason => ({ok:false,reason});
   const selected = comps.find(c => c.id === id);
   if (!selected || !['bar','triangle'].includes(selected.type)) return fail('請先選取連桿或板件。');
+  if(selected.boxPanel)return fail('盒體請從「卡榫盒子」新增另一組，或存成組合積木後加入。');
   if (!['copy','mirror-x','mirror-y'].includes(mode)) return fail('請選擇複製或鏡像方向。');
   const root = fusionRoot(comps,id);
   const fused = root && inspectBarFusionData(comps,root,params);

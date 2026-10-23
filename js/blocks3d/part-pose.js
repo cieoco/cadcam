@@ -10,6 +10,7 @@ const basis=(u,v,n,p)=>[u.x,u.y,u.z,0,v.x,v.y,v.z,0,n.x,n.y,n.z,0,p.x,p.y,p.z,1]
 /** Child matrices already include all ancestors. Never compose a second parent. */
 export function attachPartMaterials(model,catalog,{comps=[],modules=[],points={},assemblyScope=false}={}) {
   const materialParts=[],diagnostics=[...catalog.diagnostics];
+  const boxReferences=new Set(comps.filter(c=>c.boxPanel).flatMap(c=>[c.p1.id,c.p2.id]));
   const add=(id,localMatrix,parent,pickKey,color)=>{
     const geometry=catalog.parts[id];
     if(!geometry||!localMatrix||!localMatrix.every(Number.isFinite)){diagnostics.push({status:'not_supported',code:'material_pose_or_geometry_missing',sourceIds:[id],pickKey});return false;}
@@ -18,6 +19,8 @@ export function attachPartMaterials(model,catalog,{comps=[],modules=[],points={}
     return true;
   };
   const visit=(scene,parent,prefix='')=>{
+    // Generator reference points locate panels; they are not drilled pivots or pins.
+    if(boxReferences.size)scene={...scene,pins:(scene.pins || []).filter(p=>!boxReferences.has(p.id)),grounds:(scene.grounds || []).filter(p=>!boxReferences.has(p.id))};
     const frame=scene.frame && {...scene.frame};
     if(frame&&add('frame',poseMatrix(undefined,0,frame.z),parent,`${prefix}frame`,frame.color))frame.materialPartId='frame';
     const sticks=(scene.sticks || []).map(s=>{

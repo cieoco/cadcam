@@ -1,0 +1,15 @@
+import {openBoxDialog} from '../js/blocks/box-dialog.js';
+import {boxesInWork} from '../js/blocks/box-generator.js';
+import {normalizeSnapshot,toSnapshot} from '../js/blocks/schema.js';
+import {storedProject} from '../js/blocks/project-envelope.js';
+import {faceCandidateModel} from '../js/blocks/face-candidate.js';
+const $=id=>document.getElementById(id);
+let work={kind:'blocks',v:1,comps:[],modules:[],params:{},counter:0},undo=[],viewer;
+const reloadWork=data=>{const n=normalizeSnapshot(data);if(!n)throw new Error('作品正規化失敗');return {...toSnapshot(n.comps,n,n.counter,n),modules:n.modules};};
+const report=message=>{$('result').textContent=JSON.stringify({message,undo:undo.length,parts:work.comps.length,boxes:boxesInWork(work)},null,2);};
+const open=initialRoot=>{const before=JSON.stringify(work);openBoxDialog({source:structuredClone(work),initialRoot,onConfirm:plan=>{if(JSON.stringify(work)!==before)return '作品已變更';undo.push(structuredClone(work));work=reloadWork(storedProject(plan.work));report('已確認');return '';}});};
+$('new').onclick=()=>open('');$('edit').onclick=()=>open(boxesInWork(work)[0]?.id || '');
+$('undo').onclick=()=>{if(undo.length)work=undo.pop();report('已復原');};
+$('reload').onclick=()=>{work=reloadWork(JSON.parse(JSON.stringify(storedProject(work))));report('保存重開');};
+$('three').onclick=async()=>{const {createViewer}=await import('../js/blocks3d/viewer.js');$('view').hidden=false;viewer||=createViewer($('view'));viewer.update(faceCandidateModel({work}).model);viewer.resize();viewer.tiltView();};
+report('待建立');

@@ -1,4 +1,5 @@
 import {fusionRoot} from '../core/bar-fusion.js';
+import {tabNutPartGeometry} from './tab-nut-plan.js';
 import {syringeShapes} from './syringe-shape.js';
 import {planSyringeAttachmentResize} from '../core/syringe.js';
 import {assemblySyringeShapes} from '../blocks3d/syringe-scene.js';
@@ -751,6 +752,7 @@ function drawBands(pts) {
   svg.appendChild(layer);
 }
 const isHiddenSliderRailPoint = (id) => Model.isHiddenSliderRailPoint(S.comps, id);
+const isBoxReference = (id) => S.comps.some(c=>c.boxPanel&&(c.p1?.id===id||c.p2?.id===id));
 const isSliderMountPoint = (id) => Model.isSliderMountPoint(S.comps, id);
 const sliderMountInfo = (id) => Model.sliderMountInfo(S.comps, id);
 // 以「世界座標 world」為中心，找畫面上最近的接點（排除 exclude），門檻 maxDist。
@@ -758,7 +760,7 @@ const nearestDisplayToPoint = (world, exclude = [], maxDist = snapWorld()) => {
   const m = displayCoords();
   let best = null, bestD = maxDist;
   for (const id in m) {
-    if (isHiddenSliderRailPoint(id)) continue;
+    if (isHiddenSliderRailPoint(id) || isBoxReference(id)) continue;
     if (exclude.includes(id)) continue;
     const d = Math.hypot(m[id].x - world.x, m[id].y - world.y);
     if (d < bestD) { bestD = d; best = id; }
@@ -775,7 +777,7 @@ const nearestDisplayTo = (id, exclude = []) => {
   const excludeSet = [id, ...exclude];
   let best = null, bestD = maxDist;
   for (const cid in m) {
-    if (isHiddenSliderRailPoint(cid)) continue;
+    if (isHiddenSliderRailPoint(cid) || isBoxReference(cid)) continue;
     if (excludeSet.includes(cid)) continue;
     if (S.modules.length && !canMergePoints(S.comps, id, cid)) continue;
     const dist = Math.hypot(m[cid].x - d.x, m[cid].y - d.y);
@@ -1052,6 +1054,25 @@ async function copyMember(mode) {
       fitView();return '';
     }});
   } catch(e) { console.error(e);transient('複製視窗載入失敗，請重試。'); }
+}
+let boxMakerDialog=null;
+async function openBoxMaker() {
+  if(bench.inCandidate?.()){transient('請先確認或取消接合預覽。');return;}
+  pause();const before=snapshotStr(),source=JSON.parse(before),selected=S.comps.find(c=>c.id===(S.selectedLinkId || S.selectedTriangleId));
+  document.getElementById('learningMore')?.classList.remove('is-open');
+  document.querySelector('.mobile-more-toggle')?.setAttribute('aria-expanded','false');
+  try{
+    const {openBoxDialog}=await import('./box-dialog.js');
+    if(snapshotStr()!==before){transient('作品已變更，請重新開啟卡榫盒子。');return;}
+    boxMakerDialog?.close();
+    boxMakerDialog=openBoxDialog({source,initialRoot:selected?.boxPanel?.rootPart || '',onConfirm:async plan=>{
+      if(snapshotStr()!==before)return '作品已變更，請取消後重新開啟。';
+      const normalized=Store.normalizeSnapshot(plan.work);if(!normalized)return '盒體資料無法保存，尚未修改作品。';
+      applySnapshot(normalized,{fit:false,source:'box-maker'});
+      presetDesignFocus(plan.rootModule);await bench.setMode('bench');fitView();
+      transient('盒體已加入組立；可從「卡榫盒子」再改尺寸。');return '';
+    }});
+  }catch(e){console.error(e);transient('卡榫盒子載入失敗，請重試。');}
 }
 // ---- 模組拖曳安裝（D9）：邏輯在 ./module-drag.js；points() 取 draw()／renderFrame() 最近一次的求解點 ----
 let lastFramePts = null;
@@ -1814,6 +1835,7 @@ function drawNow() {
     renderModulePlates({ plates: platesNow(allPts), svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), getPlates: platesNow, registerUpdate: fn => frameUpdaters.push(fn) });
   }
   const tabNutGeometry = S.modules.some(m=>m.mount?.face?.selection?.fastener) ? orthoExtrasNow().tabNutGeometry : {};
+  for(const c of vComps)if(c.boxPanel&&!tabNutGeometry[c.id])tabNutGeometry[c.id]=tabNutPartGeometry({},c);
   const renderScene = prepareRenderScene({
     compiled: viewCompiled, comps: vComps, points: pts, frameGeometry: frameGeometry2d, sceneIds,
     computeBodyLayers, motorAssemblyLayerForBody, motorMounts
@@ -1959,6 +1981,7 @@ function drawNow() {
   const camFollowerIds = new Set(vComps.filter(c => c.type === 'cam' && c.p2).map(c => c.p2.id));
   const workpieceIds = new Set(vComps.filter(c=>c.type==='workpiece'&&c.p1).map(c=>c.p1.id));
   const hiddenPointIds = new Set(Object.keys(pts).filter(id => isHiddenSliderRailPoint(id) || isSliderMountPoint(id)));
+  vComps.filter(c=>c.boxPanel).forEach(c=>[c.p1,c.p2].forEach(p=>hiddenPointIds.add(p.id)));
   renderNodes({
     points: pts, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds,
     gearPinIds, pulleyPinIds, camFollowerIds, workpieceIds, dragId: S.dragId,
@@ -2725,6 +2748,7 @@ function clearOffHomeModuleSelection() {
 // D3 守門包住 Input.onNodeDown：按到已安裝模組的節點時，先回組裝姿態，這一下不下拉。
 // renderNodes 與 Render.init 共用同一個包裝，行為才一致。
 function guardedNodeDown(e, id) {
+  if (isBoxReference(id)) { e?.preventDefault?.(); e?.stopPropagation?.(); return; }
   if (ensureModuleHome(moduleOfPoint(S.comps, id))) { e?.preventDefault?.(); e?.stopPropagation?.(); return; }
   Input.onNodeDown(e, id);
 }
@@ -2750,6 +2774,7 @@ function deleteSelectedPart() {
   if (!id) return;
   const comp = S.comps.find(c => c.id === id);
   if (!comp) return;
+  if(comp.boxPanel){transient('這是盒體的配對板件，請整組管理；尺寸從「卡榫盒子」修改。');return;}
   pushUndo();
   pause();
   // 刪除前先清掉這個元件佔用的 topo.params（型別表宣告它擁有哪些參數）
@@ -3337,6 +3362,7 @@ window.blocks.designDebug = () => ({
   motors: [...designMotorIds()]
 });
 Object.assign(window.blocks, {
+  openBoxMaker,
   copyMember,
   mateTool: on => mateTool.set(!!on), mateDebug: () => mateTool.debug(),
   setTriSide: memberEditor.selectDimension,
