@@ -16,6 +16,8 @@
 
 ## 產品與功能規格
 
+- [SDD-LASER-TAB-NUT-JOINT.md](SDD-LASER-TAB-NUT-JOINT.md) — 3 mm 板材／M3 榫槽與螺母鎖固接合試作草案；含相容契約、輸出及實物試片驗收，尚未實作。
+
 - [SDD-ACTUATOR-INSTALLATION.md](SDD-ACTUATOR-INSTALLATION.md) — 致動元件共同安裝流程、候選與驗收。
 
 - [SDD-ROD-SYRINGE-CREATION.md](SDD-ROD-SYRINGE-CREATION.md) — 桿件自由創作、針筒選取與組立可見性 LOOP
