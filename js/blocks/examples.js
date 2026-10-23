@@ -1,3 +1,4 @@
+import {tabNutSnapshot} from './tab-nut-example.js';
 import { centerForLinks } from '../core/chain-drive.js';
 import { PARALLEL_GRIPPER_EXAMPLE } from './parallel-gripper-example.js';
 import { COMMON_MANIPULATOR_EXAMPLES } from './common-manipulator-examples.js';
@@ -56,6 +57,7 @@ export const EXAMPLE_GROUPS = [
 ];
 
 const EXAMPLE_LESSONS = {
+  'tab-nut-m3':{group:'challenge',level:'製作試作',use:'用雙榫定位與 M3 螺絲／螺母固定垂直板件；材質、切縫與實物承載尚未驗證。',try:['切到組立，選立板調整接合；在製作設定下載三組配合試片','先量板厚與五金，試切後比較間隙；不要以模擬判定可承重']},
   'parallel-gripper': PARALLEL_GRIPPER_EXAMPLE.lesson,
   ...Object.fromEntries(COMMON_MANIPULATOR_EXAMPLES.map(example => [example.id, example.lesson])),
   'hydraulic-h05': {group:'lift-motion',level:'入門液壓',use:'側視組立：升降臂與夾爪各有一支針筒，夾爪模組裝在升降臂工具端隨臂轉；一個動作一個驅動。',try:['切到組立，用「升降針筒」「夾爪針筒」兩個切換鈕分別推','練習順序：先升再夾、先夾再升，記錄夾爪開口與臂角；接觸、承載與水路未驗證']},
@@ -1012,6 +1014,8 @@ for(const [id,label,snapshot] of [
   EXAMPLE_LESSONS[practiceId]={group:'challenge',level:'練習',use:'親手安裝針筒，完成後才能試動。',
     try:['新增 → 動力來源 → 10cc液壓針筒（管夾固定）','固定外殼 → 位置方向 → 連接輸出 → 試動確認；依第九、十單元檢查並保存']};
 }
+
+ALL_BLOCK_EXAMPLES.push({id:'tab-nut-m3',title:'製作：3 mm／M3 榫槽接合',note:'兩個定位榫＋一組螺絲／螺母。可修改與輸出；試片、材料及承載待實測。',snapshot:tabNutSnapshot});
 
 export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES.filter(
   example => example.id !== 'competition-flywheel-shooter'

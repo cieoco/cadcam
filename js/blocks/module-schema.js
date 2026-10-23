@@ -236,8 +236,10 @@ function validateMount(rawMount, moduleId, outputsByModule, validModuleIds, warn
 }
 
 export function normalizeModules(rawModules, comps) {
+  for(const m of Array.isArray(rawModules)?rawModules:[]){const f=m?.mount?.face;if(f&&(f.version!==1||f.selection?.fastener!==undefined)&&!normalizeFaceMountContract(f).ok)return {ok:false,modules:[],comps,warnings:['榫槽接合格式不受支援或已損壞；拒絕開啟以免遺失加工特徵。']};}
   const warnings = [];
   const srcComps = Array.isArray(comps) ? comps : [];
+  if((Array.isArray(rawModules)?rawModules:[]).some(m=>m?.mount?.face?.version===2&&srcComps.filter(c=>c.id===m.mount.face.childPart&&c.moduleId===m.id).length!==1))return {ok:false,modules:[],comps:srcComps,warnings:['榫槽立板參照遺失或不唯一，已拒絕開啟。']};
   let outComps = srcComps.map(c => ({ ...c }));
   const rawList = Array.isArray(rawModules) ? rawModules : [];
 
@@ -376,5 +378,6 @@ export function normalizeModules(rawModules, comps) {
     return out;
   });
 
+  if((Array.isArray(rawModules) ? rawModules : []).some(m=>m?.mount?.face&&(m.mount.face.version!==1||m.mount.face.selection?.fastener!==undefined)&&!modules.some(n=>n.id===m.id&&n.mount?.face?.version===2)))return {ok:false,modules:[],comps:outComps,warnings:[...warnings,'榫槽接合無法完整保留，拒絕遺失加工特徵的作品。']};
   return { ok: true, modules, comps: outComps, warnings };
 }

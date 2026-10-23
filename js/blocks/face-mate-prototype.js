@@ -1,3 +1,4 @@
+import {TAB_NUT_DEFAULTS} from './tab-nut-geometry.js';
 import {candidateMaterialFaces,candidateHostFace,candidateCoverageText,candidateConfirmLabel} from './face-candidate-view.js';
 import {applyMatrix4} from '../blocks3d/orthogonal-3d.js';
 import {hitLabels} from './part-labels.js';
@@ -35,10 +36,21 @@ $('previewToggle').addEventListener('click', () => {
   requestAnimationFrame(preview);
 });
 let hasConfirmed = false, roughPlaced = false, configured = false, childConfirmed = false;
-let bracketPlan = null, jointSettings, useBracketHoles=true;
+let bracketPlan = null, jointSettings, useBracketHoles=true, fastenerKind='bracket', tabNutSettings={...TAB_NUT_DEFAULTS};
+$('fastenerKind').addEventListener('change',()=>{fastenerKind=$('fastenerKind').value;render();});
+for(const format of ['svg','dxf']){
+ const button=document.createElement('button');button.type='button';button.textContent=`下載 3 mm 試片 ${format.toUpperCase()}`;button.style.minHeight='44px';
+ button.onclick=async()=>{const {tabNutCouponFile}=await import('./tab-nut-coupons.js');const blob=new Blob([tabNutCouponFile(format)],{type:format==='svg'?'image/svg+xml':'application/dxf'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`tab-nut-3mm-M3-trial.${format}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};$('tabNutSettings').append(button);
+}
+const couponNote=document.createElement('p');couponNote.textContent='試片固定為 3 mm 名義尺寸，與目前作品設定分開。左底板／右立板，依圖面 y=25、80、135 mm 三列：總間隙 0.05／0.15／0.25 mm。先量測板厚與五金，再試切。';$('tabNutSettings').append(couponNote);
+
+for(const [key,label] of [['alongMm','沿板邊位置 mm'],['slotClearanceMm','插槽總間隙 mm'],['screwLengthMm','螺絲長度 mm'],['nutAcrossMm','螺母對邊 mm'],['nutHeightMm','螺母厚度 mm'],['nutClearanceMm','螺母槽總間隙 mm'],['washerThicknessMm','墊片厚度 mm'],['washerDiameterMm','墊片外徑 mm']]){
+ const l=document.createElement('label'),input=document.createElement('input');input.id=`tabNut-${key}`;input.type='number';input.step='any';input.inputMode='decimal';input.value=tabNutSettings[key];input.style.cssText='min-width:0;width:100%;box-sizing:border-box;min-height:44px;font-size:16px';l.htmlFor=input.id;l.textContent=label;
+ input.addEventListener('change',()=>{tabNutSettings[key]=input.value.trim()===''?NaN:Number(input.value);render();});$('tabNutFields').append(l,input);
+}
 $('bracketHoles').addEventListener('change',()=>{useBracketHoles=$('bracketHoles').checked;render();});
 let parentCandidate=null,previewRequest=0,previewSignature='',previewTimer=null,candidateClosed=false;
-function integratedSelection(mate){const selected={...draft};if(useBracketHoles&&Math.abs(mate.rotation[2][2])<1e-6)selected.brackets={enabled:true,offsets:{...bracketOffsets},childPart:children[draft.child].surface?.compId || 'frame'};else delete selected.brackets;return selected;}
+function integratedSelection(mate){const selected={...draft};delete selected.fastener;delete selected.brackets;if(fastenerKind==='tab-nut')selected.fastener={...tabNutSettings};else if(useBracketHoles&&Math.abs(mate.rotation[2][2])<1e-6)selected.brackets={enabled:true,offsets:{...bracketOffsets},childPart:children[draft.child].surface?.compId || 'frame'};return selected;}
 function requestCandidate(mate){
  if(!integrated||step!==3||!loadSession.ready)return;
  const selection=integratedSelection(mate),signature=JSON.stringify(selection);
@@ -50,6 +62,7 @@ function requestCandidate(mate){
 }
 function candidateLabel(id,candidate){if(id.includes('/screw'))return '固定螺絲頭';return hitLabels([id],candidate.work?.comps || [],candidate.work?.modules || [])[0] || '板件';}
 function showCandidate(candidate){
+ const error=$('tabNutFeedback');error.hidden=fastenerKind!=='tab-nut'||!!candidate.saveable;error.textContent=error.hidden?'':candidate.reason || '接頭有干涉或資料無法驗證，請調整。';
  let box=document.getElementById('faceValidation');
  if(!box){box=document.createElement('div');box.id='faceValidation';box.style.cssText='padding:8px;overflow-wrap:anywhere;';box.setAttribute('aria-live','polite');$('message').after(box);}
  box.replaceChildren();const v=candidate.validation;
@@ -282,7 +295,7 @@ function drawCandidateScene(mate){
  const svg=$('scene');svg.replaceChildren();$('bracketNote').hidden=false;fitControls.hidden=false;
  bracketPlan=parentCandidate?.bracket || null;bracketSpan=bracketPlan?.span || 0;
  const pending=parentCandidate?.selectionRevision!==previewSignature;
- $('bracketNote').textContent=pending?'此圖為上次候選；目前設定待檢查。':bracketPlan?.ok?`角碼 ${bracketPlan.brackets.length} 顆 · 固定孔 Ø3.2`:parentCandidate?.reason || '僅幾何定位，尚未配置固定五金。';
+ $('bracketNote').textContent=pending?'此圖為上次候選；目前設定待檢查。':parentCandidate?.tabNut?.ok?'3 mm 板雙榫＋M3 · 試作，實物待核對':bracketPlan?.ok?`角碼 ${bracketPlan.brackets.length} 顆 · 固定孔 Ø3.2`:parentCandidate?.reason || '僅幾何定位，尚未配置固定五金。';
  if(!parentCandidate?.model){$('mateOverlay').hidden=true;return;}
  const faces=candidateMaterialFaces(parentCandidate.model),points=faces.flatMap(f=>f.rings.flat()),projected=points.map(viewCoords);
  const minX=Math.min(...projected.map(p=>p.x)),maxX=Math.max(...projected.map(p=>p.x)),minY=Math.min(...projected.map(p=>p.y)),maxY=Math.max(...projected.map(p=>p.y));
@@ -505,7 +518,7 @@ function preview() {
   faceRelation.textContent = `${relation} · 間距 ${draft.gap} mm`;
   $('summary').textContent = `${relation}：${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
   const blocked=integrated && (step > 0 || choosingChild) && (!childConfirmed || !!children[draft.child].blockedReason);
-  const mate = solve();$('bracketChoice').hidden=!integrated||step!==3||!mate.ok||Math.abs(mate.rotation[2][2])>=1e-6;$('bracketHoles').checked=useBracketHoles;if(mate.ok && !blocked)requestCandidate(mate);$('next').disabled = blocked || !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || !!document.querySelector('input[aria-invalid="true"]');
+  const mate = solve();$('fastenerChoice').hidden=!integrated||step!==3;$('fastenerKind').value=fastenerKind;$('tabNutSettings').hidden=fastenerKind!=='tab-nut';if(fastenerKind!=='tab-nut')$('tabNutFeedback').hidden=true;$('bracketChoice').hidden=fastenerKind==='tab-nut'||!integrated||step!==3||!mate.ok||Math.abs(mate.rotation[2][2])>=1e-6;$('bracketHoles').checked=useBracketHoles;if(mate.ok && !blocked)requestCandidate(mate);$('next').disabled = blocked || !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || !!document.querySelector('input[aria-invalid="true"]');
   if(integrated&&step===3)$('next').textContent=candidateConfirmLabel(parentCandidate,parentCandidate?.selectionRevision!==previewSignature);
   if (mate.ok) scene(mate);
   else { $('mateOverlay').hidden = true; $('message').textContent = mate.reason; $('message').classList.add('error'); }
@@ -528,7 +541,7 @@ if (integrated) {
     mode = 'wizard';
     jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; choosingChild = false; configured = !!e.data.configured; childConfirmed=!!e.data.childConfirmed; roughPlaced = configured;
     bracketOffsets = { ...(draft.brackets?.offsets || {}) };
-    useBracketHoles=!configured||!!draft.brackets;
+    useBracketHoles=!configured||!!draft.brackets;fastenerKind=draft.fastener?'tab-nut':'bracket';tabNutSettings={...TAB_NUT_DEFAULTS,...draft.fastener};for(const input of $('tabNutFields').querySelectorAll('input'))input.value=tabNutSettings[input.id.replace('tabNut-','')];
     // 預設面僅作預選；只有明確重新調整位置才略過選面。
     if (e.data.startAtPlacement) step = 3;
     if (configured && !document.getElementById('optionalView')) {

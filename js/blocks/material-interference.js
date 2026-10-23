@@ -100,7 +100,7 @@ function prepared(p){
  const l=localMaterial(p.geometry),outer=l.outer.map(s=>prism(s,m)),inner=l.inner.map(s=>prism(s,m));
  return {part:p,outer,inner,box:boxOf(outer.flatMap(p=>p.vertices))};
 }
-const hardware=p=>['bracket-wing','screw','screw-head'].includes(p.geometry.kind);
+const hardware=p=>['bracket-wing','screw','screw-head','nut','washer'].includes(p.geometry.kind);
 const pairedId=p=>p.holePairId || p.geometry.holePairId;
 function namedShaft(a,b){
  const screw=a.geometry.kind==='screw'?a:b.geometry.kind==='screw'?b:null,stock=screw===a?b:a;

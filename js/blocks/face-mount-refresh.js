@@ -32,7 +32,7 @@ export function refreshFaceMounts(comps, modules, params, { exportSettings = {},
     if (!host || !child) return retain('endpoint_geometry_unavailable', '接合板已改變，請重新選面；已保留原安裝姿態。');
     const placement = buildFacePlacement({ host: reference(host), child: reference(child), selection: mod.mount.face.selection });
     if (!placement.ok) return retain('face_placement_invalid', placement.reason);
-    const face = { version: 1, ...placement.record.transform, selection: placement.record.selection,
+    const face = { version: mod.mount.face.version, ...placement.record.transform, selection: placement.record.selection,
       ...(mod.mount.face.childPart !== undefined ? { childPart: part } : {}),
       hostThicknessMm: host.box.max.z - host.box.min.z, childThicknessMm: child.box.max.z - child.box.min.z };
     const unmounted = modules.map(m => m.id === mod.id ? { ...m, mount: null } : m);

@@ -7,6 +7,7 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-10-23：加入毫米尺規，保留約 10 KB 的增量上限。
 // 2026-10-23：加入鏈輪與 #25 鏈條核心（約 12 KB），上限放寬到 1.925MB。
 // 2026-10-23：鏈傳動（S1–S3）保留完整註解後，上限再放寬到 1.93MB，原因是鏈輪與鏈條功能。
-check('首次JS原始大小低於1.93MB',r.bytes<1930000);
+// 2026-10-24：榫槽接合共用幾何、保存封裝與2D/3D橋接增加約22 KB（基準1,929,444 bytes）；試片下載仍懶載入。
+check('首次JS原始大小低於1.96MB',r.bytes<1960000);
 check('歷史紀錄點開才載入',!r.paths.includes('js/version-history.js')&&r.lazyEntries.includes('js/version-history.js'));
 report('startup-size');

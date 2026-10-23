@@ -316,7 +316,7 @@ export function createMateWizard(h) {
     row.appendChild(off); row.appendChild(edit); root.appendChild(row);
     if (mod.mount?.face) {
       const status = faceBracketStatus(S.comps,S.modules,params(),mod,{exportSettings:S.fabrication?.export || {},stockMm:S.fabrication?.cnc?.stockThicknessMm || 3,joint:S.fabrication?.joint});
-      root.appendChild(el('div','bench-note',status.fixed?'角碼與固定孔已確認':'已定位，尚未固定'));
+      root.appendChild(el('div','bench-note',status.fixed?(mod.mount.face.selection.fastener?'榫槽與五金已生成（試作）':'角碼與固定孔已確認'):'已定位，尚未固定'));
       root.appendChild(el('div','bench-note',status.reason));
       if(!status.fixed&&status.configurable!==false)root.appendChild(btn('配置角碼','primary',()=>h.openFaces(mod,true,true)));
       const change = btn('重新選面與尺寸', 'primary', () => h.openFaces(mod, true)); root.appendChild(change);

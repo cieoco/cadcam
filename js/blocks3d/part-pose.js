@@ -1,3 +1,4 @@
+import {attachTabNutHardware} from './tab-nut-hardware.js';
 /** Scene structure supplies heights; catalog supplies material. No shape reconstruction. */
 import { IDENTITY_4, multiply4 } from './orthogonal-3d.js';
 import {assemblyRoles} from '../blocks/assembly-roles.js';
@@ -73,5 +74,6 @@ export function attachPartMaterials(model,catalog,{comps=[],modules=[],points={}
       if(!connection.capabilities.geometry)for(const d of connection.diagnostics)diagnostics.push({...d,status:'not_supported',sourceIds:[d.partId || mod.id]});
     }
   }
+  attachTabNutHardware(materialParts,catalog.extras?.tabNutPlans,comps);
   return {...main,materialParts,geometryDiagnostics:diagnostics,geometryKey:catalog.key};
 }

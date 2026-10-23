@@ -1,4 +1,5 @@
 /** Plain F1 candidate and once-only transaction; no S, DOM, undo or storage access. */
+import {tabNutPlans} from './tab-nut-plan.js';
 import {buildMountSurfaces,findMountSurface,partMountOutput} from './mount-surfaces.js';
 import {buildFacePlacement} from './face-placement.js';
 import {mountFacePlacement} from './face-mount.js';
@@ -44,12 +45,14 @@ export function buildFaceCandidate(source,{childId,hostEndpoint,childEndpoint,se
  if(!host||!child)return failed('endpoint_missing','接合端點已不存在，請重新選面。',sourceRevision);
  const placement=buildFacePlacement({host:centeredFaceSurface(host),child:centeredFaceSurface(child),selection});
  if(!placement.ok)return failed('placement_invalid',placement.reason,sourceRevision);
- const face={version:1,childPart:child.compId || 'frame',...placement.record.transform,selection:placement.record.selection,hostThicknessMm:host.box.max.z-host.box.min.z,childThicknessMm:child.box.max.z-child.box.min.z};
+ const face={version:selection.fastener?2:1,childPart:child.compId || 'frame',...placement.record.transform,selection:placement.record.selection,hostThicknessMm:host.box.max.z-host.box.min.z,childThicknessMm:child.box.max.z-child.box.min.z};
  const mounted=mountFacePlacement(work.comps,work.modules,childId,{hostId:host.moduleId,outputId:host.outputId,frameEdge:hostEndpoint?.frame?.edge ?? hostEndpoint?.frameEdge,face},work.params);
  if(!mounted.ok)return failed('mount_invalid',mounted.reason,sourceRevision);
  work.modules=work.modules.map(m=>m.id===childId?{...m,mount:mounted.mount}:m);
  const prepared=prepareConnectionWork(work.comps,work.modules,work.topo,{stockMm,exportSettings});work.modules=prepared.modules;work.params=work.topo.params;
  const mod=work.modules.find(m=>m.id===childId);
+ const tabNut=selection.fastener?tabNutPlans(work.comps,work.modules,work.params,{stockMm,exportSettings}).find(p=>p.moduleId===childId):null;
+ if(selection.fastener&&!tabNut?.ok)return freezeData({...failed('tab_nut_invalid',tabNut?.reason || '榫槽接合無法驗證。',sourceRevision),selectionRevision:JSON.stringify(selection)});
  const bracket=selection.brackets?faceBracketPlan(work.comps,work.modules,work.params,mod,{stockMm,joint,exportSettings}):null;
  if(selection.brackets&&!bracket?.ok){
   // Placement can be viewed while its requested fasteners are invalid. Only
@@ -59,8 +62,8 @@ export function buildFaceCandidate(source,{childId,hostEndpoint,childEndpoint,se
   const invalid=failed('fastener_invalid',bracket?.reason || '角碼固定設定不合法。',sourceRevision);
   return freezeData({...invalid,validation:{...invalid.validation,checks:[...invalid.validation.checks,{status:'pass',code:'placement_valid'}]},saveable:false,selectionRevision:JSON.stringify(selection),hostSurface:host,placement:placement.record,bracket,work:{...work,stockMm,joint,exportSettings},displayWork});
  }
- return freezeData({ok:true,sourceRevision,selectionRevision:JSON.stringify(selection),hostSurface:host,work:{...work,stockMm,joint,exportSettings},placement:placement.record,bracket,
-  validation:{status:'not_checked',sourceRevision,checks:[{status:'pass',code:'placement_valid'},{status:bracket?'pass':'not_checked',code:bracket?'fastener_valid':'fastener_not_requested'}],coverage:{scope:'face_candidate'}}});
+ return freezeData({ok:true,sourceRevision,selectionRevision:JSON.stringify(selection),hostSurface:host,work:{...work,stockMm,joint,exportSettings},placement:placement.record,bracket,tabNut,
+  validation:{status:'not_checked',sourceRevision,checks:[{status:'pass',code:'placement_valid'},{status:bracket||tabNut?'pass':'not_checked',code:bracket||tabNut?'fastener_valid':'fastener_not_requested'}],coverage:{scope:'face_candidate'}}});
 }
 export function faceCandidateModel(candidate,pose={}){
  const work=structuredClone(candidate.displayWork || candidate.work);
@@ -96,7 +99,7 @@ export async function validateFaceCandidate(candidate,pose={},compute,sceneInput
  const args={comps:scene.work.comps,modules:scene.work.modules,params:scene.work.params,exportSettings:{...scene.work.exportSettings,drive:scene.work.fabrication?.drive || FABRICATION_DEFAULTS.drive},cnc:scene.work.fabrication?.cnc,mounts:scene.mounts,joint:scene.work.joint};
  const {plan}=resolveSpacers(args),plane=findInterference({...args,plan,pose:{...(pose.motorAngles || {}),'1':pose.motorAngles?.['1'] ?? pose.theta ?? 0}});
  checks.push({status:plane.length?'fail':'pass',code:'in_plane_interference',findings:plane},{status:material.status,code:'material_interference',findings:material.findings});
- return freezeData({...candidate,saveable:candidate.ok&&!materialUnsupported,...(materialUnsupported?{reason:'部分板件材料或姿態無法驗證，不能確認。'}:{}),work:candidate.ok?scene.work:candidate.work,model,points:scene.points,hostReference:scene.hostReference,validation:{status:!candidate.ok||plane.length||material.status==='fail'?'fail':material.status,sourceRevision:candidate.sourceRevision,selectionRevision:candidate.selectionRevision,geometryKey:model.geometryKey,poseRevision,checks,material,coverage:material.coverage}});
+ return freezeData({...candidate,saveable:candidate.ok&&!materialUnsupported&&!(candidate.work.modules.some(m=>m.mount?.face?.selection?.fastener)&&(material.status==='fail'||plane.length)),...(materialUnsupported?{reason:scene.catalog?.extras?.diagnostics?.find(d=>d.status==='fail')?.reason || '部分板件材料或姿態無法驗證，不能確認。'}:{}),work:candidate.ok?scene.work:candidate.work,model,points:scene.points,hostReference:scene.hostReference,validation:{status:!candidate.ok||plane.length||material.status==='fail'?'fail':material.status,sourceRevision:candidate.sourceRevision,selectionRevision:candidate.selectionRevision,geometryKey:model.geometryKey,poseRevision,checks,material,coverage:material.coverage}});
 }
 export function createFaceCandidateTransaction({readSource,readPose=()=>({}),build=buildFaceCandidate,validate=validateFaceCandidate,commit}){
  const sourceRevision=faceSourceRevision(readSource());let serial=0,current=null,pending=false,closed=false,confirming=false;

@@ -1,3 +1,4 @@
+import {tabNutPartGeometry} from './tab-nut-plan.js';
 import {inspectBarFusion} from './bar-fusion-geometry.js';
 /** Fabrication geometry is design data; solved positions are separate PartPose data. */
 import * as Exporters from './exporters.js';
@@ -59,12 +60,12 @@ export function buildPartGeometryCatalog(args={}) {
           memberStocks[comp.id]=stock;continue;
         }
         const a=homePoints[comp.p1.id],b=homePoints[comp.p2.id],length=Math.hypot(b.x-a.x,b.y-a.y);
-        const g=split.hosted.has(comp.id)?Exporters.hostedBarGeometry(comp,homePoints,settings,split.hosted.get(comp.id),extras.linkHoles[comp.id] || []):Exporters.inspectLinkExport(comp,length,settings,extras.linkHoles[comp.id] || []);
+        const g=tabNutPartGeometry(extras,comp,{local:true}) || (split.hosted.has(comp.id)?Exporters.hostedBarGeometry(comp,homePoints,settings,split.hosted.get(comp.id),extras.linkHoles[comp.id] || []):Exporters.inspectLinkExport(comp,length,settings,extras.linkHoles[comp.id] || []));
         add(comp.id,'bar',g,stock.thicknessMm,[comp.id],{kind:'member',pointIds:[comp.p1.id,comp.p2.id]},comp.moduleId);
         memberStocks[comp.id]=stock;
       } else if(comp.type==='triangle'&&!comp.fusedWith) {
         const ids=[comp.p1.id,comp.p2.id,comp.p3.id],points=ids.map(id=>homePoints[id]);
-        const g=Exporters.inspectPlateExport(comp,points,settings,split.hosted.get(comp.id),extras.plateHoles[comp.id] || []);
+        const g=tabNutPartGeometry(extras,comp) || Exporters.inspectPlateExport(comp,points,settings,split.hosted.get(comp.id),extras.plateHoles[comp.id] || []);
         add(comp.id,'triangle',mapGeometry(g,localizer(points[0],points[1])),stock.thicknessMm,[comp.id],{kind:'member',pointIds:ids},comp.moduleId);
         memberStocks[ids.join(',')]=stock;
       } else if(comp.type==='gear') {

@@ -68,7 +68,7 @@ export function readConnectionHost({comps=[],modules=[],mount}={}){
 export function readConnectionDescriptor({ comps = [], modules = [], childId, mount } = {}) {
  const found=unique(modules,m=>m.id===childId),childModule=found.value;
  const saved=mount===undefined?childModule?.mount:mount,diagnostics=[];
- const result={id:`connection:${childId}`,sourceFormat:saved?.face?'face-v1':saved?.orient?'orient':saved?'planar':'unmounted',source:saved?clone(saved):null,
+ const result={id:`connection:${childId}`,sourceFormat:saved?.face?`face-v${saved.face.version}`:saved?.orient?'orient':saved?'planar':'unmounted',source:saved?clone(saved):null,
   host:null,child:null,placement:null,fastener:null,capabilities:{placement:false,endpoints:false,refresh:false,drilling:false,geometry:false},diagnostics,ok:false};
  if(!saved){diagnostics.push(reason(found.ambiguous?'child_module_ambiguous':'connection_missing','尚未設定唯一接合。'));return result;}
  if(saved.face&&saved.orient){diagnostics.push(reason('connection_source_ambiguous','同一接合同時保存 face 與 orient，不能猜選其中一種來源。'));return result;}
@@ -78,7 +78,7 @@ export function readConnectionDescriptor({ comps = [], modules = [], childId, mo
   if(!normalized.ok){diagnostics.push(reason('face_record_invalid',normalized.reason));return result;}
   const face=normalized.value;
   result.placement={rotation:clone(face.rotation),translation:clone(face.translation),selection:clone(face.selection),hostThicknessMm:face.hostThicknessMm,childThicknessMm:face.childThicknessMm};
-  result.fastener=face.selection.brackets?clone(face.selection.brackets):null;
+  result.fastener=face.selection.fastener?clone(face.selection.fastener):face.selection.brackets?clone(face.selection.brackets):null;
   // Only older *confirmed fastener records* identify a legacy child part. A
   // current preset or normalDeg cannot resolve missing persisted identity.
   const explicit=face.childPart!==undefined,partId=explicit?face.childPart:face.selection.brackets?.childPart;

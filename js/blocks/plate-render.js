@@ -5,6 +5,7 @@
  * 不持有 Blocks 狀態；選取、拖曳與刪除行為由 app 注入。
  */
 
+import {tabNutPath} from './tab-nut-view.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svgEl = tag => document.createElementNS(SVG_NS, tag);
 
@@ -71,7 +72,7 @@ export function drawPlate({ component, points, ctx, svg, scale, project, selecte
       hubs.push({ element: hub, id: point.id });
     });
   }
-  if (plateExtras) path.setAttribute('fill-rule', 'evenodd');
+  if (plateExtras || ctx.tabNutGeometry?.[component.id]) path.setAttribute('fill-rule', 'evenodd');
   if (component.shape === 'jaw') {
     path.setAttribute('fill', (component.color || '#ff7043') + '26');
     path.setAttribute('stroke-linejoin', 'round');
@@ -80,7 +81,7 @@ export function drawPlate({ component, points, ctx, svg, scale, project, selecte
     const worldPoints = ids.map(id => current[id]);
     const valid = worldPoints.every(point => point && Number.isFinite(point.x) && Number.isFinite(point.y));
     path.style.display = valid ? '' : 'none';
-    if (valid) path.setAttribute('d', platePath(component, worldPoints, plateExtras) || roundedPath(...worldPoints));
+    if (valid) path.setAttribute('d', tabNutPath(ctx.tabNutGeometry?.[component.id],component,current,project) || platePath(component, worldPoints, plateExtras) || roundedPath(...worldPoints));
     hubs.forEach(hub => {
       const point = current[hub.id];
       const hubValid = valid && point && Number.isFinite(point.x) && Number.isFinite(point.y);

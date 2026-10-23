@@ -11,6 +11,7 @@
  * comps 是 wizard 風格組件陣列、params 是長度等參數（topo.params），tracePoint 是選配軌跡點。
  */
 
+import {storedProject} from './project-envelope.js';
 import { encodeSnapshot, decodeShareString } from '../share-codec.js';
 import { toSnapshot, normalizeSnapshot, highestIdNum } from './schema.js?v=20261007_singleface';
 
@@ -22,7 +23,7 @@ export { toSnapshot, normalizeSnapshot, highestIdNum };
 // 把外來物件正規化成 { comps, params, counter }，不合法回傳 null。
 // ---- localStorage 自動存檔 ----
 export function saveLocal(snapshot) {
-  try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(snapshot)); } catch (_) {}
+  try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(storedProject(snapshot))); } catch (_) {}
 }
 export function loadLocal() {
   try {
@@ -36,7 +37,7 @@ export function clearLocal() {
 
 // ---- 檔案 ----
 export function downloadJson(snapshot, filename) {
-  const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(storedProject(snapshot), null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename || 'blocks.json';
@@ -48,7 +49,7 @@ export function downloadJson(snapshot, filename) {
 
 // ---- 分享連結 ----
 export function buildShareUrl(snapshot) {
-  const enc = encodeSnapshot(snapshot);        // base64url，URL 安全
+  const enc = encodeSnapshot(storedProject(snapshot));        // base64url，URL 安全
   return location.origin + location.pathname + '#m=' + enc;
 }
 

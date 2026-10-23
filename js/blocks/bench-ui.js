@@ -102,7 +102,7 @@ export function createBench(deps) {
     if (!mod.mount) return '未安裝';
     const host = modOf(mod.mount.to.module);
     const hostName = host ? displayName(host.id) : mod.mount.to.module;
-    if (mod.mount.face) return `六面接合 · ${hostName}${faceBracketStatus(S.comps,S.modules,S.topo.params,mod,{exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint}).fixed ? '（角碼固定）' : '（已定位，尚未固定）'}`;
+    if (mod.mount.face) return `六面接合 · ${hostName}${faceBracketStatus(S.comps,S.modules,S.topo.params,mod,{exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint}).fixed ? (mod.mount.face.selection.fastener ? '（榫槽鎖固・試作）' : '（角碼固定）') : '（已定位，尚未固定）'}`;
     let outName = mod.mount.to.output || '';
     if (mod.mount.orient) {
       // C1：宿主邊可以是桿、三角板的邊或機架板的邊
@@ -1339,7 +1339,7 @@ export function createBench(deps) {
       exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,
       fabrication:S.fabrication,readSource:()=>({...assemblyWork(S.comps,S.modules,S.topo),topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint}),
       readPose:()=>deps.connectionPose?.() || ({theta:S.theta,motorAngles:motorAnglesNow()}),say,
-      commit: (result,validation,candidate) => { const mutable=mergeAssemblyWork(S.comps,S.modules,S.topo,structuredClone(result));pushUndo(); S.comps=mutable.comps;S.modules=mutable.modules;S.topo=mutable.topo;rebuild({save:false});deps.adoptConnectionPose?.(candidate.points);draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? (validation?.status==='fail'?'已接上（有干涉），角碼固定孔已生成；請調整作品。':'已接上，角碼固定孔已生成；部分五金仍未檢查。') : '已定位，尚未固定。請查看下方固定方式說明。'); syncUI(true); }
+      commit: (result,validation,candidate) => { const mutable=mergeAssemblyWork(S.comps,S.modules,S.topo,structuredClone(result));pushUndo(); S.comps=mutable.comps;S.modules=mutable.modules;S.topo=mutable.topo;rebuild({save:false});deps.adoptConnectionPose?.(candidate.points);draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.fastener ? '已接上，榫槽與 M3 五金已生成；實物試切待驗證。' : result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? (validation?.status==='fail'?'已接上（有干涉），角碼固定孔已生成；請調整作品。':'已接上，角碼固定孔已生成；部分五金仍未檢查。') : '已定位，尚未固定。請查看下方固定方式說明。'); syncUI(true); }
     });
   }
   wiz = createMateWizard({

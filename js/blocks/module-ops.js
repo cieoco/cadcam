@@ -6,6 +6,7 @@
  */
 import { compileAssembly, solveAssembly, outputPose, transformComp, planeOf, orthogonalHostEdge } from './assembly.js?v=20261007_m5a';
 import { pointKeysFor } from './part-types.js';
+import {readStoredProject,storedProject} from './project-envelope.js';
 import { normalizeSnapshot } from './schema.js?v=20261007_singleface';
 import { normalizeModules, sanitizeName } from './module-schema.js?v=20261007_singleface';
 import { BLOCK_EXAMPLES } from './examples.js';
@@ -574,6 +575,7 @@ export function moduleToTemplate(comps, modules, params, moduleId) {
 
 // 走 normalizeSnapshot（零件）＋ normalizeModules（base／outputs，用暫時 moduleId）同一套檢查。
 export function normalizeTemplate(raw) {
+  raw=readStoredProject(raw);
   if (raw && typeof raw === 'object' && raw.kind === 'blocks-composite') return normalizeComposite(raw);
   if (!raw || typeof raw !== 'object' || raw.kind !== 'blocks-module') {
     return { ok: false, template: null, warnings: ['kind 必須是 blocks-module，已拒絕。'] };
@@ -942,6 +944,9 @@ export function instantiateComposite(template, ctx) {
       if (sm.to.edge !== undefined) to.edge = sm.to.edge;                   // C1：三角板的邊序號
       if (sm.to.frame !== undefined) to.frame = { ...sm.to.frame };         // C1：機架板外框的邊序號
       mount = { ...clone(sm), to };
+      // 面接合的安裝端與 comps 一起改號，避免複合模組再次加入後指向舊零件。
+      if (mount.face?.childPart && mount.face.childPart !== 'frame') mount.face.childPart = renameStr(mount.face.childPart);
+      if (mount.face?.selection?.brackets?.childPart && mount.face.selection.brackets.childPart !== 'frame') mount.face.selection.brackets.childPart = renameStr(mount.face.selection.brackets.childPart);
       const home = {};
       Object.keys(sm.home || {}).forEach(k => { if (motorMap.has(String(k))) home[motorMap.get(String(k))] = sm.home[k]; });
       mount.home = home;
@@ -1109,5 +1114,5 @@ export function parseLibrary(jsonString) {
 }
 
 export function serializeLibrary(list) {
-  return JSON.stringify(Array.isArray(list) ? list : []);
+  return JSON.stringify(Array.isArray(list) ? list.map(storedProject) : []);
 }

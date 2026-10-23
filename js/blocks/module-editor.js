@@ -126,7 +126,7 @@ export function createModuleEditor(deps) {
     const host = S.modules.find(m => m.id === mod.mount.to.module);
     const labels = moduleLabels(S.modules);
     const hostName = host ? labels.get(host.id) : mod.mount.to.module;
-    if (mod.mount.face) return `六面接合 · ${hostName}（轉接件待設計）`;
+    if (mod.mount.face) return `六面接合 · ${hostName}（${mod.mount.face.selection.fastener ? '榫槽鎖固・試作' : '轉接件待設計'}）`;
     const hostEdgeName = mod.mount.to.frame || mod.mount.to.edge !== undefined ? mountPortName(S.comps, S.modules, mod.mount, S.topo.params) : null;   // C1：板／機架的邊
     const outName = hostEdgeName ? hostEdgeName : mod.mount.to.frame ? '機架' : mod.mount.to.body
       ? ((host && (host.outputs || []).find(o => o.body && o.body.id === mod.mount.to.body) || {}).name || mod.mount.to.body)

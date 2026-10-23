@@ -1,3 +1,4 @@
+import {normalizeTabNut} from './tab-nut-geometry.js';
 import { normalizeBracketSelection } from './face-bracket-geometry.js?v=20261008_bracket3d';
 /** Pure validation for the persisted six-face module mount contract. */
 const FACE_IDS = new Set(['right', 'left', 'front', 'back', 'top', 'bottom']);
@@ -18,7 +19,7 @@ function validRotation(rotation) {
 
 export function normalizeFaceMountContract(raw) {
   const fail = reason => ({ ok: false, reason });
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || raw.version !== 1) return fail('face.version 必須是 1。');
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || ![1,2].includes(raw.version)) return fail('face.version 必須是 1 或 2。');
   if (Object.hasOwn(raw, 'orient') || Object.hasOwn(raw, 'flip')) return fail('face 安裝不能同時帶有 orient 或 flip。');
   if (!validRotation(raw.rotation)) return fail('face.rotation 必須是有限、正交且行列式為 +1 的 3×3 矩陣。');
   const t = raw.translation;
@@ -29,6 +30,10 @@ export function normalizeFaceMountContract(raw) {
       !finite(s.offsetU) || !finite(s.offsetV) || !finite(s.gap) || s.gap < 0 || !Number.isInteger(s.quarterTurns) || s.quarterTurns < 0 || s.quarterTurns > 3) {
     return fail('face.selection 的面、對齊、偏置、間距或轉向不合法。');
   }
+  const fastener=s.fastener===undefined?null:normalizeTabNut(s.fastener);
+  if(s.fastener!==undefined&&(!fastener||s.brackets!==undefined||raw.version!==2))return fail('榫槽設定或接合版本無效，不能與角碼並存。');
+  if(raw.version===2&&!fastener)return fail('face v2 必須保存已支援的榫槽接法。');
+  if(raw.version===2&&(!raw.childPart||raw.childPart==='frame'))return fail('榫槽必須指定獨立立板零件。');
   const brackets = s.brackets === undefined ? null : normalizeBracketSelection(s.brackets);
   if (s.brackets !== undefined && !brackets) return fail('角碼固定設定不合法。');
   if (s.rotationDeg !== undefined && !finite(s.rotationDeg)) return fail('接合角度必須是有限數值。');
@@ -37,11 +42,11 @@ export function normalizeFaceMountContract(raw) {
   }
   if (raw.childPart !== undefined && (typeof raw.childPart !== 'string' || !/^[\w.-]+$/.test(raw.childPart))) return fail('face.childPart 必須是底板或安全的零件 ID。');
   return { ok: true, value: {
-    version: 1,
+    version: raw.version,
     ...(raw.childPart !== undefined ? { childPart: raw.childPart } : {}),
     rotation: raw.rotation.map(row => row.slice()),
     translation: { x: t.x, y: t.y, z: t.z },
-    selection: { ...(brackets ? { brackets } : {}), ...Object.fromEntries(SELECT_KEYS.map(k => [k, s[k]])), ...(s.rotationDeg !== undefined ? { rotationDeg: s.rotationDeg } : {}) },
+    selection: { ...(fastener ? {fastener} : {}), ...(brackets ? { brackets } : {}), ...Object.fromEntries(SELECT_KEYS.map(k => [k, s[k]])), ...(s.rotationDeg !== undefined ? { rotationDeg: s.rotationDeg } : {}) },
     hostThicknessMm: raw.hostThicknessMm,
     childThicknessMm: raw.childThicknessMm
   }};

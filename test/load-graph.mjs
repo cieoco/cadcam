@@ -127,7 +127,7 @@ const vmCode = `
 import assert from 'node:assert/strict'; import vm from 'node:vm';
 import {readFileSync} from 'node:fs'; import {resolve} from 'node:path';
 import {buildLoadGraph} from './tools/load-graph.mjs';
-const graph=buildLoadGraph(), cache=new Map(), context=vm.createContext({console,URL});
+const graph=buildLoadGraph(), cache=new Map(), context=vm.createContext({console,URL,structuredClone});
 const get=url=>{if(!cache.has(url)){const p=new URL(url).pathname.slice(1);cache.set(url,new vm.SourceTextModule(readFileSync(resolve(p),'utf8'),{identifier:url,context}));}return cache.get(url);};
 const canonicalState=graph.imports['https://load.invalid/js/blocks/state.js'];
 assert.notEqual(canonicalState,'https://load.invalid/js/blocks/state.js');

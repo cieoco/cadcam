@@ -1,3 +1,4 @@
+import {readStoredProject} from './project-envelope.js';
 import {normalizeBarFusion,inspectBarFusionData} from '../core/bar-fusion.js';
 import {migrateH03RigidGrip} from './rigid-gripper.js';
 import { normalizeLessonSequence, normalizeHydraulicSequence } from './sequence-schema.js';
@@ -575,6 +576,7 @@ function normalizeWorkpiece(comp,index,warnings){
 }
 
 export function normalizeSnapshot(obj) {
+  obj=readStoredProject(obj);
   if (!obj || typeof obj !== 'object') return null;
   const sourceComps = Array.isArray(obj.comps) ? obj.comps : null;
   if (!sourceComps) return null;

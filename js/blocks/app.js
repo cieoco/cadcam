@@ -1813,6 +1813,7 @@ function drawNow() {
     const platesNow = P => modulePlates.at(P, () => motorFrameExportMounts({ pts: pointCoords(), motorCenterIds: allModelMotorIds, motorMounts })).filter(pl => (pl.plane || null) === (S.viewPlane || null) && (!inDesign() || pl.moduleId === S.designFocus));   // 設計模式只畫焦點模組自己的底板
     renderModulePlates({ plates: platesNow(allPts), svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), getPlates: platesNow, registerUpdate: fn => frameUpdaters.push(fn) });
   }
+  const tabNutGeometry = S.modules.some(m=>m.mount?.face?.selection?.fastener) ? orthoExtrasNow().tabNutGeometry : {};
   const renderScene = prepareRenderScene({
     compiled: viewCompiled, comps: vComps, points: pts, frameGeometry: frameGeometry2d, sceneIds,
     computeBodyLayers, motorAssemblyLayerForBody, motorMounts
@@ -1848,7 +1849,7 @@ function drawNow() {
 
   // 三點桿繪製分派（slice 2 登錄表化）— 'layered' 畫進對應 zlift 疊放層（ctx 帶層查詢 helper）。
   // hostedMounts：靜態結構板承載的馬達安裝特徵（穿板槽/耳孔），板身直接開槽。
-  const triCtx = { groupForLayer, triLayerByKey, triKey, hostedMounts: mountSplit2d.hosted };
+  const triCtx = { groupForLayer, triLayerByKey, triKey, tabNutGeometry, hostedMounts: mountSplit2d.hosted };
   vComps.forEach(c => { const e = PART_DRAW[c.type]; if (e && e.phase === 'layered') e.draw(c, pts, triCtx); });
 
   // 動力來源本體：畫在桿件底下，曲柄轉在它上面。依型號畫 TT馬達或 MG995 伺服。
@@ -1922,7 +1923,7 @@ function drawNow() {
     },
     onSelect: id => { if (ensureModuleHome(compModuleId(id))) return; selectLink(id); },
     groupForLayer, linkLayer, groundIds, hullRadius: HULL_R_WORLD, scale: View.getScale(),
-    barHullPath, project: p => ({ x: TX(p.x), y: TY(p.y) }), hostedMounts: mountSplit2d.hosted,
+    tabNutGeometry, barHullPath, project: p => ({ x: TX(p.x), y: TY(p.y) }), hostedMounts: mountSplit2d.hosted,
     holeRadius: Settings.exportSettings().holeDiameterMm / 2,
     inspectHostedFrame: (nodes, mounts, comp) => Exporters.inspectFrameExport(nodes, { ...Settings.exportSettings(), barWidthMm: memberStock(comp).widthMm }, mounts),
     registerUpdate: update => frameUpdaters.push(update)

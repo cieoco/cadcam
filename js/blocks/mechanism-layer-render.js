@@ -1,3 +1,4 @@
+import {tabNutPath} from './tab-nut-view.js';
 import {inspectBarFusion,worldFusionGeometry} from './bar-fusion-geometry.js';
 /**
  * blocks / mechanism-layer-render
@@ -12,7 +13,7 @@ const svgEl = tag => document.createElementNS(SVG_NS, tag);
 
 export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBar, selectedLinkId, pickBars, interactionBlocked,
   onTryPick, onFreeDrag, onSelect, groupForLayer, linkLayer, groundIds, hullRadius, scale, barHullPath, project,
-  hostedMounts, inspectHostedFrame, registerUpdate, holeRadius = hullRadius * 0.72, params = {}, exportSettings = {} }) {
+  hostedMounts, inspectHostedFrame, registerUpdate, holeRadius = hullRadius * 0.72, params = {}, exportSettings = {}, tabNutGeometry = {} }) {
   const linksToDraw = [...links].sort((a, b) => (a.style === 'crank' ? 1 : 0) - (b.style === 'crank' ? 1 : 0));
   const eligible = linksToDraw.filter(link => !link.hidden && !triangleEdgeKeys.has([link.p1, link.p2].sort().join('|')) && !isGroundBar(link));
   const countMissing = current => eligible.reduce((count, link) => {
@@ -70,7 +71,9 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       const valid = a && b && Number.isFinite(a.x) && Number.isFinite(b.x);
       stick.style.display = valid ? '' : 'none'; holes.forEach(hole => { hole.element.style.display = valid ? '' : 'none'; });
       if (!valid) return;
-      if(fusion?.ok){
+      const tabPath=component&&tabNutPath(tabNutGeometry[component.id],component,current,project);
+      if(tabPath){stick.setAttribute('fill-rule','evenodd');stick.setAttribute('d',tabPath);}
+      else if(fusion?.ok){
         const g=worldFusionGeometry(fusion,current),ring=ps=>'M '+ps.map(p=>{const q=project(p);return q.x+','+q.y;}).join(' L ')+' Z';
         stick.setAttribute('fill-rule','evenodd');stick.setAttribute('d',[...g.outlines,...g.cutouts.map(c=>c.points)].map(ring).join(' '));
       }else stick.setAttribute('d', mounts?.length ? (hostedPath(a, b, current) || barHullPath(a, b, radius)) : barHullPath(a, b, radius));

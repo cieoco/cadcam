@@ -671,3 +671,14 @@
 - 「外形與材料」改為「外形與前後位置」，疊放改稱零件前後位置、往前／往後一層；查看活動範圍放入其他操作。材料選擇移到既有製作設定的「老師用：零件材料」，明示選取零件與僅記錄用料。沒有新增全站老師模式開關，也不改作品材料格式或模擬物性；未選零件時提示先選取，合成件禁止直接改材料。
 - member-editor 新增直接板寬／板厚修改、隱藏重複選單、板件選單不混入加工尺寸的驗證；member-editor、member-dimensions、member-stock-export、load-graph、startup-size、test_blocks_schema 共 6/6 通過，結果 output/member-properties/tests/results.json。
 - HTTP 瀏覽器 390×844、360×640、1200×900 無水平溢出，窄手機屬性區可獨立捲動。驗收板寬鍵盤修改／復原、前後位置／復原、活動範圍勾選、製作設定材料修改與保存重開；console 無錯誤。截圖 output/member-properties/mobile-390.png、mobile-360.png、desktop.png、material-mobile.png；不代表實體手機驗收。
+
+
+## 2026-10-24 — 3 mm／M3 榫槽鎖固試作（2026.10.24.2）
+
+- 依 [榫槽 SDD](SDD-LASER-TAB-NUT-JOINT.md) 完成 P0–P3。接合精靈可選「榫槽鎖固（M3）」；兩榫、中央開口 T 槽、配對槽與螺絲孔由同一純幾何產生。2D、3D 五金、SVG／DXF 與製作包同步；保存參數，不把派生加工特徵寫進原板件。
+- 新 face v2 與 `blocks-envelope` 能力封裝防止舊讀取器靜默遺失新加工語意。未知型別、缺參照、矛盾接法拒絕讀取；舊 face v1 保留。複合模組重編時同步修正安裝端零件參照。
+- 範例選單新增「製作：3 mm／M3 榫槽接合」。製作設定提供三組名義 3 mm 矩形試片 SVG／DXF，間隙 0.05／0.15／0.25 mm；不自動做雷射切縫補償。可編輯主範例使用既有固定寬桿，與精確矩形試片分開。
+- 軟體檢查拒絕過短直邊、錯誤板厚、既有孔槽過近、螺絲過短／過長、同板特徵衝突及已檢出的材料碰撞。工具進入路徑、部分牙螺絲、材料破壞與承載保留人工核對；尚無實物試切結果。
+- Node v24.19.0 全套 223／223 通過（`output/tab-nut/acceptance-release/results.json`）；最後參照拒絕與載入圖 3／3 通過（`acceptance-final-contract/results.json`）。新測試包括 32 種方向、原始 SVG／DXF 尺寸、BOM、取消／過期候選、分享、複合模組保存與實體化；全部納入 manifest。
+- 瀏覽器實操正式工具及 `test/tab-nut.html`：選面、切接法、螺絲過短阻擋、恢復有效尺寸、確認、保存重開與復原。`test/face-wizard.html` 舊 v1 接合、分享往返、復原保持正常。`test/tab-nut-devices.html` 驗收 390×844、360×640、844×390、1200×900 的 iframe viewport 與 24 px 文字；截圖在 `output/tab-nut/screenshots/`，不是實體手機測試。
+- 靜態首次載入預算由 1.93 MB 調為 1.96 MB，新增約 22 KB 共用幾何與保存橋接；3D、錄影與試片下載仍採動態載入。產生的 import map 及載入 token 一起更新。部署須另核對 GitHub Actions 與線上版本，push 本身不算部署成功。

@@ -1,3 +1,4 @@
+import {tabNutPlans} from './tab-nut-plan.js';
 import { readConnectionDescriptor } from './connection-descriptor.js';
 /** Recompute confirmed drilling against current stock; stale/invalid plans produce no holes. */
 import { buildMountSurfaces, findMountSurface } from './mount-surfaces.js';
@@ -61,6 +62,7 @@ export function appendFaceBracketHoles(extras, comps, modules, params, opts={}) 
 
 /** Read-only diagnosis also covers older placements without confirmed drilling. */
 export function faceBracketStatus(comps, modules, params, mod, opts={}) {
+  if(mod?.mount?.face?.selection?.fastener){const p=tabNutPlans(comps,modules,params,opts).find(p=>p.moduleId===mod.id);return {fixed:!!p?.ok,configurable:false,reason:p?.ok?'榫槽／M3：幾何已檢查，實物試切待驗證':`榫槽暫停輸出：${p?.reason || '接合不存在'}`};}
   const confirmed=faceBracketPlan(comps,modules,params,mod,opts);
   if(confirmed)return {fixed:confirmed.ok,reason:confirmed.ok?`角碼 ${confirmed.brackets.length} 顆 · 兩板固定孔已生成 Ø3.2 mm`:`角碼孔暫停輸出：${confirmed.reason}`};
   if(!mod?.mount?.face)return {fixed:false,reason:'尚未設定接合面'};

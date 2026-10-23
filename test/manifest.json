@@ -15,6 +15,9 @@
   ],
   "timeoutMs": 90000,
   "tests": [
+    "test/tab-nut-storage-export.mjs",
+    "test/tab-nut-connection.mjs",
+    "test/tab-nut-geometry.mjs",
     "test/member-copy.mjs",
     "test/canvas-rulers.mjs",
     "test/bar-fusion.mjs",
