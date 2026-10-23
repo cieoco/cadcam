@@ -1,0 +1,23 @@
+// 鏈輪＋#25 鏈條 S4：教材。放在齒輪單元的延伸任務（不重編單元號），學生比較齒輪與鏈條。
+import assert from 'node:assert/strict';
+import {readFileSync,existsSync} from 'node:fs';
+import {getExampleLesson} from '../js/blocks/examples.js';
+let pass=0;const ok=(c,m)=>{assert.ok(c,m);pass++;console.log('PASS',m);};
+const html=readFileSync(new URL('../teaching-gears.html',import.meta.url),'utf8');
+const i=html.indexOf('鏈條傳動');
+ok(i>0,'齒輪單元有「鏈條傳動」延伸任務');
+const sec=html.slice(i,html.indexOf('</section>',i));
+ok(/blocks\.html\?example=sprocket-chain/.test(sec),'有開啟 sprocket-chain 範例的連結');
+ok(/鏈輪＋鏈條/.test(sec),'教學生從「新增 → 傳動 → 鏈輪＋鏈條」自己放一次');
+ok(/同向/.test(sec)&&/反向/.test(sec),'比較轉向：鏈條同向、齒輪對反向');
+ok(/齒數/.test(sec)&&/(速比|轉速)/.test(sec),'用齒數比說明速比');
+ok(/鏈節/.test(sec)&&/整數/.test(sec)&&/對齊整數鏈節/.test(sec),'鏈節必須整數，用「對齊整數鏈節」');
+ok(/長孔/.test(sec)&&/張緊/.test(sec),'製作時從動輪長孔用來張緊');
+ok(/#25/.test(sec)&&/6\.35/.test(sec)&&/(買|購買|現成)/.test(sec),'說明 #25 規格（節距 6.35 mm）與鏈輪用買的');
+ok(/製作包/.test(sec)&&/(節數|節)/.test(sec),'交件前到製作包看鏈條節數與鏈輪齒數');
+ok(/過關/.test(sec)&&/MP4/i.test(sec),'過關條件含 MP4');
+const img=[...sec.matchAll(/src="([^"]+\.png)"/g)].map(m=>m[1]);
+ok(img.length>=1&&img.every(p=>existsSync(new URL('../'+p,import.meta.url))),`附手機截圖且檔案存在（${img.join(', ')}）`);
+const meta=getExampleLesson('sprocket-chain');
+ok(meta&&meta.predict&&meta.measure&&meta.explain,'範例說明有 預測／測量／解釋');
+console.log(`chain-lesson: ${pass} passed`);
