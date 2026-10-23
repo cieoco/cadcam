@@ -1,4 +1,5 @@
-// 鏈輪與 #25 鏈條計算（純函式）；鏈長 L=2C/p+(N1+N2)/2+p(N2−N1)²/(4π²C)
+// 鏈輪＋滾子鏈條的純計算（不碰 DOM）。S1：買現成金屬鏈輪、#25 鏈條，兩輪一條鏈。
+// 公式用標準的鏈長近似式：L = 2C/p + (N1+N2)/2 + p(N2−N1)²/(4π²C)（L 為節數，C 為中心距 mm）。
 
 export const CHAIN_25 = Object.freeze({
   id: '25',
@@ -20,19 +21,23 @@ export const LINK_TOLERANCE_MM = 0.05;
 const P = CHAIN_25.pitch;
 const RAD = 180 / Math.PI;
 
+// 節圓直徑 D = p / sin(180°/N)
 export function pitchDiameter(teeth, pitch = P) {
   return pitch / Math.sin(Math.PI / teeth);
 }
 
+// 外徑 Do = p(0.6 + cot(180°/N))
 export function outsideDiameter(teeth, pitch = P) {
   return pitch * (0.6 + 1 / Math.tan(Math.PI / teeth));
 }
 
+// 兩輪中心距 C（mm）所需的鏈長（節數，未取整）。
 export function chainLinks(center, teeth1, teeth2, pitch = P) {
   const d = teeth2 - teeth1;
   return 2 * center / pitch + (teeth1 + teeth2) / 2 + pitch * d * d / (4 * Math.PI * Math.PI * center);
 }
 
+// chainLinks 的反函數：給鏈節數求中心距。(2/p)C² − aC + p·d²/(4π²) = 0，取大根。
 export function centerForLinks(links, teeth1, teeth2, pitch = P) {
   const d = teeth2 - teeth1;
   const a = links - (teeth1 + teeth2) / 2;
@@ -41,6 +46,7 @@ export function centerForLinks(links, teeth1, teeth2, pitch = P) {
   return pitch * (a + Math.sqrt(disc)) / 4;
 }
 
+// 小鏈輪包角（度）。
 export function wrapAngle(center, teeth1, teeth2) {
   const diff = Math.abs(pitchDiameter(teeth2) - pitchDiameter(teeth1));
   const s = Math.min(1, diff / (2 * center));
@@ -49,6 +55,7 @@ export function wrapAngle(center, teeth1, teeth2) {
 
 const nearestEven = x => Math.round(x / 2) * 2;
 
+// 最接近的偶數鏈節，且該鏈節數要能排得出幾何（中心距有解）。
 function evenLinksFor(exact, teeth1, teeth2) {
   let n = Math.max(4, nearestEven(exact));
   for (let i = 0; i < 200 && !Number.isFinite(centerForLinks(n, teeth1, teeth2)); i++) n += 2;
@@ -84,6 +91,7 @@ export function checkChainDrive({ center, teeth1, teeth2 }) {
   return { ok: issues.length === 0, links, linksExact, deviationMm, issues };
 }
 
+// 把從動輪 b 沿 a→b 方向移到最接近的偶數鏈節位置。
 export function snapCenterToLinks(a, b, teeth1, teeth2) {
   const dx = b.x - a.x, dy = b.y - a.y;
   const dist = Math.hypot(dx, dy);
@@ -93,6 +101,7 @@ export function snapCenterToLinks(a, b, teeth1, teeth2) {
   return { center: { x: a.x + ux * c, y: a.y + uy * c }, links };
 }
 
+// 從動鏈輪軸在機架板上的張緊長孔：沿兩輪連線，前後各半節。
 export function chainTensionSlot(comps, chainId) {
   const chain = comps.find(c => c.type === 'belt' && c.kind === 'chain' && c.id === chainId);
   const find = id => comps.find(c => c.type === 'pulley' && c.id === id);

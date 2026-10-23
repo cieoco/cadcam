@@ -83,6 +83,7 @@ export function drawPulley({ component, points, svg, scale, project, radius, pin
     const outline = sprocketOutline(component.teeth).map(q => `${(q.x * scale).toFixed(2)},${(-q.y * scale).toFixed(2)}`).join(' ');
     add('polygon', { points: outline, fill: color + (selected ? '55' : '26'), stroke: selected ? '#e67e22' : color, 'stroke-width': Math.max(1, (selected ? 2 : 1.2) * scale), 'stroke-linejoin': 'round' });
     if (onSelect) {
+      // 點鏈輪本體＝選取（開鏈輪面板）；其他皮帶輪沒有這個互動。
       const body = group.lastChild;
       body.setAttribute('data-pick-component', component.id);
       body.style.cursor = 'pointer';
@@ -156,7 +157,7 @@ export function drawBelt({ component, points, comps, theta, svg, scale, project,
     if (!d) return;
     path.setAttribute('d', d); motion.setAttribute('d', d);
     if (rollers) {
-      // 鏈節不合：警告色
+      // 兩輪中心距不是整數偶數鏈節（或包角、外徑不合）時，鏈板改成警告色；不會自動搬動鏈輪。
       const bad = !checkChainDrive({ center: Math.hypot(b.x - a.x, b.y - a.y), teeth1: driver.teeth, teeth2: driven.teeth }).ok;
       path.setAttribute('stroke', bad ? '#d97706' : color);
       rollers.setAttribute('d', d);

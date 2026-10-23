@@ -881,6 +881,7 @@ const { gearById, gearMeshChain, gearMeshOff, syncGearMeshAnchoredAt, selectGear
         addGearPair, addRackPinion, toggleRackOrientation,
         changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter,
         changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth } = gearEditor;
+// 取消齒輪選取時一併收掉鏈輪面板（鏈輪的選取與面板在 chain-editor.js，第一次用才載入）。
 function deselectGear() {
   deselectGearOnly();
   if (S.selectedSprocketId) {
@@ -890,7 +891,7 @@ function deselectGear() {
   }
 }
 
-// 鏈輪＋鏈條：chain-editor.js 動態載入
+// ---- 鏈輪＋鏈條域：./chain-editor.js 第一次用到才動態載入，不佔啟動時的 JS ----
 let chainEditor = null, chainEditorLoading = null;
 function withChainEditor(fn) {
   if (chainEditor) return fn(chainEditor);
@@ -1209,7 +1210,7 @@ function rebuild({save=true}={}) {
   parallelLiftController?.recompute();
   document.getElementById('hint').style.display = S.comps.length ? 'none' : 'block';
   Panels.updateRoleEditor();
-  if (S.selectedSprocketId) chainEditor?.updatePanel();
+  if (S.selectedSprocketId) chainEditor?.updatePanel();   // 拖動、改齒數後面板上的鏈節與偏差跟著更新
   if(save)scheduleAutosave();    // 任何結構變更都防丟（debounce，播放不觸發）
 }
 
@@ -1767,7 +1768,7 @@ function drawNow() {
     Tools.drawDrawPreview();   // 空畫布也要顯示正在拉出的第一根連桿
     Tools.drawTrianglePreview();
     Tools.drawPolygonPreview();
-    chainEditor?.drawPreview();
+    chainEditor?.drawPreview();   // 放鏈輪中：空畫布也要看到第一個鏈輪
     return;
   }
 
@@ -1983,7 +1984,7 @@ function drawNow() {
   Tools.drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
   Tools.drawTrianglePreview(); // 三點桿模式：疊在最上層的三角預覽
   Tools.drawPolygonPreview();  // 多邊形板模式：疊在最上層的預覽
-  chainEditor?.drawPreview();
+  chainEditor?.drawPreview();  // 鏈輪放置模式：第一個鏈輪與對齊後的第二個鏈輪預覽
   hydraulic?.render(allPts,sol?.isValid===true);
 
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
@@ -3171,9 +3172,11 @@ function saveBuildPack(html,title,partCount) {
   transient(`已產生製作包（${partCount} 片板件）`);
 }
 const facePackSource=()=>({...representationWork(),topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings(),stockMm:S.fabrication?.cnc?.stockThicknessMm || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint || FABRICATION_DEFAULTS.joint});
-const facePackDownload=createFaceExportCoordinator({readSource:facePackSource,readPose:()=>({theta:S.theta,motorAngles:motorAnglesNow(),_prevPoints:lastFullPts}),isPlaying:()=>playbackActive,pause,notify:transient,download:result=>{
+const facePackDownload=createFaceExportCoordinator({readSource:facePackSource,readPose:()=>({theta:S.theta,motorAngles:motorAnglesNow(),_prevPoints:lastFullPts}),isPlaying:()=>playbackActive,pause,notify:transient,download:async result=>{
   const title=result.work.modules.map(m=>m.name).filter(Boolean).join('＋') || '機構作品';
-  saveBuildPack(faceBuildPackHtml(result),title,result.plan.parts.length);
+  let html=faceBuildPackHtml(result);
+  try{if(result.work.comps.some(c=>c.kind==='chain')){const {addChainToBuildPack}=await import('./chain-manufacturing.js');html=addChainToBuildPack(html,result.work.comps,result.work.params,{holeDiameterMm:result.work.exportSettings?.frameHoleDiameterMm});}}catch(e){transient(`鏈條購買清單未加入：${e.message}`);}
+  saveBuildPack(html,title,result.plan.parts.length);
 }});
 async function downloadBuildPack() {
   if(hydraulic?.active())return hydraulic.exportWork('pack');
