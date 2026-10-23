@@ -994,6 +994,25 @@ const memberEditor = createMemberEditor({
 });
 const jawTipHandle = createJawTipHandle({ svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
   editor: memberEditor, getParams: () => S.topo.params });
+async function copyMember(mode) {
+  const id=S.selectedTriangleId||S.selectedLinkId;
+  if(!id || S.mode!=='design')return;
+  pause();
+  const revision=snapshotStr();
+  const source={comps:S.comps,params:S.topo.params,modules:S.modules,counter:S.counter,id,positions:displayCoords(),settings:Settings.exportSettings()};
+  try {
+    const {openMemberCopy}=await import('./member-copy-dialog.js');
+    if(snapshotStr()!==revision){transient('作品已變更，請重新選取零件。');return;}
+    openMemberCopy({source,mode,onConfirm:plan=>{
+      if(snapshotStr()!==revision)return '作品已變更，請取消後重新開啟。';
+      pushUndo();S.comps.push(...plan.comps);Object.assign(S.topo.params,plan.params);S.counter=plan.counter;
+      rebuild();
+      const c=plan.comps.find(c=>c.id===plan.selectedId);
+      if(c.type==='bar')selectLink(c.id);else selectTriangle(c.id);
+      fitView();return '';
+    }});
+  } catch(e) { console.error(e);transient('複製視窗載入失敗，請重試。'); }
+}
 // ---- 模組拖曳安裝（D9）：邏輯在 ./module-drag.js；points() 取 draw()／renderFrame() 最近一次的求解點 ----
 let lastFramePts = null;
 const moduleDrag = createModuleDrag({
@@ -3255,6 +3274,7 @@ window.blocks.designDebug = () => ({
   motors: [...designMotorIds()]
 });
 Object.assign(window.blocks, {
+  copyMember,
   mateTool: on => mateTool.set(!!on), mateDebug: () => mateTool.debug(),
   setTriSide: memberEditor.selectDimension,
   setMemberDimension: memberEditor.setValue,

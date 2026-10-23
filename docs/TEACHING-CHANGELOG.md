@@ -627,3 +627,12 @@
 - HTTP 瀏覽器驗收 390×844、360×640、844×390 及 1200×900：小尺／完整尺規、視圖列換行、參數面板展開、接點選取、平移、滾輪縮放、置中及 3D 往返正常。32 mm 孔距換算成 20 mm 比例尺，螢幕距離誤差小於 0.00001 CSS px。證據 output/canvas-rulers/ 的 mobile-390.png、mobile-editor.png、mobile-full-360.png、landscape.png、desktop.png、scale-check.json。瀏覽器尺寸驗收不代表實體手機手指驗收。
 - 新增 canvas-rulers 回歸，涵蓋各縮放刻度、負座標、Y 軸方向、小數、視圖變更通知及縮放錨點；並執行 input-gestures、touch-link-creation、member-dimensions、startup-size、load-graph 共 6 組。結果 output/canvas-rulers/tests/results.json。
 - 尺規功能增加約 5.8 KB 未壓縮首次 JS（總量 1,905,756 bytes），首次載入上限由 1.90 MB 明列調整為 1.91 MB，仍檢查 Three.js／錄影／歷史紀錄不進入初始依賴。未變更作品格式、求解器、尺寸輸入或吸附規則。
+
+
+## 2026-10-23｜連桿與板件複製、鏡像副本（2026.10.23.4）
+
+- 選取零件後從「更多」開啟複製或鏡像；共同預覽可切換複製、左右鏡像、上下鏡像，灰色原件、綠色副本，確認才沿用一次復原與保存。保持原件，副本放在旁邊，可拖曳移動。
+- 重用 instantiateTemplate 的唯一 ID／參數重編，副本尺寸及孔位獨立；使用目前顯示姿態，保留材料與板件形狀，反射板件方向、夾爪轉向、外形局部座標及合成群組局部孔位。合成連桿整片複製，保留內部共用孔，不接回原件。
+- 範圍為連桿、三角板／多邊形板／折線桿／夾爪及合成連桿本體；不複製馬達、針筒、固定狀態或安裝關係。齒輪合成板與伸縮桿顯示不支援原因。未新增作品格式或整個機構鏡像功能。視窗與純邏輯懶載入，初始 JS 仍在既有 1.91 MB 預算內。
+- Node 24 定向 9/9 通過：member-copy、member-editor、member-dimensions、bar-fusion、part-fusion、module-ops、startup-size、load-graph、test_blocks_schema。覆蓋獨立 ID／參數、原件不變、目前姿態、兩方向反射、夾爪／外形／孔、合成、模組歸屬、正規化、固定後求解及 SVG／DXF。結果 output/member-copy/tests/results.json。
+- HTTP 瀏覽器實際操作複製、修改副本尺寸、復原尺寸、復原新增、取消預覽、切換鏡像方向及新增後自動保存重開。390×844、360×640 預覽與按鈕完整，無水平溢出，桌機預覽正常。Chrome 原有縮放影響 viewport，依 innerWidth／innerHeight 校準 CSS 尺寸。證據 output/member-copy/mirror-mobile-390.png、mirror-mobile-360.png、mirror-desktop.png、mirror-created.png。內嵌瀏覽器截圖逾時，改用 Chrome 保存截圖；未宣稱實體手機驗收。

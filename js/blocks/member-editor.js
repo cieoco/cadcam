@@ -18,6 +18,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if (tipDraft && tipDraft.selectedId !== comp?.id) tipDraft = null;
     const dimensions = memberDimensions(comp);
     const active = dimensions.length > 0;
+    const copyActions=el('memberCopyActions');if(copyActions)copyActions.hidden=!active;
     const input = el('memberDimensionInput'), hint = el('memberDimensionHint');
     if (!input) return;
     const dimensionLabel=el('memberDimensionLabel');if(dimensionLabel)dimensionLabel.hidden=!active;

@@ -1,4 +1,15 @@
 .mobile-more-toggle { display:none; }
+#memberCopyActions[hidden] { display:none; }
+#memberCopyActions button { min-height:44px; }
+.member-copy-dialog { box-sizing:border-box; width:min(560px,calc(100vw - 16px)); max-height:92dvh; overflow:auto; padding:12px; border:1px solid #a4b9b6; border-radius:12px; color:#25453f; }
+.member-copy-dialog h2 { font-size:18px; margin:0 0 12px; }
+.member-copy-dialog p { font-size:14px; line-height:1.5; overflow-wrap:anywhere; }
+.member-copy-dialog select,.member-copy-dialog button { min-height:44px; font:16px system-ui; padding:6px 8px; border:1px solid #a4b9b6; border-radius:8px; background:white; color:#25453f; }
+.member-copy-dialog svg { width:100%; height:clamp(140px,28dvh,240px); background:#f4f7f6; border-radius:8px; }
+.member-copy-dialog footer { position:sticky; bottom:-12px; display:flex; gap:8px; padding:8px 0; background:white; }
+.member-copy-dialog footer button { flex:1; }
+.member-copy-dialog footer button:last-child { background:#236e5e; color:white; }
+.member-copy-dialog button:disabled { opacity:.5; }
 #canvasRulers { position:absolute; pointer-events:none; overflow:hidden; z-index:1; }
 #canvasRulers text { font:11px system-ui,sans-serif; fill:#435b70; }
 #canvasRulers .ruler-back { fill:#f6f8fb; fill-opacity:.94; }
