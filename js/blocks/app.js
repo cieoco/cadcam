@@ -15,6 +15,7 @@ import {createCreationPalette} from './creation-palette.js';
 import {createDesignGuide,guideFrameCandidate} from './design-guide.js';
 import {validateSupports} from './support-validation.js';
 import {prepareConnectionWork} from './connection-work.js';
+import {createCanvasRulers} from './canvas-rulers.js';
 import {usesFaceExport,faceFileExportData,createFaceExportCoordinator,faceBuildPackHtml} from './face-export.js';
 import {materialSolveValidity} from './material-pose-status.js';
 import {createPlaybackProbe} from './playback-probe.js';
@@ -3280,6 +3281,7 @@ hydraulic=createSyringeUI({is3D:()=>view3DActive,capture:()=>{viewer3D.renderNow
 window.blocks.addSyringe=hydraulic.add;
 window.blocks.addFixedSyringe=hydraulic.addFixed;
 init();
+createCanvasRulers(svg);
 if(benchmarkSession){
  Object.assign(window.blocks,{benchmark:{identity:{source:'current',token:LOAD_GRAPH_TOKEN},async load(snapshot){playbackProbe.abort('work_changed');const norm=Store.normalizeSnapshot(snapshot);if(!norm)throw Error('無效量測作品');applySnapshot(norm,{recordUndo:false,source:'benchmark'});bench.setMode('bench');await set3D(true);viewer3D.stop();return benchmarkCoverage;},
   start(meta){pause();viewer3D.stop();benchmarkShapeKey=viewer3D?.cacheStats?.().key;playbackProbe.start({...meta,sourceToken:LOAD_GRAPH_TOKEN,userAgent:navigator.userAgent,viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},renderer:{antialias:true,pixelRatio:Math.min(devicePixelRatio || 1,2),schedule:'app rAF calls the same renderNow as viewer rAF; one submission per pose'},cpuOnly:true});play();},

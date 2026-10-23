@@ -618,3 +618,12 @@
 - HTTP 瀏覽器 390×844、360×640：一般連桿面板由 225px 降至 160px（約 29%），標題與完成同列；主欄無水平溢出，更多內合成可開啟／取消。實際鍵盤輸入 32mm、加減、復原、刪除與復原、完成收合通過。1200×900 桌機合成控制仍在原本主面板。
 - 360px 寬的獨立驗收頁將面板文字設為 200%，數字輸入為 32px，欄位自動加寬、內容換行，面板內可捲動且無水平溢出。此為文字放大模擬，不等同實體 Android 系統字型設定。證據 output/member-density/before.png、after-390.png、after-360.png、large-text-360.png、desktop.png。
 - Node 24 定向 7/7 通過：member-editor、member-dimensions、bar-fusion、part-fusion、numeric-input、startup-size、load-graph；結果 output/member-density/tests/results.json。未變更作品格式、幾何、保存及復原邏輯。
+
+## 2026-10-23｜設計畫布毫米尺規試作（2026.10.23.3）
+
+- 桌機顯示上方及左側尺規，手機預設左下角小比例尺；「視圖 → 完整尺規」可切換，按鈕狀態以 aria-pressed 呈現。視圖列不足時換行，維持至少 44px 點選高度。
+- 刻度使用 1／2／5 系列毫米間距，依 View 世界縮放及 SVG 螢幕矩陣換算，包含 meet 留白；Y 軸向上為正，尺規零點沿用作品座標。縮放、平移、置中與視窗尺寸改變同步更新。依實際畫布範圍定位，參數面板不遮住比例尺；3D 及組立隱藏。
+- 尺規為畫布外的獨立 SVG，pointer-events:none，不攔截手勢，也不加入作品、加工輸出或復原。僅視圖／版面變動才重繪，不跟隨播放逐幀重建。手機完整尺規開關為本頁暫時偏好。
+- HTTP 瀏覽器驗收 390×844、360×640、844×390 及 1200×900：小尺／完整尺規、視圖列換行、參數面板展開、接點選取、平移、滾輪縮放、置中及 3D 往返正常。32 mm 孔距換算成 20 mm 比例尺，螢幕距離誤差小於 0.00001 CSS px。證據 output/canvas-rulers/ 的 mobile-390.png、mobile-editor.png、mobile-full-360.png、landscape.png、desktop.png、scale-check.json。瀏覽器尺寸驗收不代表實體手機手指驗收。
+- 新增 canvas-rulers 回歸，涵蓋各縮放刻度、負座標、Y 軸方向、小數、視圖變更通知及縮放錨點；並執行 input-gestures、touch-link-creation、member-dimensions、startup-size、load-graph 共 6 組。結果 output/canvas-rulers/tests/results.json。
+- 尺規功能增加約 5.8 KB 未壓縮首次 JS（總量 1,905,756 bytes），首次載入上限由 1.90 MB 明列調整為 1.91 MB，仍檢查 Three.js／錄影／歷史紀錄不進入初始依賴。未變更作品格式、求解器、尺寸輸入或吸附規則。

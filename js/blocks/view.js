@@ -29,6 +29,9 @@ const SNAP_PX = 18;                   // 吸附門檻（畫面 user units，換�
 let scale = SCALE_DEFAULT;
 let ox = W / 2;                       // 世界原點對到的畫面 x
 let oy = H / 2;                       // 世界原點對到的畫面 y
+const viewListeners = new Set();
+export function onViewChange(fn) { viewListeners.add(fn); return () => viewListeners.delete(fn); }
+const viewChanged = () => viewListeners.forEach(fn => fn());
 
 const clampScale = s => Math.max(SCALE_MIN, Math.min(SCALE_MAX, s));
 
@@ -48,6 +51,7 @@ export function resetView() {
   scale = SCALE_DEFAULT;
   ox = W / 2;
   oy = H / 2;
+  viewChanged();
 }
 
 // 由指標事件反推世界座標（需要 svg 元素做 CTM 反轉）
@@ -68,6 +72,7 @@ export function zoomAt(svg, clientX, clientY, factor) {
   scale = clampScale(scale * factor);
   ox = p.x - wx * scale;             // 讓 (wx,wy) 仍落在 p
   oy = p.y + wy * scale;
+  viewChanged();
 }
 
 // 依「畫面 px 位移」平移（換算成 user units）。
@@ -76,6 +81,7 @@ export function panByClient(svg, dxClient, dyClient) {
   if (!ctm) return;
   ox += dxClient / ctm.a;
   oy += dyClient / ctm.d;
+  viewChanged();
 }
 
 // 把世界外接框 fit 進畫面（含留白），並置中。
@@ -91,6 +97,7 @@ export function fit(bounds) {
   const cy = (bounds.minY + bounds.maxY) / 2;
   ox = W / 2 - cx * scale;
   oy = H / 2 + cy * scale;
+  viewChanged();
 }
 
 // 把一根桿（兩端點 a、b）算成「冰棒棍」外形：兩端圓 + 外切線 + 半圓封口。
