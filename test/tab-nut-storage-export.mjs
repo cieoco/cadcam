@@ -24,6 +24,17 @@ const brokenTarget=structuredClone(disk);brokenTarget.project.modules.find(m=>m.
 const missingChild=structuredClone(disk);delete missingChild.project.modules.find(m=>m.mount).mount.face.childPart;assert.equal(normalizeSnapshot(missingChild),null);
 const staleChild=structuredClone(disk);staleChild.project.modules.find(m=>m.mount).mount.face.childPart='deleted';assert.equal(normalizeSnapshot(staleChild),null);
 assert.ok(normalizeSnapshot(storedProject(tabNutSnapshot)));
+// Custom UI dimensions must survive reopening and drive the actual cutting slots.
+const customRequest=tabNutRequest();Object.assign(customRequest.selection.fastener,{tabWidthMm:10,tabPitchMm:28,slotClearanceMm:.25,nutCenterMm:7,screwLengthMm:14});
+const custom=await validateFaceCandidate(buildFaceCandidate(source,customRequest));assert.equal(custom.saveable,true,custom.reason);
+const reopened=normalizeSnapshot(storedProject({...source,...custom.work}));
+assert.deepEqual(reopened.modules.find(m=>m.mount).mount.face.selection.fastener,customRequest.selection.fastener);
+const customPlan=tabNutPlans(reopened.comps,reopened.modules,reopened.params)[0];assert.equal(customPlan.ok,true,customPlan.reason);
+const customData=faceFileExportData(reopened),customFiles=[];
+exportLinksAsSvg(customData.comps,customData.points,customData.params,customData.settings,customData.mounts,customData.extras,(text,name)=>customFiles.push({text,name}));
+const customSlots=[...customFiles.find(f=>f.name==='HostPlate.svg').text.matchAll(/<path d="([^"]+)" data-layer="TAB_NUT_SLOT"/g)].map(m=>[...m[1].matchAll(/-?\d+(?:\.\d+)?/g)].map(n=>Number(n[0])));
+assert.equal(customSlots.length,2);
+for(const values of customSlots){const xs=values.filter((_,i)=>i%2===0),ys=values.filter((_,i)=>i%2===1);assert.ok(Math.abs(Math.max(...xs)-Math.min(...xs)-10.25)<.002);assert.ok(Math.abs(Math.max(...ys)-Math.min(...ys)-3.25)<.002);}
 const template=compositeToTemplate(snap.comps,snap.modules,snap.params,'Host');assert.ok(template);
 assert.equal(normalizeTemplate(storedProject(template)).ok,true);
 assert.equal(parseLibrary(serializeLibrary([template])).length,1);

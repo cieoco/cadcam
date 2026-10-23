@@ -1,3 +1,4 @@
+import {renderTabNutDimensions} from './tab-nut-parameter-ui.js';
 import {TAB_NUT_DEFAULTS} from './tab-nut-geometry.js';
 import {candidateMaterialFaces,candidateHostFace,candidateCoverageText,candidateConfirmLabel} from './face-candidate-view.js';
 import {applyMatrix4} from '../blocks3d/orthogonal-3d.js';
@@ -40,16 +41,23 @@ let bracketPlan = null, jointSettings, useBracketHoles=true, fastenerKind='brack
 $('fastenerKind').addEventListener('change',()=>{fastenerKind=$('fastenerKind').value;render();});
 for(const format of ['svg','dxf']){
  const button=document.createElement('button');button.type='button';button.textContent=`下載 3 mm 試片 ${format.toUpperCase()}`;button.style.minHeight='44px';
- button.onclick=async()=>{const {tabNutCouponFile}=await import('./tab-nut-coupons.js');const blob=new Blob([tabNutCouponFile(format)],{type:format==='svg'?'image/svg+xml':'application/dxf'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`tab-nut-3mm-M3-trial.${format}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};$('tabNutSettings').append(button);
+ button.onclick=async()=>{const {tabNutCouponFile}=await import('./tab-nut-coupons.js');const blob=new Blob([tabNutCouponFile(format)],{type:format==='svg'?'image/svg+xml':'application/dxf'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`tab-nut-3mm-M3-trial.${format}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};$('tabNutCoupons').append(button);
 }
-const couponNote=document.createElement('p');couponNote.textContent='試片固定為 3 mm 名義尺寸，與目前作品設定分開。左底板／右立板，依圖面 y=25、80、135 mm 三列：總間隙 0.05／0.15／0.25 mm。先量測板厚與五金，再試切。';$('tabNutSettings').append(couponNote);
+const couponNote=document.createElement('p');couponNote.textContent='試片固定為 3 mm 名義尺寸，與目前作品設定分開。左底板／右立板，依圖面 y=25、80、135 mm 三列：總間隙 0.05／0.15／0.25 mm。先量測板厚與五金，再試切。';$('tabNutCoupons').append(couponNote);
 
-for(const [key,label] of [['alongMm','沿板邊位置 mm'],['slotClearanceMm','插槽總間隙 mm'],['screwLengthMm','螺絲長度 mm'],['nutAcrossMm','螺母對邊 mm'],['nutHeightMm','螺母厚度 mm'],['nutClearanceMm','螺母槽總間隙 mm'],['washerThicknessMm','墊片厚度 mm'],['washerDiameterMm','墊片外徑 mm']]){
- const l=document.createElement('label'),input=document.createElement('input');input.id=`tabNut-${key}`;input.type='number';input.step='any';input.inputMode='decimal';input.value=tabNutSettings[key];input.style.cssText='min-width:0;width:100%;box-sizing:border-box;min-height:44px;font-size:16px';l.htmlFor=input.id;l.textContent=label;
- input.addEventListener('change',()=>{tabNutSettings[key]=input.value.trim()===''?NaN:Number(input.value);render();});$('tabNutFields').append(l,input);
+const tabNutFields=[
+ ['tabWidthMm','A 榫寬',false],['tabPitchMm','B 榫中心距',false],['slotClearanceMm','插槽總間隙',false],['screwLengthMm','螺絲長度',false],
+ ['alongMm','沿板邊位置',true],['nutCenterMm','螺母中心離板邊',true],['nutAcrossMm','螺母對邊',true],['nutHeightMm','螺母厚度',true],['nutClearanceMm','螺母槽總間隙',true],['washerThicknessMm','墊片厚度',true],['washerDiameterMm','墊片外徑',true]
+];
+for(const [key,label,advanced] of tabNutFields){
+ const l=document.createElement('label'),input=document.createElement('input');input.id=`tabNut-${key}`;input.type='number';input.step='any';input.inputMode='decimal';input.value=tabNutSettings[key];l.htmlFor=input.id;l.textContent=label;input.setAttribute('aria-label',`${label}（mm）`);
+ // Refresh the isolated candidate while typing; clearing a field must also invalidate confirmation.
+ input.addEventListener('input',()=>{tabNutSettings[key]=readNumber(input);render();});
+ $(advanced?'tabNutAdvanced':'tabNutFields').append(l,input);
+ if(key==='alongMm')signedNumberInput(input);
 }
 $('bracketHoles').addEventListener('change',()=>{useBracketHoles=$('bracketHoles').checked;render();});
-let parentCandidate=null,previewRequest=0,previewSignature='',previewTimer=null,candidateClosed=false;
+let parentCandidate=null,previewRequest=0,previewResultRequest=0,previewSignature='',previewTimer=null,candidateClosed=false;
 function integratedSelection(mate){const selected={...draft};delete selected.fastener;delete selected.brackets;if(fastenerKind==='tab-nut')selected.fastener={...tabNutSettings};else if(useBracketHoles&&Math.abs(mate.rotation[2][2])<1e-6)selected.brackets={enabled:true,offsets:{...bracketOffsets},childPart:children[draft.child].surface?.compId || 'frame'};return selected;}
 function requestCandidate(mate){
  if(!integrated||step!==3||!loadSession.ready)return;
@@ -295,6 +303,7 @@ function drawCandidateScene(mate){
  const svg=$('scene');svg.replaceChildren();$('bracketNote').hidden=false;fitControls.hidden=false;
  bracketPlan=parentCandidate?.bracket || null;bracketSpan=bracketPlan?.span || 0;
  const pending=parentCandidate?.selectionRevision!==previewSignature;
+ if(fastenerKind==='tab-nut')renderTabNutDimensions($('tabNutDimensions'),$('tabNutComputed'),parentCandidate?.tabNut,{pending:previewResultRequest!==previewRequest});
  $('bracketNote').textContent=pending?'此圖為上次候選；目前設定待檢查。':parentCandidate?.tabNut?.ok?'3 mm 板雙榫＋M3 · 試作，實物待核對':bracketPlan?.ok?`角碼 ${bracketPlan.brackets.length} 顆 · 固定孔 Ø3.2`:parentCandidate?.reason || '僅幾何定位，尚未配置固定五金。';
  if(!parentCandidate?.model){$('mateOverlay').hidden=true;return;}
  const faces=candidateMaterialFaces(parentCandidate.model),points=faces.flatMap(f=>f.rings.flat()),projected=points.map(viewCoords);
@@ -529,7 +538,7 @@ if (integrated) {
     if (e.source !== parent || e.origin !== location.origin) return;
     if(e.data?.type==='face-wizard-preview-result'){
       if(e.data.requestId!==previewRequest || e.data.loadGraph!==LOAD_GRAPH_TOKEN)return;
-      parentCandidate=e.data.candidate;preview();showCandidate(parentCandidate);return;
+      parentCandidate=e.data.candidate;previewResultRequest=e.data.requestId;preview();showCandidate(parentCandidate);return;
     }
     if (e.data?.type === 'face-wizard-error') {
       if (e.data.loadMismatch) { loadSession.receiveReady(null); $('next').disabled = true; }
@@ -541,7 +550,7 @@ if (integrated) {
     mode = 'wizard';
     jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; choosingChild = false; configured = !!e.data.configured; childConfirmed=!!e.data.childConfirmed; roughPlaced = configured;
     bracketOffsets = { ...(draft.brackets?.offsets || {}) };
-    useBracketHoles=!configured||!!draft.brackets;fastenerKind=draft.fastener?'tab-nut':'bracket';tabNutSettings={...TAB_NUT_DEFAULTS,...draft.fastener};for(const input of $('tabNutFields').querySelectorAll('input'))input.value=tabNutSettings[input.id.replace('tabNut-','')];
+    useBracketHoles=!configured||!!draft.brackets;fastenerKind=draft.fastener?'tab-nut':'bracket';tabNutSettings={...TAB_NUT_DEFAULTS,...draft.fastener};for(const input of $('tabNutSettings').querySelectorAll('input'))input.value=tabNutSettings[input.id.replace('tabNut-','')];
     // 預設面僅作預選；只有明確重新調整位置才略過選面。
     if (e.data.startAtPlacement) step = 3;
     if (configured && !document.getElementById('optionalView')) {
