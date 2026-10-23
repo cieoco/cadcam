@@ -25,8 +25,13 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     const lockNotice=el('memberDimensionLock');if(lockNotice&&!active)lockNotice.hidden=true;
     input.style.display = active ? '' : 'none';
     el('lenValue').style.display = active ? 'none' : '';
-    hint.style.display = active ? '' : 'none';
+    hint.style.display = 'none';
     el('memberMirrorLabel').style.display = 'none';
+    const stockFields=el('memberStockDimensions');if(stockFields)stockFields.hidden=!active;
+    for(const [field,key] of [['memberWidthInput','widthMm'],['memberThicknessInput','thicknessMm']]){
+      const node=el(field);if(node){node.value=active?memberStock(comp)[key]:'';node.disabled=!active||Boolean(comp?.barFusionRoot);}
+    }
+    const target=el('memberMaterialTarget');if(target)target.textContent=active?`選取零件：${comp.label || comp.id}${comp.barFusionRoot?'（請先解除合成再修改材料）':''}`:'請先選取連桿或板件，再開啟製作設定。';
     const material = el('memberMaterial');
     if (material) {
       material.parentElement.style.display = active ? '' : 'none';
@@ -34,6 +39,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
         const option = document.createElement('option'); option.value = item.id; option.textContent = item.label; return option;
       }));
       material.value = memberStock(comp).material;
+      material.disabled=!active||Boolean(comp?.barFusionRoot);
     }
     ['lenMinusBtn', 'lenPlusBtn'].forEach(key => { el(key).disabled = false; });
     if (!active) return;
@@ -42,13 +48,13 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     const dimension = dimensions.find(d => d.id === id);
     if(dimensionLabel)dimensionLabel.textContent=dimension.label;
     const selector = el('triSideSelect');
-    selector.replaceChildren(...dimensions.map(d => {
+    selector.replaceChildren(...dimensions.filter(d=>!d.stockKey).map(d => {
       const option = document.createElement('option'); option.value = d.id; option.textContent = d.label;
       return option;
     }));
     selector.value = id;
-    selector.style.display = '';
-    selector.title = '選擇孔距或外形尺寸；畫布會標示對應位置';
+    selector.style.display = comp.type==='triangle' ? '' : 'none';
+    selector.title = '選擇要調整的孔距；也可點畫布尺寸';
     input.value = Number(memberDimensionValue(displayComp(comp), S.topo.params, id).toFixed(1));
     input.min = String(dimension.min ?? 8);
     input.max = String(dimension.max ?? (id === 'tip' ? 160 : 2000));
@@ -59,11 +65,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     ['lenMinusBtn', 'lenPlusBtn'].forEach(key => { el(key).disabled = Boolean(lock); });
     el('lenMinusBtn').title = `${dimension.label} 減少 ${dimension.step ?? 8} mm`;
     el('lenPlusBtn').title = `${dimension.label} 增加 ${dimension.step ?? 8} mm`;
-    hint.textContent = lock || (id === 'width' ? '板寬控制桿身寬度／板邊留量，不移動連接孔；馬達安裝處可能較寬。'
-      : id === 'thickness' ? '板厚用於 3D 疊放與製作記錄；材料僅為註記，尚未驗證強度。'
-      : id === 'tip'
-      ? '外形尺寸：只改爪端，不移動連接孔；開口會重新計算。'
-      : '連接孔距：改變剛性零件的幾何；折彎處不會自行轉動。');
+    hint.textContent = ''; // 一般說明留在教學；限制由主要尺寸列顯示。
     if (mirroredJaw(comp, S.comps, S.topo.params)) {
       el('memberMirrorLabel').style.display = '';
       el('memberMirror').checked = mirror;
@@ -113,7 +115,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if (comp) setValue(memberDimensionValue(comp, S.topo.params, dimensionId()) + (dimension?.step ? Math.sign(delta) * dimension.step : delta));
   }
   function setStock(key, raw) {
-    if(selected()?.barFusionRoot){notify('請先解除合成再修改材料。');return;}
+    if(selected()?.barFusionRoot){notify('請先解除合成再修改尺寸或材料。');sync();return;}
     const comp = selected();
     if (!comp || !['bar', 'triangle'].includes(comp.type)) return;
     const partner = mirror && mirroredJaw(comp, S.comps, S.topo.params);
@@ -145,6 +147,6 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if (!cancel && draft && selected()?.id === draft.selectedId) { S.triSide = 'tip'; setValue(draft.value); }
     else draw();
   }
-  return { sync, selected, displayComp, selectDimension, setValue, change, beginTipPreview, previewTip, finishTipPreview,
+  return { sync, setStock, selected, displayComp, selectDimension, setValue, change, beginTipPreview, previewTip, finishTipPreview,
     setMaterial: raw => setStock('material', raw), setMirror(value) { mirror = Boolean(value); sync(); } };
 }

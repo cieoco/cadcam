@@ -663,3 +663,11 @@
 - 鏡射文案明示新增副本，保留既有預覽、確認、取消、保存與復原契約。未改作品格式及幾何運算。手機原共用復原會被作用中的屬性面板隱藏，改為畫布控制列固定入口，桌機沿用上方復原；移除屬性內重複入口。
 - HTTP 瀏覽器驗收 390×844、360×640、1200×900：操作列完整、無水平溢出，主要按鈕至少約 44 CSS px；複製新增、鏡射方向切換／新增／復原、合成開啟及取消、刪除／復原、孔距增減、變滑軌／復原、保存重開正常，console 無錯誤。瀏覽器原有 120% 縮放，依 innerWidth／innerHeight 校準實際 CSS 尺寸；不代表實體手機驗收。
 - 截圖 output/member-actions/mobile-390.png、mobile-360.png、desktop.png。執行既有 member-copy、member-editor、bar-fusion、part-fusion、module-ops、startup-size、load-graph 定向測試，結果 output/member-actions/tests/results.json。
+
+
+## 2026-10-24｜桿件屬性減量（2026.10.24.1）
+
+- 兩孔連桿隱藏重複孔距選單，板件保留幾何尺寸切換；板寬與板厚各自提供數字欄，沿用材料外形驗證、同步夾爪、一次復原與保存。移除常態長說明，尺寸鎖定仍在主要欄位直接提示。
+- 「外形與材料」改為「外形與前後位置」，疊放改稱零件前後位置、往前／往後一層；查看活動範圍放入其他操作。材料選擇移到既有製作設定的「老師用：零件材料」，明示選取零件與僅記錄用料。沒有新增全站老師模式開關，也不改作品材料格式或模擬物性；未選零件時提示先選取，合成件禁止直接改材料。
+- member-editor 新增直接板寬／板厚修改、隱藏重複選單、板件選單不混入加工尺寸的驗證；member-editor、member-dimensions、member-stock-export、load-graph、startup-size、test_blocks_schema 共 6/6 通過，結果 output/member-properties/tests/results.json。
+- HTTP 瀏覽器 390×844、360×640、1200×900 無水平溢出，窄手機屬性區可獨立捲動。驗收板寬鍵盤修改／復原、前後位置／復原、活動範圍勾選、製作設定材料修改與保存重開；console 無錯誤。截圖 output/member-properties/mobile-390.png、mobile-360.png、desktop.png、material-mobile.png；不代表實體手機驗收。

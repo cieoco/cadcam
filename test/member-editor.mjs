@@ -186,8 +186,24 @@ check('stock width rejects insufficient hole margin without mutation or undo', (
 check('stock dimensions stay selected on bar sync and increments use their own steps', (() => {
   reset([simpleBar()], barParams); S.selectedLinkId = 'Bar1';
   editor.selectDimension('width'); editor.change(8); editor.sync();
-  const widthSelected = el('triSideSelect').value === 'width' && S.comps[0].stock.widthMm === 19;
+  const widthSelected = el('memberWidthInput').value === 19 && S.comps[0].stock.widthMm === 19;
   editor.selectDimension('thickness'); editor.change(-8); editor.sync();
   return widthSelected && S.comps[0].stock.thicknessMm === 3.5 && S.topo.params.L === 18;
+})());
+check('bar properties hide duplicate selector and expose independent stock fields', (() => {
+  reset([simpleBar()], barParams); S.selectedLinkId = 'Bar1'; editor.sync();
+  return el('triSideSelect').style.display === 'none' && !el('memberStockDimensions').hidden
+    && el('memberDimensionHint').style.display === 'none';
+})());
+check('direct stock edits preserve hole selection and use one undo each', (() => {
+  reset([simpleBar()], barParams); S.selectedLinkId = 'Bar1'; editor.sync();
+  editor.setStock('widthMm', 24); editor.setStock('thicknessMm', 6); editor.sync();
+  return S.triSide === 'g' && S.topo.params.L === 18 && counts.undo === 2
+    && el('memberWidthInput').value === 24 && el('memberThicknessInput').value === 6;
+})());
+check('plate selector contains geometric dimensions, not stock fields', (() => {
+  const s=fixture(); reset(s.comps,s.params); S.selectedTriangleId='LeftJaw'; editor.sync();
+  return el('triSideSelect').style.display === ''
+    && el('triSideSelect').children.every(o=>!['width','thickness'].includes(o.value));
 })());
 report('member-editor');

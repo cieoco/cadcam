@@ -1743,7 +1743,7 @@ function drawNow() {
   const sweepControl = document.getElementById('memberSweepControl');
   const sweepSelected = viewComps().find(c => (c.id === S.selectedLinkId && c.type === 'bar') || (c.id === S.selectedTriangleId && c.type === 'triangle'));
   sweepControl.hidden = !sweepSelected;
-  document.getElementById('memberSweepLabel').textContent = sweepSelected?.type === 'triangle' ? '顯示掃動範圍（第 1–3 孔）' : '顯示掃動範圍';
+  document.getElementById('memberSweepLabel').textContent = sweepSelected?.type === 'triangle' ? '查看活動範圍（第 1–3 孔）' : '查看活動範圍';
   sweepControl.title = sweepSelected?.type === 'triangle' ? '顯示第 1 孔到第 3 孔的掃動範圍（雨刷範例為 B–E）；不是實體刷片面積。' : '顯示桿件兩端的掃動範圍；不是實體刷片面積。';
   document.getElementById('memberSweepToggle').checked = !!sweepSelected && sweepMemberId === sweepSelected.id;
   if (sweepMemberId && !S.comps.some(c => c.id === sweepMemberId && ['bar', 'triangle'].includes(c.type))) sweepMemberId = null;
@@ -3342,6 +3342,7 @@ Object.assign(window.blocks, {
   setMemberDimension: memberEditor.setValue,
   setRailLength: sliderEditor.setRailLength,
   setMemberMirror: memberEditor.setMirror,
+  setMemberStock: memberEditor.setStock,
   setMemberMaterial: memberEditor.setMaterial
 });
 if (gripperPilotSession) window.blocks.gripperPilot = {
