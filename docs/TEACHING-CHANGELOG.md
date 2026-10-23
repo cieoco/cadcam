@@ -655,3 +655,11 @@
 - 補上手機動力選單視窗高度上限及獨立捲動，避免新增項目後上下截斷；360×640 全部選項與取消完整可見，640×360 橫向可捲至取消，1200×900 桌機正常，無水平溢出。截圖 output/n20/menu-mobile-360.png、menu-desktop.png。
 - 完整 Node 驗收 219/220 通過；唯一失敗為測試期間修改手機 CSS 導致載入清單過期，重新產生後定向重驗 load-graph／startup-size／n20-motor。完整結果 output/n20/full-tests/results.json，最終重驗 output/n20/final-checks/results.json。
 - 本包未修改先前鏈輪審查指出的重合點、鏈節數一致性及包角提示問題。
+
+
+## 2026-10-23｜零件操作與屬性分開（2026.10.23.11）
+
+- 連桿／板件尺寸下方直接顯示複製、鏡射副本、刪除與「⋯」；合成、變滑軌及模組移入其他零件操作，桌機／手機位置一致。外形、尺寸種類、材料、掃動與疊放留在「外形與材料」。切換零件或收合手機編輯器會收起操作展開區。
+- 鏡射文案明示新增副本，保留既有預覽、確認、取消、保存與復原契約。未改作品格式及幾何運算。手機原共用復原會被作用中的屬性面板隱藏，改為畫布控制列固定入口，桌機沿用上方復原；移除屬性內重複入口。
+- HTTP 瀏覽器驗收 390×844、360×640、1200×900：操作列完整、無水平溢出，主要按鈕至少約 44 CSS px；複製新增、鏡射方向切換／新增／復原、合成開啟及取消、刪除／復原、孔距增減、變滑軌／復原、保存重開正常，console 無錯誤。瀏覽器原有 120% 縮放，依 innerWidth／innerHeight 校準實際 CSS 尺寸；不代表實體手機驗收。
+- 截圖 output/member-actions/mobile-390.png、mobile-360.png、desktop.png。執行既有 member-copy、member-editor、bar-fusion、part-fusion、module-ops、startup-size、load-graph 定向測試，結果 output/member-actions/tests/results.json。

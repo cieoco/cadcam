@@ -222,7 +222,7 @@ function updateUndoBtn(recordLesson = false) {
     if (!count) undoLessons.delete(key);
     else if (lessons.length > count) lessons.splice(0, lessons.length - count);
   }
-  ['btnUndo', 'memberUndoBtn'].forEach(id => {
+  ['btnUndo', 'mobileUndoBtn'].forEach(id => {
     const btn = document.getElementById(id);
     if (btn) btn.disabled = S.undoStack.length === 0;
   });
@@ -2194,6 +2194,9 @@ function closeMobileEditPanel() {
   delete document.body.dataset.mobileEditor;
   const more = document.getElementById('memberMore');
   if (more) more.open = false;
+  const operations=document.getElementById('memberOperations');
+  if(operations)operations.hidden=true;
+  document.getElementById('memberOperationsToggle')?.setAttribute('aria-expanded','false');
 }
 
 function mobileOpenMenuEl() { return document.getElementById('mobileOpenMenu'); }

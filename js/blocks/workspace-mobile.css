@@ -149,6 +149,7 @@
 .le-head { display:contents; }
 @media (max-width:700px), (max-width:1099px) and (max-height:500px) {
   #lenEditor { gap:4px; }
+  body[data-mobile-panel="edit"]:has(#lenEditor[style*="flex"]) .mobile-panel { display:none; }
   #lenEditor > .le-row { gap:6px; }
   #lenEditor .le-head { display:flex; flex:0 0 100%; min-width:0; align-items:center; gap:8px; }
   #lenEditor #lenTitle { flex:1; min-width:0; overflow-wrap:anywhere; font-size:14px; }
@@ -158,8 +159,6 @@
   #lenEditor #lenControls .le-step { flex:0 0 44px; width:44px; height:44px; }
   #lenEditor #lenControls .le-value { display:flex; align-items:center; min-width:0; font-size:16px; }
   #lenEditor #lenControls input { width:max(76px,6ch) !important; box-sizing:border-box; min-width:0; max-width:100%; min-height:44px; font-size:16px !important; }
-  #lenEditor > .le-row > .danger-btn { min-height:44px; margin-left:auto; }
   #lenEditor #memberMore { min-width:0; }
   #lenEditor #memberMore > summary { min-height:44px; padding:8px 0; font-size:14px; }
-  #lenEditor #memberMore [data-fusion-controls] { border-top:0 !important; padding:4px 0 !important; }
 }

@@ -3,8 +3,8 @@ const NS='http://www.w3.org/2000/svg';
 
 export function openMemberCopy({source,mode,onConfirm}) {
   const dialog=document.createElement('dialog');
-  dialog.className='member-copy-dialog';dialog.setAttribute('aria-label','複製與鏡像');
-  dialog.innerHTML='<h2>複製與鏡像</h2><label>方式 <select aria-label="複製方式"><option value="copy">複製</option><option value="mirror-x">左右鏡像副本</option><option value="mirror-y">上下鏡像副本</option></select></label><p>灰色原件 · 綠色副本。只複製桿件本體，不帶馬達、針筒及固定狀態；孔位不與原件相連。</p><svg aria-label="原件與副本預覽"></svg><p role="status"></p><footer><button type="button">取消</button><button type="button">確認新增</button></footer>';
+  dialog.className='member-copy-dialog';dialog.setAttribute('aria-label','複製與鏡射');
+  dialog.innerHTML='<h2>複製與鏡射</h2><label>方式 <select aria-label="複製方式"><option value="copy">複製</option><option value="mirror-x">左右鏡射副本</option><option value="mirror-y">上下鏡射副本</option></select></label><p>灰色原件 · 綠色副本。只複製桿件本體，不帶馬達、針筒及固定狀態；孔位不與原件相連。</p><svg aria-label="原件與副本預覽"></svg><p role="status"></p><footer><button type="button">取消</button><button type="button">確認新增</button></footer>';
   const select=dialog.querySelector('select'),svg=dialog.querySelector('svg'),status=dialog.querySelector('[role="status"]');
   const [cancel,confirm]=dialog.querySelectorAll('button');select.value=mode;
   let plan;

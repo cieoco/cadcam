@@ -8,16 +8,7 @@ import { openFusionPreview, planFusionPair } from './fusion-preview.js';
 /** Reuses the original editors; only the manufacturing relationship is changed. */
 export function createFusionEditor({settings,pause,pushUndo,rebuild,draw,save,selectGear,selectTriangle,positions=()=>({}),notify=()=>{}}) {
   const hosts=['lenEditor','gearEditor'];
-  const mobile=window.matchMedia('(max-width:700px), (max-width:1099px) and (max-height:500px)');
-  const place=box=>{
-    const host=document.getElementById('lenEditor');
-    if(mobile.matches)host.querySelector('#memberMore').append(box);
-    else host.querySelector('.le-row').after(box);
-  };
-  mobile.addEventListener('change',()=>{
-    const box=document.querySelector('#lenEditor [data-fusion-controls]');
-    if(box)place(box);
-  });
+  const place=box=>document.getElementById('memberOperations').append(box);
   let preview=null,context='';
   const fingerprint=()=>JSON.stringify([S.mode,S.designFocus,S.comps,S.topo.params,settings()]);
   const start=selected=>{

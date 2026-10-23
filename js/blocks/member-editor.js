@@ -14,7 +14,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
   const dimensionId = () => S.triSide || 'g';
   function sync() {
     const comp = selected();
-    if(lastSelectedId!==comp?.id){const more=el('memberMore');if(more)more.open=false;lastSelectedId=comp?.id;}
+    if(lastSelectedId!==comp?.id){const more=el('memberMore');if(more)more.open=false;const operations=el('memberOperations');if(operations)operations.hidden=true;el('memberOperationsToggle')?.setAttribute('aria-expanded','false');lastSelectedId=comp?.id;}
     if (tipDraft && tipDraft.selectedId !== comp?.id) tipDraft = null;
     const dimensions = memberDimensions(comp);
     const active = dimensions.length > 0;

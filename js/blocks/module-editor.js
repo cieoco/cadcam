@@ -464,7 +464,7 @@ export function createModuleEditor(deps) {
   function findHostPanel() {
     for (const id of ['lenEditor', 'gearEditor', 'roleEditor']) {
       const el = document.getElementById(id);
-      if (el && el.style.display !== 'none') return el.querySelector('.editor-more') || el;
+      if (el && el.style.display !== 'none') return el.querySelector('#memberOperations') || el.querySelector('.editor-more') || el;
     }
     return null;
   }
