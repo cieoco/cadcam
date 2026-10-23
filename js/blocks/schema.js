@@ -109,7 +109,7 @@ function normalizeBar(comp, index, params, warnings) {
     out.isInput = true;
     out.physicalMotor = String(comp.physicalMotor || p1.physicalMotor || p2.physicalMotor || '1');
     // 動力來源型號：TT 馬達（整圈轉）或 MG995 伺服（角度範圍內來回擺）。
-    out.motorType = comp.motorType === 'mg995' ? 'mg995' : 'tt';
+    out.motorType = ['mg995','n20'].includes(comp.motorType) ? comp.motorType : 'tt';
     if (out.motorType === 'mg995') {
       // 伺服來回擺的兩端角度（與 play 的 theta 同座標系），clamp 0..360。
       // 伺服角度相對於組裝姿態，可以是負的（例如四連桿升降 −60～60°）。
@@ -391,6 +391,7 @@ function normalizeGear(comp, index, params, warnings) {
       reversed:!!m.reversed,order:m.frameBody?['motor','frameBody','outputBody']:['motor','outputBody']};
   }
   // 驅動輪可標 MG995 伺服（角度範圍內來回擺）；TT / 未標型號不輸出任何欄位，舊檔不變。
+  if (comp.motorType === 'n20') out.motorType = 'n20';
   if (comp.motorType === 'mg995') {
     // 伺服角度相對於組裝姿態，可以是負的（例如四連桿升降 −60～60°）。
       const clampAng = v => Math.max(-360, Math.min(360, Math.round(num(v, 0))));
@@ -521,6 +522,7 @@ function normalizePulley(comp, index, params, warnings) {
     phase: num(comp.phase, 0)
   };
   if (isSprocket) { out.kind = 'sprocket'; out.teeth = teeth; }
+  if (comp.motorType === 'n20') out.motorType = 'n20';
   if (pinRadiusParam) out.pinRadiusParam = pinRadiusParam;
   else if (Number.isFinite(Number(comp.pinRadius))) out.pinRadius = Math.max(1, Math.round(num(comp.pinRadius, R * 0.65)));
   if (safeId(comp.mountLocatorPoint)) out.mountLocatorPoint = comp.mountLocatorPoint;

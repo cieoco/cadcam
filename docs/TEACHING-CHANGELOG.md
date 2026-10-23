@@ -643,3 +643,15 @@
 - 範圍為連桿、三角板／多邊形板／折線桿／夾爪及合成連桿本體；不複製馬達、針筒、固定狀態或安裝關係。齒輪合成板與伸縮桿顯示不支援原因。未新增作品格式或整個機構鏡像功能。視窗與純邏輯懶載入，初始 JS 仍在既有 1.91 MB 預算內。
 - Node 24 定向 9/9 通過：member-copy、member-editor、member-dimensions、bar-fusion、part-fusion、module-ops、startup-size、load-graph、test_blocks_schema。覆蓋獨立 ID／參數、原件不變、目前姿態、兩方向反射、夾爪／外形／孔、合成、模組歸屬、正規化、固定後求解及 SVG／DXF。結果 output/member-copy/tests/results.json。
 - HTTP 瀏覽器實際操作複製、修改副本尺寸、復原尺寸、復原新增、取消預覽、切換鏡像方向及新增後自動保存重開。390×844、360×640 預覽與按鈕完整，無水平溢出，桌機預覽正常。Chrome 原有縮放影響 viewport，依 innerWidth／innerHeight 校準 CSS 尺寸。證據 output/member-copy/mirror-mobile-390.png、mirror-mobile-360.png、mirror-desktop.png、mirror-created.png。內嵌瀏覽器截圖逾時，改用 Chrome 保存截圖；未宣稱實體手機驗收。
+
+
+## 2026-10-23｜N20 減速馬達通用模擬（2026.10.23.10）
+
+- 使用者選擇先做通用 N20，未指定商品、電壓、減速比與轉速。動力來源選單及共同安裝視窗加入 N20，連桿／齒輪可安裝及換型號；鏈輪面板「更多」可將主動輪切換 N20／TT，沿用原馬達編號、接點及一次復原，不開放鏈輪 MG995 擺動。
+- motorType=n20 經既有 snapshot v1 正規化、保存及分享；同一求解器維持連續旋轉，不增加實際 RPM、負載、扭力或編碼器模擬。2D 正視金屬齒輪箱，3D 機身沿輸出軸方向，避免套用 TT 的直角機身。
+- 視覺尺寸參考 [Pololu Micro Metal Gearmotor 尺寸圖](https://www.pololu.com/file/0J1487/pololu-micro-metal-gearmotors.pdf)（12×10 mm 截面、約 26 mm 本體、3 mm 輸出軸）；僅作通用示意，3D 軸延伸到輸出件不代表實物軸長足夠。實際 N20 型號、支架、孔位與軸接頭未核對；不產生 TT 固定孔／輪轂孔或 MG995 舵盤孔，製作包與 SVG／DXF 結果明示一般中心參考孔不是 N20 安裝孔。
+- Node 24 定向 10/10 通過：n20-motor、actuator-installation、member-stock-export、motor-tools、motor-frame-modules、gear-servo、chain-fab-export、startup-size、load-graph、test_blocks_schema。新測試涵蓋 N20 安裝、整圈求解、保存分享、3D 型號、購買清單、輸出孔及鏈輪原軸換型號；共同安裝測試納入正背面與兩端安裝。既有 1.93 MB 啟動上限不變。
+- HTTP 手機 390×844 實操：鏈輪改 N20、播放、3D 旋轉檢查、重開保留 N20；空白作品畫桿 → 動力來源 N20 → 點端孔 → 確認 → 一次復原移除安裝。證據 output/n20/install-mobile.png、chain-3d-mobile.png；瀏覽器尺寸驗收不是實體手機或馬達驗收。
+- 補上手機動力選單視窗高度上限及獨立捲動，避免新增項目後上下截斷；360×640 全部選項與取消完整可見，640×360 橫向可捲至取消，1200×900 桌機正常，無水平溢出。截圖 output/n20/menu-mobile-360.png、menu-desktop.png。
+- 完整 Node 驗收 219/220 通過；唯一失敗為測試期間修改手機 CSS 導致載入清單過期，重新產生後定向重驗 load-graph／startup-size／n20-motor。完整結果 output/n20/full-tests/results.json，最終重驗 output/n20/final-checks/results.json。
+- 本包未修改先前鏈輪審查指出的重合點、鏈節數一致性及包角提示問題。

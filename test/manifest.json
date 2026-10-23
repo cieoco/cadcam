@@ -158,6 +158,7 @@
     "test/module-plates.mjs",
     "test/motor-frame-modules.mjs",
     "test/motor-tools.mjs",
+    "test/n20-motor.mjs",
     "test/mount-surfaces.mjs",
     "test/node-editor.mjs",
     "test/orient-bracket-physical.mjs",

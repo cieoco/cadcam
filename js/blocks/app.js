@@ -1884,12 +1884,12 @@ function drawNow() {
       return Math.atan2(-(far.x - ctr.x), -(far.y - ctr.y)) * 180 / Math.PI + (mount?.reversed ? 180 : 0);  // 同 computeMotorRotDeg 慣例
     };
     const rotDeg0 = rotFor(pts);
-    const isServo = motorTypeForCenter(id) === 'mg995';
+    const motorType = motorTypeForCenter(id), isServo = motorType === 'mg995';
     const body = isServo ? Render.drawMG995Servo(p.x, p.y, rotDeg0, motorLayer)
-                         : Render.drawTTMotor(p.x, p.y, rotDeg0, motorLayer);
+                         : motorType === 'n20' ? Render.drawN20Motor(p.x, p.y, rotDeg0, motorLayer) : Render.drawTTMotor(p.x, p.y, rotDeg0, motorLayer);
     const mId = motorIdForCenter(id);
     const isActive = mId && String(S.activeMotor) === mId;
-    const labelText = (isServo ? 'MG995' : 'TT') + (multiMotor && mId ? `·M${mId}` : '');
+    const labelText = (isServo ? 'MG995' : motorType === 'n20' ? 'N20' : 'TT') + (multiMotor && mId ? `·M${mId}` : '');
     const labelColor = multiMotor
       ? (isActive ? '#d35400' : '#95a5a6')
       : (isServo ? '#2c6fbb' : '#c9971b');
@@ -2595,6 +2595,12 @@ function closePowerMenu() {
 }
 function setSelectedMotorType(type, source = 'node') {
   if(S.mode!=='design')return;
+  if(source==='sprocket'){
+    const chain=S.comps.find(c=>c.kind==='chain'&&(c.driver===S.selectedSprocketId||c.driven===S.selectedSprocketId));
+    const driver=chain&&S.comps.find(c=>c.id===chain.driver);
+    if(driver?.p1?.physicalMotor&&['tt','n20'].includes(type))motorTools.changeMotorTypeAt(driver.p1.id,type);
+    return;
+  }
   if(source==='gear'){
     const g=gearDriver(S.comps,S.selectedGearId);
     if(g&&!g.p1?.physicalMotor){S.pendingMotorType=type;configureMotorMount(null,g.id);return;}
@@ -2611,7 +2617,7 @@ function setSelectedMotorType(type, source = 'node') {
   if(type==='mg995')requestAnimationFrame(()=>document.getElementById('servoEditor')?.scrollIntoView({block:'nearest'}));
 }
 function pickMotorType(type) {
-  S.pendingMotorType = (type === 'mg995') ? 'mg995' : (type === 'linear') ? 'linear' : 'tt';
+  S.pendingMotorType = (type === 'mg995') ? 'mg995' : (type === 'linear') ? 'linear' : (type === 'n20') ? 'n20' : 'tt';
   closePowerMenu();
   placeMotor();
 }

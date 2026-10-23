@@ -575,7 +575,7 @@ export function buildSceneModel(links, points, opts = {}) {
       const dx = tx !== null ? tx - j.x : 0;
       const dy = ty !== null ? ty - j.y : -1;
       const dl = Math.hypot(dx, dy) || 1;
-      const type = motorTypes.get(j.id) === 'mg995' ? 'mg995' : 'tt';
+      const type = ['mg995','n20'].includes(motorTypes.get(j.id)) ? motorTypes.get(j.id) : 'tt';
       const hostPart=mount?.face&&sticks.find(s=>s.id===mount.frameBody);
       const face=mount?.face,shaftDirection=face==='front'?-1:1;
       const hostZ=hostPart?hostPart.layer*plateGap:(frameBackZ??0);

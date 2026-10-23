@@ -243,7 +243,7 @@ export function createChainEditor({
       setText('sprocketDevVal', `${check.deviationMm >= 0 ? '+' : ''}${check.deviationMm.toFixed(2)} mm`);
       const suggest = centerForLinks(check.links, a.teeth, b.teeth);
       setText('sprocketSuggestVal', `${suggest.toFixed(2)} mm（${check.links} 節）`);
-      const driver = a.p1.physicalMotor ? `${(a.motorType === 'mg995' ? 'MG995' : 'TT')} 馬達在主動鏈輪（${a.teeth} 齒）` : '主動鏈輪還沒裝馬達';
+      const driver = a.p1.physicalMotor ? `${(a.motorType === 'mg995' ? 'MG995' : a.motorType === 'n20' ? 'N20' : 'TT')} 馬達在主動鏈輪（${a.teeth} 齒）` : '主動鏈輪還沒裝馬達';
       setText('sprocketPowerVal', driver);
       const bom = $('sprocketBom');
       if (bom) bom.textContent = chainBillOfMaterials(S.comps, S.topo.params).filter(i => i.id === a.id || i.id === b.id || i.id === chain.id).map(i => `${i.label} × ${i.qty}`).join('；');

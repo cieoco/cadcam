@@ -1013,6 +1013,24 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
         g.position.z=m.mountZ+m.shaftDirection*gap;
       }
 
+      if(m.type==='n20') {
+        // 通用 N20：同軸金屬齒輪箱與馬達罐，12×10 mm 截面、約 26 mm 本體。
+        // 軸長為示意連接；實際減速比、支架、軸接頭及干涉仍待核對。
+        const front=-2;
+        g.position.z=m.face?m.mountZ+m.shaftDirection*2:(Number.isFinite(m.mountZ)?m.mountZ:0)+2;
+        const box=new THREE.Mesh(new THREE.BoxGeometry(12,10,10),motorBoxMat);
+        box.position.set(0,0,front-5);g.add(box);
+        const can=new THREE.Mesh(new THREE.BoxGeometry(12,10,16),motorCanMat);
+        can.position.set(0,0,front-18);g.add(can);
+        const top=m.face?(m.shaftEndZ-g.position.z)/m.shaftDirection:m.shaftTopZ-g.position.z;
+        const len=Math.max(2,top-front);
+        const shaft=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,len,16),pinMat);
+        shaft.rotation.x=Math.PI/2;shaft.position.set(0,0,front+len/2);g.add(shaft);
+        g.userData.motorType='n20';addPart(g,'motor:'+m.id);
+        bindPose(g,(o,scene)=>{const next=scene.motors.find(p=>p.id===m.id);o.position.x=next.x;o.position.y=next.y;o.rotation.z=Math.atan2(next.dir?next.dir.y:-1,next.dir?next.dir.x:0);});
+        return;
+      }
+
       if (m.type === 'mg995') {
         // MG995 伺服：藍色扁方殼沉在背面、輸出軸近端有白色舵盤
         const bodyCz = -(SERVO.gap + SERVO.boxThick / 2);

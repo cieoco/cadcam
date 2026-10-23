@@ -35,7 +35,7 @@ export function buildMotorExportMounts({comps,pts={},motorCenterIds=new Set(),mo
   const center=pts[id];if(!center||!Number.isFinite(center.x)||!Number.isFinite(center.y))return;
   const type=motorTypes.get(id) || typeForCenter(id),mount=motorMounts.get(id);
   // pointId：供 splitMountsByHost 對應 bar.motorMountPoint（宿主機架桿）。
-  out.push({kind:type==='mg995'?'mg995':'tt',pointId:id,frameBody:mount?.frameBody,center,rotDeg:motorMountPatternRotDegForCenter({id,pts,comps,mount,fallbackRotDeg}),settings:type==='mg995'?mg995Settings:ttSettings});
+  out.push({kind:type,pointId:id,frameBody:mount?.frameBody,center,rotDeg:motorMountPatternRotDegForCenter({id,pts,comps,mount,fallbackRotDeg}),settings:type==='mg995'?mg995Settings:ttSettings});
  });
  return out;
 }

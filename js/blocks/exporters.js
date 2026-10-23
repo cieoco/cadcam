@@ -140,7 +140,7 @@ export function exportableRacks(comps, params) {
 }
 
 function isTtMotorEnd(comp, key) {
-  return Boolean(comp && comp.isInput && comp.motorType !== 'mg995' && comp[key] && comp[key].physicalMotor);
+  return Boolean(comp && comp.isInput && !['mg995','n20'].includes(comp.motorType) && comp[key] && comp[key].physicalMotor);
 }
 
 function ttShaftFlatPoints(cx, cy, settings = {}, steps = 12) {
@@ -314,7 +314,7 @@ function gearGeometry(comp, params = {}, settings = {}, comps = []) {
   // MG995 用圓形舵盤鎖 N 顆螺絲；尺寸取 settings.drive（常見值，請實量）。從動輪與 MG995 外的圓孔不變。
   const drive = { ...FABRICATION_DEFAULTS.drive, ...((settings && settings.drive) || {}) };
   const driven = Boolean(comp.p1 && comp.p1.physicalMotor);
-  const ttDriven = driven && comp.motorType !== 'mg995';
+  const ttDriven = driven && !['mg995','n20'].includes(comp.motorType);
   const driveHoles = [];
   if (ttDriven) {
     driveHoles.push({ x: 0, y: 0, r: drive.ttHubCenterMm / 2, layer: 'TT_HUB_CENTER' });
@@ -322,6 +322,8 @@ function gearGeometry(comp, params = {}, settings = {}, comps = []) {
     // 螺絲孔沿輸出孔方向 angle 的垂直方向，對稱於中心。
     const nx = -Math.sin(angle), ny = Math.cos(angle);
     [1, -1].forEach(sgn => driveHoles.push({ x: sgn * half * nx, y: sgn * half * ny, r: drive.ttHubScrewMm / 2, layer: 'TT_HUB_SCREW' }));
+  } else if (driven && comp.motorType === 'n20') {
+    driveHoles.push({x:0,y:0,r:centerR,layer:'CENTER_HOLE'}); // 一般參考孔；N20 軸接頭未定。
   } else if (driven) {
     driveHoles.push(...servoHornHoles(settings, 0, angle).map(({ kind, ...hole }) => hole));
   }
@@ -895,7 +897,7 @@ function dxfForRack(comp, geometry) {
 // 單一動力來源的加工特徵（世界座標）：corners＝安裝內容角點（供外形合併／延伸判斷）、
 // cutouts＝非圓形切割（MG995 穿板槽）、holes＝圓孔。自動地基、宿主機架桿與結構板共用。
 export function motorMountFeatures(mount) {
-  if (!mount || !mount.center || !Number.isFinite(mount.center.x)) return null;
+  if (!mount || mount.kind === 'n20' || !mount.center || !Number.isFinite(mount.center.x)) return null;
   const rot = (Number(mount.rotDeg) || 0) * Math.PI / 180;
   const cos = Math.cos(rot), sin = Math.sin(rot);
   const local = (x, y) => ({

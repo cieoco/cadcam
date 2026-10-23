@@ -94,7 +94,7 @@ export function deriveMotorMounts(list) {
     const far = farId && pts[farId];
     const visual = far ? Math.atan2(-(far.x - center.x), -(far.y - center.y)) * 180 / Math.PI : (mount ? mount.rotDeg : 0);
     mounts.push({
-      kind: motorTypeAt(list, id) === 'mg995' ? 'mg995' : 'tt',
+      kind: motorTypeAt(list, id),
       pointId: id, frameBody: mount && mount.frameBody, center, rotDeg: visual - 90, settings: {}
     });
   });
@@ -559,6 +559,8 @@ export function hardwareList(plan, { modules = [] } = {}) {
   if (nuts > 0) rows.push({ spec: 'M3 防鬆螺帽', qty: nuts, note: '穿透式 M3 螺絲各一顆（鎖進輪轂的 M3×8 不需要）' });
   const ttCount = motors.filter(m => m.type === 'tt').length;
   const servoCount = motors.filter(m => m.type === 'mg995').length;
+  const n20Count = motors.filter(m => m.type === 'n20').length;
+  if(n20Count)rows.push({spec:'N20 減速馬達',qty:n20Count,note:'通用模擬；電壓、減速比、固定支架與軸接頭待核對'});
   if (ttCount) rows.push({ spec: 'TT 減速馬達', qty: ttCount, note: '動力來源，裝在機架板背面' });
   if (servoCount) rows.push({ spec: 'MG995 伺服', qty: servoCount, note: '動力來源，從機架板槽穿入' });
   return rows;
@@ -576,6 +578,7 @@ export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = []
   const parts = (plan && plan.parts) || [];
   const joints = (plan && plan.joints) || [];
   const motors = (plan && plan.motors) || [];
+  if(motors.some(m=>m.type==='n20'))warnings.push('N20 僅通用模擬：固定支架、軸接頭與配對孔尚未提供；板件中心孔為一般參考孔，不能直接作為 N20 安裝孔。');
   const gaps = (plan && plan.gaps) || [];
   const stock = finitePos(cnc && cnc.stockThicknessMm) ? Number(cnc.stockThicknessMm) : DEFAULT_STOCK_THICKNESS_MM;
   const tool = finitePos(cnc && cnc.toolDiameterMm) ? fmtNum(cnc.toolDiameterMm) : '未設定';
@@ -606,7 +609,7 @@ export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = []
       motors.forEach(m => {
         const plate = here.find(p => p.name === m.plate);
         if (!plate) return;
-        items.push(m.type === 'mg995'
+        items.push(m.type === 'n20' ? `<li>N20 馬達（${e(m.centerId)}）：固定支架、軸接頭與配對孔尚未提供；請依實物補齊，勿直接加工安裝。</li>` : m.type === 'mg995'
           ? `<li>安裝 MG995 伺服（${e(m.centerId)}）：從 ${e(plate.name)} 的槽穿入，用 M3 螺絲鎖耳孔。</li>`
           : `<li>安裝 TT 馬達（${e(m.centerId)}）：裝在 ${e(plate.name)} 背面，用 M3×30 螺絲鎖固定孔。</li>`);
       });

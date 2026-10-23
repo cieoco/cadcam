@@ -48,7 +48,7 @@ export function planMotorInstallation(source,request,points={},motion={}){
   }
   if(out===host)return fail('外殼與輸出端不能固定在同一根桿。');
   if(out.mesh)return fail('請選這組齒輪的主動輪。');
-  if(!['tt','mg995'].includes(request.type)||!['front','back'].includes(request.face))return fail('請選致動元件與安裝面。');
+  if(!['tt','mg995','n20'].includes(request.type)||!['front','back'].includes(request.face))return fail('請選致動元件與安裝面。');
   if(!host&&request.face==='front')return fail('自動機架沿用背面安裝；需要選正面時，請先選實際承載零件。');
   if(!['horizontal','vertical','follow-frame'].includes(request.orientation))return fail('請選外殼方向。');
   const key=out.type==='gear'?'p1':request.outputEnd;

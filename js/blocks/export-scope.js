@@ -42,6 +42,7 @@ export function prepareScopedExport(source,options,format) {
   const work=structuredClone(source),{context,targets,scope}=resolveExportScope(work,options);
   const targetIds=new Set(targets.map(c=>c.id)),files=[],warnings=[],notices=[];
   const emit=(text,name,mime,ids=[])=>{if(scope!=='selected'||ids.some(id=>targetIds.has(id)))files.push({text,name,mime,sourceIds:ids});};
+  if(context.comps.some(c=>c.motorType==='n20')){const note='N20 僅通用模擬：固定支架、軸接頭與配對孔尚未提供；中心孔為一般參考孔，製作前須核對。';warnings.push(note);notices.push(note);}
   if(context.comps.some(c=>c.type==='syringe')) {
     const plan=syringeManufacturing(context.comps,work.topo.params,work.fabrication);
     const selected=scope==='selected'?plan.parts.filter(p=>targetIds.has(p.id)||plan.syringes.some(s=>targetIds.has(s.id)&&p.id.startsWith(s.id+'-'))):plan.parts;

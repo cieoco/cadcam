@@ -84,6 +84,18 @@ export function drawTTMotor(cx, cy, rotDeg = 0, parent = _svg) {
   return g;   // 回傳根 <g>：播放快路徑只改它的 transform（位置/朝向），不重建內部
 }
 
+// N20 通用示意：輸出軸與機身同軸，正視為 12×10 mm 金屬齒輪箱。
+// 參考 Pololu micro metal gearmotor；不代表特定商品的安裝／加工尺寸。
+export function drawN20Motor(cx, cy, rotDeg = 0, parent = _svg) {
+  const s=View.getScale(),g=document.createElementNS(SVG_NS,'g');
+  g.setAttribute('transform',`translate(${TX(cx)} ${TY(cy)}) rotate(${rotDeg})`);
+  g.setAttribute('data-motor-type','n20');g.style.pointerEvents='none';
+  for(const [tag,attrs] of [['rect',{x:-6*s,y:-5*s,width:12*s,height:10*s,rx:s,fill:'#c9a45b',stroke:'#75613b'}],['circle',{cx:0,cy:0,r:2.5*s,fill:'#b4bbc2',stroke:'#58636e'}]]){
+    const e=document.createElementNS(SVG_NS,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);g.appendChild(e);
+  }
+  parent.appendChild(g);return g;
+}
+
 // MG995 伺服側視：藍色扁方殼 + 兩側固定耳 + 輸出軸上的舵盤（horn）。
 // 與 TT 馬達同一套擺位慣例：輸出軸在 local 原點，本體沿 -y（朝機架）延伸。
 export function drawMG995Servo(cx, cy, rotDeg = 0, parent = _svg) {

@@ -33,7 +33,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
   const panels=actuatorSteps.map((name,i)=>{const p=el('section',null,body);el('h3',`${i+1} · ${name}`,p);return p;});
   const field=(p,text,kind='select')=>{const l=el('label',text,p),n=el(kind,null,l);n.setAttribute('aria-label',text);if(kind==='input'){n.type='number';n.step='1';}return n;};
   const option=(s,text,value)=>{const o=el('option',text,s);o.value=value;};
-  const kind=field(panels[0],'致動元件');option(kind,'MG995 舵機','mg995');option(kind,'TT 馬達','tt');kind.value=request.type;
+  const kind=field(panels[0],'致動元件');option(kind,'MG995 舵機','mg995');option(kind,'TT 馬達','tt');option(kind,'N20 減速馬達','n20');kind.value=request.type;
   const host=field(panels[0],'外殼固定在哪個零件？');option(host,'請選承載零件','');option(host,'自動機架（固定在圖面）','world');
   choices.hosts.forEach(c=>option(host,label(c),c.id));host.value=request.hostId;
   const faceRow=el('div',null,panels[0]);faceRow.className='install-faces';
@@ -54,6 +54,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
   const reading=el('output',null,panels[3]),toggle=el('button','查看 3D',panels[3]);
   const scan=el('button','檢查動作範圍',panels[3]),scanText=el('p','尚未檢查動作範圍。',panels[3]);
   el('p','預覽檢查幾何連動；安裝孔、軸長、五金、干涉與扭力仍需核對。',panels[3]);
+  const n20Note=el('p','N20 通用模擬：轉速、扭力、固定支架及軸接頭待依實物核對。',body);
   const error=el('p',null,body);error.className='install-error';error.setAttribute('role','status');
   const foot=el('footer',null,dialog),back=el('button','上一步',foot),next=el('button','下一步',foot);
   cancel.onclick=()=>dialog.close();back.onclick=()=>{step--;update();};
@@ -86,7 +87,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     if(at){
       const carrier=owner?{p1:owner.p1.id,a:world(owner.p1),b:world(owner.p2)}:null;
       const d=resolveMotorOrientation(request.orientation,{center:{...at,id:owner?.[request.hostEnd]?.id},carrier,reversed:request.reversed}).dir;
-      const n=draw('rect',{x:-7,y:-12,width:48,height:24,rx:4,fill:request.type==='mg995'?'#7aa0dd':'#e3bc60',stroke:'#40536c',transform:`translate(${at.x} ${-at.y}) rotate(${-Math.atan2(d.y,d.x)*180/Math.PI})`});
+      const n=draw('rect',{x:request.type==='n20'?-6:-7,y:request.type==='n20'?-5:-12,width:request.type==='n20'?12:48,height:request.type==='n20'?10:24,rx:2,fill:request.type==='mg995'?'#7aa0dd':'#e3bc60',stroke:'#40536c',transform:`translate(${at.x} ${-at.y}) rotate(${-Math.atan2(d.y,d.x)*180/Math.PI})`});
       n.setAttribute('opacity','.8');
     }
     for(const c of cs){
@@ -131,9 +132,10 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     }catch(e){if(!closed)error.textContent=`3D 預覽未完成：${e.message}`;}
   }
   function update(trialOnly=false){
+    n20Note.hidden=request.type!=='n20';
     revision++;if(!trialOnly)scanText.textContent='設定已變更，請重新檢查動作範圍。';
     result=request.outputId?planMotorInstallation(base,request,points,motion):null;
-    title.textContent=`${request.type==='mg995'?'舵機':'馬達'}安裝${quick?'':` · ${step+1}/4`}`;
+    title.textContent=`${request.type==='mg995'?'舵機':request.type==='n20'?'N20 減速馬達':'馬達'}安裝${quick?'':` · ${step+1}/4`}`;
     dialog.classList.toggle('install-quick',quick);nav.hidden=quick;quickPanel.hidden=!quick;
     panels.forEach((p,i)=>p.hidden=quick||i!==step);tabs.forEach((b,i)=>{b.disabled=i>furthest;b.setAttribute('aria-current',i===step?'step':'false');});
     quickSummary.textContent=request.outputId?`帶動「${label(base.comps.find(c=>c.id===request.outputId))}」・孔 ${selectedNode}；${request.hostId==='world'?'外殼固定在圖面基準（會固定此孔）':`外殼固定在「${label(base.comps.find(c=>c.id===request.hostId))}」`}。`

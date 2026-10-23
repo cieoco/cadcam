@@ -8,7 +8,7 @@ import {solveTopology} from '../js/multilink/solver.js';
 import {buildMotorMounts,motorMountPatternRotDegForCenter} from '../js/blocks/motor-mounts.js';
 const request={hostId:'Frame',hostEnd:'p1',outputId:'Arm',outputEnd:'p1',face:'back',orientation:'follow-frame',type:'mg995',angle:0};
 const original=JSON.stringify(source);
-for(const type of ['mg995','tt'])for(const face of ['front','back'])for(const end of ['p1','p2']){
+for(const type of ['mg995','tt','n20'])for(const face of ['front','back'])for(const end of ['p1','p2']){
  const r=planMotorInstallation(source,{...request,type,face,outputEnd:end,angle:30});assert.ok(r.ok,r.message);
  const arm=r.comps.find(c=>c.id==='Arm'),host=r.comps.find(c=>c.id==='Frame');
  assert.equal(arm[end].id,'A');assert.equal(host.motorMountPoint,'A');assert.equal(arm.motorCarrier,'Frame');assert.equal(arm.motorMount.face,face);

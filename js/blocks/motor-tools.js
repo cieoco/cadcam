@@ -16,9 +16,9 @@ export function motorTypeAt(comps, centerId) {
     (c.p1 && c.p1.id === centerId && c.p1.physicalMotor) ||
     (c.p2 && c.p2.id === centerId && c.p2.physicalMotor)
   ));
-  if (bar) return bar.motorType === 'mg995' ? 'mg995' : 'tt';
-  const gear = comps.find(c => c.type === 'gear' && c.p1 && c.p1.id === centerId && c.p1.physicalMotor);
-  if (gear) return gear.motorType === 'mg995' ? 'mg995' : 'tt';
+  if (bar) return ['mg995','n20'].includes(bar.motorType) ? bar.motorType : 'tt';
+  const gear = comps.find(c => ['gear','pulley'].includes(c.type) && c.p1 && c.p1.id === centerId && c.p1.physicalMotor);
+  if (gear) return ['mg995','n20'].includes(gear.motorType) ? gear.motorType : 'tt';
   return 'tt';
 }
 // 角度面板與編輯共用同一查詢；馬達裝配的桿件查詢仍保持原用途。
@@ -88,7 +88,7 @@ export function createMotorTools({
     svg.style.cursor = '';
     clearBanner();
   }
-  const motorTypeLabel = (type) => (type === 'mg995') ? 'MG995 🟦' : (type === 'linear') ? '線性致動器 🟢' : 'TT馬達 🔴';
+  const motorTypeLabel = (type) => (type === 'mg995') ? 'MG995 🟦' : (type === 'linear') ? '線性致動器 🟢' : (type === 'n20') ? 'N20 減速馬達 ⚙️' : 'TT馬達 🔴';
   function placeMotor() {
     pause();
     exitDrawTools();
@@ -334,7 +334,7 @@ export function createMotorTools({
       if (g.servoStart == null) g.servoStart = 0;
       if (g.servoEnd == null) g.servoEnd = 90;
     } else {
-      delete g.motorType; delete g.servoStart; delete g.servoEnd;
+      if(S.pendingMotorType==='n20')g.motorType='n20';else delete g.motorType; delete g.servoStart; delete g.servoEnd;
     }
     freezePointAtDisplay(g.p1.id);     // 馬達順手把驅動輪中心釘在目前位置（固定在機架），與桿件一致
     setPointType(g.p1.id, 'fixed');
@@ -351,9 +351,9 @@ export function createMotorTools({
 
   // 原軸直接換型號：保留編號、機架、相位與輸出桿，不走拆除／重裝。
   function changeMotorTypeAt(nodeId,type) {
-    if(!['tt','mg995'].includes(type))return null;
-    const c=motorBarForCenter(nodeId) || S.comps.find(c=>c.type==='gear' && c.p1?.id===nodeId && c.p1.physicalMotor);
-    if(!c)return null;
+    if(!['tt','mg995','n20'].includes(type))return null;
+    const c=motorBarForCenter(nodeId) || S.comps.find(c=>['gear','pulley'].includes(c.type) && c.p1?.id===nodeId && c.p1.physicalMotor);
+    if(!c || (c.type==='pulley' && type==='mg995'))return null;
     pause();
     if((c.motorType || 'tt')!==type) {
       pushUndo();
@@ -363,14 +363,14 @@ export function createMotorTools({
         if(c.servoEnd==null)c.servoEnd=90;
       }
     }
-    const motor=c.type==='gear'?c.p1.physicalMotor:c.physicalMotor;
+    const motor=c.type==='bar'?c.physicalMotor:c.p1.physicalMotor;
     activateMotor(String(motor || '1'));
     cancelMotorMode(); rebuild(); draw();
     return nodeId;
   }
   function setGearMotorType(gearId,type) {
     const g=gearDriver(S.comps,gearId);
-    if(!g || !['tt','mg995'].includes(type))return null;
+    if(!g || !['tt','mg995','n20'].includes(type))return null;
     if(g.p1.physicalMotor)return changeMotorTypeAt(g.p1.id,type);
     pause(); S.pendingMotorType=type; driveGearAt(g.id);
     return g.p1.id;

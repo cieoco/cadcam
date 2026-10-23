@@ -221,7 +221,7 @@ export function createGearEditor({
     const setRow = (elId, show) => { const el = document.getElementById(elId); if (el) el.style.display = show ? '' : 'none'; };
     const driver=gearDriver(S.comps,c.id);
     setRow('gearPowerRow',!!driver);
-    setText('gearPowerStatus',driver ? `輸入輪 ${driver.id}：${driver.p1.physicalMotor ? (driver.motorType==='mg995'?'MG995 舵機':'TT 馬達') : '尚未安裝動力'}` : '');
+    setText('gearPowerStatus',driver ? `輸入輪 ${driver.id}：${driver.p1.physicalMotor ? (driver.motorType==='mg995'?'MG995 舵機':driver.motorType==='n20'?'N20 減速馬達':'TT 馬達') : '尚未安裝動力'}` : '');
     setText('gearModuleVal', Math.round(mod));
     setText('gearTeethVal', c.teeth);
     setText('gearRadiusVal', Math.round(Number(S.topo.params[c.radiusParam]) || c.teeth * mod / 2));

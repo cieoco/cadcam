@@ -62,6 +62,7 @@ export function drawMotorMountHoles({ motorIds, motorMounts, points, svg, scale,
   };
   motorIds.forEach(id => {
     const type = motorTypeForCenter(id), point = points[id];
+    if(type==='n20')return; // 通用模擬尚無固定座孔規格，不套用 TT 孔位。
     if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
     const group = svgEl('g');
     const update = current => {

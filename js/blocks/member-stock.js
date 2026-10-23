@@ -90,7 +90,7 @@ export function planMemberStock(comp, key, raw, { holeDiameterMm = 12.96 } = {})
 
 export function memberHoleDiameter(comp, settings = {}) {
   const connection = finiteInput(settings.holeDiameterMm) ?? 12.96;
-  return comp?.type === 'bar' && comp.isInput && comp.motorType !== 'mg995'
+  return comp?.type === 'bar' && comp.isInput && !['mg995','n20'].includes(comp.motorType)
     ? Math.max(connection, finiteInput(settings.ttShaftFlatDiameterMm) ?? 5.4) : connection;
 }
 
