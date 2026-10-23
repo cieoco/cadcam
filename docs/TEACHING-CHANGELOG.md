@@ -682,3 +682,10 @@
 - Node v24.19.0 全套 223／223 通過（`output/tab-nut/acceptance-release/results.json`）；最後參照拒絕與載入圖 3／3 通過（`acceptance-final-contract/results.json`）。新測試包括 32 種方向、原始 SVG／DXF 尺寸、BOM、取消／過期候選、分享、複合模組保存與實體化；全部納入 manifest。
 - 瀏覽器實操正式工具及 `test/tab-nut.html`：選面、切接法、螺絲過短阻擋、恢復有效尺寸、確認、保存重開與復原。`test/face-wizard.html` 舊 v1 接合、分享往返、復原保持正常。`test/tab-nut-devices.html` 驗收 390×844、360×640、844×390、1200×900 的 iframe viewport 與 24 px 文字；截圖在 `output/tab-nut/screenshots/`，不是實體手機測試。
 - 靜態首次載入預算由 1.93 MB 調為 1.96 MB，新增約 22 KB 共用幾何與保存橋接；3D、錄影與試片下載仍採動態載入。產生的 import map 及載入 token 一起更新。部署須另核對 GitHub Actions 與線上版本，push 本身不算部署成功。
+
+
+## 2026-10-24 — 榫槽凹形板留料檢查（2026.10.24.3）
+
+- 發布複核重現凹形板反例：T 槽包圍框四角都在板內，凹口卻穿過框中段。改為逐段邊界距離／相交檢查，並對凸榫根部保留同樣的外緣留料；禁止這類配置確認與加工輸出。
+- `tab-nut-geometry` 新增此反例，原 32 種方向及保存／輸出測試仍通過。純幾何修正不改操作及作品格式；依新的載入 token 更新靜態頁面。
+- 最後定向回歸 7／7 通過（`output/tab-nut/acceptance-concave/results.json`），包含幾何、接合、保存輸出、舊存檔、載入圖、41 項範例庫與啟動大小。完整 CI 隨最終提交執行。

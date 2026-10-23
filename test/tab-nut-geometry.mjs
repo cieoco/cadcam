@@ -21,6 +21,9 @@ for(const hostFace of ['top','bottom'])for(const childFace of ['front','back','l
 }
 for(const f of [fixture({gap:1}),fixture({hostFace:'front'}),fixture({fastener:{...TAB_NUT_DEFAULTS,screwLengthMm:8}}),fixture({fastener:{...TAB_NUT_DEFAULTS,screwLengthMm:40}}),fixture({fastener:{...TAB_NUT_DEFAULTS,alongMm:20}}),fixture({},host,board(20,30))])assert.equal(planTabNutGeometry(f).ok,false);
 const drilled=structuredClone(host);drilled.holes=[{x:12,y:0,r:2}];assert.equal(planTabNutGeometry(fixture({},drilled)).ok,false);
+// All four notch-box corners are inside, yet the concave boundary crosses its middle.
+const concave=structuredClone(child);concave.outlines=[[[-20,-15],[20,-15],[20,-11],[0,-11],[0,-9],[20,-9],[20,15],[-20,15]].map(([x,y])=>({x,y}))];
+assert.equal(planTabNutGeometry(fixture({},host,concave)).ok,false,'whole edges must clear concave boundaries');
 const t=structuredClone(child);t.box.max.z=2.5;assert.equal(planTabNutGeometry(fixture({},host,t)).ok,false);
 for(const value of [0,-1,NaN,Infinity,'3',null])assert.equal(normalizeTabNut({...TAB_NUT_DEFAULTS,tabWidthMm:value}),null);
 assert.equal(normalizeTabNut({...TAB_NUT_DEFAULTS,version:2}),null);

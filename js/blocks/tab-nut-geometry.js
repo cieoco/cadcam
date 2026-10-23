@@ -24,10 +24,11 @@ const clean=r=>r.filter((p,i)=>!i||Math.hypot(p.x-r[i-1].x,p.y-r[i-1].y)>eps).fi
 export function segmentDistance(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,k=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy)));return Math.hypot(p.x-a.x-k*dx,p.y-a.y-k*dy);}
 const edges=r=>r.map((p,i)=>[p,r[(i+1)%r.length]]);
 function crosses(a,b,c,d){const cross=(p,q,r)=>(q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x);return cross(a,b,c)*cross(a,b,d)<-eps&&cross(c,d,a)*cross(c,d,b)<-eps;}
+const boundaryDistance=(ring,boundary)=>Math.min(...edges(ring).flatMap(([a,b])=>boundary.map(([c,d])=>crosses(a,b,c,d)?0:Math.min(segmentDistance(a,c,d),segmentDistance(b,c,d),segmentDistance(c,a,b),segmentDistance(d,a,b)))));
 export function ringDistance(a,b){if(a.some(p=>inside(p,b))||b.some(p=>inside(p,a))||edges(a).some(([p,q])=>edges(b).some(([r,s])=>crosses(p,q,r,s))))return 0;return Math.min(...a.flatMap(p=>edges(b).map(([q,r])=>segmentDistance(p,q,r))),...b.flatMap(p=>edges(a).map(([q,r])=>segmentDistance(p,q,r))));}
 function featureClear(ring,surface,web,{edge=false}={}){
   const outer=surface.outlines?.[0]||surface.outline;
-  if(!edge&&(!ring.every(p=>inside(p,outer))||Math.min(...ring.flatMap(p=>edges(outer).map(([a,b])=>segmentDistance(p,a,b))))<web-eps||edges(ring).some(([a,b])=>edges(outer).some(([c,d])=>crosses(a,b,c,d)))))return false;
+  if(!edge&&(!ring.every(p=>inside(p,outer))||boundaryDistance(ring,edges(outer))<web-eps))return false;
   if((surface.holes||[]).some(h=>inside(h,ring)||Math.min(...edges(ring).map(([a,b])=>segmentDistance(h,a,b)))<(h.r||h.diameterMm/2)+web-eps))return false;
   return !(surface.cutouts||[]).some(c=>ringDistance(ring,c.points)<web-eps);
 }
@@ -66,13 +67,13 @@ export function planTabNutGeometry({host,child,face,connectionId='tab-nut',setti
   const zone=rect(-n,eps,n,top).map(q=>pos(q.x,q.y));
   if(!zone.every(q=>inside(q,edge.ring))||!featureClear(zone,child,p.minWebMm,{edge:true}))return fail('螺母／螺絲槽會切到既有孔槽或超出立板。');
   const otherEdges=edges(edge.ring).filter((_,i)=>i!==edge.index);
-  if(Math.min(...zone.flatMap(q=>otherEdges.map(([a,b])=>segmentDistance(q,a,b))))<p.minWebMm-eps)return fail('螺絲末端或螺母槽距離板外緣太近。');
+  if(boundaryDistance(zone,otherEdges)<p.minWebMm-eps)return fail('螺絲末端或螺母槽距離板外緣太近。');
   const path=[edge.a];
   for(const x of [-halfPitch,halfPitch]){
     if(x>0)path.push(...notch);
     path.push(pos(x-halfTab,0),pos(x-halfTab,-tHost),pos(x+halfTab,-tHost),pos(x+halfTab,0));
     const tabZone=rect(x-halfTab,eps,x+halfTab,p.minWebMm).map(q=>pos(q.x,q.y));
-    if(!featureClear(tabZone,child,p.minWebMm,{edge:true}))return fail('定位榫根部距離既有孔槽太近。');
+    if(!tabZone.every(q=>inside(q,edge.ring))||boundaryDistance(tabZone,otherEdges)<p.minWebMm-eps||!featureClear(tabZone,child,p.minWebMm,{edge:true}))return fail('定位榫根部距離板外緣或既有孔槽太近。');
   }
   path.push(edge.b);
   const childOutline=[...edge.ring.slice(0,edge.index),...path,...edge.ring.slice(edge.index+2)];
