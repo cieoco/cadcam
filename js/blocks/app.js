@@ -881,7 +881,6 @@ const { gearById, gearMeshChain, gearMeshOff, syncGearMeshAnchoredAt, selectGear
         addGearPair, addRackPinion, toggleRackOrientation,
         changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter,
         changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth } = gearEditor;
-// 取消齒輪選取時一併收掉鏈輪面板（鏈輪的選取與面板在 chain-editor.js，第一次用才載入）。
 function deselectGear() {
   deselectGearOnly();
   if (S.selectedSprocketId) {
@@ -891,7 +890,7 @@ function deselectGear() {
   }
 }
 
-// ---- 鏈輪＋鏈條域：./chain-editor.js 第一次用到才動態載入，不佔啟動時的 JS ----
+// 鏈輪＋鏈條：chain-editor.js 動態載入
 let chainEditor = null, chainEditorLoading = null;
 function withChainEditor(fn) {
   if (chainEditor) return fn(chainEditor);
@@ -1210,7 +1209,7 @@ function rebuild({save=true}={}) {
   parallelLiftController?.recompute();
   document.getElementById('hint').style.display = S.comps.length ? 'none' : 'block';
   Panels.updateRoleEditor();
-  if (S.selectedSprocketId) chainEditor?.updatePanel();   // 拖動、改齒數後面板上的鏈節與偏差跟著更新
+  if (S.selectedSprocketId) chainEditor?.updatePanel();
   if(save)scheduleAutosave();    // 任何結構變更都防丟（debounce，播放不觸發）
 }
 
@@ -1768,7 +1767,7 @@ function drawNow() {
     Tools.drawDrawPreview();   // 空畫布也要顯示正在拉出的第一根連桿
     Tools.drawTrianglePreview();
     Tools.drawPolygonPreview();
-    chainEditor?.drawPreview();   // 放鏈輪中：空畫布也要看到第一個鏈輪
+    chainEditor?.drawPreview();
     return;
   }
 
@@ -1984,7 +1983,7 @@ function drawNow() {
   Tools.drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
   Tools.drawTrianglePreview(); // 三點桿模式：疊在最上層的三角預覽
   Tools.drawPolygonPreview();  // 多邊形板模式：疊在最上層的預覽
-  chainEditor?.drawPreview();  // 鏈輪放置模式：第一個鏈輪與對齊後的第二個鏈輪預覽
+  chainEditor?.drawPreview();
   hydraulic?.render(allPts,sol?.isValid===true);
 
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
@@ -3199,7 +3198,11 @@ async function downloadBuildPack() {
   const warnings = [...frameWarnings, ...cncWarningList(cncParts)];
   // 目前沒有作品名稱欄位：有模組就用模組名稱串起來，否則「機構作品」。
   const title = representationWork().modules.map(m => m && m.name).filter(Boolean).join('＋') || '機構作品';
-  const html = buildPackHtml(plan, { title, cnc, warnings, interference, suggestions, modules: representationWork().modules });
+  let html = buildPackHtml(plan, { title, cnc, warnings, interference, suggestions, modules: representationWork().modules });
+  if (representationWork().comps.some(c => c.kind === 'chain')) {   // 鏈傳動：購買清單與長孔說明（第一次用到才載入）
+    const { addChainToBuildPack } = await import('./chain-manufacturing.js');
+    html = addChainToBuildPack(html, representationWork().comps, S.topo.params, { holeDiameterMm: settings.frameHoleDiameterMm });
+  }
   saveBuildPack(html,title,plan.parts.length);
 }
 function openFile() {

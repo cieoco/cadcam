@@ -28,8 +28,8 @@ export function buildPreviewModelInputs({ comps, params, theta, links, points, g
   const pulleys = comps.filter(comp => comp.type === 'pulley' && comp.p1 && comp.p2).map(comp => {
     const radius = pulleyRadius(comp);
     return { id: comp.id, center: comp.p1.id, pin: comp.p2.id, radius, pinRadius: pulleyPinRadius(comp, radius),
-      rollerWidth: Number(comp.rollerWidth) || 0, color: comp.color };
+      rollerWidth: Number(comp.rollerWidth) || 0, color: comp.color, kind: comp.kind, teeth: comp.teeth };
   });
-  const belts = comps.filter(comp => comp.type === 'belt').map(comp => ({ id: comp.id, driver: comp.driver, driven: comp.driven, color: comp.color }));
+  const belts = comps.filter(comp => comp.type === 'belt').map(comp => ({ id: comp.id, driver: comp.driver, driven: comp.driven, color: comp.color, kind: comp.kind, links: comp.links }));
   return { links, pts: points, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts };
 }

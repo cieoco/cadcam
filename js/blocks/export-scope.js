@@ -79,7 +79,7 @@ export function prepareScopedExport(source,options,format) {
       }
     }
     warnings.push(...cncWarnings(cncParts,work.fabrication?.cnc||FABRICATION_DEFAULTS.cnc));
-    const skipped=targets.filter(c=>!['anchor','bar','triangle','gear','rack'].includes(c.type));
+    const skipped=targets.filter(c=>!['anchor','bar','triangle','gear','rack'].includes(c.type)&&!['sprocket','chain'].includes(c.kind));   // 鏈輪與鏈條是買現成的，不出板材檔也不提醒
     if(skipped.length){const notice=`未提供獨立板材檔：${skipped.map(c=>c.id).join('、')}`;warnings.push(notice);notices.push(notice);}
   }
   if(!files.length)throw Error('這個範圍沒有可匯出的板材零件；請選板身，不是接點。');

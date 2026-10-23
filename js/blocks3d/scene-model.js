@@ -442,6 +442,7 @@ export function buildSceneModel(links, points, opts = {}) {
       thickness: plateThickness,
       rollerWidth: Math.max(0,Number(pu.rollerWidth)||0),
       color: pu.color || '#d35400',
+      kind: pu.kind, teeth: pu.teeth,
     };
     pulleys.push(pulley);
     pulleyById.set(pu.id, pulley);
@@ -461,6 +462,7 @@ export function buildSceneModel(links, points, opts = {}) {
       z: gearZ + plateThickness + 1.2,
       thickness: 2.2,
       color: b.color || '#2c3e50',
+      kind: b.kind, links: b.links,
     });
   });
 

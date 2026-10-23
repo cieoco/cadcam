@@ -6,6 +6,7 @@
  * 本模組第一次用到才動態載入（app.js 的 withChainEditor），不佔啟動時的 JS。
  */
 import { S, activateMotor } from './state.js';
+import { chainBillOfMaterials } from './chain-manufacturing.js';
 import { placeChainDrive, setSprocketTeeth, alignChainLinks } from './chain-tools.js';
 import { checkChainDrive, pitchDiameter, wrapAngle, centerForLinks, TEETH_MIN, TEETH_MAX } from '../core/chain-drive.js';
 
@@ -243,10 +244,12 @@ export function createChainEditor({
       setText('sprocketSuggestVal', `${suggest.toFixed(2)} mm（${check.links} 節）`);
       const driver = a.p1.physicalMotor ? `${(a.motorType === 'mg995' ? 'MG995' : 'TT')} 馬達在主動鏈輪（${a.teeth} 齒）` : '主動鏈輪還沒裝馬達';
       setText('sprocketPowerVal', driver);
+      const bom = $('sprocketBom');
+      if (bom) bom.textContent = chainBillOfMaterials(S.comps, S.topo.params).filter(i => i.id === a.id || i.id === b.id || i.id === chain.id).map(i => `${i.label} × ${i.qty}`).join('；');
       issuesText = check.issues.filter(i => i.code !== 'not-integer' && i.code !== 'odd-links').map(i => i.message).join(' ');
     } else {
       row.style.display = 'none';
-      ['sprocketWrapVal', 'sprocketDevVal', 'sprocketSuggestVal', 'sprocketPowerVal'].forEach(id => setText(id, '-'));
+      ['sprocketWrapVal', 'sprocketDevVal', 'sprocketSuggestVal', 'sprocketPowerVal', 'sprocketBom'].forEach(id => setText(id, '-'));
     }
     const issues = $('sprocketIssues');
     if (issues) { issues.textContent = issuesText; issues.style.display = issuesText ? '' : 'none'; }

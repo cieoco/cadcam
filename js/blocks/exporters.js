@@ -1015,7 +1015,18 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   }
 
   // holeLayer（字串）：模組螺絲孔等專用圖層，其餘節點照舊 PIVOT_HOLE。
-  allNodes.forEach(p => addHole(p.x, p.y, Number.isFinite(p.holeDiameterMm) ? p.holeDiameterMm / 2 : holeR, typeof p.holeLayer === 'string' && p.holeLayer ? p.holeLayer : 'PIVOT_HOLE', p));
+  // 鏈條從動輪軸心：開張緊長孔（兩端半圓、孔寬＝固定孔徑），不開圓孔。
+  const slotOutline = (p, { dir, travelMm }) => {
+    const base = Math.atan2(dir.y, dir.x), pts = [];
+    for (const [sign, from] of [[1, -Math.PI / 2], [-1, Math.PI / 2]]) {
+      for (let i = 0; i <= 12; i++) {
+        const a = base + from + Math.PI * i / 12;
+        pts.push({ x: round(p.x + sign * dir.x * travelMm + Math.cos(a) * holeR), y: round(p.y + sign * dir.y * travelMm + Math.sin(a) * holeR) });
+      }
+    }
+    return pts;
+  };
+  allNodes.forEach(p => p.axleSlot ? cutouts.push({ layer: 'AXLE_SLOT', points: slotOutline(p, p.axleSlot) }) : addHole(p.x, p.y, Number.isFinite(p.holeDiameterMm) ? p.holeDiameterMm / 2 : holeR, typeof p.holeLayer === 'string' && p.holeLayer ? p.holeLayer : 'PIVOT_HOLE', p));
 
   motorMounts.forEach(mount => {
     const feats = motorMountFeatures(mount);

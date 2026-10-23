@@ -17,6 +17,7 @@ import { pointKeysFor } from './part-types.js';
 import { connectionModule } from './assembly.js';
 import { syringeClampFrameNodes } from './syringe-shape.js';
 import { planSyringeAttachmentResize } from '../core/syringe.js';
+import { chainTensionSlot } from '../core/chain-drive.js';
 
 export const LEGO_FRAME_STEP = 8;
 
@@ -157,8 +158,10 @@ export function frameConnectorNodes(comps) {
   const pinHoleById = new Map();
   (comps||[]).filter(c=>c?.type==='rack'&&Number.isFinite(c.pinHoleDiameterMm)&&Array.isArray(c.framePins))
     .forEach(c=>c.framePins.forEach(id=>pinHoleById.set(id,c.pinHoleDiameterMm)));
+  const slotById = new Map();   // 鏈條從動輪軸心：開張緊長孔（axleSlot），不開圓孔
+  (comps||[]).filter(c=>c?.type==='belt'&&c.kind==='chain').forEach(c=>{const s=chainTensionSlot(comps,c.id);if(s)slotById.set(s.pointId,{dir:s.dir,travelMm:s.travelMm});});
   const nodes = frameNodes(comps).filter(p => !isHiddenSliderRailPoint(comps, p.id) && !locators.has(p.id) && !separateIds.has(p.id))
-    .map(p => pinHoleById.has(p.id) ? { ...p, holeDiameterMm: pinHoleById.get(p.id) } : p);
+    .map(p => pinHoleById.has(p.id) ? { ...p, holeDiameterMm: pinHoleById.get(p.id) } : slotById.has(p.id) ? { ...p, axleSlot: slotById.get(p.id) } : p);
   return [...nodes, ...syringeClampFrameNodes(comps,nodes)];
 }
 

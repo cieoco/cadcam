@@ -19,6 +19,7 @@ import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { createGearPath } from '../utils/gear-geometry.js';
 import { applyMatrix4 } from './orthogonal-3d.js';
+import { SPROCKET_THICKNESS, sprocketGeometry, chainGroup } from './chain-3d.js';
 
 // 把一根桿（兩端 a、b、半徑 r、兩端孔徑 holeR）做成 THREE.Shape。
 // 外形與 blocks.html 的 barHullPath 一致：兩端圓 + 外切線 + 半圓封口，外加兩個孔。
@@ -895,7 +896,10 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       const group = new THREE.Group();
       group.position.set(p.center.x, p.center.y, 0);
       group.rotation.z = p.angle || 0;
-      const geo = new THREE.ExtrudeGeometry(pulleyShape(p.radius, holeR * 1.05), {
+      // 鏈輪（買現成的金屬件）：薄圓盤＋滾子槽；一般皮帶輪維持原樣。
+      const sprocket = p.kind === 'sprocket' && p.teeth >= 3;
+      const thick = sprocket ? SPROCKET_THICKNESS : p.thickness;
+      const geo = sprocket ? sprocketGeometry(p.teeth, holeR * 1.05) : new THREE.ExtrudeGeometry(pulleyShape(p.radius, holeR * 1.05), {
         depth: p.thickness,
         bevelEnabled: false,
         curveSegments: 36,
@@ -904,11 +908,13 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       disk.position.z = p.z;
       group.add(disk);
 
-      const groove = new THREE.Mesh(
-        new THREE.TorusGeometry(Math.max(1, p.radius - 2.2), 0.8, 8, 48),
-        plateMaterial('#7f4a17'));
-      groove.position.z = p.z + p.thickness + 0.35;
-      group.add(groove);
+      if (!sprocket) {
+        const groove = new THREE.Mesh(
+          new THREE.TorusGeometry(Math.max(1, p.radius - 2.2), 0.8, 8, 48),
+          plateMaterial('#7f4a17'));
+        groove.position.z = p.z + p.thickness + 0.35;
+        group.add(groove);
+      }
 
       if(p.rollerWidth>0){
         const roller=new THREE.Mesh(new THREE.CylinderGeometry(p.radius,p.radius,p.rollerWidth,40),plateMaterial('#238f78'));
@@ -917,18 +923,22 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
 
       const spokeLen = Math.max(1, p.pinRadius);
       const spoke = new THREE.Mesh(new THREE.BoxGeometry(spokeLen, 2.4, 1.8), plateMaterial(p.color));
-      spoke.position.set(spokeLen / 2, 0, p.z + p.thickness + 1.2);
+      spoke.position.set(spokeLen / 2, 0, p.z + thick + 1.2);
       group.add(spoke);
       addPart(group, 'pulley:' + p.id);
 
-      const boltH = Math.max(1, p.thickness * 0.35);
+      const boltH = Math.max(1, thick * 0.35);
       const bolt = new THREE.Mesh(new THREE.CylinderGeometry(holeR * 1.05, holeR * 1.05, boltH, 20), gearBoltMat);
       bolt.rotation.x = Math.PI / 2;
-      bolt.position.set(p.pin.x, p.pin.y, p.z + p.thickness + boltH / 2 + 0.2);
+      bolt.position.set(p.pin.x, p.pin.y, p.z + thick + boltH / 2 + 0.2);
       addPart(bolt, 'pulley:' + p.id);
     });
 
     (model.belts || []).forEach(b => {
+      if (b.kind === 'chain') {   // #25 鏈條：滾子＋鏈板，放在鏈輪的中心面
+        addPart(chainGroup({ ...b, zMid: b.driver.z + SPROCKET_THICKNESS / 2 }, { roller: plateMaterial('#1f2933'), plate: plateMaterial(b.color || '#34495e') }), 'belt:' + b.id);
+        return;
+      }
       const pts = openBeltPoints(b.driver.center, b.driver.radius, b.driven.center, b.driven.radius);
       if (pts.length < 4) return;
       const curve = new THREE.CatmullRomCurve3(

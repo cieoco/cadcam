@@ -54,7 +54,7 @@ for(const e of BLOCK_EXAMPLES){
    else {
      const out=prepareScopedExport(exportSource,{scope:'assembly'},format);
      assert.ok(out.files.length&&out.files.every(f=>!/(NaN|Infinity)/.test(f.text)),e.id+' finite '+format);
-     if(['slider-crank','quick-return','slider-crank-practice','cam-follower','pulley-belt','sprocket-chain','competition-roller-intake'].includes(e.id))assert.ok(out.notices.some(n=>n.includes('未提供獨立板材檔')),e.id+' partial export is disclosed');
+     if(['slider-crank','quick-return','slider-crank-practice','cam-follower','pulley-belt','competition-roller-intake'].includes(e.id))assert.ok(out.notices.some(n=>n.includes('未提供獨立板材檔')),e.id+' partial export is disclosed');
    }
  }
  assert.equal(JSON.stringify(e.snapshot),before,e.id+' source unchanged');
