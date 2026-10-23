@@ -76,6 +76,7 @@
     "test/chain-fab.mjs",
     "test/chain-fab-export.mjs",
     "test/chain-lesson.mjs",
+    "test/chain-warning-route.mjs",
     "test/chain-ui.mjs",
     "test/chebyshev-linkage.mjs",
     "test/classroom-bridge.mjs",

@@ -7,7 +7,7 @@
  */
 import { S, activateMotor } from './state.js';
 import { chainBillOfMaterials } from './chain-manufacturing.js';
-import { placeChainDrive, setSprocketTeeth, alignChainLinks } from './chain-tools.js';
+import { placeChainDrive, setSprocketTeeth, alignChainLinks, nudgeDrivenSprocket } from './chain-tools.js';
 import { checkChainDrive, pitchDiameter, wrapAngle, centerForLinks, TEETH_MIN, TEETH_MAX } from '../core/chain-drive.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -238,6 +238,7 @@ export function createChainEditor({
       btn.style.fontWeight = aligned ? '' : '700';
       btn.style.color = aligned ? '' : '#7c2d12';
       btn.textContent = aligned ? '已對齊整數鏈節' : '對齊整數鏈節';
+      setText('sprocketDistVal', C.toFixed(1));
       setText('sprocketWrapVal', `${wrapAngle(C, a.teeth, b.teeth).toFixed(0)}°（小鏈輪）`);
       setText('sprocketDevVal', `${check.deviationMm >= 0 ? '+' : ''}${check.deviationMm.toFixed(2)} mm`);
       const suggest = centerForLinks(check.links, a.teeth, b.teeth);
@@ -249,7 +250,7 @@ export function createChainEditor({
       issuesText = check.issues.filter(i => i.code !== 'not-integer' && i.code !== 'odd-links').map(i => i.message).join(' ');
     } else {
       row.style.display = 'none';
-      ['sprocketWrapVal', 'sprocketDevVal', 'sprocketSuggestVal', 'sprocketPowerVal', 'sprocketBom'].forEach(id => setText(id, '-'));
+      ['sprocketDistVal', 'sprocketWrapVal', 'sprocketDevVal', 'sprocketSuggestVal', 'sprocketPowerVal', 'sprocketBom'].forEach(id => setText(id, '-'));
     }
     const issues = $('sprocketIssues');
     if (issues) { issues.textContent = issuesText; issues.style.display = issuesText ? '' : 'none'; }
@@ -280,6 +281,16 @@ export function createChainEditor({
     rebuild(); draw(); updatePanel();
     notify(r.message);
   }
+  function nudge(delta) {
+    const info = selectedChainInfo();
+    if (!info?.chain) return;
+    pause();
+    const r = nudgeDrivenSprocket(S.comps, S.topo.params, info.chain.id, delta);
+    if (!r.ok) { notify(r.message); return; }
+    pushUndo();
+    applyResult(r);
+    rebuild(); draw(); updatePanel();
+  }
   function deleteDrive() {
     const info = selectedChainInfo();
     if (!info) return;
@@ -294,5 +305,5 @@ export function createChainEditor({
     rebuild(); draw();
   }
 
-  return { start, cancel, drawPreview, selectSprocket, deselectSprocket, updatePanel, changeTeeth, align, deleteDrive, isPlacing: () => Boolean(placing()) };
+  return { start, cancel, drawPreview, selectSprocket, deselectSprocket, updatePanel, changeTeeth, align, nudge, deleteDrive, isPlacing: () => Boolean(placing()) };
 }

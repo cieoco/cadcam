@@ -131,6 +131,24 @@ export function alignChainLinks(comps, params, chainId) {
   return { ok: r.ok, comps: out, params: outParams, message: r.message };
 }
 
+// 把從動輪沿兩輪連線拉遠（＋）或拉近（−）deltaMm；鏈節數不變，之後可按「對齊整數鏈節」。
+export function nudgeDrivenSprocket(comps, params, chainId, deltaMm) {
+  const out = clone(comps || []);
+  const outParams = clone(params || {});
+  const chain = out.find(c => c.type === 'belt' && c.kind === 'chain' && c.id === chainId);
+  const a = chain && sprocketById(out, chain.driver), b = chain && sprocketById(out, chain.driven);
+  const d = Number(deltaMm);
+  if (!a || !b || !Number.isFinite(d)) return fail('找不到這條鏈條。', out, outParams);
+  const C = dist(a.p1, b.p1);
+  const need = (outsideDiameter(a.teeth) + outsideDiameter(b.teeth)) / 2 + MIN_GAP_MM;
+  if (C + d < need) return fail(`兩個鏈輪太近會互相碰到，中心距離至少要 ${Math.ceil(need)} mm。`, clone(comps), clone(params));
+  const ux = C > 1e-9 ? (b.p1.x - a.p1.x) / C : 1, uy = C > 1e-9 ? (b.p1.y - a.p1.y) / C : 0;
+  const pin = b.p2;
+  movePointEverywhere(out, b.p1.id, ux * d, uy * d);
+  if (pin?.id) movePointEverywhere(out, pin.id, ux * d, uy * d);
+  return { ok: true, comps: out, params: outParams, message: '' };
+}
+
 function realign(comps, params, chain) {
   const a = sprocketById(comps, chain.driver), b = sprocketById(comps, chain.driven);
   if (!a || !b) return { ok: false, message: '鏈條要連接兩個鏈輪。' };
