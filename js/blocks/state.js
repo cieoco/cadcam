@@ -36,6 +36,8 @@ export const S = {
   selectedNodeId: null,
   selectedSliderId: null,
   selectedGearId: null,
+  selectedSprocketId: null,                        // 鏈輪（pulley kind sprocket）；面板在 chain-editor.js
+  placingChain: null,                              // 「鏈輪＋鏈條」放置中：{ first: 已點的主動輪中心 | null }
 
   // ---- 拖曳 ----
   dragId: null,

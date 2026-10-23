@@ -869,15 +869,54 @@ const gearEditor = createGearEditor({
     document.getElementById('roleEditor').style.display = 'none';
     document.getElementById('servoEditor').style.display = 'none';
     document.getElementById('strokeEditor').style.display = 'none';
+    S.selectedSprocketId = null;
+    const sprocketPanel = document.getElementById('sprocketEditor');
+    if (sprocketPanel) sprocketPanel.style.display = 'none';
   },
   snapshotStr, updateUndoBtn, recordManualTrace,
   worldFromEvent, mobilePrompt, pointCoords, updatePointCoordsById, pointIsGround
 });
-const { gearById, gearMeshChain, gearMeshOff, syncGearMeshAnchoredAt, selectGear, deselectGear, startGearManualRotate,
+const { gearById, gearMeshChain, gearMeshOff, syncGearMeshAnchoredAt, selectGear, deselectGear: deselectGearOnly, startGearManualRotate,
         rackBodyHeight, rackPinionThetaRange, deleteGearChain,
         addGearPair, addRackPinion, toggleRackOrientation,
         changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter,
         changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth } = gearEditor;
+// 取消齒輪選取時一併收掉鏈輪面板（鏈輪的選取與面板在 chain-editor.js，第一次用才載入）。
+function deselectGear() {
+  deselectGearOnly();
+  if (S.selectedSprocketId) {
+    S.selectedSprocketId = null;
+    const panel = document.getElementById('sprocketEditor');
+    if (panel) panel.style.display = 'none';
+  }
+}
+
+// ---- 鏈輪＋鏈條域：./chain-editor.js 第一次用到才動態載入，不佔啟動時的 JS ----
+let chainEditor = null, chainEditorLoading = null;
+function withChainEditor(fn) {
+  if (chainEditor) return fn(chainEditor);
+  chainEditorLoading ||= import('./chain-editor.js').then(({ createChainEditor }) => {
+    chainEditor = createChainEditor({
+      svg, pushUndo, pause, rebuild, draw, setBanner, clearBanner, promptText, notify: transient,
+      cancelMotorMode: (...a) => cancelMotorMode(...a),
+      exitDrawTools: () => { Tools.exitDrawLink(); Tools.exitDrawTriangle(); Tools.exitDrawPolygon(); },
+      deselectLink, openMobileEditPanel, closeMobileEditPanel,
+      hideEditorPanels: () => {
+        ['lenEditor', 'roleEditor', 'servoEditor', 'strokeEditor'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+      },
+      worldFromEvent, pointCoords, displayCoords: () => displayCoords(), nearestDisplayToPoint,
+      projectWorld: { scale: () => View.getScale(), point: p => ({ x: TX(p.x), y: TY(p.y) }) },
+      fitView: () => fitView()
+    });
+    return chainEditor;
+  }).catch(error => { chainEditorLoading = null; throw error; });
+  return chainEditorLoading.then(fn);
+}
+const startChainDrive = () => { if (S.mode !== 'design') return; withChainEditor(ed => ed.start()); };
+const changeSprocketTeeth = delta => withChainEditor(ed => ed.changeTeeth(delta));
+const alignChain = () => withChainEditor(ed => ed.align());
+const deleteSprocketDrive = () => withChainEditor(ed => ed.deleteDrive());
+const selectSprocket = id => { if (ensureModuleHome(compModuleId(id))) return; withChainEditor(ed => ed.selectSprocket(id)); };
 
 // ---- 滑軌域：邏輯抽到 ./slider-editor.js，同樣注入 app 能力並綁回原名 ----
 const sliderEditor = createSliderEditor({
@@ -1130,6 +1169,7 @@ function selectModuleTarget(comp) {
   else if (comp.type === 'triangle') selectTriangle(comp.id);
   else if (comp.type === 'gear') selectGear(comp.id);
   else if (comp.type === 'slider') selectSlider(comp.id);
+  else if (comp.type === 'pulley' && comp.kind === 'sprocket') selectSprocket(comp.id);
 }
 
 // 隱性機架：所有 grounded 接點（fixed / motor / linear）視為同一個固定底座（機架）。
@@ -1170,6 +1210,7 @@ function rebuild({save=true}={}) {
   parallelLiftController?.recompute();
   document.getElementById('hint').style.display = S.comps.length ? 'none' : 'block';
   Panels.updateRoleEditor();
+  if (S.selectedSprocketId) chainEditor?.updatePanel();   // 拖動、改齒數後面板上的鏈節與偏差跟著更新
   if(save)scheduleAutosave();    // 任何結構變更都防丟（debounce，播放不觸發）
 }
 
@@ -1642,7 +1683,10 @@ function pulleyPinRadius(c, pitchR) {
 
 // 皮帶輪：p1 為中心，p2 為輪緣輸出孔；旋轉角由 solver 反映在 p2 位置。
 function drawPulleyPart(c, pts) {
-  const update = drawPulley({ component: c, points: pts, svg, scale: View.getScale(), project: p => ({ x: TX(p.x), y: TY(p.y) }), radius: pulleyRadius, pinRadius: pulleyPinRadius });
+  const sprocket = c.kind === 'sprocket';
+  const update = drawPulley({ component: c, points: pts, svg, scale: View.getScale(), project: p => ({ x: TX(p.x), y: TY(p.y) }), radius: pulleyRadius, pinRadius: pulleyPinRadius,
+    ...(sprocket ? { selected: c.id === S.selectedSprocketId, onSelect: selectSprocket,
+      interactionBlocked: () => Boolean(S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars || S.placingChain) } : {}) });
   if (update) frameUpdaters.push(update);
 }
 
@@ -1724,6 +1768,7 @@ function drawNow() {
     Tools.drawDrawPreview();   // 空畫布也要顯示正在拉出的第一根連桿
     Tools.drawTrianglePreview();
     Tools.drawPolygonPreview();
+    chainEditor?.drawPreview();   // 放鏈輪中：空畫布也要看到第一個鏈輪
     return;
   }
 
@@ -1939,6 +1984,7 @@ function drawNow() {
   Tools.drawDrawPreview();   // 畫桿模式：疊在最上層的拖曳預覽
   Tools.drawTrianglePreview(); // 三點桿模式：疊在最上層的三角預覽
   Tools.drawPolygonPreview();  // 多邊形板模式：疊在最上層的預覽
+  chainEditor?.drawPreview();  // 鏈輪放置模式：第一個鏈輪與對齊後的第二個鏈輪預覽
   hydraulic?.render(allPts,sol?.isValid===true);
 
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
@@ -2673,7 +2719,7 @@ function guardedNodeDown(e, id) {
 }
 
 function deselectLink() {
-  if (!S.selectedLinkId && !S.selectedTriangleId && !S.selectedSliderId && !S.selectedGearId) return;
+  if (!S.selectedLinkId && !S.selectedTriangleId && !S.selectedSliderId && !S.selectedGearId && !S.selectedSprocketId) return;
   S.selectedLinkId = null;
   S.selectedTriangleId = null;
   S.selectedSliderId = null;
@@ -3262,7 +3308,7 @@ function init() {
   offerExampleFromUrl({ loadExample, insertModule: id => moduleEditor.insertBuiltin(id), notify: transient });
 }
 
-window.blocks = { setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
+window.blocks = { startChainDrive, changeSprocketTeeth, alignChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
 window.blocks.changeFrameGround = changeFrameGround;
 window.blocks.setFrameSize = setFrameSize;
 // H1 除錯／測試：設計模式目前看得到的零件與點（畫面實際畫的那一份）。

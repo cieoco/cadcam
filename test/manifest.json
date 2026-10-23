@@ -73,6 +73,7 @@
     "test/build-plan.mjs",
     "test/cam-follower.mjs",
     "test/chain-drive.mjs",
+    "test/chain-ui.mjs",
     "test/chebyshev-linkage.mjs",
     "test/classroom-bridge.mjs",
     "test/cnc-check.mjs",

@@ -107,8 +107,11 @@ export function onNodeDown(e, id) {
   S.selectedTriangleId = null;
   S.selectedSliderId = null;
   S.selectedGearId = null;   // 選接點＝離開齒輪編輯
+  S.selectedSprocketId = null;   // 也離開鏈輪編輯
   document.getElementById('lenEditor').style.display = 'none';
   document.getElementById('gearEditor').style.display = 'none';
+  const sprocketPanel = document.getElementById('sprocketEditor');
+  if (sprocketPanel) sprocketPanel.style.display = 'none';
   document.getElementById('sliderBaseBtn').style.display = 'none';
   document.getElementById('linkToRailBtn').style.display = 'none';
   setSliderDetailRows(false);

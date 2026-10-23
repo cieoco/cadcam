@@ -21,7 +21,7 @@ export function collectPickCandidates(svg, x, y, comps) {
     const c = id && comps.find(c => c.id === id);
     if (!c) continue;
     if (result.length===1 && !result[0].motor && result[0].kind==='node' && c.type==='bar' && [c.p1,c.p2].some(p=>p?.id===result[0].id)) continue;
-    const name = c.fusedWith ? '合成夾指' : ({gear:'齒輪',triangle:'夾指／板件',bar:'連桿'})[c.type];
+    const name = c.fusedWith ? '合成夾指' : (c.type === 'pulley' && c.kind === 'sprocket' ? '鏈輪' : ({gear:'齒輪',triangle:'夾指／板件',bar:'連桿'})[c.type]);
     if (name) add({kind:'component', id, label:`${name} · ${id}（尺寸／外形）`});
   }
   return result.sort((a,b) => Number(b.motor || false) - Number(a.motor || false));

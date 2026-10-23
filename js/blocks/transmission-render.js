@@ -6,7 +6,7 @@
  */
 
 import { buildOpenBeltPath, gearMeshPhaseDeg, sprocketOutline } from './transmission-geometry.js';
-import { CHAIN_25 } from '../core/chain-drive.js';
+import { CHAIN_25, checkChainDrive } from '../core/chain-drive.js';
 import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -67,7 +67,7 @@ export function drawGear({ component, points, svg, scale, project, params, gearB
   return update;
 }
 
-export function drawPulley({ component, points, svg, scale, project, radius, pinRadius }) {
+export function drawPulley({ component, points, svg, scale, project, radius, pinRadius, selected = false, interactionBlocked = () => false, onSelect = null }) {
   if (!component.p1 || !component.p2) return null;
   const R = radius(component);
   const pinR = pinRadius(component, R);
@@ -81,7 +81,18 @@ export function drawPulley({ component, points, svg, scale, project, radius, pin
   if (component.kind === 'sprocket') {
     // 鏈輪：外形是一圈滾子槽與齒尖；節圓畫成細虛線（鏈條中心走的位置）。
     const outline = sprocketOutline(component.teeth).map(q => `${(q.x * scale).toFixed(2)},${(-q.y * scale).toFixed(2)}`).join(' ');
-    add('polygon', { points: outline, fill: color + '26', stroke: color, 'stroke-width': Math.max(1, 1.2 * scale), 'stroke-linejoin': 'round' });
+    add('polygon', { points: outline, fill: color + (selected ? '55' : '26'), stroke: selected ? '#e67e22' : color, 'stroke-width': Math.max(1, (selected ? 2 : 1.2) * scale), 'stroke-linejoin': 'round' });
+    if (onSelect) {
+      // 點鏈輪本體＝選取（開鏈輪面板）；其他皮帶輪沒有這個互動。
+      const body = group.lastChild;
+      body.setAttribute('data-pick-component', component.id);
+      body.style.cursor = 'pointer';
+      body.addEventListener('pointerdown', event => {
+        if (interactionBlocked()) return;
+        event.stopPropagation();
+        onSelect(component.id);
+      });
+    }
     add('circle', { r: Math.max(1, R * scale), fill: 'none', stroke: '#475569', 'stroke-width': Math.max(0.7, 0.9 * scale), 'stroke-dasharray': `${(2 * scale).toFixed(1)},${(2 * scale).toFixed(1)}`, opacity: '0.6' });
   } else {
     add('circle', { r: Math.max(1, R * scale), fill: color + '26', stroke: color, 'stroke-width': Math.max(1.8, 2.4 * scale) });
@@ -146,6 +157,9 @@ export function drawBelt({ component, points, comps, theta, svg, scale, project,
     if (!d) return;
     path.setAttribute('d', d); motion.setAttribute('d', d);
     if (rollers) {
+      // 兩輪中心距不是整數偶數鏈節（或包角、外徑不合）時，鏈板改成警告色；不會自動搬動鏈輪。
+      const bad = !checkChainDrive({ center: Math.hypot(b.x - a.x, b.y - a.y), teeth1: driver.teeth, teeth2: driven.teeth }).ok;
+      path.setAttribute('stroke', bad ? '#d97706' : color);
       rollers.setAttribute('d', d);
       const total = typeof path.getTotalLength === 'function' ? path.getTotalLength() : 0;
       if (total > 0 && links) {
