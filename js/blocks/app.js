@@ -44,6 +44,7 @@ let benchmarkCoverage=null,benchmarkShapeKey=null;
 // 重用既有引擎：角色→步驟編譯 + 求解。針筒僅擴充距離約束編譯與結果驗證，沿用求解數學。
 import { compileTopology } from '../core/topology.js';
 import { initClassroomBridge } from './classroom-bridge.js';
+import { initCommandUi, commandActions, setCommandState } from './command-ui.js';
 import { APP_VERSION } from '../version.js?v=20261008_bracketalign';
 import { solveTopology } from '../multilink/solver.js';
 import { camFollowerState, camRadius } from '../utils/cam-profile.js';
@@ -204,6 +205,7 @@ const undoLessons = new Map();
 function snapshotStr() {
   return JSON.stringify(Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()));
 }
+initCommandUi();
 initClassroomBridge(() => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()), APP_VERSION);
 function pushUndo() {
   const s = snapshotStr();
@@ -224,10 +226,7 @@ function updateUndoBtn(recordLesson = false) {
     if (!count) undoLessons.delete(key);
     else if (lessons.length > count) lessons.splice(0, lessons.length - count);
   }
-  ['btnUndo', 'mobileUndoBtn'].forEach(id => {
-    const btn = document.getElementById(id);
-    if (btn) btn.disabled = S.undoStack.length === 0;
-  });
+  document.querySelectorAll('[data-command="undo"]').forEach(btn => { btn.disabled = S.undoStack.length === 0; });
 }
 function undo() {
   if (!S.undoStack.length) return;
@@ -315,7 +314,7 @@ function normalizeIncomingSnapshot(raw) {
 }
 
 const exampleController = createExampleController({
-  applySnapshot, insertModule: id => moduleEditor.insertBuiltin(id), notify: transient, closeMobileMenu: closeMobileOpenMenu,
+  applySnapshot, insertModule: id => moduleEditor.insertBuiltin(id), notify: transient, closeExamples: () => document.getElementById('examplesDialog')?.close(),
   isMobile: () => mobilePrompt(), showBuildPanel: () => setMobilePanel('build', {expandTools:false})
 });
 const populateExamples = () => exampleController.populate();
@@ -1061,8 +1060,6 @@ let boxMakerDialog=null;
 async function openBoxMaker() {
   if(bench.inCandidate?.()){transient('請先確認或取消接合預覽。');return;}
   pause();const before=snapshotStr(),source=JSON.parse(before),selected=S.comps.find(c=>c.id===(S.selectedLinkId || S.selectedTriangleId));
-  document.getElementById('learningMore')?.classList.remove('is-open');
-  document.querySelector('.mobile-more-toggle')?.setAttribute('aria-expanded','false');
   try{
     const {openBoxDialog}=await import('./box-dialog.js');
     if(snapshotStr()!==before){transient('作品已變更，請重新開啟卡榫盒子。');return;}
@@ -1749,7 +1746,7 @@ function drawNow() {
   mateTool.sync();   // M2：換分頁／模式或開始畫圖時關掉接合面工具，並更新按鈕
   syncModulePlates();   // G1：作品內容變了才讓固定板 home 幾何作廢（θ 不算內容）
   validateViewPlane();
-  document.getElementById('designListBench').style.display=inDesign()?'none':'';
+  document.getElementById('projectName').textContent=S.topo.projectName||'';
   designTabsUi.render();   // H1：設計分頁列
   creationPalette.sync({key:S.designFocus || ROOT_TAB,count:viewComps().length,drawing:!!(S.drawingLink||S.drawingTriangle||S.drawingPolygon)});
   designGuide.sync(viewComps(),S.selectedNodeId||S.selectedLinkId||S.selectedTriangleId,S.mode);
@@ -2207,7 +2204,6 @@ function setMobilePanel(panel, {expandTools=true} = {}) {
   document.body.dataset.mobilePanel = next;
   if(next==='build' && expandTools)document.getElementById('creationTools').open=true;
   if (next !== 'edit') closeMobileEditPanel();
-  if (next !== 'project') closeMobileOpenMenu();
   syncMobilePanelTabs(next);
   // Switching panels preserves manual pan/zoom; the visible fit button resets it.
 }
@@ -2228,30 +2224,12 @@ function closeMobileEditPanel() {
   document.getElementById('memberOperationsToggle')?.setAttribute('aria-expanded','false');
 }
 
-function mobileOpenMenuEl() { return document.getElementById('mobileOpenMenu'); }
-function openMobileOpenMenu() {
-  const m = mobileOpenMenuEl();
-  if (!m) return;
-  m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
-}
-function closeMobileOpenMenu() {
-  const m = mobileOpenMenuEl();
-  if (m) m.style.display = 'none';
-}
-function openMobileFile() {
-  closeMobileOpenMenu();
-  openFile();
-}
-
 // 切換 3D 唯讀預覽：首次開啟才動態載入 THREE viewer。
 async function toggle3D() {
   if(hydraulic?.active())transient('3D 含針筒外形參考；完整裝配與干涉未驗證。');
   view3DActive = !view3DActive;
   const overlay = document.getElementById('view3d');
-  const btn = document.getElementById('btn3d');
-  const mobileBtn = document.getElementById('mobileBtn3d');
-  btn.classList.toggle('active', view3DActive);
-  if (mobileBtn) mobileBtn.classList.toggle('active', view3DActive);
+  setCommandState('view3d', view3DActive);
   if (view3DActive) {
     // 開 3D 時收起 2D 的編輯小面板（避免疊在覆蓋層上）
     deselectLink();
@@ -2300,11 +2278,7 @@ function drawMotorMountHoles(motorIds, motorMounts, pts) {
 }
 
 function syncFrameOptionButtons() {
-  const lockButtons = [document.getElementById('btnFrameLock'), document.getElementById('mobileBtnFrameLock')].filter(Boolean);
-  lockButtons.forEach(lock => {
-    lock.classList.toggle('active', Boolean(S.lockFrameHoles));
-    lock.title = S.lockFrameHoles ? '取消固定孔 8mm 吸附' : '拖曳固定孔與機架時吸附到 8mm LEGO 孔距';
-  });
+  setCommandState('frameLock', Boolean(S.lockFrameHoles));
 }
 
 function toggleFrameLock() {
@@ -3356,7 +3330,7 @@ function init() {
   offerExampleFromUrl({ loadExample, insertModule: id => moduleEditor.insertBuiltin(id), notify: transient });
 }
 
-window.blocks = { startChainDrive, changeSprocketTeeth, alignChain, nudgeChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, openMobileOpenMenu, openMobileFile, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
+window.blocks = { startChainDrive, changeSprocketTeeth, alignChain, nudgeChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
 window.blocks.changeFrameGround = changeFrameGround;
 window.blocks.setFrameSize = setFrameSize;
 // H1 除錯／測試：設計模式目前看得到的零件與點（畫面實際畫的那一份）。
@@ -3367,7 +3341,7 @@ window.blocks.designDebug = () => ({
   hidden: S.comps.filter(c => !viewComps().includes(c)).map(c => c.id),
   motors: [...designMotorIds()]
 });
-Object.assign(window.blocks, {
+Object.assign(window.blocks, commandActions, {
   openBoxMaker,
   copyMember,
   mateTool: on => mateTool.set(!!on), mateDebug: () => mateTool.debug(),
@@ -3411,7 +3385,7 @@ window.blocks.startDimensionFromNode = () => window.blocks.startDimension(S.sele
 window.blocks.addSyringe=hydraulic.add;
 window.blocks.addFixedSyringe=hydraulic.addFixed;
 init();
-createCanvasRulers(svg);
+window.blocks.toggleRulers = createCanvasRulers(svg);
 if(benchmarkSession){
  Object.assign(window.blocks,{benchmark:{identity:{source:'current',token:LOAD_GRAPH_TOKEN},async load(snapshot){playbackProbe.abort('work_changed');const norm=Store.normalizeSnapshot(snapshot);if(!norm)throw Error('無效量測作品');applySnapshot(norm,{recordUndo:false,source:'benchmark'});bench.setMode('bench');await set3D(true);viewer3D.stop();return benchmarkCoverage;},
   start(meta){pause();viewer3D.stop();benchmarkShapeKey=viewer3D?.cacheStats?.().key;playbackProbe.start({...meta,sourceToken:LOAD_GRAPH_TOKEN,userAgent:navigator.userAgent,viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},renderer:{antialias:true,pixelRatio:Math.min(devicePixelRatio || 1,2),schedule:'app rAF calls the same renderNow as viewer rAF; one submission per pose'},cpuOnly:true});play();},

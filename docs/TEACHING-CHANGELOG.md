@@ -708,3 +708,10 @@
 - 390×844、360×640、844×390 與桌機驗收；24 px 放大文字的錯誤提示可換行，底部確認固定、內容可捲動。非法尺寸停用加入及下載，取消不提交。截圖在 output/box-maker/mobile-390.png、mobile-error-large.png、landscape.png、desktop-assembled.png、desktop-flat.png。包裝頁曾有無來源 MutationObserver 訊息；正式 blocks 頁最終 console 無 error，瀏覽器尺寸不代表實體手機。
 - test/box-maker.mjs 核對內部尺寸、邊界、8 槽／4 螺絲孔、BOM、原始 SVG／DXF、獨立草稿、多盒互不影響、分享／組合模組重編號、接到運動桿件後五片保持相對姿態。完整 224／224 通過（output/box-maker/release-acceptance/results.json），最後定向 5／5（release-targeted/results.json）。啟動原始 JS 約 1.962 MB，預算 1.97 MB；生成器、對話框仍點開才載入。
 - 實體板厚、切縫、螺母工具空間、配合與承載待試切核對；沒有切縫補償與自動排版。部署另以最終提交的 Actions 與線上版本確認。
+
+## 2026-10-27 — 電腦與手機同一份指令清單（2026.10.27.2）
+
+- 頂端原有存檔、開啟、分享、量尺、匯出、範例、卡榫盒子、設計引導、操作說明、版本、教學與狀態標籤，改由 `js/blocks/ui-commands.js` 分成「新增／調整／視圖／專案／說明」五類，電腦與手機同名同內容。電腦頂端只留名稱＋作品名、設計／組立、復原、「專案 ▾」「說明 ▾」；置中、3D、鎖孔距、尺規、量尺在畫布工具列（手機為「視圖」分頁）；卡榫盒子在「新增」；範例在「專案 → 範例…」；狀態訊息在畫布狀態列。播放列快捷鍵（復原、置中、3D）兩種版面相同；清空全部只在「專案」。
+- 教材文字同步：fourbar／rack／tipping-bucket／teaching 的 MP4 步驟改為「專案 → MP4 動畫（10 秒）」，不再說電腦在「匯出」；teaching-slider 的「桌面為匯出」改為「電腦在頂端專案 ▾」；teaching-hydraulic 改「專案 → 開啟」「專案 → 範例…」；teaching 改「專案 → 開啟」「說明 → 設計引導」。
+- 驗收：`test/ui-commands.mjs`（契約）；瀏覽器腳本 `tools/ui-commands-browser.mjs` 在 1280×800 與 390×844、設計與組立兩種模式逐類比對看得見的指令，並實際觸發各指令，67 項通過、無主控台錯誤。`test/dimensions.mjs`、`test/build-pack.mjs`、`test/example-controller.mjs` 改查指令清單／範例清單而非舊按鈕。完整 226／226。
+- 啟動原始 JS 1,969,321 bytes，未調高 1.97 MB 預算。

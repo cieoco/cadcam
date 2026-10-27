@@ -17,14 +17,33 @@
     }
     header, .appbar {
       display: flex; align-items: center; gap: 12px;
-      padding: 10px 16px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.06); z-index: 5;
+      padding: 10px 16px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.06); z-index: 20;
     }
-    .learning-actions { display:flex; align-items:center; gap:6px; margin-left:auto; flex-shrink:0; }
-    .gesture-help { position:relative; font-size:12px; }
-    .gesture-help summary { cursor:pointer; padding:9px; border:1px solid #b8cbd2; border-radius:7px; color:#176b87; white-space:nowrap; }
-    .gesture-help-content { position:absolute; right:0; top:100%; width:min(310px,85vw); max-height:60dvh; overflow:auto; padding:14px; background:white; border:1px solid #b8cbd2; border-radius:10px; box-shadow:0 8px 24px #18324b33; z-index:30; line-height:1.7; }
-    .gesture-help-content p { margin:0 0 8px; }
-    .learning-actions > a { text-decoration:none; }
+    .help-pop { position:fixed; z-index:4; inset:auto; top:64px; right:12px; margin:0; box-sizing:border-box; width:min(330px,calc(100vw - 24px)); max-height:70dvh; overflow:auto; padding:14px; background:white; border:1px solid #b8cbd2; border-radius:10px; box-shadow:0 8px 24px #18324b33; color:#2c3e50; line-height:1.7; font-size:14px; }
+    .help-pop p { margin:0 0 8px; }
+    .help-pop .tool-btn { min-height:44px; margin:2px 6px 2px 0; }
+    .help-modal { inset:0; margin:auto; width:min(440px,calc(100vw - 24px)); }
+    @media (min-width:1100px) { #designGuide { width:296px; } }
+    .help-modal::backdrop { background:#0005; }
+    .dlg-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .dlg-note { color:#60717d; font-size:13px; margin:6px 0; }
+    .example-list { display:grid; grid-template-columns:1fr; gap:6px; max-height:min(60dvh,480px); overflow-y:auto; overscroll-behavior:contain; }
+    .example-section { display:grid; grid-template-columns:1fr; gap:6px; }
+    .example-group-title { color:#60717d; font-size:12px; font-weight:900; padding:6px 2px 2px; }
+    .example-btn { min-height:44px; border:1px solid #d8dee6; background:#fff; border-radius:8px; padding:8px; text-align:left; font:inherit; font-size:13px; font-weight:800; color:#34495e; cursor:pointer; }
+    .example-btn:hover, .example-btn:active { background:#eaf2ff; border-color:#7fb0ff; color:#2c5282; }
+    .project-name { max-width:260px; padding-left:10px; border-left:2px solid #d8dee6; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#60717d; font-size:14px; font-weight:700; }
+    .project-name:empty { display:none; }
+    .app-commands { display:flex; align-items:center; gap:6px; margin-left:auto; flex:0 0 auto; }
+    .cmd-menu { position:relative; }
+    .cmd-menu > summary { list-style:none; user-select:none; }
+    .cmd-menu > summary::-webkit-details-marker { display:none; }
+    .cmd-menu > summary::after { content:" ▾"; color:#8a95a1; }
+    .cmd-menu[open] > summary { background:#eaf2ff; border-color:#7fb0ff; }
+    .cmd-menu-body { position:absolute; top:calc(100% + 6px); right:0; z-index:30; display:flex; flex-direction:column; align-items:stretch; gap:6px; min-width:190px; max-height:calc(100dvh - 90px); overflow-y:auto; padding:8px; border:1px solid #d8dee6; border-radius:10px; background:#fff; box-shadow:0 12px 28px rgba(44,62,80,0.16); }
+    .cmd-menu-body .tool-btn { min-height:40px; text-align:left; white-space:nowrap; }
+    [data-command][aria-pressed="true"].tool-btn { background:#eaf2ff; border-color:#7fb0ff; color:#2c5282; font-weight:800; }
+    body:not([data-mode="bench"]) [data-modes="bench"], body[data-mode="bench"] [data-modes="design"] { display:none !important; }
     .app-identity { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
     header h1, .appbar h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
     .app-status {
@@ -35,12 +54,9 @@
     .app-status[data-state="warn"] { background: #fff7dd; color: #8a6500; }
     .app-status[data-state="error"] { background: #fff0f0; color: #b33b32; }
     .app-status[data-state="static"] { background: #eef2f7; color: #60717d; }
-    .toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; margin-left: auto; min-width: 0; }
     .tool-btn { border: 1px solid #e6e9f0; background: #fff; color: #34495e; border-radius: 10px;
       padding: 8px 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
     .toolbar-icon { width: 38px; padding: 8px 0; text-align: center; }
-    .example-select { border: 1px solid #e6e9f0; background: #fff; color: #34495e; border-radius: 10px;
-      padding: 8px 10px; font-size: 14px; font-weight: 600; width: 150px; }
     .tool-btn:hover { background: #f6f8fb; }
     .tool-btn:disabled { opacity: .45; cursor: default; }
     .tool-btn.active { background: #eaf2ff; border-color: #7fb0ff; color: #2c5282; font-weight: 800; }
@@ -55,17 +71,6 @@
     .mount-settings summary::-webkit-details-marker { display: none; }
     .mount-settings summary::after { content: "v"; margin-left: 6px; color: #8a95a1; }
     .mount-settings[open] summary::after { content: "^"; }
-    .toolbar-menu { position: relative; }
-    .toolbar-menu summary { list-style: none; }
-    .toolbar-menu summary::-webkit-details-marker { display: none; }
-    .toolbar-menu summary::after { content: "v"; margin-left: 5px; color: #8a95a1; }
-    .toolbar-menu[open] summary::after { content: "^"; }
-    .toolbar-menu-content { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20;
-      display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 142px;
-      padding: 8px; border: 1px solid #d8dee6; border-radius: 10px; background: #fff;
-      box-shadow: 0 12px 28px rgba(44,62,80,0.16); }
-    .toolbar-menu:not([open]) .toolbar-menu-content { display: none; }
-    .toolbar-menu-content .tool-btn { text-align: left; white-space: nowrap; }
     .mount-grid { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20;
       display: grid; grid-template-columns: repeat(2, max-content); gap: 6px 8px;
       padding: 10px; border: 1px solid #d8dee6; border-radius: 8px; background: #fff;
@@ -76,7 +81,7 @@
     .mount-field input { width: 62px; border: 1px solid #d8dee6; border-radius: 6px; padding: 5px 6px;
       color: #2c3e50; font: inherit; font-weight: 700; }
     .stage, .workspace { flex: 1; display: flex; min-height: 0; }
-    .mobile-panel, .mobile-tabs, .mobile-example-list, .mobile-open-menu, .mobile-editor-done, .mobile-editor-more { display: none; }
+    .mobile-panel, .mobile-tabs, .mobile-editor-done, .mobile-editor-more { display: none; }
 
     /* 零件盤 */
     .tray { width: 188px; background: #fff; border-right: 1px solid #e6e9f0; padding: 14px 10px;
@@ -264,7 +269,7 @@
     .view3d-hint { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
       background: rgba(15,20,32,0.75); color: #cdd6e6; border-radius: 999px; padding: 7px 14px;
       font-size: 13px; pointer-events: none; }
-    #btn3d.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+    [data-command="view3d"].active { background: #2c3e50 !important; color: #fff !important; border-color: #2c3e50 !important; }
     @media (min-width: 1100px) {
       .canvas-wrap::after {
         content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 320px;
@@ -287,7 +292,13 @@
 
 
     /* ---- 設計分頁列（H1）：設計模式一次只看一個設計，分頁列蓋在舞台最上緣；組立模式隱藏 ---- */
-    .design-tabs { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; gap: 6px; align-items: stretch;
+    .canvas-top { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: stretch; }
+    .canvas-toolbar { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; padding: 0 8px; background: rgba(246,248,251,0.96); border-bottom: 1px solid #d8dee6; }
+    .cmd-cluster { display: flex; align-items: center; gap: 4px; }
+    .cmd-cluster:empty { display: none; }
+    .cmd-cluster + .cmd-cluster { padding-left: 8px; border-left: 1px solid #c9d6e6; }
+    .canvas-toolbar .tool-btn { min-height: 40px; padding: 6px 10px; font-size: 13px; white-space: nowrap; }
+    .design-tabs { position: relative; flex: 1 1 0; min-width: 0; display: flex; gap: 6px; align-items: stretch;
       padding: 6px 8px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: thin;
       background: rgba(246,248,251,0.96); border-bottom: 1px solid #d8dee6; }
     .design-tab { flex: 0 0 auto; min-height: 44px; padding: 4px 14px; border: 2px solid #c9d6e6; border-radius: 10px; background: #fff; color: #34495e;
@@ -309,8 +320,14 @@
     .has-design-tabs .mode-banner { margin-top: 56px; }
     .has-design-tabs .work-range-card { margin-top: 56px; }
     @media (min-width: 1100px) {
-      .design-tabs { right: 320px; }
+      .canvas-top { right: 320px; }
     }
+    body[data-mode="bench"] .canvas-top { display: none !important; }
+    .canvas-status { position: absolute; right: 16px; bottom: 18px; z-index: 2; max-width: calc(50% - 190px); pointer-events: none; }
+    .canvas-status .app-status { display: block; overflow: hidden; text-overflow: ellipsis; border: 1px solid #dfe6ee; }
+    @media (min-width: 1100px) { .canvas-status { right: 336px; max-width: calc((100% - 320px) / 2 - 190px); } }
+    body[data-mode="bench"] .canvas-status { display: none; }
+    .cmd-shortcuts { display: contents; }
 
     /* ---- 接合面工具（M2）：設計分頁左上的按鈕與說明，已標面的小選單 ---- */
     .mate-dock { position: absolute; top: 64px; left: 12px; z-index: 3; display: flex; align-items: flex-start; gap: 6px; max-width: calc(100% - 24px); pointer-events: none; }
@@ -343,7 +360,7 @@
     .mode-seg.active { background: #2c5282; color: #fff; }
     .bench-list, .bench-panel { display: none; }
     body[data-mode="bench"] .part-palette { display: none; }
-    body[data-mode="bench"] .view3d-hint, body[data-mode="bench"] #btn3d, body[data-mode="bench"] #mobileBtn3d { display: none; }
+    body[data-mode="bench"] .view3d-hint { display: none; }
     body[data-mode="bench"] .bench-list { display: flex; flex-direction: column; gap: 8px; position: absolute; left: 0; top: 0; bottom: 0; width: 210px; z-index: 4;
       padding: 10px; background: #fff; border-right: 1px solid #e6e9f0; overflow-y: auto; }
     body[data-mode="bench"] .bench-panel { display: flex; flex-direction: column; gap: 10px; position: absolute; right: 0; top: 0; bottom: 0; width: 320px; z-index: 4;
@@ -497,13 +514,18 @@
       header { flex-wrap: wrap; gap: 8px; }
       .appbar { padding: 10px 14px; }
       .appbar h1 { font-size: 18px; }
-      .app-status { display:none; margin:0 0 0 auto; max-width:140px; overflow:hidden; text-overflow:ellipsis; }
-      .app-status[data-state="warn"], .app-status[data-state="error"] { display:block; }
-      .project-actions { display: none; }
       .appbar { flex-shrink:0; }
-      .learning-actions { max-width:100%; flex-wrap:wrap; }
-      .gesture-help-content { position:fixed; left:12px; right:12px; top:110px; width:auto; max-width:340px; margin:0 auto; }
-      .learning-actions > button, .learning-actions > a { min-height:36px; }
+      .canvas-top { display: contents; }
+      .canvas-toolbar { display: none; }
+      .help-pop { left:12px; right:12px; top:56px; width:auto; max-width:340px; margin:0 auto; }
+      .help-modal { top:56px; bottom:auto; }
+      body:not([data-mode="bench"]) [data-command-menu="project"] { display:none; }
+      .cmd-menu-body { position:fixed; left:12px; right:12px; top:56px; width:auto; max-width:340px; margin:0 0 0 auto; }
+      [data-command-menu="help"] .cmd-label { display:none; }
+      [data-command-menu="help"] > summary::before { content:"⋯ 更多"; }
+      [data-command-menu="help"] > summary::after { content:none; }
+      .appbar [data-command="undo"] { display:none; }
+      body:not([data-mode="bench"]) .canvas-status { position:relative; left:auto; bottom:auto; max-width:none; align-self:center; flex:0 0 auto; margin-top:2px; }
       .tool-btn { padding: 7px 10px; font-size: 13px; }
       .stage { flex-direction: column-reverse; }
       .canvas-wrap { min-height: 0; overflow: hidden; }
@@ -542,7 +564,7 @@
       body[data-mobile-panel="edit"][data-mobile-editor="active"] .mobile-panel-section[data-panel="edit"] { display: none; }
       body[data-mobile-panel="edit"][data-mobile-editor="active"] .mobile-panel { display: none; }
       .mobile-panel-title { flex: 0 0 auto; color: #60717d; font-size: 12px; font-weight: 800; }
-      .mobile-panel .tool-btn, .mobile-panel .example-select {
+      .mobile-panel .tool-btn {
         min-height: 38px; border-radius: 8px; white-space: nowrap;
       }
       .mobile-panel .export-settings { flex: 1 1 100%; justify-content: flex-start; flex-wrap: wrap; }
@@ -555,28 +577,9 @@
       .mobile-panel-section[data-panel="project"] {
         flex-wrap: wrap; align-items: stretch; max-height: min(22dvh, 160px); overflow-y: auto; overscroll-behavior:contain;
       }
-      .mobile-panel-section[data-panel="project"] .example-select { display: none; }
       .lesson-card { display: none !important; }
       .lesson-card.workflow-active { display: flex !important; top: 8px; left: 8px; right: 8px; width: auto; max-height: min(42vh, 330px); overflow-y: auto; padding: 9px 11px; gap: 6px; }
       .lesson-card.workflow-active.workflow-hidden { display: none !important; }
-      .mobile-example-list {
-        display: grid; grid-template-columns: 1fr; gap: 6px; max-height: 230px; overflow-y: auto;
-      }
-      .mobile-example-section { display: grid; grid-template-columns: 1fr; gap: 6px; }
-      .mobile-example-group-title { color: #60717d; font-size: 12px; font-weight: 900; padding: 6px 2px 2px; }
-      .mobile-example-btn {
-        min-height: 42px; border: 1px solid #d8dee6; background: #fff; border-radius: 8px;
-        padding: 8px; text-align: left; font-size: 12px; font-weight: 800; color: #34495e;
-      }
-      .mobile-example-btn:active { background: #eaf2ff; border-color: #7fb0ff; color: #2c5282; }
-      .mobile-open-menu {
-        position: fixed; left: 12px; right: 12px; bottom: calc(58px + env(safe-area-inset-bottom, 0px));
-        z-index: 10; background: #fff; border: 1px solid #e6e9f0; border-radius: 8px;
-        box-shadow: 0 -10px 30px rgba(44,62,80,0.18); padding: 10px; gap: 8px; flex-direction: column;
-      }
-      .mobile-open-menu[style*="flex"] { display: flex !important; }
-      .mobile-open-title { font-size: 13px; font-weight: 800; color: #60717d; }
-      .mobile-open-divider { height: 1px; background: #edf1f6; margin: 2px 0; }
       .mobile-tabs {
         display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;
         background: #fff; border-top: 1px solid #e6e9f0;
@@ -602,9 +605,6 @@
       .controls #btnMotorDirection { font-size:0; }
       .controls #btnMotorDirection::before { content:"↻"; font-size:17px; }
       .controls #btnMotorDirection.active::before { content:"↺"; }
-      .controls #btnFrameLock,
-      .controls #btn3d,
-      .controls #btnClearAll { display: none; }
       .ctrl-sub { min-width: 36px; padding: 0 5px; font-size: 11px; }
       body:not([data-mode="bench"])[data-mobile-panel="edit"] .inspector-panel {
         position:relative; left:auto; right:auto; bottom:auto; top:auto;
@@ -695,7 +695,7 @@
         overflow-y:auto;
       }
     }
-    .hydraulic-active .design-tabs{position:relative;flex:0 0 auto;right:0}
+    .hydraulic-active .canvas-top{position:relative;flex:0 0 auto;right:0}
     .hydraulic-active #modeBanner,.hydraulic-active #solveBanner{
       position:relative;top:auto!important;left:auto;transform:none;flex:0 0 auto;
       box-sizing:border-box;width:auto;max-width:none;margin:4px 8px;padding:8px 12px;
@@ -713,8 +713,7 @@
     .syringe-dialog p,.syringe-dialog small{font-size:13px}
     .syringe-dialog summary{cursor:pointer;padding:10px 0;font-weight:bold}
     .editor-more{width:100%}.editor-more>summary{cursor:pointer;padding:12px 0;font-size:13px}.editor-more .le-row,.editor-more .se-row{margin:8px 0}.editor-more select{max-width:100%}.inspector-panel #memberDimensionLabel{font-size:12px}
-    .mobile-undo{display:none}
-    @media(max-width:700px),(max-width:1099px) and (max-height:500px){.controls .mobile-undo{display:block;min-width:44px;min-height:44px}}
+    @media(max-width:700px),(max-width:1099px) and (max-height:500px){.controls [data-command]{min-width:44px;min-height:44px}}
     .member-stock-fields{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
     .member-stock-fields label{display:flex;align-items:center;gap:4px;font-size:13px}
     .member-stock-fields input{width:68px;min-height:44px;box-sizing:border-box;font-size:16px;border:1px solid #cbd5e1;border-radius:6px;padding:5px}
@@ -758,64 +757,23 @@
     #syringePartPicker input,#syringePartPicker select{display:block;width:100%;max-width:100%;min-height:44px;margin-top:4px}
     @media(max-width:600px){#syringeControls{font-size:11px;padding:3px 6px}#syringeControls output{max-width:72px}#syringeControls>div:first-child{gap:4px}}
   </style>
-  <link rel="stylesheet" href="js/blocks/workspace-mobile.css?v=20261023_member_actions">
+  <link rel="stylesheet" href="js/blocks/workspace-mobile.css?v=20261027_ui1">
 
 </head>
 <body>
   <header class="appbar">
     <div class="app-identity">
       <h1>🧩 機構積木</h1>
-      <div class="app-status" id="mechanismStatus" data-state="idle">尚未建立機構</div>
+      <span class="project-name" id="projectName"></span>
     </div>
     <div class="mode-switch" id="modeSwitch" role="tablist" aria-label="設計／組立">
       <button type="button" role="tab" id="modeBtnDesign" class="mode-seg active" aria-selected="true" onclick="window.blocks.setMode('design')">✏️ 設計</button>
       <button type="button" role="tab" id="modeBtnBench" class="mode-seg" aria-selected="false" onclick="window.blocks.setMode('bench')">🧩 組立</button>
     </div>
-    <div class="toolbar project-actions">
-      <button class="tool-btn toolbar-icon" id="btnUndo" onclick="window.blocks.undo()" disabled title="復原上一步">↩</button>
-      <button class="tool-btn toolbar-icon" onclick="window.blocks.saveFile()" title="儲存整份作品（所有設計與組立接合）">💾</button>
-      <button id="designListBench" class="tool-btn" style="display:none" onclick="window.blocks.openDesignList()">設計清單</button>
-      <button class="tool-btn toolbar-icon" onclick="window.blocks.openFile()" title="開啟作品（替換目前作品）">📂</button>
-      <button class="tool-btn toolbar-icon" onclick="window.blocks.share()" title="複製分享連結">🔗</button>
-      <button class="tool-btn" onclick="window.blocks.startDimension()" title="量尺：量兩點距離、離地高度、水平距離或移動量，並顯示全行程最小／最大">📏 量尺</button>
-      <details class="toolbar-menu">
-        <summary class="tool-btn">匯出</summary>
-        <div class="toolbar-menu-content">
-          <button class="tool-btn" onclick="document.getElementById('fabricationDialog').showModal();this.closest('details.toolbar-menu')?.removeAttribute('open')">製作設定與零件輸出</button>
-          
-          <button class="tool-btn" onclick="window.blocks.exportVideo()">MP4 動畫（10 秒）</button>
-          
-          
-          <button class="tool-btn" onclick="window.blocks.downloadBuildPack()" title="板件清單＋五金清單＋組裝步驟（可列印）">製作包</button>
-          
-        </div>
-      </details>
-      <select class="example-select" id="exampleSelect" onchange="window.blocks.requestExample(this.value)" title="選擇機構範例（可載入或加入模組）">
-        <option value="">📘 範例</option>
-      </select>
-    </div>
-    <div class="learning-actions" aria-label="教學與回報">
-      <button type="button" class="tool-btn mobile-more-toggle" aria-expanded="false" aria-controls="learningMore" onclick="const open=this.getAttribute('aria-expanded')!=='true';this.setAttribute('aria-expanded',String(open));document.getElementById('learningMore').classList.toggle('is-open',open)">⋯ 更多</button>
-      <div id="learningMore" class="learning-more">
-      <button type="button" class="tool-btn" onclick="window.blocks.openBoxMaker()">卡榫盒子</button>
-      <details id="designGuide" class="gesture-help"><summary>設計引導</summary><div class="gesture-help-content">
-        <strong id="guideTitle"></strong><p id="guideText"></p>
-        <p id="guideSelection"></p>
-        <button type="button" class="tool-btn" id="guideNext">下一步</button>
-        <button type="button" class="tool-btn" id="guideFrame">將所選設為機架</button>
-        <p>機架 → 驅動 → 試播 → 組立。可隨時收起，自由修改。</p>
-        <button type="button" class="tool-btn" onclick="document.getElementById('designGuide').open=false">收起引導</button>
-      </div></details>
-      <details class="gesture-help"><summary>操作說明</summary><div class="gesture-help-content">
-        <p><strong>選零件 → 改尺寸 → 完成 → 播放</strong></p>
-        <p>單指點零件：選取編輯，先暫停。<br>拖接點／自由桿：調整位置；固定點須先解鎖。<br>拖空白：移動畫布。<br>雙指張合：縮放；雙指同移：平移。</p>
-        <p>兩點桿可依序點頭尾或拖曳建立；三角板／折線桿依序點三孔。雙指仍可縮放移動，不會畫桿。</p>
-        <p>找不到機構？按播放旁的「⊡」置中。手動縮放後，修改尺寸不會強制置中。</p>
-        <button type="button" class="tool-btn" onclick="this.closest('details').open=false">知道了</button>
-      </div></details>
-      </div>
-
-      <a class="tool-btn" href="teaching.html" target="_blank" rel="noopener">教學</a>
+    <div class="app-commands">
+      <button type="button" class="tool-btn toolbar-icon" id="btnUndo" data-command="undo" title="復原上一步" aria-label="復原上一步" disabled>↩</button>
+      <details class="cmd-menu" data-command-menu="project"><summary class="tool-btn"><span data-group-label="project"></span></summary><div class="cmd-menu-body" data-command-group="project"></div></details>
+      <details class="cmd-menu" data-command-menu="help"><summary class="tool-btn"><span class="cmd-label" data-group-label="help"></span></summary><div class="cmd-menu-body" data-command-group="help"></div></details>
     </div>
   </header>
 
@@ -858,7 +816,7 @@
             <span class="name">鏈輪＋鏈條</span>
             <span class="role">#25 鏈條，點兩處放兩個鏈輪</span>
           </button></div></details>
-        <div class="creation-items"><button type="button" class="block motor" onclick="window.blocks.openPowerMenu()">
+        <div class="creation-items" data-command-group="add"><button type="button" class="block motor" onclick="window.blocks.openPowerMenu()">
             <span class="ico">⚡</span>
             <span class="name">動力來源</span>
             <span class="role">TT / N20 / MG995</span>
@@ -869,7 +827,13 @@
     </div>
 
     <div class="canvas-wrap canvas-area has-design-tabs">
-      <div class="design-tabs" id="designTabs" aria-label="設計分頁"></div>
+      <div class="canvas-top">
+        <div class="design-tabs" id="designTabs" aria-label="設計分頁"></div>
+        <div class="canvas-toolbar" aria-label="調整與視圖">
+          <span class="cmd-cluster" data-command-group="edit" data-command-except="undo"></span>
+          <span class="cmd-cluster" data-command-group="view"></span>
+        </div>
+      </div>
       <svg id="stageSvg" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="hint" id="hint">
         <span class="desktop-hint">從「＋ 新增」建立零件或加入模組<br>已有零件？直接點選修改</span>
@@ -1284,56 +1248,21 @@
       <button type="button" class="tool-btn" id="lessonSequenceBtn" onclick="window.blocks.openAssemblySequence()">動作序列</button>
       <div class="bench-list" id="benchList" aria-label="模組清單"></div>
       <aside class="bench-panel" id="benchPanel" aria-label="接法面板"></aside>
+      <div class="canvas-status" role="status" aria-live="polite"><span class="app-status" id="mechanismStatus" data-state="idle">尚未建立機構</span></div>
       <div class="controls">
         <div class="motor-switch" id="motorSwitch" style="display:none" title="切換要控制的馬達（其他馬達停在原角度）"></div>
         <button class="play-btn" id="playBtn" onclick="window.blocks.togglePlay()" title="播放 / 暫停">▶</button>
         <button class="clear-btn" id="btnMotorDirection" onclick="window.blocks.toggleMotorDirection()" title="切換馬達轉動方向">↻ 順時針</button>
-        <button class="clear-btn mobile-undo" id="mobileUndoBtn" onclick="window.blocks.undo()" title="復原上一步" aria-label="復原上一步" disabled>↩</button>
         <div class="ctrl-sub" title="目前角度"><span id="thetaVal">0</span>°</div>
-        <button class="clear-btn" id="btnFitView" onclick="window.blocks.fitView()" title="置中">⊡</button>
-        <button class="clear-btn" id="btnFrameLock" onclick="window.blocks.toggleFrameLock()" title="拖曳固定孔與機架時吸附到 8mm LEGO 孔距">鎖</button>
-        <button class="clear-btn" id="btn3d" onclick="window.blocks.toggle3D()" title="3D 預覽">3D</button>
-        <button class="clear-btn" id="btnClearAll" onclick="window.blocks.clearAll()" title="清空">🗑</button>
+        <span class="cmd-shortcuts" data-command-shortcuts></span>
       </div>
     </div>
   </div>
 
   <div class="mobile-panel" aria-label="手機工具面板">
-    <div class="mobile-panel-section" data-panel="edit">
-      <span class="mobile-panel-title">調整</span>
-      <button class="tool-btn danger-btn" onclick="window.blocks.deleteSelectedPart()" title="刪除選取零件">🗑 刪除選取</button>
-    </div>
-    <div class="mobile-panel-section" data-panel="view">
-      <span class="mobile-panel-title">視圖</span>
-      <button class="tool-btn" onclick="window.blocks.fitView()" title="置中畫布">⊡ 置中</button>
-      <button class="tool-btn" id="mobileBtn3d" onclick="window.blocks.toggle3D()" title="3D 預覽">3D 預覽</button>
-      <button class="tool-btn" id="mobileBtnFrameLock" onclick="window.blocks.toggleFrameLock()" title="拖曳固定孔與機架時吸附到 8mm LEGO 孔距">鎖孔距</button>
-      <button class="tool-btn" id="mobileBtnRulers" type="button" aria-pressed="false">完整尺規</button>
-      <button class="tool-btn" onclick="window.blocks.startDimension()" title="量尺：量兩點距離、離地高度、水平距離或移動量，並顯示全行程最小／最大">📏 量尺</button>
-    </div>
-    <div class="mobile-panel-section" data-panel="project">
-      <span class="mobile-panel-title">專案</span>
-      <button class="tool-btn" onclick="window.blocks.saveFile()" title="儲存整份作品（所有設計與組立接合）">💾 存檔</button>
-      <button class="tool-btn" onclick="document.getElementById('fabricationDialog').showModal();this.closest('details.toolbar-menu')?.removeAttribute('open')">製作設定與零件輸出</button>
-      
-          <button class="tool-btn" onclick="window.blocks.exportVideo()">MP4 動畫（10 秒）</button>
-          
-      
-      <button class="tool-btn" onclick="window.blocks.downloadBuildPack()" title="板件清單＋五金清單＋組裝步驟（可列印）">製作包</button>
-          
-      <button class="tool-btn" onclick="window.blocks.openMobileOpenMenu()" title="開啟舊檔或機構範例">📂 開啟</button>
-      <button class="tool-btn" onclick="window.blocks.share()" title="複製分享連結">🔗 分享</button>
-      <button class="tool-btn danger-btn" onclick="window.blocks.confirmClearAll()" title="清空目前全部零件">🗑 清空全部</button>
-    </div>
-  </div>
-
-  <div class="mobile-open-menu" id="mobileOpenMenu" style="display:none;" aria-label="開啟">
-    <div class="mobile-open-title">開啟</div>
-    <button class="tool-btn" onclick="window.blocks.openMobileFile()" title="從檔案開啟自己的機構">📂 開啟舊檔</button>
-    <div class="mobile-open-divider"></div>
-    <div class="mobile-open-title">範例</div>
-    <div class="mobile-example-list" id="mobileExampleList" aria-label="機構範例"></div>
-    <button class="tool-btn" onclick="window.blocks.openMobileOpenMenu()">取消</button>
+    <div class="mobile-panel-section" data-panel="edit" data-command-group="edit"><span class="mobile-panel-title" data-group-label="edit"></span></div>
+    <div class="mobile-panel-section" data-panel="view" data-command-group="view"><span class="mobile-panel-title" data-group-label="view"></span></div>
+    <div class="mobile-panel-section" data-panel="project" data-command-group="project"><span class="mobile-panel-title" data-group-label="project"></span></div>
   </div>
 
   <nav class="mobile-tabs" aria-label="手機模式切換">
@@ -1350,6 +1279,29 @@
       <span class="mt-ico">☰</span><span>專案</span>
     </button>
   </nav>
+
+  <span data-version-host hidden></span>
+  <dialog id="designGuide" class="help-pop" aria-label="設計引導">
+    <strong id="guideTitle"></strong><p id="guideText"></p>
+    <p id="guideSelection"></p>
+    <button type="button" class="tool-btn" id="guideNext">下一步</button>
+    <button type="button" class="tool-btn" id="guideFrame">將所選設為機架</button>
+    <p>機架 → 驅動 → 試播 → 組立。可隨時收起，自由修改。</p>
+    <button type="button" class="tool-btn" onclick="this.closest('dialog').close()">收起引導</button>
+  </dialog>
+  <dialog id="helpDialog" class="help-pop help-modal" aria-label="操作說明">
+    <p><strong>選零件 → 改尺寸 → 完成 → 播放</strong></p>
+    <p>單指點零件：選取編輯，先暫停。<br>拖接點／自由桿：調整位置；固定點須先解鎖。<br>拖空白：移動畫布。<br>雙指張合：縮放；雙指同移：平移。</p>
+    <p>兩點桿可依序點頭尾或拖曳建立；三角板／折線桿依序點三孔。雙指仍可縮放移動，不會畫桿。</p>
+    <p>找不到機構？按播放旁的「⊡」或「視圖 → 置中」。手動縮放後，修改尺寸不會強制置中。</p>
+    <p>指令都分在「新增、調整、視圖、專案、說明」五類；電腦在頂端與畫布工具列，手機在下方分頁，名稱與內容相同。</p>
+    <button type="button" class="tool-btn" onclick="this.closest('dialog').close()">知道了</button>
+  </dialog>
+  <dialog id="examplesDialog" class="help-pop help-modal" aria-label="範例">
+    <div class="dlg-head"><strong>📘 範例</strong><button type="button" class="tool-btn" onclick="this.closest('dialog').close()">關閉</button></div>
+    <p class="dlg-note">選一個範例；可載入（取代目前作品）或加入成模組。</p>
+    <div class="example-list" id="exampleList" aria-label="機構範例"></div>
+  </dialog>
 
   <dialog id="fabricationDialog" class="fabrication-dialog" aria-labelledby="fabricationTitle">
     <header><h2 id="fabricationTitle">製作設定</h2><button class="tool-btn" onclick="this.closest('dialog').close()">完成</button></header>
@@ -1415,303 +1367,305 @@
   <!-- 同一份共用模組只載入一個版本；避免重載時混用舊幾何或舊存檔 schema。 -->
 
   <!-- BEGIN GENERATED LOAD MAP -->
-<script type="importmap" data-load-graph="47a35353f77b80a85d23">
+<script type="importmap" data-load-graph="28273516c04a93676005">
 {
   "imports": {
-    "./js/blocks/actuator-install-scene.js": "./js/blocks/actuator-install-scene.js?v=47a35353f77b80a85d23",
-    "./js/blocks/actuator-install-ui.js": "./js/blocks/actuator-install-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/actuator-installation.js": "./js/blocks/actuator-installation.js?v=47a35353f77b80a85d23",
-    "./js/blocks/adapter-stl.js": "./js/blocks/adapter-stl.js?v=47a35353f77b80a85d23",
-    "./js/blocks/app.js": "./js/blocks/app.js?v=47a35353f77b80a85d23",
-    "./js/blocks/assembly-lesson-example.js": "./js/blocks/assembly-lesson-example.js?v=47a35353f77b80a85d23",
-    "./js/blocks/assembly-lesson-example.js?v=parallel": "./js/blocks/assembly-lesson-example.js?v=47a35353f77b80a85d23",
-    "./js/blocks/assembly-membership.js": "./js/blocks/assembly-membership.js?v=47a35353f77b80a85d23",
-    "./js/blocks/assembly-roles.js": "./js/blocks/assembly-roles.js?v=47a35353f77b80a85d23",
-    "./js/blocks/assembly-syringe.js": "./js/blocks/assembly-syringe.js?v=47a35353f77b80a85d23",
-    "./js/blocks/assembly-task-validation.js": "./js/blocks/assembly-task-validation.js?v=47a35353f77b80a85d23",
-    "./js/blocks/assembly-view.js": "./js/blocks/assembly-view.js?v=47a35353f77b80a85d23",
-    "./js/blocks/assembly.js": "./js/blocks/assembly.js?v=47a35353f77b80a85d23",
-    "./js/blocks/assembly.js?v=20261007_m5a": "./js/blocks/assembly.js?v=47a35353f77b80a85d23",
-    "./js/blocks/assembly.js?v=20261007_solverguard": "./js/blocks/assembly.js?v=47a35353f77b80a85d23",
-    "./js/blocks/assembly.js?v=face-mount-20261007": "./js/blocks/assembly.js?v=47a35353f77b80a85d23",
-    "./js/blocks/bar-fusion-geometry.js": "./js/blocks/bar-fusion-geometry.js?v=47a35353f77b80a85d23",
-    "./js/blocks/bar-fusion-plan.js": "./js/blocks/bar-fusion-plan.js?v=47a35353f77b80a85d23",
-    "./js/blocks/bar-fusion-ui.js": "./js/blocks/bar-fusion-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/bench-ui.js": "./js/blocks/bench-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/bench-ui.js?v=20261007_8_final": "./js/blocks/bench-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/bench-ui.js?v=20261008_brackets": "./js/blocks/bench-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/bench.js": "./js/blocks/bench.js?v=47a35353f77b80a85d23",
-    "./js/blocks/bench.js?v=20261007_m5a": "./js/blocks/bench.js?v=47a35353f77b80a85d23",
-    "./js/blocks/box-config.js": "./js/blocks/box-config.js?v=47a35353f77b80a85d23",
-    "./js/blocks/box-dialog.js": "./js/blocks/box-dialog.js?v=47a35353f77b80a85d23",
-    "./js/blocks/box-files.js": "./js/blocks/box-files.js?v=47a35353f77b80a85d23",
-    "./js/blocks/box-generator.js": "./js/blocks/box-generator.js?v=47a35353f77b80a85d23",
-    "./js/blocks/box-operations.js": "./js/blocks/box-operations.js?v=47a35353f77b80a85d23",
-    "./js/blocks/bracket-layout.js": "./js/blocks/bracket-layout.js?v=47a35353f77b80a85d23",
-    "./js/blocks/bracket-physical.js": "./js/blocks/bracket-physical.js?v=47a35353f77b80a85d23",
-    "./js/blocks/bracket-spec.js": "./js/blocks/bracket-spec.js?v=47a35353f77b80a85d23",
-    "./js/blocks/build-plan.js": "./js/blocks/build-plan.js?v=47a35353f77b80a85d23",
-    "./js/blocks/build-plan.js?v=20261007_7": "./js/blocks/build-plan.js?v=47a35353f77b80a85d23",
-    "./js/blocks/canvas-rulers.js": "./js/blocks/canvas-rulers.js?v=47a35353f77b80a85d23",
-    "./js/blocks/chain-editor.js": "./js/blocks/chain-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/chain-manufacturing.js": "./js/blocks/chain-manufacturing.js?v=47a35353f77b80a85d23",
-    "./js/blocks/chain-tools.js": "./js/blocks/chain-tools.js?v=47a35353f77b80a85d23",
-    "./js/blocks/classroom-bridge.js": "./js/blocks/classroom-bridge.js?v=47a35353f77b80a85d23",
-    "./js/blocks/cnc-check.js": "./js/blocks/cnc-check.js?v=47a35353f77b80a85d23",
-    "./js/blocks/collision-actions.js": "./js/blocks/collision-actions.js?v=47a35353f77b80a85d23",
-    "./js/blocks/common-manipulator-examples.js": "./js/blocks/common-manipulator-examples.js?v=47a35353f77b80a85d23",
-    "./js/blocks/connection-descriptor.js": "./js/blocks/connection-descriptor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/connection-editor.js": "./js/blocks/connection-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/connection-editor.js?v=20261007_facecolor": "./js/blocks/connection-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/connection-selection.js": "./js/blocks/connection-selection.js?v=47a35353f77b80a85d23",
-    "./js/blocks/connection-work.js": "./js/blocks/connection-work.js?v=47a35353f77b80a85d23",
-    "./js/blocks/creation-palette.js": "./js/blocks/creation-palette.js?v=47a35353f77b80a85d23",
-    "./js/blocks/design-focus.js": "./js/blocks/design-focus.js?v=47a35353f77b80a85d23",
-    "./js/blocks/design-guide.js": "./js/blocks/design-guide.js?v=47a35353f77b80a85d23",
-    "./js/blocks/design-tabs-ui.js": "./js/blocks/design-tabs-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/design-tabs-ui.js?v=20261005_tabclose": "./js/blocks/design-tabs-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/dimension-schema.js": "./js/blocks/dimension-schema.js?v=47a35353f77b80a85d23",
-    "./js/blocks/dimension-ui.js": "./js/blocks/dimension-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/dimension-ui.js?v=20261027_dim1": "./js/blocks/dimension-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/dimensions.js": "./js/blocks/dimensions.js?v=47a35353f77b80a85d23",
-    "./js/blocks/dof.js": "./js/blocks/dof.js?v=47a35353f77b80a85d23",
-    "./js/blocks/example-controller.js": "./js/blocks/example-controller.js?v=47a35353f77b80a85d23",
-    "./js/blocks/example-controller.js?v=20261005_parallel": "./js/blocks/example-controller.js?v=47a35353f77b80a85d23",
-    "./js/blocks/example-entry.js": "./js/blocks/example-entry.js?v=47a35353f77b80a85d23",
-    "./js/blocks/example-entry.js?v=20261005_unit2": "./js/blocks/example-entry.js?v=47a35353f77b80a85d23",
-    "./js/blocks/examples.js": "./js/blocks/examples.js?v=47a35353f77b80a85d23",
-    "./js/blocks/examples.js?v=20261005_parallel": "./js/blocks/examples.js?v=47a35353f77b80a85d23",
-    "./js/blocks/examples.js?v=20261005_unit2": "./js/blocks/examples.js?v=47a35353f77b80a85d23",
-    "./js/blocks/export-dialog.js": "./js/blocks/export-dialog.js?v=47a35353f77b80a85d23",
-    "./js/blocks/export-scope.js": "./js/blocks/export-scope.js?v=47a35353f77b80a85d23",
-    "./js/blocks/exporters.js": "./js/blocks/exporters.js?v=47a35353f77b80a85d23",
-    "./js/blocks/exporters.js?v=20261007_7": "./js/blocks/exporters.js?v=47a35353f77b80a85d23",
-    "./js/blocks/exporters.js?v=20261007_9": "./js/blocks/exporters.js?v=47a35353f77b80a85d23",
-    "./js/blocks/fabrication-profile.js": "./js/blocks/fabrication-profile.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-auto-fit.js": "./js/blocks/face-auto-fit.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-auto-fit.js?v=20261008_bracket3d": "./js/blocks/face-auto-fit.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-bracket-extras.js": "./js/blocks/face-bracket-extras.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-bracket-geometry.js": "./js/blocks/face-bracket-geometry.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-bracket-geometry.js?v=20261008_bracket3d": "./js/blocks/face-bracket-geometry.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-bracket-geometry.js?v=20261008_bracketalign": "./js/blocks/face-bracket-geometry.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-candidate-view.js": "./js/blocks/face-candidate-view.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-candidate.js": "./js/blocks/face-candidate.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-export.js": "./js/blocks/face-export.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-mate-examples.js": "./js/blocks/face-mate-examples.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-mate-prototype.js": "./js/blocks/face-mate-prototype.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-mate.js": "./js/blocks/face-mate.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-mount-contract.js": "./js/blocks/face-mount-contract.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-mount-refresh.js": "./js/blocks/face-mount-refresh.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-mount.js": "./js/blocks/face-mount.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-placement.js": "./js/blocks/face-placement.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-wizard-ui.js": "./js/blocks/face-wizard-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/face-wizard-ui.js?v=20261007_singleface": "./js/blocks/face-wizard-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/fixed-syringe-examples.js": "./js/blocks/fixed-syringe-examples.js?v=47a35353f77b80a85d23",
-    "./js/blocks/fourbar-measurement.js": "./js/blocks/fourbar-measurement.js?v=47a35353f77b80a85d23",
-    "./js/blocks/frame-stock.js": "./js/blocks/frame-stock.js?v=47a35353f77b80a85d23",
-    "./js/blocks/fusion-controls.js": "./js/blocks/fusion-controls.js?v=47a35353f77b80a85d23",
-    "./js/blocks/fusion-editor.js": "./js/blocks/fusion-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/fusion-preview.js": "./js/blocks/fusion-preview.js?v=47a35353f77b80a85d23",
-    "./js/blocks/gear-editor.js": "./js/blocks/gear-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/gear-editor.js?v=20261004_fourbar_r1": "./js/blocks/gear-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/gripper-controller.js": "./js/blocks/gripper-controller.js?v=47a35353f77b80a85d23",
-    "./js/blocks/gripper-controller.js?v=20260925_r1b2": "./js/blocks/gripper-controller.js?v=47a35353f77b80a85d23",
-    "./js/blocks/gripper-download.js": "./js/blocks/gripper-download.js?v=47a35353f77b80a85d23",
-    "./js/blocks/gripper-download.js?v=20260925_r1b2": "./js/blocks/gripper-download.js?v=47a35353f77b80a85d23",
-    "./js/blocks/gripper-object.js": "./js/blocks/gripper-object.js?v=47a35353f77b80a85d23",
-    "./js/blocks/gripper-object.js?v=20260925_r1b2": "./js/blocks/gripper-object.js?v=47a35353f77b80a85d23",
-    "./js/blocks/gripper-operations.js": "./js/blocks/gripper-operations.js?v=47a35353f77b80a85d23",
-    "./js/blocks/gripper-workflow.js": "./js/blocks/gripper-workflow.js?v=47a35353f77b80a85d23",
-    "./js/blocks/gripper-workflow.js?v=20260925_r1b": "./js/blocks/gripper-workflow.js?v=47a35353f77b80a85d23",
-    "./js/blocks/hydraulic-assembly-example.js": "./js/blocks/hydraulic-assembly-example.js?v=47a35353f77b80a85d23",
-    "./js/blocks/hydraulic-example.js": "./js/blocks/hydraulic-example.js?v=47a35353f77b80a85d23",
-    "./js/blocks/hydraulic-sequence-dialog.js": "./js/blocks/hydraulic-sequence-dialog.js?v=47a35353f77b80a85d23",
-    "./js/blocks/hydraulic-sequence.js": "./js/blocks/hydraulic-sequence.js?v=47a35353f77b80a85d23",
-    "./js/blocks/input.js": "./js/blocks/input.js?v=47a35353f77b80a85d23",
-    "./js/blocks/input.js?v=20261007_m2b": "./js/blocks/input.js?v=47a35353f77b80a85d23",
-    "./js/blocks/intake-contact.js": "./js/blocks/intake-contact.js?v=47a35353f77b80a85d23",
-    "./js/blocks/interference.js": "./js/blocks/interference.js?v=47a35353f77b80a85d23",
-    "./js/blocks/jaw-tip-handle.js": "./js/blocks/jaw-tip-handle.js?v=47a35353f77b80a85d23",
-    "./js/blocks/lesson-check-dialog.js": "./js/blocks/lesson-check-dialog.js?v=47a35353f77b80a85d23",
-    "./js/blocks/lesson-check.js": "./js/blocks/lesson-check.js?v=47a35353f77b80a85d23",
-    "./js/blocks/lesson-sequence-dialog.js": "./js/blocks/lesson-sequence-dialog.js?v=47a35353f77b80a85d23",
-    "./js/blocks/lesson-sequence.js": "./js/blocks/lesson-sequence.js?v=47a35353f77b80a85d23",
-    "./js/blocks/lift-bucket-builder.js": "./js/blocks/lift-bucket-builder.js?v=47a35353f77b80a85d23",
-    "./js/blocks/lift-bucket-example.js": "./js/blocks/lift-bucket-example.js?v=47a35353f77b80a85d23",
-    "./js/blocks/lift-bucket-workflow.js": "./js/blocks/lift-bucket-workflow.js?v=47a35353f77b80a85d23",
-    "./js/blocks/live-interference-status.js": "./js/blocks/live-interference-status.js?v=47a35353f77b80a85d23",
-    "./js/blocks/load-session.js": "./js/blocks/load-session.js?v=47a35353f77b80a85d23",
-    "./js/blocks/mate-candidate.js": "./js/blocks/mate-candidate.js?v=47a35353f77b80a85d23",
-    "./js/blocks/mate-connect.js": "./js/blocks/mate-connect.js?v=47a35353f77b80a85d23",
-    "./js/blocks/mate-connect.js?v=20261007_8_final": "./js/blocks/mate-connect.js?v=47a35353f77b80a85d23",
-    "./js/blocks/mate-tool.js": "./js/blocks/mate-tool.js?v=47a35353f77b80a85d23",
-    "./js/blocks/mate-tool.js?v=20261007_facecolor": "./js/blocks/mate-tool.js?v=47a35353f77b80a85d23",
-    "./js/blocks/mate-wizard-ui.js": "./js/blocks/mate-wizard-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/mate-wizard-ui.js?v=20261008_brackets": "./js/blocks/mate-wizard-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/material-interference.js": "./js/blocks/material-interference.js?v=47a35353f77b80a85d23",
-    "./js/blocks/material-pose-status.js": "./js/blocks/material-pose-status.js?v=47a35353f77b80a85d23",
-    "./js/blocks/material-voids.js": "./js/blocks/material-voids.js?v=47a35353f77b80a85d23",
-    "./js/blocks/mates-schema.js": "./js/blocks/mates-schema.js?v=47a35353f77b80a85d23",
-    "./js/blocks/mates-view.js": "./js/blocks/mates-view.js?v=47a35353f77b80a85d23",
-    "./js/blocks/mates.js": "./js/blocks/mates.js?v=47a35353f77b80a85d23",
-    "./js/blocks/measurement.js": "./js/blocks/measurement.js?v=47a35353f77b80a85d23",
-    "./js/blocks/mechanism-layer-render.js": "./js/blocks/mechanism-layer-render.js?v=47a35353f77b80a85d23",
-    "./js/blocks/member-copy-dialog.js": "./js/blocks/member-copy-dialog.js?v=47a35353f77b80a85d23",
-    "./js/blocks/member-copy.js": "./js/blocks/member-copy.js?v=47a35353f77b80a85d23",
-    "./js/blocks/member-dimension-render.js": "./js/blocks/member-dimension-render.js?v=47a35353f77b80a85d23",
-    "./js/blocks/member-dimensions.js": "./js/blocks/member-dimensions.js?v=47a35353f77b80a85d23",
-    "./js/blocks/member-editor.js": "./js/blocks/member-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/member-stock.js": "./js/blocks/member-stock.js?v=47a35353f77b80a85d23",
-    "./js/blocks/member-sweep.js": "./js/blocks/member-sweep.js?v=47a35353f77b80a85d23",
-    "./js/blocks/model.js": "./js/blocks/model.js?v=47a35353f77b80a85d23",
-    "./js/blocks/module-drag.js": "./js/blocks/module-drag.js?v=47a35353f77b80a85d23",
-    "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/module-editor.js?v=20261007_import_spacing": "./js/blocks/module-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/module-editor.js?v=20261007_singleface": "./js/blocks/module-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/module-ops.js": "./js/blocks/module-ops.js?v=47a35353f77b80a85d23",
-    "./js/blocks/module-ops.js?v=20261007_m5a": "./js/blocks/module-ops.js?v=47a35353f77b80a85d23",
-    "./js/blocks/module-ops.js?v=20261007_singleface": "./js/blocks/module-ops.js?v=47a35353f77b80a85d23",
-    "./js/blocks/module-plates.js": "./js/blocks/module-plates.js?v=47a35353f77b80a85d23",
-    "./js/blocks/module-plates.js?v=20261007_m5a": "./js/blocks/module-plates.js?v=47a35353f77b80a85d23",
-    "./js/blocks/module-schema.js": "./js/blocks/module-schema.js?v=47a35353f77b80a85d23",
-    "./js/blocks/module-schema.js?v=20261007_singleface": "./js/blocks/module-schema.js?v=47a35353f77b80a85d23",
-    "./js/blocks/motion-range-validation.js": "./js/blocks/motion-range-validation.js?v=47a35353f77b80a85d23",
-    "./js/blocks/motion.js": "./js/blocks/motion.js?v=47a35353f77b80a85d23",
-    "./js/blocks/motor-frame-render.js": "./js/blocks/motor-frame-render.js?v=47a35353f77b80a85d23",
-    "./js/blocks/motor-mounts.js": "./js/blocks/motor-mounts.js?v=47a35353f77b80a85d23",
-    "./js/blocks/motor-orientation.js": "./js/blocks/motor-orientation.js?v=47a35353f77b80a85d23",
-    "./js/blocks/motor-tools.js": "./js/blocks/motor-tools.js?v=47a35353f77b80a85d23",
-    "./js/blocks/mount-surfaces.js": "./js/blocks/mount-surfaces.js?v=47a35353f77b80a85d23",
-    "./js/blocks/node-editor.js": "./js/blocks/node-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/numeric-input.js": "./js/blocks/numeric-input.js?v=47a35353f77b80a85d23",
-    "./js/blocks/orthogonal-joint.js": "./js/blocks/orthogonal-joint.js?v=47a35353f77b80a85d23",
-    "./js/blocks/overlap-picker.js": "./js/blocks/overlap-picker.js?v=47a35353f77b80a85d23",
-    "./js/blocks/panels.js": "./js/blocks/panels.js?v=47a35353f77b80a85d23",
-    "./js/blocks/parallel-gripper-example.js": "./js/blocks/parallel-gripper-example.js?v=47a35353f77b80a85d23",
-    "./js/blocks/parallel-lift-controller.js": "./js/blocks/parallel-lift-controller.js?v=47a35353f77b80a85d23",
-    "./js/blocks/parallel-lift-operations.js": "./js/blocks/parallel-lift-operations.js?v=47a35353f77b80a85d23",
-    "./js/blocks/parallel-lift-workflow.js": "./js/blocks/parallel-lift-workflow.js?v=47a35353f77b80a85d23",
-    "./js/blocks/part-fusion.js": "./js/blocks/part-fusion.js?v=47a35353f77b80a85d23",
-    "./js/blocks/part-geometry.js": "./js/blocks/part-geometry.js?v=47a35353f77b80a85d23",
-    "./js/blocks/part-hole-trace.js": "./js/blocks/part-hole-trace.js?v=47a35353f77b80a85d23",
-    "./js/blocks/part-labels.js": "./js/blocks/part-labels.js?v=47a35353f77b80a85d23",
-    "./js/blocks/part-types.js": "./js/blocks/part-types.js?v=47a35353f77b80a85d23",
-    "./js/blocks/plate-editor.js": "./js/blocks/plate-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/plate-geometry.js": "./js/blocks/plate-geometry.js?v=47a35353f77b80a85d23",
-    "./js/blocks/plate-render.js": "./js/blocks/plate-render.js?v=47a35353f77b80a85d23",
-    "./js/blocks/playback-probe.js": "./js/blocks/playback-probe.js?v=47a35353f77b80a85d23",
-    "./js/blocks/preview-model-inputs.js": "./js/blocks/preview-model-inputs.js?v=47a35353f77b80a85d23",
-    "./js/blocks/project-envelope.js": "./js/blocks/project-envelope.js?v=47a35353f77b80a85d23",
-    "./js/blocks/project-name.js": "./js/blocks/project-name.js?v=47a35353f77b80a85d23",
-    "./js/blocks/rack-limits.js": "./js/blocks/rack-limits.js?v=47a35353f77b80a85d23",
-    "./js/blocks/render-scene.js": "./js/blocks/render-scene.js?v=47a35353f77b80a85d23",
-    "./js/blocks/render.js": "./js/blocks/render.js?v=47a35353f77b80a85d23",
-    "./js/blocks/rigid-gripper.js": "./js/blocks/rigid-gripper.js?v=47a35353f77b80a85d23",
-    "./js/blocks/rigid-group-interface.js": "./js/blocks/rigid-group-interface.js?v=47a35353f77b80a85d23",
-    "./js/blocks/rigid-groups-ui.js": "./js/blocks/rigid-groups-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/rigid-groups.js": "./js/blocks/rigid-groups.js?v=47a35353f77b80a85d23",
-    "./js/blocks/rock-motion.js": "./js/blocks/rock-motion.js?v=47a35353f77b80a85d23",
-    "./js/blocks/schema.js": "./js/blocks/schema.js?v=47a35353f77b80a85d23",
-    "./js/blocks/schema.js?v=20261007_singleface": "./js/blocks/schema.js?v=47a35353f77b80a85d23",
-    "./js/blocks/schema.js?v=face-mount-20261007": "./js/blocks/schema.js?v=47a35353f77b80a85d23",
-    "./js/blocks/sequence-schema.js": "./js/blocks/sequence-schema.js?v=47a35353f77b80a85d23",
-    "./js/blocks/settings.js": "./js/blocks/settings.js?v=47a35353f77b80a85d23",
-    "./js/blocks/simulation-scope.js": "./js/blocks/simulation-scope.js?v=47a35353f77b80a85d23",
-    "./js/blocks/slider-editor.js": "./js/blocks/slider-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/slider-editor.js?v=20261005_sliderui": "./js/blocks/slider-editor.js?v=47a35353f77b80a85d23",
-    "./js/blocks/solve-health.js": "./js/blocks/solve-health.js?v=47a35353f77b80a85d23",
-    "./js/blocks/special-part-render.js": "./js/blocks/special-part-render.js?v=47a35353f77b80a85d23",
-    "./js/blocks/state.js": "./js/blocks/state.js?v=47a35353f77b80a85d23",
-    "./js/blocks/storage.js": "./js/blocks/storage.js?v=47a35353f77b80a85d23",
-    "./js/blocks/storage.js?v=20261007_singleface": "./js/blocks/storage.js?v=47a35353f77b80a85d23",
-    "./js/blocks/support-validation.js": "./js/blocks/support-validation.js?v=47a35353f77b80a85d23",
-    "./js/blocks/syringe-install-preview.js": "./js/blocks/syringe-install-preview.js?v=47a35353f77b80a85d23",
-    "./js/blocks/syringe-install-ui.js": "./js/blocks/syringe-install-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/syringe-installation.js": "./js/blocks/syringe-installation.js?v=47a35353f77b80a85d23",
-    "./js/blocks/syringe-manufacturing.js": "./js/blocks/syringe-manufacturing.js?v=47a35353f77b80a85d23",
-    "./js/blocks/syringe-operations.js": "./js/blocks/syringe-operations.js?v=47a35353f77b80a85d23",
-    "./js/blocks/syringe-placement.js": "./js/blocks/syringe-placement.js?v=47a35353f77b80a85d23",
-    "./js/blocks/syringe-shape.js": "./js/blocks/syringe-shape.js?v=47a35353f77b80a85d23",
-    "./js/blocks/syringe-ui.js": "./js/blocks/syringe-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/tab-nut-coupons.js": "./js/blocks/tab-nut-coupons.js?v=47a35353f77b80a85d23",
-    "./js/blocks/tab-nut-example.js": "./js/blocks/tab-nut-example.js?v=47a35353f77b80a85d23",
-    "./js/blocks/tab-nut-geometry.js": "./js/blocks/tab-nut-geometry.js?v=47a35353f77b80a85d23",
-    "./js/blocks/tab-nut-parameter-ui.js": "./js/blocks/tab-nut-parameter-ui.js?v=47a35353f77b80a85d23",
-    "./js/blocks/tab-nut-plan.js": "./js/blocks/tab-nut-plan.js?v=47a35353f77b80a85d23",
-    "./js/blocks/tab-nut-view.js": "./js/blocks/tab-nut-view.js?v=47a35353f77b80a85d23",
-    "./js/blocks/task-operation-support.js": "./js/blocks/task-operation-support.js?v=47a35353f77b80a85d23",
-    "./js/blocks/teaching-feedback.js": "./js/blocks/teaching-feedback.js?v=47a35353f77b80a85d23",
-    "./js/blocks/tipping-bucket-assembly-validation.js": "./js/blocks/tipping-bucket-assembly-validation.js?v=47a35353f77b80a85d23",
-    "./js/blocks/tipping-bucket-example.js": "./js/blocks/tipping-bucket-example.js?v=47a35353f77b80a85d23",
-    "./js/blocks/tipping-bucket-legacy.js": "./js/blocks/tipping-bucket-legacy.js?v=47a35353f77b80a85d23",
-    "./js/blocks/tipping-bucket-operations.js": "./js/blocks/tipping-bucket-operations.js?v=47a35353f77b80a85d23",
-    "./js/blocks/tipping-bucket-workflow.js": "./js/blocks/tipping-bucket-workflow.js?v=47a35353f77b80a85d23",
-    "./js/blocks/tools.js": "./js/blocks/tools.js?v=47a35353f77b80a85d23",
-    "./js/blocks/transmission-geometry.js": "./js/blocks/transmission-geometry.js?v=47a35353f77b80a85d23",
-    "./js/blocks/transmission-render.js": "./js/blocks/transmission-render.js?v=47a35353f77b80a85d23",
-    "./js/blocks/video-evidence.js": "./js/blocks/video-evidence.js?v=47a35353f77b80a85d23",
-    "./js/blocks/video-export.js": "./js/blocks/video-export.js?v=47a35353f77b80a85d23",
-    "./js/blocks/view.js": "./js/blocks/view.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/chain-3d.js": "./js/blocks3d/chain-3d.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/face-brackets.js": "./js/blocks3d/face-brackets.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/material-scene.js": "./js/blocks3d/material-scene.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/orthogonal-3d.js?v=20261007_m5a": "./js/blocks3d/orthogonal-3d.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/orthogonal-3d.js?v=20261008_bracketalign": "./js/blocks3d/orthogonal-3d.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/orthogonal-3d.js?v=face-mount-20261007": "./js/blocks3d/orthogonal-3d.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/part-pose.js": "./js/blocks3d/part-pose.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/scene-model.js": "./js/blocks3d/scene-model.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/scene-reuse.js": "./js/blocks3d/scene-reuse.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/syringe-scene.js": "./js/blocks3d/syringe-scene.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/tab-nut-hardware.js": "./js/blocks3d/tab-nut-hardware.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/viewer.js": "./js/blocks3d/viewer.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/viewer.js?v=20261007_import_spacing": "./js/blocks3d/viewer.js?v=47a35353f77b80a85d23",
-    "./js/blocks3d/viewer.js?v=20261007_m4b": "./js/blocks3d/viewer.js?v=47a35353f77b80a85d23",
-    "./js/core/bar-fusion.js": "./js/core/bar-fusion.js?v=47a35353f77b80a85d23",
-    "./js/core/chain-drive.js": "./js/core/chain-drive.js?v=47a35353f77b80a85d23",
-    "./js/core/syringe.js": "./js/core/syringe.js?v=47a35353f77b80a85d23",
-    "./js/core/topology.js": "./js/core/topology.js?v=47a35353f77b80a85d23",
-    "./js/core/validation/health-report.js": "./js/core/validation/health-report.js?v=47a35353f77b80a85d23",
-    "./js/core/validation/validate-mechanism.js": "./js/core/validation/validate-mechanism.js?v=47a35353f77b80a85d23",
-    "./js/load-graph.js": "./js/load-graph.js?v=47a35353f77b80a85d23",
-    "./js/module-url.js": "./js/module-url.js?v=47a35353f77b80a85d23",
-    "./js/multilink/solver.js": "./js/multilink/solver.js?v=47a35353f77b80a85d23",
-    "./js/share-codec.js": "./js/share-codec.js?v=47a35353f77b80a85d23",
-    "./js/utils.js": "./js/utils.js?v=47a35353f77b80a85d23",
-    "./js/utils/cam-profile.js": "./js/utils/cam-profile.js?v=47a35353f77b80a85d23",
-    "./js/utils/gear-geometry.js": "./js/utils/gear-geometry.js?v=47a35353f77b80a85d23",
-    "./js/vendor/OrbitControls.js": "./js/vendor/OrbitControls.js?v=47a35353f77b80a85d23",
-    "./js/vendor/mediabunny/mediabunny.mjs": "./js/vendor/mediabunny/mediabunny.mjs?v=47a35353f77b80a85d23",
-    "./js/vendor/shape-utils.js": "./js/vendor/shape-utils.js?v=47a35353f77b80a85d23",
-    "./js/vendor/three.module.js": "./js/vendor/three.module.js?v=47a35353f77b80a85d23",
-    "./js/version-history.js": "./js/version-history.js?v=47a35353f77b80a85d23",
-    "./js/version-info.js": "./js/version-info.js?v=47a35353f77b80a85d23",
-    "./js/version.js": "./js/version.js?v=47a35353f77b80a85d23",
-    "./js/version.js?v=20261008_bracketalign": "./js/version.js?v=47a35353f77b80a85d23",
-    "./test/actuator-ui-browser.js": "./test/actuator-ui-browser.js?v=47a35353f77b80a85d23",
-    "./test/actuator-ui-browser.js?run=": "./test/actuator-ui-browser.js?run=&v=47a35353f77b80a85d23",
-    "./test/box-maker-browser.js": "./test/box-maker-browser.js?v=47a35353f77b80a85d23",
-    "./test/design-isolation-browser.js": "./test/design-isolation-browser.js?v=47a35353f77b80a85d23",
-    "./test/face-wizard-browser.js": "./test/face-wizard-browser.js?v=47a35353f77b80a85d23",
-    "./test/fixtures/actuator-installation.mjs": "./test/fixtures/actuator-installation.mjs?v=47a35353f77b80a85d23",
-    "./test/fixtures/face-bracket-fixture.mjs": "./test/fixtures/face-bracket-fixture.mjs?v=47a35353f77b80a85d23",
-    "./test/fixtures/hinged-syringe.mjs": "./test/fixtures/hinged-syringe.mjs?v=47a35353f77b80a85d23",
-    "./test/fixtures/syringe-end-resize.mjs": "./test/fixtures/syringe-end-resize.mjs?v=47a35353f77b80a85d23",
-    "./test/fixtures/tab-nut-fixture.mjs": "./test/fixtures/tab-nut-fixture.mjs?v=47a35353f77b80a85d23",
-    "./test/gripper-pilot.js": "./test/gripper-pilot.js?v=47a35353f77b80a85d23",
-    "./test/hydraulic-ui-browser.js": "./test/hydraulic-ui-browser.js?v=47a35353f77b80a85d23",
-    "./test/hydraulic-ui-browser.js?run=": "./test/hydraulic-ui-browser.js?run=&v=47a35353f77b80a85d23",
-    "./test/parallel-lift-pilot.js": "./test/parallel-lift-pilot.js?v=47a35353f77b80a85d23",
-    "./test/performance-browser.js": "./test/performance-browser.js?v=47a35353f77b80a85d23",
-    "./test/tab-nut-browser.js": "./test/tab-nut-browser.js?v=47a35353f77b80a85d23",
-    "./test/tipping-bucket-pilot.js": "./test/tipping-bucket-pilot.js?v=47a35353f77b80a85d23",
-    "three": "./js/vendor/three.module.js?v=47a35353f77b80a85d23"
+    "./js/blocks/actuator-install-scene.js": "./js/blocks/actuator-install-scene.js?v=28273516c04a93676005",
+    "./js/blocks/actuator-install-ui.js": "./js/blocks/actuator-install-ui.js?v=28273516c04a93676005",
+    "./js/blocks/actuator-installation.js": "./js/blocks/actuator-installation.js?v=28273516c04a93676005",
+    "./js/blocks/adapter-stl.js": "./js/blocks/adapter-stl.js?v=28273516c04a93676005",
+    "./js/blocks/app.js": "./js/blocks/app.js?v=28273516c04a93676005",
+    "./js/blocks/assembly-lesson-example.js": "./js/blocks/assembly-lesson-example.js?v=28273516c04a93676005",
+    "./js/blocks/assembly-lesson-example.js?v=parallel": "./js/blocks/assembly-lesson-example.js?v=28273516c04a93676005",
+    "./js/blocks/assembly-membership.js": "./js/blocks/assembly-membership.js?v=28273516c04a93676005",
+    "./js/blocks/assembly-roles.js": "./js/blocks/assembly-roles.js?v=28273516c04a93676005",
+    "./js/blocks/assembly-syringe.js": "./js/blocks/assembly-syringe.js?v=28273516c04a93676005",
+    "./js/blocks/assembly-task-validation.js": "./js/blocks/assembly-task-validation.js?v=28273516c04a93676005",
+    "./js/blocks/assembly-view.js": "./js/blocks/assembly-view.js?v=28273516c04a93676005",
+    "./js/blocks/assembly.js": "./js/blocks/assembly.js?v=28273516c04a93676005",
+    "./js/blocks/assembly.js?v=20261007_m5a": "./js/blocks/assembly.js?v=28273516c04a93676005",
+    "./js/blocks/assembly.js?v=20261007_solverguard": "./js/blocks/assembly.js?v=28273516c04a93676005",
+    "./js/blocks/assembly.js?v=face-mount-20261007": "./js/blocks/assembly.js?v=28273516c04a93676005",
+    "./js/blocks/bar-fusion-geometry.js": "./js/blocks/bar-fusion-geometry.js?v=28273516c04a93676005",
+    "./js/blocks/bar-fusion-plan.js": "./js/blocks/bar-fusion-plan.js?v=28273516c04a93676005",
+    "./js/blocks/bar-fusion-ui.js": "./js/blocks/bar-fusion-ui.js?v=28273516c04a93676005",
+    "./js/blocks/bench-ui.js": "./js/blocks/bench-ui.js?v=28273516c04a93676005",
+    "./js/blocks/bench-ui.js?v=20261007_8_final": "./js/blocks/bench-ui.js?v=28273516c04a93676005",
+    "./js/blocks/bench-ui.js?v=20261008_brackets": "./js/blocks/bench-ui.js?v=28273516c04a93676005",
+    "./js/blocks/bench.js": "./js/blocks/bench.js?v=28273516c04a93676005",
+    "./js/blocks/bench.js?v=20261007_m5a": "./js/blocks/bench.js?v=28273516c04a93676005",
+    "./js/blocks/box-config.js": "./js/blocks/box-config.js?v=28273516c04a93676005",
+    "./js/blocks/box-dialog.js": "./js/blocks/box-dialog.js?v=28273516c04a93676005",
+    "./js/blocks/box-files.js": "./js/blocks/box-files.js?v=28273516c04a93676005",
+    "./js/blocks/box-generator.js": "./js/blocks/box-generator.js?v=28273516c04a93676005",
+    "./js/blocks/box-operations.js": "./js/blocks/box-operations.js?v=28273516c04a93676005",
+    "./js/blocks/bracket-layout.js": "./js/blocks/bracket-layout.js?v=28273516c04a93676005",
+    "./js/blocks/bracket-physical.js": "./js/blocks/bracket-physical.js?v=28273516c04a93676005",
+    "./js/blocks/bracket-spec.js": "./js/blocks/bracket-spec.js?v=28273516c04a93676005",
+    "./js/blocks/build-plan.js": "./js/blocks/build-plan.js?v=28273516c04a93676005",
+    "./js/blocks/build-plan.js?v=20261007_7": "./js/blocks/build-plan.js?v=28273516c04a93676005",
+    "./js/blocks/canvas-rulers.js": "./js/blocks/canvas-rulers.js?v=28273516c04a93676005",
+    "./js/blocks/chain-editor.js": "./js/blocks/chain-editor.js?v=28273516c04a93676005",
+    "./js/blocks/chain-manufacturing.js": "./js/blocks/chain-manufacturing.js?v=28273516c04a93676005",
+    "./js/blocks/chain-tools.js": "./js/blocks/chain-tools.js?v=28273516c04a93676005",
+    "./js/blocks/classroom-bridge.js": "./js/blocks/classroom-bridge.js?v=28273516c04a93676005",
+    "./js/blocks/cnc-check.js": "./js/blocks/cnc-check.js?v=28273516c04a93676005",
+    "./js/blocks/collision-actions.js": "./js/blocks/collision-actions.js?v=28273516c04a93676005",
+    "./js/blocks/command-ui.js": "./js/blocks/command-ui.js?v=28273516c04a93676005",
+    "./js/blocks/common-manipulator-examples.js": "./js/blocks/common-manipulator-examples.js?v=28273516c04a93676005",
+    "./js/blocks/connection-descriptor.js": "./js/blocks/connection-descriptor.js?v=28273516c04a93676005",
+    "./js/blocks/connection-editor.js": "./js/blocks/connection-editor.js?v=28273516c04a93676005",
+    "./js/blocks/connection-editor.js?v=20261007_facecolor": "./js/blocks/connection-editor.js?v=28273516c04a93676005",
+    "./js/blocks/connection-selection.js": "./js/blocks/connection-selection.js?v=28273516c04a93676005",
+    "./js/blocks/connection-work.js": "./js/blocks/connection-work.js?v=28273516c04a93676005",
+    "./js/blocks/creation-palette.js": "./js/blocks/creation-palette.js?v=28273516c04a93676005",
+    "./js/blocks/design-focus.js": "./js/blocks/design-focus.js?v=28273516c04a93676005",
+    "./js/blocks/design-guide.js": "./js/blocks/design-guide.js?v=28273516c04a93676005",
+    "./js/blocks/design-tabs-ui.js": "./js/blocks/design-tabs-ui.js?v=28273516c04a93676005",
+    "./js/blocks/design-tabs-ui.js?v=20261005_tabclose": "./js/blocks/design-tabs-ui.js?v=28273516c04a93676005",
+    "./js/blocks/dimension-schema.js": "./js/blocks/dimension-schema.js?v=28273516c04a93676005",
+    "./js/blocks/dimension-ui.js": "./js/blocks/dimension-ui.js?v=28273516c04a93676005",
+    "./js/blocks/dimension-ui.js?v=20261027_dim1": "./js/blocks/dimension-ui.js?v=28273516c04a93676005",
+    "./js/blocks/dimensions.js": "./js/blocks/dimensions.js?v=28273516c04a93676005",
+    "./js/blocks/dof.js": "./js/blocks/dof.js?v=28273516c04a93676005",
+    "./js/blocks/example-controller.js": "./js/blocks/example-controller.js?v=28273516c04a93676005",
+    "./js/blocks/example-controller.js?v=20261005_parallel": "./js/blocks/example-controller.js?v=28273516c04a93676005",
+    "./js/blocks/example-entry.js": "./js/blocks/example-entry.js?v=28273516c04a93676005",
+    "./js/blocks/example-entry.js?v=20261005_unit2": "./js/blocks/example-entry.js?v=28273516c04a93676005",
+    "./js/blocks/examples.js": "./js/blocks/examples.js?v=28273516c04a93676005",
+    "./js/blocks/examples.js?v=20261005_parallel": "./js/blocks/examples.js?v=28273516c04a93676005",
+    "./js/blocks/examples.js?v=20261005_unit2": "./js/blocks/examples.js?v=28273516c04a93676005",
+    "./js/blocks/export-dialog.js": "./js/blocks/export-dialog.js?v=28273516c04a93676005",
+    "./js/blocks/export-scope.js": "./js/blocks/export-scope.js?v=28273516c04a93676005",
+    "./js/blocks/exporters.js": "./js/blocks/exporters.js?v=28273516c04a93676005",
+    "./js/blocks/exporters.js?v=20261007_7": "./js/blocks/exporters.js?v=28273516c04a93676005",
+    "./js/blocks/exporters.js?v=20261007_9": "./js/blocks/exporters.js?v=28273516c04a93676005",
+    "./js/blocks/fabrication-profile.js": "./js/blocks/fabrication-profile.js?v=28273516c04a93676005",
+    "./js/blocks/face-auto-fit.js": "./js/blocks/face-auto-fit.js?v=28273516c04a93676005",
+    "./js/blocks/face-auto-fit.js?v=20261008_bracket3d": "./js/blocks/face-auto-fit.js?v=28273516c04a93676005",
+    "./js/blocks/face-bracket-extras.js": "./js/blocks/face-bracket-extras.js?v=28273516c04a93676005",
+    "./js/blocks/face-bracket-geometry.js": "./js/blocks/face-bracket-geometry.js?v=28273516c04a93676005",
+    "./js/blocks/face-bracket-geometry.js?v=20261008_bracket3d": "./js/blocks/face-bracket-geometry.js?v=28273516c04a93676005",
+    "./js/blocks/face-bracket-geometry.js?v=20261008_bracketalign": "./js/blocks/face-bracket-geometry.js?v=28273516c04a93676005",
+    "./js/blocks/face-candidate-view.js": "./js/blocks/face-candidate-view.js?v=28273516c04a93676005",
+    "./js/blocks/face-candidate.js": "./js/blocks/face-candidate.js?v=28273516c04a93676005",
+    "./js/blocks/face-export.js": "./js/blocks/face-export.js?v=28273516c04a93676005",
+    "./js/blocks/face-mate-examples.js": "./js/blocks/face-mate-examples.js?v=28273516c04a93676005",
+    "./js/blocks/face-mate-prototype.js": "./js/blocks/face-mate-prototype.js?v=28273516c04a93676005",
+    "./js/blocks/face-mate.js": "./js/blocks/face-mate.js?v=28273516c04a93676005",
+    "./js/blocks/face-mount-contract.js": "./js/blocks/face-mount-contract.js?v=28273516c04a93676005",
+    "./js/blocks/face-mount-refresh.js": "./js/blocks/face-mount-refresh.js?v=28273516c04a93676005",
+    "./js/blocks/face-mount.js": "./js/blocks/face-mount.js?v=28273516c04a93676005",
+    "./js/blocks/face-placement.js": "./js/blocks/face-placement.js?v=28273516c04a93676005",
+    "./js/blocks/face-wizard-ui.js": "./js/blocks/face-wizard-ui.js?v=28273516c04a93676005",
+    "./js/blocks/face-wizard-ui.js?v=20261007_singleface": "./js/blocks/face-wizard-ui.js?v=28273516c04a93676005",
+    "./js/blocks/fixed-syringe-examples.js": "./js/blocks/fixed-syringe-examples.js?v=28273516c04a93676005",
+    "./js/blocks/fourbar-measurement.js": "./js/blocks/fourbar-measurement.js?v=28273516c04a93676005",
+    "./js/blocks/frame-stock.js": "./js/blocks/frame-stock.js?v=28273516c04a93676005",
+    "./js/blocks/fusion-controls.js": "./js/blocks/fusion-controls.js?v=28273516c04a93676005",
+    "./js/blocks/fusion-editor.js": "./js/blocks/fusion-editor.js?v=28273516c04a93676005",
+    "./js/blocks/fusion-preview.js": "./js/blocks/fusion-preview.js?v=28273516c04a93676005",
+    "./js/blocks/gear-editor.js": "./js/blocks/gear-editor.js?v=28273516c04a93676005",
+    "./js/blocks/gear-editor.js?v=20261004_fourbar_r1": "./js/blocks/gear-editor.js?v=28273516c04a93676005",
+    "./js/blocks/gripper-controller.js": "./js/blocks/gripper-controller.js?v=28273516c04a93676005",
+    "./js/blocks/gripper-controller.js?v=20260925_r1b2": "./js/blocks/gripper-controller.js?v=28273516c04a93676005",
+    "./js/blocks/gripper-download.js": "./js/blocks/gripper-download.js?v=28273516c04a93676005",
+    "./js/blocks/gripper-download.js?v=20260925_r1b2": "./js/blocks/gripper-download.js?v=28273516c04a93676005",
+    "./js/blocks/gripper-object.js": "./js/blocks/gripper-object.js?v=28273516c04a93676005",
+    "./js/blocks/gripper-object.js?v=20260925_r1b2": "./js/blocks/gripper-object.js?v=28273516c04a93676005",
+    "./js/blocks/gripper-operations.js": "./js/blocks/gripper-operations.js?v=28273516c04a93676005",
+    "./js/blocks/gripper-workflow.js": "./js/blocks/gripper-workflow.js?v=28273516c04a93676005",
+    "./js/blocks/gripper-workflow.js?v=20260925_r1b": "./js/blocks/gripper-workflow.js?v=28273516c04a93676005",
+    "./js/blocks/hydraulic-assembly-example.js": "./js/blocks/hydraulic-assembly-example.js?v=28273516c04a93676005",
+    "./js/blocks/hydraulic-example.js": "./js/blocks/hydraulic-example.js?v=28273516c04a93676005",
+    "./js/blocks/hydraulic-sequence-dialog.js": "./js/blocks/hydraulic-sequence-dialog.js?v=28273516c04a93676005",
+    "./js/blocks/hydraulic-sequence.js": "./js/blocks/hydraulic-sequence.js?v=28273516c04a93676005",
+    "./js/blocks/input.js": "./js/blocks/input.js?v=28273516c04a93676005",
+    "./js/blocks/input.js?v=20261007_m2b": "./js/blocks/input.js?v=28273516c04a93676005",
+    "./js/blocks/intake-contact.js": "./js/blocks/intake-contact.js?v=28273516c04a93676005",
+    "./js/blocks/interference.js": "./js/blocks/interference.js?v=28273516c04a93676005",
+    "./js/blocks/jaw-tip-handle.js": "./js/blocks/jaw-tip-handle.js?v=28273516c04a93676005",
+    "./js/blocks/lesson-check-dialog.js": "./js/blocks/lesson-check-dialog.js?v=28273516c04a93676005",
+    "./js/blocks/lesson-check.js": "./js/blocks/lesson-check.js?v=28273516c04a93676005",
+    "./js/blocks/lesson-sequence-dialog.js": "./js/blocks/lesson-sequence-dialog.js?v=28273516c04a93676005",
+    "./js/blocks/lesson-sequence.js": "./js/blocks/lesson-sequence.js?v=28273516c04a93676005",
+    "./js/blocks/lift-bucket-builder.js": "./js/blocks/lift-bucket-builder.js?v=28273516c04a93676005",
+    "./js/blocks/lift-bucket-example.js": "./js/blocks/lift-bucket-example.js?v=28273516c04a93676005",
+    "./js/blocks/lift-bucket-workflow.js": "./js/blocks/lift-bucket-workflow.js?v=28273516c04a93676005",
+    "./js/blocks/live-interference-status.js": "./js/blocks/live-interference-status.js?v=28273516c04a93676005",
+    "./js/blocks/load-session.js": "./js/blocks/load-session.js?v=28273516c04a93676005",
+    "./js/blocks/mate-candidate.js": "./js/blocks/mate-candidate.js?v=28273516c04a93676005",
+    "./js/blocks/mate-connect.js": "./js/blocks/mate-connect.js?v=28273516c04a93676005",
+    "./js/blocks/mate-connect.js?v=20261007_8_final": "./js/blocks/mate-connect.js?v=28273516c04a93676005",
+    "./js/blocks/mate-tool.js": "./js/blocks/mate-tool.js?v=28273516c04a93676005",
+    "./js/blocks/mate-tool.js?v=20261007_facecolor": "./js/blocks/mate-tool.js?v=28273516c04a93676005",
+    "./js/blocks/mate-wizard-ui.js": "./js/blocks/mate-wizard-ui.js?v=28273516c04a93676005",
+    "./js/blocks/mate-wizard-ui.js?v=20261008_brackets": "./js/blocks/mate-wizard-ui.js?v=28273516c04a93676005",
+    "./js/blocks/material-interference.js": "./js/blocks/material-interference.js?v=28273516c04a93676005",
+    "./js/blocks/material-pose-status.js": "./js/blocks/material-pose-status.js?v=28273516c04a93676005",
+    "./js/blocks/material-voids.js": "./js/blocks/material-voids.js?v=28273516c04a93676005",
+    "./js/blocks/mates-schema.js": "./js/blocks/mates-schema.js?v=28273516c04a93676005",
+    "./js/blocks/mates-view.js": "./js/blocks/mates-view.js?v=28273516c04a93676005",
+    "./js/blocks/mates.js": "./js/blocks/mates.js?v=28273516c04a93676005",
+    "./js/blocks/measurement.js": "./js/blocks/measurement.js?v=28273516c04a93676005",
+    "./js/blocks/mechanism-layer-render.js": "./js/blocks/mechanism-layer-render.js?v=28273516c04a93676005",
+    "./js/blocks/member-copy-dialog.js": "./js/blocks/member-copy-dialog.js?v=28273516c04a93676005",
+    "./js/blocks/member-copy.js": "./js/blocks/member-copy.js?v=28273516c04a93676005",
+    "./js/blocks/member-dimension-render.js": "./js/blocks/member-dimension-render.js?v=28273516c04a93676005",
+    "./js/blocks/member-dimensions.js": "./js/blocks/member-dimensions.js?v=28273516c04a93676005",
+    "./js/blocks/member-editor.js": "./js/blocks/member-editor.js?v=28273516c04a93676005",
+    "./js/blocks/member-stock.js": "./js/blocks/member-stock.js?v=28273516c04a93676005",
+    "./js/blocks/member-sweep.js": "./js/blocks/member-sweep.js?v=28273516c04a93676005",
+    "./js/blocks/model.js": "./js/blocks/model.js?v=28273516c04a93676005",
+    "./js/blocks/module-drag.js": "./js/blocks/module-drag.js?v=28273516c04a93676005",
+    "./js/blocks/module-editor.js": "./js/blocks/module-editor.js?v=28273516c04a93676005",
+    "./js/blocks/module-editor.js?v=20261007_import_spacing": "./js/blocks/module-editor.js?v=28273516c04a93676005",
+    "./js/blocks/module-editor.js?v=20261007_singleface": "./js/blocks/module-editor.js?v=28273516c04a93676005",
+    "./js/blocks/module-ops.js": "./js/blocks/module-ops.js?v=28273516c04a93676005",
+    "./js/blocks/module-ops.js?v=20261007_m5a": "./js/blocks/module-ops.js?v=28273516c04a93676005",
+    "./js/blocks/module-ops.js?v=20261007_singleface": "./js/blocks/module-ops.js?v=28273516c04a93676005",
+    "./js/blocks/module-plates.js": "./js/blocks/module-plates.js?v=28273516c04a93676005",
+    "./js/blocks/module-plates.js?v=20261007_m5a": "./js/blocks/module-plates.js?v=28273516c04a93676005",
+    "./js/blocks/module-schema.js": "./js/blocks/module-schema.js?v=28273516c04a93676005",
+    "./js/blocks/module-schema.js?v=20261007_singleface": "./js/blocks/module-schema.js?v=28273516c04a93676005",
+    "./js/blocks/motion-range-validation.js": "./js/blocks/motion-range-validation.js?v=28273516c04a93676005",
+    "./js/blocks/motion.js": "./js/blocks/motion.js?v=28273516c04a93676005",
+    "./js/blocks/motor-frame-render.js": "./js/blocks/motor-frame-render.js?v=28273516c04a93676005",
+    "./js/blocks/motor-mounts.js": "./js/blocks/motor-mounts.js?v=28273516c04a93676005",
+    "./js/blocks/motor-orientation.js": "./js/blocks/motor-orientation.js?v=28273516c04a93676005",
+    "./js/blocks/motor-tools.js": "./js/blocks/motor-tools.js?v=28273516c04a93676005",
+    "./js/blocks/mount-surfaces.js": "./js/blocks/mount-surfaces.js?v=28273516c04a93676005",
+    "./js/blocks/node-editor.js": "./js/blocks/node-editor.js?v=28273516c04a93676005",
+    "./js/blocks/numeric-input.js": "./js/blocks/numeric-input.js?v=28273516c04a93676005",
+    "./js/blocks/orthogonal-joint.js": "./js/blocks/orthogonal-joint.js?v=28273516c04a93676005",
+    "./js/blocks/overlap-picker.js": "./js/blocks/overlap-picker.js?v=28273516c04a93676005",
+    "./js/blocks/panels.js": "./js/blocks/panels.js?v=28273516c04a93676005",
+    "./js/blocks/parallel-gripper-example.js": "./js/blocks/parallel-gripper-example.js?v=28273516c04a93676005",
+    "./js/blocks/parallel-lift-controller.js": "./js/blocks/parallel-lift-controller.js?v=28273516c04a93676005",
+    "./js/blocks/parallel-lift-operations.js": "./js/blocks/parallel-lift-operations.js?v=28273516c04a93676005",
+    "./js/blocks/parallel-lift-workflow.js": "./js/blocks/parallel-lift-workflow.js?v=28273516c04a93676005",
+    "./js/blocks/part-fusion.js": "./js/blocks/part-fusion.js?v=28273516c04a93676005",
+    "./js/blocks/part-geometry.js": "./js/blocks/part-geometry.js?v=28273516c04a93676005",
+    "./js/blocks/part-hole-trace.js": "./js/blocks/part-hole-trace.js?v=28273516c04a93676005",
+    "./js/blocks/part-labels.js": "./js/blocks/part-labels.js?v=28273516c04a93676005",
+    "./js/blocks/part-types.js": "./js/blocks/part-types.js?v=28273516c04a93676005",
+    "./js/blocks/plate-editor.js": "./js/blocks/plate-editor.js?v=28273516c04a93676005",
+    "./js/blocks/plate-geometry.js": "./js/blocks/plate-geometry.js?v=28273516c04a93676005",
+    "./js/blocks/plate-render.js": "./js/blocks/plate-render.js?v=28273516c04a93676005",
+    "./js/blocks/playback-probe.js": "./js/blocks/playback-probe.js?v=28273516c04a93676005",
+    "./js/blocks/preview-model-inputs.js": "./js/blocks/preview-model-inputs.js?v=28273516c04a93676005",
+    "./js/blocks/project-envelope.js": "./js/blocks/project-envelope.js?v=28273516c04a93676005",
+    "./js/blocks/project-name.js": "./js/blocks/project-name.js?v=28273516c04a93676005",
+    "./js/blocks/rack-limits.js": "./js/blocks/rack-limits.js?v=28273516c04a93676005",
+    "./js/blocks/render-scene.js": "./js/blocks/render-scene.js?v=28273516c04a93676005",
+    "./js/blocks/render.js": "./js/blocks/render.js?v=28273516c04a93676005",
+    "./js/blocks/rigid-gripper.js": "./js/blocks/rigid-gripper.js?v=28273516c04a93676005",
+    "./js/blocks/rigid-group-interface.js": "./js/blocks/rigid-group-interface.js?v=28273516c04a93676005",
+    "./js/blocks/rigid-groups-ui.js": "./js/blocks/rigid-groups-ui.js?v=28273516c04a93676005",
+    "./js/blocks/rigid-groups.js": "./js/blocks/rigid-groups.js?v=28273516c04a93676005",
+    "./js/blocks/rock-motion.js": "./js/blocks/rock-motion.js?v=28273516c04a93676005",
+    "./js/blocks/schema.js": "./js/blocks/schema.js?v=28273516c04a93676005",
+    "./js/blocks/schema.js?v=20261007_singleface": "./js/blocks/schema.js?v=28273516c04a93676005",
+    "./js/blocks/schema.js?v=face-mount-20261007": "./js/blocks/schema.js?v=28273516c04a93676005",
+    "./js/blocks/sequence-schema.js": "./js/blocks/sequence-schema.js?v=28273516c04a93676005",
+    "./js/blocks/settings.js": "./js/blocks/settings.js?v=28273516c04a93676005",
+    "./js/blocks/simulation-scope.js": "./js/blocks/simulation-scope.js?v=28273516c04a93676005",
+    "./js/blocks/slider-editor.js": "./js/blocks/slider-editor.js?v=28273516c04a93676005",
+    "./js/blocks/slider-editor.js?v=20261005_sliderui": "./js/blocks/slider-editor.js?v=28273516c04a93676005",
+    "./js/blocks/solve-health.js": "./js/blocks/solve-health.js?v=28273516c04a93676005",
+    "./js/blocks/special-part-render.js": "./js/blocks/special-part-render.js?v=28273516c04a93676005",
+    "./js/blocks/state.js": "./js/blocks/state.js?v=28273516c04a93676005",
+    "./js/blocks/storage.js": "./js/blocks/storage.js?v=28273516c04a93676005",
+    "./js/blocks/storage.js?v=20261007_singleface": "./js/blocks/storage.js?v=28273516c04a93676005",
+    "./js/blocks/support-validation.js": "./js/blocks/support-validation.js?v=28273516c04a93676005",
+    "./js/blocks/syringe-install-preview.js": "./js/blocks/syringe-install-preview.js?v=28273516c04a93676005",
+    "./js/blocks/syringe-install-ui.js": "./js/blocks/syringe-install-ui.js?v=28273516c04a93676005",
+    "./js/blocks/syringe-installation.js": "./js/blocks/syringe-installation.js?v=28273516c04a93676005",
+    "./js/blocks/syringe-manufacturing.js": "./js/blocks/syringe-manufacturing.js?v=28273516c04a93676005",
+    "./js/blocks/syringe-operations.js": "./js/blocks/syringe-operations.js?v=28273516c04a93676005",
+    "./js/blocks/syringe-placement.js": "./js/blocks/syringe-placement.js?v=28273516c04a93676005",
+    "./js/blocks/syringe-shape.js": "./js/blocks/syringe-shape.js?v=28273516c04a93676005",
+    "./js/blocks/syringe-ui.js": "./js/blocks/syringe-ui.js?v=28273516c04a93676005",
+    "./js/blocks/tab-nut-coupons.js": "./js/blocks/tab-nut-coupons.js?v=28273516c04a93676005",
+    "./js/blocks/tab-nut-example.js": "./js/blocks/tab-nut-example.js?v=28273516c04a93676005",
+    "./js/blocks/tab-nut-geometry.js": "./js/blocks/tab-nut-geometry.js?v=28273516c04a93676005",
+    "./js/blocks/tab-nut-parameter-ui.js": "./js/blocks/tab-nut-parameter-ui.js?v=28273516c04a93676005",
+    "./js/blocks/tab-nut-plan.js": "./js/blocks/tab-nut-plan.js?v=28273516c04a93676005",
+    "./js/blocks/tab-nut-view.js": "./js/blocks/tab-nut-view.js?v=28273516c04a93676005",
+    "./js/blocks/task-operation-support.js": "./js/blocks/task-operation-support.js?v=28273516c04a93676005",
+    "./js/blocks/teaching-feedback.js": "./js/blocks/teaching-feedback.js?v=28273516c04a93676005",
+    "./js/blocks/tipping-bucket-assembly-validation.js": "./js/blocks/tipping-bucket-assembly-validation.js?v=28273516c04a93676005",
+    "./js/blocks/tipping-bucket-example.js": "./js/blocks/tipping-bucket-example.js?v=28273516c04a93676005",
+    "./js/blocks/tipping-bucket-legacy.js": "./js/blocks/tipping-bucket-legacy.js?v=28273516c04a93676005",
+    "./js/blocks/tipping-bucket-operations.js": "./js/blocks/tipping-bucket-operations.js?v=28273516c04a93676005",
+    "./js/blocks/tipping-bucket-workflow.js": "./js/blocks/tipping-bucket-workflow.js?v=28273516c04a93676005",
+    "./js/blocks/tools.js": "./js/blocks/tools.js?v=28273516c04a93676005",
+    "./js/blocks/transmission-geometry.js": "./js/blocks/transmission-geometry.js?v=28273516c04a93676005",
+    "./js/blocks/transmission-render.js": "./js/blocks/transmission-render.js?v=28273516c04a93676005",
+    "./js/blocks/ui-commands.js": "./js/blocks/ui-commands.js?v=28273516c04a93676005",
+    "./js/blocks/video-evidence.js": "./js/blocks/video-evidence.js?v=28273516c04a93676005",
+    "./js/blocks/video-export.js": "./js/blocks/video-export.js?v=28273516c04a93676005",
+    "./js/blocks/view.js": "./js/blocks/view.js?v=28273516c04a93676005",
+    "./js/blocks3d/chain-3d.js": "./js/blocks3d/chain-3d.js?v=28273516c04a93676005",
+    "./js/blocks3d/face-brackets.js": "./js/blocks3d/face-brackets.js?v=28273516c04a93676005",
+    "./js/blocks3d/material-scene.js": "./js/blocks3d/material-scene.js?v=28273516c04a93676005",
+    "./js/blocks3d/orthogonal-3d.js": "./js/blocks3d/orthogonal-3d.js?v=28273516c04a93676005",
+    "./js/blocks3d/orthogonal-3d.js?v=20261007_m5a": "./js/blocks3d/orthogonal-3d.js?v=28273516c04a93676005",
+    "./js/blocks3d/orthogonal-3d.js?v=20261008_bracketalign": "./js/blocks3d/orthogonal-3d.js?v=28273516c04a93676005",
+    "./js/blocks3d/orthogonal-3d.js?v=face-mount-20261007": "./js/blocks3d/orthogonal-3d.js?v=28273516c04a93676005",
+    "./js/blocks3d/part-pose.js": "./js/blocks3d/part-pose.js?v=28273516c04a93676005",
+    "./js/blocks3d/scene-model.js": "./js/blocks3d/scene-model.js?v=28273516c04a93676005",
+    "./js/blocks3d/scene-reuse.js": "./js/blocks3d/scene-reuse.js?v=28273516c04a93676005",
+    "./js/blocks3d/syringe-scene.js": "./js/blocks3d/syringe-scene.js?v=28273516c04a93676005",
+    "./js/blocks3d/tab-nut-hardware.js": "./js/blocks3d/tab-nut-hardware.js?v=28273516c04a93676005",
+    "./js/blocks3d/viewer.js": "./js/blocks3d/viewer.js?v=28273516c04a93676005",
+    "./js/blocks3d/viewer.js?v=20261007_import_spacing": "./js/blocks3d/viewer.js?v=28273516c04a93676005",
+    "./js/blocks3d/viewer.js?v=20261007_m4b": "./js/blocks3d/viewer.js?v=28273516c04a93676005",
+    "./js/core/bar-fusion.js": "./js/core/bar-fusion.js?v=28273516c04a93676005",
+    "./js/core/chain-drive.js": "./js/core/chain-drive.js?v=28273516c04a93676005",
+    "./js/core/syringe.js": "./js/core/syringe.js?v=28273516c04a93676005",
+    "./js/core/topology.js": "./js/core/topology.js?v=28273516c04a93676005",
+    "./js/core/validation/health-report.js": "./js/core/validation/health-report.js?v=28273516c04a93676005",
+    "./js/core/validation/validate-mechanism.js": "./js/core/validation/validate-mechanism.js?v=28273516c04a93676005",
+    "./js/load-graph.js": "./js/load-graph.js?v=28273516c04a93676005",
+    "./js/module-url.js": "./js/module-url.js?v=28273516c04a93676005",
+    "./js/multilink/solver.js": "./js/multilink/solver.js?v=28273516c04a93676005",
+    "./js/share-codec.js": "./js/share-codec.js?v=28273516c04a93676005",
+    "./js/utils.js": "./js/utils.js?v=28273516c04a93676005",
+    "./js/utils/cam-profile.js": "./js/utils/cam-profile.js?v=28273516c04a93676005",
+    "./js/utils/gear-geometry.js": "./js/utils/gear-geometry.js?v=28273516c04a93676005",
+    "./js/vendor/OrbitControls.js": "./js/vendor/OrbitControls.js?v=28273516c04a93676005",
+    "./js/vendor/mediabunny/mediabunny.mjs": "./js/vendor/mediabunny/mediabunny.mjs?v=28273516c04a93676005",
+    "./js/vendor/shape-utils.js": "./js/vendor/shape-utils.js?v=28273516c04a93676005",
+    "./js/vendor/three.module.js": "./js/vendor/three.module.js?v=28273516c04a93676005",
+    "./js/version-history.js": "./js/version-history.js?v=28273516c04a93676005",
+    "./js/version-info.js": "./js/version-info.js?v=28273516c04a93676005",
+    "./js/version.js": "./js/version.js?v=28273516c04a93676005",
+    "./js/version.js?v=20261008_bracketalign": "./js/version.js?v=28273516c04a93676005",
+    "./test/actuator-ui-browser.js": "./test/actuator-ui-browser.js?v=28273516c04a93676005",
+    "./test/actuator-ui-browser.js?run=": "./test/actuator-ui-browser.js?run=&v=28273516c04a93676005",
+    "./test/box-maker-browser.js": "./test/box-maker-browser.js?v=28273516c04a93676005",
+    "./test/design-isolation-browser.js": "./test/design-isolation-browser.js?v=28273516c04a93676005",
+    "./test/face-wizard-browser.js": "./test/face-wizard-browser.js?v=28273516c04a93676005",
+    "./test/fixtures/actuator-installation.mjs": "./test/fixtures/actuator-installation.mjs?v=28273516c04a93676005",
+    "./test/fixtures/face-bracket-fixture.mjs": "./test/fixtures/face-bracket-fixture.mjs?v=28273516c04a93676005",
+    "./test/fixtures/hinged-syringe.mjs": "./test/fixtures/hinged-syringe.mjs?v=28273516c04a93676005",
+    "./test/fixtures/syringe-end-resize.mjs": "./test/fixtures/syringe-end-resize.mjs?v=28273516c04a93676005",
+    "./test/fixtures/tab-nut-fixture.mjs": "./test/fixtures/tab-nut-fixture.mjs?v=28273516c04a93676005",
+    "./test/gripper-pilot.js": "./test/gripper-pilot.js?v=28273516c04a93676005",
+    "./test/hydraulic-ui-browser.js": "./test/hydraulic-ui-browser.js?v=28273516c04a93676005",
+    "./test/hydraulic-ui-browser.js?run=": "./test/hydraulic-ui-browser.js?run=&v=28273516c04a93676005",
+    "./test/parallel-lift-pilot.js": "./test/parallel-lift-pilot.js?v=28273516c04a93676005",
+    "./test/performance-browser.js": "./test/performance-browser.js?v=28273516c04a93676005",
+    "./test/tab-nut-browser.js": "./test/tab-nut-browser.js?v=28273516c04a93676005",
+    "./test/tipping-bucket-pilot.js": "./test/tipping-bucket-pilot.js?v=28273516c04a93676005",
+    "three": "./js/vendor/three.module.js?v=28273516c04a93676005"
   }
 }
 </script>
 <!-- END GENERATED LOAD MAP -->
-<script type="module" src="./js/blocks/app.js?v=47a35353f77b80a85d23"></script>
-<script type="module" src="./js/version-info.js?v=47a35353f77b80a85d23"></script>
+<script type="module" src="./js/blocks/app.js?v=28273516c04a93676005"></script>
+<script type="module" src="./js/version-info.js?v=28273516c04a93676005"></script>
 <dialog id="saveProjectDialog" aria-labelledby="saveProjectTitle" style="border:1px solid #bacddd;border-radius:12px;padding:20px;width:min(360px,calc(100vw - 64px));color:#19354c;">
   <form id="saveProjectForm">
     <h2 id="saveProjectTitle" style="margin:0 0 12px;font-size:20px;">儲存作品</h2>

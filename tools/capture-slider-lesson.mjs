@@ -21,7 +21,7 @@ export async function captureSliderLesson({ ui, tab, browser, baseURL, outputRoo
     report.images.push(name);
   }
   async function check(expected) {
-    await tab.playwright.locator('#btnFitView').click(); await state();
+    await tab.playwright.locator('.controls [data-command="fitView"]').click(); await state();
     await button('☰ 專案').click(); await state();
     await button('檢查 80 mm 推送器').click(); await state();
     const actual = await tab.playwright.locator('[data-lesson-result]').getAttribute('data-lesson-result');

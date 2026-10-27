@@ -31,9 +31,7 @@ export function createDesignGuide({next,frame}) {
   const action=document.getElementById('guideNext'),fix=document.getElementById('guideFrame');
   let step;
   action.addEventListener('click',()=>{
-    root.open=false;
-    document.getElementById('learningMore')?.classList.remove('is-open');
-    document.querySelector('.mobile-more-toggle')?.setAttribute('aria-expanded','false');
+    root.close();
     next(step.stage);
   });
   fix.addEventListener('click',()=>{frame();});

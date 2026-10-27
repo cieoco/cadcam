@@ -1,7 +1,6 @@
 // 量尺（製圖式尺寸標註）D1：兩點距離、離基準線的高度／水平距離、歸零位移；放上就算出全行程最小／最大。
 // 2D 為主：基準是線（地面、經過固定點的水平線／垂直線），世界座標 y 向上。
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
 import * as D from '../js/blocks/dimensions.js';
 import {BLOCK_EXAMPLES} from '../js/blocks/examples.js';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
@@ -87,7 +86,7 @@ ok(base.some(b=>b.kind==='h'&&b.id!=='ground')&&base.some(b=>b.kind==='v'),'也�
 }
 // ---------- 介面 ----------
 {
-  const html=readFileSync(new URL('../blocks.html',import.meta.url),'utf8');
-  ok(/startDimension\(\)/.test(html)&&/量尺/.test(html),'有「量尺」入口');
+  const {COMMANDS}=await import('../js/blocks/ui-commands.js');   // UI-1：入口由指令清單產生（視圖 → 量尺）
+  ok(COMMANDS.some(c=>c.id==='dimension'&&c.group==='view'&&c.run==='window.blocks.startDimension'&&/量尺/.test(c.label)),'有「量尺」入口');
 }
 console.log(`dimensions: ${pass} passed`);

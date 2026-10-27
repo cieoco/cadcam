@@ -239,7 +239,8 @@
     "test/hydraulic-p2-2.mjs",
     "test/hydraulic-p2-3.mjs",
     "test/hydraulic-p2-3b.mjs",
-    "test/parallel-gripper.mjs"
+    "test/parallel-gripper.mjs",
+    "test/ui-commands.mjs"
   ],
   "version": 1
 }

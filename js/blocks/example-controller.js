@@ -8,16 +8,14 @@ import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './
 import { normalizeSnapshot } from './schema.js';
 import { offerExample } from './example-entry.js';
 
-export function createExampleController({ applySnapshot, insertModule, notify, closeMobileMenu, isMobile, showBuildPanel, onLesson = () => {} }) {
+export function createExampleController({ applySnapshot, insertModule, notify, closeExamples = () => {}, isMobile, showBuildPanel, onLesson = () => {} }) {
   let activeExampleId = '';
   let pendingDialog = null;
 
   function requestLoad(id) {
-    const select = document.getElementById('exampleSelect');
-    const example = getExample(id || select?.value);
-    if (select) select.value = '';
+    const example = getExample(id);
     if (!example || pendingDialog) return false;
-    pendingDialog = offerExample({ example, loadExample: load, insertModule, onDismiss: () => { pendingDialog = null; } });
+    pendingDialog = offerExample({ example, loadExample: load, insertModule: moduleId => { closeExamples(); return insertModule(moduleId); }, onDismiss: () => { pendingDialog = null; } });
     return true;
   }
 
@@ -46,8 +44,7 @@ export function createExampleController({ applySnapshot, insertModule, notify, c
   }
 
   function load(id) {
-    const select = document.getElementById('exampleSelect');
-    const example = getExample(id || select?.value);
+    const example = getExample(id);
     if (!example) return false;
     const snapshot = normalizeSnapshot(example.snapshot);
     if (!snapshot) { notify('⚠️ 範例格式不正確'); return false; }
@@ -59,8 +56,7 @@ export function createExampleController({ applySnapshot, insertModule, notify, c
       if (card) card.dataset.lessonVisible = 'false';
     } else renderLessonCard(example);
     notify('📘 已載入：' + example.title);
-    if (select) select.value = '';
-    closeMobileMenu();
+    closeExamples();
     if (isMobile()) showBuildPanel();
     return true;
   }
@@ -78,31 +74,21 @@ export function createExampleController({ applySnapshot, insertModule, notify, c
     renderLessonCard(null);
   }
 
+  // 範例清單（專案 → 範例…）：電腦與手機同一份，依分類列出。
   function populate() {
-    const select = document.getElementById('exampleSelect');
-    const mobileList = document.getElementById('mobileExampleList');
+    const list = document.getElementById('exampleList');
     const groupById = Object.fromEntries(EXAMPLE_GROUPS.map(group => [group.id, group]));
-    const desktopGroups = {};
-    if (select) EXAMPLE_GROUPS.forEach(group => {
-      const optionGroup = document.createElement('optgroup'); optionGroup.label = group.label;
-      desktopGroups[group.id] = optionGroup; select.appendChild(optionGroup);
-    });
     BLOCK_EXAMPLES.forEach(example => {
       const lesson = getExampleLesson(example.id);
       const groupId = groupById[lesson.group] ? lesson.group : 'challenge';
-      if (select) {
-        const option = document.createElement('option'); option.value = example.id;
-        option.textContent = `${lesson.level || '探索'}｜${example.title}`; option.title = lesson.use || example.note || '';
-        (desktopGroups[groupId] || select).appendChild(option);
-      }
-      if (mobileList) {
-        let section = mobileList.querySelector(`[data-example-group="${groupId}"]`);
+      if (list) {
+        let section = list.querySelector(`[data-example-group="${groupId}"]`);
         if (!section) {
-          section = document.createElement('div'); section.className = 'mobile-example-section'; section.dataset.exampleGroup = groupId;
-          const title = document.createElement('div'); title.className = 'mobile-example-group-title'; title.textContent = groupById[groupId]?.label || '挑戰';
-          section.appendChild(title); mobileList.appendChild(section);
+          section = document.createElement('div'); section.className = 'example-section'; section.dataset.exampleGroup = groupId;
+          const title = document.createElement('div'); title.className = 'example-group-title'; title.textContent = groupById[groupId]?.label || '挑戰';
+          section.appendChild(title); list.appendChild(section);
         }
-        const button = document.createElement('button'); button.type = 'button'; button.className = 'mobile-example-btn'; button.textContent = example.title;
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'example-btn'; button.textContent = `${lesson.level || '探索'}｜${example.title}`;
         button.title = lesson.use || example.note || ''; button.addEventListener('click', () => requestLoad(example.id)); section.appendChild(button);
       }
     });

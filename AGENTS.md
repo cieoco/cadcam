@@ -31,7 +31,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 python -m http.server 8000   # 然後開啟 http://localhost:8000
 ```
 
-`index.html` 直接轉址到繪圖工具 `blocks.html`，保留 query 與分享 hash；`teaching.html` 提供學習目錄，由工具的「教學」連結另開。舊版 `mechanism.html` 沒有 `?type=` 參數時顯示機構 chooser；帶 `?type=fourbar`（等）時載入舊機構工作頁。`?mode=wizard` 與 `?template=<id>` 也是舊版 multilink 設計器的參數，不是 blocks 的入口。
+`index.html` 直接轉址到繪圖工具 `blocks.html`，保留 query 與分享 hash；`teaching.html` 提供學習目錄，由工具的「說明 → 教學單元」另開。舊版 `mechanism.html` 沒有 `?type=` 參數時顯示機構 chooser；帶 `?type=fourbar`（等）時載入舊機構工作頁。`?mode=wizard` 與 `?template=<id>` 也是舊版 multilink 設計器的參數，不是 blocks 的入口。
 
 沒有 npm test runner，但已有 `test/*.mjs` Node 驗收腳本，共用 `test/_harness.mjs`；Node 22 以上可直接執行，例如 `node test/slider-crank.mjs`。`node test_blocks_schema.mjs` 驗證 blocks 範例與作品正規化。`test_hull.js` 是獨立幾何腳本。UI 改動仍須透過 HTTP 在瀏覽器實際操作；Node 通過不能替代瀏覽器驗收。
 

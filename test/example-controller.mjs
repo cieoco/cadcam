@@ -14,7 +14,7 @@ class FakeElement {
   focus() {}
 }
 const ids = new Map([
-  ['exampleSelect', new FakeElement('select')], ['exampleLessonCard', new FakeElement()],
+  ['exampleList', Object.assign(new FakeElement(), { querySelector() { return null; } })], ['exampleLessonCard', new FakeElement()],
   ['exampleLessonTitle', new FakeElement()], ['exampleLessonMeta', new FakeElement()],
   ['exampleLessonUse', new FakeElement()], ['exampleLessonLearn', new FakeElement()],
   ['exampleLessonTasks', new FakeElement('ul')]
@@ -30,7 +30,7 @@ const controller = createExampleController({
   closeMobileMenu: () => {}, isMobile: () => false, showBuildPanel: () => {}
 });
 controller.populate();
-check('範例控制器依分類建立桌面選單', ids.get('exampleSelect').children.length > 1 && ids.get('exampleSelect').children.every(child => child.tag === 'optgroup'));
+check('範例控制器依分類建立範例清單（電腦與手機同一份）', ids.get('exampleList').children.length > 1 && ids.get('exampleList').children.every(child => child.className === 'example-section'));
 check('初始化時隱藏教學卡', ids.get('exampleLessonCard').style.display === 'none');
 check('範例 snapshot 可正規化並保留原本 30 mm 曲柄', controller.load('fourbar-crank-rocker') && applied?.comps?.length > 0 && applied.params?.LL1 === 30);
 check('載入後更新教學卡與通知', ids.get('exampleLessonCard').style.display === '' && ids.get('exampleLessonTitle').textContent.includes('四連桿') && message.includes('已載入'));
@@ -51,8 +51,7 @@ controller.restoreLesson('');
 check('復原到非課程作品會清除任務', controller.activeExampleId === '');
 globalThis.window = { document: globalThis.document };
 const previous = applied;
-ids.get('exampleSelect').value = 'parallel-fourbar';
-check('選單要求載入時不套用且清空選項', controller.requestLoad() && applied === previous && ids.get('exampleSelect').value === '');
+check('清單要求載入時先詢問、不直接套用', controller.requestLoad('parallel-fourbar') && applied === previous);
 check('對話框開啟時不重複建立', controller.requestLoad('gear-gripper') === false && document.body.children.length === 1);
 const pending = document.body.children[0];
 pending.children.find(e => e.textContent === '保留目前作品').onclick();

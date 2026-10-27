@@ -1,4 +1,5 @@
 import * as View from './view.js';
+import { setCommandState } from './command-ui.js';
 
 // 1、2、5 系列；至少保留約半個目標寬度，數字不隨裝置像素密度改變。
 export function rulerStep(pxPerMm, target = 90) {
@@ -28,18 +29,14 @@ export function createCanvasRulers(svg) {
   overlay.setAttribute('aria-hidden', 'true');
   host.append(overlay);
   const mobile = matchMedia('(max-width:700px), (max-width:1099px) and (max-height:500px)');
-  const button = document.getElementById('mobileBtnRulers');
-  let mobileFull = false, pending = false;
+  let full = null, pending = false;   // null＝依裝置：電腦完整尺規、手機只留比例尺；按「尺規」後依使用者
+  const isFull = () => full ?? !mobile.matches;
   const schedule = () => {
     if (pending) return;
     pending = true;
     requestAnimationFrame(() => { pending = false; update(); });
   };
-  button.addEventListener('click', () => {
-    mobileFull = !mobileFull;
-    button.setAttribute('aria-pressed', String(mobileFull));
-    schedule();
-  });
+  const sync = () => { setCommandState('rulers', isFull()); schedule(); };
   const add = (tag, attrs, text = '') => {
     const el = document.createElementNS(overlay.namespaceURI, tag);
     for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
@@ -67,7 +64,7 @@ export function createCanvasRulers(svg) {
     overlay.setAttribute('viewBox', `0 0 ${width} ${height}`);
     overlay.replaceChildren();
     const step = rulerStep(px);
-    if (mobile.matches && !mobileFull) {
+    if (!isFull()) {
       const length = step * px, y = height - 24;
       add('rect', { x: 6, y: y - 12, width: length + 16, height: 34, rx: 4, class: 'ruler-back' });
       add('path', { d: `M 14 ${y - 5} v 5 h ${length} v -5`, class: 'ruler-line' });
@@ -105,7 +102,8 @@ export function createCanvasRulers(svg) {
   const mode = new MutationObserver(schedule);
   mode.observe(document.body, { attributes: true, attributeFilter: ['data-mode', 'data-mobile-panel'] });
   mode.observe(document.getElementById('view3d'), { attributes: true, attributeFilter: ['style', 'class'] });
-  mobile.addEventListener('change', schedule);
+  mobile.addEventListener('change', sync);
   window.addEventListener('resize', schedule);
-  schedule();
+  sync();
+  return () => { full = !isFull(); sync(); };
 }

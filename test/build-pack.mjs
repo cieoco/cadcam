@@ -64,8 +64,8 @@ check('HTML：註明輪轂／舵盤尺寸與干涉尚未實物驗證', /實(物|
 
 // 接到 UI
 import { readFileSync } from 'node:fs';
-const page = readFileSync(new URL('../blocks.html', import.meta.url), 'utf8');
 const app = readFileSync(new URL('../js/blocks/app.js', import.meta.url), 'utf8');
-check('匯出區有「製作包」按鈕', /window\.blocks\.downloadBuildPack\(\)/.test(page) && page.includes('製作包'));
+const { COMMANDS } = await import('../js/blocks/ui-commands.js');   // UI-1：按鈕由指令清單產生（專案 → 製作包）
+check('專案區有「製作包」按鈕', COMMANDS.some(c => c.id === 'buildPack' && c.group === 'project' && c.label === '製作包' && c.run === 'window.blocks.downloadBuildPack'));
 check('window.blocks 暴露 downloadBuildPack', /downloadBuildPack\s*[,}]/.test(app.slice(app.indexOf('window.blocks = {'))));
 report('build-pack');
