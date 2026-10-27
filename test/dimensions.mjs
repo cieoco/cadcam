@@ -34,7 +34,8 @@ ok(base.some(b=>b.kind==='h'&&b.id!=='ground')&&base.some(b=>b.kind==='v'),'也�
   const scan=Op.scanSyringe(g.comps,g.params,'H3Syringe',0.5).samples.map(s=>s.tipGap);
   ok(r.ok&&r.input.kind==='syringe'&&r.input.unit==='mm'&&r.input.from===0&&r.input.to===20,'H03 以針筒伸出量 0–20 mm 掃描');
   ok(near(r.min,Math.min(...scan),0.05)&&near(r.max,Math.max(...scan),0.05),`夾口最小 ${r.min?.toFixed(1)}／最大 ${r.max?.toFixed(1)} mm（與夾臂端距一致）`);
-  ok(near(r.minAt,20,0.5)&&near(r.maxAt,0,0.5),'並告訴你最小、最大發生在哪個輸入值');
+  const at=v=>scan.indexOf(v)*0.5;
+  ok(near(r.minAt,at(Math.min(...scan)),0.5)&&near(r.maxAt,at(Math.max(...scan)),0.5),`並告訴你最小、最大發生在哪個伸出量（${r.minAt} / ${r.maxAt} mm）`);
   ok(near(D.measureDimension(dim,g.comps,g.params,pts(g)).value,Math.hypot(a.x-b.x,a.y-b.y),1e-9),'目前值＝兩點距離');
 }
 // ---------- 高度：H02 臂端離地 ----------
