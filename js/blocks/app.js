@@ -5,6 +5,7 @@ import {planSyringeAttachmentResize} from '../core/syringe.js';
 import {assemblySyringeShapes} from '../blocks3d/syringe-scene.js';
 import {createSyringeUI} from './syringe-ui.js';
 let hydraulic=null;
+let dimUI = null;   // 量尺介面（懶載入）
 import {assemblyWork,designIds,assemblyFamily,changeAssemblyMembership,normalizeAssemblyMembers} from './assembly-membership.js';
 import {faceCandidateModel} from './face-candidate.js';
 import {validateAssemblyTask} from './assembly-task-validation.js';
@@ -256,7 +257,8 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組
   if(source!=='undo'){closedDesignTabs.clear();closedAssemblies.clear();}
   if (source !== 'undo') S.designFocus = source === 'local-autosave' ? savedFocus() : null;   // 開檔／範例／分享 → 第一頁；自動還原 → 回到上次那頁
-  S.topo = { lessonSequence: norm.lessonSequence || null, hydraulicSequence: norm.hydraulicSequence || null, assemblyMembers: norm.assemblyMembers ?? designIds(S.comps,S.modules), projectName: norm.projectName || '', rootDesignName: norm.rootDesignName || (!S.modules.length ? norm.projectName : '') || '', params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '' };
+  S.topo = { lessonSequence: norm.lessonSequence || null, hydraulicSequence: norm.hydraulicSequence || null, assemblyMembers: norm.assemblyMembers ?? designIds(S.comps,S.modules), projectName: norm.projectName || '', rootDesignName: norm.rootDesignName || (!S.modules.length ? norm.projectName : '') || '', params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '', dimensions: norm.dimensions || [] };
+  if (source !== 'undo') dimUI?.reset();
   manualTrace = {};
   S.counter = Math.max(norm.counter || 0, Store.highestIdNum(S.comps));
   S.theta = 0;
@@ -2011,6 +2013,9 @@ function drawNow() {
   Tools.drawPolygonPreview();  // 多邊形板模式：疊在最上層的預覽
   chainEditor?.drawPreview();  // 鏈輪放置模式：第一個鏈輪與對齊後的第二個鏈輪預覽
   hydraulic?.render(allPts,sol?.isValid===true);
+  if (S.topo.dimensions?.length && !dimUI) loadDimUI();
+  const updateDims = dimUI?.render(allPts);   // 量尺：標註層疊在最上面，播放時逐幀更新
+  if (updateDims) frameUpdaters.push(updateDims);
 
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
   // polygons 一併帶上：3D 用它把三點桿畫成實心板，並過濾掉與三角板邊重疊的桿（避免分身）。
@@ -2429,7 +2434,8 @@ function clearAll() {
   document.getElementById('servoEditor').style.display = 'none';
   document.getElementById('strokeEditor').style.display = 'none';
   document.getElementById('solveBanner').style.display = 'none';
-  S.topo = { assemblyMembers: [], params: { theta: 0 }, tracePoint: '', tracePoints: [], referencePoint: '' };
+  S.topo = { assemblyMembers: [], params: { theta: 0 }, tracePoint: '', tracePoints: [], referencePoint: '', dimensions: [] };
+  dimUI?.reset();
   Settings.applyFabricationProfile(Settings.legacyLocalFabrication(), { source: '新作品：已帶入此瀏覽器的舊加工偏好' });
   manualTrace = {};
   document.getElementById('thetaVal').textContent = '0';
@@ -3388,6 +3394,20 @@ if (gripperPilotSession) window.blocks.gripperPilot = {
 hydraulic=createSyringeUI({is3D:()=>view3DActive,capture:()=>{viewer3D.renderNow();return viewer3D.canvas;},svg,comps:viewComps,points:()=>lastFullPts,seed:pts=>{lastSolved={...pts};prevSolved={...pts};},pushUndo,pause,rebuild,draw,save:scheduleAutosave,notify:transient,applyFabrication:Settings.applyFabricationProfile,
   playing:on=>{playbackActive=on;const b=document.getElementById('playBtn');b.classList.toggle('playing',on);b.textContent=on?'⏸':'▶';}
 });
+// 量尺（js/blocks/dimension-ui.js）：第一次用到才載入，不佔啟動大小。
+let dimLoading = null;
+function loadDimUI() {
+  return dimLoading ??= import('./dimension-ui.js?v=20261027_dim1').then(m => {
+    dimUI = m.createDimensionUI({ svg, comps: viewComps, scopeComps: () => simulationScope().comps, points: () => lastFullPts,
+      pushUndo, save: scheduleAutosave, notify: transient, draw, pause, version: () => geomVersion,
+      dragging: () => !!(S.dragId || S.dragFrame || S.dragLinkId), inputRange: () => inputRockRange(),
+      frozenAngles: frozenMotorAngles, motion: () => ({ thetaDeg: S.theta, motorAngles: motorAnglesNow() }) });
+    draw();
+    return dimUI;
+  }, e => { dimLoading = null; transient('量尺載入失敗'); throw e; });
+}
+window.blocks.startDimension = async pointId => (await loadDimUI()).start(typeof pointId === 'string' ? pointId : undefined);
+window.blocks.startDimensionFromNode = () => window.blocks.startDimension(S.selectedNodeId || undefined);
 window.blocks.addSyringe=hydraulic.add;
 window.blocks.addFixedSyringe=hydraulic.addFixed;
 init();

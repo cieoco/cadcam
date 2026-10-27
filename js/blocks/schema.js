@@ -5,6 +5,7 @@ import {migrateH03RigidGrip} from './rigid-gripper.js';
 import { normalizeLessonSequence, normalizeHydraulicSequence } from './sequence-schema.js';
 import {normalizeAssemblyMembers} from './assembly-membership.js';
 import {normalizeSyringe} from '../core/syringe.js';
+import {normalizeDimensions} from './dimension-schema.js';
 import {pitchDiameter,TEETH_MIN,TEETH_MAX,checkChainDrive} from '../core/chain-drive.js';
 /**
  * blocks / schema
@@ -343,6 +344,8 @@ export function toSnapshot(comps, topo, counter, motor) {
   if (tracePoints.length === 1) snapshot.tracePoint = tracePoints[0]; // 舊欄位相容：單點檔案仍好讀。
   if (tracePoints.length) snapshot.tracePoints = tracePoints;
   if (safeId(topo?.referencePoint)) snapshot.referencePoint = topo.referencePoint;
+  const dimensions = normalizeDimensions(topo?.dimensions);
+  if (dimensions.length) snapshot.dimensions = dimensions;
   if (motor?.fabrication) snapshot.fabrication = clone(motor.fabrication);
   // 模組（選配）：沒有模組時不輸出，舊檔逐位元組不變（SDD-ASSEMBLY-MODULES §3.1／§4.1）。
   if (Array.isArray(motor?.modules) && motor.modules.length) snapshot.modules = clone(motor.modules);
@@ -641,7 +644,8 @@ export function normalizeSnapshot(obj) {
   }
   const projectName=normalizeProjectName(obj.projectName==='H03 針筒夾具／被動夾片'?'H03 針筒夾具／一體式夾臂':obj.projectName);
   const hydraulicSequence=normalizeHydraulicSequence(obj.hydraulicSequence,cleanComps.filter(c=>c.type==='syringe').map(c=>c.id));
-  return { lessonSequence:normalizeLessonSequence(obj.lessonSequence), ...(hydraulicSequence?{hydraulicSequence}:{}), ...(Array.isArray(obj.assemblyMembers)?{assemblyMembers:normalizeAssemblyMembers(obj.assemblyMembers,cleanComps,modulesResult.modules)}:{}), ...(projectName?{projectName}:{}), ...(normalizeProjectName(obj.rootDesignName)?{rootDesignName:normalizeProjectName(obj.rootDesignName==='H03 針筒夾具／被動夾片'?'H03 針筒夾具／一體式夾臂':obj.rootDesignName)}:{}), comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
+  const dimensions = normalizeDimensions(obj.dimensions);
+  return { ...(dimensions.length?{dimensions}:{}), lessonSequence:normalizeLessonSequence(obj.lessonSequence), ...(hydraulicSequence?{hydraulicSequence}:{}), ...(Array.isArray(obj.assemblyMembers)?{assemblyMembers:normalizeAssemblyMembers(obj.assemblyMembers,cleanComps,modulesResult.modules)}:{}), ...(projectName?{projectName}:{}), ...(normalizeProjectName(obj.rootDesignName)?{rootDesignName:normalizeProjectName(obj.rootDesignName==='H03 針筒夾具／被動夾片'?'H03 針筒夾具／一體式夾臂':obj.rootDesignName)}:{}), comps: cleanComps, params, counter, tracePoint, tracePoints, referencePoint, activeMotor, motorAngles,
     fabrication: fabricationResult.status === 'present' ? fabricationResult.profile : null, modules: modulesResult.modules, warnings };
 }
 

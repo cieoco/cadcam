@@ -21,6 +21,7 @@
     "test/tab-nut-geometry.mjs",
     "test/member-copy.mjs",
     "test/canvas-rulers.mjs",
+    "test/dimensions.mjs",
     "test/bar-fusion.mjs",
     "test/actuator-installation.mjs",
     "test/syringe.mjs",
