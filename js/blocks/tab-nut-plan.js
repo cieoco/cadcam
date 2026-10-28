@@ -3,30 +3,35 @@ import {buildMountSurfaces,findMountSurface} from './mount-surfaces.js';
 import {planTabNutGeometry,ringDistance} from './tab-nut-geometry.js';
 import {isFixedMountPart} from './part-types.js';
 import {readConnectionDescriptor} from './connection-descriptor.js';
-import {boxPanelGeometry} from './box-config.js';
+import {boxPanelGeometry} from './box-contract.js';
 
 export const hasTabNut=modules=>(modules||[]).some(m=>m.mount?.face?.selection?.fastener);
-function rawPlan(comps,modules,params,mod,opts){
-  if(!mod.mount?.face?.selection?.fastener)return null;
+function rawPlan(comps,modules,params,mod,opts,over={}){
+  if(!mod.mount?.face?.selection?.fastener||!over.id&&comps.find(c=>c.id===mod.mount.face.childPart)?.boxPanel?.role==='lid')return null;
   const fail=reason=>({ok:false,reason,moduleId:mod.id,connectionId:`connection:${mod.id}`});
-  const d=readConnectionDescriptor({comps,modules,childId:mod.id});
+  const d=readConnectionDescriptor({comps,modules,childId:mod.id,mount:mod.mount});
   if(!d.ok)return fail(d.diagnostics[0]?.message||'接合參照無效。');
   const parts=[d.host.partId,d.child.partId].map(id=>comps.find(c=>c.id===id));
   if(parts.some(c=>!c||!['bar','triangle'].includes(c.type)||!isFixedMountPart(c)||c.barFusion||c.barFusionRoot||c.fusedWith))return fail('榫槽試作只支援獨立固定桿／板；自動機架、活動件與合成件請使用其他接法。');
   const surfaces=(moduleId,partId)=>buildMountSurfaces({comps,modules,params,moduleId,partId,exportSettings:opts.exportSettings||{},thicknessMm:opts.stockMm||3,drilling:true}).surfaces||[];
-  const host=findMountSurface(surfaces(d.host.moduleId),mod.mount.to),child=surfaces(mod.id,d.child.partId).find(s=>s.compId===d.child.partId);
+  const host=findMountSurface(surfaces(d.host.moduleId),mod.mount.to),child=over.child||surfaces(mod.id,d.child.partId).find(s=>s.compId===d.child.partId);
   if(!host||!child)return fail('找不到實際接合板件。');
-  return {...planTabNutGeometry({host,child,face:mod.mount.face,connectionId:d.id}),host,child,moduleId:mod.id};
+  return {...planTabNutGeometry({host,child,face:mod.mount.face,connectionId:over.id||d.id}),host,child,moduleId:mod.id};
 }
 export function tabNutPlans(comps,modules,params,opts={}){
   const plans=modules.map(m=>rawPlan(comps,modules,params,m,opts)).filter(Boolean);
+  // Lid closure joints are derived (fabrication only); the side outline already carries its base-end tabs.
+  for(const lid of comps)for(const [role,face] of Object.entries(lid.boxPanel?.closures||{})){
+    const side=comps.find(c=>c.boxPanel?.rootPart===lid.boxPanel.rootPart&&c.boxPanel.role===role),mod=modules.find(m=>m.id===side?.moduleId),low=plans.find(q=>q.child?.compId===side?.id),g=low?.childGeometry;
+    if(mod&&low?.ok)plans.push({...rawPlan(comps,modules,params,{...mod,mount:{to:{module:lid.moduleId,output:'panel'},face}},opts,{id:`connection:${mod.id}/lid`,child:{...low.child,outlines:g.outlines,outline:g.outlines[0]}})||{ok:false,reason:'上蓋接合無效。'},moduleId:lid.moduleId});
+  }
   for(let i=0;i<plans.length;i++)for(let j=i+1;j<plans.length;j++){
     const a=plans[i],b=plans[j];if(!a.ok||!b.ok)continue;
     for(const ak of ['host','child'])for(const bk of ['host','child'])if(a[ak].compId===b[bk].compId&&a.features[ak].some(r=>b.features[bk].some(s=>ringDistance(r,s)<Math.max(a.settings.minWebMm,b.settings.minWebMm)))){
       a.ok=b.ok=false;a.reason=b.reason='榫槽與另一筆接合太近；請移動接合位置。';
     }
-    // Outer-edge edits are deliberately single-owner until multi-edge composition is verified.
-    if(a.child.compId===b.child.compId){a.ok=b.ok=false;a.reason=b.reason='同一立板暫只支援一筆榫槽外框修改。';}
+    // One owner per edge of a child plate.
+    if(a.child.compId===b.child.compId&&a.edgeKey===b.edgeKey){a.ok=b.ok=false;a.reason=b.reason='同一立板暫只支援一筆榫槽外框修改。';}
   }
   return plans;
 }

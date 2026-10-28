@@ -426,7 +426,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     });
   });
 
-  for(const p of orthoExtras.tabNutPlans || [])if(p.ok)joints.push({id:`TAB-${p.moduleId}`,kind:'tab-nut',jointKind:'tab-nut-m3',parts:[p.host.compId,p.child.compId],layers:[],spanMm:p.settings.screwLengthMm,holeDiameterMm:p.settings.clearanceDiameterMm,spacers:[],settings:p.settings});
+  for(const p of orthoExtras.tabNutPlans || [])if(p.ok)for(const q of p.sets)joints.push({id:`TAB-${q.connectionId.replace('connection:','')}`,kind:'tab-nut',jointKind:'tab-nut-m3',parts:[p.host.compId,p.child.compId],layers:[],spanMm:q.settings.screwLengthMm,holeDiameterMm:q.settings.clearanceDiameterMm,spacers:[],settings:q.settings});
 
   // ---- 4. 馬達 ----
   const motors = [...motorIds].map(centerId => {

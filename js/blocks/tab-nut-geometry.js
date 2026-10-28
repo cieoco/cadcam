@@ -14,6 +14,8 @@ export function normalizeTabNut(raw){
     if(typeof value==='number'&&(typeof v!=='number'||!Number.isFinite(v)||Math.abs(v)>1000||key!=='alongMm'&&v<=0))return null;
     out[key]=v;
   }
+  const more=raw.moreAlongMm;
+  if(more!==undefined){if(!Array.isArray(more)||more.length>5||!more.every((v,i)=>Math.abs(v)<1e3&&v>(i?more[i-1]:out.alongMm)))return null;out.moreAlongMm=[...more];}
   if(out.slotClearanceMm>.5||out.nutClearanceMm>.5||out.minWebMm<3||out.headDiameterMm>out.washerDiameterMm)return null;
   if(out.screwDiameterMm!==3||out.clearanceDiameterMm<=3||out.clearanceDiameterMm>=out.nutAcrossMm||out.nutCenterMm<=out.nutHeightMm/2+out.nutClearanceMm||out.tabPitchMm<=out.tabWidthMm+out.nutAcrossMm+2*out.minWebMm)return null;
   return out;
@@ -53,39 +55,43 @@ export function planTabNutGeometry({host,child,face,connectionId='tab-nut',setti
   const tHost=host.box.max.z-host.box.min.z,tChild=child.box.max.z-child.box.min.z;
   if(![tHost,tChild].every(t=>Number.isFinite(t)&&t>=2.5&&t<=3.5))return fail('此試作適用公稱 3 mm 板；請核對兩片實際板厚（2.5–3.5 mm），不會自動修改板厚。');
   const edge=tabNutEdge(child,s.childFace);if(!edge)return fail('所選面不是唯一真實直板邊；請選直邊，不能用外框包圍盒代替。');
-  const center=edge.length/2+p.alongMm,halfPitch=p.tabPitchMm/2,halfTab=p.tabWidthMm/2;
-  if(center-halfPitch-halfTab<p.minWebMm||edge.length-center-halfPitch-halfTab<p.minWebMm)return fail('直邊太短或位置太靠邊，無法保留雙榫兩側材料。');
-  const pos=(u,v)=>({x:edge.a.x+edge.u.x*(center+u)+edge.v.x*v,y:edge.a.y+edge.u.y*(center+u)+edge.v.y*v});
-  const project=(u,v,z=0)=>transformMatePoint(face,{...pos(u,v),z});
-  const root=project(0,0),hostZ=s.hostFace==='top'?host.box.max.z:host.box.min.z;
-  if(Math.abs(root.z-hostZ)>eps)return fail('立板肩部尚未貼合承接板面。');
   const tip=p.screwLengthMm-tHost-p.washerThicknessMm,nutLo=p.nutCenterMm-(p.nutHeightMm+p.nutClearanceMm)/2,nutHi=p.nutCenterMm+(p.nutHeightMm+p.nutClearanceMm)/2;
   if(tip<nutHi+.5-eps)return fail('螺絲太短，必須穿滿螺母並至少露出一牙。');
-  const top=tip+p.endClearanceMm,b=p.clearanceDiameterMm/2,n=(p.nutAcrossMm+p.nutClearanceMm)/2;
+  const top=tip+p.endClearanceMm,b=p.clearanceDiameterMm/2,n=(p.nutAcrossMm+p.nutClearanceMm)/2,halfPitch=p.tabPitchMm/2,halfTab=p.tabWidthMm/2;
   if(top<nutHi||p.washerDiameterMm<p.clearanceDiameterMm+1||p.headDiameterMm<=3)return fail('螺絲、墊片或末端避空設定不合法。');
-  const notch=[[-b,0],[-b,nutLo],[-n,nutLo],[-n,nutHi],[-b,nutHi],[-b,top],[b,top],[b,nutHi],[n,nutHi],[n,nutLo],[b,nutLo],[b,0]].map(([u,v])=>pos(u,v));
-  const zone=rect(-n,eps,n,top).map(q=>pos(q.x,q.y));
-  if(!zone.every(q=>inside(q,edge.ring))||!featureClear(zone,child,p.minWebMm,{edge:true}))return fail('螺母／螺絲槽會切到既有孔槽或超出立板。');
-  const otherEdges=edges(edge.ring).filter((_,i)=>i!==edge.index);
-  if(boundaryDistance(zone,otherEdges)<p.minWebMm-eps)return fail('螺絲末端或螺母槽距離板外緣太近。');
-  const path=[edge.a];
-  for(const x of [-halfPitch,halfPitch]){
-    if(x>0)path.push(...notch);
-    path.push(pos(x-halfTab,0),pos(x-halfTab,-tHost),pos(x+halfTab,-tHost),pos(x+halfTab,0));
-    const tabZone=rect(x-halfTab,eps,x+halfTab,p.minWebMm).map(q=>pos(q.x,q.y));
-    if(!tabZone.every(q=>inside(q,edge.ring))||boundaryDistance(tabZone,otherEdges)<p.minWebMm-eps||!featureClear(tabZone,child,p.minWebMm,{edge:true}))return fail('定位榫根部距離板外緣或既有孔槽太近。');
+  const otherEdges=edges(edge.ring).filter((_,i)=>i!==edge.index),offsets=[p.alongMm,...(p.moreAlongMm||[])],path=[edge.a],sets=[],hostRings=[],slots=[],holes=[],childRings=[];
+  for(const [si,along] of offsets.entries()){
+    const center=edge.length/2+along,id=si?`${connectionId}/set:${si}`:connectionId;
+    if(si&&along-offsets[si-1]<p.tabPitchMm+p.tabWidthMm+p.slotClearanceMm+p.minWebMm)return fail('卡榫組數太多，相鄰兩組放不下。');
+    if(center-halfPitch-halfTab<p.minWebMm||edge.length-center-halfPitch-halfTab<p.minWebMm)return fail('直邊太短或位置太靠邊，無法保留雙榫兩側材料。');
+    const pos=(u,v)=>({x:edge.a.x+edge.u.x*(center+u)+edge.v.x*v,y:edge.a.y+edge.u.y*(center+u)+edge.v.y*v});
+    const project=(u,v,z=0)=>transformMatePoint(face,{...pos(u,v),z});
+    const root=project(0,0),hostZ=s.hostFace==='top'?host.box.max.z:host.box.min.z;
+    if(Math.abs(root.z-hostZ)>eps)return fail('立板肩部尚未貼合承接板面。');
+    const notch=[[-b,0],[-b,nutLo],[-n,nutLo],[-n,nutHi],[-b,nutHi],[-b,top],[b,top],[b,nutHi],[n,nutHi],[n,nutLo],[b,nutLo],[b,0]].map(([u,v])=>pos(u,v));
+    const zone=rect(-n,eps,n,top).map(q=>pos(q.x,q.y));
+    if(!zone.every(q=>inside(q,edge.ring))||!featureClear(zone,child,p.minWebMm,{edge:true}))return fail('螺母／螺絲槽會切到既有孔槽或超出立板。');
+    if(boundaryDistance(zone,otherEdges)<p.minWebMm-eps)return fail('螺絲末端或螺母槽距離板外緣太近。');
+    for(const x of [-halfPitch,halfPitch]){
+      if(x>0)path.push(...notch);
+      path.push(pos(x-halfTab,0),pos(x-halfTab,-tHost),pos(x+halfTab,-tHost),pos(x+halfTab,0));
+      const tabZone=rect(x-halfTab,eps,x+halfTab,p.minWebMm).map(q=>pos(q.x,q.y));
+      if(!tabZone.every(q=>inside(q,edge.ring))||boundaryDistance(tabZone,otherEdges)<p.minWebMm-eps||!featureClear(tabZone,child,p.minWebMm,{edge:true}))return fail('定位榫根部距離板外緣或既有孔槽太近。');
+      childRings.push(rect(x-halfTab,-tHost,x+halfTab,p.minWebMm).map(q=>pos(q.x,q.y)));
+    }
+    slots.push(...[-halfPitch,halfPitch].map((x,i)=>({id:`${id}/slot:${i}`,layer:'TAB_NUT_SLOT',points:rect(x-halfTab-p.slotClearanceMm/2,-(tChild+p.slotClearanceMm)/2,x+halfTab+p.slotClearanceMm/2,(tChild+p.slotClearanceMm)/2).map(q=>{const h=project(q.x,0,q.y);return {x:h.x,y:h.y};})})));
+    const hole={id:`${id}/bolt`,x:root.x,y:root.y,r:b,layer:'TAB_NUT_BOLT'};
+    holes.push(hole);hostRings.push(Array.from({length:48},(_,i)=>({x:hole.x+b*Math.cos(i*Math.PI/24),y:hole.y+b*Math.sin(i*Math.PI/24)})));childRings.unshift(zone);
+    sets.push({connectionId:id,settings:{...p,alongMm:along},local:{origin:pos(0,0),u:edge.u,v:edge.v,nutLo,nutHi,tip}});
   }
   path.push(edge.b);
   const childOutline=[...edge.ring.slice(0,edge.index),...path,...edge.ring.slice(edge.index+2)];
   const childGeometry={outlines:[clean(childOutline)],holes:structuredClone(child.holes||[]),cutouts:structuredClone(child.cutouts||[])};
-  const slots=[-halfPitch,halfPitch].map((x,i)=>({id:`${connectionId}/slot:${i}`,layer:'TAB_NUT_SLOT',points:rect(x-halfTab-p.slotClearanceMm/2,-(tChild+p.slotClearanceMm)/2,x+halfTab+p.slotClearanceMm/2,(tChild+p.slotClearanceMm)/2).map(q=>{const h=project(q.x,0,q.y);return {x:h.x,y:h.y};})}));
-  const hole={id:`${connectionId}/bolt`,x:root.x,y:root.y,r:b,layer:'TAB_NUT_BOLT'};
-  const holeRing=Array.from({length:48},(_,i)=>({x:hole.x+b*Math.cos(i*Math.PI/24),y:hole.y+b*Math.sin(i*Math.PI/24)}));
-  if(![...slots.map(c=>c.points),holeRing].every(r=>featureClear(r,host,p.minWebMm)))return fail('承接板插槽或螺絲孔超出板材，或距離既有孔槽太近。');
-  const hostGeometry={outlines:structuredClone(host.outlines),holes:[...(structuredClone(host.holes||[])),hole],cutouts:[...(structuredClone(host.cutouts||[])),...slots]};
+  if(![...slots.map(c=>c.points),...hostRings].every(r=>featureClear(r,host,p.minWebMm)))return fail('承接板插槽或螺絲孔超出板材，或距離既有孔槽太近。');
+  const hostGeometry={outlines:structuredClone(host.outlines),holes:[...(structuredClone(host.holes||[])),...holes],cutouts:[...(structuredClone(host.cutouts||[])),...slots]};
   return {ok:true,kind:p.kind,connectionId,settings:p,edgeKey:edge.key,tHost,tChild,hostGeometry,childGeometry,
-    features:{host:[...slots.map(c=>c.points),holeRing],child:[zone,...[-halfPitch,halfPitch].map(x=>rect(x-halfTab,-tHost,x+halfTab,p.minWebMm).map(q=>pos(q.x,q.y)))]},
-    local:{origin:pos(0,0),u:edge.u,v:edge.v,nutLo,nutHi,tip},
+    features:{host:[...slots.map(c=>c.points),...hostRings],child:childRings},sets,
+    local:sets[0].local,
     hardware:{screw:{diameterMm:3,lengthMm:p.screwLengthMm},nut:{acrossMm:p.nutAcrossMm,heightMm:p.nutHeightMm},washer:{diameterMm:p.washerDiameterMm,thicknessMm:p.washerThicknessMm}},
     warnings:['試作尺寸；材質、雷射切縫與五金實物待核對。','未做切縫補償；加工軟體依實測補償一次。','螺母由立板側面放入，螺絲由底板外側穿入；工具空間與負載需實物核對。']};
 }

@@ -5,7 +5,7 @@ export const COMMAND_GROUPS = [
   { id: 'project', label: '專案' }, { id: 'help', label: '說明' }
 ];
 export const COMMANDS = [
-  { id: 'boxMaker', group: 'add', label: '卡榫盒子', icon: '📦', tip: '輸入尺寸，生成五片盒體', run: 'window.blocks.openBoxMaker', modes: ['design'] },
+  { id: 'boxMaker', group: 'add', label: '卡榫盒子', icon: '📦', tip: '輸入尺寸，生成盒體', run: 'window.blocks.openBoxMaker', modes: ['design'] },
   { id: 'undo', group: 'edit', label: '復原', icon: '↩', tip: '復原上一步', run: 'window.blocks.undo' },
   { id: 'deleteSelected', group: 'edit', label: '刪除選取', icon: '🗑', danger: true, tip: '刪除選取零件', run: 'window.blocks.deleteSelectedPart', modes: ['design'] },
   { id: 'fitView', group: 'view', label: '置中', icon: '⊡', tip: '置中畫布', run: 'window.blocks.fitView' },

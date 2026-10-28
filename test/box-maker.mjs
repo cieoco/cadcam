@@ -16,13 +16,15 @@ import {buildFaceCandidate,validateFaceCandidate,faceCandidateModel} from '../js
 import {memberStock,planMemberStock} from '../js/blocks/member-stock.js';
 import {planMemberDimension} from '../js/blocks/member-dimensions.js';
 
+// B2: the default is now auto joint count; this file keeps testing the original one-set-per-edge box.
+const BASE={...BOX_DEFAULTS,jointsPerEdge:1};
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-6,`${a} != ${b}`);
 const worldBounds=(candidate,role)=>{
  const id=candidate.work.comps.find(c=>c.boxPanel?.role===role).id,part=candidate.model.materialParts.find(p=>p.partId===id);
  const pts=part.geometry.outlines.flat().flatMap(p=>[0,part.geometry.thicknessMm].map(z=>applyMatrix4(part.pose.matrix,{...p,z})));
  return Object.fromEntries(['x','y','z'].map(k=>[k,[Math.min(...pts.map(p=>p[k])),Math.max(...pts.map(p=>p[k]))]]));
 };
-for(const settings of [BOX_DEFAULTS,{...BOX_DEFAULTS,lengthMm:60,widthMm:60,heightMm:25},{...BOX_DEFAULTS,lengthMm:400,widthMm:400,heightMm:120},{...BOX_DEFAULTS,thicknessMm:3.5,screwLengthMm:14},{...BOX_DEFAULTS,thicknessMm:2.5}]){
+for(const settings of [BASE,{...BASE,lengthMm:60,widthMm:60,heightMm:25},{...BASE,lengthMm:400,widthMm:400,heightMm:120},{...BASE,thicknessMm:3.5,screwLengthMm:14},{...BASE,thicknessMm:2.5}]){
  const result=await checkedBox(settings);assert.equal(result.saveable,true,result.reason);
  assert.equal(result.work.comps.length,5);assert.equal(result.work.modules.filter(m=>m.mount).length,4);
  assert.deepEqual(result.validation.material.findings,[]);assert.equal(result.model.pins.length,0);
@@ -35,9 +37,9 @@ for(const settings of [BOX_DEFAULTS,{...BOX_DEFAULTS,lengthMm:60,widthMm:60,heig
  for(const c of reopened.comps){assert.deepEqual(c.boxPanel,result.work.comps.find(x=>x.id===c.id).boxPanel);near(memberStock(c).thicknessMm,settings.thicknessMm);}
  assert.ok(tabNutPlans(reopened.comps,reopened.modules,reopened.params).every(p=>p.ok));
 }
-for(const patch of [{lengthMm:0},{widthMm:NaN},{heightMm:24},{thicknessMm:4},{tabPitchMm:180},{tabWidthMm:20,tabPitchMm:12},{screwLengthMm:8}])assert.notEqual((await checkedBox({...BOX_DEFAULTS,...patch})).saveable,true,JSON.stringify(patch));
-assert.equal(normalizeBoxPanel({v:2,role:'base',rootPart:'x',settings:BOX_DEFAULTS}),null);
-const raw=await checkedBox(),w=raw.work,data=faceFileExportData(w),files=[];
+for(const patch of [{lengthMm:0},{widthMm:NaN},{heightMm:24},{thicknessMm:4},{tabPitchMm:180},{tabWidthMm:20,tabPitchMm:12},{screwLengthMm:8}])assert.notEqual((await checkedBox({...BASE,...patch})).saveable,true,JSON.stringify(patch));
+assert.equal(normalizeBoxPanel({v:2,role:'base',rootPart:'x',settings:BASE}),null);
+const raw=await checkedBox(BASE),w=raw.work,data=faceFileExportData(w),files=[];
 for(const fn of [exportLinksAsSvg,exportLinksAsDxf])fn(data.comps,data.points,data.params,data.settings,data.mounts,data.extras,(text,name)=>files.push({text,name}));
 assert.equal(files.length,10);const baseSvg=files.find(f=>f.name==='BoxBase.svg').text;
 assert.equal((baseSvg.match(/data-layer="TAB_NUT_SLOT"/g)||[]).length,8);
@@ -50,11 +52,11 @@ assert.match(boxFile(w,'svg'),/NO KERF COMPENSATION/);assert.match(boxFile(w,'dx
 const bom=hardwareList(buildPlan({...w,extras:data.extras}));assert.equal(bom.find(x=>x.spec==='M3×12').qty,4);assert.equal(bom.find(x=>x.spec.includes('螺母')).qty,4);assert.equal(bom.find(x=>x.spec.includes('墊片')).qty,4);
 
 const source={kind:'blocks',v:1,counter:12,params:{existing:77,theta:23},comps:[{id:'Other',type:'anchor',p1:{id:'O',type:'fixed',x:0,y:0}}],modules:[],assemblyMembers:['#root']},before=structuredClone(source);
-assert.equal((await planBoxChange({...source,modules:undefined},BOX_DEFAULTS)).ok,true);
-const first=await planBoxChange(source,BOX_DEFAULTS);assert.equal(first.ok,true,first.reason);assert.deepEqual(source,before);assert.deepEqual(first.work.comps[0],source.comps[0]);assert.equal(first.work.params.theta,23);assert.equal(first.work.assemblyMembers.length,6);
-const second=await planBoxChange(first.work,{...BOX_DEFAULTS,lengthMm:160});assert.equal(second.ok,true,second.reason);assert.equal(boxesInWork(second.work).length,2);
+assert.equal((await planBoxChange({...source,modules:undefined},BASE)).ok,true);
+const first=await planBoxChange(source,BASE);assert.equal(first.ok,true,first.reason);assert.deepEqual(source,before);assert.deepEqual(first.work.comps[0],source.comps[0]);assert.equal(first.work.params.theta,23);assert.equal(first.work.assemblyMembers.length,6);
+const second=await planBoxChange(first.work,{...BASE,lengthMm:160});assert.equal(second.ok,true,second.reason);assert.equal(boxesInWork(second.work).length,2);
 assert.equal(new Set(second.work.comps.map(c=>c.id)).size,11);assert.equal(new Set(second.work.modules.map(m=>m.id)).size,10);
-const changed=await planBoxChange(second.work,{...BOX_DEFAULTS,lengthMm:150,widthMm:90},{rootPart:first.rootPart});assert.equal(changed.ok,true,changed.reason);
+const changed=await planBoxChange(second.work,{...BASE,lengthMm:150,widthMm:90},{rootPart:first.rootPart});assert.equal(changed.ok,true,changed.reason);
 assert.deepEqual(changed.work.comps.filter(c=>c.boxPanel?.rootPart===second.rootPart),second.work.comps.filter(c=>c.boxPanel?.rootPart===second.rootPart));
 assert.deepEqual(changed.work.comps.filter(c=>c.boxPanel?.rootPart===first.rootPart).map(c=>c.id).sort(),first.work.comps.filter(c=>c.boxPanel).map(c=>c.id).sort());
 assert.equal(changed.work.params.existing,77);assert.equal(changed.work.params.theta,23);
@@ -81,5 +83,5 @@ for(const theta of [0,45,90]){
   for(let i=1;i<5;i++)near(Math.hypot(points[i].x-points[0].x,points[i].y-points[0].y,points[i].z-points[0].z),Math.hypot(referencePoints[i].x-referencePoints[0].x,referencePoints[i].y-referencePoints[0].y,referencePoints[i].z-referencePoints[0].z));
  }
 }
-assert.equal((await planBoxChange(joined.work,BOX_DEFAULTS,{rootPart:first.rootPart})).ok,false);
+assert.equal((await planBoxChange(joined.work,BASE,{rootPart:first.rootPart})).ok,false);
 console.log('PASS box maker: five panels, inside dimensions, voids, four joints, bounds, SVG/DXF/BOM, isolation, resize, shares, composite rename, mounted group');

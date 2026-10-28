@@ -1,4 +1,4 @@
-import {normalizeBoxPanel,boxPanelSize} from './box-config.js';
+import {normalizeBoxPanel,boxPanelSize} from './box-contract.js';
 // Shared physical stock metadata for rigid bar and plate members.
 // This is descriptive data only; it does not make strength or fabrication claims.
 
