@@ -832,7 +832,7 @@ const ALL_BLOCK_EXAMPLES = [
   {
     id: 'competition-roller-intake',
     title: '競賽擺臂進料機構',
-    adjustmentNote: '選取連桿可改孔距，選馬達可改起終角；每次改一項再試播。要保留目前作品，請用「新增 → 加入模組 → 擺臂進料」。取物端軌跡不代表物件已被收進。',
+    adjustmentNote: '選取連桿可改孔距，選馬達可改起終角；每次改一項再試播。要保留目前作品，請用「新增 → 現成組件 → 擺臂進料」。取物端軌跡不代表物件已被收進。',
     note: '機架全部用結構板組成：伺服板承載 MG995（穿板槽直接開在板上）與擺臂樞軸，折線立柱板連到地面。曲柄經連桿推拉黑色彎折臂，取物端沿地面掃過，把黃色物件耙入機架。',
     snapshot: {
       kind: 'blocks',
@@ -1012,7 +1012,7 @@ for(const [id,label,snapshot] of [
   ALL_BLOCK_EXAMPLES.push({id:practiceId,title:`${id.slice(-3).toUpperCase()}｜${label}針筒安裝練習`,
     note:'連桿已接好、尚未安裝針筒。先選固定機架，再放置、接孔並檢查行程。',snapshot:practice});
   EXAMPLE_LESSONS[practiceId]={group:'challenge',level:'練習',use:'親手安裝針筒，完成後才能試動。',
-    try:['新增 → 動力來源 → 10cc液壓針筒（管夾固定）','固定外殼 → 位置方向 → 連接輸出 → 試動確認；依第九、十單元檢查並保存']};
+    try:['新增 → 動力 → 液壓針筒（10cc、管夾固定）','固定外殼 → 位置方向 → 連接輸出 → 試動確認；依第九、十單元檢查並保存']};
 }
 
 ALL_BLOCK_EXAMPLES.push({id:'tab-nut-m3',title:'製作：3 mm／M3 榫槽接合',note:'兩個定位榫＋一組螺絲／螺母。可修改與輸出；試片、材料及承載待實測。',snapshot:tabNutSnapshot});

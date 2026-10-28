@@ -61,7 +61,7 @@
 活塞模式 `drawPiston(...)`（缸體＋伸桿＋「活塞」標籤，重用 `drawMotorLabel`）。draw 迴圈掃 `comps` 出 slider。
 
 ### D. 線性動力源 — 併入動力來源選單
-`blocks.html` `#powerMenu` 加第三顆「🟢 線性致動器」→ `pickMotorType('linear')`。`app.js` 放置時目標是
+「新增 → 動力」區有獨立按鈕「線性致動器」→ `pickMotorType('linear')`（2026-10-29 起不再經 `#powerMenu`，該選單只剩 TT／N20 選擇）。`app.js` 放置時目標是
 滑塊點 p3：`driveSliderAt(sliderId)` 設 `isInput/physicalMotor/theta=0/strokeMin=0/strokeMax=64`，放完選取
 跳行程面板。
 

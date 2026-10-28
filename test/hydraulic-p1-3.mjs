@@ -52,7 +52,8 @@ const place=(comps,a,b,opt)=>placeFixedSyringe(comps,params,pts,a,b,opt);
 // ---------- 選單與教材 ----------
 {
   const html=readFileSync(new URL('../blocks.html',import.meta.url),'utf8');
-  ok(/addFixedSyringe\(\)/.test(html)&&/管夾固定/.test(html),'動力來源選單有「管夾固定」針筒');
+  const {COMMANDS}=await import('../js/blocks/ui-commands.js');   // 新增面板由指令清單產生
+  ok(COMMANDS.some(c=>c.run==='window.blocks.addFixedSyringe'&&c.section==='power'&&/管夾固定/.test(c.tip)),'新增 → 動力 有「管夾固定」針筒');
   ok(!/onclick="window\.blocks\.addSyringe\(\)"/.test(html),'新增清單不提供沒有管夾的兩端鉸接針筒');
   const app=readFileSync(new URL('../js/blocks/app.js',import.meta.url),'utf8');
   ok(/window\.blocks\.addFixedSyringe\s*=/.test(app),'window.blocks.addFixedSyringe 可呼叫');

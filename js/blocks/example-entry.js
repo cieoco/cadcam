@@ -29,7 +29,7 @@ export function offerExample({ example, loadExample, insertModule, onDismiss = (
   dialog.setAttribute('aria-label', '載入機構範例');
   const heading = document.createElement('h2'); heading.textContent = example.title;
   const message = document.createElement('p');
-  message.textContent = '載入會替換整份作品（所有設計分頁與組立），可按復原找回。若要保留作品，請取消後查看「新增 → 加入模組」的可用機構；並非所有範例都有內建模組。';
+  message.textContent = '載入會替換整份作品（所有設計分頁與組立），可按復原找回。若要保留作品，請取消後查看「新增 → 現成組件」的可用機構；並非所有範例都有內建模組。';
   const use = document.createElement('p');
   const lesson = getExampleLesson(example.id);
   use.textContent = lesson.use || example.note || '';

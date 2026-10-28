@@ -16,10 +16,9 @@ const s=startupSize();
 ok(!s.paths.some(p=>p.startsWith('js/plugins/box-maker/')&&!/contract/.test(p)),'外掛主體不在啟動載入（只允許存讀用的小合約檔）');
 ok(s.paths.includes('js/plugins/registry.js')||s.lazyEntries.includes('js/plugins/registry.js'),'外掛清單本身很小，可在啟動時列出');
 const html=readFileSync(new URL('../blocks.html',import.meta.url),'utf8');
-const trans=html.slice(html.indexOf('<summary>傳動</summary>'),html.indexOf('</details>',html.indexOf('<summary>傳動</summary>')));
-ok(!/openBoxMaker|卡榫盒子/.test(trans),'「傳動」區不再放卡榫盒子');
-const iPlug=html.indexOf('data-plugin-list'),iMods=html.indexOf('加入模組');
-ok(iPlug>0&&iPlug>iMods&&/外掛/.test(html.slice(iPlug-400,iPlug+400)),'「新增」面板最下方（加入模組之後）有「外掛」區');
+const {ADD_SECTIONS}=await import('../js/blocks/ui-commands.js');   // 新增面板改由分類清單產生（palette-1）
+const ids=ADD_SECTIONS.map(x=>x.id);
+ok(/data-add-sections/.test(html)&&ids.indexOf('plugin')>ids.indexOf('modules')&&ADD_SECTIONS.find(x=>x.id==='plugin').label==='外掛','「新增」面板最下方（現成組件之後）有「外掛」區，由分類清單產生');
 const ui=readFileSync(new URL('../js/blocks/ui-commands.js',import.meta.url),'utf8');
 ok(/plugin/.test(ui),'指令清單標示卡榫盒子為外掛（電腦、手機同一處）');
 console.log(`plugin-box: ${pass} passed`);

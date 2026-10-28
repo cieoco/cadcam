@@ -325,7 +325,7 @@ const designGuide=createDesignGuide({frame:setGuideFrame,next:stage=>{
   if(stage==='frame'){setGuideFrame();return;}
   if(stage==='try'){togglePlay();return;}
   setMobilePanel('build');document.getElementById('creationTools').open=true;
-  if(stage==='draw')openLinkMenu();else openPowerMenu();
+  document.querySelector(`[data-add-section="${stage==='draw'?'member':'power'}"]`).open=true;
 }});
 function setGuideFrame(){
   const comps=viewComps(),nodeId=S.selectedNodeId;
@@ -2572,30 +2572,15 @@ function updateSolveBanner(sol, missingVisibleLinks) {
   el.style.display = show ? 'block' : 'none';
 }
 // cancelMotorMode 已隨動力來源域移到 ./motor-tools.js
-// ---- 動力來源選單：點「動力來源」先選 TT馬達 / MG995，再進入放置模式 ----
-function linkMenuEl() { return document.getElementById('linkMenu'); }
-function openLinkMenu() {
-  const power = powerMenuEl();
-  if (power) power.style.display = 'none';
-  const m = linkMenuEl();
-  if (m) m.style.display = m.style.display === 'flex' ? 'none' : 'flex';
-  document.getElementById('linkMenuToggle')?.setAttribute('aria-expanded', String(m?.style.display === 'flex'));
-}
-function closeLinkMenu() {
-  const m = linkMenuEl();
-  if (m) m.style.display = 'none';
-  document.getElementById('linkMenuToggle')?.setAttribute('aria-expanded', 'false');
-}
+// ---- 動力：「馬達」先選 TT／N20（powerMenu），舵機、線性致動器、針筒由各自按鈕直接進入 ----
 function pickLinkTool(type) {
-  closeLinkMenu();
   if (type === 'triangle') Tools.startDrawTriangle('triangle');
   else if (type === 'polyline') Tools.startDrawTriangle('polyline');
   else if (type === 'jaw') Tools.startDrawTriangle('jaw');
   else Tools.startDrawLink();
 }
 function powerMenuEl() { return document.getElementById('powerMenu'); }
-function openPowerMenu() {
-  closeLinkMenu();
+function openMotorChoice() {
   const m = powerMenuEl();
   if (m) m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
 }
@@ -3333,7 +3318,7 @@ function init() {
   offerExampleFromUrl({ loadExample, insertModule: id => moduleEditor.insertBuiltin(id), notify: transient });
 }
 
-window.blocks = { startChainDrive, changeSprocketTeeth, alignChain, nudgeChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openPowerMenu, pickMotorType, openLinkMenu, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, exportStep: () => import('./step-export.js').then(m => m.exportStepFile({ S, design: inDesign(), motorAngles: motorAnglesNow(), notify: transient })), setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
+window.blocks = { startChainDrive, changeSprocketTeeth, alignChain, nudgeChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openMotorChoice, pickMotorType, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, exportStep: () => import('./step-export.js').then(m => m.exportStepFile({ S, design: inDesign(), motorAngles: motorAnglesNow(), notify: transient })), setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
 window.blocks.changeFrameGround = changeFrameGround;
 window.blocks.setFrameSize = setFrameSize;
 // H1 除錯／測試：設計模式目前看得到的零件與點（畫面實際畫的那一份）。

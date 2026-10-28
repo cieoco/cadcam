@@ -1,13 +1,29 @@
-// UI-1：電腦與手機共用的指令清單（純資料）。run：'window.blocks.函式' 或 '#元素id'（點該元素）。
-// modes：只在這些模式出現（省略＝設計與組立都有）；SHORTCUTS 是控制列上重複出現的少數入口。
+// 電腦與手機共用的指令清單（純資料）；run＝'window.blocks.函式' 或 '#元素id'；modes＝只在該模式出現。
 import { PLUGINS } from '../plugins/registry.js';
 const box = PLUGINS.find(p => p.id === 'box-maker');
 export const COMMAND_GROUPS = [
   { id: 'add', label: '新增' }, { id: 'edit', label: '調整' }, { id: 'view', label: '視圖' },
   { id: 'project', label: '專案' }, { id: 'help', label: '說明' }
 ];
+// 新增面板分類（工作順序）；open＝預設展開
+export const ADD_SECTIONS = [
+  { id: 'ground', label: '固定', hint: '機構哪裡不動', open: 1 }, { id: 'member', label: '構件', hint: '會動的零件', open: 1 },
+  { id: 'guide', label: '導引', hint: '讓零件照路線走' }, { id: 'power', label: '動力', hint: '讓機構動起來' },
+  { id: 'transmission', label: '傳動', hint: '改速度或方向、傳到別處' }, { id: 'modules', label: '現成組件', hint: '拿做好的來用' },
+  { id: 'plugin', label: '外掛', hint: '擴充功能' }
+];
+const B = 'window.blocks.';
+// [id, 名稱, 圖示, 說明, 函式, ...參數]
+const add = (section, rows) => rows.map(([id, label, icon, tip, run, ...args]) => ({ id, group: 'add', section, label, icon, tip, run: B + run, args, modes: ['design'] }));
 export const COMMANDS = [
-  { id: 'boxMaker', group: 'add', plugin: true, label: box.name, icon: box.icon, tip: box.hint, run: 'window.blocks.openBoxMaker', modes: ['design'] },
+  ...add('ground', [['anchor', '固定支點', '📌', '非實體支架', 'addAnchor']]),
+  ...add('member', [['bar', '連桿', '🔵', '點兩點畫桿', 'pickLinkTool', 'bar'], ['triangle', '三角板', '🔺', '三孔，填滿', 'pickLinkTool', 'triangle'],
+    ['polyline', '折線桿', '📈', '多孔，不填滿', 'pickLinkTool', 'polyline'], ['plate', '板件', '🟢', '前三點主孔，再加外形', 'startDrawPolygon']]),
+  ...add('guide', [['rail', '滑軌', '🟩', '畫軌道讓滑塊走', 'startDrawRail']]),
+  ...add('power', [['motor', '馬達', '🔴', 'TT／N20', 'openMotorChoice'], ['servo', '舵機', '🟦', 'MG995', 'pickMotorType', 'mg995'],
+    ['linear', '線性致動器', '🟢', '沿滑軌推拉', 'pickMotorType', 'linear'], ['syringe', '液壓針筒', '💧', '10cc 管夾固定', 'addFixedSyringe']]),
+  ...add('transmission', [['gearPair', '齒輪對', '⚙️', '成對嚙合', 'addGearPair'], ['rackPinion', '齒輪齒條', '▥', '直線滑台', 'addRackPinion'], ['chain', '鏈輪＋鏈條', '⛓️', '#25 鏈條', 'startChainDrive']]),
+  ...add('plugin', [['boxMaker', box.name, box.icon, box.hint, 'openBoxMaker']]),
   { id: 'undo', group: 'edit', label: '復原', icon: '↩', tip: '復原上一步', run: 'window.blocks.undo' },
   { id: 'deleteSelected', group: 'edit', label: '刪除選取', icon: '🗑', danger: true, tip: '刪除選取零件', run: 'window.blocks.deleteSelectedPart', modes: ['design'] },
   { id: 'fitView', group: 'view', label: '置中', icon: '⊡', tip: '置中畫布', run: 'window.blocks.fitView' },

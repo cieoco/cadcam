@@ -34,7 +34,7 @@ export async function captureSliderLesson({ ui, tab, browser, baseURL, outputRoo
     await ui.goto(new URL('blocks.html?example=slider-crank-practice', url).href); await state();
     if (await button('載入此範例').isVisible()) { await button('載入此範例').click(); await state(); }
     await tab.playwright.locator('#creationTools > summary').click(); await state();
-    if (!await tab.playwright.locator('.link-tool > .block').isVisible()) throw Error('Default link tool missing.');
+    if (!await tab.playwright.locator('[data-command="bar"]').isVisible()) throw Error('Default link tool missing.');
     await shot('add');
     await check('unknown');
     await ui.goto(new URL('blocks.html?example=slider-crank', url).href); await state();

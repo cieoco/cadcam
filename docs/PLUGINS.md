@@ -6,7 +6,7 @@
 
 1. 登記：`js/plugins/registry.js` 的 `PLUGINS` 新增一筆 `{id, name, hint, icon, load}`。`load` 只能是 `() => import('./<id>/index.js')`。
 2. 資料夾：`js/plugins/<id>/`，入口 `index.js` 匯出 app 要呼叫的函式（卡榫盒子是 `openBoxMaker`）。介面、生成、匯出等程式都放這裡。
-3. 指令：`js/blocks/ui-commands.js` 的指令加 `plugin: true`、`group: 'add'`，名稱、圖示、說明取自登記。「外掛」區由 `command-ui.js` 依指令清單填入 `[data-plugin-list]`，電腦與手機共用。
+3. 指令：`js/blocks/ui-commands.js` 的指令加 `section: 'plugin'`、`group: 'add'`，名稱、圖示、說明取自登記。「外掛」區是 `ADD_SECTIONS` 的一區，由 `command-ui.js` 依 `section` 填入 `[data-add-sections]`，電腦與手機共用。
 4. 懶載入：app 在使用者點入口時才 `await PLUGINS.find(...).load()`。啟動路徑（`js/blocks/app.js` 的靜態 import）不可直接 import 外掛資料夾裡除保存契約以外的檔案；`test/startup-size.mjs` 會檢查。
 
 ## 保存資料契約
@@ -20,4 +20,4 @@
 
 ## 新增外掛的檢查
 
-登記一筆、建資料夾與 `index.js`、指令加 `plugin: true`、執行 `node tools/load-graph.mjs`，再跑 `node test/plugin-box.mjs`（同一型式的檢查）、`node test/startup-size.mjs` 與 `node tools/ui-commands-browser.mjs`。
+登記一筆、建資料夾與 `index.js`、指令加 `section: 'plugin'`、執行 `node tools/load-graph.mjs`，再跑 `node test/plugin-box.mjs`（同一型式的檢查）、`node test/startup-size.mjs` 與 `node tools/ui-commands-browser.mjs`。

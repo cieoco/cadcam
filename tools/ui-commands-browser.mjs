@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { extname, join, normalize, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
-import { COMMANDS, COMMAND_GROUPS, SHORTCUTS } from '../js/blocks/ui-commands.js';
+import { COMMANDS, COMMAND_GROUPS, SHORTCUTS, ADD_SECTIONS } from '../js/blocks/ui-commands.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const shotsDir = process.argv[2] ? resolve(process.argv[2]) : '';
@@ -46,10 +46,17 @@ const visible = page => page.evaluate(() => [...document.querySelectorAll('[data
   .filter(el => el.checkVisibility({ checkVisibilityCSS: true }) && !el.closest('dialog:not([open])'))
   .map(el => ({ id: el.dataset.command, where: el.closest('.controls') ? 'bar' : el.closest('.canvas-toolbar') ? 'toolbar' : el.closest('.mobile-panel') ? 'panel' : el.closest('.part-palette') ? 'palette' : el.closest('header') ? 'header' : 'other' })));
 
+// 新增面板各分類的預設狀態（順序、展開、數量、說明、按鈕順序），之後全部展開才看得到每顆按鈕
+const readSections = page => page.evaluate(() => [...document.querySelectorAll('[data-add-section]')].map(d => ({ id: d.dataset.addSection, open: d.open,
+  summary: d.querySelector('summary').textContent.replace(/\s+/g, ' ').trim(), items: [...d.querySelectorAll('[data-command]')].map(b => b.dataset.command) })));
+const expandSections = page => page.evaluate(() => document.querySelectorAll('[data-add-section]').forEach(d => { d.open = true; }));
+
 async function collect(page, layout, mode) {
   const seen = new Map();   // id -> Set(where)
   const add = async () => { for (const { id, where } of await visible(page)) (seen.get(id) ?? seen.set(id, new Set()).get(id)).add(where); };
   const menu = async g => { await page.click(`header [data-command-menu="${g}"] > summary`); await add(); await page.keyboard.press('Escape'); };
+  const sections = mode === 'design' ? await readSections(page) : [];
+  if (mode === 'design') await expandSections(page);
   await add();
   if (layout === 'desktop') { await menu('project'); await menu('help'); }
   else {
@@ -59,7 +66,7 @@ async function collect(page, layout, mode) {
   }
   const groups = {};
   for (const g of COMMAND_GROUPS) groups[g.id] = new Set([...seen.keys()].filter(id => groupOf[id] === g.id));
-  return { seen, groups };
+  return { seen, groups, sections };
 }
 const same = (a, b) => [...a].every(x => b.has(x)) && [...b].every(x => a.has(x));
 
@@ -80,6 +87,15 @@ for (const mode of ['design', 'bench']) {
     // 該模式下每個指令都找得到
     const expected = COMMANDS.filter(c => inMode(c, mode)).map(c => c.id).sort();
     ok(JSON.stringify([...r.seen.keys()].sort()) === JSON.stringify(expected), `${label}：看得見的指令 = 清單中該模式的全部指令（${expected.length} 個）`);
+    if (mode === 'design') {   // 新增面板：依工作順序分類，預設只展開固定、構件，收合時顯示數量與說明
+      const got = r.sections.map(({ id, items }) => ({ id, items }));
+      const want = ADD_SECTIONS.map(sec => ({ id: sec.id, items: COMMANDS.filter(c => c.section === sec.id).map(c => c.id) }));   // 現成組件由模組庫填入，不在指令清單
+      ok(JSON.stringify(got) === JSON.stringify(want), `${label}：新增面板分類與按鈕順序＝清單（${got.map(x => x.id).join('→')}）`);
+      ok(r.sections.every(x => x.open === (x.id === 'ground' || x.id === 'member')), `${label}：預設只展開固定、構件`);
+      const sec = id => r.sections.find(x => x.id === id).summary;
+      ok(/^傳動（3）/.test(sec('transmission')) && /^動力（4）/.test(sec('power')) && ADD_SECTIONS.every(x => sec(x.id).includes(x.hint)), `${label}：收合的分類顯示數量與說明（${sec('transmission')}）`);
+      ok(await page.evaluate(() => !document.querySelector('#linkMenu, #linkMenuToggle')), `${label}：沒有「連桿 ▾」下拉`);
+    }
     // 控制列的快捷鍵
     const bar = [...r.seen].filter(([, w]) => w.has('bar')).map(([id]) => id).sort();
     ok(JSON.stringify(bar) === JSON.stringify(SHORTCUTS.filter(id => inMode(byId(id), mode)).sort()), `${label}：控制列只放快捷鍵 ${bar.join('、')}`);
@@ -101,6 +117,7 @@ for (const mode of ['design', 'bench']) {
     await ctx.close();
   }
   // 兩種版面逐類比對
+  if (mode === 'design') ok(JSON.stringify(results['desktop/design'].sections) === JSON.stringify(results['mobile/design'].sections), '設計：新增面板的分類、展開、數量、說明、按鈕順序電腦＝手機');
   for (const g of COMMAND_GROUPS) {
     const d = results[`desktop/${mode}`].groups[g.id], m = results[`mobile/${mode}`].groups[g.id];
     const diff = [...d].filter(x => !m.has(x)).concat([...m].filter(x => !d.has(x)));
@@ -120,6 +137,7 @@ for (const [layout, viewport] of Object.entries(LAYOUTS)) {
   const label = layout === 'desktop' ? '電腦' : '手機';
   const trigger = async id => {   // 用該版面的入口點擊指令
     const g = groupOf[id];
+    if (g === 'add') await expandSections(page);
     if (layout === 'desktop') {
       if (g === 'project' || g === 'help') { await page.click(`header [data-command-menu="${g}"] > summary`); await page.click(`header [data-command-menu="${g}"] [data-command="${id}"]`); }
       else await page.click(`${id === 'undo' ? 'header' : g === 'add' ? '.part-palette' : '.canvas-toolbar'} [data-command="${id}"]`);
@@ -148,6 +166,14 @@ for (const [layout, viewport] of Object.entries(LAYOUTS)) {
   await page.click('.controls [data-command="view3d"]'); ok(await page.evaluate(() => document.getElementById('view3d').style.display === 'none'), `${label}：控制列的 3D 快捷鍵關閉 3D`);
   await trigger('dimension'); await page.waitForTimeout(600); ok(true, `${label}：視圖 → 量尺可啟動`);
   await trigger('fitView'); ok(true, `${label}：視圖 → 置中`);
+  for (const id of ['bar', 'triangle', 'polyline', 'plate', 'rail']) {   // 新增 → 構件／導引：進入繪製，出現「取消繪製」
+    await trigger(id); await page.waitForTimeout(150);
+    ok(await page.evaluate(() => !document.getElementById('cancelCreation').hidden), `${label}：新增 → ${byId(id).label} 進入繪製`);
+    await page.evaluate(() => document.getElementById('cancelCreation').click());
+  }
+  await trigger('motor'); ok(await page.evaluate(() => getComputedStyle(document.getElementById('powerMenu')).display !== 'none' && document.querySelectorAll('#powerMenu .pm-opt').length === 2), `${label}：新增 → 動力 → 馬達 再選 TT／N20 兩項`);
+  await page.click('#powerMenu .pm-opt >> nth=0'); ok(await page.evaluate(() => getComputedStyle(document.getElementById('powerMenu')).display === 'none'), `${label}：選定馬達型號後進入放置`);
+  await page.evaluate(() => document.getElementById('cancelCreation').click());
   await closeAll(); await page.evaluate(() => window.blocks.setMode('bench')); await page.waitForFunction(() => document.body.dataset.mode === 'bench');
   await page.click('header [data-command-menu="project"] > summary'); await page.click('header [data-command-menu="project"] [data-command="designList"]');
   ok(await open('#designListDialog'), `${label}：組立中 專案 → 設計清單`);
