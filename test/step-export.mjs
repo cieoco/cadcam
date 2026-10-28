@@ -42,13 +42,15 @@ ok(stepFromParts([plate],{name:'測試'})===t1,'同樣輸入產生相同檔案�
 // ---------- 凹形外形＋內部挖空、姿態 ----------
 {
   const L=[{x:0,y:0},{x:60,y:0},{x:60,y:20},{x:20,y:20},{x:20,y:50},{x:0,y:50}];
-  const rot=[0,-1,0,0, 1,0,0,0, 0,0,1,0, 0,0,0,1]; // 繞 z 轉 90°，且平移 (5,7,11)
-  rot[3]=5;rot[7]=7;rot[11]=11;
+  const rot=[0,1,0,0, -1,0,0,0, 0,0,1,0, 5,7,11,1]; // app 的欄主序：繞 z 轉 90°，平移 (5,7,11) 在 [12..14]
   const t=stepFromParts([{name:'L板',outline:L,holes:[],cutouts:[rect(10,10).map(p=>({x:p.x+5,y:p.y+5}))],thicknessMm:2,matrix:rot},plate],{name:'兩片'});
   const e=parse(t);
   ok(typeCount(e,'MANIFOLD_SOLID_BREP')===2&&typeCount(e,'PRODUCT')>=2,'兩片＝兩個實體、各自有零件名稱');
   const lPts=[...e.values()].filter(v=>v.startsWith('CARTESIAN_POINT(')).map(v=>v.match(/\(([^()]*)\)\s*\)$/)[1].split(',').map(Number)).filter(p=>p.length===3);
-  ok(lPts.some(p=>near(p[0],5-50)&&near(p[1],7)&&near(p[2],11))||/AXIS2_PLACEMENT_3D/.test(t),'依姿態矩陣擺放（座標已轉換，或以組立擺放）');
+  const dirs=[...e.values()].filter(v=>v.startsWith('DIRECTION(')).map(v=>v.match(/\(([^()]*)\)\s*\)$/)[1].split(',').map(Number));
+  const world=lPts.some(p=>near(p[0],5-50)&&near(p[1],7)&&near(p[2],11));
+  const placed=lPts.some(p=>near(p[0],5)&&near(p[1],7)&&near(p[2],11))&&dirs.some(d=>near(d[0],0)&&near(d[1],1)&&near(d[2],0));
+  ok(world||placed,'依姿態矩陣擺放：L 板頂點 (0,50) 落在 (−45,7,11)，或以平移 (5,7,11)＋x 軸 (0,1,0) 的組立擺放');
   ok(typeCount(e,'FACE_BOUND')>=2,'內部挖空成為內迴圈');
 }
 ok((()=>{try{stepFromParts([{...plate,outline:[{x:0,y:0},{x:1,y:0}]}]);return false;}catch(e){return /外形/.test(e.message);}})(),'不合理外形丟出中文錯誤');
