@@ -1,9 +1,9 @@
 import {BOX_DEFAULTS,BOX_ROLES,BOX_NAMES,normalizeBoxSettings,boxPanelSize,boxJointLayout} from './box-config.js';
-import {TAB_NUT_DEFAULTS} from './tab-nut-geometry.js';
-import {buildFaceCandidate,validateFaceCandidate,centeredFaceSurface} from './face-candidate.js';
-import {buildMountSurfaces} from './mount-surfaces.js';
-import {buildFacePlacement} from './face-placement.js';
-import {tabNutPlans} from './tab-nut-plan.js';
+import {TAB_NUT_DEFAULTS} from '../../blocks/tab-nut-geometry.js';
+import {buildFaceCandidate,validateFaceCandidate,centeredFaceSurface} from '../../blocks/face-candidate.js';
+import {buildMountSurfaces} from '../../blocks/mount-surfaces.js';
+import {buildFacePlacement} from '../../blocks/face-placement.js';
+import {tabNutPlans} from '../../blocks/tab-nut-plan.js';
 
 export {BOX_DEFAULTS};
 const SIDES=BOX_ROLES.slice(1),BAD='請輸入有效尺寸：內長／寬 60–400、高 25–120、板厚 2.5–3.5 mm。';

@@ -1,5 +1,5 @@
 import {tabNutPartGeometry} from './tab-nut-plan.js';
-import {boxPanelGeometry} from './box-contract.js';
+import {boxPanelGeometry} from '../plugins/box-maker/box-contract.js';
 import {inspectBarFusion} from './bar-fusion-geometry.js';
 import { DEFAULT_PLATE_RADIUS_WORLD, createPlateGeometry, localToWorld } from './plate-geometry.js';
 import { createGearPath, createRackPath } from '../utils/gear-geometry.js';

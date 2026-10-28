@@ -16,6 +16,7 @@
 
 ## 產品與功能規格
 
+- [PLUGINS.md](PLUGINS.md) — 外掛（要用才載入的功能）的登記、資料夾與保存資料契約。
 - [SDD-MECHANISM-BOX.md](SDD-MECHANISM-BOX.md) — 機構用五片式參數盒體、組立與加工輸出契約。
 
 - [SDD-LASER-TAB-NUT-JOINT.md](SDD-LASER-TAB-NUT-JOINT.md) — 3 mm 板材／M3 榫槽與螺母鎖固接合試作；含相容契約、輸出與試片，實物試切待驗證。

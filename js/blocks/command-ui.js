@@ -25,7 +25,10 @@ export function setCommandState(id, on) {
 export function initCommandUi() {
   for (const el of document.querySelectorAll('[data-command-group]')) {
     const skip = el.dataset.commandExcept || '';
-    el.append(...COMMANDS.filter(c => c.group === el.dataset.commandGroup && !skip.includes(c.id)).map(c => button(c)));
+    el.append(...COMMANDS.filter(c => c.group === el.dataset.commandGroup && !c.plugin && !skip.includes(c.id)).map(c => button(c)));
+  }
+  for (const el of document.querySelectorAll('[data-plugin-list]')) {
+    el.append(...COMMANDS.filter(c => c.plugin).map(c => button(c)));
   }
   document.querySelectorAll('[data-command-shortcuts]').forEach(el => el.append(...SHORTCUTS.map(id => button(byId[id], 1))));
   for (const el of document.querySelectorAll('[data-group-label]')) el.textContent = COMMAND_GROUPS.find(g => g.id === el.dataset.groupLabel).label;

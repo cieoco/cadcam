@@ -1,5 +1,5 @@
 import {readStoredProject} from './project-envelope.js';
-import {normalizeBoxPanel,boxPanelSize} from './box-contract.js';
+import {normalizeBoxPanel,boxPanelSize} from '../plugins/box-maker/box-contract.js';
 import {normalizeBarFusion,inspectBarFusionData} from '../core/bar-fusion.js';
 import {migrateH03RigidGrip} from './rigid-gripper.js';
 import { normalizeLessonSequence, normalizeHydraulicSequence } from './sequence-schema.js';

@@ -1,9 +1,9 @@
 // 卡榫盒子 B2：① 每邊卡榫組數依邊長自動決定（間距 ≤ 80 mm、離角落留料）；② 面板可選：預設五面，可加上蓋（六面）或拿掉側板。
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {BOX_DEFAULTS,normalizeBoxSettings,boxJointLayout} from '../js/blocks/box-config.js';
-import {checkedBox} from '../js/blocks/box-generator.js';
-import {planBoxChange} from '../js/blocks/box-operations.js';
+import {BOX_DEFAULTS,normalizeBoxSettings,boxJointLayout} from '../js/plugins/box-maker/box-config.js';
+import {checkedBox} from '../js/plugins/box-maker/box-generator.js';
+import {planBoxChange} from '../js/plugins/box-maker/box-operations.js';
 import {faceFileExportData} from '../js/blocks/face-export.js';
 import {exportLinksAsSvg} from '../js/blocks/exporters.js';
 import {buildPlan,hardwareList} from '../js/blocks/build-plan.js';
@@ -96,7 +96,7 @@ ok(JSON.stringify(BOX_DEFAULTS.panels)===JSON.stringify({lid:false,front:true,ba
 }
 // ---------- 介面 ----------
 {
-  const ui=readFileSync(new URL('../js/blocks/box-dialog.js',import.meta.url),'utf8');
+  const ui=readFileSync(new URL('../js/plugins/box-maker/box-dialog.js',import.meta.url),'utf8');
   ok(/上蓋/.test(ui)&&/前板|前/.test(ui)&&/底板/.test(ui),'對話框可勾選面板（底板固定、上蓋與四面可選）');
   ok(/組數/.test(ui)&&/自動/.test(ui)&&/間距/.test(ui),'對話框有卡榫組數（自動／手動）與最大間距');
   ok(/顆/.test(ui),'預覽顯示螺絲總數');

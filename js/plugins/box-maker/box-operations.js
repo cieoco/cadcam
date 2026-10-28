@@ -1,7 +1,7 @@
 /** Atomic box changes. All returned data is a draft until the caller commits. */
 import {checkedBox,boxRoles} from './box-generator.js';
 import {boxPanelSize,normalizeBoxSettings} from './box-config.js';
-import {instantiateComposite,COMPOSITE_MAX_MODULES} from './module-ops.js';
+import {instantiateComposite,COMPOSITE_MAX_MODULES} from '../../blocks/module-ops.js';
 
 export async function planBoxChange(source,settings,{rootPart=null}={}){
  source={...source,modules:source.modules || []};

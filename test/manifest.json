@@ -18,6 +18,7 @@
     "test/box-maker.mjs",
     "test/box-panels-joints.mjs",
     "test/box-lid-closure.mjs",
+    "test/plugin-box.mjs",
     "test/tab-nut-storage-export.mjs",
     "test/tab-nut-connection.mjs",
     "test/tab-nut-geometry.mjs",

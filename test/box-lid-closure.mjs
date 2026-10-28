@@ -1,9 +1,9 @@
 // 卡榫盒子 B2 補充：上蓋閉合接合（只作加工用）、多組卡榫的保存／複製／3D 與舊檔相容。
 // test/box-panels-joints.mjs 的「螺母卡槽」圖層規則比對不到任何圖層（卡槽是外框的一部分），這裡改查外框頂點。
 import assert from 'node:assert/strict';
-import {BOX_DEFAULTS,normalizeBoxSettings} from '../js/blocks/box-config.js';
-import {checkedBox,boxJointSummary,boxScrewCount} from '../js/blocks/box-generator.js';
-import {planBoxChange} from '../js/blocks/box-operations.js';
+import {BOX_DEFAULTS,normalizeBoxSettings} from '../js/plugins/box-maker/box-config.js';
+import {checkedBox,boxJointSummary,boxScrewCount} from '../js/plugins/box-maker/box-generator.js';
+import {planBoxChange} from '../js/plugins/box-maker/box-operations.js';
 import {storedProject,readStoredProject} from '../js/blocks/project-envelope.js';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
 import {encodeSnapshot,decodeShareString} from '../js/share-codec.js';

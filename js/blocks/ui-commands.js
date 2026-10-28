@@ -1,11 +1,13 @@
 // UI-1：電腦與手機共用的指令清單（純資料）。run：'window.blocks.函式' 或 '#元素id'（點該元素）。
 // modes：只在這些模式出現（省略＝設計與組立都有）；SHORTCUTS 是控制列上重複出現的少數入口。
+import { PLUGINS } from '../plugins/registry.js';
+const box = PLUGINS.find(p => p.id === 'box-maker');
 export const COMMAND_GROUPS = [
   { id: 'add', label: '新增' }, { id: 'edit', label: '調整' }, { id: 'view', label: '視圖' },
   { id: 'project', label: '專案' }, { id: 'help', label: '說明' }
 ];
 export const COMMANDS = [
-  { id: 'boxMaker', group: 'add', label: '卡榫盒子', icon: '📦', tip: '輸入尺寸，生成盒體', run: 'window.blocks.openBoxMaker', modes: ['design'] },
+  { id: 'boxMaker', group: 'add', plugin: true, label: box.name, icon: box.icon, tip: box.hint, run: 'window.blocks.openBoxMaker', modes: ['design'] },
   { id: 'undo', group: 'edit', label: '復原', icon: '↩', tip: '復原上一步', run: 'window.blocks.undo' },
   { id: 'deleteSelected', group: 'edit', label: '刪除選取', icon: '🗑', danger: true, tip: '刪除選取零件', run: 'window.blocks.deleteSelectedPart', modes: ['design'] },
   { id: 'fitView', group: 'view', label: '置中', icon: '⊡', tip: '置中畫布', run: 'window.blocks.fitView' },

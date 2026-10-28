@@ -1,6 +1,6 @@
-import {faceFileExportData} from './face-export.js';
-import {tabNutPartGeometry} from './tab-nut-plan.js';
-import {svgForFrameGeometry,dxfForFrameGeometry} from './exporters.js';
+import {faceFileExportData} from '../../blocks/face-export.js';
+import {tabNutPartGeometry} from '../../blocks/tab-nut-plan.js';
+import {svgForFrameGeometry,dxfForFrameGeometry} from '../../blocks/exporters.js';
 import {BOX_NAMES,normalizeBoxSettings} from './box-config.js';
 import {boxRoles,boxScrewCount} from './box-generator.js';
 

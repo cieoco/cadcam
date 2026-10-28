@@ -1,5 +1,5 @@
-import {openBoxDialog} from '../js/blocks/box-dialog.js';
-import {boxesInWork} from '../js/blocks/box-generator.js';
+import {openBoxDialog} from '../js/plugins/box-maker/box-dialog.js';
+import {boxesInWork} from '../js/plugins/box-maker/box-generator.js';
 import {normalizeSnapshot,toSnapshot} from '../js/blocks/schema.js';
 import {storedProject} from '../js/blocks/project-envelope.js';
 import {faceCandidateModel} from '../js/blocks/face-candidate.js';

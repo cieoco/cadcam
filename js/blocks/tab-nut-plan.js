@@ -3,7 +3,7 @@ import {buildMountSurfaces,findMountSurface} from './mount-surfaces.js';
 import {planTabNutGeometry,ringDistance} from './tab-nut-geometry.js';
 import {isFixedMountPart} from './part-types.js';
 import {readConnectionDescriptor} from './connection-descriptor.js';
-import {boxPanelGeometry} from './box-contract.js';
+import {boxPanelGeometry} from '../plugins/box-maker/box-contract.js';
 
 export const hasTabNut=modules=>(modules||[]).some(m=>m.mount?.face?.selection?.fastener);
 function rawPlan(comps,modules,params,mod,opts,over={}){

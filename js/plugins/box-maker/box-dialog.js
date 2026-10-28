@@ -2,7 +2,7 @@ import {BOX_DEFAULTS,BOX_NAMES,normalizeBoxSettings} from './box-config.js';
 import {boxesInWork,boxJointSummary} from './box-generator.js';
 import {planBoxChange} from './box-operations.js';
 import {boxLayout,boxFile} from './box-files.js';
-import {candidateMaterialFaces} from './face-candidate-view.js';
+import {candidateMaterialFaces} from '../../blocks/face-candidate-view.js';
 
 export function openBoxDialog({source,initialRoot='',onConfirm}){
  const dialog=document.createElement('dialog');dialog.className='box-maker';

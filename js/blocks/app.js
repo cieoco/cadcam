@@ -122,6 +122,7 @@ import { cncWarnings } from './cnc-check.js';   // L4：依刀徑檢查匯出特
 import { orthogonalExportExtras, withAdapterNodes, withWorldAdapterNodes } from './orthogonal-joint.js';   // O4a：直角安裝轉接座孔位
 import { adapterMesh, meshToStl } from './adapter-stl.js';   // O4b：3D 列印轉接座 STL
 import { buildPlan, buildPackHtml, deriveMotorMounts } from './build-plan.js?v=20261007_7';   // L5b：製作包（板件＋五金＋組裝步驟）
+import { PLUGINS } from '../plugins/registry.js';
 import { frameStockOf } from './frame-stock.js';
 import { pointKeysFor } from './part-types.js';
 import { resolveSpacers, suggestRackStops } from './interference.js';   // L5c／L6：干涉檢查、自動隔圈、齒條長槽限位建議
@@ -1061,10 +1062,10 @@ async function openBoxMaker() {
   if(bench.inCandidate?.()){transient('請先確認或取消接合預覽。');return;}
   pause();const before=snapshotStr(),source=JSON.parse(before),selected=S.comps.find(c=>c.id===(S.selectedLinkId || S.selectedTriangleId));
   try{
-    const {openBoxDialog}=await import('./box-dialog.js');
+    const {openBoxMaker:openDialog}=await PLUGINS.find(p=>p.id==='box-maker').load();
     if(snapshotStr()!==before){transient('作品已變更，請重新開啟卡榫盒子。');return;}
     boxMakerDialog?.close();
-    boxMakerDialog=openBoxDialog({source,initialRoot:selected?.boxPanel?.rootPart || '',onConfirm:async plan=>{
+    boxMakerDialog=openDialog({source,initialRoot:selected?.boxPanel?.rootPart || '',onConfirm:async plan=>{
       if(snapshotStr()!==before)return '作品已變更，請取消後重新開啟。';
       const normalized=Store.normalizeSnapshot(plan.work);if(!normalized)return '盒體資料無法保存，尚未修改作品。';
       applySnapshot(normalized,{fit:false,source:'box-maker'});
