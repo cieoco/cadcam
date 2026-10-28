@@ -715,3 +715,10 @@
 - 教材文字同步：fourbar／rack／tipping-bucket／teaching 的 MP4 步驟改為「專案 → MP4 動畫（10 秒）」，不再說電腦在「匯出」；teaching-slider 的「桌面為匯出」改為「電腦在頂端專案 ▾」；teaching-hydraulic 改「專案 → 開啟」「專案 → 範例…」；teaching 改「專案 → 開啟」「說明 → 設計引導」。
 - 驗收：`test/ui-commands.mjs`（契約）；瀏覽器腳本 `tools/ui-commands-browser.mjs` 在 1280×800 與 390×844、設計與組立兩種模式逐類比對看得見的指令，並實際觸發各指令，67 項通過、無主控台錯誤。`test/dimensions.mjs`、`test/build-pack.mjs`、`test/example-controller.mjs` 改查指令清單／範例清單而非舊按鈕。完整 226／226。
 - 啟動原始 JS 1,969,321 bytes，未調高 1.97 MB 預算。
+
+## 2026-10-28 — 固定軸方向無反應（2026.10.28.4）
+
+- 使用者手機截圖只有一個 TT 固定軸，機架面板卻仍顯示軸距 0 mm／相對角 0° 和可按的加減。單軸現在顯示「—」、停用軸距／方向並說明原因；「相對角」改名「固定軸方向」，明示移動第二個固定軸，不是馬達本體安裝角度。重合雙軸先增加軸距才能旋轉。
+- 顯示與操作共用焦點設計的固定軸清單、依 ID 選穩定的一對，避免跨分頁或轉過垂直後換軸。數字軸距／角度修改不再套 8 mm XY 格點，修正短軸距的 5° 被吸回原位；拖曳吸附維持原行為，操作先暫停、一次復原並沿用保存。
+- test/frame-ground.mjs 覆蓋單軸拒絕、重合軸回饋、8 mm 軸距的精確 5°／反向／整圈、穩定基準、焦點範圍、保存及面板停用。定向 8／8 通過：frame-ground、frame-stock、node-editor、design-focus、frame-export、assembly-frame、startup-size、load-graph（output/frame-ground/release-tests/results.json）。共用邏輯與提示增加約 2 KB，啟動上限從 1.9725 MB 調為 1.975 MB。
+- HTTP 手機 390×844 單軸 TT 顯示不可用提示；雙軸 8 mm 開啟吸附仍可 0→5→10°，復原回 5°；360×640 複核，1200×800 桌機保存重開仍為 5°，console 無 error。截圖 output/frame-ground/single-mobile.png、pair-mobile-360.png。瀏覽器尺寸驗收不代表實體手機測試。

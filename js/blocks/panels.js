@@ -13,10 +13,10 @@ import { S } from './state.js';
 import { servoInputAt } from './motor-tools.js';
 
 // ---- 注入的查詢 helper（由 app 在啟動時提供）----
-let pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked, frameSizeInfo;
+let pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked, frameSizeInfo, frameGroundInfo;
 
 export function init(deps) {
-  ({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked, frameSizeInfo } = deps);
+  ({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked, frameSizeInfo, frameGroundInfo } = deps);
 }
 
 // 更新長度顯示（用上方的 − / + 以 8mm 為單位調整）
@@ -107,7 +107,8 @@ export function updateFrameEditor() {
   if (!panel) return;
   const roleEditor = document.getElementById('roleEditor');
   const points = pointCoords();
-  const grounds = Object.entries(points).filter(([id]) => pointIsGround?.(id)).map(([id, point]) => ({ id, ...point }));
+  const axis=frameGroundInfo?.();
+  const grounds = axis?.nodes || Object.entries(points).filter(([id]) => pointIsGround?.(id)).map(([id, point]) => ({ id, ...point }));
   if (!grounds.length || !S.frameEditorOpen) { panel.style.display = 'none'; if (roleEditor) placeFrameEditor(panel, roleEditor); return; }
   const sizes=frameSizeInfo?.();
   for(const key of ['lengthMm','widthMm','thicknessMm']) {
@@ -127,8 +128,13 @@ export function updateFrameEditor() {
   const base = grounds[0], target = grounds[1];
   const axisLength = target ? Math.hypot(target.x - base.x, target.y - base.y) : 0;
   const axisAngle = target ? Math.atan2(target.y - base.y, target.x - base.x) * 180 / Math.PI : 0;
-  if (lengthValue) lengthValue.textContent = `${Math.round(axisLength)} mm`;
-  if (angleValue) angleValue.textContent = `${Math.round(axisAngle)}°`;
+  if (lengthValue) lengthValue.textContent = target?`${Math.round(axisLength)} mm`:'—';
+  if (angleValue) angleValue.textContent = target&&axisLength>1e-6?`${Math.round(axisAngle)}°`:'—';
+  for(const id of ['frameLengthMinus','frameLengthPlus','frameAngleMinus','frameAnglePlus']){
+    const button=document.getElementById(id);if(button)button.disabled=!target||(id.includes('Angle')&&axisLength<1e-6);
+  }
+  const hint=document.getElementById('frameAxisHint');
+  if(hint)hint.textContent=!target?'只有一個固定軸，無法調整軸距與方向。這裡不是馬達本體角度。':axisLength<1e-6?'兩個固定軸重合，請先增加軸距。':`調整 ${base.id} → ${target.id} 的方向；移動第二個固定軸，不旋轉馬達本體。`;
   if (lock) { lock.textContent = S.lockFrameHoles ? '✓ 8 mm 吸附中' : '8 mm 吸附'; lock.classList.toggle('trace-on', Boolean(S.lockFrameHoles)); }
   if (margin) margin.value = Number(S.frameMarginMm || 18);
   if (hole) hole.value = Number(S.frameHoleDiameterMm || 5);

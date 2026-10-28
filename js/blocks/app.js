@@ -1,4 +1,5 @@
 import {fusionRoot} from '../core/bar-fusion.js';
+import {frameGroundAxis,planFrameGroundChange} from './frame-ground.js';
 import {tabNutPartGeometry} from './tab-nut-plan.js';
 import {syringeShapes} from './syringe-shape.js';
 import {planSyringeAttachmentResize} from '../core/syringe.js';
@@ -2320,24 +2321,19 @@ function setFrameSize(key, raw) {
   rebuild();draw();Panels.updateFrameEditor();scheduleAutosave();
 }
 function changeFrameGround(kind, delta) {
-  const points = pointCoords();
-  const nodes = [...frameNodeIds()].map(id => ({ id, ...points[id] })).filter(point => Number.isFinite(point.x) && Number.isFinite(point.y))
-    .sort((a, b) => (a.x - b.x) || (a.y - b.y));
-  if (nodes.length < 2) return;
-  const base = nodes[0], target = nodes[1];
-  const dx = target.x - base.x, dy = target.y - base.y;
-  let length = Math.hypot(dx, dy), angle = Math.atan2(dy, dx);
-  if (kind === 'length') length += Number(delta || 0);
-  else if (kind === 'angle') angle += Number(delta || 0) * Math.PI / 180;
-  else return;
-  if (length < LEGO_STEP) { transient('機架軸距至少保留 8 mm'); return; }
+  const next=planFrameGroundChange(frameGroundInfo().nodes,kind,Number(delta));
+  if(!next.ok){transient(next.reason);return;}
+  pause();
   pushUndo();
-  const next = { x: base.x + Math.cos(angle) * length, y: base.y + Math.sin(angle) * length };
-  const snapped = snapFramePoint(next);
-  updatePointCoordsById(target.id, snapped.x, snapped.y);
+  updatePointCoordsById(next.id,next.x,next.y);
   rebuild();
   Panels.updateFrameEditor();
   draw();
+}
+
+function frameGroundInfo() {
+  const points=pointCoords();
+  return frameGroundAxis([...frameNodeIds()].map(id=>({id,...points[id]})));
 }
 
 // 機架移動把手：固定銷形心放一顆「🏠 機架」鈕，拖它＝把所有固定銷整組平移。
@@ -3279,7 +3275,7 @@ async function share() {
 // ---- 啟動：分享連結優先，其次 localStorage 自動還原，否則空白 ----
 function init() {
   Render.init({ svg, onNodeDown: guardedNodeDown });   // 注入繪製基元的外部依賴（預設 parent + 固定孔互動）
-  Panels.init({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked, frameSizeInfo });
+  Panels.init({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked, frameSizeInfo, frameGroundInfo });
   Tools.init({ svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
                setBanner, clearBanner, worldFromEvent, pointCoords, nearestDisplayToPoint, snapWorld,
                mobilePrompt, promptText, displayPointCoords: displayCoords, notify: transient });
