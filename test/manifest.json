@@ -15,6 +15,7 @@
   ],
   "timeoutMs": 90000,
   "tests": [
+    "test/step-export.mjs",
     "test/box-maker.mjs",
     "test/box-panels-joints.mjs",
     "test/box-lid-closure.mjs",

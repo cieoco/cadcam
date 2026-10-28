@@ -23,6 +23,7 @@ export const COMMANDS = [
   { id: 'fabrication', group: 'project', label: '製作設定與零件輸出', icon: '⚙️', run: 'window.blocks.openFabrication' },
   { id: 'exportVideo', group: 'project', label: 'MP4 動畫（10 秒）', icon: '🎬', run: 'window.blocks.exportVideo' },
   { id: 'buildPack', group: 'project', label: '製作包', icon: '📋', tip: '板件清單＋五金清單＋組裝步驟（可列印）', run: 'window.blocks.downloadBuildPack' },
+  { id: 'exportStep', group: 'project', label: '匯出 STEP', icon: '📐', tip: '板件存成 STEP，CAD 可開', run: 'window.blocks.exportStep' },
   { id: 'clearAll', group: 'project', label: '清空全部', icon: '🗑', danger: true, tip: '清空目前全部零件', run: 'window.blocks.confirmClearAll' },
   { id: 'guide', group: 'help', label: '設計引導', icon: '🧭', run: 'window.blocks.openGuide', modes: ['design'] },
   { id: 'help', group: 'help', label: '操作說明', icon: '❓', run: 'window.blocks.openHelp' },
