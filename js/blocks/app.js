@@ -1033,6 +1033,12 @@ const { selectTriangle, startShapeDrag, deleteShapeVertex, updatePlateShapeContr
         setTriangleShapeMode, addTriangleOutlinePoint,
         triParamFor, setTriSide, changeTriSide } = plateEditor;
 const memberEditor = createMemberEditor({
+  resizeFusion: async (id,value) => {
+    pause();const revision=snapshotStr();
+    try {const {commitBarFusionResize}=await import('./bar-fusion-resize.js');
+      commitBarFusionResize({S,id,value,revision,fingerprint:snapshotStr,positions:displayCoords,settings:Settings.exportSettings,comps:viewComps,pause,pushUndo,rebuild,draw,notify:transient});
+    }catch(e){transient('合成尺寸未修改：'+e.message);draw();}
+  },
   openMobileEditPanel,
   pause, pushUndo, rebuild, draw, reshapeTriangle: plateEditor.reshapeTriangle,
   updatePointCoordsById, notify: transient, holeDiameter: comp => memberHoleDiameter(comp, Settings.exportSettings())
@@ -2772,7 +2778,7 @@ function deleteSelectedPart() {
   rebuild(); draw();
 }
 function setLen(v) {
-  if(fusionRoot(S.comps,S.selectedLinkId)){transient('請先解除合成，再修改尺寸。');return;}
+  if(fusionRoot(S.comps,S.selectedLinkId))return memberEditor.setValue(v);
   const c = S.comps.find(x => x.id === S.selectedLinkId);
   if (!c) return;
   pushUndo();

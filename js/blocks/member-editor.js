@@ -4,7 +4,7 @@ import { planSyringeAttachmentResize } from '../core/syringe.js';
 import { memberDimensions, memberDimensionValue, planMemberDimension, mirroredJaw, dimensionLock } from './member-dimensions.js';
 import { MATERIALS, memberStock, planMemberStock } from './member-stock.js';
 
-export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTriangle, updatePointCoordsById, notify, openMobileEditPanel = () => {}, holeDiameter = () => 12.96 }) {
+export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTriangle, updatePointCoordsById, notify, resizeFusion, openMobileEditPanel = () => {}, holeDiameter = () => 12.96 }) {
   let mirror = true;
   let tipDraft = null;
   let lastSelectedId = null;
@@ -14,6 +14,16 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
   const dimensionId = () => S.triSide || 'g';
   function sync() {
     const comp = selected();
+    const segments=el('fusionSegment');
+    if(segments){
+      segments.hidden=!comp?.barFusionRoot;
+      if(comp?.barFusionRoot){
+        segments.replaceChildren(...S.comps.filter(c=>c.barFusionRoot===comp.barFusionRoot).map((c,i)=>{
+          const option=document.createElement('option');option.value=c.id;option.textContent=`${c.name||`第 ${i+1} 段`} · ${S.topo.params[c.lenParam]} mm`;return option;
+        }));segments.value=comp.id;
+        segments.onchange=()=>{pause();S.selectedLinkId=segments.value;S.triSide='g';draw();};
+      }
+    }
     if(lastSelectedId!==comp?.id){const more=el('memberMore');if(more)more.open=false;const operations=el('memberOperations');if(operations)operations.hidden=true;el('memberOperationsToggle')?.setAttribute('aria-expanded','false');lastSelectedId=comp?.id;}
     if (tipDraft && tipDraft.selectedId !== comp?.id) tipDraft = null;
     const dimensions = memberDimensions(comp);
@@ -74,7 +84,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
       el('memberMirrorLabel').style.display = '';
       el('memberMirror').checked = mirror;
     }
-    el('lenTitle').textContent = comp.boxPanel ? '盒體板件' : comp.type === 'bar' ? '連桿' : comp.shape === 'jaw' ? '夾爪板' : '桿件／板件';
+    el('lenTitle').textContent = comp.barFusionRoot ? '合成一片' : comp.boxPanel ? '盒體板件' : comp.type === 'bar' ? '連桿' : comp.shape === 'jaw' ? '夾爪板' : '桿件／板件';
   }
   function selectDimension(id) {
     if (!memberDimensions(selected()).some(d => d.id === id)) return;
@@ -96,6 +106,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     const failure = plans.find(plan => !plan.ok);
     if (failure) { notify(failure.message); sync(); return; }
     if (targets.every(c => Math.abs(memberDimensionValue(c, S.topo.params, id) - plans[0].value) < 0.001)) { sync(); return; }
+    if(comp.barFusionRoot)return resizeFusion?.(comp.id,plans[0].value);
     pause(); pushUndo();
     targets.forEach((c, index) => {
       if (c.type === 'bar' && id === 'g') {

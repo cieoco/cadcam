@@ -73,7 +73,7 @@ export function mirroredJaw(comp, comps, params) {
 
 export function dimensionLock(comp, comps, id) {
   if(comp?.boxPanel)return '盒體板件尺寸請從「卡榫盒子」統一修改。';
-  if(comp?.barFusionRoot)return '已合成一片；請先解除合成再調整尺寸。';
+  if(comp?.barFusionRoot&&id!=='g')return '請先解除合成再調整板寬或板厚。';
   const dimension = memberDimensions(comp).find(d => d.id === id);
   if (!dimension || dimension.property || dimension.stockKey) return '';
   const ids = dimension.refs.map(ref => comp[ref]?.id);

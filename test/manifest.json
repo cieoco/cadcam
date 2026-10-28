@@ -28,6 +28,7 @@
     "test/canvas-rulers.mjs",
     "test/dimensions.mjs",
     "test/bar-fusion.mjs",
+    "test/bar-fusion-resize.mjs",
     "test/actuator-installation.mjs",
     "test/syringe.mjs",
     "test/rod-syringe-creation.mjs",

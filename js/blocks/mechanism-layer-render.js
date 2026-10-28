@@ -21,7 +21,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
     return count + (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(b.x) ? 1 : 0);
   }, 0);
   eligible.forEach(link => {
-    const selected = link.id && link.id === selectedLinkId;
+    const selected = link.id && (link.id === selectedLinkId || comps.some(c=>c.id===selectedLinkId&&c.barFusionRoot===link.id));
     const component = comps.find(comp => comp.id === link.id && comp.type === 'bar');
     const editable = component?.fixedLen;
     const fusion=component?.barFusion && inspectBarFusion(comps,component,params,exportSettings);
