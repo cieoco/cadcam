@@ -61,11 +61,10 @@ ok(JSON.stringify(BOX_DEFAULTS.panels)===JSON.stringify({lid:false,front:true,ba
   const b=Object.fromEntries(['base','lid','front','left','right','back'].map(k=>[k,bounds(r,k)]));
   ok(near(b.lid.z[0]-b.base.z[1],s.heightMm),'上蓋下表面距底板上表面＝內高');
   ok(near(b.lid.x[1]-b.lid.x[0],b.base.x[1]-b.base.x[0])&&near(b.lid.y[1]-b.lid.y[0],b.base.y[1]-b.base.y[0]),'上蓋與底板同尺寸（留邊給插槽）');
-  const f=svgs(r.work).files,lid=f.find(x=>/lid/i.test(x.name)).text,front=f.find(x=>x.name==='Boxfront.svg'||/front/i.test(x.name)).text;
+  const f=svgs(r.work).files,lid=f.find(x=>/lid/i.test(x.name)).text;
   ok(count(lid,'TAB_NUT_SLOT')===12&&count(lid,'TAB_NUT_BOLT')===6,'上蓋也有 12 槽、6 孔，對到四面側板上緣');
   ok(screws(r.work)===12,'六面盒：M3 螺絲 12 顆');
-  const five=svgs((await checkedBox(BOX_DEFAULTS)).work).files.find(x=>/front/i.test(x.name)).text;
-  ok((front.match(/data-layer="TAB_NUT_[A-Z_]*NUT[A-Z_]*"/g)||[]).length===2*(five.match(/data-layer="TAB_NUT_[A-Z_]*NUT[A-Z_]*"/g)||[]).length,'加上蓋後，側板上下兩端都有螺母卡槽');
+  // 側板上下兩端的螺母卡槽屬於板外形（無圖層名），由 test/box-lid-closure.mjs 以外形頂點檢查。
 }
 // ---------- 少於五面 ----------
 {
