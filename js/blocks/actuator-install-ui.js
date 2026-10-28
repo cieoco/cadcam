@@ -13,7 +13,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     outputId:old?.id||initialOutputId,outputEnd:oldCenter&&old?.p2?.id===oldCenter?'p2':'p1',start:old?.servoStart??0,end:old?.servoEnd??90,
     angle:old?Number(motion.motorAngles?.[old.physicalMotor||old.p1?.physicalMotor]??motion.thetaDeg??0):0};
   const oldHost=choices.hosts.find(c=>c.id===request.hostId);if(oldHost&&oldCenter&&oldHost.p2.id===oldCenter)request.hostEnd='p2';
-  let step=old?3:0,furthest=old?3:0,result=null,viewer=null,closed=false,revision=0,three=false,quick=!old,selectedNode='';
+  let step=old?1:0,furthest=old?3:0,result=null,viewer=null,closed=false,revision=0,three=false,quick=!old,selectedNode='';
   const candidates=old?[]:quickMotorChoices(base.comps,initialOutputId);
   const legal=candidates.filter(c=>planMotorInstallation(base,{...request,...c},points,motion).ok);
   if(legal.length===1){Object.assign(request,legal[0]);selectedNode=legal[0].nodeId;}
@@ -41,8 +41,9 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
   el('p','藍色是外殼的承載零件；正背面決定外殼位於哪側。軸心孔用來定位，螺絲固定孔另由安裝規格產生。',panels[0]);
   const hostNote=el('p',null,panels[0]);
   const location=field(panels[1],'軸心位置');option(location,'承載桿第一孔','p1');option(location,'承載桿第二孔','p2');location.value=request.hostEnd;
-  const orientation=field(panels[1],'外殼方向');for(const [v,t] of [['horizontal','水平'],['vertical','垂直'],['follow-frame','沿承載桿']])option(orientation,t,v);orientation.value=request.orientation;
-  const reverse=el('button','反向放置',panels[1]);reverse.onclick=()=>{request.reversed=!request.reversed;update();};
+  const orientation=field(panels[1],'馬達本體方向');for(const [v,t] of [['horizontal','水平'],['vertical','垂直'],['follow-frame','沿承載桿']])option(orientation,t,v);orientation.value=request.orientation;
+  const reverse=el('button','本體轉向 180°',panels[1]);reverse.onclick=()=>{request.reversed=!request.reversed;update();};
+  el('p','調整馬達外殼的安裝朝向，連桿角度保持不變。正／背面與承載零件在「固定外殼」設定。',panels[1]);
   el('p','點預覽中的承載端孔定位。自動機架使用下一步選定的輸出孔；活動承載桿採沿桿方向，外殼會跟著它移動。',panels[1]);
   const output=field(panels[2],'輸出軸帶動哪個零件？');option(output,'請選輸出零件','');choices.outputs.forEach(c=>option(output,label(c),c.id));output.value=request.outputId;
   const end=field(panels[2],'輸出連接孔');option(end,'第一孔／齒輪軸心','p1');option(end,'第二孔','p2');end.value=request.outputEnd;
@@ -58,7 +59,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
   const error=el('p',null,body);error.className='install-error';error.setAttribute('role','status');
   const foot=el('footer',null,dialog),back=el('button','上一步',foot),next=el('button','下一步',foot);
   cancel.onclick=()=>dialog.close();back.onclick=()=>{step--;update();};
-  next.onclick=()=>{if(!quick&&step<3){step++;furthest=Math.max(furthest,step);update();}else if(result?.ok){if(confirm(result)!==false)dialog.close();else error.textContent='作品已變更，請關閉後重新安裝。';}};
+  next.onclick=()=>{if(!old&&!quick&&step<3){step++;furthest=Math.max(furthest,step);update();}else if(result?.ok){if(confirm(result)!==false)dialog.close();else error.textContent='作品已變更，請關閉後重新安裝。';}};
   adjust.onclick=()=>{quick=false;step=0;furthest=result?.ok?3:0;host.value=request.hostId;output.value=request.outputId;location.value=request.hostEnd;end.value=request.outputEnd;orientation.value=request.orientation;update();};
   kind.onchange=()=>{request.type=kind.value;update();};
   host.onchange=()=>{request.hostId=host.value;request.orientation=host.value==='world'?'horizontal':'follow-frame';if(host.value==='world')request.face='back';orientation.value=request.orientation;update();};
@@ -154,9 +155,9 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     trial.min=request.type==='mg995'?Math.min(Number(request.start),Number(request.end)):0;trial.max=request.type==='mg995'?Math.max(Number(request.start),Number(request.end)):360;trial.value=request.angle;
     summary.textContent=`固定：${request.hostId==='world'?'自動機架':request.hostId}・${request.face==='front'?'正面':'背面'} → 帶動：${request.outputId}`;
     reading.textContent=`${request.angle}°${result?.ok?' · 幾何可解':''}`;
-    error.textContent=(quick||step>=2)&&result&&!result.ok?result.message:'';
-    back.hidden=quick;back.disabled=step===0;next.textContent=quick||step===3?'確認安裝':'下一步';
-    next.disabled=quick?!result?.ok:step===0?!request.hostId:step===1?!request.hostId:!result?.ok;
+    error.textContent=(old||quick||step>=2)&&result&&!result.ok?result.message:'';
+    back.hidden=quick;back.disabled=step===0;next.textContent=old?'儲存安裝':quick||step===3?'確認安裝':'下一步';
+    next.disabled=old||quick?!result?.ok:step===0?!request.hostId:step===1?!request.hostId:!result?.ok;
     trial.disabled=!request.hostId||!request.outputId;scan.disabled=toggle.disabled=!result?.ok;
     const show3d=three&&step===3&&result?.ok;space.hidden=!show3d;svg.toggleAttribute('hidden',!!show3d);toggle.textContent=show3d?'回到 2D':'查看 3D';
     hint.textContent=quick?'點孔選軸心 → 確認安裝':show3d?'拖模型轉動視角；安裝面與輸出層一起預覽':['選藍色承載零件，再選外殼安裝面','選軸心端孔與外殼方向','選橘色輸出零件與連接孔','候選試動不改作品；確認後可一次復原'][step];
