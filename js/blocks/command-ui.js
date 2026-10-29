@@ -28,9 +28,13 @@ export function initCommandUi() {
     el.append(...COMMANDS.filter(c => c.group === el.dataset.commandGroup && !skip.includes(c.id)).map(c => button(c)));
   }
   for (const el of document.querySelectorAll('[data-add-sections]')) for (const sec of ADD_SECTIONS) {
-    const items = COMMANDS.filter(c => c.section === sec.id), d = document.createElement('details'), box = document.createElement('div');
-    d.className = 'creation-category'; d.dataset.addSection = sec.id; d.open = !!sec.open;
-    d.innerHTML = `<summary>${sec.label}<span class="add-count">${items.length ? `（${items.length}）` : ''}</span><small>${sec.hint}</small></summary>`;
+    const items = COMMANDS.filter(c => c.section === sec.id), d = document.createElement(sec.primary ? 'div' : 'details'), box = document.createElement('div');
+    d.className = sec.primary ? 'creation-primary' : 'creation-category'; d.dataset.addSection = sec.id;
+    if (sec.primary) { d.setAttribute('role', 'group'); d.setAttribute('aria-label', sec.label); }
+    else {
+      d.open = !!sec.open;
+      d.innerHTML = `<summary>${sec.label}<span class="add-count">${items.length ? `（${items.length}）` : ''}</span><small>${sec.hint}</small></summary>`;
+    }
     if (sec.id === 'modules') { box.id = 'moduleLibrary'; box.className = 'tray-section-items'; }
     else { box.className = 'creation-items'; box.append(...items.map(c => button(c))); }
     d.append(box); el.append(d);

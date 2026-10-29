@@ -1,4 +1,4 @@
-// 鏈輪＋#25 鏈條 S2：學生從「新增 → 傳動」放兩個鏈輪＋鏈條，改齒數、對齊整數鏈節。
+// 鏈輪＋#25 鏈條 S2：學生從「新增 → 其他零件」放兩個鏈輪＋鏈條，改齒數、對齊整數鏈節。
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as CD from '../js/core/chain-drive.js';
@@ -59,7 +59,7 @@ ok(/近|碰|距離/.test(placeChainDrive(frame,params,{x:0,y:0},{x:10,y:0}).mess
 {
   const html=readFileSync(new URL('../blocks.html',import.meta.url),'utf8');
   const {COMMANDS}=await import('../js/blocks/ui-commands.js');   // 新增面板由指令清單產生
-  ok(COMMANDS.some(c=>c.run==='window.blocks.startChainDrive'&&c.section==='transmission'&&/鏈輪/.test(c.label)),'新增 → 傳動 有「鏈輪＋鏈條」');
+  ok(COMMANDS.some(c=>c.run==='window.blocks.startChainDrive'&&c.section==='other'&&/鏈輪/.test(c.label)),'新增 → 其他零件 有「鏈輪＋鏈條」');
   const app=readFileSync(new URL('../js/blocks/app.js',import.meta.url),'utf8');
   ok(/window\.blocks\.startChainDrive\s*=/.test(app)||/startChainDrive\s*[:,]/.test(app),'window.blocks.startChainDrive 可呼叫');
   ok(/alignChainLinks/.test(app)||/alignChainLinks/.test(readFileSync(new URL('../js/blocks/chain-tools.js',import.meta.url),'utf8')),'面板提供「對齊整數鏈節」');

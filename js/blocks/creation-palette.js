@@ -9,7 +9,7 @@ export function createCreationPalette({cancel}) {
       if(!tools)return;
       if(focus!==key || (empty===false && count===0))tools.open=count===0;
       focus=key;empty=count===0;
-      hint.textContent=count===0?'先加零件，或加入完整模組。':'點選零件可修改；需要連接或動力時，從這裡新增。';
+      hint.textContent=count===0?'先放連桿或板件；點孔可固定在底座。':'點零件改尺寸，點孔調整固定或馬達安裝。';
       button.hidden=!drawing;
     }
   };

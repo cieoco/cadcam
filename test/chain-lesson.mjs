@@ -8,7 +8,7 @@ const i=html.indexOf('鏈條傳動');
 ok(i>0,'齒輪單元有「鏈條傳動」延伸任務');
 const sec=html.slice(i,html.indexOf('</section>',i));
 ok(/blocks\.html\?example=sprocket-chain/.test(sec),'有開啟 sprocket-chain 範例的連結');
-ok(/鏈輪＋鏈條/.test(sec),'教學生從「新增 → 傳動 → 鏈輪＋鏈條」自己放一次');
+ok(/鏈輪＋鏈條/.test(sec),'教學生從「新增 → 其他零件 → 鏈輪＋鏈條」自己放一次');
 ok(/同向/.test(sec)&&/反向/.test(sec),'比較轉向：鏈條同向、齒輪對反向');
 ok(/齒數/.test(sec)&&/(速比|轉速)/.test(sec),'用齒數比說明速比');
 ok(/鏈節/.test(sec)&&/整數/.test(sec)&&/對齊整數鏈節/.test(sec),'鏈節必須整數，用「對齊整數鏈節」');

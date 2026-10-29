@@ -743,3 +743,13 @@
 - 顯示與操作共用焦點設計的固定軸清單、依 ID 選穩定的一對，避免跨分頁或轉過垂直後換軸。數字軸距／角度修改不再套 8 mm XY 格點，修正短軸距的 5° 被吸回原位；拖曳吸附維持原行為，操作先暫停、一次復原並沿用保存。
 - test/frame-ground.mjs 覆蓋單軸拒絕、重合軸回饋、8 mm 軸距的精確 5°／反向／整圈、穩定基準、焦點範圍、保存及面板停用。定向 8／8 通過：frame-ground、frame-stock、node-editor、design-focus、frame-export、assembly-frame、startup-size、load-graph（output/frame-ground/release-tests/results.json）。共用邏輯與提示增加約 2 KB，啟動上限從 1.9725 MB 調為 1.975 MB。
 - HTTP 手機 390×844 單軸 TT 顯示不可用提示；雙軸 8 mm 開啟吸附仍可 0→5→10°，復原回 5°；360×640 複核，1200×800 桌機保存重開仍為 5°，console 無 error。截圖 output/frame-ground/single-mobile.png、pair-mobile-360.png。瀏覽器尺寸驗收不代表實體手機測試。
+
+
+## 2026-10-29 — 常用新增入口與點選修改（2026.10.29.2，使用者先行試看）
+
+- 新增第一層改為連桿、板件、馬達；其餘十項收進其他零件，保留加入模組與外掛。固定不再單獨占區，固定支點仍可新增；主要工作沿用點現有孔固定／取消固定。所有十四個新增動作保留原派送函式。
+- 共用 command-ui 支援沒有重複標題的常用群組；手機三個常用按鈕並列、其他零件兩欄，名稱換行、至少 44px 點選區。橫式新增盤修正為 200px 左欄，不再被 100% 寬規則擠掉畫布。未選取的手機調整頁加入點選提示；既有點選即開屬性、完成收合、尺寸／複製／鏡射／刪除與固定／馬達安裝流程保留。
+- 教學頁的分類路徑同步改成其他零件與加入模組，移除必須先切調整的敘述。舊教學截圖尚待本次瀏覽器驗收後核對，不能當作新版畫面證據。未改作品格式、保存、復原或求解邏輯。
+- 定向 Node 8／8 通過（output/palette-simple/tests/results.json）。全套首次 232／233 通過，唯一鏈輪入口斷言仍指向舊分類；更新分類後 chain-ui、hydraulic-p1-3、chain-lesson 與 load-graph 4／4 重測通過（output/palette-simple/recheck/results.json），無未解的測試失敗。
+- Browser 外掛在本機設定為啟用，但瀏覽器工具仍回報 Work 設定停用本機瀏覽器操作；重連後相同，原因未確認，不能歸因於使用者關閉。尚未取得手機／桌機畫面與實際互動證據。測試入口 output/palette-simple/preview.html 提供 390×844、360×640、844×390、1366×768。
+- 使用者明確要求「先 Push，我來看一下」，本次依此授權先升版提交推送，畫面與互動由使用者試看；不將 Node 通過視為完成瀏覽器驗收。部署結果另以該提交的 GitHub Actions 與線上版本確認。教材同步後另有 lesson-sequence、hydraulic-course、chain-lesson、load-graph 4／4 通過（output/palette-simple/teaching-check/results.json）。
