@@ -1564,7 +1564,7 @@ function updateMechanismStatus(sol = null) {
     } else if (gearMeshHasWarning()) {
       state = 'error';
       text = '齒輪沒有咬合，請調整位置';
-    } else if (sol?.isValid === false) {
+    } else if (sol?.isValid === false && hasDriveSource()) {
       state = 'error';
       text = '目前角度無解，可先復原最後一次修改';
     } else if (mobility.dof < 0) {
