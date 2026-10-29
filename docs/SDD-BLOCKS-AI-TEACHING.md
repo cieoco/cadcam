@@ -150,6 +150,7 @@ P2 不以先完成 MCP 為前提。首例僅需某個局部操作時，不預做
 - 達成／尚未達成／無法判定分開；達成可接既有 MP4 匯出，修改後重新檢查。額外桿件不判定為物理上不可能，僅超出本課範圍。未驗證連續極值、碰撞、承載與實物。
 - tools/capture-slider-lesson.mjs 在 CUA 瀏覽器環境檢查半成品的新增入口／無法判定，再重跑完整範例的 60 → 80 mm 檢查操作，依 APP_VERSION 產生候選圖與 manifest；按鈕／選取／成果不符則停止。這是檢查入口的示範，不代替半成品補接教學。
 - 截圖需人工核對後才複製至 media/tutorials/keyshots；不自動覆蓋教材，不每次版本無差別重錄影片。其餘六課尚未自動化。
+- tools/capture-tutorial-shots.mjs（2026-10-30）：獨立的 Playwright 腳本，自備本機伺服器，用手機 390×844 從範例／空白畫布走真實按鈕，重錄教學頁全部 45 張手機截圖（匯出 MP4 一張在無頭 Chromium 以 VP9 代替 H.264 取得同一對話框）。預設輸出 output/tutorial-shots/ 供人工核對；加 --publish 才覆蓋教材圖，並依目標元素實際位置改寫教學頁的 .shot-mark 編號圈；--only 名稱 可只重錄部分。審核判定仍相符的兩張針筒安裝圖標為 verify，只比對不覆蓋（--include-ok 才覆蓋）。
 - 重跑方式：先啟動 HTTP server，於 cua_repl 讀取瀏覽器操作文件，建立獨立本機測試分頁與對應 browser／DOM tab；匯入此腳本並呼叫 captureSliderLesson({ ui, tab, browser, baseURL, outputRoot })。ui 是 cua.createBrowserTab 的回傳，tab 為 browser.tabs.get(ui.id)，outputRoot 建議 output/lesson-candidates；使用測試用 origin，因載入範例會替換該 origin 的自動保存。輸出於版本／slider，需主機支援 AX stepper 設值；不支援時明確失敗，不跳過驗收。
 
 

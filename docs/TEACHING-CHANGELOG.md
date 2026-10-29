@@ -753,3 +753,11 @@
 - 定向 Node 8／8 通過（output/palette-simple/tests/results.json）。全套首次 232／233 通過，唯一鏈輪入口斷言仍指向舊分類；更新分類後 chain-ui、hydraulic-p1-3、chain-lesson 與 load-graph 4／4 重測通過（output/palette-simple/recheck/results.json），無未解的測試失敗。
 - Browser 外掛在本機設定為啟用，但瀏覽器工具仍回報 Work 設定停用本機瀏覽器操作；重連後相同，原因未確認，不能歸因於使用者關閉。尚未取得手機／桌機畫面與實際互動證據。測試入口 output/palette-simple/preview.html 提供 390×844、360×640、844×390、1366×768。
 - 使用者明確要求「先 Push，我來看一下」，本次依此授權先升版提交推送，畫面與互動由使用者試看；不將 Node 通過視為完成瀏覽器驗收。部署結果另以該提交的 GitHub Actions 與線上版本確認。教材同步後另有 lesson-sequence、hydraulic-course、chain-lesson、load-graph 4／4 通過（output/palette-simple/teaching-check/results.json）。
+
+## 2026-10-30 — 教學截圖更新到目前介面（2026.10.29.3）
+
+- 稽核：教學頁引用的 45 張手機截圖，43 張的畫面外殼已過期（舊頂列「教學／⋯ 更多／設計引導／版本」、舊新增面板、舊調整列、舊接合精靈的版本晶片等），只有兩張全螢幕針筒安裝精靈（第 1、3 步）仍相符；沒有純示意圖。逐張結果與文字不符清單見本次提交說明。
+- 重錄：新增 tools/capture-tutorial-shots.mjs，同檔名、同 390×844，保留 .png／.webp 格式；圈選編號（.shot-mark）由腳本依畫面上目標元素的實際位置寫回教學頁。43 張全部重錄並逐張目視核對。匯出完成對話框需要 MP4：無頭 Chromium 沒有 H.264 編碼器，腳本只在截圖時把編碼換成 VP9，仍是同一個匯出流程與對話框。
+- 文字修正：孔距欄不再有尺寸下拉（教學首頁、第 2、3 課）；成果檢查在「專案 → 製作設定與零件輸出」（第 3 課三處）；齒數圖說的模數位置（第 4 課）；聯集按鈕收在「⋯」（第 5 課）；槽長在「更多：傳動、孔位與動力」（第 6 課）；接合方式與面按鈕標示（第 8 課）；針筒與安裝設定對話框路徑（第 10 課）；移除「2026-10-16 舊版示意」字樣與舊 alt。
+- 未處理：teaching-slider.html 的教學影片（media/tutorials/mobile-slider-basics.*）仍是舊 UI，需另行重錄；未被引用的舊圖未動；js/blocks/example-entry.js 範例視窗仍寫「新增 → 現成組件」（應為「加入模組」）。
+- 版本 2026.10.29.3；不改作品格式、求解或 UI 程式。驗證見提交說明與全套測試結果。
