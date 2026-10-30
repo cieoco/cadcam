@@ -761,3 +761,15 @@
 - 文字修正：孔距欄不再有尺寸下拉（教學首頁、第 2、3 課）；成果檢查在「專案 → 製作設定與零件輸出」（第 3 課三處）；齒數圖說的模數位置（第 4 課）；聯集按鈕收在「⋯」（第 5 課）；槽長在「更多：傳動、孔位與動力」（第 6 課）；接合方式與面按鈕標示（第 8 課）；針筒與安裝設定對話框路徑（第 10 課）；移除「2026-10-16 舊版示意」字樣與舊 alt。
 - 未處理：teaching-slider.html 的教學影片（media/tutorials/mobile-slider-basics.*）仍是舊 UI，需另行重錄；未被引用的舊圖未動；js/blocks/example-entry.js 範例視窗仍寫「新增 → 現成組件」（應為「加入模組」）。
 - 版本 2026.10.29.3；不改作品格式、求解或 UI 程式。驗證見提交說明與全套測試結果。
+
+## 2026-10-31 — 每個單元都有自己的起始練習檔（2026.10.31.1）
+
+- 緣由：教師要求學生不必用上一單元保存的作品開始，每個單元可獨立練習。原本第五課要「在上一課齒輪上補畫夾指」、第十一課要「沿用自己的夾爪」、第十二課要「保留第十一單元作品」，缺課或沒存檔就無法開始。
+- 課程對照（教學頁第一步都是「開啟起始練習檔」連結，`data-unit-start="N"`）：1 empty-challenge；2 wiper-missing-coupler；3 slider-crank-practice；4 unit4-start（空白畫布）；5 unit5-start（15／20 齒齒輪對，兩輪固定，左輪 MG995 0°～30°，尚無夾指）；6 unit6-start（齒條升降器，槽長 144 mm）；7 unit7-start（四板翻斗，結束角 −100°）；8 assembly-lift-gripper-practice；9 hydraulic-h01-practice；10 hydraulic-h02-practice（夾具另有 hydraulic-h03-practice）；11 unit11-start（升降與夾爪各有針筒、兩個模組分開、尚未接合）；12 unit12-start（升降＋夾爪已接好、旋轉底盤分開）。
+- 資料：新增 js/blocks/unit-starts.js（單元對照，純資料）與 js/blocks/unit-start-examples.js（六個新檔，由既有範例複製後改幾個欄位，不另抄座標）。兩者都不在啟動程式內：examples.js 只多一個 `loadUnitStarts()`，網址深連結（?example=）、「專案 → 範例…」與 `requestExample` 在第一次需要時才載入，可重複呼叫、不重複登記。啟動預算不變（上限 1,977,000，目前 1,976,617）。
+- 為了讓啟動大小不變，把從未公開的範例「競賽飛輪射球」（原本在 examples.js 以 id 濾掉）原樣移到 js/blocks/parked-examples.js，內容與公開清單都沒有改變。
+- 第四單元：教師希望從「已備好機架與 TT 馬達」開始，但課文要學生自己「固定右輪、左輪裝 TT 馬達」，齒輪對也不會吸附到既有機架，多一顆馬達會和「只加一顆驅動馬達」衝突，所以照課文用空白畫布起始檔。
+- 教學頁文字：移除「先保存上一課」「在上一課齒輪上」「沿用第四課作品／自己的夾爪」「保存給下一課」等必經路徑（第 4、5、7、8 課與第九～十二單元、課程總覽）；課程總覽說明每個單元都有起始練習檔。
+- 截圖：rack-select、rack-slot、bucket-assembly、bucket-angle、h06-face-placement-mobile 改由新起始檔重錄並逐張目視核對；tools/capture-tutorial-shots.mjs 對應改開 unit6-start、unit7-start、unit12-start。
+- 測試：test/unit-starts.mjs（契約）、新增 test/unit-start-examples.mjs（延遲載入、不重複登記、各檔內容與求解、深連結），test/units345.mjs 先 `await loadUnitStarts()`。
+- 瀏覽器（Chromium 390×844）：從十二個教學頁的連結各開一次起始檔並截圖（scratchpad/unitstart_1～12.png），無主控台錯誤（僅 favicon 404）；第 11 課接合精靈可列出「升降 → 工具端」，第 12 課「旋轉底盤 → H4Turn」；第 6、7 課實際按到 128 mm、−70°。未驗證實體機構。

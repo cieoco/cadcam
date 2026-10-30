@@ -4,7 +4,7 @@
  * 課堂範例選單、教學卡與 snapshot 載入流程。
  */
 
-import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson } from './examples.js?v=20261005_parallel';
+import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson, loadUnitStarts } from './examples.js?v=20261005_parallel';
 import { normalizeSnapshot } from './schema.js';
 import { offerExample } from './example-entry.js';
 
@@ -14,6 +14,7 @@ export function createExampleController({ applySnapshot, insertModule, notify, c
 
   function requestLoad(id) {
     const example = getExample(id);
+    if (!example && /^unit\d+-start$/.test(id)) return loadUnitStarts().then(() => requestLoad(id)), true;
     if (!example || pendingDialog) return false;
     pendingDialog = offerExample({ example, loadExample: load, insertModule: moduleId => { closeExamples(); return insertModule(moduleId); }, onDismiss: () => { pendingDialog = null; } });
     return true;
@@ -79,6 +80,7 @@ export function createExampleController({ applySnapshot, insertModule, notify, c
     const list = document.getElementById('exampleList');
     const groupById = Object.fromEntries(EXAMPLE_GROUPS.map(group => [group.id, group]));
     BLOCK_EXAMPLES.forEach(example => {
+      if (list?.querySelector(`[data-example-id="${example.id}"]`)) return;
       const lesson = getExampleLesson(example.id);
       const groupId = groupById[lesson.group] ? lesson.group : 'challenge';
       if (list) {
@@ -88,7 +90,7 @@ export function createExampleController({ applySnapshot, insertModule, notify, c
           const title = document.createElement('div'); title.className = 'example-group-title'; title.textContent = groupById[groupId]?.label || '挑戰';
           section.appendChild(title); list.appendChild(section);
         }
-        const button = document.createElement('button'); button.type = 'button'; button.className = 'example-btn'; button.textContent = `${lesson.level || '探索'}｜${example.title}`;
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'example-btn'; button.dataset.exampleId = example.id; button.textContent = `${lesson.level || '探索'}｜${example.title}`;
         button.title = lesson.use || example.note || ''; button.addEventListener('click', () => requestLoad(example.id)); section.appendChild(button);
       }
     });
@@ -102,5 +104,8 @@ export function createExampleController({ applySnapshot, insertModule, notify, c
     onLesson(example || null);
   }
 
-  return { populate, load, requestLoad, renderLessonCard, snapshotApplied, restoreLesson, get activeExampleId() { return activeExampleId; } };
+  // 起始練習檔資料第一次開「範例」才載入，載入後補上清單。
+  const openExamples = () => { document.getElementById('examplesDialog').showModal(); loadUnitStarts().then(populate); };
+
+  return { populate, openExamples, load, requestLoad, renderLessonCard, snapshotApplied, restoreLesson, get activeExampleId() { return activeExampleId; } };
 }

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-import { getExample } from '../js/blocks/examples.js';
+import { getExample, loadUnitStarts } from '../js/blocks/examples.js';
 import { rackGuideTravel } from '../js/blocks/rack-limits.js';
+await loadUnitStarts();   // 單元起始練習檔用到才載入
 let links=0;
 for (const name of ['index.html','teaching.html','teaching-slider.html','teaching-gears.html','teaching-rack.html','teaching-assembly.html']) {
  const html=readFileSync(new URL('../'+name,import.meta.url),'utf8');

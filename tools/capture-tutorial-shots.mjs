@@ -247,13 +247,13 @@ add(`${MEDIA}/chain-aligned.png`, 'teaching-gears.html', async s => {
   await s.text('對齊整數鏈節'); await s.settle(600);
 });
 
-// 第六單元（teaching-rack.html）：齒條升降器
+// 第六單元（teaching-rack.html）：齒條升降器（從本課的起始練習檔 unit6-start 開始）
 add(`${MEDIA}/rack-select.webp`, 'teaching-rack.html', async s => {
-  await s.open('competition-rack-lift'); await s.fit(); await s.tab('build'); await s.collapseAdd(); await s.quiet();
+  await s.open('unit6-start'); await s.fit(); await s.tab('build'); await s.collapseAdd(); await s.quiet();
   const g = await s.comp('LiftPinion'); await s.mark([g.x + g.w / 2, g.y + g.h * 0.2]);
 });
 add(`${MEDIA}/rack-slot.webp`, 'teaching-rack.html', async s => {
-  await s.open('competition-rack-lift'); await s.tab('edit'); await s.zoomOn('LiftPinion', 5); await s.tapHit('LiftPinion'); await s.fit(); await s.text('更多：傳動、孔位與動力');
+  await s.open('unit6-start'); await s.tab('edit'); await s.zoomOn('LiftPinion', 5); await s.tapHit('LiftPinion'); await s.fit(); await s.text('更多：傳動、孔位與動力');
   const row = s.p.getByText('導軌槽長', { exact: true }).first();
   await s.scrollTo(row, 'center');
   const minus = row.locator('xpath=following::button[normalize-space()="−"][1]');
@@ -302,12 +302,12 @@ add(`${MEDIA}/gripper-fused-close.webp`, 'teaching-gripper.html', async s => {
   await close.click(); await s.settle(1500); await s.mark(open, close);
 });
 
-// 第七單元（teaching-tipping-bucket.html）：單軸翻斗
+// 第七單元（teaching-tipping-bucket.html）：單軸翻斗（從本課的起始練習檔 unit7-start 開始）
 add(`${MEDIA}/bucket-assembly.webp`, 'teaching-tipping-bucket.html', async s => {
-  await s.open('tipping-bucket'); await s.mode('bench'); await s.settle(1500); await s.mark('#modeBtnBench');
+  await s.open('unit7-start'); await s.mode('bench'); await s.settle(1500); await s.mark('#modeBtnBench');
 });
 add(`${MEDIA}/bucket-angle.webp`, 'teaching-tipping-bucket.html', async s => {
-  await s.open('tipping-bucket'); await s.tab('edit'); await s.tapNode('O', '舵機軸心'); await s.quiet();
+  await s.open('unit7-start'); await s.tab('edit'); await s.tapNode('O', '舵機軸心'); await s.quiet();
   const end = s.p.getByText('結束', { exact: true }).first(); await s.scrollTo(end, 'center');
   const plus = end.locator('xpath=following::button[normalize-space()="＋"][1]');
   for (let i = 0; i < 2; i++) await plus.click();
@@ -389,10 +389,10 @@ async function hydraulicBench(s, example, pickRow) {
 }
 add(`${HYD}/h05-mobile.png`, 'teaching-hydraulic.html', async s => { await hydraulicBench(s, 'hydraulic-h05'); await s.quiet(); });
 add(`${HYD}/h06-mobile.png`, 'teaching-hydraulic.html', async s => { await hydraulicBench(s, 'hydraulic-h06'); await s.quiet(); });
+// 第十二單元：從起始練習檔 unit12-start 開始（升降＋夾爪已接好、旋轉底盤分開），直接選「升降」開接合精靈。
 add(`${HYD}/h06-face-placement-mobile.png`, 'teaching-hydraulic.html', async s => {
-  await hydraulicBench(s, 'hydraulic-h06', [150, 190]);
-  await s.p.locator('#mateDetach').click(); await s.p.locator('button:has-text("整組拆下")').click(); await s.settle(2000);   // 先拆下升降（保留夾爪跟著）
-  await s.p.mouse.click(150, 190); await s.settle(1000);
+  await s.open('unit12-start'); await s.mode('bench'); await s.settle(5000);
+  await s.p.locator('div,li,button').filter({ hasText: /^·?\s*升降\s*(未安裝)?$/ }).last().click(); await s.settle(1200);
   await s.p.locator('#benchFaceWizard').click(); await wiz(s).locator('#next').waitFor(); await s.settle(1500);
   await wiz(s).locator('button:has-text("板件 H4Turn")').click(); await wiz(s).locator('#next').click(); await s.settle(900);   // 承接：轉盤板
   await wiz(s).locator('button:has-text("H2Frame")').click(); await wiz(s).locator('#next').click(); await s.settle(900);      // 安裝：升降機架

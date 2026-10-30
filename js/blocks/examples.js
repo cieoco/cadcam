@@ -906,33 +906,6 @@ const ALL_BLOCK_EXAMPLES = [
     }
   },
   {
-    id: 'competition-flywheel-shooter',
-    title: '競賽飛輪射球：皮帶加速',
-    note: '大皮帶輪帶小飛輪，讓輸出輪高速旋轉。可用來討論射球速度、打滑與減速/加速取捨。',
-    snapshot: {
-      kind: 'blocks',
-      v: 1,
-      counter: 4,
-      comps: [
-        { type: 'pulley', id: 'ShooterDrivePulley', color: '#e74c3c',
-          p1: pt('SDC', 'motor', -72, 0, { physicalMotor: '1' }),
-          p2: pt('SDP', 'floating', -24, 0),
-          radiusParam: 'SH_DRIVE_R', phase: 0 },
-        { type: 'pulley', id: 'ShooterFlywheel', color: '#2c6fbb',
-          p1: pt('SFC', 'fixed', 72, 0),
-          p2: pt('SFP', 'floating', 96, 0),
-          radiusParam: 'SH_FLY_R', phase: 0 },
-        { type: 'belt', id: 'ShooterBelt', color: '#2c3e50',
-          driver: 'ShooterDrivePulley', driven: 'ShooterFlywheel' },
-        bar('ShooterFrame', pt('SDC', 'motor', -72, 0, { physicalMotor: '1' }), pt('SFC', 'fixed', 72, 0), 144, {
-          lenParam: 'SH_FRAME',
-          color: '#95a5a6'
-        })
-      ],
-      params: { SH_DRIVE_R: 48, SH_FLY_R: 24, SH_FRAME: 144, theta: 0 }
-    }
-  },
-  {
     id: 'competition-rack-lift',
     title: '競賽齒條升降滑台',
     note: '小齒輪帶動垂直齒條，做直上直下升降。適合作為伸縮臂、升降夾爪或推桿的出發點。',
@@ -1017,9 +990,10 @@ for(const [id,label,snapshot] of [
 
 ALL_BLOCK_EXAMPLES.push({id:'tab-nut-m3',title:'製作：3 mm／M3 榫槽接合',note:'兩個定位榫＋一組螺絲／螺母。可修改與輸出；試片、材料及承載待實測。',snapshot:tabNutSnapshot});
 
-export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES.filter(
-  example => example.id !== 'competition-flywheel-shooter'
-);
+export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES;
+
+let unitStarts;
+export const loadUnitStarts=()=>unitStarts||=import('./unit-start-examples.js').then(m=>m.register(BLOCK_EXAMPLES,EXAMPLE_LESSONS));
 
 export function getExample(id) {
   return BLOCK_EXAMPLES.find(example => example.id === id) || null;

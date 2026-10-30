@@ -3329,7 +3329,7 @@ window.blocks.designDebug = () => ({
   hidden: S.comps.filter(c => !viewComps().includes(c)).map(c => c.id),
   motors: [...designMotorIds()]
 });
-Object.assign(window.blocks, commandActions, {
+Object.assign(window.blocks, commandActions, { openExamples: exampleController.openExamples,
   openBoxMaker,
   copyMember,
   mateTool: on => mateTool.set(!!on), mateDebug: () => mateTool.debug(),

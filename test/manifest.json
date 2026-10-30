@@ -247,7 +247,9 @@
     "test/hydraulic-p2-3b.mjs",
     "test/parallel-gripper.mjs",
     "test/ui-commands.mjs",
-    "test/add-palette.mjs"
+    "test/add-palette.mjs",
+    "test/unit-starts.mjs",
+    "test/unit-start-examples.mjs"
   ],
   "version": 1
 }

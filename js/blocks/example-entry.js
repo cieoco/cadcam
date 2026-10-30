@@ -1,6 +1,6 @@
 /** 教材深連結只選範例，不承載課程或作品進度。先還原原作品，確認後才替換。 */
 import { BUILTIN_MODULES } from './module-ops.js';
-import { getExample, getExampleLesson } from './examples.js?v=20261005_unit2';
+import { getExample, getExampleLesson, loadUnitStarts } from './examples.js?v=20261005_unit2';
 
 export function requestedExample(href) {
   const url = new URL(href);
@@ -13,6 +13,8 @@ export function offerExampleFromUrl({ loadExample, insertModule, notify = () => 
   location = window.location, history = window.history, document = window.document } = {}) {
   const url = new URL(location.href);
   if (!url.searchParams.has('example') || url.hash) return;
+  const id = url.searchParams.get('example');
+  if (/^unit\d+-start$/.test(id) && !getExample(id)) return loadUnitStarts().then(() => offerExampleFromUrl({ loadExample, insertModule, notify, location, history, document }));
   const example = requestedExample(url.href);
   const consume = () => {
     url.searchParams.delete('example');
