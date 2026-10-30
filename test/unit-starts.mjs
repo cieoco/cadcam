@@ -2,11 +2,14 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {UNIT_STARTS} from '../js/blocks/unit-starts.js';
-import {getExample,getExampleLesson} from '../js/blocks/examples.js';
+import {getExample,getExampleLesson,loadUnitStarts} from '../js/blocks/examples.js';
+import {startupSize} from '../tools/startup-size.mjs';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
 let pass=0;const ok=(c,m)=>{assert.ok(c,m);pass++;console.log('PASS',m);};
 ok(Array.isArray(UNIT_STARTS)&&UNIT_STARTS.length===12&&UNIT_STARTS.every((u,i)=>u.unit===i+1),'第一～十二單元各一筆起始檔');
 ok(new Set(UNIT_STARTS.map(u=>u.example)).size===12,'每個單元的起始檔都不同');
+await loadUnitStarts();
+ok(!startupSize().paths.some(p=>/unit-start/.test(p)),'起始練習檔資料用到才載入（不在啟動程式）');
 for(const u of UNIT_STARTS){
   const ex=getExample(u.example);
   if(!ex)assert.fail(`第 ${u.unit} 單元的起始檔 ${u.example} 不存在`);
