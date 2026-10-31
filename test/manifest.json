@@ -250,7 +250,8 @@
     "test/ui-commands.mjs",
     "test/add-palette.mjs",
     "test/unit-starts.mjs",
-    "test/unit-start-examples.mjs"
+    "test/unit-start-examples.mjs",
+    "test/gear-member-mount.mjs"
   ],
   "version": 1
 }

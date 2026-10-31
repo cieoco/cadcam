@@ -1067,6 +1067,17 @@ async function copyMember(mode) {
   } catch(e) { console.error(e);transient('複製視窗載入失敗，請重試。'); }
 }
 let boxMakerDialog=null;
+async function mountMemberToGear() {
+  const id=S.selectedTriangleId||S.selectedLinkId;if(!id||S.mode!=='design')return;
+  pause();const revision=snapshotStr(),source=JSON.parse(revision),positions=displayCoords();
+  const motion={thetaDeg:S.theta,motorAngles:{...S.motorAngles,[String(S.activeMotor)]:S.theta}};
+  try {
+    const {openGearMemberMount,commitGearMemberMount}=await import('./gear-member-mount-ui.js');
+    if(snapshotStr()!==revision){transient('作品已變更，請重新開啟安裝。');return;}
+    openGearMemberMount({source,id,positions,motion,settings:Settings.exportSettings(),onConfirm:plan=>
+      commitGearMemberMount({plan,revision,fingerprint:snapshotStr,pushUndo,apply:p=>{S.comps=p.comps;Object.assign(S.topo,p.references,{params:p.params});rebuild();draw();}})});
+  } catch(e) {console.error(e);transient('安裝視窗載入失敗，尚未修改作品。');}
+}
 async function openBoxMaker() {
   if(bench.inCandidate?.()){transient('請先確認或取消接合預覽。');return;}
   pause();const before=snapshotStr(),source=JSON.parse(before),selected=S.comps.find(c=>c.id===(S.selectedLinkId || S.selectedTriangleId));
@@ -3341,6 +3352,7 @@ window.blocks.designDebug = () => ({
 Object.assign(window.blocks, commandActions, { openExamples: exampleController.openExamples,
   openBoxMaker,
   copyMember,
+  mountMemberToGear,
   mateTool: on => mateTool.set(!!on), mateDebug: () => mateTool.debug(),
   setTriSide: memberEditor.selectDimension,
   setMemberDimension: memberEditor.setValue,

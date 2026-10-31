@@ -1,0 +1,255 @@
+{
+  "kind": "blocks",
+  "v": 1,
+  "counter": 8,
+  "comps": [
+    {
+      "type": "gear",
+      "id": "GearA",
+      "color": "#e74c3c",
+      "p1": {
+        "id": "GCA",
+        "x": -40,
+        "y": 0,
+        "type": "motor",
+        "physicalMotor": "1"
+      },
+      "p2": {
+        "id": "GPA",
+        "x": -22,
+        "y": 0,
+        "type": "floating"
+      },
+      "radiusParam": "GRA",
+      "teeth": 15,
+      "module": 4,
+      "phase": 0,
+      "motorType": "mg995",
+      "servoStart": 0,
+      "servoEnd": 30
+    },
+    {
+      "type": "gear",
+      "id": "GearB",
+      "color": "#2c6fbb",
+      "p1": {
+        "id": "GCB",
+        "x": 20,
+        "y": 0,
+        "type": "fixed"
+      },
+      "p2": {
+        "id": "GPB",
+        "x": 70,
+        "y": 0,
+        "type": "floating"
+      },
+      "radiusParam": "GRB",
+      "teeth": 15,
+      "module": 4,
+      "phase": 0,
+      "pinRadius": 23,
+      "mesh": "GearA"
+    },
+    {
+      "type": "bar",
+      "id": "Link4",
+      "color": "#3498db",
+      "p1": {
+        "id": "GPA",
+        "x": -22,
+        "y": 0,
+        "type": "floating"
+      },
+      "p2": {
+        "id": "GCA",
+        "x": -40,
+        "y": 0,
+        "type": "floating"
+      },
+      "lenParam": "LL4",
+      "isInput": false,
+      "fixedLen": true,
+      "barFusionRoot": "Link7"
+    },
+    {
+      "type": "bar",
+      "id": "Link5",
+      "color": "#3498db",
+      "p1": {
+        "id": "GCA",
+        "x": -40,
+        "y": 0,
+        "type": "floating"
+      },
+      "p2": {
+        "id": "P5b",
+        "x": -73.26781657387085,
+        "y": 90.05138744298881,
+        "type": "floating"
+      },
+      "lenParam": "LL5",
+      "isInput": false,
+      "fixedLen": true,
+      "barFusionRoot": "Link7"
+    },
+    {
+      "type": "bar",
+      "id": "Link7",
+      "color": "#3498db",
+      "p1": {
+        "id": "P5b",
+        "x": -73.26781657387085,
+        "y": 90.05138744298881,
+        "type": "floating"
+      },
+      "p2": {
+        "id": "P7b",
+        "x": -44.73333371406659,
+        "y": 118.08321378241124,
+        "type": "floating"
+      },
+      "lenParam": "LL7",
+      "isInput": false,
+      "fixedLen": true,
+      "barFusionRoot": "Link7",
+      "barFusion": {
+        "version": 1,
+        "members": [
+          "Link7",
+          "Link5",
+          "Link4"
+        ],
+        "points": [
+          {
+            "id": "P5b",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "P7b",
+            "x": 40,
+            "y": 0
+          },
+          {
+            "id": "GCA",
+            "x": -39.37562281539195,
+            "y": -87.55318570960159
+          },
+          {
+            "id": "GPA",
+            "x": -26.535105528480038,
+            "y": -100.16750756234168
+          }
+        ]
+      }
+    },
+    {
+      "type": "bar",
+      "id": "Link7_8",
+      "color": "#3498db",
+      "p1": {
+        "id": "P5b_8",
+        "x": 85.80829471615075,
+        "y": 77.02268278453265,
+        "type": "floating"
+      },
+      "p2": {
+        "id": "P7b_8",
+        "x": 66.33223685123497,
+        "y": 111.96095935969376,
+        "type": "floating"
+      },
+      "lenParam": "LL7_8",
+      "isInput": false,
+      "fixedLen": true,
+      "barFusionRoot": "Link7_8",
+      "barFusion": {
+        "version": 1,
+        "members": [
+          "Link7_8",
+          "Link5_8",
+          "Link4_8"
+        ],
+        "points": [
+          {
+            "id": "P5b_8",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "P7b_8",
+            "x": 40,
+            "y": 0
+          },
+          {
+            "id": "GCA_8",
+            "x": -39.37562281539195,
+            "y": 87.55318570960159
+          },
+          {
+            "id": "GPA_8",
+            "x": -26.535105528480038,
+            "y": 100.16750756234168
+          }
+        ]
+      }
+    },
+    {
+      "type": "bar",
+      "id": "Link5_8",
+      "color": "#3498db",
+      "p1": {
+        "id": "GCA_8",
+        "x": 28.50640699267992,
+        "y": 0,
+        "type": "floating"
+      },
+      "p2": {
+        "id": "P5b_8",
+        "x": 85.80829471615075,
+        "y": 77.02268278453265,
+        "type": "floating"
+      },
+      "lenParam": "LL5_8",
+      "isInput": false,
+      "fixedLen": true,
+      "barFusionRoot": "Link7_8"
+    },
+    {
+      "type": "bar",
+      "id": "Link4_8",
+      "color": "#3498db",
+      "p1": {
+        "id": "GPA_8",
+        "x": 11.236273907817925,
+        "y": 5.07370705019072,
+        "type": "floating"
+      },
+      "p2": {
+        "id": "GCA_8",
+        "x": 28.50640699267992,
+        "y": 0,
+        "type": "floating"
+      },
+      "lenParam": "LL4_8",
+      "isInput": false,
+      "fixedLen": true,
+      "barFusionRoot": "Link7_8"
+    }
+  ],
+  "params": {
+    "GRA": 30,
+    "GRB": 30,
+    "theta": 0,
+    "LL4": 18,
+    "LL5": 96,
+    "LL7": 40,
+    "LL7_8": 40,
+    "LL5_8": 96,
+    "LL4_8": 18
+  },
+  "assemblyMembers": [
+    "#root"
+  ]
+}

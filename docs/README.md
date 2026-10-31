@@ -16,6 +16,8 @@
 
 ## 產品與功能規格
 
+- [SDD-GEAR-MEMBER-MOUNT.md](SDD-GEAR-MEMBER-MOUNT.md) — 鏡射夾指與齒輪共用雙孔的預覽、安裝、保存與驗收契約。
+
 - [STEP-EXPORT.md](STEP-EXPORT.md) — 專案 → 匯出 STEP：板件寫成 B-rep 實體（匯出與不匯出的範圍、CAD 開啟方式、姿態矩陣約定、限制）。
 - [PLUGINS.md](PLUGINS.md) — 外掛（要用才載入的功能）的登記、資料夾與保存資料契約。
 - [SDD-MECHANISM-BOX.md](SDD-MECHANISM-BOX.md) — 機構用五片式參數盒體、組立與加工輸出契約。
