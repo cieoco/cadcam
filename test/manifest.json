@@ -148,6 +148,7 @@
     "test/material-pose-status.mjs",
     "test/mates-view.mjs",
     "test/mates.mjs",
+    "test/mobile-workspace.mjs",
     "test/measurement.mjs",
     "test/mechanism-layer-render.mjs",
     "test/member-dimensions.mjs",

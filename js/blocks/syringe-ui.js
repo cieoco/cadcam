@@ -12,7 +12,6 @@ import {S,motorAnglesNow} from './state.js';
 import * as View from './view.js';
 import {createPlateGeometry} from './plate-geometry.js';
 import {frameConnectorNodes} from './model.js';
-import {openSyringeInstallation} from './syringe-install-ui.js';
 const ns='http://www.w3.org/2000/svg';
 const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(parent)parent.append(n);return n;};
 const clone=structuredClone;
@@ -204,10 +203,11 @@ export function createSyringeUI(h){
     const source={comps:clone(h.comps()),params:{...params()},fabrication:clone(S.fabrication)};
     const revision=JSON.stringify([S.comps,S.topo.params,S.designFocus]);
     let counter=1;while(S.comps.some(c=>c.id===`Syringe${counter}`))counter++;
-    openSyringeInstallation({source,points:clone(h.points()),existing:candidate,newId:`Syringe${counter}`,motion:motion(),
+    // 安裝介面（含預覽與選項）第一次安裝針筒才載入，不佔啟動大小
+    import('./syringe-install-ui.js').then(({openSyringeInstallation})=>openSyringeInstallation({source,points:clone(h.points()),existing:candidate,newId:`Syringe${counter}`,motion:motion(),
       advancedSettings:c=>open(c,true),
       confirm:r=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus]))return false;message='';commit(r.comps,r.params,r);return true;},
-      remove:candidate&&S.comps.some(c=>c.id===candidate.id)?()=>{h.pushUndo();S.comps=S.comps.filter(c=>c.id!==candidate.id);h.rebuild();h.draw();h.save();}:null});
+      remove:candidate&&S.comps.some(c=>c.id===candidate.id)?()=>{h.pushUndo();S.comps=S.comps.filter(c=>c.id!==candidate.id);h.rebuild();h.draw();h.save();}:null}),()=>notify('安裝介面載入失敗，請再試一次。'));
   }
   function open(candidate=null,advanced=false){
     const current=candidate || active();

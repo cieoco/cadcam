@@ -773,3 +773,9 @@
 - 截圖：rack-select、rack-slot、bucket-assembly、bucket-angle、h06-face-placement-mobile 改由新起始檔重錄並逐張目視核對；tools/capture-tutorial-shots.mjs 對應改開 unit6-start、unit7-start、unit12-start。
 - 測試：test/unit-starts.mjs（契約）、新增 test/unit-start-examples.mjs（延遲載入、不重複登記、各檔內容與求解、深連結），test/units345.mjs 先 `await loadUnitStarts()`。
 - 瀏覽器（Chromium 390×844）：從十二個教學頁的連結各開一次起始檔並截圖（scratchpad/unitstart_1～12.png），無主控台錯誤（僅 favicon 404）；第 11 課接合精靈可列出「升降 → 工具端」，第 12 課「旋轉底盤 → H4Turn」；第 6、7 課實際按到 128 mm、−70°。未驗證實體機構。
+
+## 2026-11-01 — 手機保護工作區：三段抽屜與頂端訊息列（2026.11.1.1）
+
+- 下方面板改成三段抽屜（收合／半開／全開），預設收合只留分頁列與一行摘要；選取零件不再自動展開，點摘要列或往上拉才展開，點畫布空白處收合。訊息統一在畫布上方一條不擋點選的訊息列，幾秒後消失。量尺、工作範圍／夾持、任務卡進抽屜。細節與前後量測表見 docs/SDD-BLOCKS-UI-LAYOUT.md 第 13 節。
+- 教學頁：重錄 31 張設計模式手機截圖（組立與針筒安裝精靈畫面沒有改，不動）；tools/capture-tutorial-shots.mjs 新增抽屜自動展開（找不到控制項時先半開、再全開）、點畫布零件前先收起抽屜、置中後再截圖。教學首頁第 2 步與基本操作速查改寫為「下方面板先露出一行摘要，點它或往上拉展開」；夾爪頁註明「張開／閉合」在下方面板裡。
+- 啟動大小 1,946,288 bytes（上限不變）；測試 test/mobile-workspace.mjs 已登記，tools/mobile-workspace-check.mjs 為瀏覽器驗收。

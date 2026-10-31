@@ -47,10 +47,10 @@ export function worldFromScreen(sx, sy) {
   return { x: (sx - ox) / scale, y: (oy - sy) / scale };
 }
 
-export function resetView() {
+export function resetView(area) {   // area＝看得到的區域（手機抽屜／播放列以外），預設整個畫布
   scale = SCALE_DEFAULT;
-  ox = W / 2;
-  oy = H / 2;
+  ox = area ? area.x + area.width / 2 : W / 2;
+  oy = area ? area.y + area.height / 2 : H / 2;
   viewChanged();
 }
 
@@ -85,18 +85,18 @@ export function panByClient(svg, dxClient, dyClient) {
 }
 
 // 把世界外接框 fit 進畫面（含留白），並置中。
-export function fit(bounds) {
-  if (!bounds) { resetView(); return; }
-  const padPx = 50;
+export function fit(bounds, area) {   // area＝看得到的區域（svg 座標）；手機只在抽屜與播放列以外置中
+  if (!bounds) { resetView(area); return; }
+  const padPx = 50, a = area || { x: 0, y: 0, width: W, height: H };
   const wWorld = Math.max(1, bounds.maxX - bounds.minX);
   const hWorld = Math.max(1, bounds.maxY - bounds.minY);
-  const sx = (W - 2 * padPx) / wWorld;
-  const sy = (H - 2 * padPx) / hWorld;
+  const sx = (a.width - 2 * padPx) / wWorld;
+  const sy = (a.height - 2 * padPx) / hWorld;
   scale = clampScale(Math.min(sx, sy));
   const cx = (bounds.minX + bounds.maxX) / 2;
   const cy = (bounds.minY + bounds.maxY) / 2;
-  ox = W / 2 - cx * scale;
-  oy = H / 2 + cy * scale;
+  ox = a.x + a.width / 2 - cx * scale;
+  oy = a.y + a.height / 2 + cy * scale;
   viewChanged();
 }
 

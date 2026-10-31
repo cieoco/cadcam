@@ -42,17 +42,39 @@ class Shot {
     if (id) { await this.p.click('dialog.example-entry-dialog button:has-text("載入此範例")'); }
     await this.settle(600);
   }
+  /** 手機下方抽屜（收合／半開／全開）：點上緣一段一段展開，到指定高度為止；桌面或工作台沒有抽屜就略過 */
+  async sheet(state) {
+    const order = ['collapsed', 'half', 'full'];
+    for (let i = 0; i < 4; i++) {
+      const cur = await this.p.evaluate(() => { const b = document.getElementById('sheetBar'); return b && b.getClientRects().length ? (document.body.dataset.sheet || 'collapsed') : null; });
+      if (!cur || cur === state) return;
+      if (order.indexOf(cur) > order.indexOf(state)) { const key = state === 'collapsed' ? 'Escape' : ' '; await this.p.evaluate(key => document.getElementById('sheetBar').dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })), key); }
+      else await this.p.locator('#sheetBar').click({ position: { x: 20, y: 10 } });
+      await this.settle(300);
+    }
+  }
+  /** 讓某個控制項點得到：抽屜收合時先半開，還被蓋住再全開（原本面板一直攤開，改版後要先拉起） */
+  async reach(loc, strict = true) {
+    // 只管抽屜裡的控制項；畫布、對話框、桌面版一律視為已經點得到
+    const hit = () => loc.evaluate(el => {
+      if (!el.closest('#workSheet, .mobile-panel') || el.closest('#sheetBar')) return true;
+      el.scrollIntoView({ block: 'nearest' }); const r = el.getBoundingClientRect(); const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return r.width > 0 && !!t && (t === el || el.contains(t) || t.contains(el));
+    }, undefined, { timeout: 800 }).catch(() => !strict);
+    if (await hit()) return;
+    for (const st of ['half', 'full']) { await this.sheet(st); if (await hit()) return; }
+  }
   /** 手機下方分頁：build 新增／edit 調整／view 視圖／project 專案 */
   async tab(name) { await this.p.click(`.mobile-tab[data-tab="${name}"]`); await this.settle(300); }
   /** 指令按鈕（新增面板、視圖、專案等共用 data-command） */
-  async cmd(id) { await this.p.locator(`.mobile-panel [data-command="${id}"], .part-palette [data-command="${id}"]`).filter({ visible: true }).first().click(); await this.settle(300); }
+  async cmd(id) { const l = this.p.locator(`.mobile-panel [data-command="${id}"], .part-palette [data-command="${id}"]`).filter({ visible: true }).first(); await this.reach(l); await l.click(); await this.settle(300); }
   /** 展開／收合新增面板的分類（常用零件以外）：其他零件、加入模組、外掛 */
   async section(id, open = true) { await this.p.evaluate(([id, open]) => { const d = document.querySelector(`[data-add-section="${id}"]`); if (d) d.open = open; }, [id, open]); await this.settle(200); }
   async tap(x, y) { await this.p.touchscreen.tap(x, y); await this.settle(250); }
-  async text(label, opts = {}) { await this.p.locator(`button:has-text("${label}"), summary:has-text("${label}")`).filter({ visible: true }).first().click(opts); await this.settle(300); }
+  async text(label, opts = {}) { const l = this.p.locator(`button:has-text("${label}"), summary:has-text("${label}")`).filter({ visible: true }).first(); await this.reach(l); await l.click(opts); await this.settle(300); }
   async mode(name) { await this.p.click(name === 'bench' ? '#modeBtnBench' : '#modeBtnDesign'); await this.settle(500); }
   /** 在數值欄輸入並離開欄位 */
-  async fill(selector, v) { const el = this.p.locator(selector).filter({ visible: true }).first(); await el.fill(String(v)); await el.press('Enter'); await el.blur().catch(() => {}); await this.settle(300); }
+  async fill(selector, v) { const el = this.p.locator(selector).filter({ visible: true }).first(); await this.reach(el); await el.fill(String(v)); await el.press('Enter'); await el.blur().catch(() => {}); await this.settle(300); }
   /** 畫兩點桿（手機：新增 → 連桿，依序點頭尾） */
   async drawBar(a, b) { await this.tab('build'); await this.cmd('bar'); await this.tap(...a); await this.tap(...b); }
   /** 完成／收合調整面板 */
@@ -67,13 +89,22 @@ class Shot {
   }
   /** 畫布上接點 id 的畫面中心（取最小的那顆圓＝可見的孔，不是透明點選圈） */
   async node(id) {
+    await this.sheet('collapsed');   // 手指點畫布上的零件前，抽屜要先收起來，才不會蓋住零件
     const r = await this.p.evaluate(id => [...document.querySelectorAll(`#stageSvg circle[data-id="${id}"]`)].map(e => e.getBoundingClientRect()).filter(b => b.width).sort((a, b) => a.width - b.width)[0] || null, id);
     if (!r) throw Error('node not found: ' + id);
     return [r.x + r.width / 2, r.y + r.height / 2];
   }
   /** 點接點；若跳出「這裡有多個物件」，pick 指定要選哪一項（按鈕文字片段） */
   async tapNode(id, pick) {
-    await this.tap(...await this.node(id));
+    const [x, y] = await this.node(id);
+    if (pick) {
+      // 選單（重疊物件）會在放開手指當下蓋在落點上，緊接而來的合成 click 可能直接點到選單按鈕；
+      // 這裡只送 pointerdown／pointerup（不產生 click），等同手指點下去再看選單。
+      await this.p.evaluate(([x, y]) => {
+        const el = document.elementFromPoint(x, y), init = { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, pointerId: 41, pointerType: 'touch', isPrimary: true, button: 0, buttons: 1 };
+        el.dispatchEvent(new PointerEvent('pointerdown', init)); el.dispatchEvent(new PointerEvent('pointerup', { ...init, buttons: 0 }));
+      }, [x, y]); await this.settle(300);
+    } else await this.tap(x, y);
     if (pick && await this.p.getByText('這裡有多個物件').isVisible().catch(() => false)) { await this.p.locator(`button:has-text("${pick}")`).first().click(); await this.settle(400); }
   }
   /** 點兩個接點中間（點桿身選取） */
@@ -86,12 +117,14 @@ class Shot {
   }
   /** 元件（齒輪等，data-pick-component）在畫面上的外框 */
   async comp(id) {
+    await this.sheet('collapsed');
     const r = await this.p.evaluate(id => { const b = document.querySelector(`#stageSvg [data-pick-component="${id}"]`)?.getBoundingClientRect(); return b && { x: b.x, y: b.y, w: b.width, h: b.height }; }, id);
     if (!r) throw Error('component not found: ' + id);
     return r;
   }
   /** 真的點得到該元件的位置（避開壓在上面的馬達、孔位）：由外圈往內、由上往下掃 */
   async hitComp(id) {
+    await this.sheet('collapsed');
     const pt = await this.p.evaluate(id => {
       const b = document.querySelector(`#stageSvg [data-pick-component="${id}"]`).getBoundingClientRect(), cx = b.x + b.width / 2, cy = b.y + b.height / 2;
       for (const f of [0.42, 0.38, 0.34, 0.3, 0.25, 0.2]) for (let a = -90; a < 270; a += 10) {
@@ -107,6 +140,7 @@ class Shot {
   async zoomOn(id, notches = 3) { const r = await this.comp(id); await this.zoom(r.x + r.w / 2, r.y + r.h / 2, notches); }
   /** 桿件／板件（data-link-id）上真的點得到的位置：在外框內掃格點 */
   async tapLink(id) {
+    await this.sheet('collapsed');
     const pt = await this.p.evaluate(id => {
       const sel = `[data-link-id="${id}"],[data-pick-component="${id}"]`;
       const b = document.querySelector('#stageSvg ' + sel).getBoundingClientRect();
@@ -167,7 +201,7 @@ const add = (file, page, run, opts = {}) => SHOTS.push({ file, page, run, ...opt
 
 // 第一單元（teaching.html）
 add(`${MEDIA}/first-link-add.png`, 'teaching.html', async s => {
-  await s.open();
+  await s.open(); await s.tab('build');
   await s.mark('.mobile-tab[data-tab="build"]', '.part-palette [data-command="bar"]');
 });
 
@@ -194,7 +228,7 @@ add(`${MEDIA}/member-tools-current.png`, 'teaching.html', async s => {
 });
 
 // 第二單元（teaching-fourbar.html）：缺桿雨刷
-async function openWiper(s) { await s.open('wiper-missing-coupler'); await s.tab('build'); await s.quiet(); }
+async function openWiper(s) { await s.open('wiper-missing-coupler'); await s.tab('build'); await s.fit(); await s.quiet(); }
 add(`${MEDIA}/wiper-add-current.png`, 'teaching-fourbar.html', async s => { await openWiper(s); });
 add(`${MEDIA}/wiper-connect-current.png`, 'teaching-fourbar.html', async s => {
   await openWiper(s); await s.cmd('bar'); await s.tapNode('C'); await s.tapNode('D');
@@ -229,10 +263,10 @@ add(`${MEDIA}/gears-teeth.webp`, 'teaching-gears.html', async s => {
 });
 
 // 第四單元延伸：鏈條傳動（sprocket-chain）
-add(`${MEDIA}/chain-example.png`, 'teaching-gears.html', async s => { await s.open('sprocket-chain'); await s.tab('build'); await s.collapseAdd(); await s.quiet(); });
+add(`${MEDIA}/chain-example.png`, 'teaching-gears.html', async s => { await s.open('sprocket-chain'); await s.tab('build'); await s.collapseAdd(); await s.fit(); await s.quiet(); });
 async function chainPanel(s) {
   await s.open('sprocket-chain'); await s.tab('edit'); await s.quiet(); await s.tapHit('SprocketB');
-  await s.text('更多：包角、偏差與動力');
+  await s.text('更多：包角、偏差與動力'); await s.fit();   // 抽屜展開後，把機構重新置中在上方露出的畫布
 }
 add(`${MEDIA}/chain-warning.png`, 'teaching-gears.html', async s => {
   await chainPanel(s);
@@ -263,7 +297,7 @@ add(`${MEDIA}/rack-slot.webp`, 'teaching-rack.html', async s => {
 
 // 第三單元（teaching-slider.html）：滑塊曲柄推送器
 add(`${MEDIA}/slider-add-current.png`, 'teaching-slider.html', async s => {
-  await s.open('slider-crank-practice'); await s.fit(); await s.tab('build');
+  await s.open('slider-crank-practice'); await s.tab('build'); await s.fit();
 });
 async function sliderConnect(s) { await s.open('slider-crank-practice'); await s.fit(); await s.tab('build'); await s.quiet(); await s.cmd('bar'); }
 add(`${MEDIA}/slider-connect.webp`, 'teaching-slider.html', async s => {
@@ -473,6 +507,14 @@ async function main() {
       const page = await context.newPage();
       const errors = []; page.on('pageerror', e => errors.push(e.message));
       const s = new Shot(page); s.base = base;
+      // 教學腳本裡直接 locator.click() 的控制項若在收合的抽屜裡，先自動拉起（跟手指一樣要先拉起抽屜）
+      const Locator = page.locator('body').constructor;
+      if (!Locator.prototype.__reachPatched) {
+        const click = Locator.prototype.click; let cur = null;
+        Locator.prototype.click = async function (opts) { if (cur) await cur.reach(this); return click.call(this, opts); };
+        Locator.prototype.__reachPatched = true; Locator.__setShot = x => { cur = x; };
+      }
+      Locator.__setShot(s);
       try {
         await x.run(s);
         if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw Error('page overflows horizontally');

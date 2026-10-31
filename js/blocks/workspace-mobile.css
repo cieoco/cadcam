@@ -163,3 +163,68 @@
   #lenEditor #memberMore { min-width:0; }
   #lenEditor #memberMore > summary { min-height:44px; padding:8px 0; font-size:14px; }
 }
+
+/* ===== 手機直立：保護工作區（下方三段式抽屜、頂端訊息帶、播放列合併狀態） =====
+   抽屜蓋在畫布下緣（畫布不縮放，拉抽屜時零件不會跳動）；收合時只剩分頁列＋一行摘要。
+   面板由 work-sheet.js 搬進 #sheetBody，離開手機直立時放回原位，桌機版面不變。
+   高度用 .stage 的百分比，播放列與抽屜用同一個變數，才會貼齊。 */
+.work-sheet, .message-lane, .status-detail { display:none; }
+@media (max-width:700px) and (orientation:portrait) {
+  body:not([data-mode="bench"]) {
+    --sheet-bar-h:40px; --sheet-body-h:0px; --sheet-h:calc(var(--sheet-bar-h) + var(--sheet-body-h));
+  }
+  body:not([data-mode="bench"])[data-sheet="collapsed"] { --sheet-body-h:0px; }
+  body:not([data-mode="bench"])[data-sheet="half"] { --sheet-body-h:40%; }
+  body:not([data-mode="bench"])[data-sheet="full"] { --sheet-body-h:calc(100% - 200px); }
+  body:not([data-mode="bench"]) .stage { position:relative; flex-direction:column; }
+  body:not([data-mode="bench"]) .work-sheet {
+    display:flex; flex-direction:column; position:absolute; left:0; right:0; bottom:0; height:var(--sheet-h); z-index:8;
+    background:#fff; border-top:1px solid #d3dce6; border-radius:14px 14px 0 0; box-shadow:0 -4px 14px rgba(44,62,80,.14);
+  }
+  .sheet-bar { position:relative; flex:0 0 var(--sheet-bar-h); height:var(--sheet-bar-h); display:flex; align-items:center; gap:8px; padding:8px 12px 0; touch-action:none; cursor:pointer; user-select:none; -webkit-user-select:none; }
+  .sheet-bar:focus-visible { outline:2px solid #e9a23b; outline-offset:-3px; }
+  .sheet-grab { position:absolute; top:5px; left:50%; width:44px; height:4px; margin-left:-22px; border-radius:2px; background:#b3c1d0; }
+  .sheet-summary { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:700; color:#34495e; }
+  .sheet-more { flex:0 0 auto; padding:3px 10px; border:1px solid #bcd3f0; border-radius:999px; background:#eaf2ff; color:#2c5282; font-size:12px; font-weight:800; }
+  .sheet-body { flex:1 1 0; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:0 8px 8px; }
+  body:not([data-sheet]) .sheet-body, body[data-sheet="collapsed"] .sheet-body { display:none; }
+  /* 搬進抽屜的面板：不再浮在畫布上，改成抽屜裡的一列一列 */
+  #sheetBody > .part-palette, #sheetBody > .part-palette:has(#creationTools:not([open])) { width:100%; max-height:none; overflow:visible; flex:0 0 auto; border:0; padding:0 0 4px; }
+  #sheetBody > .mobile-panel { border:0; padding:4px 0; }
+  #sheetBody .mobile-panel-section[data-panel="project"] { max-height:none; overflow:visible; }
+  body:not([data-mode="bench"]) #sheetBody > .inspector-panel {
+    position:static; max-height:none; overflow:visible; width:100%; max-width:none; padding:4px 2px; border:0; border-radius:0; box-shadow:none; background:transparent;
+  }
+  #sheetBody #dimPanel, #sheetBody #dimPanel.stepping { position:static; height:auto; max-height:none; width:auto; margin:0 0 6px; box-shadow:none; }
+  #sheetBody #workRangeCard { position:static; width:auto; margin:0 0 6px !important; }
+  #sheetBody #exampleLessonCard.workflow-active { position:static; width:auto; max-height:none; overflow:visible; margin:0 0 6px !important; box-shadow:none; }
+  body:not([data-mode="bench"]) .canvas-wrap.gripper-card-visible #stageSvg { position:static; top:auto; }
+  body:has(.canvas-wrap.gripper-workflow-active) #sheetBody #workRangeCard { display:none !important; }
+  .canvas-status:empty { display:none; }
+  body:not([data-mode="bench"]) #view3d { bottom:var(--sheet-h); }
+  body:not([data-mode="bench"]) .hint { top:calc(50% - var(--sheet-h) / 2 - 28px); }
+  /* 播放列：貼在抽屜上緣；狀態圓點併進播放列 */
+  html body:not([data-mode="bench"]) .canvas-wrap .controls, html body:not([data-mode="bench"]) .canvas-wrap.gripper-card-visible .controls {
+    position:absolute; left:50%; bottom:calc(var(--sheet-h) + 6px); transform:translateX(-50%); margin:0; padding:2px 6px; z-index:7; box-shadow:0 4px 14px rgba(0,0,0,.14);
+  }
+  .controls .app-status { position:relative; flex:0 0 auto; display:inline-flex; align-items:center; gap:4px; max-width:84px; padding:4px 4px 4px 2px; border:0; border-radius:999px; background:transparent; font-size:0; cursor:pointer; pointer-events:auto; }
+  .controls .app-status::before { content:""; flex:0 0 auto; width:10px; height:10px; border-radius:50%; background:#98a6b3; }
+  .controls .app-status::after { content:"尚未建立"; font-size:12px; font-weight:800; color:#60717d; white-space:nowrap; }
+  .controls .app-status[data-state="ready"]::before { background:#2ecc71; }  .controls .app-status[data-state="ready"]::after { content:"可播放"; color:#117a45; }
+  .controls .app-status[data-state="warn"]::before { background:#f1c40f; }   .controls .app-status[data-state="warn"]::after { content:"注意"; color:#8a6500; }
+  .controls .app-status[data-state="static"]::after { content:"固定結構"; }
+  .controls .app-status[data-state="error"]::before, .controls .app-status[data-alert]::before { background:#e74c3c; }
+  .controls .app-status[data-state="error"]::after, .controls .app-status[data-alert]::after { content:"需修正"; color:#b33b32; }
+  .status-detail { display:block; position:absolute; right:0; bottom:calc(100% + 8px); width:max-content; max-width:min(320px, calc(100vw - 16px)); padding:8px 12px; border:1px solid #d3dce6; border-radius:12px; background:#fff; color:#34495e; font-size:13px; line-height:1.5; white-space:pre-line; box-shadow:0 6px 18px rgba(44,62,80,.2); }
+  .status-detail[hidden] { display:none; }
+  /* 訊息帶：設計分頁正下方、點擊穿透、幾秒後自己消失；不蓋住畫布中央 */
+  body:not([data-mode="bench"]) .message-lane {
+    display:flex; flex-direction:column; align-items:center; gap:4px; position:relative; z-index:9; flex:0 0 0; height:0; overflow:visible;
+    pointer-events:none;
+  }
+  .message-lane .mode-banner {
+    position:relative; left:auto; transform:none; top:6px !important; margin:0 !important; width:auto; max-width:calc(100% - 16px); white-space:normal; padding:6px 12px; border-radius:12px;
+    font-size:13px; line-height:1.4; text-align:center; pointer-events:none; box-shadow:0 3px 10px rgba(0,0,0,.18);
+  }
+  body:not([data-mode="bench"]) #solveBanner { display:none !important; }
+}

@@ -47,9 +47,9 @@ const visible = page => page.evaluate(() => [...document.querySelectorAll('[data
   .map(el => ({ id: el.dataset.command, where: el.closest('.controls') ? 'bar' : el.closest('.canvas-toolbar') ? 'toolbar' : el.closest('.mobile-panel') ? 'panel' : el.closest('.part-palette') ? 'palette' : el.closest('header') ? 'header' : 'other' })));
 
 // 新增面板各分類的預設狀態（順序、展開、數量、說明、按鈕順序），之後全部展開才看得到每顆按鈕
-const readSections = page => page.evaluate(() => [...document.querySelectorAll('[data-add-section]')].map(d => ({ id: d.dataset.addSection, open: d.open,
-  summary: d.querySelector('summary').textContent.replace(/\s+/g, ' ').trim(), items: [...d.querySelectorAll('[data-command]')].map(b => b.dataset.command) })));
-const expandSections = page => page.evaluate(() => document.querySelectorAll('[data-add-section]').forEach(d => { d.open = true; }));
+const readSections = page => page.evaluate(() => [...document.querySelectorAll('[data-add-section]')].map(d => ({ id: d.dataset.addSection, open: d.tagName === 'DETAILS' ? d.open : true,
+  summary: (d.querySelector('summary')?.textContent || '').replace(/\s+/g, ' ').trim(), items: [...d.querySelectorAll('[data-command]')].map(b => b.dataset.command) })));
+const expandSections = page => page.evaluate(() => document.querySelectorAll('details[data-add-section]').forEach(d => { d.open = true; }));
 
 async function collect(page, layout, mode) {
   const seen = new Map();   // id -> Set(where)
@@ -91,9 +91,9 @@ for (const mode of ['design', 'bench']) {
       const got = r.sections.map(({ id, items }) => ({ id, items }));
       const want = ADD_SECTIONS.map(sec => ({ id: sec.id, items: COMMANDS.filter(c => c.section === sec.id).map(c => c.id) }));   // 現成組件由模組庫填入，不在指令清單
       ok(JSON.stringify(got) === JSON.stringify(want), `${label}：新增面板分類與按鈕順序＝清單（${got.map(x => x.id).join('→')}）`);
-      ok(r.sections.every(x => x.open === (x.id === 'ground' || x.id === 'member')), `${label}：預設只展開固定、構件`);
+      ok(r.sections.every(x => x.open === (x.id === 'common')), `${label}：預設只展開常用零件（連桿、板件、馬達），其餘收合`);
       const sec = id => r.sections.find(x => x.id === id).summary;
-      ok(/^傳動（3）/.test(sec('transmission')) && /^動力（4）/.test(sec('power')) && ADD_SECTIONS.every(x => sec(x.id).includes(x.hint)), `${label}：收合的分類顯示數量與說明（${sec('transmission')}）`);
+      ok(/^其他零件（10）/.test(sec('other')) && ADD_SECTIONS.filter(x => !x.primary).every(x => sec(x.id).includes(x.hint)), `${label}：收合的分類顯示數量與說明（${sec('other')}）`);
       ok(await page.evaluate(() => !document.querySelector('#linkMenu, #linkMenuToggle')), `${label}：沒有「連桿 ▾」下拉`);
     }
     // 控制列的快捷鍵
@@ -105,7 +105,9 @@ for (const mode of ['design', 'bench']) {
     const wantHeader = ['modeBtnDesign', 'modeBtnBench', ...(layout === 'desktop' ? ['btnUndo', 'menu:project', 'menu:help'] : mode === 'design' ? ['menu:help'] : ['menu:project', 'menu:help'])];
     ok(JSON.stringify([...header].sort()) === JSON.stringify([...wantHeader].sort()), `${label}：頂端只有 ${wantHeader.join('、')}（實際：${header.join('、')}）`);
     ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${label}：沒有橫向捲動`);
-    ok(await page.evaluate(() => !document.querySelector('header.appbar #mechanismStatus') && document.querySelector('.canvas-status #mechanismStatus')), `${label}：狀態訊息在畫布狀態列`);
+    // 手機（直立、設計）：狀態圓點併進播放列；其餘版面維持畫布狀態列
+    const host = layout === 'mobile' && mode === 'design' ? '.controls' : '.canvas-status';
+    ok(await page.evaluate(h => !document.querySelector('header.appbar #mechanismStatus') && document.querySelector(`${h} #mechanismStatus`), host), `${label}：狀態訊息在${host === '.controls' ? '播放列（圓點＋短字）' : '畫布狀態列'}`);
     if (shotsDir) {
       if (layout === 'desktop') { for (const g of ['project', 'help']) { await page.click(`header [data-command-menu="${g}"] > summary`); await page.screenshot({ path: join(shotsDir, `ui1_${layout}_${mode}_menu_${g}.png`) }); await page.keyboard.press('Escape'); } }
       else {

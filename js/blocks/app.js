@@ -81,6 +81,7 @@ import { createDesignTabs } from './design-tabs-ui.js?v=20261005_tabclose';
 import { createMateTool } from './mate-tool.js?v=20261007_facecolor';   // M2：設計分頁的「接合面」工具
 import { advanceRock } from './rock-motion.js';
 import { createMemberEditor } from './member-editor.js';
+import { SHEET_QUERY, messagePlacement, setSheet, sheetMode, settleInside, visibleUserRect } from './mobile-workspace.js';   // 手機工作區：抽屜狀態、訊息位置、看得到的區域
 import { drawMemberDimensions } from './member-dimension-render.js';
 import { memberStock, memberHoleDiameter, memberStockWarnings } from './member-stock.js';
 import { createJawTipHandle } from './jaw-tip-handle.js';
@@ -250,6 +251,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   if (recordUndo) pushUndo();
   bench.workReplaced?.();
   if (source !== 'undo') { sweepMemberId = null; mateTool.reset(); }
+  if (fit && source !== 'undo') setSheet('collapsed');   // 載入新作品：先收合抽屜，置中才用得到最大的看得到的區域
   pause();
   cancelMotorMode();
   Settings.syncFabricationInputs(); // 放棄尚未 change/blur 提交的表單草稿。
@@ -581,7 +583,7 @@ function deleteDesign(id) {
   if (!tab) return;
   const mod = S.modules.find(m => m.id === id);
   if (mod?.mount || S.modules.some(m => m.mount?.to?.module === id)) {
-    window.alert('這組設計已有組立連接。請先到組立台拆下它與相連模組，再刪除；其他設計不會被連帶刪除。');
+    transient('⚠️ 這組設計已有組立連接。請先到組立台拆下它與相連模組，再刪除；其他設計不會被連帶刪除。', 6000);   // 提示不是確認：走訊息帶，不開對話框
     return;
   }
   if (!window.confirm(`刪除「${tab.label}」及其 ${tab.count} 個零件？其他設計會保留，可按復原還原。`)) return;
@@ -623,7 +625,7 @@ function fitForMate() {   // 置中時多留箭頭的位置：箭頭是固定畫
   if (!b) { fitView(); return; }
   let pad = 0;
   for (let i = 0; i < 3; i++) {
-    View.fit({ minX: b.minX - 24 - pad, maxX: b.maxX + 24 + pad, minY: b.minY - 24 - pad, maxY: b.maxY + 24 + pad });
+    View.fit({ minX: b.minX - 24 - pad, maxX: b.maxX + 24 + pad, minY: b.minY - 24 - pad, maxY: b.maxY + 24 + pad }, visibleUserRect(svg));
     pad = (mateTool.reach() + 6) / (View.getScale() * (svg.getScreenCTM()?.a || 1));
   }
   draw();
@@ -2554,10 +2556,15 @@ function addLink() {
 // ---- 工具模式（畫桿 / 畫滑軌 / 畫三點桿 / 連桿升級滑軌）已抽到 ./tools.js（以 Tools.* 呼叫）----
 
 // ---- 馬達：放到接點上，挑一根連桿來驅動 ----
+let bannerTimer = 0;
+const bannerTtl = msg => sheetMode() ? messagePlacement(/^⚠/.test(msg) ? 'warn' : 'info').ttlMs : 1600;
 function setBanner(text) {
   const el = document.getElementById('modeBanner');
   el.textContent = text;
   el.style.display = text ? 'block' : 'none';
+  clearTimeout(bannerTimer);
+  // 手機：提示幾秒後自己消失；正在畫桿、放馬達的操作提示留到操作結束
+  if (text && sheetMode() && !(S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars || S.placingChain)) bannerTimer = setTimeout(() => { if (el.textContent === text) clearBanner(); }, bannerTtl(text));
 }
 function clearBanner() { setBanner(''); }
 function updateSolveBanner(sol, missingVisibleLinks) {
@@ -2856,8 +2863,10 @@ function currentBounds() {
 function fitView() {
   const b = currentBounds();
   // 接點外仍有馬達外殼與零件端圓；手機窄畫面也要留得住這些部分。
-  if (b) View.fit({ minX: b.minX - 24, maxX: b.maxX + 24, minY: b.minY - 24, maxY: b.maxY + 24 }); else View.resetView();
+  const area = visibleUserRect(svg);   // 手機：只在抽屜與播放列以外置中
+  if (b) View.fit({ minX: b.minX - 24, maxX: b.maxX + 24, minY: b.minY - 24, maxY: b.maxY + 24 }, area); else View.resetView(area);
   draw();
+  if (b && settleInside(svg, View)) draw();
 }
 
 window.addEventListener('resize', () => { refresh3DView(); draw(); });
@@ -2872,7 +2881,7 @@ document.addEventListener('visibilitychange', () => {
 // ---- 課堂閉環：存檔 / 開啟 / 分享 ----
 function transient(msg, hold = 0) {
   setBanner(msg);
-  setTimeout(() => { if (document.getElementById('modeBanner').textContent === msg) clearBanner(); }, hold || (hydraulic?.active() ? Math.max(4000,Math.min(8000,msg.length*80)) : 1600));
+  setTimeout(() => { if (document.getElementById('modeBanner').textContent === msg) clearBanner(); }, hold || (hydraulic?.active() ? Math.max(4000,Math.min(8000,msg.length*80)) : bannerTtl(msg)));
 }
 function motorMountPatternRotDegForCenter(id,pts,mount=null){
   return planMotorPatternRotDeg({id,pts,comps:S.comps,mount,fallbackRotDeg:()=>computeMotorRotDeg(id,pts || {},new Set())});
@@ -3318,7 +3327,7 @@ function init() {
   offerExampleFromUrl({ loadExample, insertModule: id => moduleEditor.insertBuiltin(id), notify: transient });
 }
 
-window.blocks = { startChainDrive, changeSprocketTeeth, alignChain, nudgeChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openMotorChoice, pickMotorType, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, exportStep: () => import('./step-export.js').then(m => m.exportStepFile({ S, design: inDesign(), motorAngles: motorAnglesNow(), notify: transient })), setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
+window.blocks = { draw, startChainDrive, changeSprocketTeeth, alignChain, nudgeChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openMotorChoice, pickMotorType, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, exportStep: () => import('./step-export.js').then(m => m.exportStepFile({ S, design: inDesign(), motorAngles: motorAnglesNow(), notify: transient })), setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
 window.blocks.changeFrameGround = changeFrameGround;
 window.blocks.setFrameSize = setFrameSize;
 // H1 除錯／測試：設計模式目前看得到的零件與點（畫面實際畫的那一份）。
@@ -3373,6 +3382,8 @@ window.blocks.startDimensionFromNode = () => window.blocks.startDimension(S.sele
 window.blocks.addSyringe=hydraulic.add;
 window.blocks.addFixedSyringe=hydraulic.addFixed;
 init();
+// 手機直立才需要的抽屜與訊息帶（work-sheet.js）：第一次在手機版面才載入，桌機不下載。
+{ const mq = matchMedia(SHEET_QUERY), load = () => import('./work-sheet.js'); mq.matches ? load() : mq.addEventListener('change', load, { once: true }); }
 window.blocks.toggleRulers = createCanvasRulers(svg);
 if(benchmarkSession){
  Object.assign(window.blocks,{benchmark:{identity:{source:'current',token:LOAD_GRAPH_TOKEN},async load(snapshot){playbackProbe.abort('work_changed');const norm=Store.normalizeSnapshot(snapshot);if(!norm)throw Error('無效量測作品');applySnapshot(norm,{recordUndo:false,source:'benchmark'});bench.setMode('bench');await set3D(true);viewer3D.stop();return benchmarkCoverage;},
