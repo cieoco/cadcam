@@ -50,7 +50,7 @@ export function buildPartGeometryCatalog(args={}) {
   };
   for(const comp of comps) {
     try {
-      const stock={...memberStock(comp),thicknessMm:Number(comp.stock?.thicknessMm) || stockMm};
+      const stock={...memberStock(comp),thicknessMm:comp.shape==='disk'?stockMm:Number(comp.stock?.thicknessMm) || stockMm};
       if(comp.type==='bar') {
         if(comp.barFusionRoot && !comp.barFusion)continue;
         if(comp.barFusion){

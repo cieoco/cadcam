@@ -5,6 +5,7 @@ export function planBarFusion(comps,ids,params={},settings={},positions={}) {
   const fail=reason=>({ok:false,reason});
   const members=ids.map(id=>comps.find(c=>c.id===id));
   if(ids.length<2||ids.length>16||new Set(ids).size!==ids.length||members.some(c=>c?.type!=='bar'))return fail('請選 2～16 支連桿。');
+  if(members.some(c=>c.shape==='disk'))return fail('圓盤保留獨立外徑，請用孔連接，不支援與連桿合成一片。');
   if(members.some(c=>c.moduleId!==members[0].moduleId))return fail('連桿必須在同一設計內。');
   if(members.some(c=>fusionRoot(comps,c.id)))return fail('請先解除既有合成，再重新選取連桿。');
   if(members.filter(c=>c.isInput).length>1 || members.some(c=>ids.includes(c.motorCarrier)))return fail('同一片只能保留一個動力輸入，不能合併馬達承載與輸出。');

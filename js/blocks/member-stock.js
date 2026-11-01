@@ -52,6 +52,7 @@ export function memberStock(comp) {
 }
 
 export function memberStockLabel(comp) {
+  if(comp?.shape==='disk')return `圓盤外徑 ${comp.diameterMm} mm・板厚沿用製作設定`;
   const stock = memberStock(comp);
   const material = MATERIALS.find(item => item.id === stock.material)?.label || '未指定';
   const format = value => Number.isInteger(value) ? String(value) : value.toFixed(1);
@@ -59,6 +60,7 @@ export function memberStockLabel(comp) {
 }
 
 export function planMemberStock(comp, key, raw, { holeDiameterMm = 12.96 } = {}) {
+  if(comp?.shape==='disk'&&key!=='material')return {ok:false,message:'圓盤外徑請從尺寸列調整，板厚沿用全局製作設定。'};
   if(comp?.boxPanel && key!=='material')return {ok:false,message:'盒體板件尺寸請從「卡榫盒子」統一修改。'};
   if (!['widthMm', 'thicknessMm', 'material'].includes(key)) {
     return { ok: false, message: '不支援的實體資料欄位。' };
@@ -69,6 +71,7 @@ export function planMemberStock(comp, key, raw, { holeDiameterMm = 12.96 } = {})
     if (typeof raw !== 'string' || !MATERIAL_IDS.has(raw)) {
       return { ok: false, message: '請選擇有效的材料標籤。' };
     }
+    if(comp?.shape==='disk')return {ok:true,stock:{material:raw}};
     return { ok: true, stock: { ...stock, material: raw } };
   }
 

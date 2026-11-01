@@ -1,4 +1,5 @@
 /** 共用剛性桿件尺寸列：選取 → 預檢整筆修改 → 一次復原 → 重算。 */
+import {isDisk,validateDisk} from './disk-plate.js';
 import { S } from './state.js';
 import { planSyringeAttachmentResize } from '../core/syringe.js';
 import { memberDimensions, memberDimensionValue, planMemberDimension, mirroredJaw, dimensionLock } from './member-dimensions.js';
@@ -26,6 +27,19 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     }
     if(lastSelectedId!==comp?.id){const more=el('memberMore');if(more)more.open=false;const operations=el('memberOperations');if(operations)operations.hidden=true;el('memberOperationsToggle')?.setAttribute('aria-expanded','false');lastSelectedId=comp?.id;}
     if (tipDraft && tipDraft.selectedId !== comp?.id) tipDraft = null;
+    const diskFields=el('diskDimensions');if(diskFields)diskFields.hidden=!isDisk(comp);
+    const diskInput=el('diskDiameterInput');
+    if(diskInput){
+      diskInput.value=isDisk(comp)?comp.diameterMm:'';
+      diskInput.onchange=()=>{
+        const c=selected();if(!isDisk(c))return;
+        const value=Math.round(Number(diskInput.value)*10)/10;
+        const error=validateDisk(c,Number(S.topo.params[c.lenParam]),value,holeDiameter(c));
+        if(error){notify(error);sync();return;}
+        if(value===c.diameterMm)return;
+        pause();pushUndo();c.diameterMm=value;rebuild();draw();
+      };
+    }
     const dimensions = memberDimensions(comp);
     const active = dimensions.length > 0;
     const copyActions=el('memberCopyActions');if(copyActions)copyActions.hidden=!active||!!comp?.boxPanel;
@@ -41,7 +55,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     el('lenValue').style.display = active ? 'none' : '';
     hint.style.display = 'none';
     el('memberMirrorLabel').style.display = 'none';
-    const stockFields=el('memberStockDimensions');if(stockFields)stockFields.hidden=!active;
+    const stockFields=el('memberStockDimensions');if(stockFields)stockFields.hidden=!active||isDisk(comp);
     for(const [field,key] of [['memberWidthInput','widthMm'],['memberThicknessInput','thicknessMm']]){
       const node=el(field);if(node){node.value=active?memberStock(comp)[key]:'';node.disabled=!active||Boolean(comp?.barFusionRoot);}
     }
@@ -84,7 +98,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
       el('memberMirrorLabel').style.display = '';
       el('memberMirror').checked = mirror;
     }
-    el('lenTitle').textContent = comp.barFusionRoot ? '合成一片' : comp.boxPanel ? '盒體板件' : comp.type === 'bar' ? '連桿' : comp.shape === 'jaw' ? '夾爪板' : '桿件／板件';
+    el('lenTitle').textContent = comp.barFusionRoot ? '合成一片' : comp.boxPanel ? '盒體板件' : isDisk(comp) ? '圓盤' : comp.type === 'bar' ? '連桿' : comp.shape === 'jaw' ? '夾爪板' : '桿件／板件';
   }
   function selectDimension(id) {
     if (!memberDimensions(selected()).some(d => d.id === id)) return;
@@ -96,13 +110,14 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     const comp = selected();
     if (!comp) return;
     const id = dimensionId();
+    if(isDisk(comp)){const error=validateDisk(comp,Number(raw),comp.diameterMm,holeDiameter(comp));if(error){notify(error);sync();return;}}
     const dimension = memberDimensions(comp).find(d => d.id === id);
     if (dimension?.stockKey) { setStock(dimension.stockKey, raw); return; }
     const lock = dimensionLock(comp, S.comps, id);
     if (lock) { notify(lock); sync(); return; }
     const partner = mirror && mirroredJaw(comp, S.comps, S.topo.params);
     const targets = partner ? [comp, partner] : [comp];
-    const plans = targets.map(c => planMemberDimension(c, S.topo.params, id, raw));
+    const plans = targets.map(c => planMemberDimension(c, S.topo.params, id, raw,{holeDiameterMm:holeDiameter(c)}));
     const failure = plans.find(plan => !plan.ok);
     if (failure) { notify(failure.message); sync(); return; }
     if (targets.every(c => Math.abs(memberDimensionValue(c, S.topo.params, id) - plans[0].value) < 0.001)) { sync(); return; }

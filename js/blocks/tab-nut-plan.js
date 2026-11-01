@@ -12,7 +12,7 @@ function rawPlan(comps,modules,params,mod,opts,over={}){
   const d=readConnectionDescriptor({comps,modules,childId:mod.id,mount:mod.mount});
   if(!d.ok)return fail(d.diagnostics[0]?.message||'接合參照無效。');
   const parts=[d.host.partId,d.child.partId].map(id=>comps.find(c=>c.id===id));
-  if(parts.some(c=>!c||!['bar','triangle'].includes(c.type)||!isFixedMountPart(c)||c.barFusion||c.barFusionRoot||c.fusedWith))return fail('榫槽試作只支援獨立固定桿／板；自動機架、活動件與合成件請使用其他接法。');
+  if(parts.some(c=>!c||!['bar','triangle'].includes(c.type)||!isFixedMountPart(c)||c.barFusion||c.barFusionRoot||c.fusedWith||c.shape==='disk'))return fail('榫槽試作只支援獨立固定桿／板；自動機架、活動件與合成件請使用其他接法。');
   const surfaces=(moduleId,partId)=>buildMountSurfaces({comps,modules,params,moduleId,partId,exportSettings:opts.exportSettings||{},thicknessMm:opts.stockMm||3,drilling:true}).surfaces||[];
   const host=findMountSurface(surfaces(d.host.moduleId),mod.mount.to),child=over.child||surfaces(mod.id,d.child.partId).find(s=>s.compId===d.child.partId);
   if(!host||!child)return fail('找不到實際接合板件。');

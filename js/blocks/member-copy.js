@@ -1,3 +1,4 @@
+import {isDisk,diskOutline} from './disk-plate.js';
 import {fusionRoot, inspectBarFusionData} from '../core/bar-fusion.js';
 import {instantiateTemplate} from './module-ops.js';
 import {pointKeysFor, ownedParamKeys} from './part-types.js';
@@ -15,7 +16,7 @@ export function copyMemberGeometry(comp, params, settings = {}) {
     const ratio = params[hole.distParam] / length;
     holes.push({x:a.x+(b.x-a.x)*ratio,y:a.y+(b.y-a.y)*ratio,r:holeRadius});
   }
-  return {outlines:[roundedHullOutline(points,radius)],holes,cutouts:[]};
+  return {outlines:[isDisk(comp)?diskOutline(comp,a):roundedHullOutline(points,radius)],holes,cutouts:[]};
 }
 
 export function planMemberCopy({comps, params, modules = [], counter = 0, id, positions = {}, mode = 'copy', settings = {}}) {

@@ -13,6 +13,7 @@
  *   pointCoords / nearestDisplayToPoint / snapWorld / mobilePrompt / promptText
  */
 
+import { diskOutline } from './disk-plate.js';
 import { S } from './state.js';
 import * as View from './view.js';
 import * as Model from './model.js';
@@ -52,6 +53,10 @@ function rejectCrossModule(exit) {
 }
 
 // ---- 畫桿模式：桌機可拖放或點兩下；觸控按住起點、拖到終點放開。----
+export function startDrawDisk() {
+  if(S.drawingLink&&S.drawKind==='disk'){exitDrawLink();draw();return;}
+  beginDraw('disk');
+}
 export function startDrawLink() {
   if (S.drawingLink && S.drawKind === 'link') { exitDrawLink(); draw(); return; } // 再點同一工具＝取消
   beginDraw('link');
@@ -75,10 +80,10 @@ function beginDraw(kind) {
   S.drawStart = null;
   S.drawStartNodeId = null;
   S.drawPreview = null;
-  const noun = kind === 'rail' ? '滑軌' : '連桿';
+  const noun = kind === 'disk' ? '圓盤：先選中心 A，再選工作孔 B' : kind === 'rail' ? '滑軌' : '連桿';
   setBanner(promptText(
-    `${noun}：點起點，拖到終點放開；也可點兩下`,
-    kind === 'rail' ? '按住起點拖出滑軌，放開建立' : '依序點起點、終點；也可按住起點拖到終點'
+    kind==='disk' ? '圓盤：點中心 A，再點工作孔 B；也可拖放' : `${noun}：點起點，拖到終點放開；也可點兩下`,
+    kind === 'disk' ? '圓盤：先點中心 A，再點工作孔 B；外徑完成後可調' : kind === 'rail' ? '按住起點拖出滑軌，放開建立' : '依序點起點、終點；也可按住起點拖到終點'
   ));
   draw();
 }
@@ -121,10 +126,10 @@ function linkLenLabel(len, nodeId = null) {
 export function drawDrawPreview() {
   if (!S.drawingLink || !S.drawActive || !S.drawStart || !S.drawPreview) return;
   const isRail = S.drawKind === 'rail';
-  const res = resolveDrawEnd(S.drawStart, S.drawPreview, S.drawStartNodeId, !isRail);
+  const res = resolveDrawEnd(S.drawStart, S.drawPreview, S.drawStartNodeId, S.drawKind === 'link');
   const accent = isRail ? '#16a085' : '#3498db';
   const path = document.createElementNS(SVG_NS, 'path');
-  path.setAttribute('d', barHullPath(S.drawStart, res.pos));
+  path.setAttribute('d', S.drawKind==='disk' ? 'M '+diskOutline({diameterMm:Math.max(60,2*(res.len+10))},S.drawStart).map(p=>`${TX(p.x)},${TY(p.y)}`).join(' L ')+' Z' : barHullPath(S.drawStart, res.pos));
   path.setAttribute('fill', accent + '22');
   path.setAttribute('stroke', accent);
   path.setAttribute('stroke-width', 2);
@@ -621,14 +626,14 @@ export function drawPolygonPreview() {
 // 第一點可吸附既有孔；桌機點兩下或按住拖放都由此建立起點。
 export function startLinkAt(cur) {
   if (!cur) return;
-  const nodeId = S.drawKind === 'link' ? nearestNodeId(cur) : null;
+  const nodeId = S.drawKind !== 'rail' ? nearestNodeId(cur) : null;
   const p = nodeId && displayPointCoords()[nodeId];
   S.drawStart = p ? { x: p.x, y: p.y } : { x: cur.x, y: cur.y };
   S.drawStartNodeId = nodeId;
   S.drawPreview = { x: S.drawStart.x + LINK_DEFAULT_LEN, y: S.drawStart.y };
   S.drawActive = true;
-  const noun = S.drawKind === 'rail' ? '滑軌' : '連桿';
-  setBanner(promptText(`${noun}：拖到終點放開，或再點一下完成`, S.drawKind === 'rail' ? `${noun}：拖到終點放開` : '連桿：再點終點完成，或拖到終點放開'));
+  const noun = S.drawKind === 'disk' ? '圓盤工作孔 B' : S.drawKind === 'rail' ? '滑軌' : '連桿';
+  setBanner(promptText(`${noun}：拖到終點放開，或再點一下完成`, S.drawKind === 'rail' ? `${noun}：拖到終點放開` : `${noun}：再點一下完成，或拖到終點放開`));
   draw();
 }
 export function placeLinkPoint(e) {
@@ -643,12 +648,13 @@ export function placeLinkPoint(e) {
 export function finishDrawLink(e) {
   if (!S.drawStart) return;
   const cur = worldFromEvent(e) || S.drawPreview || S.drawStart;
-  if (S.drawKind === 'link' && Math.hypot(cur.x-S.drawStart.x,cur.y-S.drawStart.y)<6) {
+  if (S.drawKind !== 'rail' && Math.hypot(cur.x-S.drawStart.x,cur.y-S.drawStart.y)<6) {
     setBanner('請在離起點較遠的位置選擇終點');
     return;
   }
-  const res = resolveDrawEnd(S.drawStart, cur, S.drawStartNodeId, S.drawKind !== 'rail');
+  const res = resolveDrawEnd(S.drawStart, cur, S.drawStartNodeId, S.drawKind === 'link');
   if (S.drawKind === 'rail') { finishDrawRail(res); return; }
+  if(S.drawKind==='disk'&&(res.len<8||res.len>990)){notify('圓盤工作孔距請設在 8–990 mm。');return;}
   const conn = connectionModule(S.comps, [S.drawStartNodeId, res.nodeId]);
   if (!conn.ok) { rejectCrossModule(exitDrawLink); return; }
   pushUndo();
@@ -663,6 +669,7 @@ export function finishDrawLink(e) {
     p2: { id: 'P' + n + 'b', type: 'floating', x: res.pos.x, y: res.pos.y },
     lenParam: lp, isInput: false, fixedLen: true
   };
+  if(S.drawKind==='disk')Object.assign(comp,{shape:'disk',diameterMm:Math.max(60,2*(res.len+10)),snapLength:false,frameSeparate:true});
   if (conn.moduleId) comp.moduleId = conn.moduleId;
   S.comps.push(comp);
   S.topo.params[lp] = res.len;
@@ -717,6 +724,7 @@ function finishDrawRail(res) {
 export function convertLinkToSlider() {
   const c = S.comps.find(x => x.id === S.selectedLinkId && x.type === 'bar' && x.fixedLen);
   if (!c) return;
+  if(c.shape==='disk'){notify('圓盤不能轉成滑軌，請另新增滑軌。');return;}
   pushUndo();
   pause();
   const aId = c.p1.id, bId = c.p2.id;

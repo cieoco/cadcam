@@ -1,5 +1,6 @@
 import {tabNutPartGeometry} from './tab-nut-plan.js';
 import {boxPanelGeometry} from '../plugins/box-maker/box-contract.js';
+import {isDisk,diskOutline,validateDisk} from './disk-plate.js';
 import {inspectBarFusion} from './bar-fusion-geometry.js';
 import { DEFAULT_PLATE_RADIUS_WORLD, createPlateGeometry, localToWorld } from './plate-geometry.js';
 import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
@@ -222,6 +223,7 @@ function linkHoleSpecs(comp, length, settings, extraHoles = []) {
 }
 
 function svgForLink(comp, length, settings, extraHoles = []) {
+  if(isDisk(comp))return addSvgStockDescription(svgForFrameGeometry(inspectLinkExport(comp,length,settings,extraHoles),comp.id),comp);
   const stock = memberStock(comp);
   const r = round(stock.widthMm / 2, 3);
   const holes = linkHoleSpecs(comp, length, settings, extraHoles);
@@ -1165,6 +1167,7 @@ export function splitMountsByHost(comps, mounts = []) {
 // 宿主機架桿幾何：桿局部座標（p1 在原點、+X 沿桿軸），複用 frameGeometry 的
 // 「沿桿軸延長/加寬＋槽內固定孔剔除」邏輯，讓桿本體、端點孔與馬達穿板特徵成為同一塊料。
 export function hostedBarGeometry(comp, pts, settings, mounts = [], extraHoles = []) {
+  if(isDisk(comp)&&mounts.length)throw Error('圓盤承載馬達的穿板安裝孔尚未支援輸出；可先用中心孔作為馬達輸出盤。');
   const a = pointForExport(comp, 'p1', pts);
   const b = pointForExport(comp, 'p2', pts);
   if (!a || !b) return null;
@@ -1248,10 +1251,12 @@ ${cutouts ? cutouts + '\n' : ''}${holes}
 }
 
 function stockDescription(comp) {
+  if(isDisk(comp))return '圓盤；板厚沿用作品的全局製作設定。';
   return `材料與尺寸：${memberStockLabel(comp)}`;
 }
 
 function stockComment(comp) {
+  if(isDisk(comp))return 'DISK thickness=project-fabrication-settings';
   const stock = memberStock(comp);
   return `STOCK material=${stock.material} widthMm=${stock.widthMm} thicknessMm=${stock.thicknessMm}`;
 }
@@ -1288,6 +1293,7 @@ export function dxfForFrameGeometry(geometry,partId='frame') {
 }
 
 function dxfForLink(comp, length, settings, extraHoles = []) {
+  if(isDisk(comp))return addDxfStockComment(dxfForFrameGeometry(inspectLinkExport(comp,length,settings,extraHoles),comp.id),comp);
   const stock = memberStock(comp);
   const r = round(stock.widthMm / 2, 3);
   const holes = linkHoleSpecs(comp, length, settings, extraHoles);
@@ -1320,7 +1326,8 @@ function dxfForLink(comp, length, settings, extraHoles = []) {
 export function inspectLinkExport(comp, length, settings = {}, extraHoles = []) {
   if(comp.boxPanel){const g=boxPanelGeometry(comp);if(!g)throw Error('盒體板件資料無效');return {...g,holes:adapterHoleSpecs(extraHoles)};}
   const safeLength = Number.isFinite(Number(length)) && Number(length) > 0 ? Number(length) : 1;
-  const outline = barOutline({ x: 0, y: 0 }, { x: safeLength, y: 0 }, memberStock(comp).widthMm / 2);
+  if(isDisk(comp)){const error=validateDisk(comp,safeLength,comp.diameterMm,normalizeExportSettings(settings).holeDiameterMm);if(error)throw Error(error);}
+  const outline = isDisk(comp)?diskOutline(comp):barOutline({ x: 0, y: 0 }, { x: safeLength, y: 0 }, memberStock(comp).widthMm / 2);
   const holes = [];
   const cutouts = [];
   linkHoleSpecs(comp, safeLength, settings, extraHoles).forEach(hole => {
@@ -1330,6 +1337,7 @@ export function inspectLinkExport(comp, length, settings = {}, extraHoles = []) 
       holes.push({ ...holeMetadata(hole), x: hole.x, y: hole.y, r: hole.r, layer: hole.layer || 'HOLE' });
     }
   });
+  if(isDisk(comp)&&(holes.some(h=>Math.hypot(h.x,h.y)+h.r>comp.diameterMm/2-0.5)||cutouts.some(c=>c.points.some(p=>Math.hypot(p.x,p.y)>comp.diameterMm/2-0.5))))throw Error('安裝孔超出圓盤邊界，請加大外徑。');
   return { outlines: [outline], holes, cutouts };
 }
 

@@ -1,3 +1,4 @@
+import {isDisk,diskOutline} from './disk-plate.js';
 /**
  * blocks / interference
  *
@@ -376,7 +377,7 @@ function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], 
     const r = memberStock(comp).widthMm / 2;
     if (comp.type === 'bar') {
       const a = pt('p1'), b = pt('p2');
-      return a && b ? [capsulePoly(a, b, r)] : [];
+      return a && b ? [isDisk(comp)?diskOutline(comp,a):capsulePoly(a, b, r)] : [];
     }
     if (comp.type === 'triangle') {
       const a = pt('p1'), b = pt('p2'), c = pt('p3');

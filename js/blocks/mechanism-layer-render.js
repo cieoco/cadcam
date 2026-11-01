@@ -6,6 +6,7 @@ import {inspectBarFusion,worldFusionGeometry} from './bar-fusion-geometry.js';
  * 可見連桿與節點互動層的 SVG 建立／更新。
  */
 
+import { isDisk, diskOutline } from './disk-plate.js';
 import { memberStock } from './member-stock.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -15,7 +16,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
   onTryPick, onFreeDrag, onSelect, groupForLayer, linkLayer, groundIds, hullRadius, scale, barHullPath, project,
   hostedMounts, inspectHostedFrame, registerUpdate, holeRadius = hullRadius * 0.72, params = {}, exportSettings = {}, tabNutGeometry = {} }) {
   const linksToDraw = [...links].sort((a, b) => (a.style === 'crank' ? 1 : 0) - (b.style === 'crank' ? 1 : 0));
-  const eligible = linksToDraw.filter(link => !link.hidden && !triangleEdgeKeys.has([link.p1, link.p2].sort().join('|')) && !isGroundBar(link));
+  const eligible = linksToDraw.filter(link => !link.hidden && !triangleEdgeKeys.has([link.p1, link.p2].sort().join('|')) && (!isGroundBar(link)||comps.some(c=>c.id===link.id&&isDisk(c))));
   const countMissing = current => eligible.reduce((count, link) => {
     const a = current[link.p1], b = current[link.p2];
     return count + (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(b.x) ? 1 : 0);
@@ -72,7 +73,8 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       stick.style.display = valid ? '' : 'none'; holes.forEach(hole => { hole.element.style.display = valid ? '' : 'none'; });
       if (!valid) return;
       const tabPath=component&&tabNutPath(tabNutGeometry[component.id],component,current,project);
-      if(tabPath){stick.setAttribute('fill-rule','evenodd');stick.setAttribute('d',tabPath);}
+      if(isDisk(component)){stick.setAttribute('d','M '+diskOutline(component,a).map(p=>{const q=project(p);return q.x+','+q.y;}).join(' L ')+' Z');}
+      else if(tabPath){stick.setAttribute('fill-rule','evenodd');stick.setAttribute('d',tabPath);}
       else if(fusion?.ok){
         const g=worldFusionGeometry(fusion,current),ring=ps=>'M '+ps.map(p=>{const q=project(p);return q.x+','+q.y;}).join(' L ')+' Z';
         stick.setAttribute('fill-rule','evenodd');stick.setAttribute('d',[...g.outlines,...g.cutouts.map(c=>c.points)].map(ring).join(' '));

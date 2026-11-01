@@ -49,6 +49,8 @@ function sync() {
 
 // ---------- 摘要列 ----------
 function selectionSummary(panel) {
+  const disk=panel.querySelector('#diskDimensions');
+  if(disk&&!disk.hidden)return `圓盤：外徑 ${disk.querySelector('input').value} mm・孔距 ${panel.querySelector('#memberDimensionInput').value} mm`;
   if(panel.id==='gearEditor')return `齒輪：${txt(panel.querySelector('#gearTeethVal'))} 齒`;
   const title = txt(panel.querySelector('#lenTitle,.re-title,.se-title,.fe-title'));
   const label = txt(panel.querySelector('#memberDimensionLabel'));

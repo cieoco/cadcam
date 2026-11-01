@@ -252,7 +252,8 @@
     "test/unit-starts.mjs",
     "test/unit-start-examples.mjs",
     "test/gear-member-mount.mjs",
-    "test/gear-hole-placement.mjs"
+    "test/gear-hole-placement.mjs",
+    "test/disk-plate.mjs"
   ],
   "version": 1
 }

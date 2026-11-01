@@ -88,6 +88,7 @@ function normalizeBar(comp, index, params, warnings) {
     isInput: Boolean(comp.isInput),
     fixedLen: comp.fixedLen !== false
   };
+  if(comp.shape==='disk'){if(comp.boxPanel||comp.barFusion||comp.barFusionRoot)throw Error('圓盤不能同時為盒體或合成桿');out.shape='disk';out.frameSeparate=true;out.diameterMm=Math.max(20,Math.min(2000,Number(comp.diameterMm)||100));out.snapLength=false;}
   if(comp.barFusion) { out.barFusion=normalizeBarFusion(comp.barFusion); if(!out.barFusion)throw Error('合成資料格式無效'); }
   if(comp.barFusionRoot) { if(!safeId(comp.barFusionRoot))throw Error('合成基準無效'); out.barFusionRoot=comp.barFusionRoot; }
   if (comp.snapLength === false) out.snapLength = false;
@@ -95,6 +96,7 @@ function normalizeBar(comp, index, params, warnings) {
   if(comp.boxPanel)out.boxPanel=normalizeBoxPanel(comp.boxPanel);
   const stock = normalizeMemberStock(comp.stock);
   if (stock) out.stock = stock;
+  if(out.shape==='disk'&&out.stock)delete out.stock.thicknessMm;
   if(out.boxPanel)out.stock={...stock,widthMm:boxPanelSize(out.boxPanel).width,thicknessMm:out.boxPanel.settings.thicknessMm,material:stock?.material || 'unspecified'};
   // 宿主機架桿：此桿承載該馬達接點的穿板安裝特徵（MG995 槽/耳孔、TT 孔位），
   // 匯出時特徵切進桿身、不再進自動地基 frame.dxf。

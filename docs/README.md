@@ -16,6 +16,8 @@
 
 ## 產品與功能規格
 
+- [SDD-DISK-PLATE.md](SDD-DISK-PLATE.md) — 圓盤外徑、兩孔剛體、全局板厚與輸出契約。
+
 - [SDD-GEAR-HOLE-PLACEMENT.md](SDD-GEAR-HOLE-PLACEMENT.md) — 齒輪輸出孔起始角度、兩軸中線對稱配對及預覽保存契約。
 
 - [SDD-GEAR-MEMBER-MOUNT.md](SDD-GEAR-MEMBER-MOUNT.md) — 鏡射夾指與齒輪共用雙孔的預覽、安裝、保存與驗收契約。

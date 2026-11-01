@@ -17,7 +17,7 @@ const B = 'window.blocks.';
 const add = (section, rows) => rows.map(([id, label, icon, tip, run, ...args]) => ({ id, group: 'add', section, label, icon, tip, run: B + run, args, modes: ['design'] }));
 export const COMMANDS = [
   ...add('common', [['bar', '連桿', '🔵', '點兩點畫桿', 'pickLinkTool', 'bar'],
-    ['plate', '板件', '🟢', '前三點主孔，再加外形', 'startDrawPolygon'], ['motor', '馬達', '🔴', 'TT／N20', 'openMotorChoice']]),
+    ['disk', '圓盤', '⚪', '中心孔與工作孔；外徑可調', 'startDrawDisk'], ['plate', '板件', '🟢', '前三點主孔，再加外形', 'startDrawPolygon'], ['motor', '馬達', '🔴', 'TT／N20', 'openMotorChoice']]),
   ...add('other', [['anchor', '固定支點', '📌', '新增獨立固定點；也可點現有孔固定', 'addAnchor'],
     ['triangle', '三角板', '🔺', '三孔，填滿', 'pickLinkTool', 'triangle'],
     ['polyline', '折線桿', '📈', '多孔，不填滿', 'pickLinkTool', 'polyline'], ['rail', '滑軌', '🟩', '畫軌道讓滑塊走', 'startDrawRail'],

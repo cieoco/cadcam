@@ -1,4 +1,5 @@
 /** 剛性桿件共用尺寸語意；不持有 UI 或修改輸入資料。 */
+import {isDisk,validateDisk} from './disk-plate.js';
 import { polylineTriangleParams, preservedDiagonalLength } from './plate-geometry.js';
 import { memberStock, planMemberStock } from './member-stock.js';
 
@@ -8,6 +9,7 @@ const stockDimensions = () => [
 ];
 
 export function memberDimensions(comp) {
+  if(isDisk(comp))return [{id:'g',label:'工作孔距中心 A–B',refs:['p1','p2'],param:comp.lenParam,step:1}];
   if (comp?.type === 'bar') return [{ id: 'g', label: comp.boxPanel?'板件長度':'孔距 A–B', refs: ['p1', 'p2'], param: comp.lenParam }, ...stockDimensions()];
   if (comp?.type !== 'triangle') return [];
   const dimensions = [
@@ -29,7 +31,7 @@ export function memberDimensionValue(comp, params, id = 'g') {
   return Number(params[dimension.param]);
 }
 
-export function planMemberDimension(comp, params, id, raw) {
+export function planMemberDimension(comp, params, id, raw, {holeDiameterMm=12.96}={}) {
   if(comp?.boxPanel)return {ok:false,message:'盒體板件尺寸請從「卡榫盒子」統一修改。'};
   const dimension = memberDimensions(comp).find(d => d.id === id);
   if (dimension?.stockKey) {
@@ -42,6 +44,7 @@ export function planMemberDimension(comp, params, id, raw) {
   if (!dimension || !Number.isFinite(numeric) || numeric < 8 || numeric > max)
     return { ok: false, message: `尺寸請填 8–${max} mm，最多一位小數。` };
   if (dimension.property) return { ok: true, params: {}, properties: { [dimension.property]: value }, value };
+  if(isDisk(comp)){const error=validateDisk(comp,value,comp.diameterMm,holeDiameterMm);if(error)return {ok:false,message:error};}
   const patch = { [dimension.param]: value };
   const poly = polylineTriangleParams(comp);
   if (poly && dimension.param !== poly.diagParam) {
