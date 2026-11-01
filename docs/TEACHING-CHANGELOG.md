@@ -856,3 +856,12 @@
 - Node v24.22.1 完整回歸 242／242 通過（output/acceptance/results.json）；最後增補板厚案例後 disk-turntable.mjs 再驗收通過。
 - HTTP 瀏覽器：桌機及 390×844，三支針筒分別推到 20 mm、底盤回 0／復原、重開保留圓盤與接合、3D 水平底盤及上層跟隨、七步 281 點驗證與 16.5 秒實播完成回原姿態、重新選面與取消，以及舊 H04 網址顯示 H07。錯誤記錄為空。
 - 更新 assets/teaching/hydraulic/h06-mobile.png、h06-face-placement-mobile.png 與第十二單元操作說明。本機證據另保留於 output/h07-replacement/（h06-desktop、h06-mobile、h06-face-placement-mobile、h04-redirect）。上述是瀏覽器與幾何取樣驗收，不代表實物、全行程干涉或製作就緒。
+
+## 2026-11-02：獨立單元「針筒怎麼控制機構」（2026.11.2.3）
+
+- 新增 teaching-syringe.html，不編入第一～十二單元；教學目錄在第九～十二單元下方放「專題單元」卡，第九～十二單元頁首放背景閱讀連結。
+- 三段：知識（不用電腦）→ 數位模擬六步 → 檢核。知識含 6 張自畫內嵌 SVG（針筒各部分、主從針筒、推與拉的氣泡、曲柄滑塊正反、力臂與死點、固定／可轉安裝）、一題主動 5 mL／從動 10 mL 的面積比算算看，並說明本工具只模擬從動針筒的伸出量，沒有主動針筒、水管與水量。
+- 模擬六步各有自己的起始檔：H01 觀察、H02 兩個驅動孔與折返、固定／可轉自己安裝、H03 夾口與量尺、H07 對 H08 轉角、選做 H05 動作序列。每步有目標、步驟、觀察問題、記錄表與對照參考值。步驟 3 新增兩個待安裝起始檔 syringe-fixed-start（H07 去針筒）、syringe-pivot-start（H08 去針筒），登記在 unit-start-examples.js（用到才載入），網址深連結規則同步放寬；真實瀏覽器逐步驗證兩種安裝都能完成，且固定練習檔改選可轉會顯示「連接或固定無效」並停用確認。
+- 頁面上的模擬數字全由 js/blocks/syringe-unit-facts.js 現算（scanSyringe／syringeGain／planSyringeStroke／量尺 dimensionRange），頁面標成 `data-sim`；載入後頁面也會重算並更新，test/syringe-unit.mjs 逐一重算比對。主要數字：H01 擺角約 19.5°；H02 遠孔 10 mm 每推 1 mm 約 0.32°、近孔約 0.09°，近孔約 16.5 mm 折返；H03 夾口 70.9～103.5 mm，推出為張開（H05 變體 82.8→46.6 mm 為推出收攏）；H07／H08 轉盤角約 83.7°，H08 筒身只擺約 1.7°。這個模組不屬於啟動程式。
+- 限制：只有幾何，沒有力、摩擦、水量、漏水與氣泡；10 mL 針筒內徑、管夾孔距、20 mm 行程都是示範尺寸，未實測。
+- 截圖 3 張（media/tutorials/keyshots/syringe-readout.webp、syringe-ruler-gap.webp、syringe-mount-mode.webp，由 tools/capture-tutorial-shots.mjs 產生）：針筒列讀數、量尺量夾口、安裝視窗的連接方式。

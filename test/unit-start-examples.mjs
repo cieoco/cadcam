@@ -6,13 +6,15 @@ import { compileAssembly, solveAssembly } from '../js/blocks/assembly.js';
 import { rackGuideTravel } from '../js/blocks/rack-limits.js';
 import { offerExampleFromUrl } from '../js/blocks/example-entry.js';
 import { UNIT_STARTS } from '../js/blocks/unit-starts.js';
-const ids = ['unit4-start', 'unit5-start', 'unit6-start', 'unit7-start', 'unit11-start', 'unit12-start'];
+import { planSyringeInstallation } from '../js/blocks/syringe-installation.js';
+import { scanSyringe } from '../js/blocks/syringe-operations.js';
+const ids = ['unit4-start', 'unit5-start', 'unit6-start', 'unit7-start', 'unit11-start', 'unit12-start', 'syringe-fixed-start', 'syringe-pivot-start'];
 check('載入前清單沒有單元起始檔（不在啟動資料）', ids.every(id => !getExample(id)));
 const before = BLOCK_EXAMPLES.length;
 const [first, second] = [loadUnitStarts(), loadUnitStarts()];
 check('重複呼叫共用同一個載入', first === second);
 await first;
-check('載入後六個起始檔進入清單', ids.every(id => getExample(id)) && BLOCK_EXAMPLES.length === before + ids.length);
+check('載入後八個起始檔進入清單（含針筒單元的兩個）', ids.every(id => getExample(id)) && BLOCK_EXAMPLES.length === before + ids.length);
 await loadUnitStarts();
 check('再次載入不重複登記', BLOCK_EXAMPLES.length === before + ids.length && new Set(BLOCK_EXAMPLES.map(e => e.id)).size === BLOCK_EXAMPLES.length);
 check('每個起始檔標為練習並說明內容與第一步', ids.every(id => { const l = getExampleLesson(id); return l.group === 'challenge' && l.level === '練習' && l.use && l.try.length; }));
@@ -61,5 +63,14 @@ check('第四單元：空白畫布', snap('unit4-start').comps.length === 0);
   check('第十二單元：夾爪已接在升降上；升降還沒立在轉盤上，旋轉底盤分開', !!mount('Grip')?.to && mount('Grip').to.module === 'Lift' && !mount('Lift') && !mount('Base') && s.modules.some(m => m.id === 'Base'));
   const asm = compileAssembly(s.comps, s.modules, { params: s.params });
   check('第十二單元：可求解', solveAssembly(asm, { thetaDeg: 0, motorAngles: {} }).isValid !== false);
+}
+// 獨立單元「針筒怎麼控制機構」步驟 3：待安裝的固定／可轉兩個起始檔（H07、H08 去掉針筒）。
+for (const [id, source, mode, wrong] of [['syringe-fixed-start', 'hydraulic-h07', 'fixed-axis', 'pivot'], ['syringe-pivot-start', 'hydraulic-h08', 'pivot', 'fixed-axis']]) {
+  const s = snap(id), full = snap(source), c = full.comps.find(o => o.type === 'syringe');
+  check(`${id}：沒有針筒、其餘零件與 ${source} 相同`, !s.comps.some(o => o.type === 'syringe') && JSON.stringify(s.comps) === JSON.stringify(full.comps.filter(o => o.type !== 'syringe')));
+  const r = planSyringeInstallation(s, { id: null, newId: 'Practice', a: c.a, b: c.b, mountMode: mode, axisDeg: c.axisDeg, face: 'front' }, null);
+  const scan = r.ok && scanSyringe(r.comps, r.params, 'Practice');
+  check(`${id}：照單元步驟能裝上${mode === 'pivot' ? '可轉' : '固定'}針筒，全行程通過`, r.ok && scan.ok && scan.samples.length === 41, r.message);
+  check(`${id}：改選另一種安裝會被拒絕（不能試動）`, !planSyringeInstallation(s, { id: null, newId: 'Practice', a: c.a, b: c.b, mountMode: wrong, axisDeg: c.axisDeg, face: 'front' }, null).ok);
 }
 report('unit-start-examples');

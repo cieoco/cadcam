@@ -457,6 +457,31 @@ add(`${HYD}/h01-selfdraw-mobile.png`, 'teaching-hydraulic.html', async s => {
   await s.quiet();
 });
 
+// 獨立單元「針筒怎麼控制機構」（teaching-syringe.html）
+// 針筒列的讀數：伸出量滑桿、臂角與「每推 1 mm」
+add(`${MEDIA}/syringe-readout.webp`, 'teaching-syringe.html', async s => {
+  await s.open('hydraulic-h01'); await s.quiet();
+  await s.mark(s.p.locator('input[type="range"]').filter({ visible: true }).first(), s.p.getByText(/每推 1 mm/).first());
+});
+// 量尺量 H03 夾口：點兩個夾臂尖端（A尖、B尖），面板顯示全行程最小／最大
+add(`${MEDIA}/syringe-ruler-gap.webp`, 'teaching-syringe.html', async s => {
+  const press = async loc => { const r = await loc.boundingBox(); await s.p.mouse.click(r.x + r.width / 2, r.y + r.height / 2); await s.settle(500); };   // 面板在抽屜裡，用滑鼠點避免抽屜被收起
+  await s.open('hydraulic-h03'); await s.tab('view');
+  await press(s.p.locator('[data-command="fitView"]').filter({ visible: true }).first());   // 抽屜半開時置中，模型才不會被抽屜蓋住
+  await press(s.p.locator('.mobile-panel [data-command="dimension"]').filter({ visible: true }).first());
+  const tip = async name => { const r = await s.p.locator('#stageSvg text', { hasText: name }).first().boundingBox(); return [r.x - 14, r.y + r.height / 2]; };
+  const [a, b] = [await tip('A尖'), await tip('B尖')];
+  await s.tap(...a); await s.settle(800);
+  await press(s.p.locator('#dimPanel button:has-text("量到另一點")'));
+  await s.tap(...b); await s.settle(1200); await s.sheet('half'); await s.quiet();
+  await s.mark(b, s.p.locator('#dimPanel').getByText(/最小 \d/).first());
+});
+// 安裝視窗最上面的「固定環與底板的連接」：固定安裝／可轉安裝
+add(`${MEDIA}/syringe-mount-mode.webp`, 'teaching-syringe.html', async s => {
+  await s.open('syringe-fixed-start'); await s.tab('build'); await s.section('other', true); await s.cmd('syringe'); await s.settle(800);
+  await s.mark(s.p.getByLabel('固定環與底板的連接'), s.p.locator('button:has-text("調整安裝")').filter({ visible: true }).first());
+});
+
 // 首頁「完成後：保存可編輯作品與動畫」（slider-crank 範例，專案 → MP4 動畫）
 async function sliderProject(s) {
   await s.open('slider-crank'); await s.fit(); await s.playTo(81); await s.tab('project');

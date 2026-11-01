@@ -256,6 +256,7 @@
     "test/disk-plate.mjs",
     "test/disk-turntable.mjs",
     "test/syringe-mount-modes.mjs",
+    "test/syringe-unit.mjs",
     "test/disk-orientation.mjs"
   ],
   "version": 1

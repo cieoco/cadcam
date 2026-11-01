@@ -14,7 +14,7 @@ export function createExampleController({ applySnapshot, insertModule, notify, c
 
   function requestLoad(id) {
     const example = getExample(id);
-    if (!example && /^unit\d+-start$/.test(id)) return loadUnitStarts().then(() => requestLoad(id)), true;
+    if (!example && /^(unit\d+|syringe-[a-z]+)-start$/.test(id)) return loadUnitStarts().then(() => requestLoad(id)), true;
     if (!example || pendingDialog) return false;
     pendingDialog = offerExample({ example, loadExample: load, insertModule: moduleId => { closeExamples(); return insertModule(moduleId); }, onDismiss: () => { pendingDialog = null; } });
     return true;

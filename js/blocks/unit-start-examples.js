@@ -1,4 +1,4 @@
-// 第四～十二單元各自的起始練習檔：只在第一次需要時才載入（見 examples.js 的 loadUnitStarts），不放進啟動程式。
+// 第四～十二單元，以及獨立單元「針筒怎麼控制機構」的起始練習檔：只在第一次需要時才載入（見 examples.js 的 loadUnitStarts），不放進啟動程式。
 // 全部由既有範例複製後改幾個欄位，不另抄座標；學生不必用上一單元保存的作品開始，每個單元都能單獨練習。
 const clone = value => JSON.parse(JSON.stringify(value));
 const moveModule = (snapshot, moduleId, dx) => snapshot.comps.filter(c => c.moduleId === moduleId)
@@ -26,7 +26,16 @@ const STARTS = [
   ['unit12-start', 'hydraulic-h06', '第十二單元：機械手臂待加底盤',
     '升降＋夾爪已接好；「旋轉底盤」另外放著，升降還沒有立在轉盤上。',
     ['切到組立，把旋轉底盤設為底座，再把升降接到轉盤板上'],
-    snapshot => { snapshot.modules.find(m => m.id === 'Lift').mount = null; }]
+    snapshot => { snapshot.modules.find(m => m.id === 'Lift').mount = null; }],
+  // 獨立單元（teaching-syringe.html）步驟 3：兩種安裝各一個練習檔，連桿與圓盤已接好、尚未安裝針筒。
+  ['syringe-fixed-start', 'hydraulic-h07', '針筒單元：待安裝（固定安裝）',
+    '俯視雙圓盤底座，連桿與圓盤已接好、尚未安裝針筒。固定安裝：筒身用雙孔鎖固，推桿經短連桿推圓盤。',
+    ['新增 → 其他零件 → 液壓針筒 → 調整安裝，連接方式選「固定安裝 · 雙孔鎖固」，推桿接短連桿的第一孔，再檢查全行程'],
+    snapshot => { snapshot.comps = snapshot.comps.filter(c => c.type !== 'syringe'); }],
+  ['syringe-pivot-start', 'hydraulic-h08', '針筒單元：待安裝（可轉安裝）',
+    '俯視單點可轉底座，圓盤已接好、尚未安裝針筒。可轉安裝：固定環單點鉸接，推桿直接接圓盤的工作孔。',
+    ['新增 → 其他零件 → 液壓針筒 → 調整安裝，連接方式選「可轉安裝 · 單點鉸接」，推桿接圓盤的工作孔，再檢查全行程'],
+    snapshot => { snapshot.comps = snapshot.comps.filter(c => c.type !== 'syringe'); }]
 ];
 
 /** 把起始練習檔加進範例清單與教學資料；重複呼叫不會重複加入。 */
