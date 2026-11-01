@@ -37,10 +37,10 @@ export function buildMaterialScene({comps,modules,params,catalog,inputs,allPlane
  const result={...attachPartMaterials(model,catalog,{comps,modules,points,assemblyScope}),solveValidity};
  if(assemblyScope){
   result.syringes=assemblySyringeShapes(result,comps,modules,params,points);
-  // H04 is authored in top view: its XY plane is the floor, not a vertical wall.
+  // The hydraulic turntable is authored in top view: its XY plane is the floor, not a vertical wall.
   // Source survives module renaming/insertion; this is a view hint, not a pose transform.
   const root=modules.find(m=>m.id===assemblyRoles(modules).root);
-  result.viewUp=root?.source==='hydraulic-h04'?'z':'y';
+  result.viewUp=['hydraulic-h04','hydraulic-h07','hydraulic-h08'].includes(root?.source)?'z':'y';
  }
  return result;
 }

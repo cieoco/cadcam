@@ -845,3 +845,14 @@
 - Node v24.22.1 完整回歸 242／242 通過（output/acceptance/results.json）。3D 材質收尾後再驗收方向標記、圓盤、雙圓盤、載入圖及啟動大小 5／5 通過（output/disk-orientation/targeted/results.json）。新測試核對 0／10／20 mm 箭頭跟隨、固定刻線不動、各尺寸數值有限及 SVG／DXF 完全不變。
 - HTTP 瀏覽器 390×844 手機與桌機驗收：0／20 mm 方向變化、播放至 11.8 mm 暫停、3D 正面／斜視／底盤背面、手機點箭頭可經重疊清單選取圓盤；錯誤記錄為空。不等同實體手機或實物測試。
 - 本機截圖：output/disk-orientation/mobile-0.png、mobile-20.png、mobile-final.png、desktop-3d-0.png、desktop-3d-20.png、desktop-back.png。契約見 [圓盤 SDD](SDD-DISK-PLATE.md)。
+
+
+## 2026-11-02：H07 取代 H04、H06 換雙圓盤（2026.11.2.2）
+
+- 移除 H04 公開範例項，H07 保留編號；舊 H04 query 及教學資料查詢轉用 H07。H04 幾何僅保留作傳動種子及舊功能回歸，沒有存檔遷移。
+- H06 的 Base 改用 H07 全部零件／參數，現成「針筒旋轉底盤」與第十二單元起始檔同步更新。H05 升降＋夾爪不變。H06 的升降接 H07 活動圓盤上板面，沿用六面接合、保存、復原與三軸序列；取代原三角板直邊列印座。
+- 新接合明確為「已定位，尚未固定」，沒有借用舊轉接座孔；實體角碼／支架、固定孔與承載需另行設計核對。圓盤接合面厚度改為全局板厚，修正原先誤用連桿預設厚度的差異。
+- 幾何：45 組三軸姿態、18 組世界座標姿態、12 組材料干涉取樣、七步序列、保存分享與輸出限制通過。新增 H04 隱藏／舊網址解析、H07 模組／H06 共用來源／unit12，以及 3／6 mm 接合厚度檢查；保留原資料不變測試。
+- Node v24.22.1 完整回歸 242／242 通過（output/acceptance/results.json）；最後增補板厚案例後 disk-turntable.mjs 再驗收通過。
+- HTTP 瀏覽器：桌機及 390×844，三支針筒分別推到 20 mm、底盤回 0／復原、重開保留圓盤與接合、3D 水平底盤及上層跟隨、七步 281 點驗證與 16.5 秒實播完成回原姿態、重新選面與取消，以及舊 H04 網址顯示 H07。錯誤記錄為空。
+- 更新 assets/teaching/hydraulic/h06-mobile.png、h06-face-placement-mobile.png 與第十二單元操作說明。本機證據另保留於 output/h07-replacement/（h06-desktop、h06-mobile、h06-face-placement-mobile、h04-redirect）。上述是瀏覽器與幾何取樣驗收，不代表實物、全行程干涉或製作就緒。

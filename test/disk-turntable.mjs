@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {diskTurntableSnapshot as source} from '../js/blocks/disk-turntable-example.js';
 import {fixedBaseSnapshot} from '../js/blocks/fixed-syringe-examples.js';
-import {getExample} from '../js/blocks/examples.js';
+import {BLOCK_EXAMPLES,loadUnitStarts,getExample} from '../js/blocks/examples.js';
 import {normalizeSnapshot,toSnapshot} from '../js/blocks/schema.js';
 import {scanSyringe,planSyringeStroke} from '../js/blocks/syringe-operations.js';
 import {attachmentPoint} from '../js/core/syringe.js';
@@ -43,6 +43,32 @@ const bad=buildPartGeometryCatalog({comps:tooSmall.comps,params:tooSmall.params}
 assert.ok(bad.diagnostics.some(d=>d.sourceIds.includes(frame.id)&&d.reason?.includes('管夾配對孔')));
 assert.throws(()=>syringeManufacturing(s.comps,s.params,null),/本輪不輸出/);
 assert.equal(getExample('hydraulic-h07').snapshot.projectName,source.projectName);
-assert.equal(fixedBaseSnapshot.comps.find(c=>c.id==='H4Turn').type,'triangle','existing H04/H06 interface unchanged');
+assert.equal(fixedBaseSnapshot.comps.find(c=>c.id==='H4Turn').type,'triangle','legacy H04 geometry seed unchanged');
 assert.equal(JSON.stringify(source),before);
 console.log(`disk turntable: two coaxial plates, fixed clamp, coupled motion 0–20 mm (${span.toFixed(2)}°), reverse stroke, diameter, save/share, material geometry and fabrication guard passed`);
+
+// Public replacement, shared module source and unit 12 must all use the same two disks.
+import {builtinTemplate} from '../js/blocks/module-ops.js';
+import {hydraulicArmSnapshot} from '../js/blocks/hydraulic-assembly-example.js';
+assert.ok(!BLOCK_EXAMPLES.some(e=>e.id==='hydraulic-h04'));
+assert.strictEqual(getExample('hydraulic-h04'),getExample('hydraulic-h07'),'old URL resolves to H07');
+const template=builtinTemplate('hydraulic-base');
+assert.equal(template.comps.filter(c=>c.shape==='disk').length,2);
+assert.equal(template.outputs[0].body.id,'H7Turn');assert.equal(template.outputs[0].body.kind,'bar');
+assert.equal(hydraulicArmSnapshot.modules.find(m=>m.id==='Base').source,'hydraulic-h07');
+assert.ok(!hydraulicArmSnapshot.comps.some(c=>c.id.startsWith('H4')));
+for(const sourceComp of source.comps){
+ const actual=structuredClone(hydraulicArmSnapshot.comps.find(c=>c.id===sourceComp.id));delete actual.moduleId;
+ assert.deepEqual(actual,sourceComp,'H06 uses H07 geometry, clamp and stroke without a second copy of dimensions');
+}
+await loadUnitStarts();const start=getExample('unit12-start').snapshot;
+assert.equal(start.modules.find(m=>m.id==='Lift').mount,null);
+assert.equal(start.comps.filter(c=>c.moduleId==='Base'&&c.shape==='disk').length,2);
+console.log('H04 hidden/redirected, H07 module and H06/unit12 shared disk base passed');
+
+import {buildMountSurfaces} from '../js/blocks/mount-surfaces.js';
+for(const thicknessMm of [3,6]){
+ const surfaces=buildMountSurfaces({comps:hydraulicArmSnapshot.comps,modules:hydraulicArmSnapshot.modules,params:hydraulicArmSnapshot.params,moduleId:'Base',thicknessMm}).surfaces;
+ const top=surfaces.find(p=>p.compId==='H7Turn');
+ assert.equal(top.box.max.z-top.box.min.z,thicknessMm,'mount surface uses global disk stock, not default bar thickness');
+}

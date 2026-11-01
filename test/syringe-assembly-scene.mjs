@@ -49,7 +49,7 @@ import {applyMatrix4} from '../js/blocks3d/orthogonal-3d.js';
 import {attachmentPoint} from '../js/core/syringe.js';
 import {plateVertexWorldPoints} from '../js/blocks/plate-geometry.js';
 const n=load(SNAP),seen=[];
-for(const ext of [{H4Syringe:0,H2Syringe:0,H3Syringe:0},{H4Syringe:20,H2Syringe:0,H3Syringe:0},{H4Syringe:20,H2Syringe:20,H3Syringe:20}]){
+for(const ext of [{H7Syringe:0,H2Syringe:0,H3Syringe:0},{H7Syringe:20,H2Syringe:0,H3Syringe:0},{H7Syringe:20,H2Syringe:20,H3Syringe:20}]){
  const {model,work,points}=panel(n,ext),before=JSON.stringify(work);
  const shapes=assemblySyringeShapes(model,work.comps,work.modules,work.params,points);
  assert.equal(shapes.length,3);
@@ -101,7 +101,7 @@ console.log('H05: two visible syringes and their fixed supports, nine poses with
 // Merely changing local y or making a valid loop does not establish this contract.
 const poses=new Map(),eps=1e-6;
 for(const yaw of [0,10,20])for(const lift of [0,10,20])for(const grip of [0,20]){
- const r=panel(n,{H4Syringe:yaw,H2Syringe:lift,H3Syringe:grip});
+ const r=panel(n,{H7Syringe:yaw,H2Syringe:lift,H3Syringe:grip});
  assert.ok(r.model.syringes.every(s=>s.mount?.status==='reference'),'H06 clamps follow all three axes');
  assert.equal(r.model.viewUp,'z','top-view turntable uses a horizontal XY floor');
  const matrix=r.model.orthogonal.find(p=>p.id==='Lift').matrix;

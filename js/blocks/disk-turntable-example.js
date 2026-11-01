@@ -1,6 +1,6 @@
 import {fixedBaseSnapshot} from './fixed-syringe-examples.js';
 
-// H04 的同一個針筒／短桿傳動，另建兩層圓盤示範；不變更 H06 的三點安裝介面。
+// H04 的同一個針筒／短桿傳動，改為兩層圓盤示範，亦作為 H06 底盤來源；H04 僅保留內部幾何種子。
 // 外徑為教學配置，不是量測過的施工尺寸。下盤覆蓋筒身與管夾，上盤留偏心工作孔。
 export const diskTurntableSnapshot=(()=>{
   const s=JSON.parse(JSON.stringify(fixedBaseSnapshot).replaceAll('H4','H7'));

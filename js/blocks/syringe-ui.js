@@ -224,7 +224,7 @@ export function createSyringeUI(h){
     let section=form;
     const fields={},input=(key,text,value,type='number')=>{const label=el('label',text,section),n=el('input',null,label);n.type=type;n.name=key;n.setAttribute('aria-label',text);if(type==='number'){n.step='any';n.dataset.numeric='true';if(/^[ab][UV]$|^axisDeg$|^tip\d+$/.test(key))signedNumberInput(n);showNumber(n,value);}else n.value=value;fields[key]=n;return n;};
     const tasks=el('details',null,form);el('summary',c.mountMode==='fixed-axis'?'固定筒身教學任務':'兩端鉸接教學任務',tasks);
-    el('p',c.id==='H1Syringe'?'管夾固定筒身，推桿經短連桿帶動單臂。先觀察 0–20 mm 往返，再只改活動臂長 60、80、100 mm，掃描後比較擺角。':c.mountMode==='fixed-axis'?'只改伸出量 0–20 mm。H02 比較驅動孔位；H03 推出張開、縮回夾合，觀察一體式夾臂的端孔距；末端與夾臂同片、一起轉動，不含接觸求解；H04 讀轉盤每推 1 mm 轉幾度。':'① 推動滑桿、掃描並記錄可用行程。② 其他條件不變，只改 B 孔位，先預測再比較臂角與 C 位置。③ 修改前後分別存檔，寫下「改了什麼／預測／觀察」，最後與實物比較。',tasks);
+    el('p',c.id==='H1Syringe'?'管夾固定筒身，推桿經短連桿帶動單臂。先觀察 0–20 mm 往返，再只改活動臂長 60、80、100 mm，掃描後比較擺角。':c.mountMode==='fixed-axis'?'只改伸出量 0–20 mm。H02 比較驅動孔位；H03 推出張開、縮回夾合，觀察一體式夾臂的端孔距；末端與夾臂同片、一起轉動，不含接觸求解；H07 讀轉盤每推 1 mm 轉幾度。':'① 推動滑桿、掃描並記錄可用行程。② 其他條件不變，只改 B 孔位，先預測再比較臂角與 C 位置。③ 修改前後分別存檔，寫下「改了什麼／預測／觀察」，最後與實物比較。',tasks);
     if(c.mountMode!=='fixed-axis'){
       el('p',`筒身端：${c.a.componentId} → 推桿端：${c.b.componentId}`,form);
       const pick=el('button','在圖上換孔位',form);pick.type='button';

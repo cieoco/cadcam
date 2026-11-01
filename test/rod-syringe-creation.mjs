@@ -49,7 +49,7 @@ import {buildFaceCandidate,validateFaceCandidate} from '../js/blocks/face-candid
 import {candidateCoverageText} from '../js/blocks/face-candidate-view.js';
 for(const [source,childId,hostId,hostPart,childPart,hostFace,childFace] of [
  [hydraulicLiftGripSnapshot,'Grip','Lift','H2Arm','H3Frame','front','back'],
- [hydraulicArmSnapshot,'Lift','Base','H4Turn','H2Frame','front','bottom']]){
+ [hydraulicArmSnapshot,'Lift','Base','H7Turn','H2Frame','front','bottom']]){
  const saved=JSON.stringify(source),work=normalizeSnapshot(source);
  const baked=rebakeModules(work.comps,work.modules,work.params);work.comps=baked.comps;work.modules=baked.modules;
  const candidate=buildFaceCandidate(work,{childId,hostEndpoint:{moduleId:hostId,partId:hostPart},childEndpoint:{partId:childPart},reselect:true,

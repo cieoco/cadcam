@@ -4,10 +4,8 @@ import {readFileSync} from 'node:fs';
 import {hydraulicLiftGripSnapshot as H05,hydraulicArmSnapshot as H06} from '../js/blocks/hydraulic-assembly-example.js';
 import {DEFAULT_HYDRAULIC_SEQUENCE,prepareHydraulicSequence,sequenceExtensionsAt,sequenceSyringeOptions} from '../js/blocks/hydraulic-sequence.js';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
-import {rebakeModules,orthogonalHostEdge} from '../js/blocks/assembly.js';
-import {mountOrthogonal} from '../js/blocks/module-ops.js';
-import {ADAPTER_LENGTH_MM} from '../js/blocks/orthogonal-joint.js';
-import {pointCoords} from '../js/blocks/model.js';
+import {rebakeModules} from '../js/blocks/assembly.js';
+import {buildFaceCandidate} from '../js/blocks/face-candidate.js';
 let pass=0;const ok=(cond,msg)=>{assert.ok(cond,msg);pass++;console.log('PASS',msg);};
 const near=(a,b,t=1e-6)=>Math.abs(a-b)<=t;
 const load=snap=>{const n=normalizeSnapshot(structuredClone(snap)),rb=rebakeModules(n.comps,n.modules,n.params);return {comps:rb.comps,modules:rb.modules,params:n.params};};
@@ -55,25 +53,21 @@ ok(sequenceSyringeOptions(h6).map(o=>o.label).join()==='旋轉底盤 針筒,升�
 // 設計不合法時仍會擋：夾爪針筒推到 25 mm、或底盤針筒負值
 ok(!prepareHydraulicSequence(h6,[{name:'x',syringe:base,extension:25,seconds:1}],start).ok,'超出行程的步驟被拒絕');
 
-// ---------- 範例內的安裝資料 ＝ 學生在組立台「直角安裝」得到的形狀 ----------
+// ---------- 範例內的安裝資料 ＝ 學生在組立台選圓盤板面得到的形狀 ----------
 {
-  const n=normalizeSnapshot(structuredClone(H06));
-  const comps=n.comps,mods=n.modules.map(m=>m.id==='Lift'?{...m,mount:null}:m);
-  const lift=n.modules.find(m=>m.id==='Lift');
-  const r=mountOrthogonal(comps,mods,'Lift',{module:'Base',body:lift.mount.to.body,edge:lift.mount.to.edge,side:lift.mount.orient.side},n.params,{activeMotor:'1',theta:0,motorAngles:{}});
-  ok(r.ok,`mountOrthogonal 對同一條邊可安裝（${r.reason}）`);
-  const made=r.modules.find(m=>m.id==='Lift').mount,mine=lift.mount;
-  assert.deepEqual(mine.to,made.to);ok(true,'to（模組、轉盤、邊）相同');
-  ok(near(mine.ref.x,made.ref.x)&&near(mine.ref.y,made.ref.y)&&near(mine.ref.a,made.ref.a,1e-6),'ref（邊的位姿）相同');
-  ok(mine.orient.type===made.orient.type&&mine.orient.edge===made.orient.edge&&mine.orient.side===made.orient.side,'orient 型態、edge、side 相同');
-  assert.deepEqual(mine.orient.joint,made.orient.joint);ok(true,'接合件（列印轉接座）相同');
-  assert.deepEqual(mine.home,made.home);ok(true,'home 相同');
-  // 範例刻意改的兩個欄位：childAxisDeg 180（升降「上」朝 +z）、offsetMm＝邊上最遠處（邊長/2−轉接座長）。
-  const edge=orthogonalHostEdge(comps,n.modules,{to:mine.to,orient:{side:mine.orient.side}},pointCoords(comps),n.params);
-  ok(mine.orient.childAxisDeg===180,'childAxisDeg 180');
-  ok(near(mine.orient.offsetMm,Math.floor((edge.lengthMm/2-ADAPTER_LENGTH_MM)*10)/10),`offsetMm＝⌊(邊長/2−轉接座長 ${ADAPTER_LENGTH_MM})·10⌋/10＝${mine.orient.offsetMm}（範例內的常數 20 與 orthogonal-joint 一致）`);
-  ok(mine.orient.offsetMm<=edge.lengthMm/2-ADAPTER_LENGTH_MM+1e-9&&mine.orient.offsetMm>=-edge.lengthMm/2,'offsetMm 在轉接座可滑動的範圍內');
-  ok(edge.lengthMm>=ADAPTER_LENGTH_MM,`宿主邊 ${edge.lengthMm.toFixed(1)} mm ≥ 轉接座 ${ADAPTER_LENGTH_MM} mm`);
+ const n=normalizeSnapshot(structuredClone(H06)),lift=n.modules.find(m=>m.id==='Lift'),mine=lift.mount;
+ const r=buildFaceCandidate(n,{childId:'Lift',hostEndpoint:{moduleId:'Base',partId:'H7Turn'},childEndpoint:{partId:'frame'},reselect:true,selection:mine.face.selection});
+ ok(r.ok,`同一組選面可重建接合（${r.reason||''}）`);
+ const made=r.work.modules.find(m=>m.id==='Lift').mount;
+ assert.deepEqual(mine.to,made.to);
+ for(const k of ['x','y','a'])assert.ok(near(mine.ref[k],made.ref[k]));
+ assert.deepEqual(mine.face.rotation,made.face.rotation);
+ for(const k of ['x','y','z'])assert.ok(near(mine.face.translation[k],made.face.translation[k]));
+ assert.equal(mine.face.hostThicknessMm,3,'圓盤接合厚度沿用全局 3 mm');
+ assert.equal(mine.face.selection.hostFace,'top');assert.equal(mine.face.selection.childFace,'back');
+ assert.equal(mine.face.selection.brackets,undefined,'定位未假裝已生成固定孔');
+ assert.equal(mine.face.childPart,'frame');
+ ok(true,'上板面接升降機架後緣，保存後可用共同接合流程重建');
 }
 
 // ---------- 版本、教材、清單 ----------
@@ -81,5 +75,5 @@ const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const info=read('../js/version-history.js');
 ok(info.split('\n').some(l=>/^\s*\['2026\./.test(l)&&/H06/.test(l)),'更新紀錄有一筆提到 H06');
 const t=read('../teaching-hydraulic.html');
-ok(/第十二單元/.test(t)&&/H06/.test(t)&&/動作序列/.test(t)&&/13\s*mm/.test(t)&&/h06-mobile\.png/.test(t),'教材第十二單元：動作序列、轉盤條寬 ≥ 13 mm 的限制、手機截圖');
+ok(/第十二單元/.test(t)&&/H06/.test(t)&&/動作序列/.test(t)&&/實體角碼/.test(t)&&/h06-mobile\.png/.test(t),'教材第十二單元：動作序列、H07 板面接合與實體固定待配置、手機截圖');
 console.log(`hydraulic-p2-3b: ${pass} passed`);

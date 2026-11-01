@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {buildPartGeometryCatalog} from '../js/blocks/part-geometry.js';
 import {getExample} from '../js/blocks/examples.js';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
 import {frameConnectorNodes} from '../js/blocks/model.js';
@@ -11,7 +12,13 @@ const near=(a,b)=>assert.ok(Math.abs(a-b)<.002,`${a} != ${b}`);
 for(const name of ['hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h04','hydraulic-h05','hydraulic-h06']){
  const n=normalizeSnapshot(getExample(name).snapshot),before=JSON.stringify(n);
  for(const s of n.comps.filter(c=>c.type==='syringe')){
-  const own=n.comps.filter(c=>c.moduleId===s.moduleId),nodes=frameConnectorNodes(own),g=inspectFrameExport(nodes,{});
+  const own=n.comps.filter(c=>c.moduleId===s.moduleId),nodes=frameConnectorNodes(own),support=own.find(c=>c.id===s.a.componentId);
+  let g=inspectFrameExport(nodes,{});
+  if(support.shape==='disk'){
+   const local=buildPartGeometryCatalog({comps:own,params:n.params}).parts[support.id],a=support.p1,b=support.p2,t=Math.atan2(b.y-a.y,b.x-a.x);
+   const world=p=>({...p,x:a.x+p.x*Math.cos(t)-p.y*Math.sin(t),y:a.y+p.x*Math.sin(t)+p.y*Math.cos(t)});
+   g={...local,outlines:local.outlines.map(r=>r.map(world)),holes:local.holes.map(world)};
+  }
   const holes=g.holes.filter(h=>h.layer==='SYRINGE_CLAMP');assert.equal(holes.length,2,name);
   near(Math.hypot(holes[0].x-holes[1].x,holes[0].y-holes[1].y),28);
   const a=attachmentPoint(s.a,own,n.params),angle=s.axisDeg*Math.PI/180;

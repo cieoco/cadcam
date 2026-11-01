@@ -3,7 +3,7 @@ import {tabNutSnapshot} from './tab-nut-example.js';
 import { centerForLinks } from '../core/chain-drive.js';
 import { PARALLEL_GRIPPER_EXAMPLE } from './parallel-gripper-example.js';
 import { COMMON_MANIPULATOR_EXAMPLES } from './common-manipulator-examples.js';
-import {fixedLiftSnapshot,fixedGripSnapshot,fixedBaseSnapshot} from './fixed-syringe-examples.js';
+import {fixedLiftSnapshot,fixedGripSnapshot} from './fixed-syringe-examples.js';
 import {hydraulicLiftGripSnapshot,hydraulicArmSnapshot} from './hydraulic-assembly-example.js';
 import { hydraulicSnapshot } from './hydraulic-example.js';
 import { liftBucketSnapshot } from './lift-bucket-example.js';
@@ -65,7 +65,6 @@ const EXAMPLE_LESSONS = {
   'hydraulic-h06': {group:'lift-motion',level:'進階液壓',use:'由下往上：底座左右轉、中段升降、頂端夾取。升降總成朝上立在水平轉盤上，轉盤轉時整組升降與夾爪跟著轉；三支針筒各管一軸（轉、升降、夾）。',try:['切到組立，用三個切換鈕分別推：轉盤針筒轉整條臂、升降針筒抬臂、夾爪針筒開合','按「動作序列」看預設取放：轉到取物方向→張開→降→夾緊→升→轉到放置方向→放開；3D 針筒為外形參考，固定座與完整干涉未驗證，接觸、承載與水路未驗證']},
   'hydraulic-h07': {group:'lift-motion',level:'入門液壓',use:'俯視：灰色下盤固定針筒，短連桿推橘色上盤的偏心孔，兩片共用中心轉軸。',try:['拖動伸出量，觀察轉盤往返','點圓盤改外徑；外徑改變不會移動孔位','這是幾何示範；管夾孔、層間墊高與實物干涉仍需核對']},
   'hydraulic-h08': {group:'lift-motion',level:'入門液壓',use:'固定環以單點鉸接到底盤，筒身隨推桿方向擺動，推桿直接接橘色轉盤工作孔。',try:['拖動伸出量，比較 H07 筒身固定與 H08 筒身擺動','針筒設定可調固定環距筒尾，孔位跟隨安裝位置','單點轉軸與筒身夾持為參考配置，實物五金與干涉尚待核對']},
-  'hydraulic-h04': {group:'lift-motion',level:'入門液壓',use:'俯視：管夾固定筒身推短連桿，連桿帶動轉盤繞垂直軸轉動；轉盤安裝點之後可放升降總成。',try:['改針筒伸出量，讀「每推 1 mm」轉幾度','只改曲柄半徑或連桿長，掃描後比較總轉角與傳動角；太斜會推不動']},
   'hydraulic-h03': {group:'lift-motion',level:'入門液壓',use:'固定筒身驅動左右交叉的一體式三點夾臂；末端造形與交叉臂同片、保持剛性。',try:['改針筒伸出量並掃描可用行程','觀察伸出與縮回時夾臂端孔距如何改變；接觸與夾持力未驗證']},
   'hydraulic-h02': {group:'lift-motion',level:'入門液壓',use:'管夾固定筒身，短連桿把直線輸入轉成抬臂擺動。',try:['改針筒伸出量並觀察末端高度','修改前先存檔，再比較安裝孔位的影響']},
   'wiper-single': {group:'challenge',level:'探索',use:'曲柄經浮桿帶動三孔雨刷臂往復擺動。',try:['選浮桿改孔距，再試播比較掃掠範圍']},
@@ -311,10 +310,9 @@ const ALL_BLOCK_EXAMPLES = [
   {id:'hydraulic-h01',title:'H01｜固定針筒單臂抬升',note:'管夾固定筒身，短連桿帶動單臂；20 mm 為教學區間。',snapshot:hydraulicSnapshot},
   {id:'hydraulic-h02',title:'H02｜管夾固定針筒抬臂',note:'F3D 尺寸參考；20 mm 教學區間未實測，短桿兩端可轉。',snapshot:fixedLiftSnapshot},
   {id:'hydraulic-h03',title:'H03｜針筒夾具與一體式夾臂',note:'左右交叉臂與末端同一片，接觸、承載未驗證。',snapshot:fixedGripSnapshot},
-  {id:'hydraulic-h04',title:'H04｜管夾固定針筒旋轉底盤',note:'俯視：針筒經短連桿帶動轉盤；20 mm 教學區間未實測，轉盤安裝點供之後放升降總成。',snapshot:fixedBaseSnapshot},
-  {id:'hydraulic-h05',title:'H05｜液壓升降＋夾爪（側視組立）',note:'升降與夾爪各一支針筒，切到組立分別控制；夾爪隨升降臂轉。幾何結果，接觸與承載未驗證。',snapshot:hydraulicLiftGripSnapshot},
-  {id:'hydraulic-h06',title:'H06｜液壓三軸手臂',note:'轉盤＋直角立在轉盤上的升降＋夾爪，三支針筒各管一軸；切到組立分別控制或排動作序列。幾何結果，接觸與承載未驗證。',snapshot:hydraulicArmSnapshot},
   {id:'hydraulic-h07',title:'H07｜針筒雙圓盤底座',note:'俯視：下盤固定筒身，短連桿推動上盤；0–20 mm 教學行程，實體安裝未驗證。',snapshot:diskTurntableSnapshot},
+  {id:'hydraulic-h05',title:'H05｜液壓升降＋夾爪（側視組立）',note:'升降與夾爪各一支針筒，切到組立分別控制；夾爪隨升降臂轉。幾何結果，接觸與承載未驗證。',snapshot:hydraulicLiftGripSnapshot},
+  {id:'hydraulic-h06',title:'H06｜液壓三軸手臂',note:'H07 雙圓盤＋直立升降＋夾爪；升降已定位、實體固定待配置。三支針筒各管一軸；切到組立分別控制或排動作序列。幾何結果，接觸與承載未驗證。',snapshot:hydraulicArmSnapshot},
   {id:'hydraulic-h08',title:'H08｜單點可轉針筒底座',note:'俯視：固定環繞單點轉動，推桿直接帶動圓盤；固定環與筒身夾牢，轉軸及加工尺寸未實測。',snapshot:pivotTurntableSnapshot},
   wiperExample(false),
   wiperExample(true),
@@ -1001,10 +999,12 @@ let unitStarts;
 export const loadUnitStarts=()=>unitStarts||=import('./unit-start-examples.js').then(m=>m.register(BLOCK_EXAMPLES,EXAMPLE_LESSONS));
 
 export function getExample(id) {
+  if(id==='hydraulic-h04')id='hydraulic-h07'; // 舊課程網址沿用新底盤；已存作品不遷移。
   return BLOCK_EXAMPLES.find(example => example.id === id) || null;
 }
 
 export function getExampleLesson(id) {
+  if(id==='hydraulic-h04')id='hydraulic-h07';
   return EXAMPLE_LESSONS[id] || {
     group: 'challenge',
     level: '探索',
