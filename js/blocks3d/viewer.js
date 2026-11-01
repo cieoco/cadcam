@@ -331,7 +331,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       const shape=new THREE.Shape();shape.moveTo(s.length-12,-5);shape.lineTo(s.length,-5);shape.absarc(s.length,0,5,-Math.PI/2,Math.PI/2,false);shape.lineTo(s.length-12,5);shape.closePath();
       const hole=new THREE.Path();hole.absarc(s.length,0,1.7,0,Math.PI*2,true);shape.holes.push(hole);
       mesh(new THREE.ExtrudeGeometry(shape,{depth:3,bevelEnabled:false}),'#b3ab9f',0,0,-1.5);
-      if(s.fixed){
+      if(s.clamp){
         const c=s.clamp,sh=new THREE.Shape();
         c.profile.forEach((p,i)=>i?sh.lineTo(p.y,p.z):sh.moveTo(p.y,p.z));sh.closePath();
         const band=new THREE.ExtrudeGeometry(sh,{depth:c.width,bevelEnabled:false});

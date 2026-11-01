@@ -17,6 +17,7 @@
 ## 產品與功能規格
 
 - [SDD-DISK-PLATE.md](SDD-DISK-PLATE.md) — 圓盤外徑、兩孔剛體、全局板厚與輸出契約。
+- [SDD-SYRINGE-MOUNT-MODES.md](SDD-SYRINGE-MOUNT-MODES.md) — 固定環雙孔鎖固／單點鉸接、筒身夾持位置、共用配對孔與相容契約。
 
 - [SDD-GEAR-HOLE-PLACEMENT.md](SDD-GEAR-HOLE-PLACEMENT.md) — 齒輪輸出孔起始角度、兩軸中線對稱配對及預覽保存契約。
 

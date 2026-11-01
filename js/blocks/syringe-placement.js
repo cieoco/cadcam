@@ -34,3 +34,17 @@ export function placeFixedSyringe(comps,params,points,aRef,bRef,{extension=10}={
     a:{componentId:ownerA.id,u:aRef.u,v:aRef.v},b:{componentId:ownerB.id,u:bRef.u,v:bRef.v},
     spec:{...SYRINGE_DEMO,name:'F3D 外形參考／20 mm 教學區間（未實測）',outerDiameter:17.5,bodyLength:72,rodDiameter:8,lmin,stroke,calibrated:false},extension:ext,branch:1}};
 }
+
+// 單點鉸接：固定環與筒身一起繞 A 轉，推桿直接接有固定軸的輸出件。
+export function placePivotSyringe(comps,params,points,aRef,bRef,{extension=10}={}){
+ const frame=comps.find(c=>c.id===aRef?.componentId),arm=comps.find(c=>c.id===bRef?.componentId);
+ if(!frame||!isFixedFrame(frame,comps))return fail('可轉固定環的支點須安裝在固定機架上。');
+ const end=barEnd(arm,params,bRef),fixed=fixedSyringePointIds(comps);
+ if(!end||fixed.has(arm[end].id)||![arm.p1,arm.p2].some(p=>fixed.has(p.id)))return fail('可轉安裝請直接接有固定軸的連桿／圓盤活動端孔；保留中間短連桿會多出自由度。');
+ const a=attachmentPoint(aRef,comps,params,points),b=attachmentPoint(bRef,comps,params,points);
+ if(!a||!b)return fail('找不到有效的安裝點。');
+ const stroke=20,ext=Math.max(0,Math.min(stroke,Number(extension)||0)),lmin=Math.hypot(b.x-a.x,b.y-a.y)-ext;
+ if(lmin<MIN_LMIN_MM)return fail('固定環離推桿孔太近，請調整支點位置。');
+ let n=1;while(comps.some(c=>c.id===`Syringe${n}`))n++;
+ return {ok:true,syringe:{type:'syringe',id:`Syringe${n}`,mountMode:'pivot',appearance:'flat-rod',a:{...aRef},b:{...bRef},spec:{...SYRINGE_DEMO,name:'單點可轉固定環／20 mm 教學區間（未實測）',outerDiameter:17.5,bodyLength:72,rodDiameter:8,lmin,stroke,calibrated:false},extension:ext,branch:1}};
+}

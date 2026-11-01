@@ -19,3 +19,17 @@ export const diskTurntableSnapshot=(()=>{
   s.tracePoint='H7B';s.projectName='H07 針筒雙圓盤底座（俯視）';
   return s;
 })();
+
+// 同一個底座的單點鉸接版本：直接接工作孔，移除固定軸版本需要的短桿。
+export const pivotTurntableSnapshot=(()=>{
+  const s=JSON.parse(JSON.stringify(diskTurntableSnapshot).replaceAll('H7','H8'));
+  const frame=s.comps.find(c=>c.id==='H8Frame'),turn=s.comps.find(c=>c.id==='H8Turn'),syr=s.comps.find(c=>c.type==='syringe');
+  s.comps=s.comps.filter(c=>c.id!=='H8Coupler');delete s.params.H8Coupler;
+  syr.mountMode='pivot';delete syr.axisDeg;delete syr.outputId;
+  syr.b={componentId:turn.id,u:s.params.H8Crank,v:0};
+  syr.spec.lmin=Math.hypot(turn.p2.x-frame.p2.x,turn.p2.y-frame.p2.y)-syr.extension;
+  syr.spec.name='單點可轉固定環／20 mm 教學區間（未實測）';
+  turn.zlift=2; // 轉軸座在筒身下方，將工作孔疊至推桿中心層。
+  s.projectName='H08 單點可轉針筒底座（俯視）';
+  return s;
+})();

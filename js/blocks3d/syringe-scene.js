@@ -7,14 +7,16 @@ import {IDENTITY_4,applyMatrix4} from './orthogonal-3d.js';
 // The plunger lies on its rod's centre plane. Hardware uses the actual frame
 // hole poses; it never invents a second support plate or changes the mechanism.
 const inPlane=(m,p)=>{const x=p.x-m[12],y=p.y-m[13],z=p.z-m[14];return {x:m[0]*x+m[1]*y+m[2]*z,y:m[4]*x+m[5]*y+m[6]*z,z:m[8]*x+m[9]*y+m[10]*z};};
+const matches=(h,id)=>h.id===id||h.mountIds?.includes(id);
 export function syringeClampInstallation(model,shape,z,matrix){
- if(!shape.fixed)return null;
+ if(!shape.clamp)return null;
  if(shape.r>shape.clamp.innerRadius)return {status:'unverified',reason:'clamp_diameter',fasteners:[]};
  const fasteners=[];
  for(const [i,foot] of shape.clamp.feet.entries()){
-  const id=`${shape.id}_clamp_${i}`,part=model.materialParts?.find(p=>p.geometry.holes.some(h=>h.id===id));
+  const id=`${shape.id}_clamp_${i}`,part=model.materialParts?.find(p=>p.geometry.holes.some(h=>matches(h,id)));
   if(!part)return {status:'unverified',reason:'missing_frame_holes',fasteners:[]};
-  const hole=part.geometry.holes.find(h=>h.id===id),m=part.pose.matrix;
+  const hole=part.geometry.holes.find(h=>matches(h,id)),m=part.pose.matrix;
+  if(hole.r<1.5)return {status:'unverified',reason:'mount_hole_diameter',fasteners:[]};
   const bottom=inPlane(matrix,applyMatrix4(m,{...hole,z:0}));
   const top=inPlane(matrix,applyMatrix4(m,{...hole,z:part.geometry.thicknessMm}));
   const x=shape.a.x-Math.sin(shape.angle)*foot.hole.y,y=shape.a.y+Math.cos(shape.angle)*foot.hole.y;
@@ -43,9 +45,9 @@ export function assemblySyringeShapes(model,comps,modules,params,points,{flatten
     const shape=syringeShape(c,comps,params,points);if(!shape)continue;
     const rodZ=rod?rod.z+rod.thickness/2:16,mountSide=c.installation?.face==='back'?-1:1;
     let z=rodZ;
-    const part=model.materialParts?.find(p=>p.geometry.holes.some(h=>h.id===`${c.id}_clamp_0`));
+    const part=model.materialParts?.find(p=>p.geometry.holes.some(h=>matches(h,`${c.id}_clamp_0`)));
     if(c.installation&&part){
-      const hole=part.geometry.holes.find(h=>h.id===`${c.id}_clamp_0`);
+      const hole=part.geometry.holes.find(h=>matches(h,`${c.id}_clamp_0`));
       const surface=inPlane(matrix,applyMatrix4(part.pose.matrix,{...hole,z:mountSide===1?part.geometry.thicknessMm:0})).z;
       const minimum=Math.max(0,shape.r+1+shape.clamp.baseZ);
       const automatic=Math.max(minimum,mountSide*(rodZ-surface)+shape.clamp.baseZ);

@@ -11,6 +11,8 @@ import { deriveMotorMounts } from './build-plan.js';
 import { framePlateHomes } from './module-plates.js';
 import {identifiedHoles} from './part-hole-trace.js';
 import {syringeClampFrameNodes} from './syringe-shape.js';
+import {fixedSyringePointIds} from '../core/syringe.js';
+import {inside} from './part-fusion.js';
 import {assemblyRoles} from './assembly-roles.js';
 import { orthogonalExportExtras, withWorldAdapterNodes } from './orthogonal-joint.js';
 
@@ -21,6 +23,7 @@ const localizer=(a,b)=>{const t=angle(a,b),c=Math.cos(t),s=Math.sin(t);return p=
 const mapGeometry=(g,move)=>({outlines:(g.outlines || (g.outline?[g.outline]:[])).map(r=>r.map(move)),holes:(g.holes || []).map(h=>({...h,...move(h)})),cutouts:(g.cutouts || []).map(c=>({...c,points:c.points.map(move)}))});
 const identityPoint=p=>({x:p.x,y:p.y});
 const circle=r=>Array.from({length:48},(_,i)=>({x:r*Math.cos(i*Math.PI/24),y:r*Math.sin(i*Math.PI/24)}));
+const edgeDistance=(p,ring)=>Math.min(...ring.map((a,i)=>{const b=ring[(i+1)%ring.length],dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy);}));
 
 /** Key intentionally excludes drive angle and camera. All shape dependencies remain. */
 export function partGeometryKey({comps=[],modules=[],params={},fabrication={},exportSettings={},frameNodes,mounts,frameMounts,includeSpareFrames=false}={}) {
@@ -31,6 +34,12 @@ export function partGeometryKey({comps=[],modules=[],params={},fabrication={},ex
 export function buildPartGeometryCatalog(args={}) {
   const input=structuredClone(args);
   const {comps=[],modules=[],params={},fabrication={},frameNodes}=input;
+  // 另一片獨立板可能共用機架點，使自動機架排除該點；此時保留完整承載桿。
+  const visibleFrameIds=new Set((frameNodes||frameConnectorNodes(comps)).map(p=>p.id));
+  for(const syringe of comps.filter(c=>c.type==='syringe'&&['fixed-axis','pivot'].includes(c.mountMode))){
+    const host=comps.find(c=>c.id===syringe.a.componentId);
+    if(host?.type==='bar'&&!host.frameSeparate&&[host.p1,host.p2].some(p=>!visibleFrameIds.has(p.id)))host.frameSeparate=true;
+  }
   const settings={...(fabrication.export || {}),...(input.exportSettings || {}),drive:fabrication.drive || FABRICATION_DEFAULTS.drive};
   const stockMm=Number(fabrication.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;
   const joint=fabrication.joint || FABRICATION_DEFAULTS.joint;
@@ -44,6 +53,19 @@ export function buildPartGeometryCatalog(args={}) {
   const add=(id,kind,g,thicknessMm,sourceIds,binding,moduleId=null)=>{
     const geometry=mapGeometry(g,identityPoint);
     if(!geometry.outlines.length){diagnostics.push({status:'not_supported',code:'material_outline_missing',sourceIds});return;}
+    // 獨立承載板共用同一管夾孔來源；一般固定桿仍由自動機架承接。
+    const host=comps.find(c=>c.id===id),fixed=fixedSyringePointIds(comps);
+    if(['bar','triangle'].includes(kind)&&host&&(host.frameSeparate||host.type==='triangle')&&[host.p1,host.p2,host.p3].filter(Boolean).every(p=>fixed.has(p.id))){
+      const local=localizer(host.p1,host.p2),nodes=syringeClampFrameNodes(comps.filter(c=>c.type!=='syringe'||c.a?.componentId===id),[host.p1,host.p2,host.p3].filter(Boolean));
+      for(const n of nodes){
+        const h={...local(n),r:n.holeDiameterMm/2,id:n.id,layer:n.holeLayer};
+        if(!geometry.outlines.some(r=>inside(h,r)&&edgeDistance(h,r)>h.r)||geometry.cutouts.some(c=>inside(h,c.points)||edgeDistance(h,c.points)<=h.r))throw Error('承載板無法容納管夾配對孔，請調整位置或板件外形。');
+        const old=geometry.holes.find(q=>Math.hypot(q.x-h.x,q.y-h.y)<.001);
+        if(old){old.mountIds=[...(old.mountIds||[]),h.id];continue;}
+        if(geometry.holes.some(q=>Math.hypot(q.x-h.x,q.y-h.y)<q.r+h.r))throw Error('管夾配對孔與既有孔重疊，請調整安裝位置。');
+        geometry.holes.push(h);
+      }
+    }
     const record={id,partId:id,kind,moduleId,sourceIds,geometryVersion:PART_GEOMETRY_VERSION,thicknessMm,...geometry,binding};
     record.holes=identifiedHoles(id,record.holes);
     record.cutouts=record.cutouts.map((c,i)=>({...c,id:c.id || `${id}/cutout:${c.layer || 'CUTOUT'}:${i}`,purpose:c.layer || 'CUTOUT'}));
@@ -62,14 +84,6 @@ export function buildPartGeometryCatalog(args={}) {
         }
         const a=homePoints[comp.p1.id],b=homePoints[comp.p2.id],length=Math.hypot(b.x-a.x,b.y-a.y);
         const g=tabNutPartGeometry(extras,comp,{local:true}) || (split.hosted.has(comp.id)?Exporters.hostedBarGeometry(comp,homePoints,settings,split.hosted.get(comp.id),extras.linkHoles[comp.id] || []):Exporters.inspectLinkExport(comp,length,settings,extras.linkHoles[comp.id] || []));
-        // 獨立圓盤不進自動機架；管夾配對孔仍須落在實際承載板上。
-        // 固定軸針筒的加工輸出仍沿用既有核對限制，這裡只補共用材料幾何。
-        if(comp.shape==='disk'&&[comp.p1,comp.p2].every(p=>p.type==='fixed')){
-          const local=localizer(comp.p1,comp.p2);
-          const holes=syringeClampFrameNodes(comps.filter(c=>c.type!=='syringe'||c.a?.componentId===comp.id),[comp.p1,comp.p2]).map(h=>({...local(h),id:h.id,r:h.holeDiameterMm/2,layer:h.holeLayer}));
-          if(holes.some(h=>Math.hypot(h.x,h.y)+h.r>comp.diameterMm/2))throw Error('圓盤外徑不足以容納管夾配對孔');
-          g.holes=[...(g.holes||[]),...holes];
-        }
         add(comp.id,'bar',g,stock.thicknessMm,[comp.id],{kind:'member',pointIds:[comp.p1.id,comp.p2.id]},comp.moduleId);
         memberStocks[comp.id]=stock;
       } else if(comp.type==='triangle'&&!comp.fusedWith) {

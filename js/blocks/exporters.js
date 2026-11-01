@@ -996,6 +996,9 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   let barAxis = null;
   const addHole = (x, y, r, layer = 'HOLE', metadata = {}) => {
     const q = { ...holeMetadata(metadata), x: round(x), y: round(y), r: round(r), layer };
+    // 單點鉸接可使用既有同心孔；保留原孔尺寸與身分，不疊切第二個圓。
+    const pivot=layer==='SYRINGE_PIVOT'&&holes.find(h=>Math.hypot(h.x-q.x,h.y-q.y)<.001);
+    if(pivot){pivot.mountIds=[...(pivot.mountIds||[]),metadata.id];return;}
     const duplicate = holes.some(h => Math.hypot(h.x - q.x, h.y - q.y) < 0.05 && Math.abs(h.r - q.r) < 0.05 && h.layer === q.layer);
     if (!duplicate) holes.push(q);
   };

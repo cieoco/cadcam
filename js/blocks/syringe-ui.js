@@ -1,7 +1,7 @@
 import {signedNumberInput,showNumber,readNumber,formatNumber} from './numeric-input.js';
 import {APP_VERSION} from '../version.js';
 import {syringeShape} from './syringe-shape.js';
-import {SYRINGE_DEMO,attachmentFrame,attachmentPoint} from '../core/syringe.js';
+import {SYRINGE_DEMO,attachmentFrame,attachmentPoint,hasSyringeClamp} from '../core/syringe.js';
 import {solveSyringe,planSyringeStroke,scanSyringe,syringeReading,syringeGain,advanceSyringe} from './syringe-operations.js';
 import {syringeSeatGeometry,syringeManufacturing,syringeFiles,syringeBuildPack} from './syringe-manufacturing.js';
 import {placeFixedSyringe,isFixedFrame} from './syringe-placement.js';
@@ -39,7 +39,7 @@ export function createSyringeUI(h){
   const mountReference='水管固定夾、M3 螺絲與套筒為參考尺寸；夾持力、完整干涉、承重與水路未驗證。';
   function setMountPreview(shapes){
     const failed=shapes.find(s=>s.mount?.status==='unverified'),misaligned=shapes.find(s=>Number.isFinite(s.alignmentMm)&&Math.abs(s.alignmentMm)>.1);
-    const reasons={missing_frame_holes:'機架缺少管夾配對孔',frame_alignment:'管夾與機架孔未對齊',barrel_clearance:'筒身與機架高度不足，請調整疊放層',clamp_diameter:'筒身大於參考管夾內徑，需更換管夾'};
+    const reasons={missing_frame_holes:'機架缺少管夾配對孔',frame_alignment:'管夾與機架孔未對齊',barrel_clearance:'筒身與機架高度不足，請調整疊放層',clamp_diameter:'筒身大於參考管夾內徑，需更換管夾',mount_hole_diameter:'固定孔小於參考 M3 軸／螺絲直徑'};
     mountNotice=failed?`固定座待調整：${reasons[failed.mount.reason] || '尚未核對'}。`:misaligned?`推桿與短連桿不同層，相差 ${Math.abs(misaligned.alignmentMm).toFixed(1)} mm。`:'';
     warning3d.textContent=mountNotice+mountReference;
   }
@@ -115,7 +115,7 @@ export function createSyringeUI(h){
     if(!(visible&&inAssembly()))layoutBar(false);
     if(!visible){if(raf)stop();return;}
     id=c.id;
-    const diskOutput=list().length>0&&S.comps.some(o=>o.id===c.outputId&&o.shape==='disk');
+    const diskOutput=list().length>0&&S.comps.some(o=>o.id===(c.outputId||c.b.componentId)&&o.shape==='disk');
     settings.hidden=inAssembly();if(!inAssembly())chips.style.display='none';
     if(inAssembly()){
       // 組立：每支針筒一顆切換鈕；每推 1 mm 的比例與針筒設定只在設計模式提供（組立裡改尺寸請回設計）。
@@ -154,7 +154,7 @@ export function createSyringeUI(h){
       line(at(shape.start),at(shape.end),c.spec.outerDiameter,'#d6e9e5');
       line(at(shape.end,-shape.r-5),at(shape.end,shape.r+5),2,'#a3a69b');
       line(at(length-12),b,10,'#b3ab9f');
-      if(shape.fixed){
+      if(shape.clamp){
         const clamp=shape.clamp;
         const supported=frameConnectorNodes(h.comps()).some(n=>n.id===`${c.id}_clamp_0`);
         const polygon=(pts,fill)=>node('polygon',{points:pts.map(p=>{const q=at(p.x,p.y);return `${View.TX(q.x)},${View.TY(q.y)}`;}).join(' '),fill,stroke:'#475569','stroke-width':.5*View.getScale()});
@@ -169,10 +169,11 @@ export function createSyringeUI(h){
         const half=clamp.width/2,outer=clamp.innerRadius+clamp.thickness;
         polygon([{x:-half,y:-outer},{x:half,y:-outer},{x:half,y:outer},{x:-half,y:outer}],'#6b7b7a');
         for(const v of [-clamp.innerRadius,clamp.innerRadius])node('line',{x1:View.TX(at(-half,v).x),y1:View.TY(at(-half,v).y),x2:View.TX(at(half,v).x),y2:View.TY(at(half,v).y),stroke:'#c5cfcb','stroke-width':.5*View.getScale()});
+        if(shape.pivot)node('circle',{cx:View.TX(a.x),cy:View.TY(a.y),r:3*View.getScale(),fill:'white',stroke:'#0e7490','stroke-width':1.5});
         node('circle',{cx:View.TX(b.x),cy:View.TY(b.y),r:1.7*View.getScale(),fill:'white',stroke:'#475569'});
       }
       for(const [key,p] of [['a',a],['b',b]]){
-        if(c.mountMode==='fixed-axis')continue;
+        if(hasSyringeClamp(c))continue;
         const geometry=syringeSeatGeometry(c.spec,S.fabrication,key),dir=key==='a'?1:-1;
         const convert=q=>({x:p.x+dir*(dx*q.x-dy*q.y),y:p.y+dir*(dy*q.x+dx*q.y)});
         for(const outline of geometry.outlines)node('polygon',{points:outline.map(q=>{const w=convert(q);return `${View.TX(w.x)},${View.TY(w.y)}`;}).join(' '),fill:'none',stroke:'#0e7490','stroke-width':1,'stroke-dasharray':'4 3','pointer-events':'none'});
@@ -212,7 +213,7 @@ export function createSyringeUI(h){
   }
   function open(candidate=null,advanced=false){
     const current=candidate || active();
-    if(current?.mountMode==='fixed-axis'&&!advanced){install(current);return;}
+    if(hasSyringeClamp(current)&&!advanced){install(current);return;}
     h.pause();const c=clone(candidate||active());if(!c)return;
     const dialog=el('dialog');dialog.id='syringeDialog';dialog.className='syringe-dialog';const form=el('form',null,dialog);
     el('h3',candidate&&!h.comps().some(o=>o.id===candidate.id)?'新增 10cc 液壓針筒':'針筒與安裝設定',form);

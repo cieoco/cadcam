@@ -17,7 +17,7 @@ export function buildMaterialScene({comps,modules,params,catalog,inputs,allPlane
  // Keep syringe supports that have no main frame representation (e.g. mounted children).
  // In a design preview a root bar already represented by the frame is not drawn twice.
  // Assembly/candidate material keeps explicit members for their connection references.
- const syringeFrames=new Set(comps.filter(c=>c.type==='syringe'&&c.mountMode==='fixed-axis').map(c=>c.a.componentId));
+ const syringeFrames=new Set(comps.filter(c=>c.type==='syringe'&&['fixed-axis','pivot'].includes(c.mountMode)).map(c=>c.a.componentId));
  const create=(i,frame=null)=>{
   const separate=new Set(endpointIds);
   for(const c of comps)if(syringeFrames.has(c.id)&&!(combineSyringeFrame&&frame&&catalog.parts.frame?.sourceModuleIds?.includes(c.moduleId||null)))separate.add(c.id);
