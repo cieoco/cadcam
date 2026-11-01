@@ -224,6 +224,7 @@ export function createGearEditor({
     setText('gearPowerStatus',driver ? `輸入輪 ${driver.id}：${driver.p1.physicalMotor ? (driver.motorType==='mg995'?'MG995 舵機':driver.motorType==='n20'?'N20 減速馬達':'TT 馬達') : '尚未安裝動力'}` : '');
     setText('gearModuleVal', Math.round(mod));
     setText('gearTeethVal', c.teeth);
+    setText('gearHoleAngleVal',Number((((Number(c.phase)||0)%360+360)%360).toFixed(2))+'°');
     setText('gearRadiusVal', Math.round(Number(S.topo.params[c.radiusParam]) || c.teeth * mod / 2));
     const pinInput=document.getElementById('gearPinRadiusVal');
     if(pinInput){pinInput.value=String(Math.round(gearPinRadius(c)));pinInput.max=String(Math.max(4,Math.floor(gearPitchRadius(c)-4)));}

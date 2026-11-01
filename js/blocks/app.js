@@ -3354,6 +3354,7 @@ Object.assign(window.blocks, commandActions, { openExamples: exampleController.o
   copyMember,
   mountMemberToGear,
   setGearPinRadius: gearEditor.setGearPinRadius,
+  openGearHolePlacement: mode=>import('./gear-hole-dialog.js').then(m=>m.openGearHoleDialog({S,mode,pause,snapshotStr,pushUndo,rebuild,draw,updateGearEditor:gearEditor.updateGearEditor,notify:transient})).catch(e=>{console.error(e);transient('孔位設定載入失敗，請重試。');}),
   mateTool: on => mateTool.set(!!on), mateDebug: () => mateTool.debug(),
   setTriSide: memberEditor.selectDimension,
   setMemberDimension: memberEditor.setValue,

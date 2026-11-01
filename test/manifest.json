@@ -251,7 +251,8 @@
     "test/add-palette.mjs",
     "test/unit-starts.mjs",
     "test/unit-start-examples.mjs",
-    "test/gear-member-mount.mjs"
+    "test/gear-member-mount.mjs",
+    "test/gear-hole-placement.mjs"
   ],
   "version": 1
 }
