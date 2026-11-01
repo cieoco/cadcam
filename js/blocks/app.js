@@ -3353,6 +3353,7 @@ Object.assign(window.blocks, commandActions, { openExamples: exampleController.o
   openBoxMaker,
   copyMember,
   mountMemberToGear,
+  setGearPinRadius: gearEditor.setGearPinRadius,
   mateTool: on => mateTool.set(!!on), mateDebug: () => mateTool.debug(),
   setTriSide: memberEditor.selectDimension,
   setMemberDimension: memberEditor.setValue,

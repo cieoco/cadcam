@@ -225,7 +225,8 @@ export function createGearEditor({
     setText('gearModuleVal', Math.round(mod));
     setText('gearTeethVal', c.teeth);
     setText('gearRadiusVal', Math.round(Number(S.topo.params[c.radiusParam]) || c.teeth * mod / 2));
-    setText('gearPinRadiusVal', Math.round(gearPinRadius(c)));
+    const pinInput=document.getElementById('gearPinRadiusVal');
+    if(pinInput){pinInput.value=String(Math.round(gearPinRadius(c)));pinInput.max=String(Math.max(4,Math.floor(gearPitchRadius(c)-4)));}
     setText('gearPinHoleVal', Number(c.pinHoleDiameter || 5).toFixed(1).replace(/\.0$/, ''));
     setRow('rackLengthRow', !!rack);
     setRow('rackOrientationRow', !!rack);
@@ -423,11 +424,16 @@ export function createGearEditor({
   function changeGearPinRadius(delta) {
     const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
     if (!c) return;
-    pushUndo();
-    const pitchR = gearPitchRadius(c);
-    const next = Math.max(4, Math.min(Math.max(4, pitchR - 4), gearPinRadius(c) + delta));
-    if (c.pinRadiusParam) S.topo.params[c.pinRadiusParam] = Math.round(next);
-    else c.pinRadius = Math.round(next);
+    setGearPinRadius(Math.max(4,Math.min(Math.max(4,Math.floor(gearPitchRadius(c)-4)),Math.round(gearPinRadius(c)+delta))));
+  }
+  function setGearPinRadius(value) {
+    const c=S.selectedGearId?gearById(S.selectedGearId):null;if(!c)return;
+    const next=Number(value),max=Math.max(4,Math.floor(gearPitchRadius(c)-4));
+    if(!Number.isInteger(next)||next<4||next>max){transient(`輸出孔距請輸入 4～${max} mm 的整數`);updateGearEditor();return;}
+    if(Math.abs(next-gearPinRadius(c))<1e-9){updateGearEditor();return;}
+    pause();pushUndo();
+    if (c.pinRadiusParam) S.topo.params[c.pinRadiusParam] = next;
+    else c.pinRadius = next;
     const ctr = pointCoords()[c.p1.id] || c.p1;
     const pin = pointCoords()[c.p2.id] || c.p2;
     const ang = Math.atan2((pin.y || 0) - (ctr.y || 0), (pin.x || 0) - (ctr.x || 0));
@@ -603,7 +609,7 @@ export function createGearEditor({
     ensureRackSlot, rackFramePinPositions, syncRackFramePins, syncRackFramePinsForGear,
     gearPitchRadius, gearPinRadius, gearDriveState,
     setGearManualAngle, startGearManualRotate, clampGearPinRadius,
-    changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeGearModule,
+    changeGearTeeth, changeGearPinRadius, setGearPinRadius, changeGearPinHoleDiameter, changeGearModule,
     changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, clearRackStops,
     deleteGearChain, rackPinionThetaRange
   };

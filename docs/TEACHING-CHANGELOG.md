@@ -789,3 +789,9 @@
 - 證據 `output/gear-member-mount/`：mobile-preview.png、mobile-small.png、landscape.png、desktop-preview.png、mobile-installed.png、mobile-reopened.png，以及定向測試日誌。下載事件等待因尚在名稱確認步驟超時，完成名稱確認後顯示「已下載」，重開另以分享網址驗證；不宣稱已透過檔案選擇器重開下載檔。
 - 規格見 [SDD-GEAR-MEMBER-MOUNT.md](SDD-GEAR-MEMBER-MOUNT.md)，教學第五單元加入鏡射夾指安裝延伸說明。
 - 完整回歸：Node v24.22.1，237／237 通過（output/acceptance/results.json）；載入圖與啟動大小維持通過。
+
+## 2026-11-01：齒輪輸出孔距可調到18 mm（2026.11.1.3）
+
+- 原孔距按鈕固定每次 ±2 mm，從17只能到19。改成 ±1 mm，桌機／手機共用一個可直接輸入的整數欄（16px字、44px高），保留4 mm至節圓半徑減4 mm的範圍；空白、非整數、無效及越界值拒絕並還原顯示，相同值不新增復原。
+- setter共用孔位同步與一次復原流程，兼容 pinRadius 舊作品與 pinRadiusParam；手機摘要繼續顯示齒數，不因展開孔距欄而誤標成毫米。
+- gear-editor 22/22、gear-drive-hole 13/13、gear-member-mount、mobile-workspace 17/17、startup-size 7/7與load-graph定向回歸通過。Chrome 390×844實際驗證17→18→19→18、鍵盤直接輸入、999拒絕、一次復原回24；桌機輸入19再減回18。證據：output/gear-pin-radius/mobile-18.png。

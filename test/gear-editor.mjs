@@ -18,8 +18,9 @@ const Model = await import('../js/blocks/model.js');
 const { createGearEditor, GEAR_MODULE } = await import('../js/blocks/gear-editor.js');
 
 const noop = () => {};
+let undos=0;
 const editor = createGearEditor({
-  pushUndo: noop, pause: noop, rebuild: noop, draw: noop, renderFrame: noop,
+  pushUndo: () => undos++, pause: noop, rebuild: noop, draw: noop, renderFrame: noop,
   transient: noop, scheduleAutosave: noop, cancelMotorMode: noop, exitDrawTools: noop,
   openMobileEditPanel: noop, closeMobileEditPanel: noop, hideEditorPanels: noop,
   snapshotStr: () => '', updateUndoBtn: noop, recordManualTrace: noop,
@@ -39,6 +40,23 @@ const tangent = (a, b) => {
 // ---- 成對齒輪：建立即相切、預設 12:18 ----
 editor.addGearPair();
 let [driver, driven] = gears();
+// Both legacy inline radii and parameter-backed gears must reach every integer.
+const radiusKey=driven.pinRadiusParam;
+for(const legacy of [false,true]){
+  if(legacy){delete driven.pinRadiusParam;driven.pinRadius=17;}
+  else S.topo.params[radiusKey]=17;
+  const start=undos;
+  editor.changeGearPinRadius(1);
+  check(`孔距17→18（${legacy?'舊作品':'參數'}）`,editor.gearPinRadius(driven)===18&&undos===start+1);
+  editor.changeGearPinRadius(1);editor.changeGearPinRadius(-1);
+  check('孔距18→19→18，孔位距離同步',editor.gearPinRadius(driven)===18&&Math.abs(dist(driven.p1,driven.p2)-18)<1e-6);
+  editor.setGearPinRadius('23');editor.setGearPinRadius('18');
+  check('可直接輸入18，面板同步',editor.gearPinRadius(driven)===18&&document.getElementById('gearPinRadiusVal').value==='18');
+  const same=undos,original=JSON.stringify(driven);
+  for(const v of ['','bad',NaN,Infinity,3,999,18.5,18])editor.setGearPinRadius(v);
+  check('空白、無效、越界與相同值不修改也不新增復原',undos===same&&JSON.stringify(driven)===original);
+}
+driven.pinRadiusParam=radiusKey;delete driven.pinRadius;
 check('齒輪成對建立且從動輪嚙合驅動輪', gears().length === 2 && driven.mesh === driver.id);
 check('節圓半徑參數 = teeth·module/2', S.topo.params[driver.radiusParam] === 12 * GEAR_MODULE / 2 && S.topo.params[driven.radiusParam] === 18 * GEAR_MODULE / 2);
 check('兩輪中心距 = 兩節圓半徑和（相切）', tangent(driver, driven));

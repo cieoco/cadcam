@@ -49,6 +49,7 @@ function sync() {
 
 // ---------- 摘要列 ----------
 function selectionSummary(panel) {
+  if(panel.id==='gearEditor')return `齒輪：${txt(panel.querySelector('#gearTeethVal'))} 齒`;
   const title = txt(panel.querySelector('#lenTitle,.re-title,.se-title,.fe-title'));
   const label = txt(panel.querySelector('#memberDimensionLabel'));
   const input = [...panel.querySelectorAll('input')].find(i => i.type === 'number' && i.value !== '' && shown(i) && !i.closest('details:not([open])'));
