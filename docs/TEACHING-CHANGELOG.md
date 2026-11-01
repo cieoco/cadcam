@@ -836,3 +836,12 @@
 - Node v24.22.1 完整回歸 241／241 通過；後續 3D 孔徑防護與介面收尾再跑安裝模式、管夾、安裝、雙圓盤及範例庫 5／5 通過（output/syringe-mount-modes/targeted/results.json）。公開範例增為 43 項。
 - HTTP 瀏覽器：390×844、360×640 無橫向溢出；固定環位置 50.4→40、確認、一次復原回 50.4，再保存重開仍保留 pivot／40。直接驅動盤切成固定式會提示缺少短桿並停用確認，取消保留作品。3D 顯示單點轉軸參考、套筒 2.5 mm 與中心層對齊；瀏覽器錯誤記錄為空。
 - 截圖：output/syringe-mount-modes/mobile-pivot.png、mobile-360.png、desktop-3d.png（本機驗收產物）。規格見 [固定環安裝 SDD](SDD-SYRINGE-MOUNT-MODES.md)。
+
+
+## 2026-11-02：圓盤轉動方向標記（2026.11.2.1）
+
+- 活動圓盤由細虛線改為白邊深藍方向線與外緣箭頭，沿中心到工作孔方向跟隨求解姿態；兩孔皆固定的底盤只顯示朝上短刻線。2D、3D 共用顯示幾何，3D 正反面皆有標記並保留板件遮擋；斜視深度衝突以顯示材質偏移修正。
+- 標記不接收點選、不更動作品資料、求解、板件輪廓及孔位；3D display metadata 與加工 catalog 分離，不加入 SVG／DXF。
+- Node v24.22.1 完整回歸 242／242 通過（output/acceptance/results.json）。3D 材質收尾後再驗收方向標記、圓盤、雙圓盤、載入圖及啟動大小 5／5 通過（output/disk-orientation/targeted/results.json）。新測試核對 0／10／20 mm 箭頭跟隨、固定刻線不動、各尺寸數值有限及 SVG／DXF 完全不變。
+- HTTP 瀏覽器 390×844 手機與桌機驗收：0／20 mm 方向變化、播放至 11.8 mm 暫停、3D 正面／斜視／底盤背面、手機點箭頭可經重疊清單選取圓盤；錯誤記錄為空。不等同實體手機或實物測試。
+- 本機截圖：output/disk-orientation/mobile-0.png、mobile-20.png、mobile-final.png、desktop-3d-0.png、desktop-3d-20.png、desktop-back.png。契約見 [圓盤 SDD](SDD-DISK-PLATE.md)。

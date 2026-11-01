@@ -255,7 +255,8 @@
     "test/gear-hole-placement.mjs",
     "test/disk-plate.mjs",
     "test/disk-turntable.mjs",
-    "test/syringe-mount-modes.mjs"
+    "test/syringe-mount-modes.mjs",
+    "test/disk-orientation.mjs"
   ],
   "version": 1
 }

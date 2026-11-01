@@ -8,6 +8,7 @@ import {inspectBarFusion,worldFusionGeometry} from './bar-fusion-geometry.js';
 
 import { isDisk, diskOutline } from './disk-plate.js';
 import { memberStock } from './member-stock.js';
+import {diskOrientationMark} from './disk-orientation.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svgEl = tag => document.createElementNS(SVG_NS, tag);
@@ -45,10 +46,10 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
     }
     const group = groupForLayer(linkLayer.get(link)); group.appendChild(stick);
     // 圓盤是旋轉對稱外形；方向線只供觀察轉角，不是加工槽。
-    const diskDirection=isDisk(component)?svgEl('line'):null;
+    const diskDirection=isDisk(component)?svgEl('g'):null;
     if(diskDirection){
-      diskDirection.setAttribute('stroke',color);diskDirection.setAttribute('stroke-width','1.5');
-      diskDirection.setAttribute('stroke-dasharray','5 4');diskDirection.style.pointerEvents='none';
+      diskDirection.style.pointerEvents='none';diskDirection.dataset.diskOrientation=link.id;
+      for(const fill of ['#ffffff','#075985']){const ink=svgEl('path');ink.setAttribute('fill',fill);diskDirection.appendChild(ink);}
       diskDirection.setAttribute('aria-hidden','true');group.appendChild(diskDirection);
     }
     const holes = [];
@@ -80,9 +81,10 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       stick.style.display = valid ? '' : 'none'; holes.forEach(hole => { hole.element.style.display = valid ? '' : 'none'; });
       if(diskDirection){
         diskDirection.style.display=valid?'':'none';
-        if(valid){const length=Math.hypot(b.x-a.x,b.y-a.y)||1,k=component.diameterMm*.45/length;
-          const start=project(a),end=project({x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k});
-          for(const [key,value] of Object.entries({x1:start.x,y1:start.y,x2:end.x,y2:end.y}))diskDirection.setAttribute(key,value);
+        if(valid){
+          const fixed=groundIds.has(link.p1)&&groundIds.has(link.p2),start=project(a),end=project(fixed?{x:a.x,y:a.y+1}:b),rim=project({x:a.x+component.diameterMm/2,y:a.y});
+          const mark=diskOrientationMark(Math.hypot(rim.x-start.x,rim.y-start.y),fixed,Math.atan2(end.y-start.y,end.x-start.x));
+          [mark.outline,mark.ink].forEach((rings,i)=>diskDirection.children[i].setAttribute('d',rings.map(r=>'M '+r.map(p=>`${start.x+p.x},${start.y+p.y}`).join(' L ')+' Z').join(' ')));
         }
       }
       if (!valid) return;

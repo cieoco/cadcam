@@ -4,17 +4,21 @@ import { IDENTITY_4, multiply4 } from './orthogonal-3d.js';
 import {assemblyRoles} from '../blocks/assembly-roles.js';
 import {readConnectionDescriptor} from '../blocks/connection-descriptor.js';
 import { poseMatrix, moduleFramePose } from '../blocks/part-geometry.js';
+import {isDisk,diskDiameter} from '../blocks/disk-plate.js';
 const unit=v=>{const n=Math.hypot(v.x,v.y,v.z);return {x:v.x/n,y:v.y/n,z:v.z/n};};
 const basis=(u,v,n,p)=>[u.x,u.y,u.z,0,v.x,v.y,v.z,0,n.x,n.y,n.z,0,p.x,p.y,p.z,1];
 
 /** Child matrices already include all ancestors. Never compose a second parent. */
 export function attachPartMaterials(model,catalog,{comps=[],modules=[],points={},assemblyScope=false}={}) {
   const materialParts=[],diagnostics=[...catalog.diagnostics];
+  const fixedIds=new Set(comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(p=>p&&['fixed','motor'].includes(p.type)).map(p=>p.id)));
   const boxReferences=new Set(comps.filter(c=>c.boxPanel).flatMap(c=>[c.p1.id,c.p2.id]));
   const add=(id,localMatrix,parent,pickKey,color)=>{
     const geometry=catalog.parts[id];
     if(!geometry||!localMatrix||!localMatrix.every(Number.isFinite)){diagnostics.push({status:'not_supported',code:'material_pose_or_geometry_missing',sourceIds:[id],pickKey});return false;}
+    const comp=comps.find(c=>c.id===id),fixed=isDisk(comp)&&fixedIds.has(comp.p1.id)&&fixedIds.has(comp.p2.id);
     materialParts.push({partId:id,moduleId:geometry.moduleId,pickKey,geometry,pose:{partId:id,matrix:multiply4(parent,localMatrix)},color,
+      ...(isDisk(comp)?{diskMark:{radius:diskDiameter(comp)/2,fixed,angle:fixed?Math.PI/2-Math.atan2(comp.p2.y-comp.p1.y,comp.p2.x-comp.p1.x):0}}:{}),
       ...(geometry.connectionId?{connectionId:geometry.connectionId,bracketId:geometry.bracketId,holePairId:geometry.holePairId}: {})});
     return true;
   };

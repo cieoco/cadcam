@@ -1,4 +1,5 @@
 import {normalizeMaterialVoids,materialCircleContour} from '../blocks/material-voids.js';
+import {diskOrientationMark} from '../blocks/disk-orientation.js';
 import {retainedSceneKey,createSceneLifetime} from './scene-reuse.js';
 /**
  * blocks3d / viewer
@@ -654,6 +655,17 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
 
   // Representation only: every material island and machining feature comes from
   // the shared local catalog; pose matrices are already complete world poses.
+  const diskInk=new THREE.MeshBasicMaterial({color:'#075985',side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}),diskHalo=new THREE.MeshBasicMaterial({color:'#ffffff',side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});
+  function addDiskMark(mesh,part){
+    if(!part.diskMark)return;
+    const {radius,fixed,angle}=part.diskMark,mark=diskOrientationMark(radius,fixed,angle);
+    // 貼在正反板面並沿用板件姿態；不改輪廓、孔或切槽，也不攔截點選。
+    for(const side of [-1,1])for(const [i,rings] of [mark.outline,mark.ink].entries())for(const ring of rings){
+      const shape=new THREE.Shape();ring.forEach((p,j)=>j?shape.lineTo(p.x,p.y):shape.moveTo(p.x,p.y));shape.closePath();
+      const ink=new THREE.Mesh(new THREE.ShapeGeometry(shape),i?diskInk:diskHalo);
+      ink.position.z=(side===1?part.geometry.thicknessMm:0)+side*(.04+i*.02);ink.raycast=()=>{};mesh.add(ink);
+    }
+  }
   function renderMaterialParts(parts) {
     const unverified=[];
     const inside=(p,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){
@@ -685,6 +697,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
         const mesh=new THREE.Mesh(geo,material);mesh.matrixAutoUpdate=false;mesh.matrix.fromArray(part.pose.matrix);mesh.matrixWorldNeedsUpdate=true;
         mesh.userData.partId=part.partId;mesh.userData.geometryVersion=g.geometryVersion;
         if(diagnostic)mesh.userData.geometryDiagnostic=diagnostic;
+        addDiskMark(mesh,part);
         addPart(mesh,part.pickKey);
         bindPose(mesh,(o,m,root)=>{const next=root.materialParts.find(p=>p.partId===part.partId);o.matrix.fromArray(next.pose.matrix);o.matrixWorldNeedsUpdate=true;});
       }
@@ -1489,6 +1502,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     lifetime.retire();
     materialNotice.remove();
     unsupportedMaterial.dispose();
+    diskInk.dispose();diskHalo.dispose();
     stop();
     highlightSurface(null);
     clearDynamic();
