@@ -253,7 +253,8 @@
     "test/unit-start-examples.mjs",
     "test/gear-member-mount.mjs",
     "test/gear-hole-placement.mjs",
-    "test/disk-plate.mjs"
+    "test/disk-plate.mjs",
+    "test/disk-turntable.mjs"
   ],
   "version": 1
 }

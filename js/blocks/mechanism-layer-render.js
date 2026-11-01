@@ -44,6 +44,13 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       });
     }
     const group = groupForLayer(linkLayer.get(link)); group.appendChild(stick);
+    // 圓盤是旋轉對稱外形；方向線只供觀察轉角，不是加工槽。
+    const diskDirection=isDisk(component)?svgEl('line'):null;
+    if(diskDirection){
+      diskDirection.setAttribute('stroke',color);diskDirection.setAttribute('stroke-width','1.5');
+      diskDirection.setAttribute('stroke-dasharray','5 4');diskDirection.style.pointerEvents='none';
+      diskDirection.setAttribute('aria-hidden','true');group.appendChild(diskDirection);
+    }
     const holes = [];
     [link.p1, link.p2].forEach(pointId => {
       if (groundIds.has(pointId)) return;
@@ -71,6 +78,13 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       const a = current[link.p1], b = current[link.p2];
       const valid = a && b && Number.isFinite(a.x) && Number.isFinite(b.x);
       stick.style.display = valid ? '' : 'none'; holes.forEach(hole => { hole.element.style.display = valid ? '' : 'none'; });
+      if(diskDirection){
+        diskDirection.style.display=valid?'':'none';
+        if(valid){const length=Math.hypot(b.x-a.x,b.y-a.y)||1,k=component.diameterMm*.45/length;
+          const start=project(a),end=project({x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k});
+          for(const [key,value] of Object.entries({x1:start.x,y1:start.y,x2:end.x,y2:end.y}))diskDirection.setAttribute(key,value);
+        }
+      }
       if (!valid) return;
       const tabPath=component&&tabNutPath(tabNutGeometry[component.id],component,current,project);
       if(isDisk(component)){stick.setAttribute('d','M '+diskOutline(component,a).map(p=>{const q=project(p);return q.x+','+q.y;}).join(' L ')+' Z');}

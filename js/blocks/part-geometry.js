@@ -10,6 +10,7 @@ import { compileAssembly, solveAssembly, machineFrameComps, machineMounts, outpu
 import { deriveMotorMounts } from './build-plan.js';
 import { framePlateHomes } from './module-plates.js';
 import {identifiedHoles} from './part-hole-trace.js';
+import {syringeClampFrameNodes} from './syringe-shape.js';
 import {assemblyRoles} from './assembly-roles.js';
 import { orthogonalExportExtras, withWorldAdapterNodes } from './orthogonal-joint.js';
 
@@ -61,6 +62,14 @@ export function buildPartGeometryCatalog(args={}) {
         }
         const a=homePoints[comp.p1.id],b=homePoints[comp.p2.id],length=Math.hypot(b.x-a.x,b.y-a.y);
         const g=tabNutPartGeometry(extras,comp,{local:true}) || (split.hosted.has(comp.id)?Exporters.hostedBarGeometry(comp,homePoints,settings,split.hosted.get(comp.id),extras.linkHoles[comp.id] || []):Exporters.inspectLinkExport(comp,length,settings,extras.linkHoles[comp.id] || []));
+        // 獨立圓盤不進自動機架；管夾配對孔仍須落在實際承載板上。
+        // 固定軸針筒的加工輸出仍沿用既有核對限制，這裡只補共用材料幾何。
+        if(comp.shape==='disk'&&[comp.p1,comp.p2].every(p=>p.type==='fixed')){
+          const local=localizer(comp.p1,comp.p2);
+          const holes=syringeClampFrameNodes(comps.filter(c=>c.type!=='syringe'||c.a?.componentId===comp.id),[comp.p1,comp.p2]).map(h=>({...local(h),id:h.id,r:h.holeDiameterMm/2,layer:h.holeLayer}));
+          if(holes.some(h=>Math.hypot(h.x,h.y)+h.r>comp.diameterMm/2))throw Error('圓盤外徑不足以容納管夾配對孔');
+          g.holes=[...(g.holes||[]),...holes];
+        }
         add(comp.id,'bar',g,stock.thicknessMm,[comp.id],{kind:'member',pointIds:[comp.p1.id,comp.p2.id]},comp.moduleId);
         memberStocks[comp.id]=stock;
       } else if(comp.type==='triangle'&&!comp.fusedWith) {

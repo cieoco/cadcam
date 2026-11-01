@@ -115,6 +115,7 @@ export function createSyringeUI(h){
     if(!(visible&&inAssembly()))layoutBar(false);
     if(!visible){if(raf)stop();return;}
     id=c.id;
+    const diskOutput=list().length>0&&S.comps.some(o=>o.id===c.outputId&&o.shape==='disk');
     settings.hidden=inAssembly();if(!inAssembly())chips.style.display='none';
     if(inAssembly()){
       // 組立：每支針筒一顆切換鈕；每推 1 mm 的比例與針筒設定只在設計模式提供（組立裡改尺寸請回設計）。
@@ -123,16 +124,16 @@ export function createSyringeUI(h){
       for(const control of controls){const b=el('button',control.label,chips);b.type='button';b.className='motor-chip'+(control.id===c.id?' active':'');b.setAttribute('aria-pressed',String(control.id===c.id));b.onclick=()=>{stop();id=control.id;message='';sync(h.points(),valid);};}
       const label=controls.find(x=>x.id===c.id)?.label||'針筒',r=syringeReading(c,work.comps,params(),points);
       range.max=c.spec.stroke;range.value=c.extension;value.textContent=`${c.extension.toFixed(1)} / ${c.spec.stroke} mm`;
-      readout.textContent=`${valid?'幾何可行':'姿勢無解'}${r.tipGap!==null?` · 夾臂端孔距 ${r.tipGap.toFixed(1)} mm`:Number.isFinite(r.angle)?` · 臂角 ${r.angle.toFixed(1)}°`:''} · AB ${r.length.toFixed(1)} mm`;
+      readout.textContent=`${valid?'幾何可行':'姿勢無解'}${r.tipGap!==null?` · 夾臂端孔距 ${r.tipGap.toFixed(1)} mm`:Number.isFinite(r.angle)?` · ${diskOutput?'轉盤角':'臂角'} ${r.angle.toFixed(1)}°`:''} · AB ${r.length.toFixed(1)} mm`;
       gainLine.hidden=true;gainLine.textContent='';
       note.textContent=message||'一次推一支；外形參考，固定座／干涉／承重／水路待驗證。';
       layoutBar(true);return;
     }
     settings.hidden=false;range.max=c.spec.stroke;range.value=c.extension;value.textContent=`${c.extension.toFixed(1)} / ${c.spec.stroke} mm`;
     const r=syringeReading(c,h.comps(),params(),points);
-    readout.textContent=`${valid?(c.passiveTips?.length?'主傳動可解／夾片角度手動':'幾何可行'):'姿勢無解'}${r.tipGap!==null?` · 夾臂端孔距 ${r.tipGap.toFixed(1)} mm`:''}${r.mountGap!==null?` · 夾片安裝軸距 ${r.mountGap.toFixed(1)} mm`:''} · AB ${r.length.toFixed(2)} mm · 臂角 ${r.angle.toFixed(1)}°${r.end?` · C (${r.end.x.toFixed(1)}, ${r.end.y.toFixed(1)}) mm`:''}`;
+    readout.textContent=`${valid?(c.passiveTips?.length?'主傳動可解／夾片角度手動':'幾何可行'):'姿勢無解'}${r.tipGap!==null?` · 夾臂端孔距 ${r.tipGap.toFixed(1)} mm`:''}${r.mountGap!==null?` · 夾片安裝軸距 ${r.mountGap.toFixed(1)} mm`:''} · AB ${r.length.toFixed(2)} mm · ${diskOutput?'轉盤角':'臂角'} ${r.angle.toFixed(1)}°${r.end?` · ${diskOutput?'偏心孔':'C'} (${r.end.x.toFixed(1)}, ${r.end.y.toFixed(1)}) mm`:''}`;
     const gain=valid?syringeGain(h.comps(),params(),c.id,points):null;
-    gainLine.hidden=!gain;gainLine.textContent=gain?(gain.tipGapMmPerMm!==null?`每推 1 mm：夾臂端孔距${gain.tipGapMmPerMm>=0?'縮小':'增加'} ${Math.abs(gain.tipGapMmPerMm).toFixed(1)} mm`:`每推 1 mm：臂轉 ${gain.degPerMm.toFixed(2)}°、臂端移 ${gain.endMmPerMm.toFixed(1)} mm`):'';
+    gainLine.hidden=!gain;gainLine.textContent=gain?(gain.tipGapMmPerMm!==null?`每推 1 mm：夾臂端孔距${gain.tipGapMmPerMm>=0?'縮小':'增加'} ${Math.abs(gain.tipGapMmPerMm).toFixed(1)} mm`:`每推 1 mm：${diskOutput?'盤轉':'臂轉'} ${gain.degPerMm.toFixed(2)}°、${diskOutput?'偏心孔移':'臂端移'} ${gain.endMmPerMm.toFixed(1)} mm`):'';
     note.textContent=message||(c.spec.calibrated?'規格已實測；':'示範尺寸，未依實物校正；')+'干涉未檢查、承重未驗證。';
     const theta=document.getElementById('thetaVal');if(theta)theta.textContent=`${c.extension.toFixed(1)} mm`;
   }
@@ -235,7 +236,7 @@ export function createSyringeUI(h){
       select.value=c[key].componentId;input(`${key}U`,`${key.toUpperCase()} 沿桿位置 u (mm)`,c[key].u);input(`${key}V`,`${key.toUpperCase()} 偏置 v (板件用，mm)`,c[key].v);
     }
     if(c.mountMode==='fixed-axis')input('axisDeg','固定筒身軸向 (°)',c.axisDeg);
-    const arm=h.comps().find(o=>o.id===(c.outputId||c.b.componentId)&&['bar','triangle'].includes(o.type));if(arm&&!c.passiveTips?.length&&!c.jawIds?.length)input('armLength',c.outputId==='H2Arm'?'驅動孔距主軸 (mm)':'活動臂長度 (mm)',params()[arm.lenParam||arm.gParam]);
+    const arm=h.comps().find(o=>o.id===(c.outputId||c.b.componentId)&&['bar','triangle'].includes(o.type));if(arm&&!c.passiveTips?.length&&!c.jawIds?.length)input('armLength',arm.shape==='disk'?'偏心孔距中心 (mm)':c.outputId==='H2Arm'?'驅動孔距主軸 (mm)':'活動臂長度 (mm)',params()[arm.lenParam||arm.gParam]);
     if(c.id==='HSyringe'){
       const presets=el('div',null,form);for(const u of [60,80,100]){const btn=el('button',`B = ${u} mm`,presets);btn.type='button';btn.onclick=()=>{fields.bU.value=u;};}
       el('small','比較只改 B：示範三組均以 0–40 mm、0.5 mm 間隔通過幾何採樣。修改其他條件後請重新掃描。',form);
