@@ -388,15 +388,15 @@ async function syringeWizard(s, step) {
   await s.open(HYD_PRACTICE); await s.tab('build'); await s.section('other', true); await s.cmd('syringe');
   await s.text('調整安裝'); await s.settle(800);
   const next = async () => { await s.p.locator('button:has-text("下一步")').filter({ visible: true }).click(); await s.settle(700); };
-  await s.p.locator('select').filter({ visible: true }).first().selectOption({ label: 'H1Frame' }); await s.settle(400);   // 1 固定外殼：H1Frame、正面
+  await s.p.getByLabel('筒身固定在哪個零件？').selectOption({ label: 'H1Frame' }); await s.settle(400);   // 1 固定外殼：H1Frame、正面（第一個下拉現在是安裝方式，要用標籤找）
   if (step === 1) return; await next();
   for (const [label, v] of [['筒身位置 X (mm)', '-100'], ['筒身位置 Y (mm)', '-60'], ['推進方向角度 (°)', '0']]) {   // 2 位置方向：X −100、Y −60、向右 0°
     const f = s.p.getByLabel(label).locator('visible=true').first(); await f.fill(v); await f.press('Tab');
   }
   await s.settle(600);
   if (step === 2) return; await next();
-  const sel = s.p.locator('select').filter({ visible: true });                                                              // 3 連接輸出：H1Coupler、第一孔
-  await sel.nth(0).selectOption({ label: 'H1Coupler' }); await s.settle(300); await sel.nth(1).selectOption({ index: 0 }); await s.settle(500);
+  await s.p.getByLabel('推桿接哪個零件？').selectOption({ label: 'H1Coupler' }); await s.settle(300);                          // 3 連接輸出：H1Coupler、第一孔
+  await s.p.getByLabel('連接端孔').selectOption({ index: 0 }); await s.settle(500);
   if (step === 3) return; await next();
 }
 add(`${HYD}/installation-frame-mobile.png`, 'teaching-hydraulic.html', s => syringeWizard(s, 1), { verify: true });
@@ -428,7 +428,7 @@ add(`${HYD}/h06-face-placement-mobile.png`, 'teaching-hydraulic.html', async s =
   await s.open('unit12-start'); await s.mode('bench'); await s.settle(5000);
   await s.p.locator('div,li,button').filter({ hasText: /^·?\s*升降\s*(未安裝)?$/ }).last().click(); await s.settle(1200);
   await s.p.locator('#benchFaceWizard').click(); await wiz(s).locator('#next').waitFor(); await s.settle(1500);
-  await wiz(s).locator('button:has-text("板件 H4Turn")').click(); await wiz(s).locator('#next').click(); await s.settle(900);   // 承接：轉盤板
+  await wiz(s).locator('button:has-text("轉盤")').first().click(); await wiz(s).locator('#next').click(); await s.settle(900);   // 承接：H07 活動轉盤板（零件名稱現為「轉盤」）
   await wiz(s).locator('button:has-text("H2Frame")').click(); await wiz(s).locator('#next').click(); await s.settle(900);      // 安裝：升降機架
   await wiz(s).locator('#next').click(); await s.settle(900); await wiz(s).locator('#next').click(); await s.settle(1800);     // 承接面、安裝面用預設，停在第 5 步位置調整（有干涉，尚未接上）
 });
@@ -450,7 +450,7 @@ add(`${HYD}/h01-selfdraw-mobile.png`, 'teaching-hydraulic.html', async s => {
   const next = async () => { await s.p.locator('button:has-text("下一步")').filter({ visible: true }).click(); await s.settle(800); };
   await s.p.getByLabel('筒身固定在哪個零件？').selectOption('Link1'); await s.settle(500); await next();                                           // 1 固定外殼：機架
   await s.tap(69, 314); await s.settle(500); await next();                                                                                        // 2 位置方向：機架左下孔、向右
-  await s.p.getByLabel('推桿接哪個短連桿？').selectOption('Link3'); await s.p.getByLabel('連接端孔').selectOption('0'); await s.settle(500); await next(); // 3 連接輸出：短連桿第一孔
+  await s.p.getByLabel('推桿接哪個零件？').selectOption('Link3'); await s.p.getByLabel('連接端孔').selectOption('0'); await s.settle(500); await next(); // 3 連接輸出：短連桿第一孔
   await s.text('確認安裝'); await s.settle(2000);
   await s.p.locator('input[type="range"]').filter({ visible: true }).first().fill('0'); await s.tap(40, 250);                                   // 伸出量 0.0 / 20 mm
   await s.section('other', false); await s.collapseAdd(); await s.fit();
@@ -465,7 +465,7 @@ add(`${MEDIA}/syringe-readout.webp`, 'teaching-syringe.html', async s => {
 });
 // 量尺量 H03 夾口：點兩個夾臂尖端（A尖、B尖），面板顯示全行程最小／最大
 add(`${MEDIA}/syringe-ruler-gap.webp`, 'teaching-syringe.html', async s => {
-  const press = async loc => { const r = await loc.boundingBox(); await s.p.mouse.click(r.x + r.width / 2, r.y + r.height / 2); await s.settle(500); };   // 面板在抽屜裡，用滑鼠點避免抽屜被收起
+  const press = async loc => { await loc.evaluate(el => el.click()); await s.settle(500); };   // 面板在抽屜裡：直接觸發按鈕，避免抽屜開合改變座標
   await s.open('hydraulic-h03'); await s.tab('view');
   await press(s.p.locator('[data-command="fitView"]').filter({ visible: true }).first());   // 抽屜半開時置中，模型才不會被抽屜蓋住
   await press(s.p.locator('.mobile-panel [data-command="dimension"]').filter({ visible: true }).first());

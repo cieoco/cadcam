@@ -13,9 +13,11 @@ export function createExampleController({ applySnapshot, insertModule, notify, c
   let activeExampleId = '';
   let pendingDialog = null;
 
-  function requestLoad(id) {
+  // 起始練習檔資料懶載入：只重試一次；載入後仍沒有這個編號（例如 unit2-start）就回報找不到，不再重試。
+  function requestLoad(id, lazyLoaded = false) {
     const example = getExample(id);
-    if (!example && /^(unit\d+|syringe-[a-z]+)-start$/.test(id)) return loadUnitStarts().then(() => requestLoad(id)), true;
+    if (!example && !lazyLoaded && /^(unit\d+|syringe-[a-z]+)-start$/.test(id)) return loadUnitStarts().then(() => requestLoad(id, true)), true;
+    if (!example && lazyLoaded) { notify('找不到範例'); return false; }
     if (!example || pendingDialog) return false;
     pendingDialog = offerExample({ example, loadExample: load, insertModule: moduleId => { closeExamples(); return insertModule(moduleId); }, onDismiss: () => { pendingDialog = null; } });
     return true;

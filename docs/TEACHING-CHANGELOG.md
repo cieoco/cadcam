@@ -882,3 +882,10 @@
 - 手機播放列短字依狀態改成：可播放、待補、待核對、固定結構、解不出、待修正、沒咬合、限制太多；量尺摘要為「名稱：目前 x.x mm」；範例說明裡的舊名稱「現成組件」改為「加入模組」。
 - 教學頁截圖重錄 30 張（含播放列短字的畫面）：first-link-*、member-tools-current、wiper-*、gears-*、chain-*、rack-*、slider-*、gripper-fusion-*／fused-close、bucket-angle、export-project、syringe-readout、h03／h05／h06-mobile；圈選位置由工具重算。assembly-* 與 installation-* 等組立或原本就無法重錄的圖未動。
 
+## 2026-11-02：練習檔狀態只看機構改動、針筒安裝截圖重錄（2026.11.2.6）
+
+- 練習檔「改過」改以機構內容（零件、尺寸參數、模組、組立）與載入當時比較；量尺、視角、播放角度不算，復原回原狀會回到黃色提示。純函式 isMechanismEdit 在 js/blocks/status-text.js，test/practice-status.mjs 檢查。
+- 不存在的 unitN-start（如 unit2-start）原本會無限重試而卡住頁面；現在只載入一次起始練習檔，找不到就提示「找不到範例」並結束（選單與網址參數都是）。
+- tools/capture-tutorial-shots.mjs 修正針筒安裝（第一個下拉現在是「固定環與底板的連接」，改用標籤找「筒身固定在哪個零件？」「推桿接哪個零件？」「連接端孔」）、第十二單元接合預覽（零件名稱「轉盤」）與量尺（按鈕改直接觸發）後，重錄 installation-frame／mobile／unfixed／trial、h06-face-placement、h01-selfdraw、syringe-ruler-gap 共 7 張。
+- teaching-hydraulic.html 同步：第 1 步補上「固定環與底板的連接」預設「固定安裝・雙孔鎖固」，第 3 步改用現在的欄位名稱「推桿接哪個零件？」「連接端孔」。
+

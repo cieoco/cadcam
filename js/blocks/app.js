@@ -65,7 +65,7 @@ import * as Panels from './panels.js';   // 編輯面板呈現（讀 S + 寫 DOM
 import * as Tools from './tools.js';     // 工具模式互動（畫桿 / 畫滑軌 / 畫三點桿 / 連桿升級滑軌）
 import * as Input from './input.js?v=20261007_m2b';     // 指標 / 手勢互動（拖曳 + 吸附合併 + pinch 縮放）
 import * as Model from './model.js';
-import { invalidPoseStatus } from './status-text.js';
+import { invalidPoseStatus, isMechanismEdit } from './status-text.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints, motionPoseIssue, inspectMotionRange } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
 import { offerExampleFromUrl } from './example-entry.js?v=20261005_unit2';
@@ -212,19 +212,17 @@ function snapshotStr() {
 initCommandUi();
 initClassroomBridge(() => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()), APP_VERSION);
 // 練習檔剛打開、還沒動手改時，解不出是「待補」而不是錯誤；第一次可復原的修改或新設計後才算改過。
-const practice = { id: '', depth: 0, edited: false };
+const practice = { id: '', base: null };   // base：載入當時的 snapshot；只有機構本身與它不同才算改過（量尺等不算）
 let practiceBeforeUndo = null;   // 復原時先記下，restoreLesson 回報同一份練習檔時沿用：復原回到載入當時才算沒改過
 function setPractice(example) {
   const before = practiceBeforeUndo; practiceBeforeUndo = null;
   practice.id = example && exampleController.isPractice(example.id) ? example.id : '';
-  if (before && practice.id && practice.id === before.id) { practice.depth = before.depth; practice.edited = S.undoStack.length > before.depth; }
-  else { practice.depth = S.undoStack.length; practice.edited = false; }
+  practice.base = before && practice.id && practice.id === before.id ? before.base : (practice.id ? Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()) : null);
   if (example) draw();   // 載入或復原後狀態字才知道這是不是練習檔
 }
 function pushUndo() {
   const s = snapshotStr();
   if (S.undoStack[S.undoStack.length - 1] === s) return; // 沒變就不堆
-  if (practice.id) practice.edited = true;
   S.undoStack.push(s);
   if (S.undoStack.length > 60) S.undoStack.shift();
   updateUndoBtn(true);
@@ -506,7 +504,7 @@ function presetDesignFocus(id) {
 }
 // 「＋ 新設計」：沒有根零件就直接給一張空白畫布；已有根零件要先存成模組。
 function newDesign() {
-  practice.edited = true;
+  practice.id = '';
   const hasRootParts = compsInFocus(S.comps, S.modules, ROOT_TAB).length > 0;
   if(!hasRootParts && S.modules.length && S.topo.rootDesignName){pushUndo();S.topo.rootDesignName='';scheduleAutosave();}
   setDesignFocus(ROOT_TAB);   // 先切換（會收掉畫圖工具與橫幅），再顯示提示
@@ -1594,7 +1592,7 @@ function updateMechanismStatus(sol = null) {
       state = 'error'; chip = 'mesh';
       text = '齒輪沒有咬合，請調整位置';
     } else if (sol?.isValid === false && hasDriveSource()) {
-      ({ state, text } = invalidPoseStatus({ fromPractice: !!practice.id, edited: practice.edited }));
+      ({ state, text } = invalidPoseStatus({ fromPractice: !!practice.id, edited: !!practice.id && isMechanismEdit(practice.base, Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState())) }));
       if (state === 'warn') title = `這份練習檔刻意缺零件，補上後才能動；改壞了可按復原。\n${title}`;
     } else if (mobility.dof < 0) {
       state = 'error'; chip = 'over';

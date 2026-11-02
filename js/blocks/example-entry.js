@@ -10,11 +10,11 @@ export function requestedExample(href) {
 }
 
 export function offerExampleFromUrl({ loadExample, insertModule, notify = () => {},
-  location = window.location, history = window.history, document = window.document } = {}) {
+  location = window.location, history = window.history, document = window.document, lazyLoaded = false } = {}) {
   const url = new URL(location.href);
   if (!url.searchParams.has('example') || url.hash) return;
   const id = url.searchParams.get('example');
-  if (/^(unit\d+|syringe-[a-z]+)-start$/.test(id) && !getExample(id)) return loadUnitStarts().then(() => offerExampleFromUrl({ loadExample, insertModule, notify, location, history, document }));
+  if (!lazyLoaded && /^(unit\d+|syringe-[a-z]+)-start$/.test(id) && !getExample(id)) return loadUnitStarts().then(() => offerExampleFromUrl({ loadExample, insertModule, notify, location, history, document, lazyLoaded: true }));
   const example = requestedExample(url.href);
   const consume = () => {
     url.searchParams.delete('example');
