@@ -271,6 +271,7 @@ export function createDimensionUI(h) {
       const d = dims().find(x => x.id === old.id) || old;   // 復原後物件會換新，不能用建面板時的舊物件
       const m = measureDimension(d, cs, S.topo.params, pts);
       now.textContent = m.ok ? `目前 ${fmt(m.value)} mm` : '—';
+      now.dataset.value = m.ok ? String(m.value) : '';   // 手機抽屜摘要用數值重組文字（work-sheet.js）
       extra.textContent = m.ok && d.kind === 'displacement' ? `Δ左右 ${fmt(m.dx)} mm · Δ上下 ${fmt(m.dy)} mm` : m.ok ? '' : m.message;
       if (!m.ok) { range.textContent = ''; continue; }
       const r = rangeOf(d);

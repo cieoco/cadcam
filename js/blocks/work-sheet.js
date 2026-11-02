@@ -11,6 +11,7 @@
  */
 import {SHEET_QUERY, nextSheetState, setSheet, sheetState, sheetMode} from './mobile-workspace.js';
 import {S} from './state.js';
+import {dimensionSummaryText} from './dimensions.js';
 import * as View from './view.js';
 
 const $ = id => document.getElementById(id);
@@ -65,7 +66,8 @@ function summary() {
   const dim = $('dimPanel');
   if (shown(dim)) {
     const card = dim.querySelector('.dim-card.sel') || dim.querySelector('.dim-card');
-    const row = card && [card.querySelector('input.dim-name')?.value ?? txt(card.querySelector('b')), txt(card.querySelector('.dim-now'))].filter(Boolean).join(' ');
+    const now = card?.querySelector('.dim-now');
+    const row = card && dimensionSummaryText({name: card.querySelector('input.dim-name')?.value || txt(card.querySelector('b')), value: now?.dataset.value ? Number(now.dataset.value) : null});
     return {text: `📏 量尺：${(dim.classList.contains('stepping') ? txt(dim.querySelector('.dim-note')) : row) || '點「＋ 新量尺」'}`};
   }
   const range = $('workRangeCard');

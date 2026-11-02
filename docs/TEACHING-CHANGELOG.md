@@ -875,3 +875,10 @@
 - 安裝視窗：選項改為「可轉安裝 · 固定環只鎖一顆螺絲」，新增「鎖哪一耳（沿推進方向看）」；選單改為整列寬度避免截字。
 - 教材：teaching-syringe.html 的 5 圖（鎖住的耳在上、空孔在下，轉軸＝螺絲）、表格、3B 步驟（多一步選鎖哪一耳）、小測驗與對照數字（由 syringe-unit-facts 重算）改寫；力臂改用筒身軸線。截圖：重錄 syringe-mount-mode.webp，新增 syringe-pivot-ear.webp。
 - 驗證：test/pivot-clamp.mjs 13 項、syringe-mount-modes、unit-start-examples（新增左右耳）、syringe-unit 18 項；完整回歸見提交說明。物理仍未實測：單螺絲轉軸的墊片或軸套、晃動、筒身擺動空間與干涉。
+
+## 2026-11-02：練習檔黃色提示、播放列短字、量尺摘要（2026.11.2.5）
+
+- 剛打開、尚未改動的練習／挑戰範例（含各單元起始練習檔）解不出時顯示黃色「練習檔：照步驟把零件補上」；第一次可復原的修改或新設計後才是紅色「解不出：檢查孔有沒有接好，或按復原」。純函式在 js/blocks/status-text.js。
+- 手機播放列短字依狀態改成：可播放、待補、待核對、固定結構、解不出、待修正、沒咬合、限制太多；量尺摘要為「名稱：目前 x.x mm」；範例說明裡的舊名稱「現成組件」改為「加入模組」。
+- 教學頁截圖重錄 30 張（含播放列短字的畫面）：first-link-*、member-tools-current、wiper-*、gears-*、chain-*、rack-*、slider-*、gripper-fusion-*／fused-close、bucket-angle、export-project、syringe-readout、h03／h05／h06-mobile；圈選位置由工具重算。assembly-* 與 installation-* 等組立或原本就無法重錄的圖未動。
+

@@ -65,6 +65,7 @@ import * as Panels from './panels.js';   // 編輯面板呈現（讀 S + 寫 DOM
 import * as Tools from './tools.js';     // 工具模式互動（畫桿 / 畫滑軌 / 畫三點桿 / 連桿升級滑軌）
 import * as Input from './input.js?v=20261007_m2b';     // 指標 / 手勢互動（拖曳 + 吸附合併 + pinch 縮放）
 import * as Model from './model.js';
+import { invalidPoseStatus } from './status-text.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints, motionPoseIssue, inspectMotionRange } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
 import { offerExampleFromUrl } from './example-entry.js?v=20261005_unit2';
@@ -210,9 +211,20 @@ function snapshotStr() {
 }
 initCommandUi();
 initClassroomBridge(() => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()), APP_VERSION);
+// 練習檔剛打開、還沒動手改時，解不出是「待補」而不是錯誤；第一次可復原的修改或新設計後才算改過。
+const practice = { id: '', depth: 0, edited: false };
+let practiceBeforeUndo = null;   // 復原時先記下，restoreLesson 回報同一份練習檔時沿用：復原回到載入當時才算沒改過
+function setPractice(example) {
+  const before = practiceBeforeUndo; practiceBeforeUndo = null;
+  practice.id = example && exampleController.isPractice(example.id) ? example.id : '';
+  if (before && practice.id && practice.id === before.id) { practice.depth = before.depth; practice.edited = S.undoStack.length > before.depth; }
+  else { practice.depth = S.undoStack.length; practice.edited = false; }
+  if (example) draw();   // 載入或復原後狀態字才知道這是不是練習檔
+}
 function pushUndo() {
   const s = snapshotStr();
   if (S.undoStack[S.undoStack.length - 1] === s) return; // 沒變就不堆
+  if (practice.id) practice.edited = true;
   S.undoStack.push(s);
   if (S.undoStack.length > 60) S.undoStack.shift();
   updateUndoBtn(true);
@@ -249,6 +261,7 @@ function scheduleAutosave() {
 // 套用一份 snapshot 到目前狀態。recordUndo 預設 true（外部開檔/分享要能 undo）。
 function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external' } = {}) {
   if (recordUndo) pushUndo();
+  if (source === 'undo') practiceBeforeUndo = { ...practice };
   bench.workReplaced?.();
   if (source !== 'undo') { sweepMemberId = null; mateTool.reset(); }
   if (fit && source !== 'undo') setSheet('collapsed');   // 載入新作品：先收合抽屜，置中才用得到最大的看得到的區域
@@ -319,7 +332,8 @@ function normalizeIncomingSnapshot(raw) {
 
 const exampleController = createExampleController({
   applySnapshot, insertModule: id => moduleEditor.insertBuiltin(id), notify: transient, closeExamples: () => document.getElementById('examplesDialog')?.close(),
-  isMobile: () => mobilePrompt(), showBuildPanel: () => setMobilePanel('build', {expandTools:false})
+  isMobile: () => mobilePrompt(), showBuildPanel: () => setMobilePanel('build', {expandTools:false}),
+  onLesson: setPractice
 });
 const populateExamples = () => exampleController.populate();
 const creationPalette=createCreationPalette({cancel:()=>{Tools.exitDrawLink();Tools.exitDrawTriangle();Tools.exitDrawPolygon();cancelMotorMode();draw();}});
@@ -492,6 +506,7 @@ function presetDesignFocus(id) {
 }
 // 「＋ 新設計」：沒有根零件就直接給一張空白畫布；已有根零件要先存成模組。
 function newDesign() {
+  practice.edited = true;
   const hasRootParts = compsInFocus(S.comps, S.modules, ROOT_TAB).length > 0;
   if(!hasRootParts && S.modules.length && S.topo.rootDesignName){pushUndo();S.topo.rootDesignName='';scheduleAutosave();}
   setDesignFocus(ROOT_TAB);   // 先切換（會收掉畫圖工具與橫幅），再顯示提示
@@ -1557,13 +1572,14 @@ function updateMechanismStatus(sol = null) {
   const el = document.getElementById('mechanismStatus');
   if (!el) return;
   if(simulationScope().comps.some(c=>c.type==='syringe')){
-    el.dataset.state=sol?.isValid?'warn':'error';
+    el.dataset.state=sol?.isValid?'warn':'error';el.dataset.chip=sol?.isValid?'verify':'fix';
     el.textContent=sol?.isValid?'液壓幾何可行 · 製作待核對':'液壓姿勢待修正';
     el.title='針筒長度約束求解；干涉、固定與承重未驗證，不代表完整裝配驗證。';return;
   }
   let state = 'idle';
   let text = '尚未建立機構';
   let title = '';
+  let chip = '';   // 播放列短字的細分類（CSS 依 data-chip 換字）
   const mobility = simulationScope().comps.length ? analyzeDof(simulationScope().comps) : null;
   if (simulationScope().comps.length) {
     title = mobility.mobilityOverride
@@ -1571,17 +1587,17 @@ function updateMechanismStatus(sol = null) {
       : `理論自由度：F = ${mobility.dof}（剛體 ${mobility.bodies}、低副 ${mobility.lowerPairs}、高副 ${mobility.higherPairs}）`;
     const unsolvedIds = sol !== null ? unsolvedMovingPoints(simulationScope().comps, sol) : [];   // S3 漏解警示：只算一次
     if (taskApplies(gripperController) && !gripperController.currentPlan().ok) {
-      state = 'error';
+      state = 'error'; chip = 'fix';
       text = '夾爪任務待修正，請查看任務卡';
       title = gripperController.currentPlan().message;
     } else if (gearMeshHasWarning()) {
-      state = 'error';
+      state = 'error'; chip = 'mesh';
       text = '齒輪沒有咬合，請調整位置';
     } else if (sol?.isValid === false && hasDriveSource()) {
-      state = 'error';
-      text = '目前角度無解，可先復原最後一次修改';
+      ({ state, text } = invalidPoseStatus({ fromPractice: !!practice.id, edited: practice.edited }));
+      if (state === 'warn') title = `這份練習檔刻意缺零件，補上後才能動；改壞了可按復原。\n${title}`;
     } else if (mobility.dof < 0) {
-      state = 'error';
+      state = 'error'; chip = 'over';
       text = '接點限制太多，機構可能卡住';
     } else if (mobility.dof === 0) {
       state = 'static';
@@ -1611,12 +1627,13 @@ function updateMechanismStatus(sol = null) {
   }
   const support = validateSupports({comps:simulationScope().comps,modules:simulationScope().modules});
   if (state === 'ready') {
-    state = support.ok ? 'warn' : 'error';
+    state = support.ok ? 'warn' : 'error'; chip = support.ok ? 'verify' : 'fix';
     text = support.ok ? '可模擬 · 製作待核對' : '動力支撐有誤，請至組立查看';
   }
   if(inDesign())title += '\n僅檢查目前設計；組立連接請至組立模式驗證。';
   title += '\n' + support.issues.map(i=>i.message).join('\n');
   el.dataset.state = state;
+  if (chip) el.dataset.chip = chip; else delete el.dataset.chip;
   el.textContent = text;
   el.title = title;
   const feedback = getTeachingFeedback({ comps: simulationScope().comps, sol, compiled: simulationScope().compiled,

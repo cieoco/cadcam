@@ -89,7 +89,7 @@ for (const mode of ['design', 'bench']) {
     ok(JSON.stringify([...r.seen.keys()].sort()) === JSON.stringify(expected), `${label}：看得見的指令 = 清單中該模式的全部指令（${expected.length} 個）`);
     if (mode === 'design') {   // 新增面板：依工作順序分類，預設只展開固定、構件，收合時顯示數量與說明
       const got = r.sections.map(({ id, items }) => ({ id, items }));
-      const want = ADD_SECTIONS.map(sec => ({ id: sec.id, items: COMMANDS.filter(c => c.section === sec.id).map(c => c.id) }));   // 現成組件由模組庫填入，不在指令清單
+      const want = ADD_SECTIONS.map(sec => ({ id: sec.id, items: COMMANDS.filter(c => c.section === sec.id).map(c => c.id) }));   // 加入模組由模組庫填入，不在指令清單
       ok(JSON.stringify(got) === JSON.stringify(want), `${label}：新增面板分類與按鈕順序＝清單（${got.map(x => x.id).join('→')}）`);
       ok(r.sections.every(x => x.open === (x.id === 'common')), `${label}：預設只展開常用零件（連桿、板件、馬達），其餘收合`);
       const sec = id => r.sections.find(x => x.id === id).summary;

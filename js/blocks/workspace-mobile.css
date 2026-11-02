@@ -209,12 +209,19 @@
   }
   .controls .app-status { position:relative; flex:0 0 auto; display:inline-flex; align-items:center; gap:4px; max-width:84px; padding:4px 4px 4px 2px; border:0; border-radius:999px; background:transparent; font-size:0; cursor:pointer; pointer-events:auto; }
   .controls .app-status::before { content:""; flex:0 0 auto; width:10px; height:10px; border-radius:50%; background:#98a6b3; }
-  .controls .app-status::after { content:"尚未建立"; font-size:12px; font-weight:800; color:#60717d; white-space:nowrap; }
+  .controls .app-status::after { content:"未建立"; font-size:12px; font-weight:800; color:#60717d; white-space:nowrap; }
   .controls .app-status[data-state="ready"]::before { background:#2ecc71; }  .controls .app-status[data-state="ready"]::after { content:"可播放"; color:#117a45; }
-  .controls .app-status[data-state="warn"]::before { background:#f1c40f; }   .controls .app-status[data-state="warn"]::after { content:"注意"; color:#8a6500; }
+  .controls .app-status[data-state="warn"]::before { background:#f1c40f; }   .controls .app-status[data-state="warn"]::after { content:"待補"; color:#8a6500; }
+  .controls .app-status[data-state="warn"][data-chip="verify"]::after { content:"待核對"; }
   .controls .app-status[data-state="static"]::after { content:"固定結構"; }
-  .controls .app-status[data-state="error"]::before, .controls .app-status[data-alert]::before { background:#e74c3c; }
-  .controls .app-status[data-state="error"]::after, .controls .app-status[data-alert]::after { content:"需修正"; color:#b33b32; }
+  .controls .app-status[data-state="error"]::before { background:#e74c3c; }
+  .controls .app-status[data-state="error"]::after { content:"解不出"; color:#b33b32; }
+  .controls .app-status[data-state="error"][data-chip="fix"]::after { content:"待修正"; }
+  .controls .app-status[data-state="error"][data-chip="mesh"]::after { content:"沒咬合"; }
+  .controls .app-status[data-state="error"][data-chip="over"]::after { content:"限制太多"; }
+  /* 求解失敗等橫幅錯誤：蓋過各狀態短字 */
+  .controls .app-status[data-alert]::before { background:#e74c3c; }
+  .controls .app-status[data-alert][data-state]::after { content:"需修正"; color:#b33b32; }
   .status-detail { display:block; position:absolute; right:0; bottom:calc(100% + 8px); width:max-content; max-width:min(320px, calc(100vw - 16px)); padding:8px 12px; border:1px solid #d3dce6; border-radius:12px; background:#fff; color:#34495e; font-size:13px; line-height:1.5; white-space:pre-line; box-shadow:0 6px 18px rgba(44,62,80,.2); }
   .status-detail[hidden] { display:none; }
   /* 訊息帶：設計分頁正下方、點擊穿透、幾秒後自己消失；不蓋住畫布中央 */

@@ -7,6 +7,7 @@
 import { BLOCK_EXAMPLES, EXAMPLE_GROUPS, getExample, getExampleLesson, loadUnitStarts } from './examples.js?v=20261005_parallel';
 import { normalizeSnapshot } from './schema.js';
 import { offerExample } from './example-entry.js';
+import { isPracticeLesson } from './status-text.js';
 
 export function createExampleController({ applySnapshot, insertModule, notify, closeExamples = () => {}, isMobile, showBuildPanel, onLesson = () => {} }) {
   let activeExampleId = '';
@@ -107,5 +108,7 @@ export function createExampleController({ applySnapshot, insertModule, notify, c
   // 起始練習檔資料第一次開「範例」才載入，載入後補上清單。
   const openExamples = () => { document.getElementById('examplesDialog').showModal(); loadUnitStarts().then(populate); };
 
-  return { populate, openExamples, load, requestLoad, renderLessonCard, snapshotApplied, restoreLesson, get activeExampleId() { return activeExampleId; } };
+  const isPractice = id => !!id && isPracticeLesson(getExampleLesson(id));
+
+  return { populate, openExamples, isPractice, load, requestLoad, renderLessonCard, snapshotApplied, restoreLesson, get activeExampleId() { return activeExampleId; } };
 }

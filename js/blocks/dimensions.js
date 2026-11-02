@@ -101,6 +101,14 @@ function resolveBaseline(id, comps, points, ground) {
   return q ? (m[1] === 'h' ? {kind: 'h', y: q.y} : {kind: 'v', x: q.x}) : null;
 }
 
+// 量尺摘要（手機抽屜收合列）：「名稱：目前 x.x mm」；量不到顯示「名稱：—」。
+export function dimensionSummaryText({name = '', value} = {}) {
+  const n = String(name ?? '').trim() || '量尺';
+  if (value === null || value === undefined || value === '' || !Number.isFinite(Number(value))) return `${n}：—`;
+  const v = Number(value);
+  return `${n}：目前 ${(Math.abs(v) < 0.05 ? 0 : v).toFixed(1)} mm`;
+}
+
 // ---------- 量測 ----------
 // points：目前（或某個輸入值下）的接點位置表 {id:{x,y}}。回傳 value 與畫圖用的量測線 from→to。
 export function measureDimension(dim, comps = [], params = {}, points = {}, ground) {
