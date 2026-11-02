@@ -865,3 +865,13 @@
 - 頁面上的模擬數字全由 js/blocks/syringe-unit-facts.js 現算（scanSyringe／syringeGain／planSyringeStroke／量尺 dimensionRange），頁面標成 `data-sim`；載入後頁面也會重算並更新，test/syringe-unit.mjs 逐一重算比對。主要數字：H01 擺角約 19.5°；H02 遠孔 10 mm 每推 1 mm 約 0.32°、近孔約 0.09°，近孔約 16.5 mm 折返；H03 夾口 70.9～103.5 mm，推出為張開（H05 變體 82.8→46.6 mm 為推出收攏）；H07／H08 轉盤角約 83.7°，H08 筒身只擺約 1.7°。這個模組不屬於啟動程式。
 - 限制：只有幾何，沒有力、摩擦、水量、漏水與氣泡；10 mL 針筒內徑、管夾孔距、20 mm 行程都是示範尺寸，未實測。
 - 截圖 3 張（media/tutorials/keyshots/syringe-readout.webp、syringe-ruler-gap.webp、syringe-mount-mode.webp，由 tools/capture-tutorial-shots.mjs 產生）：針筒列讀數、量尺量夾口、安裝視窗的連接方式。
+
+## 2026-11-02：可轉安裝改為「同一個固定環只鎖一顆螺絲」（2026.11.2.4）
+
+- 教師更正：可轉安裝不是另一種圓形轉軸座，而是和固定安裝同一個雙耳固定環，只鎖其中一耳的螺絲，那顆螺絲就是轉軸，另一耳不鎖。轉軸離筒身軸線 14 mm（耳距 28 mm 的一半），固定環與筒身一起繞它擺。
+- 模型：`syringeClampShape('pivot')` 與固定式相同；針筒新增 `pivotEar`（+1／−1，預設 +1）。推桿端 B 在筒身軸線上，軸向長度 L = lmin + 伸出量；A–B 距離 = √(L² + 14²)，筒身軸線 = A→B 方向轉 ±atan(14/L)。`expandSyringes`、`validateSyringePose`（殘差與力臂）、`syringeShape`（angle＝軸線角、a＝固定環中心、另附 anchor／pivotEar／lockedFoot）、2D／3D 繪圖（鎖住的耳畫螺絲，另一耳空孔）、組立場景只剩一顆螺絲、底板只開一個孔（SYRINGE_PIVOT）。固定安裝的形狀、孔位與輸出逐位元不變（以 H01／H02／H03／H05／H07 全行程取樣比對雜湊）。
+- 舊存檔：可轉式沒有 `pivotEar` 時補 1，並把 lmin 換成軸向長度，使 √((lmin+伸出量)²+14²) 等於舊的 A–B 距離。
+- H08 重建（pivotEar＝1，lmin＝129.18 mm）：0–20 mm 轉盤角變化 83.2°（H07 為 83.7°），筒身軸線擺約 1.8°。`syringe-pivot-start` 同步；左耳、右耳都能裝並通過 41 點全行程，預設取能動作的那一耳。
+- 安裝視窗：選項改為「可轉安裝 · 固定環只鎖一顆螺絲」，新增「鎖哪一耳（沿推進方向看）」；選單改為整列寬度避免截字。
+- 教材：teaching-syringe.html 的 5 圖（鎖住的耳在上、空孔在下，轉軸＝螺絲）、表格、3B 步驟（多一步選鎖哪一耳）、小測驗與對照數字（由 syringe-unit-facts 重算）改寫；力臂改用筒身軸線。截圖：重錄 syringe-mount-mode.webp，新增 syringe-pivot-ear.webp。
+- 驗證：test/pivot-clamp.mjs 13 項、syringe-mount-modes、unit-start-examples（新增左右耳）、syringe-unit 18 項；完整回歸見提交說明。物理仍未實測：單螺絲轉軸的墊片或軸套、晃動、筒身擺動空間與干涉。

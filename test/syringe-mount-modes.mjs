@@ -17,13 +17,13 @@ const angles=[],holes=[];let previous=solved.points;
 for(const extension of [0,5,10,15,20,15,10,5,0]){
  const r=planSyringeStroke(s.comps,s.params,c.id,extension,previous);assert.ok(r.ok,r.message);previous=r.points;
  const shape=syringeShape(r.comps.find(o=>o.id===c.id),r.comps,s.params,r.points);angles.push(shape.angle);
- assert.equal(shape.fixed,false);assert.equal(shape.pivot,true);assert.equal(shape.clamp.feet.length,1);
+ assert.equal(shape.fixed,false);assert.equal(shape.pivot,true);assert.equal(shape.clamp.feet.length,2,'same two-ear clamp as the fixed mount');assert.equal(shape.lockedFoot,1);
  assert.ok(Math.abs(shape.length-c.spec.lmin-extension)<.001);
  const scene=buildSyringeInstallPreview({...s,comps:r.comps}),item=scene.model.syringes[0];
  assert.equal(item.mount.status,'reference');assert.equal(item.mount.fasteners.length,1);
  assert.ok(Math.abs(item.alignmentMm)<.001,'H08 rod and disk hole are on the same centre plane');
  const part=scene.model.materialParts.find(p=>p.partId===item.mount.fasteners[0].framePartId);
- const hole=part.geometry.holes.find(h=>h.id===`${c.id}_clamp_0`||h.mountIds?.includes(`${c.id}_clamp_0`));holes.push(hole);
+ const lockedId=`${c.id}_clamp_${shape.lockedFoot}`,hole=part.geometry.holes.find(h=>h.id===lockedId||h.mountIds?.includes(lockedId));holes.push(hole);
  assert.ok(part.geometry.holes.filter(h=>Math.hypot(h.x-hole.x,h.y-hole.y)<.001).length===1,'no duplicate cut at pivot');
  if(extension===10){hole.r=1;assert.equal(syringeClampInstallation(scene.model,item,item.z,item.matrix).reason,'mount_hole_diameter');}
 }

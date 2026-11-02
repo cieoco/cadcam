@@ -64,7 +64,7 @@ const EXAMPLE_LESSONS = {
   'hydraulic-h05': {group:'lift-motion',level:'入門液壓',use:'側視組立：升降臂與夾爪各有一支針筒，夾爪模組裝在升降臂工具端隨臂轉；一個動作一個驅動。',try:['切到組立，用「升降針筒」「夾爪針筒」兩個切換鈕分別推','練習順序：先升再夾、先夾再升，記錄夾爪開口與臂角；接觸、承載與水路未驗證']},
   'hydraulic-h06': {group:'lift-motion',level:'進階液壓',use:'由下往上：底座左右轉、中段升降、頂端夾取。升降總成朝上立在水平轉盤上，轉盤轉時整組升降與夾爪跟著轉；三支針筒各管一軸（轉、升降、夾）。',try:['切到組立，用三個切換鈕分別推：轉盤針筒轉整條臂、升降針筒抬臂、夾爪針筒開合','按「動作序列」看預設取放：轉到取物方向→張開→降→夾緊→升→轉到放置方向→放開；3D 針筒為外形參考，固定座與完整干涉未驗證，接觸、承載與水路未驗證']},
   'hydraulic-h07': {group:'lift-motion',level:'入門液壓',use:'俯視：灰色下盤固定針筒，短連桿推橘色上盤的偏心孔，兩片共用中心轉軸。',try:['拖動伸出量，觀察轉盤往返','點圓盤改外徑；外徑改變不會移動孔位','這是幾何示範；管夾孔、層間墊高與實物干涉仍需核對']},
-  'hydraulic-h08': {group:'lift-motion',level:'入門液壓',use:'固定環以單點鉸接到底盤，筒身隨推桿方向擺動，推桿直接接橘色轉盤工作孔。',try:['拖動伸出量，比較 H07 筒身固定與 H08 筒身擺動','針筒設定可調固定環距筒尾，孔位跟隨安裝位置','單點轉軸與筒身夾持為參考配置，實物五金與干涉尚待核對']},
+  'hydraulic-h08': {group:'lift-motion',level:'入門液壓',use:'同一個雙耳固定環只鎖一顆螺絲到底板：這顆螺絲是轉軸，固定環與筒身一起繞它擺動，推桿直接接橘色轉盤工作孔。',try:['拖動伸出量，比較 H07 筒身固定與 H08 筒身擺動','針筒設定可改鎖左耳或右耳，另一耳不鎖、底板只開一個孔','轉軸（耳螺絲）離筒身軸線 14 mm；實物五金與干涉尚待核對']},
   'hydraulic-h03': {group:'lift-motion',level:'入門液壓',use:'固定筒身驅動左右交叉的一體式三點夾臂；末端造形與交叉臂同片、保持剛性。',try:['改針筒伸出量並掃描可用行程','觀察伸出與縮回時夾臂端孔距如何改變；接觸與夾持力未驗證']},
   'hydraulic-h02': {group:'lift-motion',level:'入門液壓',use:'管夾固定筒身，短連桿把直線輸入轉成抬臂擺動。',try:['改針筒伸出量並觀察末端高度','修改前先存檔，再比較安裝孔位的影響']},
   'wiper-single': {group:'challenge',level:'探索',use:'曲柄經浮桿帶動三孔雨刷臂往復擺動。',try:['選浮桿改孔距，再試播比較掃掠範圍']},
@@ -313,7 +313,7 @@ const ALL_BLOCK_EXAMPLES = [
   {id:'hydraulic-h07',title:'H07｜針筒雙圓盤底座',note:'俯視：下盤固定筒身，短連桿推動上盤；0–20 mm 教學行程，實體安裝未驗證。',snapshot:diskTurntableSnapshot},
   {id:'hydraulic-h05',title:'H05｜液壓升降＋夾爪（側視組立）',note:'升降與夾爪各一支針筒，切到組立分別控制；夾爪隨升降臂轉。幾何結果，接觸與承載未驗證。',snapshot:hydraulicLiftGripSnapshot},
   {id:'hydraulic-h06',title:'H06｜液壓三軸手臂',note:'H07 雙圓盤＋直立升降＋夾爪；升降已定位、實體固定待配置。三支針筒各管一軸；切到組立分別控制或排動作序列。幾何結果，接觸與承載未驗證。',snapshot:hydraulicArmSnapshot},
-  {id:'hydraulic-h08',title:'H08｜單點可轉針筒底座',note:'俯視：固定環繞單點轉動，推桿直接帶動圓盤；固定環與筒身夾牢，轉軸及加工尺寸未實測。',snapshot:pivotTurntableSnapshot},
+  {id:'hydraulic-h08',title:'H08｜單螺絲可轉針筒底座',note:'俯視：同一個雙耳固定環只鎖一顆螺絲當轉軸，固定環與筒身一起繞它擺動，推桿直接帶動圓盤；加工尺寸未實測。',snapshot:pivotTurntableSnapshot},
   wiperExample(false),
   wiperExample(true),
   {

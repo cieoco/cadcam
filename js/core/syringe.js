@@ -3,6 +3,17 @@
 export const SYRINGE_DEMO = Object.freeze({name:'10mL 教學示範（未校正）',capacityMl:10,outerDiameter:16,bodyLength:70,rodDiameter:6,lmin:95,stroke:40,calibrated:false});
 export const SYRINGE_TOLERANCE_MM = 0.001;
 export const hasSyringeClamp=c=>c?.mountMode==='fixed-axis'||c?.mountMode==='pivot';
+// 可轉安裝＝同一個雙耳固定環，只鎖其中一顆耳螺絲當轉軸；螺絲離筒身軸線一個耳距（28 mm 孔距的一半）。
+export const SYRINGE_EAR_MM=14;
+export const syringePivotEar=c=>c?.pivotEar===-1?-1:1;
+// 針筒作用長度（推桿端點到固定環中心的軸向距離）→ 實際 A–B 拘束距離。
+export const syringeLinkLength=c=>{const L=c.spec.lmin+c.extension;return c.mountMode==='pivot'?Math.hypot(L,SYRINGE_EAR_MM):L;};
+// 由已鎖耳螺絲 a 與推桿端點 b 還原筒身軸線：b 在軸線上，a 偏離軸線 14 mm。
+export function syringePivotFrame(a,b,ear){
+  const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy),L=Math.sqrt(Math.max(0,d*d-SYRINGE_EAR_MM*SYRINGE_EAR_MM));
+  const angle=Math.atan2(dy,dx)+ear*Math.atan2(SYRINGE_EAR_MM,L),nx=-Math.sin(angle),ny=Math.cos(angle);
+  return {angle,length:L,center:{x:a.x-SYRINGE_EAR_MM*ear*nx,y:a.y-SYRINGE_EAR_MM*ear*ny}};
+}
 export const syringeBarrelOffset=c=>c.installation?.barrelOffsetMm ?? c.spec.bodyLength*.7;
 // A shared node can be declared fixed by another member. Drawing a new bar
 // reuses its ID with a floating local copy; match compileTopology's node roles.
@@ -14,9 +25,11 @@ export function normalizeSyringe(c) {
   const finite=(n,f)=>Number.isFinite(Number(n))?Number(n):f;
   let restored=false;
   for(const k of ['capacityMl','outerDiameter','bodyLength','rodDiameter','lmin','stroke']){spec[k]=finite(c.spec?.[k],SYRINGE_DEMO[k]);if(!Number.isFinite(c.spec?.[k]))restored=true;}
+  // 舊存檔的可轉安裝沒有 pivotEar：當時 lmin 是 A–B 距離，改成軸向長度，讓 √((lmin+ext)²+14²) 仍等於舊距離。
+  if(c.mountMode==='pivot'&&c.pivotEar!==1&&c.pivotEar!==-1){const total=spec.lmin+finite(c.extension,0);spec.lmin=Math.sqrt(Math.max(0,total*total-SYRINGE_EAR_MM*SYRINGE_EAR_MM))-finite(c.extension,0);}
   spec.name=String(c.spec?.name || spec.name).slice(0,80);spec.calibrated=c.spec?.calibrated===true&&!restored;
   const endpoint=r=>({componentId:String(r?.componentId || ''),u:finite(r?.u,0),v:finite(r?.v,0)});
-  return {type:'syringe',id:String(c.id),color:'#0891b2',...(c.mountMode==='fixed-axis'?{mountMode:'fixed-axis',axisDeg:finite(c.axisDeg,NaN),appearance:'flat-rod',outputId:String(c.outputId||''),...(Array.isArray(c.jawIds)?{jawIds:c.jawIds.slice(0,2).map(String)}:{}),...(Array.isArray(c.passiveTips)?{passiveTips:c.passiveTips.slice(0,2).map(t=>({hostId:String(t.hostId||''),length:finite(t.length,NaN),angleDeg:finite(t.angleDeg,NaN)}))}:{})}:c.mountMode==='pivot'?{mountMode:'pivot',appearance:'flat-rod'}:{}),...(hasSyringeClamp(c)&&c.installation?{installation:{face:c.installation.face==='back'?'back':'front',spacerMm:c.installation.spacerMm===null||c.installation.spacerMm===undefined?null:Math.max(0,Math.min(100,finite(c.installation.spacerMm,0))),...(c.installation.barrelOffsetMm!==undefined?{barrelOffsetMm:finite(c.installation.barrelOffsetMm,NaN)}:{})}}:{}),a:endpoint(c.a),b:endpoint(c.b),spec,extension:finite(c.extension,0),branch:c.branch===-1?-1:1};
+  return {type:'syringe',id:String(c.id),color:'#0891b2',...(c.mountMode==='fixed-axis'?{mountMode:'fixed-axis',axisDeg:finite(c.axisDeg,NaN),appearance:'flat-rod',outputId:String(c.outputId||''),...(Array.isArray(c.jawIds)?{jawIds:c.jawIds.slice(0,2).map(String)}:{}),...(Array.isArray(c.passiveTips)?{passiveTips:c.passiveTips.slice(0,2).map(t=>({hostId:String(t.hostId||''),length:finite(t.length,NaN),angleDeg:finite(t.angleDeg,NaN)}))}:{})}:c.mountMode==='pivot'?{mountMode:'pivot',appearance:'flat-rod',pivotEar:syringePivotEar(c)}:{}),...(hasSyringeClamp(c)&&c.installation?{installation:{face:c.installation.face==='back'?'back':'front',spacerMm:c.installation.spacerMm===null||c.installation.spacerMm===undefined?null:Math.max(0,Math.min(100,finite(c.installation.spacerMm,0))),...(c.installation.barrelOffsetMm!==undefined?{barrelOffsetMm:finite(c.installation.barrelOffsetMm,NaN)}:{})}}:{}),a:endpoint(c.a),b:endpoint(c.b),spec,extension:finite(c.extension,0),branch:c.branch===-1?-1:1};
 }
 // Length edits preserve attachments at the second end hole. Interior mounts keep
 // their measured offset; never stretch a clamp position or infer a broken joint.
@@ -114,7 +127,7 @@ export function expandSyringes(comps,params) {
       continue;
     }
     if(ends.every(Boolean)){
-      const lenParam=`${c.id}_length`;values[lenParam]=c.spec.lmin+c.extension;
+      const lenParam=`${c.id}_length`;values[lenParam]=syringeLinkLength(c);
       output.push({id:c.id,type:'bar',p1:ends[0],p2:ends[1],lenParam,hidden:true,fixedLen:true,...(c.moduleId?{moduleId:c.moduleId}:{})});
     }
   }
@@ -126,7 +139,7 @@ export function validateSyringePose(comps,params,points) {
     issues.push(...syringeIssues(c,comps,params));
     const a=attachmentPoint(c.a,comps,params,points),b=attachmentPoint(c.b,comps,params,points);
     if(!a||!b){issues.push('針筒安裝點缺失。');continue;}
-    residual=Math.max(residual,Math.abs(Math.hypot(a.x-b.x,a.y-b.y)-c.spec.lmin-c.extension));
+    residual=Math.max(residual,Math.abs(Math.hypot(a.x-b.x,a.y-b.y)-syringeLinkLength(c)));
     if(c.mountMode==='fixed-axis'){
       const angle=c.axisDeg*Math.PI/180,L=c.spec.lmin+c.extension;
       residual=Math.max(residual,Math.hypot(b.x-a.x-Math.cos(angle)*L,b.y-a.y-Math.sin(angle)*L));
@@ -136,7 +149,7 @@ export function validateSyringePose(comps,params,points) {
     }
     const owner=comps.find(o=>o.id===c.b.componentId),fixed=fixedSyringePointIds(comps);
     const pivot=c.mountMode==='pivot'?[owner?.p1,owner?.p2].find(p=>fixed.has(p?.id)):owner?.p1,o=points?.[pivot?.id];
-    if(o){const length=Math.hypot(b.x-a.x,b.y-a.y),lever=Math.abs((b.x-a.x)*(o.y-a.y)-(b.y-a.y)*(o.x-a.x))/length;
+    if(o){const axis=c.mountMode==='pivot'?syringePivotFrame(a,b,syringePivotEar(c)):null,ux=axis?Math.cos(axis.angle):b.x-a.x,uy=axis?Math.sin(axis.angle):b.y-a.y,ref=axis?b:a,length=axis?1:Math.hypot(ux,uy),lever=Math.abs(ux*(o.y-ref.y)-uy*(o.x-ref.x))/length;
       if(lever<0.5)issues.push('針筒推力作用線接近通過關節中心，請避開奇異姿勢。');}
   }
   if(residual>SYRINGE_TOLERANCE_MM)issues.push('目前輸入無法形成有效組裝姿勢，安裝孔距不符合針筒長度。');

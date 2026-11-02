@@ -6,7 +6,8 @@ import {getExample} from './examples.js';
 import {normalizeSnapshot} from './schema.js';
 import {scanSyringe,syringeGain,planSyringeStroke,solveSyringe} from './syringe-operations.js';
 import {dimensionRange} from './dimensions.js';
-import {attachmentPoint,fixedSyringePointIds} from '../core/syringe.js';
+import {fixedSyringePointIds} from '../core/syringe.js';
+import {syringeShape} from './syringe-shape.js';
 
 const RAD_TO_DEG=180/Math.PI;
 const load=id=>{
@@ -39,12 +40,13 @@ const gainAt=(s,e,params=s.params)=>{
   return g;
 };
 // 力臂：輸出件固定軸心，到「力的作用線」的垂直距離。
-// 固定安裝：力沿短連桿傳（兩端孔連線）；可轉安裝：推桿直接推，力沿筒身（A、B 連線）。
+// 固定安裝：力沿短連桿傳（兩端孔連線）；可轉安裝：推桿直接推，力沿筒身軸線（過推桿孔 B，離鎖住的耳螺絲 14 mm）。
 function leverAt(s,e,params=s.params){
   const st=stateAt(s,e,params),c=syringeOf({comps:st.comps}),fixed=fixedSyringePointIds(st.comps);
   let from,to,outputId=c.outputId;
   if(c.mountMode==='pivot'){
-    from=attachmentPoint(c.a,st.comps,params,st.points);to=attachmentPoint(c.b,st.comps,params,st.points);outputId=c.b.componentId;
+    const shape=syringeShape(c,st.comps,params,st.points);
+    from=shape.b;to={x:shape.b.x+Math.cos(shape.angle),y:shape.b.y+Math.sin(shape.angle)};outputId=c.b.componentId;
   }else{
     const link=st.comps.find(o=>o.id===c.b.componentId);
     from=st.points[link.p1.id];to=st.points[link.p2.id];
@@ -53,17 +55,18 @@ function leverAt(s,e,params=s.params){
   const dx=to.x-from.x,dy=to.y-from.y;
   return Math.abs(dx*(o.y-from.y)-dy*(o.x-from.x))/Math.hypot(dx,dy);
 }
-// 筒身（A→B）在整個行程中擺過的角度範圍（最大減最小）：固定安裝為 0；可轉安裝筒身會跟著擺。
+// 筒身軸線在整個行程中擺過的角度範圍（最大減最小）：固定安裝為 0；可轉安裝筒身會繞耳螺絲跟著擺。
 function barrelSwing(s){
   const c=syringeOf(s),n=Math.round(c.spec.stroke/0.5),angles=[];
   let previous=need(solveSyringe(s.comps,s.params),'求解初始姿勢').points;
   for(let i=0;i<=n;i++){
     const r=need(planSyringeStroke(s.comps,s.params,c.id,i*0.5,previous),`伸出 ${i*0.5} mm`);
     previous=r.points;
-    const q=r.comps.find(o=>o.id===c.id),a=attachmentPoint(q.a,r.comps,s.params,previous),b=attachmentPoint(q.b,r.comps,s.params,previous);
-    angles.push(Math.atan2(b.y-a.y,b.x-a.x)*RAD_TO_DEG);
+    const q=r.comps.find(o=>o.id===c.id);
+    angles.push(syringeShape(q,r.comps,s.params,previous).angle*RAD_TO_DEG);
   }
-  return Math.max(...angles.map(x=>turn(angles[0],x)));
+  const rel=angles.map(x=>((x-angles[0]+540)%360+360)%360-180);   // 相對起點的帶號角度
+  return Math.max(...rel)-Math.min(...rel);
 }
 // H02「近孔」＝驅動孔改為 145.892 mm，臂端距主軸 250 mm 不變（課文的比較條件）。
 const h02Params=(s,hole)=>({...s.params,H2Arm:hole,H2Tail:s.params.H2Reach-hole});

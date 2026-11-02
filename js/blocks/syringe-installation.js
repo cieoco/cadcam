@@ -22,20 +22,25 @@ export function planSyringeInstallation(source,request,points=null,motion={}){
  if(changed){
   // Calibrate at the original pose once; changing the trial extension must
   // not subtract the same value from Lmin and freeze the output in place.
-  const placed=(mode==='pivot'?placePivotSyringe:placeFixedSyringe)(comps,params,points,a,b,{extension:old?.extension ?? 10});
+  const placed=(mode==='pivot'?placePivotSyringe:placeFixedSyringe)(comps,params,points,a,b,{extension:old?.extension ?? 10,pivotEar:request.pivotEar ?? old?.pivotEar});
   if(!placed.ok)return placed;
   next=old?{...next,a:placed.syringe.a,b:placed.syringe.b,axisDeg:placed.syringe.axisDeg,outputId:placed.syringe.outputId,
-   spec:{...next.spec,lmin:placed.syringe.spec.lmin,calibrated:false}}:placed.syringe;
+   ...(mode==='pivot'?{pivotEar:placed.syringe.pivotEar}:{}),spec:{...next.spec,lmin:placed.syringe.spec.lmin,calibrated:false}}:placed.syringe;
  }
  next.mountMode=mode;
- if(mode==='pivot'){delete next.axisDeg;delete next.outputId;delete next.jawIds;delete next.passiveTips;}
+ if(mode==='pivot'){delete next.axisDeg;delete next.outputId;delete next.jawIds;delete next.passiveTips;next.pivotEar=(request.pivotEar ?? next.pivotEar)===-1?-1:1;}else delete next.pivotEar;
  if(!old&&request.newId)next.id=request.newId;
  if(!old){const moduleId=comps.find(c=>c.id===a.componentId)?.moduleId;if(moduleId)next.moduleId=moduleId;}
  next.extension=extension;next.installation={face,spacerMm,...(old?.installation?.barrelOffsetMm!==undefined?{barrelOffsetMm:old.installation.barrelOffsetMm}:{}),...(request.barrelOffsetMm!==undefined?{barrelOffsetMm:request.barrelOffsetMm}:{})};
  if(request.spec)next.spec={...next.spec,...request.spec,calibrated:false};
  if(mode==='fixed-axis'&&request.axisDeg!==undefined)next.axisDeg=request.axisDeg;
  const index=comps.findIndex(c=>c.id===next.id);if(index<0)comps.push(next);else comps[index]=next;
- const result=solveSyringe(comps,params,points,motion);
+ let result=solveSyringe(comps,params,points,motion);
+ // 沒指定鎖哪一耳時，預設取能解出完整行程的那一耳。
+ if(mode==='pivot'&&request.pivotEar===undefined&&!result.ok){
+  const other={...next,pivotEar:-next.pivotEar},alt=comps.map(c=>c.id===next.id?other:c),retry=solveSyringe(alt,params,points,motion);
+  if(retry.ok){comps.splice(0,comps.length,...alt);next=other;result=retry;}
+ }
  return {...result,comps,params,syringe:next};
 }
 

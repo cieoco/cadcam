@@ -16,7 +16,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  const base=structuredClone(source),choices=installationChoices(base.comps,base.params);
  let step=existing&&source.comps.some(c=>c.id===existing.id)?3:0,furthest=step,result=null,closed=false,revision=0,viewer=null,sceneTimer=null,preview3d=false,dragging=false;
  const request={id:existing&&base.comps.some(c=>c.id===existing.id)?existing.id:null,newId:newId || existing?.id,
-  mountMode:existing?.mountMode==='pivot'?'pivot':'fixed-axis',
+  mountMode:existing?.mountMode==='pivot'?'pivot':'fixed-axis',pivotEar:existing?.mountMode==='pivot'?existing.pivotEar:undefined,
   a:existing?.a?{...existing.a}:null,b:existing?.b?{...existing.b}:null,face:existing?.installation?.face || 'front',spacerMm:existing?.installation?.spacerMm ?? null,extension:existing?.extension ?? 10,position:existing?attachmentPoint(existing.a,base.comps,base.params,points):null,axisDeg:existing?.axisDeg ?? 0,frameId:existing?.a?.componentId || ''};
  // A canvas-picked candidate retains its custom specification before insertion.
  if(existing&&!request.id){base.comps.push(structuredClone(existing));request.id=existing.id;}
@@ -41,8 +41,11 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  const panels=names.map((name,i)=>{const p=el('section',null,body);el('h3',`${i+1} · ${name}`,p);return p;});
  const field=(p,text,type='select')=>{const label=el('label',text,p),n=el(type,null,label);n.setAttribute('aria-label',text);if(type==='input'){n.type='number';n.step='0.1';}return n;};
  const option=(s,text,value)=>{const o=el('option',text,s);o.value=value;};
- const mode=field(body,'固定環與底板的連接');option(mode,'固定安裝 · 雙孔鎖固','fixed-axis');option(mode,'可轉安裝 · 單點鉸接','pivot');
+ const mode=field(body,'固定環與底板的連接');option(mode,'固定安裝 · 雙孔鎖固','fixed-axis');option(mode,'可轉安裝 · 固定環只鎖一顆螺絲','pivot');
  const modeHint=el('p','',body);body.prepend(mode.parentElement,modeHint);
+ // 可轉安裝：同一個雙耳固定環，只鎖一耳。沿推進方向（固定環往推桿）看，+1 是左耳、-1 是右耳。
+ const ear=field(body,'鎖哪一耳（沿推進方向看）');option(ear,'鎖左耳 · 另一耳（右）不鎖','1');option(ear,'鎖右耳 · 另一耳（左）不鎖','-1');modeHint.after(ear.parentElement);mode.parentElement.classList.add('wide');ear.parentElement.classList.add('wide');
+ ear.onchange=()=>{request.pivotEar=Number(ear.value)===-1?-1:1;preview3d=false;changed();update();};
  mode.value=request.mountMode;mode.onchange=()=>{request.mountMode=mode.value;preview3d=false;changed();update();};
  el('p','先選針筒的固定機架，可點預覽中的零件或使用清單；下一步再放針筒、調位置與角度。',panels[0]);
  const positionHint=el('p','',panels[1]);
@@ -58,7 +61,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  const snap=el('button','移到所選機架',panels[1]);
  const faceRow=el('div',null,panels[0]);faceRow.className='install-faces';
  const faces=['front','back'].map((face,i)=>{const b=el('button',i?'背面':'正面',faceRow);b.onclick=()=>{request.face=face;update();};return b;});
- el('p','筒身與固定環夾牢，固定環再接到所選固定機架。雙孔參考孔距 28 mm，單點使用一個轉軸孔；孔徑與實際夾持方式仍需核對。活動承載零件尚未支援。',panels[0]);
+ el('p','筒身與固定環夾牢，固定環再接到所選固定機架。雙耳參考孔距 28 mm；可轉安裝同一個固定環只鎖一耳當轉軸、另一耳不鎖；孔徑與實際夾持方式仍需核對。活動承載零件尚未支援。',panels[0]);
  const rod=field(panels[2],'推桿接哪個零件？');option(rod,'請選活動連桿／圓盤','');choices.rods.forEach(c=>option(rod,labelOf(c),c.id));rod.value=request.b?.componentId || '';
  const end=field(panels[2],'連接端孔');option(end,'第一孔','0');option(end,'第二孔','1');
  end.value=request.b?.u>0?'1':'0';
@@ -72,9 +75,9 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  const advanced=el('details',null,panels[3]);el('summary','進階：針筒規格與軸向',advanced);
  const offset=field(advanced,'固定環距筒尾 (mm)','input');offset.min=6;
  offset.onchange=()=>{request.barrelOffsetMm=readNumber(offset);changed();update();};
- el('p','筒身與固定環保持夾牢；此距離調整筒身穿過固定環的位置，不改 A–B 安裝距離。止滑、夾緊方式與單點轉軸五金尚待實物核對。',advanced);
+ el('p','筒身與固定環保持夾牢；此距離調整筒身穿過固定環的位置，不改 A–B 安裝距離。止滑、夾緊方式與單螺絲轉軸五金尚待實物核對。',advanced);
  const advancedFields={};
- for(const [key,text] of [['outerDiameter','筒身外徑 (mm)'],['bodyLength','筒身長度 (mm)'],['rodDiameter','推桿寬度 (mm)'],['lmin','最短安裝距離 (mm)'],['stroke','有效行程 (mm)'],['axisDeg','固定軸向 (°)']]){
+ for(const [key,text] of [['outerDiameter','筒身外徑 (mm)'],['bodyLength','筒身長度 (mm)'],['rodDiameter','推桿寬度 (mm)'],['lmin','最短安裝距離（沿筒身軸，mm）'],['stroke','有效行程 (mm)'],['axisDeg','固定軸向 (°)']]){
   const input=field(advanced,text,'input');advancedFields[key]=input;
   if(key==='axisDeg')signedNumberInput(input);
   input.onchange=()=>{const value=readNumber(input);if(key==='axisDeg')request.axisDeg=value;else request.spec={...request.spec,[key]:value};changed();update();};
@@ -152,7 +155,9 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   const rear=request.barrelOffsetMm ?? existing?.installation?.barrelOffsetMm ?? bodyLength*.7;
   line(A,tip,request.spec?.rodDiameter ?? existing?.spec.rodDiameter ?? 8,'#a89f92');line(at(-rear),at(bodyLength-rear),diameter,request.position?'#b4d6d0':'#d7e5e4');
   if(step===3&&shape){const side={x:-Math.sin(theta)*14,y:Math.cos(theta)*14};line({x:A.x-side.x,y:A.y-side.y},{x:A.x+side.x,y:A.y+side.y},8,'#647574');
-   if(shape.pivot)draw('circle',{cx:A.x,cy:-A.y,r:4,fill:'white',stroke:'#0e7490','stroke-width':2});}
+   if(shape.pivot){const nx=-Math.sin(theta),ny=Math.cos(theta),s=shape.pivotEar,free={x:shape.anchor.x-28*s*nx,y:shape.anchor.y-28*s*ny};
+    draw('circle',{cx:free.x,cy:-free.y,r:3.5,fill:'white',stroke:'#64748b','stroke-width':1,'stroke-dasharray':'2 2'});
+    draw('circle',{cx:shape.anchor.x,cy:-shape.anchor.y,r:4.5,fill:'#0e7490',stroke:'white','stroke-width':1.5});}}
   if(firstMember)for(const node of [...svg.childNodes].slice(actuatorStart))svg.insertBefore(node,firstMember);
   if(step===2&&request.b){const c=cs.find(c=>c.id===request.b.componentId);if(c){const mid={x:(pos(c.p1).x+pos(c.p2).x)/2,y:(pos(c.p1).y+pos(c.p2).y)/2};const label=draw('text',{x:mid.x,y:-mid.y-7,'font-size':8,fill:'#0369a1',stroke:'white','stroke-width':2,'paint-order':'stroke','text-anchor':'middle'});label.textContent=labelOf(c);}}
   const dot=(p,color,data)=>{draw('circle',{cx:p.x,cy:-p.y,r:6,fill:color,stroke:'white','stroke-width':2});draw('circle',{cx:p.x,cy:-p.y,r:14,fill:'transparent',[data]:'true'});};
@@ -192,7 +197,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
    if(!s){mountStatus.textContent='安裝材料未能建立，請回工作區核對機架。';return;}
    const f=s.mount?.fasteners?.[0];
    const reasons={missing_frame_holes:'此機架尚無配對孔，需另外設計固定座',frame_alignment:'固定孔未對齊',barrel_clearance:'套筒太短，筒身會碰到機架',clamp_diameter:'筒身超出參考管夾內徑',mount_hole_diameter:'固定孔小於參考 M3 軸／螺絲直徑'};
-   mountStatus.textContent=(f?`${request.mountMode==='pivot'?'單點轉軸參考':'雙孔鎖固參考'} · ${request.face==='back'?'背面':'正面'} · 套筒 ${f.spacerHeight.toFixed(1)} mm。`:reasons[s.mount?.reason] || '固定座待核對。')+(s.alignmentMm===null?' 推桿高度未驗證。':Math.abs(s.alignmentMm)>.1?` 推桿與連接件差 ${Math.abs(s.alignmentMm).toFixed(1)} mm，請調整套筒或連接件疊放層。`:' 推桿與連接件中心層已對齊。');
+   mountStatus.textContent=(f?`${request.mountMode==='pivot'?'單螺絲轉軸參考（只鎖一顆 M3，另一耳不鎖）':'雙孔鎖固參考'} · ${request.face==='back'?'背面':'正面'} · 套筒 ${f.spacerHeight.toFixed(1)} mm。`:reasons[s.mount?.reason] || '固定座待核對。')+(s.alignmentMm===null?' 推桿高度未驗證。':Math.abs(s.alignmentMm)>.1?` 推桿與連接件差 ${Math.abs(s.alignmentMm).toFixed(1)} mm，請調整套筒或連接件疊放層。`:' 推桿與連接件中心層已對齊。');
    if(preview3d){if(!viewer){const {createViewer}=await import('../blocks3d/viewer.js');if(closed||token!==revision)return;viewer=createViewer(space);}viewer.update(out.model);}
   }catch(e){if(!closed&&token===revision)mountStatus.textContent=`安裝預覽未完成：${e.message}`;}
  }
@@ -202,9 +207,10 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   panels.forEach((p,i)=>p.hidden=quick?i!==3:i!==step);tabs.forEach((b,i)=>{b.disabled=i>furthest;b.setAttribute('aria-current',i===step?'step':'false');});
   panels[3].querySelector('h3').hidden=quick;
   const pivot=request.mountMode==='pivot';
-  modeHint.textContent=pivot?'固定環與筒身一起繞單點轉動；推桿直接接輸出件活動孔，方向由機構決定。':'固定環用雙孔鎖住，筒身方向不變；推桿經短連桿帶動輸出件。';
+  modeHint.textContent=pivot?'同一個雙耳固定環，只鎖一顆耳螺絲當轉軸；固定環與筒身一起繞它轉，另一耳不鎖。推桿直接接輸出件活動孔，方向由機構決定。':'固定環用雙孔鎖住，筒身方向不變；推桿經短連桿帶動輸出件。';
+  ear.closest('label').hidden=!pivot;ear.value=String(result?.ok&&result.syringe?.pivotEar===-1||request.pivotEar===-1&&!(result?.ok)?-1:1);
   angle.disabled=pivot;angle.closest('label').hidden=pivot;directionRow.hidden=directionHint.hidden=pivot;advancedFields.axisDeg.closest('label').hidden=pivot;
-  positionHint.textContent=pivot?'在所選機架上點一下放置轉軸，拖藍點移動；筒身方向由連接孔與伸出量決定。':'在所選機架上點一下放針筒，拖藍點移動、拖橘點旋轉。選機架只設定基準，不會代替你決定角度。';
+  positionHint.textContent=pivot?'在所選機架上點一下放置鎖住的那顆耳螺絲（轉軸），拖藍點移動；筒身離轉軸 14 mm，方向由連接孔與伸出量決定。':'在所選機架上點一下放針筒，拖藍點移動、拖橘點旋轉。選機架只設定基準，不會代替你決定角度。';
   offset.max=(request.spec?.bodyLength ?? existing?.spec.bodyLength ?? 72)-6;
   if(document.activeElement!==offset)showNumber(offset,request.barrelOffsetMm ?? existing?.installation?.barrelOffsetMm ?? (request.spec?.bodyLength ?? existing?.spec.bodyLength ?? 72)*.7);
   reselect.hidden=quickStage!=='ready';

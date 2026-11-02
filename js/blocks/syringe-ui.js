@@ -145,10 +145,11 @@ export function createSyringeUI(h){
       const a=attachmentPoint(c.a,h.comps(),params(),points),b=attachmentPoint(c.b,h.comps(),params(),points);if(!a||!b)continue;
       const g=document.createElementNS(ns,'g');g.setAttribute('data-syringe',c.id);h.svg.append(g);
       const node=(tag,attrs)=>{const n=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v));g.append(n);return n;};
-      const length=Math.hypot(b.x-a.x,b.y-a.y),dx=(b.x-a.x)/length,dy=(b.y-a.y)/length;
-      const at=(x,y=0)=>({x:a.x+dx*x-dy*y,y:a.y+dy*x+dx*y});
-      const line=(from,to,width,color)=>node('line',{x1:View.TX(from.x),y1:View.TY(from.y),x2:View.TX(to.x),y2:View.TY(to.y),'stroke-width':width*View.getScale(),stroke:color,'stroke-linecap':'round'});
       const shape=syringeShape(c,h.comps(),params(),points);
+      // 可轉安裝：筒身軸線不經過鎖住的耳螺絲 a，以固定環中心 shape.a 與軸向為準。
+      const origin=shape.pivot?shape.a:a,length=shape.pivot?shape.length:Math.hypot(b.x-a.x,b.y-a.y),dx=shape.pivot?Math.cos(shape.angle):(b.x-a.x)/length,dy=shape.pivot?Math.sin(shape.angle):(b.y-a.y)/length;
+      const at=(x,y=0)=>({x:origin.x+dx*x-dy*y,y:origin.y+dy*x+dx*y});
+      const line=(from,to,width,color)=>node('line',{x1:View.TX(from.x),y1:View.TY(from.y),x2:View.TX(to.x),y2:View.TY(to.y),'stroke-width':width*View.getScale(),stroke:color,'stroke-linecap':'round'});
       line(at(shape.start-8),at(shape.start),3,'#e5ded0');
       line(at(shape.end),b,c.spec.rodDiameter,'#a89f92');
       line(at(shape.start),at(shape.end),c.spec.outerDiameter,'#d6e9e5');
@@ -156,20 +157,23 @@ export function createSyringeUI(h){
       line(at(length-12),b,10,'#b3ab9f');
       if(shape.clamp){
         const clamp=shape.clamp;
-        const supported=frameConnectorNodes(h.comps()).some(n=>n.id===`${c.id}_clamp_0`);
+        const nodes=frameConnectorNodes(h.comps());
+        // 可轉安裝：鎖住的那一耳一定畫螺絲（它就是轉軸，syringeIssues 已要求接在固定機架）；另一耳是空孔。
+        const supportedAt=i=>shape.pivot?i===shape.lockedFoot:nodes.some(n=>n.id===`${c.id}_clamp_0`);
         const polygon=(pts,fill)=>node('polygon',{points:pts.map(p=>{const q=at(p.x,p.y);return `${View.TX(q.x)},${View.TY(q.y)}`;}).join(' '),fill,stroke:'#475569','stroke-width':.5*View.getScale()});
-        for(const foot of clamp.feet){
+        clamp.feet.forEach((foot,i)=>{
+          const supported=supportedAt(i);
           polygon(foot.outline,'#859391');
           const q=at(foot.hole.x,foot.hole.y);node('circle',{cx:View.TX(q.x),cy:View.TY(q.y),r:(supported?3.25:foot.hole.r)*View.getScale(),fill:supported?'#bdc7d0':'white',stroke:'#475569'});
           if(supported){
             polygon(Array.from({length:6},(_,i)=>({x:foot.hole.x+2.75*Math.cos(i*Math.PI/3),y:foot.hole.y+2.75*Math.sin(i*Math.PI/3)})),'#475569');
             line(at(foot.hole.x-1.4,foot.hole.y),at(foot.hole.x+1.4,foot.hole.y),.5,'#e2e8f0');
+            if(shape.pivot)node('circle',{cx:View.TX(q.x),cy:View.TY(q.y),r:5.2*View.getScale(),fill:'none',stroke:'#0e7490','stroke-width':1.5});
           }
-        }
+        });
         const half=clamp.width/2,outer=clamp.innerRadius+clamp.thickness;
         polygon([{x:-half,y:-outer},{x:half,y:-outer},{x:half,y:outer},{x:-half,y:outer}],'#6b7b7a');
         for(const v of [-clamp.innerRadius,clamp.innerRadius])node('line',{x1:View.TX(at(-half,v).x),y1:View.TY(at(-half,v).y),x2:View.TX(at(half,v).x),y2:View.TY(at(half,v).y),stroke:'#c5cfcb','stroke-width':.5*View.getScale()});
-        if(shape.pivot)node('circle',{cx:View.TX(a.x),cy:View.TY(a.y),r:3*View.getScale(),fill:'white',stroke:'#0e7490','stroke-width':1.5});
         node('circle',{cx:View.TX(b.x),cy:View.TY(b.y),r:1.7*View.getScale(),fill:'white',stroke:'#475569'});
       }
       for(const [key,p] of [['a',a],['b',b]]){
@@ -217,7 +221,7 @@ export function createSyringeUI(h){
     h.pause();const c=clone(candidate||active());if(!c)return;
     const dialog=el('dialog');dialog.id='syringeDialog';dialog.className='syringe-dialog';const form=el('form',null,dialog);
     el('h3',candidate&&!h.comps().some(o=>o.id===candidate.id)?'新增 10cc 液壓針筒':'針筒與安裝設定',form);
-    el('p',c.mountMode==='fixed-axis'?'管夾固定筒身；A 為固定參考點，B 為片狀推桿孔。軸向固定，接孔保留轉動。':'mm；A 為筒身托架轉軸，B 為推桿轉接座。孔位沿所屬零件第 1 孔→第 2 孔量測。',form);
+    el('p',c.mountMode==='fixed-axis'?'管夾固定筒身；A 為固定參考點，B 為片狀推桿孔。軸向固定，接孔保留轉動。':c.mountMode==='pivot'?'同一個雙耳固定環只鎖一顆耳螺絲：A 為這顆螺絲（轉軸），離筒身軸線 14 mm；B 為推桿孔，在筒身軸線上。':'mm；A 為筒身托架轉軸，B 為推桿轉接座。孔位沿所屬零件第 1 孔→第 2 孔量測。',form);
     if(c.mountMode==='fixed-axis')el('p',frameConnectorNodes(h.comps()).some(n=>n.id===`${c.id}_clamp_0`)
       ?'雙耳水管固定夾：機架配對孔距 28 mm、孔徑 3.5 mm；M3 螺絲穿過夾腳、套筒及機架，以螺帽固定。套筒高度依 3D 層位推算；夾具、螺絲長度與止滑襯墊須依實物核對。'
       :'此固定零件尚未產生水管夾配對孔，請人工設計安裝座；不會顯示已鎖上的螺絲。',form);
@@ -248,7 +252,7 @@ export function createSyringeUI(h){
     section=form;input('extension','目前伸出量 s (mm)',c.extension);
     const specs=el('details',null,form);el('summary','針筒規格與實測校正',specs);section=specs;
     input('name','規格名稱',c.spec.name,'text');
-    for(const [key,text] of [['capacityMl','標稱容量 (mL)'],['outerDiameter','筒身外徑 (mm)'],['bodyLength','筒身外形長度 (mm)'],['rodDiameter','推桿外形寬度 (mm)'],['lmin','最短 A–B 安裝孔距 Lmin (mm)'],['stroke','有效行程 S (mm)']])input(key,text,c.spec[key]);
+    for(const [key,text] of [['capacityMl','標稱容量 (mL)'],['outerDiameter','筒身外徑 (mm)'],['bodyLength','筒身外形長度 (mm)'],['rodDiameter','推桿外形寬度 (mm)'],['lmin',c.mountMode==='pivot'?'最短軸向長度 Lmin：固定環中心到推桿孔 (mm)':'最短 A–B 安裝孔距 Lmin (mm)'],['stroke','有效行程 S (mm)']])input(key,text,c.spec[key]);
     const maximum=el('p',`最大孔距 Lmax = ${formatNumber(c.spec.lmin+c.spec.stroke)} mm（由 Lmin + S 計算）`,specs);
     const calibration=input('calibrated','以上尺寸已依實物量測確認','', 'checkbox');calibration.checked=c.spec.calibrated;
     for(const key of ['outerDiameter','bodyLength','rodDiameter','lmin','stroke'])fields[key].oninput=()=>{calibration.checked=false;maximum.textContent=`最大孔距 Lmax = ${formatNumber(readNumber(fields.lmin)+readNumber(fields.stroke))} mm（由 Lmin + S 計算）`;};

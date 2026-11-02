@@ -73,4 +73,15 @@ for (const [id, source, mode, wrong] of [['syringe-fixed-start', 'hydraulic-h07'
   check(`${id}：照單元步驟能裝上${mode === 'pivot' ? '可轉' : '固定'}針筒，全行程通過`, r.ok && scan.ok && scan.samples.length === 41, r.message);
   check(`${id}：改選另一種安裝會被拒絕（不能試動）`, !planSyringeInstallation(s, { id: null, newId: 'Practice', a: c.a, b: c.b, mountMode: wrong, axisDeg: c.axisDeg, face: 'front' }, null).ok);
 }
+// 可轉安裝只鎖一耳：左耳、右耳都能裝並通過全行程，筒身落在螺絲的不同側；不指定時預設能動的那一耳。
+{
+  const s = snap('syringe-pivot-start'), c = snap('hydraulic-h08').comps.find(o => o.type === 'syringe');
+  const sides = [1, -1, undefined].map(pivotEar => {
+    const r = planSyringeInstallation(s, { id: null, newId: 'Practice', a: c.a, b: c.b, mountMode: 'pivot', pivotEar, face: 'front' }, null);
+    const scan = r.ok && scanSyringe(r.comps, r.params, 'Practice');
+    check(`syringe-pivot-start：鎖${pivotEar === 1 ? '左' : pivotEar === -1 ? '右' : '預設'}耳，全行程通過`, r.ok && scan.ok && scan.samples.length === 41 && r.syringe.pivotEar === (pivotEar ?? r.syringe.pivotEar), r.message);
+    return r.ok && r.syringe.pivotEar;
+  });
+  check('syringe-pivot-start：預設鎖左耳（pivotEar=1）', sides[2] === 1);
+}
 report('unit-start-examples');

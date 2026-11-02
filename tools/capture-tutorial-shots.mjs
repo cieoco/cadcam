@@ -481,6 +481,12 @@ add(`${MEDIA}/syringe-mount-mode.webp`, 'teaching-syringe.html', async s => {
   await s.open('syringe-fixed-start'); await s.tab('build'); await s.section('other', true); await s.cmd('syringe'); await s.settle(800);
   await s.mark(s.p.getByLabel('固定環與底板的連接'), s.p.locator('button:has-text("調整安裝")').filter({ visible: true }).first());
 });
+// 可轉安裝：同一個固定環只鎖一顆螺絲，另外選鎖哪一耳
+add(`${MEDIA}/syringe-pivot-ear.webp`, 'teaching-syringe.html', async s => {
+  await s.open('syringe-pivot-start'); await s.tab('build'); await s.section('other', true); await s.cmd('syringe'); await s.settle(800);
+  await s.p.getByLabel('固定環與底板的連接').selectOption('pivot'); await s.settle(600);
+  await s.mark(s.p.getByLabel('固定環與底板的連接'), s.p.getByLabel('鎖哪一耳（沿推進方向看）'));
+});
 
 // 首頁「完成後：保存可編輯作品與動畫」（slider-crank 範例，專案 → MP4 動畫）
 async function sliderProject(s) {

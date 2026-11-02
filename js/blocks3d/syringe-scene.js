@@ -13,6 +13,7 @@ export function syringeClampInstallation(model,shape,z,matrix){
  if(shape.r>shape.clamp.innerRadius)return {status:'unverified',reason:'clamp_diameter',fasteners:[]};
  const fasteners=[];
  for(const [i,foot] of shape.clamp.feet.entries()){
+  if(shape.pivot&&i!==shape.lockedFoot)continue; // 可轉安裝只鎖一耳；另一耳不鎖、底板也沒有孔
   const id=`${shape.id}_clamp_${i}`,part=model.materialParts?.find(p=>p.geometry.holes.some(h=>matches(h,id)));
   if(!part)return {status:'unverified',reason:'missing_frame_holes',fasteners:[]};
   const hole=part.geometry.holes.find(h=>matches(h,id)),m=part.pose.matrix;
@@ -45,9 +46,10 @@ export function assemblySyringeShapes(model,comps,modules,params,points,{flatten
     const shape=syringeShape(c,comps,params,points);if(!shape)continue;
     const rodZ=rod?rod.z+rod.thickness/2:16,mountSide=c.installation?.face==='back'?-1:1;
     let z=rodZ;
-    const part=model.materialParts?.find(p=>p.geometry.holes.some(h=>matches(h,`${c.id}_clamp_0`)));
+    const mountHole=`${c.id}_clamp_${shape.pivot?shape.lockedFoot:0}`;
+    const part=model.materialParts?.find(p=>p.geometry.holes.some(h=>matches(h,mountHole)));
     if(c.installation&&part){
-      const hole=part.geometry.holes.find(h=>matches(h,`${c.id}_clamp_0`));
+      const hole=part.geometry.holes.find(h=>matches(h,mountHole));
       const surface=inPlane(matrix,applyMatrix4(part.pose.matrix,{...hole,z:mountSide===1?part.geometry.thicknessMm:0})).z;
       const minimum=Math.max(0,shape.r+1+shape.clamp.baseZ);
       const automatic=Math.max(minimum,mountSide*(rodZ-surface)+shape.clamp.baseZ);
