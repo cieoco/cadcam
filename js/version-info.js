@@ -17,6 +17,7 @@ button.title = '查看版本與更新紀錄';
 button.setAttribute('aria-label', `目前版本 ${version}，查看更新紀錄`);
 const host = document.querySelector('[data-version-host]') || document.querySelector('#learningMore') || document.querySelector('.learning-actions') || document.querySelector('.appbar') || document.querySelector('main') || document.body;
 host.append(button);
+document.querySelectorAll('[data-version-label]').forEach(l => { l.textContent = `v${version}`; l.onclick = () => button.click(); });
 document.querySelectorAll('[data-command="version"]').forEach(b => { b.textContent = b.textContent.replace("版本", `版本 v${version}`); });
 const dialog = document.createElement('dialog');
 dialog.className = 'version-dialog';

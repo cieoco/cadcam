@@ -21,6 +21,8 @@ import { OrbitControls } from '../vendor/OrbitControls.js';
 import { createGearPath } from '../utils/gear-geometry.js';
 import { applyMatrix4 } from './orthogonal-3d.js';
 import { SPROCKET_THICKNESS, sprocketGeometry, chainGroup } from './chain-3d.js';
+import { presetCameraPose } from './view-presets.js';
+import { explodeOffsets } from './explode.js';
 
 // 把一根桿（兩端 a、b、半徑 r、兩端孔徑 holeR）做成 THREE.Shape。
 // 外形與 blocks.html 的 barHullPath 一致：兩端圓 + 外切線 + 半圓封口，外加兩個孔。
@@ -508,11 +510,13 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     const key = keyPrefix + rawKey;
     if(pickable)obj.userData.pickKey = key;
     obj.traverse(o=>{if(o.isMesh)o.userData.baseMaterial=o.material;if(o.geometry)geometryBuilds++;});
-    partObjects.push({obj,key,rawKey,prefix:keyPrefix});
+    // 每個零件外包一層 wrap：分離（explode）只動 wrap.position，姿態更新改的是 obj.matrix，兩者互不覆蓋。
+    const wrap=new THREE.Group();wrap.add(obj);
+    partObjects.push({obj,wrap,key,rawKey,prefix:keyPrefix});
     if (isPreviewGhostKey(rawKey)) ghostify(obj, true);
     else if (ghosted.has(key)) ghostify(obj);
     else if (isHighlightKey(key)) redify(obj);
-    sink.add(obj);
+    sink.add(wrap);
     return obj;
   }
   function bindPose(obj,update){poseBindings.push({obj,scope:bindingScope,update});}
@@ -528,6 +532,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     for(const b of poseBindings)b.update(b.obj,scopes.get(b.scope),model);
     geometryReuses+=partObjects.reduce((n,p)=>{p.obj.traverse(o=>{if(o.geometry)n++;});return n;},0);
     applyAppearance();
+    applyExplode();
   }
 
   // G2：角碼一翼的幾何。有 hole：板面（兩個大尺寸軸）的矩形擠出厚度、挖一個圓孔（孔心依 hole.center 換算到板面座標），
@@ -555,7 +560,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       obj.traverse(o => { if (o.geometry) {o.geometry.dispose();geometryDisposals++;} });
       // 材質有快取共用，不在這裡 dispose
     }
-    poseBindings.length=0;partObjects.length=0;childGroups.clear();
+    poseBindings.length=0;partObjects.length=0;childGroups.clear();explodeCache=null;explodeApplied=false;
   }
 
   let initialized = false;
@@ -579,6 +584,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       fill.position.set(-.6,viewUp==='z'?.8:-.3,viewUp==='z'?-.3:-.8);
       initialized=false;fitHeld=false;
     }
+    const hadModel = !!lastModel;
     lastModel = model;
     renderSyringes(model.syringes);
     if(lifetime.begin(retainedSceneKey(model))){updateRetainedPose(model);focusCamera(model);return;}
@@ -650,7 +656,9 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       keyPrefix = sc.moduleId ? sc.moduleId + '/' : '';
       try { addPart(grp, `screw:${i}`); } finally { keyPrefix = ''; }
     });
+    applyExplode();
     focusCamera(model);
+    if (onRebuilt) onRebuilt({ first: !hadModel, sinceStart: performance.now() - startedAt });
   }
 
   // Representation only: every material island and machining feature comes from
@@ -1227,12 +1235,12 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   }
 
   let raf = null;
-  function renderNow(timestamp=null){const at=timestamp===null?0:performance.now();controls.update();renderer.render(scene,camera);return timestamp===null?null:{cpuMs:performance.now()-at,poseRevision,rendererRafTimestamp:timestamp};}
+  function renderNow(timestamp=null){const at=timestamp===null?0:performance.now();stepCamAnim();controls.update();renderer.render(scene,camera);return timestamp===null?null:{cpuMs:performance.now()-at,poseRevision,rendererRafTimestamp:timestamp};}
   function loop() {
     renderNow();
     raf = requestAnimationFrame(loop);
   }
-  function start() { if (!raf) loop(); }
+  function start() { startedAt = performance.now(); if (!raf) loop(); }
   function stop() { if (raf) cancelAnimationFrame(raf); raf = null; }
 
   // 點選判定：從滑鼠位置射線找出最近、且帶 pickKey 的部件（關節銷柱無 key，會穿透到後方板件）。
@@ -1418,7 +1426,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   // ---- 組立台精靈：把相機拉到剛好框住符合 filter(pickKey) 的零件（沒給＝全部）；保留目前的視角，只改距離與目標 ----
   let fitHeld = false;       // fitTo 設定過目標：focusCamera 不再把目標拉回地錨（releaseFit 還原）
   let interacting = false;   // 使用者正在拖曳／捏合：不要搶鏡頭
-  const beginInteraction=()=>{interacting=true;},endInteraction=()=>{interacting=false;};
+  const beginInteraction=()=>{interacting=true;camAnim=null;},endInteraction=()=>{interacting=false;};
   controls.addEventListener('start',beginInteraction);
   controls.addEventListener('end',endInteraction);
   function partsBox(filter) {
@@ -1487,6 +1495,81 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     return true;
   }
 
+  // ---- 分離（explode）與視角快捷 ----
+  // 每個平面各自分層：主平面沿世界 z，直角安裝的子模組沿自己平面的法向（子 Group 的本地 z）；層來自場景模型的 z／plateGap。
+  let startedAt = 0, explodeAmount = 0, explodeApplied = false, explodeCache = null, onRebuilt = null;
+  function buildExplodeCache() {
+    for (const p of partObjects) p.wrap.position.set(0, 0, 0);
+    dynamic.updateMatrixWorld(true);
+    const gap = lastModel?.plateGap > 0 ? lastModel.plateGap : 6, groups = new Map(), box = new THREE.Box3(), c = new THREE.Vector3();
+    partObjects.forEach((p, i) => {
+      box.setFromObject(p.obj);
+      if (box.isEmpty()) return;
+      const parent = p.wrap.parent;
+      box.getCenter(c); parent.worldToLocal(c);
+      if (!groups.has(parent)) groups.set(parent, []);
+      groups.get(parent).push({ id: i, layer: Math.round(c.z / gap), normal: [0, 0, 1] });
+    });
+    explodeCache = { gap, groups: [...groups.values()] };
+  }
+  function applyExplode() {
+    if (explodeAmount <= 0) {
+      if (explodeApplied) { for (const p of partObjects) p.wrap.position.set(0, 0, 0); explodeApplied = false; }
+      return;
+    }
+    if (!explodeCache) buildExplodeCache();
+    for (const items of explodeCache.groups) {
+      const off = explodeOffsets(items, explodeAmount, { gap: explodeCache.gap });
+      for (const it of items) partObjects[it.id].wrap.position.fromArray(off[it.id]);
+    }
+    explodeApplied = true;
+  }
+  function setExplode(amount) { explodeAmount = Math.min(1, Math.max(0, Number(amount) || 0)); applyExplode(); }
+  // 整體外框（mm，世界座標，不含分離位移）；沒有零件回 null。
+  function getExtents() {
+    const was = explodeApplied;
+    if (was) for (const p of partObjects) p.wrap.position.set(0, 0, 0);
+    const box = partsBox(null);
+    if (was) applyExplode();
+    return box ? { min: box.min.toArray(), max: box.max.toArray() } : null;
+  }
+  let camAnim = null;
+  const cancelCamAnim = () => { camAnim = null; };
+  function stepCamAnim() {
+    if (!camAnim) return;
+    const a = camAnim, k = Math.min(1, (performance.now() - a.t0) / a.ms), e = k * k * (3 - 2 * k);
+    const target = a.fromTarget.clone().lerp(a.toTarget, e);
+    const dir = a.fromDir.clone().lerp(a.toDir, e).normalize(), dist = a.fromDist + (a.toDist - a.fromDist) * e;
+    controls.target.copy(target); camera.position.copy(target).addScaledVector(dir, dist); camera.lookAt(target);
+    if (k >= 1) camAnim = null;
+  }
+  // id：top／front／right／iso／fit；instant＝不做動畫（減少動態偏好也一律直接到位）。
+  function setViewPreset(id, { instant = false } = {}) {
+    const from = { pos: camera.position.clone(), target: controls.target.clone() };
+    cancelCamAnim();
+    let ok;
+    if (id === 'fit') { showAll(); ok = fitTo(null, { fill: 0.66, insetBottom: 70 }); }
+    else {
+      const box = partsBox(null);
+      if (!box) return false;
+      const c = box.getCenter(new THREE.Vector3()), r = Math.max(20, box.getSize(new THREE.Vector3()).length() / 2);
+      const pose = presetCameraPose(id, { center: c.toArray(), radius: r, viewUp });
+      camera.position.fromArray(pose.position);
+      if (id === 'top') camera.position.addScaledVector(new THREE.Vector3().fromArray(pose.up), -r * 0.01);   // 避開正上方的奇異點
+      controls.target.copy(c); camera.lookAt(c);
+      ok = fitTo(null, { fill: 0.66, insetBottom: 70 });
+    }
+    if (!ok) { camera.position.copy(from.pos); controls.target.copy(from.target); camera.lookAt(from.target); return false; }
+    const to = { pos: camera.position.clone(), target: controls.target.clone() };
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (instant || reduce) { controls.update(); return true; }
+    camera.position.copy(from.pos); controls.target.copy(from.target); camera.lookAt(from.target);
+    const dirOf = (p, t) => p.clone().sub(t).normalize(), distOf = (p, t) => p.distanceTo(t);
+    camAnim = { t0: performance.now(), ms: 380, fromTarget: from.target, toTarget: to.target,
+      fromDir: dirOf(from.pos, from.target), toDir: dirOf(to.pos, to.target), fromDist: distOf(from.pos, from.target), toDist: distOf(to.pos, to.target) };
+    return true;
+  }
+
   // 讓外部（如「全部顯示」按鈕）可清掉所有隱藏狀態。
   function showAll() {
     if (!ghosted.size) return;
@@ -1532,13 +1615,16 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   resize();
   start();
 
-  return {
+  const api = {
     renderNow,
     cacheStats:()=>({...lifetime.stats(),geometryBuilds,geometryReuses,geometryDisposals}),
-    update, resize, dispose, start, stop, showAll, fitTo, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, project, tiltView, pickSurface, highlightSurface,
+    update, resize, dispose, start, stop, showAll, fitTo, setViewPreset, setExplode, getExtents, set onRebuilt(fn) { onRebuilt = fn; }, get viewUp() { return viewUp; }, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, project, tiltView, pickSurface, highlightSurface,
     setPickEnabled(on) { pickEnabled = !!on; },
     get canvas() { return renderer.domElement; },
     get interacting() { return interacting; },
     get camera() { return camera; }, get controls() { return controls; }
   };
+  // 視角快捷列／分離滑桿／整體尺寸（標記在 blocks.html 的 #view3d 裡）；其他容器（安裝預覽）沒有就不載入。
+  if (container.querySelector?.('.view-presets')) import('./view-tools-ui.js').then(m => m.bindViewTools(container, api));
+  return api;
 }

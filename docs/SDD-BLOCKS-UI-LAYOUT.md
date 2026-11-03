@@ -395,3 +395,17 @@ UI 的責任是把這四件事分清楚，讓按鈕不再平鋪成一串。
 - 用在：連桿／板件孔距、滑軌可滑動長度、齒輪齒數（6–60，預設 12）、鏈輪齒數（9–40，預設 12）、卡榫盒子 10 個尺寸（範圍取自存檔契約，預設取 `BOX_DEFAULTS`）。數值欄第一次用到才載入，不佔啟動大小。
 - 驗收：`node test/numeric-field.mjs`、`node test/start-gallery.mjs`、`node tools/ui-commands-browser.mjs`（含第一次開啟與重新整理後不再跳出）。
 
+
+### 14.3 3D 視角快捷、分離滑桿、整體尺寸、建議與回饋、版本字（2026-11-03，2026.11.3.2）
+
+同樣學自電路板外殼生成器：3D 畫面有「頂 前 右 立體」快捷與「分離」滑桿，並顯示整體尺寸。設計預覽（toggle3D）與組立台共用同一個 `#view3d`，所以只做一份。
+
+- **視角快捷**（`js/blocks3d/view-presets.js`，純函式）：`VIEW_PRESETS`＝頂、前、右、立體、置中；`presetCameraPose(id,{center,radius,viewUp})` 回傳 position／target／up。viewUp `y`（學生畫的 xy 平面）前視從 +z 看；viewUp `z` 前視從 −y 看；四個視角距離一致，切換不忽大忽小。viewer 的 `setViewPreset(id,{instant})` 先算出「該方向＋框住整個機構」的終點再做約 0.38 秒的平順移動（減少動態偏好或 `instant` 直接到位；使用者一碰畫面就中止）；「置中」＝原本的全部顯示＋框住，保留目前方向。頂視不改 `camera.up`（OrbitControls 在建構時就記住上方向），而是把鏡頭略往前偏 1%，避開正上方的奇異點。
+- **分離**（`js/blocks3d/explode.js`，純函式）：`explodeOffsets(items,amount,{gap})` 以「中間層」為準，沿各項目的法向（預設 [0,0,1]）把各層拉開；`amount` 夾在 0–1，全開時相鄰層多拉開 2×gap（至少 1×gap）。viewer 的 `setExplode(amount)` 在每個零件外多包一層 `wrap`，只動 `wrap.position`，姿態更新改的是零件本身的矩陣，所以播放中兩者不互相覆蓋；每次姿態更新後與每次重建後都會重新套用。層數取自場景模型的 z／`plateGap`；主平面沿世界 z，直角安裝的子模組在自己的子 Group 內沿本地 z（＝該平面法向），各平面各自以中間層為準。針筒外形、接口標記不參與分離。
+- **整體尺寸**：`getExtents()` 回傳所有零件的世界外框 `{min,max}`（mm，不含分離位移）；`formatExtents` 轉成「整體 W × H × D mm」（沒有厚度只寫兩個數；viewUp `z` 時高＝z 軸）。顯示在視角列下方，重建、點視角時與每秒更新一次（播放時跟著姿態變）。
+- **模型已更新**：viewer 只在「完整重建」（不是播放時的姿態更新）觸發 `onRebuilt`；3D 剛開（0.9 秒內）或第一次建置不顯示，其餘顯示約 1.5 秒的淡出小膠囊（右上，不蓋視角列與播放列）。
+- **版面**：視角列在 `#view3d` 左上（設計模式讓出設計分頁列），寬 206 px；按鈕高 32 px，手機（≤700 px 或觸控）38 px；滑桿沿用數值欄的握把樣式（深色底）。原本置中的「3D 預覽」提示移到播放列上方，避免和視角列重疊。標記寫在 `blocks.html`，接線在懶載入的 `js/blocks3d/view-tools-ui.js`（`createViewer` 偵測容器裡有 `.view-presets` 才載入），所以 `view-presets.js`、`explode.js`、`view-tools-ui.js` 都不在啟動閉包內。
+- **說明 → 建議與回饋**：`ui-commands.js` 新增 `href` 型指令（`{id:'feedback',group:'help',href:'https://github.com/cieoco/cadcam/issues/new'}`）；`command-ui.js` 對有 `href` 的指令產生 `<a target="_blank" rel="noopener">`，電腦選單與手機共用同一支 `button()`；派送器略過沒有 `run` 的指令。
+- **版本小字**：電腦版標題旁顯示 `v{APP_VERSION}`（11 px 灰字，`#appVersionLabel`），點一下等於按 `#versionBtn` 開版本視窗；≤700 px 隱藏（手機仍可從 說明 → 版本 開）。
+- **啟動大小**：1,975,256 → 1,975,695 bytes（+439：command-ui +110、ui-commands +195、version-info +134），`test/startup-size.mjs` 上限 1,977,000 未動。
+- 驗收：`node test/view-tools.mjs`（純函式與接線）、`node tools/ui-commands-browser.mjs`（連結、版本字、頂端元件）；瀏覽器逐項（390×844、1280×800；單支雨刷與組立升降夾爪）檢查見該次提交說明。

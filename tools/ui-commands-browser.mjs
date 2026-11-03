@@ -103,7 +103,7 @@ for (const mode of ['design', 'bench']) {
     // 頂端只有身分、模式切換、復原與兩個選單
     const header = await page.evaluate(() => [...document.querySelectorAll('header.appbar button, header.appbar summary, header.appbar select, header.appbar a')]
       .filter(el => el.checkVisibility({ checkVisibilityCSS: true }) && !el.closest('.cmd-menu-body')).map(el => el.id || 'menu:' + el.parentElement.dataset.commandMenu));
-    const wantHeader = ['modeBtnDesign', 'modeBtnBench', ...(layout === 'desktop' ? ['btnUndo', 'menu:project', 'menu:help'] : mode === 'design' ? ['menu:help'] : ['menu:project', 'menu:help'])];
+    const wantHeader = ['modeBtnDesign', 'modeBtnBench', ...(layout === 'desktop' ? ['appVersionLabel', 'btnUndo', 'menu:project', 'menu:help'] : mode === 'design' ? ['menu:help'] : ['menu:project', 'menu:help'])];
     ok(JSON.stringify([...header].sort()) === JSON.stringify([...wantHeader].sort()), `${label}：頂端只有 ${wantHeader.join('、')}（實際：${header.join('、')}）`);
     ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${label}：沒有橫向捲動`);
     // 手機（直立、設計）：狀態圓點併進播放列；其餘版面維持畫布狀態列
@@ -171,6 +171,13 @@ for (const [layout, viewport] of Object.entries(LAYOUTS)) {
   await trigger('startGallery'); await page.waitForSelector('dialog.start-gallery[open]'); ok(await open('dialog.start-gallery') && await page.locator('dialog.start-gallery .sg-card').count() >= 6, `${label}：說明 → 功能範例 打開開始畫面`); await closeAll(); await page.evaluate(() => document.querySelector('dialog.start-gallery')?.remove());
   await trigger('guide'); ok(await open('#designGuide') && (await page.textContent('#guideTitle')).length > 0, `${label}：說明 → 設計引導`); await trigger('guide'); ok(!await open('#designGuide'), `${label}：再按一次收起設計引導`);
   await trigger('version'); ok(await open('.version-dialog'), `${label}：說明 → 版本`); await closeAll();
+  const lab = page.locator('#appVersionLabel');   // 電腦版標題旁的小版本字，點一下開同一個版本視窗；手機空間緊，隱藏
+  ok(layout === 'desktop' ? (await lab.isVisible() && /^v\d{4}\.\d+\.\d+\.\d+$/.test(await lab.textContent())) : !await lab.isVisible(), `${label}：版本小字${layout === 'desktop' ? '在標題旁' : '在手機隱藏'}`);
+  if (layout === 'desktop') { await lab.click(); ok(await open('.version-dialog'), `${label}：點版本小字開啟版本視窗`); await closeAll(); }
+  const fbLink = await page.evaluate(() => { const a = document.querySelector('a[data-command="feedback"]'); return a && { href: a.href, target: a.target, rel: a.rel, text: a.textContent }; });   // 說明 → 建議與回饋：新分頁開 GitHub issues
+  ok(fbLink && fbLink.href === 'https://github.com/cieoco/cadcam/issues/new' && fbLink.target === '_blank' && /noopener/.test(fbLink.rel) && /建議與回饋/.test(fbLink.text), `${label}：說明 → 建議與回饋是新分頁連結（noopener）`);
+  { const popup = ctx.waitForEvent('page', { timeout: 5000 }); await trigger('feedback'); const p = await popup; ok(true, `${label}：點「建議與回饋」另開分頁`); await p.close();
+    ok(!await page.evaluate(() => document.querySelector('details.cmd-menu[open]')), `${label}：點連結後選單收起`); }
   await trigger('fabrication'); ok(await open('#fabricationDialog'), `${label}：專案 → 製作設定與零件輸出`); await closeAll();
   await page.evaluate(() => { window.__opened = []; window.open = (...a) => { window.__opened.push(a[0]); return null; }; });
   await trigger('teaching'); ok((await page.evaluate(() => window.__opened)).join() === 'teaching.html', `${label}：說明 → 教學單元`);

@@ -3,8 +3,9 @@ import { COMMANDS, COMMAND_GROUPS, SHORTCUTS, ADD_SECTIONS } from './ui-commands
 const byId = Object.fromEntries(COMMANDS.map(c => [c.id, c]));
 const $ = id => document.getElementById(id);
 function button(c, short) {
-  const b = document.createElement('button');
-  b.type = 'button'; b.dataset.command = c.id; b.title = c.tip || c.label;
+  const b = document.createElement(c.href ? 'a' : 'button');
+  if (c.href) Object.assign(b, { href: c.href, target: '_blank', rel: 'noopener' }); else b.type = 'button';
+  b.dataset.command = c.id; b.title = c.tip || c.label;
   if (c.modes) b.dataset.modes = c.modes.join(' ');
   if (short) { b.className = 'clear-btn'; b.setAttribute('aria-label', c.label); b.textContent = c.icon || c.label; }
   else if (c.group === 'add') { b.className = 'block'; b.innerHTML = `<span class="ico">${c.icon}</span><span class="name">${c.label}</span><span class="role">${c.tip}</span>`; }
@@ -44,7 +45,7 @@ export function initCommandUi() {
   const closeMenus = keep => document.querySelectorAll('details.cmd-menu[open]').forEach(d => { if (!keep || !d.contains(keep)) d.open = false; });
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-command]'), c = b && !b.disabled && byId[b.dataset.command];
-    if (c) c.run[0] === '#' ? document.querySelector(c.run)?.click() : window.blocks[c.run.slice(14)]?.(...c.args || []);
+    if (c?.run) c.run[0] === '#' ? document.querySelector(c.run)?.click() : window.blocks[c.run.slice(14)]?.(...c.args || []);
     closeMenus(c ? null : e.target);
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });

@@ -6,7 +6,7 @@ let pass=0;const ok=(c,m)=>{assert.ok(c,m);pass++;console.log('PASS',m);};
 ok(JSON.stringify(COMMAND_GROUPS.map(g=>g.id))===JSON.stringify(['add','edit','view','project','help'])&&COMMAND_GROUPS.map(g=>g.label).join()==='新增,調整,視圖,專案,說明','五個分類：新增、調整、視圖、專案、說明（與手機分頁同名）');
 const ids=COMMANDS.map(c=>c.id);
 ok(new Set(ids).size===ids.length,'每個指令只出現一次（不在兩個分類重複）');
-ok(COMMANDS.every(c=>COMMAND_GROUPS.some(g=>g.id===c.group)&&typeof c.label==='string'&&c.label&&typeof c.run==='string'&&/^window\.blocks\.\w+|^#\w+/.test(c.run)),'每個指令有分類、中文名稱與一個動作');
+ok(COMMANDS.every(c=>COMMAND_GROUPS.some(g=>g.id===c.group)&&typeof c.label==='string'&&c.label&&(c.href?/^https:\/\//.test(c.href):typeof c.run==='string'&&/^window\.blocks\.\w+|^#\w+/.test(c.run))),'每個指令有分類、中文名稱與一個動作');
 const where={undo:'edit',deleteSelected:'edit',boxMaker:'add',fitView:'view',view3d:'view',frameLock:'view',rulers:'view',dimension:'view',
   save:'project',open:'project',examples:'project',share:'project',fabrication:'project',exportVideo:'project',buildPack:'project',clearAll:'project',
   guide:'help',help:'help',teaching:'help',version:'help'};
