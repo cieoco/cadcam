@@ -1,5 +1,6 @@
 /** Saved-data contract (eager); defaults, names and joint layout are in box-config.js (lazy). */
 const bounds={lengthMm:[60,400],widthMm:[60,400],heightMm:[25,120],thicknessMm:[2.5,3.5],flangeMm:[4,20],tabWidthMm:[4,20],tabPitchMm:[12,200],clearanceMm:[0,1],screwLengthMm:[8,30],maxJointSpacingMm:[30,200],jointEndMarginMm:[5,40]},legacy={maxJointSpacingMm:80,jointEndMarginMm:15},sides=['front','back','left','right'];
+export {bounds as BOX_BOUNDS};
 /** Pre-B2 files: five panels, one set per edge. */
 export function normalizeBoxSettings(raw){
  if(!raw||typeof raw!=='object')return null;

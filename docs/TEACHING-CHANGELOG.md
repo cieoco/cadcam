@@ -6,6 +6,14 @@
 
 ---
 
+# 目前狀態：開始畫面與數值欄改版後的教學頁（2026-11-03）
+
+- blocks 新增開始畫面（功能範例卡）與共用數值欄（輸入框＋滑桿＋↺＋範圍）。齒輪齒數原本只有「−／＋」，現在改成可直接輸入或拉滑桿，教學頁同步：teaching-gears.html 延伸「改齒數，讓輸出變慢」改為「在齒數欄輸入 30，或拉滑桿到 30」（截圖 gears-teeth.webp、gears-direct-motor.png 重錄）；鏈條延伸任務的說明改為在齒數欄輸入或拉滑桿，截圖說明改指「鏈條列」的中心距與差值（chain-warning／chain-aligned 重錄，面板最上面可見齒數欄）。
+- 連桿孔距的「−／＋」保留，教學中「按一次＋」仍正確；其下多了滑桿與「範圍 8–2000 mm · 預設 88」，重錄 first-link-size、wiper-length-current、slider-length、gripper-fusion-before／preview／after。
+- 教學截圖腳本（tools/capture-tutorial-shots.mjs）開頁前先寫入「看過開始畫面」旗標，並新增 tools/capture-start-cards.mjs 重錄開始畫面縮圖。
+
+---
+
 # 目前狀態：齒輪單元新增鏈條傳動延伸任務（2026-10-23）
 
 - teaching-gears.html 在第四單元末尾新增「延伸任務：鏈條傳動（#25）」，不重編單元號。內容：開啟 sprocket-chain 範例，先預測再看同向（鏈條）與反向（齒輪）；12→24 齒用齒數比算速比；自己從新增 → 傳動 → 鏈輪＋鏈條放一次並改齒數；鏈節必須整數（偶數），用「對齊整數鏈節」修正；製作面說明 #25 鏈輪與鏈條用買的（節距 6.35 mm），製作包核對鏈條節數與鏈輪齒數，從動輪長孔用來張緊。

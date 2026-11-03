@@ -8,6 +8,7 @@
 import { S, activateMotor } from './state.js';
 import { chainBillOfMaterials } from './chain-manufacturing.js';
 import { placeChainDrive, setSprocketTeeth, alignChainLinks, nudgeDrivenSprocket } from './chain-tools.js';
+import { numericField } from './numeric-field.js';
 import { checkChainDrive, pitchDiameter, wrapAngle, centerForLinks, TEETH_MIN, TEETH_MAX } from '../core/chain-drive.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -224,6 +225,7 @@ export function createChainEditor({
     }
     const setText = (id, v) => { const el = $(id); if (el) el.textContent = v; };
     setText('sprocketTeethVal', spr.teeth);
+    numericField($('sprocketTeethField'), { id: 'sprocketTeethInput', label: '鏈輪齒數', value: spr.teeth, min: TEETH_MIN, max: TEETH_MAX, step: 1, defaultValue: 12, unit: '齒', onCommit: setTeeth });
     setText('sprocketPitchVal', pitchDiameter(spr.teeth).toFixed(1));
     const row = $('sprocketChainRow'), btn = $('sprocketAlignBtn'), text = $('sprocketChainText');
     let issuesText = '';
@@ -257,6 +259,13 @@ export function createChainEditor({
     panel.style.display = 'flex';
   }
 
+  function setTeeth(raw) {
+    const info = selectedChainInfo(), next = String(raw).trim() === '' ? NaN : Number(raw);
+    if (!info) return;
+    if (!Number.isInteger(next) || next < TEETH_MIN || next > TEETH_MAX) { notify(`鏈輪齒數要在 ${TEETH_MIN}～${TEETH_MAX} 之間的整數`); updatePanel(); return; }
+    if (next === info.spr.teeth) { updatePanel(); return; }
+    changeTeeth(next - info.spr.teeth);
+  }
   function changeTeeth(delta) {
     const info = selectedChainInfo();
     if (!info) return;
@@ -305,5 +314,5 @@ export function createChainEditor({
     rebuild(); draw();
   }
 
-  return { start, cancel, drawPreview, selectSprocket, deselectSprocket, updatePanel, changeTeeth, align, nudge, deleteDrive, isPlacing: () => Boolean(placing()) };
+  return { start, cancel, drawPreview, selectSprocket, deselectSprocket, updatePanel, changeTeeth, setTeeth, align, nudge, deleteDrive, isPlacing: () => Boolean(placing()) };
 }

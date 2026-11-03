@@ -224,6 +224,7 @@ export function createGearEditor({
     setText('gearPowerStatus',driver ? `輸入輪 ${driver.id}：${driver.p1.physicalMotor ? (driver.motorType==='mg995'?'MG995 舵機':driver.motorType==='n20'?'N20 減速馬達':'TT 馬達') : '尚未安裝動力'}` : '');
     setText('gearModuleVal', Math.round(mod));
     setText('gearTeethVal', c.teeth);
+    teethField(c);
     setText('gearHoleAngleVal',Number((((Number(c.phase)||0)%360+360)%360).toFixed(2))+'°');
     setText('gearRadiusVal', Math.round(Number(S.topo.params[c.radiusParam]) || c.teeth * mod / 2));
     const pinInput=document.getElementById('gearPinRadiusVal');
@@ -409,6 +410,23 @@ export function createGearEditor({
     const next = Math.max(4, Math.min(Math.max(4, pitchR - 4), gearPinRadius(c)));
     if (c.pinRadiusParam) S.topo.params[c.pinRadiusParam] = Math.round(next);
     else c.pinRadius = Math.round(next);
+  }
+  // 齒數欄（輸入框＋滑桿＋↺）：共用數值欄第一次選到齒輪才載入，不佔啟動大小。
+  let fieldModule = null;
+  const TEETH_MIN = 6, TEETH_MAX = 60, TEETH_DEFAULT = 12;
+  function teethField(c) {
+    const host = document.getElementById('gearTeethField');
+    if (!fieldModule) fieldModule = import('./numeric-field.js').then(m => { fieldModule = m; if (S.selectedGearId) updateGearEditor(); });
+    else fieldModule.numericField?.(host, { id: 'gearTeethInput', label: '齒數', value: c.teeth, min: TEETH_MIN, max: Math.max(TEETH_MAX, c.teeth), step: 1, softMax: TEETH_MAX,
+      defaultValue: TEETH_DEFAULT, unit: '齒', onCommit: setGearTeeth });
+  }
+  function setGearTeeth(raw) {
+    const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
+    if (!c) return;
+    const next = String(raw).trim() === '' ? NaN : Number(raw), max = Math.max(TEETH_MAX, c.teeth);
+    if (!Number.isInteger(next) || next < TEETH_MIN || next > max) { transient(`齒數請輸入 ${TEETH_MIN}～${max} 的整數`); updateGearEditor(); return; }
+    if (next === c.teeth) { updateGearEditor(); return; }
+    changeGearTeeth(next - c.teeth);   // 同一個入口：一次復原、半徑與嚙合同步
   }
   function changeGearTeeth(delta) {
     const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
@@ -610,7 +628,7 @@ export function createGearEditor({
     ensureRackSlot, rackFramePinPositions, syncRackFramePins, syncRackFramePinsForGear,
     gearPitchRadius, gearPinRadius, gearDriveState,
     setGearManualAngle, startGearManualRotate, clampGearPinRadius,
-    changeGearTeeth, changeGearPinRadius, setGearPinRadius, changeGearPinHoleDiameter, changeGearModule,
+    changeGearTeeth, setGearTeeth, changeGearPinRadius, setGearPinRadius, changeGearPinHoleDiameter, changeGearModule,
     changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, clearRackStops,
     deleteGearChain, rackPinionThetaRange
   };

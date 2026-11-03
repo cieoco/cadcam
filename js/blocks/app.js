@@ -934,6 +934,7 @@ function withChainEditor(fn) {
 }
 const startChainDrive = () => { if (S.mode !== 'design') return; withChainEditor(ed => ed.start()); };
 const changeSprocketTeeth = delta => withChainEditor(ed => ed.changeTeeth(delta));
+const setSprocketTeeth = raw => withChainEditor(ed => ed.setTeeth(raw));
 const alignChain = () => withChainEditor(ed => ed.align());
 const nudgeChain = d => withChainEditor(ed => ed.nudge(d));
 const deleteSprocketDrive = () => withChainEditor(ed => ed.deleteDrive());
@@ -1090,6 +1091,11 @@ async function mountMemberToGear() {
     openGearMemberMount({source,id,positions,motion,settings:Settings.exportSettings(),onConfirm:plan=>
       commitGearMemberMount({plan,revision,fingerprint:snapshotStr,pushUndo,apply:p=>{S.comps=p.comps;Object.assign(S.topo,p.references,{params:p.params});rebuild();draw();}})});
   } catch(e) {console.error(e);transient('安裝視窗載入失敗，尚未修改作品。');}
+}
+// 功能範例卡（js/blocks/start-gallery.js）：用到才載入。第一次開啟（沒看過、不是範例連結、沒有已存作品）自動顯示。
+function openStartGallery(auto = false) {
+  return import('./start-gallery.js').then(m => m.openStartGallery({ auto, requestExample, hasWork: () => S.comps.length > 0 || S.modules.length > 0, startBar: () => pickLinkTool('bar') }))
+    .catch(e => { console.error(e); transient('功能範例載入失敗，請重試。'); });
 }
 async function openBoxMaker() {
   if(bench.inCandidate?.()){transient('請先確認或取消接合預覽。');return;}
@@ -3352,9 +3358,11 @@ function init() {
   updateUndoBtn();
   syncFrameOptionButtons();
   offerExampleFromUrl({ loadExample, insertModule: id => moduleEditor.insertBuiltin(id), notify: transient });
+  let seen = true; try { seen = Boolean(localStorage.getItem('blocks.startGallerySeen')); } catch (_) { /* 讀不到儲存空間：不自動跳出 */ }
+  if (!seen && !loaded && !benchmarkSession && !gripperPilotSession && !new URLSearchParams(location.search).has('example')) openStartGallery(true);
 }
 
-window.blocks = { draw, startChainDrive, changeSprocketTeeth, alignChain, nudgeChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openMotorChoice, pickMotorType, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawDisk: Tools.startDrawDisk, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, exportStep: () => import('./step-export.js').then(m => m.exportStepFile({ S, design: inDesign(), motorAngles: motorAnglesNow(), notify: transient })), setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
+window.blocks = { draw, startChainDrive, changeSprocketTeeth, setSprocketTeeth, alignChain, nudgeChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openMotorChoice, pickMotorType, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawDisk: Tools.startDrawDisk, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, exportStep: () => import('./step-export.js').then(m => m.exportStepFile({ S, design: inDesign(), motorAngles: motorAnglesNow(), notify: transient })), setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
 window.blocks.changeFrameGround = changeFrameGround;
 window.blocks.setFrameSize = setFrameSize;
 // H1 除錯／測試：設計模式目前看得到的零件與點（畫面實際畫的那一份）。
@@ -3366,10 +3374,11 @@ window.blocks.designDebug = () => ({
   motors: [...designMotorIds()]
 });
 Object.assign(window.blocks, commandActions, { openExamples: exampleController.openExamples,
-  openBoxMaker,
+  openBoxMaker, openStartGallery: () => openStartGallery(),
   copyMember,
   mountMemberToGear,
   setGearPinRadius: gearEditor.setGearPinRadius,
+  setGearTeeth: gearEditor.setGearTeeth,
   openGearHolePlacement: mode=>import('./gear-hole-dialog.js').then(m=>m.openGearHoleDialog({S,mode,pause,snapshotStr,pushUndo,rebuild,draw,updateGearEditor:gearEditor.updateGearEditor,notify:transient})).catch(e=>{console.error(e);transient('孔位設定載入失敗，請重試。');}),
   mateTool: on => mateTool.set(!!on), mateDebug: () => mateTool.debug(),
   setTriSide: memberEditor.selectDimension,

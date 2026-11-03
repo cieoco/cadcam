@@ -44,6 +44,7 @@ export const COMMANDS = [
   { id: 'clearAll', group: 'project', label: '清空全部', icon: '🗑', danger: true, tip: '清空目前全部零件', run: 'window.blocks.confirmClearAll' },
   { id: 'guide', group: 'help', label: '設計引導', icon: '🧭', run: 'window.blocks.openGuide', modes: ['design'] },
   { id: 'help', group: 'help', label: '操作說明', icon: '❓', run: 'window.blocks.openHelp' },
+  { id: 'startGallery', group: 'help', label: '功能範例', icon: '🧩', tip: '開始畫面：從空白、雨刷、齒輪、針筒、組立、卡榫盒子挑一個開始', run: 'window.blocks.openStartGallery' },
   { id: 'teaching', group: 'help', label: '教學單元', icon: '🎓', tip: '另開分頁', run: 'window.blocks.openTeaching' },
   { id: 'version', group: 'help', label: '版本', icon: '🏷', tip: '查看版本與更新紀錄', run: '#versionBtn' }
 ];

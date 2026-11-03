@@ -73,6 +73,7 @@ const inside = m => !m.bbox || (m.bbox.L >= -1 && m.bbox.R <= 391 + 1000 && m.bb
 
 async function fresh(vp, query = '') {
   const ctx = await browser.newContext({viewport: vp, hasTouch: true, isMobile: true, deviceScaleFactor: 2});
+  await ctx.addInitScript(() => { try { localStorage.setItem('blocks.startGallerySeen', '1'); } catch { /* 工具腳本不要被開始畫面擋住 */ } });
   const page = await ctx.newPage();
   page.on('pageerror', e => { console.log('PAGEERROR', e.message); failed++; });
   await page.goto(base + 'blocks.html' + query);
@@ -213,6 +214,7 @@ for (const vp of [{width: 390, height: 844}, {width: 360, height: 640}]) {
 // ---------- 桌機截圖：前後比對 ----------
 if (flag('desktop')) {
   const ctx = await browser.newContext({viewport: {width: 1280, height: 800}});
+  await ctx.addInitScript(() => { try { localStorage.setItem('blocks.startGallerySeen', '1'); } catch { /* 工具腳本不要被開始畫面擋住 */ } });
   const page = await ctx.newPage();
   await page.goto(base + 'blocks.html'); await page.waitForSelector('#modeBtnDesign'); await sleep(900);
   await page.addStyleTag({content: '#versionBtn,[data-command="version"]{visibility:hidden!important}'});

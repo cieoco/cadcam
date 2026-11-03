@@ -74,6 +74,7 @@ const results = {};
 for (const mode of ['design', 'bench']) {
   for (const [layout, viewport] of Object.entries(LAYOUTS)) {
     const ctx = await browser.newContext(viewport);
+    await ctx.addInitScript(() => { try { localStorage.setItem('blocks.startGallerySeen', '1'); } catch { /* 工具腳本不要被開始畫面擋住 */ } });
     const page = await ctx.newPage();
     page.on('console', m => { if (m.type() === 'error' && !/favicon/.test(m.location().url || '')) errors.push(`${layout}/${mode}: ${m.text()}`); });
     page.on('pageerror', e => errors.push(`${layout}/${mode}: ${e.message}`));
@@ -128,9 +129,26 @@ for (const mode of ['design', 'bench']) {
 }
 function byId(id) { return COMMANDS.find(c => c.id === id); }
 
+// 第一次開啟：顯示「你的機構，從這裡開始。」，卡片縮圖都載得到；看過之後重新整理不再跳出
+for (const [layout, viewport] of Object.entries(LAYOUTS)) {
+  const ctx = await browser.newContext(viewport), page = await ctx.newPage();
+  page.on('pageerror', e => errors.push(`${layout}/first: ${e.message}`));
+  await page.goto(url); await page.waitForSelector('dialog.start-gallery[open]');
+  ok(await page.locator('dialog.start-gallery .sg-card').count() >= 6 && (await page.textContent('dialog.start-gallery h2')).includes('從這裡開始'), `${layout}：第一次開啟顯示功能範例`);
+  await page.waitForFunction(() => [...document.querySelectorAll('dialog.start-gallery img')].every(i => i.complete && i.naturalWidth > 0), null, { timeout: 8000 }).catch(() => {});
+  ok(await page.evaluate(() => [...document.querySelectorAll('dialog.start-gallery img')].every(i => i.naturalWidth === 480)), `${layout}：縮圖都載入（480 寬）`);
+  ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${layout}：功能範例不造成橫向捲動`);
+  if (shotsDir) await page.screenshot({ path: join(shotsDir, `start_${layout}.png`) });
+  await page.click('dialog.start-gallery .sg-go'); ok(!await page.evaluate(() => !!document.querySelector('dialog.start-gallery')), `${layout}：「開始設計」關閉`);
+  await page.reload(); await page.waitForFunction(() => window.blocks?.setMode); await page.waitForTimeout(500);
+  ok(!await page.evaluate(() => !!document.querySelector('dialog.start-gallery')), `${layout}：看過之後不再自動顯示`);
+  await ctx.close();
+}
+
 // 指令真的會動：兩種版面都從各自的入口點一次
 for (const [layout, viewport] of Object.entries(LAYOUTS)) {
   const ctx = await browser.newContext(viewport);
+  await ctx.addInitScript(() => { try { localStorage.setItem('blocks.startGallerySeen', '1'); } catch { /* 工具腳本不要被開始畫面擋住 */ } });
   const page = await ctx.newPage();
   page.on('console', m => { if (m.type() === 'error' && !/favicon/.test(m.location().url || '')) errors.push(`${layout}/act: ${m.text()}`); });
   page.on('pageerror', e => errors.push(`${layout}/act: ${e.message}`));
@@ -150,6 +168,7 @@ for (const [layout, viewport] of Object.entries(LAYOUTS)) {
   const closeAll = () => page.evaluate(() => document.querySelectorAll('dialog[open]').forEach(d => d.close()));
   await trigger('examples'); ok(await open('#examplesDialog') && await page.locator('#exampleList .example-btn').count() > 10, `${label}：專案 → 範例… 打開同一份範例清單`); await closeAll();
   await trigger('help'); ok(await open('#helpDialog'), `${label}：說明 → 操作說明`); await closeAll();
+  await trigger('startGallery'); await page.waitForSelector('dialog.start-gallery[open]'); ok(await open('dialog.start-gallery') && await page.locator('dialog.start-gallery .sg-card').count() >= 6, `${label}：說明 → 功能範例 打開開始畫面`); await closeAll(); await page.evaluate(() => document.querySelector('dialog.start-gallery')?.remove());
   await trigger('guide'); ok(await open('#designGuide') && (await page.textContent('#guideTitle')).length > 0, `${label}：說明 → 設計引導`); await trigger('guide'); ok(!await open('#designGuide'), `${label}：再按一次收起設計引導`);
   await trigger('version'); ok(await open('.version-dialog'), `${label}：說明 → 版本`); await closeAll();
   await trigger('fabrication'); ok(await open('#fabricationDialog'), `${label}：專案 → 製作設定與零件輸出`); await closeAll();

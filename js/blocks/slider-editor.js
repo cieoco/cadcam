@@ -151,15 +151,20 @@ export function createSliderEditor({
     c.travelStart = sliderTravelStart(c);
     c.travelEnd = sliderTravelEnd(c);
   }
+  let fieldModule = null;
   function syncLengthInput() {
     const input = document.getElementById('sliderLengthInput');
     if (!input) return;
     const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
     input.style.display = c ? '' : 'none';
+    const field = document.getElementById('sliderLengthField'); if (field) field.hidden = !c;
     if (!c) return;
     document.getElementById('lenValue').style.display = 'none';
     input.value = railLength(c);
     input.max = sliderCarrierLength(c) - sliderRailOffset(c);
+    // 共用數值欄（滑桿＋範圍）：第一次選到滑軌才載入，輸入框仍走 setRailLength 的驗證。
+    if (!fieldModule) fieldModule = import('./numeric-field.js').then(m => { fieldModule = m; syncLengthInput(); });
+    else fieldModule.numericField?.(field, { input, min: 1, max: Number(input.max), step: 1, softMax: 400, unit: 'mm', ariaLabel: '可滑動長度' });
   }
   function setRailLength(raw) {
     const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');

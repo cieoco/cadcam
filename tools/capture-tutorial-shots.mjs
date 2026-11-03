@@ -257,13 +257,18 @@ add(`${MEDIA}/gears-direct-servo.png`, 'teaching-gears.html', async s => {
 });
 add(`${MEDIA}/gears-teeth.webp`, 'teaching-gears.html', async s => {
   await selectGearB(s);
-  const plus = s.p.getByText('齒數', { exact: true }).first().locator('xpath=following::button[normalize-space()="＋"][1]');
-  for (let i = 0; i < 10; i++) await plus.click();
-  await s.quiet(); await s.fit(); await s.mark(plus);
+  await s.fill('#gearTeethInput', 30);   // 齒數欄：輸入 30（也可拉滑桿）
+  await s.quiet(); await s.fit(); await s.mark('#gearTeethInput');
 });
+
 
 // 第四單元延伸：鏈條傳動（sprocket-chain）
 add(`${MEDIA}/chain-example.png`, 'teaching-gears.html', async s => { await s.open('sprocket-chain'); await s.tab('build'); await s.collapseAdd(); await s.fit(); await s.quiet(); });
+/** 手機抽屜捲回最上面（「完成／收合」是 sticky，捲動後會蓋在欄位上） */
+async function sheetTop(s) {
+  await s.p.evaluate(() => { let p = document.getElementById('sprocketEditor').parentElement; while (p) { if (p.scrollHeight > p.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(p).overflowY)) p.scrollTop = 0; p = p.parentElement; } });
+  await s.settle(250);
+}
 async function chainPanel(s) {
   await s.open('sprocket-chain'); await s.tab('edit'); await s.quiet(); await s.tapHit('SprocketB');
   await s.text('更多：包角、偏差與動力'); await s.fit();   // 抽屜展開後，把機構重新置中在上方露出的畫布
@@ -272,6 +277,7 @@ add(`${MEDIA}/chain-warning.png`, 'teaching-gears.html', async s => {
   await chainPanel(s);
   const plus = s.p.getByText('兩輪距離', { exact: true }).first().locator('xpath=following::button[normalize-space()="＋"][1]');
   for (let i = 0; i < 3; i++) await plus.click();
+  await sheetTop(s);   // 捲到面板最上面（「完成／收合」在原位），齒數欄不被它蓋住
   await s.quiet();
 });
 add(`${MEDIA}/chain-aligned.png`, 'teaching-gears.html', async s => {
@@ -279,6 +285,7 @@ add(`${MEDIA}/chain-aligned.png`, 'teaching-gears.html', async s => {
   const plus = s.p.getByText('兩輪距離', { exact: true }).first().locator('xpath=following::button[normalize-space()="＋"][1]');
   for (let i = 0; i < 3; i++) await plus.click();
   await s.text('對齊整數鏈節'); await s.settle(600);
+  await sheetTop(s);
 });
 
 // 第六單元（teaching-rack.html）：齒條升降器（從本課的起始練習檔 unit6-start 開始）
@@ -529,6 +536,7 @@ async function main() {
   try {
     for (const x of selected) {
       const context = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1, hasTouch: true, isMobile: true, locale: 'zh-TW' });
+      await context.addInitScript(() => { try { localStorage.setItem('blocks.startGallerySeen', '1'); } catch { /* 教學截圖不要拍到開始畫面 */ } });
       await context.route(url => !/^(http:\/\/127\.0\.0\.1|data:|blob:)/.test(url.href), route => route.abort()); // 不連外網，截圖不受外部資源影響
       if (x.mp4Shim) await context.route(/\/video-export\.js/, async route => {
         // 無頭 Chromium 沒有 H.264 編碼器：只為截圖把編碼改成 VP9（仍是 mediabunny 的真實匯出流程與同一個對話框）
