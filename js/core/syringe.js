@@ -74,7 +74,10 @@ export function syringeIssues(c,comps,params) {
     const ref=c[key],owner=comps.find(o=>o.id===ref?.componentId);
     if(!ref||!Number.isFinite(ref.u)||!Number.isFinite(ref.v)||!attachmentFrame(owner,params))issues.push(`${label}端需要有效的機架、桿件或板件接點。`);
     if(owner?.type==='anchor'&&(ref.u!==0||ref.v!==0))issues.push(`${label}端固定支點不能有局部偏移，請選機架板。`);
-    if(owner?.type==='bar'&&(ref.u<0||ref.u>Number(params[owner.lenParam])||Math.abs(ref.v)>0.000001))issues.push(`${label}端須在桿件中心線與有效孔距內；偏置安裝請用板件。`);
+    // 圓盤底板的固定環可放在板面內；輸出端仍須使用既有端孔。
+    if(key==='a'&&owner?.type==='bar'&&owner.shape==='disk'){
+      if(Math.hypot(ref?.u,ref?.v)>(Number(owner.diameterMm)||100)/2+0.000001)issues.push('固定環位置超出圓盤底板，請移回板內。');
+    }else if(owner?.type==='bar'&&(ref.u<0||ref.u>Number(params[owner.lenParam])||Math.abs(ref.v)>0.000001))issues.push(`${label}端須在桿件中心線與有效孔距內；偏置安裝請用板件。`);
   }
   if(c.a?.componentId===c.b?.componentId)issues.push('兩端不能安裝在同一剛性零件上。');
   if(c.mountMode==='pivot'){

@@ -263,7 +263,8 @@
     "test/syringe-mount-modes.mjs",
     "test/syringe-unit.mjs",
     "test/pivot-clamp.mjs",
-    "test/disk-orientation.mjs"
+    "test/disk-orientation.mjs",
+    "test/syringe-position.mjs"
   ],
   "version": 1
 }
