@@ -390,33 +390,34 @@ add(`${MEDIA}/assembly-horizontal-complete.png`, 'teaching-assembly.html', async
 
 // 第九～十二單元（teaching-hydraulic.html）
 const HYD_PRACTICE = 'hydraulic-h01-practice';
-/** 新增 → 其他零件 → 液壓針筒 → 調整安裝，走到安裝精靈第 step 步（1～4） */
-async function syringeWizard(s, step) {
-  await s.open(HYD_PRACTICE); await s.tab('build'); await s.section('other', true); await s.cmd('syringe');
-  await s.text('調整安裝'); await s.settle(800);
-  const next = async () => { await s.p.locator('button:has-text("下一步")').filter({ visible: true }).click(); await s.settle(700); };
-  await s.p.getByLabel('筒身固定在哪個零件？').selectOption({ label: 'H1Frame' }); await s.settle(400);   // 1 固定外殼：H1Frame、正面（第一個下拉現在是安裝方式，要用標籤找）
-  if (step === 1) return; await next();
-  for (const [label, v] of [['筒身位置 X (mm)', '-100'], ['筒身位置 Y (mm)', '-60'], ['推進方向角度 (°)', '0']]) {   // 2 位置方向：X −100、Y −60、向右 0°
-    const f = s.p.getByLabel(label).locator('visible=true').first(); await f.fill(v); await f.press('Tab');
+/** 同一針筒表單的選機架、定位、接孔與試動教材畫面。 */
+async function syringeForm(s, stage) {
+  await s.open(HYD_PRACTICE); await s.tab('build'); await s.section('other', true); await s.cmd('syringe'); await s.settle(800);
+  await s.p.getByLabel('筒身固定在哪個零件？').selectOption('H1Frame');
+  if (stage === 1) return;
+  await s.text('連接與安裝方式'); await s.text('精確座標與角度');
+  for (const [label, v] of [['固定位置 X (mm)', '-100'], ['固定位置 Y (mm)', '-60'], ['推進方向角度 (°)', '0']]) {
+    await s.p.getByLabel(label, { exact: true }).fill(v);
   }
   await s.settle(600);
-  if (step === 2) return; await next();
-  await s.p.getByLabel('推桿接哪個零件？').selectOption({ label: 'H1Coupler' }); await s.settle(300);                          // 3 連接輸出：H1Coupler、第一孔
-  await s.p.getByLabel('連接端孔').selectOption({ index: 0 }); await s.settle(500);
-  if (step === 3) return; await next();
+  if (stage === 2) { await s.scrollTo(s.p.getByLabel('推進方向角度 (°)', { exact: true }), 'center'); await s.settle(300); return; }
+  await s.text('精確座標與角度'); await s.text('連接與安裝方式');
+  await s.p.getByLabel('推桿接哪個零件？').selectOption('H1Coupler');
+  await s.p.getByLabel('連接端孔', { exact: true }).selectOption('0'); await s.settle(500);
+  if (stage === 3) return;
+  await s.text('連接與安裝方式'); await s.text('更多：安裝、規格與檢查');
 }
-add(`${HYD}/installation-frame-mobile.png`, 'teaching-hydraulic.html', s => syringeWizard(s, 1), { verify: true });
-add(`${HYD}/installation-mobile.png`, 'teaching-hydraulic.html', s => syringeWizard(s, 2));
-add(`${HYD}/installation-unfixed-mobile.png`, 'teaching-hydraulic.html', s => syringeWizard(s, 3), { verify: true });
+add(`${HYD}/installation-frame-mobile.png`, 'teaching-hydraulic.html', s => syringeForm(s, 1), { verify: true });
+add(`${HYD}/installation-mobile.png`, 'teaching-hydraulic.html', s => syringeForm(s, 2));
+add(`${HYD}/installation-unfixed-mobile.png`, 'teaching-hydraulic.html', s => syringeForm(s, 3), { verify: true });
 add(`${HYD}/installation-trial-mobile.png`, 'teaching-hydraulic.html', async s => {
-  await syringeWizard(s, 4); await s.text('檢查全行程'); await s.settle(1500);
+  await syringeForm(s, 4); await s.text('檢查全行程'); await s.settle(1500);
   await s.scrollTo(s.p.getByText('更多：安裝、規格與檢查').locator('visible=true').first(), 'start'); await s.settle(300);
 });
 
 add(`${HYD}/h02-settings-mobile.png`, 'teaching-hydraulic.html', async s => {
   await s.open('hydraulic-h02'); await s.text('針筒設定'); await s.settle(800);
-  await s.text('更多：安裝、規格與檢查'); await s.text('進階：針筒規格與軸向'); await s.text('其他尺寸與加工設定'); await s.settle(800);
+  await s.text('更多：安裝、規格與檢查'); await s.text('其他尺寸與加工設定'); await s.settle(800);
   await s.text('更多：孔位與連桿尺寸'); await s.text('孔位 145.89 mm');   // 課文：臂端距主軸維持，只把驅動孔位選成 145.89 mm
   const dlg = s.p.locator('dialog[open]').last();
   await dlg.evaluate(d => { for (const el of [d, ...d.querySelectorAll('*')]) if (el.scrollHeight > el.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(el).overflowY)) el.scrollTop = el.scrollHeight; });
@@ -444,7 +445,7 @@ add(`${HYD}/h03-mobile.png`, 'teaching-hydraulic.html', async s => {
   await s.open('hydraulic-h03'); await s.tab('edit'); await s.tapLink('H3JawA'); await s.quiet();
 });
 
-// 第九單元加做：從空白畫三根桿（機架 208、活動臂 144、短連桿 173 mm），再用四步安裝針筒
+// 第九單元加做：從空白畫三根桿（機架 208、活動臂 144、短連桿 173 mm），再在同一表單安裝針筒
 add(`${HYD}/h01-selfdraw-mobile.png`, 'teaching-hydraulic.html', async s => {
   const setDim = async v => { await s.fill('#memberDimensionInput', v); await s.done(); };
   await s.open(); await s.drawBar([70, 330], [230, 200]); await s.fill('#memberDimensionInput', 208); await s.done(); await s.fit();     // 機架
@@ -453,11 +454,13 @@ add(`${HYD}/h01-selfdraw-mobile.png`, 'teaching-hydraulic.html', async s => {
   await setDim(144); await s.fit();
   await s.tab('build'); await s.cmd('bar'); const a = await s.node('P1a'), e = await s.node('P2b'); await s.tap(a[0] + 112, a[1]); await s.tap(...e);   // 短連桿：機架左下孔右方到臂端
   await setDim(173); await s.fit();
-  await s.tab('build'); await s.section('other', true); await s.cmd('syringe'); await s.text('調整安裝'); await s.settle(800);
-  const next = async () => { await s.p.locator('button:has-text("下一步")').filter({ visible: true }).click(); await s.settle(800); };
-  await s.p.getByLabel('筒身固定在哪個零件？').selectOption('Link1'); await s.settle(500); await next();                                           // 1 固定外殼：機架
-  await s.tap(69, 314); await s.settle(500); await next();                                                                                        // 2 位置方向：機架左下孔、向右
-  await s.p.getByLabel('推桿接哪個零件？').selectOption('Link3'); await s.p.getByLabel('連接端孔').selectOption('0'); await s.settle(500); await next(); // 3 連接輸出：短連桿第一孔
+  await s.tab('build'); await s.section('other', true); await s.cmd('syringe'); await s.settle(800);
+  await s.p.getByLabel('筒身固定在哪個零件？').selectOption('Link1'); await s.settle(500);
+  const mount = await s.p.locator('#syringeInstallation svg [data-install-member="Link1"]').first().evaluate(n => {
+    const p = new DOMPoint(Number(n.getAttribute('x1')), Number(n.getAttribute('y1'))).matrixTransform(n.getScreenCTM());return { x: p.x, y: p.y };
+  });
+  await s.p.mouse.click(mount.x, mount.y);
+  await s.p.getByLabel('推桿接哪個零件？').selectOption('Link3'); await s.p.getByLabel('連接端孔').selectOption('0'); await s.settle(500);
   await s.text('確認安裝'); await s.settle(2000);
   await s.p.locator('input[type="range"]').filter({ visible: true }).first().fill('0'); await s.tap(40, 250);                                   // 伸出量 0.0 / 20 mm
   await s.section('other', false); await s.collapseAdd(); await s.fit();
@@ -486,7 +489,7 @@ add(`${MEDIA}/syringe-ruler-gap.webp`, 'teaching-syringe.html', async s => {
 // 安裝視窗最上面的「固定環與底板的連接」：固定安裝／可轉安裝
 add(`${MEDIA}/syringe-mount-mode.webp`, 'teaching-syringe.html', async s => {
   await s.open('syringe-fixed-start'); await s.tab('build'); await s.section('other', true); await s.cmd('syringe'); await s.settle(800);
-  await s.mark(s.p.getByLabel('固定環與底板的連接'), s.p.locator('button:has-text("調整安裝")').filter({ visible: true }).first());
+  await s.mark(s.p.getByLabel('固定環與底板的連接'), s.p.getByLabel('筒身固定在哪個零件？'));
 });
 // 可轉安裝：同一個固定環只鎖一顆螺絲，另外選鎖哪一耳
 add(`${MEDIA}/syringe-pivot-ear.webp`, 'teaching-syringe.html', async s => {
@@ -514,7 +517,7 @@ async function main() {
   const selected = SHOTS.filter(x => !only || only.has(basename(x.file).replace(/\.\w+$/, '')));
   if (flag('list')) { for (const x of SHOTS) console.log(x.file, '←', x.page); return; }
   const load = async () => {
-    try { return await import('playwright'); } catch { /* 全域安裝 */ }
+    try { return createRequire(import.meta.url)('playwright'); } catch { /* 全域安裝 */ }
     const base = execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim() + '/';
     return createRequire(base)('playwright');
   };
@@ -606,4 +609,4 @@ async function updateMarks(selected, marks) {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) await main();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

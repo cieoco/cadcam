@@ -12,7 +12,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 本節是 Codex 與 Claude 共用的方向規則；`CLAUDE.md` 引用本檔，不另外維護一套產品目標。具體契約、階段與驗收見 [Blocks／AI／教學 SDD](docs/SDD-BLOCKS-AI-TEACHING.md)。既有 FTC 模組與框架穩定化 SDD 的有效契約、相容要求及已授權工作仍適用；本節不代表重做或取消那些工作。
 
-2026-11-05 使用者確認以「快速驗證機構想法」為優先修正方向，後續工作依 [直覺操作與快速機構驗證 SDD](docs/SDD-RAPID-MECHANISM-VALIDATION.md) 分包：先貫通 H07 的指定驅動、量測目標與修改比較，再擴至四連桿及齒輪夾爪，最後接續實體安裝。本規格目前僅 P0 文件完成，不代表理想驅動、共同連接或 A/B 比較已實作；既有作品與安全提交契約保留。
+2026-11-05 使用者修正方向：在維持既有運作下做減法。依 [減法修正 SDD](docs/SDD-RAPID-MECHANISM-VALIDATION.md)，先合併針筒安裝的重複流程，刪除被取代的入口、步驟與狀態；不另加理想驅動、目標或比較層。每輪只處理已確認的摩擦點，保留候選提交、復原、保存與驗證契約。
 
 - **目標：** 面向零基礎學生與機構設計者，以有來源的 FTC 應用案例，建立能修改、模擬、組立及逐步製作的機構。優先選擇可用 2D 輪廓／孔／槽加工板件，再以角碼、轉軸及現成零件組成的 2.5D 實作；不等同任意 3D CAD。
 - **同一作品、同一規則：** 圖形介面、教學與未來 AI 使用 Blocks snapshot 與共同操作／驗證語意。`comps`／`params` 等持久化資料經既有正規化與編譯；不要讓 AI 另寫一套求解器，或用舊版 steps 格式取代可編輯的 Blocks 作品。
