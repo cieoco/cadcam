@@ -7,6 +7,14 @@ export function outputPoint(g,params){
   const r=outputRadius(g,params),a=(Number(g.phase)||0)*Math.PI/180;
   return {x:g.p1.x+r*Math.cos(a),y:g.p1.y+r*Math.sin(a)};
 }
+/** Direct manipulation uses the same radius/phase as numeric editing; only the pointer is bounded. */
+export function gearHoleAtPoint(gear,params,point){
+  const max=Number(params[gear.radiusParam])-4,dx=point.x-gear.p1.x,dy=point.y-gear.p1.y;
+  if(![max,dx,dy].every(Number.isFinite)||max<4)return null;
+  const distance=Math.hypot(dx,dy);
+  return {radius:Math.min(max,Math.max(4,Math.round(distance*10)/10)),
+    angle:normalizeHoleAngle(Math.round((distance<1e-9?Number(gear.phase)||0:Math.atan2(dy,dx)*180/Math.PI)*10)/10)};
+}
 const refs=c=>pointKeysFor(c).map(k=>c[k]).filter(Boolean);
 const fixed=(s,g)=>s.comps.some(c=>refs(c).some(p=>p.id===g.p1.id&&['fixed','motor'].includes(p.type)))&&!g.motorCarrier;
 

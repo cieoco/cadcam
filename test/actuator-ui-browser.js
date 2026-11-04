@@ -65,5 +65,43 @@ try{
  assert(JSON.stringify(api.snapshot())===looseBefore,'quick preview leaves source unchanged');button('確認安裝');
  assert(S.comps[0].p2.physicalMotor&&S.comps[0].p2.type==='fixed','quick flow installs at the chosen second endpoint');
  b.undo();assert(JSON.stringify(api.snapshot())===looseBefore,'quick installation has one undo');
+ { // Gear hole: one draft shared by dragging and numeric input.
+ const selectGear=()=>document.querySelector('#stageSvg [data-pick-component="GearB"]').dispatchEvent(new PointerEvent('pointerdown',{pointerType:'mouse',bubbles:true}));
+ const gears=await (await fetch(new URL('./fixtures/gear-member-mount.json',import.meta.url))).json();gears.comps=gears.comps.slice(0,2);
+ api.reopen(gears);selectGear();const holeBefore=JSON.stringify(api.snapshot());
+ await b.openGearHolePlacement('manual');
+ const hole=()=>document.querySelector('.gear-hole-dialog[open]');
+ const number=(label,value)=>{const n=hole().querySelector(`[aria-label="${label}"]`);n.value=value;n.dispatchEvent(new Event('input',{bubbles:true}));};
+ const holeButton=text=>[...hole().querySelectorAll('button')].find(n=>n.textContent===text).click();
+ const r=hole().querySelector('[aria-label="預覽孔距"]'),a=hole().querySelector('[aria-label="起始角度"]'),oldR=r.value,oldA=a.value;
+ const canvas=hole().querySelector('svg'),handle=canvas.querySelector('[data-hole-handle]');
+ const screen=(x,y)=>new DOMPoint(x,-y).matrixTransform(canvas.getScreenCTM());
+ const start=screen(Number(handle.getAttribute('cx')),-Number(handle.getAttribute('cy'))),target=screen(20,18);
+ handle.dispatchEvent(new PointerEvent('pointerdown',{pointerId:1,isPrimary:true,clientX:start.x+5,clientY:start.y,bubbles:true}));
+ assert(r.value===oldR&&a.value===oldA,'pressing the handle edge does not jump the hole');
+ canvas.dispatchEvent(new PointerEvent('pointermove',{pointerId:1,isPrimary:true,clientX:target.x+5,clientY:target.y,bubbles:true}));
+ assert(r.value==='18'&&a.value==='90','dragging the hole synchronizes radius and angle');
+ assert(JSON.stringify(api.snapshot())===holeBefore,'dragging remains a candidate');
+ canvas.dispatchEvent(new PointerEvent('pointercancel',{pointerId:1,isPrimary:true,bubbles:true}));
+ assert(r.value===oldR&&a.value===oldA,'cancelled gesture restores previous numeric draft');
+ number('預覽孔距','18');number('起始角度','90');
+ assert(Math.abs(Number(canvas.querySelector('[data-hole-handle]').getAttribute('cy'))+18)<.01,'typing moves the same graphical hole');
+ number('預覽孔距','999');assert([...hole().querySelectorAll('button')].find(n=>n.textContent==='確認孔位').disabled,'invalid typed radius is rejected');
+ number('預覽孔距','18');holeButton('取消');assert(JSON.stringify(api.snapshot())===holeBefore,'cancel leaves gear work unchanged');
+ await b.openGearHolePlacement('manual');number('預覽孔距','18');number('起始角度','90');holeButton('確認孔位');
+ assert(S.comps.find(c=>c.id==='GearB').phase===90,'confirmed hole has the chosen angle');
+ const placedHole=api.snapshot();b.undo();assert(JSON.stringify(api.snapshot())===holeBefore,'one undo restores hole radius and phase');
+ api.reopen(decodeShareString(encodeSnapshot(placedHole)));selectGear();await b.openGearHolePlacement('manual');
+ assert(hole().querySelector('[aria-label="起始角度"]').value==='90','hole placement survives share and reopen');holeButton('取消');
+ await b.openGearHolePlacement('mirror');assert(!hole().querySelector('[data-hole-handle]'),'mirror uses the existing source rule without a competing drag handle');holeButton('取消');
+ const teeth=document.querySelector('#gearTeethField');for(let i=0;i<30&&!teeth.querySelector('input');i++)await new Promise(r=>setTimeout(r,20));
+ assert(!teeth.querySelector('.nf-hint')&&teeth.querySelector('.nf-reset').hidden,'gear numbers have no redundant hint row or arbitrary reset');
+ const teethNumber=teeth.querySelector('.nf-input'),teethSlider=teeth.querySelector('.nf-slider');
+ teethNumber.value='16';teethNumber.dispatchEvent(new Event('change',{bubbles:true}));
+ assert(S.comps.find(c=>c.id==='GearB').teeth===16&&teethSlider.value==='16','number updates teeth and shared slider');
+ teethSlider.value='17';teethSlider.dispatchEvent(new Event('input',{bubbles:true}));teethSlider.dispatchEvent(new Event('change',{bubbles:true}));
+ assert(S.comps.find(c=>c.id==='GearB').teeth===17&&teethNumber.value==='17','slider commits through existing numeric action');
+ b.undo();assert(S.comps.find(c=>c.id==='GearB').teeth===16,'one slider change has one undo');
+ }
  b.fitView();parent.actuatorResult(lines.join('\n')+`\n${lines.length}/${lines.length} passed`);
 }catch(e){parent.actuatorResult(lines.join('\n')+'\nFAIL '+e.stack);}

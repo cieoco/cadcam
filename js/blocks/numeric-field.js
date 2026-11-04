@@ -1,4 +1,4 @@
-/** 共用數值欄：輸入框＋滑桿＋↺回預設＋「範圍 a–b」（參考電路板外殼生成器的尺寸欄）。
+/** 共用數值欄：輸入框＋滑桿；有明確預設的工具保留 ↺（參考電路板外殼生成器的尺寸欄）。
  *  輸入框仍是唯一的資料來源：滑桿與 ↺ 只改輸入框並送出 input／change，原本的驗證、復原與提示訊息照舊。 */
 const toNumber = v => typeof v === 'string' && !v.trim() ? NaN : Number(v);
 export function numericFieldModel({ value, min = 0, max = 100, step = 1, defaultValue, unit = '', softMax, sliderStep }) {
@@ -22,8 +22,8 @@ export function numericField(host, opts) {
   if (!f) {
     const input = opts.input || Object.assign(el('input', 'nf-input'), { type: 'number', id: opts.id || `nf${++seq}`, inputMode: opts.step % 1 ? 'decimal' : 'numeric' });
     const slider = Object.assign(el('input', 'nf-slider'), { type: 'range' }), reset = Object.assign(el('button', 'nf-reset', '↺'), { type: 'button' });
-    const unit = el('span', 'nf-unit'), range = el('span', 'nf-range'), preset = el('span', 'nf-default'), track = el('div', 'nf-track');
-    f = { input, slider, reset, unit, range, preset, o: opts };
+    const unit = el('span', 'nf-unit'), track = el('div', 'nf-track');
+    f = { input, slider, reset, unit, o: opts };
     host.classList.add('numeric-field');
     if (!opts.input) {
       input.setAttribute('aria-label', opts.ariaLabel || opts.label || '數值');
@@ -32,7 +32,7 @@ export function numericField(host, opts) {
       head.append(input, unit); host.append(head);
     }
     reset.title = '還原預設值'; slider.setAttribute('aria-label', `${opts.ariaLabel || opts.label || '數值'}滑桿`);
-    track.append(slider, reset); host.append(track, el('div', 'nf-hint')); host.lastChild.append(range, preset);
+    track.append(slider, reset); host.append(track);
     slider.oninput = () => { input.value = slider.value; fire(input, 'input'); };
     slider.onchange = () => fire(input, 'change');
     reset.onclick = () => { if (f.m.canReset) { input.value = f.o.defaultValue; fire(input, 'input'); fire(input, 'change'); } };
@@ -50,6 +50,8 @@ function refresh(f) {
   Object.assign(slider, { min: m.min, max: m.sliderMax, step: m.sliderStep, value: m.value, disabled: Boolean(o.disabled) });
   f.reset.hidden = !m.defaultText; f.reset.disabled = !m.canReset || Boolean(o.disabled);
   f.reset.setAttribute('aria-label', `${o.ariaLabel || o.label || '數值'}還原預設值${m.defaultText ? ' ' + o.defaultValue : ''}`);
-  f.range.textContent = `${m.rangeText}${m.unit ? ' ' + m.unit : ''}`; f.preset.textContent = m.canReset ? `· ${m.defaultText}` : '';
+  input.setAttribute('aria-description', `${m.rangeText}${m.unit ? ' ' + m.unit : ''}`);
+  slider.setAttribute('aria-description',input.getAttribute('aria-description'));
+  slider.setAttribute('aria-label',`${o.ariaLabel || o.label || '數值'}滑桿`);
   return f;
 }

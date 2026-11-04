@@ -1,11 +1,11 @@
-// 參考「電路板外殼生成器」：數值欄＝輸入框＋滑桿＋↺回預設＋「範圍 a–b」，手機用拇指拉也能改。
+// 共用數值欄：範圍語意保留供驗證與輔助閱讀；有明確預設的工具可還原。
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {numericFieldModel} from '../js/blocks/numeric-field.js';
 let pass=0;const ok=(c,m)=>{assert.ok(c,m);pass++;console.log('PASS',m);};
 const m=numericFieldModel({value:120,min:25,max:350,step:1,defaultValue:100,unit:'mm'});
 ok(m.value===120&&m.min===25&&m.max===350&&m.step===1,'保留值與範圍');
-ok(m.rangeText==='範圍 25–350'&&m.defaultText==='預設 100'&&m.unit==='mm','顯示「範圍 25–350」與預設值');
+ok(m.rangeText==='範圍 25–350'&&m.defaultText==='預設 100'&&m.unit==='mm','保留範圍與預設描述供輔助閱讀');
 ok(m.canReset===true&&numericFieldModel({value:100,min:25,max:350,defaultValue:100}).canReset===false,'↺ 只在改過時可按');
 ok(numericFieldModel({value:999,min:25,max:350}).value===350&&numericFieldModel({value:-5,min:25,max:350}).value===25,'超出範圍夾回邊界');
 ok(numericFieldModel({value:12.345,min:0,max:20,step:0.1}).value===12.3,'依步距取整（0.1）');

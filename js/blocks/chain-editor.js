@@ -225,7 +225,7 @@ export function createChainEditor({
     }
     const setText = (id, v) => { const el = $(id); if (el) el.textContent = v; };
     setText('sprocketTeethVal', spr.teeth);
-    numericField($('sprocketTeethField'), { id: 'sprocketTeethInput', label: '鏈輪齒數', value: spr.teeth, min: TEETH_MIN, max: TEETH_MAX, step: 1, defaultValue: 12, unit: '齒', onCommit: setTeeth });
+    numericField($('sprocketTeethField'), { id: 'sprocketTeethInput', label: '鏈輪齒數', value: spr.teeth, min: TEETH_MIN, max: TEETH_MAX, step: 1, unit: '齒', onCommit: setTeeth });
     setText('sprocketPitchVal', pitchDiameter(spr.teeth).toFixed(1));
     const row = $('sprocketChainRow'), btn = $('sprocketAlignBtn'), text = $('sprocketChainText');
     let issuesText = '';

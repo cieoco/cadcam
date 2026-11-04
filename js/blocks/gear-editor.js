@@ -411,14 +411,14 @@ export function createGearEditor({
     if (c.pinRadiusParam) S.topo.params[c.pinRadiusParam] = Math.round(next);
     else c.pinRadius = Math.round(next);
   }
-  // 齒數欄（輸入框＋滑桿＋↺）：共用數值欄第一次選到齒輪才載入，不佔啟動大小。
+  // 齒數欄（輸入框＋滑桿）：共用數值欄第一次選到齒輪才載入，不佔啟動大小。
   let fieldModule = null;
-  const TEETH_MIN = 6, TEETH_MAX = 60, TEETH_DEFAULT = 12;
+  const TEETH_MIN = 6, TEETH_MAX = 60;
   function teethField(c) {
     const host = document.getElementById('gearTeethField');
     if (!fieldModule) fieldModule = import('./numeric-field.js').then(m => { fieldModule = m; if (S.selectedGearId) updateGearEditor(); });
     else fieldModule.numericField?.(host, { id: 'gearTeethInput', label: '齒數', value: c.teeth, min: TEETH_MIN, max: Math.max(TEETH_MAX, c.teeth), step: 1, softMax: TEETH_MAX,
-      defaultValue: TEETH_DEFAULT, unit: '齒', onCommit: setGearTeeth });
+      unit: '齒', onCommit: setGearTeeth });
   }
   function setGearTeeth(raw) {
     const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
