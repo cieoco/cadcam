@@ -16,6 +16,8 @@
 
 ## 產品與功能規格
 
+- [SDD-RAPID-MECHANISM-VALIDATION.md](SDD-RAPID-MECHANISM-VALIDATION.md) — 直覺操作、理想驅動、目標與前後比較；先 H07，再四連桿／齒輪夾爪，含分包與使用者驗收（規格階段）。
+
 - [SDD-DISK-PLATE.md](SDD-DISK-PLATE.md) — 圓盤外徑、兩孔剛體、全局板厚與輸出契約。
 - [SDD-SYRINGE-MOUNT-MODES.md](SDD-SYRINGE-MOUNT-MODES.md) — 固定環雙耳鎖固／只鎖一顆耳螺絲可轉、筒身夾持位置、共用配對孔與相容契約。
 
