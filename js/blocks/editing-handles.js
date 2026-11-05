@@ -5,6 +5,8 @@ import {memberDimensions,memberDimensionValue,dimensionLock} from './member-dime
 import {memberStock} from './member-stock.js';
 import {showNumber} from './numeric-input.js';
 import {pointDimensionEditor} from './point-dimension-editor.js';
+import {outputRadius,gearHoleAtPoint} from './gear-hole-placement.js';
+import {worldFromScreen} from './view.js';
 const NS='http://www.w3.org/2000/svg';
 // Keep the 44 px dimension hit area clear of the hole's 48 px touch target.
 function besideHole(svg,a,b){
@@ -110,6 +112,13 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
     }
   }
   if(c?.type==='gear'){
+    const radius=outputRadius(c,S.topo.params),phase=Number(c.phase)||0,pose=Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI-phase;
+    const radiusField=document.getElementById('gearPinRadiusVal'),angleField=document.querySelector('#gearHoleAngleVal input');
+    const polar=q=>gearHoleAtPoint(c,S.topo.params,q,{center:a,poseDeg:pose})||{radius,angle:phase};
+    const reset=()=>{showNumber(radiusField,radius);if(angleField)showNumber(angleField,phase);};
+    const revision=JSON.stringify([S.comps,S.topo.params,S.theta,S.designFocus]);
+    dimensionHandle(svg,{key:'gear-hole',label:'輸出孔位',point:besideHole(svg,project(a),project(b)),direction:{x:1,y:0},value:0,activate:()=>{document.getElementById('gearMore').open=true;openEditor();radiusField?.focus();radiusField?.select();},cancel:reset,
+      plane:{value:b,fromScreen:q=>worldFromScreen(q.x,q.y),project,constrain:q=>{const v=polar(q),t=(v.angle+pose)*Math.PI/180;return {x:a.x+v.radius*Math.cos(t),y:a.y+v.radius*Math.sin(t)};},preview:q=>{const v=polar(q);showNumber(radiusField,v.radius);if(angleField)showNumber(angleField,v.angle);},commit:q=>{if(revision===JSON.stringify([S.comps,S.topo.params,S.theta,S.designFocus])){const v=polar(q);gear.setHole(v.radius,v.angle);}else redraw();}}});
     const rack=S.comps.find(r=>r.type==='rack'&&r.pinion===c.id);
     if(rack){const p=at(rack.p1),angle=(rack.axisDeg||0)*Math.PI/180,dir={x:Math.cos(angle),y:Math.sin(angle)},L=S.topo.params[rack.lenParam];handle('rack-length','齒條孔距',{x:p.x+dir.x*L/2,y:p.y+dir.y*L/2},{x:dir.x/2,y:dir.y/2},L,v=>gear.changeRackLength(v-L),'rackLengthVal',32,2000,1);}
   }

@@ -139,6 +139,9 @@ export function nudgeDrivenSprocket(comps, params, chainId, deltaMm) {
   const a = chain && sprocketById(out, chain.driver), b = chain && sprocketById(out, chain.driven);
   const d = Number(deltaMm);
   if (!a || !b || !Number.isFinite(d)) return fail('找不到這條鏈條。', out, outParams);
+  const attached=comps.some(c=>![a.id,b.id,chain.id].includes(c.id)&&c.type!=='anchor'&&
+    (POINT_KEYS.some(k=>[b.p1.id,b.p2?.id].includes(c[k]?.id)&&c[k]?.id)||[c.a?.componentId,c.b?.componentId,c.outputId,c.motorCarrier,c.motorMount?.hostBody,c.motorMount?.outputBody,c.driver,c.driven].includes(b.id)));
+  if(attached&&Math.abs(d)>1e-9)return fail('從動鏈輪已連接其他零件，無法單獨修改中心距；請先調整連接。',clone(comps),clone(params));
   const C = dist(a.p1, b.p1);
   const need = (outsideDiameter(a.teeth) + outsideDiameter(b.teeth)) / 2 + MIN_GAP_MM;
   if (C + d < need) return fail(`兩個鏈輪太近會互相碰到，中心距離至少要 ${Math.ceil(need)} mm。`, clone(comps), clone(params));

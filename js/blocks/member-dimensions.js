@@ -47,31 +47,40 @@ export function planMemberDimension(comp, params, id, raw, {holeDiameterMm=12.96
   if(isDisk(comp)){const error=validateDisk(comp,value,comp.diameterMm,holeDiameterMm);if(error)return {ok:false,message:error};}
   const patch = { [dimension.param]: value };
   const poly = polylineTriangleParams(comp);
+  const straight=poly&&Math.abs(Number(params[poly.segParams[0]])+Number(params[poly.segParams[1]])-Number(params[poly.diagParam]))<.001;
   if (poly && dimension.param !== poly.diagParam) {
     const [a, b] = poly.segParams;
-    const diagonal = preservedDiagonalLength(Number(params[a]), Number(params[b]), Number(params[poly.diagParam]),
+    if(straight){const other=dimension.param===a?b:a;patch[other]=Number(params[poly.diagParam])-value;if(patch[other]<8)return {ok:false,message:'中間孔需距兩端至少 8 mm。'};}
+    else {const diagonal = preservedDiagonalLength(Number(params[a]), Number(params[b]), Number(params[poly.diagParam]),
       Number(patch[a] ?? params[a]), Number(patch[b] ?? params[b]));
     if (diagonal !== null) patch[poly.diagParam] = Math.round(diagonal * 10) / 10;
+    }
   }
   if (comp.type === 'triangle') {
     const lengths = [comp.gParam, comp.r1Param, comp.r2Param].map(key => Number(patch[key] ?? params[key]));
     const [a, b, c] = lengths.slice().sort((x, y) => x - y);
-    if (!lengths.every(n => Number.isFinite(n) && n > 0) || a + b <= c + 0.01)
+    if (!lengths.every(n => Number.isFinite(n) && n > 0) || (straight? a+b<c-1e-8 : a + b <= c + 0.01))
       return { ok: false, message: '這個孔距無法形成剛性三點桿，請縮小變化或改另一段。' };
   }
   return { ok: true, params: patch, properties: { snapLength: false }, value };
 }
 
-// 只有水平鏡像、尺寸一致的既有任務對才允許連動；不以名稱猜配對。
+// Only an unambiguous, meshed two-gear pair with matching mirrored jaws may link edits.
+// The actual shared holes define ownership; names and lesson flags do not.
 export function mirroredJaw(comp, comps, params) {
-  if (Number(params.gripperWorkflow) !== 1 || comp?.shape !== 'jaw') return null;
-  const otherId = comp.id === 'LeftJaw' ? 'RightJaw' : comp.id === 'RightJaw' ? 'LeftJaw' : null;
-  const other = comps.find(c => c.id === otherId && c.type === 'triangle' && c.shape === 'jaw');
-  if (!other || other.jawTurnSign !== -comp.jawTurnSign || Math.abs(comp.p1.y - other.p1.y) > 0.1) return null;
-  const same = ['g', 'r1', 'r2', 'tip'].every(id => Math.abs(memberDimensionValue(comp, params, id) - memberDimensionValue(other, params, id)) < 0.1);
-  const middle = (comp.p1.x + other.p1.x) / 2;
-  const mirror = ['p1', 'p2', 'p3'].every(ref => Math.abs(comp[ref].x + other[ref].x - 2 * middle) < 0.1 && Math.abs(comp[ref].y - other[ref].y) < 0.1);
-  return same && mirror ? other : null;
+  if(comp?.shape!=='jaw'||!comps.some(c=>c.id===comp.id))return null;
+  const owner=c=>comps.filter(g=>g.type==='gear'&&g.p1?.id===c.p1?.id&&g.p2?.id===c.p2?.id);
+  const gears=owner(comp);if(gears.length!==1)return null;const gear=gears[0];
+  const matches=comps.filter(other=>{
+    if(other.id===comp.id||other.moduleId!==comp.moduleId||other.type!=='triangle'||other.shape!=='jaw'||other.jawTurnSign!==-comp.jawTurnSign)return false;
+    const pair=owner(other);if(pair.length!==1)return false;const mate=pair[0];
+    if(!(mate.mesh===gear.id||gear.mesh===mate.id)||mate.teeth!==gear.teeth)return false;
+    if(!['g','r1','r2','tip'].every(id=>Math.abs(memberDimensionValue(comp,params,id)-memberDimensionValue(other,params,id))<.1))return false;
+    const dx=other.p1.x-comp.p1.x,dy=other.p1.y-comp.p1.y,L=Math.hypot(dx,dy);if(L<.1)return false;
+    const u={x:dx/L,y:dy/L},m={x:(comp.p1.x+other.p1.x)/2,y:(comp.p1.y+other.p1.y)/2};
+    return ['p1','p2','p3'].every(ref=>{const p=comp[ref],q=other[ref],d=(p.x-m.x)*u.x+(p.y-m.y)*u.y;return Math.hypot(p.x-2*d*u.x-q.x,p.y-2*d*u.y-q.y)<.1;});
+  });
+  return matches.length===1?matches[0]:null;
 }
 
 export function dimensionLock(comp, comps, id) {

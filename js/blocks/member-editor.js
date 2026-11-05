@@ -1,6 +1,6 @@
 import {editableNumber} from './numeric-input.js';
-import {setPointPosition} from './input.js';
-import {freeLinkForPoint,freeTriangleForPoint,updatePointCoordsById as movePoint} from './model.js';
+import {setPointPosition,setPointAngle} from './input.js';
+import {pointRotation,freeLinkForPoint,freeTriangleForPoint,updatePointCoordsById as movePoint} from './model.js';
 import {commitMountingEdit} from './mounting-review-ui.js';
 /** 共用剛性桿件尺寸列：選取 → 預檢整筆修改 → 一次復原 → 重算。 */
 import {isDisk,validateDisk} from './disk-plate.js';
@@ -52,6 +52,11 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
       if(!position.hidden)for(const key of ['x','y'])editableNumber(position.querySelector(`[data-${key}]`),comp.p1[key],v=>{const old=S.selectedNodeId;S.selectedNodeId=comp.p1.id;setPointPosition(key,v);S.selectedNodeId=old;draw();},{label:`零件第一孔 ${key.toUpperCase()}（mm）`});
     }
     const dimensions = memberDimensions(comp);
+    let direction=el('memberDirection');
+    if(!direction){direction=document.createElement('label');direction.id='memberDirection';direction.innerHTML='方向（°，水平為 0） <span></span>';el('memberCopyActions')?.before(direction);}
+    const rotation=comp&&['bar','triangle'].includes(comp.type)&&[comp.p2,comp.p3,comp.p1].filter(Boolean).map(p=>pointRotation(S.comps,S.topo.params,p.id)).find(Boolean);
+    direction.hidden=!rotation;
+    if(rotation&&direction.nodeType===1)editableNumber(direction.querySelector('span'),rotation.angle,v=>setPointAngle(rotation.end.id,v),{label:'連桿方向角度',min:-360,max:360});
     const active = dimensions.length > 0;
     const copyActions=el('memberCopyActions');if(copyActions)copyActions.hidden=!active||!!comp?.boxPanel;
     const boxEdit=el('boxEditButton');if(boxEdit)boxEdit.hidden=!comp?.boxPanel;

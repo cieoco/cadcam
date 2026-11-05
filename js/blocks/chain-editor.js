@@ -1,4 +1,5 @@
-import {editableNumber} from './numeric-input.js';
+import {editableNumber,showNumber} from './numeric-input.js';
+import {dimensionHandle} from './dimension-handle.js';
 import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 /**
  * blocks / chain-editor
@@ -298,6 +299,7 @@ export function createChainEditor({
   function nudge(delta) {
     const info = selectedChainInfo();
     if (!info?.chain) return;
+    if(!Number.isFinite(delta)||Math.abs(delta)<1e-9)return;
     pause();
     const r = nudgeDrivenSprocket(S.comps, S.topo.params, info.chain.id, delta);
     if (!r.ok) { notify(r.message); return; }
@@ -305,6 +307,15 @@ export function createChainEditor({
     pushUndo();
     applyResult(r);
     rebuild(); draw(); updatePanel();
+  }
+  function drawHandle(){
+    if(S.mode!=='design'||S.mateMode)return;
+    const info=selectedChainInfo();if(!info?.chain)return;
+    const a=sprocketById(info.chain.driver)?.p1,b=sprocketById(info.chain.driven)?.p1;if(!a||!b)return;
+    const C=dist(a,b),u={x:(b.x-a.x)/C,y:(b.y-a.y)/C},p=projectWorld.point(b),q=projectWorld.point({x:b.x+u.x,y:b.y+u.y}),field=$('sprocketDistVal')?.querySelector('input');
+    const revision=JSON.stringify([S.comps,S.topo.params,S.designFocus]);
+    dimensionHandle(svg,{key:'chain-center',label:'鏈輪中心距',point:p,direction:{x:q.x-p.x,y:q.y-p.y},value:C,min:1,max:10000,
+      preview:v=>{if(field)showNumber(field,v);},cancel:()=>{if(field)showNumber(field,C);},activate:()=>{$('sprocketMore').open=true;openMobileEditPanel();field?.focus();field?.select();},commit:v=>{if(revision===JSON.stringify([S.comps,S.topo.params,S.designFocus]))nudge(v-C);else draw();}});
   }
   function deleteDrive() {
     const info = selectedChainInfo();
@@ -320,5 +331,5 @@ export function createChainEditor({
     rebuild(); draw();
   }
 
-  return { start, cancel, drawPreview, selectSprocket, deselectSprocket, updatePanel, changeTeeth, setTeeth, align, nudge, deleteDrive, isPlacing: () => Boolean(placing()) };
+  return { start, cancel, drawPreview, drawHandle, selectSprocket, deselectSprocket, updatePanel, changeTeeth, setTeeth, align, nudge, deleteDrive, isPlacing: () => Boolean(placing()) };
 }

@@ -40,4 +40,7 @@ ok(near(dist(da,db1),dist(da,db)+2)&&near((db1.y-da.y)*(db.x-da.x),(db1.x-da.x)*
 const tooClose=nudgeDrivenSprocket(placed.comps,placed.params,'Chain1',-50);
 ok(!tooClose.ok&&/太近/.test(tooClose.message)&&JSON.stringify(tooClose.comps)===JSON.stringify(placed.comps),'拉得太近會被擋下，作品不變');
 ok(!nudgeDrivenSprocket(placed.comps,placed.params,'Nope',1).ok,'找不到鏈條時回報失敗');
+const attached=structuredClone(placed);attached.comps.push({type:'bar',id:'attached',p1:{...b0.p2},p2:{id:'extra',type:'fixed',x:180,y:0},lenParam:'attachedLength',fixedLen:true});attached.params.attachedLength=60;
+const blocked=nudgeDrivenSprocket(attached.comps,attached.params,'Chain1',3);
+ok(!blocked.ok&&blocked.message.includes('已連接')&&JSON.stringify(blocked.comps)===JSON.stringify(attached.comps),'連接其他桿件時拒絕中心距修改，不偷偷改桿長');
 console.log(`chain-warning-route: ${pass} passed`);

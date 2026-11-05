@@ -188,6 +188,7 @@
     "test/part-fusion.mjs",
     "test/part-labels.mjs",
     "test/pinned-pantograph.mjs",
+    "test/point-rotation.mjs",
     "test/plate-editor.mjs",
     "test/plate-render.mjs",
     "test/play-timing.mjs",

@@ -2075,6 +2075,7 @@ function drawNow() {
   }
 
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
+  if(!playbackActive&&S.selectedSprocketId)chainEditor?.drawHandle();
   // polygons 一併帶上：3D 用它把三點桿畫成實心板，並過濾掉與三角板邊重疊的桿（避免分身）。
   // motorCenterIds：3D 把這些中心畫成沉在機構背面的馬達，輸出軸往上帶動曲柄。
   // motorTypes：每個馬達中心的型號（'tt'/'mg995'），讓 3D 也畫出對應外形。
@@ -3398,7 +3399,7 @@ Object.assign(window.blocks, commandActions, { openExamples: exampleController.o
   mountMemberToGear,
   setGearPinRadius: gearEditor.setGearPinRadius,
   setGearTeeth: gearEditor.setGearTeeth,
-  openGearHolePlacement: mode=>import('./gear-hole-dialog.js').then(m=>m.openGearHoleDialog({S,mode,pause,snapshotStr,pushUndo,rebuild,draw,updateGearEditor:gearEditor.updateGearEditor,notify:transient})).catch(e=>{console.error(e);transient('孔位設定載入失敗，請重試。');}),
+  openGearHolePlacement: mode=>{if(mode!=='mirror'){document.getElementById('gearMore').open=true;openMobileEditPanel();document.querySelector('#gearHoleAngleVal input')?.focus();return;}return import('./gear-hole-dialog.js').then(m=>m.openGearHoleDialog({S,pause,snapshotStr,pushUndo,rebuild,draw,updateGearEditor:gearEditor.updateGearEditor,notify:transient})).catch(e=>{console.error(e);transient('孔位設定載入失敗，請重試。');});},
   mateTool: on => mateTool.set(!!on), mateDebug: () => mateTool.debug(),
   setTriSide: memberEditor.selectDimension,
   setMemberDimension: memberEditor.setValue,

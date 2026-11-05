@@ -1,5 +1,6 @@
 import {editableNumber} from './numeric-input.js';
-import {setPointPosition,setFramePosition} from './input.js';
+import {setPointPosition,setFramePosition,setPointAngle} from './input.js';
+import {pointRotation} from './model.js';
 /**
  * blocks / panels
  *
@@ -169,6 +170,11 @@ export function updateRoleEditor() {
     (c.type==='gear' && c.p1?.id===S.selectedNodeId && c.p1.physicalMotor) ||
     (c.type==='bar' && c.isInput && [c.p1,c.p2].some(p=>p?.id===S.selectedNodeId && p.physicalMotor)))?'flex':'none';
   renderNodePosition(S.selectedNodeId);
+  let angleRow=document.getElementById('nodeDirection');
+  if(!angleRow){angleRow=document.createElement('label');angleRow.id='nodeDirection';angleRow.innerHTML='方向（°，水平為 0） <span></span>';editor.insertBefore(angleRow,advanced);}
+  const rotation=pointRotation(S.comps,S.topo.params,S.selectedNodeId);
+  angleRow.hidden=!rotation;
+  if(rotation&&angleRow.nodeType===1)editableNumber(angleRow.querySelector('span'),rotation.angle,v=>setPointAngle(S.selectedNodeId,v),{label:'連桿方向角度',min:-360,max:360});
   const motorMountRow = document.getElementById('motorMountRow');
   const motorMountStatus = document.getElementById('motorMountStatus');
   const motorBar = motorBarForCenter(S.selectedNodeId) || S.comps.find(c=>c.type==='gear'&&c.p1?.id===S.selectedNodeId&&c.p1.physicalMotor);

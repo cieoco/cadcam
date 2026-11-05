@@ -9,7 +9,7 @@ import {gearDriver} from './motor-tools.js';
  */
 
 import { S, activateMotor, nextMotorId } from './state.js';
-import {commitLegacyMountingEdit} from './mounting-review-ui.js';
+import {commitMountingEdit,commitLegacyMountingEdit} from './mounting-review-ui.js';
 import {planGearHolePlacement} from './gear-hole-placement.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { rackGuideThetaRange, rackGuideTravel } from './rack-limits.js';
@@ -228,7 +228,7 @@ export function createGearEditor({
     editableNumber(document.getElementById('gearModuleVal'),mod,v=>changeGearModule(v-(mod)),{label:'齒輪模數（mm）',min:1,max:30});
     setText('gearTeethVal', c.teeth);
     teethField(c);
-    setText('gearHoleAngleVal',Number((((Number(c.phase)||0)%360+360)%360).toFixed(2))+'°');
+    editableNumber(document.getElementById('gearHoleAngleVal'),Number(c.phase)||0,v=>setHole(gearPinRadius(c),v),{label:'輸出孔起始角度',min:-360,max:360});
     setText('gearRadiusVal', Math.round(Number(S.topo.params[c.radiusParam]) || c.teeth * mod / 2));
     const pinInput=document.getElementById('gearPinRadiusVal');
     if(pinInput){pinInput.value=String(gearPinRadius(c));pinInput.max=String(Math.max(4,gearPitchRadius(c)-4));}
@@ -451,19 +451,14 @@ export function createGearEditor({
   }
   function setGearPinRadius(value) {
     const c=S.selectedGearId?gearById(S.selectedGearId):null;if(!c)return;
-    const next=Number(value),max=Math.max(4,gearPitchRadius(c)-4);
-    if(!Number.isFinite(next)||next<4||next>max){transient(`輸出孔距請輸入 4～${max} mm`);updateGearEditor();return;}
-    if(Math.abs(next-gearPinRadius(c))<1e-9){updateGearEditor();return;}
-    const plan=planGearHolePlacement({comps:S.comps,params:S.topo.params,modules:S.modules},{gearId:c.id,mode:'manual',radius:next,angle:Number(c.phase)||0});
+    return setHole(Number(value),Number(c.phase)||0);
+  }
+  function setHole(radius,angle) {
+    const c=S.selectedGearId?gearById(S.selectedGearId):null;if(!c)return;
+    const plan=planGearHolePlacement({comps:S.comps,params:S.topo.params,modules:S.modules},{gearId:c.id,mode:'manual',radius,angle});
     if(!plan.ok){transient(plan.reason);updateGearEditor();return;}
-    const id=c.id;pause();if(!commitLegacyMountingEdit(S,()=>{const c=gearById(id);
-    if (c.pinRadiusParam) S.topo.params[c.pinRadiusParam] = next;
-    else c.pinRadius = next;
-    const ctr = pointCoords()[c.p1.id] || c.p1;
-    const pin = pointCoords()[c.p2.id] || c.p2;
-    const ang = Math.atan2((pin.y || 0) - (ctr.y || 0), (pin.x || 0) - (ctr.x || 0));
-    updatePointCoordsById(c.p2.id, (ctr.x || 0) + next * Math.cos(ang), (ctr.y || 0) + next * Math.sin(ang));
-    },{pushUndo,notify:transient})){updateGearEditor();return;}
+    if(!plan.changed){updateGearEditor();return;}
+    pause();if(!commitMountingEdit(S,d=>{d.comps=plan.comps;d.params=plan.params;},{pushUndo,notify:transient})){updateGearEditor();return;}
     rebuild(); draw();
     updateGearEditor();
   }
@@ -647,7 +642,7 @@ export function createGearEditor({
     ensureRackSlot, rackFramePinPositions, syncRackFramePins, syncRackFramePinsForGear,
     gearPitchRadius, gearPinRadius, gearDriveState,
     setGearManualAngle, startGearManualRotate, clampGearPinRadius,
-    changeGearTeeth, setGearTeeth, changeGearPinRadius, setGearPinRadius, changeGearPinHoleDiameter, changeGearModule,
+    changeGearTeeth, setGearTeeth, changeGearPinRadius, setGearPinRadius, setHole, changeGearPinHoleDiameter, changeGearModule,
     changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, clearRackStops,
     deleteGearChain, rackPinionThetaRange
   };

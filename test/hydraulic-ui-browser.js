@@ -40,12 +40,14 @@ try{
   if(num===2){
    await settings();[...q('#syringeEditor').querySelectorAll('button')].find(n=>n.textContent==='尺寸與加工設定').click();
    const originalMin=S.comps.find(c=>c.type==='syringe').spec.lmin;
-   button('孔位 145.89 mm');button('掃描候選全行程');
-   assert(q('#syringeDialog [role=status]').textContent.includes('41'),'H02 new actuator retains lesson hole presets');
+   assert(!q('#syringeDialog [name=armLength]'),'syringe settings do not duplicate member dimensions');
    button('確認套用');
    assert(S.comps.find(c=>c.type==='syringe').spec.lmin===originalMin,'rounded display preserves untouched syringe precision');
-   assert(S.topo.params.H2Arm===145.892&&Math.abs(S.topo.params.H2Arm+S.topo.params.H2Tail-250)<1e-6,'H02 hole comparison preserves 250 mm reach');
-   b.undo();assert(S.topo.params.H2Arm!==145.892,'H02 hole comparison undo');
+   document.querySelector('#stageSvg [data-pick-component="H2Arm"]').dispatchEvent(new PointerEvent('pointerdown',{pointerType:'mouse',bubbles:true}));
+   const dimension=q('#memberDimensionInput');dimension.value='145.9';dimension.dispatchEvent(new Event('change',{bubbles:true}));
+   assert(S.topo.params.H2Arm===145.9&&Math.abs(S.topo.params.H2Arm+S.topo.params.H2Tail-250)<1e-6,'shared member edit preserves straight-bar total reach');
+   assert(scanSyringe(S.comps,S.topo.params,S.comps.find(c=>c.type==='syringe').id).ok,'shared member edit retains full hydraulic stroke');
+   b.undo();assert(S.topo.params.H2Arm!==145.9,'shared member hole edit has one undo');
   }
  }
  // Unit 10: ordinary student design must be selectable without loading a replacement gripper.

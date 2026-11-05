@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {pointRotation,rotateLooseBarEnd} from '../js/blocks/model.js';
+const w=JSON.parse(readFileSync(new URL('./fixtures/loose-bar-rotation.json',import.meta.url)));
+const r=pointRotation(w.comps,w.params,'P11b');assert.ok(r);assert.equal(r.length,57);
+const before=structuredClone(w),a=27.35*Math.PI/180;
+rotateLooseBarEnd(w.comps,w.params,r.end.id,{x:r.pivot.x+r.length*Math.cos(a),y:r.pivot.y+r.length*Math.sin(a)});
+assert.ok(Math.abs(pointRotation(w.comps,w.params,r.end.id).angle-27.35)<1e-9);
+assert.deepEqual(w.comps.filter(c=>c.id!==r.bar.id),before.comps.filter(c=>c.id!==r.bar.id));
+assert.deepEqual(w.params,before.params);
+const triangle={type:'triangle',id:'any',p1:{id:'A',type:'fixed',x:0,y:0},p2:{id:'B',type:'floating',x:40,y:0},p3:{id:'C',type:'floating',x:0,y:30}};
+assert.equal(pointRotation([triangle],{},'B').angle,0);assert.equal(pointRotation([triangle],{},'C').angle,90);
+assert.equal(pointRotation([triangle],{},'A'),null);
+triangle.p2.type='fixed';assert.equal(pointRotation([triangle],{},'C'),null,'two pivots determine the angle');
+console.log('point rotation: exact angles, common one-pivot eligibility and constrained rejection passed');

@@ -74,16 +74,23 @@ check('jaw tip length edits leave parameters, holes, and component data unchange
     && JSON.stringify(s.params) === paramsBefore && JSON.stringify(jaw) === jawBefore;
 })());
 
-check('mirroredJaw accepts only the matching default workflow pair', (() => {
+check('mirroredJaw follows an unambiguous gear connection instead of lesson names', (() => {
   const s = fixture(), left = leftJaw(s), right = rightJaw(s);
   const defaultMatch = mirroredJaw(left, s.comps, s.params) === right
     && mirroredJaw(right, s.comps, s.params) === left;
-  const disabled = mirroredJaw(left, s.comps, { ...s.params, gripperWorkflow: 0 }) === null;
+  const independent = mirroredJaw(left, s.comps, { ...s.params, gripperWorkflow: 0 }) === right;
   const changed = structuredClone(s);
   rightJaw(changed).p3.x += 1;
   const asymmetric = mirroredJaw(leftJaw(changed), changed.comps, changed.params) === null;
   const unrelated = mirroredJaw({ ...left, id: 'OtherJaw' }, s.comps, s.params) === null;
-  return defaultMatch && disabled && asymmetric && unrelated;
+  const renamed=structuredClone(s);for(const c of renamed.comps)c.id='renamed-'+c.id;
+  for(const c of renamed.comps)if(c.mesh)c.mesh='renamed-'+c.mesh;
+  const jaws=renamed.comps.filter(c=>c.shape==='jaw');
+  const renamedMatch=mirroredJaw(jaws[0],renamed.comps,renamed.params)===jaws[1];
+  const disconnected=structuredClone(s);disconnected.comps.filter(c=>c.type==='gear').forEach(c=>delete c.mesh);
+  const noMesh=mirroredJaw(leftJaw(disconnected),disconnected.comps,disconnected.params)===null;
+  const ambiguous=structuredClone(s);ambiguous.comps.push({...rightJaw(ambiguous),id:'duplicate'});
+  return defaultMatch && independent && asymmetric && unrelated && renamedMatch && noMesh && mirroredJaw(leftJaw(ambiguous),ambiguous.comps,ambiguous.params)===null;
 })());
 
 check('gear output pin locks the shared jaw dimension', (() => {
@@ -138,5 +145,19 @@ check('owner choices use readable stable shape names without depending on exampl
   const comps=[{type:'anchor',id:'opaque-anchor'},{...bar,id:'opaque-a'},{...bar,id:'opaque-b',shape:'disk'},{...bar,id:'opaque-c',name:'我的長連桿'}];
   const labels=pointDimensions(comps,'B').map(d=>d.optionLabel);
   return labels[0].startsWith('連桿 1 ·')&&labels[1].startsWith('圓盤 1 ·')&&labels[2].startsWith('我的長連桿 ·')&&!labels.join('').includes('opaque');
+})());
+check('straight three-hole member preserves total reach without lesson identifiers', (()=>{
+  const comp={...triangle,shapeMode:'polyline'},params={G:40,R1:100,R2:60},before=JSON.stringify({comp,params});
+  const plan=planMemberDimension(comp,params,'g',30.5);
+  return plan.ok&&plan.params.G===30.5&&plan.params.R2===69.5&&!('R1' in plan.params)
+    &&JSON.stringify({comp,params})===before;
+})());
+check('either segment of a straight member preserves the other endpoint', (()=>{
+  const plan=planMemberDimension({...triangle,shapeMode:'polyline'},{G:40,R1:100,R2:60},'r2',75);
+  return plan.ok&&plan.params.G===25&&plan.params.R2===75;
+})());
+check('straight member rejects moving the middle hole past either endpoint', (()=>{
+  const comp={...triangle,shapeMode:'polyline'},params={G:40,R1:100,R2:60};
+  return !planMemberDimension(comp,params,'g',95).ok&&!planMemberDimension(comp,params,'r2',101).ok;
 })());
 report('member-dimensions');

@@ -74,9 +74,14 @@ export function createSyringeEditor(h){
   h.svg.querySelectorAll('[data-dimension-handle^="syringe-"]').forEach(n=>n.remove());
   const base=JSON.stringify([S.comps,S.topo.params,S.modules,S.fabrication,S.designFocus,S.mode]);
   const accept=patch=>{draft=false;if(base!==JSON.stringify([S.comps,S.topo.params,S.modules,S.fabrication,S.designFocus,S.mode])||!current()){h.draw();return;}apply(patch);h.draw();};
-  const reset=()=>{draft=false;showNumber(along,c.a.u);showNumber(x,p.x);showNumber(y,p.y);showNumber(angle,c.axisDeg??0);showNumber(offset,c.installation?.barrelOffsetMm??c.spec.bodyLength*.7);};
+  const reset=()=>{draft=false;showNumber(along,c.a.u);showNumber(x,p.x);showNumber(y,p.y);showNumber(angle,c.axisDeg??0);showNumber(offset,c.installation?.barrelOffsetMm??c.spec.bodyLength*.7);h.previewStroke(c.extension);};
   dimensionHandle(h.svg,{key:'syringe-position',label:c.mountMode==='pivot'?'轉軸':'固定環',point:project(p),direction:{x:1,y:0},value:0,step:1,cancel:reset,plane:{value:p,fromScreen:q=>View.worldFromScreen(q.x,q.y),project,constrain:q=>syringePositionOnFrame(owner,params,points,q)||p,preview:q=>{draft=true;showNumber(x,q.x);showNumber(y,q.y);if(line){const a=points[owner.p1.id]||owner.p1;showNumber(along,Math.hypot(q.x-a.x,q.y-a.y));}},commit:q=>accept({position:q})}});
   const unit=View.getScale(),pixel=unit*Math.hypot(h.svg.getScreenCTM().a,h.svg.getScreenCTM().b),at=d=>({x:shape.a.x+u.x*d,y:shape.a.y+u.y*d});
+  // Offset from the output hole, so pulling the stroke cannot steal joint selection.
+  const strokePoint={x:shape.b.x-u.y*48/pixel,y:shape.b.y+u.x*48/pixel};
+  const leader=document.createElementNS('http://www.w3.org/2000/svg','line'),start=project(shape.b),end=project(strokePoint);
+  for(const [key,value]of Object.entries({x1:start.x,y1:start.y,x2:end.x,y2:end.y,stroke:'#81aeb8','stroke-width':1,'pointer-events':'none'}))leader.setAttribute(key,value);h.svg.append(leader);
+  dimensionHandle(h.svg,{key:'syringe-stroke',label:'伸出量',point:project(strokePoint),direction:{x:u.x*unit,y:-u.y*unit},value:c.extension,min:0,max:c.spec.stroke,activate:h.focusStroke,preview:v=>{draft=true;h.previewStroke(v);},cancel:reset,commit:v=>{draft=false;if(base===JSON.stringify([S.comps,S.topo.params,S.modules,S.fabrication,S.designFocus,S.mode]))h.stroke(c.id,v);h.draw();}});
   if(c.mountMode!=='pivot')dimensionHandle(h.svg,{key:'syringe-angle',label:'方向',point:project(at(Math.max(65,66/pixel))),direction:{x:0,y:0},value:c.axisDeg??0,min:-360,max:360,step:1,angleCenter:project(shape.a),angleAxes:{u:{x:unit,y:0},v:{x:0,y:-unit}},preview:v=>{draft=true;showNumber(angle,v);},cancel:reset,commit:v=>accept({axisDeg:v}),color:'#d97706'});
   if(more.open){const v=c.installation?.barrelOffsetMm??c.spec.bodyLength*.7;dimensionHandle(h.svg,{key:'syringe-barrel',label:'距筒尾',point:project(at(-v)),direction:{x:-u.x*unit,y:u.y*unit},value:v,min:6,max:c.spec.bodyLength-6,preview:v=>{draft=true;showNumber(offset,v);},cancel:reset,commit:v=>accept({barrelOffsetMm:v})});}
  }

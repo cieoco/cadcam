@@ -60,6 +60,8 @@ for(const [x,y,r,a] of [[0,18,18,90],[-18,0,18,180],[0,-18,18,270],[100,0,26,0],
 assert.equal(gearHoleAtPoint(dragGear,source.params,{x:NaN,y:0}),null);
 assert.equal(gearHoleAtPoint({...dragGear,phase:37},source.params,{x:cx,y:cy}).angle,37);
 assert.equal(gearHoleAtPoint(dragGear,{...source.params,[dragGear.radiusParam]:30.8},{x:cx+100,y:cy}).radius,26);
+const posed=gearHoleAtPoint(dragGear,source.params,{x:100,y:118},{center:{x:100,y:100},poseDeg:30});
+assert.deepEqual(posed,{radius:18,angle:60},'main-canvas pointer removes current drive pose from initial angle');
 const precise=planGearHolePlacement(source,{gearId:dragGear.id,radius:18.25,angle:12.5});
 assert.ok(precise.ok);near(outputRadius(precise.comps.find(c=>c.id===dragGear.id),precise.params),18.25);
 

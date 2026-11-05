@@ -13,7 +13,7 @@ import {fusionRoot,fusionAtPoint} from '../core/bar-fusion.js';
  */
 
 import { S } from './state.js';
-import {rotateLooseBarEnd} from './model.js';
+import {rotateLooseBarEnd,pointRotation} from './model.js';
 import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 import * as View from './view.js';
 import * as Tools from './tools.js';
@@ -268,7 +268,8 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     const f = pc[pinTri.pivot.id];
     const d = pc[id];
     if (f && d) {
-      const delta = Math.atan2(dragTarget.y - f.y, dragTarget.x - f.x) - Math.atan2(d.y - f.y, d.x - f.x);
+      const targetAngle = Math.atan2(dragTarget.y-f.y,dragTarget.x-f.x);
+      const delta = (snap?Math.round(targetAngle*180/Math.PI)*Math.PI/180:targetAngle) - Math.atan2(d.y - f.y, d.x - f.x);
       const cosD = Math.cos(delta), sinD = Math.sin(delta);
       [pinTri.tri.p1, pinTri.tri.p2, pinTri.tri.p3].forEach(p => {
         if (!p || p.id === pinTri.pivot.id) return;   // 固定頂點不動
@@ -331,8 +332,19 @@ export function setFramePosition(axis,value){
 export function setPointPosition(axis,raw) {
   const id=S.selectedNodeId,p=pointCoords()[id],value=Number(raw);
   if(!p||!['x','y'].includes(axis)||!Number.isFinite(value))return;
+  return setPointTarget(id,{...p,[axis]:value});
+}
+/** Exact angle through the shared point edit. */
+export function setPointAngle(id,value) {
+  const r=pointRotation(S.comps,S.topo.params,id);
+  if(!r||!Number.isFinite(value))return;
+  const a=value*Math.PI/180;
+  return setPointTarget(id,{x:r.pivot.x+r.length*Math.cos(a),y:r.pivot.y+r.length*Math.sin(a)});
+}
+function setPointTarget(id,target) {
+  const p=pointCoords()[id];if(!p)return;
   if(fusionAtPoint(S.comps,id)){transient('合成孔位請改桿段尺寸，或先解除合成。');return;}
-  const target={...p,[axis]:value};if(Math.hypot(target.x-p.x,target.y-p.y)<1e-7)return;
+  if(Math.hypot(target.x-p.x,target.y-p.y)<1e-7)return;
   pause();const before=snapshotStr(),saved={comps:structuredClone(S.comps),modules:structuredClone(S.modules),params:{...S.topo.params},theta:S.theta,motorAngles:{...S.motorAngles}};
   moveNodeTo(id,target,{snap:false});S.snapTarget=null;rebuild();
   const actual=pointCoords()[id];

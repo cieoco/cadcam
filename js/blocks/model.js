@@ -263,19 +263,34 @@ export function recomputeLengths(comps, topo) {
 }
 
 // A dangling bar end turns about its attached hole; it must not pull the whole linkage.
-export function rotateLooseBarEnd(comps, params, id, target, snapDegrees = false) {
+export function looseBarRotation(comps, params, id) {
   const bar = fixedLinkFor(comps, id);
   if (!bar || bar.isInput || bar.barFusionRoot || bar.barFusion || pointIsGround(comps, id) || pointUseCount(comps, id) !== 1) return false;
   if (comps.some(c => c.type === 'syringe' && [c.a?.componentId, c.b?.componentId, c.outputId].includes(bar.id))) return false;
   const pivot = bar.p1.id === id ? bar.p2 : bar.p1;
   if (!pointIsGround(comps, pivot.id) && pointUseCount(comps, pivot.id) < 2) return false;
-  const length = Number(params[bar.lenParam]), dx = target.x - pivot.x, dy = target.y - pivot.y;
+  const end = bar.p1.id === id ? bar.p1 : bar.p2, length = Number(params[bar.lenParam]);
+  if (!(length > 0)) return null;
+  return {bar, pivot, end, length, angle: Math.atan2(end.y-pivot.y,end.x-pivot.x)*180/Math.PI};
+}
+export function rotateLooseBarEnd(comps, params, id, target, snapDegrees = false) {
+  const rotation = looseBarRotation(comps, params, id);
+  if (!rotation) return false;
+  const {pivot,length} = rotation, dx = target.x - pivot.x, dy = target.y - pivot.y;
   if (!(length > 0) || !Number.isFinite(dx + dy)) return false;
   if (Math.hypot(dx, dy) < 1e-9) return true;
   let angle = Math.atan2(dy, dx);
   if (snapDegrees) angle = Math.round(angle * 180 / Math.PI) * Math.PI / 180;
   updatePointCoordsById(comps, id, pivot.x + length * Math.cos(angle), pivot.y + length * Math.sin(angle));
   return true;
+}
+
+/** Shared one-pivot rotation. */
+export function pointRotation(comps,params,id){
+  const bar=looseBarRotation(comps,params,id);if(bar)return bar;
+  const pinned=pinnedTriangleForPoint(comps,id);if(!pinned)return null;
+  const end=[pinned.tri.p1,pinned.tri.p2,pinned.tri.p3].find(p=>p.id===id),pivot=pinned.pivot;
+  return {end,pivot,length:Math.hypot(end.x-pivot.x,end.y-pivot.y),angle:Math.atan2(end.y-pivot.y,end.x-pivot.x)*180/Math.PI};
 }
 
 export function solvePinnedConstraints(comps, topo, pinId, target, options = {}) {
