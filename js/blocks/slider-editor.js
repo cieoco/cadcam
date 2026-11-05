@@ -1,3 +1,4 @@
+import {editableNumber} from './numeric-input.js';
 /**
  * blocks / slider-editor
  *
@@ -116,11 +117,11 @@ export function createSliderEditor({
     const railOffset = document.getElementById('sliderRailOffsetVal');
     const start = document.getElementById('sliderStartVal');
     const end = document.getElementById('sliderEndVal');
-    if (body) body.textContent = sliderBodyLength(c);
-    if (carrier) carrier.textContent = sliderCarrierLength(c);
-    if (railOffset) railOffset.textContent = sliderRailOffset(c);
-    if (start) start.textContent = sliderTravelStart(c);
-    if (end) end.textContent = sliderTravelEnd(c);
+    editableNumber(body,sliderBodyLength(c),v=>changeSliderBodyLen(v-sliderBodyLength(c)),{label:'滑塊長度（mm）',min:1,max:railLength(c)});
+    editableNumber(carrier,sliderCarrierLength(c),v=>changeSliderCarrierLen(v-sliderCarrierLength(c)),{label:'底座長度（mm）',min:railLength(c),max:2000});
+    editableNumber(railOffset,sliderRailOffset(c),v=>changeSliderRailOffset(v-sliderRailOffset(c)),{label:'軌道偏移（mm）',min:0,max:sliderCarrierLength(c)-railLength(c)});
+    editableNumber(start,sliderTravelStart(c),v=>changeSliderTravelStart(v-sliderTravelStart(c)),{label:'行程起點（mm）',min:0,max:sliderTravelEnd(c)});
+    editableNumber(end,sliderTravelEnd(c),v=>changeSliderTravelEnd(v-sliderTravelEnd(c)),{label:'行程終點（mm）',min:sliderTravelStart(c),max:railLength(c)});
     const limit = document.getElementById('sliderLengthLimit');
     if (limit) limit.hidden = railLength(c) < sliderCarrierLength(c) - sliderRailOffset(c);
     const origin = document.getElementById('sliderRangeOrigin');

@@ -1,3 +1,4 @@
+import {editableNumber} from './numeric-input.js';
 /**
  * blocks / plate-editor
  *
@@ -16,6 +17,21 @@ export function createPlateEditor({
   setSliderDetailRows, setBanner, snapLego, worldFromEvent, pointCoords, updatePointCoordsById
 }) {
 
+  let vertexIndex=3;
+  function syncVertex(comp){
+    const parent=document.getElementById('memberMore');if(parent?.nodeType!==1)return;
+    let box=document.getElementById('plateVertexFields');
+    if(!box){box=document.createElement('div');box.id='plateVertexFields';box.innerHTML='<label>外形點 <select aria-label="外形點"></select></label><label>沿 A–B <span data-u></span> mm</label><label>垂直 A–B <span data-v></span> mm</label>';parent.append(box);}
+    const vertices=comp?.type==='triangle'?plateVertices(comp):[],indices=vertices.map((v,i)=>v.solve?null:i).filter(i=>i!==null);
+    box.hidden=!indices.length;if(box.hidden)return;
+    if(!indices.includes(vertexIndex))vertexIndex=indices[0];
+    const select=box.querySelector('select');select.replaceChildren(...indices.map(i=>{const o=document.createElement('option');o.value=i;o.textContent=`第 ${i+1} 點`;return o;}));select.value=vertexIndex;select.onchange=()=>{vertexIndex=Number(select.value);syncVertex(comp);};
+    for(const key of ['u','v'])editableNumber(box.querySelector(`[data-${key}]`),vertices[vertexIndex][key],value=>{
+      const current=S.comps.find(c=>c.id===comp.id);if(!current)return;
+      const index=vertexIndex,v=plateVertices(current)[index];if(!v||v.solve||v[key]===value)return;
+      pause();pushUndo();ensurePlateVertices(current)[index][key]=value;rebuild();draw();syncVertex(current);
+    },{label:key==='u'?'外形點沿 A–B（mm）':'外形點垂直 A–B（mm）'});
+  }
   function plateBasisFor(comp) {
     const P = pointCoords();
     const a = comp.p1 && P[comp.p1.id];
@@ -28,27 +44,37 @@ export function createPlateEditor({
     const comp = S.comps.find(x => x.id === compId && x.type === 'triangle');
     if (!comp) return;
     pause();
-    S.dragShape = { compId, vi, moved: false, startX: e.clientX, startY: e.clientY };
+    vertexIndex=vi;
+    S.dragShape = { compId, vi, pointerId:e.pointerId, original:structuredClone(comp), moved: false, startX: e.clientX, startY: e.clientY };
     try { svg.setPointerCapture(e.pointerId); } catch (_) {}
     const onMove = (ev) => shapeDragMove(ev);
     const onUp = (ev) => {
       svg.removeEventListener('pointermove', onMove);
       svg.removeEventListener('pointerup', onUp);
       svg.removeEventListener('pointercancel', onUp);
+      svg.removeEventListener('pointerdown', onSecondary,true);
+      svg.removeEventListener('lostpointercapture', onCancel);
+      document.removeEventListener('keydown',onEscape,true);
       shapeDragEnd(ev);
     };
+    const onCancel=()=>onUp({type:'pointercancel'});
+    const onSecondary=ev=>{if(ev.pointerId!==e.pointerId)onCancel();};
+    const onEscape=ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopImmediatePropagation();onCancel();}};
+    document.addEventListener('keydown',onEscape,true);
+    svg.addEventListener('pointerdown',onSecondary,true);
+    svg.addEventListener('lostpointercapture',onCancel);
     svg.addEventListener('pointermove', onMove);
     svg.addEventListener('pointerup', onUp);
     svg.addEventListener('pointercancel', onUp);
   }
   function shapeDragMove(e) {
     const ds = S.dragShape;
-    if (!ds) return;
+    if (!ds || e.pointerId!==ds.pointerId) return;
     if (!ds.moved) {
       if (Math.hypot(e.clientX - ds.startX, e.clientY - ds.startY) < 4) return; // 抖動門檻：分辨點擊 vs 拖曳
       ds.moved = true;
       const c0 = S.comps.find(x => x.id === ds.compId && x.type === 'triangle');
-      if (c0) { ensurePlateVertices(c0); pushUndo(); }
+      if (c0) ensurePlateVertices(c0);
     }
     const comp = S.comps.find(x => x.id === ds.compId && x.type === 'triangle');
     if (!comp) return;
@@ -61,14 +87,18 @@ export function createPlateEditor({
     if (!vt || vt.solve) return;
     vt.u = Number(local.u.toFixed(1));
     vt.v = Number(local.v.toFixed(1));
-    draw();
+    draw();syncVertex(comp);
   }
-  function shapeDragEnd() {
+  function shapeDragEnd(event) {
     const ds = S.dragShape;
     S.dragShape = null;
     if (!ds) return;
     const comp = S.comps.find(x => x.id === ds.compId && x.type === 'triangle');
     if (!comp) return;
+    if(event?.type==='pointercancel'){
+      Object.keys(comp).forEach(k=>delete comp[k]);Object.assign(comp,ds.original);rebuild();draw();syncVertex(comp);return;
+    }
+    if(ds.moved){const edited=structuredClone(comp);Object.keys(comp).forEach(k=>delete comp[k]);Object.assign(comp,ds.original);pushUndo();Object.assign(comp,edited);}
     if (!ds.moved) {                                   // 純點擊＝切換是否鑽孔
       ensurePlateVertices(comp);
       const vt = comp.vertices[ds.vi];
@@ -123,6 +153,7 @@ export function createPlateEditor({
   }
   // 三點板外形：前三點仍給求解器，其它點只作加工外形控制。
   function updatePlateShapeControls(comp = null) {
+    syncVertex(comp);
     const modeSel = document.getElementById('plateShapeModeSelect');
     const addBtn = document.getElementById('addOutlinePointBtn');
     if (!modeSel || !addBtn) return;

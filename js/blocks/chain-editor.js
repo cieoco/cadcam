@@ -1,3 +1,4 @@
+import {editableNumber} from './numeric-input.js';
 /**
  * blocks / chain-editor
  *
@@ -240,7 +241,7 @@ export function createChainEditor({
       btn.style.fontWeight = aligned ? '' : '700';
       btn.style.color = aligned ? '' : '#7c2d12';
       btn.textContent = aligned ? '已對齊整數鏈節' : '對齊整數鏈節';
-      setText('sprocketDistVal', C.toFixed(1));
+      editableNumber($('sprocketDistVal'),C,v=>nudge(v-C),{label:'鏈輪中心距（mm）',min:1,max:10000});
       setText('sprocketWrapVal', `${wrapAngle(C, a.teeth, b.teeth).toFixed(0)}°（小鏈輪）`);
       setText('sprocketDevVal', `${check.deviationMm >= 0 ? '+' : ''}${check.deviationMm.toFixed(2)} mm`);
       const suggest = centerForLinks(check.links, a.teeth, b.teeth);

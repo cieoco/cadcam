@@ -37,7 +37,7 @@ function emit(type, id, x, y, target = noop, targetElement = null) {
 }
 Input.init({ svg, draw: noop, rebuild: noop, pause: noop, cancelMotorMode: noop, deselectLink: noop,
   worldFromEvent: e => ({ x: e.clientX, y: e.clientY }), pointCoords: () => ({}), mobilePrompt: () => mobile,
-  snapshotStr: () => '{}', updateUndoBtn: noop, nearestDisplayTo: () => null,
+  snapshotStr: () => JSON.stringify({comps:S.comps,params:S.topo.params,theta:S.theta,motorAngles:S.motorAngles}), updateUndoBtn: noop, nearestDisplayTo: () => null,
   frameNodeIds: () => new Set(), recomputeLengths: noop, mergePoints: () => mergeCount++, pointIsGround: () => false,
   setSliderDetailRows: noop, openMobileEditPanel: () => openedEditor++
 });
@@ -63,9 +63,14 @@ emit('pointermove', 4, 250, 100); flush();
 check('零件阻止冒泡時仍能開始雙指縮放', View.getScale() > 1.4);
 emit('pointerup', 3, 100, 100); emit('pointerup', 4, 250, 100);
 
-S.dragFrame = true; S.dragLastWorld = { x: 100, y: 100 }; S.preDragSnap = '{}';
+S.comps=[{id:'frame',type:'bar',p1:{id:'P1',type:'fixed',x:0,y:0},p2:{id:'P2',type:'fixed',x:80,y:0},lenParam:'L'}];
+S.topo.params={L:80};
+S.dragFrame = true; S.dragLastWorld = { x: 100, y: 100 }; S.preDragSnap = JSON.stringify({comps:S.comps,params:S.topo.params,theta:S.theta,motorAngles:S.motorAngles});
+S.comps[0].p1.x=20;
+const undoBefore=S.undoStack.length;
 emit('pointerdown', 5, 100, 100); emit('pointerdown', 6, 200, 100);
 check('第二指接手時清除機架拖曳', !S.dragFrame && S.dragLastWorld === null);
+check('第二指接手還原未完成位移且不新增復原', S.comps[0].p1.x===0 && S.undoStack.length===undoBefore);
 emit('pointercancel', 5, 100, 100); emit('pointercancel', 6, 200, 100);
 S.dragFrame = false;
 

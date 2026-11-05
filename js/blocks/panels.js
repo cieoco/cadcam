@@ -1,3 +1,5 @@
+import {editableNumber} from './numeric-input.js';
+import {setPointPosition,setFramePosition} from './input.js';
 /**
  * blocks / panels
  *
@@ -42,8 +44,8 @@ function renderNodePosition(id) {
   const p = pointCoords()[id];
   const x = document.getElementById('nodeXVal');
   const y = document.getElementById('nodeYVal');
-  if (x) x.textContent = p ? Math.round(p.x) : '0';
-  if (y) y.textContent = p ? Math.round(p.y) : '0';
+  editableNumber(x,p?.x??0,v=>setPointPosition('x',v),{label:'接點 X（mm）'});
+  editableNumber(y,p?.y??0,v=>setPointPosition('y',v),{label:'接點 Y（mm）'});
 }
 
 export function renderTriValue() {
@@ -73,8 +75,9 @@ export function updateServoEditor() {
   }
   const sv = document.getElementById('servoStartVal');
   const ev = document.getElementById('servoEndVal');
-  if (sv) sv.textContent = Math.round(Number(bar.servoStart) || 0);
-  if (ev) ev.textContent = Math.round(Number.isFinite(Number(bar.servoEnd)) ? Number(bar.servoEnd) : 90);
+  editableNumber(sv,Number(bar.servoStart)||0,v=>window.blocks.changeServoAngle('start',v-(Number(bar.servoStart)||0)),{label:'舵機起始角度',min:-360,max:360});
+  const end=Number.isFinite(Number(bar.servoEnd))?Number(bar.servoEnd):90;
+  editableNumber(ev,end,v=>window.blocks.changeServoAngle('end',v-end),{label:'舵機結束角度',min:-360,max:360});
   panel.style.display = 'flex';
 }
 
@@ -110,14 +113,16 @@ export function updateFrameEditor() {
   const axis=frameGroundInfo?.();
   const grounds = axis?.nodes || Object.entries(points).filter(([id]) => pointIsGround?.(id)).map(([id, point]) => ({ id, ...point }));
   if (!grounds.length || !S.frameEditorOpen) { panel.style.display = 'none'; if (roleEditor) placeFrameEditor(panel, roleEditor); return; }
+  let position=panel.querySelector?.('[data-frame-position]');
+  if(panel.nodeType===1){
+    if(!position){position=document.createElement('div');position.dataset.framePosition='';position.innerHTML='<label>機架中心 X <span data-x></span></label><label>Y <span data-y></span></label>';panel.append(position);}
+    for(const key of ['x','y'])editableNumber(position.querySelector(`[data-${key}]`),grounds.reduce((n,p)=>n+p[key],0)/grounds.length,v=>setFramePosition(key,v),{label:`機架中心 ${key.toUpperCase()}（mm）`});
+  }
   const sizes=frameSizeInfo?.();
   for(const key of ['lengthMm','widthMm','thicknessMm']) {
     const input=document.getElementById(`frameSize-${key}`);
     if(input && sizes) input.value=Number((sizes[key] || 0).toFixed(1));
   }
-  const xs = grounds.map(point => point.x), ys = grounds.map(point => point.y);
-  const width = Math.round(Math.max(...xs) - Math.min(...xs));
-  const height = Math.round(Math.max(...ys) - Math.min(...ys));
   const count = document.getElementById('frameHoleCount');
   const lengthValue = document.getElementById('frameLengthVal');
   const angleValue = document.getElementById('frameAngleVal');
@@ -128,8 +133,8 @@ export function updateFrameEditor() {
   const base = grounds[0], target = grounds[1];
   const axisLength = target ? Math.hypot(target.x - base.x, target.y - base.y) : 0;
   const axisAngle = target ? Math.atan2(target.y - base.y, target.x - base.x) * 180 / Math.PI : 0;
-  if (lengthValue) lengthValue.textContent = target?`${Math.round(axisLength)} mm`:'—';
-  if (angleValue) angleValue.textContent = target&&axisLength>1e-6?`${Math.round(axisAngle)}°`:'—';
+  if(target)editableNumber(lengthValue,axisLength,v=>window.blocks.changeFrameGround('length',v-axisLength),{label:'固定軸距（mm）',min:0,max:2000});else if(lengthValue)lengthValue.textContent='—';
+  if(target&&axisLength>1e-6)editableNumber(angleValue,axisAngle,v=>window.blocks.changeFrameGround('angle',v-axisAngle),{label:'固定軸方向（°）',min:-360,max:360});else if(angleValue)angleValue.textContent='—';
   for(const id of ['frameLengthMinus','frameLengthPlus','frameAngleMinus','frameAnglePlus']){
     const button=document.getElementById(id);if(button)button.disabled=!target||(id.includes('Angle')&&axisLength<1e-6);
   }

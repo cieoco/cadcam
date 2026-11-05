@@ -158,8 +158,7 @@ function onDragMove(e) {
     const dy = w.y - S.dragLastWorld.y;
     const anchorId = Array.from(frameNodeIds())[0];
     const before = anchorId ? pointCoords()[anchorId] : null;
-    frameNodeIds().forEach(id => movePointById(id, dx, dy));
-    snapFrameNodesToGrid();
+    translateFrame(dx,dy,true);
     const after = anchorId ? pointCoords()[anchorId] : null;
     if (!before || !after || Math.hypot(after.x - before.x, after.y - before.y) > 1e-6) S.dragLastWorld = w;
     redrawAfterDrag();
@@ -185,27 +184,31 @@ function onDragMove(e) {
     return;
   }
   if (!S.dragId) return;
-  if (pointIsRackHole(S.dragId)) return;
+  moveNodeTo(S.dragId,w);
+}
+/** Numeric coordinates and dragging share rigid-body and joint constraints. */
+export function moveNodeTo(id,w,{snap=true}={}) {
+  if (pointIsRackHole(id)) return;
   // 馬達輸入桿的動端：solver 會把它釘在 S.theta 對應的姿勢，直接拖會被拉回、移不動。
   // 不跟 solver 較勁——以「指標位置」找最近的接點當吸附目標、放開即連接（綠圈給回饋）。
-  const crankBar = inputCrankMovingEnd(S.dragId);
+  const crankBar = inputCrankMovingEnd(id);
   if (crankBar) {
     if (rotateInputCrankToPoint(crankBar,w)) { rebuild(); recordManualTrace(); draw(); }
     return;
   }
   // Only world-frame holes snap. Floating joints are motion constraints and
   // must never be quantized to the 8 mm reference grid during editing.
-  const dragTarget = pointIsGround(S.dragId) ? snapFramePoint(w) : w;
+  const dragTarget = snap && pointIsGround(id) ? snapFramePoint(w) : w;
   // 齒輪中心：拖中心＝整顆齒輪剛性平移（輪緣銷 p2 跟著走），否則齒形繞 p1、銷停舊位會分離。
   // 並維持嚙合（中心距 D=Ra+Rb 是死的）：
   //  - 夥伴已接地 → 本中心被 D 綁住，繞夥伴中心「公轉」（保持咬合，只改方位，之後可就地設地錨）。
   //  - 夥伴未接地 → 整對一起平移（兩顆都搬，維持咬合）。
   //  - 沒夥伴（單顆）→ 整顆剛性平移。
   // 放開沿用既有 mergePoints 合併到已知點/地錨＝固定在機架上（乙）。
-  const gearForCenter = S.comps.find(c => c.type === 'gear' && c.p1 && c.p1.id === S.dragId);
+  const gearForCenter = S.comps.find(c => c.type === 'gear' && c.p1 && c.p1.id === id);
   if (gearForCenter && gearForCenter.p2) {
     const pc = pointCoords();
-    const cur = pc[S.dragId] || { x: gearForCenter.p1.x || 0, y: gearForCenter.p1.y || 0 };
+    const cur = pc[id] || { x: gearForCenter.p1.x || 0, y: gearForCenter.p1.y || 0 };
     const partner = S.comps.find(p => p.type === 'gear' && p !== gearForCenter &&
       (gearForCenter.mesh === p.id || p.mesh === gearForCenter.id));
     const moveGear = (g, dx, dy) => { if (g.p1) movePointById(g.p1.id, dx, dy); if (g.p2) movePointById(g.p2.id, dx, dy); };
@@ -224,44 +227,44 @@ function onDragMove(e) {
     } else {
       moveGear(gearForCenter, dragTarget.x - cur.x, dragTarget.y - cur.y);
     }
-    S.snapTarget = nearestDisplayTo(S.dragId);
+    S.snapTarget = nearestDisplayTo(id);
     redrawAfterDrag();
     return;
   }
   let tx = dragTarget.x, ty = dragTarget.y;
   // 自由連桿：兩端都未固定、也沒接到別的桿時，拖端點等於整根平移。
-  const free = freeLinkForPoint(S.dragId);
+  const free = freeLinkForPoint(id);
   if (free) {
-    const p = pointCoords()[S.dragId];
+    const p = pointCoords()[id];
     const desired = { x: w.x, y: w.y };
-    const snapped = snapFramePoint(desired);
+    const snapped = snap ? snapFramePoint(desired) : desired;
     const dx = snapped.x - (p?.x || 0);
     const dy = snapped.y - (p?.y || 0);
     movePointById(free.p1.id, dx, dy);
     movePointById(free.p2.id, dx, dy);
-    S.snapTarget = nearestDisplayTo(S.dragId);
+    S.snapTarget = nearestDisplayTo(id);
     redrawAfterDrag();
     return;
   }
   // 自由三點桿：三頂點都沒接到別處時是自由剛體，拖任一頂點＝整個三角平移（三邊長不變，不變形）。
-  const freeTri = freeTriangleForPoint && freeTriangleForPoint(S.dragId);
+  const freeTri = freeTriangleForPoint && freeTriangleForPoint(id);
   if (freeTri) {
-    const p = pointCoords()[S.dragId];
+    const p = pointCoords()[id];
     const dx = w.x - (p?.x || 0);
     const dy = w.y - (p?.y || 0);
     movePointById(freeTri.p1.id, dx, dy);
     movePointById(freeTri.p2.id, dx, dy);
     movePointById(freeTri.p3.id, dx, dy);
-    S.snapTarget = nearestDisplayTo(S.dragId);
+    S.snapTarget = nearestDisplayTo(id);
     redrawAfterDrag();
     return;
   }
   // 一頂點固定的三點桿：整個三角繞固定頂點剛性旋轉（拖的頂點沿其半徑圓走，第三點同步轉），三邊長不變。
-  const pinTri = freeTriangleForPoint && pinnedTriangleForPoint && pinnedTriangleForPoint(S.dragId);
+  const pinTri = freeTriangleForPoint && pinnedTriangleForPoint && pinnedTriangleForPoint(id);
   if (pinTri) {
     const pc = pointCoords();
     const f = pc[pinTri.pivot.id];
-    const d = pc[S.dragId];
+    const d = pc[id];
     if (f && d) {
       const delta = Math.atan2(dragTarget.y - f.y, dragTarget.x - f.x) - Math.atan2(d.y - f.y, d.x - f.x);
       const cosD = Math.cos(delta), sinD = Math.sin(delta);
@@ -271,31 +274,31 @@ function onDragMove(e) {
         const vx = cur.x - f.x, vy = cur.y - f.y;
         updatePointCoordsById(p.id, f.x + vx * cosD - vy * sinD, f.y + vx * sinD + vy * cosD);
       });
-      S.snapTarget = nearestDisplayTo(S.dragId);
+      S.snapTarget = nearestDisplayTo(id);
       redrawAfterDrag();
       return;
     }
   }
   // 一般閉鏈/欠定機構的手抓點：把被拖的洞暫時 pin 到游標，用距離約束迭代解其他桿件。
-  if (solvePinnedConstraints && solvePinnedConstraints(S.dragId, dragTarget)) {
-    S.snapTarget = nearestDisplayTo(S.dragId);
+  if (solvePinnedConstraints && solvePinnedConstraints(id, dragTarget)) {
+    S.snapTarget = nearestDisplayTo(id);
     redrawAfterDrag();
     return;
   }
   // 三點桿自由頂點，但另兩頂點都被機構牽制（≥2 樞紐）：此頂點被剛體完全決定，
   // 自由拖會破壞三角剛性 → 鎖住不動（要移動請拖牽制較少的接點，或加馬達驅動機構）。
-  if (lockedTriangleVertex && lockedTriangleVertex(S.dragId)) return;
-  const sharedFixedBars = !pointIsGround(S.dragId) ? S.comps.filter(comp =>
+  if (lockedTriangleVertex && lockedTriangleVertex(id)) return;
+  const sharedFixedBars = !pointIsGround(id) ? S.comps.filter(comp =>
     comp.type === 'bar' && comp.fixedLen && comp.p1 && comp.p2 &&
-    (comp.p1.id === S.dragId || comp.p2.id === S.dragId)) : [];
+    (comp.p1.id === id || comp.p2.id === id)) : [];
   if (sharedFixedBars.length > 1) {
     transient('這是多桿共用的固定長度接點；請調整桿長或移動機架固定孔。');
     return;
   }
   // 固定長度連桿：已有約束時，拖端點繞另一端以固定半徑旋轉（圓規），長度不變
-  const fl = fixedLinkFor(S.dragId);
+  const fl = fixedLinkFor(id);
   if (fl) {
-    const other = fl.p1.id === S.dragId ? fl.p2 : fl.p1;
+    const other = fl.p1.id === id ? fl.p2 : fl.p1;
     const L = Math.max(1, S.topo.params[fl.lenParam] ||
       Math.hypot((fl.p2.x || 0) - (fl.p1.x || 0), (fl.p2.y || 0) - (fl.p1.y || 0)));
     let dx = dragTarget.x - (other.x || 0), dy = dragTarget.y - (other.y || 0);
@@ -303,11 +306,33 @@ function onDragMove(e) {
     tx = (other.x || 0) + dx / d * L;
     ty = (other.y || 0) + dy / d * L;
   }
-  updatePointCoordsById(S.dragId, tx, ty);
+  updatePointCoordsById(id, tx, ty);
   recomputeLengths();
-  S.snapTarget = nearestDisplayTo(S.dragId);
+  S.snapTarget = nearestDisplayTo(id);
   redrawAfterDrag();
 }
+export function translateFrame(dx,dy,snap=false){
+  frameNodeIds().forEach(id=>movePointById(id,dx,dy));if(snap)snapFrameNodesToGrid();
+}
+export function setFramePosition(axis,value){
+  const nodes=[...frameNodeIds()].map(id=>pointCoords()[id]).filter(Boolean);if(!nodes.length||!Number.isFinite(value))return;
+  const center=nodes.reduce((sum,p)=>sum+p[axis],0)/nodes.length,delta=value-center;if(Math.abs(delta)<1e-7)return;
+  pause();const before=snapshotStr();translateFrame(axis==='x'?delta:0,axis==='y'?delta:0);rebuild();draw();
+  S.undoStack.push(before);if(S.undoStack.length>60)S.undoStack.shift();updateUndoBtn(true);Panels.updateFrameEditor();
+}
+export function setPointPosition(axis,raw) {
+  const id=S.selectedNodeId,p=pointCoords()[id],value=Number(raw);
+  if(!p||!['x','y'].includes(axis)||!Number.isFinite(value))return;
+  if(fusionAtPoint(S.comps,id)){transient('合成孔位請改桿段尺寸，或先解除合成。');return;}
+  const target={...p,[axis]:value};if(Math.hypot(target.x-p.x,target.y-p.y)<1e-7)return;
+  pause();const before=snapshotStr(),saved={comps:structuredClone(S.comps),params:{...S.topo.params},theta:S.theta,motorAngles:{...S.motorAngles}};
+  moveNodeTo(id,target,{snap:false});S.snapTarget=null;rebuild();
+  const actual=pointCoords()[id];
+  if(!actual||Math.hypot(actual.x-target.x,actual.y-target.y)>.05){S.comps=saved.comps;S.topo.params=saved.params;S.theta=saved.theta;S.motorAngles=saved.motorAngles;rebuild();transient('此位置不符合連接或固定長度；請改孔距，或拖曳到可達位置。');}
+  else if(snapshotStr()!==before){S.undoStack.push(before);if(S.undoStack.length>60)S.undoStack.shift();updateUndoBtn(true);}
+  draw();Panels.updateRoleEditor();
+}
+
 function commitDragUndo() {
   if (S.preDragSnap == null) return;
   if (snapshotStr() !== S.preDragSnap) {
@@ -317,7 +342,13 @@ function commitDragUndo() {
   }
   S.preDragSnap = null;
 }
+function cancelPointDrag(){
+  const before=S.preDragSnap;S.preDragSnap=null;S.dragId=null;S.dragLinkId=null;S.dragFrame=false;S.dragLastWorld=null;S.snapTarget=null;
+  if(before){const saved=JSON.parse(before);S.comps=saved.comps;S.topo.params=saved.params;S.motorAngles={...(saved.motorAngles||{})};S.theta=Number(saved.params?.theta)||0;rebuild();draw();}
+}
 function onDragEnd(e) {
+  if(e?.type==='pointercancel'&&!S.drawingLink&&!S.drawingTriangle&&!S.drawingPolygon){cancelPointDrag();pendingNodeDrag=null;return;}
+
   if (e?.type === 'pointercancel' && (S.drawingLink || S.drawingTriangle || S.drawingPolygon)) { linkPointerStart = null; return; }
   if (pinchActive) return;
   if (S.dragShape) return;   // 造形點拖曳由 app 的專用監聽處理
@@ -368,7 +399,7 @@ function onDragEnd(e) {
 
 function abortSingleDrag() {
   // 第二指落下時，放棄正在進行的單指拖曳，避免與縮放打架
-  commitDragUndo(); // 已完成的單指位移仍保留一筆復原，雙指本身不改機構。
+  cancelPointDrag(); // 第二指取消尚未完成的單指候選，不留下半次移動。
   backgroundPan = null;
   pendingNodeDrag = null;
   pendingOverlap = null;
@@ -440,6 +471,7 @@ export function init(deps) {
   svg.addEventListener('pointercancel', () => { pendingMobileEdit = false; });
   // 點空白處（背景/地面線，未 stopPropagation）取消選取
   svg.addEventListener('pointerdown', (e) => {
+    if(e.target?.closest?.('[data-dimension-handle]'))return;
     if (pinchActive) return;
     if (S.drawingLink || S.drawingTriangle || S.drawingPolygon) return; // 畫圖模式：交給工具處理
     if (S.placingMotor || S.pickBars) { cancelMotorMode(); draw(); return; }
@@ -485,7 +517,7 @@ export function init(deps) {
       pinchState = { dist, cx, cy };
       draw();
     }
-  });
+  }, true);
   svg.addEventListener('pointerup', endPointer);
   svg.addEventListener('pointercancel', endPointer);
 
@@ -538,6 +570,7 @@ export function init(deps) {
   // 落點若靠近某個接點（用畫面 px 當門檻，縮放下手感一致），就直接接手那個接點，
   // 並擋住桿身的 pointerdown，避免它把選取搶去顯示長度。
   svg.addEventListener('pointerdown', (e) => {
+    if(e.target?.closest?.('[data-dimension-handle]'))return;
     if (!mobilePrompt()) return;
     if (S.mateMode) return;                                   // 接合面工具開著：舞台只接受點目標與平移（mate-tool.js）
     if (e.pointerType === 'mouse') return;
@@ -562,6 +595,7 @@ export function init(deps) {
 
   // 畫桿模式：按下決定起點；桌機拖放或點兩下，觸控拖放。
   svg.addEventListener('pointerdown', (e) => {
+    if(e.target?.closest?.('[data-dimension-handle]'))return;
     if (!S.drawingLink) return;
     if (activePointers.size >= 2) return; // 雙指縮放優先
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -582,6 +616,7 @@ export function init(deps) {
     try { svg.setPointerCapture(e.pointerId); } catch (_) {}
   });
   svg.addEventListener('pointerdown', (e) => {
+    if(e.target?.closest?.('[data-dimension-handle]'))return;
     if (!S.drawingTriangle) return;
     if (activePointers.size >= 2) return;
     const w = worldFromEvent(e); if (!w) return;
@@ -596,6 +631,7 @@ export function init(deps) {
   });
   // 多邊形板：滑鼠左鍵逐點加頂點 / 選求解點；觸控按下設預覽、放開時提交（見 onDragEnd）。
   svg.addEventListener('pointerdown', (e) => {
+    if(e.target?.closest?.('[data-dimension-handle]'))return;
     if (!S.drawingPolygon) return;
     if (activePointers.size >= 2) return;
     const w = worldFromEvent(e); if (!w) return;

@@ -10,15 +10,18 @@ export function candidateCoverageText(candidate){
 }
 export const candidateConfirmLabel=(candidate,pending=false)=>!pending&&candidate?.saveable&&candidate.validation?.status==='fail'?'接上（有干涉）':'接上';
 /** Face names and U/V belong to the selected home XY box, not a member AABB. */
-export function candidateHostFace(candidate,faceId){
+export function candidateHostPoint(candidate,p){
  const part=candidate.model?.materialParts.find(p=>p.partId===(candidate.hostSurface?.framePartId || candidate.hostSurface?.compId));
- const face=candidate.hostSurface&&boxFaces(candidate.hostSurface.box).find(f=>f.id===faceId);
- if(!part||!face||!candidate.hostReference)return null;
+ if(!part||!candidate.hostReference)return null;
  const {origin,angle}=candidate.hostReference,c=Math.cos(angle),s=Math.sin(angle),t=part.geometry.thicknessMm;
  const local=p=>({x:(p.x-origin.x)*c+(p.y-origin.y)*s,y:-(p.x-origin.x)*s+(p.y-origin.y)*c,z:p.z+t/2});
- const center=applyMatrix4(part.pose.matrix,local(face.center));
- const axis=v=>{const q=applyMatrix4(part.pose.matrix,local({x:face.center.x+v.x,y:face.center.y+v.y,z:face.center.z+v.z}));return {x:q.x-center.x,y:q.y-center.y,z:q.z-center.z};};
- return {center,u:axis(face.u),v:axis(face.v)};
+ return applyMatrix4(part.pose.matrix,local(p));
+}
+export function candidateHostFace(candidate,faceId){
+ const face=candidate.hostSurface&&boxFaces(candidate.hostSurface.box).find(f=>f.id===faceId);if(!face)return null;
+ const center=candidateHostPoint(candidate,face.center);if(!center)return null;
+ const axis=v=>{const q=candidateHostPoint(candidate,{x:face.center.x+v.x,y:face.center.y+v.y,z:face.center.z+v.z});return {x:q.x-center.x,y:q.y-center.y,z:q.z-center.z};};
+ return {center,u:axis(face.u),v:axis(face.v),n:axis(face.n)};
 }
 export function candidateMaterialFaces(model){
  const faces=[];

@@ -1,7 +1,7 @@
+import {dimensionHandle} from './dimension-handle.js';
 import {renderTabNutDimensions} from './tab-nut-parameter-ui.js';
 import {TAB_NUT_DEFAULTS} from './tab-nut-geometry.js';
-import {candidateMaterialFaces,candidateHostFace,candidateCoverageText,candidateConfirmLabel} from './face-candidate-view.js';
-import {applyMatrix4} from '../blocks3d/orthogonal-3d.js';
+import {candidateMaterialFaces,candidateHostFace,candidateHostPoint,candidateCoverageText,candidateConfirmLabel} from './face-candidate-view.js';
 import {hitLabels} from './part-labels.js';
 import { LOAD_GRAPH_TOKEN } from '../module-url.js';
 import { createLoadSession, LOAD_MISMATCH_MESSAGE } from './load-session.js';
@@ -84,7 +84,7 @@ function showCandidate(candidate){
 }
 window.addEventListener('pagehide',()=>{candidateClosed=true;clearTimeout(previewTimer);});
 let bracketOffsets = {}, selectedBracket = null, bracketSpan = 0;
-let moveStep = 5, edgeMode = false, dimensionField = null, dimensionAlignment = null;
+let dimensionField = null;
 const titles = ['選擇兩個機構', '選承接端的面', '選安裝端的面', '預覽對齊與偏置'];
 const add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
 const mul = (p, n) => ({ x: p.x * n, y: p.y * n, z: p.z * n });
@@ -187,47 +187,32 @@ const angle = () => draft.rotationDeg ?? draft.quarterTurns * 90;
 $('turn').addEventListener('click', () => update('rotationDeg', (angle() + 90) % 360));
 $('turnMinus').addEventListener('click', () => update('rotationDeg', (angle() + 270) % 360));
 $('angleChip').addEventListener('click', () => openDimension('rotationDeg', angle()));
-$('mateMode').addEventListener('click', () => {
-  edgeMode = !edgeMode;
-  $('mateMode').textContent = edgeMode ? '靠邊' : '移動';
-  $('mateMode').setAttribute('aria-pressed', String(edgeMode));
-});
 $('mateCenter').addEventListener('click', () => {
   draft.alignU = 0; draft.alignV = 0; draft.offsetU = 0; draft.offsetV = 0; render();
 });
-const arrowFields = {
-  uPlus: ['offsetU', 'alignU', 1], uMinus: ['offsetU', 'alignU', -1],
-  vPlus: ['offsetV', 'alignV', 1], vMinus: ['offsetV', 'alignV', -1]
-};
-document.querySelectorAll('.mate-arrow').forEach(b => b.addEventListener('click', () => {
-  const [offset, align, sign] = arrowFields[b.dataset.arrow];
-  openDimension(offset, edgeMode ? 0 : draft[offset] + sign * moveStep, edgeMode ? [align, sign] : null);
-}));
 const dimensionButtons = {
-  offsetU: $('mateUChip'), offsetV: $('mateVChip'), gap: $('mateGapChip'), moveStep: $('mateStepChip')
+  offsetU: $('mateUChip'), offsetV: $('mateVChip'), gap: $('mateGapChip')
 };
 const dimensionText = {
   offsetU: value => `左右 ${value}`,
   offsetV: value => `上下 ${value}`,
-  gap: value => `間距 ${value}`,
-  moveStep: value => `步距 ${value}`
+  gap: value => `間距 ${value}`
 };
-function openDimension(field, value, alignment = null) {
+function openDimension(field, value) {
   dimensionField = field;
-  dimensionAlignment = alignment;
   $('dimensionTitle').textContent = field === 'bracket' ? '角碼位置偏移' : field === 'rotationDeg' ? '設定接合角度' : field === 'offsetU' ? '設定左右偏移' : field === 'offsetV' ? '設定上下偏移' : field === 'gap' ? '設定面間距' : '設定移動步距';
   $('dimensionLabel').textContent = `${$('dimensionTitle').textContent}（${field === 'rotationDeg' ? '°' : 'mm'}）`;
   const input = $('dimensionValue');
   showNumber(input, value);
-  input.min = field === 'moveStep' || field === 'gap' ? '0' : '';
-  dimensionSign.hidden = field === 'moveStep' || field === 'gap';
+  input.min = field === 'gap' ? '0' : '';
+  dimensionSign.hidden = field === 'gap';
   input.removeAttribute('aria-invalid');
-  $('dimensionError').textContent = field === 'bracket' ? '位置超出接合區，或與另一顆角碼太接近。' : '請輸入有效數字；步距須大於 0，間距不可小於 0。';
+  $('dimensionError').textContent = field === 'bracket' ? '位置超出接合區，或與另一顆角碼太接近。' : '請輸入有效數字；間距不可小於 0。';
   $('dimensionError').hidden = true;
   $('dimensionDialog').showModal(); input.focus();
 }
 Object.entries(dimensionButtons).forEach(([field, b]) => b.addEventListener('click', () => {
-  openDimension(field, field === 'moveStep' ? moveStep : draft[field]);
+  openDimension(field, draft[field]);
 }));
 $('dimensionCancel').addEventListener('click', () => $('dimensionDialog').close('cancel'));
 $('dimensionDialog').addEventListener('close', () => {
@@ -236,13 +221,11 @@ $('dimensionDialog').addEventListener('close', () => {
 $('dimensionForm').addEventListener('submit', e => {
   e.preventDefault();
   const input = $('dimensionValue'), value = readNumber(input);
-  if ((dimensionField === 'bracket' && !bracketLayout(bracketSpan, { ...bracketOffsets, [selectedBracket]: value }).length) || !Number.isFinite(value) || (dimensionField === 'moveStep' && value <= 0) || (dimensionField === 'gap' && value < 0)) {
+  if ((dimensionField === 'bracket' && !bracketLayout(bracketSpan, { ...bracketOffsets, [selectedBracket]: value }).length) || !Number.isFinite(value) || (dimensionField === 'gap' && value < 0)) {
     input.setAttribute('aria-invalid', 'true'); $('dimensionError').hidden = false; input.focus(); return;
   }
   if (dimensionField === 'bracket') bracketOffsets[selectedBracket] = value;
-  else if (dimensionField === 'moveStep') moveStep = value;
   else draft[dimensionField] = dimensionField === 'rotationDeg' ? ((value % 360) + 360) % 360 : value;
-  if (dimensionAlignment) draft[dimensionAlignment[0]] = dimensionAlignment[1];
   input.removeAttribute('aria-invalid');
   $('dimensionDialog').close('confirm'); render();
 });
@@ -280,6 +263,7 @@ $('viewRight').addEventListener('click', () => { viewYaw += 90; preview(); });
 $('viewFlip').addEventListener('click', () => { viewElevation = -viewElevation; preview(); });
 $('viewReset').addEventListener('click', () => { viewYaw = 45; viewElevation = 30; preview(); });
 $('scene').addEventListener('pointerdown', e => {
+  if(e.target.closest?.('[data-dimension-handle]'))return;
   if (e.button !== 0) return;
   draggedView = false;
   viewDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, yaw: viewYaw, elevation: viewElevation };
@@ -303,7 +287,7 @@ function drawCandidateScene(mate){
  const svg=$('scene');svg.replaceChildren();$('bracketNote').hidden=false;fitControls.hidden=false;
  bracketPlan=parentCandidate?.bracket || null;bracketSpan=bracketPlan?.span || 0;
  const pending=parentCandidate?.selectionRevision!==previewSignature;
- if(fastenerKind==='tab-nut')renderTabNutDimensions($('tabNutDimensions'),$('tabNutComputed'),parentCandidate?.tabNut,{pending:previewResultRequest!==previewRequest});
+ if(fastenerKind==='tab-nut')renderTabNutDimensions($('tabNutDimensions'),$('tabNutComputed'),parentCandidate?.tabNut,{pending:previewResultRequest!==previewRequest,onPreview:(key,v)=>showNumber($(`tabNut-${key}`),v),onChange:(key,v)=>{tabNutSettings[key]=v;showNumber($(`tabNut-${key}`),v);render();}});
  $('bracketNote').textContent=pending?'此圖為上次候選；目前設定待檢查。':parentCandidate?.tabNut?.ok?'3 mm 板雙榫＋M3 · 試作，實物待核對':bracketPlan?.ok?`角碼 ${bracketPlan.brackets.length} 顆 · 固定孔 Ø3.2`:parentCandidate?.reason || '僅幾何定位，尚未配置固定五金。';
  if(!parentCandidate?.model){$('mateOverlay').hidden=true;return;}
  const faces=candidateMaterialFaces(parentCandidate.model),points=faces.flatMap(f=>f.rings.flat()),projected=points.map(viewCoords);
@@ -316,11 +300,14 @@ function drawCandidateScene(mate){
   const d=f.rings.map(r=>r.map(screen).map((p,i)=>`${i?'L':'M'}${p.x},${p.y}`).join(' ')+'Z').join(' ');
   make('path',{d,'fill-rule':'evenodd',fill:f.unsupported?'none':red.has(f.pickKey)?'#cf5046':f.color,stroke:f.unsupported?'#ca8b31':red.has(f.pickKey)?'#932b26':'#47636a','stroke-width':red.has(f.pickKey)?2:1,'fill-opacity':.8,'data-part-id':f.partId,'data-pick-key':f.pickKey});
  });
- const model=parentCandidate.model,face=candidateHostFace(parentCandidate,parentCandidate.placement.selection.hostFace);
+ const face=candidateHostFace(parentCandidate,parentCandidate.placement.selection.hostFace);
  if(face)positionMateOverlay(face,screen);else $('mateOverlay').hidden=true;
- for(const slot of bracketPlan?.brackets || []){const wing=model.materialParts.find(p=>p.bracketId?.endsWith('/slot:'+slot.id));if(!wing)continue;const local=wing.geometry.outlines[0],center=applyMatrix4(wing.pose.matrix,{x:local.reduce((n,p)=>n+p.x,0)/local.length,y:local.reduce((n,p)=>n+p.y,0)/local.length,z:wing.geometry.thicknessMm/2}),q=screen(center);
-  const button=make('circle',{cx:q.x,cy:q.y,r:17,fill:'transparent',stroke:selectedBracket===slot.id?'#d99821':'none',role:'button',tabindex:0,'aria-label':`角碼 ${slot.id}，調整位置`});
-  const choose=()=>{selectedBracket=slot.id;openDimension('bracket',bracketOffsets[slot.id] || 0);};button.addEventListener('click',choose);button.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}});
+ for(const slot of bracketPlan?.brackets || []){const physical=bracketPlan.physical?.find(p=>p.slotId===slot.id);if(!physical)continue;const center=candidateHostPoint(parentCandidate,slot.corner);if(!center)continue;const q=screen(center);
+  const choose=()=>{selectedBracket=slot.id;openDimension('bracket',bracketOffsets[slot.id] || 0);};
+  const end=screen(candidateHostPoint(parentCandidate,add(slot.corner,physical.seamAxis))),value=bracketOffsets[slot.id]||0;
+  dimensionHandle(svg,{key:'bracket-'+slot.id,label:'角碼 '+slot.id,point:q,direction:{x:end.x-q.x,y:end.y-q.y},value,min:-bracketSpan/2,max:bracketSpan/2,activate:choose,color:slot.reason?'#b34436':'#087f8c',
+    preview:v=>{selectedBracket=slot.id;bracketOffsets[slot.id]=v;render();},cancel:()=>{bracketOffsets[slot.id]=value;render();},commit:v=>{if(!bracketLayout(bracketSpan,{...bracketOffsets,[slot.id]:v}).length){$('message').textContent='角碼位置超出接合區，請縮小位移。';return;}bracketOffsets[slot.id]=v;render();}});
+
  }
 }
 function scene(mate) {
@@ -344,7 +331,7 @@ function scene(mate) {
       const normalPoint = transform(add(face.center, face.n));
       const normal = { x: normalPoint.x - center.x, y: normalPoint.y - center.y, z: normalPoint.z - center.z };
       const visible = viewCoords(normal).depth > .01;
-      polygons.push({ which, id: face.id, points, center, u: face.u, v: face.v, visible, selected: selected === face.id, depth: viewCoords(center).depth, transform, bounds });
+      polygons.push({ which, id: face.id, points, center, u: face.u, v: face.v, n: normal, visible, selected: selected === face.id, depth: viewCoords(center).depth, transform, bounds });
     }
   }
   const all = [...polygons, ...objects].flatMap(p => p.points.map(project));
@@ -412,10 +399,10 @@ function scene(mate) {
         make('circle',{cx:q.x,cy:q.y,r:FACE_BRACKET_SPEC.diameter/2*scale,fill:'none',stroke:slot.reason?'#c84436':'#167553','stroke-width':2,'pointer-events':'none'});
       }
       const q = screen(slot.corner);
-      const target=make('circle',{cx:q.x,cy:q.y,r:24,fill:'transparent',role:'button',tabindex:0,'aria-label':`角碼 ${slot.id}，調整位置`,'aria-pressed':active});
       const choose=()=>{if(draggedView)return;selectedBracket=slot.id;preview();openDimension('bracket',bracketOffsets[slot.id]||0);};
-      target.style.cursor='pointer';target.addEventListener('pointerdown',e=>e.stopPropagation());target.addEventListener('click',choose);
-      target.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}});
+      const physical=bracketPlan.physical?.find(p=>p.slotId===slot.id),value=bracketOffsets[slot.id]||0;
+      if(physical){const end=screen(add(slot.corner,physical.seamAxis));dimensionHandle(svg,{key:'bracket-'+slot.id,label:'角碼 '+slot.id,point:q,direction:{x:end.x-q.x,y:end.y-q.y},value,min:-bracketSpan/2,max:bracketSpan/2,activate:choose,color,
+        preview:v=>{bracketOffsets[slot.id]=v;render();},cancel:()=>{bracketOffsets[slot.id]=value;render();},commit:v=>{if(!bracketLayout(bracketSpan,{...bracketOffsets,[slot.id]:v}).length){$('message').textContent='角碼位置超出接合區，請縮小位移。';return;}bracketOffsets[slot.id]=v;render();}});}
     }
   }
   const axis = make('text', { x: 300, y: 370, 'text-anchor': 'middle', 'font-size': 13, fill: '#516d69' });
@@ -424,63 +411,23 @@ function scene(mate) {
   if (hostFace && !separate) positionMateOverlay(hostFace, screen);
   else $('mateOverlay').hidden = true;
 }
-function positionMateOverlay(face, screen) {
-  const overlay = $('mateOverlay'), wrap = $('sceneWrap'), svg = $('scene');
-  const show = mode === 'work' || step === 3;
-  overlay.hidden = !show;
-  if (!show) return;
-  const wrapRect = wrap.getBoundingClientRect(), matrix = svg.getScreenCTM();
-  if (!matrix || !wrapRect.width || !wrapRect.height) { overlay.hidden = true; return; }
-  const point = p => {
-    const q = svg.createSVGPoint(); q.x = p.x; q.y = p.y;
-    const client = q.matrixTransform(matrix);
-    return { x: client.x - wrapRect.left, y: client.y - wrapRect.top };
-  };
-  const center = point(screen(face.center));
-  const axis = basis => {
-    const origin = screen(face.center), end = screen(add(face.center, basis));
-    const a = point(origin), b = point(end), dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy);
-    return length < 0.01 ? null : { x: dx / length, y: dy / length };
-  };
-  const u = axis(face.u) || { x: 1, y: 0 };
-  let v = axis(face.v);
-  if (!v || Math.abs(u.x * v.y - u.y * v.x) < .45) {
-    const perpendicular = { x: -u.y, y: u.x };
-    if (v && perpendicular.x * v.x + perpendicular.y * v.y < 0) { perpendicular.x *= -1; perpendicular.y *= -1; }
-    v = perpendicular;
+function positionMateOverlay(face,screen){
+  const overlay=$('mateOverlay'),svg=$('scene');overlay.hidden=!(mode==='work'||step===3);if(overlay.hidden)return;
+  const center=screen(face.center),matrix=svg.getScreenCTM();if(!matrix)return;
+  const css=1/Math.hypot(matrix.a,matrix.b),offset=50*css;
+  const axis=basis=>{const end=screen(add(face.center,basis));return {x:end.x-center.x,y:end.y-center.y};};
+  for(const [field,label,basis] of [['offsetU','左右',face.u],['offsetV','上下',face.v],['gap','間距',face.n]]){
+    const direction=axis(basis),L=Math.hypot(direction.x,direction.y);if(L<.01)continue;
+    const point={x:center.x+direction.x/L*offset,y:center.y+direction.y/L*offset},value=draft[field];
+    dimensionHandle(svg,{key:'mate-'+field,label,point,direction,value,min:field==='gap'?0:-2000,max:2000,
+      preview:v=>{draft[field]=v;render();},cancel:()=>{draft[field]=value;render();},commit:v=>update(field,v)});
   }
-  const specs = [
-    ['uPlus', u], ['uMinus', { x: -u.x, y: -u.y }],
-    ['vPlus', v], ['vMinus', { x: -v.x, y: -v.y }]
-  ];
-  const centerLeft = Math.max(4, Math.min(wrapRect.width - 48, center.x - 22));
-  const centerTop = Math.max(4, Math.min(wrapRect.height - 54, center.y - 22));
-  const placed = [], centerBox = { left: centerLeft, top: centerTop, right: centerLeft + 44, bottom: centerTop + 44 };
-  const collides = box => [centerBox, ...placed].some(other => box.left < other.right + 4 && box.right + 4 > other.left && box.top < other.bottom + 4 && box.bottom + 4 > other.top);
-  for (const [key, dir] of specs) {
-    const b = overlay.querySelector(`[data-arrow="${key}"]`);
-    let chosen = null;
-    for (const radius of [62, 78, 94, 110]) {
-      const px = center.x + dir.x * radius, py = center.y + dir.y * radius;
-      const left = Math.max(4, Math.min(wrapRect.width - 52, px - 24));
-      const top = Math.max(4, Math.min(wrapRect.height - 52, py - 24));
-      const candidate = { left, top, right: left + 48, bottom: top + 48 };
-      if (!collides(candidate)) { chosen = candidate; break; }
-    }
-    if (!chosen) {
-      const fallback = { uPlus: [28, wrapRect.height / 2], uMinus: [wrapRect.width - 28, wrapRect.height / 2], vPlus: [wrapRect.width / 2, 74], vMinus: [wrapRect.width / 2, wrapRect.height - 74] }[key];
-      const left = Math.max(4, Math.min(wrapRect.width - 52, fallback[0] - 24));
-      const top = Math.max(4, Math.min(wrapRect.height - 52, fallback[1] - 24));
-      chosen = { left, top, right: left + 48, bottom: top + 48 };
-    }
-    placed.push(chosen);
-    const { left, top } = chosen;
-    b.style.left = `${left}px`; b.style.top = `${top}px`;
-    b.style.transform = `rotate(${Math.atan2(dir.y, dir.x) * 180 / Math.PI + 90}deg)`;
-  }
-  $('mateCenter').style.left = `${centerLeft}px`;
-  $('mateCenter').style.top = `${centerTop}px`;
+  const rotation=angle(),axes={u:axis(face.u),v:axis(face.v)},r=rotation*Math.PI/180,radius=110*css/Math.max(Math.hypot(axes.u.x,axes.u.y),Math.hypot(axes.v.x,axes.v.y),.01);
+  if(Math.abs(axes.u.x*axes.v.y-axes.u.y*axes.v.x)>.01)dimensionHandle(svg,{key:'mate-angle',label:'角度',point:{x:center.x+radius*(axes.u.x*Math.cos(r)+axes.v.x*Math.sin(r)),y:center.y+radius*(axes.u.y*Math.cos(r)+axes.v.y*Math.sin(r))},direction:{x:1,y:0},angleCenter:center,angleAxes:axes,value:rotation,min:-360,max:360,step:1,
+    preview:v=>{draft.rotationDeg=v;render();},cancel:()=>{draft.rotationDeg=rotation;render();},commit:v=>update('rotationDeg',((v%360)+360)%360)});
+  const wrap=$('sceneWrap').getBoundingClientRect(),pt=new DOMPoint(center.x,center.y).matrixTransform(matrix);$('mateCenter').style.left=`${Math.max(0,pt.x-wrap.left-22)}px`;$('mateCenter').style.top=`${Math.max(0,pt.y-wrap.top-22)}px`;
 }
+
 function render() {
   document.body.dataset.ui = mode;
   document.body.dataset.step = step;
@@ -505,7 +452,7 @@ function render() {
   $('back').textContent = '上一步';
   $('next').textContent = mode === 'work' || step === 3 ? (integrated ? '接上' : '確認擺放') : '下一步';
   if (integrated) $('cancel').textContent = '取消';
-  if (integrated && configured) { $('wizardMode').parentElement.hidden = true; document.querySelector('header .tag').hidden = true; $('mateStepChip').hidden = true; }
+  if (integrated && configured) { $('wizardMode').parentElement.hidden = true; document.querySelector('header .tag').hidden = true; }
   if(integrated && hosts[draft.host]?.designId) {
     $('hostDesign').value=hosts[draft.host].designId;
     $('hosts').querySelectorAll('button').forEach(b=>{b.style.display=hosts[Number(b.dataset.value)].designId===hosts[draft.host].designId?'':'none';});
@@ -521,7 +468,6 @@ function preview() {
   $('mateUChip').textContent = dimensionText.offsetU(Number(draft.offsetU.toFixed(2)));
   $('mateVChip').textContent = dimensionText.offsetV(Number(draft.offsetV.toFixed(2)));
   $('mateGapChip').textContent = dimensionText.gap(Number(draft.gap.toFixed(2)));
-  $('mateStepChip').textContent = dimensionText.moveStep(moveStep);
   const broad = f => f === 'top' || f === 'bottom';
   const relation = broad(draft.hostFace) && broad(draft.childFace) ? '板面平行' : broad(draft.hostFace) !== broad(draft.childFace) ? '板面垂直' : '外框邊對齊';
   faceRelation.textContent = `${relation} · 間距 ${draft.gap} mm`;

@@ -1,5 +1,6 @@
-/** Read-only dimensions from the validated shared plan, never a second cutting model. */
-export function renderTabNutDimensions(svg,summary,plan,{pending=false}={}) {
+import {dimensionHandle} from './dimension-handle.js';
+/** Dimensions from the validated shared plan; handles update the existing settings. */
+export function renderTabNutDimensions(svg,summary,plan,{pending=false,onChange=null,onPreview=()=>{}}={}) {
   svg.replaceChildren();
   svg.toggleAttribute('hidden',pending||!plan?.ok);
   if(pending||!plan?.ok){summary.textContent=pending?'尺寸檢查中…':'尺寸通過檢查後顯示配對槽與板厚。';return;}
@@ -21,4 +22,9 @@ export function renderTabNutDimensions(svg,summary,plan,{pending=false}={}) {
   };
   dimension(-p.tabPitchMm/2-p.tabWidthMm/2,-p.tabPitchMm/2+p.tabWidthMm/2,plan.tHost+2,`A ${number(p.tabWidthMm)}`);
   dimension(-p.tabPitchMm/2,p.tabPitchMm/2,plan.tHost+8,`B ${number(p.tabPitchMm)}`);
+  if(onChange){for(const [key,label,point,direction,min,max] of [
+    ['tabWidthMm','榫寬',{x:-p.tabPitchMm/2+p.tabWidthMm/2,y:plan.tHost+2},{x:.5,y:0},4,30],
+    ['tabPitchMm','中心距',{x:p.tabPitchMm/2,y:plan.tHost+8},{x:.5,y:0},8,100]
+  ])dimensionHandle(svg,{key:'tab-'+key,label,point,direction,value:p[key],min,max,preview:v=>onPreview(key,v),cancel:()=>onPreview(key,p[key]),commit:v=>onChange(key,v)});}
+
 }

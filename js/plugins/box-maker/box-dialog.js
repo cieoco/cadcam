@@ -1,3 +1,4 @@
+import {dimensionHandle} from '../../blocks/dimension-handle.js';
 import {BOX_DEFAULTS,BOX_NAMES,BOX_BOUNDS,normalizeBoxSettings} from './box-config.js';
 import {numericField} from '../../blocks/numeric-field.js';
 import {boxesInWork,boxJointSummary} from './box-generator.js';
@@ -29,11 +30,11 @@ export function openBoxDialog({source,initialRoot='',onConfirm}){
  let timer,serial=0,plan=null,view='assembled',closed=false,base=BOX_DEFAULTS;
  const setStatus=(text,error=false)=>{status.textContent=text;status.classList.toggle('box-error',error);};
  const setEnabled=on=>{confirm.disabled=!on;dialog.querySelectorAll('[data-file]').forEach(b=>b.disabled=!on);};
- function close(){if(closed)return;closed=true;serial++;clearTimeout(timer);dialog.close();dialog.remove();}
+ function close(){if(closed)return;closed=true;serial++;clearTimeout(timer);resize.disconnect();dialog.close();dialog.remove();}
  dialog.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
  function reset(){const p=normalizeBoxSettings(options.find(o=>o.id===select.value)?.settings) || BOX_DEFAULTS;base=p;for(const [k,input] of Object.entries(fields)){input.value=p[k];input.dispatchEvent(new Event('change'));}for(const [role,box] of Object.entries(checks))box.checked=role==='base'||p.panels[role];mode.value=p.jointsPerEdge==='auto'?'auto':'manual';count.value=p.jointsPerEdge==='auto'?1:p.jointsPerEdge;count.hidden=mode.value!=='manual';confirm.textContent=select.value?'套用修改':'加入作品';schedule();}
  select.onchange=reset;
- function schedule(){const at=++serial;clearTimeout(timer);plan=null;setEnabled(false);svg.replaceChildren();q('[data-summary]').textContent='';q('[data-joints]').textContent='';q('[data-panel-list]').textContent='';setStatus('正在檢查尺寸與接合…');timer=setTimeout(()=>update(at),180);}
+ function schedule(keepPreview=false){const at=++serial;clearTimeout(timer);plan=null;setEnabled(false);if(keepPreview!==true)svg.replaceChildren();q('[data-summary]').textContent='';q('[data-joints]').textContent='';q('[data-panel-list]').textContent='';setStatus('正在檢查尺寸與接合…');timer=setTimeout(()=>update(at),keepPreview===true?40:180);}
  async function update(at){
   const p={...base,...Object.fromEntries(Object.entries(fields).map(([k,i])=>[k,i.value.trim()===''?NaN:Number(i.value)])),jointsPerEdge:mode.value==='auto'?'auto':count.value.trim()===''?NaN:Number(count.value),panels:Object.fromEntries(Object.entries(checks).filter(([r])=>r!=='base').map(([r,b])=>[r,b.checked]))};
   try{const result=await planBoxChange(source,p,{rootPart:select.value || null});if(closed||at!==serial)return;
@@ -53,10 +54,13 @@ export function openBoxDialog({source,initialRoot='',onConfirm}){
   }else{
    const project=p=>({x:.7*p.x-.7*p.y,y:.35*p.x+.35*p.y-.85*p.z}),faces=candidateMaterialFaces(plan.preview.model),all=faces.flatMap(f=>f.rings.flat()).map(project),xs=all.map(p=>p.x),ys=all.map(p=>p.y),loX=Math.min(...xs),loY=Math.min(...ys),w=Math.max(...xs)-loX,h=Math.max(...ys)-loY;svg.setAttribute('viewBox',`${loX-12} ${loY-12} ${w+24} ${h+24}`);
    faces.sort((a,b)=>{const depth=f=>f.rings.flat().reduce((n,p)=>n+p.x+p.y+p.z,0)/f.rings.flat().length;return depth(a)-depth(b);}).forEach(f=>node('path',{d:f.rings.map(r=>path(r.map(project))).join(' '),fill:f.color || '#d7b17b',stroke:'#476775','stroke-width':.35,'fill-rule':'evenodd','fill-opacity':.85}));
+   const axes=[['lengthMm','長度',{x:.35,y:.175},{x:.35*p.lengthMm,y:.175*p.lengthMm}],['widthMm','寬度',{x:-.35,y:.175},{x:-.35*p.widthMm,y:.175*p.widthMm}],['heightMm','高度',{x:0,y:-.85},{x:0,y:-.85*(p.heightMm+p.thicknessMm)}]];
+   for(const [key,label,direction,point]of axes){const value=p[key],[min,max]=BOX_BOUNDS[key];dimensionHandle(svg,{key:'box-'+key,label,point,direction,value,min,max,preview:v=>{fields[key].value=v;schedule(true);},cancel:()=>{fields[key].value=value;schedule(true);},commit:v=>{fields[key].value=v;fields[key].dispatchEvent(new Event('input'));}});}
   }
  }
  dialog.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view;dialog.querySelectorAll('[data-view]').forEach(btn=>btn.setAttribute('aria-pressed',String(btn===b)));render();});
  dialog.querySelectorAll('[data-file]').forEach(b=>b.onclick=()=>{if(!plan)return;try{const format=b.dataset.file,text=boxFile(plan.preview.work,format),url=URL.createObjectURL(new Blob([text],{type:format==='svg'?'image/svg+xml':'application/dxf'})),a=document.createElement('a');a.href=url;a.download=`open-box-${format==='svg'?'panels.svg':'panels.dxf'}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){setStatus(e.message,true);}});
  confirm.onclick=async()=>{if(!plan||confirm.disabled)return;setEnabled(false);try{const error=await onConfirm(plan);if(error){setStatus(error,true);return;}close();}catch(e){setStatus(e.message,true);}};
+ const resize=new ResizeObserver(()=>{if(plan)render();});resize.observe(svg);
  dialog.showModal();reset();return {close};
 }

@@ -1,4 +1,5 @@
 import {S} from '../js/blocks/state.js';
+import * as Panels from '../js/blocks/panels.js';
 import {actuatorSource} from './fixtures/actuator-installation.mjs';
 import {encodeSnapshot,decodeShareString} from '../js/share-codec.js';
 const b=window.blocks,api=b.gripperPilot,lines=[];
@@ -6,11 +7,11 @@ const assert=(condition,name)=>{if(!condition)throw Error(name);lines.push('PASS
 const dialog=()=>document.querySelector('#motorInstallation[open]');
 const button=text=>[...dialog().querySelectorAll('button')].find(n=>n.textContent===text).click();
 const field=(label,value,event='change')=>{const n=dialog().querySelector(`[aria-label="${label}"]`);n.value=value;n.dispatchEvent(new Event(event,{bubbles:true}));};
-const next=()=>button('下一步');
 const waitDialog=async()=>{for(let i=0;i<50&&!dialog();i++)await new Promise(r=>setTimeout(r,100));assert(!!dialog(),'installation dialog loaded');};
 const configure=()=>{
- button('調整安裝');
- field('外殼固定在哪個零件？','Frame');button('正面');next();field('軸心位置','p1');next();field('輸出軸帶動哪個零件？','Arm');next();
+ dialog().querySelector('details').open=true;
+ assert(!dialog().querySelector('nav'),'motor has one installation view without step navigation');
+ field('外殼固定在哪個零件？','Frame');button('正面');field('軸心位置','p1');field('輸出軸帶動哪個零件？','Arm');
 };
 try{
  api.reopen(structuredClone(actuatorSource));const before=JSON.stringify(api.snapshot());
@@ -47,11 +48,11 @@ try{
  assert(adjusted.motorMount.orientation==='vertical'&&adjusted.motorMount.reversed&&S.theta===beforeDirectionAngle,'orientation saves directly without changing motor angle');
  api.reopen(decodeShareString(encodeSnapshot(api.snapshot())));await b.configureMotorMount('A');
  assert(dialog().querySelector('[aria-label="馬達本體方向"]').value==='vertical'&&[...dialog().querySelectorAll('button')].find(n=>n.textContent==='本體轉向 180°').getAttribute('aria-pressed')==='true','saved body orientation reopens');button('取消');
- await b.configureMotorMount('A');button('1 固定外殼');button('背面');button('儲存安裝');assert(S.comps.find(c=>c.id==='Arm').motorMount.face==='back','edit can jump directly to face and save');
+ await b.configureMotorMount('A');button('背面');button('儲存安裝');assert(S.comps.find(c=>c.id==='Arm').motorMount.face==='back','edit can jump directly to face and save');
  b.undo();assert(S.comps.find(c=>c.id==='Arm').motorMount.face==='front','mount edit undo');
  api.reopen(structuredClone(actuatorSource));b.pickMotorType('tt');await waitDialog();configure();button('檢查動作範圍');assert(dialog().textContent.includes('361 個角度採樣通過'),'TT continuous rotation shares the same flow');button('確認安裝');
  assert(S.comps.find(c=>c.id==='Arm').motorType==='tt','TT installed');
- await b.configureMotorMount('A');button('3 連接輸出');field('輸出軸帶動哪個零件？','Frame');
+ await b.configureMotorMount('A');field('輸出軸帶動哪個零件？','Frame');
  assert([...dialog().querySelectorAll('button')].find(n=>n.textContent==='儲存安裝').disabled,'same carrier/output cannot save');button('取消');
  api.reopen({kind:'blocks',v:1,params:{GR:20,PR:12},comps:[{type:'gear',id:'Gear',p1:{id:'G',type:'floating',x:0,y:0},p2:{id:'P',type:'floating',x:12,y:0},radiusParam:'GR',pinRadiusParam:'PR',teeth:20,module:2}]});
  S.selectedGearId='Gear';b.setSelectedMotorType('tt','gear');await waitDialog();
@@ -66,7 +67,7 @@ try{
  assert(S.comps[0].p2.physicalMotor&&S.comps[0].p2.type==='fixed','quick flow installs at the chosen second endpoint');
  b.undo();assert(JSON.stringify(api.snapshot())===looseBefore,'quick installation has one undo');
  { // Gear hole: one draft shared by dragging and numeric input.
- const selectGear=()=>document.querySelector('#stageSvg [data-pick-component="GearB"]').dispatchEvent(new PointerEvent('pointerdown',{pointerType:'mouse',bubbles:true}));
+ const selectGear=()=>{document.querySelector('#stageSvg [data-pick-component="GearB"]').dispatchEvent(new PointerEvent('pointerdown',{pointerType:'mouse',bubbles:true}));document.getElementById('stageSvg').dispatchEvent(new PointerEvent('pointerup',{pointerId:0,bubbles:true}));};
  const gears=await (await fetch(new URL('./fixtures/gear-member-mount.json',import.meta.url))).json();gears.comps=gears.comps.slice(0,2);
  api.reopen(gears);selectGear();const holeBefore=JSON.stringify(api.snapshot());
  await b.openGearHolePlacement('manual');
@@ -102,6 +103,35 @@ try{
  teethSlider.value='17';teethSlider.dispatchEvent(new Event('input',{bubbles:true}));teethSlider.dispatchEvent(new Event('change',{bubbles:true}));
  assert(S.comps.find(c=>c.id==='GearB').teeth===17&&teethNumber.value==='17','slider commits through existing numeric action');
  b.undo();assert(S.comps.find(c=>c.id==='GearB').teeth===16,'one slider change has one undo');
+ }
+ { // Shared direct editing: draft, exact placement, constraints, undo and persistence.
+ const free={kind:'blocks',v:1,counter:1,comps:[{id:'Free',type:'bar',p1:{id:'A',type:'floating',x:0,y:0},p2:{id:'B',type:'floating',x:80,y:0},lenParam:'L',fixedLen:true}],params:{L:80,theta:0}};
+ api.reopen(free);b.selectLink('Free');
+ for(let i=0;i<50&&!document.querySelector('[data-dimension-handle="member-length"]');i++)await new Promise(r=>setTimeout(r,20));
+ const before=JSON.stringify(api.snapshot()),undoCount=S.undoStack.length,svg=document.getElementById('stageSvg');
+ const handle=()=>svg.querySelector('[data-dimension-handle="member-length"]');
+ const move=()=>{const h=handle(),circle=h.querySelector('circle'),p=new DOMPoint(+circle.getAttribute('cx'),+circle.getAttribute('cy')).matrixTransform(svg.getScreenCTM());h.dispatchEvent(new PointerEvent('pointerdown',{pointerId:81,isPrimary:true,pointerType:'mouse',clientX:p.x,clientY:p.y,bubbles:true}));svg.dispatchEvent(new PointerEvent('pointermove',{pointerId:81,isPrimary:true,pointerType:'mouse',clientX:p.x+40,clientY:p.y,bubbles:true}));};
+ move();assert(Number(document.getElementById('memberDimensionInput').value)>80&&JSON.stringify(api.snapshot())===before,'dimension drag updates numeric draft without changing work');
+ svg.dispatchEvent(new PointerEvent('pointercancel',{pointerId:81,bubbles:true}));assert(JSON.stringify(api.snapshot())===before&&S.undoStack.length===undoCount,'cancel size drag preserves work and undo');
+ move();svg.dispatchEvent(new PointerEvent('pointerup',{pointerId:81,bubbles:true}));const resized=api.snapshot();assert(resized.params.L>80&&S.undoStack.length===undoCount+1,'release size handle commits one undo');
+ b.undo();assert(JSON.stringify(api.snapshot())===before,'size drag undo restores exact work');
+ api.reopen(decodeShareString(encodeSnapshot(resized)));assert(S.topo.params.L===resized.params.L,'direct dimension survives share/reopen');
+ api.reopen(free);b.selectLink('Free');const number=(label,value)=>{const n=document.querySelector(`[aria-label="${label}"]`);n.value=value;n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}));};
+ number('零件第一孔 X（mm）','20');assert(S.comps[0].p1.x===20&&S.comps[0].p2.x===100&&S.topo.params.L===80,'exact free-part position translates both holes without resizing');b.undo();assert(S.comps[0].p1.x===0,'exact movement has undo');
+ const pinned=structuredClone(free);pinned.comps[0].p1.type='fixed';api.reopen(pinned);S.selectedNodeId='B';b.draw();const locked=JSON.stringify(api.snapshot());number('接點 X（mm）','40');assert(JSON.stringify(api.snapshot())===locked,'unreachable numeric coordinate cannot shorten a constrained bar');
+ const tri={kind:'blocks',v:1,counter:1,params:{G:80,R1:60,R2:100},comps:[{id:'Tri',type:'triangle',p1:{id:'T1',type:'floating',x:0,y:0},p2:{id:'T2',type:'floating',x:80,y:0},p3:{id:'T3',type:'floating',x:0,y:60},gParam:'G',r1Param:'R1',r2Param:'R2'}]};
+ api.reopen(tri);document.querySelector('#stageSvg [data-pick-component="Tri"]').dispatchEvent(new PointerEvent('pointerdown',{pointerType:'mouse',bubbles:true}));document.getElementById('stageSvg').dispatchEvent(new PointerEvent('pointerup',{pointerId:0,bubbles:true}));b.addTriangleOutlinePoint();const shapeBefore=JSON.stringify(api.snapshot());number('外形點沿 A–B（mm）','32.5');assert(S.comps[0].vertices.find(v=>!v.solve).u===32.5&&S.topo.params.R2===100,'outline coordinate changes shape without moving solver holes');b.undo();assert(JSON.stringify(api.snapshot())===shapeBefore,'outline coordinate has one undo');
+ // Escape and a second contact cancel a size gesture without adding undo.
+ api.reopen(free);b.selectLink('Free');const cancelledUndo=S.undoStack.length;move();document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert(S.topo.params.L===80&&S.undoStack.length===cancelledUndo,'Escape cancels size gesture');
+ move();svg.dispatchEvent(new PointerEvent('pointerdown',{pointerId:82,isPrimary:false,pointerType:'touch',bubbles:true}));svg.dispatchEvent(new PointerEvent('pointerup',{pointerId:81,bubbles:true}));svg.dispatchEvent(new PointerEvent('pointerup',{pointerId:82,bubbles:true}));assert(S.topo.params.L===80&&S.undoStack.length===cancelledUndo,'second pointer cancels size gesture');
+ const stepHandle=(key)=>{const h=svg.querySelector(`[data-dimension-handle="${key}"]`);assert(!!h,`${key} has a graphical control`);h.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));};
+ const disk=structuredClone(free);disk.comps[0].shape='disk';disk.comps[0].diameterMm=200;api.reopen(disk);b.selectLink('Free');stepHandle('disk-diameter');assert(S.comps[0].diameterMm===200.1,'disk handle uses diameter validation');b.undo();assert(S.comps[0].diameterMm===200,'disk diameter undo');
+ api.reopen(free);b.selectLink('Free');document.getElementById('memberMore').open=true;b.draw();stepHandle('member-width');assert(S.comps[0].stock.widthMm>18,'stock width handle uses stock setter');b.undo();
+ const ground=structuredClone(free);ground.comps[0].p1.type=ground.comps[0].p2.type='fixed';api.reopen(ground);S.frameEditorOpen=true;Panels.updateFrameEditor();b.draw();number('機架中心 X（mm）','60');assert(S.comps[0].p1.x===20&&S.comps[0].p2.x===100,'frame numeric move preserves hole distance');b.undo();S.frameEditorOpen=true;Panels.updateFrameEditor();b.draw();stepHandle('frame-widthMm');assert(S.comps[0].p1.frameStock.widthMm>0,'frame width handle keeps stock with fixed nodes');b.undo();
+ const rail={kind:'blocks',v:1,counter:1,params:{RL:100,theta:0},comps:[{id:'Rail',type:'slider',lenParam:'RL',p1:{id:'RA',type:'fixed',x:0,y:0},p2:{id:'RB',type:'fixed',x:100,y:0},p3:{id:'RC',type:'floating',x:40,y:0},m1:{id:'RM1',type:'fixed',x:0,y:0},m2:{id:'RM2',type:'fixed',x:160,y:0},carrierLen:160,travelStart:0,travelEnd:80}]};
+ api.reopen(rail);svg.querySelector('path[fill="transparent"]').dispatchEvent(new PointerEvent('pointerdown',{pointerType:'mouse',bubbles:true}));document.getElementById('stageSvg').dispatchEvent(new PointerEvent('pointerup',{pointerId:0,bubbles:true}));stepHandle('rail-length');assert(S.topo.params.RL===101,'rail handle edits length');b.undo();svg.querySelector('path[fill="transparent"]').dispatchEvent(new PointerEvent('pointerdown',{pointerType:'mouse',bubbles:true}));document.getElementById('stageSvg').dispatchEvent(new PointerEvent('pointerup',{pointerId:0,bubbles:true}));stepHandle('travel-start');assert(S.comps[0].travelStart===1,'rail travel handle edits allowed start');number('行程終點（mm）','70');assert(S.comps[0].travelEnd===70,'rail end accepts exact input');
+ api.reopen({kind:'blocks',v:1,counter:0,params:{theta:0},comps:[]});b.addRackPinion();const rack=S.comps.find(c=>c.type==='rack');stepHandle('rack-length');assert(S.topo.params[rack.lenParam]%8!==0,'rack size can use one mm without eight mm rounding');
+ api.reopen(free);b.pickMotorType('n20');await waitDialog();field('外殼固定在哪個零件？','world');field('輸出軸帶動哪個零件？','Free');field('試動角度數值 (°)','35.5');assert(dialog().querySelector('[aria-label="試動角度 (°)"]').value==='35.5'&&dialog().querySelector('output').textContent.includes('35.5'),'N20 exact trial updates same candidate');button('確認安裝');assert(S.comps[0].motorType==='n20','N20 single-view installation commits');b.undo();assert(!S.comps[0].motorType,'N20 installation has one undo');
  }
  b.fitView();parent.actuatorResult(lines.join('\n')+`\n${lines.length}/${lines.length} passed`);
 }catch(e){parent.actuatorResult(lines.join('\n')+'\nFAIL '+e.stack);}

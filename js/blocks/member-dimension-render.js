@@ -22,7 +22,7 @@ export function drawMemberDimensions({ svg, comp, points, params, selected, proj
     'stroke-width': 3 * px, 'paint-order': 'stroke', 'pointer-events': 'none'
   }) }));
   labels.forEach(({ ref, node }) => { node.textContent = { p1: 'A', p2: 'B', p3: 'C', tip: 'T' }[ref]; });
-  const lines = dimensions.map(dimension => {
+  const lines = dimensions.filter(d => d.id !== selected || !svg.querySelector('[data-dimension-handle="member-length"]')).map(dimension => {
     const active = dimension.id === selected;
     const button = make('g', { role: 'button', tabindex: '0', 'aria-label': `調整${dimension.label}` });
     button.style.cursor = 'pointer';

@@ -1,3 +1,6 @@
+import {editableNumber} from './numeric-input.js';
+import {setPointPosition} from './input.js';
+import {freeLinkForPoint,freeTriangleForPoint} from './model.js';
 /** 共用剛性桿件尺寸列：選取 → 預檢整筆修改 → 一次復原 → 重算。 */
 import {isDisk,validateDisk} from './disk-plate.js';
 import { S } from './state.js';
@@ -39,6 +42,13 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
         if(value===c.diameterMm)return;
         pause();pushUndo();c.diameterMm=value;rebuild();draw();
       };
+    }
+    const more=el('memberMore');if(more?.nodeType===1&&!more.dataset.resizeListener){more.dataset.resizeListener='1';more.addEventListener('toggle',draw);}
+    let position=el('memberPosition');
+    if(more?.nodeType===1){
+      if(!position){position=document.createElement('div');position.id='memberPosition';position.innerHTML='<label>位置 X <span data-x></span></label><label>Y <span data-y></span></label>';more.append(position);}
+      position.hidden=!comp||!!comp.moduleId||!!comp.barFusionRoot||!(freeLinkForPoint(S.comps,comp.p1?.id)||freeTriangleForPoint(S.comps,comp.p1?.id));
+      if(!position.hidden)for(const key of ['x','y'])editableNumber(position.querySelector(`[data-${key}]`),comp.p1[key],v=>{const old=S.selectedNodeId;S.selectedNodeId=comp.p1.id;setPointPosition(key,v);S.selectedNodeId=old;draw();},{label:`零件第一孔 ${key.toUpperCase()}（mm）`});
     }
     const dimensions = memberDimensions(comp);
     const active = dimensions.length > 0;

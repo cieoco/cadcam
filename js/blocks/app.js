@@ -123,7 +123,6 @@ import * as Settings from './settings.js';   // 作品級加工設定 + 舊 loca
 import { normalizeFabricationProfile, FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { cncWarnings } from './cnc-check.js';   // L4：依刀徑檢查匯出特徵
 import { orthogonalExportExtras, withAdapterNodes, withWorldAdapterNodes } from './orthogonal-joint.js';   // O4a：直角安裝轉接座孔位
-import { adapterMesh, meshToStl } from './adapter-stl.js';   // O4b：3D 列印轉接座 STL
 import { buildPlan, buildPackHtml, deriveMotorMounts } from './build-plan.js?v=20261007_7';   // L5b：製作包（板件＋五金＋組裝步驟）
 import { PLUGINS } from '../plugins/registry.js';
 import { frameStockOf } from './frame-stock.js';
@@ -1059,6 +1058,7 @@ const memberEditor = createMemberEditor({
   pause, pushUndo, rebuild, draw, reshapeTriangle: plateEditor.reshapeTriangle,
   updatePointCoordsById, notify: transient, holeDiameter: comp => memberHoleDiameter(comp, Settings.exportSettings())
 });
+let editingHandles=null;
 const jawTipHandle = createJawTipHandle({ svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
   editor: memberEditor, getParams: () => S.topo.params });
 async function copyMember(mode) {
@@ -1127,6 +1127,7 @@ const moduleDrag = createModuleDrag({
 
 // ---- 節點角色域：邏輯抽到 ./node-editor.js（Panels 由該模組自行 import）----
 const nodeEditor = createNodeEditor({
+  setPointPosition:Input.setPointPosition,
   pushUndo, pause, rebuild, draw, setBanner, transient, scheduleAutosave,
   hasPoint, pointCoords, pointIsGround, updatePointCoordsById, snapFramePoint, syncGearMeshAnchoredAt,
   sliderMountInfo, removeMotorAtPoint, removeAnchorsAtPoint, setPointType, freezePointAtDisplay,
@@ -2032,6 +2033,10 @@ function drawNow() {
   });
 
   drawGearManualHandles(pts);
+  if(!playbackActive&&(S.selectedLinkId||S.selectedTriangleId||S.selectedSliderId||S.selectedGearId||S.frameEditorOpen)){
+    if(!editingHandles)editingHandles=import('./editing-handles.js').then(m=>{editingHandles=m;draw();});
+    editingHandles.drawEditingHandles?.({svg,points:pts,project:p=>({x:TX(p.x),y:TY(p.y)}),member:memberEditor,slider:sliderEditor,gear:gearEditor,frame:S.frameEditorOpen?{nodes:frameGroundInfo().nodes,geometry:frameGeometry2d,info:frameSizeInfo(),set:setFrameSize}:null});
+  }
   drawFrameHandle();   // 機架移動把手：畫在節點之上，才點得到、拖得動
   const updateMemberDimensions = drawMemberDimensions({
     svg, comp: memberEditor.displayComp(memberEditor.selected()), points: pts, params: S.topo.params,
@@ -2957,11 +2962,13 @@ const modulePlates = createModulePlateSource(() => {
   };
 });
 // O4b：下載每個直角安裝的 3D 列印轉接座 STL（L 形，孔位與木板上的 ADAPTER_HOLE 對應）。
-function downloadAdapterStl() {
+async function downloadAdapterStl() {
   const all = (orthoExtrasNow().adapters || []);
   if (!all.length) { transient('沒有直角安裝，不需要轉接座'); return; }
   const adapters = all.filter(a => a.kind !== 'bracket-m3');   // E1：金屬角碼是現成零件，不用列印
   if (!adapters.length) { transient('金屬角碼不需要列印'); return; }
+  let adapterMesh,meshToStl;
+  try{({adapterMesh,meshToStl}=await import('./adapter-stl.js'));}catch(e){transient('STL 輸出未載入：'+e.message);return;}
   adapters.forEach(a => {
     const name = `adapter-${a.moduleId}${a.tiltDeg ? `-tilt${a.tiltDeg}` : ''}`;   // D4：傾斜的轉接座檔名帶角度
     const stl = meshToStl(adapterMesh({ lengthMm: a.lengthMm, wallMm: a.wallMm, flangeMm: a.flangeMm, holeDiameterMm: a.holeDiameterMm, holesPerFlange: a.holesPerFlange, tiltDeg: a.tiltDeg }), name);

@@ -41,3 +41,16 @@ export function signedNumberInput(input) {
   wrap.append(sign);
   return sign;
 }
+
+/** Replace a read-only value in an existing row; commit through that row's existing action. */
+export function editableNumber(host, value, commit, {label='數值',min=-100000,max=100000,disabled=false}={}) {
+  if(host?.nodeType!==1){if(host)host.textContent=formatNumber(value);return;}
+  let input=host.querySelector('input');
+  if(!input){input=document.createElement('input');input.type='text';input.inputMode='decimal';input.className='exact-value';host.replaceChildren(input);}
+  input.setAttribute('aria-label',label);input.disabled=disabled;
+  if(document.activeElement!==input)showNumber(input,value);
+  input.onchange=()=>{const next=readNumber(input);if(!Number.isFinite(next)||next<min||next>max){input.setCustomValidity(`請輸入 ${min}～${max}`);input.reportValidity();return;}input.setCustomValidity('');commit(next);};
+  input.oninput=()=>input.setCustomValidity('');
+  input.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();input.blur();}else if(e.key==='Escape'){showNumber(input,value);input.setCustomValidity('');input.blur();}};
+  return input;
+}

@@ -14,7 +14,7 @@ import { LEGO_FRAME_STEP as LEGO_STEP } from './model.js';
 import { servoInputAt } from './motor-tools.js';
 
 export function createNodeEditor({
-  pushUndo, pause, rebuild, draw, setBanner, transient, scheduleAutosave,
+  pushUndo, pause, rebuild, draw, setBanner, transient, scheduleAutosave, setPointPosition,
   hasPoint, pointCoords, pointIsGround, updatePointCoordsById, snapFramePoint, syncGearMeshAnchoredAt,
   sliderMountInfo, removeMotorAtPoint, removeAnchorsAtPoint, setPointType, freezePointAtDisplay, pointRefs,
   motorBarForCenter, sliderTravelStart, sliderTravelEnd, railLength, normalizeSliderRange,
@@ -80,19 +80,9 @@ export function createNodeEditor({
     rebuild(); draw();
   }
   function changeNodePos(axis, delta) {
-    if(fusionAtPoint(S.comps,S.selectedNodeId)){transient('請先解除合成，再修改孔位。');return;}
-    if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) return;
-    const p = pointCoords()[S.selectedNodeId];
-    if (!p) return;
-    pushUndo();
-    const step = (S.lockFrameHoles && pointIsGround(S.selectedNodeId)) ? Math.sign(delta || 1) * LEGO_STEP : delta;
-    const next = { x: axis === 'x' ? p.x + step : p.x, y: axis === 'y' ? p.y + step : p.y };
-    const q = pointIsGround(S.selectedNodeId) ? snapFramePoint(next) : next;
-    updatePointCoordsById(S.selectedNodeId, q.x, q.y);
-    // 微調固定的齒輪中心時同樣維持嚙合：夥伴齒輪跟隨保持圓心距（見 setNodeRole）。
-    if (pointIsGround(S.selectedNodeId)) syncGearMeshAnchoredAt?.(S.selectedNodeId);
-    rebuild(); draw();
-    Panels.updateRoleEditor();
+    const p=pointCoords()[S.selectedNodeId];if(!p)return;
+    const step=S.lockFrameHoles&&pointIsGround(S.selectedNodeId)?Math.sign(delta||1)*LEGO_STEP:delta;
+    setPointPosition(axis,p[axis]+step);
   }
   function removeNodeMotor() {
     if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) return;

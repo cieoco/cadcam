@@ -137,7 +137,7 @@ const pt = (id, extra = {}) => ({ id, x: 0, y: 0, type: 'floating', ...extra });
   S.comps = [gear, tt]; S.selectedNodeId = 'LessonCenter';
   Panels.init({ hasPoint: id => ['LessonCenter', 'OtherCenter'].includes(id), motorBarForCenter: () => null });
   Panels.updateServoEditor();
-  check('齒輪中心選取後顯示角度面板', els.get('servoEditor').style.display === 'flex' && els.get('servoEndVal').textContent === 90);
+  check('齒輪中心選取後顯示角度面板', els.get('servoEditor').style.display === 'flex' && Number(els.get('servoEndVal').textContent) === 90);
   let undo = 0, saves = 0;
   const editor = createNodeEditor({ hasPoint: () => true, pushUndo: () => undo++, scheduleAutosave: () => saves++ });
   editor.changeServoAngle('end', -15);

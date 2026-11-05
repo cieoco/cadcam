@@ -1,3 +1,4 @@
+import {editableNumber} from './numeric-input.js';
 /**
  * blocks / module-editor
  *
@@ -497,6 +498,12 @@ export function createModuleEditor(deps) {
       nameInput.addEventListener('change', () => rename(nameInput.value));
       el.appendChild(nameInput);
       addTextSpan(el, 'module-status', ps.mounted ? ps.mountLabel : '未安裝');
+      const mod=S.modules.find(m=>m.id===ps.moduleId),base=S.comps.flatMap(c=>pointKeysFor(c).map(k=>c[k])).find(p=>p?.id===mod?.base);
+      if(!ps.mounted&&base&&el.nodeType===1){
+        const position=document.createElement('div');position.innerHTML='<label>模組基準 X <span data-x></span></label><label>Y <span data-y></span></label>';el.append(position);
+        for(const key of ['x','y'])editableNumber(position.querySelector(`[data-${key}]`),base[key],v=>{const delta=v-base[key];if(!delta)return;pushUndo();S.comps=translateModule(S.comps,mod.id,key==='x'?delta:0,key==='y'?delta:0);rebuild();draw();},{label:`模組基準 ${key.toUpperCase()}（mm）`});
+      }
+
       if (ps.candidates.length) {
         const sel = document.createElement('select');
         const optDefault = document.createElement('option');

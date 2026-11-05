@@ -27,6 +27,7 @@ Panels.init({
   pointIsGround: id => Model.pointIsGround(S.comps, id), isGroundPositionUnlocked: () => false
 });
 const editor = createNodeEditor({
+  setPointPosition:(axis,value)=>{const p=Model.pointCoords(S.comps)[S.selectedNodeId];Model.updatePointCoordsById(S.comps,S.selectedNodeId,axis==='x'?value:p.x,axis==='y'?value:p.y);},
   pushUndo: noop, pause: noop, rebuild: noop, draw: noop,
   setBanner: t => { banner = t; }, transient: t => { toast = t; }, scheduleAutosave: noop,
   hasPoint: id => Model.hasPoint(S.comps, id),
@@ -67,7 +68,7 @@ check('接點設為固定（所有共用副本一起改）', S.comps[0].p2.type 
 editor.setNodeRole('floating');
 check('接點回自由', S.comps[0].p2.type === 'floating');
 
-// ---- X/Y 微調與 LEGO 吸附 ----
+// ---- X/Y 微調步距委派給共同座標操作；幾何約束另以真瀏覽器驗收 ----
 editor.changeNodePos('x', 4);
 check('X +4mm（未鎖 LEGO 時任意步進）', S.comps[0].p2.x === 84 && S.comps[1].p1.x === 84);
 S.lockFrameHoles = true;

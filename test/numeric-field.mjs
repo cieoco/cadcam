@@ -15,3 +15,12 @@ for(const [f,what] of [['js/blocks/member-editor.js','連桿孔距'],['js/blocks
 const css=readFileSync(new URL('../js/blocks/workspace-mobile.css',import.meta.url),'utf8')+readFileSync(new URL('../blocks.html',import.meta.url),'utf8');
 ok(/\.numeric-field[^{]*input\[type=["']?range["']?\][^{]*\{[^}]*(height|min-height):\s*(2[8-9]|[3-9]\d)px/.test(css)||/numeric-field[^{]*::-webkit-slider-thumb[^{]*\{[^}]*(width|height):\s*(2[8-9]|[3-9]\d)px/.test(css),'手機滑桿好拉（觸控高度 ≥ 28px）');
 console.log(`numeric-field: ${pass} passed`);
+
+// A graphical length follows its projected axis even in an oblique view.
+const {projectedDimension,projectedAngle}=await import('../js/blocks/dimension-handle.js');
+assert.equal(projectedDimension(80,{x:30,y:40},{x:3,y:4}),90);
+assert.equal(projectedDimension(80,{x:-40,y:30},{x:3,y:4}),80);
+assert.equal(projectedDimension(80,{x:-100,y:0},{x:1,y:0},{min:8,max:200}),8);
+assert.equal(projectedDimension(80,{x:1000,y:0},{x:1,y:0},{min:8,max:200}),200);
+assert.equal(projectedAngle({x:0,y:0},{u:{x:2,y:1},v:{x:-1,y:3}},{x:2,y:1},{x:-1,y:3}),90);
+assert.equal(projectedAngle({x:0,y:0},{u:{x:2,y:1},v:{x:4,y:2}},{x:2,y:1},{x:4,y:2}),0);

@@ -1,3 +1,4 @@
+import {editableNumber} from './numeric-input.js';
 import {gearDriver} from './motor-tools.js';
 /**
  * blocks / gear-editor
@@ -222,14 +223,14 @@ export function createGearEditor({
     const driver=gearDriver(S.comps,c.id);
     setRow('gearPowerRow',!!driver);
     setText('gearPowerStatus',driver ? `輸入輪 ${driver.id}：${driver.p1.physicalMotor ? (driver.motorType==='mg995'?'MG995 舵機':driver.motorType==='n20'?'N20 減速馬達':'TT 馬達') : '尚未安裝動力'}` : '');
-    setText('gearModuleVal', Math.round(mod));
+    editableNumber(document.getElementById('gearModuleVal'),mod,v=>changeGearModule(v-(mod)),{label:'齒輪模數（mm）',min:1,max:30});
     setText('gearTeethVal', c.teeth);
     teethField(c);
     setText('gearHoleAngleVal',Number((((Number(c.phase)||0)%360+360)%360).toFixed(2))+'°');
     setText('gearRadiusVal', Math.round(Number(S.topo.params[c.radiusParam]) || c.teeth * mod / 2));
     const pinInput=document.getElementById('gearPinRadiusVal');
     if(pinInput){pinInput.value=String(Math.round(gearPinRadius(c)));pinInput.max=String(Math.max(4,Math.floor(gearPitchRadius(c)-4)));}
-    setText('gearPinHoleVal', Number(c.pinHoleDiameter || 5).toFixed(1).replace(/\.0$/, ''));
+    editableNumber(document.getElementById('gearPinHoleVal'),Number(c.pinHoleDiameter)||5,v=>changeGearPinHoleDiameter(v-(Number(c.pinHoleDiameter)||5)),{label:'輸出孔徑（mm）',min:1,max:30});
     setRow('rackLengthRow', !!rack);
     setRow('rackOrientationRow', !!rack);
     setRow('rackBodyHeightRow', !!rack);
@@ -240,10 +241,10 @@ export function createGearEditor({
       const len = rackLength(rack);
       const bodyH = rackBodyHeight(rack, mod);
       const slot = ensureRackSlot(rack, len);
-      setText('rackLengthVal', Math.round(len));
-      setText('rackBodyHeightVal', Number(bodyH).toFixed(1).replace(/\.0$/, ''));
-      setText('rackSlotLengthVal', Math.round(slot.length));
-      setText('rackSlotWidthVal', Number(slot.width).toFixed(1).replace(/\.0$/, ''));
+      editableNumber(document.getElementById('rackLengthVal'),len,v=>changeRackLength(v-(len)),{label:'齒條孔距（mm）',min:32,max:2000});
+      editableNumber(document.getElementById('rackBodyHeightVal'),bodyH,v=>changeRackBodyHeight(v-(bodyH)),{label:'齒條背板高度（mm）',min:4,max:2000});
+      editableNumber(document.getElementById('rackSlotLengthVal'),slot.length,v=>changeRackSlotLength(v-(slot.length)),{label:'齒條槽長（mm）',min:8,max:len-12});
+      editableNumber(document.getElementById('rackSlotWidthVal'),slot.width,v=>changeRackSlotWidth(v-(slot.width)),{label:'齒條槽寬（mm）',min:2,max:20});
       const fmt = v => Number(v).toFixed(1).replace(/\.0$/, '');
       setText('rackStopVal', (slot.trimStart > 0 || slot.trimEnd > 0) ? [slot.trimStart > 0 ? `${(Number(rack.sign) < 0) ? '負' : '正'}角度端 ${fmt(slot.trimStart)}` : '', slot.trimEnd > 0 ? `${(Number(rack.sign) < 0) ? '正' : '負'}角度端 ${fmt(slot.trimEnd)}` : ''].filter(Boolean).join('、') + ' mm' : '無');
       const orientationBtn=document.getElementById('rackOrientationBtn');
@@ -489,7 +490,7 @@ export function createGearEditor({
     const rack = rackForGear(gear);
     if (!rack) return;
     pushUndo();
-    const next = Math.max(32, Math.round((rackLength(rack) + delta) / 8) * 8);
+    const next = Math.max(32, Math.round(rackLength(rack) + delta));
     S.topo.params[rack.lenParam] = next;
     ensureRackSlot(rack, next);
     syncRackFramePins(rack, gear);
@@ -515,7 +516,7 @@ export function createGearEditor({
     pushUndo();
     const len = rackLength(rack);
     const slot = ensureRackSlot(rack, len);
-    slot.length = Math.max(8, Math.min(Math.max(8, len - 12), Math.round((slot.length + delta) / 8) * 8));
+    slot.length = Math.max(8, Math.min(Math.max(8, len - 12), Math.round(slot.length + delta)));
     syncRackFramePins(rack, gear);
     rebuild(); draw();
     updateGearEditor();
