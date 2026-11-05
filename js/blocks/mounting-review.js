@@ -16,7 +16,9 @@ function interfaces(s){
   for(const c of s.comps){
     if(c.type==='syringe'&&['fixed-axis','pivot'].includes(c.mountMode))add(`syringe:${c.id}`,'針筒固定環',[c.a?.componentId,c.b?.componentId,'frame']);
     const center=c.motorMount?.center || pointKeys.map(k=>c[k]).find(p=>p?.physicalMotor)?.id;
-    if(center&&(c.type==='bar'&&c.isInput||['gear','pulley'].includes(c.type)))add(`motor:${c.id}`,'馬達固定座',[c.id,c.motorMount?.frameBody||c.motorCarrier||'frame',c.moduleId?`${c.moduleId}-frame`:null]);
+    // A motor keeps its identity when the user chooses a different output body.
+    const motor=c.motorMount?.motor||c.physicalMotor||pointKeys.map(k=>c[k]).find(p=>p?.physicalMotor)?.physicalMotor;
+    if(center&&(c.type==='bar'&&c.isInput||['gear','pulley'].includes(c.type)))add(`motor:${c.moduleId||'#root'}:${motor||center}`,'馬達固定座',[c.id,c.motorMount?.frameBody||c.motorCarrier||'frame',c.moduleId?`${c.moduleId}-frame`:null]);
     if(c.type==='rack'&&c.framePins?.length)add(`rack:${c.id}`,'齒條導銷',[c.id,'frame',c.moduleId?`${c.moduleId}-frame`:null]);
     if(c.type==='gear')for(const other of s.comps.filter(o=>['bar','triangle'].includes(o.type))){
       const ids=pointKeys.map(k=>other[k]?.id);

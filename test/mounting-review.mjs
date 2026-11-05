@@ -54,6 +54,7 @@ const motor={comps:[{type:'bar',id:'Arm',isInput:true,fixedLen:true,motorType:'t
 assert.ok(inspect(motor,s=>s.comps[0].motorMount.orientation='vertical').changes.length,'motor orientation uses the real mounting pattern');
 assert.ok(inspect(motor,s=>s.fabrication.ttMount.screwSpacingMm+=1).changes.length,'machining profile moves paired holes');
 assert.ok(inspect(motor,s=>s.comps[0].motorType='mg995').changes.length,'motor replacement changes mounting pattern');
+assert.ok(inspect(motor,s=>{s.comps[0].id='OtherArm';s.comps[0].motorMount.outputBody='OtherArm';}).changes.length,'same motor on a different output body is an edit, not an unrelated first installation');
 assert.equal(inspect(motor,s=>{s.params.L=100;s.comps[0].p2.x=100;}).changes.length,0,'unconnected arm length does not move motor mounting holes');
 assert.equal(inspect(base,s=>s.comps.push({type:'anchor',id:'Elsewhere',p1:{id:'Z',type:'fixed',x:500,y:500}})).changes.length,0,'unrelated holes do not prompt for a clamp');
 assert.equal(inspect(base,s=>syringe(s).a.u=10000).ok,false,'unavailable paired-hole geometry blocks acceptance');
