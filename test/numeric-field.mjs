@@ -10,7 +10,7 @@ ok(m.canReset===true&&numericFieldModel({value:100,min:25,max:350,defaultValue:1
 ok(numericFieldModel({value:999,min:25,max:350}).value===350&&numericFieldModel({value:-5,min:25,max:350}).value===25,'超出範圍夾回邊界');
 ok(numericFieldModel({value:12.345,min:0,max:20,step:0.1}).value===12.3,'依步距取整（0.1）');
 ok(numericFieldModel({value:'abc',min:0,max:20,defaultValue:5}).value===5,'不是數字時回到預設');
-for(const [f,what] of [['js/blocks/member-editor.js','連桿孔距'],['js/blocks/gear-editor.js','齒輪齒數'],['js/plugins/box-maker/box-dialog.js','盒子長寬高']])
+for(const [f,what] of [['js/blocks/gear-editor.js','齒輪齒數'],['js/plugins/box-maker/box-dialog.js','盒子長寬高']])
   ok(/numeric-field/.test(readFileSync(new URL('../'+f,import.meta.url),'utf8')),`${what} 改用共用數值欄`);
 const css=readFileSync(new URL('../js/blocks/workspace-mobile.css',import.meta.url),'utf8')+readFileSync(new URL('../blocks.html',import.meta.url),'utf8');
 ok(/\.numeric-field[^{]*input\[type=["']?range["']?\][^{]*\{[^}]*(height|min-height):\s*(2[8-9]|[3-9]\d)px/.test(css)||/numeric-field[^{]*::-webkit-slider-thumb[^{]*\{[^}]*(width|height):\s*(2[8-9]|[3-9]\d)px/.test(css),'手機滑桿好拉（觸控高度 ≥ 28px）');

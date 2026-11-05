@@ -1,5 +1,6 @@
 // 參考「電路板外殼生成器」：3D 視角快捷（頂／前／右／立體／置中）、分離（爆炸）滑桿、整體尺寸、建議與回饋。
 import assert from 'node:assert/strict';
+import {previewEditTarget} from '../js/blocks3d/preview-edit.js';
 import {readFileSync} from 'node:fs';
 import {VIEW_PRESETS,presetCameraPose} from '../js/blocks3d/view-presets.js';
 import {explodeOffsets,formatExtents} from '../js/blocks3d/explode.js';
@@ -65,4 +66,18 @@ ok(ver&&ver.group==='help','說明 → 版本仍在');
 // 6. 不吃啟動預算
 const paths=startupSize().paths;
 ok(!paths.includes('js/blocks3d/view-presets.js')&&!paths.includes('js/blocks3d/explode.js'),'視角與分離跟著 3D 一起延後載入');
+// 7. 3D 命中只導向實際擁有者；名稱、形狀和範例不影響選取。
+const parts=[{id:'arm-x',type:'bar'},{id:'disk-x',type:'bar',shape:'disk'},
+  {id:'plate-x',type:'triangle'},{id:'drive-x',type:'gear',p1:{id:'shaft-x',physicalMotor:'1'}},
+  {id:'piston-x',type:'syringe'},{id:'rail-x',type:'slider'},{id:'rack-x',type:'rack',pinion:'drive-x'},{id:'wheel-x',type:'pulley',kind:'sprocket'}];
+for(const [key,partId,id] of [['stick:arm-x',null,'arm-x'],['stick:disk-x',null,'disk-x'],
+ ['plate:P-A-P-B-P-C','plate-x','plate-x'],['rail:0','rail-x','rail-x'],['carriage:0','rail-x','rail-x'],['rack:rack-x',null,'drive-x'],['gear:drive-x',null,'drive-x'],['syringe:piston-x',null,'piston-x'],['M2/pulley:wheel-x',null,'wheel-x']]){
+ ok(previewEditTarget({key,partId},parts)?.comp.id===id,`3D 命中 ${id} 沿用原零件`);
+}
+ok(previewEditTarget({key:'motor:shaft-x'},parts)?.motor==='shaft-x','馬達以真實軸心進入原安裝');
+ok(previewEditTarget({key:'motor:missing'},parts)===null,'失效馬達不開成新增');
+ok(previewEditTarget({key:'frame'},parts)===null,'隱性機架不猜測某一支桿');
+ok(previewEditTarget({key:'stick:arm-x'},[])===null,'其他分頁／不存在零件不選取');
+ok(previewEditTarget({key:'plate:P-A-P-B-P-C'},parts)===null,'沒有零件擁有者不拆字串猜孔');
+ok(!paths.includes('js/blocks3d/preview-edit.js'),'3D 選取接頭跟著預覽延後載入');
 console.log(`view-tools: ${pass} passed`);

@@ -321,7 +321,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   function renderSyringes(items){
     clearSyringes();
     for(const s of items||[]){
-      const plane=new THREE.Group();syringeGroup.add(plane);
+      const plane=new THREE.Group();plane.userData.pickKey='syringe:'+s.id;syringeGroup.add(plane);
       if(s.matrix){plane.matrixAutoUpdate=false;plane.matrix.fromArray(s.matrix);}
       for(const tip of s.tips||[]){const sh=stadiumShape(tip.a,tip.b,4.5,1.5),m=new THREE.Mesh(new THREE.ExtrudeGeometry(sh,{depth:2,bevelEnabled:false}),new THREE.MeshStandardMaterial({color:'#dd9b39'}));m.position.z=s.z??12;plane.add(m);}
       const group=new THREE.Group();group.position.set(s.a.x,s.a.y,s.z??16);group.rotation.z=s.angle;group.scale.z=s.mountSide || 1;plane.add(group);
@@ -506,9 +506,10 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   // 並用模組 id 當 pickKey 前綴，點選隱藏時不會與宿主同名零件互撞。
   let sink = dynamic;
   let keyPrefix = '';
-  function addPart(obj, rawKey, {pickable=true}={}) {
+  function addPart(obj, rawKey, {pickable=true,partId}={}) {
     const key = keyPrefix + rawKey;
     if(pickable)obj.userData.pickKey = key;
+    if(partId)obj.userData.partId=partId;
     obj.traverse(o=>{if(o.isMesh)o.userData.baseMaterial=o.material;if(o.geometry)geometryBuilds++;});
     // 每個零件外包一層 wrap：分離（explode）只動 wrap.position，姿態更新改的是 obj.matrix，兩者互不覆蓋。
     const wrap=new THREE.Group();wrap.add(obj);
@@ -822,7 +823,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       });
       const mesh = new THREE.Mesh(geo, plateMaterial(r.color));
       mesh.position.z = r.z;
-      addPart(mesh, railKey);
+      addPart(mesh, railKey,{partId:r.id});
 
       // 槽底有色墊片：墊在洞後方、只填底部一小段厚度 → 看起來像「有色底的凹槽」而非透空黑洞
       if (r.slot && r.slot.color) {
@@ -831,7 +832,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
           { depth: 1.5, bevelEnabled: false, curveSegments: 20 });
         const floor = new THREE.Mesh(floorGeo, plateMaterial(r.slot.color));
         floor.position.z = r.z;   // 與軌道背面齊，凹槽剩 (thickness-1.5) 的深度
-        addPart(floor, railKey);
+        addPart(floor, railKey,{partId:r.id});
       }
     });
 
@@ -846,13 +847,13 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       });
       const body = new THREE.Mesh(geo, plateMaterial(c.color));
       body.position.z = c.z;
-      addPart(body, carKey);
+      addPart(body, carKey,{partId:c.id});
       (c.screws || []).forEach(s => {
         const h = Math.max(1, c.screwZ1 - c.screwZ0);
         const pin = new THREE.Mesh(new THREE.CylinderGeometry(c.screwR, c.screwR, h, 16), pinMat);
         pin.rotation.x = Math.PI / 2;
         pin.position.set(s.x, s.y, (c.screwZ0 + c.screwZ1) / 2);
-        addPart(pin, carKey);
+        addPart(pin, carKey,{partId:c.id});
       });
     });
 
@@ -1249,11 +1250,11 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(dynamic.children, true);
+    const hits = raycaster.intersectObjects([...dynamic.children,...(onPick?syringeGroup.children:[])], true);
     for (const hit of hits) {
       let o = hit.object;
       while (o && o !== dynamic && o.userData.pickKey === undefined) o = o.parent;
-      if (o && o.userData.pickKey !== undefined) return o.userData.pickKey;
+      if (o && o.userData.pickKey !== undefined) return {key:o.userData.pickKey,partId:o.userData.partId};
     }
     return null;
   }
@@ -1307,19 +1308,33 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     return null;
   }
 
-  // 用 pointerdown/up 的位移量區分「點選」與「拖曳旋轉」，才不會在轉動視角時誤觸隱藏。
-  let downX = 0, downY = 0;
-  function onPointerDown(e) { downX = e.clientX; downY = e.clientY; }
-  function onPointerUp(e) {
-    if (e.button !== 0 || !pickEnabled) return;
-    if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return;   // 視為拖曳
-    const key = pickAt(e.clientX, e.clientY);
-    if (!key) return;
-    if (ghosted.has(key)) ghosted.delete(key); else ghosted.add(key);
-    if (lastModel) update(lastModel);   // 停在靜止幀時也要即時反映
+  // 點選與相機手勢分開：拖出後回原處、第二指與取消都不能觸發零件操作。
+  const pointers=new Set();
+  let tap=null,onPick=null;
+  function onPointerDown(e) {
+    pointers.add(e.pointerId);
+    if(pointers.size!==1){tap=null;return;}
+    tap=e.button===0?{id:e.pointerId,x:e.clientX,y:e.clientY}:null;
   }
-  renderer.domElement.addEventListener('pointerdown', onPointerDown);
-  renderer.domElement.addEventListener('pointerup', onPointerUp);
+  function onPointerMove(e) {
+    if(tap?.id===e.pointerId&&Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>5)tap=null;
+  }
+  function onPointerCancel(e){pointers.delete(e.pointerId);tap=null;}
+  function onPointerUp(e) {
+    const hitTap=tap?.id===e.pointerId&&pointers.size===1&&Math.hypot(e.clientX-tap.x,e.clientY-tap.y)<=5;
+    pointers.delete(e.pointerId);tap=null;
+    if(!hitTap||e.button!==0||!pickEnabled)return;
+    const hit=pickAt(e.clientX,e.clientY);
+    if(!hit)return;
+    if(onPick){onPick(hit);return;}
+    // 獨立安裝預覽仍沿用原本點選透明；設計畫面由既有編輯入口接手。
+    if(ghosted.has(hit.key))ghosted.delete(hit.key);else ghosted.add(hit.key);
+    if(lastModel)update(lastModel);
+  }
+  renderer.domElement.addEventListener('pointerdown',onPointerDown);
+  renderer.domElement.addEventListener('pointermove',onPointerMove);
+  renderer.domElement.addEventListener('pointerup',onPointerUp);
+  renderer.domElement.addEventListener('pointercancel',onPointerCancel);
 
   // ---- 組立台：接口標記（疊在場景上、不被 update() 清掉）、螢幕投影、關閉點選隱藏 ----
   let pickEnabled = true;
@@ -1595,6 +1610,8 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     redMatCache.forEach(m => m.dispose());
     renderer.domElement.removeEventListener('pointerdown', onPointerDown);
     renderer.domElement.removeEventListener('pointerup', onPointerUp);
+    renderer.domElement.removeEventListener('pointermove',onPointerMove);
+    renderer.domElement.removeEventListener('pointercancel',onPointerCancel);
     ghostMatCache.forEach(m => m.dispose());
     matCache.forEach(m => m.dispose());
     pinMat.dispose();
@@ -1619,7 +1636,8 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     renderNow,
     cacheStats:()=>({...lifetime.stats(),geometryBuilds,geometryReuses,geometryDisposals}),
     update, resize, dispose, start, stop, showAll, fitTo, setViewPreset, setExplode, getExtents, set onRebuilt(fn) { onRebuilt = fn; }, get viewUp() { return viewUp; }, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, project, tiltView, pickSurface, highlightSurface,
-    setPickEnabled(on) { pickEnabled = !!on; },
+    set onPick(fn) { onPick=fn; },
+    setPickEnabled(on) { pickEnabled = !!on; tap=null; },
     get canvas() { return renderer.domElement; },
     get interacting() { return interacting; },
     get camera() { return camera; }, get controls() { return controls; }

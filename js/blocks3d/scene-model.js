@@ -301,12 +301,14 @@ export function buildSceneModel(links, points, opts = {}) {
     const slotB = { x: base.x + ux * te, y: base.y + uy * te };
 
     rails.push({
+      id:sl.id,
       a: { x: m1.x, y: m1.y }, b: { x: m2.x, y: m2.y },
       r: hullR * 0.9, thickness: plateThickness,
       z: railZ, color: '#7f8c9b',
       slot: { a: slotA, b: slotB, half: slotHalf, color: '#3a4452' },
     });
     carriages.push({
+      id:sl.id,
       bodyA: screwA, bodyB: screwB, bodyR: hullR * 0.7,
       thickness: plateThickness, z: bodyZ, color: sl.color || '#16a085',
       screws: [screwA, screwB], screwR,

@@ -31,7 +31,7 @@ export function createSyringeUI(h){
   h.svg.before(document.getElementById('modeBanner'),document.getElementById('solveBanner'),bar);
   // 桌機尺寸面板以畫布頂端定位，須避開分頁與可換行的針筒控制列。
   // 讀取實際高度，讓窄螢幕、組立多針筒及狀態訊息換行都能更新。
-  const positionInspectors=()=>wrap.style.setProperty('--hydraulic-header-height',`${Math.max(0,h.svg.getBoundingClientRect().top-wrap.getBoundingClientRect().top)}px`);
+  const positionInspectors=()=>wrap.style.setProperty('--hydraulic-header-height',`${Math.max(h.svg.getBoundingClientRect().top,document.getElementById('designTabs').getBoundingClientRect().bottom)-wrap.getBoundingClientRect().top}px`);
   const headerObserver=new ResizeObserver(positionInspectors);
   headerObserver.observe(bar);headerObserver.observe(h.svg);
   let id=null,raf=null,last=null,direction=1,dragUndo=false,picking=null,scopeKey=null,message='';

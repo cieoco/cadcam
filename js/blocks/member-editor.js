@@ -10,7 +10,7 @@ import { memberDimensions, memberDimensionValue, planMemberDimension, mirroredJa
 import { MATERIALS, memberStock, planMemberStock } from './member-stock.js';
 
 export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTriangle, updatePointCoordsById, notify, resizeFusion, validateCandidate = () => '', openMobileEditPanel = () => {}, holeDiameter = () => 12.96 }) {
-  let mirror = true, fieldModule = null;   // 數值欄（輸入框＋滑桿）第一次選到桿件才載入，不佔啟動大小
+  let mirror = true;   // 孔距使用圖上把手與原數字欄，不再另建面板滑桿。
   let tipDraft = null;
   let lastSelectedId = null;
   const el = id => document.getElementById(id);
@@ -64,7 +64,6 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     const lockNotice=el('memberDimensionLock');if(lockNotice&&!active)lockNotice.hidden=true;
     input.style.display = active ? '' : 'none';
     el('lenValue').style.display = active ? 'none' : '';
-    const field = el('memberDimensionField'); if (field) field.hidden = !active;
     hint.style.display = 'none';
     el('memberMirrorLabel').style.display = 'none';
     const stockFields=el('memberStockDimensions');if(stockFields)stockFields.hidden=!active||isDisk(comp);
@@ -102,10 +101,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     const lock = dimensionLock(comp, S.comps, id);
     if(lockNotice){lockNotice.textContent=lock || '';lockNotice.hidden=!lock;}
     input.disabled = Boolean(lock);
-    // 共用數值欄：滑桿改輸入框並送出 change，驗證與復原走原本的 setValue。
-    if (!fieldModule) fieldModule = import('./numeric-field.js').then(m => { fieldModule = m; if (selected()) sync(); });
-    else fieldModule.numericField?.(field, { input, min: dimension.min ?? 8, max: Number(input.max), step: 0.1, sliderStep: 1, softMax: 400, unit: 'mm',
-      disabled: Boolean(lock), ariaLabel: dimension.label });
+    input.setAttribute('aria-description',`範圍 ${input.min}–${input.max} mm`);
     ['lenMinusBtn', 'lenPlusBtn'].forEach(key => { el(key).disabled = Boolean(lock); });
     el('lenMinusBtn').title = `${dimension.label} 減少 ${dimension.step ?? 8} mm`;
     el('lenPlusBtn').title = `${dimension.label} 增加 ${dimension.step ?? 8} mm`;

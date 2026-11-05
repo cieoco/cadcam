@@ -1,8 +1,10 @@
 // 3D 畫面上的視角快捷列、分離滑桿、整體尺寸與「模型已更新」提示（標記在 blocks.html 的 #view3d）。
 import { formatExtents } from './explode.js';
+import {bindPreviewEditing} from './preview-edit.js';
 export function bindViewTools(root, viewer) {
   const $ = s => root.querySelector(s), bar = $('.view-presets'), range = $('.vp-explode input'), pct = $('.vp-explode output'), size = $('.vp-size'), pill = $('.model-updated');
   if (!bar) return;
+  bindPreviewEditing(viewer);
   const showSize = () => {
     const e = viewer.getExtents();
     if (!e) { size.textContent = ''; return; }
