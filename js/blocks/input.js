@@ -13,6 +13,7 @@ import {fusionRoot,fusionAtPoint} from '../core/bar-fusion.js';
  */
 
 import { S } from './state.js';
+import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 import * as View from './view.js';
 import * as Tools from './tools.js';
 import * as Panels from './panels.js';
@@ -318,6 +319,7 @@ export function setFramePosition(axis,value){
   const nodes=[...frameNodeIds()].map(id=>pointCoords()[id]).filter(Boolean);if(!nodes.length||!Number.isFinite(value))return;
   const center=nodes.reduce((sum,p)=>sum+p[axis],0)/nodes.length,delta=value-center;if(Math.abs(delta)<1e-7)return;
   pause();const before=snapshotStr();translateFrame(axis==='x'?delta:0,axis==='y'?delta:0);rebuild();draw();
+  if(!confirmMountingChange(JSON.parse(before),mountingWork(S),{notify:transient})){S.preDragSnap=before;cancelPointDrag();Panels.updateFrameEditor();return;}
   S.undoStack.push(before);if(S.undoStack.length>60)S.undoStack.shift();updateUndoBtn(true);Panels.updateFrameEditor();
 }
 export function setPointPosition(axis,raw) {
@@ -325,17 +327,21 @@ export function setPointPosition(axis,raw) {
   if(!p||!['x','y'].includes(axis)||!Number.isFinite(value))return;
   if(fusionAtPoint(S.comps,id)){transient('合成孔位請改桿段尺寸，或先解除合成。');return;}
   const target={...p,[axis]:value};if(Math.hypot(target.x-p.x,target.y-p.y)<1e-7)return;
-  pause();const before=snapshotStr(),saved={comps:structuredClone(S.comps),params:{...S.topo.params},theta:S.theta,motorAngles:{...S.motorAngles}};
+  pause();const before=snapshotStr(),saved={comps:structuredClone(S.comps),modules:structuredClone(S.modules),params:{...S.topo.params},theta:S.theta,motorAngles:{...S.motorAngles}};
   moveNodeTo(id,target,{snap:false});S.snapTarget=null;rebuild();
   const actual=pointCoords()[id];
-  if(!actual||Math.hypot(actual.x-target.x,actual.y-target.y)>.05){S.comps=saved.comps;S.topo.params=saved.params;S.theta=saved.theta;S.motorAngles=saved.motorAngles;rebuild();transient('此位置不符合連接或固定長度；請改孔距，或拖曳到可達位置。');}
-  else if(snapshotStr()!==before){S.undoStack.push(before);if(S.undoStack.length>60)S.undoStack.shift();updateUndoBtn(true);}
+  if(!actual||Math.hypot(actual.x-target.x,actual.y-target.y)>.05){S.comps=saved.comps;S.modules=saved.modules;S.topo.params=saved.params;S.theta=saved.theta;S.motorAngles=saved.motorAngles;rebuild();transient('此位置不符合連接或固定長度；請改孔距，或拖曳到可達位置。');}
+  else if(snapshotStr()!==before){
+    if(!confirmMountingChange(JSON.parse(before),mountingWork(S),{notify:transient})){S.preDragSnap=before;cancelPointDrag();S.theta=saved.theta;S.motorAngles=saved.motorAngles;}
+    else{S.undoStack.push(before);if(S.undoStack.length>60)S.undoStack.shift();updateUndoBtn(true);}
+  }
   draw();Panels.updateRoleEditor();
 }
 
 function commitDragUndo() {
   if (S.preDragSnap == null) return;
   if (snapshotStr() !== S.preDragSnap) {
+    if(!confirmMountingChange(JSON.parse(S.preDragSnap),mountingWork(S),{notify:transient})){cancelPointDrag();return;}
     S.undoStack.push(S.preDragSnap);
     if (S.undoStack.length > 60) S.undoStack.shift();
     updateUndoBtn(true);
@@ -344,7 +350,7 @@ function commitDragUndo() {
 }
 function cancelPointDrag(){
   const before=S.preDragSnap;S.preDragSnap=null;S.dragId=null;S.dragLinkId=null;S.dragFrame=false;S.dragLastWorld=null;S.snapTarget=null;
-  if(before){const saved=JSON.parse(before);S.comps=saved.comps;S.topo.params=saved.params;S.motorAngles={...(saved.motorAngles||{})};S.theta=Number(saved.params?.theta)||0;rebuild();draw();}
+  if(before){const saved=JSON.parse(before);S.comps=saved.comps;S.modules=saved.modules||[];S.topo.params=saved.params;S.motorAngles={...(saved.motorAngles||{})};S.theta=Number(saved.params?.theta)||0;rebuild();draw();}
 }
 function onDragEnd(e) {
   if(e?.type==='pointercancel'&&!S.drawingLink&&!S.drawingTriangle&&!S.drawingPolygon){cancelPointDrag();pendingNodeDrag=null;return;}

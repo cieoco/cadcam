@@ -1,4 +1,5 @@
 import {fusionRoot} from '../core/bar-fusion.js';
+import {commitMountingEdit,confirmMountingChange,mountingCandidate} from './mounting-review-ui.js';
 import {frameGroundAxis,planFrameGroundChange} from './frame-ground.js';
 import {tabNutPartGeometry} from './tab-nut-plan.js';
 import {syringeShapes} from './syringe-shape.js';
@@ -252,7 +253,11 @@ function undo() {
 function scheduleAutosave() {
   if(benchmarkSession || gripperPilotSession)return;
   clearTimeout(S.autosaveTimer);
-  S.autosaveTimer = setTimeout(() => Store.saveLocal(bench.autosaveSnapshot() || Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState())), 500);
+  S.autosaveTimer = setTimeout(() => {
+    const snapshot=bench.autosaveSnapshot() || (S.preDragSnap?JSON.parse(S.preDragSnap):Store.toSnapshot(S.comps,S.topo,S.counter,motorSnapshotState()));
+    if(S.dragShape?.original)snapshot.comps=snapshot.comps.map(c=>c.id===S.dragShape.compId?structuredClone(S.dragShape.original):c);
+    Store.saveLocal(snapshot);
+  },500);
 }
 
 // 套用一份 snapshot 到目前狀態。recordUndo 預設 true（外部開檔/分享要能 undo）。
@@ -987,7 +992,8 @@ async function configureMotorMount(nodeId=null,initialOutputId='') {
   catch { transient('安裝介面載入失敗，請再試一次。');return; }
   finally { motorInstallationLoading=false; }
   if(S.mode!=='design'||snapshotStr()!==before||S.designFocus!==focus){transient('作品已變更，請重新選擇安裝。');return;}
-  openMotorInstallation({source:{comps:scoped,params:S.topo.params},points:displayCoords(),
+  openMotorInstallation({source:{comps:scoped,params:S.topo.params,fabrication:S.fabrication},points:displayCoords(),
+    review:(plan,notify)=>{if(snapshotStr()!==before){notify('作品已變更，請重新開啟安裝。');return false;}return confirmMountingChange(JSON.parse(before),mountingCandidate(JSON.parse(before),plan,scoped),{notify});},
     motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()},type:S.pendingMotorType,
     existingId:existing?.id,initialOutputId,motorId:nextMotorId(),confirm:plan=>{
       if(snapshotStr()!==before||S.designFocus!==focus)return false;
@@ -1107,6 +1113,7 @@ async function openBoxMaker() {
     boxMakerDialog=openDialog({source,initialRoot:selected?.boxPanel?.rootPart || '',onConfirm:async plan=>{
       if(snapshotStr()!==before)return '作品已變更，請取消後重新開啟。';
       const normalized=Store.normalizeSnapshot(plan.work);if(!normalized)return '盒體資料無法保存，尚未修改作品。';
+      if(!confirmMountingChange(source,normalized,{notify:transient}))return '已保留原孔位，請繼續調整。';
       applySnapshot(normalized,{fit:false,source:'box-maker'});
       presetDesignFocus(plan.rootModule);await bench.setMode('bench');fitView();
       transient('盒體已加入組立；可從「卡榫盒子」再改尺寸。');return '';
@@ -2360,17 +2367,15 @@ function setFrameSize(key, raw) {
     stock[key]=Math.round(Math.max(value,minimum || 0)*10)/10;
     if(value<minimum) transient('已保留容納固定孔與馬達座的最小尺寸。');
   }
-  pause();pushUndo();
-  const ids=new Set(nodes.map(p=>p.id));
-  comps.forEach(c=>pointKeysFor(c).forEach(k=>{if(ids.has(c[k]?.id))c[k].frameStock={...stock};}));
+  pause();const ids=new Set(nodes.map(p=>p.id)),scope=new Set(comps.map(c=>c.id));
+  if(!commitMountingEdit(S,d=>d.comps.filter(c=>scope.has(c.id)).forEach(c=>pointKeysFor(c).forEach(k=>{if(ids.has(c[k]?.id))c[k].frameStock={...stock};})),{pushUndo,notify:transient})){Panels.updateFrameEditor();return;}
   rebuild();draw();Panels.updateFrameEditor();scheduleAutosave();
 }
 function changeFrameGround(kind, delta) {
   const next=planFrameGroundChange(frameGroundInfo().nodes,kind,Number(delta));
   if(!next.ok){transient(next.reason);return;}
   pause();
-  pushUndo();
-  updatePointCoordsById(next.id,next.x,next.y);
+  if(!commitMountingEdit(S,d=>Model.updatePointCoordsById(d.comps,next.id,next.x,next.y),{pushUndo,notify:transient}))return;
   rebuild();
   Panels.updateFrameEditor();
   draw();
@@ -3069,13 +3074,13 @@ function applyRackStops() {
   const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
   const sug = currentRackStopSuggestions(settings, homeMountsNow());
   if (!sug.length) { transient('目前沒有需要限位的齒條'); return; }
-  pushUndo(); pause();
-  sug.forEach(s => {
-    const rack = S.comps.find(c => c.type === 'rack' && c.id === s.rackId);
+  pause();
+  if(!commitMountingEdit(S,d=>sug.forEach(s => {
+    const rack = d.comps.find(c => c.type === 'rack' && c.id === s.rackId);
     if (!rack || !rack.slot || typeof rack.slot !== 'object') return;
     if (s.trimStart > 0) rack.slot.trimStart = s.trimStart; else delete rack.slot.trimStart;
     if (s.trimEnd > 0) rack.slot.trimEnd = s.trimEnd; else delete rack.slot.trimEnd;
-  });
+  }),{pushUndo,notify:transient}))return;
   rebuild(); draw(); gearEditor.updateGearEditor(); scheduleAutosave();
   transient(sug.map(s => s.message).join(' '));
 }

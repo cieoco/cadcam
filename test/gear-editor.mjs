@@ -1,6 +1,7 @@
 // 齒輪 / 齒條域（gear-editor.js）驗收：成對建立、嚙合同步、整鏈改模數、
 // 有限齒條 theta 範圍、整鏈刪除與參數清理。DOM 以極簡假件替身。
 import { check, report } from './_harness.mjs';
+globalThis.window={confirm:()=>true,alert:message=>{throw Error(message);}};
 
 class FakeElement {
   constructor() { this.children = []; this.style = {}; this.dataset = {}; this.textContent = ''; this.value = ''; }
@@ -88,6 +89,10 @@ check('齒條組建立：小齒輪＋齒條＋兩導銷', !!pinion && !!rack && 
 const range = editor.rackPinionThetaRange();
 check('有限齒條回傳有限 theta 範圍', !!range && Number.isFinite(range.lo) && Number.isFinite(range.hi) && range.lo < range.hi);
 const lenBefore = S.topo.params[rack.lenParam];
+const beforeDecline=JSON.stringify({comps:S.comps,params:S.topo.params}),undoBefore=undos;window.confirm=()=>false;
+editor.changeRackLength(8);
+check('拒絕更新導銷孔位不改齒條、不新增復原',beforeDecline===JSON.stringify({comps:S.comps,params:S.topo.params})&&undos===undoBefore);
+window.confirm=()=>true;
 editor.changeRackLength(8);
 check('齒條長度 +8 並保持 8mm 對齊', S.topo.params[rack.lenParam] === lenBefore + 8 && S.topo.params[rack.lenParam] % 8 === 0);
 editor.deleteGearChain(pinion.id);

@@ -155,6 +155,7 @@
     "test/mechanism-layer-render.mjs",
     "test/member-dimensions.mjs",
     "test/member-editor.mjs",
+    "test/mounting-review.mjs",
     "test/member-stock-export.mjs",
     "test/member-stock-integration.mjs",
     "test/member-stock.mjs",

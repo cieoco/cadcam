@@ -1,5 +1,6 @@
 import {planGearHolePlacement,commitGearHolePlacement,outputRadius,outputPoint,normalizeHoleAngle,gearHoleAtPoint} from './gear-hole-placement.js';
 import {showNumber,readNumber} from './numeric-input.js';
+import {confirmMountingChange} from './mounting-review-ui.js';
 
 export function openGearHoleDialog({S,mode,pause,snapshotStr,pushUndo,rebuild,draw,updateGearEditor}){
   if(S.mode!=='design'||!S.selectedGearId)return;
@@ -73,6 +74,6 @@ export function openGearHoleDialog({S,mode,pause,snapshotStr,pushUndo,rebuild,dr
   svg.onpointercancel=svg.onlostpointercapture=cancelDrag;
   const resize=new ResizeObserver(()=>preview());resize.observe(svg);
   method.onchange=reference.onchange=update;radius.oninput=angle.oninput=update;
-  cancel.onclick=()=>dialog.close();confirm.onclick=()=>{const error=commitGearHolePlacement({plan,revision,fingerprint:snapshotStr,pushUndo,apply:p=>{S.comps=p.comps;S.topo.params=p.params;rebuild();draw();updateGearEditor();}});if(error){status.textContent=error;confirm.disabled=true;}else dialog.close();};
+  cancel.onclick=()=>dialog.close();confirm.onclick=()=>{if(snapshotStr()===revision&&plan?.ok&&plan.changed&&!confirmMountingChange(source,{...source,comps:plan.comps,params:plan.params},{notify:message=>{status.textContent=message;}}))return;const error=commitGearHolePlacement({plan,revision,fingerprint:snapshotStr,pushUndo,apply:p=>{S.comps=p.comps;S.topo.params=p.params;rebuild();draw();updateGearEditor();}});if(error){status.textContent=error;confirm.disabled=true;}else dialog.close();};
   dialog.addEventListener('close',()=>{resize.disconnect();dialog.remove();},{once:true});document.body.append(dialog);dialog.showModal();update();
 }

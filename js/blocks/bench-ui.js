@@ -1,4 +1,5 @@
 import { appendCollisionActions } from './collision-actions.js';
+import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 import {assemblyWork,mergeAssemblyWork} from './assembly-membership.js';
 import {closedAssemblies, closedAssemblyIds} from './assembly-view.js';
 import {createMaterialPoseStatus} from './material-pose-status.js';
@@ -800,6 +801,7 @@ export function createBench(deps) {
       r = mateDetach(S.comps, S.modules, id, S.topo.params, motorState());
     } else r = mateAdjust(S.comps, S.modules, id, action, S.topo.params, { joint: S.fabrication?.joint });
     if (!r.ok) { say(r.reason || '這個動作現在不能用'); return false; }
+    if(!confirmMountingChange(mountingWork(S),{...mountingWork(S),comps:r.comps,modules:r.modules},{notify:say}))return false;
     pushUndo();
     S.comps = r.comps; S.modules = r.modules;
     if (action === 'joint:printed' || action === 'joint:bracket-m3') Settings.setJointDefaultKind(action.slice(6));   // F1：記住使用者的選擇，存成作品的預設，之後新接的也用它（隨作品保存）
@@ -1354,6 +1356,8 @@ export function createBench(deps) {
       const checked=deps.takeCandidate?.();
       if(deps.takeCandidate&&!checked){say('候選尚未完成檢查或作品已變動，請重新預覽');return false;}
       if(checked){comps=checked.work.comps;modules=checked.work.modules;}
+      const before=mountingWork(S);
+      if(!confirmMountingChange(before,{...before,comps,modules},{notify:say}))return false;
       deps.setCandidate(null); viewer()?.setPreviewGhost(null);
       pushUndo(); S.comps = comps; S.modules = modules;
       rebuild(); draw(); say(msg, { toast: false }); syncUI(true); drawMarkers();
@@ -1361,6 +1365,8 @@ export function createBench(deps) {
     },
     // 已接好的機構換接法（一筆復原）。
     apply(r, msg) {
+      const before=mountingWork(S);
+      if(!confirmMountingChange(before,{...before,comps:r.comps,modules:r.modules},{notify:say}))return false;
       pushUndo(); S.comps = r.comps; S.modules = r.modules;
       rebuild(); draw(); say(msg, { toast: false }); syncUI(true); drawMarkers();
     }

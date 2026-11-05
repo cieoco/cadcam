@@ -2,6 +2,7 @@ import {fusionRoot,inspectBarFusionData} from '../core/bar-fusion.js';
 import {inspectBarFusion} from './bar-fusion-geometry.js';
 import {compileTopology} from '../core/topology.js';
 import {solveTopology} from '../multilink/solver.js';
+import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 
 /** Resize a bridge of the member graph; translate one entire side, never bend it.
  * All geometry/solver checks run on a candidate before the caller commits. */
@@ -51,6 +52,8 @@ export function commitBarFusionResize({S,id,value,revision,fingerprint,positions
   const motion={thetaDeg:S.theta,motorAngles:{...S.motorAngles,[String(S.activeMotor)]:S.theta}};
   const plan=planBarFusionResize(comps(),S.topo.params,id,value,{positions:positions(),settings:settings(),motion});
   if(!plan.ok){notify(plan.reason);draw();return;}
+  const before=mountingWork(S),byCandidate=new Map(plan.comps.map(c=>[c.id,c]));
+  if(!confirmMountingChange(before,{...before,comps:S.comps.map(c=>byCandidate.get(c.id)||c),params:plan.params},{notify}))return;
   pause();pushUndo();const byId=new Map(plan.comps.map(c=>[c.id,c]));
   S.comps=S.comps.map(c=>byId.get(c.id)||c);S.topo.params=plan.params;rebuild();draw();
 }

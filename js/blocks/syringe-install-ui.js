@@ -8,11 +8,12 @@ import {createPlateGeometry} from './plate-geometry.js';
 import {syringePositionOnFrame} from './syringe-position.js';
 import {diskOutline} from './disk-plate.js';
 import {signedNumberInput,showNumber,readNumber} from './numeric-input.js';
+import {confirmMountingChange} from './mounting-review-ui.js';
 
 const ns='http://www.w3.org/2000/svg';
 const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textContent=text;parent?.append(n);return n;};
 const labelOf=c=>c.name || c.id;
-export function openSyringeInstallation({source,points,existing=null,newId,motion={},confirm,remove,advancedSettings}){
+export function openSyringeInstallation({source,points,existing=null,newId,motion={},confirm,remove,advancedSettings,review=(result,notify)=>confirmMountingChange(source,{...source,comps:result.comps,params:result.params},{notify})}){
  const base=structuredClone(source),choices=installationChoices(base.comps,base.params);
  let result=null,closed=false,revision=0,viewer=null,sceneTimer=null,preview3d=false,dragging=false,focusClamp=!!existing,focusBox=null,dragOffset=null;
  const request={id:existing&&base.comps.some(c=>c.id===existing.id)?existing.id:null,newId:newId || existing?.id,
@@ -82,7 +83,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  const error=el('p');error.setAttribute('role','status');error.className='install-error';
  const footer=el('footer',null,dialog),next=el('button','確認安裝',footer);footer.prepend(error);
  cancel.onclick=()=>dialog.close();
- next.onclick=()=>{if(result?.ok&&!result.temporary){const accepted=confirm(result);if(accepted!==false)dialog.close();else error.textContent='作品已變更，請關閉後重新安裝。';}};
+ next.onclick=()=>{if(result?.ok&&!result.temporary){if(!review(result,message=>{error.textContent=message;}))return;const accepted=confirm(result);if(accepted!==false)dialog.close();else error.textContent='作品已變更，請關閉後重新安裝。';}};
  const changed=()=>{scanStatus.textContent='設定已變更，請重新檢查全行程。';};
  frame.onchange=()=>{request.frameId=frame.value;request.position=null;focusBox=null;preview3d=false;changed();update();};
  const setPosition=()=>{request.position={x:readNumber(px),y:readNumber(py)};changed();update();};
@@ -160,7 +161,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
    const hit=draw('circle',{cx:p.x,cy:-p.y,r:22*unit,fill:'transparent',[data]:'true',role:'button',tabindex:0,'aria-label':label});group.append(hit);
    hit.onkeydown=e=>{const keys={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,1],ArrowDown:[0,-1]};if(!keys[e.key])return;e.preventDefault();if(data==='data-install-angle'){request.axisDeg+=(keys[e.key][0]||keys[e.key][1]);autoAxis=false;changed();update();}else shift(...keys[e.key]);svg.querySelector(`[${data}]`)?.focus();};
   };
-  if(request.position){dot(shape?.anchor||A,'#0284c7','data-install-position',request.mountMode==='pivot'?'轉軸位置':'固定環位置');if(request.mountMode!=='pivot'&&request.b){const distance=Math.max(65,66*unit),handle=at(distance);line(A,handle,1.5*unit,'#e87911');const arrow=at(distance-10*unit),normal={x:-Math.sin(theta)*5*unit,y:Math.cos(theta)*5*unit};poly([handle,{x:arrow.x+normal.x,y:arrow.y+normal.y},{x:arrow.x-normal.x,y:arrow.y-normal.y}],'#e87911');dot(handle,'#e87911','data-install-angle','轉方向');}}
+  if(request.position){if(request.mountMode!=='pivot'&&request.b){const distance=Math.max(65,66*unit),handle=at(distance);line(A,handle,1.5*unit,'#e87911');const arrow=at(distance-10*unit),normal={x:-Math.sin(theta)*5*unit,y:Math.cos(theta)*5*unit};poly([handle,{x:arrow.x+normal.x,y:arrow.y+normal.y},{x:arrow.x-normal.x,y:arrow.y-normal.y}],'#e87911');dot(handle,'#e87911','data-install-angle','轉方向');}dot(shape?.anchor||A,'#0284c7','data-install-position',request.mountMode==='pivot'?'轉軸位置':'固定環位置');}
 
  }
  const pointer=e=>{const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());return {x:p.x,y:-p.y};};

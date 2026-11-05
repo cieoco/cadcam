@@ -1,6 +1,7 @@
 import {editableNumber} from './numeric-input.js';
 import {setPointPosition} from './input.js';
-import {freeLinkForPoint,freeTriangleForPoint} from './model.js';
+import {freeLinkForPoint,freeTriangleForPoint,updatePointCoordsById as movePoint} from './model.js';
+import {commitMountingEdit} from './mounting-review-ui.js';
 /** 共用剛性桿件尺寸列：選取 → 預檢整筆修改 → 一次復原 → 重算。 */
 import {isDisk,validateDisk} from './disk-plate.js';
 import { S } from './state.js';
@@ -40,7 +41,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
         const error=validateDisk(c,Number(S.topo.params[c.lenParam]),value,holeDiameter(c));
         if(error){notify(error);sync();return;}
         if(value===c.diameterMm)return;
-        pause();pushUndo();c.diameterMm=value;rebuild();draw();
+        pause();if(!commitMountingEdit(S,d=>{d.comps.find(o=>o.id===c.id).diameterMm=value;},{pushUndo,notify})){sync();return;}rebuild();draw();
       };
     }
     const more=el('memberMore');if(more?.nodeType===1&&!more.dataset.resizeListener){more.dataset.resizeListener='1';more.addEventListener('toggle',draw);}
@@ -137,21 +138,22 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if (failure) { notify(failure.message); sync(); return; }
     if (targets.every(c => Math.abs(memberDimensionValue(c, S.topo.params, id) - plans[0].value) < 0.001)) { sync(); return; }
     if(comp.barFusionRoot)return resizeFusion?.(comp.id,plans[0].value);
-    pause(); pushUndo();
-    targets.forEach((c, index) => {
+    pause();
+    if(!commitMountingEdit(S,draft=>targets.forEach((target, index) => {
+      const c=draft.comps.find(o=>o.id===target.id);
       if (c.type === 'bar' && id === 'g') {
-        const patches = planSyringeAttachmentResize(S.comps, c, Number(S.topo.params[c.lenParam]), plans[index].value);
-        patches.forEach(({ id, ...patch }) => Object.assign(S.comps.find(c => c.id === id), patch));
+        const patches = planSyringeAttachmentResize(draft.comps, c, Number(draft.params[c.lenParam]), plans[index].value);
+        patches.forEach(({ id, ...patch }) => Object.assign(draft.comps.find(c => c.id === id), patch));
       }
-      Object.assign(S.topo.params, plans[index].params);
+      Object.assign(draft.params, plans[index].params);
       Object.assign(c, plans[index].properties);
       if (id === 'tip') return;
-      if (c.type === 'triangle') reshapeTriangle(c);
+      if (c.type === 'triangle') reshapeTriangle(c,draft.params,(id,x,y)=>movePoint(draft.comps,id,x,y));
       else {
         const dx = c.p2.x - c.p1.x, dy = c.p2.y - c.p1.y, length = Math.hypot(dx, dy) || 1;
-        updatePointCoordsById(c.p2.id, c.p1.x + (dx || (dy ? 0 : 1)) / length * plans[index].value, c.p1.y + dy / length * plans[index].value);
+        movePoint(draft.comps,c.p2.id, c.p1.x + (dx || (dy ? 0 : 1)) / length * plans[index].value, c.p1.y + dy / length * plans[index].value);
       }
-    });
+    }),{pushUndo,notify})){sync();return;}
     rebuild(); draw();
   }
   function change(delta) {
@@ -169,8 +171,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     const failure = plans.find(plan => !plan.ok);
     if (failure) { notify(failure.message); sync(); return; }
     if (targets.every((c, i) => JSON.stringify(memberStock(c)) === JSON.stringify(plans[i].stock))) { sync(); return; }
-    pause(); pushUndo();
-    targets.forEach((c, i) => { c.stock = plans[i].stock; });
+    pause();if(!commitMountingEdit(S,draft=>targets.forEach((c,i)=>{draft.comps.find(o=>o.id===c.id).stock=plans[i].stock;}),{pushUndo,notify})){sync();return;}
     rebuild(); draw();
   }
   function beginTipPreview() {

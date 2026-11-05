@@ -151,6 +151,12 @@ try{
   const x=Number(d.querySelector('[aria-label="固定位置 X (mm)"]').value);
   handle.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
   assert(Math.abs(Number(d.querySelector('[aria-label="固定位置 X (mm)"]').value)-x-1)<.011,`${name} handle nudges disk mount 1 mm`);
+  if(name==='hydraulic-h08'){
+   // The original pivot shares an existing plate hole. A 1 mm offset would overlap it.
+   [...d.querySelectorAll('button')].find(n=>n.textContent==='確認安裝').click();
+   assert(JSON.stringify(api.snapshot())===before&&d.querySelector('.install-error').textContent.includes('孔重疊'),'overlapping pivot hole is refused without writing work');
+   for(let i=0;i<7;i++)d.querySelector('[data-install-position]').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
+  }
   const moved=d.querySelector('[aria-label="固定位置 X (mm)"]').value;
   d.querySelector('svg').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:0,clientY:0}));
   assert(d.querySelector('[aria-label="固定位置 X (mm)"]').value===moved,`${name} blank preview does not move the clamp`);

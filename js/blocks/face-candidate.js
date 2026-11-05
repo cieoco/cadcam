@@ -101,7 +101,7 @@ export async function validateFaceCandidate(candidate,pose={},compute,sceneInput
  checks.push({status:plane.length?'fail':'pass',code:'in_plane_interference',findings:plane},{status:material.status,code:'material_interference',findings:material.findings});
  return freezeData({...candidate,saveable:candidate.ok&&!materialUnsupported&&!(candidate.work.modules.some(m=>m.mount?.face?.selection?.fastener)&&(material.status==='fail'||plane.length)),...(materialUnsupported?{reason:scene.catalog?.extras?.diagnostics?.find(d=>d.status==='fail')?.reason || '部分板件材料或姿態無法驗證，不能確認。'}:{}),work:candidate.ok?scene.work:candidate.work,model,points:scene.points,hostReference:scene.hostReference,validation:{status:!candidate.ok||plane.length||material.status==='fail'?'fail':material.status,sourceRevision:candidate.sourceRevision,selectionRevision:candidate.selectionRevision,geometryKey:model.geometryKey,poseRevision,checks,material,coverage:material.coverage}});
 }
-export function createFaceCandidateTransaction({readSource,readPose=()=>({}),build=buildFaceCandidate,validate=validateFaceCandidate,commit}){
+export function createFaceCandidateTransaction({readSource,readPose=()=>({}),build=buildFaceCandidate,validate=validateFaceCandidate,review=()=>true,commit}){
  const sourceRevision=faceSourceRevision(readSource());let serial=0,current=null,pending=false,closed=false,confirming=false;
  const reject=(code,reason)=>({ok:false,code,reason});
  return {
@@ -123,6 +123,7 @@ export function createFaceCandidateTransaction({readSource,readPose=()=>({}),bui
    try{const checked=await validate(target,pose);
     if(closed||at!==serial||target!==current||faceSourceRevision(readSource())!==sourceRevision||facePoseRevision(readPose())!==facePoseRevision(pose))return reject('candidate_stale','候選或姿態已變動，請重新預覽。');
     if(!checked.saveable)return reject('candidate_invalid','目前姿態無法驗證，請重新預覽。');
+    if(!review(readSource(),checked.work))return reject('mounting_review_declined','已保留原固定孔位，請繼續調整。');
     closed=true;commit(checked.work,checked.validation,checked);return {ok:true,candidate:checked};
    }catch(e){return reject('validation_failed',e.message);}finally{confirming=false;}
   },

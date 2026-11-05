@@ -2,6 +2,7 @@
 // 防呆（兩端固定 / 線性致動器限滑塊）、型號查詢與有限行程範圍。
 // 依 app.js 的接線方式把 gear-editor / slider-editor / motor-tools 三個 factory 串起來測。
 import { check, report } from './_harness.mjs';
+globalThis.window={confirm:()=>true,alert:message=>{throw Error(message);}};
 
 class FakeElement {
   constructor() { this.children = []; this.style = {}; this.dataset = {}; this.textContent = ''; this.value = ''; this.classList = { toggle() {} }; }
@@ -126,6 +127,9 @@ check('局部分頁仍採用自身伺服行程', JSON.stringify(motorTools.input
 // 面板更換保留同一動力與機構幾何；移掉後可從整片齒輪重裝。
 S.comps=[driver,driven]; driver.p1.physicalMotor='7';
 const before=JSON.stringify({p1:driver.p1,mesh:driver.mesh,teeth:driver.teeth});
+const beforeDecline=JSON.stringify(S.comps);window.confirm=()=>false;
+check('取消改馬達孔位保留原機構',motorTools.setGearMotorType(driven.id,'mg995')===null && JSON.stringify(S.comps)===beforeDecline);
+window.confirm=()=>true;
 check('從動輪面板更換同一輸入軸',motorTools.setGearMotorType(driven.id,'mg995')===driver.p1.id);
 check('更換保留編號與幾何',before===JSON.stringify({p1:driver.p1,mesh:driver.mesh,teeth:driver.teeth}) && S.activeMotor==='7');
 check('更換後提供預設伺服角度',driver.motorType==='mg995' && driver.servoStart===0 && driver.servoEnd===90);

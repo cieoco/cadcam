@@ -1,3 +1,4 @@
+import {confirmMountingChange,mountingWork,mountingCandidate} from './mounting-review-ui.js';
 import {signedNumberInput,showNumber,readNumber,formatNumber} from './numeric-input.js';
 import {APP_VERSION} from '../version.js';
 import {syringeShape} from './syringe-shape.js';
@@ -211,6 +212,7 @@ export function createSyringeUI(h){
     let counter=1;while(S.comps.some(c=>c.id===`Syringe${counter}`))counter++;
     // 安裝介面（含預覽與選項）第一次安裝針筒才載入，不佔啟動大小
     import('./syringe-install-ui.js').then(({openSyringeInstallation})=>openSyringeInstallation({source,points:clone(h.points()),existing:candidate,newId:`Syringe${counter}`,motion:motion(),
+      review:(r,notify)=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus])){notify('作品已變更，請重新開啟安裝。');return false;}return confirmMountingChange(mountingWork(S),mountingCandidate(mountingWork(S),r,h.comps()),{notify});},
       advancedSettings:c=>open(c,true),
       confirm:r=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus]))return false;message='';commit(r.comps,r.params,r);return true;},
       remove:candidate&&S.comps.some(c=>c.id===candidate.id)?()=>{h.pushUndo();S.comps=S.comps.filter(c=>c.id!==candidate.id);h.rebuild();h.draw();h.save();}:null}),()=>notify('安裝介面載入失敗，請再試一次。'));
@@ -218,7 +220,7 @@ export function createSyringeUI(h){
   function open(candidate=null,advanced=false){
     const current=candidate || active();
     if(hasSyringeClamp(current)&&!advanced){install(current);return;}
-    h.pause();const c=clone(candidate||active());if(!c)return;
+    h.pause();const c=clone(candidate||active());if(!c)return;const sourceRevision=JSON.stringify([S.comps,S.topo.params,S.fabrication]);
     const dialog=el('dialog');dialog.id='syringeDialog';dialog.className='syringe-dialog';const form=el('form',null,dialog);
     el('h3',candidate&&!h.comps().some(o=>o.id===candidate.id)?'新增 10cc 液壓針筒':'針筒與安裝設定',form);
     el('p',c.mountMode==='fixed-axis'?'管夾固定筒身；A 為固定參考點，B 為片狀推桿孔。軸向固定，接孔保留轉動。':c.mountMode==='pivot'?'同一個雙耳固定環只鎖一顆耳螺絲：A 為這顆螺絲（轉軸），離筒身軸線 14 mm；B 為推桿孔，在筒身軸線上。':'mm；A 為筒身托架轉軸，B 為推桿轉接座。孔位沿所屬零件第 1 孔→第 2 孔量測。',form);
@@ -277,7 +279,7 @@ export function createSyringeUI(h){
     }
     const scan=el('button','掃描候選全行程',form);scan.type='button';scan.onclick=()=>{const r=plan();if(!r.ok){error.textContent=r.message;return;}const result=scanSyringe(r.comps,r.params,c.id,0.5,motion());error.textContent=result.ok?`${result.message} 最大誤差 ${result.maxResidualMm.toExponential(2)} mm`:`${result.atMm??''} mm：${result.message}`;};
     const save=el('button','確認套用',form);save.type='submit';
-    form.onsubmit=e=>{e.preventDefault();const r=plan();if(!r.ok){error.textContent=r.message;return;}message='';commit(r.comps,r.params,r,{fabrication:r.fabrication});dialog.close();};
+    form.onsubmit=e=>{e.preventDefault();if(sourceRevision!==JSON.stringify([S.comps,S.topo.params,S.fabrication])){error.textContent='作品已變更，請重新開啟設定。';return;}const r=plan();if(!r.ok){error.textContent=r.message;return;}if(!confirmMountingChange(mountingWork(S),mountingCandidate(mountingWork(S),r,h.comps()),{notify:message=>{error.textContent=message;}}))return;message='';commit(r.comps,r.params,r,{fabrication:r.fabrication});dialog.close();};
     const cancel=el('button','取消',form);cancel.type='button';cancel.onclick=()=>dialog.close();
     if(!candidate){const remove=el('button','刪除針筒',form);remove.type='button';remove.onclick=()=>{h.pushUndo();S.comps=S.comps.filter(o=>o.id!==c.id);h.rebuild();h.draw();dialog.close();};}
     dialog.onclose=()=>dialog.remove();document.body.append(dialog);dialog.showModal();

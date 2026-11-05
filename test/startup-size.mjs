@@ -13,7 +13,8 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-10-28：P1 卡榫盒子改為外掛，生成與介面程式移出啟動；保存契約（box-contract）與外掛登記仍在啟動，總量不低於 1.97MB，上限維持 1.9725MB。
 // 2026-10-28：固定軸共用選取／精確角度與不可用狀態增加約 2 KB，目前 1,973,959 bytes。
 // 2026-10-28：合成桿段選擇與編輯接頭約 1.1 KB（目前 1,975,060 bytes），幾何重算仍懶載入。
-check('首次JS原始大小低於1.977MB',r.bytes<1977000);
+// 2026-11-05：共用裝配孔位核對與既有編輯入口接線，增量約 20 KB；無新增依賴或載入 3D。
+check('首次JS原始大小低於2MB',r.bytes<2000000);
 check('合成尺寸候選計算延後載入',!r.paths.includes('js/blocks/bar-fusion-resize.js')&&r.lazyEntries.includes('js/blocks/bar-fusion-resize.js'));
 check('盒體生成介面（外掛）延後載入',!r.paths.includes('js/plugins/box-maker/box-generator.js')&&!r.paths.includes('js/plugins/box-maker/box-dialog.js')&&r.lazyEntries.includes('js/plugins/box-maker/index.js'));
 check('歷史紀錄點開才載入',!r.paths.includes('js/version-history.js')&&r.lazyEntries.includes('js/version-history.js'));

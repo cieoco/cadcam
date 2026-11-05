@@ -8,6 +8,7 @@
  */
 
 import { S, activateMotor, usedMotorIds, nextMotorId } from './state.js';
+import {commitMountingEdit} from './mounting-review-ui.js';
 
 // ---- 動力來源查詢純函式（不碰 S / 工廠，方便單測）----
 // 以此接點為馬達中心的型號：桿件輸入 → 齒輪驅動輪 → 預設 TT。
@@ -147,7 +148,8 @@ export function createMotorTools({
     const bar = S.comps.find(comp => comp.type === 'bar' && comp.id === barId);
     const carrier = carrierId && S.comps.find(comp => comp.type === 'bar' && comp.id === carrierId);
     if (!bar) return;
-    pushUndo();
+    if(!commitMountingEdit(S,draft=>{
+    const bar=draft.comps.find(c=>c.id===barId);
     const angle = Math.atan2(bar.p2.y - bar.p1.y, bar.p2.x - bar.p1.x) * 180 / Math.PI;
     if (carrier) {
       const carrierAngle = Math.atan2(carrier.p2.y - carrier.p1.y, carrier.p2.x - carrier.p1.x) * 180 / Math.PI;
@@ -161,6 +163,7 @@ export function createMotorTools({
     bar.motorMount = { motor, center: nodeId, outputBody: bar.id,
       ...(carrier ? { frameBody: carrier.id } : {}), orientation: carrier ? 'follow-frame' : 'horizontal',
       order: carrier ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody'] };
+    },{pushUndo}))return;
     cancelMotorMode(); rebuild(); draw(); updateRoleEditor();
   }
   function configureMotorMount(nodeId) {
@@ -180,20 +183,22 @@ export function createMotorTools({
   function setMotorOrientation(nodeId, orientation) {
     const bar = motorBarForCenter(nodeId);
     if (!bar || !['horizontal', 'vertical', 'follow-frame'].includes(orientation)) return;
-    pushUndo();
-    bar.motorMount = { ...(bar.motorMount || {}), motor: String(bar.physicalMotor || '1'), center: nodeId,
+    if(!commitMountingEdit(S,draft=>{const target=draft.comps.find(c=>c.id===bar.id);
+    target.motorMount = { ...(bar.motorMount || {}), motor: String(bar.physicalMotor || '1'), center: nodeId,
       outputBody: bar.id, ...(bar.motorCarrier ? { frameBody: bar.motorCarrier } : {}), orientation,
       order: bar.motorCarrier ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody'] };
+    },{pushUndo}))return;
     rebuild(); draw(); updateRoleEditor();
   }
   function toggleMotorReverse(nodeId) {
     const bar = motorBarForCenter(nodeId);
     if (!bar) return;
-    pushUndo();
-    bar.motorMount = { ...(bar.motorMount || {}), motor: String(bar.physicalMotor || '1'), center: nodeId,
+    if(!commitMountingEdit(S,draft=>{const target=draft.comps.find(c=>c.id===bar.id);
+    target.motorMount = { ...(bar.motorMount || {}), motor: String(bar.physicalMotor || '1'), center: nodeId,
       outputBody: bar.id, ...(bar.motorCarrier ? { frameBody: bar.motorCarrier } : {}),
       orientation: bar.motorMount?.orientation || (bar.motorCarrier ? 'follow-frame' : 'horizontal'),
       reversed: !bar.motorMount?.reversed, order: bar.motorCarrier ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody'] };
+    },{pushUndo}))return;
     rebuild(); draw(); updateRoleEditor();
   }
   function driveBarAt(barId, nodeId) {
@@ -354,14 +359,16 @@ export function createMotorTools({
     if(!['tt','mg995','n20'].includes(type))return null;
     const c=motorBarForCenter(nodeId) || S.comps.find(c=>['gear','pulley'].includes(c.type) && c.p1?.id===nodeId && c.p1.physicalMotor);
     if(!c || (c.type==='pulley' && type==='mg995'))return null;
+    const cId=c.id;
     pause();
     if((c.motorType || 'tt')!==type) {
-      pushUndo();
+      if(!commitMountingEdit(S,d=>{const c=d.comps.find(o=>o.id===cId);
       c.motorType=type;
       if(type==='mg995') {
         if(c.servoStart==null)c.servoStart=0;
         if(c.servoEnd==null)c.servoEnd=90;
       }
+      },{pushUndo,notify:setBanner}))return null;
     }
     const motor=c.type==='bar'?c.physicalMotor:c.p1.physicalMotor;
     activateMotor(String(motor || '1'));

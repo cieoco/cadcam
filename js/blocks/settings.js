@@ -5,6 +5,7 @@
  */
 
 import { S } from './state.js';
+import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 import * as Exporters from './exporters.js?v=20261007_9';
 import { FABRICATION_DEFAULTS, normalizeFabricationProfile, planFabricationProfile } from './fabrication-profile.js';
 
@@ -192,6 +193,7 @@ function commit(group, key, value) {
   const result = planFabricationProfile(S.fabrication || FABRICATION_DEFAULTS, group, key, group === 'joint' && key === 'defaultKind' ? raw : numeric);
   if (!result.ok) { notify(result.message); syncFabricationInputs(); return false; }
   if (!result.changed) { syncFabricationInputs(); return false; }
+  const before=mountingWork(S);if(!confirmMountingChange(before,{...before,fabrication:result.profile},{notify})){syncFabricationInputs();return false;}
   pause(); pushUndo(); applyFabricationProfile(result.profile); scheduleAutosave(); draw(); return true;
 }
 export function setExportSetting(key, value) { return commit('export', key, value); }

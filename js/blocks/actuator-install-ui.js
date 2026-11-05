@@ -5,7 +5,8 @@ const ns='http://www.w3.org/2000/svg';
 const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textContent=text;parent?.append(n);return n;};
 const label=c=>c.name || c.id;
 
-export function openMotorInstallation({source,points={},motion={},type='mg995',existingId=null,initialOutputId='',motorId='1',confirm}){
+import {confirmMountingChange} from './mounting-review-ui.js';
+export function openMotorInstallation({source,points={},motion={},type='mg995',existingId=null,initialOutputId='',motorId='1',confirm,review=(result,notify)=>confirmMountingChange(source,{...source,comps:result.comps,params:result.params},{notify})}){
   const base=structuredClone(source),choices=actuatorChoices(base.comps),old=base.comps.find(c=>c.id===existingId);
   const oldCenter=old?.motorMount?.center || ['p1','p2'].map(k=>old?.[k]).find(p=>p?.physicalMotor)?.id;
   const request={type:old?(old.motorType||'tt'):type,motorId,existingId,hostId:old?(old.motorMount?.frameBody||old.motorCarrier||'world'):'',
@@ -56,7 +57,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
   const error=el('p',null,body);error.className='install-error';error.setAttribute('role','status');
   const foot=el('footer',null,dialog),next=el('button',old?'儲存安裝':'確認安裝',foot);
   foot.prepend(error);cancel.onclick=()=>dialog.close();
-  next.onclick=()=>{if(result?.ok){if(confirm(result)!==false)dialog.close();else error.textContent='作品已變更，請關閉後重新安裝。';}};
+  next.onclick=()=>{if(result?.ok){if(!review(result,message=>{error.textContent=message;}))return;if(confirm(result)!==false)dialog.close();else error.textContent='作品已變更，請關閉後重新安裝。';}};
   kind.onchange=()=>{request.type=kind.value;update();};
   host.onchange=()=>{request.hostId=host.value;request.orientation=host.value==='world'?'horizontal':'follow-frame';if(host.value==='world')request.face='back';orientation.value=request.orientation;update();};
   location.onchange=()=>{request.hostEnd=location.value;update();};

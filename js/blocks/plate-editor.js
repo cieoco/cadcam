@@ -8,6 +8,8 @@ import {editableNumber} from './numeric-input.js';
  */
 
 import { S } from './state.js';
+import {commitMountingEdit} from './mounting-review-ui.js';
+import {updatePointCoordsById as movePoint} from './model.js';
 import * as Panels from './panels.js';
 import { MAX_PLATE_POINTS, worldToLocal, defaultPlateVertices, plateVertices } from './plate-geometry.js';
 import { memberDimensionValue, planMemberDimension, dimensionLock } from './member-dimensions.js';
@@ -29,7 +31,7 @@ export function createPlateEditor({
     for(const key of ['u','v'])editableNumber(box.querySelector(`[data-${key}]`),vertices[vertexIndex][key],value=>{
       const current=S.comps.find(c=>c.id===comp.id);if(!current)return;
       const index=vertexIndex,v=plateVertices(current)[index];if(!v||v.solve||v[key]===value)return;
-      pause();pushUndo();ensurePlateVertices(current)[index][key]=value;rebuild();draw();syncVertex(current);
+      pause();if(!commitMountingEdit(S,d=>{ensurePlateVertices(d.comps.find(c=>c.id===current.id))[index][key]=value;},{pushUndo,notify:setBanner})){syncVertex(current);return;}rebuild();draw();syncVertex(current);
     },{label:key==='u'?'外形點沿 A–B（mm）':'外形點垂直 A–B（mm）'});
   }
   function plateBasisFor(comp) {
@@ -98,13 +100,11 @@ export function createPlateEditor({
     if(event?.type==='pointercancel'){
       Object.keys(comp).forEach(k=>delete comp[k]);Object.assign(comp,ds.original);rebuild();draw();syncVertex(comp);return;
     }
-    if(ds.moved){const edited=structuredClone(comp);Object.keys(comp).forEach(k=>delete comp[k]);Object.assign(comp,ds.original);pushUndo();Object.assign(comp,edited);}
+    if(ds.moved){const edited=structuredClone(comp);Object.keys(comp).forEach(k=>delete comp[k]);Object.assign(comp,ds.original);if(!commitMountingEdit(S,d=>{Object.assign(d.comps.find(c=>c.id===comp.id),edited);},{pushUndo,notify:setBanner})){rebuild();draw();syncVertex(comp);return;}}
     if (!ds.moved) {                                   // 純點擊＝切換是否鑽孔
-      ensurePlateVertices(comp);
-      const vt = comp.vertices[ds.vi];
+      const vt = plateVertices(comp)[ds.vi];
       if (vt && !vt.solve) {
-        pushUndo();
-        if (vt.hole === true) delete vt.hole; else vt.hole = true;
+        if(!commitMountingEdit(S,d=>{const v=ensurePlateVertices(d.comps.find(c=>c.id===comp.id))[ds.vi];if(v.hole===true)delete v.hole;else v.hole=true;},{pushUndo,notify:setBanner}))return;
       }
     }
     rebuild(); draw();
@@ -112,11 +112,9 @@ export function createPlateEditor({
   function deleteShapeVertex(compId, vi) {
     const comp = S.comps.find(x => x.id === compId && x.type === 'triangle');
     if (!comp) return;
-    ensurePlateVertices(comp);
-    const vt = comp.vertices[vi];
+    const vt = plateVertices(comp)[vi];
     if (!vt || vt.solve) return;
-    pushUndo();
-    comp.vertices.splice(vi, 1);
+    if(!commitMountingEdit(S,d=>ensurePlateVertices(d.comps.find(c=>c.id===comp.id)).splice(vi,1),{pushUndo,notify:setBanner}))return;
     rebuild(); draw();
   }
 
@@ -192,8 +190,7 @@ export function createPlateEditor({
     const comp = S.comps.find(x => x.id === S.selectedTriangleId && x.type === 'triangle');
     if (!comp) return;
     if (comp.shape === 'jaw') { setBanner('夾爪請使用爪端長度調整外形；自由外形仍待支援。'); return; }
-    pushUndo();
-    comp.shapeMode = ['hull', 'polygon', 'polyline'].includes(mode) ? mode : 'hull';
+    if(!commitMountingEdit(S,d=>{d.comps.find(c=>c.id===comp.id).shapeMode=['hull','polygon','polyline'].includes(mode)?mode:'hull';},{pushUndo,notify:setBanner})){updatePlateShapeControls(comp);return;}
     updatePlateShapeControls(comp);
     rebuild(); draw();
   }
@@ -222,13 +219,12 @@ export function createPlateEditor({
     };
     const local = worldToLocal(pts, world);
     if (!local) return;
-    pushUndo();
-    ensurePlateVertices(comp);
-    comp.vertices = [...comp.vertices, {
+    if(!commitMountingEdit(S,d=>{const target=d.comps.find(c=>c.id===comp.id);
+    target.vertices = [...ensurePlateVertices(target), {
       solve: false,
       u: Number(local.u.toFixed(1)),
       v: Number(local.v.toFixed(1))
-    }];
+    }];},{pushUndo,notify:setBanner}))return;
     updatePlateShapeControls(comp);
     rebuild(); draw();
   }
@@ -251,22 +247,24 @@ export function createPlateEditor({
     const plan = planMemberDimension(c, S.topo.params, S.triSide, current + delta);
     if (lock || !plan.ok) { setBanner(lock || plan.message); return; }
     if (plan.value === current) return;
-    pause(); pushUndo();
-    Object.assign(S.topo.params, plan.params); Object.assign(c, plan.properties);
-    if (S.triSide !== 'tip') reshapeTriangle(c);   // 自由三點桿才看得到；已連接的由 solver 接手
+    pause();
+    if(!commitMountingEdit(S,d=>{
+      const target=d.comps.find(o=>o.id===c.id);Object.assign(d.params,plan.params);Object.assign(target,plan.properties);
+      if(S.triSide!=='tip')reshapeTriangle(target,d.params,(id,x,y)=>movePoint(d.comps,id,x,y)); // 自由三點桿才看得到；已連接的由 solver 接手
+    },{pushUndo,notify:setBanner}))return;
     Panels.renderLenEditor(plan.value);
     rebuild(); draw();
   }
   // 依 g/r1/r2 重擺三點桿：固定 P1 與底邊方向，P2 落在距 P1 為 g 處，P3 取兩圓交點
   // 中離目前位置較近的那個（避免翻面）。三角不等式不成立時 P3 不動，交給驗證提示。
-  function reshapeTriangle(c) {
-    const g = S.topo.params[c.gParam], r1 = S.topo.params[c.r1Param], r2 = S.topo.params[c.r2Param];
+  function reshapeTriangle(c,params=S.topo.params,move=updatePointCoordsById) {
+    const g = params[c.gParam], r1 = params[c.r1Param], r2 = params[c.r2Param];
     if (!(g > 0 && r1 > 0 && r2 > 0)) return;
     const P1 = { x: c.p1.x || 0, y: c.p1.y || 0 };
     const dx = (c.p2.x || 0) - P1.x, dy = (c.p2.y || 0) - P1.y;
     const d = Math.hypot(dx, dy) || 1;
     const P2 = { x: P1.x + dx / d * g, y: P1.y + dy / d * g };
-    updatePointCoordsById(c.p2.id, P2.x, P2.y);   // 更新所有共用此接點 id 的副本（見 setLen 說明）
+    move(c.p2.id, P2.x, P2.y);   // 更新所有共用此接點 id 的副本（見 setLen 說明）
     const bx = P2.x - P1.x, by = P2.y - P1.y;
     const base = Math.hypot(bx, by) || 1;
     if (base > r1 + r2 || base < Math.abs(r1 - r2)) return; // 三角不等式不成立
@@ -278,7 +276,7 @@ export function createPlateEditor({
     const cand = [{ x: mx + ox, y: my + oy }, { x: mx - ox, y: my - oy }];
     const pick = cand.reduce((best, p) =>
       Math.hypot(p.x - cur.x, p.y - cur.y) < Math.hypot(best.x - cur.x, best.y - cur.y) ? p : best);
-    updatePointCoordsById(c.p3.id, pick.x, pick.y);   // 更新所有共用此接點 id 的副本（見 setLen 說明）
+    move(c.p3.id, pick.x, pick.y);   // 更新所有共用此接點 id 的副本（見 setLen 說明）
   }
 
   return {

@@ -6,6 +6,7 @@ import { toSnapshot } from '../js/blocks/schema.js';
 const [host, child] = fresh('fourbar-lift', 'gear-gripper');
 // 本測試走真正的組立控制器；畫面容器省略，只驗證快取及交易狀態。
 const created = [];
+globalThis.window={confirm:()=>true}; // This scenario explicitly accepts updating its existing mounting holes.
 globalThis.document = {
   getElementById: () => null, addEventListener() {},
   createElement: () => { const el = { dataset: {}, style: {}, listeners: {}, appendChild() {}, remove() {}, setAttribute() {},

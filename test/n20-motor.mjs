@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+globalThis.window={confirm:()=>true,alert:message=>{throw Error(message);}}; // Explicitly accept replacing the old physical mounting pattern.
 import {actuatorSource} from './fixtures/actuator-installation.mjs';
 import {planMotorInstallation} from '../js/blocks/actuator-installation.js';
 import {motorInstallationScene} from '../js/blocks/actuator-install-scene.js';

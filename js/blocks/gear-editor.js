@@ -9,6 +9,8 @@ import {gearDriver} from './motor-tools.js';
  */
 
 import { S, activateMotor, nextMotorId } from './state.js';
+import {commitLegacyMountingEdit} from './mounting-review-ui.js';
+import {planGearHolePlacement} from './gear-hole-placement.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { rackGuideThetaRange, rackGuideTravel } from './rack-limits.js';
 import { norm360 } from './motion.js';
@@ -432,12 +434,13 @@ export function createGearEditor({
   function changeGearTeeth(delta) {
     const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
     if (!c) return;
-    pushUndo();
+    const id=c.id;if(!commitLegacyMountingEdit(S,()=>{const c=gearById(id);
     c.teeth = Math.max(6, Math.round((Number(c.teeth) || 12) + delta));
     S.topo.params[c.radiusParam] = c.teeth * (Number(c.module) || GEAR_MODULE) / 2;
     clampGearPinRadius(c);
     syncGearMesh();
     syncRackFramePinsForGear(c);
+    },{pushUndo,notify:transient})){updateGearEditor();return;}
     rebuild(); draw();
     updateGearEditor();
   }
@@ -451,28 +454,32 @@ export function createGearEditor({
     const next=Number(value),max=Math.max(4,Math.floor(gearPitchRadius(c)-4));
     if(!Number.isInteger(next)||next<4||next>max){transient(`輸出孔距請輸入 4～${max} mm 的整數`);updateGearEditor();return;}
     if(Math.abs(next-gearPinRadius(c))<1e-9){updateGearEditor();return;}
-    pause();pushUndo();
+    const plan=planGearHolePlacement({comps:S.comps,params:S.topo.params,modules:S.modules},{gearId:c.id,mode:'manual',radius:next,angle:Number(c.phase)||0});
+    if(!plan.ok){transient(plan.reason);updateGearEditor();return;}
+    const id=c.id;pause();if(!commitLegacyMountingEdit(S,()=>{const c=gearById(id);
     if (c.pinRadiusParam) S.topo.params[c.pinRadiusParam] = next;
     else c.pinRadius = next;
     const ctr = pointCoords()[c.p1.id] || c.p1;
     const pin = pointCoords()[c.p2.id] || c.p2;
     const ang = Math.atan2((pin.y || 0) - (ctr.y || 0), (pin.x || 0) - (ctr.x || 0));
     updatePointCoordsById(c.p2.id, (ctr.x || 0) + next * Math.cos(ang), (ctr.y || 0) + next * Math.sin(ang));
+    },{pushUndo,notify:transient})){updateGearEditor();return;}
     rebuild(); draw();
     updateGearEditor();
   }
   function changeGearPinHoleDiameter(delta) {
     const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
     if (!c) return;
-    pushUndo();
+    const id=c.id;if(!commitLegacyMountingEdit(S,()=>{const c=gearById(id);
     c.pinHoleDiameter = Number(Math.max(1, Math.min(30, (Number(c.pinHoleDiameter) || 5) + delta)).toFixed(1));
+    },{pushUndo,notify:transient})){updateGearEditor();return;}
     rebuild(); draw();
     updateGearEditor();
   }
   function changeGearModule(delta) {
     const c = S.selectedGearId ? gearById(S.selectedGearId) : null;
     if (!c) return;
-    pushUndo();
+    const id=c.id;if(!commitLegacyMountingEdit(S,()=>{const c=gearById(id);
     // 模數是「整鏈」共用：同時改本輪與和它嚙合的所有齒輪，否則齒大小不一咬不起來。
     const mod = Math.max(1, (Number(c.module) || GEAR_MODULE) + delta);
     gearMeshChain(c).forEach(g => {
@@ -482,6 +489,7 @@ export function createGearEditor({
       syncRackFramePinsForGear(g);
     });
     syncGearMesh();
+    },{pushUndo,notify:transient})){updateGearEditor();return;}
     rebuild(); draw();
     updateGearEditor();
   }
@@ -489,11 +497,13 @@ export function createGearEditor({
     const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
     const rack = rackForGear(gear);
     if (!rack) return;
-    pushUndo();
+    if(!commitLegacyMountingEdit(S,()=>{
+    const gear=gearById(S.selectedGearId),rack=rackForGear(gear);
     const next = Math.max(32, Math.round(rackLength(rack) + delta));
     S.topo.params[rack.lenParam] = next;
     ensureRackSlot(rack, next);
     syncRackFramePins(rack, gear);
+    },{pushUndo,notify:transient})){updateGearEditor();return;}
     rebuild(); draw();
     updateGearEditor();
   }
@@ -501,11 +511,13 @@ export function createGearEditor({
     const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
     const rack = rackForGear(gear);
     if (!rack) return;
-    pushUndo();
+    if(!commitLegacyMountingEdit(S,()=>{
+    const gear=gearById(S.selectedGearId),rack=rackForGear(gear);
     const mod = Number(gear.module) || GEAR_MODULE;
     const next = Math.max(4, rackBodyHeight(rack, mod) + delta);
     rack.bodyHeight = Number(next.toFixed(1));
     syncRackFramePins(rack, gear);
+    },{pushUndo,notify:transient})){updateGearEditor();return;}
     rebuild(); draw();
     updateGearEditor();
   }
@@ -513,11 +525,13 @@ export function createGearEditor({
     const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
     const rack = rackForGear(gear);
     if (!rack) return;
-    pushUndo();
+    if(!commitLegacyMountingEdit(S,()=>{
+    const gear=gearById(S.selectedGearId),rack=rackForGear(gear);
     const len = rackLength(rack);
     const slot = ensureRackSlot(rack, len);
     slot.length = Math.max(8, Math.min(Math.max(8, len - 12), Math.round(slot.length + delta)));
     syncRackFramePins(rack, gear);
+    },{pushUndo,notify:transient})){updateGearEditor();return;}
     rebuild(); draw();
     updateGearEditor();
   }
@@ -527,8 +541,10 @@ export function createGearEditor({
     const rack = rackForGear(gear);
     if (!rack || !rack.slot || typeof rack.slot !== 'object') return;
     if (!(rack.slot.trimStart > 0 || rack.slot.trimEnd > 0)) return;
-    pushUndo();
+    if(!commitLegacyMountingEdit(S,()=>{
+    const gear=gearById(S.selectedGearId),rack=rackForGear(gear);
     delete rack.slot.trimStart; delete rack.slot.trimEnd;
+    },{pushUndo,notify:transient})){updateGearEditor();return;}
     rebuild(); draw();
     updateGearEditor(); scheduleAutosave();
     transient('已清除齒條限位');
@@ -537,10 +553,12 @@ export function createGearEditor({
     const gear = S.selectedGearId ? gearById(S.selectedGearId) : null;
     const rack = rackForGear(gear);
     if (!rack) return;
-    pushUndo();
+    if(!commitLegacyMountingEdit(S,()=>{
+    const gear=gearById(S.selectedGearId),rack=rackForGear(gear);
     const slot = ensureRackSlot(rack);
     slot.width = Number(Math.max(2, Math.min(20, slot.width + delta)).toFixed(1));
     syncRackFramePins(rack, gear);
+    },{pushUndo,notify:transient})){updateGearEditor();return;}
     rebuild(); draw();
     updateGearEditor();
   }

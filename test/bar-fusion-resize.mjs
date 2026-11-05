@@ -69,6 +69,7 @@ assert.equal(planBarFusionResize(ext,ep,'Link7',160,{positions}).ok,false);
 assert.equal(JSON.stringify(fused.comps),before);
 
 // One commit, stale lazy load refused, and failed plans do not consume undo.
+globalThis.window={confirm:()=>true,alert:message=>{throw Error(message);}}; // Approve the affected mounting holes; cancellation has dedicated coverage.
 const S={comps:structuredClone(fused.comps),topo:{params},selectedLinkId:'Link7',theta:68,motorAngles:{},activeMotor:'1'};
 let undo=0,rebuilt=0,message='';
 const args={S,id:'Link7',value:120,revision:'a',fingerprint:()=> 'a',positions:()=>positions,settings:()=>({}),comps:()=>S.comps,pause:()=>{},pushUndo:()=>undo++,rebuild:()=>rebuilt++,draw:()=>{},notify:s=>message=s};

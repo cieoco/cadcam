@@ -1,4 +1,5 @@
 import {editableNumber} from './numeric-input.js';
+import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 /**
  * blocks / chain-editor
  *
@@ -33,6 +34,7 @@ export function createChainEditor({
     Object.keys(S.topo.params).forEach(k => { if (!(k in r.params)) delete S.topo.params[k]; });
     Object.assign(S.topo.params, r.params);
   }
+  function review(r){const before=mountingWork(S);return confirmMountingChange(before,{...before,comps:r.comps,params:r.params},{notify});}
 
   // ---------- 放置：點主動輪中心、再點從動輪中心 ----------
   let listeners = null;
@@ -275,6 +277,7 @@ export function createChainEditor({
     pause();
     const r = setSprocketTeeth(S.comps, S.topo.params, info.spr.id, next);
     if (!r.ok) { notify(r.message); return; }
+    if(!review(r)){updatePanel();return;}
     pushUndo();
     applyResult(r);
     rebuild(); draw(); updatePanel();
@@ -286,6 +289,7 @@ export function createChainEditor({
     pause();
     const r = alignChainLinks(S.comps, S.topo.params, info.chain.id);
     if (!r.ok) { notify(r.message); return; }
+    if(!review(r))return;
     pushUndo();
     applyResult(r);
     rebuild(); draw(); updatePanel();
@@ -297,6 +301,7 @@ export function createChainEditor({
     pause();
     const r = nudgeDrivenSprocket(S.comps, S.topo.params, info.chain.id, delta);
     if (!r.ok) { notify(r.message); return; }
+    if(!review(r))return;
     pushUndo();
     applyResult(r);
     rebuild(); draw(); updatePanel();
