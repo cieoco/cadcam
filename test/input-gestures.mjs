@@ -4,7 +4,7 @@ import * as Input from '../js/blocks/input.js';
 import * as View from '../js/blocks/view.js';
 import { S } from '../js/blocks/state.js';
 
-globalThis.document = { getElementById: id => ['lenEditor', 'gearEditor', 'sliderBaseBtn', 'linkToRailBtn'].includes(id) ? { style: {} } : null };
+globalThis.document = Object.assign(new EventTarget(),{ getElementById: id => ['lenEditor', 'gearEditor', 'sliderBaseBtn', 'linkToRailBtn'].includes(id) ? { style: {} } : null });
 globalThis.DOMPoint = class {
   constructor(x, y) { this.x = x; this.y = y; }
   matrixTransform() { return this; }
@@ -73,6 +73,11 @@ check('第二指接手時清除機架拖曳', !S.dragFrame && S.dragLastWorld ==
 check('第二指接手還原未完成位移且不新增復原', S.comps[0].p1.x===0 && S.undoStack.length===undoBefore);
 emit('pointercancel', 5, 100, 100); emit('pointercancel', 6, 200, 100);
 S.dragFrame = false;
+
+S.preDragSnap=JSON.stringify({comps:S.comps,params:S.topo.params});
+S.comps[0].p1.x=13.25;S.dragId='P1';
+const escape=new Event('keydown',{cancelable:true});Object.assign(escape,{key:'Escape'});document.dispatchEvent(escape);
+check('Escape 還原接點草稿且不新增復原',S.comps[0].p1.x===0&&S.dragId===null&&S.preDragSnap===null&&S.undoStack.length===undoBefore);
 
 // 第一指放開後，第二指仍屬於同一次 pinch；不能落入單指移動或放開合併。
 // 即使其他零件 handler 留有拖曳狀態，也不能讓最後一指放開執行吸附合併。

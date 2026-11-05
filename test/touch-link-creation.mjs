@@ -11,6 +11,7 @@ const svg={getBoundingClientRect:()=>({left:0,right:1000,top:0,bottom:1000}),que
 const deps={svg,draw:noop,rebuild:noop,pushUndo:noop,pause:noop,cancelMotorMode:noop,deselectLink:noop,selectLink:noop,selectTriangle:noop,
   setBanner:noop,clearBanner:noop,worldFromEvent:e=>({x:e.clientX,y:e.clientY}),pointCoords:()=>({}),displayPointCoords:()=>({}),nearestDisplayToPoint:()=>null,
   snapWorld:()=>10,mobilePrompt:()=>true,promptText:(a,b)=>b};
+globalThis.document=new EventTarget();
 Tools.init(deps); Input.init(deps);
 function fire(type,x,y,id=1){let stopped=false;const e={type,clientX:x,clientY:y,pointerId:id,pointerType:'touch',preventDefault:noop,stopPropagation:noop,stopImmediatePropagation(){stopped=true;}};
   for(const h of handlers.filter(h=>h.type===type).sort((a,b)=>Number(b.capture)-Number(a.capture))){h.fn(e);if(stopped)break;}}

@@ -37,7 +37,7 @@ export function pointDimensionEditor({member,redraw,comps,openEditor}){
   const selection={choices,dimension,choose};
   if(!dimension){hint.textContent='點圖上的編號，或選這裡對應的零件。';return selection;}
   const comp=comps.find(c=>c.id===dimension.componentId),value=memberDimensionValue(comp,S.topo.params,dimension.id);
-  hint.textContent=dimension.lock||'沿虛線拖孔改孔距，或輸入數字；其他零件孔距不變。';
+  hint.textContent=dimension.lock||'拖尺寸把手改孔距，或輸入數字；端孔保留原接點操作。';
   const selectedNode=nodeId,key=choice;
   const commit=v=>{if(S.selectedNodeId===selectedNode&&choice===key){member.setDimensionValue(comp.id,dimension.id,v);showNumber(input,memberDimensionValue(comp,S.topo.params,dimension.id));redraw();}};
   const input=editableNumber(row.querySelector('[data-number]'),value,commit,{label:'所選零件孔距（mm）',min:8,max:2000,disabled:!!dimension.lock});

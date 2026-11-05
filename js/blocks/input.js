@@ -13,6 +13,7 @@ import {fusionRoot,fusionAtPoint} from '../core/bar-fusion.js';
  */
 
 import { S } from './state.js';
+import {rotateLooseBarEnd} from './model.js';
 import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 import * as View from './view.js';
 import * as Tools from './tools.js';
@@ -280,6 +281,11 @@ export function moveNodeTo(id,w,{snap=true}={}) {
       return;
     }
   }
+  if (rotateLooseBarEnd(S.comps,S.topo.params,id,dragTarget,snap)) {
+    S.snapTarget = nearestDisplayTo(id);
+    redrawAfterDrag();
+    return;
+  }
   // 一般閉鏈/欠定機構的手抓點：把被拖的洞暫時 pin 到游標，用距離約束迭代解其他桿件。
   if (solvePinnedConstraints && solvePinnedConstraints(id, dragTarget)) {
     S.snapTarget = nearestDisplayTo(id);
@@ -451,6 +457,11 @@ export function init(deps) {
   // 避免 drag end 之後才補跑一步舊移動。
   let pendingMoveEvent = null;
   let moveRaf = 0;
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Escape'||S.preDragSnap==null)return;
+    e.preventDefault();pendingMoveEvent=null;cancelAnimationFrame(moveRaf);moveRaf=0;
+    cancelPointDrag();pendingNodeDrag=null;
+  });
   const onDragMoveThrottled = (e) => {
     pendingMoveEvent = e;
     if (moveRaf) return;

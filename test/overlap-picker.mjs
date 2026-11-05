@@ -11,7 +11,7 @@ class Element {
   showModal(){this.open=true;} close(){this.open=false;this.events.close?.();} remove(){this.removed=true;}
 }
 const body=new Element();
-globalThis.document={body,createElement:()=>new Element(),getElementById:()=>null};
+globalThis.document=Object.assign(new EventTarget(),{body,createElement:()=>new Element(),getElementById:()=>null});
 globalThis.requestAnimationFrame=()=>1;globalThis.cancelAnimationFrame=noop;
 const motor=new Element({'data-id':'O','data-motor-hit':'O'});
 const ring=new Element({'data-motor-hit':'O'},{left:76,top:76,width:48,height:48});

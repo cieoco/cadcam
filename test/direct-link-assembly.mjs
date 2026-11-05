@@ -5,6 +5,7 @@ import * as Tools from '../js/blocks/tools.js';
 import * as Input from '../js/blocks/input.js';
 
 const svg = new EventTarget();
+globalThis.document = new EventTarget();
 svg.style = {};
 svg.appendChild = () => {};
 svg.setPointerCapture = () => {};

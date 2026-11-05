@@ -43,7 +43,7 @@ const output=process.env.TEST_OUTPUT||'output/point-dimensions';
   await clickNode('H7B');await choose(JSON.stringify(['H7Turn','g']));
   await field.fill('15.4');await field.press('Tab');
   const handle=page.locator('[data-dimension-handle="point-dimension"]');await handle.waitFor({state:'visible'});
-  const coords=await handle.evaluate(g=>{const c=g.querySelectorAll('circle')[1],svg=g.ownerSVGElement,m=svg.getScreenCTM(),p=new DOMPoint(+c.getAttribute('cx'),+c.getAttribute('cy')).matrixTransform(m),center=svg.querySelector('[data-id="H7O"]'),r=center.getBoundingClientRect(),dx=p.x-r.x-r.width/2,dy=p.y-r.y-r.height/2,L=Math.hypot(dx,dy);return {x:p.x,y:p.y,dx:dx/L*12,dy:dy/L*12};});
+  const coords=await handle.evaluate(g=>{const c=g.querySelectorAll('circle')[1],svg=g.ownerSVGElement,m=svg.getScreenCTM(),p=new DOMPoint(+c.getAttribute('cx'),+c.getAttribute('cy')).matrixTransform(m),center=svg.querySelector('[data-id="H7O"]'),r=center.getBoundingClientRect(),end=svg.querySelector('[data-id="H7B"]').getBoundingClientRect(),dx=end.x+end.width/2-r.x-r.width/2,dy=end.y+end.height/2-r.y-r.height/2,L=Math.hypot(dx,dy);return {x:p.x,y:p.y,dx:dx/L*12,dy:dy/L*12};});
   const beforeDrag=await state();
   // A click and a cancelled drag must preserve a numeric decimal exactly.
   await page.mouse.click(coords.x,coords.y);assert.deepEqual(await state(),beforeDrag);

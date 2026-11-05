@@ -6,6 +6,17 @@ import {memberStock} from './member-stock.js';
 import {showNumber} from './numeric-input.js';
 import {pointDimensionEditor} from './point-dimension-editor.js';
 const NS='http://www.w3.org/2000/svg';
+// Keep the 44 px dimension hit area clear of the hole's 48 px touch target.
+function besideHole(svg,a,b){
+  const m=svg.getScreenCTM(),px=1/Math.hypot(m.a,m.b),L=Math.hypot(b.x-a.x,b.y-a.y)||1;
+  const normal={x:(b.y-a.y)/L*48*px,y:-(b.x-a.x)/L*48*px},bounds=svg.getBoundingClientRect();
+  const options=[1,-1].map(sign=>({x:b.x+normal.x*sign,y:b.y+normal.y*sign}));
+  const outside=p=>{const q=new DOMPoint(p.x,p.y).matrixTransform(m);return Math.max(0,bounds.left+24-q.x,q.x-bounds.right+24)+Math.max(0,bounds.top+30-q.y,q.y-bounds.bottom+24);};
+  const point=outside(options[1])<outside(options[0])?options[1]:options[0];
+  const line=document.createElementNS(NS,'line');
+  for(const [k,v]of Object.entries({x1:b.x,y1:b.y,x2:point.x,y2:point.y,stroke:'#81aeb8','stroke-width':px,'pointer-events':'none'}))line.setAttribute(k,v);
+  svg.append(line);return point;
+}
 /** Ownership comes from dimension references, not example names or nearest-part guesses. */
 function drawPointChoices(svg,edit,comps,at,project){
   if(!edit)return;
@@ -58,19 +69,19 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
     const p=at(comp[dimension.refs[0]]),q=at(comp[dimension.refs[1]]);
     if(p&&q){
       const a=project(p),b=project(q),length=Math.hypot(q.x-p.x,q.y-p.y)||1;
-      dimensionHandle(svg,{key:'point-dimension',label:dimension.label,point:b,direction:{x:(b.x-a.x)/length,y:(b.y-a.y)/length},value,min:8,max:2000,
+      dimensionHandle(svg,{key:'point-dimension',label:dimension.label,point:besideHole(svg,a,b),direction:{x:(b.x-a.x)/length,y:(b.y-a.y)/length},value,min:8,max:2000,
         preview:v=>showNumber(input,v),cancel:()=>showNumber(input,value),commit,activate});
     }
   }
-  function handle(key,label,point,direction,value,commit,inputId,min=0,max=2000,step=.1){
+  function handle(key,label,point,direction,value,commit,inputId,min=0,max=2000,step=.1,origin=null){
     if(!point||!direction||!Number.isFinite(value))return;
     const a=project(point),b=project({x:point.x+direction.x,y:point.y+direction.y}),input=document.getElementById(inputId),field=input?.matches('input')?input:input?.querySelector('input');
-    dimensionHandle(svg,{key,label,point:a,direction:{x:b.x-a.x,y:b.y-a.y},value,min,max,step,preview:v=>{if(field)showNumber(field,v);},cancel:()=>{if(field)showNumber(field,value);},commit,activate:()=>{openEditor();field?.focus();field?.select();}});
+    dimensionHandle(svg,{key,label,point:origin?besideHole(svg,project(origin),a):a,direction:{x:b.x-a.x,y:b.y-a.y},value,min,max,step,preview:v=>{if(field)showNumber(field,v);},cancel:()=>{if(field)showNumber(field,value);},commit,activate:()=>{openEditor();field?.focus();field?.select();}});
   }
   const a=at(c?.p1),b=at(c?.p2),length=a&&b?Math.hypot(b.x-a.x,b.y-a.y):0,u=length?{x:(b.x-a.x)/length,y:(b.y-a.y)/length}:{x:1,y:0};
   if(c&&['bar','triangle'].includes(c.type)&&!c.boxPanel){
     const id=S.selectedTriangleId?S.triSide||'g':'g',dim=memberDimensions(c).find(d=>d.id===id),lock=dimensionLock(c,S.comps,id);
-    if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,dir={x:(q.x-p.x)/L,y:(q.y-p.y)/L},screenA=project(p),screenB=project(q),scale=Math.hypot(screenB.x-screenA.x,screenB.y-screenA.y)/L,offset=28/Math.max(.01,scale*Math.hypot(svg.getScreenCTM().a,svg.getScreenCTM().b));handle('member-length',dim.label,{x:q.x-dir.y*offset,y:q.y+dir.x*offset},dir,memberDimensionValue(c,S.topo.params,id),v=>member.setValue(v),'memberDimensionInput',8,2000);}}
+    if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,dir={x:(q.x-p.x)/L,y:(q.y-p.y)/L};handle('member-length',dim.label,q,dir,memberDimensionValue(c,S.topo.params,id),v=>member.setValue(v),'memberDimensionInput',8,2000,.1,p);}}
     if(c.shape==='disk')handle('disk-diameter','外徑',{x:a.x,y:a.y+c.diameterMm/2},{x:0,y:.5},c.diameterMm,v=>{const input=document.getElementById('diskDiameterInput');input.value=v;input.onchange();},'diskDiameterInput',8,2000);
     else if(!c.barFusionRoot&&document.getElementById('memberMore')?.open){const w=memberStock(c).widthMm;handle('member-width','板寬',{x:(a.x+b.x)/2-u.y*w/2,y:(a.y+b.y)/2+u.x*w/2},{x:-u.y/2,y:u.x/2},w,v=>member.setStock('widthMm',v),'memberWidthInput',2,120);}
   }

@@ -262,6 +262,22 @@ export function recomputeLengths(comps, topo) {
   });
 }
 
+// A dangling bar end turns about its attached hole; it must not pull the whole linkage.
+export function rotateLooseBarEnd(comps, params, id, target, snapDegrees = false) {
+  const bar = fixedLinkFor(comps, id);
+  if (!bar || bar.isInput || bar.barFusionRoot || bar.barFusion || pointIsGround(comps, id) || pointUseCount(comps, id) !== 1) return false;
+  if (comps.some(c => c.type === 'syringe' && [c.a?.componentId, c.b?.componentId, c.outputId].includes(bar.id))) return false;
+  const pivot = bar.p1.id === id ? bar.p2 : bar.p1;
+  if (!pointIsGround(comps, pivot.id) && pointUseCount(comps, pivot.id) < 2) return false;
+  const length = Number(params[bar.lenParam]), dx = target.x - pivot.x, dy = target.y - pivot.y;
+  if (!(length > 0) || !Number.isFinite(dx + dy)) return false;
+  if (Math.hypot(dx, dy) < 1e-9) return true;
+  let angle = Math.atan2(dy, dx);
+  if (snapDegrees) angle = Math.round(angle * 180 / Math.PI) * Math.PI / 180;
+  updatePointCoordsById(comps, id, pivot.x + length * Math.cos(angle), pivot.y + length * Math.sin(angle));
+  return true;
+}
+
 export function solvePinnedConstraints(comps, topo, pinId, target, options = {}) {
   if (!pinId || !target || !Number.isFinite(target.x) || !Number.isFinite(target.y)) return false;
   const params = (topo && topo.params) ? topo.params : {};

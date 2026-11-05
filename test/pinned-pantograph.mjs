@@ -1,7 +1,8 @@
 // 互動驗收：手抓 pantograph 右側洞。驗證 pinned constraint solver 能讓欠定機構被游標決定。
 // 跑法：node test/pinned-pantograph.mjs
 import { normalizeSnapshot } from '../js/blocks/schema.js';
-import { solvePinnedConstraints } from '../js/blocks/model.js';
+import { solvePinnedConstraints, rotateLooseBarEnd } from '../js/blocks/model.js';
+import {readFileSync} from 'node:fs';
 import { check, report } from './_harness.mjs';
 
 const snapshot = {
@@ -79,4 +80,22 @@ check('共線三點桿的中間孔維持在線上', Math.max(
   lineError('T3c', 'P7b', 'T8c')
 ) < 0.5);
 
+const looseWork=JSON.parse(readFileSync(new URL('./fixtures/loose-bar-rotation.json',import.meta.url),'utf8'));
+const original=structuredClone(looseWork),tail=looseWork.comps.find(c=>c.id==='Link11');
+check('單端連接桿拖自由端可旋轉',rotateLooseBarEnd(looseWork.comps,looseWork.params,'P11b',{x:80,y:-30},true));
+check('旋轉不拉動原機構',JSON.stringify(looseWork.comps.filter(c=>c!==tail))===JSON.stringify(original.comps.filter(c=>c.id!=='Link11')));
+check('旋轉保留所有孔距',JSON.stringify(looseWork.params)===JSON.stringify(original.params)&&Math.abs(Math.hypot(tail.p2.x-tail.p1.x,tail.p2.y-tail.p1.y)-57)<1e-9);
+const degrees=Math.atan2(tail.p2.y-tail.p1.y,tail.p2.x-tail.p1.x)*180/Math.PI;
+check('直接旋轉為整數角度',Math.abs(degrees-Math.round(degrees))<1e-9);
+rotateLooseBarEnd(looseWork.comps,looseWork.params,'P11b',{x:80,y:-30});
+check('精確操作不取整角度',Math.abs(Math.atan2(tail.p2.y-tail.p1.y,tail.p2.x-tail.p1.x)-Math.atan2(-30-tail.p1.y,80-tail.p1.x))<1e-9);
+for(const [name,edit]of [
+ ['合成',w=>{w.comps.find(c=>c.id==='Link11').barFusionRoot='Link11';}],
+ ['固定孔',w=>{w.comps.find(c=>c.id==='Link11').p2.type='fixed';}],
+ ['驅動桿',w=>{w.comps.find(c=>c.id==='Link11').isInput=true;}],
+ ['針筒連接',w=>{w.comps.find(c=>c.type==='syringe').b.componentId='Link11';}],
+ ['共用孔',w=>{w.comps.push({type:'bar',id:'Extra',p1:{...tail.p2},p2:{id:'ExtraTip',x:90,y:0,type:'floating'},fixedLen:true});}]
+]){const w=structuredClone(original);edit(w);const before=JSON.stringify(w);check(name+'不套用自由端旋轉',!rotateLooseBarEnd(w.comps,w.params,'P11b',{x:80,y:-30},true)&&JSON.stringify(w)===before);}
+const renamed=structuredClone(original);for(const c of renamed.comps){c.id='other-'+c.id;for(const key of ['p1','p2'])if(c[key])c[key].id='other-'+c[key].id;}
+check('改名稱仍適用同一規則',rotateLooseBarEnd(renamed.comps,renamed.params,'other-P11b',{x:80,y:-30},true));
 report('pinned-pantograph');
