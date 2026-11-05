@@ -10,9 +10,11 @@ import {commitLegacyMountingEdit} from './mounting-review-ui.js';
 
 import { S } from './state.js';
 
+const roundTenth = v => Number((Number(v) || 0).toFixed(1));
+
 export function createSliderEditor({
   pushUndo, rebuild, draw, pause = () => {}, notify = () => {}, cancelMotorMode, deselectGear, openMobileEditPanel,
-  updatePointCoordsById, roundMm, renderLenEditor, setLenButtonTitles, updatePlateShapeControls
+  updatePointCoordsById, renderLenEditor, setLenButtonTitles, updatePlateShapeControls
 }) {
   document.getElementById('sliderSettings')?.addEventListener('toggle',()=>draw(),true);
 
@@ -29,13 +31,13 @@ export function createSliderEditor({
       const dx = (c.m2.x || 0) - (c.m1.x || 0);
       const dy = (c.m2.y || 0) - (c.m1.y || 0);
       const d = Math.hypot(dx, dy) || 1;
-      const carrierLen = Math.max(railLength(c), roundMm(d));
+      const carrierLen = Math.max(railLength(c), roundTenth(d));
       const ux = dx / d, uy = dy / d;
       c.m2.x = (c.m1.x || 0) + ux * carrierLen;
       c.m2.y = (c.m1.y || 0) + uy * carrierLen;
       c.carrierLen = carrierLen;
       const maxOffset = Math.max(0, carrierLen - railLength(c));
-      c.railOffset = Math.max(0, Math.min(maxOffset, roundMm(c.railOffset || 0)));
+      c.railOffset = Math.max(0, Math.min(maxOffset, roundTenth(c.railOffset || 0)));
       c.p1.x = (c.m1.x || 0) + ux * c.railOffset;
       c.p1.y = (c.m1.y || 0) + uy * c.railOffset;
       c.p2.x = c.p1.x + ux * railLength(c);
@@ -94,25 +96,25 @@ export function createSliderEditor({
     if (end) end.style.display = display;
   }
   function railLength(c) {
-    return Math.round(S.topo.params[c.lenParam] ||
+    return roundTenth(S.topo.params[c.lenParam] ||
       Math.hypot((c.p2.x || 0) - (c.p1.x || 0), (c.p2.y || 0) - (c.p1.y || 0)));
   }
   function sliderBodyLength(c) {
-    return Math.max(1, roundMm(c.carriageLen || 32));
+    return Math.max(1, roundTenth(c.carriageLen || 32));
   }
   function sliderCarrierLength(c) {
-    return Math.max(railLength(c), roundMm(c.carrierLen || railLength(c)));
+    return Math.max(railLength(c), roundTenth(c.carrierLen || railLength(c)));
   }
   function sliderRailOffset(c) {
-    return Math.max(0, Math.min(Math.max(0, sliderCarrierLength(c) - railLength(c)), roundMm(c.railOffset || 0)));
+    return Math.max(0, Math.min(Math.max(0, sliderCarrierLength(c) - railLength(c)), roundTenth(c.railOffset || 0)));
   }
   function sliderTravelStart(c) {
-    return Math.max(0, Math.min(Math.max(0, railLength(c)), roundMm(c.travelStart || 0)));
+    return Math.max(0, Math.min(Math.max(0, railLength(c)), roundTenth(c.travelStart || 0)));
   }
   function sliderTravelEnd(c) {
     const L = Math.max(0, railLength(c));
     const fallback = Number.isFinite(Number(c.travelEnd)) ? Number(c.travelEnd) : L;
-    return Math.max(sliderTravelStart(c), Math.min(L, roundMm(fallback)));
+    return Math.max(sliderTravelStart(c), Math.min(L, roundTenth(fallback)));
   }
   function renderSliderDetails(c) {
     syncLengthInput();
@@ -138,7 +140,7 @@ export function createSliderEditor({
     const dx = (other.x || 0) - (base.x || 0);
     const dy = (other.y || 0) - (base.y || 0);
     const L = Math.hypot(dx, dy) || 1;
-    return Math.max(0, Math.min(L, roundMm((((c.p3.x || 0) - (base.x || 0)) * dx + ((c.p3.y || 0) - (base.y || 0)) * dy) / L)));
+    return Math.max(0, Math.min(L, roundTenth((((c.p3.x || 0) - (base.x || 0)) * dx + ((c.p3.y || 0) - (base.y || 0)) * dy) / L)));
   }
   function normalizeSliderRange(c) {
     const L = railLength(c);
@@ -163,8 +165,8 @@ export function createSliderEditor({
     if (!c) return;
     const value = String(raw).trim() === '' ? NaN : Number(raw);
     const max = dimensions(c)[0].max;
-    if (!Number.isFinite(value) || !Number.isInteger(value) || value < 1 || value > max) {
-      notify(`可滑動長度請輸入 1～${max} mm 的整數；需要更長時，請在「外形與安裝」增加底座長度或減少軌道偏移。`);
+    if (!Number.isFinite(value) || value < 1 || value > max) {
+      notify(`可滑動長度請輸入 1～${max} mm；需要更長時，請在「外形與安裝」增加底座長度或減少軌道偏移。`);
       syncLengthInput();
       return;
     }
@@ -177,7 +179,7 @@ export function createSliderEditor({
     if (!c) return;
     const dx = (c.p2.x || 0) - (c.p1.x || 0), dy = (c.p2.y || 0) - (c.p1.y || 0);
     const d = Math.hypot(dx, dy) || 1;
-    const L = Math.max(1, Math.min(dimensions(c)[0].max, roundMm(d + delta)));
+    const L = Math.max(1, Math.min(dimensions(c)[0].max, roundTenth(d + delta)));
     if (L === railLength(c)) { syncLengthInput(); return; }
     const accepted=commitLegacyMountingEdit(S,()=>{
       const candidate=S.comps.find(x=>x.id===c.id);
@@ -212,7 +214,7 @@ export function createSliderEditor({
     const c=S.comps.find(c=>c.id===S.selectedSliderId&&c.type==='slider');if(!c)return;
     const d=dimensions(c).find(d=>d.key===key),n=Number(raw);
     if(!d||!Number.isFinite(n))return;
-    const value=Math.max(d.min,Math.min(d.max,roundMm(n)));
+    const value=Math.max(d.min,Math.min(d.max,roundTenth(n)));
     if(value===d.value){renderSliderDetails(c);return;}
     const accepted=commitLegacyMountingEdit(S,()=>{
       const candidate=S.comps.find(x=>x.id===c.id);

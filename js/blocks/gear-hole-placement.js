@@ -1,4 +1,5 @@
 import {pointKeysFor,ownedParamKeys} from './part-types.js';
+import {snapDraggedDimension} from './dimension-handle.js';
 
 const fail=reason=>({ok:false,reason});
 export const normalizeHoleAngle=a=>((a%360)+360)%360;
@@ -12,7 +13,7 @@ export function gearHoleAtPoint(gear,params,point){
   const max=Number(params[gear.radiusParam])-4,dx=point.x-gear.p1.x,dy=point.y-gear.p1.y;
   if(![max,dx,dy].every(Number.isFinite)||max<4)return null;
   const distance=Math.hypot(dx,dy);
-  return {radius:Math.min(max,Math.max(4,Math.round(distance*10)/10)),
+  return {radius:snapDraggedDimension(distance,4,max),
     angle:normalizeHoleAngle(Math.round((distance<1e-9?Number(gear.phase)||0:Math.atan2(dy,dx)*180/Math.PI)*10)/10)};
 }
 const refs=c=>pointKeysFor(c).map(k=>c[k]).filter(Boolean);

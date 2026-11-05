@@ -54,9 +54,11 @@ for(const legacy of [false,true]){
   editor.setGearPinRadius('23');editor.setGearPinRadius('18');
   check('可直接輸入18，面板同步',editor.gearPinRadius(driven)===18&&document.getElementById('gearPinRadiusVal').value==='18');
   const same=undos,original=JSON.stringify(driven);
-  for(const v of ['','bad',NaN,Infinity,3,999,18.5,18])editor.setGearPinRadius(v);
+  for(const v of ['','bad',NaN,Infinity,3,999,18])editor.setGearPinRadius(v);
   check('空白、無效、越界與相同值不修改也不新增復原',undos===same&&JSON.stringify(driven)===original);
 }
+editor.setGearPinRadius('18.5');
+check('輸出孔距數字欄接受小數',editor.gearPinRadius(driven)===18.5);
 driven.pinRadiusParam=radiusKey;delete driven.pinRadius;
 check('齒輪成對建立且從動輪嚙合驅動輪', gears().length === 2 && driven.mesh === driver.id);
 check('節圓半徑參數 = teeth·module/2', S.topo.params[driver.radiusParam] === 12 * GEAR_MODULE / 2 && S.topo.params[driven.radiusParam] === 18 * GEAR_MODULE / 2);
@@ -95,6 +97,11 @@ check('拒絕更新導銷孔位不改齒條、不新增復原',beforeDecline===J
 window.confirm=()=>true;
 editor.changeRackLength(8);
 check('齒條長度 +8 並保持 8mm 對齊', S.topo.params[rack.lenParam] === lenBefore + 8 && S.topo.params[rack.lenParam] % 8 === 0);
+editor.changeRackLength(.5);editor.changeRackSlotLength(.5);
+check('齒條及槽長的數字輸入保留小數',S.topo.params[rack.lenParam]===lenBefore+8.5&&rack.slot.length%1===.5);
+const {normalizeSnapshot,toSnapshot}=await import('../js/blocks/schema.js');
+const rackSaved=normalizeSnapshot(toSnapshot(S.comps,S.topo,1));
+check('齒條小數尺寸保存重開不取整',rackSaved.params[rack.lenParam]===lenBefore+8.5&&rackSaved.comps.find(c=>c.id===rack.id).slot.length===rack.slot.length);
 editor.deleteGearChain(pinion.id);
 check('刪小齒輪連齒條與導銷一起刪', S.comps.length === 0 && !Object.keys(S.topo.params).some(k => /^(G|RK)/.test(k)));
 

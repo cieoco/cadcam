@@ -3,8 +3,11 @@ import { getExample } from '../js/blocks/examples.js';
 import { normalizeSnapshot, toSnapshot } from '../js/blocks/schema.js';
 import { S } from '../js/blocks/state.js';
 import { createMemberEditor } from '../js/blocks/member-editor.js';
-import { createJawTipHandle } from '../js/blocks/jaw-tip-handle.js';
+import { createJawTipHandle, projectedTipLength } from '../js/blocks/jaw-tip-handle.js';
 import { jawCenterline } from '../js/blocks/plate-geometry.js';
+
+check('爪尖拖曳取整數毫米',projectedTipLength({x:42.6,y:20},{x:0,y:20},{x:2,y:0})===43);
+check('爪尖拖曳可向下取整',projectedTipLength({x:42.4,y:20},{x:0,y:20},{x:2,y:0})===42);
 
 class FakeElement {
   constructor(tag = 'g') {

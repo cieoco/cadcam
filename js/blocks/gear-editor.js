@@ -231,7 +231,7 @@ export function createGearEditor({
     setText('gearHoleAngleVal',Number((((Number(c.phase)||0)%360+360)%360).toFixed(2))+'°');
     setText('gearRadiusVal', Math.round(Number(S.topo.params[c.radiusParam]) || c.teeth * mod / 2));
     const pinInput=document.getElementById('gearPinRadiusVal');
-    if(pinInput){pinInput.value=String(Math.round(gearPinRadius(c)));pinInput.max=String(Math.max(4,Math.floor(gearPitchRadius(c)-4)));}
+    if(pinInput){pinInput.value=String(gearPinRadius(c));pinInput.max=String(Math.max(4,gearPitchRadius(c)-4));}
     editableNumber(document.getElementById('gearPinHoleVal'),Number(c.pinHoleDiameter)||5,v=>changeGearPinHoleDiameter(v-(Number(c.pinHoleDiameter)||5)),{label:'輸出孔徑（mm）',min:1,max:30});
     setRow('rackLengthRow', !!rack);
     setRow('rackOrientationRow', !!rack);
@@ -278,7 +278,7 @@ export function createGearEditor({
   }
   function ensureRackSlot(rack, length = rackLength(rack)) {
     if (!rack.slot || typeof rack.slot !== 'object') rack.slot = {};
-    rack.slot.length = Math.max(8, Math.min(Math.max(8, length - 12), Math.round(Number(rack.slot.length) || Math.max(24, length - 40))));
+    rack.slot.length = Math.max(8, Math.min(Math.max(8, length - 12), Number((Number(rack.slot.length) || Math.max(24, length - 40)).toFixed(1))));
     rack.slot.width = Number(Math.max(2, Math.min(20, Number(rack.slot.width) || 5)).toFixed(1));
     rack.slot.offset = Number(Number(rack.slot.offset) || 0);
     // 長槽限位：縮短 -u／+u 端（mm，夾在 0～halfTravel、取 0.1）；沒有就不設欄位
@@ -411,8 +411,8 @@ export function createGearEditor({
     if (!c) return;
     const pitchR = gearPitchRadius(c);
     const next = Math.max(4, Math.min(Math.max(4, pitchR - 4), gearPinRadius(c)));
-    if (c.pinRadiusParam) S.topo.params[c.pinRadiusParam] = Math.round(next);
-    else c.pinRadius = Math.round(next);
+    if (c.pinRadiusParam) S.topo.params[c.pinRadiusParam] = next;
+    else c.pinRadius = next;
   }
   // 齒數欄（輸入框＋滑桿）：共用數值欄第一次選到齒輪才載入，不佔啟動大小。
   let fieldModule = null;
@@ -451,8 +451,8 @@ export function createGearEditor({
   }
   function setGearPinRadius(value) {
     const c=S.selectedGearId?gearById(S.selectedGearId):null;if(!c)return;
-    const next=Number(value),max=Math.max(4,Math.floor(gearPitchRadius(c)-4));
-    if(!Number.isInteger(next)||next<4||next>max){transient(`輸出孔距請輸入 4～${max} mm 的整數`);updateGearEditor();return;}
+    const next=Number(value),max=Math.max(4,gearPitchRadius(c)-4);
+    if(!Number.isFinite(next)||next<4||next>max){transient(`輸出孔距請輸入 4～${max} mm`);updateGearEditor();return;}
     if(Math.abs(next-gearPinRadius(c))<1e-9){updateGearEditor();return;}
     const plan=planGearHolePlacement({comps:S.comps,params:S.topo.params,modules:S.modules},{gearId:c.id,mode:'manual',radius:next,angle:Number(c.phase)||0});
     if(!plan.ok){transient(plan.reason);updateGearEditor();return;}
@@ -499,7 +499,7 @@ export function createGearEditor({
     if (!rack) return;
     if(!commitLegacyMountingEdit(S,()=>{
     const gear=gearById(S.selectedGearId),rack=rackForGear(gear);
-    const next = Math.max(32, Math.round(rackLength(rack) + delta));
+    const next = Math.max(32, Number((rackLength(rack) + delta).toFixed(1)));
     S.topo.params[rack.lenParam] = next;
     ensureRackSlot(rack, next);
     syncRackFramePins(rack, gear);
@@ -529,7 +529,7 @@ export function createGearEditor({
     const gear=gearById(S.selectedGearId),rack=rackForGear(gear);
     const len = rackLength(rack);
     const slot = ensureRackSlot(rack, len);
-    slot.length = Math.max(8, Math.min(Math.max(8, len - 12), Math.round(slot.length + delta)));
+    slot.length = Math.max(8, Math.min(Math.max(8, len - 12), Number((slot.length + delta).toFixed(1))));
     syncRackFramePins(rack, gear);
     },{pushUndo,notify:transient})){updateGearEditor();return;}
     rebuild(); draw();

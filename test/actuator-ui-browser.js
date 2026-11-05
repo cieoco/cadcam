@@ -69,6 +69,10 @@ try{
  { // Gear hole: one draft shared by dragging and numeric input.
  const selectGear=()=>{document.querySelector('#stageSvg [data-pick-component="GearB"]').dispatchEvent(new PointerEvent('pointerdown',{pointerType:'mouse',bubbles:true}));document.getElementById('stageSvg').dispatchEvent(new PointerEvent('pointerup',{pointerId:0,bubbles:true}));};
  const gears=await (await fetch(new URL('./fixtures/gear-member-mount.json',import.meta.url))).json();gears.comps=gears.comps.slice(0,2);
+ api.reopen(gears);selectGear();
+ const radiusInput=document.getElementById('gearPinRadiusVal');radiusInput.value='18.5';radiusInput.dispatchEvent(new Event('change',{bubbles:true}));
+ assert(radiusInput.value==='18.5','gear main numeric field retains decimal radius');
+ api.reopen(decodeShareString(encodeSnapshot(api.snapshot())));selectGear();assert(radiusInput.value==='18.5','decimal gear radius survives share and reopen');
  api.reopen(gears);selectGear();const holeBefore=JSON.stringify(api.snapshot());
  await b.openGearHolePlacement('manual');
  const hole=()=>document.querySelector('.gear-hole-dialog[open]');
@@ -77,7 +81,7 @@ try{
  const r=hole().querySelector('[aria-label="預覽孔距"]'),a=hole().querySelector('[aria-label="起始角度"]'),oldR=r.value,oldA=a.value;
  const canvas=hole().querySelector('svg'),handle=canvas.querySelector('[data-hole-handle]');
  const screen=(x,y)=>new DOMPoint(x,-y).matrixTransform(canvas.getScreenCTM());
- const start=screen(Number(handle.getAttribute('cx')),-Number(handle.getAttribute('cy'))),target=screen(20,18);
+ const start=screen(Number(handle.getAttribute('cx')),-Number(handle.getAttribute('cy'))),target=screen(20,18.4);
  handle.dispatchEvent(new PointerEvent('pointerdown',{pointerId:1,isPrimary:true,clientX:start.x+5,clientY:start.y,bubbles:true}));
  assert(r.value===oldR&&a.value===oldA,'pressing the handle edge does not jump the hole');
  canvas.dispatchEvent(new PointerEvent('pointermove',{pointerId:1,isPrimary:true,clientX:target.x+5,clientY:target.y,bubbles:true}));

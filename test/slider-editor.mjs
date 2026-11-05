@@ -74,7 +74,7 @@ check('輸入一次更新長度、保留 B 端並只記一筆復原',
   editor.railLength(slider) === 80 && slider.p2.x === fixedEnd.x && slider.p2.y === fixedEnd.y && undoCount === before + 1);
 check('輸入後行程仍在軌道內', slider.travelStart <= slider.travelEnd && slider.travelEnd <= 80);
 const saved = JSON.stringify(slider), unchanged = undoCount;
-for (const invalid of ['', ' ', 'abc', 'Infinity', '-1', '0', '12.5', '10000']) editor.setRailLength(invalid);
+for (const invalid of ['', ' ', 'abc', 'Infinity', '-1', '0', '10000']) editor.setRailLength(invalid);
 editor.setRailLength('80');
 check('空白、非法值、超出底座與相同值不改作品或復原', JSON.stringify(slider) === saved && undoCount === unchanged);
 check('超出底座時提供修正方向', warning.includes('底座'));
@@ -99,4 +99,14 @@ check('B端固定縮軌後再次重建仍保留B端',slider.p2.x===stableB.x&&sl
 const retainedB=JSON.stringify(slider);editor.setRailLength(editor.dimensions(slider)[0].max+1);
 check('B端固定加長不得越過底座起點',JSON.stringify(slider)===retainedB);
 
+// Numeric decimals must survive geometry synchronization and saved-work normalization.
+editor.dimensions(slider).find(d=>d.key==='carrier').set(180.5);
+editor.setRailLength(40.5);
+for(const [key,value]of [['body',20.5],['offset',10.5],['start',5.5],['end',35.5]])
+  editor.dimensions(slider).find(d=>d.key===key).set(value);
+editor.syncSliderGeometries();
+check('六種滑軌尺寸的參數輸入保留小數',editor.dimensions(slider).map(d=>d.value).join(',')==='40.5,20.5,180.5,10.5,5.5,35.5');
+const {normalizeSnapshot,toSnapshot}=await import('../js/blocks/schema.js');
+const reopened=normalizeSnapshot(toSnapshot(S.comps,S.topo,1));
+check('保存重開保留滑軌小數尺寸',reopened.params.SLL1===40.5&&['carriageLen','carrierLen','railOffset','travelStart','travelEnd'].every(k=>reopened.comps[0][k]===slider[k]));
 report('slider-editor');

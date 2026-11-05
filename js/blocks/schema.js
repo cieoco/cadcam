@@ -30,7 +30,6 @@ const POINT_TYPES = new Set(['floating', 'fixed', 'motor', 'linear']);
 
 const clone = value => JSON.parse(JSON.stringify(value));
 const num = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
-const roundMm = (value, fallback = 0) => Math.round(num(value, fallback));
 const roundTenth = (value, fallback = 0) => Number(num(value, fallback).toFixed(1));
 const safeId = value => typeof value === 'string' && SAFE_ID.test(value);
 const uniqueSafeIds = values => Array.from(new Set((values || []).filter(safeId)));
@@ -261,28 +260,28 @@ function normalizeSlider(comp, index, params, warnings) {
   m1.type = 'fixed';   // 承載桿件兩端固定孔
   m2.type = 'fixed';
   const lenParam = safeId(comp.lenParam) ? comp.lenParam : `SL${index + 1}`;
-  const rawLen = Math.max(1, roundMm(params[lenParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y), 1));
-  const carriageLen = Math.max(1, Math.min(rawLen, roundMm(comp.carriageLen, 32)));
-  const carrierLen = Math.max(rawLen, Math.min(1000, roundMm(comp.carrierLen ?? comp.trackLen ?? rawLen, rawLen)));
+  const rawLen = Math.max(1, roundTenth(params[lenParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y), 1));
+  const carriageLen = Math.max(1, Math.min(rawLen, roundTenth(comp.carriageLen, 32)));
+  const carrierLen = Math.max(rawLen, Math.min(1000, roundTenth(comp.carrierLen ?? comp.trackLen ?? rawLen, rawLen)));
   const axisDx = p2.x - p1.x;
   const axisDy = p2.y - p1.y;
   const axisLen = Math.hypot(axisDx, axisDy) || 1;
   const ux = axisDx / axisLen;
   const uy = axisDy / axisLen;
   const maxOffset = Math.max(0, carrierLen - rawLen);
-  let railOffset = Math.max(0, Math.min(maxOffset, roundMm(comp.railOffset, 0)));
+  let railOffset = Math.max(0, Math.min(maxOffset, roundTenth(comp.railOffset, 0)));
   if (!comp.m1 && !comp.m2 && comp.railOffset === undefined && carrierLen > rawLen) {
     railOffset = Math.round(maxOffset / 2);
   }
   if (comp.m1 && comp.m2 && comp.railOffset === undefined) {
-    railOffset = Math.max(0, Math.min(maxOffset, roundMm((p1.x - m1.x) * ux + (p1.y - m1.y) * uy, 0)));
+    railOffset = Math.max(0, Math.min(maxOffset, roundTenth((p1.x - m1.x) * ux + (p1.y - m1.y) * uy, 0)));
   }
   m1.x = p1.x - ux * railOffset;
   m1.y = p1.y - uy * railOffset;
   m2.x = m1.x + ux * carrierLen;
   m2.y = m1.y + uy * carrierLen;
-  const travelStart = Math.max(0, Math.min(rawLen, roundMm(comp.travelStart ?? comp.strokeMin, 0)));
-  const travelEnd = Math.max(travelStart, Math.min(rawLen, roundMm(comp.travelEnd ?? comp.strokeMax, rawLen)));
+  const travelStart = Math.max(0, Math.min(rawLen, roundTenth(comp.travelStart ?? comp.strokeMin, 0)));
+  const travelEnd = Math.max(travelStart, Math.min(rawLen, roundTenth(comp.travelEnd ?? comp.strokeMax, rawLen)));
   const out = {
     type: 'slider',
     id,
@@ -368,7 +367,7 @@ function normalizeGear(comp, index, params, warnings) {
   const R = Math.max(1, Math.round(num(rawR, 40)));
   params[radiusParam] = R;
   if (pinRadiusParam) {
-    params[pinRadiusParam] = Math.max(1, Math.round(num(params[pinRadiusParam] ?? comp.pinRadius, R * 0.6)));
+    params[pinRadiusParam] = Math.max(1, num(params[pinRadiusParam] ?? comp.pinRadius, R * 0.6));
   }
   // 模數沒給就從節圓半徑反推（R = teeth·module/2 → module = 2R/teeth），讓齒形大小自洽。
   const module = num(comp.module, 0) > 0
@@ -386,7 +385,7 @@ function normalizeGear(comp, index, params, warnings) {
     phase: num(comp.phase, 0)
   };
   if (pinRadiusParam) out.pinRadiusParam = pinRadiusParam;
-  else if (Number.isFinite(Number(comp.pinRadius))) out.pinRadius = Math.max(1, Math.round(num(comp.pinRadius, R * 0.6)));
+  else if (Number.isFinite(Number(comp.pinRadius))) out.pinRadius = Math.max(1, num(comp.pinRadius, R * 0.6));
   if (Number.isFinite(Number(comp.pinHoleDiameter))) out.pinHoleDiameter = Math.max(1, Math.min(30, roundTenth(comp.pinHoleDiameter, 5)));
   if (safeId(comp.mesh)) out.mesh = comp.mesh;
   if (safeId(comp.mountLocatorPoint)) out.mountLocatorPoint = comp.mountLocatorPoint;
@@ -428,11 +427,11 @@ function normalizeRack(comp, index, params, warnings) {
     sign: Number(comp.sign) < 0 ? -1 : 1
   };
   if (safeId(comp.pinion)) out.pinion = comp.pinion;
-  params[lenParam] = Math.max(1, Math.round(num(params[lenParam] ?? comp.len, 160)));
+  params[lenParam] = Math.max(1, roundTenth(params[lenParam] ?? comp.len, 160));
   if (Number.isFinite(Number(comp.bodyHeight))) out.bodyHeight = Math.max(4, roundTenth(comp.bodyHeight, 20));
   const normalizeSlot = (slot) => {
     const s = {
-      length: Math.max(1, roundMm(slot.length, Math.max(24, params[lenParam] - 32))),
+      length: Math.max(1, roundTenth(slot.length, Math.max(24, params[lenParam] - 32))),
       width: Math.max(1, roundTenth(slot.width, 5)),
       offset: roundTenth(slot.offset, 0)
     };

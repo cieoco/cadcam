@@ -1,11 +1,12 @@
 /** 在既有爪端方向上改長短；手勢預覽交給共用 member editor，不直接改 snapshot。 */
 import { jawCenterline } from './plate-geometry.js';
 import { memberDimensionValue } from './member-dimensions.js';
+import { snapDraggedDimension } from './dimension-handle.js';
 
 export function projectedTipLength(point, corner, direction) {
   const length = Math.hypot(direction.x, direction.y);
   if (!length || ![point?.x, point?.y, corner?.x, corner?.y, length].every(Number.isFinite)) return null;
-  return Math.max(8, Math.min(160, Math.round(((point.x - corner.x) * direction.x + (point.y - corner.y) * direction.y) / length * 10) / 10));
+  return snapDraggedDimension(((point.x - corner.x) * direction.x + (point.y - corner.y) * direction.y) / length, 8, 160);
 }
 
 export function createJawTipHandle({ svg, project, worldFromEvent, editor, getParams }) {

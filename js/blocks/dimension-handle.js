@@ -1,8 +1,14 @@
 /** A dimension handle previews a value, then calls the existing numeric action once. */
 const sessions=new WeakMap(),NS='http://www.w3.org/2000/svg';
-export function projectedDimension(start,delta,direction,{min=-100000,max=100000,step=.1}={}){
+// Pointer dimensions use whole mm; numeric inputs and keyboard precision are independent.
+// Fractional bounds stay inside the valid range. No integer available means no edit.
+export function snapDraggedDimension(value,min,max,original=value){
+  const low=Math.ceil(min),high=Math.floor(max);
+  return low<=high?Math.min(high,Math.max(low,Math.round(value))):original;
+}
+export function projectedDimension(start,delta,direction,{min=-100000,max=100000}={}){
   const d=direction.x**2+direction.y**2;if(d<1e-12)return start;
-  return Math.min(max,Math.max(min,Math.round((start+(delta.x*direction.x+delta.y*direction.y)/d)/step)*step));
+  return snapDraggedDimension(start+(delta.x*direction.x+delta.y*direction.y)/d,min,max,start);
 }
 export function projectedAngle(center,axes,start,end){
   const det=axes.u.x*axes.v.y-axes.u.y*axes.v.x;if(Math.abs(det)<1e-8)return 0;

@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs/promises');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-const output='output/point-dimensions';
+const output=process.env.TEST_OUTPUT||'output/point-dimensions';
 (async()=>{
  await fs.mkdir(output,{recursive:true});
  const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
@@ -31,22 +31,30 @@ const output='output/point-dimensions';
   assert.equal(await page.locator('[data-dimension-highlight]').getAttribute('data-dimension-highlight'),JSON.stringify(['H7Turn','g']));
   const field=page.getByRole('textbox',{name:'所選零件孔距（mm）',exact:true});
   await field.waitFor({state:'visible'}).catch(async e=>{await page.screenshot({path:output+'/'+viewport.width+'-pick-failure.png'});console.log(viewport,await state(),await page.locator('#pointDimensionEditor').innerHTML());throw e;});const baseline=await state();assert.equal(Number(await field.inputValue()),15);
-  await field.fill('20');await field.press('Tab');
-  const numeric=await state();assert.equal(numeric.params.H7Crank,20);assert.equal(numeric.params.H7Coupler,baseline.params.H7Coupler);assert.equal(numeric.undo,baseline.undo+1);
+  await field.fill('20.5');await field.press('Tab');
+  const numeric=await state();assert.equal(numeric.params.H7Crank,20.5);assert.equal(numeric.params.H7Coupler,baseline.params.H7Coupler);assert.equal(numeric.undo,baseline.undo+1);
   // Invalid edge clearance must retain the exact work and restore the input.
-  await field.fill('100');await field.press('Tab');assert.deepEqual(await state(),numeric);assert.equal(Number(await field.inputValue()),20);
+  await field.fill('100');await field.press('Tab');assert.deepEqual(await state(),numeric);assert.equal(Number(await field.inputValue()),20.5);
   await choose(JSON.stringify(['H7Coupler','g']));await field.fill('200');await field.press('Tab');
   assert.deepEqual(await state(),numeric,'unreachable connecting rod length must be rejected before commit');
   await choose(JSON.stringify(['H7Turn','g']));
   await page.evaluate(()=>window.blocks.undo());assert.deepEqual((await state()).params,baseline.params);
   // Undo can reset selection; reselect through UI.
   await clickNode('H7B');await choose(JSON.stringify(['H7Turn','g']));
+  await field.fill('15.4');await field.press('Tab');
   const handle=page.locator('[data-dimension-handle="point-dimension"]');await handle.waitFor({state:'visible'});
   const coords=await handle.evaluate(g=>{const c=g.querySelectorAll('circle')[1],svg=g.ownerSVGElement,m=svg.getScreenCTM(),p=new DOMPoint(+c.getAttribute('cx'),+c.getAttribute('cy')).matrixTransform(m),center=svg.querySelector('[data-id="H7O"]'),r=center.getBoundingClientRect(),dx=p.x-r.x-r.width/2,dy=p.y-r.y-r.height/2,L=Math.hypot(dx,dy);return {x:p.x,y:p.y,dx:dx/L*12,dy:dy/L*12};});
   const beforeDrag=await state();
+  // A click and a cancelled drag must preserve a numeric decimal exactly.
+  await page.mouse.click(coords.x,coords.y);assert.deepEqual(await state(),beforeDrag);
+  await page.mouse.move(coords.x,coords.y);await page.mouse.down();await page.mouse.move(coords.x+coords.dx,coords.y+coords.dy,{steps:4});
+  assert.ok(Number.isInteger(Number(await field.inputValue())),'drag preview is whole mm');
+  await page.keyboard.press('Escape');await page.mouse.up();assert.deepEqual(await state(),beforeDrag);assert.equal(Number(await field.inputValue()),15.4);
   if(mobile){const cdp=await context.newCDPSession(page);await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:coords.x,y:coords.y}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:coords.x+coords.dx,y:coords.y+coords.dy}]});assert.deepEqual(await state(),beforeDrag);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();}
   else{await page.mouse.move(coords.x,coords.y);await page.mouse.down();await page.mouse.move(coords.x+coords.dx,coords.y+coords.dy,{steps:4});assert.deepEqual(await state(),beforeDrag);await page.mouse.up();}
-  const dragged=await state();assert.notEqual(dragged.params.H7Crank,15);assert.equal(dragged.undo,beforeDrag.undo+1);assert.equal(dragged.params.H7Coupler,beforeDrag.params.H7Coupler);
+  const dragged=await state();assert.notEqual(dragged.params.H7Crank,15.4);assert.ok(Number.isInteger(dragged.params.H7Crank));assert.equal(dragged.undo,beforeDrag.undo+1);assert.equal(dragged.params.H7Coupler,beforeDrag.params.H7Coupler);
+  await page.evaluate(()=>window.blocks.undo());assert.equal((await state()).params.H7Crank,15.4,'undo restores the precise original');
+  await clickNode('H7B');await choose(JSON.stringify(['H7Turn','g']));await field.fill(String(dragged.params.H7Crank));await field.press('Tab');
   if(mobile){const f=await field.boundingBox(),tabs=await page.locator('.mobile-tabs').boundingBox();assert.ok(f.y+f.height<=tabs.y,'numeric preview must remain above bottom tabs');}
   await page.screenshot({path:`${output}/${viewport.width}-selected-hole.png`});
   if(viewport.width===390){

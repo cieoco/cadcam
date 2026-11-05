@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {planGearHolePlacement,commitGearHolePlacement,outputPoint,gearHoleAtPoint} from '../js/blocks/gear-hole-placement.js';
+import {planGearHolePlacement,commitGearHolePlacement,outputPoint,outputRadius,gearHoleAtPoint} from '../js/blocks/gear-hole-placement.js';
 import {compileTopology} from '../js/core/topology.js';
 import {solveTopology} from '../js/multilink/solver.js';
 import {toSnapshot,normalizeSnapshot} from '../js/blocks/schema.js';
@@ -50,7 +50,7 @@ console.log('gear hole placement: arbitrary-axis mirror sweep, initial angle, re
 
 // Direct dragging and numeric input describe the same hole, including rotated/translated gears.
 const dragGear=source.comps[1],cx=dragGear.p1.x,cy=dragGear.p1.y;
-for(const [x,y,r,a] of [[0,18,18,90],[-18,0,18,180],[0,-18,18,270],[100,0,26,0],[1,0,4,0]]){
+for(const [x,y,r,a] of [[0,18,18,90],[-18,0,18,180],[0,-18,18,270],[100,0,26,0],[1,0,4,0],[18.4,0,18,0],[18.6,0,19,0]]){
  const value=gearHoleAtPoint(dragGear,source.params,{x:cx+x,y:cy+y});
  near(value.radius,r);near(value.angle,a);
  const viaDrag=planGearHolePlacement(source,{gearId:dragGear.id,...value});
@@ -59,3 +59,9 @@ for(const [x,y,r,a] of [[0,18,18,90],[-18,0,18,180],[0,-18,18,270],[100,0,26,0],
 }
 assert.equal(gearHoleAtPoint(dragGear,source.params,{x:NaN,y:0}),null);
 assert.equal(gearHoleAtPoint({...dragGear,phase:37},source.params,{x:cx,y:cy}).angle,37);
+assert.equal(gearHoleAtPoint(dragGear,{...source.params,[dragGear.radiusParam]:30.8},{x:cx+100,y:cy}).radius,26);
+const precise=planGearHolePlacement(source,{gearId:dragGear.id,radius:18.25,angle:12.5});
+assert.ok(precise.ok);near(outputRadius(precise.comps.find(c=>c.id===dragGear.id),precise.params),18.25);
+
+const preciseSaved=normalizeSnapshot(toSnapshot(precise.comps,{params:precise.params},1));
+near(outputRadius(preciseSaved.comps.find(c=>c.id===dragGear.id),preciseSaved.params),18.25);
