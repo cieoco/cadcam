@@ -49,15 +49,16 @@ export function createFusionEditor({settings,pause,pushUndo,rebuild,draw,save,se
       }else button('合成一片…',async event=>{
         event.currentTarget.disabled=true;
         pause();const revision=fingerprint(),first=selected;const pts=positions();
+        const motion={thetaDeg:S.theta,motorAngles:{...S.motorAngles,[String(S.activeMotor)]:S.theta}};
         const trigger=event.currentTarget;
         let openBarFusion;
         try { ({openBarFusion}=await import('./bar-fusion-ui.js')); }
         catch { notify('合成視窗載入失敗，請重試。'); return; }
         finally { trigger.disabled=false; }
         if(fingerprint()!==revision){notify('作品已變更，請重新開啟合成。');return;}
-        openBarFusion({first,comps:S.comps,params:S.topo.params,settings:settings(),positions:pts,onConfirm:ids=>{
+        openBarFusion({first,comps:S.comps,params:S.topo.params,settings:settings(),positions:pts,motion,onConfirm:ids=>{
           if(fingerprint()!==revision)return '作品已變更，請取消後重新選取。';
-          const plan=planBarFusion(S.comps,ids,S.topo.params,settings(),pts);if(!plan.ok)return plan.reason;
+          const plan=planBarFusion(S.comps,ids,S.topo.params,settings(),pts,motion);if(!plan.ok)return plan.reason;
           pushUndo();S.comps=plan.comps;rebuild();draw();save();return '';
         }});
       });

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {inspectBarFusion} from '../js/blocks/bar-fusion-geometry.js';
 import {planBarFusion,dissolveBarFusion} from '../js/blocks/bar-fusion-plan.js';
 import {compileTopology} from '../js/core/topology.js';
@@ -98,3 +99,43 @@ for(const selectedId of ['One','Two','Three'])for(const format of ['svg','dxf'])
  assert.equal(scoped.files.length,1);assert.deepEqual(scoped.files[0].sourceIds,['One','Two','Three']);
 }
 console.log('bar fusion: scoped SVG/DXF from any constituent keeps the complete union');
+
+// A loose extension freezes the hydraulic display at stale coordinates. Fusion
+// must retain declared lengths, align tiny angles, then validate the pose.
+const hydraulic=normalizeSnapshot(JSON.parse(readFileSync(new URL('./fixtures/fusion-hydraulic-stale.json',import.meta.url),'utf8')));
+const originalHydraulic=JSON.stringify(hydraulic);
+const angle=(a,b)=>Math.atan2(b.y-a.y,b.x-a.x);
+const arm=hydraulic.comps.find(c=>c.id==='H1Arm'),extension=hydraulic.comps.find(c=>c.id==='Link11');
+const oldAngle=angle(extension.p1,extension.p2)-angle(arm.p1,arm.p2);
+for(const ids of [['H1Arm','Link11'],['Link11','H1Arm']]){
+ const f=planBarFusion(hydraulic.comps,ids,hydraulic.params);assert.ok(f.ok,f.reason);
+ const saved=normalizeSnapshot(toSnapshot(f.comps,{params:hydraulic.params},11));assert.ok(saved);
+ const local=f.points,actualAngle=angle(local.H1C,local.P11b)-angle(local.H1O,local.H1C);
+ assert.ok(Math.abs(oldAngle)<Math.PI/180);assert.ok(Math.abs(actualAngle)<1e-9,'tiny angle aligns to a straight part');assert.equal(f.straightened,true);
+ assert.equal(saved.params.H1Arm,52);assert.equal(saved.params.LL11,80);
+ for(const mm of [0,5,10,15,20]){
+  const candidate=structuredClone(saved.comps);candidate.find(c=>c.type==='syringe').extension=mm;
+  const s=solveTopology(compileTopology(candidate,{params:saved.params},new Set()),{thetaDeg:0});assert.ok(s.isValid,s.reason);assert.equal(s.isUnderconstrained,false);
+  assert.ok(Math.abs(Math.hypot(s.points.H1C.x-s.points.H1O.x,s.points.H1C.y-s.points.H1O.y)-52)<.001);
+  assert.ok(Math.abs(Math.hypot(s.points.P11b.x-s.points.H1C.x,s.points.P11b.y-s.points.H1C.y)-80)<.001);
+ }
+ for(const format of ['svg','dxf']){
+  const work={comps:f.comps,modules:[],topo:{params:hydraulic.params},exportSettings:{}};
+  assert.throws(()=>prepareScopedExport(work,{scope:'selected',selectedId:ids[0]},format),/尚待核對/,'the existing hydraulic manufacturing restriction remains');
+  assert.equal(prepareScopedExport({...work,comps:f.comps.filter(c=>ids.includes(c.id))},{scope:'selected',selectedId:ids[0]},format).files.length,1);
+ }
+}
+assert.equal(JSON.stringify(hydraulic),originalHydraulic,'preview cannot rewrite the original pose or dimensions');
+const locked=structuredClone(hydraulic.comps);locked.find(c=>c.id==='Link11').p2.type='fixed';
+assert.equal(planBarFusion(locked,['H1Arm','Link11'],hydraulic.params).ok,false,'a conflicting external fixed end is still rejected');
+// No example IDs: the same stale-pose path works for an ordinary renamed work.
+const renamed=JSON.parse(originalHydraulic.replaceAll('H1','Generic').replaceAll('Link11','Extension'));
+assert.ok(planBarFusion(renamed.comps,['GenericArm','Extension'],renamed.params).ok);
+console.log('bar fusion: stale hydraulic pose, both selection orders, unchanged lengths/angle, export, reload, stroke and conflicting anchor passed');
+for(const degrees of [-1.1,-1,-.01643,.01643,1,1.1]){
+ const r=degrees*Math.PI/180,tip=pt('Tip',80+60*Math.cos(r),60*Math.sin(r));
+ const f=planBarFusion([source[0],bar('Tail',b,tip)],['One','Tail'],{OneL:80,TailL:60});
+ assert.ok(f.ok,f.reason);
+ if(Math.abs(degrees)<=1){assert.equal(f.straightened,true);assert.ok(Math.abs(f.points.Tip.y)<1e-9);}
+ else{assert.ok(!f.straightened);assert.ok(Math.abs(f.points.Tip.y-tip.y)<1e-9,'larger angles remain unchanged');}
+}

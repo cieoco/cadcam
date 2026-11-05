@@ -1,7 +1,9 @@
 import {fusionRoot} from '../core/bar-fusion.js';
 import {inspectBarFusion} from './bar-fusion-geometry.js';
+import {compileTopology} from '../core/topology.js';
+import {solveTopology} from '../multilink/solver.js';
 
-export function planBarFusion(comps,ids,params={},settings={},positions={}) {
+export function planBarFusion(comps,ids,params={},settings={},positions={},motion={}) {
   const fail=reason=>({ok:false,reason});
   const members=ids.map(id=>comps.find(c=>c.id===id));
   if(ids.length<2||ids.length>16||new Set(ids).size!==ids.length||members.some(c=>c?.type!=='bar'))return fail('請選 2～16 支連桿。');
@@ -18,12 +20,43 @@ export function planBarFusion(comps,ids,params={},settings={},positions={}) {
     const q=positions[p.id]||p;
     map.set(p.id,{id:p.id,x:(q.x-a.x)*ux+(q.y-a.y)*uy,y:-(q.x-a.x)*uy+(q.y-a.y)*ux});
   }
+  // Capture declared lengths rather than a frozen, unfinished mechanism pose.
+  // Adjacent axes within one degree align in the candidate, never on selection.
+  const repaired=members.some(c=>{const p=map.get(c.p1.id),q=map.get(c.p2.id);return Number.isFinite(params[c.lenParam])&&Math.abs(Math.hypot(q.x-p.x,q.y-p.y)-params[c.lenParam])>.001;});
+  let straightened=false;
+  {
+    const placed=new Map([[root.p1.id,{...map.get(root.p1.id)}]]),axes=new Map(),pending=[root,...members.filter(c=>c!==root)];
+    while(pending.length){
+      let i=pending.findIndex(c=>placed.has(c.p1.id)||placed.has(c.p2.id));
+      if(i<0){i=0;placed.set(pending[0].p1.id,{...map.get(pending[0].p1.id)});}
+      const c=pending.splice(i,1)[0],p=map.get(c.p1.id),q=map.get(c.p2.id),distance=Math.hypot(q.x-p.x,q.y-p.y),length=Number.isFinite(Number(params[c.lenParam]))?Number(params[c.lenParam]):distance;
+      if(!(distance>1e-6&&length>0&&Number.isFinite(length)))return fail('連桿尺寸無效，請先確認孔距。');
+      const from=placed.has(p.id)?p:q,to=from===p?q:p,base=placed.get(from.id);
+      let dx=(to.x-from.x)/distance,dy=(to.y-from.y)/distance;
+      const near=axes.get(from.id)?.find(u=>Math.abs(u.x*dx+u.y*dy)+1e-12>=Math.cos(Math.PI/180));
+      if(near){const sign=near.x*dx+near.y*dy<0?-1:1;straightened ||= Math.abs(near.x*dy-near.y*dx)>1e-10;dx=sign*near.x;dy=sign*near.y;}
+      const target={id:to.id,x:base.x+dx*length,y:base.y+dy*length};
+      if(placed.has(to.id)&&Math.hypot(placed.get(to.id).x-target.x,placed.get(to.id).y-target.y)>.001)return fail('目前夾角與孔距無法閉合，請先調整連桿再合成。');
+      placed.set(to.id,target);
+      for(const id of [from.id,to.id])axes.set(id,[...(axes.get(id)||[]),{x:dx,y:dy}]);
+    }
+    if(repaired||straightened)for(const [id,p]of placed)map.set(id,{...p,x:Math.abs(p.x)<1e-9?0:p.x,y:Math.abs(p.y)<1e-9?0:p.y});
+  }
   const points=[...map.values()];
   if(points.some((p,i)=>points.slice(i+1).some(q=>Math.hypot(p.x-q.x,p.y-q.y)<1e-5)))return fail('重合孔尚未連接，請先將它們吸附成同一接點。');
   const data={version:1,members:[...ids],points};
   const next=comps.map(c=>!ids.includes(c.id)?c:{...c,barFusionRoot:root.id,...(c.id===root.id?{barFusion:data}:{})});
   const result=inspectBarFusion(next,next.find(c=>c.id===root.id),params,settings);
-  return result.ok?{...result,comps:next}:result;
+  if(!result.ok)return result;
+  if(repaired||straightened){
+    const scope=next.filter(c=>c.moduleId===root.moduleId);
+    const solved=solveTopology(compileTopology(structuredClone(scope),{params:{...params}},new Set()),{...motion,_prevPoints:positions});
+    if(!solved.isValid)return fail('合成後無法維持孔距與外部連接，請先調整連桿或針筒位置。');
+    // Preview and commit use the same checked pose; no source coordinates mutate.
+    const updated=next.map(c=>{if(c.moduleId!==root.moduleId)return c;const copy={...c};for(const k of ['p1','p2','p3','m1','m2'])if(solved.points[c[k]?.id])copy[k]={...c[k],...solved.points[c[k].id]};return copy;});
+    return {...result,comps:updated,positions:{...positions,...solved.points},straightened};
+  }
+  return {...result,comps:next};
 }
 export function dissolveBarFusion(comps,id) {
   const root=fusionRoot(comps,id);
