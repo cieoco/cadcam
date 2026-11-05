@@ -117,7 +117,7 @@ function canvasGestures() {
   const inSvg = e => svg.contains(e.target) && sheetMode();
   document.addEventListener('pointerdown', e => {
     if (!inSvg(e)) return;
-    $('mechanismStatus')?.removeAttribute('data-open');
+    $('mechanismDetails')?.hidePopover();
     down.set(e.pointerId, {x: e.clientX, y: e.clientY, part: !!e.target.closest?.(PART), dimension:!!e.target.closest?.('[data-dimension-handle]'), moved: false});
     if (down.size > 1) go('pinchStart');
   }, true);
@@ -139,23 +139,6 @@ function tabGestures() {
   document.querySelector('.mobile-tabs').addEventListener('click', e => {
     if (e.target.closest('.mobile-tab') && sheetMode()) { go('openTab'); refresh(); }
   });
-}
-
-// ---------- 播放列上的狀態點：錯誤與較長的說明點一下展開 ----------
-function statusChip() {
-  const chip = $('mechanismStatus'), banner = $('solveBanner'), detail = document.createElement('div');
-  detail.className = 'status-detail'; detail.hidden = true; detail.setAttribute('role', 'status');
-  document.querySelector('.controls').append(detail);
-  const paint = () => {
-    const alert = sheetMode() && banner.style.display === 'block' ? txt(banner) : '';   // 求解失敗等錯誤：不再浮在畫布上，改放這裡
-    chip.toggleAttribute('data-alert', !!alert);
-    detail.textContent = [alert, txt(chip), (chip.title || '').split('\n')[0]].filter((v, i, a) => v && a.indexOf(v) === i).join('\n');
-    detail.hidden = !chip.hasAttribute('data-open') || !sheetMode();
-  };
-  chip.addEventListener('click', () => { chip.toggleAttribute('data-open'); paint(); });
-  const watchPaint = {attributes: true, childList: true, characterData: true, subtree: true};
-  new MutationObserver(paint).observe(banner, watchPaint);
-  new MutationObserver(paint).observe(chip, watchPaint);
 }
 
 // 全開＝全部展開：把抽屜裡收著的細節（外形、更多調整、分類）打開；離開全開時只收回這次打開的
@@ -205,7 +188,7 @@ function watch() {
   });
 }
 function start() {
-  barGestures(); canvasGestures(); tabGestures(); statusChip(); watch();
+  barGestures(); canvasGestures(); tabGestures(); watch();
   sync(); refresh();
 }
 start();

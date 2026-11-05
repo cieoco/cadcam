@@ -2264,6 +2264,7 @@ for (const panel of document.querySelectorAll('.inspector-panel')) {
 
 function setMobilePanel(panel, {expandTools=true} = {}) {
   const next = ['build', 'edit', 'view', 'project'].includes(panel) ? panel : 'build';
+  if(view3DActive&&inDesign()&&next!=='view')toggle3D();
   document.body.dataset.mobilePanel = next;
   if(next==='build' && expandTools)document.getElementById('creationTools').open=true;
   if (next !== 'edit') closeMobileEditPanel();
@@ -2289,9 +2290,10 @@ function closeMobileEditPanel() {
 
 // 切換 3D 唯讀預覽：首次開啟才動態載入 THREE viewer。
 async function toggle3D() {
-  if(hydraulic?.active())transient('3D 含針筒外形參考；完整裝配與干涉未驗證。');
   view3DActive = !view3DActive;
+  document.body.toggleAttribute('data-preview3d',view3DActive);
   const overlay = document.getElementById('view3d');
+  overlay.querySelector('.view-presets').open=false;
   setCommandState('view3d', view3DActive);
   if (view3DActive) {
     // 開 3D 時收起 2D 的編輯小面板（避免疊在覆蓋層上）
@@ -3442,6 +3444,15 @@ window.blocks.startDimensionFromNode = () => window.blocks.startDimension(S.sele
 window.blocks.addSyringe=hydraulic.add;
 window.blocks.addFixedSyringe=hydraulic.addFixed;
 init();
+// 共用狀態詳情。
+{
+  const $=id=>document.getElementById(id),chip=$('mechanismStatus'),detail=$('mechanismDetails'),banner=$('solveBanner');
+  const paint=()=>{detail.firstElementChild.textContent=[chip.textContent,banner.style.display==='block'?banner.textContent:'',chip.title].filter(Boolean).join('\n');};
+  chip.addEventListener('click',()=>{paint();detail.style.setProperty('--status-bottom',`${innerHeight-chip.getBoundingClientRect().top+8}px`);});
+  const observer=new MutationObserver(paint);
+  observer.observe(chip,{attributeFilter:['title']});
+  observer.observe(banner,{attributes:true,childList:true});
+}
 // 手機直立才需要的抽屜與訊息帶（work-sheet.js）：第一次在手機版面才載入，桌機不下載。
 { const mq = matchMedia(SHEET_QUERY), load = () => import('./work-sheet.js'); mq.matches ? load() : mq.addEventListener('change', load, { once: true }); }
 window.blocks.toggleRulers = createCanvasRulers(svg);

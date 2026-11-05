@@ -1,0 +1,54 @@
+// Read-only 3D tools must leave the model visible, without losing diagnostics.
+const assert=require('node:assert/strict');
+const fs=require('node:fs/promises');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const output='output/compact-3d';
+(async()=>{
+ await fs.mkdir(output,{recursive:true});
+ const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+ const results=[];
+ try{for(const viewport of [{width:1280,height:900},{width:390,height:844},{width:360,height:640},{width:844,height:390}]){
+  const mobile=viewport.width<500||viewport.height<500,context=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile}),page=await context.newPage(),errors=[];
+  page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+  await page.goto((process.env.TEST_URL||'http://127.0.0.1:8021')+'/blocks.html');await page.waitForFunction(()=>window.blocks);
+  await page.evaluate(()=>window.blocks.loadExample('hydraulic-h01'));
+  await page.getByRole('button',{name:'開始設計',exact:true}).click();
+  const state=()=>page.evaluate(async()=>{const {S}=await import('/js/blocks/state.js');return {comps:S.comps,params:S.topo.params,undo:S.undoStack.length};});
+  const baseline=await state();
+  await page.evaluate(()=>window.blocks.toggle3D());await page.locator('#view3d canvas').waitFor({state:'visible'});await page.waitForTimeout(4500);
+  const tools=page.locator('.view-presets'),status=page.locator('#mechanismStatus'),details=page.locator('#mechanismDetails');
+  assert.equal(await tools.getAttribute('open'),null);assert.equal(await page.locator('.vp-explode input').isVisible(),false);
+  assert.equal(await page.getByRole('button',{name:'針筒設定',exact:true}).isVisible(),false);
+  assert.equal(await page.locator('#workSheet').isVisible(),false);
+  assert.equal(await page.locator('#syringeReadout').isVisible(),false);
+  assert.equal(await page.locator('#view3d').innerText().then(t=>t.includes('承重')),false);
+  assert.deepEqual(await state(),baseline,'opening preview must not edit work');
+  const controls=await page.locator('.controls').boundingBox();assert.ok(controls.x>=0&&controls.x+controls.width<=viewport.width+1,'playback controls fit the viewport');
+  await page.screenshot({path:`${output}/${viewport.width}-default.png`});
+  await tools.locator('summary').click();await page.locator('.vp-explode input').fill('35');await page.locator('.vp-explode input').dispatchEvent('input');
+  assert.equal(await page.locator('.vp-explode output').innerText(),'35%');
+  await page.screenshot({path:`${output}/${viewport.width}-tools.png`});
+  await tools.getByRole('button',{name:'頂',exact:true}).click();assert.equal(await tools.getAttribute('open'),null);
+  await tools.locator('summary').click();await page.locator('.vp-explode input').fill('0');await page.locator('.vp-explode input').dispatchEvent('input');
+  await tools.getByRole('button',{name:'立體',exact:true}).click();
+  await status.click();await page.waitForFunction(()=>document.querySelector('#mechanismDetails').matches(':popover-open'));
+  assert.ok((await details.innerText()).includes('承重'));assert.ok(await page.locator('#syringeReadout').isVisible());
+  const box=await details.boundingBox();assert.ok(box.x>=0&&box.y>=0&&box.x+box.width<=viewport.width+1&&box.y+box.height<=viewport.height+1);
+  await page.screenshot({path:`${output}/${viewport.width}-details.png`});
+  await page.keyboard.press('Escape');assert.equal(await details.isVisible(),false);
+  const stroke=page.getByRole('slider',{name:'針筒伸出量 mm',exact:true});await stroke.fill('12');await stroke.dispatchEvent('change');
+  const changed=await state();assert.equal(changed.comps.find(c=>c.type==='syringe').extension,12);assert.equal(changed.undo,baseline.undo+1);
+  await page.evaluate(()=>window.blocks.undo());assert.deepEqual((await state()).comps,baseline.comps);
+  if(viewport.width<500)await page.locator('.mobile-tab[data-tab="edit"]').click();else await page.evaluate(()=>window.blocks.toggle3D());
+  assert.equal(await page.locator('#view3d').isVisible(),false);assert.equal(await page.locator('body').getAttribute('data-preview3d'),null);
+  assert.ok(await page.getByRole('button',{name:'針筒設定',exact:true}).isVisible());
+  await page.locator('#modeBtnBench').click();await page.waitForTimeout(1000);
+  assert.ok(await page.locator('#syringeReadout').isVisible(),'assembly keeps its original hydraulic readout');
+  await page.locator('#modeBtnDesign').click();await status.click();
+  assert.ok(await page.locator('#syringeReadout').isVisible(),'returning to design restores details inside status');
+  await page.keyboard.press('Escape');
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);
+  results.push({viewport,tools:true,diagnostics:true,strokeUndo:true,return2d:true,errors});await context.close();
+ }}finally{await browser.close();}
+ await fs.writeFile(`${output}/results.json`,JSON.stringify(results,null,2));console.log(JSON.stringify(results));
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -11,8 +11,9 @@ export function bindViewTools(root, viewer) {
   };
   bar.addEventListener('click', ev => {
     const b = ev.target.closest('[data-view]');
-    if (b && viewer.setViewPreset(b.dataset.view)) setTimeout(showSize, 450);
+    if (b && viewer.setViewPreset(b.dataset.view)) { bar.open=false; setTimeout(showSize, 450); }
   });
+  bar.addEventListener('keydown',ev=>{if(ev.key==='Escape'){bar.open=false;bar.querySelector('summary')?.focus();}});
   range.addEventListener('input', () => { pct.textContent = `${range.value}%`; range.setAttribute('aria-valuetext', `${range.value}%`); viewer.setExplode(range.value / 100); });
   let fade = 0;
   viewer.onRebuilt = ({ first, sinceStart }) => {

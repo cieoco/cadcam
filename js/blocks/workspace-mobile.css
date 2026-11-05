@@ -168,7 +168,7 @@
    抽屜蓋在畫布下緣（畫布不縮放，拉抽屜時零件不會跳動）；收合時只剩分頁列＋一行摘要。
    面板由 work-sheet.js 搬進 #sheetBody，離開手機直立時放回原位，桌機版面不變。
    高度用 .stage 的百分比，播放列與抽屜用同一個變數，才會貼齊。 */
-.work-sheet, .message-lane, .status-detail { display:none; }
+.work-sheet, .message-lane { display:none; }
 @media (max-width:700px) and (orientation:portrait) {
   body:not([data-mode="bench"]) {
     --sheet-bar-h:40px; --sheet-body-h:0px; --sheet-h:calc(var(--sheet-bar-h) + var(--sheet-body-h));
@@ -220,10 +220,8 @@
   .controls .app-status[data-state="error"][data-chip="mesh"]::after { content:"沒咬合"; }
   .controls .app-status[data-state="error"][data-chip="over"]::after { content:"限制太多"; }
   /* 求解失敗等橫幅錯誤：蓋過各狀態短字 */
-  .controls .app-status[data-alert]::before { background:#e74c3c; }
-  .controls .app-status[data-alert][data-state]::after { content:"需修正"; color:#b33b32; }
-  .status-detail { display:block; position:absolute; right:0; bottom:calc(100% + 8px); width:max-content; max-width:min(320px, calc(100vw - 16px)); padding:8px 12px; border:1px solid #d3dce6; border-radius:12px; background:#fff; color:#34495e; font-size:13px; line-height:1.5; white-space:pre-line; box-shadow:0 6px 18px rgba(44,62,80,.2); }
-  .status-detail[hidden] { display:none; }
+  body:has(#solveBanner[style*="display: block"]) .controls .app-status::before { background:#e74c3c; }
+  body:has(#solveBanner[style*="display: block"]) .controls .app-status[data-state]::after { content:"需修正"; color:#b33b32; }
   /* 訊息帶：設計分頁正下方、點擊穿透、幾秒後自己消失；不蓋住畫布中央 */
   body:not([data-mode="bench"]) .message-lane {
     display:flex; flex-direction:column; align-items:center; gap:4px; position:relative; z-index:9; flex:0 0 0; height:0; overflow:visible;
@@ -235,3 +233,18 @@
   }
   body:not([data-mode="bench"]) #solveBanner { display:none !important; }
 }
+
+/* 唯讀預覽讓出編輯區；回到 2D 後仍使用原面板。 */
+body[data-preview3d]:not([data-mode="bench"]) .inspector-panel,
+body[data-preview3d]:not([data-mode="bench"]) #workSheet,
+body[data-preview3d]:not([data-mode="bench"]) .canvas-wrap::after,
+body[data-preview3d]:not([data-mode="bench"]) #syringeControls button { display:none !important; }
+body[data-preview3d]:not([data-mode="bench"]) #view3d { right:0; bottom:0; }
+html body[data-preview3d]:not([data-mode="bench"]) .canvas-wrap .controls { position:absolute; left:50%; bottom:8px; transform:translateX(-50%); margin:0; }
+body[data-preview3d]:not([data-mode="bench"]) .canvas-status { position:absolute; left:auto; bottom:18px; right:16px; max-width:calc(50% - 190px); }
+.canvas-status .app-status { pointer-events:auto; cursor:pointer; font:inherit; }
+#mechanismDetails { top:auto; bottom:var(--status-bottom,80px); left:0; right:0; margin:0 auto; width:min(420px,calc(100vw - 24px)); box-sizing:border-box; max-height:min(60dvh,calc(100dvh - var(--status-bottom,80px) - 12px)); overflow:auto; padding:12px; border:1px solid #d3dce6; border-radius:12px; background:#fff; color:#34495e; font:14px/1.5 sans-serif; white-space:pre-line; box-shadow:0 6px 18px #0003; }
+#syringeDetails { margin-top:8px; }
+#syringeDetails[hidden] { display:none; }
+
+body:not([data-preview3d]) #syringeMountNotice, #syringeControls #syringeMountNotice { display:none; }

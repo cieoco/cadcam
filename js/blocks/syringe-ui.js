@@ -23,9 +23,9 @@ function inside(q,polygon){let hit=false;for(let i=0,j=polygon.length-1;i<polygo
 export function createSyringeUI(h){
   const wrap=h.svg.parentElement,bar=el('section');bar.id='syringeControls';bar.hidden=true;
   const chips=el('nav',null,bar),row=el('div',null,bar),label=el('label','伸出量 ',row),range=el('input',null,label);range.type='range';range.min=0;range.step='0.1';range.setAttribute('aria-label','針筒伸出量 mm');
-  const value=el('output',null,row),settings=el('button','針筒設定',row),readout=el('div',null,bar),gainLine=el('div',null,bar),note=el('div',null,bar);
-  row.style.cssText='display:flex;align-items:center;gap:8px';
-  chips.id='syringeChips';chips.className='motor-switch';chips.style.cssText='display:none;gap:6px;margin-bottom:4px;flex-wrap:wrap';
+  const status=document.getElementById('mechanismDetails'),details=el('section',null,status);details.id='syringeDetails';details.hidden=true;
+  const value=el('output',null,row),settings=el('button','針筒設定',row),readout=el('div',null,details),gainLine=el('div',null,details),note=el('div',null,details);
+  chips.id='syringeChips';chips.className='motor-switch';chips.style.display='none';
   readout.id='syringeReadout';gainLine.id='syringeGain';note.id='syringeNotice';note.setAttribute('aria-live','polite');
   // Give feedback its own row before the stroke control instead of overlaying it.
   h.svg.before(document.getElementById('modeBanner'),document.getElementById('solveBanner'),bar);
@@ -34,14 +34,12 @@ export function createSyringeUI(h){
   const positionInspectors=()=>wrap.style.setProperty('--hydraulic-header-height',`${Math.max(0,h.svg.getBoundingClientRect().top-wrap.getBoundingClientRect().top)}px`);
   const headerObserver=new ResizeObserver(positionInspectors);
   headerObserver.observe(bar);headerObserver.observe(h.svg);
-  const warning3d=el('div','針筒／管夾為外形參考；完整裝配、干涉與承重未驗證。',document.getElementById('view3d'));
-  warning3d.style.cssText='position:absolute;bottom:72px;left:8px;right:8px;padding:8px;background:#fff3cd;color:#664d03;z-index:6;font-size:13px;pointer-events:none';warning3d.hidden=true;
-  let id=null,raf=null,last=null,direction=1,dragUndo=false,picking=null,scopeKey=null,message='',mountNotice='';
-  const mountReference='水管固定夾、M3 螺絲與套筒為參考尺寸；夾持力、完整干涉、承重與水路未驗證。';
+  let id=null,raf=null,last=null,direction=1,dragUndo=false,picking=null,scopeKey=null,message='';
+  const warning3d=document.getElementById('syringeMountNotice'),mountReference=warning3d.textContent;details.append(warning3d);
   function setMountPreview(shapes){
     const failed=shapes.find(s=>s.mount?.status==='unverified'),misaligned=shapes.find(s=>Number.isFinite(s.alignmentMm)&&Math.abs(s.alignmentMm)>.1);
     const reasons={missing_frame_holes:'機架缺少管夾配對孔',frame_alignment:'管夾與機架孔未對齊',barrel_clearance:'筒身與機架高度不足，請調整疊放層',clamp_diameter:'筒身大於參考管夾內徑，需更換管夾',mount_hole_diameter:'固定孔小於參考 M3 軸／螺絲直徑'};
-    mountNotice=failed?`固定座待調整：${reasons[failed.mount.reason] || '尚未核對'}。`:misaligned?`推桿與短連桿不同層，相差 ${Math.abs(misaligned.alignmentMm).toFixed(1)} mm。`:'';
+    const mountNotice=failed?`固定座待調整：${reasons[failed.mount.reason] || '尚未核對'}。`:misaligned?`推桿與短連桿不同層，相差 ${Math.abs(misaligned.alignmentMm).toFixed(1)} mm。`:'';
     warning3d.textContent=mountNotice+mountReference;
   }
   const inAssembly=()=>S.mode!=='design';
@@ -51,7 +49,7 @@ export function createSyringeUI(h){
   const params=()=>S.topo.params;
   const motion=()=>({thetaDeg:S.theta,motorAngles:motorAnglesNow()});
   const stop=()=>{if(raf)cancelAnimationFrame(raf);raf=null;last=null;h.playing(false);};
-  const notify=t=>{message=t;note.textContent=t;};
+  const notify=t=>{message=t;note.textContent=t;h.notify(t);};
   const download=(name,text,type)=>{const a=el('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
   function commit(comps,newParams,result,{undo=true,fabrication}={}){
     if(undo)h.pushUndo();
@@ -111,7 +109,8 @@ export function createSyringeUI(h){
     const key=`${S.mode}:${S.designFocus}`;
     if(key!==scopeKey){stop();picking=null;message='';scopeKey=key;}
     const c=active(),visible=!!c;
-    warning3d.hidden=!c||inAssembly();warning3d.textContent=mountNotice+mountReference;
+    const parent=inAssembly()?bar:status;if(details.parentNode!==parent)parent.append(details);
+    details.hidden=!visible;
     bar.hidden=!visible&&!picking;wrap.classList.toggle('hydraulic-active',visible||!!picking);
     if(!(visible&&inAssembly()))layoutBar(false);
     if(!visible){if(raf)stop();return;}
