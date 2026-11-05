@@ -1054,6 +1054,13 @@ const { selectTriangle, startShapeDrag, deleteShapeVertex, updatePlateShapeContr
         setTriangleShapeMode, addTriangleOutlinePoint,
         triParamFor, setTriSide, changeTriSide } = plateEditor;
 const memberEditor = createMemberEditor({
+  validateCandidate: draft => {
+    const ids=new Set(viewComps().map(c=>c.id)),comps=draft.comps.filter(c=>ids.has(c.id));
+    try{
+      const solved=solveTopology(compileTopology(comps,{...S.topo,params:{...draft.params}},new Set()),{thetaDeg:S.theta,motorAngles:motorAnglesNow()});
+      return solved?.isValid===false ? `孔距未修改：${solved.errorReason||'此尺寸無法維持目前連接與行程。'}` : '';
+    }catch(e){return `孔距未修改：${e.message}`;}
+  },
   resizeFusion: async (id,value) => {
     pause();const revision=snapshotStr();
     try {const {commitBarFusionResize}=await import('./bar-fusion-resize.js');
@@ -2040,10 +2047,6 @@ function drawNow() {
   });
 
   drawGearManualHandles(pts);
-  if(!playbackActive&&(S.selectedLinkId||S.selectedTriangleId||S.selectedSliderId||S.selectedGearId||S.frameEditorOpen)){
-    if(!editingHandles)editingHandles=import('./editing-handles.js').then(m=>{editingHandles=m;draw();});
-    editingHandles.drawEditingHandles?.({svg,points:pts,project:p=>({x:TX(p.x),y:TY(p.y)}),member:memberEditor,slider:sliderEditor,gear:gearEditor,frame:S.frameEditorOpen?{nodes:frameGroundInfo().nodes,geometry:frameGeometry2d,info:frameSizeInfo(),set:setFrameSize}:null});
-  }
   drawFrameHandle();   // 機架移動把手：畫在節點之上，才點得到、拖得動
   const updateMemberDimensions = drawMemberDimensions({
     svg, comp: memberEditor.displayComp(memberEditor.selected()), points: pts, params: S.topo.params,
@@ -2067,6 +2070,12 @@ function drawNow() {
   if (S.topo.dimensions?.length && !dimUI) loadDimUI();
   const updateDims = dimUI?.render(allPts);   // 量尺：標註層疊在最上面，播放時逐幀更新
   if (updateDims) frameUpdaters.push(updateDims);
+
+  // 編輯把手最後繪製，避免被針筒外形或尺寸標註遮住。
+  if(!playbackActive&&(S.selectedNodeId||S.selectedLinkId||S.selectedTriangleId||S.selectedSliderId||S.selectedGearId||S.frameEditorOpen)){
+    if(!editingHandles)editingHandles=import('./editing-handles.js').then(m=>{editingHandles=m;draw();});
+    editingHandles.drawEditingHandles?.({svg,points:pts,project:p=>({x:TX(p.x),y:TY(p.y)}),member:memberEditor,slider:sliderEditor,gear:gearEditor,redraw:draw,comps:viewComps(),frame:S.frameEditorOpen?{nodes:frameGroundInfo().nodes,geometry:frameGeometry2d,info:frameSizeInfo(),set:setFrameSize}:null});
+  }
 
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
   // polygons 一併帶上：3D 用它把三點桿畫成實心板，並過濾掉與三角板邊重疊的桿（避免分身）。

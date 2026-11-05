@@ -545,6 +545,7 @@ export function init(deps) {
       else {
         (nodeDownEntry || onNodeDown)(pick.event,item.id);
         pendingMobileEdit=false; pendingNodeDrag=null;
+        S.preDragSnap=null; // 選單在放開後才選取，沒有拖曳候選可留給自動存檔。
         openMobileEditPanel();
         document.getElementById('servoEditor')?.scrollIntoView?.({block:'nearest'});
       }

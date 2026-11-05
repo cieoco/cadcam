@@ -16,7 +16,7 @@
 
 ## 產品與功能規格
 
-- [SDD-RAPID-MECHANISM-VALIDATION.md](SDD-RAPID-MECHANISM-VALIDATION.md) — 在原有流程做減法；含全操作族「圖上直接操作／精確數值」盤點及裝配孔位變更的共用核對規則；保留既有功能與資料契約。
+- [SDD-RAPID-MECHANISM-VALIDATION.md](SDD-RAPID-MECHANISM-VALIDATION.md) — 在原有流程做減法；含全操作族盤點、裝配孔位共用核對，以及點接點修改零件孔距的直接／數值共用規則；保留既有功能與資料契約。
 
 - [SDD-DISK-PLATE.md](SDD-DISK-PLATE.md) — 圓盤外徑、兩孔剛體、全局板厚與輸出契約。
 - [SDD-SYRINGE-MOUNT-MODES.md](SDD-SYRINGE-MOUNT-MODES.md) — 固定環雙耳鎖固／只鎖一顆耳螺絲可轉、筒身夾持位置、共用配對孔與相容契約。

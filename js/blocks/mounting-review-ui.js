@@ -10,7 +10,7 @@ export function mountingCandidate(before,result,scope){
 /** Adapter for existing synchronous editors: mutate a clone, review, then one undo/write. */
 export function commitMountingEdit(S,mutate,{pushUndo,notify}={}){
   const before=mountingWork(S),candidate=structuredClone(before);
-  mutate(candidate);
+  if(mutate(candidate)===false)return false;
   if(!confirmMountingChange(before,candidate,{notify}))return false;
   pushUndo();
   // Keep selected-component references used by the existing panels, after approval only.

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {pointDimensions} from '../js/blocks/point-dimensions.js';
 import { check, report } from './_harness.mjs';
 import { getExample } from '../js/blocks/examples.js';
 import {
@@ -121,4 +122,16 @@ check('jaw dimension values retain the exact saved tip length', (() => {
   return memberDimensionValue(jaw, s.params, 'tip') === 55.5;
 })());
 
+check('selected joint enumerates existing owner dimensions for bars, disks and triangles', (()=>{
+  const disk={...bar,id:'AnyDisk',shape:'disk'},tri={...triangle,id:'AnyPlate'};
+  const choices=pointDimensions([bar,disk,tri],'B');
+  return choices.length===4 && new Set(choices.map(d=>d.key)).size===4
+    && choices.filter(d=>d.componentId==='AnyPlate').map(d=>d.id).join(',')==='g,r2'
+    && choices.every(d=>d.param&&!d.stockKey)&&pointDimensions([bar,disk,tri],'absent').length===0;
+})());
+check('selected joint carries original gear and box locks instead of bypassing them', (()=>{
+  const gear={type:'gear',p1:{id:'A'},p2:{id:'B'}};
+  return pointDimensions([bar,gear],'B')[0].lock.includes('齒輪')
+    &&pointDimensions([{...bar,boxPanel:{}}],'B')[0].lock.includes('盒體');
+})());
 report('member-dimensions');

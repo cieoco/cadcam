@@ -9,7 +9,7 @@ import { planSyringeAttachmentResize } from '../core/syringe.js';
 import { memberDimensions, memberDimensionValue, planMemberDimension, mirroredJaw, dimensionLock } from './member-dimensions.js';
 import { MATERIALS, memberStock, planMemberStock } from './member-stock.js';
 
-export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTriangle, updatePointCoordsById, notify, resizeFusion, openMobileEditPanel = () => {}, holeDiameter = () => 12.96 }) {
+export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTriangle, updatePointCoordsById, notify, resizeFusion, validateCandidate = () => '', openMobileEditPanel = () => {}, holeDiameter = () => 12.96 }) {
   let mirror = true, fieldModule = null;   // 數值欄（輸入框＋滑桿）第一次選到桿件才載入，不佔啟動大小
   let tipDraft = null;
   let lastSelectedId = null;
@@ -125,13 +125,17 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
   function setValue(raw) {
     const comp = selected();
     if (!comp) return;
-    const id = dimensionId();
+    return setDimensionValue(comp.id,dimensionId(),raw,{mirrorPair:mirror});
+  }
+  function setDimensionValue(componentId,id,raw,{mirrorPair=false}={}) {
+    const comp=S.comps.find(c=>c.id===componentId);
+    if(!comp)return;
     if(isDisk(comp)){const error=validateDisk(comp,Number(raw),comp.diameterMm,holeDiameter(comp));if(error){notify(error);sync();return;}}
     const dimension = memberDimensions(comp).find(d => d.id === id);
     if (dimension?.stockKey) { setStock(dimension.stockKey, raw); return; }
     const lock = dimensionLock(comp, S.comps, id);
     if (lock) { notify(lock); sync(); return; }
-    const partner = mirror && mirroredJaw(comp, S.comps, S.topo.params);
+    const partner = mirrorPair && mirroredJaw(comp, S.comps, S.topo.params);
     const targets = partner ? [comp, partner] : [comp];
     const plans = targets.map(c => planMemberDimension(c, S.topo.params, id, raw,{holeDiameterMm:holeDiameter(c)}));
     const failure = plans.find(plan => !plan.ok);
@@ -139,7 +143,8 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if (targets.every(c => Math.abs(memberDimensionValue(c, S.topo.params, id) - plans[0].value) < 0.001)) { sync(); return; }
     if(comp.barFusionRoot)return resizeFusion?.(comp.id,plans[0].value);
     pause();
-    if(!commitMountingEdit(S,draft=>targets.forEach((target, index) => {
+    let invalid='';
+    const committed=commitMountingEdit(S,draft=>{targets.forEach((target, index) => {
       const c=draft.comps.find(o=>o.id===target.id);
       if (c.type === 'bar' && id === 'g') {
         const patches = planSyringeAttachmentResize(draft.comps, c, Number(draft.params[c.lenParam]), plans[index].value);
@@ -153,7 +158,8 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
         const dx = c.p2.x - c.p1.x, dy = c.p2.y - c.p1.y, length = Math.hypot(dx, dy) || 1;
         movePoint(draft.comps,c.p2.id, c.p1.x + (dx || (dy ? 0 : 1)) / length * plans[index].value, c.p1.y + dy / length * plans[index].value);
       }
-    }),{pushUndo,notify})){sync();return;}
+    });invalid=dimension?.param?validateCandidate(draft):'';return !invalid;},{pushUndo,notify});
+    if(!committed){if(invalid)notify(invalid);sync();draw();return;}
     rebuild(); draw();
   }
   function change(delta) {
@@ -193,6 +199,6 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if (!cancel && draft && selected()?.id === draft.selectedId) { S.triSide = 'tip'; setValue(draft.value); }
     else draw();
   }
-  return { sync, setStock, selected, displayComp, selectDimension, setValue, change, beginTipPreview, previewTip, finishTipPreview,
+  return { sync, setStock, selected, displayComp, selectDimension, setValue, setDimensionValue, change, beginTipPreview, previewTip, finishTipPreview,
     setMaterial: raw => setStock('material', raw), setMirror(value) { mirror = Boolean(value); sync(); } };
 }

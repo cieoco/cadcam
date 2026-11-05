@@ -4,10 +4,21 @@ import {dimensionHandle} from './dimension-handle.js';
 import {memberDimensions,memberDimensionValue,dimensionLock} from './member-dimensions.js';
 import {memberStock} from './member-stock.js';
 import {showNumber} from './numeric-input.js';
-export function drawEditingHandles({svg,points,project,member,slider,gear,frame}){
+import {pointDimensionEditor} from './point-dimension-editor.js';
+export function drawEditingHandles({svg,points,project,member,slider,gear,frame,redraw,comps=S.comps}){
   if(S.mode!=='design'||S.mateMode)return;
   const c=S.comps.find(c=>c.id===(S.selectedTriangleId||S.selectedLinkId||S.selectedSliderId||S.selectedGearId));
   const at=p=>points[p?.id]||p;
+  const pointEdit=pointDimensionEditor({member,redraw,comps});
+  if(pointEdit){
+    const {comp,dimension,value,input,commit,activate}=pointEdit;
+    const p=at(comp[dimension.refs[0]]),q=at(comp[dimension.refs[1]]);
+    if(p&&q){
+      const a=project(p),b=project(q),length=Math.hypot(q.x-p.x,q.y-p.y)||1;
+      dimensionHandle(svg,{key:'point-dimension',label:dimension.label,point:b,direction:{x:(b.x-a.x)/length,y:(b.y-a.y)/length},value,min:8,max:2000,
+        preview:v=>showNumber(input,v),cancel:()=>showNumber(input,value),commit,activate});
+    }
+  }
   function handle(key,label,point,direction,value,commit,inputId,min=0,max=2000,step=.1){
     if(!point||!direction||!Number.isFinite(value))return;
     const a=project(point),b=project({x:point.x+direction.x,y:point.y+direction.y}),input=document.getElementById(inputId),field=input?.matches('input')?input:input?.querySelector('input');

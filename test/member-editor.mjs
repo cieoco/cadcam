@@ -206,4 +206,17 @@ check('plate selector contains geometric dimensions, not stock fields', (() => {
   return el('triSideSelect').style.display === ''
     && el('triSideSelect').children.every(o=>!['width','thickness'].includes(o.value));
 })());
+check('point editing targets an explicit owner without replacing node selection or other lengths', (()=>{
+  const first=simpleBar(),second={...simpleBar(),id:'Other',lenParam:'OtherL'};
+  reset([first,second],{...barParams,OtherL:18});S.selectedNodeId=first.p2.id;
+  editor.setDimensionValue('Other','g',27.5);
+  return S.topo.params.L===18&&S.topo.params.OtherL===27.5&&counts.undo===1
+    &&S.selectedNodeId===first.p2.id&&S.selectedLinkId===null;
+})());
+check('candidate validation rejects before mounting review, undo, or model mutation', (()=>{
+  reset([simpleBar()],barParams);const before=JSON.stringify({comps:S.comps,params:S.topo.params});
+  const guarded=createMemberEditor({pause(){},pushUndo(){counts.undo++;},rebuild(){counts.rebuild++;},draw(){},notify:m=>notices.push(m),validateCandidate:()=> '尺寸不可達'});
+  guarded.setDimensionValue('Bar1','g',90);
+  return JSON.stringify({comps:S.comps,params:S.topo.params})===before&&counts.undo===0&&counts.rebuild===0&&notices.at(-1)==='尺寸不可達';
+})());
 report('member-editor');

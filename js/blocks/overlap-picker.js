@@ -35,7 +35,11 @@ export function openOverlapPicker(items, choose) {
   const button = (label, action) => {
     const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
     b.style.cssText = 'display:block;width:100%;min-height:48px;margin:8px 0;padding:10px;text-align:left;white-space:normal;font:inherit;color:#18324b;background:#edf6fa;border:1px solid #b8cbd2;border-radius:8px';
-    b.addEventListener('click', action); dialog.appendChild(b);
+    // 手機放開畫布才開選單；同一手勢的合成 click 不可誤選剛出現的按鈕。
+    let pressed=false;
+    b.addEventListener('pointerdown',()=>{pressed=true;});
+    b.addEventListener('pointercancel',()=>{pressed=false;});
+    b.addEventListener('click',e=>{if(e.detail&&!pressed)return;pressed=false;action();});dialog.appendChild(b);
   };
   for (const item of items) button(item.label, () => { dialog.close(); choose(item); });
   button('取消選取', () => dialog.close());

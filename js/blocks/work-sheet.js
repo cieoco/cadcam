@@ -111,20 +111,21 @@ function barGestures() {
     else if (e.key === 'Escape') go('collapse');
   });
 }
-const PART = '[data-id],[data-motor-hit],[data-pick-component],[data-link-id]';
+const PART = '[data-id],[data-motor-hit],[data-pick-component],[data-link-id],[data-dimension-handle]';
 function canvasGestures() {
   const svg = $('stageSvg'), down = new Map();
   const inSvg = e => svg.contains(e.target) && sheetMode();
   document.addEventListener('pointerdown', e => {
     if (!inSvg(e)) return;
     $('mechanismStatus')?.removeAttribute('data-open');
-    down.set(e.pointerId, {x: e.clientX, y: e.clientY, part: !!e.target.closest?.(PART), moved: false});
+    down.set(e.pointerId, {x: e.clientX, y: e.clientY, part: !!e.target.closest?.(PART), dimension:!!e.target.closest?.('[data-dimension-handle]'), moved: false});
     if (down.size > 1) go('pinchStart');
   }, true);
   document.addEventListener('pointermove', e => {
     const d = down.get(e.pointerId);
     if (!d || d.moved || Math.hypot(e.clientX - d.x, e.clientY - d.y) < 8) return;
-    d.moved = true; go('canvasDragStart');
+    d.moved = true;
+    if(!d.dimension)go('canvasDragStart'); // 尺寸把手需保留同步數字，也避免中途改變畫布座標。
   }, true);
   const up = e => {
     const d = down.get(e.pointerId); down.delete(e.pointerId);
