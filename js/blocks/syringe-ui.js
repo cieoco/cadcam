@@ -40,12 +40,8 @@ export function createSyringeUI(h){
   headerObserver.observe(bar);headerObserver.observe(h.svg);
   let id=null,raf=null,last=null,direction=1,dragUndo=false,picking=null,scopeKey=null,message='';
   const warning3d=document.getElementById('syringeMountNotice'),mountReference=warning3d.textContent;details.append(warning3d);
-  function setMountPreview(shapes){
-    const failed=shapes.find(s=>s.mount?.status==='unverified'),misaligned=shapes.find(s=>Number.isFinite(s.alignmentMm)&&Math.abs(s.alignmentMm)>.1);
-    const reasons={missing_frame_holes:'機架缺少管夾配對孔',frame_alignment:'管夾與機架孔未對齊',barrel_clearance:'筒身與機架高度不足，請調整疊放層',clamp_diameter:'筒身大於參考管夾內徑，需更換管夾',mount_hole_diameter:'固定孔小於參考 M3 軸／螺絲直徑'};
-    const mountNotice=failed?`固定座待調整：${reasons[failed.mount.reason] || '尚未核對'}。`:misaligned?`推桿與短連桿不同層，相差 ${Math.abs(misaligned.alignmentMm).toFixed(1)} mm。`:'';
-    warning3d.textContent=mountNotice+mountReference;
-  }
+  function setMountPreview(shapes){import('./motion-warning.js').then(m=>{warning3d.textContent=m.mountNotice(shapes)+mountReference;});}
+
   const inAssembly=()=>S.mode!=='design';
   // 組立：針筒清單含直角平面上的針筒（切換鈕與伸出量不受目前視圖平面限制）；設計模式仍只看目前視圖。
   const list=()=>(inAssembly()?assemblyWork(S.comps,S.modules,S.topo).comps:h.comps()).filter(c=>c.type==='syringe');
@@ -54,6 +50,7 @@ export function createSyringeUI(h){
   const motion=()=>({thetaDeg:S.theta,motorAngles:motorAnglesNow()});
   const stop=()=>{if(raf)cancelAnimationFrame(raf);raf=null;last=null;h.playing(false);};
   const notify=t=>{message=t;note.textContent=t;h.notify(t);};
+  const warn=r=>r.componentIds?.length?h.warnMotion(r):notify(r.message);
   const download=(name,text,type)=>{const a=el('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
   function commit(comps,newParams,result,{undo=true,fabrication}={}){
     if(undo)h.pushUndo();
@@ -68,7 +65,7 @@ export function createSyringeUI(h){
   // 組立：只推選取的那支針筒（模組各自的伸出量），整份組立重新求解；其他針筒維持原位。座標留在各模組自己的圖面，不寫回世界座標。
   function assemblyStroke(c,extension,undo){
     const work=assemblyWork(S.comps,S.modules,S.topo),result=planAssemblySyringe(work.comps,work.modules,params(),c.id,extension,h.points());
-    if(!result.ok){stop();range.value=c.extension;notify(result.message);return false;}
+    if(!result.ok){stop();range.value=c.extension;warn(result);return false;}
     if(undo)h.pushUndo();
     const next=result.comps.find(o=>o.id===c.id);S.comps=S.comps.map(o=>o.id===c.id?next:o);
     message='';h.rebuild();h.seed(result.points);h.draw();h.save();return true;
@@ -78,7 +75,7 @@ export function createSyringeUI(h){
     if(extension===c.extension)return true;
     if(inAssembly())return assemblyStroke(c,extension,undo);
     const result=planSyringeStroke(h.comps(),params(),c.id,extension,h.points(),motion());
-    if(!result.ok){stop();range.value=c.extension;notify(result.message);return false;}
+    if(!result.ok){stop();range.value=c.extension;warn(result);return false;}
     message='';commit(result.comps,params(),result,{undo});return true;
   }
   range.onpointerdown=()=>{h.pause();dragUndo=false;};
@@ -148,12 +145,12 @@ export function createSyringeUI(h){
     const inView=new Set(h.comps().map(c=>c.id));
     for(const c of list()){
       if(!inView.has(c.id))continue;   // 組立：其他平面的針筒只出現在控制列，不畫在這一頁的 2D
-      const a=attachmentPoint(c.a,h.comps(),params(),points),b=attachmentPoint(c.b,h.comps(),params(),points);if(!a||!b)continue;
+      const shape=syringeShape(c,h.comps(),params(),points);if(!shape)continue;
+      const a=shape.a,b=shape.b;
       const g=document.createElementNS(ns,'g');g.setAttribute('data-syringe',c.id);h.svg.append(g);
       const node=(tag,attrs)=>{const n=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v));g.append(n);return n;};
-      const shape=syringeShape(c,h.comps(),params(),points);
       // 可轉安裝：筒身軸線不經過鎖住的耳螺絲 a，以固定環中心 shape.a 與軸向為準。
-      const origin=shape.pivot?shape.a:a,length=shape.pivot?shape.length:Math.hypot(b.x-a.x,b.y-a.y),dx=shape.pivot?Math.cos(shape.angle):(b.x-a.x)/length,dy=shape.pivot?Math.sin(shape.angle):(b.y-a.y)/length;
+      const origin=shape.a,length=shape.length,dx=Math.cos(shape.angle),dy=Math.sin(shape.angle);
       const at=(x,y=0)=>({x:origin.x+dx*x-dy*y,y:origin.y+dy*x+dx*y});
       const line=(from,to,width,color)=>node('line',{x1:View.TX(from.x),y1:View.TY(from.y),x2:View.TX(to.x),y2:View.TY(to.y),'stroke-width':width*View.getScale(),stroke:color,'stroke-linecap':'round'});
       line(at(shape.start-8),at(shape.start),3,'#e5ded0');
@@ -170,7 +167,7 @@ export function createSyringeUI(h){
         clamp.feet.forEach((foot,i)=>{
           const supported=supportedAt(i);
           polygon(foot.outline,'#859391');
-          const q=at(foot.hole.x,foot.hole.y);node('circle',{cx:View.TX(q.x),cy:View.TY(q.y),r:(supported?3.25:foot.hole.r)*View.getScale(),fill:supported?'#bdc7d0':'white',stroke:'#475569'});
+          const q=at(foot.hole.x,foot.hole.y);node('circle',{'data-clamp-hole':`${c.id}_clamp_${i}`,cx:View.TX(q.x),cy:View.TY(q.y),r:(supported?3.25:foot.hole.r)*View.getScale(),fill:supported?'#bdc7d0':'white',stroke:'#475569'});
           if(supported){
             polygon(Array.from({length:6},(_,i)=>({x:foot.hole.x+2.75*Math.cos(i*Math.PI/3),y:foot.hole.y+2.75*Math.sin(i*Math.PI/3)})),'#475569');
             line(at(foot.hole.x-1.4,foot.hole.y),at(foot.hole.x+1.4,foot.hole.y),.5,'#e2e8f0');
@@ -207,7 +204,7 @@ export function createSyringeUI(h){
     const c=active();if(!c)return;
     h.pause();
     if(!inAssembly()){const scan=scanSyringe(h.comps(),params(),c.id,0.5,motion());
-    if(!scan.ok){notify(`行程 ${scan.atMm??c.extension} mm：${scan.message}`);return;}}
+    if(!scan.ok){warn({...scan,message:`行程 ${formatNumber(scan.atMm??c.extension)} mm：${scan.message}`});return;}}
     h.pushUndo();h.playing(true);last=null;
     const step=ts=>{
       const current=active();if(!current){stop();return;}
@@ -277,7 +274,7 @@ export function createSyringeUI(h){
       const norm=normalizeFabricationProfile(fabrication);if(!norm.ok)return norm;
       const r=solveSyringe(comps,p,h.points(),motion());return {...r,comps,params:p,fabrication:norm.profile};
     }
-    const scan=el('button','掃描候選全行程',form);scan.type='button';scan.onclick=()=>{const r=plan();if(!r.ok){error.textContent=r.message;return;}const result=scanSyringe(r.comps,r.params,c.id,0.5,motion());error.textContent=result.ok?`${result.message} 最大誤差 ${result.maxResidualMm.toExponential(2)} mm`:`${result.atMm??''} mm：${result.message}`;};
+    const scan=el('button','掃描候選全行程',form);scan.type='button';scan.onclick=()=>{const r=plan();if(!r.ok){error.textContent=r.message;return;}const result=scanSyringe(r.comps,r.params,c.id,0.5,motion());error.textContent=result.ok?`${result.message} 最大誤差 ${result.maxResidualMm.toExponential(2)} mm`:`${result.atMm==null?'':formatNumber(result.atMm)} mm：${result.message}`;};
     const save=el('button','確認套用',form);save.type='submit';
     form.onsubmit=e=>{e.preventDefault();if(sourceRevision!==JSON.stringify([S.comps,S.topo.params,S.fabrication])){error.textContent='作品已變更，請重新開啟設定。';return;}const r=plan();if(!r.ok){error.textContent=r.message;return;}if(!confirmMountingChange(mountingWork(S),mountingCandidate(mountingWork(S),r,h.comps()),{notify:message=>{error.textContent=message;}}))return;message='';commit(r.comps,r.params,r,{fabrication:r.fabrication});dialog.close();};
     const cancel=el('button','取消',form);cancel.type='button';cancel.onclick=()=>dialog.close();

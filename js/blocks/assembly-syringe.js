@@ -21,7 +21,8 @@ export function planAssemblySyringe(comps,modules,params,id,extension,previous=n
   if(issues.length)return {ok:false,message:issues.join(' ')};
   try{
     const result=solveAssembly(compileAssembly(candidate,modules,{params}),{thetaDeg:0,motorAngles:{},...motion,_prevPoints:previous});
-    if(!result.isValid||result.isUnderconstrained)return {ok:false,message:result.errorReason||'目前伸出量無法形成有效的組立姿勢；已保留原姿勢。',result};
+    const issue=motionPoseIssue(candidate,result);
+    if(issue)return {ok:false,...issue,result};
     return {ok:true,comps:candidate,points:result.points,result};
   }catch(e){return {ok:false,message:`目前伸出量無法形成有效的組立姿勢：${e.message}`};}
 }

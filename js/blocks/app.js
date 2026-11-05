@@ -2508,7 +2508,7 @@ function play() {
   }
   if (!hasDriveSource()) { transient('先把動力來源放到轉軸，才能播放'); return; }
   const checked = checkPlaybackMotion();
-  if (!checked.ok) { showMotionWarning(checked.message); return; }
+  if (!checked.ok) { showMotionWarning(checked.message,checked); return; }
   playbackActive=true;onPlaybackChange();
   document.getElementById('playBtn').classList.add('playing');
   document.getElementById('playBtn').textContent = '⏸';
@@ -2558,13 +2558,11 @@ function pause() {
   document.getElementById('playBtn').textContent = '▶';
 }
 
-function showMotionWarning(message) {
-  clearBanner();
-  const el = document.getElementById('solveBanner');
-  el.textContent = `暫停模擬：${message}`;
-  el.style.display = 'block';
-  el.setAttribute('role', 'status');
+function showMotionWarning(message,issue={}) {
+  clearBanner();const version=geomVersion;
+  import('./motion-warning.js').then(m=>{if(version===geomVersion)m.showMotionWarning({message,svg,banner:document.getElementById('solveBanner'),issue,comps:simulationScope().comps,points:lastFullPts,project:p=>({x:TX(p.x),y:TY(p.y)}),select:c=>{if(c.type==='bar')selectLink(c.id);else if(c.type==='triangle')selectTriangle(c.id);else if(c.type==='gear')selectGear(c.id);}});}).catch(()=>transient(message));
 }
+
 function checkPlaybackMotion() {
   const scope = simulationScope();
   const solveAt = (angle, seed) => {
@@ -3161,13 +3159,13 @@ async function exportVideo(lessonId = null) {
   if (taskApplies(gripperController) && !gripperController.currentPlan().ok) { transient('請先修正夾爪任務，再匯出動畫'); return; }
   if (taskApplies(parallelLiftController) && !parallelLiftController.currentPlan().ok) { transient('請先確認、取消或修正平行四連桿任務，再匯出動畫'); return; }
   const checked = checkPlaybackMotion();
-  if (!checked.ok) { showMotionWarning(checked.message); return; }
+  if (!checked.ok) { showMotionWarning(checked.message,checked); return; }
   videoExportLoading = true;
   try {
     const [{ exportAnimation }, { buildVideoEvidence }] = await Promise.all([import('./video-export.js'), import('./video-evidence.js')]);
     await exportAnimation({ svg, begin: () => {
       const fresh = checkPlaybackMotion();
-      if (!fresh.ok) { showMotionWarning(fresh.message); throw new Error(fresh.message); }
+      if (!fresh.ok) { showMotionWarning(fresh.message,fresh); throw new Error(fresh.message); }
       const evidence = buildVideoEvidence({ comps: viewComps(), params: S.topo.params, version: APP_VERSION, lessonId });
       const evidenceSource = JSON.stringify({ comps: viewComps(), params: S.topo.params });
       const theta = S.theta, direction = playDir, wasPlaying = !!raf;
@@ -3422,7 +3420,7 @@ if (gripperPilotSession) window.blocks.gripperPilot = {
   snapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
   reopen: snapshot => { const norm = Store.normalizeSnapshot(snapshot); if (!norm) throw Error('作品格式無效'); applySnapshot(norm, { source: 'gripper-pilot' }); },
 };
-hydraulic=createSyringeUI({clearSelection:clearSelectionAndEditors,showEditor:openMobileEditPanel,is3D:()=>view3DActive,capture:()=>{viewer3D.renderNow();return viewer3D.canvas;},svg,comps:viewComps,points:()=>lastFullPts,seed:pts=>{lastSolved={...pts};prevSolved={...pts};},pushUndo,pause,rebuild,draw,save:scheduleAutosave,notify:transient,applyFabrication:Settings.applyFabricationProfile,
+hydraulic=createSyringeUI({warnMotion:issue=>showMotionWarning(issue.message,issue),clearSelection:clearSelectionAndEditors,showEditor:openMobileEditPanel,is3D:()=>view3DActive,capture:()=>{viewer3D.renderNow();return viewer3D.canvas;},svg,comps:viewComps,points:()=>lastFullPts,seed:pts=>{lastSolved={...pts};prevSolved={...pts};},pushUndo,pause,rebuild,draw,save:scheduleAutosave,notify:transient,applyFabrication:Settings.applyFabricationProfile,
   playing:on=>{playbackActive=on;const b=document.getElementById('playBtn');b.classList.toggle('playing',on);b.textContent=on?'⏸':'▶';}
 });
 // 量尺（js/blocks/dimension-ui.js）：第一次用到才載入，不佔啟動大小。

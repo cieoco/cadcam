@@ -63,3 +63,13 @@ mixed.comps.push(...good.comps.map(c=>({...c,moduleId:'Slider'})));
 const mixedAssembly=compileAssembly(mixed.comps,[{id:'Slider',name:'Slider',base:'O',outputs:[]}],{params:{...mixed.params,...good.params}});
 assert.equal(motionPoseIssue(mixed.comps,solveAssembly(mixedAssembly,{thetaDeg:0})),null);
 console.log('motion-preflight: passed');
+
+// Report identities before fallback coordinates hide the unresolved end; no Hxx naming dependency.
+const {scanSyringe}=await import('../js/blocks/syringe-operations.js');
+const hydraulic=structuredClone(BLOCK_EXAMPLES.find(e=>e.id==='hydraulic-h01').snapshot);
+const arm=hydraulic.comps.find(c=>c.id===hydraulic.comps.find(c=>c.type==='syringe').outputId);
+const pivot=arm.p2;
+hydraulic.comps.push({type:'bar',id:'ExtraArm',p1:{...pivot},p2:{id:'LooseEnd',type:'floating',x:pivot.x+57,y:pivot.y},lenParam:'ExtraLength',fixedLen:true});hydraulic.params.ExtraLength=57;
+const snapshot=JSON.stringify(hydraulic),check=scanSyringe(hydraulic.comps,hydraulic.params,hydraulic.comps.find(c=>c.type==='syringe').id);
+assert.equal(check.ok,false);assert.equal(check.code,'underconstrained');assert.deepEqual(check.componentIds,['ExtraArm']);assert.ok(check.sourceIds.includes('LooseEnd'));assert.ok(check.message.includes('合成一片'));assert.equal(JSON.stringify(hydraulic),snapshot);
+assert.ok(check.result.points.LooseEnd,'fallback coordinate still exists, but is not a solved constraint');

@@ -46,8 +46,10 @@ export function syringeClampFrameNodes(comps,nodes){
 export function syringeShape(c,comps,params,points){
  const a=attachmentPoint(c.a,comps,params,points),b=attachmentPoint(c.b,comps,params,points);if(!a||!b)return null;
  const pivot=c.mountMode==='pivot',frame=pivot?syringePivotFrame(a,b,syringePivotEar(c)):null;
- const length=frame?frame.length:Math.hypot(b.x-a.x,b.y-a.y),angle=frame?frame.angle:Math.atan2(b.y-a.y,b.x-a.x),fixed=c.mountMode==='fixed-axis';
+ const fixed=c.mountMode==='fixed-axis',length=frame?frame.length:fixed?c.spec.lmin+c.extension:Math.hypot(b.x-a.x,b.y-a.y),angle=frame?frame.angle:fixed?c.axisDeg*Math.PI/180:Math.atan2(b.y-a.y,b.x-a.x);
+ // Fixed installation stays aligned with its drilling even when the linkage has no valid pose.
+ const endPoint=fixed?{x:a.x+length*Math.cos(angle),y:a.y+length*Math.sin(angle)}:b;
  const body=c.spec.bodyLength,r=c.spec.outerDiameter/2,start=hasSyringeClamp(c)?-syringeBarrelOffset(c):0,end=start+body;
- return {id:c.id,a:frame?frame.center:a,b,angle,length,r,start,end,rodWidth:c.spec.rodDiameter,fixed,pivot,...(pivot?{anchor:a,pivotEar:syringePivotEar(c),lockedFoot:syringeLockedFoot(c)}:{}),clamp:hasSyringeClamp(c)?syringeClampShape(c.mountMode):null,tips:(c.passiveTips||[]).map(t=>{const owner=comps.find(o=>o.id===t.hostId),p=points?.[owner?.p3?.id]||owner?.p3,o=points?.[owner?.p1?.id]||owner?.p1;if(!p||!o)return null;const theta=Math.atan2(p.y-o.y,p.x-o.x)+t.angleDeg*Math.PI/180;return {a:p,b:{x:p.x+t.length*Math.cos(theta),y:p.y+t.length*Math.sin(theta)}};}).filter(Boolean)};
+ return {id:c.id,a:frame?frame.center:a,b:endPoint,angle,length,r,start,end,rodWidth:c.spec.rodDiameter,fixed,pivot,...(pivot?{anchor:a,pivotEar:syringePivotEar(c),lockedFoot:syringeLockedFoot(c)}:{}),clamp:hasSyringeClamp(c)?syringeClampShape(c.mountMode):null,tips:(c.passiveTips||[]).map(t=>{const owner=comps.find(o=>o.id===t.hostId),p=points?.[owner?.p3?.id]||owner?.p3,o=points?.[owner?.p1?.id]||owner?.p1;if(!p||!o)return null;const theta=Math.atan2(p.y-o.y,p.x-o.x)+t.angleDeg*Math.PI/180;return {a:p,b:{x:p.x+t.length*Math.cos(theta),y:p.y+t.length*Math.sin(theta)}};}).filter(Boolean)};
 }
 export function syringeShapes(comps,params,points){return comps.filter(c=>c.type==='syringe').map(c=>syringeShape(c,comps,params,points)).filter(Boolean);}

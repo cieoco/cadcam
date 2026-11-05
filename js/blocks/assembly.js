@@ -351,12 +351,13 @@ export function solveAssembly(asm, params) {
       const p = sol.points[id];
       points[id] = (p && Number.isFinite(p.x) && Number.isFinite(p.y)) ? transformPoint(p, ref, now) : p;
     }
-    perModule[unit.id] = { isValid: !!sol.isValid, isUnderconstrained: !!sol.isUnderconstrained, errorReason: sol.errorReason, reason: sol.isValid ? 'ok' : 'solve-invalid' };
+    perModule[unit.id] = { isValid: !!sol.isValid, isUnderconstrained: !!sol.isUnderconstrained, unresolvedPointIds: sol.unresolvedPointIds || [], errorReason: sol.errorReason, reason: sol.isValid ? 'ok' : 'solve-invalid' };
   }
   const isValid = Object.values(perModule).every(m => m.isValid);
   const B = asm.tracePoint ? points[asm.tracePoint] : undefined;
   return { isValid, points, B, perModule, orthogonal,
     isUnderconstrained: Object.values(perModule).some(m => m.isUnderconstrained),
+    unresolvedPointIds: [...new Set(Object.values(perModule).flatMap(m => m.unresolvedPointIds))],
     errorReason: Object.values(perModule).find(m => m.errorReason)?.errorReason || null };
 }
 

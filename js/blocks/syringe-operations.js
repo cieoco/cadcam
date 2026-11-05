@@ -1,3 +1,4 @@
+import {motionPoseIssue} from './solve-health.js';
 import {plateVertexWorldPoints} from './plate-geometry.js';
 import {compileTopology} from '../core/topology.js';
 import {solveTopology} from '../multilink/solver.js';
@@ -10,7 +11,8 @@ export function solveSyringe(comps,params,previous=null,motion={}) {
   try {
     const topology=compileTopology(comps,{params});
     const result=solveTopology(topology,{thetaDeg:0,...motion,_prevPoints:previous});
-    if(!result.isValid||result.isUnderconstrained)return {ok:false,message:result.reason || result.errorReason || '目前輸入無法形成有效組裝姿勢，請檢查固定點與未受約束的零件。',result};
+    const issue=motionPoseIssue(comps,result);
+    if(issue)return {ok:false,...issue,result};
     return {ok:true,result,points:result.points};
   } catch(e) {return {ok:false,message:`目前輸入無法形成有效組裝姿勢：${e.message}`};}
 }

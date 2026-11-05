@@ -231,7 +231,7 @@
     position:relative; left:auto; transform:none; top:6px !important; margin:0 !important; width:auto; max-width:calc(100% - 16px); white-space:normal; padding:6px 12px; border-radius:12px;
     font-size:13px; line-height:1.4; text-align:center; pointer-events:none; box-shadow:0 3px 10px rgba(0,0,0,.18);
   }
-  body:not([data-mode="bench"]) #solveBanner { display:none !important; }
+  body:not([data-mode="bench"]) #solveBanner:not(:has(button)) { display:none !important; }
 }
 
 /* 唯讀預覽讓出編輯區；回到 2D 後仍使用原面板。 */
@@ -268,6 +268,8 @@ body:has(#syringeEditor[style*="flex"]) .mobile-panel-section[data-panel="edit"]
  body:not([data-mode="bench"]) .canvas-wrap .canvas-status{position:absolute;top:calc(var(--hydraulic-header-height,0px) + 4px);bottom:auto;left:8px;right:auto;max-width:190px;margin:0}
  body[data-mobile-panel="edit"]:not([data-mode="bench"]) .mobile-panel{position:absolute;top:4px;bottom:4px;right:4px;width:250px;box-sizing:border-box;overflow:auto}
  body[data-mobile-panel="edit"]:not([data-mode="bench"]) .canvas-wrap .mode-banner{right:264px!important}
+ body:not([data-mode="bench"]) .hydraulic-active #solveBanner{right:auto!important;left:auto;transform:none;width:calc(100% - 16px)}
+ body[data-mobile-panel="edit"]:not([data-mode="bench"]) .hydraulic-active #solveBanner{width:calc(100% - 276px)}
  body:not([data-mode="bench"]) .canvas-wrap>.inspector-panel{top:4px;bottom:4px;right:4px;width:250px;max-height:none;margin:0;position:absolute;overflow:auto;box-sizing:border-box}
  body:not([data-mode="bench"]) .canvas-wrap>.inspector-panel .mobile-editor-done{position:static;margin:0 0 4px auto}
  body:not([data-mode="bench"]) .canvas-wrap .mode-banner{position:absolute;top:4px!important;left:8px;right:8px;margin:0!important;pointer-events:none;z-index:6}

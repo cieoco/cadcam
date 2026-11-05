@@ -1002,13 +1002,7 @@ function solveBodyJointTopology(topology, params) {
         }
     }
 
-    let allResolved = true;
-    for (const pid of pointIds) {
-        if (!points[pid]) {
-            allResolved = false;
-            break;
-        }
-    }
+    const unresolvedPointIds = [...pointIds].filter(id => !points[id]);
 
     if (!infeasible) {
         for (const pid of pointIds) {
@@ -1101,7 +1095,8 @@ function solveBodyJointTopology(topology, params) {
 
     return {
         isValid: !infeasible,
-        isUnderconstrained: !infeasible && !allResolved,
+        isUnderconstrained: !infeasible && unresolvedPointIds.length > 0,
+        unresolvedPointIds,
         points,
         dyadQualities: dyadQualities || {},
         B: points[topology.tracePoint],

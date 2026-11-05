@@ -63,3 +63,7 @@ Fields
 - files: array of { name, text }
 - dxfText: string
 - machiningInfo: string
+
+## Blocks body-joint diagnostics
+
+`solveTopology` 的 body-joint 結果增加選配 `unresolvedPointIds: string[]`，記錄 fallback 補畫之前仍無解的接點。`solveAssembly` 合併各模組的此清單；接點 ID 沿用原作品全域 ID。這是暫態診斷，不存入 Blocks snapshot，不改既有有效性／幾何求解規則。僅在 `isUnderconstrained` 時用來指出未受約束零件；fallback 有座標不等於已被約束。

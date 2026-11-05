@@ -9,7 +9,7 @@ import {syringePositionOnFrame} from './syringe-position.js';
 import {syringeShape} from './syringe-shape.js';
 import {scanSyringe} from './syringe-operations.js';
 import {confirmMountingChange,mountingWork,mountingCandidate} from './mounting-review-ui.js';
-import {signedNumberInput,showNumber,readNumber} from './numeric-input.js';
+import {signedNumberInput,showNumber,readNumber,formatNumber} from './numeric-input.js';
 
 export function createSyringeEditor(h){
  const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textContent=text;parent?.append(n);return n;};
@@ -28,7 +28,8 @@ export function createSyringeEditor(h){
  let selected=null,focus=null,choiceKey='',draft=false;
  const current=()=>h.comps().find(c=>c.id===selected&&c.type==='syringe');
  const project=p=>({x:View.TX(p.x),y:View.TY(p.y)});
- function close(){selected=null;draft=false;panel.style.display='none';h.svg.querySelectorAll('[data-dimension-handle^="syringe-"]').forEach(n=>n.remove());}
+ const clearPreview=()=>h.svg.querySelector('[data-clamp-preview]')?.remove();
+ function close(){clearPreview();selected=null;draft=false;panel.style.display='none';h.svg.querySelectorAll('[data-dimension-handle^="syringe-"]').forEach(n=>n.remove());}
  done.onclick=()=>{close();h.draw();};
  const message=t=>{status.textContent=t;};
  function apply(patch){
@@ -51,7 +52,7 @@ export function createSyringeEditor(h){
  mode.onchange=()=>apply({mountMode:mode.value});ear.onchange=()=>apply({pivotEar:Number(ear.value)});face.onchange=()=>apply({face:face.value});
  frame.onchange=()=>{const c=current(),owner=h.comps().find(o=>o.id===frame.value),p=c&&attachmentPoint(c.a,h.comps(),h.params(),h.points()),q=p&&syringePositionOnFrame(owner,h.params(),h.points(),p);if(q)apply({frameId:frame.value,position:q});};
  output.onchange=()=>{if(output.value)apply({b:JSON.parse(output.value)});};
- scan.onclick=()=>{const c=current();if(c){h.pause();const r=scanSyringe(h.comps(),h.params(),c.id,.5,h.motion());message(r.ok?r.message:`${r.atMm??''} mm：${r.message}`);}};
+ scan.onclick=()=>{const c=current();if(c){h.pause();const r=scanSyringe(h.comps(),h.params(),c.id,.5,h.motion());message(r.ok?r.message:`${r.atMm==null?'':formatNumber(r.atMm)} mm：${r.message}`);}};
  advanced.onclick=()=>{const c=current();close();h.advanced(c);};
  remove.onclick=()=>{const c=current();if(!c)return;close();h.pushUndo();S.comps=S.comps.filter(o=>o.id!==c.id);h.rebuild();h.draw();h.save();};
  more.ontoggle=()=>{if(selected)h.draw();};
@@ -74,15 +75,25 @@ export function createSyringeEditor(h){
   h.svg.querySelectorAll('[data-dimension-handle^="syringe-"]').forEach(n=>n.remove());
   const base=JSON.stringify([S.comps,S.topo.params,S.modules,S.fabrication,S.designFocus,S.mode]);
   const accept=patch=>{draft=false;if(base!==JSON.stringify([S.comps,S.topo.params,S.modules,S.fabrication,S.designFocus,S.mode])||!current()){h.draw();return;}apply(patch);h.draw();};
-  const reset=()=>{draft=false;showNumber(along,c.a.u);showNumber(x,p.x);showNumber(y,p.y);showNumber(angle,c.axisDeg??0);showNumber(offset,c.installation?.barrelOffsetMm??c.spec.bodyLength*.7);h.previewStroke(c.extension);};
-  dimensionHandle(h.svg,{key:'syringe-position',label:c.mountMode==='pivot'?'轉軸':'固定環',point:project(p),direction:{x:1,y:0},value:0,step:1,cancel:reset,plane:{value:p,fromScreen:q=>View.worldFromScreen(q.x,q.y),project,constrain:q=>syringePositionOnFrame(owner,params,points,q)||p,preview:q=>{draft=true;showNumber(x,q.x);showNumber(y,q.y);if(line){const a=points[owner.p1.id]||owner.p1;showNumber(along,Math.hypot(q.x-a.x,q.y-a.y));}},commit:q=>accept({position:q})}});
+  const reset=()=>{clearPreview();draft=false;showNumber(along,c.a.u);showNumber(x,p.x);showNumber(y,p.y);showNumber(angle,c.axisDeg??0);showNumber(offset,c.installation?.barrelOffsetMm??c.spec.bodyLength*.7);h.previewStroke(c.extension);};
+  const previewMount=(center,deg=c.axisDeg)=>{
+   clearPreview();const ns='http://www.w3.org/2000/svg',g=document.createElementNS(ns,'g');g.dataset.clampPreview='';g.style.pointerEvents='none';h.svg.append(g);
+   const t=(deg??0)*Math.PI/180,add=(tag,attrs)=>{const n=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v));g.append(n);};
+   const world=q=>({x:center.x+q.x*Math.cos(t)-q.y*Math.sin(t),y:center.y+q.x*Math.sin(t)+q.y*Math.cos(t)});
+   if(c.mountMode==='pivot'){const q=project(center);add('circle',{cx:q.x,cy:q.y,r:5,fill:'white',stroke:'#d97706','stroke-width':2});return;}
+   for(const foot of shape.clamp.feet){
+    add('polygon',{points:foot.outline.map(q=>{const p=project(world(q));return `${p.x},${p.y}`;}).join(' '),fill:'#fff7ed','fill-opacity':.7,stroke:'#d97706','stroke-dasharray':'4 3'});
+    const q=project(world(foot.hole));add('circle',{cx:q.x,cy:q.y,r:foot.hole.r*View.getScale(),fill:'white',stroke:'#d97706','stroke-width':2,'data-preview-hole':'true'});
+   }
+  };
+  dimensionHandle(h.svg,{key:'syringe-position',label:c.mountMode==='pivot'?'轉軸':'固定環',point:project(p),direction:{x:1,y:0},value:0,step:1,cancel:reset,plane:{value:p,fromScreen:q=>View.worldFromScreen(q.x,q.y),project,constrain:q=>syringePositionOnFrame(owner,params,points,q)||p,preview:q=>{draft=true;previewMount(q);showNumber(x,q.x);showNumber(y,q.y);if(line){const a=points[owner.p1.id]||owner.p1;showNumber(along,Math.hypot(q.x-a.x,q.y-a.y));}},commit:q=>accept({position:q})}});
   const unit=View.getScale(),pixel=unit*Math.hypot(h.svg.getScreenCTM().a,h.svg.getScreenCTM().b),at=d=>({x:shape.a.x+u.x*d,y:shape.a.y+u.y*d});
   // Offset from the output hole, so pulling the stroke cannot steal joint selection.
   const strokePoint={x:shape.b.x-u.y*48/pixel,y:shape.b.y+u.x*48/pixel};
   const leader=document.createElementNS('http://www.w3.org/2000/svg','line'),start=project(shape.b),end=project(strokePoint);
   for(const [key,value]of Object.entries({x1:start.x,y1:start.y,x2:end.x,y2:end.y,stroke:'#81aeb8','stroke-width':1,'pointer-events':'none'}))leader.setAttribute(key,value);h.svg.append(leader);
   dimensionHandle(h.svg,{key:'syringe-stroke',label:'伸出量',point:project(strokePoint),direction:{x:u.x*unit,y:-u.y*unit},value:c.extension,min:0,max:c.spec.stroke,activate:h.focusStroke,preview:v=>{draft=true;h.previewStroke(v);},cancel:reset,commit:v=>{draft=false;if(base===JSON.stringify([S.comps,S.topo.params,S.modules,S.fabrication,S.designFocus,S.mode]))h.stroke(c.id,v);h.draw();}});
-  if(c.mountMode!=='pivot')dimensionHandle(h.svg,{key:'syringe-angle',label:'安裝方向',point:project(at(Math.max(65,66/pixel))),direction:{x:0,y:0},value:c.axisDeg??0,min:-360,max:360,step:1,activate:()=>{angle.focus();angle.select();},angleCenter:project(shape.a),angleAxes:{u:{x:unit,y:0},v:{x:0,y:-unit}},preview:v=>{draft=true;showNumber(angle,v);},cancel:reset,commit:v=>accept({axisDeg:v}),color:'#d97706'});
+  if(c.mountMode!=='pivot')dimensionHandle(h.svg,{key:'syringe-angle',label:'安裝方向',point:project(at(Math.max(65,66/pixel))),direction:{x:0,y:0},value:c.axisDeg??0,min:-360,max:360,step:1,activate:()=>{angle.focus();angle.select();},angleCenter:project(shape.a),angleAxes:{u:{x:unit,y:0},v:{x:0,y:-unit}},preview:v=>{draft=true;previewMount(p,v);showNumber(angle,v);},cancel:reset,commit:v=>accept({axisDeg:v}),color:'#d97706'});
   if(more.open){const v=c.installation?.barrelOffsetMm??c.spec.bodyLength*.7;dimensionHandle(h.svg,{key:'syringe-barrel',label:'距筒尾',point:project(at(-v)),direction:{x:-u.x*unit,y:u.y*unit},value:v,min:6,max:c.spec.bodyLength-6,preview:v=>{draft=true;showNumber(offset,v);},cancel:reset,commit:v=>accept({barrelOffsetMm:v})});}
  }
  h.svg.addEventListener('pointerdown',e=>{if(selected&&e.isPrimary!==false&&!e.target.closest('[data-dimension-handle^="syringe-"],[data-syringe]'))close();},true);

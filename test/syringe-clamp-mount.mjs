@@ -3,7 +3,7 @@ import {buildPartGeometryCatalog} from '../js/blocks/part-geometry.js';
 import {getExample} from '../js/blocks/examples.js';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
 import {frameConnectorNodes} from '../js/blocks/model.js';
-import {syringeClampShape} from '../js/blocks/syringe-shape.js';
+import {syringeShape,syringeClampShape} from '../js/blocks/syringe-shape.js';
 import {attachmentPoint} from '../js/core/syringe.js';
 import {inspectFrameExport,svgForFrameGeometry,dxfForFrameGeometry} from '../js/blocks/exporters.js';
 import {syringeClampInstallation} from '../js/blocks3d/syringe-scene.js';
@@ -62,3 +62,14 @@ const fake={materialParts:[{partId:'frame',geometry:{thicknessMm:4,holes:[{id:'S
 assert.equal(syringeClampInstallation(fake,shape,10,I).reason,'barrel_clearance');
 const mount=syringeClampInstallation(fake,shape,20,I);assert.equal(mount.status,'reference');assert.equal(mount.fasteners.length,2);
 console.log('Pipe clamps: H01–H06 hole alignment, ear support, SVG/DXF, custom geometry and missing/low support checks passed');
+
+// A failed linkage pose must not rotate the fixed clamp away from its manufactured holes.
+for(const deg of [0,37.25,-45,90]){
+ const changed=structuredClone(custom),c=changed.comps.find(c=>c.type==='syringe');c.axisDeg=deg;
+ const stale=Object.fromEntries(changed.comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(Boolean).map(p=>[p.id,p])));
+ const shape=syringeShape(c,changed.comps,changed.params,stale),holes=frameConnectorNodes(changed.comps).filter(p=>p.id.startsWith(c.id+'_clamp_'));
+ near(shape.angle,deg*Math.PI/180);near(shape.length,c.spec.lmin+c.extension);
+ shape.clamp.feet.forEach((f,i)=>{near(holes[i].x,shape.a.x-Math.sin(shape.angle)*f.hole.y);near(holes[i].y,shape.a.y+Math.cos(shape.angle)*f.hole.y);});
+ const catalog=buildPartGeometryCatalog({...changed,fabrication:changed.fabrication||{}}),manufactured=catalog.parts.frame.holes.filter(h=>h.id.startsWith(c.id+'_clamp_'));
+ assert.equal(manufactured.length,2);manufactured.forEach((h,i)=>{near(h.x,holes[i].x);near(h.y,holes[i].y);});
+}

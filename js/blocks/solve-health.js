@@ -35,13 +35,16 @@ export function unsolvedMovingPoints(comps, sol) {
 
 // 播放、錄影與逐幀呈現共用；不能把 solver 的補畫座標當成已受約束的解。
 export function motionPoseIssue(comps, sol) {
-  if (!sol || sol.isValid === false || !sol.points)
-    return { code: 'invalid_pose', message: sol?.errorReason || '目前姿態無法求解，請檢查桿長、滑軌行程與接點連接。' };
   const missing = unsolvedMovingPoints(comps, sol);
   if (missing.length) return { code: 'missing_points', sourceIds: missing,
     message: `接點 ${missing.join('、')} 尚未解出位置，請確認孔位已連接、機架已固定。` };
-  if (sol.isUnderconstrained) return { code: 'underconstrained',
-    message: '活動零件尚未受約束。請補接孔位、固定機架或移除多加的活動桿。' };
+  if (sol?.isUnderconstrained) {
+    const ids=new Set(sol.unresolvedPointIds||[]);
+    return {code:'underconstrained',sourceIds:[...ids],componentIds:(comps||[]).filter(c=>pointKeysFor(c).some(k=>ids.has(c[k]?.id))).map(c=>c.id),
+      message:'零件仍可自由活動。補接孔位，或選取連桿後「合成一片」固定夾角。'};
+  }
+  if (!sol || sol.isValid === false || !sol.points)
+    return { code: 'invalid_pose', message: sol?.reason || sol?.errorReason || '目前姿態無法求解，請檢查桿長、滑軌行程與接點連接。' };
   return null;
 }
 
