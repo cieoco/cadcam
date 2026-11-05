@@ -112,14 +112,14 @@ function barGestures() {
     else if (e.key === 'Escape') go('collapse');
   });
 }
-const PART = '[data-id],[data-motor-hit],[data-pick-component],[data-link-id],[data-dimension-handle]';
+const PART = '[data-id],[data-motor-hit],[data-pick-component],[data-link-id],[data-dimension-handle],[data-point-choice]';
 function canvasGestures() {
   const svg = $('stageSvg'), down = new Map();
   const inSvg = e => svg.contains(e.target) && sheetMode();
   document.addEventListener('pointerdown', e => {
     if (!inSvg(e)) return;
     $('mechanismDetails')?.hidePopover();
-    down.set(e.pointerId, {x: e.clientX, y: e.clientY, part: !!e.target.closest?.(PART), dimension:!!e.target.closest?.('[data-dimension-handle]'), moved: false});
+    down.set(e.pointerId, {x: e.clientX, y: e.clientY, part: !!e.target.closest?.(PART), dimension:!!e.target.closest?.('[data-dimension-handle],[data-point-choice]'), moved: false});
     if (down.size > 1) go('pinchStart');
   }, true);
   document.addEventListener('pointermove', e => {

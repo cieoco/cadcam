@@ -2079,7 +2079,7 @@ function drawNow() {
   // 編輯把手最後繪製，避免被針筒外形或尺寸標註遮住。
   if(!playbackActive&&(S.selectedNodeId||S.selectedLinkId||S.selectedTriangleId||S.selectedSliderId||S.selectedGearId||S.frameEditorOpen)){
     if(!editingHandles)editingHandles=import('./editing-handles.js').then(m=>{editingHandles=m;draw();});
-    editingHandles.drawEditingHandles?.({svg,points:pts,project:p=>({x:TX(p.x),y:TY(p.y)}),member:memberEditor,slider:sliderEditor,gear:gearEditor,redraw:draw,comps:viewComps(),frame:S.frameEditorOpen?{nodes:frameGroundInfo().nodes,geometry:frameGeometry2d,info:frameSizeInfo(),set:setFrameSize}:null});
+    editingHandles.drawEditingHandles?.({svg,points:pts,project:p=>({x:TX(p.x),y:TY(p.y)}),member:memberEditor,slider:sliderEditor,gear:gearEditor,redraw:draw,openEditor:openMobileEditPanel,comps:viewComps(),frame:S.frameEditorOpen?{nodes:frameGroundInfo().nodes,geometry:frameGeometry2d,info:frameSizeInfo(),set:setFrameSize}:null});
   }
 
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
@@ -2152,6 +2152,7 @@ function drawSliders(pts, parent) {
     const hit = document.createElementNS(SVG_NS, 'path');
     hit.setAttribute('d', barHullPath(a, b));
     hit.setAttribute('fill', 'transparent');
+    hit.setAttribute('data-pick-component',sl.id);
     hit.style.cursor = 'pointer';
     hit.addEventListener('pointerdown', (e) => {
       if (S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars) return;

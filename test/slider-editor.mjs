@@ -84,4 +84,19 @@ const fixedStart = { ...slider.p1 };
 editor.setRailLength('60');
 check('A 端固定也維持原位', editor.railLength(slider) === 60 && slider.p1.x === fixedStart.x && slider.p1.y === fixedStart.y);
 
+const noOpUndo=undoCount;
+for(const dimension of editor.dimensions(slider))dimension.set(dimension.value);
+check('所有滑軌尺寸的數值與把手共用入口，相同值不增加復原',undoCount===noOpUndo);
+const oldOffset=slider.railOffset;
+editor.dimensions(slider).find(d=>d.key==='carrier').set(10000);
+check('底座限制與保存格式相同（1000 mm）',slider.carrierLen===1000);
+editor.dimensions(slider).find(d=>d.key==='carrier').set(1);
+check('縮短底座不會暗改軌道位置',slider.railOffset===oldOffset&&slider.carrierLen===editor.railLength(slider)+oldOffset);
+editor.dimensions(slider).find(d=>d.key==='offset').set(0);
+check('偏移候選在提交前更新實際軌道端點',slider.p1.x===slider.m1.x&&slider.p2.x===slider.p1.x+editor.railLength(slider));
+slider.baseEnd='p2';const stableB={...slider.p2};editor.setRailLength(40);editor.syncSliderGeometries();
+check('B端固定縮軌後再次重建仍保留B端',slider.p2.x===stableB.x&&slider.p2.y===stableB.y&&slider.p2.x-slider.p1.x===40);
+const retainedB=JSON.stringify(slider);editor.setRailLength(editor.dimensions(slider)[0].max+1);
+check('B端固定加長不得越過底座起點',JSON.stringify(slider)===retainedB);
+
 report('slider-editor');

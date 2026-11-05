@@ -134,4 +134,9 @@ check('selected joint carries original gear and box locks instead of bypassing t
   return pointDimensions([bar,gear],'B')[0].lock.includes('齒輪')
     &&pointDimensions([{...bar,boxPanel:{}}],'B')[0].lock.includes('盒體');
 })());
+check('owner choices use readable stable shape names without depending on example ids',(()=>{
+  const comps=[{type:'anchor',id:'opaque-anchor'},{...bar,id:'opaque-a'},{...bar,id:'opaque-b',shape:'disk'},{...bar,id:'opaque-c',name:'我的長連桿'}];
+  const labels=pointDimensions(comps,'B').map(d=>d.optionLabel);
+  return labels[0].startsWith('連桿 1 ·')&&labels[1].startsWith('圓盤 1 ·')&&labels[2].startsWith('我的長連桿 ·')&&!labels.join('').includes('opaque');
+})());
 report('member-dimensions');

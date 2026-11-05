@@ -1,4 +1,5 @@
 import {editableNumber} from './numeric-input.js';
+import {commitLegacyMountingEdit} from './mounting-review-ui.js';
 /**
  * blocks / slider-editor
  *
@@ -13,6 +14,7 @@ export function createSliderEditor({
   pushUndo, rebuild, draw, pause = () => {}, notify = () => {}, cancelMotorMode, deselectGear, openMobileEditPanel,
   updatePointCoordsById, roundMm, renderLenEditor, setLenButtonTitles, updatePlateShapeControls
 }) {
+  document.getElementById('sliderSettings')?.addEventListener('toggle',()=>draw(),true);
 
   // 滑軌幾何同步（rebuild 前呼叫）：補齊 / 正規化 m1、m2 固定孔，並把軌道 p1、p2
   // 依載板方向與 railOffset 重新擺正（軌道是載板上的一段，整組同一直線）。
@@ -52,6 +54,8 @@ export function createSliderEditor({
     S.selectedLinkId = null;
     S.selectedTriangleId = null;
     S.selectedNodeId = null;
+    S.frameEditorOpen = false;
+    document.getElementById('frameEditor').style.display = 'none';
     document.getElementById('roleEditor').style.display = 'none';
     document.getElementById('servoEditor').style.display = 'none';
     document.getElementById('strokeEditor').style.display = 'none';
@@ -112,18 +116,10 @@ export function createSliderEditor({
   }
   function renderSliderDetails(c) {
     syncLengthInput();
-    const body = document.getElementById('sliderBodyVal');
-    const carrier = document.getElementById('sliderCarrierVal');
-    const railOffset = document.getElementById('sliderRailOffsetVal');
-    const start = document.getElementById('sliderStartVal');
-    const end = document.getElementById('sliderEndVal');
-    editableNumber(body,sliderBodyLength(c),v=>changeSliderBodyLen(v-sliderBodyLength(c)),{label:'滑塊長度（mm）',min:1,max:railLength(c)});
-    editableNumber(carrier,sliderCarrierLength(c),v=>changeSliderCarrierLen(v-sliderCarrierLength(c)),{label:'底座長度（mm）',min:railLength(c),max:2000});
-    editableNumber(railOffset,sliderRailOffset(c),v=>changeSliderRailOffset(v-sliderRailOffset(c)),{label:'軌道偏移（mm）',min:0,max:sliderCarrierLength(c)-railLength(c)});
-    editableNumber(start,sliderTravelStart(c),v=>changeSliderTravelStart(v-sliderTravelStart(c)),{label:'行程起點（mm）',min:0,max:sliderTravelEnd(c)});
-    editableNumber(end,sliderTravelEnd(c),v=>changeSliderTravelEnd(v-sliderTravelEnd(c)),{label:'行程終點（mm）',min:sliderTravelStart(c),max:railLength(c)});
+    for(const d of dimensions(c).filter(d=>d.key!=='rail'))
+      editableNumber(document.getElementById(d.inputId),d.value,d.set,{label:d.label+'（mm）',min:d.min,max:d.max});
     const limit = document.getElementById('sliderLengthLimit');
-    if (limit) limit.hidden = railLength(c) < sliderCarrierLength(c) - sliderRailOffset(c);
+    if (limit) limit.hidden = railLength(c) < dimensions(c)[0].max;
     const origin = document.getElementById('sliderRangeOrigin');
     if (origin) origin.textContent = `從軌道 ${c.baseEnd === 'p2' ? 'B' : 'A'} 端量起的允許位置（mm），不是實際往復行程。`;
     renderSliderBaseButton(c);
@@ -152,26 +148,21 @@ export function createSliderEditor({
     c.travelStart = sliderTravelStart(c);
     c.travelEnd = sliderTravelEnd(c);
   }
-  let fieldModule = null;
   function syncLengthInput() {
     const input = document.getElementById('sliderLengthInput');
     if (!input) return;
     const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
     input.style.display = c ? '' : 'none';
-    const field = document.getElementById('sliderLengthField'); if (field) field.hidden = !c;
     if (!c) return;
     document.getElementById('lenValue').style.display = 'none';
     input.value = railLength(c);
-    input.max = sliderCarrierLength(c) - sliderRailOffset(c);
-    // 共用數值欄（滑桿＋範圍）：第一次選到滑軌才載入，輸入框仍走 setRailLength 的驗證。
-    if (!fieldModule) fieldModule = import('./numeric-field.js').then(m => { fieldModule = m; syncLengthInput(); });
-    else fieldModule.numericField?.(field, { input, min: 1, max: Number(input.max), step: 1, softMax: 400, unit: 'mm', ariaLabel: '可滑動長度' });
+    input.max = dimensions(c)[0].max;
   }
   function setRailLength(raw) {
     const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
     if (!c) return;
     const value = String(raw).trim() === '' ? NaN : Number(raw);
-    const max = sliderCarrierLength(c) - sliderRailOffset(c);
+    const max = dimensions(c)[0].max;
     if (!Number.isFinite(value) || !Number.isInteger(value) || value < 1 || value > max) {
       notify(`可滑動長度請輸入 1～${max} mm 的整數；需要更長時，請在「外形與安裝」增加底座長度或減少軌道偏移。`);
       syncLengthInput();
@@ -186,72 +177,61 @@ export function createSliderEditor({
     if (!c) return;
     const dx = (c.p2.x || 0) - (c.p1.x || 0), dy = (c.p2.y || 0) - (c.p1.y || 0);
     const d = Math.hypot(dx, dy) || 1;
-    const L = Math.max(1, Math.min(sliderCarrierLength(c) - sliderRailOffset(c), roundMm(d + delta)));
+    const L = Math.max(1, Math.min(dimensions(c)[0].max, roundMm(d + delta)));
     if (L === railLength(c)) { syncLengthInput(); return; }
-    pause(); pushUndo();
-    // 用 updatePointCoordsById 更新所有共用此接點 id 的副本（見 setLen 說明；軌道端可能被 merge 共用）
-    if (c.baseEnd === 'p2') {
-      updatePointCoordsById(c.p1.id, (c.p2.x || 0) - dx / d * L, (c.p2.y || 0) - dy / d * L);
-    } else {
-      updatePointCoordsById(c.p2.id, (c.p1.x || 0) + dx / d * L, (c.p1.y || 0) + dy / d * L);
-    }
-    S.topo.params[c.lenParam] = L;
-    normalizeSliderRange(c);
-    renderLenEditor(L);
+    const accepted=commitLegacyMountingEdit(S,()=>{
+      const candidate=S.comps.find(x=>x.id===c.id);
+      // 用 updatePointCoordsById 更新所有共用此接點 id 的副本（見 setLen 說明；軌道端可能被 merge 共用）
+      if (c.baseEnd === 'p2') {
+        candidate.railOffset=sliderRailOffset(c)+railLength(c)-L;
+        updatePointCoordsById(c.p1.id, (c.p2.x || 0) - dx / d * L, (c.p2.y || 0) - dy / d * L);
+      } else {
+        updatePointCoordsById(c.p2.id, (c.p1.x || 0) + dx / d * L, (c.p1.y || 0) + dy / d * L);
+      }
+      S.topo.params[c.lenParam] = L;
+      normalizeSliderRange(candidate);
+      syncSliderGeometries();
+    },{pushUndo,notify});
+    renderLenEditor(railLength(c));
     renderSliderDetails(c);
-    rebuild(); draw();
+    if(accepted){pause();rebuild();}draw();
   }
-  function changeSliderBodyLen(delta) {
-    const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
-    if (!c) return;
-    pushUndo();
-    c.carriageLen = Math.max(1, Math.min(Math.max(1, railLength(c)), sliderBodyLength(c) + delta));
-    normalizeSliderRange(c);
-    renderSliderDetails(c);
-    rebuild(); draw();
+  // Numeric fields and graphical handles consume the same dimension limits and setter.
+  function dimensions(c) {
+    const L=railLength(c),carrier=sliderCarrierLength(c),offset=sliderRailOffset(c);
+    return [
+      {key:'rail',label:'軌長',value:L,min:1,max:c.baseEnd==='p2'?L+offset:carrier-offset,inputId:'sliderLengthInput',set:setRailLength},
+      {key:'body',label:'滑塊長度',value:sliderBodyLength(c),min:1,max:L,inputId:'sliderBodyVal'},
+      {key:'carrier',label:'底座長度',value:carrier,min:L+offset,max:1000,inputId:'sliderCarrierVal'},
+      {key:'offset',label:'軌道偏移',value:offset,min:0,max:carrier-L,inputId:'sliderRailOffsetVal'},
+      {key:'start',label:'行程起點',value:sliderTravelStart(c),min:0,max:sliderTravelEnd(c),inputId:'sliderStartVal'},
+      {key:'end',label:'行程終點',value:sliderTravelEnd(c),min:sliderTravelStart(c),max:L,inputId:'sliderEndVal'}
+    ].map(d=>({...d,step:1,set:d.set|| (v=>setDimension(d.key,v))}));
   }
-  function changeSliderCarrierLen(delta) {
-    const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
-    if (!c) return;
-    pushUndo();
-    const dx = (c.m2.x || 0) - (c.m1.x || 0);
-    const dy = (c.m2.y || 0) - (c.m1.y || 0);
-    const d = Math.hypot(dx, dy) || 1;
-    const L = Math.max(railLength(c), sliderCarrierLength(c) + delta);
-    c.m2.x = (c.m1.x || 0) + dx / d * L;
-    c.m2.y = (c.m1.y || 0) + dy / d * L;
-    c.carrierLen = L;
-    normalizeSliderRange(c);
-    renderSliderDetails(c);
-    rebuild(); draw();
+  function setDimension(key,raw) {
+    const c=S.comps.find(c=>c.id===S.selectedSliderId&&c.type==='slider');if(!c)return;
+    const d=dimensions(c).find(d=>d.key===key),n=Number(raw);
+    if(!d||!Number.isFinite(n))return;
+    const value=Math.max(d.min,Math.min(d.max,roundMm(n)));
+    if(value===d.value){renderSliderDetails(c);return;}
+    const accepted=commitLegacyMountingEdit(S,()=>{
+      const candidate=S.comps.find(x=>x.id===c.id);
+      if(key==='carrier'){
+        const dx=candidate.m2.x-candidate.m1.x,dy=candidate.m2.y-candidate.m1.y,L=Math.hypot(dx,dy)||1;
+        candidate.m2.x=candidate.m1.x+dx/L*value;candidate.m2.y=candidate.m1.y+dy/L*value;
+      }
+      candidate[{body:'carriageLen',carrier:'carrierLen',offset:'railOffset',start:'travelStart',end:'travelEnd'}[key]]=value;
+      normalizeSliderRange(candidate);
+      syncSliderGeometries();
+    },{pushUndo,notify});
+    renderSliderDetails(c);if(accepted){pause();rebuild();}draw();
   }
-  function changeSliderRailOffset(delta) {
-    const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
-    if (!c) return;
-    pushUndo();
-    c.railOffset = sliderRailOffset(c) + delta;
-    normalizeSliderRange(c);
-    renderSliderDetails(c);
-    rebuild(); draw();
-  }
-  function changeSliderTravelStart(delta) {
-    const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
-    if (!c) return;
-    pushUndo();
-    c.travelStart = Math.min(sliderTravelEnd(c), Math.max(0, sliderTravelStart(c) + delta));
-    normalizeSliderRange(c);
-    renderSliderDetails(c);
-    rebuild(); draw();
-  }
-  function changeSliderTravelEnd(delta) {
-    const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
-    if (!c) return;
-    pushUndo();
-    c.travelEnd = Math.max(sliderTravelStart(c), Math.min(railLength(c), sliderTravelEnd(c) + delta));
-    normalizeSliderRange(c);
-    renderSliderDetails(c);
-    rebuild(); draw();
-  }
+  function changeDimension(key,delta){const c=S.comps.find(c=>c.id===S.selectedSliderId&&c.type==='slider');if(c)setDimension(key,dimensions(c).find(d=>d.key===key).value+delta);}
+  const changeSliderBodyLen=delta=>changeDimension('body',delta);
+  const changeSliderCarrierLen=delta=>changeDimension('carrier',delta);
+  const changeSliderRailOffset=delta=>changeDimension('offset',delta);
+  const changeSliderTravelStart=delta=>changeDimension('start',delta);
+  const changeSliderTravelEnd=delta=>changeDimension('end',delta);
   function toggleSliderBase() {
     const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
     if (!c) return;
@@ -274,7 +254,7 @@ export function createSliderEditor({
   }
 
   return {
-    syncSliderGeometries, selectSlider, setSliderDetailRows,
+    syncSliderGeometries, selectSlider, setSliderDetailRows, dimensions,
     railLength, sliderBodyLength, sliderCarrierLength, sliderRailOffset,
     sliderTravelStart, sliderTravelEnd,
     renderSliderDetails, renderSliderBaseButton, sliderProjectedDistance, normalizeSliderRange,

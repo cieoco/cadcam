@@ -477,7 +477,7 @@ export function init(deps) {
   svg.addEventListener('pointercancel', () => { pendingMobileEdit = false; });
   // 點空白處（背景/地面線，未 stopPropagation）取消選取
   svg.addEventListener('pointerdown', (e) => {
-    if(e.target?.closest?.('[data-dimension-handle]'))return;
+    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice]'))return;
     if (pinchActive) return;
     if (S.drawingLink || S.drawingTriangle || S.drawingPolygon) return; // 畫圖模式：交給工具處理
     if (S.placingMotor || S.pickBars) { cancelMotorMode(); draw(); return; }
@@ -577,7 +577,7 @@ export function init(deps) {
   // 落點若靠近某個接點（用畫面 px 當門檻，縮放下手感一致），就直接接手那個接點，
   // 並擋住桿身的 pointerdown，避免它把選取搶去顯示長度。
   svg.addEventListener('pointerdown', (e) => {
-    if(e.target?.closest?.('[data-dimension-handle]'))return;
+    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice]'))return;
     if (!mobilePrompt()) return;
     if (S.mateMode) return;                                   // 接合面工具開著：舞台只接受點目標與平移（mate-tool.js）
     if (e.pointerType === 'mouse') return;
@@ -602,7 +602,7 @@ export function init(deps) {
 
   // 畫桿模式：按下決定起點；桌機拖放或點兩下，觸控拖放。
   svg.addEventListener('pointerdown', (e) => {
-    if(e.target?.closest?.('[data-dimension-handle]'))return;
+    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice]'))return;
     if (!S.drawingLink) return;
     if (activePointers.size >= 2) return; // 雙指縮放優先
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -623,7 +623,7 @@ export function init(deps) {
     try { svg.setPointerCapture(e.pointerId); } catch (_) {}
   });
   svg.addEventListener('pointerdown', (e) => {
-    if(e.target?.closest?.('[data-dimension-handle]'))return;
+    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice]'))return;
     if (!S.drawingTriangle) return;
     if (activePointers.size >= 2) return;
     const w = worldFromEvent(e); if (!w) return;
@@ -638,7 +638,7 @@ export function init(deps) {
   });
   // 多邊形板：滑鼠左鍵逐點加頂點 / 選求解點；觸控按下設預覽、放開時提交（見 onDragEnd）。
   svg.addEventListener('pointerdown', (e) => {
-    if(e.target?.closest?.('[data-dimension-handle]'))return;
+    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice]'))return;
     if (!S.drawingPolygon) return;
     if (activePointers.size >= 2) return;
     const w = worldFromEvent(e); if (!w) return;
