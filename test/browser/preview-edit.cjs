@@ -53,9 +53,9 @@ async function pixel(page,accept){
   assert.equal((await state()).params.H1Arm,84);await page.evaluate(()=>window.blocks.undo());assert.deepEqual((await state()).params,baseline.params);
   await enter();p=await pixel(page,(r,g,b)=>g>r+9&&b>r+6&&g>=b&&r>70);
   if(mobile)await page.touchscreen.tap(p.x,p.y);else await page.mouse.click(p.x,p.y);
-  await page.locator('#syringeInstallation').waitFor({state:'visible'});
+  await page.locator('#syringeEditor').waitFor({state:'visible'});
   const beforeCancel=await state();assert.deepEqual(beforeCancel.comps,baseline.comps);
-  await page.locator('#syringeInstallation').getByRole('button',{name:'取消',exact:true}).click();assert.deepEqual(await state(),beforeCancel);
+  await page.locator('#syringeEditor').getByRole('button',{name:'完成',exact:true}).click();assert.deepEqual(await state(),beforeCancel);
   await page.screenshot({path:`${output}/${viewport.width}-after-cancel.png`});
   assert.deepEqual(errors,[]);results.push({viewport,pick:true,drag:true,multitouch:mobile,dimensionUndo:true,syringeCancel:true,errors});await context.close();
  }}finally{await browser.close();}

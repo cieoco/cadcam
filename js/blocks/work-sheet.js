@@ -50,6 +50,7 @@ function sync() {
 
 // ---------- 摘要列 ----------
 function selectionSummary(panel) {
+  if(panel.id==='syringeEditor')return '針筒：拖固定環移位置';
   const disk=panel.querySelector('#diskDimensions');
   if(disk&&!disk.hidden)return `圓盤：外徑 ${disk.querySelector('input').value} mm・孔距 ${panel.querySelector('#memberDimensionInput').value} mm`;
   if(panel.id==='gearEditor')return `齒輪：${txt(panel.querySelector('#gearTeethVal'))} 齒`;

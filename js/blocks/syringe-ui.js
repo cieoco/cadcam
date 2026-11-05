@@ -5,7 +5,6 @@ import {syringeShape} from './syringe-shape.js';
 import {SYRINGE_DEMO,attachmentFrame,attachmentPoint,hasSyringeClamp} from '../core/syringe.js';
 import {solveSyringe,planSyringeStroke,scanSyringe,syringeReading,syringeGain,advanceSyringe} from './syringe-operations.js';
 import {syringeSeatGeometry,syringeManufacturing,syringeFiles,syringeBuildPack} from './syringe-manufacturing.js';
-import {placeFixedSyringe,isFixedFrame} from './syringe-placement.js';
 import {assemblySyringeControls,planAssemblySyringe} from './assembly-syringe.js';
 import {assemblyWork} from './assembly-membership.js';
 import {normalizeFabricationProfile} from './fabrication-profile.js';
@@ -137,6 +136,7 @@ export function createSyringeUI(h){
     note.textContent=message||(c.spec.calibrated?'規格已實測；':'示範尺寸，未依實物校正；')+'干涉未檢查、承重未驗證。';
     const theta=document.getElementById('thetaVal');if(theta)theta.textContent=`${c.extension.toFixed(1)} mm`;
   }
+  let editor=null,editorLoad=null,editEpoch=0;
   function render(points,valid){
     sync(points,valid);
     const inView=new Set(h.comps().map(c=>c.id));
@@ -188,10 +188,16 @@ export function createSyringeUI(h){
       for(const tip of shape.tips){line(tip.a,tip.b,9,'#dd9b39');for(const q of [tip.a,tip.b])node('circle',{cx:View.TX(q.x),cy:View.TY(q.y),r:1.5*View.getScale(),fill:'white',stroke:'#92400e'});}
       const reading=syringeReading(c,h.comps(),params(),points);
       for(const [p,label] of [[reading.origin,'O'],[reading.end,'C']]){if(p)node('text',{x:View.TX(p.x)+9,y:View.TY(p.y)-9,fill:'#92400e','font-size':14,'pointer-events':'none'}).textContent=label;}
-      g.addEventListener('pointerdown',e=>{if(picking)return;e.stopPropagation();id=c.id;open();});
+      g.addEventListener('pointerdown',e=>{if(picking||e.isPrimary===false)return;e.stopPropagation();id=c.id;open();});
     }
+    editor?.sync();
+  }
+  function edit(candidate){
+    h.pause();h.clearSelection();id=candidate.id;const token=++editEpoch,focus=S.designFocus;
+    (editorLoad??=import('./syringe-editor.js').then(m=>editor=m.createSyringeEditor({...h,params,motion,commit,advanced:c=>open(c,true)}))).then(e=>{if(token===editEpoch&&S.designFocus===focus)e.open(candidate.id);},()=>{editorLoad=null;notify('調整介面載入失敗，請再試一次。');});
   }
   function play(){
+    editor?.close();
     const c=active();if(!c)return;
     h.pause();
     if(!inAssembly()){const scan=scanSyringe(h.comps(),params(),c.id,0.5,motion());
@@ -205,7 +211,7 @@ export function createSyringeUI(h){
     };raf=requestAnimationFrame(step);
   }
   function install(candidate=null){
-    h.pause();stop();
+    editor?.close();h.pause();stop();
     const source={comps:clone(h.comps()),params:{...params()},fabrication:clone(S.fabrication)};
     const revision=JSON.stringify([S.comps,S.topo.params,S.designFocus]);
     let counter=1;while(S.comps.some(c=>c.id===`Syringe${counter}`))counter++;
@@ -218,7 +224,7 @@ export function createSyringeUI(h){
   }
   function open(candidate=null,advanced=false){
     const current=candidate || active();
-    if(hasSyringeClamp(current)&&!advanced){install(current);return;}
+    if(hasSyringeClamp(current)&&!advanced){if(h.comps().some(c=>c.id===current.id))edit(current);else install(current);return;}
     h.pause();const c=clone(candidate||active());if(!c)return;const sourceRevision=JSON.stringify([S.comps,S.topo.params,S.fabrication]);
     const dialog=el('dialog');dialog.id='syringeDialog';dialog.className='syringe-dialog';const form=el('form',null,dialog);
     el('h3',candidate&&!h.comps().some(o=>o.id===candidate.id)?'新增 10cc 液壓針筒':'針筒與安裝設定',form);
@@ -296,66 +302,15 @@ export function createSyringeUI(h){
     document.getElementById('powerMenu').style.display='none';
     install();
   }
-  // 清單選件與畫布選點共用同一候選；手機不必精準命中重疊的小孔。
-  function chooseFixedParts(seedA=null,rodChoices=null){
-    const dialog=el('dialog');dialog.id='syringePartPicker';dialog.className='syringe-dialog';
-    const form=el('form',null,dialog);el('h3','針筒接在哪裡？',form);
-    el('p','先選固定筒身的機架，再選短連桿的推桿孔。桿件可自由命名、反向繪製。',form);
-    const field=(text,name,type='select')=>{const label=el('label',text,form),n=el(type,null,label);n.name=name;return n;};
-    const a=field('① 筒身固定零件','frame'),u=field('管夾距第一孔 (mm)','u','input'),v=field('板件橫向偏移 (mm)','v','input'),b=field('② 推桿接短連桿的孔','rod');
-    for(const n of [u,v]){n.type='number';n.step='any';n.required=true;n.value='0';}
-    const labelOf=o=>`${o.name || o.id}（${o.type==='anchor'?'固定點':o.type==='triangle'?'板件':'桿件'}）`;
-    for(const owner of h.comps().filter(o=>isFixedFrame(o,h.comps())&&attachmentFrame(o,params(),h.points()))){const option=el('option',labelOf(owner),a);option.value=owner.id;}
-    if(seedA){a.value=seedA.componentId;u.value=seedA.u;v.value=seedA.v;}
-    const choices=rodChoices || h.comps().filter(o=>o.type==='bar'&&!isFixedFrame(o,h.comps())).flatMap(o=>[0,Number(params()[o.lenParam])].map((u,index)=>({ref:{componentId:o.id,u,v:0},end:index+1})));
-    const empty=el('option','請選擇短連桿與端孔',b);empty.value='';b.required=true;
-    choices.forEach((choice,i)=>{const owner=h.comps().find(o=>o.id===choice.ref.componentId),end=choice.ref.u===0?1:2;const option=el('option',`${labelOf(owner)} · 第 ${end} 孔 (${owner[end===1?'p1':'p2'].id})`,b);option.value=String(i);});
-    const syncFrame=()=>{const owner=h.comps().find(o=>o.id===a.value),f=attachmentFrame(owner,params(),h.points());u.min=0;u.max=f?.length||0;u.disabled=owner?.type==='anchor';v.disabled=owner?.type!=='triangle';if(u.disabled)u.value=0;if(v.disabled)v.value=0;};
-    a.onchange=()=>{u.value=0;v.value=0;syncFrame();};syncFrame();
-    const status=el('p','依目前桿件位置建立幾何示範；下一步可核對規格與掃描行程，尚未加入作品。',form);status.setAttribute('role','status');
-    const next=el('button','預覽針筒設定',form);next.type='submit';next.disabled=!choices.length;
-    form.onsubmit=e=>{e.preventDefault();if(b.value==='')return;const r=placeFixedSyringe(h.comps(),params(),h.points(),{componentId:a.value,u:Number(u.value),v:Number(v.value)},choices[Number(b.value)].ref);if(!r.ok){status.textContent=r.message;return;}dialog.close();cancelPicking();open(r.syringe);};
-    const canvas=el('button','改用畫布點選',form);canvas.type='button';canvas.onclick=()=>{dialog.close();beginFixedPick();};
-    const cancel=el('button','取消',form);cancel.type='button';cancel.onclick=()=>dialog.close();
-    dialog.onclose=()=>dialog.remove();document.body.append(dialog);dialog.showModal();
-  }
-  function beginFixedPick(){
-    picking={a:null,fixed:true};bar.hidden=false;wrap.classList.add('hydraulic-active');
-    notify('點選管夾位置：點在固定的機架上；Esc 或「取消選點」取消。');cancelPick.hidden=false;
-  }
   const cancelPick=el('button','取消選點',row);cancelPick.hidden=true;
   const cancelPicking=()=>{picking=null;cancelPick.hidden=true;message='';h.draw();};cancelPick.onclick=cancelPicking;
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&picking)cancelPicking();});
   h.svg.addEventListener('pointerdown',e=>{
     if(!picking)return;e.preventDefault();e.stopImmediatePropagation();
     const q=View.worldFromEvent(h.svg,e);if(!q)return;
-    if(picking.fixed&&picking.a){
-      // B：吸附到最近的短連桿端孔；多個可用端孔重疊時，開啟清單讓使用者明確選擇。
-      const ctm=h.svg.getScreenCTM(),found=[];
-      for(const owner of h.comps()){
-        if(owner.type!=='bar'||isFixedFrame(owner,h.comps()))continue;
-        for(const u of [0,Number(params()[owner.lenParam])]){
-          const ref={componentId:owner.id,u,v:0},p=attachmentPoint(ref,h.comps(),params(),h.points());if(!p)continue;
-          const pt=new DOMPoint(View.TX(p.x),View.TY(p.y)).matrixTransform(ctm),distance=Math.hypot(pt.x-e.clientX,pt.y-e.clientY);
-          if(distance<32)found.push({ref,distance});
-        }
-      }
-      found.sort((x,y)=>x.distance-y.distance);
-      if(!found.length){notify('請點在短連桿的端孔附近。');return;}
-      let first=null;const valid=[];
-      for(const f of found.filter(f=>f.distance<found[0].distance+4)){
-        const r=placeFixedSyringe(h.comps(),params(),h.points(),picking.a,f.ref);
-        if(r.ok)valid.push({ref:f.ref,syringe:r.syringe});
-        first=first||r;
-      }
-      if(valid.length>1){const a=picking.a;cancelPicking();chooseFixedParts(a,valid);return;}
-      if(valid.length===1){cancelPicking();open(valid[0].syringe);return;}
-      notify(first.message);return;
-    }
     let best=null;
     for(const owner of h.comps()){
       const f=attachmentFrame(owner,params(),h.points());if(!f)continue;
-      if(picking.fixed&&!isFixedFrame(owner,h.comps()))continue;
       if(owner.type==='triangle'){
         const points=[owner.p1,owner.p2,owner.p3].map(p=>h.points()?.[p.id]||p);
         if(!createPlateGeometry(owner,points).outlines.some(poly=>inside(q,poly)))continue;
@@ -365,8 +320,8 @@ export function createSyringeUI(h){
       const ctm=h.svg.getScreenCTM(),pt=new DOMPoint(View.TX(p.x),View.TY(p.y)).matrixTransform(ctm),distance=Math.hypot(pt.x-e.clientX,pt.y-e.clientY);
       if(distance<24&&(!best||distance<best.distance))best={ref,distance};
     }
-    if(!best){notify(picking.fixed?'請點在固定的機架上（管夾位置）。':'請點在機架、桿件或板件上。');return;}
-    if(!picking.a){picking.a=best.ref;notify(picking.fixed?'已選管夾位置；接著點短連桿的端孔（推桿接點）。':'已選 A；接著點選 B 推桿端的活動桿件位置。');return;}
+    if(!best){notify('請點在機架、桿件或板件上。');return;}
+    if(!picking.a){picking.a=best.ref;notify('已選 A；接著點選 B 推桿端的活動桿件位置。');return;}
     if(picking.a.componentId===best.ref.componentId){notify('A、B 不能在同一剛性零件上。');return;}
     const a=picking.a,b=best.ref,pa=attachmentPoint(a,h.comps(),params(),h.points()),pb=attachmentPoint(b,h.comps(),params(),h.points());
     const length=Math.hypot(pa.x-pb.x,pa.y-pb.y);let counter=S.counter+1;while(S.comps.some(c=>c.id===`Syringe${counter}`))counter++;
@@ -403,5 +358,5 @@ export function createSyringeUI(h){
     }catch(e){h.notify(`尚未輸出：${e.message}`);}
   }
     const select=sid=>{if(list().some(c=>c.id===sid))id=sid;};   // 動作序列播放時，讓控制列跟著正在動的針筒
-    return {active,select,add,addFixed:addFixed,open,render,sync,stop,play,stroke,setMountPreview,exportWork,exportVideo,isPlaying:()=>!!raf};
+    return {closeEditor:()=>{editEpoch++;editor?.close();},active,select,add,addFixed:addFixed,open,render,sync,stop,play,stroke,setMountPreview,exportWork,exportVideo,isPlaying:()=>!!raf};
 }

@@ -1,0 +1,91 @@
+/** Daily syringe edits use the main drawing and the existing installation candidate. */
+import {S} from './state.js';
+import * as View from './view.js';
+import {sheetMode,setSheet} from './mobile-workspace.js';
+import {dimensionHandle} from './dimension-handle.js';
+import {attachmentPoint} from '../core/syringe.js';
+import {installationChoices,planPlacedSyringe} from './syringe-installation.js';
+import {syringePositionOnFrame} from './syringe-position.js';
+import {syringeShape} from './syringe-shape.js';
+import {scanSyringe} from './syringe-operations.js';
+import {confirmMountingChange,mountingWork,mountingCandidate} from './mounting-review-ui.js';
+import {signedNumberInput,showNumber,readNumber} from './numeric-input.js';
+
+export function createSyringeEditor(h){
+ const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textContent=text;parent?.append(n);return n;};
+ const panel=el('section',null,h.svg.parentElement);panel.id='syringeEditor';panel.className='inspector-panel syringe-editor';panel.style.display='none';
+ const head=el('header',null,panel);el('strong','針筒',head).className='se-title';const done=el('button','完成',head);
+ const fields=el('div',null,panel);fields.className='syringe-position-fields';
+ const field=(label,parent=fields,type='input')=>{const row=el('label',label,parent),n=el(type,null,row);n.setAttribute('aria-label',label);if(type==='input'){n.type='number';n.step='.1';n.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();n.blur();}if(e.key==='Escape'){e.preventDefault();e.stopPropagation();sync(true);n.blur();}};}return n;};
+ const x=field('位置 X (mm)'),y=field('位置 Y (mm)'),along=field('距第一孔 (mm)'),angle=field('方向 (°)');[x,y,angle].forEach(signedNumberInput);
+ const status=el('p',null,panel);status.className='syringe-edit-status';status.setAttribute('role','status');
+ const more=el('details',null,panel);el('summary','連接與其他設定',more);
+ const connections=el('div',null,more),mode=field('固定方式',connections,'select'),frame=field('固定在哪裡',connections,'select'),output=field('推桿接孔',connections,'select'),ear=field('固定耳',connections,'select'),face=field('正反面',connections,'select');
+ const opt=(n,label,value)=>{const o=el('option',label,n);o.value=value;};
+ opt(mode,'雙孔固定','fixed-axis');opt(mode,'單孔可轉','pivot');opt(ear,'左耳','1');opt(ear,'右耳','-1');opt(face,'正面','front');opt(face,'背面','back');
+ const offset=field('固定環距筒尾 (mm)',more),spacer=field('套筒高度 (mm，空白自動)',more);
+ const scan=el('button','檢查全行程',more),advanced=el('button','尺寸與加工設定',more),remove=el('button','刪除針筒',more);
+ let selected=null,focus=null,choiceKey='',draft=false;
+ const current=()=>h.comps().find(c=>c.id===selected&&c.type==='syringe');
+ const project=p=>({x:View.TX(p.x),y:View.TY(p.y)});
+ function close(){selected=null;draft=false;panel.style.display='none';h.svg.querySelectorAll('[data-dimension-handle^="syringe-"]').forEach(n=>n.remove());}
+ done.onclick=()=>{close();h.draw();};
+ const message=t=>{status.textContent=t;};
+ function apply(patch){
+  const c=current();if(!c)return false;h.pause();
+  const source={comps:structuredClone(h.comps()),params:{...h.params()},fabrication:structuredClone(S.fabrication)},points=h.points();
+  const request={id:c.id,mountMode:c.mountMode,pivotEar:c.pivotEar,frameId:c.a.componentId,position:attachmentPoint(c.a,source.comps,source.params,points),b:{...c.b},axisDeg:c.axisDeg??0,extension:c.extension,face:c.installation?.face||'front',spacerMm:c.installation?.spacerMm??null,...patch};
+  if(Object.entries(patch).every(([k,v])=>JSON.stringify(v)===JSON.stringify(k==='position'?attachmentPoint(c.a,source.comps,source.params,points):k==='barrelOffsetMm'?c.installation?.barrelOffsetMm??c.spec.bodyLength*.7:k==='spacerMm'?c.installation?.spacerMm??null:k==='frameId'?c.a.componentId:k==='face'?c.installation?.face||'front':c[k]))){message('');sync(true);return true;}
+  const owner=source.comps.find(o=>o.id===request.frameId),p=request.position,q=p&&syringePositionOnFrame(owner,source.params,points,p);
+  if(!p||![p.x,p.y,request.axisDeg].every(Number.isFinite)||!q||Math.hypot(p.x-q.x,p.y-q.y)>1e-6){message('位置需在所選固定零件內，請調整數字或拖動固定環。');sync(true);return false;}
+  const r=planPlacedSyringe(source,request,points,h.motion());
+  if(!r.ok||r.temporary){message(r.message);sync(true);return false;}
+  if(!confirmMountingChange(mountingWork(S),mountingCandidate(mountingWork(S),r,h.comps()),{notify:message})){sync(true);return false;}
+  message('');h.commit(r.comps,r.params,r);return true;
+ }
+ x.onchange=y.onchange=()=>apply({position:{x:readNumber(x),y:readNumber(y)}});
+ along.onchange=()=>{const c=current();if(c)apply({position:attachmentPoint({...c.a,u:readNumber(along)},h.comps(),h.params(),h.points())});};
+ angle.onchange=()=>apply({axisDeg:readNumber(angle)});
+ offset.onchange=()=>apply({barrelOffsetMm:readNumber(offset)});
+ spacer.onchange=()=>apply({spacerMm:spacer.value.trim()===''?null:readNumber(spacer)});
+ mode.onchange=()=>apply({mountMode:mode.value});ear.onchange=()=>apply({pivotEar:Number(ear.value)});face.onchange=()=>apply({face:face.value});
+ frame.onchange=()=>{const c=current(),owner=h.comps().find(o=>o.id===frame.value),p=c&&attachmentPoint(c.a,h.comps(),h.params(),h.points()),q=p&&syringePositionOnFrame(owner,h.params(),h.points(),p);if(q)apply({frameId:frame.value,position:q});};
+ output.onchange=()=>{if(output.value)apply({b:JSON.parse(output.value)});};
+ scan.onclick=()=>{const c=current();if(c){h.pause();const r=scanSyringe(h.comps(),h.params(),c.id,.5,h.motion());message(r.ok?r.message:`${r.atMm??''} mm：${r.message}`);}};
+ advanced.onclick=()=>{const c=current();close();h.advanced(c);};
+ remove.onclick=()=>{const c=current();if(!c)return;close();h.pushUndo();S.comps=S.comps.filter(o=>o.id!==c.id);h.rebuild();h.draw();h.save();};
+ more.ontoggle=()=>{if(selected)h.draw();};
+ function sync(force=false){
+  const c=current();
+  if(!c||S.mode!=='design'||S.designFocus!==focus||h.is3D()||S.selectedLinkId||S.selectedNodeId||S.selectedTriangleId||S.selectedSliderId||S.selectedGearId||S.frameEditorOpen){close();return;}
+  const points=h.points(),params=h.params(),comps=h.comps(),p=attachmentPoint(c.a,comps,params,points);if(!p)return;
+  const shape=syringeShape(c,comps,params,points),theta=shape.angle,u={x:Math.cos(theta),y:Math.sin(theta)};
+  const set=(n,v)=>{if(force||document.activeElement!==n)showNumber(n,v);};
+  const owner=comps.find(o=>o.id===c.a.componentId),line=owner?.type==='bar'&&owner.shape!=='disk';
+  x.closest('label').hidden=y.closest('label').hidden=line;along.closest('label').hidden=!line;set(along,c.a.u);
+  set(x,p.x);set(y,p.y);set(angle,c.axisDeg??0);set(offset,c.installation?.barrelOffsetMm??c.spec.bodyLength*.7);
+  if(document.activeElement!==spacer){if(c.installation?.spacerMm==null)spacer.value='';else showNumber(spacer,c.installation.spacerMm);}
+  angle.closest('label').hidden=c.mountMode==='pivot';ear.closest('label').hidden=c.mountMode!=='pivot';
+  mode.value=c.mountMode;ear.value=String(c.pivotEar??1);face.value=c.installation?.face||'front';
+  const choices=installationChoices(comps,params),key=JSON.stringify([choices.frames.map(o=>[o.id,o.name]),choices.rods.map(o=>[o.id,o.name,params[o.lenParam]])]);
+  if(key!==choiceKey){choiceKey=key;frame.replaceChildren();output.replaceChildren();choices.frames.forEach(o=>opt(frame,o.name||o.id,o.id));choices.rods.forEach(o=>[0,params[o.lenParam]].forEach((v,i)=>opt(output,`${o.name||o.id}・第 ${i+1} 孔`,JSON.stringify({componentId:o.id,u:v,v:0}))));}
+  frame.value=c.a.componentId;output.value=JSON.stringify({componentId:c.b.componentId,u:c.b.u,v:c.b.v});
+  if(draft)return;
+  h.svg.querySelectorAll('[data-dimension-handle^="syringe-"]').forEach(n=>n.remove());
+  const base=JSON.stringify([S.comps,S.topo.params,S.modules,S.fabrication,S.designFocus,S.mode]);
+  const accept=patch=>{draft=false;if(base!==JSON.stringify([S.comps,S.topo.params,S.modules,S.fabrication,S.designFocus,S.mode])||!current()){h.draw();return;}apply(patch);h.draw();};
+  const reset=()=>{draft=false;showNumber(along,c.a.u);showNumber(x,p.x);showNumber(y,p.y);showNumber(angle,c.axisDeg??0);showNumber(offset,c.installation?.barrelOffsetMm??c.spec.bodyLength*.7);};
+  dimensionHandle(h.svg,{key:'syringe-position',label:c.mountMode==='pivot'?'轉軸':'固定環',point:project(p),direction:{x:1,y:0},value:0,step:1,cancel:reset,plane:{value:p,fromScreen:q=>View.worldFromScreen(q.x,q.y),project,constrain:q=>syringePositionOnFrame(owner,params,points,q)||p,preview:q=>{draft=true;showNumber(x,q.x);showNumber(y,q.y);if(line){const a=points[owner.p1.id]||owner.p1;showNumber(along,Math.hypot(q.x-a.x,q.y-a.y));}},commit:q=>accept({position:q})}});
+  const unit=View.getScale(),pixel=unit*Math.hypot(h.svg.getScreenCTM().a,h.svg.getScreenCTM().b),at=d=>({x:shape.a.x+u.x*d,y:shape.a.y+u.y*d});
+  if(c.mountMode!=='pivot')dimensionHandle(h.svg,{key:'syringe-angle',label:'方向',point:project(at(Math.max(65,66/pixel))),direction:{x:0,y:0},value:c.axisDeg??0,min:-360,max:360,step:1,angleCenter:project(shape.a),angleAxes:{u:{x:unit,y:0},v:{x:0,y:-unit}},preview:v=>{draft=true;showNumber(angle,v);},cancel:reset,commit:v=>accept({axisDeg:v}),color:'#d97706'});
+  if(more.open){const v=c.installation?.barrelOffsetMm??c.spec.bodyLength*.7;dimensionHandle(h.svg,{key:'syringe-barrel',label:'距筒尾',point:project(at(-v)),direction:{x:-u.x*unit,y:u.y*unit},value:v,min:6,max:c.spec.bodyLength-6,preview:v=>{draft=true;showNumber(offset,v);},cancel:reset,commit:v=>accept({barrelOffsetMm:v})});}
+ }
+ h.svg.addEventListener('pointerdown',e=>{if(selected&&e.isPrimary!==false&&!e.target.closest('[data-dimension-handle^="syringe-"],[data-syringe]'))close();},true);
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&selected&&!draft&&!panel.contains(e.target)){close();h.draw();}});
+ function reveal(){
+  if(!selected||!matchMedia('(max-width:1099px) and (max-height:500px), (max-width:700px)').matches)return;const nodes=[...h.svg.querySelectorAll('[data-dimension-handle^="syringe-"]')],bounds=nodes.map(n=>n.getBoundingClientRect());if(!bounds.length)return;
+  const bottom=Math.max(...bounds.map(r=>r.bottom)),top=Math.min(...bounds.map(r=>r.top)),limit=document.querySelector('.controls').getBoundingClientRect().top-10,edge=h.svg.getBoundingClientRect().top+10;
+  const dy=bottom>limit?Math.max(limit-bottom,edge-top):top<edge?edge-top:0;if(Math.abs(dy)>1){View.panByClient(h.svg,0,dy);h.draw();}
+ }
+ return {close,sync,open(id){selected=id;focus=S.designFocus;message('');panel.style.display='flex';h.showEditor();if(sheetMode())setSheet('half');h.draw();requestAnimationFrame(()=>requestAnimationFrame(reveal));}};
+}

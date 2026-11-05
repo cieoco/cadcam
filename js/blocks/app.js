@@ -475,6 +475,7 @@ function validateViewPlane() {
   if (S.viewPlane && planeOf(S.comps, S.modules, S.viewPlane) !== S.viewPlane) S.viewPlane = null;
 }
 function clearSelectionAndEditors() {
+  hydraulic?.closeEditor();
   S.frameEditorOpen=false;
   S.selectedLinkId = S.selectedTriangleId = S.selectedSliderId = S.selectedNodeId = null;
   deselectGear();
@@ -3426,7 +3427,7 @@ if (gripperPilotSession) window.blocks.gripperPilot = {
   snapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
   reopen: snapshot => { const norm = Store.normalizeSnapshot(snapshot); if (!norm) throw Error('作品格式無效'); applySnapshot(norm, { source: 'gripper-pilot' }); },
 };
-hydraulic=createSyringeUI({is3D:()=>view3DActive,capture:()=>{viewer3D.renderNow();return viewer3D.canvas;},svg,comps:viewComps,points:()=>lastFullPts,seed:pts=>{lastSolved={...pts};prevSolved={...pts};},pushUndo,pause,rebuild,draw,save:scheduleAutosave,notify:transient,applyFabrication:Settings.applyFabricationProfile,
+hydraulic=createSyringeUI({clearSelection:clearSelectionAndEditors,showEditor:openMobileEditPanel,is3D:()=>view3DActive,capture:()=>{viewer3D.renderNow();return viewer3D.canvas;},svg,comps:viewComps,points:()=>lastFullPts,seed:pts=>{lastSolved={...pts};prevSolved={...pts};},pushUndo,pause,rebuild,draw,save:scheduleAutosave,notify:transient,applyFabrication:Settings.applyFabricationProfile,
   playing:on=>{playbackActive=on;const b=document.getElementById('playBtn');b.classList.toggle('playing',on);b.textContent=on?'⏸':'▶';}
 });
 // 量尺（js/blocks/dimension-ui.js）：第一次用到才載入，不佔啟動大小。

@@ -248,3 +248,27 @@ body[data-preview3d]:not([data-mode="bench"]) .canvas-status { position:absolute
 #syringeDetails[hidden] { display:none; }
 
 body:not([data-preview3d]) #syringeMountNotice, #syringeControls #syringeMountNotice { display:none; }
+/* Syringe adjustments share the normal inspector; the mechanism stays on the main canvas. */
+#syringeEditor{position:absolute;margin-top:0;right:16px;top:var(--hydraulic-header-height,16px);width:288px;max-height:calc(100% - var(--hydraulic-header-height,16px) - 90px);overflow:auto;z-index:4;box-sizing:border-box;gap:6px}
+#syringeEditor header{position:sticky;top:0;z-index:2;padding:0;box-shadow:none;background:white;display:flex;align-items:center;justify-content:space-between;gap:8px}
+#syringeEditor label{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:13px;margin:4px 0}
+#syringeEditor label>span{width:62%}
+#syringeEditor input,#syringeEditor select{box-sizing:border-box;min-width:0;width:62%;min-height:44px;font-size:16px;border:1px solid #c6d5e1;border-radius:6px;padding:4px}
+#syringeEditor button{min-height:44px;border:1px solid #c6d5e1;border-radius:6px;background:white;color:#24496e;padding:6px 10px;cursor:pointer}
+#syringeEditor header button{background:#0e7490;color:white}
+#syringeEditor summary{padding:8px 0;cursor:pointer;font-size:13px}
+#syringeEditor [hidden]{display:none!important}
+#syringeEditor .syringe-edit-status{font-size:13px;margin:0;overflow-wrap:anywhere;color:#a13320}
+#syringeEditor .syringe-edit-status:empty{display:none}
+@media(max-width:700px){#syringeEditor{width:auto;max-height:none}#syringeEditor .syringe-position-fields{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}#syringeEditor .syringe-position-fields label{flex-direction:column;align-items:stretch}#syringeEditor .syringe-position-fields label>span{width:100%}}
+body:has(#syringeEditor[style*="flex"]) .mobile-panel-section[data-panel="edit"]{display:none!important}
+@media(max-width:1099px) and (max-height:500px) and (orientation:landscape){
+ body:not([data-mode="bench"]) #syringeEditor{top:54px;bottom:4px;right:4px;width:250px;max-height:none;margin:0;position:absolute}
+ body:has(#syringeEditor[style*="flex"]) #stageSvg{width:calc(100% - 260px)}
+ body:has(#syringeEditor[style*="flex"]) .canvas-wrap .controls{position:absolute;bottom:4px;left:calc((100% - 260px)/2);margin:0}
+}
+@media(max-width:1099px) and (max-height:500px) and (orientation:landscape){
+ body:has(#syringeEditor[style*="flex"]) .canvas-wrap .canvas-status{position:absolute;top:calc(var(--hydraulic-header-height,100px) + 4px);bottom:auto;left:8px;right:auto;max-width:190px;margin:0}
+ body:has(#syringeEditor[style*="flex"]) #syringeControls{box-sizing:border-box;width:calc(100% - 260px)}
+ body:has(#syringeEditor[style*="flex"]) .canvas-wrap .controls{transform:translateX(-50%)}
+}
