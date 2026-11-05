@@ -551,6 +551,8 @@ export function buildSceneModel(links, points, opts = {}) {
         const far = carrier.p1 === j.id ? carrier.b : carrier.a;
         tx = mount?.reversed ? j.x * 2 - far.x : far.x;
         ty = mount?.reversed ? j.y * 2 - far.y : far.y;
+        const a=(mount?.angleDeg||0)*Math.PI/180,dx=tx-j.x,dy=ty-j.y;
+        tx=j.x+dx*Math.cos(a)-dy*Math.sin(a);ty=j.y+dx*Math.sin(a)+dy*Math.cos(a);
       } else if (mount && mount.dir && Number.isFinite(mount.dir.x) && Number.isFinite(mount.dir.y)) {
         tx = j.x + mount.dir.x;
         ty = j.y + mount.dir.y;

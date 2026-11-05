@@ -16,10 +16,10 @@ export function motorRotDegFromDir(dir) {
 }
 // drawTTMotor / drawMG995Servo's local long axis is +Y, while mount/CAD coordinates use +X as the motor long axis.
 export function motorMountPatternRotDegForCenter({id,pts,comps,mount=null,fallbackRotDeg=()=>0}){
- if(mount?.face){
+ if(mount?.face||Number.isFinite(mount?.angleDeg)||mount?.reason?.startsWith('mount-')){
    const host=comps.find(c=>c.id===mount.frameBody),center=pts?.[id];
    const carrier=host?{p1:host.p1?.id,a:pts?.[host.p1?.id],b:pts?.[host.p2?.id]}:null;
-   return resolveMotorOrientation(mount.orientation,{center:{...center,id},carrier:carrier?.a&&carrier?.b?carrier:null,reversed:mount.reversed}).rotDeg-90;
+   return resolveMotorOrientation(mount.orientation,{center:{...center,id},carrier:carrier?.a&&carrier?.b?carrier:null,reversed:mount.reversed,angleDeg:mount.angleDeg}).rotDeg-90;
  }
  const inputBar=comps.find(c=>c.type==='bar'&&c.isInput&&c.p1&&c.p2&&((c.p1.id===id&&c.p1.physicalMotor)||(c.p2.id===id&&c.p2.physicalMotor)));
  const carrier=inputBar?.motorCarrier&&comps.find(c=>c.id===inputBar.motorCarrier);
@@ -121,6 +121,7 @@ export function buildMotorMounts({ motorIds, groundIds, staticPoints, comps, com
           outputBody: outputBar.id,
           ...(carrierId ? { frameBody: carrierId } : {}),
           orientation: orientation || (carrierId ? 'follow-frame' : 'horizontal'),
+          ...(Number.isFinite(outputBar.motorMount?.angleDeg)?{angleDeg:outputBar.motorMount.angleDeg}:{}),
           reversed: Boolean(outputBar.motorMount?.reversed),
           ...(outputBar.motorMount?.face?{face:outputBar.motorMount.face,outputType:outputBar.type}:{}),
           order: carrierId ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody']
@@ -133,7 +134,7 @@ export function buildMotorMounts({ motorIds, groundIds, staticPoints, comps, com
       // A carrier's live direction is resolved by 2D/3D frame updates.  At
       // build time this gives world mounts their canonical horizontal/vertical
       // direction and prevents any fallback to the output crank.
-      const resolved = resolveMotorOrientation(orientation, { center, reversed: Boolean(outputBar.motorMount?.reversed) });
+      const resolved = resolveMotorOrientation(orientation, { center, reversed: Boolean(outputBar.motorMount?.reversed),angleDeg:barAssembly.angleDeg });
       mounts.set(id, { ...resolved, reason: `mount-${orientation}`, ...barAssembly });
       return;
     }

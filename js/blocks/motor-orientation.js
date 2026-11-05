@@ -19,6 +19,7 @@ export function motorRotDegFromWorldDir(dir) {
 }
 
 export function resolveMotorOrientation(orientation, context = {}) {
-  const dir = directionForOrientation(orientation, context);
+  const base = directionForOrientation(orientation, context), a=(Number(context.angleDeg)||0)*Math.PI/180;
+  const dir={x:base.x*Math.cos(a)-base.y*Math.sin(a),y:base.x*Math.sin(a)+base.y*Math.cos(a)};
   return { dir, rotDeg: motorRotDegFromWorldDir(dir) };
 }

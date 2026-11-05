@@ -1,3 +1,4 @@
+import {planMotorAngle,motorInstallationAngle} from '../js/blocks/motor-angle-editor.js';
 import assert from 'node:assert/strict';
 import {actuatorSource as source} from './fixtures/actuator-installation.mjs';
 import {planMotorInstallation,quickMotorChoices} from '../js/blocks/actuator-installation.js';
@@ -68,3 +69,36 @@ ambiguous.comps.push({...structuredClone(shared.comps[0]),id:'OtherFrame',p2:{id
 assert.equal(quickMotorChoices(ambiguous.comps).length,2,'two real carriers remain an explicit choice');
 const anchored={...structuredClone(source),comps:[{type:'anchor',id:'Base',p1:{...shared.comps[0].p1}},structuredClone(shared.comps[1])]};
 assert.equal(quickMotorChoices(anchored.comps)[0].hostId,'world','an existing ideal anchor can use the explicit world mount');
+
+// Arbitrary body rotation changes neither the drive phase nor the output geometry.
+for(const type of ['tt','mg995','n20'])for(const offset of [37.25,-123.5]){
+ const baseline=planMotorInstallation(source,{...request,type});
+ const changed=planMotorInstallation(source,{...request,type,angleDeg:offset});assert.ok(changed.ok,changed.message);
+ assert.deepEqual(changed.points,baseline.points);assert.deepEqual(changed.params,baseline.params);
+ const saved=normalizeSnapshot({kind:'blocks',v:1,comps:changed.comps,params:changed.params});
+ assert.equal(saved.comps.find(c=>c.id==='Arm').motorMount.angleDeg,offset);
+ const dir=motorInstallationScene(changed).motors[0].dir;
+ assert.ok(Math.abs(Math.atan2(dir.y,dir.x)*180/Math.PI-offset)<1e-7);
+ const ms=buildMotorMounts({motorIds:new Set(['A']),groundIds:new Set(['A','B']),staticPoints:changed.points,comps:changed.comps,compiledSteps:[],sliderMountInfo:()=>null,isHiddenSliderRailPoint:()=>false,motorTypeForCenter:()=>type});
+ assert.ok(Math.abs(motorMountPatternRotDegForCenter({id:'A',pts:changed.points,comps:changed.comps,mount:ms.get('A')})+180+offset)<1e-7);
+}
+assert.equal(planMotorInstallation(source,{...request,angleDeg:Infinity}).ok,false);
+const ridingTurn=planMotorInstallation(moving,{...ride,angleDeg:32.5},{},{motorAngles:{'1':30}});
+const ridingBase=motorInstallationScene(r).motors.find(m=>m.id===r.comps.find(c=>c.id==='Tool').motorMount.center);
+const ridingRotated=motorInstallationScene(ridingTurn).motors.find(m=>m.id===ridingBase.id);
+const angleOf=m=>Math.atan2(m.dir.y,m.dir.x)*180/Math.PI;
+assert.ok(Math.abs(((angleOf(ridingRotated)-angleOf(ridingBase)+540)%360)-180-32.5)<1e-7);
+assert.deepEqual(ridingTurn.points,r.points);
+console.log('Arbitrary mount angle: exact roundtrip, 3D, output/phase preservation and riding carrier passed');
+
+const gearTurn=planMotorInstallation(gear,{...request,outputId:'Gear',angleDeg:42.75});assert.ok(gearTurn.ok,gearTurn.message);
+assert.equal(normalizeSnapshot({kind:'blocks',v:1,comps:gearTurn.comps,params:gearTurn.params}).comps.find(c=>c.id==='Gear').motorMount.angleDeg,42.75);
+const originalTurn=JSON.stringify(horizontal),numeric=planMotorAngle(horizontal.comps,horizontal.points,'A',mount,-22.5);
+assert.ok(numeric.changed);const changedComps=structuredClone(horizontal.comps);changedComps.find(c=>c.id===numeric.owner.id).motorMount=numeric.mount;
+const nextMount={...mount,...numeric.mount};assert.ok(Math.abs(motorInstallationAngle(changedComps,horizontal.points,'A',nextMount)+22.5)<1e-7);
+assert.equal(JSON.stringify(horizontal),originalTurn);assert.equal(planMotorAngle(horizontal.comps,horizontal.points,'A',mount,NaN),null);
+
+const legacy=structuredClone(horizontal);delete legacy.comps.find(c=>c.id==='Arm').motorMount.face;
+const legacyMount={...mount};delete legacyMount.face;
+const legacyEdit=planMotorAngle(legacy.comps,legacy.points,'A',legacyMount,23);
+assert.equal(legacyEdit.mount.face,undefined,'rotation preserves implicit legacy mounting face');

@@ -1955,12 +1955,13 @@ function drawNow() {
       const farId = carrierBar.p1.id === id ? carrierBar.p2.id : carrierBar.p1.id;
       const ctr = P[id], far = P[farId];
       if (!ctr || !far || !Number.isFinite(far.x)) return staticRotDeg;
-      return Math.atan2(-(far.x - ctr.x), -(far.y - ctr.y)) * 180 / Math.PI + (mount?.reversed ? 180 : 0);  // 同 computeMotorRotDeg 慣例
+      return Math.atan2(-(far.x - ctr.x), -(far.y - ctr.y)) * 180 / Math.PI + (mount?.reversed ? 180 : 0) - (mount?.angleDeg||0);  // 同 computeMotorRotDeg 慣例
     };
     const rotDeg0 = rotFor(pts);
     const motorType = motorTypeForCenter(id), isServo = motorType === 'mg995';
     const body = isServo ? Render.drawMG995Servo(p.x, p.y, rotDeg0, motorLayer)
                          : motorType === 'n20' ? Render.drawN20Motor(p.x, p.y, rotDeg0, motorLayer) : Render.drawTTMotor(p.x, p.y, rotDeg0, motorLayer);
+    body.dataset.motorBody=id;body.style.pointerEvents='auto';body.addEventListener('pointerdown',e=>guardedNodeDown(e,id));
     const mId = motorIdForCenter(id);
     const isActive = mId && String(S.activeMotor) === mId;
     const labelText = (isServo ? 'MG995' : motorType === 'n20' ? 'N20' : 'TT') + (multiMotor && mId ? `·M${mId}` : '');
@@ -2071,7 +2072,7 @@ function drawNow() {
   // 編輯把手最後繪製，避免被針筒外形或尺寸標註遮住。
   if(!playbackActive&&(S.selectedNodeId||S.selectedLinkId||S.selectedTriangleId||S.selectedSliderId||S.selectedGearId||S.frameEditorOpen)){
     if(!editingHandles)editingHandles=import('./editing-handles.js').then(m=>{editingHandles=m;draw();});
-    editingHandles.drawEditingHandles?.({svg,points:pts,project:p=>({x:TX(p.x),y:TY(p.y)}),member:memberEditor,slider:sliderEditor,gear:gearEditor,redraw:draw,openEditor:openMobileEditPanel,comps:viewComps(),frame:S.frameEditorOpen?{nodes:frameGroundInfo().nodes,geometry:frameGeometry2d,info:frameSizeInfo(),set:setFrameSize}:null});
+    editingHandles.drawEditingHandles?.({mounts:motorMounts,pause,pushUndo,rebuild,notify:transient,svg,points:pts,project:p=>({x:TX(p.x),y:TY(p.y)}),member:memberEditor,slider:sliderEditor,gear:gearEditor,redraw:draw,openEditor:openMobileEditPanel,comps:viewComps(),frame:S.frameEditorOpen?{nodes:frameGroundInfo().nodes,geometry:frameGeometry2d,info:frameSizeInfo(),set:setFrameSize}:null});
   }
 
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）

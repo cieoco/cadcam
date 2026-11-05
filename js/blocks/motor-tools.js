@@ -180,27 +180,13 @@ export function createMotorTools({
     const driven = motorBarForCenter(nodeId);
     if (driven) setMotorCarrier(driven.id, nodeId, null);
   }
-  function setMotorOrientation(nodeId, orientation) {
-    const bar = motorBarForCenter(nodeId);
-    if (!bar || !['horizontal', 'vertical', 'follow-frame'].includes(orientation)) return;
-    if(!commitMountingEdit(S,draft=>{const target=draft.comps.find(c=>c.id===bar.id);
-    target.motorMount = { ...(bar.motorMount || {}), motor: String(bar.physicalMotor || '1'), center: nodeId,
-      outputBody: bar.id, ...(bar.motorCarrier ? { frameBody: bar.motorCarrier } : {}), orientation,
-      order: bar.motorCarrier ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody'] };
-    },{pushUndo}))return;
-    rebuild(); draw(); updateRoleEditor();
+  function setMotorOrientation(nodeId,orientation) {
+    if(['horizontal','vertical','follow-frame'].includes(orientation))editMount(nodeId,{orientation,angleDeg:0});
   }
   function toggleMotorReverse(nodeId) {
-    const bar = motorBarForCenter(nodeId);
-    if (!bar) return;
-    if(!commitMountingEdit(S,draft=>{const target=draft.comps.find(c=>c.id===bar.id);
-    target.motorMount = { ...(bar.motorMount || {}), motor: String(bar.physicalMotor || '1'), center: nodeId,
-      outputBody: bar.id, ...(bar.motorCarrier ? { frameBody: bar.motorCarrier } : {}),
-      orientation: bar.motorMount?.orientation || (bar.motorCarrier ? 'follow-frame' : 'horizontal'),
-      reversed: !bar.motorMount?.reversed, order: bar.motorCarrier ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody'] };
-    },{pushUndo}))return;
-    rebuild(); draw(); updateRoleEditor();
+    const bar=motorBarForCenter(nodeId);if(bar)editMount(nodeId,{reversed:!bar.motorMount?.reversed});
   }
+  const editMount=(nodeId,patch)=>import('./motor-angle-editor.js').then(m=>m.editMotorPreset(nodeId,patch,{pushUndo,rebuild,draw,updateRoleEditor}));
   function driveBarAt(barId, nodeId) {
     const bar = S.comps.find(c => c.id === barId && c.type === 'bar');
     if (!bar) return;

@@ -251,7 +251,6 @@ export function createSyringeUI(h){
       for(const owner of h.comps().filter(o=>attachmentFrame(o,params()))){const option=el('option',owner.id,select);option.value=owner.id;}
       select.value=c[key].componentId;input(`${key}U`,`${key.toUpperCase()} 沿桿位置 u (mm)`,c[key].u);input(`${key}V`,`${key.toUpperCase()} 偏置 v (板件用，mm)`,c[key].v);
     }
-    if(c.mountMode==='fixed-axis')input('axisDeg','固定筒身軸向 (°)',c.axisDeg);
     (c.passiveTips||[]).forEach((t,i)=>input(`tip${i}`,`夾片 ${i+1} 手動相對角度 (°，不含接觸求解)`,t.angleDeg));
     section=form;
     const specs=el('details',null,form);el('summary','針筒規格與實測校正',specs);section=specs;
@@ -271,7 +270,6 @@ export function createSyringeUI(h){
       for(const key of ['a','b'])next[key]={componentId:fields[`${key}Owner`].value,u:readNumber(fields[`${key}U`]),v:readNumber(fields[`${key}V`])};
       for(const key of ['capacityMl','outerDiameter','bodyLength','rodDiameter','lmin','stroke'])next.spec[key]=readNumber(fields[key]);
       (next.passiveTips||[]).forEach((t,i)=>{t.angleDeg=readNumber(fields[`tip${i}`]);});
-      if(fields.axisDeg)next.axisDeg=readNumber(fields.axisDeg);
       next.spec.name=fields.name.value;next.spec.calibrated=calibration.checked;
 
       const index=comps.findIndex(o=>o.id===next.id);if(index<0)comps.push(next);else comps[index]=next;

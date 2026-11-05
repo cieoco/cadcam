@@ -10,7 +10,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
   const base=structuredClone(source),choices=actuatorChoices(base.comps),old=base.comps.find(c=>c.id===existingId);
   const oldCenter=old?.motorMount?.center || ['p1','p2'].map(k=>old?.[k]).find(p=>p?.physicalMotor)?.id;
   const request={type:old?(old.motorType||'tt'):type,motorId,existingId,hostId:old?(old.motorMount?.frameBody||old.motorCarrier||'world'):'',
-    hostEnd:'p1',face:old?.motorMount?.face||'back',orientation:old?.motorMount?.orientation||'horizontal',reversed:!!old?.motorMount?.reversed,
+    angleDeg:old?.motorMount?.angleDeg??0,hostEnd:'p1',face:old?.motorMount?.face||'back',orientation:old?.motorMount?.orientation||'horizontal',reversed:!!old?.motorMount?.reversed,
     outputId:old?.id||initialOutputId,outputEnd:oldCenter&&old?.p2?.id===oldCenter?'p2':'p1',start:old?.servoStart??0,end:old?.servoEnd??90,
     angle:old?Number(motion.motorAngles?.[old.physicalMotor||old.p1?.physicalMotor]??motion.thetaDeg??0):0};
   const oldHost=choices.hosts.find(c=>c.id===request.hostId);if(oldHost&&oldCenter&&oldHost.p2.id===oldCenter)request.hostEnd='p2';
@@ -61,7 +61,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
   kind.onchange=()=>{request.type=kind.value;update();};
   host.onchange=()=>{request.hostId=host.value;request.orientation=host.value==='world'?'horizontal':'follow-frame';if(host.value==='world')request.face='back';orientation.value=request.orientation;update();};
   location.onchange=()=>{request.hostEnd=location.value;update();};
-  orientation.onchange=()=>{request.orientation=orientation.value;update();};
+  orientation.onchange=()=>{request.orientation=orientation.value;request.angleDeg=0;update();};
   output.onchange=()=>{request.outputId=output.value;if(choices.outputs.find(c=>c.id===output.value)?.type==='gear'){request.outputEnd='p1';end.value='p1';}update();};
   end.onchange=()=>{request.outputEnd=end.value;update();};
   start.onchange=()=>{request.start=readNumber(start);update();};finish.onchange=()=>{request.end=readNumber(finish);update();};
@@ -86,7 +86,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     const at=owner?world(owner[request.hostEnd]):out?world(out[request.outputEnd]):null;
     if(at){
       const carrier=owner?{p1:owner.p1.id,a:world(owner.p1),b:world(owner.p2)}:null;
-      const d=resolveMotorOrientation(request.orientation,{center:{...at,id:owner?.[request.hostEnd]?.id},carrier,reversed:request.reversed}).dir;
+      const d=resolveMotorOrientation(request.orientation,{center:{...at,id:owner?.[request.hostEnd]?.id},carrier,reversed:request.reversed,angleDeg:request.angleDeg}).dir;
       const n=draw('rect',{x:request.type==='n20'?-6:-7,y:request.type==='n20'?-5:-12,width:request.type==='n20'?12:48,height:request.type==='n20'?10:24,rx:2,fill:request.type==='mg995'?'#7aa0dd':'#e3bc60',stroke:'#40536c',transform:`translate(${at.x} ${-at.y}) rotate(${-Math.atan2(d.y,d.x)*180/Math.PI})`});
       n.setAttribute('opacity','.8');
     }

@@ -137,6 +137,7 @@ function normalizeBar(comp, index, params, warnings) {
         ...(frameBody ? { frameBody } : {}),
         ...(['horizontal', 'vertical', 'follow-frame'].includes(rawMount.orientation)
           ? { orientation: rawMount.orientation } : {}),
+        ...(Number.isFinite(rawMount.angleDeg)?{angleDeg:Math.max(-360,Math.min(360,rawMount.angleDeg))}:{}),
         reversed: Boolean(rawMount.reversed),
         ...(['front','back'].includes(rawMount.face) ? {face:rawMount.face} : {}),
         order: frameBody ? ['motor', 'frameBody', 'outputBody'] : ['motor', 'outputBody']
@@ -396,6 +397,7 @@ function normalizeGear(comp, index, params, warnings) {
       ...(safeId(m.frameBody)?{frameBody:m.frameBody}:{}),
       ...(['front','back'].includes(m.face)?{face:m.face}:{}),
       ...(['horizontal','vertical','follow-frame'].includes(m.orientation)?{orientation:m.orientation}:{}),
+      ...(Number.isFinite(m.angleDeg)?{angleDeg:Math.max(-360,Math.min(360,m.angleDeg))}:{}),
       reversed:!!m.reversed,order:m.frameBody?['motor','frameBody','outputBody']:['motor','outputBody']};
   }
   // 驅動輪可標 MG995 伺服（角度範圍內來回擺）；TT / 未標型號不輸出任何欄位，舊檔不變。

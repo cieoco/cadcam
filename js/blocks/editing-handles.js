@@ -1,3 +1,4 @@
+import {drawMotorAngle} from './motor-angle-editor.js';
 /** Selected dimensions use existing setters; the moving handle is a draft until release. */
 import {S} from './state.js';
 import {dimensionHandle} from './dimension-handle.js';
@@ -60,8 +61,9 @@ function drawPointChoices(svg,edit,comps,at,project){
   });
   highlight(edit.dimension?.key);
 }
-export function drawEditingHandles({svg,points,project,member,slider,gear,frame,redraw,openEditor,comps=S.comps}){
+export function drawEditingHandles({svg,points,project,member,slider,gear,frame,redraw,openEditor,comps=S.comps,mounts,pause,pushUndo,rebuild,notify}){
   if(S.mode!=='design'||S.mateMode)return;
+  drawMotorAngle({svg,points,project,mounts,redraw,openEditor,pause,pushUndo,rebuild,notify});
   const c=S.comps.find(c=>c.id===(S.selectedTriangleId||S.selectedLinkId||S.selectedSliderId||S.selectedGearId));
   const at=p=>points[p?.id]||p;
   const pointEdit=pointDimensionEditor({member,redraw,comps,openEditor});

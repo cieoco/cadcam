@@ -51,6 +51,7 @@ export function planMotorInstallation(source,request,points={},motion={}){
   if(!['tt','mg995','n20'].includes(request.type)||!['front','back'].includes(request.face))return fail('請選致動元件與安裝面。');
   if(!host&&request.face==='front')return fail('自動機架沿用背面安裝；需要選正面時，請先選實際承載零件。');
   if(!['horizontal','vertical','follow-frame'].includes(request.orientation))return fail('請選外殼方向。');
+  if(request.angleDeg!=null&&(!Number.isFinite(request.angleDeg)||Math.abs(request.angleDeg)>360))return fail('安裝轉角需在 −360～360°。');
   const key=out.type==='gear'?'p1':request.outputEnd;
   const oldCenter=out.motorMount?.center || keys.map(k=>out[k]).find(p=>p?.physicalMotor)?.id;
   if(!['p1','p2'].includes(key)||!out[key])return fail('請選輸出零件的端孔。');
@@ -107,7 +108,7 @@ export function planMotorInstallation(source,request,points={},motion={}){
   if(host){host.motorMountPoint=center;host.frameSeparate=true;}
   delete out.mountLocatorPoint; // Explicit installation replaces the old direction locator.
   out.motorMount={motor,center,outputBody:out.id,...(host?{frameBody:host.id}:{}),face:request.face,
-    orientation:request.orientation,reversed:!!request.reversed,order:host?['motor','frameBody','outputBody']:['motor','outputBody']};
+    orientation:request.orientation,...(request.angleDeg!=null?{angleDeg:request.angleDeg}:{}),reversed:!!request.reversed,order:host?['motor','frameBody','outputBody']:['motor','outputBody']};
   const angle=Number(request.angle??(oldCenter?currentAngle:0));
   if(!Number.isFinite(angle))return fail('試動角度無效。');
   const motorAngles={...motion.motorAngles,[motor]:angle};

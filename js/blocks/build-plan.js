@@ -21,7 +21,7 @@ import { frameConnectorNodes, motorPointIds, pointCoords, frameNodeIds, sliderMo
 import { machineFrameComps, machineMounts, moduleFrameExports, moduleFrameNodes, moduleOfPoint, splitFrameMounts, planeOf } from './assembly.js?v=20261007_m5a';
 import { machineComps, machineModules, spareModules } from './assembly-roles.js';
 import { orthogonalExportExtras, withAdapterNodes, withWorldAdapterNodes, jointSpec } from './orthogonal-joint.js';
-import { buildMotorMounts } from './motor-mounts.js';
+import { motorMountPatternRotDegForCenter, buildMotorMounts } from './motor-mounts.js';
 import { computeBodyLayers } from '../blocks3d/scene-model.js';
 import { motorTypeAt } from './motor-tools.js';
 import { pointKeysFor } from './part-types.js';
@@ -87,15 +87,10 @@ export function deriveMotorMounts(list) {
     const center = pts[id];
     if (!center) return;
     const mount = planned.get(id);
-    const inputBar = list.find(c => c.type === 'bar' && c.isInput && c.p1 && c.p2 &&
-      ((c.p1.id === id && c.p1.physicalMotor) || (c.p2.id === id && c.p2.physicalMotor)));
-    const carrier = inputBar && inputBar.motorCarrier && list.find(c => c.type === 'bar' && c.id === inputBar.motorCarrier);
-    const farId = carrier ? (carrier.p1.id === id ? carrier.p2.id : carrier.p2.id === id ? carrier.p1.id : null) : null;
-    const far = farId && pts[farId];
-    const visual = far ? Math.atan2(-(far.x - center.x), -(far.y - center.y)) * 180 / Math.PI : (mount ? mount.rotDeg : 0);
+    const visual = mount?.rotDeg || 0;
     mounts.push({
       kind: motorTypeAt(list, id),
-      pointId: id, frameBody: mount && mount.frameBody, center, rotDeg: visual - 90, settings: {}
+      pointId: id, frameBody: mount && mount.frameBody, center, rotDeg: motorMountPatternRotDegForCenter({id,pts,comps:list,mount,fallbackRotDeg:()=>visual}), settings: {}
     });
   });
   return mounts;
