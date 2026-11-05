@@ -18,9 +18,11 @@ export function workRangeFromTrace(trace) {
       if (d > maxDistance) { maxDistance = d; a = pts[i]; b = pts[j]; }
     }
   }
+  if(maxDistance<1e-6)return null;
   const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
   return {
     a, b,
+    partial: (trace.results || []).some(r=>!r?.isValid),
     distance: maxDistance,
     spanX: Math.max(...xs) - Math.min(...xs),
     spanY: Math.max(...ys) - Math.min(...ys)

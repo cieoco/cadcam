@@ -120,7 +120,7 @@ export function createSyringeUI(h){
       // 組立：每支針筒一顆切換鈕；每推 1 mm 的比例與針筒設定只在設計模式提供（組立裡改尺寸請回設計）。
       const work=assemblyWork(S.comps,S.modules,S.topo),controls=assemblySyringeControls(work.comps,work.modules);
       chips.style.display=controls.length<2?'none':'flex';chips.textContent='';
-      for(const control of controls){const b=el('button',control.label,chips);b.type='button';b.className='motor-chip'+(control.id===c.id?' active':'');b.setAttribute('aria-pressed',String(control.id===c.id));b.onclick=()=>{stop();id=control.id;message='';sync(h.points(),valid);};}
+      for(const control of controls){const b=el('button',control.label,chips);b.type='button';b.className='motor-chip'+(control.id===c.id?' active':'');b.setAttribute('aria-pressed',String(control.id===c.id));b.onclick=()=>{stop();id=control.id;message='';h.draw();};}
       const label=controls.find(x=>x.id===c.id)?.label||'針筒',r=syringeReading(c,work.comps,params(),points);
       range.max=c.spec.stroke;range.value=c.extension;value.textContent=`${c.extension.toFixed(1)} / ${c.spec.stroke} mm`;
       readout.textContent=`${valid?'幾何可行':'姿勢無解'}${r.tipGap!==null?` · 夾臂端孔距 ${r.tipGap.toFixed(1)} mm`:Number.isFinite(r.angle)?` · ${diskOutput?'轉盤角':'臂角'} ${r.angle.toFixed(1)}°`:''} · AB ${r.length.toFixed(1)} mm`;

@@ -11,7 +11,7 @@ export function assemblySyringeControls(comps,modules){
     return {id:c.id,moduleId:c.moduleId||null,label:`${module?.name||c.moduleId||'組立'} 針筒`,extension:c.extension,stroke:c.spec?.stroke,order:[module?depth(module.id):0,Math.max(0,modules.indexOf(module)),i]};
   }).sort((a,b)=>a.order[0]-b.order[0]||a.order[1]-b.order[1]||a.order[2]-b.order[2]).map(({order,...x})=>x);
 }
-export function planAssemblySyringe(comps,modules,params,id,extension,previous=null){
+export function planAssemblySyringe(comps,modules,params,id,extension,previous=null,motion={}){
   const candidate=structuredClone(comps),c=candidate.find(o=>o.id===id&&o.type==='syringe');
   if(!c)return {ok:false,message:'找不到針筒。'};
   const stroke=c.spec?.stroke;
@@ -20,7 +20,7 @@ export function planAssemblySyringe(comps,modules,params,id,extension,previous=n
   const issues=candidate.filter(o=>o.type==='syringe').flatMap(o=>syringeIssues(o,candidate,params));
   if(issues.length)return {ok:false,message:issues.join(' ')};
   try{
-    const result=solveAssembly(compileAssembly(candidate,modules,{params}),{thetaDeg:0,motorAngles:{},_prevPoints:previous});
+    const result=solveAssembly(compileAssembly(candidate,modules,{params}),{thetaDeg:0,motorAngles:{},...motion,_prevPoints:previous});
     if(!result.isValid||result.isUnderconstrained)return {ok:false,message:result.errorReason||'目前伸出量無法形成有效的組立姿勢；已保留原姿勢。',result};
     return {ok:true,comps:candidate,points:result.points,result};
   }catch(e){return {ok:false,message:`目前伸出量無法形成有效的組立姿勢：${e.message}`};}

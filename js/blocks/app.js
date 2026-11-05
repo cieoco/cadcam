@@ -1344,8 +1344,8 @@ function switchActiveMotor(id) {
   draw();                                    // 各馬達角度值不變，姿勢不動，只換控制權與軌跡掃描對象
 }
 
+let trajectoryModule=null;
 function getTrajectoryData() {
-  if(simulationScope().comps.some(c=>c.type==='syringe'))return null; // Hydraulic input is mm, not the rotary theta sweep.
   // 拖曳中不掃軌跡：每次移動 rebuild() 都讓快取失效，整段 sweepTopology（每個追蹤點 72 步）
   // 會把拖曳拖到掉幀。拖曳中軌跡本來就持續失真，乾脆不畫；放開時 drag end 走完整
   // rebuild+draw，軌跡即恢復。（shapeDrag 只改造形孔、不動 geomVersion，走快取即可不必跳過。）
@@ -1362,24 +1362,15 @@ function getTrajectoryData() {
   // 快取鍵＝結構版本號 geomVersion，取代每幀 JSON.stringify 整份快照（零件多時字串化本身會變慢）。
   // 軌跡只取決於 simulationScope().compiled 與 traceIds，兩者都只在 rebuild / 切換軌跡點變動、那兩處都會 +1，
   // 故版本號是完整且正確的失效訊號。多馬達後軌跡還取決於「掃哪顆馬達＋其他馬達凍在哪」，一併入鍵。
-  const motorKey = String(S.activeMotor) + '|' + JSON.stringify(S.motorAngles) + '|' + (inDesign() ? 'f:' + S.designFocus : (S.viewPlane || '')) + '|' + ids.join(',') + '|' + [...normalIds].join(',');
+  const syringeId=hydraulic?.active()?.id;
+  const motorKey = String(syringeId||'')+'|'+String(S.activeMotor) + '|' + JSON.stringify(syringeId?motorAnglesNow():S.motorAngles) + '|' + (inDesign() ? 'f:' + S.designFocus : (S.viewPlane || '')) + '|' + ids.join(',') + '|' + [...normalIds].join(',');
   if (trajectoryCache && trajectoryCache.version === geomVersion && trajectoryCache.motorKey === motorKey) return trajectoryCache.data;
-  // 伺服與線性致動器只在自己的有限行程內運動；量測不應誤把不存在的整圈算進去。
-  const range = inputRockRange();
-  const thetaStart = range ? range.lo : 0;
-  const thetaEnd = range ? range.hi : 360;
-  // S2：軌跡點共用同一份 compiled，只 sweep 一次（traceSweeps 內部處理），不再逐點各掃一次。
-  const params = { ...(simulationScope().compiled.params || S.topo.params || {}), motorAngles: frozenMotorAngles(), sweepMotor: String(S.activeMotor) };
+  if(!trajectoryModule)trajectoryModule=import('./trajectory.js').then(m=>{trajectoryModule=m;draw();}).catch(()=>{trajectoryModule=null;transient('軌跡載入失敗，請重新整理。');});
+  if(!trajectoryModule.scopeTrajectories)return null;
   let data;
-  try {
-    // S2b：範圍太窄（如夾爪 3.8°）時 5° 取不到足夠取樣點，改用 traceSweepRange 算出的步長。
-    const { start, end, step } = Motion.traceSweepRange(thetaStart, thetaEnd);
-    data = simulationScope().assembly
-      ? Motion.traceSweeps(simulationScope().compiled, params, ids, start, end, step, (c, p, s, e, st) => sweepAssembly(simulationScope().assembly, p, s, e, st))
-      : Motion.traceSweeps(simulationScope().compiled, params, ids, start, end, step);
-  } catch (_) {
-    data = [];
-  }
+  try {data=trajectoryModule.scopeTrajectories({scope:simulationScope(),params:S.topo.params,ids,syringeId,
+    motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()},range:syringeId?null:inputRockRange(),sweepMotor:String(S.activeMotor)});}
+  catch(_){data=[];}
   data.forEach(trace => { trace.sweepOnly = !normalIds.has(trace.id); });
   trajectoryCache = { version: geomVersion, motorKey, data };
   return data.length ? data : null;
@@ -1408,18 +1399,19 @@ function drawTraceTrajectory(trajectoryData) {
     ? trajectoryData
     : (trajectoryData && Array.isArray(trajectoryData.results) ? [{ id: '', results: trajectoryData.results }] : []);
   traces.forEach((trace, index) => {
-    const pts = trace.results.filter(r => r && r.isValid && r.B).map(r => r.B);
-    if (pts.length < 2) return;
-    const poly = document.createElementNS(SVG_NS, 'polyline');
-    poly.setAttribute('points', pts.map(p => `${TX(p.x)},${TY(p.y)}`).join(' '));
-    poly.setAttribute('fill', 'none');
-    poly.setAttribute('stroke', traceColor(index));
-    poly.setAttribute('stroke-width', 2.5);
-    poly.setAttribute('stroke-opacity', 0.72);
-    poly.setAttribute('stroke-linejoin', 'round');
-    poly.setAttribute('stroke-linecap', 'round');
-    poly.style.pointerEvents = 'none';
-    svg.appendChild(poly);
+    for(const pts of Motion.traceSegments(trace)){
+      const poly = document.createElementNS(SVG_NS, 'polyline');
+      poly.setAttribute('points', pts.map(p => `${TX(p.x)},${TY(p.y)}`).join(' '));
+      poly.dataset.tracePoint=trace.id;
+      poly.setAttribute('fill', 'none');
+      poly.setAttribute('stroke', traceColor(index));
+      poly.setAttribute('stroke-width', 2.5);
+      poly.setAttribute('stroke-opacity', 0.72);
+      poly.setAttribute('stroke-linejoin', 'round');
+      poly.setAttribute('stroke-linecap', 'round');
+      poly.style.pointerEvents = 'none';
+      svg.appendChild(poly);
+    }
   });
 }
 
@@ -1440,7 +1432,7 @@ function updateWorkRangeCard(measurement) {
       : `最小距離 ${roundMm(measurement.min.distance)} mm · 最大距離 ${roundMm(measurement.max.distance)} mm`;
     return;
   }
-  value.textContent = `工作範圍 ${roundMm(measurement.distance)} mm`;
+  value.textContent = `${measurement.partial?'有效段範圍':'工作範圍'}（直線）${roundMm(measurement.distance)} mm`;
   detail.textContent = `左右 ${roundMm(measurement.spanX)} mm · 上下 ${roundMm(measurement.spanY)} mm`;
 }
 
@@ -1905,8 +1897,6 @@ function drawNow() {
   drawMotorMountHoles(motorCenterIds, motorMounts, pts);
   const trajectoryData = getTrajectoryData();
   const visibleTraces = trajectoryData?.filter(trace => !trace.sweepOnly);
-  drawMemberSweep(trajectoryData);
-  drawTraceTrajectory(visibleTraces);
   drawWorkRange(visibleTraces, pts);
   drawManualTrace();
 
@@ -2072,6 +2062,8 @@ function drawNow() {
   Tools.drawPolygonPreview();  // 多邊形板模式：疊在最上層的預覽
   chainEditor?.drawPreview();  // 鏈輪放置模式：第一個鏈輪與對齊後的第二個鏈輪預覽
   hydraulic?.render(allPts,sol?.isValid===true);
+  drawMemberSweep(trajectoryData);
+  drawTraceTrajectory(visibleTraces); // Trace stays visible over plate faces; hit testing remains on the holes.
   if (S.topo.dimensions?.length && !dimUI) loadDimUI();
   const updateDims = dimUI?.render(allPts);   // 量尺：標註層疊在最上面，播放時逐幀更新
   if (updateDims) frameUpdaters.push(updateDims);

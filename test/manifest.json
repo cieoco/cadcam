@@ -265,7 +265,8 @@
     "test/syringe-unit.mjs",
     "test/pivot-clamp.mjs",
     "test/disk-orientation.mjs",
-    "test/syringe-position.mjs"
+    "test/syringe-position.mjs",
+    "test/stroke-trajectories.mjs"
   ],
   "version": 1
 }

@@ -98,15 +98,32 @@ function walkBranch(compiled, topo, theta, lastSolved, dir, motorCtx, solveFn) {
 export function traceSweeps(compiled, params, ids, startDeg, endDeg, stepDeg, sweepFn = sweepTopology) {
   if (!ids.length) return [];
   const { results } = sweepFn(compiled, params, startDeg, endDeg, stepDeg);
+  return tracesFromResults(results,ids);
+}
+// Both angular and linear drives supply solved point positions in mm.
+export function tracesFromResults(results,ids) {
   return ids.map(id => ({
     id,
     results: results.map(step => ({
       theta: step.theta,
+      inputValue: step.inputValue ?? step.theta,
+      inputUnit: step.inputUnit || 'deg',
       isValid: step.isValid,
       B: step.isValid ? (step.points ? step.points[id] : undefined) : null,
       points: step.points
     }))
   }));
+}
+
+export function traceSegments(trace) {
+  const segments=[];let current=[];
+  for(const r of trace.results||[]){
+    const p=r?.B;
+    if(r?.isValid&&Number.isFinite(p?.x)&&Number.isFinite(p?.y))current.push(p);
+    else {segments.push(current);current=[];}
+  }
+  segments.push(current);
+  return segments.filter(s=>s.length>1&&s.some(p=>Math.hypot(p.x-s[0].x,p.y-s[0].y)>1e-6));
 }
 
 // S4：compile 給的預設軌跡點（沒指定軌跡點時的退回值）常是地錨或馬達軸心——這種點本來就不動，
