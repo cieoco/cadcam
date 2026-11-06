@@ -17,6 +17,7 @@
   "tests": [
     "test/frame-ground.mjs",
     "test/frame-holes.mjs",
+    "test/grid-rule.mjs",
     "test/step-export.mjs",
     "test/box-maker.mjs",
     "test/box-panels-joints.mjs",
