@@ -126,14 +126,14 @@ export function createSyringeUI(h){
       for(const control of controls){const b=el('button',control.label,chips);b.type='button';b.className='motor-chip'+(control.id===c.id?' active':'');b.setAttribute('aria-pressed',String(control.id===c.id));b.onclick=()=>{stop();id=control.id;message='';h.draw();};}
       const label=controls.find(x=>x.id===c.id)?.label||'針筒',r=syringeReading(c,work.comps,params(),points);
       syncStroke(c);
-      readout.textContent=`${valid?'幾何可行':'姿勢無解'}${r.tipGap!==null?` · 夾臂端孔距 ${r.tipGap.toFixed(1)} mm`:Number.isFinite(r.angle)?` · ${diskOutput?'轉盤角':'臂角'} ${r.angle.toFixed(1)}°`:''} · AB ${r.length.toFixed(1)} mm`;
+      readout.textContent=`${valid?'幾何可行':'姿勢無解'}${r.tipGap!==null?` · 夾臂端孔距 ${r.tipGap.toFixed(1)} mm`:Number.isFinite(r.angle)?` · ${diskOutput?'轉盤角':'臂角'} ${r.angle.toFixed(1)}°`:''} · AB ${(Number.isFinite(r.length)?r.length.toFixed(1):'—')} mm`;
       gainLine.hidden=true;gainLine.textContent='';
       note.textContent=message||'一次推一支；外形參考，固定座／干涉／承重／水路待驗證。';
       layoutBar(true);return;
     }
     settings.hidden=false;syncStroke(c);
     const r=syringeReading(c,h.comps(),params(),points);
-    readout.textContent=`${valid?(c.passiveTips?.length?'主傳動可解／夾片角度手動':'幾何可行'):'姿勢無解'}${r.tipGap!==null?` · 夾臂端孔距 ${r.tipGap.toFixed(1)} mm`:''}${r.mountGap!==null?` · 夾片安裝軸距 ${r.mountGap.toFixed(1)} mm`:''} · AB ${r.length.toFixed(2)} mm · ${diskOutput?'轉盤角':'臂角'} ${r.angle.toFixed(1)}°${r.end?` · ${diskOutput?'偏心孔':'C'} (${r.end.x.toFixed(1)}, ${r.end.y.toFixed(1)}) mm`:''}`;
+    readout.textContent=`${valid?(c.passiveTips?.length?'主傳動可解／夾片角度手動':'幾何可行'):'姿勢無解'}${r.tipGap!==null?` · 夾臂端孔距 ${r.tipGap.toFixed(1)} mm`:''}${r.mountGap!==null?` · 夾片安裝軸距 ${r.mountGap.toFixed(1)} mm`:''} · AB ${(Number.isFinite(r.length)?r.length.toFixed(2):'—')} mm · ${diskOutput?'轉盤角':'臂角'} ${r.angle.toFixed(1)}°${r.end?` · ${diskOutput?'偏心孔':'C'} (${r.end.x.toFixed(1)}, ${r.end.y.toFixed(1)}) mm`:''}`;
     const gain=valid?syringeGain(h.comps(),params(),c.id,points):null;
     gainLine.hidden=!gain;gainLine.textContent=gain?(gain.tipGapMmPerMm!==null?`每推 1 mm：夾臂端孔距${gain.tipGapMmPerMm>=0?'縮小':'增加'} ${Math.abs(gain.tipGapMmPerMm).toFixed(1)} mm`:`每推 1 mm：${diskOutput?'盤轉':'臂轉'} ${gain.degPerMm.toFixed(2)}°、${diskOutput?'偏心孔移':'臂端移'} ${gain.endMmPerMm.toFixed(1)} mm`):'';
     note.textContent=message||(c.spec.calibrated?'規格已實測；':'示範尺寸，未依實物校正；')+'干涉未檢查、承重未驗證。';
@@ -162,7 +162,7 @@ export function createSyringeUI(h){
         const clamp=shape.clamp;
         const nodes=frameConnectorNodes(h.comps());
         // 可轉安裝：鎖住的那一耳一定畫螺絲（它就是轉軸，syringeIssues 已要求接在固定機架）；另一耳是空孔。
-        const supportedAt=i=>shape.pivot?i===shape.lockedFoot:nodes.some(n=>n.id===`${c.id}_clamp_0`);
+        const supportedAt=i=>!attachmentPoint(c.a,h.comps(),params(),points)?false:shape.pivot?i===shape.lockedFoot:nodes.some(n=>n.id===`${c.id}_clamp_0`);
         const polygon=(pts,fill)=>node('polygon',{points:pts.map(p=>{const q=at(p.x,p.y);return `${View.TX(q.x)},${View.TY(q.y)}`;}).join(' '),fill,stroke:'#475569','stroke-width':.5*View.getScale()});
         clamp.feet.forEach((foot,i)=>{
           const supported=supportedAt(i);
@@ -189,6 +189,11 @@ export function createSyringeUI(h){
         node('text',{x:View.TX(p.x)+9,y:View.TY(p.y)-9,fill:'#075985','font-size':14}).textContent=key.toUpperCase();
       }
       for(const tip of shape.tips){line(tip.a,tip.b,9,'#dd9b39');for(const q of [tip.a,tip.b])node('circle',{cx:View.TX(q.x),cy:View.TY(q.y),r:1.5*View.getScale(),fill:'white',stroke:'#92400e'});}
+      for(const [key,p]of [['a',a],['b',b]])if(!attachmentPoint(c[key],h.comps(),params(),points)){
+        const m=h.svg.getScreenCTM(),px=1/Math.hypot(m.a,m.b);
+        node('circle',{'data-detached-end':key,cx:View.TX(p.x),cy:View.TY(p.y),r:9*px,fill:'white',stroke:'#d97706','stroke-width':2*px,'stroke-dasharray':`${3*px} ${2*px}`});
+        node('text',{x:View.TX(p.x)+12*px,y:View.TY(p.y)-12*px,fill:'#92400e','font-size':13*px}).textContent='未連接';
+      }
       const reading=syringeReading(c,h.comps(),params(),points);
       for(const [p,label] of [[reading.origin,'O'],[reading.end,'C']]){if(p)node('text',{x:View.TX(p.x)+9,y:View.TY(p.y)-9,fill:'#92400e','font-size':14,'pointer-events':'none'}).textContent=label;}
       g.addEventListener('pointerdown',e=>{if(picking||e.isPrimary===false)return;e.stopPropagation();id=c.id;open();});

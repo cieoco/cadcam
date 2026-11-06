@@ -44,7 +44,7 @@ export function syringeClampFrameNodes(comps,nodes){
 }
 // Shared mm appearance for 2D and 3D. Mount offset is an illustrative clamp layout.
 export function syringeShape(c,comps,params,points){
- const a=attachmentPoint(c.a,comps,params,points),b=attachmentPoint(c.b,comps,params,points);if(!a||!b)return null;
+ const a=attachmentPoint(c.a,comps,params,points)||c.a.position,b=attachmentPoint(c.b,comps,params,points)||c.b.position;if(!a||!b)return null;
  const pivot=c.mountMode==='pivot',frame=pivot?syringePivotFrame(a,b,syringePivotEar(c)):null;
  const fixed=c.mountMode==='fixed-axis',length=frame?frame.length:fixed?c.spec.lmin+c.extension:Math.hypot(b.x-a.x,b.y-a.y),angle=frame?frame.angle:fixed?c.axisDeg*Math.PI/180:Math.atan2(b.y-a.y,b.x-a.x);
  // Fixed installation stays aligned with its drilling even when the linkage has no valid pose.

@@ -8,6 +8,8 @@ import {showNumber} from './numeric-input.js';
 import {pointDimensionEditor} from './point-dimension-editor.js';
 import {outputRadius,gearHoleAtPoint} from './gear-hole-placement.js';
 import {worldFromScreen} from './view.js';
+import {sheetMode,setSheet} from './mobile-workspace.js';
+import {frameGroundAxis} from './frame-ground.js';
 const NS='http://www.w3.org/2000/svg';
 // Keep the 44 px dimension hit area clear of the hole's 48 px touch target.
 function besideHole(svg,a,b){
@@ -126,6 +128,21 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
   }
   if(S.frameEditorOpen&&frame){
     const {nodes,geometry,info,set}=frame,outline=geometry?.outlines?.flat()||[];
+    const axis=frameGroundAxis(nodes);
+    if(axis.target&&axis.length>1e-6){
+      const field=document.querySelector('#frameAngleVal input'),a=project(axis.base),b=project(axis.target);
+      const revision=JSON.stringify([S.comps,S.topo.params,S.designFocus]);
+      const reset=()=>{svg.querySelector('[data-frame-axis-preview]')?.remove();if(field)showNumber(field,axis.angle);};
+      dimensionHandle(svg,{key:'frame-angle',label:'固定軸方向',point:besideHole(svg,a,b),direction:{x:0,y:0},value:axis.angle,step:1,min:-360,max:360,
+        angleCenter:a,angleAxes:{u:{x:1,y:0},v:{x:0,y:-1}},color:'#d97706',
+        activate:()=>{openEditor();if(sheetMode())setSheet('half');const more=document.getElementById('nodeAdvanced');if(document.getElementById('roleEditor')?.contains(field)&&more)more.open=true;field?.focus();field?.select();},cancel:reset,
+        preview:value=>{
+          reset();if(field)showNumber(field,value);
+          const t=value*Math.PI/180,q=project({x:axis.base.x+axis.length*Math.cos(t),y:axis.base.y+axis.length*Math.sin(t)}),line=document.createElementNS(NS,'line');
+          for(const [k,v]of Object.entries({'data-frame-axis-preview':'',x1:a.x,y1:a.y,x2:q.x,y2:q.y,stroke:'#d97706','stroke-width':3,'stroke-dasharray':'5 4','pointer-events':'none'}))line.setAttribute(k,v);
+          svg.append(line);
+        },commit:value=>{if(revision===JSON.stringify([S.comps,S.topo.params,S.designFocus]))frame.change('angle',value-axis.angle);else redraw();}});
+    }
     if(nodes.length&&outline.length){
       let first=nodes[0],second=first,distance=0;
       for(const p of nodes)for(const q of nodes){const d=Math.hypot(q.x-p.x,q.y-p.y);if(d>distance){first=p;second=q;distance=d;}}

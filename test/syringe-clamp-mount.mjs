@@ -73,3 +73,30 @@ for(const deg of [0,37.25,-45,90]){
  const catalog=buildPartGeometryCatalog({...changed,fabrication:changed.fabrication||{}}),manufactured=catalog.parts.frame.holes.filter(h=>h.id.startsWith(c.id+'_clamp_'));
  assert.equal(manufactured.length,2);manufactured.forEach((h,i)=>{near(h.x,holes[i].x);near(h.y,holes[i].y);});
 }
+
+// Deleted hosts leave a visible detached actuator, never a solver constraint.
+{
+ const {detachDeletedAttachments}=await import('../js/blocks/detached-attachments.js');
+ const {solveSyringe}=await import('../js/blocks/syringe-operations.js');
+ const {planPlacedSyringe}=await import('../js/blocks/syringe-installation.js');
+ const n=normalizeSnapshot(getExample('hydraulic-h01').snapshot),s=n.comps.find(c=>c.type==='syringe');
+ const pose=solveSyringe(n.comps,n.params);assert.equal(pose.ok,true);
+ const before=JSON.stringify(n),oldShape=syringeShape(s,n.comps,n.params,pose.points);
+ for(const ends of [['a'],['b'],['a','b']]){
+  const ids=new Set(ends.map(k=>s[k].componentId));
+  const comps=detachDeletedAttachments(n.comps,ids,n.params,pose.points).filter(c=>!ids.has(c.id)),c=comps.find(c=>c.id===s.id);
+  assert.ok(c);assert.equal(JSON.stringify(n),before);
+  for(const key of ends){assert.equal(c[key].componentId,'');assert.ok(c[key].position);assert.equal(attachmentPoint(c[key],comps,n.params),null);}
+  const shape=syringeShape(c,comps,n.params,pose.points);near(shape.a.x,oldShape.a.x);near(shape.a.y,oldShape.a.y);near(shape.angle,oldShape.angle);
+  assert.equal(solveSyringe(comps,n.params).ok,false);
+  const reopened=normalizeSnapshot({...getExample('hydraulic-h01').snapshot,comps});
+  assert.deepEqual(reopened.comps.find(o=>o.id===s.id).a,c.a);assert.deepEqual(reopened.comps.find(o=>o.id===s.id).b,c.b);
+  assert.ok(syringeShape(reopened.comps.find(o=>o.id===s.id),reopened.comps,reopened.params));
+ }
+ const ids=new Set([s.b.componentId]),comps=detachDeletedAttachments(n.comps,ids,n.params,pose.points).filter(c=>!ids.has(c.id));
+ const replacement={...structuredClone(n.comps.find(c=>ids.has(c.id))),id:'ReplacementRod'};comps.push(replacement);
+ const result=planPlacedSyringe({comps,params:n.params},{id:s.id,mountMode:s.mountMode,frameId:s.a.componentId,position:attachmentPoint(s.a,n.comps,n.params,pose.points),b:{...s.b,componentId:replacement.id},axisDeg:s.axisDeg,extension:s.extension},pose.points);
+ assert.equal(result.ok,true,result.message);assert.equal(result.syringe.b.componentId,'ReplacementRod');assert.equal(result.syringe.b.position,undefined);
+ const malformed=normalizeSnapshot({...getExample('hydraulic-h01').snapshot,comps:[{...s,b:{componentId:'',position:{x:NaN,y:0}}}]});assert.equal(malformed.comps[0].b.position,undefined);
+ console.log('PASS detached syringe: retained pose, invalid motion, round-trip, replacement host and invalid seed rejection');
+}

@@ -2072,7 +2072,7 @@ function drawNow() {
   // 編輯把手最後繪製，避免被針筒外形或尺寸標註遮住。
   if(!playbackActive&&(S.selectedNodeId||S.selectedLinkId||S.selectedTriangleId||S.selectedSliderId||S.selectedGearId||S.frameEditorOpen)){
     if(!editingHandles)editingHandles=import('./editing-handles.js').then(m=>{editingHandles=m;draw();});
-    editingHandles.drawEditingHandles?.({mounts:motorMounts,pause,pushUndo,rebuild,notify:transient,svg,points:pts,project:p=>({x:TX(p.x),y:TY(p.y)}),member:memberEditor,slider:sliderEditor,gear:gearEditor,redraw:draw,openEditor:openMobileEditPanel,comps:viewComps(),frame:S.frameEditorOpen?{nodes:frameGroundInfo().nodes,geometry:frameGeometry2d,info:frameSizeInfo(),set:setFrameSize}:null});
+    editingHandles.drawEditingHandles?.({mounts:motorMounts,pause,pushUndo,rebuild,notify:transient,svg,points:pts,project:p=>({x:TX(p.x),y:TY(p.y)}),member:memberEditor,slider:sliderEditor,gear:gearEditor,redraw:draw,openEditor:openMobileEditPanel,comps:viewComps(),frame:S.frameEditorOpen?{nodes:frameGroundInfo().nodes,geometry:frameGeometry2d,info:frameSizeInfo(),set:setFrameSize,change:changeFrameGround}:null});
   }
 
   // 把這一幀的姿勢同步給 3D 預覽（開著時才推；平面路徑零負擔）
@@ -2790,33 +2790,11 @@ function deselectLink() {
   setSliderDetailRows(false);
   draw();
 }
-function deleteSelectedPart() {
-  if(fusionRoot(S.comps,S.selectedLinkId)){transient('請先解除合成，再刪除其中的連桿。');return;}
-  if(S.comps.some(c=>c.id===S.selectedTriangleId && c.fusedWith)){transient('請先解除合成，再刪除板件');return;}
-  if (S.selectedGearId) { deleteGearChain(S.selectedGearId); return; }
-  const id = S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId;
-  if (!id) return;
-  const comp = S.comps.find(c => c.id === id);
-  if (!comp) return;
-  if(comp.boxPanel){transient('這是盒體的配對板件，請整組管理；尺寸從「卡榫盒子」修改。');return;}
-  pushUndo();
-  pause();
-  // 刪除前先清掉這個元件佔用的 topo.params（型別表宣告它擁有哪些參數）
-  ownedParamKeys(comp).forEach(k => delete S.topo.params[k]);
-  S.comps = S.comps.filter(c => c.id !== id);
-  S.selectedLinkId = null;
-  S.selectedTriangleId = null;
-  S.selectedSliderId = null;
-  S.selectedNodeId = null;
-  closeMobileEditPanel();
-  document.getElementById('lenEditor').style.display = 'none';
-  document.getElementById('roleEditor').style.display = 'none';
-  document.getElementById('servoEditor').style.display = 'none';
-  document.getElementById('strokeEditor').style.display = 'none';
-  document.getElementById('sliderBaseBtn').style.display = 'none';
-  document.getElementById('linkToRailBtn').style.display = 'none';
-  setSliderDetailRows(false);
-  rebuild(); draw();
+async function deleteSelectedPart() {
+  const before=JSON.stringify([S.comps,S.topo.params,S.selectedLinkId,S.selectedTriangleId,S.selectedSliderId,S.selectedGearId]);
+  const {deleteSelectedPart:remove}=await import('./delete-part.js');
+  if(before!==JSON.stringify([S.comps,S.topo.params,S.selectedLinkId,S.selectedTriangleId,S.selectedSliderId,S.selectedGearId]))return;
+  remove({S,transient,deleteGearChain,pushUndo,pause,closeMobileEditPanel,setSliderDetailRows,rebuild,draw,points:lastFullPts});
 }
 function setLen(v) {
   if(fusionRoot(S.comps,S.selectedLinkId))return memberEditor.setValue(v);
