@@ -10,6 +10,7 @@ import {outputRadius,gearHoleAtPoint} from './gear-hole-placement.js';
 import {worldFromScreen} from './view.js';
 import {sheetMode,setSheet} from './mobile-workspace.js';
 import {frameGroundAxis} from './frame-ground.js';
+import {gridDragStep,showHoleCount} from './grid-drag.js';
 const NS='http://www.w3.org/2000/svg';
 // Keep the 44 px dimension hit area clear of the hole's 48 px touch target.
 function besideHole(svg,a,b){
@@ -65,6 +66,7 @@ function drawPointChoices(svg,edit,comps,at,project){
 }
 import {drawFrameHoleHandle} from './frame-hole-editor.js';
 export function drawEditingHandles({svg,points,project,member,slider,gear,frame,redraw,openEditor,comps=S.comps,mounts,pause,pushUndo,rebuild,notify}){
+  showHoleCount(null);
   if(S.mode!=='design'||S.mateMode||S.drawingLink||S.drawingTriangle||S.drawingPolygon||S.placingMotor||S.pickBars)return;
   if(drawFrameHoleHandle({svg,project,openEditor,redraw}))return;
   drawMotorAngle({svg,points,project,mounts,redraw,openEditor,pause,pushUndo,rebuild,notify});
@@ -77,19 +79,21 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
     const p=at(comp[dimension.refs[0]]),q=at(comp[dimension.refs[1]]);
     if(p&&q){
       const a=project(p),b=project(q),length=Math.hypot(q.x-p.x,q.y-p.y)||1;
-      dimensionHandle(svg,{key:'point-dimension',label:dimension.label,point:besideHole(svg,a,b),direction:{x:(b.x-a.x)/length,y:(b.y-a.y)/length},value,min:8,max:2000,
-        preview:v=>showNumber(input,v),cancel:()=>showNumber(input,value),commit,activate});
+      const snap=gridDragStep(comp,dimension),holes=v=>{if(snap>1)showHoleCount(input,v);};holes(value);
+      dimensionHandle(svg,{key:'point-dimension',label:dimension.label,point:besideHole(svg,a,b),direction:{x:(b.x-a.x)/length,y:(b.y-a.y)/length},value,min:8,max:2000,snap,
+        preview:v=>{showNumber(input,v);holes(v);},cancel:()=>{showNumber(input,value);holes(value);},commit,activate});
     }
   }
-  function handle(key,label,point,direction,value,commit,inputId,min=0,max=2000,step=.1,origin=null){
+  function handle(key,label,point,direction,value,commit,inputId,min=0,max=2000,step=.1,origin=null,snap=1){
     if(!point||!direction||!Number.isFinite(value))return;
     const a=project(point),b=project({x:point.x+direction.x,y:point.y+direction.y}),input=document.getElementById(inputId),field=input?.matches('input')?input:input?.querySelector('input');
-    dimensionHandle(svg,{key,label,point:origin?besideHole(svg,project(origin),a):a,direction:{x:b.x-a.x,y:b.y-a.y},value,min,max,step,preview:v=>{if(field)showNumber(field,v);},cancel:()=>{if(field)showNumber(field,value);},commit,activate:()=>{openEditor();field?.focus();field?.select();}});
+    if(snap>1)showHoleCount(field,value);
+    dimensionHandle(svg,{key,label,point:origin?besideHole(svg,project(origin),a):a,direction:{x:b.x-a.x,y:b.y-a.y},value,min,max,step,snap,preview:v=>{if(field)showNumber(field,v);if(snap>1)showHoleCount(field,v);},cancel:()=>{if(field)showNumber(field,value);if(snap>1)showHoleCount(field,value);},commit,activate:()=>{openEditor();field?.focus();field?.select();}});
   }
   const a=at(c?.p1),b=at(c?.p2),length=a&&b?Math.hypot(b.x-a.x,b.y-a.y):0,u=length?{x:(b.x-a.x)/length,y:(b.y-a.y)/length}:{x:1,y:0};
   if(c&&['bar','triangle'].includes(c.type)&&!c.boxPanel){
     const id=S.selectedTriangleId?S.triSide||'g':'g',dim=memberDimensions(c).find(d=>d.id===id),lock=dimensionLock(c,S.comps,id);
-    if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,dir={x:(q.x-p.x)/L,y:(q.y-p.y)/L};handle('member-length',dim.label,q,dir,memberDimensionValue(c,S.topo.params,id),v=>member.setValue(v),'memberDimensionInput',8,2000,.1,p);}}
+    if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,dir={x:(q.x-p.x)/L,y:(q.y-p.y)/L};handle('member-length',dim.label,q,dir,memberDimensionValue(c,S.topo.params,id),v=>member.setValue(v),'memberDimensionInput',8,2000,.1,p,gridDragStep(c,dim));}}
     if(c.shape==='disk')handle('disk-diameter','外徑',{x:a.x,y:a.y+c.diameterMm/2},{x:0,y:.5},c.diameterMm,v=>{const input=document.getElementById('diskDiameterInput');input.value=v;input.onchange();},'diskDiameterInput',8,2000);
     else if(!c.barFusionRoot&&document.getElementById('memberMore')?.open){const w=memberStock(c).widthMm;handle('member-width','板寬',{x:(a.x+b.x)/2-u.y*w/2,y:(a.y+b.y)/2+u.x*w/2},{x:-u.y/2,y:u.x/2},w,v=>member.setStock('widthMm',v),'memberWidthInput',2,120);}
   }

@@ -1,21 +1,21 @@
 /** A dimension handle previews a value, then calls the existing numeric action once. */
 const sessions=new WeakMap(),NS='http://www.w3.org/2000/svg';
-// Pointer dimensions use whole mm; numeric inputs and keyboard precision are independent.
-// Fractional bounds stay inside the valid range. No integer available means no edit.
-export function snapDraggedDimension(value,min,max,original=value){
-  const low=Math.ceil(min),high=Math.floor(max);
-  return low<=high?Math.min(high,Math.max(low,Math.round(value))):original;
+// Drag snaps to whole mm or to step (grid pitch); typed values keep decimals.
+// None in range means no edit.
+export function snapDraggedDimension(value,min,max,original=value,step=1){
+  const low=Math.ceil(min/step),high=Math.floor(max/step);
+  return low<=high?Math.min(high,Math.max(low,Math.round(value/step)))*step:original;
 }
-export function projectedDimension(start,delta,direction,{min=-100000,max=100000}={}){
+export function projectedDimension(start,delta,direction,{min=-100000,max=100000,snap}={}){
   const d=direction.x**2+direction.y**2;if(d<1e-12)return start;
-  return snapDraggedDimension(start+(delta.x*direction.x+delta.y*direction.y)/d,min,max,start);
+  return snapDraggedDimension(start+(delta.x*direction.x+delta.y*direction.y)/d,min,max,start,snap);
 }
 export function projectedAngle(center,axes,start,end){
   const det=axes.u.x*axes.v.y-axes.u.y*axes.v.x;if(Math.abs(det)<1e-8)return 0;
   const angle=p=>{const x=p.x-center.x,y=p.y-center.y;return Math.atan2((axes.u.x*y-axes.u.y*x)/det,(x*axes.v.y-y*axes.v.x)/det);};
   const delta=angle(end)-angle(start);return Math.atan2(Math.sin(delta),Math.cos(delta))*180/Math.PI;
 }
-export function dimensionHandle(svg,{key,label,point,direction,value,min=0,max=2000,step=.1,angleCenter=null,angleAxes=null,plane=null,activate=()=>{},preview=()=>{},commit,cancel=()=>preview(value),color='#087f8c'}){
+export function dimensionHandle(svg,{key,label,point,direction,value,min=0,max=2000,step=.1,snap,angleCenter=null,angleAxes=null,plane=null,activate=()=>{},preview=()=>{},commit,cancel=()=>preview(value),color='#087f8c'}){
   if(!svg?.getScreenCTM||!Number.isFinite(value))return;
   let session=sessions.get(svg);
   if(!session){
@@ -42,7 +42,7 @@ export function dimensionHandle(svg,{key,label,point,direction,value,min=0,max=2
     add('path',{d:`M ${point.x+6*unit} ${point.y+2*unit} L ${point.x+11*unit} ${point.y+7*unit} L ${point.x+14*unit} ${point.y+unit}`,fill:'none',stroke:color,'stroke-width':1.5*unit,'pointer-events':'none'});
   }
   const text=add('text' ,{x:point.x,y:point.y-13*unit,'font-size':12*unit,'text-anchor':'middle',fill:color,stroke:'white','stroke-width':3*unit,'paint-order':'stroke','pointer-events':'none'});text.textContent=plane?label:`${label} ${Number(value.toFixed(2))}`;
-  group.addEventListener('pointerdown',e=>{if(e.button>0||e.isPrimary===false)return;e.preventDefault();e.stopImmediatePropagation();group.focus();const inverse=svg.getScreenCTM().inverse();session.drag={id:e.pointerId,start:new DOMPoint(e.clientX,e.clientY).matrixTransform(inverse),clientX:e.clientX,clientY:e.clientY,moved:false,matrix:inverse,group,text,label,direction,value,next:value,min,max,step,angleCenter,angleAxes,plane,activate,preview,commit,cancel};session.listen();try{svg.setPointerCapture(e.pointerId);}catch(_){}},true);
+  group.addEventListener('pointerdown',e=>{if(e.button>0||e.isPrimary===false)return;e.preventDefault();e.stopImmediatePropagation();group.focus();const inverse=svg.getScreenCTM().inverse();session.drag={id:e.pointerId,start:new DOMPoint(e.clientX,e.clientY).matrixTransform(inverse),clientX:e.clientX,clientY:e.clientY,moved:false,matrix:inverse,group,text,label,direction,value,next:value,min,max,step,snap,angleCenter,angleAxes,plane,activate,preview,commit,cancel};session.listen();try{svg.setPointerCapture(e.pointerId);}catch(_){}},true);
   group.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate();return;}if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();e.stopPropagation();if(plane){const keys={ArrowLeft:[-step,0],ArrowRight:[step,0],ArrowUp:[0,step],ArrowDown:[0,-step]},[x,y]=keys[e.key];plane.commit(plane.constrain({x:plane.value.x+x,y:plane.value.y+y}));svg.querySelector(`[data-dimension-handle="${key}"]`)?.focus();return;}commit(Math.max(min,Math.min(max,value+(['ArrowLeft','ArrowDown'].includes(e.key)?-step:step))));svg.querySelector(`[data-dimension-handle="${key}"]`)?.focus();});
   svg.append(group);return group;
 }
