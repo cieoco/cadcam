@@ -4,7 +4,7 @@ import * as Panels from './panels.js';
 import * as View from './view.js';
 import * as Tools from './tools.js';
 import {frameGroundAxis} from './frame-ground.js';
-import {frameHoleAt,frameHoleAxis,syncFrameHoles} from './frame-holes.js';
+import {frameHoleAt,frameHoleAxis,frameHolePoint,syncFrameHoles} from './frame-holes.js';
 import {planFrameHole} from './frame-hole-plan.js';
 import {inspectFrameExport} from './exporters.js';
 import {commitMountingEdit} from './mounting-review-ui.js';
@@ -22,10 +22,12 @@ function select(ctx,id){ctx.deselectLink();S.selectedNodeId=id;S.frameEditorOpen
 function finish(ctx){ctx.rebuild();ctx.draw();Panels.updateRoleEditor();ctx.scheduleAutosave();}
 
 export function setFrameHole(ctx,id,value){
-  const hole=frameHoleAt(S.comps,id);if(!hole||Number(value)===hole.frameHole.u)return;
+  const hole=frameHoleAt(S.comps,id);if(!hole)return;
   const next=plan(ctx,hole,value);if(!next.ok){ctx.transient(next.reason);renderFrameHoleEditor();return;}
+  const relation={a:hole.frameHole.a,b:hole.frameHole.b,u:next.u,...(!next.centered?{centered:false,v:next.v}:{})};
+  if(JSON.stringify(relation)===JSON.stringify(hole.frameHole))return;
   ctx.pause();
-  if(commitMountingEdit(S,d=>{d.comps.find(c=>c.id===hole.id).frameHole.u=next.u;syncFrameHoles(d.comps);},{pushUndo:ctx.pushUndo,notify:ctx.transient}))finish(ctx);
+  if(commitMountingEdit(S,d=>{d.comps.find(c=>c.id===hole.id).frameHole=relation;syncFrameHoles(d.comps);},{pushUndo:ctx.pushUndo,notify:ctx.transient}))finish(ctx);
   else renderFrameHoleEditor();
 }
 export function removeFrameHole(ctx,id){
@@ -39,11 +41,15 @@ export function renderFrameHoleEditor(){
   const hole=frameHoleAt(S.comps,S.selectedNodeId),panel=document.getElementById('roleEditor');if(!hole||!panel)return;
   let row=panel.querySelector('[data-frame-hole-editor]');
   if(!row){row=document.createElement('div');row.dataset.frameHoleEditor='';panel.append(row);}
-  panel.dataset.selectionSummary=`機架孔：距基準孔 ${Number(hole.frameHole.u.toFixed(2))} mm`;
+  const centered=hole.frameHole.centered!==false;
+  panel.dataset.selectionSummary=`機架孔：距基準孔 ${Number(hole.frameHole.u.toFixed(2))} mm${centered?'':` · 偏移 ${Number((hole.frameHole.v||0).toFixed(2))} mm`}`;
   row.replaceChildren();
+  row.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center';
+  const lock=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.checked=centered;check.onchange=()=>window.blocks.setFrameHole(hole.p1.id,{centered:check.checked});lock.append(check,document.createTextNode(' 沿中心線'));lock.style.cssText='display:flex;align-items:center;min-height:44px;flex-basis:100%';row.append(lock);
   const label=document.createElement('label'),value=document.createElement('span');label.textContent='機架孔 · 距基準孔 ';label.append(value,document.createTextNode(' mm'));row.append(label);
   editableNumber(value,hole.frameHole.u,v=>window.blocks.setFrameHole(hole.p1.id,v),{label:'機架孔距基準孔（mm）',min:-2000,max:2000});
-  const hint=document.createElement('p');hint.textContent='沿機架中心線移動；可從這個孔畫連桿。';row.append(hint);
+  if(!centered){const label=document.createElement('label'),value=document.createElement('span');label.textContent='左右偏移 ';label.append(value,document.createTextNode(' mm'));row.append(label);editableNumber(value,hole.frameHole.v||0,v=>window.blocks.setFrameHole(hole.p1.id,{v}),{label:'機架孔左右偏移（mm）',min:-2000,max:2000});}
+  const hint=document.createElement('p');hint.style.cssText='flex-basis:100%;margin:0';hint.textContent=centered?'沿中心線拖孔；取消勾選可左右移動。':'可在板面拖孔；偏移正值在基準方向左側，負值在右側。';row.append(hint);
   if(Model.pointRefs(S.comps,hole.p1.id).length>1){const split=document.createElement('button');split.textContent='分離連接';split.onclick=()=>window.blocks.splitNode();row.append(split);}
   const remove=document.createElement('button');remove.textContent='刪除孔';remove.onclick=()=>window.blocks.removeFrameHole(hole.p1.id);row.append(remove);
 }
@@ -55,10 +61,18 @@ export function drawFrameHoleHandle({svg,project,openEditor,redraw}){
   const line=document.createElementNS(NS,'line');
   for(const [key,value]of Object.entries({x1:a.x,y1:a.y,x2:p.x,y2:p.y,stroke:'#087f8c','stroke-dasharray':'4 4','pointer-events':'none'}))line.setAttribute(key,value);
   svg.append(line);
-  const field=()=>document.querySelector('[aria-label="機架孔距基準孔（mm）"]'),rev=revision(),reset=()=>{if(field())showNumber(field(),hole.frameHole.u);line.setAttribute('x2',p.x);line.setAttribute('y2',p.y);};
-  dimensionHandle(svg,{key:'frame-hole',label:'距基準孔',point:p,direction:{x:q.x-p.x,y:q.y-p.y},value:hole.frameHole.u,min:-2000,max:2000,step:1,
+  const field=()=>document.querySelector('[aria-label="機架孔距基準孔（mm）"]'),offset=()=>document.querySelector('[aria-label="機架孔左右偏移（mm）"]'),rev=revision();
+  const preview=(u,v=0)=>{if(field())showNumber(field(),u);if(offset())showNumber(offset(),v);const next=project(frameHolePoint(axis,u,v));line.setAttribute('x2',next.x);line.setAttribute('y2',next.y);};
+  const reset=()=>preview(hole.frameHole.u,hole.frameHole.v||0);
+  const plane=hole.frameHole.centered===false?{
+    value:{x:hole.frameHole.u,y:hole.frameHole.v||0},
+    fromScreen:p=>{const w=View.worldFromScreen(p.x,p.y),dx=w.x-axis.a.x,dy=w.y-axis.a.y;return {x:dx*axis.u.x+dy*axis.u.y,y:-dx*axis.u.y+dy*axis.u.x};},
+    project:p=>project(frameHolePoint(axis,p.x,p.y)),constrain:p=>({x:Math.round(p.x),y:Math.round(p.y)}),
+    preview:p=>preview(p.x,p.y),commit:p=>{if(rev===revision())window.blocks.setFrameHole(hole.p1.id,{u:p.x,v:p.y});else redraw();}
+  }:null;
+  dimensionHandle(svg,{key:'frame-hole',label:plane?'孔位':'距基準孔',point:p,direction:{x:q.x-p.x,y:q.y-p.y},value:hole.frameHole.u,min:-2000,max:2000,step:1,plane,
     activate:()=>{openEditor();if(sheetMode())setSheet('half');field()?.focus();field()?.select();},cancel:reset,
-    preview:v=>{if(field())showNumber(field(),v);const next=project({x:axis.a.x+axis.u.x*v,y:axis.a.y+axis.u.y*v});line.setAttribute('x2',next.x);line.setAttribute('y2',next.y);},
+    preview:v=>preview(v),
     commit:v=>{if(rev===revision())window.blocks.setFrameHole(hole.p1.id,v);else redraw();}});
   return true;
 }

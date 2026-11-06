@@ -47,3 +47,29 @@ const blobs=[];globalThis.document={body:{appendChild(){}},createElement:()=>({c
 exportFrameAsSvg(frameConnectorNodes(comps),settings);exportFrameAsDxf(frameConnectorNodes(comps),settings);
 const files=await Promise.all(blobs.map(b=>b.text()));assert.equal(files.length,2);assert.ok(files.every(f=>f.includes('145.125')),'same hole position reaches SVG and DXF');
 console.log('PASS frame holes: same joint, material/slot clearance, stable outline/axis, relative motion, exact save, copy remapping, orphan fallback and SVG/DXF');
+
+// Center-line is the default constraint; releasing it adds the second local coordinate.
+const wide=[{type:'bar',id:'Frame',p1:{id:'A',type:'fixed',x:0,y:0,frameStock:{lengthMm:216,widthMm:80}},p2:{id:'B',type:'fixed',x:100,y:0,frameStock:{lengthMm:216,widthMm:80}},lenParam:'L',fixedLen:true},
+ {type:'anchor',id:'Hole',p1:{id:'H',type:'fixed',x:50,y:0},frameHole:{a:'A',b:'B',u:50}}];
+const wh=wide[1],wg=inspectFrameExport(frameConnectorNodes(wide),settings);
+assert.deepEqual(planFrameHole(wide,wh,{v:16.25},wg,3.2).point,{x:50,y:0},'locked hole stays centered');
+for(const v of [-16.25,16.25]){
+ const planned=planFrameHole(wide,wh,{centered:false,u:52.125,v},wg,3.2);assert.ok(planned.ok,planned.reason);assert.deepEqual(planned.point,{x:52.125,y:v});
+}
+assert.equal(planFrameHole(wide,wh,{centered:false,v:39},wg,3.2).ok,false,'side edge margin');
+assert.equal(planFrameHole(wide,wh,{centered:false,v:NaN},wg,3.2).ok,false);
+wh.frameHole={...wh.frameHole,u:52.125,centered:false,v:16.25};syncFrameHoles(wide);
+assert.equal(planFrameHole(wide,wh,60,wg,3.2).v,16.25,'editing distance retains offset');
+assert.equal(planFrameHole(wide,wh,{centered:true},wg,3.2).v,0);
+assert.equal(planFrameHole(wide,wh,{centered:true},{...wg,holes:[...wg.holes,{id:'Occupied',x:52.125,y:0,r:1.6}]},3.2).ok,false,'re-centering checks occupied holes');
+const wideSnap={kind:'blocks',v:1,counter:2,comps:wide,params:{L:100}};
+const reload=normalizeSnapshot(wideSnap);assert.deepEqual(reload.comps[1].frameHole,wh.frameHole);near(reload.comps[1].p1.y,16.25);
+const {buildPartGeometryCatalog}=await import('../js/blocks/part-geometry.js');
+assert.ok(buildPartGeometryCatalog({comps:wide,params:{L:100},exportSettings:settings}).parts.frame.holes.some(h=>h.id==='H'&&h.y===16.25));
+const shifted=instantiateTemplate({comps:wide,params:{L:100},base:'A',name:'Wide'},{counter:40,place:{x:50,y:70}});
+const sh=shifted.comps.find(c=>c.frameHole);assert.equal(sh.frameHole.v,16.25);const shpos={...sh.p1};syncFrameHoles(shifted.comps);assert.deepEqual(sh.p1,shpos);
+updatePointCoordsById(wide,'B',0,100);syncFrameHoles(wide);near(wh.p1.x,-16.25);near(wh.p1.y,52.125);
+exportFrameAsSvg(frameConnectorNodes(wide),settings);exportFrameAsDxf(frameConnectorNodes(wide),settings);
+assert.ok((await Promise.all(blobs.slice(2).map(b=>b.text()))).every(t=>t.includes('16.25')&&t.includes('52.125')));
+const invalid=structuredClone(wideSnap);invalid.comps[1].frameHole.v='invalid';assert.ok(!normalizeSnapshot(invalid).comps[1].frameHole,'invalid offset preserves world position as independent anchor');
+console.log('PASS frame hole offsets: center default, both sides, edge/overlap rejection, exact save, axis following, module copy and shared export/3D geometry');

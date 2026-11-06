@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs/promises');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 (async()=>{
- const out='output/frame-holes';await fs.mkdir(out,{recursive:true});
+ const out='output/frame-hole-offset';await fs.mkdir(out,{recursive:true});
  const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true}),results=[];
  try{for(const viewport of [{width:1280,height:900},{width:390,height:844},{width:360,height:640},{width:844,height:390}].filter(v=>!process.env.TEST_WIDTH||v.width===+process.env.TEST_WIDTH)){
   console.log(viewport);const mobile=viewport.width<500,context=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile}),page=await context.newPage(),errors=[];
@@ -11,7 +11,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   await page.evaluate(()=>blocks.loadExample('hydraulic-h01'));const start=page.getByRole('button',{name:'開始設計',exact:true});if(await start.isVisible())await start.click();
   const state=()=>page.evaluate(()=>blocks.gripperPilot.snapshot());
   await page.locator('#stageSvg text').filter({hasText:'🏠'}).click();if(viewport.width<1000)await page.locator('[data-dimension-handle="frame-angle"]').click();await page.getByRole('button',{name:'新增孔',exact:true}).waitFor();
-  await page.evaluate(()=>blocks.setFrameSize('lengthMm',216));const before=await state();await page.screenshot({path:`${out}/${viewport.width}-before.png`});
+  await page.evaluate(()=>{blocks.setFrameSize('lengthMm',216);blocks.setFrameSize('widthMm',80);});const before=await state();await page.screenshot({path:`${out}/${viewport.width}-before.png`});
   const pointAt=async u=>page.evaluate(async u=>{const V=await import('/js/blocks/view.js'),s=blocks.gripperPilot.snapshot(),f=s.comps.find(c=>c.id==='H1Frame'),l=Math.hypot(f.p2.x-f.p1.x,f.p2.y-f.p1.y),p={x:f.p1.x+(f.p2.x-f.p1.x)*u/l,y:f.p1.y+(f.p2.y-f.p1.y)*u/l};const q=new DOMPoint(V.TX(p.x),V.TY(p.y)).matrixTransform(document.querySelector('#stageSvg').getScreenCTM());return {x:q.x,y:q.y};},u);
   // A viewport pan is not a work edit; expose the extension on small/landscape screens.
   const reveal=async u=>{const p=await pointAt(u),svg=await page.locator('#stageSvg').boundingBox(),control=await page.locator('.controls').boundingBox();const tx=Math.max(svg.x+70,Math.min(svg.x+svg.width-90,p.x)),ty=Math.max(svg.y+70,Math.min(control.y-70,p.y));if(tx!==p.x||ty!==p.y)await page.evaluate(async({dx,dy})=>{const V=await import('/js/blocks/view.js');V.panByClient(document.querySelector('#stageSvg'),dx,dy);blocks.draw();},{dx:tx-p.x,dy:ty-p.y});};
@@ -43,7 +43,29 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   await page.waitForFunction(n=>blocks.gripperPilot.snapshot().comps.length===n,rotated.comps.length+1);const linked=await state(),bar=linked.comps.find(c=>!rotated.comps.some(p=>p.id===c.id));assert.equal(bar.type,'bar');assert.ok([bar.p1.id,bar.p2.id].includes(hole.p1.id));
   await page.evaluate(id=>blocks.removeFrameHole(id),hole.p1.id);assert.deepEqual(await state(),linked,'connected hole cannot silently sever its rod');
   await page.evaluate(n=>blocks.gripperPilot.reopen(n),linked);assert.deepEqual(await state(),linked);
-  assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));results.push({viewport,place:true,placementCancel:true,integerDrag:true,cancelPreservesDecimal:true,numericMatches:true,invalidRejected:true,undo:true,save:true,followsAxis:true,existingDrawLink:true});await context.close();}catch(e){await page.screenshot({path:`${out}/${viewport.width}-failure.png`});throw e;}
+  // The same handle switches from axis movement to planar movement when released.
+  await selectHole(integer);await page.locator('[data-dimension-handle="frame-hole"]').click();
+  const centered=page.getByRole('checkbox',{name:'沿中心線',exact:true});assert.equal(await centered.isChecked(),true);
+  const centeredWork=await state();await centered.uncheck();await page.getByRole('textbox',{name:'機架孔左右偏移（mm）',exact:true}).waitFor();
+  const free=await state();assert.equal(free.comps.find(c=>c.frameHole).frameHole.centered,false);assert.deepEqual(free.comps.find(c=>c.frameHole).p1,centeredWork.comps.find(c=>c.frameHole).p1);
+  const offset=page.getByRole('textbox',{name:'機架孔左右偏移（mm）',exact:true});await offset.fill('8.25');await offset.press('Tab');await page.waitForFunction(()=>blocks.gripperPilot.snapshot().comps.find(c=>c.frameHole).frameHole.v===8.25);
+  const decimal=await state();await offset.fill('999');await offset.press('Tab');await page.waitForFunction(()=>document.querySelector('[aria-label="機架孔左右偏移（mm）"]').value==='8.25');assert.deepEqual(await state(),decimal);
+  const uvAt=async(u,v)=>page.evaluate(async({u,v})=>{const V=await import('/js/blocks/view.js'),s=blocks.gripperPilot.snapshot(),h=s.comps.find(c=>c.frameHole),{frameHoleAxis,frameHolePoint}=await import('/js/blocks/frame-holes.js'),p=frameHolePoint(frameHoleAxis(s.comps,h),u,v),q=new DOMPoint(V.TX(p.x),V.TY(p.y)).matrixTransform(document.querySelector('#stageSvg').getScreenCTM());return {x:q.x,y:q.y};},{u,v});
+  await reveal(integer);const uvStart=await uvAt(integer,8.25);await tap(uvStart);assert.deepEqual(await state(),decimal,'tap keeps both decimal coordinates');
+  const dragUV=async (cancel,invalid=false)=>{const a=await uvAt(integer,8.25),b=await uvAt(integer-5.3,invalid?45:14.4),cdp=mobile?await context.newCDPSession(page):null;
+   if(cdp){await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[a]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[b]});}else{await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:5});}
+   assert.deepEqual(await state(),decimal,'planar preview does not write');
+   if(cdp){await cdp.send('Input.dispatchTouchEvent',{type:cancel?'touchCancel':'touchEnd',touchPoints:[]});await cdp.detach();}else{if(cancel)await page.keyboard.press('Escape');await page.mouse.up();}
+  };
+  await dragUV(true);assert.deepEqual(await state(),decimal);await dragUV(false,true);assert.deepEqual(await state(),decimal,'out-of-material drag is rejected');await dragUV(false);await page.waitForFunction(()=>blocks.gripperPilot.snapshot().comps.find(c=>c.frameHole).frameHole.v===14);
+  const planar=await state();assert.equal(planar.comps.find(c=>c.frameHole).frameHole.u,Math.round(integer-5.3));assert.deepEqual(planar.params,decimal.params,'moving hole never changes attached lengths');
+  await page.evaluate(()=>blocks.undo());assert.deepEqual(await state(),decimal);await tap(await uvAt(integer,8.25));const choice=page.getByRole('dialog',{name:'選取重疊物件'});if(await choice.isVisible())await choice.getByRole('button',{name:/^機架孔/}).click();await page.locator('[data-dimension-handle="frame-hole"]').click();
+  await input.fill(String(Math.round(integer-5.3)));await input.press('Tab');await offset.fill('14');await offset.press('Tab');await page.waitForFunction(()=>blocks.gripperPilot.snapshot().comps.find(c=>c.frameHole).frameHole.v===14);assert.deepEqual(await state(),planar,'direct and numeric edit give same result');
+  await page.screenshot({path:`${out}/${viewport.width}-offset.png`});
+  await centered.check();await page.waitForFunction(()=>blocks.gripperPilot.snapshot().comps.find(c=>c.frameHole).frameHole.centered!==false);assert.equal(await offset.count(),0);
+  await page.evaluate(()=>blocks.undo());assert.deepEqual(await state(),planar,'undo restores offset and unlocked constraint');
+  await page.evaluate(n=>blocks.gripperPilot.reopen(n),planar);assert.deepEqual(await state(),planar);
+  assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));results.push({viewport,place:true,placementCancel:true,integerDrag:true,cancelPreservesDecimal:true,numericMatches:true,invalidRejected:true,undo:true,save:true,followsAxis:true,existingDrawLink:true,centerToggle:true,planarDrag:true,offsetNumeric:true,offsetCancel:true,recenterUndo:true});await context.close();}catch(e){await page.screenshot({path:`${out}/${viewport.width}-failure.png`});throw e;}
  }}finally{await browser.close();}
  await fs.writeFile(out+'/results.json',JSON.stringify(results,null,2));console.log(results);
 })().catch(e=>{console.error(e);process.exitCode=1;});

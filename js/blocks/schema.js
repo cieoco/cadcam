@@ -71,7 +71,7 @@ function normalizeAnchor(comp, index, warnings) {
   const p1 = normalizePoint(comp.p1, `A${index + 1}`, warnings);
   p1.type = 'fixed';
   const h=comp.frameHole;
-  const frameHole=h&&safeId(h.a)&&safeId(h.b)&&h.a!==h.b&&Number.isFinite(h.u)?{a:h.a,b:h.b,u:h.u}:null;
+  const frameHole=h&&safeId(h.a)&&safeId(h.b)&&h.a!==h.b&&Number.isFinite(h.u)&&(h.v===undefined||Number.isFinite(h.v))&&(h.centered===undefined||typeof h.centered==='boolean')?{a:h.a,b:h.b,u:h.u,...(h.centered===false?{centered:false,v:h.v??0}:{})}:null;
   if(h&&!frameHole)warnings.push('機架孔的定位資料無效，保留為獨立固定點。');
   return { type: 'anchor', id, p1, ...(frameHole?{frameHole}:{}) };
 }

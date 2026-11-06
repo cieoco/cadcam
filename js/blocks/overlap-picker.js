@@ -14,7 +14,7 @@ export function collectPickCandidates(svg, x, y, comps) {
     const id = motor || el.getAttribute('data-id');
     const servo = comps.some(c => c.motorType === 'mg995' && [c.p1, c.p2].some(p => p?.id === id));
     const hole=comps.find(c=>c.frameHole&&c.p1.id===id);
-    add({ kind:'node', id, motor:!!motor, label:motor ? `${servo ? '舵機' : '馬達'}軸心 · ${id}（動力／角度）` : hole?`機架孔 · 距基準孔 ${Number(hole.frameHole.u.toFixed(2))} mm`:`接點 · ${id}` });
+    add({ kind:'node', id, motor:!!motor, label:motor ? `${servo ? '舵機' : '馬達'}軸心 · ${id}（動力／角度）` : hole?`機架孔 · 距基準孔 ${Number(hole.frameHole.u.toFixed(2))} mm${hole.frameHole.centered===false?` · 偏移 ${Number((hole.frameHole.v||0).toFixed(2))} mm`:""}`:`接點 · ${id}` });
   }
   for (const el of svg.ownerDocument.elementsFromPoint(x, y)) {
     if (!svg.contains(el)) continue;
