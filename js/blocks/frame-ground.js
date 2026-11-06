@@ -1,6 +1,6 @@
 /** One stable pair for both the inspector readout and fixed-axis editing. */
 export function frameGroundAxis(nodes) {
-  const ordered=[...nodes].filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)).sort((a,b)=>a.id.localeCompare(b.id));
+  const ordered=[...nodes].filter(p=>!p.frameHole&&Number.isFinite(p.x)&&Number.isFinite(p.y)).sort((a,b)=>a.id.localeCompare(b.id));
   const [base,target]=ordered;
   const length=target?Math.hypot(target.x-base.x,target.y-base.y):0;
   return {nodes:ordered,base,target,length,angle:target?Math.atan2(target.y-base.y,target.x-base.x)*180/Math.PI:0};

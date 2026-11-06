@@ -81,7 +81,7 @@ Panels.init({
   isGroundPositionUnlocked: () => false
 });
 S.selectedNodeId = 'A'; S.frameEditorOpen = true;
-Panels.updateRoleEditor();
+Panels.updateRoleEditor();await Panels.updateFrameEditor();
 check('選機架點：節點面板顯示', role.style.display !== 'none');
 check('選機架點：機架面板顯示', frame.style.display === 'flex');
 check('選機架點：機架面板在節點面板內', frame.parentNode === role && frame.dataset.embedded === 'true');
@@ -93,7 +93,7 @@ check('取消選取：機架面板回到獨立位置', frame.parentNode === cont
 
 // 只開機架（例如從機架把手開啟），沒有選接點：維持獨立面板
 S.frameEditorOpen = true;
-Panels.updateFrameEditor();
+await Panels.updateFrameEditor();
 check('只開機架：獨立顯示，不塞進隱藏的節點面板', frame.style.display === 'flex' && frame.parentNode === container);
 
 S.selectedNodeId = 'C';

@@ -1,3 +1,4 @@
+import {syncFrameHoles,frameHoleAxis} from './frame-holes.js';
 import {readStoredProject} from './project-envelope.js';
 import {normalizeBoxPanel,boxPanelSize} from '../plugins/box-maker/box-contract.js';
 import {normalizeBarFusion,inspectBarFusionData} from '../core/bar-fusion.js';
@@ -69,7 +70,10 @@ function normalizeAnchor(comp, index, warnings) {
   const id = safeId(comp.id) ? comp.id : `Anchor${index + 1}`;
   const p1 = normalizePoint(comp.p1, `A${index + 1}`, warnings);
   p1.type = 'fixed';
-  return { type: 'anchor', id, p1 };
+  const h=comp.frameHole;
+  const frameHole=h&&safeId(h.a)&&safeId(h.b)&&h.a!==h.b&&Number.isFinite(h.u)?{a:h.a,b:h.b,u:h.u}:null;
+  if(h&&!frameHole)warnings.push('機架孔的定位資料無效，保留為獨立固定點。');
+  return { type: 'anchor', id, p1, ...(frameHole?{frameHole}:{}) };
 }
 
 function normalizeBar(comp, index, params, warnings) {
@@ -636,6 +640,8 @@ export function normalizeSnapshot(obj) {
     if(c.barFusion && !inspectBarFusionData(cleanComps,c,params).ok)return null;
     if(c.barFusionRoot && !cleanComps.some(r=>r.id===c.barFusionRoot && r.barFusion?.members.includes(c.id)))return null;
   }
+  for(const c of cleanComps)if(c.frameHole&&!frameHoleAxis(cleanComps,c)){delete c.frameHole;warnings.push('機架孔的基準已不存在，保留原位置為獨立固定點。');}
+  syncFrameHoles(cleanComps);
   const counter = Math.max(Number(obj.counter) || 0, highestIdNum(cleanComps));
   // 多馬達欄位（選配）：activeMotor = 目前控制中的馬達編號；motorAngles = 其他馬達的凍結角度。
   const activeMotor = safeId(String(obj.activeMotor || '')) ? String(obj.activeMotor) : '1';

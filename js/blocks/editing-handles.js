@@ -63,8 +63,10 @@ function drawPointChoices(svg,edit,comps,at,project){
   });
   highlight(edit.dimension?.key);
 }
+import {drawFrameHoleHandle} from './frame-hole-editor.js';
 export function drawEditingHandles({svg,points,project,member,slider,gear,frame,redraw,openEditor,comps=S.comps,mounts,pause,pushUndo,rebuild,notify}){
-  if(S.mode!=='design'||S.mateMode)return;
+  if(S.mode!=='design'||S.mateMode||S.drawingLink||S.drawingTriangle||S.drawingPolygon||S.placingMotor||S.pickBars)return;
+  if(drawFrameHoleHandle({svg,project,openEditor,redraw}))return;
   drawMotorAngle({svg,points,project,mounts,redraw,openEditor,pause,pushUndo,rebuild,notify});
   const c=S.comps.find(c=>c.id===(S.selectedTriangleId||S.selectedLinkId||S.selectedSliderId||S.selectedGearId));
   const at=p=>points[p?.id]||p;

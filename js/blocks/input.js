@@ -100,7 +100,8 @@ export function onNodeDown(e, id) {
   // 過去 dragId 會間接擋住取消，但加入拖曳門檻後按下階段尚未設定 dragId，
   // 因此必須在事件語意上明確阻止背景處理。
   e.stopPropagation();
-  if (pointIsGround(id)) openFrameEditor();
+  if (S.comps.some(c=>c.frameHole&&c.p1.id===id)) S.frameEditorOpen=false;
+  else if (pointIsGround(id)) openFrameEditor();
   else S.frameEditorOpen = false;
   S.preDragSnap = snapshotStr(); // 拖曳前狀態；若真的有變動，drag end 才記入 undo
   pause();
@@ -122,7 +123,7 @@ export function onNodeDown(e, id) {
   if (!pendingMobileEdit) openMobileEditPanel();
   Panels.updateRoleEditor();
   S.dragId = null; S.snapTarget = null;
-  pendingNodeDrag = fusionAtPoint(S.comps,id) || (pointIsGround(id) && !isGroundPositionUnlocked(id)) ? null : {
+  pendingNodeDrag = S.comps.some(c=>c.frameHole&&c.p1.id===id) || fusionAtPoint(S.comps,id) || (pointIsGround(id) && !isGroundPositionUnlocked(id)) ? null : {
     id, x:e.clientX, y:e.clientY, pointerType:e.pointerType || 'mouse'
   };
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
@@ -190,7 +191,7 @@ function onDragMove(e) {
 }
 /** Numeric coordinates and dragging share rigid-body and joint constraints. */
 export function moveNodeTo(id,w,{snap=true}={}) {
-  if (pointIsRackHole(id)) return;
+  if (pointIsRackHole(id)||S.comps.some(c=>c.frameHole&&c.p1.id===id)) return;
   // 馬達輸入桿的動端：solver 會把它釘在 S.theta 對應的姿勢，直接拖會被拉回、移不動。
   // 不跟 solver 較勁——以「指標位置」找最近的接點當吸附目標、放開即連接（綠圈給回饋）。
   const crankBar = inputCrankMovingEnd(id);

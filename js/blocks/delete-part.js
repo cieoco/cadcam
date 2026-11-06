@@ -1,3 +1,4 @@
+import {frameHoleAxis} from './frame-holes.js';
 import {fusionRoot} from '../core/bar-fusion.js';
 import {ownedParamKeys} from './part-types.js';
 import {detachDeletedAttachments} from './detached-attachments.js';
@@ -16,6 +17,7 @@ export function deleteSelectedPart({S,transient,deleteGearChain,pushUndo,pause,c
   S.comps = detachDeletedAttachments(S.comps,new Set([id]),S.topo.params,points);
   ownedParamKeys(comp).forEach(k => delete S.topo.params[k]);
   S.comps = S.comps.filter(c => c.id !== id);
+  for(const c of S.comps)if(c.frameHole&&!frameHoleAxis(S.comps,c)){delete c.frameHole;transient('機架孔的基準已移除，孔保留在原位置成為獨立固定點。');}
   S.selectedLinkId = null;
   S.selectedTriangleId = null;
   S.selectedSliderId = null;

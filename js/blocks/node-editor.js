@@ -53,6 +53,8 @@ export function createNodeEditor({
     scheduleAutosave();
   }
   function setNodeRole(type) {
+    if(type==='floating'&&S.comps.some(c=>c.frameHole&&[c.frameHole.a,c.frameHole.b].includes(S.selectedNodeId))){transient('這個基準孔仍有機架孔依附，請先刪除附屬孔再取消固定。');return;}
+    if(S.comps.some(c=>c.frameHole&&c.p1.id===S.selectedNodeId)){transient('這是機架上的孔；要移動請調整距基準孔。');return;}
     if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) return;
     if (sliderMountInfo(S.selectedNodeId) && type !== 'fixed') {
       setBanner('滑軌固定孔需要維持固定；可用 X/Y 或拖曳調整位置');

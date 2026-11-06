@@ -2362,6 +2362,10 @@ function frameSizeInfo() {
   const geometry = Exporters.inspectFrameExport(nodes,Settings.exportSettings(),mounts);
   return {...geometry?.dimensions,thicknessMm:geometry?.thicknessMm || S.fabrication?.cnc?.stockThicknessMm || 3};
 }
+function frameAction(name,...args) {
+  const revision=JSON.stringify([S.comps,S.topo.params,S.designFocus]);
+  return import('./frame-hole-editor.js').then(m=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus]))return;return m[name]({S,viewComps,frameSizeInfo,frameGroundInfo,pause,pushUndo,transient,rebuild,draw,scheduleAutosave,svg,deselectLink,openMobileEditPanel,setBanner,clearBanner,settings:Settings.exportSettings(),mounts:()=>Exporters.splitMountsByHost(viewComps(),deriveMotorMounts(viewComps())).free},...args);});
+}
 function setFrameSize(key, raw) {
   if (!['lengthMm','widthMm','thicknessMm','auto'].includes(key)) return;
   const value=Number(raw), comps=viewComps(), nodes=Model.frameConnectorNodes(comps);
@@ -2390,9 +2394,11 @@ function changeFrameGround(kind, delta) {
   draw();
 }
 
+
 function frameGroundInfo() {
   const points=pointCoords();
-  return frameGroundAxis([...frameNodeIds()].map(id=>({id,...points[id]})));
+  const holes=new Set(S.comps.filter(c=>c.frameHole).map(c=>c.p1.id));
+  return frameGroundAxis([...frameNodeIds()].map(id=>({id,...points[id],frameHole:holes.has(id)})));
 }
 
 // 機架移動把手：固定銷形心放一顆「🏠 機架」鈕，拖它＝把所有固定銷整組平移。
@@ -3362,6 +3368,7 @@ function init() {
 window.blocks = { selectModuleTarget, draw, startChainDrive, changeSprocketTeeth, setSprocketTeeth, alignChain, nudgeChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openMotorChoice, pickMotorType, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawDisk: Tools.startDrawDisk, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, exportStep: () => import('./step-export.js').then(m => m.exportStepFile({ S, design: inDesign(), motorAngles: motorAnglesNow(), notify: transient })), setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
 window.blocks.changeFrameGround = changeFrameGround;
 window.blocks.setFrameSize = setFrameSize;
+for(const name of ['startFrameHole','setFrameHole','removeFrameHole'])window.blocks[name]=(...args)=>frameAction(name,...args);
 // H1 除錯／測試：設計模式目前看得到的零件與點（畫面實際畫的那一份）。
 window.blocks.designDebug = () => ({
   mode: S.mode, focus: S.designFocus, viewPlane: S.viewPlane,

@@ -12,7 +12,7 @@ export function normalizeFrameStock(raw) {
 export const frameStockOf = nodes => normalizeFrameStock((nodes || []).find(p => p.frameStock)?.frameStock) || {};
 
 /** Length follows the fixed-point axis; width is perpendicular. Holes never move. */
-export function sizeFrameOutline(outlines, nodes) {
+export function sizeFrameOutline(outlines, nodes, addedHoles = []) {
   const stock = frameStockOf(nodes), points = outlines.flat();
   let a = nodes[0], b = a, distance = 0;
   for (const p of nodes) for (const q of nodes) {
@@ -23,10 +23,12 @@ export function sizeFrameOutline(outlines, nodes) {
   const v = {x:-u.y,y:u.x}, dot=(p,d)=>p.x*d.x+p.y*d.y;
   const xs=points.map(p=>dot(p,u)),ys=points.map(p=>dot(p,v));
   const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
-  const minLength=x1-x0,minWidth=y1-y0;
+  const cx=(x0+x1)/2,cy=(y0+y1)/2;
+  // Added holes cannot recenter the existing stock; retain material on both sides.
+  const minLength=Math.max(x1-x0,...addedHoles.map(p=>2*(Math.abs(dot(p,u)-cx)+p.r)));
+  const minWidth=Math.max(y1-y0,...addedHoles.map(p=>2*(Math.abs(dot(p,v)-cy)+p.r)));
   const lengthMm=Math.max(minLength,stock.lengthMm || 0),widthMm=Math.max(minWidth,stock.widthMm || 0);
   const dimensions={lengthMm,widthMm,minLength,minWidth};
-  const cx=(x0+x1)/2,cy=(y0+y1)/2;
   // Both automatic and explicit sizes use the same regular outline. The natural
   // envelope already includes stock around the holes and motor features.
   const r=Math.min(2,lengthMm/4,widthMm/4);

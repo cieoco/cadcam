@@ -985,7 +985,7 @@ export function plateMountExtras(mounts = []) {
 function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
   const allNodes = (frameNodes || []).filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
   // C1：outlineExempt 的孔（直角轉接座開在機架板上的宿主孔）只開孔，不參與外框／凸包，否則外框會被孔撐大。
-  const nodes = allNodes.filter(p => !p.outlineExempt);
+  const nodes = allNodes.filter(p => !p.outlineExempt&&!p.frameHole);
   const { barWidthMm, frameMarginMm, frameHoleDiameterMm } = normalizeExportSettings(settings);
   const holeR = frameHoleDiameterMm / 2;
   const frameR = barWidthMm / 2;
@@ -1082,7 +1082,7 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
 
   if (!outlines.length) return null;
   // 固定孔貼近槽緣一樣是薄肉，警告時把槽邊當外緣一起檢查。
-  const sized = sizeFrameOutline(outlines,nodes);
+  const sized = sizeFrameOutline(outlines,nodes,allNodes.filter(p=>p.frameHole).map(p=>({...p,r:holeR+2})));
   // Add a round-ended bar under each pipe clamp, without widening the WHOLE frame
   // into neighbouring moving modules. Use the same outline for all consumers.
   const clampNodes=allNodes.filter(p=>p.holeLayer==='SYRINGE_CLAMP'&&p.mountRadiusMm>0);

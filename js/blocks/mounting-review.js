@@ -48,7 +48,8 @@ function footprint(part,s,relation,catalog){
   let local=p=>({x:p.x,y:p.y});
   if(['frame','module-frame'].includes(part.binding.kind)){
     const nodes=s.comps.filter(c=>part.moduleId==null?!c.moduleId:c.moduleId===part.moduleId).flatMap(c=>pointKeys.map(k=>c[k])).filter(p=>p&&['fixed','motor'].includes(p.type));
-    const unique=[...new Map(nodes.map(p=>[p.id,p])).values()].sort((a,b)=>a.id.localeCompare(b.id));
+    const owned=new Set(s.comps.filter(c=>c.frameHole).map(c=>c.p1.id));
+    const unique=[...new Map(nodes.filter(p=>!owned.has(p.id)).map(p=>[p.id,p])).values()].sort((a,b)=>a.id.localeCompare(b.id));
     const a=unique[0],b=unique.find(p=>a&&Math.hypot(p.x-a.x,p.y-a.y)>.001);
     if(a){const angle=b?Math.atan2(b.y-a.y,b.x-a.x):0,c=Math.cos(angle),t=Math.sin(angle);local=p=>({x:(p.x-a.x)*c+(p.y-a.y)*t,y:-(p.x-a.x)*t+(p.y-a.y)*c});}
   }

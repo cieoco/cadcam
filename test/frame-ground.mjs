@@ -27,10 +27,10 @@ const elements=new Map(['frameEditor','frameLengthVal','frameAngleVal','frameAxi
 globalThis.document={getElementById:id=>elements.get(id)||null};
 let shown=single;
 Panels.init({pointCoords:()=>({A:single[0],Foreign:{x:100,y:100}}),pointIsGround:()=>true,frameGroundInfo:()=>frameGroundAxis(shown)});
-S.frameEditorOpen=true;Panels.updateFrameEditor();
+S.frameEditorOpen=true;await Panels.updateFrameEditor();
 assert.equal(elements.get('frameAnglePlus').disabled,true);assert.equal(elements.get('frameLengthPlus').disabled,true);
 assert.equal(elements.get('frameAngleVal').textContent,'—');assert.match(elements.get('frameAxisHint').textContent,/只有一個固定軸/);
-shown=pair;Panels.updateFrameEditor();assert.equal(elements.get('frameAnglePlus').disabled,false);assert.equal(elements.get('frameLengthVal').textContent,'8');
-shown=[negative,...single];Panels.updateFrameEditor();assert.equal(elements.get('frameAngleVal').textContent,'100');
-shown=coincident;Panels.updateFrameEditor();assert.equal(elements.get('frameAnglePlus').disabled,true);assert.equal(elements.get('frameLengthPlus').disabled,false);
+shown=pair;await Panels.updateFrameEditor();assert.equal(elements.get('frameAnglePlus').disabled,false);assert.equal(elements.get('frameLengthVal').textContent,'8');
+shown=[negative,...single];await Panels.updateFrameEditor();assert.equal(elements.get('frameAngleVal').textContent,'100');
+shown=coincident;await Panels.updateFrameEditor();assert.equal(elements.get('frameAnglePlus').disabled,true);assert.equal(elements.get('frameLengthPlus').disabled,false);
 console.log('PASS fixed-axis editing: unavailable single/coincident angles, precise 5° rotation, stable pair, scoped inspector and save round-trip');

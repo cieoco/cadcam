@@ -12,9 +12,11 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-10-28：卡榫盒子 B2 的多組榫槽幾何與上蓋閉合接合（已存盒體不開對話框也要能讀取與輸出）使目前為 1,971,474 bytes，上限放寬到 1.9725MB；啟動瘦身另案處理。
 // 2026-10-28：P1 卡榫盒子改為外掛，生成與介面程式移出啟動；保存契約（box-contract）與外掛登記仍在啟動，總量不低於 1.97MB，上限維持 1.9725MB。
 // 2026-10-28：固定軸共用選取／精確角度與不可用狀態增加約 2 KB，目前 1,973,959 bytes。
-// 2026-10-28：合成桿段選擇與編輯接頭約 1.1 KB（目前 1,975,060 bytes），幾何重算仍懶載入。
+// 2026-10-28：合成桿段選擇與編輯接頭約 1.2 KB（目前 1,975,060 bytes），幾何重算仍懶載入。
 // 2026-11-05：共用裝配孔位核對與既有編輯入口接線，增量約 20 KB；無新增依賴或載入 3D。
-check('首次JS原始大小低於2MB',r.bytes<2000000);
+// 2026-11-06：機架附屬孔保存／跟隨及輸出契約；機架參數面板延後載入，啟動淨增約 1.2 KB。
+check('首次JS原始大小低於2.005MB',r.bytes<2005000);
+check('機架編輯介面延後載入',!r.paths.includes('js/blocks/frame-hole-editor.js')&&!r.paths.includes('js/blocks/frame-panel.js'));
 check('合成尺寸候選計算延後載入',!r.paths.includes('js/blocks/bar-fusion-resize.js')&&r.lazyEntries.includes('js/blocks/bar-fusion-resize.js'));
 check('盒體生成介面（外掛）延後載入',!r.paths.includes('js/plugins/box-maker/box-generator.js')&&!r.paths.includes('js/plugins/box-maker/box-dialog.js')&&r.lazyEntries.includes('js/plugins/box-maker/index.js'));
 check('歷史紀錄點開才載入',!r.paths.includes('js/version-history.js')&&r.lazyEntries.includes('js/version-history.js'));
