@@ -273,6 +273,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   S.comps = norm.comps;
   S.modules = Array.isArray(norm.modules) ? norm.modules : [];
   knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組
+  gq=1;
   if(source!=='undo'){closedDesignTabs.clear();closedAssemblies.clear();}
   if (source !== 'undo') S.designFocus = source === 'local-autosave' ? savedFocus() : null;   // 開檔／範例／分享 → 第一頁；自動還原 → 回到上次那頁
   S.topo = { lessonSequence: norm.lessonSequence || null, hydraulicSequence: norm.hydraulicSequence || null, assemblyMembers: norm.assemblyMembers ?? designIds(S.comps,S.modules), projectName: norm.projectName || '', rootDesignName: norm.rootDesignName || (!S.modules.length ? norm.projectName : '') || '', params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '', dimensions: norm.dimensions || [] };
@@ -1267,6 +1268,8 @@ function frameConnectorNodes() { const w=inDesign()?{comps:S.comps,modules:S.mod
 
 // syncSliderGeometries（滑軌幾何同步）已隨滑軌域移到 ./slider-editor.js
 
+let gq=1,gm;
+const gc=(f,...a)=>import('./grid-marks.js').then(m=>(gm=m)[f](...a));
 function rebuild({save=true}={}) {
   syncSliderGeometries();
   adoptNewComps();               // H1：焦點是模組時，新畫的零件歸到那個模組
@@ -1292,6 +1295,7 @@ function rebuild({save=true}={}) {
   document.getElementById('hint').style.display = S.comps.length ? 'none' : 'block';
   Panels.updateRoleEditor();
   if (S.selectedSprocketId) chainEditor?.updatePanel();   // 拖動、改齒數後面板上的鏈節與偏差跟著更新
+  gc('sync',S,gq,setBanner,draw);gq=0;
   if(save)scheduleAutosave();    // 任何結構變更都防丟（debounce，播放不觸發）
 }
 
@@ -2069,6 +2073,7 @@ function drawNow() {
   const updateDims = dimUI?.render(allPts);   // 量尺：標註層疊在最上面，播放時逐幀更新
   if (updateDims) frameUpdaters.push(updateDims);
 
+  gm?.drawMarks(S,svg,pts,TX,TY);
   // 編輯把手最後繪製，避免被針筒外形或尺寸標註遮住。
   if(!playbackActive&&(S.selectedNodeId||S.selectedLinkId||S.selectedTriangleId||S.selectedSliderId||S.selectedGearId||S.frameEditorOpen)){
     if(!editingHandles)editingHandles=import('./editing-handles.js').then(m=>{editingHandles=m;draw();});
@@ -3209,7 +3214,8 @@ function collectCncPartsAndFrameWarnings(settings) {
   return { cncParts, frameWarnings };
 }
 // L5b：下載「製作包」HTML（板件清單＋五金清單＋組裝步驟，可列印）。
-function saveBuildPack(html,title,partCount) {
+async function saveBuildPack(html,title,partCount) {
+  html=await gc('addGridToBuildPack',html,S);
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
