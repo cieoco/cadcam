@@ -212,9 +212,11 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     addBody(key, part, joints.map(p=>p.id), comp);
   });
   links.forEach(({ comp, length }) => {
-    const hostGeometry = comp.barFusion ? inspectBarFusion(list,comp,params,exp).geometry : hosted.has(comp.id) ? hostedBarGeometry(comp, seedPts, exp, hosted.get(comp.id), extraHolesOf(comp)) : null;
+    const fusion=comp.barFusion ? inspectBarFusion(list,comp,params,exp) : null;
+    const hostGeometry = fusion ? fusion.geometry : hosted.has(comp.id) ? hostedBarGeometry(comp, seedPts, exp, hosted.get(comp.id), extraHolesOf(comp)) : null;
     const part = memberPart(comp, 'member', hostGeometry || inspectLinkExport(comp, length, exp, extraHolesOf(comp)));
-    const joints=comp.barFusion ? comp.barFusion.points.map(p=>({id:p.id,holeDiameterMm:linkHole})) : pointsOf(comp, ['p1','p2'],linkHole);
+    if(fusion?.frameThicknessMm)part.thicknessMm=fusion.frameThicknessMm;
+    const joints=comp.barFusion ? [...new Set([...comp.barFusion.points.map(p=>p.id),...(comp.barFusion.framePointIds||[])])].map(id=>({id,holeDiameterMm:hostGeometry?.holes.find(h=>h.id===id)?.r*2||linkHole})) : pointsOf(comp, ['p1','p2'],linkHole);
     if(comp.barFusion){part.fusedMembers=comp.barFusion.members;for(const id of part.fusedMembers)partByComp.set(id,part);}
     addPart(part, joints);
     partByComp.set(comp.id, part);

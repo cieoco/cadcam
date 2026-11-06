@@ -147,6 +147,7 @@ export function mountLocatorPointIds(comps) {
 export function frameConnectorNodes(comps) {
   const locators = mountLocatorPointIds(comps);
   const separateIds=new Set();
+  (comps||[]).forEach(c=>c.barFusion?.framePointIds?.forEach(id=>separateIds.add(id)));
   (comps||[]).filter(c=>c?.frameSeparate).forEach(c=>pointKeysFor(c).forEach(k=>{if(c[k]?.id)separateIds.add(c[k].id);}));
   const fixedIds=frameNodeIds(comps);
   (comps||[]).filter(c=>c.barFusion?.points.filter(p=>fixedIds.has(p.id)).length>=2)

@@ -4,6 +4,7 @@ import { S } from './state.js';
 import { inspectFusion } from './exporters.js';
 import { fusionCandidates } from './part-fusion.js';
 import { openFusionPreview, planFusionPair } from './fusion-preview.js';
+import {mountingWork,confirmMountingChange} from './mounting-review-ui.js';
 
 /** Reuses the original editors; only the manufacturing relationship is changed. */
 export function createFusionEditor({settings,pause,pushUndo,rebuild,draw,save,selectGear,selectTriangle,positions=()=>({}),notify=()=>{}}) {
@@ -59,6 +60,8 @@ export function createFusionEditor({settings,pause,pushUndo,rebuild,draw,save,se
         openBarFusion({first,comps:S.comps,params:S.topo.params,settings:settings(),positions:pts,motion,onConfirm:ids=>{
           if(fingerprint()!==revision)return '作品已變更，請取消後重新選取。';
           const plan=planBarFusion(S.comps,ids,S.topo.params,settings(),pts,motion);if(!plan.ok)return plan.reason;
+          const before=mountingWork(S);
+          if(!confirmMountingChange(before,{...before,comps:plan.comps},{notify}))return '已取消，原安裝與固定孔位保留。';
           pushUndo();S.comps=plan.comps;rebuild();draw();save();return '';
         }});
       });

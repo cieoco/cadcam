@@ -38,7 +38,7 @@ export function buildPartGeometryCatalog(args={}) {
   const visibleFrameIds=new Set((frameNodes||frameConnectorNodes(comps)).map(p=>p.id));
   for(const syringe of comps.filter(c=>c.type==='syringe'&&['fixed-axis','pivot'].includes(c.mountMode))){
     const host=comps.find(c=>c.id===syringe.a.componentId);
-    if(host?.type==='bar'&&!host.frameSeparate&&[host.p1,host.p2].some(p=>!visibleFrameIds.has(p.id)))host.frameSeparate=true;
+    if(host?.type==='bar'&&!host.barFusionRoot&&!host.frameSeparate&&[host.p1,host.p2].some(p=>!visibleFrameIds.has(p.id)))host.frameSeparate=true;
   }
   const settings={...(fabrication.export || {}),...(input.exportSettings || {}),drive:fabrication.drive || FABRICATION_DEFAULTS.drive};
   const stockMm=Number(fabrication.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;
@@ -55,7 +55,7 @@ export function buildPartGeometryCatalog(args={}) {
     if(!geometry.outlines.length){diagnostics.push({status:'not_supported',code:'material_outline_missing',sourceIds});return;}
     // 獨立承載板共用同一管夾孔來源；一般固定桿仍由自動機架承接。
     const host=comps.find(c=>c.id===id),fixed=fixedSyringePointIds(comps);
-    if(['bar','triangle'].includes(kind)&&host&&(host.frameSeparate||host.type==='triangle')&&[host.p1,host.p2,host.p3].filter(Boolean).every(p=>fixed.has(p.id))){
+    if(['bar','triangle'].includes(kind)&&host&&!host.barFusion?.framePointIds&&(host.frameSeparate||host.type==='triangle')&&[host.p1,host.p2,host.p3].filter(Boolean).every(p=>fixed.has(p.id))){
       const local=localizer(host.p1,host.p2),nodes=syringeClampFrameNodes(comps.filter(c=>c.type!=='syringe'||c.a?.componentId===id),[host.p1,host.p2,host.p3].filter(Boolean));
       for(const n of nodes){
         const h={...local(n),r:n.holeDiameterMm/2,id:n.id,layer:n.holeLayer};
@@ -79,7 +79,7 @@ export function buildPartGeometryCatalog(args={}) {
         if(comp.barFusion){
           Exporters.assertFusionFeatures(comps,mounts,extras);
           const f=inspectBarFusion(comps,comp,params,settings);if(!f.ok)throw Error(f.reason);
-          add(comp.id,'bar',f.geometry,stock.thicknessMm,f.data.members,{kind:'member',pointIds:[comp.p1.id,comp.p2.id,...f.data.points.map(p=>p.id).filter(id=>id!==comp.p1.id&&id!==comp.p2.id)]},comp.moduleId);
+          add(comp.id,'bar',f.geometry,f.frameThicknessMm||stock.thicknessMm,f.data.members,{kind:'member',...(f.data.framePointIds?{framePointIds:f.data.framePointIds}:{}),pointIds:[...new Set([comp.p1.id,comp.p2.id,...f.data.points.map(p=>p.id),...(f.data.framePointIds||[])])]},comp.moduleId);
           memberStocks[comp.id]=stock;continue;
         }
         const a=homePoints[comp.p1.id],b=homePoints[comp.p2.id],length=Math.hypot(b.x-a.x,b.y-a.y);

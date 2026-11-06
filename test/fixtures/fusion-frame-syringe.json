@@ -1,0 +1,172 @@
+{
+  "kind": "blocks",
+  "v": 1,
+  "counter": 13,
+  "comps": [
+    {
+      "type": "bar",
+      "id": "H1Frame",
+      "color": "#94a3b8",
+      "p1": {
+        "id": "H1A",
+        "x": -100,
+        "y": -60,
+        "type": "fixed",
+        "frameStock": {
+          "lengthMm": 216,
+          "widthMm": 80
+        }
+      },
+      "p2": {
+        "id": "H1O",
+        "x": -34.78746159846409,
+        "y": 36.68156409175536,
+        "type": "fixed",
+        "frameStock": {
+          "lengthMm": 216,
+          "widthMm": 80
+        }
+      },
+      "lenParam": "H1Frame",
+      "isInput": false,
+      "fixedLen": true,
+      "snapLength": false
+    },
+    {
+      "type": "bar",
+      "id": "H1Arm",
+      "color": "#e99a33",
+      "p1": {
+        "id": "H1O",
+        "x": -34.78746159846409,
+        "y": 36.68156409175536,
+        "type": "fixed",
+        "frameStock": {
+          "lengthMm": 216,
+          "widthMm": 80
+        }
+      },
+      "p2": {
+        "id": "H1C",
+        "x": 37.58011482106066,
+        "y": -13.387726727710495,
+        "type": "floating"
+      },
+      "lenParam": "H1Arm",
+      "isInput": false,
+      "fixedLen": true,
+      "snapLength": false
+    },
+    {
+      "type": "bar",
+      "id": "H1Coupler",
+      "color": "#64748b",
+      "p1": {
+        "id": "H1P",
+        "x": -19.33378122500619,
+        "y": -35.33786196322775,
+        "type": "floating"
+      },
+      "p2": {
+        "id": "H1C",
+        "x": 37.58011482106066,
+        "y": -13.387726727710495,
+        "type": "floating"
+      },
+      "lenParam": "H1Coupler",
+      "isInput": false,
+      "fixedLen": true,
+      "snapLength": false
+    },
+    {
+      "type": "syringe",
+      "id": "H1Syringe",
+      "mountMode": "fixed-axis",
+      "axisDeg": 17,
+      "appearance": "flat-rod",
+      "outputId": "H1Arm",
+      "a": {
+        "componentId": "H1Frame",
+        "u": 0,
+        "v": 0
+      },
+      "b": {
+        "componentId": "H1Coupler",
+        "u": 0,
+        "v": 0
+      },
+      "spec": {
+        "name": "10cc",
+        "capacityMl": 10,
+        "outerDiameter": 17.5,
+        "bodyLength": 72,
+        "rodDiameter": 8,
+        "lmin": 70,
+        "stroke": 20,
+        "calibrated": false
+      },
+      "extension": 14.351999999999833,
+      "branch": 1,
+      "installation": {
+        "face": "front",
+        "spacerMm": null
+      }
+    },
+    {
+      "type": "anchor",
+      "id": "Anchor11",
+      "p1": {
+        "id": "A11",
+        "type": "fixed",
+        "x": -104.61652858592844,
+        "y": -72.38238391843653
+      }
+    },
+    {
+      "type": "anchor",
+      "id": "FrameHole12",
+      "p1": {
+        "id": "FH12",
+        "type": "fixed",
+        "x": -65.14105274447928,
+        "y": 33.498146903292735
+      },
+      "frameHole": {
+        "a": "A11",
+        "b": "H1A",
+        "u": 113
+      }
+    },
+    {
+      "type": "bar",
+      "id": "Link13",
+      "color": "#3498db",
+      "p1": {
+        "id": "FH12",
+        "type": "floating",
+        "x": -65.14105274447928,
+        "y": 33.498146903292735
+      },
+      "p2": {
+        "id": "P13b",
+        "type": "floating",
+        "x": -149.0892501623468,
+        "y": 59.89322504848374
+      },
+      "lenParam": "LL13",
+      "isInput": false,
+      "fixedLen": true
+    }
+  ],
+  "params": {
+    "H1Frame": 116.619037896906,
+    "H1Arm": 88,
+    "H1Coupler": 61,
+    "LL13": 88
+  },
+  "assemblyMembers": [
+    "#root"
+  ],
+  "projectName": "H01 固定筒身單臂",
+  "rootDesignName": "H01 固定筒身單臂"
+}

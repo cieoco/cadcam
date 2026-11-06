@@ -502,7 +502,7 @@ export function compileTopology(components, topology, solvedPoints) {
                 lenParam: c.lenParam,
                 hidden: Boolean(c.hidden || (c.barFusionRoot && !c.barFusion)),
                 _frameSeparate: Boolean(c.frameSeparate || c.barFusionRoot),
-                _fusionJoints: c.barFusion?.points.map(p=>p.id)
+                _fusionJoints: c.barFusion && [...new Set([...c.barFusion.points.map(p=>p.id),...(c.barFusion.framePointIds||[])])]
             });
         } else if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
             if (c.gParam) {

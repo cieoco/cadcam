@@ -139,3 +139,51 @@ for(const degrees of [-1.1,-1,-.01643,.01643,1,1.1]){
  if(Math.abs(degrees)<=1){assert.equal(f.straightened,true);assert.ok(Math.abs(f.points.Tip.y)<1e-9);}
  else{assert.ok(!f.straightened);assert.ok(Math.abs(f.points.Tip.y-tip.y)<1e-9,'larger angles remain unchanged');}
 }
+
+// A frame union retains the physical frame and its existing clamp drilling.
+const {inspectFrameExport}=await import('../js/blocks/exporters.js');
+const {worldFusionGeometry}=await import('../js/blocks/bar-fusion-geometry.js');
+const {syringeShapes}=await import('../js/blocks/syringe-shape.js');
+const {inspectMountingChange}=await import('../js/blocks/mounting-review.js');
+const frameWork=normalizeSnapshot(JSON.parse(readFileSync(new URL('./fixtures/fusion-frame-syringe.json',import.meta.url),'utf8')));
+const frameBefore=JSON.stringify(frameWork),frameGeometry=inspectFrameExport(frameConnectorNodes(frameWork.comps),{});
+for(const ids of [['H1Frame','Link13'],['Link13','H1Frame']]){
+ const f=planBarFusion(frameWork.comps,ids,frameWork.params);assert.ok(f.ok,f.reason);
+ assert.equal(f.root.id,'H1Frame');assert.ok(f.data.framePointIds.includes('FH12'));assert.ok(f.data.framePointIds.includes('A11'));
+ const world=worldFusionGeometry(f,{});
+ for(const h of frameGeometry.holes)assert.ok(world.holes.some(q=>Math.hypot(q.x-h.x,q.y-h.y)<.001&&Math.abs(q.r-h.r)<.001),`preserved ${h.id}`);
+ const catalog=buildPartGeometryCatalog({comps:f.comps,params:frameWork.params});assert.equal(catalog.parts.frame,undefined,'no second automatic frame');
+ assert.equal(catalog.parts.Link13,undefined);assert.equal(catalog.parts.H1Frame.holes.filter(h=>h.layer==='SYRINGE_CLAMP').length,2);
+ const topology=compileTopology(f.comps,{params:frameWork.params},new Set()),pose=solveTopology(topology,{thetaDeg:0});
+ const preview=attachPartMaterials(buildSceneModel(topology.visualization.links,pose.points,{groundIds:new Set(f.data.framePointIds),memberStocks:catalog.memberStocks}),catalog,{comps:f.comps,points:pose.points});
+ assert.ok(preview.materialParts.some(p=>p.partId==='H1Frame'));
+ assert.ok(catalog.parts.H1Frame.binding.pointIds.includes('A11'));
+ for(const format of ['svg','dxf'])assert.throws(()=>prepareScopedExport({comps:f.comps,modules:[],topo:{params:frameWork.params},exportSettings:{}},{scope:'selected',selectedId:'H1Frame'},format),/尚待核對/,'hydraulic fabrication guard remains');
+ assert.deepEqual(f.comps.find(c=>c.type==='syringe'),frameWork.comps.find(c=>c.type==='syringe'));
+ assert.deepEqual(inspectMountingChange(frameWork,{...frameWork,comps:f.comps}).changes,[],'regrouping does not move approved holes');
+ const changed=structuredClone(f.comps);changed.find(c=>c.type==='syringe').axisDeg+=5;
+ assert.ok(inspectMountingChange({...frameWork,comps:f.comps},{...frameWork,comps:changed}).changes.length,'subsequent clamp rotation still requests hole review');
+ const saved=normalizeSnapshot(toSnapshot(f.comps,{params:frameWork.params},13));assert.ok(saved);assert.deepEqual(saved.comps.find(c=>c.barFusion).barFusion.framePointIds,f.data.framePointIds);
+ for(const mm of [0,5,10,15,20]){
+  const cs=structuredClone(saved.comps);cs.find(c=>c.type==='syringe').extension=mm;
+  const solved=solveTopology(compileTopology(cs,{params:saved.params},new Set()),{thetaDeg:0});assert.ok(solved.isValid,solved.errorReason);assert.equal(solved.isUnderconstrained,false);
+  assert.equal(syringeShapes(cs,saved.params,solved.points).length,1);
+  assert.ok(Math.hypot(solved.points.P13b.x-cs.find(c=>c.id==='Link13').p2.x,solved.points.P13b.y-cs.find(c=>c.id==='Link13').p2.y)<.001,'extension is static');
+ }
+ const dissolved=dissolveBarFusion(f.comps,'Link13');assert.ok(frameConnectorNodes(dissolved).some(p=>p.id==='FH12'));assert.equal(dissolved.some(c=>c.barFusion),false);
+ const copy=instantiateTemplate({comps:f.comps,params:frameWork.params,base:'H1A',name:'frame'},{place:{x:200,y:300}});
+ assert.ok(normalizeSnapshot(toSnapshot(copy.comps,{params:copy.params},copy.counter,{modules:[copy.module]})),'whole-module copy retains frame reference IDs');
+}
+assert.equal(JSON.stringify(frameWork),frameBefore);
+assert.equal(planBarFusion(frameWork.comps,['H1Frame','H1Coupler'],frameWork.params).ok,false,'cannot lock cylinder and output together');
+assert.equal(planBarFusion(frameWork.comps,['H1Coupler','H1Arm'],frameWork.params).ok,false,'cannot weld driven hinge');
+const genericFrame=JSON.parse(frameBefore.replaceAll('H1','Carrier').replaceAll('Link13','Extension'));
+assert.ok(planBarFusion(genericFrame.comps,['Extension','CarrierFrame'],genericFrame.params).ok);
+const thickFrame=structuredClone(frameWork.comps);
+for(const c of thickFrame)for(const p of [c.p1,c.p2])if(p?.frameStock)p.frameStock.thicknessMm=6;
+const thickFusion=planBarFusion(thickFrame,['H1Frame','Link13'],frameWork.params);assert.ok(thickFusion.ok,thickFusion.reason);
+assert.equal(buildPartGeometryCatalog({comps:thickFusion.comps,params:frameWork.params}).parts.H1Frame.thicknessMm,6);
+assert.equal(buildPlan({comps:thickFusion.comps,params:frameWork.params}).parts.find(p=>p.compId==='H1Frame').thicknessMm,6);
+thickFrame.find(c=>c.id==='Link13').stock={thicknessMm:3};
+assert.equal(planBarFusion(thickFrame,['H1Frame','Link13'],frameWork.params).ok,false,'explicitly different plate thickness cannot silently merge');
+console.log('bar fusion: fixed frame outline, added holes, clamp, motion, review, save/module copy and conflicting attachment checks passed');

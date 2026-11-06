@@ -42,16 +42,18 @@ function catalog(s){
   return buildPartGeometryCatalog({...s,mounts});
 }
 function partFor(catalog,id){
-  return catalog.parts[id] || Object.values(catalog.parts).find(p=>p.sourceIds.includes(id)) || (id.endsWith('-frame')&&catalog.parts.frame?.sourceModuleIds?.includes(id.slice(0,-6))?catalog.parts.frame:null);
+  return catalog.parts[id] || Object.values(catalog.parts).find(p=>p.sourceIds.includes(id)) || Object.values(catalog.parts).find(p=>p.binding.framePointIds&&(id==='frame'?!p.moduleId:id===`${p.moduleId}-frame`)) || (id.endsWith('-frame')&&catalog.parts.frame?.sourceModuleIds?.includes(id.slice(0,-6))?catalog.parts.frame:null);
 }
 function footprint(part,s,relation,catalog){
   let local=p=>({x:p.x,y:p.y});
-  if(['frame','module-frame'].includes(part.binding.kind)){
+  if(['frame','module-frame'].includes(part.binding.kind)||part.binding.framePointIds){
     const nodes=s.comps.filter(c=>part.moduleId==null?!c.moduleId:c.moduleId===part.moduleId).flatMap(c=>pointKeys.map(k=>c[k])).filter(p=>p&&['fixed','motor'].includes(p.type));
     const owned=new Set(s.comps.filter(c=>c.frameHole).map(c=>c.p1.id));
     const unique=[...new Map(nodes.filter(p=>!owned.has(p.id)).map(p=>[p.id,p])).values()].sort((a,b)=>a.id.localeCompare(b.id));
     const a=unique[0],b=unique.find(p=>a&&Math.hypot(p.x-a.x,p.y-a.y)>.001);
-    if(a){const angle=b?Math.atan2(b.y-a.y,b.x-a.x):0,c=Math.cos(angle),t=Math.sin(angle);local=p=>({x:(p.x-a.x)*c+(p.y-a.y)*t,y:-(p.x-a.x)*t+(p.y-a.y)*c});}
+    if(a){const angle=b?Math.atan2(b.y-a.y,b.x-a.x):0,c=Math.cos(angle),t=Math.sin(angle);
+      const host=part.binding.framePointIds&&s.comps.find(c=>c.id===part.id),h=host?Math.atan2(host.p2.y-host.p1.y,host.p2.x-host.p1.x):0;
+      local=p=>{if(host)p={x:host.p1.x+p.x*Math.cos(h)-p.y*Math.sin(h),y:host.p1.y+p.x*Math.sin(h)+p.y*Math.cos(h)};return {x:(p.x-a.x)*c+(p.y-a.y)*t,y:-(p.x-a.x)*t+(p.y-a.y)*c};};}
   }
   let holes=part.holes,cutouts=part.cutouts;
   if(relation.id.startsWith('syringe:')){
@@ -91,6 +93,9 @@ export function inspectMountingChange(before,after){
     const changed=[];
     for(const id of ids){
       const p=partFor(ca,id),q=partFor(cb,id);
+      // The same drilling moves from the automatic frame record to the union.
+      // Compare that physical interface once via 'frame', not again via its bar.
+      if(r.id.startsWith('syringe:')&&id!=='frame'&&!id.endsWith('-frame')&&(p?.binding.framePointIds||q?.binding.framePointIds))continue;
       if(p&&!q){const reason=cb.diagnostics.find(d=>d.reason&&d.sourceIds?.some(id=>p.sourceIds.includes(id)))?.reason;issues.push(`${r.label}：${reason||`${id} 的加工幾何無法核對，請返回調整。`}`);continue;}
       if(p&&q&&!same(footprint(p,a,r,ca),footprint(q,b,n,cb)))changed.push(id);
     }

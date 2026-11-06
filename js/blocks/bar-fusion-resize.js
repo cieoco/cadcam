@@ -7,6 +7,7 @@ import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 /** Resize a bridge of the member graph; translate one entire side, never bend it.
  * All geometry/solver checks run on a candidate before the caller commits. */
 export function planBarFusionResize(comps,params,id,value,{positions={},settings={},motion={}}={}) {
+  if(fusionRoot(comps,id)?.barFusion?.framePointIds)return {ok:false,reason:'此合成包含機架固定孔，請先解除合成再調整尺寸。'};
   const fail=reason=>({ok:false,reason}),root=fusionRoot(comps,id),member=comps.find(c=>c.id===id);
   const f=inspectBarFusionData(comps,root,params);if(!f.ok)return f;
   if(!Number.isFinite(value)||value<8||value>2000)return fail('孔距請填 8–2000 mm。');

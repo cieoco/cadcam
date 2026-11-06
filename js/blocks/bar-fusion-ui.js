@@ -30,7 +30,12 @@ export function openBarFusion({first,comps,params,settings,positions,motion,onCo
     shown=plan.positions||positions;
     status.textContent=plan.ok?'已選 '+selected.size+' 支 → 合成一片；'+(plan.straightened?'接近直線（1° 內）的桿段已對齊，孔距不變。':'內部角度固定。'):plan.reason;
     confirm.disabled=!plan.ok;svg.replaceChildren();
-    if(plan.ok){const g=worldFusionGeometry(plan,shown),path=document.createElementNS(NS,'path');path.setAttribute('d',[...g.outlines,...g.cutouts.map(c=>c.points),...g.holes.map(h=>Array.from({length:32},(_,i)=>({x:h.x+h.r*Math.cos(i*Math.PI/16),y:h.y+h.r*Math.sin(i*Math.PI/16)})))].map(ring).join(' '));path.setAttribute('fill','#aedccc');path.setAttribute('fill-rule','evenodd');path.setAttribute('stroke','#236e5e');svg.append(path);}
+    if(plan.ok){const g=worldFusionGeometry(plan,shown),path=document.createElementNS(NS,'path');
+      const ps=[...all,...g.outlines.flat()],xs=ps.map(p=>p.x),ys=ps.map(p=>p.y),left=Math.min(...xs)-pad,bottom=Math.min(...ys)-pad,top=Math.max(...ys)+pad;
+      svg.setAttribute('viewBox',[left,-top,Math.max(...xs)+pad-left,top-bottom].join(' '));
+      if(plan.data.framePointIds)status.textContent+=' 原機架外形、固定孔與針筒安裝保留。';
+      path.setAttribute('d',[...g.outlines,...g.cutouts.map(c=>c.points),...g.holes.map(h=>Array.from({length:32},(_,i)=>({x:h.x+h.r*Math.cos(i*Math.PI/16),y:h.y+h.r*Math.sin(i*Math.PI/16)})))].map(ring).join(' '));path.setAttribute('fill','#aedccc');path.setAttribute('fill-rule','evenodd');path.setAttribute('stroke','#236e5e');svg.append(path);
+    }else svg.setAttribute('viewBox',[x,-y-h,w,h].join(' '));
     for(const c of bars){const a=point(c.p1),b=point(c.p2),line=document.createElementNS(NS,'line');
       for(const [key,value] of Object.entries({x1:a.x,y1:-a.y,x2:b.x,y2:-b.y,stroke:selected.has(c.id)?'#268878':'#a9b9bf','stroke-width':memberStock(c).widthMm,'stroke-linecap':'round','stroke-opacity':plan.ok&&selected.has(c.id)?'.18':'.65'}))line.setAttribute(key,value);
       line.setAttribute('role','button');line.setAttribute('aria-label','選取連桿 '+(c.name||c.id));line.style.cursor='pointer';line.addEventListener('click',()=>toggle(c.id));svg.append(line);

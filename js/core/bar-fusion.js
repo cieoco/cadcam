@@ -5,7 +5,7 @@ export const fusionRoot = (comps, id) => {
   const c = comps.find(c => c.id === id);
   return c?.barFusion ? c : comps.find(p => p.id === c?.barFusionRoot && p.barFusion) || null;
 };
-export const fusionAtPoint = (comps, id) => comps.find(c => c.barFusion?.points?.some(p => p.id === id)) || null;
+export const fusionAtPoint = (comps, id) => comps.find(c => c.barFusion?.points?.some(p => p.id === id)||c.barFusion?.framePointIds?.includes(id)) || null;
 export function barFusionSide(comps,id,aId,bId) {
   const data=comps.find(c=>[id,aId,bId].every(id=>c.barFusion?.points.some(p=>p.id===id)))?.barFusion.points;
   const p=data?.find(p=>p.id===id),a=data?.find(p=>p.id===aId),b=data?.find(p=>p.id===bId);
@@ -17,7 +17,8 @@ export function normalizeBarFusion(raw) {
     || !Array.isArray(raw.points) || raw.points.length < 2 || raw.points.length > 32
     || !raw.points.every(p => p && safe(p.id) && Number.isFinite(p.x) && Number.isFinite(p.y))
     || new Set(raw.points.map(p => p.id)).size !== raw.points.length) return null;
-  return {version:1,members:[...raw.members],points:raw.points.map(({id,x,y})=>({id,x,y}))};
+  if(raw.framePointIds && (!Array.isArray(raw.framePointIds)||raw.framePointIds.length<2||!raw.framePointIds.every(safe)||new Set(raw.framePointIds).size!==raw.framePointIds.length))return null;
+  return {version:1,members:[...raw.members],points:raw.points.map(({id,x,y})=>({id,x,y})),...(raw.framePointIds?{framePointIds:[...raw.framePointIds]}:{})};
 }
 export function inspectBarFusionData(comps, root, params = {}) {
   const fail = reason => ({ok:false,reason});
@@ -29,6 +30,10 @@ export function inspectBarFusionData(comps, root, params = {}) {
   const ids = new Set(members.flatMap(c => [c.p1?.id,c.p2?.id]));
   if (ids.size !== data.points.length || data.points.some(p => !ids.has(p.id))) return fail('合成孔位已變更，請先解除合成。');
   const points = Object.fromEntries(data.points.map(p => [p.id,p]));
+  if(data.framePointIds){
+    const fixed=new Set(comps.filter(c=>c.moduleId===root.moduleId).flatMap(c=>[c.p1,c.p2,c.p3]).filter(p=>p&&['fixed','motor'].includes(p.type)).map(p=>p.id));
+    if(!data.framePointIds.every(id=>fixed.has(id))||![root.p1.id,root.p2.id].every(id=>data.framePointIds.includes(id)))return fail('合成機架的固定孔已變更，請先解除合成。');
+  }
   const a=points[root.p1.id], b=points[root.p2.id];
   if (Math.hypot(a.x,a.y)>1e-6 || Math.abs(b.y)>1e-6 || b.x<=0) return fail('合成基準孔無效。');
   for (const c of members) {

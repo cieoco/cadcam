@@ -27,6 +27,7 @@ export function planMemberCopy({comps, params, modules = [], counter = 0, id, po
   if (!['copy','mirror-x','mirror-y'].includes(mode)) return fail('請選擇複製或鏡像方向。');
   const root = fusionRoot(comps,id);
   const fused = root && inspectBarFusionData(comps,root,params);
+  if(root?.barFusion?.framePointIds)return fail('合成機架包含固定孔與安裝關係，請存成模組複製，或先解除合成。');
   if (fused && !fused.ok) return fail(fused.reason);
   const members = fused ? fused.members : [selected];
   if (members.some(c => c.fusedWith)) return fail('這片板已與齒輪合成，請先解除合成再複製。');
