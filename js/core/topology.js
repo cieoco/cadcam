@@ -1,3 +1,4 @@
+import {localHoles,expandLocalHoles} from './local-holes.js';
 import {gearTrain} from './gear-train.js';
 import {expandSyringes} from './syringe.js';
 /**
@@ -61,6 +62,15 @@ export function compileTopology(components, topology, solvedPoints) {
         const compiled=compileTopology(expanded.comps,{...topology,params:expanded.params},solvedPoints);
         compiled._syringes={comps:components,params:topology.params || {},issues:expanded.issues};
         return compiled;
+    }
+    if(components.some(c=>localHoles(c).length)){
+        const expanded=expandLocalHoles(components,topology.params || {}),result=compileTopology(expanded.comps,{...topology,params:expanded.params},solvedPoints),ids=new Set(expanded.aux.map(c=>c.id)),holes=new Set(expanded.aux.map(c=>c.p3.id));
+        result.parts=result.parts.filter(p=>!ids.has(p.id));
+        const pair=(a,b)=>[a,b].sort().join('|'),edges=list=>new Set(list.flatMap(c=>[[c.p1.id,c.p2.id],[c.p1.id,c.p3.id],[c.p2.id,c.p3.id]].map(([a,b])=>pair(a,b)))),realEdges=edges(components.filter(c=>c.type==='triangle')),auxEdges=edges(expanded.aux);
+        const seen=new Set();result.visualization.links=result.visualization.links.filter(l=>{if(expanded.aux.some(c=>l.id?.startsWith(c.id))||!l.id&&auxEdges.has(pair(l.p1,l.p2))&&!realEdges.has(pair(l.p1,l.p2)))return false;const key=l.id||pair(l.p1,l.p2)+(l.style || '');if(seen.has(key))return false;seen.add(key);return true;});
+        for(const c of expanded.aux)for(const k of [c.r1Param,c.r2Param])if(!(k in (topology.params || {})))delete result.params[k];
+        result.visualization.polygons=result.visualization.polygons.filter(p=>!holes.has(p.points?.[2]));
+        return result;
     }
     const steps = [];
     const visualization = { links: [], polygons: [], joints: [] };

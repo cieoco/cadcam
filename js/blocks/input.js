@@ -1,3 +1,4 @@
+import {localHoles} from '../core/local-holes.js';
 import {fusionRoot,fusionAtPoint} from '../core/bar-fusion.js';
 /**
  * blocks / input
@@ -123,7 +124,7 @@ export function onNodeDown(e, id) {
   if (!pendingMobileEdit) openMobileEditPanel();
   Panels.updateRoleEditor();
   S.dragId = null; S.snapTarget = null;
-  pendingNodeDrag = S.comps.some(c=>c.frameHole&&c.p1.id===id) || fusionAtPoint(S.comps,id) || (pointIsGround(id) && !isGroundPositionUnlocked(id)) ? null : {
+  pendingNodeDrag = S.comps.some(c=>localHoles(c).some(h=>h.id===id)) || S.comps.some(c=>c.frameHole&&c.p1.id===id) || fusionAtPoint(S.comps,id) || (pointIsGround(id) && !isGroundPositionUnlocked(id)) ? null : {
     id, x:e.clientX, y:e.clientY, pointerType:e.pointerType || 'mouse'
   };
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}

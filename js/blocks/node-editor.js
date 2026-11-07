@@ -1,3 +1,4 @@
+import {localHoles} from '../core/local-holes.js';
 import {fusionAtPoint} from '../core/bar-fusion.js';
 /**
  * blocks / node-editor
@@ -10,7 +11,7 @@ import {fusionAtPoint} from '../core/bar-fusion.js';
 
 import { S } from './state.js';
 import * as Panels from './panels.js';
-import { LEGO_FRAME_STEP as LEGO_STEP } from './model.js';
+import { displayPoint, LEGO_FRAME_STEP as LEGO_STEP } from './model.js';
 import { servoInputAt } from './motor-tools.js';
 
 export function createNodeEditor({
@@ -53,6 +54,9 @@ export function createNodeEditor({
     scheduleAutosave();
   }
   function setNodeRole(type) {
+    const local=S.comps.some(c=>localHoles(c).some(h=>h.id===S.selectedNodeId));
+    if(type==='fixed'&&local){const home=pointCoords()[S.selectedNodeId],shown=displayPoint(S.comps,S.compiled,S.theta,S.selectedNodeId,{...S.motorAngles,[String(S.activeMotor)]:S.theta});if(!home||!shown||Math.hypot(home.x-shown.x,home.y-shown.y)>.0001){transient('請先回到板材的初始姿態，再固定局部孔；這次未改變作品。');return;}}
+    if(type==='motor'&&S.comps.some(c=>localHoles(c).some(h=>h.id===S.selectedNodeId))){transient('這個是剛體局部孔；可連接或固定，馬達請使用致動元件安裝。');return;}
     if(type==='floating'&&S.comps.some(c=>c.frameHole&&[c.frameHole.a,c.frameHole.b].includes(S.selectedNodeId))){transient('這個基準孔仍有機架孔依附，請先刪除附屬孔再取消固定。');return;}
     if(S.comps.some(c=>c.frameHole&&c.p1.id===S.selectedNodeId)){transient('這是機架上的孔；要移動請調整距基準孔。');return;}
     if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) return;
@@ -68,7 +72,7 @@ export function createNodeEditor({
     setPointType(S.selectedNodeId, type);
     // Promoting a joint to the frame is an explicit manufacturing decision;
     // immediately place it on the 8 mm hole grid (always on since G4a).
-    if (type === 'fixed') {
+    if (type === 'fixed' && !local) {
       const p = pointCoords()[S.selectedNodeId];
       if (p) {
         const q = snapFramePoint(p);

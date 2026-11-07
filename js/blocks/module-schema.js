@@ -94,7 +94,7 @@ function validateBase(rawBase, moduleComps) {
     const p = c[k];
     return p && p.id === rawBase && (p.type === 'fixed' || p.type === 'motor');
   }));
-  return found ? rawBase : null;
+  return found || moduleComps.some(c=>(c.holes || []).some(h=>h.id===rawBase&&h.type==='fixed')) ? rawBase : null;
 }
 
 // 直角安裝 orient（SDD-ORTHOGONAL-MOUNT §4.1）：不合法就回 null（靜默丟掉，退回同平面安裝）。

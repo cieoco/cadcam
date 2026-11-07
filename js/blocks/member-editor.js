@@ -1,3 +1,5 @@
+import {resizeStandardBlank} from './standard-blank.js';
+import {pointRefs} from './model.js';
 import {editableNumber} from './numeric-input.js';
 import {setPointPosition,setPointAngle} from './input.js';
 import {pointRotation,freeLinkForPoint,freeTriangleForPoint,updatePointCoordsById as movePoint} from './model.js';
@@ -19,6 +21,10 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
   const dimensionId = () => S.triSide || 'g';
   function sync() {
     const comp = selected();
+    if(el('lenEditor'))el('lenEditor').dataset.selectionSummary=comp?.standardBlank?`${comp.name}：實際 ${(comp.holes || []).length+(comp.type==='bar'?2:3)} 孔・孔距基準 ${S.topo.params[comp.type==='bar'?comp.lenParam:comp.gParam]}${comp.type==='triangle'?' × '+S.topo.params[comp.r1Param]:''} mm`:'';
+    let blankFields=el('standardBlankEdit');if(!blankFields&&el('memberDimensionLabel')){blankFields=document.createElement('div');blankFields.id='standardBlankEdit';el('memberDimensionLabel').before(blankFields);}
+    if(blankFields){blankFields.hidden=!comp?.standardBlank;blankFields.replaceChildren();if(comp?.standardBlank)for(const[axis,label,value]of[['g','長向孔數',Number(S.topo.params[comp.type==='bar'?comp.lenParam:comp.gParam])/8+1],...(comp.type==='triangle'?[['r1','直向孔數',Number(S.topo.params[comp.r1Param])/8+1]]:[]),...(comp.standardBlank.kind==='l'?[['arm','臂寬孔列數',(comp.standardBlank.armWidthMm-13)/8+1]]:[])]){const row=document.createElement('label'),input=document.createElement('input');row.textContent=label;input.type='number';input.min=axis==='arm'?1:2;input.max=128;input.step=1;input.value=Number.isInteger(value)?value:'';input.placeholder='特殊尺寸';input.dataset.blankEdit=axis;input.setAttribute('aria-label',label);input.onchange=()=>{const n=Number(input.value);if(!Number.isInteger(n)||n<Number(input.min)){notify('孔數請填有效整數；精確尺寸可用原毫米欄。');sync();return;}S.triSide=axis;setDimensionValue(comp.id,axis,axis==='arm'?(n-1)*8+13:(n-1)*8,{exact:true});};row.append(input);blankFields.append(row);}}
+
     const segments=el('fusionSegment');
     if(segments){
       segments.hidden=!comp?.barFusionRoot;
@@ -73,7 +79,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     el('memberMirrorLabel').style.display = 'none';
     const stockFields=el('memberStockDimensions');if(stockFields)stockFields.hidden=!active||isDisk(comp);
     for(const [field,key] of [['memberWidthInput','widthMm'],['memberThicknessInput','thicknessMm']]){
-      const node=el(field);if(node){node.value=active?memberStock(comp)[key]:'';node.disabled=!active||Boolean(comp?.barFusionRoot);}
+      const node=el(field);if(node){if(key==='widthMm')node.closest('label').hidden=!!comp?.standardBlank&&comp.type==='triangle';node.value=active?memberStock(comp)[key]:'';node.disabled=!active||Boolean(comp?.barFusionRoot);}
     }
     const target=el('memberMaterialTarget');if(target)target.textContent=active?`選取零件：${comp.label || comp.id}${comp.barFusionRoot?'（請先解除合成再修改材料）':''}`:'請先選取連桿或板件，再開啟製作設定。';
     const material = el('memberMaterial');
@@ -131,6 +137,15 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
   function setDimensionValue(componentId,id,raw,{mirrorPair=false,exact=false}={}) {
     const comp=S.comps.find(c=>c.id===componentId);
     if(!comp)return;
+    if(comp.standardBlank&&['g','r1','arm'].includes(id)){
+      const value=Number(raw),plan=resizeStandardBlank(comp,S.topo.params,id,value,{comps:S.comps});if(!plan.ok){notify(plan.message);sync();return;}
+      const retained=new Set((plan.comp.holes || []).map(h=>h.id)),lost=(comp.holes || []).filter(h=>!retained.has(h.id)&&(h.type==='fixed'||pointRefs(S.comps,h.id).length>1));
+      if(lost.length){notify('縮小會刪除已固定或已連接的孔，請先解除連接。');sync();return;}
+      if(JSON.stringify(comp)===JSON.stringify(plan.comp)&&Object.entries(plan.params).every(([k,v])=>S.topo.params[k]===v))return;
+      pause();let invalid='';const accepted=commitMountingEdit(S,draft=>{const index=draft.comps.findIndex(c=>c.id===comp.id);draft.comps[index]=plan.comp;Object.assign(draft.params,plan.params);for(const key of ['p1','p2',...(comp.type==='triangle'?['p3']:[])]){const p=plan.comp[key];movePoint(draft.comps,p.id,p.x,p.y);}invalid=validateCandidate(draft);return !invalid;},{pushUndo,notify});
+      if(!accepted){if(invalid)notify(invalid);sync();draw();return;}rebuild();draw();return;
+    }
+
     if(isDisk(comp)){const error=validateDisk(comp,Number(raw),comp.diameterMm,holeDiameter(comp));if(error){notify(error);sync();return;}}
     const dimension = memberDimensions(comp).find(d => d.id === id);
     if (dimension?.stockKey) { setStock(dimension.stockKey, raw); return; }
@@ -169,6 +184,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if (comp) setValue(memberDimensionValue(comp, S.topo.params, dimensionId()) + (dimension?.step ? Math.sign(delta) * dimension.step : delta));
   }
   function setStock(key, raw) {
+    if(key==='widthMm'&&selected()?.standardBlank&&selected().type==='triangle'){notify('板材寬度請調整寬向孔數；L型件請調整臂寬。');return;}
     if(selected()?.barFusionRoot){notify('請先解除合成再修改尺寸或材料。');sync();return;}
     const comp = selected();
     if (!comp || !['bar', 'triangle'].includes(comp.type)) return;

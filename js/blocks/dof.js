@@ -38,7 +38,7 @@ function pointIds(comp) {
   if (!comp) return [];
   // 滑軌的可動剛體是滑塊 p3；p1/p2/m1/m2 是承載它的軌道／機架。
   if (comp.type === 'slider') return comp.p3?.id ? [comp.p3.id] : [];
-  return pointKeysFor(comp).map(key => comp[key]?.id).filter(Boolean);
+  return [...pointKeysFor(comp).map(key => comp[key]?.id),...(comp.holes || []).map(h=>h.id)].filter(Boolean);
 }
 
 function isGroundPoint(point) {
@@ -53,6 +53,7 @@ function allGroundPointIds(comps) {
     const point = comp[key];
     if (point?.id && isGroundPoint(point)) ground.add(point.id);
   }));
+  for(const c of comps)for(const h of c.holes || [])if(isGroundPoint(h))ground.add(h.id);
   return ground;
 }
 

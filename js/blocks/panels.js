@@ -1,3 +1,4 @@
+import {localHoles} from '../core/local-holes.js';
 import {partDisplayName} from './display-labels.js';
 import {editableNumber} from './numeric-input.js';
 import {setPointPosition,setPointAngle} from './input.js';
@@ -142,6 +143,7 @@ export function updateRoleEditor() {
     (c.type==='gear' && c.p1?.id===S.selectedNodeId && c.p1.physicalMotor) ||
     (c.type==='bar' && c.isInput && [c.p1,c.p2].some(p=>p?.id===S.selectedNodeId && p.physicalMotor)))?'flex':'none';
   renderNodePosition(S.selectedNodeId);
+  const local=S.comps.some(c=>localHoles(c).some(h=>h.id===S.selectedNodeId));let notice=document.getElementById('localHoleNotice');if(!notice){notice=document.createElement('p');notice.id='localHoleNotice';editor.append(notice);}notice.hidden=!local;notice.textContent='此孔隨桿件／板材移動，可接桿或在初始姿態固定；獨立移孔請沿特殊孔位／外形繪圖。';for(const key of ['nodeXVal','nodeYVal']){const field=document.getElementById(key)?.querySelector('input');if(field)field.disabled=local;}
   let angleRow=document.getElementById('nodeDirection');
   if(!angleRow){angleRow=document.createElement('label');angleRow.id='nodeDirection';angleRow.innerHTML='方向（°，水平為 0） <span></span>';editor.insertBefore(angleRow,advanced);}
   const rotation=pointRotation(S.comps,S.topo.params,S.selectedNodeId);

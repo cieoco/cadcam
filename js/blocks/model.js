@@ -1,3 +1,4 @@
+import {localHoles,holeWorld} from '../core/local-holes.js';
 /**
  * blocks / model
  *
@@ -29,6 +30,7 @@ export function pointCoords(comps) {
   comps.filter(c => c.type === 'rack' && Array.isArray(c.holes)).forEach(c => c.holes.forEach(h => {
     if (h?.id) m[h.id] = { x: Number(h.x ?? c.p1?.x) || 0, y: Number(h.y ?? c.p1?.y) || 0 };
   }));
+  for(const c of comps)for(const h of localHoles(c))m[h.id]=holeWorld(c,h);
   return m;
 }
 
@@ -74,6 +76,7 @@ export function pointRefs(comps, id) {
   comps.filter(c => c.type === 'rack' && Array.isArray(c.holes)).forEach(c => c.holes.forEach((h, index) => {
     if (h?.id === id) refs.push({ comp: c, key: `holes.${index}`, point: h });
   }));
+  for(const c of comps)for(const h of localHoles(c))if(h.id===id)refs.push({comp:c,key:'holes',point:h});
   return refs;
 }
 
@@ -122,6 +125,7 @@ export function frameNodeIds(comps) {
   comps.forEach(c => pointKeysFor(c).forEach(k => {
     if (c[k] && c[k].id && isGroundPoint(c[k])) ids.add(c[k].id);
   }));
+  for(const c of comps)for(const h of localHoles(c))if(isGroundPoint(h))ids.add(h.id);
   return ids;
 }
 
@@ -154,8 +158,8 @@ export function frameConnectorNodes(comps) {
     .forEach(c=>c.barFusion.points.forEach(p=>separateIds.add(p.id)));
   // 靜態結構板（三點桿、≥2 個機架固定點）＝使用者畫的機架本體：
   // 它的接點不再餵給自動地基，否則會生成第二塊重複的機架板。
-  (comps||[]).filter(c=>c?.type==='triangle'&&['p1','p2','p3'].filter(k=>c[k]&&isGroundPoint(c[k])).length>=2)
-    .forEach(c=>pointKeysFor(c).forEach(k=>{if(c[k]?.id)separateIds.add(c[k].id);}));
+  (comps||[]).filter(c=>(c?.type==='triangle'||c?.standardBlank)&&[...pointKeysFor(c).map(k=>c[k]),...localHoles(c)].filter(p=>p&&isGroundPoint(p)).length>=2)
+    .forEach(c=>{pointKeysFor(c).forEach(k=>{if(c[k]?.id)separateIds.add(c[k].id);});localHoles(c).forEach(h=>separateIds.add(h.id));});
   // 齒條導銷孔徑（M3）：framePins 節點帶 holeDiameterMm（回傳新物件，不動 comps 內原物件）
   const pinHoleById = new Map();
   (comps||[]).filter(c=>c?.type==='rack'&&Number.isFinite(c.pinHoleDiameterMm)&&Array.isArray(c.framePins))
@@ -225,6 +229,7 @@ export function mergePoints(comps, fromId, toId) {
   comps.forEach(c => pointKeysFor(c).forEach(k => {
     if (c[k] && c[k].id === fromId) { c[k].id = toId; c[k].x = t.x; c[k].y = t.y; }
   }));
+  for(const c of comps)for(const h of localHoles(c))if(h.id===fromId)h.id=toId;
   // 被合併成零長度的桿就移除
   return comps.filter(c => !(c.type === 'bar' && c.p1 && c.p2 && c.p1.id === c.p2.id));
 }
@@ -441,13 +446,7 @@ export function fixedLinkFor(comps, id) {
   return ls.length === 1 ? ls[0] : null;
 }
 
-export function pointUseCount(comps, id) {
-  let count = 0;
-  comps.forEach(c => pointKeysFor(c).forEach(k => {
-    if (c[k] && c[k].id === id) count += 1;
-  }));
-  return count;
-}
+export function pointUseCount(comps,id){return pointRefs(comps,id).length;}
 
 export function isFreeLink(comps, c) {
   return c && c.type === 'bar' && c.fixedLen &&

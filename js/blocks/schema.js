@@ -66,6 +66,11 @@ function normalizePoint(point, fallbackId, warnings) {
   return out;
 }
 
+function localHoleRecords(raw){
+ return (Array.isArray(raw)?raw:[]).filter(h=>h&&safeId(h.id)&&Number.isFinite(h.u)&&Number.isFinite(h.v)).map(h=>({id:h.id,u:h.u,v:h.v,diameter:Math.max(.5,Math.min(20,num(h.diameter,3.2))),type:h.type==='fixed'?'fixed':'floating'}));
+}
+function keepBlank(comp,out){if(['bar','plate','l'].includes(comp.standardBlank?.kind))out.standardBlank={kind:comp.standardBlank.kind,...(comp.standardBlank.kind==='l'?{armWidthMm:Math.max(13,num(comp.standardBlank.armWidthMm,13))}:{})};}
+
 function normalizeAnchor(comp, index, warnings) {
   const id = safeId(comp.id) ? comp.id : `Anchor${index + 1}`;
   const p1 = normalizePoint(comp.p1, `A${index + 1}`, warnings);
@@ -153,6 +158,7 @@ function normalizeBar(comp, index, params, warnings) {
     const holes = comp.holes
       .filter(h => h && safeId(h.id))
       .map((h, hIndex) => {
+        if(Number.isFinite(h.u)&&Number.isFinite(h.v))return localHoleRecords([h])[0];
         const distParam = safeId(h.distParam) ? h.distParam : `${lenParam}_H${hIndex + 1}`;
         if (params[distParam] === undefined) params[distParam] = Math.max(0, Math.round(num(h.dist, 0)));
         return { id: h.id, distParam };
@@ -160,6 +166,7 @@ function normalizeBar(comp, index, params, warnings) {
     if (holes.length) out.holes = holes;
   }
 
+  keepBlank(comp,out);
   params[lenParam] = restoredLength(params[lenParam], Math.hypot(p2.x - p1.x, p2.y - p1.y), lenParam, warnings);
   return out;
 }
@@ -241,6 +248,7 @@ function normalizeTriangle(comp, index, params, warnings) {
   }
   if (!vertices.some(v => v.solve) && refExists.p1) vertices.unshift({ solve: true, ref: 'p1' });
   out.vertices = vertices;
+  const holes=localHoleRecords(comp.holes);if(holes.length)out.holes=holes;keepBlank(comp,out);
   if (comp.visualOnly) out.visualOnly = true;
   if (comp.snapLength === false) out.snapLength = false;
 
@@ -595,6 +603,7 @@ export function normalizeSnapshot(obj) {
   if (!obj || typeof obj !== 'object') return null;
   const sourceComps = Array.isArray(obj.comps) ? obj.comps : null;
   if (!sourceComps) return null;
+  if(sourceComps.some(c=>['bar','triangle'].includes(c?.type)&&Array.isArray(c.holes)&&(c.standardBlank||c.holes.some(h=>Number.isFinite(h?.u)&&Number.isFinite(h?.v)))&&(c.holes.length>128||new Set(c.holes.map(h=>h?.id)).size!==c.holes.length)))return null;
   if(sourceComps.some(c=>c?.boxPanel && (c.type!=='bar'||!normalizeBoxPanel(c.boxPanel))))return null;
 
   const warnings = [];

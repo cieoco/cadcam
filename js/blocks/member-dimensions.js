@@ -9,6 +9,7 @@ const stockDimensions = () => [
 ];
 
 export function memberDimensions(comp) {
+  if(comp?.standardBlank)return [{id:'g',label:'長向孔距 A–B',refs:['p1','p2'],param:comp.type==='bar'?comp.lenParam:comp.gParam},...(comp.type==='triangle'?[{id:'r1',label:'直向孔距 A–C',refs:['p1','p3'],param:comp.r1Param}]:[]),...(comp.standardBlank.kind==='l'?[{id:'arm',label:'L型臂寬',property:'standardArmWidth'}]:[]),...stockDimensions().filter(d=>comp.type==='bar'||d.stockKey!=='widthMm')];
   if(isDisk(comp))return [{id:'g',label:'工作孔距中心 A–B',refs:['p1','p2'],param:comp.lenParam,step:1}];
   if (comp?.type === 'bar') return [{ id: 'g', label: comp.boxPanel?'板件長度':'孔距 A–B', refs: ['p1', 'p2'], param: comp.lenParam }, ...stockDimensions()];
   if (comp?.type !== 'triangle') return [];
@@ -27,6 +28,7 @@ export function memberDimensionValue(comp, params, id = 'g') {
   const dimension = memberDimensions(comp).find(d => d.id === id);
   if (!dimension) return NaN;
   if (dimension.stockKey) return memberStock(comp)[dimension.stockKey];
+  if(id==='arm')return comp.standardBlank.armWidthMm;
   if (dimension.property) return Number(comp.jawTipLength ?? Math.max(38, Math.min(84, Number(params[comp.r1Param]) * 0.58)));
   return Number(params[dimension.param]);
 }

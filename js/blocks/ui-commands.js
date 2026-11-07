@@ -7,8 +7,9 @@ export const COMMAND_GROUPS = [
 ];
 // 常用零件直接呈現，少用零件再展開；不要求初學者先理解機構分類。
 export const ADD_SECTIONS = [
-  { id: 'common', label: '常用零件', hint: '放零件，再點選修改', primary: true },
-  { id: 'other', label: '其他零件', hint: '固定支點、滑軌、齒輪等' },
+  { id: 'common', label: '基本結構', hint: '孔數決定大小，再點畫布放置', primary: true },
+  { id: 'other', label: '專用機件', hint: '動力、圓盤、滑軌與傳動' },
+  { id: 'free', label: '特殊孔位／外形', hint: '沿用自由繪圖' },
   { id: 'modules', label: '加入模組', hint: '從完整機構開始' },
   { id: 'plugin', label: '外掛', hint: '擴充功能' }
 ];
@@ -16,11 +17,11 @@ const B = 'window.blocks.';
 // [id, 名稱, 圖示, 說明, 函式, ...參數]
 const add = (section, rows) => rows.map(([id, label, icon, tip, run, ...args]) => ({ id, group: 'add', section, label, icon, tip, run: B + run, args, modes: ['design'] }));
 export const COMMANDS = [
-  ...add('common', [['bar', '連桿', '🔵', '點兩點畫桿', 'pickLinkTool', 'bar'],
-    ['disk', '圓盤', '⚪', '中心孔與工作孔；外徑可調', 'startDrawDisk'], ['plate', '板件', '🟢', '前三點主孔，再加外形', 'startDrawPolygon'], ['motor', '馬達', '🔴', 'TT／N20', 'openMotorChoice']]),
+  ...add('common', [['bar', '桿件', '🔵', '單排孔數', 'openStandardBlank', 'bar'], ['plate', '板材', '🟩', '長×寬孔數', 'openStandardBlank', 'plate'], ['lshape', 'L型件', 'Ⅼ', '兩臂孔數與臂寬；同平面', 'openStandardBlank', 'l']]),
+  ...add('free', [['drawBar', '自由畫桿', '🔵', '點兩點畫桿', 'pickLinkTool', 'bar'], ['drawPlate', '自訂板件', '🟢', '前三點主孔，再加外形', 'startDrawPolygon'], ['triangle', '三角板', '🔺', '三孔，填滿', 'pickLinkTool', 'triangle'], ['polyline', '折線桿', '📈', '多孔，不填滿', 'pickLinkTool', 'polyline']]),
+  ...add('other', [['disk', '圓盤', '⚪', '中心孔與工作孔', 'startDrawDisk'], ['motor', '馬達', '🔴', 'TT／N20', 'openMotorChoice']]),
   ...add('other', [['anchor', '固定支點', '📌', '新增獨立固定點；也可點現有孔固定', 'addAnchor'],
-    ['triangle', '三角板', '🔺', '三孔，填滿', 'pickLinkTool', 'triangle'],
-    ['polyline', '折線桿', '📈', '多孔，不填滿', 'pickLinkTool', 'polyline'], ['rail', '滑軌', '🟩', '畫軌道讓滑塊走', 'startDrawRail'],
+    ['rail', '滑軌', '🟩', '畫軌道讓滑塊走', 'startDrawRail'],
     ['servo', '舵機', '🟦', 'MG995', 'pickMotorType', 'mg995'],
     ['linear', '線性致動器', '🟢', '沿滑軌推拉', 'pickMotorType', 'linear'], ['syringe', '液壓針筒', '💧', '10cc 管夾固定', 'addFixedSyringe']]),
   ...add('other', [['gearPair', '齒輪對', '⚙️', '成對嚙合', 'addGearPair'], ['rackPinion', '齒輪齒條', '▥', '直線滑台', 'addRackPinion'], ['chain', '鏈輪＋鏈條', '⛓️', '#25 鏈條', 'startChainDrive']]),

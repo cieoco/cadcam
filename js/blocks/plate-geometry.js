@@ -1,3 +1,5 @@
+import {blankGeometry} from './standard-blank.js';
+import {localHoles,holeWorld} from '../core/local-holes.js';
 import { memberStock } from './member-stock.js';
 
 export const DEFAULT_PLATE_RADIUS_WORLD = 6.5;
@@ -357,9 +359,11 @@ export function createPlateGeometry(comp, points, options = {}) {
   if (mode === 'polyline') outline = cleanPolylineOutline(source || fallback, radius);       // 折線桿：沿孔順序的細彎桿
   else if (mode === 'polygon') outline = roundedPolygonOutline(source || fallback, radius);  // 多邊形板：照孔位收成封閉圓角實心板
   else outline = roundedHullOutline(fallback, radius);                                        // 包絡板：凸包外框
+  const blank=blankGeometry(comp,points);if(blank)outline=blank;
   const holePts = world.filter(p => p.solve || p.hole);
   let holes = (holePts.length ? holePts : cleanPoints(points))
     .map(p => ({ x: p.x, y: p.y, r: holeRadius }));
+  holes.push(...localHoles(comp).map(h=>({...holeWorld({...comp,p1:points[0],p2:points[1],p3:points[2]},h),r:h.diameter/2,id:h.id})));
   // 落在切割槽內或與外加孔重疊的頂點孔沒有意義（材料被切掉／同軸），移除。
   if (extraCutouts.length) holes = holes.filter(h => !extraCutouts.some(c => pointInPoly(h, c.points)));
   if (extraHoles.length) holes = holes.filter(h => !extraHoles.some(e => Math.hypot(e.x - h.x, e.y - h.y) < 0.05));

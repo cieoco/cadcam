@@ -156,7 +156,7 @@ export function createPlateEditor({
     const modeSel = document.getElementById('plateShapeModeSelect');
     const addBtn = document.getElementById('addOutlinePointBtn');
     if (!modeSel || !addBtn) return;
-    if (!comp || comp.type !== 'triangle' || comp.shape === 'jaw') {
+    if (!comp || comp.type !== 'triangle' || comp.shape === 'jaw' || comp.standardBlank) {
       modeSel.style.display = 'none';
       addBtn.style.display = 'none';
       return;
@@ -190,6 +190,7 @@ export function createPlateEditor({
   function setTriangleShapeMode(mode) {
     const comp = S.comps.find(x => x.id === S.selectedTriangleId && x.type === 'triangle');
     if (!comp) return;
+    if(comp.standardBlank){setBanner('標準板材請調整孔數或毫米尺寸；自由外形請沿特殊孔位／外形建立。');return;}
     if (comp.shape === 'jaw') { setBanner('夾爪請使用爪端長度調整外形；自由外形仍待支援。'); return; }
     if(!commitMountingEdit(S,d=>{d.comps.find(c=>c.id===comp.id).shapeMode=['hull','polygon','polyline'].includes(mode)?mode:'hull';},{pushUndo,notify:setBanner})){updatePlateShapeControls(comp);return;}
     updatePlateShapeControls(comp);
@@ -198,6 +199,7 @@ export function createPlateEditor({
   function addTriangleOutlinePoint() {
     const comp = S.comps.find(x => x.id === S.selectedTriangleId && x.type === 'triangle');
     if (!comp) return;
+    if(comp.standardBlank){setBanner('標準板材請調整孔數或毫米尺寸；自由外形請沿特殊孔位／外形建立。');return;}
     if (comp.shape === 'jaw') { setBanner('夾爪請使用爪端長度調整外形；自由外形仍待支援。'); return; }
     if (plateVertices(comp).length >= MAX_PLATE_POINTS) {
       setBanner(`多點桿最多 ${MAX_PLATE_POINTS} 點；其它點只作外形控制。`);

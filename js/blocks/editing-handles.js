@@ -1,3 +1,4 @@
+import {holeSide} from '../core/local-holes.js';
 import {drawMotorAngle} from './motor-angle-editor.js';
 /** Selected dimensions use existing setters; the moving handle is a draft until release. */
 import {S} from './state.js';
@@ -97,8 +98,9 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
   if(c&&['bar','triangle'].includes(c.type)&&!c.boxPanel){
     const id=S.selectedTriangleId?S.triSide||'g':'g',dim=memberDimensions(c).find(d=>d.id===id),lock=dimensionLock(c,S.comps,id);
     if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,dir={x:(q.x-p.x)/L,y:(q.y-p.y)/L};handle('member-length',dim.label,q,dir,memberDimensionValue(c,S.topo.params,id),(v,exact)=>member.setValue(v,exact),'memberDimensionInput',8,2000,.1,p,gridDragStep(c,dim),edgeSnap(c,dim,S.topo.params,{comps:S.comps}));}}
+    if(c.standardBlank?.kind==='l'&&id==='arm'){const w=c.standardBlank.armWidthMm;handle('blank-arm-width','L型臂寬',{x:(a.x+b.x)/2-u.y*(w-6.5)*holeSide(c),y:(a.y+b.y)/2+u.x*(w-6.5)*holeSide(c)},{x:-u.y*holeSide(c),y:u.x*holeSide(c)},w,v=>member.setDimensionValue(c.id,'arm',v,{exact:true}),'memberDimensionInput',13,120,1,null,8,null,raw=>13+8*Math.round((raw-13)/8));}
     if(c.shape==='disk')handle('disk-diameter','外徑',{x:a.x,y:a.y+c.diameterMm/2},{x:0,y:.5},c.diameterMm,v=>{const input=document.getElementById('diskDiameterInput');input.value=v;input.onchange();},'diskDiameterInput',8,2000);
-    else if(!c.barFusionRoot&&document.getElementById('memberMore')?.open){const w=memberStock(c).widthMm;handle('member-width','板寬',{x:(a.x+b.x)/2-u.y*w/2,y:(a.y+b.y)/2+u.x*w/2},{x:-u.y/2,y:u.x/2},w,v=>member.setStock('widthMm',v),'memberWidthInput',2,120);}
+    else if(!c.barFusionRoot&&!(c.standardBlank&&c.type==='triangle')&&document.getElementById('memberMore')?.open){const w=memberStock(c).widthMm;handle('member-width','板寬',{x:(a.x+b.x)/2-u.y*w/2,y:(a.y+b.y)/2+u.x*w/2},{x:-u.y/2,y:u.x/2},w,v=>member.setStock('widthMm',v),'memberWidthInput',2,120);}
   }
   if(c?.type==='slider'){
     const base=c.baseEnd==='p2'?b:a,dir=c.baseEnd==='p2'?{x:-u.x,y:-u.y}:u;

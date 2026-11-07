@@ -11,6 +11,7 @@ import { polylineTriangleParams } from './plate-geometry.js';
 // dimension 為 memberDimensions(comp) 的一項；回傳圖上拖曳的步距（mm）。
 export function gridDragStep(comp, dimension) {
   if (!comp || !dimension?.refs || dimension.stockKey || dimension.property || comp.boxPanel) return 1;
+  if(comp.standardBlank)return GRID_PITCH_MM;
   if (comp.type === 'bar') return dimension.id === 'g' ? GRID_PITCH_MM : 1;
   if (comp.type !== 'triangle') return 1;
   return polylineTriangleParams(comp)?.segParams.includes(dimension.param) ? GRID_PITCH_MM : 1;

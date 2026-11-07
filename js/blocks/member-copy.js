@@ -1,3 +1,4 @@
+import {localHoles,holeWorld} from '../core/local-holes.js';
 import {isDisk,diskOutline} from './disk-plate.js';
 import {fusionRoot, inspectBarFusionData} from '../core/bar-fusion.js';
 import {instantiateTemplate} from './module-ops.js';
@@ -13,6 +14,7 @@ export function copyMemberGeometry(comp, params, settings = {}) {
   const [a,b] = points, length = Math.hypot(b.x-a.x,b.y-a.y);
   const holes = points.map(p => ({...p,r:holeRadius}));
   for (const hole of comp.holes || []) {
+    if(localHoles(comp).includes(hole)){holes.push({...holeWorld(comp,hole),r:(hole.diameter || holeRadius*2)/2});continue;}
     const ratio = params[hole.distParam] / length;
     holes.push({x:a.x+(b.x-a.x)*ratio,y:a.y+(b.y-a.y)*ratio,r:holeRadius});
   }
@@ -35,7 +37,7 @@ export function planMemberCopy({comps, params, modules = [], counter = 0, id, po
   const source = JSON.parse(JSON.stringify(members));
   const sourceParams = {};
   for (const c of source) {
-    for (const key of [...ownedParamKeys(c), ...(c.holes || []).map(h => h.distParam)]) {
+    for (const key of [...ownedParamKeys(c), ...(c.holes || []).map(h => h.distParam).filter(Boolean)]) {
       if (!Number.isFinite(params[key]) || params[key] < 0) return fail('零件尺寸無效，請先修正尺寸。');
       sourceParams[key] = params[key];
     }
@@ -45,6 +47,7 @@ export function planMemberCopy({comps, params, modules = [], counter = 0, id, po
       c[key] = {id:p.id,type:'floating',x:pos.x,y:pos.y};
     }
     for (const key of ['physicalMotor','physical_motor','motorType','motorMount','motorCarrier','motorMountPoint','mountLocatorPoint','phaseOffset','servoStart','servoEnd','assemblyMobility','assemblyType','frameSeparate']) delete c[key];
+    localHoles(c).forEach(h=>h.type='floating');
     if (c.type === 'bar') c.isInput = false;
     if (c.type === 'triangle') {
       const cross = (c.p2.x-c.p1.x)*(c.p3.y-c.p1.y)-(c.p2.y-c.p1.y)*(c.p3.x-c.p1.x);

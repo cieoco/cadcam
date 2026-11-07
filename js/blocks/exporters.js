@@ -1,3 +1,4 @@
+import {localHoles} from '../core/local-holes.js';
 import {tabNutPartGeometry} from './tab-nut-plan.js';
 import {boxPanelGeometry} from '../plugins/box-maker/box-contract.js';
 import {isDisk,diskOutline,validateDisk} from './disk-plate.js';
@@ -225,7 +226,7 @@ function linkHoleSpecs(comp, length, settings, extraHoles = []) {
     if (comp.isInput && comp.motorType === 'mg995' && comp[key]?.physicalMotor) return servoHornHoles(settings, x, 0, comp.shape === 'disk' ? null : { halfWidth: memberStock(comp).widthMm / 2, length });
     return [isTtMotorEnd(comp, key) ? { kind: 'tt-shaft-flat', x, y: 0, settings: flat } : { kind: 'circle', x, y: 0, r: holeR }];
   };
-  return [...endHoles('p1', 0), ...endHoles('p2', length), ...adapterHoleSpecs(extraHoles)];
+  return [...endHoles('p1', 0), ...endHoles('p2', length), ...localHoles(comp).map(h=>({kind:'circle',id:h.id,x:h.u,y:h.v,r:h.diameter/2})), ...adapterHoleSpecs(extraHoles)];
 }
 
 function svgForLink(comp, length, settings, extraHoles = []) {
@@ -1147,7 +1148,7 @@ export function inspectFrameExport(frameNodes, settings, motorMounts = []) {
 // 靜態結構板：三點桿有 ≥2 個機架固定點＝使用者畫的機架本體（整片板都是靜止剛體）。
 export function isStaticPlate(comp) {
   return Boolean(comp && comp.type === 'triangle' &&
-    ['p1', 'p2', 'p3'].filter(k => comp[k] && comp[k].type === 'fixed').length >= 2);
+    [...['p1','p2','p3'].map(k=>comp[k]),...localHoles(comp)].filter(p=>p?.type==='fixed').length >= 2);
 }
 
 // 馬達安裝特徵的宿主分派：

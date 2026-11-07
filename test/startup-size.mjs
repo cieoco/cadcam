@@ -30,7 +30,9 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-08 H01／24 mm 固定環：共用耳距、標準板包覆與干涉診斷較前輪完成值增 1,257 bytes（2,063,790→2,065,047）；不增加第三方依賴。
 // 2026-11-08 Linq：新增單側齒輪四連桿／固定托物段與教學資料，作者helper移除初始化循環；2,065,047→2,069,710（+4,663 bytes），無新第三方依賴。
 // 2026-11-08 Linq孔位重建：實體托盤與掛接、來源比例資料增4,214 bytes（2,069,710→2,073,924）；沿既有模組，無新依賴。
-check('首次JS原始大小低於2.075MB',r.bytes<2075000);
+// 2026-11-08：三類孔格結構與共用局部孔支援，2,074,980→2,091,543（+16,563 bytes）；設定面板按需載入，無新求解器／依賴。
+check('首次JS原始大小低於2.093MB',r.bytes<2093000);
+check('標準結構設定面板按需載入',!r.paths.includes('js/blocks/standard-blank-ui.js')&&r.lazyEntries.includes('js/blocks/standard-blank-ui.js'));
 check('機架編輯介面延後載入',!r.paths.includes('js/blocks/frame-hole-editor.js')&&!r.paths.includes('js/blocks/frame-panel.js'));
 check('合成尺寸候選計算延後載入',!r.paths.includes('js/blocks/bar-fusion-resize.js')&&r.lazyEntries.includes('js/blocks/bar-fusion-resize.js'));
 check('盒體生成介面（外掛）延後載入',!r.paths.includes('js/plugins/box-maker/box-generator.js')&&!r.paths.includes('js/plugins/box-maker/box-dialog.js')&&r.lazyEntries.includes('js/plugins/box-maker/index.js'));

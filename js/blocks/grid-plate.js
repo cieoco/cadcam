@@ -98,6 +98,7 @@ export function plateGridHint(comp, params, dimension, value, comps = []) {
  * 候選以實際尺寸修改結果核對全部孔；沒有合法候選就保留原值，數字欄仍可輸入例外。
  */
 export function edgeSnap(comp, dimension, params, { min = 8, max = 2000, comps = [] } = {}) {
+  if(comp?.standardBlank)return null;
   if (!comp || comp.type !== 'triangle' || comp.boxPanel || !dimension?.refs || dimension.property || dimension.stockKey) return null;
   if (!['g', 'r1', 'r2'].includes(dimension.id)) return null;
   const segment = polylineTriangleParams(comp)?.segParams.includes(dimension.param);

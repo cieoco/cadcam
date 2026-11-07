@@ -1,3 +1,4 @@
+import {makeStandardBlank,blankGeometry} from './standard-blank.js';
 /**
  * blocks / tools
  *
@@ -469,6 +470,7 @@ export function finishPlateAsLinkEarly() {
 /* ---- 板件：逐點畫孔、右鍵（或點回起點）收尾。角色由畫的順序決定 ----
  * 前 3 孔＝機構求解孔（p1/p2/p3，進求解）；第 4 孔起＝造形孔（只描外形＋鑽孔，不進求解）。
  * 這一版求解仍沿用三點板；2 求解點的耦桿板留待 Phase 4（需改編譯層的 p3 前提）。 */
+export function startStandardBlank(options){exitDrawPolygon();startDrawPolygon();S.standardBlankDraft=options;setBanner('點畫布放置；取消不建立零件');draw();}
 export function startDrawPolygon() {
   if (S.drawingPolygon) { exitDrawPolygon(); draw(); return; }
   pause();
@@ -487,6 +489,7 @@ export function startDrawPolygon() {
   draw();
 }
 export function exitDrawPolygon() {
+  S.standardBlankDraft = null;
   S.drawingPolygon = false;
   S.polygonPoints = [];
   S.polygonPreview = null;
@@ -500,6 +503,8 @@ function polygonNearFirst(world) {
 }
 // 左鍵：加一個孔（吸附既有接點）。桌機一律由右鍵收尾；觸控可點回第一孔收尾。
 export function addPolygonVertex(e) {
+  if(S.standardBlankDraft){const point=worldFromEvent(e)||S.polygonPreview;if(!point)return;const snapped=nearestNodeId(point),origin=snapped?displayPointCoords()[snapped]:point,candidate=makeStandardBlank({...S.standardBlankDraft,n:S.counter+1,origin});if(!candidate.ok){notify(candidate.message);return;}if(snapped){candidate.comp.p1.id=snapped;const conn=connectionModule(S.comps,[snapped]);if(!conn.ok){notify('不同模組只能透過安裝接口連接');return;}if(conn.moduleId)candidate.comp.moduleId=conn.moduleId;}pushUndo();S.counter++;S.comps.push(candidate.comp);Object.assign(S.topo.params,candidate.params);exitDrawPolygon();rebuild();draw();candidate.comp.type==='bar'?selectLink(candidate.comp.id):selectTriangle(candidate.comp.id);return;}
+
   const cur = worldFromEvent(e) || S.polygonPreview;
   if (!cur) return;
   if (e?.pointerType && e.pointerType !== 'mouse' && S.polygonPoints.length >= 2 && polygonNearFirst(cur)) {
@@ -593,6 +598,7 @@ function buildPolygonPlate() {
 }
 export function drawPolygonPreview() {
   if (!S.drawingPolygon) return;
+  if(S.standardBlankDraft){const draft=makeStandardBlank({...S.standardBlankDraft,origin:S.polygonPreview || {x:0,y:0}});if(draft.ok){const c=draft.comp,r=c.type==='triangle'?blankGeometry(c,[c.p1,c.p2,c.p3]):[{x:c.p1.x-6.5,y:c.p1.y-6.5},{x:c.p2.x+6.5,y:c.p2.y-6.5},{x:c.p2.x+6.5,y:c.p2.y+6.5},{x:c.p1.x-6.5,y:c.p1.y+6.5}],path=document.createElementNS(SVG_NS,'path');path.setAttribute('d','M '+r.map(p=>`${TX(p.x)} ${TY(p.y)}`).join(' L ')+' Z');path.setAttribute('fill','#27ae6033');path.setAttribute('stroke','#168a54');path.setAttribute('pointer-events','none');svg.append(path);}return;}
   const pts = S.polygonPoints.map(p => p.pos);
   const chain = pts.slice();
   let closing = false;
