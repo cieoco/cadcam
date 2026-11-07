@@ -60,6 +60,8 @@ const gear = (id, r, extra = {}) => ({ type: 'gear', id, radiusParam: r, p1: { i
 assert.deepEqual(gridIssues([gear('GA', 'R24'), gear('GB', 'R24', { mesh: 'GA' })], P).filter(i => i.rule === 'R5'), []);
 assert.deepEqual(rules(gridIssues([gear('GA', 'R24'), gear('GB', 'R21', { mesh: 'GA' })], P).filter(i => i.rule === 'R5')), ['GB:R5:齒輪中心距']);
 assert.deepEqual(rules(gridIssues([gear('GA', 'R24', { pinRadiusParam: 'R20' })], P).filter(i => i.rule === 'R5')), ['GA:R5:齒輪輸出孔']);
+assert.deepEqual(rules(gridIssues([gear('GA', 'R24', { pinRadius: 20 })], P).filter(i => i.rule === 'R5')), ['GA:R5:齒輪輸出孔'], 'inline pinRadius is checked too');
+assert.deepEqual(gridIssues([gear('GA', 'R24', { pinRadius: 24 })], P).filter(i => i.rule === 'R5'), []);
 
 // 機架（R3）：以機架自己的方格判定；整組旋轉仍在格上
 const frame = (pts, extra = []) => [

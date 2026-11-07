@@ -136,7 +136,7 @@ function gearIssues(c, comps, params, pitch, tol, out) {
     const d = pitchDeviation(radius(c) + radius(mate), pitch, tol);
     if (!d.ok) out.push(issue(c, 'R5', '齒輪中心距', { mateId: mate.id, valueMm: d.valueMm, nearestMm: d.nearestMm, deviationMm: d.deviationMm, message: `與 ${mate.id} 的中心距 ${fmt(d.valueMm)} mm 不是 ${pitch} mm 的倍數（差 ${fmt(d.deviationMm)} mm）` }));
   }
-  const r = num(params, c.pinRadiusParam);
+  const r = c.pinRadiusParam ? num(params, c.pinRadiusParam) : Number(c.pinRadius);   // 內嵌 pinRadius 的齒輪（例如 gear-pair 範例）也要檢查
   if (Number.isFinite(r) && r > 0) {
     const e = latticeEmbedding([{ x: 0, y: 0 }, { x: r, y: 0 }], pitch, tol);
     if (!e.ok) out.push(issue(c, 'R5', '齒輪輸出孔', { valueMm: r, deviationMm: e.maxDeviationMm, message: `輸出孔離中心 ${fmt(r)} mm，無法落在齒輪的 ${pitch} mm 方格（差 ${fmt(e.maxDeviationMm)} mm）` }));

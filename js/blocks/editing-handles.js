@@ -6,7 +6,8 @@ import {memberDimensions,memberDimensionValue,dimensionLock} from './member-dime
 import {memberStock} from './member-stock.js';
 import {showNumber} from './numeric-input.js';
 import {pointDimensionEditor} from './point-dimension-editor.js';
-import {outputRadius,gearHoleAtPoint} from './gear-hole-placement.js';
+import {outputRadius} from './gear-hole-placement.js';
+import {gearHoleGridAtPoint,showGearGridHint} from './grid-gear.js';
 import {worldFromScreen} from './view.js';
 import {sheetMode,setSheet} from './mobile-workspace.js';
 import {frameGroundAxis} from './frame-ground.js';
@@ -126,7 +127,8 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
   if(c?.type==='gear'){
     const radius=outputRadius(c,S.topo.params),phase=Number(c.phase)||0,pose=Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI-phase;
     const radiusField=document.getElementById('gearPinRadiusVal'),angleField=document.querySelector('#gearHoleAngleVal input');
-    const polar=q=>gearHoleAtPoint(c,S.topo.params,q,{center:a,poseDeg:pose})||{radius,angle:phase};
+    showGearGridHint(c,S.comps,S.topo.params);
+    const polar=q=>gearHoleGridAtPoint(c,S.topo.params,q,{center:a,poseDeg:pose})||{radius,angle:phase};
     const reset=()=>{showNumber(radiusField,radius);if(angleField)showNumber(angleField,phase);};
     const revision=JSON.stringify([S.comps,S.topo.params,S.theta,S.designFocus]);
     dimensionHandle(svg,{key:'gear-hole',label:'輸出孔位',point:besideHole(svg,project(a),project(b)),direction:{x:1,y:0},value:0,activate:()=>{document.getElementById('gearMore').open=true;openEditor();radiusField?.focus();radiusField?.select();},cancel:reset,

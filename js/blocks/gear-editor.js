@@ -51,7 +51,7 @@ export function createGearEditor({
   function makeGear(n, opts) {
     const { teeth, module, cx, cy, isDriver, meshId, color } = opts;
     const R = teeth * module / 2;
-    const pinR = Math.round(R * 0.6);
+    const pinR = Math.max(8, Math.round(R * 0.6 / 8) * 8);   // 預設輸出孔落在 8 mm 孔格（數位積木 R5）
     const radiusParam = 'GR' + n;
     const pinRadiusParam = 'GPR' + n;
     // 乙：放下即「浮動未固定」——兩個中心都是 floating，比照桿件由使用者把中心拖去地錨/接點才接地。
@@ -77,7 +77,7 @@ export function createGearEditor({
     exitDrawTools();
     cancelMotorMode();
     const m = GEAR_MODULE;
-    const na = 12, nb = 18;                         // 預設 12:18，一放下就看得到轉速比
+    const na = 12, nb = 20;                         // 預設 12:20，一放下就看得到轉速比
     const Ra = na * m / 2, Rb = nb * m / 2;
     // 擺在畫布中央偏左，整對沿 x 排開、相切
     const base = mobilePrompt() ? worldFromScreen(W * 0.30, H * 0.45) : { x: -70, y: 0 };

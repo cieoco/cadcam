@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-11-07 · 數位積木：齒輪對格（G6）
+
+- 齒輪輸出孔在主畫布拖曳時吸附齒輪自身方格點（孔距 8·√n，起始角隨之為格點方向，例如 26.57°）；不合法時退次近格點，沒有就不改。孔距與起始角數字維持精確、可離格。
+- 齒輪面板顯示「中心距 96 mm＝12 格」；離格時列出最多 3 組最接近、使中心距為 8 倍數的齒數建議（只顯示不套用）。新建齒輪對預設由 12:18（90 mm）改 12:20（96 mm），預設輸出孔改取 8 的倍數（0.6R 就近取整到 8）。
+- grid-rule 的 R5 輸出孔檢查補上內嵌 pinRadius 的齒輪（例如 gear-pair 範例）。新邏輯在按需載入的 js/blocks/grid-gear.js；首次 JS 不變（約 2,008,3xx bytes）。
+- 測試：新增 test/grid-gear.mjs（18 項）與 grid-rule 兩條斷言；test/gear-editor.mjs 依新預設更新兩處（從動輪 18→20 齒、改齒數 +2 後預期 20→22）。全套由施工者跑過（僅 gear-editor 待更新），更新後定向重跑 gear-editor、grid-gear、gear-pair、grid-rule、grid-marks、gear-hole-placement、startup-size、load-graph、test_blocks_schema 通過。
+- 瀏覽器 test/browser/grid-gear.cjs 四尺寸通過：離格提示含建議、新建齒輪對預設孔在格上、拖曳後孔距為 8√n 且無 R5、一次復原、數字孔距 21 保留並標例外；grid-exceptions、grid-drag 無回歸。證據 output/grid-blocks/g6（雲端 Chromium）。
+
 ## 2026-11-07 · 數位積木：預設棍寬 13 mm、板厚 3 mm、預設列印轉接座（G5-P3）
 
 - 未指定 stock 時的預設改為 3 mm 合板、棍寬 13 mm（邊距＝8−板厚／2），2D 外形、3D、匯出同源；外形半徑後備 9→6.5。未指定接合時預設改為 3D 列印轉接座（外購 M3 角碼為例外，作品中明確指定者不變）。**沒有存 stock 的舊作品會變細、變薄，外形、疊層、DXF、BOM 與 3D 都會改變，需重新匯出。** 保存格式不變。
