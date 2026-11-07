@@ -12,6 +12,7 @@ import {sheetMode,setSheet} from './mobile-workspace.js';
 import {frameGroundAxis} from './frame-ground.js';
 import {snapFrameAngle} from './frame-grid.js';
 import {gridDragStep,showHoleCount} from './grid-drag.js';
+import {edgeSnap} from './grid-plate.js';
 const NS='http://www.w3.org/2000/svg';
 // Keep the 44 px dimension hit area clear of the hole's 48 px touch target.
 function besideHole(svg,a,b){
@@ -80,21 +81,21 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
     const p=at(comp[dimension.refs[0]]),q=at(comp[dimension.refs[1]]);
     if(p&&q){
       const a=project(p),b=project(q),length=Math.hypot(q.x-p.x,q.y-p.y)||1;
-      const snap=gridDragStep(comp,dimension),holes=v=>{if(snap>1)showHoleCount(input,v);};holes(value);
-      dimensionHandle(svg,{key:'point-dimension',label:dimension.label,point:besideHole(svg,a,b),direction:{x:(b.x-a.x)/length,y:(b.y-a.y)/length},value,min:8,max:2000,snap,
-        preview:v=>{showNumber(input,v);holes(v);},cancel:()=>{showNumber(input,value);holes(value);},commit,activate});
+      const snap=gridDragStep(comp,dimension),plate=edgeSnap(comp,dimension,S.topo.params,{comps}),holes=v=>{if(snap>1)showHoleCount(input,v);else if(plate)showHoleCount(input,v,plate.hint);};holes(value);
+      dimensionHandle(svg,{key:'point-dimension',label:dimension.label,point:besideHole(svg,a,b),direction:{x:(b.x-a.x)/length,y:(b.y-a.y)/length},value,min:8,max:2000,snap,quantize:plate?.quantize(value),
+        preview:v=>{showNumber(input,v);holes(v);},cancel:()=>{showNumber(input,value);holes(value);},commit:plate?.candidates.length?v=>commit(v,true):commit,activate});
     }
   }
-  function handle(key,label,point,direction,value,commit,inputId,min=0,max=2000,step=.1,origin=null,snap=1){
+  function handle(key,label,point,direction,value,commit,inputId,min=0,max=2000,step=.1,origin=null,snap=1,plate=null){
     if(!point||!direction||!Number.isFinite(value))return;
     const a=project(point),b=project({x:point.x+direction.x,y:point.y+direction.y}),input=document.getElementById(inputId),field=input?.matches('input')?input:input?.querySelector('input');
-    if(snap>1)showHoleCount(field,value);
-    dimensionHandle(svg,{key,label,point:origin?besideHole(svg,project(origin),a):a,direction:{x:b.x-a.x,y:b.y-a.y},value,min,max,step,snap,preview:v=>{if(field)showNumber(field,v);if(snap>1)showHoleCount(field,v);},cancel:()=>{if(field)showNumber(field,value);if(snap>1)showHoleCount(field,value);},commit,activate:()=>{openEditor();field?.focus();field?.select();}});
+    const note=v=>{if(snap>1)showHoleCount(field,v);else if(plate)showHoleCount(field,v,plate.hint);};note(value);
+    dimensionHandle(svg,{key,label,point:origin?besideHole(svg,project(origin),a):a,direction:{x:b.x-a.x,y:b.y-a.y},value,min,max,step,snap,quantize:plate?.quantize(value),preview:v=>{if(field)showNumber(field,v);note(v);},cancel:()=>{if(field)showNumber(field,value);note(value);},commit:plate?.candidates.length?v=>commit(v,true):commit,activate:()=>{openEditor();field?.focus();field?.select();}});
   }
   const a=at(c?.p1),b=at(c?.p2),length=a&&b?Math.hypot(b.x-a.x,b.y-a.y):0,u=length?{x:(b.x-a.x)/length,y:(b.y-a.y)/length}:{x:1,y:0};
   if(c&&['bar','triangle'].includes(c.type)&&!c.boxPanel){
     const id=S.selectedTriangleId?S.triSide||'g':'g',dim=memberDimensions(c).find(d=>d.id===id),lock=dimensionLock(c,S.comps,id);
-    if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,dir={x:(q.x-p.x)/L,y:(q.y-p.y)/L};handle('member-length',dim.label,q,dir,memberDimensionValue(c,S.topo.params,id),v=>member.setValue(v),'memberDimensionInput',8,2000,.1,p,gridDragStep(c,dim));}}
+    if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,dir={x:(q.x-p.x)/L,y:(q.y-p.y)/L};handle('member-length',dim.label,q,dir,memberDimensionValue(c,S.topo.params,id),(v,exact)=>member.setValue(v,exact),'memberDimensionInput',8,2000,.1,p,gridDragStep(c,dim),edgeSnap(c,dim,S.topo.params,{comps:S.comps}));}}
     if(c.shape==='disk')handle('disk-diameter','外徑',{x:a.x,y:a.y+c.diameterMm/2},{x:0,y:.5},c.diameterMm,v=>{const input=document.getElementById('diskDiameterInput');input.value=v;input.onchange();},'diskDiameterInput',8,2000);
     else if(!c.barFusionRoot&&document.getElementById('memberMore')?.open){const w=memberStock(c).widthMm;handle('member-width','板寬',{x:(a.x+b.x)/2-u.y*w/2,y:(a.y+b.y)/2+u.x*w/2},{x:-u.y/2,y:u.x/2},w,v=>member.setStock('widthMm',v),'memberWidthInput',2,120);}
   }

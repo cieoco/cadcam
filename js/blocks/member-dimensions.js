@@ -31,7 +31,7 @@ export function memberDimensionValue(comp, params, id = 'g') {
   return Number(params[dimension.param]);
 }
 
-export function planMemberDimension(comp, params, id, raw, {holeDiameterMm=12.96}={}) {
+export function planMemberDimension(comp, params, id, raw, {holeDiameterMm=12.96,exact=false}={}) {
   if(comp?.boxPanel)return {ok:false,message:'盒體板件尺寸請從「卡榫盒子」統一修改。'};
   const dimension = memberDimensions(comp).find(d => d.id === id);
   if (dimension?.stockKey) {
@@ -39,7 +39,7 @@ export function planMemberDimension(comp, params, id, raw, {holeDiameterMm=12.96
     return plan.ok ? { ok: true, params: {}, properties: { stock: plan.stock }, value: plan.stock[dimension.stockKey] } : plan;
   }
   const numeric = Number(raw);
-  const value = Math.round(numeric * 10) / 10;
+  const value = exact ? Math.round(numeric * 1e4) / 1e4 : Math.round(numeric * 10) / 10;
   const max = id === 'tip' ? 160 : 2000;
   if (!dimension || !Number.isFinite(numeric) || numeric < 8 || numeric > max)
     return { ok: false, message: `尺寸請填 8–${max} mm，最多一位小數。` };

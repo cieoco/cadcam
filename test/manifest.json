@@ -19,6 +19,7 @@
     "test/frame-holes.mjs",
     "test/grid-rule.mjs",
     "test/grid-drag.mjs",
+    "test/grid-plate.mjs",
     "test/grid-frame.mjs",
     "test/grid-marks.mjs",
     "test/step-export.mjs",

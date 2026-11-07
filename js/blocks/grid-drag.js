@@ -25,7 +25,7 @@ export function holeCountText(lengthMm) {
 // 在數字欄旁顯示孔數；field 為空則隱藏。數字欄手動輸入時同步更新。
 const spans = new WeakMap();
 let shown = null;
-export function showHoleCount(field, lengthMm) {
+export function showHoleCount(field, lengthMm, textFn = holeCountText) {
   if (shown && shown !== spans.get(field)) shown.hidden = true;
   shown = null;
   if (!field) return;
@@ -40,9 +40,10 @@ export function showHoleCount(field, lengthMm) {
     while (unit && unit.tagName === 'INPUT' && unit.style.display === 'none') unit = unit.nextElementSibling;   // 略過隱藏的其他數字欄
     (unit && unit.tagName !== 'INPUT' && /^\s*mm\s*$/.test(unit.textContent) ? unit : field).after(span);
     spans.set(field, span);
-    field.addEventListener('input', () => { if (!span.hidden) span.textContent = holeCountText(Number(field.value)); });
+    field.addEventListener('input', () => { if (!span.hidden) span.textContent = span.textFn(Number(field.value)); });
   }
   span.hidden = false;
-  span.textContent = holeCountText(lengthMm);
+  span.textFn = textFn;
+  span.textContent = textFn(lengthMm);
   shown = span;
 }

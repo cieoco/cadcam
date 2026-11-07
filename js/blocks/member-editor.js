@@ -123,12 +123,12 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     pause(); openMobileEditPanel(); draw();
     const input=el('memberDimensionInput');input?.focus?.();input?.select?.();
   }
-  function setValue(raw) {
+  function setValue(raw, exact = false) {
     const comp = selected();
     if (!comp) return;
-    return setDimensionValue(comp.id,dimensionId(),raw,{mirrorPair:mirror});
+    return setDimensionValue(comp.id,dimensionId(),raw,{mirrorPair:mirror,exact});
   }
-  function setDimensionValue(componentId,id,raw,{mirrorPair=false}={}) {
+  function setDimensionValue(componentId,id,raw,{mirrorPair=false,exact=false}={}) {
     const comp=S.comps.find(c=>c.id===componentId);
     if(!comp)return;
     if(isDisk(comp)){const error=validateDisk(comp,Number(raw),comp.diameterMm,holeDiameter(comp));if(error){notify(error);sync();return;}}
@@ -138,7 +138,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if (lock) { notify(lock); sync(); return; }
     const partner = mirrorPair && mirroredJaw(comp, S.comps, S.topo.params);
     const targets = partner ? [comp, partner] : [comp];
-    const plans = targets.map(c => planMemberDimension(c, S.topo.params, id, raw,{holeDiameterMm:holeDiameter(c)}));
+    const plans = targets.map(c => planMemberDimension(c, S.topo.params, id, raw,{holeDiameterMm:holeDiameter(c),exact}));
     const failure = plans.find(plan => !plan.ok);
     if (failure) { notify(failure.message); sync(); return; }
     if (targets.every(c => Math.abs(memberDimensionValue(c, S.topo.params, id) - plans[0].value) < 0.001)) { sync(); return; }

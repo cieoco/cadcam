@@ -19,7 +19,7 @@ export function createPlateEditor({
   setSliderDetailRows, setBanner, snapLego, worldFromEvent, pointCoords, updatePointCoordsById
 }) {
 
-  let vertexIndex=3;
+  let vertexIndex=3,gp=null;
   function syncVertex(comp){
     const parent=document.getElementById('memberMore');if(parent?.nodeType!==1)return;
     let box=document.getElementById('plateVertexFields');
@@ -46,7 +46,7 @@ export function createPlateEditor({
     const comp = S.comps.find(x => x.id === compId && x.type === 'triangle');
     if (!comp) return;
     pause();
-    vertexIndex=vi;
+    vertexIndex=vi;if(plateVertices(comp)[vi]?.hole===true)import('./grid-plate.js').then(m=>{gp=m;});
     S.dragShape = { compId, vi, pointerId:e.pointerId, original:structuredClone(comp), moved: false, startX: e.clientX, startY: e.clientY };
     try { svg.setPointerCapture(e.pointerId); } catch (_) {}
     const onMove = (ev) => shapeDragMove(ev);
@@ -87,8 +87,9 @@ export function createPlateEditor({
     if (!local) return;
     const vt = comp.vertices && comp.vertices[ds.vi];
     if (!vt || vt.solve) return;
-    vt.u = Number(local.u.toFixed(1));
-    vt.v = Number(local.v.toFixed(1));
+    const g = vt.hole === true && gp?.snapPlateHole(triangleWorldPoints(comp), basis, comp.vertices.filter((o, i) => i !== ds.vi && o.hole === true), w);
+    vt.u = g ? g.u : Number(local.u.toFixed(1));
+    vt.v = g ? g.v : Number(local.v.toFixed(1));
     draw();syncVertex(comp);
   }
   function shapeDragEnd(event) {
