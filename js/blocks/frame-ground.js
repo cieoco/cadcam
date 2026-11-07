@@ -6,7 +6,7 @@ export function frameGroundAxis(nodes) {
   return {nodes:ordered,base,target,length,angle:target?Math.atan2(target.y-base.y,target.x-base.x)*180/Math.PI:0};
 }
 
-export function planFrameGroundChange(nodes,kind,delta) {
+export function planFrameGroundChange(nodes,kind,delta,grid=false) {
   const axis=frameGroundAxis(nodes),fail=reason=>({ok:false,reason});
   if(!axis.target)return fail('需要兩個固定軸，才能調整軸距與方向；這裡不是馬達本體角度。');
   if(!['length','angle'].includes(kind)||!Number.isFinite(delta))return fail('請輸入有效的軸距或角度。');
@@ -14,5 +14,8 @@ export function planFrameGroundChange(nodes,kind,delta) {
   const length=axis.length+(kind==='length'?delta:0),angle=(axis.angle+(kind==='angle'?delta:0))*Math.PI/180;
   if(length<8-1e-7)return fail('機架軸距至少保留 8 mm');
   // Numeric changes are exact; the 8 mm grid is for dragging, not angle steps.
-  return {ok:true,id:axis.target.id,x:axis.base.x+Math.cos(angle)*length,y:axis.base.y+Math.sin(angle)*length};
+  let dx=Math.cos(angle)*length,dy=Math.sin(angle)*length;
+  // 拖曳吸附到格點時直接存 基準孔 + 8·(i,j)，避免三角函數的浮點尾數（63.99999999999997）；軸距不能因此改變。
+  if(grid&&kind==='angle'){const i=Math.round(dx/8),j=Math.round(dy/8);if(Math.abs(8*Math.hypot(i,j)-length)<1e-6){dx=8*i;dy=8*j;}}
+  return {ok:true,id:axis.target.id,x:axis.base.x+dx,y:axis.base.y+dy};
 }

@@ -6,6 +6,15 @@
 
 ---
 
+## 2026-11-07 · 數位積木：機架對格（G4a）
+
+- 移除「8 mm 吸附」開關（state.lockFrameHoles、frameLock 指令、機架面板按鈕）：固定孔拖曳與 ± 一律落在 8 mm 世界格，整組機架拖曳以第一固定孔對格、其餘剛性跟隨；格點參考只在選機架或拖固定孔時顯示。數字 X／Y 仍精確。升格為固定點時依原設計對格。
+- 機架方向把手只吸附到「第二固定軸落在格點」的角度（軸距 L 有 8·√(i²+j²)=L 的整數解時），並直接存 基準孔 + 8·(i,j) 的精確座標；無解時維持整度。數字角度不變。
+- 新增機架孔的放置與拖曳（中心線／平面）吸附機架方格：世界格成立時用世界格，否則用機架孔的方格嵌入；機架本身離格時退回 u、v 各取 8 的倍數。既有板邊／槽口／孔距檢查照舊。新邏輯在按需載入的 js/blocks/frame-grid.js；移除開關使首次 JS 降至約 2,004,257 bytes。
+- 修正 G2 回歸：離格集合變動時改為只重畫標記群組（grid-marks repaint），不再整頁 draw 而替換使用者正在操作的節點（slider-dimensions 瀏覽器測試在 G2 起失敗的根因）。
+- 既有測試更新：test/ui-commands.mjs 移除 frameLock；test/browser/frame-holes.cjs 放孔預期 150→152、拖曳結果由「整數」改為「8 的倍數」、機架離格時平面拖曳預期 u／v 為 8 的倍數，並在勾回中心線後等待偏移欄消失（原版在 360 寬也會因此偶發失敗）。
+- Node：test/grid-frame.mjs（21 項）新增；全套 258/258 通過（output/loop/g4a2-node）。瀏覽器 test/browser/grid-frame.cjs 四尺寸通過（output/grid-blocks/g4a）；slider-dimensions、grid-exceptions、frame-holes 通過。既有 20 支瀏覽器腳本另跑一輪：mounting-review 在動工前的原始版本即失敗，未處理；frame-holes 在 360×640 仍偶發逾時，原始版本同尺寸亦偶發失敗。皆為雲端 Chromium 執行。
+
 ## 2026-11-07 · 數位積木：孔距拖曳一步 8 mm 與孔數顯示（G3a）
 
 - 共用 dimensionHandle／snapDraggedDimension 增加選配步距（預設仍 1 mm）。受格尺寸——一般連桿孔距、合成片桿段、折線兩桿段、圓盤工作孔距——圖上拖曳一步 8 mm；三點板三邊、折線跨距、爪端、板寬板厚、外徑、齒條、滑軌維持原 1 mm。數字欄保留小數，可離格。

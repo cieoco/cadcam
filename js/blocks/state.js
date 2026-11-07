@@ -48,7 +48,6 @@ export const S = {
   preDragSnap: null,                               // 拖曳前的狀態：整段拖曳合併成一筆 undo
 
   // ---- 機架 / LEGO 視覺 ----
-  lockFrameHoles: false,                           // 拖曳固定孔/機架時吸附到 8mm pitch
   frameMarginMm: 18,
   frameHoleDiameterMm: 5,
   frameEditorOpen: false,

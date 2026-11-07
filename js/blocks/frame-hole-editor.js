@@ -6,6 +6,7 @@ import * as Tools from './tools.js';
 import {frameGroundAxis} from './frame-ground.js';
 import {frameHoleAt,frameHoleAxis,frameHolePoint,syncFrameHoles} from './frame-holes.js';
 import {planFrameHole} from './frame-hole-plan.js';
+import {snapFrameHole} from './frame-grid.js';
 import {inspectFrameExport} from './exporters.js';
 import {commitMountingEdit} from './mounting-review-ui.js';
 import {inside} from './part-fusion.js';
@@ -18,6 +19,8 @@ const revision=()=>JSON.stringify([S.comps,S.topo.params,S.designFocus,S.mode,S.
 let placement=null;
 function contextGeometry(ctx){return inspectFrameExport(Model.frameConnectorNodes(ctx.viewComps()),ctx.settings,ctx.mounts());}
 function plan(ctx,hole,value){return planFrameHole(ctx.viewComps(),hole,value,contextGeometry(ctx),Number(ctx.settings.frameHoleDiameterMm)||3.2);}
+// 拖曳結果吸附到機架方格（固定孔不含新增孔）；數字欄不經過這裡。
+const gridPoints=(comps,moduleId)=>Model.frameNodes(comps.filter(c=>(c.moduleId||null)===(moduleId||null))).filter(p=>!p.frameHole);
 function select(ctx,id){ctx.deselectLink();S.selectedNodeId=id;S.frameEditorOpen=false;Panels.updateRoleEditor();ctx.openMobileEditPanel();ctx.draw();}
 function finish(ctx){ctx.rebuild();ctx.draw();Panels.updateRoleEditor();ctx.scheduleAutosave();}
 
@@ -61,16 +64,16 @@ export function drawFrameHoleHandle({svg,project,openEditor,redraw}){
   const line=document.createElementNS(NS,'line');
   for(const [key,value]of Object.entries({x1:a.x,y1:a.y,x2:p.x,y2:p.y,stroke:'#087f8c','stroke-dasharray':'4 4','pointer-events':'none'}))line.setAttribute(key,value);
   svg.append(line);
-  const field=()=>document.querySelector('[aria-label="機架孔距基準孔（mm）"]'),offset=()=>document.querySelector('[aria-label="機架孔左右偏移（mm）"]'),rev=revision();
+  const points=gridPoints(S.comps,hole.moduleId),field=()=>document.querySelector('[aria-label="機架孔距基準孔（mm）"]'),offset=()=>document.querySelector('[aria-label="機架孔左右偏移（mm）"]'),rev=revision();
   const preview=(u,v=0)=>{if(field())showNumber(field(),u);if(offset())showNumber(offset(),v);const next=project(frameHolePoint(axis,u,v));line.setAttribute('x2',next.x);line.setAttribute('y2',next.y);};
   const reset=()=>preview(hole.frameHole.u,hole.frameHole.v||0);
   const plane=hole.frameHole.centered===false?{
     value:{x:hole.frameHole.u,y:hole.frameHole.v||0},
     fromScreen:p=>{const w=View.worldFromScreen(p.x,p.y),dx=w.x-axis.a.x,dy=w.y-axis.a.y;return {x:dx*axis.u.x+dy*axis.u.y,y:-dx*axis.u.y+dy*axis.u.x};},
-    project:p=>project(frameHolePoint(axis,p.x,p.y)),constrain:p=>({x:Math.round(p.x),y:Math.round(p.y)}),
+    project:p=>project(frameHolePoint(axis,p.x,p.y)),constrain:p=>{const s=snapFrameHole(points,axis,p.x,p.y,false);return {x:s.u,y:s.v};},
     preview:p=>preview(p.x,p.y),commit:p=>{if(rev===revision())window.blocks.setFrameHole(hole.p1.id,{u:p.x,v:p.y});else redraw();}
   }:null;
-  dimensionHandle(svg,{key:'frame-hole',label:plane?'孔位':'距基準孔',point:p,direction:{x:q.x-p.x,y:q.y-p.y},value:hole.frameHole.u,min:-2000,max:2000,step:1,plane,
+  dimensionHandle(svg,{key:'frame-hole',label:plane?'孔位':'距基準孔',point:p,direction:{x:q.x-p.x,y:q.y-p.y},value:hole.frameHole.u,min:-2000,max:2000,step:1,plane,quantize:plane?undefined:raw=>snapFrameHole(points,axis,raw).u,
     activate:()=>{openEditor();if(sheetMode())setSheet('half');field()?.focus();field()?.select();},cancel:reset,
     preview:v=>preview(v),
     commit:v=>{if(rev===revision())window.blocks.setFrameHole(hole.p1.id,v);else redraw();}});
@@ -88,6 +91,7 @@ export function startFrameHole(ctx){
   const moduleId=comps.find(c=>Model.pointRefs([c],axis.base.id).length)?.moduleId;if(moduleId)hole.moduleId=moduleId;
   const svg=ctx.svg,button=document.getElementById('addFrameHoleBtn'),rev=revision(),geometry=contextGeometry(ctx),diameter=Number(ctx.settings.frameHoleDiameterMm)||3.2;
   const marker=document.createElementNS(NS,'circle');marker.dataset.frameHolePreview='';marker.setAttribute('fill','white');marker.setAttribute('stroke-width','2');marker.style.pointerEvents='none';
+  const points=gridPoints(comps,hole.moduleId);
   let down=null,next=null;
   const stop=e=>{e.preventDefault();e.stopImmediatePropagation();};
   const cancel=()=>{placement=null;svg.removeEventListener('pointerdown',onDown,true);svg.removeEventListener('pointermove',move,true);svg.removeEventListener('pointerup',up,true);svg.removeEventListener('pointercancel',abort,true);document.removeEventListener('keydown',key,true);document.removeEventListener('pointerdown',outside,true);marker.remove();if(down!==null)try{svg.releasePointerCapture(down);}catch{}svg.style.cursor='';if(button)button.textContent='新增孔';ctx.clearBanner();};
@@ -95,7 +99,7 @@ export function startFrameHole(ctx){
     if(rev!==revision()){cancel();return;}
     const w=View.worldFromEvent(svg,e);if(!w)return;
     const direction={x:(axis.target.x-axis.base.x)/axis.length,y:(axis.target.y-axis.base.y)/axis.length};
-    const value=Math.round((w.x-axis.base.x)*direction.x+(w.y-axis.base.y)*direction.y);
+    const value=snapFrameHole(points,{a:axis.base,u:direction},(w.x-axis.base.x)*direction.x+(w.y-axis.base.y)*direction.y).u;
     next=geometry?.outlines.some(r=>inside(w,r))?planFrameHole(comps,hole,value,geometry,diameter):{ok:false,reason:'請點機架板面放孔。'};
     const p=next.point||{x:axis.base.x+direction.x*value,y:axis.base.y+direction.y*value};
     marker.setAttribute('cx',View.TX(p.x));marker.setAttribute('cy',View.TY(p.y));marker.setAttribute('r',6/Math.hypot(svg.getScreenCTM().a,svg.getScreenCTM().b));marker.setAttribute('stroke',next.ok?'#087f8c':'#dc2626');svg.append(marker);

@@ -172,16 +172,9 @@ function onDragMove(e) {
     if (!c) return;
     const dx = w.x - S.dragLastWorld.x;
     const dy = w.y - S.dragLastWorld.y;
-    const points = pointCoords();
-    const anchor = points[c.p1.id];
-    const desired = anchor ? { x: anchor.x + dx, y: anchor.y + dy } : { x: dx, y: dy };
-    // A free bar translates as one rigid part. Snap its first hole to the
-    // 8 mm frame grid, then apply that same delta to its other hole.
-    const snapped = snapFramePoint(desired);
-    const moveX = anchor ? snapped.x - anchor.x : dx;
-    const moveY = anchor ? snapped.y - anchor.y : dy;
-    movePointById(c.p1.id, moveX, moveY);
-    movePointById(c.p2.id, moveX, moveY);
+    // A free bar translates as one rigid part (floating holes are never quantized).
+    movePointById(c.p1.id, dx, dy);
+    movePointById(c.p2.id, dx, dy);
     S.dragLastWorld = w;
     redrawAfterDrag();
     return;
@@ -240,9 +233,8 @@ export function moveNodeTo(id,w,{snap=true}={}) {
   if (free) {
     const p = pointCoords()[id];
     const desired = { x: w.x, y: w.y };
-    const snapped = snap ? snapFramePoint(desired) : desired;
-    const dx = snapped.x - (p?.x || 0);
-    const dy = snapped.y - (p?.y || 0);
+    const dx = desired.x - (p?.x || 0);
+    const dy = desired.y - (p?.y || 0);
     movePointById(free.p1.id, dx, dy);
     movePointById(free.p2.id, dx, dy);
     S.snapTarget = nearestDisplayTo(id);

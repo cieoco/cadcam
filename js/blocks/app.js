@@ -847,13 +847,11 @@ const updatePointCoordsById = (id, x, y) => Model.updatePointCoordsById(S.comps,
 const freezePointAtDisplay = (id) => Model.freezePointAtDisplay(S.comps, S.compiled, S.theta, id, motorAnglesNow());
 const movePointById = (id, dx, dy) => Model.movePointById(S.comps, id, dx, dy);
 const snapFrameCoord = (v) => Model.snapFrameCoord(v, LEGO_STEP);
-const snapFramePoint = (p) => S.lockFrameHoles ? { x: snapFrameCoord(p.x), y: snapFrameCoord(p.y) } : p;
+const snapFramePoint = (p) => ({ x: snapFrameCoord(p.x), y: snapFrameCoord(p.y) });
+// 固定孔永遠吸附 8 mm 世界格（G4a）：整組平移時以第一個固定孔對格，其餘剛性跟隨，不扭曲機架形狀。
 const snapFrameNodesToGrid = () => {
-  if (!S.lockFrameHoles) return;
-  frameNodeIds().forEach(id => {
-    const p = pointCoords()[id];
-    if (p) updatePointCoordsById(id, snapFrameCoord(p.x), snapFrameCoord(p.y));
-  });
+  const ids = [...frameNodeIds()], first = ids.map(id => pointCoords()[id]).find(Boolean);
+  if (first) ids.forEach(id => movePointById(id, snapFrameCoord(first.x) - first.x, snapFrameCoord(first.y) - first.y));
 };
 const pointIsGround = (id) => Model.pointIsGround(S.comps, id);
 const pointIsRackHole = id => S.comps.some(c => c.type === 'rack' && Array.isArray(c.holes) && c.holes.some(h => h.id === id));
@@ -1295,7 +1293,7 @@ function rebuild({save=true}={}) {
   document.getElementById('hint').style.display = S.comps.length ? 'none' : 'block';
   Panels.updateRoleEditor();
   if (S.selectedSprocketId) chainEditor?.updatePanel();   // 拖動、改齒數後面板上的鏈節與偏差跟著更新
-  gc('sync',S,gq,setBanner,draw);gq=0;
+  gc('sync',S,gq,setBanner,()=>gm.repaint()||draw());gq=0;
   if(save)scheduleAutosave();    // 任何結構變更都防丟（debounce，播放不觸發）
 }
 
@@ -2111,7 +2109,7 @@ function drawNow() {
 // actual snap remains in snapFramePoint() so all fixed-point editing paths use
 // the same constraint.
 function drawFrameGrid() {
-  if (!S.lockFrameHoles) return;
+  if (!(S.frameEditorOpen || S.dragFrame || (S.dragId && pointIsGround(S.dragId)))) return;   // 只在選到機架／拖固定孔時顯示
   const step = LEGO_STEP * View.getScale();
   if (!Number.isFinite(step) || step < 3) return;
   const mod = (value, divisor) => ((value % divisor) + divisor) % divisor;
@@ -2345,22 +2343,6 @@ function drawMotorMountHoles(motorIds, motorMounts, pts) {
   });
 }
 
-function syncFrameOptionButtons() {
-  setCommandState('frameLock', Boolean(S.lockFrameHoles));
-}
-
-function toggleFrameLock() {
-  S.lockFrameHoles = !S.lockFrameHoles;
-  if (S.lockFrameHoles) {
-    pushUndo();
-    snapFrameNodesToGrid();
-    rebuild();
-  }
-  syncFrameOptionButtons();
-  Panels.updateFrameEditor();
-  draw();
-}
-
 function frameSizeInfo() {
   const comps = viewComps(), nodes = Model.frameConnectorNodes(comps);
   const mounts = Exporters.splitMountsByHost(comps,deriveMotorMounts(comps)).free;
@@ -2389,8 +2371,8 @@ function setFrameSize(key, raw) {
   if(!commitMountingEdit(S,d=>d.comps.filter(c=>scope.has(c.id)).forEach(c=>pointKeysFor(c).forEach(k=>{if(ids.has(c[k]?.id))c[k].frameStock={...stock};})),{pushUndo,notify:transient})){Panels.updateFrameEditor();return;}
   rebuild();draw();Panels.updateFrameEditor();scheduleAutosave();
 }
-function changeFrameGround(kind, delta) {
-  const next=planFrameGroundChange(frameGroundInfo().nodes,kind,Number(delta));
+function changeFrameGround(kind, delta, grid) {
+  const next=planFrameGroundChange(frameGroundInfo().nodes,kind,Number(delta),grid);
   if(!next.ok){transient(next.reason);return;}
   pause();
   if(!commitMountingEdit(S,d=>Model.updatePointCoordsById(d.comps,next.id,next.x,next.y),{pushUndo,notify:transient}))return;
@@ -3365,13 +3347,12 @@ function init() {
   if (!loaded) { rebuild(); draw(); }
   setMobilePanel('build', {expandTools:false});
   updateUndoBtn();
-  syncFrameOptionButtons();
   offerExampleFromUrl({ loadExample, insertModule: id => moduleEditor.insertBuiltin(id), notify: transient });
   let seen = true; try { seen = Boolean(localStorage.getItem('blocks.startGallerySeen')); } catch (_) { /* 讀不到儲存空間：不自動跳出 */ }
   if (!seen && !loaded && !benchmarkSession && !gripperPilotSession && !new URLSearchParams(location.search).has('example')) openStartGallery(true);
 }
 
-window.blocks = { selectModuleTarget, draw, startChainDrive, changeSprocketTeeth, setSprocketTeeth, alignChain, nudgeChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openMotorChoice, pickMotorType, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawDisk: Tools.startDrawDisk, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, toggleFrameLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, exportStep: () => import('./step-export.js').then(m => m.exportStepFile({ S, design: inDesign(), motorAngles: motorAnglesNow(), notify: transient })), setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
+window.blocks = { selectModuleTarget, draw, startChainDrive, changeSprocketTeeth, setSprocketTeeth, alignChain, nudgeChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openMotorChoice, pickMotorType, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawDisk: Tools.startDrawDisk, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, bringPart, toggle3D, fitView, undo, saveFile, exportStep: () => import('./step-export.js').then(m => m.exportStepFile({ S, design: inDesign(), motorAngles: motorAnglesNow(), notify: transient })), setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
 window.blocks.changeFrameGround = changeFrameGround;
 window.blocks.setFrameSize = setFrameSize;
 for(const name of ['startFrameHole','setFrameHole','removeFrameHole'])window.blocks[name]=(...args)=>frameAction(name,...args);

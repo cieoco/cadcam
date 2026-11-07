@@ -24,7 +24,6 @@ export function renderFrameEditor({pointCoords,frameGroundInfo,frameSizeInfo,poi
   const count = document.getElementById('frameHoleCount');
   const lengthValue = document.getElementById('frameLengthVal');
   const angleValue = document.getElementById('frameAngleVal');
-  const lock = document.getElementById('frameLockEditorBtn');
   const margin = document.getElementById('frameMarginInput');
   const hole = document.getElementById('frameHoleInput');
   if (count) count.textContent = `${grounds.length+S.comps.filter(c=>c.frameHole&&grounds.some(p=>p.id===c.frameHole.a)).length} 個固定孔`;
@@ -38,7 +37,6 @@ export function renderFrameEditor({pointCoords,frameGroundInfo,frameSizeInfo,poi
   }
   const hint=document.getElementById('frameAxisHint');
   if(hint)hint.textContent=!target?'只有一個固定軸，無法調整軸距與方向。這裡不是馬達本體角度。':axisLength<1e-6?'兩個固定軸重合，請先增加軸距。':`調整 ${base.id} → ${target.id} 的方向；移動第二個固定軸，不旋轉馬達本體。`;
-  if (lock) { lock.textContent = S.lockFrameHoles ? '✓ 8 mm 吸附中' : '8 mm 吸附'; lock.classList.toggle('trace-on', Boolean(S.lockFrameHoles)); }
   if (margin) margin.value = Number(S.frameMarginMm || 18);
   if (hole) hole.value = Number(S.frameHoleDiameterMm || 5);
   panel.style.display = 'flex';

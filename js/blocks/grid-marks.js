@@ -98,7 +98,10 @@ export function sync(S, quiet, notify, redraw) {
 export const currentIssues = () => issues;
 
 // 畫布標記：不擋操作（pointer-events:none），每次 draw 重畫，位置取當下 pts。
+let last = null;   // 最近一次 drawMarks 的參數；離格集合改變時只重畫標記，不整頁重畫（避免替換正在被點選的零件節點）
+export const repaint = () => !!last && (drawMarks(...last), true);
 export function drawMarks(S, svg, pts, TX, TY) {
+  last = [S, svg, pts, TX, TY];
   svg.querySelectorAll('[data-grid-marks]').forEach(n => n.remove());
   syncPanel(S);
   if (!issues.length) return;

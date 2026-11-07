@@ -7,7 +7,7 @@ ok(JSON.stringify(COMMAND_GROUPS.map(g=>g.id))===JSON.stringify(['add','edit','v
 const ids=COMMANDS.map(c=>c.id);
 ok(new Set(ids).size===ids.length,'每個指令只出現一次（不在兩個分類重複）');
 ok(COMMANDS.every(c=>COMMAND_GROUPS.some(g=>g.id===c.group)&&typeof c.label==='string'&&c.label&&(c.href?/^https:\/\//.test(c.href):typeof c.run==='string'&&/^window\.blocks\.\w+|^#\w+/.test(c.run))),'每個指令有分類、中文名稱與一個動作');
-const where={undo:'edit',deleteSelected:'edit',boxMaker:'add',fitView:'view',view3d:'view',frameLock:'view',rulers:'view',dimension:'view',
+const where={undo:'edit',deleteSelected:'edit',boxMaker:'add',fitView:'view',view3d:'view',rulers:'view',dimension:'view',
   save:'project',open:'project',examples:'project',share:'project',fabrication:'project',exportVideo:'project',buildPack:'project',clearAll:'project',
   guide:'help',help:'help',teaching:'help',version:'help'};
 for(const [id,g] of Object.entries(where))if(!COMMANDS.some(c=>c.id===id&&c.group===g))assert.fail(`缺少指令 ${id}（應在 ${g}）`);

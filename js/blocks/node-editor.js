@@ -67,7 +67,7 @@ export function createNodeEditor({
     if (type === 'fixed') freezePointAtDisplay(S.selectedNodeId);
     setPointType(S.selectedNodeId, type);
     // Promoting a joint to the frame is an explicit manufacturing decision;
-    // immediately place it on the active 8 mm hole grid when locking is on.
+    // immediately place it on the 8 mm hole grid (always on since G4a).
     if (type === 'fixed') {
       const p = pointCoords()[S.selectedNodeId];
       if (p) {
@@ -83,7 +83,7 @@ export function createNodeEditor({
   }
   function changeNodePos(axis, delta) {
     const p=pointCoords()[S.selectedNodeId];if(!p)return;
-    const step=S.lockFrameHoles&&pointIsGround(S.selectedNodeId)?Math.sign(delta||1)*LEGO_STEP:delta;
+    const step=pointIsGround(S.selectedNodeId)?Math.sign(delta||1)*LEGO_STEP:delta;
     setPointPosition(axis,p[axis]+step);
   }
   function removeNodeMotor() {
