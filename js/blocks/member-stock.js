@@ -13,7 +13,7 @@ export const MATERIALS = Object.freeze([
 ]);
 
 const MATERIAL_IDS = new Set(MATERIALS.map(item => item.id));
-const DEFAULT_STOCK = Object.freeze({ widthMm: FABRICATION_DEFAULTS.export.barWidthMm, thicknessMm: 4, material: 'unspecified' });
+const DEFAULT_STOCK = Object.freeze({ widthMm: FABRICATION_DEFAULTS.export.barWidthMm, thicknessMm: 3, material: 'unspecified' });
 
 function finiteInput(value) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;

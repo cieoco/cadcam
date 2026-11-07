@@ -16,6 +16,8 @@
   "timeoutMs": 90000,
   "tests": [
     "test/frame-ground.mjs",
+    "test/part-fusion-ring.mjs",
+    "test/servo-horn-fit.mjs",
     "test/frame-holes.mjs",
     "test/grid-rule.mjs",
     "test/grid-corner.mjs",

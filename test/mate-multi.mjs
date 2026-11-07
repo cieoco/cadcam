@@ -7,7 +7,11 @@ import { S, B, Asm, fresh, motor, solveAt, cnc, ex, ed } from './_bench-setup.mj
 import { audit, fails } from './_bracket-audit.mjs';
 let R = null;
 try { R = await import('../js/blocks/assembly-roles.js'); } catch (e) { console.log(String(e).slice(0, 160)); }
-const C = await import('../js/blocks/mate-connect.js');
+// G5-P3：預設接合改為 3D 列印轉接座、預設棍寬 13 mm。本測試驗外購角碼的多構件接法，所以角碼明確指定（jointKind），
+// 且宿主桿明確用 18 mm 寬（角碼長腳 13＋板厚 3＝16 mm 才站得住）。
+const C0 = await import('../js/blocks/mate-connect.js');
+const C = { ...C0, mateConnect: (a1, a2, a3, a4, a5, a6, o) => C0.mateConnect(a1, a2, a3, a4, a5, a6, { jointKind: 'bracket-m3', ...(o || {}) }) };
+const freshWide = (...ids) => { const r = fresh(...ids); S.comps.forEach(c => { if (c.type === 'bar') c.stock = { ...(c.stock || {}), widthMm: 18 }; }); return r; };
 const need = ['mateOccupancy', 'mateAdjust', 'mateDetach'];
 check('assembly-roles.js 匯出 assemblyRoles／setAssemblyRoot／machineComps', !!R && ['assemblyRoles', 'setAssemblyRoot', 'machineComps'].every(f => typeof R[f] === 'function'));
 check('mate-connect.js 多了 ' + need.join('／'), need.every(f => typeof C[f] === 'function'));
@@ -24,7 +28,7 @@ const offsetOf = (st, id) => modOf(st, id).mount.orient.offsetMm || 0;
 
 // ---------- 1. 角色：底座／機器／未安裝 ----------
 {
-  const [A, L, G] = fresh('rack-lift', 'fourbar-lift', 'gear-gripper'); const P = S.topo.params;
+  const [A, L, G] = freshWide('rack-lift', 'fourbar-lift', 'gear-gripper'); const P = S.topo.params;
   const st0 = { comps: S.comps, modules: S.modules };
   const r0 = R.assemblyRoles(S.modules);
   check('三個都沒接：第一個（齒條升降）是底座，另外兩個是未安裝', r0.root === A.id && JSON.stringify(r0.machine) === JSON.stringify([A.id]) && JSON.stringify(r0.spare) === JSON.stringify([L.id, G.id]));
@@ -36,12 +40,12 @@ const offsetOf = (st, id) => modOf(st, id).mount.orient.offsetMm || 0;
   const frame0 = p0.parts.find(p => p.name === 'frame');
   console.log('3 unmounted: parts modules =', [...new Set(p0.parts.map(p => p.moduleId))].join(','), ' frame', Math.round(frame0.widthMm), '×', Math.round(frame0.heightMm), ' spare:', JSON.stringify(p0.spare));
   check('製作計畫：只有底座的零件；未安裝的列在 plan.spare（id、name）', p0.parts.every(p => p.moduleId === A.id || p.moduleId === null) && Array.isArray(p0.spare) && p0.spare.length === 2 && p0.spare.every(s => s.id && s.name));
-  const alone = (() => { const [A1] = fresh('rack-lift'); const f = planOf({ comps: S.comps, modules: S.modules }).parts.find(p => p.name === 'frame'); return [Math.round(f.widthMm), Math.round(f.heightMm)]; })();
+  const alone = (() => { const [A1] = freshWide('rack-lift'); const f = planOf({ comps: S.comps, modules: S.modules }).parts.find(p => p.name === 'frame'); return [Math.round(f.widthMm), Math.round(f.heightMm)]; })();
   fresh('rack-lift', 'fourbar-lift', 'gear-gripper');
   check('機架板不再被未安裝的機構撐大：尺寸＝齒條升降單獨存在時', JSON.stringify([Math.round(frame0.widthMm), Math.round(frame0.heightMm)]) === JSON.stringify(alone));
 }
 {
-  const [A, L, G] = fresh('rack-lift', 'fourbar-lift', 'gear-gripper'); const P = S.topo.params;
+  const [A, L, G] = freshWide('rack-lift', 'fourbar-lift', 'gear-gripper'); const P = S.topo.params;
   const st0 = { comps: S.comps, modules: S.modules };
   const html0 = BP.buildPackHtml(planOf(st0), { title: 'T', cnc, modules: S.modules });
   check('製作包提醒哪些機構還沒接上、不在製作包內', /還沒接上/.test(html0) && html0.includes(L.name) && html0.includes(G.name));
@@ -71,7 +75,7 @@ const offsetOf = (st, id) => modOf(st, id).mount.orient.offsetMm || 0;
 }
 // 底座自己被接到別人身上 → 底座自動換成那一串的頭
 {
-  const [G, L] = fresh('gear-gripper', 'fourbar-lift');
+  const [G, L] = freshWide('gear-gripper', 'fourbar-lift');
   const st0 = { comps: S.comps, modules: S.modules };
   check('夾爪先放進來：它是底座', R.assemblyRoles(S.modules).root === G.id);
   const s1 = join(st0, G.id, L.id, /下緣/);
@@ -81,7 +85,7 @@ const offsetOf = (st, id) => modOf(st, id).mount.orient.offsetMm || 0;
 
 // ---------- 2. 同一個承接構件接好幾個 ----------
 {
-  const [L, G1] = fresh('fourbar-lift', 'gear-gripper'); ed.insertBuiltin('gear-gripper'); ed.insertBuiltin('gear-gripper'); ed.insertBuiltin('gear-gripper');
+  const [L, G1] = freshWide('fourbar-lift', 'gear-gripper'); ed.insertBuiltin('gear-gripper'); ed.insertBuiltin('gear-gripper'); ed.insertBuiltin('gear-gripper');
   const [, , G2, G3, G4] = S.modules; const P = S.topo.params;
   const brace = S.comps.find(c => c.moduleId === L.id && c.id.startsWith('ToolBrace'));
   let st = { comps: S.comps, modules: S.modules };
@@ -120,7 +124,7 @@ const offsetOf = (st, id) => modOf(st, id).mount.orient.offsetMm || 0;
 }
 // ---------- 3. 對鎖的輸出端一次只能鎖一個 ----------
 {
-  const [A, G1] = fresh('rack-lift', 'gear-gripper'); ed.insertBuiltin('gear-gripper');
+  const [A, G1] = freshWide('rack-lift', 'gear-gripper'); ed.insertBuiltin('gear-gripper');
   const G2 = S.modules[2]; const P = S.topo.params;
   const a = join({ comps: S.comps, modules: S.modules }, G1.id, A.id, /滑台/);
   const t = C.mateTargets(a.comps, a.modules, G2.id, P).find(x => /滑台/.test(x.name));

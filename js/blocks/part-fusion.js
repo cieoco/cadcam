@@ -40,7 +40,16 @@ export function unionOutlines(input, {precisionMm=1e-6,sampleMm=1e-5,minAreaMm2=
       if(occupied({x:m.x+n.x,y:m.y+n.y})&&!occupied({x:m.x-n.x,y:m.y-n.y}))boundary.set(`${pointKey(a)}>${pointKey(b)}`,{a,b});
     }
   }
-  const remaining=[...boundary.values()], loops=[];
+  // 重合邊可能被某一環多切、另一環沒切：補切後依端點去重，否則同段會整段與小段並存而誤報「未閉合」。
+  const verts=new Map();for(const {a,b} of boundary.values()){verts.set(pointKey(a),a);verts.set(pointKey(b),b);}
+  const vlist=[...verts.values()],tol=Math.max(precisionMm*.1,1e-9),pieces=new Map();
+  for(const {a,b} of boundary.values()) {
+    const v=sub(b,a),len2=v.x*v.x+v.y*v.y,len=Math.sqrt(len2),cuts=[];
+    for(const q of vlist) {const w=sub(q,a),t=(w.x*v.x+w.y*v.y)/len2;if(t>1e-9&&t<1-1e-9&&Math.abs(cross(w,v))/len<tol)cuts.push({t,q});}
+    const chain=[a,...cuts.sort((x,y)=>x.t-y.t).map(c=>c.q),b];
+    for(let i=1;i<chain.length;i++){const ka=pointKey(chain[i-1]),kb=pointKey(chain[i]);if(ka!==kb)pieces.set(`${ka}>${kb}`,{a:chain[i-1],b:chain[i]});}
+  }
+  const remaining=[...pieces.values()], loops=[];
   while(remaining.length) {
     const first=remaining.pop(),ring=[first.a],start=pointKey(first.a);let end=first.b;
     while(pointKey(end)!==start) {

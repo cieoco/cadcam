@@ -44,7 +44,7 @@ const base = pts[G.base];
 {
   const a = OJ.adapterLayout(S.comps, S.modules, G.id, P, { stockMm: 3 });
   console.log('layout:', JSON.stringify(a));
-  check('預設尺寸：長 21、壁厚 3、翼高 18（宿主）／13（子模組）、孔 3.2', a && a.lengthMm === 21 && a.wallMm === 3 && a.flangeMm === 18 && a.flangeBMm === 13 && a.holeDiameterMm === 3.2);
+  check('預設尺寸：長 21、壁厚 3、翼高 13（宿主＝預設棍寬）／13（子模組）、孔 3.2', a && a.lengthMm === 21 && a.wallMm === 3 && a.flangeMm === 13 && a.flangeBMm === 13 && a.holeDiameterMm === 3.2);
   check('宿主構件＝ToolBrace、子模組板＝夾爪底板', a.hostCompId === brace.id && a.childPart === `${G.id}-frame`);
   // 宿主孔：沿桿從 p1 起算 u（桿長 80 → 中點 40，再往前 5、15）；v＝side·(寬/2 − 9)＝0（板寬 18、翼孔距接合邊 9）
   check('宿主孔（桿座標）：u 48、56（宿主孔格），v 0', a.hostHoles.length === 2 && near(a.hostHoles[0].u, 48) && near(a.hostHoles[1].u, 56) && a.hostHoles.every(h => near(h.v, 0)));

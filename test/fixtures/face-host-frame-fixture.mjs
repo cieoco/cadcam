@@ -17,7 +17,7 @@ const attach=(work,childId,hostEndpoint,selection)=>{
  return structuredClone(candidate.work);
 };
 export function rootFrameFixture(){
- const f=f1NestedFixture(),arm=f.modules[1];arm.mount=null;
+ const f=f1NestedFixture(3),arm=f.modules[1];arm.mount=null;
  // A sized, real base plate and arm plate, not a fake scene box. F1 itself is
  // unchanged; these are the explicit stock sizes of this dedicated F3 case.
  f.comps[0].p1.frameStock={widthMm:150,thicknessMm:6};
@@ -28,7 +28,7 @@ export function rootFrameFixture(){
  return attach(f,arm.id,{moduleId:'Base',frameEdge:6},frameSelection({hostFace:'top',childFace:'back'}));
 }
 export function installedFrameFixture(kind='face',{stablePlanar=true}={}){
- let f=f1AssemblyFixture({mounted:kind==='face'});const root=f.modules[0],host=f.modules[1];
+ let f=f1AssemblyFixture({mounted:kind==='face',t:3});const root=f.modules[0],host=f.modules[1];
  if(kind==='planar'&&stablePlanar){
   // Exact integer 48/64/80 tool rectangle also survives the normal parameter
   // grid on open. The original F1 geometry and its real hits remain unchanged.
@@ -50,7 +50,7 @@ export function installedFrameFixture(kind='face',{stablePlanar=true}={}){
  return attach(f,t.module.id,{moduleId:host.id,frameEdge:6},frameSelection(kind==='face'?{hostFace:'front'}:{offsetU:10}));
 }
 export function twoClawsFixture(){
- let f=f1AssemblyFixture({mounted:false});const host=f.modules[0],child=f.modules[1];
+ let f=f1AssemblyFixture({mounted:false,t:3});const host=f.modules[0],child=f.modules[1];
  const t=instantiateTemplate(builtinTemplate('gear-gripper'),{counter:3,place:{x:0,y:0},usedMotorIds:['1','2']});
  f.comps.push(...t.comps);f.modules.push(t.module);Object.assign(f.params,t.params);
  f=attach(f,child.id,{moduleId:host.id,outputId:host.outputs[0].id},frameSelection({offsetU:-30}));

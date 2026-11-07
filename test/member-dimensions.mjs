@@ -113,7 +113,7 @@ check('jawTipLength survives normalize/share and drives geometry, tips, and expo
   };
   const pointsFor = jaw => ['p1', 'p2', 'p3'].map(ref => solvedPoints[jaw[ref].id]);
   const leftPoints = pointsFor(restoredLeft);
-  const geometry = createPlateGeometry(restoredLeft, leftPoints, { radius: 9, holeRadius: 3.6 });
+  const geometry = createPlateGeometry(restoredLeft, leftPoints, { radius: 6.5, holeRadius: 3.6 });
   const end = geometry.sourcePoints.at(-1);
   const tip = leftPoints[2];
   const tips = gripperTips(restored.comps, solvedPoints);

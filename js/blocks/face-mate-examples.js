@@ -2,8 +2,9 @@
 import { builtinTemplate, instantiateTemplate } from './module-ops.js';
 import { buildMountSurfaces } from './mount-surfaces.js';
 
-function example(id, counter) {
+function example(id, counter, stock) {
   const instance = instantiateTemplate(builtinTemplate(id), { counter, place: { x: 0, y: 0 } });
+  if (stock) instance.comps.forEach(c => { if ((c.type === 'bar' || c.type === 'triangle') && !c.stock) c.stock = { ...stock }; });   // 測試用：指定板材
   const result = buildMountSurfaces({ comps: instance.comps, modules: [instance.module], moduleId: instance.module.id, params: instance.params, thicknessMm: 4 });
   if (!result.ok) throw new Error(result.reason);
   return { ...instance, surfaces: result.surfaces };
@@ -25,7 +26,7 @@ function reference(instance, kind) {
   };
 }
 
-export function realMountExamples() {
-  const lift = example('fourbar-lift', 0), rack = example('rack-lift', 1), gripper = example('gear-gripper', 2);
+export function realMountExamples({ stock } = {}) {
+  const lift = example('fourbar-lift', 0, stock), rack = example('rack-lift', 1, stock), gripper = example('gear-gripper', 2, stock);
   return { hosts: [reference(lift, 'output'), reference(rack, 'output')], children: [reference(gripper, 'frame')] };
 }

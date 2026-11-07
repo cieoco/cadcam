@@ -4,6 +4,8 @@ import { inspectLinkExport, exportLinksAsSvg, exportLinksAsDxf } from '../js/blo
 import { buildPlan, hardwareList, buildPackHtml } from '../js/blocks/build-plan.js';
 const inst = instantiateTemplate(builtinTemplate('fourbar-lift'), { counter: 0 });
 const crank = inst.comps.find(c => c.isInput && c.motorType === 'mg995');
+// G5-P3：預設棍寬 13 mm 放不下橫向搖臂孔（見 servo-horn-fit）；本測試驗搖臂孔數與設定，所以明確指定 18 mm。
+crank.stock = { ...(crank.stock || {}), widthMm: 18 };
 const geometry = inspectLinkExport(crank, 48);
 assert.equal(geometry.holes.filter(h => h.layer === 'MG995_HORN_SCREW').length, 4);
 assert.equal(geometry.holes.filter(h => h.layer === 'MG995_HORN_CENTER')[0].r, 3);

@@ -15,6 +15,8 @@ check('角碼規格：寬 7、厚 1.2、長邊孔離轉角 9.5、短邊孔離轉
 const [L, G] = fresh('fourbar-lift', 'gear-gripper');
 const P = S.topo.params;
 const brace = S.comps.find(c => c.moduleId === L.id && c.id.startsWith('ToolBrace'));
+// 預設棍寬 13 mm 站不住外購角碼（長腳 13＋板厚 3＝16 mm）；這份測試驗角碼立面，所以明確指定 18 mm 宿主桿寬。
+brace.stock = { ...(brace.stock || {}), widthMm: 18 };
 const w = memberStock(brace).widthMm, T = 3;
 const printed = B.connect(S.comps, S.modules, G.id, { module: L.id, port: `edge:${brace.id}:R` }, P, motor);
 const orient = st => st.modules.find(m => m.id === G.id).mount.orient;

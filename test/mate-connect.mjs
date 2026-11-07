@@ -8,6 +8,11 @@ import { S, B, Asm, fresh, motor, solveAt, cnc, ex } from './_bench-setup.mjs';
 import { audit, fails } from './_bracket-audit.mjs';
 let C = null;
 try { C = await import('../js/blocks/mate-connect.js'); } catch (e) { console.log(String(e).slice(0, 200)); }
+// G5-P3：預設接合改為 3D 列印轉接座、預設棍寬 13 mm。這份測試驗的是外購角碼的接法，所以角碼明確指定（jointKind），
+// 且宿主桿明確用 18 mm 寬（角碼長腳 13＋板厚 3＝16 mm 才站得住）；預設為列印轉接座另有一條檢查。
+const C0 = C;
+if (C0) C = { ...C0, mateConnect: (a1, a2, a3, a4, a5, a6, o) => C0.mateConnect(a1, a2, a3, a4, a5, a6, { jointKind: 'bracket-m3', ...(o || {}) }) };
+const freshWide = (...ids) => { const r = fresh(...ids); S.comps.forEach(c => { if (c.type === 'bar') c.stock = { ...(c.stock || {}), widthMm: 18 }; }); return r; };
 const fns = ['mateTargets', 'mateConnect', 'mateOfMount', 'mateStyle', 'mateStyles', 'setMateStyle'];
 check('mate-connect.js 匯出 ' + fns.join('／'), !!C && fns.every(f => typeof C[f] === 'function'));
 if (!C || !fns.every(f => typeof C[f] === 'function')) { report('mate-connect'); process.exit(1); }
@@ -21,7 +26,7 @@ const hw = st => BP.hardwareList(plan(st), { modules: st.modules });
 
 // ---------- 1. 四連桿升降臂 ← 夾爪 ----------
 {
-  const [L, G] = fresh('fourbar-lift', 'gear-gripper'); const P = S.topo.params;
+  const [L, G] = freshWide('fourbar-lift', 'gear-gripper'); const P = S.topo.params;
   const before = JSON.stringify([S.comps, S.modules]);
   const t = C.mateTargets(S.comps, S.modules, G.id, P);
   console.log('targets:', t.map(x => `${x.moduleName}・${x.name}[${x.kind}${x.ok ? '' : ' ✗' + x.reason}]`).join(' | '));
@@ -31,8 +36,9 @@ const hw = st => BP.hardwareList(plan(st), { modules: st.modules });
   const r = C.mateConnect(S.comps, S.modules, G.id, { module: L.id, mate: low.mateId }, P, motor);
   check('mateConnect 成功、不改輸入', r.ok === true && JSON.stringify([S.comps, S.modules]) === before);
   const o = r.ok && modOf(r, G.id).mount.orient;
-  check('結果是直角・壓在邊上、預設用金屬角碼', o && o.type === 'orthogonal' && o.edge === 'host' && o.joint.kind === 'bracket-m3' && r.style === 'hang' && C.mateStyle(r.modules, G.id) === 'hang');
+  check('結果是直角・壓在邊上、指定金屬角碼（未指定時預設為列印轉接座）', o && o.type === 'orthogonal' && o.edge === 'host' && o.joint.kind === 'bracket-m3' && r.style === 'hang' && C.mateStyle(r.modules, G.id) === 'hang');
   check('接合線方向由夾爪的安裝方向決定：childAxisDeg＝安裝方向＋180°（爪沿宿主邊伸出去）', o && sameDeg(o.childAxisDeg, 90 + 180));
+  check('未指定接合件時預設為 3D 列印轉接座', (() => { const x = C0.mateConnect(S.comps, S.modules, G.id, { module: L.id, mate: low.mateId }, P, motor); return x.ok && modOf(x, G.id).mount.orient.joint.kind === 'printed'; })());
   check('可指定列印轉接座（opts.jointKind printed）', (() => { const x = C.mateConnect(S.comps, S.modules, G.id, { module: L.id, mate: low.mateId }, P, motor, { jointKind: 'printed' }); return x.ok && modOf(x, G.id).mount.orient.joint.kind === 'printed'; })());
   const mo = C.mateOfMount(r.comps, r.modules, G.id, P);
   check('mateOfMount：夾爪接在四連桿的「工具架下緣」', mo && mo.module === L.id && mo.mateId === low.mateId && mo.name === low.name);
@@ -77,7 +83,7 @@ const hw = st => BP.hardwareList(plan(st), { modules: st.modules });
 
 // ---------- 2. 自己加的承接面（機架邊）、失效的承接面 ----------
 {
-  const [L, G] = fresh('fourbar-lift', 'gear-gripper'); const P = S.topo.params;
+  const [L, G] = freshWide('fourbar-lift', 'gear-gripper'); const P = S.topo.params;
   const fr = M.ownPorts(S.comps, S.modules, L.id, P).find(p => p.body && p.body.kind === 'frame');
   const a = M.addReceive(S.comps, S.modules, L.id, fr.id, P, '底座側邊');
   const t = C.mateTargets(S.comps, a.modules, G.id, P).find(x => x.name === '底座側邊');
@@ -92,7 +98,7 @@ const hw = st => BP.hardwareList(plan(st), { modules: st.modules });
 
 // ---------- 3. 齒條升降 ← 夾爪（平貼對鎖） ----------
 {
-  const [A, G] = fresh('rack-lift', 'gear-gripper'); const P = S.topo.params;
+  const [A, G] = freshWide('rack-lift', 'gear-gripper'); const P = S.topo.params;
   const t = C.mateTargets(S.comps, S.modules, G.id, P);
   const car = t.find(x => /滑台/.test(x.name));
   check('齒條滑台是可接的對鎖承接面', car && car.ok && car.kind === 'bolt');
@@ -107,7 +113,7 @@ const hw = st => BP.hardwareList(plan(st), { modules: st.modules });
 
 // ---------- 4. 只有 1 個孔的輸出端不能對鎖 ----------
 {
-  const [L, G] = fresh('fourbar-lift', 'gear-gripper'); const P = S.topo.params;
+  const [L, G] = freshWide('fourbar-lift', 'gear-gripper'); const P = S.topo.params;
   const mods = S.modules.map(m => m.id === L.id ? { ...m, mates: { ...m.mates, receive: [...m.mates.receive, { id: 'rx', name: '工具架板面', ref: { kind: 'bolt', output: 'tool' } }] } } : m);
   const t = C.mateTargets(S.comps, mods, G.id, P).find(x => x.mateId === 'rx');
   check('只有 1 個孔的輸出端：列出但 ok false，原因講到孔不夠；mateConnect 拒絕', t && t.ok === false && /孔/.test(t.reason) && C.mateConnect(S.comps, mods, G.id, { module: L.id, mate: 'rx' }, P, motor).ok === false);
@@ -115,7 +121,7 @@ const hw = st => BP.hardwareList(plan(st), { modules: st.modules });
 
 // ---------- 5. 三個構件：齒條升降 ← 四連桿 ← 夾爪 ----------
 {
-  const [A, L, G] = fresh('rack-lift', 'fourbar-lift', 'gear-gripper'); const P = S.topo.params;
+  const [A, L, G] = freshWide('rack-lift', 'fourbar-lift', 'gear-gripper'); const P = S.topo.params;
   const tl = C.mateTargets(S.comps, S.modules, L.id, P);
   check('四連桿可接到齒條滑台（不列自己的承接面）', tl.length === 1 && tl[0].module === A.id && tl[0].ok);
   const r1 = C.mateConnect(S.comps, S.modules, L.id, { module: A.id, mate: tl[0].mateId }, P, motor);

@@ -21,7 +21,7 @@ assert.equal(normalizeMemberStock(null), undefined);
 assert.equal(normalizeMemberStock(undefined), undefined);
 assert.equal(normalizeMemberStock([]), undefined);
 assert.equal(normalizeMemberStock('stock'), undefined);
-assert.deepEqual(normalizeMemberStock({}), { widthMm: 18, thicknessMm: 4, material: 'unspecified' });
+assert.deepEqual(normalizeMemberStock({}), { widthMm: 13, thicknessMm: 3, material: 'unspecified' });
 assert.deepEqual(normalizeMemberStock({
   widthMm: 121.76,
   thicknessMm: 0.46,
@@ -34,22 +34,22 @@ assert.deepEqual(normalizeMemberStock({
 }), { widthMm: 2, thicknessMm: 30, material: 'aluminum' });
 assert.deepEqual(normalizeMemberStock({
   widthMm: '', thicknessMm: null, material: 'pla',
-}), { widthMm: 18, thicknessMm: 4, material: 'pla' });
+}), { widthMm: 13, thicknessMm: 3, material: 'pla' });
 assert.deepEqual(normalizeMemberStock({
   widthMm: true, thicknessMm: false, material: 'acrylic',
-}), { widthMm: 18, thicknessMm: 4, material: 'acrylic' });
+}), { widthMm: 13, thicknessMm: 3, material: 'acrylic' });
 assert.deepEqual(normalizeMemberStock({
   widthMm: Infinity, thicknessMm: NaN, material: 'plywood',
-}), { widthMm: 18, thicknessMm: 4, material: 'plywood' });
+}), { widthMm: 13, thicknessMm: 3, material: 'plywood' });
 
 const malformedComp = { stock: [] };
-assert.deepEqual(memberStock(malformedComp), { widthMm: 18, thicknessMm: 4, material: 'unspecified' });
+assert.deepEqual(memberStock(malformedComp), { widthMm: 13, thicknessMm: 3, material: 'unspecified' });
 assert.deepEqual(malformedComp, { stock: [] }, 'reading defaults must not mutate the component');
 const legacyComp = {};
-assert.deepEqual(memberStock(legacyComp), { widthMm: 18, thicknessMm: 4, material: 'unspecified' });
+assert.deepEqual(memberStock(legacyComp), { widthMm: 13, thicknessMm: 3, material: 'unspecified' });
 assert.deepEqual(legacyComp, {}, 'reading legacy defaults must not write stock back');
 assert.equal(memberStockLabel({ stock: { widthMm: 24, thicknessMm: 6, material: 'plywood' } }), '夾板・板寬 24 mm・厚度 6 mm');
-assert.equal(memberStockLabel({}), '未指定・板寬 18 mm・厚度 4 mm');
+assert.equal(memberStockLabel({}), '未指定・板寬 13 mm・厚度 3 mm');
 
 const original = { id: 'bar-1', stock: { widthMm: 24, thicknessMm: 6, material: 'plywood' } };
 const widthPlan = planMemberStock(original, 'widthMm', 26.26);

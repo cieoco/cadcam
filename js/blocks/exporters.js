@@ -199,7 +199,7 @@ function adapterHoleSpecs(extraHoles) {
 }
 
 // 舵盤孔以零件局部座標輸出；齒輪與搖臂共用同一套加工設定。
-function servoHornHoles(settings, x = 0, angle = 0) {
+function servoHornHoles(settings, x = 0, angle = 0, fit = null) {
   const drive = { ...FABRICATION_DEFAULTS.drive, ...(settings?.drive || {}) };
   const holes = [];
   if (drive.hornCenterMm > 0) holes.push({ kind: 'circle', x, y: 0, r: drive.hornCenterMm / 2, layer: 'MG995_HORN_CENTER' });
@@ -207,6 +207,12 @@ function servoHornHoles(settings, x = 0, angle = 0) {
   for (let i = 0; i < n; i++) {
     const a = angle + 2 * Math.PI * i / n;
     holes.push({ kind: 'circle', x: x + drive.hornScrewCircleMm / 2 * Math.cos(a), y: drive.hornScrewCircleMm / 2 * Math.sin(a), r: drive.hornScrewMm / 2, layer: 'MG995_HORN_SCREW' });
+  }
+  // 外購搖臂的孔位由零件決定：棍太窄時只留整個孔（含 0.5 mm 孔邊肉）落在桿身內的孔；至少要有 2 個（含中心）才改，否則照舊交給加工檢查回報。
+  if (fit) {
+    const inside = h => { const px = Math.min(Math.max(h.x, 0), fit.length); return Math.hypot(h.x - px, h.y) + h.r + 0.5 <= fit.halfWidth; };
+    const kept = holes.filter(inside);
+    if (kept.length >= 2) return kept;
   }
   return holes;
 }
@@ -216,7 +222,7 @@ function linkHoleSpecs(comp, length, settings, extraHoles = []) {
   const holeR = round(holeDiameterMm / 2, 3);
   const flat = { ttShaftFlatDiameterMm, ttShaftFlatThicknessMm };
   const endHoles = (key, x) => {
-    if (comp.isInput && comp.motorType === 'mg995' && comp[key]?.physicalMotor) return servoHornHoles(settings, x);
+    if (comp.isInput && comp.motorType === 'mg995' && comp[key]?.physicalMotor) return servoHornHoles(settings, x, 0, comp.shape === 'disk' ? null : { halfWidth: memberStock(comp).widthMm / 2, length });
     return [isTtMotorEnd(comp, key) ? { kind: 'tt-shaft-flat', x, y: 0, settings: flat } : { kind: 'circle', x, y: 0, r: holeR }];
   };
   return [...endHoles('p1', 0), ...endHoles('p2', length), ...adapterHoleSpecs(extraHoles)];

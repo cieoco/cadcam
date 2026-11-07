@@ -110,7 +110,7 @@ const orientOf = st => st.modules.find(x => x.id === G.id).mount.orient;
   const rot = B.benchAdjust(cur.comps, cur.modules, G.id, 'rotate', P);
   check('轉 90°：childAxisDeg +90', rot.ok && near(Math.cos((orientOf(rot).childAxisDeg - o0.childAxisDeg - 90) * Math.PI / 180), 1, 1e-9));
   const sd = B.benchAdjust(cur.comps, cur.modules, G.id, 'side', P);
-  check('換邊：side 變 +1、origin 移到上緣（往上一個板寬 18）', sd.ok && orientOf(sd).side === 1 && near(frameOf(sd).origin.y - f0.origin.y, 18));
+  check('換邊：side 變 +1、origin 移到上緣（往上一個板寬 13）', sd.ok && orientOf(sd).side === 1 && near(frameOf(sd).origin.y - f0.origin.y, 13));
   check('調整不改零件', [s1, rev, rot, sd].every(r => JSON.stringify(r.comps) === JSON.stringify(cur.comps)));
   const bad = B.benchAdjust(cur.comps, cur.modules, L.id, 'side', P);
   check('沒有直角安裝的模組：調整失敗並說明', bad.ok === false && typeof bad.reason === 'string');

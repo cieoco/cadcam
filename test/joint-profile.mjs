@@ -7,16 +7,16 @@ const BP = await import('../js/blocks/build-plan.js');
 const { memberStock } = await import('../js/blocks/member-stock.js');
 
 const D = FP.FABRICATION_DEFAULTS.joint;
-check('加工設定預設有 joint：預設接合件 bracket-m3、角碼規格 寬 7／厚 1.2／長邊 13／短邊 9.5／孔心離末端 3.5',
-  D && D.defaultKind === 'bracket-m3' && D.bracket && D.bracket.widthMm === 7 && D.bracket.thicknessMm === 1.2 && D.bracket.longLegMm === 13 && D.bracket.shortLegMm === 9.5 && D.bracket.holeEndMm === 3.5);
+check('加工設定預設有 joint：預設接合件 printed（外購角碼為例外）、角碼規格 寬 7／厚 1.2／長邊 13／短邊 9.5／孔心離末端 3.5',
+  D && D.defaultKind === 'printed' && D.bracket && D.bracket.widthMm === 7 && D.bracket.thicknessMm === 1.2 && D.bracket.longLegMm === 13 && D.bracket.shortLegMm === 9.5 && D.bracket.holeEndMm === 3.5);
 if (!D) { report('joint-profile'); process.exit(1); }
 const norm = FP.normalizeFabricationProfile({});
 const prof = norm.profile || norm;
-check('舊作品沒有 joint：靜默補上預設', prof.joint && prof.joint.defaultKind === 'bracket-m3' && prof.joint.bracket.longLegMm === 13);
+check('舊作品沒有 joint：靜默補上預設', prof.joint && prof.joint.defaultKind === 'printed' && prof.joint.bracket.longLegMm === 13);
 const custom = FP.normalizeFabricationProfile({ joint: { defaultKind: 'printed', bracket: { longLegMm: 15, holeEndMm: 4, widthMm: 999, shortLegMm: 'x' } } });
 const cp = custom.profile || custom;
 check('自訂值保留、不合理的值回預設或夾住', cp.joint.defaultKind === 'printed' && cp.joint.bracket.longLegMm === 15 && cp.joint.bracket.holeEndMm === 4 && cp.joint.bracket.shortLegMm === 9.5 && cp.joint.bracket.widthMm <= 30);
-check('不認識的預設種類回 bracket-m3', (() => { const r = FP.normalizeFabricationProfile({ joint: { defaultKind: 'glue' } }); return (r.profile || r).joint.defaultKind === 'bracket-m3'; })());
+check('不認識的預設種類回預設（printed）', (() => { const r = FP.normalizeFabricationProfile({ joint: { defaultKind: 'glue' } }); return (r.profile || r).joint.defaultKind === 'printed'; })());
 
 check('jointSpec(kind, joint 設定)：由規格算出孔距', typeof OJ.jointSpec === 'function');
 const s0 = OJ.jointSpec('bracket-m3', D);

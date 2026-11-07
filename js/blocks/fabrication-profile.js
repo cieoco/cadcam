@@ -9,7 +9,7 @@ export const FABRICATION_DEFAULTS = Object.freeze({
   syringeMount: freezeRecord({clearanceMm:0.5,marginMm:8,strapSpacingMm:24}),
   export: freezeRecord({
     // These match normalizeExportSettings({}) after the three preference loaders run.
-    barWidthMm: 18,
+    barWidthMm: 13,
     // 使用者現場決定：關節一律 M3 螺絲＋防鬆螺帽，新作品預設 3.2
     holeDiameterMm: 3.2,
     frameMarginMm: 18,
@@ -55,7 +55,7 @@ export const FABRICATION_DEFAULTS = Object.freeze({
   // F1：直角接合件。預設用現成 M3 帶牙金屬角碼（13×9.5×7、厚 1.2、孔心離腳端 3.5）；
   // 規格存在作品裡，實量後可改，孔位、五金清單、3D 都引用這裡。
   joint: Object.freeze({
-    defaultKind: 'bracket-m3',
+    defaultKind: 'printed',
     bracket: freezeRecord({
       widthMm: 7,
       thicknessMm: 1.2,

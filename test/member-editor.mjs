@@ -186,9 +186,9 @@ check('stock width rejects insufficient hole margin without mutation or undo', (
 check('stock dimensions stay selected on bar sync and increments use their own steps', (() => {
   reset([simpleBar()], barParams); S.selectedLinkId = 'Bar1';
   editor.selectDimension('width'); editor.change(8); editor.sync();
-  const widthSelected = el('memberWidthInput').value === 19 && S.comps[0].stock.widthMm === 19;
+  const widthSelected = el('memberWidthInput').value === 14 && S.comps[0].stock.widthMm === 14;
   editor.selectDimension('thickness'); editor.change(-8); editor.sync();
-  return widthSelected && S.comps[0].stock.thicknessMm === 3.5 && S.topo.params.L === 18;
+  return widthSelected && S.comps[0].stock.thicknessMm === 2.5 && S.topo.params.L === 18;
 })());
 check('bar properties hide duplicate selector and expose independent stock fields', (() => {
   reset([simpleBar()], barParams); S.selectedLinkId = 'Bar1'; editor.sync();

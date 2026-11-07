@@ -62,7 +62,7 @@ test('M3/M4: changing both jaw tips replans real geometry and survives save', ()
       const sol = solveTopology(topo, { thetaDeg: pose.theta, motorAngles: { [p.motor]: pose.theta } });
       const l = jawCenterline([sol.points.GCA, sol.points.GPA, sol.points.LT], 1, tipLength).at(-1);
       const r = jawCenterline([sol.points.GCB, sol.points.GPB, sol.points.RT], -1, tipLength).at(-1);
-      near(r.x - l.x - 18, expected); near(l.y, r.y);
+      near(r.x - l.x - 13, expected); near(l.y, r.y);
     }
   }
 });

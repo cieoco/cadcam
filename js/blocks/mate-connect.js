@@ -83,7 +83,7 @@ export function mateConnect(comps, modules, childId, target, params, motorState,
     return r.ok ? rebase({ ...r, style: 'bolt' }) : fail(r.reason);
   }
   const attach = effectiveMates(list, mods, childId, params).attach;
-  const r = connect(list, mods, childId, to, params, motorState, { joint: opts.jointKind || 'bracket-m3' });
+  const r = connect(list, mods, childId, to, params, motorState, { joint: opts.jointKind || 'printed' });
   if (!r.ok) return fail(r.reason);
   let res = { ...r, style: 'hang' };
   if (attach) {   // 爪沿宿主邊伸出去：接合線方向＝安裝方向＋180°。

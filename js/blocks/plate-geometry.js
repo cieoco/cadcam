@@ -1,6 +1,6 @@
 import { memberStock } from './member-stock.js';
 
-export const DEFAULT_PLATE_RADIUS_WORLD = 9;
+export const DEFAULT_PLATE_RADIUS_WORLD = 6.5;
 export const MAX_PLATE_POINTS = 6;
 
 const EPS = 1e-6;

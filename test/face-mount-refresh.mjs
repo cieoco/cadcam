@@ -17,8 +17,8 @@ const before = JSON.stringify({ comps, modules, params });
 const refreshed = refreshFaceMounts(comps, modules, params, { exportSettings: { stockThicknessMm: 6 }, stockMm: 6 });
 assert.deepEqual(refreshed.warnings, []);
 const face = refreshed.modules.find(m => m.mount?.face).mount.face;
-assert.equal(face.childThicknessMm, 6); assert.equal(face.hostThicknessMm, 4);
-assert.equal(face.translation.z, 10); // 兩板中心距＝2＋3＋5。
+assert.equal(face.childThicknessMm, 6); assert.equal(face.hostThicknessMm, 3);
+assert.equal(face.translation.z, 9.5); // 兩板中心距＝1.5＋3＋5（宿主預設板厚 3 mm）。
 assert.deepEqual(face.selection, record.selection);
 assert.equal(JSON.stringify({ comps, modules, params }), before);
 const snapshot = toSnapshot(comps, { params }, 3, { modules: refreshed.modules });

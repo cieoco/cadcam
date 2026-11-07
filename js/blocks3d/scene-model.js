@@ -113,15 +113,15 @@ export function computeBodyLayers(bodies, groundIds = new Set(), opts = {}) {
  * @param {Array}  [opts.cams]           - 凸輪：{ id, center, follower, baseRadius, lift, axisDeg, profile, phase, rollerRadius, thetaDeg, color }
  * @param {Array}  [opts.pulleys]        - 皮帶輪：{ id, center, pin, radius, pinRadius, color }
  * @param {Array}  [opts.belts]          - 皮帶：{ id, driver, driven, color }
- * @param {number} [opts.hullR=9]        - 冰棒棍外形半徑（與 2D 一致）
+ * @param {number} [opts.hullR=6.5]        - 冰棒棍外形半徑（與 2D 一致）
  * @param {number} [opts.plateGap=6]     - 相鄰層的 z 間距 (mm)
- * @param {number} [opts.plateThickness=4] - 每片板的厚度 (mm)
+ * @param {number} [opts.plateThickness=3] - 每片板的厚度 (mm)
  * @param {number} [opts.pinR=3.2]       - 銷柱半徑 (mm)
  * @returns {{ sticks, plates, pins, grounds, motors, rails, carriages, gears, plateGap, plateThickness, center, span }}
  */
 export function buildSceneModel(links, points, opts = {}) {
-  const hullR = opts.hullR ?? 9;
-  const plateThickness = opts.plateThickness ?? 4;
+  const hullR = opts.hullR ?? 6.5;
+  const plateThickness = opts.plateThickness ?? 3;
   const memberStocks = opts.memberStocks || {};
   const maxThickness = Math.max(plateThickness, opts.frameGeometry?.thicknessMm || 0, ...Object.values(memberStocks).map(s => s.thicknessMm));
   const plateGap = Math.max(opts.plateGap ?? 6, maxThickness + 2);

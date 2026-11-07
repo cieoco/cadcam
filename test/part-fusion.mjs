@@ -55,7 +55,7 @@ for(const b of downloads)assert.ok((await b.text()).includes('GEAR_CUT'));
 globalThis.document=originalDoc;globalThis.URL=originalUrl;globalThis.setTimeout=originalTimeout;
 const plan=buildPlan({comps:S.comps,modules:S.modules,params:S.topo.params,exportSettings:ex,cnc});
 assert.equal(plan.parts.filter(p=>p.fusedMembers).length,2);
-assert.ok(plan.parts.filter(p=>p.fusedMembers).every(p=>p.thicknessMm===4));
+assert.ok(plan.parts.filter(p=>p.fusedMembers).every(p=>p.thicknessMm===3));
 assert.equal(plan.parts.filter(p=>p.name.includes('Jaw')).length,0);
 const {findInterference}=await import('../js/blocks/interference.js');
 const hits=findInterference({comps:S.comps,modules:S.modules,params:S.topo.params,plan,ranges:{'1':{lo:0,hi:90}},samplesPerMotor:10});

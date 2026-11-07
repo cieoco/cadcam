@@ -21,7 +21,7 @@ const bounds = rings => {
   const r = buildMountSurfaces({ comps: S.comps, modules: S.modules, moduleId: mod.id, params: S.topo.params, exportSettings: ex });
   check('四連桿工具架產生真實輸出外框', r.ok && r.surfaces.some(s => s.kind === 'output' && s.outputId === mod.outputs[0].id && s.compId === mod.outputs[0].body.id));
   const output = r.surfaces.find(s => s.kind === 'output');
-  check('桿件採用 memberStock 預設厚度', output && output.box.min.z === -2 && output.box.max.z === 2);
+  check('桿件採用 memberStock 預設厚度', output && output.box.min.z === -1.5 && output.box.max.z === 1.5);
   check('工具架 bounds 來自真實 link export', output && (() => {
     const comp = S.comps.find(c => c.id === output.compId), a = comp.p1, b = comp.p2;
     const len = Math.hypot(b.x - a.x, b.y - a.y), c = (b.x - a.x) / len, s = (b.y - a.y) / len;
@@ -41,7 +41,7 @@ const bounds = rings => {
   const r = buildMountSurfaces({ comps: S.comps, modules: S.modules, moduleId: mod.id, params: S.topo.params, exportSettings: ex });
   const surface = r.ok && r.surfaces.find(s => s.outputId === 'jaw');
   check('夾爪輸出使用真實 plate outline 與多環欄位', surface && surface.compId === jaw.id && surface.outlines.length >= 1 && surface.outline === surface.outlines[0]);
-  check('夾爪板件沿用 memberStock 預設厚度', surface && surface.box.min.z === -2 && surface.box.max.z === 2);
+  check('夾爪板件沿用 memberStock 預設厚度', surface && surface.box.min.z === -1.5 && surface.box.max.z === 1.5);
   check('夾爪 bounds 與 inspectPlateExport 一致', surface && (() => {
     const expected = inspectPlateExport(jaw, [jaw.p1, jaw.p2, jaw.p3], ex).outlines;
     const a = bounds(surface.outlines), b = bounds(expected);

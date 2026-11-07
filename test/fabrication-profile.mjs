@@ -12,7 +12,7 @@ assert.deepEqual(FABRICATION_DEFAULTS, {
   syringeMount: {clearanceMm:0.5,marginMm:8,strapSpacingMm:24},
   export: {
     // L5-0：使用者現場決定關節一律 M3 螺絲＋防鬆螺帽 → 新作品的連接孔／機架孔預設 3.2。
-    barWidthMm: 18, holeDiameterMm: 3.2, frameMarginMm: 18, frameHoleDiameterMm: 3.2,
+    barWidthMm: 13, holeDiameterMm: 3.2, frameMarginMm: 18, frameHoleDiameterMm: 3.2,
     ttShaftFlatDiameterMm: 5.4, ttShaftFlatThicknessMm: 3.7,
   },
   ttMount: {
@@ -32,7 +32,7 @@ assert.deepEqual(FABRICATION_DEFAULTS, {
   },
   // F1：直角接合件——預設用 M3 帶牙金屬角碼（13×9.5×7、厚 1.2、孔心離腳端 3.5），規格存在作品裡可改。
   joint: {
-    defaultKind: 'bracket-m3',
+    defaultKind: 'printed',
     bracket: { widthMm: 7, thicknessMm: 1.2, longLegMm: 13, shortLegMm: 9.5, holeEndMm: 3.5 },
   },
 });
@@ -67,7 +67,7 @@ const full = normalizeFabricationProfile(nonDefault);
 assert.deepEqual(nonDefault, original, 'normalization must not mutate its input');
 assert.equal(full.ok, true);
 assert.equal(full.status, 'present');
-assert.deepEqual(full.profile, { ...nonDefault, syringeMount: {...FABRICATION_DEFAULTS.syringeMount}, cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 }, drive: { ...FABRICATION_DEFAULTS.drive }, joint: { defaultKind: 'bracket-m3', bracket: { ...FABRICATION_DEFAULTS.joint.bracket } } },
+assert.deepEqual(full.profile, { ...nonDefault, syringeMount: {...FABRICATION_DEFAULTS.syringeMount}, cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 }, drive: { ...FABRICATION_DEFAULTS.drive }, joint: { defaultKind: 'printed', bracket: { ...FABRICATION_DEFAULTS.joint.bracket } } },
   'older three-group profiles round-trip and get the cnc, drive and joint defaults');
 assert.deepEqual(full.warnings, [], 'missing cnc / drive / joint groups (older works) are filled silently');
 
@@ -102,7 +102,7 @@ const partial = normalizeFabricationProfile({
 assert.equal(partial.ok, true);
 assert.equal(partial.status, 'present');
 assert.equal(partial.profile.export.holeDiameterMm, 5);
-assert.equal(partial.profile.export.barWidthMm, 18);
+assert.equal(partial.profile.export.barWidthMm, 13);
 assert.deepEqual(partial.profile.ttMount, FABRICATION_DEFAULTS.ttMount);
 assert.ok(partial.warnings.some(w => w.includes('futureGroup')));
 assert.ok(partial.warnings.some(w => w.includes('futureExportSetting')));

@@ -16,6 +16,8 @@ const at=(m,p)=>({x:m[0]*p.x+m[4]*p.y+m[8]*p.z+m[12],y:m[1]*p.x+m[5]*p.y+m[9]*p.
 const normal=m=>({x:m[8],y:m[9],z:m[10]}),negative=v=>({x:-v.x,y:-v.y,z:-v.z});
 const [host,child]=fresh('fourbar-lift','gear-gripper'),params=structuredClone(S.topo.params);
 const bar=S.comps.find(c=>c.moduleId===host.id&&c.id.startsWith('ToolBrace'));
+// G5-P3：預設棍寬 13 mm 站不住外購角碼（長腳 13＋板厚 3＝16 mm）；本測試驗角碼的立面，明確指定宿主桿 18 mm。
+bar.stock={...bar.stock,widthMm:18};
 const st=B.connect(S.comps,S.modules,child.id,{module:host.id,port:`edge:${bar.id}:R`},params,motor,{joint:'bracket-m3'});
 assert.ok(st.ok);
 const comps=st.comps.map(c=>c.id===bar.id?{...c,stock:{...c.stock,thicknessMm:6}}:c),opts={stockMm:3};

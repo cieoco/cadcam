@@ -30,7 +30,7 @@ const topo = compileTopology(restored.comps, { params: restored.params }, new Se
 const sol = solveTopology(topo, { thetaDeg: plan.closed.theta, motorAngles: { [plan.motor]: plan.closed.theta } });
 assert.ok(Math.abs(gripperTips(restored.comps, sol.points).gap - plan.width) < 1e-6);
 const oldGap = gripperTips(original.comps, sol.points).gap;
-assert.ok(Math.abs(oldGap - gripperTips(restored.comps, sol.points).gap - 6) < 1e-9);
+assert.ok(Math.abs(oldGap - gripperTips(restored.comps, sol.points).gap - 11) < 1e-9);
 const polygons = restored.comps.filter(c => c.type === 'triangle').map(c => ({ points: [c.p1.id, c.p2.id, c.p3.id], shape: c.shape }));
 const memberStocks = {}, plateGeometries = {};
 for (const comp of restored.comps.filter(c => c.type === 'triangle')) {

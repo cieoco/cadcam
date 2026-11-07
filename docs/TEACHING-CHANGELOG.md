@@ -6,6 +6,15 @@
 
 ---
 
+## 2026-11-07 · 數位積木：預設棍寬 13 mm、板厚 3 mm、預設列印轉接座（G5-P3）
+
+- 未指定 stock 時的預設改為 3 mm 合板、棍寬 13 mm（邊距＝8−板厚／2），2D 外形、3D、匯出同源；外形半徑後備 9→6.5。未指定接合時預設改為 3D 列印轉接座（外購 M3 角碼為例外，作品中明確指定者不變）。**沒有存 stock 的舊作品會變細、變薄，外形、疊層、DXF、BOM 與 3D 都會改變，需重新匯出。** 保存格式不變。
+- 修正 part-fusion 聯集既有 bug：重合輪廓邊一側被第三環頂點切段、另一側未切時，縫合分岔而誤報「合成外框未閉合」（方環在棍寬 13～15 mm 必現，18 mm 碰巧正常）；建邊界後補切落在其他片段中間的頂點再依端點去重。新增 test/part-fusion-ring.mjs，18 mm 既有結果不變。
+- MG995 舵機搖臂孔為外購件孔位：鑽在輸入桿上時只保留整孔（含 0.5 mm 孔邊肉）落在外形內者，至少 2 個（13 mm 棍為中心孔＋沿桿一孔；桿端圓頭外的孔不鑽）；少於 2 個沿用既有加工問題回報。18 mm 棍維持原 4 孔。兩點鎖固的承扭能力未經實物驗證。新增 test/servo-horn-fit.mjs。
+- 範例資料：hydraulic-assembly-example 的 Lift 平移依新棍寬重算一處；其餘範例上格留待 G7。
+- 既有測試依新預設更新（舊 18／4／9 及其推得值）：fabrication-profile、joint-profile、member-stock、member-stock-integration、member-editor、member-dimensions、bench-ports、orthogonal-fab、gripper-workflow（開口 70→65）、face-mate-examples、face-mount-refresh、mount-surfaces、part-fusion、servo-crank-holes（明確指定 18 mm）；測試金屬角碼行為者（mate-connect、mate-multi、bench-bracket、orient-bracket-physical）改為明確指定 18 mm 宿主與 bracket-m3。F1 fixture 的碰撞見證以 18×4 計算，改為明確指定該 stock。
+- 首次 JS 2,008,296 bytes；主模型追認 startup-size 上限放寬至 2.009 MB（合成聯集修正與預設 13 mm）。Node 全套 262 支：最後一輪除 servo-crank-holes 外全過，該支改為明確指定 18 mm 後單跑通過（output/loop/g5p3d-node）。瀏覽器 22 支：僅已知的 mounting-review 與 frame-holes 360×640 偶發逾時未過。截圖 output/grid-blocks/g5p3/fourbar-13mm.png。
+
 ## 2026-11-07 · 數位積木：直角組立對格與 3D 列印轉接座（G5-P2）
 
 - 依數位積木 SDD 的 R4／R6：列印轉接座＝兩支直角相接的棍，宿主翼長 2m_c、立翼高 2m_h（m＝8−板厚／2），孔在翼中央，沿接合線孔距 8 mm，翼厚預設 4→3 mm（W ≤ m−2.75 避免 M3 螺絲頭頂到另一翼）。立板改貼在宿主孔列旁的格面上（宿主為桿時立板面與桿邊對齊），孔高為宿主中面上方 8 的倍數；「壓在邊上」時宿主孔改在桿中線。STL 下載依同一 layout。

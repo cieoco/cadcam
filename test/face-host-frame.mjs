@@ -12,7 +12,7 @@ import {faceFileExportData,validateFaceExport,faceBuildPackHtml} from '../js/blo
 import * as E from '../js/blocks/exporters.js';
 import {writeFileSync,mkdirSync} from 'node:fs';
 import {unmountModule} from '../js/blocks/module-ops.js';
-const source=f1NestedFixture(),arm=source.modules[1];
+const source=f1NestedFixture(3),arm=source.modules[1];
 arm.mount.to={module:source.modules[0].id,frame:{edge:6}};
 const descriptor=readConnectionDescriptor({...source,childId:arm.id});
 assert.ok(descriptor.ok);
@@ -31,8 +31,8 @@ const fixtures=[rootFrameFixture(),installedFrameFixture(),installedFrameFixture
 let lastScene,lastWork;
 for(const [i,work] of fixtures.entries()){
  const before=JSON.stringify(work);freezeData(work);
- const r1=refreshFaceMounts(work.comps,work.modules,work.params,{stockMm:4,exportSettings:work.fabrication.export});
- const r2=refreshFaceMounts(work.comps,r1.modules,work.params,{stockMm:4,exportSettings:work.fabrication.export});
+ const r1=refreshFaceMounts(work.comps,work.modules,work.params,{stockMm:3,exportSettings:work.fabrication.export});
+ const r2=refreshFaceMounts(work.comps,r1.modules,work.params,{stockMm:3,exportSettings:work.fabrication.export});
  assert.deepEqual(r2.modules,r1.modules,'refresh twice never drifts references/transforms');assert.deepEqual(r1.diagnostics,[]);
  for(const theta of [20,40]){
   const pose={theta,motorAngles:{'1':theta,'2':10,'3':15}},scene=faceCandidateModel({work},pose);
@@ -73,10 +73,10 @@ for(const [i,work] of fixtures.entries()){
 }
 // Reorder and change design defaults, without changing any saved endpoint.
 const changed=structuredClone(fixtures[0]);changed.modules.reverse();changed.modules.forEach(m=>{m.faceParts={part:'frame',face:'left'};m.mates={receive:[]};});
-assert.deepEqual(refreshFaceMounts(changed.comps,changed.modules,changed.params,{stockMm:4}).modules.map(m=>m.mount?.to),changed.modules.map(m=>m.mount?.to));
+assert.deepEqual(refreshFaceMounts(changed.comps,changed.modules,changed.params,{stockMm:3}).modules.map(m=>m.mount?.to),changed.modules.map(m=>m.mount?.to));
 changed.comps.find(c=>c.id==='BaseBar').p1.frameStock.widthMm=170;
-const resized=refreshFaceMounts(changed.comps,changed.modules,changed.params,{stockMm:4});assert.deepEqual(resized.diagnostics,[]);
-assert.deepEqual(refreshFaceMounts(changed.comps,resized.modules,changed.params,{stockMm:4}).modules,resized.modules);
+const resized=refreshFaceMounts(changed.comps,changed.modules,changed.params,{stockMm:3});assert.deepEqual(resized.diagnostics,[]);
+assert.deepEqual(refreshFaceMounts(changed.comps,resized.modules,changed.params,{stockMm:3}).modules,resized.modules);
 // Every stable edge is a reference to the same board, not another placement.
 const root=fixtures[0],armId=root.modules[1].id;
 for(const edge of [6,13,20,27]){
@@ -100,7 +100,7 @@ const resizedBrace=faceCandidateModel({work:changedBrace},{theta:20,motorAngles:
 assert.ok(resizedBrace.catalog.diagnostics.some(d=>d.moduleId===removed&&d.code==='face_fastener_invalid'),'a thickness change may invalidate one hole; never silently degrade its fasteners');
 assert.deepEqual(resizedBrace.work.modules.map(m=>m.mount?.to),double.modules.map(m=>m.mount?.to));
 assert.equal(resizedBrace.catalog.extras.adapters.length,1);assert.equal(resizedBrace.catalog.extras.adapters[0].moduleId,remaining);assert.notEqual(resizedBrace.model.geometryKey,ds.model.geometryKey);
-assert.deepEqual(refreshFaceMounts(resizedBrace.work.comps,resizedBrace.work.modules,resizedBrace.work.params,{stockMm:4}).modules,resizedBrace.work.modules,'resized shared host refresh is stable');
+assert.deepEqual(refreshFaceMounts(resizedBrace.work.comps,resizedBrace.work.modules,resizedBrace.work.params,{stockMm:3}).modules,resizedBrace.work.modules,'resized shared host refresh is stable');
 // Actual public serialized files, independently inverse-projected world holes.
 const blobs=new Map(),downloads=[];globalThis.URL.createObjectURL=b=>{const id=`blob:${blobs.size}`;blobs.set(id,b);return id;};globalThis.URL.revokeObjectURL=()=>{};
 globalThis.document={body:{appendChild(){}},createElement:()=>({click(){downloads.push({name:this.download,blob:blobs.get(this.href)});},remove(){}})};
@@ -143,7 +143,7 @@ class Element{constructor(tag){this.style={};this.listeners={};if(tag==='iframe'
 globalThis.document={createElement:t=>new Element(t),body:new Element('body')};globalThis.window={addEventListener:(t,f)=>{if(t==='message')receiver=f;},removeEventListener(){}};
 globalThis.location={origin:'https://example.test'};globalThis.matchMedia=()=>({matches:false});
 const ui=structuredClone(root),initialMount=ui.modules[1].mount;initialMount.to.frame.edge=13;ui.modules[1].mount=null;
-openFaceWizard({...ui,params:ui.params,childId:armId,stockMm:4,initialMount,exportSettings:ui.fabrication.export,joint:ui.fabrication.joint,say:s=>notices.push(s),commit:()=>assert.fail('init cannot commit')});
+openFaceWizard({...ui,params:ui.params,childId:armId,stockMm:3,initialMount,exportSettings:ui.fabrication.export,joint:ui.fabrication.joint,say:s=>notices.push(s),commit:()=>assert.fail('init cannot commit')});
 receiver({origin:location.origin,source:iframe.contentWindow,data:{type:'face-wizard-ready',loadGraph:LOAD_GRAPH_TOKEN}});
 const init=messages.at(-1);assert.equal(init.type,'face-wizard-init');assert.equal(init.hosts.filter(h=>h.surface.moduleId==='Base'&&h.surface.kind==='frame').length,1);
 assert.equal(init.hosts[init.host].surface.frameEdge,13);assert.ok(!init.hosts.some(h=>/直邊\s*\d/.test(h.name)));assert.deepEqual(notices,[]);iframe.listeners={};
