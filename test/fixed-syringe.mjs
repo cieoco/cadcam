@@ -25,19 +25,22 @@ for(const original of [hydraulicSnapshot,fixedLiftSnapshot,fixedGripSnapshot]){
  assert.equal(JSON.stringify(original),before);
 }
 const s=fixedLiftSnapshot;
-assert.equal(scanSyringe(s.comps,{...s.params,H2Arm:145.892,H2Tail:250-145.892},'H2Syringe').ok,true);
-assert.equal(scanSyringe(s.comps,{...s.params,H2Arm:198.958,H2Tail:250-198.958},'H2Syringe').ok,false);
+assert.equal(scanSyringe(s.comps,{...s.params,H2Arm:144,H2Tail:s.params.H2Reach-144},'H2Syringe').ok,true);
+assert.equal(scanSyringe(s.comps,{...s.params,H2Arm:200,H2Tail:s.params.H2Reach-200},'H2Syringe').ok,false);
 console.log('PASS fixed syringe: axis, bidirectional stroke, JSON/share, passive-tip metadata, invalid mounting and machining guard');
 
 const grip=normalizeSnapshot(fixedGripSnapshot),gripper=grip.comps.find(c=>c.type==='syringe');
 assert.equal(gripper.passiveTips,undefined);assert.deepEqual(gripper.jawIds,['H3JawA','H3JawB']);
 const old=structuredClone(fixedGripSnapshot),oldS=old.comps.find(c=>c.type==='syringe');
-oldS.passiveTips=[{hostId:'H3JawA',length:40,angleDeg:70},{hostId:'H3JawB',length:40,angleDeg:-70}];delete oldS.jawIds;
+// 舊檔的 passiveTips（長度＋角度）由目前範例的端孔位置反推，轉入板件後要得到同一個端孔（數值誤差 1e-6 內）。
+const tipOf=arm=>{const t=arm.vertices.find(v=>v.hole),dx=arm.p2.x-arm.p1.x,dy=arm.p2.y-arm.p1.y,d=Math.hypot(dx,dy),ex=arm.p3.x-arm.p1.x,ey=arm.p3.y-arm.p1.y;const vx=(t.u*dx-t.v*dy)/d-ex,vy=(t.u*dy+t.v*dx)/d-ey;return {length:Math.hypot(vx,vy),angleDeg:(Math.atan2(vy,vx)-Math.atan2(ey,ex))*180/Math.PI};};
+oldS.passiveTips=['H3JawA','H3JawB'].map(id=>({hostId:id,...tipOf(fixedGripSnapshot.comps.find(c=>c.id===id))}));delete oldS.jawIds;
 for(const a of old.comps.filter(c=>c.type==='triangle'))a.vertices=a.vertices.filter(v=>v.solve);
 const oldJson=JSON.stringify(old),converted=normalizeSnapshot(old);
 assert.equal(JSON.stringify(old),oldJson,'migration cannot mutate input');
-assert.deepEqual(converted.comps,grip.comps);
-assert.deepEqual(normalizeSnapshot(toSnapshot(converted.comps,{params:converted.params},30)).comps,grip.comps);
+const round=c=>JSON.parse(JSON.stringify(c,(k,v)=>typeof v==='number'?Math.round(v*1e6)/1e6:v));
+assert.deepEqual(round(converted.comps),round(grip.comps));
+assert.deepEqual(normalizeSnapshot(toSnapshot(converted.comps,{params:converted.params},30)).comps,converted.comps);
 const refs=new Map();
 for(let extension=0;extension<=20;extension+=.5){
  const r=planSyringeStroke(grip.comps,grip.params,gripper.id,extension);assert.ok(r.ok,r.message);
@@ -50,9 +53,9 @@ for(let extension=0;extension<=20;extension+=.5){
   assert.equal(createPlateGeometry(a,[a.p1,a.p2,a.p3].map(p=>r.points[p.id])).outlines.length,1);
  }
 }
-for(const length of [145.892,172.422]){
- const p={...s.params,H2Arm:length,H2Tail:250-length};
- for(const sample of scanSyringe(s.comps,p,'H2Syringe').samples)assert.ok(Math.abs(Math.hypot(sample.end.x-134.1527,sample.end.y-209.5479)-250)<.001);
+for(const length of [144,176]){
+ const p={...s.params,H2Arm:length,H2Tail:s.params.H2Reach-length};
+ for(const sample of scanSyringe(s.comps,p,'H2Syringe').samples)assert.ok(Math.abs(Math.hypot(sample.end.x-136,sample.end.y-208)-256)<.001);
 }
 
 for(const comp of normalizeSnapshot(fixedGripSnapshot).comps.filter(c=>c.type==='triangle')){
@@ -94,7 +97,7 @@ for(const arm of [60,80,100]){
  const h=hydraulicSnapshot,p={...h.params,H1Arm:arm},scan=scanSyringe(h.comps,p,'H1Syringe');
  assert.ok(scan.ok,scan.message);assert.equal(scan.samples.length,41);
  for(const sample of scan.samples){
-  assert.ok(Math.abs(sample.b.y+60)<.001,'fixed H01 plunger stays horizontal');
+  assert.ok(Math.abs(sample.b.y+72)<.001,'fixed H01 plunger stays horizontal');
   assert.ok(Math.abs(Math.hypot(sample.end.x,sample.end.y)-arm)<.001,'rocker retains chosen length');
   assert.ok(Math.abs(Math.hypot(sample.b.x-sample.end.x,sample.b.y-sample.end.y)-80)<.001,'pinned coupler retains length');
  }
@@ -107,5 +110,5 @@ console.log('PASS fixed H01: three arm comparisons, straight plunger, rigid coup
 const restoredScan=scanSyringe(grip.comps,grip.params,gripper.id);
 assert.ok(restoredScan.ok);
 assert.ok(restoredScan.samples.at(-1).tipGap-restoredScan.samples[0].tipGap>30);
-assert.equal(grip.params.H3JawAd,104.9);
-assert.equal(grip.params.H3JawBd,104.9);
+assert.equal(grip.params.H3JawAd,112);
+assert.equal(grip.params.H3JawBd,112);

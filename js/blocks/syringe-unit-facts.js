@@ -68,7 +68,7 @@ function barrelSwing(s){
   const rel=angles.map(x=>((x-angles[0]+540)%360+360)%360-180);   // 相對起點的帶號角度
   return Math.max(...rel)-Math.min(...rel);
 }
-// H02「近孔」＝驅動孔改為 145.892 mm，臂端距主軸 250 mm 不變（課文的比較條件）。
+// H02「近孔」＝驅動孔改為 144 mm，臂端距主軸 256 mm 不變（課文的比較條件）。
 const h02Params=(s,hole)=>({...s.params,H2Arm:hole,H2Tail:s.params.H2Reach-hole});
 const gripTipGap=(s)=>dimensionRange({id:'gap',kind:'distance',a:{compId:'H3JawA',vertex:3},b:{compId:'H3JawB',vertex:3}},s.comps,s.params);
 
@@ -82,16 +82,16 @@ export const SYRINGE_SIM_FACTS={
   'h01-gain-10':async()=>gainAt(load('hydraulic-h01'),10).degPerMm,
   'h01-lever-10-mm':async()=>leverAt(load('hydraulic-h01'),10),
   'h01-gain-est-10':async()=>(1/(leverAt(load('hydraulic-h01'),10)))*RAD_TO_DEG,
-  // 步驟 2：H02 兩個驅動孔（遠孔＝原 172.422 mm；近孔＝145.892 mm）
+  // 步驟 2：H02 兩個驅動孔（遠孔＝176 mm；近孔＝144 mm）
   'h02-far-gain-10':async()=>gainAt(load('hydraulic-h02'),10).degPerMm,
-  'h02-near-gain-10':async()=>{const s=load('hydraulic-h02');return gainAt(s,10,h02Params(s,145.892)).degPerMm;},
+  'h02-near-gain-10':async()=>{const s=load('hydraulic-h02');return gainAt(s,10,h02Params(s,144)).degPerMm;},
   'h02-far-lever-10-mm':async()=>leverAt(load('hydraulic-h02'),10),
-  'h02-near-lever-10-mm':async()=>{const s=load('hydraulic-h02');return leverAt(s,10,h02Params(s,145.892));},
+  'h02-near-lever-10-mm':async()=>{const s=load('hydraulic-h02');return leverAt(s,10,h02Params(s,144));},
   'h02-far-cos-10':async()=>{const s=load('hydraulic-h02');return gainAt(s,10).degPerMm/RAD_TO_DEG*leverAt(s,10);},
-  'h02-near-cos-10':async()=>{const s=load('hydraulic-h02'),p=h02Params(s,145.892);return gainAt(s,10,p).degPerMm/RAD_TO_DEG*leverAt(s,10,p);},
+  'h02-near-cos-10':async()=>{const s=load('hydraulic-h02'),p=h02Params(s,144);return gainAt(s,10,p).degPerMm/RAD_TO_DEG*leverAt(s,10,p);},
   // 近孔在這個伸出量附近臂角走到最小值，再往下推臂會往回轉（折返）。
   'h02-near-turnback-mm':async()=>{
-    const s=load('hydraulic-h02'),samples=scan(s,h02Params(s,145.892)),lowest=samples.reduce((m,x)=>x.angle<m.angle?x:m,samples[0]);
+    const s=load('hydraulic-h02'),samples=scan(s,h02Params(s,144)),lowest=samples.reduce((m,x)=>x.angle<m.angle?x:m,samples[0]);
     return lowest.extension;
   },
   // 步驟 4：H03 夾具（量尺量兩夾臂尖端），H05 夾爪是「推出收攏」變體

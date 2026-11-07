@@ -32,7 +32,7 @@ let pass=0;const ok=(cond,msg)=>{assert.ok(cond,msg);pass++;console.log('PASS',m
   }
   ok(maxMid<0.1,`全行程兩夾端中點都在軸線上（最大偏 ${maxMid.toFixed(3)} mm）`);
   ok(maxAngle<0.1,`左右夾臂對軸線鏡像（最大不對稱 ${maxAngle.toFixed(3)}°）`);
-  ok(n.params.H3Upper===60&&n.params.H3Lower===60,'兩支短連桿仍為 60 mm（沿用模型）');
+  ok(n.params.H3Upper===64&&n.params.H3Lower===64,'兩支短連桿 64 mm（8 mm 孔格，原 60 mm）');
   ok(c.spec.capacityMl===10&&c.spec.stroke===20,'仍為 10 mL 針筒、20 mm 教學區間');
   ok(JSON.stringify(fixedGripSnapshot)===before,'不改範例原始資料');
 }
@@ -64,12 +64,12 @@ ok(typeof Op.syringeGain==='function','syringe-operations 匯出 syringeGain(com
   const reach=n.params.H2Reach;
   ok(Math.abs(g.endMmPerMm-g.degPerMm*Math.PI/180*reach)/g.endMmPerMm<0.02,'臂端每 mm 位移＝角度×臂端半徑');
   const gainFor=(arm,ext=10)=>{const p={...n.params,H2Arm:arm,H2Tail:reach-arm};const q=at(p,ext);return Op.syringeGain(q.comps,p,c.id,q.points).degPerMm;};
-  const near=gainFor(145.892),far=gainFor(172.422);
-  ok(far>near,`本例的連桿配置下，172.422 孔每 mm 轉得較多：${far.toFixed(3)} > ${near.toFixed(3)}（不是「離支點近就轉得多」）`);
-  const nearScan=Op.scanSyringe(n.comps,{...n.params,H2Arm:145.892,H2Tail:reach-145.892},c.id,0.5).samples.map(x=>x.angle);
+  const near=gainFor(144),far=gainFor(176);
+  ok(far>near,`本例的連桿配置下，176 孔每 mm 轉得較多：${far.toFixed(3)} > ${near.toFixed(3)}（不是「離支點近就轉得多」）`);
+  const nearScan=Op.scanSyringe(n.comps,{...n.params,H2Arm:144,H2Tail:reach-144},c.id,0.5).samples.map(x=>x.angle);
   const d=nearScan.slice(1).map((a,i)=>a-nearScan[i]);
-  ok(d.some(x=>x>1e-6)&&d.some(x=>x<-1e-6),'145.892 孔在 0–20 mm 內擺臂會折返（經過死點附近）');
-  ok(Math.min(...[0,4,8,12,14,15,16,17,18,20].map(e=>gainFor(145.892,e)))<0.03,'折返處每 mm 轉角接近 0');
+  ok(d.some(x=>x>1e-6)&&d.some(x=>x<-1e-6),'144 孔在 0–20 mm 內擺臂會折返（經過死點附近）');
+  ok(Math.min(...[0,4,8,12,14,15,16,17,18,20].map(e=>gainFor(144,e)))<0.03,'折返處每 mm 轉角接近 0');
   ok(Op.syringeGain(comps,n.params,'nope',points)===null,'找不到針筒回 null');
 }
 
@@ -78,7 +78,7 @@ ok(typeof Op.syringeGain==='function','syringe-operations 匯出 syringeGain(com
   const html=readFileSync(new URL('../teaching-hydraulic.html',import.meta.url),'utf8').replace(/<[^>]+>/g,'');
   ok(/曲柄滑塊/.test(html),'H01 說明針筒推連桿與曲柄滑塊（第三單元）的關係');
   ok(/每推 ?1 ?mm/.test(html),'H02 以「每推 1 mm」比較孔位');
-  ok(/(折返|死點)/.test(html),'H02 說明 145.892 孔會在行程中折返（死點附近）');
+  ok(/(折返|死點)/.test(html),'H02 說明 144 孔會在行程中折返（死點附近）');
   ok(/針筒夾具 H03[\s\S]*?左右交叉臂/.test(html),'H03 教材恢復交叉臂說明');
 }
 console.log(`hydraulic-p1: ${pass} checks passed`);

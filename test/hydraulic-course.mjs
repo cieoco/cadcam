@@ -86,7 +86,7 @@ for(const n of [1,2,3]){
  assert.deepEqual(practice.comps,complete.comps.filter(c=>c.type!=='syringe'));
  const c=complete.comps.find(c=>c.type==='syringe'),f=source.comps.find(part=>part.id===c.a.componentId);
  // Rounded angles match the hints students actually enter, not exact hidden values.
- const angle=[0,153.57,.62][n-1],typed=[{x:f.p1.x,y:f.p1.y},{x:59.27,y:100.62},{x:-26,y:253.37}][n-1];
+ const angle=[0,158,0][n-1],typed=[{x:f.p1.x,y:f.p1.y},{x:72,y:88},{x:-24,y:256}][n-1];
  // Follow the rounded lesson values and the real "move to frame" projection.
  const frame=attachmentFrame(f,source.params),along=Math.max(0,Math.min(frame.length,(typed.x-frame.p.x)*frame.x+(typed.y-frame.p.y)*frame.y));
  const request={newId:'StudentSyringe',frameId:f.id,
@@ -98,14 +98,14 @@ for(const n of [1,2,3]){
  assert.ok(scanSyringe(reopened.comps,reopened.params,'StudentSyringe').ok);
  if(n===1){
   const l=plan.params.H1Frame;
-  const moved=planPlacedSyringe(plan,{...request,id:plan.syringe.id,position:{x:f.p1.x+200/l,y:f.p1.y+120/l}});
+  const moved=planPlacedSyringe(plan,{...request,id:plan.syringe.id,position:{x:f.p1.x+192/l,y:f.p1.y+144/l}});
   assert.ok(moved.ok,moved.message);assert.ok(scanSyringe(moved.comps,moved.params,plan.syringe.id).ok);
  }
  if(n===2){
-  const params={...plan.params,H2Arm:145.892,H2Tail:plan.params.H2Reach-145.892};
+  const params={...plan.params,H2Arm:144,H2Tail:plan.params.H2Reach-144};
   assert.ok(scanSyringe(plan.comps,params,plan.syringe.id).ok);
   const solved=solveSyringe(plan.comps,params);
-  assert.deepEqual(syringeReading(plan.syringe,plan.comps,params,solved.points).end,solved.points.H2C,'newly installed syringe measures the actual 250 mm tip');
+  assert.deepEqual(syringeReading(plan.syringe,plan.comps,params,solved.points).end,solved.points.H2C,'newly installed syringe measures the actual 256 mm tip');
  }
  assert.equal(JSON.stringify(complete),before,'original reference unchanged');
  console.log('PASS',id,'install, stroke, persistence and reference preservation');

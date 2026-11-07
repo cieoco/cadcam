@@ -18,16 +18,16 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   const tap=async p=>mobile?page.touchscreen.tap(p.x,p.y):page.mouse.click(p.x,p.y);
   const selectHole=async u=>{await reveal(u);await tap(await pointAt(u));const picker=page.getByRole('dialog',{name:'選取重疊物件'});if(await picker.isVisible())await picker.getByRole('button',{name:/^機架孔/}).click();};
   await page.getByRole('button',{name:'新增孔',exact:true}).click();await page.getByRole('button',{name:'取消新增',exact:true}).waitFor();await page.keyboard.press('Escape');assert.deepEqual(await state(),before);
-  await reveal(150);await page.getByRole('button',{name:'新增孔',exact:true}).click();await page.getByRole('button',{name:'取消新增',exact:true}).waitFor();await tap(await pointAt(150));
-  await page.locator('[data-frame-hole-editor]').waitFor();await page.locator('[data-dimension-handle="frame-hole"]').waitFor();
-  const added=await state(),hole=added.comps.find(c=>c.frameHole);assert.equal(hole.frameHole.u,152,'placement snaps to the 8 mm grid (G4a)');assert.equal(added.comps.length,before.comps.length+1);
+  await reveal(84);await page.getByRole('button',{name:'新增孔',exact:true}).click();await page.getByRole('button',{name:'取消新增',exact:true}).waitFor();await tap(await pointAt(84));
+  if(mobile&&await page.locator('#sheetMore').isVisible()&&!['half','full'].includes(await page.locator('body').getAttribute('data-sheet')))await page.locator('#sheetMore').click();await page.locator('[data-frame-hole-editor]').waitFor();await page.locator('[data-dimension-handle="frame-hole"]').waitFor();
+  const added=await state(),hole=added.comps.find(c=>c.frameHole);assert.equal(hole.frameHole.u,80,'placement snaps to the 8 mm grid (G4a)');assert.equal(added.comps.length,before.comps.length+1);
   await page.evaluate(()=>blocks.undo());assert.deepEqual(await state(),before);
   await page.evaluate(n=>blocks.gripperPilot.reopen(n),added);
-  await selectHole(152);await page.locator('[data-dimension-handle="frame-hole"]').waitFor();await page.locator('[data-dimension-handle="frame-hole"]').click();
+  await selectHole(80);await page.locator('[data-dimension-handle="frame-hole"]').waitFor();await page.locator('[data-dimension-handle="frame-hole"]').click();
   const input=page.getByRole('textbox',{name:'機架孔距基準孔（mm）',exact:true});await input.fill('145.25');await input.press('Tab');await page.waitForFunction(()=>blocks.gripperPilot.snapshot().comps.find(c=>c.frameHole)?.frameHole.u===145.25);const precise=await state();
   await input.fill('999');await input.press('Tab');await page.waitForFunction(()=>document.querySelector('[aria-label="機架孔距基準孔（mm）"]').value==='145.25');assert.deepEqual(await state(),precise);
   await reveal(145.25);const drag=async cancel=>{
-   const a=await pointAt(145.25),b=await pointAt(138.3),cdp=mobile?await context.newCDPSession(page):null;
+   const a=await pointAt(145.25),b=await pointAt(141),cdp=mobile?await context.newCDPSession(page):null;
    if(cdp){await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[a]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[b]});}else{await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:5});}
    assert.deepEqual(await state(),precise,'drag preview does not write');
    if(cdp){await cdp.send('Input.dispatchTouchEvent',{type:cancel?'touchCancel':'touchEnd',touchPoints:[]});await cdp.detach();}else{if(cancel)await page.keyboard.press('Escape');await page.mouse.up();}
@@ -38,7 +38,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   await page.evaluate(n=>blocks.gripperPilot.reopen(n),rotated);assert.deepEqual(await state(),rotated);
   await selectHole(integer);await page.locator('[data-dimension-handle="frame-hole"]').waitFor();await page.screenshot({path:`${out}/${viewport.width}-after.png`});
   // Draw an ordinary bar from the new hole using the existing tool and real pointer input.
-  await page.evaluate(()=>blocks.startDrawLink());const origin=await pointAt(integer),end={x:origin.x-65,y:origin.y+35};
+  await page.evaluate(()=>blocks.startDrawLink());const origin=await pointAt(integer),end={x:origin.x-45,y:origin.y+25};
   if(mobile){await tap(origin);await tap(end);}else{await page.mouse.move(origin.x,origin.y);await page.mouse.down();await page.mouse.move(end.x,end.y,{steps:5});await page.mouse.up();}
   await page.waitForFunction(n=>blocks.gripperPilot.snapshot().comps.length===n,rotated.comps.length+1);const linked=await state(),bar=linked.comps.find(c=>!rotated.comps.some(p=>p.id===c.id));assert.equal(bar.type,'bar');assert.ok([bar.p1.id,bar.p2.id].includes(hole.p1.id));
   await page.evaluate(id=>blocks.removeFrameHole(id),hole.p1.id);assert.deepEqual(await state(),linked,'connected hole cannot silently sever its rod');

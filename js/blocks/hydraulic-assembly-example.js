@@ -6,7 +6,7 @@ import {diskTurntableSnapshot} from './disk-turntable-example.js';
 // 原側視姿態的工具端低於主軸，直立組裝後會讓一側夾指落到轉盤以下。
 const liftUpright=structuredClone(fixedLiftSnapshot);
 const liftOrigin=liftUpright.comps.find(c=>c.id==='H2Frame').p1;
-const liftX=liftOrigin.x,liftY=liftOrigin.y,liftAngle=-40*Math.PI/180;
+const liftX=liftOrigin.x,liftY=liftOrigin.y,liftAngle=-48*Math.PI/180;
 const rotatedPoints=new Set();
 for(const c of liftUpright.comps){
   for(const p of [c.p1,c.p2,c.p3].filter(Boolean))if(!rotatedPoints.has(p)){
@@ -14,7 +14,7 @@ for(const c of liftUpright.comps){
     p.x=liftX+x*Math.cos(liftAngle)-y*Math.sin(liftAngle);
     p.y=liftY+x*Math.sin(liftAngle)+y*Math.cos(liftAngle);
   }
-  if(c.type==='syringe')c.axisDeg-=40;
+  if(c.type==='syringe')c.axisDeg-=48;
 }
 // zlift：夾爪整組桿／板往外抬 3 層（疊放相對位移，同組同抬，組內相對層序與組裝計畫不變），夾爪疊在升降臂與連接桿前面，各自一層、不穿模。
 const tag=(snapshot,moduleId,zlift=0)=>structuredClone(snapshot.comps).map(c=>({...c,moduleId,...(zlift&&['bar','triangle'].includes(c.type)?{zlift}:{})}));
@@ -41,7 +41,7 @@ const arm=(()=>{
   const params={...structuredClone(diskTurntableSnapshot.params),...structuredClone(fixedLiftSnapshot.params),...structuredClone(fixedGripSnapshot.params)};
   const modules=[
     {id:'Base',name:'旋轉底盤',source:'hydraulic-h07',base:'H7O',outputs:[{id:'turn',name:'轉盤',at:'H7O',body:{kind:'bar',id:'H7Turn'}}],mount:null},
-    {id:'Lift',name:'升降',base:'H2A',outputs:[{id:'tool',name:'工具端',at:'H2C',body:{kind:'triangle',id:'H2Arm'}}],mount:{"to":{"module":"Base","output":"turn"},"ref":{"x":0,"y":0,"a":89.99999999999994},"home":{},"face":{"version":1,"childPart":"frame","rotation":[[1,0,0],[0,0,-1],[0,1,0]],"translation":{"x":-115.31506132553352,"y":0,"z":-83.51759016233977},"selection":{"hostFace":"top","childFace":"back","alignU":0,"alignV":0,"offsetU":0,"offsetV":0,"gap":0,"quarterTurns":0},"hostThicknessMm":3,"childThicknessMm":3}}},
+    {id:'Lift',name:'升降',base:'H2A',outputs:[{id:'tool',name:'工具端',at:'H2C',body:{kind:'triangle',id:'H2Arm'}}],mount:{"to":{"module":"Base","output":"turn"},"ref":{"x":0,"y":0,"a":89.99999999999994},"home":{},"face":{"version":1,"childPart":"frame","rotation":[[1,0,0],[0,0,-1],[0,1,0]],"translation":{"x":-130.1482595125717,"y":0,"z":-71.71171799344064},"selection":{"hostFace":"top","childFace":"back","alignU":0,"alignV":0,"offsetU":0,"offsetV":0,"gap":0,"quarterTurns":0},"hostThicknessMm":3,"childThicknessMm":3}}},
     {id:'Grip',name:'夾爪',base:'H3O',outputs:[],mount:{to:{module:'Lift',output:'tool'},ref:{x:grip.p2.x,y:grip.p2.y,a:0},home:{}}}
   ];
   return {comps,params,modules};

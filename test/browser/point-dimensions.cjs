@@ -30,7 +30,7 @@ const output=process.env.TEST_OUTPUT||'output/point-dimensions';
   if(mobile)await page.touchscreen.tap(hitBox.x+hitBox.width/2,hitBox.y+hitBox.height/2);else await hit.click();
   assert.equal(await page.locator('[data-dimension-highlight]').getAttribute('data-dimension-highlight'),JSON.stringify(['H7Turn','g']));
   const field=page.getByRole('textbox',{name:'所選零件孔距（mm）',exact:true});
-  await field.waitFor({state:'visible'}).catch(async e=>{await page.screenshot({path:output+'/'+viewport.width+'-pick-failure.png'});console.log(viewport,await state(),await page.locator('#pointDimensionEditor').innerHTML());throw e;});const baseline=await state();assert.equal(Number(await field.inputValue()),15);
+  await field.waitFor({state:'visible'}).catch(async e=>{await page.screenshot({path:output+'/'+viewport.width+'-pick-failure.png'});console.log(viewport,await state(),await page.locator('#pointDimensionEditor').innerHTML());throw e;});const baseline=await state();assert.equal(Number(await field.inputValue()),16);
   await field.fill('20.5');await field.press('Tab');
   const numeric=await state();assert.equal(numeric.params.H7Crank,20.5);assert.equal(numeric.params.H7Coupler,baseline.params.H7Coupler);assert.equal(numeric.undo,baseline.undo+1);
   // Invalid edge clearance must retain the exact work and restore the input.

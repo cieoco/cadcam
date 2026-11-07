@@ -17,12 +17,12 @@ assert.equal(rod.p2.id,turn.p2.id);assert.equal(syr.outputId,turn.id);
 assert.ok(!s.comps.some(c=>c.isInput||c.motorType),'no motor drives the turntable');
 const a=attachmentPoint(syr.a,s.comps,s.params);assert.ok(Math.hypot(a.x-frame.p2.x,a.y-frame.p2.y)<1e-8);
 const scan=scanSyringe(s.comps,s.params,syr.id);assert.ok(scan.ok,scan.message);assert.equal(scan.samples.length,41);
-const span=Math.abs(scan.samples.at(-1).angle-scan.samples[0].angle);assert.ok(span>83&&span<85);
+const span=Math.abs(scan.samples.at(-1).angle-scan.samples[0].angle);assert.ok(span>77&&span<78);
 let previous=null;
 for(const extension of [...Array.from({length:41},(_,i)=>i/2),...Array.from({length:41},(_,i)=>20-i/2)]){
  const r=planSyringeStroke(s.comps,s.params,syr.id,extension,previous);assert.ok(r.ok,r.message);previous=r.points;
  assert.ok(Math.hypot(previous[turn.p1.id].x,previous[turn.p1.id].y)<1e-6);
- assert.ok(Math.abs(Math.hypot(previous[turn.p2.id].x,previous[turn.p2.id].y)-15)<1e-6);
+ assert.ok(Math.abs(Math.hypot(previous[turn.p2.id].x,previous[turn.p2.id].y)-16)<1e-6);
  assert.ok(Math.abs(Math.hypot(previous[rod.p1.id].x-previous[rod.p2.id].x,previous[rod.p1.id].y-previous[rod.p2.id].y)-s.params.H7Coupler)<1e-6);
 }
 assert.ok(!planSyringeStroke(s.comps,s.params,syr.id,21).ok);
@@ -38,7 +38,7 @@ assert.ok(Math.abs(Math.hypot(clamp[0].x-clamp[1].x,clamp[0].y-clamp[1].y)-28)<1
 assert.ok(clamp.every(h=>h.r===1.75&&Math.hypot(h.x,h.y)+h.r<frame.diameterMm/2));
 assert.ok(!catalog.parts[turn.id].holes.some(h=>h.layer==='SYRINGE_CLAMP'));
 assert.deepEqual(syr.installation,{face:'front',spacerMm:null});
-const tooSmall=structuredClone(s);tooSmall.comps.find(c=>c.id===frame.id).diameterMm=288;
+const tooSmall=structuredClone(s);tooSmall.comps.find(c=>c.id===frame.id).diameterMm=296;
 const bad=buildPartGeometryCatalog({comps:tooSmall.comps,params:tooSmall.params});
 assert.ok(bad.diagnostics.some(d=>d.sourceIds.includes(frame.id)&&d.reason?.includes('管夾配對孔')));
 assert.throws(()=>syringeManufacturing(s.comps,s.params,null),/本輪不輸出/);

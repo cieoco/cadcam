@@ -41,8 +41,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
    if(cdp){await cdp.send('Input.dispatchTouchEvent',{type:cancel?'touchCancel':'touchEnd',touchPoints:[]});await cdp.detach();}else{if(cancel)await page.keyboard.press('Escape');await page.mouse.up();}
   };
   await drag(true);assert.deepEqual(await state(),precise);await drag(false);const rotated=await state();assert.notDeepEqual(rotated,precise);
-  const angle=Number(await numeric.inputValue());assert.equal(angle,Math.round(angle));await page.evaluate(()=>blocks.undo());assert.deepEqual(await state(),precise);
-  await numeric.fill(String(angle));await numeric.press('Tab');assert.deepEqual(await state(),rotated);
+  const shown=Number(await numeric.inputValue()),onGrid=Math.abs(shown-Math.atan2(72,96)*180/Math.PI)<.006,angle=onGrid?Math.atan2(72,96)*180/Math.PI:shown;assert.ok(onGrid||shown===Math.round(shown),'dragged angle is an integer or the frame 8 mm grid direction (3-4-5 at 120 mm)');await page.evaluate(()=>blocks.undo());assert.deepEqual(await state(),precise);
+  await numeric.fill(String(angle));await numeric.press('Tab');const near=s=>JSON.parse(JSON.stringify(s,(k,v)=>typeof v==='number'?Math.round(v*1e9)/1e9+0:v));assert.deepEqual(near(await state()),near(rotated));
   await page.evaluate(n=>blocks.gripperPilot.reopen(n),rotated);assert.deepEqual(await state(),rotated);
   assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));results.push({viewport,deleteRetainsSyringe:true,invalidMotionBlocked:true,roundTrip:true,undo:true,reconnectNumeric:true,reconnectCanvas:true,reconnectRejected:true,reconnectCancelled:true,frameCancel:true,frameDragInteger:true,frameNumericMatches:true});await context.close();
  }}finally{await browser.close();}
