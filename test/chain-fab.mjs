@@ -14,7 +14,7 @@ const before=JSON.stringify(n.comps);
 // ---------- 購買清單 ----------
 const bom=chainBillOfMaterials(n.comps,n.params);
 const spr=bom.filter(i=>i.kind==='sprocket'),ch=bom.filter(i=>i.kind==='chain');
-ok(spr.length===2&&spr.map(i=>i.teeth).sort((a,b)=>a-b).join()==='12,24'&&spr.every(i=>i.standard==='25'&&i.qty===1),'清單：#25 鏈輪 12 齒、24 齒各 1');
+ok(spr.length===2&&spr.map(i=>i.teeth).sort((a,b)=>a-b).join()==='20,40'&&spr.every(i=>i.standard==='25'&&i.qty===1),'清單：#25 鏈輪 20 齒、40 齒各 1');
 ok(ch.length===1&&ch[0].links===chain.links&&ch[0].connectingLinks===1&&ch[0].offsetLinks===0,`清單：#25 鏈條 ${chain.links} 節＋接頭 1，偶數不需半節`);
 ok(near(ch[0].lengthMm,chain.links*6.35,1e-9),'鏈條長度＝節數 × 6.35 mm');
 ok(spr.every(i=>near(i.pitchDiameterMm,CD.pitchDiameter(i.teeth),1e-6)&&near(i.outsideDiameterMm,CD.outsideDiameter(i.teeth),1e-6)),'鏈輪附節圓與外徑（核對買到的實物）');
@@ -44,7 +44,7 @@ ok(bom.every(i=>typeof i.label==='string'&&/[一-鿿]/.test(i.label)),'每項有
 // ---------- 製作包 ----------
 {
   const html=chainBuildPackSection(n.comps,n.params);
-  ok(/鏈條/.test(html)&&new RegExp(`${chain.links}\\s*節`).test(html)&&/12\s*齒/.test(html)&&/24\s*齒/.test(html),'製作包列出鏈條節數與兩個鏈輪齒數');
+  ok(/鏈條/.test(html)&&new RegExp(`${chain.links}\\s*節`).test(html)&&/20\s*齒/.test(html)&&/40\s*齒/.test(html),'製作包列出鏈條節數與兩個鏈輪齒數');
   ok(/長孔/.test(html)&&/張緊/.test(html),'製作包說明從動輪長孔用來張緊');
   ok(/軸孔|轉接/.test(html),'提醒依買到的鏈輪軸孔配軸或轉接');
   ok(!/<script/i.test(html),'只是一段 HTML，不含程式');

@@ -62,7 +62,7 @@ const exactMaterialContains=(part,world)=>{
  }
  return g.outlines.some(r=>pointInRing(p,r))&&!g.holes.some(h=>Math.hypot(p.x-h.x,p.y-h.y)<=h.r)&&!g.cutouts.some(c=>pointInRing(p,c.points));
 };
-for(const [theta,a,b,witness] of [[0,'GearA_3','connection:Mod3/slot:L1/wing:child/pair:0/screw/head',{x:196.894803,y:-14.1,z:8.25}],[0,'GearB_3','connection:Mod3/slot:R1/wing:child/pair:0/screw/head',{x:177.35,y:-14.1,z:31.25}],[40,'LiftCrank_1','Mod3-frame',{x:109.334961,y:80.290265,z:6.1}]]){
+for(const [theta,a,b,witness] of [[0,'GearA_3','connection:Mod3/slot:L1/wing:child/pair:0/screw/head',{x:201.4499,y:-14.1,z:7.75}],[0,'GearB_3','connection:Mod3/slot:R1/wing:child/pair:0/screw/head',{x:182.25,y:-14.1,z:30.75}],[40,'LiftCrank_1','Mod3-frame',{x:109.7746,y:80.8903,z:6.15}]]){
  const {model}=f1MaterialScene(theta,f1AssemblyFixture()),report=checkMaterialInterference(model);
  assert.ok([a,b].every(id=>exactMaterialContains(model.materialParts.find(p=>p.partId===id),witness)),'hardcoded world witness is strictly inside both actual materials');
  assert.ok(report.findings.some(f=>f.partIds.includes(a)&&f.partIds.includes(b)),'SAT catches independently proven actual penetration');

@@ -6,6 +6,13 @@
 
 ---
 
+## 2026-11-07 · 數位積木：連桿／齒輪範例調回孔格（G7a）
+
+- 14 個範例調回 8 mm 孔格且保持機構性質：四連桿／雨刷機架 100→104（B 20→24）、曲柄 30→32、連桿 100→104；曲柄滑塊 30/90→32/88；齒輪對 15:20→12:16（傳動比 3:4 不變，中心距 70→56）；平行夾爪齒輪 18 齒→16 齒、軸距 72→64；齒條小齒輪 15→16 齒、導孔上格；鏈輪擺臂 60/45→64/48、軸距 68.78→80；競賽滾筒吸取與齒條舉升各孔上格；榫槽示範 100/60→96/64；齒輪夾爪齒輪 15→16 齒、輸出孔 18→24。練習版（缺連桿）與完整版一致。齒條長度、爪端長度不受孔格約束，依配合重算。
+- tools/grid-report.mjs 改傳 modules，R6 進報告。調整後 42 個範例中 27 個全部在格上；剩液壓 H 系列（G7b）、翻斗與舉升夾取（G7c）及保留為例外示範的 Jansen 腿。
+- 測試：寫死範例尺寸的斷言依新值更新（assembly、chain-drive、chain-fab、chain-fab-export、dimensions、example-controller、face-host-frame、gripper-workflow、material-interference、member-sweep、module-bolts、module-editor、module-ops、rack-export、unit-start-examples、units345）；瀏覽器 grid-exceptions、grid-gear 改用仍離格的範例當例外素材，direct-parameter-completion 依新尺寸更新。行為類斷言未放寬。
+- Node 全套 263/263（output/loop/g7a-final）。瀏覽器全部腳本：僅已知 mounting-review 未過（動工前即失敗）；施工中斷後由主模型重跑 grid-exceptions、grid-gear、direct-parameter-completion 通過。各範例播放截圖 output/grid-blocks/g7a（雲端 Chromium）。教學頁截圖未重做，可能顯示舊尺寸。
+
 ## 2026-11-07 · 數位積木：齒輪對格（G6）
 
 - 齒輪輸出孔在主畫布拖曳時吸附齒輪自身方格點（孔距 8·√n，起始角隨之為格點方向，例如 26.57°）；不合法時退次近格點，沒有就不改。孔距與起始角數字維持精確、可離格。

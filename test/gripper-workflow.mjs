@@ -105,7 +105,7 @@ test('A3: modified topology / body geometry never silently returns a successful 
     s => s.comps[1].mesh = '',
     s => s.comps[0].p1.physicalMotor = '',
     s => s.comps[1].p1.physicalMotor = '2',
-    s => s.comps[1].teeth = 16,
+    s => s.comps[1].teeth = 20,
     s => s.comps[1].p1.x = 50,
     s => s.comps[2].shapeMode = 'hull',
     s => s.comps[2].jawTurnSign = -1,

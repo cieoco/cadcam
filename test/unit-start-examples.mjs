@@ -38,8 +38,8 @@ const snap = id => normalizeSnapshot(structuredClone(getExample(id).snapshot));
 check('第四單元：空白畫布', snap('unit4-start').comps.length === 0);
 {
   const s = snap('unit5-start'), a = s.comps.find(c => c.id === 'GearA'), b = s.comps.find(c => c.id === 'GearB');
-  check('第五單元：15／20 齒、左輪 MG995 0°～30°、兩輪固定，還沒有夾指',
-    a.teeth === 15 && b.teeth === 20 && a.motorType === 'mg995' && a.servoStart === 0 && a.servoEnd === 30
+  check('第五單元：12／16 齒、左輪 MG995 0°～30°、兩輪固定，還沒有夾指',
+    a.teeth === 12 && b.teeth === 16 && a.motorType === 'mg995' && a.servoStart === 0 && a.servoEnd === 30
     && b.p1.type === 'fixed' && !s.comps.some(c => c.type === 'triangle' || c.shape === 'jaw'));
 }
 {

@@ -55,17 +55,17 @@ const n=normalizeSnapshot(ex.snapshot);
 const spr=n.comps.filter(c=>c.type==='pulley'&&c.kind==='sprocket'),chain=n.comps.find(c=>c.type==='belt'&&c.kind==='chain');
 ok(spr.length===2&&chain&&chain.standard==='25','兩個鏈輪（pulley kind sprocket）＋一條 #25 鏈條（belt kind chain）');
 const drv=spr.find(s=>s.id===chain.driver),dvn=spr.find(s=>s.id===chain.driven);
-ok(drv.teeth===12&&dvn.teeth===24,'範例 12 齒帶 24 齒');
+ok(drv.teeth===20&&dvn.teeth===40,'範例 20 齒帶 40 齒');
 ok(spr.every(s=>near(n.params[s.radiusParam],CD.pitchDiameter(s.teeth)/2,1e-9)),'鏈輪半徑＝節圓半徑（由齒數算，不四捨五入）');
 const C0=Math.hypot(dvn.p1.x-drv.p1.x,dvn.p1.y-drv.p1.y);
-ok(CD.checkChainDrive({center:C0,teeth1:drv.teeth,teeth2:dvn.teeth}).ok&&chain.links===CD.checkChainDrive({center:C0,teeth1:12,teeth2:24}).links,`範例中心距剛好整數偶數鏈節（${chain.links} 節）`);
+ok(CD.checkChainDrive({center:C0,teeth1:drv.teeth,teeth2:dvn.teeth}).ok&&chain.links===CD.checkChainDrive({center:C0,teeth1:20,teeth2:40}).links,`範例中心距剛好整數偶數鏈節（${chain.links} 節）`);
 ok(String(drv.p1.physicalMotor||'')!==''&&drv.p1.type==='motor','主動鏈輪裝在馬達上');
 const crank=n.comps.find(c=>c.type==='bar'&&(c.p1.id===dvn.p2.id||c.p2.id===dvn.p2.id));
 ok(crank,'從動鏈輪的輪緣銷帶動下游連桿');
 const {frames,allValid}=sweep(n.comps,n.params,[drv.p2.id,dvn.p2.id,crank.p1.id,crank.p2.id]);
 ok(allValid,'0～360° 全程可解（含下游連桿）');
 const t1=unwrapSum(frames.map(f=>angle(f.points[drv.p2.id],f.points[drv.p1.id]))),t2=unwrapSum(frames.map(f=>angle(f.points[dvn.p2.id],f.points[dvn.p1.id])));
-ok(near(t2/t1,12/24,0.0005),`速比＝齒數比 12/24（量到 ${(t2/t1).toFixed(5)}）`);
+ok(near(t2/t1,20/40,0.0005),`速比＝齒數比 20/40（量到 ${(t2/t1).toFixed(5)}）`);
 ok(t2/t1>0,'鏈條兩輪同向');
 
 // ---------- 讀檔修正 ----------

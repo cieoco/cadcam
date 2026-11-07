@@ -1015,11 +1015,11 @@ export function builtinTemplate(id) {
   const template = { kind: 'blocks-module', v: 1, name: entry.name, source: entry.source, comps, params };
   if (id === 'rack-lift') {
     template.base = 'LPC';
-    // 滑台輸出端兩顆 M3 螺絲孔（LiftOutput＋LiftOutputB，v 同為 -15，u 96 在長槽之外、齒條本體之內），
+    // 滑台輸出端兩顆 M3 螺絲孔（LiftOutput＋LiftOutputB，v 同為 -16，u 96 在長槽之外、齒條本體之內），
     // 夾爪鎖上去才不會繞單一孔轉。
     const rackComp = comps.find(c => c.type === 'rack');
     if (rackComp && Array.isArray(rackComp.holes) && !rackComp.holes.some(h => h.id === 'LiftOutputB')) {
-      rackComp.holes.push({ id: 'LiftOutputB', type: 'floating', u: 96, v: -15, diameter: 3.2 });
+      rackComp.holes.push({ id: 'LiftOutputB', type: 'floating', u: 96, v: -16, diameter: 3.2 });
     }
     template.outputs = [{ id: 'carriage', name: '滑台', at: 'LiftOutput', body: { kind: 'rack', id: 'LiftRackGear' }, bolts: ['LiftOutput', 'LiftOutputB'] }];
     template.mates = { attach: { normalDeg: 180 }, receive: [{ id: 'r1', name: '滑台', ref: { kind: 'bolt', output: 'carriage' } }] };   // M1：與 suggestMates 規則一致（有 2 個對鎖孔的輸出端）
@@ -1058,7 +1058,7 @@ export function builtinTemplate(id) {
       { id: 'r2', name: '工具架下緣', ref: { kind: 'bar', id: 'ToolBrace', side: -1 } }] };
   } else if (id === 'gear-gripper') {
     // 專用安裝點 GripMount：避開伺服軸（GCA 是 MG995 輸出軸心，鎖不了），夾爪以它為基準裝到滑台孔上。
-    comps.push({ type: 'anchor', id: 'GripMount', p1: { id: 'GripMount', type: 'fixed', x: 0, y: 40 } });
+    comps.push({ type: 'anchor', id: 'GripMount', p1: { id: 'GripMount', type: 'fixed', x: 0, y: 39 } });
     template.base = 'GripMount';
     template.outputs = [];
     template.mates = { attach: { normalDeg: 90 }, receive: [] };   // 爪往 −y 伸，朝宿主的那一側是 +90°

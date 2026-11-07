@@ -13,7 +13,7 @@ function sweep(length) {
 }
 const segments=sweep(80);
 assert.ok(segments.length>60);
-assert.ok(segments.every(({a,b})=>Math.abs(a.x-20)<1e-7 && Math.abs(a.y)<1e-7 && Math.abs(Math.hypot(b.x-a.x,b.y-a.y)-80)<1e-6));
+assert.ok(segments.every(({a,b})=>Math.abs(a.x-24)<1e-7 && Math.abs(a.y)<1e-7 && Math.abs(Math.hypot(b.x-a.x,b.y-a.y)-80)<1e-6));
 const span=lines=>{const angles=lines.map(({a,b})=>Math.atan2(b.y-a.y,b.x-a.x));return Math.max(...angles)-Math.min(...angles)};
 assert.ok(span(sweep(88))<span(segments),'Changing rocker length updates the swept angular range');
 assert.deepEqual(memberSweepSegments([{isValid:false,points:{B:{x:0,y:0},D:{x:1,y:1}}},{isValid:true,points:{B:{x:0,y:0}}}],'B','D'),[]);

@@ -53,10 +53,10 @@ ok(base.some(b=>b.kind==='h'&&b.id!=='ground')&&base.some(b=>b.kind==='v'),'也�
   const h={id:'d3',name:'滑塊位置',kind:'horizontal',a:{pointId:'P3'},baseline:'v:O'};
   const r=D.dimensionRange(h,s.comps,s.params);
   ok(r.ok&&r.input.kind==='motor'&&r.input.unit==='°'&&r.input.from===0&&r.input.to===360,'馬達機構以 0–360° 掃描');
-  ok(near(r.min,60,0.5)&&near(r.max,120,0.5),`滑塊離 O 的水平距離 ${r.min.toFixed(1)}～${r.max.toFixed(1)} mm（行程 60）`);
+  ok(near(r.min,56,0.5)&&near(r.max,120,0.5),`滑塊離 O 的水平距離 ${r.min.toFixed(1)}～${r.max.toFixed(1)} mm（行程 64）`);
   const z={id:'d4',name:'滑塊移動',kind:'displacement',a:{pointId:'P3'},zero:{x:120,y:0}};
   const rz=D.dimensionRange(z,s.comps,s.params);
-  ok(rz.ok&&near(rz.min,0,0.5)&&near(rz.max,60,0.5),'歸零後量「從起點移動多少」：0～60 mm');
+  ok(rz.ok&&near(rz.min,0,0.5)&&near(rz.max,64,0.5),'歸零後量「從起點移動多少」：0～64 mm');
   const m=D.measureDimension(z,s.comps,s.params,{...pts(s),P3:{x:100,y:0}});
   ok(near(m.value,20,1e-9)&&near(m.dx,-20,1e-9)&&near(m.dy,0,1e-9),'歸零位移同時給 Δ左右、Δ上下');
 }

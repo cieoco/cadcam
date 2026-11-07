@@ -57,7 +57,7 @@ const plan=buildPlan({comps:s.comps,modules:[],params:s.params,exportSettings:FA
 const base=buildPackHtml(plan,{title:'鏈輪測試',cnc,warnings:[],comps:s.comps});
 const html=addChainToBuildPack(base,s.comps,s.params,{holeDiameterMm:FABRICATION_DEFAULTS.export.frameHoleDiameterMm});
 ok(!/鏈輪與鏈條/.test(base)&&/鏈輪與鏈條/.test(html),'製作包加上鏈輪與鏈條段落');
-ok(new RegExp(`${chain.links}\\s*節`).test(html)&&/12\s*齒/.test(html)&&/24\s*齒/.test(html)&&/張緊/.test(html),'段落列出節數、齒數與張緊說明');
+ok(new RegExp(`${chain.links}\\s*節`).test(html)&&/20\s*齒/.test(html)&&/40\s*齒/.test(html)&&/張緊/.test(html),'段落列出節數、齒數與張緊說明');
 ok(html.indexOf('鏈輪與鏈條')<html.indexOf('CNC 注意事項'),'段落放在 CNC 注意事項之前');
 ok(addChainToBuildPack(base,s.comps.filter(c=>c.type!=='belt'),s.params)===base,'沒有鏈傳動時製作包不變');
 

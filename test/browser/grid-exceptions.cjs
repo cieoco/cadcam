@@ -20,7 +20,7 @@ for(const viewport of [{width:1280,height:900},{width:390,height:844},{width:360
  await p.screenshot({path:`${out}/${r.viewport}-edit.png`});
  assert.equal(r.lenAfter,50,'numeric input keeps the exact off-grid value');assert.ok(r.banner.includes('離開 8 mm 孔格'),'banner');assert.ok(r.marksAfterEdit.includes('Link1'),'mark');assert.ok(r.panel.includes('孔格例外'),'panel');
  await p.evaluate(()=>blocks.undo());await p.waitForTimeout(700);r.marksAfterUndo=(await marks()).length;assert.equal(r.marksAfterUndo,0,'undo clears marks');
- await load('fourbar-crank-rocker');r.loadMarks=await marks();r.loadBanner=await banner();
+ await load('fourbar-crank-rocker');await p.evaluate(()=>{const sn=blocks.gripperPilot.snapshot();sn.params.LL1=30;sn.params.LL2=100;for(const c of sn.comps)for(const k of Object.keys(c))if(c[k]&&c[k].id==='B'&&typeof c[k].x==='number')c[k].x=20;blocks.gripperPilot.reopen(sn);});await p.waitForTimeout(800);r.loadMarks=await marks();r.loadBanner=await banner();
  assert.deepEqual([...r.loadMarks].sort(),['Link1','Link2','frame:'].sort());assert.ok(!r.loadBanner.includes('離開'),'no notice on load');
  await p.screenshot({path:`${out}/${r.viewport}-example.png`});
  const [dl]=await Promise.all([p.waitForEvent('download',{timeout:15000}),p.evaluate(()=>blocks.downloadBuildPack())]);const html=fs.readFileSync(await dl.path(),'utf8');

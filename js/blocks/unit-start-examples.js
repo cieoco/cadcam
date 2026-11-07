@@ -8,10 +8,10 @@ const moveModule = (snapshot, moduleId, dx) => snapshot.comps.filter(c => c.modu
 const STARTS = [
   ['unit4-start', 'empty-challenge', '第四單元：齒輪傳動練習',
     '空白畫布。第四單元從新增齒輪對開始，不需要前面單元的作品。',
-    ['新增 → 其他零件 → 齒輪對，建立 15／20 齒、模數 4，固定右輪、左輪裝 TT 馬達'], () => {}],
+    ['新增 → 其他零件 → 齒輪對，建立 12／16 齒、模數 4，固定右輪、左輪裝 TT 馬達'], () => {}],
   ['unit5-start', 'gear-pair', '第五單元：已存好的齒輪對',
-    '第四單元做好的樣子：15／20 齒、兩輪中心固定、左輪 MG995 輸入 0°～30°。還沒有夾指。',
-    ['把右輪改成 15 齒、結束角縮到 15°，再用折線桿各畫一支夾指'],
+    '第四單元做好的樣子：12／16 齒、兩輪中心固定、左輪 MG995 輸入 0°～30°。還沒有夾指。',
+    ['把右輪改成 12 齒、結束角縮到 15°，再用折線桿各畫一支夾指'],
     snapshot => Object.assign(snapshot.comps.find(c => c.id === 'GearA'), { motorType: 'mg995', servoStart: 0, servoEnd: 30 })],
   ['unit6-start', 'competition-rack-lift', '第六單元：齒條升降練習',
     '垂直齒條升降器，導軌槽長 144 mm；行程還沒有調到 100～110 mm。',

@@ -9,6 +9,8 @@ for(const viewport of [{width:1280,height:900},{width:390,height:844},{width:360
  await p.goto('http://127.0.0.1:8021/blocks.html?gripperPilot=1');await p.waitForFunction(()=>window.blocks,{},{timeout:45000});
  await p.evaluate(()=>blocks.loadExample('gear-pair'));const s=p.getByRole('button',{name:'開始設計',exact:true});if(await s.isVisible().catch(()=>false))await s.click();await p.waitForTimeout(800);
  const hint=()=>p.evaluate(()=>[...document.querySelectorAll('[data-gear-grid-hint]')].filter(e=>!e.hidden).map(e=>e.textContent).join('|'));
+ // 內建 gear-pair 已調回孔格（中心距 56 mm）；先在頁內還原成離格的 15/20 齒、中心距 70 mm 再驗提示。
+ await p.evaluate(()=>{const sn=blocks.gripperPilot.snapshot();const g=sn.comps.filter(c=>c.type==='gear');g[0].teeth=15;g[1].teeth=20;sn.params.GRA=30;sn.params.GRB=40;for(const c of g)if(c.p1.id==='GCB')c.p1.x=30;blocks.gripperPilot.reopen(sn);});await p.waitForTimeout(800);
  let gid='GearB';const gear=()=>p.evaluate(id=>{const s=blocks.gripperPilot.snapshot(),c=s.comps.find(c=>c.id===id);return {teeth:c.teeth,phase:c.phase,radius:c.pinRadiusParam?s.params[c.pinRadiusParam]:c.pinRadius};},gid);
  const marked=()=>p.evaluate(()=>[...document.querySelectorAll('[data-grid-exception]')].map(e=>e.getAttribute('data-grid-exception')));
  let poly=p.locator('polygon[data-pick-component="GearB"]').first();await poly.waitFor();const pb=await poly.boundingBox();

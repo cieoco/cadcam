@@ -8,7 +8,7 @@ import { gridIssues, GRID_PITCH_MM } from '../js/blocks/grid-rule.js';
 const outDir = process.argv[2] || 'output/grid-blocks';
 const rows = BLOCK_EXAMPLES.map(ex => {
   const norm = normalizeSnapshot(ex.snapshot);
-  const issues = norm ? gridIssues(norm.comps, norm.params) : null;
+  const issues = norm ? gridIssues(norm.comps, norm.params, norm.modules ? { modules: norm.modules } : undefined) : null;
   return { id: ex.id, title: ex.title || ex.name || ex.label || '', parts: norm?.comps.length || 0, issues };
 });
 const byRule = {};

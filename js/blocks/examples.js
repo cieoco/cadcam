@@ -45,8 +45,8 @@ const triangle = (id, p1, p2, p3, extra = {}) => ({
 });
 
 const pt = (id, type, x, y, extra = {}) => ({ id, type, x, y, ...extra });
-// 鏈輪鏈條範例：12 齒帶 24 齒，40 節（偶數）#25 鏈條；中心距由鏈節數反算，取到 0.01 mm（誤差遠小於 0.05 mm 容許）。
-const SPROCKET_HALF = Number((centerForLinks(40, 12, 24) / 2).toFixed(2));
+// 鏈輪鏈條範例：20 齒帶 40 齒，56 節（偶數）#25 鏈條；中心距由鏈節數反算，取到 0.01 mm（誤差遠小於 0.05 mm 容許）。
+const SPROCKET_HALF = Number((centerForLinks(56, 20, 40) / 2).toFixed(2));
 
 export const EXAMPLE_GROUPS = [
   { id: 'starter', label: '入門：先讓它動' },
@@ -225,8 +225,8 @@ const EXAMPLE_LESSONS = {
     use: '跨距較遠又不能打滑的同向減速，例如輪子、捲線或升降機構的傳動。',
     learn: '鏈輪速比等於齒數比；#25 鏈條節距 6.35 mm，鏈節數取偶數，中心距才能剛好繃緊。',
     try: ['改從動鏈輪齒數（9～40）', '把兩輪拉近或拉遠，看鏈節數變化', '觀察從動輪的輪緣銷如何帶動搖桿'],
-    predict: '12 齒帶 24 齒：從動輪轉一圈時，馬達鏈輪會轉幾圈？兩輪轉向相同嗎？',
-    measure: '播放並數兩輪各轉幾圈；再把從動輪改成 18 齒，比較速比與搖桿擺動。',
+    predict: '20 齒帶 40 齒：從動輪轉一圈時，馬達鏈輪會轉幾圈？兩輪轉向相同嗎？',
+    measure: '播放並數兩輪各轉幾圈；再把從動輪改成 30 齒，比較速比與搖桿擺動。',
     explain: '用齒數比說明速度與力矩的取捨，並說明鏈條為何兩輪同向、為何鏈節要取偶數。'
   },
   'jansen-leg': {
@@ -291,13 +291,13 @@ const wiperExample = practice => ({
     kind: 'blocks', v: 1, counter: 6,
     comps: [
       { type: 'anchor', id: 'Anchor1', p1: pt('A', 'fixed', -80, 0) },
-      { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 20, 0) },
+      { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 24, 0) },
       bar('Link1', pt('A', 'fixed', -80, 0, { physicalMotor: '1' }), pt('C', 'floating', -48, 0), 32,
         { color: '#e74c3c', isInput: true, physicalMotor: '1', phaseOffset: 0 }),
-      ...(!practice ? [bar('Link2', pt('C', 'floating', -48, 0), pt('D', 'floating', 18.470588235294116, -79.98537928680453, { solveSign: -1 }), 104)] : []),
-      triangle('WiperArm', pt('B', 'fixed', 20, 0),
-        pt('D', 'floating', 18.470588235294116, -79.98537928680453, { solveSign: -1 }),
-        pt('E', 'floating', 22.294117647058826, 119.9780689302068),
+      ...(!practice ? [bar('Link2', pt('C', 'floating', -48, 0), pt('D', 'floating', 18.66666666666667, -79.82202425117741, { solveSign: -1 }), 104)] : []),
+      triangle('WiperArm', pt('B', 'fixed', 24, 0),
+        pt('D', 'floating', 18.66666666666667, -79.82202425117741, { solveSign: -1 }),
+        pt('E', 'floating', 32, 119.73303637676611),
         { color: '#c5a52b', shapeMode: 'polyline', gParam: 'WB', r1Param: 'WE', r2Param: 'WDE',
           vertices: [{ solve: true, ref: 'p2' }, { solve: true, ref: 'p1' }, { solve: true, ref: 'p3' }] })
     ],
@@ -326,17 +326,17 @@ const ALL_BLOCK_EXAMPLES = [
       counter: 6,
       comps: [
         { type: 'anchor', id: 'Anchor1', p1: pt('A', 'fixed', -80, 0) },
-        { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 20, 0) },
-        bar('Link1', pt('A', 'fixed', -80, 0, { physicalMotor: '1' }), pt('C', 'floating', -50, 0), 30, {
+        { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 24, 0) },
+        bar('Link1', pt('A', 'fixed', -80, 0, { physicalMotor: '1' }), pt('C', 'floating', -48, 0), 32, {
           color: '#e74c3c',
           isInput: true,
           physicalMotor: '1',
           phaseOffset: 0
         }),
-        bar('Link2', pt('C', 'floating', -50, 0), pt('D', 'floating', 10.7, 79.5), 100),
-        bar('Link3', pt('B', 'fixed', 20, 0), pt('D', 'floating', 10.7, 79.5), 80)
+        bar('Link2', pt('C', 'floating', -48, 0), pt('D', 'floating', 18.66666666666667, 79.82202425117741), 104),
+        bar('Link3', pt('B', 'fixed', 24, 0), pt('D', 'floating', 18.66666666666667, 79.82202425117741), 80)
       ],
-      params: { LL1: 30, LL2: 100, LL3: 80 }
+      params: { LL1: 32, LL2: 104, LL3: 80 }
     }
   },
   {
@@ -347,12 +347,12 @@ const ALL_BLOCK_EXAMPLES = [
       kind: 'blocks', v: 1, counter: 6,
       comps: [
         { type: 'anchor', id: 'Anchor1', p1: pt('A', 'fixed', -80, 0) },
-        { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 20, 0) },
+        { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 24, 0) },
         bar('Link1', pt('A', 'fixed', -80, 0, { physicalMotor: '1' }), pt('C', 'floating', -48, 0), 32, {
           color: '#e74c3c', isInput: true, physicalMotor: '1', phaseOffset: 0
         }),
         // 與完整範例正規化後的姿勢一致：C–D = 104 mm，B–D = 80 mm。
-        bar('Link3', pt('B', 'fixed', 20, 0), pt('D', 'floating', 18.470588235294116, 79.98537928680453), 80)
+        bar('Link3', pt('B', 'fixed', 24, 0), pt('D', 'floating', 18.66666666666667, 79.82202425117741), 80)
       ],
       params: { LL1: 32, LL3: 80 }
     }
@@ -389,12 +389,12 @@ const ALL_BLOCK_EXAMPLES = [
       counter: 6,
       comps: [
         { type: 'anchor', id: 'Anchor1', p1: pt('A', 'fixed', 0, 0) },
-        { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 100, 0) },
+        { type: 'anchor', id: 'Anchor2', p1: pt('B', 'fixed', 104, 0) },
         exactBar('Link1', pt('A', 'fixed', 0, 0, { physicalMotor: '1' }), pt('C', 'floating', 32, 55.4256), 64, {
           lenParam: 'LL1', color: '#e74c3c', isInput: true, physicalMotor: '1', phaseOffset: 60
         }),
-        exactBar('Link2', pt('C', 'floating', 32, 55.4256), pt('D', 'floating', 28.3981, 7.561), 48, { lenParam: 'LL2' }),
-        exactBar('Link3', pt('B', 'fixed', 100, 0), pt('D', 'floating', 28.3981, 7.561), 72, { lenParam: 'LL3' })
+        exactBar('Link2', pt('C', 'floating', 32, 55.4256), pt('D', 'floating', 32.38409646588839, 7.427136796425529), 48, { lenParam: 'LL2' }),
+        exactBar('Link3', pt('B', 'fixed', 104, 0), pt('D', 'floating', 32.38409646588839, 7.427136796425529), 72, { lenParam: 'LL3' })
       ],
       params: { LL1: 64, LL2: 48, LL3: 72, theta: 0 }
     }
@@ -464,7 +464,7 @@ const ALL_BLOCK_EXAMPLES = [
         { type: 'anchor', id: 'Anchor1', p1: pt('O', 'fixed', 0, 0) },
         { type: 'anchor', id: 'Anchor2', p1: pt('M1', 'fixed', 40, 0) },
         { type: 'anchor', id: 'Anchor3', p1: pt('M2', 'fixed', 152, 0) },
-        bar('Link1', pt('O', 'fixed', 0, 0, { physicalMotor: '1' }), pt('A', 'floating', 30, 0), 30, {
+        bar('Link1', pt('O', 'fixed', 0, 0, { physicalMotor: '1' }), pt('A', 'floating', 32, 0), 32, {
           color: '#e74c3c',
           isInput: true,
           physicalMotor: '1',
@@ -476,10 +476,10 @@ const ALL_BLOCK_EXAMPLES = [
           p1: pt('Sa', 'fixed', 45, 0), p2: pt('Sb', 'fixed', 140, 0), p3: pt('P3', 'floating', 120, 0),
           carrierLen: 112, railOffset: 5, carriageLen: 24, travelStart: 0, travelEnd: 95
         },
-        bar('Link2', pt('A', 'floating', 30, 0), pt('P3', 'floating', 120, 0), 90)
+        bar('Link2', pt('A', 'floating', 32, 0), pt('P3', 'floating', 120, 0), 88)
       ],
       // 兩固定滑軌座 M1-M2 的機架由自動地基表現，不再另放一根顯式接地桿。
-      params: { LL1: 30, LL2: 90, SL1: 95 }
+      params: { LL1: 32, LL2: 88, SL1: 95 }
     }
   },
   {
@@ -538,7 +538,7 @@ const ALL_BLOCK_EXAMPLES = [
   {
     id: 'gear-pair',
     title: '齒輪對：嚙合傳動',
-    note: '紅色驅動齒輪整圈轉、藍色從動齒輪反向轉，轉速比＝半徑反比（30:40，大輪較慢）。',
+    note: '紅色驅動齒輪整圈轉、藍色從動齒輪反向轉，轉速比＝半徑反比（24:32，大輪較慢）。',
     snapshot: {
       kind: 'blocks',
       v: 1,
@@ -546,14 +546,14 @@ const ALL_BLOCK_EXAMPLES = [
       comps: [
         { type: 'gear', id: 'GearA', color: '#e74c3c',
           p1: pt('GCA', 'motor', -40, 0, { physicalMotor: '1' }),
-          p2: pt('GPA', 'floating', -10, 0),
-          radiusParam: 'GRA', teeth: 15, phase: 0 },
+          p2: pt('GPA', 'floating', -16, 0),
+          radiusParam: 'GRA', teeth: 12, phase: 0 },
         { type: 'gear', id: 'GearB', color: '#2c6fbb',
-          p1: pt('GCB', 'fixed', 30, 0),
-          p2: pt('GPB', 'floating', 70, 0),
-          radiusParam: 'GRB', teeth: 20, phase: 0, mesh: 'GearA' }
+          p1: pt('GCB', 'fixed', 16, 0),
+          p2: pt('GPB', 'floating', 48, 0),
+          radiusParam: 'GRB', teeth: 16, phase: 0, mesh: 'GearA' }
       ],
-      params: { GRA: 30, GRB: 40, theta: 0 }
+      params: { GRA: 24, GRB: 32, theta: 0 }
     }
   },
   {
@@ -592,18 +592,18 @@ const ALL_BLOCK_EXAMPLES = [
       comps: [
         { type: 'gear', id: 'Pinion', color: '#e74c3c',
           p1: pt('PC', 'motor', 0, 0, { physicalMotor: '1' }),
-          p2: pt('PP', 'floating', 18, 0),
-          radiusParam: 'PR', teeth: 15, module: 4, phase: 0 },
-        { type: 'anchor', id: 'RackGuideA', p1: pt('RGA', 'fixed', -2.5, -45) },
-        { type: 'anchor', id: 'RackGuideB', p1: pt('RGB', 'fixed', 18, -45) },
+          p2: pt('PP', 'floating', 16, 0),
+          radiusParam: 'PR', teeth: 16, module: 4, phase: 0 },
+        { type: 'anchor', id: 'RackGuideA', p1: pt('RGA', 'fixed', -8, -48) },
+        { type: 'anchor', id: 'RackGuideB', p1: pt('RGB', 'fixed', 16, -48) },
         { type: 'rack', id: 'Rack1', color: '#16a085',
-          p1: pt('RKP', 'floating', 0, -30),
+          p1: pt('RKP', 'floating', 0, -32),
           pinion: 'Pinion', lenParam: 'RKL', axisDeg: 0, sign: 1,
-          bodyHeight: 20,
+          bodyHeight: 22,
           slot: { length: 128, width: 5, offset: 0 },
           framePins: ['RGA', 'RGB'] }
       ],
-      params: { PR: 30, RKL: 160, theta: 0 }
+      params: { PR: 32, RKL: 172.5, theta: 0 }
     }
   },
   {
@@ -617,14 +617,14 @@ const ALL_BLOCK_EXAMPLES = [
       tracePoints: ['LT', 'RT'],
       comps: [
         { type: 'gear', id: 'GearA', color: '#e74c3c',
-          p1: pt('GCA', 'motor', -30, 0, { physicalMotor: '1' }),
-          p2: pt('GPA', 'floating', -30, 18),
-          radiusParam: 'GRA', pinRadiusParam: 'GPRA', pinHoleDiameter: 5, teeth: 15, module: 4, phase: 90 },
+          p1: pt('GCA', 'motor', -32, 0, { physicalMotor: '1' }),
+          p2: pt('GPA', 'floating', -32, 24),
+          radiusParam: 'GRA', pinRadiusParam: 'GPRA', pinHoleDiameter: 5, teeth: 16, module: 4, phase: 90 },
         { type: 'gear', id: 'GearB', color: '#2c6fbb',
-          p1: pt('GCB', 'fixed', 30, 0),
-          p2: pt('GPB', 'floating', 30, 18),
-          radiusParam: 'GRB', pinRadiusParam: 'GPRB', pinHoleDiameter: 5, teeth: 15, module: 4, phase: 90, mesh: 'GearA' },
-        triangle('LeftJaw', pt('GCA', 'motor', -30, 0, { physicalMotor: '1' }), pt('GPA', 'floating', -30, 18), pt('LT', 'floating', -95, -85), {
+          p1: pt('GCB', 'fixed', 32, 0),
+          p2: pt('GPB', 'floating', 32, 24),
+          radiusParam: 'GRB', pinRadiusParam: 'GPRB', pinHoleDiameter: 5, teeth: 16, module: 4, phase: 90, mesh: 'GearA' },
+        triangle('LeftJaw', pt('GCA', 'motor', -32, 0, { physicalMotor: '1' }), pt('GPA', 'floating', -32, 24), pt('LT', 'floating', -104, -96), {
           color: '#ff6b35',
           shape: 'jaw',
           shapeMode: 'polyline',
@@ -634,7 +634,7 @@ const ALL_BLOCK_EXAMPLES = [
           r2Param: 'LJ_edge',
           sign: 1
         }),
-        triangle('RightJaw', pt('GCB', 'fixed', 30, 0), pt('GPB', 'floating', 30, 18), pt('RT', 'floating', 95, -85), {
+        triangle('RightJaw', pt('GCB', 'fixed', 32, 0), pt('GPB', 'floating', 32, 24), pt('RT', 'floating', 104, -96), {
           color: '#ff6b35',
           shape: 'jaw',
           shapeMode: 'polyline',
@@ -647,9 +647,9 @@ const ALL_BLOCK_EXAMPLES = [
       ],
       params: {
         gripperWorkflow: 1, gripperObjectWidth: 50, gripperClearance: 10,
-        GRA: 30, GRB: 30, GPRA: 18, GPRB: 18,
-        LJ_tip: 107, LJ_edge: 121.8,
-        RJ_tip: 107, RJ_edge: 121.8,
+        GRA: 32, GRB: 32, GPRA: 24, GPRB: 24,
+        LJ_tip: 120, LJ_edge: 139.9428454762872,
+        RJ_tip: 120, RJ_edge: 139.9428454762872,
         theta: 0
       }
     }
@@ -698,27 +698,27 @@ const ALL_BLOCK_EXAMPLES = [
   {
     id: 'sprocket-chain',
     title: '鏈輪鏈條：同向減速（#25）',
-    note: 'TT 馬達帶動 12 齒鏈輪，#25 鏈條（40 節）帶動 24 齒鏈輪，兩輪同向、速度減半；從動鏈輪的輪緣銷再推動曲柄搖桿。',
+    note: 'TT 馬達帶動 20 齒鏈輪，#25 鏈條（56 節）帶動 40 齒鏈輪，兩輪同向、速度減半；從動鏈輪的輪緣銷再推動曲柄搖桿。',
     snapshot: {
       kind: 'blocks',
       v: 1,
       counter: 8,
       comps: [
-        { type: 'pulley', id: 'SprocketA', kind: 'sprocket', teeth: 12, color: '#e74c3c',
+        { type: 'pulley', id: 'SprocketA', kind: 'sprocket', teeth: 20, color: '#e74c3c',
           p1: pt('SKA', 'motor', -SPROCKET_HALF, 0, { physicalMotor: '1' }),
           p2: pt('SKAP', 'floating', -SPROCKET_HALF + 8, 0),
           radiusParam: 'SKRA', phase: 0 },
-        { type: 'pulley', id: 'SprocketB', kind: 'sprocket', teeth: 24, color: '#2c6fbb',
+        { type: 'pulley', id: 'SprocketB', kind: 'sprocket', teeth: 40, color: '#2c6fbb',
           p1: pt('SKB', 'fixed', SPROCKET_HALF, 0),
           p2: pt('SKBP', 'floating', SPROCKET_HALF + 16, 0),
           radiusParam: 'SKRB', pinRadius: 16, phase: 0 },
-        { type: 'belt', id: 'Chain1', kind: 'chain', standard: '25', links: 40, color: '#34495e',
+        { type: 'belt', id: 'Chain1', kind: 'chain', standard: '25', links: 56, color: '#34495e',
           driver: 'SprocketA', driven: 'SprocketB' },
-        { type: 'anchor', id: 'Anchor1', p1: pt('SKF', 'fixed', SPROCKET_HALF + 55, 40) },
-        bar('Coupler1', pt('SKBP', 'floating', SPROCKET_HALF + 16, 0), pt('SKE', 'floating', SPROCKET_HALF + 14.68, 59.99), 60, { lenParam: 'SKL1' }),
-        bar('Rocker1', pt('SKF', 'fixed', SPROCKET_HALF + 55, 40), pt('SKE', 'floating', SPROCKET_HALF + 14.68, 59.99), 45, { lenParam: 'SKL2' })
+        { type: 'anchor', id: 'Anchor1', p1: pt('SKF', 'fixed', SPROCKET_HALF + 56, 40) },
+        bar('Coupler1', pt('SKBP', 'floating', SPROCKET_HALF + 16, 0), pt('SKE', 'floating', SPROCKET_HALF + 14.419518002323392, 63.980481997676605), 64, { lenParam: 'SKL1' }),
+        bar('Rocker1', pt('SKF', 'fixed', SPROCKET_HALF + 56, 40), pt('SKE', 'floating', SPROCKET_HALF + 14.419518002323392, 63.980481997676605), 48, { lenParam: 'SKL2' })
       ],
-      params: { SKL1: 60, SKL2: 45, theta: 0 }
+      params: { SKL1: 64, SKL2: 48, theta: 0 }
     }
   },
   {
@@ -846,42 +846,42 @@ const ALL_BLOCK_EXAMPLES = [
         // 伺服板＝靜態結構板（樞軸與板尾兩個固定點）：擺臂樞軸、MG995、右側立柱都掛在它上面。
         // 馬達軸心是板頂點 → MG995 穿板槽/耳孔自動切進這塊板（2D/3D/DXF 同一份幾何）。
         triangle('IntakeServoPlate',
-          pt('INTAKE_PIVOT', 'fixed', 170.5, 147.1),
-          pt('INTAKE_MOTOR', 'floating', 203.9, 189.5),
-          pt('PLATE_END', 'fixed', 336.5, 144.1), {
+          pt('INTAKE_PIVOT', 'fixed', 168, 144),
+          pt('INTAKE_MOTOR', 'floating', 200, 184),
+          pt('PLATE_END', 'fixed', 336, 144), {
             color: '#95a5a6',
             gParam: 'INTAKE_PLATE_G', r1Param: 'INTAKE_PLATE_R1', r2Param: 'INTAKE_PLATE_R2'
           }),
         // 立柱板（折線桿）：從伺服板尾端往下到地面、再沿地面往左——右立柱＋底座一體成形。
         triangle('IntakeFrameColumn',
-          pt('PLATE_END', 'fixed', 336.5, 144.1),
-          pt('FRAME_BR', 'fixed', 336.2, 2.1),
-          pt('FRAME_BL', 'fixed', 177.2, 1.2), {
+          pt('PLATE_END', 'fixed', 336, 144),
+          pt('FRAME_BR', 'fixed', 336, 0),
+          pt('FRAME_BL', 'fixed', 176, 0), {
             color: '#95a5a6', shapeMode: 'polyline',
             gParam: 'INTAKE_COL_G', r1Param: 'INTAKE_COL_R1', r2Param: 'INTAKE_COL_R2'
           }),
-        // 靜止姿勢＝擺動起點（theta=0、phaseOffset≈138.8），舵臂朝左下。
+        // 靜止姿勢＝擺動起點（theta=0、phaseOffset=135），舵臂朝左下。
         // mountLocatorPoint：伺服本體朝向定位點（在軸心正下方 → 本體水平朝右），不參與求解。
         bar('IntakeCrank',
-          pt('INTAKE_MOTOR', 'fixed', 203.9, 189.5, { physicalMotor: '1' }),
-          pt('CRANK_PIN', 'floating', 149.8, 237.0), 72, {
+          pt('INTAKE_MOTOR', 'fixed', 200, 184, { physicalMotor: '1' }),
+          pt('CRANK_PIN', 'floating', 149.08831175456856, 234.91168824543144), 72, {
             lenParam: 'INTAKE_CRANK', color: '#f05a28', isInput: true,
             physicalMotor: '1', motorType: 'mg995', servoStart: 0, servoEnd: 90,
-            phaseOffset: 138.75853160493327,
+            phaseOffset: 135,
             mountLocatorPoint: 'SERVO_DIR'
           }),
-        { type: 'anchor', id: 'IntakeServoDir', p1: pt('SERVO_DIR', 'fixed', 203.9, 179.5) },
+        { type: 'anchor', id: 'IntakeServoDir', p1: pt('SERVO_DIR', 'fixed', 200, 174) },
         exactBar('IntakeCoupler',
-          pt('CRANK_PIN', 'floating', 149.8, 237.0),
-          pt('ARM_LINK', 'floating', 123.0, 182.1), 64, {
+          pt('CRANK_PIN', 'floating', 149.08831175456856, 234.91168824543144),
+          pt('ARM_LINK', 'floating', 122.52715766003818, 176.68364437337087), 64, {
             lenParam: 'INTAKE_COUPLER', color: '#7f8c8d'
           }),
         // 黑色進料臂（折線桿）：樞軸在伺服板上，彎折點吃連桿，取物端往左下伸出。
         // 調桿段長度時彎角自動保持（對角線 INTAKE_ARM_R1 是彎角參數）。
         triangle('IntakeArm',
-          pt('INTAKE_PIVOT', 'fixed', 170.5, 147.1),
-          pt('ARM_LINK', 'floating', 123.0, 182.1),
-          pt('INTAKE_TIP', 'floating', 73.9, 118.9), {
+          pt('INTAKE_PIVOT', 'fixed', 168, 144),
+          pt('ARM_LINK', 'floating', 122.52715766003818, 176.68364437337087),
+          pt('INTAKE_TIP', 'floating', 75.83623712665124, 111.72244103056828), {
             color: '#2f343b',
             snapLength: false,   // 邊長取 0.1mm：彎角與靜止姿勢不因整數化漂移
             shapeMode: 'polyline',
@@ -892,18 +892,18 @@ const ALL_BLOCK_EXAMPLES = [
               { solve: true, ref: 'p3' }
             ]
           }),
-        // 黃色物件放在底座板上（底座頂緣≈10.7、物件高 44 → 中心 y=33）；
-        // 取物端低點掃過 y≈47、x 75→270，正好從物件上緣把它往機架內耙。
+        // 黃色物件放在底座板上（底座頂緣≈9、物件高 44 → 中心 y=31.5）；
+        // 取物端低點掃過 y≈47、x 76→265，正好從物件上緣把它往機架內耙。
         { type: 'workpiece', id: 'IntakeTarget',
-          p1: pt('INTAKE_OBJECT', 'floating', 150, 33),
+          p1: pt('INTAKE_OBJECT', 'floating', 150, 31.5),
           width: 44, height: 44, color: '#f4b400' }
       ],
       params: {
-        INTAKE_PLATE_G: 54, INTAKE_PLATE_R1: 166, INTAKE_PLATE_R2: 141,
-        INTAKE_COL_G: 142, INTAKE_COL_R1: 214, INTAKE_COL_R2: 159,
+        INTAKE_PLATE_G: 51.22499389946279, INTAKE_PLATE_R1: 168, INTAKE_PLATE_R2: 141.76036117335482,
+        INTAKE_COL_G: 144, INTAKE_COL_R1: 215.2579847531794, INTAKE_COL_R2: 160,
         INTAKE_CRANK: 72,
         INTAKE_COUPLER: 64,
-        INTAKE_ARM_G: 59, INTAKE_ARM_R1: 100.6, INTAKE_ARM_R2: 80,
+        INTAKE_ARM_G: 56, INTAKE_ARM_R1: 97.65244492586962, INTAKE_ARM_R2: 80,
         theta: 0
       }
     }
@@ -919,21 +919,21 @@ const ALL_BLOCK_EXAMPLES = [
       comps: [
         { type: 'gear', id: 'LiftPinion', color: '#e74c3c',
           p1: pt('LPC', 'motor', 0, 0, { physicalMotor: '1' }),
-          p2: pt('LPP', 'floating', 18, 0),
-          radiusParam: 'LPR', teeth: 15, module: 4, phase: 0, mountLocatorPoint: 'LML' },
+          p2: pt('LPP', 'floating', 16, 0),
+          radiusParam: 'LPR', teeth: 16, module: 4, phase: 0, mountLocatorPoint: 'LML' },
         { type: 'anchor', id: 'MotorLocator', p1: pt('LML', 'fixed', 0, 11.18) },
-        { type: 'anchor', id: 'LiftGuideA', p1: pt('LGA', 'fixed', 45, -5.2) },
-        { type: 'anchor', id: 'LiftGuideB', p1: pt('LGB', 'fixed', 45, 17.8) },
+        { type: 'anchor', id: 'LiftGuideA', p1: pt('LGA', 'fixed', 48, -8) },
+        { type: 'anchor', id: 'LiftGuideB', p1: pt('LGB', 'fixed', 48, 16) },
         { type: 'rack', id: 'LiftRackGear', color: '#16a085',
-          p1: pt('LiftRack', 'floating', 30, 0),
+          p1: pt('LiftRack', 'floating', 32, 0),
           pinion: 'LiftPinion', lenParam: 'LRL', axisDeg: 90, sign: 1,
-          bodyHeight: 20,
+          bodyHeight: 22,
           // M3 螺絲當導銷與鎖付：槽寬 3.4、孔 3.2
           slot: { length: 144, width: 3.4, offset: 0 },
           framePins: ['LGA', 'LGB'], endMargin:12, pinHoleDiameterMm: 3.2,
-          holes: [{id:'LiftHoleA',role:'endA',u:0,v:-15,diameter:3.2},{id:'LiftOutput',role:'endB',u:0,v:-15,diameter:3.2}] }
+          holes: [{id:'LiftHoleA',role:'endA',u:0,v:-16,diameter:3.2},{id:'LiftOutput',role:'endB',u:0,v:-16,diameter:3.2}] }
       ],
-      params: { LPR: 30, LRL: 176, theta: 0 }
+      params: { LPR: 32, LRL: 172.5, theta: 0 }
     }
   },
   {

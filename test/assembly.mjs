@@ -67,7 +67,7 @@ function armFixture(phaseOffset = 0) {
   ];
   grip.comps.forEach(c => {
     c.moduleId = 'Grip1';
-    ['p1', 'p2', 'p3'].forEach(k => { if (!c[k]) return; c[k].x += 150; if (c[k].physicalMotor) c[k].physicalMotor = '2'; });
+    ['p1', 'p2', 'p3'].forEach(k => { if (!c[k]) return; c[k].x += 152; if (c[k].physicalMotor) c[k].physicalMotor = '2'; });
     comps.push(c);
   });
   return {
@@ -89,11 +89,11 @@ function armFixture(phaseOffset = 0) {
     const armAng = ang(s.points.O, s.points.A);
     if (!s.isValid) { ok = false; why ||= `${th}° 無效`; continue; }
     if (!samePt(s.points.GCA, s.points.A)) { ok = false; why ||= `${th}° GCA 未在臂端`; }
-    if (!near(dist(s.points.GCA, s.points.GCB), 60)) { ok = false; why ||= `${th}° 中心距`; }
+    if (!near(dist(s.points.GCA, s.points.GCB), 64)) { ok = false; why ||= `${th}° 中心距`; }
     if (!near(angDiff(ang(s.points.GCA, s.points.GCB), armAng), 0, 1e-7)) { ok = false; why ||= `${th}° 底座未跟著臂轉`; }
     if (!near(angDiff(ang(s.points.GCA, s.points.GPA), armAng), relPin0, 1e-7)) { ok = false; why ||= `${th}° 齒輪銷相對角改變`; }
   }
-  check('E-M2：臂轉 0／45／90° 時夾爪整組跟轉、中心距 60、齒輪銷相對底座角不變', ok, why);
+  check('E-M2：臂轉 0／45／90° 時夾爪整組跟轉、中心距 64、齒輪銷相對底座角不變', ok, why);
 }
 
 // ---------- E-M3 零回歸：沒有模組時與 solveTopology／sweepTopology 完全相同 ----------
@@ -160,7 +160,7 @@ const pointMap = comps => { const m = {}; comps.forEach(c => ['p1', 'p2', 'p3', 
   const after = pointMap(moduleIds(r.comps, 'Grip1'));
   const A = { x: 120 * Math.cos(Math.PI / 6), y: 120 * Math.sin(Math.PI / 6) };
   check('E-M5c：changed=true、ref 更新為臂端 30°', r.changed && (() => { const ref = r.modules.find(m => m.id === 'Grip1').mount.ref; return near(ref.x, A.x) && near(ref.y, A.y) && near(ref.a, 30); })());
-  check('E-M5c：GCA 搬到臂端、GCB 在 30° 方向 60 mm', samePt(after.GCA, A) && samePt(after.GCB, { x: A.x + 60 * Math.cos(Math.PI / 6), y: A.y + 60 * Math.sin(Math.PI / 6) }));
+  check('E-M5c：GCA 搬到臂端、GCB 在 30° 方向 64 mm', samePt(after.GCA, A) && samePt(after.GCB, { x: A.x + 64 * Math.cos(Math.PI / 6), y: A.y + 64 * Math.sin(Math.PI / 6) }));
   check('E-M5c：齒輪 phase 各 +30（90→120）', moduleIds(r.comps, 'Grip1').filter(c => c.type === 'gear').every(c => near(c.phase, 120, 1e-9)));
   check('E-M5c：三角板局部造形頂點 u,v 不動', JSON.stringify(moduleIds(r.comps, 'Grip1').filter(c => c.type === 'triangle').map(c => c.vertices))
     === JSON.stringify(moduleIds(f.comps, 'Grip1').filter(c => c.type === 'triangle').map(c => c.vertices)));
@@ -169,7 +169,7 @@ const pointMap = comps => { const m = {}; comps.forEach(c => ['p1', 'p2', 'p3', 
   check('E-M5c I1：home 姿態下齒輪中心與銷的解＝存檔座標', ['GCA', 'GCB', 'GPA', 'GPB'].every(id => samePt(s.points[id], after[id])),
     ['GCA', 'GCB', 'GPA', 'GPB'].map(id => s.points[id] && after[id] ? dist(s.points[id], after[id]).toExponential(2) : 'x').join(','));
   const s45 = solveAt(asm, 45, 20);
-  check('E-M5c：rebake 後臂轉 45° 夾爪仍貼臂端、中心距 60', s45.isValid && samePt(s45.points.GCA, s45.points.A) && near(dist(s45.points.GCA, s45.points.GCB), 60));
+  check('E-M5c：rebake 後臂轉 45° 夾爪仍貼臂端、中心距 64', s45.isValid && samePt(s45.points.GCA, s45.points.A) && near(dist(s45.points.GCA, s45.points.GCB), 64));
 }
 {
   // (d) 旋轉時其他世界方向角度欄位也要 +δ；有 motorCarrier 的 phaseOffset 與伺服角不動

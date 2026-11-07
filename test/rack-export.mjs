@@ -42,7 +42,7 @@ const holes = g.holes.filter(h => h.layer === 'RACK_HOLE');
 check('三個 RACK_HOLE（兩端＋L3b 的第二顆鎖付螺絲 LiftOutputB）、半徑 1.6', holes.length === 3 && holes.every(h => near(h.r, 1.6, 1e-6)));
 const half = params[rack.lenParam] / 2;
 check('兩端孔在 x ＝ ±齒條長/2（與 solver 的 endA／endB 一致）', holes.some(h => near(h.x, -half, 0.01)) && holes.some(h => near(h.x, half, 0.01)));
-check('孔在 y ＝ v（-15），與長槽中心線同一條線', holes.every(h => near(h.y, -15, 0.01)) && near((s.minY + s.maxY) / 2, -15, 0.05));
+check('孔在 y ＝ v（-16），與長槽中心線同一條線', holes.every(h => near(h.y, -16, 0.01)) && near((s.minY + s.maxY) / 2, -16, 0.05));
 check('孔與長槽都在外形範圍內', holes.every(h => h.x - h.r > o.minX && h.x + h.r < o.maxX && h.y - h.r > o.minY && h.y + h.r < o.maxY) && s.minY > o.minY && s.maxY < o.maxY);
 
 // 匯出檔：齒條檔

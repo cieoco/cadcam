@@ -14,8 +14,8 @@ for (const name of ['index.html','teaching.html','teaching-slider.html','teachin
   links++;
  }
 }
-assert.equal(getExample('gear-pair').snapshot.comps[0].teeth,15);
-assert.equal(getExample('gear-pair').snapshot.comps[1].teeth,20);
+assert.equal(getExample('gear-pair').snapshot.comps[0].teeth,12);
+assert.equal(getExample('gear-pair').snapshot.comps[1].teeth,16);
 const lift=getExample('competition-rack-lift').snapshot;
 const rack=lift.comps.find(c=>c.type==='rack');
 assert.equal(rack.slot.length,144);

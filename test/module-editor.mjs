@@ -52,7 +52,7 @@ reset();
   const u0 = log.undo;
   editor.insertBuiltin('rack-lift');
   check('插入齒條升降：5 件、1 個模組、一次 undo、重建與重畫', S.comps.length === 5 && S.modules.length === 1 && log.undo === u0 + 1 && log.rebuild >= 1 && log.draw >= 1);
-  check('插入的零件都標上模組 id、參數併入作品', S.comps.every(c => c.moduleId === S.modules[0].id) && Object.values(S.topo.params).includes(176));
+  check('插入的零件都標上模組 id、參數併入作品', S.comps.every(c => c.moduleId === S.modules[0].id) && Object.values(S.topo.params).includes(172.5));
   editor.insertBuiltin('gear-gripper');
   check('插入齒輪夾爪：馬達自動改成 2 號', S.modules.length === 2 && motorsOf(S.comps.filter(c => c.moduleId === S.modules[1].id)).join(',') === '2');
   check('插入後選取新模組的第一個零件（方便接著安裝）', S.comps.some(c => c.moduleId === S.modules[1].id && [S.selectedLinkId, S.selectedTriangleId, S.selectedGearId, S.selectedSliderId].includes(c.id)));

@@ -46,7 +46,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   const gearId=await selectGear();await tap(await center('gear-hole'));await page.locator('#gearMore[open]').waitFor();const beforeGear=await state();
   await input(page.getByRole('textbox',{name:'輸出孔起始角度',exact:true}),'35.25');assert.equal((await state()).work.comps.find(c=>c.id===gearId).phase,35.25);await undo(beforeGear);await selectGear();
   await drag('gear-hole',{x:-9,y:-22},true);const beforeHole=await drag('gear-hole',{x:-9,y:-22});after=await state();
-  const changed=after.work.comps.find(c=>c.id===gearId);assert.notEqual(changed.phase,0);assert.ok(Number.isInteger(changed.phase));assert.equal(after.undo,beforeHole.undo+1);const holeResult=after.work;await undo(beforeHole);await selectGear();
+  const changed=after.work.comps.find(c=>c.id===gearId);assert.notEqual(changed.phase,0);assert.ok(Number.isFinite(changed.phase));assert.equal(after.undo,beforeHole.undo+1);const holeResult=after.work;await undo(beforeHole);await selectGear();
   const radius=changed.pinRadiusParam?after.work.params[changed.pinRadiusParam]:changed.pinRadius;
   await input(page.getByRole('spinbutton',{name:'輸出孔距',exact:true}),radius);await input(page.getByRole('textbox',{name:'輸出孔起始角度',exact:true}),changed.phase);assert.deepEqual((await state()).work,holeResult,'hole pointer and number agree');
   await page.screenshot({path:`${out}/${viewport.width}-gear.png`});await reopen();

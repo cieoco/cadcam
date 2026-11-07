@@ -101,7 +101,7 @@ let work;
     const rack = L.comps.find(c => c.type === 'rack'), pinion = L.comps.find(c => c.type === 'gear');
     return rack.pinion === pinion.id && rack.framePins.every(id => tokL.has(id)) && pinion.mountLocatorPoint && tokL.has(pinion.mountLocatorPoint);
   })());
-  check('param key 同步改名且值保留', (() => { const rack = L.comps.find(c => c.type === 'rack'); return L.params[rack.lenParam] === 176 && rack.lenParam !== 'LRL'; })());
+  check('param key 同步改名且值保留', (() => { const rack = L.comps.find(c => c.type === 'rack'); return L.params[rack.lenParam] === 172.5 && rack.lenParam !== 'LRL'; })());
   check('base 落在 place', near(ptOf(L.comps, L.module.base).x, 0) && near(ptOf(L.comps, L.module.base).y, 0) && near(ptOf(G.comps, G.module.base).x, 200));
   check('輸出端 at／body 跟著改名', L.module.outputs[0].at !== 'LiftOutput' && tokL.has(L.module.outputs[0].at) && L.comps.some(c => c.id === L.module.outputs[0].body.id));
   check('counter 遞增', G.counter > L.counter && L.counter > 0);
