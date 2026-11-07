@@ -180,7 +180,7 @@ check('stock width, thickness and material mirror without moving pins, one undo 
 })());
 check('stock width rejects insufficient hole margin without mutation or undo', (() => {
   reset([simpleBar()], barParams); S.selectedLinkId = 'Bar1';
-  editor.selectDimension('width'); editor.setValue(12);
+  editor.selectDimension('width'); editor.setValue(3);
   return !S.comps[0].stock && counts.undo === 0 && notices.at(-1).includes('連接孔');
 })());
 check('stock dimensions stay selected on bar sync and increments use their own steps', (() => {

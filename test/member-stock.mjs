@@ -61,7 +61,7 @@ assert.deepEqual(planMemberStock(original, 'thicknessMm', 7.25), {
 assert.deepEqual(planMemberStock(original, 'material', 'pla'), {
   ok: true, stock: { widthMm: 24, thicknessMm: 6, material: 'pla' },
 });
-assert.equal(planMemberStock(original, 'widthMm', 13.4).ok, false, 'default hole clearance rejects narrow width');
+assert.equal(planMemberStock(original, 'widthMm', 3.6).ok, false, 'default hole clearance rejects narrow width');
 assert.equal(planMemberStock(original, 'widthMm', 14.2, { holeDiameterMm: 13.7 }).ok, true);
 for (const value of ['', null, true, false, NaN, Infinity, -Infinity, 1.9, 120.1]) {
   assert.equal(planMemberStock(original, 'widthMm', value).ok, false, `width edit should reject ${String(value)}`);

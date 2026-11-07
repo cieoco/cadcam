@@ -1,7 +1,7 @@
 /** 剛性桿件共用尺寸語意；不持有 UI 或修改輸入資料。 */
 import {isDisk,validateDisk} from './disk-plate.js';
 import { polylineTriangleParams, preservedDiagonalLength } from './plate-geometry.js';
-import { memberStock, planMemberStock } from './member-stock.js';
+import { memberStock, planMemberStock, DEFAULT_HOLE_MM } from './member-stock.js';
 
 const stockDimensions = () => [
   { id: 'width', label: '板寬', stockKey: 'widthMm', min: 2, max: 120, step: 1 },
@@ -31,7 +31,7 @@ export function memberDimensionValue(comp, params, id = 'g') {
   return Number(params[dimension.param]);
 }
 
-export function planMemberDimension(comp, params, id, raw, {holeDiameterMm=12.96,exact=false}={}) {
+export function planMemberDimension(comp, params, id, raw, {holeDiameterMm=DEFAULT_HOLE_MM,exact=false}={}) {
   if(comp?.boxPanel)return {ok:false,message:'盒體板件尺寸請從「卡榫盒子」統一修改。'};
   const dimension = memberDimensions(comp).find(d => d.id === id);
   if (dimension?.stockKey) {

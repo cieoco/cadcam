@@ -5,15 +5,15 @@ import {inspectBarFusion} from './bar-fusion-geometry.js';
 import { DEFAULT_PLATE_RADIUS_WORLD, createPlateGeometry, localToWorld } from './plate-geometry.js';
 import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
 import { rackPhaseShift } from './gear-editor.js';
-import { memberStock, memberStockLabel } from './member-stock.js';
+import { memberStock, memberStockLabel, DEFAULT_HOLE_MM } from './member-stock.js';
 import { sizeFrameOutline } from './frame-stock.js';
 import { unionOutlines, area, inside, fusionCandidates } from './part-fusion.js';
 import { gearMeshPhaseDeg } from './transmission-geometry.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import {identifiedHoles,holeTrace} from './part-hole-trace.js';
 
-export const DEFAULT_BAR_WIDTH_MM = DEFAULT_PLATE_RADIUS_WORLD * 2;
-export const DEFAULT_HOLE_DIAMETER_MM = DEFAULT_PLATE_RADIUS_WORLD * 2 * 0.72;
+export const DEFAULT_BAR_WIDTH_MM = FABRICATION_DEFAULTS.export.barWidthMm;
+export const DEFAULT_HOLE_DIAMETER_MM = DEFAULT_HOLE_MM;
 // 匯出（加工）用的預設孔徑：使用者現場關節一律 M3 螺絲＋防鬆螺帽，與 FABRICATION_DEFAULTS.export 一致。
 // 上面那個 12.96 是畫面孔大小的比例，不再當加工預設。
 const DEFAULT_EXPORT_HOLE_DIAMETER_MM = 3.2;

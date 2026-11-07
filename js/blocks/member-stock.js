@@ -1,4 +1,6 @@
 import {normalizeBoxPanel,boxPanelSize} from '../plugins/box-maker/box-contract.js';
+import {FABRICATION_DEFAULTS} from './fabrication-profile.js';
+export const DEFAULT_HOLE_MM=FABRICATION_DEFAULTS.export.holeDiameterMm;
 // Shared physical stock metadata for rigid bar and plate members.
 // This is descriptive data only; it does not make strength or fabrication claims.
 
@@ -11,7 +13,7 @@ export const MATERIALS = Object.freeze([
 ]);
 
 const MATERIAL_IDS = new Set(MATERIALS.map(item => item.id));
-const DEFAULT_STOCK = Object.freeze({ widthMm: 18, thicknessMm: 4, material: 'unspecified' });
+const DEFAULT_STOCK = Object.freeze({ widthMm: FABRICATION_DEFAULTS.export.barWidthMm, thicknessMm: 4, material: 'unspecified' });
 
 function finiteInput(value) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
@@ -59,7 +61,7 @@ export function memberStockLabel(comp) {
   return `${material}・板寬 ${format(stock.widthMm)} mm・厚度 ${format(stock.thicknessMm)} mm`;
 }
 
-export function planMemberStock(comp, key, raw, { holeDiameterMm = 12.96 } = {}) {
+export function planMemberStock(comp, key, raw, { holeDiameterMm = DEFAULT_HOLE_MM } = {}) {
   if(comp?.shape==='disk'&&key!=='material')return {ok:false,message:'圓盤外徑請從尺寸列調整，板厚沿用全局製作設定。'};
   if(comp?.boxPanel && key!=='material')return {ok:false,message:'盒體板件尺寸請從「卡榫盒子」統一修改。'};
   if (!['widthMm', 'thicknessMm', 'material'].includes(key)) {
@@ -86,7 +88,7 @@ export function planMemberStock(comp, key, raw, { holeDiameterMm = 12.96 } = {})
   const rounded = roundTenth(value);
   if (key === 'widthMm') {
     const hole = finiteInput(holeDiameterMm);
-    const minWidth = (hole === null ? 12.96 : hole) + 0.5;
+    const minWidth = (hole === null ? DEFAULT_HOLE_MM : hole) + 0.5;
     if (value < minWidth || rounded < minWidth) {
       return { ok: false, message: `板寬不得小於連接孔直徑加 0.5 mm（目前至少 ${Math.ceil(minWidth * 10) / 10} mm）。` };
     }
@@ -96,7 +98,7 @@ export function planMemberStock(comp, key, raw, { holeDiameterMm = 12.96 } = {})
 }
 
 export function memberHoleDiameter(comp, settings = {}) {
-  const connection = finiteInput(settings.holeDiameterMm) ?? 12.96;
+  const connection = finiteInput(settings.holeDiameterMm) ?? DEFAULT_HOLE_MM;
   return comp?.type === 'bar' && comp.isInput && !['mg995','n20'].includes(comp.motorType)
     ? Math.max(connection, finiteInput(settings.ttShaftFlatDiameterMm) ?? 5.4) : connection;
 }

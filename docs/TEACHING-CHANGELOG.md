@@ -6,6 +6,12 @@
 
 ---
 
+## 2026-11-07 · 數位積木：孔徑與棍寬預設解耦（G5-P1）
+
+- 未指定孔徑時的後備值原寫死 12.96 mm（由舊 18 mm 棍寬 ×0.72 推得），分散在 member-stock、member-dimensions、member-editor、disk-plate、exporters；改為單一來源 FABRICATION_DEFAULTS.export.holeDiameterMm（M3 3.2 mm）。預設棍寬改由 FABRICATION_DEFAULTS.export.barWidthMm 單一來源提供（本包仍為 18，G5-P3 改 13）。一般流程原本就明傳 3.2，只有不完整設定才會用到後備值。
+- 測試：member-stock 與 member-editor 各 1 處依新後備值更新（最小寬 13.4→3.6、12→3）。首次 JS 2,005,273 bytes（+320）；依 2026.11.6.6 前例把 startup-size 上限由 2.005 MB 放寬到 2.006 MB 並在測試註明理由。
+- Node 全套 259/259（output/loop/g5p1-node，更新兩處後定向重跑 member-stock、member-editor、member-dimensions、bar-fusion、disk-turntable、startup-size、load-graph、test_blocks_schema 通過）。無介面行為改變。
+
 ## 2026-11-07 · 數位積木：三點板頂點對格（G4b）
 
 - 三點板三邊與折線／夾爪的跨距，圖上拖曳只停在「三頂點能同時落在 8 mm 方格點」的長度（候選 8·√n，搜尋 ±24 mm，找不到則不改）；板本身已離格時維持原 1 mm 行為。格上拖曳以精確值提交（例 8√2），數字輸入維持最多一位小數、可離格。折線與夾爪桿段維持 8 mm 步距。

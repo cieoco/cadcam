@@ -7,9 +7,9 @@ import {isDisk,validateDisk} from './disk-plate.js';
 import { S } from './state.js';
 import { planSyringeAttachmentResize } from '../core/syringe.js';
 import { memberDimensions, memberDimensionValue, planMemberDimension, mirroredJaw, dimensionLock } from './member-dimensions.js';
-import { MATERIALS, memberStock, planMemberStock } from './member-stock.js';
+import { MATERIALS, memberStock, planMemberStock, DEFAULT_HOLE_MM } from './member-stock.js';
 
-export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTriangle, updatePointCoordsById, notify, resizeFusion, validateCandidate = () => '', openMobileEditPanel = () => {}, holeDiameter = () => 12.96 }) {
+export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTriangle, updatePointCoordsById, notify, resizeFusion, validateCandidate = () => '', openMobileEditPanel = () => {}, holeDiameter = () => DEFAULT_HOLE_MM }) {
   let mirror = true;   // 孔距使用圖上把手與原數字欄，不再另建面板滑桿。
   let tipDraft = null;
   let lastSelectedId = null;
