@@ -18,6 +18,7 @@
 
 - [SDD-RAPID-MECHANISM-VALIDATION.md](SDD-RAPID-MECHANISM-VALIDATION.md) — 在原有流程做減法；含全操作族盤點、裝配孔位共用核對，以及點接點修改零件孔距的直接／數值共用規則；保留既有功能與資料契約。
 - [SDD-GRID-BLOCKS.md](SDD-GRID-BLOCKS.md) — 數位積木 8 mm 孔格（草案）：條／板／機架／角件對格、M3 孔、立體格與 3D 列印角件，離格須確認並標示
+- [RESEARCH-ACTUATOR-MOUNTING.md](RESEARCH-ACTUATOR-MOUNTING.md) — 研究報告：MG995／SG90／TT／N20 真實尺寸、與 8 mm 孔格的接合問題及處理順序
 
 - [SDD-DISK-PLATE.md](SDD-DISK-PLATE.md) — 圓盤外徑、兩孔剛體、全局板厚與輸出契約。
 - [SDD-SYRINGE-MOUNT-MODES.md](SDD-SYRINGE-MOUNT-MODES.md) — 固定環雙耳鎖固／只鎖一顆耳螺絲可轉、筒身夾持位置、共用配對孔與相容契約。
