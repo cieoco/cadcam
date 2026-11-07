@@ -9,12 +9,14 @@
  *   R2 板積木：三點板、圓盤、合成片的孔可同時落在「該零件自己的」P 方格點（可旋轉，不要求平行世界軸）。
  *   R3 機架：同一設計的機架固定孔可同時落在一個 P 方格。
  *   R5 齒輪：嚙合兩輪中心距為 P 的倍數；齒輪輸出孔落在齒輪方格。
+ *   R6 角件：外購金屬角碼與傾斜轉接座不在立體格上，列為例外（需傳入 modules）；列印轉接座的孔必須落在宿主與子模組的孔格、翼厚不得讓螺絲頭頂到另一翼。
  * 不檢查：滑軌、齒條、皮帶輪、凸輪、針筒本體與其外購固定環孔、鏈條張緊長孔（SDD §3「不受孔格約束」）。
  */
 import { LEGO_FRAME_STEP, frameConnectorNodes } from './model.js';
 import { plateVertices, plateShapeMode, polylineTriangleParams, localToWorld } from './plate-geometry.js';
 import { isDisk } from './disk-plate.js';
 import { syncFrameHoles } from './frame-holes.js';
+import { adapterLayout } from './orthogonal-joint.js';
 
 export const GRID_PITCH_MM = LEGO_FRAME_STEP;   // 8 mm
 export const GRID_TOLERANCE_MM = 0.01;          // 低於此偏差視為在格上（作品參數多為 0.1 mm 精度）
@@ -153,6 +155,38 @@ function frameIssues(group, moduleId, pitch, tol, out) {
   }
 }
 
+// 既有孔本身在格上時，加上轉接座孔後的最大偏差；既有孔本身離格（R2／R3 另報）或不足兩孔回 0。
+function holeDeviation(base, added, pitch, tol) {
+  if (base.length < 2 || !added.length || !latticeEmbedding(base, pitch, tol).ok) return 0;
+  return latticeEmbedding([...base, ...added], pitch, tol).maxDeviationMm;
+}
+const frameNodesOf = (list, id) => frameConnectorNodes(list.filter(c => (c.moduleId || null) === id)).filter(p => !String(p.holeLayer || '').startsWith('SYRINGE') && !p.axleSlot);
+
+// R6：直角安裝用外購金屬角碼或傾斜轉接座時，孔不在立體格上；列印轉接座的孔要同時落在宿主與子模組孔格，翼厚 W ≤ m − 2.75。標在子模組底板（type 'frame'）。
+function mountIssues(list, modules, params, pitch, tol, out) {
+  for (const m of modules || []) {
+    const o = m && m.mount && m.mount.orient;
+    if (!o || o.type !== 'orthogonal') continue;
+    const add = (subject, message) => out.push({ componentId: '', moduleId: m.id, type: 'frame', rule: 'R6', subject, pointId: m.base || '', message });
+    if (o.joint && o.joint.kind === 'bracket-m3') { add('外購金屬角碼', `外購金屬角碼的孔不在 ${pitch} mm 立體格上，列為例外`); continue; }
+    if (Number(o.tiltDeg)) add('傾斜轉接座', `傾斜轉接座的孔不在 ${pitch} mm 立體格上，列為例外`);
+    let a = null;
+    try { a = adapterLayout(list, modules, m.id, params); } catch (e) { a = null; }
+    if (!a || a.kind !== 'printed') continue;
+    if (a.wallMm > Math.min(a.flangeMm, a.flangeBMm) / 2 - 2.75 + tol) add('轉接座翼厚', `轉接座翼厚 ${fmt(a.wallMm)} mm 過厚，螺絲頭會頂到另一翼`);
+    let dev = 0;
+    const host = list.find(c => c.id === a.hostCompId);
+    if (a.hostKind === 'bar') dev = Math.max(...a.hostHoles.map(h => Math.hypot(h.u - Math.round(h.u / pitch) * pitch, h.v)));
+    else if (a.hostKind === 'triangle' && host) {
+      const base = trianglePoints(host, params);
+      if (base) dev = holeDeviation([...base, ...plateVertices(host).filter(v => !v.solve && v.hole === true).map(v => localToWorld(base, v)).filter(Boolean)], a.hostHoles.filter(h => Number.isFinite(h.u)).map(h => localToWorld(base, h)).filter(Boolean), pitch, tol);
+    } else if (a.hostKind === 'frame' && !a.hostModuleId) dev = holeDeviation(frameNodesOf(list, null), a.hostHoles, pitch, tol);
+    if (dev > tol) add('轉接座宿主孔', `轉接座孔不在宿主 ${pitch} mm 孔格（偏差 ${fmt(dev)} mm），請調整接合位置`);
+    const cdev = holeDeviation(frameNodesOf(list, m.id), a.childHoles, pitch, tol);
+    if (cdev > tol) add('轉接座子模組孔', `轉接座孔不在子模組 ${pitch} mm 孔格（偏差 ${fmt(cdev)} mm）`);
+  }
+}
+
 const fmt = v => (Math.round(v * 100) / 100).toString();
 
 /**
@@ -160,7 +194,7 @@ const fmt = v => (Math.round(v * 100) / 100).toString();
  * @param {object[]} comps 正規化後的元件
  * @param {object} params topo.params
  */
-export function gridIssues(comps, params = {}, { pitch = GRID_PITCH_MM, tol = GRID_TOLERANCE_MM } = {}) {
+export function gridIssues(comps, params = {}, { pitch = GRID_PITCH_MM, tol = GRID_TOLERANCE_MM, modules = [] } = {}) {
   const list = structuredClone(comps || []);
   syncFrameHoles(list);
   const out = [];
@@ -173,5 +207,6 @@ export function gridIssues(comps, params = {}, { pitch = GRID_PITCH_MM, tol = GR
   const groups = new Map();
   list.forEach(c => { const k = c.moduleId || null; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(c); });
   for (const [moduleId, group] of groups) frameIssues(group, moduleId, pitch, tol, out);
+  mountIssues(list, modules, params, pitch, tol, out);
   return out;
 }

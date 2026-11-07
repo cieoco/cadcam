@@ -28,7 +28,7 @@ const planOrig = BP.buildPlan({ comps: S.comps, modules: S.modules, params: S.to
 const t = Ops.compositeToTemplate(S.comps, S.modules, S.topo.params, L.id);
 check('kind blocks-composite、兩個模組、名稱「四連桿升降臂＋齒輪夾爪」', t && t.kind === 'blocks-composite' && t.modules.length === 2 && t.name === '四連桿升降臂＋齒輪夾爪');
 check('包含兩個模組全部零件與參數', t.comps.length === S.comps.length && Object.keys(S.topo.params).filter(k => k !== 'theta').every(k => k in t.params));
-check('子模組的安裝關係（直角、工具架下緣、沿邊 5 mm）保留在範本裡', (() => { const gm = t.modules.find(m => m.mount); return gm && gm.mount.orient && gm.mount.orient.offsetMm === 5 && gm.mount.to.module === t.modules.find(m => !m.mount).id; })());
+check('子模組的安裝關係（直角、工具架下緣、沿邊一格 8 mm）保留在範本裡', (() => { const gm = t.modules.find(m => m.mount); return gm && gm.mount.orient && gm.mount.orient.offsetMm === 9.5 && gm.mount.to.module === t.modules.find(m => !m.mount).id; })());
 check('只有宿主（沒裝東西）也能存，回傳單一模組的組合', Ops.compositeToTemplate(S.comps, S.modules, S.topo.params, G.id)?.modules?.length === 1);
 check('模組庫往返（parseLibrary／serializeLibrary）保留組合積木', (() => { const l = Ops.parseLibrary(Ops.serializeLibrary([t])); return l.length === 1 && l[0].kind === 'blocks-composite' && l[0].modules.length === 2; })());
 

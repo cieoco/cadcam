@@ -66,7 +66,7 @@ const bottomPort = ports.find(p => p.kind === 'edge' && p.body.id === brace.id &
   const tinyParams = { ...P, [upright.lenParam]: 12 };
   const upPort = B.autoPorts(S.comps, S.modules, L.id, tinyParams).find(p => p.kind === 'edge' && p.body.id === upright.id);
   const short = B.canConnect(S.comps, S.modules, G.id, { module: L.id, port: upPort.id }, tinyParams);
-  check('邊太短（12 mm < 轉接座 20 mm）：不行，原因含長度', short.ok === false && /12/.test(short.reason) && /20/.test(short.reason));
+  check('邊太短（12 mm < 轉接座 21 mm）：不行，原因含長度', short.ok === false && /12/.test(short.reason) && /21/.test(short.reason));
   check('找不到接口：不行', B.canConnect(S.comps, S.modules, G.id, { module: L.id, port: 'nope' }, P).ok === false);
 }
 
@@ -97,14 +97,14 @@ const orientOf = st => st.modules.find(x => x.id === G.id).mount.orient;
 {
   const f0 = frameOf(cur), o0 = orientOf(cur);
   const s1 = B.benchAdjust(cur.comps, cur.modules, G.id, 'slide+', P);
-  check('沿邊 +5 mm：offsetMm 5、origin 沿 d 移 5', s1.ok && orientOf(s1).offsetMm === 5 && near(frameOf(s1).origin.x - f0.origin.x, 5) && near(frameOf(s1).origin.y, f0.origin.y));
+  check('沿邊一格：offsetMm 1.5→9.5（吸附到孔格）、origin 沿 d 移 8', s1.ok && orientOf(s1).offsetMm === 9.5 && near(frameOf(s1).origin.x - f0.origin.x, 8) && near(frameOf(s1).origin.y, f0.origin.y));
   const a = OJ.adapterLayout(s1.comps, s1.modules, G.id, P, { stockMm: 3 }), a0 = OJ.adapterLayout(cur.comps, cur.modules, G.id, P, { stockMm: 3 });
-  check('轉接座孔位跟著滑 5 mm', near(a.hostHoles[0].u - a0.hostHoles[0].u, 5));
+  check('轉接座孔位跟著滑 8 mm', near(a.hostHoles[0].u - a0.hostHoles[0].u, 8));
   let st = cur;
   for (let i = 0; i < 20; i++) st = B.benchAdjust(st.comps, st.modules, G.id, 'slide+', P);
-  check('滑到底會停：轉接座不超出桿端（offset ≤ 桿長/2 − 20）', orientOf(st).offsetMm <= 40 - 20 + 1e-9);
+  check('滑到底會停：轉接座不超出桿端（offset ≤ 桿長/2 − 21）', orientOf(st).offsetMm <= 40 - 21 + 1e-9);
   const back = B.benchAdjust(s1.comps, s1.modules, G.id, 'slide-', P);
-  check('沿邊 −5 mm 回到 0（offsetMm 為 0 時不寫入欄位）', back.ok && !('offsetMm' in orientOf(back)));
+  check('沿邊 −1 格回到初裝位置 1.5', back.ok && orientOf(back).offsetMm === 1.5);
   const rev = B.benchAdjust(cur.comps, cur.modules, G.id, 'reverse', P);
   check('掉頭：childAxisDeg +180', rev.ok && near(Math.cos((orientOf(rev).childAxisDeg - o0.childAxisDeg) * Math.PI / 180), -1, 1e-9) && orientOf(rev).childAxisDeg > -180 && orientOf(rev).childAxisDeg <= 180);
   const rot = B.benchAdjust(cur.comps, cur.modules, G.id, 'rotate', P);

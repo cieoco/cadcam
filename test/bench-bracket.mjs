@@ -33,7 +33,7 @@ const a = OJ.adapterLayout(br.comps, br.modules, G.id, P, { stockMm: T });
 const a0 = OJ.adapterLayout(printed.comps, printed.modules, G.id, P, { stockMm: T });
 console.log('bracket layout:', JSON.stringify({ host: a.hostHoles, child: a.childHoles, kind: a.kind }));
 check('layout 帶 kind bracket-m3、兩片各一孔、孔徑 3.2（螺絲穿過木板）', a.kind === 'bracket-m3' && a.hostHoles.length === 2 && a.childHoles.length === 2 && a.holeDiameterMm === 3.2);
-check('宿主孔：沿邊位置與列印版相同（相距 10），離邊 9.5 mm', near(a.hostHoles[0].u, a0.hostHoles[0].u) && near(a.hostHoles[1].u - a.hostHoles[0].u, 10) && a.hostHoles.every(h => near(h.v, -1 * (w / 2 - 9.5))));
+check('宿主孔：角碼起點 5 mm（列印版起點 m_h＝8−板厚/2），相距 10，離邊 9.5 mm', near(a.hostHoles[0].u - a0.hostHoles[0].u, 5 - (8 - T / 2)) && near(a.hostHoles[1].u - a.hostHoles[0].u, 10) && a.hostHoles.every(h => near(h.v, -1 * (w / 2 - 9.5))));
 const tOf = h => (h.x - f.base.x) * f.f.x + (h.y - f.base.y) * f.f.y;
 check('子模組孔：離宿主板面 6 mm（＝板厚 3＋6＝9 從宿主底面算起）', a.childHoles.every(h => near(tOf(h), T + 6, 1e-3)));
 

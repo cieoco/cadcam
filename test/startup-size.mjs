@@ -16,7 +16,8 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-05：共用裝配孔位核對與既有編輯入口接線，增量約 20 KB；無新增依賴或載入 3D。
 // 2026-11-06：機架附屬孔保存／跟隨及輸出契約；機架參數面板延後載入，啟動淨增約 1.2 KB。
 // 2026-11-07 數位積木 G5：修正孔徑預設（12.96→M3 3.2 mm，單一來源）需 +320 bytes，依前例放寬 1 KB，不以刪掉必要契約縮小數字。
-check('首次JS原始大小低於2.006MB',r.bytes<2006000);
+// 2026-11-07 G5-P2 直角孔格對齊：轉接座孔對宿主孔格、佔位長度與滑動吸附（orthogonal-joint／assembly／bench／module-ops），啟動淨增約 1.7 KB，放寬到 2.007MB。
+check('首次JS原始大小低於2.007MB',r.bytes<2007000);
 check('機架編輯介面延後載入',!r.paths.includes('js/blocks/frame-hole-editor.js')&&!r.paths.includes('js/blocks/frame-panel.js'));
 check('合成尺寸候選計算延後載入',!r.paths.includes('js/blocks/bar-fusion-resize.js')&&r.lazyEntries.includes('js/blocks/bar-fusion-resize.js'));
 check('盒體生成介面（外掛）延後載入',!r.paths.includes('js/plugins/box-maker/box-generator.js')&&!r.paths.includes('js/plugins/box-maker/box-dialog.js')&&r.lazyEntries.includes('js/plugins/box-maker/index.js'));

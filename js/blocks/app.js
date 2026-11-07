@@ -2954,7 +2954,7 @@ async function downloadAdapterStl() {
   try{({adapterMesh,meshToStl}=await import('./adapter-stl.js'));}catch(e){transient('STL 輸出未載入：'+e.message);return;}
   adapters.forEach(a => {
     const name = `adapter-${a.moduleId}${a.tiltDeg ? `-tilt${a.tiltDeg}` : ''}`;   // D4：傾斜的轉接座檔名帶角度
-    const stl = meshToStl(adapterMesh({ lengthMm: a.lengthMm, wallMm: a.wallMm, flangeMm: a.flangeMm, holeDiameterMm: a.holeDiameterMm, holesPerFlange: a.holesPerFlange, tiltDeg: a.tiltDeg }), name);
+    const stl = meshToStl(adapterMesh({ lengthMm: a.lengthMm, wallMm: a.wallMm, flangeMm: a.flangeMm, flangeBMm: a.flangeBMm, holeDiameterMm: a.holeDiameterMm, holesPerFlange: a.holesPerFlange, tiltDeg: a.tiltDeg }), name);
     const link = document.createElement('a');
     link.href = URL.createObjectURL(new Blob([stl], { type: 'model/stl' }));
     link.download = `${name}.stl`;

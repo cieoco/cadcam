@@ -36,6 +36,6 @@ check('對鎖接口：一個點在輸出端 at', bolt && bolt.points.length === 
 check('標記帶白話名稱', mk.every(m => typeof m.name === 'string' && m.name.length > 0));
 const tiny = B.portMarkers(S.comps, S.modules, G.id, pts, { ...P, [S.comps.find(c => c.moduleId === L.id && c.id.startsWith('LiftUpright')).lenParam]: 12 }, { zOf, thicknessMm: 3 });
 const up = tiny.find(m => m.portId.startsWith('edge:LiftUpright'));
-check('不相容的接口：compatible false＋reason（邊太短）', up && up.compatible === false && /20/.test(up.reason));
+check('不相容的接口：compatible false＋reason（邊太短）', up && up.compatible === false && /21/.test(up.reason));
 check('已安裝的子模組：沒有標記（要先拆下）', (() => { const r = B.connect(S.comps, S.modules, G.id, { module: L.id, port: `edge:${brace.id}:R` }, P, { activeMotor: '1', theta: 0, motorAngles: {} }); return B.portMarkers(r.comps, r.modules, G.id, pts, P, { zOf, thicknessMm: 3 }).length === 0; })());
 report('bench-markers');

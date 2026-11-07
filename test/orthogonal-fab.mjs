@@ -44,13 +44,13 @@ const base = pts[G.base];
 {
   const a = OJ.adapterLayout(S.comps, S.modules, G.id, P, { stockMm: 3 });
   console.log('layout:', JSON.stringify(a));
-  check('預設尺寸：長 20、壁厚 4、翼高 14、孔 3.2', a && a.lengthMm === 20 && a.wallMm === 4 && a.flangeMm === 14 && a.holeDiameterMm === 3.2);
+  check('預設尺寸：長 21、壁厚 3、翼高 18（宿主）／13（子模組）、孔 3.2', a && a.lengthMm === 21 && a.wallMm === 3 && a.flangeMm === 18 && a.flangeBMm === 13 && a.holeDiameterMm === 3.2);
   check('宿主構件＝ToolBrace、子模組板＝夾爪底板', a.hostCompId === brace.id && a.childPart === `${G.id}-frame`);
   // 宿主孔：沿桿從 p1 起算 u（桿長 80 → 中點 40，再往前 5、15）；v＝side·(寬/2 − 9)＝0（板寬 18、翼孔距接合邊 9）
-  check('宿主孔（桿座標）：u 45、55，v 0', a.hostHoles.length === 2 && near(a.hostHoles[0].u, 45) && near(a.hostHoles[1].u, 55) && a.hostHoles.every(h => near(h.v, 0)));
+  check('宿主孔（桿座標）：u 48、56（宿主孔格），v 0', a.hostHoles.length === 2 && near(a.hostHoles[0].u, 48) && near(a.hostHoles[1].u, 56) && a.hostHoles.every(h => near(h.v, 0)));
   // 子模組孔：base + s·e + t·f；e 沿 childAxisDeg（-90° → (0,-1)）、f＝(−e.y, e.x)＝(1,0)；s 5、15；t＝宿主板厚 3＋9＝12
-  check('子模組孔（夾爪自己的座標）：base＋(12,−5)、base＋(12,−15)', a.childHoles.length === 2 &&
-    near(a.childHoles[0].x, base.x + 12, 1e-3) && near(a.childHoles[0].y, base.y - 5, 1e-3) && near(a.childHoles[1].y, base.y - 15, 1e-3));
+  check('子模組孔（夾爪自己的座標）：base＋(9.5,−6.5)、base＋(9.5,−14.5)', a.childHoles.length === 2 &&
+    near(a.childHoles[0].x, base.x + 9.5, 1e-3) && near(a.childHoles[0].y, base.y - 6.5, 1e-3) && near(a.childHoles[1].y, base.y - 14.5, 1e-3));
   check('不是直角安裝的模組：回 null', OJ.adapterLayout(S.comps, S.modules, L.id, P, { stockMm: 3 }) === null);
 }
 
@@ -62,10 +62,10 @@ const base = pts[G.base];
   const g = Ex.inspectLinkExport(brace, 80, { holeDiameterMm: 3.2 }, lh);
   const ad = g.holes.filter(h => h.layer === 'ADAPTER_HOLE');
   const p1 = g.holes.filter(h => h.layer === 'HOLE').sort((a, b) => a.x - b.x)[0];
-  check('桿件匯出：多兩個 ADAPTER_HOLE（u 45、55，與 p1 孔同高）、孔徑 3.2', ad.length === 2 && near(ad[0].x - p1.x, 45, 1e-3) && near(ad[1].x - p1.x, 55, 1e-3) && ad.every(h => near(h.y, p1.y, 1e-3) && near(h.r, 1.6, 1e-3)));
+  check('桿件匯出：多兩個 ADAPTER_HOLE（u 48、56，與 p1 孔同高）、孔徑 3.2', ad.length === 2 && near(ad[0].x - p1.x, 48, 1e-3) && near(ad[1].x - p1.x, 56, 1e-3) && ad.every(h => near(h.y, p1.y, 1e-3) && near(h.r, 1.6, 1e-3)));
   check('沒傳 extra 時桿件匯出不變', Ex.inspectLinkExport(brace, 80, { holeDiameterMm: 3.2 }).holes.every(h => h.layer !== 'ADAPTER_HOLE'));
   const fn = extras.frameNodes && extras.frameNodes[G.id];
-  check('extras.frameNodes[夾爪]：2 個 ADAPTER_HOLE 節點（夾爪自己的座標）', Array.isArray(fn) && fn.length === 2 && fn.every(n => n.holeLayer === 'ADAPTER_HOLE' && near(n.holeDiameterMm, 3.2)) && near(fn[0].x, base.x + 12, 1e-3));
+  check('extras.frameNodes[夾爪]：2 個 ADAPTER_HOLE 節點（夾爪自己的座標）', Array.isArray(fn) && fn.length === 2 && fn.every(n => n.holeLayer === 'ADAPTER_HOLE' && near(n.holeDiameterMm, 3.2)) && near(fn[0].x, base.x + 9.5, 1e-3));
 }
 
 // ---------- 3. 製作計畫：兩個平面 ----------
@@ -83,9 +83,9 @@ console.log('parts:', plan.parts.map(p => `${p.name}@${p.plane || 'main'}:${p.la
   const hw = BP.hardwareList(plan);
   console.log('hw:', hw.map(r => `${r.spec}×${r.qty}`).join(' '));
   check('五金：3D 列印轉接座 ×1', hw.some(r => /轉接座/.test(r.spec) && r.qty === 1));
-  // 每翼 2 孔 × 2 翼 = 4 顆；長度＝板厚 3＋壁厚 4＋螺帽 4 = 11 → M3×12
-  const s12 = hw.find(r => r.spec === 'M3×12');
-  check('五金：轉接座螺絲 M3×12 ×4', s12 && s12.qty === 4 && /轉接座/.test(s12.note));
+  // 每翼 2 孔 × 2 翼 = 4 顆；長度＝板厚 3＋壁厚 3＋螺帽 4 = 10 → M3×10
+  const s12 = hw.find(r => r.spec === 'M3×10' && /轉接座/.test(r.note));
+  check('五金：轉接座螺絲 M3×10 ×4（與樞軸、MG995 耳孔同長度合併列）', s12 && /轉接座 4/.test(s12.note));
   const html = BP.buildPackHtml(plan, { title: 'T', cnc });
   check('製作包有「直角組裝」段落並提到 STL', /直角組裝/.test(html) && /STL/.test(html));
 }

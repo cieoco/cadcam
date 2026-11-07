@@ -75,6 +75,12 @@ const hole = (u, v) => ({ type: 'anchor', id: 'Extra', p1: { id: 'X', type: 'fix
 assert.deepEqual(gridIssues(frame([{ x: 0, y: 0 }, { x: 48, y: 0 }, { x: 24, y: 40 }], [hole(16, 8)]), FP).filter(i => i.rule === 'R3'), []);
 assert.equal(gridIssues(frame([{ x: 0, y: 0 }, { x: 48, y: 0 }, { x: 24, y: 40 }], [hole(20)]), FP).filter(i => i.rule === 'R3').length, 1);
 
+// R6：外購金屬角碼與傾斜轉接座列為例外（需傳入 modules）；筆直的列印轉接座在格上
+const mod = (id, orient) => ({ id, base: id + 'b', mount: { to: { module: 'M0' }, orient: { type: 'orthogonal', ...orient } } });
+const r6 = gridIssues([], P, { modules: [mod('Pr', { joint: { kind: 'printed' } }), mod('Mt', { joint: { kind: 'bracket-m3' } }), mod('Tl', { joint: { kind: 'printed' }, tiltDeg: 15 }), { id: 'Pl', mount: { to: { module: 'M0' } } }] });
+assert.deepEqual(r6.map(i => `${i.moduleId}:${i.rule}:${i.subject}`).sort(), ['Mt:R6:外購金屬角碼', 'Tl:R6:傾斜轉接座']);
+assert.equal(r6[0].type, 'frame'); assert.deepEqual(gridIssues([], P), [], 'no modules, no R6');
+
 // 不改作品
 const comps = [bar('Off', 'L50'), ...frame([{ x: 0, y: 0 }, { x: 48, y: 0 }, { x: 24, y: 40 }], [hole(16, 8)])];
 const before = JSON.stringify(comps); gridIssues(comps, { ...P, ...FP }); assert.equal(JSON.stringify(comps), before);

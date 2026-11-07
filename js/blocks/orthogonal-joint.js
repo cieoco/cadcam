@@ -8,9 +8,9 @@ import { appendFaceBracketHoles } from './face-bracket-extras.js';
  * 這裡只算兩邊木板要鑽的孔位（3.2 mm），STL 另由 adapter-stl.js 產生。
  */
 import { memberStock } from './member-stock.js';
-import { pointCoords, frameConnectorNodes } from './model.js';
+import { pointCoords, frameConnectorNodes, LEGO_FRAME_STEP } from './model.js';
 import { frameStockOf } from './frame-stock.js';
-import { orthogonalHostEdge, orthogonalFrame, hostPlateThickness, standChildHoles } from './assembly.js';
+import { orthogonalHostEdge, orthogonalFrame, hostPlateThickness, hostRowInset, childMargin, standChildHoles } from './assembly.js';
 import { worldToLocal } from './plate-geometry.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
 import { metalBracketSpec } from './bracket-spec.js';
@@ -23,7 +23,7 @@ export const ADAPTER_LENGTH_MM = 20;
 export const ADAPTER_FLANGE_MM = 14;
 export const ADAPTER_HOLE_MM = 3.2;
 export const ADAPTER_LAYER = 'ADAPTER_HOLE';
-const DEFAULT_WALL_MM = 4;
+const DEFAULT_WALL_MM = 3;
 const DEFAULT_HOLES_PER_FLANGE = 2;
 
 // E1：直角接合件的種類。printed＝3D 列印 L 形轉接座（孔距轉角＝壁厚＋(翼高−壁厚)/2＝9，用螺帽）；
@@ -37,6 +37,16 @@ export const JOINT_KINDS = {
   }
 };
 export const DEFAULT_JOINT_KIND = 'printed';   // 舊存檔沒有 joint.kind 時視為 printed；新接的預設見 FABRICATION_DEFAULTS.joint.defaultKind
+// R4：佔位長度與孔對格的沿線位置
+export const adapterSpanMm = (joint, hostT = 3) => jointKindOf(joint) === 'printed' ? ((joint && joint.holesPerFlange > 0 ? joint.holesPerFlange : DEFAULT_HOLES_PER_FLANGE) - 1) * LEGO_FRAME_STEP + 16 - hostT : ADAPTER_LENGTH_MM;
+export function gridOffsetMm(edge, off, joint, hostT = 3) {
+  if (jointKindOf(joint) !== 'printed' || (edge.kind !== 'bar' && edge.kind !== 'triangle')) return off;
+  const P = LEGO_FRAME_STEP, h = edge.lengthMm / 2, lead = P - hostT / 2;
+  let v = Math.round((h + off + lead) / P) * P - h - lead;
+  if (v > h - adapterSpanMm(joint, hostT) + 1e-9) v -= P;
+  if (v < -h - 1e-9) v += P;
+  return v < -h - 1e-9 || v > h - adapterSpanMm(joint, hostT) + 1e-9 ? off : Math.round(v * 10) / 10;
+}
 // 讀出 joint 的種類 id（不認得的一律視為 printed，與舊存檔相容）。
 export const jointKindOf = joint => (joint && JOINT_KINDS[joint.kind] ? joint.kind : DEFAULT_JOINT_KIND);
 
@@ -58,12 +68,11 @@ export function adapterChildHoles({ base, orient, bar = null, hostSide, hostThic
   const joint = orient.joint || {};
   const kind = jointKindOf(joint);
   const bracket = kind !== 'printed';
-  const wallMm = finitePos(joint.wallMm) ? Number(joint.wallMm) : DEFAULT_WALL_MM;
   const K = jointSpec(kind, jointSettings);
   const n = bracket ? K.count : (Number.isInteger(joint.holesPerFlange) && joint.holesPerFlange > 0 ? joint.holesPerFlange : DEFAULT_HOLES_PER_FLANGE);
-  // 子模組端的孔離轉角：列印版＝翼孔距；角碼＝短腳孔距（預設 6，由規格算出）。
-  const flangeHole = bracket ? K.childHoleMm : wallMm + (ADAPTER_FLANGE_MM - wallMm) / 2;
   const hostThickness = finitePos(hostThicknessMm)?Number(hostThicknessMm):bar && finitePos(bar.stock && bar.stock.thicknessMm) ? Number(bar.stock.thicknessMm) : stockMm;
+  // 子模組端孔離轉角：列印版 P−t/2（R4）；角碼短腳孔距
+  const flangeHole = bracket ? K.childHoleMm : LEGO_FRAME_STEP - hostThickness / 2;
   const e = { x: Math.cos(orient.childAxisDeg * D2R), y: Math.sin(orient.childAxisDeg * D2R) };
   const f = { x: -e.y, y: e.x };
   // 子模組基準面在宿主板底面（side＝1）或頂面（side＝-1）；只有頂面側要跨過板厚。
@@ -81,7 +90,7 @@ export function adapterChildHoles({ base, orient, bar = null, hostSide, hostThic
   }
   const t = hostFace + flangeHole;
   return Array.from({ length: n }, (_, k) => {
-    const s = ADAPTER_LENGTH_MM * (k + 0.5) / n;
+    const s = flangeHole + k * LEGO_FRAME_STEP;
     return { x: r3(base.x + s * e.x + t * f.x), y: r3(base.y + s * e.y + t * f.y) };
   });
 }
@@ -111,19 +120,20 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3, j
   const K = jointSpec(kind, jointSettings);
   const wallMm = finitePos(joint.wallMm) ? Number(joint.wallMm) : DEFAULT_WALL_MM;
   const n = bracket ? K.count : (Number.isInteger(joint.holesPerFlange) && joint.holesPerFlange > 0 ? joint.holesPerFlange : DEFAULT_HOLES_PER_FLANGE);
-  const lengthMm = ADAPTER_LENGTH_MM, flangeMm = ADAPTER_FLANGE_MM;
   const side = Number(orient.side) < 0 ? -1 : 1;
   const offsetMm = Number.isFinite(Number(orient.offsetMm)) ? Number(orient.offsetMm) : 0;   // 沿桿滑動（從桿中點起算）
-  // 列印版：翼孔距接合角＝壁厚＋(翼高−壁厚)/2（翼的外露段正中央）＝9；角碼：長腳孔（預設 9.5，宿主）、短腳孔（預設 6，子模組）。
-  const flangeHole = bracket ? K.hostHoleMm : wallMm + (flangeMm - wallMm) / 2;
-  const childHole = bracket ? K.childHoleMm : flangeHole;
+  // 列印版 R4／R6：孔在翼長 2m 正中央
+  const P = LEGO_FRAME_STEP, mh = P - hostPlateThickness(list, edge, stockMm) / 2, mc = childMargin(list, moduleId, stockMm);
+  const row = hostRowInset(list, edge, stockMm);
+  const childHole = bracket ? K.childHoleMm : mh;
   const barWidth = bar ? memberStock(bar).widthMm : 0;
-  const ss = Array.from({ length: n }, (_, k) => lengthMm * (k + 0.5) / n);
+  const ss = Array.from({ length: n }, (_, k) => bracket ? ADAPTER_LENGTH_MM * (k + 0.5) / n : mh + k * P);
 
   // D3：子模組立在宿主板面上（edge 'child'）：宿主孔在板面上、離邊 板厚＋flangeHole；壓在邊上則離邊 flangeHole（在板面的邊上）。
   const standing = orient.edge === 'child';
-  const T = standing ? hostPlateThickness(list, edge, stockMm) : 0;
-  const inset = standing ? T + flangeHole : flangeHole;
+  const inset = row;
+  const lengthMm = bracket ? ADAPTER_LENGTH_MM : (n - 1) * P + 2 * mh;
+  const flangeMm = bracket ? ADAPTER_FLANGE_MM : 2 * (standing ? mc : row), flangeBMm = bracket ? ADAPTER_FLANGE_MM : 2 * mh;
   let hostHoles;
   if(bracket)hostHoles=[];
   else if (edge.kind === 'bar') {
@@ -151,7 +161,7 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3, j
     hostModuleId: edge.frameModule || null,   // D2：宿主是已安裝模組的底板時為該模組 id，世界機架為 null
     childPart: `${moduleId}-frame`,
     kind,
-    lengthMm, wallMm, flangeMm,
+    lengthMm, wallMm, flangeMm, flangeBMm,
     holeDiameterMm: ADAPTER_HOLE_MM,
     holesPerFlange: n,
     tiltDeg: Number(orient.tiltDeg) || 0,   // D4：兩翼夾角＝90°＋tiltDeg

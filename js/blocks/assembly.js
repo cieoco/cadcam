@@ -12,8 +12,8 @@ import { solveTopology, sweepTopology, validateSweepRange } from '../multilink/s
 import { pointKeysFor } from './part-types.js';
 import { memberStock } from './member-stock.js';
 import { frameOutlineEdges, safeName } from './exporters.js?v=20261007_7';   // C1：機架外框直邊、零件檔名
-import { frameConnectorNodes, pointCoords } from './model.js';
-import { adapterChildHoles } from './orthogonal-joint.js';   // D2：子模組底板上的轉接座孔（只在呼叫時用，與本檔互相引用無妨）
+import { frameConnectorNodes, pointCoords, LEGO_FRAME_STEP } from './model.js';
+import { adapterChildHoles, jointKindOf } from './orthogonal-joint.js';   // D2：子模組底板上的轉接座孔（只在呼叫時用，與本檔互相引用無妨）
 import { assemblyRoles, machineComps } from './assembly-roles.js';   // M5a：底座／機器／未安裝（純函式，不回頭引用本檔）
 import {readConnectionHost} from './connection-descriptor.js';
 import {frameStockOf} from './frame-stock.js';
@@ -490,8 +490,10 @@ export function orthogonalFrame(comps, modules, moduleId, points, params, opts =
     if (!se) return null;
     const T = hostPlateThickness(list, edge, opts.stockMm);
     const face = orient.face === -1 ? -1 : 1;
+    // R4：立板面離孔列 m_c；角碼內縮板厚
+    const inset = jointKindOf(orient.joint) === 'printed' ? hostRowInset(list, edge, opts.stockMm) - childMargin(list, moduleId, opts.stockMm) : T;
     return tiltFrame({
-      origin: { x: mid.x + off * d.x - T * m.x, y: mid.y + off * d.y - T * m.y, z: face === 1 ? T : 0 },
+      origin: { x: mid.x + off * d.x - inset * m.x, y: mid.y + off * d.y - inset * m.y, z: face === 1 ? T : 0 },
       d: { x: -face * m.y, y: face * m.x, z: 0 },
       m: { x: m.x, y: m.y, z: 0 },
       n: { x: 0, y: 0, z: face },
@@ -532,6 +534,13 @@ export function hostPlateThickness(comps, edge, stockMm = 3) {
   const comp = edge && edge.compId ? (Array.isArray(comps) ? comps : []).find(c => c && c.id === edge.compId) : null;
   const t = edge?.kind==='frame'?Number(edge.stockThicknessMm):comp && comp.stock ? Number(comp.stock.thicknessMm) : NaN;
   return Number.isFinite(t) && t > 0 ? t : (Number.isFinite(Number(stockMm)) && Number(stockMm) > 0 ? Number(stockMm) : 3);
+}
+
+// R4：m＝P−板厚/2；孔列離邊
+export const childMargin = (comps, id, stockMm = 3) => LEGO_FRAME_STEP - (frameStockOf(frameConnectorNodes(comps.filter(c => c.moduleId === id))).thicknessMm || stockMm) / 2;
+export function hostRowInset(comps, edge, stockMm = 3) {
+  const c = edge.compId && comps.find(x => x && x.id === edge.compId);
+  return c && (edge.kind === 'bar' || edge.kind === 'triangle') ? memberStock(c).widthMm / 2 : LEGO_FRAME_STEP - hostPlateThickness(comps, edge, stockMm) / 2;
 }
 
 // D3：子模組自己底板外框第 k 條邊（orient.childEdge）當作站立邊：base＝邊中點、e＝沿邊單位向量，

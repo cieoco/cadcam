@@ -73,7 +73,7 @@ export function buildPackSection(list, comps, modules) {
 }
 // 插入製作包 HTML（CNC 注意事項之前）；沒有例外時原樣回傳。
 export function addGridToBuildPack(html, S) {
-  const sec = buildPackSection(gridIssues(S.comps, S.topo?.params || {}), S.comps, S.modules);
+  const sec = buildPackSection(gridIssues(S.comps, S.topo?.params || {}, { modules: S.modules }), S.comps, S.modules);
   if (!sec) return html;
   const at = html.indexOf('<h2>CNC 注意事項</h2>');
   return at < 0 ? html.replace('</body>', `${sec}</body>`) : html.slice(0, at) + sec + html.slice(at);
@@ -84,7 +84,7 @@ export function addGridToBuildPack(html, S) {
  * 離格集合有變時呼叫 redraw（app 的 draw）重畫標記；回傳是否有變。
  */
 export function sync(S, quiet, notify, redraw) {
-  const next = gridIssues(S.comps, S.topo?.params || {});
+  const next = gridIssues(S.comps, S.topo?.params || {}, { modules: S.modules });
   const nextKeys = new Set(next.map(issueKey));
   const added = quiet || !prevKeys ? [] : next.filter(i => !prevKeys.has(issueKey(i)));
   const changed = nextKeys.size !== (prevKeys?.size ?? 0) || [...nextKeys].some(k => !prevKeys?.has(k)) || next.length !== issues.length;

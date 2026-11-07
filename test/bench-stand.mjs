@@ -26,7 +26,7 @@ check('n＝宿主板面法向（face 1 → +z）、m 仍是邊的外法線（朝
 const w = memberStock(brace).widthMm;
 const pts0 = solveAt(st.comps, st.modules, P).points;
 const edgeY = (pts0[brace.p1.id].y + pts0[brace.p2.id].y) / 2 - w / 2;
-check('origin：邊往內一個板厚、z＝宿主板厚（上表面）', near(f.origin.y, edgeY + T) && near(f.origin.z, T) && near(f.origin.x, f0.origin.x));
+check('origin：邊往內 孔列離邊 w/2 − m_c（m_c＝8−板厚/2）、z＝宿主板厚（上表面）', near(f.origin.y, edgeY + (w / 2 - (8 - T / 2))) && near(f.origin.z, T) && near(f.origin.x, f0.origin.x));
 check('子模組的站立邊中點落在 origin', (() => { const p = Asm.toWorld3D(f, f.base, 0); return near(p.x, f.origin.x) && near(p.y, f.origin.y) && near(p.z, f.origin.z); })());
 check('往子模組內側 10 mm → 離開板面往上 10 mm', (() => { const p = Asm.toWorld3D(f, { x: f.base.x + 10 * f.f.x, y: f.base.y + 10 * f.f.y }, 0); return near(p.z, T + 10) && near(p.x, f.origin.x) && near(p.y, f.origin.y); })());
 check('e、f 是右手系（f＝e 的左法線），不會把子模組鏡射', near(f.f.x, -f.e.y) && near(f.f.y, f.e.x));
@@ -40,17 +40,17 @@ check("'face'：換到宿主另一面（face -1）→ n 朝 -z、origin.z＝0、
 const rt = B.benchAdjust(st.comps, st.modules, G.id, 'rotate', P);
 check("站立時 'rotate'＝換子模組的下一條底板邊", rt.ok && orient(rt).childEdge !== orient(st).childEdge && orient(rt).edge === 'child');
 const sl = B.benchAdjust(st.comps, st.modules, G.id, 'slide+', P);
-check('站立時也能沿邊滑 5 mm', sl.ok && orient(sl).offsetMm === 5 && near(frameOf(sl).origin.x - f.origin.x, 5));
+check('站立時也能沿邊滑一格（8 mm，吸附孔格：1.5→9.5）', sl.ok && orient(sl).offsetMm === 9.5 && near(frameOf(sl).origin.x - f.origin.x, 8));
 check("壓在邊上（edge 'host'）時 'face' 不適用：白話原因", B.benchAdjust(hang.comps, hang.modules, G.id, 'face', P).ok === false);
 const back = B.benchAdjust(st.comps, st.modules, G.id, 'stand', P);
 check("再按一次 'stand' 回到壓在邊上，位姿與原本相同", back.ok && orient(back).edge === 'host' && near(frameOf(back).origin.y, f0.origin.y) && near(frameOf(back).n.z, f0.n.z));
 check('升降 40°：站立的子模組跟著工具架走', (() => { const a = frameOf(st, { '1': 40 }), b = frameOf(hang, { '1': 40 }); return near(a.origin.x - f.origin.x, b.origin.x - f0.origin.x, 1e-4) && near(a.origin.y - f.origin.y, b.origin.y - f0.origin.y, 1e-4); })());
 
-// 製作：宿主孔在板面內側（離邊 板厚＋9），子模組孔離站立邊 9
+// 製作：宿主孔在桿中線（R4），子模組孔離站立邊 m_h＝6.5、孔距 8
 const a = OJ.adapterLayout(st.comps, st.modules, G.id, P, { stockMm: T });
 console.log('stand layout:', JSON.stringify({ host: a.hostHoles, child: a.childHoles }));
-check('宿主桿上的孔：v＝side·(寬/2 − 板厚 − 9)＝3（在桿面內）', a.hostHoles.length === 2 && a.hostHoles.every(h => near(h.v, -1 * (w / 2 - T - 9))) && near(a.hostHoles[1].u - a.hostHoles[0].u, 10));
-check('子模組底板上的孔：離站立邊 9 mm、沿邊相距 10 mm', a.childHoles.length === 2 && a.childHoles.every(h => near((h.x - f.base.x) * f.f.x + (h.y - f.base.y) * f.f.y, 9, 1e-3)) && near(Math.abs((a.childHoles[1].x - a.childHoles[0].x) * f.e.x + (a.childHoles[1].y - a.childHoles[0].y) * f.e.y), 10, 1e-3));
+check('宿主桿上的孔：v＝0（桿中線）、孔距 8', a.hostHoles.length === 2 && a.hostHoles.every(h => near(h.v, 0)) && near(a.hostHoles[1].u - a.hostHoles[0].u, 8));
+check('子模組底板上的孔：離站立邊 6.5 mm、沿邊相距 8 mm', a.childHoles.length === 2 && a.childHoles.every(h => near((h.x - f.base.x) * f.f.x + (h.y - f.base.y) * f.f.y, 6.5, 1e-3)) && near(Math.abs((a.childHoles[1].x - a.childHoles[0].x) * f.e.x + (a.childHoles[1].y - a.childHoles[0].y) * f.e.y), 8, 1e-3));
 const plan = BP.buildPlan({ comps: st.comps, modules: st.modules, params: P, exportSettings: ex, cnc });
 check('製作計畫有轉接座關節、兩邊各 2 孔', plan.joints.some(j => j.kind === 'adapter') && plan.parts.find(p => p.compId === brace.id).holeLayers.ADAPTER_HOLE === 2 && plan.parts.find(p => p.name === `${G.id}-frame`).holeLayers.ADAPTER_HOLE === 2);
 check('組裝說明寫「立在…板面上」', /立在/.test(BP.buildPackHtml(plan, { title: 'T', cnc, modules: st.modules })));

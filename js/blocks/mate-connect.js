@@ -10,7 +10,7 @@ import { canConnect, connect, benchAdjust, mountPortId, isDescendant, withOrient
 import { moduleFrameEdges, orthogonalHostEdge, orthogonalHostBody } from './assembly.js';
 import { assemblyRoles, setAssemblyRoot } from './assembly-roles.js';
 import { unmountModule } from './module-ops.js';
-import { ADAPTER_LENGTH_MM } from './orthogonal-joint.js';
+import { ADAPTER_LENGTH_MM, adapterSpanMm } from './orthogonal-joint.js';
 import { pointCoords } from './model.js';
 
 const asList = v => Array.isArray(v) ? v : [];
@@ -122,7 +122,7 @@ export function mateOccupancy(comps, modules, hostId, portId, params, opts = {})
   const key = bodyKey(portId), list = asList(comps), mods = asList(modules);
   if (!key) return [];
   return mods.filter(m => m && m.id !== (opts && opts.except) && m.mount && m.mount.orient && m.mount.orient.type === 'orthogonal' && m.mount.to && m.mount.to.module === hostId && bodyKey(portOfMount(list, mods, m.mount)) === key)
-    .map(m => ({ child: m.id, from: offsetOfMod(m), to: offsetOfMod(m) + ADAPTER_LENGTH_MM }))
+    .map(m => ({ child: m.id, from: offsetOfMod(m), to: offsetOfMod(m) + adapterSpanMm(m.mount.orient.joint) }))
     .sort((a, b) => a.from - b.from);
 }
 
@@ -137,9 +137,9 @@ function freeSlot(comps, modules, childId, params) {
   if (!occ.length || free(cur)) return { ok: true };
   const edge = orthogonalHostEdge(comps, modules, mount, pointCoords(comps), params, { home: true });
   if (!edge) return { ok: true };
-  const half = edge.lengthMm / 2, lo = -half, hi = half - ADAPTER_LENGTH_MM;
+  const half = edge.lengthMm / 2, lo = -half, hi = half - adapterSpanMm(mount.orient.joint);
   let pick = null;
-  [5, 1].some(step => {
+  [8, 1].some(step => {
     for (let k = 1; k * step <= edge.lengthMm && pick === null; k++) {
       pick = [cur + k * step, cur - k * step].map(v => Math.round(v * 10) / 10).find(v => v >= lo - 1e-9 && v <= hi + 1e-9 && free(v)) ?? null;
     }

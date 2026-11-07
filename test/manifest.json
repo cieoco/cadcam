@@ -18,6 +18,7 @@
     "test/frame-ground.mjs",
     "test/frame-holes.mjs",
     "test/grid-rule.mjs",
+    "test/grid-corner.mjs",
     "test/grid-drag.mjs",
     "test/grid-plate.mjs",
     "test/grid-frame.mjs",

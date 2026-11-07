@@ -5,7 +5,7 @@ try { A = await import('../js/blocks/adapter-stl.js'); } catch (e) { console.log
 check('adapter-stl.js 匯出 adapterMesh／meshToStl', typeof A?.adapterMesh === 'function' && typeof A?.meshToStl === 'function');
 if (typeof A?.adapterMesh !== 'function') { report('adapter-stl'); process.exit(1); }
 
-const spec = { lengthMm: 20, wallMm: 4, flangeMm: 14, holeDiameterMm: 3.2, holesPerFlange: 2, segments: 16 };
+const spec = { lengthMm: 21, wallMm: 3, flangeMm: 13, holeDiameterMm: 3.2, holesPerFlange: 2, segments: 16 };
 const mesh = A.adapterMesh(spec);
 check('回傳 { vertices: [[x,y,z]], triangles: [[i,j,k]] }', Array.isArray(mesh?.vertices) && Array.isArray(mesh?.triangles) && mesh.triangles.length > 0 &&
   mesh.vertices.every(v => v.length === 3 && v.every(Number.isFinite)) && mesh.triangles.every(t => t.length === 3 && t.every(i => Number.isInteger(i) && i >= 0 && i < mesh.vertices.length)));
@@ -41,15 +41,15 @@ check('體積為正（法向朝外）且與 L 形扣孔一致（±0.5%）', vol 
 
 const xs = V.map(v => v[0]), ys = V.map(v => v[1]), zs = V.map(v => v[2]);
 check('外框：x 0～L、y 0～F、z 0～F', Math.min(...xs) === 0 && Math.max(...xs) === L && Math.min(...ys) === 0 && Math.max(...ys) === F && Math.min(...zs) === 0 && Math.max(...zs) === F);
-// 孔位：翼 A（z 0～W 的水平板）孔軸沿 z，中心 (x_k, W+(F−W)/2)；翼 B（y 0～W 的垂直板）孔軸沿 y，中心 (x_k, z=W+(F−W)/2)
-const c = W + (F - W) / 2, r = D / 2;
+// 孔位（R4／R6）：翼 A（z 0～W 的水平板）孔軸沿 z，中心 (x_k, F/2)；翼 B（y 0～W 的垂直板）孔軸沿 y，中心 (x_k, z=F/2)；孔距 8
+const c = F / 2, r = D / 2;
 const holeVerts = (axis) => V.filter(v => {
   const [x, y, z] = v;
-  const inPlane = axis === 'z' ? Math.hypot(x - L / 4, y - c) : Math.hypot(x - L / 4, z - c);
+  const inPlane = axis === 'z' ? Math.hypot(x - (L / 2 - 4), y - c) : Math.hypot(x - (L / 2 - 4), z - c);
   return Math.abs(inPlane - r) < 1e-6;
 });
-check('翼 A 第一孔（x＝L/4）在孔半徑上有頂點', holeVerts('z').length >= N);
-check('翼 B 第一孔（x＝L/4）在孔半徑上有頂點', holeVerts('y').length >= N);
+check('翼 A 第一孔（x＝L/2−4）在孔半徑上有頂點', holeVerts('z').length >= N);
+check('翼 B 第一孔（x＝L/2−4）在孔半徑上有頂點', holeVerts('y').length >= N);
 
 const stl = A.meshToStl(mesh, 'adapter');
 check('ASCII STL：solid／endsolid、facet 數＝三角形數', typeof stl === 'string' && stl.startsWith('solid adapter') && stl.trim().endsWith('endsolid adapter') &&

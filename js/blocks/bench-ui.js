@@ -1035,7 +1035,7 @@ export function createBench(deps) {
       sec.appendChild(el('div', 'bench-label', '② 對齊與微調位置'));
       if (mod.mount.orient) {
         sec.appendChild(el('div', 'bench-note', '沿接合邊移動；對齊的是接合座範圍，不是整個模組外形。'));
-        addActions(sec, [['align-start', '靠起點'], ['align-center', '置中'], ['align-end', '靠終點'], ['slide-', '往起點 5 mm'], ['slide+', '往終點 5 mm']]);
+        addActions(sec, [['align-start', '靠起點'], ['align-center', '置中'], ['align-end', '靠終點'], ['slide-', '往起點一格（8 mm）'], ['slide+', '往終點一格（8 mm）']]);
       } else sec.appendChild(el('div', 'bench-note', '同平面對鎖以接點定位，不能沿邊滑動。'));
       sec.appendChild(el('div', 'bench-label', '③ 選固定件並接上'));
       // E1：直角安裝的接合件（金屬角碼｜3D 列印），放在定位之後選擇。

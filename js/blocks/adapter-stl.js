@@ -8,7 +8,7 @@
  * 網格自然封閉。孔的那一面輸出成「方形扣圓孔」的環（方形只用 4 個角，跟鄰格的邊對得上）。
  *
  * 座標：x ∈ [0,L] 長度方向；翼 A＝水平板 y∈[0,F]、z∈[0,W]，孔軸沿 z；
- *       翼 B＝垂直板 y∈[0,W]、z∈[0,F]，孔軸沿 y；孔心 x_k＝L·(k+0.5)/n，離轉角 c＝W+(F−W)/2。
+ *       翼 B＝垂直板 y∈[0,W]、z∈[0,FB]，孔軸沿 y；孔心 x_k＝L/2+(k−(n−1)/2)·Pm（孔距 Pm＝8，R6），離轉角在各翼正中央（F/2、FB/2，R4）。
  *
  * D4 傾斜（tiltDeg，15° 一格、±60°；0＝原本的直角 L，輸出與舊版逐位元相同）：
  *   兩翼夾角＝90°＋tiltDeg——正值把支架「打開」（夾角大於 90°，子模組往遠離宿主板的方向傾倒）、
@@ -26,12 +26,12 @@ function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
 function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
 function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
 
-export function adapterMesh({ lengthMm: L = 20, wallMm: W = 4, flangeMm: F = 14, holeDiameterMm: D = 3.2, holesPerFlange: n = 2, segments: N = 16, tiltDeg = 0 } = {}) {
+export function adapterMesh({ lengthMm: L = 21, wallMm: W = 3, flangeMm: F = 13, flangeBMm: FB = F, pitchMm: Pm = 8, holeDiameterMm: D = 3.2, holesPerFlange: n = 2, segments: N = 16, tiltDeg = 0 } = {}) {
   const tilt = Number(tiltDeg);
-  if (!Number.isFinite(tilt) || tilt === 0) return buildShell({ L, W, F, D, n, N, only: 'both' });
+  if (!Number.isFinite(tilt) || tilt === 0) return buildShell({ L, W, F, FB, Pm, D, n, N, only: 'both' });
   // D4：兩個各自封閉的殼，不共用頂點索引（各殼自己去重）。
-  const A = buildShell({ L, W, F, D, n, N, only: 'A' });
-  const B = buildShell({ L, W, F, D, n, N, only: 'B', fromZ: tilt > 0 ? W : -Infinity });
+  const A = buildShell({ L, W, F, FB, Pm, D, n, N, only: 'A' });
+  const B = buildShell({ L, W, F, FB, Pm, D, n, N, only: 'B', fromZ: tilt > 0 ? W : -Infinity });
   const a = tilt * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
   const round = v => Math.abs(v) < 1e-12 ? 0 : Math.round(v * 1e9) / 1e9;
   const rot = ([x, y, z]) => [x, round(W + (y - W) * ca - (z - W) * sa), round(W + (y - W) * sa + (z - W) * ca)];
@@ -43,16 +43,16 @@ export function adapterMesh({ lengthMm: L = 20, wallMm: W = 4, flangeMm: F = 14,
 }
 
 // only：'both'＝直角 L（翼 A∪翼 B）、'A'＝只有水平翼、'B'＝只有垂直翼（fromZ：只取 z≥fromZ 的格子）。
-function buildShell({ L, W, F, D, n, N, only, fromZ = -Infinity }) {
+function buildShell({ L, W, F, FB, Pm, D, n, N, only, fromZ = -Infinity }) {
   const r = D / 2;
-  const c = W + (F - W) / 2;
-  const h = Math.min(r + 1.5, (F - W) / 2 - EPS, L / (2 * n) - EPS);   // 孔格半寬：留肉但不超出翼板與相鄰孔
-  const holeX = Array.from({ length: n }, (_, k) => L * (k + 0.5) / n);
+  const cA = F / 2, cB = FB / 2;
+  const h = Math.min(r + 1.5, Math.min(cA, cB) - W - EPS, Pm / 2 - EPS);   // 孔格半寬：留肉但不超出翼板與相鄰孔
+  const holeX = Array.from({ length: n }, (_, k) => L / 2 + (k - (n - 1) / 2) * Pm);
 
   const uniq = list => [...new Set(list.map(v => Math.round(v * 1e9) / 1e9))].sort((a, b) => a - b);
   const X = uniq([0, L, ...holeX.flatMap(x => [x - h, x + h])]);
-  const Y = uniq([0, W, c - h, c + h, F]);
-  const Z = uniq([0, W, c - h, c + h, F]);
+  const Y = uniq([0, W, cA - h, cA + h, F]);
+  const Z = uniq([0, W, cB - h, cB + h, FB]);
 
   // 格子狀態：0 空、1 實心、'z'／'y' 有孔（孔軸方向）
   const inHoleX = (x0, x1) => holeX.find(x => Math.abs(x0 - (x - h)) < EPS && Math.abs(x1 - (x + h)) < EPS);
@@ -60,12 +60,12 @@ function buildShell({ L, W, F, D, n, N, only, fromZ = -Infinity }) {
     if (i < 0 || j < 0 || k < 0 || i >= X.length - 1 || j >= Y.length - 1 || k >= Z.length - 1) return 0;
     const y0 = Y[j], y1 = Y[j + 1], z0 = Z[k], z1 = Z[k + 1];
     const inA = only !== 'B' && y1 <= F + EPS && z1 <= W + EPS;          // 水平板
-    const inB = only !== 'A' && y1 <= W + EPS && z1 <= F + EPS && z0 >= fromZ - EPS;   // 垂直板
+    const inB = only !== 'A' && y1 <= W + EPS && z1 <= FB + EPS && z0 >= fromZ - EPS;   // 垂直板
     if (!inA && !inB) return 0;
     const hx = inHoleX(X[i], X[i + 1]);
     if (hx !== undefined) {
-      if (inA && Math.abs(y0 - (c - h)) < EPS && Math.abs(y1 - (c + h)) < EPS) return 'z';
-      if (inB && Math.abs(z0 - (c - h)) < EPS && Math.abs(z1 - (c + h)) < EPS) return 'y';
+      if (inA && Math.abs(y0 - (cA - h)) < EPS && Math.abs(y1 - (cA + h)) < EPS) return 'z';
+      if (inB && Math.abs(z0 - (cB - h)) < EPS && Math.abs(z1 - (cB + h)) < EPS) return 'y';
     }
     return 1;
   };

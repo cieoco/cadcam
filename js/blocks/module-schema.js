@@ -134,7 +134,7 @@ function validateOrient(raw) {
     if (tilt !== 0) out.tiltDeg = tilt;
   }
   // 角碼是現成零件，沒有壁厚／每翼孔數這些欄位，只留 kind。
-  out.joint = joint.kind === 'bracket-m3' ? { kind: 'bracket-m3' } : { kind: 'printed', wallMm: clampNum(joint.wallMm, 1, 20, 4), holesPerFlange: holes };
+  out.joint = joint.kind === 'bracket-m3' ? { kind: 'bracket-m3' } : { kind: 'printed', wallMm: clampNum(joint.wallMm, 1, 20, 3), holesPerFlange: holes };
   return out;
 }
 

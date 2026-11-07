@@ -8,14 +8,14 @@
  */
 import { mountModule, mountOrthogonal, unmountModule } from './module-ops.js';
 import { orthogonalHostBody, orthogonalHostEdge, worldFrameEdges, moduleFrameEdges, planeOf, defaultStandEdge, hostPlateThickness } from './assembly.js';
-import { ADAPTER_LENGTH_MM, JOINT_KINDS, jointKindOf, jointSpec } from './orthogonal-joint.js';
+import { JOINT_KINDS, jointKindOf, jointSpec, adapterSpanMm, gridOffsetMm } from './orthogonal-joint.js';
 import { pointCoords, frameConnectorNodes } from './model.js';
 import { memberStock } from './member-stock.js';
 
 const SLIDE_STEP_MM = 5;   // 沿邊滑動一格（SDD-BENCH Q3）
 const TILT_STEP_DEG = 15;   // D4：傾斜一格
 const TILT_MAX_DEG = 60;    // D4：傾斜上限（±）
-const ADAPTER_STAND_MARGIN_MM = 14;   // D3：站立時宿主桿的板寬要大於「板厚＋14」（列印轉接座；角碼用長腳 13）
+// D3／R6：站立寬 ≥ 2m_h（角碼例外）
 
 const asList = v => Array.isArray(v) ? v : [];
 const finiteNum = v => typeof v === 'number' && Number.isFinite(v);
@@ -206,8 +206,8 @@ export function canConnect(comps, modules, childId, target, params) {
   const host = modList.find(m => m && m.id === target.module);
   const port = host ? autoPorts(comps, modList, host.id, params, { childId }).find(p => p.id === target.port) : null;
   if (!port) return { ok: false, reason: '找不到這個接口' };
-  if (port.kind === 'edge' && port.lengthMm < ADAPTER_LENGTH_MM) {
-    return { ok: false, reason: `這條邊只有 ${Math.round(port.lengthMm)} mm，轉接座需要至少 ${ADAPTER_LENGTH_MM} mm` };
+  if (port.kind === 'edge' && port.lengthMm < adapterSpanMm()) {
+    return { ok: false, reason: `這條邊只有 ${Math.round(port.lengthMm)} mm，轉接座需要至少 ${adapterSpanMm()} mm` };
   }
   return { ok: true, port };
 }
@@ -302,8 +302,8 @@ export function benchAdjust(comps, modules, moduleId, action, params, opts = {})
         const bar = list.find(c => c && c.id === edge0.compId);
         const w = bar ? memberStock(bar).widthMm : 0;
         // E1：角碼長腳（預設 13 mm）要貼在板面上，板寬要 ≥ 板厚＋13；列印轉接座維持 ＋14。
-        const need = T + (jointKindOf(orient.joint) === 'printed' ? ADAPTER_STAND_MARGIN_MM : jointSpec('bracket-m3', opts && opts.joint).longLegMm);
-        if (w < need) return fail(`宿主這根桿的板寬只有 ${w} mm，太窄，站不住（至少要 ${need} mm 寬）`);
+        const need = jointKindOf(orient.joint) === 'printed' ? 16 - T : T + jointSpec('bracket-m3', opts && opts.joint).longLegMm;
+        if (w < need - 0.01) return fail(`宿主這根桿的板寬只有 ${w} mm，太窄，站不住（至少要 ${need} mm 寬）`);
       }
       const k = defaultStandEdge(list, modList, moduleId, params, {});
       if (k === null) return fail('算不出這個模組的底板邊，不能立在板面上');
@@ -337,20 +337,20 @@ export function benchAdjust(comps, modules, moduleId, action, params, opts = {})
     const edge = orthogonalHostEdge(list, modList, mod.mount, pointCoords(list), params, { home: true });   // D2：只要邊長，底板邊用 home 座標
     if (!edge) return fail('找不到宿主的邊');
     const half = edge.lengthMm / 2;
-    const lo = -half, hi = half - ADAPTER_LENGTH_MM;   // 轉接座占 [offset, offset+20]，不能超出邊的兩端
+    const T = hostPlateThickness(list, edge, 3), lo = -half, hi = half - adapterSpanMm(orient.joint, T);   // 轉接座占 [offset, offset+長度]
     if (hi < lo) return fail('這條邊太短，不能沿邊滑動');
     const cur = finiteNum(orient.offsetMm) ? orient.offsetMm : 0;
     const target = action === 'align-start' ? lo : action === 'align-end' ? hi
       : action === 'align-center' ? (lo + hi) / 2
       : cur + (action === 'slide+' ? SLIDE_STEP_MM : -SLIDE_STEP_MM);
-    const v = Math.min(hi, Math.max(lo, round1(target)));
+    const v = gridOffsetMm(edge, Math.min(hi, Math.max(lo, round1(target))), orient.joint, T);
     next = withOrient(orient, { offsetMm: v });
   } else if (action === 'joint:printed' || action === 'joint:bracket-m3') {
     // E1：換接合件。金屬角碼只有 90°，已傾斜的要先回到 0°。
     const kind = action.slice(6);
     if (jointKindOf(orient.joint) === kind) return { ok: true, comps: list, modules: modList };
     if (!JOINT_KINDS[kind].tiltable && finiteNum(orient.tiltDeg) && orient.tiltDeg !== 0) return fail('金屬角碼只有 90°，這個模組目前有傾斜；請先把傾斜調回 0°，或繼續用 3D 列印轉接座');
-    next = withOrient(orient, { joint: kind === 'bracket-m3' ? { kind } : { kind: 'printed', wallMm: 4, holesPerFlange: 2 } });
+    next = withOrient(orient, { joint: kind === 'bracket-m3' ? { kind } : { kind: 'printed', wallMm: 3, holesPerFlange: 2 } });
   } else if (action === 'tilt+' || action === 'tilt-') {
     if (!JOINT_KINDS[jointKindOf(orient.joint)].tiltable) return fail('金屬角碼只有 90°，要傾斜請改用 3D 列印轉接座');
     // D4：繞接合線傾斜，15° 一格，範圍 ±60°。

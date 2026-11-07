@@ -6,6 +6,15 @@
 
 ---
 
+## 2026-11-07 · 數位積木：直角組立對格與 3D 列印轉接座（G5-P2）
+
+- 依數位積木 SDD 的 R4／R6：列印轉接座＝兩支直角相接的棍，宿主翼長 2m_c、立翼高 2m_h（m＝8−板厚／2），孔在翼中央，沿接合線孔距 8 mm，翼厚預設 4→3 mm（W ≤ m−2.75 避免 M3 螺絲頭頂到另一翼）。立板改貼在宿主孔列旁的格面上（宿主為桿時立板面與桿邊對齊），孔高為宿主中面上方 8 的倍數；「壓在邊上」時宿主孔改在桿中線。STL 下載依同一 layout。
+- 轉接座在宿主上的孔對齊宿主孔格（桿自 p1 起 8 的倍數）：模組沿接合線的按鈕滑動、對齊與初裝偏移吸附到孔對格的位置；數字輸入可離格。站立門檻改為宿主寬 ≥ 一支標準棍（16−板厚）；外購 M3 金屬角碼維持原長腳規則。滑動範圍與佔位改用實際長度（3 mm 宿主時 21 mm）。
+- grid-rule 新增 R6 例外：外購金屬角碼、傾斜轉接座、轉接座宿主孔離格、子模組孔離格（子模組既有孔在格上時才比對）、翼厚過厚；由 G2 標記顯示，不自動改值。
+- 限制：子模組孔與宿主孔由同一個沿線偏移決定，兩邊方格相位不一致時只能標示；機架板與已安裝模組底板當宿主時不吸附，後者 R6 亦未檢查；內建夾爪底板本身離格，子模組孔檢查待 G7 範例上格後實測。
+- 既有測試依新幾何更新：adapter-stl、bench-bracket、bench-stand、bench-align、bench-composite、bench-ports、bench-ports2、bench-short-edge、bench-markers、orthogonal-mount、orthogonal-fab（舊翼長 14／20、孔距 10、孔偏 9、門檻 T+14、滑動 5 mm 等改為新公式值）。新增 test/grid-corner.mjs（20 項，13/3 與 18/4 兩種 stock）。首次 JS 2,006,933 bytes，startup-size 上限依「G5-P2 直角孔格對齊」放寬至 2.007 MB。
+- Node 全套 260/260（output/loop/g5p2b-node；bench-markers 更新後單跑通過）。瀏覽器 test/browser/grid-corner.cjs 通過（宿主孔 u＝48、56 在格上、無 R6、STL 460 三角形、無 pageerror），compact-3d、installation-rotation、grid-exceptions 重跑通過。證據 output/grid-blocks/g5（雲端 Chromium）。未做實物列印與鎖附驗證。
+
 ## 2026-11-07 · 數位積木：孔徑與棍寬預設解耦（G5-P1）
 
 - 未指定孔徑時的後備值原寫死 12.96 mm（由舊 18 mm 棍寬 ×0.72 推得），分散在 member-stock、member-dimensions、member-editor、disk-plate、exporters；改為單一來源 FABRICATION_DEFAULTS.export.holeDiameterMm（M3 3.2 mm）。預設棍寬改由 FABRICATION_DEFAULTS.export.barWidthMm 單一來源提供（本包仍為 18，G5-P3 改 13）。一般流程原本就明傳 3.2，只有不完整設定才會用到後備值。

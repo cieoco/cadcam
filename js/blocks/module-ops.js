@@ -4,13 +4,13 @@
  * 模組操作的純函式（SDD-ASSEMBLY-MODULES §4.3a、M1c 刀 1）：存成模組、宣告輸出端、
  * 安裝／拆下／解散、匯出模板、插入實例、模組庫序列化。不碰 DOM、不碰 localStorage。
  */
-import { compileAssembly, solveAssembly, outputPose, transformComp, planeOf, orthogonalHostEdge } from './assembly.js?v=20261007_m5a';
+import { compileAssembly, solveAssembly, outputPose, transformComp, planeOf, orthogonalHostEdge, hostPlateThickness } from './assembly.js?v=20261007_m5a';
 import { pointKeysFor } from './part-types.js';
 import {readStoredProject,storedProject} from './project-envelope.js';
 import { normalizeSnapshot } from './schema.js?v=20261007_singleface';
 import { normalizeModules, sanitizeName } from './module-schema.js?v=20261007_singleface';
 import { BLOCK_EXAMPLES } from './examples.js';
-import { ADAPTER_LENGTH_MM } from './orthogonal-joint.js';
+import { adapterSpanMm, gridOffsetMm } from './orthogonal-joint.js';
 
 const clone = v => JSON.parse(JSON.stringify(v));
 
@@ -358,8 +358,9 @@ export function mountOrthogonal(comps, modules, moduleId, target, params, motorS
   const mountTo = (byBody || byFrame) ? to : { module: target.module, output: target.output };
   const mounted = modList.map(m => m.id === moduleId ? { ...m, mount: { to: mountTo } } : m);
   const hostEdge = orthogonalHostEdge(list, mounted, { to: mountTo, orient: { side: sideOut } }, sol.points, params);
-  if (!hostEdge || hostEdge.lengthMm < ADAPTER_LENGTH_MM) return fail('short-edge');
-  const offsetMm = Math.min(0, Math.floor((hostEdge.lengthMm / 2 - ADAPTER_LENGTH_MM) * 10) / 10);
+  const joint = opts && opts.joint === 'bracket-m3' ? { kind: 'bracket-m3' } : { kind: 'printed', wallMm: 3, holesPerFlange: 2 }, T = hostEdge && hostPlateThickness(list, hostEdge, 3);
+  if (!hostEdge || hostEdge.lengthMm < adapterSpanMm(joint, T)) return fail('short-edge');
+  const offsetMm = gridOffsetMm(hostEdge, Math.min(0, Math.floor((hostEdge.lengthMm / 2 - adapterSpanMm(joint, T)) * 10) / 10), joint, T);
 
   const newModules = modList.map(m => m.id === moduleId
     ? {
@@ -372,7 +373,7 @@ export function mountOrthogonal(comps, modules, moduleId, target, params, motorS
           type: 'orthogonal', edge: 'host', side: sideOut, childAxisDeg,
           ...(offsetMm ? { offsetMm } : {}),
           // E1：接合件種類（opts.joint）；預設 3D 列印轉接座，角碼是現成零件不帶壁厚／孔數。
-          joint: opts && opts.joint === 'bracket-m3' ? { kind: 'bracket-m3' } : { kind: 'printed', wallMm: 4, holesPerFlange: 2 }
+          joint
         }
       }
     }

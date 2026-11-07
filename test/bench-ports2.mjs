@@ -44,7 +44,7 @@ const plate = S.comps.find(c => c.id === 'Plt');
   check('夾爪直角接到三角板下緣', r.ok && r.modules.find(m => m.id === G.id).mount.to.body === 'Plt' && r.modules.find(m => m.id === G.id).mount.to.edge === 0);
   const f = Asm.orthogonalFrame(r.comps, r.modules, G.id, solve(r.comps, r.modules, P).points);
   const w = memberStock(plate).widthMm;
-  check('位姿：d 沿底邊、m 朝下、origin 在底邊中點往外半個板寬', f && near(f.d.x, 1) && near(f.m.y, -1) && near(f.origin.x, -340) && near(f.origin.y, -w / 2));
+  check('位姿：d 沿底邊、m 朝下、origin 在底邊中點（吸附 −2.5）往外半個板寬', f && near(f.d.x, 1) && near(f.m.y, -1) && near(f.origin.x, -342.5) && near(f.origin.y, -w / 2));   // 初裝位置吸附到宿主孔格：偏移 −2.5
   const n = Sch.normalizeSnapshot(JSON.parse(JSON.stringify({ kind: 'blocks', v: 1, comps: r.comps, modules: r.modules, params: P })));
   check('存檔往返保留 to.edge', n.modules.find(m => m.id === G.id)?.mount?.to?.edge === 0);
   const plan = BP.buildPlan({ comps: r.comps, modules: r.modules, params: P, exportSettings: ex, cnc });

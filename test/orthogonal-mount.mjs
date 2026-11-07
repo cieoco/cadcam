@@ -77,7 +77,7 @@ const solveAt = (comps, modules, a1, a2 = 0) => {
   check('直角安裝不搬動子模組零件（座標存在自己的平面）', JSON.stringify(r.comps) === JSON.stringify(before));
   const m = r.modules.find(x => x.id === G.id).mount;
   check('mount.orient：type orthogonal、edge host、side -1', m && m.orient && m.orient.type === 'orthogonal' && m.orient.edge === 'host' && m.orient.side === -1);
-  check('mount.orient.joint 預設 3D 列印轉接座（wall 4、每翼 2 孔）', m.orient.joint && m.orient.joint.kind === 'printed' && m.orient.joint.wallMm === 4 && m.orient.joint.holesPerFlange === 2);
+  check('mount.orient.joint 預設 3D 列印轉接座（wall 3、每翼 2 孔）', m.orient.joint && m.orient.joint.kind === 'printed' && m.orient.joint.wallMm === 3 && m.orient.joint.holesPerFlange === 2);
   // 子模組接合軸：從 base 指向子模組所有點的重心（夾爪：base 在上方中央，爪在下方 → 朝下 ≈ -90°）
   check('childAxisDeg 預設由 base 指向子模組重心（夾爪 ≈ -90°）', Number.isFinite(m.orient.childAxisDeg) && Math.abs(m.orient.childAxisDeg - (-90)) < 1);
   check('mount.ref 為有效位姿（相容舊欄位）', m.ref && [m.ref.x, m.ref.y, m.ref.a].every(Number.isFinite));
@@ -123,7 +123,7 @@ const w = memberStock(brace).widthMm;
   const pA = s0.points[brace.p1.id], pD = s0.points[brace.p2.id];
   check('orthogonalFrame：d 沿 ToolBrace p1→p2（工具架水平 → (1,0,0)）', f0 && near(f0.d.x, 1) && near(f0.d.y, 0) && near(f0.d.z, 0));
   check('m＝下緣外法線（0,-1,0）、n＝(0,0,1)（d×n＝m）', near(f0.m.y, -1) && near(f0.m.x, 0) && near(f0.n.z, 1));
-  check('origin＝ToolBrace 下緣中點（中心線往下半個板寬）', near(f0.origin.x, (pA.x + pD.x) / 2) && near(f0.origin.y, (pA.y + pD.y) / 2 - w / 2) && near(f0.origin.z, 0));
+  check('origin＝ToolBrace 下緣中點（吸附宿主孔格 +1.5；中心線往下半個板寬）', near(f0.origin.x, (pA.x + pD.x) / 2 + 1.5) && near(f0.origin.y, (pA.y + pD.y) / 2 - w / 2) && near(f0.origin.z, 0));
   const base = s0.points[G.base];
   const o3 = Asm.toWorld3D(f0, base, 0);
   check('toWorld3D：夾爪 base 落在 origin', near(o3.x, f0.origin.x) && near(o3.y, f0.origin.y) && near(o3.z, 0));
