@@ -200,7 +200,9 @@ function bucketPlaybackIssue(){
   return bucketValidationResult.ok?null:bucketValidationResult.issues[0]?.message;
 }
 // 共用伺服顯示有號模型角；TT 持續旋轉仍顯示0–360讀值。
+const inputIsLinear = () => S.comps.some(c=>c.type==='slider'&&c.isInput&&String(c.physicalMotor||c.physical_motor||'1')===String(S.activeMotor||'1'));
 function angleLabel(theta){
+  if(inputIsLinear())return Number(theta.toFixed(1)); // 直線輸入是 mm，不取 360° 餘數。
   const servo=S.comps.some(c=>c.motorType==='mg995'&&String(c.physicalMotor||c.physical_motor||c.p1?.physicalMotor||c.p1?.physical_motor||'1')===String(S.activeMotor||'1'));
   return Math.round(servo?theta:norm360(theta));
 }
@@ -1798,6 +1800,9 @@ function draw() { if(renderMateCandidate())return;return drawNow(); }   // M4：
 const fusionEditor=createFusionEditor({settings:Settings.exportSettings,pause,pushUndo,rebuild,draw,save:scheduleAutosave,selectGear,selectTriangle,positions:displayCoords,notify:transient});
 function drawNow() {
   hydraulic?.sync(lastFullPts);
+  const unit=document.getElementById('thetaUnit');
+  if(unit){unit.textContent=hydraulic?.active()?'':inputIsLinear()?' mm':'°';unit.parentElement.title=hydraulic?.active()?'目前伸出量':inputIsLinear()?'距行程起點的位移（mm）':'目前角度';}
+  if(inputIsLinear())document.getElementById('thetaVal').textContent=angleLabel(S.theta);
   fusionEditor.sync();
   mateTool.sync();   // M2：換分頁／模式或開始畫圖時關掉接合面工具，並更新按鈕
   syncModulePlates();   // G1：作品內容變了才讓固定板 home 幾何作廢（θ 不算內容）
@@ -2534,7 +2539,7 @@ function play() {
     document.getElementById('thetaVal').textContent = angleLabel(S.theta);
     renderFrame();
     if (lastFrameIssue) {
-      const message = `${S.theta.toFixed(1)}°：${lastFrameIssue.message}`;
+      const message = `${S.theta.toFixed(1)}${inputIsLinear()?' mm':'°'}：${lastFrameIssue.message}`;
       S.theta = previousTheta; pause(); draw(); showMotionWarning(message); return;
     }
     const rendered=measuring?viewer3D.renderNow(ts):null;

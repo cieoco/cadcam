@@ -20,7 +20,8 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-07 G5-P3：合成聯集修正與預設 13 mm（外形聯集補切重合邊，修方環棍寬 13 時「未閉合」；搖臂孔依棍寬保留），啟動淨增約 1.5 KB，放寬到 2.009MB（主模型追認）。
 // 2026-11-07 G1–G7 審查修正：板厚與接合種類傳遞、偏移保存精度約增 1 KB；保留必要驗證，預算調為 2.010 MB。
 // 2026-11-07：六連桿範例與短教學約 3.5 KB，沿用既有操作／求解，無新增依賴。
-check('首次JS原始大小低於2.014MB',r.bytes<2014000);
+// 2026-11-07：三個 IQ 用途範例與短教學、直線輸入單位修正約 9 KB；沒有新求解器或依賴。
+check('首次JS原始大小低於2.023MB',r.bytes<2023000);
 check('機架編輯介面延後載入',!r.paths.includes('js/blocks/frame-hole-editor.js')&&!r.paths.includes('js/blocks/frame-panel.js'));
 check('合成尺寸候選計算延後載入',!r.paths.includes('js/blocks/bar-fusion-resize.js')&&r.lazyEntries.includes('js/blocks/bar-fusion-resize.js'));
 check('盒體生成介面（外掛）延後載入',!r.paths.includes('js/plugins/box-maker/box-generator.js')&&!r.paths.includes('js/plugins/box-maker/box-dialog.js')&&r.lazyEntries.includes('js/plugins/box-maker/index.js'));
