@@ -68,8 +68,8 @@ export const IQ_MECHANISM_EXAMPLES = [
    ...scissorArms,
    ...fuse([bar('ScissorPlatform',left[3],scissorRailEnd,'ScissorPlatformLength','#e67e22',{name:'平台滑槽段'}),bar('ScissorExtension',scissorRailEnd,scissorPlatformEnd,'ScissorExtensionLength','#e67e22',{name:'平台外伸段'})],
     [['ScissorL3',0,0],['ScissorRailEnd',128,0],['ScissorP',192,0]]),
-   {type:'slider',id:'ScissorBottom',name:'底座水平滑軌',p1:left[0],p2:p('ScissorBaseEnd',192,0,'fixed'),p3:right[0],lenParam:'ScissorBottomLength',carriageLen:16,carrierLen:192,travelStart:40,travelEnd:112,color:'#16a085'},
-   {type:'slider',id:'ScissorTop',name:'平台水平滑軌',movingRail:true,p1:left[3],p2:scissorRailEnd,p3:right[3],lenParam:'ScissorTopLength',carriageLen:16,carrierLen:128,travelStart:40,travelEnd:112,color:'#16a085'},
+   {type:'slider',id:'ScissorBottom',name:'底座水平滑軌',p1:left[0],p2:p('ScissorBaseEnd',192,0,'fixed'),p3:right[0],m1:p('S15m1',0,0,'fixed'),m2:p('S15m2',192,0,'fixed'),lenParam:'ScissorBottomLength',carriageLen:16,carrierLen:192,travelStart:40,travelEnd:112,color:'#16a085'},
+   {type:'slider',id:'ScissorTop',name:'平台水平滑軌',movingRail:true,p1:left[3],p2:scissorRailEnd,p3:right[3],m1:p('S16m1',0,scissorH*3),m2:p('S16m2',128,scissorH*3),lenParam:'ScissorTopLength',carriageLen:16,carrierLen:128,travelStart:40,travelEnd:112,color:'#16a085'},
    {type:'syringe',id:'ScissorSyringe',name:'跨層斜置針筒',a:{componentId:'ScissorUp0Tip',u:40,v:0},b:{componentId:'ScissorUp2',u:16,v:0},extension:0,branch:1,
     spec:{name:'10mL 教學示範（未校正）',capacityMl:10,outerDiameter:16,bodyLength:70,rodDiameter:6,lmin:95,stroke:40,calibrated:false}}
   ],params:{theta:0,ScissorPlatformLength:128,ScissorExtensionLength:64,ScissorBottomLength:192,ScissorTopLength:128,

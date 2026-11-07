@@ -24,6 +24,7 @@ export const CATALOG_FAMILIES = [
     variant('six-bar-lift', '六連桿保持方向升降', '可試動', 'IQ'), variant('lift-bucket', '平行升降托斗')]),
   family('rack', 'lift', '直線推送與升降 · 齒條', '比較水平推送與垂直滑台。', [
     variant('rack-pinion', '旋轉轉為直線推送'), variant('competition-rack-lift', '齒條升降滑台')]),
+  family('linq', 'lift', '齒輪四連桿升降 · Linq', '單側幾何試作；托架方向會變，尺寸與軸接頭待核對。', [variant('iq-linq-lift', '齒輪四連桿升降', '可試動', 'IQ')]),
   family('syringe-lift', 'lift', '推動單臂升降 · 針筒', '先看完成版，再親手安裝針筒。', [
     variant('hydraulic-h01', '固定針筒抬升單臂 · H01'), variant('hydraulic-h01-practice', '安裝單臂針筒 · H01', '待完成練習'),
     variant('hydraulic-h02', '管夾固定針筒抬臂 · H02'), variant('hydraulic-h02-practice', '安裝抬臂針筒 · H02', '待完成練習')]),

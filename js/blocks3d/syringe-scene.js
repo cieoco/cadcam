@@ -32,6 +32,12 @@ export function syringeClampInstallation(model,shape,z,matrix){
    frameBottomZ:farZ-sign*z,frameTopZ:nearZ-sign*z,seatZ:shape.clamp.baseZ,spacerHeight,
    diameter:3,headDiameter:5.5,headHeight:2,washerDiameter:6.5,washerThickness:.6,nutDiameter:6.4,nutHeight:2.4});
  }
+ // The requested 24 mm ear pitch leaves the existing ring and M3 hardware
+ // overlapping. Keep the requested holes and barrel bore; do not certify a
+ // fastening or silently cut away the reference ring to make it appear viable.
+ const ear=Math.min(...fasteners.map(f=>Math.abs(f.y))),outer=shape.clamp.outerRadius;
+ const clearance={holeMm:ear-shape.clamp.holeRadius-outer,washerMm:ear-fasteners[0].washerDiameter/2-outer,requiredSpacingMm:2*(outer+fasteners[0].washerDiameter/2)};
+ if(clearance.holeMm<-.001||clearance.washerMm<-.001)return {status:'unverified',reason:'clamp_fastener_clearance',clearance,candidateFasteners:fasteners,fasteners:[]};
  return {status:'reference',fasteners};
 }
 export function assemblySyringeShapes(model,comps,modules,params,points,{flatten=false}={}){

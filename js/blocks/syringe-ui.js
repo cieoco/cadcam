@@ -2,7 +2,7 @@ import {confirmMountingChange,mountingWork,mountingCandidate} from './mounting-r
 import {editableNumber,signedNumberInput,showNumber,readNumber,formatNumber} from './numeric-input.js';
 import {APP_VERSION} from '../version.js';
 import {syringeShape} from './syringe-shape.js';
-import {SYRINGE_DEMO,attachmentFrame,attachmentPoint,hasSyringeClamp} from '../core/syringe.js';
+import {SYRINGE_DEMO,SYRINGE_EAR_MM,attachmentFrame,attachmentPoint,hasSyringeClamp} from '../core/syringe.js';
 import {solveSyringe,planSyringeStroke,scanSyringe,syringeReading,syringeGain,advanceSyringe} from './syringe-operations.js';
 import {syringeSeatGeometry,syringeManufacturing,syringeFiles,syringeBuildPack} from './syringe-manufacturing.js';
 import {assemblySyringeControls,planAssemblySyringe} from './assembly-syringe.js';
@@ -251,9 +251,9 @@ export function createSyringeUI(h){
     h.pause();const c=clone(candidate||active());if(!c)return;const sourceRevision=JSON.stringify([S.comps,S.topo.params,S.fabrication]);
     const dialog=el('dialog');dialog.id='syringeDialog';dialog.className='syringe-dialog';const form=el('form',null,dialog);
     el('h3',candidate&&!h.comps().some(o=>o.id===candidate.id)?'新增 10cc 液壓針筒':'針筒與安裝設定',form);
-    el('p',c.mountMode==='fixed-axis'?'管夾固定筒身；A 為固定參考點，B 為片狀推桿孔。軸向固定，接孔保留轉動。':c.mountMode==='pivot'?'同一個雙耳固定環只鎖一顆耳螺絲：A 為這顆螺絲（轉軸），離筒身軸線 14 mm；B 為推桿孔，在筒身軸線上。':'mm；A 為筒身托架轉軸，B 為推桿轉接座。孔位沿所屬零件第 1 孔→第 2 孔量測。',form);
+    el('p',c.mountMode==='fixed-axis'?'管夾固定筒身；A 為固定參考點，B 為片狀推桿孔。軸向固定，接孔保留轉動。':c.mountMode==='pivot'?`同一個雙耳固定環只鎖一顆耳螺絲：A 為這顆螺絲（轉軸），離筒身軸線 ${SYRINGE_EAR_MM} mm；B 為推桿孔，在筒身軸線上。`:'mm；A 為筒身托架轉軸，B 為推桿轉接座。孔位沿所屬零件第 1 孔→第 2 孔量測。',form);
     if(c.mountMode==='fixed-axis')el('p',frameConnectorNodes(h.comps()).some(n=>n.id===`${c.id}_clamp_0`)
-      ?'雙耳水管固定夾：機架配對孔距 28 mm、孔徑 3.5 mm；M3 螺絲穿過夾腳、套筒及機架，以螺帽固定。套筒高度依 3D 層位推算；夾具、螺絲長度與止滑襯墊須依實物核對。'
+      ?`雙耳水管固定夾：機架配對孔距 ${2*SYRINGE_EAR_MM} mm、孔徑 3.5 mm；現有參考環壁與耳孔／M3 墊片干涉，固定架待改製核對。套筒高度依 3D 層位推算；夾具、螺絲長度與止滑襯墊須依實物核對。`
       :'此固定零件尚未產生水管夾配對孔，請人工設計安裝座；不會顯示已鎖上的螺絲。',form);
     let section=form;
     const fields={},input=(key,text,value,type='number')=>{const label=el('label',text,section),n=el('input',null,label);n.type=type;n.name=key;n.setAttribute('aria-label',text);if(type==='number'){n.step='any';n.dataset.numeric='true';if(/^[ab][UV]$|^axisDeg$|^tip\d+$/.test(key))signedNumberInput(n);showNumber(n,value);}else n.value=value;fields[key]=n;return n;};

@@ -4,7 +4,7 @@ import {getExample} from '../js/blocks/examples.js';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
 import {frameConnectorNodes} from '../js/blocks/model.js';
 import {syringeShape,syringeClampShape} from '../js/blocks/syringe-shape.js';
-import {attachmentPoint} from '../js/core/syringe.js';
+import {SYRINGE_EAR_MM,attachmentPoint} from '../js/core/syringe.js';
 import {inspectFrameExport,svgForFrameGeometry,dxfForFrameGeometry} from '../js/blocks/exporters.js';
 import {syringeClampInstallation} from '../js/blocks3d/syringe-scene.js';
 import {inside} from '../js/blocks/part-fusion.js';
@@ -20,10 +20,10 @@ for(const name of ['hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h0
    g={...local,outlines:local.outlines.map(r=>r.map(world)),holes:local.holes.map(world)};
   }
   const holes=g.holes.filter(h=>h.layer==='SYRINGE_CLAMP');assert.equal(holes.length,2,name);
-  near(Math.hypot(holes[0].x-holes[1].x,holes[0].y-holes[1].y),28);
+  near(Math.hypot(holes[0].x-holes[1].x,holes[0].y-holes[1].y),2*SYRINGE_EAR_MM);
   const a=attachmentPoint(s.a,own,n.params),angle=s.axisDeg*Math.PI/180;
   // Both holes sit on one constant-width, round-ended bar; no waist between pads.
-  for(const u of [-9,0,9])for(const v of [-14,-7,0,7,14]){
+  for(const u of [-9,0,9])for(const v of [-SYRINGE_EAR_MM,-6,0,6,SYRINGE_EAR_MM]){
    const q={x:a.x+Math.cos(angle)*u-Math.sin(angle)*v,y:a.y+Math.sin(angle)*u+Math.cos(angle)*v};
    assert.ok(g.outlines.some(r=>inside(q,r)),`${name}: continuous clamp support`);
   }
@@ -58,9 +58,14 @@ for(let deg=0;deg<360;deg+=30){
 const shape={id:'S',fixed:true,a:{x:0,y:0},angle:0,r:8.75,clamp:syringeClampShape()},I=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];
 assert.equal(syringeClampInstallation({},shape,10,I).reason,'missing_frame_holes');
 assert.equal(syringeClampInstallation({},{...shape,r:20},30,I).reason,'clamp_diameter');
-const fake={materialParts:[{partId:'frame',geometry:{thicknessMm:4,holes:[{id:'S_clamp_0',x:0,y:-14},{id:'S_clamp_1',x:0,y:14}]},pose:{matrix:I}}]};
+const fake={materialParts:[{partId:'frame',geometry:{thicknessMm:4,holes:[{id:'S_clamp_0',x:0,y:-SYRINGE_EAR_MM},{id:'S_clamp_1',x:0,y:SYRINGE_EAR_MM}]},pose:{matrix:I}}]};
 assert.equal(syringeClampInstallation(fake,shape,10,I).reason,'barrel_clearance');
-const mount=syringeClampInstallation(fake,shape,20,I);assert.equal(mount.status,'reference');assert.equal(mount.fasteners.length,2);
+const mount=syringeClampInstallation(fake,shape,20,I);assert.equal(mount.status,'unverified');assert.equal(mount.reason,'clamp_fastener_clearance');assert.equal(mount.fasteners.length,0);
+near(mount.clearance.holeMm,-.5);near(mount.clearance.washerMm,-2);near(mount.clearance.requiredSpacingMm,28);
+// This minimum is specific to the existing ring and 6.5 mm washer reference.
+const roomy=structuredClone(shape);roomy.clamp.feet.forEach(f=>f.hole.y=Math.sign(f.hole.y)*14);roomy.clamp.spacing=28;
+const wide=structuredClone(fake);wide.materialParts[0].geometry.holes.forEach(h=>h.y=Math.sign(h.y)*14);
+const reference=syringeClampInstallation(wide,roomy,20,I);assert.equal(reference.status,'reference');assert.equal(reference.fasteners.length,2);
 console.log('Pipe clamps: H01–H06 hole alignment, ear support, SVG/DXF, custom geometry and missing/low support checks passed');
 
 // A failed linkage pose must not rotate the fixed clamp away from its manufactured holes.

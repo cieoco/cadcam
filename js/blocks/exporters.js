@@ -6,7 +6,7 @@ import { DEFAULT_PLATE_RADIUS_WORLD, createPlateGeometry, localToWorld } from '.
 import { createGearPath, createRackPath } from '../utils/gear-geometry.js';
 import { rackPhaseShift } from './gear-editor.js';
 import { memberStock, memberStockLabel, DEFAULT_HOLE_MM } from './member-stock.js';
-import { sizeFrameOutline } from './frame-stock.js';
+import { sizeFrameOutline,frameStockOf } from './frame-stock.js';
 import { unionOutlines, area, inside, fusionCandidates } from './part-fusion.js';
 import { gearMeshPhaseDeg } from './transmission-geometry.js';
 import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
@@ -1088,7 +1088,6 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
 
   if (!outlines.length) return null;
   // 固定孔貼近槽緣一樣是薄肉，警告時把槽邊當外緣一起檢查。
-  const sized = sizeFrameOutline(outlines,nodes,allNodes.filter(p=>p.frameHole).map(p=>({...p,r:holeR+2})));
   // Add a round-ended bar under each pipe clamp, without widening the WHOLE frame
   // into neighbouring moving modules. Use the same outline for all consumers.
   const clampNodes=allNodes.filter(p=>p.holeLayer==='SYRINGE_CLAMP'&&p.mountRadiusMm>0);
@@ -1096,7 +1095,11 @@ function frameGeometry(frameNodes, settings = {}, motorMounts = []) {
     const b=clampNodes.find(p=>p.id===a.id.slice(0,-1)+'1');
     return b?[hull([...roundPadOutline(a,a.mountRadiusMm),...roundPadOutline(b,b.mountRadiusMm)])]:[];
   });
-  if(clampLands.length){
+  const grid=!!frameStockOf(nodes).grid;
+  // Hardware ears do not set the grid phase or axis. Their existing support
+  // lands are material requirements; standard stock encloses them in whole cells.
+  const sized = sizeFrameOutline(outlines,nodes,allNodes.filter(p=>p.frameHole).map(p=>({...p,r:holeR+2})),[...mountOutlines.flat(),...cutouts.flatMap(c=>c.points),...(grid?clampLands.flat():[])]);
+  if(clampLands.length&&!grid){
     // Preserve convex pieces for the coarse collision checker; taking a convex
     // hull of their union would fill the empty space beside the clamp lands.
     sized.collisionOutlines=[...sized.outlines,...clampLands];

@@ -13,13 +13,13 @@ for(const name of ['hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h0
  assert.ok(placement.ok,placement.message);assert.equal(placement.syringe.axisDeg,c.axisDeg);
  const front=planSyringeInstallation(source,request,points);assert.ok(front.ok,front.message);
  const preview=buildSyringeInstallPreview(front),f=preview.model.syringes[0];
- assert.equal(f.mount.status,'reference',name);assert.ok(Math.abs(f.alignmentMm)<.1,name);
+ assert.equal(f.mount.status,'unverified',name);assert.equal(f.mount.reason,'clamp_fastener_clearance');assert.ok(Math.abs(f.alignmentMm)<.1,name);
  assert.equal(preview.model.materialParts.filter(p=>p.partId==='frame'||p.partId===c.a.componentId).length,1);
  assert.ok(scanSyringe(front.comps,front.params,c.id).ok);
  const back=planSyringeInstallation(source,{...request,face:'back'},points);assert.ok(back.ok);
  const b=buildSyringeInstallPreview(back).model.syringes[0];
- assert.equal(b.mountSide,-1);assert.equal(b.mount.status,'reference');assert.ok(b.z<f.z);assert.ok(Math.abs(b.alignmentMm)>1,'back must expose rod misalignment');
- const manual=planSyringeInstallation(source,{...request,spacerMm:f.mount.fasteners[0].spacerHeight+3},points);
+ assert.equal(b.mountSide,-1);assert.equal(b.mount.status,'unverified');assert.equal(b.mount.reason,'clamp_fastener_clearance');assert.ok(b.z<f.z);assert.ok(Math.abs(b.alignmentMm)>1,'back must expose rod misalignment');
+ const manual=planSyringeInstallation(source,{...request,spacerMm:f.mount.candidateFasteners[0].spacerHeight+3},points);
  const m=buildSyringeInstallPreview(manual).model.syringes[0];assert.ok(Math.abs(m.z-f.z-3)<.001);assert.ok(Math.abs(m.alignmentMm-3)<.001);
  const saved=normalizeSnapshot(JSON.parse(JSON.stringify({kind:'blocks',v:1,comps:back.comps,params:back.params})));
  assert.deepEqual(saved.comps.find(item=>item.id===c.id).installation,{face:'back',spacerMm:null});

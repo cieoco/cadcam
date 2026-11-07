@@ -57,9 +57,10 @@ for(const ext of [{H7Syringe:0,H2Syringe:0,H3Syringe:0},{H7Syringe:20,H2Syringe:
  assert.ok(model.geometryDiagnostics.some(d=>d.kind==='syringe'&&d.status==='not_supported'),'appearance is not collision coverage');
  assert.equal(shapes.filter(s=>s.plane==='Lift').length,2,'Lift and its in-plane gripper share transformed plane');
  for(const s of shapes){
-  assert.equal(s.mount?.status,'reference',`${s.id}: ${JSON.stringify(s.mount)}`);
-  assert.equal(s.mount.fasteners.length,2);
-  for(const f of s.mount.fasteners){
+  assert.equal(s.mount?.status,'unverified',`${s.id}: ${JSON.stringify(s.mount)}`);
+  assert.equal(s.mount.reason,'clamp_fastener_clearance');
+  assert.equal(s.mount.fasteners.length,0);
+  for(const f of s.mount.candidateFasteners){
    assert.ok(f.spacerHeight>=0);
    assert.ok(Math.abs(f.frameTopZ+f.spacerHeight-f.seatZ)<1e-8,'spacer seats on frame and under clamp');
    assert.ok(f.frameTopZ<=-s.r-1,'frame clears the barrel');
@@ -90,7 +91,7 @@ const two=load(hydraulicLiftGripSnapshot);
 for(const lift of [0,10,20])for(const grip of [0,10,20]){
  const {model}=panel(two,{H2Syringe:lift,H3Syringe:grip});
  assert.equal(model.syringes.length,2);
- assert.ok(model.syringes.every(s=>s.mount?.status==='reference'),'H05 clamps follow both frames');
+ assert.ok(model.syringes.every(s=>s.mount?.reason==='clamp_fastener_clearance'&&s.mount.candidateFasteners.length===2),'H05 clamp holes follow both frames; 24 mm reference hardware remains unverified');
  assert.ok(model.materialParts.some(p=>p.partId==='H3Frame'),'fixed syringe support remains visible');
  const report=checkMaterialInterference(model);
  assert.equal(report.findings.length,0,JSON.stringify({lift,grip,findings:report.findings}));
@@ -102,7 +103,7 @@ console.log('H05: two visible syringes and their fixed supports, nine poses with
 const poses=new Map(),eps=1e-6;
 for(const yaw of [0,10,20])for(const lift of [0,10,20])for(const grip of [0,20]){
  const r=panel(n,{H7Syringe:yaw,H2Syringe:lift,H3Syringe:grip});
- assert.ok(r.model.syringes.every(s=>s.mount?.status==='reference'),'H06 clamps follow all three axes');
+ assert.ok(r.model.syringes.every(s=>s.mount?.reason==='clamp_fastener_clearance'&&s.mount.candidateFasteners.length===2),'H06 clamp pairs follow all three axes; hardware interference is separate');
  assert.equal(r.model.viewUp,'z','top-view turntable uses a horizontal XY floor');
  const matrix=r.model.orthogonal.find(p=>p.id==='Lift').matrix;
  const world=id=>applyMatrix4(matrix,{...r.points[id],z:0});
@@ -141,7 +142,7 @@ for(const [snapshot,id,drive] of [[hydraulicSnapshot,'H1Frame','H1Syringe'],[fix
  for(const extension of [0,20]){
   const {model}=panel(single,{[drive]:extension},{combineSyringeFrame:true});
   assert.ok(model.frame?.materialPartId,'generated frame stays visible');
-  assert.equal(model.syringes[0].mount.status,'reference',JSON.stringify(model.syringes[0].mount));
+  assert.equal(model.syringes[0].mount.reason,'clamp_fastener_clearance',JSON.stringify(model.syringes[0].mount));
   assert.equal(model.sticks.some(s=>s.id===id),false,'root support is represented once by the frame');
   assert.equal(model.materialParts.filter(p=>p.partId==='frame'||p.partId===id).length,1);
  }

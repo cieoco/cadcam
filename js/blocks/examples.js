@@ -1,4 +1,6 @@
 import { MAD_BOX_EXAMPLE } from './iq-mad-box-example.js';
+import { LINQ_LIFT_EXAMPLE } from './iq-linq-example.js';
+import {standardizeExampleFrame} from './example-frame-stock.js';
 import { IQ_PASSIVE_TOOL_EXAMPLES } from './iq-passive-tools-examples.js';
 import { IQ_WHEEL_GRABBER_EXAMPLE } from './iq-wheel-grabber-example.js';
 import {diskTurntableSnapshot,pivotTurntableSnapshot} from './disk-turntable-example.js';
@@ -67,6 +69,7 @@ const EXAMPLE_LESSONS = {
   'six-bar-lift': SIX_BAR_LIFT_EXAMPLE.lesson,
   ...Object.fromEntries(IQ_MECHANISM_EXAMPLES.map(example => [example.id, example.lesson])),
   [MAD_BOX_EXAMPLE.id]:MAD_BOX_EXAMPLE.lesson,
+  [LINQ_LIFT_EXAMPLE.id]:LINQ_LIFT_EXAMPLE.lesson,
   [IQ_WHEEL_GRABBER_EXAMPLE.id]:IQ_WHEEL_GRABBER_EXAMPLE.lesson,
   ...Object.fromEntries(IQ_PASSIVE_TOOL_EXAMPLES.map(example => [example.id, example.lesson])),
   ...Object.fromEntries(IQ_CLAWBOT_EXAMPLES.map(example => [example.id, example.lesson])),
@@ -989,6 +992,7 @@ ALL_BLOCK_EXAMPLES.push(...COMMON_MANIPULATOR_EXAMPLES);
 ALL_BLOCK_EXAMPLES.push(SIX_BAR_LIFT_EXAMPLE);
 ALL_BLOCK_EXAMPLES.push(...IQ_MECHANISM_EXAMPLES);
 ALL_BLOCK_EXAMPLES.push(...IQ_CLAWBOT_EXAMPLES,MAD_BOX_EXAMPLE,...IQ_PASSIVE_TOOL_EXAMPLES,IQ_WHEEL_GRABBER_EXAMPLE);
+ALL_BLOCK_EXAMPLES.push(LINQ_LIFT_EXAMPLE);
 
 // 第九、十單元：直接從既有幾何開始安裝，不重製 H01–H03，也不要求學生先開成品再拆除。
 for(const [id,label,snapshot] of [
@@ -1007,6 +1011,19 @@ for(const [id,label,snapshot] of [
 }
 
 ALL_BLOCK_EXAMPLES.push({id:'tab-nut-m3',title:'製作：3 mm／M3 榫槽接合',note:'兩個定位榫＋一組螺絲／螺母。可修改與輸出；試片、材料及承載待實測。',snapshot:tabNutSnapshot});
+
+// Reviewed stock-only examples: no module mounting faces or hydraulic lands move.
+for(const id of [
+  'parallel-gripper','quick-return','rack-pinion','competition-rack-lift','sprocket-chain',
+  'wiper-single','wiper-missing-coupler','fourbar-crank-rocker','fourbar-missing-coupler',
+  'fourbar-double-crank','fourbar-double-rocker','parallel-fourbar','chebyshev-linkage',
+  'slider-crank','slider-crank-practice','pantograph','gear-pair','reduction-gear-train',
+  'gear-gripper','cam-follower','pulley-belt','competition-fourbar-lift','competition-roller-intake',
+  'single-servo-claw','single-axis-wrist','six-bar-lift','continuous-roller-intake',
+  'crank-catapult-study','clawbot-geared-lift','iq-mad-box','guided-scissor-lift',
+  'hydraulic-h01-practice','hydraulic-h02-practice','hydraulic-h03-practice','hydraulic-h01','iq-linq-lift'
+])
+  standardizeExampleFrame(ALL_BLOCK_EXAMPLES.find(e=>e.id===id).snapshot);
 
 export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES;
 

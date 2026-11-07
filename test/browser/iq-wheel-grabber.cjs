@@ -1,6 +1,6 @@
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs/promises');
-const base=process.env.TEST_URL||'http://127.0.0.1:8024',out='output/iq-wheel-grabber/browser';
+const base=process.env.TEST_URL||'http://127.0.0.1:8024',out=process.env.OUT||'output/iq-wheel-grabber/browser';
 (async()=>{await fs.mkdir(out,{recursive:true});const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true}),results=[];
 try{for(const viewport of [{width:1280,height:900},{width:390,height:844}]){
  const mobile=viewport.width<500,ctx=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile}),page=await ctx.newPage(),errors=[];page.setDefaultTimeout(12000);

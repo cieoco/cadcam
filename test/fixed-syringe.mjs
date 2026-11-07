@@ -69,29 +69,29 @@ const arm=s.comps.find(c=>c.id==='H2Arm'),rod=s.comps.find(c=>c.id==='H2Coupler'
 const tangent={...s.params,H2Coupler:Math.abs(Math.hypot(arm.p1.x-rod.p1.x,arm.p1.y-rod.p1.y)-s.params.H2Arm)};
 assert.equal(solveSyringe(s.comps,tangent).ok,false,'dead point must reject');
 
-// Fusion reference: width 12, span 40, height 17.5, volume 1066.2693 mm³.
-// Teacher correction centers both holes in the ears; moving holes preserves volume.
+// Requested 24 mm pitch: ears stay centered on their holes, total span is 36.
+// Reference ring bore and height stay unchanged; hardware clearance is unverified.
 const clamp=syringeClampShape();
-assert.equal(clamp.spacing,28);
+assert.equal(clamp.spacing,24);
 assert.equal(clamp.holeRadius*2,3.5);
 assert.equal(clamp.width,12);assert.equal(clamp.thickness,1.5);
-assert.equal(clamp.extent*2,40);assert.equal(clamp.innerRadius,9.25);
+assert.equal(clamp.extent*2,36);assert.equal(clamp.innerRadius,9.25);
 assert.equal(Math.max(...clamp.profile.map(p=>p.z))-clamp.baseZ,17.5);
 assert.equal(Math.min(...clamp.profile.map(p=>p.z)),clamp.baseZ);
 for(const foot of clamp.feet){
  assert.equal(foot.outline[0].x,-clamp.width/2);
  assert.equal(Math.abs(foot.outline[0].y),clamp.innerRadius,'foot overlaps strap thickness');
- assert.ok(Math.abs(foot.hole.y)-foot.hole.r>clamp.innerRadius+clamp.thickness,'hole clears wall');
+ assert.ok(Math.abs(Math.abs(foot.hole.y)-foot.hole.r-clamp.outerRadius+.5)<1e-9,'24 mm ear hole overlaps the unchanged ring wall by 0.5 mm');
  assert.ok(foot.outline.every(p=>Math.abs(p.y)<=clamp.extent));
 }
 assert.deepEqual(clamp.feet[0].outline.map(p=>({x:p.x,y:-p.y})),clamp.feet[1].outline);
-assert.equal(clamp.feet[1].hole.y,14);assert.equal(clamp.feet[0].hole.y,-14);
+assert.equal(clamp.feet[1].hole.y,12);assert.equal(clamp.feet[0].hole.y,-12);
 const area=pts=>Math.abs(pts.reduce((sum,p,i)=>{const q=pts[(i+1)%pts.length];return sum+p.x*q.y-q.x*p.y;},0))/2;
 const volume=area(clamp.profile.map(p=>({x:p.y,y:p.z})))*clamp.width
  +clamp.feet.reduce((sum,f)=>sum+(area(f.outline)-Math.PI*f.hole.r**2)*clamp.thickness,0)
  -2*clamp.width*clamp.thickness**2; // subtract overlapping wall/foot material
-assert.ok(Math.abs(volume-1066.2692984351563)<.6,`saddle volume ${volume} must match Fusion within tessellation tolerance`);
-console.log('PASS saddle clamp: Fusion dimensions, symmetric holes, joined walls and reference volume');
+assert.ok(Math.abs(volume-(1066.2692984351563-72))<.6,`shorter ears reduce the reference mesh estimate by 72 mm³; this is not a validated drilled-solid volume`);
+console.log('PASS saddle clamp: 24 mm symmetric ears, unchanged bore, diagnosed wall overlap and reference mesh estimate');
 
 for(const arm of [60,80,100]){
  const h=hydraulicSnapshot,p={...h.params,H1Arm:arm},scan=scanSyringe(h.comps,p,'H1Syringe');

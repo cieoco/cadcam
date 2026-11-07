@@ -27,16 +27,21 @@ for(const example of examples){
   assert.equal(candidate.bracket.physical.length,1);count++;
   assert.ok(faceBracketStatus(s.comps,s.modules,s.params,m).fixed);
   if(m.id==='ForkL'){
-   const narrow=structuredClone(s),fork=narrow.comps.find(c=>c.id===m.id);
-   // Keep the same seam dimensions but remove its flat root: a rounded nose
-   // must still fail the complete footprint test, even though a slot fits.
-   fork.vertices=fork.vertices.filter(v=>v.solve);
-   assert.equal(faceBracketPlan(narrow.comps,narrow.modules,narrow.params,narrow.modules.find(q=>q.id===m.id)).ok,false);
+   const nose=buildFaceCandidate(detached,{childId:m.id,hostEndpoint:{moduleId:'Back',outputId:'tool',partId:'Back'},childEndpoint:{partId:m.id},selection:{...m.mount.face.selection,hostFace:'top',childFace:'left',quarterTurns:0,offsetV:-8}});
+   assert.equal(nose.ok,false,'a capsule nose cannot support the whole bracket footprint');
+   assert.match(nose.reason,/角碼底面/);
   }
   const bad=structuredClone(m);bad.mount.face.selection.brackets.offsets.L1=99;
   assert.equal(faceBracketPlan(s.comps,s.modules.map(q=>q.id===m.id?bad:q),s.params,bad).ok,false,'offset still rejects unsupported footprint');
  }
  const {model,catalog}=faceCandidateModel(candidate);
+ for(const part of Object.values(catalog.parts).filter(p=>p.kind==='triangle')){
+  const comp=s.comps.find(c=>c.id===part.id),xs=part.outlines.flat().map(p=>p.x),ys=part.outlines.flat().map(p=>p.y);
+  const expected=part.id==='Back'?[85,21]:part.id.startsWith('Fork')?[69,13]:part.id.endsWith('Corner')?[29,29]:[61,21];
+  assert.deepEqual([Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys)],expected,'source hole-count proportions use standard outer dimensions');
+  assert.equal(comp.stock.widthMm,13);assert.equal(comp.stock.thicknessMm,3);
+  assert.ok(comp.vertices.filter(v=>!v.solve).every(v=>v.u%8===0&&v.v%8===0),'shape corners stay on the existing 8mm grid');
+ }
  assert.equal(Object.values(catalog.parts).filter(p=>p.kind==='triangle').length,s.comps.length,'all actual plates represented');
  assert.equal(Object.values(catalog.parts).filter(p=>p.kind==='bracket-wing').length,count*2);
  assert.equal(Object.values(catalog.parts).filter(p=>p.kind==='triangle').flatMap(p=>p.holes).filter(h=>h.holePairId).length,count*2,'both real plate holes are present');

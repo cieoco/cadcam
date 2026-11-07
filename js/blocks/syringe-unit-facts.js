@@ -40,7 +40,7 @@ const gainAt=(s,e,params=s.params)=>{
   return g;
 };
 // 力臂：輸出件固定軸心，到「力的作用線」的垂直距離。
-// 固定安裝：力沿短連桿傳（兩端孔連線）；可轉安裝：推桿直接推，力沿筒身軸線（過推桿孔 B，離鎖住的耳螺絲 14 mm）。
+// 固定安裝：力沿短連桿傳（兩端孔連線）；可轉安裝：推桿直接推，力沿筒身軸線（過推桿孔 B，離鎖住的耳螺絲 12 mm）。
 function leverAt(s,e,params=s.params){
   const st=stateAt(s,e,params),c=syringeOf({comps:st.comps}),fixed=fixedSyringePointIds(st.comps);
   let from,to,outputId=c.outputId;

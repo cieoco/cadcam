@@ -13,6 +13,10 @@ let modules = [host.instance.module, child.instance.module];
 const created = mountFacePlacement(comps, modules, child.surface.moduleId, { hostId: host.surface.moduleId, outputId: host.surface.outputId,
   face: { version: 1, ...record.transform, selection: record.selection, hostThicknessMm: 4, childThicknessMm: 4 } }, params);
 modules = modules.map(m => m.id === child.surface.moduleId ? { ...m, mount: created.mount } : m);
+// Automatic frames now carry their own 3 mm stock; changing the global fallback
+// alone does not edit that board. Exercise an actual explicit frame-thickness edit.
+for (const c of comps.filter(c => c.moduleId === child.surface.moduleId))
+  for (const key of ['p1', 'p2', 'p3']) if (c[key]?.frameStock) c[key].frameStock.thicknessMm = 6;
 const before = JSON.stringify({ comps, modules, params });
 const refreshed = refreshFaceMounts(comps, modules, params, { exportSettings: { stockThicknessMm: 6 }, stockMm: 6 });
 assert.deepEqual(refreshed.warnings, []);

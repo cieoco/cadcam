@@ -1,4 +1,5 @@
 import {fixedBaseSnapshot} from './fixed-syringe-examples.js';
+import {SYRINGE_EAR_MM} from '../core/syringe.js';
 
 // H04 的同一個針筒／短桿傳動，改為兩層圓盤示範，亦作為 H06 底盤來源；H04 僅保留內部幾何種子。
 // 外徑為教學配置，不是量測過的施工尺寸。下盤覆蓋筒身與管夾，上盤留偏心工作孔。
@@ -27,8 +28,8 @@ export const pivotTurntableSnapshot=(()=>{
   s.comps=s.comps.filter(c=>c.id!=='H8Coupler');delete s.params.H8Coupler;
   syr.mountMode='pivot';syr.pivotEar=1;delete syr.axisDeg;delete syr.outputId;
   syr.b={componentId:turn.id,u:s.params.H8Crank,v:0};
-  // 同一個雙耳固定環只鎖一耳（轉軸＝耳螺絲，離筒身軸線 14 mm）：A–B 距離 = √(軸向長度² + 14²)。
-  const ear=14,d=Math.hypot(turn.p2.x-frame.p2.x,turn.p2.y-frame.p2.y);
+  // 同一個雙耳固定環只鎖一耳：A–B 距離 = √(軸向長度² + 耳距²)，保留原安裝端點。
+  const ear=SYRINGE_EAR_MM,d=Math.hypot(turn.p2.x-frame.p2.x,turn.p2.y-frame.p2.y);
   syr.spec.lmin=Math.sqrt(d*d-ear*ear)-syr.extension;
   syr.spec.name='雙耳固定環只鎖一耳／20 mm 教學區間（未實測）';
   turn.zlift=2; // 轉軸座在筒身下方，將工作孔疊至推桿中心層。

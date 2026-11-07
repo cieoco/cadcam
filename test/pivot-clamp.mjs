@@ -1,4 +1,4 @@
-// 可轉安裝＝同一個水管固定環（兩耳），只鎖一耳的螺絲當轉軸；另一耳不鎖。轉軸偏離筒身軸線一個耳距（14 mm）。
+// 可轉安裝＝同一個水管固定環（兩耳），只鎖一耳的螺絲當轉軸；另一耳不鎖。轉軸偏離筒身軸線一個耳距（12 mm）。
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {pivotTurntableSnapshot as H08} from '../js/blocks/disk-turntable-example.js';
@@ -11,7 +11,7 @@ const near=(a,b,t=1e-6)=>Math.abs(a-b)<=t;
 const fixedClamp=syringeClampShape('fixed-axis'),pivotClamp=syringeClampShape('pivot');
 ok(pivotClamp.feet.length===2&&JSON.stringify(pivotClamp.feet)===JSON.stringify(fixedClamp.feet)&&JSON.stringify(pivotClamp.profile)===JSON.stringify(fixedClamp.profile),'可轉與固定用同一個固定環（同樣兩耳、同樣外形）');
 const EAR=Math.abs(fixedClamp.feet[0].hole.y);
-ok(near(EAR,14),'耳孔距筒身軸線 14 mm（孔距 28 mm）');
+ok(near(EAR,12),'耳孔距筒身軸線 12 mm（孔距 24 mm）');
 
 const n=normalizeSnapshot(structuredClone(H08)),c=n.comps.find(x=>x.type==='syringe');
 ok(c.mountMode==='pivot'&&(c.pivotEar===1||c.pivotEar===-1),`H08 可轉安裝，指定鎖哪一耳（pivotEar=${c.pivotEar}）`);
@@ -27,13 +27,13 @@ for(const s of scan.samples){
   const A=attachmentPoint(r.comps.find(x=>x.id===c.id).a,r.comps,n.params,prev),B=attachmentPoint(c.b,r.comps,n.params,prev);
   const sh=syringeShape(r.comps.find(x=>x.id===c.id),r.comps,n.params,prev);
   const L=c.spec.lmin+s.extension,d=Math.hypot(B.x-A.x,B.y-A.y);
-  if(!near(d,Math.hypot(L,EAR),1e-4)){okGeo=false;why||=`伸出 ${s.extension}：|AB|=${d.toFixed(3)}，應為 √(L²+14²)=${Math.hypot(L,EAR).toFixed(3)}`;}
+  if(!near(d,Math.hypot(L,EAR),1e-4)){okGeo=false;why||=`伸出 ${s.extension}：|AB|=${d.toFixed(3)}，應為 √(L²+12²)=${Math.hypot(L,EAR).toFixed(3)}`;}
   const ux=Math.cos(sh.angle),uy=Math.sin(sh.angle),perpA=Math.abs(-(A.x-B.x)*uy+(A.y-B.y)*ux);
-  if(!near(perpA,EAR,1e-4)){okGeo=false;why||=`伸出 ${s.extension}：轉軸離筒身軸線 ${perpA.toFixed(3)} mm，應為 14`;}
+  if(!near(perpA,EAR,1e-4)){okGeo=false;why||=`伸出 ${s.extension}：轉軸離筒身軸線 ${perpA.toFixed(3)} mm，應為 12`;}
   barrelAng.push(sh.angle*180/Math.PI);
   const turn=r.comps.find(x=>x.id==='H8Turn');turnAng.push(Math.atan2(prev[turn.p2.id].y-prev[turn.p1.id].y,prev[turn.p2.id].x-prev[turn.p1.id].x)*180/Math.PI);
 }
-ok(okGeo,`幾何正確：轉軸在耳孔、筒身軸線離轉軸 14 mm、推桿端在軸線上（${why}）`);
+ok(okGeo,`幾何正確：轉軸在耳孔、筒身軸線離轉軸 12 mm、推桿端在軸線上（${why}）`);
 const un=a=>a.reduce((o,v,i)=>{if(!i)return [v];let d=v-a[i-1];d=((d+540)%360)-180;return [...o,o[i-1]+d];},[]);
 const T=un(turnAng),Bg=un(barrelAng),sw=Math.abs(T.at(-1)-T[0]);
 ok(sw>=60&&sw<=120&&T.slice(1).every((v,i)=>(v-T[i])*(T.at(-1)-T[0])>0),`圓盤轉角單調、總轉角 ${sw.toFixed(1)}°`);

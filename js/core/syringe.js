@@ -3,12 +3,12 @@
 export const SYRINGE_DEMO = Object.freeze({name:'10mL 教學示範（未校正）',capacityMl:10,outerDiameter:16,bodyLength:70,rodDiameter:6,lmin:95,stroke:40,calibrated:false});
 export const SYRINGE_TOLERANCE_MM = 0.001;
 export const hasSyringeClamp=c=>c?.mountMode==='fixed-axis'||c?.mountMode==='pivot';
-// 可轉安裝＝同一個雙耳固定環，只鎖其中一顆耳螺絲當轉軸；螺絲離筒身軸線一個耳距（28 mm 孔距的一半）。
-export const SYRINGE_EAR_MM=14;
+// 可轉安裝＝同一個雙耳固定環，只鎖其中一顆耳螺絲當轉軸；螺絲離筒身軸線一個耳距（24 mm 孔距的一半）。
+export const SYRINGE_EAR_MM=12;
 export const syringePivotEar=c=>c?.pivotEar===-1?-1:1;
 // 針筒作用長度（推桿端點到固定環中心的軸向距離）→ 實際 A–B 拘束距離。
 export const syringeLinkLength=c=>{const L=c.spec.lmin+c.extension;return c.mountMode==='pivot'?Math.hypot(L,SYRINGE_EAR_MM):L;};
-// 由已鎖耳螺絲 a 與推桿端點 b 還原筒身軸線：b 在軸線上，a 偏離軸線 14 mm。
+// 由已鎖耳螺絲 a 與推桿端點 b 還原筒身軸線：b 在軸線上，a 偏離軸線一個耳距。
 export function syringePivotFrame(a,b,ear){
   const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy),L=Math.sqrt(Math.max(0,d*d-SYRINGE_EAR_MM*SYRINGE_EAR_MM));
   const angle=Math.atan2(dy,dx)+ear*Math.atan2(SYRINGE_EAR_MM,L),nx=-Math.sin(angle),ny=Math.cos(angle);
@@ -25,7 +25,7 @@ export function normalizeSyringe(c) {
   const finite=(n,f)=>Number.isFinite(Number(n))?Number(n):f;
   let restored=false;
   for(const k of ['capacityMl','outerDiameter','bodyLength','rodDiameter','lmin','stroke']){spec[k]=finite(c.spec?.[k],SYRINGE_DEMO[k]);if(!Number.isFinite(c.spec?.[k]))restored=true;}
-  // 舊存檔的可轉安裝沒有 pivotEar：當時 lmin 是 A–B 距離，改成軸向長度，讓 √((lmin+ext)²+14²) 仍等於舊距離。
+  // 舊存檔的可轉安裝沒有 pivotEar：當時 lmin 是 A–B 距離，改成軸向長度，讓 √((lmin+ext)²+耳距²) 仍等於舊距離。
   if(c.mountMode==='pivot'&&c.pivotEar!==1&&c.pivotEar!==-1){const total=spec.lmin+finite(c.extension,0);spec.lmin=Math.sqrt(Math.max(0,total*total-SYRINGE_EAR_MM*SYRINGE_EAR_MM))-finite(c.extension,0);}
   spec.name=String(c.spec?.name || spec.name).slice(0,80);spec.calibrated=c.spec?.calibrated===true&&!restored;
   const endpoint=r=>({componentId:String(r?.componentId || ''),u:finite(r?.u,0),v:finite(r?.v,0),...(!r?.componentId&&Number.isFinite(r?.position?.x)&&Number.isFinite(r?.position?.y)?{position:{x:r.position.x,y:r.position.y}}:{})});

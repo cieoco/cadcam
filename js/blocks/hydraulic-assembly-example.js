@@ -41,7 +41,7 @@ const arm=(()=>{
   const params={...structuredClone(diskTurntableSnapshot.params),...structuredClone(fixedLiftSnapshot.params),...structuredClone(fixedGripSnapshot.params)};
   const modules=[
     {id:'Base',name:'旋轉底盤',source:'hydraulic-h07',base:'H7O',outputs:[{id:'turn',name:'轉盤',at:'H7O',body:{kind:'bar',id:'H7Turn'}}],mount:null},
-    {id:'Lift',name:'升降',base:'H2A',outputs:[{id:'tool',name:'工具端',at:'H2C',body:{kind:'triangle',id:'H2Arm'}}],mount:{"to":{"module":"Base","output":"turn"},"ref":{"x":0,"y":0,"a":89.99999999999994},"home":{},"face":{"version":1,"childPart":"frame","rotation":[[1,0,0],[0,0,-1],[0,1,0]],"translation":{"x":-130.1482595125717,"y":0,"z":-71.71171799344064},"selection":{"hostFace":"top","childFace":"back","alignU":0,"alignV":0,"offsetU":0,"offsetV":0,"gap":0,"quarterTurns":0},"hostThicknessMm":3,"childThicknessMm":3}}},
+    {id:'Lift',name:'升降',base:'H2A',outputs:[{id:'tool',name:'工具端',at:'H2C',body:{kind:'triangle',id:'H2Arm'}}],mount:{"to":{"module":"Base","output":"turn"},"ref":{"x":0,"y":0,"a":89.99999999999994},"home":{},"face":{"version":1,"childPart":"frame","rotation":[[1,0,0],[0,0,-1],[0,1,0]],"translation":{"x":-131.08795213335765,"y":0,"z":-72.39575828009197},"selection":{"hostFace":"top","childFace":"back","alignU":0,"alignV":0,"offsetU":0,"offsetV":0,"gap":0,"quarterTurns":0},"hostThicknessMm":3,"childThicknessMm":3}}},
     {id:'Grip',name:'夾爪',base:'H3O',outputs:[],mount:{to:{module:'Lift',output:'tool'},ref:{x:grip.p2.x,y:grip.p2.y,a:0},home:{}}}
   ];
   return {comps,params,modules};

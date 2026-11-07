@@ -1,22 +1,23 @@
-import {attachmentPoint,hasSyringeClamp,syringeBarrelOffset,syringePivotEar,syringePivotFrame} from '../core/syringe.js';
-// Reference saddle measured from both teacher F3D models (2026-10-14).
+import {SYRINGE_EAR_MM,attachmentPoint,hasSyringeClamp,syringeBarrelOffset,syringePivotEar,syringePivotFrame} from '../core/syringe.js';
+// Ring dimensions reference the teacher F3D models (2026-10-14).
+// Ear pitch is now authored at 24 mm; its wall/hardware clearance is unverified.
 // Local X follows the barrel, Y spans the feet, Z=0 is the barrel axis.
-// Teacher correction: both holes centered in the rounded ears (28 mm pitch).
+// Both holes remain centered in the rounded ears; requested pitch is now 24 mm.
 export function syringeClampShape(mode='fixed-axis'){
  // 可轉安裝用同一個雙耳固定環（形狀與固定安裝完全相同），差別只在鎖幾顆螺絲。
  const pivot=mode==='pivot';
  const width=12,thickness=1.5,innerRadius=9.25,outer=10.75,baseZ=-6.75,holeRadius=1.75;
- const holeY=[-14,14],spacing=holeY[1]-holeY[0];
+ const holeY=[-SYRINGE_EAR_MM,SYRINGE_EAR_MM],spacing=holeY[1]-holeY[0];
  const arc=(radius,from,to)=>Array.from({length:65},(_,i)=>{const a=from+(to-from)*i/64;return {y:radius*Math.cos(a),z:radius*Math.sin(a)};});
  const profile=[{y:-outer,z:baseZ},...arc(outer,Math.PI,0),{y:outer,z:baseZ},{y:innerRadius,z:baseZ},...arc(innerRadius,0,Math.PI),{y:-innerRadius,z:baseZ}];
  const feet=[-1,1].map((sign,index)=>{
-  const center=sign*14,outline=[{x:-width/2,y:sign*innerRadius},{x:width/2,y:sign*innerRadius}];
+  const center=sign*SYRINGE_EAR_MM,outline=[{x:-width/2,y:sign*innerRadius},{x:width/2,y:sign*innerRadius}];
   for(let i=0;i<=32;i++){const a=i*Math.PI/32;outline.push({x:width/2*Math.cos(a),y:center+sign*width/2*Math.sin(a)});}
   return {outline,hole:{x:0,y:holeY[index],r:holeRadius}};
  });
- return {width,thickness,innerRadius,spacing,holeRadius,baseZ,profile,feet,extent:20,pivot};
+ return {width,thickness,innerRadius,outerRadius:outer,spacing,holeRadius,baseZ,profile,feet,extent:SYRINGE_EAR_MM+width/2,pivot};
 }
-// 鎖住的耳在 feet 陣列的索引：pivotEar=+1 對應筒身左側（局部 y=+14）的耳。
+// 鎖住的耳在 feet 陣列的索引：pivotEar=+1 對應筒身左側（局部 y 為正）的耳。
 export const syringeLockedFoot=c=>syringePivotEar(c)===1?1:0;
 // Two-ear pipe clamp: manufacturing holes, not kinematic joints. Keep them
 // out of the frame's reference axis; each ear needs its own supporting land.

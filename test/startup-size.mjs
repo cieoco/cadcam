@@ -26,7 +26,11 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-07：共用兩孔齒輪傳動與 M.A.D. Box 範例淨增約 5.4 KB；沒有新依賴。
 // 2026-11-07：三份共用板件的 IQ 被動工具資料與來源教學約 5 KB，無新操作或依賴。
 // 2026-11-07：被動輪爪的來源、支承座與輪胎外形約增 5.4 KB；重用既有操作，無新依賴。
-check('首次JS原始大小低於2.061MB',r.bytes<2061000);
+// 2026-11-08：範例標準 N×M 機架、保存政策與共用輸出幾何淨增 4,195 bytes（基準 2,059,187）；無新依賴，預算調為 2.064 MB。
+// 2026-11-08 H01／24 mm 固定環：共用耳距、標準板包覆與干涉診斷較前輪完成值增 1,257 bytes（2,063,790→2,065,047）；不增加第三方依賴。
+// 2026-11-08 Linq：新增單側齒輪四連桿／固定托物段與教學資料，作者helper移除初始化循環；2,065,047→2,069,710（+4,663 bytes），無新第三方依賴。
+// 2026-11-08 Linq孔位重建：實體托盤與掛接、來源比例資料增4,214 bytes（2,069,710→2,073,924）；沿既有模組，無新依賴。
+check('首次JS原始大小低於2.075MB',r.bytes<2075000);
 check('機架編輯介面延後載入',!r.paths.includes('js/blocks/frame-hole-editor.js')&&!r.paths.includes('js/blocks/frame-panel.js'));
 check('合成尺寸候選計算延後載入',!r.paths.includes('js/blocks/bar-fusion-resize.js')&&r.lazyEntries.includes('js/blocks/bar-fusion-resize.js'));
 check('盒體生成介面（外掛）延後載入',!r.paths.includes('js/plugins/box-maker/box-generator.js')&&!r.paths.includes('js/plugins/box-maker/box-dialog.js')&&r.lazyEntries.includes('js/plugins/box-maker/index.js'));

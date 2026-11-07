@@ -71,6 +71,7 @@
 - [TEACHING-TRIAL.md](TEACHING-TRIAL.md) — 教學與操作現況
 - [mobile-six-face-wizard.md](mobile-six-face-wizard.md) — 手機六面體組立精靈（2026.10.07.8）
 - [TEACHING-CHANGELOG.md](TEACHING-CHANGELOG.md) — 教學與操作更新紀錄
+- [IQ Linq 原圖孔位比例重建](TEACHING-CHANGELOG.md#iq-linq-lift) — 官方10:11:4:5孔距比例、實體托盤改製界限與定向驗收。
 
 ## 驗收與工作紀錄
 

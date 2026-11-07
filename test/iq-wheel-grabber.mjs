@@ -22,6 +22,12 @@ for(const m of s.modules.filter(m=>m.mount)){
  assert.equal(buildFaceCandidate(detached,{childId:m.id,hostEndpoint:{moduleId:'GrabBack',outputId:'tool',partId:'GrabBack'},childEndpoint:{partId:m.id},selection:bad}).ok,false);
 }
 const {catalog}=faceCandidateModel(candidate);
+for(const [id,expected] of [['GrabBack',[85,21]],['GrabLeft',[37,13]],['GrabRight',[37,13]],['GrabLeftArm',[85,13]],['GrabRightArm',[85,13]]]){
+ const part=catalog.parts[id],xs=part.outlines.flat().map(p=>p.x),ys=part.outlines.flat().map(p=>p.y);
+ assert.deepEqual([Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys)],expected);
+ assert.equal(s.comps.find(c=>c.id===id).stock.widthMm,13);assert.equal(part.thicknessMm,3);
+}
+assert.deepEqual(s.comps.find(c=>c.id==='GrabLeftArm').p1,{id:'GrabLeftA',type:'fixed',x:16,y:0},'standard stock does not move the original arm pivot');
 assert.equal(Object.values(catalog.parts).filter(p=>p.kind==='bracket-wing').length,4);
 assert.equal(Object.values(catalog.parts).filter(p=>p.kind==='triangle').flatMap(p=>p.holes).filter(h=>h.holePairId).length,4);
 const pose=solveAssembly(compileAssembly(s.comps,s.modules,{params:s.params}),{thetaDeg:0});

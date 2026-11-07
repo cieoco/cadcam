@@ -3,7 +3,7 @@ import {S} from './state.js';
 import * as View from './view.js';
 import {sheetMode,setSheet} from './mobile-workspace.js';
 import {dimensionHandle} from './dimension-handle.js';
-import {attachmentPoint} from '../core/syringe.js';
+import {SYRINGE_EAR_MM,attachmentPoint} from '../core/syringe.js';
 import {installationChoices,planPlacedSyringe} from './syringe-installation.js';
 import {syringePositionOnFrame} from './syringe-position.js';
 import {syringeShape} from './syringe-shape.js';
@@ -23,6 +23,7 @@ export function createSyringeEditor(h){
  const connections=el('div',null,more),mode=field('固定方式',connections,'select'),frame=field('固定在哪裡',connections,'select'),output=field('推桿接孔',connections,'select'),ear=field('固定耳',connections,'select'),face=field('正反面',connections,'select');
  const opt=(n,label,value)=>{const o=el('option',label,n);o.value=value;};
  opt(mode,'雙孔固定','fixed-axis');opt(mode,'單孔可轉','pivot');opt(ear,'左耳','1');opt(ear,'右耳','-1');opt(face,'正面','front');opt(face,'背面','back');
+ el('p',`雙耳孔距 ${2*SYRINGE_EAR_MM} mm。現有參考環壁與耳孔／M3 墊片有干涉，固定架待改製核對。`,more);
  const offset=field('固定環距筒尾 (mm)',more),spacer=field('套筒高度 (mm，空白自動)',more);
  const reconnect=el('button','在圖上重新接孔',panel);reconnect.hidden=true;status.after(reconnect);
  const scan=el('button','檢查全行程',more),advanced=el('button','尺寸與加工設定',more),remove=el('button','刪除針筒',more);

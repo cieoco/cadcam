@@ -20,9 +20,9 @@ for(const extension of [0,5,10,15,20,15,10,5,0]){
  assert.equal(shape.fixed,false);assert.equal(shape.pivot,true);assert.equal(shape.clamp.feet.length,2,'same two-ear clamp as the fixed mount');assert.equal(shape.lockedFoot,1);
  assert.ok(Math.abs(shape.length-c.spec.lmin-extension)<.001);
  const scene=buildSyringeInstallPreview({...s,comps:r.comps}),item=scene.model.syringes[0];
- assert.equal(item.mount.status,'reference');assert.equal(item.mount.fasteners.length,1);
+ assert.equal(item.mount.status,'unverified');assert.equal(item.mount.reason,'clamp_fastener_clearance');assert.equal(item.mount.fasteners.length,0);assert.equal(item.mount.candidateFasteners.length,1);
  assert.ok(Math.abs(item.alignmentMm)<.001,'H08 rod and disk hole are on the same centre plane');
- const part=scene.model.materialParts.find(p=>p.partId===item.mount.fasteners[0].framePartId);
+ const part=scene.model.materialParts.find(p=>p.partId===item.mount.candidateFasteners[0].framePartId);
  const lockedId=`${c.id}_clamp_${shape.lockedFoot}`,hole=part.geometry.holes.find(h=>h.id===lockedId||h.mountIds?.includes(lockedId));holes.push(hole);
  assert.ok(part.geometry.holes.filter(h=>Math.hypot(h.x-hole.x,h.y-hole.y)<.001).length===1,'no duplicate cut at pivot');
  if(extension===10){hole.r=1;assert.equal(syringeClampInstallation(scene.model,item,item.z,item.matrix).reason,'mount_hole_diameter');}
@@ -31,7 +31,7 @@ const plate=structuredClone(s),host=plate.comps.find(o=>o.id===c.a.componentId);
 host.type='triangle';delete host.shape;delete host.diameterMm;
 host.p3={id:'PlateCorner',x:0,y:-160,type:'fixed'};host.gParam=host.lenParam;delete host.lenParam;
 host.r1Param='PlateSide1';host.r2Param='PlateSide2';plate.params.PlateSide1=160;plate.params.PlateSide2=Math.hypot(host.p3.x-host.p2.x,host.p3.y-host.p2.y);
-assert.equal(buildSyringeInstallPreview(plate).model.syringes[0].mount.status,'reference','fixed triangular plate shares pivot mapping');
+assert.equal(buildSyringeInstallPreview(plate).model.syringes[0].mount.reason,'clamp_fastener_clearance','fixed triangular plate shares pivot mapping, with explicit hardware interference');
 assert.ok(Math.max(...angles)-Math.min(...angles)>.01,'barrel angle follows the moving output');
 assert.ok(holes.every(h=>h.x===holes[0].x&&h.y===holes[0].y),'base hole stays fixed during motion');
 const request={id:c.id,a:c.a,b:c.b,mountMode:'pivot',face:'front',spacerMm:null};
@@ -51,7 +51,7 @@ assert.equal(planSyringeInstallation(s,{...request,mountMode:'fixed-axis'}).ok,f
 for(const disk of [true,false]){
  const copy=structuredClone(s),host=copy.comps.find(o=>o.id===c.a.componentId);if(!disk){delete host.shape;delete host.diameterMm;delete host.frameSeparate;}
  const nodes=syringeClampFrameNodes(copy.comps,[host.p1,host.p2]);assert.equal(nodes.length,1);
- const scene=buildSyringeInstallPreview(copy);assert.equal(scene.model.syringes[0].mount.status,'reference','disk and automatic bar frame');
+ const scene=buildSyringeInstallPreview(copy);assert.equal(scene.model.syringes[0].mount.reason,'clamp_fastener_clearance','disk and automatic bar frame retain the common hardware diagnostic');
 }
 assert.throws(()=>syringeManufacturing(s.comps,s.params,null),/本輪不輸出/);
 assert.ok(scanSyringe(normalizeSnapshot(legacy).comps,legacy.params,'HSyringe').ok,'legacy two-hinge files unchanged');

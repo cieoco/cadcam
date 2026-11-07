@@ -1,5 +1,5 @@
 import {installationChoices,planPlacedSyringe} from './syringe-installation.js';
-import {attachmentFrame,attachmentPoint} from '../core/syringe.js';
+import {SYRINGE_EAR_MM,attachmentFrame,attachmentPoint} from '../core/syringe.js';
 import {scanSyringe} from './syringe-operations.js';
 import {syringeShape} from './syringe-shape.js';
 import {frameConnectorNodes} from './model.js';
@@ -57,7 +57,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  const snap=el('button','移到所選機架',positionPanel);
  const faceRow=el('div',null,connections);faceRow.className='install-faces';
  const faces=['front','back'].map((face,i)=>{const b=el('button',i?'背面':'正面',faceRow);b.onclick=()=>{request.face=face;update();};return b;});
- el('p','筒身與固定環夾牢，固定環再接到所選固定機架。雙耳參考孔距 28 mm；可轉安裝同一個固定環只鎖一耳當轉軸、另一耳不鎖；孔徑與實際夾持方式仍需核對。活動承載零件尚未支援。',connections);
+ el('p',`筒身與固定環夾牢，固定環再接到所選固定機架。雙耳參考孔距 ${2*SYRINGE_EAR_MM} mm；可轉安裝同一個固定環只鎖一耳當轉軸、另一耳不鎖。現有參考環壁與耳孔／M3 墊片有干涉，固定架須改製核對；活動承載零件尚未支援。`,connections);
  const rod=field(connections,'推桿接哪個零件？');option(rod,'請選活動連桿／圓盤','');choices.rods.forEach(c=>option(rod,labelOf(c),c.id));rod.value=request.b?.componentId || '';
  const end=field(connections,'連接端孔');option(end,'第一孔','0');option(end,'第二孔','1');
  end.value=request.b?.u>0?'1':'0';
@@ -149,8 +149,8 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   const bodyLength=existing?.spec.bodyLength ?? 72,diameter=existing?.spec.outerDiameter ?? 17.5;
   const rear=request.barrelOffsetMm ?? existing?.installation?.barrelOffsetMm ?? bodyLength*.7;
   line(A,tip,existing?.spec.rodDiameter ?? 8,'#a89f92');line(at(-rear),at(bodyLength-rear),diameter,request.position?'#b4d6d0':'#d7e5e4');
-  if(request.position){const side={x:-Math.sin(theta)*14,y:Math.cos(theta)*14};line({x:A.x-side.x,y:A.y-side.y},{x:A.x+side.x,y:A.y+side.y},8,'#647574');
-   if(shape?.pivot){const nx=-Math.sin(theta),ny=Math.cos(theta),s=shape.pivotEar,free={x:shape.anchor.x-28*s*nx,y:shape.anchor.y-28*s*ny};
+  if(request.position){const side={x:-Math.sin(theta)*SYRINGE_EAR_MM,y:Math.cos(theta)*SYRINGE_EAR_MM};line({x:A.x-side.x,y:A.y-side.y},{x:A.x+side.x,y:A.y+side.y},8,'#647574');
+   if(shape?.pivot){const nx=-Math.sin(theta),ny=Math.cos(theta),s=shape.pivotEar,free={x:shape.anchor.x-2*SYRINGE_EAR_MM*s*nx,y:shape.anchor.y-2*SYRINGE_EAR_MM*s*ny};
     draw('circle',{cx:free.x,cy:-free.y,r:3.5,fill:'white',stroke:'#64748b','stroke-width':1,'stroke-dasharray':'2 2'});
     draw('circle',{cx:shape.anchor.x,cy:-shape.anchor.y,r:4.5,fill:'#0e7490',stroke:'white','stroke-width':1.5});}}
   if(firstMember)for(const node of [...svg.childNodes].slice(actuatorStart))svg.insertBefore(node,firstMember);
@@ -197,7 +197,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
    const out=buildSyringeInstallPreview({...candidate,fabrication:base.fabrication,motion}),s=out.model?.syringes?.find(s=>s.id===candidate.syringe.id);
    if(!s){mountStatus.textContent='安裝材料未能建立，請回工作區核對機架。';return;}
    const f=s.mount?.fasteners?.[0];
-   const reasons={missing_frame_holes:'此機架尚無配對孔，需另外設計固定座',frame_alignment:'固定孔未對齊',barrel_clearance:'套筒太短，筒身會碰到機架',clamp_diameter:'筒身超出參考管夾內徑',mount_hole_diameter:'固定孔小於參考 M3 軸／螺絲直徑'};
+   const reasons={missing_frame_holes:'此機架尚無配對孔，需另外設計固定座',frame_alignment:'固定孔未對齊',barrel_clearance:'套筒太短，筒身會碰到機架',clamp_diameter:'筒身超出參考管夾內徑',mount_hole_diameter:'固定孔小於參考 M3 軸／螺絲直徑',clamp_fastener_clearance:'24 mm 配對孔已對齊；現有參考環壁與耳孔／M3 墊片干涉，固定架待改製核對'};
    mountStatus.textContent=(f?`${request.mountMode==='pivot'?'單螺絲轉軸參考（只鎖一顆 M3，另一耳不鎖）':'雙孔鎖固參考'} · ${request.face==='back'?'背面':'正面'} · 套筒 ${f.spacerHeight.toFixed(1)} mm。`:reasons[s.mount?.reason] || '固定座待核對。')+(s.alignmentMm===null?' 推桿高度未驗證。':Math.abs(s.alignmentMm)>.1?` 推桿與連接件差 ${Math.abs(s.alignmentMm).toFixed(1)} mm，請調整套筒或連接件疊放層。`:' 推桿與連接件中心層已對齊。');
    if(preview3d){if(!viewer){const {createViewer}=await import('../blocks3d/viewer.js');if(closed||token!==revision)return;viewer=createViewer(space);}viewer.update(out.model);}
   }catch(e){if(!closed&&token===revision)mountStatus.textContent=`安裝預覽未完成：${e.message}`;}

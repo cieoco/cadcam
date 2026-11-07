@@ -283,7 +283,10 @@
     "test/pivot-clamp.mjs",
     "test/disk-orientation.mjs",
     "test/syringe-position.mjs",
-    "test/stroke-trajectories.mjs"
+    "test/stroke-trajectories.mjs",
+    "test/example-frame-stock.mjs",
+    "test/h01-frame-clamp.mjs",
+    "test/iq-linq-lift.mjs"
   ],
   "version": 1
 }

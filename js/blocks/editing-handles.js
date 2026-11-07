@@ -87,11 +87,11 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
         preview:v=>{showNumber(input,v);holes(v);},cancel:()=>{showNumber(input,value);holes(value);},commit:plate?v=>commit(v,true):commit,activate});
     }
   }
-  function handle(key,label,point,direction,value,commit,inputId,min=0,max=2000,step=.1,origin=null,snap=1,plate=null){
+  function handle(key,label,point,direction,value,commit,inputId,min=0,max=2000,step=.1,origin=null,snap=1,plate=null,quantize=null){
     if(!point||!direction||!Number.isFinite(value))return;
     const a=project(point),b=project({x:point.x+direction.x,y:point.y+direction.y}),input=document.getElementById(inputId),field=input?.matches('input')?input:input?.querySelector('input');
     const note=v=>{if(snap>1)showHoleCount(field,v);else if(plate)showHoleCount(field,v,plate.hint);};note(value);
-    dimensionHandle(svg,{key,label,point:origin?besideHole(svg,project(origin),a):a,direction:{x:b.x-a.x,y:b.y-a.y},value,min,max,step,snap,quantize:plate?.quantize(value),preview:v=>{if(field)showNumber(field,v);note(v);},cancel:()=>{if(field)showNumber(field,value);note(value);},commit:plate?v=>commit(v,true):commit,activate:()=>{openEditor();field?.focus();field?.select();}});
+    dimensionHandle(svg,{key,label,point:origin?besideHole(svg,project(origin),a):a,direction:{x:b.x-a.x,y:b.y-a.y},value,min,max,step,snap,quantize:quantize || plate?.quantize(value),preview:v=>{if(field)showNumber(field,v);note(v);},cancel:()=>{if(field)showNumber(field,value);note(value);},commit:plate?v=>commit(v,true):commit,activate:()=>{openEditor();field?.focus();field?.select();}});
   }
   const a=at(c?.p1),b=at(c?.p2),length=a&&b?Math.hypot(b.x-a.x,b.y-a.y):0,u=length?{x:(b.x-a.x)/length,y:(b.y-a.y)/length}:{x:1,y:0};
   if(c&&['bar','triangle'].includes(c.type)&&!c.boxPanel){
@@ -156,9 +156,12 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
     if(nodes.length&&outline.length){
       let first=nodes[0],second=first,distance=0;
       for(const p of nodes)for(const q of nodes){const d=Math.hypot(q.x-p.x,q.y-p.y);if(d>distance){first=p;second=q;distance=d;}}
-      const u=distance?{x:(second.x-first.x)/distance,y:(second.y-first.y)/distance}:{x:0,y:1},v={x:-u.y,y:u.x};
+      const u=geometry.dimensions?.axis?.u || (distance?{x:(second.x-first.x)/distance,y:(second.y-first.y)/distance}:{x:0,y:1}),v={x:-u.y,y:u.x};
       const middle=dir=>{const ns=outline.map(p=>p.x*dir.x+p.y*dir.y);return (Math.min(...ns)+Math.max(...ns))/2;},x=middle(u),y=middle(v),center={x:x*u.x+y*v.x,y:x*u.y+y*v.y};
-      for(const [key,label,dir]of [['lengthMm','外框長',u],['widthMm','外框寬',v]]){const n=info[key];handle('frame-'+key,label,{x:center.x+dir.x*n/2,y:center.y+dir.y*n/2},{x:dir.x/2,y:dir.y/2},n,value=>set(key,value),'frameSize-'+key,info[key==='lengthMm'?'minLength':'minWidth']||2,2000);}
+      for(const [key,label,dir]of [['lengthMm','外框長',u],['widthMm','外框寬',v]]){
+        const n=info[key],grid=!!geometry.dimensions?.axis,scale=grid?1:.5,edge=2*Math.max(1,8-(info.thicknessMm || 3)/2);
+        handle('frame-'+key,label,{x:center.x+dir.x*n/2,y:center.y+dir.y*n/2},{x:dir.x*scale,y:dir.y*scale},n,value=>set(key,value),'frameSize-'+key,info[key==='lengthMm'?'minLength':'minWidth']||2,2000,.1,null,1,null,grid?raw=>edge+8*Math.round((raw-edge)/8):null);
+      }
     }
   }
 }

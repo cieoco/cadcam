@@ -35,8 +35,8 @@ export function placeFixedSyringe(comps,params,points,aRef,bRef,{extension=10}={
     spec:{...SYRINGE_DEMO,name:'F3D 外形參考／20 mm 教學區間（未實測）',outerDiameter:17.5,bodyLength:72,rodDiameter:8,lmin,stroke,calibrated:false},extension:ext,branch:1}};
 }
 
-// 可轉安裝：同一個雙耳固定環只鎖一顆耳螺絲（A），固定環與筒身一起繞它轉；螺絲離筒身軸線 14 mm，
-// 推桿直接接有固定軸的輸出件。A–B 距離 = √(軸向長度² + 14²)，軸向長度 = lmin + 伸出量。
+// 可轉安裝：同一個雙耳固定環只鎖一顆耳螺絲（A），固定環與筒身一起繞它轉；螺絲離筒身軸線 12 mm，
+// 推桿直接接有固定軸的輸出件。A–B 距離 = √(軸向長度² + 耳距²)，軸向長度 = lmin + 伸出量。
 export function placePivotSyringe(comps,params,points,aRef,bRef,{extension=10,pivotEar=1}={}){
  const frame=comps.find(c=>c.id===aRef?.componentId),arm=comps.find(c=>c.id===bRef?.componentId);
  if(!frame||!isFixedFrame(frame,comps))return fail('可轉固定環的支點須安裝在固定機架上。');
