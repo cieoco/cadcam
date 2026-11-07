@@ -1,3 +1,4 @@
+import {pointDisplayName} from './display-labels.js';
 import {actuatorChoices,planMotorInstallation,quickMotorChoices} from './actuator-installation.js';
 import {signedNumberInput,showNumber,readNumber} from './numeric-input.js';
 import {resolveMotorOrientation} from './motor-orientation.js';
@@ -104,7 +105,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
       for(const id of new Set(candidates.map(c=>c.nodeId))){
         const c=base.comps.find(c=>['p1','p2'].some(k=>c[k]?.id===id)),p=world(c?.p1?.id===id?c.p1:c?.p2);if(!p)continue;
         draw('circle',{cx:p.x,cy:-p.y,r:7,fill:id===selectedNode?'#e88d27':'white',stroke:'#0e7490','stroke-width':2});
-        const hit=draw('circle',{cx:p.x,cy:-p.y,r:Math.max(12,radius),fill:'transparent','data-quick-node':id,role:'button',tabindex:0,'aria-label':`在孔 ${id} 安裝馬達`});
+        const hit=draw('circle',{cx:p.x,cy:-p.y,r:Math.max(12,radius),fill:'transparent','data-quick-node':id,role:'button',tabindex:0,'aria-label':`在${pointDisplayName(base.comps,id)}安裝馬達`});
         hit.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();chooseNode(id);}};
       }
     }

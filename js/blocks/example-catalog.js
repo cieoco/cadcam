@@ -16,41 +16,41 @@ const family = (id, group, title, note, variants) => ({ id, group, title, note, 
 export const CATALOG_FAMILIES = [
   family('gears', 'transmission', '改變轉速與轉向 · 齒輪', '比較單對齒輪、齒輪列與共軸減速。', [
     variant('gear-pair', '兩輪嚙合傳動'), variant('reduction-gear-train', '齒輪列四倍減速'),
-    variant('iq-mad-box', '三段共軸減速 · M.A.D. Box', '可試動', 'IQ')]),
+    variant('iq-mad-box', "三段共軸減速", '可試動', "")]),
   family('belt', 'transmission', '跨軸同向傳動 · 皮帶輪', '改輪徑比較轉速比。', [variant('pulley-belt', '皮帶輪同向變速')]),
   family('chain', 'transmission', '跨軸減速 · 鏈輪鏈條', '20 齒帶動 40 齒；#25 鏈條示範。', [variant('sprocket-chain', '鏈輪鏈條同向減速')]),
   family('parallel-lift', 'lift', '保持方向升降 · 平行連桿', '工具保持姿態，仍沿圓弧移動。', [
     variant('parallel-fourbar', '平行四連桿保持姿態'), variant('competition-fourbar-lift', '四連桿升降與工具調角'),
-    variant('six-bar-lift', '六連桿保持方向升降', '可試動', 'IQ'), variant('lift-bucket', '平行升降托斗')]),
+    variant('six-bar-lift', '六連桿保持方向升降', '可試動', ""), variant('lift-bucket', '平行升降托斗')]),
   family('rack', 'lift', '直線推送與升降 · 齒條', '比較水平推送與垂直滑台。', [
     variant('rack-pinion', '旋轉轉為直線推送'), variant('competition-rack-lift', '齒條升降滑台')]),
-  family('linq', 'lift', '齒輪四連桿升降 · Linq', '單側幾何試作；托架方向會變，尺寸與軸接頭待核對。', [variant('iq-linq-lift', '齒輪四連桿升降', '可試動', 'IQ')]),
+  family('linq', 'lift', "齒輪四連桿升降", '單側幾何試作；托架方向會變，尺寸與軸接頭待核對。', [variant('iq-linq-lift', '齒輪四連桿升降', '可試動', "")]),
   family('syringe-lift', 'lift', '推動單臂升降 · 針筒', '先看完成版，再親手安裝針筒。', [
     variant('hydraulic-h01', '固定針筒抬升單臂 · H01'), variant('hydraulic-h01-practice', '安裝單臂針筒 · H01', '待完成練習'),
     variant('hydraulic-h02', '管夾固定針筒抬臂 · H02'), variant('hydraulic-h02-practice', '安裝抬臂針筒 · H02', '待完成練習')]),
-  family('scissor', 'lift', '垂直升起平台 · 剪式台', '三層交叉臂、上下滑槽與跨層針筒。', [variant('guided-scissor-lift', '針筒驅動三層剪式升降', '可試動', 'VEX')]),
-  family('clawbot', 'handling', '抬臂再夾取 · Clawbot', '單轉軸臂會帶著工具傾斜；先分別試升降與夾爪。', [
-    variant('clawbot-geared-lift', '3:1 單轉軸升降 · Clawbot', '可試動', 'IQ'),
+  family('scissor', 'lift', '垂直升起平台 · 剪式台', '三層交叉臂、上下滑槽與跨層針筒。', [variant('guided-scissor-lift', '針筒驅動三層剪式升降', '可試動', "")]),
+  family('clawbot', 'handling', "抬臂再夾取", '單轉軸臂會帶著工具傾斜；先分別試升降與夾爪。', [
+    variant('clawbot-geared-lift', "3:1 單轉軸升降", '可試動', ""),
     variant('gear-gripper', '雙齒輪反向夾取 · 通用夾爪'),
-    variant('clawbot-lift-gripper', '升降與夾取組立 · Clawbot', '可試動', 'IQ'),
-    variant('clawbot-lift-gripper-practice', '接合升降臂與夾爪 · Clawbot', '待完成練習', 'IQ')]),
+    variant('clawbot-lift-gripper', "升降與夾取組立", '可試動', ""),
+    variant('clawbot-lift-gripper-practice', "接合升降臂與夾爪", '待完成練習', "")]),
   family('claws', 'handling', '開合夾指 · 旋轉與平行夾爪', '比較單側活動與雙側保持方向；接觸與夾持力未模擬。', [
     variant('single-servo-claw', '單側活動夾取', '可試動', 'FTC 用途'), variant('parallel-gripper', '雙側平行四連桿夾取')]),
   family('syringe-grip', 'handling', '交叉夾臂開合 · 針筒', '一體式交叉臂由固定筒身推動。', [
     variant('hydraulic-h03', '推動一體式交叉夾臂 · H03'), variant('hydraulic-h03-practice', '安裝夾臂針筒 · H03', '待完成練習')]),
   family('passive-tools', 'handling', '托起物件 · 固定叉與鏟', '共用背板的三種工具；不含車體或主動升降。', [
-    variant('iq-passive-fork', '雙叉托物', '固定組立', 'IQ'), variant('iq-passive-spatula', '雙鏟托物', '固定組立', 'IQ'),
-    variant('iq-passive-combined', '叉臂與鏟板共用背板', '固定組立', 'IQ')]),
-  family('wheel-grabber', 'handling', '調整兩支被動輪爪', '兩臂獨立轉動；橡皮筋、回彈與抓持未模擬。', [variant('iq-wheel-grabber', '兩支獨立輪爪臂', '手動調姿', 'IQ')]),
+    variant('iq-passive-fork', '雙叉托物', '固定組立', ""), variant('iq-passive-spatula', '雙鏟托物', '固定組立', ""),
+    variant('iq-passive-combined', '叉臂與鏟板共用背板', '固定組立', "")]),
+  family('wheel-grabber', 'handling', '調整兩支被動輪爪', '兩臂獨立轉動；橡皮筋、回彈與抓持未模擬。', [variant('iq-wheel-grabber', '兩支獨立輪爪臂', '手動調姿', "")]),
   family('intake', 'handling', '收放進料臂與連續轉輪', '擺臂與連續滾輪是不同動作；物件輸送未模擬。', [
-    variant('competition-roller-intake', '收放式擺臂進料'), variant('continuous-roller-intake', '連續滾輪傳動 · Fling', '局部示意', 'IQ')]),
+    variant('competition-roller-intake', '收放式擺臂進料'), variant('continuous-roller-intake', "連續滾輪傳動", '局部示意', "")]),
   family('wrist', 'handling', '翻轉工具與傾倒料斗', '觀察工具朝向；不模擬物件倒出。', [
     variant('single-axis-wrist', '單軸翻轉工具', '可試動', 'FTC 用途'), variant('tipping-bucket', '單軸傾倒料斗')]),
-  family('lift-gripper', 'handling', '保持姿態升降與夾取', '與 Clawbot 單轉軸升降分開比較。', [
+  family('lift-gripper', 'handling', '保持姿態升降與夾取', "與 單轉軸升降分開比較。", [
     variant('assembly-lift-gripper', '平行升降與夾爪組立'), variant('assembly-lift-gripper-practice', '接合平行升降與夾爪', '待完成練習')]),
   family('hydraulic-arm', 'handling', '分軸升降、轉向與夾取 · 針筒', '每個動作各有針筒，組立台分別控制。', [
     variant('hydraulic-h05', '升降與夾取 · H05'), variant('hydraulic-h06', '轉向、升降與夾取 · H06')]),
-  family('catapult', 'handling', '拉下投球臂 · Fling', '只表達曲柄拉緊段；沒有釋放、彈射或球的飛行。', [variant('crank-catapult-study', '曲柄拉緊投球臂', '局部示意', 'IQ')]),
+  family('catapult', 'handling', "拉下投球臂", '只表達曲柄拉緊段；沒有釋放、彈射或球的飛行。', [variant('crank-catapult-study', '曲柄拉緊投球臂', '局部示意', "")]),
   family('fourbar', 'motion', '旋轉與往復擺動 · 四連桿', '同一家族比較曲柄搖桿、雙曲柄與雙搖桿。', [
     variant('fourbar-crank-rocker', '曲柄帶動搖桿'), variant('fourbar-missing-coupler', '補接四連桿浮桿', '待完成練習'),
     variant('fourbar-double-crank', '雙曲柄連續旋轉'), variant('fourbar-double-rocker', '雙搖桿往復擺動')]),

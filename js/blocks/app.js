@@ -1,3 +1,4 @@
+import {pointDisplayName} from './display-labels.js';
 import {fusionRoot} from '../core/bar-fusion.js';
 import {commitMountingEdit,confirmMountingChange,mountingCandidate} from './mounting-review-ui.js';
 import {frameGroundAxis,planFrameGroundChange} from './frame-ground.js';
@@ -1631,7 +1632,7 @@ function updateMechanismStatus(sol = null) {
       // S3 漏解警示：solver 回報有效，但有些會動的接點沒被解出來，停在原位卻沒提示。
       state = 'warn';
       text = `有 ${unsolvedIds.length} 個接點沒有被帶動（停在原位）`;
-      title = `${title}\n沒有被帶動的接點：${unsolvedIds.join('、')}`;
+      title = `${title}\n沒有被帶動的接點：${unsolvedIds.map(id=>pointDisplayName(S.comps,id)).join('、')}`;
     } else if (mobility.dof === 1) {
       state = 'ready';
       text = '可以播放了';
@@ -2042,7 +2043,7 @@ function drawNow() {
   const hiddenPointIds = new Set(Object.keys(pts).filter(id => isHiddenSliderRailPoint(id) || isSliderMountPoint(id)));
   vComps.filter(c=>c.boxPanel).forEach(c=>[c.p1,c.p2].forEach(p=>hiddenPointIds.add(p.id)));
   renderNodes({
-    points: pts, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds,
+    points: pts, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds, pointLabel: id => pointDisplayName(vComps,id),
     gearPinIds, pulleyPinIds, camFollowerIds, workpieceIds, dragId: S.dragId,
     sliderMountInfo, project: p => ({ x: TX(p.x), y: TY(p.y) }),
     onPointerDown: guardedNodeDown, registerUpdate: update => frameUpdaters.push(update),

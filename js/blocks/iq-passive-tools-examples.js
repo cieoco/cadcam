@@ -1,4 +1,4 @@
-/** IQ passive tools as editable plates and ordinary M3 corner brackets.
+/** Passive tools as editable plates and ordinary M3 corner brackets.
  * The standard 8 mm grid bodies and orthogonal spatula ribs are plate adaptations,
  * not replicas of the original moulded plastic connectors.
  */
@@ -27,16 +27,16 @@ function snapshot(kind){
   if(m.id.endsWith('Corner')){const left=m.id==='SpatulaLCorner',u=left?-4:4;mount(m,'Back',left?[[0,-6.123233995736766e-17,1],[0,-1,-6.123233995736766e-17],[1,0,0]]:[[0,1.8369701987210297e-16,-1],[0,1,1.8369701987210297e-16],[1,0,0]],{x:36+u,y:left?8:-8,z:8},selection(m.id,'top','left',u,-4,left?1:3),{x:72,y:0,a:0});}
   if(/^Spatula[LR]$/.test(m.id)){const left=m.id==='SpatulaL';mount(m,m.id+'Corner',left?[[1,1.2246467991473532e-16,0],[0,0,1],[1.2246467991473532e-16,-1,0]]:[[1,0,0],[0,0,1],[0,-1,0]],{x:0,y:left?24:-8,z:left?-8.000000000000004:-8},selection(m.id,left?'front':'back',left?'bottom':'top',left?-16:16,-12,left?2:0),{x:16,y:left?0:16,a:0});m.mount.face.selection.brackets.offsets.L1=left?-4:4;}
  }
- return {kind:'blocks',v:1,counter:comps.length,projectName:'IQ '+({fork:'叉臂',spatula:'鏟板',combined:'叉臂與鏟板'})[kind],comps,params:Object.fromEntries(comps.flatMap(c=>[[c.gParam,c.p2.x-c.p1.x],[c.r1Param,c.p3.y-c.p1.y],[c.r2Param,Math.hypot(c.p2.x-c.p1.x,c.p3.y-c.p1.y)]])),modules,assemblyMembers:modules.map(m=>m.id)};
+ return {kind:'blocks',v:1,counter:comps.length,projectName:""+({fork:'叉臂',spatula:'鏟板',combined:'叉臂與鏟板'})[kind],comps,params:Object.fromEntries(comps.flatMap(c=>[[c.gParam,c.p2.x-c.p1.x],[c.r1Param,c.p3.y-c.p1.y],[c.r2Param,Math.hypot(c.p2.x-c.p1.x,c.p3.y-c.p1.y)]])),modules,assemblyMembers:modules.map(m=>m.id)};
 }
 export const IQ_PASSIVE_TOOL_EXAMPLES=['fork','spatula','combined'].map(kind=>({
- id:'iq-passive-'+kind,title:'IQ 被動工具：'+({fork:'雙叉臂',spatula:'雙鏟板',combined:'叉臂＋鏟板'})[kind],
+ id:'iq-passive-'+kind,title:"被動工具："+({fork:'雙叉臂',spatula:'雙鏟板',combined:'叉臂＋鏟板'})[kind],
  note:'固定式工具，沒有獨立升降或馬達。'+(kind==='combined'?'外側長叉與內側低鏟共用一塊背板。':'先獨立觀察工具，再對照共用背板的組合版。'),
  adjustmentNote:'切到組立看角碼、配對孔及螺絲。單列叉以長平面接角碼；鏟板以兩片標準轉接肋跨過 8 mm 高差。這是板材改製，五金尺寸與實物承載仍待核對。',
- lesson:{group:'manipulator',level:'來源試作',use:'用現有板件、選面接合與 M3 角碼表示 IQ 固定式叉／鏟；不含車體。',
+ lesson:{group:'manipulator',level:'來源試作',use:"用現有板件、選面接合與 M3 角碼表示 固定式叉／鏟；不含車體。",
   learn:'叉臂較長且窄；鏟板較短且寬，組合時位置更低、靠內。角碼把配對固定孔連起來，轉接肋跨過高差。',
   try:['切到組立，比較背板、外叉、轉接肋與內鏟的相對位置','回各板件設計修改孔距，再復原；保存作品重新開啟'],
   measure:'背板 10×2 孔，85×21 mm、叉臂 8×1 孔，69×13 mm、鏟板 7×2 孔，61×21 mm、轉接肋 3×3 孔，29×29 mm；板厚皆 3 mm。固定孔 Ø3.2，角碼 13×9.5×7 mm。',
-  explain:'來源為 VEX IQ Fork、Spatula、Fork + Spatula 官方 3D Parts List：背板 2×10、叉臂 1×8、鏟板 2×7。採 8 mm 孔距、3 mm 板厚與 6.5 mm 邊距，外形沿既有包絡板產生；高差與安裝位置是看圖改製推論。單列叉的圓端不承接角碼，改由背板邊接叉臂長平面，鏟板用垂直轉接肋與兩顆角碼接背板；只鑽實際使用孔，未複製全部原廠孔列。不是原廠兩種塑膠直角接頭的複製。已核對角碼底面、孔邊距及板件材料；沒有核對實物、承重、接觸或完整施工規格，SVG／DXF 含固定孔仍不等於完整施工圖。'},
+  explain:"來源為 固定叉、鏟與共用背板工具的參考3D零件表：背板 2×10、叉臂 1×8、鏟板 2×7。採 8 mm 孔距、3 mm 板厚與 6.5 mm 邊距，外形沿既有包絡板產生；高差與安裝位置是看圖改製推論。單列叉的圓端不承接角碼，改由背板邊接叉臂長平面，鏟板用垂直轉接肋與兩顆角碼接背板；只鑽實際使用孔，未複製全部參考零件孔列。未複製參考圖中的兩種塑膠直角接頭。已核對角碼底面、孔邊距及板件材料；沒有核對實物、承重、接觸或完整施工規格，SVG／DXF 含固定孔仍不等於完整施工圖。"},
  snapshot:snapshot(kind)
 }));

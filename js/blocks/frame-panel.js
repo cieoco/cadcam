@@ -1,3 +1,4 @@
+import {pointDisplayName} from './display-labels.js';
 import {S} from './state.js';
 import {editableNumber} from './numeric-input.js';
 import {setFramePosition} from './input.js';
@@ -36,7 +37,7 @@ export function renderFrameEditor({pointCoords,frameGroundInfo,frameSizeInfo,poi
     const button=document.getElementById(id);if(button)button.disabled=!target||(id.includes('Angle')&&axisLength<1e-6);
   }
   const hint=document.getElementById('frameAxisHint');
-  if(hint)hint.textContent=!target?'只有一個固定軸，無法調整軸距與方向。這裡不是馬達本體角度。':axisLength<1e-6?'兩個固定軸重合，請先增加軸距。':`調整 ${base.id} → ${target.id} 的方向；移動第二個固定軸，不旋轉馬達本體。`;
+  if(hint)hint.textContent=!target?'只有一個固定軸，無法調整軸距與方向。這裡不是馬達本體角度。':axisLength<1e-6?'兩個固定軸重合，請先增加軸距。':`調整 ${pointDisplayName(S.comps,base.id)} → ${pointDisplayName(S.comps,target.id)} 的方向；移動第二個固定軸，不旋轉馬達本體。`;
   if (margin) margin.value = Number(S.frameMarginMm || 18);
   if (hole) hole.value = Number(S.frameHoleDiameterMm || 5);
   panel.style.display = 'flex';

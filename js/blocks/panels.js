@@ -1,3 +1,4 @@
+import {partDisplayName} from './display-labels.js';
 import {editableNumber} from './numeric-input.js';
 import {setPointPosition,setPointAngle} from './input.js';
 import {pointRotation} from './model.js';
@@ -172,7 +173,7 @@ export function updateRoleEditor() {
     const orientation = mount.orientation || (frameBody ? 'follow-frame' : 'horizontal');
     const effectiveOrientation = orientation === 'follow-frame' && !frameBody ? 'horizontal' : orientation;
     const orientationLabel = effectiveOrientation === 'horizontal' ? '水平' : effectiveOrientation === 'vertical' ? '垂直' : '沿機架';
-    motorMountStatus.textContent = `${frameBody ? `承載：${frameBody}` : '承載：自動機架'}・${mount.face==='front'?'正面':'背面'}・${orientationLabel} → ${motorBar.id}`;
+    motorMountStatus.textContent = `${frameBody ? `承載：${partDisplayName(S.comps,frameBody)}` : '承載：自動機架'}・${mount.face==='front'?'正面':'背面'}・${orientationLabel} → ${partDisplayName(S.comps,motorBar.id)}`;
   }
   const traceBtn = document.getElementById('traceBtn');
   if (traceBtn) {

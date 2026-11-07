@@ -104,7 +104,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
 }
 
 export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds, gearPinIds, pulleyPinIds, camFollowerIds,
-  workpieceIds, dragId, sliderMountInfo, project, onPointerDown, registerUpdate, mountedBaseIds = new Set(), touchTargets = false }) {
+  workpieceIds, dragId, sliderMountInfo, project, onPointerDown, registerUpdate, mountedBaseIds = new Set(), touchTargets = false, pointLabel = id => id }) {
   const size = 14;
   Object.keys(points).forEach(id => {
     if (hiddenPointIds.has(id) || gearPinIds.has(id) || pulleyPinIds.has(id) || camFollowerIds.has(id) || workpieceIds.has(id)) return;
@@ -120,7 +120,8 @@ export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterI
       touchHit.setAttribute('stroke-width', 1);
       touchHit.setAttribute(motor ? 'data-motor-hit' : 'data-id', id);
       touchHit.setAttribute('role', 'button');
-      touchHit.setAttribute('aria-label', motor ? `動力軸心 ${id}：設定馬達或伺服角度` : `接點 ${id}`);
+      const label=pointLabel(id);
+      touchHit.setAttribute('aria-label', motor ? `動力軸心 ${label}：設定馬達或伺服角度` : label.startsWith('接點 ')?label:`接點 ${label}`);
       touchHit.style.pointerEvents = 'all'; touchHit.style.cursor = 'pointer';
       touchHit.addEventListener('pointerdown', event => onPointerDown(event, id));
       svg.appendChild(touchHit);
