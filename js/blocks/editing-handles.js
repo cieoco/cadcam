@@ -84,14 +84,14 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
       const a=project(p),b=project(q),length=Math.hypot(q.x-p.x,q.y-p.y)||1;
       const snap=gridDragStep(comp,dimension),plate=edgeSnap(comp,dimension,S.topo.params,{comps}),holes=v=>{if(snap>1)showHoleCount(input,v);else if(plate)showHoleCount(input,v,plate.hint);};holes(value);
       dimensionHandle(svg,{key:'point-dimension',label:dimension.label,point:besideHole(svg,a,b),direction:{x:(b.x-a.x)/length,y:(b.y-a.y)/length},value,min:8,max:2000,snap,quantize:plate?.quantize(value),
-        preview:v=>{showNumber(input,v);holes(v);},cancel:()=>{showNumber(input,value);holes(value);},commit:plate?.candidates.length?v=>commit(v,true):commit,activate});
+        preview:v=>{showNumber(input,v);holes(v);},cancel:()=>{showNumber(input,value);holes(value);},commit:plate?v=>commit(v,true):commit,activate});
     }
   }
   function handle(key,label,point,direction,value,commit,inputId,min=0,max=2000,step=.1,origin=null,snap=1,plate=null){
     if(!point||!direction||!Number.isFinite(value))return;
     const a=project(point),b=project({x:point.x+direction.x,y:point.y+direction.y}),input=document.getElementById(inputId),field=input?.matches('input')?input:input?.querySelector('input');
     const note=v=>{if(snap>1)showHoleCount(field,v);else if(plate)showHoleCount(field,v,plate.hint);};note(value);
-    dimensionHandle(svg,{key,label,point:origin?besideHole(svg,project(origin),a):a,direction:{x:b.x-a.x,y:b.y-a.y},value,min,max,step,snap,quantize:plate?.quantize(value),preview:v=>{if(field)showNumber(field,v);note(v);},cancel:()=>{if(field)showNumber(field,value);note(value);},commit:plate?.candidates.length?v=>commit(v,true):commit,activate:()=>{openEditor();field?.focus();field?.select();}});
+    dimensionHandle(svg,{key,label,point:origin?besideHole(svg,project(origin),a):a,direction:{x:b.x-a.x,y:b.y-a.y},value,min,max,step,snap,quantize:plate?.quantize(value),preview:v=>{if(field)showNumber(field,v);note(v);},cancel:()=>{if(field)showNumber(field,value);note(value);},commit:plate?v=>commit(v,true):commit,activate:()=>{openEditor();field?.focus();field?.select();}});
   }
   const a=at(c?.p1),b=at(c?.p2),length=a&&b?Math.hypot(b.x-a.x,b.y-a.y):0,u=length?{x:(b.x-a.x)/length,y:(b.y-a.y)/length}:{x:1,y:0};
   if(c&&['bar','triangle'].includes(c.type)&&!c.boxPanel){

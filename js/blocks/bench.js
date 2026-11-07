@@ -194,7 +194,7 @@ export function isDescendant(modules, candidateId, ancestorId) {
 }
 
 // 能不能把 childId 接到 target＝{ module, port }。不能時 reason 用白話說明。
-export function canConnect(comps, modules, childId, target, params) {
+export function canConnect(comps, modules, childId, target, params, opts = {}) {
   const modList = asList(modules);
   const child = modList.find(m => m && m.id === childId);
   if (!child) return { ok: false, reason: '找不到這個模組' };
@@ -206,8 +206,10 @@ export function canConnect(comps, modules, childId, target, params) {
   const host = modList.find(m => m && m.id === target.module);
   const port = host ? autoPorts(comps, modList, host.id, params, { childId }).find(p => p.id === target.port) : null;
   if (!port) return { ok: false, reason: '找不到這個接口' };
-  if (port.kind === 'edge' && port.lengthMm < adapterSpanMm()) {
-    return { ok: false, reason: `這條邊只有 ${Math.round(port.lengthMm)} mm，轉接座需要至少 ${adapterSpanMm()} mm` };
+  if (port.kind === 'edge') {
+    const to = orthogonalTarget(target.module, port), edge = orthogonalHostEdge(comps, modList, { to, orient: { side: port.side } }, pointCoords(comps), params, { home: true });
+    const span = adapterSpanMm({ kind: opts.joint }, hostPlateThickness(comps, edge, 3));
+    if (port.lengthMm < span) return { ok: false, reason: `這條邊只有 ${Math.round(port.lengthMm)} mm，轉接座需要至少 ${span} mm` };
   }
   return { ok: true, port };
 }
@@ -255,7 +257,7 @@ function orthogonalTarget(module, port) {
 // opts.joint：直角接合件種類（'printed'｜'bracket-m3'，只對 edge 接口有效；預設 'printed'）。
 export function connect(comps, modules, childId, target, params, motorState, opts = {}) {
   const list = asList(comps), modList = asList(modules);
-  const can = canConnect(list, modList, childId, target, params);
+  const can = canConnect(list, modList, childId, target, params, opts);
   if (!can.ok) return { ok: false, comps: list, modules: modList, reason: can.reason };
   const port = can.port;
   const r = port.kind === 'bolt'
@@ -409,7 +411,7 @@ export function toggleAngle(comps, modules, moduleId, params, motorState, opts =
 // 畫進主 3D 場景前要乘上該平面的矩陣（C2，由 bench-ui 處理）。
 // edge：桿的兩個求解端點往外法線（side·左法線）挪半個板寬，z＝桿中間高度；bolt：輸出端 at 一個點。
 // 子模組不存在、已安裝、或沒有 base → []（已安裝的要先拆下，沒有基準點不能裝）。
-export function portMarkers(comps, modules, childId, points, params, { zOf, thicknessMm = 3 } = {}) {
+export function portMarkers(comps, modules, childId, points, params, { zOf, thicknessMm = 3, joint } = {}) {
   const list = asList(comps), modList = asList(modules);
   const child = modList.find(m => m && m.id === childId);
   if (!child || child.mount || !child.base) return [];
@@ -450,7 +452,7 @@ export function portMarkers(comps, modules, childId, points, params, { zOf, thic
         if (!okPoint(at)) return;
         mpoints = [{ x: at.x, y: at.y, z: zBase(o.body && o.body.id, plane) }];
       }
-      const can = canConnect(list, modList, childId, { module: host.id, port: port.id }, params);
+      const can = canConnect(list, modList, childId, { module: host.id, port: port.id }, params, { joint });
       const marker = {
         portId: port.id, module: host.id, moduleName: labels.get(host.id) || host.id, kind: port.kind, name: port.name,
         suggested: !!port.suggested, compatible: can.ok, plane, points: mpoints

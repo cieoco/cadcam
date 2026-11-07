@@ -34,7 +34,7 @@ const hb = rack.holes.find(h => h.id === 'LiftOutputB');
 check('升降：齒條多一個 LiftOutputB 孔（u 96、v -16、Ø3.2，避開長槽）', hb && hb.u === 96 && hb.v === -16 && hb.diameter === 3.2 && !hb.role);
 const grip = Ops.builtinTemplate('gear-gripper');
 const gm = grip.comps.find(c => c.type === 'anchor' && c.p1 && c.p1.id === 'GripMount');
-check('夾爪：新增固定安裝點 GripMount (0, 39)，且是模組基準', gm && gm.p1.type === 'fixed' && gm.p1.x === 0 && gm.p1.y === 39 && grip.base === 'GripMount');
+check('夾爪：新增固定安裝點 GripMount (0, 40)，且是模組基準', gm && gm.p1.type === 'fixed' && gm.p1.x === 0 && gm.p1.y === 40 && grip.base === 'GripMount');
 check('夾爪：原本四個零件不變', ['GearA', 'GearB', 'LeftJaw', 'RightJaw'].every(id => grip.comps.some(c => c.id === id)));
 
 // schema：bolts 保存、非法 id 捨棄

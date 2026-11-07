@@ -53,7 +53,7 @@ export function planMemberDimension(comp, params, id, raw, {holeDiameterMm=DEFAU
     if(straight){const other=dimension.param===a?b:a;patch[other]=Number(params[poly.diagParam])-value;if(patch[other]<8)return {ok:false,message:'中間孔需距兩端至少 8 mm。'};}
     else {const diagonal = preservedDiagonalLength(Number(params[a]), Number(params[b]), Number(params[poly.diagParam]),
       Number(patch[a] ?? params[a]), Number(patch[b] ?? params[b]));
-    if (diagonal !== null) patch[poly.diagParam] = Math.round(diagonal * 10) / 10;
+    if (diagonal !== null) patch[poly.diagParam] = exact ? diagonal : Math.round(diagonal * 10) / 10;
     }
   }
   if (comp.type === 'triangle') {

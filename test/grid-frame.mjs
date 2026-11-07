@@ -58,4 +58,11 @@ check('吸附提交存精確值（基準 (20,20)，(6,8) → (68,84)）', gp.ok 
 const np = planFrameGroundChange(gPair, 'angle', gdelta);
 check('不帶吸附旗標（數字輸入）維持三角函數結果', np.ok && near(np.x, 68) && near(np.y, 84));
 check('非格點角度即使帶旗標也不被湊整', (() => { const r = planFrameGroundChange(gPair, 'angle', 10, true); return near(r.x, 20 + 80 * Math.cos(10 * Math.PI / 180)) && r.x !== Math.round(r.x); })());
+// 長斜機架中心線的相鄰格點可能相隔超過舊搜尋窗的80格。
+{
+  const pts=[{x:0,y:0},{x:1000,y:8}],L=Math.hypot(1000,8),axis={a:pts[0],u:{x:1000/L,y:8/L}};
+  const first=snapFrameHole(pts,axis,500),second=snapFrameHole(pts,axis,600),negative=snapFrameHole(pts,axis,-600);
+  check('長斜機架取真正中心線格點，無局部8mm fallback',near(first.u,0)&&near(second.u,L)&&near(negative.u,-L));
+  check('長斜機架換回世界座標仍在格上',[first,second,negative].every(q=>near(q.u*axis.u.x/8,Math.round(q.u*axis.u.x/8))&&near(q.u*axis.u.y/8,Math.round(q.u*axis.u.y/8))));
+}
 report('grid-frame');

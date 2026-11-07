@@ -9,6 +9,7 @@
  */
 import { GRID_PITCH_MM, GRID_TOLERANCE_MM, latticeEmbedding } from './grid-rule.js';
 import { plateVertices, polylineTriangleParams, localToWorld, worldToLocal } from './plate-geometry.js';
+import { planMemberDimension } from './member-dimensions.js';
 
 export const EDGE_SEARCH_MM = 24;
 const REF_INDEX = { p1: 0, p2: 1, p3: 2 };
@@ -93,19 +94,29 @@ export function plateGridHint(comp, params, dimension, value, comps = []) {
 }
 
 /**
- * 三點板邊長把手的格上設定；不適用（折線桿段、夾爪爪端、板寬板厚、盒體）回 null。
- * quantize(start) 回傳給 dimensionHandle 的 quantize；候選為空（板已是例外）時為 undefined，沿用 1 mm 取整。
+ * 三點板邊長把手的格上設定；不適用（夾爪爪端、板寬板厚、盒體）回 null。
+ * 候選以實際尺寸修改結果核對全部孔；沒有合法候選就保留原值，數字欄仍可輸入例外。
  */
 export function edgeSnap(comp, dimension, params, { min = 8, max = 2000, comps = [] } = {}) {
   if (!comp || comp.type !== 'triangle' || comp.boxPanel || !dimension?.refs || dimension.property || dimension.stockKey) return null;
   if (!['g', 'r1', 'r2'].includes(dimension.id)) return null;
-  if (polylineTriangleParams(comp)?.segParams.includes(dimension.param)) return null;   // 桿段維持 8 mm 步距（grid-drag）
+  const segment = polylineTriangleParams(comp)?.segParams.includes(dimension.param);
+  const hint = value => {
+    const plan = planMemberDimension(comp, params, dimension.id, value, { exact: true });
+    return plan.ok ? plateGridHint(comp, { ...params, ...plan.params }, dimension, plan.value, comps) : '離格';
+  };
+  const valid = value => { const text = hint(value); return !!text && text !== '離格'; };
   const [a, b] = [comp.gParam, comp.r1Param, comp.r2Param].filter(k => k !== dimension.param).map(k => Number(params?.[k]));
-  const candidates = latticeEdgeCandidates(a, b, { min, max });
+  const candidates = segment ? [] : latticeEdgeCandidates(a, b, { min, max }).filter(valid);
   return {
     candidates,
-    quantize: candidates.length ? start => raw => nearestEdgeLength(raw, candidates, start) : () => undefined,
-    hint: value => plateGridHint(comp, params, dimension, value, comps)
+    quantize: start => raw => {
+      // 折線桿段仍以 8 mm 為步距，但固定彎角與其他孔也須同時對格。
+      const nearby = segment ? Array.from({ length: 7 }, (_, k) => (Math.round(raw / GRID_PITCH_MM) + k - 3) * GRID_PITCH_MM)
+        .filter(v => v >= min && v <= max && valid(v)) : candidates;
+      return nearestEdgeLength(raw, nearby, start);
+    },
+    hint
   };
 }
 

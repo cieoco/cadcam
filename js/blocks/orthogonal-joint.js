@@ -45,7 +45,7 @@ export function gridOffsetMm(edge, off, joint, hostT = 3) {
   let v = Math.round((h + off + lead) / P) * P - h - lead;
   if (v > h - adapterSpanMm(joint, hostT) + 1e-9) v -= P;
   if (v < -h - 1e-9) v += P;
-  return v < -h - 1e-9 || v > h - adapterSpanMm(joint, hostT) + 1e-9 ? off : Math.round(v * 10) / 10;
+  return v < -h - 1e-9 || v > h - adapterSpanMm(joint, hostT) + 1e-9 ? off : Math.round(v * 1e6) / 1e6;
 }
 // 讀出 joint 的種類 id（不認得的一律視為 printed，與舊存檔相容）。
 export const jointKindOf = joint => (joint && JOINT_KINDS[joint.kind] ? joint.kind : DEFAULT_JOINT_KIND);
@@ -166,7 +166,7 @@ export function adapterLayout(comps, modules, moduleId, params, { stockMm = 3, j
     holesPerFlange: n,
     tiltDeg: Number(orient.tiltDeg) || 0,   // D4：兩翼夾角＝90°＋tiltDeg
     hostHoles,
-    childHoles: bracket ? [] : standing ? standHoles(list, modList, mod, params, edge, ss, childHole, stockMm, jointSettings) : adapterChildHoles({ base, orient, bar, hostSide: edge.side, stockMm, joint: jointSettings }),
+    childHoles: bracket ? [] : standing ? standHoles(list, modList, mod, params, edge, ss, childHole, stockMm, jointSettings) : adapterChildHoles({ base, orient, bar, hostSide: edge.side, hostThicknessMm: hostPlateThickness(list, edge, stockMm), stockMm, joint: jointSettings }),
     // F1：角碼外形（寬、厚、兩腳長），給 3D 與說明用；列印版沒有
     bracket: bracket ? { widthMm: K.widthMm, thicknessMm: K.thicknessMm, longLegMm: K.longLegMm, shortLegMm: K.shortLegMm } : undefined
   };

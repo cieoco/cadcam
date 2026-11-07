@@ -515,7 +515,7 @@ export function createBench(deps) {
       const f = plane ? (sc.planes[plane] && sc.planes[plane].zOf) : sc.zOf;
       return f ? f(id) : 0;
     };
-    return Bench.portMarkers(S.comps, S.modules, st.selected, sc.ptsAll || sc.pts, S.topo.params, { zOf, thicknessMm: sc.thickness })
+    return Bench.portMarkers(S.comps, S.modules, st.selected, sc.ptsAll || sc.pts, S.topo.params, { zOf, thicknessMm: sc.thickness, joint: defaultJointKind() })
       .map(m => {
         const pl = m.plane ? sc.planes[m.plane] : null;
         if (m.plane && !pl) return null;   // 該平面的子場景算不出來，沒辦法放進 3D

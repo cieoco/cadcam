@@ -26,7 +26,7 @@ const labelOf = (modules, id) => moduleLabels(asList(modules)).get(id) || id;
 const boltCount = (host, port) => { const o = asList(host.outputs).find(x => x.id === port.output); return asList(o && o.bolts).length; };
 
 // 這個承接面現在能不能接給 child；回 { ok, reason? }。
-function checkTarget(comps, modules, childId, host, mate, params) {
+function checkTarget(comps, modules, childId, host, mate, params, opts = {}) {
   if (!mate.valid || !mate.port) return { ok: false, reason: '這個承接面指到的零件已經不在了，請重新設定' };
   if (isDescendant(asList(modules), host.id, childId)) return { ok: false, reason: '會形成環：這個機構已經是它的宿主（裝在它身上）' };
   if (mate.port.kind === 'bolt' && boltCount(host, mate.port) < 2) return { ok: false, reason: '這個輸出端只有 1 個孔，不能平貼對鎖' };
@@ -34,7 +34,7 @@ function checkTarget(comps, modules, childId, host, mate, params) {
     const used = asList(modules).find(m => m && m.id !== childId && m.mount && !m.mount.orient && m.mount.to && m.mount.to.module === host.id && m.mount.to.output === mate.port.output);
     if (used) return { ok: false, reason: `這個輸出端已經鎖著「${labelOf(modules, used.id)}」，一次只能鎖一個；要換的話先把它拆下來` };
   }
-  const can = canConnect(comps, modules, childId, { module: host.id, port: mate.port.id }, params);
+  const can = canConnect(comps, modules, childId, { module: host.id, port: mate.port.id }, params, { joint: opts.jointKind });
   return can.ok ? { ok: true } : { ok: false, reason: can.reason };
 }
 
@@ -66,7 +66,7 @@ export function mateConnect(comps, modules, childId, target, params, motorState,
   if (!host || host.id === childId) return fail('找不到要接的模組');
   const mate = effectiveMates(list, mods, host.id, params).receive.find(r => r.id === target.mate);
   if (!mate) return fail('找不到這個承接面');
-  const c = checkTarget(list, mods, childId, host, mate, params);
+  const c = checkTarget(list, mods, childId, host, mate, params, opts);
   if (!c.ok) return fail(c.reason);
   const to = { module: host.id, port: mate.port.id };
   // 底座自己被接到別人身上 → 底座跟著走：把那一串的頭（宿主往上找到沒安裝的那個）移到最前面。

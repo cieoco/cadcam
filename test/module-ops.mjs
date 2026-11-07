@@ -86,6 +86,7 @@ let work;
 {
   check('內建模組含三種針筒模組與既有九種機構', BUILTIN_MODULES.map(m => m.id).join(',') === 'hydraulic-lift,hydraulic-gripper,hydraulic-base,rack-lift,gear-gripper,fourbar-lift,single-servo-claw,single-axis-wrist,swing-intake,tipping-bucket,lift-bucket,parallel-gripper');
   const tLift = builtinTemplate('rack-lift'), tGrip = builtinTemplate('gear-gripper');
+  check('模組庫新增安裝基準不使夾爪機架離格', !(await import('../js/blocks/grid-rule.js')).gridIssues(tGrip.comps,tGrip.params).some(i=>i.rule==='R3'));
   check('內建模組是合法模板', normalizeTemplate(tLift).ok && normalizeTemplate(tGrip).ok);
   check('齒條升降模板帶滑台輸出端', tLift.outputs.length === 1 && tLift.outputs[0].at === 'LiftOutput');
   check('夾爪模板去掉夾爪任務 params', !('gripperWorkflow' in tGrip.params) && !('gripperObjectWidth' in tGrip.params));

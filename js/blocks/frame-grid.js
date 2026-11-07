@@ -42,10 +42,17 @@ export function snapFrameHole(points, axis, u, v = 0, centered = true, pitch = G
   const rx = axis.a.x + axis.u.x * u - axis.u.y * v - o.x, ry = axis.a.y + axis.u.y * u + axis.u.x * v - o.y;
   const fi = Math.round((c * rx + s * ry) / pitch), fj = Math.round((-s * rx + c * ry) / pitch);
   if (!centered) { const l = local(world(fi, fj)); return { u: clean(l.u), v: clean(l.v) }; }
-  let best = null;   // 中心線只取落在線上的格點
-  for (let I = fi - 40; I <= fi + 40; I++) for (let J = fj - 40; J <= fj + 40; J++) {
-    const l = local(world(I, J));
-    if (Math.abs(l.v) <= 0.01 && (best === null || Math.abs(l.u - u) < Math.abs(best - u))) best = l.u;
-  }
-  return best === null ? multiple() : { u: clean(best), v: 0 };
+  // 中心線穿過兩個基準格點：格向量除以最大公因數，直接得到所有線上格點的步距。
+  // 長斜機架的相鄰格點可以相隔上百格，不能只搜拖點附近再退回局部 8 mm。
+  const grid = p => { const dx = p.x - o.x, dy = p.y - o.y; return { i: Math.round((c * dx + s * dy) / pitch), j: Math.round((-s * dx + c * dy) / pitch) }; };
+  const a = grid(axis.a), b = points.filter(p => Math.abs(local(p).v) <= GRID_TOLERANCE_MM)
+    .sort((p, q) => Math.abs(local(q).u) - Math.abs(local(p).u))[0];
+  if (!b) return { u: 0, v: 0 };
+  const end = grid(b), di = end.i - a.i, dj = end.j - a.j;
+  const gcd = (a, b) => b ? gcd(b, a % b) : a, divisor = gcd(Math.abs(di), Math.abs(dj));
+  if (!divisor) return { u: 0, v: 0 };
+  const origin = local(world(a.i, a.j)).u, step = local(world(a.i + di / divisor, a.j + dj / divisor)).u - origin;
+  const next = origin + Math.round((u - origin) / step) * step;
+  const q = { x: axis.a.x + axis.u.x * next, y: axis.a.y + axis.u.y * next }, g = grid(q), snapped = world(g.i, g.j);
+  return { u: Math.hypot(q.x - snapped.x, q.y - snapped.y) <= GRID_TOLERANCE_MM ? clean(next) : 0, v: 0 };
 }

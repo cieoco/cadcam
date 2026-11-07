@@ -5,12 +5,12 @@ const SNAP={"kind":"blocks","v":1,"counter":2,"comps":[{"type":"anchor","id":"An
 (async()=>{
  const output=process.env.OUT||process.env.TEST_OUTPUT||'output/grid-blocks/g5';await fs.mkdir(output,{recursive:true});
  const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true}),results=[];
- try{for(const viewport of [{width:1280,height:900},{width:390,height:844}].filter(v=>!process.env.TEST_WIDTH||v.width===Number(process.env.TEST_WIDTH))){
+ try{for(const viewport of [{width:1280,height:900},{width:390,height:844},{width:360,height:640},{width:844,height:390}].filter(v=>!process.env.TEST_WIDTH||v.width===Number(process.env.TEST_WIDTH))){
   const mobile=viewport.width<500,context=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile,acceptDownloads:true}),page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());page.setDefaultTimeout(15000);
   try{
    await page.goto((process.env.TEST_URL||'http://127.0.0.1:8021')+'/blocks.html#m='+Buffer.from(JSON.stringify(SNAP)).toString('base64url'));
-   await page.waitForFunction(()=>window.blocks);await page.waitForTimeout(800);
+   await page.waitForFunction(()=>window.blocks,{},{timeout:45000});await page.waitForTimeout(800);
    const start=page.getByRole('button',{name:'開始設計',exact:true});if(await start.isVisible().catch(()=>false))await start.click();await page.waitForTimeout(500);
    const info=await page.evaluate(async()=>{const {S}=await import('/js/blocks/state.js'),{adapterLayout}=await import('/js/blocks/orthogonal-joint.js');
     const mod=S.modules.find(m=>m.mount&&m.mount.orient&&m.mount.orient.type==='orthogonal');

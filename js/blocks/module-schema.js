@@ -121,10 +121,10 @@ function validateOrient(raw) {
     out.childEdge = Number(raw.childEdge);
   }
   out.childAxisDeg = Number(raw.childAxisDeg);
-  // offsetMm（選配）：沿宿主桿滑動的位置（mm，從桿中點起算），四捨五入到 0.1；0 或不合法就不寫入。
+  // offsetMm（選配）：沿宿主桿滑動的位置（mm，從桿中點起算），保留對格所需的小數；0 或不合法就不寫入。
   const ov = raw.offsetMm;
   if (!(ov === null || ov === '' || typeof ov === 'boolean' || !isFiniteNum(ov))) {
-    const off = Math.round(Number(ov) * 10) / 10;
+    const off = Math.round(Number(ov) * 1e6) / 1e6;
     if (off !== 0) out.offsetMm = off;
   }
   // tiltDeg（選配，D4）：整個子模組繞接合線傾斜的角度，15° 一格、夾在 ±60°；0 或不合法就不寫入。

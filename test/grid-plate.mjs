@@ -1,7 +1,7 @@
-// G4b 三點板頂點對格（docs/SDD-GRID-BLOCKS.md R2）：邊長拖曳候選、板已例外時退回 1 mm、額外孔吸附、格向量提示。跑法：node test/grid-plate.mjs
+// G4b 三點板頂點對格（docs/SDD-GRID-BLOCKS.md R2）：邊長拖曳候選、無合法候選時保留原值、額外孔吸附、格向量提示。跑法：node test/grid-plate.mjs
 import { check, report } from './_harness.mjs';
 import { latticeEdgeCandidates, nearestEdgeLength, edgeSnap, snapPlateHole, plateGridHint, gridVectorText } from '../js/blocks/grid-plate.js';
-import { latticeEmbedding } from '../js/blocks/grid-rule.js';
+import { latticeEmbedding, gridIssues } from '../js/blocks/grid-rule.js';
 import { memberDimensions, planMemberDimension } from '../js/blocks/member-dimensions.js';
 import { projectedDimension } from '../js/blocks/dimension-handle.js';
 import { readFileSync } from 'node:fs';
@@ -36,17 +36,17 @@ check('另外兩邊 16、8√2：拖曳停在 8√2', (() => {
   return Math.abs(projectedDimension(12, { x: 0, y: 0 }, { x: 1, y: 0 }, { min: 8, max: 2000, quantize: s.quantize(12) }) - S2) < 1e-9
     || Math.abs(projectedDimension(12, { x: 0.1, y: 0 }, { x: 1, y: 0 }, { min: 8, max: 2000, quantize: s.quantize(12) }) - S2) < 1e-9;
 })());
-check('板已是例外（另外兩邊 10、10）：無候選、quantize 為 undefined，退回 1 mm 取整', (() => {
+check('板已是例外（另外兩邊 10、10）：無候選時拖曳保留原值', (() => {
   const s = edgeSnap(comp, dim(comp, 'g'), { G: 15, R1: 10, R2: 10 }, {});
-  return s.candidates.length === 0 && s.quantize(15) === undefined &&
-    projectedDimension(15, { x: 3.4, y: 0 }, { x: 1, y: 0 }, { min: 8, max: 2000, quantize: s.quantize(15) }) === 18;
+  return s.candidates.length === 0 &&
+    projectedDimension(15, { x: 3.4, y: 0 }, { x: 1, y: 0 }, { min: 8, max: 2000, quantize: s.quantize(15) }) === 15;
 })());
 check('另外一邊 11.3（0.1 精度、離格 0.014）亦視為例外', edgeSnap(comp, dim(comp, 'g'), { G: 16, R1: 11.3, R2: 11.3 }, {}).candidates.length === 0);
-check('不適用者回 null：板寬、折線桿段、爪端、盒體、非三點板', (() => {
+check('板寬、盒體、非三點板不適用；折線桿段也核對孔格', (() => {
   const poly = { ...comp, shapeMode: 'polyline', vertices: [{ solve: true, ref: 'p1' }, { solve: true, ref: 'p2' }, { solve: true, ref: 'p3' }] };
   const p = { G: 24, R1: 40, R2: 32 }, ds = memberDimensions(poly);   // 折線 p1→p2→p3：桿段 g、r2，跨距 r1
   const segs = ds.filter(d => d.param && edgeSnap(poly, d, p, {}) === null).length, diag = edgeSnap(poly, dim(poly, 'r1'), p, {});
-  return segs === 2 && diag && diag.candidates.length > 0 && edgeSnap(comp, dim(comp, 'width'), p, {}) === null &&
+  return segs === 0 && diag && diag.candidates.length > 0 && edgeSnap(comp, dim(comp, 'width'), p, {}) === null &&
     edgeSnap({ ...comp, boxPanel: true }, dim(comp, 'g'), p, {}) === null && edgeSnap({ type: 'bar' }, { id: 'g', refs: ['p1', 'p2'] }, p, {}) === null;
 })());
 check('折線跨距吸附後彎角落在格點', (() => {
@@ -103,4 +103,22 @@ check('板本身離格：u、v 各取 8 的倍數', (() => {
 // 6. 接線
 const src = f => readFileSync(new URL(`../js/blocks/${f}`, import.meta.url), 'utf8');
 check('尺寸把手與孔拖曳接上 grid-plate，plate-editor 只按需載入', /edgeSnap\(/.test(src('editing-handles.js')) && /import\('\.\/grid-plate\.js'\)/.test(src('plate-editor.js')) && !/from '\.\/grid-plate\.js'/.test(src('plate-editor.js')));
+// 全部加工孔須與實際提交後的尺寸同格，不只檢查三個頂點。
+{
+  const c = { ...comp, p2:{id:'B',x:40,y:0}, p3:{id:'C',x:0,y:40}, outlinePoints:[{u:8,v:0,hole:true}] };
+  const p = {G:40,R1:40,R2:40*Math.SQRT2}, d=dim(c,'g'), s=edgeSnap(c,d,p,{comps:[c]});
+  const value=s.quantize(40)(51), plan=planMemberDimension(c,p,'g',value,{exact:true});
+  check('額外孔原本對格，拖曳不採用使孔離格的51.225候選', !gridIssues([c],p).length && !gridIssues([c],{...p,...plan.params}).length && Math.abs(value-51.225)>.01);
+  const owner={...c,outlinePoints:[]}, syringe={id:'S',type:'syringe',a:{componentId:'T',u:8,v:0}};
+  const guarded=edgeSnap(owner,dim(owner,'g'),p,{comps:[owner,syringe]}), next=guarded.quantize(40)(51);
+  check('針筒掛點也參與候選核對', guarded.hint(next)!=='離格' && Math.abs(next-51.225)>.01);
+}
+{
+  const c={...comp,p2:{id:'B',x:56,y:0},p3:{id:'C',x:56,y:80},shapeMode:'polyline',vertices:['p1','p2','p3'].map(ref=>({solve:true,ref}))};
+  const p={G:56,R1:Math.hypot(56,80),R2:80},s=edgeSnap(c,dim(c,'g'),p,{comps:[c]}),v=s.quantize(56)(64),next=planMemberDimension(c,p,'g',v,{exact:true});
+  check('折線56→64保留精確衍生跨距，提交後不離格',v===64 && Math.abs(next.params.R1-Math.hypot(64,80))<1e-8 && !gridIssues([c],{...p,...next.params}).length);
+  const slope={...c,p3:{id:'C',x:104,y:64}},sp={G:56,R1:Math.hypot(104,64),R2:80};
+  const guarded=edgeSnap(slope,dim(slope,'r2'),sp,{comps:[slope]}),nv=guarded.quantize(80)(88),np=planMemberDimension(slope,sp,'r2',nv,{exact:true});
+  check('斜向折線改段長若破壞方格則保留原值，不暗改彎角',nv===80 && !gridIssues([slope],{...sp,...np.params}).length);
+}
 report('grid-plate');

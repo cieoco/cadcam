@@ -1058,7 +1058,7 @@ export function builtinTemplate(id) {
       { id: 'r2', name: '工具架下緣', ref: { kind: 'bar', id: 'ToolBrace', side: -1 } }] };
   } else if (id === 'gear-gripper') {
     // 專用安裝點 GripMount：避開伺服軸（GCA 是 MG995 輸出軸心，鎖不了），夾爪以它為基準裝到滑台孔上。
-    comps.push({ type: 'anchor', id: 'GripMount', p1: { id: 'GripMount', type: 'fixed', x: 0, y: 39 } });
+    comps.push({ type: 'anchor', id: 'GripMount', p1: { id: 'GripMount', type: 'fixed', x: 0, y: 40 } });
     template.base = 'GripMount';
     template.outputs = [];
     template.mates = { attach: { normalDeg: 90 }, receive: [] };   // 爪往 −y 伸，朝宿主的那一側是 +90°
