@@ -4,7 +4,7 @@ const base=process.env.TEST_URL||'http://127.0.0.1:8023',out=process.env.OUT||'o
 const cases=[
  {id:'continuous-roller-intake',part:'IntakeRoller',field:'diskDiameterInput',handle:'disk-diameter',prop:'diameterMm',from:40,to:48,dir:[0,-.5]},
  {id:'crank-catapult-study',part:'ThrowExtension',field:'memberDimensionInput',handle:'member-length',param:'ThrowTipLength',from:64,to:72,dir:[-24.18655473466067/64,-59.25378106135729/64]},
- {id:'guided-scissor-lift',part:'ScissorPlatform',field:'memberDimensionInput',handle:'member-length',param:'ScissorPlatformLength',from:192,to:200,dir:[1,0]}
+ {id:'guided-scissor-lift',part:'ScissorExtension',field:'memberDimensionInput',handle:'member-length',param:'ScissorExtensionLength',from:64,to:72,dir:[1,0]}
 ].filter(c=>!process.env.TEST_CASE||c.id===process.env.TEST_CASE);
 (async()=>{
  await fs.mkdir(out,{recursive:true});const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true}),results=[];
@@ -18,7 +18,7 @@ const cases=[
   try{
    await page.goto(base+'/blocks.html?gripperPilot=1');await page.waitForFunction(()=>window.blocks);await page.evaluate(()=>blocks.openExamples());
    await page.locator(`[data-example-id="${c.id}"]`).click();await page.getByRole('button',{name:'載入此範例',exact:true}).click();await page.waitForTimeout(500);
-   assert.equal((await page.locator('#thetaUnit').textContent()).trim(),c.id==='guided-scissor-lift'?'mm':'°');
+   if(c.id==='guided-scissor-lift')assert.ok(await page.locator('#syringeControls').isVisible());else assert.equal((await page.locator('#thetaUnit').textContent()).trim(),'°');
    await select();await reveal();const before=await state();assert.equal(before.value,c.from);
    await field.fill(String(c.to));await field.press('Tab');await page.waitForTimeout(400);assert.equal((await state()).value,c.to);assert.equal((await state()).undo,before.undo+1);
    await page.evaluate(()=>blocks.undo());await select();await reveal();assert.equal((await state()).value,c.from);
@@ -30,7 +30,7 @@ const cases=[
    await page.evaluate(()=>blocks.saveFile());const downloaded=page.waitForEvent('download');await page.locator('#saveProjectForm').evaluate(f=>f.requestSubmit());const file=await downloaded,path=`${out}/${c.id}-${viewport.width}.json`;await file.saveAs(path);
    await page.evaluate(()=>blocks.undo());assert.equal((await state()).value,c.from);
    await page.evaluate(()=>blocks.openFile());const chooser=page.waitForEvent('filechooser');await page.getByRole('button',{name:'選擇作品檔',exact:true}).click();await (await chooser).setFiles(path);await page.waitForTimeout(500);assert.equal((await state()).value,c.to);
-   await page.evaluate(()=>blocks.togglePlay());await page.waitForTimeout(650);await page.evaluate(()=>blocks.togglePlay());assert.ok((await state()).theta>0);
+   await page.evaluate(()=>blocks.togglePlay());await page.waitForTimeout(650);await page.evaluate(()=>blocks.togglePlay());if(c.id==='guided-scissor-lift')assert.ok((await state()).comps.find(c=>c.type==='syringe').extension>0);else assert.ok((await state()).theta>0);
    await page.evaluate(()=>blocks.toggle3D());await page.locator('#view3d canvas').waitFor();await page.waitForTimeout(500);await page.screenshot({path:`${out}/${c.id}-${viewport.width}-3d.png`});await page.evaluate(()=>blocks.toggle3D());assert.equal((await state()).value,c.to);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);results.push({viewport,example:c.id,ok:true});
   }catch(e){results.push({viewport,example:c.id,ok:false,error:e.stack});await page.screenshot({path:`${out}/${c.id}-${viewport.width}-failed.png`});throw e;}

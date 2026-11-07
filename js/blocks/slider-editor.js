@@ -1,5 +1,7 @@
 import {editableNumber} from './numeric-input.js';
 import {commitLegacyMountingEdit} from './mounting-review-ui.js';
+import {compileTopology} from '../core/topology.js';
+import {solveTopology} from '../multilink/solver.js';
 /**
  * blocks / slider-editor
  *
@@ -18,16 +20,29 @@ export function createSliderEditor({
 }) {
   document.getElementById('sliderSettings')?.addEventListener('toggle',()=>draw(),true);
 
+  function validateMovingRailEdit(){
+    if(!S.comps.some(c=>c.type==='slider'&&c.movingRail))return true;
+    const result=solveTopology(compileTopology(S.comps,{params:S.topo.params},new Set()),{thetaDeg:S.theta||0});
+    if(result.isValid&&!result.isUnderconstrained)return true;
+    notify(result.reason||result.errorReason||'滑軌修改無法保持原有連接與孔距。');return false;
+  }
+
   // 滑軌幾何同步（rebuild 前呼叫）：補齊 / 正規化 m1、m2 固定孔，並把軌道 p1、p2
   // 依載板方向與 railOffset 重新擺正（軌道是載板上的一段，整組同一直線）。
   function syncSliderGeometries() {
     S.comps.filter(c => c.type === 'slider' && c.p1 && c.p2).forEach(c => {
+      if(c.movingRail){
+        const dx=c.p2.x-c.p1.x,dy=c.p2.y-c.p1.y,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L,offset=sliderRailOffset(c),carrier=sliderCarrierLength(c);
+        c.m1={...c.m1,id:c.m1?.id||`${c.id}m1`,type:'floating',x:c.p1.x-ux*offset,y:c.p1.y-uy*offset};
+        c.m2={...c.m2,id:c.m2?.id||`${c.id}m2`,type:'floating',x:c.p1.x+ux*(carrier-offset),y:c.p1.y+uy*(carrier-offset)};
+        return;
+      }
       if (!c.m1 || !c.m2) {
         c.m1 = { id: `${c.id || 'Slider'}m1`, type: 'fixed', x: c.p1.x || 0, y: c.p1.y || 0 };
         c.m2 = { id: `${c.id || 'Slider'}m2`, type: 'fixed', x: c.p2.x || 0, y: c.p2.y || 0 };
       }
-      c.m1.type = 'fixed';
-      c.m2.type = 'fixed';
+      c.m1.type = c.movingRail ? 'floating' : 'fixed';
+      c.m2.type = c.movingRail ? 'floating' : 'fixed';
       const dx = (c.m2.x || 0) - (c.m1.x || 0);
       const dy = (c.m2.y || 0) - (c.m1.y || 0);
       const d = Math.hypot(dx, dy) || 1;
@@ -193,6 +208,7 @@ export function createSliderEditor({
       S.topo.params[c.lenParam] = L;
       normalizeSliderRange(candidate);
       syncSliderGeometries();
+      return validateMovingRailEdit();
     },{pushUndo,notify});
     renderLenEditor(railLength(c));
     renderSliderDetails(c);
@@ -225,6 +241,7 @@ export function createSliderEditor({
       candidate[{body:'carriageLen',carrier:'carrierLen',offset:'railOffset',start:'travelStart',end:'travelEnd'}[key]]=value;
       normalizeSliderRange(candidate);
       syncSliderGeometries();
+      return validateMovingRailEdit();
     },{pushUndo,notify});
     renderSliderDetails(c);if(accepted){pause();rebuild();}draw();
   }

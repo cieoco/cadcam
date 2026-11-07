@@ -5,9 +5,20 @@ const motor=p('RollMotor',-64,32,'motor'),axis=p('RollAxis',0,32,'fixed');
 const motorPin=p('RollMotorPin',-59,32),rollPin=p('RollPin',8,32);
 const throwO=p('ThrowO',0,0,'motor'),throwD=p('ThrowD',96,0,'fixed'),throwA=p('ThrowA',0,24);
 const throwB=p('ThrowB',71.81344526533933,59.25378106135729),throwTip=p('ThrowTip',47.62689053067866,118.50756212271458);
-const sa=p('ScissorA',0,0,'fixed'),sb=p('ScissorB',96,0),sm=p('ScissorM',48,64);
-const sc=p('ScissorC',0,128),sd=p('ScissorD',96,128),sp=p('ScissorP',192,128),sq=p('ScissorQ',192,184);
 const fuse=(members,points)=>members.map((c,i)=>({...c,barFusionRoot:members[0].id,...(!i?{barFusion:{version:1,members:members.map(m=>m.id),points:points.map(([id,x,y])=>({id,x,y}))}}:{})}));
+// Three X stages, with a pinned end and a horizontal slider at both ends.
+// 112 mm arms and the mount offsets are teaching values inferred from the photo.
+const scissorH=Math.sqrt((95**2-80**2)*7/8),scissorW=Math.sqrt(112**2-scissorH**2);
+const left=Array.from({length:4},(_,i)=>p(`ScissorL${i}`,0,i*scissorH,i===0?'fixed':'floating'));
+const right=Array.from({length:4},(_,i)=>p(`ScissorR${i}`,scissorW,i*scissorH));
+const scissorArms=left.slice(0,3).flatMap((a,i)=>{
+ const mid=p(`ScissorM${i}`,scissorW/2,(i+.5)*scissorH),up=`ScissorUp${i}`,down=`ScissorDown${i}`;
+ return [...fuse([bar(up,a,mid,`${up}Length`,'#e74c3c'),bar(`${up}Tip`,mid,right[i+1],`${up}TipLength`,'#e74c3c')],
+  [[a.id,0,0],[mid.id,56,0],[right[i+1].id,112,0]]),
+ ...fuse([bar(down,right[i],mid,`${down}Length`,'#3498db'),bar(`${down}Tip`,mid,left[i+1],`${down}TipLength`,'#3498db')],
+  [[right[i].id,0,0],[mid.id,56,0],[left[i+1].id,112,0]])].map((c,k)=>({...c,name:`第 ${i+1} 層${k<2?'上升':'下降'}剪臂${k%2?'外段':'內段'}`}));
+});
+const scissorRailEnd=p('ScissorRailEnd',128,scissorH*3),scissorPlatformEnd=p('ScissorP',192,scissorH*3);
 export const IQ_MECHANISM_EXAMPLES = [
  {
   id:'continuous-roller-intake',title:'連續滾輪吸入器：傳動試作',
@@ -45,24 +56,23 @@ export const IQ_MECHANISM_EXAMPLES = [
   ],params:{theta:0,ThrowGround:96,ThrowRadius:30,ThrowPin:24,ThrowPull:80,ThrowArmLength:64,ThrowTipLength:64}}
  },
  {
-  id:'guided-scissor-lift',title:'導軌式剪式升降台',
-  note:'底部滑塊收近時升高、拉遠時下降。交叉桿左上端抬平台，右側導軌經斜撐保持平台水平；右上剪臂端未固定在平台上。',
-  adjustmentNote:'這是單側抬升、右側導向的試作，不是雙端接移動滑槽的標準剪式台。點橘色平台改伸出長度，或點底部滑軌改行程。',
-  lesson:{group:'lift-motion',level:'試作',use:'沿用交叉一體桿、直線輸入及固定導軌，探索剪式升降。右上剪臂端只呈現位置，不模擬與平台接觸。',
-   learn:'兩根交叉桿共用中間轉軸；底部跨度變小，高度增加，平台另由右側導軌限制方向。',
-   try:['播放底部跨度 96～144 mm，觀察平台下降，再反向升高','點橘色平台選水平段，把 192 改為 200 mm，再復原','保存重開；不要把右上剪臂端直接固定到平台，否則會鎖死'],
-   predict:'底部滑塊每移動相同距離，升降高度也相同嗎？',measure:'剪臂端距 160 mm，跨度 96／144 mm 時高度約 128／69.7424 mm。',
-   explain:'屬幾何試作；直線驅動為理想輸入，沒有指定實體致動器。板材、軸承、導軌支承、接觸與承載未驗證。'},
-  snapshot:{kind:'blocks',v:1,counter:8,projectName:'導軌式剪式升降台',tracePoint:'ScissorP',comps:[
-   ...fuse([bar('ScissorAscending',sa,sm,'ScissorAscendingLength','#e74c3c'),bar('ScissorFreeTip',sm,sd,'ScissorFreeTipLength','#e74c3c')],
-    [['ScissorA',0,0],['ScissorM',80,0],['ScissorD',160,0]]),
-   ...fuse([bar('ScissorDescending',sm,sb,'ScissorDescendingLength','#3498db'),bar('ScissorLiftTip',sm,sc,'ScissorLiftTipLength','#3498db')],
-    [['ScissorM',0,0],['ScissorB',80,0],['ScissorC',-80,0]]),
-   // 右導軌先依 C–Q 斜撐求交點；水平段仍是合成基準，局部孔位落在 8 mm 格上。
-   bar('ScissorBrace',sc,sq,'ScissorBraceLength','#e67e22',{barFusionRoot:'ScissorPlatform'}),
-   bar('ScissorPlatform',sc,sp,'ScissorPlatformLength','#e67e22',{barFusionRoot:'ScissorPlatform',barFusion:{version:1,members:['ScissorPlatform','ScissorBrace'],points:[{id:'ScissorC',x:0,y:0},{id:'ScissorP',x:192,y:0},{id:'ScissorQ',x:192,y:56}]}}),
-   {type:'slider',id:'ScissorBottom',p1:p('ScissorS1',0,0,'fixed'),p2:p('ScissorS2',176,0,'fixed'),p3:sb,lenParam:'ScissorBottomLength',carriageLen:24,carrierLen:176,travelStart:96,travelEnd:144,sign:-1,isInput:true,physicalMotor:'1',color:'#16a085'},
-   {type:'slider',id:'ScissorGuide',p1:p('ScissorR1',192,0,'fixed'),p2:p('ScissorR2',192,224,'fixed'),p3:sq,lenParam:'ScissorGuideLength',carriageLen:24,carrierLen:224,travelStart:0,travelEnd:224,sign:-1,color:'#16a085'}
-  ],params:{theta:0,ScissorAscendingLength:80,ScissorFreeTipLength:80,ScissorDescendingLength:80,ScissorLiftTipLength:80,ScissorBraceLength:200,ScissorPlatformLength:192,ScissorBottomLength:176,ScissorGuideLength:224}}
+  id:'guided-scissor-lift',title:'針筒驅動三層剪式升降台',
+  note:'依 VEX 原圖的三組交叉桿重建；底座與平台各有一個轉軸端及水平滑塊端。斜向針筒接在第一層與第三層活動剪臂上，伸出時抬高平台。',
+  adjustmentNote:'沿原針筒伸出量試動；點橘色平台改長度，點上方滑軌改允許行程。尺寸是未量測的教學示範值，不是原機施工規格。',
+  lesson:{group:'lift-motion',level:'幾何試作',use:'參考 VEX 剪式升降台照片的三層 X、水平上下滑槽及跨層斜置致動器。',
+   learn:'三層共用交叉中軸；滑塊隨剪臂展開而收近。針筒兩端都隨剪臂移動，並非底部滑塊的直線驅動。',
+   try:['調整針筒伸出量 0～40 mm，觀察三層與水平平台','點橘色平台，選外伸段，把 64 改為 72 mm，再復原','保存重開，核對針筒兩端仍接在活動剪臂及上滑塊仍接平台'],
+   predict:'針筒每伸出相同距離，平台升高量也相同嗎？',measure:'每支剪臂孔距 112 mm、中心孔在 56 mm；針筒孔距 95～135 mm 時，平台高度約 143.777～305.159 mm。',
+   explain:'結構取自官方照片；112 mm 剪臂、安裝孔及針筒 95+40 mm 均為未量測示範值。未驗證實物、承重、摩擦、全行程干涉或原機液壓規格。'},
+  snapshot:{kind:'blocks',v:1,counter:20,projectName:'針筒驅動三層剪式升降台',tracePoint:'ScissorP',comps:[
+   ...scissorArms,
+   ...fuse([bar('ScissorPlatform',left[3],scissorRailEnd,'ScissorPlatformLength','#e67e22',{name:'平台滑槽段'}),bar('ScissorExtension',scissorRailEnd,scissorPlatformEnd,'ScissorExtensionLength','#e67e22',{name:'平台外伸段'})],
+    [['ScissorL3',0,0],['ScissorRailEnd',128,0],['ScissorP',192,0]]),
+   {type:'slider',id:'ScissorBottom',name:'底座水平滑軌',p1:left[0],p2:p('ScissorBaseEnd',192,0,'fixed'),p3:right[0],lenParam:'ScissorBottomLength',carriageLen:16,carrierLen:192,travelStart:40,travelEnd:112,color:'#16a085'},
+   {type:'slider',id:'ScissorTop',name:'平台水平滑軌',movingRail:true,p1:left[3],p2:scissorRailEnd,p3:right[3],lenParam:'ScissorTopLength',carriageLen:16,carrierLen:128,travelStart:40,travelEnd:112,color:'#16a085'},
+   {type:'syringe',id:'ScissorSyringe',name:'跨層斜置針筒',a:{componentId:'ScissorUp0Tip',u:40,v:0},b:{componentId:'ScissorUp2',u:16,v:0},extension:0,branch:1,
+    spec:{name:'10mL 教學示範（未校正）',capacityMl:10,outerDiameter:16,bodyLength:70,rodDiameter:6,lmin:95,stroke:40,calibrated:false}}
+  ],params:{theta:0,ScissorPlatformLength:128,ScissorExtensionLength:64,ScissorBottomLength:192,ScissorTopLength:128,
+   ...Object.fromEntries(scissorArms.map(c=>[c.lenParam,56]))}}
  }
 ];

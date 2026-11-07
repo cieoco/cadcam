@@ -24,7 +24,7 @@ export function commitLegacyMountingEdit(S,mutate,options){
   return commitMountingEdit(S,draft=>{
     const saved={comps:S.comps,modules:S.modules,topo:S.topo};
     S.comps=draft.comps;S.modules=draft.modules;S.topo={...saved.topo,params:draft.params};
-    try{mutate();draft.comps=S.comps;draft.modules=S.modules;draft.params=S.topo.params;}finally{Object.assign(S,saved);}
+    try{if(mutate()===false)return false;draft.comps=S.comps;draft.modules=S.modules;draft.params=S.topo.params;}finally{Object.assign(S,saved);}
   },options);
 }
 

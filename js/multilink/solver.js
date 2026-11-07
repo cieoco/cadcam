@@ -1,5 +1,6 @@
 import {expandBarFusions,validateBarFusionPose,barFusionSide} from '../core/bar-fusion.js';
 import {validateSyringePose} from '../core/syringe.js';
+import {solveConstraintClosure} from './constraint-closure.js';
 /**
  * Generic Multilink Solver Engine
  * 通用多連桿求解核心
@@ -1249,7 +1250,9 @@ export function solveTopology(topologyOrParams, params) {
     if (topology && topology._wizard_data && topology.bodyJoint !== false) {
         const expanded=expandBarFusions(topology._wizard_data,{...topology.params,...actualParams});
         if(!expanded.ok)return {isValid:false,isUnderconstrained:false,points:{},errorReason:expanded.reason};
-        const result=solveBodyJointTopology({...topology,_wizard_data:expanded.comps}, actualParams);
+        const result=topology._wizard_data.some(c=>c.type==='slider'&&c.movingRail)
+            ?solveConstraintClosure(topology,actualParams)
+            :solveBodyJointTopology({...topology,_wizard_data:expanded.comps}, actualParams);
         const fusionError=validateBarFusionPose(topology._wizard_data,result.points);
         if(fusionError){result.isValid=false;result.errorReason=fusionError;}
         if(topology._syringes){

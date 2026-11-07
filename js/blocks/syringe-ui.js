@@ -9,6 +9,7 @@ import {assemblySyringeControls,planAssemblySyringe} from './assembly-syringe.js
 import {assemblyWork} from './assembly-membership.js';
 import {normalizeFabricationProfile} from './fabrication-profile.js';
 import {S,motorAnglesNow} from './state.js';
+import {dimensionHandle} from './dimension-handle.js';
 import * as View from './view.js';
 import {createPlateGeometry} from './plate-geometry.js';
 import {frameConnectorNodes} from './model.js';
@@ -39,6 +40,7 @@ export function createSyringeUI(h){
   const headerObserver=new ResizeObserver(positionInspectors);
   headerObserver.observe(bar);headerObserver.observe(h.svg);
   let id=null,raf=null,last=null,direction=1,dragUndo=false,picking=null,scopeKey=null,message='';
+  let legacyStrokeDraft=false;
   const warning3d=document.getElementById('syringeMountNotice'),mountReference=warning3d.textContent;details.append(warning3d);
   function setMountPreview(shapes){import('./motion-warning.js').then(m=>{warning3d.textContent=m.mountNotice(shapes)+mountReference;});}
 
@@ -198,6 +200,19 @@ export function createSyringeUI(h){
       for(const [p,label] of [[reading.origin,'O'],[reading.end,'C']]){if(p)node('text',{x:View.TX(p.x)+9,y:View.TY(p.y)-9,fill:'#92400e','font-size':14,'pointer-events':'none'}).textContent=label;}
       g.addEventListener('pointerdown',e=>{if(picking||e.isPrimary===false)return;e.stopPropagation();id=c.id;open();});
     }
+    const c=active();
+    // The existing hinged (two moving ends) actuator uses the same stroke
+    // candidate as the numeric field. Its installation remains in the original dialog.
+    if(c&&!hasSyringeClamp(c)&&valid&&S.mode==='design'&&!h.is3D()&&!document.querySelector('dialog[open]')&&!S.selectedLinkId&&!S.selectedSliderId&&!S.selectedNodeId&&!legacyStrokeDraft){
+      const shape=syringeShape(c,h.comps(),params(),points),base=JSON.stringify([S.comps,S.topo.params]);
+      if(shape){const unit=View.getScale(),pixel=unit*Math.hypot(h.svg.getScreenCTM().a,h.svg.getScreenCTM().b),u={x:Math.cos(shape.angle),y:Math.sin(shape.angle)};
+        const point={x:View.TX(shape.b.x-u.y*48/pixel),y:View.TY(shape.b.y+u.x*48/pixel)};
+        dimensionHandle(h.svg,{key:'syringe-stroke',label:'伸出量',point,direction:{x:u.x*unit,y:-u.y*unit},value:c.extension,min:0,max:c.spec.stroke,
+          activate:()=>{exact.querySelector('input')?.focus();exact.querySelector('input')?.select();},
+          preview:v=>{legacyStrokeDraft=true;showNumber(exact.querySelector('input'),v);range.value=v;},
+          cancel:()=>{legacyStrokeDraft=false;syncStroke(c);},commit:v=>{legacyStrokeDraft=false;if(base===JSON.stringify([S.comps,S.topo.params])){h.pause();stroke(v);}h.draw();}});
+      }
+    }
     editor?.sync();
   }
   function edit(candidate){
@@ -243,14 +258,15 @@ export function createSyringeUI(h){
     let section=form;
     const fields={},input=(key,text,value,type='number')=>{const label=el('label',text,section),n=el('input',null,label);n.type=type;n.name=key;n.setAttribute('aria-label',text);if(type==='number'){n.step='any';n.dataset.numeric='true';if(/^[ab][UV]$|^axisDeg$|^tip\d+$/.test(key))signedNumberInput(n);showNumber(n,value);}else n.value=value;fields[key]=n;return n;};
     if(c.mountMode!=='fixed-axis'){
-      el('p',`筒身端：${c.a.componentId} → 推桿端：${c.b.componentId}`,form);
+      const ownerName=id=>h.comps().find(o=>o.id===id)?.name||id;
+      el('p',`筒身端：${ownerName(c.a.componentId)} → 推桿端：${ownerName(c.b.componentId)}`,form);
       const pick=el('button','在圖上換孔位',form);pick.type='button';
       pick.onclick=()=>{dialog.close();picking={a:null,existing:clone(c)};cancelPick.hidden=false;bar.hidden=false;wrap.classList.add('hydraulic-active');notify('先點筒身端，再點推桿端；確認前不修改作品。');};
     }
     const attachments=el('details',null,form);el('summary','更多：連接孔位',attachments);section=attachments;
     for(const key of ['a','b']){
       const label=el('label',`${key.toUpperCase()} 所屬零件`,attachments),select=el('select',null,label);select.name=`${key}Owner`;fields[select.name]=select;
-      for(const owner of h.comps().filter(o=>attachmentFrame(o,params()))){const option=el('option',owner.id,select);option.value=owner.id;}
+      for(const owner of h.comps().filter(o=>attachmentFrame(o,params()))){const option=el('option',owner.name||owner.id,select);option.value=owner.id;}
       select.value=c[key].componentId;input(`${key}U`,`${key.toUpperCase()} 沿桿位置 u (mm)`,c[key].u);input(`${key}V`,`${key.toUpperCase()} 偏置 v (板件用，mm)`,c[key].v);
     }
     (c.passiveTips||[]).forEach((t,i)=>input(`tip${i}`,`夾片 ${i+1} 手動相對角度 (°，不含接觸求解)`,t.angleDeg));

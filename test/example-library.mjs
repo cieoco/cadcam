@@ -11,10 +11,10 @@ import {encodeSnapshot,decodeShareString} from '../js/share-codec.js';
 import {prepareScopedExport} from '../js/blocks/export-scope.js';
 import {FABRICATION_DEFAULTS} from '../js/blocks/fabrication-profile.js';
 const groups={
- hydraulic:['hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h05','hydraulic-h06','hydraulic-h07','hydraulic-h08'],
+ hydraulic:['guided-scissor-lift','hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h05','hydraulic-h06','hydraulic-h07','hydraulic-h08'],
  incomplete:['hydraulic-h01-practice','hydraulic-h02-practice','hydraulic-h03-practice','wiper-missing-coupler','fourbar-missing-coupler'],
  manual:['pantograph'],empty:['empty-challenge'],static:['tab-nut-m3'],
- motion:['continuous-roller-intake','crank-catapult-study','guided-scissor-lift','six-bar-lift','parallel-gripper','wiper-single','fourbar-crank-rocker','fourbar-double-crank','fourbar-double-rocker','tipping-bucket','parallel-fourbar','chebyshev-linkage','slider-crank','quick-return','gear-pair','reduction-gear-train','rack-pinion','gear-gripper','cam-follower','pulley-belt','sprocket-chain','jansen-leg','competition-fourbar-lift','competition-roller-intake','competition-rack-lift','slider-crank-practice','assembly-lift-gripper','assembly-lift-gripper-practice','lift-bucket','single-servo-claw','single-axis-wrist']
+ motion:['continuous-roller-intake','crank-catapult-study','six-bar-lift','parallel-gripper','wiper-single','fourbar-crank-rocker','fourbar-double-crank','fourbar-double-rocker','tipping-bucket','parallel-fourbar','chebyshev-linkage','slider-crank','quick-return','gear-pair','reduction-gear-train','rack-pinion','gear-gripper','cam-follower','pulley-belt','sprocket-chain','jansen-leg','competition-fourbar-lift','competition-roller-intake','competition-rack-lift','slider-crank-practice','assembly-lift-gripper','assembly-lift-gripper-practice','lift-bucket','single-servo-claw','single-axis-wrist']
 };
 assert.deepEqual(Object.values(groups).flat().sort(),BLOCK_EXAMPLES.map(e=>e.id).sort());
 for(const e of BLOCK_EXAMPLES){
@@ -50,7 +50,8 @@ for(const e of BLOCK_EXAMPLES){
  // Match the loader's default fabrication profile; scope is the saved assembly membership.
  const exportSource={...s,topo:s,fabrication:s.fabrication||structuredClone(FABRICATION_DEFAULTS),exportSettings:FABRICATION_DEFAULTS.export};
  for(const format of ['svg','dxf']){
-   if(groups.hydraulic.includes(e.id))assert.throws(()=>prepareScopedExport(exportSource,{scope:'assembly'},format),/管夾固定案例.*不輸出加工檔/);
+   if(e.id==='guided-scissor-lift')assert.throws(()=>prepareScopedExport(exportSource,{scope:'assembly'},format),/液壓製作包目前支援/);
+   else if(groups.hydraulic.includes(e.id))assert.throws(()=>prepareScopedExport(exportSource,{scope:'assembly'},format),/管夾固定案例.*不輸出加工檔/);
    else if(groups.empty.includes(e.id))assert.throws(()=>prepareScopedExport(exportSource,{scope:'assembly'},format),/沒有零件/);
    else {
      const out=prepareScopedExport(exportSource,{scope:'assembly'},format);

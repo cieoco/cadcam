@@ -259,11 +259,12 @@ function normalizeSlider(comp, index, params, warnings) {
   const m2Seed = comp.m2 || (comp.p2 ? { type: 'fixed', x: comp.p2.x, y: comp.p2.y } : null);
   const m1 = normalizePoint(m1Seed, `S${index + 1}m1`, warnings);
   const m2 = normalizePoint(m2Seed, `S${index + 1}m2`, warnings);
-  p1.type = 'fixed';   // 軌道兩端釘地
-  p2.type = 'fixed';
+  // 移動軌道由共享端孔的剛體承載；缺省仍為原本的固定軌道。
+  p1.type = comp.movingRail === true ? 'floating' : 'fixed';
+  p2.type = p1.type;
   p3.type = 'floating'; // 滑塊點沿軌道滑動（活塞模式由 input_linear 推算，型別仍非 fixed）
-  m1.type = 'fixed';   // 承載桿件兩端固定孔
-  m2.type = 'fixed';
+  m1.type = p1.type;
+  m2.type = p1.type;
   const lenParam = safeId(comp.lenParam) ? comp.lenParam : `SL${index + 1}`;
   const rawLen = Math.max(1, roundTenth(params[lenParam] ?? Math.hypot(p2.x - p1.x, p2.y - p1.y), 1));
   const carriageLen = Math.max(1, Math.min(rawLen, roundTenth(comp.carriageLen, 32)));
@@ -290,6 +291,7 @@ function normalizeSlider(comp, index, params, warnings) {
   const out = {
     type: 'slider',
     id,
+    ...(comp.movingRail === true ? {movingRail:true} : {}),
     color: SAFE_COLOR.test(comp.color || '') ? comp.color : '#16a085',
     p1,
     p2,
@@ -622,6 +624,7 @@ export function normalizeSnapshot(obj) {
     else if (raw.type === 'workpiece') comps.push(normalizeWorkpiece(raw,index,warnings));
     else if (raw.type === 'belt') comps.push(normalizeBelt(raw, index, params, warnings));
     else { warnings.push(`不支援的零件 ${raw.type || '(unknown)'}，已略過。`); return; }
+    if(typeof raw.name==='string'&&raw.name.trim())comps[comps.length-1].name=raw.name.trim().slice(0,80);
     // 模組標記：只在這裡加一次，不動十個 normalizeXxx（SDD-ASSEMBLY-MODULES §3.3）。
     if(raw.type==='triangle' && safeId(raw.fusedWith)) comps[comps.length-1].fusedWith=raw.fusedWith;
     if (safeId(raw.moduleId)) {
