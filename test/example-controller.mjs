@@ -1,6 +1,9 @@
 // 範例選單、教學卡與 snapshot 載入流程驗收。
 import { createExampleController } from '../js/blocks/example-controller.js';
 import { check, report } from './_harness.mjs';
+import { BLOCK_EXAMPLES, loadUnitStarts } from '../js/blocks/examples.js?v=20261005_parallel';
+import { CATALOG_GROUPS, CATALOG_FAMILIES, CATALOG_RECOMMENDATIONS, getCatalogVariant } from '../js/blocks/example-catalog.js';
+import { startupSize } from '../tools/startup-size.mjs';
 
 class FakeElement {
   constructor(tag = 'div') { this.tag = tag; this.children = []; this.style = {}; this.dataset = {}; this.textContent = ''; this.value = ''; }
@@ -12,6 +15,8 @@ class FakeElement {
   close() { this.open = false; }
   remove() { this.removed = true; }
   focus() {}
+  set textContent(value) { this.text = value; this.children = []; }
+  get textContent() { return this.text; }
 }
 const ids = new Map([
   ['exampleList', Object.assign(new FakeElement(), { querySelector() { return null; } })], ['exampleLessonCard', new FakeElement()],
@@ -29,8 +34,24 @@ const controller = createExampleController({
   applySnapshot: snapshot => { applied = snapshot; }, notify: text => { message = text; },
   closeMobileMenu: () => {}, isMobile: () => false, showBuildPanel: () => {}
 });
-controller.populate();
+await controller.populate();
 check('範例控制器依分類建立範例清單（電腦與手機同一份）', ids.get('exampleList').children.length > 1 && ids.get('exampleList').children.every(child => child.className === 'example-section'));
+const descendants = node => node.children.flatMap(child => [child, ...descendants(child)]);
+const entries = () => descendants(ids.get('exampleList'));
+const catalogIds = CATALOG_FAMILIES.flatMap(family => family.variants.map(item => item.id));
+const snapshots = JSON.stringify(BLOCK_EXAMPLES);
+check('54 個公開範例各有唯一主要位置，沒有遺失或多餘 ID', catalogIds.length === 54 && new Set(catalogIds).size === 54 && BLOCK_EXAMPLES.every(example => catalogIds.includes(example.id)));
+check('五個用途依確認順序排列，工具練習另列', CATALOG_GROUPS.map(group => group.label).join('、') === '傳動與變速、升降與伸縮、夾取與搬運、往復與特殊運動、行走機構' && CATALOG_FAMILIES.every(family => CATALOG_GROUPS.some(group => group.id === family.group) || family.group === 'tools'));
+check('推薦使用同 ID 捷徑，不複製主要入口', entries().filter(node => node.dataset.exampleId).length === 54 && entries().filter(node => node.dataset.exampleRef).length === CATALOG_RECOMMENDATIONS.length);
+check('能力標示保留手動、固定、局部與待完成界限', getCatalogVariant('iq-wheel-grabber').capability === '手動調姿' && getCatalogVariant('iq-passive-combined').capability === '固定組立' && getCatalogVariant('crank-catapult-study').capability === '局部示意' && getCatalogVariant('slider-crank-practice').capability === '待完成練習');
+check('通用夾爪不被標成 IQ 原廠來源', !getCatalogVariant('gear-gripper').source && CATALOG_FAMILIES.find(family => family.id === 'clawbot').variants.some(item => item.id === 'gear-gripper'));
+check('目錄不進入首次載入', !startupSize().paths.includes('js/blocks/example-catalog.js'));
+await controller.populate();
+check('重建目錄不重複入口、不改原作品資料', entries().filter(node => node.dataset.exampleId).length === 54 && JSON.stringify(BLOCK_EXAMPLES) === snapshots);
+await loadUnitStarts(); const withStarts = JSON.stringify(BLOCK_EXAMPLES); await controller.populate();
+check('八份教學起始檔另列且各保留原 ID', entries().filter(node => node.dataset.exampleId).length === 62 && entries().some(node => node.dataset.exampleGroup === 'lessons'));
+check('教學起始檔與公開作品在目錄呈現後皆保持原內容', JSON.stringify(BLOCK_EXAMPLES) === withStarts);
+controller.renderLessonCard(null);
 check('初始化時隱藏教學卡', ids.get('exampleLessonCard').style.display === 'none');
 check('範例 snapshot 可正規化並保留 32 mm 曲柄', controller.load('fourbar-crank-rocker') && applied?.comps?.length > 0 && applied.params?.LL1 === 32);
 check('載入後更新教學卡與通知', ids.get('exampleLessonCard').style.display === '' && ids.get('exampleLessonTitle').textContent.includes('四連桿') && message.includes('已載入'));

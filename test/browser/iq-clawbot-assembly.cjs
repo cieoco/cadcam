@@ -1,3 +1,4 @@
+const {revealExample}=require('./_example-catalog.cjs');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs/promises');
 const base=process.env.TEST_URL||'http://127.0.0.1:8023',out=process.env.OUT||'output/iq-clawbot-assembly';
@@ -20,7 +21,7 @@ const base=process.env.TEST_URL||'http://127.0.0.1:8023',out=process.env.OUT||'o
    assert.ok(await frame.locator('#next').isEnabled(),await frame.locator('body').innerText());
   };
   try{
-   await page.goto(base+'/blocks.html?gripperPilot=1');await page.waitForFunction(()=>window.blocks);await page.evaluate(()=>blocks.openExamples());await page.locator('[data-example-id="clawbot-lift-gripper-practice"]').click();await page.getByRole('button',{name:'載入此範例',exact:true}).click();await page.locator('#modeBtnBench').click();
+   await page.goto(base+'/blocks.html?gripperPilot=1');await page.waitForFunction(()=>window.blocks);await page.evaluate(()=>blocks.openExamples());await revealExample(page, 'clawbot-lift-gripper-practice');await page.locator('[data-example-id="clawbot-lift-gripper-practice"]').click();await page.getByRole('button',{name:'載入此範例',exact:true}).click();await page.locator('#modeBtnBench').click();
    const before=await state();assert.equal(before.mount,null);await open();assert.deepEqual(await state(),before,'preview cannot change either independent mechanism');
    await page.screenshot({path:`${out}/${viewport.width}-candidate.png`});await frame.locator('#cancel').click();await dialog.waitFor({state:'hidden'});assert.deepEqual(await state(),before);
    await open();await frame.locator('#next').click();await dialog.waitFor({state:'hidden'});await page.waitForTimeout(300);const mounted=await state();assert.ok(mounted.mount?.face);assert.equal(mounted.undo,before.undo+1);assert.equal(mounted.mount.to.module,'ClawLift');assert.equal(mounted.mount.face.selection.offsetU,-100);assert.equal(mounted.mount.face.selection.rotationDeg??mounted.mount.face.selection.quarterTurns*90,270);assert.equal(mounted.mount.face.selection.brackets.enabled,true);

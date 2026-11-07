@@ -340,7 +340,6 @@ const exampleController = createExampleController({
   isMobile: () => mobilePrompt(), showBuildPanel: () => setMobilePanel('build', {expandTools:false}),
   onLesson: setPractice
 });
-const populateExamples = () => exampleController.populate();
 const creationPalette=createCreationPalette({cancel:()=>{Tools.exitDrawLink();Tools.exitDrawTriangle();Tools.exitDrawPolygon();cancelMotorMode();draw();}});
 const designGuide=createDesignGuide({frame:setGuideFrame,next:stage=>{
   if(stage==='frame'){setGuideFrame();return;}
@@ -3335,7 +3334,6 @@ function init() {
     sweepMemberId = event.target.checked ? (S.selectedLinkId || S.selectedTriangleId) : null;
     draw();
   };
-  populateExamples();
   let loaded = false;
   try {
     const hashObj = Store.readShareFromHash();

@@ -1,3 +1,4 @@
+const {revealExample}=require('./_example-catalog.cjs');
 const assert=require('node:assert/strict'),fs=require('node:fs/promises');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 (async()=>{
@@ -11,7 +12,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   const ext=s=>s.comps.find(c=>c.type==='syringe').extension;
   try{
    await page.goto((process.env.TEST_URL||'http://127.0.0.1:8023')+'/blocks.html?gripperPilot=1');await page.waitForFunction(()=>window.blocks);
-   await page.evaluate(()=>blocks.openExamples());await page.locator('[data-example-id="guided-scissor-lift"]').click();await page.getByRole('button',{name:'載入此範例',exact:true}).click();await page.waitForTimeout(500);
+   await page.evaluate(()=>blocks.openExamples());await revealExample(page, 'guided-scissor-lift');await page.locator('[data-example-id="guided-scissor-lift"]').click();await page.getByRole('button',{name:'載入此範例',exact:true}).click();await page.waitForTimeout(500);
    await page.screenshot({path:`${out}/clean-${viewport.width}.png`});
    const field=page.getByRole('textbox',{name:'針筒伸出量數值（mm）',exact:true}),before=await state();
    await input(field,7.25);assert.equal(ext(await state()),7.25);assert.equal((await state()).undo,before.undo+1);

@@ -1,3 +1,4 @@
+const {revealExample}=require('./_example-catalog.cjs');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs/promises');
 const base=process.env.TEST_URL||'http://127.0.0.1:8023',out=process.env.OUT||'output/iq-mechanisms';
@@ -17,7 +18,7 @@ const cases=[
   const reveal=async()=>{if(!await field.isVisible())await page.locator('#sheetMore').click();await field.waitFor();};
   try{
    await page.goto(base+'/blocks.html?gripperPilot=1');await page.waitForFunction(()=>window.blocks);await page.evaluate(()=>blocks.openExamples());
-   await page.locator(`[data-example-id="${c.id}"]`).click();await page.getByRole('button',{name:'載入此範例',exact:true}).click();await page.waitForTimeout(500);
+   await revealExample(page, c.id);await page.locator(`[data-example-id="${c.id}"]`).click();await page.getByRole('button',{name:'載入此範例',exact:true}).click();await page.waitForTimeout(500);
    if(c.id==='guided-scissor-lift')assert.ok(await page.locator('#syringeControls').isVisible());else assert.equal((await page.locator('#thetaUnit').textContent()).trim(),'°');
    await select();await reveal();const before=await state();assert.equal(before.value,c.from);
    await field.fill(String(c.to));await field.press('Tab');await page.waitForTimeout(400);assert.equal((await state()).value,c.to);assert.equal((await state()).undo,before.undo+1);

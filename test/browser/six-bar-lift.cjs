@@ -1,3 +1,4 @@
+const {revealExample}=require('./_example-catalog.cjs');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs/promises');
 const base=process.env.TEST_URL||'http://127.0.0.1:8023',out=process.env.OUT||'output/six-bar-lift';
@@ -14,7 +15,7 @@ const base=process.env.TEST_URL||'http://127.0.0.1:8023',out=process.env.OUT||'o
   try{
    await page.goto(base+'/blocks.html?gripperPilot=1');await page.waitForFunction(()=>window.blocks);
    await page.evaluate(()=>blocks.openExamples());
-   await page.locator('[data-example-id="six-bar-lift"]').click();await page.getByRole('button',{name:'載入此範例',exact:true}).click();await page.waitForTimeout(600);
+   await revealExample(page, 'six-bar-lift');await page.locator('[data-example-id="six-bar-lift"]').click();await page.getByRole('button',{name:'載入此範例',exact:true}).click();await page.waitForTimeout(600);
    assert.equal((await state()).comps.length,9);await select();
    const before=await state(),input=page.locator('#memberDimensionInput');
    if(!await input.isVisible())await page.locator('#sheetMore').click();

@@ -78,26 +78,12 @@ export function createExampleController({ applySnapshot, insertModule, notify, c
     renderLessonCard(null);
   }
 
-  // 範例清單（專案 → 範例…）：電腦與手機同一份，依分類列出。
-  function populate() {
+  // 範例清單（專案 → 範例…）：目錄資料只在需要時載入；桌機與手機同一份。
+  async function populate() {
     const list = document.getElementById('exampleList');
-    const groupById = Object.fromEntries(EXAMPLE_GROUPS.map(group => [group.id, group]));
-    BLOCK_EXAMPLES.forEach(example => {
-      if (list?.querySelector(`[data-example-id="${example.id}"]`)) return;
-      const lesson = getExampleLesson(example.id);
-      const groupId = groupById[lesson.group] ? lesson.group : 'challenge';
-      if (list) {
-        let section = list.querySelector(`[data-example-group="${groupId}"]`);
-        if (!section) {
-          section = document.createElement('div'); section.className = 'example-section'; section.dataset.exampleGroup = groupId;
-          const title = document.createElement('div'); title.className = 'example-group-title'; title.textContent = groupById[groupId]?.label || '挑戰';
-          section.appendChild(title); list.appendChild(section);
-        }
-        const button = document.createElement('button'); button.type = 'button'; button.className = 'example-btn'; button.dataset.exampleId = example.id; button.textContent = `${lesson.level || '探索'}｜${example.title}`;
-        button.title = lesson.use || example.note || ''; button.addEventListener('click', () => requestLoad(example.id)); section.appendChild(button);
-      }
-    });
-    renderLessonCard(null);
+    if (!list) return;
+    const { renderExampleCatalog } = await import('./example-catalog.js');
+    renderExampleCatalog(list, BLOCK_EXAMPLES, requestLoad);
   }
 
   function restoreLesson(id) {
@@ -108,7 +94,11 @@ export function createExampleController({ applySnapshot, insertModule, notify, c
   }
 
   // 起始練習檔資料第一次開「範例」才載入，載入後補上清單。
-  const openExamples = () => { document.getElementById('examplesDialog').showModal(); loadUnitStarts().then(populate); };
+  const openExamples = async () => {
+    document.getElementById('examplesDialog').showModal();
+    await loadUnitStarts();
+    await populate();
+  };
 
   const isPractice = id => !!id && isPracticeLesson(getExampleLesson(id));
 
