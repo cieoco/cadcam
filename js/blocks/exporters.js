@@ -110,15 +110,15 @@ export function exportablePlates(comps, pts) {
 export function assertFusionFeatures(comps, mounts=[], extras=null) {
   const {hosted}=splitMountsByHost(comps,mounts);
   for(const root of comps.filter(c=>c.barFusion)){
-    if(root.barFusion.members.some(id=>hosted.has(id) || extras?.linkHoles?.[id]?.length))throw Error('合成連桿含額外安裝孔，請先解除合成再輸出。');
+    if(root.barFusion.members.some(id=>hosted.has(id)))throw Error('合成連桿含馬達安裝特徵，請先解除合成再輸出。');
   }
 
   if(comps.some(c=>c.fusedWith && (hosted.has(c.id) || extras?.plateHoles?.[c.id]?.length)))
     throw Error('合成板件含角碼孔或馬達安裝槽；請先解除合成再匯出，避免遺漏加工特徵');
 }
 
-export function exportableGears(comps, params, settings) {
-  for(const root of comps.filter(c=>c.barFusion)){const f=inspectBarFusion(comps,root,params,settings);if(!f.ok)throw Error(f.reason);}
+export function exportableGears(comps, params, settings, extras=null) {
+  for(const root of comps.filter(c=>c.barFusion)){const f=inspectBarFusion(comps,root,params,settings,extras);if(!f.ok)throw Error(f.reason);}
   for(const plate of comps.filter(c=>c.fusedWith)) {
     const f=inspectFusion(comps,plate,params,settings);
     if(!f.ok)throw Error(`合成零件 ${plate.id}：${f.reason}`);
@@ -1353,14 +1353,14 @@ export function inspectLinkExport(comp, length, settings = {}, extraHoles = []) 
 export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extras = null, emit = downloadText) {
   assertAdapterFeatures(extras);
   assertFusionFeatures(comps,mounts,extras);
-  exportableGears(comps,params,settings);
+  exportableGears(comps,params,settings,extras);
   const { hosted } = splitMountsByHost(comps, mounts);
   const extraOf = comp => (extras && extras.linkHoles && extras.linkHoles[comp.id]) || [];
   const plateHolesOf = comp => (extras && extras.plateHoles && extras.plateHoles[comp.id]) || [];
   const links = exportableLinks(comps, pts, params);
   links.forEach(({ comp, length }) => {
     // 宿主機架桿：桿身直接帶馬達穿板特徵（同一塊料），其餘桿件走一般路徑。
-    const hostGeometry = tabNutPartGeometry(extras,comp,{local:true}) || (comp.barFusion ? inspectBarFusion(comps,comp,params,settings).geometry : hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id), extraOf(comp)) : null);
+    const hostGeometry = tabNutPartGeometry(extras,comp,{local:true}) || (comp.barFusion ? inspectBarFusion(comps,comp,params,settings,extras).geometry : hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id), extraOf(comp)) : null);
     const text = hostGeometry
       ? addSvgStockDescription(svgForFrameGeometry(hostGeometry, comp.id), comp)
       : svgForLink(comp, length, settings, extraOf(comp));
@@ -1371,7 +1371,7 @@ export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extr
     const tab=tabNutPartGeometry(extras,comp);
     emit(tab ? svgForFrameGeometry(tab,comp.id) : svgForPlate(comp, points, settings, hosted.get(comp.id), plateHolesOf(comp)), `${safeName(comp.id)}.svg`, 'image/svg+xml', [comp.id]);
   });
-  const gears = exportableGears(comps, params, settings);
+  const gears = exportableGears(comps, params, settings,extras);
   gears.forEach(({ comp, geometry, fusedPlate }) => {
     emit(fusedPlate ? addSvgStockDescription(svgForGear(comp,geometry),fusedPlate) : svgForGear(comp, geometry), `${safeName(comp.id)}.svg`, 'image/svg+xml', fusedPlate ? [comp.id, fusedPlate.id] : [comp.id]);
   });
@@ -1385,13 +1385,13 @@ export function exportLinksAsSvg(comps, pts, params, settings, mounts = [], extr
 export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extras = null, emit = downloadText) {
   assertAdapterFeatures(extras);
   assertFusionFeatures(comps,mounts,extras);
-  exportableGears(comps,params,settings);
+  exportableGears(comps,params,settings,extras);
   const { hosted } = splitMountsByHost(comps, mounts);
   const extraOf = comp => (extras && extras.linkHoles && extras.linkHoles[comp.id]) || [];
   const plateHolesOf = comp => (extras && extras.plateHoles && extras.plateHoles[comp.id]) || [];
   const links = exportableLinks(comps, pts, params);
   links.forEach(({ comp, length }) => {
-    const hostGeometry = tabNutPartGeometry(extras,comp,{local:true}) || (comp.barFusion ? inspectBarFusion(comps,comp,params,settings).geometry : hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id), extraOf(comp)) : null);
+    const hostGeometry = tabNutPartGeometry(extras,comp,{local:true}) || (comp.barFusion ? inspectBarFusion(comps,comp,params,settings,extras).geometry : hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id), extraOf(comp)) : null);
     const text = hostGeometry
       ? addDxfStockComment(dxfForFrameGeometry(hostGeometry,comp.id), comp)
       : dxfForLink(comp, length, settings, extraOf(comp));
@@ -1402,7 +1402,7 @@ export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extr
     const tab=tabNutPartGeometry(extras,comp);
     emit(tab ? dxfForFrameGeometry(tab,comp.id) : dxfForPlate(comp, points, settings, hosted.get(comp.id), plateHolesOf(comp)), `${safeName(comp.id)}.dxf`, 'application/dxf', [comp.id]);
   });
-  const gears = exportableGears(comps, params, settings);
+  const gears = exportableGears(comps, params, settings,extras);
   gears.forEach(({ comp, geometry, fusedPlate }) => {
     emit(fusedPlate ? addDxfStockComment(dxfForGear(comp,geometry),fusedPlate) : dxfForGear(comp, geometry), `${safeName(comp.id)}.dxf`, 'application/dxf', fusedPlate ? [comp.id, fusedPlate.id] : [comp.id]);
   });
@@ -1416,7 +1416,7 @@ export function exportLinksAsDxf(comps, pts, params, settings, mounts = [], extr
 // L4 CNC 檢查用：與 exportLinksAsDxf 輸出同一批零件（桿件含宿主桿、板件、齒輪）的孔與開口。
 export function cncPartsForExport(comps, pts, params, settings, mounts = [], extras = null) {
   assertAdapterFeatures(extras);
-  exportableGears(comps,params,settings);
+  exportableGears(comps,params,settings,extras);
   assertFusionFeatures(comps,mounts,extras);
   const { hosted } = splitMountsByHost(comps, mounts);
   const extraOf = comp => (extras && extras.linkHoles && extras.linkHoles[comp.id]) || [];
@@ -1425,7 +1425,7 @@ export function cncPartsForExport(comps, pts, params, settings, mounts = [], ext
   const cutoutsOf = g => (g && g.cutouts) || [];
   const parts = [];
   exportableLinks(comps, pts, params).forEach(({ comp, length }) => {
-    const hostGeometry = tabNutPartGeometry(extras,comp,{local:true}) || (comp.barFusion ? inspectBarFusion(comps,comp,params,settings).geometry : hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id), extraOf(comp)) : null);
+    const hostGeometry = tabNutPartGeometry(extras,comp,{local:true}) || (comp.barFusion ? inspectBarFusion(comps,comp,params,settings,extras).geometry : hosted.has(comp.id) ? hostedBarGeometry(comp, pts, settings, hosted.get(comp.id), extraOf(comp)) : null);
     const g = hostGeometry || inspectLinkExport(comp, length, settings, extraOf(comp));
     parts.push({ name: safeName(comp.id), holes: holesOf(g), cutouts: cutoutsOf(g) });
   });
@@ -1433,7 +1433,7 @@ export function cncPartsForExport(comps, pts, params, settings, mounts = [], ext
     const g = tabNutPartGeometry(extras,comp) || inspectPlateExport(comp, points, settings, hosted.get(comp.id), plateHolesOf(comp));
     parts.push({ name: safeName(comp.id), holes: holesOf(g), cutouts: cutoutsOf(g) });
   });
-  exportableGears(comps, params, settings).forEach(({ comp, geometry }) => {
+  exportableGears(comps, params, settings,extras).forEach(({ comp, geometry }) => {
     parts.push({ name: safeName(comp.id), holes: holesOf(geometry), cutouts: cutoutsOf(geometry) });
   });
   exportableRacks(comps, params).forEach(({ comp, geometry }) => {

@@ -1,3 +1,4 @@
+import {gearTrain,sameGearBody} from '../core/gear-train.js';
 import {editableNumber} from './numeric-input.js';
 import {gearDriver} from './motor-tools.js';
 /**
@@ -145,13 +146,13 @@ export function createGearEditor({
       if (!g || seen.has(g.id)) continue;
       seen.add(g.id);
       if (g.mesh) { const drv = all.find(x => x.id === g.mesh); if (drv) stack.push(drv); }
-      all.forEach(x => { if (x.mesh === g.id) stack.push(x); });
+      all.forEach(x => { if (x.mesh === g.id || sameGearBody(x,g)) stack.push(x); });
     }
     return all.filter(g => seen.has(g.id));
   }
   // 把每顆「從動輪」重擺到和它驅動輪相切（中心距＝兩節圓半徑和），沿目前方向。改模數/齒數後保持嚙合。
   function syncGearMesh() {
-    S.comps.filter(c => c.type === 'gear' && c.mesh).forEach(c => {
+    S.comps.filter(c => c.type === 'gear' && c.mesh).sort((a,b)=>(gearDriveState(a)?.depth||0)-(gearDriveState(b)?.depth||0)).forEach(c => {
       const drv = gearById(c.mesh);
       if (!drv) return;
       const dc = pointCoords()[drv.p1.id] || drv.p1;
@@ -336,19 +337,7 @@ export function createGearEditor({
       ? Number(S.topo.params[c.pinRadiusParam]) || Math.round(pitchR * 0.6)
       : Number(c.pinRadius) || Math.round(pitchR * 0.6);
   }
-  function gearDriveState(c, seen = new Set()) {
-    if (!c || seen.has(c.id)) return null;
-    if (!c.mesh) return { root: c, factor: 1 };
-    seen.add(c.id);
-    const driver = gearById(c.mesh);
-    if (!driver) return null;
-    const parent = gearDriveState(driver, seen);
-    if (!parent) return null;
-    return {
-      root: parent.root,
-      factor: parent.factor * -(gearPitchRadius(driver) / (gearPitchRadius(c) || 1))
-    };
-  }
+  function gearDriveState(c) { return gearTrain(S.comps,S.topo.params).state(c); }
   function setGearManualAngle(c, angleRad) {
     if (!c || !c.p1 || !c.p2) return;
     const state = gearDriveState(c);

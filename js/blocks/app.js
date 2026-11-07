@@ -1894,7 +1894,8 @@ function drawNow() {
     const platesNow = P => modulePlates.at(P, () => motorFrameExportMounts({ pts: pointCoords(), motorCenterIds: allModelMotorIds, motorMounts })).filter(pl => (pl.plane || null) === (S.viewPlane || null) && (!inDesign() || pl.moduleId === S.designFocus));   // 設計模式只畫焦點模組自己的底板
     renderModulePlates({ plates: platesNow(allPts), svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), getPlates: platesNow, registerUpdate: fn => frameUpdaters.push(fn) });
   }
-  const tabNutGeometry = S.modules.some(m=>m.mount?.face?.selection?.fastener) ? orthoExtrasNow().tabNutGeometry : {};
+  const connectionExtras = S.modules.some(m=>m.mount?.face?.selection?.fastener || m.mount?.face?.selection?.brackets?.enabled&&vComps.some(c=>c.barFusion)) ? orthoExtrasNow() : null;
+  const tabNutGeometry = connectionExtras?.tabNutGeometry || {};
   for(const c of vComps)if(c.boxPanel&&!tabNutGeometry[c.id])tabNutGeometry[c.id]=tabNutPartGeometry({},c);
   const renderScene = prepareRenderScene({
     compiled: viewCompiled, comps: vComps, points: pts, frameGeometry: frameGeometry2d, sceneIds,
@@ -2004,7 +2005,7 @@ function drawNow() {
     },
     onSelect: id => { if (ensureModuleHome(compModuleId(id))) return; selectLink(id); },
     groupForLayer, linkLayer, groundIds, hullRadius: HULL_R_WORLD, scale: View.getScale(),
-    tabNutGeometry, barHullPath, project: p => ({ x: TX(p.x), y: TY(p.y) }), hostedMounts: mountSplit2d.hosted,
+    tabNutGeometry, connectionExtras, barHullPath, project: p => ({ x: TX(p.x), y: TY(p.y) }), hostedMounts: mountSplit2d.hosted,
     holeRadius: Settings.exportSettings().holeDiameterMm / 2,
     inspectHostedFrame: (nodes, mounts, comp) => Exporters.inspectFrameExport(nodes, { ...Settings.exportSettings(), barWidthMm: memberStock(comp).widthMm }, mounts),
     registerUpdate: update => frameUpdaters.push(update)

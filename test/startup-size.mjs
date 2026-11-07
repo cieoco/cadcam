@@ -22,7 +22,11 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-07：六連桿範例與短教學約 3.5 KB，沿用既有操作／求解，無新增依賴。
 // 2026-11-07：三個 IQ 用途範例與短教學、直線輸入單位修正約 9 KB；沒有新求解器或依賴。
 // 2026-11-07：原圖剪式台所需的活動軌道閉環約束、保存與原操作接頭淨增約 11.5 KB；無新增依賴，3D 仍懶載入。
-check('首次JS原始大小低於2.035MB',r.bytes<2035000);
+// 2026-11-07 本地 IQ 第一包：獨立升降與組立範例、合成臂角碼孔共用幾何約增 9.1 KB，未增加依賴。
+// 2026-11-07：共用兩孔齒輪傳動與 M.A.D. Box 範例淨增約 5.4 KB；沒有新依賴。
+// 2026-11-07：三份共用板件的 IQ 被動工具資料與來源教學約 5 KB，無新操作或依賴。
+// 2026-11-07：被動輪爪的來源、支承座與輪胎外形約增 5.4 KB；重用既有操作，無新依賴。
+check('首次JS原始大小低於2.061MB',r.bytes<2061000);
 check('機架編輯介面延後載入',!r.paths.includes('js/blocks/frame-hole-editor.js')&&!r.paths.includes('js/blocks/frame-panel.js'));
 check('合成尺寸候選計算延後載入',!r.paths.includes('js/blocks/bar-fusion-resize.js')&&r.lazyEntries.includes('js/blocks/bar-fusion-resize.js'));
 check('盒體生成介面（外掛）延後載入',!r.paths.includes('js/plugins/box-maker/box-generator.js')&&!r.paths.includes('js/plugins/box-maker/box-dialog.js')&&r.lazyEntries.includes('js/plugins/box-maker/index.js'));

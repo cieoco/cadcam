@@ -157,7 +157,8 @@ function hostBodyZ(model, edge, comps) {
     const own = edge.frameModule ? moduleFrameZ(model, comps, edge.frameModule) : null;
     return own !== null ? own : fin(model.frame && model.frame.z);
   }
-  const stick = (model.sticks || []).find(s => s.id === edge.compId);
+  const member = comps.find(c => c.id === edge.compId);
+  const stick = (model.sticks || []).find(s => s.id === (member?.barFusionRoot || edge.compId));
   if (stick) return fin(stick.z);
   const rack = (model.racks || []).find(s => s.id === edge.compId);
   if (rack) return fin(rack.z);

@@ -15,7 +15,7 @@ const svgEl = tag => document.createElementNS(SVG_NS, tag);
 
 export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBar, selectedLinkId, pickBars, interactionBlocked,
   onTryPick, onFreeDrag, onSelect, groupForLayer, linkLayer, groundIds, hullRadius, scale, barHullPath, project,
-  hostedMounts, inspectHostedFrame, registerUpdate, holeRadius = hullRadius * 0.72, params = {}, exportSettings = {}, tabNutGeometry = {} }) {
+  hostedMounts, inspectHostedFrame, registerUpdate, holeRadius = hullRadius * 0.72, params = {}, exportSettings = {}, tabNutGeometry = {}, connectionExtras=null }) {
   const linksToDraw = [...links].sort((a, b) => (a.style === 'crank' ? 1 : 0) - (b.style === 'crank' ? 1 : 0));
   const eligible = linksToDraw.filter(link => !link.hidden && !triangleEdgeKeys.has([link.p1, link.p2].sort().join('|')) && (!isGroundBar(link)||comps.some(c=>c.id===link.id&&isDisk(c))));
   const countMissing = current => eligible.reduce((count, link) => {
@@ -26,7 +26,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
     const selected = link.id && (link.id === selectedLinkId || comps.some(c=>c.id===selectedLinkId&&c.barFusionRoot===link.id));
     const component = comps.find(comp => comp.id === link.id && comp.type === 'bar');
     const editable = component?.fixedLen;
-    const fusion=component?.barFusion && inspectBarFusion(comps,component,params,exportSettings);
+    const fusion=component?.barFusion && inspectBarFusion(comps,component,params,exportSettings,connectionExtras);
     const radius = component ? memberStock(component).widthMm / 2 : hullRadius;
     const pickCandidate = pickBars && pickBars.ids.includes(link.id);
     const color = pickCandidate ? '#f39c12' : (selected ? '#e67e22' : (link.style === 'crank' ? '#e74c3c' : (link.color || '#3498db')));
@@ -93,7 +93,8 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       else if(tabPath){stick.setAttribute('fill-rule','evenodd');stick.setAttribute('d',tabPath);}
       else if(fusion?.ok){
         const g=worldFusionGeometry(fusion,current),ring=ps=>'M '+ps.map(p=>{const q=project(p);return q.x+','+q.y;}).join(' L ')+' Z';
-        stick.setAttribute('fill-rule','evenodd');stick.setAttribute('d',[...g.outlines,...g.cutouts.map(c=>c.points)].map(ring).join(' '));
+        const drilling=g.holes.filter(h=>['ADAPTER_HOLE','MOUNT_BOLT'].includes(h.layer)).map(h=>Array.from({length:32},(_,i)=>({x:h.x+h.r*Math.cos(i*Math.PI/16),y:h.y+h.r*Math.sin(i*Math.PI/16)})));
+        stick.setAttribute('fill-rule','evenodd');stick.setAttribute('d',[...g.outlines,...g.cutouts.map(c=>c.points),...drilling].map(ring).join(' '));
       }else stick.setAttribute('d', mounts?.length ? (hostedPath(a, b, current) || barHullPath(a, b, radius)) : barHullPath(a, b, radius));
       holes.forEach(hole => { const point = current[hole.pointId]; if (point && Number.isFinite(point.x)) { const p = project(point); hole.element.setAttribute('cx', p.x); hole.element.setAttribute('cy', p.y); } });
     };

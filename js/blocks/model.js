@@ -266,14 +266,20 @@ export function recomputeLengths(comps, topo) {
 
 // A dangling bar end turns about its attached hole; it must not pull the whole linkage.
 export function looseBarRotation(comps, params, id) {
-  const bar = fixedLinkFor(comps, id);
-  if (!bar || bar.isInput || bar.barFusionRoot || bar.barFusion || pointIsGround(comps, id) || pointUseCount(comps, id) !== 1) return false;
-  if (comps.some(c => c.type === 'syringe' && [c.a?.componentId, c.b?.componentId, c.outputId].includes(bar.id))) return false;
+  const arms=comps.filter(c=>c.type==='bar'&&c.fixedLen&&c.shape!=='disk'&&[c.p1,c.p2].some(p=>p?.id===id));
+  const bar = arms.length===1?arms[0]:fixedLinkFor(comps, id);
+  if (!bar || bar.isInput || bar.barFusionRoot || bar.barFusion || pointIsGround(comps, id)) return false;
+  // A single free disk at the arm tip adds no arm-position constraint. Its
+  // reference pin follows the center translation; this does not solve spin.
+  const attached=comps.filter(c=>c!==bar&&pointKeysFor(c).some(k=>c[k]?.id===id));
+  const disk=attached.length===1&&attached[0].shape==='disk'?attached[0]:null;
+  if(attached.length&&(!disk||disk.type!=='bar'||!disk.fixedLen||disk.isInput||disk.physicalMotor||disk.p1?.id!==id||disk.p1.physicalMotor||disk.p2?.physicalMotor||disk.barFusion||disk.barFusionRoot||pointIsGround(comps,disk.p2?.id)||pointUseCount(comps,disk.p2?.id)!==1))return false;
+  if (comps.some(c => c.type === 'syringe' && [c.a?.componentId, c.b?.componentId, c.outputId].some(host=>host===bar.id||disk&&host===disk.id))) return false;
   const pivot = bar.p1.id === id ? bar.p2 : bar.p1;
   if (!pointIsGround(comps, pivot.id) && pointUseCount(comps, pivot.id) < 2) return false;
   const end = bar.p1.id === id ? bar.p1 : bar.p2, length = Number(params[bar.lenParam]);
   if (!(length > 0)) return null;
-  return {bar, pivot, end, length, angle: Math.atan2(end.y-pivot.y,end.x-pivot.x)*180/Math.PI};
+  return {bar, pivot, end, length, ...(disk?{disk}:{}), angle: Math.atan2(end.y-pivot.y,end.x-pivot.x)*180/Math.PI};
 }
 export function rotateLooseBarEnd(comps, params, id, target, snapDegrees = false) {
   const rotation = looseBarRotation(comps, params, id);
@@ -283,7 +289,9 @@ export function rotateLooseBarEnd(comps, params, id, target, snapDegrees = false
   if (Math.hypot(dx, dy) < 1e-9) return true;
   let angle = Math.atan2(dy, dx);
   if (snapDegrees) angle = Math.round(angle * 180 / Math.PI) * Math.PI / 180;
-  updatePointCoordsById(comps, id, pivot.x + length * Math.cos(angle), pivot.y + length * Math.sin(angle));
+  const x=pivot.x+length*Math.cos(angle),y=pivot.y+length*Math.sin(angle);
+  if(rotation.disk)updatePointCoordsById(comps,rotation.disk.p2.id,rotation.disk.p2.x+x-rotation.end.x,rotation.disk.p2.y+y-rotation.end.y);
+  updatePointCoordsById(comps, id, x, y);
   return true;
 }
 

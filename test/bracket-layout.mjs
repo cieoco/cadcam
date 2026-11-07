@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { bracketLayout } from '../js/blocks/bracket-layout.js';
-assert.deepEqual(bracketLayout(29), []);
+assert.deepEqual(bracketLayout(6.9), []);
+assert.equal(bracketLayout(8).length,1);
+assert.equal(bracketLayout(29).length,1);
+assert.equal(bracketLayout(8,{L1:.5})[0].at,.5);
+assert.deepEqual(bracketLayout(8,{L1:.6}),[]);
 assert.deepEqual(bracketLayout(Infinity), []);
 const small = bracketLayout(48), large = bracketLayout(90);
 assert.equal(small.length, 2);

@@ -212,7 +212,8 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     addBody(key, part, joints.map(p=>p.id), comp);
   });
   links.forEach(({ comp, length }) => {
-    const fusion=comp.barFusion ? inspectBarFusion(list,comp,params,exp) : null;
+    const fusion=comp.barFusion ? inspectBarFusion(list,comp,params,exp,orthoExtras) : null;
+    if(fusion&&!fusion.ok)throw Error(fusion.reason);
     const hostGeometry = fusion ? fusion.geometry : hosted.has(comp.id) ? hostedBarGeometry(comp, seedPts, exp, hosted.get(comp.id), extraHolesOf(comp)) : null;
     const part = memberPart(comp, 'member', hostGeometry || inspectLinkExport(comp, length, exp, extraHolesOf(comp)));
     if(fusion?.frameThicknessMm)part.thicknessMm=fusion.frameThicknessMm;

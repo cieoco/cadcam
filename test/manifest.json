@@ -15,6 +15,10 @@
   ],
   "timeoutMs": 90000,
   "tests": [
+    "test/iq-clawbot.mjs",
+    "test/iq-mad-box.mjs",
+    "test/iq-passive-tools.mjs",
+    "test/iq-wheel-grabber.mjs",
     "test/frame-ground.mjs",
     "test/part-fusion-ring.mjs",
     "test/servo-horn-fit.mjs",

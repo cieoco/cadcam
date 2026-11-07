@@ -78,7 +78,7 @@ export function buildPartGeometryCatalog(args={}) {
         if(comp.barFusionRoot && !comp.barFusion)continue;
         if(comp.barFusion){
           Exporters.assertFusionFeatures(comps,mounts,extras);
-          const f=inspectBarFusion(comps,comp,params,settings);if(!f.ok)throw Error(f.reason);
+          const f=inspectBarFusion(comps,comp,params,settings,extras);if(!f.ok)throw Error(f.reason);
           add(comp.id,'bar',f.geometry,f.frameThicknessMm||stock.thicknessMm,f.data.members,{kind:'member',...(f.data.framePointIds?{framePointIds:f.data.framePointIds}:{}),pointIds:[...new Set([comp.p1.id,comp.p2.id,...f.data.points.map(p=>p.id),...(f.data.framePointIds||[])])]},comp.moduleId);
           memberStocks[comp.id]=stock;continue;
         }

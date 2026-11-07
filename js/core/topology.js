@@ -1,3 +1,4 @@
+import {gearTrain} from './gear-train.js';
 import {expandSyringes} from './syringe.js';
 /**
  * Topology Compiler
@@ -22,26 +23,8 @@ function compileGearSteps(c, ctx) {
         return pitchR * 0.6;
     };
 
-    const gearById = new Map(components.filter(g => g.type === 'gear' && g.id).map(g => [g.id, g]));
-    const driveState = (gear, seen = new Set()) => {
-        if (!gear || seen.has(gear.id)) return null;
-        if (!gear.mesh) {
-            const center = allPointsMap.get(gear.p1?.id);
-            return { motor: String(center?.physicalMotor || '1'), factor: 1 };
-        }
-
-        seen.add(gear.id);
-        const driver = gearById.get(gear.mesh);
-        if (!driver || !driver.p1?.id) return null;
-        const parent = driveState(driver, seen);
-        if (!parent) return null;
-        return {
-            motor: parent.motor,
-            factor: parent.factor * -(gearRadius(driver) / (gearRadius(gear) || 1))
-        };
-    };
-
-    const state = driveState(c);
+    const resolved = gearTrain(components,params).state(c);
+    const state = resolved && {motor:String((allPointsMap.get(resolved.root.p1?.id)||resolved.root.p1)?.physicalMotor || '1'),factor:resolved.factor};
     if (!state) return;
     const sign = state.factor < 0 ? -1 : 1;
     const ratio = Math.abs(state.factor);

@@ -1,3 +1,4 @@
+import {gearTrain} from '../core/gear-train.js';
 /**
  * blocks / motor-tools
  *
@@ -64,15 +65,7 @@ export function rackDrivenBy(comps, activeMotor) {
 
 // 齒輪面板明示實際輸入輪，與放置馬達共用嚙合鏈方向。
 export function gearDriver(comps, gearId) {
-  let g=comps.find(c=>c.type==='gear' && c.id===gearId);
-  const seen=new Set();
-  while(g?.mesh && !seen.has(g.id)) {
-    seen.add(g.id);
-    const next=comps.find(c=>c.type==='gear' && c.id===g.mesh);
-    if(!next?.p1)return null;
-    g=next;
-  }
-  return g?.p1 && !g.mesh ? g : null;
+  return gearTrain(comps).state(gearId)?.root || null;
 }
 
 export function createMotorTools({
@@ -314,10 +307,8 @@ export function createMotorTools({
       cancelMotorMode();
       return;
     }
-    let g = gearById(gearId);
-    if (!g || !g.p1) return;
-    const seen = new Set();
-    while (g.mesh && !seen.has(g.id)) { seen.add(g.id); const d = gearById(g.mesh); if (!d || !d.p1) break; g = d; }
+    const g = gearDriver(S.comps,gearId);
+    if (!g?.p1) { setBanner('齒輪傳動關係無法確認，請先修正共軸或嚙合'); return; }
     pushUndo();
     // 型號記在驅動輪上：MG995 有角度範圍（預設 0～90），TT 連續旋轉。
     if (S.pendingMotorType === 'mg995') {

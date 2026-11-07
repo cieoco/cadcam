@@ -1,3 +1,4 @@
+import {gearLayers} from '../core/gear-train.js';
 /**
  * blocks3d / scene-model
  *
@@ -321,7 +322,9 @@ export function buildSceneModel(links, points, opts = {}) {
   const gears = [];
   const gearLayer = -1;
   const gearZ = gearLayer * plateGap;
+  const compoundLayers=gearLayers(gearDefs.map(g=>({...g,type:'gear',p1:{id:g.center},p2:{id:g.pin}})));
   gearDefs.forEach(g => {
+    const gearLayer=compoundLayers.get(g.id) ?? -1,gearZ=gearLayer*plateGap;
     const center = points[g.center];
     const pin = points[g.pin];
     if (![center, pin].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))) return;

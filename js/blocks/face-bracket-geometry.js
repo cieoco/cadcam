@@ -94,7 +94,11 @@ export function planFaceBrackets(host, child, transform, offsets={}, allowRevers
   const z=sign>0?host.box.max.z:host.box.min.z, up={x:0,y:0,z:sign};
   const hostHoles=[],childHoles=[],brackets=[],physical=[];
   for(const slot of slots) {
-    const side=slot.side, cz=side>0?child.box.max.z:child.box.min.z;
+    // A single narrow-seam bracket has no staggered neighbours. Use the side
+    // whose complete contact faces and holes fit; keep the ordinary checks.
+    let chosen;
+    for(const side of slots.length===1?[slot.side,-slot.side]:[slot.side]) {
+    const cz=side>0?child.box.max.z:child.box.min.z;
     const plane=world({x:0,y:0,z:cz}), outward=mul(normal,side);
     const corner=add(add(mul(normal,dot(normal,plane)),mul(along,(lo+hi)/2+slot.at)),{x:0,y:0,z});
     const entity=buildBracketInstance({connectionId,slotId:slot.id,corner,seamAxis:along,spec:K,wings:[
@@ -104,6 +108,10 @@ export function planFaceBrackets(host, child, transform, offsets={}, allowRevers
     const [hw,cw]=entity.wings, hp=hw.plateHole.local, cp=cw.plateHole.local;
     let reason=holeReason(host,hp,hostHoles,K) || holeReason(child,cp,childHoles,K);
     if (!reason && (!footprintFits(host,corner,along,outward,K.hostLeg,p=>p,K) || !footprintFits(child,corner,along,up,K.childLeg,local,K))) reason='角碼底面超出材料或碰到槽口';
+    if(!chosen||!reason)chosen={entity,side,corner,hp,cp,reason};
+    if(!reason)break;
+    }
+    const {entity,side,corner,hp,cp,reason}=chosen,[hw,cw]=entity.wings;
     physical.push(entity);
     brackets.push({id:slot.id,physicalId:entity.id,side,corner,hostHole:hp,childHole:cp,childHoleWorld:cw.plateHole.center,wings:entity.wings.map(w=>w.contact.ring),reason});
     const drilling=w=>({...w.plateHole,...w.plateHole.local,r:K.diameter/2});

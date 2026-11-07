@@ -1,3 +1,4 @@
+import {gearTrain} from '../core/gear-train.js';
 import {expandBarFusions,validateBarFusionPose,barFusionSide} from '../core/bar-fusion.js';
 import {validateSyringePose} from '../core/syringe.js';
 import {solveConstraintClosure} from './constraint-closure.js';
@@ -272,23 +273,8 @@ function solveBodyJointTopology(topology, params) {
         const r = c.pinRadiusParam
             ? getParamVal(c.pinRadiusParam, Math.round(pitchR * 0.6))
             : (Number.isFinite(Number(c.pinRadius)) ? Number(c.pinRadius) : pitchR * 0.6);
-        const gearById = new Map(components.filter(g => g.type === 'gear' && g.id).map(g => [g.id, g]));
-        const driveState = (gear, seen = new Set()) => {
-            if (!gear || seen.has(gear.id)) return null;
-            if (!gear.mesh) return { driverPt: gear.p1, factor: 1 };
-            seen.add(gear.id);
-            const driver = gearById.get(gear.mesh);
-            if (!driver || !driver.p1) return null;
-            const parent = driveState(driver, seen);
-            if (!parent) return null;
-            const rDriver = getParamVal(driver.radiusParam, pitchR);
-            const rDriven = getParamVal(gear.radiusParam, pitchR);
-            return {
-                driverPt: parent.driverPt,
-                factor: parent.factor * -(rDriver / (rDriven || 1))
-            };
-        };
-        const state = driveState(c);
+        const resolved = gearTrain(components,{...topology.params,...actualParams}).state(c);
+        const state = resolved && {driverPt:resolved.root.p1,factor:resolved.factor};
         if (!state) return;
         // 只有「驅動輪中心帶實體馬達」才依 theta 旋轉；沒馬達＝靜止的接地輪（銷停在放置角度，theta 不影響）。
         // 與桿件一致：沒放馬達就不動，不再自動退回預設馬達 '1' 而平白轉起來。
@@ -1248,6 +1234,8 @@ export function solveTopology(topologyOrParams, params) {
         }
     }
     if (topology && topology._wizard_data && topology.bodyJoint !== false) {
+        const gearError=gearTrain(topology._wizard_data,{...topology.params,...actualParams}).reason;
+        if(gearError)return {isValid:false,isUnderconstrained:false,points:{},errorReason:gearError};
         const expanded=expandBarFusions(topology._wizard_data,{...topology.params,...actualParams});
         if(!expanded.ok)return {isValid:false,isUnderconstrained:false,points:{},errorReason:expanded.reason};
         const result=topology._wizard_data.some(c=>c.type==='slider'&&c.movingRail)

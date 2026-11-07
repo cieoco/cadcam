@@ -1,7 +1,13 @@
 /** 角碼配置試作：沿接合線分散；只供操作預覽，不是可加工孔位。 */
 export function bracketLayout(span, offsets = {}, width = 7) {
   const margin = Math.max(10, width/2 + 3);
-  if (!Number.isFinite(span) || span < 30) return [];
+  if (!Number.isFinite(span) || span < width) return [];
+  // A narrow seam can carry one ordinary bracket. Placement still validates
+  // its complete footprint, both holes and the remaining edge material.
+  if (span < 30) {
+    const at=Number.isFinite(offsets.L1)?offsets.L1:0;
+    return Math.abs(at)+width/2<=span/2 ? [{id:'L1',side:-1,at,width}] : [];
+  }
   const half = span / 2 - margin;
   const slots = span >= 70
     ? [{ id: 'L1', side: -1, at: -.7 * half }, { id: 'R1', side: 1, at: 0 }, { id: 'L2', side: -1, at: .7 * half }]

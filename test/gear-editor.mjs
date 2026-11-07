@@ -109,4 +109,15 @@ check('刪小齒輪連齒條與導銷一起刪', S.comps.length === 0 && !Object
 editor.deselectGear();
 check('取消選取後齒輪面板隱藏', S.selectedGearId === null && document.getElementById('gearEditor').style.display === 'none');
 
+// ---- 共軸複合列：同一入口改整鏈模數、同步各軸並一次復原 ----
+const {MAD_BOX_EXAMPLE}=await import('../js/blocks/iq-mad-box-example.js');
+const mad=normalizeSnapshot(structuredClone(MAD_BOX_EXAMPLE.snapshot));
+S.comps=mad.comps;S.topo={params:mad.params};S.modules=[];S.selectedGearId='MadF';
+const beforeCompound=undos;editor.changeGearModule(1);
+check('共軸三段改模數共用一次提交',undos===beforeCompound+1&&gears().every(g=>g.module===3));
+check('共軸三段所有嚙合保持相切',gears().filter(g=>g.mesh).every(g=>tangent(g,gears().find(a=>a.id===g.mesh))));
+check('四軸間距依序同步為72mm',gears().find(g=>g.id==='MadF').p1.x===216);
+editor.deleteGearChain('MadC');
+check('刪除複合列不留下共軸孤輪',S.comps.length===0);
+
 report('gear-editor');
