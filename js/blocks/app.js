@@ -2308,6 +2308,8 @@ async function toggle3D() {
     viewer3D ||= await viewerSource.get();
     if(!view3DActive){viewer3D.stop();return;}
     viewer3D.start();
+    // 2D 播放不更新隱藏的 3D 輸入；切入時先同步目前姿態，避免暫停後顯示舊角度。
+    renderFrame();
     refresh3DView();
     requestAnimationFrame(refresh3DView);
     setTimeout(refresh3DView, 120);

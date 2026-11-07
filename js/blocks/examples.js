@@ -3,6 +3,7 @@ import {tabNutSnapshot} from './tab-nut-example.js';
 import { centerForLinks } from '../core/chain-drive.js';
 import { PARALLEL_GRIPPER_EXAMPLE } from './parallel-gripper-example.js';
 import { COMMON_MANIPULATOR_EXAMPLES } from './common-manipulator-examples.js';
+import { SIX_BAR_LIFT_EXAMPLE } from './six-bar-lift-example.js';
 import {fixedLiftSnapshot,fixedGripSnapshot} from './fixed-syringe-examples.js';
 import {hydraulicLiftGripSnapshot,hydraulicArmSnapshot} from './hydraulic-assembly-example.js';
 import { hydraulicSnapshot } from './hydraulic-example.js';
@@ -58,6 +59,7 @@ export const EXAMPLE_GROUPS = [
 ];
 
 const EXAMPLE_LESSONS = {
+  'six-bar-lift': SIX_BAR_LIFT_EXAMPLE.lesson,
   'tab-nut-m3':{group:'challenge',level:'製作試作',use:'用雙榫定位與 M3 螺絲／螺母固定垂直板件；材質、切縫與實物承載尚未驗證。',try:['切到組立，選立板調整接合；在製作設定下載三組配合試片','先量板厚與五金，試切後比較間隙；不要以模擬判定可承重']},
   'parallel-gripper': PARALLEL_GRIPPER_EXAMPLE.lesson,
   ...Object.fromEntries(COMMON_MANIPULATOR_EXAMPLES.map(example => [example.id, example.lesson])),
@@ -974,6 +976,7 @@ ALL_BLOCK_EXAMPLES.push({ id: 'assembly-lift-gripper-practice', title: '組立�
 ALL_BLOCK_EXAMPLES.push({ id: 'lift-bucket', title: '組立：平行升降托斗', note: '單馬達保持料斗方向，沿圓弧升降；組立可整組拆裝。尚未驗證承載及安裝五金。', snapshot: liftBucketSnapshot });
 
 ALL_BLOCK_EXAMPLES.push(...COMMON_MANIPULATOR_EXAMPLES);
+ALL_BLOCK_EXAMPLES.push(SIX_BAR_LIFT_EXAMPLE);
 
 // 第九、十單元：直接從既有幾何開始安裝，不重製 H01–H03，也不要求學生先開成品再拆除。
 for(const [id,label,snapshot] of [

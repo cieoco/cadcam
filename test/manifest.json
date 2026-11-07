@@ -213,6 +213,7 @@
     "test/rock-motion.mjs",
     "test/runner-contract.mjs",
     "test/servo-crank-holes.mjs",
+    "test/six-bar-lift.mjs",
     "test/slider-crank.mjs",
     "test/slider-editor.mjs",
     "test/slider-lesson.mjs",
