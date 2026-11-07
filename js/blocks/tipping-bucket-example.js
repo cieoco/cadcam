@@ -1,4 +1,4 @@
-/** 四塊真實輸出板件；5mm包邊容納主孔，O 位於側板中段，固定支架在O右側。 */
+/** 四塊真實輸出板件；5mm包邊容納主孔，O 位於側板中段偏下（頂邊 L 上格），固定支架在O右側。 */
 export const tippingBucketSnapshot = {
   "kind": "blocks",
   "v": 1,
@@ -85,7 +85,7 @@ export const tippingBucketSnapshot = {
         "id": "L",
         "type": "floating",
         "x": 0,
-        "y": 20
+        "y": 24
       },
       "gParam": "BucketBase",
       "r1Param": "SideHeight",
@@ -114,7 +114,7 @@ export const tippingBucketSnapshot = {
         {
           "solve": false,
           "u": 80,
-          "v": 20
+          "v": 24
         },
         {
           "solve": true,
@@ -133,7 +133,7 @@ export const tippingBucketSnapshot = {
       "p1": {
         "id": "RightSideA",
         "type": "fixed",
-        "x": -15,
+        "x": -16,
         "y": 0,
         "frameStock": {
           "lengthMm": 90,
@@ -149,7 +149,7 @@ export const tippingBucketSnapshot = {
       "p1": {
         "id": "RightSideB",
         "type": "fixed",
-        "x": 15,
+        "x": 16,
         "y": 0
       }
     },
@@ -160,7 +160,7 @@ export const tippingBucketSnapshot = {
       "p1": {
         "id": "FloorA",
         "type": "fixed",
-        "x": -15,
+        "x": -16,
         "y": 0,
         "frameStock": {
           "lengthMm": 130,
@@ -176,7 +176,7 @@ export const tippingBucketSnapshot = {
       "p1": {
         "id": "FloorB",
         "type": "fixed",
-        "x": 15,
+        "x": 16,
         "y": 0
       }
     },
@@ -187,7 +187,7 @@ export const tippingBucketSnapshot = {
       "p1": {
         "id": "BackA",
         "type": "fixed",
-        "x": -15,
+        "x": -16,
         "y": 0,
         "frameStock": {
           "lengthMm": 60,
@@ -203,7 +203,7 @@ export const tippingBucketSnapshot = {
       "p1": {
         "id": "BackB",
         "type": "fixed",
-        "x": 15,
+        "x": 16,
         "y": 0
       }
     }
@@ -429,8 +429,8 @@ export const tippingBucketSnapshot = {
   "params": {
     "bucketAssembly": 1,
     "BucketBase": 80,
-    "SideHeight": 20,
-    "SideDiagonal": 82.46211251235322,
+    "SideHeight": 24,
+    "SideDiagonal": 83.5224520712844,
     "SupportLength": 40,
     "theta": 0
   },

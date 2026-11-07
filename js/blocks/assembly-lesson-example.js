@@ -94,7 +94,7 @@ export const assemblyLessonSnapshot = {
       "p3": {
         "id": "E",
         "type": "floating",
-        "x": 104,
+        "x": 106,
         "y": 72
       },
       "gParam": "LL3",
@@ -118,7 +118,7 @@ export const assemblyLessonSnapshot = {
         {
           "solve": false,
           "u": 0,
-          "v": -54
+          "v": -56
         }
       ]
     },
@@ -129,7 +129,7 @@ export const assemblyLessonSnapshot = {
       "p1": {
         "id": "GCA",
         "type": "motor",
-        "x": 50,
+        "x": 48,
         "y": 0,
         "physicalMotor": "2",
         "frameStock": {
@@ -141,13 +141,13 @@ export const assemblyLessonSnapshot = {
       "p2": {
         "id": "GPA",
         "type": "floating",
-        "x": 50,
-        "y": 18
+        "x": 48,
+        "y": 24
       },
       "radiusParam": "GRA",
       "pinRadiusParam": "GPRA",
       "pinHoleDiameter": 5,
-      "teeth": 15,
+      "teeth": 16,
       "module": 4,
       "phase": 90,
       "moduleId": "Grip1"
@@ -159,7 +159,7 @@ export const assemblyLessonSnapshot = {
       "p1": {
         "id": "GCB",
         "type": "fixed",
-        "x": 110,
+        "x": 112,
         "y": 0,
         "frameStock": {
           "lengthMm": 110,
@@ -170,13 +170,13 @@ export const assemblyLessonSnapshot = {
       "p2": {
         "id": "GPB",
         "type": "floating",
-        "x": 110,
-        "y": 18
+        "x": 112,
+        "y": 24
       },
       "radiusParam": "GRB",
       "pinRadiusParam": "GPRB",
       "pinHoleDiameter": 5,
-      "teeth": 15,
+      "teeth": 16,
       "module": 4,
       "phase": 90,
       "mesh": "GearA",
@@ -189,7 +189,7 @@ export const assemblyLessonSnapshot = {
       "p1": {
         "id": "GCA",
         "type": "motor",
-        "x": 50,
+        "x": 48,
         "y": 0,
         "physicalMotor": "2",
         "frameStock": {
@@ -201,14 +201,14 @@ export const assemblyLessonSnapshot = {
       "p2": {
         "id": "GPA",
         "type": "floating",
-        "x": 50,
-        "y": 18
+        "x": 48,
+        "y": 24
       },
       "p3": {
         "id": "LT",
         "type": "floating",
-        "x": -15,
-        "y": -85
+        "x": -24,
+        "y": -96
       },
       "gParam": "GPRA",
       "r1Param": "LJ_tip",
@@ -226,7 +226,7 @@ export const assemblyLessonSnapshot = {
       "p1": {
         "id": "GCB",
         "type": "fixed",
-        "x": 110,
+        "x": 112,
         "y": 0,
         "frameStock": {
           "lengthMm": 110,
@@ -237,14 +237,14 @@ export const assemblyLessonSnapshot = {
       "p2": {
         "id": "GPB",
         "type": "floating",
-        "x": 110,
-        "y": 18
+        "x": 112,
+        "y": 24
       },
       "p3": {
         "id": "RT",
         "type": "floating",
-        "x": 175,
-        "y": -85
+        "x": 184,
+        "y": -96
       },
       "gParam": "GPRB",
       "r1Param": "RJ_tip",
@@ -258,19 +258,19 @@ export const assemblyLessonSnapshot = {
   ],
   "params": {
     "theta": 0,
-    "GRA": 30,
-    "GRB": 30,
-    "GPRA": 18,
-    "GPRB": 18,
-    "LJ_tip": 107,
-    "LJ_edge": 121.8,
-    "RJ_tip": 107,
-    "RJ_edge": 121.8,
+    "GRA": 32,
+    "GRB": 32,
+    "GPRA": 24,
+    "GPRB": 24,
+    "LJ_tip": 120,
+    "LJ_edge": 139.9428454762872,
+    "RJ_tip": 120,
+    "RJ_edge": 139.9428454762872,
     "LL1": 160,
     "LL2": 160,
     "LL3": 72,
-    "ToolDiagonal": 90,
-    "ToolTop": 54
+    "ToolDiagonal": 91.21403400793103,
+    "ToolTop": 56
   },
   "modules": [
     {
@@ -347,7 +347,7 @@ export const assemblyLessonSnapshot = {
             ]
           ],
           "translation": {
-            "x": 136.99999999999997,
+            "x": 137.99999999999997,
             "y": 82.5,
             "z": 80
           },

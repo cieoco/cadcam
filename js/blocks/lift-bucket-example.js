@@ -24,7 +24,7 @@ export const liftBucketSnapshot = {
         "id": "RigidGroup-L",
         "type": "floating",
         "x": -5.684341886080802e-15,
-        "y": 20
+        "y": 24
       },
       "gParam": "RigidGroup-BucketBase",
       "r1Param": "RigidGroup-SideHeight",
@@ -53,7 +53,7 @@ export const liftBucketSnapshot = {
         {
           "solve": false,
           "u": 80,
-          "v": 20
+          "v": 24
         },
         {
           "solve": true,
@@ -72,7 +72,7 @@ export const liftBucketSnapshot = {
       "p1": {
         "id": "RightSideA",
         "type": "fixed",
-        "x": -15,
+        "x": -16,
         "y": 0,
         "frameStock": {
           "lengthMm": 90,
@@ -88,7 +88,7 @@ export const liftBucketSnapshot = {
       "p1": {
         "id": "RightSideB",
         "type": "fixed",
-        "x": 15,
+        "x": 16,
         "y": 0
       }
     },
@@ -99,7 +99,7 @@ export const liftBucketSnapshot = {
       "p1": {
         "id": "FloorA",
         "type": "fixed",
-        "x": -15,
+        "x": -16,
         "y": 0,
         "frameStock": {
           "lengthMm": 130,
@@ -115,7 +115,7 @@ export const liftBucketSnapshot = {
       "p1": {
         "id": "FloorB",
         "type": "fixed",
-        "x": 15,
+        "x": 16,
         "y": 0
       }
     },
@@ -126,7 +126,7 @@ export const liftBucketSnapshot = {
       "p1": {
         "id": "BackA",
         "type": "fixed",
-        "x": -15,
+        "x": -16,
         "y": 0,
         "frameStock": {
           "lengthMm": 60,
@@ -142,7 +142,7 @@ export const liftBucketSnapshot = {
       "p1": {
         "id": "BackB",
         "type": "fixed",
-        "x": 15,
+        "x": 16,
         "y": 0
       }
     },
@@ -530,7 +530,7 @@ export const liftBucketSnapshot = {
             "alignU": 0,
             "alignV": 0,
             "offsetU": 40,
-            "offsetV": -36,
+            "offsetV": -34,
             "gap": 12,
             "quarterTurns": 0
           },
@@ -542,13 +542,13 @@ export const liftBucketSnapshot = {
   ],
   "params": {
     "BucketBase": 80,
-    "SideHeight": 20,
-    "SideDiagonal": 82.46211251235322,
+    "SideHeight": 24,
+    "SideDiagonal": 83.5224520712844,
     "SupportLength": 40,
     "theta": 0,
     "RigidGroup-BucketBase": 80,
-    "RigidGroup-SideHeight": 20,
-    "RigidGroup-SideDiagonal": 82.46211251235322,
+    "RigidGroup-SideHeight": 24,
+    "RigidGroup-SideDiagonal": 83.5224520712844,
     "LL1": 48,
     "LL2": 48,
     "LL3": 72,
