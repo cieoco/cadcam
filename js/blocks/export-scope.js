@@ -41,7 +41,7 @@ export function resolveExportScope(source,{scope='design',focus=ROOT_TAB,selecte
 export function prepareScopedExport(source,options,format) {
   if(!['svg','dxf'].includes(format))throw Error('不支援的格式');
   const work=structuredClone(source),{context,targets,scope}=resolveExportScope(work,options);
-  const targetIds=new Set(targets.map(c=>c.id)),files=[],warnings=[],notices=[];
+  const targetIds=new Set(targets.map(c=>c.id)),files=[],warnings=[],notices=[],cncList=[];
   const emit=(text,name,mime,ids=[])=>{if(scope!=='selected'||ids.some(id=>targetIds.has(id)))files.push({text,name,mime,sourceIds:ids});};
   if(context.comps.some(c=>c.motorType==='n20')){const note=work.fabrication?.drive?.n20Spec===1?'N20特定前端雙孔座與3 mm軸輪轂試作：小孔需另鑽；螺絲牙深、軸向間隙及實物待核對。':'N20 僅通用模擬：固定支架、軸接頭與配對孔尚未提供；中心孔為一般參考孔，製作前須核對。';warnings.push(note);notices.push(note);}
   if(context.comps.some(c=>c.type==='syringe')) {
@@ -80,11 +80,12 @@ export function prepareScopedExport(source,options,format) {
         if(geometry)cncParts.push({name:frame.name,holes:geometry.holes,cutouts:geometry.cutouts});
       }
     }
-    warnings.push(...cncWarnings(cncParts,work.fabrication?.cnc||FABRICATION_DEFAULTS.cnc));
+    cncList.push(...cncWarnings(cncParts,work.fabrication?.cnc||FABRICATION_DEFAULTS.cnc));warnings.push(...cncList);
     const skipped=targets.filter(c=>!['anchor','bar','triangle','gear','rack'].includes(c.type)&&!['sprocket','chain'].includes(c.kind));   // 鏈輪與鏈條是買現成的，不出板材檔也不提醒
     if(skipped.length){const notice=`未提供獨立板材檔：${skipped.map(c=>c.id).join('、')}`;warnings.push(notice);notices.push(notice);}
   }
   if(!files.length)throw Error('這個範圍沒有可匯出的板材零件；請選板身，不是接點。');
   if(new Set(files.map(f=>f.name)).size!==files.length)throw Error('零件檔名重複，請調整零件名稱後再匯出。');
-  return {files,warnings:[...new Set(warnings)],notices,scope};
+  // cncWarnings 另列一份，供合併 CNC 排版顯示；逐件輸出內容不變。
+  return {files,warnings:[...new Set(warnings)],notices,scope,cncWarnings:[...new Set(cncList)]};
 }

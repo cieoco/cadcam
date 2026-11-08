@@ -257,6 +257,8 @@
     "test/simulation-scope.mjs",
     "test/project-name.mjs",
     "test/export-scope.mjs",
+    "test/dxf-nest.mjs",
+    "test/dxf-nest-export.mjs",
     "test/motion-preflight.mjs",
     "test/lesson-check.mjs",
     "test/lesson-structure.mjs",
