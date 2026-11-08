@@ -189,7 +189,7 @@ export function buildSceneModel(links, points, opts = {}) {
       motorDriven: l.style === 'crank' && (motorCenters.has(l.p1) || motorCenters.has(l.p2)),
       assemblyLayer: assemblyLayerForBody(l.id),
     })),
-    ...triPlates.filter(poly=>!Object.values(opts.fusedParts || {}).some(f=>f.ids.join(',')===poly.points.join(','))).map(poly => ({ kind: 'plate', src: poly, joints: [...poly.points], lift: poly._zlift || 0 })),
+    ...triPlates.filter(poly=>!Object.values(opts.fusedParts || {}).some(f=>f.ids.join(',')===poly.points.join(','))).map(poly => ({ kind: 'plate', src: poly, joints: [...poly.points], lift: poly._zlift || 0,...(poly.id?{assemblyLayer:assemblyLayerForBody(poly.id)}:{}) })),
   ];
 
   // 分層（離地深度，2D 疊放順序與此共用同一套 → 兩邊一致）
@@ -231,6 +231,7 @@ export function buildSceneModel(links, points, opts = {}) {
       const stock = memberStocks[poly.points.join(',')];
       plates.push({
         ids: [...poly.points],
+        ...(poly.id?{id:poly.id}:{}),
         corners,
         layer,
         z,
@@ -583,7 +584,7 @@ export function buildSceneModel(links, points, opts = {}) {
       const dy = ty !== null ? ty - j.y : -1;
       const dl = Math.hypot(dx, dy) || 1;
       const type = ['mg995','n20'].includes(motorTypes.get(j.id)) ? motorTypes.get(j.id) : 'tt';
-      const hostPart=mount?.face&&sticks.find(s=>s.id===mount.frameBody);
+      const hostPart=mount?.face&&(sticks.find(s=>s.id===mount.frameBody)||plates.find(p=>p.id===mount.frameBody));
       const face=mount?.face,shaftDirection=face==='front'?-1:1;
       const hostZ=hostPart?hostPart.layer*plateGap:(frameBackZ??0);
       const hostTop=hostZ+(hostPart?.thickness??plateThickness);

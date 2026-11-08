@@ -37,6 +37,7 @@ export function planMemberCopy({comps, params, modules = [], counter = 0, id, po
   const source = JSON.parse(JSON.stringify(members));
   const sourceParams = {};
   for (const c of source) {
+    if(c.standardBlank?.mountHoles?.length){c.holes=[...(c.holes || []),...c.standardBlank.mountHoles];delete c.standardBlank.mountHoles;}if(c.standardBlank)delete c.motorMountPoint;
     for (const key of [...ownedParamKeys(c), ...(c.holes || []).map(h => h.distParam).filter(Boolean)]) {
       if (!Number.isFinite(params[key]) || params[key] < 0) return fail('零件尺寸無效，請先修正尺寸。');
       sourceParams[key] = params[key];
@@ -66,6 +67,7 @@ export function planMemberCopy({comps, params, modules = [], counter = 0, id, po
     existingTokens.add(c.id);
     pointKeysFor(c).forEach(k => { if(c[k])existingTokens.add(c[k].id); });
     (c.holes || []).forEach(h=>existingTokens.add(h.id));
+    (c.standardBlank?.mountHoles || []).forEach(h=>existingTokens.add(h.id));
   }
   // 沿用模組插入的唯一 ID／孔／參數重編；不建立新的設計或安裝關係。
   const result = instantiateTemplate({comps:source,params:sourceParams}, {counter,existingTokens,place:source[0].p1});

@@ -41,7 +41,8 @@ const descendants = node => node.children.flatMap(child => [child, ...descendant
 const entries = () => descendants(ids.get('exampleList'));
 const catalogIds = CATALOG_FAMILIES.flatMap(family => family.variants.map(item => item.id));
 const snapshots = JSON.stringify(BLOCK_EXAMPLES);
-check('55 個公開範例各有唯一主要位置，沒有遺失或多餘 ID', catalogIds.length === 55 && new Set(catalogIds).size === 55 && BLOCK_EXAMPLES.every(example => catalogIds.includes(example.id)));
+// 57 = 55 個啟動即有的範例＋2 個舵機座板範例（隨起始檔按需載入，載入前目錄只顯示 55 個）。
+check('57 個公開範例各有唯一主要位置，沒有遺失或多餘 ID', catalogIds.length === 57 && new Set(catalogIds).size === 57 && BLOCK_EXAMPLES.every(example => catalogIds.includes(example.id)));
 check('五個用途依確認順序排列，工具練習另列', CATALOG_GROUPS.map(group => group.label).join('、') === '傳動與變速、升降與伸縮、夾取與搬運、往復與特殊運動、行走機構' && CATALOG_FAMILIES.every(family => CATALOG_GROUPS.some(group => group.id === family.group) || family.group === 'tools'));
 check('推薦使用同 ID 捷徑，不複製主要入口', entries().filter(node => node.dataset.exampleId).length === 55 && entries().filter(node => node.dataset.exampleRef).length === CATALOG_RECOMMENDATIONS.length);
 check('能力標示保留手動、固定、局部與待完成界限', getCatalogVariant('iq-wheel-grabber').capability === '手動調姿' && getCatalogVariant('iq-passive-combined').capability === '固定組立' && getCatalogVariant('crank-catapult-study').capability === '局部示意' && getCatalogVariant('slider-crank-practice').capability === '待完成練習');
@@ -56,7 +57,7 @@ check('目錄不進入首次載入', !startupSize().paths.includes('js/blocks/ex
 await controller.populate();
 check('重建目錄不重複入口、不改原作品資料', entries().filter(node => node.dataset.exampleId).length === 55 && JSON.stringify(BLOCK_EXAMPLES) === snapshots);
 await loadUnitStarts(); const withStarts = JSON.stringify(BLOCK_EXAMPLES); await controller.populate();
-check('八份教學起始檔另列且各保留原 ID', entries().filter(node => node.dataset.exampleId).length === 63 && entries().some(node => node.dataset.exampleGroup === 'lessons'));
+check('八份教學起始檔另列且各保留原 ID', entries().filter(node => node.dataset.exampleId).length === 65 && entries().some(node => node.dataset.exampleGroup === 'lessons'));
 check('教學起始檔與公開作品在目錄呈現後皆保持原內容', JSON.stringify(BLOCK_EXAMPLES) === withStarts);
 controller.renderLessonCard(null);
 check('初始化時隱藏教學卡', ids.get('exampleLessonCard').style.display === 'none');

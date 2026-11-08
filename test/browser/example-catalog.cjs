@@ -15,7 +15,7 @@ const base=process.env.TEST_URL||'http://127.0.0.1:8024',out='output/example-cat
   try{
    await page.goto(base+'/blocks.html?example=gear-pair');await page.getByRole('button',{name:'載入此範例',exact:true}).click();
    const original=await state();await catalog();
-   assert.equal(await page.locator('[data-example-id]').count(),62);
+   assert.equal(await page.locator('[data-example-id]').count(),65);
    assert.equal(await page.locator('[data-example-ref]').count(),4);
    assert.equal(await page.locator('[data-example-group="challenge"]').count(),0);
    assert.equal(await page.locator('[data-example-family="passive-tools"] summary .example-capability').textContent(),'固定組立');
@@ -36,7 +36,7 @@ const base=process.env.TEST_URL||'http://127.0.0.1:8024',out='output/example-cat
    await page.getByRole('button',{name:'關閉',exact:true}).filter({visible:true}).click();
    await page.goto(base+'/blocks.html?example=iq-passive-spatula');await page.getByRole('button',{name:'載入此範例',exact:true}).click();
    assert.ok(await page.evaluate(async()=>{const {S}=await import('/js/blocks/state.js');const {getExample}=await import('/js/blocks/examples.js');const {normalizeSnapshot}=await import('/js/blocks/schema.js');return JSON.stringify(S.comps)===JSON.stringify(normalizeSnapshot(getExample('iq-passive-spatula').snapshot).comps);}),'existing deep URL resolves its unchanged snapshot');
-   assert.deepEqual(errors,[]);results.push({viewport,entries:62,families:true,keyboard:true,cancel:true,undo:true,deepLink:true,overflow:false});
+   assert.deepEqual(errors,[]);results.push({viewport,entries:65,families:true,keyboard:true,cancel:true,undo:true,deepLink:true,overflow:false});
   }catch(e){results.push({viewport,error:e.stack});await page.screenshot({path:`${out}/${viewport.width}-failed.png`});throw e;}
   finally{await ctx.close();await fs.writeFile(out+'/results.json',JSON.stringify(results,null,2));}
  }}finally{await browser.close();}console.log(results);

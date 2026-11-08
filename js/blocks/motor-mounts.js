@@ -10,7 +10,7 @@ export function normalizedDir(from, to, fallback = { x: 0, y: -1 }) {
   return distance > 1e-6 ? { x: dx / distance, y: dy / distance } : fallback;
 }
 
-import { resolveMotorOrientation } from './motor-orientation.js';
+import { motorCarrierFrame,resolveMotorOrientation } from './motor-orientation.js';
 export function motorRotDegFromDir(dir) {
   return dir ? Math.atan2(-dir.x, -dir.y) * 180 / Math.PI : 0;
 }
@@ -18,7 +18,7 @@ export function motorRotDegFromDir(dir) {
 export function motorMountPatternRotDegForCenter({id,pts,comps,mount=null,fallbackRotDeg=()=>0}){
  if(mount?.face||Number.isFinite(mount?.angleDeg)||mount?.reason?.startsWith('mount-')){
    const host=comps.find(c=>c.id===mount.frameBody),center=pts?.[id];
-   const carrier=host?{p1:host.p1?.id,a:pts?.[host.p1?.id],b:pts?.[host.p2?.id]}:null;
+   const carrier=motorCarrierFrame(host,{...center,id},pts);
    return resolveMotorOrientation(mount.orientation,{center:{...center,id},carrier:carrier?.a&&carrier?.b?carrier:null,reversed:mount.reversed,angleDeg:mount.angleDeg}).rotDeg-90;
  }
  const inputBar=comps.find(c=>c.type==='bar'&&c.isInput&&c.p1&&c.p2&&((c.p1.id===id&&c.p1.physicalMotor)||(c.p2.id===id&&c.p2.physicalMotor)));
@@ -134,7 +134,7 @@ export function buildMotorMounts({ motorIds, groundIds, staticPoints, comps, com
       // A carrier's live direction is resolved by 2D/3D frame updates.  At
       // build time this gives world mounts their canonical horizontal/vertical
       // direction and prevents any fallback to the output crank.
-      const resolved = resolveMotorOrientation(orientation, { center, reversed: Boolean(outputBar.motorMount?.reversed),angleDeg:barAssembly.angleDeg });
+      const resolved = resolveMotorOrientation(orientation, { center:{...center,id},carrier:comps.find(c=>c.id===carrierId)?.standardBlank?.kind==='plate'?motorCarrierFrame(comps.find(c=>c.id===carrierId),{...center,id},staticPoints):null,reversed: Boolean(outputBar.motorMount?.reversed),angleDeg:barAssembly.angleDeg });
       mounts.set(id, { ...resolved, reason: `mount-${orientation}`, ...barAssembly });
       return;
     }

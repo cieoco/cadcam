@@ -1,3 +1,4 @@
+import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import {frameHoleAxis} from './frame-holes.js';
 import {fusionRoot} from '../core/bar-fusion.js';
 import {ownedParamKeys} from './part-types.js';
@@ -11,12 +12,14 @@ export function deleteSelectedPart({S,transient,deleteGearChain,pushUndo,pause,c
   const comp = S.comps.find(c => c.id === id);
   if (!comp) return;
   if(comp.boxPanel){transient('這是盒體的配對板件，請整組管理；尺寸從「卡榫盒子」修改。');return;}
+  const params={...S.topo.params};
+  const candidate=detachDeletedAttachments(structuredClone(S.comps),new Set([id]),params,points).filter(c=>c.id!==id);
+  ownedParamKeys(comp).forEach(k=>delete params[k]);
+  const platePlan=planActuatorPlateHoles({comps:candidate,params,modules:S.modules,fabrication:S.fabrication});if(!platePlan.ok){transient(platePlan.message);return;}
   pushUndo();
   pause();
   // 刪除前先清掉這個元件佔用的 topo.params（型別表宣告它擁有哪些參數）
-  S.comps = detachDeletedAttachments(S.comps,new Set([id]),S.topo.params,points);
-  ownedParamKeys(comp).forEach(k => delete S.topo.params[k]);
-  S.comps = S.comps.filter(c => c.id !== id);
+  S.comps=platePlan.comps;S.topo.params=params;
   for(const c of S.comps)if(c.frameHole&&!frameHoleAxis(S.comps,c)){delete c.frameHole;transient('機架孔的基準已移除，孔保留在原位置成為獨立固定點。');}
   S.selectedLinkId = null;
   S.selectedTriangleId = null;

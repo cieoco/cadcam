@@ -153,6 +153,7 @@ export function frameConnectorNodes(comps) {
   const separateIds=new Set();
   (comps||[]).forEach(c=>c.barFusion?.framePointIds?.forEach(id=>separateIds.add(id)));
   (comps||[]).filter(c=>c?.frameSeparate).forEach(c=>pointKeysFor(c).forEach(k=>{if(c[k]?.id)separateIds.add(c[k].id);}));
+  for(const c of comps || [])if(c.motorMount?.frameBody&&comps.some(h=>h.id===c.motorMount.frameBody&&h.standardBlank&&h.type==='triangle'))separateIds.add(c.motorMount.center);
   const fixedIds=frameNodeIds(comps);
   (comps||[]).filter(c=>c.barFusion?.points.filter(p=>fixedIds.has(p.id)).length>=2)
     .forEach(c=>c.barFusion.points.forEach(p=>separateIds.add(p.id)));

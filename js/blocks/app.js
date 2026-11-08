@@ -3327,7 +3327,7 @@ function init() {
                },
                snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel, openFrameEditor: () => { S.frameEditorOpen = true; Panels.updateFrameEditor(); }, transient,
                isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, pointIsRackHole });
-  Settings.init({ draw: () => { if (S.modules.some(m => m.mount?.face)) rebuild(); draw(); }, pushUndo, pause, scheduleAutosave, notify: transient });
+  Settings.init({ rebuild, draw, pushUndo, pause, scheduleAutosave, notify: transient });
   Settings.loadExportSettings();
   Settings.loadTtMountSettings();
   Settings.loadMg995MountSettings();

@@ -1,10 +1,12 @@
+import {inspectPlateExport} from './exporters.js';
+import {deriveMotorMounts} from './build-plan.js';
 import {pointDisplayName} from './display-labels.js';
-import {actuatorChoices,planMotorInstallation,quickMotorChoices} from './actuator-installation.js';
+import {actuatorChoices,actuatorHostPoints,actuatorPoint,planMotorInstallation,quickMotorChoices} from './actuator-installation.js';
 import {signedNumberInput,showNumber,readNumber} from './numeric-input.js';
-import {resolveMotorOrientation} from './motor-orientation.js';
+import {motorCarrierFrame,resolveMotorOrientation} from './motor-orientation.js';
 const ns='http://www.w3.org/2000/svg';
 const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textContent=text;parent?.append(n);return n;};
-const label=c=>c.name || c.id;
+const label=c=>c?.name || c?.id || '尚未選擇';
 
 import {confirmMountingChange} from './mounting-review-ui.js';
 export function openMotorInstallation({source,points={},motion={},type='mg995',existingId=null,initialOutputId='',motorId='1',confirm,review=(result,notify)=>confirmMountingChange(source,{...source,comps:result.comps,params:result.params},{notify})}){
@@ -14,7 +16,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     angleDeg:old?.motorMount?.angleDeg??0,hostEnd:'p1',face:old?.motorMount?.face||'back',orientation:old?.motorMount?.orientation||'horizontal',reversed:!!old?.motorMount?.reversed,
     outputId:old?.id||initialOutputId,outputEnd:oldCenter&&old?.p2?.id===oldCenter?'p2':'p1',start:old?.servoStart??0,end:old?.servoEnd??90,
     angle:old?Number(motion.motorAngles?.[old.physicalMotor||old.p1?.physicalMotor]??motion.thetaDeg??0):0};
-  const oldHost=choices.hosts.find(c=>c.id===request.hostId);if(oldHost&&oldCenter&&oldHost.p2.id===oldCenter)request.hostEnd='p2';
+  const oldHost=choices.hosts.find(c=>c.id===request.hostId);if(oldHost&&oldCenter)request.hostEnd=actuatorHostPoints(oldHost).find(p=>p.id===oldCenter)?.key || 'p1';
   let result=null,viewer=null,closed=false,revision=0,three=false,selectedNode=oldCenter||'';
   const candidates=old?[]:quickMotorChoices(base.comps,initialOutputId);
   const legal=candidates.filter(c=>planMotorInstallation(base,{...request,...c},points,motion).ok);
@@ -39,8 +41,9 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
   const faces=['front','back'].map((face,i)=>{const b=el('button',i?'背面':'正面',faceRow);b.onclick=()=>{request.face=face;update();};return b;});
   el('p','藍色承載外殼；正背面決定外殼在哪側。',panels[0]);
   const hostNote=el('p',null,panels[0]);
-  const location=field(panels[1],'軸心位置');option(location,'承載桿第一孔','p1');option(location,'承載桿第二孔','p2');location.value=request.hostEnd;
-  const orientation=field(panels[1],'馬達本體方向');for(const [v,t] of [['horizontal','水平'],['vertical','垂直'],['follow-frame','沿承載桿']])option(orientation,t,v);orientation.value=request.orientation;
+  const location=field(panels[1],'軸心位置');
+  const hostLocations=()=>{location.replaceChildren();const owner=base.comps.find(c=>c.id===request.hostId),parked=new Set((owner?.standardBlank?.mountHoles || []).map(h=>h.id));for(const [i,p]of actuatorHostPoints(owner).entries())if(!parked.has(p.id)||p.id===oldCenter)option(location,owner?.standardBlank?`格位 ${i+1}（${p.x}, ${p.y} mm）`:`承載桿第${i+1}孔`,p.key);location.value=request.hostEnd;};hostLocations();
+  const orientation=field(panels[1],'馬達本體方向');for(const [v,t] of [['horizontal','水平'],['vertical','垂直'],['follow-frame','沿承載零件']])option(orientation,t,v);orientation.value=request.orientation;
   const reverse=el('button','本體轉向 180°',panels[1]);reverse.onclick=()=>{request.reversed=!request.reversed;update();};
   el('p','點圖上的孔定位；本體方向只改外殼朝向。',panels[1]);
   const output=field(panels[2],'輸出軸帶動哪個零件？');option(output,'請選輸出零件','');choices.outputs.forEach(c=>option(output,label(c),c.id));output.value=request.outputId;
@@ -60,7 +63,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
   foot.prepend(error);cancel.onclick=()=>dialog.close();
   next.onclick=()=>{if(result?.ok){if(!review(result,message=>{error.textContent=message;}))return;if(confirm(result)!==false)dialog.close();else error.textContent='作品已變更，請關閉後重新安裝。';}};
   kind.onchange=()=>{request.type=kind.value;update();};
-  host.onchange=()=>{request.hostId=host.value;request.orientation=host.value==='world'?'horizontal':'follow-frame';if(host.value==='world')request.face='back';orientation.value=request.orientation;update();};
+  host.onchange=()=>{request.hostId=host.value;request.orientation=host.value==='world'?'horizontal':'follow-frame';if(host.value==='world')request.face='back';orientation.value=request.orientation;request.hostEnd='p1';hostLocations();update();};
   location.onchange=()=>{request.hostEnd=location.value;update();};
   orientation.onchange=()=>{request.orientation=orientation.value;request.angleDeg=0;update();};
   output.onchange=()=>{request.outputId=output.value;if(choices.outputs.find(c=>c.id===output.value)?.type==='gear'){request.outputEnd='p1';end.value='p1';}update();};
@@ -84,10 +87,10 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     svg.setAttribute('viewBox',`${minX} ${-maxY} ${maxX-minX} ${maxY-minY}`);
     const draw=(tag,attrs)=>{const n=document.createElementNS(ns,tag);for(const [k,v]of Object.entries(attrs))n.setAttribute(k,String(v));svg.append(n);return n;};
     const owner=cs.find(c=>c.id===request.hostId),out=cs.find(c=>c.id===request.outputId);
-    const at=owner?world(owner[request.hostEnd]):out?world(out[request.outputEnd]):null;
+    const at=owner?actuatorPoint(owner,request.hostEnd,pts):out?world(out[request.outputEnd]):null;
     if(at){
-      const carrier=owner?{p1:owner.p1.id,a:world(owner.p1),b:world(owner.p2)}:null;
-      const d=resolveMotorOrientation(request.orientation,{center:{...at,id:owner?.[request.hostEnd]?.id},carrier,reversed:request.reversed,angleDeg:request.angleDeg}).dir;
+      const carrier=motorCarrierFrame(owner,{...at,id:actuatorHostPoints(owner).find(p=>p.key===request.hostEnd)?.id},pts);
+      const d=resolveMotorOrientation(request.orientation,{center:{...at,id:actuatorHostPoints(owner).find(p=>p.key===request.hostEnd)?.id},carrier,reversed:request.reversed,angleDeg:request.angleDeg}).dir;
       const n=draw('rect',{x:request.type==='n20'?-6:-7,y:request.type==='n20'?-5:-12,width:request.type==='n20'?12:48,height:request.type==='n20'?10:24,rx:2,fill:request.type==='mg995'?'#7aa0dd':'#e3bc60',stroke:'#40536c',transform:`translate(${at.x} ${-at.y}) rotate(${-Math.atan2(d.y,d.x)*180/Math.PI})`});
       n.setAttribute('opacity','.8');
     }
@@ -96,8 +99,10 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
       const color=c.id===request.outputId?'#e88d27':c.id===request.hostId?'#1686b3':'#a6b4bf';
       if(c.type==='bar')draw('line',{x1:a.x,y1:-a.y,x2:b.x,y2:-b.y,stroke:color,'stroke-width':12,'stroke-linecap':'round','data-actuator-part':c.id});
       else if(c.type==='gear')draw('circle',{cx:a.x,cy:-a.y,r:base.params[c.radiusParam]||18,fill:'#dce6ed',stroke:color,'stroke-width':3,'data-actuator-part':c.id});
+      else if(c.type==='triangle'&&c.standardBlank){const mounts=deriveMotorMounts(cs).filter(m=>m.frameBody===c.id).map(m=>({...m,settings:base.fabrication?.[m.kind==='mg995'?'mg995Mount':'ttMount']})),g=inspectPlateExport(c,['p1','p2','p3'].map(k=>world(c[k])),{},mounts);for(const ring of g.outlines)draw('path',{d:'M '+ring.map(p=>`${p.x} ${-p.y}`).join(' L ')+' Z',fill:'#dcecf0',stroke:color,'data-actuator-part':c.id});for(const cut of g.cutouts)draw('path',{d:'M '+cut.points.map(p=>`${p.x} ${-p.y}`).join(' L ')+' Z',fill:'white',stroke:color});for(const h of g.holes)draw('circle',{cx:h.x,cy:-h.y,r:h.r,fill:'white',stroke:color});}
       else continue;
-      for(const k of c.type==='gear'?['p1']:['p1','p2']){const p=world(c[k]);draw('circle',{cx:p.x,cy:-p.y,r:5,fill:'white',stroke:color,'stroke-width':2});
+      const available=c.type==='gear'?[{key:'p1',...c.p1}]:actuatorHostPoints(c).filter(p=>!(c.standardBlank?.mountHoles || []).some(h=>h.id===p.id)||p.id===oldCenter||p.key===request.hostEnd);
+      for(const entry of available){const k=entry.key,p=pts[entry.id] || entry;draw('circle',{cx:p.x,cy:-p.y,r:5,fill:'white',stroke:color,'stroke-width':2});
         if(c.id===request.hostId||c.id===request.outputId)draw('circle',{cx:p.x,cy:-p.y,r:12,fill:'transparent','data-actuator-end':k,'data-owner':c.id});}
     }
     if(!old){
@@ -120,7 +125,11 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
   svg.onpointerdown=e=>{
     const node=e.target.getAttribute('data-quick-node');if(node){chooseNode(node);return;}
     const endKey=e.target.getAttribute('data-actuator-end'),owner=e.target.getAttribute('data-owner');
-    if(endKey&&owner===request.hostId){request.hostEnd=endKey;update();}
+    if(endKey&&owner===request.hostId){
+      const c=(result?.ok?result.comps:base.comps).find(c=>c.id===owner),pts=result?.ok?result.points:points;
+      if(c?.standardBlank?.kind==='plate'){const at=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse()),available=actuatorHostPoints(c).filter(p=>!(c.standardBlank.mountHoles || []).some(h=>h.id===p.id)||p.id===oldCenter||p.key===request.hostEnd);request.hostEnd=available.reduce((best,p)=>{const w=actuatorPoint(c,p.key,pts),b=best&&actuatorPoint(c,best.key,pts);return !b||Math.hypot(w.x-at.x,w.y+at.y)<Math.hypot(b.x-at.x,b.y+at.y)?p:best;},null)?.key || endKey;}else request.hostEnd=endKey;
+      update();
+    }
     else if(endKey&&owner===request.outputId){request.outputEnd=endKey;update();}
   };
   async function showScene(token){
@@ -135,7 +144,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     revision++;if(!trialOnly)scanText.textContent='設定已變更，請重新檢查動作範圍。';
     result=request.outputId?planMotorInstallation(base,request,points,motion):null;
     title.textContent=`${request.type==='mg995'?'舵機':request.type==='n20'?'N20 減速馬達':'馬達'}安裝`;
-    host.value=request.hostId;output.value=request.outputId;location.value=request.hostEnd;end.value=request.outputEnd;orientation.value=request.orientation;
+    host.value=request.hostId;output.value=request.outputId;hostLocations();location.value=request.hostEnd;end.value=request.outputEnd;orientation.value=request.orientation;
     quickSummary.textContent=request.outputId?`帶動「${label(base.comps.find(c=>c.id===request.outputId))}」・孔 ${selectedNode}；${request.hostId==='world'?'外殼固定在圖面基準（會固定此孔）':`外殼固定在「${label(base.comps.find(c=>c.id===request.hostId))}」`}。`
       :selectedNode?'這個孔連接了多個零件，請選要帶動的零件與承載方式。':candidates.length?'點圖上的孔，選馬達軸心。':'目前沒有可直接安裝的孔，請展開「連接與安裝方式」選承載與輸出零件。';
     quickChoices.replaceChildren();
@@ -153,7 +162,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     if(document.activeElement!==exact)showNumber(exact,request.angle);
     summary.hidden=!old||request.type!=='mg995';summary.textContent=`擺動 ${request.start}–${request.end}°；範圍沿用接點面板的伺服角度。`;
     reading.textContent=`${request.angle}°${result?.ok?' · 幾何可解':''}`;
-    error.textContent=result&&!result.ok?result.message:'';
+    error.textContent=result&&!result.ok?result.message:result?.plateHoles?.length?'板座孔槽為未實量試作；占用格孔已停用，拆除或改方向會重新核對並還原。':'';
     next.disabled=!result?.ok;
     exact.disabled=trial.disabled=!request.hostId||!request.outputId;scan.disabled=toggle.disabled=!result?.ok;
     const show3d=three&&result?.ok;space.hidden=!show3d;svg.toggleAttribute('hidden',!!show3d);toggle.textContent=show3d?'回到 2D':'查看 3D';

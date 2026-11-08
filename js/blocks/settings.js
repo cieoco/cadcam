@@ -1,3 +1,4 @@
+import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 /**
  * 作品級加工與馬達安裝設定。
  * 舊 localStorage 僅在建立空作品／遷移舊本機自存時讀取；編輯後由作品 snapshot
@@ -36,11 +37,12 @@ const MG995_MOUNT_DEFAULTS = {
 };
 
 // ---- 綁定層注入（同 tools/input 慣例）----
-let draw = () => {}, pushUndo = () => {}, pause = () => {}, scheduleAutosave = () => {}, notify = () => {};
+let rebuild = () => {}, draw = () => {}, pushUndo = () => {}, pause = () => {}, scheduleAutosave = () => {}, notify = () => {};
 let legacyLocalProfile = JSON.parse(JSON.stringify(FABRICATION_DEFAULTS));
 let sourceLabel = '目前作品的加工設定';
 
 export function init(deps) {
+  if (deps.rebuild) rebuild = deps.rebuild;
   if (deps.draw) draw = deps.draw;
   if (deps.pushUndo) pushUndo = deps.pushUndo;
   if (deps.pause) pause = deps.pause;
@@ -193,8 +195,8 @@ function commit(group, key, value) {
   const result = planFabricationProfile(S.fabrication || FABRICATION_DEFAULTS, group, key, group === 'joint' && key === 'defaultKind' ? raw : numeric);
   if (!result.ok) { notify(result.message); syncFabricationInputs(); return false; }
   if (!result.changed) { syncFabricationInputs(); return false; }
-  const before=mountingWork(S);if(!confirmMountingChange(before,{...before,fabrication:result.profile},{notify})){syncFabricationInputs();return false;}
-  pause(); pushUndo(); applyFabricationProfile(result.profile); scheduleAutosave(); draw(); return true;
+  const before=mountingWork(S),candidate=structuredClone({...before,fabrication:result.profile}),platePlan=planActuatorPlateHoles(candidate);if(!platePlan.ok){notify(platePlan.message);syncFabricationInputs();return false;}candidate.comps=platePlan.comps;if(!confirmMountingChange(before,candidate,{notify})){syncFabricationInputs();return false;}
+  pause(); pushUndo(); S.comps=candidate.comps;applyFabricationProfile(result.profile); rebuild();scheduleAutosave(); draw(); return true;
 }
 export function setExportSetting(key, value) { return commit('export', key, value); }
 export function setTtMountSetting(key, value) {

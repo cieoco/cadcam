@@ -1,12 +1,17 @@
+import {localHoles,holeWorld} from '../core/local-holes.js';
+import {frameNodeIds} from './model.js';
+import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 /** Rotary actuator candidates. No DOM, no global state and no extra solver. */
 import {compileTopology} from '../core/topology.js';
 import {solveTopology} from '../multilink/solver.js';
 
 const keys=['p1','p2','p3'];
 export const actuatorSteps=['固定外殼','位置方向','連接輸出','試動確認'];
-export const actuatorPoint=(c,key,points={})=>points[c?.[key]?.id] || c?.[key];
+export function actuatorHostPoints(c){return [...keys.filter(k=>c?.[k]).map(k=>({key:k,...c[k]})),...[...localHoles(c),...(c?.standardBlank?.mountHoles || [])].map(h=>({...h,...holeWorld(c,h),key:h.id}))];}
+export const actuatorPoint=(c,key,points={})=>{const p=actuatorHostPoints(c).find(p=>p.key===key);return points[p?.id] || p;};
+const fixedPlate=(c,comps)=>c?.type==='triangle'&&c.standardBlank?.kind==='plate'&&actuatorHostPoints(c).filter(p=>frameNodeIds(comps).has(p.id)).length>=2;
 export function actuatorChoices(comps){
-  return {hosts:comps.filter(c=>c.type==='bar'),outputs:comps.filter(c=>c.type==='bar'||c.type==='gear'&&!c.mesh)};
+  return {hosts:comps.filter(c=>c.type==='bar'||fixedPlate(c,comps)),outputs:comps.filter(c=>c.type==='bar'||c.type==='gear'&&!c.mesh)};
 }
 // Infer only existing shared joints. A loose endpoint can explicitly preview a
 // world mount; never guess an endpoint or translate a connected part here.
@@ -20,9 +25,9 @@ export function quickMotorChoices(comps,outputId=''){
       const node=out[end];if(!node)continue;
       if(out.type==='bar'&&fixed.has(out[end==='p1'?'p2':'p1'].id))continue;
       const shared=comps.filter(c=>c!==out&&keys.some(k=>c[k]?.id===node.id));
-      const hosts=shared.filter(c=>c.type==='bar'&&['p1','p2'].some(k=>c[k]?.id===node.id));
+      const hosts=actuatorChoices(comps).hosts.filter(c=>c!==out&&actuatorHostPoints(c).some(p=>p.id===node.id));
       for(const host of hosts)result.push({nodeId:node.id,outputId:out.id,outputEnd:end,hostId:host.id,
-        hostEnd:host.p1.id===node.id?'p1':'p2',orientation:'follow-frame',face:'back'});
+        hostEnd:actuatorHostPoints(host).find(p=>p.id===node.id).key,orientation:'follow-frame',face:'back'});
       if(!shared.length||shared.every(c=>c.type==='anchor'&&fixed.has(c.p1.id)))result.push({nodeId:node.id,outputId:out.id,outputEnd:end,hostId:'world',
         hostEnd:'p1',orientation:'horizontal',face:'back'});
     }
@@ -30,12 +35,12 @@ export function quickMotorChoices(comps,outputId=''){
   return result;
 }
 export function planMotorInstallation(source,request,points={},motion={}){
-  const comps=structuredClone(source.comps),params={...source.params};
+  let comps=structuredClone(source.comps);const params={...source.params};
   const fail=message=>({ok:false,message});
   const out=comps.find(c=>c.id===request.outputId&&['bar','gear'].includes(c.type));
   const former=comps.find(c=>c.id===request.existingId);
   const formerMotor=former&&(former.physicalMotor||keys.map(k=>former[k]?.physicalMotor).find(Boolean));
-  const host=request.hostId==='world'?null:comps.find(c=>c.id===request.hostId&&c.type==='bar');
+  const host=request.hostId==='world'?null:comps.find(c=>c.id===request.hostId&&(c.type==='bar'||fixedPlate(c,comps)));
   if(!host&&request.hostId!=='world')return fail('請先選外殼的承載零件。');
   if(!out)return fail('請選輸出軸要帶動的零件。');
   if(former&&former!==out&&formerMotor){
@@ -57,12 +62,12 @@ export function planMotorInstallation(source,request,points={},motion={}){
   if(!['p1','p2'].includes(key)||!out[key])return fail('請選輸出零件的端孔。');
   if(oldCenter&&oldCenter!==out[key].id)return fail('這個零件已有另一端的動力，請先拆除原動力再換孔。');
   const hostKey=request.hostEnd;
-  if(host&&!['p1','p2'].includes(hostKey))return fail('請選承載零件的軸心孔。');
-  const fixedIds=new Set(comps.flatMap(c=>keys.map(k=>c[k])).filter(p=>p?.type==='fixed').map(p=>p.id));
-  const moving=host&&![host.p1,host.p2].every(p=>fixedIds.has(p.id));
+  if(host&&!actuatorHostPoints(host).some(p=>p.key===hostKey))return fail('請選承載零件的軸心孔。');
+  const fixedIds=frameNodeIds(comps);
+  const moving=host&&host.type==='bar'&&![host.p1,host.p2].every(p=>fixedIds.has(p.id));
   if(moving&&out.type==='gear')return fail('目前齒輪輸入僅支援固定承載零件；活動承載桿請先使用連桿輸出。');
   if(moving&&request.orientation!=='follow-frame')return fail('活動承載桿上的外殼方向需沿承載桿，才會一起轉動。');
-  const originalPoint=out[key],target=host?host[hostKey]:originalPoint;
+  const originalPoint=out[key],target=host?actuatorHostPoints(host).find(p=>p.key===hostKey):originalPoint;
   const originalWorld=actuatorPoint(out,key,points),targetWorld=host?actuatorPoint(host,hostKey,points):originalWorld;
   if(!originalWorld||!targetWorld)return fail('找不到所選孔的位置。');
   const same=originalPoint.id===target.id;
@@ -90,14 +95,15 @@ export function planMotorInstallation(source,request,points={},motion={}){
       const a=actuatorPoint(out,'p1',same?points:{}),b=actuatorPoint(out,'p2',same?points:{});
       const angle=Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;
       const ha=host&&actuatorPoint(host,'p1',points),hb=host&&actuatorPoint(host,'p2',points);
-      out.phaseOffset=angle-(host?Math.atan2(hb.y-ha.y,hb.x-ha.x)*180/Math.PI:0)-(oldCenter||formerMotor?currentAngle:0);
+      out.phaseOffset=angle-(host?.type==='bar'?Math.atan2(hb.y-ha.y,hb.x-ha.x)*180/Math.PI:0)-(oldCenter||formerMotor?currentAngle:0);
     }
     out.isInput=true;out.physicalMotor=motor;
-    if(host)out.motorCarrier=host.id;else delete out.motorCarrier;
+    if(host?.type==='bar')out.motorCarrier=host.id;else delete out.motorCarrier;
   }
   // A real fixed host already supplies the ground constraint. The explicit
   // auto-frame choice supplies it only when the user chose that option.
   if(!host)for(const c of comps)for(const k of keys)if(c[k]?.id===center)c[k].type='fixed';
+  if(host?.type==='triangle')out[key].type='fixed';
   out[key].physicalMotor=motor;out.motorType=request.type;
   if(request.type==='mg995'){
     const lo=Number(request.start??out.servoStart??0),hi=Number(request.end??out.servoEnd??90);
@@ -109,6 +115,7 @@ export function planMotorInstallation(source,request,points={},motion={}){
   delete out.mountLocatorPoint; // Explicit installation replaces the old direction locator.
   out.motorMount={motor,center,outputBody:out.id,...(host?{frameBody:host.id}:{}),face:request.face,
     orientation:request.orientation,...(request.angleDeg!=null?{angleDeg:request.angleDeg}:{}),reversed:!!request.reversed,order:host?['motor','frameBody','outputBody']:['motor','outputBody']};
+  const platePlan=planActuatorPlateHoles({comps,params,fabrication:source.fabrication,modules:source.modules});if(!platePlan.ok)return fail(platePlan.message);comps=platePlan.comps;
   const angle=Number(request.angle??(oldCenter?currentAngle:0));
   if(!Number.isFinite(angle))return fail('試動角度無效。');
   const motorAngles={...motion.motorAngles,[motor]:angle};
@@ -116,6 +123,6 @@ export function planMotorInstallation(source,request,points={},motion={}){
     const topology=compileTopology(comps,{params},new Set());
     const result=solveTopology(topology,{thetaDeg:angle,motorAngles,_prevPoints:points});
     if(!result.isValid||result.isUnderconstrained)return {...fail(result.reason||result.errorReason||'目前機構尚未完整約束，請核對固定與接點。'),comps,params};
-    return {ok:true,comps,params,result,points:result.points,motor,angle,center,outputId:out.id,hostId:host?.id||'world',moving};
+    return {ok:true,comps,params,fabrication:source.fabrication,plateHoles:platePlan.reports,result,points:result.points,motor,angle,center,outputId:out.id,hostId:host?.id||'world',moving};
   }catch(e){return fail(`目前無法求解：${e.message}`);}
 }

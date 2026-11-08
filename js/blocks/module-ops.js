@@ -28,6 +28,7 @@ function ownTokensOf(comp) {
   if (comp && comp.id) s.add(comp.id);
   pointKeysFor(comp).forEach(k => { const p = comp[k]; if (p && p.id) s.add(p.id); });
   if (Array.isArray(comp.holes)) comp.holes.forEach(h => { if (h && h.id) s.add(h.id); });
+  for(const h of comp.standardBlank?.mountHoles || [])if(h.id)s.add(h.id);
   return s;
 }
 

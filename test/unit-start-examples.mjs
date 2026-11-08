@@ -10,13 +10,14 @@ import { planSyringeInstallation } from '../js/blocks/syringe-installation.js';
 import { scanSyringe } from '../js/blocks/syringe-operations.js';
 const ids = ['unit4-start', 'unit5-start', 'unit6-start', 'unit7-start', 'unit11-start', 'unit12-start', 'syringe-fixed-start', 'syringe-pivot-start'];
 check('載入前清單沒有單元起始檔（不在啟動資料）', ids.every(id => !getExample(id)));
+const servoIds = ['servo-plate-arm', 'servo-plate-fourbar'];  // 同一次按需載入還會帶入 2 個舵機座板範例
 const before = BLOCK_EXAMPLES.length;
 const [first, second] = [loadUnitStarts(), loadUnitStarts()];
 check('重複呼叫共用同一個載入', first === second);
 await first;
-check('載入後八個起始檔進入清單（含針筒單元的兩個）', ids.every(id => getExample(id)) && BLOCK_EXAMPLES.length === before + ids.length);
+check('載入後八個起始檔進入清單（含針筒單元的兩個）', ids.every(id => getExample(id)) && servoIds.every(id => getExample(id)) && BLOCK_EXAMPLES.length === before + ids.length + servoIds.length);
 await loadUnitStarts();
-check('再次載入不重複登記', BLOCK_EXAMPLES.length === before + ids.length && new Set(BLOCK_EXAMPLES.map(e => e.id)).size === BLOCK_EXAMPLES.length);
+check('再次載入不重複登記', BLOCK_EXAMPLES.length === before + ids.length + servoIds.length && new Set(BLOCK_EXAMPLES.map(e => e.id)).size === BLOCK_EXAMPLES.length);
 check('每個起始檔標為練習並說明內容與第一步', ids.every(id => { const l = getExampleLesson(id); return l.group === 'challenge' && l.level === '練習' && l.use && l.try.length; }));
 // 網址深連結：起始檔還沒載入時先載入再開「載入此範例」視窗；先前已知的範例仍是同步。
 class Element { constructor(tag) { this.tag = tag; this.children = []; } setAttribute() {} append(...c) { this.children.push(...c); } addEventListener() {} showModal() { this.open = true; } close() {} remove() {} focus() {} }

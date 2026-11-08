@@ -1,3 +1,4 @@
+import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 /** One review for both pointer and numeric candidates. No undo/write before acceptance. */
 import {inspectMountingChange} from './mounting-review.js';
 
@@ -11,6 +12,7 @@ export function mountingCandidate(before,result,scope){
 export function commitMountingEdit(S,mutate,{pushUndo,notify}={}){
   const before=mountingWork(S),candidate=structuredClone(before);
   if(mutate(candidate)===false)return false;
+  const platePlan=planActuatorPlateHoles(candidate);if(!platePlan.ok){notify?.(platePlan.message);return false;}candidate.comps=platePlan.comps;
   if(!confirmMountingChange(before,candidate,{notify}))return false;
   pushUndo();
   // Keep selected-component references used by the existing panels, after approval only.

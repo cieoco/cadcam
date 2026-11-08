@@ -31,5 +31,5 @@ export function buildPreviewModelInputs({ comps, params, theta, links, points, g
       rollerWidth: Number(comp.rollerWidth) || 0, color: comp.color, kind: comp.kind, teeth: comp.teeth };
   });
   const belts = comps.filter(comp => comp.type === 'belt').map(comp => ({ id: comp.id, driver: comp.driver, driven: comp.driven, color: comp.color, kind: comp.kind, links: comp.links }));
-  return { links, pts: points, groundIds, motorCenterIds, motorTypes, motorMounts, polygons, sliders, gears, racks, cams, pulleys, belts };
+  return { links, pts: points, groundIds, motorCenterIds, motorTypes, motorMounts, polygons:(polygons || []).map(poly=>{const owner=comps.find(c=>c.standardBlank?.kind==='plate'&&[c.p1,c.p2,c.p3].every(p=>poly.points.includes(p.id)));return owner?{...poly,id:owner.id}:poly;}), sliders, gears, racks, cams, pulleys, belts };
 }

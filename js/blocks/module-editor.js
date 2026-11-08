@@ -1,3 +1,4 @@
+import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import {editableNumber} from './numeric-input.js';
 /**
  * blocks / module-editor
@@ -198,6 +199,7 @@ export function createModuleEditor(deps) {
       if (c.id) s.add(c.id);
       pointKeysFor(c).forEach(k => { const p = c[k]; if (p && p.id) s.add(p.id); });
       if (Array.isArray(c.holes)) c.holes.forEach(h => { if (h && h.id) s.add(h.id); });
+      for(const h of c.standardBlank?.mountHoles || [])if(h.id)s.add(h.id);
     });
     Object.keys(S.topo.params || {}).forEach(k => s.add(k));
     return s;
@@ -217,8 +219,9 @@ export function createModuleEditor(deps) {
     });
     const off = insertOffset(compsInPlane(S.comps, S.modules, null), compsInPlane(r.comps, r.modules, null), 80, { ...S.topo.params, ...r.params }, { sideBySide: true });
     if (off.dx !== 0 || off.dy !== 0) { const moved = translateComposite(r.comps, r.modules, off.dx, off.dy); r.comps = moved.comps; r.modules = moved.modules; }
+    const platePlan=planActuatorPlateHoles({comps:[...S.comps,...r.comps],params:{...S.topo.params,...r.params},modules:[...S.modules,...r.modules],fabrication:S.fabrication});if(!platePlan.ok){transient(platePlan.message);return false;}
     pushUndo();
-    S.comps = [...S.comps, ...r.comps];
+    S.comps = platePlan.comps;
     Object.keys(r.params).forEach(k => { S.topo.params[k] = r.params[k]; });
     S.modules = [...S.modules, ...r.modules];
     S.counter = r.counter;
@@ -243,8 +246,9 @@ export function createModuleEditor(deps) {
     const r = instantiateTemplate(template, ctx);
     const off = insertOffset(compsInPlane(S.comps, S.modules, null), r.comps, 80, { ...S.topo.params, ...r.params }, { sideBySide: true });
     if (off.dx !== 0 || off.dy !== 0) r.comps = translateModule(r.comps, r.module.id, off.dx, off.dy);
+    const platePlan=planActuatorPlateHoles({comps:[...S.comps,...r.comps],params:{...S.topo.params,...r.params},modules:[...S.modules,r.module],fabrication:S.fabrication});if(!platePlan.ok){transient(platePlan.message);return false;}
     pushUndo();
-    S.comps = [...S.comps, ...r.comps];
+    S.comps = platePlan.comps;
     Object.keys(r.params).forEach(k => { S.topo.params[k] = r.params[k]; });
     S.modules = [...S.modules, r.module];
     S.counter = r.counter;

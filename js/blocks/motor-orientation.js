@@ -23,3 +23,9 @@ export function resolveMotorOrientation(orientation, context = {}) {
   const dir={x:base.x*Math.cos(a)-base.y*Math.sin(a),y:base.x*Math.sin(a)+base.y*Math.cos(a)};
   return { dir, rotDeg: motorRotDegFromWorldDir(dir) };
 }
+
+/** A board's interior shaft follows its board axes, not the vector to a corner. */
+export function motorCarrierFrame(host,center,points={}){
+ const a=points[host?.p1?.id] || host?.p1,b=points[host?.p2?.id] || host?.p2;if(!a||!b||!center)return null;
+ return host.type==='triangle'&&host.standardBlank?.kind==='plate'?{p1:center.id,a:center,b:{x:center.x+b.x-a.x,y:center.y+b.y-a.y}}:{p1:host.p1.id,a,b};
+}

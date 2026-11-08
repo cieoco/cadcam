@@ -16,6 +16,8 @@
 
 ## 產品與功能規格
 
+- [固定標準座板的致動安裝](TEACHING-CHANGELOG.md#actuator-standard-plates) — 真N×M板、占孔／還原、兩個舵機例及未驗證界限。
+
 - [桿件／板材／同平面L型件](TEACHING-CHANGELOG.md#standard-structures) — 三類基本結構、真孔、凹角、數字／把手與保存驗收及限制；[新增前拖拉／精確參數](TEACHING-CHANGELOG.md#standard-structure-creation)。
 
 - [SDD-RAPID-MECHANISM-VALIDATION.md](SDD-RAPID-MECHANISM-VALIDATION.md) — 在原有流程做減法；含全操作族盤點、裝配孔位共用核對，以及點接點修改零件孔距的直接／數值共用規則；保留既有功能與資料契約。

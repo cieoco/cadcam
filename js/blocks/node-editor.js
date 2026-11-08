@@ -1,3 +1,4 @@
+import {commitLegacyMountingEdit} from './mounting-review-ui.js';
 import {localHoles} from '../core/local-holes.js';
 import {fusionAtPoint} from '../core/bar-fusion.js';
 /**
@@ -64,8 +65,7 @@ export function createNodeEditor({
       setBanner('滑軌固定孔需要維持固定；可用 X/Y 或拖曳調整位置');
       return;
     }
-    pushUndo();
-    pause();
+    const mutate=()=>{
     if (type === 'floating') removeMotorAtPoint(S.selectedNodeId);
     if (type === 'fixed') removeMotorAtPoint(S.selectedNodeId);
     if (type === 'fixed') freezePointAtDisplay(S.selectedNodeId);
@@ -83,6 +83,8 @@ export function createNodeEditor({
       }
     }
     if (type === 'floating') removeAnchorsAtPoint(S.selectedNodeId);
+    };
+    if(S.comps.some(c=>c.standardBlank?.mountHoles)){pause();if(!commitLegacyMountingEdit(S,mutate,{pushUndo,notify:transient}))return;}else{pushUndo();pause();mutate();}
     rebuild(); draw();
   }
   function changeNodePos(axis, delta) {
@@ -92,12 +94,13 @@ export function createNodeEditor({
   }
   function removeNodeMotor() {
     if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) return;
-    pushUndo();
     pause();
-    removeMotorAtPoint(S.selectedNodeId);
-    // 線性致動器：把驅動該滑塊的設定一併拿掉，滑塊回到被動（可由連桿推動）。
-    const sl = sliderInputForPoint(S.selectedNodeId);
-    if (sl) { delete sl.isInput; delete sl.physicalMotor; delete sl.strokeMin; delete sl.strokeMax; }
+    if(!commitLegacyMountingEdit(S,()=>{
+      removeMotorAtPoint(S.selectedNodeId);
+      // 線性致動器：把驅動該滑塊的設定一併拿掉，滑塊回到被動（可由連桿推動）。
+      const sl = sliderInputForPoint(S.selectedNodeId);
+      if (sl) { delete sl.isInput; delete sl.physicalMotor; delete sl.strokeMin; delete sl.strokeMax; }
+    },{pushUndo,notify:transient}))return;
     rebuild(); draw();
     Panels.updateRoleEditor();
   }
