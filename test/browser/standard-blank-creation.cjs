@@ -15,6 +15,13 @@ try{for(const viewport of [{width:1280,height:900},{width:390,height:844},{width
  };
  for(const kind of ['bar','plate','l']){
   console.log('creation',viewport.width,kind);await p.evaluate(()=>blocks.gripperPilot.reopen({kind:'blocks',v:1,comps:[],params:{theta:0},counter:0}));const empty=await snap();await open(kind);assert.deepEqual(await snap(),empty,'opening is only a preview');
+  await canvas();
+  const labels=await p.locator('[data-dimension-handle^="blank-create-"] text').evaluateAll(nodes=>{const s=document.querySelector('#stageSvg').getBoundingClientRect();return nodes.map(n=>{const r=n.getBoundingClientRect();return {lines:n.querySelectorAll('tspan').length,inside:r.top>=s.top&&r.left>=s.left&&r.right<=s.right&&r.bottom<=s.bottom};});});
+  assert.ok(labels.length&&labels.every(l=>l.lines===2&&l.inside),'draft labels remain inside the visible canvas');
+  for(const key of ['length',...(kind==='bar'?[]:['height']),...(kind==='l'?['arm']:[])]){const handle=p.locator(`[data-dimension-handle="blank-create-${key}"]`),state=await draft();assert.equal(Number(await handle.getAttribute('aria-valuenow')),key==='arm'?state.armWidthMm:state[key==='length'?'lengthMm':'heightMm']+13,'accessible dimension matches the displayed outside size');}
+  assert.equal(await p.locator('#hint').isVisible(),false,'empty-state hint does not cover the draft');
+  assert.equal(await p.locator('.mode-banner').first().isVisible(),false,'draft instructions do not cover dimension labels');
+  await p.screenshot({path:`${out}/draft-${viewport.width}-${kind}.png`});
   const before=await draft();await drag('length',8,0);assert.equal((await draft()).lengthMm,before.lengthMm+8);assert.deepEqual(await snap(),empty,'drag does not create a part');
   await build();assert.equal(Number(await p.locator('[data-blank-mm="lengthMm"]').inputValue()),before.lengthMm+8);await p.locator('[data-blank-field="columns"]').fill(String(before.lengthMm/8+2));assert.equal((await draft()).lengthMm,before.lengthMm+8,'numeric and drag target the same quantity');
   if(kind!=='bar'){await drag('height',0,8);assert.equal((await draft()).heightMm,before.heightMm+8);}
