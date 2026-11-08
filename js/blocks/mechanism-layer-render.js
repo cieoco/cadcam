@@ -100,7 +100,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
         const drilling=g.holes.filter(h=>['ADAPTER_HOLE','MOUNT_BOLT'].includes(h.layer)).map(h=>Array.from({length:32},(_,i)=>({x:h.x+h.r*Math.cos(i*Math.PI/16),y:h.y+h.r*Math.sin(i*Math.PI/16)})));
         stick.setAttribute('fill-rule','evenodd');stick.setAttribute('d',[...g.outlines,...g.cutouts.map(c=>c.points),...drilling].map(ring).join(' '));
       }else stick.setAttribute('d', mounts?.length ? (hostedPath(a, b, current) || barHullPath(a, b, radius)) : barHullPath(a, b, radius));
-      if(outputHoles){outputHoles.replaceChildren();const L=Math.hypot(b.x-a.x,b.y-a.y),ux=(b.x-a.x)/L,uy=(b.y-a.y)/L,g=inspectLinkExport(component,L,exportSettings);for(const h of g.holes.filter(h=>/^(MG995_HORN|TT_HUB|N20_HUB)/.test(h.layer))){const p=project({x:a.x+h.x*ux-h.y*uy,y:a.y+h.x*uy+h.y*ux}),circle=svgEl('circle');for(const[k,v]of Object.entries({cx:p.x,cy:p.y,r:h.r*scale,fill:'white',stroke:color,'stroke-width':1}))circle.setAttribute(k,v);outputHoles.appendChild(circle);}}
+      if(outputHoles){outputHoles.replaceChildren();const L=Math.hypot(b.x-a.x,b.y-a.y),ux=(b.x-a.x)/L,uy=(b.y-a.y)/L,g=inspectLinkExport(component,L,exportSettings);for(const h of g.holes.filter(h=>/^(MG995_HORN|TT_HUB|N20_HUB)/.test(h.layer))){const p=project({x:a.x+h.x*ux-h.y*uy,y:a.y+h.x*uy+h.y*ux}),circle=svgEl('circle');for(const[k,v]of Object.entries({cx:p.x,cy:p.y,r:h.r*scale,fill:'white',stroke:color,'stroke-width':1}))circle.setAttribute(k,v);outputHoles.appendChild(circle);}for(const cut of g.cutouts.filter(c=>c.layer==='TT_SHAFT_FLAT')){const path=svgEl('path');path.setAttribute('d','M '+cut.points.map(h=>{const p=project({x:a.x+h.x*ux-h.y*uy,y:a.y+h.x*uy+h.y*ux});return `${p.x},${p.y}`;}).join(' L ')+' Z');path.setAttribute('fill','white');path.setAttribute('stroke',color);path.setAttribute('data-output-shaft',link.id);outputHoles.appendChild(path);}}
       holes.forEach(hole => { const point = current[hole.pointId]; if (point && Number.isFinite(point.x)) { const p = project(point); hole.element.setAttribute('cx', p.x); hole.element.setAttribute('cy', p.y); } });
     };
     update(points); registerUpdate(update);
@@ -109,7 +109,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
 }
 
 export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds, gearPinIds, pulleyPinIds, camFollowerIds,
-  workpieceIds, dragId, sliderMountInfo, project, onPointerDown, registerUpdate, mountedBaseIds = new Set(), touchTargets = false, pointLabel = id => id }) {
+  workpieceIds, dragId, sliderMountInfo, project, onPointerDown, registerUpdate, mountedBaseIds = new Set(), shaftCenterIds = new Set(), touchTargets = false, pointLabel = id => id }) {
   const size = 14;
   Object.keys(points).forEach(id => {
     if (hiddenPointIds.has(id) || gearPinIds.has(id) || pulleyPinIds.has(id) || camFollowerIds.has(id) || workpieceIds.has(id)) return;
@@ -138,6 +138,7 @@ export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterI
     else if (mountedBase) { node.setAttribute('r', id === dragId ? 9 : 7); node.setAttribute('fill', '#eef6ff'); node.setAttribute('stroke', id === dragId ? '#2ecc71' : '#2c6fbb'); node.setAttribute('stroke-width', 3); node.setAttribute('stroke-dasharray', '3 2'); const title = svgEl('title'); title.textContent = '安裝孔：鎖在宿主模組上（隨宿主移動）'; node.appendChild(title); }
     else if (rectangle) { node.setAttribute('width', size); node.setAttribute('height', size); node.setAttribute('rx', 3); node.setAttribute('fill', '#34495e'); }
     else { node.setAttribute('r', id === dragId ? 9 : 7); node.setAttribute('fill', '#fff'); node.setAttribute('stroke', id === dragId ? '#2ecc71' : '#34495e'); node.setAttribute('stroke-width', 3); }
+    if(motor&&shaftCenterIds.has(id)){node.setAttribute('fill','transparent');node.setAttribute('r',10);}
     node.setAttribute('data-id', id); if (motor && touchHit) node.setAttribute('data-motor-hit', id);
     node.style.cursor = 'grab'; node.addEventListener('pointerdown', event => onPointerDown(event, id)); svg.appendChild(node);
     const update = current => {

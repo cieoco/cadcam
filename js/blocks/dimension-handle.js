@@ -51,7 +51,7 @@ export function dimensionHandle(svg,{key,label,point,direction,value,min=0,max=2
   if(stack){
     const box=text.getBoundingClientRect(),bounds=svg.getBoundingClientRect();
     // Keep two-line draft labels inside the canvas, beside or above the handle.
-    if(box.top<bounds.top||box.right>bounds.right){
+    if(box.top<bounds.top||box.right>bounds.right-8){
       text.setAttribute('x',point.x-(box.top<bounds.top?12*unit:0));
       text.setAttribute('y',point.y-(box.top<bounds.top?3:27)*unit);
       text.setAttribute('text-anchor','end');

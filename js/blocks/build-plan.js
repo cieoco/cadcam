@@ -687,7 +687,7 @@ ${j.stand ? `<li>子模組底板 ${e(childName)} 立在 ${e(hostName)} 的板面
 ` : '';
   const motorShafts = joints.filter(j => j.kind === 'motor-shaft');
   const shaftNote = motorShafts.length
-    ? `<p class="muted">馬達軸（${motorShafts.map(j => e(j.id)).join('、')}）鎖在輪轂或舵盤上，不另配 M3 螺絲。</p>` : '';
+    ? `<p class="muted">馬達軸（${motorShafts.map(j => e(j.id)).join('、')}）依輸出孔形使用扁軸直連、輪轂或舵盤，不另配一般樞軸 M3 螺絲；扁軸直連的配合與軸向防脫待實量。</p>` : '';
   const shaftSpacer = motorShafts.filter(j => (j.spacers || []).length)
     .map(j => `<li>馬達軸 ${e(j.id)} 穿過隔圈層：輪轂／舵盤要墊高 ${fmtNum(j.spacers.reduce((s, g) => s + g.mm, 0))} mm，齒輪才會在正確高度。</li>`).join('');
   const gapSection = gaps.length

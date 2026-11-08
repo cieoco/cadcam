@@ -104,13 +104,13 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     for(const c of cs){
       const a=world(c.p1),b=world(c.p2);if(!a||!b)continue;
       const color=c.id===request.outputId?'#e88d27':c.id===request.hostId?'#1686b3':'#a6b4bf';
-      if(isOutputBlank(c)){const g=inspectLinkExport(c,base.params[c.lenParam],{...base.fabrication?.export,drive:base.fabrication?.drive}),L=Math.hypot(b.x-a.x,b.y-a.y),ux=(b.x-a.x)/L,uy=(b.y-a.y)/L,world=p=>({x:a.x+p.x*ux-p.y*uy,y:a.y+p.x*uy+p.y*ux});for(const r of g.outlines)draw('path',{d:'M '+r.map(p=>{const q=world(p);return `${q.x} ${-q.y}`;}).join(' L ')+' Z',fill:'#f5ddd1',stroke:color,'data-actuator-part':c.id});for(const h of g.holes){const q=world(h);draw('circle',{cx:q.x,cy:-q.y,r:h.r,fill:'white',stroke:color,'data-output-horn':/^(MG995_HORN|TT_HUB|N20_HUB)/.test(h.layer)?c.id:''});}}
+      if(isOutputBlank(c)){const g=inspectLinkExport(c,base.params[c.lenParam],{...base.fabrication?.export,drive:base.fabrication?.drive}),L=Math.hypot(b.x-a.x,b.y-a.y),ux=(b.x-a.x)/L,uy=(b.y-a.y)/L,world=p=>({x:a.x+p.x*ux-p.y*uy,y:a.y+p.x*uy+p.y*ux});for(const r of g.outlines)draw('path',{d:'M '+r.map(p=>{const q=world(p);return `${q.x} ${-q.y}`;}).join(' L ')+' Z',fill:'#f5ddd1',stroke:color,'data-actuator-part':c.id});for(const cut of g.cutouts)draw('path',{d:'M '+cut.points.map(p=>{const q=world(p);return `${q.x} ${-q.y}`;}).join(' L ')+' Z',fill:'white',stroke:color,'data-output-shaft':c.id});for(const h of g.holes){const q=world(h);draw('circle',{cx:q.x,cy:-q.y,r:h.r,fill:'white',stroke:color,'data-output-horn':/^(MG995_HORN|TT_HUB|N20_HUB)/.test(h.layer)?c.id:''});}}
       else if(c.type==='bar')draw('line',{x1:a.x,y1:-a.y,x2:b.x,y2:-b.y,stroke:color,'stroke-width':12,'stroke-linecap':'round','data-actuator-part':c.id});
       else if(c.type==='gear')draw('circle',{cx:a.x,cy:-a.y,r:base.params[c.radiusParam]||18,fill:'#dce6ed',stroke:color,'stroke-width':3,'data-actuator-part':c.id});
       else if(c.type==='triangle'&&c.standardBlank){const mounts=deriveMotorMounts(cs).filter(m=>m.frameBody===c.id).map(m=>({...m,settings:actuatorMountSettings(base.fabrication,m.kind)})),g=inspectPlateExport(c,['p1','p2','p3'].map(k=>world(c[k])),{},mounts);for(const ring of g.outlines)draw('path',{d:'M '+ring.map(p=>`${p.x} ${-p.y}`).join(' L ')+' Z',fill:'#dcecf0',stroke:color,'data-actuator-part':c.id});for(const cut of g.cutouts)draw('path',{d:'M '+cut.points.map(p=>`${p.x} ${-p.y}`).join(' L ')+' Z',fill:'white',stroke:color});for(const h of g.holes)draw('circle',{cx:h.x,cy:-h.y,r:h.r,fill:'white',stroke:color});}
       else continue;
       const available=c.type==='gear'?[{key:'p1',...c.p1}]:actuatorHostPoints(c).filter(p=>!(c.standardBlank?.mountHoles || []).some(h=>h.id===p.id)||p.id===oldCenter||p.key===request.hostEnd);
-      for(const entry of available){const k=entry.key,p=pts[entry.id] || entry;draw('circle',{cx:p.x,cy:-p.y,r:5,fill:'white',stroke:color,'stroke-width':2});
+      for(const entry of available){const k=entry.key,p=pts[entry.id] || entry;if(!(k==='p1'&&isOutputBlank(c)&&c.isInput&&c.ttOutput==='shaft'&&(c.motorType || 'tt')==='tt'))draw('circle',{cx:p.x,cy:-p.y,r:5,fill:'white',stroke:color,'stroke-width':2});
         if(c.id===request.hostId||c.id===request.outputId)draw('circle',{cx:p.x,cy:-p.y,r:12,fill:'transparent','data-actuator-end':k,'data-owner':c.id});}
     }
     if(!old){
@@ -122,7 +122,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
         hit.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();chooseNode(id);}};
       }
     }
-    if(at)draw('circle',{cx:at.x,cy:-at.y,r:3,fill:'#dc3838','pointer-events':'none'});
+    if(at){const flat=out?.ttOutput==='shaft'&&(out.motorType || 'tt')==='tt';draw('circle',{cx:at.x,cy:-at.y,r:flat?4:3,fill:flat?'none':'#dc3838',stroke:'#dc3838','pointer-events':'none'});}
   }
   function chooseNode(id){
     selectedNode=id;const options=candidates.filter(c=>c.nodeId===id);

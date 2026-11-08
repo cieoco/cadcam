@@ -2046,6 +2046,7 @@ function drawNow() {
   const hiddenPointIds = new Set(Object.keys(pts).filter(id => isHiddenSliderRailPoint(id) || isSliderMountPoint(id)));
   vComps.filter(c=>c.boxPanel).forEach(c=>[c.p1,c.p2].forEach(p=>hiddenPointIds.add(p.id)));
   renderNodes({
+    shaftCenterIds: new Set(vComps.filter(c=>c.isInput&&c.ttOutput==='shaft'&&(c.motorType || 'tt')==='tt').map(c=>c.p1.id)),
     points: pts, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds, pointLabel: id => pointDisplayName(vComps,id),
     gearPinIds, pulleyPinIds, camFollowerIds, workpieceIds, dragId: S.dragId,
     sliderMountInfo, project: p => ({ x: TX(p.x), y: TY(p.y) }),

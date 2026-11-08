@@ -1,4 +1,5 @@
 import {pointRefs} from './model.js';
+import {ringDistance} from './tab-nut-geometry.js';
 import {attachmentPoint} from '../core/syringe.js';
 /** Restore/repartition real standard-board holes for one existing mounting candidate. No mutation.
  * The 1 mm web is a geometric prototype check, not a strength/manufacturing claim. */
@@ -41,12 +42,15 @@ export function planActuatorPlateHoles(source){
  }
  for(const out of comps.filter(isOutputBlank)){
   const pool=[...(out.holes || []),...(out.standardBlank.mountHoles || [])].sort((a,b)=>a.v-b.v||a.u-b.u),L=source.params[out.lenParam],active=out.isInput&&(['mg995','tt'].includes(out.motorType || 'tt')||out.motorType==='n20'&&fabrication.drive?.n20Spec===1),g=inspectLinkExport({...out,holes:[]},L,{...fabrication.export,drive:fabrication.drive}),special=g.holes.filter(h=>/^(MG995_HORN|TT_HUB|N20_HUB)/.test(h.layer));
-  const screws=special.filter(h=>/^(MG995_HORN|TT_HUB|N20_HUB)_SCREW$/.test(h.layer)).length;if(active&&screws<2)return {ok:false,message:'輸出板至少需要2顆有效軸接頭固定螺絲，請調整板寬或孔規格。'};
+  const direct=(out.motorType || 'tt')==='tt'&&out.ttOutput==='shaft',cuts=g.cutouts.filter(c=>c.layer==='TT_SHAFT_FLAT');
+  const screws=special.filter(h=>/^(MG995_HORN|TT_HUB|N20_HUB)_SCREW$/.test(h.layer)).length;if(active&&!direct&&screws<2)return {ok:false,message:'輸出板至少需要2顆有效軸接頭固定螺絲，請調整板寬或孔規格。'};
+  const occupied=(p,r)=>special.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<r+q.r+1-1e-6)||cuts.some(c=>inside(p,c.points)||edge(p,c.points)<r+1-1e-6);
   const available=[],parked=[],used=h=>usedPoint(comps,source.modules,out,h,source.params);
-  if(comps.some(c=>c.type==='syringe'&&['a','b'].some(k=>c[k]?.componentId===out.id&&special.some(q=>Math.hypot(c[k].u-q.x,c[k].v-q.y)<q.r+2.6))))return {ok:false,message:'軸接頭固定孔會占用針筒接合位置，請換接法。'};
-  for(const h of pool){if(special.some(q=>Math.hypot(h.u-q.x,h.v-q.y)<(h.diameter || 3.2)/2+q.r+1-1e-6)){if(h.type==='fixed'||used(h))return {ok:false,message:'軸接頭固定孔會占用已固定或已連接格孔，請先解除或換接法。'};parked.push(h);}else available.push(h);}
+  if(comps.some(c=>c.type==='syringe'&&['a','b'].some(k=>c[k]?.componentId===out.id&&occupied({x:c[k].u,y:c[k].v},1.6))))return {ok:false,message:'軸接頭孔會占用針筒接合位置，請換接法。'};
+  for(const h of pool){if(occupied({x:h.u,y:h.v},(h.diameter || 3.2)/2)){if(h.type==='fixed'||used(h))return {ok:false,message:'軸接頭孔會占用已固定或已連接格孔，請先解除或換接法。'};parked.push(h);}else available.push(h);}
   out.holes=available;if(parked.length)out.standardBlank.mountHoles=parked;else delete out.standardBlank.mountHoles;
   const full=inspectLinkExport(out,L,{...fabrication.export,drive:fabrication.drive}),ring=full.outlines[0];for(let i=0;i<full.holes.length;i++){const h=full.holes[i];if(!inside(h,ring)||edge(h,ring)<h.r+1-1e-6||full.holes.slice(i+1).some(q=>Math.hypot(h.x-q.x,h.y-q.y)<h.r+q.r+1-1e-6))return {ok:false,message:'輸出板工作孔／軸接頭孔重疊或材料不足1 mm，請加長、加寬或修正孔規格。'};}
+  for(let i=0;i<full.cutouts.length;i++){const r=full.cutouts[i].points;if(r.some(p=>!inside(p,ring)||edge(p,ring)<1-1e-6)||full.holes.some(h=>inside(h,r)||edge(h,r)<h.r+1-1e-6)||full.cutouts.slice(i+1).some(c=>ringDistance(r,c.points)<1-1e-6))return {ok:false,message:'輸出板扁軸孔與孔／槽重疊或材料不足1 mm，請調整板材或孔規格。'};}
   reports.push({outputId:out.id,available:available.length,occupied:parked.length,effectiveScrews:screws});
  }
  return {ok:true,comps,reports};

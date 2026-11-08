@@ -232,7 +232,7 @@ function linkHoleSpecs(comp, length, settings, extraHoles = []) {
   const holeR = round(holeDiameterMm / 2, 3);
   const flat = { ttShaftFlatDiameterMm, ttShaftFlatThicknessMm };
   const endHoles = (key, x) => {
-    if(isOutputBlank(comp)&&comp.isInput&&comp[key]?.physicalMotor&&['tt','n20'].includes(comp.motorType || 'tt')){const h=actuatorHubHoles(comp.motorType || 'tt',settings,x);if(h.length)return h;}
+    if(isOutputBlank(comp)&&comp.isInput&&comp[key]?.physicalMotor&&['tt','n20'].includes(comp.motorType || 'tt')&&!((comp.motorType || 'tt')==='tt'&&comp.ttOutput==='shaft')){const h=actuatorHubHoles(comp.motorType || 'tt',settings,x);if(h.length)return h;}
     if (comp.isInput && comp.motorType === 'mg995' && comp[key]?.physicalMotor) return servoHornHoles(settings, x, 0, comp.shape === 'disk' ? null : {halfWidth:memberStock(comp).widthMm/2,length,...(isOutputBlank(comp)?{rect:true,minX:-comp.standardBlank.rearMm-(8-memberStock(comp).thicknessMm/2),maxX:length+(8-memberStock(comp).thicknessMm/2)}:{})});
     return [isTtMotorEnd(comp, key) ? { kind: 'tt-shaft-flat', x, y: 0, settings: flat } : { kind: 'circle', x, y: 0, r: holeR }];
   };
