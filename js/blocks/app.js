@@ -1994,7 +1994,7 @@ function drawNow() {
 
   // 桿件：依層級放進對應的 <g>（內層在底、外層在上）；同層內紅色曲柄最後畫不被蓋住。
   const { linksToDraw, countMissing: countMissingLinks } = renderLinks({
-    params:S.topo.params,exportSettings:Settings.exportSettings(),
+    params:S.topo.params,exportSettings:{...Settings.exportSettings(),drive:S.fabrication?.drive},
     links: viewCompiled.visualization.links || [], comps: S.comps, points: pts, triangleEdgeKeys, isGroundBar,
     selectedLinkId: S.selectedLinkId, pickBars: S.pickBars,
     interactionBlocked: () => Boolean(S.drawingLink || S.drawingTriangle || S.drawingPolygon),

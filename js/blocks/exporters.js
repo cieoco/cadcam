@@ -1,3 +1,4 @@
+import {blankGeometry,isOutputBlank} from './standard-blank.js';
 import {localHoles} from '../core/local-holes.js';
 import {tabNutPartGeometry} from './tab-nut-plan.js';
 import {boxPanelGeometry} from '../plugins/box-maker/box-contract.js';
@@ -211,7 +212,7 @@ function servoHornHoles(settings, x = 0, angle = 0, fit = null) {
   }
   // 外購搖臂的孔位由零件決定：棍太窄時只留整個孔（含 0.5 mm 孔邊肉）落在桿身內的孔；至少要有 2 個（含中心）才改，否則照舊交給加工檢查回報。
   if (fit) {
-    const inside = h => { const px = Math.min(Math.max(h.x, 0), fit.length); return Math.hypot(h.x - px, h.y) + h.r + 0.5 <= fit.halfWidth; };
+    const inside = h => {if(fit.rect)return h.x-h.r-1>=fit.minX&&h.x+h.r+1<=fit.maxX&&Math.abs(h.y)+h.r+1<=fit.halfWidth; const px = Math.min(Math.max(h.x, 0), fit.length); return Math.hypot(h.x - px, h.y) + h.r + 0.5 <= fit.halfWidth; };
     const kept = holes.filter(inside);
     if (kept.length >= 2) return kept;
   }
@@ -223,14 +224,14 @@ function linkHoleSpecs(comp, length, settings, extraHoles = []) {
   const holeR = round(holeDiameterMm / 2, 3);
   const flat = { ttShaftFlatDiameterMm, ttShaftFlatThicknessMm };
   const endHoles = (key, x) => {
-    if (comp.isInput && comp.motorType === 'mg995' && comp[key]?.physicalMotor) return servoHornHoles(settings, x, 0, comp.shape === 'disk' ? null : { halfWidth: memberStock(comp).widthMm / 2, length });
+    if (comp.isInput && comp.motorType === 'mg995' && comp[key]?.physicalMotor) return servoHornHoles(settings, x, 0, comp.shape === 'disk' ? null : {halfWidth:memberStock(comp).widthMm/2,length,...(isOutputBlank(comp)?{rect:true,minX:-comp.standardBlank.rearMm-(8-memberStock(comp).thicknessMm/2),maxX:length+(8-memberStock(comp).thicknessMm/2)}:{})});
     return [isTtMotorEnd(comp, key) ? { kind: 'tt-shaft-flat', x, y: 0, settings: flat } : { kind: 'circle', x, y: 0, r: holeR }];
   };
   return [...endHoles('p1', 0), ...endHoles('p2', length), ...localHoles(comp).map(h=>({kind:'circle',id:h.id,x:h.u,y:h.v,r:h.diameter/2})), ...adapterHoleSpecs(extraHoles)];
 }
 
 function svgForLink(comp, length, settings, extraHoles = []) {
-  if(isDisk(comp))return addSvgStockDescription(svgForFrameGeometry(inspectLinkExport(comp,length,settings,extraHoles),comp.id),comp);
+  if(isDisk(comp)||isOutputBlank(comp))return addSvgStockDescription(svgForFrameGeometry(inspectLinkExport(comp,length,settings,extraHoles),comp.id),comp);
   const stock = memberStock(comp);
   const r = round(stock.widthMm / 2, 3);
   const holes = linkHoleSpecs(comp, length, settings, extraHoles);
@@ -1306,7 +1307,7 @@ export function dxfForFrameGeometry(geometry,partId='frame') {
 }
 
 function dxfForLink(comp, length, settings, extraHoles = []) {
-  if(isDisk(comp))return addDxfStockComment(dxfForFrameGeometry(inspectLinkExport(comp,length,settings,extraHoles),comp.id),comp);
+  if(isDisk(comp)||isOutputBlank(comp))return addDxfStockComment(dxfForFrameGeometry(inspectLinkExport(comp,length,settings,extraHoles),comp.id),comp);
   const stock = memberStock(comp);
   const r = round(stock.widthMm / 2, 3);
   const holes = linkHoleSpecs(comp, length, settings, extraHoles);
@@ -1340,7 +1341,7 @@ export function inspectLinkExport(comp, length, settings = {}, extraHoles = []) 
   if(comp.boxPanel){const g=boxPanelGeometry(comp);if(!g)throw Error('盒體板件資料無效');return {...g,holes:adapterHoleSpecs(extraHoles)};}
   const safeLength = Number.isFinite(Number(length)) && Number(length) > 0 ? Number(length) : 1;
   if(isDisk(comp)){const error=validateDisk(comp,safeLength,comp.diameterMm,normalizeExportSettings(settings).holeDiameterMm);if(error)throw Error(error);}
-  const outline = isDisk(comp)?diskOutline(comp):barOutline({ x: 0, y: 0 }, { x: safeLength, y: 0 }, memberStock(comp).widthMm / 2);
+  const outline = isOutputBlank(comp)?blankGeometry(comp,[{x:0,y:0},{x:safeLength,y:0}]):isDisk(comp)?diskOutline(comp):barOutline({ x: 0, y: 0 }, { x: safeLength, y: 0 }, memberStock(comp).widthMm / 2);
   const holes = [];
   const cutouts = [];
   linkHoleSpecs(comp, safeLength, settings, extraHoles).forEach(hole => {

@@ -1,3 +1,4 @@
+import {blankGeometry,isOutputBlank} from './standard-blank.js';
 import {localHoles,holeWorld} from '../core/local-holes.js';
 import {isDisk,diskOutline} from './disk-plate.js';
 import {fusionRoot, inspectBarFusionData} from '../core/bar-fusion.js';
@@ -18,7 +19,7 @@ export function copyMemberGeometry(comp, params, settings = {}) {
     const ratio = params[hole.distParam] / length;
     holes.push({x:a.x+(b.x-a.x)*ratio,y:a.y+(b.y-a.y)*ratio,r:holeRadius});
   }
-  return {outlines:[isDisk(comp)?diskOutline(comp,a):roundedHullOutline(points,radius)],holes,cutouts:[]};
+  return {outlines:[isOutputBlank(comp)?blankGeometry(comp,points):isDisk(comp)?diskOutline(comp,a):roundedHullOutline(points,radius)],holes,cutouts:[]};
 }
 
 export function planMemberCopy({comps, params, modules = [], counter = 0, id, positions = {}, mode = 'copy', settings = {}}) {
@@ -77,6 +78,7 @@ export function planMemberCopy({comps, params, modules = [], counter = 0, id, po
     pointKeysFor(c).forEach(k => Object.assign(c[k],move(c[k])));
     if (mode !== 'copy') {
       if (c.type === 'triangle') c.sign *= -1;
+      if(c.type==='bar')localHoles(c).forEach(h=>h.v*=-1);
       if (c.jawTurnSign) c.jawTurnSign *= -1;
       for (const v of [...(c.vertices || []), ...(c.outlinePoints || [])]) if (!v.solve && Number.isFinite(v.v)) v.v *= -1;
       if (c.barFusion) c.barFusion.points.forEach(p=>{p.y *= -1;});

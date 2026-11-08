@@ -101,7 +101,7 @@ export function inspectMountingChange(before,after){
     }
     const syringeId=r.id.startsWith('syringe:')?r.id.slice(8):null;
     const outputChanged=syringeId&&!same(a.comps.find(c=>c.id===syringeId)?.b,b.comps.find(c=>c.id===syringeId)?.b);
-    if(changed.length||outputChanged||!same(r.parts,n.parts))changes.push({id:r.id,label:r.label,parts:changed.length?changed:[...ids]});
+    if(changed.length||outputChanged||!same(r.parts,n.parts)){const count=c=>c?.holes.filter(h=>h.layer==='MG995_HORN_SCREW').length || 0,oldOutput=Object.values(ca.parts).find(p=>p.sourceIds.some(id=>a.comps.some(c=>c.id===id&&c.standardBlank?.rearMm!==undefined))&&r.parts.includes(p.id)),newOutput=oldOutput&&partFor(cb,oldOutput.id),detail=oldOutput&&newOutput&&count(oldOutput)!==count(newOutput)?`舵盤有效固定螺絲 ${count(oldOutput)}→${count(newOutput)} 顆` : '';changes.push({id:r.id,label:detail||r.label,parts:changed.length?changed:[...ids]});}
   }
   return {ok:!issues.length,changes,issues:[...new Set(issues)]};
 }

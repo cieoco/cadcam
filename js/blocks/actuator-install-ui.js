@@ -1,4 +1,5 @@
-import {inspectPlateExport} from './exporters.js';
+import {isOutputBlank} from './standard-blank.js';
+import {inspectLinkExport,inspectPlateExport} from './exporters.js';
 import {deriveMotorMounts} from './build-plan.js';
 import {pointDisplayName} from './display-labels.js';
 import {actuatorChoices,actuatorHostPoints,actuatorPoint,planMotorInstallation,quickMotorChoices} from './actuator-installation.js';
@@ -97,7 +98,8 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     for(const c of cs){
       const a=world(c.p1),b=world(c.p2);if(!a||!b)continue;
       const color=c.id===request.outputId?'#e88d27':c.id===request.hostId?'#1686b3':'#a6b4bf';
-      if(c.type==='bar')draw('line',{x1:a.x,y1:-a.y,x2:b.x,y2:-b.y,stroke:color,'stroke-width':12,'stroke-linecap':'round','data-actuator-part':c.id});
+      if(isOutputBlank(c)){const g=inspectLinkExport(c,base.params[c.lenParam],{...base.fabrication?.export,drive:base.fabrication?.drive}),L=Math.hypot(b.x-a.x,b.y-a.y),ux=(b.x-a.x)/L,uy=(b.y-a.y)/L,world=p=>({x:a.x+p.x*ux-p.y*uy,y:a.y+p.x*uy+p.y*ux});for(const r of g.outlines)draw('path',{d:'M '+r.map(p=>{const q=world(p);return `${q.x} ${-q.y}`;}).join(' L ')+' Z',fill:'#f5ddd1',stroke:color,'data-actuator-part':c.id});for(const h of g.holes){const q=world(h);draw('circle',{cx:q.x,cy:-q.y,r:h.r,fill:'white',stroke:color,'data-output-horn':h.layer.startsWith('MG995_HORN')?c.id:''});}}
+      else if(c.type==='bar')draw('line',{x1:a.x,y1:-a.y,x2:b.x,y2:-b.y,stroke:color,'stroke-width':12,'stroke-linecap':'round','data-actuator-part':c.id});
       else if(c.type==='gear')draw('circle',{cx:a.x,cy:-a.y,r:base.params[c.radiusParam]||18,fill:'#dce6ed',stroke:color,'stroke-width':3,'data-actuator-part':c.id});
       else if(c.type==='triangle'&&c.standardBlank){const mounts=deriveMotorMounts(cs).filter(m=>m.frameBody===c.id).map(m=>({...m,settings:base.fabrication?.[m.kind==='mg995'?'mg995Mount':'ttMount']})),g=inspectPlateExport(c,['p1','p2','p3'].map(k=>world(c[k])),{},mounts);for(const ring of g.outlines)draw('path',{d:'M '+ring.map(p=>`${p.x} ${-p.y}`).join(' L ')+' Z',fill:'#dcecf0',stroke:color,'data-actuator-part':c.id});for(const cut of g.cutouts)draw('path',{d:'M '+cut.points.map(p=>`${p.x} ${-p.y}`).join(' L ')+' Z',fill:'white',stroke:color});for(const h of g.holes)draw('circle',{cx:h.x,cy:-h.y,r:h.r,fill:'white',stroke:color});}
       else continue;
@@ -161,7 +163,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     trial.min=request.type==='mg995'?Math.min(Number(request.start),Number(request.end)):0;trial.max=request.type==='mg995'?Math.max(Number(request.start),Number(request.end)):360;trial.value=request.angle;
     if(document.activeElement!==exact)showNumber(exact,request.angle);
     summary.hidden=!old||request.type!=='mg995';summary.textContent=`擺動 ${request.start}–${request.end}°；範圍沿用接點面板的伺服角度。`;
-    reading.textContent=`${request.angle}°${result?.ok?' · 幾何可解':''}`;
+    reading.textContent=`${Number(request.angle.toFixed(2))}°${result?.ok?' · 幾何可解':''}`;
     error.textContent=result&&!result.ok?result.message:result?.plateHoles?.length?'板座孔槽為未實量試作；占用格孔已停用，拆除或改方向會重新核對並還原。':'';
     next.disabled=!result?.ok;
     exact.disabled=trial.disabled=!request.hostId||!request.outputId;scan.disabled=toggle.disabled=!result?.ok;

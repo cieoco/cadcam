@@ -1,3 +1,5 @@
+import {blankGeometry,isOutputBlank} from './standard-blank.js';
+import {inspectLinkExport} from './exporters.js';
 import {tabNutPath} from './tab-nut-view.js';
 import {inspectBarFusion,worldFusionGeometry} from './bar-fusion-geometry.js';
 /**
@@ -52,6 +54,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       for(const fill of ['#ffffff','#075985']){const ink=svgEl('path');ink.setAttribute('fill',fill);diskDirection.appendChild(ink);}
       diskDirection.setAttribute('aria-hidden','true');group.appendChild(diskDirection);
     }
+    const outputHoles=isOutputBlank(component)?svgEl('g'):null;if(outputHoles){outputHoles.dataset.outputHorn=link.id;outputHoles.style.pointerEvents='none';group.appendChild(outputHoles);}
     const holes = [];
     [link.p1, link.p2].forEach(pointId => {
       if (groundIds.has(pointId)) return;
@@ -90,12 +93,14 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       if (!valid) return;
       const tabPath=component&&tabNutPath(tabNutGeometry[component.id],component,current,project);
       if(isDisk(component)){stick.setAttribute('d','M '+diskOutline(component,a).map(p=>{const q=project(p);return q.x+','+q.y;}).join(' L ')+' Z');}
+      else if(isOutputBlank(component)){const r=blankGeometry(component,[a,b]),path=ps=>'M '+ps.map(p=>{const q=project(p);return q.x+','+q.y;}).join(' L ')+' Z';stick.setAttribute('d',path(r));}
       else if(tabPath){stick.setAttribute('fill-rule','evenodd');stick.setAttribute('d',tabPath);}
       else if(fusion?.ok){
         const g=worldFusionGeometry(fusion,current),ring=ps=>'M '+ps.map(p=>{const q=project(p);return q.x+','+q.y;}).join(' L ')+' Z';
         const drilling=g.holes.filter(h=>['ADAPTER_HOLE','MOUNT_BOLT'].includes(h.layer)).map(h=>Array.from({length:32},(_,i)=>({x:h.x+h.r*Math.cos(i*Math.PI/16),y:h.y+h.r*Math.sin(i*Math.PI/16)})));
         stick.setAttribute('fill-rule','evenodd');stick.setAttribute('d',[...g.outlines,...g.cutouts.map(c=>c.points),...drilling].map(ring).join(' '));
       }else stick.setAttribute('d', mounts?.length ? (hostedPath(a, b, current) || barHullPath(a, b, radius)) : barHullPath(a, b, radius));
+      if(outputHoles){outputHoles.replaceChildren();const L=Math.hypot(b.x-a.x,b.y-a.y),ux=(b.x-a.x)/L,uy=(b.y-a.y)/L,g=inspectLinkExport(component,L,exportSettings);for(const h of g.holes.filter(h=>h.layer.startsWith('MG995_HORN'))){const p=project({x:a.x+h.x*ux-h.y*uy,y:a.y+h.x*uy+h.y*ux}),circle=svgEl('circle');for(const[k,v]of Object.entries({cx:p.x,cy:p.y,r:h.r*scale,fill:'white',stroke:color,'stroke-width':1}))circle.setAttribute(k,v);outputHoles.appendChild(circle);}}
       holes.forEach(hole => { const point = current[hole.pointId]; if (point && Number.isFinite(point.x)) { const p = project(point); hole.element.setAttribute('cx', p.x); hole.element.setAttribute('cy', p.y); } });
     };
     update(points); registerUpdate(update);

@@ -33,7 +33,8 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-08：三類孔格結構與共用局部孔支援，2,074,980→2,091,543（+16,563 bytes）；設定面板按需載入，無新求解器／依賴。
 // 2026-11-08：新增前同一候選的拖拉／數字、定位與確認生命週期，2,091,543→2,094,418（+2,875 bytes）；把手與面板仍按需載入。
 // 2026-11-08：真實標準座板的占孔還原／共用候選與保存保護，2,094,418→2,103,317（+8,899 bytes）；兩個舵機例按需載入，無新依賴。
-check('首次JS原始大小低於2.104MB',r.bytes<2104000);
+// 2026-11-08：矩形輸出料、舵盤占孔與有效螺絲共同核對，2,103,317→2,111,463（+8,146 bytes）；沿既有bar求解，無新增依賴。
+check('首次JS原始大小低於2.113MB',r.bytes<2113000);
 check('舵機座板範例按需載入',!r.paths.includes('js/blocks/servo-mount-examples.js'));
 check('標準結構設定面板按需載入',!r.paths.includes('js/blocks/standard-blank-ui.js')&&r.lazyEntries.includes('js/blocks/standard-blank-ui.js'));
 check('機架編輯介面延後載入',!r.paths.includes('js/blocks/frame-hole-editor.js')&&!r.paths.includes('js/blocks/frame-panel.js'));

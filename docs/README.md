@@ -16,6 +16,8 @@
 
 ## 產品與功能規格
 
+- [三列輸出板與舵盤固定](TEACHING-CHANGELOG.md#servo-output-plate) — 軸後一格、可選預設、四／雙螺絲、占孔及輸出驗收。
+
 - [固定標準座板的致動安裝](TEACHING-CHANGELOG.md#actuator-standard-plates) — 真N×M板、占孔／還原、兩個舵機例及未驗證界限。
 
 - [桿件／板材／同平面L型件](TEACHING-CHANGELOG.md#standard-structures) — 三類基本結構、真孔、凹角、數字／把手與保存驗收及限制；[新增前拖拉／精確參數](TEACHING-CHANGELOG.md#standard-structure-creation)。
