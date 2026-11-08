@@ -1,3 +1,4 @@
+import {authorExampleActuatorPlates} from './example-actuator-plates.js';
 import { MAD_BOX_EXAMPLE } from './iq-mad-box-example.js';
 import { LINQ_LIFT_EXAMPLE } from './iq-linq-example.js';
 import {standardizeExampleFrame} from './example-frame-stock.js';
@@ -1024,6 +1025,18 @@ for(const id of [
   'hydraulic-h01-practice','hydraulic-h02-practice','hydraulic-h03-practice','hydraulic-h01','iq-linq-lift'
 ])
   standardizeExampleFrame(ALL_BLOCK_EXAMPLES.find(e=>e.id===id).snapshot);
+
+// Reviewed fixed-first-end bar examples. Gears, riding motors, fused roots and
+// large/special supports retain their own construction (see teaching changelog).
+for(const id of ['wiper-single','wiper-missing-coupler','fourbar-crank-rocker','fourbar-missing-coupler',
+ 'fourbar-double-crank','fourbar-double-rocker','parallel-fourbar','chebyshev-linkage',
+ 'slider-crank','slider-crank-practice','single-servo-claw','single-axis-wrist']){
+ const example=ALL_BLOCK_EXAMPLES.find(e=>e.id===id),replaceId=id==='single-servo-claw'?'ClawFrame':id==='single-axis-wrist'?'WristFrame':null;
+ if(example.snapshot.comps.some(c=>c.isInput&&c.standardBlank?.rearMm===8))continue;
+ const candidate=authorExampleActuatorPlates(example.snapshot,{id,replaceId});if(!candidate.ok)throw Error(`${id}: ${candidate.message}`);
+ example.snapshot=candidate.snapshot;
+ example.adjustmentNote=(example.adjustmentNote||'')+' 標準座板與三列輸出板可沿原面板改孔數／尺寸；專用孔為待實量試作，軸長、五金與承載未核對。';
+}
 
 export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES;
 

@@ -35,7 +35,8 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-08：真實標準座板的占孔還原／共用候選與保存保護，2,094,418→2,103,317（+8,899 bytes）；兩個舵機例按需載入，無新依賴。
 // 2026-11-08：矩形輸出料、舵盤占孔與有效螺絲共同核對，2,103,317→2,111,463（+8,146 bytes）；沿既有bar求解，無新增依賴。
 // 2026-11-08：TT共用輪轂／N20明選規格、全作品占孔與型號一致入口，2,111,463→2,116,497（+5,034 bytes）；兩新例及安裝面板懶載入，無新依賴。
-check('首次JS原始大小低於2.118MB',r.bytes<2118000);
+// 2026-11-08：12例已核對的座板／輸出板作者recipe與提示，2,116,497→2,121,897（+5,400 bytes）；不遷移舊作品，無新核心或依賴。
+check('首次JS原始大小低於2.123MB',r.bytes<2123000);
 check('舵機座板範例按需載入',!r.paths.includes('js/blocks/servo-mount-examples.js')&&!r.paths.includes('js/blocks/motor-plate-examples.js'));
 check('標準結構設定面板按需載入',!r.paths.includes('js/blocks/standard-blank-ui.js')&&r.lazyEntries.includes('js/blocks/standard-blank-ui.js'));
 check('機架編輯介面延後載入',!r.paths.includes('js/blocks/frame-hole-editor.js')&&!r.paths.includes('js/blocks/frame-panel.js'));

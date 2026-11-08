@@ -19,6 +19,7 @@
     "test/actuator-standard-plates.mjs",
     "test/servo-output-plate.mjs",
     "test/motor-plates.mjs",
+    "test/example-actuator-plates.mjs",
     "test/standard-blank-creation.mjs",
     "test/iq-clawbot.mjs",
     "test/iq-mad-box.mjs",
