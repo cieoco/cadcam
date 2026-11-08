@@ -69,7 +69,7 @@ function normalizePoint(point, fallbackId, warnings) {
 }
 
 function localHoleRecords(raw){
- return (Array.isArray(raw)?raw:[]).filter(h=>h&&safeId(h.id)&&Number.isFinite(h.u)&&Number.isFinite(h.v)).map(h=>({id:h.id,u:h.u,v:h.v,diameter:Math.max(.5,Math.min(20,num(h.diameter,3.2))),type:h.type==='fixed'?'fixed':'floating'}));
+ return (Array.isArray(raw)?raw:[]).filter(h=>h&&safeId(h.id)&&Number.isFinite(h.u)&&Number.isFinite(h.v)).map(h=>({id:h.id,u:h.u,v:h.v,diameter:Math.max(.5,Math.min(20,num(h.diameter,3.2))),type:h.type==='fixed'?'fixed':'floating',...(h.manufactured===true?{manufactured:true}:{})}));
 }
 function keepBlank(comp,out){if(['bar','plate','l'].includes(comp.standardBlank?.kind)){out.standardBlank={kind:comp.standardBlank.kind,...(comp.standardBlank.kind==='l'?{armWidthMm:Math.max(13,num(comp.standardBlank.armWidthMm,13))}:{})};if(comp.type==='bar'&&Number.isFinite(comp.standardBlank.rearMm)){out.standardBlank.rearMm=comp.standardBlank.rearMm;if(['shaft','hub'].includes(comp.ttOutput))out.ttOutput=comp.ttOutput;if(!out.stock)out.stock={widthMm:29,thicknessMm:3,material:'unspecified'};}if(comp.standardBlank.mountHoles?.length)out.standardBlank.mountHoles=localHoleRecords(comp.standardBlank.mountHoles);}}
 
@@ -613,7 +613,7 @@ export function normalizeSnapshot(obj) {
   if(sourceComps.some(c=>['bar','triangle'].includes(c?.type)&&Array.isArray(c.holes)&&(c.standardBlank||c.holes.some(h=>Number.isFinite(h?.u)&&Number.isFinite(h?.v)))&&(c.holes.length>128||new Set(c.holes.map(h=>h?.id)).size!==c.holes.length)))return null;
   if(sourceComps.some(c=>c?.standardBlank?.rearMm!==undefined&&(c.type!=='bar'||c.standardBlank.kind!=='bar'||!Number.isFinite(c.standardBlank.rearMm)||c.standardBlank.rearMm<0||c.standardBlank.rearMm>1000)))return null;
   if(sourceComps.some(c=>c?.ttOutput!==undefined&&(c.type!=='bar'||c.standardBlank?.kind!=='bar'||!Number.isFinite(c.standardBlank.rearMm)||!['shaft','hub'].includes(c.ttOutput))))return null;
-  if(sourceComps.some(c=>c?.standardBlank?.mountHoles!==undefined&&(!(c.type==='triangle'&&c.standardBlank.kind==='plate'||c.type==='bar'&&c.standardBlank.kind==='bar'&&Number.isFinite(c.standardBlank.rearMm))||!Array.isArray(c.standardBlank.mountHoles)||c.standardBlank.mountHoles.some(h=>!safeId(h?.id)||!Number.isFinite(h?.u)||!Number.isFinite(h?.v)))))return null;
+  if(sourceComps.some(c=>c?.standardBlank?.mountHoles!==undefined&&(!(['bar','triangle'].includes(c.type)&&['bar','plate','l'].includes(c.standardBlank.kind))||!Array.isArray(c.standardBlank.mountHoles)||c.standardBlank.mountHoles.some(h=>!safeId(h?.id)||!Number.isFinite(h?.u)||!Number.isFinite(h?.v)))))return null;
   if(sourceComps.some(c=>c?.standardBlank?.mountHoles?.length&&((c.holes?.length || 0)+c.standardBlank.mountHoles.length>128||new Set([...(c.holes || []),...c.standardBlank.mountHoles].map(h=>h?.id)).size!==(c.holes?.length || 0)+c.standardBlank.mountHoles.length)))return null;
   if(sourceComps.some(c=>c?.boxPanel && (c.type!=='bar'||!normalizeBoxPanel(c.boxPanel))))return null;
 

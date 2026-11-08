@@ -1,4 +1,5 @@
-import {confirmMountingChange,mountingWork,mountingCandidate} from './mounting-review-ui.js';
+import {planActuatorPlateHoles} from './actuator-plate-holes.js';
+import {commitMountingEdit,confirmMountingChange,mountingWork,mountingCandidate} from './mounting-review-ui.js';
 import {editableNumber,signedNumberInput,showNumber,readNumber,formatNumber} from './numeric-input.js';
 import {APP_VERSION} from '../version.js';
 import {syringeShape} from './syringe-shape.js';
@@ -240,10 +241,10 @@ export function createSyringeUI(h){
     let counter=1;while(S.comps.some(c=>c.id===`Syringe${counter}`))counter++;
     // 安裝介面（含預覽與選項）第一次安裝針筒才載入，不佔啟動大小
     import('./syringe-install-ui.js').then(({openSyringeInstallation})=>openSyringeInstallation({stage:h.svg,redraw:h.draw,source,points:clone(h.points()),existing:candidate,newId:`Syringe${counter}`,motion:motion(),
-      review:(r,notify)=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus])){notify('作品已變更，請重新開啟安裝。');return false;}return confirmMountingChange(mountingWork(S),mountingCandidate(mountingWork(S),r,h.comps()),{notify});},
+      review:(r,notify,ask)=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus])){notify('作品已變更，請重新開啟安裝。');return false;}return confirmMountingChange(mountingWork(S),mountingCandidate(mountingWork(S),r,h.comps()),{notify,ask});},
       advancedSettings:c=>open(c,true),
       confirm:r=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus]))return false;message='';commit(r.comps,r.params,r);return true;},
-      remove:candidate&&S.comps.some(c=>c.id===candidate.id)?()=>{h.pushUndo();S.comps=S.comps.filter(c=>c.id!==candidate.id);h.rebuild();h.draw();h.save();}:null}),()=>notify('安裝介面載入失敗，請再試一次。'));
+      remove:candidate&&S.comps.some(c=>c.id===candidate.id)?()=>{if(!commitMountingEdit(S,d=>{d.comps=d.comps.filter(c=>c.id!==candidate.id);},{pushUndo:h.pushUndo,notify}))return false;h.rebuild();h.draw();h.save();}:null}),()=>notify('安裝介面載入失敗，請再試一次。'));
   }
   function open(candidate=null,advanced=false){
     const current=candidate || active();
@@ -293,13 +294,14 @@ export function createSyringeUI(h){
       const index=comps.findIndex(o=>o.id===next.id);if(index<0)comps.push(next);else comps[index]=next;
       const fabrication=clone(f);Object.assign(fabrication.cnc,{stockThicknessMm:readNumber(fields.thickness)});Object.assign(fabrication.export,{holeDiameterMm:readNumber(fields.pin),frameHoleDiameterMm:readNumber(fields.bolt)});Object.assign(fabrication.syringeMount,{clearanceMm:readNumber(fields.clearance),marginMm:readNumber(fields.margin),strapSpacingMm:readNumber(fields.spacing)});
       const norm=normalizeFabricationProfile(fabrication);if(!norm.ok)return norm;
-      const r=solveSyringe(comps,p,h.points(),motion());return {...r,comps,params:p,fabrication:norm.profile};
+      const holes=planActuatorPlateHoles({comps,params:p,modules:S.modules,fabrication:norm.profile});if(!holes.ok)return holes;
+      const r=solveSyringe(holes.comps,p,h.points(),motion());return {...r,comps:holes.comps,params:p,fabrication:norm.profile};
     }
     const scan=el('button','掃描候選全行程',form);scan.type='button';scan.onclick=()=>{const r=plan();if(!r.ok){error.textContent=r.message;return;}const result=scanSyringe(r.comps,r.params,c.id,0.5,motion());error.textContent=result.ok?`${result.message} 最大誤差 ${result.maxResidualMm.toExponential(2)} mm`:`${result.atMm==null?'':formatNumber(result.atMm)} mm：${result.message}`;};
     const save=el('button','確認套用',form);save.type='submit';
     form.onsubmit=e=>{e.preventDefault();if(sourceRevision!==JSON.stringify([S.comps,S.topo.params,S.fabrication])){error.textContent='作品已變更，請重新開啟設定。';return;}const r=plan();if(!r.ok){error.textContent=r.message;return;}if(!confirmMountingChange(mountingWork(S),mountingCandidate(mountingWork(S),r,h.comps()),{notify:message=>{error.textContent=message;}}))return;message='';commit(r.comps,r.params,r,{fabrication:r.fabrication});dialog.close();};
     const cancel=el('button','取消',form);cancel.type='button';cancel.onclick=()=>dialog.close();
-    if(!candidate){const remove=el('button','刪除針筒',form);remove.type='button';remove.onclick=()=>{h.pushUndo();S.comps=S.comps.filter(o=>o.id!==c.id);h.rebuild();h.draw();dialog.close();};}
+    if(!candidate){const remove=el('button','刪除針筒',form);remove.type='button';remove.onclick=()=>{if(!commitMountingEdit(S,d=>{d.comps=d.comps.filter(o=>o.id!==c.id);},{pushUndo:h.pushUndo,notify}))return;h.rebuild();h.draw();h.save();dialog.close();};}
     dialog.onclose=()=>dialog.remove();document.body.append(dialog);dialog.showModal();
   }
   function add(){

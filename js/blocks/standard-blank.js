@@ -36,7 +36,7 @@ export function resizeStandardBlank(c,params,axis,value,{comps=[]}={}){
  out.holes=raw.holes.map(h=>({...h,...old.get(`${h.u},${h.v}`),id:old.get(`${h.u},${h.v}`)?.id||`${c.id}.H${h.u}_${h.v}`.replaceAll('.','_')}));out.standardBlank=raw.standardBlank;if(isOutputBlank(c)&&axis==='width')out.stock.widthMm=value;
  const patch={[g]:axis==='g'?value:L};if(c.type==='triangle'){patch[c.r1Param]=axis==='r1'?value:H;patch[c.r2Param]=Math.hypot(patch[g],patch[c.r1Param]);}
  const retained=new Set(out.holes.map(h=>h.id)),removed=originalHoles.filter(h=>!retained.has(h.id));
- if(removed.some(h=>h.type==='fixed'||comps.some(other=>other.id!==c.id&&(['p1','p2','p3','m1','m2'].some(k=>other[k]?.id===h.id)||other.holes?.some(q=>q.id===h.id)))))return {ok:false,message:'縮小會刪除已固定或已連接的孔，請先解除連接。'};
+ if(removed.some(h=>h.manufactured||h.type==='fixed'||comps.some(other=>other.id!==c.id&&(['p1','p2','p3','m1','m2'].some(k=>other[k]?.id===h.id)||other.holes?.some(q=>q.id===h.id)))))return {ok:false,message:'縮小會刪除已固定或已連接的孔，請先解除連接。'};
  return {ok:true,comp:out,params:patch};
 }
 

@@ -61,7 +61,7 @@ export function buildPartGeometryCatalog(args={}) {
         const h={...local(n),r:n.holeDiameterMm/2,id:n.id,layer:n.holeLayer};
         if(!geometry.outlines.some(r=>inside(h,r)&&edgeDistance(h,r)>h.r)||geometry.cutouts.some(c=>inside(h,c.points)||edgeDistance(h,c.points)<=h.r))throw Error('承載板無法容納管夾配對孔，請調整位置或板件外形。');
         const old=geometry.holes.find(q=>Math.hypot(q.x-h.x,q.y-h.y)<.001);
-        if(old){old.mountIds=[...(old.mountIds||[]),h.id];continue;}
+        if(old){old.r=Math.max(old.r,h.r);old.mountIds=[...(old.mountIds||[]),h.id];continue;}
         if(geometry.holes.some(q=>Math.hypot(q.x-h.x,q.y-h.y)<q.r+h.r))throw Error('管夾配對孔與既有孔重疊，請調整安裝位置。');
         geometry.holes.push(h);
       }
