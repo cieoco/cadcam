@@ -1080,6 +1080,17 @@ const memberEditor = createMemberEditor({
 let editingHandles=null;
 const jawTipHandle = createJawTipHandle({ svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
   editor: memberEditor, getParams: () => S.topo.params });
+async function setMemberAsFrame(){
+  const id=S.selectedTriangleId||S.selectedLinkId;if(!id||S.mode!=='design')return;
+  pause();const revision=snapshotStr(),source={comps:structuredClone(viewComps()),params:{...S.topo.params},id,points:displayCoords(),motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()}};
+  try{const {planMemberFrame}=await import('./member-frame.js');
+    if(snapshotStr()!==revision){transient('作品已變更，請重新選取零件。');return;}
+    const plan=planMemberFrame(source);if(!plan.ok){transient(plan.message);return;}if(plan.unchanged)return;
+    const replacements=new Map(plan.comps.map(c=>[c.id,c]));
+    if(!commitMountingEdit(S,d=>{d.comps=d.comps.map(c=>replacements.get(c.id)||c);},{pushUndo,notify:transient}))return;
+    rebuild();draw();scheduleAutosave();transient('已設為機架：第一孔與第二孔已固定，可按復原還原。');
+  }catch(e){transient('未設為機架：'+e.message);}
+}
 async function copyMember(mode) {
   const id=S.selectedTriangleId||S.selectedLinkId;
   if(!id || S.mode!=='design')return;
@@ -3390,6 +3401,7 @@ Object.assign(window.blocks, commandActions, { openExamples: exampleController.o
   setRailLength: sliderEditor.setRailLength,
   setMemberMirror: memberEditor.setMirror,
   setMemberStock: memberEditor.setStock,
+  setMemberAsFrame,
   setMemberMaterial: memberEditor.setMaterial
 });
 if (gripperPilotSession) window.blocks.gripperPilot = {

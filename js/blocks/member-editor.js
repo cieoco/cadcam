@@ -8,7 +8,7 @@ import {commitMountingEdit} from './mounting-review-ui.js';
 /** 共用剛性桿件尺寸列：選取 → 預檢整筆修改 → 一次復原 → 重算。 */
 import {isDisk,validateDisk} from './disk-plate.js';
 import { S } from './state.js';
-import { planSyringeAttachmentResize } from '../core/syringe.js';
+import { fixedSyringePointIds, planSyringeAttachmentResize } from '../core/syringe.js';
 import { memberDimensions, memberDimensionValue, planMemberDimension, mirroredJaw, dimensionLock } from './member-dimensions.js';
 import { MATERIALS, memberStock, planMemberStock, DEFAULT_HOLE_MM } from './member-stock.js';
 
@@ -22,6 +22,8 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
   const dimensionId = () => S.triSide || 'g';
   function sync() {
     const comp = selected();
+    const frameAction=el('memberSetFrame');if(frameAction){const fixed=fixedSyringePointIds(S.comps),isFrame=comp&&[comp.p1,comp.p2].every(p=>fixed.has(p?.id));frameAction.hidden=!comp||!['bar','triangle'].includes(comp.type);frameAction.disabled=!!isFrame;frameAction.textContent=isFrame?'已設為機架':'設為機架';frameAction.title='固定第一孔與第二孔，保留孔距；可一次復原';}
+
     let outputPreset=el('servoOutputPreset'),outputStatus=el('servoOutputStatus');if(!outputPreset&&el('memberMore')){outputPreset=document.createElement('button');outputPreset.id='servoOutputPreset';outputPreset.textContent='三列輸出板（軸後留一格）';outputPreset.type='button';el('memberMore').before(outputPreset);outputStatus=document.createElement('p');outputStatus.id='servoOutputStatus';outputPreset.after(outputStatus);}
     if(outputPreset){outputPreset.hidden=!(comp?.type==='bar'&&comp.isInput&&['mg995','tt','n20'].includes(comp.motorType || 'tt'))||isOutputBlank(comp);outputPreset.onclick=()=>{const plan=convertStandardOutput(comp,S.topo.params,S.comps);if(!plan.ok){notify(plan.message);return;}if((comp.motorType || 'tt')==='tt')plan.comp.ttOutput='shaft';pause();if(!commitMountingEdit(S,d=>{d.comps[d.comps.findIndex(c=>c.id===comp.id)]=plan.comp;Object.assign(d.params,plan.params);},{pushUndo,notify}))return;rebuild();draw();};outputStatus.hidden=!isOutputBlank(comp);if(isOutputBlank(comp)){const g=inspectLinkExport(comp,S.topo.params[comp.lenParam],{...S.fabrication?.export,drive:S.fabrication?.drive}),flat=normalizeExportSettings(S.fabrication?.export);outputStatus.textContent=!comp.isInput?'格孔輸出板：尚未安裝軸接頭。':(comp.motorType || 'tt')==='tt'&&comp.ttOutput==='shaft'?`TT扁軸直連：${flat.ttShaftFlatDiameterMm} × ${flat.ttShaftFlatThicknessMm} mm（直徑 × 對邊）；軸向固定待實量。`:`輸出板：軸後留${comp.standardBlank.rearMm} mm；有效${g.holes.filter(h=>/^(MG995_HORN|TT_HUB|N20_HUB)_SCREW$/.test(h.layer)).length}顆軸接頭固定螺絲（試作待實量）。`;}}
     let ttRow=el('ttOutputConnectionRow'),ttSelect=el('ttOutputConnection');

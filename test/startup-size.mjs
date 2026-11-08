@@ -40,7 +40,8 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-08：固定座板的嚴格教學辨識、任務改長同步真孔，2,125,494→2,127,533（+2,039 bytes）；無新依賴或求解器。
 // 2026-11-08：TT扁軸直連選項、共用孔槽檢查及2D孔形，首次JS約2.132MB；未新增依賴。
 // 2026-11-09：針筒板材輸出共用材料場景與逐孔檢查，增加約12 KB；不新增幾何或求解依賴。
-check('首次JS原始大小低於2.146MB',r.bytes<2146000);
+// 2026-11-09：設為機架入口與狀態提示約1.7 KB；候選驗證仍按需載入。
+check('首次JS原始大小低於2.148MB',r.bytes<2148000);
 check('扭力UI與估算核心按需載入',!r.paths.includes('js/blocks/torque-ui.js')&&!r.paths.includes('js/core/required-torque.js')&&!r.paths.includes('js/core/actuator-speed.js'));
 check('舵機座板範例按需載入',!r.paths.includes('js/blocks/servo-mount-examples.js')&&!r.paths.includes('js/blocks/motor-plate-examples.js'));
 check('標準結構設定面板按需載入',!r.paths.includes('js/blocks/standard-blank-ui.js')&&r.lazyEntries.includes('js/blocks/standard-blank-ui.js'));
