@@ -178,3 +178,37 @@ export const removeLoad = (loads, id) => (loads || []).filter(l => l.id !== id);
 /** 馬達顯示名稱。 */
 export const MOTOR_NAMES = Object.freeze({ mg995: 'MG995 伺服', tt: 'TT 馬達', n20: 'N20 馬達', linear: '線性致動器' });
 export const motorLabel = m => `馬達 ${m.id}（${MOTOR_NAMES[m.motorType] || m.motorType}）`;
+
+// ---- 速度、電流與電源（Q4；計算在 core/actuator-speed.js）----
+const amp = a => `${Math.round(a * 100) / 100} A`;
+const sec = t => (t < 10 ? t.toFixed(2) : t.toFixed(1)) + ' 秒';
+/**
+ * 行程時間與電流的白話列：[{key,label,text,bad}]。est 是 strokeEstimate 的結果；全部是估算。
+ * 伺服的時間是「至少」（負載會更慢）；直流的電流若缺空載電流，只寫下限與失速電流。
+ */
+export function speedRows(est, spec) {
+  if (!est?.ok) return [{ key: 'time', label: '行程時間', text: est?.reason || '無法估算', bad: false }];
+  const deg0 = `${Math.round(est.strokeDeg * 10) / 10}°`, rows = [];
+  if (est.cantFinish) rows.push({ key: 'time', label: '行程時間', text: `無法完成行程：最吃力處的需求已達或超過失速扭力，馬達會卡住（${deg0}）`, bad: true });
+  else if (est.kind === 'servo') rows.push({ key: 'time', label: '行程時間', text: `至少 ${sec(est.timeS)}（${spec.secPer60deg} 秒／60° × ${deg0}；這是無負載速度，有負載會更慢）`, bad: false });
+  else rows.push({ key: 'time', label: '行程時間', text: `約 ${sec(est.timeS)}（轉 ${deg0}；無負載 ${sec(est.noLoadTimeS)}，慢 ${Math.round((est.slowdown - 1) * 100)}%；最吃力處約 ${Math.round(est.peakRpm)} rpm）`, bad: false });
+  const c = est.current;
+  if (c?.amps !== null && c?.amps !== undefined) rows.push({ key: 'current', label: '峰值電流', text: `約 ${amp(c.amps)}（失速時 ${amp(c.upperA)}）`, bad: false });
+  else if (c?.lowerA !== null && c?.lowerA !== undefined && c.lowerA >= c.upperA) rows.push({ key: 'current', label: '峰值電流', text: `約 ${amp(c.upperA)}（已達失速電流）`, bad: false });
+  else if (c?.lowerA !== null && c?.lowerA !== undefined) rows.push({ key: 'current', label: '峰值電流', text: `至少約 ${amp(c.lowerA)}（${c.reason}，實際略高；失速時 ${amp(c.upperA)}）`, bad: false });
+  else rows.push({ key: 'current', label: '峰值電流', text: `未知（${c?.reason || '規格沒有電流資料'}）`, bad: false });
+  return rows;
+}
+/**
+ * 電源建議。只講能從規格得到的事：電壓對應的 AA 電池數、需要能供應的電流；不保證電池一定撐得住。
+ * 電壓：每顆 AA 鹼性標稱 1.5 V（串聯相加）。
+ */
+export function powerAdvice(est, spec) {
+  if (!spec) return [];
+  const out = [], cells = Math.round(spec.voltage / 1.5);
+  out.push(`規格電壓 ${spec.voltage} V：${cells} 顆 AA 鹼性電池串聯標稱 ${cells * 1.5} V，與規格相符；電壓低於規格，轉速與扭力都會變小。`);
+  const c = est?.current;
+  if (c?.upperA !== null && c?.upperA !== undefined) out.push(`${spec.label.split(' ')[0]} 失速電流 ${amp(c.upperA)}，電源與驅動板要能供應這麼大的瞬間電流；${c.amps !== null ? `這個作品最吃力處約 ${amp(c.amps)}。` : `這個作品最吃力處至少約 ${amp(c.lowerA)}。`}電池在大電流下電壓會下降，請實測。`);
+  else out.push('規格沒有電流資料。多顆馬達同時動作或卡住時，電流可能超過電池或穩壓器的能力，請留餘裕並實測。');
+  return out;
+}

@@ -10,7 +10,7 @@ export const nmmToKgfcm = v => v / KGFCM_TO_NMM;
 const s = (id, label, kind, voltage, kgfcm, speed, extra) => Object.freeze({
   id, label, kind, voltage, stallTorqueNmm: kgfcmToNmm(kgfcm),
   secPer60deg: speed.sec ?? null, noLoadRpm: speed.rpm ?? null,
-  stallCurrentA: extra.amp ?? null,
+  stallCurrentA: extra.amp ?? null, noLoadCurrentA: extra.i0 ?? null,
   gearboxLimitNmm: extra.limit ? kgfcmToNmm(extra.limit) : null,
   massG: extra.mass ?? null, source: extra.src, note: extra.note || '', measured: false
 });
@@ -38,7 +38,7 @@ export const defaultSpecIdForMotorType = type => DEFAULT_BY_MOTOR_TYPE[type] || 
 /** 無負載轉速 rpm：直流直接取；伺服由 s／60° 換算（10 ÷ 秒）。 */
 export const noLoadRpmOf = spec => spec?.noLoadRpm ?? (spec?.secPer60deg > 0 ? 10 / spec.secPer60deg : null);
 
-const NUM_KEYS = ['stallTorqueNmm', 'noLoadRpm', 'secPer60deg', 'stallCurrentA', 'gearboxLimitNmm', 'massG'];
+const NUM_KEYS = ['stallTorqueNmm', 'noLoadRpm', 'secPer60deg', 'stallCurrentA', 'noLoadCurrentA', 'gearboxLimitNmm', 'massG'];
 
 /**
  * 預設＋作品覆寫。override 只認有限數值（stallTorqueKgfcm 會換成 N·mm）與 label／note；

@@ -34,7 +34,6 @@ const num = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(val
 const roundTenth = (value, fallback = 0) => Number(num(value, fallback).toFixed(1));
 const safeId = value => typeof value === 'string' && SAFE_ID.test(value);
 const uniqueSafeIds = values => Array.from(new Set((values || []).filter(safeId)));
-// 負載標記：輕量保存，完整檢查見 load-schema.js。
 const keepLoads = a => (Array.isArray(a) ? a : []).filter(l => l && safeId(l.id) && l.massG >= 0 && l.at && typeof l.at === 'object').slice(0, 24).map(clone);
 
 // 存檔長度是已提交的幾何，不再套用建立/編輯時的吸附或小數位數。

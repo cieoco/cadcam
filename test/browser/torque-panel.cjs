@@ -1,6 +1,6 @@
 // 扭力面板瀏覽器驗收（沿用 six-bar-lift.cjs 的寫法）：桌機與手機寬度各跑一次。
 // 用法：TEST_URL=http://127.0.0.1:8023 [SHOT_DIR=output/shots] node test/browser/torque-panel.cjs
-// 涵蓋：新增負載的預設接點不是固定點（A1）、手機開面板時下方抽屜收合且面板可捲動、關閉鈕可按（A3）。
+// 涵蓋：新增負載的預設接點不是固定點（A1）、手機開面板時下方抽屜收合且面板可捲動、關閉鈕可按（A3）、速度與電流區塊（B2）。
 const {revealExample}=require('./_example-catalog.cjs');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const assert=require('node:assert/strict');
@@ -25,6 +25,7 @@ const fs=require('node:fs');if(shotDir)fs.mkdirSync(shotDir,{recursive:true});
   const panel=page.locator('#torquePanel');await panel.waitFor();
   await page.locator('#torquePanel .tq-sum').waitFor();
   assert.match(await panel.locator('.tq-sum').innerText(),/最大需求 .* kgf·cm @ .*使用率/);
+  const speed=await panel.locator('.tq-speed').innerText();assert.match(speed,/行程時間/);assert.match(speed,/峰值電流/);   // B2
   if(viewport.width<500){   // A3：手機開面板後抽屜收合，面板在視窗內且能捲到底，關閉鈕不被捲走
    assert.equal(await page.evaluate(()=>document.body.dataset.sheet||'collapsed'),'collapsed','手機開面板時抽屜收合');
    const sc=await panel.evaluate(el=>({sh:el.scrollHeight,ch:el.clientHeight}));

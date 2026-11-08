@@ -3203,9 +3203,10 @@ function collectCncPartsAndFrameWarnings(settings) {
   });
   return { cncParts, frameWarnings };
 }
-// L5b：下載「製作包」HTML（板件清單＋五金清單＋組裝步驟，可列印）。
+// L5b：下載製作包 HTML。
 async function saveBuildPack(html,title,partCount) {
   html=await gc('addGridToBuildPack',html,S);
+  html=await import('./power-check.js').then(m=>m.addPowerCheckToBuildPack(html,S));
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

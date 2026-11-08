@@ -4,7 +4,7 @@ import { BLOCK_EXAMPLES } from '../js/blocks/examples.js';
 import { requiredTorque, evaluateActuator, findMotors } from '../js/core/required-torque.js';
 import { getActuatorSpec, listActuatorSpecs, kgfcmToNmm } from '../js/core/actuator-specs.js';
 import { normalizeLoads } from '../js/blocks/load-schema.js';
-import { summaryText, noteLines, curveGeometry, pathOf, suggestions, nextLoadId, attachPoints, defaultAttachPoint, SHRINK_IMPRACTICAL, attachBars, loadFromForm, upsertLoad, removeLoad, describeAttach, motorLabel, fmtKg, pct } from '../js/blocks/torque-model.js';
+import { summaryText, noteLines, curveGeometry, pathOf, suggestions, nextLoadId, attachPoints, defaultAttachPoint, SHRINK_IMPRACTICAL, speedRows, powerAdvice, attachBars, loadFromForm, upsertLoad, removeLoad, describeAttach, motorLabel, fmtKg, pct } from '../js/blocks/torque-model.js';
 
 const near = (a, b, t) => Math.abs(a - b) <= t;
 const stick = { type: 'bar', id: 'Arm', color: '#3498db', p1: { id: 'O', type: 'fixed', x: 0, y: 0, physicalMotor: '1' }, p2: { id: 'E', type: 'floating', x: 160, y: 0 }, lenParam: 'L1', isInput: true, fixedLen: true, physicalMotor: '1', motorType: 'mg995', stock: { widthMm: 13, thicknessMm: 3, material: 'plywood' } };

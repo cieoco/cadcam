@@ -5,13 +5,13 @@ import { S, activateMotor, frozenMotorAngles } from './state.js';
 import { toSnapshot } from './schema.js';
 import {
   LEVELS, fmtKg, pct, summaryText, noteLines, curveGeometry, pathOf, suggestions, nextLoadId, attachPoints, attachBars,
-  describeAttach, loadFromForm, upsertLoad, removeLoad, motorLabel, defaultAttachPoint
+  describeAttach, loadFromForm, upsertLoad, removeLoad, motorLabel, defaultAttachPoint, speedRows, powerAdvice
 } from './torque-model.js';
 import { setSheet, sheetMode } from './mobile-workspace.js';
 
 let core = null;
-const loadCore = () => core ||= Promise.all([import('../core/required-torque.js'), import('../core/actuator-specs.js')])
-  .then(([rt, sp]) => ({ ...rt, ...sp }));
+const loadCore = () => core ||= Promise.all([import('../core/required-torque.js'), import('../core/actuator-specs.js'), import('../core/actuator-speed.js')])
+  .then(([rt, sp, sd]) => ({ ...rt, ...sp, ...sd }));
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const CSS = `
@@ -41,6 +41,9 @@ const ui = { poseNote: '', motorId: null, specs: {}, editing: null, formError: '
 
 const snapshot = () => toSnapshot(S.comps, S.topo, S.counter, { activeMotor: S.activeMotor, motorAngles: frozenMotorAngles(), fabrication: S.fabrication, modules: S.modules });
 const modelKey = () => JSON.stringify([S.comps, S.topo.loads, S.topo.gravity, { ...S.topo.params, theta: 0 }, S.activeMotor, S.modules, ui.editing, ui.formError]);
+
+/** 面板裡選過的動力規格（只存在這次開啟的頁面裡；製作包的動力檢查會參考）。 */
+export const chosenSpecIds = () => ({ ...ui.specs });
 
 export function closeTorque() {
   clearInterval(timer); timer = null; panel?.remove(); panel = null; lastKey = '';
@@ -101,6 +104,9 @@ async function render(host) {
   const geo = curveGeometry(result, spec, ev);
   if (geo) body += curveSvg(geo, motor);
   if (result.ok) body += `<div class="tq-row"><button class="tq-primary" data-act="worst">顯示最吃力姿態</button><span class="tq-note" data-pose-note>${esc(ui.poseNote || (motor.id === String(S.activeMotor) ? '' : '會改成控制這顆馬達'))}</span></div>`;
+  const est = c.strokeEstimate(result, spec);
+  if (result.ok) body += `<h4>速度與電流（估算）</h4><ul class="tq-speed">${speedRows(est, spec).map(r => `<li${r.bad ? ' style="color:#c0392b;font-weight:700"' : ''}><b>${esc(r.label)}</b>：${esc(r.text)}</li>`).join('')}</ul>
+   <details><summary>電源建議</summary><ul>${powerAdvice(est, spec).map(t => `<li>${esc(t)}</li>`).join('')}</ul></details>`;
   const tips = suggestions(result, ev, spec, { specs, flatPeakNmm: flatPeak });
   if (ev.ok) body += `<h4>${ev.level === 'green' ? '判定' : '建議（估算）'}</h4><ul>${ev.level === 'green' ? '<li>目前在綠燈範圍，不需要調整。</li>' : tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`;
   body += `<p class="tq-note">${esc(spec.measured ? '規格為使用者實測值。' : '規格是廠商標示值，市售品常較弱，建議實測後再信任。')}${spec.note ? esc(' ' + spec.note) : ''}</p>`;

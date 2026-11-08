@@ -48,5 +48,5 @@ export function register(examples, lessons) {
     examples.push({ id, title, note: use, snapshot });
     lessons[id] = { group: 'challenge', level: '練習', use, try: steps };
   }
-  return import('./servo-mount-examples.js').then(m => m.register(examples, lessons));
+  return Promise.all([import('./servo-mount-examples.js'), import('./torque-arm-examples.js')]).then(ms => ms.forEach(m => m.register(examples, lessons)));
 }
