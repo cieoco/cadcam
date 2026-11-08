@@ -108,7 +108,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
   return { linksToDraw, countMissing };
 }
 
-export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds, unusedIds = new Set(), gearPinIds, pulleyPinIds, camFollowerIds,
+export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds, unusedIds = new Set(), holeRadii = new Map(), gearPinIds, pulleyPinIds, camFollowerIds,
   workpieceIds, dragId, sliderMountInfo, project, onPointerDown, registerUpdate, mountedBaseIds = new Set(), shaftCenterIds = new Set(), touchTargets = false, pointLabel = id => id }) {
   const size = 14;
   Object.keys(points).forEach(id => {
@@ -117,13 +117,15 @@ export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterI
     const rectangle = ground && !motor && !cam && !mount;
     // 已安裝模組的固定孔：鎖在宿主上，畫成虛線圓環而非地錨方塊。
     const mountedBase = rectangle && mountedBaseIds.has(id);
-    // 手機接點可點區使用螢幕像素，不隨模型縮小；保留原來的小點作精確位置標記。
-    const touchHit = touchTargets ? svgEl('circle') : null;
+    // 可點區使用螢幕像素；實際孔圈另依毫米投影，不因縮小而失去點選範圍。
+    const physicalRadius=holeRadii.get(id), physical=Number.isFinite(physicalRadius)&&physicalRadius>0&&!rectangle&&!motor&&!cam;
+    const touchHit = touchTargets || physical ? svgEl('circle') : null;
     if (touchHit) {
       touchHit.setAttribute('fill', motor ? 'rgba(231,76,60,0.08)' : 'transparent');
       touchHit.setAttribute('stroke', motor ? 'rgba(146,43,33,0.45)' : 'none');
       touchHit.setAttribute('stroke-width', 1);
       touchHit.setAttribute(motor ? 'data-motor-hit' : 'data-id', id);
+      touchHit.setAttribute('data-node-hit', id);
       touchHit.setAttribute('role', 'button');
       const label=pointLabel(id);
       touchHit.setAttribute('aria-label', motor ? `動力軸心 ${label}：設定馬達或伺服角度` : label.startsWith('接點 ')?label:`接點 ${label}`);
@@ -147,12 +149,16 @@ export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterI
       node.style.display = valid ? '' : 'none'; if (touchHit) touchHit.style.display = node.style.display;
       if (!valid) return;
       const p = project(point);
+      if(physical){
+        const rim=project({x:point.x+physicalRadius,y:point.y}),r=Math.hypot(rim.x-p.x,rim.y-p.y);
+        node.setAttribute('r',r);node.style.strokeWidth=String(r*.2);node.setAttribute('data-hole-diameter-mm',physicalRadius*2);
+      }
       if (rectangle && !mountedBase) { node.setAttribute('x', p.x - size / 2); node.setAttribute('y', p.y - size / 2); }
       else { node.setAttribute('cx', p.x); node.setAttribute('cy', p.y); }
       if (touchHit) {
         const ctm = svg.getScreenCTM?.(), screenScale = ctm ? Math.hypot(ctm.a, ctm.b) : 1;
         touchHit.setAttribute('cx', p.x); touchHit.setAttribute('cy', p.y);
-        touchHit.setAttribute('r', 24 / (screenScale || 1));
+        touchHit.setAttribute('r', (touchTargets ? 24 : 9) / (screenScale || 1));
       }
     };
     update(points); registerUpdate(update);

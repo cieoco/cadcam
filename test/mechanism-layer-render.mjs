@@ -72,4 +72,15 @@ plainUpdates[0]({B:{x:70,y:15}});
 check('普通孔觸控區隨動態位置更新',plainHit.getAttribute('cx')===plainDot.getAttribute('cx') && plainHit.getAttribute('cy')==='15');
 plainUpdates[0]({});
 check('不存在的普通孔不留透明攔截區',plainHit.style.display==='none');
+// Actual lattice holes follow the mm projection, while hit targets stay usable.
+for(const touchTargets of [false,true]){
+ const zoomSvg=new FakeElement('svg'),zoomUpdates=[];let scale=4;
+ zoomSvg.getScreenCTM=()=>({a:1,b:0});
+ renderNodes({points:{H:{x:8,y:0}},svg:zoomSvg,groundIds:new Set(),motorCenterIds:new Set(),camCenterIds:new Set(),hiddenPointIds:new Set(),gearPinIds:new Set(),pulleyPinIds:new Set(),camFollowerIds:new Set(),workpieceIds:new Set(),unusedIds:new Set(['H']),holeRadii:new Map([['H',1.6]]),sliderMountInfo:()=>null,project:p=>({x:p.x*scale,y:p.y*scale}),onPointerDown:(_e,id)=>picked=id,registerUpdate:fn=>zoomUpdates.push(fn),touchTargets});
+ const [target,hole]=zoomSvg.children,large=Number(hole.getAttribute('r')),hitRadius=target.getAttribute('r');
+ scale=1;zoomUpdates[0]({H:{x:8,y:0}});
+ check(`孔徑隨縮放同比變小（${touchTargets?'手機':'桌機'}）`,Math.abs(large/Number(hole.getAttribute('r'))-4)<1e-9&&hole.getAttribute('data-hole-diameter-mm')==='3.2'&&Math.abs(Number(hole.style.strokeWidth)-.32)<1e-9);
+ check('透明命中區保持尺寸且可選同孔',target.getAttribute('r')===hitRadius&&target.getAttribute('fill')==='transparent'&&hole.getAttribute('data-unused')==='');
+ target.listeners.get('pointerdown')({});check('縮小後仍選到原孔',picked==='H');
+}
 report('mechanism-layer-render');

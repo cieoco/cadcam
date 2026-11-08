@@ -2056,7 +2056,13 @@ function drawNow() {
   const workpieceIds = new Set(vComps.filter(c=>c.type==='workpiece'&&c.p1).map(c=>c.p1.id));
   const hiddenPointIds = new Set(Object.keys(pts).filter(id => isHiddenSliderRailPoint(id) || isSliderMountPoint(id)));
   vComps.filter(c=>c.boxPanel).forEach(c=>[c.p1,c.p2].forEach(p=>hiddenPointIds.add(p.id)));
+  const nodeHoleRadii = new Map();
+  for(const c of vComps.filter(c=>['bar','triangle'].includes(c.type))){
+    for(const p of [c.p1,c.p2,c.p3].filter(Boolean))nodeHoleRadii.set(p.id,Math.max(nodeHoleRadii.get(p.id)||0,memberHoleDiameter(c,Settings.exportSettings())/2));
+    for(const p of c.holes||[])nodeHoleRadii.set(p.id,Math.max(nodeHoleRadii.get(p.id)||0,(p.diameter||3.2)/2));
+  }
   renderNodes({
+    holeRadii: nodeHoleRadii,
     shaftCenterIds: new Set(vComps.filter(c=>c.isInput&&c.ttOutput==='shaft'&&(c.motorType || 'tt')==='tt').map(c=>c.p1.id)),
     points: pts, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds, unusedIds: Exporters.undrilledIds(S.comps,S.modules,S.topo.params), pointLabel: id => pointDisplayName(vComps,id),
     gearPinIds, pulleyPinIds, camFollowerIds, workpieceIds, dragId: S.dragId,
