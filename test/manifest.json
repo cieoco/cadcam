@@ -290,7 +290,8 @@
     "test/example-frame-stock.mjs",
     "test/h01-frame-clamp.mjs",
     "test/iq-linq-lift.mjs",
-    "test/required-torque.mjs"
+    "test/required-torque.mjs",
+    "test/torque-panel-model.mjs"
   ],
   "version": 1
 }

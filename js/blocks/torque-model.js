@@ -1,0 +1,150 @@
+// 扭力面板的純函式（無 DOM）：曲線座標、建議文字、負載標記編輯。介面在 torque-ui.js。
+// 單位：內部 N·mm，顯示 kgf·cm。所有建議都是「估算」，依 docs/RESEARCH-ACTUATOR-TORQUE.md §3.4。
+import { nmmToKgfcm } from '../core/actuator-specs.js';
+
+export const LEVELS = Object.freeze({
+  green: Object.freeze({ label: '綠燈', color: '#1e8e4e', hint: '夠用' }),
+  yellow: Object.freeze({ label: '黃燈', color: '#c98a00', hint: '勉強，建議改善' }),
+  red: Object.freeze({ label: '紅燈', color: '#c0392b', hint: '不夠或太吃力' })
+});
+const fin = Number.isFinite;
+export const kg = nmm => (fin(nmm) ? nmmToKgfcm(nmm) : null);
+export const fmtKg = nmm => (fin(nmm) ? nmmToKgfcm(nmm).toFixed(2) : '—');
+export const pct = u => (fin(u) ? `${Math.round(u * 100)}%` : '—');
+const deg = t => `${Math.round(t * 10) / 10}°`;
+
+/** 一行摘要：最大需求 x kgf·cm @ θ°，使用率 %（顏色等級）。 */
+export function summaryText(result, ev) {
+  if (!result?.ok || !result.summary) return result?.reason || '無法估算';
+  const s = `最大需求 ${fmtKg(result.summary.maxAbsNmm)} kgf·cm @ ${deg(result.summary.worstTheta)}`;
+  if (!ev?.ok) return s;
+  return `${s}，使用率 ${pct(ev.utilization)}（${LEVELS[ev.level].label}）`;
+}
+
+const NOTE_FLAGS = [
+  ['nearDeadPoint', n => `${n} 個角度接近死點（輸出幾乎不動），該處扭力數值會失真，曲線上以菱形標記。`],
+  ['singular', n => `${n} 個角度的機構卡在奇異點，無法估算，曲線上以叉號標記。`],
+  ['nearSingular', n => `${n} 個角度接近奇異點，已縮小差分步長估算。`],
+  ['invalid', n => `${n} 個角度機構無解（連桿接不起來），略過。`]
+];
+
+/** 假設、略過項目與旗標的白話清單。 */
+export function noteLines(result) {
+  if (!result) return [];
+  const out = [...(result.assumptions || [])];
+  for (const s of result.skipped || []) out.push(`略過 ${s.id}：${s.reason}`);
+  for (const [flag, make] of NOTE_FLAGS) {
+    const n = (result.samples || []).filter(x => x.flags.includes(flag)).length;
+    if (n) out.push(make(n));
+  }
+  if (result.gearStages > 0) out.push(`齒輪 ${result.gearStages} 級，每級效率 ${Math.round((result.efficiency || 0.9) * 100)}%（預設值，未實測）`);
+  return out;
+}
+
+/**
+ * 曲線座標。畫的是 |需求扭力|（正負都會吃力），門檻線與帶狀底色對應 evaluateActuator 的綠／黃界線。
+ * size = {w,h}；回傳可直接餵 SVG 的座標。無資料回傳 null。
+ */
+export function curveGeometry(result, spec, ev, size = { w: 340, h: 180 }) {
+  if (!result?.ok || !result.samples?.length || !spec) return null;
+  const { w, h } = size, m = { l: 44, r: 10, t: 10, b: 26 };
+  const pw = w - m.l - m.r, ph = h - m.t - m.b;
+  const [x0, x1] = result.thetaRange, xs = x1 > x0 ? x1 - x0 : 1;
+  const stall = spec.stallTorqueNmm, [gT, yT] = ev?.thresholds || [0.25, 0.5];
+  const peak = result.summary?.maxAbsNmm || 0;
+  const ymax = Math.max(peak, stall * yT, 1e-6) * 1.15;
+  const X = t => m.l + (t - x0) / xs * pw, Y = v => m.t + ph - Math.min(v, ymax) / ymax * ph;
+  const segments = [], marks = []; let cur = [];
+  for (const s of result.samples) {
+    if (s.torqueNmm === null || !fin(s.torqueNmm)) { if (cur.length) segments.push(cur); cur = []; if (s.flags.some(f => f === 'singular' || f === 'invalid')) marks.push({ x: X(s.theta), y: Y(0), kind: 'singular', theta: s.theta }); continue; }
+    cur.push({ x: X(s.theta), y: Y(Math.abs(s.torqueNmm)) });
+    if (s.flags.includes('nearDeadPoint')) marks.push({ x: X(s.theta), y: Y(Math.abs(s.torqueNmm)), kind: 'dead', theta: s.theta });
+  }
+  if (cur.length) segments.push(cur);
+  const lines = [
+    { key: 'green', nmm: stall * gT, color: LEVELS.green.color, label: `綠 ≤ ${pct(gT)}` },
+    { key: 'yellow', nmm: stall * yT, color: LEVELS.yellow.color, label: `黃 ≤ ${pct(yT)}` }
+  ];
+  if (stall <= ymax) lines.push({ key: 'red', nmm: stall, color: LEVELS.red.color, label: '失速 100%' });
+  if (spec.gearboxLimitNmm != null && spec.gearboxLimitNmm <= ymax) lines.push({ key: 'gearbox', nmm: spec.gearboxLimitNmm, color: LEVELS.red.color, label: '齒輪箱上限', dashed: true });
+  for (const l of lines) l.y = Y(l.nmm);
+  const bands = [
+    { color: LEVELS.green.color, y1: Y(stall * gT), y2: Y(0) },
+    { color: LEVELS.yellow.color, y1: Y(stall * yT), y2: Y(stall * gT) },
+    { color: LEVELS.red.color, y1: Y(ymax), y2: Y(stall * yT) }
+  ];
+  const nice = (a, b, n) => { const step = (b - a) / n, mag = Math.pow(10, Math.floor(Math.log10(step))), f = step / mag, s = (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * mag; return Array.from({ length: Math.floor(b / s) + 1 }, (_, i) => i * s); };
+  const yTicks = nice(0, nmmToKgfcm(ymax), 4).map(v => ({ y: Y(v / nmmToKgfcm(1)), label: String(Math.round(v * 100) / 100) }));
+  const xTicks = nice(0, xs, 4).map(v => ({ x: X(x0 + v), label: String(Math.round((x0 + v) * 10) / 10) }));
+  const worst = result.summary ? { x: X(result.summary.worstTheta), y: Y(result.summary.maxAbsNmm), theta: result.summary.worstTheta } : null;
+  return { w, h, plot: { l: m.l, r: w - m.r, t: m.t, b: m.t + ph }, segments, marks, lines, bands, yTicks, xTicks, worst, ymaxNmm: ymax };
+}
+export const pathOf = seg => seg.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join('');
+
+/**
+ * 黃／紅燈時的白話建議（全部是估算）。
+ * opts.specs：可挑選的規格清單；opts.flatPeakNmm：改成平放後的最大需求（UI 另跑一次得到，可省略）。
+ */
+export function suggestions(result, ev, spec, { specs = [], flatPeakNmm = null } = {}) {
+  if (!result?.ok || !ev?.ok || !spec || ev.level === 'green') return [];
+  const out = [], peak = ev.peakNmm, g = ev.thresholds[0], util = ev.utilization;
+  const eta = result.efficiency || 0.9;
+  if (ev.cantLift) out.push(`在最吃力的姿態（${deg(ev.worstTheta)}），需求超過這個動力的失速扭力，估算舉不起來。`);
+  else if (ev.exceedsGearbox) out.push('需求超過齒輪箱建議的瞬間上限，長期使用齒輪可能受損。');
+  const ratio = util / (g * eta);
+  if (ratio > 1) {
+    const r1 = (Math.ceil(ratio * 10) / 10).toFixed(1);
+    out.push(`加一級減速齒輪，約 ${r1}:1 可估到綠燈（已含每級效率 ${Math.round(eta * 100)}%）。代價是輸出轉速變成約 1/${r1}，也多一級齒輪要做。${ratio > 8 ? '比值偏大，通常要兩級以上。' : ''}`);
+  }
+  if (util > g) out.push(`縮短手臂或把負載移近軸心：需求大致與力臂成正比，縮到約 ${Math.max(1, Math.floor(g / util * 100))}% 長度可估到綠燈（質量不變時）。`);
+  if (flatPeakNmm !== null && fin(flatPeakNmm) && flatPeakNmm < peak * 0.9) {
+    out.push(`如果機構其實是平放（在桌面上轉），重力不產生扭力：最大需求約 ${fmtKg(flatPeakNmm)} kgf·cm（使用率 ${pct(flatPeakNmm / spec.stallTorqueNmm)}）。把上方重力改成「平放」可重算。`);
+  }
+  const better = specs.filter(s => s.id !== spec.id && s.kind === spec.kind && s.stallTorqueNmm > spec.stallTorqueNmm && peak / s.stallTorqueNmm <= g && !(s.gearboxLimitNmm != null && peak > s.gearboxLimitNmm))
+    .sort((a, b) => a.stallTorqueNmm - b.stallTorqueNmm).slice(0, 2);
+  if (better.length) out.push(`改用清單中更強的型號：${better.map(s => `${s.label}（約 ${pct(peak / s.stallTorqueNmm)}）`).join('、')}。規格為標示值，市售品多半較弱。`);
+  else out.push('清單內沒有更強又能到綠燈的同類型型號；可考慮加齒輪或減輕負載。');
+  return out;
+}
+
+// ---- 負載標記編輯（存在 S.topo.loads，格式見 load-schema.js）----
+export function nextLoadId(loads) {
+  const used = new Set((loads || []).map(l => l.id));
+  for (let i = 1; ; i++) if (!used.has(`Load${i}`)) return `Load${i}`;
+}
+/** 可掛接的接點：所有零件的 p1/p2/p3 去重，標出所屬零件。 */
+export function attachPoints(comps) {
+  const seen = new Map();
+  for (const c of comps || []) for (const k of ['p1', 'p2', 'p3']) { const p = c?.[k]; if (p?.id && !seen.has(p.id)) seen.set(p.id, `${p.id}（${c.id}）`); }
+  return [...seen].map(([id, label]) => ({ id, label }));
+}
+/** 可用「零件上位置」掛接的零件（有 p1、p2 的桿）。 */
+export const attachBars = comps => (comps || []).filter(c => c?.p1?.id && c?.p2?.id && c.id).map(c => ({ id: c.id, label: c.id }));
+export const describeAttach = l => (l.at?.pointId ? `接點 ${l.at.pointId}` : `${l.at?.compId} 上 (${l.at?.u}, ${l.at?.v}) mm`);
+
+/** 表單值 → 負載；錯誤回傳 {error}。form = {id,name,massG,mode:'point'|'bar',pointId,compId,u,v,fx,fy}（字串或數字皆可）。 */
+export function loadFromForm(form) {
+  const num = (v, d) => (v === '' || v === undefined || v === null ? d : Number(v));
+  const massG = num(form.massG, NaN);
+  if (!fin(massG) || massG < 0) return { error: '質量請填 0 以上的數字（克）' };
+  const load = { id: form.id, massG };
+  if (form.name && String(form.name).trim()) load.name = String(form.name).trim().slice(0, 24);
+  if (form.mode === 'bar') {
+    const u = num(form.u, NaN), v = num(form.v, 0);
+    if (!form.compId || !fin(u) || !fin(v)) return { error: '請選零件並填沿桿距離 u（mm）' };
+    load.at = { compId: form.compId, u, v };
+  } else {
+    if (!form.pointId) return { error: '請選掛接的接點' };
+    load.at = { pointId: form.pointId };
+  }
+  const fx = num(form.fx, 0), fy = num(form.fy, 0);
+  if (!fin(fx) || !fin(fy)) return { error: '外力請填數字（N）' };
+  if (fx || fy) load.force = { x: fx, y: fy };
+  return { load };
+}
+export const upsertLoad = (loads, load) => (loads || []).some(l => l.id === load.id) ? loads.map(l => l.id === load.id ? load : l) : [...(loads || []), load];
+export const removeLoad = (loads, id) => (loads || []).filter(l => l.id !== id);
+
+/** 馬達顯示名稱。 */
+export const MOTOR_NAMES = Object.freeze({ mg995: 'MG995 伺服', tt: 'TT 馬達', n20: 'N20 馬達', linear: '線性致動器' });
+export const motorLabel = m => `馬達 ${m.id}（${MOTOR_NAMES[m.motorType] || m.motorType}）`;
