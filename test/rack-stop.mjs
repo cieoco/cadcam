@@ -1,3 +1,4 @@
+import {legacyFrameStock} from './fixtures/legacy-frame-stock.mjs';
 // L6b（走通舉升＋夾取 第 6 包）：MG995 機身在升降低處會撞小齒輪與機架 → 限制升降行程。
 // 限位是實體的：把齒條長槽一端縮短（slot.trimStart／trimEnd，mm），導銷碰到槽端就停。
 // 干涉檢查會建議縮短多少（suggestRackStops），套用後在新行程內不再干涉。
@@ -64,6 +65,7 @@ S.selectedLinkId = S.selectedTriangleId = S.selectedSliderId = S.selectedGearId 
 const q = () => {};
 const ed = createModuleEditor({ pushUndo: q, rebuild: q, draw: q, transient: q, downloadJson: q, viewCenter: () => ({ x: 0, y: 0 }), loadLibraryText: () => null, saveLibraryText: q });
 ed.insertBuiltin('rack-lift'); ed.insertBuiltin('gear-gripper');
+legacyFrameStock(S.comps); // Pin the historical collision/trim witnesses, not current example envelopes.
 const L = S.modules[0], G = S.modules[1];
 S.selectedGearId = S.comps.find(c => c.moduleId === G.id && c.type === 'gear').id;
 ed.mountTo(L.id, L.outputs[0].id);

@@ -1,3 +1,4 @@
+import {lessonMechanismComps} from './lesson-structure.js';
 import {checkMaterialInterference} from './material-interference.js';
 /** 升降托斗的窄域組立驗證；升降數學交回原任務，材料交回既有3D模型。 */
 import { faceCandidateModel } from './face-candidate.js';
@@ -7,7 +8,7 @@ function computeLiftBucket(snapshot, planLift) {
   const fail = message => ({ok:false,issues:[taskIssue('LIFT_BUCKET_INVALID',message)]});
   if(!Array.isArray(snapshot?.modules)||!Array.isArray(snapshot?.comps)||snapshot.comps.some(c=>!c)||snapshot.modules.some(m=>!m))return fail('需要完整升降托斗作品。');
   const root = snapshot.modules?.find(m=>m?.id==='RigidGroup'), lift = snapshot.modules?.find(m=>m?.id==='Lift');
-  if (!root || !lift || snapshot.modules.length!==5 || snapshot.comps.length!==12) return fail('請保留平行升降臂與四板托斗結構。');
+  if (!root || !lift || snapshot.modules.length!==5 || lessonMechanismComps(snapshot.comps).length!==12) return fail('請保留平行升降臂與四板托斗結構。');
   if (root.mount && (root.mount.orient || root.mount.to?.module!=='Lift' || root.mount.to.output!=='tool')) return fail('托斗須安裝在保持姿態工具架輸出。');
   const output=lift.outputs?.find(o=>o.id==='tool');
   if(output?.at!=='C'||output.body?.id!=='Link3'||output.body.kind!=='bar')return fail('工具架須保留 C 點與 CD 輸出桿。');

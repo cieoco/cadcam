@@ -1,3 +1,4 @@
+import {lessonMechanismComps} from './lesson-structure.js';
 import { planLiftBucket } from './lift-bucket-workflow.js';
 /** 平行四連桿窄教學任務。求角只在原solver上作高度二分，未另造幾何求解。 */
 import { compileTopology } from '../core/topology.js';
@@ -8,7 +9,7 @@ export const PARALLEL_LIFT_LIMITS=Object.freeze({minArmMm:32,maxArmMm:120,startD
 export function planParallelLift(snapshot){
   if(Number(snapshot?.params?.liftBucket)===1)return planLiftBucket(snapshot,planParallelLift);
   const fail=(code,message,targets=[])=>({ok:false,issues:[taskIssue(code,message,targets)]});
-  const comps=snapshot?.comps,p=snapshot?.params;
+  const comps=lessonMechanismComps(snapshot?.comps),p=snapshot?.params;
   if(!Array.isArray(comps)||!p||typeof p!=='object'||Array.isArray(p)||comps.length!==5||comps.some(c=>!c||typeof c!=='object'||Array.isArray(c)))return fail('UNSUPPORTED_STRUCTURE','此任務僅適用既有平行四連桿五零件作品。');
   const byId=Object.fromEntries(comps.map(c=>[c.id,c])),a=byId.Anchor1,b=byId.Anchor2,l=byId.Link1,r=byId.Link2,cd=byId.Link3;
   if(a?.type!=='anchor'||b?.type!=='anchor'||[l,r,cd].some(c=>c?.type!=='bar')||snapshot.modules?.length||comps.some(c=>c.moduleId))return fail('UNSUPPORTED_STRUCTURE','結構已改造，請核對平行四連桿。');
@@ -22,7 +23,7 @@ export function planParallelLift(snapshot){
   const arm=p.LL1,startHeight=p.parallelStartHeight,endHeight=p.parallelEndHeight;
   if(arm<32||arm>120||[startHeight,endHeight].some(v=>typeof v!=='number'||!Number.isFinite(v)||v<0||v>120))return fail('INVALID_DIMENSIONS','活動臂32–120mm；起終高度須為0–120mm有限數字。');
   let topo;
-  try{topo=compileTopology(comps,{params:{...p}},new Set());}catch(_){return fail('MOTION_COMPILE_FAILED','編譯未完成。');}
+  try{topo=compileTopology(snapshot.comps,{params:{...p}},new Set());}catch(_){return fail('MOTION_COMPILE_FAILED','編譯未完成。');}
   const sample=theta=>{const sol=solveTopology(topo,{thetaDeg:theta,motorAngles:{'1':theta}});return sol?.isValid!==false&&sol?.points?.C&&sol.points.A?{theta,height:sol.points.C.y-sol.points.A.y,points:sol.points}:null;};
   let lo,hi;
   try{lo=sample(0);hi=sample(80);}catch(_){return fail('MOTION_SOLVE_FAILED','教學分支端點求解未完成。');}

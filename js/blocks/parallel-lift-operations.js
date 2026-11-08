@@ -1,3 +1,5 @@
+import {resizeStandardBlank} from './standard-blank.js';
+import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import { prepareConnectionWork } from './connection-work.js';
 import { getExample } from './examples.js';
 import { planParallelLift } from './parallel-lift-workflow.js';
@@ -14,7 +16,7 @@ export function prepareParallelLiftOperation(sourceSnapshot,request){
   if(!prepared.ok)return {...prepared,operationVersion:1};
   const candidate=prepared.candidateSnapshot,changes=[];
   const set=(k,v)=>{if(candidate.params[k]!==v){changes.push({path:`params.${k}`,before:candidate.params[k],after:v});candidate.params[k]=v;}};
-  if(Object.hasOwn(params,'armLengthMm')){set('LL1',params.armLengthMm);set('LL2',params.armLengthMm);}
+  if(Object.hasOwn(params,'armLengthMm')){const c=candidate.comps.find(c=>c.id==='Link1');if(c?.standardBlank){const r=resizeStandardBlank(c,candidate.params,'g',params.armLengthMm,{comps:candidate.comps});if(!r.ok)return fail('INVALID_DIMENSIONS',r.message);candidate.comps[candidate.comps.indexOf(c)]=r.comp;}set('LL1',params.armLengthMm);set('LL2',params.armLengthMm);const holes=planActuatorPlateHoles(candidate);if(!holes.ok)return fail('INVALID_DIMENSIONS',holes.message);candidate.comps=holes.comps;}
   if(Object.hasOwn(params,'startHeightMm'))set('parallelStartHeight',params.startHeightMm);
   if(Object.hasOwn(params,'endHeightMm'))set('parallelEndHeight',params.endHeightMm);
   // 舊版原範例可啟用任務；不修補未知結構或不等長活動臂。

@@ -1,3 +1,4 @@
+import {legacyFrameStock} from './fixtures/legacy-frame-stock.mjs';
 // D4：任意角度（以 15° 為一格傾斜，±60°）＋跨平面干涉改成「底板／疊層」兩塊立體檢查（站立時不再誤報）。
 import { check, report } from './_harness.mjs';
 import { S, B, Asm, fresh, motor, near, solveAt, cnc, ex } from './_bench-setup.mjs';
@@ -8,6 +9,8 @@ const Sch = await import('../js/blocks/schema.js');
 const STL = await import('../js/blocks/adapter-stl.js');
 
 const [L, G] = fresh('fourbar-lift', 'gear-gripper');
+const currentGridComps=structuredClone(S.comps);
+legacyFrameStock(S.comps); // This projection fixture uses its original hull frame.
 const P = S.topo.params;
 const hang = B.connect(S.comps, S.modules, G.id, { module: L.id, port: 'edge:ToolBrace_1:R' }, P, motor);
 const orient = st => st.modules.find(m => m.id === G.id).mount.orient;
@@ -57,6 +60,8 @@ check('製作包寫出轉接座夾角（30° 傾斜 → 兩翼夾角 120° 或 6
 // ---------- 3. 跨平面干涉：底板與疊層分開檢查 ----------
 const rangesHit = (st, pose) => IF.findInterference({ comps: st.comps, modules: st.modules, params: P, plan: BP.buildPlan({ comps: st.comps, modules: st.modules, params: P, exportSettings: ex, cnc }), pose, exportSettings: ex });
 const names = w => w.filter(x => x.kind === 'cross-plane').flatMap(x => x.parts);
+const newGridHang=B.connect(currentGridComps,S.modules,G.id,{module:L.id,port:'edge:ToolBrace_1:R'},P,motor),newGridHits=rangesHit(newGridHang,{'1':0,'2':0}).filter(h=>h.kind==='hardware');
+check('新版座板的兩處真螺絲頭干涉仍可檢出',newGridHits.length===2&&newGridHits.every(h=>h.parts.includes(G.id+'-frame')&&h.fix?.below===1&&h.fix?.mm===3));
 const stand = adj(hang, 'stand');
 console.log('stand hits:', names(rangesHit(stand, { '1': 0, '2': 0 })).join(' '));
 check('站在工具架上面：不會誤報撞到下面幾層的曲柄、立桿、前桿', !names(rangesHit(stand, { '1': 0, '2': 0 })).some(x => /^(LiftCrank|LiftUpright|LiftFollower|ToolFront|frame$)/.test(x)));

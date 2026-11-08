@@ -1,3 +1,4 @@
+import {legacyFrameStock} from './fixtures/legacy-frame-stock.mjs';
 // L6a（走通舉升＋夾取 第 6 包）：螺絲頭／螺帽刮到鄰層 → 在那兩層之間加隔圈，拉開空間；
 // 疊層改用 mm 高度（zMm）計算，跨過隔圈的螺絲變長、清單列出隔圈、干涉檢查視為已解決。
 import { check, report } from './_harness.mjs';
@@ -27,6 +28,7 @@ S.selectedLinkId = S.selectedTriangleId = S.selectedSliderId = S.selectedGearId 
 const q = () => {};
 const ed = createModuleEditor({ pushUndo: q, rebuild: q, draw: q, transient: q, downloadJson: q, viewCenter: () => ({ x: 0, y: 0 }), loadLibraryText: () => null, saveLibraryText: q });
 ed.insertBuiltin('rack-lift'); ed.insertBuiltin('gear-gripper');
+legacyFrameStock(S.comps); // Pin the historical collision/trim witnesses, not current example envelopes.
 const L = S.modules[0], G = S.modules[1];
 S.selectedGearId = S.comps.find(c => c.moduleId === G.id && c.type === 'gear').id;
 ed.mountTo(L.id, L.outputs[0].id);

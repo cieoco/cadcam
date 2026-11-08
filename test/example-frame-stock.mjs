@@ -59,6 +59,6 @@ const tg=inspectFrameExport(frameConnectorNodes(thick.comps),{});near(tg.dimensi
 // Added holes may grow the stock, but neither side may slip by half a grid cell.
 const extra=[...frameConnectorNodes(thick.comps),{id:'Extra',x:-16,y:8,frameHole:true}];
 const eg=inspectFrameExport(extra,{});near(Math.min(...eg.outlines.flat().map(p=>p.x)),-21);
-assert.equal(ids.length,19); // Ten reviewed implicit frames are now explicit standard boards.
+assert.equal(ids.length,17); // Ten frames became explicit boards; H02/H03 practice now retain their completed-work frame.
 assert.equal(files.length,ids.length*2);assert.ok((await Promise.all(files.map(f=>f.text()))).every(t=>t.length>100&&!/NaN|Infinity/.test(t)));
 console.log('example-frame-stock: standard outer dimensions, exact edits, holes, shared 3D/export, save and rigid-copy covariance passed');

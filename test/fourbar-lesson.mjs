@@ -76,7 +76,7 @@ assert.ok(doubleCrank.inputSpanDeg > 350, `double-crank input span ${doubleCrank
 assert.ok(doubleCrank.outputSpanDeg > 350, `double-crank output span ${doubleCrank.outputSpanDeg}°`);
 {
   const { comps, params } = fourbars['fourbar-double-crank'];
-  const ground = Math.hypot(comps[1].p1.x - comps[0].p1.x, comps[1].p1.y - comps[0].p1.y);
+  const ground = Math.hypot(comps.find(c=>c.id==='Anchor2').p1.x-comps.find(c=>c.id==='Anchor1').p1.x,comps.find(c=>c.id==='Anchor2').p1.y-comps.find(c=>c.id==='Anchor1').p1.y);
   const lengths = [ground, params.LL1, params.LL2, params.LL3].sort((a, b) => a - b);
   assert.ok(lengths[0] + lengths[3] < lengths[1] + lengths[2], 'double-crank uses strict Grashof geometry');
 }
@@ -87,7 +87,7 @@ assert.ok(doubleRocker.inputSpanDeg > 0 && doubleRocker.inputSpanDeg < 360, `dou
 assert.ok(doubleRocker.outputSpanDeg > 0 && doubleRocker.outputSpanDeg < 180, `double-rocker output span ${doubleRocker.outputSpanDeg}°`);
 {
   const { comps, params } = fourbars['fourbar-double-rocker'];
-  const ground = Math.hypot(comps[1].p1.x - comps[0].p1.x, comps[1].p1.y - comps[0].p1.y);
+  const ground = Math.hypot(comps.find(c=>c.id==='Anchor2').p1.x-comps.find(c=>c.id==='Anchor1').p1.x,comps.find(c=>c.id==='Anchor2').p1.y-comps.find(c=>c.id==='Anchor1').p1.y);
   const lengths = [ground, params.LL1, params.LL2, params.LL3].sort((a, b) => a - b);
   assert.ok(lengths[0] + lengths[3] > lengths[1] + lengths[2], 'double-rocker uses strict non-Grashof geometry');
 }

@@ -37,7 +37,8 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-08：TT共用輪轂／N20明選規格、全作品占孔與型號一致入口，2,111,463→2,116,497（+5,034 bytes）；兩新例及安裝面板懶載入，無新依賴。
 // 2026-11-08：12例已核對的座板／輸出板作者recipe與提示，2,116,497→2,121,897（+5,400 bytes）；不遷移舊作品，無新核心或依賴。
 // 2026-11-08：扭力合併的輕量loads正規化、保存及製作包請求凍結，2,121,897→2,125,494（+3,597 bytes）；估算核心與UI仍懶載入。
-check('首次JS原始大小低於2.127MB',r.bytes<2127000);
+// 2026-11-08：固定座板的嚴格教學辨識、任務改長同步真孔，2,125,494→2,127,533（+2,039 bytes）；無新依賴或求解器。
+check('首次JS原始大小低於2.129MB',r.bytes<2129000);
 check('扭力UI與估算核心按需載入',!r.paths.includes('js/blocks/torque-ui.js')&&!r.paths.includes('js/core/required-torque.js')&&!r.paths.includes('js/core/actuator-speed.js'));
 check('舵機座板範例按需載入',!r.paths.includes('js/blocks/servo-mount-examples.js')&&!r.paths.includes('js/blocks/motor-plate-examples.js'));
 check('標準結構設定面板按需載入',!r.paths.includes('js/blocks/standard-blank-ui.js')&&r.lazyEntries.includes('js/blocks/standard-blank-ui.js'));

@@ -14,7 +14,7 @@ class FakeElement {
     this.tag = tag;
     this.children = [];
     this.parentElement = null;
-    this.style = {};
+    this.style = {};this.dataset={};
     this.attributes = {};
     this.listeners = new Map();
     this.value = '';
@@ -36,6 +36,7 @@ class FakeElement {
   closest(selector) {
     let node = this;
     while (node) {
+      if(selector==='label'&&node.tag==='label')return node;
       if (selector === '[data-jaw-tip]' && node.getAttribute?.('data-jaw-tip')) return node;
       node = node.parentElement;
     }
@@ -54,7 +55,7 @@ globalThis.document = {
   getElementById(id) {
     if (!elements.has(id)) {
       const element = new FakeElement('div');
-      if (id === 'memberMaterial') element.parentElement = new FakeElement('label');
+      if (['memberMaterial','memberWidthInput','memberThicknessInput'].includes(id)) element.parentElement = new FakeElement('label');
       elements.set(id, element);
     }
     return elements.get(id);

@@ -34,7 +34,7 @@ const catalog=buildPartGeometryCatalog({comps:s.comps,params:s.params,fabricatio
 for(const c of [frame,turn]){assert.equal(catalog.parts[c.id].thicknessMm,3);assert.equal(catalog.parts[c.id].outlines[0].length,128);}
 const clamp=catalog.parts[frame.id].holes.filter(h=>h.layer==='SYRINGE_CLAMP');
 assert.equal(clamp.length,2);assert.equal(clamp[0].id,`${syr.id}_clamp_0`);
-assert.ok(Math.abs(Math.hypot(clamp[0].x-clamp[1].x,clamp[0].y-clamp[1].y)-28)<1e-8);
+assert.ok(Math.abs(Math.hypot(clamp[0].x-clamp[1].x,clamp[0].y-clamp[1].y)-24)<1e-8);
 assert.ok(clamp.every(h=>h.r===1.75&&Math.hypot(h.x,h.y)+h.r<frame.diameterMm/2));
 assert.ok(!catalog.parts[turn.id].holes.some(h=>h.layer==='SYRINGE_CLAMP'));
 assert.deepEqual(syr.installation,{face:'front',spacerMm:null});

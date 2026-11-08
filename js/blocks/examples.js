@@ -1022,7 +1022,7 @@ for(const id of [
   'gear-gripper','cam-follower','pulley-belt','competition-fourbar-lift','competition-roller-intake',
   'single-servo-claw','single-axis-wrist','six-bar-lift','continuous-roller-intake',
   'crank-catapult-study','clawbot-geared-lift','iq-mad-box','guided-scissor-lift',
-  'hydraulic-h01-practice','hydraulic-h02-practice','hydraulic-h03-practice','hydraulic-h01','iq-linq-lift'
+  'hydraulic-h01-practice','hydraulic-h01','iq-linq-lift'
 ])
   standardizeExampleFrame(ALL_BLOCK_EXAMPLES.find(e=>e.id===id).snapshot);
 

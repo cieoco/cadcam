@@ -39,5 +39,5 @@ check('夾爪逆向同規則目標通過',reverse.ok);
 for(const s of [{...source,comps:[null]},{...source,params:[]}])check('非法來源格式明拒不throw',run(s).issues[0].code==='UNSUPPORTED_MOTION_STRUCTURE');
 check('首幀失敗仍揭示既定步距',failed.actualStepDeg===.5 && failed.plannedSampleCount===61 && failed.sampleCount===1);
 const deformed=clone(source);deformed.comps[2].vertices=[{solve:true,ref:'p1'},{solve:true,ref:'p2'},{hole:true}];check('額外非主孔語意明拒',run(deformed).issues[0].code==='UNSUPPORTED_MOTION_STRUCTURE');
-const missingHole=clone(source);delete missingHole.comps[0].p1;check('缺失主孔明拒',run(missingHole).issues[0].code==='UNSUPPORTED_MOTION_STRUCTURE');
+const missingHole=clone(source);delete missingHole.comps.find(c=>c.id==='Anchor1').p1;check('缺失主孔明拒',run(missingHole).issues[0].code==='UNSUPPORTED_MOTION_STRUCTURE');
 report('motion-range-validation');

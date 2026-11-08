@@ -5,6 +5,7 @@ import { check, report } from './_harness.mjs';
 class FakeElement {
   constructor() { this.children = []; this.style = {}; this.dataset = {}; this.textContent = ''; this.value = ''; this.classList = { toggle() {} }; }
   appendChild(child) { this.children.push(child); return child; }
+  querySelector(){return null;}
   addEventListener() {}
 }
 const els = new Map();

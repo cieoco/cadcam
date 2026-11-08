@@ -8,7 +8,7 @@ import { createMemberEditor } from '../js/blocks/member-editor.js';
 class FakeElement {
   constructor() {
     this.children = [];
-    this.style = {};
+    this.style = {};this.dataset={};
     this.parentElement = { style: {} };
     this.value = '';
     this.textContent = '';
@@ -17,6 +17,7 @@ class FakeElement {
     this.attributes = {};
     this.title = '';
   }
+  closest(selector){return selector==='label'?this.parentElement:null;}
   replaceChildren(...children) { this.children = children; }
   setAttribute(name, value) { this.attributes[name] = String(value); }
 }

@@ -8,7 +8,7 @@ import { check, report } from './_harness.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v)), source=clone(getExample('parallel-fourbar').snapshot), original=JSON.stringify(source);
 const req=(parameters,action='createFromExample')=>({operationVersion:1,action,...(action==='createFromExample'?{exampleId:'parallel-fourbar'}:{}),parameters});
 const create=p=>prepare(null,req(p));
-check('預設既有範例五件與姿態採樣通過',create().ok && create().candidateSnapshot.comps.length===5 && create().validation.scope.sampleChecks===2);
+check('預設既有機構及座板與姿態採樣通過',create().ok && create().candidateSnapshot.comps.length===source.comps.length && create().validation.scope.sampleChecks===2);
 for(const arm of [32,48,64,120]){const r=create({armLengthMm:arm,startHeightMm:0,endHeightMm:arm*.8});check(`同步兩臂${arm}與高度求角`,r.ok&&r.candidateSnapshot.params.LL1===arm&&r.candidateSnapshot.params.LL2===arm&&Math.abs(r.plan.end.height-arm*.8)<1e-5);}
 check('高度過教學分支明拒',create({endHeightMm:120}).issues[0].code==='UNREACHABLE_HEIGHT'&&!create({endHeightMm:120}).candidateSnapshot);
 for(const p of [{armLengthMm:'64'},{armLengthMm:31},{armLengthMm:121},{endHeightMm:NaN},{endHeightMm:Infinity},{other:1},null])check('未知欄位或非法輸入拒絕',!create(p).ok);
@@ -16,7 +16,7 @@ for(const r of [{operationVersion:2,action:'updateTask'}, {...req({}),exampleId:
 const uneven=clone(source);uneven.params.LL2=56;
 check('破壞等長明確診斷',prepare(uneven,req({},'updateTask')).issues[0].code==='EQUAL_ARMS_REQUIRED');
 check('明確同步臂長可修正等長錯誤',prepare(uneven,req({armLengthMm:64},'updateTask')).ok);
-const phase=clone(source);phase.comps[2].phaseOffset=5;check('非原分支零相位拒絕',prepare(phase,req({},'updateTask')).issues[0].code==='UNSUPPORTED_STRUCTURE');
+const phase=clone(source);phase.comps.find(c=>c.id==='Link1').phaseOffset=5;check('非原分支零相位拒絕',prepare(phase,req({},'updateTask')).issues[0].code==='UNSUPPORTED_STRUCTURE');
 check('逆向與同高都可驗證',create({startHeightMm:35,endHeightMm:10}).ok&&create({startHeightMm:10,endHeightMm:10}).validation.sampleCount===1);
 const corrected=create({armLengthMm:64,endHeightMm:45});check('錯誤修正後重驗有效',corrected.ok);
 check('來源不被修改',JSON.stringify(source)===original);

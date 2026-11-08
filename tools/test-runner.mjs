@@ -29,7 +29,7 @@ export function runSuite({ root, manifest, outputDir, selected = manifest.tests 
   validateManifest(root, manifest);
   if (selected.some(p => !manifest.tests.includes(p))) throw new Error('Unknown selected test');
   mkdirSync(outputDir, { recursive: true });
-  const nodeArgs = process.allowedNodeEnvironmentFlags.has('--no-experimental-webstorage') ? ['--no-experimental-webstorage'] : [];
+  const nodeArgs = (process.allowedNodeEnvironmentFlags.has('--experimental-webstorage')||process.allowedNodeEnvironmentFlags.has('--no-experimental-webstorage')) ? ['--no-experimental-webstorage'] : [];
   const commit = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout?.trim() || null;
   const dirty = spawnSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: root, encoding: 'utf8' }).stdout?.trim() || '';
   const results = [];

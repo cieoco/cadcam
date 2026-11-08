@@ -1,3 +1,4 @@
+import {lessonMechanismComps} from '../js/blocks/lesson-structure.js';
 import assert from 'node:assert/strict';
 import { getExample } from '../js/blocks/examples.js';
 import { normalizeSnapshot } from '../js/blocks/schema.js';
@@ -16,6 +17,9 @@ assert.ok(Math.abs(longer.spanDeg - base.spanDeg) > 1, `${base.spanDeg} vs ${lon
 assert.equal(JSON.stringify(lesson), before);
 
 const double = JSON.parse(before);
+// Independent legacy fourbar fixture: moving B must not leave an attached board
+// with a different fixed B hole. The base/longer tests above retain the real seat.
+double.comps=lessonMechanismComps(double.comps);for(const c of double.comps)if(c.isInput){delete c.motorMount;delete c.standardBlank;delete c.holes;}
 for (const c of double.comps) for (const key of ['p1', 'p2']) {
   if (c[key]?.id === 'B') c[key].x = -48;
 }

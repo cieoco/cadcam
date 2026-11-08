@@ -15,8 +15,9 @@ Tools.init({ svg, draw() {}, rebuild() {}, pushUndo() {}, pause() {}, cancelMoto
   worldFromEvent: e => e.world, pointCoords: coords, displayPointCoords: coords,
   nearestDisplayToPoint(world, exclude = [], maxDist = 13) { return Object.entries(coords()).find(([id, p]) => !exclude.includes(id) && Math.hypot(p.x - world.x, p.y - world.y) < maxDist)?.[0] || null; },
   snapWorld: () => 13, mobilePrompt: () => false, promptText: text => text });
+const beforeCount=S.comps.length;
 Tools.startDrawLink(); Tools.startLinkAt(coords().A); Tools.finishDrawLink({ world: coords().P3 });
-assert.equal(S.comps.length, 6);
+assert.equal(S.comps.length,beforeCount+1);
 assert.deepEqual(new Set([S.comps.at(-1).p1.id, S.comps.at(-1).p2.id]), new Set(['A', 'P3']));
 const drawn = S.comps.at(-1);
 assert.notEqual(drawn.id, 'Link2');

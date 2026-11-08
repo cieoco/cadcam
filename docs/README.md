@@ -16,6 +16,8 @@
 
 ## 產品與功能規格
 
+- [發布驗收與標準板教學修復](TEACHING-CHANGELOG.md#deployment-repair) — 嚴格課程辨識、同候選真孔重建、歷史幾何fixture與新版真干涉回歸。
+
 - [扭力分支合併與估算界限](TEACHING-CHANGELOG.md#torque-merge) — 靜態需求、速度電流、同範圍製作包、保存及桌手機驗收；不支援掛接組立與圖上負載拖曳。
 - [12個既有範例套用座板／輸出板](TEACHING-CHANGELOG.md#existing-actuator-plates) — 原動作與欠約束不變、分層、桌手機驗收及其餘28項保留原因。
 - [TT與特定N20座板／輪轂輸出](TEACHING-CHANGELOG.md#tt-n20-plates) — 型號孔圖、明選試作、跨設計占孔及桌手機驗收；小孔與軸向裝配限制。

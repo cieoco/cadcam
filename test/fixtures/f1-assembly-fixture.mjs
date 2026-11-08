@@ -1,3 +1,4 @@
+import {legacyFrameStock} from './legacy-frame-stock.mjs';
 import {builtinTemplate,instantiateTemplate} from '../../js/blocks/module-ops.js';
 import {realMountExamples} from '../../js/blocks/face-mate-examples.js';
 import {buildFacePlacement} from '../../js/blocks/face-placement.js';
@@ -11,6 +12,14 @@ const normalChild=instantiateTemplate(builtinTemplate('gear-gripper'),{counter:2
 if(t===4)normalChild.comps.forEach(k=>{if((k.type==='bar'||k.type==='triangle')&&!k.stock)k.stock={widthMm:18,thicknessMm:4,material:'unspecified'};});
 c.instance=normalChild;
 const f={comps:[...h.instance.comps,...c.instance.comps],modules:[h.instance.module,c.instance.module],params:{...h.instance.params,...c.instance.params}};
+if(t===4){
+ legacyFrameStock(f.comps);
+ // The placement reference must describe the same frozen hull and thickness;
+ // keeping the template's newer grid box would leave a stale mating plane.
+ c.surface=buildMountSurfaces({comps:c.instance.comps,modules:[c.instance.module],moduleId:c.instance.module.id,params:c.instance.params,thicknessMm:t}).surfaces.find(s=>s.kind==='frame');
+ const center=Object.fromEntries(['x','y','z'].map(k=>[k,(c.surface.box.min[k]+c.surface.box.max[k])/2]));
+ c.box={min:Object.fromEntries(['x','y','z'].map(k=>[k,c.surface.box.min[k]-center[k]])),max:Object.fromEntries(['x','y','z'].map(k=>[k,c.surface.box.max[k]-center[k]]))};
+}
 f.modules[0].faceParts={part:h.surface.compId,face:'back'};
 f.modules[1].faceParts={part:'frame',face:'bottom'};
 const fabrication=structuredClone(FABRICATION_DEFAULTS);fabrication.cnc.stockThicknessMm=t;

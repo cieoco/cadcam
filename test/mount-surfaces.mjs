@@ -1,3 +1,4 @@
+import {legacyFrameStock} from './fixtures/legacy-frame-stock.mjs';
 import { check, report } from './_harness.mjs';
 import { S, B, fresh, motor } from './_bench-setup.mjs';
 import { buildMountSurfaces } from '../js/blocks/mount-surfaces.js';
@@ -94,7 +95,9 @@ const bounds = rings => {
   const expectedNodes = moduleFrameNodes(entry, frameConnectorNodes(entry.comps));
   check('夾爪底板外框使用真實 frame nodes 且沒有假造接口', frame && frame.id === `${grip.id}-frame` && frame.ports.length === 0 && expectedNodes.length > 0);
   check('不混入另一機構的底板組件', frame && frame.moduleId === grip.id && frame.compId === null && !r.surfaces.some(s => s.kind === 'frame' && s.moduleId === lift.id));
-  check('底板厚度採用 stock 設定', frame && frame.box.min.z === -2.5 && frame.box.max.z === 2.5);
+  check('明確frameStock3優先於全域5',frame&&frame.box.min.z===-1.5&&frame.box.max.z===1.5);
+  const fallback=structuredClone(mounted.comps);legacyFrameStock(fallback,grip.id);const old=buildMountSurfaces({comps:fallback,modules:mounted.modules,moduleId:grip.id,params:S.topo.params,exportSettings:ex}).surfaces.find(s=>s.kind==='frame');
+  check('沒有專屬frameStock才採全域5',old&&old.box.min.z===-2.5&&old.box.max.z===2.5);
   check('底板標示尚未合併馬達與轉接座特徵', frame && frame.warnings.some(w => /馬達安裝特徵/.test(w)));
 }
 

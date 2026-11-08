@@ -27,6 +27,7 @@ class FakeElement {
     if (at < 0) throw new Error('insertBefore: ref is not a child');
     child.parentNode = this; this.children.splice(at, 0, child); return child;
   }
+  querySelector(){return null;}
   addEventListener() {}
 }
 

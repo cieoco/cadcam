@@ -1,3 +1,4 @@
+import {legacyFrameStock} from './fixtures/legacy-frame-stock.mjs';
 import assert from 'node:assert/strict';
 import {S,B,fresh,motor,solveAt,ex,ed} from './_bench-setup.mjs';
 import * as OJ from '../js/blocks/orthogonal-joint.js';
@@ -80,7 +81,7 @@ for(const theta of [0,20,40]){
  const plan=buildPlan({comps:nestedWork.comps,modules:nestedWork.modules,params:nestedWork.topo.params,exportSettings:ex,cnc:nestedWork.fabrication.cnc,joint:nestedWork.joint});
  assert.equal(scene.model.orthogonal.length,2);assert.deepEqual(auditPhysical(measureScene(scene,plan,nested.id,`${child.id}-frame`)),[],`nested world measurement ${theta}`);
 }
-const differing=structuredClone(nestedWork);
+const differing=structuredClone(nestedWork);legacyFrameStock(differing.comps,child.id);
 const point=differing.comps.filter(c=>c.moduleId===child.id).flatMap(c=>[c.p1,c.p2,c.p3]).find(p=>p&&['fixed','motor'].includes(p.type));point.frameStock={thicknessMm:6};
 for(const theta of [0,20,40]){
  const scene=faceCandidateModel({work:differing},{theta,motorAngles:{'1':theta,'2':0,'3':0}}),plan=buildPlan({comps:differing.comps,modules:differing.modules,params:differing.topo.params,exportSettings:ex,cnc:differing.fabrication.cnc,joint:differing.joint});

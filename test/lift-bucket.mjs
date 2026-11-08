@@ -1,3 +1,4 @@
+import {taskSnapshotKey} from '../js/blocks/task-operation-support.js';
 import {liftBucketSnapshot as build} from '../js/blocks/lift-bucket-builder.js';
 import { getExample } from '../js/blocks/examples.js';
 import { planParallelLift } from '../js/blocks/parallel-lift-workflow.js';
@@ -8,7 +9,11 @@ import {encodeSnapshot,decodeShareString} from '../js/share-codec.js';
 import {check,report} from './_harness.mjs';
 const w=structuredClone(getExample('lift-bucket').snapshot),before=JSON.stringify(w);
 const request=parameters=>({operationVersion:1,action:'updateTask',parameters});
-check('範例等於共用操作生成結果',JSON.stringify(build(getExample('parallel-fourbar').snapshot))===before);
+const currentLift=structuredClone(getExample('parallel-fourbar').snapshot),legacyLift={...currentLift,comps:w.comps.filter(c=>c.moduleId==='Lift').map(c=>{const x=structuredClone(c);delete x.moduleId;return x;}),params:Object.fromEntries(Object.keys(currentLift.params).filter(k=>!k.startsWith('Blank')).map(k=>[k,w.params[k]]))};
+check('舊例等於其原Lift結構經共用操作生成結果',taskSnapshotKey(build(legacyLift))===taskSnapshotKey(w));
+const boardVariant=build(currentLift),boardPlan=planParallelLift(boardVariant);
+check('新6件升降生成13件5模組並保留真座板',boardVariant.comps.length===13&&boardVariant.modules.length===5&&boardVariant.comps.some(c=>c.moduleId==='Lift'&&c.standardBlank?.kind==='plate')&&boardPlan.ok&&boardPlan.validation.assemblySampleCount>1);
+check('新座板托斗保存分享後仍通過材料與姿態',planParallelLift(normalizeSnapshot(decodeShareString(encodeSnapshot(boardVariant)))).ok);
 check('既有兩案例組成12零件5模組',w.comps.length===12&&w.modules.length===5&&planParallelLift(w).ok);
 check('單馬達無翻轉自由度',w.comps.filter(c=>c.isInput).length===1&&!w.comps.some(c=>c.id==='Drive'));
 for(const arm of [48,64,120]){const r=prepare(w,request({armLengthMm:arm,startHeightMm:10,endHeightMm:arm*.8}));check(`調臂長${arm}後材料保持姿態`,r.ok&&r.validation.assemblySampleCount>1&&r.candidateSnapshot.params.LL2===arm);}

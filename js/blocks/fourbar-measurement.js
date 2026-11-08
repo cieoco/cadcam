@@ -1,3 +1,4 @@
+import {lessonMechanismComps} from './lesson-structure.js';
 /** 四連桿入門課的按需量測；以連續組裝分支取樣，不在每個播放影格執行。 */
 import { compileTopology } from '../core/topology.js';
 import { solveTopology } from '../multilink/solver.js';
@@ -8,9 +9,10 @@ export function measureFourbarSwing(comps, params) {
   let inputMode = 'unknown';
   const fail = message => ({ ok: false, message, spanDeg: null, inputMode, outputMode: 'unknown', lengths });
   try {
-    if (!Array.isArray(comps) || comps.length !== 5 || !params) return fail('量測適用於本課的 A、B 固定點與 AC、CD、BD 三根連桿。');
-    const anchors = comps.filter(c => c?.type === 'anchor');
-    const bars = ['Link1', 'Link2', 'Link3'].map(id => comps.find(c => c?.id === id && c.type === 'bar'));
+    const mechanism=lessonMechanismComps(comps);
+    if (!Array.isArray(mechanism) || mechanism.length !== 5 || !params) return fail('量測適用於本課的 A、B 固定點與 AC、CD、BD 三根連桿。');
+    const anchors = mechanism.filter(c => c?.type === 'anchor');
+    const bars = ['Link1', 'Link2', 'Link3'].map(id => mechanism.find(c => c?.id === id && c.type === 'bar'));
     if (anchors.length !== 2 || bars.some(c => !c)) return fail('請保留本課的三根連桿與兩個固定點，再量測。');
     const [input, coupler, output] = bars;
     if (input.p1?.id !== 'A' || input.p2?.id !== 'C' || coupler.p1?.id !== 'C' || coupler.p2?.id !== 'D'

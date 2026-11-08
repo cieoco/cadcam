@@ -95,7 +95,7 @@ const double=fixtures[4],remaining=double.modules[2].id,removed=double.modules[1
 const unmounted=unmountModule(detach.comps,detach.modules,removed,detach.params,{theta:20,activeMotor:'1',motorAngles:{'1':20,'2':0,'3':0}});assert.ok(unmounted.ok,unmounted.reason);detach.comps=unmounted.comps;detach.modules=unmounted.modules;
 const ds=faceCandidateModel({work:detach},{theta:20,motorAngles:{'1':20,'2':0,'3':0}});assert.equal(ds.catalog.extras.adapters.length,1);
 assert.equal(ds.catalog.extras.adapters[0].moduleId,remaining);assert.deepEqual(ds.catalog.extras.adapters[0].physical,faceCandidateModel({work:double},{theta:20}).catalog.extras.adapters.find(a=>a.moduleId===remaining).physical);
-const changedBrace=structuredClone(double),brace=changedBrace.comps.find(c=>c.id.startsWith('ToolBrace'));brace.stock={widthMm:18,thicknessMm:10};
+const changedBrace=structuredClone(double),brace=changedBrace.comps.find(c=>c.id.startsWith('ToolBrace'));brace.stock={widthMm:10,thicknessMm:10};
 const resizedBrace=faceCandidateModel({work:changedBrace},{theta:20,motorAngles:{'1':20,'2':0,'3':0}});
 assert.ok(resizedBrace.catalog.diagnostics.some(d=>d.moduleId===removed&&d.code==='face_fastener_invalid'),'a thickness change may invalidate one hole; never silently degrade its fasteners');
 assert.deepEqual(resizedBrace.work.modules.map(m=>m.mount?.to),double.modules.map(m=>m.mount?.to));

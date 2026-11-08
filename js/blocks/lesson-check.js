@@ -1,3 +1,4 @@
+import {lessonMechanismComps} from './lesson-structure.js';
 import { compileTopology } from '../core/topology.js';
 import { solveTopology } from '../multilink/solver.js';
 import { inspectMotionRange } from './solve-health.js';
@@ -6,13 +7,14 @@ import { inspectMotionRange } from './solve-health.js';
 // 不改作品；不以曲柄長度代替實際求解，也不宣稱連續干涉或實物驗證。
 export function checkSliderLesson({ comps = [], params = {} }) {
   const unknown = message => ({ status: 'unknown', message });
-  const sliders = comps.filter(c => c.type === 'slider');
-  const inputs = comps.filter(c => c.type === 'bar' && c.isInput);
-  if (sliders.length !== 1 || inputs.length !== 1 || comps.some(c => !['anchor', 'bar', 'slider'].includes(c.type)))
+  const mechanism=lessonMechanismComps(comps);
+  const sliders = mechanism.filter(c => c.type === 'slider');
+  const inputs = mechanism.filter(c => c.type === 'bar' && c.isInput);
+  if (sliders.length !== 1 || inputs.length !== 1 || mechanism.some(c => !['anchor', 'bar', 'slider'].includes(c.type)))
     return unknown('請在目前設計開啟單馬達曲柄滑塊作品；此檢查只適用於 80 mm 推送器任務。');
   if (inputs[0].motorType === 'mg995') return unknown('本課使用 TT 馬達整圈轉動；舵機指定角度不適用此任務。');
   const slider = sliders[0];
-  const bars = comps.filter(c => c.type === 'bar');
+  const bars = mechanism.filter(c => c.type === 'bar');
   const crank = inputs[0];
   const coupler = bars.find(c => c !== crank);
   const ends = new Set([coupler?.p1?.id, coupler?.p2?.id]);

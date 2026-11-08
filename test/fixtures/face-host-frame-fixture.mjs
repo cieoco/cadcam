@@ -1,3 +1,4 @@
+import {legacyFrameStock} from './legacy-frame-stock.mjs';
 import assert from 'node:assert/strict';
 import {f1AssemblyFixture,f1NestedFixture} from './f1-assembly-fixture.mjs';
 import {builtinTemplate,instantiateTemplate} from '../../js/blocks/module-ops.js';
@@ -23,6 +24,7 @@ export function rootFrameFixture(){
  f.comps[0].p1.frameStock={widthMm:150,thicknessMm:6};
  const base=f.comps[0];f.comps[0]={id:base.id,moduleId:'Base',type:'anchor',p1:base.p1};
  f.comps.unshift({id:'BaseAnchor2',moduleId:'Base',type:'anchor',p1:base.p2});f.modules[0].outputs=[];
+ legacyFrameStock(f.comps,arm.id);
  f.comps.filter(c=>c.moduleId===arm.id).flatMap(c=>[c.p1,c.p2,c.p3]).find(p=>p&&['fixed','motor'].includes(p.type)).frameStock={lengthMm:160,widthMm:100,thicknessMm:4};
  f.modules[0].faceParts={part:'frame',face:'top'};
  return attach(f,arm.id,{moduleId:'Base',frameEdge:6},frameSelection({hostFace:'top',childFace:'back'}));
@@ -46,11 +48,14 @@ export function installedFrameFixture(kind='face',{stablePlanar=true}={}){
  const t=instantiateTemplate(builtinTemplate('gear-gripper'),{counter:3,place:{x:0,y:0},usedMotorIds:['1','2']});
  f.comps.push(...t.comps);f.modules.push(t.module);Object.assign(f.params,t.params);
  if(kind==='planar'&&stablePlanar)f=normalizeSnapshot(toSnapshot(f.comps,{params:f.params},0,{modules:f.modules,fabrication:f.fabrication}));
+ legacyFrameStock(f.comps,host.id);
  f.modules[1].faceParts={part:'frame',face:kind==='face'?'front':'back'};
  return attach(f,t.module.id,{moduleId:host.id,frameEdge:6},frameSelection(kind==='face'?{hostFace:'front'}:{offsetU:10}));
 }
 export function twoClawsFixture(){
  let f=f1AssemblyFixture({mounted:false,t:3});const host=f.modules[0],child=f.modules[1];
+ // Pin the narrow shared host for the thickness-only fastener rejection below.
+ f.comps.find(c=>c.id.startsWith('ToolBrace')).stock={widthMm:10,thicknessMm:3};
  const t=instantiateTemplate(builtinTemplate('gear-gripper'),{counter:3,place:{x:0,y:0},usedMotorIds:['1','2']});
  f.comps.push(...t.comps);f.modules.push(t.module);Object.assign(f.params,t.params);
  f=attach(f,child.id,{moduleId:host.id,outputId:host.outputs[0].id},frameSelection({offsetU:-30}));

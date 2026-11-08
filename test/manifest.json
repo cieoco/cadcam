@@ -259,6 +259,7 @@
     "test/export-scope.mjs",
     "test/motion-preflight.mjs",
     "test/lesson-check.mjs",
+    "test/lesson-structure.mjs",
     "test/video-evidence.mjs",
     "test/lesson-sequence.mjs",
     "test/fixed-syringe.mjs",
