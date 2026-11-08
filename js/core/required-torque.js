@@ -118,10 +118,15 @@ export function requiredTorque(snapshot, opts = {}) {
     let model; const assumed = {};
     try { model = assemblyMassModel(comps, start, params, settings); } catch (e) { model = { items: [], skipped: [{ id: '*', type: '*', reason: String(e.message || e) }] }; }
     for (const it of model.items) {
-      items.push({ id: it.id, kind: 'part', label: it.id, massG: it.massG, pos: pts => { const fr = frameOf(pts, it.frame); return fr && atLocal(fr, it.cg.u, it.cg.v); } });
+      items.push({ id: it.id, kind: 'part', label: it.id, massG: it.massG, pos: it.anchor
+        ? pts => { const a = pts[it.anchor.pointId]; return a ? { x: a.x + it.anchor.dx, y: a.y + it.anchor.dy } : null; }
+        : pts => { const fr = frameOf(pts, it.frame); return fr && atLocal(fr, it.cg.u, it.cg.v); } });
       if (it.assumed) (assumed[it.reason] ||= []).push(it.id);
     }
     for (const [reason, ids] of Object.entries(assumed)) assumptions.push(`${ids.join('、')}：${reason}`);
+    const fusedIds = model.items.filter(x => x.fused).map(x => x.id), approxIds = model.items.filter(x => x.approx);
+    if (fusedIds.length) assumptions.push(`合成桿 ${fusedIds.join('、')}：以聯集外形算質量（重疊處不重複計）`);
+    if (approxIds.length) assumptions.push(`${approxIds.map(x => x.id).join('、')}：${[...new Set(approxIds.map(x => x.approx))].join('、')}以匯出外形近似（重心取軸心／原點，不含軸套與螺絲）`);
     skipped.push(...model.skipped);
   }
   if (opts.includeMotors !== false) {

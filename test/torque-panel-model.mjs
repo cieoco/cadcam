@@ -1,9 +1,10 @@
 // 扭力面板的純函式驗收（建議、曲線座標、負載編輯）。介面本身見 test/browser/torque-panel.cjs。
 import { check, report } from './_harness.mjs';
-import { requiredTorque, evaluateActuator } from '../js/core/required-torque.js';
+import { BLOCK_EXAMPLES } from '../js/blocks/examples.js';
+import { requiredTorque, evaluateActuator, findMotors } from '../js/core/required-torque.js';
 import { getActuatorSpec, listActuatorSpecs, kgfcmToNmm } from '../js/core/actuator-specs.js';
 import { normalizeLoads } from '../js/blocks/load-schema.js';
-import { summaryText, noteLines, curveGeometry, pathOf, suggestions, nextLoadId, attachPoints, attachBars, loadFromForm, upsertLoad, removeLoad, describeAttach, motorLabel, fmtKg, pct } from '../js/blocks/torque-model.js';
+import { summaryText, noteLines, curveGeometry, pathOf, suggestions, nextLoadId, attachPoints, defaultAttachPoint, SHRINK_IMPRACTICAL, attachBars, loadFromForm, upsertLoad, removeLoad, describeAttach, motorLabel, fmtKg, pct } from '../js/blocks/torque-model.js';
 
 const near = (a, b, t) => Math.abs(a - b) <= t;
 const stick = { type: 'bar', id: 'Arm', color: '#3498db', p1: { id: 'O', type: 'fixed', x: 0, y: 0, physicalMotor: '1' }, p2: { id: 'E', type: 'floating', x: 160, y: 0 }, lenParam: 'L1', isInput: true, fixedLen: true, physicalMotor: '1', motorType: 'mg995', stock: { widthMm: 13, thicknessMm: 3, material: 'plywood' } };
@@ -32,6 +33,12 @@ const evOf = id => evaluateActuator(res, getActuatorSpec(id));
   check('黃燈：給出所需齒比 = 使用率 ÷ (綠門檻 × η)，並提到效率與轉速變慢', m && m.includes(`${(Math.ceil(ratio * 10) / 10).toFixed(1)}:1`) && m.includes('效率') && m.includes('轉速'), m);
   check('黃燈：縮短力臂的比例 = 綠門檻 ÷ 使用率', tipsSg.some(t => t.includes('縮短手臂') && t.includes(`${Math.floor(evSg.thresholds[0] / evSg.utilization * 100)}%`)), tipsSg.join('|'));
   check('黃燈：列出更強且到綠燈的同類型型號（MG995），不含自己與直流馬達', tipsSg.some(t => t.includes('MG995 伺服 4.8 V') && !t.includes('TT')), tipsSg.join('|'));
+  // 縮短手臂：要縮到 40% 以下時不給小百分比
+  check('縮短手臂：需縮到 40% 以下時改說單靠縮短不實際，不寫百分比', (() => {
+    const big = requiredTorque(snap({ loads: [{ id: 'W1', massG: 400, at: { pointId: 'E' } }] }), { motorId: '1', thetaRange: [0, 90], stepDeg: 30 }), ev = evaluateActuator(big, sg), tips = suggestions(big, ev, sg, { specs });
+    return ev.thresholds[0] / ev.utilization < SHRINK_IMPRACTICAL && tips.some(t => t.includes('單靠縮短手臂不實際') && !/縮到約/.test(t)) && !tips.some(t => /縮到約\s*\d+%/.test(t));
+  })());
+  check('縮短手臂：還算實際時保留百分比建議', tipsSg.some(t => /縮到約 \d+% 長度/.test(t)));
   const tt = getActuatorSpec('TT_6V'), evTt = evOf('TT_6V'), tipsTt = suggestions(res, evTt, tt, { specs });
   check('紅燈且舉不起：第一句明說舉不起來（估算）', tipsTt[0].includes('舉不起來'));
   check('直流：N20 100:1 不是綠燈就不會被推薦', !tipsTt.some(t => t.includes('N20 HP 100:1')) || evOf('N20_100_6V').level === 'green');
@@ -86,7 +93,14 @@ const evOf = id => evaluateActuator(res, getActuatorSpec(id));
 {
   check('nextLoadId 跳過已用編號', nextLoadId([]) === 'Load1' && nextLoadId([{ id: 'Load1' }, { id: 'Load3' }]) === 'Load2');
   const pts = attachPoints(snap().comps);
-  check('可掛接點去重並標示零件', pts.map(p => p.id).join() === 'O,E' && pts[1].label === 'E（Arm）', JSON.stringify(pts));
+  check('可掛接點去重、活動點在前、固定點排最後並標「固定」', pts.map(p => p.id).join() === 'E,O' && pts[0].label === 'E（Arm）' && pts[1].fixed && pts[1].label === 'O（Anchor1，固定）', JSON.stringify(pts));
+  check('預設掛接點是活動點（離馬達軸最遠的 E），不是固定的 O', defaultAttachPoint(snap().comps, { shaftPointId: 'O' }) === 'E' && defaultAttachPoint(snap().comps) === 'E');
+  const six = BLOCK_EXAMPLES.find(e => e.id === 'six-bar-lift').snapshot, sixPts = attachPoints(six.comps);
+  const sixDef = defaultAttachPoint(six.comps, { tracePoint: six.tracePoint, tracePoints: six.tracePoints, shaftPointId: findMotors(six.comps)[0].shaftPointId });
+  check('六連桿：軌跡點 SixTip 是預設，且不是固定點', sixDef === six.tracePoint && !sixPts.find(p => p.id === sixDef).fixed, sixDef);
+  check('六連桿：沒有軌跡點時退回離軸最遠的活動點，一樣不是固定點', !sixPts.find(p => p.id === defaultAttachPoint(six.comps, { shaftPointId: findMotors(six.comps)[0].shaftPointId })).fixed);
+  check('六連桿：固定點（SixO 等）全部排在活動點後面', (() => { const k = sixPts.findIndex(p => p.fixed); return k > 0 && sixPts.slice(k).every(p => p.fixed); })());
+  check('軌跡點若是固定點就不採用', defaultAttachPoint(snap().comps, { tracePoint: 'O', shaftPointId: 'O' }) === 'E');
   check('可選零件只含有 p1/p2 的桿', attachBars(snap().comps).map(b => b.id).join() === 'Arm');
   const a = loadFromForm({ id: 'Load1', name: ' 杯子 ', massG: '80', mode: 'point', pointId: 'E', fx: '', fy: '' });
   check('表單 → 接點負載（trim 名稱、無外力）', a.load && a.load.name === '杯子' && a.load.massG === 80 && a.load.at.pointId === 'E' && !a.load.force);

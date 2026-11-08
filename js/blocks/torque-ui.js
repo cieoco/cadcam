@@ -5,8 +5,9 @@ import { S, activateMotor, frozenMotorAngles } from './state.js';
 import { toSnapshot } from './schema.js';
 import {
   LEVELS, fmtKg, pct, summaryText, noteLines, curveGeometry, pathOf, suggestions, nextLoadId, attachPoints, attachBars,
-  describeAttach, loadFromForm, upsertLoad, removeLoad, motorLabel
+  describeAttach, loadFromForm, upsertLoad, removeLoad, motorLabel, defaultAttachPoint
 } from './torque-model.js';
+import { setSheet, sheetMode } from './mobile-workspace.js';
 
 let core = null;
 const loadCore = () => core ||= Promise.all([import('../core/required-torque.js'), import('../core/actuator-specs.js')])
@@ -15,8 +16,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 
 const CSS = `
 #torquePanel{position:fixed;right:12px;bottom:12px;z-index:40;width:min(392px,calc(100vw - 24px));max-height:min(86vh,720px);overflow:auto;box-sizing:border-box;
- background:#fff;border:1px solid #c9d6e6;border-radius:12px;box-shadow:0 8px 28px rgba(20,40,70,.28);padding:10px 12px 12px;font-size:13px;color:#2c3e50}
-#torquePanel header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+ background:#fff;border:1px solid #c9d6e6;border-radius:12px;box-shadow:0 8px 28px rgba(20,40,70,.28);padding:0 12px 12px;font-size:13px;color:#2c3e50}
+#torquePanel header{display:flex;align-items:center;gap:8px;margin-bottom:6px;position:sticky;top:0;z-index:2;background:#fff;padding:10px 0 4px}
 #torquePanel header b{font-size:15px}#torquePanel header small{color:#60717d;flex:1}
 #torquePanel button{font:inherit;min-height:36px;padding:4px 10px;border:1px solid #9fb3cc;border-radius:8px;background:#f4f8fd;color:#1f3a5a;cursor:pointer}
 #torquePanel button.tq-primary{background:#2c5282;border-color:#2c5282;color:#fff;font-weight:700}
@@ -33,7 +34,7 @@ const CSS = `
 #torquePanel .tq-loads li{display:flex;gap:6px;align-items:center;list-style:none;margin-left:-18px;flex-wrap:wrap}
 #torquePanel .tq-form{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;padding:8px;border:1px dashed #9fb3cc;border-radius:8px;margin-top:6px}
 #torquePanel .tq-form .wide{grid-column:1/-1}#torquePanel .tq-err{color:#c0392b;font-weight:700;grid-column:1/-1}
-@media (max-width:700px){#torquePanel{left:8px;right:8px;width:auto;bottom:calc(66px + env(safe-area-inset-bottom,0px));max-height:56vh}}`;
+@media (max-width:700px){#torquePanel{left:8px;right:8px;width:auto;bottom:calc(66px + env(safe-area-inset-bottom,0px));max-height:min(56vh,calc(100dvh - 150px));overscroll-behavior:contain;-webkit-overflow-scrolling:touch}}`;
 
 let panel = null, timer = null, lastKey = '', busy = false, again = false;
 const ui = { poseNote: '', motorId: null, specs: {}, editing: null, formError: '' };
@@ -53,6 +54,7 @@ export function openTorque(host) {
   panel.addEventListener('click', e => onClick(e, host));
   panel.addEventListener('change', e => onChange(e, host));
   document.body.append(panel);
+  if (sheetMode()) setSheet('collapsed');   // 手機：面板是唯一浮在頁籤列上方的東西，下方抽屜先收合
   panel.innerHTML = '<p class="tq-note">計算中…</p>';
   refresh(host);
   timer = setInterval(() => { if (panel && modelKey() !== lastKey) refresh(host); }, 800);
@@ -134,7 +136,7 @@ function loadsHtml(c, snap) {
    <label>名稱（選填）<input type="text" data-k="name" maxlength="24" value="${esc(cur.name || '')}"></label>
    <label>質量（g）<input type="number" data-k="massG" min="0" step="any" value="${cur.massG ?? 50}"></label>
    <label class="wide">掛在<select data-k="mode"><option value="point"${isBar ? '' : ' selected'}>機構接點（孔）</option><option value="bar"${isBar ? ' selected' : ''}>零件上的位置</option></select></label>
-   <label class="wide">接點<select data-k="pointId">${pts.map(p => `<option value="${esc(p.id)}"${cur.at?.pointId === p.id ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}</select></label>
+   <label class="wide">接點<select data-k="pointId">${pts.map(p => `<option value="${esc(p.id)}"${(cur.at?.pointId || ui.editing.defaultPointId) === p.id ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}</select></label>
    <label>零件<select data-k="compId">${bars.map(p => `<option value="${esc(p.id)}"${cur.at?.compId === p.id ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}</select></label>
    <label>沿桿 u（mm）<input type="number" data-k="u" step="any" value="${cur.at?.u ?? 0}"></label>
    <label>垂直 v（mm）<input type="number" data-k="v" step="any" value="${cur.at?.v ?? 0}"></label>
@@ -163,7 +165,7 @@ function onClick(e, host) {
   const act = b.dataset.act, loads = Array.isArray(S.topo.loads) ? S.topo.loads : [];
   if (act === 'close') closeTorque();
   else if (act === 'worst') showWorst(host);
-  else if (act === 'add') { ui.formError = ''; ui.editing = { id: nextLoadId(loads), load: null }; refresh(host); }
+  else if (act === 'add') { ui.formError = ''; ui.editing = { id: nextLoadId(loads), load: null, defaultPointId: defaultAttachPoint(S.comps, { tracePoints: S.topo.tracePoints, tracePoint: S.topo.tracePoint, shaftPointId: ui.last?.motor?.shaftPointId }) }; refresh(host); }
   else if (act === 'edit') { ui.formError = ''; ui.editing = { id: b.dataset.id, load: loads.find(l => l.id === b.dataset.id) || null }; refresh(host); }
   else if (act === 'cancel') { ui.editing = null; ui.formError = ''; refresh(host); }
   else if (act === 'del') commit(host, () => { const next = removeLoad(loads, b.dataset.id); if (next.length) S.topo.loads = next; else delete S.topo.loads; });

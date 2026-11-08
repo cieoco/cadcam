@@ -8,6 +8,8 @@ export const LEVELS = Object.freeze({
   red: Object.freeze({ label: '紅燈', color: '#c0392b', hint: '不夠或太吃力' })
 });
 const fin = Number.isFinite;
+/** 力臂要縮到這個比例以下才到綠燈時，不再給百分比，改說「單靠縮短不實際」。 */
+export const SHRINK_IMPRACTICAL = 0.4;
 export const kg = nmm => (fin(nmm) ? nmmToKgfcm(nmm) : null);
 export const fmtKg = nmm => (fin(nmm) ? nmmToKgfcm(nmm).toFixed(2) : '—');
 export const pct = u => (fin(u) ? `${Math.round(u * 100)}%` : '—');
@@ -96,7 +98,11 @@ export function suggestions(result, ev, spec, { specs = [], flatPeakNmm = null }
     const r1 = (Math.ceil(ratio * 10) / 10).toFixed(1);
     out.push(`加一級減速齒輪，約 ${r1}:1 可估到綠燈（已含每級效率 ${Math.round(eta * 100)}%）。代價是輸出轉速變成約 1/${r1}，也多一級齒輪要做。${ratio > 8 ? '比值偏大，通常要兩級以上。' : ''}`);
   }
-  if (util > g) out.push(`縮短手臂或把負載移近軸心：需求大致與力臂成正比，縮到約 ${Math.max(1, Math.floor(g / util * 100))}% 長度可估到綠燈（質量不變時）。`);
+  if (util > g) {
+    const keep = g / util;
+    if (keep < SHRINK_IMPRACTICAL) out.push('單靠縮短手臂不實際：要縮得非常短才到綠燈。請改用上面的齒輪減速或更強的型號，再視情況減輕負載。');
+    else out.push(`縮短手臂或把負載移近軸心：需求大致與力臂成正比，縮到約 ${Math.floor(keep * 100)}% 長度可估到綠燈（質量不變時）。`);
+  }
   if (flatPeakNmm !== null && fin(flatPeakNmm) && flatPeakNmm < peak * 0.9) {
     out.push(`如果機構其實是平放（在桌面上轉），重力不產生扭力：最大需求約 ${fmtKg(flatPeakNmm)} kgf·cm（使用率 ${pct(flatPeakNmm / spec.stallTorqueNmm)}）。把上方重力改成「平放」可重算。`);
   }
@@ -112,11 +118,35 @@ export function nextLoadId(loads) {
   const used = new Set((loads || []).map(l => l.id));
   for (let i = 1; ; i++) if (!used.has(`Load${i}`)) return `Load${i}`;
 }
-/** 可掛接的接點：所有零件的 p1/p2/p3 去重，標出所屬零件。 */
+/** 固定點（機架、馬達軸）：不會平移，掛負載在上面扭力為 0。type 為 fixed 或 motor。 */
+const isGround = p => p?.type === 'fixed' || p?.type === 'motor';
+/**
+ * 可掛接的接點：所有零件的 p1/p2/p3 去重，標出所屬零件。活動點在前；固定點排最後並標「固定」（掛負載不會產生扭力）。
+ * 同一個接點在任何零件上是固定點就視為固定。回傳 {id,label,fixed,x,y}。
+ */
 export function attachPoints(comps) {
   const seen = new Map();
-  for (const c of comps || []) for (const k of ['p1', 'p2', 'p3']) { const p = c?.[k]; if (p?.id && !seen.has(p.id)) seen.set(p.id, `${p.id}（${c.id}）`); }
-  return [...seen].map(([id, label]) => ({ id, label }));
+  for (const c of comps || []) for (const k of ['p1', 'p2', 'p3']) {
+    const p = c?.[k]; if (!p?.id) continue;
+    const e = seen.get(p.id);
+    if (!e) seen.set(p.id, { id: p.id, comp: c.id, fixed: isGround(p), x: Number(p.x), y: Number(p.y) });
+    else if (isGround(p)) e.fixed = true;
+  }
+  const all = [...seen.values()].map(e => ({ id: e.id, fixed: e.fixed, x: e.x, y: e.y, label: e.fixed ? `${e.id}（${e.comp}，固定）` : `${e.id}（${e.comp}）` }));
+  return [...all.filter(e => !e.fixed), ...all.filter(e => e.fixed)];
+}
+/**
+ * 新增負載時預設掛的接點：作品的軌跡點（tracePoints／tracePoint，要是活動點）優先；
+ * 否則是離馬達軸最遠的活動點（通常是手臂末端）；全是固定點時退回第一個。
+ */
+export function defaultAttachPoint(comps, { tracePoints = [], tracePoint = '', shaftPointId = '' } = {}) {
+  const pts = attachPoints(comps), moving = pts.filter(p => !p.fixed);
+  for (const id of [...(tracePoints || []), tracePoint]) if (id && moving.some(p => p.id === id)) return id;
+  if (!moving.length) return pts[0]?.id || '';
+  const shaft = pts.find(p => p.id === shaftPointId) || pts.find(p => p.fixed);
+  if (!shaft || !fin(shaft.x) || !fin(shaft.y)) return moving[0].id;
+  const dist = p => (fin(p.x) && fin(p.y) ? Math.hypot(p.x - shaft.x, p.y - shaft.y) : -1);
+  return moving.reduce((a, b) => (dist(b) > dist(a) ? b : a)).id;
 }
 /** 可用「零件上位置」掛接的零件（有 p1、p2 的桿）。 */
 export const attachBars = comps => (comps || []).filter(c => c?.p1?.id && c?.p2?.id && c.id).map(c => ({ id: c.id, label: c.id }));

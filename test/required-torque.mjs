@@ -3,7 +3,7 @@ import { check, report } from './_harness.mjs';
 import { BLOCK_EXAMPLES } from '../js/blocks/examples.js';
 import { normalizeSnapshot, toSnapshot } from '../js/blocks/schema.js';
 import { normalizeLoads, normalizeGravity } from '../js/blocks/load-schema.js';
-import { linkMass, materialDensity, polygonProps } from '../js/blocks/part-mass.js';
+import { linkMass, materialDensity, polygonProps, assemblyMassModel } from '../js/blocks/part-mass.js';
 import { MATERIALS } from '../js/blocks/member-stock.js';
 import { compileTopology } from '../js/core/topology.js';
 import { solveTopology } from '../js/multilink/solver.js';
@@ -208,5 +208,29 @@ const armSnap = (extra = {}) => ({ kind: 'blocks', v: 1, counter: 3, params: { L
     } catch (err) { bad.push(`${e.id}: ${err.message}`); }
   }
   check(`全部 ${BLOCK_EXAMPLES.length} 個內建範例：不丟例外（可算 ${ok}、明確回報無法計算 ${noMotor}）`, bad.length === 0 && ok > 25, bad.slice(0, 5).join(' | '));
+}
+// ---- 合成桿、齒輪、齒條的質量（A2）----
+{
+  const mk = (id, a, b, extra = {}) => ({ type: 'bar', id, color: '#3498db', p1: { id: a[0], type: 'floating', x: a[1], y: 0 }, p2: { id: b[0], type: 'floating', x: b[1], y: 0 }, lenParam: 'L' + id, isInput: false, fixedLen: true, stock: { widthMm: 13, thicknessMm: 3, material: 'plywood' }, ...extra });
+  const R = mk('R', ['A', 0], ['B', 80], { barFusionRoot: 'R', barFusion: { version: 1, members: ['R', 'M'], points: [{ id: 'A', x: 0, y: 0 }, { id: 'B', x: 80, y: 0 }, { id: 'C', x: 160, y: 0 }] } });
+  const M = mk('M', ['B', 80], ['C', 160], { barFusionRoot: 'R' });
+  const pts = { A: { x: 0, y: 0 }, B: { x: 80, y: 0 }, C: { x: 160, y: 0 } }, params = { LR: 80, LM: 80 };
+  const fused = assemblyMassModel([R, M], pts, params, {});
+  const sep = [mk('R2', ['A', 0], ['B', 80]), mk('M2', ['B', 80], ['C', 160])].map(c => linkMass(c, 80));
+  const sum = sep[0].massG + sep[1].massG, one = fused.items[0];
+  check('合成桿：算進質量、不再列入略過', fused.items.length === 1 && fused.skipped.length === 0 && one.fused === true, JSON.stringify(fused.skipped));
+  check('合成桿：兩段直桿的聯集質量略小於兩根單桿相加（重疊的端部不重複計），差距在 10% 內', one.massG < sum && one.massG > sum * 0.9, `${one.massG} vs ${sum}`);
+  check('合成桿：重心在兩段單桿重心之間（左段 40、右段 120 mm 之間，約 80 mm）', one.cg.u > 40 && one.cg.u < 120 && Math.abs(one.cg.u - 80) < 1 && Math.abs(one.cg.v) < 1e-6, JSON.stringify(one.cg));
+  const R2 = { ...R, p2: { ...R.p2, x: 80 } };
+  const bad = assemblyMassModel([{ ...R2, barFusion: { ...R.barFusion, members: ['R', 'M'] } }, { ...M, stock: { widthMm: 13, thicknessMm: 6, material: 'plywood' } }], pts, params, {});
+  check('合成桿聯集失敗時仍列入 skipped 並寫出原因', bad.items.length === 0 && bad.skipped.length === 1 && bad.skipped[0].id === 'R' && bad.skipped[0].reason.length > 0, JSON.stringify(bad.skipped));
+  const six = BLOCK_EXAMPLES.find(e => e.id === 'six-bar-lift').snapshot, r6 = requiredTorque(six, { stepDeg: 30 });
+  check('六連桿範例：SixDrive／SixMiddle／SixOutput 不再略過，假設裡有合成桿說明', r6.ok && !r6.skipped.some(x => /^Six(Drive|Middle|Output)$/.test(x.id)) && r6.assumptions.some(a => a.includes('合成桿') && a.includes('SixDrive')), JSON.stringify(r6.skipped));
+  const gm = assemblyMassModel(BLOCK_EXAMPLES.find(e => e.id === 'reduction-gear-train').snapshot.comps, {}, {}, {});
+  check('齒輪：以匯出外形近似算質量，重心掛在軸心接點上，不再略過', gm.items.filter(i => i.approx === '齒輪').length >= 2 && gm.items.every(i => i.massG > 0) && gm.items.filter(i => i.anchor).every(i => i.anchor.dx === 0 && i.anchor.dy === 0) && !gm.skipped.some(x => x.type === 'gear'), JSON.stringify(gm.skipped));
+  const rk = assemblyMassModel(BLOCK_EXAMPLES.find(e => e.id === 'rack-pinion').snapshot.comps, {}, BLOCK_EXAMPLES.find(e => e.id === 'rack-pinion').snapshot.params, {});
+  check('齒條：以匯出外形近似算質量，掛在 p1 上，不再略過', rk.items.some(i => i.approx === '齒條' && i.massG > 0 && i.anchor?.pointId) && !rk.skipped.some(x => x.type === 'rack'), JSON.stringify(rk.skipped));
+  const sl = requiredTorque(BLOCK_EXAMPLES.find(e => e.id === 'slider-crank').snapshot, { stepDeg: 30 });
+  check('尚未計入的型別（滑塊）仍列在 skipped', sl.skipped.some(x => x.type === 'slider'));
 }
 report('required-torque');

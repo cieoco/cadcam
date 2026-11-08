@@ -1,7 +1,8 @@
 // 零件質量與重心（動力扭力估算 Q1）：外形面積（扣孔、扣切口）× 板厚 × 密度。
 // 外形取自匯出幾何（inspectLinkExport／inspectPlateExport），所以與實際切出來的零件一致。
 // 純函式，不改作品、不依賴 DOM。重心為零件局部座標：原點 p1、+u 朝 p2、+v 為其逆時針垂直方向（mm）。
-import { exportableLinks, exportablePlates, inspectLinkExport, inspectPlateExport } from './exporters.js';
+import { exportableLinks, exportablePlates, exportableGears, exportableRacks, inspectLinkExport, inspectPlateExport } from './exporters.js';
+import { inspectBarFusion } from './bar-fusion-geometry.js';
 import { MATERIALS, memberStock } from './member-stock.js';
 
 export const PLYWOOD_DENSITY_KG_M3 = 700;
@@ -68,22 +69,68 @@ export function plateMass(comp, points, settings = {}) {
 }
 
 /**
- * 整個作品的零件質量清單（桿、板）；其他型別（齒輪、齒條、滑塊、凸輪、皮帶輪、針筒…）與合成桿尚未計入，列在 skipped。
+ * 合成桿（barFusion 根件）：用匯出時的聯集外形（已扣重疊與孔），所以重疊處不會重複計算。
+ * 外形座標以根件 p1 為原點、+u 朝 p2，與單桿相同。聯集失敗（板厚不同、外形不相連…）時丟錯，由呼叫端列入 skipped。
+ */
+export function fusionMass(root, comps, params = {}, settings = {}) {
+  const f = inspectBarFusion(comps, root, params, settings, null);
+  if (!f.ok) throw new Error(f.reason || '合成桿外形無法計算');
+  return partMassFromGeometry(root, f.geometry, { thicknessMm: f.thicknessMm });
+}
+
+/**
+ * 齒輪（近似）：用匯出的齒形外形扣孔（約等於節圓半徑的圓盤），重心取軸心 p1。板厚取該零件的 stock 預設。
+ * 外形座標以軸心為原點，所以不需要旋轉。
+ */
+export function gearMass(comp, geometry) {
+  const m = partMassFromGeometry(comp, { outlines: [geometry.outline], holes: geometry.holes || [], cutouts: geometry.cutouts || [] });
+  return { ...m, cg: { u: 0, v: 0 } };
+}
+
+/** 齒條（近似）：匯出外形（含齒、扣長槽與孔）；重心取外形形心，依 axisDeg 轉到畫面方向，掛在 p1 上（齒條只平移不轉動）。 */
+export function rackMass(comp, geometry) {
+  const m = partMassFromGeometry(comp, { outlines: [geometry.outline], holes: geometry.holes || [], cutouts: geometry.cutouts || [] });
+  const a = (Number(comp.axisDeg) || 0) * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  return { ...m, offset: { x: m.cg.u * c - m.cg.v * s, y: m.cg.u * s + m.cg.v * c } };
+}
+
+/**
+ * 整個作品的零件質量清單：桿、合成桿、板、齒輪（近似圓盤）、齒條（近似矩形）。
+ * 其他型別（滑塊、凸輪、皮帶輪、針筒…）尚未計入，列在 skipped。
+ * 項目帶 frame＋cg（隨兩個接點轉動的零件），或 anchor{pointId,dx,dy}（齒輪軸心、齒條原點，只跟著一個接點平移）。
+ * 合成桿與齒輪都以匯出外形計算；重疊處由聯集處理，所以不會重複計入。
  * @param pts 目前求解的接點座標 {id:{x,y}}
- * @returns {{items:Array<{id,kind:'part',compId,frame:[string,string],massG,cg,assumed,reason}>, skipped:Array<{id,type,reason}>}}
+ * @returns {{items:Array<{id,kind:'part',compId,frame?,anchor?,massG,cg,assumed,reason}>, skipped:Array<{id,type,reason}>}}
  */
 export function assemblyMassModel(comps, pts, params = {}, settings = {}) {
   const items = [], skipped = [], done = new Set();
-  const push = (comp, m) => {
+  const push = (comp, m, extra = {}) => {
     done.add(comp.id);
-    items.push({ id: comp.id, kind: 'part', compId: comp.id, frame: [comp.p1.id, comp.p2.id], massG: m.massG, cg: m.cg, assumed: m.assumed, reason: m.reason });
+    items.push({ id: comp.id, kind: 'part', compId: comp.id, massG: m.massG, cg: m.cg, assumed: m.assumed, reason: m.reason, ...extra });
   };
+  const skip = (comp, type, reason) => { skipped.push({ id: comp.id, type, reason }); done.add(comp.id); };
   for (const { comp, length } of exportableLinks(comps, pts, params)) {
-    if (comp.barFusion) { skipped.push({ id: comp.id, type: 'bar', reason: '合成桿質量尚未計入' }); done.add(comp.id); continue; }
-    try { push(comp, linkMass(comp, length, settings)); } catch (e) { skipped.push({ id: comp.id, type: 'bar', reason: String(e.message || e) }); done.add(comp.id); }
+    try {
+      if (comp.barFusion) push(comp, fusionMass(comp, comps, params, settings), { frame: [comp.p1.id, comp.p2.id], fused: true });
+      else push(comp, linkMass(comp, length, settings), { frame: [comp.p1.id, comp.p2.id] });
+    } catch (e) { skip(comp, 'bar', String(e.message || e)); }
   }
   for (const { comp, points } of exportablePlates(comps, pts)) {
-    try { push(comp, plateMass(comp, points, settings)); } catch (e) { skipped.push({ id: comp.id, type: 'triangle', reason: String(e.message || e) }); done.add(comp.id); }
+    try { push(comp, plateMass(comp, points, settings), { frame: [comp.p1.id, comp.p2.id] }); } catch (e) { skip(comp, 'triangle', String(e.message || e)); }
+  }
+  try {
+    for (const { comp, geometry } of exportableGears(comps, params, settings, null)) {
+      try { push(comp, gearMass(comp, geometry), { anchor: { pointId: comp.p1.id, dx: 0, dy: 0 }, approx: '齒輪' }); } catch (e) { skip(comp, 'gear', String(e.message || e)); }
+    }
+  } catch (e) {
+    for (const c of comps) if (c?.type === 'gear' && !done.has(c.id)) skip(c, 'gear', String(e.message || e));
+  }
+  try {
+    for (const { comp, geometry } of exportableRacks(comps, params)) {
+      try { const m = rackMass(comp, geometry); push(comp, m, { anchor: { pointId: comp.p1.id, dx: m.offset.x, dy: m.offset.y }, approx: '齒條' }); } catch (e) { skip(comp, 'rack', String(e.message || e)); }
+    }
+  } catch (e) {
+    for (const c of comps) if (c?.type === 'rack' && !done.has(c.id)) skip(c, 'rack', String(e.message || e));
   }
   for (const c of comps) {
     if (!c || done.has(c.id) || c.type === 'anchor') continue;
