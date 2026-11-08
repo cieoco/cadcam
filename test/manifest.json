@@ -289,7 +289,8 @@
     "test/stroke-trajectories.mjs",
     "test/example-frame-stock.mjs",
     "test/h01-frame-clamp.mjs",
-    "test/iq-linq-lift.mjs"
+    "test/iq-linq-lift.mjs",
+    "test/required-torque.mjs"
   ],
   "version": 1
 }

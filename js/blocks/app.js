@@ -279,7 +279,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   gq=1;
   if(source!=='undo'){closedDesignTabs.clear();closedAssemblies.clear();}
   if (source !== 'undo') S.designFocus = source === 'local-autosave' ? savedFocus() : null;   // 開檔／範例／分享 → 第一頁；自動還原 → 回到上次那頁
-  S.topo = { lessonSequence: norm.lessonSequence || null, hydraulicSequence: norm.hydraulicSequence || null, assemblyMembers: norm.assemblyMembers ?? designIds(S.comps,S.modules), projectName: norm.projectName || '', rootDesignName: norm.rootDesignName || (!S.modules.length ? norm.projectName : '') || '', params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '', dimensions: norm.dimensions || [] };
+  S.topo = { lessonSequence: norm.lessonSequence || null, hydraulicSequence: norm.hydraulicSequence || null, assemblyMembers: norm.assemblyMembers ?? designIds(S.comps,S.modules), projectName: norm.projectName || '', rootDesignName: norm.rootDesignName || (!S.modules.length ? norm.projectName : '') || '', params: norm.params || {}, tracePoint: norm.tracePoint || '', tracePoints: norm.tracePoints || [], referencePoint: norm.referencePoint || '', dimensions: norm.dimensions || [], loads: norm.loads, gravity: norm.gravity };
   if (source !== 'undo') dimUI?.reset();
   manualTrace = {};
   S.counter = Math.max(norm.counter || 0, Store.highestIdNum(S.comps));

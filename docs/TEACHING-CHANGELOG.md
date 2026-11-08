@@ -6,6 +6,15 @@
 
 ---
 
+<a id="actuator-torque-core"></a>
+## 2026-11-08 · 動力扭力估算核心（核心完成、尚無畫面）
+
+- 依[研究報告](RESEARCH-ACTUATOR-TORQUE.md)做 Q1＋Q2 的純函式，**尚無任何畫面入口**，使用者看不到變化。新增`js/core/actuator-specs.js`（MG995 4.8／6 V、SG90、TT 3／6 V、N20 50／100／298:1 規格，N·mm 存、可轉 kgf·cm，全部 measured:false；作品覆寫合併；判定門檻直流 25／50%、伺服 1/3、2/3）、`js/blocks/part-mass.js`（外形面積扣孔×板厚×密度與局部重心，重用匯出幾何）、`js/blocks/load-schema.js`（負載與重力的完整正規化）、`js/core/required-torque.js`（`requiredTorque`虛功法、`evaluateActuator`判定）。
+- 材料密度加在`member-stock`的MATERIALS：合板700 kg/m³（來源[9]），其他為null＝未確認；未指定或未確認時以合板計並標「假設」。既有材料id與預設stock未改。
+- 作品新增選配欄位：`loads`（id、massG、at＝接點id或零件局部u,v、選用force N）與`gravity`（只有`flat`會保存；預設`vertical`＝2D直立、重力朝畫面下方，平放不產生扭力）。舊作品不帶欄位，載入與保存結果逐項不變；負載不影響運動求解。app.js只把兩欄接進S.topo以便保存。
+- 計算：中心差分預設0.5°，被求解器拒絕或分支跳躍時縮小，仍失敗標`singular`；負載點位移率低於最大值10%標`nearDeadPoint`。齒輪效率預設0.9／級，級數取該馬達齒輪列的最大depth，需求扭力除以η^n（正負都除，保守）。多馬達時其他馬達固定在作品凍結角。齒輪、齒條、滑塊、凸輪、皮帶輪、針筒與合成桿的自重尚未計入，列在`skipped`；MG995與N20本體重量未實量，未計入並寫入`assumptions`。仍是準靜態、不含摩擦與慣量。
+- `test/required-torque.mjs`（51項）：單臂解析誤差0.001%、報告§4數字（0.837 kgf·cm；MG995 9.8%、SG90 46.5%、N20 49.2%、TT 104.6%）、12:36齒輪對=負載÷3÷η、四連桿與獨立差分核算誤差0.004%並有死點旗標、2R手臂多馬達凍結角、flat重力為0、舊作品55個範例往返不變、JSON與分享字串往返、55個內建範例不丟例外（可算37、18個明確回報無法計算）。全套Node 276支，失敗19支與基線同一批（既有，未處理）。首次JS 2,103,317→2,103,951 bytes（+634），門檻2.104 MB未放寬；其餘皆按需載入。未做瀏覽器驗收（無UI），未實測。
+
 <a id="actuator-standard-plates"></a>
 ## 2026-11-08 · 致動元件裝在真實標準座板
 
