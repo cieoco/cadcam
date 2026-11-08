@@ -21,7 +21,7 @@ for(const original of [hydraulicSnapshot,fixedLiftSnapshot,fixedGripSnapshot]){
  for(const part of bad)for(const p of [part.p1,part.p2,part.p3])if(p?.id===releasedId)p.type='floating';
  assert.equal(solveSyringe(bad,n.params).ok,false,'releasing the joint on all members invalidates the frame');
  const axis=structuredClone(n.comps);axis.find(o=>o.id===c.id).axisDeg=NaN;assert.equal(solveSyringe(axis,n.params).ok,false);
- assert.throws(()=>syringeManufacturing(n.comps,n.params,null),/本輪不輸出/);
+ assert.ok(syringeManufacturing(n.comps,n.params,null).parts.length,'verified boards export; clamp hardware remains outside DXF');
  assert.equal(JSON.stringify(original),before);
 }
 const s=fixedLiftSnapshot;

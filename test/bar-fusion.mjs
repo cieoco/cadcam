@@ -121,7 +121,10 @@ for(const ids of [['H1Arm','Link11'],['Link11','H1Arm']]){
  }
  for(const format of ['svg','dxf']){
   const work={comps:f.comps,modules:[],topo:{params:hydraulic.params},exportSettings:{}};
-  assert.throws(()=>prepareScopedExport(work,{scope:'selected',selectedId:ids[0]},format),/尚待核對/,'the existing hydraulic manufacturing restriction remains');
+  const exported=prepareScopedExport(work,{scope:'selected',selectedId:ids[0]},format);
+  assert.equal(exported.files.length,1,'the complete fused board exports once');
+  assert.ok(!/NaN|Infinity/.test(exported.files[0].text));
+  assert.ok(exported.notices.some(w=>w.includes('環壁')),'reference clamp clearance remains disclosed');
   assert.equal(prepareScopedExport({...work,comps:f.comps.filter(c=>ids.includes(c.id))},{scope:'selected',selectedId:ids[0]},format).files.length,1);
  }
 }
@@ -158,7 +161,7 @@ for(const ids of [['H1Frame','Link13'],['Link13','H1Frame']]){
  const preview=attachPartMaterials(buildSceneModel(topology.visualization.links,pose.points,{groundIds:new Set(f.data.framePointIds),memberStocks:catalog.memberStocks}),catalog,{comps:f.comps,points:pose.points});
  assert.ok(preview.materialParts.some(p=>p.partId==='H1Frame'));
  assert.ok(catalog.parts.H1Frame.binding.pointIds.includes('A11'));
- for(const format of ['svg','dxf'])assert.throws(()=>prepareScopedExport({comps:f.comps,modules:[],topo:{params:frameWork.params},exportSettings:{}},{scope:'selected',selectedId:'H1Frame'},format),/尚待核對/,'hydraulic fabrication guard remains');
+ for(const format of ['svg','dxf'])assert.equal(prepareScopedExport({comps:f.comps,modules:[],topo:{params:frameWork.params},exportSettings:{}},{scope:'selected',selectedId:'H1Frame'},format).files.length,1,'fused frame exports once with verified clamp holes');
  assert.deepEqual(f.comps.find(c=>c.type==='syringe'),frameWork.comps.find(c=>c.type==='syringe'));
  assert.deepEqual(inspectMountingChange(frameWork,{...frameWork,comps:f.comps}).changes,[],'regrouping does not move approved holes');
  const changed=structuredClone(f.comps);changed.find(c=>c.type==='syringe').axisDeg+=5;

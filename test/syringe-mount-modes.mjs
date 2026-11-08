@@ -53,7 +53,7 @@ for(const disk of [true,false]){
  const nodes=syringeClampFrameNodes(copy.comps,[host.p1,host.p2]);assert.equal(nodes.length,1);
  const scene=buildSyringeInstallPreview(copy);assert.equal(scene.model.syringes[0].mount.reason,'clamp_fastener_clearance','disk and automatic bar frame retain the common hardware diagnostic');
 }
-assert.throws(()=>syringeManufacturing(s.comps,s.params,null),/本輪不輸出/);
+assert.ok(syringeManufacturing(s.comps,s.params,null).parts.length,'verified boards export; clamp hardware remains outside DXF');
 assert.ok(scanSyringe(normalizeSnapshot(legacy).comps,legacy.params,'HSyringe').ok,'legacy two-hinge files unchanged');
 assert.equal(JSON.stringify(s),before,'preview never mutates source');
 console.log(`Syringe mounts: pivot motion, fixed hole, one fastener, no duplicate cuts, barrel offset, guards, new installation, save/share and legacy compatibility passed (${((Math.max(...angles)-Math.min(...angles))*180/Math.PI).toFixed(2)}° barrel swing)`);

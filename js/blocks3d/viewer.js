@@ -356,7 +356,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
         };
         for(const f of s.mount?.fasteners || []){
           const cap=c.baseZ+c.thickness,washerZ=cap;
-          ring(4,f.diameter/2+.25,f.spacerHeight,f.x,f.y,f.frameTopZ,'#b6bdc5');
+          ring(f.spacerOuterDiameter/2,f.spacerInnerDiameter/2,f.spacerHeight,f.x,f.y,f.frameTopZ,'#b6bdc5');
           ring(f.washerDiameter/2,f.diameter/2+.1,f.washerThickness,f.x,f.y,washerZ,'#bdc7d0');
           ring(f.washerDiameter/2,f.diameter/2+.1,f.washerThickness,f.x,f.y,f.frameBottomZ-f.washerThickness,'#bdc7d0');
           const tip=f.frameBottomZ-f.washerThickness-f.nutHeight-1.2;

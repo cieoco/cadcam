@@ -11,7 +11,7 @@ import { deriveMotorMounts } from './build-plan.js';
 import { framePlateHomes } from './module-plates.js';
 import {identifiedHoles} from './part-hole-trace.js';
 import {syringeClampFrameNodes} from './syringe-shape.js';
-import {fixedSyringePointIds} from '../core/syringe.js';
+import {fixedSyringePointIds,attachmentPoint} from '../core/syringe.js';
 import {inside} from './part-fusion.js';
 import {assemblyRoles} from './assembly-roles.js';
 import { orthogonalExportExtras, withWorldAdapterNodes } from './orthogonal-joint.js';
@@ -63,6 +63,18 @@ export function buildPartGeometryCatalog(args={}) {
         const old=geometry.holes.find(q=>Math.hypot(q.x-h.x,q.y-h.y)<.001);
         if(old){old.mountIds=[...(old.mountIds||[]),h.id];continue;}
         if(geometry.holes.some(q=>Math.hypot(q.x-h.x,q.y-h.y)<q.r+h.r))throw Error('管夾配對孔與既有孔重疊，請調整安裝位置。');
+        geometry.holes.push(h);
+      }
+    }
+    // 真實推桿連接孔與畫面共用 attachmentPoint；不能用幽靈求解點冒充已鑽孔。
+    if(['bar','triangle'].includes(kind)&&host){
+      const a=homePoints[host.p1.id],b=homePoints[host.p2.id],local=localizer(a,b);
+      for(const s of comps.filter(c=>c.type==='syringe'&&['fixed-axis','pivot'].includes(c.mountMode)&&c.b?.componentId===id)){
+        const p=attachmentPoint(s.b,comps,params,homePoints);if(!p)throw Error('針筒推桿接合位置無法核對。');
+        const h={...local(p),r:(settings.holeDiameterMm||3.2)/2,id:`${s.id}_rod`,layer:'SYRINGE_ROD'};
+        const old=geometry.holes.find(q=>Math.hypot(q.x-h.x,q.y-h.y)<.001);
+        if(old){if(old.r+.001<h.r)throw Error('既有推桿接孔小於設定孔徑。');old.mountIds=[...(old.mountIds||[]),h.id];continue;}
+        if(!geometry.outlines.some(r=>inside(h,r)&&edgeDistance(h,r)>=h.r+1-.001)||geometry.cutouts.some(c=>inside(h,c.points)||edgeDistance(h,c.points)<h.r+1-.001)||geometry.holes.some(q=>Math.hypot(q.x-h.x,q.y-h.y)<q.r+h.r+1-.001))throw Error('針筒推桿接孔與孔槽或板邊間距不足1 mm。');
         geometry.holes.push(h);
       }
     }

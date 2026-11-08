@@ -41,7 +41,7 @@ assert.deepEqual(syr.installation,{face:'front',spacerMm:null});
 const tooSmall=structuredClone(s);tooSmall.comps.find(c=>c.id===frame.id).diameterMm=296;
 const bad=buildPartGeometryCatalog({comps:tooSmall.comps,params:tooSmall.params});
 assert.ok(bad.diagnostics.some(d=>d.sourceIds.includes(frame.id)&&d.reason?.includes('管夾配對孔')));
-assert.throws(()=>syringeManufacturing(s.comps,s.params,null),/本輪不輸出/);
+assert.ok(syringeManufacturing(s.comps,s.params,null).parts.length,'verified boards export; clamp hardware remains outside DXF');
 assert.equal(getExample('hydraulic-h07').snapshot.projectName,source.projectName);
 assert.equal(fixedBaseSnapshot.comps.find(c=>c.id==='H4Turn').type,'triangle','legacy H04 geometry seed unchanged');
 assert.equal(JSON.stringify(source),before);

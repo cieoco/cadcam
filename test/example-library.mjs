@@ -51,7 +51,7 @@ for(const e of BLOCK_EXAMPLES){
  const exportSource={...s,topo:s,fabrication:s.fabrication||structuredClone(FABRICATION_DEFAULTS),exportSettings:FABRICATION_DEFAULTS.export};
  for(const format of ['svg','dxf']){
    if(e.id==='guided-scissor-lift')assert.throws(()=>prepareScopedExport(exportSource,{scope:'assembly'},format),/液壓製作包目前支援/);
-   else if(groups.hydraulic.includes(e.id))assert.throws(()=>prepareScopedExport(exportSource,{scope:'assembly'},format),/管夾固定案例.*不輸出加工檔/);
+   else if(groups.hydraulic.includes(e.id)){const out=prepareScopedExport(exportSource,{scope:'assembly'},format);assert.ok(out.files.length&&out.files.every(f=>!/(NaN|Infinity)/.test(f.text)),e.id+' verified boards');assert.ok(out.hardware.some(n=>n.kind==='purchased'),e.id+' hardware exclusion disclosed');}
    else if(groups.empty.includes(e.id))assert.throws(()=>prepareScopedExport(exportSource,{scope:'assembly'},format),/沒有零件/);
    else {
      const out=prepareScopedExport(exportSource,{scope:'assembly'},format);

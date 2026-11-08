@@ -35,6 +35,8 @@ export function openScopedExport({readSource,readOptions,format,notify}) {
   const sizeInput=(text,value)=>{const l=document.createElement('label');l.style.cssText='flex:1;min-width:120px';l.textContent=text;const input=document.createElement('input');input.type='number';input.min='20';input.max='5000';input.step='1';input.inputMode='decimal';input.value=String(value);input.setAttribute('aria-label',text);input.style.cssText='display:block;width:100%;box-sizing:border-box;min-height:44px;font:inherit;margin-top:4px';l.append(input);sheet.append(l);return input;};
   const sheetW=sizeInput('板材長（mm）',NEST_DEFAULTS.sheetW),sheetH=sizeInput('板材寬（mm）',NEST_DEFAULTS.sheetH);
   if(format==='dxf')dialog.append(methodLabel,sheet);
+  const fileChoices=document.createElement('fieldset');fileChoices.setAttribute('aria-label','選擇輸出板件');fileChoices.style.cssText='margin:8px 0;padding:8px;border:1px solid #afc4d6';dialog.append(fileChoices);
+  const excludedFiles=new Set();let fileInputs=[];
   const result=document.createElement('div');result.setAttribute('aria-live','polite');dialog.append(result);
   const footer=document.createElement('div');footer.style.cssText='display:flex;gap:8px;position:sticky;bottom:-16px;background:white;padding:12px 0';
   const cancel=document.createElement('button'),confirm=document.createElement('button');
@@ -46,7 +48,7 @@ export function openScopedExport({readSource,readOptions,format,notify}) {
   const paragraph=text=>{const p=document.createElement('p');p.textContent=text;result.append(p);};
   const listOf=(label,items)=>{const list=document.createElement('ul');list.setAttribute('aria-label',label);list.style.cssText='padding-left:24px;overflow-wrap:anywhere';for(const text of items){const li=document.createElement('li');li.textContent=text;list.append(li);}result.append(list);return list;};
   const render=()=>{
-    prepared=null;downloads=[];result.replaceChildren();confirm.disabled=true;
+    prepared=null;downloads=[];fileInputs=[];fileChoices.replaceChildren();fileChoices.hidden=true;result.replaceChildren();confirm.disabled=true;
     partLabel.hidden=select.value!=='selected';
     // 所選零件只輸出單片，不提供合併排版。
     for(const option of method.options)option.disabled=option.value!=='parts'&&select.value==='selected';
@@ -55,8 +57,14 @@ export function openScopedExport({readSource,readOptions,format,notify}) {
     if(select.value==='selected'&&!partSelect.value){paragraph('請在上方選擇要匯出的零件。');return;}
     try {
       prepared=prepareScopedExport(source,{...options,selectedId:partSelect.value||null,scope:select.value},format);
+      if(prepared.hardware?.length){const detail=document.createElement('details'),summary=document.createElement('summary');summary.textContent='固定環、隔圈與外購件規格（不輸出DXF）';detail.append(summary);for(const h of prepared.hardware){const line=document.createElement('p');line.textContent=h.label;detail.append(line);}result.append(detail);}
+      const legend=document.createElement('legend');legend.textContent='勾選要輸出的板件';fileChoices.append(legend);fileChoices.hidden=false;
+      for(const file of prepared.files){const row=document.createElement('label'),input=document.createElement('input');row.style.cssText='display:flex;align-items:center;gap:8px;min-height:44px;overflow-wrap:anywhere';input.type='checkbox';input.checked=!excludedFiles.has(file.name);input.setAttribute('aria-label',`輸出 ${file.name}`);input.onchange=()=>{input.checked?excludedFiles.delete(file.name):excludedFiles.add(file.name);render();};const name=document.createElement('span');name.textContent=file.name;row.append(input,name);fileChoices.append(row);fileInputs.push(input);}
+      const files=prepared.files.filter(f=>!excludedFiles.has(f.name));
+      if(!files.length){paragraph('請至少勾選一個板件；取消勾選只影響本次下載，不刪除作品。');return;}
+      if(files.length<prepared.files.length)paragraph(`本次略過 ${prepared.files.length-files.length} 個未勾選板件。`);
       if(nest) {
-        const cnc=source.fabrication?.cnc||{},nested=buildNestedDxf(prepared.files,{method:method.value,sheetW:sheetW.value,sheetH:sheetH.value,
+        const cnc=source.fabrication?.cnc||{},nested=buildNestedDxf(files,{method:method.value,sheetW:sheetW.value,sheetH:sheetH.value,
           toolDiameterMm:cnc.toolDiameterMm??FABRICATION_DEFAULTS.cnc.toolDiameterMm,defaultThicknessMm:cnc.stockThicknessMm??FABRICATION_DEFAULTS.cnc.stockThicknessMm,
           baseName:nestBaseName(source,{scope:select.value,focus:options.focus})});
         downloads=[nested];
@@ -68,9 +76,9 @@ export function openScopedExport({readSource,readOptions,format,notify}) {
         prepared.warnings.filter(w=>method.value==='cnc'||!(prepared.cncWarnings||[]).includes(w)).forEach(paragraph);
         confirm.disabled=false;return;
       }
-      downloads=prepared.files;
-      paragraph(`${select.options[select.selectedIndex].textContent}：${prepared.files.length} 份檔案`);
-      listOf('匯出檔案',prepared.files.map(file=>file.name+(file.sourceIds?.length>1?`（聯集：${file.sourceIds.join('＋')}）`:'')));
+      downloads=files;
+      paragraph(`${select.options[select.selectedIndex].textContent}：${files.length} 份檔案`);
+      // 上方勾選清單已列出檔名，不再重複同一份清單。
       paragraph('每個板材零件一份檔案；聯集件合為一片。馬達等外購件不輸出。');
       if(select.value==='assembly')paragraph('依目前組立成員及已安裝範圍匯出，不含未加入或備用設計。');
       if(select.value==='selected')paragraph('只輸出所選板身；不額外加入機架。聯集件會保留完整外形。');
@@ -84,7 +92,7 @@ export function openScopedExport({readSource,readOptions,format,notify}) {
   confirm.onclick=()=>{
     if(original!==revision()){paragraph('作品或選取已變更，請取消後重新匯出。');confirm.disabled=true;return;}
     if(!prepared||!downloads.length)return;
-    confirm.disabled=true;select.disabled=true;partSelect.disabled=true;method.disabled=true;sheetW.disabled=true;sheetH.disabled=true;cancel.textContent='完成';
+    confirm.disabled=true;select.disabled=true;partSelect.disabled=true;method.disabled=true;sheetW.disabled=true;sheetH.disabled=true;fileInputs.forEach(i=>i.disabled=true);cancel.textContent='完成';
     for(const file of downloads)downloadText(file.text,file.name,file.mime);
     paragraph('已送出下載。如果瀏覽器阻擋多檔下載，可允許多檔下載後重試，或點下方逐一下載。');
     for(const file of downloads){const button=document.createElement('button');button.textContent=`下載 ${file.name}`;button.style.cssText='display:block;min-height:44px;margin:6px 0;max-width:100%;overflow-wrap:anywhere';button.onclick=()=>downloadText(file.text,file.name,file.mime);result.append(button);}

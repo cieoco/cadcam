@@ -30,7 +30,7 @@ export function syringeClampInstallation(model,shape,z,matrix){
    return {status:'unverified',reason:'barrel_clearance',fasteners:[]};
   fasteners.push({holeId:id,framePartId:part.partId,x:foot.hole.x,y:foot.hole.y,
    frameBottomZ:farZ-sign*z,frameTopZ:nearZ-sign*z,seatZ:shape.clamp.baseZ,spacerHeight,
-   diameter:3,headDiameter:5.5,headHeight:2,washerDiameter:6.5,washerThickness:.6,nutDiameter:6.4,nutHeight:2.4});
+   spacerOuterDiameter:8,spacerInnerDiameter:3.5,diameter:3,headDiameter:5.5,headHeight:2,washerDiameter:6.5,washerThickness:.6,nutDiameter:6.4,nutHeight:2.4});
  }
  // The requested 24 mm ear pitch leaves the existing ring and M3 hardware
  // overlapping. Keep the requested holes and barrel bore; do not certify a

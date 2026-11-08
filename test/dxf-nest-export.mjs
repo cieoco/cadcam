@@ -72,7 +72,7 @@ openScopedExport({format:'dxf',readSource:()=>src,readOptions:()=>({mode:'assemb
 const dialog=document.body.children.at(-1),by=label=>all(dialog).find(e=>e.attrs['aria-label']===label);
 const method=by('輸出方式'),scope=by('匯出範圍'),w=by('板材長（mm）'),h=by('板材寬（mm）'),result=all(dialog).find(e=>e.attrs['aria-live']==='polite');
 assert.deepEqual(method.options.map(o=>o.textContent),['每個零件一份','合併一份（雷射切割）','合併一份（CNC 銑削）']);
-assert.equal(method.value,'parts');assert.equal(by('板材尺寸').style.display,'none');assert.equal(by('匯出檔案').children.length,7,'per-part list unchanged');
+assert.equal(method.value,'parts');assert.equal(by('板材尺寸').style.display,'none');assert.equal(all(by('選擇輸出板件')).filter(e=>e.type==='checkbox').length,7,'per-part list unchanged');
 method.value='laser';method.onchange();
 assert.equal(by('板材尺寸').style.display,'flex');assert.equal(w.value,'600');assert.equal(h.value,'400');
 assert.deepEqual(by('合併檔').children.map(c=>c.textContent),['機構作品-雷切-600x400.dxf']);

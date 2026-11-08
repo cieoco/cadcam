@@ -1,3 +1,4 @@
+import {syringePlateManufacturing} from './syringe-plate-manufacturing.js';
 import {normalizeFabricationProfile} from './fabrication-profile.js';
 import {inspectLinkExport,inspectPlateExport,svgForFrameGeometry,dxfForFrameGeometry} from './exporters.js';
 import {solveSyringe} from './syringe-operations.js';
@@ -19,8 +20,8 @@ export function syringeSeatGeometry(spec,fabrication,end='a') {
   return {outlines:[rectangle(-m.marginMm,-half,length,half)],cutouts:[],holes:[{x:0,y:0,r:pin,layer:'PIVOT'},
     ...[m.marginMm,m.marginMm+m.strapSpacingMm].flatMap(x=>[-1,1].map(sign=>({x,y:sign*(diameter/2+m.clearanceMm+m.marginMm/2),r,layer:'STRAP_BOLT'})))]};
 }
-export function syringeManufacturing(comps,params,fabrication) {
-  if(comps.some(c=>c.type==='syringe'&&['fixed-axis','pivot'].includes(c.mountMode)))throw Error('管夾固定案例的板件、隔圈與固定孔尚待核對，本輪不輸出加工檔。');
+export function syringeManufacturing(comps,params,fabrication,options={}) {
+  if(comps.some(c=>c.type==='syringe'&&['fixed-axis','pivot'].includes(c.mountMode)))return syringePlateManufacturing(comps,params,fabrication,options);
   const checked=normalizeFabricationProfile(fabrication);if(!checked.ok)throw Error(checked.message);
   const f=checked.profile,result=solveSyringe(comps,params);
   if(!result.ok)throw Error(result.message);
@@ -52,11 +53,12 @@ export function syringeManufacturing(comps,params,fabrication) {
   return {parts,warnings,purchased,fabrication:f,syringes};
 }
 export function syringeFiles(plan,format) {
+  if(plan.plateOnly)return plan.parts.map(p=>({name:`${p.id}.${format}`,sourceIds:p.sourceIds,thicknessMm:p.thicknessMm,quantity:p.quantity,text:format==='svg'?svgForFrameGeometry(p.geometry,p.id).replace('</title>',`</title><desc>${escape(plan.warnings.join(' '))} 厚度 ${p.thicknessMm} mm</desc>`):`999\nSTOCK material=${p.material} thicknessMm=${p.thicknessMm}; qty ${p.quantity}\n999\nGEOMETRY CHECKED - HARDWARE FIT AND LOAD NOT VERIFIED\n${plan.warnings.map(w=>'999\n'+w.replace(/[\r\n]+/g,' ')).join('\n')}\n${dxfForFrameGeometry(p.geometry,p.id)}`}));
   return plan.parts.map(p=>({name:`${p.id}.${format}`,text:format==='svg'
     ?svgForFrameGeometry(p.geometry,p.id).replace('</title>',`</title><desc>${escape(plan.warnings.join(' '))} 厚度 ${p.thicknessMm} mm；數量 ${p.quantity}</desc>`)
     :`999\nCONCEPT ONLY - CALIBRATION AND HARDWARE CHECK REQUIRED; thickness ${p.thicknessMm} mm; qty ${p.quantity}\n${dxfForFrameGeometry(p.geometry,p.id)}`}));
 }
 export function syringeBuildPack(plan) {
   const svg=syringeFiles(plan,'svg'),dxf=syringeFiles(plan,'dxf');
-  return `<!doctype html><meta charset="utf-8"><title>H01 液壓製作資料</title><style>body{font:16px sans-serif;max-width:960px;margin:24px auto;padding:16px}svg{max-width:100%;height:180px}article{border-top:1px solid #ccc;padding:12px}a{margin-right:20px}</style><h1>液壓機構製作資料（mm）</h1>${plan.warnings.map(w=>`<p>${escape(w)}</p>`).join('')}<h2>購買件（不列入板材切割）</h2><ul>${plan.purchased.map(p=>`<li>${escape(p)}</li>`).join('')}</ul><h2>板件與局部孔位</h2>${plan.parts.map((p,i)=>`<article><h3>${escape(p.id)} × ${p.quantity}；板厚 ${p.thicknessMm} mm</h3>${svg[i].text.replace(/<\?xml[^>]*>/,'')}<p><a download="${escape(svg[i].name)}" href="data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg[i].text)}">SVG（1:1 mm）</a><a download="${escape(dxf[i].name)}" href="data:application/dxf;charset=utf-8,${encodeURIComponent(dxf[i].text)}">DXF（mm）</a></p><p>孔心 (x,y) / 孔徑 mm：${p.geometry.holes.map(h=>`(${h.x.toFixed(3)}, ${h.y.toFixed(3)}) / ${(h.r*2).toFixed(3)}`).join('；')}</p></article>`).join('')}<h2>保存規格與接點</h2><pre>${escape(JSON.stringify(plan.syringes,null,2))}</pre><h2>組裝與校正</h2><ol><li>量測筒身外徑、長度、推桿尾端外形、夾持位置、最短 A–B 孔距及可用行程；不要用容量推算。</li><li>量測外夾托架與推桿夾具、角碼孔距、轉軸孔徑、板厚及配合間隙，再修改加工設定與座板。</li><li>兩側支架以角碼固定到自備底座，活動臂繞 O 轉動；托架繞 A、推桿夾具繞 B，均保留自由轉動與墊片間隔。</li><li>先空載手推全行程，檢查碰撞、軸向間隔、拔出／觸底，再接水路排氣。不可鑽穿筒身。</li></ol><h2>比較記錄</h2><p>B 孔位／臂長／A 孔位／s 範圍：________</p><p>我的預測：________　模擬觀察：________　實物差異與修正：________</p>`;
+  return `<!doctype html><meta charset="utf-8"><title>液壓製作資料</title><style>body{font:16px sans-serif;max-width:960px;margin:24px auto;padding:16px}svg{max-width:100%;height:180px}article{border-top:1px solid #ccc;padding:12px}a{margin-right:20px}</style><h1>液壓機構製作資料（mm）</h1>${plan.warnings.map(w=>`<p>${escape(w)}</p>`).join('')}<h2>購買件（不列入板材切割）</h2><ul>${plan.purchased.map(p=>`<li>${escape(p)}</li>`).join('')}</ul><h2>板件與局部孔位</h2>${plan.parts.map((p,i)=>`<article><h3>${escape(p.id)} × ${p.quantity}；板厚 ${p.thicknessMm} mm</h3>${svg[i].text.replace(/<\?xml[^>]*>/,'')}<p><a download="${escape(svg[i].name)}" href="data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg[i].text)}">SVG（1:1 mm）</a><a download="${escape(dxf[i].name)}" href="data:application/dxf;charset=utf-8,${encodeURIComponent(dxf[i].text)}">DXF（mm）</a></p><p>孔心 (x,y) / 孔徑 mm：${p.geometry.holes.map(h=>`(${h.x.toFixed(3)}, ${h.y.toFixed(3)}) / ${(h.r*2).toFixed(3)}`).join('；')}</p></article>`).join('')}<h2>保存規格與接點</h2><pre>${escape(JSON.stringify(plan.syringes,null,2))}</pre><h2>組裝與校正</h2><ol><li>量測筒身外徑、長度、推桿尾端外形、夾持位置、最短 A–B 孔距及可用行程；不要用容量推算。</li><li>量測外夾托架與推桿夾具、角碼孔距、轉軸孔徑、板厚及配合間隙，再修改加工設定與座板。</li><li>${plan.plateOnly?'依作品的固定式或單耳樞軸配置安裝；固定環與隔圈依上列規格及實物核對，固定式不可當成可轉動托架。':'兩側支架以角碼固定到自備底座，活動臂繞 O 轉動；托架繞 A、推桿夾具繞 B，均保留自由轉動與墊片間隔。'}</li><li>先空載手推全行程，檢查碰撞、軸向間隔、拔出／觸底，再接水路排氣。不可鑽穿筒身。</li></ol><h2>比較記錄</h2><p>B 孔位／臂長／A 孔位／s 範圍：________</p><p>我的預測：________　模擬觀察：________　實物差異與修正：________</p>`;
 }

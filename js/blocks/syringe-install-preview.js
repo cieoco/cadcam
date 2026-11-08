@@ -16,9 +16,9 @@ import {materialSolveValidity} from './material-pose-status.js';
 import {DEFAULT_PLATE_RADIUS_WORLD} from './plate-geometry.js';
 import {resolveSpacers} from './interference.js';
 import {collectSceneIds,prepareRenderScene} from './render-scene.js';
-export function buildSyringeInstallPreview(n){
-  const work={comps:structuredClone(n.comps),modules:[],params:{...n.params},fabrication:structuredClone(n.fabrication || FABRICATION_DEFAULTS)};
-  work.comps.forEach(c=>{delete c.moduleId;});
+export function buildSyringeInstallPreview(n,{assembly=false}={}){
+  const work={comps:structuredClone(n.comps),modules:assembly?structuredClone(n.modules||[]):[],params:{...n.params},fabrication:structuredClone(n.fabrication || FABRICATION_DEFAULTS)};
+  if(!assembly)work.comps.forEach(c=>{delete c.moduleId;});
   work.topo={params:work.params};work.stockMm=Number(work.fabrication.cnc.stockThicknessMm);work.exportSettings=work.fabrication.export||{};work.joint=work.fabrication.joint;
   const prepared=prepareConnectionWork(work.comps,work.modules,work.topo,{stockMm:work.stockMm,exportSettings:work.exportSettings});work.modules=prepared.modules;work.params=work.topo.params;
   const asm=compileAssembly(work.comps,work.modules,work.topo),sol=solveAssembly(asm,{thetaDeg:0,motorAngles:{},...n.motion});
@@ -35,5 +35,5 @@ export function buildSyringeInstallPreview(n){
   const args={comps:work.comps,modules:work.modules,params:work.params,exportSettings:{...work.exportSettings,drive:work.fabrication.drive||FABRICATION_DEFAULTS.drive},cnc:work.fabrication.cnc,mounts:exportMounts,joint:work.joint};
   const {plan}=resolveSpacers(args);
   const model=buildMaterialScene({...work,catalog,inputs:planeInputs(inputs,work.comps,work.modules,null),allPlanes:inputs,points:sol.points,asm,plan,combineSyringeFrame:true,hullR:DEFAULT_PLATE_RADIUS_WORLD,solveValidity:validity});
-  return {model,work,points:sol.points};
+  return {model,work,catalog,points:sol.points};
 }

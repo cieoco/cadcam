@@ -54,6 +54,7 @@
     "test/bar-fusion-resize.mjs",
     "test/actuator-installation.mjs",
     "test/syringe.mjs",
+    "test/syringe-plate-export.mjs",
     "test/rod-syringe-creation.mjs",
     "test/syringe-assembly-scene.mjs",
     "test/syringe-clamp-mount.mjs",
