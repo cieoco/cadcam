@@ -19,6 +19,7 @@ assert.deepEqual(FABRICATION_DEFAULTS, {
     shaftDiameterMm: 6, screwDiameterMm: 3, screwOffsetXMm: -20.6, screwSpacingMm: 17.3,
     locatorDiameterMm: 4, locatorOffsetXMm: -11.18, locatorOffsetYMm: 0,
   },
+  n20Mount: {bossDiameterMm:4.2,screwDiameterMm:1.8,screwSpacingMm:9},
   mg995Mount: {
     bodyLengthMm: 41.2, bodyWidthMm: 20.2, shaftOffsetMm: 10, screwDiameterMm: 3.2,
     screwSpanMm: 49.5, screwSpacingMm: 10, cableNotchWidthMm: 8, cableNotchDepthMm: 4,
@@ -27,6 +28,7 @@ assert.deepEqual(FABRICATION_DEFAULTS, {
   cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 },
   // L2b：馬達與齒輪的接法（常見值，請實量後修改）。TT 輪轂兩螺絲；MG995 圓舵盤 N 螺絲。
   drive: {
+    n20Spec:0,n20HubCenterMm:3.2,n20HubScrewMm:3.2,n20HubCircleMm:12.7,
     ttHubCenterMm: 6, ttHubScrewMm: 3.2, ttHubScrewSpacingMm: 12,
     hornCenterMm: 6, hornScrewMm: 2.2, hornScrewCount: 4, hornScrewCircleMm: 14,
   },
@@ -67,7 +69,7 @@ const full = normalizeFabricationProfile(nonDefault);
 assert.deepEqual(nonDefault, original, 'normalization must not mutate its input');
 assert.equal(full.ok, true);
 assert.equal(full.status, 'present');
-assert.deepEqual(full.profile, { ...nonDefault, syringeMount: {...FABRICATION_DEFAULTS.syringeMount}, cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 }, drive: { ...FABRICATION_DEFAULTS.drive }, joint: { defaultKind: 'printed', bracket: { ...FABRICATION_DEFAULTS.joint.bracket } } },
+assert.deepEqual(full.profile, { ...nonDefault, n20Mount:{...FABRICATION_DEFAULTS.n20Mount}, syringeMount: {...FABRICATION_DEFAULTS.syringeMount}, cnc: { toolDiameterMm: 3.175, stockThicknessMm: 3 }, drive: { ...FABRICATION_DEFAULTS.drive }, joint: { defaultKind: 'printed', bracket: { ...FABRICATION_DEFAULTS.joint.bracket } } },
   'older three-group profiles round-trip and get the cnc, drive and joint defaults');
 assert.deepEqual(full.warnings, [], 'missing cnc / drive / joint groups (older works) are filled silently');
 
@@ -75,7 +77,7 @@ assert.deepEqual(full.warnings, [], 'missing cnc / drive / joint groups (older w
 const withDrive = { ...nonDefault, drive: { ttHubCenterMm: 7, ttHubScrewMm: 3, ttHubScrewSpacingMm: 14.5, hornCenterMm: 5, hornScrewMm: 2, hornScrewCount: 6, hornScrewCircleMm: 16 } };
 const driveFull = normalizeFabricationProfile(withDrive);
 assert.equal(driveFull.ok, true);
-assert.deepEqual(driveFull.profile.drive, withDrive.drive);
+assert.deepEqual(driveFull.profile.drive, {...FABRICATION_DEFAULTS.drive,...withDrive.drive});
 assert.deepEqual(driveFull.warnings, []);
 assert.equal(normalizeFabricationProfile({ ...nonDefault, drive: { ...withDrive.drive, hornScrewCount: 2.5 } }).ok, false, 'screw count must be an integer');
 assert.equal(normalizeFabricationProfile({ ...nonDefault, drive: { ...withDrive.drive, hornScrewCount: 9 } }).ok, false, 'screw count 0..8');
@@ -188,3 +190,5 @@ assert.equal(planFabricationProfile(undefined, 'ttMount', 'shaftDiameterMm', 8).
 
 assert.equal(globalThis.localStorage, undefined, 'module tests must not require browser storage');
 console.log('fabrication profile checks passed');
+
+{const old=structuredClone(FABRICATION_DEFAULTS);delete old.n20Mount;for(const k of Object.keys(old.drive))if(k.startsWith('n20'))delete old.drive[k];const n=normalizeFabricationProfile(old);assert.ok(n.ok);assert.equal(n.profile.drive.n20Spec,0);assert.deepEqual(n.warnings,[]);assert.deepEqual(n.profile.ttMount,old.ttMount);assert.deepEqual(n.profile.mg995Mount,old.mg995Mount);assert.match(planFabricationProfile(n.profile,'drive','n20Spec',.5).message,/n20Spec/);}

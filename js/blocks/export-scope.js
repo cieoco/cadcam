@@ -1,3 +1,4 @@
+import {actuatorMountSettings} from './fabrication-profile.js';
 import {compsInFocus,ROOT_TAB} from './design-focus.js';
 import {assemblyWork,assemblyFamily} from './assembly-membership.js';
 import {machineComps,machineModules} from './assembly-roles.js';
@@ -42,7 +43,7 @@ export function prepareScopedExport(source,options,format) {
   const work=structuredClone(source),{context,targets,scope}=resolveExportScope(work,options);
   const targetIds=new Set(targets.map(c=>c.id)),files=[],warnings=[],notices=[];
   const emit=(text,name,mime,ids=[])=>{if(scope!=='selected'||ids.some(id=>targetIds.has(id)))files.push({text,name,mime,sourceIds:ids});};
-  if(context.comps.some(c=>c.motorType==='n20')){const note='N20 僅通用模擬：固定支架、軸接頭與配對孔尚未提供；中心孔為一般參考孔，製作前須核對。';warnings.push(note);notices.push(note);}
+  if(context.comps.some(c=>c.motorType==='n20')){const note=work.fabrication?.drive?.n20Spec===1?'N20特定前端雙孔座與3 mm軸輪轂試作：小孔需另鑽；螺絲牙深、軸向間隙及實物待核對。':'N20 僅通用模擬：固定支架、軸接頭與配對孔尚未提供；中心孔為一般參考孔，製作前須核對。';warnings.push(note);notices.push(note);}
   if(context.comps.some(c=>c.type==='syringe')) {
     const plan=syringeManufacturing(context.comps,work.topo.params,work.fabrication);
     const selected=scope==='selected'?plan.parts.filter(p=>targetIds.has(p.id)||plan.syringes.some(s=>targetIds.has(s.id)&&p.id.startsWith(s.id+'-'))):plan.parts;
@@ -54,7 +55,7 @@ export function prepareScopedExport(source,options,format) {
     if(usesFaceExport(scoped))data=faceFileExportData(scoped,{theta:0});
     else {
       const settings={...work.exportSettings,drive:work.fabrication?.drive||FABRICATION_DEFAULTS.drive};
-      const mounts=machineMounts(deriveMotorMounts(context.comps).map(m=>({...m,settings:m.kind==='mg995'?work.fabrication?.mg995Mount:work.fabrication?.ttMount})),context.comps,context.modules);
+      const mounts=machineMounts(deriveMotorMounts(context.comps).map(m=>({...m,settings:actuatorMountSettings(work.fabrication,m.kind)})),context.comps,context.modules);
       const catalog=buildPartGeometryCatalog({...context,params,fabrication:work.fabrication,exportSettings:settings,mounts});
       const extras=catalog.extras,split=splitFrameMounts(Ex.splitMountsByHost(context.comps,mounts).free,context.comps,context.modules);
       data={...context,params,settings,mounts,extras,points:catalog.homePoints,frames:[

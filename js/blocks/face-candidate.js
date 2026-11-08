@@ -1,3 +1,4 @@
+import {actuatorMountSettings} from './fabrication-profile.js';
 /** Plain F1 candidate and once-only transaction; no S, DOM, undo or storage access. */
 import {tabNutPlans} from './tab-nut-plan.js';
 import {buildMountSurfaces,findMountSurface,partMountOutput} from './mount-surfaces.js';
@@ -39,7 +40,7 @@ export function buildFaceCandidate(source,{childId,hostEndpoint,childEndpoint,se
    if(!hostModule.outputs?.some(o=>o.id===output.id))hostModule.outputs=[...(hostModule.outputs || []),output];
    if(!hostEndpoint.outputId && !hostEndpoint.output)hostEndpoint={...hostEndpoint,outputId:output.id};
  }
- const opts={comps:work.comps,modules:work.modules,params:work.params,exportSettings,thicknessMm:stockMm,drilling:true};
+ const opts={comps:work.comps,modules:work.modules,params:work.params,exportSettings:{...exportSettings,drive:work.fabrication?.drive},fabrication:work.fabrication,thicknessMm:stockMm,drilling:true};
  const host=findMountSurface(buildMountSurfaces({...opts,moduleId:hostEndpoint?.moduleId}).surfaces,hostEndpoint);
  const child=buildMountSurfaces({...opts,moduleId:childId,...(childEndpoint?.partId&&childEndpoint.partId!=='frame'?{partId:childEndpoint.partId}:{})}).surfaces?.find(s=>childEndpoint?.partId==='frame'?s.kind==='frame':s.compId===childEndpoint?.partId);
  if(!host||!child)return failed('endpoint_missing','接合端點已不存在，請重新選面。',sourceRevision);
@@ -76,7 +77,7 @@ export function faceCandidateModel(candidate,pose={}){
  const validity=materialSolveValidity(work.comps,sol);if(!validity.valid)return {solveValidity:validity};
  const ids=motorPointIds(work.comps),groundIds=new Set(work.comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(p=>p&&['fixed','motor'].includes(p.type)).map(p=>p.id)));
  const mounts=buildMotorMounts({motorIds:ids,groundIds,staticPoints:pointCoords(work.comps),comps:work.comps,compiledSteps:prepared.compiled.steps,sliderMountInfo:()=>null,isHiddenSliderRailPoint:()=>false,motorTypeForCenter:id=>motorTypeAt(work.comps,id)});
- const exportMounts=buildMotorExportMounts({comps:work.comps,pts:pointCoords(work.comps),motorCenterIds:ids,motorMounts:mounts,typeForCenter:id=>motorTypeAt(work.comps,id),ttSettings:work.fabrication?.ttMount || FABRICATION_DEFAULTS.ttMount,mg995Settings:work.fabrication?.mg995Mount || FABRICATION_DEFAULTS.mg995Mount});
+ const exportMounts=buildMotorExportMounts({comps:work.comps,pts:pointCoords(work.comps),motorCenterIds:ids,motorMounts:mounts,typeForCenter:id=>motorTypeAt(work.comps,id),ttSettings:work.fabrication?.ttMount || FABRICATION_DEFAULTS.ttMount,n20Settings:actuatorMountSettings(work.fabrication,'n20'),mg995Settings:work.fabrication?.mg995Mount || FABRICATION_DEFAULTS.mg995Mount});
  const catalog=buildPartGeometryCatalog({...work,mounts:exportMounts});
  const inputs=buildPreviewModelInputs({comps:work.comps,params:work.params,theta:pose.theta || 0,links:prepared.compiled.visualization.links,polygons:prepared.compiled.visualization.polygons || [],points:sol.points,groundIds,motorCenterIds:ids,motorTypes:new Map([...ids].map(id=>[id,motorTypeAt(work.comps,id)])),motorMounts:mounts,
   sliderTravelStart:c=>c.travelStart || 0,sliderTravelEnd:c=>c.travelEnd || 100,sliderBodyLength:c=>c.bodyLen || 60,rackBodyHeight:c=>c.bodyHeight || 20,rackPhaseShift:()=>0,pulleyRadius:()=>32,pulleyPinRadius:()=>20});

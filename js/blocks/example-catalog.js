@@ -54,6 +54,7 @@ export const CATALOG_FAMILIES = [
   family('fourbar', 'motion', '旋轉與往復擺動 · 四連桿', '同一家族比較曲柄搖桿、雙曲柄與雙搖桿。', [
     variant('fourbar-crank-rocker', '曲柄帶動搖桿'), variant('fourbar-missing-coupler', '補接四連桿浮桿', '待完成練習'),
     variant('fourbar-double-crank', '雙曲柄連續旋轉'), variant('fourbar-double-rocker', '雙搖桿往復擺動')]),
+  family('motor-plate','motion','馬達座板與輪轂輸出','依型號重用孔位；特定前端座與輪轂為可調試作，實物待核對。',[variant('motor-plate-tt','TT座板與雙孔輪轂','可試動',''),variant('motor-plate-n20','N20前端座與四孔輪轂','可試動','')]),
   family('servo-plate', 'motion', '舵機裝在標準孔板上', 'MG995槽與耳孔開在可編輯的N×5座板；試作尺寸待實量。', [variant('servo-plate-arm', '座板＋輸出棍', '可試動', ''), variant('servo-plate-fourbar', '舵機曲柄四連桿', '可試動', '')]),
   family('wiper', 'motion', '往復掃掠 · 單支雨刷', '先看完整連接，再練習補接浮桿。', [
     variant('wiper-single', '單支雨刷往復擺動'), variant('wiper-missing-coupler', '補接雨刷浮桿', '待完成練習')]),

@@ -219,11 +219,20 @@ function servoHornHoles(settings, x = 0, angle = 0, fit = null) {
   return holes;
 }
 
+// TT matches the existing gear hub. N20 is an explicitly selected 3 mm-shaft hub prototype.
+export function actuatorHubHoles(type,settings={},x=0,angle=0){
+ const d={...FABRICATION_DEFAULTS.drive,...settings.drive},turn=(u,v)=>({x:x+u*Math.cos(angle)-v*Math.sin(angle),y:u*Math.sin(angle)+v*Math.cos(angle)});
+ if(type==='n20'){if(d.n20Spec!==1)return [];return [{kind:'circle',...turn(0,0),r:d.n20HubCenterMm/2,layer:'N20_HUB_CENTER'},...[0,1,2,3].map(i=>({kind:'circle',...turn(d.n20HubCircleMm/2*Math.cos(i*Math.PI/2),d.n20HubCircleMm/2*Math.sin(i*Math.PI/2)),r:d.n20HubScrewMm/2,layer:'N20_HUB_SCREW'}))];}
+ if(type==='tt')return [{kind:'circle',...turn(0,0),r:d.ttHubCenterMm/2,layer:'TT_HUB_CENTER'},...[-1,1].map(n=>({kind:'circle',...turn(0,n*d.ttHubScrewSpacingMm/2),r:d.ttHubScrewMm/2,layer:'TT_HUB_SCREW'}))];
+ return [];
+}
+
 function linkHoleSpecs(comp, length, settings, extraHoles = []) {
   const { holeDiameterMm, ttShaftFlatDiameterMm, ttShaftFlatThicknessMm } = normalizeExportSettings(settings);
   const holeR = round(holeDiameterMm / 2, 3);
   const flat = { ttShaftFlatDiameterMm, ttShaftFlatThicknessMm };
   const endHoles = (key, x) => {
+    if(isOutputBlank(comp)&&comp.isInput&&comp[key]?.physicalMotor&&['tt','n20'].includes(comp.motorType || 'tt')){const h=actuatorHubHoles(comp.motorType || 'tt',settings,x);if(h.length)return h;}
     if (comp.isInput && comp.motorType === 'mg995' && comp[key]?.physicalMotor) return servoHornHoles(settings, x, 0, comp.shape === 'disk' ? null : {halfWidth:memberStock(comp).widthMm/2,length,...(isOutputBlank(comp)?{rect:true,minX:-comp.standardBlank.rearMm-(8-memberStock(comp).thicknessMm/2),maxX:length+(8-memberStock(comp).thicknessMm/2)}:{})});
     return [isTtMotorEnd(comp, key) ? { kind: 'tt-shaft-flat', x, y: 0, settings: flat } : { kind: 'circle', x, y: 0, r: holeR }];
   };
@@ -329,13 +338,9 @@ function gearGeometry(comp, params = {}, settings = {}, comps = []) {
   const ttDriven = driven && !['mg995','n20'].includes(comp.motorType);
   const driveHoles = [];
   if (ttDriven) {
-    driveHoles.push({ x: 0, y: 0, r: drive.ttHubCenterMm / 2, layer: 'TT_HUB_CENTER' });
-    const half = drive.ttHubScrewSpacingMm / 2;
-    // 螺絲孔沿輸出孔方向 angle 的垂直方向，對稱於中心。
-    const nx = -Math.sin(angle), ny = Math.cos(angle);
-    [1, -1].forEach(sgn => driveHoles.push({ x: sgn * half * nx, y: sgn * half * ny, r: drive.ttHubScrewMm / 2, layer: 'TT_HUB_SCREW' }));
+    driveHoles.push(...actuatorHubHoles('tt',settings,0,angle));
   } else if (driven && comp.motorType === 'n20') {
-    driveHoles.push({x:0,y:0,r:centerR,layer:'CENTER_HOLE'}); // 一般參考孔；N20 軸接頭未定。
+    driveHoles.push(...(actuatorHubHoles('n20',settings,0,angle).length?actuatorHubHoles('n20',settings,0,angle):[{x:0,y:0,r:centerR,layer:'CENTER_HOLE'}])); // 一般參考孔；N20 軸接頭未定。
   } else if (driven) {
     driveHoles.push(...servoHornHoles(settings, 0, angle).map(({ kind, ...hole }) => hole));
   }
@@ -909,7 +914,7 @@ function dxfForRack(comp, geometry) {
 // 單一動力來源的加工特徵（世界座標）：corners＝安裝內容角點（供外形合併／延伸判斷）、
 // cutouts＝非圓形切割（MG995 穿板槽）、holes＝圓孔。自動地基、宿主機架桿與結構板共用。
 export function motorMountFeatures(mount) {
-  if (!mount || mount.kind === 'n20' || !mount.center || !Number.isFinite(mount.center.x)) return null;
+  if (!mount || mount.kind === 'n20'&&!mount.settings?.enabled || !mount.center || !Number.isFinite(mount.center.x)) return null;
   const rot = (Number(mount.rotDeg) || 0) * Math.PI / 180;
   const cos = Math.cos(rot), sin = Math.sin(rot);
   const local = (x, y) => ({
@@ -918,6 +923,11 @@ export function motorMountFeatures(mount) {
   });
   const cutouts = [];
   const holes = [];
+  if(mount.kind==='n20'){
+    const m=mount.settings,boss=m.bossDiameterMm/2,screw=m.screwDiameterMm/2,half=m.screwSpacingMm/2;
+    holes.push({...local(0,0),r:boss,layer:'N20_BOSS'},...[-1,1].map(n=>({...local(n*half,0),r:screw,layer:'N20_SCREW'})));
+    return {corners:[local(-half-5,-6),local(half+5,-6),local(half+5,6),local(-half-5,6)],cutouts,holes};
+  }
   if (mount.kind === 'mg995') {
     // MG995 穿板式固定：本體矩形槽（含線槽缺口）+ 兩耳共 4 個螺絲孔。
     // CAD local 與 TT 同慣例：+X 為機身反方向（機殼沿 -X 延伸），輸出軸心在原點。

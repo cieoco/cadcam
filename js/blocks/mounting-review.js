@@ -1,3 +1,4 @@
+import {actuatorMountSettings} from './fabrication-profile.js';
 /** Compare fabrication interfaces in part-local coordinates, never screen or animation coordinates.
  * Existing geometry producers remain the authority; this module owns only the edit decision.
  */
@@ -38,7 +39,7 @@ function catalog(s){
   s.modules=prepareConnectionWork(s.comps,s.modules,{...(s.topo||{}),params:s.params},{exportSettings:s.fabrication.export||{},stockMm:s.fabrication.cnc?.stockThicknessMm||3}).modules;
   const pts=pointCoords(s.comps),motorIds=new Set(motorPointIds(s.comps)),type=id=>motorTypeAt(s.comps,id);
   const planned=buildMotorMounts({motorIds,groundIds:frameNodeIds(s.comps),staticPoints:pts,comps:s.comps,compiledSteps:[],sliderMountInfo:id=>sliderMountInfo(s.comps,id),isHiddenSliderRailPoint:id=>isHiddenSliderRailPoint(s.comps,id),motorTypeForCenter:type});
-  const mounts=buildMotorExportMounts({comps:s.comps,pts,motorCenterIds:motorIds,motorMounts:planned,typeForCenter:type,ttSettings:s.fabrication.ttMount,mg995Settings:s.fabrication.mg995Mount});
+  const mounts=buildMotorExportMounts({comps:s.comps,pts,motorCenterIds:motorIds,motorMounts:planned,typeForCenter:type,ttSettings:s.fabrication.ttMount,n20Settings:actuatorMountSettings(s.fabrication,'n20'),mg995Settings:s.fabrication.mg995Mount});
   return buildPartGeometryCatalog({...s,mounts});
 }
 function partFor(catalog,id){
@@ -101,7 +102,7 @@ export function inspectMountingChange(before,after){
     }
     const syringeId=r.id.startsWith('syringe:')?r.id.slice(8):null;
     const outputChanged=syringeId&&!same(a.comps.find(c=>c.id===syringeId)?.b,b.comps.find(c=>c.id===syringeId)?.b);
-    if(changed.length||outputChanged||!same(r.parts,n.parts)){const count=c=>c?.holes.filter(h=>h.layer==='MG995_HORN_SCREW').length || 0,oldOutput=Object.values(ca.parts).find(p=>p.sourceIds.some(id=>a.comps.some(c=>c.id===id&&c.standardBlank?.rearMm!==undefined))&&r.parts.includes(p.id)),newOutput=oldOutput&&partFor(cb,oldOutput.id),detail=oldOutput&&newOutput&&count(oldOutput)!==count(newOutput)?`舵盤有效固定螺絲 ${count(oldOutput)}→${count(newOutput)} 顆` : '';changes.push({id:r.id,label:detail||r.label,parts:changed.length?changed:[...ids]});}
+    if(changed.length||outputChanged||!same(r.parts,n.parts)){const count=c=>c?.holes.filter(h=>/^(MG995_HORN|TT_HUB|N20_HUB)_SCREW$/.test(h.layer)).length || 0,oldOutput=Object.values(ca.parts).find(p=>p.sourceIds.some(id=>a.comps.some(c=>c.id===id&&c.standardBlank?.rearMm!==undefined))&&r.parts.includes(p.id)),newOutput=oldOutput&&partFor(cb,oldOutput.id),detail=oldOutput&&newOutput&&count(oldOutput)!==count(newOutput)?`軸接頭有效固定螺絲 ${count(oldOutput)}→${count(newOutput)} 顆` : '';changes.push({id:r.id,label:detail||r.label,parts:changed.length?changed:[...ids]});}
   }
   return {ok:!issues.length,changes,issues:[...new Set(issues)]};
 }

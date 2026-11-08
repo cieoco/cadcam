@@ -29,13 +29,13 @@ export function motorMountPatternRotDegForCenter({id,pts,comps,mount=null,fallba
  const visual=center&&far&&Number.isFinite(far.x)?Math.atan2(-(far.x-center.x),-(far.y-center.y))*180/Math.PI:mount?mount.rotDeg:fallbackRotDeg(id);
  return visual-90;
 }
-export function buildMotorExportMounts({comps,pts={},motorCenterIds=new Set(),motorTypes=new Map(),motorMounts=new Map(),ttSettings={},mg995Settings={},typeForCenter=()=> 'tt',fallbackRotDeg=()=>0}){
+export function buildMotorExportMounts({comps,pts={},motorCenterIds=new Set(),motorTypes=new Map(),motorMounts=new Map(),ttSettings={},mg995Settings={},n20Settings={},typeForCenter=()=> 'tt',fallbackRotDeg=()=>0}){
  const out=[];
  motorCenterIds.forEach(id=>{
   const center=pts[id];if(!center||!Number.isFinite(center.x)||!Number.isFinite(center.y))return;
   const type=motorTypes.get(id) || typeForCenter(id),mount=motorMounts.get(id);
   // pointId：供 splitMountsByHost 對應 bar.motorMountPoint（宿主機架桿）。
-  out.push({kind:type,pointId:id,frameBody:mount?.frameBody,center,rotDeg:motorMountPatternRotDegForCenter({id,pts,comps,mount,fallbackRotDeg}),settings:type==='mg995'?mg995Settings:ttSettings});
+  out.push({kind:type,pointId:id,frameBody:mount?.frameBody,center,rotDeg:motorMountPatternRotDegForCenter({id,pts,comps,mount,fallbackRotDeg}),settings:type==='n20'?n20Settings:type==='mg995'?mg995Settings:ttSettings});
  });
  return out;
 }

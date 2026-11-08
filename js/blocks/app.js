@@ -1,3 +1,4 @@
+import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import {pointDisplayName} from './display-labels.js';
 import {fusionRoot} from '../core/bar-fusion.js';
 import {commitMountingEdit,confirmMountingChange,mountingCandidate} from './mounting-review-ui.js';
@@ -996,12 +997,13 @@ async function configureMotorMount(nodeId=null,initialOutputId='') {
   finally { motorInstallationLoading=false; }
   if(S.mode!=='design'||snapshotStr()!==before||S.designFocus!==focus){transient('作品已變更，請重新選擇安裝。');return;}
   openMotorInstallation({source:{comps:scoped,params:S.topo.params,fabrication:S.fabrication},points:displayCoords(),
-    review:(plan,notify)=>{if(snapshotStr()!==before){notify('作品已變更，請重新開啟安裝。');return false;}return confirmMountingChange(JSON.parse(before),mountingCandidate(JSON.parse(before),plan,scoped),{notify});},
+    review:(plan,notify)=>{if(snapshotStr()!==before){notify('作品已變更，請重新開啟安裝。');return false;}const candidate=mountingCandidate(JSON.parse(before),plan,scoped);const order=new Map(JSON.parse(before).comps.map((c,i)=>[c.id,i]));candidate.comps.sort((a,b)=>(order.get(a.id)??Infinity)-(order.get(b.id)??Infinity));const holes=planActuatorPlateHoles(candidate);if(!holes.ok){notify(holes.message);return false;}candidate.comps=holes.comps;if(!confirmMountingChange(JSON.parse(before),candidate,{notify}))return false;plan.fullWork=candidate;return true;},
     motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()},type:S.pendingMotorType,
     existingId:existing?.id,initialOutputId,motorId:nextMotorId(),confirm:plan=>{
       if(snapshotStr()!==before||S.designFocus!==focus)return false;
-      pushUndo();const byId=new Map(plan.comps.map(c=>[c.id,c]));
-      S.comps=S.comps.map(c=>ids.has(c.id)?byId.get(c.id):c);S.topo.params={...S.topo.params,...plan.params};
+      if(!plan.fullWork)return false;
+      pushUndo();S.comps=plan.fullWork.comps;S.topo.params=plan.fullWork.params;
+      if(plan.fabrication)Settings.applyFabricationProfile(plan.fabrication);
       activateMotor(plan.motor,plan.angle);S.selectedNodeId=plan.center;S.selectedLinkId=null;S.selectedTriangleId=null;S.selectedGearId=null;
       rebuild();draw();Panels.updateRoleEditor();openMobileEditPanel();scheduleAutosave();return true;
     }});
@@ -2345,7 +2347,7 @@ function drawMotorMountHoles(motorIds, motorMounts, pts) {
     motorIds, motorMounts, points: pts, svg, scale: View.getScale(),
     project: p => ({ x: TX(p.x), y: TY(p.y) }), motorTypeForCenter,
     rotationForCenter: motorMountPatternRotDegForCenter,
-    ttSettings: Settings.ttMountSettings(), mg995Settings: Settings.mg995MountSettings(),
+    ttSettings: Settings.ttMountSettings(), n20Settings: Settings.n20MountSettings(), mg995Settings: Settings.mg995MountSettings(),
     mg995SlotOutline: Exporters.mg995SlotOutline,
     registerUpdate: update => frameUpdaters.push(update)
   });
@@ -2353,13 +2355,13 @@ function drawMotorMountHoles(motorIds, motorMounts, pts) {
 
 function frameSizeInfo() {
   const comps = viewComps(), nodes = Model.frameConnectorNodes(comps);
-  const mounts = Exporters.splitMountsByHost(comps,deriveMotorMounts(comps)).free;
+  const mounts = Exporters.splitMountsByHost(comps,deriveMotorMounts(comps,S.fabrication)).free;
   const geometry = Exporters.inspectFrameExport(nodes,Settings.exportSettings(),mounts);
   return {...geometry?.dimensions,thicknessMm:geometry?.thicknessMm || S.fabrication?.cnc?.stockThicknessMm || 3};
 }
 function frameAction(name,...args) {
   const revision=JSON.stringify([S.comps,S.topo.params,S.designFocus]);
-  return import('./frame-hole-editor.js').then(m=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus]))return;return m[name]({S,viewComps,frameSizeInfo,frameGroundInfo,pause,pushUndo,transient,rebuild,draw,scheduleAutosave,svg,deselectLink,openMobileEditPanel,setBanner,clearBanner,settings:Settings.exportSettings(),mounts:()=>Exporters.splitMountsByHost(viewComps(),deriveMotorMounts(viewComps())).free},...args);});
+  return import('./frame-hole-editor.js').then(m=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus]))return;return m[name]({S,viewComps,frameSizeInfo,frameGroundInfo,pause,pushUndo,transient,rebuild,draw,scheduleAutosave,svg,deselectLink,openMobileEditPanel,setBanner,clearBanner,settings:Settings.exportSettings(),mounts:()=>Exporters.splitMountsByHost(viewComps(),deriveMotorMounts(viewComps(),S.fabrication)).free},...args);});
 }
 function setFrameSize(key, raw) {
   if (!['lengthMm','widthMm','thicknessMm','auto'].includes(key)) return;
@@ -2920,7 +2922,7 @@ function motorFrameExportMounts(inputs = null) {
   inputs ||= (S.modules.some(m=>m.mount?.face)?lastModelInputsAll || lastModelInputs:lastModelInputs) || {};
   const work=representationWork();
   if(!inDesign())inputs=focusInputs(inputs,work.comps);
-  return buildMotorExportMounts({...inputs,comps:work.comps,ttSettings:Settings.ttMountSettings(),mg995Settings:Settings.mg995MountSettings(),typeForCenter:motorTypeForCenter,fallbackRotDeg:id=>computeMotorRotDeg(id,inputs.pts || {},new Set())});
+  return buildMotorExportMounts({...inputs,comps:work.comps,ttSettings:Settings.ttMountSettings(),n20Settings:Settings.n20MountSettings(),mg995Settings:Settings.mg995MountSettings(),typeForCenter:motorTypeForCenter,fallbackRotDeg:id=>computeMotorRotDeg(id,inputs.pts || {},new Set())});
 }
 // O4a：直角安裝轉接座的孔位（桿件孔＋子模組底板節點）；板厚用 CNC 設定的板材厚度。
 // M5a：整台機器（底座＋裝在它身上的）；還沒接上的機構不進匯出、製作包與機架板。

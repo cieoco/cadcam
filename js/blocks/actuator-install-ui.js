@@ -1,3 +1,4 @@
+import {actuatorMountSettings,normalizeFabricationProfile,planFabricationProfile} from './fabrication-profile.js';
 import {isOutputBlank} from './standard-blank.js';
 import {inspectLinkExport,inspectPlateExport} from './exporters.js';
 import {deriveMotorMounts} from './build-plan.js';
@@ -10,8 +11,8 @@ const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textC
 const label=c=>c?.name || c?.id || '尚未選擇';
 
 import {confirmMountingChange} from './mounting-review-ui.js';
-export function openMotorInstallation({source,points={},motion={},type='mg995',existingId=null,initialOutputId='',motorId='1',confirm,review=(result,notify)=>confirmMountingChange(source,{...source,comps:result.comps,params:result.params},{notify})}){
-  const base=structuredClone(source),choices=actuatorChoices(base.comps),old=base.comps.find(c=>c.id===existingId);
+export function openMotorInstallation({source,points={},motion={},type='mg995',existingId=null,initialOutputId='',motorId='1',confirm,review=(result,notify)=>confirmMountingChange(source,{...source,comps:result.comps,params:result.params,fabrication:result.fabrication},{notify})}){
+  const base=structuredClone(source);base.fabrication=normalizeFabricationProfile(base.fabrication).profile;const choices=actuatorChoices(base.comps),old=base.comps.find(c=>c.id===existingId);
   const oldCenter=old?.motorMount?.center || ['p1','p2'].map(k=>old?.[k]).find(p=>p?.physicalMotor)?.id;
   const request={type:old?(old.motorType||'tt'):type,motorId,existingId,hostId:old?(old.motorMount?.frameBody||old.motorCarrier||'world'):'',
     angleDeg:old?.motorMount?.angleDeg??0,hostEnd:'p1',face:old?.motorMount?.face||'back',orientation:old?.motorMount?.orientation||'horizontal',reversed:!!old?.motorMount?.reversed,
@@ -37,6 +38,11 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
   const option=(s,text,value)=>{const o=el('option',text,s);o.value=value;};
   const kind=field(panels[0],'致動元件');option(kind,'MG995 舵機','mg995');option(kind,'TT 馬達','tt');option(kind,'N20 減速馬達','n20');kind.value=request.type;
   const host=field(panels[0],'外殼固定在哪個零件？');option(host,'請選承載零件','');option(host,'自動機架（固定在圖面）','world');
+  const n20Spec=field(panels[0],'N20 安裝規格');option(n20Spec,'通用模擬（沒有專用孔）','0');option(n20Spec,'前端雙孔＋3 mm軸輪轂試作','1');n20Spec.value=String(base.fabrication.drive.n20Spec);
+  n20Spec.onchange=()=>{base.fabrication.drive.n20Spec=Number(n20Spec.value);update();};
+  const n20Fields=el('details',null,panels[0]);el('summary','N20 試作孔規格（mm）',n20Fields);
+  for(const [group,key,text] of [['n20Mount','bossDiameterMm','凸台讓位孔'],['n20Mount','screwDiameterMm','前座螺絲清孔'],['n20Mount','screwSpacingMm','前座雙孔距'],['drive','n20HubCenterMm','輪轂中心讓位孔'],['drive','n20HubScrewMm','輪轂板上螺絲清孔'],['drive','n20HubCircleMm','輪轂四孔圓徑']]){const n=field(n20Fields,text,'input');n.step='any';n.value=base.fabrication[group][key];n.onchange=()=>{const p=planFabricationProfile(base.fabrication,group,key,Number(n.value));if(!p.ok){n.setCustomValidity(p.message);n.reportValidity();result=null;next.disabled=true;error.textContent=p.message;return;}n.setCustomValidity('');base.fabrication=p.profile;update();};}
+
   choices.hosts.forEach(c=>option(host,label(c),c.id));host.value=request.hostId;
   const faceRow=el('div',null,panels[0]);faceRow.className='install-faces';
   const faces=['front','back'].map((face,i)=>{const b=el('button',i?'背面':'正面',faceRow);b.onclick=()=>{request.face=face;update();};return b;});
@@ -98,10 +104,10 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     for(const c of cs){
       const a=world(c.p1),b=world(c.p2);if(!a||!b)continue;
       const color=c.id===request.outputId?'#e88d27':c.id===request.hostId?'#1686b3':'#a6b4bf';
-      if(isOutputBlank(c)){const g=inspectLinkExport(c,base.params[c.lenParam],{...base.fabrication?.export,drive:base.fabrication?.drive}),L=Math.hypot(b.x-a.x,b.y-a.y),ux=(b.x-a.x)/L,uy=(b.y-a.y)/L,world=p=>({x:a.x+p.x*ux-p.y*uy,y:a.y+p.x*uy+p.y*ux});for(const r of g.outlines)draw('path',{d:'M '+r.map(p=>{const q=world(p);return `${q.x} ${-q.y}`;}).join(' L ')+' Z',fill:'#f5ddd1',stroke:color,'data-actuator-part':c.id});for(const h of g.holes){const q=world(h);draw('circle',{cx:q.x,cy:-q.y,r:h.r,fill:'white',stroke:color,'data-output-horn':h.layer.startsWith('MG995_HORN')?c.id:''});}}
+      if(isOutputBlank(c)){const g=inspectLinkExport(c,base.params[c.lenParam],{...base.fabrication?.export,drive:base.fabrication?.drive}),L=Math.hypot(b.x-a.x,b.y-a.y),ux=(b.x-a.x)/L,uy=(b.y-a.y)/L,world=p=>({x:a.x+p.x*ux-p.y*uy,y:a.y+p.x*uy+p.y*ux});for(const r of g.outlines)draw('path',{d:'M '+r.map(p=>{const q=world(p);return `${q.x} ${-q.y}`;}).join(' L ')+' Z',fill:'#f5ddd1',stroke:color,'data-actuator-part':c.id});for(const h of g.holes){const q=world(h);draw('circle',{cx:q.x,cy:-q.y,r:h.r,fill:'white',stroke:color,'data-output-horn':/^(MG995_HORN|TT_HUB|N20_HUB)/.test(h.layer)?c.id:''});}}
       else if(c.type==='bar')draw('line',{x1:a.x,y1:-a.y,x2:b.x,y2:-b.y,stroke:color,'stroke-width':12,'stroke-linecap':'round','data-actuator-part':c.id});
       else if(c.type==='gear')draw('circle',{cx:a.x,cy:-a.y,r:base.params[c.radiusParam]||18,fill:'#dce6ed',stroke:color,'stroke-width':3,'data-actuator-part':c.id});
-      else if(c.type==='triangle'&&c.standardBlank){const mounts=deriveMotorMounts(cs).filter(m=>m.frameBody===c.id).map(m=>({...m,settings:base.fabrication?.[m.kind==='mg995'?'mg995Mount':'ttMount']})),g=inspectPlateExport(c,['p1','p2','p3'].map(k=>world(c[k])),{},mounts);for(const ring of g.outlines)draw('path',{d:'M '+ring.map(p=>`${p.x} ${-p.y}`).join(' L ')+' Z',fill:'#dcecf0',stroke:color,'data-actuator-part':c.id});for(const cut of g.cutouts)draw('path',{d:'M '+cut.points.map(p=>`${p.x} ${-p.y}`).join(' L ')+' Z',fill:'white',stroke:color});for(const h of g.holes)draw('circle',{cx:h.x,cy:-h.y,r:h.r,fill:'white',stroke:color});}
+      else if(c.type==='triangle'&&c.standardBlank){const mounts=deriveMotorMounts(cs).filter(m=>m.frameBody===c.id).map(m=>({...m,settings:actuatorMountSettings(base.fabrication,m.kind)})),g=inspectPlateExport(c,['p1','p2','p3'].map(k=>world(c[k])),{},mounts);for(const ring of g.outlines)draw('path',{d:'M '+ring.map(p=>`${p.x} ${-p.y}`).join(' L ')+' Z',fill:'#dcecf0',stroke:color,'data-actuator-part':c.id});for(const cut of g.cutouts)draw('path',{d:'M '+cut.points.map(p=>`${p.x} ${-p.y}`).join(' L ')+' Z',fill:'white',stroke:color});for(const h of g.holes)draw('circle',{cx:h.x,cy:-h.y,r:h.r,fill:'white',stroke:color});}
       else continue;
       const available=c.type==='gear'?[{key:'p1',...c.p1}]:actuatorHostPoints(c).filter(p=>!(c.standardBlank?.mountHoles || []).some(h=>h.id===p.id)||p.id===oldCenter||p.key===request.hostEnd);
       for(const entry of available){const k=entry.key,p=pts[entry.id] || entry;draw('circle',{cx:p.x,cy:-p.y,r:5,fill:'white',stroke:color,'stroke-width':2});
@@ -142,9 +148,10 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     }catch(e){if(!closed)error.textContent=`3D 預覽未完成：${e.message}`;}
   }
   function update(trialOnly=false){
-    n20Note.hidden=request.type!=='n20';
+    n20Note.hidden=request.type!=='n20';n20Spec.closest('label').hidden=request.type!=='n20';n20Fields.hidden=request.type!=='n20'||base.fabrication.drive.n20Spec!==1;n20Note.textContent=base.fabrication.drive.n20Spec===1?'N20 規格套用同作品全部N20。特定前端雙孔試作：參考12×10 mm減速箱、9 mm雙M1.6與3 mm軸；清孔1.8／凸台4.2為改製值，小孔需另鑽。輪轂四M3與側止付不同；螺絲長度、軸向間隙及承載待實量。':'N20 通用模擬：轉速、扭力、固定支架及軸接頭待依實物核對。';
     revision++;if(!trialOnly)scanText.textContent='設定已變更，請重新檢查動作範圍。';
-    result=request.outputId?planMotorInstallation(base,request,points,motion):null;
+    const invalidSpec=request.type==='n20'&&base.fabrication.drive.n20Spec===1&&n20Fields.querySelector('input:invalid');
+    result=!invalidSpec&&request.outputId?planMotorInstallation(base,request,points,motion):null;
     title.textContent=`${request.type==='mg995'?'舵機':request.type==='n20'?'N20 減速馬達':'馬達'}安裝`;
     host.value=request.hostId;output.value=request.outputId;hostLocations();location.value=request.hostEnd;end.value=request.outputEnd;orientation.value=request.orientation;
     quickSummary.textContent=request.outputId?`帶動「${label(base.comps.find(c=>c.id===request.outputId))}」・孔 ${selectedNode}；${request.hostId==='world'?'外殼固定在圖面基準（會固定此孔）':`外殼固定在「${label(base.comps.find(c=>c.id===request.hostId))}」`}。`
@@ -164,7 +171,7 @@ export function openMotorInstallation({source,points={},motion={},type='mg995',e
     if(document.activeElement!==exact)showNumber(exact,request.angle);
     summary.hidden=!old||request.type!=='mg995';summary.textContent=`擺動 ${request.start}–${request.end}°；範圍沿用接點面板的伺服角度。`;
     reading.textContent=`${Number(request.angle.toFixed(2))}°${result?.ok?' · 幾何可解':''}`;
-    error.textContent=result&&!result.ok?result.message:result?.plateHoles?.length?'板座孔槽為未實量試作；占用格孔已停用，拆除或改方向會重新核對並還原。':'';
+    error.textContent=invalidSpec?invalidSpec.validationMessage:result&&!result.ok?result.message:result?.plateHoles?.length?'板座孔槽為未實量試作；占用格孔已停用，拆除或改方向會重新核對並還原。':'';
     next.disabled=!result?.ok;
     exact.disabled=trial.disabled=!request.hostId||!request.outputId;scan.disabled=toggle.disabled=!result?.ok;
     const show3d=three&&result?.ok;space.hidden=!show3d;svg.toggleAttribute('hidden',!!show3d);toggle.textContent=show3d?'回到 2D':'查看 3D';

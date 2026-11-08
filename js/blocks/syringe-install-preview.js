@@ -1,3 +1,4 @@
+import {actuatorMountSettings} from './fabrication-profile.js';
 // Candidate-only local design scene, using the same material pipeline as the workspace.
 import {markAllPlaneZlift} from './render-scene.js';
 import {compileAssembly,solveAssembly} from './assembly.js';
@@ -24,7 +25,7 @@ export function buildSyringeInstallPreview(n){
   const validity=materialSolveValidity(work.comps,sol);if(!validity.valid)return {validity};
   const ids=motorPointIds(work.comps),groundIds=new Set(work.comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(p=>p&&['fixed','motor'].includes(p.type)).map(p=>p.id)));
   const mounts=buildMotorMounts({motorIds:ids,groundIds,staticPoints:pointCoords(work.comps),comps:work.comps,compiledSteps:prepared.compiled.steps,sliderMountInfo:()=>null,isHiddenSliderRailPoint:()=>false,motorTypeForCenter:id=>motorTypeAt(work.comps,id)});
-  const exportMounts=buildMotorExportMounts({comps:work.comps,pts:pointCoords(work.comps),motorCenterIds:ids,motorMounts:mounts,typeForCenter:id=>motorTypeAt(work.comps,id),ttSettings:work.fabrication.ttMount||FABRICATION_DEFAULTS.ttMount,mg995Settings:work.fabrication.mg995Mount||FABRICATION_DEFAULTS.mg995Mount});
+  const exportMounts=buildMotorExportMounts({comps:work.comps,pts:pointCoords(work.comps),motorCenterIds:ids,motorMounts:mounts,typeForCenter:id=>motorTypeAt(work.comps,id),ttSettings:work.fabrication.ttMount||FABRICATION_DEFAULTS.ttMount,n20Settings:actuatorMountSettings(work.fabrication,'n20'),mg995Settings:work.fabrication.mg995Mount||FABRICATION_DEFAULTS.mg995Mount});
   const catalog=buildPartGeometryCatalog({...work,mounts:exportMounts});
   const sceneIds=collectSceneIds({compiled:prepared.compiled,comps:work.comps,motorPointIds:ids});
   prepareRenderScene({compiled:prepared.compiled,comps:work.comps,points:sol.points,frameGeometry:catalog.parts.frame||null,sceneIds,computeBodyLayers,motorAssemblyLayerForBody:()=>null,motorMounts:mounts});

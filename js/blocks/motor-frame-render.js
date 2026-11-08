@@ -1,3 +1,4 @@
+import {motorMountFeatures} from './exporters.js';
 /**
  * blocks / motor-frame-render
  *
@@ -51,7 +52,7 @@ export function drawModulePlates({ plates, svg, project, getPlates, registerUpda
   if (registerUpdate && getPlates) registerUpdate(P => render(getPlates(P)));
 }
 
-export function drawMotorMountHoles({ motorIds, motorMounts, points, svg, scale, project, motorTypeForCenter, rotationForCenter, ttSettings, mg995Settings, mg995SlotOutline, registerUpdate }) {
+export function drawMotorMountHoles({ motorIds, motorMounts, points, svg, scale, project, motorTypeForCenter, rotationForCenter, ttSettings, mg995Settings, n20Settings, mg995SlotOutline, registerUpdate }) {
   const layer = svgEl('g'); layer.style.pointerEvents = 'none'; svg.appendChild(layer);
   const addHole = (group, xMm, yMm, diameterMm, attrs = {}) => {
     const hole = svgEl('circle');
@@ -62,7 +63,7 @@ export function drawMotorMountHoles({ motorIds, motorMounts, points, svg, scale,
   };
   motorIds.forEach(id => {
     const type = motorTypeForCenter(id), point = points[id];
-    if(type==='n20')return; // 通用模擬尚無固定座孔規格，不套用 TT 孔位。
+    if(type==='n20'&&!n20Settings?.enabled)return; // 通用模擬尚無固定座孔規格，不套用 TT 孔位。
     if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
     const group = svgEl('g');
     const update = current => {
@@ -75,7 +76,8 @@ export function drawMotorMountHoles({ motorIds, motorMounts, points, svg, scale,
     };
     update(points);
     const title = svgEl('title');
-    if (type === 'mg995') {
+    if(type==='n20'){title.textContent='N20特定前端雙M1.6座試作：小孔需另鑽、軸向安裝待量';group.appendChild(title);const f=motorMountFeatures({kind:'n20',center:{x:0,y:0},settings:n20Settings});for(const h of f.holes)addHole(group,h.x,h.y,h.r*2);
+    } else if (type === 'mg995') {
       const settings = mg995Settings;
       title.textContent = 'MG995 機架固定：本體穿板槽（尾端線槽缺口）、兩耳共 4 個螺絲孔'; group.appendChild(title);
       const slot = svgEl('polygon');

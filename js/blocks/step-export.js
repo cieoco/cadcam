@@ -1,3 +1,4 @@
+import {actuatorMountSettings} from './fabrication-profile.js';
 /**
  * blocks / step-export
  *
@@ -333,7 +334,7 @@ function sceneFromWork(work,{theta=0,motorAngles={}}) {
   if(!validity.valid)return {invalid:validity.reason||'unsolved_pose'};
   const ids=motorPointIds(comps),groundIds=new Set(comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(p=>p&&['fixed','motor'].includes(p.type)).map(p=>p.id)));
   const mounts=buildMotorMounts({motorIds:ids,groundIds,staticPoints:pointCoords(comps),comps,compiledSteps:prepared.compiled.steps,sliderMountInfo:()=>null,isHiddenSliderRailPoint:()=>false,motorTypeForCenter:id=>motorTypeAt(comps,id)});
-  const exportMounts=buildMotorExportMounts({comps,pts:pointCoords(comps),motorCenterIds:ids,motorMounts:mounts,typeForCenter:id=>motorTypeAt(comps,id),ttSettings:fabrication.ttMount||FABRICATION_DEFAULTS.ttMount,mg995Settings:fabrication.mg995Mount||FABRICATION_DEFAULTS.mg995Mount});
+  const exportMounts=buildMotorExportMounts({comps,pts:pointCoords(comps),motorCenterIds:ids,motorMounts:mounts,typeForCenter:id=>motorTypeAt(comps,id),ttSettings:fabrication.ttMount||FABRICATION_DEFAULTS.ttMount,n20Settings:actuatorMountSettings(fabrication,'n20'),mg995Settings:fabrication.mg995Mount||FABRICATION_DEFAULTS.mg995Mount});
   const catalog=buildPartGeometryCatalog({comps,modules:wmodules,params:wparams,fabrication,exportSettings,mounts:exportMounts});
   const sceneIds=collectSceneIds({compiled:prepared.compiled,comps,motorPointIds:ids});
   prepareRenderScene({compiled:prepared.compiled,comps,points:sol.points,frameGeometry:catalog.parts.frame||null,sceneIds,computeBodyLayers,motorAssemblyLayerForBody:()=>null,motorMounts:mounts});

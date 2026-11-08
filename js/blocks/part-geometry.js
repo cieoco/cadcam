@@ -5,7 +5,7 @@ import * as Exporters from './exporters.js';
 import { pointCoords, frameConnectorNodes } from './model.js';
 import { frameStockOf } from './frame-stock.js';
 import { memberStock } from './member-stock.js';
-import { FABRICATION_DEFAULTS } from './fabrication-profile.js';
+import { FABRICATION_DEFAULTS,actuatorMountSettings } from './fabrication-profile.js';
 import { compileAssembly, solveAssembly, machineFrameComps, machineMounts, outputPose, splitFrameMounts } from './assembly.js';
 import { deriveMotorMounts } from './build-plan.js';
 import { framePlateHomes } from './module-plates.js';
@@ -43,7 +43,7 @@ export function buildPartGeometryCatalog(args={}) {
   const settings={...(fabrication.export || {}),...(input.exportSettings || {}),drive:fabrication.drive || FABRICATION_DEFAULTS.drive};
   const stockMm=Number(fabrication.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm;
   const joint=fabrication.joint || FABRICATION_DEFAULTS.joint;
-  const mounts=input.mounts || deriveMotorMounts(comps),split=Exporters.splitMountsByHost(comps,mounts);
+  const mounts=input.mounts || deriveMotorMounts(comps).map(m=>({...m,settings:actuatorMountSettings(fabrication,m.kind)})),split=Exporters.splitMountsByHost(comps,mounts);
   const extras=orthogonalExportExtras(comps,modules,params,{stockMm,joint,exportSettings:settings});
   const parts={},diagnostics=[...(extras.diagnostics || [])],memberStocks={},fusedParts={};
   const motors=Object.fromEntries(comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(p=>p?.physicalMotor).map(p=>[p.physicalMotor,0])));
@@ -117,7 +117,7 @@ export function buildPartGeometryCatalog(args={}) {
     add('frame','frame',frame,frameStockOf(mainNodes).thicknessMm || stockMm,['frame'],{kind:'frame'},owners.length===1?owners[0]:null);
     parts.frame.sourceModuleIds=owners;
   }
-  const homes=framePlateHomes(comps,modules,params,{exportSettings:settings,mounts,joint,stockMm});
+  const homes=framePlateHomes(comps,modules,params,{exportSettings:settings,mounts,joint,stockMm,fabrication});
   // 未接合機構在組立預覽仍有自己的底板；不併入世界機架，也不改製作包範圍。
   if(input.includeSpareFrames)for(const id of assemblyRoles(modules).spare){
     const own=comps.filter(c=>c.moduleId===id),nodes=frameConnectorNodes(own);

@@ -16,6 +16,7 @@
 
 ## 產品與功能規格
 
+- [TT與特定N20座板／輪轂輸出](TEACHING-CHANGELOG.md#tt-n20-plates) — 型號孔圖、明選試作、跨設計占孔及桌手機驗收；小孔與軸向裝配限制。
 - [三列輸出板與舵盤固定](TEACHING-CHANGELOG.md#servo-output-plate) — 軸後一格、可選預設、四／雙螺絲、占孔及輸出驗收。
 
 - [固定標準座板的致動安裝](TEACHING-CHANGELOG.md#actuator-standard-plates) — 真N×M板、占孔／還原、兩個舵機例及未驗證界限。

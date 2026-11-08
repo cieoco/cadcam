@@ -1,3 +1,4 @@
+import {actuatorMountSettings} from './fabrication-profile.js';
 import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 /**
  * 作品級加工與馬達安裝設定。
@@ -226,3 +227,5 @@ export function handleFabricationKey(event) {
   if (event.key === 'Escape') { event.preventDefault(); syncFabricationInputs(); event.currentTarget?.blur(); }
   else if (event.key === 'Enter') { event.preventDefault(); event.currentTarget?.blur(); }
 }
+
+export const n20MountSettings=()=>actuatorMountSettings(S.fabrication,'n20');

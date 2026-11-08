@@ -26,6 +26,7 @@ export const FABRICATION_DEFAULTS = Object.freeze({
     locatorOffsetXMm: -11.18,
     locatorOffsetYMm: 0,
   }),
+  n20Mount: freezeRecord({bossDiameterMm:4.2,screwDiameterMm:1.8,screwSpacingMm:9}),
   mg995Mount: freezeRecord({
     bodyLengthMm: 41.2,
     bodyWidthMm: 20.2,
@@ -44,6 +45,10 @@ export const FABRICATION_DEFAULTS = Object.freeze({
   // 馬達帶動齒輪的鎖固孔：TT 用附的輪轂鎖兩顆螺絲、MG995 用圓舵盤鎖 N 顆螺絲。
   // 以下是常見值，請實量輪轂／舵盤後修改。
   drive: freezeRecord({
+    n20Spec: 0,
+    n20HubCenterMm: 3.2,
+    n20HubScrewMm: 3.2,
+    n20HubCircleMm: 12.7,
     ttHubCenterMm: 6,
     ttHubScrewMm: 3.2,
     ttHubScrewSpacingMm: 12,
@@ -95,6 +100,7 @@ const RANGES = Object.freeze({
     locatorOffsetXMm: [-120, 120],
     locatorOffsetYMm: [-80, 80],
   }),
+  n20Mount: freezeRecord({bossDiameterMm:[3,12],screwDiameterMm:[.5,4],screwSpacingMm:[5,30]}),
   mg995Mount: freezeRecord({
     bodyLengthMm: [20, 80],
     bodyWidthMm: [10, 40],
@@ -110,6 +116,10 @@ const RANGES = Object.freeze({
     stockThicknessMm: [0.5, 50],
   }),
   drive: freezeRecord({
+    n20Spec: [0,1],
+    n20HubCenterMm: [1,10],
+    n20HubScrewMm: [.5,6],
+    n20HubCircleMm: [5,40],
     ttHubCenterMm: [1, 20],
     ttHubScrewMm: [0.5, 8],
     ttHubScrewSpacingMm: [0, 40],
@@ -128,6 +138,7 @@ const cloneDefaults = () => ({
   syringeMount: {...FABRICATION_DEFAULTS.syringeMount},
   export: { ...FABRICATION_DEFAULTS.export },
   ttMount: { ...FABRICATION_DEFAULTS.ttMount },
+  n20Mount: {...FABRICATION_DEFAULTS.n20Mount},
   mg995Mount: { ...FABRICATION_DEFAULTS.mg995Mount },
   cnc: { ...FABRICATION_DEFAULTS.cnc },
   drive: { ...FABRICATION_DEFAULTS.drive },
@@ -138,6 +149,7 @@ const cloneProfile = profile => ({
   syringeMount: {...profile.syringeMount},
   export: { ...profile.export },
   ttMount: { ...profile.ttMount },
+  n20Mount: {...profile.n20Mount},
   mg995Mount: { ...profile.mg995Mount },
   cnc: { ...profile.cnc },
   drive: { ...profile.drive },
@@ -158,8 +170,8 @@ function validateKnownValue(group, key, value) {
   if (value < min || value > max) {
     return invalid(`${group}.${key} 必須介於 ${min}–${max} mm。`, `${group}.${key}`);
   }
-  if (group === 'drive' && key === 'hornScrewCount' && !Number.isInteger(value)) {
-    return invalid('drive.hornScrewCount 必須是整數。', 'drive.hornScrewCount');
+  if (group === 'drive' && ['hornScrewCount','n20Spec'].includes(key) && !Number.isInteger(value)) {
+    return invalid(`drive.${key} 必須是整數。`, `drive.${key}`);
   }
   return { ok: true, value: group === 'cnc' ? roundThousandth(value) : roundHundredth(value) };
 }
@@ -247,7 +259,7 @@ export function normalizeFabricationProfile(raw) {
     }
     if (!own(raw, group)) {
       // 舊作品沒有 cnc／drive 群組：靜默補預設，不算缺漏。
-      if (group === 'cnc' || group === 'drive' || group === 'syringeMount') continue;
+      if (group === 'cnc' || group === 'drive' || group === 'syringeMount' || group === 'n20Mount') continue;
       for (const key of Object.keys(FABRICATION_DEFAULTS[group])) {
         warnings.push(`缺少 fabrication.${group}.${key}，已使用 v1 固定預設。`);
       }
@@ -263,6 +275,7 @@ export function normalizeFabricationProfile(raw) {
     }
     for (const key of Object.keys(FABRICATION_DEFAULTS[group])) {
       if (!own(source, key)) {
+        if(group==='drive'&&key.startsWith('n20'))continue; // Existing profiles retain reference-only N20 silently.
         warnings.push(`缺少 fabrication.${group}.${key}，已使用 v1 固定預設。`);
         continue;
       }
@@ -312,3 +325,6 @@ export function planFabricationProfile(current, group, key, rawValue) {
     changed: normalized.status === 'missing' || JSON.stringify(profile) !== JSON.stringify(normalized.profile),
   };
 }
+
+// One explicit prototype selection; absent/legacy N20 profiles retain reference-only geometry.
+export const actuatorMountSettings=(profile,kind)=>kind==='n20'?{...FABRICATION_DEFAULTS.n20Mount,...profile?.n20Mount,enabled:profile?.drive?.n20Spec===1}:profile?.[kind==='mg995'?'mg995Mount':'ttMount'];

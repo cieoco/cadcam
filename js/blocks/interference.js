@@ -138,7 +138,7 @@ const IDENTITY_XF = { cos: 1, sin: 0, tx: 0, ty: 0, angleRad: 0 };
 // ---------- 主程式 ----------
 // 建立檢查器：做完所有「與姿態無關」的準備（機架外形、剛體分組…），回傳 { solveWalk, solveMulti, runPose }。
 // runPose(pose, results, seen) 檢查單一姿態，把新發現的干涉 push 進 results（seen 用來去重）。
-function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], exportSettings = {}, mounts, joint } = {}) {
+function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], exportSettings = {}, mounts, joint, fabrication } = {}) {
   // M5a：還沒接上的機構不參加檢查（只看底座＋裝在它身上的）。
   const list = machineComps(Array.isArray(comps) ? comps : [], modules);
   const modList = machineModules(Array.isArray(modules) ? modules : []);
@@ -245,7 +245,7 @@ function createChecker({ comps, modules = [], params = {}, plan, motorIds = [], 
   });
 
   // ---- 機架板外形（參考姿態）----
-  const allMounts = Array.isArray(mounts) ? mounts : deriveMotorMounts(list);
+  const allMounts = Array.isArray(mounts) ? mounts : deriveMotorMounts(list,fabrication);
   const { free } = splitMountsByHost(list, allMounts);
   const freeSplit = splitFrameMounts(free, list, modList);
   const refFrames = new Map();   // part.name -> { hulls, anchors: [{id,x,y}], moduleId }

@@ -42,7 +42,7 @@ export function resizeStandardBlank(c,params,axis,value,{comps=[]}={}){
 
 /** Fixed preset: solver endpoints remain the shaft and working hole. */
 export function convertStandardOutput(c,params,comps=[]){
- if(c?.type!=='bar'||!c.isInput||c.motorType!=='mg995'||c.barFusionRoot||c.shape||c.boxPanel||(c.holes || []).some(h=>!Number.isFinite(h.u)||!Number.isFinite(h.v)))return {ok:false,message:'請選一般MG995輸出桿；特殊孔或合成件需先保留原接法。'};
+ if(c?.type!=='bar'||!c.isInput||!['mg995','tt','n20'].includes(c.motorType || 'tt')||c.barFusionRoot||c.shape||c.boxPanel||(c.holes || []).some(h=>!Number.isFinite(h.u)||!Number.isFinite(h.v)))return {ok:false,message:'請選一般馬達輸出桿；特殊孔或合成件需先保留原接法。'};
  if(isOutputBlank(c))return {ok:true,comp:structuredClone(c),params:{}};
  const center=c.motorMount?.center || [c.p1,c.p2].find(p=>p.physicalMotor)?.id || c.p1.id;if(center!==c.p1.id)return {ok:false,message:'這個預設目前支援第一端作軸心；第二端驅動請保留原接法。'};
  const draft=structuredClone(c);draft.standardBlank={kind:'bar',rearMm:8};draft.stock={...draft.stock,widthMm:29,thicknessMm:c.stock?.thicknessMm || 3,material:c.stock?.material || 'unspecified'};draft.name='格孔輸出板';return resizeStandardBlank(draft,params,'g',params[c.lenParam],{comps});

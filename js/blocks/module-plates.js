@@ -29,12 +29,12 @@ function mover(ref, now) {
 
 // 第一段（home 姿態、與匯出同管線，結構不變就不必重算）：每個已安裝模組固定板的外框／孔／開口。
 // 回傳 [{ moduleId, name, plane, geometry: { outlines, holes, cutouts } }]；沒有固定板的模組略過。
-export function framePlateHomes(comps, modules, params, { exportSettings = {}, mounts, joint, stockMm } = {}) {
+export function framePlateHomes(comps, modules, params, { exportSettings = {}, mounts, joint, stockMm, fabrication } = {}) {
   const list = Array.isArray(comps) ? comps : [];
   const modList = Array.isArray(modules) ? modules : [];
   if (!modList.some(m => m && m.mount)) return [];
   const T = Number.isFinite(Number(stockMm)) && Number(stockMm) > 0 ? Number(stockMm) : 3;
-  const allMounts = Array.isArray(mounts) ? mounts : deriveMotorMounts(list);
+  const allMounts = Array.isArray(mounts) ? mounts : deriveMotorMounts(list,fabrication);
   const freeSplit = splitFrameMounts(splitMountsByHost(list, allMounts).free, list, modList);
   const extras = orthogonalExportExtras(list, modList, params, { stockMm: T, joint, exportSettings });
   const out = [];

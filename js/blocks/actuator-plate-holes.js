@@ -6,7 +6,7 @@ import {deriveMotorMounts} from './build-plan.js';
 import {inspectLinkExport,motorMountFeatures} from './exporters.js';
 import {holeWorld} from '../core/local-holes.js';
 import {blankGeometry,isOutputBlank} from './standard-blank.js';
-import {FABRICATION_DEFAULTS} from './fabrication-profile.js';
+import {FABRICATION_DEFAULTS,actuatorMountSettings} from './fabrication-profile.js';
 const keys=['p1','p2','p3'];
 const distance=(p,a,b)=>{const x=b.x-a.x,y=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*x+(p.y-a.y)*y)/(x*x+y*y||1)));return Math.hypot(p.x-a.x-t*x,p.y-a.y-t*y);};
 const edge=(p,r)=>Math.min(...r.map((a,i)=>distance(p,a,r[(i+1)%r.length])));
@@ -16,7 +16,7 @@ const usedPoint=(comps,modules,owner,h,params)=>pointRefs(comps,h.id).some(r=>r.
 export function planActuatorPlateHoles(source){
  const relevant=source.comps.some(c=>isOutputBlank(c)||c.standardBlank?.mountHoles?.length||c.motorMount?.frameBody&&source.comps.some(h=>h.id===c.motorMount.frameBody&&h.standardBlank?.kind==='plate'));if(!relevant)return {ok:true,comps:source.comps,reports:[]};
  const comps=structuredClone(source.comps),fabrication=source.fabrication || FABRICATION_DEFAULTS,reports=[];
- const mounts=deriveMotorMounts(comps).map(m=>({...m,settings:fabrication[m.kind==='mg995'?'mg995Mount':'ttMount']}));
+ const mounts=deriveMotorMounts(comps).map(m=>({...m,settings:actuatorMountSettings(fabrication,m.kind)}));
  for(const host of comps.filter(c=>c.type==='triangle'&&c.standardBlank?.kind==='plate')){
   const pool=[...(host.holes || []),...(host.standardBlank.mountHoles || [])].sort((a,b)=>a.v-b.v||a.u-b.u),attached=mounts.filter(m=>m.frameBody===host.id);
   if(!attached.length&&!host.standardBlank.mountHoles?.length)continue;
@@ -40,13 +40,13 @@ export function planActuatorPlateHoles(source){
   reports.push({hostId:host.id,available:available.length,occupied:parked.length});
  }
  for(const out of comps.filter(isOutputBlank)){
-  const pool=[...(out.holes || []),...(out.standardBlank.mountHoles || [])].sort((a,b)=>a.v-b.v||a.u-b.u),L=source.params[out.lenParam],active=out.isInput&&out.motorType==='mg995',g=inspectLinkExport({...out,holes:[]},L,{...fabrication.export,drive:fabrication.drive}),special=g.holes.filter(h=>h.layer?.startsWith('MG995_HORN'));
-  const screws=special.filter(h=>h.layer==='MG995_HORN_SCREW').length;if(active&&screws<2)return {ok:false,message:'輸出板至少需要2顆有效舵盤固定螺絲，請調整板寬或孔規格。'};
+  const pool=[...(out.holes || []),...(out.standardBlank.mountHoles || [])].sort((a,b)=>a.v-b.v||a.u-b.u),L=source.params[out.lenParam],active=out.isInput&&(['mg995','tt'].includes(out.motorType || 'tt')||out.motorType==='n20'&&fabrication.drive?.n20Spec===1),g=inspectLinkExport({...out,holes:[]},L,{...fabrication.export,drive:fabrication.drive}),special=g.holes.filter(h=>/^(MG995_HORN|TT_HUB|N20_HUB)/.test(h.layer));
+  const screws=special.filter(h=>/^(MG995_HORN|TT_HUB|N20_HUB)_SCREW$/.test(h.layer)).length;if(active&&screws<2)return {ok:false,message:'輸出板至少需要2顆有效軸接頭固定螺絲，請調整板寬或孔規格。'};
   const available=[],parked=[],used=h=>usedPoint(comps,source.modules,out,h,source.params);
-  if(comps.some(c=>c.type==='syringe'&&['a','b'].some(k=>c[k]?.componentId===out.id&&special.some(q=>Math.hypot(c[k].u-q.x,c[k].v-q.y)<q.r+2.6))))return {ok:false,message:'舵盤固定孔會占用針筒接合位置，請換接法。'};
-  for(const h of pool){if(special.some(q=>Math.hypot(h.u-q.x,h.v-q.y)<(h.diameter || 3.2)/2+q.r+1-1e-6)){if(h.type==='fixed'||used(h))return {ok:false,message:'舵盤固定孔會占用已固定或已連接格孔，請先解除或換接法。'};parked.push(h);}else available.push(h);}
+  if(comps.some(c=>c.type==='syringe'&&['a','b'].some(k=>c[k]?.componentId===out.id&&special.some(q=>Math.hypot(c[k].u-q.x,c[k].v-q.y)<q.r+2.6))))return {ok:false,message:'軸接頭固定孔會占用針筒接合位置，請換接法。'};
+  for(const h of pool){if(special.some(q=>Math.hypot(h.u-q.x,h.v-q.y)<(h.diameter || 3.2)/2+q.r+1-1e-6)){if(h.type==='fixed'||used(h))return {ok:false,message:'軸接頭固定孔會占用已固定或已連接格孔，請先解除或換接法。'};parked.push(h);}else available.push(h);}
   out.holes=available;if(parked.length)out.standardBlank.mountHoles=parked;else delete out.standardBlank.mountHoles;
-  const full=inspectLinkExport(out,L,{...fabrication.export,drive:fabrication.drive}),ring=full.outlines[0];for(let i=0;i<full.holes.length;i++){const h=full.holes[i];if(!inside(h,ring)||edge(h,ring)<h.r+1-1e-6||full.holes.slice(i+1).some(q=>Math.hypot(h.x-q.x,h.y-q.y)<h.r+q.r+1-1e-6))return {ok:false,message:'輸出板工作孔／舵盤孔重疊或材料不足1 mm，請加長、加寬或修正孔規格。'};}
+  const full=inspectLinkExport(out,L,{...fabrication.export,drive:fabrication.drive}),ring=full.outlines[0];for(let i=0;i<full.holes.length;i++){const h=full.holes[i];if(!inside(h,ring)||edge(h,ring)<h.r+1-1e-6||full.holes.slice(i+1).some(q=>Math.hypot(h.x-q.x,h.y-q.y)<h.r+q.r+1-1e-6))return {ok:false,message:'輸出板工作孔／軸接頭孔重疊或材料不足1 mm，請加長、加寬或修正孔規格。'};}
   reports.push({outputId:out.id,available:available.length,occupied:parked.length,effectiveScrews:screws});
  }
  return {ok:true,comps,reports};

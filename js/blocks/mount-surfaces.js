@@ -99,7 +99,7 @@ function validInput({ comps, modules, moduleId, params, exportSettings, thicknes
  * plate-thickness coordinates. Only exporter-backed bar, triangle, and rack
  * outputs are supported in this first bounded surface mapping.
  */
-export function buildMountSurfaces({ comps, modules, moduleId, params, exportSettings = {}, thicknessMm = 3, drilling = false, partId = null, outputIds = null } = {}) {
+export function buildMountSurfaces({ comps, modules, moduleId, params, exportSettings = {}, thicknessMm = 3, drilling = false, partId = null, outputIds = null, fabrication } = {}) {
   const reason = validInput({ comps, modules, moduleId, params, exportSettings, thicknessMm });
   if (reason) return { ok: false, reason };
 
@@ -183,7 +183,7 @@ export function buildMountSurfaces({ comps, modules, moduleId, params, exportSet
     }
 
     if (drilling) {
-      const mounts = splitMountsByHost(ownComps, deriveMotorMounts(ownComps));
+      const mounts = splitMountsByHost(ownComps, deriveMotorMounts(ownComps,fabrication));
       for (const surface of surfaces) {
         const comp = ownComps.find(c => c.id === surface.compId);
         let exact;

@@ -1,3 +1,4 @@
+import {actuatorMountSettings} from './fabrication-profile.js';
 import {inspectBarFusion} from './bar-fusion-geometry.js';
 import { memberStock } from './member-stock.js';
 import { frameStockOf } from './frame-stock.js';
@@ -74,7 +75,7 @@ function holeLayersOf(holes) {
 
 // 沒給 mounts 時，用 comps 的座標自行規劃馬達安裝座（與 app.js motorFrameExportMounts 同形狀）；
 // 機身方向與 app 的 motorMountPatternRotDegForCenter 相同（沿用靜態座標，不看 solver）。
-export function deriveMotorMounts(list) {
+export function deriveMotorMounts(list,fabrication) {
   const pts = pointCoords(list);
   const ids = new Set(motorPointIds(list));
   const planned = buildMotorMounts({
@@ -93,7 +94,7 @@ export function deriveMotorMounts(list) {
       pointId: id, frameBody: mount && mount.frameBody, center, rotDeg: motorMountPatternRotDegForCenter({id,pts,comps:list,mount,fallbackRotDeg:()=>visual}), settings: {}
     });
   });
-  return mounts;
+  return fabrication?mounts.map(m=>({...m,settings:actuatorMountSettings(fabrication,m.kind)})):mounts;
 }
 
 // 隔圈輸入正規化：[{ plane?, below, mm }] → 依（平面, below）合併（取最大 mm）、丟掉無效項。
@@ -122,7 +123,7 @@ const planeLabel = (modules, id) => { const m = (modules || []).find(x => x && x
 // 隔圈所屬平面（主平面＝null）。
 const gapPlane = g => (g && g.plane != null ? g.plane : null);
 
-export function buildPlan({ comps, modules = [], params = {}, exportSettings = {}, cnc, mounts, spacers, extras, joint } = {}) {
+export function buildPlan({ comps, modules = [], params = {}, exportSettings = {}, cnc, mounts, spacers, extras, joint, fabrication } = {}) {
   // M5a：只有「機器」（底座＋裝在它身上的）進製作計畫；還沒接上的機構與它們的底板都不算，只列在 plan.spare。
   const spare = spareModules(modules);
   const allComps = Array.isArray(comps) ? comps : [], allMods = Array.isArray(modules) ? modules : [];
@@ -155,7 +156,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
 
   // 馬達安裝座：有宿主桿／板的特徵切進該零件，其餘依所屬群組進世界機架或模組機架（同 app 匯出）。
   const exp = { ...exportSettings };
-  const allMounts = Array.isArray(mounts) ? mounts : deriveMotorMounts(list);
+  const allMounts = Array.isArray(mounts) ? mounts : deriveMotorMounts(list,fabrication);
   const { hosted, free } = splitMountsByHost(list, allMounts);
   assertFusionFeatures(list,allMounts,orthoExtras);
   const freeSplit = splitFrameMounts(free, list, modList);
@@ -434,7 +435,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     return { type: motorTypeAt(list, centerId), centerId, plate: partPoints.has(plateName) ? plateName : null };
   });
 
-  return { parts, joints, motors, gaps, spare,diagnostics:orthoExtras.diagnostics || [] };
+  return { parts, joints, motors, gaps, spare,n20Spec:exportSettings.drive?.n20Spec===1,diagnostics:orthoExtras.diagnostics || [] };
 }
 
 // ---- 五金清單 ----
@@ -562,8 +563,11 @@ export function hardwareList(plan, { modules = [] } = {}) {
   if (nuts > 0) rows.push({ spec: 'M3 防鬆螺帽', qty: nuts, note: '穿透式 M3 螺絲各一顆（鎖進輪轂的 M3×8 不需要）' });
   const ttCount = motors.filter(m => m.type === 'tt').length;
   const servoCount = motors.filter(m => m.type === 'mg995').length;
+  const n20Front=parts.reduce((n,p)=>n+(p.holeLayers?.N20_SCREW || 0),0),n20Hub=parts.reduce((n,p)=>n+(p.holeLayers?.N20_HUB_SCREW || 0),0);
+  if(n20Front)rows.push({spec:'M1.6 前座固定螺絲（長度待量）',qty:n20Front,note:'依3 mm板厚及實際有效牙深選長度；清孔需另鑽'});
+  if(n20Hub)rows.push({spec:'M3 輪轂板上固定螺絲（長度待量）',qty:n20Hub,note:'另購3 mm軸輪轂含側M3止付；止付不等於板上四孔'});
   const n20Count = motors.filter(m => m.type === 'n20').length;
-  if(n20Count)rows.push({spec:'N20 減速馬達',qty:n20Count,note:'通用模擬；電壓、減速比、固定支架與軸接頭待核對'});
+  if(n20Count)rows.push({spec:'N20 減速馬達',qty:n20Count,note:plan.n20Spec?'特定前端雙孔座與3 mm軸輪轂試作；電壓、減速比與實物待核對':'通用模擬；電壓、減速比、固定支架與軸接頭待核對'});
   if (ttCount) rows.push({ spec: 'TT 減速馬達', qty: ttCount, note: '動力來源，裝在機架板背面' });
   if (servoCount) rows.push({ spec: 'MG995 伺服', qty: servoCount, note: '動力來源，從機架板槽穿入' });
   return rows;
@@ -581,7 +585,7 @@ export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = []
   const parts = (plan && plan.parts) || [];
   const joints = (plan && plan.joints) || [];
   const motors = (plan && plan.motors) || [];
-  if(motors.some(m=>m.type==='n20'))warnings.push('N20 僅通用模擬：固定支架、軸接頭與配對孔尚未提供；板件中心孔為一般參考孔，不能直接作為 N20 安裝孔。');
+  if(motors.some(m=>m.type==='n20'))warnings.push(plan.n20Spec?'N20特定前端雙孔座／3 mm軸輪轂試作：M1.6清孔需另鑽，螺絲長度及有效牙深、軸向間隙、承載與實物待核對。':'N20 僅通用模擬：固定支架、軸接頭與配對孔尚未提供；板件中心孔為一般參考孔，不能直接作為 N20 安裝孔。');
   const gaps = (plan && plan.gaps) || [];
   const stock = finitePos(cnc && cnc.stockThicknessMm) ? Number(cnc.stockThicknessMm) : DEFAULT_STOCK_THICKNESS_MM;
   const tool = finitePos(cnc && cnc.toolDiameterMm) ? fmtNum(cnc.toolDiameterMm) : '未設定';
@@ -612,7 +616,7 @@ export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = []
       motors.forEach(m => {
         const plate = here.find(p => p.name === m.plate);
         if (!plate) return;
-        items.push(m.type === 'n20' ? `<li>N20 馬達（${e(m.centerId)}）：固定支架、軸接頭與配對孔尚未提供；請依實物補齊，勿直接加工安裝。</li>` : m.type === 'mg995'
+        items.push(m.type === 'n20' ? `<li>N20 馬達（${e(m.centerId)}）：${plan.n20Spec?'特定前端雙孔座試作，兩顆M1.6長度／牙深待量；輪轂板上四M3與側止付分別核對。':'固定支架、軸接頭與配對孔尚未提供；請依實物補齊，勿直接加工安裝。'}</li>` : m.type === 'mg995'
           ? `<li>安裝 MG995 伺服（${e(m.centerId)}）：從 ${e(plate.name)} 的槽穿入，用 M3 螺絲鎖耳孔。</li>`
           : `<li>安裝 TT 馬達（${e(m.centerId)}）：裝在 ${e(plate.name)} 背面，用 M3×30 螺絲鎖固定孔。</li>`);
       });
