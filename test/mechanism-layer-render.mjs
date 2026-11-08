@@ -33,6 +33,12 @@ renderNodes({
 check('節點層略過隱藏點並區分固定方塊與活動圓點', svg.children.map(child => child.tag).join(',') === 'rect,circle');
 updates.forEach(update => update({ O: { x: 2, y: 3 }, A: { x: 42, y: 3 }, Hidden: points.Hidden }));
 check('連桿與節點 updater 可更新座標', layer.children[0].style.display === '' && svg.children[0].getAttribute('x') === '-5');
+// 標準件未使用的格孔仍畫出（可點、可吸附），只以 data-unused 淡化；用到的孔照常實心。
+const fadeSvg = new FakeElement('svg');
+renderNodes({ points: { Used: { x: 0, y: 0 }, Spare: { x: 8, y: 0 } }, svg: fadeSvg, groundIds: new Set(), motorCenterIds: new Set(), camCenterIds: new Set(), hiddenPointIds: new Set(),
+  unusedIds: new Set(['Spare']), gearPinIds: new Set(), pulleyPinIds: new Set(), camFollowerIds: new Set(), workpieceIds: new Set(), sliderMountInfo: () => null,
+  project: p => p, onPointerDown: () => {}, registerUpdate: () => {} });
+check('未使用格孔淡化但仍可點選', fadeSvg.children.length === 2 && fadeSvg.children[1].getAttribute('data-unused') === '' && fadeSvg.children[0].getAttribute('data-unused') === null && fadeSvg.children[1].listeners.has('pointerdown'));
 
 // 手機軸心點擊範圍固定 48 CSS px，變換縮放不縮小手指目標。
 const touchSvg = new FakeElement('svg'), touchUpdates = [];

@@ -1,5 +1,6 @@
 /** Three standard blanks, authored using existing bar/triangle components. */
 import {holeSide} from '../core/local-holes.js';
+import {isHoleUsed} from './used-holes.js';
 export const BLANK_HOLE_LIMIT=128;
 export const isOutputBlank=c=>c?.type==='bar'&&c.standardBlank?.kind==='bar'&&Number.isFinite(c.standardBlank.rearMm);
 const span=n=>(n-1)*8,range=L=>{const a=Array.from({length:Math.floor(L/8)+1},(_,i)=>i*8);if(L-a.at(-1)>.00001){if(L-a.at(-1)<4)a.pop();a.push(L);}return a;};
@@ -36,7 +37,7 @@ export function resizeStandardBlank(c,params,axis,value,{comps=[]}={}){
  out.holes=raw.holes.map(h=>({...h,...old.get(`${h.u},${h.v}`),id:old.get(`${h.u},${h.v}`)?.id||`${c.id}.H${h.u}_${h.v}`.replaceAll('.','_')}));out.standardBlank=raw.standardBlank;if(isOutputBlank(c)&&axis==='width')out.stock.widthMm=value;
  const patch={[g]:axis==='g'?value:L};if(c.type==='triangle'){patch[c.r1Param]=axis==='r1'?value:H;patch[c.r2Param]=Math.hypot(patch[g],patch[c.r1Param]);}
  const retained=new Set(out.holes.map(h=>h.id)),removed=originalHoles.filter(h=>!retained.has(h.id));
- if(removed.some(h=>h.type==='fixed'||comps.some(other=>other.id!==c.id&&(['p1','p2','p3','m1','m2'].some(k=>other[k]?.id===h.id)||other.holes?.some(q=>q.id===h.id)))))return {ok:false,message:'縮小會刪除已固定或已連接的孔，請先解除連接。'};
+ if(removed.some(h=>isHoleUsed(c,h,comps)))return {ok:false,message:'縮小會刪除已固定或已連接的孔，請先解除連接。'};
  return {ok:true,comp:out,params:patch};
 }
 

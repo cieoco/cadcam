@@ -2047,7 +2047,7 @@ function drawNow() {
   vComps.filter(c=>c.boxPanel).forEach(c=>[c.p1,c.p2].forEach(p=>hiddenPointIds.add(p.id)));
   renderNodes({
     shaftCenterIds: new Set(vComps.filter(c=>c.isInput&&c.ttOutput==='shaft'&&(c.motorType || 'tt')==='tt').map(c=>c.p1.id)),
-    points: pts, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds, pointLabel: id => pointDisplayName(vComps,id),
+    points: pts, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds, unusedIds: Exporters.undrilledIds(S.comps,S.modules,S.topo.params), pointLabel: id => pointDisplayName(vComps,id),
     gearPinIds, pulleyPinIds, camFollowerIds, workpieceIds, dragId: S.dragId,
     sliderMountInfo, project: p => ({ x: TX(p.x), y: TY(p.y) }),
     onPointerDown: guardedNodeDown, registerUpdate: update => frameUpdaters.push(update),
@@ -3197,7 +3197,7 @@ function collectCncPartsAndFrameWarnings(settings) {
   const cutNodes = withWorldAdapterNodes(nodes, extras);   // C1：機架板邊上的轉接座宿主孔
   const freeMounts = exportWorldMounts(Exporters.splitMountsByHost(M.comps, mounts).free);
   const frameWarnings = Exporters.frameExportWarnings(cutNodes, settings, freeMounts);
-  const cncParts = [...Exporters.cncPartsForExport(M.comps, pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', cutNodes, settings, freeMounts)];
+  const cncParts = [...Exporters.cncPartsForExport(Exporters.machinedComps(M.comps,M.modules,S.topo.params), pts, S.topo.params, settings, mounts, extras), cncFramePart('frame', cutNodes, settings, freeMounts)];
   moduleFrameExports(M.comps, M.modules, S.topo.params).forEach(entry => {
     const modNodes = withAdapterNodes(entry.moduleId, moduleFrameNodes(entry, Model.frameConnectorNodes(entry.comps)), extras);
     const homeMounts = homeMountsNow();

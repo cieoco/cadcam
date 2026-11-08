@@ -108,7 +108,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
   return { linksToDraw, countMissing };
 }
 
-export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds, gearPinIds, pulleyPinIds, camFollowerIds,
+export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds, unusedIds = new Set(), gearPinIds, pulleyPinIds, camFollowerIds,
   workpieceIds, dragId, sliderMountInfo, project, onPointerDown, registerUpdate, mountedBaseIds = new Set(), shaftCenterIds = new Set(), touchTargets = false, pointLabel = id => id }) {
   const size = 14;
   Object.keys(points).forEach(id => {
@@ -139,6 +139,7 @@ export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterI
     else if (rectangle) { node.setAttribute('width', size); node.setAttribute('height', size); node.setAttribute('rx', 3); node.setAttribute('fill', '#34495e'); }
     else { node.setAttribute('r', id === dragId ? 9 : 7); node.setAttribute('fill', '#fff'); node.setAttribute('stroke', id === dragId ? '#2ecc71' : '#34495e'); node.setAttribute('stroke-width', 3); }
     if(motor&&shaftCenterIds.has(id)){node.setAttribute('fill','transparent');node.setAttribute('r',10);}
+    if (unusedIds.has(id)) node.setAttribute('data-unused', '');   // 未加工格孔：淡化（樣式在 blocks.html）
     node.setAttribute('data-id', id); if (motor && touchHit) node.setAttribute('data-motor-hit', id);
     node.style.cursor = 'grab'; node.addEventListener('pointerdown', event => onPointerDown(event, id)); svg.appendChild(node);
     const update = current => {

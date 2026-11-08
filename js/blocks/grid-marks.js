@@ -8,6 +8,7 @@
  */
 import { gridIssues, GRID_PITCH_MM } from './grid-rule.js';
 import { partLabel } from './part-labels.js';
+import { syncDrillSwitch } from './standard-drill-ui.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MARK_TEXT = '例外';
@@ -125,6 +126,7 @@ export function drawMarks(S, svg, pts, TX, TY) {
 // 選取面板：選到的零件有離格項目時，在其編輯面板尾端加一小段（沒有就移除）。
 export function syncPanel(S) {
   if (typeof document === 'undefined') return;
+  syncDrillSwitch(S);   // 標準件「開孔」切換跟著同一個選取面板同步（不另佔啟動載入）
   const sel = S.selectedLinkId || S.selectedTriangleId || S.selectedGearId, frame = !sel && S.frameEditorOpen;
   const host = document.getElementById(S.selectedGearId && !S.selectedLinkId && !S.selectedTriangleId ? 'gearEditor' : sel ? 'lenEditor' : frame ? 'frameEditor' : '');
   let box = document.querySelector('[data-grid-panel]');

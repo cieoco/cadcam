@@ -71,7 +71,7 @@ function normalizePoint(point, fallbackId, warnings) {
 function localHoleRecords(raw){
  return (Array.isArray(raw)?raw:[]).filter(h=>h&&safeId(h.id)&&Number.isFinite(h.u)&&Number.isFinite(h.v)).map(h=>({id:h.id,u:h.u,v:h.v,diameter:Math.max(.5,Math.min(20,num(h.diameter,3.2))),type:h.type==='fixed'?'fixed':'floating'}));
 }
-function keepBlank(comp,out){if(['bar','plate','l'].includes(comp.standardBlank?.kind)){out.standardBlank={kind:comp.standardBlank.kind,...(comp.standardBlank.kind==='l'?{armWidthMm:Math.max(13,num(comp.standardBlank.armWidthMm,13))}:{})};if(comp.type==='bar'&&Number.isFinite(comp.standardBlank.rearMm)){out.standardBlank.rearMm=comp.standardBlank.rearMm;if(['shaft','hub'].includes(comp.ttOutput))out.ttOutput=comp.ttOutput;if(!out.stock)out.stock={widthMm:29,thicknessMm:3,material:'unspecified'};}if(comp.standardBlank.mountHoles?.length)out.standardBlank.mountHoles=localHoleRecords(comp.standardBlank.mountHoles);}}
+function keepBlank(comp,out){if(['bar','plate','l'].includes(comp.standardBlank?.kind)){out.standardBlank={kind:comp.standardBlank.kind,...(comp.standardBlank.kind==='l'?{armWidthMm:Math.max(13,num(comp.standardBlank.armWidthMm,13))}:{})};if(comp.type==='bar'&&Number.isFinite(comp.standardBlank.rearMm)){out.standardBlank.rearMm=comp.standardBlank.rearMm;if(['shaft','hub'].includes(comp.ttOutput))out.ttOutput=comp.ttOutput;if(!out.stock)out.stock={widthMm:29,thicknessMm:3,material:'unspecified'};}if(comp.standardBlank.mountHoles?.length)out.standardBlank.mountHoles=localHoleRecords(comp.standardBlank.mountHoles);if(comp.standardBlank.drill=='all')out.standardBlank.drill='all';}}
 
 function normalizeAnchor(comp, index, warnings) {
   const id = safeId(comp.id) ? comp.id : `Anchor${index + 1}`;

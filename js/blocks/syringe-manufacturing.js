@@ -1,5 +1,5 @@
 import {normalizeFabricationProfile} from './fabrication-profile.js';
-import {inspectLinkExport,inspectPlateExport,svgForFrameGeometry,dxfForFrameGeometry} from './exporters.js';
+import {machinedComps,inspectLinkExport,inspectPlateExport,svgForFrameGeometry,dxfForFrameGeometry} from './exporters.js';
 import {solveSyringe} from './syringe-operations.js';
 import {attachmentFrame} from '../core/syringe.js';
 import {memberStock} from './member-stock.js';
@@ -26,7 +26,7 @@ export function syringeManufacturing(comps,params,fabrication) {
   if(!result.ok)throw Error(result.message);
   if(comps.some(c=>!['syringe','bar','triangle','anchor'].includes(c.type)||c.moduleId||c.fusedWith||c.barFusionRoot))throw Error('液壓製作包目前支援同一平面的桿件／三角板；請單獨開啟液壓設計再輸出。');
   const syringes=comps.filter(c=>c.type==='syringe'),parts=[];
-  for(const c of comps.filter(c=>['bar','triangle'].includes(c.type))){
+  for(const c of machinedComps(comps,[],params).filter(c=>['bar','triangle'].includes(c.type))){
     const refs=syringes.flatMap(s=>[s.a,s.b]).filter(r=>r.componentId===c.id);
     const length=params[c.lenParam||c.gParam];
     const extra=refs.filter(r=>Math.hypot(r.u,r.v)>1e-6&&Math.hypot(r.u-length,r.v)>1e-6)

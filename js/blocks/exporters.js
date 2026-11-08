@@ -1,5 +1,7 @@
 import {blankGeometry,isOutputBlank} from './standard-blank.js';
 import {localHoles} from '../core/local-holes.js';
+import {machinedComps} from './used-holes.js';
+export * from './used-holes.js';
 import {tabNutPartGeometry} from './tab-nut-plan.js';
 import {boxPanelGeometry} from '../plugins/box-maker/box-contract.js';
 import {isDisk,diskOutline,validateDisk} from './disk-plate.js';
@@ -86,7 +88,7 @@ function linkLength(comp, pts, params) {
 }
 
 export function exportableLinks(comps, pts, params) {
-  return comps
+  return machinedComps(comps)
     .filter(c => c && c.type === 'bar' && c.p1 && c.p2 && (!c.barFusionRoot || c.barFusion))
     .map(c => ({ comp: c, length: linkLength(c, pts, params) }))
     .filter(item => item.length > 0);
@@ -103,7 +105,7 @@ function pointForExport(comp, key, pts) {
 }
 
 export function exportablePlates(comps, pts) {
-  return comps
+  return machinedComps(comps)
     .filter(c => c && c.type === 'triangle' && !c.fusedWith && c.p1 && c.p2 && c.p3)
     .map(c => ({ comp: c, points: [pointForExport(c, 'p1', pts), pointForExport(c, 'p2', pts), pointForExport(c, 'p3', pts)] }))
     .filter(item => item.points.every(Boolean));
@@ -232,6 +234,7 @@ function linkHoleSpecs(comp, length, settings, extraHoles = []) {
   const holeR = round(holeDiameterMm / 2, 3);
   const flat = { ttShaftFlatDiameterMm, ttShaftFlatThicknessMm };
   const endHoles = (key, x) => {
+    if(comp.undrilled?.includes(key))return [];
     if(isOutputBlank(comp)&&comp.isInput&&comp[key]?.physicalMotor&&['tt','n20'].includes(comp.motorType || 'tt')&&!((comp.motorType || 'tt')==='tt'&&comp.ttOutput==='shaft')){const h=actuatorHubHoles(comp.motorType || 'tt',settings,x);if(h.length)return h;}
     if (comp.isInput && comp.motorType === 'mg995' && comp[key]?.physicalMotor) return servoHornHoles(settings, x, 0, comp.shape === 'disk' ? null : {halfWidth:memberStock(comp).widthMm/2,length,...(isOutputBlank(comp)?{rect:true,minX:-comp.standardBlank.rearMm-(8-memberStock(comp).thicknessMm/2),maxX:length+(8-memberStock(comp).thicknessMm/2)}:{})});
     return [isTtMotorEnd(comp, key) ? { kind: 'tt-shaft-flat', x, y: 0, settings: flat } : { kind: 'circle', x, y: 0, r: holeR }];

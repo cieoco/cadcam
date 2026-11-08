@@ -2,6 +2,7 @@ import {actuatorMountSettings} from './fabrication-profile.js';
 import {deriveMotorMounts} from './build-plan.js';
 import {inspectPlateExport,inspectLinkExport,splitMountsByHost} from './exporters.js';
 import {memberStock} from './member-stock.js';
+import {machinedComps} from './used-holes.js';
 import {compileTopology} from '../core/topology.js';
 import {buildSceneModel} from '../blocks3d/scene-model.js';
 import {buildMotorMounts} from './motor-mounts.js';
@@ -14,7 +15,7 @@ export function motorInstallationScene(candidate){
   const motorMounts=buildMotorMounts({motorIds,groundIds,staticPoints:points,comps,compiledSteps:topology.steps||[],sliderMountInfo:()=>null,isHiddenSliderRailPoint:()=>false,motorTypeForCenter:id=>motorTypes.get(id)});
   const links=comps.filter(c=>c.type==='bar').map(c=>({id:c.id,p1:c.p1.id,p2:c.p2.id,color:c.color,isCrank:!!c.isInput,_frameSeparate:!!c.frameSeparate}));
   const mounts=deriveMotorMounts(comps).map(m=>({...m,center:points[m.pointId] || m.center,settings:actuatorMountSettings(candidate.fabrication,m.kind)})),split=splitMountsByHost(comps,mounts),plateGeometries={},barGeometries={},memberStocks={},polygons=[];
-  for(const c of comps){if(c.type==='triangle'){const ids=[c.p1.id,c.p2.id,c.p3.id],g=inspectPlateExport(c,ids.map(id=>points[id]),{},split.hosted.get(c.id));plateGeometries[ids.join(',')]={outline:g.outlines[0],holes:g.holes,cutouts:g.cutouts};memberStocks[ids.join(',')]=memberStock(c);polygons.push({points:ids,color:c.color,...(c.standardBlank?.kind==='plate'?{id:c.id}:{})});}else if(c.type==='bar'&&!split.hosted.has(c.id)){const g=inspectLinkExport(c,params[c.lenParam],{...candidate.fabrication?.export,drive:candidate.fabrication?.drive});barGeometries[c.id]={outline:g.outlines[0],holes:g.holes,cutouts:g.cutouts};memberStocks[c.id]=memberStock(c);}}
+  for(const c of machinedComps(comps,candidate.modules,params)){if(c.type==='triangle'){const ids=[c.p1.id,c.p2.id,c.p3.id],g=inspectPlateExport(c,ids.map(id=>points[id]),{},split.hosted.get(c.id));plateGeometries[ids.join(',')]={outline:g.outlines[0],holes:g.holes,cutouts:g.cutouts};memberStocks[ids.join(',')]=memberStock(c);polygons.push({points:ids,color:c.color,...(c.standardBlank?.kind==='plate'?{id:c.id}:{})});}else if(c.type==='bar'&&!split.hosted.has(c.id)){const g=inspectLinkExport(c,params[c.lenParam],{...candidate.fabrication?.export,drive:candidate.fabrication?.drive});barGeometries[c.id]={outline:g.outlines[0],holes:g.holes,cutouts:g.cutouts};memberStocks[c.id]=memberStock(c);}}
   return buildSceneModel(links,points,{polygons,plateGeometries,barGeometries,memberStocks,groundIds,motorCenters:motorIds,motorTypes,motorMounts,
     gears:comps.filter(c=>c.type==='gear').map(c=>({...c,center:c.p1.id,pin:c.p2.id,radius:params[c.radiusParam]})),params});
 }
