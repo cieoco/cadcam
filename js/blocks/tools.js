@@ -1,3 +1,4 @@
+import {visibleUserRect} from './mobile-workspace.js';
 import {makeStandardBlank,blankGeometry} from './standard-blank.js';
 /**
  * blocks / tools
@@ -470,7 +471,27 @@ export function finishPlateAsLinkEarly() {
 /* ---- 板件：逐點畫孔、右鍵（或點回起點）收尾。角色由畫的順序決定 ----
  * 前 3 孔＝機構求解孔（p1/p2/p3，進求解）；第 4 孔起＝造形孔（只描外形＋鑽孔，不進求解）。
  * 這一版求解仍沿用三點板；2 求解點的耦桿板留待 Phase 4（需改編譯層的 p3 前提）。 */
-export function startStandardBlank(options){exitDrawPolygon();startDrawPolygon();S.standardBlankDraft=options;setBanner('點畫布放置；取消不建立零件');draw();}
+let blankHooks=null,blankDrag=null;
+export function startStandardBlank(options,hooks={}){
+  exitDrawPolygon();startDrawPolygon();blankHooks=hooks;
+  const origin=View.worldFromScreen(W*.4,H*.35);
+  S.standardBlankDraft={...options,origin};blankHooks.changed?.(S.standardBlankDraft);
+  if(!S.comps.length)View.fit({minX:origin.x-20,maxX:origin.x+options.lengthMm+20,minY:origin.y-20,maxY:origin.y+(options.heightMm || 0)+20},visibleUserRect(svg));
+  setBanner('拖本體放位置，拖長／寬把手改孔數；確認新增才建立');draw();
+}
+export function updateStandardBlank(options){if(!S.standardBlankDraft)return;S.standardBlankDraft={...S.standardBlankDraft,...options};draw();}
+export function cancelStandardBlank(){if(!S.standardBlankDraft)return;exitDrawPolygon();draw();}
+export function standardBlankPointer(e,phase){
+  if(!S.standardBlankDraft)return;
+  if(phase==='cancel'){if(blankDrag)S.standardBlankDraft.origin=blankDrag.origin;blankDrag=null;blankHooks?.changed?.(S.standardBlankDraft);draw();return;}
+  const point=worldFromEvent(e);if(!point)return;
+  if(phase==='down'){blankDrag={id:e.pointerId,clientX:e.clientX,clientY:e.clientY,moved:false,start:point,origin:{...S.standardBlankDraft.origin},body:!!e.target?.closest?.('[data-blank-preview]')};try{svg.setPointerCapture(e.pointerId);}catch(_){}return;}
+  if(!blankDrag||blankDrag.id!==e.pointerId)return;
+  const d=blankDrag;if(d.body&&!d.moved&&Math.hypot(e.clientX-d.clientX,e.clientY-d.clientY)<3){if(phase==='up')blankDrag=null;return;}d.moved=true;const raw=d.body?{x:d.origin.x+point.x-d.start.x,y:d.origin.y+point.y-d.start.y}:point,node=nearestNodeId(raw),snapped=node&&displayPointCoords()[node];S.standardBlankDraft.origin=snapped?{x:snapped.x,y:snapped.y}:raw;
+  if(phase==='up')blankDrag=null;blankHooks?.changed?.(S.standardBlankDraft);draw();
+}
+export function confirmStandardBlank(){if(S.standardBlankDraft)addPolygonVertex(null);}
+
 export function startDrawPolygon() {
   if (S.drawingPolygon) { exitDrawPolygon(); draw(); return; }
   pause();
@@ -489,7 +510,8 @@ export function startDrawPolygon() {
   draw();
 }
 export function exitDrawPolygon() {
-  S.standardBlankDraft = null;
+  const closed=blankHooks?.closed;blankHooks=null;blankDrag=null;
+  S.standardBlankDraft = null;closed?.();
   S.drawingPolygon = false;
   S.polygonPoints = [];
   S.polygonPreview = null;
@@ -503,7 +525,7 @@ function polygonNearFirst(world) {
 }
 // 左鍵：加一個孔（吸附既有接點）。桌機一律由右鍵收尾；觸控可點回第一孔收尾。
 export function addPolygonVertex(e) {
-  if(S.standardBlankDraft){const point=worldFromEvent(e)||S.polygonPreview;if(!point)return;const snapped=nearestNodeId(point),origin=snapped?displayPointCoords()[snapped]:point,candidate=makeStandardBlank({...S.standardBlankDraft,n:S.counter+1,origin});if(!candidate.ok){notify(candidate.message);return;}if(snapped){candidate.comp.p1.id=snapped;const conn=connectionModule(S.comps,[snapped]);if(!conn.ok){notify('不同模組只能透過安裝接口連接');return;}if(conn.moduleId)candidate.comp.moduleId=conn.moduleId;}pushUndo();S.counter++;S.comps.push(candidate.comp);Object.assign(S.topo.params,candidate.params);exitDrawPolygon();rebuild();draw();candidate.comp.type==='bar'?selectLink(candidate.comp.id):selectTriangle(candidate.comp.id);return;}
+  if(S.standardBlankDraft){const point=S.standardBlankDraft.origin;if(!point)return;const nearest=nearestNodeId(point),at=nearest&&displayPointCoords()[nearest],snapped=at&&Math.hypot(point.x-at.x,point.y-at.y)<1e-6?nearest:null,origin=point,candidate=makeStandardBlank({...S.standardBlankDraft,n:S.counter+1,origin});if(!candidate.ok){notify(candidate.message);return;}if(snapped){candidate.comp.p1.id=snapped;const conn=connectionModule(S.comps,[snapped]);if(!conn.ok){notify('不同模組只能透過安裝接口連接');return;}if(conn.moduleId)candidate.comp.moduleId=conn.moduleId;}pushUndo();S.counter++;S.comps.push(candidate.comp);Object.assign(S.topo.params,candidate.params);exitDrawPolygon();rebuild();draw();candidate.comp.type==='bar'?selectLink(candidate.comp.id):selectTriangle(candidate.comp.id);return;}
 
   const cur = worldFromEvent(e) || S.polygonPreview;
   if (!cur) return;
@@ -598,7 +620,7 @@ function buildPolygonPlate() {
 }
 export function drawPolygonPreview() {
   if (!S.drawingPolygon) return;
-  if(S.standardBlankDraft){const draft=makeStandardBlank({...S.standardBlankDraft,origin:S.polygonPreview || {x:0,y:0}});if(draft.ok){const c=draft.comp,r=c.type==='triangle'?blankGeometry(c,[c.p1,c.p2,c.p3]):[{x:c.p1.x-6.5,y:c.p1.y-6.5},{x:c.p2.x+6.5,y:c.p2.y-6.5},{x:c.p2.x+6.5,y:c.p2.y+6.5},{x:c.p1.x-6.5,y:c.p1.y+6.5}],path=document.createElementNS(SVG_NS,'path');path.setAttribute('d','M '+r.map(p=>`${TX(p.x)} ${TY(p.y)}`).join(' L ')+' Z');path.setAttribute('fill','#27ae6033');path.setAttribute('stroke','#168a54');path.setAttribute('pointer-events','none');svg.append(path);}return;}
+  if(S.standardBlankDraft){const draft=makeStandardBlank(S.standardBlankDraft);if(draft.ok){const c=draft.comp,r=c.type==='triangle'?blankGeometry(c,[c.p1,c.p2,c.p3]):[{x:c.p1.x-6.5,y:c.p1.y-6.5},{x:c.p2.x+6.5,y:c.p2.y-6.5},{x:c.p2.x+6.5,y:c.p2.y+6.5},{x:c.p1.x-6.5,y:c.p1.y+6.5}],path=document.createElementNS(SVG_NS,'path');path.setAttribute('d','M '+r.map(p=>`${TX(p.x)} ${TY(p.y)}`).join(' L ')+' Z');path.setAttribute('fill','#27ae6033');path.setAttribute('stroke','#168a54');path.dataset.blankPreview='';path.style.cursor='move';svg.append(path);const points=Model.pointCoords([c]);for(const p of [c.p1,c.p2,...(c.p3?[c.p3]:[]),...c.holes.map(h=>points[h.id])]){const hole=document.createElementNS(SVG_NS,'circle');for(const[k,v]of Object.entries({cx:TX(p.x),cy:TY(p.y),r:1.6*View.getScale(),fill:'white',stroke:'#168a54','pointer-events':'none'}))hole.setAttribute(k,v);svg.append(hole);}blankHooks?.draw?.({svg,draft:S.standardBlankDraft,update:options=>{Object.assign(S.standardBlankDraft,options);blankHooks?.changed?.(S.standardBlankDraft);draw();}});}return;}
   const pts = S.polygonPoints.map(p => p.pos);
   const chain = pts.slice();
   let closing = false;

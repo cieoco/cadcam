@@ -1,17 +1,55 @@
-/** Same inline size panel for all three basic structures; no work is written until placement. */
+/** One live creation candidate for canvas dimensions and exact fields. */
 import {makeStandardBlank} from './standard-blank.js';
-export function openStandardBlank(kind,{place}){
- let panel=document.getElementById('standardBlankPanel');if(!panel){panel=document.createElement('section');panel.id='standardBlankPanel';document.querySelector('.creation-sections').before(panel);}
+import {dimensionHandle} from './dimension-handle.js';
+import * as View from './view.js';
+import {sheetMode,setSheet} from './mobile-workspace.js';
+
+export function openStandardBlank(kind,{start,update,confirm,cancel}){
+ let panel=document.getElementById('standardBlankPanel');
+ if(!panel){panel=document.createElement('section');panel.id='standardBlankPanel';document.querySelector('.creation-sections').before(panel);}
  panel.replaceChildren();panel.hidden=false;panel.style.cssText='padding:10px;border:1px solid #b8cbd9;border-radius:10px;margin:8px 0;background:white';
  const title=document.createElement('strong');title.textContent=kind==='bar'?'桿件':kind==='plate'?'板材':'L型件（同平面）';panel.append(title);
- const fields={},row=(key,text,value,min=2)=>{const label=document.createElement('label'),input=document.createElement('input');label.textContent=text;input.type='number';input.min=min;input.max=128;input.step=1;input.value=value;input.dataset.blankField=key;input.setAttribute('aria-label',text);label.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:6px;margin:8px 0';input.style.cssText='width:70px;min-height:36px';label.append(input);fields[key]=input;panel.append(label);};
- row('columns',kind==='l'?'橫臂孔數':'長向孔數',kind==='bar'?8:6);if(kind!=='bar')row('rows',kind==='l'?'直臂孔數':'寬向孔數',4);if(kind==='l')row('armRows','臂寬孔列數',1,1);
+ const fields={},exact={};
+ const row=(parent,map,key,text,value,min=2)=>{
+  const label=document.createElement('label'),input=document.createElement('input');label.textContent=text;input.type='number';input.value=value;input.setAttribute('aria-label',text);
+  if(map===fields){input.min=min;input.max=128;input.step=1;input.dataset.blankField=key;}else{input.step='any';input.dataset.blankMm=key;}
+  label.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:6px;margin:8px 0';input.style.cssText='width:70px;min-height:36px';label.append(input);map[key]=input;parent.append(label);
+ };
+ row(panel,fields,'columns',kind==='l'?'橫臂孔數':'長向孔數',kind==='bar'?8:6);
+ if(kind!=='bar')row(panel,fields,'rows',kind==='l'?'直臂孔數':'寬向孔數',4);
+ if(kind==='l')row(panel,fields,'armRows','臂寬孔列數',1,1);
  const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='特殊毫米尺寸／自由繪圖';details.append(summary);panel.append(details);
- const exact={};for(const[key,text]of[['lengthMm','長向孔距 mm'],...(kind!=='bar'?[['heightMm','直向孔距 mm']]:[]),...(kind==='l'?[['armWidthMm','臂寬 mm']]:[])]){const label=document.createElement('label'),input=document.createElement('input');label.textContent=text;input.type='number';input.step='any';input.dataset.blankMm=key;input.setAttribute('aria-label',text);label.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:6px;margin:8px 0';input.style.cssText='width:70px;min-height:36px';label.append(input);details.append(label);exact[key]=input;}
- const sync=()=>{exact.lengthMm.value=(Number(fields.columns.value)-1)*8;if(exact.heightMm)exact.heightMm.value=(Number(fields.rows.value)-1)*8;if(exact.armWidthMm)exact.armWidthMm.value=(Number(fields.armRows.value)-1)*8+13;};Object.values(fields).forEach(f=>f.oninput=sync);sync();
- const note=document.createElement('p');note.textContent='孔距8 mm・板厚3 mm・每片最多128孔。L型件不是立體金屬角碼。';details.append(note);
- const free=document.createElement('button');free.type='button';free.textContent='自訂孔位／外形：沿用自由繪圖';free.onclick=()=>{panel.hidden=true;window.blocks.startDrawPolygon();};details.append(free);
- const error=document.createElement('p');error.setAttribute('role','status');panel.append(error);
- const add=document.createElement('button');add.type='button';add.textContent='放到畫布';add.dataset.blankPlace='';add.onclick=()=>{const opts={kind,...Object.fromEntries(Object.entries(fields).map(([k,n])=>[k,Number(n.value)])),...Object.fromEntries(Object.entries(exact).map(([k,n])=>[k,Number(n.value)]))};if(!Object.values(fields).every(n=>Number.isInteger(Number(n.value))&&Number(n.value)>=Number(n.min))){error.textContent='孔數請填範圍內整數；精確尺寸請展開毫米欄。';return;}const candidate=makeStandardBlank(opts);if(!candidate.ok){error.textContent=candidate.message;return;}panel.hidden=true;place(opts);};
- const cancel=document.createElement('button');cancel.type='button';cancel.textContent='取消';cancel.onclick=()=>{panel.hidden=true;};const actions=document.createElement('footer');actions.style.cssText='display:flex;gap:8px;position:sticky;bottom:0;background:white;padding:6px 0;z-index:1';actions.append(add,cancel);panel.append(actions);add.style.minHeight=cancel.style.minHeight='44px';const preview=()=>{const opts={kind,...Object.fromEntries(Object.entries(fields).map(([k,n])=>[k,Number(n.value)])),...Object.fromEntries(Object.entries(exact).map(([k,n])=>[k,Number(n.value)]))},r=makeStandardBlank(opts);const valid=Object.values(fields).every(n=>Number.isInteger(Number(n.value))&&Number(n.value)>=Number(n.min)&&Number(n.value)<=Number(n.max));add.disabled=!r.ok||!valid;error.textContent=!valid?'孔數請填有效整數。':!r.ok?r.message:`候選實際${r.holeCount}孔；外形${opts.lengthMm+13} × ${kind==='bar'?13:opts.heightMm+13} × 3 mm`;};Object.values(fields).forEach(n=>n.oninput=()=>{sync();preview();});Object.values(exact).forEach(n=>n.oninput=preview);preview();
+ for(const[key,text,value]of[['originX','位置 X mm',0],['originY','位置 Y mm',0],['lengthMm','長向孔距 mm',kind==='bar'?56:40],...(kind!=='bar'?[['heightMm','直向孔距 mm',24]]:[]),...(kind==='l'?[['armWidthMm','臂寬 mm',13]]:[])])row(details,exact,key,text,value);
+ const note=document.createElement('p');note.textContent='拖畫布候選放位置，拖長／寬／臂寬把手改孔數；確認才新增。孔距8 mm・板厚3 mm・最多128孔。';details.append(note);
+ const free=document.createElement('button');free.type='button';free.textContent='自訂孔位／外形：沿用自由繪圖';free.onclick=()=>{cancel();window.blocks.startDrawPolygon();};details.append(free);
+ const status=document.createElement('p');status.setAttribute('role','status');panel.append(status);
+ const actions=document.createElement('footer');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;position:sticky;bottom:0;background:white;padding:6px 0;z-index:1';panel.append(actions);
+ const button=(text,click)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.style.minHeight='44px';b.onclick=click;actions.append(b);return b;};
+ const add=button('確認新增',()=>{if(!add.disabled)confirm();});add.dataset.blankPlace='';
+ button('取消',cancel);
+ if(sheetMode())button('看畫布',()=>setSheet('collapsed'));
+ const options=()=>({kind,...Object.fromEntries(Object.entries(exact).filter(([k])=>!k.startsWith('origin')).map(([k,n])=>[k,Number(n.value)])),origin:{x:Number(exact.originX.value),y:Number(exact.originY.value)}});
+ const show=opts=>{
+  for(const[k,n]of Object.entries(exact))if(document.activeElement!==n)n.value=k==='originX'?opts.origin.x:k==='originY'?opts.origin.y:opts[k];
+  const r=makeStandardBlank(opts);
+  if(r.ok){const c=r.comp,holes=[{u:0,v:0},{u:opts.lengthMm,v:0},...(kind==='bar'?[]:[{u:0,v:opts.heightMm}]),...c.holes];fields.columns.value=new Set(holes.map(h=>h.u)).size;if(fields.rows)fields.rows.value=new Set(holes.map(h=>h.v)).size;if(fields.armRows)fields.armRows.value=Math.floor((opts.armWidthMm-13)/8)+1;}
+  add.disabled=!r.ok;status.textContent=r.ok?`候選實際${r.holeCount}孔；外形${opts.lengthMm+13} × ${kind==='bar'?13:opts.heightMm+13} × 3 mm`:r.message;
+ };
+ const fromFields=key=>{const valid=Object.values(fields).every(n=>Number.isInteger(Number(n.value))&&Number(n.value)>=Number(n.min)&&Number(n.value)<=Number(n.max));if(!valid){add.disabled=true;status.textContent='孔數請填範圍內整數。';return;}if(key==='columns')exact.lengthMm.value=(Number(fields.columns.value)-1)*8;if(key==='rows')exact.heightMm.value=(Number(fields.rows.value)-1)*8;if(key==='armRows')exact.armWidthMm.value=(Number(fields.armRows.value)-1)*8+13;const opts=options();show(opts);update(opts);};
+ Object.entries(fields).forEach(([key,n])=>n.oninput=()=>fromFields(key));
+ Object.values(exact).forEach(n=>n.oninput=()=>{const opts=options();show(opts);update(opts);});
+ const escape=e=>{if(e.key==='Escape'){e.preventDefault();cancel();}};
+ const closed=()=>{panel.hidden=true;document.removeEventListener('keydown',escape);};
+ const draw=({svg,draft,update:change})=>{
+  const s=View.getScale(),a=draft.origin,L=draft.lengthMm,H=draft.heightMm;
+  const handle=(key,label,field,p,direction,value,min,max,quantize,snap=8)=>dimensionHandle(svg,{key:'blank-create-'+key,label,point:{x:View.TX(p.x),y:View.TY(p.y)},direction,value,min,max,snap,quantize,step:snap,
+   activate:()=>{if(sheetMode())setSheet('half');fields[field==='lengthMm'?'columns':field==='heightMm'?'rows':'armRows'].focus();},
+   preview:v=>change({[field]:v}),cancel:()=>change({[field]:value}),commit:v=>change({[field]:v})});
+  const matrix=svg.getScreenCTM(),gap=32/(Math.hypot(matrix.a,matrix.b)*s);
+  handle('length',`長 ${fields.columns.value}孔`,'lengthMm',{x:a.x+L+gap,y:a.y+(kind==='bar'?0:H*.5)},{x:s,y:0},L,8,1000);
+  if(kind!=='bar')handle('height',`寬 ${fields.rows.value}孔`,'heightMm',{x:a.x+(kind==='l'?0:L*.5),y:a.y+H+gap},{x:0,y:-s},H,8,1000);
+  if(kind==='l')handle('arm',`臂寬 ${fields.armRows.value}列`,'armWidthMm',{x:a.x+L*.5,y:a.y+draft.armWidthMm-6.5},{x:0,y:-s},draft.armWidthMm,13,13+8*(Math.ceil(Math.min(L,H)/8)-1),raw=>13+8*Math.round((raw-13)/8));
+ };
+ if(sheetMode())setSheet('half');
+ start(options(),{changed:show,closed,draw});panel.hidden=false;document.addEventListener('keydown',escape);show(options());
 }

@@ -139,6 +139,7 @@ function onDragMove(e) {
     S.dragId=pendingNodeDrag.id; pendingNodeDrag=null; draw();
   }
   if (S.drawingPolygon) {
+    if(S.standardBlankDraft){Tools.standardBlankPointer(e,'move');return;}
     if (activePointers.size >= 2) return;
     const wp = worldFromEvent(e);
     if (wp) { S.polygonPreview = wp; draw(); }
@@ -365,6 +366,7 @@ function cancelPointDrag(){
   if(before){const saved=JSON.parse(before);S.comps=saved.comps;S.modules=saved.modules||[];S.topo.params=saved.params;S.motorAngles={...(saved.motorAngles||{})};S.theta=Number(saved.params?.theta)||0;rebuild();draw();}
 }
 function onDragEnd(e) {
+  if(S.standardBlankDraft){Tools.standardBlankPointer(e,e?.type==='pointercancel'?'cancel':'up');return;}
   if(e?.type==='pointercancel'&&!S.drawingLink&&!S.drawingTriangle&&!S.drawingPolygon){cancelPointDrag();pendingNodeDrag=null;return;}
 
   if (e?.type === 'pointercancel' && (S.drawingLink || S.drawingTriangle || S.drawingPolygon)) { linkPointerStart = null; return; }
@@ -416,6 +418,7 @@ function onDragEnd(e) {
 }
 
 function abortSingleDrag() {
+  if(S.standardBlankDraft)Tools.standardBlankPointer(null,'cancel');
   // 第二指落下時，放棄正在進行的單指拖曳，避免與縮放打架
   cancelPointDrag(); // 第二指取消尚未完成的單指候選，不留下半次移動。
   backgroundPan = null;
@@ -658,6 +661,7 @@ export function init(deps) {
     if(e.target?.closest?.('[data-dimension-handle],[data-point-choice]'))return;
     if (!S.drawingPolygon) return;
     if (activePointers.size >= 2) return;
+    if(S.standardBlankDraft){if(e.button>0)return;e.preventDefault();Tools.standardBlankPointer(e,'down');return;}
     const w = worldFromEvent(e); if (!w) return;
     e.preventDefault();
     if (e.pointerType === 'mouse') {
@@ -673,6 +677,7 @@ export function init(deps) {
   svg.addEventListener('contextmenu', (e) => {
     if (!S.drawingLink && !S.drawingTriangle && !S.drawingPolygon) return;
     e.preventDefault();
+    if (S.standardBlankDraft)return;
     if (S.drawingPolygon) { Tools.finishPolygonDraw(); return; }
     if (S.drawingTriangle) Tools.finishPlateAsLinkEarly();
     else Tools.finishDrawLink(e);

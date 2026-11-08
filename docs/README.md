@@ -16,7 +16,7 @@
 
 ## 產品與功能規格
 
-- [桿件／板材／同平面L型件](TEACHING-CHANGELOG.md#standard-structures) — 三類基本結構、真孔、凹角、數字／把手與保存驗收及限制。
+- [桿件／板材／同平面L型件](TEACHING-CHANGELOG.md#standard-structures) — 三類基本結構、真孔、凹角、數字／把手與保存驗收及限制；[新增前拖拉／精確參數](TEACHING-CHANGELOG.md#standard-structure-creation)。
 
 - [SDD-RAPID-MECHANISM-VALIDATION.md](SDD-RAPID-MECHANISM-VALIDATION.md) — 在原有流程做減法；含全操作族盤點、裝配孔位共用核對，以及點接點修改零件孔距的直接／數值共用規則；保留既有功能與資料契約。
 - [SDD-GRID-BLOCKS.md](SDD-GRID-BLOCKS.md) — 數位積木 8 mm 孔格（草案）：條／板／機架／角件對格、M3 孔、立體格與 3D 列印角件，離格須確認並標示
