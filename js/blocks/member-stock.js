@@ -5,11 +5,11 @@ export const DEFAULT_HOLE_MM=FABRICATION_DEFAULTS.export.holeDiameterMm;
 // This is descriptive data only; it does not make strength or fabrication claims.
 
 export const MATERIALS = Object.freeze([
-  Object.freeze({ id: 'unspecified', label: '未指定' }),
-  Object.freeze({ id: 'plywood', label: '夾板' }),
-  Object.freeze({ id: 'acrylic', label: '壓克力' }),
-  Object.freeze({ id: 'aluminum', label: '鋁板' }),
-  Object.freeze({ id: 'pla', label: 'PLA' }),
+  Object.freeze({ id: 'unspecified', label: '未指定', densityKgM3: null }),
+  Object.freeze({ id: 'plywood', label: '夾板', densityKgM3: 700, densitySource: '[9]' }),
+  Object.freeze({ id: 'acrylic', label: '壓克力', densityKgM3: null }),
+  Object.freeze({ id: 'aluminum', label: '鋁板', densityKgM3: null }),
+  Object.freeze({ id: 'pla', label: 'PLA', densityKgM3: null }),
 ]);
 
 const MATERIAL_IDS = new Set(MATERIALS.map(item => item.id));

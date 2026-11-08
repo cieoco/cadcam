@@ -10,7 +10,7 @@ import { planSyringeInstallation } from '../js/blocks/syringe-installation.js';
 import { scanSyringe } from '../js/blocks/syringe-operations.js';
 const ids = ['unit4-start', 'unit5-start', 'unit6-start', 'unit7-start', 'unit11-start', 'unit12-start', 'syringe-fixed-start', 'syringe-pivot-start'];
 check('載入前清單沒有單元起始檔（不在啟動資料）', ids.every(id => !getExample(id)));
-const servoIds = ['servo-plate-arm', 'servo-plate-fourbar','motor-plate-tt','motor-plate-n20'];  // 同一次按需載入還會帶入 4 個馬達／舵機座板範例
+const servoIds = ['servo-plate-arm', 'servo-plate-fourbar','motor-plate-tt','motor-plate-n20','torque-arm-direct','torque-arm-geared'];  // 同一次按需載入還會帶入 4 個馬達／舵機座板範例
 const before = BLOCK_EXAMPLES.length;
 const [first, second] = [loadUnitStarts(), loadUnitStarts()];
 check('重複呼叫共用同一個載入', first === second);

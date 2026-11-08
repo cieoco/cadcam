@@ -292,7 +292,11 @@
     "test/stroke-trajectories.mjs",
     "test/example-frame-stock.mjs",
     "test/h01-frame-clamp.mjs",
-    "test/iq-linq-lift.mjs"
+    "test/iq-linq-lift.mjs",
+    "test/required-torque.mjs",
+    "test/torque-merge.mjs",
+    "test/actuator-speed.mjs",
+    "test/torque-panel-model.mjs"
   ],
   "version": 1
 }

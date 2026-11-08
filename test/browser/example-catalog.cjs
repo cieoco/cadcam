@@ -15,7 +15,7 @@ const base=process.env.TEST_URL||'http://127.0.0.1:8024',out='output/example-cat
   try{
    await page.goto(base+'/blocks.html?example=gear-pair');await page.getByRole('button',{name:'載入此範例',exact:true}).click();
    const original=await state();await catalog();
-   assert.equal(await page.locator('[data-example-id]').count(),65);
+   assert.equal(await page.locator('[data-example-id]').count(),69);
    assert.equal(await page.locator('[data-example-ref]').count(),4);
    assert.equal(await page.locator('[data-example-group="challenge"]').count(),0);
    assert.equal(await page.locator('[data-example-family="passive-tools"] summary .example-capability').textContent(),'固定組立');

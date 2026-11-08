@@ -17,6 +17,8 @@ export const CATALOG_FAMILIES = [
   family('gears', 'transmission', '改變轉速與轉向 · 齒輪', '比較單對齒輪、齒輪列與共軸減速。', [
     variant('gear-pair', '兩輪嚙合傳動'), variant('reduction-gear-train', '齒輪列四倍減速'),
     variant('iq-mad-box', "三段共軸減速", '可試動', "")]),
+  family('torque-arm', 'transmission', '動力夠不夠 · 手臂扭力', '同一支手臂、末端 50 g；用「⚖ 扭力」比較 TT、TT＋3:1 齒輪與 MG995。', [
+    variant('torque-arm-direct', 'TT 直接帶手臂', '可試動', ''), variant('torque-arm-geared', 'TT＋3:1 齒輪帶手臂', '可試動', '')]),
   family('belt', 'transmission', '跨軸同向傳動 · 皮帶輪', '改輪徑比較轉速比。', [variant('pulley-belt', '皮帶輪同向變速')]),
   family('chain', 'transmission', '跨軸減速 · 鏈輪鏈條', '20 齒帶動 40 齒；#25 鏈條示範。', [variant('sprocket-chain', '鏈輪鏈條同向減速')]),
   family('parallel-lift', 'lift', '保持方向升降 · 平行連桿', '工具保持姿態，仍沿圓弧移動。', [
