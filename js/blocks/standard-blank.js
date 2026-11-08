@@ -1,5 +1,6 @@
 /** Three standard blanks, authored using existing bar/triangle components. */
 import {holeSide} from '../core/local-holes.js';
+import {isHoleUsed} from './used-holes.js';
 export const BLANK_HOLE_LIMIT=128;
 export const isOutputBlank=c=>c?.type==='bar'&&c.standardBlank?.kind==='bar'&&Number.isFinite(c.standardBlank.rearMm);
 const span=n=>(n-1)*8,range=L=>{const a=Array.from({length:Math.floor(L/8)+1},(_,i)=>i*8);if(L-a.at(-1)>.00001){if(L-a.at(-1)<4)a.pop();a.push(L);}return a;};
@@ -27,16 +28,16 @@ export function makeStandardBlank({kind='bar',columns=kind==='bar'?8:6,rows=4,ar
  c.holes=cells.filter(h=>!primary.some(p=>Math.hypot(p.x-origin.x-h.u,p.y-origin.y-h.v)<1e-6)).map(h=>({id:`${id}.H${h.u}_${h.v}`.replaceAll('.','_'),...h,type:'floating',diameter:3.2}));
  return {ok:true,comp:c,params,holeCount:cells.length};
 }
-export function resizeStandardBlank(c,params,axis,value,{comps=[]}={}){
+export function resizeStandardBlank(c,params,axis,value,{comps=[],modules=[]}={}){
  const g=c.type==='bar'?c.lenParam:c.gParam,L=Number(params[g]),H=Number(params[c.r1Param]),a=c.p1,b=c.p2,angle=Math.atan2(b.y-a.y,b.x-a.x);
  const next=makeStandardBlank({kind:c.standardBlank.kind,lengthMm:axis==='g'?value:L,heightMm:axis==='r1'?value:H,armWidthMm:axis==='arm'?value:c.standardBlank.armWidthMm,...(isOutputBlank(c)?{rearMm:c.standardBlank.rearMm,widthMm:axis==='width'?value:c.stock.widthMm}:{}),n:1,origin:{x:0,y:0}});if(!next.ok)return next;
  const out=structuredClone(c),raw=next.comp,keys=['p1','p2',...(c.type==='triangle'?['p3']:[])];
  for(const key of keys){const p=raw[key];out[key]={...c[key],x:a.x+p.x*Math.cos(angle)-p.y*Math.sin(angle)*holeSide(c),y:a.y+p.x*Math.sin(angle)+p.y*Math.cos(angle)*holeSide(c)};}
  const originalHoles=[...(c.holes || []),...(c.standardBlank.mountHoles || [])],old=new Map(originalHoles.map(h=>[`${h.u},${h.v}`,h]));
- out.holes=raw.holes.map(h=>({...h,...old.get(`${h.u},${h.v}`),id:old.get(`${h.u},${h.v}`)?.id||`${c.id}.H${h.u}_${h.v}`.replaceAll('.','_')}));out.standardBlank=raw.standardBlank;if(isOutputBlank(c)&&axis==='width')out.stock.widthMm=value;
+ out.holes=raw.holes.map(h=>({...h,...old.get(`${h.u},${h.v}`),id:old.get(`${h.u},${h.v}`)?.id||`${c.id}.H${h.u}_${h.v}`.replaceAll('.','_')}));out.standardBlank={...raw.standardBlank,...(c.standardBlank.drill==='all'?{drill:'all'}:{})};if(isOutputBlank(c)&&axis==='width')out.stock.widthMm=value;
  const patch={[g]:axis==='g'?value:L};if(c.type==='triangle'){patch[c.r1Param]=axis==='r1'?value:H;patch[c.r2Param]=Math.hypot(patch[g],patch[c.r1Param]);}
  const retained=new Set(out.holes.map(h=>h.id)),removed=originalHoles.filter(h=>!retained.has(h.id));
- if(removed.some(h=>h.manufactured||h.type==='fixed'||comps.some(other=>other.id!==c.id&&(['p1','p2','p3','m1','m2'].some(k=>other[k]?.id===h.id)||other.holes?.some(q=>q.id===h.id)))))return {ok:false,message:'縮小會刪除已固定或已連接的孔，請先解除連接。'};
+ if(removed.some(h=>isHoleUsed(c,h,comps,{params,modules})))return {ok:false,message:'縮小會刪除已固定或已連接的孔，請先解除連接。'};
  return {ok:true,comp:out,params:patch};
 }
 

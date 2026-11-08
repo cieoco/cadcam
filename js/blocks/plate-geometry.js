@@ -271,7 +271,7 @@ export function plateVertexWorldPoints(comp = {}, points = []) {
     if (vt.solve) {
       const w = points[PLATE_REF_INDEX[vt.ref]];
       if (w && Number.isFinite(w.x) && Number.isFinite(w.y)) {
-        out.push({ x: w.x, y: w.y, solve: true, hole: true });
+        out.push({ x: w.x, y: w.y, solve: true, hole: true, ref: vt.ref });
       }
     } else {
       const w = localToWorld(points, vt);
@@ -362,7 +362,7 @@ export function createPlateGeometry(comp, points, options = {}) {
   const blank=blankGeometry(comp,points);if(blank)outline=blank;
   const holePts = world.filter(p => p.solve || p.hole);
   let holes = (holePts.length ? holePts : cleanPoints(points))
-    .map(p => ({ x: p.x, y: p.y, r: holeRadius }));
+    .filter(p => !comp?.undrilled?.includes(p.ref)).map(p => ({ x: p.x, y: p.y, r: holeRadius }));
   holes.push(...localHoles(comp).map(h=>({...holeWorld({...comp,p1:points[0],p2:points[1],p3:points[2]},h),r:h.diameter/2,id:h.id})));
   // 落在切割槽內或與外加孔重疊的頂點孔沒有意義（材料被切掉／同軸），移除。
   if (extraCutouts.length) holes = holes.filter(h => !extraCutouts.some(c => pointInPoly(h, c.points)));

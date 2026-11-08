@@ -16,7 +16,7 @@ import {
   safeName, normalizeExportSettings, assertFusionFeatures,
   exportableLinks, exportablePlates, exportableGears, exportableRacks,
   inspectLinkExport, inspectPlateExport, inspectFrameExport,
-  splitMountsByHost, hostedBarGeometry
+  splitMountsByHost, hostedBarGeometry, machinedComps
 } from './exporters.js?v=20261007_7';
 import { frameConnectorNodes, motorPointIds, pointCoords, frameNodeIds, sliderMountInfo, isHiddenSliderRailPoint } from './model.js';
 import { machineFrameComps, machineMounts, moduleFrameExports, moduleFrameNodes, moduleOfPoint, splitFrameMounts, planeOf } from './assembly.js?v=20261007_m5a';
@@ -127,7 +127,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
   // M5a：只有「機器」（底座＋裝在它身上的）進製作計畫；還沒接上的機構與它們的底板都不算，只列在 plan.spare。
   const spare = spareModules(modules);
   const allComps = Array.isArray(comps) ? comps : [], allMods = Array.isArray(modules) ? modules : [];
-  const list = machineComps(allComps, allMods);
+  const list = machinedComps(machineComps(allComps, allMods), allMods, params);
   const modList = machineModules(allMods);
   if (spare.length) { mounts = Array.isArray(mounts) ? machineMounts(mounts, allComps, allMods) : mounts; extras = undefined; }   // 傳進來的馬達座／接合孔可能含未安裝機構的，重算
   const modById = new Map(modList.map(m => [m.id, m]));

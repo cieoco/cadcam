@@ -33,7 +33,7 @@ export function partGeometryKey({comps=[],modules=[],params={},fabrication={},ex
 
 export function buildPartGeometryCatalog(args={}) {
   const input=structuredClone(args);
-  const {comps=[],modules=[],params={},fabrication={},frameNodes}=input;
+  const {modules=[],params={},fabrication={},frameNodes}=input,comps=Exporters.machinedComps(input.comps,modules,params);
   // 另一片獨立板可能共用機架點，使自動機架排除該點；此時保留完整承載桿。
   const visibleFrameIds=new Set((frameNodes||frameConnectorNodes(comps)).map(p=>p.id));
   for(const syringe of comps.filter(c=>c.type==='syringe'&&['fixed-axis','pivot'].includes(c.mountMode))){

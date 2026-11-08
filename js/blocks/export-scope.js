@@ -55,12 +55,14 @@ export function prepareScopedExport(source,options,format) {
     if(usesFaceExport(scoped))data=faceFileExportData(scoped,{theta:0});
     else {
       const settings={...work.exportSettings,drive:work.fabrication?.drive||FABRICATION_DEFAULTS.drive};
-      const mounts=machineMounts(deriveMotorMounts(context.comps).map(m=>({...m,settings:actuatorMountSettings(work.fabrication,m.kind)})),context.comps,context.modules);
-      const catalog=buildPartGeometryCatalog({...context,params,fabrication:work.fabrication,exportSettings:settings,mounts});
-      const extras=catalog.extras,split=splitFrameMounts(Ex.splitMountsByHost(context.comps,mounts).free,context.comps,context.modules);
-      data={...context,params,settings,mounts,extras,points:catalog.homePoints,frames:[
-        {name:'frame',nodes:withWorldAdapterNodes(frameConnectorNodes(machineFrameComps(context.comps,context.modules)),extras),mounts:split.world},
-        ...moduleFrameExports(context.comps,context.modules,params).map(e=>({name:e.fileBase,nodes:withAdapterNodes(e.moduleId,moduleFrameNodes(e,frameConnectorNodes(e.comps)),extras),mounts:split.byModule[e.moduleId]||[]}))]};
+      // 標準件只輸出用到的孔（含模組輸出點等跨零件參照）；所有檔案與 CNC 檢查用同一份。
+      const mc={...context,comps:Ex.machinedComps(context.comps,context.modules,params)};
+      const mounts=machineMounts(deriveMotorMounts(mc.comps).map(m=>({...m,settings:actuatorMountSettings(work.fabrication,m.kind)})),mc.comps,mc.modules);
+      const catalog=buildPartGeometryCatalog({...mc,params,fabrication:work.fabrication,exportSettings:settings,mounts});
+      const extras=catalog.extras,split=splitFrameMounts(Ex.splitMountsByHost(mc.comps,mounts).free,mc.comps,mc.modules);
+      data={...mc,params,settings,mounts,extras,points:catalog.homePoints,frames:[
+        {name:'frame',nodes:withWorldAdapterNodes(frameConnectorNodes(machineFrameComps(mc.comps,mc.modules)),extras),mounts:split.world},
+        ...moduleFrameExports(mc.comps,mc.modules,params).map(e=>({name:e.fileBase,nodes:withAdapterNodes(e.moduleId,moduleFrameNodes(e,frameConnectorNodes(e.comps)),extras),mounts:split.byModule[e.moduleId]||[]}))]};
     }
     const stockWarnings=memberStockWarnings(targets,data.settings);
     if(stockWarnings.length)throw Error(stockWarnings[0]);
