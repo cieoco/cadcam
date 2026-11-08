@@ -1,3 +1,4 @@
+import {localHoles,holeWorld,holeSide} from './local-holes.js';
 // Hinged telescopic actuator. All lengths and attachment coordinates are mm.
 // These demonstration dimensions are not a manufacturer specification.
 export const SYRINGE_DEMO = Object.freeze({name:'10mL 教學示範（未校正）',capacityMl:10,outerDiameter:16,bodyLength:70,rodDiameter:6,lmin:95,stroke:40,calibrated:false});
@@ -18,7 +19,14 @@ export const syringeBarrelOffset=c=>c.installation?.barrelOffsetMm ?? c.spec.bod
 // A shared node can be declared fixed by another member. Drawing a new bar
 // reuses its ID with a floating local copy; match compileTopology's node roles.
 export function fixedSyringePointIds(comps){
-  return new Set(comps.flatMap(o=>[o.p1,o.p2,o.p3].filter(p=>p?.type==='fixed').map(p=>p.id)));
+  const nodes=o=>[o.p1,o.p2,o.p3,...localHoles(o).map(h=>({...h,...holeWorld(o,h)}))].filter(Boolean);
+  const ids=new Set(comps.flatMap(o=>nodes(o).filter(p=>p.type==='fixed').map(p=>p.id)));
+  // Two distinct fixed holes lock a rigid plate, including its other primary holes.
+  let changed=true;while(changed){changed=false;for(const o of comps.filter(c=>['bar','triangle'].includes(c.type))){
+    const ns=nodes(o),fixed=ns.filter(p=>ids.has(p.id));
+    if(!fixed.some((a,i)=>fixed.slice(i+1).some(b=>a.id!==b.id&&Math.hypot(a.x-b.x,a.y-b.y)>1e-6)))continue;
+    for(const p of ns)if(!ids.has(p.id)){ids.add(p.id);changed=true;}
+  }}return ids;
 }
 export function normalizeSyringe(c) {
   const spec={...SYRINGE_DEMO};
@@ -56,6 +64,13 @@ export function attachmentFrame(owner,params,points=null) {
   if(!(d>0&&length>0))return null;
   return {p,x:(q.x-p.x)/d,y:(q.y-p.y)/d,length};
 }
+// Select existing primary/grid holes; coordinates share the attachment frame.
+export function syringeAttachmentHoles(owner,params){
+ const f=attachmentFrame(owner,params);if(!f)return [];
+ return [owner.p1,owner.p2,owner.p3].filter(Boolean).map((p,i)=>({...p,key:['p1','p2','p3'][i],u:(p.x-f.p.x)*f.x+(p.y-f.p.y)*f.y,v:-(p.x-f.p.x)*f.y+(p.y-f.p.y)*f.x}))
+ .concat(localHoles(owner).map(h=>({...h,...holeWorld(owner,h),key:h.id,v:h.v*holeSide(owner)})));
+}
+export const syringeAttachmentHole=(owner,params,ref)=>syringeAttachmentHoles(owner,params).find(h=>Math.hypot(h.u-ref?.u,h.v-ref?.v)<1e-6);
 export function attachmentPoint(ref,comps,params,points=null) {
   const owner=comps.find(c=>c.id===ref.componentId),f=attachmentFrame(owner,params,points);
   return f?{x:f.p.x+f.x*ref.u-f.y*ref.v,y:f.p.y+f.y*ref.u+f.x*ref.v}:null;
@@ -83,8 +98,8 @@ export function syringeIssues(c,comps,params) {
   if(c.mountMode==='pivot'){
     const fixed=fixedSyringePointIds(comps),owner=comps.find(o=>o.id===c.a?.componentId);
     if(!owner||![owner.p1,owner.p2,owner.p3].filter(Boolean).every(p=>fixed.has(p.id)))issues.push('可轉固定環的支點須安裝在固定機架上。');
-    const arm=comps.find(o=>o.id===c.b?.componentId),at=c.b?.u===0?arm?.p1:Math.abs(c.b?.u-Number(params[arm?.lenParam]))<1e-6?arm?.p2:null;
-    if(!at||fixed.has(at.id)||!['bar'].includes(arm?.type)||![arm.p1,arm.p2].some(p=>fixed.has(p.id)))issues.push('可轉安裝請直接接有固定軸的連桿／圓盤活動端孔；保留中間短連桿會多出自由度。');
+    const arm=comps.find(o=>o.id===c.b?.componentId),at=syringeAttachmentHole(arm,params,c.b);
+    if(!at||fixed.has(at.id)||!['bar','triangle'].includes(arm?.type)||!syringeAttachmentHoles(arm,params).some(p=>fixed.has(p.id)))issues.push('可轉安裝請直接接有固定軸的連桿／圓盤活動端孔；保留中間短連桿會多出自由度。');
   }
   for(const id of c.jawIds||[])if(!comps.some(o=>o.id===id&&o.type==='triangle'))issues.push('一體式夾臂缺失。');
   for(const t of c.passiveTips||[])if(!comps.some(o=>o.id===t.hostId&&o.p3)||!Number.isFinite(t.length)||t.length<=0||!Number.isFinite(t.angleDeg))issues.push('活動夾片的宿主、長度或手動角度無效。');
@@ -115,6 +130,7 @@ export function expandSyringes(comps,params) {
       const ref=c[key],owner=output.find(o=>o.id===ref?.componentId),f=attachmentFrame(owner,values);
       if(!f){ends.push(null);continue;}
       const q=attachmentPoint(ref,output,values);
+      const hole=syringeAttachmentHole(owner,values,ref);if(hole){ends.push({id:hole.id,type:hole.type||'floating',...q});continue;}
       if(Math.hypot(ref.u,ref.v)<1e-9){ends.push(owner.p1);continue;}
       if(Math.hypot(ref.u-f.length,ref.v)<1e-9){ends.push(owner.p2);continue;}
       const p={id:`${c.id}_${key}`,type:'floating',...q,solveSign:c.branch};ends.push(p);
@@ -151,7 +167,7 @@ export function validateSyringePose(comps,params,points) {
       continue;
     }
     const owner=comps.find(o=>o.id===c.b.componentId),fixed=fixedSyringePointIds(comps);
-    const pivot=c.mountMode==='pivot'?[owner?.p1,owner?.p2].find(p=>fixed.has(p?.id)):owner?.p1,o=points?.[pivot?.id];
+    const pivot=c.mountMode==='pivot'?syringeAttachmentHoles(owner,params).find(p=>fixed.has(p.id)):owner?.p1,o=points?.[pivot?.id];
     if(o){const axis=c.mountMode==='pivot'?syringePivotFrame(a,b,syringePivotEar(c)):null,ux=axis?Math.cos(axis.angle):b.x-a.x,uy=axis?Math.sin(axis.angle):b.y-a.y,ref=axis?b:a,length=axis?1:Math.hypot(ux,uy),lever=Math.abs(ux*(o.y-ref.y)-uy*(o.x-ref.x))/length;
       if(lever<0.5)issues.push('針筒推力作用線接近通過關節中心，請避開奇異姿勢。');}
   }

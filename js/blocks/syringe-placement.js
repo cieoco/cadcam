@@ -1,4 +1,4 @@
-import {SYRINGE_DEMO,SYRINGE_EAR_MM,attachmentFrame,attachmentPoint,fixedSyringePointIds} from '../core/syringe.js';
+import {SYRINGE_DEMO,SYRINGE_EAR_MM,attachmentFrame,attachmentPoint,fixedSyringePointIds,syringeAttachmentHoles,syringeAttachmentHole} from '../core/syringe.js';
 
 // 管夾固定針筒的放置規則（純函式，不改傳入資料）。學生點選 A（機架上的管夾位置）與 B（短連桿端孔），
 // 這裡找出輸出擺臂、算出軸向與最短孔距，回傳可交給設定視窗的候選針筒。
@@ -40,8 +40,8 @@ export function placeFixedSyringe(comps,params,points,aRef,bRef,{extension=10}={
 export function placePivotSyringe(comps,params,points,aRef,bRef,{extension=10,pivotEar=1}={}){
  const frame=comps.find(c=>c.id===aRef?.componentId),arm=comps.find(c=>c.id===bRef?.componentId);
  if(!frame||!isFixedFrame(frame,comps))return fail('可轉固定環的支點須安裝在固定機架上。');
- const end=barEnd(arm,params,bRef),fixed=fixedSyringePointIds(comps);
- if(!end||fixed.has(arm[end].id)||![arm.p1,arm.p2].some(p=>fixed.has(p.id)))return fail('可轉安裝請直接接有固定軸的連桿／圓盤活動端孔；保留中間短連桿會多出自由度。');
+ const end=syringeAttachmentHole(arm,params,bRef),fixed=fixedSyringePointIds(comps);
+ if(!end||fixed.has(end.id)||!syringeAttachmentHoles(arm,params).some(p=>fixed.has(p.id)))return fail('可轉安裝請直接接有固定軸的連桿／圓盤活動端孔；保留中間短連桿會多出自由度。');
  const a=attachmentPoint(aRef,comps,params,points),b=attachmentPoint(bRef,comps,params,points);
  if(!a||!b)return fail('找不到有效的安裝點。');
  const stroke=20,ext=Math.max(0,Math.min(stroke,Number(extension)||0)),distance=Math.hypot(b.x-a.x,b.y-a.y),lmin=Math.sqrt(Math.max(0,distance*distance-SYRINGE_EAR_MM*SYRINGE_EAR_MM))-ext;

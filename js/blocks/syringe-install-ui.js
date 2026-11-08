@@ -1,5 +1,6 @@
+import * as View from './view.js';
 import {installationChoices,planPlacedSyringe} from './syringe-installation.js';
-import {SYRINGE_EAR_MM,attachmentFrame,attachmentPoint} from '../core/syringe.js';
+import {SYRINGE_EAR_MM,attachmentFrame,attachmentPoint,syringeAttachmentHoles,syringeAttachmentHole} from '../core/syringe.js';
 import {scanSyringe} from './syringe-operations.js';
 import {syringeShape} from './syringe-shape.js';
 import {frameConnectorNodes} from './model.js';
@@ -13,7 +14,8 @@ import {confirmMountingChange} from './mounting-review-ui.js';
 const ns='http://www.w3.org/2000/svg';
 const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textContent=text;parent?.append(n);return n;};
 const labelOf=c=>c.name || c.id;
-export function openSyringeInstallation({source,points,existing=null,newId,motion={},confirm,remove,advancedSettings,review=(result,notify)=>confirmMountingChange(source,{...source,comps:result.comps,params:result.params},{notify})}){
+export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,existing=null,newId,motion={},confirm,remove,advancedSettings,review=(result,notify)=>confirmMountingChange(source,{...source,comps:result.comps,params:result.params},{notify})}){
+ document.getElementById('syringeInstallation')?.close();
  const base=structuredClone(source),choices=installationChoices(base.comps,base.params);
  let result=null,closed=false,revision=0,viewer=null,sceneTimer=null,preview3d=false,dragging=false,focusClamp=!!existing,focusBox=null,dragOffset=null;
  const request={id:existing&&base.comps.some(c=>c.id===existing.id)?existing.id:null,newId:newId || existing?.id,
@@ -22,7 +24,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  // A canvas-picked candidate retains its custom specification before insertion.
  if(existing&&!request.id){base.comps.push(structuredClone(existing));request.id=existing.id;}
  let autoAxis=!existing,outputOptions=[];
- const dialog=el('dialog');dialog.id='syringeInstallation';dialog.className='syringe-install install-direct';
+ const dialog=el('dialog');dialog.id='syringeInstallation';dialog.className='syringe-install install-direct'+(stage?' install-canvas':'');
  dialog.setAttribute('aria-label','針筒安裝');
  const head=el('header',null,dialog);el('strong','針筒安裝',head);const cancel=el('button','取消',head);
  const preview=el('section',null,dialog);preview.className='install-preview';preview.setAttribute('aria-label','安裝預覽');
@@ -58,8 +60,10 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  const faceRow=el('div',null,connections);faceRow.className='install-faces';
  const faces=['front','back'].map((face,i)=>{const b=el('button',i?'背面':'正面',faceRow);b.onclick=()=>{request.face=face;update();};return b;});
  el('p',`筒身與固定環夾牢，固定環再接到所選固定機架。雙耳參考孔距 ${2*SYRINGE_EAR_MM} mm；可轉安裝同一個固定環只鎖一耳當轉軸、另一耳不鎖。現有參考環壁與耳孔／M3 墊片有干涉，固定架須改製核對；活動承載零件尚未支援。`,connections);
- const rod=field(connections,'推桿接哪個零件？');option(rod,'請選活動連桿／圓盤','');choices.rods.forEach(c=>option(rod,labelOf(c),c.id));rod.value=request.b?.componentId || '';
- const end=field(connections,'連接端孔');option(end,'第一孔','0');option(end,'第二孔','1');
+ const rod=field(connections,'推桿接哪個零件？');option(rod,'請選活動桿件／板材／L型件','');choices.rods.forEach(c=>option(rod,labelOf(c),c.id));rod.value=request.b?.componentId || '';
+ const end=field(connections,'連接端孔');
+ const holes=c=>syringeAttachmentHoles(c,base.params);
+ const holeLabel=h=>h?.key==='p1'?'第一孔':h.key==='p2'?'第二孔':h.key==='p3'?'第三孔':`格孔（${h.u.toFixed(1)}, ${h.v.toFixed(1)} mm）`;
  end.value=request.b?.u>0?'1':'0';
  const toggle=el('button','查看 3D',trialPanel);toggle.onclick=()=>{preview3d=!preview3d;update();};
  const auto=field(trialPanel,'套筒高度');option(auto,'自動估算（優先對齊）','auto');option(auto,'自行輸入套筒長度','manual');auto.value=request.spacerMm===null?'auto':'manual';
@@ -85,12 +89,12 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  cancel.onclick=()=>dialog.close();
  next.onclick=()=>{if(result?.ok&&!result.temporary){if(!review(result,message=>{error.textContent=message;}))return;const accepted=confirm(result);if(accepted!==false)dialog.close();else error.textContent='作品已變更，請關閉後重新安裝。';}};
  const changed=()=>{scanStatus.textContent='設定已變更，請重新檢查全行程。';};
- frame.onchange=()=>{request.frameId=frame.value;request.position=null;focusBox=null;preview3d=false;changed();update();};
+ frame.onchange=()=>{request.frameId=frame.value;const c=choices.frames.find(c=>c.id===frame.value);request.position=c?{...attachmentFrame(c,base.params,points).p}:null;if(!existing)autoAxis=true;focusBox=null;preview3d=false;changed();update();};
  const setPosition=()=>{request.position={x:readNumber(px),y:readNumber(py)};changed();update();};
  px.oninput=py.oninput=setPosition;
  angle.oninput=()=>{request.axisDeg=readNumber(angle);autoAxis=false;changed();update();};
  snap.onclick=()=>{if(request.position){request.position=onFrame(request.position);changed();update();}};
- const setRod=()=>{const c=choices.rods.find(c=>c.id===rod.value);if(c)connectOutput(c,end.value==='1'?'p2':'p1');else{request.b=null;changed();update();}};
+ const setRod=()=>{const c=choices.rods.find(c=>c.id===rod.value);if(c)connectOutput(c,holes(c).find(h=>h.key===end.value)?.key||'p1');else{request.b=null;changed();update();}};
  rod.onchange=setRod;end.onchange=setRod;
  auto.onchange=spacer.oninput=()=>{request.spacerMm=auto.value==='auto'?null:spacer.value.trim()===''?NaN:Number(spacer.value);changed();update();};
  stroke.oninput=()=>{if(!result?.ok)return;request.extension=Number(stroke.value);update();};
@@ -108,18 +112,22 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
    const a=request.position,len=existing?.spec.bodyLength ?? 72;
    const pad=Math.max(105,len+40),w=pad*2,h=pad*1.6;focusBox=[a.x-w/2,-a.y-h/2,w,h];
   }
-  const box=focusClamp?focusBox||viewBox:viewBox;
+  const box=stage?(()=>{const a=View.worldFromScreen(0,0);return [a.x,-a.y,View.W/View.getScale(),View.H/View.getScale()];})():focusClamp?focusBox||viewBox:viewBox;
   if(box)svg.setAttribute('viewBox',box.join(' '));
   const rect=svg.getBoundingClientRect(),unit=box?Math.max(box[2]/Math.max(1,rect.width),box[3]/Math.max(1,rect.height)):1;
-  try{const g=inspectFrameExport(frameConnectorNodes(cs),base.fabrication?.export || {});g?.outlines.forEach(r=>poly(r,'#e2e8f0'));}catch{/* Candidate failure is shown in the status, never applied. */}
+  try{const g=inspectFrameExport(frameConnectorNodes(cs),base.fabrication?.export || {});g?.outlines.forEach(r=>{const n=poly(r,stage?'transparent':'#e2e8f0');if(stage)n.setAttribute('stroke','transparent');if(choices.frames.length===1)n.setAttribute('data-install-member',choices.frames[0].id);});}catch{/* Candidate failure is shown in the status, never applied. */}
   const firstMemberIndex=svg.childNodes.length;
   for(const c of cs.filter(c=>['bar','triangle'].includes(c.type))){
    const selected=c.id===request.frameId,color=c.id===request.b?.componentId?'#e88d27':selected?'#0284c7':c.type==='bar'?'#94a3b8':'#f3b35a';
    const members=c.shape==='disk'?[poly(diskOutline(c,pos(c.p1)),color)]:c.type==='bar'?[line(pos(c.p1),pos(c.p2),8,color)]:createPlateGeometry(c,[c.p1,c.p2,c.p3].map(pos)).outlines.map(r=>poly(r,color));
    if(c.shape==='disk')members.forEach(n=>n.setAttribute('fill-opacity','.2'));
+   if(stage)members.forEach(n=>{
+    const moved=result?.ok&&!choices.frames.some(f=>f.id===c.id)&&[c.p1,c.p2,c.p3].filter(Boolean).some(p=>{const a=points?.[p.id]||p,b=P?.[p.id]||p;return Math.hypot(a.x-b.x,a.y-b.y)>.01;});
+    n.setAttribute('fill','transparent');n.setAttribute('stroke',moved?'#e88d27':'transparent');n.setAttribute('stroke-width',moved?'2':'8');if(moved)n.setAttribute('stroke-dasharray','3 2');
+   });
    members.forEach(n=>{n.setAttribute('data-install-member',c.id);n.style.cursor='pointer';});
-   for(const [i,p] of [c.p1,c.p2].entries()){
-    const q=pos(p),dot=draw('circle',{cx:q.x,cy:-q.y,r:3,fill:'white',stroke:color,'stroke-width':1});
+   for(const p of holes(c)){
+    const q=pos(p),dot=draw('circle',{cx:q.x,cy:-q.y,r:3,fill:stage?'transparent':'white',stroke:stage?'transparent':color,'stroke-width':1});
     if(choices.frames.some(f=>f.id===c.id))dot.setAttribute('data-install-member',c.id);
    }
   }
@@ -131,11 +139,11 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   }
   if(request.position&&!request.b){
    const ids=new Set();
-   for(const c of choices.rods)for(const k of ['p1','p2']){
-    const p=c[k];if(ids.has(p.id))continue;ids.add(p.id);const q=pos(p);
+   for(const c of choices.rods)for(const p of holes(c)){
+    const k=p.key;if(ids.has(p.id))continue;ids.add(p.id);const q=pos(p);
     const r=22*unit;
     draw('circle',{cx:q.x,cy:-q.y,r:5,fill:'white',stroke:'#e88d27','stroke-width':2});
-    const hit=draw('circle',{cx:q.x,cy:-q.y,r,fill:'transparent','data-quick-output':p.id,role:'button',tabindex:0,'aria-label':`連接 ${labelOf(c)} 的${k==='p1'?'第一':'第二'}孔`});
+    const hit=draw('circle',{cx:q.x,cy:-q.y,r,fill:'transparent','data-quick-output':p.id,role:'button',tabindex:0,'aria-label':`連接 ${labelOf(c)} 的${holeLabel(holes(c).find(h=>h.key===k))}`});
     hit.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pickOutput(p.id);}};
    }
   }
@@ -168,20 +176,21 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
  const onFrame=p=>syringePositionOnFrame(choices.frames.find(c=>c.id===request.frameId),base.params,points,p)||p;
  const drag=e=>{const p=pointer(e);if(dragging==='position')request.position=onFrame({x:p.x+(dragOffset?.x||0),y:p.y+(dragOffset?.y||0)});else if(dragging==='angle'&&request.position){request.axisDeg=Math.round(Math.atan2(p.y-request.position.y,p.x-request.position.x)*180/Math.PI);autoAxis=false;}changed();update();};
  function connectOutput(c,k){
-  request.b={componentId:c.id,u:k==='p2'?Number(base.params[c.lenParam]):0,v:0};outputOptions=[];changed();update();
+  const h=holes(c).find(h=>h.key===k);if(!h)return;request.b={componentId:c.id,u:h.u,v:h.v};outputOptions=[];changed();update();
  }
  function pickOutput(id){
-  outputOptions=choices.rods.flatMap(c=>['p1','p2'].filter(k=>c[k].id===id).map(k=>({c,k})));
+  outputOptions=choices.rods.flatMap(c=>holes(c).filter(h=>h.id===id).map(h=>({c,k:h.key})));
   if(outputOptions.length===1)connectOutput(outputOptions[0].c,outputOptions[0].k);else update();
  }
  svg.onpointerdown=e=>{
+  e.preventDefault();e.stopPropagation();
   const output=e.target.getAttribute('data-quick-output');if(output){pickOutput(output);return;}
   if(e.target.hasAttribute('data-install-angle')&&request.position)dragging='angle';
   else if(e.target.hasAttribute('data-install-position')&&request.position)dragging='position';
   else {
    const id=e.target.getAttribute('data-install-member');
    if(choices.frames.some(c=>c.id===id)){request.frameId=id;focusBox=null;}
-   else return;
+   else {const c=choices.rods.find(c=>c.id===id);if(c){connectOutput(c,holes(c).find(h=>h.type!=='fixed')?.key||'p1');}return;}
    dragging='position';
   }
   const p=pointer(e);dragOffset=e.target.hasAttribute('data-install-position')&&request.position?{x:request.position.x-p.x,y:request.position.y-p.y}:null;
@@ -208,7 +217,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   const pivot=request.mountMode==='pivot';
   zoom.disabled=!request.position;zoom.textContent=focusClamp?'看整個機構':'放大固定環';zoom.setAttribute('aria-pressed',String(focusClamp));
   ear.closest('label').hidden=!pivot;
-  frame.value=request.frameId;rod.value=request.b?.componentId||'';end.value=request.b?.u>0?'1':'0';
+  frame.value=request.frameId;rod.value=request.b?.componentId||'';end.replaceChildren();const selectedRod=choices.rods.find(c=>c.id===request.b?.componentId);for(const h of holes(selectedRod))option(end,holeLabel(h),h.key);end.value=syringeAttachmentHole(selectedRod,base.params,request.b)?.key||'';
   modeHint.textContent=pivot?'同一個雙耳固定環，只鎖一顆耳螺絲當轉軸；固定環與筒身一起繞它轉，另一耳不鎖。推桿直接接輸出件活動孔，方向由機構決定。':'固定環用雙孔鎖住，筒身方向不變；推桿經短連桿帶動輸出件。';
   ear.value=String(result?.ok&&result.syringe?.pivotEar===-1||request.pivotEar===-1&&!(result?.ok)?-1:1);
   angle.disabled=pivot;angle.closest('label').hidden=pivot;
@@ -218,7 +227,7 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   offset.max=(existing?.spec.bodyLength ?? 72)-6;
   if(document.activeElement!==offset)showNumber(offset,request.barrelOffsetMm ?? existing?.installation?.barrelOffsetMm ?? (existing?.spec.bodyLength ?? 72)*.7);
   offsetReading.textContent=`距筒尾 ${Number(offset.value).toFixed(1)} mm`;
-  outputChoices.replaceChildren();for(const {c,k} of outputOptions){const b=el('button',`連接 ${labelOf(c)} 的${k==='p1'?'第一':'第二'}孔`,outputChoices);b.onclick=()=>connectOutput(c,k);}
+  outputChoices.replaceChildren();for(const {c,k} of outputOptions){const b=el('button',`連接 ${labelOf(c)} 的${holeLabel(holes(c).find(h=>h.key===k))}`,outputChoices);b.onclick=()=>connectOutput(c,k);}
   faces.forEach((b,i)=>b.setAttribute('aria-pressed',String(request.face===(i?'back':'front'))));
   for(const [input,value] of [[px,request.position?.x],[py,request.position?.y],[angle,request.axisDeg]])if(document.activeElement!==input)showNumber(input,value);
   const positionOK=request.position&&[request.position.x,request.position.y,request.axisDeg].every(Number.isFinite);
@@ -233,14 +242,18 @@ export function openSyringeInstallation({source,points,existing=null,newId,motio
   if(!result?.ok||result.temporary)mountStatus.textContent=request.frameId?'固定位置尚未有效，請調整後查看 3D。':'請選擇管夾固定的機架。';
   toggle.disabled=stroke.disabled=scan.disabled=!result?.ok;if(more)more.disabled=!result?.ok||result.temporary;spacer.parentElement.hidden=auto.value==='auto';reading.textContent=`伸出 ${request.extension.toFixed(1)} / ${result?.syringe?.spec.stroke ?? stroke.max} mm`;
   if(result?.syringe)stroke.max=result.syringe.spec.stroke;
-  const show3d=preview3d&&result?.ok&&!result.temporary;space.hidden=!show3d;svg.toggleAttribute('hidden',!!show3d);toggle.textContent=preview3d?'回到平面':'查看 3D';
-  hint.textContent=!choices.frames.length?'請先在畫布建立固定機架。':!request.position?'點固定機架放置針筒；也可先從清單選機架。':!request.b?'點橘色端孔連接推桿，或從清單選孔。':pivot?'拖藍點移動轉軸，拖伸出量試動。':'拖藍點移位置、橘點轉方向，拖伸出量試動。';
+  const show3d=preview3d&&result?.ok&&!result.temporary;space.hidden=!show3d;svg.toggleAttribute('hidden',!!show3d);if(stage){svg.style.display=show3d?'none':'';space.style.height=show3d?'180px':'';}toggle.textContent=preview3d?'回到平面':'查看 3D';
+  hint.textContent=!choices.frames.length?'尚無固定機架：請取消安裝，在同一板件固定兩個不同位置的孔；單孔只會形成轉軸。':!request.position?'點固定機架放置針筒；也可先從清單選機架。':!request.b?'點橘色端孔連接推桿，或從清單選孔。':pivot?'拖藍點移動轉軸，拖伸出量試動。':'拖藍點移位置、橘點轉方向，拖伸出量試動。';
   if(result&&!result.ok)hint.textContent='連接尚未有效，請查看下方原因。';
   if(!show3d)renderDrawing();if(result?.ok&&!result.temporary){mountStatus.textContent='正在核對安裝高度…';const token=revision;sceneTimer=setTimeout(()=>scene(token),100);}
  }
- const resize=new ResizeObserver(()=>{if(!closed&&!svg.hasAttribute('hidden'))renderDrawing();});
- dialog.onclose=()=>{closed=true;revision++;clearTimeout(sceneTimer);resize.disconnect();viewer?.dispose();dialog.remove();};
- document.body.append(dialog);dialog.showModal();update();
- resize.observe(svg);
+ const fitCanvas=()=>{if(!stage)return;const r=stage.getBoundingClientRect(),panel=dialog.getBoundingClientRect(),ctm=stage.getScreenCTM();if(!ctm)return;const a=new DOMPoint(r.left,r.top).matrixTransform(ctm.inverse()),b=new DOMPoint(innerWidth<=600?r.right:panel.left-12,innerWidth<=600?panel.top-12:r.bottom).matrixTransform(ctm.inverse());const ps=base.comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(Boolean).map(p=>points?.[p.id]||p));if(ps.length&&b.x>a.x&&b.y>a.y)View.fit({minX:Math.min(...ps.map(p=>p.x))-30,maxX:Math.max(...ps.map(p=>p.x))+30,minY:Math.min(...ps.map(p=>p.y))-20,maxY:Math.max(...ps.map(p=>p.y))+20},{x:a.x,y:a.y,width:b.x-a.x,height:b.y-a.y});};
+ const syncCanvas=()=>{if(!stage)return;const r=stage.getBoundingClientRect();Object.assign(svg.style,{position:'fixed',left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px',zIndex:'1100',touchAction:'none'});};
+ const stopView=stage?View.onViewChange(()=>{redraw();syncCanvas();renderDrawing();}):()=>{};
+ const escape=e=>{if(e.key==='Escape'){e.stopPropagation();dialog.close();}};document.addEventListener('keydown',escape,true);
+ const resize=new ResizeObserver(()=>{if(!closed&&!svg.hasAttribute('hidden')){syncCanvas();renderDrawing();}});
+ dialog.onclose=()=>{closed=true;revision++;clearTimeout(sceneTimer);resize.disconnect();stopView();document.removeEventListener('keydown',escape,true);window.removeEventListener('resize',syncCanvas);svg.remove();viewer?.dispose();dialog.remove();};
+ document.body.append(dialog);if(stage){document.body.append(svg);zoom.hidden=true;preview.append(hint);dialog.show();syncCanvas();fitCanvas();window.addEventListener('resize',syncCanvas);svg.onwheel=e=>{e.preventDefault();View.zoomAt(stage,e.clientX,e.clientY,e.deltaY<0?1.1:1/1.1);};}else dialog.showModal();update();
+ resize.observe(stage||svg);
  return dialog;
 }

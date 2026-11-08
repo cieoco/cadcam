@@ -239,7 +239,7 @@ export function createSyringeUI(h){
     const revision=JSON.stringify([S.comps,S.topo.params,S.designFocus]);
     let counter=1;while(S.comps.some(c=>c.id===`Syringe${counter}`))counter++;
     // 安裝介面（含預覽與選項）第一次安裝針筒才載入，不佔啟動大小
-    import('./syringe-install-ui.js').then(({openSyringeInstallation})=>openSyringeInstallation({source,points:clone(h.points()),existing:candidate,newId:`Syringe${counter}`,motion:motion(),
+    import('./syringe-install-ui.js').then(({openSyringeInstallation})=>openSyringeInstallation({stage:h.svg,redraw:h.draw,source,points:clone(h.points()),existing:candidate,newId:`Syringe${counter}`,motion:motion(),
       review:(r,notify)=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus])){notify('作品已變更，請重新開啟安裝。');return false;}return confirmMountingChange(mountingWork(S),mountingCandidate(mountingWork(S),r,h.comps()),{notify});},
       advancedSettings:c=>open(c,true),
       confirm:r=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus]))return false;message='';commit(r.comps,r.params,r);return true;},
@@ -311,7 +311,7 @@ export function createSyringeUI(h){
   // 管夾固定針筒：先點機架上的管夾位置，再點短連桿的端孔；不合理的放法留在選點並說明原因。
   function addFixed(){
     h.pause();if(S.mode!=='design'){h.notify('請先到設計模式，再選管夾位置。');return;}
-    if(!h.comps().some(o=>o.type==='bar')){h.notify('請先畫出連桿，再放置針筒。');return;}
+    if(!h.comps().some(o=>['bar','triangle'].includes(o.type))){h.notify('請先建立板材或桿件，再放置針筒。');return;}
     document.getElementById('powerMenu').style.display='none';
     install();
   }

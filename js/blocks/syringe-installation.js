@@ -6,7 +6,7 @@ import {solveSyringe} from './syringe-operations.js';
 
 export function installationChoices(comps,params){
  const frames=comps.filter(c=>isFixedFrame(c,comps)&&attachmentFrame(c,params));
- const rods=comps.filter(c=>c.type==='bar'&&!isFixedFrame(c,comps));
+ const rods=comps.filter(c=>['bar','triangle'].includes(c.type)&&!isFixedFrame(c,comps));
  return {frames,rods};
 }
 export function planSyringeInstallation(source,request,points=null,motion={}){
