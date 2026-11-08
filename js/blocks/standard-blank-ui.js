@@ -7,13 +7,13 @@ import {sheetMode,setSheet} from './mobile-workspace.js';
 export function openStandardBlank(kind,{start,update,confirm,cancel}){
  let panel=document.getElementById('standardBlankPanel');
  if(!panel){panel=document.createElement('section');panel.id='standardBlankPanel';document.querySelector('.creation-sections').before(panel);}
- panel.replaceChildren();panel.hidden=false;panel.style.cssText='padding:10px;border:1px solid #b8cbd9;border-radius:10px;margin:8px 0;background:white';
+ panel.replaceChildren();panel.hidden=false;
  const title=document.createElement('strong');title.textContent=kind==='bar'?'桿件':kind==='plate'?'板材':'L型件（同平面）';panel.append(title);
  const fields={},exact={};
  const row=(parent,map,key,text,value,min=2)=>{
   const label=document.createElement('label'),input=document.createElement('input');label.textContent=text;input.type='number';input.value=value;input.setAttribute('aria-label',text);
   if(map===fields){input.min=min;input.max=128;input.step=1;input.dataset.blankField=key;}else{input.step='any';input.dataset.blankMm=key;}
-  label.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:6px;margin:8px 0';input.style.cssText='width:70px;min-height:36px';label.append(input);map[key]=input;parent.append(label);
+  label.append(input);map[key]=input;parent.append(label);
  };
  row(panel,fields,'columns',kind==='l'?'橫臂孔數':'長向孔數',kind==='bar'?8:6);
  if(kind!=='bar')row(panel,fields,'rows',kind==='l'?'直臂孔數':'寬向孔數',4);
@@ -21,11 +21,11 @@ export function openStandardBlank(kind,{start,update,confirm,cancel}){
  const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='特殊毫米尺寸／自由繪圖';details.append(summary);panel.append(details);
  for(const[key,text,value]of[['originX','位置 X mm',0],['originY','位置 Y mm',0],['lengthMm','長向孔距 mm',kind==='bar'?56:40],...(kind!=='bar'?[['heightMm','直向孔距 mm',24]]:[]),...(kind==='l'?[['armWidthMm','臂寬 mm',13]]:[])])row(details,exact,key,text,value);
  const note=document.createElement('p');note.textContent='拖畫布候選放位置，拖長／寬／臂寬把手改孔數；確認才新增。孔距8 mm・板厚3 mm・最多128孔。';details.append(note);
- const free=document.createElement('button');free.type='button';free.textContent='自訂孔位／外形：沿用自由繪圖';free.onclick=()=>{cancel();window.blocks.startDrawPolygon();};details.append(free);
+ const free=document.createElement('button');free.type='button';free.className='tool-btn';free.textContent='自訂孔位／外形：沿用自由繪圖';free.onclick=()=>{cancel();window.blocks.startDrawPolygon();};details.append(free);
  const status=document.createElement('p');status.setAttribute('role','status');panel.append(status);
- const actions=document.createElement('footer');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;position:sticky;bottom:0;background:white;padding:6px 0;z-index:1';panel.append(actions);
- const button=(text,click)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.style.minHeight='44px';b.onclick=click;actions.append(b);return b;};
- const add=button('確認新增',()=>{if(!add.disabled)confirm();});add.dataset.blankPlace='';
+ const actions=document.createElement('footer');panel.append(actions);
+ const button=(text,click)=>{const b=document.createElement('button');b.type='button';b.className='tool-btn';b.textContent=text;b.onclick=click;actions.append(b);return b;};
+ const add=button('確認新增',()=>{if(!add.disabled)confirm();});add.dataset.blankPlace='';add.classList.add('primary');
  button('取消',cancel);
  if(sheetMode())button('看畫布',()=>setSheet('collapsed'));
  const options=()=>({kind,...Object.fromEntries(Object.entries(exact).filter(([k])=>!k.startsWith('origin')).map(([k,n])=>[k,Number(n.value)])),origin:{x:Number(exact.originX.value),y:Number(exact.originY.value)}});
@@ -42,13 +42,14 @@ export function openStandardBlank(kind,{start,update,confirm,cancel}){
  const closed=()=>{panel.hidden=true;document.removeEventListener('keydown',escape);};
  const draw=({svg,draft,update:change})=>{
   const s=View.getScale(),a=draft.origin,L=draft.lengthMm,H=draft.heightMm;
-  const handle=(key,label,field,p,direction,value,min,max,quantize,snap=8)=>dimensionHandle(svg,{key:'blank-create-'+key,label,point:{x:View.TX(p.x),y:View.TY(p.y)},direction,value,min,max,snap,quantize,step:snap,
+  const handle=(key,label,field,p,direction,value,min,max,quantize,snap=8,offset=13,right=0)=>dimensionHandle(svg,{key:'blank-create-'+key,label,offset,right,point:{x:View.TX(p.x),y:View.TY(p.y)},direction,value,min,max,snap,quantize,step:snap,
    activate:()=>{if(sheetMode())setSheet('half');fields[field==='lengthMm'?'columns':field==='heightMm'?'rows':'armRows'].focus();},
    preview:v=>change({[field]:v}),cancel:()=>change({[field]:value}),commit:v=>change({[field]:v})});
   const matrix=svg.getScreenCTM(),gap=32/(Math.hypot(matrix.a,matrix.b)*s);
-  handle('length',`長 ${fields.columns.value}孔`,'lengthMm',{x:a.x+L+gap,y:a.y+(kind==='bar'?0:H*.5)},{x:s,y:0},L,8,1000);
-  if(kind!=='bar')handle('height',`寬 ${fields.rows.value}孔`,'heightMm',{x:a.x+(kind==='l'?0:L*.5),y:a.y+H+gap},{x:0,y:-s},H,8,1000);
-  if(kind==='l')handle('arm',`臂寬 ${fields.armRows.value}列`,'armWidthMm',{x:a.x+L*.5,y:a.y+draft.armWidthMm-6.5},{x:0,y:-s},draft.armWidthMm,13,13+8*(Math.ceil(Math.min(L,H)/8)-1),raw=>13+8*Math.round((raw-13)/8));
+  const nm=kind==='l'?['橫臂','直臂']:['長','寬'],tag=' · 外形';
+  handle('length',`${nm[0]} ${fields.columns.value}孔${tag}`,'lengthMm',{x:a.x+L+gap,y:a.y+(kind==='bar'?0:H*.5)},{x:s,y:0},L,8,1000,undefined,8,13,1);
+  if(kind!=='bar')handle('height',`${nm[1]} ${fields.rows.value}孔${tag}`,'heightMm',{x:a.x+(kind==='l'?0:L*.5),y:a.y+H+gap},{x:0,y:-s},H,8,1000,undefined,8,13);
+  if(kind==='l')handle('arm',`臂寬 ${fields.armRows.value}孔列${tag}`,'armWidthMm',{x:a.x+L*.5,y:a.y+draft.armWidthMm-6.5},{x:0,y:-s},draft.armWidthMm,13,13+8*(Math.ceil(Math.min(L,H)/8)-1),raw=>13+8*Math.round((raw-13)/8),8,0);
  };
  if(sheetMode())setSheet('half');
  start(options(),{changed:show,closed,draw});panel.hidden=false;document.addEventListener('keydown',escape);show(options());

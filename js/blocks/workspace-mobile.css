@@ -277,3 +277,21 @@ body:has(#syringeEditor[style*="flex"]) .mobile-panel-section[data-panel="edit"]
  body[data-mobile-panel="edit"]:not([data-preview3d]) .canvas-wrap .controls{position:absolute;bottom:4px;left:calc((100% - 260px)/2);margin:0;transform:translateX(-50%)}
  body[data-mobile-panel="edit"]:not([data-preview3d]) #syringeControls{box-sizing:border-box;width:calc(100% - 260px)}
 }
+
+/* 零件草稿表單：沿用 .tool-btn；確認新增為主要動作。草稿期間隱藏提示與重複的取消列，避免蓋住下方內容。 */
+.part-palette > * { flex-shrink:0; }
+#standardBlankPanel { box-sizing:border-box; max-width:100%; padding:10px; border:1px solid #b8cbd9; border-radius:10px; margin:8px 0; background:#fff; }
+#standardBlankPanel label { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:8px 0; font-size:14px; color:#34495e; }
+#standardBlankPanel input { box-sizing:border-box; width:76px; min-height:40px; padding:6px 8px; border:1px solid #cbd5df; border-radius:8px; background:#fff; font:inherit; color:#24496e; }
+#standardBlankPanel input:focus-visible, #standardBlankPanel .tool-btn:focus-visible { outline:2px solid #2f80c8; outline-offset:1px; }
+#standardBlankPanel summary { cursor:pointer; min-height:36px; padding:6px 0; font-size:13px; font-weight:700; color:#24496e; }
+#standardBlankPanel details p { margin:4px 0; font-size:12px; line-height:1.5; color:#60758a; }
+#standardBlankPanel [role=status] { margin:6px 0; font-size:12px; line-height:1.5; color:#34495e; overflow-wrap:anywhere; }
+#standardBlankPanel footer { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+#standardBlankPanel .tool-btn { min-height:44px; max-width:100%; border-color:#bccbdb; color:#24496e; }
+#standardBlankPanel footer .tool-btn { flex:1 1 auto; min-width:0; }
+#standardBlankPanel .tool-btn.primary { background:#0e7490; border-color:#0e7490; color:#fff; font-weight:800; }
+#standardBlankPanel .tool-btn.primary:hover:not(:disabled) { background:#0b6178; }
+#standardBlankPanel .tool-btn.primary:disabled { background:#0e7490; opacity:.4; }
+.part-palette:has(#standardBlankPanel:not([hidden])) #cancelCreation { display:none; }
+body:has(#standardBlankPanel:not([hidden])) #hint { display:none !important; }

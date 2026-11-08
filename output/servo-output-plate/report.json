@@ -1,0 +1,24 @@
+[
+  {
+    "id": "servo-plate-arm",
+    "outer": [
+      69,
+      29
+    ],
+    "screws": 4,
+    "parked": 4,
+    "minMaterial": 2.4,
+    "poses": 91
+  },
+  {
+    "id": "servo-plate-fourbar",
+    "outer": [
+      45,
+      29
+    ],
+    "screws": 4,
+    "parked": 4,
+    "minMaterial": 2.4,
+    "poses": 91
+  }
+]

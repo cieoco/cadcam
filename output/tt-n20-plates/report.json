@@ -1,0 +1,32 @@
+[
+  {
+    "id": "motor-plate-tt",
+    "poses": 361,
+    "seat": [
+      69,
+      45
+    ],
+    "output": [
+      69,
+      29
+    ],
+    "screws": 2,
+    "seatGap": 1.2200000000000002,
+    "outputGap": 1.4
+  },
+  {
+    "id": "motor-plate-n20",
+    "poses": 361,
+    "seat": [
+      45,
+      45
+    ],
+    "output": [
+      69,
+      29
+    ],
+    "screws": 4,
+    "seatGap": 0.9999999999999999,
+    "outputGap": 3.15
+  }
+]

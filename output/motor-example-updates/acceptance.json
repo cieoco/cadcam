@@ -1,0 +1,122 @@
+[
+  {
+    "id": "wiper-single",
+    "grid": [
+      19,
+      5
+    ],
+    "poses": 73,
+    "boardFindings": 0,
+    "otherFindings": 0
+  },
+  {
+    "id": "wiper-missing-coupler",
+    "grid": [
+      19,
+      5
+    ],
+    "poses": 0,
+    "boardFindings": 0,
+    "otherFindings": 0
+  },
+  {
+    "id": "fourbar-crank-rocker",
+    "grid": [
+      19,
+      5
+    ],
+    "poses": 73,
+    "boardFindings": 0,
+    "otherFindings": 0
+  },
+  {
+    "id": "fourbar-missing-coupler",
+    "grid": [
+      19,
+      5
+    ],
+    "poses": 0,
+    "boardFindings": 0,
+    "otherFindings": 0
+  },
+  {
+    "id": "fourbar-double-crank",
+    "grid": [
+      16,
+      5
+    ],
+    "poses": 73,
+    "boardFindings": 0,
+    "otherFindings": 0
+  },
+  {
+    "id": "fourbar-double-rocker",
+    "grid": [
+      19,
+      5
+    ],
+    "poses": 36,
+    "boardFindings": 0,
+    "otherFindings": 0
+  },
+  {
+    "id": "parallel-fourbar",
+    "grid": [
+      6,
+      13
+    ],
+    "poses": 73,
+    "boardFindings": 0,
+    "otherFindings": 0
+  },
+  {
+    "id": "chebyshev-linkage",
+    "grid": [
+      14,
+      5
+    ],
+    "poses": 73,
+    "boardFindings": 0,
+    "otherFindings": 0
+  },
+  {
+    "id": "slider-crank",
+    "grid": [
+      25,
+      5
+    ],
+    "poses": 73,
+    "boardFindings": 0,
+    "otherFindings": 0
+  },
+  {
+    "id": "slider-crank-practice",
+    "grid": [
+      25,
+      5
+    ],
+    "poses": 73,
+    "boardFindings": 0,
+    "otherFindings": 0
+  },
+  {
+    "id": "single-axis-wrist",
+    "grid": [
+      11,
+      5
+    ],
+    "poses": 22,
+    "boardFindings": 0,
+    "otherFindings": 0
+  },
+  {
+    "id": "single-servo-claw",
+    "grid": [
+      12,
+      5
+    ],
+    "poses": 10,
+    "boardFindings": 0,
+    "otherFindings": 0
+  }
+]
