@@ -42,7 +42,7 @@ export function openStandardBlank(kind,{start,update,confirm,cancel}){
  const closed=()=>{panel.hidden=true;document.removeEventListener('keydown',escape);};
  const draw=({svg,draft,update:change})=>{
   const s=View.getScale(),a=draft.origin,L=draft.lengthMm,H=draft.heightMm;
-  const handle=(key,label,field,p,direction,value,min,max,quantize,snap=8,offset=13,right=0)=>dimensionHandle(svg,{key:'blank-create-'+key,label,offset,right,point:{x:View.TX(p.x),y:View.TY(p.y)},direction,value,min,max,snap,quantize,step:snap,
+  const handle=(key,label,field,p,direction,value,min,max,quantize,snap=8,offset=13,right=0)=>dimensionHandle(svg,{key:'blank-create-'+key,label,offset,right,stack:1,point:{x:View.TX(p.x),y:View.TY(p.y)},direction,value,min,max,snap,quantize,step:snap,
    activate:()=>{if(sheetMode())setSheet('half');fields[field==='lengthMm'?'columns':field==='heightMm'?'rows':'armRows'].focus();},
    preview:v=>change({[field]:v}),cancel:()=>change({[field]:value}),commit:v=>change({[field]:v})});
   const matrix=svg.getScreenCTM(),gap=32/(Math.hypot(matrix.a,matrix.b)*s);
