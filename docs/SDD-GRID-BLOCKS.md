@@ -121,6 +121,22 @@ P = 8 mm（沿用 `model.js` 的 `LEGO_FRAME_STEP`）。
 
 2026-11-08 固定矩形N×M板可沿原致動安裝選孔承載MG995／TT；專用孔槽保留既有fabrication精確尺寸，不強改成8 mm孔距。其占用的浮動格孔進備份、停止連接／輸出，改向或拆除後還原；固定／已接孔不能默刪。兩個舵機例使用8×5／12×5真板，孔槽尺寸仍待實量；三列輸出板已由既有bar加軸後8 mm矩形材料、29 mm寬及真三列孔完成，不改求解；四個鄰近格孔因舵盤孔停用並可還原，原面板可選預設。有效臂長仍沿原孔距；TT座板與輪轂雙孔共用既有尺寸；N20明選特定前端孔距9／清孔1.8／凸台4.2與3 mm軸輪轂四孔圓徑12.7試作，專用孔為孔格例外、占孔仍同候選停用／還原。舊N20預設不開專用孔，全作品規格變更一併核對其他設計頁。小孔需另鑽，螺絲牙深／軸向間隙與實物未驗證；SG90與凹L宿主未完成。詳見[座板候選／還原契約及驗收](TEACHING-CHANGELOG.md#actuator-standard-plates)。
 
+## 範例積木化（2026-11-09）
+
+使用者要求「現有範例可以積木化的都修正」。以 `blockifyBars()`（`standard-blank.js`）在範例載入時把符合條件的一般桿標為標準桿：不移動接點、不改參數，只補淡化格孔；已用孔與加工結果不變。驗收 `test/blockify-examples.mjs`（凍結 main 5976b64 的求解點、DXF、質量、各件已鑽孔、外形面積與 ID）。
+
+| 狀態 | 範例：零件 |
+| --- | --- |
+| 已轉標準桿（28 例／42 支） | wiper-single：Link2；fourbar-crank-rocker／double-crank／double-rocker、parallel-fourbar、chebyshev-linkage、pantograph、lift-bucket：Link2、Link3；slider-crank、quick-return、assembly-lift-gripper（含練習）：Link2；parallel-gripper：左右 Follower、Jaw；sprocket-chain：Coupler1、Rocker1；competition-roller-intake：IntakeCoupler；six-bar-lift：SixFollower、SixUpper；crank-catapult-study：ThrowCoupler；iq-wheel-grabber：左右 Arm；iq-linq-lift：LinqFollower；hydraulic-h01（含練習）：H1Arm；hydraulic-h03（含練習）／h05／h06、unit11／12-start：H3Lower；servo-plate-fourbar：FourbarCoupler、FourbarRocker |
+| 機架桿（兩個以上固定孔） | H1/H2/H3Frame、PG*Ground、SixFrame、ThrowFrame、IntakeFrame/Guide、ClawLiftFrame 等：標準桿會成為獨立機架本體，自動機架外形改變 |
+| 針筒承接 | H1Coupler、H2Coupler、H3Upper（完成版）等：夾環／推桿孔會改由標準件重新規劃 |
+| 馬達相關 | 輸出桿（11）：標準輸出板改變寬度與軸後材料；Support、LiftUpright 等馬達機架桿 |
+| 合成、造形、尺寸 | 合成件 35、造形／圓盤 15、寬 10（H7Coupler）／18／40／60 mm、Jansen 經典比例 |
+| 板件 | 三點板與造形板 62：標準板為直角矩形，現有三角／圓角外形面積差 >1 % 或改變接合邊；既有標準座板 16 |
+| 其他 | fourbar-missing-coupler：Link3、H01／H02 練習的 H1Coupler／H2Coupler（浮動端未連接，轉了會停鑽）；H03 練習 H3Upper（須與完成版同源）；competition-fourbar-lift（模組庫「四連桿升降臂」以參數放大臂長，格孔會失準） |
+
+數量含練習／單元起點複本。未轉者沒有永久列為例外；若要轉，需先處理對應的加工規劃（機架外形、針筒夾環、輸出板外形或模組放大）。
+
 ## 7. 不做
 
 - 樂高 Technic 互插、4.8 mm 孔、十字軸。
