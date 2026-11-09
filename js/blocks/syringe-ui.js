@@ -236,14 +236,16 @@ export function createSyringeUI(h){
   }
   function install(candidate=null){
     editor?.close();h.pause();stop();
-    const source={comps:clone(h.comps()),params:{...params()},fabrication:clone(S.fabrication)};
-    const revision=JSON.stringify([S.comps,S.topo.params,S.designFocus]);
+    const snap=()=>({comps:clone(h.comps()),params:{...params()},fabrication:clone(S.fabrication)}),rev=()=>JSON.stringify([S.comps,S.topo.params,S.designFocus]);
+    let revision=rev();
     let counter=1;while(S.comps.some(c=>c.id===`Syringe${counter}`))counter++;
     // 安裝介面（含預覽與選項）第一次安裝針筒才載入，不佔啟動大小
-    import('./syringe-install-ui.js').then(({openSyringeInstallation})=>openSyringeInstallation({stage:h.svg,redraw:h.draw,source,points:clone(h.points()),existing:candidate,newId:`Syringe${counter}`,motion:motion(),
-      review:(r,notify,ask)=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus])){notify('作品已變更，請重新開啟安裝。');return false;}return confirmMountingChange(mountingWork(S),mountingCandidate(mountingWork(S),r,h.comps()),{notify,ask});},
+    import('./syringe-install-ui.js').then(({openSyringeInstallation})=>openSyringeInstallation({stage:h.svg,redraw:h.draw,source:snap(),points:clone(h.points()),existing:candidate,newId:`Syringe${counter}`,motion:motion(),
+      // 「設為不動的底座」沿用零件的設為機架（一次復原），安裝表單改用設定後的作品
+      setFrame:async id=>{const r=await h.setFrame?.(id);if(!r?.ok)return r;revision=rev();return {ok:true,source:snap(),points:clone(h.points())};},
+      review:(r,notify,ask)=>{if(revision!==rev()){notify('作品已變更，請重新開啟安裝。');return false;}return confirmMountingChange(mountingWork(S),mountingCandidate(mountingWork(S),r,h.comps()),{notify,ask});},
       advancedSettings:c=>open(c,true),
-      confirm:r=>{if(revision!==JSON.stringify([S.comps,S.topo.params,S.designFocus]))return false;message='';commit(r.comps,r.params,r);return true;},
+      confirm:r=>{if(revision!==rev())return false;message='';commit(r.comps,r.params,r);return true;},
       remove:candidate&&S.comps.some(c=>c.id===candidate.id)?()=>{if(!commitMountingEdit(S,d=>{d.comps=d.comps.filter(c=>c.id!==candidate.id);},{pushUndo:h.pushUndo,notify}))return false;h.rebuild();h.draw();h.save();}:null}),()=>notify('安裝介面載入失敗，請再試一次。'));
   }
   function open(candidate=null,advanced=false){

@@ -61,6 +61,7 @@
     "test/syringe-installation.mjs",
     "test/syringe-clamp-drilling.mjs",
     "test/syringe-install-selection.mjs",
+    "test/syringe-install-steps.mjs",
     "test/member-frame.mjs",
     "test/syringe-end-resize.mjs",
     "test/rigid-groups.mjs",
