@@ -1,4 +1,5 @@
 import {authorExampleActuatorPlates} from './example-actuator-plates.js';
+import {blockifyBars} from './standard-blank.js';
 import { MAD_BOX_EXAMPLE } from './iq-mad-box-example.js';
 import { LINQ_LIFT_EXAMPLE } from './iq-linq-example.js';
 import {standardizeExampleFrame} from './example-frame-stock.js';
@@ -994,6 +995,8 @@ ALL_BLOCK_EXAMPLES.push(SIX_BAR_LIFT_EXAMPLE);
 ALL_BLOCK_EXAMPLES.push(...IQ_MECHANISM_EXAMPLES);
 ALL_BLOCK_EXAMPLES.push(...IQ_CLAWBOT_EXAMPLES,MAD_BOX_EXAMPLE,...IQ_PASSIVE_TOOL_EXAMPLES,IQ_WHEEL_GRABBER_EXAMPLE);
 ALL_BLOCK_EXAMPLES.push(LINQ_LIFT_EXAMPLE);
+// Blockify on-lattice plain bars (standard-blank.js); practices below copy the result.
+ALL_BLOCK_EXAMPLES.forEach(e=>/^(wiper|fourbar|parallel|chebyshev|slider|pantograph|quick|sprocket|six|crank|competition-roller)/.test(e.id)&&blockifyBars(e.snapshot));
 
 // 第九、十單元：直接從既有幾何開始安裝，不重製 H01–H03，也不要求學生先開成品再拆除。
 for(const [id,label,snapshot] of [
