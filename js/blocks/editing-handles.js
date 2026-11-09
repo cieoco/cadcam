@@ -88,16 +88,26 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
         preview:v=>{showNumber(input,v);holes(v);},cancel:()=>{showNumber(input,value);holes(value);},commit:plate?v=>commit(v,true):commit,activate});
     }
   }
-  function handle(key,label,point,direction,value,commit,inputId,min=0,max=2000,step=.1,origin=null,snap=1,plate=null,quantize=null){
+  function handle(key,label,point,direction,value,commit,inputId,min=0,max=2000,step=.1,origin=null,snap=1,plate=null,quantize=null,activate=null){
     if(!point||!direction||!Number.isFinite(value))return;
     const a=project(point),b=project({x:point.x+direction.x,y:point.y+direction.y}),input=document.getElementById(inputId),field=input?.matches('input')?input:input?.querySelector('input');
     const note=v=>{if(snap>1)showHoleCount(field,v);else if(plate)showHoleCount(field,v,plate.hint);};note(value);
-    dimensionHandle(svg,{key,label,point:origin?besideHole(svg,project(origin),a):a,direction:{x:b.x-a.x,y:b.y-a.y},value,min,max,step,snap,quantize:quantize || plate?.quantize(value),preview:v=>{if(field)showNumber(field,v);note(v);},cancel:()=>{if(field)showNumber(field,value);note(value);},commit:plate?v=>commit(v,true):commit,activate:()=>{openEditor();field?.focus();field?.select();}});
+    dimensionHandle(svg,{key,label,point:origin?besideHole(svg,project(origin),a):a,direction:{x:b.x-a.x,y:b.y-a.y},value,min,max,step,snap,quantize:quantize || plate?.quantize(value),preview:v=>{if(field)showNumber(field,v);note(v);},cancel:()=>{if(field)showNumber(field,value);note(value);},commit:plate?v=>commit(v,true):commit,activate:activate||(()=>{openEditor();field?.focus();field?.select();})});
   }
   const a=at(c?.p1),b=at(c?.p2),length=a&&b?Math.hypot(b.x-a.x,b.y-a.y):0,u=length?{x:(b.x-a.x)/length,y:(b.y-a.y)/length}:{x:1,y:0};
   if(c&&['bar','triangle'].includes(c.type)&&!c.boxPanel){
     const id=S.selectedTriangleId?S.triSide||'g':'g',dim=memberDimensions(c).find(d=>d.id===id),lock=dimensionLock(c,S.comps,id);
-    if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,dir={x:(q.x-p.x)/L,y:(q.y-p.y)/L};handle('member-length',dim.label,q,dir,memberDimensionValue(c,S.topo.params,id),(v,exact)=>member.setValue(v,exact),'memberDimensionInput',8,2000,.1,p,gridDragStep(c,dim),edgeSnap(c,dim,S.topo.params,{comps:S.comps}));}}
+    if(c.standardBlank&&c.type==='triangle'){
+      for(const d of memberDimensions(c).filter(d=>d.refs)){
+        if(dimensionLock(c,S.comps,d.id))continue;
+        const p=at(c[d.refs[0]]),q=at(c[d.refs[1]]);if(!p||!q)continue;
+        const L=Math.hypot(q.x-p.x,q.y-p.y)||1;
+        handle(d.id==='g'?'member-length':`member-length-${d.id}`,d.label,q,{x:(q.x-p.x)/L,y:(q.y-p.y)/L},memberDimensionValue(c,S.topo.params,d.id),
+          (v,exact)=>{S.triSide=d.id;member.setDimensionValue(c.id,d.id,v,{exact});},d.id===id?'memberDimensionInput':null,
+          8,2000,.1,p,gridDragStep(c,d),edgeSnap(c,d,S.topo.params,{comps:S.comps}),null,()=>member.selectDimension(d.id));
+        svg.querySelector(`[data-member-dimension="${d.id}"]`)?.remove();
+      }
+    }else if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,dir={x:(q.x-p.x)/L,y:(q.y-p.y)/L};handle('member-length',dim.label,q,dir,memberDimensionValue(c,S.topo.params,id),(v,exact)=>member.setValue(v,exact),'memberDimensionInput',8,2000,.1,p,gridDragStep(c,dim),edgeSnap(c,dim,S.topo.params,{comps:S.comps}));}}
     if(c.standardBlank?.kind==='l'&&id==='arm'){const w=c.standardBlank.armWidthMm;handle('blank-arm-width','L型臂寬',{x:(a.x+b.x)/2-u.y*(w-6.5)*holeSide(c),y:(a.y+b.y)/2+u.x*(w-6.5)*holeSide(c)},{x:-u.y*holeSide(c),y:u.x*holeSide(c)},w,v=>member.setDimensionValue(c.id,'arm',v,{exact:true}),'memberDimensionInput',13,120,1,null,8,null,raw=>13+8*Math.round((raw-13)/8));}
     if(c.shape==='disk')handle('disk-diameter','外徑',{x:a.x,y:a.y+c.diameterMm/2},{x:0,y:.5},c.diameterMm,v=>{const input=document.getElementById('diskDiameterInput');input.value=v;input.onchange();},'diskDiameterInput',8,2000);
     else if(!c.barFusionRoot&&!(c.standardBlank&&c.type==='triangle')&&document.getElementById('memberMore')?.open){const w=memberStock(c).widthMm;handle('member-width','板寬',{x:(a.x+b.x)/2-u.y*w/2,y:(a.y+b.y)/2+u.x*w/2},{x:-u.y/2,y:u.x/2},w,v=>member.setStock('widthMm',v),'memberWidthInput',2,120);}

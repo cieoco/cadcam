@@ -24,7 +24,7 @@ export function drawMemberDimensions({ svg, comp, points, params, selected, proj
   labels.forEach(({ ref, node }) => { node.textContent = { p1: 'A', p2: 'B', p3: 'C', tip: 'T' }[ref]; });
   const lines = dimensions.filter(d => d.id !== selected || !svg.querySelector('[data-dimension-handle="member-length"]')).map(dimension => {
     const active = dimension.id === selected;
-    const button = make('g', { role: 'button', tabindex: '0', 'aria-label': `調整${dimension.label}` });
+    const button = make('g', { 'data-member-dimension': dimension.id, role: 'button', tabindex: '0', 'aria-label': `調整${dimension.label}` });
     button.style.cursor = 'pointer';
     const choose = event => { event.preventDefault(); event.stopPropagation(); onSelect(dimension.id); };
     button.addEventListener('pointerdown', choose);
