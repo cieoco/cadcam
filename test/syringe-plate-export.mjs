@@ -23,7 +23,7 @@ const h1=load('hydraulic-h01'),p=syringeManufacturing(h1.comps,h1.params,h1.fabr
 const frame=p.parts.find(p=>p.id==='frame'),holes=frame.geometry.holes.filter(h=>h.layer==='SYRINGE_CLAMP');assert.deepEqual(holes.map(h=>[h.x,h.y]),[[-96,-84],[-96,-60]]);assert.ok(p.hardware.filter(h=>h.kind==='spacer').every(h=>h.lengthMm===15.75));
 const src={...h1,topo:h1,exportSettings:h1.fabrication?.export};assert.deepEqual(prepareScopedExport(src,{scope:'selected',selectedId:'H1Arm'},'dxf').files.map(f=>f.name),['H1Arm.dxf']);assert.deepEqual(prepareScopedExport(src,{scope:'selected',selectedId:'H1Frame'},'dxf').files.map(f=>f.name),['frame.dxf']);
 // An invalid individual board does not suppress the good frame or emit the bad hole.
-const bad=structuredClone(h1),c=bad.comps.find(c=>c.id==='H1Arm');c.holes=[...(c.holes||[]),{id:'BadHole',u:1,v:0,diameter:3.2}];
+const bad=structuredClone(h1),c=bad.comps.find(c=>c.id==='H1Arm');c.holes=[...(c.holes||[]),{id:'BadHole',u:1,v:0,diameter:3.2,manufactured:true}];
 const partial=syringeManufacturing(bad.comps,bad.params,bad.fabrication);assert.ok(partial.excluded.some(p=>p.id==='H1Arm'));assert.ok(!partial.parts.some(p=>p.id==='H1Arm'));assert.ok(partial.parts.some(p=>p.id==='frame'));assert.ok(partial.warnings.some(w=>w.startsWith('未輸出 H1Arm')));
 const low=structuredClone(h1);low.comps.find(c=>c.type==='syringe').installation={face:'front',spacerMm:0};const lowPlan=syringeManufacturing(low.comps,low.params,low.fabrication);assert.equal(lowPlan.hardware.filter(h=>h.kind==='spacer').length,0);assert.ok(lowPlan.parts.length);
 // Real local holes and IDs survive save/reopen; original reference ring clearance remains honestly unverified.

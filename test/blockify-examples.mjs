@@ -31,7 +31,7 @@ function reason(e,c,s){
  if(c.type!=='bar')return null;
  if(c.standardBlank)return 'standard';
  if(e.id==='jansen-leg')return 'jansen';
- if(/^(hydraulic|unit1[12]|iq-|assembly-|lift-bucket)/.test(e.id))return 'later-batch';
+ if(/^(iq-|assembly-|lift-bucket)/.test(e.id))return 'later-batch';
  if(c.isInput)return 'motor-input';
  if(c.barFusion||c.barFusionRoot)return 'fusion';
  if(c.shape||c.boxPanel)return 'shaped';
