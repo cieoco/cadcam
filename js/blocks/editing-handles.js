@@ -1,3 +1,4 @@
+import {BLANK_SPAN_LIMIT} from './standard-blank.js';
 import {holeSide} from '../core/local-holes.js';
 import {drawMotorAngle} from './motor-angle-editor.js';
 /** Selected dimensions use existing setters; the moving handle is a draft until release. */
@@ -84,7 +85,7 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
     if(p&&q){
       const a=project(p),b=project(q),length=Math.hypot(q.x-p.x,q.y-p.y)||1;
       const snap=gridDragStep(comp,dimension),plate=edgeSnap(comp,dimension,S.topo.params,{comps}),holes=v=>{if(snap>1)showHoleCount(input,v);else if(plate)showHoleCount(input,v,plate.hint);};holes(value);
-      dimensionHandle(svg,{key:'point-dimension',label:dimension.label,point:besideHole(svg,a,b),direction:{x:(b.x-a.x)/length,y:(b.y-a.y)/length},value,min:8,max:2000,snap,quantize:plate?.quantize(value),
+      dimensionHandle(svg,{key:'point-dimension',label:dimension.label,point:besideHole(svg,a,b),direction:{x:(b.x-a.x)/length,y:(b.y-a.y)/length},value,min:8,max:comp.standardBlank?BLANK_SPAN_LIMIT:2000,snap,quantize:plate?.quantize(value),
         preview:v=>{showNumber(input,v);holes(v);},cancel:()=>{showNumber(input,value);holes(value);},commit:plate?v=>commit(v,true):commit,activate});
     }
   }
@@ -104,10 +105,10 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
         const L=Math.hypot(q.x-p.x,q.y-p.y)||1;
         handle(d.id==='g'?'member-length':`member-length-${d.id}`,d.label,q,{x:(q.x-p.x)/L,y:(q.y-p.y)/L},memberDimensionValue(c,S.topo.params,d.id),
           (v,exact)=>{S.triSide=d.id;member.setDimensionValue(c.id,d.id,v,{exact});},d.id===id?'memberDimensionInput':null,
-          8,2000,.1,p,gridDragStep(c,d),edgeSnap(c,d,S.topo.params,{comps:S.comps}),null,()=>member.selectDimension(d.id));
+          8,BLANK_SPAN_LIMIT,.1,p,gridDragStep(c,d),edgeSnap(c,d,S.topo.params,{comps:S.comps}),null,()=>member.selectDimension(d.id));
         svg.querySelector(`[data-member-dimension="${d.id}"]`)?.remove();
       }
-    }else if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,dir={x:(q.x-p.x)/L,y:(q.y-p.y)/L};handle('member-length',dim.label,q,dir,memberDimensionValue(c,S.topo.params,id),(v,exact)=>member.setValue(v,exact),'memberDimensionInput',8,2000,.1,p,gridDragStep(c,dim),edgeSnap(c,dim,S.topo.params,{comps:S.comps}));}}
+    }else if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,dir={x:(q.x-p.x)/L,y:(q.y-p.y)/L};handle('member-length',dim.label,q,dir,memberDimensionValue(c,S.topo.params,id),(v,exact)=>member.setValue(v,exact),'memberDimensionInput',8,c.standardBlank?BLANK_SPAN_LIMIT:2000,.1,p,gridDragStep(c,dim),edgeSnap(c,dim,S.topo.params,{comps:S.comps}));}}
     if(c.standardBlank?.kind==='l'&&id==='arm'){const w=c.standardBlank.armWidthMm;handle('blank-arm-width','L型臂寬',{x:(a.x+b.x)/2-u.y*(w-6.5)*holeSide(c),y:(a.y+b.y)/2+u.x*(w-6.5)*holeSide(c)},{x:-u.y*holeSide(c),y:u.x*holeSide(c)},w,v=>member.setDimensionValue(c.id,'arm',v,{exact:true}),'memberDimensionInput',13,120,1,null,8,null,raw=>13+8*Math.round((raw-13)/8));}
     if(c.shape==='disk')handle('disk-diameter','外徑',{x:a.x,y:a.y+c.diameterMm/2},{x:0,y:.5},c.diameterMm,v=>{const input=document.getElementById('diskDiameterInput');input.value=v;input.onchange();},'diskDiameterInput',8,2000);
     else if(!c.barFusionRoot&&!(c.standardBlank&&c.type==='triangle')&&document.getElementById('memberMore')?.open){const w=memberStock(c).widthMm;handle('member-width','板寬',{x:(a.x+b.x)/2-u.y*w/2,y:(a.y+b.y)/2+u.x*w/2},{x:-u.y/2,y:u.x/2},w,v=>member.setStock('widthMm',v),'memberWidthInput',2,120);}

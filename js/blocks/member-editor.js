@@ -1,5 +1,5 @@
 import {inspectLinkExport,normalizeExportSettings} from './exporters.js';
-import {convertStandardOutput,isOutputBlank,resizeStandardBlank} from './standard-blank.js';
+import {convertStandardOutput,isOutputBlank,resizeStandardBlank,BLANK_SPAN_LIMIT} from './standard-blank.js';
 import {pointRefs} from './model.js';
 import {editableNumber} from './numeric-input.js';
 import {setPointPosition,setPointAngle} from './input.js';
@@ -31,7 +31,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if(ttRow){ttRow.hidden=!(isOutputBlank(comp)&&comp.isInput&&(comp.motorType || 'tt')==='tt');if(!ttRow.hidden){ttSelect.value=comp.ttOutput || 'hub';ttSelect.onchange=()=>{const value=ttSelect.value;if(!['shaft','hub'].includes(value)||value===(comp.ttOutput || 'hub'))return;pause();if(!commitMountingEdit(S,d=>{d.comps.find(c=>c.id===comp.id).ttOutput=value;},{pushUndo,notify})){sync();return;}rebuild();draw();};}}
     if(el('lenEditor'))el('lenEditor').dataset.selectionSummary=comp?.standardBlank?`${comp.name}：孔格 ${(comp.holes || []).length+(comp.type==='bar'?2:3)} 位・孔距基準 ${S.topo.params[comp.type==='bar'?comp.lenParam:comp.gParam]}${comp.type==='triangle'?' × '+S.topo.params[comp.r1Param]:''} mm`:'';
     let blankFields=el('standardBlankEdit');if(!blankFields&&el('memberDimensionLabel')){blankFields=document.createElement('div');blankFields.id='standardBlankEdit';el('memberDimensionLabel').before(blankFields);}
-    if(blankFields){blankFields.hidden=!comp?.standardBlank;blankFields.replaceChildren();if(comp?.standardBlank)for(const[axis,label,value]of[['g',isOutputBlank(comp)?'軸至工作孔數':'長向孔數',Number(S.topo.params[comp.type==='bar'?comp.lenParam:comp.gParam])/8+1],...(comp.type==='triangle'?[['r1','直向孔數',Number(S.topo.params[comp.r1Param])/8+1]]:[]),...(comp.standardBlank.kind==='l'?[['arm','臂寬孔列數',(comp.standardBlank.armWidthMm-13)/8+1]]:[])]){const row=document.createElement('label'),input=document.createElement('input');row.textContent=label;input.type='number';input.min=axis==='arm'?1:2;input.max=128;input.step=1;input.value=Number.isInteger(value)?value:'';input.placeholder='特殊尺寸';input.dataset.blankEdit=axis;input.setAttribute('aria-label',label);input.onchange=()=>{const n=Number(input.value);if(!Number.isInteger(n)||n<Number(input.min)){notify('孔數請填有效整數；精確尺寸可用原毫米欄。');sync();return;}S.triSide=axis;setDimensionValue(comp.id,axis,axis==='arm'?(n-1)*8+13:(n-1)*8,{exact:true});};row.append(input);blankFields.append(row);}}
+    if(blankFields){blankFields.hidden=!comp?.standardBlank;blankFields.replaceChildren();if(comp?.standardBlank)for(const[axis,label,value]of[['g',isOutputBlank(comp)?'軸至工作孔數':'長向孔數',Number(S.topo.params[comp.type==='bar'?comp.lenParam:comp.gParam])/8+1],...(comp.type==='triangle'?[['r1','直向孔數',Number(S.topo.params[comp.r1Param])/8+1]]:[]),...(comp.standardBlank.kind==='l'?[['arm','臂寬孔列數',(comp.standardBlank.armWidthMm-13)/8+1]]:[])]){const row=document.createElement('label'),input=document.createElement('input');row.textContent=label;input.type='number';input.min=axis==='arm'?1:2;input.max=BLANK_SPAN_LIMIT/8+1;input.step=1;input.value=Number.isInteger(value)?value:'';input.placeholder='特殊尺寸';input.dataset.blankEdit=axis;input.setAttribute('aria-label',label);input.onchange=()=>{const n=Number(input.value);if(!Number.isInteger(n)||n<Number(input.min)){notify('孔數請填有效整數；精確尺寸可用原毫米欄。');sync();return;}S.triSide=axis;setDimensionValue(comp.id,axis,axis==='arm'?(n-1)*8+13:(n-1)*8,{exact:true});};row.append(input);blankFields.append(row);}}
 
     const segments=el('fusionSegment');
     if(segments){
@@ -115,7 +115,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     selector.title = '選擇要調整的孔距；也可點畫布尺寸';
     input.value = Number(memberDimensionValue(displayComp(comp), S.topo.params, id).toFixed(1));
     input.min = String(dimension.min ?? 8);
-    input.max = String(dimension.max ?? (id === 'tip' ? 160 : 2000));
+    input.max = String(dimension.max ?? (id === 'tip' ? 160 : comp.standardBlank ? BLANK_SPAN_LIMIT : 2000));
     input.setAttribute('aria-label', dimension.label);
     const lock = dimensionLock(comp, S.comps, id);
     if(lockNotice){lockNotice.textContent=lock || '';lockNotice.hidden=!lock;}

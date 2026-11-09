@@ -1,4 +1,5 @@
 import {gearTrain} from '../core/gear-train.js';
+import {restorePassiveHoles} from '../core/local-holes.js';
 import {expandBarFusions,validateBarFusionPose,barFusionSide} from '../core/bar-fusion.js';
 import {validateSyringePose} from '../core/syringe.js';
 import {solveConstraintClosure} from './constraint-closure.js';
@@ -1241,6 +1242,7 @@ export function solveTopology(topologyOrParams, params) {
         const result=topology._wizard_data.some(c=>c.type==='slider'&&c.movingRail)
             ?solveConstraintClosure(topology,actualParams)
             :solveBodyJointTopology({...topology,_wizard_data:expanded.comps}, actualParams);
+        restorePassiveHoles(topology._passiveLocalHoles,result.points);
         const fusionError=validateBarFusionPose(topology._wizard_data,result.points);
         if(fusionError){result.isValid=false;result.errorReason=fusionError;}
         if(topology._syringes){

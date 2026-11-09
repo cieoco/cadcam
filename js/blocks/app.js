@@ -1,4 +1,5 @@
 import {freezePowerWork} from './power-check-snapshot.js';
+import {hiddenGridHoles} from './grid-hole-display.js';
 import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import {pointDisplayName} from './display-labels.js';
 import {fusionRoot} from '../core/bar-fusion.js';
@@ -2056,6 +2057,10 @@ function drawNow() {
   const camFollowerIds = new Set(vComps.filter(c => c.type === 'cam' && c.p2).map(c => c.p2.id));
   const workpieceIds = new Set(vComps.filter(c=>c.type==='workpiece'&&c.p1).map(c=>c.p1.id));
   const hiddenPointIds = new Set(Object.keys(pts).filter(id => isHiddenSliderRailPoint(id) || isSliderMountPoint(id)));
+  const screenMatrix=svg.getScreenCTM(),screenBounds=svg.getBoundingClientRect();
+  if(screenMatrix)for(const id of hiddenGridHoles(vComps,pts,{modules:S.modules,params:S.topo.params,
+    keep:[S.selectedNodeId,S.dragId,S.topo.tracePoint,...S.topo.tracePoints||[]],bounds:screenBounds,
+    project:p=>new DOMPoint(TX(p.x),TY(p.y)).matrixTransform(screenMatrix)}))hiddenPointIds.add(id);
   vComps.filter(c=>c.boxPanel).forEach(c=>[c.p1,c.p2].forEach(p=>hiddenPointIds.add(p.id)));
   const nodeHoleRadii = new Map();
   for(const c of vComps.filter(c=>['bar','triangle'].includes(c.type))){

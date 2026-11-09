@@ -24,7 +24,7 @@ for(const kind of['bar','plate','l']){
 }
 // Actual middle-hole downstream linkage, not a decorative drilling mark.
 for(const kind of['plate','l']){const made=makeStandardBlank({kind}),c0=made.comp,h0=c0.holes.find(h=>h.u===16&&h.v===(kind==='plate'?8:0)),raw={kind:'blocks',v:1,comps:[c0,{type:'bar',id:'Drive',isInput:true,p1:{...c0.p1,type:'motor',physicalMotor:'1'},p2:{...c0.p2},lenParam:c0.gParam},{type:'bar',id:'Coupler',p1:{id:h0.id,type:'floating',x:h0.u,y:h0.v},p2:{id:'D',type:'floating',x:50,y:20},lenParam:'CouplerLength'},{type:'bar',id:'Rocker',p1:{id:'B',type:'fixed',x:64,y:64},p2:{id:'D',type:'floating',x:50,y:20},lenParam:'RockerLength'}],params:{...made.params,CouplerLength:64,RockerLength:64}},s=normalizeSnapshot(raw),t=compileTopology(s.comps,{params:{...s.params}},new Set());for(let a=0;a<=90;a++){const sol=solveTopology(t,{thetaDeg:a});assert.ok(sol.isValid&&!sol.isUnderconstrained);const c=s.comps[0],h=c.holes.find(h=>h.u===16&&h.v===(kind==='plate'?8:0)),q=sol.points[h.id],r=a*Math.PI/180;near(q.x,h.u*Math.cos(r)-h.v*Math.sin(r));near(q.y,h.u*Math.sin(r)+h.v*Math.cos(r));near(Math.hypot(q.x-sol.points.D.x,q.y-sol.points.D.y),64);}assert.equal(Object.keys(t.params).length,5);}
-assert.equal(makeStandardBlank({kind:'plate',columns:64,rows:64}).ok,false);assert.equal(makeStandardBlank({kind:'bar',columns:1}).ok,false);
+assert.equal(makeStandardBlank({kind:'plate',columns:65,rows:65}).ok,false);assert.equal(makeStandardBlank({kind:'bar',columns:1}).ok,false);
 console.log('standard blanks: 8/24/9 true holes, shape/export, exact save/share, local point refs, module copy/base, used-hole refusal, fixed flags, reflection and 182 connected poses passed');
 
 // A local hole cannot silently jump home when fixed at a nonzero solved pose.

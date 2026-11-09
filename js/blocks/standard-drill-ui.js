@@ -44,7 +44,7 @@ export function syncDrillSwitch(S, blocks = globalThis.window?.blocks) {
   row.hidden = false;
   const select = row.querySelector('select'), note = row.querySelector('small'), { drilled, total } = drillCounts(S, comp);
   select.value = comp.standardBlank.drill === 'all' ? 'all' : 'used';
-  note.textContent = ` 目前開 ${drilled}／${total} 孔`;
+  note.textContent = ` 目前開 ${drilled}／${total} 孔${total>128?' · 密集格孔簡化顯示，放大可選細孔':''}`;
   select.onchange = () => {
     const target = S.comps.find(c => c.id === comp.id);
     if (!target?.standardBlank || (target.standardBlank.drill === 'all') === (select.value === 'all')) return;

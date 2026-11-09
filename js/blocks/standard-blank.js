@@ -1,7 +1,8 @@
 /** Three standard blanks, authored using existing bar/triangle components. */
 import {holeSide} from '../core/local-holes.js';
 import {isHoleUsed} from './used-holes.js';
-export const BLANK_HOLE_LIMIT=128;
+export const BLANK_HOLE_LIMIT=4096;
+export const BLANK_SPAN_LIMIT=10000;
 export const isOutputBlank=c=>c?.type==='bar'&&c.standardBlank?.kind==='bar'&&Number.isFinite(c.standardBlank.rearMm);
 const span=n=>(n-1)*8,range=L=>{const a=Array.from({length:Math.floor(L/8)+1},(_,i)=>i*8);if(L-a.at(-1)>.00001){if(L-a.at(-1)<4)a.pop();a.push(L);}return a;};
 export function blankGeometry(c,points){
@@ -14,11 +15,11 @@ export function blankGeometry(c,points){
 }
 export function makeStandardBlank({kind='bar',columns=kind==='bar'?8:6,rows=4,armRows=1,lengthMm=span(columns),heightMm=span(rows),armWidthMm=span(armRows)+13,rearMm=null,widthMm=13,n=1,origin={x:0,y:0}}={}){
  const fail=message=>({ok:false,message});
- if(!['bar','plate','l'].includes(kind)||!Number.isFinite(lengthMm)||lengthMm<8||lengthMm>1000||kind!=='bar'&&(!Number.isFinite(heightMm)||heightMm<8||heightMm>1000))return fail('桿件至少2孔；板材至少2×2孔，尺寸需在8–1000 mm。');
+ if(!['bar','plate','l'].includes(kind)||!Number.isFinite(lengthMm)||lengthMm<8||lengthMm>BLANK_SPAN_LIMIT||kind!=='bar'&&(!Number.isFinite(heightMm)||heightMm<8||heightMm>BLANK_SPAN_LIMIT))return fail('桿件至少2孔；板材至少2×2孔，尺寸需在8–10000 mm。');
  if(kind==='l'&&(!Number.isFinite(armWidthMm)||armWidthMm<13||armWidthMm>=Math.min(lengthMm,heightMm)+13))return fail('L型兩臂孔數必須大於臂寬孔列數。');
  const output=kind==='bar'&&rearMm!==null;if(output&&(!Number.isFinite(rearMm)||rearMm<0||rearMm>1000||!Number.isFinite(widthMm)||widthMm<13||widthMm>120))return fail('輸出板寬需13–120 mm，軸後材料需0–1000 mm。');
  const xs=range(lengthMm),rowsOut=output?Math.floor((widthMm-13)/16):0,ys=kind==='bar'?Array.from({length:2*rowsOut+1},(_,i)=>(i-rowsOut)*8):range(heightMm),cells=[];if(output)for(let u=-8;u>=-rearMm-.00001;u-=8)xs.unshift(u);
- for(const v of ys)for(const u of xs)if(kind!=='l'||u<=armWidthMm-13+.001||v<=armWidthMm-13+.001)cells.push({u,v});
+ for(const v of ys)for(const u of xs)if(kind!=='l'||u<=armWidthMm-13+.001||v<=armWidthMm-13+.001){cells.push({u,v});if(cells.length>BLANK_HOLE_LIMIT)return fail(`格孔超過${BLANK_HOLE_LIMIT}個，請分成數片板材，避免瀏覽器負擔過大。`);}
  if(cells.length>BLANK_HOLE_LIMIT)return fail(`每片最多${BLANK_HOLE_LIMIT}孔，請減少孔數。`);
  const id='Blank'+n,p=(key,u,v)=>({id:`${id}.${key}`,type:'floating',x:origin.x+u,y:origin.y+v}),a=p('A',0,0),b=p('B',lengthMm,0),d=p('C',0,heightMm),g=id+'.G',r1=id+'.H',r2=id+'.D';
  const c={id,type:kind==='bar'?'bar':'triangle',name:kind==='bar'?'孔格桿件':kind==='plate'?'矩形板材':'同平面L型件',p1:a,p2:b,stock:{widthMm:output?widthMm:13,thicknessMm:3,material:'unspecified'},standardBlank:{kind,...(output?{rearMm}:{}),...(kind==='l'?{armWidthMm}:{})},color:kind==='bar'?'#3498db':'#27ae60',snapLength:false};

@@ -1,3 +1,4 @@
+import {BLANK_HOLE_LIMIT} from './standard-blank.js';
 import {syringePositionOnFrame} from './syringe-position.js';
 import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import {syringeClampFrameNodes} from './syringe-shape.js';
@@ -57,7 +58,7 @@ export function planSyringeInstallation(source,request,points=null,motion={}){
    const nodes=syringeClampFrameNodes(source.comps.filter(c=>c.type!=='syringe'||c.id===old.id),[host.p1,host.p2,host.p3].filter(Boolean));
    host.holes??=[];
    for(const n of nodes){const dx=n.x-f.p.x,dy=n.y-f.p.y,u=dx*f.x+dy*f.y,v=(-dx*f.y+dy*f.x)*holeSide(host);const found=[...host.holes,...(host.standardBlank.mountHoles||[])].find(h=>Math.hypot(h.u-u,h.v-v)<.001);if(found){found.manufactured=true;found.diameter=n.holeDiameterMm;}else{let i=1;const ids=new Set(comps.flatMap(c=>[c.p1,c.p2,c.p3,...(c.holes||[]),...(c.standardBlank?.mountHoles||[])]).filter(Boolean).map(h=>h.id));while(ids.has(`${old.id}_drilled_${i}`))i++;host.holes.push({id:`${old.id}_drilled_${i}`,u,v,diameter:n.holeDiameterMm,type:'floating',manufactured:true});}}
-   if(host.holes.length+(host.standardBlank.mountHoles?.length||0)>128)return {ok:false,message:'保留舊孔後超過128孔，請先整理板件。'};
+   if(host.holes.length+(host.standardBlank.mountHoles?.length||0)>BLANK_HOLE_LIMIT)return {ok:false,message:`保留舊孔後超過${BLANK_HOLE_LIMIT}孔，請先整理板件。`};
   }
   const holes=planActuatorPlateHoles({...source,comps,params});if(!holes.ok)return holes;comps=holes.comps;next=comps.find(c=>c.id===next.id);
  }

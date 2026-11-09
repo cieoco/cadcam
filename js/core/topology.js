@@ -1,4 +1,4 @@
-import {localHoles,expandLocalHoles} from './local-holes.js';
+import {localHoles,expandLocalHoles,passiveLocalHoles} from './local-holes.js';
 import {gearTrain} from './gear-train.js';
 import {expandSyringes} from './syringe.js';
 /**
@@ -57,6 +57,10 @@ function compileRegisteredParts(components, phase, ctx) {
 }
 
 export function compileTopology(components, topology, solvedPoints) {
+    if(topology.bodyJoint!==false&&components.some(c=>c.standardBlank&&localHoles(c).length>=128)){
+        const reduced=passiveLocalHoles(components,topology);
+        if(reduced.passive.length){const compiled=compileTopology(reduced.comps,topology,solvedPoints);compiled._passiveLocalHoles=reduced.passive;return compiled;}
+    }
     if(components.some(c=>c.type==='syringe')){
         const expanded=expandSyringes(components,topology.params || {});
         const compiled=compileTopology(expanded.comps,{...topology,params:expanded.params},solvedPoints);

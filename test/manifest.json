@@ -16,6 +16,7 @@
   "timeoutMs": 90000,
   "tests": [
     "test/standard-blanks.mjs",
+    "test/dense-grid.mjs",
     "test/used-holes.mjs",
     "test/actuator-standard-plates.mjs",
     "test/servo-output-plate.mjs",

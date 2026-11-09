@@ -1,3 +1,4 @@
+import {BLANK_HOLE_LIMIT} from './standard-blank.js';
 import {normalizeLoads} from './load-schema.js';
 import {syncFrameHoles,frameHoleAxis} from './frame-holes.js';
 import {readStoredProject} from './project-envelope.js';
@@ -610,11 +611,11 @@ export function normalizeSnapshot(obj) {
   if (!obj || typeof obj !== 'object') return null;
   const sourceComps = Array.isArray(obj.comps) ? obj.comps : null;
   if (!sourceComps) return null;
-  if(sourceComps.some(c=>['bar','triangle'].includes(c?.type)&&Array.isArray(c.holes)&&(c.standardBlank||c.holes.some(h=>Number.isFinite(h?.u)&&Number.isFinite(h?.v)))&&(c.holes.length>128||new Set(c.holes.map(h=>h?.id)).size!==c.holes.length)))return null;
+  if(sourceComps.some(c=>['bar','triangle'].includes(c?.type)&&Array.isArray(c.holes)&&(c.standardBlank||c.holes.some(h=>Number.isFinite(h?.u)&&Number.isFinite(h?.v)))&&(c.holes.length>(c.standardBlank?BLANK_HOLE_LIMIT:128)||new Set(c.holes.map(h=>h?.id)).size!==c.holes.length)))return null;
   if(sourceComps.some(c=>c?.standardBlank?.rearMm!==undefined&&(c.type!=='bar'||c.standardBlank.kind!=='bar'||!Number.isFinite(c.standardBlank.rearMm)||c.standardBlank.rearMm<0||c.standardBlank.rearMm>1000)))return null;
   if(sourceComps.some(c=>c?.ttOutput!==undefined&&(c.type!=='bar'||c.standardBlank?.kind!=='bar'||!Number.isFinite(c.standardBlank.rearMm)||!['shaft','hub'].includes(c.ttOutput))))return null;
   if(sourceComps.some(c=>c?.standardBlank?.mountHoles!==undefined&&(!(['bar','triangle'].includes(c.type)&&['bar','plate','l'].includes(c.standardBlank.kind))||!Array.isArray(c.standardBlank.mountHoles)||c.standardBlank.mountHoles.some(h=>!safeId(h?.id)||!Number.isFinite(h?.u)||!Number.isFinite(h?.v)))))return null;
-  if(sourceComps.some(c=>c?.standardBlank?.mountHoles?.length&&((c.holes?.length || 0)+c.standardBlank.mountHoles.length>128||new Set([...(c.holes || []),...c.standardBlank.mountHoles].map(h=>h?.id)).size!==(c.holes?.length || 0)+c.standardBlank.mountHoles.length)))return null;
+  if(sourceComps.some(c=>c?.standardBlank?.mountHoles?.length&&((c.holes?.length || 0)+c.standardBlank.mountHoles.length>BLANK_HOLE_LIMIT||new Set([...(c.holes || []),...c.standardBlank.mountHoles].map(h=>h?.id)).size!==(c.holes?.length || 0)+c.standardBlank.mountHoles.length)))return null;
   if(sourceComps.some(c=>c?.boxPanel && (c.type!=='bar'||!normalizeBoxPanel(c.boxPanel))))return null;
 
   const warnings = [];

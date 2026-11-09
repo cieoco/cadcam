@@ -74,3 +74,7 @@ Fields
 `slider.movingRail:true` keeps the rail endpoints and derived carrier endpoints mobile. A bar, triangle or fused rigid body must share both rail endpoint IDs. Missing/false preserves grounded rails. Blocks v1 persists the optional flag; earlier readers ground the rail and cannot preserve this new behavior.
 
 For supported bar/triangle/slider/hinged-syringe graphs containing a moving rail, `solveTopology` completes the same distance, rigid local-coordinate, attachment and line constraints numerically. It verifies residuals and local Jacobian rank; seed coordinates do not fix unconstrained points. Unsupported component/input constraints fail explicitly. Fixed-rail graphs retain the constructive path. `closureResidualMm` is an optional transient residual, never saved; the existing `isValid`, `isUnderconstrained`, `unresolvedPointIds` and `errorReason` contracts remain in use.
+
+## Dense standard grid derived positions
+
+Blocks compile results may contain `_passiveLocalHoles`: transient groups `{p1, p2, side, holes}` for unreferenced floating holes on dense standard blanks. These holes remain in the source snapshot but do not enter the body-joint constraint list. `solveTopology` reconstructs their world coordinates in `result.points` from solved endpoints before pose validation. Grounded/shared/referenced holes retain normal constraints. This optimization is limited to body-joint compilation; saved topology/snapshot contracts are unchanged.
