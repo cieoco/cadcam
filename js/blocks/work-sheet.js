@@ -120,7 +120,8 @@ function canvasGestures() {
   document.addEventListener('pointerdown', e => {
     if (!inSvg(e)) return;
     $('mechanismDetails')?.hidePopover();
-    down.set(e.pointerId, {x: e.clientX, y: e.clientY, part: !!e.target.closest?.(PART), dimension:!!e.target.closest?.('[data-dimension-handle],[data-point-choice]'), moved: false});
+    const picking=!!svg.querySelector('[data-syringe-pick-holes]');
+    down.set(e.pointerId, {x: e.clientX, y: e.clientY, part: picking || !!e.target.closest?.(PART), dimension:picking || !!e.target.closest?.('[data-dimension-handle],[data-point-choice]'), moved: false});
     if (down.size > 1) go('pinchStart');
   }, true);
   document.addEventListener('pointermove', e => {

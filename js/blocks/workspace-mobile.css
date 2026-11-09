@@ -297,3 +297,11 @@ body:has(#syringeEditor[style*="flex"]) .mobile-panel-section[data-panel="edit"]
 body:has(#standardBlankPanel:not([hidden])) #hint { display:none !important; }
 /* The draft form already explains dragging; keep the canvas labels unobscured. */
 body:has(#standardBlankPanel:not([hidden])) .mode-banner { display:none !important; }
+
+/* Syringe daily connections remain visible; numeric details stay collapsible. */
+#syringeEditor .syringe-connection-actions{display:grid;gap:8px}
+#syringeEditor .syringe-connection-actions [role="group"]{display:flex;gap:6px}
+#syringeEditor .syringe-connection-actions [role="group"] button{flex:1;min-height:44px}
+#syringeEditor .syringe-connection-actions button[aria-pressed="true"]{background:#087f8c;color:white}
+#syringeEditor .syringe-connection-actions label{display:flex;flex-direction:column;align-items:stretch;gap:4px}
+#syringeEditor .syringe-connection-actions select{max-width:100%;min-width:0;min-height:44px}

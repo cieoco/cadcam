@@ -578,6 +578,7 @@ export function init(deps) {
     });
   });
   svg.addEventListener('pointerdown', e => {
+    if(svg.querySelector?.('[data-syringe-pick-holes]'))return;
     if (!mobilePrompt() || S.mode !== 'design' || S.mateMode || S.placingMotor || S.pickBars || S.drawingLink || S.drawingTriangle || S.drawingPolygon || activePointers.size>=2) return;
     if (e.button !== undefined && e.button !== 0) return;
     // Leave dedicated handles (shape vertices, gear output pins, task sliders) to their own handlers.
@@ -603,7 +604,7 @@ export function init(deps) {
   // 落點若靠近某個接點（用畫面 px 當門檻，縮放下手感一致），就直接接手那個接點，
   // 並擋住桿身的 pointerdown，避免它把選取搶去顯示長度。
   svg.addEventListener('pointerdown', (e) => {
-    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice]'))return;
+    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice]')||svg.querySelector?.('[data-syringe-pick-holes]'))return;
     if (!mobilePrompt()) return;
     if (S.mateMode) return;                                   // 接合面工具開著：舞台只接受點目標與平移（mate-tool.js）
     if (e.pointerType === 'mouse') return;
