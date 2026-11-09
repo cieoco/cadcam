@@ -16,6 +16,10 @@ export function collectPickCandidates(svg, x, y, comps) {
     const hole=comps.find(c=>c.frameHole&&c.p1.id===id);
     add({ kind:'node', id, motor:!!motor, label:motor ? `${servo ? '舵機' : '馬達'}軸心 · ${id}（動力／角度）` : hole?`機架孔 · 距基準孔 ${Number(hole.frameHole.u.toFixed(2))} mm${hole.frameHole.centered===false?` · 偏移 ${Number((hole.frameHole.v||0).toFixed(2))} mm`:""}`:`接點 · ${id}` });
   }
+  // 淡化的未用格孔只在附近沒有實際接點時才當候選，且只留最近一個。
+  const idle=r=>r.kind==='node'&&svg.querySelector?.(`circle[data-unused][data-id="${r.id}"]`),near=r=>{const e=svg.querySelector?.(`[data-id="${r.id}"]`)?.getBoundingClientRect();return e?Math.hypot(x-e.left-e.width/2,y-e.top-e.height/2):1e9;};
+  const keep=result.some(r=>!idle(r))?null:result.filter(idle).sort((a,b)=>near(a)-near(b))[0];
+  for(let i=result.length;i--;)if(idle(result[i])&&result[i]!==keep)result.splice(i,1);
   for (const el of svg.ownerDocument.elementsFromPoint(x, y)) {
     if (!svg.contains(el)) continue;
     const id = el.getAttribute('data-pick-component');

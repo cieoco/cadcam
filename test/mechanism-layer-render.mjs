@@ -38,7 +38,9 @@ const fadeSvg = new FakeElement('svg');
 renderNodes({ points: { Used: { x: 0, y: 0 }, Spare: { x: 8, y: 0 } }, svg: fadeSvg, groundIds: new Set(), motorCenterIds: new Set(), camCenterIds: new Set(), hiddenPointIds: new Set(),
   unusedIds: new Set(['Spare']), gearPinIds: new Set(), pulleyPinIds: new Set(), camFollowerIds: new Set(), workpieceIds: new Set(), sliderMountInfo: () => null,
   project: p => p, onPointerDown: () => {}, registerUpdate: () => {} });
-check('未使用格孔淡化但仍可點選', fadeSvg.children.length === 2 && fadeSvg.children[1].getAttribute('data-unused') === '' && fadeSvg.children[0].getAttribute('data-unused') === null && fadeSvg.children[1].listeners.has('pointerdown'));
+const fadeOf = id => fadeSvg.children.find(c => c.getAttribute('data-id') === id);
+// 未用格孔先畫（在下層），實際接點的可點區疊在上面。
+check('未使用格孔淡化但仍可點選', fadeSvg.children.length === 2 && fadeSvg.children[0] === fadeOf('Spare') && fadeOf('Spare').getAttribute('data-unused') === '' && fadeOf('Used').getAttribute('data-unused') === null && fadeOf('Spare').listeners.has('pointerdown'));
 
 // 手機軸心點擊範圍固定 48 CSS px，變換縮放不縮小手指目標。
 const touchSvg = new FakeElement('svg'), touchUpdates = [];

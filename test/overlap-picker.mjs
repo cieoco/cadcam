@@ -28,6 +28,12 @@ assert.deepEqual(choices.map(c=>c.id),['O','J','G']);
 assert.match(choices[0].label,/舵機軸心/);
 assert.equal(collectPickCandidates(svg,-1,100,comps).length,0);
 nodes=[];hit=[gear];assert.equal(collectPickCandidates(svg,100,100,comps).length,1);
+// 積木化範例：淡化的未用格孔不和實際接點搶選取；只有淡化格孔時只留最近一個。
+{const used=new Element({'data-id':'D'}),idle1=new Element({'data-id':'H1','data-unused':''},{left:95,top:90,width:20,height:20}),idle2=new Element({'data-id':'H2','data-unused':''},{left:80,top:90,width:20,height:20});
+const q=sel=>[used,idle1,idle2].find(e=>sel.includes(`"${e.attrs['data-id']}"`)&&(!sel.includes('data-unused')||'data-unused' in e.attrs))||null;
+const s2={...svg,querySelectorAll:()=>[used,idle1,idle2],querySelector:q,ownerDocument:{elementsFromPoint:()=>[]}};
+assert.deepEqual(collectPickCandidates(s2,100,100,[]).map(c=>c.id),['D']);
+const s3={...s2,querySelectorAll:()=>[idle1,idle2]};assert.deepEqual(collectPickCandidates(s3,104,100,[]).map(c=>c.id),['H1']);}
 nodes=[motor,ring];hit=[jaw,gear];
 let selected='',opened=0;
 Object.assign(S,{mode:'design',comps,placingMotor:false,pickBars:null,drawingLink:false,drawingTriangle:false,drawingPolygon:false,mateMode:false,dragId:null,dragLinkId:null,dragFrame:false});

@@ -111,7 +111,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
 export function renderNodes({ points, svg, groundIds, motorCenterIds, camCenterIds, hiddenPointIds, unusedIds = new Set(), holeRadii = new Map(), gearPinIds, pulleyPinIds, camFollowerIds,
   workpieceIds, dragId, sliderMountInfo, project, onPointerDown, registerUpdate, mountedBaseIds = new Set(), shaftCenterIds = new Set(), touchTargets = false, pointLabel = id => id }) {
   const size = 14;
-  Object.keys(points).forEach(id => {
+  Object.keys(points).sort((a,b)=>unusedIds.has(b)-unusedIds.has(a)).forEach(id => {
     if (hiddenPointIds.has(id) || gearPinIds.has(id) || pulleyPinIds.has(id) || camFollowerIds.has(id) || workpieceIds.has(id)) return;
     const ground = groundIds.has(id), motor = motorCenterIds.has(id), cam = camCenterIds.has(id), mount = sliderMountInfo(id);
     const rectangle = ground && !motor && !cam && !mount;
