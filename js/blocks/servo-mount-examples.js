@@ -1,5 +1,5 @@
 /** Two MG995 prototypes using an editable standard board; hardware dimensions await measurement. */
-import {convertStandardOutput,makeStandardBlank} from './standard-blank.js';
+import {blockifyBars,convertStandardOutput,makeStandardBlank} from './standard-blank.js';
 import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import {FABRICATION_DEFAULTS} from './fabrication-profile.js';
 
@@ -14,7 +14,7 @@ function fabrication() {
   return f;
 }
 function seat(columns,axisId,rockerId=null){const made=makeStandardBlank({kind:'plate',columns,rows:5,n:1,origin:{x:-40,y:-16}}),c=made.comp;c.id='ServoPlate';c.name='標準舵機座板';c.p1.type=c.p2.type='fixed';c.frameSeparate=true;c.motorMountPoint=axisId;c.holes.find(h=>h.u===40&&h.v===16).id=axisId;if(rockerId){const h=c.holes.find(h=>h.u===88&&h.v===16);h.id=rockerId;h.type='fixed';}return made;}
-function withSeat(example,columns,axisId,rockerId=null){const m=seat(columns,axisId,rockerId);example.snapshot.comps.unshift(m.comp);Object.assign(example.snapshot.params,m.params);const input=example.snapshot.comps.find(c=>c.isInput);input.motorMount={motor:'1',center:axisId,frameBody:m.comp.id,outputBody:input.id,orientation:'horizontal',reversed:true,face:'back',order:['motor','frameBody','outputBody']};const converted=convertStandardOutput(input,example.snapshot.params,example.snapshot.comps);if(!converted.ok)throw Error(converted.message);example.snapshot.comps[example.snapshot.comps.indexOf(input)]=converted.comp;const planned=planActuatorPlateHoles({...example.snapshot,fabrication:example.snapshot.fabrication});if(!planned.ok)throw Error(planned.message);example.snapshot.comps=planned.comps;return example;}
+function withSeat(example,columns,axisId,rockerId=null){const m=seat(columns,axisId,rockerId);example.snapshot.comps.unshift(m.comp);Object.assign(example.snapshot.params,m.params);const input=example.snapshot.comps.find(c=>c.isInput);input.motorMount={motor:'1',center:axisId,frameBody:m.comp.id,outputBody:input.id,orientation:'horizontal',reversed:true,face:'back',order:['motor','frameBody','outputBody']};const converted=convertStandardOutput(input,example.snapshot.params,example.snapshot.comps);if(!converted.ok)throw Error(converted.message);example.snapshot.comps[example.snapshot.comps.indexOf(input)]=converted.comp;const planned=planActuatorPlateHoles({...example.snapshot,fabrication:example.snapshot.fabrication});if(!planned.ok)throw Error(planned.message);example.snapshot.comps=planned.comps;blockifyBars(example.snapshot);return example;}
 
 const gridHoles = (id, us) => us.map(u => ({id:`${id}H${u}`, u, v:0, type:'floating', diameter:3.2}));
 

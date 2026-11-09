@@ -29,7 +29,8 @@ for(const e of BLOCK_EXAMPLES){
   const s=normalizeSnapshot(e.snapshot);if(!s?.comps.some(c=>c.standardBlank))continue;examples++;
   const fabrication=s.fabrication || structuredClone(FABRICATION_DEFAULTS);
   const cat=buildPartGeometryCatalog({comps:s.comps,modules:s.modules,params:s.params,fabrication});
-  const files=prepareScopedExport({...s,topo:s,fabrication,exportSettings:FABRICATION_DEFAULTS.export},{scope:'design'},'dxf').files;
+  // 2026-11-09 積木化後模組範例也有標準桿：逐一設計分頁（根＋各模組）收集檔案。
+  const files=[undefined,...(s.modules||[]).map(m=>m.id)].flatMap(focus=>{try{return prepareScopedExport({...s,topo:s,fabrication,exportSettings:FABRICATION_DEFAULTS.export},{scope:'design',...(focus?{focus}:{})},'dxf').files;}catch(err){if(/沒有零件/.test(err.message))return [];throw err;}});
   for(const c of s.comps.filter(c=>c.standardBlank)){
     const part=cat.parts[c.id];assert.ok(part,`${e.id}/${c.id} has fabrication geometry`);
     const home=cat.homePoints,move=local(home[c.p1.id],home[c.p2.id]);

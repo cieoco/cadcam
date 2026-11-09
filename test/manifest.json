@@ -23,6 +23,7 @@
     "test/motor-plates.mjs",
     "test/tt-direct-output.mjs",
     "test/example-actuator-plates.mjs",
+    "test/blockify-examples.mjs",
     "test/standard-blank-creation.mjs",
     "test/iq-clawbot.mjs",
     "test/iq-mad-box.mjs",
