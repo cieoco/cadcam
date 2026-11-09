@@ -100,7 +100,7 @@ export function createSyringeEditor(h){
   modeButtons.forEach((b,i)=>b.setAttribute('aria-pressed',String(editMode===(i?'pivot':'fixed-axis'))));
  ear.value=String(c.pivotEar??1);face.value=c.installation?.face||'front';
   const choices=installationChoices(comps,params),key=JSON.stringify([editMode,params,choices.frames.map(o=>[o.id,o.name]),choices.rods.map(o=>[o.id,o.name,params[o.lenParam]])]);
-  if(key!==choiceKey){choiceKey=key;frame.replaceChildren();output.replaceChildren();opt(frame,'未連接','');opt(output,'未連接','');choices.frames.forEach(o=>opt(frame,o.name||o.id,o.id));choices.rods.forEach(o=>syringeAttachmentHoles(o,params).sort((a,b)=>a.v-b.v||a.u-b.u).filter(h=>editMode==='pivot'||['p1','p2'].includes(h.key)).forEach(h=>opt(output,holeName(ownerName(o),syringeAttachmentHoles(o,params),h),JSON.stringify({componentId:o.id,u:h.u,v:h.v}))));}
+  if(key!==choiceKey){choiceKey=key;frame.replaceChildren();output.replaceChildren();opt(frame,'未連接','');opt(output,'未連接','');choices.frames.forEach(o=>opt(frame,o.name||o.id,o.id));choices.rods.forEach(o=>syringeAttachmentHoles(o,params).sort((a,b)=>a.v-b.v||a.u-b.u).forEach(h=>opt(output,holeName(ownerName(o),syringeAttachmentHoles(o,params),h),JSON.stringify({componentId:o.id,u:h.u,v:h.v}))));}
   frame.value=pending.frameId??c.a.componentId;const ref=pending.b||c.b;output.value=ref.componentId?JSON.stringify({componentId:ref.componentId,u:ref.u,v:ref.v}):'';
   const missing=['a','b'].filter(k=>!attachmentPoint(c[k],comps,params,points));reconnect.hidden=false;cancelPick.hidden=!!awaiting||(!pickingKey&&!Object.keys(pending).length);done.textContent=awaiting||Object.keys(pending).length?'關閉（不套用）':'完成';reconnect.textContent=pickingKey?'正在選孔…':'在圖上更換推桿孔';
   clearPicks();if(pickingKey)drawPickHoles(c,editMode);
@@ -141,6 +141,8 @@ export function createSyringeEditor(h){
  function changeMode(value){
   const c=current();if(!c)return;
   if(value===c.mountMode&&!Object.keys(pending).length)return;
+  const comps=h.comps(),params=h.params(),available=installationChoices(comps,params).rods.some(o=>syringeAttachmentHoles(o,params).some(h=>{const r=outputHoleChecks(comps,params,pending.frameId||c.a.componentId,{componentId:o.id,u:h.u,v:h.v})[value];return r.ok||r.reason==='distance';}));
+  if(!available){message(value==='fixed-axis'?'無法改成雙孔固定：目前沒有可用的活動短連桿。筒身鎖死後，推桿需透過可轉的短連桿帶動擺臂；兩孔鎖成一體的延伸桿不適用。原設定保留。':'無法改成單孔可轉：推桿需直接接有固定支點的擺臂。請先調整接法；原設定保留。');return;}
   const shape=syringeShape(c,h.comps(),h.params(),h.points());if(!shape)return;
   // Keep the physical clamp location when changing center-based / ear-based attachment.
   const sign=c.pivotEar??1,position=value==='fixed-axis'?shape.a:{x:shape.a.x-Math.sin(shape.angle)*SYRINGE_EAR_MM*sign,y:shape.a.y+Math.cos(shape.angle)*SYRINGE_EAR_MM*sign};
