@@ -119,11 +119,11 @@ export function createPlateEditor({
     rebuild(); draw();
   }
 
-  function selectTriangle(id) {
+  function selectTriangle(id, {openPanel=true} = {}) {
     cancelMotorMode();
     deselectGear();
     if (!S.comps.some(x => x.id === id && x.type === 'triangle')) return;
-    openMobileEditPanel();
+    if(openPanel)openMobileEditPanel();
     S.selectedTriangleId = id;
     S.selectedLinkId = null;
     S.selectedNodeId = null;

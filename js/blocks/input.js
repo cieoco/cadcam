@@ -14,7 +14,7 @@ import {fusionRoot,fusionAtPoint} from '../core/bar-fusion.js';
  */
 
 import { S } from './state.js';
-import {rotateLooseBarEnd,pointRotation} from './model.js';
+import {rotateLooseBarEnd,pointRotation,isFreeBody} from './model.js';
 import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 import * as View from './view.js';
 import * as Tools from './tools.js';
@@ -34,7 +34,7 @@ let pendingOverlap = null;
 let pendingMobileEdit = false;      // 放開接點後再展開面板，避免拖曳途中畫布高度改變
 
 // ---- 注入的外部依賴（由 app 在啟動時提供）----
-let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
+let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle,
     worldFromEvent, pointCoords, mobilePrompt,
     snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
     movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
@@ -57,13 +57,14 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
 
 export function startFreeLinkDrag(e, linkId) {
   if(fusionRoot(S.comps,linkId))return false;
-  const c = S.comps.find(x => x.id === linkId && isFreeLink(x));
+  const c = S.comps.find(x => x.id === linkId && isFreeBody(S.comps,x,S.modules));
   if (!c) return false;
   const w = worldFromEvent(e);
   if (!w) return false;
   S.preDragSnap = snapshotStr(); // 整段拖曳合併成一筆 undo
   pause();
-  selectLink(linkId);
+  pendingMobileEdit = mobilePrompt();
+  (c.type==='triangle'?selectTriangle:selectLink)(linkId,{openPanel:!pendingMobileEdit});
   S.dragLinkId = linkId;
   S.dragLastWorld = w;
   S.snapTarget = null;
@@ -124,7 +125,10 @@ export function onNodeDown(e, id) {
   if (!pendingMobileEdit) openMobileEditPanel();
   Panels.updateRoleEditor();
   S.dragId = null; S.snapTarget = null;
-  pendingNodeDrag = S.comps.some(c=>localHoles(c).some(h=>h.id===id)) || S.comps.some(c=>c.frameHole&&c.p1.id===id) || fusionAtPoint(S.comps,id) || (pointIsGround(id) && !isGroundPositionUnlocked(id)) ? null : {
+  const localBody=S.comps.find(c=>localHoles(c).some(h=>h.id===id));
+  pendingNodeDrag = localBody && isFreeBody(S.comps,localBody,S.modules) && !fusionRoot(S.comps,localBody.id)
+    ? {id,bodyId:localBody.id,event:e,x:e.clientX,y:e.clientY,pointerType:e.pointerType || 'mouse'}
+    : localBody || S.comps.some(c=>c.frameHole&&c.p1.id===id) || fusionAtPoint(S.comps,id) || (pointIsGround(id) && !isGroundPositionUnlocked(id)) ? null : {
     id, x:e.clientX, y:e.clientY, pointerType:e.pointerType || 'mouse'
   };
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
@@ -136,7 +140,10 @@ function onDragMove(e) {
   if (pendingNodeDrag && !S.dragId) {
     const threshold = pendingNodeDrag.pointerType === 'mouse' ? 6 : 12;
     if (Math.hypot(e.clientX-pendingNodeDrag.x,e.clientY-pendingNodeDrag.y) < threshold) return;
-    S.dragId=pendingNodeDrag.id; pendingNodeDrag=null; draw();
+    const pending=pendingNodeDrag;pendingNodeDrag=null;
+    if(pending.bodyId)startFreeLinkDrag(pending.event,pending.bodyId);
+    else S.dragId=pending.id;
+    draw();
   }
   if (S.drawingPolygon) {
     if(S.standardBlankDraft){Tools.standardBlankPointer(e,'move');return;}
@@ -170,13 +177,12 @@ function onDragMove(e) {
     return;
   }
   if (S.dragLinkId && S.dragLastWorld) {
-    const c = S.comps.find(x => x.id === S.dragLinkId && isFreeLink(x));
+    const c = S.comps.find(x => x.id === S.dragLinkId && isFreeBody(S.comps,x,S.modules));
     if (!c) return;
     const dx = w.x - S.dragLastWorld.x;
     const dy = w.y - S.dragLastWorld.y;
-    // A free bar translates as one rigid part (floating holes are never quantized).
-    movePointById(c.p1.id, dx, dy);
-    movePointById(c.p2.id, dx, dy);
+    // Translate vertices together; local holes follow without changing dimensions.
+    for(const p of [c.p1,c.p2,c.p3].filter(Boolean))movePointById(p.id,dx,dy);
     S.dragLastWorld = w;
     redrawAfterDrag();
     return;
@@ -439,7 +445,7 @@ function endPointer(e) {
 
 
 export function init(deps) {
-  ({ svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
+  ({ svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle,
      worldFromEvent, pointCoords, mobilePrompt,
      snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
      movePointById, updatePointCoordsById, recomputeLengths, mergePoints,

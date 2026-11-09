@@ -43,7 +43,7 @@ function drawShapeHandles({ component, ids, points, svg, scale, project, vertice
   });
 }
 
-export function drawPlate({ component, points, ctx, svg, scale, project, selectedId, interactionBlocked, onSelect, shapeMode, plateExtras, platePath, roundedPath, vertices, localToWorld, onShapeDrag, onDeleteShapeVertex, registerUpdate }) {
+export function drawPlate({ component, points, ctx, svg, scale, project, selectedId, interactionBlocked, onSelect, onFreeDrag = () => false, shapeMode, plateExtras, platePath, roundedPath, vertices, localToWorld, onShapeDrag, onDeleteShapeVertex, registerUpdate }) {
   if (!component.p1 || !component.p2 || !component.p3) return;
   const ids = [component.p1.id, component.p2.id, component.p3.id];
   const path = svgEl('path');
@@ -58,6 +58,7 @@ export function drawPlate({ component, points, ctx, svg, scale, project, selecte
   path.addEventListener('pointerdown', event => {
     if (interactionBlocked()) return;
     event.stopPropagation();
+    if(onFreeDrag(event,component.id))return;
     onSelect(component.id);
   });
   const hubs = [];

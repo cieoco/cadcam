@@ -1741,6 +1741,7 @@ function drawTrianglePart(c, pts, ctx) {
     component: c, points: pts, ctx, svg, scale: View.getScale(),
     project: p => ({ x: TX(p.x), y: TY(p.y) }), selectedId: S.selectedTriangleId,
     interactionBlocked: () => Boolean(S.drawingLink || S.drawingTriangle || S.drawingPolygon || S.placingMotor || S.pickBars),
+    onFreeDrag: (e,id) => { if(ensureModuleHome(compModuleId(id)))return true; return Input.startFreeLinkDrag(e,id); },
     onSelect: id => { if (ensureModuleHome(compModuleId(id))) return; selectTriangle(id); }, shapeMode: plateShapeMode, plateExtras,
     platePath, roundedPath: roundedTriangleHullPath, vertices: plateVertices, localToWorld,
     onShapeDrag: startShapeDrag, onDeleteShapeVertex: deleteShapeVertex,
@@ -2703,12 +2704,12 @@ function pickMotorType(type) {
 // ---- 節點 / 連桿 / 機架拖曳處理已抽到 ./input.js（以 Input.* 呼叫；事件監聽見其 init）----
 
 // ---- 選取連桿 + 改長度 ----
-function selectLink(id) {
+function selectLink(id, {openPanel=true} = {}) {
   cancelMotorMode();
   deselectGear();
   const c = S.comps.find(x => x.id === id && x.type === 'bar' && x.fixedLen);
   if (!c) return;
-  openMobileEditPanel();
+  if(openPanel)openMobileEditPanel();
   S.selectedLinkId = id;
   S.triSide = 'g';
   S.frameEditorOpen = false;
@@ -3334,7 +3335,7 @@ function init() {
   Tools.init({ svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
                setBanner, clearBanner, worldFromEvent, pointCoords, nearestDisplayToPoint, snapWorld,
                mobilePrompt, promptText, displayPointCoords: displayCoords, notify: transient });
-  Input.init({ svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink,
+  Input.init({ svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle,
                worldFromEvent, pointCoords, mobilePrompt,
                snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
                movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
@@ -3345,7 +3346,7 @@ function init() {
                  if (ensureModuleHome(compModuleId(id))) return;
                  const comp = S.comps.find(c => c.id === id);
                  if (!comp) return;
-                 if (dragEvent && comp.type === 'bar' && Input.startFreeLinkDrag(dragEvent, id)) return;
+                 if (dragEvent && Input.startFreeLinkDrag(dragEvent, id)) return;
                  selectModuleTarget(comp);
                },
                snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel, openFrameEditor: () => { S.frameEditorOpen = true; Panels.updateFrameEditor(); }, transient,

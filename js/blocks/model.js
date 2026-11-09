@@ -456,6 +456,16 @@ export function isFreeLink(comps, c) {
     pointUseCount(comps, c.p1.id) === 1 && pointUseCount(comps, c.p2.id) === 1;
 }
 
+// Whole-body translation also respects local holes and indirect attachments.
+export function isFreeBody(comps, c, modules = []) {
+  if (!(isFreeLink(comps,c) || (c?.type==='triangle' && freeTriangleForPoint(comps,c.p1?.id)===c))) return false;
+  const holes=[c.p1,c.p2,c.p3,...localHoles(c)].filter(Boolean);
+  if(holes.some(p=>isGroundPoint(p)||p.physicalMotor||pointUseCount(comps,p.id)!==1))return false;
+  const ids=new Set([c.id,...holes.map(p=>p.id)]);
+  const references=value=>typeof value==='string'?ids.has(value):!!value&&typeof value==='object'&&Object.values(value).some(references);
+  return !c.isInput && !comps.some(other=>other!==c&&references(other)) && !modules.some(references);
+}
+
 export function freeLinkForPoint(comps, id) {
   const c = fixedLinkFor(comps, id);
   return isFreeLink(comps, c) ? c : null;

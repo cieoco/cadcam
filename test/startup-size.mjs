@@ -43,7 +43,8 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-09：設為機架入口與狀態提示約1.7 KB；候選驗證仍按需載入。
 // 2026-11-09：固定環格孔占用、已鑽孔保存與拆除還原共用既有安裝檢查，首次約2.150MB；編輯候選與介面仍按需載入。
 // 2026-11-09：共用已用格孔判定、輸出與畫布淡化增加約2 KB，首次約2.152MB；開孔選項仍懶載入。
-check('首次JS原始大小低於2.153MB',r.bytes<2153000);
+// 2026-11-09：板材共用整件拖曳、局部孔與間接引用保護增加約1.5 KB，無新依賴。
+check('首次JS原始大小低於2.155MB',r.bytes<2155000);
 check('扭力UI與估算核心按需載入',!r.paths.includes('js/blocks/torque-ui.js')&&!r.paths.includes('js/core/required-torque.js')&&!r.paths.includes('js/core/actuator-speed.js'));
 check('舵機座板範例按需載入',!r.paths.includes('js/blocks/servo-mount-examples.js')&&!r.paths.includes('js/blocks/motor-plate-examples.js'));
 check('標準結構設定面板按需載入',!r.paths.includes('js/blocks/standard-blank-ui.js')&&r.lazyEntries.includes('js/blocks/standard-blank-ui.js'));

@@ -2,6 +2,7 @@
 import { check, report } from './_harness.mjs';
 import * as Input from '../js/blocks/input.js';
 import * as View from '../js/blocks/view.js';
+import {isFreeBody,movePointById} from '../js/blocks/model.js';
 import { S } from '../js/blocks/state.js';
 
 globalThis.document = Object.assign(new EventTarget(),{ getElementById: id => ['lenEditor', 'gearEditor', 'sliderBaseBtn', 'linkToRailBtn'].includes(id) ? { style: {} } : null });
@@ -35,7 +36,7 @@ function emit(type, id, x, y, target = noop, targetElement = null) {
   if (!event.stopped) target(event);
   if (!event.stopped) for (const item of list.filter(item => !item.capture)) { item.fn(event); if (event.immediate) break; }
 }
-Input.init({ svg, draw: noop, rebuild: noop, pause: noop, cancelMotorMode: noop, deselectLink: noop,
+Input.init({ selectLink:noop, selectTriangle:noop, movePointById:(id,dx,dy)=>movePointById(S.comps,id,dx,dy), svg, draw: noop, rebuild: noop, pause: noop, cancelMotorMode: noop, deselectLink: noop,
   worldFromEvent: e => ({ x: e.clientX, y: e.clientY }), pointCoords: () => ({}), mobilePrompt: () => mobile,
   snapshotStr: () => JSON.stringify({comps:S.comps,params:S.topo.params,theta:S.theta,motorAngles:S.motorAngles}), updateUndoBtn: noop, nearestDisplayTo: () => null,
   frameNodeIds: () => new Set(), recomputeLengths: noop, mergePoints: () => mergeCount++, pointIsGround: () => false,
@@ -128,4 +129,31 @@ check('觸控圓環直接選軸心，不落到後面的板件', S.selectedNodeId
 emit('pointerdown', 31, 200, 100, () => bodyPicked = true, motorTarget);
 check('圓環上的第二指仍優先縮放，不啟動第二次零件選取', !bodyPicked && S.dragId === null);
 emit('pointerup', 30, 120, 100); emit('pointerup', 31, 200, 100);
+mobile=false;
+S.modules=[];
+const plate={id:'Plate',type:'triangle',p1:{id:'a',type:'floating',x:0.25,y:0.5},p2:{id:'b',type:'floating',x:80.25,y:0.5},p3:{id:'c',type:'floating',x:0.25,y:40.5},holes:[{id:'h',u:8,v:8,type:'floating'}]};
+S.comps=[structuredClone(plate)];S.topo.params={g:80,r1:40,r2:Math.hypot(80,40)};
+const bodyUndo=S.undoStack.length;
+const bodyDown=e=>{e.stopPropagation();Input.startFreeLinkDrag(e,'Plate');};
+emit('pointerdown',40,10,10,bodyDown);emit('pointerup',40,10,10);
+check('只點板身不新增 undo',S.undoStack.length===bodyUndo);
+emit('pointerdown',41,10,10,bodyDown);emit('pointermove',41,25,30);flush();emit('pointerup',41,25,30);
+check('板身拖曳整片平移且保留小數、孔距及局部孔',S.comps[0].p1.x===15.25&&S.comps[0].p2.x===95.25&&S.comps[0].p3.y===60.5&&S.comps[0].holes[0].u===8);
+check('整片拖曳一次 undo 可還原所有頂點',S.undoStack.length===bodyUndo+1&&JSON.stringify(JSON.parse(S.undoStack.at(-1)).comps[0])===JSON.stringify(plate));
+const moved=JSON.stringify(S.comps);
+emit('pointerdown',42,10,10,bodyDown);emit('pointermove',42,40,40);flush();
+const cancelBody=new Event('keydown',{cancelable:true});Object.assign(cancelBody,{key:'Escape'});document.dispatchEvent(cancelBody);emit('pointerup',42,40,40);
+check('取消整片拖曳還原',JSON.stringify(S.comps)===moved&&S.undoStack.length===bodyUndo+1);
+S.comps=[structuredClone(plate)];S.comps[0].holes[0].type='fixed';
+check('局部固定孔阻止整片移動',!isFreeBody(S.comps,S.comps[0]));
+S.comps=[structuredClone(plate),{id:'attach',type:'bar',p1:{id:'h'},p2:{id:'z'}}];
+check('局部孔已接其他桿件不能整片移動',!isFreeBody(S.comps,S.comps[0]));
+S.comps=[structuredClone(plate),{id:'actuator',a:{componentId:'Plate'}}];
+check('致動器間接引用阻止整片移動',!isFreeBody(S.comps,S.comps[0]));
+S.comps=[structuredClone(plate)];
+check('模組引用阻止整片移動',!isFreeBody(S.comps,S.comps[0],[{members:['Plate']}]));
+mobile=true;
+const localStart=S.undoStack.length;
+Input.onNodeDown({clientX:10,clientY:10,pointerId:43,pointerType:'touch',preventDefault:noop,stopPropagation:noop},'h');emit('pointermove',43,35,30);flush();emit('pointerup',43,35,30);
+check('手機拖局部格孔會平移自由板而非吞掉手勢',S.comps[0].p1.x===25.25&&S.comps[0].p3.y===60.5&&S.undoStack.length===localStart+1);
 report('input-gestures');

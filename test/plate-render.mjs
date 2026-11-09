@@ -20,10 +20,11 @@ const component = {
 };
 const points = { A: { x: 0, y: 0 }, B: { x: 80, y: 0 }, C: { x: 40, y: 50 } };
 const updates = [];
+let dragged=null, selectedCount=0;
 drawPlate({
   component, points, svg, scale: 1, project: p => ({ x: p.x, y: -p.y }), selectedId: 'PlateA',
   ctx: { triKey: ids => ids.join('|'), triLayerByKey: new Map([['A|B|C', 0]]), groupForLayer: () => layer },
-  interactionBlocked: () => false, onSelect: () => {}, shapeMode: c => c.shapeMode,
+  interactionBlocked: () => false, onSelect: () => selectedCount++, onFreeDrag: (_e,id) => {dragged=id;return true;}, shapeMode: c => c.shapeMode,
   plateExtras: null, platePath: () => 'M 0 0 Z', roundedPath: () => '', vertices: c => c.vertices,
   localToWorld: ([a, b], vertex) => ({ x: a.x + (b.x - a.x) * vertex.u, y: a.y + vertex.v * 80 }),
   onShapeDrag: () => {}, onDeleteShapeVertex: () => {}, registerUpdate: update => updates.push(update)
@@ -35,4 +36,6 @@ check('板身與握把都註冊動畫更新', updates.length === 2);
 updates.forEach(update => update({ A: { x: 5, y: 5 }, B: { x: 85, y: 5 }, C: { x: 45, y: 55 } }));
 check('更新後板身與造形點仍可見', layer.children[0].style.display === '' && svg.children[0].style.display === '');
 
+layer.children[0].listeners.get('pointerdown')({stopPropagation(){}});
+check('板身 pointerdown 優先沿用整件拖曳',dragged==='PlateA'&&selectedCount===0);
 report('plate-render');
