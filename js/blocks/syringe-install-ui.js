@@ -1,5 +1,5 @@
 import * as View from './view.js';
-import {installationChoices,planPlacedSyringe,rotateClampAboutEar} from './syringe-installation.js';
+import {installationChoices,planPlacedSyringe,rotateClampAboutEar,outputHoleModes} from './syringe-installation.js';
 import {SYRINGE_EAR_MM,attachmentFrame,attachmentPoint,syringeAttachmentHoles,syringeAttachmentHole} from '../core/syringe.js';
 import {scanSyringe} from './syringe-operations.js';
 import {syringeShape} from './syringe-shape.js';
@@ -20,7 +20,8 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
  let base=structuredClone(source),choices=installationChoices(base.comps,base.params),names=partLabels(base.comps);
  let result=null,closed=false,revision=0,viewer=null,sceneTimer=null,checkTimer=null,preview3d=false,dragging=false,focusClamp=!!existing,focusBox=null,dragOffset=null,viewBox=null;
  // pendingFrame：學生點了還會動的零件，等「設為不動的底座」；viewStep：回頭修改已答過的步驟。
- let pendingFrame='',viewStep=null,frameNote='',modeTouched=!!existing,suggestion=null,suggestKey='',shownStep=0;
+ let pendingFrame='',viewStep=null,frameNote='',modeTouched=!!existing,suggestion=null,suggestKey='',shownStep=0,outputNote='';
+ const holeModes=new Map();
  const request={id:existing&&base.comps.some(c=>c.id===existing.id)?existing.id:null,newId:newId || existing?.id,
   mountMode:existing?.mountMode==='pivot'?'pivot':'fixed-axis',pivotEar:existing?.mountMode==='pivot'?existing.pivotEar:undefined,
   b:existing?.b?{...existing.b}:null,face:existing?.installation?.face || 'front',spacerMm:existing?.installation?.spacerMm ?? null,extension:existing?.extension ?? 10,position:existing?attachmentPoint(existing.a,base.comps,base.params,points):null,axisDeg:existing?.axisDeg ?? 0,frameId:existing?.a?.componentId || ''};
@@ -49,6 +50,7 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
  const frame=field(pickPanel,'或從清單選零件');frame.setAttribute('aria-label','針筒固定的零件');frame.parentElement.classList.add('wide');
  // ② 推桿要推哪個孔？
  el('p','點畫布上橘色圈起來的孔。它在會動的零件上，推桿推它就會帶動機構。',outputPanel);
+ const outputStatus=el('p','',outputPanel);outputStatus.setAttribute('role','status');outputStatus.dataset.installOutputStatus='';
  const outputChoices=el('div',null,outputPanel);outputChoices.className='install-faces';
  const rod=field(outputPanel,'或從清單選零件');rod.setAttribute('aria-label','推桿接的零件');
  const end=field(outputPanel,'孔');end.setAttribute('aria-label','推桿接的孔');
@@ -110,6 +112,10 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
  const changed=()=>{scanStatus.textContent='設定已變更，請重新檢查全行程。';};
  const holes=c=>syringeAttachmentHoles(c,base.params);
  const plainHole=(c,h)=>c&&h?holeName(names.get(c.id),holes(c),h):'';
+ // ② 每個候選孔先用放置規則預查兩種安裝方式（結果快取，作品或底座換了才重算）；推不動的孔灰色、不能點。
+ const modesOf=(c,h)=>{const k=`${request.frameId}|${c.id}|${h.key}`;if(!holeModes.has(k))holeModes.set(k,outputHoleModes(base.comps,base.params,request.frameId,{componentId:c.id,u:h.u,v:h.v}));return holeModes.get(k);};
+ const canPush=(c,h)=>{const m=modesOf(c,h);return m['fixed-axis']||m.pivot;};
+ const stuck=c=>`「${names.get(c.id)}」還沒有推得動的孔：它要有一端接在固定的孔上當擺臂，或當短連桿接到這樣的擺臂，針筒才推得動。`;
  function fillLists(){
   frame.replaceChildren();option(frame,'請選零件','');choices.frames.forEach(c=>option(frame,names.get(c.id),c.id));choices.rods.forEach(c=>option(frame,`${names.get(c.id)}（會動，需設為底座）`,c.id));
   rod.replaceChildren();option(rod,'請選會動的零件','');choices.rods.forEach(c=>option(rod,names.get(c.id),c.id));
@@ -117,10 +123,10 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
  // 「把它設為不動的底座」已提交到作品（可復原）；表單改用提交後的作品，候選與原作品一致。
  function load(next,pts){
   base=structuredClone(next);if(request.id&&existing&&!base.comps.some(c=>c.id===request.id))base.comps.push(structuredClone(existing));
-  points=pts;choices=installationChoices(base.comps,base.params);names=partLabels(base.comps);viewBox=null;focusBox=null;suggestKey='';fillLists();
+  points=pts;choices=installationChoices(base.comps,base.params);names=partLabels(base.comps);viewBox=null;focusBox=null;suggestKey='';holeModes.clear();fillLists();
  }
  fillLists();
- const selectFrame=id=>{request.frameId=id;const c=choices.frames.find(c=>c.id===id);request.position=c?{...attachmentFrame(c,base.params,points).p}:null;if(!existing)autoAxis=true;focusBox=null;preview3d=false;viewStep=null;changed();update();};
+ const selectFrame=id=>{outputNote='';request.frameId=id;const c=choices.frames.find(c=>c.id===id);request.position=c?{...attachmentFrame(c,base.params,points).p}:null;if(!existing)autoAxis=true;focusBox=null;preview3d=false;viewStep=null;changed();update();};
  frame.onchange=()=>{frameNote='';if(choices.rods.some(c=>c.id===frame.value)){pendingFrame=frame.value;update();return;}pendingFrame='';selectFrame(frame.value);};
  setFrameButton.onclick=async()=>{
   const id=pendingFrame;if(!id||!setFrame)return;setFrameButton.disabled=true;frameNote='正在設為底座…';update();
@@ -172,7 +178,7 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
    members.forEach(n=>{n.setAttribute('data-install-member',c.id);n.style.cursor='pointer';});
    for(const p of holes(c)){
     const q=pos(p),dot=draw('circle',{cx:q.x,cy:-q.y,r:3,fill:stage?'transparent':'white',stroke:stage?'transparent':color,'stroke-width':1});
-    if(isFrame(c.id))dot.setAttribute('data-install-member',c.id);
+    if(isFrame(c.id)||step===1)dot.setAttribute('data-install-member',c.id);
    }
   }
   if(step===1){
@@ -184,7 +190,10 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
   // ② 橘色圈是會動零件上可接推桿的孔；已選的孔填滿。
   if(step===2){
    const ids=new Set(),chosen=request.b&&syringeAttachmentHole(choices.rods.find(c=>c.id===request.b.componentId),base.params,request.b);
-   for(const c of choices.rods)for(const p of holes(c)){
+   const usable=choices.rods.flatMap(c=>holes(c).filter(p=>canPush(c,p)).map(p=>[c,p])),usableIds=new Set(usable.map(([,p])=>p.id));
+   // 灰點先畫在下層；同一個孔只要有一個零件推得動就是橘色可點。
+   for(const c of choices.rods)for(const p of holes(c)){if(usableIds.has(p.id)||ids.has('grey:'+p.id))continue;ids.add('grey:'+p.id);const q=pos(p);draw('circle',{cx:q.x,cy:-q.y,r:3.5,fill:'#e2e8f0',stroke:'#94a3b8','stroke-width':1,'data-install-unusable':p.id});}
+   for(const [c,p] of usable){
     if(ids.has(p.id))continue;ids.add(p.id);const q=pos(p);
     const r=22*unit;
     draw('circle',{cx:q.x,cy:-q.y,r:5,fill:chosen?.id===p.id?'#e88d27':'white',stroke:'#e88d27','stroke-width':2});
@@ -221,10 +230,10 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
  const onFrame=p=>syringePositionOnFrame(choices.frames.find(c=>c.id===request.frameId),base.params,points,p,base)||p;
  const drag=e=>{const p=pointer(e);if(dragging==='position')request.position=onFrame({x:p.x+(dragOffset?.x||0),y:p.y+(dragOffset?.y||0)});else if(dragging==='angle'&&request.position){const center=keepEar.checked?rotateClampAboutEar(request.position,request.axisDeg,request.axisDeg).ear:request.position;setAngle(Math.round(Math.atan2(p.y-center.y,p.x-center.x)*180/Math.PI));}changed();update();};
  function connectOutput(c,k){
-  const h=holes(c).find(h=>h.key===k);if(!h)return;request.b={componentId:c.id,u:h.u,v:h.v};outputOptions=[];viewStep=null;frameNote='';changed();update();
+  const h=holes(c).find(h=>h.key===k);if(!h)return;request.b={componentId:c.id,u:h.u,v:h.v};outputOptions=[];viewStep=null;frameNote='';outputNote='';changed();update();
  }
  function pickOutput(id){
-  outputOptions=choices.rods.flatMap(c=>holes(c).filter(h=>h.id===id).map(h=>({c,k:h.key})));
+  outputOptions=choices.rods.flatMap(c=>holes(c).filter(h=>h.id===id&&canPush(c,h)).map(h=>({c,k:h.key})));
   if(outputOptions.length===1)connectOutput(outputOptions[0].c,outputOptions[0].k);else update();
  }
  svg.onpointerdown=e=>{
@@ -236,7 +245,7 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
    const id=e.target.getAttribute('data-install-member');
    // ① 點已固定的零件就選它並放下固定環；點還會動的零件只標出來，等學生按「設為不動的底座」。
    if(choices.frames.some(c=>c.id===id)){request.frameId=id;focusBox=null;if(shownStep===1){pendingFrame='';frameNote='';viewStep=null;}}
-   else {const c=choices.rods.find(c=>c.id===id);if(c){if(shownStep===1){pendingFrame=c.id;frameNote='';update();}else connectOutput(c,holes(c).find(h=>h.type!=='fixed')?.key||'p1');}return;}
+   else {const c=choices.rods.find(c=>c.id===id);if(c){if(shownStep===1){pendingFrame=c.id;frameNote='';update();}else{const h=holes(c).find(h=>h.type!=='fixed'&&canPush(c,h));if(h)connectOutput(c,h.key);else{outputNote=stuck(c);update();}}}return;}
    dragging='position';
   }
   const p=pointer(e);dragOffset=e.target.hasAttribute('data-install-position')&&request.position?{x:request.position.x-p.x,y:request.position.y-p.y}:null;
@@ -270,6 +279,9 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
   if(choiceKey&&choiceKey!==suggestKey){
    suggestKey=choiceKey;const other=request.mountMode==='pivot'?'fixed-axis':'pivot',alt=planPlacedSyringe(base,{...request,mountMode:other},points,motion);
    suggestion=suggestMountMode({[request.mountMode]:!!result.ok&&!result.temporary,[other]:!!alt.ok&&!alt.temporary});
+   // 目前位置兩種都推不動時，改用孔的接法判斷：只有一種接法可行就先選它，位置在 ③ 再調。
+   const rodC=choices.rods.find(c=>c.id===request.b.componentId),hole=rodC&&syringeAttachmentHole(rodC,base.params,request.b),st=hole&&modesOf(rodC,hole);
+   if(!suggestion?.mode&&st&&st['fixed-axis']!==st.pivot)suggestion=suggestMountMode(st);
    if(!modeTouched&&suggestion?.mode&&suggestion.mode!==request.mountMode){request.mountMode=suggestion.mode;modeTouched=true;preview3d=false;update();return;}
   }else if(!request.b)suggestion=null;
   const pivot=request.mountMode==='pivot';
@@ -277,7 +289,7 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
   ear.closest('label').hidden=!pivot;
   frame.value=pendingFrame||request.frameId;rod.value=request.b?.componentId||'';end.replaceChildren();
   const selectedRod=choices.rods.find(c=>c.id===request.b?.componentId),rodHoles=selectedRod?holeNames(holes(selectedRod)):new Map();
-  for(const h of holes(selectedRod))option(end,rodHoles.get(h.key),h.key);
+  for(const h of holes(selectedRod))option(end,rodHoles.get(h.key)+(request.frameId&&!canPush(selectedRod,h)?'（推不動）':''),h.key);
   const chosenHole=syringeAttachmentHole(selectedRod,base.params,request.b);end.value=chosenHole?.key||'';
   outputCoords.textContent=chosenHole?`推桿孔：沿零件第一孔→第二孔 ${chosenHole.u.toFixed(1)} mm、偏移 ${chosenHole.v.toFixed(1)} mm。`:'';
   ear.value=String(result?.ok&&result.syringe?.pivotEar===-1||request.pivotEar===-1&&!(result?.ok)?-1:1);
@@ -290,7 +302,8 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
   offsetReading.textContent=`距筒尾 ${Number(offset.value).toFixed(1)} mm`;
   outputChoices.replaceChildren();for(const {c,k} of outputOptions){const b=el('button',`連接 ${plainHole(c,holes(c).find(h=>h.key===k))}`,outputChoices);b.onclick=()=>connectOutput(c,k);}
   faces.forEach((b,i)=>b.setAttribute('aria-pressed',String(request.face===(i?'back':'front'))));
-  for(const [input,value] of [[px,request.position?.x],[py,request.position?.y],[angle,request.axisDeg]])if(document.activeElement!==input)showNumber(input,value);
+  // 打到一半的數字（例如只有「-」）在請求裡是 NaN，不能被重畫蓋掉；欄位在未顯示的步驟裡也一樣。
+  for(const [input,value] of [[px,request.position?.x],[py,request.position?.y],[angle,request.axisDeg]])if(document.activeElement!==input&&!Number.isNaN(value))showNumber(input,value);
   const planOk=!!result?.ok&&!result.temporary;
   const prog=installProgress({frameId:pendingFrame||request.frameId,frameFixed:!pendingFrame&&!!owner&&!!request.position,output:!!request.b,onFrame:!positionOK||onSelectedFrame,planOk,requested:viewStep});
   const stepChanged=prog.step!==shownStep;shownStep=prog.step;
@@ -302,6 +315,7 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
    if(k===prog.step)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current');});
   frameStatus.textContent=[pendingFrame?`「${names.get(pendingFrame)}」現在還會動；針筒要鎖在不動的零件上，推的時候才不會跟著跑。${setFrame?'':'請先在零件操作把它設為機架。'}`:'',!pendingFrame&&!choices.frames.length?'這個作品還沒有不動的零件：點一個板子或桿件，再把它設為不動的底座。':'',frameNote].filter(Boolean).join(' ');
   setFrameButton.hidden=!pendingFrame||!setFrame;
+  outputStatus.textContent=prog.step!==2?'':outputNote||(choices.rods.some(c=>holes(c).some(h=>canPush(c,h)))?'':'目前沒有推得動的孔：會動的零件還沒接到底座。先把一根桿的一端接在固定的孔上當擺臂（推桿可直接推擺臂上的孔），或再用短連桿接到擺臂（推桿推短連桿的端孔）。');
   modeInputs.forEach(n=>{n.checked=n.value===request.mountMode;});
   modeHint.textContent=suggestion?.text||'';
   advancedSummary.textContent=`進階：${MODE_TEXT[request.mountMode]}・裝在板子${request.face==='back'?'後面':'前面'}`;
@@ -314,7 +328,7 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
   toggle.disabled=stroke.disabled=scan.disabled=!result?.ok;if(more)more.disabled=!planOk;spacer.parentElement.hidden=auto.value==='auto';reading.textContent=`伸出 ${request.extension.toFixed(1)} / ${result?.syringe?.spec.stroke ?? stroke.max} mm`;
   if(result?.syringe)stroke.max=result.syringe.spec.stroke;
   const show3d=preview3d&&planOk;space.hidden=!show3d;svg.toggleAttribute('hidden',!!show3d);if(stage){svg.style.display=show3d?'none':'';space.style.height=show3d?'180px':'';}toggle.textContent=preview3d?'回到平面':'查看 3D';
-  hint.textContent=prog.step===1?(pendingFrame?'按下方「把它設為不動的底座」，或改點藍框的零件。':'點畫布上框起來的板子或桿件（藍框是已固定的）。'):prog.step===2?`${frameNote}點畫布上橘色圈起來的孔，推桿會接在那裡。`:pivot?'拖藍點移動轉軸，拖「試動伸出量」試推。':'拖藍點移固定環、橘點轉方向，拖「試動伸出量」試推。';
+  hint.textContent=prog.step===1?(pendingFrame?'按下方「把它設為不動的底座」，或改點藍框的零件。':'點畫布上框起來的板子或桿件（藍框是已固定的）。'):prog.step===2?`${frameNote}點畫布上橘色圈起來的孔，推桿會接在那裡；灰色的孔推不動機構。`:pivot?'拖藍點移動轉軸，拖「試動伸出量」試推。':'拖藍點移固定環、橘點轉方向，拖「試動伸出量」試推。';
   const shown=check.textContent;
   check.textContent=!request.b||!request.position?'':planOk?(/^[✓✗] 推|^✓/.test(shown)?shown:'正在試推…'):`✗ 目前推不動：${planMessage||'請調整位置或方向。'}`;
   if(!show3d)renderDrawing();

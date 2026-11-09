@@ -73,7 +73,7 @@ globalThis.window={addEventListener(){},removeEventListener(){}};globalThis.inne
 globalThis.ResizeObserver=class{observe(){}disconnect(){}};
 
 const {openSyringeInstallation}=await import('../js/blocks/syringe-install-ui.js');
-const {planPlacedSyringe,installationChoices}=await import('../js/blocks/syringe-installation.js');
+const {planPlacedSyringe,installationChoices,outputHoleModes}=await import('../js/blocks/syringe-installation.js');
 const {planMemberFrame}=await import('../js/blocks/member-frame.js');
 const {makeStandardBlank}=await import('../js/blocks/standard-blank.js');
 const {normalizeSnapshot}=await import('../js/blocks/schema.js');
@@ -92,19 +92,24 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 // 1) H01 練習：清單選底座與推桿孔，結果與直接規劃同一請求完全相同。
 {
  const s=normalizeSnapshot(structuredClone(getExample('hydraulic-h01-practice').snapshot)),source={comps:s.comps,params:s.params,fabrication:s.fabrication};
- let accepted=null;
+ let accepted=null;const rod0=()=>s.comps.find(c=>c.id==='H1Coupler');
  const d=openSyringeInstallation({source,points:null,newId:'Syringe1',confirm:r=>{accepted=r;return true;},review:()=>true});
  assert.deepEqual(shown(d),[1],'opens at ① only');
  assert.equal(missing(d),'還差：① 選針筒固定的零件、② 選推桿的孔');assert.equal(confirmButton(d).disabled,true);
  assert.ok(aria(d,'針筒固定的零件')&&!aria(d,'針筒固定的零件').closest('section').hidden,'fallback frame list is in the visible step');
  const frameId='H1Frame',frame=s.comps.find(c=>c.id===frameId);
  choose(d,'針筒固定的零件',frameId);
- assert.deepEqual(shown(d),[2],'frame answered → ②');assert.equal(missing(d),'還差：② 選推桿的孔');
+ assert.deepEqual(shown(d),[2],'frame answered → ②');
+ const px1=aria(d,'固定位置 X (mm)'),keepX=px1.value;px1.value='-';px1.oninput();assert.equal(px1.value,'-','a partly typed minus survives the re-render, even in a hidden step');
+ px1.value=keepX;px1.oninput();
+ const arm=s.comps.find(c=>c.id==='H1Arm'),fixedEnd=[arm.p1,arm.p2].find(p=>p.type==='fixed');
+ assert.ok(all(d).some(n=>n.attrs['data-quick-output']===rod0().p1.id)&&all(d).some(n=>n.attrs['data-install-unusable']===fixedEnd.id),'② feasible holes orange, the arm pivot grey');assert.equal(missing(d),'還差：② 選推桿的孔');
  const stepOne=by(d,n=>n.dataset.installStep==1);assert.match(stepOne.textContent,/^✓ ① /);assert.equal(stepOne.disabled,false);
  const rod=s.comps.find(c=>c.id==='H1Coupler');
  choose(d,'推桿接的零件',rod.id);
  const holeOptions=all(aria(d,'推桿接的孔')).filter(n=>n.tagName==='OPTION').map(n=>n.textContent);
- assert.ok(holeOptions.length>=2&&holeOptions.every(t=>/^第 \d+ (排第 \d+ )?孔$/.test(t)),`plain hole names: ${holeOptions}`);
+ assert.ok(holeOptions.length>=2&&holeOptions.every(t=>/^第 \d+ (排第 \d+ )?孔(（推不動）)?$/.test(t)),`plain hole names: ${holeOptions}`);
+ assert.deepEqual(holeOptions,['第 1 孔','第 2 孔（推不動）'],'the coupler end tied to the arm cannot push');
  assert.deepEqual(shown(d),[3],'hole answered → ③');
  assert.equal(confirmButton(d).disabled,false);
  assert.match(missing(d),/^將建立：針筒固定在「H1Frame」，推桿接「H1Coupler・第 1 孔」，針筒固定不動（兩顆螺絲），裝在板子前面。$/);
@@ -132,6 +137,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  assert.doesNotMatch(d.textContent,/取消安裝|請取消/,'never tells the student to cancel');
  assert.match(status(),/還沒有不動的零件/);assert.equal(button.hidden,true);
  const option=all(aria(d,'針筒固定的零件')).find(n=>n.value===plate.comp.id);assert.match(option.textContent,/^矩形板材（會動，需設為底座）$/);
+ assert.ok(all(d).some(n=>n.tagName==='CIRCLE'&&n.attrs['data-install-member']===plate.comp.id),'step ① holes inside a moving plate select it too');
  choose(d,'針筒固定的零件',plate.comp.id);
  assert.deepEqual(shown(d),[1]);assert.match(status(),/^「矩形板材」現在還會動/);assert.equal(button.hidden,false);assert.equal(button.textContent,'把它設為不動的底座');
  assert.equal(missing(d),'還差：① 把所選零件設為不動的底座、② 選推桿的孔');assert.equal(confirmButton(d).disabled,true);
@@ -139,12 +145,33 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  assert.deepEqual(calls,[plate.comp.id]);assert.deepEqual(source,original,'the panel never edits its source; set-as-frame goes through the work commit');
  assert.ok(!d.closed,'set-as-frame keeps the panel open');assert.deepEqual(shown(d),[2]);assert.match(by(d,n=>n.className==='install-hint').textContent,/已設為不動的底座，可按復原還原/);
  assert.equal(aria(d,'針筒固定的零件').value,plate.comp.id);
- const hits=all(d).filter(n=>n.attrs['data-quick-output']).map(n=>n.attrs['aria-label']);
- assert.ok(hits.includes('連接 孔格桿件・第 3 孔')&&hits.includes('連接 孔格桿件・第 13 孔'),'canvas holes are named in plain words');
- assert.ok(hits.every(t=>!/mm|\d+\.\d/.test(t)));
+ // 鬆的桿：每個孔都推不動，② 直接說原因，不讓學生到 ③ 才發現。
+ assert.equal(all(d).filter(n=>n.attrs['data-quick-output']).length,0);assert.equal(all(d).filter(n=>n.attrs['data-install-unusable']).length,13);
+ assert.match(by(d,n=>'installOutputStatus' in n.dataset).textContent,/^目前沒有推得動的孔：會動的零件還沒接到底座。/);
  choose(d,'推桿接的零件',bar.comp.id);
+ assert.match(all(aria(d,'推桿接的孔')).find(n=>n.tagName==='OPTION').textContent,/^第 1 孔（推不動）$/);
  assert.deepEqual(shown(d),[3]);assert.equal(confirmButton(d).disabled,true);assert.match(missing(d),/^還不能安裝：/,'a loose bar explains why instead of a silent disabled button');
  assert.match(by(d,n=>'installCheck' in n.dataset).textContent,/^✗ 目前推不動：/);
+ d.close();
+}
+// 2b) 桿的一端鎖在固定孔上（擺臂）：其餘孔用可以擺動推得動；孔名用白話，點孔就預選可以擺動並說明原因。
+{
+ const plate=makeStandardBlank({kind:'plate',columns:16,rows:3,n:1}),bar=makeStandardBlank({kind:'bar',columns:13,n:2,origin:{x:0,y:40}});
+ const framed=planMemberFrame({comps:[plate.comp],params:plate.params,id:plate.comp.id});assert.ok(framed.ok,framed.message);
+ bar.comp.p1.type='fixed';const source={comps:[...framed.comps,bar.comp],params:{...plate.params,...bar.params},fabrication:{}};
+ assert.deepEqual(outputHoleModes(source.comps,source.params,plate.comp.id,{componentId:bar.comp.id,u:16,v:0}),{'fixed-axis':false,pivot:true});
+ assert.deepEqual(outputHoleModes(source.comps,source.params,plate.comp.id,{componentId:bar.comp.id,u:0,v:0}),{'fixed-axis':false,pivot:false},'the fixed pivot itself cannot be pushed');
+ const d=openSyringeInstallation({source,points:null,newId:'Syringe1',confirm:()=>true,review:()=>true});
+ choose(d,'針筒固定的零件',plate.comp.id);
+ const hits=all(d).filter(n=>n.attrs['data-quick-output']);
+ assert.equal(hits.length,12);assert.ok(hits.some(n=>n.attrs['aria-label']==='連接 孔格桿件・第 3 孔'));assert.ok(hits.every(n=>!/mm|\d+\.\d/.test(n.attrs['aria-label'])));
+ assert.equal(by(d,n=>'installOutputStatus' in n.dataset).textContent,'');
+ const third=hits.find(n=>n.attrs['aria-label']==='連接 孔格桿件・第 3 孔');
+ const svg=all(body).find(n=>n.tagName==='SVG'&&n.attrs['aria-label']==='放置針筒、拖動位置與方向把手');
+ svg.onpointerdown({target:{getAttribute:k=>third.attrs[k]??null,hasAttribute:k=>k in third.attrs},preventDefault(){},stopPropagation(){}});
+ assert.deepEqual(shown(d),[3]);assert.match(by(d,n=>n.dataset.installStep==2).textContent,/孔格桿件・第 3 孔$/);
+ assert.equal(by(d,n=>n.name==='syringeMountMode'&&n.value==='pivot').checked,true,'a hole that only swings preselects the swinging mode');
+ assert.match(by(d,n=>'installSuggestion' in n.dataset).textContent,/^建議：針筒可以擺動/);
  d.close();
 }
 // 設為底座失敗時留在 ①，說明原因，不關閉表單。
