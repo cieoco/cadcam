@@ -241,6 +241,7 @@ export function previewPointConnection(comps, topo, fromId, toId) {
   const points = pointCoords(comps), source=points[fromId], target=points[toId];
   if (!source || !target || fromId===toId) return fail('請選擇兩個不同接點');
   if (!connectionModule(comps,[fromId,toId]).ok) return fail('不同模組請使用組立接口接合');
+  if(comps.some(c=>{const holes=[...pointKeysFor(c).map(k=>c[k]),...localHoles(c),...(c.standardBlank?.mountHoles||[])];return holes.some(h=>h?.id===fromId)&&holes.some(h=>h?.id===toId);}))return fail('不能合併同一零件的兩個孔');
   const ids=new Set([fromId,toId]);
   let changed=true;
   while(changed){changed=false;for(const c of comps){const keys=pointKeysFor(c).map(k=>c[k]?.id).filter(Boolean);if(keys.some(id=>ids.has(id)))for(const id of keys)if(!ids.has(id)){ids.add(id);changed=true;}}}

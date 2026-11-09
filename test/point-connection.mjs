@@ -23,3 +23,11 @@ const coords=pointCoords(r.comps);assert.ok(Math.abs(Math.hypot(coords.b.x-coord
 const modules=structuredClone(free);modules[0].moduleId='one';modules[1].moduleId='two';
 assert.equal(previewPointConnection(modules,topo,'a','target').ok,false);
 console.log('PASS connection candidates preserve dimensions, reject impossible/degenerate/cross-module joins, and never mutate originals');
+// A standard member's local holes belong to the same rigid part as its endpoints.
+const grid=[{...bar('grid',p('A',0,0),p('B',32,0)),standardBlank:{kind:'bar'},holes:[{id:'H8',u:8,v:0,type:'floating'},{id:'H24',u:24,v:0,type:'floating'}]}];
+const gridBefore=JSON.stringify(grid);
+for(const [from,to] of [['B','H24'],['H24','B'],['H8','H24']]){
+ const result=previewPointConnection(grid,{params:{grid:32}},from,to);
+ assert.equal(result.ok,false);assert.match(result.message,/同一零件/);assert.equal(JSON.stringify(grid),gridBefore);
+}
+console.log('PASS same-member endpoint/local-hole merges rejected without mutation');
