@@ -43,6 +43,10 @@ check('離格顯示最近孔數與差值', holeCountText(50) === '≈ 7 孔（�
 
 // 接線：受格把手用步距，其他把手不傳
 const handles = readFileSync(new URL('../js/blocks/editing-handles.js', import.meta.url), 'utf8');
-check('尺寸把手接上 gridDragStep，且只有兩處', (handles.match(/gridDragStep\(/g) || []).length === 2);
+check('標準板材兩向孔距沿用 8 mm 孔格', ['plate','l'].every(kind => {
+  const plate = { ...tri, standardBlank: { kind } };
+  return ['g','r1'].every(id => gridDragStep(plate, dim(plate,id)) === 8);
+}));
+check('尺寸把手接上各自的 gridDragStep', handles.includes('gridDragStep(c,dim)') && handles.includes('gridDragStep(c,d)'));
 check('夾爪爪尖與圓盤外徑等把手維持 1 mm', !/disk-diameter[^\n]*gridDragStep/.test(handles) && !/rack-length[^\n]*gridDragStep/.test(handles));
 report('grid-drag');
