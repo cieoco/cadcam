@@ -1,4 +1,5 @@
 import {actuatorMountSettings} from './fabrication-profile.js';
+import {syringeAttachmentHole} from '../core/syringe.js';
 /** Compare fabrication interfaces in part-local coordinates, never screen or animation coordinates.
  * Existing geometry producers remain the authority; this module owns only the edit decision.
  */
@@ -101,7 +102,13 @@ export function inspectMountingChange(before,after){
       if(p&&q&&!same(footprint(p,a,r,ca),footprint(q,b,n,cb)))changed.push(id);
     }
     const syringeId=r.id.startsWith('syringe:')?r.id.slice(8):null;
-    const outputChanged=syringeId&&!same(a.comps.find(c=>c.id===syringeId)?.b,b.comps.find(c=>c.id===syringeId)?.b);
+    const beforeOutput=a.comps.find(c=>c.id===syringeId)?.b,afterOutput=b.comps.find(c=>c.id===syringeId)?.b;
+    const beforeOwner=a.comps.find(c=>c.id===beforeOutput?.componentId),afterOwner=b.comps.find(c=>c.id===afterOutput?.componentId);
+    // Resizing a bar keeps the same second end joint; it does not redrill the clamp.
+    const followsEnd=beforeOwner?.type==='bar'&&afterOwner?.id===beforeOwner.id&&
+      syringeAttachmentHole(beforeOwner,a.params,beforeOutput)?.key==='p2'&&
+      syringeAttachmentHole(afterOwner,b.params,afterOutput)?.key==='p2'&&beforeOwner.p2.id===afterOwner.p2.id;
+    const outputChanged=syringeId&&!same(beforeOutput,afterOutput)&&!followsEnd;
     if(changed.length||outputChanged||!same(r.parts,n.parts)){const count=c=>c?.holes.filter(h=>/^(MG995_HORN|TT_HUB|N20_HUB)_SCREW$/.test(h.layer)).length || 0,oldOutput=Object.values(ca.parts).find(p=>p.sourceIds.some(id=>a.comps.some(c=>c.id===id&&c.standardBlank?.rearMm!==undefined))&&r.parts.includes(p.id)),newOutput=oldOutput&&partFor(cb,oldOutput.id),detail=oldOutput&&newOutput&&count(oldOutput)!==count(newOutput)?`軸接頭有效固定螺絲 ${count(oldOutput)}→${count(newOutput)} 顆` : '';changes.push({id:r.id,label:detail||r.label,parts:changed.length?changed:[...ids]});}
   }
   return {ok:!issues.length,changes,issues:[...new Set(issues)]};

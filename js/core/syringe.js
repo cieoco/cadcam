@@ -67,7 +67,8 @@ export function attachmentFrame(owner,params,points=null) {
 // Select existing primary/grid holes; coordinates share the attachment frame.
 export function syringeAttachmentHoles(owner,params){
  const f=attachmentFrame(owner,params);if(!f)return [];
- return [owner.p1,owner.p2,owner.p3].filter(Boolean).map((p,i)=>({...p,key:['p1','p2','p3'][i],u:(p.x-f.p.x)*f.x+(p.y-f.p.y)*f.y,v:-(p.x-f.p.x)*f.y+(p.y-f.p.y)*f.x}))
+ // Primary bar holes belong to the dimension, not the last saved motion pose.
+ return [owner.p1,owner.p2,owner.p3].filter(Boolean).map((p,i)=>({...p,key:['p1','p2','p3'][i],u:i===0?0:i===1?f.length:(p.x-f.p.x)*f.x+(p.y-f.p.y)*f.y,v:i<2?0:-(p.x-f.p.x)*f.y+(p.y-f.p.y)*f.x}))
  .concat(localHoles(owner).map(h=>({...h,...holeWorld(owner,h),key:h.id,v:h.v*holeSide(owner)})));
 }
 export const syringeAttachmentHole=(owner,params,ref)=>syringeAttachmentHoles(owner,params).find(h=>Math.hypot(h.u-ref?.u,h.v-ref?.v)<1e-6);

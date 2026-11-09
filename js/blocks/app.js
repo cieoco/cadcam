@@ -1065,7 +1065,7 @@ const memberEditor = createMemberEditor({
     const ids=new Set(viewComps().map(c=>c.id)),comps=draft.comps.filter(c=>ids.has(c.id));
     try{
       const solved=solveTopology(compileTopology(comps,{...S.topo,params:{...draft.params}},new Set()),{thetaDeg:S.theta,motorAngles:motorAnglesNow()});
-      return solved?.isValid===false ? `孔距未修改：${solved.errorReason||'此尺寸無法維持目前連接與行程。'}` : '';
+      return solved?.isValid===false ? `孔距未修改：${solved.reason||solved.errorReason||'此尺寸無法維持目前連接與行程。'}` : '';
     }catch(e){return `孔距未修改：${e.message}`;}
   },
   resizeFusion: async (id,value) => {
