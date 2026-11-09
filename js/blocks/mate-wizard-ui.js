@@ -1,5 +1,5 @@
 import {assemblyWork} from './assembly-membership.js';
-import {FASTENER_CHOICES} from './fastener-choice.js';
+import {fastenerPanel} from './fastener-panel.js';
 import {closedAssemblies, closedAssemblyIds} from './assembly-view.js';
 import { faceBracketStatus } from './face-bracket-extras.js';
 /**
@@ -274,33 +274,14 @@ export function createMateWizard(h) {
   function fastenerBox(comps, modules, id) {
     const mod = modules.find(m => m.id === id);
     if (!mod?.mount?.orient) return null;
-    const sec = el('div', 'bench-section');
-    sec.appendChild(el('div', 'bench-label', '固定方式'));
-    const group = el('div', 'bench-seg');
-    group.setAttribute('role','group'); group.setAttribute('aria-label','固定方式');
-    const current = mod.mount.orient.joint?.kind === 'bracket-m3' ? 'bracket' : 'printed';
-    for (const [kind,label] of FASTENER_CHOICES) {
-      const available = kind === 'bracket' || kind === 'printed';
-      const b = btn(label, 'bench-seg-btn' + (current === kind ? ' is-on' : ''), () => {
-        if (!available) return;
-        const source = S.modules, preview = pv, revision = pv?.rev;
-        // Let the pointer event finish before the native fixed-hole review opens.
-        setTimeout(() => {
-          if (S.modules !== source || pv !== preview || pv?.rev !== revision || st.selected !== id) return;
-          adjust(`joint:${kind === 'bracket' ? 'bracket-m3' : kind}`);
-        }, 0);
-      });
-      b.setAttribute('aria-pressed',String(current === kind)); b.disabled = !available;
-      if(!available)b.title='請使用下方選面接合';
-      group.appendChild(b);
-    }
-    sec.appendChild(group);
-    sec.appendChild(btn('改用選面接合（榫槽／只定位）', '', () => {
-      cancel({silent:true});
-      h.openFaces(h.modOf(id), true);
-    }));
-    return sec;
+    return fastenerPanel({
+      current: mod.mount.orient.joint?.kind === 'bracket-m3' ? 'bracket' : 'printed',
+      isCurrent: () => (pv ? pv.cand.modules : S.modules) === modules && st.selected === id,
+      onChange: kind => adjust(`joint:${kind === 'bracket' ? 'bracket-m3' : kind}`),
+      onSelectFaces: () => { cancel({silent:true}); h.openFaces(h.modOf(id), true); }
+    });
   }
+
   function adjustBox(comps, modules, id) {
     const m = modules.find(x => x.id === id), to = m && m.mount && m.mount.to;
     if (!m || !m.mount || !m.mount.orient) return null;   // 對鎖不能沿邊滑動

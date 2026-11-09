@@ -1,4 +1,4 @@
-import {FASTENER_CHOICES} from './fastener-choice.js';
+import {fastenerPanel} from './fastener-panel.js';
 import { appendCollisionActions } from './collision-actions.js';
 import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 import {assemblyWork,mergeAssemblyWork} from './assembly-membership.js';
@@ -20,7 +20,6 @@ import { checkLiveInterference, liveInterferenceStatus } from './live-interferen
  */
 import { S, motorAnglesNow } from './state.js';
 import { createRigidGroupsUI } from './rigid-groups-ui.js';
-import { openFaceWizard } from './face-wizard-ui.js?v=20261007_singleface';
 import * as Bench from './bench.js?v=20261007_m5a';
 import { createMateWizard } from './mate-wizard-ui.js?v=20261008_brackets';
 import { moduleFrameEdges } from './assembly.js?v=20261007_m5a';
@@ -1044,18 +1043,12 @@ export function createBench(deps) {
       // E1：直角安裝的接合件（金屬角碼｜3D 列印），放在定位之後選擇。
       if (mod.mount.orient) {
         const cur = mod.mount.orient.joint?.kind === 'bracket-m3' ? 'bracket-m3' : 'printed';
-        const group = el('div', 'bench-seg');
-        group.setAttribute('role','group'); group.setAttribute('aria-label','固定方式');
-        for (const [kind,label] of FASTENER_CHOICES) {
-          const available = kind === 'bracket' || kind === 'printed';
-          const action = kind === 'bracket' ? 'bracket-m3' : kind;
-          const b = bigBtn(label, () => { const source = S.modules; setTimeout(() => { if (S.modules === source && st.selected === mod.id) adjust(`joint:${action}`); }, 0); }, 'bench-seg-btn' + (cur === action ? ' is-on' : ''));
-          b.setAttribute('aria-pressed',String(cur === action)); b.disabled = !available;
-          if(!available)b.title='請使用下方選面接合';
-          group.appendChild(b);
-        }
-        sec.appendChild(group);
-        sec.appendChild(bigBtn('改用選面接合（榫槽／只定位）', () => openDefaultFaceWizard(mod, true)));
+        sec.appendChild(fastenerPanel({
+          current: cur === 'bracket-m3' ? 'bracket' : 'printed',
+          isCurrent: () => modOf(mod.id) === mod && st.selected === mod.id,
+          onChange: kind => adjust(`joint:${kind === 'bracket' ? 'bracket-m3' : kind}`),
+          onSelectFaces: () => openDefaultFaceWizard(mod, true)
+        }));
         if (cur === 'printed') addActions(sec, [['tilt-', '傾斜 −15°'], ['tilt+', '傾斜 +15°']]);
       } else sec.appendChild(el('div', 'bench-note', '同平面接點對鎖，不使用直角角碼。'));
       root.appendChild(sec);
@@ -1337,7 +1330,11 @@ export function createBench(deps) {
 
   // 精靈要用到的內部（接上／取消都走這裡，不另寫一套）
   // 預設精靈與進階面板共用同一條六面選面流程，確認前不改作品。
-  function openDefaultFaceWizard(mod, reselect = false, startAtPlacement = false) {
+  async function openDefaultFaceWizard(mod, reselect = false, startAtPlacement = false) {
+    let openFaceWizard;
+    try { ({openFaceWizard} = await import('./face-wizard-ui.js?v=20261007_singleface')); }
+    catch { say('接合設定載入失敗，請重試。'); return; }
+    if (modOf(mod.id) !== mod || st.selected !== mod.id) return;
     if (st.preview) cancelPreview({ silent: true });
     deps.pause?.();
     const active=assemblyWork(S.comps,S.modules,S.topo);

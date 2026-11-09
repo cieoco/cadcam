@@ -1,6 +1,13 @@
 # 教學與操作更新紀錄
 
 <a id="syringe-edit-connections"></a>
+## 2026-11-09：首次載入預算造成的發布失敗（2026.11.9.12）
+
+- `db5c9ed` 的 Actions run 42548376351 在test階段292/293，唯一失敗為startup-size；build／deploy因此跳過，並非已部署後才壞掉。上輪定向測試未涵蓋此預算，此次補完整驗收。
+- 共用角件按鈕移至既有fastener-choice模組按需載入，兩個入口共用；選面編輯器也改為點入口時載入。首次JS由2,158,012降為2,141,610 bytes，原2,155,000上限不變；新增測試保證兩模組維持按需載入。
+- 完整293項首輪292通過；face-candidate的真實按鈕測試改為等待新增的非同步載入，保留原取消／保存／一次復原斷言。該項與startup-size、load-graph再驗3/3通過，合計覆蓋293項；證據另見`output/fastener-deployment/recheck/results.json`。
+- 正式blocks Chrome驗收：固定方式載入、金屬角碼確認、一次復原回列印角件、轉入選面預覽；保存與孔位規則不改。截圖`output/fastener-deployment/local.png`，完整驗收結果`output/fastener-deployment/tests/results.json`。
+
 ## 2026-11-09：組立固定方式入口（2026.11.9.11）
 
 - 選面固定方式整併金屬角碼、榫槽＋M3鎖固與先只定位，移除重複勾選；原直角接口加入同名固定方式區及轉入選面的入口。列印角件仍限原直角接口，不能把未支援的六面列印角件視為完成。

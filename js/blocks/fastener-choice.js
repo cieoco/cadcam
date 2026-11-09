@@ -29,3 +29,27 @@ export function fillFastenerChoices(select, value, unavailable = {}) {
   }
   select.value = value;
 }
+
+export function renderFastenerButtons(root, {current, onChange, onSelectFaces, isCurrent}) {
+  const label = document.createElement('div'), group = document.createElement('div');
+  label.className = 'bench-label'; label.textContent = '固定方式';
+  group.className = 'bench-seg';
+  group.setAttribute('role','group'); group.setAttribute('aria-label','固定方式');
+  for (const [kind, text] of FASTENER_CHOICES) {
+    const button = document.createElement('button'); button.type = 'button';
+    button.textContent = text;
+    button.className = 'bench-btn bench-seg-btn' + (current === kind ? ' is-on' : '');
+    button.setAttribute('aria-pressed', String(current === kind));
+    button.disabled = kind !== 'bracket' && kind !== 'printed';
+    if (button.disabled) button.title = '請使用下方選面接合';
+    // Finish the pointer event before opening the existing fixed-hole review.
+    button.onclick = () => setTimeout(() => {
+      if (root.isConnected && isCurrent() && current !== kind) onChange(kind);
+    }, 0);
+    group.appendChild(button);
+  }
+  const faces = document.createElement('button'); faces.type = 'button'; faces.className = 'bench-btn';
+  faces.textContent = '改用選面接合（榫槽／只定位）';
+  faces.onclick = () => { if (isCurrent()) onSelectFaces(); };
+  root.replaceChildren(label, group, faces);
+}

@@ -52,4 +52,5 @@ check('機架編輯介面延後載入',!r.paths.includes('js/blocks/frame-hole-e
 check('合成尺寸候選計算延後載入',!r.paths.includes('js/blocks/bar-fusion-resize.js')&&r.lazyEntries.includes('js/blocks/bar-fusion-resize.js'));
 check('盒體生成介面（外掛）延後載入',!r.paths.includes('js/plugins/box-maker/box-generator.js')&&!r.paths.includes('js/plugins/box-maker/box-dialog.js')&&r.lazyEntries.includes('js/plugins/box-maker/index.js'));
 check('歷史紀錄點開才載入',!r.paths.includes('js/version-history.js')&&r.lazyEntries.includes('js/version-history.js'));
+check('組立固定方式與選面設定按需載入',!r.paths.includes('js/blocks/fastener-choice.js')&&!r.paths.includes('js/blocks/face-wizard-ui.js')&&r.lazyEntries.includes('js/blocks/fastener-choice.js')&&r.lazyEntries.includes('js/blocks/face-wizard-ui.js'));
 report('startup-size');
