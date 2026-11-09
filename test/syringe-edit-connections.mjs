@@ -129,12 +129,14 @@ assert.equal(commits,countBefore);assert.equal(JSON.stringify(S.comps),initialDr
 const dragConfirm=button('確認連接修改')||button('確認更新固定孔');assert.ok(!dragConfirm.parentElement.hidden,by(n=>n.className==='syringe-edit-status').textContent);dragConfirm.onclick();
 assert.equal(commits,countBefore+1);assert.equal(S.comps.find(c=>c.id==='H8Syringe').b.u,12);
 console.log('same-member overlap regression, snapped drag, cancel and one confirmed edit passed');
-// Incompatible mounting mode must preserve the current selection and all hole options.
+// An incomplete mode is editable draft state; no invalid work is committed.
 editor.sync(true);const modeBefore=JSON.stringify(S.comps),selectedBefore=output.value,optionCount=output.children.length,commitBefore=commits;
 button('雙孔固定').onclick();editor.sync(true);
-assert.equal(button('單孔可轉').getAttribute('aria-pressed'),'true');
+assert.equal(button('雙孔固定').getAttribute('aria-pressed'),'true');
 assert.equal(output.value,selectedBefore);assert.equal(output.children.length,optionCount);
-assert.match(by(n=>n.className==='syringe-edit-status').textContent,/沒有可用的活動短連桿.*原設定保留/);
+assert.match(by(n=>n.className==='syringe-edit-status').textContent,/尚未套用/);
 assert.equal(JSON.stringify(S.comps),modeBefore);assert.equal(commits,commitBefore);
 button('雙孔固定').onclick();assert.equal(commits,commitBefore);
 console.log('incompatible mounting switch preserves mode, selected hole, options and undo state');
+
+button('取消連接修改').onclick();editor.sync(true);assert.equal(button('單孔可轉').getAttribute('aria-pressed'),'true');

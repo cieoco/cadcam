@@ -116,7 +116,7 @@ export function syringeIssues(c,comps,params) {
     const other=atEnd2?rod?.p1:rod?.p2,output=comps.find(o=>o.id===c.outputId);
     if(rod?.type!=='bar'||!rod.p1||!rod.p2)issues.push('缺少推桿連接的短連桿，請補回並重新連接。');
     if(!output||!['bar','triangle'].includes(output.type)||output.id===rod?.id)issues.push('缺少輸出連桿／擺臂，不能只靠針筒端點運動。');
-    else if(!other||fixedIds.has(other.id)||![output.p1,output.p2,output.p3].some(p=>p?.id===other.id)||![output.p1,output.p2,output.p3].some(p=>fixedIds.has(p?.id)))issues.push('短連桿須接到有固定支點的輸出連桿；目前接點未接妥。');
+    else if(!other||fixedIds.has(other.id)||!syringeAttachmentHoles(output,params).some(p=>p.id===other.id)||!syringeAttachmentHoles(output,params).some(p=>fixedIds.has(p.id)))issues.push('短連桿須接到有固定支點的輸出連桿；目前接點未接妥。');
   }
   return issues;
 }

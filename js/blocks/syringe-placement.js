@@ -23,7 +23,7 @@ export function placeFixedSyringe(comps,params,points,aRef,bRef,{extension=10}={
   const rodPoint=ownerB[end],other=ownerB[end==='p1'?'p2':'p1'];
   const fixedIds=fixedSyringePointIds(comps);
   if(fixedIds.has(rodPoint.id))return fail('推桿接孔不能是固定點，請改點活動的連桿端孔。');
-  const output=fixedIds.has(other.id)?null:comps.find(o=>o.id!==ownerB.id&&['bar','triangle'].includes(o.type)&&[o.p1,o.p2,o.p3].some(p=>fixedIds.has(p?.id))&&[o.p1,o.p2,o.p3].some(p=>p?.id===other.id));
+  const output=fixedIds.has(other.id)?null:comps.find(o=>o.id!==ownerB.id&&['bar','triangle'].includes(o.type)&&syringeAttachmentHoles(o,params).some(p=>fixedIds.has(p.id))&&syringeAttachmentHoles(o,params).some(p=>p.id===other.id));
   if(!output)return fail('推桿要接短連桿，短連桿另一端接有固定支點的擺臂；請改點這樣的連桿端孔。');
   const a=attachmentPoint(aRef,comps,params,points),b=attachmentPoint({...bRef},comps,params,points);
   if(!a||!b||![a.x,a.y,b.x,b.y].every(Number.isFinite))return fail('找不到有效的安裝點，請重新點選。');

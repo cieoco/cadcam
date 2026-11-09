@@ -61,3 +61,13 @@ for(const name of ['hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h0
  assert.equal(solveSyringe(broken,work.params).ok,false,`${name}: unjoined output cannot move`);
 }
 console.log('Unfixed, missing frame/coupler/output and disconnected output correctly reject motion');
+// A short rod can connect to an existing interior hole of the grounded output arm.
+{
+ const s=normalizeSnapshot(structuredClone(getExample('hydraulic-h01').snapshot));
+ const sy=s.comps.find(c=>c.type==='syringe'),arm=s.comps.find(c=>c.id===sy.outputId),L=s.params[arm.lenParam],tip={...arm.p2};
+ arm.p2={...tip,id:'ExtendedArmTip',x:arm.p1.x+(tip.x-arm.p1.x)*(L+16)/L,y:arm.p1.y+(tip.y-arm.p1.y)*(L+16)/L};
+ arm.holes=[...(arm.holes||[]),{id:tip.id,type:'floating',u:L,v:0,diameter:3.2}];s.params[arm.lenParam]=L+16;
+ const result=planSyringeInstallation(s,{id:sy.id,a:sy.a,b:sy.b,mountMode:'fixed-axis',axisDeg:sy.axisDeg});
+ assert.ok(result.ok,result.message);assert.equal(result.syringe.outputId,arm.id);
+ console.log('fixed-axis short rod connects through an interior output-arm hole');
+}

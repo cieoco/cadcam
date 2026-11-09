@@ -141,8 +141,6 @@ export function createSyringeEditor(h){
  function changeMode(value){
   const c=current();if(!c)return;
   if(value===c.mountMode&&!Object.keys(pending).length)return;
-  const comps=h.comps(),params=h.params(),available=installationChoices(comps,params).rods.some(o=>syringeAttachmentHoles(o,params).some(h=>{const r=outputHoleChecks(comps,params,pending.frameId||c.a.componentId,{componentId:o.id,u:h.u,v:h.v})[value];return r.ok||r.reason==='distance';}));
-  if(!available){message(value==='fixed-axis'?'無法改成雙孔固定：目前沒有可用的活動短連桿。筒身鎖死後，推桿需透過可轉的短連桿帶動擺臂；兩孔鎖成一體的延伸桿不適用。原設定保留。':'無法改成單孔可轉：推桿需直接接有固定支點的擺臂。請先調整接法；原設定保留。');return;}
   const shape=syringeShape(c,h.comps(),h.params(),h.points());if(!shape)return;
   // Keep the physical clamp location when changing center-based / ear-based attachment.
   const sign=c.pivotEar??1,position=value==='fixed-axis'?shape.a:{x:shape.a.x-Math.sin(shape.angle)*SYRINGE_EAR_MM*sign,y:shape.a.y+Math.cos(shape.angle)*SYRINGE_EAR_MM*sign};
