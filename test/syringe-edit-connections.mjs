@@ -62,3 +62,44 @@ assert.ok(!confirm.parentElement.hidden,by(n=>n.className==='syringe-edit-status
 confirm.onclick();assert.equal(commits,1);assert.equal(S.comps.find(c=>c.id===actuator.id).b.u,12);
 const roundtrip=normalizeSnapshot({comps:S.comps,params:S.topo.params});assert.equal(roundtrip.comps.find(c=>c.id===actuator.id).b.u,12);
 console.log('syringe connection edits: visible actions, invalid mode draft, cancel, local-hole reconnect, one commit and save round-trip passed');
+
+// New same-named members must appear distinctly; a gray hole reports why,
+// instead of silently selecting a nearby orange hole.
+const originalArm=S.comps.find(c=>c.id===arm.id);originalArm.name='孔格桿件';
+const added={type:'bar',id:'NewRod',name:'孔格桿件',p1:{id:'NewA',type:'floating',x:300,y:0},p2:{id:'NewB',type:'floating',x:340,y:0},lenParam:'NewLength',fixedLen:true};
+S.comps.push(added);S.topo.params.NewLength=40;editor.sync(true);
+assert.ok(output.children.some(n=>n.textContent.includes('第2件')&&n.value.includes('NewRod')));
+assert.ok(output.children.some(n=>n.textContent.includes('第1件')));
+button('在圖上更換推桿孔').onclick();editor.sync(true);
+const dot=walk(svg).find(n=>n.attrs['data-syringe-pick']==='NewB');assert.ok(dot);
+globalThis.DOMPoint=class{constructor(x,y){this.x=x;this.y=y;}matrixTransform(){return this;}};
+const before=JSON.stringify(S.comps);
+svg.listeners.pointerdown[0]({clientX:Number(dot.attrs.cx),clientY:Number(dot.attrs.cy),preventDefault(){},stopImmediatePropagation(){}});
+assert.match(by(n=>n.className==='syringe-edit-status').textContent,/第2件.*固定軸/);
+assert.equal(JSON.stringify(S.comps),before);assert.equal(commits,1);
+console.log('new duplicate-name rod appears; invalid canvas target reports mounting reason without mutating design');
+editor.close();
+const linked=normalizeSnapshot(structuredClone(getExample('hydraulic-h08').snapshot));
+S.comps=linked.comps;S.topo.params=linked.params;S.fabrication=linked.fabrication;
+const turn=S.comps.find(c=>c.id==='H8Turn');turn.name='孔格桿件';
+S.comps.push({type:'bar',id:'Intermediate',name:'孔格桿件',p1:{...turn.p2},p2:{id:'Tip',type:'floating',x:32,y:16},lenParam:'Intermediate',fixedLen:true});S.topo.params.Intermediate=32;
+editor.open('H8Syringe');editor.sync(true);
+const initialLinked=JSON.stringify(S.comps);
+button('在圖上更換推桿孔').onclick();editor.sync(true);
+const tip=walk(svg).find(n=>n.attrs['data-syringe-pick']==='Tip');
+svg.listeners.pointerdown[0]({clientX:Number(tip.attrs.cx),clientY:Number(tip.attrs.cy),preventDefault(){},stopImmediatePropagation(){}});
+assert.match(by(n=>n.className==='syringe-edit-status').textContent,/第2件.*雙孔固定/);
+assert.equal(JSON.stringify(S.comps),initialLinked);
+button('取消連接修改').onclick();editor.sync(true);
+assert.equal(JSON.stringify(S.comps),initialLinked);
+output.value=JSON.stringify({componentId:'Intermediate',u:32,v:0});output.onchange();editor.sync(true);
+assert.match(by(n=>n.className==='syringe-edit-status').textContent,/第2件.*雙孔固定/);
+button('雙孔固定').onclick();editor.sync(true);
+const linkedConfirm=button('確認連接修改')||button('確認更新固定孔');
+assert.ok(linkedConfirm&&!linkedConfirm.parentElement.hidden,by(n=>n.className==='syringe-edit-status').textContent);
+linkedConfirm.onclick();
+assert.equal(commits,2);assert.equal(S.comps.find(c=>c.id==='H8Syringe').b.componentId,'Intermediate');
+assert.equal(S.comps.find(c=>c.id==='H8Syringe').mountMode,'fixed-axis');
+const savedLinked=normalizeSnapshot({comps:S.comps,params:S.topo.params});
+assert.equal(savedLinked.comps.find(c=>c.id==='H8Syringe').b.componentId,'Intermediate');
+console.log('intermediate bar: canvas selection retains target across mounting mode switch and confirms once');

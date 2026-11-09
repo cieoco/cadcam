@@ -16,8 +16,11 @@ export function installationChoices(comps,params){
 }
 // 推桿孔預查：只看零件怎麼接（不求解），與固定環距離有關的失敗留到 ③ 調位置。
 export function outputHoleModes(comps,params,frameId,b){
- const a={componentId:frameId,u:0,v:0},works=r=>!!r.ok||r.reason==='distance';
- return {'fixed-axis':works(placeFixedSyringe(comps,params,null,a,b)),pivot:works(placePivotSyringe(comps,params,null,a,b))};
+ return Object.fromEntries(Object.entries(outputHoleChecks(comps,params,frameId,b)).map(([mode,r])=>[mode,!!r.ok||r.reason==='distance']));
+}
+export function outputHoleChecks(comps,params,frameId,b){
+ const a={componentId:frameId,u:0,v:0};
+ return {'fixed-axis':placeFixedSyringe(comps,params,null,a,b),pivot:placePivotSyringe(comps,params,null,a,b)};
 }
 export function planSyringeInstallation(source,request,points=null,motion={}){
  let comps=structuredClone(source.comps),params={...source.params};
