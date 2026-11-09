@@ -1,4 +1,5 @@
 import {assemblyWork} from './assembly-membership.js';
+import {FASTENER_CHOICES} from './fastener-choice.js';
 import {closedAssemblies, closedAssemblyIds} from './assembly-view.js';
 import { faceBracketStatus } from './face-bracket-extras.js';
 /**
@@ -270,6 +271,36 @@ export function createMateWizard(h) {
     sec.appendChild(seg);
     return sec;
   }
+  function fastenerBox(comps, modules, id) {
+    const mod = modules.find(m => m.id === id);
+    if (!mod?.mount?.orient) return null;
+    const sec = el('div', 'bench-section');
+    sec.appendChild(el('div', 'bench-label', '固定方式'));
+    const group = el('div', 'bench-seg');
+    group.setAttribute('role','group'); group.setAttribute('aria-label','固定方式');
+    const current = mod.mount.orient.joint?.kind === 'bracket-m3' ? 'bracket' : 'printed';
+    for (const [kind,label] of FASTENER_CHOICES) {
+      const available = kind === 'bracket' || kind === 'printed';
+      const b = btn(label, 'bench-seg-btn' + (current === kind ? ' is-on' : ''), () => {
+        if (!available) return;
+        const source = S.modules, preview = pv, revision = pv?.rev;
+        // Let the pointer event finish before the native fixed-hole review opens.
+        setTimeout(() => {
+          if (S.modules !== source || pv !== preview || pv?.rev !== revision || st.selected !== id) return;
+          adjust(`joint:${kind === 'bracket' ? 'bracket-m3' : kind}`);
+        }, 0);
+      });
+      b.setAttribute('aria-pressed',String(current === kind)); b.disabled = !available;
+      if(!available)b.title='請使用下方選面接合';
+      group.appendChild(b);
+    }
+    sec.appendChild(group);
+    sec.appendChild(btn('改用選面接合（榫槽／只定位）', '', () => {
+      cancel({silent:true});
+      h.openFaces(h.modOf(id), true);
+    }));
+    return sec;
+  }
   function adjustBox(comps, modules, id) {
     const m = modules.find(x => x.id === id), to = m && m.mount && m.mount.to;
     if (!m || !m.mount || !m.mount.orient) return null;   // 對鎖不能沿邊滑動
@@ -305,7 +336,7 @@ export function createMateWizard(h) {
     const no = btn('取消', '', () => cancel()); no.id = 'mateCancel';
     row.appendChild(ok); row.appendChild(no); root.appendChild(row);
     const { comps, modules } = pv.cand;
-    [styleBox(comps, modules, pv.childId, mateStyles(comps, modules, pv.childId, params(), opts())), adjustBox(comps, modules, pv.childId)].forEach(x => x && root.appendChild(x));
+    [styleBox(comps, modules, pv.childId, mateStyles(comps, modules, pv.childId, params(), opts())), fastenerBox(comps, modules, pv.childId), adjustBox(comps, modules, pv.childId)].forEach(x => x && root.appendChild(x));
   }
   function mountedView(root, mod) {
     const mate = mateOfMount(S.comps, S.modules, mod.id, params());
@@ -318,13 +349,13 @@ export function createMateWizard(h) {
       const status = faceBracketStatus(S.comps,S.modules,params(),mod,{exportSettings:S.fabrication?.export || {},stockMm:S.fabrication?.cnc?.stockThicknessMm || 3,joint:S.fabrication?.joint});
       root.appendChild(el('div','bench-note',status.fixed?(mod.mount.face.selection.fastener?'榫槽與五金已生成（試作）':'角碼與固定孔已確認'):'已定位，尚未固定'));
       root.appendChild(el('div','bench-note',status.reason));
-      if(!status.fixed&&status.configurable!==false)root.appendChild(btn('配置角碼','primary',()=>h.openFaces(mod,true,true)));
+      root.appendChild(btn('修改固定方式與位置','primary',()=>h.openFaces(mod,true,true)));
       const change = btn('重新選面與尺寸', 'primary', () => h.openFaces(mod, true)); root.appendChild(change);
       const f = mod.mount.face.selection;
       root.appendChild(el('div', 'bench-note', `間距 ${f.gap} mm · 偏移 ${f.offsetU} / ${f.offsetV} mm`));
       return;
     }
-    if (mate) [styleBox(S.comps, S.modules, mod.id, stylesOf(mod.id)), adjustBox(S.comps, S.modules, mod.id)].forEach(x => x && root.appendChild(x));
+    if (mate) [styleBox(S.comps, S.modules, mod.id, stylesOf(mod.id)), fastenerBox(S.comps, S.modules, mod.id), adjustBox(S.comps, S.modules, mod.id)].forEach(x => x && root.appendChild(x));
     else root.appendChild(el('div', 'bench-note', '此接合保留原安裝資料；可拆下重新接合，或回設計修改零件。'));
   }
 

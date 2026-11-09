@@ -1,6 +1,14 @@
 # 教學與操作更新紀錄
 
 <a id="syringe-edit-connections"></a>
+## 2026-11-09：組立固定方式入口（2026.11.9.11）
+
+- 選面固定方式整併金屬角碼、榫槽＋M3鎖固與先只定位，移除重複勾選；原直角接口加入同名固定方式區及轉入選面的入口。列印角件仍限原直角接口，不能把未支援的六面列印角件視為完成。
+- 已接合板件可直接修改固定方式與位置；狀態依既有固定孔核對顯示，移除工程面板無條件寫「尚未固定」。固定方式切換清掉另一種候選孔槽，原作品確認才改；非直角角碼不再靜默降為只定位。
+- 原直角接口的固定孔確認延後到指標事件結束，核對前檢查來源、選取與候選版本；保留原確認規則。修正前原生確認框會使瀏覽器操作逾時，修正後Chrome正式入口及隔離頁均可確認與復原。
+- 10/10定向套件：tab-nut-connection、tab-nut-storage-export、face-candidate、face-bracket-holes、bench-bracket、bench-tilt、load-graph、mate-connect、mate-candidate、connection-reselect。證據：`output/fastener-choice/completion-tests/results.json`。
+- 瀏覽器：榫槽→只定位→保存重開保持選擇、角碼板不足拒絕、榫槽確認／取消／一次復原；直角接口取消不增undo、確認增1、正規化作品保存分享PASS、回復列印角件、轉入選面。正式blocks入口再核對金屬角碼與復原。390×844手機欄位無水平溢出（非實機觸控）。截圖：`output/fastener-choice/mobile.png`、`output/fastener-choice/desktop-edge.png`。
+
 ## 2026-11-09：針筒常用固定與改接（2026.11.9.10）
 
 - 舊固定方式藏在展開區、圖上重新接孔只在斷線時顯示；改為直接顯示雙孔固定／單孔可轉、在圖上更換推桿孔，孔名沿用第幾排／第幾孔。座標、左右耳及加工選項收合，未另開安裝流程。

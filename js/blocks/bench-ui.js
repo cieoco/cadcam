@@ -1,3 +1,4 @@
+import {FASTENER_CHOICES} from './fastener-choice.js';
 import { appendCollisionActions } from './collision-actions.js';
 import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 import {assemblyWork,mergeAssemblyWork} from './assembly-membership.js';
@@ -953,7 +954,9 @@ export function createBench(deps) {
       root.appendChild(el('div', 'bench-note', `間距 ${selection.gap} mm · 偏移 ${selection.offsetU} / ${selection.offsetV} mm`));
       root.appendChild(bigBtn('拆下重新選面', () => adjust('unmount')));
       root.appendChild(bigBtn('編輯機構', () => adjust('edit')));
-      root.appendChild(el('div', 'bench-note', '已定位，尚未固定。請配置角碼並確認固定孔。'));
+      root.appendChild(bigBtn('修改固定方式與位置', () => openDefaultFaceWizard(mod, true, true)));
+      const fixed = faceBracketStatus(S.comps,S.modules,S.topo.params,mod,{exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint});
+      root.appendChild(el('div', 'bench-note', fixed.fixed ? (selection.fastener ? '榫槽與五金已生成（試作）' : '角碼與固定孔已確認') : fixed.reason || '已定位，尚未固定。'));
       return;
     }
 
@@ -1041,15 +1044,18 @@ export function createBench(deps) {
       // E1：直角安裝的接合件（金屬角碼｜3D 列印），放在定位之後選擇。
       if (mod.mount.orient) {
         const cur = mod.mount.orient.joint?.kind === 'bracket-m3' ? 'bracket-m3' : 'printed';
-        const seg = el('div', 'bench-seg');
-        seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', '接合件');
-        [['bracket-m3', '🔩 金屬角碼'], ['printed', '🖨 3D 列印']].forEach(([kind, label]) => {
-          const b = bigBtn(label, () => adjust(`joint:${kind}`), 'bench-seg-btn' + (cur === kind ? ' is-on' : ''));
-          b.dataset.benchAction = `joint:${kind}`;
-          b.setAttribute('aria-pressed', String(cur === kind));
-          seg.appendChild(b);
-        });
-        sec.appendChild(seg);
+        const group = el('div', 'bench-seg');
+        group.setAttribute('role','group'); group.setAttribute('aria-label','固定方式');
+        for (const [kind,label] of FASTENER_CHOICES) {
+          const available = kind === 'bracket' || kind === 'printed';
+          const action = kind === 'bracket' ? 'bracket-m3' : kind;
+          const b = bigBtn(label, () => { const source = S.modules; setTimeout(() => { if (S.modules === source && st.selected === mod.id) adjust(`joint:${action}`); }, 0); }, 'bench-seg-btn' + (cur === action ? ' is-on' : ''));
+          b.setAttribute('aria-pressed',String(cur === action)); b.disabled = !available;
+          if(!available)b.title='請使用下方選面接合';
+          group.appendChild(b);
+        }
+        sec.appendChild(group);
+        sec.appendChild(bigBtn('改用選面接合（榫槽／只定位）', () => openDefaultFaceWizard(mod, true)));
         if (cur === 'printed') addActions(sec, [['tilt-', '傾斜 −15°'], ['tilt+', '傾斜 +15°']]);
       } else sec.appendChild(el('div', 'bench-note', '同平面接點對鎖，不使用直角角碼。'));
       root.appendChild(sec);

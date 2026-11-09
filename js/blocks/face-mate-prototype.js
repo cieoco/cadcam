@@ -1,3 +1,4 @@
+import {faceFastenerKind,faceFastenerSelection,fillFastenerChoices} from './fastener-choice.js';
 import {dimensionHandle} from './dimension-handle.js';
 import {renderTabNutDimensions} from './tab-nut-parameter-ui.js';
 import {TAB_NUT_DEFAULTS} from './tab-nut-geometry.js';
@@ -37,7 +38,7 @@ $('previewToggle').addEventListener('click', () => {
   requestAnimationFrame(preview);
 });
 let hasConfirmed = false, roughPlaced = false, configured = false, childConfirmed = false;
-let bracketPlan = null, jointSettings, useBracketHoles=true, fastenerKind='bracket', tabNutSettings={...TAB_NUT_DEFAULTS};
+let bracketPlan = null, jointSettings, fastenerKind='bracket', tabNutSettings={...TAB_NUT_DEFAULTS};
 $('fastenerKind').addEventListener('change',()=>{fastenerKind=$('fastenerKind').value;render();});
 for(const format of ['svg','dxf']){
  const button=document.createElement('button');button.type='button';button.textContent=`下載 3 mm 試片 ${format.toUpperCase()}`;button.style.minHeight='44px';
@@ -56,9 +57,8 @@ for(const [key,label,advanced] of tabNutFields){
  $(advanced?'tabNutAdvanced':'tabNutFields').append(l,input);
  if(key==='alongMm')signedNumberInput(input);
 }
-$('bracketHoles').addEventListener('change',()=>{useBracketHoles=$('bracketHoles').checked;render();});
 let parentCandidate=null,previewRequest=0,previewResultRequest=0,previewSignature='',previewTimer=null,candidateClosed=false;
-function integratedSelection(mate){const selected={...draft};delete selected.fastener;delete selected.brackets;if(fastenerKind==='tab-nut')selected.fastener={...tabNutSettings};else if(useBracketHoles&&Math.abs(mate.rotation[2][2])<1e-6)selected.brackets={enabled:true,offsets:{...bracketOffsets},childPart:children[draft.child].surface?.compId || 'frame'};return selected;}
+function integratedSelection(mate){return faceFastenerSelection(draft,fastenerKind,{offsets:bracketOffsets,childPart:children[draft.child].surface?.compId || 'frame',tabNut:tabNutSettings});}
 function requestCandidate(mate){
  if(!integrated||step!==3||!loadSession.ready)return;
  const selection=integratedSelection(mate),signature=JSON.stringify(selection);
@@ -473,7 +473,7 @@ function preview() {
   faceRelation.textContent = `${relation} · 間距 ${draft.gap} mm`;
   $('summary').textContent = `${relation}：${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
   const blocked=integrated && (step > 0 || choosingChild) && (!childConfirmed || !!children[draft.child].blockedReason);
-  const mate = solve();$('fastenerChoice').hidden=!integrated||step!==3;$('fastenerKind').value=fastenerKind;$('tabNutSettings').hidden=fastenerKind!=='tab-nut';if(fastenerKind!=='tab-nut')$('tabNutFeedback').hidden=true;$('bracketChoice').hidden=fastenerKind==='tab-nut'||!integrated||step!==3||!mate.ok||Math.abs(mate.rotation[2][2])>=1e-6;$('bracketHoles').checked=useBracketHoles;if(mate.ok && !blocked)requestCandidate(mate);$('next').disabled = blocked || !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || !!document.querySelector('input[aria-invalid="true"]');
+  const mate = solve();$('fastenerChoice').hidden=!integrated||step!==3;fillFastenerChoices($('fastenerKind'),fastenerKind,{printed:'僅支援直角接口'});$('fastenerHelp').textContent=fastenerKind==='none'?'只記錄組立位置，不新增固定孔或五金。':fastenerKind==='tab-nut'?'榫頭插入槽口，再用 M3 螺絲與螺母鎖固；尺寸與板厚需核對。':'在圖上拖曳角碼調位置，或點角碼輸入偏移；確認後加入兩板固定孔。';$('tabNutSettings').hidden=fastenerKind!=='tab-nut';if(fastenerKind!=='tab-nut')$('tabNutFeedback').hidden=true;if(mate.ok && !blocked)requestCandidate(mate);$('next').disabled = blocked || !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || [...document.querySelectorAll('input[aria-invalid="true"]')].some(input=>input.getClientRects().length);
   if(integrated&&step===3)$('next').textContent=candidateConfirmLabel(parentCandidate,parentCandidate?.selectionRevision!==previewSignature);
   if (mate.ok) scene(mate);
   else { $('mateOverlay').hidden = true; $('message').textContent = mate.reason; $('message').classList.add('error'); }
@@ -496,7 +496,7 @@ if (integrated) {
     mode = 'wizard';
     jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; choosingChild = false; configured = !!e.data.configured; childConfirmed=!!e.data.childConfirmed; roughPlaced = configured;
     bracketOffsets = { ...(draft.brackets?.offsets || {}) };
-    useBracketHoles=!configured||!!draft.brackets;fastenerKind=draft.fastener?'tab-nut':'bracket';tabNutSettings={...TAB_NUT_DEFAULTS,...draft.fastener};for(const input of $('tabNutSettings').querySelectorAll('input'))input.value=tabNutSettings[input.id.replace('tabNut-','')];
+    fastenerKind=faceFastenerKind(draft,configured);tabNutSettings={...TAB_NUT_DEFAULTS,...draft.fastener};for(const input of $('tabNutSettings').querySelectorAll('input'))input.value=tabNutSettings[input.id.replace('tabNut-','')];
     // 預設面僅作預選；只有明確重新調整位置才略過選面。
     if (e.data.startAtPlacement) step = 3;
     if (configured && !document.getElementById('optionalView')) {
