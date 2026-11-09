@@ -56,7 +56,9 @@ export function planSyringeInstallation(source,request,points=null,motion={}){
   const other={...next,pivotEar:-next.pivotEar},alt=comps.map(c=>c.id===next.id?other:c),retry=solveSyringe(alt,params,points,motion);
   if(retry.ok){comps.splice(0,comps.length,...alt);next=other;result=retry;}
  }
- if(result.ok){
+ // Existing edits may save a valid installation while other members remain unsolved.
+ const simulationIssue=!result.ok&&result.result&&request.allowUnsolved?result.message:null;
+ if(result.ok||simulationIssue){
   if(request.keepOldHoles&&old){const host=comps.find(c=>c.id===old.a.componentId),f=attachmentFrame(host,params);if(!host?.standardBlank||!f)return {ok:false,message:'保留已鑽孔目前需使用標準板材或桿件。'};
    const nodes=syringeClampFrameNodes(source.comps.filter(c=>c.type!=='syringe'||c.id===old.id),[host.p1,host.p2,host.p3].filter(Boolean));
    host.holes??=[];
@@ -65,7 +67,7 @@ export function planSyringeInstallation(source,request,points=null,motion={}){
   }
   const holes=planActuatorPlateHoles({...source,comps,params});if(!holes.ok)return holes;comps=holes.comps;next=comps.find(c=>c.id===next.id);
  }
- return {...result,comps,params,syringe:next};
+ return {...result,...(simulationIssue?{ok:true,simulationIssue,points:undefined}:{}),comps,params,syringe:next};
 }
 
 // Placement is visual only until a real fixed frame has been selected.

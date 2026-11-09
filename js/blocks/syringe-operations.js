@@ -77,3 +77,13 @@ export function advanceSyringe(extension,direction,seconds,stroke,speed=8){
   const p=((phase%(2*stroke))+2*stroke)%(2*stroke);
   return {extension:p<=stroke?p:2*stroke-p,direction:p<stroke?1:-1};
 }
+
+// Detach only the output connection, retaining the drawn endpoint and clamp.
+export function planSyringeDisconnect(source,id,points=null){
+ const comps=structuredClone(source.comps),c=comps.find(c=>c.id===id&&c.type==='syringe');
+ if(!c)return {ok:false,message:'找不到針筒。'};
+ const position=attachmentPoint(c.b,comps,source.params,points)||c.b.position;
+ if(!position||![position.x,position.y].every(Number.isFinite))return {ok:false,message:'找不到推桿位置，請先選擇有效接孔。'};
+ c.b={componentId:'',u:0,v:0,position:{...position}};
+ return {ok:true,comps,params:{...source.params},syringe:c,simulationIssue:'推桿尚未連接，請選孔接回後再播放。'};
+}

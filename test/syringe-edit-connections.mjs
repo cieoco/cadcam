@@ -50,14 +50,14 @@ const original=JSON.stringify(S.comps);
 button('單孔可轉').onclick();editor.sync(true);
 assert.equal(commits,0,'mode needing a different output is a draft, not an invalid write');
 assert.equal(button('單孔可轉').getAttribute('aria-pressed'),'true','requested mode remains visible while reconnecting');
-button('取消連接修改').onclick();assert.equal(JSON.stringify(S.comps),original);
+button('取消修改').onclick();assert.equal(JSON.stringify(S.comps),original);
 editor.close();
 const pivot=normalizeSnapshot(structuredClone(getExample('hydraulic-h08').snapshot));S.comps=pivot.comps;S.topo.params=pivot.params;S.fabrication=pivot.fabrication;
 const actuator=S.comps.find(c=>c.type==='syringe'),arm=S.comps.find(c=>c.id===actuator.b.componentId);arm.holes=[{id:'extra',type:'floating',u:12,v:0,diameter:3.2}];
 editor.open(actuator.id);editor.sync(true);
 const output=select('推桿連接孔');output.value=JSON.stringify({componentId:arm.id,u:12,v:0});output.onchange();editor.sync(true);
 assert.equal(commits,0,'output choice only previews');
-const confirm=button('確認連接修改')||button('確認更新固定孔');
+const confirm=button('確認套用');
 assert.ok(!confirm.parentElement.hidden,by(n=>n.className==='syringe-edit-status').textContent);
 confirm.onclick();assert.equal(commits,1);assert.equal(S.comps.find(c=>c.id===actuator.id).b.u,12);
 const roundtrip=normalizeSnapshot({comps:S.comps,params:S.topo.params});assert.equal(roundtrip.comps.find(c=>c.id===actuator.id).b.u,12);
@@ -90,12 +90,12 @@ const tip=walk(svg).find(n=>n.attrs['data-syringe-pick']==='Tip');
 svg.listeners.pointerdown[0]({clientX:Number(tip.attrs.cx),clientY:Number(tip.attrs.cy),preventDefault(){},stopImmediatePropagation(){}});
 assert.match(by(n=>n.className==='syringe-edit-status').textContent,/第2件.*雙孔固定/);
 assert.equal(JSON.stringify(S.comps),initialLinked);
-button('取消連接修改').onclick();editor.sync(true);
+button('取消修改').onclick();editor.sync(true);
 assert.equal(JSON.stringify(S.comps),initialLinked);
 output.value=JSON.stringify({componentId:'Intermediate',u:32,v:0});output.onchange();editor.sync(true);
 assert.match(by(n=>n.className==='syringe-edit-status').textContent,/第2件.*雙孔固定/);
 button('雙孔固定').onclick();editor.sync(true);
-const linkedConfirm=button('確認連接修改')||button('確認更新固定孔');
+const linkedConfirm=button('確認套用');
 assert.ok(linkedConfirm&&!linkedConfirm.parentElement.hidden,by(n=>n.className==='syringe-edit-status').textContent);
 linkedConfirm.onclick();
 assert.equal(commits,2);assert.equal(S.comps.find(c=>c.id==='H8Syringe').b.componentId,'Intermediate');
@@ -126,7 +126,7 @@ drag();assert.equal(JSON.stringify(S.comps),initialDrag);assert.equal(JSON.parse
 svg.listeners.pointercancel.forEach(f=>f(event(0,12)));assert.equal(commits,countBefore);assert.equal(JSON.parse(output.value).u,16);
 drag();svg.listeners.pointerup.forEach(f=>f(event(0,12)));
 assert.equal(commits,countBefore);assert.equal(JSON.stringify(S.comps),initialDrag);
-const dragConfirm=button('確認連接修改')||button('確認更新固定孔');assert.ok(!dragConfirm.parentElement.hidden,by(n=>n.className==='syringe-edit-status').textContent);dragConfirm.onclick();
+const dragConfirm=button('確認套用');assert.ok(!dragConfirm.parentElement.hidden,by(n=>n.className==='syringe-edit-status').textContent);dragConfirm.onclick();
 assert.equal(commits,countBefore+1);assert.equal(S.comps.find(c=>c.id==='H8Syringe').b.u,12);
 console.log('same-member overlap regression, snapped drag, cancel and one confirmed edit passed');
 // An incomplete mode is editable draft state; no invalid work is committed.
@@ -139,4 +139,12 @@ assert.equal(JSON.stringify(S.comps),modeBefore);assert.equal(commits,commitBefo
 button('雙孔固定').onclick();assert.equal(commits,commitBefore);
 console.log('incompatible mounting switch preserves mode, selected hole, options and undo state');
 
-button('取消連接修改').onclick();editor.sync(true);assert.equal(button('單孔可轉').getAttribute('aria-pressed'),'true');
+button('取消修改').onclick();editor.sync(true);assert.equal(button('單孔可轉').getAttribute('aria-pressed'),'true');
+
+const beforeDetach=JSON.stringify(S.comps),beforeCommits=commits;
+button('解除推桿連接').onclick();assert.equal(JSON.stringify(S.comps),beforeDetach,'disconnect preview is isolated');
+button('取消修改').onclick();assert.equal(JSON.stringify(S.comps),beforeDetach);
+button('解除推桿連接').onclick();button('確認套用').onclick();editor.sync(true);
+assert.equal(commits,beforeCommits+1);assert.equal(S.comps.find(c=>c.type==='syringe').b.componentId,'');
+assert.ok(button('在圖上連接推桿孔'));assert.ok(button('解除推桿連接').hidden);
+console.log('Disconnect preview, cancel and one confirmed write passed');

@@ -1,3 +1,4 @@
+import {syringeClampFrameNodes} from './syringe-shape.js';
 import {actuatorMountSettings} from './fabrication-profile.js';
 import {inspectBarFusion} from './bar-fusion-geometry.js';
 import { memberStock } from './member-stock.js';
@@ -216,7 +217,12 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     const fusion=comp.barFusion ? inspectBarFusion(list,comp,params,exp,orthoExtras) : null;
     if(fusion&&!fusion.ok)throw Error(fusion.reason);
     const hostGeometry = fusion ? fusion.geometry : hosted.has(comp.id) ? hostedBarGeometry(comp, seedPts, exp, hosted.get(comp.id), extraHolesOf(comp)) : null;
-    const part = memberPart(comp, 'member', hostGeometry || inspectLinkExport(comp, length, exp, extraHolesOf(comp)));
+    const geometry=hostGeometry || inspectLinkExport(comp, length, exp, extraHolesOf(comp));
+    for(const c of list.filter(c=>c.type==='syringe'&&c.b?.componentId===comp.id)){
+      const h={x:c.b.u,y:c.b.v,r:linkHole/2,id:`${c.id}_rod`,layer:'SYRINGE_ROD'};
+      if(!geometry.holes.some(q=>Math.hypot(q.x-h.x,q.y-h.y)<.001))geometry.holes.push(h);
+    }
+    const part = memberPart(comp, 'member', geometry);
     if(fusion?.frameThicknessMm)part.thicknessMm=fusion.frameThicknessMm;
     const joints=comp.barFusion ? [...new Set([...comp.barFusion.points.map(p=>p.id),...(comp.barFusion.framePointIds||[])])].map(id=>({id,holeDiameterMm:hostGeometry?.holes.find(h=>h.id===id)?.r*2||linkHole})) : pointsOf(comp, ['p1','p2'],linkHole);
     if(comp.barFusion){part.fusedMembers=comp.barFusion.members;for(const id of part.fusedMembers)partByComp.set(id,part);}
@@ -227,7 +233,14 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     addBody(key, part, joints.map(p=>p.id), comp);
   });
   plates.forEach(({ comp, points }) => {
-    const part = memberPart(comp, 'member', inspectPlateExport(comp, points, exp, hosted.get(comp.id), plateHolesOf(comp)));
+    const geometry = inspectPlateExport(comp, points, exp, hosted.get(comp.id), plateHolesOf(comp));
+    // The build list includes the same physical clamp holes as the export catalog.
+    for(const n of syringeClampFrameNodes(list.filter(c=>c.type!=='syringe'||c.a?.componentId===comp.id),[comp.p1,comp.p2,comp.p3].filter(Boolean))){
+      const old=geometry.holes.find(h=>Math.hypot(h.x-n.x,h.y-n.y)<.001);
+      if(old)old.r=Math.max(old.r,n.holeDiameterMm/2);
+      else geometry.holes.push({x:n.x,y:n.y,r:n.holeDiameterMm/2,id:n.id,layer:n.holeLayer});
+    }
+    const part = memberPart(comp, 'member', geometry);
     addPart(part, pointsOf(comp, ['p1', 'p2', 'p3'], linkHole));
     partByComp.set(comp.id, part);
     const key = groupKeyOf(comp, modById);

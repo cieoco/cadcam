@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import {pivotTurntableSnapshot} from '../js/blocks/disk-turntable-example.js';
+import {normalizeSnapshot,toSnapshot} from '../js/blocks/schema.js';
+import {planSyringeInstallation} from '../js/blocks/syringe-installation.js';
+import {solveSyringe,scanSyringe,planSyringeDisconnect} from '../js/blocks/syringe-operations.js';
+const base=normalizeSnapshot(pivotTurntableSnapshot),c=base.comps.find(c=>c.type==='syringe');
+base.comps.push({id:'Loose',type:'bar',name:'待連接桿',p1:{id:'Loose.A',type:'floating',x:200,y:0},p2:{id:'Loose.B',type:'floating',x:240,y:0},lenParam:'Loose.L',fixedLen:true});base.params['Loose.L']=40;
+const request={id:c.id,a:c.a,b:c.b,mountMode:c.mountMode,face:'back'};
+assert.equal(planSyringeInstallation(base,request).ok,false);
+const result=planSyringeInstallation(base,{...request,allowUnsolved:true});
+assert.ok(result.ok,result.message);assert.ok(result.simulationIssue);assert.equal(result.syringe.installation.face,'back');assert.equal(base.comps.find(o=>o.id===c.id).installation?.face==='back',false);
+assert.equal(scanSyringe(result.comps,result.params,c.id).ok,false,'playback still blocked');
+const reopened=normalizeSnapshot(toSnapshot(result.comps,{params:result.params},1,result));
+assert.equal(reopened.comps.find(o=>o.id===c.id).installation.face,'back');assert.equal(solveSyringe(reopened.comps,reopened.params).ok,false);
+assert.equal(planSyringeInstallation(base,{...request,allowUnsolved:true,spacerMm:-1}).ok,false,'invalid dimensions blocked');
+assert.equal(planSyringeInstallation(base,{...request,allowUnsolved:true,b:{componentId:'missing',u:0,v:0}}).ok,false,'missing owner blocked');
+console.log('Editable unsolved syringe: save/reopen, isolation, playback and invalid data guards passed');
+
+const detached=planSyringeDisconnect(base,c.id);
+assert.ok(detached.ok);assert.equal(detached.syringe.b.componentId,'');assert.ok(detached.syringe.b.position);
+assert.deepEqual(detached.syringe.a,c.a);assert.deepEqual(detached.syringe.spec,c.spec);
+assert.deepEqual(detached.comps.filter(o=>o.id!==c.id),base.comps.filter(o=>o.id!==c.id));
+assert.match(scanSyringe(detached.comps,detached.params,c.id).message,/推桿尚未連接/);
+const saved=normalizeSnapshot(toSnapshot(detached.comps,{params:detached.params},1,detached));
+assert.deepEqual(saved.comps.find(o=>o.id===c.id).b,detached.syringe.b);
+assert.ok(planSyringeInstallation(saved,{...request,allowUnsolved:true}).ok,'reconnect after reopen');
+console.log('Disconnect retains clamp, stock, other members and endpoint; save/reopen and reconnect passed');

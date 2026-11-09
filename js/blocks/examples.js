@@ -1,3 +1,4 @@
+import {adjustmentSnapshot} from './adjustment-example.js';
 import {authorExampleActuatorPlates} from './example-actuator-plates.js';
 import {blockifyBars} from './standard-blank.js';
 import { MAD_BOX_EXAMPLE } from './iq-mad-box-example.js';
@@ -1040,6 +1041,11 @@ for(const id of ['wiper-single','wiper-missing-coupler','fourbar-crank-rocker','
  example.snapshot=candidate.snapshot;
  example.adjustmentNote=(example.adjustmentNote||'')+' 標準座板與三列輸出板可沿原面板改孔數／尺寸；專用孔為待實量試作，軸長、五金與承載未核對。';
 }
+
+ALL_BLOCK_EXAMPLES.unshift({id:'adjustment-repair',title:'調整－待修理',
+  note:'本地協作範例：針筒安裝、換孔與桿長調整。保留原接法，逐步重現問題；非加工完成品。',snapshot:adjustmentSnapshot});
+EXAMPLE_LESSONS['adjustment-repair']={group:'challenge',level:'調整',use:'使用同一作品核對安裝與修改流程。',
+  try:['一次修改一項：固定方式、推桿接孔或桿長。','檢查提示、取消與復原；要保留調整結果請下載存檔。']};
 
 export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES;
 

@@ -69,6 +69,7 @@ export const CATALOG_FAMILIES = [
   family('pantograph', 'motion', '放大描點運動 · 縮放儀', '手動移動接點觀察二倍軌跡。', [variant('pantograph', '手動二倍放大描點', '手動調姿')]),
   family('jansen', 'walking', '追蹤足端步行軌跡 · Jansen', '單腿幾何試動；輪地接觸與整機行走未模擬。', [variant('jansen-leg', '連桿帶動步行腿')]),
   family('tools', 'tools', '工具與製作練習', '從空白開始，或核對板件接合試片。', [
+    variant('adjustment-repair', '調整－待修理', '待完成練習'),
     variant('empty-challenge', '從空白畫第一根桿', '待完成練習'), variant('tab-nut-m3', '3 mm／M3 榫槽接合試片', '固定組立')])
 ];
 

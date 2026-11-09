@@ -88,7 +88,7 @@ export function syringeIssues(c,comps,params) {
   if(!Number.isFinite(c.extension)||c.extension<0||c.extension>s?.stroke)issues.push('目前伸出量超出針筒有效行程。');
   for(const [key,label] of [['a','A'],['b','B']]){
     const ref=c[key],owner=comps.find(o=>o.id===ref?.componentId);
-    if(!ref||!Number.isFinite(ref.u)||!Number.isFinite(ref.v)||!attachmentFrame(owner,params))issues.push(`${label}端需要有效的機架、桿件或板件接點。`);
+    if(!ref||!Number.isFinite(ref.u)||!Number.isFinite(ref.v)||!attachmentFrame(owner,params))issues.push(key==='b'&&!ref?.componentId?'推桿尚未連接，請選孔接回後再播放。':`${label}端需要有效的機架、桿件或板件接點。`);
     if(owner?.type==='anchor'&&(ref.u!==0||ref.v!==0))issues.push(`${label}端固定支點不能有局部偏移，請選機架板。`);
     // 圓盤底板的固定環可放在板面內；輸出端仍須使用既有端孔。
     if(key==='a'&&owner?.type==='bar'&&owner.shape==='disk'){

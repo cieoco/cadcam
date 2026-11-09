@@ -7,7 +7,7 @@ import {SYRINGE_EAR_MM,attachmentPoint,syringeAttachmentHoles} from '../core/syr
 import {installationChoices,planPlacedSyringe,fixedEarRotation,outputHoleChecks} from './syringe-installation.js';
 import {syringePositionOnFrame} from './syringe-position.js';
 import {syringeClampFrameNodes,syringeShape} from './syringe-shape.js';
-import {scanSyringe} from './syringe-operations.js';
+import {scanSyringe,planSyringeDisconnect} from './syringe-operations.js';
 import {commitMountingEdit,confirmMountingChange,mountingWork,mountingCandidate} from './mounting-review-ui.js';
 import {holeName} from './syringe-install-steps.js';
 import {signedNumberInput,showNumber,readNumber,formatNumber} from './numeric-input.js';
@@ -28,8 +28,8 @@ export function createSyringeEditor(h){
  const approval=el('div',null,panel),confirmHoles=el('button','確認更新固定孔',approval),cancelHoles=el('button','取消修改',approval);approval.hidden=true;
  let awaiting=null;
  const revision=()=>JSON.stringify([S.comps,S.topo.params,S.modules,S.fabrication,S.designFocus,S.mode]);
- const discard=()=>{awaiting=null;approval.hidden=true;};
- confirmHoles.onclick=()=>{const candidate=awaiting;discard();clearPreview();if(!candidate)return;if(candidate.revision!==revision()){message('作品已變更，請重新調整固定環。');sync(true);return;}pending={};pickingKey=null;clearPicks();message('');h.commit(candidate.r.comps,candidate.r.params,candidate.r);h.draw();};
+ const discard=()=>{awaiting=null;};
+ confirmHoles.onclick=()=>{const candidate=awaiting;discard();clearPreview();if(!candidate){apply({}, {preview:true});h.draw();return;}if(candidate.revision!==revision()){message('作品已變更，請重新調整固定環。');sync(true);return;}pending={};pickingKey=null;clearPicks();message('');h.commit(candidate.r.comps,candidate.r.params,candidate.r);message(candidate.r.simulationIssue?'設定已保存，模擬待修正：'+candidate.r.simulationIssue:'設定已套用。');h.draw();};
  cancelHoles.onclick=()=>{pending={};pickingKey=null;clearPicks();discard();clearPreview();message('已取消修改。');sync(true);h.draw();};
  const more=el('details',null,panel);el('summary','連接與其他設定',more);
  const connections=el('div',null,more),frame=field('固定在哪裡',connections,'select'),output=field('推桿連接孔',quick,'select'),ear=field('固定耳',connections,'select'),face=field('正反面',connections,'select');
@@ -39,8 +39,9 @@ export function createSyringeEditor(h){
  el('p',`雙耳孔距 ${2*SYRINGE_EAR_MM} mm。現有參考環壁與耳孔／M3 墊片有干涉，固定架待改製核對。`,more);
  const offset=field('固定環距筒尾 (mm)',more),spacer=field('套筒高度 (mm，空白自動)',more);
  const reconnect=el('button','在圖上更換推桿孔',quick);
+ const disconnect=el('button','解除推桿連接',quick);
  const cancelPick=el('button','取消連接修改',quick);cancelPick.hidden=true;
- output.closest('label').before(reconnect);quick.after(status,approval);
+ output.closest('label').before(reconnect);head.after(approval);quick.after(status);approval.hidden=false;confirmHoles.textContent='確認套用';
  const scan=el('button','檢查全行程',more),advanced=el('button','尺寸與加工設定',more),remove=el('button','刪除針筒',more);
  let selected=null,focus=null,choiceKey='',draft=false,pickingKey=null,pending={};
  const current=()=>h.comps().find(c=>c.id===selected&&c.type==='syringe');
@@ -60,15 +61,15 @@ export function createSyringeEditor(h){
  function apply(patch,{preview=false}={}){
   const c=current();if(!c)return false;preview=preview||Object.keys(pending).length>0;if(preview)pending={...pending,...patch};discard();clearPreview();h.pause();
   const source={comps:structuredClone(h.comps()),params:{...h.params()},fabrication:structuredClone(S.fabrication),modules:S.modules},points=h.points();
-  const request={id:c.id,mountMode:c.mountMode,pivotEar:c.pivotEar,frameId:c.a.componentId,position:attachmentPoint(c.a,source.comps,source.params,points)||c.a.position,b:{...c.b},axisDeg:c.axisDeg??0,extension:c.extension,face:c.installation?.face||'front',spacerMm:c.installation?.spacerMm??null,keepOldHoles:drilled.checked,...pending,...patch};
+  const request={id:c.id,mountMode:c.mountMode,pivotEar:c.pivotEar,frameId:c.a.componentId,position:attachmentPoint(c.a,source.comps,source.params,points)||c.a.position,b:{...c.b},axisDeg:c.axisDeg??0,extension:c.extension,face:c.installation?.face||'front',spacerMm:c.installation?.spacerMm??null,keepOldHoles:drilled.checked,...pending,...patch,allowUnsolved:true};
   if(!source.comps.some(o=>o.id===request.frameId)||!source.comps.some(o=>o.id===request.b.componentId)){pending={...pending,...patch};message('尚未接好：請選固定位置及推桿接孔。');return false;}
   if(!Object.keys(pending).length&&Object.entries(patch).every(([k,v])=>JSON.stringify(v)===JSON.stringify(k==='position'?attachmentPoint(c.a,source.comps,source.params,points):k==='barrelOffsetMm'?c.installation?.barrelOffsetMm??c.spec.bodyLength*.7:k==='spacerMm'?c.installation?.spacerMm??null:k==='frameId'?c.a.componentId:k==='face'?c.installation?.face||'front':c[k]))){message('');sync(true);return true;}
   const owner=source.comps.find(o=>o.id===request.frameId),p=request.position,q=p&&syringePositionOnFrame(owner,source.params,points,p,source);
   if(!p||![p.x,p.y,request.axisDeg].every(Number.isFinite)||!q||Math.hypot(p.x-q.x,p.y-q.y)>1e-6){message('位置需在所選固定零件內，請調整數字或拖動固定環。');sync(true);return false;}
   const r=planPlacedSyringe(source,request,points,h.motion());
   if(!r.ok||r.temporary){message((preview?'尚未套用：':'')+r.message);sync(true);return false;}
-  if(!confirmMountingChange(mountingWork(S),mountingCandidate(mountingWork(S),r,h.comps()),{notify:message,ask:()=>{awaiting={r,revision:revision()};approval.hidden=false;message('固定孔將依候選位置更新；請確認，或取消保留原孔。');return false;}})){sync(true);return false;}
-  if(preview){awaiting={r,revision:revision()};approval.hidden=false;confirmHoles.textContent='確認連接修改';message('已預覽連接修改，確認後套用。');sync(true);h.draw();return true;}
+  if(!confirmMountingChange(mountingWork(S),mountingCandidate(mountingWork(S),r,h.comps()),{notify:message,ask:()=>{awaiting={r,revision:revision()};approval.hidden=false;message('固定孔將依候選位置更新；確認後套用。'+(r.simulationIssue?' 模擬待修正：'+r.simulationIssue:''));return false;}})){sync(true);return false;}
+  if(preview){awaiting={r,revision:revision()};approval.hidden=false;confirmHoles.textContent='確認套用';message(r.simulationIssue?'設定可保存；模擬待修正：'+r.simulationIssue:'已預覽連接修改，確認後套用。');sync(true);h.draw();return true;}
   pending={};pickingKey=null;message('');h.commit(r.comps,r.params,r);return true;
  }
  x.onchange=y.onchange=()=>apply({position:{x:readNumber(x),y:readNumber(y)}});
@@ -79,7 +80,9 @@ export function createSyringeEditor(h){
  ear.onchange=()=>{pending={...pending,pivotEar:Number(ear.value)};apply({}, {preview:true});h.draw();};face.onchange=()=>apply({face:face.value});
  frame.onchange=()=>{const c=current(),owner=h.comps().find(o=>o.id===frame.value),p=c&&(attachmentPoint(c.a,h.comps(),h.params(),h.points())||c.a.position),q=p&&syringePositionOnFrame(owner,h.params(),h.points(),p,{comps:h.comps(),params:h.params(),fabrication:S.fabrication});if(q)apply({frameId:frame.value,position:q});};
  function chooseOutput(b){pending={...pending,b};pickingKey=null;apply({}, {preview:true});h.draw();explainOutput(b);if(sheetMode())setSheet('half');}
- output.onchange=()=>{if(output.value)chooseOutput(JSON.parse(output.value));};
+ function detachOutput(){const c=current();if(!c)return;h.pause();const r=planSyringeDisconnect({comps:h.comps(),params:h.params()},c.id,h.points());if(!r.ok){message(r.message);return;}pending={b:r.syringe.b};pickingKey=null;clearPicks();clearPreview();awaiting={r,revision:revision()};message('確認後解除推桿連接；固定環與其他桿件保留。');sync(true);h.draw();}
+ disconnect.onclick=detachOutput;
+ output.onchange=()=>{if(output.value)chooseOutput(JSON.parse(output.value));else detachOutput();};
  scan.onclick=()=>{const c=current();if(c){h.pause();const r=scanSyringe(h.comps(),h.params(),c.id,.5,h.motion());message(r.ok?r.message:`${r.atMm==null?'':formatNumber(r.atMm)} mm：${r.message}`);}};
  advanced.onclick=()=>{const c=current();close();h.advanced(c);};
  remove.onclick=()=>{const c=current();if(!c)return;if(!commitMountingEdit(S,d=>{d.comps=d.comps.filter(o=>o.id!==c.id);},{pushUndo:h.pushUndo,notify:message}))return;close();h.rebuild();h.draw();h.save();};
@@ -102,7 +105,7 @@ export function createSyringeEditor(h){
   const choices=installationChoices(comps,params),key=JSON.stringify([editMode,params,choices.frames.map(o=>[o.id,o.name]),choices.rods.map(o=>[o.id,o.name,params[o.lenParam]])]);
   if(key!==choiceKey){choiceKey=key;frame.replaceChildren();output.replaceChildren();opt(frame,'未連接','');opt(output,'未連接','');choices.frames.forEach(o=>opt(frame,o.name||o.id,o.id));choices.rods.forEach(o=>syringeAttachmentHoles(o,params).sort((a,b)=>a.v-b.v||a.u-b.u).forEach(h=>opt(output,holeName(ownerName(o),syringeAttachmentHoles(o,params),h),JSON.stringify({componentId:o.id,u:h.u,v:h.v}))));}
   frame.value=pending.frameId??c.a.componentId;const ref=pending.b||c.b;output.value=ref.componentId?JSON.stringify({componentId:ref.componentId,u:ref.u,v:ref.v}):'';
-  const missing=['a','b'].filter(k=>!attachmentPoint(c[k],comps,params,points));reconnect.hidden=false;cancelPick.hidden=!!awaiting||(!pickingKey&&!Object.keys(pending).length);done.textContent=awaiting||Object.keys(pending).length?'關閉（不套用）':'完成';reconnect.textContent=pickingKey?'正在選孔…':'在圖上更換推桿孔';
+  const missing=['a','b'].filter(k=>!attachmentPoint(c[k],comps,params,points));reconnect.hidden=false;cancelPick.hidden=true;done.textContent=awaiting||Object.keys(pending).length?'關閉（不套用）':'完成';disconnect.hidden=!ref.componentId;reconnect.textContent=pickingKey?'正在選孔…':ref.componentId?'在圖上更換推桿孔':'在圖上連接推桿孔';
   clearPicks();if(pickingKey)drawPickHoles(c,editMode);
   if(missing.length){h.svg.querySelectorAll('[data-dimension-handle^="syringe-"]').forEach(n=>n.remove());return;}
   if(awaiting){h.svg.querySelectorAll('[data-dimension-handle^="syringe-"]').forEach(n=>n.remove());previewCandidate(awaiting.r);return;}

@@ -11,6 +11,7 @@ import {encodeSnapshot,decodeShareString} from '../js/share-codec.js';
 import {prepareScopedExport} from '../js/blocks/export-scope.js';
 import {FABRICATION_DEFAULTS} from '../js/blocks/fabrication-profile.js';
 const groups={
+ adjustment:['adjustment-repair'],
  hydraulic:['guided-scissor-lift','hydraulic-h01','hydraulic-h02','hydraulic-h03','hydraulic-h05','hydraulic-h06','hydraulic-h07','hydraulic-h08'],
  incomplete:['hydraulic-h01-practice','hydraulic-h02-practice','hydraulic-h03-practice','wiper-missing-coupler','fourbar-missing-coupler'],
  manual:['pantograph','iq-wheel-grabber'],empty:['empty-challenge'],static:['tab-nut-m3','iq-passive-fork','iq-passive-spatula','iq-passive-combined'],
@@ -30,6 +31,7 @@ for(const e of BLOCK_EXAMPLES){
  if(groups.empty.includes(e.id))assert.equal(issue.code,'invalid_pose');
  else if(e.id==='hydraulic-h03-practice')assert.equal(issue.code,'missing_points'); // No input yet: both jaw branches lack solved points.
  else if([...groups.incomplete,...groups.manual].includes(e.id))assert.equal(issue.code,'underconstrained');
+ else if(groups.adjustment.includes(e.id))assert.equal(issue,null,e.id+' editable starting pose; full stroke is not promised');
  else if(groups.static.includes(e.id))assert.equal(issue,null,e.id+' fixed assembly pose');
  else if(groups.hydraulic.includes(e.id)){
    const c=s.comps.find(c=>c.type==='syringe');assert.ok(scanSyringe(s.comps,s.params,c.id).ok,e.id+' stroke');
@@ -54,7 +56,7 @@ for(const e of BLOCK_EXAMPLES){
    else if(groups.hydraulic.includes(e.id)){const out=prepareScopedExport(exportSource,{scope:'assembly'},format);assert.ok(out.files.length&&out.files.every(f=>!/(NaN|Infinity)/.test(f.text)),e.id+' verified boards');assert.ok(out.hardware.some(n=>n.kind==='purchased'),e.id+' hardware exclusion disclosed');}
    else if(groups.empty.includes(e.id))assert.throws(()=>prepareScopedExport(exportSource,{scope:'assembly'},format),/沒有零件/);
    else {
-     const out=prepareScopedExport(exportSource,{scope:'assembly'},format);
+     const out=prepareScopedExport(exportSource,{scope:groups.adjustment.includes(e.id)?'design':'assembly'},format);
      assert.ok(out.files.length&&out.files.every(f=>!/(NaN|Infinity)/.test(f.text)),e.id+' finite '+format);
      if(['slider-crank','quick-return','slider-crank-practice','cam-follower','pulley-belt','competition-roller-intake'].includes(e.id))assert.ok(out.notices.some(n=>n.includes('未提供獨立板材檔')),e.id+' partial export is disclosed');
    }

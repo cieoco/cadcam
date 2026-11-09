@@ -1062,7 +1062,8 @@ const { selectTriangle, startShapeDrag, deleteShapeVertex, updatePlateShapeContr
         triParamFor, setTriSide, changeTriSide } = plateEditor;
 const memberEditor = createMemberEditor({
   validateCandidate: draft => {
-    const ids=new Set(viewComps().map(c=>c.id)),comps=draft.comps.filter(c=>ids.has(c.id));
+    // An intentionally detached syringe cannot constrain a member being edited.
+    const ids=new Set(viewComps().map(c=>c.id)),comps=draft.comps.filter(c=>ids.has(c.id)&&!(c.type==='syringe'&&!c.b?.componentId&&c.b?.position));
     try{
       const solved=solveTopology(compileTopology(comps,{...S.topo,params:{...draft.params}},new Set()),{thetaDeg:S.theta,motorAngles:motorAnglesNow()});
       return solved?.isValid===false ? `孔距未修改：${solved.reason||solved.errorReason||'此尺寸無法維持目前連接與行程。'}` : '';

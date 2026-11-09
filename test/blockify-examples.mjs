@@ -68,8 +68,11 @@ if(WRITE){
  writeFileSync(FIXTURE,JSON.stringify(out)+'\n');console.log('fixture written',Object.keys(out.examples).length);process.exit(0);
 }
 const before=JSON.parse(readFileSync(FIXTURE,'utf8')).examples,summary={examples:0,parts:0},left={};
-assert.deepEqual(BLOCK_EXAMPLES.map(e=>e.id).sort(),Object.keys(before).sort(),'same example catalog');
-for(const e of BLOCK_EXAMPLES){
+// The adjustment case was added after the frozen conversion baseline.
+// Its geometry/export coverage lives in used-holes and the syringe edit tests.
+const baselineExamples=BLOCK_EXAMPLES.filter(e=>e.id!=='adjustment-repair');
+assert.deepEqual(baselineExamples.map(e=>e.id).sort(),Object.keys(before).sort(),'same baseline example catalog');
+for(const e of baselineExamples){
  const old=before[e.id],m=measure(e),converted=Object.keys(m.parts).filter(id=>m.parts[id].std&&old.parts[id]);
  for(const c of m.s.comps){const r=reason(e,c,m.s);if(!r||converted.includes(c.id))continue;assert.notEqual(r,'UNLISTED',`${e.id}:${c.id} could be a standard bar but has no listed reason`);(left[r]||=new Set).add(`${e.id}:${c.id}`);}
  if(!converted.length){assert.equal(sha(e.snapshot),old.snapshot,e.id+' untouched');continue;}

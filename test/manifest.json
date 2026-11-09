@@ -68,6 +68,7 @@
     "test/member-frame.mjs",
     "test/syringe-end-resize.mjs",
     "test/syringe-standard-resize.mjs",
+    "test/syringe-edit-unsolved.mjs",
     "test/rigid-groups.mjs",
     "test/performance-fixtures.mjs",
     "test/assembly-lesson-wizard.mjs",
