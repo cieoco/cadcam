@@ -78,7 +78,8 @@ export function createSyringeEditor(h){
  spacer.onchange=()=>apply({spacerMm:spacer.value.trim()===''?null:readNumber(spacer)});
  ear.onchange=()=>{pending={...pending,pivotEar:Number(ear.value)};apply({}, {preview:true});h.draw();};face.onchange=()=>apply({face:face.value});
  frame.onchange=()=>{const c=current(),owner=h.comps().find(o=>o.id===frame.value),p=c&&(attachmentPoint(c.a,h.comps(),h.params(),h.points())||c.a.position),q=p&&syringePositionOnFrame(owner,h.params(),h.points(),p,{comps:h.comps(),params:h.params(),fabrication:S.fabrication});if(q)apply({frameId:frame.value,position:q});};
- output.onchange=()=>{if(output.value){const b=JSON.parse(output.value);pending={...pending,b};pickingKey=null;apply({}, {preview:true});h.draw();explainOutput(b);}};
+ function chooseOutput(b){pending={...pending,b};pickingKey=null;apply({}, {preview:true});h.draw();explainOutput(b);if(sheetMode())setSheet('half');}
+ output.onchange=()=>{if(output.value)chooseOutput(JSON.parse(output.value));};
  scan.onclick=()=>{const c=current();if(c){h.pause();const r=scanSyringe(h.comps(),h.params(),c.id,.5,h.motion());message(r.ok?r.message:`${r.atMm==null?'':formatNumber(r.atMm)} mm：${r.message}`);}};
  advanced.onclick=()=>{const c=current();close();h.advanced(c);};
  remove.onclick=()=>{const c=current();if(!c)return;if(!commitMountingEdit(S,d=>{d.comps=d.comps.filter(o=>o.id!==c.id);},{pushUndo:h.pushUndo,notify:message}))return;close();h.rebuild();h.draw();h.save();};
@@ -123,6 +124,10 @@ export function createSyringeEditor(h){
   };
   dimensionHandle(h.svg,{key:'syringe-position',label:c.mountMode==='pivot'?'轉軸':'固定環',point:project(p),direction:{x:1,y:0},value:0,step:1,cancel:reset,plane:{value:p,fromScreen:q=>View.worldFromScreen(q.x,q.y),project,constrain:q=>syringePositionOnFrame(owner,params,points,q,{comps,params,fabrication:S.fabrication})||p,preview:q=>{draft=true;previewMount(q);showNumber(x,q.x);showNumber(y,q.y);if(line){const a=points[owner.p1.id]||owner.p1;showNumber(along,Math.hypot(q.x-a.x,q.y-a.y));}},commit:q=>accept({position:q})}});
   const unit=View.getScale(),pixel=unit*Math.hypot(h.svg.getScreenCTM().a,h.svg.getScreenCTM().b),at=d=>({x:shape.a.x+u.x*d,y:shape.a.y+u.y*d});
+  // Same-member relocation uses the same candidate as the existing hole list.
+  const rod=comps.find(o=>o.id===c.b.componentId),holes=syringeAttachmentHoles(rod,params).filter(q=>c.mountMode==='pivot'||['p1','p2'].includes(q.key)).map(q=>({ref:{componentId:rod.id,u:q.u,v:q.v},point:attachmentPoint({componentId:rod.id,u:q.u,v:q.v},comps,params,points)})).filter(q=>q.point);
+  const nearest=q=>holes.reduce((best,h)=>!best||Math.hypot(q.x-h.point.x,q.y-h.point.y)<Math.hypot(q.x-best.point.x,q.y-best.point.y)?h:best,null);
+  if(holes.length>1)dimensionHandle(h.svg,{key:'syringe-output',label:'推桿接孔',point:project(shape.b),direction:{x:1,y:0},value:0,activate:()=>output.focus(),cancel:()=>{output.value=JSON.stringify(c.b);message('');reset();h.draw();},plane:{value:shape.b,fromScreen:q=>View.worldFromScreen(q.x,q.y),project,constrain:q=>nearest(q).point,preview:q=>{draft=true;const b=nearest(q).ref;output.value=JSON.stringify(b);message('沿原零件選孔；放開後預覽，確認才套用。');},commit:q=>{draft=false;if(base!==JSON.stringify([S.comps,S.topo.params,S.modules,S.fabrication,S.designFocus,S.mode])||!current()){h.draw();return;}const b=nearest(q).ref;if(b.u===c.b.u&&b.v===c.b.v){message('');h.draw();return;}chooseOutput(b);}}});
   // Offset from the output hole, so pulling the stroke cannot steal joint selection.
   const strokePoint={x:shape.b.x-u.y*48/pixel,y:shape.b.y+u.x*48/pixel};
   const leader=document.createElementNS('http://www.w3.org/2000/svg','line'),start=project(shape.b),end=project(strokePoint);
@@ -177,8 +182,9 @@ export function createSyringeEditor(h){
   const c=current();if(!c)return;
   const hits=pickHoles(c,pending.mountMode||c.mountMode).map(pick=>{const p=project(pick.point),q=new DOMPoint(p.x,p.y).matrixTransform(h.svg.getScreenCTM());return {...pick,distance:Math.hypot(q.x-e.clientX,q.y-e.clientY)};}).filter(p=>p.distance<=24).sort((a,b)=>a.distance-b.distance);
   if(!hits.length){message('請點橘色可用孔；也可從「推桿連接孔」清單選擇。');return;}
-  if(hits[1]&&Math.abs(hits[1].distance-hits[0].distance)<2){message(`重疊孔：${[...new Set(hits.filter(p=>p.distance-hits[0].distance<2).map(p=>ownerName(p.owner)))].join('、')}。請在「推桿連接孔」指定零件。`);output.focus();return;}
-  const pick=hits[0],patch=pickingKey==='a'?{frameId:pick.owner.id,position:pick.point}:{b:pick.ref};
+  const closeHits=hits.filter(p=>p.distance-hits[0].distance<2),usable=closeHits.filter(p=>p.usable),candidates=usable.length?usable:closeHits;
+  if(candidates.length>1){message(`重疊孔：${[...new Set(candidates.map(p=>ownerName(p.owner)))].join('、')}。請在「推桿連接孔」指定零件。`);output.focus();return;}
+  const pick=candidates[0],patch=pickingKey==='a'?{frameId:pick.owner.id,position:pick.point}:{b:pick.ref};
   pending={...pending,...patch};pickingKey=null;apply({}, {preview:true});h.draw();
   if(patch.b)explainOutput(patch.b);
  },true);
