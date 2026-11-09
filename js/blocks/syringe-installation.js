@@ -13,6 +13,11 @@ export function installationChoices(comps,params){
  const rods=comps.filter(c=>['bar','triangle'].includes(c.type)&&!isFixedFrame(c,comps));
  return {frames,rods};
 }
+// 推桿孔預查：只看零件怎麼接（不求解），與固定環距離有關的失敗留到 ③ 調位置。
+export function outputHoleModes(comps,params,frameId,b){
+ const a={componentId:frameId,u:0,v:0},works=r=>!!r.ok||r.reason==='distance';
+ return {'fixed-axis':works(placeFixedSyringe(comps,params,null,a,b)),pivot:works(placePivotSyringe(comps,params,null,a,b))};
+}
 export function planSyringeInstallation(source,request,points=null,motion={}){
  let comps=structuredClone(source.comps),params={...source.params};
  const old=request.id?comps.find(c=>c.id===request.id&&c.type==='syringe'):null;

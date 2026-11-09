@@ -4,7 +4,7 @@ import {SYRINGE_DEMO,SYRINGE_EAR_MM,attachmentFrame,attachmentPoint,fixedSyringe
 // 這裡找出輸出擺臂、算出軸向與最短孔距，回傳可交給設定視窗的候選針筒。
 export const MIN_LMIN_MM=40; // 筒身最短孔距下限：低於此值筒身放不下
 const EPS=1e-6;
-const fail=message=>({ok:false,message});
+const fail=(message,reason)=>reason?{ok:false,message,reason}:{ok:false,message};
 export const isFixedFrame=(o,comps)=>{const ids=fixedSyringePointIds(Array.isArray(comps)?comps:[o].filter(Boolean));return !!o?.p1&&[o.p1,...(o.type==='anchor'?[]:[o.p2,o.p3].filter(Boolean))].every(p=>ids.has(p.id));};
 // 桿件端孔：u=0 為第一孔，u=桿長 為第二孔；其餘位置回 null。
 export function barEnd(owner,params,ref){
@@ -28,7 +28,7 @@ export function placeFixedSyringe(comps,params,points,aRef,bRef,{extension=10}={
   const a=attachmentPoint(aRef,comps,params,points),b=attachmentPoint({...bRef},comps,params,points);
   if(!a||!b||![a.x,a.y,b.x,b.y].every(Number.isFinite))return fail('找不到有效的安裝點，請重新點選。');
   const stroke=20,ext=Math.max(0,Math.min(stroke,Number(extension)||0)),distance=Math.hypot(b.x-a.x,b.y-a.y),lmin=distance-ext;
-  if(!(lmin>=MIN_LMIN_MM))return fail(`管夾離推桿接點太近：距離 ${distance.toFixed(1)} mm，筒身最短孔距需至少 ${MIN_LMIN_MM} mm；請把管夾往後移。`);
+  if(!(lmin>=MIN_LMIN_MM))return fail(`管夾離推桿接點太近：距離 ${distance.toFixed(1)} mm，筒身最短孔距需至少 ${MIN_LMIN_MM} mm；請把管夾往後移。`,'distance');
   let n=1;while(comps.some(o=>o.id===`Syringe${n}`))n++;
   return {ok:true,syringe:{type:'syringe',id:`Syringe${n}`,mountMode:'fixed-axis',appearance:'flat-rod',axisDeg:Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI,outputId:output.id,
     a:{componentId:ownerA.id,u:aRef.u,v:aRef.v},b:{componentId:ownerB.id,u:bRef.u,v:bRef.v},
@@ -45,7 +45,7 @@ export function placePivotSyringe(comps,params,points,aRef,bRef,{extension=10,pi
  const a=attachmentPoint(aRef,comps,params,points),b=attachmentPoint(bRef,comps,params,points);
  if(!a||!b)return fail('找不到有效的安裝點。');
  const stroke=20,ext=Math.max(0,Math.min(stroke,Number(extension)||0)),distance=Math.hypot(b.x-a.x,b.y-a.y),lmin=Math.sqrt(Math.max(0,distance*distance-SYRINGE_EAR_MM*SYRINGE_EAR_MM))-ext;
- if(!(lmin>=MIN_LMIN_MM))return fail('固定環離推桿孔太近，請調整支點位置。');
+ if(!(lmin>=MIN_LMIN_MM))return fail('固定環離推桿孔太近，請調整支點位置。','distance');
  let n=1;while(comps.some(c=>c.id===`Syringe${n}`))n++;
  return {ok:true,syringe:{type:'syringe',id:`Syringe${n}`,mountMode:'pivot',appearance:'flat-rod',pivotEar:pivotEar===-1?-1:1,a:{...aRef},b:{...bRef},spec:{...SYRINGE_DEMO,name:'雙耳固定環只鎖一耳／20 mm 教學區間（未實測）',outerDiameter:17.5,bodyLength:72,rodDiameter:8,lmin,stroke,calibrated:false},extension:ext,branch:1}};
 }

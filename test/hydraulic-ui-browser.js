@@ -28,11 +28,11 @@ try{
   const install=()=>document.querySelector('#syringeInstallation[open]');
   const choose=(label,value)=>{const n=install().querySelector(`[aria-label="${label}"]`);if(n.closest('details'))n.closest('details').open=true;n.focus();n.value=value;n.dispatchEvent(new Event(n.tagName==='SELECT'?'change':'input',{bubbles:true}));};
   const press=text=>[...install().querySelectorAll('button')].find(b=>b.textContent===text).click();
-  choose('筒身固定在哪個零件？',`H${num}Frame`);
+  choose('針筒固定的零件',`H${num}Frame`);
   choose('固定位置 X (mm)','-');
   assert(install().querySelector('[aria-label="固定位置 X (mm)"]').value==='-','partial minus survives editing');
   choose('固定位置 X (mm)',x);choose('固定位置 Y (mm)',y);choose('推進方向角度 (°)',angle);press('移到所選機架');
-  choose('推桿接哪個零件？',num===3?'H3Upper':`H${num}Coupler`);choose('連接端孔','0');press('檢查全行程');
+  choose('推桿接的零件',num===3?'H3Upper':`H${num}Coupler`);choose('推桿接的孔','0');press('檢查全行程');
   assert(install().textContent.includes('41 點幾何採樣通過'),`H0${num} student placement full stroke`);press('確認安裝');
   assert(S.comps.filter(c=>c.type==='syringe').length===1,`H0${num} student installation committed`);
   api.reopen(decodeShareString(encodeSnapshot(api.snapshot())));
@@ -112,7 +112,7 @@ try{
    canvas.querySelector('[data-install-member="H1Frame"]').dispatchEvent(new PointerEvent('pointerdown',{clientX:p.x,clientY:p.y,pointerId:17,pointerType:'touch',bubbles:true}));
    canvas.dispatchEvent(new PointerEvent('pointerup',{pointerId:17,bubbles:true}));
   };
-  const connect=()=>{select('筒身固定在哪個零件？','H1Frame');put();input('推進方向角度 (°)','0');select('推桿接哪個零件？','H1Coupler');select('連接端孔','0');};
+  const connect=()=>{select('針筒固定的零件','H1Frame');put();input('推進方向角度 (°)','0');select('推桿接的零件','H1Coupler');select('推桿接的孔','0');};
   await addFixed();
   const quickSvg=q('#syringeInstallation[open] svg'),seat=blank.comps.find(c=>c.id==='H1Frame').p1;
   const screen=new DOMPoint(seat.x,-seat.y).matrixTransform(quickSvg.getScreenCTM());
@@ -124,9 +124,9 @@ try{
   assert(Math.abs(S.comps.find(c=>c.type==='syringe')?.axisDeg)<1e-6,'quick direction follows the picked hole');b.undo();
   assert(JSON.stringify(api.snapshot())===original,'quick syringe installation has one undo');
   await addFixed();assert(!!q('#syringeInstallation[open]'),'new fixed syringe opens actuator placement');
-  assert(!q('#syringeInstallation[open] [aria-label="筒身固定在哪個零件？"]').closest('section').hidden,'frame selection is available in the same form');
+  assert(!q('#syringeInstallation[open] [aria-label="針筒固定的零件"]').closest('section').hidden,'frame selection is available in the same form');
   assert([...q('#syringeInstallation[open]').querySelectorAll('button')].find(n=>n.textContent==='確認安裝').disabled,'cannot place actuator before selecting frame');
-  select('筒身固定在哪個零件？','H1Frame');put();input('推進方向角度 (°)','0');
+  select('針筒固定的零件','H1Frame');put();input('推進方向角度 (°)','0');
   const draftSvg=q('#syringeInstallation[open] svg').innerHTML;
   assert(q('#syringeInstallation[open] [aria-label="試動伸出量 (mm)"]').disabled,'unmounted actuator cannot be trial driven');
   assert([...q('#syringeInstallation[open]').querySelectorAll('button')].find(n=>n.textContent==='檢查全行程').disabled,'unmounted actuator cannot pass a scan');
@@ -134,12 +134,12 @@ try{
   assert(!q('#syringeInstallation[open] nav')&&!q('#syringeInstallation[open]').textContent.includes('調整安裝'),'one form replaces wizard and duplicate adjustment entrances');
   assert(q('#syringeInstallation[open] svg [data-install-member="H1Coupler"]'),'coupler remains drawn');
   assert(JSON.stringify(api.snapshot())===original,'placement, direction and trial do not edit the work');
-  select('推桿接哪個零件？','H1Coupler');select('連接端孔','0');input('試動伸出量 (mm)','20');ib('檢查全行程');assert(q('#syringeInstallation[open]').textContent.includes('41 點'),'fixed connected actuator full stroke passes');ib('背面');ib('取消');await new Promise(resolve=>setTimeout(resolve,0));assert(JSON.stringify(api.snapshot())===original,'cancel preserves original work');
+  select('推桿接的零件','H1Coupler');select('推桿接的孔','0');input('試動伸出量 (mm)','20');ib('檢查全行程');assert(q('#syringeInstallation[open]').textContent.includes('41 點'),'fixed connected actuator full stroke passes');ib('針筒裝在板子後面');ib('取消');await new Promise(resolve=>setTimeout(resolve,0));assert(JSON.stringify(api.snapshot())===original,'cancel preserves original work');
   await addFixed();connect();ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
   const placed=S.comps.find(c=>c.type==='syringe');assert(placed?.b.componentId==='H1Coupler'&&placed.installation.face==='front'&&placed.axisDeg===0,'confirm preserves placement, angle and real owners');
   assert(!S.comps.some(c=>c.id.startsWith('SyringePlacementReference')),'temporary placement reference never saved');
   b.undo();assert(!S.comps.some(c=>c.type==='syringe'),'one undo removes the entire installation');
-  await addFixed();connect();ib('背面');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
+  await addFixed();connect();ib('針筒裝在板子後面');ib('確認安裝');await new Promise(resolve=>setTimeout(resolve,0));
   api.reopen(decodeShareString(encodeSnapshot(api.snapshot())));assert(S.comps.find(c=>c.type==='syringe').installation.face==='back','face survives save/share/reopen');
   await settings();[...q('#syringeEditor').querySelectorAll('button')].find(n=>n.textContent==='尺寸與加工設定').click();await new Promise(resolve=>setTimeout(resolve,0));assert(!!q('#syringeDialog'),'existing advanced dimensions and fabrication remain available');close();
  }

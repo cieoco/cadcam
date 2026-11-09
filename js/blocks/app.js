@@ -1080,15 +1080,15 @@ const memberEditor = createMemberEditor({
 let editingHandles=null;
 const jawTipHandle = createJawTipHandle({ svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
   editor: memberEditor, getParams: () => S.topo.params });
-async function setMemberAsFrame(){
-  const id=S.selectedTriangleId||S.selectedLinkId;if(!id||S.mode!=='design')return;
+async function setMemberAsFrame(id=S.selectedTriangleId||S.selectedLinkId){
+  if(!id||S.mode!=='design')return;
   pause();const revision=snapshotStr(),source={comps:structuredClone(viewComps()),params:{...S.topo.params},id,points:displayCoords(),motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()}};
   try{const {planMemberFrame}=await import('./member-frame.js');
     if(snapshotStr()!==revision){transient('作品已變更，請重新選取零件。');return;}
-    const plan=planMemberFrame(source);if(!plan.ok){transient(plan.message);return;}if(plan.unchanged)return;
+    const plan=planMemberFrame(source);if(!plan.ok){transient(plan.message);return plan;}if(plan.unchanged)return plan;
     const replacements=new Map(plan.comps.map(c=>[c.id,c]));
     if(!commitMountingEdit(S,d=>{d.comps=d.comps.map(c=>replacements.get(c.id)||c);},{pushUndo,notify:transient}))return;
-    rebuild();draw();scheduleAutosave();transient('已設為機架：第一孔與第二孔已固定，可按復原還原。');
+    rebuild();draw();scheduleAutosave();transient('已設為機架：第一孔與第二孔已固定，可按復原還原。');return plan;
   }catch(e){transient('未設為機架：'+e.message);}
 }
 async function copyMember(mode) {
@@ -3424,7 +3424,7 @@ if (gripperPilotSession) window.blocks.gripperPilot = {
   snapshot: () => Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()),
   reopen: snapshot => { const norm = Store.normalizeSnapshot(snapshot); if (!norm) throw Error('作品格式無效'); applySnapshot(norm, { source: 'gripper-pilot' }); },
 };
-hydraulic=createSyringeUI({warnMotion:issue=>showMotionWarning(issue.message,issue),clearSelection:clearSelectionAndEditors,showEditor:openMobileEditPanel,is3D:()=>view3DActive,capture:()=>{viewer3D.renderNow();return viewer3D.canvas;},svg,comps:viewComps,points:()=>lastFullPts,seed:pts=>{lastSolved={...pts};prevSolved={...pts};},pushUndo,pause,rebuild,draw,save:scheduleAutosave,notify:transient,applyFabrication:Settings.applyFabricationProfile,
+hydraulic=createSyringeUI({warnMotion:issue=>showMotionWarning(issue.message,issue),clearSelection:clearSelectionAndEditors,showEditor:openMobileEditPanel,is3D:()=>view3DActive,capture:()=>{viewer3D.renderNow();return viewer3D.canvas;},svg,comps:viewComps,points:()=>lastFullPts,seed:pts=>{lastSolved={...pts};prevSolved={...pts};},pushUndo,pause,rebuild,draw,save:scheduleAutosave,notify:transient,applyFabrication:Settings.applyFabricationProfile,setFrame:setMemberAsFrame,
   playing:on=>{playbackActive=on;const b=document.getElementById('playBtn');b.classList.toggle('playing',on);b.textContent=on?'⏸':'▶';}
 });
 // 量尺（js/blocks/dimension-ui.js）：第一次用到才載入，不佔啟動大小。
