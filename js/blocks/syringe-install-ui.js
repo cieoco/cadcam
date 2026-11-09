@@ -314,7 +314,9 @@ export function openSyringeInstallation({stage=null,redraw=()=>{},source,points,
    b.setAttribute('aria-label',INSTALL_STEPS[i]+(done?`已選「${value}」，按此更改`:''));
    if(k===prog.step)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current');});
   frameStatus.textContent=[pendingFrame?`「${names.get(pendingFrame)}」現在還會動；針筒要鎖在不動的零件上，推的時候才不會跟著跑。${setFrame?'':'請先在零件操作把它設為機架。'}`:'',!pendingFrame&&!choices.frames.length?'這個作品還沒有不動的零件：點一個板子或桿件，再把它設為不動的底座。':'',frameNote].filter(Boolean).join(' ');
-  setFrameButton.hidden=!pendingFrame||!setFrame;
+  const showSetFrame=!setFrameButton.hidden;setFrameButton.hidden=!pendingFrame||!setFrame;
+  // 換步驟回到頂端；底座按鈕剛出現時捲到看得見（手機面板較矮）
+  if(stepChanged)body.scrollTop=0;if(!setFrameButton.hidden&&!showSetFrame)setFrameButton.scrollIntoView?.({block:'nearest'});
   outputStatus.textContent=prog.step!==2?'':outputNote||(choices.rods.some(c=>holes(c).some(h=>canPush(c,h)))?'':'目前沒有推得動的孔：會動的零件還沒接到底座。先把一根桿的一端接在固定的孔上當擺臂（推桿可直接推擺臂上的孔），或再用短連桿接到擺臂（推桿推短連桿的端孔）。');
   modeInputs.forEach(n=>{n.checked=n.value===request.mountMode;});
   modeHint.textContent=suggestion?.text||'';
