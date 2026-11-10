@@ -16,7 +16,7 @@ globalThis.document = {
 
 const { S } = await import('../js/blocks/state.js');
 const Model = await import('../js/blocks/model.js');
-const { createGearEditor, GEAR_MODULE } = await import('../js/blocks/gear-editor.js');
+const { createGearEditor } = await import('../js/blocks/gear-editor.js');
 
 const noop = () => {};
 let undos=0;
@@ -61,15 +61,16 @@ editor.setGearPinRadius('18.5');
 check('輸出孔距數字欄接受小數',editor.gearPinRadius(driven)===18.5);
 driven.pinRadiusParam=radiusKey;delete driven.pinRadius;
 check('齒輪成對建立且從動輪嚙合驅動輪', gears().length === 2 && driven.mesh === driver.id);
-check('節圓半徑參數 = teeth·module/2', S.topo.params[driver.radiusParam] === 12 * GEAR_MODULE / 2 && S.topo.params[driven.radiusParam] === 20 * GEAR_MODULE / 2);   // G6：預設 12:20，中心距 96 mm＝12 格
+const initialModule = driver.module, initialDrivenTeeth = driven.teeth;
+check('節圓半徑參數 = teeth·module/2', S.topo.params[driver.radiusParam] === driver.teeth * initialModule / 2 && S.topo.params[driven.radiusParam] === driven.teeth * initialModule / 2);
 check('兩輪中心距 = 兩節圓半徑和（相切）', tangent(driver, driven));
 check('放下即選取從動輪', S.selectedGearId === driven.id);
 
 // ---- 改齒數 / 模數：半徑同步且保持嚙合 ----
 editor.changeGearTeeth(2);
-check('改齒數後半徑參數同步且仍相切', driven.teeth === 22 && S.topo.params[driven.radiusParam] === 22 * GEAR_MODULE / 2 && tangent(driver, driven));
+check('改齒數後半徑參數同步且仍相切', driven.teeth === initialDrivenTeeth + 2 && S.topo.params[driven.radiusParam] === driven.teeth * initialModule / 2 && tangent(driver, driven));
 editor.changeGearModule(1);
-check('改模數整鏈共用且仍相切', driver.module === GEAR_MODULE + 1 && driven.module === GEAR_MODULE + 1 && tangent(driver, driven));
+check('改模數整鏈共用且仍相切', driver.module === initialModule + 1 && driven.module === initialModule + 1 && tangent(driver, driven));
 const state = editor.gearDriveState(driven);
 check('傳動比 = −(驅動節圓半徑/從動節圓半徑)', state && Math.abs(state.factor + S.topo.params[driver.radiusParam] / S.topo.params[driven.radiusParam]) < 1e-9);
 
