@@ -32,7 +32,7 @@ export function openMotorInstallation({stage=document.getElementById('stageSvg')
   let draftNumber=Math.max(Number(source.counter)||0,...base.comps.map(c=>Number(c.id.match(/\d+$/)?.[0])||0))+1;
   while(base.comps.some(c=>c.id==='Blank'+draftNumber))draftNumber++;
   const legal=candidates.filter(c=>planMotorInstallation(base,{...request,...c},points,motion).ok);
-  if(!old&&legal.length===1){Object.assign(request,legal[0]);selectedNode=legal[0].nodeId;}
+  if(!old&&initialOutputId&&legal.length===1){Object.assign(request,legal[0]);selectedNode=legal[0].nodeId;}
   const dialog=el('section');dialog.id='motorInstallation';dialog.className='inspector-panel motor-install-inline';dialog.setAttribute('role','region');dialog.setAttribute('aria-label','致動元件安裝');dialog.dataset.selectionSummary='馬達／舵機：在原畫布放置或改接';
   const head=el('header',null,dialog),title=el('strong','致動元件安裝',head),cancel=el('button','取消',head);
   const preview=el('section',null,dialog);preview.className='install-preview';
@@ -262,7 +262,7 @@ export function openMotorInstallation({stage=document.getElementById('stageSvg')
   dialog.onclose=()=>{if(closed)return;closed=true;revision++;resize.disconnect();stopView();document.removeEventListener('keydown',escape,true);viewer?.dispose();svg.remove();dialog.remove();stage.style.opacity=oldOpacity;redraw();};
   dialog.close=()=>dialog.onclose();
   const oldOpacity=stage.style.opacity;stage.style.opacity='.25';
-  document.addEventListener('keydown',escape,true);wrap.append(dialog,svg);window.blocks.setMobilePanel('edit');document.body.dataset.mobileEditor='active';if(sheetMode())setSheet('half');syncCanvas();update();fitCanvas();resize.observe(stage);if(!old&&!candidates.length)createOutput.click();dialog.tabIndex=-1;dialog.focus({preventScroll:true});
+  document.addEventListener('keydown',escape,true);wrap.append(dialog,svg);window.blocks.setMobilePanel('edit');document.body.dataset.mobileEditor='active';if(sheetMode())setSheet('half');syncCanvas();update();fitCanvas();resize.observe(stage);if(!old&&!initialOutputId)createOutput.click();dialog.tabIndex=-1;dialog.focus({preventScroll:true});
   svg.onwheel=e=>{e.preventDefault();View.zoomAt(stage,e.clientX,e.clientY,e.deltaY<0?1.1:1/1.1);};
   return dialog;
 }

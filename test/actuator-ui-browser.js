@@ -19,6 +19,23 @@ const configure=()=>{
 };
 if(new URLSearchParams(parent.location.search).has('blankOnly')){await import('./standard-blank-ui-browser.js');}else{
 try{
+ // Adding a motor must not change meaning just because a separate rod exists.
+ for(const type of ['tt','n20','mg995'])for(const reverse of [false,true])for(const entry of ['canvas','numeric']){
+  const plate=makeStandardBlank({kind:'plate',columns:16,rows:12,origin:{x:-64,y:-40}}),rod=makeStandardBlank({kind:'bar',n:20,lengthMm:56,origin:{x:-32,y:-80}}),fab=structuredClone(FABRICATION_DEFAULTS);
+  fab.drive.n20Spec=1;Object.assign(fab.mg995Mount,{cableNotchWidthMm:6,cableNotchDepthMm:2});
+  const comps=[plate.comp,rod.comp];if(reverse)comps.reverse();api.reopen({kind:'blocks',v:1,counter:20,comps,params:{...plate.params,...rod.params},fabrication:fab});S.undoStack=[];b.fitView();
+  const before=JSON.stringify(api.snapshot()),beforeRod=JSON.stringify(S.comps.find(c=>c.id===rod.comp.id));b.pickMotorType(type);await waitDialog();
+  assert(dialog().textContent.includes('點畫布放馬達軸心'),'mixed design starts placement '+type+' '+entry+' '+reverse);
+  assert(dialog().querySelector('[aria-label="輸出軸帶動哪個零件？"]').value==='','mixed design never guesses existing output');
+  if(entry==='canvas'){
+   const svg=document.getElementById('motorInstallationCanvas'),q=new DOMPoint(0,0).matrixTransform(svg.getScreenCTM());
+   const fire=event=>svg.dispatchEvent(new PointerEvent(event,{bubbles:true,cancelable:true,pointerId:901,isPrimary:true,pointerType:innerWidth<700?'touch':'mouse',button:0,clientX:q.x,clientY:q.y}));
+   fire('pointerdown');fire('pointercancel');assert(JSON.stringify(api.snapshot())===before&&!S.undoStack.length,'mixed placement cancel preserves both parts');fire('pointerdown');fire('pointerup');
+  }else{field('軸心 X (mm)','0');field('軸心 Y (mm)','0');button('依座標放置');}
+  const motor=S.comps.find(c=>c.type==='motor');assert(!dialog()&&motor?.motorMount.frameBody===plate.comp.id,'mixed design places motor on plate '+type+' '+entry+' '+reverse);
+  assert(JSON.stringify(S.comps.find(c=>c.id===rod.comp.id))===beforeRod,'unselected rod stays unchanged');assert(S.comps.find(c=>c.id===plate.comp.id).standardBlank.mountHoles.length>0,'mixed carrier has actual mounting holes');assert(S.undoStack.length===1,'mixed placement is one undo');
+  const saved=api.snapshot();b.undo();assert(JSON.stringify(api.snapshot())===before,'mixed placement undo restores original');api.reopen(decodeShareString(encodeSnapshot(saved)));assert(S.comps.find(c=>c.type==='motor')?.motorMount.frameBody===plate.comp.id,'mixed placement survives reopen');
+ }
  api.reopen(structuredClone(actuatorSource));const before=JSON.stringify(api.snapshot());
  b.pickMotorType('mg995');await waitDialog();assert(!!dialog(),'new servo enters installation before changing work');
  assert([...dialog().querySelectorAll('button')].find(n=>n.textContent==='確認安裝').disabled,'two loose endpoints require a choice');
@@ -71,7 +88,7 @@ try{
  assert(dialog().textContent.includes('會固定此孔'),'quick world mount is explicit');button('確認安裝');
  assert(S.comps[0].p1.physicalMotor&&S.comps[0].motorMount.face==='back','gear shortcut confirms through shared installation');
  const loose={...structuredClone(actuatorSource),comps:[structuredClone(actuatorSource.comps[1])]};
- api.reopen(loose);const looseBefore=JSON.stringify(api.snapshot());b.pickMotorType('tt');await waitDialog();
+ api.reopen(loose);const looseBefore=JSON.stringify(api.snapshot());await b.configureMotorMount(null,'Arm');await waitDialog();
  document.querySelector('#motorInstallationCanvas [data-quick-node="D"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
  assert(dialog().textContent.includes(pointDisplayName(loose.comps,'D'))&&dialog().textContent.includes('會固定此孔'),'clicked endpoint and grounding are previewed');
  assert(JSON.stringify(api.snapshot())===looseBefore,'quick preview leaves source unchanged');button('確認安裝');
