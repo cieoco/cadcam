@@ -609,8 +609,5 @@ export const liftBucketSnapshot = {
         "holeEndMm": 3.5
       }
     }
-  },
-  "tracePoints": [
-    "P"
-  ]
+  }
 };

@@ -22,5 +22,7 @@ export function liftBucketSnapshot(liftSource) {
   for (const comp of work.comps) if (comp.type === 'bar' || comp.type === 'triangle') comp.stock = { ...comp.stock, thicknessMm: 3 };
   const r = prepareRigidGroupInterface(work, { operationVersion: 1, action: 'attach', hostId: 'RigidGroup', groupId: group.group.id, target: { module: 'Lift', output: 'tool' }, faceGapMm: 12 });
   if (!r.ok) throw Error(r.issues[0].message);
+  // 原托斗的軌跡點 P 屬於已移除的 Driver 模組，組立後不再存在；不保留懸空的軌跡引用。
+  delete r.candidateSnapshot.tracePoints;
   return r.candidateSnapshot;
 }
