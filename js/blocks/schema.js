@@ -694,9 +694,7 @@ export function normalizeSnapshot(obj) {
     fabrication: fabricationResult.status === 'present' ? fabricationResult.profile : null, modules: modulesResult.modules, warnings };
 }
 
-// 開檔／復原時作用中馬達回到 0°（未凍結的馬達也是 0°）。存檔的輸入桿角度與 θ＋相位不符時
-// （舊檔接軸心時未換算），以存檔姿勢為準調整相位，開啟後不跳動；一致的作品（含全部內建範例）不受影響。
-// 只由 app 套用作品時呼叫，不改一般正規化。
+// 開檔 θ=0：輸入桿相位與存檔角度不符時以存檔姿勢為準（app 套用作品時呼叫）。
 export function alignSavedInputPhase(snapshot) {
   const active = String(snapshot?.activeMotor || '1'), frozen = snapshot?.motorAngles || {};
   for (const c of snapshot?.comps || []) {

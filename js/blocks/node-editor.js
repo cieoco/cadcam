@@ -154,6 +154,8 @@ export function createNodeEditor({
   }
   function toggleGroundPositionLock() {
     const id=S.selectedNodeId; if(!id||!pointIsGround(id)){ transient('只有固定點或馬達軸心需要位置鎖'); return; }
+    // 格孔上的軸心不能單獨拖離零件。
+    if(S.comps.some(c=>[...localHoles(c),...(c.standardBlank?.mountHoles||[])].some(h=>h.id===id))){ transient('這個軸心在零件的格孔上，不能單獨拖動；要換孔請用「調整馬達安裝」，或移動整個零件。'); return; }
     unlockedGroundPointId=unlockedGroundPointId===id?'':id; Panels.updateRoleEditor();
     transient(unlockedGroundPointId ? '🔓 固定點已解除鎖定，可拖曳一次' : '🔒 固定點已鎖定');
   }

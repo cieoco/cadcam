@@ -276,6 +276,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   cancelMotorMode();
   Settings.syncFabricationInputs(); // 放棄尚未 change/blur 提交的表單草稿。
   Store.alignSavedInputPhase(norm);   // 開啟即為存檔姿勢（θ 回到 0°）
+  motorRelease('check');
   S.comps = norm.comps;
   S.modules = Array.isArray(norm.modules) ? norm.modules : [];
   knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組
@@ -998,7 +999,7 @@ async function configureMotorMount(nodeId=null,initialOutputId='') {
   finally { motorInstallationLoading=false; }
   if(S.mode!=='design'||snapshotStr()!==before||S.designFocus!==focus){transient('作品已變更，請重新選擇安裝。');return;}
   openMotorInstallation({stage:svg,redraw:draw,source:{comps:scoped,params:S.topo.params,fabrication:S.fabrication,counter:S.counter,moduleId:focus==='#root'?null:focus},points:displayCoords(),
-    review:(plan,notify)=>{if(S.mode!=='design'||S.designFocus!==focus||snapshotStr()!==before){notify('作品已變更，請重新開啟安裝。');return false;}const candidate=mountingCandidate(JSON.parse(before),plan,scoped);const order=new Map(JSON.parse(before).comps.map((c,i)=>[c.id,i]));candidate.comps.sort((a,b)=>(order.get(a.id)??Infinity)-(order.get(b.id)??Infinity));const holes=planActuatorPlateHoles(candidate);if(!holes.ok){notify(holes.message);return false;}candidate.comps=holes.comps;if(!confirmMountingChange(JSON.parse(before),candidate,{notify}))return false;plan.fullWork=candidate;return true;},
+    review:(plan,notify)=>{if(S.mode!=='design'||S.designFocus!==focus||snapshotStr()!==before){notify('作品已變更，請重新開啟安裝。');return false;}const candidate=mountingCandidate(JSON.parse(before),plan,scoped);const order=new Map(JSON.parse(before).comps.map((c,i)=>[c.id,i]));candidate.comps.sort((a,b)=>(order.get(a.id)??Infinity)-(order.get(b.id)??Infinity));const holes=planActuatorPlateHoles(candidate);if(!holes.ok&&!plan.release){notify(holes.message);return false;}if(holes.ok)candidate.comps=holes.comps;if(!confirmMountingChange(JSON.parse(before),candidate,{notify}))return false;plan.fullWork=candidate;return true;},
     motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()},type:S.pendingMotorType,
     existingId:existing?.id,initialOutputId,motorId:nextMotorId(),confirm:plan=>{
       if(S.mode!=='design'||snapshotStr()!==before||S.designFocus!==focus)return false;
@@ -1081,6 +1082,8 @@ const memberEditor = createMemberEditor({
 let editingHandles=null;
 const jawTipHandle = createJawTipHandle({ svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
   editor: memberEditor, getParams: () => S.topo.params });
+// 馬達解除／軸心修復，按需載入。
+function motorRelease(action,id){return import('./motor-release.js').then(m=>m.run(action,{S,id,pause,pushUndo,rebuild,draw,notify:transient,save:scheduleAutosave,points:displayCoords,motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()}}));}
 async function setMemberAsFrame(id=S.selectedTriangleId||S.selectedLinkId){
   if(!id||S.mode!=='design')return;
   pause();const revision=snapshotStr(),source={comps:structuredClone(viewComps()),params:{...S.topo.params},id,points:displayCoords(),motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()}};
@@ -1586,7 +1589,7 @@ function solveFrame() {
   lastFrameIssue = motionPoseIssue(scope.comps, sol);
   if (lastFrameIssue) sol = { ...sol, isValid: false, errorReason: lastFrameIssue.message };
   lastSolveValidity=materialSolveValidity(scope.comps,sol);
-  // A loose (under-constrained) pose is still a rigid solve: draw it so dangling parts keep their lengths.
+  // A loose pose is still a rigid solve: draw it.
   const solved = (sol && (sol.isValid !== false || lastFrameIssue?.code === 'underconstrained') && sol.points) ? sol.points : {};
   // 無效解整幀不採用，避免新舊接點混合而拉伸剛性零件；保留上一姿態。
   const newLast = { ...lastSolved };
@@ -1684,7 +1687,7 @@ function updateMechanismStatus(sol = null) {
   el.title = title;
   const feedback = { comps: simulationScope().comps, sol, compiled: simulationScope().compiled,
     hasDrive: hasDriveSource(), gearWarning: gearMeshHasWarning(), dof: mobility };
-  // 未受約束時提示可晃動；其他教學提示只放在 title，按需載入以維持首次載入大小。
+  // 教學提示按需載入。
   if (lastFrameIssue?.code === 'underconstrained') el.title += '\n' + lastFrameIssue.message;
   else if (['error', 'warn', 'static'].includes(state)) import('./teaching-feedback.js').then(m => { if (el.title === title) el.title += '\n' + m.getTeachingFeedback(feedback).message; });
 }
@@ -3426,7 +3429,7 @@ Object.assign(window.blocks, commandActions, { openExamples: exampleController.o
   setRailLength: sliderEditor.setRailLength,
   setMemberMirror: memberEditor.setMirror,
   setMemberStock: memberEditor.setStock,
-  setMemberAsFrame,
+  setMemberAsFrame, motorRelease,
   setMemberMaterial: memberEditor.setMaterial
 });
 if (gripperPilotSession) window.blocks.gripperPilot = {

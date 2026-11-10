@@ -20,8 +20,7 @@ export function invalidPoseStatus({ fromPractice = false, edited = false, issue 
   return { state: 'error', text: '解不出：檢查孔有沒有接好，或按復原' };
 }
 
-// 還會晃動（未受約束）不是解不出：用學生看得到的零件名稱指出來。
-// 只被一個零件用到、又沒解出的端點，就是「沒接的那一端」。
+// 未受約束不是解不出：點名只被一個零件用到的未解端點（沒接的一端）。
 export function loosePartStatus(comps = [], issue = {}) {
   const ids = new Set(issue.sourceIds || []), uses = new Map(), keys = ['p1', 'p2', 'p3'];
   for (const c of comps) for (const k of keys) if (c?.[k]?.id) uses.set(c[k].id, (uses.get(c[k].id) || 0) + 1);

@@ -19,6 +19,7 @@
     "test/connected-resize.mjs",
     "test/connected-status.mjs",
     "test/saved-pose.mjs",
+    "test/motor-release.mjs",
     "test/dense-grid.mjs",
     "test/used-holes.mjs",
     "test/actuator-standard-plates.mjs",

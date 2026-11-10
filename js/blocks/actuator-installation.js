@@ -157,6 +157,9 @@ function planUnconnectedMotor(source,request,points,motion){
   if(!host&&request.face==='front')return fail('圖面基準沿用背面安裝。');
   if(host?.type==='bar'&&request.orientation!=='follow-frame'&&![host.p1,host.p2].every(p=>frameNodeIds(comps).has(p.id)))return fail('活動承載桿上的外殼方向需沿承載桿。');
   const center=mount.center||keys.map(k=>old?.[k]).find(p=>p?.physicalMotor)?.id;
+  // Releasing an output in place only removes constraints: the motor keeps its current
+  // shaft and mount, and a broken housing mount must not block the release.
+  const pureRelease=!!old&&old.type!=='motor'&&request.hostId===(mount.frameBody||old.motorCarrier||'world')&&(!host||actuatorHostPoints(host).find(p=>p.key===request.hostEnd)?.id===center);
   const at=host?actuatorPoint(host,request.hostEnd,points):request.position||points[center]||keys.map(k=>old?.[k]).find(p=>p?.id===center);
   if(!at||![at.x,at.y].every(Number.isFinite))return fail('請先在畫布放置馬達，或輸入有效的軸心座標。');
   let id=old?.type==='motor'?old.id:mount.partId;
@@ -183,6 +186,6 @@ function planUnconnectedMotor(source,request,points,motion){
   if(request.type==='mg995'){body.servoStart=Number(request.start??0);body.servoEnd=Number(request.end??90);if(![body.servoStart,body.servoEnd].every(n=>Number.isFinite(n)&&Math.abs(n)<=360)||body.servoStart===body.servoEnd)return fail('舵機起終角需有效且不同。');}
   comps=comps.filter(c=>c!==old||old.type!=='motor');comps.push(body);
   if(host){host.motorMountPoint=p1.id;host.frameSeparate=true;}
-  const holes=planActuatorPlateHoles({...source,comps,params});if(!holes.ok)return fail(holes.message);
-  return evaluateMotorCandidate({ok:true,comps:holes.comps,params,fabrication:source.fabrication,plateHoles:holes.reports,motor,angle:Number(request.angle)||0,center:p1.id,outputId:'',hostId:host?.id||'world'},points,motion.motorAngles);
+  const holes=planActuatorPlateHoles({...source,comps,params});if(!holes.ok&&!pureRelease)return fail(holes.message);
+  return evaluateMotorCandidate({ok:true,...(pureRelease?{release:true}:{}),...(holes.ok?{}:{mountIssue:holes.message}),comps:holes.ok?holes.comps:comps,params,fabrication:source.fabrication,plateHoles:holes.reports,motor,angle:Number(request.angle)||0,center:p1.id,outputId:'',hostId:host?.id||'world'},points,motion.motorAngles);
 }

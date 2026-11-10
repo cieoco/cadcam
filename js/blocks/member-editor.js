@@ -23,6 +23,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
   const dimensionId = () => S.triSide || 'g';
   function sync() {
     const comp = selected();
+    const releaseMotor=el('memberReleaseMotor');if(releaseMotor)releaseMotor.hidden=!(comp?.isInput&&comp.type==='bar');
     const frameAction=el('memberSetFrame');if(frameAction){const fixed=fixedSyringePointIds(S.comps),isFrame=comp&&[comp.p1,comp.p2].every(p=>fixed.has(p?.id));frameAction.hidden=!comp||!['bar','triangle'].includes(comp.type);frameAction.disabled=!!isFrame;frameAction.textContent=isFrame?'已設為機架':'設為機架';frameAction.title='固定第一孔與第二孔，保留孔距；可一次復原';}
 
     let outputPreset=el('servoOutputPreset'),outputStatus=el('servoOutputStatus');if(!outputPreset&&el('memberMore')){outputPreset=document.createElement('button');outputPreset.id='servoOutputPreset';outputPreset.textContent='三列輸出板（軸後留一格）';outputPreset.type='button';el('memberMore').before(outputPreset);outputStatus=document.createElement('p');outputStatus.id='servoOutputStatus';outputPreset.after(outputStatus);}

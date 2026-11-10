@@ -10,6 +10,7 @@ import {motorCarrierFrame,resolveMotorOrientation} from './motor-orientation.js'
 import {sheetMode,setSheet,visibleUserRect} from './mobile-workspace.js';
 import {confirmEditorKey} from './editor-confirm-key.js';
 import {planMotorDrop} from './motor-drop.js';
+import {offPlateMotors,offPlateMessage} from './motor-release.js';
 const ns='http://www.w3.org/2000/svg';
 const el=(tag,text,parent)=>{const n=document.createElement(tag);if(text)n.textContent=text;parent?.append(n);return n;};
 const label=c=>c?.name || c?.id || '尚未選擇';
@@ -45,6 +46,10 @@ export function openMotorInstallation({stage=document.getElementById('stageSvg')
   const createOutput=el('button',old?'先放馬達，再畫輸出桿':'在畫布放馬達',quickPanel);createOutput.hidden=!!old&&old.type!=='motor';
   const release=el('button','解除輸出連接',quickPanel);release.hidden=old?.type!=='bar';
   release.onclick=()=>{request.outputId=request.outputId?'':old.id;request.position=null;placement=points[oldCenter]||old?.p1;update();};
+  // A shaft dragged off its plate hole: explain and offer the two repairs (release still works).
+  const offPlate=old&&offPlateMotors(base.comps).find(i=>i.id===old.id);
+  if(offPlate){const note=el('p',offPlateMessage(offPlate),quickPanel);note.className='install-hint';
+    for(const [action,text] of [['back','把馬達放回座板原孔'],['leave','讓馬達離開座板（改成獨立固定點）']])el('button',text,quickPanel).onclick=()=>{dialog.close();window.blocks?.motorRelease?.(action,old.id);};}
   const placementFields=el('details',null,body);el('summary','位置與輸出桿',placementFields);placementFields.hidden=true;
   const details=el('details',null,body);el('summary','連接與安裝方式',details);details.open=false;
   const panels=[0,1,2].map(()=>el('section',null,details));panels.push(el('section',null,body));
