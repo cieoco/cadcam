@@ -17,9 +17,9 @@ const clone = v => JSON.parse(JSON.stringify(v));
 // 「相連」與「重新命名」共用：略過列舉型欄位與馬達編號欄位（SDD §4.3a）。
 const CONNECTIVITY_EXCLUDED_KEYS = new Set([
   'type', 'color', 'shape', 'shapeMode', 'profile', 'kind', 'motorType', 'role', 'orientation', 'ref', 'baseEnd', 'name', 'id',
-  'physicalMotor', 'physical_motor', 'motor'
+  'physicalMotor', 'motor'
 ]);
-const MOTOR_KEYS = new Set(['physicalMotor', 'physical_motor', 'motor']);
+const MOTOR_KEYS = new Set(['physicalMotor', 'motor']);
 const BODY_COMP_TYPES = new Set(['bar', 'triangle', 'rack', 'slider']);
 
 // 零件的自有 token：它的 id、接點 id、holes 內孔 id。

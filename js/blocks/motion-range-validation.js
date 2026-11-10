@@ -26,7 +26,7 @@ export function validateMotionRange(snapshot, options = {}) {
     const required=c.type==='anchor'?['p1']:c.type==='triangle'?['p1','p2','p3']:['p1','p2'];
     if(required.some(k=>!record(c[k])||typeof c[k].id!=='string'||!c[k].id))issue('UNSUPPORTED_MOTION_STRUCTURE','零件缺少有效主孔資料。',null,c.id,[c.id]);
     if(!scope.supportedTypes.includes(c.type)||c.moduleId||(c.vertices!==undefined && (c.type!=='triangle'||!Array.isArray(c.vertices)||c.vertices.length<3||c.vertices.length>MAX_PLATE_POINTS||['p1','p2','p3'].some(ref=>c.vertices.filter(v=>v?.solve===true&&v.ref===ref).length!==1)||c.vertices.some(v=>!record(v)||(v.solve===true?!['p1','p2','p3'].includes(v.ref):v.solve!==false||!finite(v.u)||!finite(v.v)||v.hole===true)))))issue('UNSUPPORTED_MOTION_STRUCTURE','此零件型態或額外孔形尚未納入行程驗證。',null,c.id,[c.id]);
-    for(const p of [c,c.p1,c.p2,c.p3])if(p?.physicalMotor||p?.physical_motor)motorIds.add(String(p.physicalMotor||p.physical_motor));
+    for(const p of [c,c.p1,c.p2,c.p3])if(p?.physicalMotor)motorIds.add(String(p.physicalMotor));
   }
   const motorId=String(options.motorId??snapshot.activeMotor??'1');
   if(motorIds.size!==1||!motorIds.has(motorId)){issue('UNSUPPORTED_MOTOR_CONFIGURATION','目前只驗證一個指定驅動馬達，其他馬達配置尚未覆蓋。');return finish();}

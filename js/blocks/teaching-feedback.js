@@ -40,13 +40,13 @@ export function teachingRoles(comps = [], tracePoint = '') {
       if (!p?.id) continue;
       add(p.id, null);
       if (p.type === 'fixed') add(p.id, '固定');
-      if (p.type === 'motor' || p.type === 'linear' || p.physicalMotor || p.physical_motor) add(p.id, '輸入');
+      if (p.type === 'motor' || p.type === 'linear' || p.physicalMotor) add(p.id, '輸入');
     }
     if (c.motorMount?.center) add(c.motorMount.center, '輸入');
     if (c.type === 'slider' && (c.isInput || c.physicalMotor)) add(c.p3?.id, '輸入');
     if (['gear', 'pulley'].includes(c.type) && c.physicalMotor) add(c.p1?.id, '輸入');
     if (c.type === 'bar' && c.isInput && !c.motorMount?.center) {
-      const center = [c.p1, c.p2].find(p => p && (p.type === 'motor' || p.type === 'linear' || p.physicalMotor || p.physical_motor))
+      const center = [c.p1, c.p2].find(p => p && (p.type === 'motor' || p.type === 'linear' || p.physicalMotor))
         || [c.p1, c.p2].find(p => p?.type === 'fixed');
       if (center) add(center.id, '輸入');
     }

@@ -1,5 +1,18 @@
 # 教學與操作更新紀錄
 
+## 2026-11-11：接合關係 C4——馬達與接地改單一來源，I1／I3 接入提交關卡
+
+- **馬達與接地的答案只剩一份。** 新增啟動路徑上的小模組 `js/blocks/motor-roles.js`（`motorRecords`、`motorRecordOf`、`isGroundPoint`）：`relations.js` 的 `motorOf`／`groundSource` 與下列查詢共用它，欄位角色只在這裡判定。`relations.js` 本身（15 KB）維持按需載入，不進啟動路徑，所以啟動路徑只放這個小模組。已改用：`model.pointHasMotor`／`motorPointIds`／`isGroundPoint`、`motor-tools.motorTypeAt`／`servoInputAt`、`mounting-review` 的馬達軸心與馬達編號推導（含腳印計算的軸心判斷）、`dof.js` 自己抄的 `isGroundPoint`、`motor-release.offPlateMotors`（改走 `relations.motorOf`，按需載入的模組）。
+- **新舊答案不同處（C1 差異表）逐項判斷：**
+  - 齒輪／凸輪／皮帶輪／鏈輪軸心（`gear-pair/GCA`、`cam-follower/CC`、`pulley-belt/PLA`、`sprocket-chain/SKA`、`continuous-roller-intake/RollMotor` 等 24 個點）：舊 `pointHasMotor` 只認桿件，節點角色標籤把馬達軸心顯示成「機架固定點」。這是舊答案的錯，現在顯示「馬達」；`motorPointIds`（決定哪些點畫成馬達、輸出馬達座）本來就包含它們，集合與舊版逐例相同。C1 的 `motorOf` 擁有者規則漏了「軸心點型別為 motor 的凸輪／皮帶輪」，本包補上（`test/commit-gate.mjs` 鎖定）。
+  - 兩個固定孔鎖住的板件（`locked-plate`）：只有 `relations.isGround` 計入，設為機架、拖曳、角色標籤等呼叫端需要的是「宣告的接地」，維持 `isGroundPoint`（fixed／motor／linear 型別），行為不變。
+  - 保留不改：`torque-model.js` 的接地集合（fixed／motor，**不含 linear**，掛負載的語意不同）、`module-ops.scanMotors`（模板內任意深度欄位的馬達編號掃描與改名，需看到所有副本，不是查詢）。
+- **刪除的死讀取與重複實作：** `physical_motor`（約 40 處別名讀取，無寫入者；`js/blocks` 與 `js/core/required-torque.js`）、`motor_carrier`、`motorMount.hostBody`（3 處）、`slider.driverId`（blocks 內無讀取）；舊的 `pointHasMotor`／`motorPointIds`／`motorTypeAt`／`servoInputAt` 本體、`dof.js` 的接地副本、`relations.js` 內的馬達推導。保留：`js/multilink/solver.js`／`visualization.js`、`js/core/topology.js`、`js/core/gear-train.js`、`js/ui/`、`mechanism-loader.js`、`remote-sync.js`（凍結的 `mechanism.html` 路徑與 steps 格式仍讀這些別名，不確定的一律不動）。
+- **提交關卡 `js/blocks/integrity-gate.js`：** 候選作品建好、寫入之前，`checkWork` 比對目前作品；只有「新增」的 **I1／I3 `contradiction`** 才拒絕（原本就有的問題與所有 `notice`、`dangling` 都不擋）。拒絕沿用既有流程：保留候選或選取、`transient` 訊息、不產生復原項目；訊息用 C3 的零件名稱（「名稱」(編號)），並呼叫 `integrity-hints` 的 `flash` 把相關零件短暫標成橘色。文字：「這個修改會讓作品資料對不起來，未套用：」＋該筆說明（另有 N 項時加「（另有 N 項）」）。`integrity.js` 懶載入一次，之後同步執行；尚未載入時第一次提交放行並開始載入，作品套用後的 `setTimeout` 與 C3 的開檔提示一起預先載入。
+- **已接入的提交入口：** 共用的 `confirmMountingChange`（拖曳放開 `commitDragUndo`、馬達安裝／拖入／重接、拆除還原、板件與孔位編輯、bench、鏈條、合成、針筒共用的審查）與 `commitMountingEdit`／`commitLegacyMountingEdit`（改尺寸、設為機架、機架孔與板材、齒輪、滑軌、節點編輯的板件分支）；另外 `app.mergePoints`（合併接點）、`delete-part`（刪除）、`motor-release` 的 `commit`（解除與放回馬達）各自呼叫同一關卡。**未接入：** 畫桿／加零件（新端點取目標座標，無法新增 I1）、開檔與復原（整份作品，走 C3 提示）、C3 修復按鈕（只會減少問題）、沒有標準板材的作品的節點「固定／取消固定」（`node-editor` 直接就地修改，同 C2 KNOWN 的 `connected-resize-1008089`）、模組操作、針筒專用入口（最後一包）。
+- 測試：新增 `test/commit-gate.mjs`（31 項：新增 I1／I3 被拒且訊息點名零件、原有問題與 I4 notice 不擋、尚未載入時放行、70 個內建範例改名與整體平移皆不被拒、各入口接線、角色標籤修正）；`test/operation-sequences.mjs` 現在載入關卡執行全部步驟，隨機執行 0 次拒絕，並以假的 `checkWork` 對每個入口（改尺寸、設為機架、解除馬達、合併、拖曳放開、刪除）強制製造 I1：全部被拒、作品與復原堆疊不變。KNOWN 重播中有 1–2 筆現在直接被關卡擋下。
+- 啟動大小：2,164,664 → 2,164,202 bytes（上限 2,165,000 不變）。新增 `motor-roles.js`＋`integrity-gate.js` 約 3.4 KB，抵銷來自刪除舊馬達查詢、別名讀取與全專案無人呼叫的 `exporters.roundedTriangleOutline`、`app.showCncWarnings`、`plate-geometry.outlineControlWorldPoints`、`part-fusion.fusionPartner`、`storage.clearLocal`。
+
 ## 2026-11-10：開檔提示第 2 輪（手機）——標出的零件不被提示蓋住，板件外框用畫布的路徑
 
 - 標出的零件若落在提示底下，用既有的 `fitView`（新增頂端留白參數 `inset`）重新置中，提示消失或關閉時恢復；手機 390×844 開 `motor-off-plate.json`：要移動的零件由被蓋住（約 y≈265、只露出底緣）改為完整落在提示（底緣 y=257）之下（y≥276）；桌機提示（底緣 y=213）不蓋零件，視圖不動。

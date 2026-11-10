@@ -11,7 +11,7 @@ function physicalMotorIds(comps) {
   const ids = new Set();
   comps.forEach(c => ['p1', 'p2', 'p3', 'm1', 'm2'].forEach(k => {
     const p = c[k];
-    if (p && p.id && (p.physicalMotor || p.physical_motor)) ids.add(p.id);
+    if (p && p.id && p.physicalMotor) ids.add(p.id);
   }));
   return ids;
 }

@@ -62,7 +62,6 @@ export function unionOutlines(input, {precisionMm=1e-6,sampleMm=1e-5,minAreaMm2=
   return loops;
 }
 
-export function fusionPartner(comps, plate) {return comps.find(c=>c.id===plate?.fusedWith && c.type==='gear');}
 // Shared eligibility contract: coincident screen positions never imply a rigid connection.
 export function fusionPairReason(comps, plate, gear) {
   if(plate?.type!=='triangle'||gear?.type!=='gear')return '目前支援齒輪＋三點板件；此配對尚未支援。';

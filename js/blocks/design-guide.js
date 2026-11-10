@@ -1,6 +1,6 @@
 import { pointKeysFor } from './part-types.js';
 
-const powered = c => !!c.isInput || pointKeysFor(c).some(k => c[k]?.type === 'motor' || c[k]?.physicalMotor || c[k]?.physical_motor);
+const powered = c => !!c.isInput || pointKeysFor(c).some(k => c[k]?.type === 'motor' || c[k]?.physicalMotor);
 
 // Advisory only: these stages never claim that motion or fabrication is verified.
 export function designGuideStep(comps) {

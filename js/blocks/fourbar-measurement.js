@@ -26,7 +26,7 @@ export function measureFourbarSwing(comps, params) {
     if (!finitePoint(a) || !finitePoint(b) || a.type !== 'fixed' || b.type !== 'fixed'
       || bars.some(c => !finitePoint(c.p1) || !finitePoint(c.p2))) return fail('固定點或接點資料不完整，請先檢查作品。');
     if (coupler.p1.type !== 'floating' || coupler.p2.type !== 'floating' || output.p2.type !== 'floating'
-      || [coupler.p1, coupler.p2, output.p2].some(p => p.physicalMotor || p.physical_motor)) return fail('C、D 需要保持自由接點，不能另加固定或動力。');
+      || [coupler.p1, coupler.p2, output.p2].some(p => p.physicalMotor)) return fail('C、D 需要保持自由接點，不能另加固定或動力。');
     lengths = { ground: Math.hypot(b.x - a.x, b.y - a.y), input: params[input.lenParam], coupler: params[coupler.lenParam], output: params[output.lenParam] };
     if (Object.values(lengths).some(v => !Number.isFinite(v) || v <= 0)) return fail('桿長需要是大於零的有限數值。');
     // 編譯器取得副本：量測不能改寫目前作品或目前播放姿勢。

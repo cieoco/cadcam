@@ -4,6 +4,7 @@ import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import {pointDisplayName} from './display-labels.js';
 import {fusionRoot} from '../core/bar-fusion.js';
 import {commitMountingEdit,confirmMountingChange,mountingCandidate} from './mounting-review-ui.js';
+import {integrityGate,loadIntegrity} from './integrity-gate.js';
 import {frameGroundAxis,planFrameGroundChange} from './frame-ground.js';
 import {tabNutPartGeometry} from './tab-nut-plan.js';
 import {syringeShapes} from './syringe-shape.js';
@@ -203,10 +204,10 @@ function bucketPlaybackIssue(){
   return bucketValidationResult.ok?null:bucketValidationResult.issues[0]?.message;
 }
 // 共用伺服顯示有號模型角；TT 持續旋轉仍顯示0–360讀值。
-const inputIsLinear = () => S.comps.some(c=>c.type==='slider'&&c.isInput&&String(c.physicalMotor||c.physical_motor||'1')===String(S.activeMotor||'1'));
+const inputIsLinear = () => S.comps.some(c=>c.type==='slider'&&c.isInput&&String(c.physicalMotor||'1')===String(S.activeMotor||'1'));
 function angleLabel(theta){
   if(inputIsLinear())return Number(theta.toFixed(1)); // 直線輸入是 mm，不取 360° 餘數。
-  const servo=S.comps.some(c=>c.motorType==='mg995'&&String(c.physicalMotor||c.physical_motor||c.p1?.physicalMotor||c.p1?.physical_motor||'1')===String(S.activeMotor||'1'));
+  const servo=S.comps.some(c=>c.motorType==='mg995'&&String(c.physicalMotor||c.p1?.physicalMotor||'1')===String(S.activeMotor||'1'));
   return Math.round(servo?theta:norm360(theta));
 }
 
@@ -276,7 +277,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   cancelMotorMode();
   Settings.syncFabricationInputs(); // 放棄尚未 change/blur 提交的表單草稿。
   Store.alignSavedInputPhase(norm);   // 開啟即為存檔姿勢（θ 回到 0°）
-  setTimeout(()=>integrityHints('check'),0);   // 套用後再檢查（lazy），不拖慢開檔
+  setTimeout(()=>{integrityHints('check');loadIntegrity();},0);   // 套用後再檢查（lazy），不拖慢開檔
   S.comps = norm.comps;
   S.modules = Array.isArray(norm.modules) ? norm.modules : [];
   knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組
@@ -459,7 +460,7 @@ function designMotorIds() {
   if (inDesign() && !S.modules.length) return all;
   const own = new Set();
   (inDesign()?viewComps():assemblyWork(S.comps,S.modules,S.topo).comps).forEach(c => [c, c.p1, c.p2, c.p3].forEach(o => {
-    const v = o && (o.physicalMotor || o.physical_motor);
+    const v = o && (o.physicalMotor);
     if (v) own.add(String(v));
   }));
   return own;
@@ -828,7 +829,7 @@ function rotateInputCrankToPoint(bar, target) {
   const center = displayCoords()[centerPoint.id] || pointCoords()[centerPoint.id] || centerPoint;
   if (!center || Math.hypot(target.x-center.x,target.y-center.y) < 1e-6) return false;
   // 拖哪根輸入桿就把控制權切給那顆馬達（其他馬達凍結在原角度），符合「摸哪根動哪根」直覺。
-  const motorId = String(bar.physicalMotor || bar.physical_motor || '1');
+  const motorId = String(bar.physicalMotor || '1');
   if (String(S.activeMotor) !== motorId) {
     activateMotor(motorId, Number(S.motorAngles[motorId]) || 0);
     updateMotorSwitcher();
@@ -869,10 +870,10 @@ const hasPoint = (id) => Model.hasPoint(S.comps, id);
 const mergePoints = (fromId, toId) => {
   const seed=structuredClone(S.comps);
   for(const [id,p] of Object.entries(displayCoords())) Model.updatePointCoordsById(seed,id,p.x,p.y);
-  const candidate=Model.previewPointConnection(seed,S.topo,fromId,toId);
-  if(!candidate.ok){
+  const candidate=Model.previewPointConnection(seed,S.topo,fromId,toId),work={comps:S.comps,modules:S.modules,params:S.topo.params};
+  if(!candidate.ok||!integrityGate(S.preDragSnap?JSON.parse(S.preDragSnap):work,{...work,comps:candidate.comps},transient)){
     if(S.preDragSnap){const norm=Store.normalizeSnapshot(JSON.parse(S.preDragSnap));if(norm)applySnapshot(norm,{recordUndo:false,fit:false,source:'undo'});}
-    transient(candidate.message);
+    if(!candidate.ok)transient(candidate.message);
     return false;
   }
   S.comps=candidate.comps;
@@ -1983,7 +1984,7 @@ function drawNow() {
     for (const c of S.comps) {
       for (const k of ['p1', 'p2', 'p3']) {
         const pt = c[k];
-        if (pt && pt.id === nodeId && (pt.physicalMotor || pt.physical_motor)) return String(pt.physicalMotor || pt.physical_motor);
+        if (pt && pt.id === nodeId && (pt.physicalMotor)) return String(pt.physicalMotor);
       }
     }
     return '';
@@ -3121,14 +3122,6 @@ function applyRackStops() {
   }),{pushUndo,notify:transient}))return;
   rebuild(); draw(); gearEditor.updateGearEditor(); scheduleAutosave();
   transient(sug.map(s => s.message).join(' '));
-}
-function showCncWarnings(parts, settings) {
-  const list = cncWarningList(parts);
-  let found = [];
-  try { found = resolvedBuild(settings, homeMountsNow()).interference; } catch (e) { found = []; }
-  if (found.length) list.unshift(`干涉 ${found.length} 項，詳見製作包`);
-  if (!list.length) return;
-  setBanner(`⚠ CNC：${list.slice(0, 3).join('；')}${list.length > 3 ? `；…等 ${list.length} 項` : ''}`);
 }
 async function openAssemblySequence() {
   if (S.mode !== 'bench') { transient('請先切到組立模式。'); return; }

@@ -707,7 +707,7 @@ export function suggestRackStops({ comps, modules = [], params = {}, plan, range
     let g = gearById.get(pinionId);
     while (g && !seen.has(g.id)) {
       seen.add(g.id);
-      const m = g.p1 && (g.p1.physicalMotor || g.p1.physical_motor);
+      const m = g.p1 && (g.p1.physicalMotor);
       if (m) return String(m);
       g = g.mesh ? gearById.get(g.mesh) : null;
     }

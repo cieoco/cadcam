@@ -10,7 +10,7 @@ import { prepareConnectionWork } from './connection-work.js';
 import { pointKeysFor } from './part-types.js';
 
 const fail = (message, code = 'GROUP_INTERFACE_UNSUPPORTED') => ({ ok: false, issues: [taskIssue(code, message)] });
-const ground = p => p?.type === 'fixed' && !p.physicalMotor && !p.physical_motor;
+const ground = p => p?.type === 'fixed' && !p.physicalMotor;
 const solve = w => solveAssembly(compileAssembly(w.comps, w.modules, { params: w.params }), { thetaDeg: 0, motorAngles: {} });
 const fresh = (prefix, used) => { let id = prefix, n = 1; while (used.has(id)) id = `${prefix}-${n++}`; used.add(id); return id; };
 
@@ -47,9 +47,9 @@ function extract(work, info) {
     const p = solved.points[body[k].id];
     if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return fail('基準板孔位無有效解。');
     extracted[k] = { ...body[k], id: fresh(`${moduleId}-${body[k].id}`, usedPoints), x: p.x, y: p.y, type: k === 'p3' ? 'floating' : 'fixed' };
-    delete extracted[k].physicalMotor; delete extracted[k].physical_motor;
+    delete extracted[k].physicalMotor;
   }
-  delete extracted.physicalMotor; delete extracted.physical_motor; delete extracted.isInput;
+  delete extracted.physicalMotor; delete extracted.isInput;
   const usedParams = new Set(Object.keys(work.params));
   for (const field of ['gParam', 'r1Param', 'r2Param']) {
     const key = body[field], next = fresh(`${moduleId}-${key}`, usedParams);

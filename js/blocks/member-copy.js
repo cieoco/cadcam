@@ -48,7 +48,7 @@ export function planMemberCopy({comps, params, modules = [], counter = 0, id, po
       if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return fail('零件目前沒有有效位置。');
       c[key] = {id:p.id,type:'floating',x:pos.x,y:pos.y};
     }
-    for (const key of ['physicalMotor','physical_motor','motorType','motorMount','motorCarrier','motorMountPoint','mountLocatorPoint','phaseOffset','servoStart','servoEnd','assemblyMobility','assemblyType','frameSeparate']) delete c[key];
+    for (const key of ['physicalMotor','motorType','motorMount','motorCarrier','motorMountPoint','mountLocatorPoint','phaseOffset','servoStart','servoEnd','assemblyMobility','assemblyType','frameSeparate']) delete c[key];
     localHoles(c).forEach(h=>h.type='floating');
     if (c.type === 'bar') c.isInput = false;
     if (c.type === 'triangle') {

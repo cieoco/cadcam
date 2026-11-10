@@ -281,13 +281,6 @@ export function plateVertexWorldPoints(comp = {}, points = []) {
   return out;
 }
 
-// 造形（非求解）頂點的世界座標；保留給既有呼叫端。
-export function outlineControlWorldPoints(comp = {}, points = []) {
-  return plateVertexWorldPoints(comp, points)
-    .filter(p => !p.solve)
-    .map(p => ({ x: p.x, y: p.y, hole: p.hole }));
-}
-
 // 依頂點順序的世界輪廓點（求解點 + 造形點）。
 export function plateContourPoints(comp = {}, points = []) {
   const world = plateVertexWorldPoints(comp, points).map(p => ({ x: p.x, y: p.y }));

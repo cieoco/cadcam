@@ -14,6 +14,7 @@
 
 import {withMotorShaftHoles} from '../core/local-holes.js';
 import { pointKeysFor } from './part-types.js';
+import { isGroundPoint } from './motor-roles.js';
 
 const GROUND = '__ground__';
 const BODY_TYPES = new Set(['bar', 'triangle', 'slider', 'gear', 'rack', 'cam', 'pulley']);
@@ -42,11 +43,8 @@ function pointIds(comp) {
   return [...pointKeysFor(comp).map(key => comp[key]?.id),...(comp.holes || []).map(h=>h.id)].filter(Boolean);
 }
 
-function isGroundPoint(point) {
-  // 只看接點型別。帶 physicalMotor 但型別 floating 的是「騎乘馬達」（馬達殼固定在動桿上、
-  // 軸心跟著機構動），它驅動一個關節而非把節點釘到機架，不能算接地。
-  return Boolean(point && (point.type === 'fixed' || point.type === 'motor' || point.type === 'linear'));
-}
+// 只看接點型別（motor-roles.isGroundPoint）。帶 physicalMotor 但型別 floating 的是「騎乘馬達」（馬達殼固定在動桿上、
+// 軸心跟著機構動），它驅動一個關節而非把節點釘到機架，不能算接地。
 
 function allGroundPointIds(comps) {
   const ground = new Set();
@@ -128,7 +126,7 @@ export function analyzeDof(comps = []) {
   comps.forEach(comp => {
     if (!comp) return;
     [comp, comp.p1, comp.p2, comp.p3].forEach(o => {
-      const v = o && (o.physicalMotor || o.physical_motor);
+      const v = o && (o.physicalMotor);
       if (v) motorIds.add(String(v));
     });
   });

@@ -31,9 +31,6 @@ export function loadLocal() {
     return s ? JSON.parse(s) : null;
   } catch (_) { return null; }
 }
-export function clearLocal() {
-  try { localStorage.removeItem(AUTOSAVE_KEY); } catch (_) {}
-}
 
 // ---- 檔案 ----
 export function downloadJson(snapshot, filename) {

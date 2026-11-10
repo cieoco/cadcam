@@ -86,7 +86,7 @@ export function usedMotorIds() {
   const ids = new Set();
   S.comps.forEach(c => {
     [c, c.p1, c.p2, c.p3].forEach(o => {
-      const v = o && (o.physicalMotor || o.physical_motor);
+      const v = o && (o.physicalMotor);
       if (v) ids.add(String(v));
     });
   });

@@ -2,6 +2,8 @@
 import {holeWorld} from '../core/local-holes.js';
 import {planMotorInstallation,actuatorHostPoints} from './actuator-installation.js';
 import {planActuatorPlateHoles} from './actuator-plate-holes.js';
+import {buildRelations} from './relations.js';
+import {integrityGate} from './integrity-gate.js';
 
 const keys=['p1','p2','p3'];
 const near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<=0.01;
@@ -9,15 +11,15 @@ const holeLabel=(host,h)=>host.type==='bar'?`第${h.u/8+1}孔`:`長向第${h.u/8
 
 /** 軸心 id 是座板格孔，但存檔座標不在那個孔上（例如解除位置鎖定後拖走）。 */
 export function offPlateMotors(comps=[]){
-  const out=[];
+  const out=[],rel=buildRelations({comps});
   for(const c of comps){
-    const m=c.motorMount,host=m?.frameBody&&comps.find(h=>h.id===m.frameBody);
-    if(!m?.center||!host?.standardBlank)continue;
-    const hole=[...(host.holes||[]),...(host.standardBlank.mountHoles||[])].find(h=>h.id===m.center);
-    const shaft=keys.map(k=>c[k]).find(p=>p?.id===m.center);
+    const m=rel.motorOf(c.id),center=m?.ownerId===c.id&&m.centerId,host=m?.frameBodyId&&comps.find(h=>h.id===m.frameBodyId);
+    if(!center||!host?.standardBlank)continue;
+    const hole=[...(host.holes||[]),...(host.standardBlank.mountHoles||[])].find(h=>h.id===center);
+    const shaft=keys.map(k=>c[k]).find(p=>p?.id===center);
     if(!hole||!shaft)continue;
     const world=holeWorld(host,hole);
-    if(!near(shaft,world))out.push({id:c.id,center:m.center,host,hole,shaft:{x:shaft.x,y:shaft.y},world});
+    if(!near(shaft,world))out.push({id:c.id,center,host,hole,shaft:{x:shaft.x,y:shaft.y},world});
   }
   return out;
 }
@@ -77,6 +79,8 @@ export function planMotorRelease(source,barId,points={},motion={}){
 // ---- 畫面接頭（app 以 window.blocks.motorRelease 呼叫；離開座板的提示由 integrity-hints.js 顯示）----
 function commit(api,plan){
   if(!plan.ok){api.notify(plan.message);return false;}
+  const S=api.S;
+  if(!integrityGate({comps:S.comps,modules:S.modules,params:S.topo.params},{comps:plan.comps,modules:plan.modules||S.modules,params:plan.params||S.topo.params},api.notify))return false;
   api.pause?.();api.pushUndo();api.S.comps=plan.comps;if(plan.params)api.S.topo.params=plan.params;
   api.rebuild();api.draw();api.save?.();api.notify(plan.message);api.refresh?.();return true;
 }

@@ -23,7 +23,7 @@ import {servoRange} from './motor-tools.js';
 export const DIMENSION_KINDS = ['distance', 'height', 'horizontal', 'displacement'];
 const fin = n => Number.isFinite(n);
 const holes = c => [c?.p1, c?.p2, c?.p3].filter(p => p && p.id);
-const roleOf = p => p.physicalMotor || p.physical_motor ? '馬達軸心' : p.type === 'fixed' ? '固定孔' : '接點';
+const roleOf = p => p.physicalMotor ? '馬達軸心' : p.type === 'fixed' ? '固定孔' : '接點';
 
 // ---------- 候選點 ----------
 // 每個孔／接點都是候選；板件的外形頂點（求解孔以外的點）也是，最後一個標為「尖端」（夾爪尖）。
@@ -166,10 +166,10 @@ export function dimensionRange(dim, comps = [], params = {}, opts = {}) {
       if (m.ok) samples.push({at, value: m.value});
     }
   } else {
-    const motorIds = [...new Set(comps.flatMap(c => [c, c.p1, c.p2, c.p3]).map(o => o && (o.physicalMotor || o.physical_motor)).filter(Boolean).map(String))].sort();
+    const motorIds = [...new Set(comps.flatMap(c => [c, c.p1, c.p2, c.p3]).map(o => o && (o.physicalMotor)).filter(Boolean).map(String))].sort();
     if (!motorIds.length) return fail('這個機構沒有動力輸入，只能看目前值');
     const id = opts.motorId && motorIds.includes(String(opts.motorId)) ? String(opts.motorId) : motorIds[0];
-    const servo = servoRange(comps, id), linear = comps.some(c => c.type === 'slider' && c.isInput && String(c.physicalMotor || c.physical_motor || '1') === id);
+    const servo = servoRange(comps, id), linear = comps.some(c => c.type === 'slider' && c.isInput && String(c.physicalMotor || '1') === id);
     const range = opts.range && fin(opts.range.lo) && fin(opts.range.hi) ? opts.range : servo;
     const from = range ? range.lo : 0, to = range ? range.hi : 360;
     input = {kind: servo ? 'servo' : linear ? 'linear' : 'motor', unit: linear ? 'mm' : '°', from, to, id};

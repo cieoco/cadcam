@@ -1,6 +1,7 @@
 import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 /** One review for both pointer and numeric candidates. No undo/write before acceptance. */
 import {inspectMountingChange} from './mounting-review.js';
+import {integrityGate} from './integrity-gate.js';
 
 export const mountingWork=S=>({comps:S.comps,modules:S.modules,params:S.topo.params,fabrication:S.fabrication});
 /** Focused editors replace only their design; review the same complete work that will be saved. */
@@ -31,6 +32,7 @@ export function commitLegacyMountingEdit(S,mutate,options){
 }
 
 export function confirmMountingChange(before,after,{ask=message=>window.confirm(message),notify=message=>window.alert(message)}={}){
+  if(!integrityGate(before,after,notify))return false;
   let review;
   try{review=inspectMountingChange(before,after);}catch(e){notify(`無法核對固定孔位：${e.message}`);return false;}
   if(!review.ok){notify(review.issues.join('\n'));return false;}

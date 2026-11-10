@@ -46,7 +46,7 @@ export function planGearHolePlacement(source,{gearId,mode='manual',referenceId,r
   const angleChanged=Math.abs(angle-normalizeHoleAngle(Number(gear.phase)||0))>1e-9;
   const changed=radiusChanged||angleChanged;
   const outside=source.comps.filter(c=>c.id!==gear.id);
-  if(changed&&(gear.motorCarrier||outside.some(c=>refs(c).some(p=>p.id===gear.p2.id)||c.fusedWith===gear.id||c.pinion===gear.id||c.a?.componentId===gear.id||c.b?.componentId===gear.id||c.motorCarrier===gear.id||c.motorMount?.hostBody===gear.id||c.motorMount?.outputBody===gear.id||c.mountLocatorPoint===gear.p2.id||c.motorMountPoint===gear.p2.id)))
+  if(changed&&(gear.motorCarrier||outside.some(c=>refs(c).some(p=>p.id===gear.p2.id)||c.fusedWith===gear.id||c.pinion===gear.id||c.a?.componentId===gear.id||c.b?.componentId===gear.id||c.motorCarrier===gear.id||c.motorMount?.outputBody===gear.id||c.mountLocatorPoint===gear.p2.id||c.motorMountPoint===gear.p2.id)))
     return fail('輸出孔已連接其他零件，請先在未連接的齒輪設定孔位，再安裝夾指；可用復原退回安裝前。');
   const used=v=>typeof v==='string'?[gear.id,gear.p2.id].includes(v):!!v&&typeof v==='object'&&Object.values(v).some(used);
   if(changed&&(source.modules||[]).some(used))return fail('齒輪已用於模組介面，請先解除介面關聯再調整。');

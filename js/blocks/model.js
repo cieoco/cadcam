@@ -15,6 +15,7 @@ import {localHoles,holeWorld,holeSide} from '../core/local-holes.js';
 
 import { solveTopology } from '../multilink/solver.js';
 import { pointKeysFor } from './part-types.js';
+import { isGroundPoint, motorRecords, motorOfComps } from './motor-roles.js';
 import { connectionModule } from './assembly.js';
 import { syringeClampFrameNodes } from './syringe-shape.js';
 import { planSyringeAttachmentResize } from '../core/syringe.js';
@@ -82,30 +83,15 @@ export function pointRefs(comps, id) {
 
 export function hasPoint(comps, id) { return pointRefs(comps, id).length > 0; }
 
-export function pointHasMotor(comps, id) {
-  if(comps.some(c=>c.type==='motor'&&c.p1?.id===id))return true;
-  return comps.some(c => c.type === 'bar' && c.isInput && (
-    (c.p1 && c.p1.id === id && c.p1.physicalMotor) ||
-    (c.p2 && c.p2.id === id && c.p2.physicalMotor)
-  ));
-}
+export const pointHasMotor = (comps, id) => !!motorOfComps(comps, id);
 
-export function isGroundPoint(p) {
-  return p && (p.type === 'fixed' || p.type === 'motor' || p.type === 'linear');
-}
+export { isGroundPoint };
 
 export function pointIsGround(comps, id) {
   return pointRefs(comps, id).some(ref => isGroundPoint(ref.point));
 }
 
-export function motorPointIds(comps) {
-  const ids = new Set();
-  comps.forEach(c => pointKeysFor(c).forEach(k => {
-    const p = c[k];
-    if (p && p.id && (p.physicalMotor || p.physical_motor)) ids.add(p.id);
-  }));
-  return ids;
-}
+export const motorPointIds = comps => new Set(motorRecords(comps).map(r => r.centerId).filter(Boolean));
 
 export function sliderMountInfo(comps, id) {
   const sl = comps.find(c => c.type === 'slider' && (c.m1?.id === id || c.m2?.id === id));
@@ -180,15 +166,14 @@ export function snapFrameCoord(v, step = LEGO_FRAME_STEP) {
 export function removeMotorAtPoint(comps, id) {
   comps.forEach(c => {
     if (!['bar','gear','pulley'].includes(c.type)) return;
-    const isMotorEnd = [c.p1,c.p2].some(p=>p?.id===id&&(p.physicalMotor||p.physical_motor));
+    const isMotorEnd = [c.p1,c.p2].some(p=>p?.id===id&&(p.physicalMotor));
     if (!isMotorEnd) return;
     if(c.type==='bar')c.isInput = false;
-    for(const key of ['physicalMotor','physical_motor','motorType','motorMount','motorCarrier','motor_carrier','servoStart','servoEnd'])delete c[key];
+    for(const key of ['physicalMotor','motorType','motorMount','motorCarrier','servoStart','servoEnd'])delete c[key];
   });
   comps.forEach(c=>{if(c.motorMountPoint===id)delete c.motorMountPoint;});
   pointRefs(comps, id).forEach(ref => {
     delete ref.point.physicalMotor;
-    delete ref.point.physical_motor;
   });
 }
 
@@ -202,7 +187,6 @@ export function setPointType(comps, id, type) {
     ref.point.type = type;
     if (type !== 'fixed') {
       delete ref.point.physicalMotor;
-      delete ref.point.physical_motor;
     }
   });
 }
@@ -464,7 +448,7 @@ export function isFreeLink(comps, c) {
 
 // Whole-body translation also respects local holes and indirect attachments.
 export function isFreeBody(comps, c, modules = []) {
-  const motor=c?.type==='motor'&&c.p1&&!c.motorCarrier&&!c.motor_carrier&&(!c.motorMount?.frameBody||c.motorMount.frameBody==='world');
+  const motor=c?.type==='motor'&&c.p1&&!c.motorCarrier&&(!c.motorMount?.frameBody||c.motorMount.frameBody==='world');
   if (!(motor || isFreeLink(comps,c) || (c?.type==='triangle' && freeTriangleForPoint(comps,c.p1?.id)===c))) return false;
   const holes=[c.p1,c.p2,c.p3,...localHoles(c)].filter(Boolean);
   // An unattached motor is grounded for simulation, but remains placeable in design.

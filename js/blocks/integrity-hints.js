@@ -14,7 +14,7 @@ import {barHullPath, platePath} from './view.js';
 const MAX_SHOWN = 3, NS = 'http://www.w3.org/2000/svg';
 const ORANGE = '#f97316', BLUE = '#2563eb';
 let shown = {fp: '', items: []}, dismissed = '';
-let marks = {hint: [], hover: []}, last = {}, observer = null, fitted = false;
+let flashTimer = 0, marks = {hint: [], hover: []}, last = {}, observer = null, fitted = false;
 
 // ---------------------------------------------------------------- canvas marks (same layer for hints and the status pill)
 /** 把零件畫成粗外框疊在畫布上；groups: [{ids, color}]。重畫後（svg 被清空）由 observer 補回。 */
@@ -148,6 +148,10 @@ function repair(api, item, r) {
 export function run(action, api) {
   if (action === 'check') return check(api);
   last = {...last, ...api};
+  if (action === 'flash') {   // 提交關卡拒絕時，把牽涉的零件短暫標出
+    marks.hover = [{ids: api.ids, color: ORANGE}]; refreshMarks(); clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => { marks.hover = []; refreshMarks(); }, 4000); return true;
+  }
   if (action === 'mark') {   // 狀態列點名「有一端沒接」的零件
     marks.hover = [{ids: looseEnds(api.comps || [], api.issue || {}).map(c => c.id), color: ORANGE}];
     refreshMarks(); return true;

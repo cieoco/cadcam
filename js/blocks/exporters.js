@@ -642,37 +642,6 @@ function cleanPolylineOutline(points, radius) {
   ];
 }
 
-function roundedTriangleOutline(a, b, c, radius) {
-  const pts = [a, b, c];
-  const area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-  const ordered = area < 0 ? [a, c, b] : pts;
-  const tangent = (p, q) => {
-    const dx = q.x - p.x, dy = q.y - p.y;
-    const dist = Math.hypot(dx, dy) || 1;
-    const nx = dy / dist, ny = -dx / dist;
-    return {
-      start: { x: p.x + nx * radius, y: p.y + ny * radius },
-      end: { x: q.x + nx * radius, y: q.y + ny * radius }
-    };
-  };
-  const out = [];
-  const ts = ordered.map((p, i) => tangent(p, ordered[(i + 1) % ordered.length]));
-  out.push(ts[0].start);
-  for (let i = 0; i < ts.length; i++) {
-    const curr = ts[i];
-    const next = ts[(i + 1) % ts.length];
-    const corner = ordered[(i + 1) % ordered.length];
-    out.push(curr.end);
-    out.push(...arcPoints(
-      corner.x, corner.y, radius,
-      Math.atan2(curr.end.y - corner.y, curr.end.x - corner.x) * 180 / Math.PI,
-      Math.atan2(next.start.y - corner.y, next.start.x - corner.x) * 180 / Math.PI,
-      14
-    ).slice(1));
-  }
-  return out;
-}
-
 function jawCenterline(pivot, drive, tip, turnSign = 0) {
   const dx = tip.x - pivot.x;
   const dy = tip.y - pivot.y;

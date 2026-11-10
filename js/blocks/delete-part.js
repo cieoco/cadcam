@@ -4,6 +4,7 @@ import {fusionRoot} from '../core/bar-fusion.js';
 import {ownedParamKeys} from './part-types.js';
 import {detachDeletedAttachments} from './detached-attachments.js';
 import {pruneTopoRefs} from './topo-refs.js';
+import {integrityGate} from './integrity-gate.js';
 export function deleteSelectedPart({S,transient,deleteGearChain,pushUndo,pause,closeMobileEditPanel,setSliderDetailRows,rebuild,draw,points}) {
   if(fusionRoot(S.comps,S.selectedLinkId)){transient('請先解除合成，再刪除其中的連桿。');return;}
   if(S.comps.some(c=>c.id===S.selectedTriangleId && c.fusedWith)){transient('請先解除合成，再刪除板件');return;}
@@ -18,6 +19,7 @@ export function deleteSelectedPart({S,transient,deleteGearChain,pushUndo,pause,c
   if(comp.type==='motor')for(const c of candidate)if(c.motorMountPoint===comp.p1.id)delete c.motorMountPoint;
   ownedParamKeys(comp).forEach(k=>delete params[k]);
   const platePlan=planActuatorPlateHoles({comps:candidate,params,modules:S.modules,fabrication:S.fabrication});if(!platePlan.ok){transient(platePlan.message);return;}
+  if(!integrityGate({comps:S.comps,modules:S.modules,params:S.topo.params},{comps:platePlan.comps,modules:S.modules,params},transient))return;
   pushUndo();
   pause();
   // 刪除前先清掉這個元件佔用的 topo.params（型別表宣告它擁有哪些參數）

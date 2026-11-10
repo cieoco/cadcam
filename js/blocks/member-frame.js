@@ -14,7 +14,7 @@ export function planMemberFrame({comps,params,id,points={},motion={}}){
  if(pair.some(p=>!p||![p.x,p.y].every(Number.isFinite))||pair[0].id===pair[1].id||Math.hypot(pair[0].x-pair[1].x,pair[0].y-pair[1].y)<.001)return fail('需要兩個不同位置的有效孔，才能設為機架。');
  for(const [a,b,key] of [[owner.p1,owner.p2,owner.lenParam||owner.gParam],...(owner.p3?[[owner.p1,owner.p3,owner.r1Param],[owner.p2,owner.p3,owner.r2Param]]:[])])if(!Number.isFinite(params[key])||Math.abs(Math.hypot(a.x-b.x,a.y-b.y)-params[key])>.001)return fail('目前孔位與設定孔距不一致，請先回到初始姿態；不會以固定操作改變形狀。');
  const ids=new Set(pair.map(p=>p.id)),newIds=new Set([...ids].filter(id=>!before.has(id)));
- if(owner.isInput||comps.some(c=>keys.some(k=>newIds.has(c[k]?.id)&&(c.isInput||c[k]?.type==='motor'||c[k]?.physicalMotor||c[k]?.physical_motor))))return fail('這些孔仍由馬達或致動器驅動，請先解除對應動力，再設為機架。');
+ if(owner.isInput||comps.some(c=>keys.some(k=>newIds.has(c[k]?.id)&&(c.isInput||c[k]?.type==='motor'||c[k]?.physicalMotor))))return fail('這些孔仍由馬達或致動器驅動，請先解除對應動力，再設為機架。');
  if([owner.p1,owner.p2,owner.p3].filter(Boolean).some(p=>points[p.id]&&Math.hypot(points[p.id].x-p.x,points[p.id].y-p.y)>.001))return fail('請先回到零件的初始姿態再設為機架；這次沒有移動孔位或改變桿長。');
  const next=structuredClone(comps);
  if(owner.type==='bar')next.find(c=>c.id===id).frameSeparate=true;

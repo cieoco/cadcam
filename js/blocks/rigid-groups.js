@@ -18,7 +18,7 @@ export function normalizeRigidGroups(raw) {
 function structuralFrame(comps, id) {
   const own = comps.filter(c => c?.moduleId === id);
   return own.length > 0 && own.every(c => c.type === 'anchor' && c.p1?.type === 'fixed'
-    && !c.physicalMotor && !c.physical_motor && !c.p1.physicalMotor && !c.p1.physical_motor);
+    && !c.physicalMotor && !c.p1.physicalMotor);
 }
 function follows(to, host, output, members) {
   return to && (to.module === host && to.output === output && !to.frame && !to.body

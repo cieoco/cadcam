@@ -17,9 +17,9 @@
  */
 import {pointKeysFor} from './part-types.js';
 import {localHoles,holeWorld} from '../core/local-holes.js';
+import {isGroundPoint, motorRecords, motorRecordOf} from './motor-roles.js';
 import {attachmentPoint,hasSyringeClamp,fixedSyringePointIds} from '../core/syringe.js';
 
-const GROUND_TYPES = new Set(['fixed', 'motor', 'linear']);
 const isStr = v => typeof v === 'string' && v !== '';
 const hasId = p => !!p && typeof p === 'object' && isStr(p.id);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -148,39 +148,15 @@ export function buildRelations(work) {
   // ---------------------------------------------------------------- ground
   const lockedIds = () => once('locked', () => attempt(() => fixedSyringePointIds(comps), new Set()));
   const groundSource = id => {
-    for (const r of copies().get(id) || []) if (GROUND_TYPES.has(r.type)) return r.type;
+    for (const r of copies().get(id) || []) if (isGroundPoint(r)) return r.type;
     return lockedIds().has(id) ? 'locked-plate' : null;
   };
   const isGround = id => groundSource(id) !== null;
 
   // ---------------------------------------------------------------- motors (field roles of SDD 3.1)
-  const motors = () => once('motors', () => {
-    const out = [];
-    for (const c of comps) {
-      const m = c.motorMount && typeof c.motorMount === 'object' ? c.motorMount : null;
-      const part = c.type === 'motor';
-      const carrying = pointKeysFor(c).map(k => c[k]).find(p => hasId(p) && p.physicalMotor != null && p.physicalMotor !== '');
-      const owner = part || c.physicalMotor != null || !!m || (!!carrying && (!!c.isInput || !!c.motorType || c.type === 'gear'));
-      if (!owner) continue;
-      const src = {};
-      let motor = '1';
-      if (c.physicalMotor != null) { motor = String(c.physicalMotor); src.motor = 'physicalMotor'; }
-      else if (m?.motor != null) { motor = String(m.motor); src.motor = 'motorMount.motor'; }
-      else if (carrying) { motor = String(carrying.physicalMotor); src.motor = 'point.physicalMotor'; }
-      else src.motor = 'default';
-      const centerId = isStr(m?.center) ? m.center : part ? (c.p1?.id ?? null) : (carrying?.id ?? null);
-      src.center = isStr(m?.center) ? 'motorMount.center' : part ? 'p1' : carrying ? 'point.physicalMotor' : 'none';
-      out.push({ownerId: c.id, motor, type: c.motorType || m?.type || 'tt', centerId,
-        carrierId: isStr(c.motorCarrier) ? c.motorCarrier : null,
-        frameBodyId: isStr(m?.frameBody) ? m.frameBody : null,
-        partId: isStr(m?.partId) ? m.partId : null,
-        mountPointId: isStr(c.motorMountPoint) ? c.motorMountPoint : null,
-        isInput: !!c.isInput, phaseOffset: Number(c.phaseOffset) || 0, independent: part, sources: src});
-    }
-    return out;
-  });
+  const motors = () => once('motors', () => motorRecords(comps));
   const motorOf = id => {
-    const rec = motors().find(r => r.ownerId === id) || motors().find(r => r.centerId === id);
+    const rec = motorRecordOf(motors(), id);
     return rec ? {...rec, sources: {...rec.sources}} : null;
   };
 
@@ -191,7 +167,7 @@ export function buildRelations(work) {
     const part = c.type === 'motor';
     const points = [...pointKeysFor(c).map(k => c[k]).filter(hasId), ...localHoles(c)];
     // 獨立馬達零件自己的軸心就是馬達／固定點，不算「接地」；尚未接任何關係時仍可自由擺放。
-    if (!part && (c.isInput || c.physicalMotor != null || points.some(p => GROUND_TYPES.has(p.type) || p.physicalMotor))) return false;
+    if (!part && (c.isInput || c.physicalMotor != null || points.some(p => isGroundPoint(p) || p.physicalMotor))) return false;
     // 每個孔 id 只屬於這個零件
     const own = owners();
     for (const p of points) if ((own.get(p.id)?.size || 0) > 1) return false;
@@ -226,7 +202,7 @@ export function buildRelations(work) {
     // 別處的引用（宣告本身不算）
     const external = (refs().byValue.get(holeId) || []).filter(r => !(r.kind === 'comp' && r.index === compIndex.get(compId) && r.path === decl));
     const refText = r => `${r.kind === 'comp' ? r.ownerId : '模組 ' + r.ownerId}.${r.path}`;
-    const ground = GROUND_TYPES.has(p.type);
+    const ground = isGroundPoint(p);
     // constraint：參與運動約束
     if (kind === 'primary') reasons.constraint.push('零件自己的主要孔');
     if (ground) reasons.constraint.push(`type=${p.type}`);

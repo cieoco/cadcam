@@ -6,7 +6,7 @@ export function validateSupports(snapshot = {}) {
   const issues = [], motors = [], fixedPoints = [];
   const issue = (code, message, targets, severity = 'warning') => issues.push({ code, message, targets, severity });
   const points = c => [c.p1, c.p2, c.p3].filter(Boolean);
-  const fixed = c => ['bar', 'triangle'].includes(c?.type) && !c.isInput && !c.physicalMotor && !c.physical_motor &&
+  const fixed = c => ['bar', 'triangle'].includes(c?.type) && !c.isInput && !c.physicalMotor &&
     [c.p1, c.p2].every(p => p && ['fixed', 'motor'].includes(p.type)) &&
     Math.hypot(c.p1.x-c.p2.x,c.p1.y-c.p2.y)>1e-6;
   for (const c of comps) for (const p of points(c)) {
@@ -14,8 +14,8 @@ export function validateSupports(snapshot = {}) {
       fixedPoints.push({ id:p.id, moduleId:c.moduleId || null, status:'ideal_fixed', physicalVerified:false });
   }
   // 多孔板可共用動力孔，但不是另一顆馬達；只核對動力來源元件。
-  for (const c of comps.filter(c => c.isInput || c.motorMount || c.motorCarrier || c.motor_carrier || (c.type !== 'triangle' && (c.physicalMotor || c.physical_motor)))) {
-    const mount = c.motorMount || {}, frameId = mount.frameBody || c.motorCarrier || c.motor_carrier;
+  for (const c of comps.filter(c => c.isInput || c.motorMount || c.motorCarrier || (c.type !== 'triangle' && c.physicalMotor))) {
+    const mount = c.motorMount || {}, frameId = mount.frameBody || c.motorCarrier;
     const motor = { componentId:c.id, frameBody:frameId || null, status:'ideal_fixed', physicalVerified:false };
     motors.push(motor);
     if (mount.outputBody && mount.outputBody !== c.id) issue('INVALID_MOTOR_OUTPUT','動力輸出件宣告與來源元件不一致。',[c.id,mount.outputBody],'error');
@@ -27,7 +27,7 @@ export function validateSupports(snapshot = {}) {
       issue('MOTOR_FRAME_IS_OUTPUT','動力外殼與輸出件屬同一剛體，無法產生相對轉動。',[c.id,frameId],'error'); continue;
     }
     if (frame.moduleId !== c.moduleId) { issue('CROSS_MODULE_MOTOR_SUPPORT','跨模組動力支撐尚未驗證。',[c.id,frameId]); continue; }
-    const carrier = c.motorCarrier || c.motor_carrier;
+    const carrier = c.motorCarrier;
     if (!fixed(frame)) {
       if (carrier === frameId) { motor.status='moving_carrier_declared'; issue('CARRIER_SUPPORT_UNVERIFIED','已宣告隨動機架，至底座的支撐鏈尚未驗證。',[c.id,frameId]); }
       else issue('MOVING_MOTOR_FRAME','指定機架未被固定，也未宣告為隨動機架。',[c.id,frameId],'error');

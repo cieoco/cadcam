@@ -8,18 +8,19 @@ import {readConnectionDescriptor} from './connection-descriptor.js';
 import {buildMotorMounts,buildMotorExportMounts} from './motor-mounts.js';
 import {motorPointIds,pointCoords,frameNodeIds,sliderMountInfo,isHiddenSliderRailPoint} from './model.js';
 import {motorTypeAt} from './motor-tools.js';
+import {motorRecords} from './motor-roles.js';
 import {FABRICATION_DEFAULTS} from './fabrication-profile.js';
 import {prepareConnectionWork} from './connection-work.js';
 
 const pointKeys=['p1','p2','p3'];
 const work=s=>({...s,comps:s.comps||[],modules:s.modules||[],params:s.params||s.topo?.params||{},fabrication:s.fabrication||FABRICATION_DEFAULTS});
 function interfaces(s){
-  const result=new Map(),add=(id,label,parts)=>{const r={id,label,parts:parts.filter(Boolean)};result.set(id,r);return r;};
+  const motorOf=new Map(motorRecords(s.comps).map(r=>[r.ownerId,r])),result=new Map(),add=(id,label,parts)=>{const r={id,label,parts:parts.filter(Boolean)};result.set(id,r);return r;};
   for(const c of s.comps){
     if(c.type==='syringe'&&['fixed-axis','pivot'].includes(c.mountMode))add(`syringe:${c.id}`,'針筒固定環',[c.a?.componentId,c.b?.componentId,'frame']);
-    const center=c.motorMount?.center || pointKeys.map(k=>c[k]).find(p=>p?.physicalMotor)?.id;
+    const rec=motorOf.get(c.id),center=rec?.centerId;
     // A motor keeps its identity when the user chooses a different output body.
-    const motor=c.motorMount?.motor||c.physicalMotor||pointKeys.map(k=>c[k]).find(p=>p?.physicalMotor)?.physicalMotor;
+    const motor=rec?.sources.motor==='default'?undefined:rec?.motor;
     if(center&&(c.type==='bar'&&c.isInput||['gear','pulley'].includes(c.type)))add(`motor:${c.moduleId||'#root'}:${motor||center}`,'馬達固定座',[c.id,c.motorMount?.frameBody||c.motorCarrier||'frame',c.moduleId?`${c.moduleId}-frame`:null]);
     if(c.type==='rack'&&c.framePins?.length)add(`rack:${c.id}`,'齒條導銷',[c.id,'frame',c.moduleId?`${c.moduleId}-frame`:null]);
     if(c.type==='gear')for(const other of s.comps.filter(o=>['bar','triangle'].includes(o.type))){
@@ -65,7 +66,7 @@ function footprint(part,s,relation,catalog){
     const motorFeature=f=>/^(TT_|MG995_|N20_)/.test(f.layer||f.purpose||'');
     holes=holes.filter(motorFeature);cutouts=cutouts.filter(motorFeature);
     // Shaft at p2: measure from it.
-    const o=s.comps.find(c=>c.id===part.id),dx=o?.isInput&&o.p2?.id===(o.motorMount?.center||o.p2.physicalMotor&&o.p2.id)?Number(s.params[o.lenParam])||0:0;
+    const o=s.comps.find(c=>c.id===part.id),dx=o?.isInput&&o.p2?.id===motorRecords(s.comps).find(r=>r.ownerId===o.id)?.centerId?Number(s.params[o.lenParam])||0:0;
     if(dx){const f=local;local=p=>({...f(p),x:f(p).x-dx});}
   }else if(relation.pointIds){
     // Only the paired mounting holes; changing a jaw tip is not a mounting edit.

@@ -10,31 +10,24 @@ import {gearTrain} from '../core/gear-train.js';
 
 import { S, activateMotor, usedMotorIds, nextMotorId } from './state.js';
 import {commitMountingEdit} from './mounting-review-ui.js';
+import {motorOfComps} from './motor-roles.js';
 
 // ---- 動力來源查詢純函式（不碰 S / 工廠，方便單測）----
-// 以此接點為馬達中心的型號：桿件輸入 → 齒輪驅動輪 → 預設 TT。
+// 以此接點為馬達中心的型號（馬達關係的單一來源 motor-roles.js）：預設 TT。
 export function motorTypeAt(comps, centerId) {
-  const bar = comps.find(c => c.type === 'bar' && c.isInput && (
-    (c.p1 && c.p1.id === centerId && c.p1.physicalMotor) ||
-    (c.p2 && c.p2.id === centerId && c.p2.physicalMotor)
-  ));
-  if (bar) return ['mg995','n20'].includes(bar.motorType) ? bar.motorType : 'tt';
-  const gear = comps.find(c => ['gear','pulley','motor'].includes(c.type) && c.p1 && c.p1.id === centerId && c.p1.physicalMotor);
-  if (gear) return ['mg995','n20'].includes(gear.motorType) ? gear.motorType : 'tt';
-  return 'tt';
+  const t = motorOfComps(comps, centerId)?.type;
+  return t === 'mg995' || t === 'n20' ? t : 'tt';
 }
 // 角度面板與編輯共用同一查詢；馬達裝配的桿件查詢仍保持原用途。
 export function servoInputAt(comps, centerId) {
-  return comps.find(c => c.motorType === 'mg995' && (
-    (['gear','motor'].includes(c.type) && c.p1?.id === centerId && c.p1.physicalMotor) ||
-    (c.type === 'bar' && c.isInput && [c.p1, c.p2].some(p => p?.id === centerId && p.physicalMotor))
-  )) || null;
+  const r = motorOfComps(comps, centerId);
+  return r?.type === 'mg995' && comps.find(c => c.id === r.ownerId) || null;
 }
 
 // active 馬達若是 MG995 伺服（桿件或齒輪），回它來回擺的 {lo, hi}；否則 null。
 export function servoRange(comps, activeMotor) {
   const active = String(activeMotor);
-  const motorIdOf = (c) => String(c.physicalMotor || c.physical_motor || '1');
+  const motorIdOf = (c) => String(c.physicalMotor || '1');
   const range = (c) => {
     const a = Number(c.servoStart) || 0;
     const b = Number.isFinite(Number(c.servoEnd)) ? Number(c.servoEnd) : 90;
@@ -43,7 +36,7 @@ export function servoRange(comps, activeMotor) {
   const servoBar = comps.find(c => c.type === 'bar' && c.isInput && c.motorType === 'mg995' && motorIdOf(c) === active);
   if (servoBar) return range(servoBar);
   const servoGear = comps.find(c => ['gear','motor'].includes(c.type) && c.motorType === 'mg995' && c.p1 &&
-    String(c.p1.physicalMotor || c.p1.physical_motor || '') === active);
+    String(c.p1.physicalMotor || '') === active);
   return servoGear ? range(servoGear) : null;
 }
 // active 馬達是否帶動某個齒條的小齒輪（小齒輪本身，或沿 mesh 鏈往上的驅動輪）。
@@ -56,7 +49,7 @@ export function rackDrivenBy(comps, activeMotor) {
     let g = byId.get(r.pinion);
     while (g && !seen.has(g.id)) {
       seen.add(g.id);
-      if (g.p1 && String(g.p1.physicalMotor || g.p1.physical_motor || '') === active) return true;
+      if (g.p1 && String(g.p1.physicalMotor || '') === active) return true;
       g = g.mesh ? byId.get(g.mesh) : null;
     }
     return false;
@@ -225,7 +218,7 @@ export function createMotorTools({
     if (!key) return;
     const carrier = carrierId ? S.comps.find(c => c.id === carrierId && c.type === 'bar') : null;
     // 這根桿已是輸入就沿用原編號；否則配一個新編號（第一顆自然是 '1'）。
-    const motorId = String(bar.physicalMotor || bar.physical_motor ||
+    const motorId = String(bar.physicalMotor ||
       bar.p1.physicalMotor || bar.p2.physicalMotor || nextMotorId());
     pushUndo();
     freezePointAtDisplay(nodeId);
@@ -278,7 +271,7 @@ export function createMotorTools({
     const sl = S.comps.find(c => c.id === sliderId && c.type === 'slider');
     if (!sl) return;
     pushUndo();
-    const motorId = String(sl.physicalMotor || sl.physical_motor || nextMotorId());
+    const motorId = String(sl.physicalMotor || nextMotorId());
     activateMotor(motorId, 0);   // S.theta 直接當行程位移（active 馬達由 motorAngles 傳給 getLinearShift）
     sl.isInput = true;
     sl.physicalMotor = motorId;
@@ -320,7 +313,7 @@ export function createMotorTools({
     }
     freezePointAtDisplay(g.p1.id);     // 馬達順手把驅動輪中心釘在目前位置（固定在機架），與桿件一致
     setPointType(g.p1.id, 'fixed');
-    const motorId = String(g.p1.physicalMotor || g.p1.physical_motor || nextMotorId());
+    const motorId = String(g.p1.physicalMotor || nextMotorId());
     activateMotor(motorId);            // 齒輪沿用舊行為：不重置 θ，只切換控制權
     g.p1.physicalMotor = motorId;
     cancelMotorMode();
@@ -376,7 +369,7 @@ export function createMotorTools({
   // 多馬達時只看 active 那顆——其他馬達凍結不動，不該影響播放範圍。
   function inputRockRange(comps = S.comps) {
     const active = String(S.activeMotor || '1');
-    const motorIdOf = (c) => String(c.physicalMotor || c.physical_motor || '1');
+    const motorIdOf = (c) => String(c.physicalMotor || '1');
     const servo = servoRange(comps, active);
     if (servo) return servo;
     const slider = comps.find(c => c.type === 'slider' && c.isInput && motorIdOf(c) === active);

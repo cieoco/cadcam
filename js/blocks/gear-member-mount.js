@@ -25,9 +25,9 @@ export function gearMountMember(source,id,positions={}) {
   const nodeIds=new Set([...refs.map(p=>p.id),...members.flatMap(c=>(c.holes||[]).map(h=>h.id))]);
   const usedByInterface=v=>typeof v==='string'?(nodeIds.has(v)||ids.has(v)):!!v&&typeof v==='object'&&Object.values(v).some(usedByInterface);
   if((source.modules||[]).some(usedByInterface))return fail('此零件已用於模組介面，請先建立獨立副本。');
-  if(members.flatMap(pointsOf).some(p=>p.type!=='floating'||p.physicalMotor||p.physical_motor))return fail('此零件已有固定或動力孔，請使用未固定的副本。');
+  if(members.flatMap(pointsOf).some(p=>p.type!=='floating'||p.physicalMotor))return fail('此零件已有固定或動力孔，請使用未固定的副本。');
   const outside=source.comps.filter(c=>!ids.has(c.id));
-  if(outside.some(c=>pointsOf(c).some(p=>nodeIds.has(p.id))||[c.a?.componentId,c.b?.componentId,c.outputId,c.motorCarrier,c.motorMount?.hostBody,c.motorMount?.outputBody].some(v=>ids.has(v))||
+  if(outside.some(c=>pointsOf(c).some(p=>nodeIds.has(p.id))||[c.a?.componentId,c.b?.componentId,c.outputId,c.motorCarrier,c.motorMount?.outputBody].some(v=>ids.has(v))||
     [c.motorMountPoint,c.mountLocatorPoint].some(v=>nodeIds.has(v))))return fail('此零件已接到其他零件；請先建立獨立副本，再安裝到齒輪。');
   const points=refs.map(p=>({...p,...(finite(positions[p.id])?positions[p.id]:{})}));
   // Rigid unions retain their saved local shape, even when a free part has no solved pose.
@@ -59,7 +59,7 @@ export function planGearMemberMount(source,request,{positions={},motion={}}={}) 
   if(mismatch&&!request.matchRadius)return {ok:false,reason:`夾指孔距 ${Number(length.toFixed(2))} mm，齒輪輸出孔距 ${radius} mm；請確認是否調整齒輪孔距。`,mismatch:true,length,radius};
   const changing=mismatch||request.flipPin===true;
   const external=source.comps.filter(c=>c.id!==gear.id&&!member.ids.has(c.id));
-  if(changing&&external.some(c=>pointsOf(c).some(p=>p.id===gear.p2.id)||c.fusedWith===gear.id||c.pinion===gear.id||c.a?.componentId===gear.id||c.b?.componentId===gear.id||c.motorCarrier===gear.id||c.motorMount?.hostBody===gear.id))
+  if(changing&&external.some(c=>pointsOf(c).some(p=>p.id===gear.p2.id)||c.fusedWith===gear.id||c.pinion===gear.id||c.a?.componentId===gear.id||c.b?.componentId===gear.id||c.motorCarrier===gear.id))
     return fail('齒輪輸出已連接其他零件，不能修改孔距或定位孔方向。');
   if(mismatch&&gear.pinRadiusParam&&external.some(c=>ownedParamKeys(c).includes(gear.pinRadiusParam)))return fail('齒輪孔距參數與其他零件共用，不能自動修改。');
   const comps=structuredClone(source.comps),params={...source.params},target=comps.find(c=>c.id===gear.id);

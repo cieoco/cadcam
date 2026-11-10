@@ -342,7 +342,7 @@ export function createGearEditor({
     if (!c || !c.p1 || !c.p2) return;
     const state = gearDriveState(c);
     const rootMotor = state && state.root && state.root.p1 &&
-      (state.root.p1.physicalMotor || state.root.p1.physical_motor);
+      (state.root.p1.physicalMotor);
     const phaseRad = (Number(c.phase) || 0) * Math.PI / 180;
     if (rootMotor && state && Math.abs(state.factor) > 1e-9) {
       // 多馬達：手轉哪條齒輪鏈就把控制權切給它的驅動馬達，其他馬達凍結在原角度。

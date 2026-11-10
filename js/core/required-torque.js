@@ -27,7 +27,7 @@ export function findMotors(comps) {
   for (const c of [...comps].sort((a,b)=>Number(!!(b?.isInput||b?.type==='gear'))-Number(!!(a?.isInput||a?.type==='gear')))) {
     if (!c || typeof c !== 'object') continue;
     for (const k of KEYS) {
-      const pm = c[k]?.physicalMotor ?? c[k]?.physical_motor;
+      const pm = c[k]?.physicalMotor;
       if (pm === undefined || pm === null || pm === '') continue;
       const id = String(pm);
       if (!map.has(id)) map.set(id, { id, shaftPointId: c[k].id, compId: c.id, motorType: c.motorType || 'tt', servoStart: c.servoStart, servoEnd: c.servoEnd, carrier: c.motorCarrier || null });
@@ -54,7 +54,7 @@ function gearStages(comps, params, motorId) {
   let stages = 0;
   for (const g of comps.filter(c => c.type === 'gear')) {
     const st = gt.state(g);
-    const root = st?.root && String(st.root.p1?.physicalMotor ?? st.root.p1?.physical_motor ?? '');
+    const root = st?.root && String(st.root.p1?.physicalMotor ?? '');
     if (st && root === motorId) stages = Math.max(stages, st.depth);
   }
   return { stages, reason: '' };

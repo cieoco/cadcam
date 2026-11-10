@@ -47,6 +47,8 @@ const {localHoles,holeWorld}=await import('../js/core/local-holes.js');
 const {pointKeysFor}=await import('../js/blocks/part-types.js');
 const {buildRelations}=await import('../js/blocks/relations.js');
 const {checkWork}=await import('../js/blocks/integrity.js');
+const {integrityGate,loadIntegrity,setIntegrityForTest}=await import('../js/blocks/integrity-gate.js');
+await loadIntegrity();   // C4: the commit gate is live for every step below (it is lazy in the app)
 await loadUnitStarts();
 
 const ROOT=new URL('../',import.meta.url);
@@ -101,7 +103,8 @@ const comp=id=>S.comps.find(c=>c.id===id);
 // ------------------------------------------------------------------ editors wired like the app
 let pushes=0,notices=[];
 const pushUndo=()=>{pushes++;};
-const notify=m=>{notices.push(m);};
+const GATE_TEXT='這個修改會讓作品資料對不起來';let gateRefusals=[];
+const notify=m=>{notices.push(m);if(String(m).startsWith(GATE_TEXT))gateRefusals.push(m);};
 let lastPoints=null;
 // app.displayCoords: stored coordinates overlaid with the last solved points (partial ones too when the pose is unsolvable).
 const displayCoords=()=>{const m=Model.pointCoords(S.comps);for(const [id,p] of Object.entries(lastPoints||{}))if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y))m[id]={x:p.x,y:p.y};return m;};
@@ -189,7 +192,9 @@ const OPS={
     const seed=structuredClone(S.comps);for(const [id,p] of Object.entries(displayCoords()))Model.updatePointCoordsById(seed,id,p.x,p.y);
     const cand=Model.previewPointConnection(seed,S.topo,step.from,step.to);
     if(!cand.ok){notify(cand.message);return {touched:[]};}
-    pushUndo();S.comps=cand.comps;retargetPointRefs(S.topo,step.from,step.to);      // as app.mergePoints
+    const work={comps:S.comps,modules:S.modules,params:S.topo.params};
+    if(!integrityGate(work,{...work,comps:cand.comps},notify))return {touched:[]};      // as app.mergePoints
+    pushUndo();S.comps=cand.comps;retargetPointRefs(S.topo,step.from,step.to);
     return {touched:[owner.id,...compOfPoint(step.to).map(c=>c.id)]};
   },
   split(step){
@@ -202,12 +207,14 @@ const OPS={
     // solvePinnedConstraints (holes joined by other parts or fixed stay rigid). If that cannot solve, the drag is refused.
     const skip=syringeInvolved(),owners=compOfPoint(step.pid);
     if(!owners.length||!owners.every(c=>plainBody(c,skip)))return null;
+    // The release of the drag is input.commitDragUndo: confirmMountingChange (mounting review + C4 integrity gate), else cancelPointDrag.
+    const pre=structuredClone(mountingWork(S)),release=r=>confirmMountingChange(pre,mountingWork(S),{notify})?r:(S.comps=pre.comps,{touched:[]});
     const free=Model.freeLinkForPoint(S.comps,step.pid)||Model.freeTriangleForPoint(S.comps,step.pid);
-    if(free){for(const k of pointKeysFor(free))if(free[k]?.id)Model.movePointById(S.comps,free[k].id,step.dx,step.dy);return {touched:[free.id],moved:Math.hypot(step.dx,step.dy)};}
+    if(free){for(const k of pointKeysFor(free))if(free[k]?.id)Model.movePointById(S.comps,free[k].id,step.dx,step.dy);return release({touched:[free.id],moved:Math.hypot(step.dx,step.dy)});}
     const at=displayCoords()[step.pid],draft=structuredClone(S.comps);
     if(!at||!Model.solvePinnedConstraints(draft,S.topo,step.pid,{x:at.x+step.dx,y:at.y+step.dy}))return {touched:[]};
     S.comps=draft;
-    return {touched:S.comps.map(c=>c.id),moved:Math.hypot(step.dx,step.dy)};
+    return release({touched:S.comps.map(c=>c.id),moved:Math.hypot(step.dx,step.dy)});
   },
   delete(step){
     const c=comp(step.id);if(!c||!['bar','triangle','motor','slider'].includes(c.type)||syringeInvolved().has(c.id))return null;
@@ -422,6 +429,7 @@ const knownClasses=new Set(fixtures.filter(f=>f.known).map(f=>`${f.signature}|${
 const tolerate=(sig,step)=>sig.startsWith('integrity:')&&knownClasses.has(`${sig}|${step.op}`);
 
 // ------------------------------------------------------------------ random runs
+const knownGateRefusals=gateRefusals.length;gateRefusals=[];   // KNOWN replays reproduce real contradictions: the gate refusing them is its job
 const RUNS_PER_WORK=2*SCALE,STEPS_PER_RUN=80;      // 6 works x 2 runs x 80 attempted steps, about 500 committed
 const SEEDS=[20261110,7,1234567,98765,424242,31337,5150,8086,271828,314159];
 const stats={tried:{},committed:{},refused:{},na:{},steps:0,invalid:0};
@@ -454,6 +462,46 @@ console.log('  committed by op: '+Object.entries(stats.committed).map(([k,v])=>`
 console.log('  not applicable at execution: '+JSON.stringify(stats.na));
 console.log('  refused/no-op by op: '+Object.entries(stats.tried).map(([k,v])=>`${k}=${v-(stats.committed[k]||0)}`).join(' '));
 if(stats.why)console.log(stats.why);
+const randomGateRefusals=gateRefusals.length;
+// ------------------------------------------------------------------ C4: forced contradictions are refused at every gated entry
+// A stand-in checkWork reports no problem for the current work and one I1 contradiction for the candidate (the gate calls it
+// for `before` first, then `after`). Every operation that goes through the gate must then leave the work untouched.
+{
+  const real=await import('../js/blocks/integrity.js');
+  let calls=0;
+  setIntegrityForTest({checkWork:()=>calls++%2?[{code:'I1',severity:'contradiction',parts:['forced'],ids:['forced-hole'],message:'forced test contradiction'}]:[]});
+  const forced={},stuck=[];
+  for(const workId of WORK_IDS){
+    const r=rngFrom(SEEDS[0]+WORK_IDS.indexOf(workId)*17+5);
+    initState(WORKS[workId]());lastPoints=null;pushes=0;
+    for(let i=0;i<120;i++){
+      const step=generate(r),before=fingerprint(),refusalsBefore=gateRefusals.length,undoBefore=pushes;
+      let res;try{res=OPS[step.op](step);}catch(e){stuck.push(`${workId}:${step.op} threw ${e.message}`);break;}
+      const refused=gateRefusals.length>refusalsBefore,changed=fingerprint()!==before;
+      const o=forced[step.op]??={refused:0,changed:0};
+      if(refused){o.refused++;if(changed||pushes!==undoBefore)stuck.push(`${workId}:${step.op} refused but changed the work or pushed undo`);}
+      else if(changed)o.changed++;
+    }
+  }
+  // reconnect (motor-drop-ui) and every other review-based entry share confirmMountingChange / commitMountingEdit
+  {
+    initState(WORKS[WORK_IDS[0]]());const src=mountingWork(S),cand={...src,comps:structuredClone(src.comps)};
+    let undo=0,msgs=[];calls=0;
+    check('forced contradiction: confirmMountingChange refuses',confirmMountingChange(src,cand,{notify:m=>msgs.push(m)})===false&&msgs[0]?.startsWith(GATE_TEXT),msgs[0]||'');
+    calls=0;const comps0=S.comps;
+    check('forced contradiction: commitMountingEdit refuses, keeps the work, no undo entry',commitMountingEdit(S,d=>{d.comps[0].name='x';},{pushUndo:()=>undo++,notify:m=>msgs.push(m)})===false&&undo===0&&S.comps===comps0);
+    setIntegrityForTest(real);
+    check('without the forced contradiction the same edit is accepted',commitMountingEdit(S,d=>{d.comps[0].name='x';},{pushUndo:()=>undo++,notify:m=>msgs.push(m)})===true&&undo===1);
+  }
+  setIntegrityForTest(real);
+  console.log('  forced contradiction, per op (refused/committed anyway): '+Object.entries(forced).map(([k,v])=>`${k}=${v.refused}/${v.changed}`).join(' '));
+  check('forced contradiction: a refused operation leaves the work and the undo stack untouched',stuck.length===0,stuck[0]||'');
+  const GATED=['resize','frame','release','merge','delete','move'];   // fix/unfix of a node in a work without standard plates mutates in place (not gated, listed in the changelog)
+  check('forced contradiction: every gated entry was refused at least once',GATED.every(op=>forced[op]?.refused>0),GATED.filter(op=>!(forced[op]?.refused>0)).join(','));
+  check('forced contradiction: nothing committed through a gated entry',GATED.every(op=>!forced[op]?.changed),GATED.filter(op=>forced[op]?.changed).map(op=>`${op}=${forced[op].changed}`).join(','));
+}
 check('random runs finished within the time budget',Date.now()-t0<120000*SCALE,`${secs}s`);
+console.log(`  commit gate: ${knownGateRefusals} refusal(s) while replaying KNOWN fixtures, ${randomGateRefusals} in random runs`);
+check('commit gate never refused a normal operation in the random runs (C4)',randomGateRefusals===0,gateRefusals[0]||'');
 check('no new failures in default seeds',found===0||knownKeys.size>=found,`${found} failing runs`);
 report('operation-sequences');
