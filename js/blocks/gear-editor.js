@@ -1,5 +1,5 @@
 import {gearTrain,sameGearBody} from '../core/gear-train.js';
-import {fitGearReduction} from './gear-reduction.js';
+let reductionEditor;
 import {editableNumber} from './numeric-input.js';
 import {gearDriver} from './motor-tools.js';
 /**
@@ -71,14 +71,12 @@ export function createGearEditor({
     S.topo.params[pinRadiusParam] = pinR;
     return gear;
   }
-  // 齒輪以「成對」為基本單位（圓心距、反向同動都是一對的性質）：放下一個嚙合齒輪對——
-  // 驅動輪（中心放馬達、一放下就轉）＋ 從動輪（mesh＝驅動輪），擺在相切位置（中心距＝兩節圓
-  // 半徑和），播放時依齒數比反向轉。兩輪共用模數 module，節圓半徑 R＝teeth·module/2，必定咬合。
+  // 新增相切的浮動齒輪對，選取從動輪後可調減速比。
   function addGearPair() {
     pushUndo();
     exitDrawTools();
     cancelMotorMode();
-    const {module:m, input:na, output:nb} = fitGearReduction(2, 72);
+    const m = 2, na = 24, nb = 48; // 2:1，中心距 72 mm（9 格）
     const Ra = na * m / 2, Rb = nb * m / 2;
     // 擺在畫布中央偏左，整對沿 x 排開、相切
     const base = mobilePrompt() ? worldFromScreen(W * 0.30, H * 0.45) : { x: -70, y: 0 };
@@ -224,46 +222,14 @@ export function createGearEditor({
     const setText = (elId, v) => { const el = document.getElementById(elId); if (el) el.textContent = v; };
     const setRow = (elId, show) => { const el = document.getElementById(elId); if (el) el.style.display = show ? '' : 'none'; };
     const driver=gearDriver(S.comps,c.id);
-    const chain = gearMeshChain(c);
-    const pairOutput = chain.length === 2 && chain.find(g => g.mesh);
-    const pairInput = pairOutput && gearById(pairOutput.mesh);
-    const ratioField = document.getElementById('gearRatio');
-    const simplePair = pairInput && !chain.some(rackForGear);
-    setRow('gearRatioRow', simplePair);
-    setText('gearPairSpec', simplePair ? `主動 ${pairInput.teeth} 齒 → 從動 ${pairOutput.teeth} 齒，模數 ${mod}` : '');
-    if (ratioField && pairInput) {
-      ratioField.value = String(pairOutput.teeth / pairInput.teeth);
-      if (ratioField.selectedIndex < 0) ratioField.value = '';
-      ratioField.onchange = () => {
-        if (!ratioField.value) return;
-        const pts = pointCoords();
-        const a = pts[pairInput.p1.id] || pairInput.p1, b = pts[pairOutput.p1.id] || pairOutput.p1;
-        const distance = Math.hypot(a.x-b.x, a.y-b.y);
-        // 只有獨立浮動的從動輪可以跟著換軸距。
-        const free = pairOutput.p1.type === 'floating' && !pointIsGround(pairOutput.p1.id)
-          && !S.comps.some(p => p !== pairOutput && [p.p1,p.p2,p.p3,...(p.holes || [])].some(n => n?.id === pairOutput.p1.id));
-        const fit = fitGearReduction(Number(ratioField.value), distance, !free);
-        if (!fit) {
-          const nearest = fitGearReduction(Number(ratioField.value), distance);
-          transient(nearest ? `目前軸距無法配齒，建議改用中心距 ${nearest.center} mm 的軸孔` : '目前沒有合適的齒輪組');
-          updateGearEditor(); return;
-        }
-        if (commitLegacyMountingEdit(S, () => {
-          for (const [g, teeth] of [[pairInput,fit.input],[pairOutput,fit.output]]) {
-            const gear = gearById(g.id);
-            gear.module = fit.module;
-            gear.teeth = teeth;
-            S.topo.params[gear.radiusParam] = teeth * fit.module / 2;
-            clampGearPinRadius(gear);
-          }
-          if (free && fit.error > 0.001) {
-            const angle = Math.atan2(b.y-a.y, b.x-a.x);
-            updatePointCoordsById(pairOutput.p1.id, a.x+fit.center*Math.cos(angle), a.y+fit.center*Math.sin(angle));
-          }
-        }, {pushUndo, notify:transient})) { rebuild(); draw(); scheduleAutosave(); }
-        updateGearEditor();
-      };
-    }
+    if (reductionEditor) reductionEditor.renderReduction(c, {gearMeshChain, gearById, rackForGear, setRow, setText,
+      pointCoords, pointIsGround, transient, updateGearEditor, clampGearPinRadius,
+      updatePointCoordsById, pushUndo, rebuild, draw, scheduleAutosave});
+    else import('./gear-reduction-ui.js').then(m => {
+      if (reductionEditor) return;
+      reductionEditor = m;
+      if (S.selectedGearId) updateGearEditor();
+    });
     setRow('gearPowerRow',!!driver);
     setText('gearPowerStatus',driver ? `輸入輪 ${driver.id}：${driver.p1.physicalMotor ? (driver.motorType==='mg995'?'MG995 舵機':driver.motorType==='n20'?'N20 減速馬達':'TT 馬達') : '尚未安裝動力'}` : '');
     editableNumber(document.getElementById('gearModuleVal'),mod,v=>changeGearModule(v-(mod)),{label:'齒輪模數（mm）',min:1,max:30});
