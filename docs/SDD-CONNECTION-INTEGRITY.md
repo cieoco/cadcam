@@ -133,9 +133,10 @@ C1 必須以程式碼逐欄核對本表，並把修正寫回本節。
 
 | 包 | 施工 | 交付 | 驗收閘門 | 狀態 |
 | --- | --- | --- | --- | --- |
-| C0 測試先行 | Opus | `test/connection-integrity.mjs` 骨架與兩份使用者 fixture；I1–I9 各一個最小反例與一個「看似矛盾但合法」的正例（板材承載無 `motorCarrier`、承載孔無 `physicalMotor` 副本、多馬達非零角度、針筒任意位置固定孔） | 反例在 main 上失敗、正例通過，失敗原因正確 | 待核可 |
-| C1 索引與影子檢查（影子模式已實作，待審查） | Sonnet | `relations.js`（3.2）、`checkWork`（3.3），按需載入；核對並修正 3.1 欄位角色表；新舊查詢差異表 | C0 全過；範例零 `contradiction`／`dangling`；差異逐項有判斷；不進啟動路徑 | 待做 |
-| C2 操作序列測試 | Sonnet 寫、Opus 審 | `test/operation-sequences.mjs`；影子檢查每步執行；把失敗縮小成 fixture，非針筒的問題在本包修 | 固定種子 500 步無新 `contradiction`，失敗都有 fixture | 待做 |
+| C0 測試先行 | Opus | `test/connection-integrity.mjs` 骨架與兩份使用者 fixture；I1–I9 各一個最小反例與一個「看似矛盾但合法」的正例（板材承載無 `motorCarrier`、承載孔無 `physicalMotor` 副本、多馬達非零角度、針筒任意位置固定孔） | 反例在 main 上失敗、正例通過，失敗原因正確 | 完成：b176744（Sonnet 施工，改由施工模型寫測試以節省 token；主模型審查） |
+| C1 索引與影子檢查 | Sonnet | `relations.js`（3.2）、`checkWork`（3.3），按需載入；核對並修正 3.1 欄位角色表；新舊查詢差異表 | C0 全過；範例零 `contradiction`／`dangling`；差異逐項有判斷；不進啟動路徑 | 完成：958fb73；範例掃出 lift-bucket 懸空軌跡點，主模型以 83854c3 修正 |
+| C2 操作序列測試 | Sonnet 寫、Opus 審 | `test/operation-sequences.mjs`；影子檢查每步執行；把失敗縮小成 fixture，非針筒的問題在本包修 | 固定種子 500 步無新 `contradiction`，失敗都有 fixture | 完成：4a0b6cf；找到 3 類問題，13 個重播列 KNOWN，轉 C2b |
+| C2b 修正序列測試找到的問題 | Sonnet | 局部孔副本失步（I1）、刪除承載板留下懸空承載引用（I3）、求解把孔鏡射到另一側仍判有效；重播轉為 `fixed-*` 強制 | 序列測試預設與 4 倍規模通過；全套 Node 306/306；瀏覽器失敗清單與 af73ecc 相同 | 完成：490b81f；剩 5 個 KNOWN（夾爪 0.1 mm 播種、4 個 10 倍規模才出現）|
 | C3 逐項啟用開檔提示 | Sonnet | 通用提示與修復元件（泛化 `motor-release` 提示）；I1、I3、I5 先啟用，其他保持影子 | 兩份使用者原檔顯示正確；範例無提示；修復一次復原；桌機與手機 | 待做 |
 | C4 馬達單一來源與提交關卡 | Sonnet | 「有沒有馬達」「接地」改用 `motorOf`／`isGround`；刪除 `physical_motor` 等死讀取；刪除零件清理失效的承載引用；I1／I3 接入提交關卡 | 馬達相關 Node 與瀏覽器測試全過；範例姿態與匯出不變；任一入口製造 I1 被拒 | 待做 |
 | C5 孔用途與自由件統一 | Sonnet | `holeRoles` 三種用途、`isFreeBody`／`attachmentsOf` 取代舊實作；`m1/m2`、`mountHoles` 一致 | 加工孔集合與範例匯出 hash 不變，例外逐項列出；拖曳、改尺寸、設機架、安裝測試全過 | 待做 |
