@@ -37,7 +37,7 @@ const els = new Map();
 globalThis.document = { getElementById: id => { if (!els.has(id)) els.set(id, new FakeElement()); return els.get(id); }, createElement: () => new FakeElement() };
 const { S } = await import('../js/blocks/state.js');
 const Model = await import('../js/blocks/model.js');
-const { createGearEditor, GEAR_MODULE } = await import('../js/blocks/gear-editor.js');
+const { createGearEditor } = await import('../js/blocks/gear-editor.js');
 const noop = () => {};
 const editor = createGearEditor({ pushUndo: noop, pause: noop, rebuild: noop, draw: noop, renderFrame: noop, transient: noop, scheduleAutosave: noop,
   cancelMotorMode: noop, exitDrawTools: noop, openMobileEditPanel: noop, closeMobileEditPanel: noop, hideEditorPanels: noop,
@@ -45,7 +45,7 @@ const editor = createGearEditor({ pushUndo: noop, pause: noop, rebuild: noop, dr
   pointCoords: () => Model.pointCoords(S.comps), updatePointCoordsById: (id, x, y) => Model.updatePointCoordsById(S.comps, id, x, y), pointIsGround: id => Model.pointIsGround(S.comps, id) });
 editor.addGearPair();
 const [a, b] = S.comps.filter(c => c.type === 'gear');
-const center = GEAR_MODULE * (a.teeth + b.teeth) / 2;
-check('新建齒輪對預設中心距在 8 mm 格上', pitchDeviation(center).ok && a.teeth === 12, `${a.teeth}:${b.teeth} 中心距 ${center}`);
+const center = a.module * (a.teeth + b.teeth) / 2;
+check('新建齒輪對預設中心距在 8 mm 格上', pitchDeviation(center).ok && b.teeth === 2 * a.teeth && center === 72 && b.p1.x - a.p1.x === center, `${a.teeth}:${b.teeth} 中心距 ${center}`);
 check('預設齒輪對無 R5 中心距離格', !gridIssues(S.comps, S.topo.params).some(i => i.rule === 'R5' && i.subject === '齒輪中心距'));
 report('grid-gear');
