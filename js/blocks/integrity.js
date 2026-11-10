@@ -139,6 +139,12 @@ export function checkWork(work, relations) {
       const to = m?.mount?.to?.module;
       if (isStr(to) && !modules.some(x => x?.id === to)) add('I5', 'dangling', [], [], `模組「${m.id}」安裝在不存在的模組「${to}」上。`);
     }
+    // 模組接口（base／輸出端的點與本體／安裝目標）：讀的欄位與 relations.moduleEdges 同一份，引用的零件或點不在了就是失效。
+    for (const x of net.moduleMissing()) {
+      const mod = modules.find(m => m?.id === x.module), out = (mod?.outputs || []).find(o => o?.id === x.output);
+      add('I5', 'dangling', [], [x.id], `模組「${mod?.name || x.module}」的${x.output ? `輸出端「${out?.name || x.output}」` : x.field === 'base' ? '基座' : '接合零件'}指向不存在的零件或點 ${x.id}；請重新設定輸出端，或解散模組。`,
+        {what: 'moduleRef', id: x.id, module: x.module, field: x.field, role: x.field === 'base' ? 'base' : x.output ? 'output' : 'mount', moduleName: mod?.name || x.module, ...(x.output ? {outName: out?.name || x.output} : {})});
+    }
     // topo 的追蹤／參考／負載／尺寸點：只要求引用存在，不讓孔變成「需加工」。
     const exists = id => net.copies().has(id) || !!byId(id);
     const pointRef = (id, what) => { if (isStr(id) && !exists(id)) add('I5', 'dangling', [], [id], `${what}指向不存在的點 ${id}；請重新選擇，或刪除這項設定。`, {what: 'topo'}); };

@@ -45,7 +45,7 @@ export const KINDS = ['shared-point', 'syringe', 'motor', 'fusion', 'plate-gear-
 // 模組與組立接合：只讀這些欄位（moduleId、模組 id、mount.to.module 是模組編號，不是零件，不算引用）。
 // 回傳 [{kind,field,from,to,via,module?}]；from 是 `module:<id>`（模組本身的宣告）或零件 id（兩個零件之間的接合）。
 function moduleEdges(comps, modules, owners) {
-  const out = [], seen = new Set();
+  const out = [], seen = new Set(), missing = [];   // missing：模組引用的零件或點已不存在（I5 讀它）
   const compsOf = id => (owners.get(id) || []).map(i => comps[i]);
   const push = (kind, field, from, to, via, module) => {
     const key = [kind, field, from, to, via].join('|');
@@ -56,14 +56,18 @@ function moduleEdges(comps, modules, owners) {
   const bodyOf = (modId, outId) => modules.find(m => m?.id === modId)?.outputs?.find(o => o?.id === outId)?.body;
   for (const m of modules) {
     if (!m || !isStr(m.id)) continue;
-    const from = `module:${m.id}`, ref = (kind, field, v) => ids(v).forEach(id => compsOf(id).forEach(c => push(kind, field, from, c.id, id, true)));
+    const from = `module:${m.id}`, ref = (kind, field, v, quiet, outId) => ids(v).forEach(id => {
+      const cs = compsOf(id);
+      if (!cs.length && !quiet) missing.push({module: m.id, field, id, ...(outId ? {output: outId} : {})});
+      cs.forEach(c => push(kind, field, from, c.id, id, true));
+    });
     ref('module-mount', 'base', m.base);
     for (const o of Array.isArray(m.outputs) ? m.outputs : []) {
       const b = o?.body || {};
-      ref('module-output', 'outputs.at', o?.at);
-      ref('module-output', 'outputs.bolts', o?.bolts);
-      if (b.kind === 'points') { ref('module-output', 'outputs.body.a', b.a); ref('module-output', 'outputs.body.b', b.b); }
-      else ref('module-output', 'outputs.body', b.id);
+      ref('module-output', 'outputs.at', o?.at, 0, o?.id);
+      ref('module-output', 'outputs.bolts', o?.bolts, 0, o?.id);
+      if (b.kind === 'points') { ref('module-output', 'outputs.body.a', b.a, 0, o?.id); ref('module-output', 'outputs.body.b', b.b, 0, o?.id); }
+      else ref('module-output', 'outputs.body', b.id, 0, o?.id);
     }
     // 剛性群組：基準板件（宿主輸出的 body）與每個成員模組的零件固定在一起。
     for (const g of Array.isArray(m.rigidGroups) ? m.rigidGroups : []) {
@@ -74,7 +78,7 @@ function moduleEdges(comps, modules, owners) {
     if (mount) {
       ref('module-mount', 'mount.to.body', to?.body);
       const host = ids(to?.body)[0] || ids(bodyOf(to?.module, to?.output)?.id)[0];          // 宿主零件：直接指定的 body，或宿主輸出端的 body
-      if (!to?.body) ref('module-mount', 'mount.to.output', host);
+      if (!to?.body) ref('module-mount', 'mount.to.output', host, 1);
       const sel = face?.selection || {};
       // 面接合的固定方式決定種類：榫槽＋螺絲 tab-nut、角碼 bracket、其餘 face-mount（只定位）。
       const kind = sel.fastener ? 'tab-nut' : sel.brackets ? 'bracket' : 'face-mount';
@@ -86,6 +90,7 @@ function moduleEdges(comps, modules, owners) {
     for (const r of Array.isArray(m.mates?.receive) ? m.mates.receive : []) if (r?.ref?.kind === 'bar' || r?.ref?.kind === 'triangle') ref('face-mount', 'mates.receive', r.ref.id);
     for (const k of ['part', 'attach']) if (m.faceParts?.[k] !== 'frame') ref('face-mount', 'faceParts.' + k, m.faceParts?.[k]);
   }
+  out.missing = missing;
   return out;
 }
 
@@ -152,10 +157,8 @@ export function buildRelations(work) {
   });
 
   // ---------------------------------------------------------------- attachments (field-directed; fields in ref-fields.js and moduleEdges)
-  const edges = () => once('edges', () => {
-    const own = new Map([...owners()].map(([id, set]) => [id, [...set]]));
-    return [...compEdges(comps), ...moduleEdges(comps, modules, own)];
-  });
+  const modEdges = () => once('modEdges', () => moduleEdges(comps, modules, new Map([...owners()].map(([id, set]) => [id, [...set]]))));
+  const edges = () => once('edges', () => [...compEdges(comps), ...modEdges()]);
   const attachmentsOf = compId => {
     const list = [];
     for (const e of edges()) {
@@ -245,5 +248,5 @@ export function buildRelations(work) {
 
   return {copiesOf, worldOf, holeRoles, isGround, groundSource, motorOf, attachmentsOf, isFreeBody,
     // 供 integrity.js 重用同一份掃描（不屬於對外契約）
-    _internal: {comps, modules, params, topo: workParts(work).topo, compById, copies, motors, owners, edges}};
+    _internal: {comps, modules, params, topo: workParts(work).topo, compById, copies, motors, owners, edges, moduleMissing: () => modEdges().missing}};
 }

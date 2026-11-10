@@ -10,6 +10,7 @@ import {checkWork} from './integrity.js';
 import {pointKeysFor} from './part-types.js';
 import {offPlateMotors, offPlateMessage, planMotorReturn, planMotorLeave, attachedGroup} from './motor-release.js';
 import {pruneTopoRefs} from './topo-refs.js';
+import {ownIdsOf} from './ref-fields.js';
 
 /** 逐項啟用：只有這裡列出的代號會在開檔時提示（其餘維持影子模式，見 SDD 3.3）。 */
 export const ENABLED = {I1: true, I3: true, I5: true, I8: true};   // I8（C6）只提示、不修復：先解除合成，再修改
@@ -150,6 +151,7 @@ function danglingText(ref, c, count) {
     case 'barFusionRoot': return `${n}記錄屬於一個合成件，但那個合成件已不存在或不含它，請先解除合成。`;
     case 'fusedWith': return `${n}合成的齒輪已經不存在，請先解除合成。`;
     case 'fusedPair': return `${n}和齒輪的合成不成立：${ref.why}請先解除合成，再修改。`;
+    case 'moduleRef': return `模組「${ref.moduleName}」的${ref.role === 'output' ? `輸出端「${ref.outName}」` : ref.role === 'base' ? '基座' : '接合零件'}指向已經不存在的零件，請重新設定，或解散模組。`;
     case 'topo': return `作品裡有 ${count} 項軌跡追蹤、參考點、負載或量尺指向已經不存在的點。`;
     default: return null;
   }
@@ -182,8 +184,14 @@ export function findings(work) {
 }
 
 /** 提交關卡拒絕時的說明（integrity-gate.js）：與開檔提示同一套名稱與色彩規則。回傳 {text, far, canon}。 */
-export function describeIssue(work, issue) {
+export function describeIssue(work, issue, before) {
   const comps = work.comps || [];
+  const mr = issue.ref;
+  if (mr?.what === 'moduleRef') {   // 零件已在候選裡被刪掉：名稱從刪除前的作品取；整句就是給學生的說明，不加前綴
+    const gone = (before?.comps || []).find(c => ownIdsOf(c).includes(mr.id)), own = gone ? ownIdsOf(gone) : [];
+    const isOut = ((before?.modules || []).find(m => m?.id === mr.module)?.outputs || []).some(o => [o?.at, o?.body?.id, o?.body?.a, o?.body?.b, ...(o?.bolts || [])].some(v => own.includes(v)));   // 同一零件同時是基座與輸出件時只說輸出件
+    return {text: `${quote(gone)}是模組「${mr.moduleName}」的${isOut ? '輸出件' : mr.role === 'base' ? '基座' : '接合件'}，請先拆下或解散模組，再刪除。`, far: [], canon: [], plain: true};
+  }
   if (issue.code === 'I1') {
     const it = i1Item(buildRelations(work), issue, comps);
     if (it) return {text: it.text, far: it.mark.far, canon: it.mark.canon};

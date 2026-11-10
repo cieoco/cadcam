@@ -1,5 +1,14 @@
 # 教學與操作更新紀錄
 
+## 2026-11-11：接合關係 C6b——刪除模組輸出件／基座所在零件不再讓模組接口懸空
+
+- **I5 讀模組接口。** `relations.moduleEdges` 在建立邊時同步記下「引用的零件或點已不存在」（`base`、`outputs[].at`／`bolts`／`body`、`mount.to.body`、面接合 `childPart`、`mates.receive`、`faceParts`），I5 以 `dangling` 回報，`ref.what` 為 `moduleRef`。欄位仍只有 `moduleEdges` 一份。影子結果：70 個內建範例零誤報。
+- **刪除零件會拒絕，不自動清。** 要刪的零件若是某模組的輸出件、基座或輸出點的唯一擁有者，刪除不套用，訊息為「「桿件」是模組「平行升降臂」的輸出件，請先拆下或解散模組，再刪除。」（基座時為「…的基座，…」）。名稱用學生看得到的零件名與模組名，不顯示內部代號；沒有名稱的零件顯示種類（桿件、板件…）。走 C4 提交關卡（`integrity-gate.js` 把 `moduleRef` 失效引用算成新問題，與 I1／I3／I8 同一個機制），所以只有「這次修改新造成」的才拒絕，原本就懸空的檔案不受影響；沒有復原步驟、作品不變。
+- **開檔提示只說明、不提供修復。** 「清除失效的連結」對模組接口沒有單一明確的清法（清掉輸出端會讓安裝在它上面的其他模組變成未安裝，與 `normalizeModules` 的連鎖行為相同，卻不是學生預期的結果），所以只顯示說明「模組「…」的輸出端「…」指向已經不存在的零件，請重新設定，或解散模組。」。
+- **測試：** `test/c6-attachments.mjs` 的 KNOWN GAP 改為正式檢查（74 項）：`lift-bucket` 刪 `Link3`、`iq-wheel-grabber` 刪 `GrabBack` 皆被拒絕且作品不變、無復原步驟；直接從資料移除零件時 I5 回報 `dangling`；`base` 指向不存在的點時 I5 回報；說明無修復按鈕。
+- **啟動大小：** 改動集中在按需載入的模組（`relations`、`integrity*`）；唯一在啟動路徑的是 `integrity-gate.js`，淨增 198 bytes，啟動 JS 2,164,441→2,164,639，上限 2,165,000 不動（餘額 361 bytes）。
+- **範圍外：** 選到齒輪時的刪除（`deleteGearChain`）與其他會移除零件的入口（合併、解除合成）尚未做模組接口檢查；提交關卡對它們也會擋「新造成的懸空」，但訊息結尾的「再刪除」只對刪除成立。瀏覽器操作驗收待主模型。
+
 ## 2026-11-11：接合關係 C6——接合種類依欄位區分、I8 啟用提示與提交關卡
 
 - **`attachmentsOf` 只讀「真正代表引用」的欄位，每種關係有自己的 `kind`（並附 `field`、`direction`）。** 零件之間的欄位表集中在新的小模組 `js/blocks/ref-fields.js`（純函式，不進啟動路徑）；模組與組立接合在 `relations.js` 的 `moduleEdges`。種類：`shared-point`、`syringe`、`motor`、`fusion`（`barFusion.members`／`points`／`framePointIds`／`barFusionRoot`）、`plate-gear-fusion`（`fusedWith`）、`mesh`、`rack`（`pinion`／`framePins`）、`belt`（`driver`／`driven`）、`reference`（`frameHole`）、`module-mount`（`base`、`mount.to.body`／`output`）、`module-output`（`outputs[].at`／`body`／`bolts`）、`face-mount`（無固定件的面接合、`mates.receive`、`faceParts`）、`bracket`、`tab-nut`（依 `selection.brackets`／`fastener` 決定）、`rigid-group`。面接合另外記一條宿主板件到子板件的邊，所以立板與承接板互相查得到。
@@ -10,7 +19,7 @@
 - **操作序列：** 加入 `six-bar-lift`（fuse／unfuse，走 `bar-fusion-plan`）與 `clawbot-lift-gripper`（unmount／mount，走 `module-ops`）兩份作品；新操作只在這兩份作品抽到，原六份作品的隨機序列不變。預設 869 步、4 倍 3128 步，I8 與提交關卡零誤報。限制：mount 用一般 `mountModule` 接回（原來是面接合，接回後的 mount 種類不同）；`fuse` 在預設種子只成功 1 次（4 倍為 13 次）；該作品不抽 `theta`（雙馬達夾爪的姿態分支連續性不是本包要查的）。
 - **父 SDD P3 矩陣（非針筒列）：** 三件共用一孔，刪其中任一件，其餘兩件仍共用該孔、無懸空、一次復原——通過。局部孔（有／無已鑽孔旗標）：刪一支桿後另一支仍在同一孔上、板件孔位與 `drilled` 不變、其他孔上的桿不動——通過。解除指定模組（角碼的 `iq-wheel-grabber`、榫槽的 `tab-nut-m3`、`lift-bucket` 的面接合）只清掉該模組的 mount，其他模組、宿主零件（孔、已鑽旗標、座標）與輸出端不變、無矛盾——通過。**未通過（已知缺口，測試明寫為 KNOWN GAP）：** 刪除被模組當作輸出端 body 的零件（例 `lift-bucket` 的 `Link3`）、或模組 `base`／輸出 `at` 所在的零件，會讓 `modules[].outputs[].body.id`／`at`／`base` 懸空（`GrabBack`、`LeftSide`、`GrabLeft` 等同樣），而且沒有任何檢查報出（I5 尚未讀模組接口，SDD 3.3 列為 I5 範圍）。下一步：`delete-part` 用 `module-output`／`module-mount` 關係拒絕或一併清除，並讓 I5 讀模組接口；`delete-part` 在啟動路徑，需先處理預算。
 - **介面可見變更（需瀏覽器核對）：** (1) I8 開檔提示：含壞合成的作品開檔／復原／重做時，提示條出現「某零件的合成資料對不起來／合成件不成立…請先解除合成，再修改」，沒有修復按鈕，只有「說明」「先不處理」，並以橘色標出涉及零件。(2) 提交關卡：合併點、刪除、拖曳等會讓合成件新增矛盾時，狀態列顯示「這個修改會讓作品資料對不起來，未套用：…請先解除合成，再修改。」(3) 其他畫面與操作不變。
-- **證據：** 完整 Node 套件前後各 309／311 支（見下）；`test/c6-attachments.mjs` 69 項、`test/c6-parity.mjs`、`test/c5-parity.mjs` 27 項、`operation-sequences` 預設與 4 倍、`connection-integrity` 41 項、`integrity-hints`、`commit-gate` 39 項皆通過。`tools/load-graph.mjs` 已重新產生。
+- **證據：** 完整 Node 套件在本包前後各以平行執行器跑一次，結果相同（309 支通過；`example-actuator-plates` 在平行負載下逾時，單獨執行通過）；`test/c6-attachments.mjs` 69 項、`test/c6-parity.mjs`、`test/c5-parity.mjs` 27 項、`operation-sequences` 預設與 4 倍、`connection-integrity` 41 項、`integrity-hints`、`commit-gate` 39 項皆通過。`tools/load-graph.mjs` 已重新產生。
 
 ## 2026-11-11：接合關係 C5——孔用途與自由件查詢統一
 

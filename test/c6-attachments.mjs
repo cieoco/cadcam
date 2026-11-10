@@ -178,10 +178,23 @@ function deleteOf(w,id){
 {// module identity: removing a connection must not strand module references
  const s=ex('lift-bucket'),w=work(s);
  const dangling=r=>{const rel=buildRelations(r),out=[];for(const m of r.modules){if(m.base&&!rel.copiesOf(m.base).length)out.push(m.id+'.base');for(const o of m.outputs||[]){if(!rel.copiesOf(o.at).length)out.push(m.id+'.'+o.id+'.at');if(o.body?.id&&!r.comps.some(c=>c.id===o.body.id))out.push(m.id+'.'+o.id+'.body');}}return out;};
- // KNOWN GAP (reported in TEACHING-CHANGELOG C6, next step: delete-part should refuse or clear through the module-output/module-mount relations):
- // deleting a part that a module names as its output body leaves outputs[].body.id / at dangling, and nothing reports it (I5 does not read module interfaces yet).
- const r=deleteOf(w,'Link3');
- check('KNOWN GAP: deleting the output body of module Lift strands Lift.tool (module identity dangling, not detected)',r.deleted&&dangling(r).includes('Lift.tool.body')&&issues(r).length===0,dangling(r).join());
+ // C6b：module interfaces are read by I5 (relations.moduleEdges 'missing'), and delete-part refuses to strand them.
+ const refuse=(wk,id,mod,partName,role)=>{
+  const before=JSON.stringify(wk.comps)+JSON.stringify(wk.modules),r=deleteOf(wk,id),want=`「${partName}」是模組「${mod}」的${role}，請先拆下或解散模組，再刪除。`;
+  check(`delete ${id}: refused (part stays, nothing changes), one message with the module and part names`,!r.deleted&&r.msgs.length===1&&r.msgs[0]===want&&JSON.stringify(r.comps)+JSON.stringify(r.modules)===before&&r.undo===0,r.msgs.join('|'));
+  return r;};
+ const refLb=refuse(w,'Link3','平行升降臂','桿件','輸出件');
+ // I5 reports a dangling module reference when the part is simply removed from the data (bypassing delete-part, e.g. a hand-edited file)
+ const removed=id=>({...w,comps:w.comps.filter(c=>c.id!==id)});
+ const i5=checkWork(removed('Link3')).filter(i=>i.code==='I5'&&i.ref?.what==='moduleRef');
+ check('I5: removing Link3 from the data flags the module reference as dangling (body and output point)',i5.length>=1&&i5.every(i=>i.severity==='dangling')&&i5.some(i=>i.ref.field==='outputs.body'),JSON.stringify(i5.map(i=>[i.severity,i.ref.field])));
+ check('I5: the hint text names the module and output (no repair offered)',(()=>{const f=Repairs.findings(removed('Link3')).filter(x=>x.code==='I5');return f.length>=1&&f.every(x=>x.repairs.length===0&&/平行升降臂/.test(x.text)&&/保持姿態工具架/.test(x.text));})());
+ check('I5: a work with no module damage has no moduleRef finding',checkWork(w).every(i=>i.ref?.what!=='moduleRef'));
+ {const wb=clone(w);wb.modules.find(m=>m.id==='Lift').base='GONE_POINT';
+  const i=checkWork(wb).filter(i=>i.ref?.what==='moduleRef'&&i.ref.role==='base');
+  check('I5: a module base that no part owns is flagged (dangling, field base)',i.length===1&&i[0].severity==='dangling'&&i[0].ref.field==='base',JSON.stringify(i.map(x=>x.message)));}
+ const gb=ex('iq-wheel-grabber');
+ refuse(work(gb),'GrabBack','輪爪背板',gb.comps.find(c=>c.id==='GrabBack').name||'板件','輸出件');
  // deleting a part that no module names leaves modules intact
  const plain=s.comps.find(c=>c.type==='bar'&&!buildRelations(w).attachmentsOf(c.id).some(a=>a.module||a.kind==='rigid-group')&&!c.barFusion&&!c.isInput&&!c.moduleId)||null;
  if(plain){const r2=deleteOf(w,plain.id);check(`deleting an unreferenced part (${plain.id}) leaves every module reference resolvable`,dangling(r2).length===0);}
