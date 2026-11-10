@@ -12,6 +12,7 @@
  *     motorOf(compId|pointId) 規範化的馬達關係，或 null
  *     attachmentsOf(compId)   全部關係 [{kind,otherId,via,field,direction}]（kind 見 KINDS；欄位表在 ref-fields.js，模組／組立接合在本檔）
  *     isFreeBody(compId)
+ *     endsOn(compId)          掛在這個零件上的針筒端點 [{by,key,u,v}]（C7；u／v 是零件自己的 p1→p2 座標）
  *   }
  * `machining` 的規則只有 used-holes.js 一份（C5 起不再各算一份）；本檔只決定哪一種孔要問它並附理由。
  */
@@ -208,6 +209,9 @@ export function buildRelations(work) {
     }
     return out;
   });
+  // C7：針筒端點（局部座標 u／v）掛在哪個零件上；網格規則與板件格孔共用，不再各自掃 a／b。
+  const endsOn = hostId => comps.filter(o => o.type === 'syringe').flatMap(o => ['a', 'b'].map(key => ({by: o.id, key, u: o[key]?.u, v: o[key]?.v, host: o[key]?.componentId})))
+    .filter(e => e.host === hostId && Number.isFinite(e.u) && Number.isFinite(e.v)).map(({host, ...e}) => e);
   const holeRoles = (compId, holeId) => {
     const none = {found: false, machining: false, mountOccupied: false, constraint: false, reasons: {machining: [], mountOccupied: [], constraint: []}};
     const c = compById(compId);
@@ -246,7 +250,7 @@ export function buildRelations(work) {
     return {found: true, kind, machining: reasons.machining.length > 0, mountOccupied: reasons.mountOccupied.length > 0, constraint: reasons.constraint.length > 0, reasons};
   };
 
-  return {copiesOf, worldOf, holeRoles, isGround, groundSource, motorOf, attachmentsOf, isFreeBody,
+  return {copiesOf, worldOf, holeRoles, isGround, groundSource, motorOf, attachmentsOf, isFreeBody, endsOn,
     // 供 integrity.js 重用同一份掃描（不屬於對外契約）
     _internal: {comps, modules, params, topo: workParts(work).topo, compById, copies, motors, owners, edges, moduleMissing: () => modEdges().missing}};
 }

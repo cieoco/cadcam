@@ -325,7 +325,8 @@
     "test/commit-gate.mjs",
     "test/c5-parity.mjs",
     "test/c6-parity.mjs",
-    "test/c6-attachments.mjs"
+    "test/c6-attachments.mjs",
+    "test/c7-syringe.mjs"
   ],
   "version": 1
 }

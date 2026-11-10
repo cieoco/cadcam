@@ -10,6 +10,7 @@ import {syringeClampFrameNodes,syringeShape} from './syringe-shape.js';
 import {scanSyringe,planSyringeDisconnect} from './syringe-operations.js';
 import {commitMountingEdit,confirmMountingChange,mountingWork,mountingCandidate} from './mounting-review-ui.js';
 import {holeName} from './syringe-install-steps.js';
+import {integrityGate} from './integrity-gate.js';
 import {signedNumberInput,showNumber,readNumber,formatNumber} from './numeric-input.js';
 
 export function createSyringeEditor(h){
@@ -80,7 +81,7 @@ export function createSyringeEditor(h){
  ear.onchange=()=>{pending={...pending,pivotEar:Number(ear.value)};apply({}, {preview:true});h.draw();};face.onchange=()=>apply({face:face.value});
  frame.onchange=()=>{const c=current(),owner=h.comps().find(o=>o.id===frame.value),p=c&&(attachmentPoint(c.a,h.comps(),h.params(),h.points())||c.a.position),q=p&&syringePositionOnFrame(owner,h.params(),h.points(),p,{comps:h.comps(),params:h.params(),fabrication:S.fabrication});if(q)apply({frameId:frame.value,position:q});};
  function chooseOutput(b){pending={...pending,b};pickingKey=null;apply({}, {preview:true});h.draw();explainOutput(b);if(sheetMode())setSheet('half');}
- function detachOutput(){const c=current();if(!c)return;h.pause();const r=planSyringeDisconnect({comps:h.comps(),params:h.params()},c.id,h.points());if(!r.ok){message(r.message);return;}pending={b:r.syringe.b};pickingKey=null;clearPicks();clearPreview();awaiting={r,revision:revision()};message('確認後解除推桿連接；固定環與其他桿件保留。');sync(true);h.draw();}
+ function detachOutput(){const c=current();if(!c)return;h.pause();const r=planSyringeDisconnect({comps:h.comps(),params:h.params()},c.id,h.points());if(!r.ok){message(r.message);return;}const before=mountingWork(S);if(!integrityGate(before,mountingCandidate(before,r,h.comps()),message)){sync(true);return;}pending={b:r.syringe.b};pickingKey=null;clearPicks();clearPreview();awaiting={r,revision:revision()};message('確認後解除推桿連接；固定環與其他桿件保留。');sync(true);h.draw();}
  disconnect.onclick=detachOutput;
  output.onchange=()=>{if(output.value)chooseOutput(JSON.parse(output.value));else detachOutput();};
  scan.onclick=()=>{const c=current();if(c){h.pause();const r=scanSyringe(h.comps(),h.params(),c.id,.5,h.motion());message(r.ok?r.message:`${r.atMm==null?'':formatNumber(r.atMm)} mm：${r.message}`);}};

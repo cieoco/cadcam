@@ -10,6 +10,7 @@
 import { GRID_PITCH_MM, GRID_TOLERANCE_MM, latticeEmbedding } from './grid-rule.js';
 import { plateVertices, polylineTriangleParams, localToWorld, worldToLocal } from './plate-geometry.js';
 import { planMemberDimension } from './member-dimensions.js';
+import { buildRelations } from './relations.js';
 
 export const EDGE_SEARCH_MM = 24;
 const REF_INDEX = { p1: 0, p2: 1, p3: 2 };
@@ -67,10 +68,7 @@ function basePoints(comp, params, override) {
   const cross = comp.p1 && comp.p2 && comp.p3 ? (comp.p2.x - comp.p1.x) * (comp.p3.y - comp.p1.y) - (comp.p2.y - comp.p1.y) * (comp.p3.x - comp.p1.x) : 1;
   return [{ x: 0, y: 0 }, { x: g, y: 0 }, { x, y: (cross < 0 ? -1 : 1) * Math.sqrt(Math.max(0, y2)) }];
 }
-function attachedHoles(comps, owner) {
-  return (comps || []).filter(c => c.type === 'syringe').flatMap(c => ['a', 'b'].map(k => c[k]))
-    .filter(r => r && r.componentId === owner.id && Number.isFinite(r.u) && Number.isFinite(r.v)).map(r => ({ x: r.u, y: r.v }));
-}
+const attachedHoles = (comps, owner) => buildRelations({ comps: comps || [] }).endsOn(owner.id).map(e => ({ x: e.u, y: e.v }));
 
 // 格向量文字：(i,j) 為邊兩端的格座標差。
 export function gridVectorText(i, j) {

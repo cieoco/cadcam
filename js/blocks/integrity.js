@@ -9,15 +9,18 @@
 import {buildRelations, workParts} from './relations.js';
 import {pointKeysFor} from './part-types.js';
 import {inspectBarFusionData} from '../core/bar-fusion.js';
-import {attachmentFrame} from '../core/syringe.js';
+import {attachmentFrame, attachmentPoint, hasSyringeClamp, syringeAttachmentHole} from '../core/syringe.js';
 import {isDisk, diskDiameter} from './disk-plate.js';
-import {fusionPairReason} from './part-fusion.js';
+import {fusionPairReason, inside} from './part-fusion.js';
+import {createPlateGeometry} from './plate-geometry.js';
 
 const TOL_MM = 0.01;          // I1 座標容差
 const PHASE_TOL_DEG = 0.05;   // 與 schema.alignSavedInputPhase 相同
 const isStr = v => typeof v === 'string' && v !== '';
 const hasId = p => !!p && typeof p === 'object' && isStr(p.id);
 const fix1 = n => (Math.round(n * 10) / 10).toString();
+const attempt = (fn, d) => { try { return fn(); } catch { return d; } };
+const nearRing = (p, r) => Math.min(...r.map((a, i) => { const b = r[(i + 1) % r.length], dx = b.x - a.x, dy = b.y - a.y, t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1))); return Math.hypot(a.x + t * dx - p.x, a.y + t * dy - p.y); }));
 const wrap360 = d => ((d % 360) + 540) % 360 - 180;
 
 export function checkWork(work, relations) {
@@ -190,9 +193,18 @@ export function checkWork(work, relations) {
         add('I9', 'notice', [c.id, host.id], [], `${label(c.id)} 的${k === 'a' ? '固定' : '推桿'}端接在 ${label(host.id)} 上，但這個零件目前沒有可用的尺寸，算不出接合位置。`);
         continue;
       }
-      // 圓盤的外形是以第一孔為圓心的圓；其他零件的外形規則由針筒放置流程負責（任意位置、新增固定孔都合法）。
-      if (isDisk(host) && Math.hypot(ref.u, ref.v) > diskDiameter(host) / 2 + TOL_MM) {
-        add('I9', 'contradiction', [c.id, host.id], [], `${label(c.id)} 的${k === 'a' ? '固定' : '推桿'}端落在 ${label(host.id)} 的外形之外（離圓心 ${fix1(Math.hypot(ref.u, ref.v))} mm，圓盤半徑 ${fix1(diskDiameter(host) / 2)} mm）；請把它移回零件上。`);
+      // 外形規則取自現有放置流程（core/syringe syringeIssues、syringe-position）：不要求對到既有格孔，任意位置與新增固定孔都合法。
+      const where = out => add('I9', 'contradiction', [c.id, host.id], [], `${label(c.id)} 的${k === 'a' ? '固定' : '推桿'}端${out}；請把它移回零件上，或解除這一端。`, {what: 'syringeEnd', comp: c.id, end: k, outside: true});
+      if (isDisk(host)) {   // 圓盤的外形是以第一孔為圓心的圓
+        if (Math.hypot(ref.u, ref.v) > diskDiameter(host) / 2 + TOL_MM) where(`落在 ${label(host.id)} 的外形之外（離圓心 ${fix1(Math.hypot(ref.u, ref.v))} mm，圓盤半徑 ${fix1(diskDiameter(host) / 2)} mm）`);
+      } else if (host.type === 'anchor') {
+        if (Math.abs(ref.u) > TOL_MM || Math.abs(ref.v) > TOL_MM) where(`接在機架支點 ${label(host.id)} 上卻偏離了支點`);
+      } else if (host.type === 'triangle' && host.p3) {   // 板件：落點在板件外形之內（邊界算內）
+        const w = attachmentPoint(ref, comps, params), rings = attempt(() => createPlateGeometry(host, [host.p1, host.p2, host.p3]).outlines, null);
+        if (w && rings?.length && !rings.some(r => inside(w, r) || nearRing(w, r) <= TOL_MM)) where(`落在 ${label(host.id)} 的外形之外`);
+      } else if (host.type === 'bar' && !(k === 'a' && hasSyringeClamp(c)) && !syringeAttachmentHole(host, params, ref)) {   // 桿件：沿中心線、在孔距內（固定環的位置由板件外形流程負責）
+        const f = attachmentFrame(host, params);
+        if (ref.u < -TOL_MM || ref.u > f.length + TOL_MM || Math.abs(ref.v) > TOL_MM) where(`不在 ${label(host.id)} 的中心線與孔距之內`);
       }
     }
   }

@@ -11,9 +11,10 @@ import {pointKeysFor} from './part-types.js';
 import {offPlateMotors, offPlateMessage, planMotorReturn, planMotorLeave, attachedGroup} from './motor-release.js';
 import {pruneTopoRefs} from './topo-refs.js';
 import {ownIdsOf} from './ref-fields.js';
+import {attachmentPoint} from '../core/syringe.js';
 
 /** 逐項啟用：只有這裡列出的代號會在開檔時提示（其餘維持影子模式，見 SDD 3.3）。 */
-export const ENABLED = {I1: true, I3: true, I5: true, I8: true};   // I8（C6）只提示、不修復：先解除合成，再修改
+export const ENABLED = {I1: true, I3: true, I5: true, I8: true, I9: true};   // I8（C6）只提示、不修復：先解除合成，再修改；I9（C7）只提供「解除該端」
 export const SHOWN = ['contradiction', 'dangling'];
 
 const TOL = 0.01, KEYS = ['p1', 'p2', 'p3'];
@@ -129,7 +130,11 @@ function planClear(source, ref) {
   if (ref.what === 'frameBody') c = dropHost(c, c.motorMount?.frameBody);
   else if (ref.what === 'motorCarrier') c = dropHost(c, c.motorCarrier);
   else if (ref.what === 'motorMountPoint') { c = {...c}; delete c.motorMountPoint; }
-  else if (ref.what === 'syringeEnd') { const e = c[ref.end]; c = {...c, [ref.end]: {componentId: '', u: 0, v: 0, ...(e?.position ? {position: e.position} : {})}}; }
+  else if (ref.what === 'syringeEnd') {
+    const e = c[ref.end], at = attachmentPoint(e, next.comps, next.params);   // 零件還在時保留目前的世界位置（C7）
+    const position = at && Number.isFinite(at.x) && Number.isFinite(at.y) ? {x: at.x, y: at.y} : e?.position;
+    c = {...c, [ref.end]: {componentId: '', u: 0, v: 0, ...(position ? {position} : {})}};
+  }
   else if (ref.what === 'syringeOutput') c = {...c, outputId: ''};
   else if (ref.what === 'moduleId') { c = {...c}; delete c.moduleId; }
   else return {ok: false, message: '這項問題需要自己決定怎麼修。'};
@@ -144,7 +149,7 @@ function danglingText(ref, c, count) {
     case 'motorMountPoint': return `${n}記錄的馬達座孔已不在這個零件上。`;
     case 'center': return `${n}記錄的馬達軸心不是它自己的孔，請重新設定馬達安裝。`;
     case 'carrierConflict': return `${n}的馬達承載零件有兩種不同的記錄，請重新選擇馬達裝在哪個零件上。`;
-    case 'syringeEnd': return `${n}的${SYRINGE_END[ref.end]}端接在已經不存在的零件上。`;
+    case 'syringeEnd': return ref.outside ? `${n}的${SYRINGE_END[ref.end]}端已經跑到它所接零件的外形之外，接點對不上；請移回零件上，或解除這一端。` : `${n}的${SYRINGE_END[ref.end]}端接在已經不存在的零件上。`;
     case 'syringeOutput': return `${n}要推動的零件已經不存在。`;
     case 'moduleId': return `${n}屬於已經不存在的模組。`;
     case 'barFusion': return `${n}的合成資料對不起來：${ref.why}`;
@@ -176,8 +181,8 @@ export function findings(work) {
     const c = work.comps.find(x => x.id === ref.comp) || work.comps.find(x => x.id === issue.parts[0]);
     const text = danglingText(ref, c, 1) || issue.message;
     const fused = issue.code === 'I8';   // 合成件：標出涉及的所有零件，只說明、不提供修復（先解除合成，再修改）
-    items.push({key: `${issue.code}|${ref.what || issue.message}|${ref.comp || ''}${ref.end || ''}`, code: issue.code, text, short: fused ? (c ? `${quote(c)}的合成資料對不起來` : '有一組合成件對不起來') : c ? `${quote(c)}有失效的馬達或接合記錄` : '有一項連接需要處理', mark: {far: fused ? issue.parts : c ? [c.id] : [], canon: []},
-      repairs: ['frameBody', 'motorCarrier', 'motorMountPoint', 'syringeEnd', 'syringeOutput', 'moduleId'].includes(ref.what) ? [{id: 'clear', label: '清除失效的連結', plan: s => planClear(s, ref)}] : []});
+    items.push({key: `${issue.code}|${ref.what || issue.message}|${ref.comp || ''}${ref.end || ''}`, code: issue.code, text, short: fused ? (c ? `${quote(c)}的合成資料對不起來` : '有一組合成件對不起來') : ref.outside ? `${quote(c)}的針筒接點不在零件上` : c ? `${quote(c)}有失效的馬達或接合記錄` : '有一項連接需要處理', mark: {far: fused || ref.outside ? issue.parts : c ? [c.id] : [], canon: []},
+      repairs: ['frameBody', 'motorCarrier', 'motorMountPoint', 'syringeEnd', 'syringeOutput', 'moduleId'].includes(ref.what) ? [{id: 'clear', label: ref.outside ? '解除該端' : '清除失效的連結', plan: s => planClear(s, ref)}] : []});
   }
   if (topo) { topo.text = danglingText({what: 'topo'}, null, topo.count); topo.short = `有 ${topo.count} 項設定指向不存在的點`; }
   return items.sort((a, b) => (b.first ? 1 : 0) - (a.first ? 1 : 0));

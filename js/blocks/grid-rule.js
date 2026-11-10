@@ -17,6 +17,7 @@ import { plateVertices, plateShapeMode, polylineTriangleParams, localToWorld } f
 import { isDisk } from './disk-plate.js';
 import { syncFrameHoles } from './frame-holes.js';
 import { adapterLayout } from './orthogonal-joint.js';
+import { buildRelations } from './relations.js';
 
 export const GRID_PITCH_MM = LEGO_FRAME_STEP;   // 8 mm
 export const GRID_TOLERANCE_MM = 0.01;          // 低於此偏差視為在格上（作品參數多為 0.1 mm 精度）
@@ -87,11 +88,7 @@ function trianglePoints(c, params) {
 }
 
 // 針筒端點接在零件上的孔，換成宿主零件 p1→p2 座標（core/syringe attachmentPoint 的 u／v）。
-function attachedHoles(comps, owner) {
-  return comps.filter(c => c.type === 'syringe').flatMap(c => ['a', 'b'].map(k => c[k]))
-    .filter(r => r && r.componentId === owner.id && Number.isFinite(r.u) && Number.isFinite(r.v))
-    .map(r => ({ x: r.u, y: r.v }));
-}
+const attachedHoles = (comps, owner) => buildRelations({ comps }).endsOn(owner.id).map(e => ({ x: e.u, y: e.v }));
 
 function barIssues(c, comps, params, pitch, tol, out) {
   const L = num(params, c.lenParam);
