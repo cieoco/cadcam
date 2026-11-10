@@ -28,7 +28,7 @@ await loadIntegrity();
 check('startup closure does not contain integrity.js or relations.js (lazy)',(()=>{const p=startupSize().paths;return !p.includes('js/blocks/integrity.js')&&!p.includes('js/blocks/relations.js');})());
 
 // -- new contradiction refused, with part names (C3 label rules) and a highlight request
-check('a new I1 contradiction is refused with a message naming both parts',integrityGate(consistent,broken,notify)===false&&/對不起來/.test(msgs[0])&&msgs[0].includes('Bar1')&&msgs[0].includes('Bar2'),msgs[0]);
+check('a new I1 contradiction is refused with a message naming both parts',integrityGate(consistent,broken,notify)===false&&/對不起來/.test(msgs[0])&&msgs[0].includes('「左桿」')&&msgs[0].includes('「右桿」')&&!/Bar[12]/.test(msgs[0]),msgs[0]);
 check('a consistent candidate is accepted',integrityGate(consistent,clone(consistent),notify)===true);
 // -- pre-existing issue never blocks; only the NEW one does
 msgs.length=0;
@@ -61,6 +61,37 @@ check('worsening the same pre-existing contradiction is not "new"',integrityGate
  deleteSelectedPart({S,transient:notify,deleteGearChain(){},pushUndo:()=>undo++,pause(){},closeMobileEditPanel(){},setSliderDetailRows(){},rebuild(){},draw(){},points:{}});
  check('delete of an ordinary part is not refused',undo===1&&S.comps.length===n-1&&!msgs.some(m=>/未套用/.test(m)),msgs[0]);}
 
+// -- a work that already has an I1 (user file motor-off-plate): repairs and unrelated edits are never "new" (browser regression of b6ee062)
+{const {readStoredProject}=await import('../js/blocks/project-envelope.js'),{alignSavedInputPhase}=await import('../js/blocks/schema.js');
+ const {run}=await import('../js/blocks/motor-release.js'),{S}=await import('../js/blocks/state.js');
+ const {compileTopology}=await import('../js/core/topology.js'),{solveTopology}=await import('../js/multilink/solver.js');
+ const load=()=>alignSavedInputPhase(normalizeSnapshot(readStoredProject(rd('motor-off-plate.json'))));
+ const pts=s=>solveTopology(compileTopology(s.comps,{params:{...s.params}},new Set()),{thetaDeg:0,motorAngles:{1:0}}).points;
+ for(const action of ['release','back','leave']){
+  const s=load(),points=pts(s),notes=[],undo=[];Object.assign(S,{comps:s.comps,modules:[],topo:{params:s.params},fabrication:s.fabrication,counter:139,mode:'design',selectedLinkId:'Blank135'});
+  const ok=run(action,{S,pause(){},pushUndo:()=>undo.push(1),rebuild(){},draw(){},notify:m=>notes.push(m),save(){},refresh(){},points:()=>points,motion:{}});
+  check(`motor-off-plate: "${action}" is not refused by the gate and makes one undo step`,ok===true&&undo.length===1&&!notes.some(m=>/未套用/.test(m)),notes.join(' '));
+ }
+ const w0=(()=>{const s=load();return {comps:s.comps,modules:[],params:s.params};})();
+ // resizing a bar elsewhere (a bar that is not part of the broken hole) is accepted
+ const resized=clone(w0);const other=resized.comps.find(c=>c.type==='bar'&&!c.isInput&&c.p1&&!['Blank135','Motor133'].includes(c.id))||resized.comps.find(c=>c.type==='bar');
+ other.name='moved elsewhere';
+ check('a work that already has an I1: an unrelated edit is accepted',integrityGate(w0,resized,notify)===true);
+ // the same broken hole with different parts involved (the release case) is not new
+ const swapped=clone(w0);swapped.comps.forEach(c=>{if(c.type==='bar'&&c.isInput)c.name='renamed';});
+ check('a work that already has an I1: same hole, other parts involved, is not new',integrityGate(w0,swapped,notify)===true);
+ // a genuinely new I1 on another hole is refused, and the message uses names, not internal ids
+ const fresh=clone(w0);{const p=fresh.comps.flatMap(c=>c.type==='bar'||c.type==='triangle'?[c.p1,c.p2]:[]).find(p=>p&&p.id!=='Blank133_H24_32'&&fresh.comps.filter(c=>[c.p1,c.p2,c.p3].some(q=>q?.id===p.id)).length>1);
+  if(p){p.x+=9;}else check('fixture has a shared end to break',false);}
+ msgs.length=0;
+ check('a genuinely new I1 on a different hole is still refused',integrityGate(w0,fresh,notify)===false&&/未套用/.test(msgs[0]),msgs[0]||'');
+ check('refusal text uses student-visible names, no internal ids',!/Blank\d|Motor\d|_H\d/.test(msgs[0]||''),msgs[0]);
+}
+{// the fixture release as the browser did it: independent motor part, no name -> its model
+ const {S}=await import('../js/blocks/state.js');
+ const w=work(base);w.comps[1].p1.x=107;msgs.length=0;
+ check('refusal names parts by their names',integrityGate(consistent,w,notify)===false&&msgs[0].includes('「右桿」'),msgs[0]);
+}
 // -- wiring that the Node harness cannot drive (app.js / input.js need a browser): the calls must stay in place
 const src=n=>readFileSync(new URL('../js/blocks/'+n,import.meta.url),'utf8');
 check('app.js mergePoints asks the gate before writing the merged candidate',/const mergePoints[\s\S]{0,700}integrityGate\(/.test(src('app.js')));

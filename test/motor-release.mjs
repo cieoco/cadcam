@@ -11,6 +11,8 @@ import {planActuatorPlateHoles} from '../js/blocks/actuator-plate-holes.js';
 import {planMotorInstallation,actuatorHostPoints} from '../js/blocks/actuator-installation.js';
 import {offPlateMotors,offPlateMessage,planMotorRelease,planMotorReturn,planMotorLeave,run} from '../js/blocks/motor-release.js';
 import {S} from '../js/blocks/state.js';
+import {loadIntegrity} from '../js/blocks/integrity-gate.js';
+await loadIntegrity();   // C4: the commit gate is live; a repair of an already broken work must not be refused
 
 class FakeElement{constructor(){this.children=[];this.style={};this.dataset={};this.attributes={};this.textContent='';}
  replaceChildren(...c){this.children=c;this.textContent=c.filter(x=>typeof x==='string').join('');}append(...c){this.children.push(...c);}after(){}setAttribute(k,v){this.attributes[k]=v;}}

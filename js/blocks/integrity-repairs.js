@@ -18,7 +18,9 @@ export const SHOWN = ['contradiction', 'dangling'];
 const TOL = 0.01, KEYS = ['p1', 'p2', 'p3'];
 const GROUND = new Set(['fixed', 'motor', 'linear']);
 const fix1 = n => (Math.round(n * 10) / 10).toString();
-const nameOf = c => (typeof c?.name === 'string' && c.name.trim()) || c?.id || '零件';
+const MOTOR_NAMES = {tt: 'TT 馬達', n20: 'N20 減速馬達', mg995: 'MG995 伺服馬達'};
+// 學生看得到的名稱：自己取的名字；沒有名字時獨立馬達用型號，其他用零件種類，不顯示內部編號。
+const nameOf = c => (typeof c?.name === 'string' && c.name.trim()) || (c?.type === 'motor' ? MOTOR_NAMES[c.motorType] || MOTOR_NAMES.tt : c ? ({bar: '桿件', triangle: '板件', gear: '齒輪', slider: '滑軌'})[c.type] || '零件' : '零件');
 const quote = c => `「${nameOf(c)}」`;
 const clone = v => structuredClone(v);
 
@@ -172,4 +174,17 @@ export function findings(work) {
   }
   if (topo) { topo.text = danglingText({what: 'topo'}, null, topo.count); topo.short = `有 ${topo.count} 項設定指向不存在的點`; }
   return items.sort((a, b) => (b.first ? 1 : 0) - (a.first ? 1 : 0));
+}
+
+/** 提交關卡拒絕時的說明（integrity-gate.js）：與開檔提示同一套名稱與色彩規則。回傳 {text, far, canon}。 */
+export function describeIssue(work, issue) {
+  const comps = work.comps || [];
+  if (issue.code === 'I1') {
+    const it = i1Item(buildRelations(work), issue, comps);
+    if (it) return {text: it.text, far: it.mark.far, canon: it.mark.canon};
+  }
+  const ref = issue.ref || {}, c = comps.find(x => x.id === ref.comp) || comps.find(x => x.id === issue.parts[0]);
+  const names = issue.parts.map(id => quote(comps.find(x => x.id === id))).join('、');
+  const text = ref.what === 'partIdDup' ? `${names}的馬達零件編號重複，請重新編號其中一個。` : danglingText(ref, c, 1) || `${names}的馬達記錄自相矛盾。`;
+  return {text: `${text}畫面上已標出這些零件。`, far: issue.parts, canon: []};
 }

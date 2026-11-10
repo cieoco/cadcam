@@ -149,7 +149,7 @@ export function run(action, api) {
   if (action === 'check') return check(api);
   last = {...last, ...api};
   if (action === 'flash') {   // 提交關卡拒絕時，把牽涉的零件短暫標出
-    marks.hover = [{ids: api.ids, color: ORANGE}]; refreshMarks(); clearTimeout(flashTimer);
+    marks.hover = [{ids: api.far, color: ORANGE}, {ids: api.canon, color: BLUE}]; refreshMarks(); clearTimeout(flashTimer);
     flashTimer = setTimeout(() => { marks.hover = []; refreshMarks(); }, 4000); return true;
   }
   if (action === 'mark') {   // 狀態列點名「有一端沒接」的零件
