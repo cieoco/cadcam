@@ -12,6 +12,7 @@ import {getExample} from '../js/blocks/examples.js';
 import {compileTopology} from '../js/core/topology.js';
 import {solveTopology} from '../js/multilink/solver.js';
 import {holeWorld} from '../js/core/local-holes.js';
+import {makeStandardBlank} from '../js/blocks/standard-blank.js';
 
 class FakeElement{constructor(){this.children=[];this.style={};this.dataset={};this.parentElement={style:{}};this.value='';this.textContent='';this.attributes={};}
  closest(){return this.parentElement;}replaceChildren(...c){this.children=c;}append(...c){this.children.push(...c);}before(){}setAttribute(k,v){this.attributes[k]=String(v);}}
@@ -95,4 +96,22 @@ for(const [id,n] of [['Link1',6],['Link2',15],['Link3',12]]){
  assert.equal(S.topo.params[c.lenParam],(n-2)*8);editor.setDimensionValue(id,'g',(n-1)*8,{exact:true});
  assert.deepEqual(notices,[]);assert.equal(S.topo.params[c.lenParam],(n-1)*8);assert.equal(undo.length,1);assert.ok(solve().isValid);
 }
+// 8. 連續改尺寸後，懸空的下游零件保持自身長度與格孔（不能沿用舊座標被拉長）；播放各角度亦同。
+const rigid=(r,m)=>{for(const c of S.comps.filter(c=>c.standardBlank)){const a=r.points[c.p1.id],b=r.points[c.p2.id],L=Math.hypot(b.x-a.x,b.y-a.y);
+  near(L,S.topo.params[c.type==='bar'?c.lenParam:c.gParam],`${m} ${c.id} length`);
+  if(c.type==='triangle'){const d=r.points[c.p3.id];near(Math.hypot(d.x-a.x,d.y-a.y),S.topo.params[c.r1Param],`${m} ${c.id} height`);near(Math.hypot(d.x-b.x,d.y-b.y),S.topo.params[c.r2Param],`${m} ${c.id} diagonal`);}
+  for(const h of c.holes){const q=r.points[h.id],w=holeWorld({...c,p1:{...c.p1,...a},p2:{...c.p2,...b},...(c.p3?{p3:{...c.p3,...r.points[c.p3.id]}}:{})},h);near(q.x,w.x,`${m} ${c.id} ${h.id} x`);near(q.y,w.y,`${m} ${c.id} ${h.id} y`);}}};
+reset(load());
+for(const [id,n] of [['Blank136',32],['Blank136',48],['Blank135',40],['Blank137',40]]){
+ editor.setDimensionValue(id,'g',n,{exact:true});assert.deepEqual(notices,[],`${id} ${n}`);assert.equal(S.topo.params[comp(id).lenParam],n);
+ const r=solve();assert.ok(r.isValid,r.errorReason);rigid(r,`${id}→${n}`);
+ // 播放：沿用上一幀當種子（與 app 的 solveFrame 相同），懸空桿維持原角度、長度不變。
+ let prev=null,angle=null;for(const a of [0,30,90,180,270,359]){const f=solve(S.comps,S.topo.params,{thetaDeg:a,motorAngles:{1:a},_prevPoints:prev});assert.ok(f.isValid,`θ=${a} ${f.errorReason}`);rigid(f,`${id}→${n} θ=${a}`);
+  const B=f.points['Blank136.B'],P=f.points.P138s,now=Math.atan2(P.y-B.y,P.x-B.x);if(angle!==null)near(now,angle,`θ=${a} free bar keeps its angle`);angle=now;prev=f.points;}
+}
+// 懸空的標準板材（只有一角接在曲柄上）也維持剛體與格孔。
+{const s=load(),plate=makeStandardBlank({kind:'plate',columns:3,rows:3,n:900,origin:{x:s.comps.find(c=>c.id==='Blank135').p1.x,y:s.comps.find(c=>c.id==='Blank135').p1.y}});assert.ok(plate.ok);plate.comp.p1={...plate.comp.p1,id:'Blank135.A'};s.comps.push(plate.comp);Object.assign(s.params,plate.params);reset(s);
+ let prev=null;for(const a of [0,45,120,250]){const f=solve(S.comps,S.topo.params,{thetaDeg:a,motorAngles:{1:a},_prevPoints:prev});assert.ok(f.isValid,`hanging plate θ=${a} ${f.errorReason}`);rigid(f,`hanging plate θ=${a}`);prev=f.points;}}
+// 求解結果違反剛性距離時必須回報失敗，不可當成有效。
+{const s=load();s.params['Blank133.D']=10;const r=solve(s.comps,s.params);assert.equal(r.isValid,false,'broken plate diagonal is a real failure');}
 console.log('connected resize: user work bars/plate ±1, motor hole identity, used-hole and impossible-loop refusals, undo, save/reopen and four-bar example passed');

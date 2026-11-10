@@ -39,7 +39,7 @@ for (const ex of BLOCK_EXAMPLES) {
 }
 
 // 2. L0 的錯誤接法：夾爪齒輪中心直接共用升降滑台的點。
-// solver 現在會直接拒絕無法保持孔距的三角板；漏解檢查仍需涵蓋歷史部分結果。
+// 2026-11-10 起懸空的板件保持剛體（左夾臂可解，不再誤報孔距）；沒接上的右夾臂由漏解檢查指出。
 {
   const lift = clone(BLOCK_EXAMPLES.find(e => e.id === 'competition-rack-lift').snapshot);
   const grip = clone(BLOCK_EXAMPLES.find(e => e.id === 'gear-gripper').snapshot);
@@ -54,8 +54,8 @@ for (const ex of BLOCK_EXAMPLES) {
   }));
   const sol = solve(comps, { ...lift.params, ...grip.params }, { '1': 1, '2': 0 });
   const miss = unsolvedMovingPoints(comps, sol);
-  check('錯誤接法：solver 拒絕且指出無法保持孔距的構件', sol.isValid === false && /LeftJaw.*孔距/.test(sol.errorReason || ''), sol.errorReason || '');
-  check('錯誤接法：整体無解由 solver 診斷，漏解檢查不重複報警', miss.length === 0);
+  check('錯誤接法：懸空的左夾臂保持剛體，不誤報孔距', sol.isValid === true && !/孔距/.test(sol.errorReason || ''), sol.errorReason || '');
+  check('錯誤接法：漏解檢查指出沒接上的右夾臂 GCB、GPB、RT', miss.join(',') === 'GCB,GPB,RT', miss.join(','));
   const partial = unsolvedMovingPoints(comps, { ...sol, isValid: true });
   check('歷史部分結果：有效標記仍不能掩蓋 GCB、GPB、RT 漏解', ['GCB', 'GPB', 'RT'].every(id => partial.includes(id)) && partial.length === 3, partial.join(','));
 }

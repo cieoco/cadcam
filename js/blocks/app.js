@@ -1585,7 +1585,8 @@ function solveFrame() {
   lastFrameIssue = motionPoseIssue(scope.comps, sol);
   if (lastFrameIssue) sol = { ...sol, isValid: false, errorReason: lastFrameIssue.message };
   lastSolveValidity=materialSolveValidity(scope.comps,sol);
-  const solved = (sol && sol.isValid !== false && sol.points) ? sol.points : {};
+  // A loose (under-constrained) pose is still a rigid solve: draw it so dangling parts keep their lengths.
+  const solved = (sol && (sol.isValid !== false || lastFrameIssue?.code === 'underconstrained') && sol.points) ? sol.points : {};
   // 無效解整幀不採用，避免新舊接點混合而拉伸剛性零件；保留上一姿態。
   const newLast = { ...lastSolved };
   Object.keys(solved).forEach(id => {

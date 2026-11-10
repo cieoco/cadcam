@@ -993,7 +993,9 @@ function solveBodyJointTopology(topology, params) {
     const unresolvedPointIds = [...pointIds].filter(id => !points[id]);
 
     if (!infeasible) {
-        const lattice = new Set([...triangles].filter(([k]) => k.startsWith('localHole.')).map(([, t]) => t.p3));
+        // Rigid bodies: plate vertices and lattice holes (local-hole triangles).
+        const rigid = new Set([...triangles.values()].flatMap(t => [t.p1, t.p2, t.p3]));
+        const prev = id => prevPoints?.[id] || getInitialPoint(id);
         for (const pid of pointIds) {
             if (points[pid]) continue;
             const related = constraints
@@ -1008,9 +1010,11 @@ function solveBodyJointTopology(topology, params) {
             const pick = related[0];
             const other = points[pick.otherId];
             const len = pick.len || 0;
-            const seed = getInitialPoint(pid) || { x: other.x + len, y: other.y };
-            let dx = seed.x - other.x;
-            let dy = seed.y - other.y;
+            // A free end keeps its previous angle from the end already placed, so nothing stretches.
+            const seed = prev(pid) || { x: other.x + len, y: other.y };
+            const from = prev(pick.otherId) || other;
+            let dx = seed.x - from.x;
+            let dy = seed.y - from.y;
             const d = Math.hypot(dx, dy);
             if (d === 0) {
                 dx = len;
@@ -1019,9 +1023,10 @@ function solveBodyJointTopology(topology, params) {
                 dx = (dx / d) * len;
                 dy = (dy / d) * len;
             }
-            // Lattice holes follow their placed bar or plate.
-            if (lattice.has(pid) && related.length > 1) solveDistanceConstraints(id => lattice.has(id));
-            points[pid] ||= { x: other.x + dx, y: other.y + dy };
+            const at = { x: other.x + dx, y: other.y + dy };
+            // A seed that breaks another rigid distance is re-solved from the body's placed points.
+            if (rigid.has(pid) && related.some(c => Math.abs(Math.hypot(at.x - points[c.otherId].x, at.y - points[c.otherId].y) - c.len) > tol)) solveDistanceConstraints(id => rigid.has(id));
+            points[pid] ||= at;
         }
     }
 
@@ -1065,7 +1070,7 @@ function solveBodyJointTopology(topology, params) {
 
     // A driven vertex can already be solved before triangle constraints run.
     // Validate all three edges, including the edge not used for intersection.
-    constraints.filter(c => c.type === 'tri').forEach(c => {
+    constraints.filter(c => c.type === 'tri' || c.type === 'hole').forEach(c => {
         // Ground-to-ground geometry is prescribed by anchors (legacy dimensions may be rounded).
         if (fixedIds.has(c.a) && fixedIds.has(c.b)) return;
         const a = points[c.a], b = points[c.b];
@@ -1073,7 +1078,7 @@ function solveBodyJointTopology(topology, params) {
         const actual = Math.hypot(b.x - a.x, b.y - a.y);
         if (!Number.isFinite(actual) || Math.abs(actual - c.len) > tol) {
             infeasible = true;
-            if (!infeasibleReason) infeasibleReason = `三角板 ${c.triId} 無法保持設定孔距 ${c.len} mm`;
+            if (!infeasibleReason) infeasibleReason = `${c.triId ? '三角板 ' + c.triId : '孔 ' + c.b} 無法保持設定孔距 ${c.len} mm`;
         }
     });
 
