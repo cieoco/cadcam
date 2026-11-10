@@ -9,11 +9,12 @@
 import {findings, workOf, sourceOf, fingerprint} from './integrity-repairs.js';
 import {pointKeysFor} from './part-types.js';
 import {looseEnds} from './status-text.js';
+import {barHullPath, platePath} from './view.js';
 
 const MAX_SHOWN = 3, NS = 'http://www.w3.org/2000/svg';
 const ORANGE = '#f97316', BLUE = '#2563eb';
 let shown = {fp: '', items: []}, dismissed = '';
-let marks = {hint: [], hover: []}, last = {}, observer = null;
+let marks = {hint: [], hover: []}, last = {}, observer = null, fitted = false;
 
 // ---------------------------------------------------------------- canvas marks (same layer for hints and the status pill)
 /** 把零件畫成粗外框疊在畫布上；groups: [{ids, color}]。重畫後（svg 被清空）由 observer 補回。 */
@@ -28,12 +29,14 @@ export function paintMarks(api, groups) {
   for (const {ids, color} of groups) for (const id of ids) {
     const c = api.S.comps.find(c => c.id === id);
     if (!c) continue;
-    const list = pointKeysFor(c).map(k => pts[c[k]?.id] || c[k]).filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y)).map(project);
-    if (!list.length) continue;
-    const shape = document.createElementNS(NS, list.length > 2 ? 'polygon' : list.length === 2 ? 'polyline' : 'circle');
+    const world = pointKeysFor(c).map(k => pts[c[k]?.id] || c[k]).filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
+    if (!world.length) continue;
+    // 外框用畫布畫這個零件的同一條路徑：桿用冰棒棍外形，板件用板外形。
+    const d = c.type === 'bar' && world.length === 2 ? barHullPath(world[0], world[1]) : c.type === 'triangle' && world.length === 3 ? platePath(c, world) : '';
+    const list = world.map(project), shape = document.createElementNS(NS, d ? 'path' : list.length > 2 ? 'polygon' : list.length === 2 ? 'polyline' : 'circle');
     shape.dataset.hintPart = id;
-    const attrs = list.length > 1 ? {points: list.map(p => `${p.x},${p.y}`).join(' ')} : {cx: list[0].x, cy: list[0].y, r: 16};
-    for (const [k, v] of Object.entries({...attrs, fill: 'none', stroke: color, 'stroke-opacity': .65, 'stroke-width': 10, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke'})) shape.setAttribute(k, v);
+    const attrs = d ? {d} : list.length > 1 ? {points: list.map(p => `${p.x},${p.y}`).join(' ')} : {cx: list[0].x, cy: list[0].y, r: 16};
+    for (const [k, v] of Object.entries({...attrs, fill: 'none', stroke: color, 'stroke-opacity': .65, 'stroke-width': 10, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke', 'fill-rule': 'evenodd'})) shape.setAttribute(k, v);
     layer.append(shape); n++;
   }
   svg.append(layer);
@@ -85,12 +88,22 @@ function place(el) {
   if (top && wrap) el.style.setProperty('--ih-top', `${Math.round(top.getBoundingClientRect().bottom - wrap.getBoundingClientRect().top + 34)}px`);
 }
 
+// 標出的零件若在提示底下，就用既有的置中函式（帶頂端留白）重新置中；提示消失後恢復。
+function avoid(api, el, on) {
+  if (!api.fit) return;
+  if (!on) { if (fitted) { fitted = false; api.fit(0); } return; }
+  const layer = api.svg?.querySelector?.('[data-integrity-hint]'), c = el.getBoundingClientRect?.();
+  if (!layer || !c?.height) return;
+  const hit = [...layer.children].some(s => { const r = s.getBoundingClientRect(); return r.bottom > c.top && r.top < c.bottom && r.right > c.left && r.left < c.right; });
+  if (hit) { fitted = true; api.fit(c.bottom - api.svg.getBoundingClientRect().top + 8); }
+}
+
 /** 重新檢查並更新（或隱藏）提示。回傳目前顯示的問題數。 */
 export function check(api) {
   last = api;
   const el = panel(), work = workOf(api.S), items = findings(work), fp = fingerprint(work);
   shown = {fp, items};
-  if (!items.length || dismissed === fp) { el.style.display = 'none'; el.replaceChildren(); marks.hint = []; refreshMarks(); return 0; }
+  if (!items.length || dismissed === fp) { el.style.display = 'none'; el.replaceChildren(); marks.hint = []; refreshMarks(); avoid(api, el, false); return 0; }
   dismissed = '';
   const rows = [], visible = items.slice(0, MAX_SHOWN);
   visible.forEach((item, i) => {
@@ -102,7 +115,7 @@ export function check(api) {
     const more = button('說明', () => { detail.hidden = !detail.hidden; more.setAttribute('aria-expanded', String(!detail.hidden)); }, {label: '說明：這項問題的完整解釋'});
     more.setAttribute('aria-expanded', 'false');
     row.append(more);
-    if (!i) row.append(button('先不處理', () => { dismissed = fp; el.style.display = 'none'; marks.hint = []; refreshMarks(); }, {label: '先不處理，關閉這則作品檢查提示', cls: 'quiet'}));
+    if (!i) row.append(button('先不處理', () => { dismissed = fp; el.style.display = 'none'; marks.hint = []; refreshMarks(); avoid(api, el, false); }, {label: '先不處理，關閉這則作品檢查提示', cls: 'quiet'}));
     row.append(detail);
     rows.push(row);
   });
@@ -112,6 +125,7 @@ export function check(api) {
   el.style.display = 'block';
   marks.hint = [{ids: visible.flatMap(i => i.mark?.far || []), color: ORANGE}, {ids: visible.flatMap(i => i.mark?.canon || []), color: BLUE}];
   refreshMarks();
+  avoid(api, el, true);
   return items.length;
 }
 

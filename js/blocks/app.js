@@ -1084,7 +1084,7 @@ let editingHandles=null;
 const jawTipHandle = createJawTipHandle({ svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
   editor: memberEditor, getParams: () => S.topo.params });
 // 馬達解除／軸心修復，按需載入。
-const editApi=id=>({S,id,svg,project:p=>({x:TX(p.x),y:TY(p.y)}),pause,pushUndo,rebuild,draw,notify:transient,save:scheduleAutosave,points:displayCoords,motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()}});
+const editApi=id=>({S,id,svg,fit:fitView,project:p=>({x:TX(p.x),y:TY(p.y)}),pause,pushUndo,rebuild,draw,notify:transient,save:scheduleAutosave,points:displayCoords,motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()}});
 function motorRelease(action,id){return import('./motor-release.js').then(m=>m.run(action,{...editApi(id),refresh:()=>integrityHints('check')}));}
 // 開檔檢查提示（I1／I3／I5）與其修復，按需載入。
 function integrityHints(action,extra){return import('./integrity-hints.js').then(m=>m.run(action,{...editApi(),...extra}));}
@@ -2940,10 +2940,11 @@ function currentBounds() {
   }
   return any ? { minX, maxX, minY, maxY } : null;
 }
-function fitView() {
+function fitView(inset = 0) {   // inset：頂端被檢查提示占去的畫面 px，置中時避開
   const b = currentBounds();
   // 接點外仍有馬達外殼與零件端圓；手機窄畫面也要留得住這些部分。
-  const area = visibleUserRect(svg);   // 手機：只在抽屜與播放列以外置中
+  let area = visibleUserRect(svg);   // 手機：只在抽屜與播放列以外置中
+  if (inset > 0) { const r = svg.getBoundingClientRect(), k = svg.getScreenCTM()?.a || 1, a = area || { x: 0, y: 0, width: r.width / k, height: r.height / k }; area = { ...a, y: a.y + inset / k, height: a.height - inset / k }; }
   if (b) View.fit({ minX: b.minX - 24, maxX: b.maxX + 24, minY: b.minY - 24, maxY: b.maxY + 24 }, area); else View.resetView(area);
   draw();
   if (b && settleInside(svg, View)) draw();
