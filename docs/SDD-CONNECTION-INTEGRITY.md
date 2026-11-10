@@ -54,10 +54,10 @@
 | 角色 | 欄位 | 規則 |
 | --- | --- | --- |
 | 身分 | 點／孔 `id`、零件 `id` | 共用 id 代表接合；零件 id 唯一 |
-| 幾何 | 點副本的 `x,y`、局部孔 `u,v` 推得的世界座標 | 同一 id 的幾何副本必須一致（I1） |
+| 幾何 | 點副本的 `x,y`、局部孔與 `standardBlank.mountHoles` 的 `u,v` 推得的世界座標（`holeWorld`）、齒條孔的 `x,y` | 同一 id 的幾何副本必須一致（I1）。以板上孔（`holes`／`mountHoles`／齒條孔）為規範位置，端點是「跟著孔」的副本 |
 | 運動角色 | 點的 `type`（floating／fixed／motor／linear） | 各副本可以只有部分帶強角色，以最強者為準。只有兩個強角色互相衝突才算矛盾，例如兩個不同的 `physicalMotor` |
-| 馬達擁有 | 輸出件或獨立馬達的 `physicalMotor`、`motorType`、`isInput`、`phaseOffset`、`motorMount` | 由擁有者保存。點與承載孔上的 `physicalMotor` 是**可選的副本**：沒有複製不算錯；有複製則值必須相同 |
-| 承載 | `motorMount.frameBody`；`motorCarrier` 只在承載件會動時使用；承載件的 `motorMountPoint`、`frameSeparate` | 板材承載合法地沒有 `motorCarrier`。兩者都存在時才要求相同；有寫的引用必須指向存在的零件 |
+| 馬達擁有 | 輸出件或獨立馬達的 `physicalMotor`、`motorType`、`isInput`、`phaseOffset`、`motorMount`。齒輪輸出件沒有 `isInput` 與零件層 `physicalMotor`，擁有者由軸心點的 `physicalMotor` 加 `motorType` 判定 | 由擁有者保存。點與承載孔上的 `physicalMotor` 是**可選的副本**：沒有複製不算錯；有複製則值必須相同。軸心 id 的備援順序：`motorMount.center`、獨立馬達的 `p1`、帶 `physicalMotor` 的點 |
+| 承載 | `motorMount.frameBody`（可為 `'world'`，表示自動機架）；`motorCarrier` 只在承載件會動時使用；承載件的 `motorMountPoint`（承載件自己的軸心孔 id，匯出時用來認機架）。`frameSeparate` 只是「機架桿獨立成零件」的顯示旗標，不是引用，不檢查 | 板材承載合法地沒有 `motorCarrier`。兩者都存在時才要求相同（`'world'` 不比對）；有寫的引用必須指向存在的零件。失效引用的歸屬：`frameBody`／`motorMountPoint` 記 I3，`motorCarrier` 記 I5，避免同一筆重複回報 |
 | 加工 | 局部孔的 `manufactured`、`standardBlank.drill`、`mountHoles` | 見 3.2 的三種孔用途，不與運動角色混用 |
 | 非加工引用 | `topo.tracePoints`、`loads`、`dimensions`、`referencePoint` | 只要求引用存在，不讓孔變成「需加工」 |
 
@@ -87,13 +87,13 @@ C1 必須以程式碼逐欄核對本表，並把修正寫回本節。
 | --- | --- | --- |
 | I1 | 同一 id 的幾何副本一致。端點用了某零件的孔 id，就要在該孔世界位置（容差 0.01 mm） | 移回孔位，或改用自己的 id 離開該零件；只掛在它上面的自由件剛體同行 |
 | I2 | 強運動角色不互相衝突：兩個不同 `physicalMotor`，或 fixed 與 motor 指向不同驅動。只缺複製不算 | 列出讓學生選擇，不自動決定 |
-| I3 | 馬達引用可解析：`center` 是輸出件或獨立馬達自己的點；有寫的 `frameBody`／`motorCarrier`／`motorMountPoint` 指向存在的零件；兩者並存時相同；`partId` 唯一 | 清除指向已刪零件的引用並說明；`partId` 重新編號 |
-| I4 | 重開作品的姿態等於存檔姿態，比對方式：用**存檔的各馬達角度**（`topo.motorAngles`／`theta`／`activeMotor`）求解，而不是一律零度；涵蓋多馬達與相對承載件角度。現行 `alignSavedInputPhase` 刻意排除的情況（凍結輸入、承載件輸入等）先只標記 `notice` | 只對已證明安全的案例重算相位；其他情況只說明 |
+| I3 | 馬達引用可解析：`center` 是輸出件或獨立馬達自己的點；有寫的 `frameBody` 指向存在的零件、`motorMountPoint` 是承載件自己的孔；`motorCarrier` 與 `frameBody` 並存時相同；`partId` 唯一（`motorCarrier` 不存在記 I5） | 清除指向已刪零件的引用並說明；`partId` 重新編號 |
+| I4 | 重開作品的姿態等於存檔姿態，比對方式：用**存檔的各馬達角度**（`topo.motorAngles`／`theta`／`activeMotor`）求解，而不是一律零度；涵蓋多馬達與相對承載件角度。現行 `alignSavedInputPhase` 刻意排除的情況（凍結輸入、承載件輸入等）先只標記 `notice`。**C1 實作：** 條件逐項沿用 `alignSavedInputPhase`（世界座標輸入桿、固定／馬達軸心、非凍結馬達），一律 `notice`——開檔本來就會對齊相位，未對齊的舊檔（例如 `connected-resize.json`）不算壞檔；承載件輸入以相對承載件角度比對，凍結馬達不比對。改用求解器比對與升級為 `contradiction` 留給 C3/C4 | 只對已證明安全的案例重算相位；其他情況只說明 |
 | I5 | 有寫的引用必須存在：針筒端的承載零件、`motorCarrier`、`frameBody`、`topo` 的追蹤／負載／尺寸點、模組接口 | 清除失效引用並說明；不刪零件、不猜接法 |
 | I6 | 零件 id 唯一；不安全字元的 id 改名後共用要同步更新 | 改名並同步全部副本 |
 | I7 | 同一零件的兩個孔不共用同一 id | 拆開並保留原位 |
 | I8 | 合成件成員與共用孔符合凍結形狀 | 提示先解除合成，不自動改形 |
-| I9 | 針筒端點**可解析**：承載零件存在；`(u,v)` 在零件外形內、符合現有針筒放置規則。可以是任意已支援位置或新增的固定孔，**不要求對到既有格孔** | 只在承載零件失效時提供「解除該端」 |
+| I9 | 針筒端點**可解析**：承載零件存在；`(u,v)` 在零件外形內、符合現有針筒放置規則。可以是任意已支援位置或新增的固定孔，**不要求對到既有格孔**。**C1 實作：** 承載零件缺席記 I5；只檢查圓盤外形（`hypot(u,v)` ≤ 半徑）與「承載零件沒有可用尺寸」（`notice`）。其他外形與放置規則（固定機架、端孔）C7 再補，避免誤判 | 只在承載零件失效時提供「解除該端」 |
 
 **分階段啟用**
 
@@ -134,7 +134,7 @@ C1 必須以程式碼逐欄核對本表，並把修正寫回本節。
 | 包 | 施工 | 交付 | 驗收閘門 | 狀態 |
 | --- | --- | --- | --- | --- |
 | C0 測試先行 | Opus | `test/connection-integrity.mjs` 骨架與兩份使用者 fixture；I1–I9 各一個最小反例與一個「看似矛盾但合法」的正例（板材承載無 `motorCarrier`、承載孔無 `physicalMotor` 副本、多馬達非零角度、針筒任意位置固定孔） | 反例在 main 上失敗、正例通過，失敗原因正確 | 待核可 |
-| C1 索引與影子檢查 | Sonnet | `relations.js`（3.2）、`checkWork`（3.3），按需載入；核對並修正 3.1 欄位角色表；新舊查詢差異表 | C0 全過；範例零 `contradiction`／`dangling`；差異逐項有判斷；不進啟動路徑 | 待做 |
+| C1 索引與影子檢查（影子模式已實作，待審查） | Sonnet | `relations.js`（3.2）、`checkWork`（3.3），按需載入；核對並修正 3.1 欄位角色表；新舊查詢差異表 | C0 全過；範例零 `contradiction`／`dangling`；差異逐項有判斷；不進啟動路徑 | 待做 |
 | C2 操作序列測試 | Sonnet 寫、Opus 審 | `test/operation-sequences.mjs`；影子檢查每步執行；把失敗縮小成 fixture，非針筒的問題在本包修 | 固定種子 500 步無新 `contradiction`，失敗都有 fixture | 待做 |
 | C3 逐項啟用開檔提示 | Sonnet | 通用提示與修復元件（泛化 `motor-release` 提示）；I1、I3、I5 先啟用，其他保持影子 | 兩份使用者原檔顯示正確；範例無提示；修復一次復原；桌機與手機 | 待做 |
 | C4 馬達單一來源與提交關卡 | Sonnet | 「有沒有馬達」「接地」改用 `motorOf`／`isGround`；刪除 `physical_motor` 等死讀取；刪除零件清理失效的承載引用；I1／I3 接入提交關卡 | 馬達相關 Node 與瀏覽器測試全過；範例姿態與匯出不變；任一入口製造 I1 被拒 | 待做 |

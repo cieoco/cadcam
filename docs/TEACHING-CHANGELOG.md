@@ -1,5 +1,12 @@
 # 教學與操作更新紀錄
 
+## 2026-11-10：接合關係索引與一致性檢查（影子模式，無使用者可見變更）
+
+- 依 [接合關係 SDD](SDD-CONNECTION-INTEGRITY.md) 的 C1 包新增 `js/blocks/relations.js`（`buildRelations`：副本、世界座標、孔的三種用途、接地、馬達、關係、自由剛體）與 `js/blocks/integrity.js`（`checkWork`：I1–I9）。兩者都是純函式、不改輸入，**沒有任何啟動模組或 app.js 引用**，學生看不到、也不阻擋任何操作；`test/startup-size.mjs` 與首次 JS 大小未動。新增模組使 load graph 重新產生（`node tools/load-graph.mjs`，只改雜湊與頁面 importmap）。
+- `test/connection-integrity.mjs`（C0 先寫的測試）40/41 通過（唯一未過是上述 lift-bucket），已列入 `test/manifest.json`：70 個內建範例與兩份學生原檔零 `contradiction`／`dangling`；`motor-off-plate.json` 報 I1（Blank135 的軸心離座板孔約 76 mm）；加工孔判斷與 `used-holes` 逐孔相同（2132 孔 0 差異）。I4 在 C1 一律只標 `notice`（開檔本來就會對齊相位）。
+- 新舊查詢差異表：`node tools/relations-diff.mjs`。發現一筆範例資料問題，本包不動資料：`lift-bucket` 範例的 `tracePoints: ["P"]` 指向不存在的點（`lift-bucket-builder.js` 由 `tippingBucketSnapshot` 起手，繼承了翻斗的追蹤點）；修資料要連動 builder、`example-actuator-plates` 的雜湊與整份 load graph 重生，留待決定。`connection-integrity` 的 P1 因此只剩這一筆 I5 不過。
+- SDD 3.1 欄位角色表依程式碼核對修正（`motorMountPoint`、`frameSeparate`、`'world'` 承載、齒輪馬達擁有者、I3／I5 引用歸屬、I4／I9 的 C1 範圍）。
+
 ## 2026-11-10：馬達與連桿可以解除連接；軸心離開座板時可修復
 
 - 學生回報「馬達和連桿沒法解除連接」。學生曾在馬達軸心按「解除位置鎖定」後拖動，軸心被拖到座板外，但孔號仍是座板格孔；之後所有安裝檢查都以「馬達軸心需保持在所選座板格位」擋下，連「解除輸出連接」也無法儲存。
