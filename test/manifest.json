@@ -17,6 +17,7 @@
   "tests": [
     "test/standard-blanks.mjs",
     "test/connected-resize.mjs",
+    "test/connected-status.mjs",
     "test/dense-grid.mjs",
     "test/used-holes.mjs",
     "test/actuator-standard-plates.mjs",

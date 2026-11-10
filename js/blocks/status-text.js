@@ -14,7 +14,20 @@ export const isPracticeLesson = lesson => !!lesson && (lesson.group === 'challen
 const mechanismKey = snap => JSON.stringify([snap?.comps || [], snap?.params || {}, snap?.modules || [], snap?.assemblyMembers || []]);
 export const isMechanismEdit = (before, after) => mechanismKey(before) !== mechanismKey(after);
 
-export function invalidPoseStatus({ fromPractice = false, edited = false } = {}) {
+export function invalidPoseStatus({ fromPractice = false, edited = false, issue = null, comps = [] } = {}) {
   if (fromPractice && !edited) return { state: 'warn', text: '練習檔：照步驟把零件補上' };
+  if (issue?.code === 'underconstrained') return loosePartStatus(comps, issue);
   return { state: 'error', text: '解不出：檢查孔有沒有接好，或按復原' };
+}
+
+// 還會晃動（未受約束）不是解不出：用學生看得到的零件名稱指出來。
+// 只被一個零件用到、又沒解出的端點，就是「沒接的那一端」。
+export function loosePartStatus(comps = [], issue = {}) {
+  const ids = new Set(issue.sourceIds || []), uses = new Map(), keys = ['p1', 'p2', 'p3'];
+  for (const c of comps) for (const k of keys) if (c?.[k]?.id) uses.set(c[k].id, (uses.get(c[k].id) || 0) + 1);
+  const label = list => list.map(c => `「${c.name || c.id}」(${c.id})`).join('、');
+  const ends = comps.filter(c => keys.some(k => ids.has(c?.[k]?.id) && uses.get(c[k].id) === 1));
+  if (ends.length) return { state: 'warn', text: `${label(ends)} 有一端沒接，機構會晃動；接上固定孔或其他零件後才能正確播放` };
+  const parts = comps.filter(c => issue.componentIds?.includes(c.id));
+  return { state: 'warn', text: parts.length ? `${label(parts)} 還會晃動；補接孔位或動力後才能正確播放` : '還有未控制的活動部分，請補連接或動力' };
 }

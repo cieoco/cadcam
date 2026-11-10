@@ -74,7 +74,6 @@ import { invalidPoseStatus, isMechanismEdit } from './status-text.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { unsolvedMovingPoints, motionPoseIssue, inspectMotionRange } from './solve-health.js';   // S3 漏解警示：找出 solver 沒解出的活動接點
 import { offerExampleFromUrl } from './example-entry.js?v=20261005_unit2';
-import { getTeachingFeedback } from './teaching-feedback.js';
 import * as Motion from './motion.js';
 import { memberSweepSegments } from './member-sweep.js';
 let sweepMemberId = null; // 顯示偏好，不寫入作品格式。
@@ -1639,8 +1638,8 @@ function updateMechanismStatus(sol = null) {
       state = 'error'; chip = 'mesh';
       text = '齒輪沒有咬合，請調整位置';
     } else if (sol?.isValid === false && hasDriveSource()) {
-      ({ state, text } = invalidPoseStatus({ fromPractice: !!practice.id, edited: !!practice.id && isMechanismEdit(practice.base, Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState())) }));
-      if (state === 'warn') title = `這份練習檔刻意缺零件，補上後才能動；改壞了可按復原。\n${title}`;
+      ({ state, text } = invalidPoseStatus({ fromPractice: !!practice.id, edited: !!practice.id && isMechanismEdit(practice.base, Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState())), issue: lastFrameIssue, comps: simulationScope().comps }));
+      if (text.startsWith('練習檔')) title = `這份練習檔刻意缺零件，補上後才能動；改壞了可按復原。\n${title}`;
     } else if (mobility.dof < 0) {
       state = 'error'; chip = 'over';
       text = '接點限制太多，機構可能卡住';
@@ -1681,9 +1680,11 @@ function updateMechanismStatus(sol = null) {
   if (chip) el.dataset.chip = chip; else delete el.dataset.chip;
   el.textContent = text;
   el.title = title;
-  const feedback = getTeachingFeedback({ comps: simulationScope().comps, sol, compiled: simulationScope().compiled,
-    hasDrive: hasDriveSource(), gearWarning: gearMeshHasWarning(), dof: mobility });
-  if (['error', 'warn', 'static'].includes(state)) el.title += '\n' + feedback.message;
+  const feedback = { comps: simulationScope().comps, sol, compiled: simulationScope().compiled,
+    hasDrive: hasDriveSource(), gearWarning: gearMeshHasWarning(), dof: mobility };
+  // 未受約束時提示可晃動；其他教學提示只放在 title，按需載入以維持首次載入大小。
+  if (lastFrameIssue?.code === 'underconstrained') el.title += '\n' + lastFrameIssue.message;
+  else if (['error', 'warn', 'static'].includes(state)) import('./teaching-feedback.js').then(m => { if (el.title === title) el.title += '\n' + m.getTeachingFeedback(feedback).message; });
 }
 
 // 算馬達本體的朝向（度）：對準接在中心、非曲柄的那根桿；沒有就朝滑軌另一固定孔；再沒有才朝最近地錨。
