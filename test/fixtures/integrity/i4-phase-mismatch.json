@@ -1,0 +1,1179 @@
+{
+ "_note": "fourbar-crank-rocker with crank point C moved to 40 deg about A (all copies) while Link1.phaseOffset is still 0; I4.",
+ "_base": {
+  "example": "fourbar-crank-rocker"
+ },
+ "kind": "blocks",
+ "v": 1,
+ "lessonSequence": null,
+ "comps": [
+  {
+   "type": "triangle",
+   "id": "ActuatorSeat7",
+   "color": "#27ae60",
+   "p1": {
+    "id": "Blank7.A",
+    "type": "fixed",
+    "x": -112,
+    "y": -16
+   },
+   "p2": {
+    "id": "Blank7.B",
+    "type": "fixed",
+    "x": 32,
+    "y": -16
+   },
+   "p3": {
+    "id": "Blank7.C",
+    "type": "floating",
+    "x": -112,
+    "y": 16
+   },
+   "gParam": "Blank7.G",
+   "r1Param": "Blank7.H",
+   "r2Param": "Blank7.D",
+   "sign": 1,
+   "snapLength": false,
+   "stock": {
+    "widthMm": 13,
+    "thicknessMm": 3,
+    "material": "unspecified"
+   },
+   "shapeMode": "hull",
+   "vertices": [
+    {
+     "solve": true,
+     "ref": "p1"
+    },
+    {
+     "solve": true,
+     "ref": "p2"
+    },
+    {
+     "solve": true,
+     "ref": "p3"
+    }
+   ],
+   "holes": [
+    {
+     "id": "Blank7_H8_0",
+     "u": 8,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H16_0",
+     "u": 16,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H24_0",
+     "u": 24,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H32_0",
+     "u": 32,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H40_0",
+     "u": 40,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H48_0",
+     "u": 48,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H56_0",
+     "u": 56,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H64_0",
+     "u": 64,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H72_0",
+     "u": 72,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H80_0",
+     "u": 80,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H88_0",
+     "u": 88,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H96_0",
+     "u": 96,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H104_0",
+     "u": 104,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H112_0",
+     "u": 112,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H120_0",
+     "u": 120,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H128_0",
+     "u": 128,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H136_0",
+     "u": 136,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H0_8",
+     "u": 0,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H16_8",
+     "u": 16,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H24_8",
+     "u": 24,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H32_8",
+     "u": 32,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H40_8",
+     "u": 40,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H48_8",
+     "u": 48,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H56_8",
+     "u": 56,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H64_8",
+     "u": 64,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H72_8",
+     "u": 72,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H80_8",
+     "u": 80,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H88_8",
+     "u": 88,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H96_8",
+     "u": 96,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H104_8",
+     "u": 104,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H112_8",
+     "u": 112,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H120_8",
+     "u": 120,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H128_8",
+     "u": 128,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H136_8",
+     "u": 136,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H144_8",
+     "u": 144,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H0_16",
+     "u": 0,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H8_16",
+     "u": 8,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H16_16",
+     "u": 16,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H40_16",
+     "u": 40,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H48_16",
+     "u": 48,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H56_16",
+     "u": 56,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H64_16",
+     "u": 64,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H72_16",
+     "u": 72,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H80_16",
+     "u": 80,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H88_16",
+     "u": 88,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H96_16",
+     "u": 96,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H104_16",
+     "u": 104,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H112_16",
+     "u": 112,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H120_16",
+     "u": 120,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H128_16",
+     "u": 128,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "B",
+     "u": 136,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "fixed"
+    },
+    {
+     "id": "Blank7_H144_16",
+     "u": 144,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H0_24",
+     "u": 0,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H16_24",
+     "u": 16,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H24_24",
+     "u": 24,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H32_24",
+     "u": 32,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H40_24",
+     "u": 40,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H48_24",
+     "u": 48,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H56_24",
+     "u": 56,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H64_24",
+     "u": 64,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H72_24",
+     "u": 72,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H80_24",
+     "u": 80,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H88_24",
+     "u": 88,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H96_24",
+     "u": 96,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H104_24",
+     "u": 104,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H112_24",
+     "u": 112,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H120_24",
+     "u": 120,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H128_24",
+     "u": 128,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H136_24",
+     "u": 136,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H144_24",
+     "u": 144,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H8_32",
+     "u": 8,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H16_32",
+     "u": 16,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H24_32",
+     "u": 24,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H32_32",
+     "u": 32,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H40_32",
+     "u": 40,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H48_32",
+     "u": 48,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H56_32",
+     "u": 56,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H64_32",
+     "u": 64,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H72_32",
+     "u": 72,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H80_32",
+     "u": 80,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H88_32",
+     "u": 88,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H96_32",
+     "u": 96,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H104_32",
+     "u": 104,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H112_32",
+     "u": 112,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H120_32",
+     "u": 120,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H128_32",
+     "u": 128,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H136_32",
+     "u": 136,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank7_H144_32",
+     "u": 144,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    }
+   ],
+   "standardBlank": {
+    "kind": "plate",
+    "mountHoles": [
+     {
+      "id": "Blank7_H8_8",
+      "u": 8,
+      "v": 8,
+      "diameter": 3.2,
+      "type": "floating"
+     },
+     {
+      "id": "Blank7_H24_16",
+      "u": 24,
+      "v": 16,
+      "diameter": 3.2,
+      "type": "floating"
+     },
+     {
+      "id": "A",
+      "u": 32,
+      "v": 16,
+      "diameter": 3.2,
+      "type": "fixed"
+     },
+     {
+      "id": "Blank7_H8_24",
+      "u": 8,
+      "v": 24,
+      "diameter": 3.2,
+      "type": "floating"
+     }
+    ]
+   },
+   "motorMountPoint": "A",
+   "frameSeparate": true,
+   "name": "標準馬達座板"
+  },
+  {
+   "type": "anchor",
+   "id": "Anchor1",
+   "p1": {
+    "id": "A",
+    "type": "fixed",
+    "x": -80,
+    "y": 0
+   }
+  },
+  {
+   "type": "anchor",
+   "id": "Anchor2",
+   "p1": {
+    "id": "B",
+    "type": "fixed",
+    "x": 24,
+    "y": 0
+   }
+  },
+  {
+   "type": "bar",
+   "id": "Link1",
+   "color": "#e74c3c",
+   "p1": {
+    "id": "A",
+    "type": "fixed",
+    "x": -80,
+    "y": 0,
+    "physicalMotor": "1"
+   },
+   "p2": {
+    "id": "C",
+    "type": "floating",
+    "x": -55.48657782019271,
+    "y": 20.569203509969256
+   },
+   "lenParam": "LL1",
+   "isInput": true,
+   "fixedLen": true,
+   "stock": {
+    "widthMm": 29,
+    "thicknessMm": 3,
+    "material": "unspecified"
+   },
+   "phaseOffset": 0,
+   "physicalMotor": "1",
+   "motorType": "tt",
+   "motorMount": {
+    "motor": "1",
+    "center": "A",
+    "outputBody": "Link1",
+    "frameBody": "ActuatorSeat7",
+    "orientation": "horizontal",
+    "reversed": true,
+    "face": "back",
+    "order": [
+     "motor",
+     "frameBody",
+     "outputBody"
+    ]
+   },
+   "zlift": 2,
+   "holes": [
+    {
+     "id": "Link1_H-8_-8",
+     "u": -8,
+     "v": -8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link1_H8_-8",
+     "u": 8,
+     "v": -8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link1_H16_-8",
+     "u": 16,
+     "v": -8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link1_H24_-8",
+     "u": 24,
+     "v": -8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link1_H32_-8",
+     "u": 32,
+     "v": -8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link1_H-8_0",
+     "u": -8,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link1_H8_0",
+     "u": 8,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link1_H16_0",
+     "u": 16,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link1_H24_0",
+     "u": 24,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link1_H-8_8",
+     "u": -8,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link1_H8_8",
+     "u": 8,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link1_H16_8",
+     "u": 16,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link1_H24_8",
+     "u": 24,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link1_H32_8",
+     "u": 32,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    }
+   ],
+   "standardBlank": {
+    "kind": "bar",
+    "rearMm": 8,
+    "mountHoles": [
+     {
+      "id": "Link1_H0_-8",
+      "u": 0,
+      "v": -8,
+      "diameter": 3.2,
+      "type": "floating"
+     },
+     {
+      "id": "Link1_H0_8",
+      "u": 0,
+      "v": 8,
+      "diameter": 3.2,
+      "type": "floating"
+     }
+    ]
+   },
+   "name": "格孔輸出板"
+  },
+  {
+   "type": "bar",
+   "id": "Link2",
+   "color": "#3498db",
+   "p1": {
+    "id": "C",
+    "type": "floating",
+    "x": -55.48657782019271,
+    "y": 20.569203509969256
+   },
+   "p2": {
+    "id": "D",
+    "type": "floating",
+    "x": 18.66666666666667,
+    "y": 79.82202425117741
+   },
+   "lenParam": "LL2",
+   "isInput": false,
+   "fixedLen": true,
+   "zlift": 2,
+   "holes": [
+    {
+     "id": "Link2_H8_0",
+     "u": 8,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link2_H16_0",
+     "u": 16,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link2_H24_0",
+     "u": 24,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link2_H32_0",
+     "u": 32,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link2_H40_0",
+     "u": 40,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link2_H48_0",
+     "u": 48,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link2_H56_0",
+     "u": 56,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link2_H64_0",
+     "u": 64,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link2_H72_0",
+     "u": 72,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link2_H80_0",
+     "u": 80,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link2_H88_0",
+     "u": 88,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link2_H96_0",
+     "u": 96,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    }
+   ],
+   "standardBlank": {
+    "kind": "bar"
+   }
+  },
+  {
+   "type": "bar",
+   "id": "Link3",
+   "color": "#3498db",
+   "p1": {
+    "id": "B",
+    "type": "fixed",
+    "x": 24,
+    "y": 0
+   },
+   "p2": {
+    "id": "D",
+    "type": "floating",
+    "x": 18.66666666666667,
+    "y": 79.82202425117741
+   },
+   "lenParam": "LL3",
+   "isInput": false,
+   "fixedLen": true,
+   "zlift": 2,
+   "holes": [
+    {
+     "id": "Link3_H8_0",
+     "u": 8,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link3_H16_0",
+     "u": 16,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link3_H24_0",
+     "u": 24,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link3_H32_0",
+     "u": 32,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link3_H40_0",
+     "u": 40,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link3_H48_0",
+     "u": 48,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link3_H56_0",
+     "u": 56,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link3_H64_0",
+     "u": 64,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Link3_H72_0",
+     "u": 72,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    }
+   ],
+   "standardBlank": {
+    "kind": "bar"
+   }
+  }
+ ],
+ "params": {
+  "LL1": 32,
+  "LL2": 104,
+  "LL3": 80,
+  "Blank7.G": 144,
+  "Blank7.H": 32,
+  "Blank7.D": 147.51271131668622
+ },
+ "counter": 7,
+ "tracePoint": "",
+ "tracePoints": [],
+ "referencePoint": "",
+ "activeMotor": "1",
+ "motorAngles": {},
+ "fabrication": {
+  "v": 1,
+  "syringeMount": {
+   "clearanceMm": 0.5,
+   "marginMm": 8,
+   "strapSpacingMm": 24
+  },
+  "export": {
+   "barWidthMm": 13,
+   "holeDiameterMm": 3.2,
+   "frameMarginMm": 18,
+   "frameHoleDiameterMm": 3.2,
+   "ttShaftFlatDiameterMm": 5.4,
+   "ttShaftFlatThicknessMm": 3.7
+  },
+  "ttMount": {
+   "shaftDiameterMm": 6,
+   "screwDiameterMm": 3,
+   "screwOffsetXMm": -20.6,
+   "screwSpacingMm": 17.3,
+   "locatorDiameterMm": 4,
+   "locatorOffsetXMm": -11.18,
+   "locatorOffsetYMm": 0
+  },
+  "n20Mount": {
+   "bossDiameterMm": 4.2,
+   "screwDiameterMm": 1.8,
+   "screwSpacingMm": 9
+  },
+  "mg995Mount": {
+   "bodyLengthMm": 41.2,
+   "bodyWidthMm": 20.2,
+   "shaftOffsetMm": 10,
+   "screwDiameterMm": 3.2,
+   "screwSpanMm": 49.5,
+   "screwSpacingMm": 10,
+   "cableNotchWidthMm": 8,
+   "cableNotchDepthMm": 4
+  },
+  "cnc": {
+   "toolDiameterMm": 3.175,
+   "stockThicknessMm": 3
+  },
+  "drive": {
+   "n20Spec": 0,
+   "n20HubCenterMm": 3.2,
+   "n20HubScrewMm": 3.2,
+   "n20HubCircleMm": 12.7,
+   "ttHubCenterMm": 6,
+   "ttHubScrewMm": 3.2,
+   "ttHubScrewSpacingMm": 12,
+   "hornCenterMm": 6,
+   "hornScrewMm": 2.2,
+   "hornScrewCount": 4,
+   "hornScrewCircleMm": 14
+  },
+  "joint": {
+   "defaultKind": "printed",
+   "bracket": {
+    "widthMm": 7,
+    "thicknessMm": 1.2,
+    "longLegMm": 13,
+    "shortLegMm": 9.5,
+    "holeEndMm": 3.5
+   }
+  }
+ },
+ "modules": []
+}

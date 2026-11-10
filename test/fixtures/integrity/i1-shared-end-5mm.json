@@ -1,0 +1,61 @@
+{
+ "_note": "Synthetic: Bar1.p2 and Bar2.p1 both use id J but sit at (100,0) and (105,0); I1 contradiction.",
+ "_base": null,
+ "kind": "blocks",
+ "v": 1,
+ "comps": [
+  {
+   "type": "bar",
+   "id": "Bar1",
+   "name": "左桿",
+   "color": "#3498db",
+   "p1": {
+    "id": "J0",
+    "type": "floating",
+    "x": 0,
+    "y": 0
+   },
+   "p2": {
+    "id": "J",
+    "type": "floating",
+    "x": 100,
+    "y": 0
+   },
+   "lenParam": "L1",
+   "isInput": false,
+   "fixedLen": true
+  },
+  {
+   "type": "bar",
+   "id": "Bar2",
+   "name": "右桿",
+   "color": "#e74c3c",
+   "p1": {
+    "id": "J",
+    "type": "floating",
+    "x": 105,
+    "y": 0
+   },
+   "p2": {
+    "id": "J2",
+    "type": "floating",
+    "x": 200,
+    "y": 0
+   },
+   "lenParam": "L2",
+   "isInput": false,
+   "fixedLen": true
+  }
+ ],
+ "modules": [],
+ "params": {
+  "L1": 100,
+  "L2": 95
+ },
+ "counter": 0,
+ "tracePoint": "",
+ "tracePoints": [],
+ "referencePoint": "",
+ "activeMotor": "1",
+ "motorAngles": {}
+}

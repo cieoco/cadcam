@@ -1,0 +1,147 @@
+{
+ "_note": "Disk turntable with a new fixed local hole H7Frame_Hnew at (100,-30) and the syringe clamp mounted there; legitimate, no I9.",
+ "_base": {
+  "snapshot": "disk-turntable"
+ },
+ "kind": "blocks",
+ "v": 1,
+ "lessonSequence": null,
+ "projectName": "H07 針筒雙圓盤底座（俯視）",
+ "comps": [
+  {
+   "type": "bar",
+   "id": "H7Frame",
+   "color": "#64748b",
+   "p1": {
+    "id": "H7O",
+    "type": "fixed",
+    "x": 0,
+    "y": 0
+   },
+   "p2": {
+    "id": "H7A",
+    "type": "fixed",
+    "x": -144,
+    "y": 16
+   },
+   "lenParam": "H7Frame",
+   "isInput": false,
+   "fixedLen": true,
+   "shape": "disk",
+   "frameSeparate": true,
+   "diameterMm": 420,
+   "snapLength": false,
+   "holes": [
+    {
+     "id": "H7Frame_Hnew",
+     "u": 100,
+     "v": -30,
+     "diameter": 3.2,
+     "type": "fixed"
+    }
+   ]
+  },
+  {
+   "type": "bar",
+   "id": "H7Coupler",
+   "color": "#64748b",
+   "p1": {
+    "id": "H7P",
+    "type": "floating",
+    "x": -64,
+    "y": 16
+   },
+   "p2": {
+    "id": "H7B",
+    "type": "floating",
+    "x": 0,
+    "y": 16
+   },
+   "lenParam": "H7Coupler",
+   "isInput": false,
+   "fixedLen": true,
+   "snapLength": false,
+   "stock": {
+    "widthMm": 10,
+    "thicknessMm": 2,
+    "material": "unspecified"
+   },
+   "zlift": 2
+  },
+  {
+   "type": "bar",
+   "id": "H7Turn",
+   "color": "#d99b35",
+   "p1": {
+    "id": "H7O",
+    "type": "fixed",
+    "x": 0,
+    "y": 0
+   },
+   "p2": {
+    "id": "H7B",
+    "type": "floating",
+    "x": 0,
+    "y": 16
+   },
+   "lenParam": "H7Crank",
+   "isInput": false,
+   "fixedLen": true,
+   "shape": "disk",
+   "frameSeparate": true,
+   "diameterMm": 140,
+   "snapLength": false,
+   "zlift": 1
+  },
+  {
+   "type": "syringe",
+   "id": "H7Syringe",
+   "color": "#0891b2",
+   "mountMode": "fixed-axis",
+   "axisDeg": 0,
+   "appearance": "flat-rod",
+   "outputId": "H7Turn",
+   "installation": {
+    "face": "front",
+    "spacerMm": null
+   },
+   "a": {
+    "componentId": "H7Frame",
+    "u": 100,
+    "v": -30
+   },
+   "b": {
+    "componentId": "H7Coupler",
+    "u": 0,
+    "v": 0
+   },
+   "spec": {
+    "name": "F3D 外形參考／20 mm 教學區間（未實測）",
+    "capacityMl": 10,
+    "outerDiameter": 17.5,
+    "bodyLength": 72,
+    "rodDiameter": 8,
+    "lmin": 70,
+    "stroke": 20,
+    "calibrated": false
+   },
+   "extension": 10,
+   "branch": 1
+  }
+ ],
+ "params": {
+  "H7Frame": 144.88616221019868,
+  "H7Coupler": 64,
+  "H7Crank": 16
+ },
+ "counter": 20,
+ "tracePoint": "H7B",
+ "tracePoints": [
+  "H7B"
+ ],
+ "referencePoint": "",
+ "activeMotor": "1",
+ "motorAngles": {},
+ "fabrication": null,
+ "modules": []
+}

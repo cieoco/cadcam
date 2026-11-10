@@ -1,0 +1,208 @@
+{
+ "_note": "hydraulic-h01 with H1Syringe.a.componentId = GhostFrame (no such comp); I5 dangling.",
+ "_base": {
+  "example": "hydraulic-h01"
+ },
+ "kind": "blocks",
+ "v": 1,
+ "lessonSequence": null,
+ "projectName": "H01 固定針筒單臂抬升",
+ "rootDesignName": "H01 固定筒身單臂",
+ "comps": [
+  {
+   "type": "bar",
+   "id": "H1Frame",
+   "color": "#94a3b8",
+   "p1": {
+    "id": "H1A",
+    "type": "fixed",
+    "x": -96,
+    "y": -72,
+    "frameStock": {
+     "thicknessMm": 3,
+     "grid": {
+      "axisOffsetDeg": -36.86989764584402
+     }
+    }
+   },
+   "p2": {
+    "id": "H1O",
+    "type": "fixed",
+    "x": 0,
+    "y": 0,
+    "frameStock": {
+     "thicknessMm": 3,
+     "grid": {
+      "axisOffsetDeg": -36.86989764584402
+     }
+    }
+   },
+   "lenParam": "H1Frame",
+   "isInput": false,
+   "fixedLen": true,
+   "snapLength": false
+  },
+  {
+   "type": "bar",
+   "id": "H1Arm",
+   "color": "#e99a33",
+   "p1": {
+    "id": "H1O",
+    "type": "fixed",
+    "x": 0,
+    "y": 0,
+    "frameStock": {
+     "thicknessMm": 3,
+     "grid": {
+      "axisOffsetDeg": -36.86989764584402
+     }
+    }
+   },
+   "p2": {
+    "id": "H1C",
+    "type": "floating",
+    "x": 61.3024,
+    "y": -51.4005
+   },
+   "lenParam": "H1Arm",
+   "isInput": false,
+   "fixedLen": true,
+   "snapLength": false,
+   "holes": [
+    {
+     "id": "H1Arm_H8_0",
+     "u": 8,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "H1Arm_H16_0",
+     "u": 16,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "H1Arm_H24_0",
+     "u": 24,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "H1Arm_H32_0",
+     "u": 32,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "H1Arm_H40_0",
+     "u": 40,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "H1Arm_H48_0",
+     "u": 48,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "H1Arm_H56_0",
+     "u": 56,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "H1Arm_H64_0",
+     "u": 64,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "H1Arm_H72_0",
+     "u": 72,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    }
+   ],
+   "standardBlank": {
+    "kind": "bar"
+   }
+  },
+  {
+   "type": "bar",
+   "id": "H1Coupler",
+   "color": "#64748b",
+   "p1": {
+    "id": "H1P",
+    "type": "floating",
+    "x": -16,
+    "y": -72
+   },
+   "p2": {
+    "id": "H1C",
+    "type": "floating",
+    "x": 61.3024,
+    "y": -51.4005
+   },
+   "lenParam": "H1Coupler",
+   "isInput": false,
+   "fixedLen": true,
+   "snapLength": false
+  },
+  {
+   "type": "syringe",
+   "id": "H1Syringe",
+   "color": "#0891b2",
+   "mountMode": "fixed-axis",
+   "axisDeg": 0,
+   "appearance": "flat-rod",
+   "outputId": "H1Arm",
+   "a": {
+    "componentId": "GhostFrame",
+    "u": 0,
+    "v": 0
+   },
+   "b": {
+    "componentId": "H1Coupler",
+    "u": 0,
+    "v": 0
+   },
+   "spec": {
+    "name": "F3D 外形參考／20 mm 教學區間（未實測）",
+    "capacityMl": 10,
+    "outerDiameter": 17.5,
+    "bodyLength": 72,
+    "rodDiameter": 8,
+    "lmin": 70,
+    "stroke": 20,
+    "calibrated": false
+   },
+   "extension": 10,
+   "branch": 1
+  }
+ ],
+ "params": {
+  "H1Frame": 120,
+  "H1Arm": 80,
+  "H1Coupler": 80
+ },
+ "counter": 10,
+ "tracePoint": "H1C",
+ "tracePoints": [
+  "H1C"
+ ],
+ "referencePoint": "",
+ "activeMotor": "1",
+ "motorAngles": {},
+ "fabrication": null,
+ "modules": []
+}

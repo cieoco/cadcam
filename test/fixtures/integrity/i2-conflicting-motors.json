@@ -1,0 +1,216 @@
+{
+ "_note": "competition-fourbar-lift with Anchor1.p1 (id O1) claiming motor 2 while LiftCrank.p1 (same id O1) claims motor 1; I2 contradiction.",
+ "_base": {
+  "example": "competition-fourbar-lift"
+ },
+ "kind": "blocks",
+ "v": 1,
+ "lessonSequence": null,
+ "comps": [
+  {
+   "type": "anchor",
+   "id": "Anchor1",
+   "p1": {
+    "id": "O1",
+    "type": "fixed",
+    "x": -96,
+    "y": 0,
+    "frameStock": {
+     "thicknessMm": 3,
+     "grid": {
+      "axisOffsetDeg": 0
+     }
+    },
+    "physicalMotor": "2"
+   }
+  },
+  {
+   "type": "anchor",
+   "id": "Anchor2",
+   "p1": {
+    "id": "O2",
+    "type": "fixed",
+    "x": -96,
+    "y": 72,
+    "frameStock": {
+     "thicknessMm": 3,
+     "grid": {
+      "axisOffsetDeg": 0
+     }
+    }
+   }
+  },
+  {
+   "type": "bar",
+   "id": "LiftCrank",
+   "color": "#e74c3c",
+   "p1": {
+    "id": "O1",
+    "type": "fixed",
+    "x": -96,
+    "y": 0,
+    "physicalMotor": "1",
+    "frameStock": {
+     "thicknessMm": 3,
+     "grid": {
+      "axisOffsetDeg": 0
+     }
+    }
+   },
+   "p2": {
+    "id": "A",
+    "type": "floating",
+    "x": -48,
+    "y": 0
+   },
+   "lenParam": "LIFT_ARM",
+   "isInput": true,
+   "fixedLen": true,
+   "assemblyType": "parallel-fourbar-lift",
+   "phaseOffset": 0,
+   "physicalMotor": "1",
+   "motorType": "tt"
+  },
+  {
+   "type": "bar",
+   "id": "LiftFollower",
+   "color": "#3498db",
+   "p1": {
+    "id": "O2",
+    "type": "fixed",
+    "x": -96,
+    "y": 72,
+    "frameStock": {
+     "thicknessMm": 3,
+     "grid": {
+      "axisOffsetDeg": 0
+     }
+    }
+   },
+   "p2": {
+    "id": "B",
+    "type": "floating",
+    "x": -48,
+    "y": 72
+   },
+   "lenParam": "LIFT_ARM_2",
+   "isInput": false,
+   "fixedLen": true
+  },
+  {
+   "type": "bar",
+   "id": "LiftUpright",
+   "color": "#27ae60",
+   "p1": {
+    "id": "A",
+    "type": "floating",
+    "x": -48,
+    "y": 0
+   },
+   "p2": {
+    "id": "B",
+    "type": "floating",
+    "x": -48,
+    "y": 72
+   },
+   "lenParam": "LIFT_UPRIGHT",
+   "isInput": false,
+   "fixedLen": true
+  },
+  {
+   "type": "bar",
+   "id": "ToolPlate",
+   "color": "#f39c12",
+   "p1": {
+    "id": "B",
+    "type": "floating",
+    "x": -48,
+    "y": 72,
+    "physicalMotor": "2"
+   },
+   "p2": {
+    "id": "C",
+    "type": "floating",
+    "x": 0,
+    "y": 72
+   },
+   "lenParam": "LIFT_TOOL_TOP",
+   "isInput": true,
+   "fixedLen": true,
+   "phaseOffset": -90,
+   "physicalMotor": "2",
+   "motorCarrier": "LiftUpright",
+   "motorType": "tt",
+   "motorMount": {
+    "motor": "2",
+    "center": "B",
+    "outputBody": "ToolPlate",
+    "frameBody": "LiftUpright",
+    "orientation": "follow-frame",
+    "reversed": false,
+    "order": [
+     "motor",
+     "frameBody",
+     "outputBody"
+    ]
+   }
+  },
+  {
+   "type": "bar",
+   "id": "ToolBrace",
+   "color": "#f39c12",
+   "p1": {
+    "id": "A",
+    "type": "floating",
+    "x": -48,
+    "y": 0
+   },
+   "p2": {
+    "id": "D",
+    "type": "floating",
+    "x": 0,
+    "y": 0
+   },
+   "lenParam": "LIFT_TOOL_BOTTOM",
+   "isInput": false,
+   "fixedLen": true
+  },
+  {
+   "type": "bar",
+   "id": "ToolFront",
+   "color": "#f39c12",
+   "p1": {
+    "id": "D",
+    "type": "floating",
+    "x": 0,
+    "y": 0
+   },
+   "p2": {
+    "id": "C",
+    "type": "floating",
+    "x": 0,
+    "y": 72
+   },
+   "lenParam": "LIFT_TOOL_FRONT",
+   "isInput": false,
+   "fixedLen": true
+  }
+ ],
+ "params": {
+  "LIFT_ARM": 48,
+  "LIFT_ARM_2": 48,
+  "LIFT_UPRIGHT": 72,
+  "LIFT_TOOL_TOP": 48,
+  "LIFT_TOOL_BOTTOM": 48,
+  "LIFT_TOOL_FRONT": 72,
+  "theta": 0
+ },
+ "counter": 8,
+ "tracePoint": "",
+ "tracePoints": [],
+ "referencePoint": "",
+ "activeMotor": "1",
+ "motorAngles": {},
+ "fabrication": null,
+ "modules": []
+}

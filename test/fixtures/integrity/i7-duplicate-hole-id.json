@@ -1,0 +1,618 @@
+{
+ "_note": "motor-plate-tt with ServoArm local holes [0] and [1] sharing one id; I7.",
+ "_base": {
+  "example": "motor-plate-tt"
+ },
+ "kind": "blocks",
+ "v": 1,
+ "lessonSequence": null,
+ "projectName": "TT座板＋雙孔輪轂輸出板",
+ "comps": [
+  {
+   "type": "triangle",
+   "id": "ServoPlate",
+   "color": "#27ae60",
+   "p1": {
+    "id": "Blank1.A",
+    "type": "fixed",
+    "x": -40,
+    "y": -16
+   },
+   "p2": {
+    "id": "Blank1.B",
+    "type": "fixed",
+    "x": 16,
+    "y": -16
+   },
+   "p3": {
+    "id": "Blank1.C",
+    "type": "floating",
+    "x": -40,
+    "y": 16
+   },
+   "gParam": "Blank1.G",
+   "r1Param": "Blank1.H",
+   "r2Param": "Blank1.D",
+   "sign": 1,
+   "snapLength": false,
+   "stock": {
+    "widthMm": 13,
+    "thicknessMm": 3,
+    "material": "unspecified"
+   },
+   "shapeMode": "hull",
+   "vertices": [
+    {
+     "solve": true,
+     "ref": "p1"
+    },
+    {
+     "solve": true,
+     "ref": "p2"
+    },
+    {
+     "solve": true,
+     "ref": "p3"
+    }
+   ],
+   "holes": [
+    {
+     "id": "Blank1_H8_0",
+     "u": 8,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H16_0",
+     "u": 16,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H24_0",
+     "u": 24,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H32_0",
+     "u": 32,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H40_0",
+     "u": 40,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H48_0",
+     "u": 48,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H0_8",
+     "u": 0,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H8_8",
+     "u": 8,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H24_8",
+     "u": 24,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H32_8",
+     "u": 32,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H40_8",
+     "u": 40,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H48_8",
+     "u": 48,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H56_8",
+     "u": 56,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H0_16",
+     "u": 0,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H8_16",
+     "u": 8,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H16_16",
+     "u": 16,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H24_16",
+     "u": 24,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H48_16",
+     "u": 48,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H56_16",
+     "u": 56,
+     "v": 16,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H0_24",
+     "u": 0,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H8_24",
+     "u": 8,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H24_24",
+     "u": 24,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H32_24",
+     "u": 32,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H40_24",
+     "u": 40,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H48_24",
+     "u": 48,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H56_24",
+     "u": 56,
+     "v": 24,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H8_32",
+     "u": 8,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H16_32",
+     "u": 16,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H24_32",
+     "u": 24,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H32_32",
+     "u": 32,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H40_32",
+     "u": 40,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H48_32",
+     "u": 48,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "Blank1_H56_32",
+     "u": 56,
+     "v": 32,
+     "diameter": 3.2,
+     "type": "floating"
+    }
+   ],
+   "standardBlank": {
+    "kind": "plate",
+    "mountHoles": [
+     {
+      "id": "Blank1_H16_8",
+      "u": 16,
+      "v": 8,
+      "diameter": 3.2,
+      "type": "floating"
+     },
+     {
+      "id": "Blank1_H32_16",
+      "u": 32,
+      "v": 16,
+      "diameter": 3.2,
+      "type": "floating"
+     },
+     {
+      "id": "ServoAxis",
+      "u": 40,
+      "v": 16,
+      "diameter": 3.2,
+      "type": "floating"
+     },
+     {
+      "id": "Blank1_H16_24",
+      "u": 16,
+      "v": 24,
+      "diameter": 3.2,
+      "type": "floating"
+     }
+    ]
+   },
+   "motorMountPoint": "ServoAxis",
+   "frameSeparate": true,
+   "name": "標準馬達座板"
+  },
+  {
+   "type": "bar",
+   "id": "ServoArm",
+   "color": "#e74c3c",
+   "p1": {
+    "id": "ServoAxis",
+    "type": "fixed",
+    "x": 0,
+    "y": 0,
+    "physicalMotor": "1"
+   },
+   "p2": {
+    "id": "ServoArmTip",
+    "type": "floating",
+    "x": 48,
+    "y": 0
+   },
+   "lenParam": "ServoArmLen",
+   "isInput": true,
+   "fixedLen": true,
+   "snapLength": false,
+   "stock": {
+    "widthMm": 29,
+    "thicknessMm": 3,
+    "material": "unspecified"
+   },
+   "physicalMotor": "1",
+   "motorType": "tt",
+   "motorMount": {
+    "motor": "1",
+    "center": "ServoAxis",
+    "outputBody": "ServoArm",
+    "frameBody": "ServoPlate",
+    "orientation": "horizontal",
+    "reversed": true,
+    "face": "back",
+    "order": [
+     "motor",
+     "frameBody",
+     "outputBody"
+    ]
+   },
+   "holes": [
+    {
+     "id": "ServoArm_H-8_-8",
+     "u": -8,
+     "v": -8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H-8_-8",
+     "u": 8,
+     "v": -8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H16_-8",
+     "u": 16,
+     "v": -8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H24_-8",
+     "u": 24,
+     "v": -8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H32_-8",
+     "u": 32,
+     "v": -8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H40_-8",
+     "u": 40,
+     "v": -8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H48_-8",
+     "u": 48,
+     "v": -8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H-8_0",
+     "u": -8,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H8_0",
+     "u": 8,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArmH16",
+     "u": 16,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArmH24",
+     "u": 24,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArmH32",
+     "u": 32,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArmH40",
+     "u": 40,
+     "v": 0,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H-8_8",
+     "u": -8,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H8_8",
+     "u": 8,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H16_8",
+     "u": 16,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H24_8",
+     "u": 24,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H32_8",
+     "u": 32,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H40_8",
+     "u": 40,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    },
+    {
+     "id": "ServoArm_H48_8",
+     "u": 48,
+     "v": 8,
+     "diameter": 3.2,
+     "type": "floating"
+    }
+   ],
+   "standardBlank": {
+    "kind": "bar",
+    "rearMm": 8,
+    "mountHoles": [
+     {
+      "id": "ServoArm_H0_-8",
+      "u": 0,
+      "v": -8,
+      "diameter": 3.2,
+      "type": "floating"
+     },
+     {
+      "id": "ServoArm_H0_8",
+      "u": 0,
+      "v": 8,
+      "diameter": 3.2,
+      "type": "floating"
+     }
+    ]
+   },
+   "name": "格孔輸出板"
+  }
+ ],
+ "params": {
+  "theta": 0,
+  "ServoArmLen": 48,
+  "Blank1.G": 56,
+  "Blank1.H": 32,
+  "Blank1.D": 64.4980619863884
+ },
+ "counter": 4,
+ "tracePoint": "ServoArmTip",
+ "tracePoints": [
+  "ServoArmTip"
+ ],
+ "referencePoint": "",
+ "activeMotor": "1",
+ "motorAngles": {},
+ "fabrication": {
+  "v": 1,
+  "syringeMount": {
+   "clearanceMm": 0.5,
+   "marginMm": 8,
+   "strapSpacingMm": 24
+  },
+  "export": {
+   "barWidthMm": 13,
+   "holeDiameterMm": 3.2,
+   "frameMarginMm": 18,
+   "frameHoleDiameterMm": 3.2,
+   "ttShaftFlatDiameterMm": 5.4,
+   "ttShaftFlatThicknessMm": 3.7
+  },
+  "ttMount": {
+   "shaftDiameterMm": 6,
+   "screwDiameterMm": 3,
+   "screwOffsetXMm": -20.6,
+   "screwSpacingMm": 17.3,
+   "locatorDiameterMm": 4,
+   "locatorOffsetXMm": -11.18,
+   "locatorOffsetYMm": 0
+  },
+  "n20Mount": {
+   "bossDiameterMm": 4.2,
+   "screwDiameterMm": 1.8,
+   "screwSpacingMm": 9
+  },
+  "mg995Mount": {
+   "bodyLengthMm": 41.2,
+   "bodyWidthMm": 20.2,
+   "shaftOffsetMm": 10,
+   "screwDiameterMm": 3.2,
+   "screwSpanMm": 49.5,
+   "screwSpacingMm": 10,
+   "cableNotchWidthMm": 8,
+   "cableNotchDepthMm": 4
+  },
+  "cnc": {
+   "toolDiameterMm": 3.175,
+   "stockThicknessMm": 3
+  },
+  "drive": {
+   "n20Spec": 0,
+   "n20HubCenterMm": 3.2,
+   "n20HubScrewMm": 3.2,
+   "n20HubCircleMm": 12.7,
+   "ttHubCenterMm": 6,
+   "ttHubScrewMm": 3.2,
+   "ttHubScrewSpacingMm": 12,
+   "hornCenterMm": 6,
+   "hornScrewMm": 2.2,
+   "hornScrewCount": 4,
+   "hornScrewCircleMm": 14
+  },
+  "joint": {
+   "defaultKind": "printed",
+   "bracket": {
+    "widthMm": 7,
+    "thicknessMm": 1.2,
+    "longLegMm": 13,
+    "shortLegMm": 9.5,
+    "holeEndMm": 3.5
+   }
+  }
+ },
+ "modules": []
+}

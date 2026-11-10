@@ -1,0 +1,660 @@
+{
+ "_note": "guided-scissor-lift with ScissorDown0.barFusion.points[1].id changed so it no longer matches the member joint id; I8.",
+ "_base": {
+  "example": "guided-scissor-lift"
+ },
+ "kind": "blocks",
+ "v": 1,
+ "lessonSequence": null,
+ "projectName": "針筒驅動三層剪式升降台",
+ "comps": [
+  {
+   "type": "bar",
+   "id": "ScissorUp0",
+   "color": "#e74c3c",
+   "p1": {
+    "id": "ScissorL0",
+    "type": "fixed",
+    "x": 0,
+    "y": 0
+   },
+   "p2": {
+    "id": "ScissorM0",
+    "type": "floating",
+    "x": 50.6140420239285,
+    "y": 23.962861890851016
+   },
+   "lenParam": "ScissorUp0Length",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusion": {
+    "version": 1,
+    "members": [
+     "ScissorUp0",
+     "ScissorUp0Tip"
+    ],
+    "points": [
+     {
+      "id": "ScissorL0",
+      "x": 0,
+      "y": 0
+     },
+     {
+      "id": "ScissorM0",
+      "x": 56,
+      "y": 0
+     },
+     {
+      "id": "ScissorR1",
+      "x": 112,
+      "y": 0
+     }
+    ]
+   },
+   "barFusionRoot": "ScissorUp0",
+   "snapLength": false,
+   "name": "第 1 層上升剪臂內段"
+  },
+  {
+   "type": "bar",
+   "id": "ScissorUp0Tip",
+   "color": "#e74c3c",
+   "p1": {
+    "id": "ScissorM0",
+    "type": "floating",
+    "x": 50.6140420239285,
+    "y": 23.962861890851016
+   },
+   "p2": {
+    "id": "ScissorR1",
+    "type": "floating",
+    "x": 101.228084047857,
+    "y": 47.92572378170203
+   },
+   "lenParam": "ScissorUp0TipLength",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusionRoot": "ScissorUp0",
+   "snapLength": false,
+   "name": "第 1 層上升剪臂外段"
+  },
+  {
+   "type": "bar",
+   "id": "ScissorDown0",
+   "color": "#3498db",
+   "p1": {
+    "id": "ScissorR0",
+    "type": "floating",
+    "x": 101.228084047857,
+    "y": 0
+   },
+   "p2": {
+    "id": "ScissorM0",
+    "type": "floating",
+    "x": 50.6140420239285,
+    "y": 23.962861890851016
+   },
+   "lenParam": "ScissorDown0Length",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusion": {
+    "version": 1,
+    "members": [
+     "ScissorDown0",
+     "ScissorDown0Tip"
+    ],
+    "points": [
+     {
+      "id": "ScissorR0",
+      "x": 0,
+      "y": 0
+     },
+     {
+      "id": "WrongPoint",
+      "x": 56,
+      "y": 0
+     },
+     {
+      "id": "ScissorL1",
+      "x": 112,
+      "y": 0
+     }
+    ]
+   },
+   "barFusionRoot": "ScissorDown0",
+   "snapLength": false,
+   "name": "第 1 層下降剪臂內段"
+  },
+  {
+   "type": "bar",
+   "id": "ScissorDown0Tip",
+   "color": "#3498db",
+   "p1": {
+    "id": "ScissorM0",
+    "type": "floating",
+    "x": 50.6140420239285,
+    "y": 23.962861890851016
+   },
+   "p2": {
+    "id": "ScissorL1",
+    "type": "floating",
+    "x": 0,
+    "y": 47.92572378170203
+   },
+   "lenParam": "ScissorDown0TipLength",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusionRoot": "ScissorDown0",
+   "snapLength": false,
+   "name": "第 1 層下降剪臂外段"
+  },
+  {
+   "type": "bar",
+   "id": "ScissorUp1",
+   "color": "#e74c3c",
+   "p1": {
+    "id": "ScissorL1",
+    "type": "floating",
+    "x": 0,
+    "y": 47.92572378170203
+   },
+   "p2": {
+    "id": "ScissorM1",
+    "type": "floating",
+    "x": 50.6140420239285,
+    "y": 71.88858567255305
+   },
+   "lenParam": "ScissorUp1Length",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusion": {
+    "version": 1,
+    "members": [
+     "ScissorUp1",
+     "ScissorUp1Tip"
+    ],
+    "points": [
+     {
+      "id": "ScissorL1",
+      "x": 0,
+      "y": 0
+     },
+     {
+      "id": "ScissorM1",
+      "x": 56,
+      "y": 0
+     },
+     {
+      "id": "ScissorR2",
+      "x": 112,
+      "y": 0
+     }
+    ]
+   },
+   "barFusionRoot": "ScissorUp1",
+   "snapLength": false,
+   "name": "第 2 層上升剪臂內段"
+  },
+  {
+   "type": "bar",
+   "id": "ScissorUp1Tip",
+   "color": "#e74c3c",
+   "p1": {
+    "id": "ScissorM1",
+    "type": "floating",
+    "x": 50.6140420239285,
+    "y": 71.88858567255305
+   },
+   "p2": {
+    "id": "ScissorR2",
+    "type": "floating",
+    "x": 101.228084047857,
+    "y": 95.85144756340407
+   },
+   "lenParam": "ScissorUp1TipLength",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusionRoot": "ScissorUp1",
+   "snapLength": false,
+   "name": "第 2 層上升剪臂外段"
+  },
+  {
+   "type": "bar",
+   "id": "ScissorDown1",
+   "color": "#3498db",
+   "p1": {
+    "id": "ScissorR1",
+    "type": "floating",
+    "x": 101.228084047857,
+    "y": 47.92572378170203
+   },
+   "p2": {
+    "id": "ScissorM1",
+    "type": "floating",
+    "x": 50.6140420239285,
+    "y": 71.88858567255305
+   },
+   "lenParam": "ScissorDown1Length",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusion": {
+    "version": 1,
+    "members": [
+     "ScissorDown1",
+     "ScissorDown1Tip"
+    ],
+    "points": [
+     {
+      "id": "ScissorR1",
+      "x": 0,
+      "y": 0
+     },
+     {
+      "id": "ScissorM1",
+      "x": 56,
+      "y": 0
+     },
+     {
+      "id": "ScissorL2",
+      "x": 112,
+      "y": 0
+     }
+    ]
+   },
+   "barFusionRoot": "ScissorDown1",
+   "snapLength": false,
+   "name": "第 2 層下降剪臂內段"
+  },
+  {
+   "type": "bar",
+   "id": "ScissorDown1Tip",
+   "color": "#3498db",
+   "p1": {
+    "id": "ScissorM1",
+    "type": "floating",
+    "x": 50.6140420239285,
+    "y": 71.88858567255305
+   },
+   "p2": {
+    "id": "ScissorL2",
+    "type": "floating",
+    "x": 0,
+    "y": 95.85144756340407
+   },
+   "lenParam": "ScissorDown1TipLength",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusionRoot": "ScissorDown1",
+   "snapLength": false,
+   "name": "第 2 層下降剪臂外段"
+  },
+  {
+   "type": "bar",
+   "id": "ScissorUp2",
+   "color": "#e74c3c",
+   "p1": {
+    "id": "ScissorL2",
+    "type": "floating",
+    "x": 0,
+    "y": 95.85144756340407
+   },
+   "p2": {
+    "id": "ScissorM2",
+    "type": "floating",
+    "x": 50.6140420239285,
+    "y": 119.81430945425508
+   },
+   "lenParam": "ScissorUp2Length",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusion": {
+    "version": 1,
+    "members": [
+     "ScissorUp2",
+     "ScissorUp2Tip"
+    ],
+    "points": [
+     {
+      "id": "ScissorL2",
+      "x": 0,
+      "y": 0
+     },
+     {
+      "id": "ScissorM2",
+      "x": 56,
+      "y": 0
+     },
+     {
+      "id": "ScissorR3",
+      "x": 112,
+      "y": 0
+     }
+    ]
+   },
+   "barFusionRoot": "ScissorUp2",
+   "snapLength": false,
+   "name": "第 3 層上升剪臂內段"
+  },
+  {
+   "type": "bar",
+   "id": "ScissorUp2Tip",
+   "color": "#e74c3c",
+   "p1": {
+    "id": "ScissorM2",
+    "type": "floating",
+    "x": 50.6140420239285,
+    "y": 119.81430945425508
+   },
+   "p2": {
+    "id": "ScissorR3",
+    "type": "floating",
+    "x": 101.228084047857,
+    "y": 143.7771713451061
+   },
+   "lenParam": "ScissorUp2TipLength",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusionRoot": "ScissorUp2",
+   "snapLength": false,
+   "name": "第 3 層上升剪臂外段"
+  },
+  {
+   "type": "bar",
+   "id": "ScissorDown2",
+   "color": "#3498db",
+   "p1": {
+    "id": "ScissorR2",
+    "type": "floating",
+    "x": 101.228084047857,
+    "y": 95.85144756340407
+   },
+   "p2": {
+    "id": "ScissorM2",
+    "type": "floating",
+    "x": 50.6140420239285,
+    "y": 119.81430945425508
+   },
+   "lenParam": "ScissorDown2Length",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusion": {
+    "version": 1,
+    "members": [
+     "ScissorDown2",
+     "ScissorDown2Tip"
+    ],
+    "points": [
+     {
+      "id": "ScissorR2",
+      "x": 0,
+      "y": 0
+     },
+     {
+      "id": "ScissorM2",
+      "x": 56,
+      "y": 0
+     },
+     {
+      "id": "ScissorL3",
+      "x": 112,
+      "y": 0
+     }
+    ]
+   },
+   "barFusionRoot": "ScissorDown2",
+   "snapLength": false,
+   "name": "第 3 層下降剪臂內段"
+  },
+  {
+   "type": "bar",
+   "id": "ScissorDown2Tip",
+   "color": "#3498db",
+   "p1": {
+    "id": "ScissorM2",
+    "type": "floating",
+    "x": 50.6140420239285,
+    "y": 119.81430945425508
+   },
+   "p2": {
+    "id": "ScissorL3",
+    "type": "floating",
+    "x": 0,
+    "y": 143.7771713451061
+   },
+   "lenParam": "ScissorDown2TipLength",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusionRoot": "ScissorDown2",
+   "snapLength": false,
+   "name": "第 3 層下降剪臂外段"
+  },
+  {
+   "type": "bar",
+   "id": "ScissorPlatform",
+   "color": "#e67e22",
+   "p1": {
+    "id": "ScissorL3",
+    "type": "floating",
+    "x": 0,
+    "y": 143.7771713451061
+   },
+   "p2": {
+    "id": "ScissorRailEnd",
+    "type": "floating",
+    "x": 128,
+    "y": 143.7771713451061
+   },
+   "lenParam": "ScissorPlatformLength",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusion": {
+    "version": 1,
+    "members": [
+     "ScissorPlatform",
+     "ScissorExtension"
+    ],
+    "points": [
+     {
+      "id": "ScissorL3",
+      "x": 0,
+      "y": 0
+     },
+     {
+      "id": "ScissorRailEnd",
+      "x": 128,
+      "y": 0
+     },
+     {
+      "id": "ScissorP",
+      "x": 192,
+      "y": 0
+     }
+    ]
+   },
+   "barFusionRoot": "ScissorPlatform",
+   "snapLength": false,
+   "name": "平台滑槽段"
+  },
+  {
+   "type": "bar",
+   "id": "ScissorExtension",
+   "color": "#e67e22",
+   "p1": {
+    "id": "ScissorRailEnd",
+    "type": "floating",
+    "x": 128,
+    "y": 143.7771713451061
+   },
+   "p2": {
+    "id": "ScissorP",
+    "type": "floating",
+    "x": 192,
+    "y": 143.7771713451061
+   },
+   "lenParam": "ScissorExtensionLength",
+   "isInput": false,
+   "fixedLen": true,
+   "barFusionRoot": "ScissorPlatform",
+   "snapLength": false,
+   "name": "平台外伸段"
+  },
+  {
+   "type": "slider",
+   "id": "ScissorBottom",
+   "color": "#16a085",
+   "p1": {
+    "id": "ScissorL0",
+    "type": "fixed",
+    "x": 0,
+    "y": 0
+   },
+   "p2": {
+    "id": "ScissorBaseEnd",
+    "type": "fixed",
+    "x": 192,
+    "y": 0
+   },
+   "p3": {
+    "id": "ScissorR0",
+    "type": "floating",
+    "x": 101.228084047857,
+    "y": 0
+   },
+   "m1": {
+    "id": "S15m1",
+    "type": "fixed",
+    "x": 0,
+    "y": 0,
+    "frameStock": {
+     "thicknessMm": 3,
+     "grid": {
+      "axisOffsetDeg": 0
+     }
+    }
+   },
+   "m2": {
+    "id": "S15m2",
+    "type": "fixed",
+    "x": 192,
+    "y": 0,
+    "frameStock": {
+     "thicknessMm": 3,
+     "grid": {
+      "axisOffsetDeg": 0
+     }
+    }
+   },
+   "lenParam": "ScissorBottomLength",
+   "baseEnd": "p1",
+   "carriageLen": 16,
+   "carrierLen": 192,
+   "railOffset": 0,
+   "travelStart": 40,
+   "travelEnd": 112,
+   "sign": 1,
+   "name": "底座水平滑軌"
+  },
+  {
+   "type": "slider",
+   "id": "ScissorTop",
+   "movingRail": true,
+   "color": "#16a085",
+   "p1": {
+    "id": "ScissorL3",
+    "type": "floating",
+    "x": 0,
+    "y": 143.7771713451061
+   },
+   "p2": {
+    "id": "ScissorRailEnd",
+    "type": "floating",
+    "x": 128,
+    "y": 143.7771713451061
+   },
+   "p3": {
+    "id": "ScissorR3",
+    "type": "floating",
+    "x": 101.228084047857,
+    "y": 143.7771713451061
+   },
+   "m1": {
+    "id": "S16m1",
+    "type": "floating",
+    "x": 0,
+    "y": 143.7771713451061
+   },
+   "m2": {
+    "id": "S16m2",
+    "type": "floating",
+    "x": 128,
+    "y": 143.7771713451061
+   },
+   "lenParam": "ScissorTopLength",
+   "baseEnd": "p1",
+   "carriageLen": 16,
+   "carrierLen": 128,
+   "railOffset": 0,
+   "travelStart": 40,
+   "travelEnd": 112,
+   "sign": 1,
+   "name": "平台水平滑軌"
+  },
+  {
+   "type": "syringe",
+   "id": "ScissorSyringe",
+   "color": "#0891b2",
+   "a": {
+    "componentId": "ScissorUp0Tip",
+    "u": 40,
+    "v": 0
+   },
+   "b": {
+    "componentId": "ScissorUp2",
+    "u": 16,
+    "v": 0
+   },
+   "spec": {
+    "name": "10mL 教學示範（未校正）",
+    "capacityMl": 10,
+    "outerDiameter": 16,
+    "bodyLength": 70,
+    "rodDiameter": 6,
+    "lmin": 95,
+    "stroke": 40,
+    "calibrated": false
+   },
+   "extension": 0,
+   "branch": 1,
+   "name": "跨層斜置針筒"
+  }
+ ],
+ "params": {
+  "theta": 0,
+  "ScissorPlatformLength": 128,
+  "ScissorExtensionLength": 64,
+  "ScissorBottomLength": 192,
+  "ScissorTopLength": 128,
+  "ScissorUp0Length": 56,
+  "ScissorUp0TipLength": 56,
+  "ScissorDown0Length": 56,
+  "ScissorDown0TipLength": 56,
+  "ScissorUp1Length": 56,
+  "ScissorUp1TipLength": 56,
+  "ScissorDown1Length": 56,
+  "ScissorDown1TipLength": 56,
+  "ScissorUp2Length": 56,
+  "ScissorUp2TipLength": 56,
+  "ScissorDown2Length": 56,
+  "ScissorDown2TipLength": 56
+ },
+ "counter": 20,
+ "tracePoint": "ScissorP",
+ "tracePoints": [
+  "ScissorP"
+ ],
+ "referencePoint": "",
+ "activeMotor": "1",
+ "motorAngles": {},
+ "fabrication": null,
+ "modules": []
+}
