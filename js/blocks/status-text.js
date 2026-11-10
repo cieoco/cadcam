@@ -21,12 +21,15 @@ export function invalidPoseStatus({ fromPractice = false, edited = false, issue 
 }
 
 // 未受約束不是解不出：點名只被一個零件用到的未解端點（沒接的一端）。
-export function loosePartStatus(comps = [], issue = {}) {
+export function looseEnds(comps = [], issue = {}) {
   const ids = new Set(issue.sourceIds || []), uses = new Map(), keys = ['p1', 'p2', 'p3'];
   for (const c of comps) for (const k of keys) if (c?.[k]?.id) uses.set(c[k].id, (uses.get(c[k].id) || 0) + 1);
-  const label = list => list.map(c => `「${c.name || c.id}」(${c.id})`).join('、');
-  const ends = comps.filter(c => keys.some(k => ids.has(c?.[k]?.id) && uses.get(c[k].id) === 1));
-  if (ends.length) return { state: 'warn', text: `${label(ends)} 有一端沒接，機構會晃動；接上固定孔或其他零件後才能正確播放` };
+  return comps.filter(c => keys.some(k => ids.has(c?.[k]?.id) && uses.get(c[k].id) === 1));
+}
+export function loosePartStatus(comps = [], issue = {}) {
+  const label = list => list.map(c => `「${c.name || c.id}」`).join('、');
+  const ends = looseEnds(comps, issue);
+  if (ends.length) return { state: 'warn', text: `${label(ends)}有一端沒接，機構會晃動；接上固定孔或其他零件後才能正確播放` };
   const parts = comps.filter(c => issue.componentIds?.includes(c.id));
   return { state: 'warn', text: parts.length ? `${label(parts)} 還會晃動；補接孔位或動力後才能正確播放` : '還有未控制的活動部分，請補連接或動力' };
 }

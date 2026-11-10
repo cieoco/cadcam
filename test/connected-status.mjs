@@ -14,7 +14,7 @@ const load=()=>alignSavedInputPhase(normalizeSnapshot(readStoredProject(JSON.par
 // 與 app.js solveFrame／updateMechanismStatus 相同：θ 與馬達角度求解 → motionPoseIssue → 狀態文字。
 const status=(s,theta=0,practice={})=>{const sol=solveTopology(compileTopology(s.comps,{params:{...s.params}},new Set()),{thetaDeg:theta,motorAngles:{1:theta}});
  const issue=motionPoseIssue(s.comps,sol);return {sol,issue,status:issue?invalidPoseStatus({...practice,issue,comps:s.comps}):null};};
-const LOOSE='「孔格桿件」(Blank137) 有一端沒接，機構會晃動；接上固定孔或其他零件後才能正確播放';
+const LOOSE='「孔格桿件」有一端沒接，機構會晃動；接上固定孔或其他零件後才能正確播放';
 
 for(const a of [0,45,180]){const r=status(load(),a);
  assert.equal(r.sol.isValid,true,`θ=${a} solver result is valid`);assert.equal(r.issue.code,'underconstrained');
@@ -29,5 +29,5 @@ const closed=()=>{const s=load(),p=s.comps.find(c=>c.id==='Blank133'),h=p.holes.
 // 真的接不起來（2 孔無法閉合）才是「解不出」。
 {const s=closed();s.params['Blank137.G']=8;const r=status(s);assert.equal(r.issue.code,'invalid_pose');assert.deepEqual(r.status,{state:'error',text:'解不出：檢查孔有沒有接好，或按復原'});}
 // 拿掉 Blank137 後，改點名末端沒接的 Blank136。
-{const s=load();s.comps=s.comps.filter(c=>c.id!=='Blank137');const r=status(s);assert.equal(r.status.text,'「孔格桿件」(Blank136) 有一端沒接，機構會晃動；接上固定孔或其他零件後才能正確播放');}
+{const s=load();s.comps=s.comps.filter(c=>c.id!=='Blank137');const r=status(s);assert.equal(r.status.text,'「孔格桿件」有一端沒接，機構會晃動；接上固定孔或其他零件後才能正確播放');}
 console.log('connected status: loose end named instead of 解不出, closed loop clean, real failure still 解不出');

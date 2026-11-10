@@ -1084,10 +1084,13 @@ let editingHandles=null;
 const jawTipHandle = createJawTipHandle({ svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
   editor: memberEditor, getParams: () => S.topo.params });
 // 馬達解除／軸心修復，按需載入。
-const editApi=id=>({S,id,pause,pushUndo,rebuild,draw,notify:transient,save:scheduleAutosave,points:displayCoords,motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()}});
+const editApi=id=>({S,id,svg,project:p=>({x:TX(p.x),y:TY(p.y)}),pause,pushUndo,rebuild,draw,notify:transient,save:scheduleAutosave,points:displayCoords,motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()}});
 function motorRelease(action,id){return import('./motor-release.js').then(m=>m.run(action,{...editApi(id),refresh:()=>integrityHints('check')}));}
 // 開檔檢查提示（I1／I3／I5）與其修復，按需載入。
-function integrityHints(action){return import('./integrity-hints.js').then(m=>m.run(action,editApi()));}
+function integrityHints(action,extra){return import('./integrity-hints.js').then(m=>m.run(action,{...editApi(),...extra}));}
+// 狀態列點名「有一端沒接」時，指向的零件在畫布上標出來（同一個標示層）。
+{const chip=document.getElementById('mechanismStatus'),mark=on=>integrityHints(on?'mark':'unmark',{issue:lastFrameIssue,comps:simulationScope().comps});
+ for(const [a,on] of [['pointerenter',1],['focus',1],['pointerleave',0],['blur',0]])chip?.addEventListener(a,()=>mark(on));}
 async function setMemberAsFrame(id=S.selectedTriangleId||S.selectedLinkId){
   if(!id||S.mode!=='design')return;
   pause();const revision=snapshotStr(),source={comps:structuredClone(viewComps()),params:{...S.topo.params},id,points:displayCoords(),motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()}};

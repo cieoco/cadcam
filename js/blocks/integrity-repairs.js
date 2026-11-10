@@ -78,19 +78,24 @@ function planLeave(source, id) {
   return {ok: true, comps: next.comps, message: `已讓端點離開${quote(next.comps.find(c => c.id === w.source.compId))}，改用自己的接點，位置不變；可按復原。`};
 }
 
+// 畫面上標示：要移動的零件用橘色，對照的零件用藍色（integrity-hints.js 的標示層）；文字同步寫出顏色，同名零件才分得出來。
+const ORANGE = '橘色', BLUE = '藍色';
 function i1Item(rel, issue, comps) {
   const id = issue.ids[0], w = rel.worldOf(id);
   if (!w) return null;
   const byId = cid => comps.find(c => c.id === cid), host = byId(w.source.compId);
-  const far = w.copies.filter(x => x.offset > TOL), farNames = [...new Set(far.map(x => quote(byId(x.compId))))].join('、');
-  const text = w.source.holeId
-    ? `${farNames}的端點沒有落在${quote(host)}的孔上（相差 ${fix1(w.spread)} mm），畫面與製作會對不起來。`
-    : `${farNames}與${quote(host)}本來接在同一點，端點卻相差 ${fix1(w.spread)} mm，畫面與製作會對不起來。`;
+  const far = w.copies.filter(x => x.offset > TOL), farIds = [...new Set(far.map(x => x.compId))];
+  const farNames = farIds.map(cid => quote(byId(cid))).join('、'), hole = !!w.source.holeId, gap = fix1(w.spread);
+  const same = farIds.some(cid => nameOf(byId(cid)) === nameOf(host));
+  const text = (hole
+    ? `${farNames}（${ORANGE}）的端點沒有落在${quote(host)}（${BLUE}）的孔上（相差 ${gap} mm），畫面與製作會對不起來。`
+    : `${farNames}（${ORANGE}）的端點，和${quote(host)}（${BLUE}）的端點本來接在同一點，卻相差 ${gap} mm，畫面與製作會對不起來。`) + '畫面上已標出這些零件。';
+  const target = same ? `${BLUE}的${quote(host)}` : quote(host);
   // 只有「跟著孔走的端點」能搬；兩塊板共用同一個孔號、孔本身對不上時，不猜哪一塊對（只說明）。
   const repairs = far.every(x => x.key) ? [
-    {id: 'back', label: `放回${quote(host)}的孔`, plan: s => planPutBack(s, id)},
-    {id: 'leave', label: `讓它離開${quote(host)}（改用自己的接點）`, plan: s => planLeave(s, id)}] : [];
-  return {key: `I1|${id}`, code: 'I1', text, repairs};
+    {id: 'back', label: hole ? `放回${target}的孔` : `把端點接回${target}`, plan: s => planPutBack(s, id)},
+    {id: 'leave', label: `讓它離開${target}（改用自己的接點）`, plan: s => planLeave(s, id)}] : [];
+  return {key: `I1|${id}`, code: 'I1', short: hole ? `${farNames}的端點沒有落在孔上（差 ${gap} mm）` : `${farNames}的端點沒有接在共用點上（差 ${gap} mm）`, text, repairs, mark: {far: farIds, canon: [host.id]}};
 }
 
 // ---------------------------------------------------------------- I3 / I5 dangling references
@@ -152,19 +157,19 @@ export function findings(work) {
     if (!ENABLED[issue.code] || !SHOWN.includes(issue.severity)) continue;
     if (issue.code === 'I1') {
       const motor = motors.find(m => m.center === issue.ids[0]);
-      const item = motor ? {key: `I1|${issue.ids[0]}`, code: 'I1', text: offPlateMessage(motor), repairs: [
+      const item = motor ? {key: `I1|${issue.ids[0]}`, code: 'I1', short: '馬達軸心不在座板原孔上', mark: {far: [motor.id], canon: [motor.host.id]}, text: offPlateMessage(motor), repairs: [
         {id: 'back', label: '把馬達放回座板原孔', plan: s => planMotorReturn(s, motor.id)},
         {id: 'leave', label: '讓馬達離開座板（改成獨立固定點）', plan: s => planMotorLeave(s, motor.id)}]} : i1Item(rel, issue, work.comps);
       if (item) items.push(motor ? {...item, first: true} : item);
       continue;
     }
     const ref = issue.ref || {};
-    if (ref.what === 'topo') { if (topo) topo.count++; else { topo = {key: 'I5|topo', code: issue.code, count: 1, repairs: [{id: 'clear', label: '清除失效的連結', plan: s => planClear(s, ref)}]}; items.push(topo); } continue; }
+    if (ref.what === 'topo') { if (topo) topo.count++; else { topo = {key: 'I5|topo', code: issue.code, count: 1, mark: {far: [], canon: []}, repairs: [{id: 'clear', label: '清除失效的連結', plan: s => planClear(s, ref)}]}; items.push(topo); } continue; }
     const c = work.comps.find(x => x.id === ref.comp) || work.comps.find(x => x.id === issue.parts[0]);
     const text = danglingText(ref, c, 1) || issue.message;
-    items.push({key: `${issue.code}|${ref.what || issue.message}|${ref.comp || ''}${ref.end || ''}`, code: issue.code, text,
+    items.push({key: `${issue.code}|${ref.what || issue.message}|${ref.comp || ''}${ref.end || ''}`, code: issue.code, text, short: c ? `${quote(c)}有失效的馬達或接合記錄` : '有一項連接需要處理', mark: {far: c ? [c.id] : [], canon: []},
       repairs: ['frameBody', 'motorCarrier', 'motorMountPoint', 'syringeEnd', 'syringeOutput', 'moduleId'].includes(ref.what) ? [{id: 'clear', label: '清除失效的連結', plan: s => planClear(s, ref)}] : []});
   }
-  if (topo) topo.text = danglingText({what: 'topo'}, null, topo.count);
+  if (topo) { topo.text = danglingText({what: 'topo'}, null, topo.count); topo.short = `有 ${topo.count} 項設定指向不存在的點`; }
   return items.sort((a, b) => (b.first ? 1 : 0) - (a.first ? 1 : 0));
 }

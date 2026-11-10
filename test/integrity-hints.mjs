@@ -49,8 +49,9 @@ const NAMES_ONLY = /[A-Za-z]+\d+_H\d|Ghost|Deleted|\bBlank\d+\b/;
 for (const action of ['把馬達放回座板原孔', '讓馬達離開座板（改成獨立固定點）']) {
   assert.equal(open('motor-off-plate.json'), 1);
   assert.equal(el().style.display, 'block');
-  assert.match(shownText(), /^馬達軸心不在「矩形板材」的原孔（長向第4、直向第5孔）上，畫面與製作會對不起來。請選「把馬達放回座板原孔」或「讓馬達離開座板（改成獨立固定點）」，也可以刪除馬達。/);
-  assert.deepEqual(labels(), ['把馬達放回座板原孔', '讓馬達離開座板（改成獨立固定點）', '先不處理']);
+  assert.match(shownText(), /馬達軸心不在「矩形板材」的原孔（長向第4、直向第5孔）上，畫面與製作會對不起來。請選「把馬達放回座板原孔」或「讓馬達離開座板（改成獨立固定點）」，也可以刪除馬達。/);
+  assert.deepEqual(labels(), ['把馬達放回座板原孔', '讓馬達離開座板（改成獨立固定點）', '說明', '先不處理']);
+  assert.equal(el().buttons()[0].className, 'tool-btn primary'); assert.equal(el().buttons()[1].className, 'tool-btn');
   assert.equal(el().attributes['aria-label'], '作品檢查提示');
   const original = snapshot();
   assert.equal(click(action), true, notes.join(' '));
@@ -61,9 +62,9 @@ for (const action of ['把馬達放回座板原孔', '讓馬達離開座板（�
 // ---------------------------------------------------------------- 2. generic I1 (a point copy not at its hole / not at the shared point)
 {
   assert.equal(open('integrity/i1-shared-end-5mm.json'), 1);
-  assert.match(shownText(), /端點.*相差 5 mm/); assert.ok(!NAMES_ONLY.test(shownText()), shownText());
+  assert.match(shownText(), /橘色.*藍色.*相差 5 mm/); assert.ok(el().children[0].children[0].textContent.includes('端點'), 'one-line summary first'); assert.ok(!NAMES_ONLY.test(shownText()), shownText());
   const [back, leave] = labels();
-  assert.match(back, /^放回「.+」的孔$/); assert.match(leave, /^讓它離開「.+」（改用自己的接點）$/);
+  assert.match(back, /^把端點接回「.+」$/, 'shared bar end, not a hole'); assert.match(leave, /^讓它離開「.+」（改用自己的接點）$/);
   for (const which of [back, leave]) {
     open('integrity/i1-shared-end-5mm.json');
     const original = snapshot(); assert.equal(click(which), true, notes.join(' '));
@@ -84,7 +85,7 @@ for (const [file, pattern] of [['i3-frame-body-missing', /馬達承載零件已�
   ['i5-syringe-missing-comp', /端接在已經不存在的零件上/], ['i5-trace-point-missing', /指向已經不存在的點/]]) {
   assert.ok(open(`integrity/${file}.json`) >= 1, `${file}: hint shown`);
   assert.match(shownText(), pattern, file); assert.ok(!NAMES_ONLY.test(shownText()), `${file}: ${shownText()}`);
-  assert.deepEqual(labels().slice(0, -1).filter(l => l !== '清除失效的連結'), [], file);
+  assert.deepEqual(labels().filter(l => l !== '清除失效的連結' && l !== '說明' && l !== '先不處理'), [], file);
   const count = S.comps.length, original = snapshot();
   assert.equal(click('清除失效的連結'), true, `${file}: ${notes.join(' ')}`);
   assert.equal(S.comps.length, count, `${file}: no part is deleted`); assert.equal(undo.length, 1); assert.equal(undo[0], original);
@@ -92,7 +93,7 @@ for (const [file, pattern] of [['i3-frame-body-missing', /馬達承載零件已�
 }
 // 矛盾但沒有安全自動修法的 I3：只說明，不給修復按鈕。
 for (const file of ['i3-carrier-frame-differ', 'i3-duplicate-part-id']) {
-  assert.ok(open(`integrity/${file}.json`) >= 1, file); assert.deepEqual(labels(), ['先不處理'], `${file}: explanation only`);
+  assert.ok(open(`integrity/${file}.json`) >= 1, file); assert.deepEqual(labels(), ['說明', '先不處理'], `${file}: explanation only`);
 }
 
 // ---------------------------------------------------------------- 4. no hint for the built-in examples, the user's consistent file and non-enabled rules
@@ -125,5 +126,16 @@ for (const file of ['i3-carrier-frame-differ', 'i3-duplicate-part-id']) {
   Hints.run('check', api()); assert.equal(el().style.display, 'none', 'same work stays dismissed');
   open('integrity/i5-trace-point-missing.json'); assert.equal(el().style.display, 'block', 'another work shows again');
   S.mode = 'bench'; assert.equal(click('清除失效的連結'), false); assert.match(notes.join(' '), /設計模式/); assert.equal(undo.length, 0);
+}
+// ---------------------------------------------------------------- 7. canvas marks and the status pill's loose-part highlight
+{
+  const {paintMarks} = Hints, {looseEnds} = await import('../js/blocks/status-text.js');
+  const made = [];
+  globalThis.document.createElementNS = (ns, tag) => { const e = new FakeElement(tag); e.attrs = {}; e.setAttribute = (k, v) => { e.attrs[k] = v; }; e.remove = () => {}; made.push(e); return e; };
+  const layerHost = new FakeElement('svg'); layerHost.querySelector = () => null;
+  open('integrity/i1-shared-end-5mm.json');
+  const n = paintMarks({...api(), svg: layerHost, project: p => p, points: () => ({})}, [{ids: ['Bar2'], color: '#f97316'}, {ids: ['Bar1'], color: '#2563eb'}]);
+  assert.equal(n, 2); assert.deepEqual(made.filter(e => e.dataset.hintPart).map(e => [e.dataset.hintPart, e.attrs.stroke]), [['Bar2', '#f97316'], ['Bar1', '#2563eb']]);
+  assert.deepEqual(looseEnds([{id: 'A', name: '桿', p1: {id: 'X'}, p2: {id: 'Y'}}, {id: 'B', p1: {id: 'Y'}, p2: {id: 'Z'}}], {sourceIds: ['X']}).map(c => c.id), ['A']);
 }
 console.log('integrity hints: I1/I3/I5 hints, repairs with one undo step, stale refusal and no hint on examples passed');
