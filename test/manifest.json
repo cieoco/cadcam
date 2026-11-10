@@ -320,6 +320,7 @@
     "test/torque-panel-model.mjs",
     "test/syringe-edit-connections.mjs",
     "test/connection-integrity.mjs",
+    "test/integrity-hints.mjs",
     "test/operation-sequences.mjs"
   ],
   "version": 1

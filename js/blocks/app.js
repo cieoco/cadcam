@@ -276,7 +276,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   cancelMotorMode();
   Settings.syncFabricationInputs(); // 放棄尚未 change/blur 提交的表單草稿。
   Store.alignSavedInputPhase(norm);   // 開啟即為存檔姿勢（θ 回到 0°）
-  motorRelease('check');
+  setTimeout(()=>integrityHints('check'),0);   // 套用後再檢查（lazy），不拖慢開檔
   S.comps = norm.comps;
   S.modules = Array.isArray(norm.modules) ? norm.modules : [];
   knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組
@@ -1084,7 +1084,10 @@ let editingHandles=null;
 const jawTipHandle = createJawTipHandle({ svg, project: p => ({ x: TX(p.x), y: TY(p.y) }), worldFromEvent,
   editor: memberEditor, getParams: () => S.topo.params });
 // 馬達解除／軸心修復，按需載入。
-function motorRelease(action,id){return import('./motor-release.js').then(m=>m.run(action,{S,id,pause,pushUndo,rebuild,draw,notify:transient,save:scheduleAutosave,points:displayCoords,motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()}}));}
+const editApi=id=>({S,id,pause,pushUndo,rebuild,draw,notify:transient,save:scheduleAutosave,points:displayCoords,motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()}});
+function motorRelease(action,id){return import('./motor-release.js').then(m=>m.run(action,{...editApi(id),refresh:()=>integrityHints('check')}));}
+// 開檔檢查提示（I1／I3／I5）與其修復，按需載入。
+function integrityHints(action){return import('./integrity-hints.js').then(m=>m.run(action,editApi()));}
 async function setMemberAsFrame(id=S.selectedTriangleId||S.selectedLinkId){
   if(!id||S.mode!=='design')return;
   pause();const revision=snapshotStr(),source={comps:structuredClone(viewComps()),params:{...S.topo.params},id,points:displayCoords(),motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()}};

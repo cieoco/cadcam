@@ -28,7 +28,8 @@ export function checkWork(work, relations) {
   // 學生看得到的零件名稱：「名稱」(id)；沒有名稱時只有「id」。
   const label = id => { const c = byId(id), n = typeof c?.name === 'string' ? c.name.trim() : ''; return n && n !== id ? `「${n}」(${id})` : `「${id}」`; };
   const labels = ids => [...new Set(ids)].map(label).join('、');
-  const add = (code, severity, parts, ids, message) => issues.push({code, severity, parts: [...new Set(parts)], ids: [...new Set(ids)], message});
+  // ref（可選）：失效引用的種類與位置，供開檔提示（integrity-hints）挑選修復；不屬於一致性判斷。
+  const add = (code, severity, parts, ids, message, ref) => issues.push({code, severity, parts: [...new Set(parts)], ids: [...new Set(ids)], message, ...(ref ? {ref} : {})});
   const first = (a, b) => a !== undefined && a !== null ? a : b;
   const snap = k => first(work?.[k], topo?.[k]);
 
@@ -83,18 +84,18 @@ export function checkWork(work, relations) {
       const m = c.motorMount;
       if (!m || typeof m !== 'object') continue;
       const own = new Set([...pointKeysFor(c).map(k => c[k]?.id), ...(c.holes || []).map(h => h?.id)].filter(isStr));
-      if (isStr(m.center) && !own.has(m.center)) add('I3', 'dangling', [c.id], [m.center], `${label(c.id)} 記錄的馬達軸心 ${m.center} 不是它自己的孔；請重新設定馬達安裝。`);
-      if (isStr(m.frameBody) && m.frameBody !== 'world' && !byId(m.frameBody)) add('I3', 'dangling', [c.id], [m.center].filter(isStr), `${label(c.id)} 的馬達承載零件「${m.frameBody}」已不存在；請重新選擇馬達的承載零件。`);
+      if (isStr(m.center) && !own.has(m.center)) add('I3', 'dangling', [c.id], [m.center], `${label(c.id)} 記錄的馬達軸心 ${m.center} 不是它自己的孔；請重新設定馬達安裝。`, {what: 'center', comp: c.id});
+      if (isStr(m.frameBody) && m.frameBody !== 'world' && !byId(m.frameBody)) add('I3', 'dangling', [c.id], [m.center].filter(isStr), `${label(c.id)} 的馬達承載零件「${m.frameBody}」已不存在；請重新選擇馬達的承載零件。`, {what: 'frameBody', comp: c.id});
       if (isStr(m.frameBody) && isStr(c.motorCarrier) && m.frameBody !== c.motorCarrier && m.frameBody !== 'world') {
-        add('I3', 'contradiction', [c.id, byId(m.frameBody) ? m.frameBody : null, byId(c.motorCarrier) ? c.motorCarrier : null].filter(Boolean), [m.center].filter(isStr), `${label(c.id)} 的馬達承載零件有兩種說法：motorCarrier 是「${c.motorCarrier}」、motorMount.frameBody 是「${m.frameBody}」；請決定馬達裝在哪個零件上。`);
+        add('I3', 'contradiction', [c.id, byId(m.frameBody) ? m.frameBody : null, byId(c.motorCarrier) ? c.motorCarrier : null].filter(Boolean), [m.center].filter(isStr), `${label(c.id)} 的馬達承載零件有兩種說法：motorCarrier 是「${c.motorCarrier}」、motorMount.frameBody 是「${m.frameBody}」；請決定馬達裝在哪個零件上。`, {what: 'carrierConflict', comp: c.id});
       }
       if (isStr(m.partId)) partIds.set(m.partId, [...(partIds.get(m.partId) || []), c]);
     }
     for (const c of comps) if (isStr(c.motorMountPoint)) {
       const own = new Set([...pointKeysFor(c).map(k => c[k]?.id), ...(c.holes || []).map(h => h?.id), ...(c.standardBlank?.mountHoles || []).map(h => h?.id)].filter(isStr));
-      if (!own.has(c.motorMountPoint)) add('I3', 'dangling', [c.id], [c.motorMountPoint], `${label(c.id)} 記錄的馬達座孔 ${c.motorMountPoint} 已不在這個零件上；請重新設定馬達安裝。`);
+      if (!own.has(c.motorMountPoint)) add('I3', 'dangling', [c.id], [c.motorMountPoint], `${label(c.id)} 記錄的馬達座孔 ${c.motorMountPoint} 已不在這個零件上；請重新設定馬達安裝。`, {what: 'motorMountPoint', comp: c.id});
     }
-    for (const [partId, owners] of partIds) if (owners.length > 1) add('I3', 'contradiction', owners.map(c => c.id), owners.map(c => c.motorMount.center).filter(isStr), `${labels(owners.map(c => c.id))} 的馬達零件編號都是 ${partId}；馬達編號要各自獨立，請重新編號其中一個。`);
+    for (const [partId, owners] of partIds) if (owners.length > 1) add('I3', 'contradiction', owners.map(c => c.id), owners.map(c => c.motorMount.center).filter(isStr), `${labels(owners.map(c => c.id))} 的馬達零件編號都是 ${partId}；馬達編號要各自獨立，請重新編號其中一個。`, {what: 'partIdDup'});
   }
 
   // ------------------------------------------------------------ I4 重開作品的姿態等於存檔姿態（條件同 alignSavedInputPhase）
@@ -126,12 +127,12 @@ export function checkWork(work, relations) {
       if (c.type === 'syringe') {
         for (const k of ['a', 'b']) {
           const ref = c[k];
-          if (isStr(ref?.componentId) && !byId(ref.componentId)) add('I5', 'dangling', [c.id], [], `${label(c.id)} 的${k === 'a' ? '固定（管夾）' : '推桿'}端接在不存在的零件「${ref.componentId}」上；請重新選擇接合位置，或解除這一端。`);
+          if (isStr(ref?.componentId) && !byId(ref.componentId)) add('I5', 'dangling', [c.id], [], `${label(c.id)} 的${k === 'a' ? '固定（管夾）' : '推桿'}端接在不存在的零件「${ref.componentId}」上；請重新選擇接合位置，或解除這一端。`, {what: 'syringeEnd', comp: c.id, end: k});
         }
-        if (isStr(c.outputId) && !byId(c.outputId)) add('I5', 'dangling', [c.id], [], `${label(c.id)} 要推動的輸出零件「${c.outputId}」已不存在。`);
+        if (isStr(c.outputId) && !byId(c.outputId)) add('I5', 'dangling', [c.id], [], `${label(c.id)} 要推動的輸出零件「${c.outputId}」已不存在。`, {what: 'syringeOutput', comp: c.id});
       }
-      if (isStr(c.motorCarrier) && !byId(c.motorCarrier)) add('I5', 'dangling', [c.id], [c.motorMount?.center].filter(isStr), `${label(c.id)} 的馬達承載零件「${c.motorCarrier}」已不存在；請重新選擇馬達的承載零件。`);
-      if (isStr(c.moduleId) && !modules.some(m => m?.id === c.moduleId)) add('I5', 'dangling', [c.id], [], `${label(c.id)} 屬於不存在的模組「${c.moduleId}」。`);
+      if (isStr(c.motorCarrier) && !byId(c.motorCarrier)) add('I5', 'dangling', [c.id], [c.motorMount?.center].filter(isStr), `${label(c.id)} 的馬達承載零件「${c.motorCarrier}」已不存在；請重新選擇馬達的承載零件。`, {what: 'motorCarrier', comp: c.id});
+      if (isStr(c.moduleId) && !modules.some(m => m?.id === c.moduleId)) add('I5', 'dangling', [c.id], [], `${label(c.id)} 屬於不存在的模組「${c.moduleId}」。`, {what: 'moduleId', comp: c.id});
     }
     for (const m of modules) {
       const to = m?.mount?.to?.module;
@@ -139,14 +140,14 @@ export function checkWork(work, relations) {
     }
     // topo 的追蹤／參考／負載／尺寸點：只要求引用存在，不讓孔變成「需加工」。
     const exists = id => net.copies().has(id) || !!byId(id);
-    const pointRef = (id, what) => { if (isStr(id) && !exists(id)) add('I5', 'dangling', [], [id], `${what}指向不存在的點 ${id}；請重新選擇，或刪除這項設定。`); };
+    const pointRef = (id, what) => { if (isStr(id) && !exists(id)) add('I5', 'dangling', [], [id], `${what}指向不存在的點 ${id}；請重新選擇，或刪除這項設定。`, {what: 'topo'}); };
     const tp = new Set([...(snap('tracePoints') || []), ...(isStr(snap('tracePoint')) ? [snap('tracePoint')] : [])].filter(isStr));
     for (const id of tp) pointRef(id, '軌跡追蹤');
     pointRef(snap('referencePoint'), '參考點');
-    for (const l of snap('loads') || []) { if (l?.at?.pointId) pointRef(l.at.pointId, `負載「${l.name || l.id}」`); else if (isStr(l?.at?.compId) && !byId(l.at.compId)) add('I5', 'dangling', [], [], `負載「${l.name || l.id}」放在不存在的零件「${l.at.compId}」上。`); }
+    for (const l of snap('loads') || []) { if (l?.at?.pointId) pointRef(l.at.pointId, `負載「${l.name || l.id}」`); else if (isStr(l?.at?.compId) && !byId(l.at.compId)) add('I5', 'dangling', [], [], `負載「${l.name || l.id}」放在不存在的零件「${l.at.compId}」上。`, {what: 'topo'}); }
     for (const d of snap('dimensions') || []) for (const r of [d?.a, d?.b]) {
       if (r?.pointId) pointRef(r.pointId, `量尺「${d.name || d.id}」`);
-      else if (isStr(r?.compId) && !byId(r.compId)) add('I5', 'dangling', [], [], `量尺「${d.name || d.id}」量到不存在的零件「${r.compId}」。`);
+      else if (isStr(r?.compId) && !byId(r.compId)) add('I5', 'dangling', [], [], `量尺「${d.name || d.id}」量到不存在的零件「${r.compId}」。`, {what: 'topo'});
     }
   }
 

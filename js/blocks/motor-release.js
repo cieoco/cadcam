@@ -27,7 +27,7 @@ export function offPlateMessage(item){
 
 const work=source=>({...structuredClone(source),comps:structuredClone(source.comps),params:{...source.params}});
 // 只經由活動接點與這顆馬達相連的零件（不含座板本身、也沒接到其他固定點）。
-function attachedGroup(comps,item){
+export function attachedGroup(comps,item){
   const owner=comps.find(c=>c.id===item.id),group=new Set([owner]),nodes=new Set(keys.map(k=>owner[k]?.id).filter(id=>id&&id!==item.center));
   let free=true,grew=true;
   while(grew){grew=false;for(const c of comps){if(group.has(c)||c===item.host||!keys.some(k=>nodes.has(c[k]?.id)))continue;
@@ -74,30 +74,14 @@ export function planMotorRelease(source,barId,points={},motion={}){
   return {ok:true,comps:plan.comps,params:plan.params,message:`已解除「${bar.name||bar.id}」與馬達的連接；馬達與桿件都保留，可再接回，也可按復原。`};
 }
 
-// ---- 畫面接頭（app 以 window.blocks.motorRelease 呼叫）----
-function notice(){
-  let el=document.getElementById('motorMountNotice');
-  if(!el){const base=document.getElementById('solveBanner');el=document.createElement('div');el.id='motorMountNotice';el.className='mode-banner';el.setAttribute('role','status');
-    el.style.cssText='top:104px;display:none;';base?.after(el);}
-  return el;
-}
-export function showOffPlate(api){
-  const el=notice(),item=offPlateMotors(api.S.comps)[0];
-  if(!item){el.style.display='none';el.replaceChildren();return null;}
-  el.replaceChildren(offPlateMessage(item));
-  const row=document.createElement('span');row.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin-top:6px';el.append(row);
-  for(const [action,text] of [['back','把馬達放回座板原孔'],['leave','讓馬達離開座板（改成獨立固定點）']]){
-    const b=document.createElement('button');b.type='button';b.className='lift-btn';b.textContent=text;b.style.cssText='pointer-events:auto;min-height:44px';b.onclick=()=>run(action,{...api,id:item.id});row.append(b);}
-  el.style.display='block';return item;
-}
+// ---- 畫面接頭（app 以 window.blocks.motorRelease 呼叫；離開座板的提示由 integrity-hints.js 顯示）----
 function commit(api,plan){
   if(!plan.ok){api.notify(plan.message);return false;}
   api.pause?.();api.pushUndo();api.S.comps=plan.comps;if(plan.params)api.S.topo.params=plan.params;
-  api.rebuild();api.draw();api.save?.();api.notify(plan.message);showOffPlate(api);return true;
+  api.rebuild();api.draw();api.save?.();api.notify(plan.message);api.refresh?.();return true;
 }
 export function run(action,api){
   const S=api.S,source={comps:S.comps,params:S.topo.params,fabrication:S.fabrication,modules:S.modules,counter:S.counter};
-  if(action==='check')return showOffPlate(api);
   if(S.mode&&S.mode!=='design'){api.notify('請在設計模式修改馬達連接。');return false;}
   if(action==='release')return commit(api,planMotorRelease(source,api.id||S.selectedLinkId,api.points?.()||{},api.motion||{}));
   const id=api.id||offPlateMotors(S.comps)[0]?.id;

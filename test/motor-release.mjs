@@ -71,14 +71,14 @@ assert.ok(leave.ok,leave.message);
  assert.deepEqual(offPlateMotors(s.comps),[]);const host=comp(s,'Blank133');assert.ok(!host.motorMountPoint);assert.ok(host.holes.some(h=>h.id===SHAFT),'plate hole released');
  lengths(s);assert.ok(planActuatorPlateHoles(s).ok);assert.deepEqual(reopen(s).comps,s.comps);}
 
-// 5. 畫面接頭：每個動作一次復原；修好後提示消失。
+// 5. 畫面接頭：每個動作一次復原；提示改由 integrity-hints.js 顯示（test/integrity-hints.mjs），這裡只確認修復後會要求重新檢查。
 for(const action of ['release','back','leave']){
- const s=load('motor-off-plate.json'),undo=[],notes=[];Object.assign(S,{comps:s.comps,modules:[],topo:{params:s.params},fabrication:s.fabrication,counter:139,mode:'design',selectedLinkId:'Blank135'});
- const api={S,pause(){},pushUndo:()=>undo.push(JSON.stringify({comps:S.comps,params:S.topo.params})),rebuild(){},draw(){},notify:m=>notes.push(m),save(){},points:()=>points,motion:{}};
- const before=undo.length;run('check',api);assert.equal(nodes.get('motorMountNotice').style.display,'block');assert.match(nodes.get('motorMountNotice').textContent,/馬達軸心不在/);
- const original=JSON.stringify({comps:S.comps,params:S.topo.params});
+ const s=load('motor-off-plate.json'),undo=[],notes=[];let refreshed=0;Object.assign(S,{comps:s.comps,modules:[],topo:{params:s.params},fabrication:s.fabrication,counter:139,mode:'design',selectedLinkId:'Blank135'});
+ const api={S,pause(){},pushUndo:()=>undo.push(JSON.stringify({comps:S.comps,params:S.topo.params})),rebuild(){},draw(){},notify:m=>notes.push(m),save(){},refresh:()=>refreshed++,points:()=>points,motion:{}};
+ const before=undo.length,original=JSON.stringify({comps:S.comps,params:S.topo.params});
  assert.ok(run(action,api),notes.join(' '));assert.equal(undo.length,before+1,`${action}: one undo step`);assert.equal(undo[0],original);
- assert.equal(nodes.get('motorMountNotice').style.display,action==='release'?'block':'none',`${action}: notice`);
+ assert.equal(refreshed,1,`${action}: asks the hint to re-check`);
+ assert.equal(offPlateMotors(S.comps).length,action==='release'?1:0,`${action}: off-plate state`);
 }
 
 // 6. 拖曳防護：座板格孔上的軸心不能解除位置鎖定（就不會被單獨拖離座板）。
