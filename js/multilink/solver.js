@@ -541,7 +541,7 @@ function solveBodyJointTopology(topology, params) {
 
     const prevPoints = actualParams && actualParams._prevPoints;
     let infeasible = false;
-    const solveDistanceConstraints = () => {
+    const solveDistanceConstraints = (only) => {
         let changed = true;
         let guard = 0;
         while (changed && guard < 50) {
@@ -549,7 +549,7 @@ function solveBodyJointTopology(topology, params) {
             guard += 1;
 
             for (const pid of pointIds) {
-                if (points[pid]) continue;
+                if (points[pid] || only && !only(pid)) continue;
 
                 const related = constraints
                     .filter(c => c.a === pid || c.b === pid)
@@ -993,6 +993,7 @@ function solveBodyJointTopology(topology, params) {
     const unresolvedPointIds = [...pointIds].filter(id => !points[id]);
 
     if (!infeasible) {
+        const lattice = new Set([...triangles].filter(([k]) => k.startsWith('localHole.')).map(([, t]) => t.p3));
         for (const pid of pointIds) {
             if (points[pid]) continue;
             const related = constraints
@@ -1018,7 +1019,9 @@ function solveBodyJointTopology(topology, params) {
                 dx = (dx / d) * len;
                 dy = (dy / d) * len;
             }
-            points[pid] = { x: other.x + dx, y: other.y + dy };
+            // Lattice holes follow their placed bar or plate.
+            if (lattice.has(pid) && related.length > 1) solveDistanceConstraints(id => lattice.has(id));
+            points[pid] ||= { x: other.x + dx, y: other.y + dy };
         }
     }
 

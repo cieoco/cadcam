@@ -86,7 +86,7 @@ import { designTabs, resolveFocus, compsInFocus, assignNewComps, pointIdsOf, foc
 import { createDesignTabs } from './design-tabs-ui.js?v=20261005_tabclose';
 import { createMateTool } from './mate-tool.js?v=20261007_facecolor';   // M2：設計分頁的「接合面」工具
 import { advanceRock } from './rock-motion.js';
-import { createMemberEditor } from './member-editor.js';
+import { createMemberEditor, resizeRefusal } from './member-editor.js';
 import { SHEET_QUERY, messagePlacement, setSheet, sheetMode, settleInside, visibleUserRect } from './mobile-workspace.js';   // 手機工作區：抽屜狀態、訊息位置、看得到的區域
 import { drawMemberDimensions } from './member-dimension-render.js';
 import { memberStock, memberHoleDiameter, memberStockWarnings } from './member-stock.js';
@@ -1065,7 +1065,7 @@ const memberEditor = createMemberEditor({
     const ids=new Set(viewComps().map(c=>c.id)),comps=draft.comps.filter(c=>ids.has(c.id)&&!(c.type==='syringe'&&!c.b?.componentId&&c.b?.position));
     try{
       const solved=solveTopology(compileTopology(comps,{...S.topo,params:{...draft.params}},new Set()),{thetaDeg:S.theta,motorAngles:motorAnglesNow()});
-      return solved?.isValid===false ? `孔距未修改：${solved.reason||solved.errorReason||'此尺寸無法維持目前連接與行程。'}` : '';
+      return solved?.isValid===false ? resizeRefusal(solved) : '';
     }catch(e){return `孔距未修改：${e.message}`;}
   },
   resizeFusion: async (id,value) => {

@@ -64,6 +64,9 @@ function footprint(part,s,relation,catalog){
   }else if(relation.id.startsWith('motor:')){
     const motorFeature=f=>/^(TT_|MG995_|N20_)/.test(f.layer||f.purpose||'');
     holes=holes.filter(motorFeature);cutouts=cutouts.filter(motorFeature);
+    // Shaft at p2: measure from it.
+    const o=s.comps.find(c=>c.id===part.id),dx=o?.isInput&&o.p2?.id===(o.motorMount?.center||o.p2.physicalMotor&&o.p2.id)?Number(s.params[o.lenParam])||0:0;
+    if(dx){const f=local;local=p=>({...f(p),x:f(p).x-dx});}
   }else if(relation.pointIds){
     // Only the paired mounting holes; changing a jaw tip is not a mounting edit.
     if(part.binding.kind==='gear')holes=holes.filter(h=>h.layer==='PIN_HOLE'||Math.hypot(h.x,h.y)<.01);

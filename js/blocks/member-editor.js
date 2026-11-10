@@ -1,6 +1,5 @@
 import {inspectLinkExport,normalizeExportSettings} from './exporters.js';
 import {convertStandardOutput,isOutputBlank,resizeStandardBlank,BLANK_SPAN_LIMIT} from './standard-blank.js';
-import {pointRefs} from './model.js';
 import {editableNumber} from './numeric-input.js';
 import {setPointPosition,setPointAngle} from './input.js';
 import {pointRotation,freeLinkForPoint,freeTriangleForPoint,updatePointCoordsById as movePoint} from './model.js';
@@ -11,6 +10,8 @@ import { S } from './state.js';
 import { fixedSyringePointIds, planSyringeAttachmentResize } from '../core/syringe.js';
 import { memberDimensions, memberDimensionValue, planMemberDimension, mirroredJaw, dimensionLock } from './member-dimensions.js';
 import { MATERIALS, memberStock, planMemberStock, DEFAULT_HOLE_MM } from './member-stock.js';
+// Students never see solver ids.
+export const resizeRefusal=r=>{const e=r.reason||r.errorReason;return '孔距未修改：'+(e&&!/[A-Za-z]/.test(e)?e:'改成這個尺寸後，相連的零件接不起來（長度無法閉合）。請改用其他孔數，或一起調整相連的零件。');};
 
 export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTriangle, updatePointCoordsById, notify, resizeFusion, validateCandidate = () => '', openMobileEditPanel = () => {}, holeDiameter = () => DEFAULT_HOLE_MM }) {
   let mirror = true;   // 孔距使用圖上把手與原數字欄，不再另建面板滑桿。
@@ -147,8 +148,6 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if(!comp)return;
     if(comp.standardBlank&&(['g','r1','arm'].includes(id)||isOutputBlank(comp)&&id==='width')){
       const value=Number(raw),plan=resizeStandardBlank(comp,S.topo.params,id,value,{comps:S.comps,modules:S.modules});if(!plan.ok){notify(plan.message);sync();return;}
-      const retained=new Set((plan.comp.holes || []).map(h=>h.id)),lost=(comp.holes || []).filter(h=>!retained.has(h.id)&&(h.type==='fixed'||pointRefs(S.comps,h.id).length>1));
-      if(lost.length){notify('縮小會刪除已固定或已連接的孔，請先解除連接。');sync();return;}
       if(JSON.stringify(comp)===JSON.stringify(plan.comp)&&Object.entries(plan.params).every(([k,v])=>S.topo.params[k]===v))return;
       pause();let invalid='';const accepted=commitMountingEdit(S,draft=>{const index=draft.comps.findIndex(c=>c.id===comp.id);if(comp.type==='bar'&&id==='g')planSyringeAttachmentResize(draft.comps,comp,Number(draft.params[comp.lenParam]),value).forEach(({id,...patch})=>Object.assign(draft.comps.find(c=>c.id===id),patch));draft.comps[index]=plan.comp;Object.assign(draft.params,plan.params);for(const key of ['p1','p2',...(comp.type==='triangle'?['p3']:[])]){const p=plan.comp[key];movePoint(draft.comps,p.id,p.x,p.y);}invalid=validateCandidate(draft);return !invalid;},{pushUndo,notify});
       if(!accepted){if(invalid)notify(invalid);sync();draw();return;}rebuild();draw();return;

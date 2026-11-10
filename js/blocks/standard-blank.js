@@ -51,11 +51,14 @@ export function resizeStandardBlank(c,params,axis,value,{comps=[],modules=[]}={}
  const next=makeStandardBlank({kind:c.standardBlank.kind,lengthMm:axis==='g'?value:L,heightMm:axis==='r1'?value:H,armWidthMm:axis==='arm'?value:c.standardBlank.armWidthMm,...(isOutputBlank(c)?{rearMm:c.standardBlank.rearMm,widthMm:axis==='width'?value:c.stock.widthMm}:{}),n:1,origin:{x:0,y:0}});if(!next.ok)return next;
  const out=structuredClone(c),raw=next.comp,keys=['p1','p2',...(c.type==='triangle'?['p3']:[])];
  for(const key of keys){const p=raw[key];out[key]={...c[key],x:a.x+p.x*Math.cos(angle)-p.y*Math.sin(angle)*holeSide(c),y:a.y+p.x*Math.sin(angle)+p.y*Math.cos(angle)*holeSide(c)};}
+ // Keep a grounded end in place.
+ if(c.type==='bar'&&c.p2.type==='fixed'&&c.p1.type!=='fixed'){const dx=b.x-out.p2.x,dy=b.y-out.p2.y;for(const key of keys)Object.assign(out[key],{x:out[key].x+dx,y:out[key].y+dy});}
  const originalHoles=[...(c.holes || []),...(c.standardBlank.mountHoles || [])],old=new Map(originalHoles.map(h=>[`${h.u},${h.v}`,h]));
  out.holes=raw.holes.map(h=>({...h,...old.get(`${h.u},${h.v}`),id:old.get(`${h.u},${h.v}`)?.id||`${c.id}.H${h.u}_${h.v}`.replaceAll('.','_')}));out.standardBlank={...raw.standardBlank,...(c.standardBlank.drill==='all'?{drill:'all'}:{})};if(isOutputBlank(c)&&axis==='width')out.stock.widthMm=value;
  const patch={[g]:axis==='g'?value:L};if(c.type==='triangle'){patch[c.r1Param]=axis==='r1'?value:H;patch[c.r2Param]=Math.hypot(patch[g],patch[c.r1Param]);}
  const retained=new Set(out.holes.map(h=>h.id)),removed=originalHoles.filter(h=>!retained.has(h.id));
- if(removed.some(h=>isHoleUsed(c,h,comps,{params,modules})))return {ok:false,message:'縮小會刪除已固定或已連接的孔，請先解除連接。'};
+ const lost=removed.find(h=>isHoleUsed(c,h,comps,{params,modules}));
+ if(lost)return {ok:false,message:`縮小會移除「${c.name||c.id}」${c.type==='bar'?'':`長向第${lost.u/8+1}、直向`}第${(c.type==='bar'?lost.u:lost.v)/8+1}孔，但這孔已固定或有零件連接；請先解除該孔的連接，或改用較多孔數。`};
  return {ok:true,comp:out,params:patch};
 }
 
