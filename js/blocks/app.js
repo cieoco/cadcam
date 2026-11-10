@@ -1595,9 +1595,9 @@ function solveFrame() {
   const seed = extrapolateSeed(lastSolved, prevSolved);
   const frameParams = { thetaDeg: S.theta, motorAngles: motorAnglesNow(), _prevPoints: seed };
   try { sol = scope.assembly ? solveAssembly(scope.assembly, frameParams) : solveTopology(scope.compiled, frameParams); } catch (_) {}
-  lastFrameIssue = motionPoseIssue(scope.comps, sol);
+  lastFrameIssue = motionPoseIssue(scope.moving, sol);
   if (lastFrameIssue) sol = { ...sol, isValid: false, errorReason: lastFrameIssue.message };
-  lastSolveValidity=materialSolveValidity(scope.comps,sol);
+  lastSolveValidity=materialSolveValidity(scope.moving,sol);
   // A loose pose is still a rigid solve: draw it.
   const solved = (sol && (sol.isValid !== false || lastFrameIssue?.code === 'underconstrained') && sol.points) ? sol.points : {};
   // 無效解整幀不採用，避免新舊接點混合而拉伸剛性零件；保留上一姿態。
@@ -1638,12 +1638,12 @@ function updateMechanismStatus(sol = null) {
   let text = '尚未建立機構';
   let title = '';
   let chip = '';   // 播放列短字的細分類（CSS 依 data-chip 換字）
-  const mobility = simulationScope().comps.length ? analyzeDof(simulationScope().comps) : null;
+  const mobility = simulationScope().comps.length ? analyzeDof(simulationScope().moving) : null;
   if (simulationScope().comps.length) {
     title = mobility.mobilityOverride
       ? `組裝自由度：F = ${mobility.dof}（一般公式 ${mobility.formulaDof}；平行冗餘約束已校正）`
       : `理論自由度：F = ${mobility.dof}（剛體 ${mobility.bodies}、低副 ${mobility.lowerPairs}、高副 ${mobility.higherPairs}）`;
-    const unsolvedIds = sol !== null ? unsolvedMovingPoints(simulationScope().comps, sol) : [];   // S3 漏解警示：只算一次
+    const unsolvedIds = sol !== null ? unsolvedMovingPoints(simulationScope().moving, sol) : [];   // S3 漏解警示：只算一次
     if (taskApplies(gripperController) && !gripperController.currentPlan().ok) {
       state = 'error'; chip = 'fix';
       text = '夾爪任務待修正，請查看任務卡';
@@ -1694,7 +1694,7 @@ function updateMechanismStatus(sol = null) {
   if (chip) el.dataset.chip = chip; else delete el.dataset.chip;
   el.textContent = text;
   el.title = title;
-  const feedback = { comps: simulationScope().comps, sol, compiled: simulationScope().compiled,
+  const feedback = { comps: simulationScope().moving, sol, compiled: simulationScope().compiled,
     hasDrive: hasDriveSource(), gearWarning: gearMeshHasWarning(), dof: mobility };
   // 教學提示按需載入。
   if (lastFrameIssue?.code === 'underconstrained') el.title += '\n' + lastFrameIssue.message;
@@ -2624,11 +2624,11 @@ function checkPlaybackMotion() {
   };
   let current = null;
   try { current = solveAt(S.theta, lastSolved); } catch (_) {}
-  const issue = motionPoseIssue(scope.comps, current);
+  const issue = motionPoseIssue(scope.moving, current);
   if (issue) return { ok: false, ...issue };
   const range = inputRockRange();
   const plan = range ? { mode: 'rock', lo: range.lo, hi: range.hi } : planMotion();
-  return { ...inspectMotionRange({ comps: scope.comps, solveAt, theta: S.theta, plan, seed: lastSolved }), plan };
+  return { ...inspectMotionRange({ comps: scope.moving, solveAt, theta: S.theta, plan, seed: lastSolved }), plan };
 }
 function togglePlay() {
   if(hydraulic?.active()){hydraulic.isPlaying()?pause():hydraulic.play();return;}

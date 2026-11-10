@@ -326,7 +326,8 @@
     "test/c5-parity.mjs",
     "test/c6-parity.mjs",
     "test/c6-attachments.mjs",
-    "test/c7-syringe.mjs"
+    "test/c7-syringe.mjs",
+    "test/free-part-motion.mjs"
   ],
   "version": 1
 }
