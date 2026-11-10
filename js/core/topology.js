@@ -1,4 +1,4 @@
-import {localHoles,expandLocalHoles,passiveLocalHoles} from './local-holes.js';
+import {localHoles,expandLocalHoles,passiveLocalHoles,withMotorShaftHoles} from './local-holes.js';
 import {gearTrain} from './gear-train.js';
 import {expandSyringes} from './syringe.js';
 /**
@@ -57,6 +57,8 @@ function compileRegisteredParts(components, phase, ctx) {
 }
 
 export function compileTopology(components, topology, solvedPoints) {
+    const mounted=withMotorShaftHoles(components);
+    if(mounted.some((c,i)=>c!==components[i]))return compileTopology(mounted,topology,solvedPoints);
     if(topology.bodyJoint!==false&&components.some(c=>c.standardBlank&&localHoles(c).length>=128)){
         const reduced=passiveLocalHoles(components,topology);
         if(reduced.passive.length){const compiled=compileTopology(reduced.comps,topology,solvedPoints);compiled._passiveLocalHoles=reduced.passive;return compiled;}

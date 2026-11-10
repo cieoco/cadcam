@@ -19,6 +19,7 @@ const configure=()=>{
 };
 if(new URLSearchParams(parent.location.search).has('blankOnly')){await import('./standard-blank-ui-browser.js');}else{
 try{
+ if(!new URLSearchParams(parent.location.search).has('floatingOnly')){
  // Adding a motor must not change meaning just because a separate rod exists.
  for(const type of ['tt','n20','mg995'])for(const reverse of [false,true])for(const entry of ['canvas','numeric']){
   const plate=makeStandardBlank({kind:'plate',columns:16,rows:12,origin:{x:-64,y:-40}}),rod=makeStandardBlank({kind:'bar',n:20,lengthMm:56,origin:{x:-32,y:-80}}),fab=structuredClone(FABRICATION_DEFAULTS);
@@ -203,10 +204,11 @@ try{
  {
   const blank=makeStandardBlank({lengthMm:80,origin:{x:-40,y:0}}),work={kind:'blocks',v:1,counter:1,comps:[blank.comp],params:blank.params};api.reopen(work);const before=JSON.stringify(api.snapshot());b.pickMotorType('tt');await waitDialog();button('在畫布放馬達');field('軸心 X (mm)','0');field('軸心 Y (mm)','0');button('依座標放置');assert(!!dialog()&&dialog().textContent.includes('座板無法容納')&&JSON.stringify(api.snapshot())===before,'invalid narrow carrier stays editable without drilling');button('取消');assert(JSON.stringify(api.snapshot())===before,'invalid auto mount cancel preserves original');
  }
+ }
  // Motor first, then a rod on its shaft: same output contract through canvas and exact input.
- for(const type of ['mg995','tt','n20'])for(const entry of ['canvas','numeric']){
+ for(const type of ['mg995','tt','n20'])for(const entry of ['canvas','numeric'])for(const grounded of [true,false]){
   const {planMotorDrop}=await import('../js/blocks/motor-drop.js'),blank=makeStandardBlank({kind:'plate',columns:16,rows:12,origin:{x:-64,y:-40}}),fab=structuredClone(FABRICATION_DEFAULTS);
-  blank.comp.p1.type=blank.comp.p2.type='fixed';fab.drive.n20Spec=1;Object.assign(fab.mg995Mount,{cableNotchWidthMm:6,cableNotchDepthMm:2});
+  blank.comp.p1.type=blank.comp.p2.type=grounded?'fixed':'floating';fab.drive.n20Spec=1;Object.assign(fab.mg995Mount,{cableNotchWidthMm:6,cableNotchDepthMm:2});
   const work={kind:'blocks',v:1,counter:1,comps:[blank.comp],params:blank.params,fabrication:fab},r=planMotorDrop(work,{type,position:{x:0,y:0},face:'back',orientation:'horizontal',start:0,end:90});assert(r.ok,'output setup '+type+' '+entry);
   api.reopen({...work,comps:r.comps,params:r.params});S.undoStack=[];const motor=S.comps.find(c=>c.type==='motor');await b.openStandardBlank('bar');
   const panel=document.getElementById('standardBlankPanel'),svg=document.getElementById('stageSvg');
@@ -216,12 +218,12 @@ try{
   for(let i=0;i<100&&!S.comps.some(c=>c.isInput);i++)await new Promise(resolve=>setTimeout(resolve,20));
   const output=S.comps.find(c=>c.isInput);assert(output?.motorMount.partId===motor.id&&!S.comps.some(c=>c.type==='motor'),'new rod becomes existing motor output '+type+' '+entry);
   assert(!dialog()&&panel.hidden&&S.undoStack.length===1,'output placement has no extra confirmation and one undo '+type+' '+entry);
-  const saved=api.snapshot();b.togglePlay();assert(document.getElementById('playBtn').classList.contains('playing'),'connected output can play '+type+' '+entry);b.pause();b.undo();assert(S.comps.length===2&&S.comps.some(c=>c.id===motor.id&&c.type==='motor'),'undo restores motor without output '+type+' '+entry);api.reopen(decodeShareString(encodeSnapshot(saved)));assert(S.comps.some(c=>c.isInput&&c.motorMount.partId===motor.id),'output connection reopens '+type+' '+entry);
+  const saved=api.snapshot();if(!grounded){b.togglePlay();assert(!document.getElementById('playBtn').classList.contains('playing'),'floating assembly blocks only playback');assert(S.comps.find(c=>c.id===blank.comp.id).p1.type==='floating','output never grounds carrier');await b.setMemberAsFrame(blank.comp.id);assert(document.getElementById('mechanismStatus').textContent.includes('可模擬'),'grounded carrier status recognizes shaft joint');}b.togglePlay();assert(document.getElementById('playBtn').classList.contains('playing'),'connected output can play '+type+' '+entry);b.pause();if(!grounded)b.undo();b.undo();assert(S.comps.length===2&&S.comps.some(c=>c.id===motor.id&&c.type==='motor'),'undo restores motor without output '+type+' '+entry);api.reopen(decodeShareString(encodeSnapshot(saved)));assert(S.comps.some(c=>c.isInput&&c.motorMount.partId===motor.id),'output connection reopens '+type+' '+entry);
  }
  // Existing loose rods must take the same path, not the generic transmission merge guard.
- for(const type of ['mg995','tt','n20'])for(const end of ['p1','p2']){
+ for(const type of ['mg995','tt','n20'])for(const end of ['p1','p2'])for(const grounded of [true,false]){
   const {planMotorDrop}=await import('../js/blocks/motor-drop.js'),blank=makeStandardBlank({kind:'plate',columns:16,rows:12,origin:{x:-64,y:-40}}),fab=structuredClone(FABRICATION_DEFAULTS);
-  blank.comp.p1.type=blank.comp.p2.type='fixed';fab.drive.n20Spec=1;Object.assign(fab.mg995Mount,{cableNotchWidthMm:6,cableNotchDepthMm:2});
+  blank.comp.p1.type=blank.comp.p2.type=grounded?'fixed':'floating';fab.drive.n20Spec=1;Object.assign(fab.mg995Mount,{cableNotchWidthMm:6,cableNotchDepthMm:2});
   const work={kind:'blocks',v:1,counter:20,comps:[blank.comp],params:blank.params,fabrication:fab},r=planMotorDrop(work,{type,position:{x:0,y:0},face:'back',orientation:'horizontal',start:0,end:90}),rod=makeStandardBlank({kind:'bar',lengthMm:56,origin:{x:-32,y:-70},n:20});
   api.reopen({...work,comps:[...r.comps,rod.comp],params:{...r.params,...rod.params}});S.undoStack=[];b.fitView();b.draw();
   const before=JSON.stringify(api.snapshot()),motor=S.comps.find(c=>c.type==='motor'),svg=document.getElementById('stageSvg'),screen=p=>new DOMPoint(View.TX(p.x),View.TY(p.y)).matrixTransform(svg.getScreenCTM());
@@ -231,7 +233,7 @@ try{
   await move();fire(svg,'pointerup',to);for(let i=0;i<100&&!S.comps.some(c=>c.isInput);i++)await new Promise(r=>setTimeout(r,20));
   const out=S.comps.find(c=>c.id===rod.comp.id);assert(out?.isInput&&out.motorMount.partId===motor.id&&!S.comps.some(c=>c.type==='motor'),'existing rod connects to shaft '+type+' '+end);
   assert(S.topo.params[out.lenParam]===56&&out[end].id===motor.p1.id&&S.undoStack.length===1,'drag keeps length and records one undo '+type+' '+end);
-  const saved=api.snapshot();b.togglePlay();assert(document.getElementById('playBtn').classList.contains('playing'),'dragged output plays '+type+' '+end);b.pause();b.undo();assert(JSON.stringify(api.snapshot())===before,'output drag undo restores original '+type+' '+end);api.reopen(decodeShareString(encodeSnapshot(saved)));assert(S.comps.some(c=>c.isInput&&c.motorMount.partId===motor.id),'dragged output reopens '+type+' '+end);
+  const saved=api.snapshot();if(!grounded){b.togglePlay();assert(!document.getElementById('playBtn').classList.contains('playing'),'floating dragged assembly remains editable');assert(S.comps.find(c=>c.id===blank.comp.id).p1.type==='floating','drag never grounds carrier');await b.setMemberAsFrame(blank.comp.id);assert(document.getElementById('mechanismStatus').textContent.includes('可模擬'),'grounded carrier status recognizes shaft joint');}b.togglePlay();assert(document.getElementById('playBtn').classList.contains('playing'),'dragged output plays '+type+' '+end);b.pause();if(!grounded)b.undo();b.undo();assert(JSON.stringify(api.snapshot())===before,'output drag undo restores original '+type+' '+end);api.reopen(decodeShareString(encodeSnapshot(saved)));assert(S.comps.some(c=>c.isInput&&c.motorMount.partId===motor.id),'dragged output reopens '+type+' '+end);
  }
  if(!new URLSearchParams(parent.location.search).has('motorOnly')) { // Gear hole: one draft shared by dragging and numeric input.
  const selectGear=()=>{document.querySelector('#stageSvg [data-pick-component="GearB"]').dispatchEvent(new PointerEvent('pointerdown',{pointerType:'mouse',bubbles:true}));document.getElementById('stageSvg').dispatchEvent(new PointerEvent('pointerup',{pointerId:0,bubbles:true}));};

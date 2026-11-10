@@ -12,6 +12,7 @@
  * 「約束過多」。結果是理論拓撲 DOF，仍需由求解器確認桿長、嚙合與死點。
  */
 
+import {withMotorShaftHoles} from '../core/local-holes.js';
 import { pointKeysFor } from './part-types.js';
 
 const GROUND = '__ground__';
@@ -68,6 +69,7 @@ function sharedCount(a, b) {
  * classification 僅描述拓撲，呼叫端仍應把求解失敗與齒輪未嚙合當較高優先警告。
  */
 export function analyzeDof(comps = []) {
+  comps=withMotorShaftHoles(comps);
   const assemblyMobility = comps.map(comp => Number(comp?.assemblyMobility)).find(Number.isFinite);
   const bodies = comps.filter(comp => BODY_TYPES.has(comp?.type) && !comp.visualOnly)
     .map((comp, index) => ({ id: `body:${index}`, comp, points: new Set(pointIds(comp)) }));

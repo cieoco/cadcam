@@ -31,3 +31,6 @@ export function restorePassiveHoles(groups,points){
   for(const h of c.holes)points[h.id]={x:a.x+h.u*ux-h.v*c.side*uy,y:a.y+h.u*uy+h.v*c.side*ux};
  }
 }
+
+// Retain occupied shaft references for kinematics only; never re-enable machining holes.
+export function withMotorShaftHoles(components){return components.map(c=>{const hs=(c.standardBlank?.mountHoles||[]).filter(h=>!components.some(p=>p.id===`localHole.${c.id}.${h.id}`)&&!localHoles(c).some(p=>p.id===h.id)&&components.some(m=>m.motorMount?.frameBody===c.id&&m.motorMount.center===h.id));return hs.length?{...c,holes:[...(c.holes||[]),...hs]}:c;});}

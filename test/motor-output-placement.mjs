@@ -6,6 +6,8 @@ import {makeStandardBlank} from '../js/blocks/standard-blank.js';
 import {FABRICATION_DEFAULTS} from '../js/blocks/fabrication-profile.js';
 import {planMotorDrop,planPlacedMotorOutput,planDraggedMotorOutput} from '../js/blocks/motor-drop.js';
 import {connectDraggedMotorOutput} from '../js/blocks/motor-drop-ui.js';
+import {analyzeDof} from '../js/blocks/dof.js';
+import {planMemberFrame} from '../js/blocks/member-frame.js';
 import {planMotorInstallation} from '../js/blocks/actuator-installation.js';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
 import {compileTopology} from '../js/core/topology.js';
@@ -55,3 +57,27 @@ for(const type of ['mg995','tt','n20'])for(const end of ['p1','p2']){
  const linked=structuredClone(s),q=linked.comps.at(-1);linked.comps.push({type:'bar',id:'Other',p1:{...q.p2},p2:{id:'Far',type:'floating',x:70,y:-70},fixedLen:true});assert.equal(planDraggedMotorOutput(linked,free.comp[end].id,m.p1.id).ok,false,'connected rod not silently detached');
 }
 console.log('Existing rod drop: all motors/both ends, pose/length, one undo, stale result, fixed/shared refusals passed');
+
+// A floating carrier may be assembled before grounding; no world anchor is invented.
+for(const type of ['tt','n20','mg995'])for(const end of ['p1','p2']){
+ const loose=structuredClone(base);loose.comps[0].p1.type=loose.comps[0].p2.type='floating';
+ const mounted=planMotorDrop(loose,{...req,type}),motor=mounted.comps.find(c=>c.type==='motor');
+ const free=makeStandardBlank({kind:'bar',lengthMm:56,origin:{x:-10,y:-70},n:40});
+ const source={...loose,comps:[...mounted.comps,free.comp],params:{...mounted.params,...free.params}},before=JSON.stringify(source);
+ const attached=planDraggedMotorOutput(source,free.comp[end].id,motor.p1.id,pointCoords(source.comps));
+ assert.ok(attached.ok,attached.message);assert.equal(JSON.stringify(source),before);
+ assert.ok(attached.comps.every(c=>['p1','p2','p3'].every(k=>!c[k]||c[k].type==='floating')),'assembly must not ground any part');
+ assert.equal(attached.simulation.ok,false,'floating assembly stays unavailable for simulation');
+ const out=attached.comps.find(c=>c.id===free.comp.id);assert.equal(out.motorMount.partId,motor.id);assert.equal(out.motorMount.frameBody,plate.comp.id);
+ const saved=normalizeSnapshot({...loose,comps:attached.comps,params:attached.params});assert.ok(saved);
+ const grounded=planMemberFrame({...saved,id:plate.comp.id});assert.ok(grounded.ok,grounded.message);
+ assert.equal(analyzeDof(grounded.comps).dof,1,'status counts mounted shaft joint');assert.equal(analyzeDof(saved.comps).dof,4,'free carrier still has three rigid-body freedoms');
+ const compiled=compileTopology(grounded.comps,{params:saved.params},new Set()),a=solveTopology(compiled,{thetaDeg:0}),b=solveTopology(compiled,{thetaDeg:30});
+ assert.ok(a.isValid&&!a.isUnderconstrained&&b.isValid&&!b.isUnderconstrained,'grounding completes the same assembly');
+ const tip=out[end==='p1'?'p2':'p1'].id;assert.ok(Math.hypot(a.points[tip].x-b.points[tip].x,a.points[tip].y-b.points[tip].y)>1);
+ const release=planMotorInstallation(saved,{...req,type,existingId:out.id,outputId:'',hostId:plate.comp.id,hostEnd:motor.p1.id,orientation:'follow-frame'},pointCoords(saved.comps));
+ assert.ok(release.ok,release.message);assert.ok(release.comps.some(c=>c.id===motor.id&&c.type==='motor'));
+ const reconnect=planMotorInstallation({...saved,...release},{...req,type,existingId:motor.id,outputId:out.id,outputEnd:end,hostId:plate.comp.id,hostEnd:motor.p1.id,orientation:'follow-frame'},pointCoords(release.comps));
+ assert.ok(reconnect.ok,reconnect.message);assert.equal(reconnect.simulation.ok,false);
+}
+console.log('Floating plate output: three motors/both ends, attach/save/release/reconnect, no implicit grounding, explicit frame then real motion passed');

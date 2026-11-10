@@ -42,9 +42,10 @@ export function planMotorInstallation(source,request,points={},motion={}){
   const former=comps.find(c=>c.id===request.existingId);
   if(request.existingId&&!former)return fail('原致動元件不存在，請重新選取。');
   const formerMotor=former&&(former.physicalMotor||keys.map(k=>former[k]?.physicalMotor).find(Boolean));
-  const host=request.hostId==='world'?null:comps.find(c=>c.id===request.hostId&&(c.type==='bar'||fixedPlate(c,comps)));
+  const host=request.hostId==='world'?null:actuatorChoices(comps).hosts.find(c=>c.id===request.hostId);
   if(!host&&request.hostId!=='world')return fail('請先選外殼的承載零件。');
   if(!out)return fail('請選輸出軸要帶動的零件。');
+  if(host?.type==='triangle'&&!fixedPlate(host,comps)&&out.type==='gear')return fail('目前齒輪輸出仍需固定承載板；未固定板材請先使用連桿輸出。');
   if(former&&former!==out&&(out.isInput||out.physicalMotor||keys.some(k=>out[k]?.physicalMotor)))return fail('所選輸出已有另一個致動元件，不能覆蓋。');
   if(former&&former.type!=='motor'&&former!==out&&formerMotor){
     const formerCenter=former.motorMount?.center || keys.map(k=>former[k]).find(p=>p?.physicalMotor)?.id;
@@ -106,7 +107,7 @@ export function planMotorInstallation(source,request,points={},motion={}){
   // A real fixed host already supplies the ground constraint. The explicit
   // auto-frame choice supplies it only when the user chose that option.
   if(!host)for(const c of comps)for(const k of keys)if(c[k]?.id===center)c[k].type='fixed';
-  if(host?.type==='triangle')out[key].type='fixed';
+  if(host?.type==='triangle')out[key].type=fixedPlate(host,comps)?'fixed':target.type;
   out[key].physicalMotor=motor;out.motorType=request.type;
   if(request.type==='mg995'){
     const lo=Number(request.start??out.servoStart??0),hi=Number(request.end??out.servoEnd??90);

@@ -49,7 +49,8 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-10：獨立馬達共用剛體拖曳／數值位移檢查，現值2,160,506 bytes，保留約1.5 KB餘裕；不增加依賴。
 // 2026-11-10：MG995舵盤依實際板厚外露與輸出疊層間隙，實測2,162,218 bytes；3D viewer仍按需載入。
 // 2026-11-10：既有桿件端孔拖接動力的輕量接頭增加500 bytes，實測2,163,358；候選規劃仍懶載入。
-check('首次JS原始大小低於2.164MB',r.bytes<2164000);
+// 2026-11-10：占用軸心的共同剛體定位／自由度核對增加748 bytes至2,164,106；不恢復加工孔，無新依賴。
+check('首次JS原始大小低於2.165MB',r.bytes<2165000);
 check('扭力UI與估算核心按需載入',!r.paths.includes('js/blocks/torque-ui.js')&&!r.paths.includes('js/core/required-torque.js')&&!r.paths.includes('js/core/actuator-speed.js'));
 check('舵機座板範例按需載入',!r.paths.includes('js/blocks/servo-mount-examples.js')&&!r.paths.includes('js/blocks/motor-plate-examples.js'));
 check('標準結構設定面板按需載入',!r.paths.includes('js/blocks/standard-blank-ui.js')&&r.lazyEntries.includes('js/blocks/standard-blank-ui.js'));
