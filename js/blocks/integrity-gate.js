@@ -1,8 +1,8 @@
-/** 提交關卡（SDD-CONNECTION-INTEGRITY 3.3 第 3 階段）：候選比目前作品多出 I1／I3 矛盾就拒絕寫入。integrity.js 按需載入，載入後同步檢查。 */
+/** 提交關卡（SDD-CONNECTION-INTEGRITY 3.3 第 3 階段）：候選比目前作品多出 I1／I3／I8 矛盾就拒絕寫入。integrity.js 按需載入，載入後同步檢查。 */
 let ready = null;
 export const loadIntegrity = () => Promise.all([import('./integrity.js'), import('./integrity-repairs.js')]).then(([m, r]) => (ready = {...m, describe: r.describeIssue}));
 export const setIntegrityForTest = m => { ready = m; };   // 測試：換成會製造矛盾的假檢查
-const bad = w => ready.checkWork(w).filter(i => i.severity === 'contradiction' && (i.code === 'I1' || i.code === 'I3'));
+const bad = w => ready.checkWork(w).filter(i => i.severity === 'contradiction' && /^I[138]$/.test(i.code));
 const key = i => i.code + [...(i.ids.length ? i.ids : i.parts)].sort();   // 同一個孔（或零件）原本就有同類問題，不算新的
 export function integrityGate(before, after, notify) {
   if (!ready) { loadIntegrity(); return true; }

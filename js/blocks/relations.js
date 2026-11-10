@@ -10,7 +10,7 @@
  *     holeRoles(compId,holeId) 三種孔用途 {machining,mountOccupied,constraint,reasons}
  *     isGround(id)/groundSource(id)
  *     motorOf(compId|pointId) 規範化的馬達關係，或 null
- *     attachmentsOf(compId)   全部關係 [{kind,otherId,via}]
+ *     attachmentsOf(compId)   全部關係 [{kind,otherId,via,field,direction}]（kind 見 KINDS；欄位表在 ref-fields.js，模組／組立接合在本檔）
  *     isFreeBody(compId)
  *   }
  * `machining` 的規則只有 used-holes.js 一份（C5 起不再各算一份）；本檔只決定哪一種孔要問它並附理由。
@@ -20,6 +20,7 @@ import {localHoles,holeWorld,idCounts} from '../core/local-holes.js';
 import {isHoleUsed} from './used-holes.js';
 import {isGroundPoint, motorRecords, motorRecordOf} from './motor-roles.js';
 import {attachmentPoint,hasSyringeClamp,fixedSyringePointIds} from '../core/syringe.js';
+import {compEdges,ownIdsOf} from './ref-fields.js';
 
 const isStr = v => typeof v === 'string' && v !== '';
 const hasId = p => !!p && typeof p === 'object' && isStr(p.id);
@@ -37,15 +38,55 @@ export function workParts(work) {
   };
 }
 
-// 邊的種類由「引用者那一側欄位」決定。
-function edgeKind(path) {
-  const root = path.split('.')[0];
-  if (['p1', 'p2', 'p3', 'm1', 'm2', 'holes', 'standardBlank'].includes(root)) return 'shared-point';
-  if (root === 'a' || root === 'b' || root === 'outputId' || root === 'jawIds' || root === 'passiveTips') return 'syringe';
-  if (root === 'motorMount' || root === 'motorCarrier' || root === 'motorMountPoint') return 'motor';
-  if (root === 'barFusion' || root === 'barFusionRoot') return 'fusion';
-  if (root === 'mesh' || root === 'pinion' || root === 'driver' || root === 'driven' || root === 'fusedWith') return 'mesh';
-  return 'reference';
+/** attachmentsOf 的關係種類：每種關係有自己的 kind，由「引用者那一側的欄位」決定（欄位表見 ref-fields.js 與下方 moduleEdges）。 */
+export const KINDS = ['shared-point', 'syringe', 'motor', 'fusion', 'plate-gear-fusion', 'mesh', 'rack', 'belt', 'reference',
+  'module-mount', 'module-output', 'face-mount', 'bracket', 'tab-nut', 'rigid-group'];
+
+// 模組與組立接合：只讀這些欄位（moduleId、模組 id、mount.to.module 是模組編號，不是零件，不算引用）。
+// 回傳 [{kind,field,from,to,via,module?}]；from 是 `module:<id>`（模組本身的宣告）或零件 id（兩個零件之間的接合）。
+function moduleEdges(comps, modules, owners) {
+  const out = [], seen = new Set();
+  const compsOf = id => (owners.get(id) || []).map(i => comps[i]);
+  const push = (kind, field, from, to, via, module) => {
+    const key = [kind, field, from, to, via].join('|');
+    if (from === to || seen.has(key)) return;
+    seen.add(key); out.push({kind, field, from, to, via, ...(module ? {module: true} : {})});
+  };
+  const ids = v => (Array.isArray(v) ? v : [v]).filter(isStr);
+  const bodyOf = (modId, outId) => modules.find(m => m?.id === modId)?.outputs?.find(o => o?.id === outId)?.body;
+  for (const m of modules) {
+    if (!m || !isStr(m.id)) continue;
+    const from = `module:${m.id}`, ref = (kind, field, v) => ids(v).forEach(id => compsOf(id).forEach(c => push(kind, field, from, c.id, id, true)));
+    ref('module-mount', 'base', m.base);
+    for (const o of Array.isArray(m.outputs) ? m.outputs : []) {
+      const b = o?.body || {};
+      ref('module-output', 'outputs.at', o?.at);
+      ref('module-output', 'outputs.bolts', o?.bolts);
+      if (b.kind === 'points') { ref('module-output', 'outputs.body.a', b.a); ref('module-output', 'outputs.body.b', b.b); }
+      else ref('module-output', 'outputs.body', b.id);
+    }
+    // 剛性群組：基準板件（宿主輸出的 body）與每個成員模組的零件固定在一起。
+    for (const g of Array.isArray(m.rigidGroups) ? m.rigidGroups : []) {
+      const base = ids(bodyOf(m.id, g?.output)?.id)[0];
+      if (base) for (const mem of ids(g?.members)) for (const c of comps) if (c.moduleId === mem) push('rigid-group', 'rigidGroups', base, c.id, g.id);
+    }
+    const mount = m.mount && typeof m.mount === 'object' ? m.mount : null, to = mount?.to, face = mount?.face;
+    if (mount) {
+      ref('module-mount', 'mount.to.body', to?.body);
+      const host = ids(to?.body)[0] || ids(bodyOf(to?.module, to?.output)?.id)[0];          // 宿主零件：直接指定的 body，或宿主輸出端的 body
+      if (!to?.body) ref('module-mount', 'mount.to.output', host);
+      const sel = face?.selection || {};
+      // 面接合的固定方式決定種類：榫槽＋螺絲 tab-nut、角碼 bracket、其餘 face-mount（只定位）。
+      const kind = sel.fastener ? 'tab-nut' : sel.brackets ? 'bracket' : 'face-mount';
+      for (const child of new Set([face?.childPart, sel.brackets?.childPart].filter(c => isStr(c) && c !== 'frame'))) {
+        ref(kind, 'mount.face.childPart', child);
+        if (host) compsOf(child).forEach(c => push(kind, 'mount.face.childPart', host, c.id, m.id));
+      }
+    }
+    for (const r of Array.isArray(m.mates?.receive) ? m.mates.receive : []) if (r?.ref?.kind === 'bar' || r?.ref?.kind === 'triangle') ref('face-mount', 'mates.receive', r.ref.id);
+    for (const k of ['part', 'attach']) if (m.faceParts?.[k] !== 'frame') ref('face-mount', 'faceParts.' + k, m.faceParts?.[k]);
+  }
+  return out;
 }
 
 export function buildRelations(work) {
@@ -106,42 +147,21 @@ export function buildRelations(work) {
   // id -> indexes of comps that own that id (comp id, point ids, hole ids)
   const owners = () => once('owners', () => {
     const m = new Map();
-    const add = (id, i) => { if (!isStr(id)) return; if (!m.has(id)) m.set(id, new Set()); m.get(id).add(i); };
-    comps.forEach((c, i) => {
-      add(c.id, i);
-      for (const k of pointKeysFor(c)) if (hasId(c[k])) add(c[k].id, i);
-      for (const h of Array.isArray(c.holes) ? c.holes : []) if (hasId(h)) add(h.id, i);
-      for (const h of c.standardBlank?.mountHoles || []) if (hasId(h)) add(h.id, i);
-    });
+    comps.forEach((c, i) => ownIdsOf(c).forEach(id => { if (!m.has(id)) m.set(id, new Set()); m.get(id).add(i); }));
     return m;
   });
 
-  // ---------------------------------------------------------------- attachments
+  // ---------------------------------------------------------------- attachments (field-directed; fields in ref-fields.js and moduleEdges)
   const edges = () => once('edges', () => {
-    const out = [], seen = new Set(), own = owners();
-    for (const r of refs().list) {
-      if (r.kind === 'comp' && r.path === 'id') continue;
-      for (const t of own.get(r.value) || []) {
-        const target = comps[t];
-        if (r.kind === 'comp') {
-          if (t === r.index) continue;
-          const kind = edgeKind(r.path), key = `${kind}|${comps[r.index].id}|${target.id}|${r.value}`;
-          if (seen.has(key)) continue; seen.add(key);
-          out.push({kind, from: comps[r.index].id, to: target.id, via: r.value});
-        } else {
-          const key = `module|${r.ownerId}|${target.id}|${r.value}`;
-          if (seen.has(key)) continue; seen.add(key);
-          out.push({kind: 'module', from: `module:${r.ownerId}`, to: target.id, via: r.value, module: true});
-        }
-      }
-    }
-    return out;
+    const own = new Map([...owners()].map(([id, set]) => [id, [...set]]));
+    return [...compEdges(comps), ...moduleEdges(comps, modules, own)];
   });
   const attachmentsOf = compId => {
     const list = [];
     for (const e of edges()) {
-      if (e.from === compId) list.push({kind: e.kind, otherId: e.to, via: e.via, direction: 'out'});
-      else if (e.to === compId) list.push({kind: e.kind, otherId: e.from, via: e.via, direction: 'in'});
+      const m = e.module ? {module: true} : {};
+      if (e.from === compId) list.push({kind: e.kind, otherId: e.to, via: e.via, field: e.field, direction: 'out', ...m});
+      else if (e.to === compId) list.push({kind: e.kind, otherId: e.from, via: e.via, field: e.field, direction: 'in', ...m});
     }
     return list;
   };

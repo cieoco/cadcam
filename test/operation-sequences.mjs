@@ -41,6 +41,9 @@ const {retargetPointRefs}=await import('../js/blocks/topo-refs.js');
 const {normalizeSnapshot,toSnapshot,alignSavedInputPhase,highestIdNum}=await import('../js/blocks/schema.js');
 const {storedProject,readStoredProject}=await import('../js/blocks/project-envelope.js');
 const {getExample,loadUnitStarts}=await import('../js/blocks/examples.js');
+const {planBarFusion,dissolveBarFusion}=await import('../js/blocks/bar-fusion-plan.js');
+const ModuleOps=await import('../js/blocks/module-ops.js');
+const {FABRICATION_DEFAULTS}=await import('../js/blocks/fabrication-profile.js');
 const {compileTopology}=await import('../js/core/topology.js');
 const {solveTopology}=await import('../js/multilink/solver.js');
 const {localHoles,holeWorld}=await import('../js/core/local-holes.js');
@@ -73,6 +76,9 @@ const WORKS={
   'servo-plate-fourbar':()=>alignSavedInputPhase(normalizeSnapshot(structuredClone(getExample('servo-plate-fourbar').snapshot))),
   'parallel-gripper':()=>alignSavedInputPhase(normalizeSnapshot(structuredClone(getExample('parallel-gripper').snapshot))),
   'motor-plate-tt':()=>alignSavedInputPhase(normalizeSnapshot(structuredClone(getExample('motor-plate-tt').snapshot))),
+  // C6: a work with bar fusions (fuse/unfuse) and one with modules (unmount/mount)
+  'six-bar-lift':()=>alignSavedInputPhase(normalizeSnapshot(structuredClone(getExample('six-bar-lift').snapshot))),
+  'lift-gripper-modules':()=>alignSavedInputPhase(normalizeSnapshot(structuredClone(getExample('clawbot-lift-gripper').snapshot))),
 };
 const WORK_IDS=Object.keys(WORKS);
 
@@ -92,7 +98,7 @@ function initState(norm){
 const motorState=()=>({activeMotor:S.activeMotor,motorAngles:frozenMotorAngles(),fabrication:S.fabrication,modules:S.modules});
 const snapshot=()=>toSnapshot(S.comps,S.topo,S.counter,motorState());
 const asWork=s=>({...s,topo:{...s}});
-const fingerprint=()=>JSON.stringify({c:S.comps,p:S.topo.params,t:S.theta,a:S.motorAngles,m:S.activeMotor,k:S.topo.tracePoints});
+const fingerprint=()=>JSON.stringify({c:S.comps,md:S.modules,p:S.topo.params,t:S.theta,a:S.motorAngles,m:S.activeMotor,k:S.topo.tracePoints});
 function reload(){return alignSavedInputPhase(normalizeSnapshot(readStoredProject(JSON.parse(JSON.stringify(storedProject(snapshot()))))));}
 function solveNow(prev){
   const compiled=compileTopology(S.comps,{...S.topo,params:{...S.topo.params}},new Set());S.compiled=compiled;
@@ -232,6 +238,31 @@ const OPS={
     S.theta=step.deg;S.topo.params.theta=S.theta;
     return {touched:[],theta:true};
   },
+  // C6: bar fusion and module mount, through the same planners the app uses (bar-fusion-plan, module-ops).
+  fuse(step){
+    const ids=step.ids,members=ids.map(comp);if(members.some(c=>!plainBody(c,syringeInvolved())||c.type!=='bar'||c.isInput))return null;
+    const plan=planBarFusion(S.comps,ids,S.topo.params,FABRICATION_DEFAULTS.export,displayCoords(),{thetaDeg:S.theta,motorAngles:motorAnglesNow()});
+    if(!plan.ok)return {touched:[]};
+    const work={comps:S.comps,modules:S.modules,params:S.topo.params};
+    if(!integrityGate(work,{...work,comps:plan.comps},notify))return {touched:[]};
+    pushUndo();S.comps=plan.comps;return {touched:ids};
+  },
+  unfuse(step){
+    const root=S.comps.find(c=>c.barFusion&&c.id===step.id);if(!root)return null;
+    pushUndo();S.comps=dissolveBarFusion(S.comps,root.id);return {touched:[root.id,...root.barFusion.members]};
+  },
+  unmount(step){
+    const mod=S.modules.find(m=>m.id===step.id);if(!mod?.mount)return null;
+    const r=ModuleOps.unmountModule(S.comps,S.modules,mod.id,S.topo.params,{activeMotor:S.activeMotor,theta:S.theta,motorAngles:motorAnglesNow()});
+    if(!r.ok)return {touched:[]};
+    pushUndo();S.comps=r.comps;S.modules=r.modules;return {touched:S.comps.filter(c=>c.moduleId===mod.id).map(c=>c.id)};
+  },
+  mount(step){
+    const mod=S.modules.find(m=>m.id===step.id);if(!mod||mod.mount)return null;
+    const r=ModuleOps.mountModule(S.comps,S.modules,mod.id,step.target,S.topo.params,{activeMotor:S.activeMotor,theta:S.theta,motorAngles:motorAnglesNow()});
+    if(!r.ok)return {touched:[]};
+    pushUndo();S.comps=r.comps;S.modules=r.modules;return {touched:S.comps.filter(c=>c.moduleId===mod.id).map(c=>c.id)};
+  },
   reload(){const n=reload();const keep=S.activeMotor;initState(n);return {touched:[],reloaded:true,keep};},
 };
 function setRole(step,type){
@@ -248,14 +279,18 @@ const pick=(r,a)=>a.length?a[Math.floor(r()*a.length)]:null;
 const ri=(r,lo,hi)=>lo+Math.floor(r()*(hi-lo+1));
 function allPointIds(){return Object.keys(Model.pointCoords(S.comps));}
 const WEIGHTS={resize:5,frame:1,unfix:1,fix:1,release:1.5,repair:1,reconnect:1.5,merge:4,split:2,move:3,delete:1,theta:5,reload:1.5};
+// C6: the new operations are only drawn on the works that have fusions / modules, so the random streams of the six older works are unchanged.
+const C6_WORKS={'six-bar-lift':{fuse:2,unfuse:2},'lift-gripper-modules':{unmount:2,mount:3,theta:0}};   // theta weight 0 there: pose-branch continuity of a two-motor gripper is not what C6 checks
+let curWork='';
 function generate(r){
   const skip=syringeInvolved();
   for(let tries=0;tries<12;tries++){
-    const total=Object.values(WEIGHTS).reduce((a,b)=>a+b,0);let x=r()*total,op='theta';
-    for(const [k,w] of Object.entries(WEIGHTS)){if((x-=w)<0){op=k;break;}}
+    const W={...WEIGHTS,...(C6_WORKS[curWork]||{})};
+    const total=Object.values(W).reduce((a,b)=>a+b,0);let x=r()*total,op='theta';
+    for(const [k,w] of Object.entries(W)){if((x-=w)<0){op=k;break;}}
     let step=null;
     if(op==='resize'){
-      const c=pick(r,S.comps.filter(c=>c.standardBlank&&isBody(c)&&!skip.has(c.id)));
+      const c=pick(r,S.comps.filter(c=>c.standardBlank&&isBody(c)&&!skip.has(c.id)&&!c.barFusion&&!c.barFusionRoot));   // fused members resize through bar-fusion-resize, not memberEditor
       if(c)step={op,id:c.id,axis:c.type==='bar'?'g':pick(r,['g','r1']),delta:pick(r,[-16,-8,8,8,16])};
     }else if(op==='frame'){
       const c=pick(r,S.comps.filter(c=>plainBody(c,skip)));if(c)step={op,id:c.id};
@@ -298,6 +333,19 @@ function generate(r){
     }else if(op==='theta'){
       const motors=[...new Set(['1',String(S.activeMotor),...Object.keys(S.motorAngles),...S.comps.map(c=>String(c.physicalMotor||c.motorMount&&c.motorMount.motorId||'')).filter(Boolean)])];
       step={op,motor:pick(r,motors),deg:ri(r,-180,180)};
+    }else if(op==='fuse'){
+      // two bars that share a hole and are not fused yet
+      const bars=S.comps.filter(c=>c.type==='bar'&&plainBody(c,skip)&&!c.isInput&&!c.moduleId);
+      const a=pick(r,bars),b=a&&pick(r,bars.filter(o=>o!==a&&[o.p1,o.p2].some(p=>[a.p1,a.p2].some(q=>q.id===p.id))));
+      if(a&&b)step={op,ids:[a.id,b.id]};
+    }else if(op==='unfuse'){
+      const root=pick(r,S.comps.filter(c=>c.barFusion&&!skip.has(c.id)));if(root)step={op,id:root.id};
+    }else if(op==='unmount'){
+      const m=pick(r,S.modules.filter(m=>m.mount));if(m)step={op,id:m.id};
+    }else if(op==='mount'){
+      const m=pick(r,S.modules.filter(m=>!m.mount&&m.base));
+      const t=m&&pick(r,ModuleOps.mountTargets(S.comps,S.modules,m.id,displayCoords()).filter(t=>!t.orthogonal));
+      if(t)step={op,id:m.id,target:{module:t.module,output:t.output}};
     }else if(op==='reload')step={op};
     if(step)return step;
   }
@@ -338,7 +386,7 @@ class StepFailure extends Error{constructor(sig,detail){super(`${sig}: ${detail}
 // Run a list of steps from a fresh work; throws StepFailure at the first violated invariant.
 // `gen` (optional) is called before each step to produce it, which is how random runs are generated; steps are recorded.
 function runSteps(workId,steps,gen,count,stats,tolerate){
-  initState(WORKS[workId]());lastPoints=null;pushes=0;notices=[];
+  initState(WORKS[workId]());curWork=workId;lastPoints=null;pushes=0;notices=[];
   let first=solveNow(null);let prev=first.isValid?first.points:null;lastPoints=prev;
   let lost=!first.isValid;          // the last committed pose was unsolvable: the next solvable pose has no earlier pose to be continuous with
   let bad=badKeys();
@@ -473,7 +521,7 @@ const randomGateRefusals=gateRefusals.length;
   const forced={},stuck=[];
   for(const workId of WORK_IDS){
     const r=rngFrom(SEEDS[0]+WORK_IDS.indexOf(workId)*17+5);
-    initState(WORKS[workId]());lastPoints=null;pushes=0;
+    initState(WORKS[workId]());curWork=workId;lastPoints=null;pushes=0;
     for(let i=0;i<120;i++){
       const step=generate(r),before=fingerprint(),refusalsBefore=gateRefusals.length,undoBefore=pushes;
       let res;try{res=OPS[step.op](step);}catch(e){stuck.push(`${workId}:${step.op} threw ${e.message}`);break;}

@@ -5,6 +5,7 @@ import {solveTopology} from '../multilink/solver.js';
 import {buildRelations} from './relations.js';
 
 const fail=reason=>({ok:false,reason});
+const GEAR_LINKS=['fusedWith','pinion','a.componentId','b.componentId','motorCarrier'];
 const distance=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
 const pointsOf=c=>pointKeysFor(c).map(k=>c[k]).filter(Boolean);
 const finite=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.y);
@@ -60,7 +61,8 @@ export function planGearMemberMount(source,request,{positions={},motion={}}={}) 
   if(mismatch&&!request.matchRadius)return {ok:false,reason:`夾指孔距 ${Number(length.toFixed(2))} mm，齒輪輸出孔距 ${radius} mm；請確認是否調整齒輪孔距。`,mismatch:true,length,radius};
   const changing=mismatch||request.flipPin===true;
   const external=source.comps.filter(c=>c.id!==gear.id&&!member.ids.has(c.id));
-  if(changing&&external.some(c=>pointsOf(c).some(p=>p.id===gear.p2.id)||c.fusedWith===gear.id||c.pinion===gear.id||c.a?.componentId===gear.id||c.b?.componentId===gear.id||c.motorCarrier===gear.id))
+  // 齒輪輸出孔被別的零件占用：共用輸出孔（shared-point），或別的零件用這些欄位指到齒輪（欄位表與關係種類在 ref-fields.js／relations.js）。
+  if(changing&&buildRelations({comps:source.comps}).attachmentsOf(gear.id).some(a=>a.direction==='in'&&!member.ids.has(a.otherId)&&((a.kind==='shared-point'&&a.via===gear.p2.id)||GEAR_LINKS.includes(a.field))))
     return fail('齒輪輸出已連接其他零件，不能修改孔距或定位孔方向。');
   if(mismatch&&gear.pinRadiusParam&&external.some(c=>ownedParamKeys(c).includes(gear.pinRadiusParam)))return fail('齒輪孔距參數與其他零件共用，不能自動修改。');
   const comps=structuredClone(source.comps),params={...source.params},target=comps.find(c=>c.id===gear.id);

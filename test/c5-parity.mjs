@@ -130,8 +130,8 @@ else{
    const miss=[],extra=[];
    for(const w of works){const rel=buildRelations({...w.s,topo:w.s});
      for(const c of w.s.comps){const a=isFreeBody(w.s.comps,c,w.s.modules||[]),b=rel.isFreeBody(c.id);if(a&&!b)miss.push(w.name+'/'+c.id);if(b&&!a)extra.push(w.name+'/'+c.id+':'+c.type);}
-     // Known C1 limit (reported, not changed here): relations scans every string, so a moduleId equal to some part's id (iq-wheel-grabber: GrabLeft) counts as a reference.
-     for(const c of w.s.comps.filter(c=>['bar','triangle'].includes(c.type)&&!w.s.comps.some(o=>o.id===c.moduleId))){   // detached copy: both say free
+     // C6: attachmentsOf reads reference fields only, so a moduleId equal to some part's id (iq-wheel-grabber: GrabLeft) is no longer a reference.
+     for(const c of w.s.comps.filter(c=>['bar','triangle'].includes(c.type))){   // detached copy: both say free
        const cs=clone(w.s.comps),t=cs.find(x=>x.id===c.id);for(const k of pointKeysFor(t))if(t[k]?.id)t[k].id+='_d';for(const h of t.holes||[])h.id+='_d';
        const a=isFreeBody(cs,t,w.s.modules||[]),b=buildRelations({comps:cs,modules:w.s.modules||[]}).isFreeBody(t.id);if(a&&!b)miss.push(w.name+'/'+c.id+' (detached)');}}
    check('model.isFreeBody (drag) implies relations.isFreeBody on every example comp and detached copy',miss.length===0,miss.slice(0,5).join('; '));

@@ -11,6 +11,7 @@ import {pointKeysFor} from './part-types.js';
 import {inspectBarFusionData} from '../core/bar-fusion.js';
 import {attachmentFrame} from '../core/syringe.js';
 import {isDisk, diskDiameter} from './disk-plate.js';
+import {fusionPairReason} from './part-fusion.js';
 
 const TOL_MM = 0.01;          // I1 座標容差
 const PHASE_TOL_DEG = 0.05;   // 與 schema.alignSavedInputPhase 相同
@@ -151,17 +152,26 @@ export function checkWork(work, relations) {
     }
   }
 
-  // ------------------------------------------------------------ I8 合成件成員與共用孔符合凍結形狀
+  // ------------------------------------------------------------ I8 合成件成員與共用孔符合凍結形狀（C6）
+  // 兩種合成各自的凍結形狀：連桿合成（barFusion）成員存在、孔位與成員宣告的孔距一致；板件＋齒輪合成（fusedWith）仍共用軸心與定位孔。
+  // 說明一律是「先解除合成，再修改」：不自動改形（SDD 3.3 I8）。
   {
     for (const root of comps.filter(c => c.barFusion)) {
       const f = inspectBarFusionData(comps, root, params);
-      if (f.ok) continue;
       const members = (Array.isArray(root.barFusion.members) ? root.barFusion.members : []).filter(id => byId(id));
-      add('I8', 'contradiction', [root.id, ...members], [], `合成件 ${label(root.id)} 的資料不一致：${f.reason}`);
+      if (!f.ok) { add('I8', 'contradiction', [root.id, ...members], [], `合成件 ${label(root.id)} 的資料不一致：${f.reason}`, {what: 'barFusion', comp: root.id, why: f.reason}); }
+      // 孔位與成員的孔距由 inspectBarFusionData 核對（成員存在、孔 id 一致、孔距等於宣告尺寸）。成員存檔座標只是求解的起點、
+      // 鄰桿改尺寸後會暫時偏離合成孔距（影子掃描證實會誤報），所以不拿它比對。
     }
     for (const c of comps.filter(c => isStr(c.barFusionRoot))) {
       const root = byId(c.barFusionRoot);
-      if (!root?.barFusion || !root.barFusion.members?.includes(c.id)) add('I8', 'contradiction', [c.id, ...(root ? [root.id] : [])], [], `${label(c.id)} 記錄屬於合成件「${c.barFusionRoot}」，但那個合成件已不存在或不含它；請先解除合成。`);
+      if (!root?.barFusion || !root.barFusion.members?.includes(c.id)) add('I8', 'contradiction', [c.id, ...(root ? [root.id] : [])], [], `${label(c.id)} 記錄屬於合成件「${c.barFusionRoot}」，但那個合成件已不存在或不含它；請先解除合成。`, {what: 'barFusionRoot', comp: c.id});
+    }
+    for (const plate of comps.filter(c => isStr(c.fusedWith))) {
+      const gear = byId(plate.fusedWith);
+      if (!gear) { add('I8', 'dangling', [plate.id], [], `${label(plate.id)} 合成的齒輪「${plate.fusedWith}」已不存在；請先解除合成。`, {what: 'fusedWith', comp: plate.id}); continue; }
+      const why = fusionPairReason(comps, plate, gear);
+      if (why) add('I8', 'contradiction', [plate.id, gear.id], [], `${label(plate.id)} 和 ${label(gear.id)} 的合成不成立：${why}請先解除合成，再修改。`, {what: 'fusedPair', comp: plate.id, why});
     }
   }
 

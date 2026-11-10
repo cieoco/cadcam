@@ -12,7 +12,7 @@ import {offPlateMotors, offPlateMessage, planMotorReturn, planMotorLeave, attach
 import {pruneTopoRefs} from './topo-refs.js';
 
 /** 逐項啟用：只有這裡列出的代號會在開檔時提示（其餘維持影子模式，見 SDD 3.3）。 */
-export const ENABLED = {I1: true, I3: true, I5: true};
+export const ENABLED = {I1: true, I3: true, I5: true, I8: true};   // I8（C6）只提示、不修復：先解除合成，再修改
 export const SHOWN = ['contradiction', 'dangling'];
 
 const TOL = 0.01, KEYS = ['p1', 'p2', 'p3'];
@@ -146,6 +146,10 @@ function danglingText(ref, c, count) {
     case 'syringeEnd': return `${n}的${SYRINGE_END[ref.end]}端接在已經不存在的零件上。`;
     case 'syringeOutput': return `${n}要推動的零件已經不存在。`;
     case 'moduleId': return `${n}屬於已經不存在的模組。`;
+    case 'barFusion': return `${n}的合成資料對不起來：${ref.why}`;
+    case 'barFusionRoot': return `${n}記錄屬於一個合成件，但那個合成件已不存在或不含它，請先解除合成。`;
+    case 'fusedWith': return `${n}合成的齒輪已經不存在，請先解除合成。`;
+    case 'fusedPair': return `${n}和齒輪的合成不成立：${ref.why}請先解除合成，再修改。`;
     case 'topo': return `作品裡有 ${count} 項軌跡追蹤、參考點、負載或量尺指向已經不存在的點。`;
     default: return null;
   }
@@ -169,7 +173,8 @@ export function findings(work) {
     if (ref.what === 'topo') { if (topo) topo.count++; else { topo = {key: 'I5|topo', code: issue.code, count: 1, mark: {far: [], canon: []}, repairs: [{id: 'clear', label: '清除失效的連結', plan: s => planClear(s, ref)}]}; items.push(topo); } continue; }
     const c = work.comps.find(x => x.id === ref.comp) || work.comps.find(x => x.id === issue.parts[0]);
     const text = danglingText(ref, c, 1) || issue.message;
-    items.push({key: `${issue.code}|${ref.what || issue.message}|${ref.comp || ''}${ref.end || ''}`, code: issue.code, text, short: c ? `${quote(c)}有失效的馬達或接合記錄` : '有一項連接需要處理', mark: {far: c ? [c.id] : [], canon: []},
+    const fused = issue.code === 'I8';   // 合成件：標出涉及的所有零件，只說明、不提供修復（先解除合成，再修改）
+    items.push({key: `${issue.code}|${ref.what || issue.message}|${ref.comp || ''}${ref.end || ''}`, code: issue.code, text, short: fused ? (c ? `${quote(c)}的合成資料對不起來` : '有一組合成件對不起來') : c ? `${quote(c)}有失效的馬達或接合記錄` : '有一項連接需要處理', mark: {far: fused ? issue.parts : c ? [c.id] : [], canon: []},
       repairs: ['frameBody', 'motorCarrier', 'motorMountPoint', 'syringeEnd', 'syringeOutput', 'moduleId'].includes(ref.what) ? [{id: 'clear', label: '清除失效的連結', plan: s => planClear(s, ref)}] : []});
   }
   if (topo) { topo.text = danglingText({what: 'topo'}, null, topo.count); topo.short = `有 ${topo.count} 項設定指向不存在的點`; }
