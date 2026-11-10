@@ -213,18 +213,6 @@ export function roleLabel(comps, id) {
   return '自由';
 }
 
-export function findNearest(comps, id, snapWorld) {
-  const m = pointCoords(comps);
-  const d = m[id]; if (!d) return null;
-  let best = null, bestDist = snapWorld;
-  Object.keys(m).forEach(id2 => {
-    if (id2 === id) return;
-    const dist = Math.hypot(m[id2].x - d.x, m[id2].y - d.y);
-    if (dist < bestDist) { bestDist = dist; best = id2; }
-  });
-  return best;
-}
-
 // 把 fromId 併到 toId（座標對齊 toId）；併成零長度的桿就移除。回傳新的 comps。
 export function mergePoints(comps, fromId, toId) {
   const t = pointCoords(comps)[toId]; if (!t) return comps;

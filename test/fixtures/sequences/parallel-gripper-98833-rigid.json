@@ -1,0 +1,22 @@
+{
+ "work": "parallel-gripper",
+ "seed": 98833,
+ "signature": "rigid",
+ "detail": "split: PGRightJaw hole PGRightJaw_H8_0 off its (u,v) by 0.046; PGRightJaw hole PGRightJaw_H16_0 off its (u,v) by 0.092; PGRightJaw hole PGRightJaw_H24_0 off its (u,v) by 0.137",
+ "steps": [
+  {
+   "op": "theta",
+   "motor": "1",
+   "deg": -94
+  },
+  {
+   "op": "fix",
+   "pid": "PGRightTop"
+  },
+  {
+   "op": "split",
+   "pid": "PGRightTop"
+  }
+ ],
+ "known": "Sub-0.1 mm drift of the jaw's lattice holes after a split in the parallel gripper (rigid check tolerance is 0.01 mm). Not analysed; likely the solver tolerance of the gear-driven loop. Left for the solver pack."
+}

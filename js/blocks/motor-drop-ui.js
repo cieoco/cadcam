@@ -1,5 +1,6 @@
 import {planMotorDrop,planPlacedMotorOutput,planDraggedMotorOutput} from './motor-drop.js';
 import {isFreeBody} from './model.js';
+import {retargetPointRefs} from './topo-refs.js';
 import {mountingWork,confirmMountingChange} from './mounting-review-ui.js';
 
 // The drag has already recorded its single undo. Finish the same operation only
@@ -32,6 +33,6 @@ export function connectDraggedMotorOutput({S,fromId,toId,candidate,points,before
  if(!result.ok){notify(`尚未接上動力輸出：${result.message||'找不到輸出軸。'}`);return;}
  if(!confirmMountingChange(source,{...source,comps:result.comps,params:result.params},{notify}))return;
  S.undoStack.push(before);if(S.undoStack.length>60)S.undoStack.shift();updateUndoBtn(true);
- S.comps=result.comps;S.topo.params=result.params;S.selectedNodeId=result.center;
+ S.comps=result.comps;S.topo.params=result.params;S.selectedNodeId=result.center;retargetPointRefs(S.topo,fromId,toId);
  rebuild();draw();selectLink(result.outputId);notify('已接上動力輸出；可復原或解除連接。');
 }

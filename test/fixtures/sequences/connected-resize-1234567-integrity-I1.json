@@ -1,0 +1,29 @@
+{
+ "work": "connected-resize",
+ "seed": 1234567,
+ "signature": "integrity:I1",
+ "detail": "resize: contradiction 孔 Blank137_H40_0 在 「孔格桿件」(Blank135)、「孔格桿件」(Blank137) 上的位置不一致（最多相差 8 mm）；「孔格桿件」(Blank135) 的這個端點沒有落在孔的位置上，畫面與製作會對不起來。",
+ "steps": [
+  {
+   "op": "split",
+   "pid": "Blank135.A"
+  },
+  {
+   "op": "merge",
+   "from": "P139s",
+   "to": "Blank133_H24_24"
+  },
+  {
+   "op": "resize",
+   "id": "Blank133",
+   "axis": "g",
+   "delta": 8
+  },
+  {
+   "op": "merge",
+   "from": "P138s",
+   "to": "Blank133_H72_24"
+  }
+ ],
+ "known": "Hole copies go stale when a rigid body is relocated by the merge solver or the free-body vertex drag. (a) model.previewPointConnection: mergePoints puts the end on the hole, then solvePinnedConstraints moves the target body's vertices without moving the pinned hole copy (I1 on every end-to-lattice-hole merge). (b) input.js free link/triangle vertex drag and previewPointConnection's free translation move only vertices, so parts joined at the body's lattice/mount holes keep old copies. A trial fix that also translated the copies moved fixed anchors and the motor shaft with the plate (128 mm jump). Consistent fix: re-sync copies of hole ids to holeWorld() at the commit gate (C4), and gate the vertex-drag paths with isFreeBody. Both change drag behaviour and need browser verification; the startup-size budget (2,165,000) has under 100 bytes left, so it is left for C3/C4."
+}

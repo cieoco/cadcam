@@ -1,0 +1,27 @@
+{
+ "work": "fourbar-crank-rocker",
+ "seed": null,
+ "signature": "integrity:I1",
+ "detail": "regression (fixed in C2): same, four-bar example",
+ "steps": [
+  {
+   "op": "split",
+   "pid": "D"
+  },
+  {
+   "op": "delete",
+   "id": "Link1"
+  },
+  {
+   "op": "merge",
+   "from": "D",
+   "to": "Link3_H64_0"
+  },
+  {
+   "op": "resize",
+   "id": "Link2",
+   "axis": "g",
+   "delta": 8
+  }
+ ]
+}

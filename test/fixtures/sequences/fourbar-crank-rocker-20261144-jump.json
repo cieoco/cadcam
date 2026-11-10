@@ -1,0 +1,110 @@
+{
+ "work": "fourbar-crank-rocker",
+ "seed": 20261144,
+ "signature": "jump",
+ "detail": "unfix: point Link2_H8_0 moved 77.8 mm (bound 50.0)",
+ "steps": [
+  {
+   "op": "release",
+   "id": "Link1"
+  },
+  {
+   "op": "resize",
+   "id": "Link3",
+   "axis": "g",
+   "delta": -16
+  },
+  {
+   "op": "theta",
+   "motor": "1",
+   "deg": -60
+  },
+  {
+   "op": "theta",
+   "motor": "1",
+   "deg": 130
+  },
+  {
+   "op": "fix",
+   "pid": "Blank7_H40_8"
+  },
+  {
+   "op": "merge",
+   "from": "Link1.released",
+   "to": "Blank7_H16_32"
+  },
+  {
+   "op": "merge",
+   "from": "Blank7.C",
+   "to": "Link3_H16_0"
+  },
+  {
+   "op": "resize",
+   "id": "ActuatorSeat7",
+   "axis": "r1",
+   "delta": -8
+  },
+  {
+   "op": "split",
+   "pid": "D"
+  },
+  {
+   "op": "fix",
+   "pid": "Link1_H24_8"
+  },
+  {
+   "op": "resize",
+   "id": "Link2",
+   "axis": "g",
+   "delta": 8
+  },
+  {
+   "op": "frame",
+   "id": "Link1"
+  },
+  {
+   "op": "merge",
+   "from": "P8s",
+   "to": "Blank7_H0_24"
+  },
+  {
+   "op": "split",
+   "pid": "C"
+  },
+  {
+   "op": "theta",
+   "motor": "1",
+   "deg": -46
+  },
+  {
+   "op": "merge",
+   "from": "D",
+   "to": "Blank7_H144_16"
+  },
+  {
+   "op": "merge",
+   "from": "P9s",
+   "to": "Link1_H16_8"
+  },
+  {
+   "op": "resize",
+   "id": "Link2",
+   "axis": "g",
+   "delta": -8
+  },
+  {
+   "op": "frame",
+   "id": "Link2"
+  },
+  {
+   "op": "merge",
+   "from": "Blank7.C",
+   "to": "Link3_H40_0"
+  },
+  {
+   "op": "unfix",
+   "pid": "Link1_H24_8"
+  }
+ ],
+ "known": "After a long sequence (it includes several tolerated stale-copy contradictions), unfixing a lattice hole of a framed bar lets another body jump 78 mm. Not analysed: looks like a solver branch flip on an under-constrained mechanism (solver core), not a stored-data problem. Left for the solver pack."
+}

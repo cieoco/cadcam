@@ -1,0 +1,13 @@
+{
+ "work": "motor-off-plate-repaired",
+ "seed": 8103,
+ "signature": "integrity:I3",
+ "detail": "delete: dangling 「孔格桿件」(Blank135) 的馬達承載零件「Blank133」已不存在；請重新選擇馬達的承載零件。",
+ "steps": [
+  {
+   "op": "delete",
+   "id": "Blank133"
+  }
+ ],
+ "known": "Scheduled for pack C4 (SDD 'delete a part must clear stale carrier references'): deleting the plate that carries a motor leaves motorMount.frameBody/motorCarrier pointing at the deleted part (I3/I5 dangling)."
+}

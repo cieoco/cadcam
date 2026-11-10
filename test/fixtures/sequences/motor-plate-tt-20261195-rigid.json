@@ -1,0 +1,54 @@
+{
+ "work": "motor-plate-tt",
+ "seed": 20261195,
+ "signature": "rigid",
+ "detail": "fix: ServoArm hole ServoArm_H-8_8 off its (u,v) by 16.000",
+ "steps": [
+  {
+   "op": "theta",
+   "motor": "1",
+   "deg": 89
+  },
+  {
+   "op": "unfix",
+   "pid": "Blank1.B"
+  },
+  {
+   "op": "fix",
+   "pid": "Blank1_H56_16"
+  },
+  {
+   "op": "theta",
+   "motor": "1",
+   "deg": 65
+  },
+  {
+   "op": "release",
+   "id": "ServoArm"
+  },
+  {
+   "op": "merge",
+   "from": "ServoArmTip",
+   "to": "Blank1_H48_24"
+  },
+  {
+   "op": "delete",
+   "id": "Motor4"
+  },
+  {
+   "op": "unfix",
+   "pid": "Blank1_H56_16"
+  },
+  {
+   "op": "fix",
+   "pid": "ServoArm_H-8_8"
+  },
+  {
+   "op": "resize",
+   "id": "ServoArm",
+   "axis": "g",
+   "delta": -16
+  }
+ ],
+ "known": "Fixing a lattice hole of a motor-driven crank is accepted (setNodeRole only checks the displayed pose equals the stored one at that moment). The solver then returns isValid with the hole 16 mm away from its (u,v): an over-constrained driven body is silently accepted (solver validity, solver core). Left for the solver pack."
+}

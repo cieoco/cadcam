@@ -1,0 +1,27 @@
+{
+ "work": "motor-off-plate-repaired",
+ "seed": null,
+ "signature": "integrity:I1",
+ "detail": "regression (fixed in C2): resizing a bar whose end sits on another part's hole dragged the copy off the hole (standard-blank.resizeStandardBlank)",
+ "steps": [
+  {
+   "op": "release",
+   "id": "Blank135"
+  },
+  {
+   "op": "delete",
+   "id": "Blank137"
+  },
+  {
+   "op": "merge",
+   "from": "Blank136.B",
+   "to": "Blank133_H0_8"
+  },
+  {
+   "op": "resize",
+   "id": "Blank136",
+   "axis": "g",
+   "delta": 8
+  }
+ ]
+}

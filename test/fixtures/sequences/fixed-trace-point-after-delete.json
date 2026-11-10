@@ -1,0 +1,12 @@
+{
+ "work": "motor-plate-tt",
+ "seed": null,
+ "signature": "integrity:I5",
+ "detail": "regression (fixed in C2): deleting a part left the trace point on its tip (topo-refs.pruneTopoRefs)",
+ "steps": [
+  {
+   "op": "delete",
+   "id": "ServoArm"
+  }
+ ]
+}

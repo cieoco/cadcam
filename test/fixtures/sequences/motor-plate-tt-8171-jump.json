@@ -1,0 +1,22 @@
+{
+ "work": "motor-plate-tt",
+ "seed": 8171,
+ "signature": "jump",
+ "detail": "unfix: point ServoArmTip moved 71.9 mm (bound 50.0)",
+ "steps": [
+  {
+   "op": "fix",
+   "pid": "ServoArmH24"
+  },
+  {
+   "op": "theta",
+   "motor": "1",
+   "deg": 97
+  },
+  {
+   "op": "unfix",
+   "pid": "ServoArmH24"
+  }
+ ],
+ "known": "Same as fourbar-crank-rocker-20261144-jump: unfixing a pivot lets the mechanism relax to a branch 70+ mm away (solver branch choice on an under-constrained mechanism). Left for the solver pack."
+}

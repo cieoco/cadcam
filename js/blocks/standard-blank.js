@@ -1,5 +1,5 @@
 /** Three standard blanks, authored using existing bar/triangle components. */
-import {holeSide} from '../core/local-holes.js';
+import {holeSide,localHoles,holeWorld} from '../core/local-holes.js';
 import {isHoleUsed} from './used-holes.js';
 export const BLANK_HOLE_LIMIT=4096;
 export const BLANK_SPAN_LIMIT=10000;
@@ -53,6 +53,8 @@ export function resizeStandardBlank(c,params,axis,value,{comps=[],modules=[]}={}
  for(const key of keys){const p=raw[key];out[key]={...c[key],x:a.x+p.x*Math.cos(angle)-p.y*Math.sin(angle)*holeSide(c),y:a.y+p.x*Math.sin(angle)+p.y*Math.cos(angle)*holeSide(c)};}
  // Keep a grounded end in place.
  if(c.type==='bar'&&c.p2.type==='fixed'&&c.p1.type!=='fixed'){const dx=b.x-out.p2.x,dy=b.y-out.p2.y;for(const key of keys)Object.assign(out[key],{x:out[key].x+dx,y:out[key].y+dy});}
+ // An end joined at another part's hole stays on that hole; a resize never drags the hole's copy away from it.
+ for(const key of keys)for(const o of comps)if(o.id!==c.id){const h=[...localHoles(o),...(o.standardBlank?.mountHoles||[])].find(h=>h.id===out[key].id);if(h)Object.assign(out[key],holeWorld(o,h));}
  const originalHoles=[...(c.holes || []),...(c.standardBlank.mountHoles || [])],old=new Map(originalHoles.map(h=>[`${h.u},${h.v}`,h]));
  out.holes=raw.holes.map(h=>({...h,...old.get(`${h.u},${h.v}`),id:old.get(`${h.u},${h.v}`)?.id||`${c.id}.H${h.u}_${h.v}`.replaceAll('.','_')}));out.standardBlank={...raw.standardBlank,...(c.standardBlank.drill==='all'?{drill:'all'}:{})};if(isOutputBlank(c)&&axis==='width')out.stock.widthMm=value;
  const patch={[g]:axis==='g'?value:L};if(c.type==='triangle'){patch[c.r1Param]=axis==='r1'?value:H;patch[c.r2Param]=Math.hypot(patch[g],patch[c.r1Param]);}

@@ -1,5 +1,13 @@
 # 教學與操作更新紀錄
 
+## 2026-11-10：操作序列測試（接合關係 C2）；刪除零件與合併接點不再留下失效的軌跡點，標準板材改尺寸時接在他件孔上的端點留在孔上
+
+- 新增 `test/operation-sequences.mjs`（已列入 `test/manifest.json`）：固定種子、隨機而合法的學生操作，走 app 實際用的規劃器與編輯器（`member-editor.setDimensionValue`、`member-frame`、`motor-release`、`motor-drop.planDraggedMotorOutput`、`node-editor` 的 `setNodeRole`／`splitNode`、`model.previewPointConnection`、`delete-part`、存檔→`normalizeSnapshot`→重開）。6 件代表作品：學生原檔 `connected-resize`、修好的 `motor-off-plate`、`fourbar-crank-rocker`、`servo-plate-fourbar`、`parallel-gripper`、`motor-plate-tt`。預設 12 輪約 630 個已提交步驟、約 16 秒；`OPSEQ_SCALE=4` 約 2,800 步。每步檢查：剛體長度與局部孔幾何（0.01 mm）、`checkWork` 無新增 `contradiction`／`dangling`、姿態連續（預設 50 mm，改尺寸／移動／轉角另加寬）、存檔重開後 `copiesOf` 相同、不丟例外。
+- 失敗會縮成最小重播並寫入 `test/fixtures/sequences/`；`fixed-*.json` 是本包修好的回歸重播，`known` 欄位的是尚未修的已知問題（不計失敗，原因寫在檔內）。針筒操作不碰（針筒包最後做）。未涵蓋：點選／拖曳等必須經 DOM 事件的手勢（只重用其背後的純函式）、增加零件與畫桿、齒輪／滑軌／傳動操作、模組與組立台。
+- 本包修掉的真問題：刪除零件後，指向該零件點的軌跡追蹤點／參考點／負載／量尺仍留在作品裡（I5）；把桿端拖接到馬達軸時被合併掉的點 id 同樣讓軌跡點失效。新增按需載入的 `js/blocks/topo-refs.js`（`pruneTopoRefs`、`retargetPointRefs`），由 `delete-part`、`motor-drop-ui` 與 `app.mergePoints` 呼叫。標準桿／板改孔數時，接在他件格孔上的端點原本被一起拖離該孔（儲存座標與孔位差到 8 mm 以上，I1），現在留在孔上，再由原有的求解驗證決定接受或拒絕（`standard-blank.resizeStandardBlank`）。
+- 發現但未修（KNOWN，各有重播）：(1) 剛體被合併求解器或自由件頂點拖曳搬動時，接在它格孔／座板孔上的別件端點留著舊座標（I1，合併到格孔幾乎必現）；試過連同副本一起平移，結果連固定錨與馬達軸一起被拖走 128 mm，正確解法是在提交關卡重新同步孔副本並讓頂點拖曳也過 `isFreeBody`，需瀏覽器驗收，留給 C3／C4。(2) 刪除承載馬達的板件留下失效的 `motorCarrier`／`frameBody`（I3，C4 本來就要清）。(3) 機架桿（兩端固定）與另一機架桿共用固定端時改尺寸，另一桿長度被破壞但求解器仍回報有效；對馬達驅動的曲柄孔設為固定也被求解器當成有效。這兩項屬求解器有效性，留給求解器包。(4) 解除固定樞軸後有一例機構跳到 70 mm 外的另一組態。
+- 啟動大小上限 2,165,000 不變：刪除全專案無人呼叫的 `model.findNearest`（約 420 bytes）抵銷新增；目前 2,164,9xx bytes，餘量不到 100 bytes，所以上述(1)(3)沒有在本包動 `model.js`／`input.js`。
+
 ## 2026-11-10：接合關係索引與一致性檢查（影子模式，無使用者可見變更）
 
 - 依 [接合關係 SDD](SDD-CONNECTION-INTEGRITY.md) 的 C1 包新增 `js/blocks/relations.js`（`buildRelations`：副本、世界座標、孔的三種用途、接地、馬達、關係、自由剛體）與 `js/blocks/integrity.js`（`checkWork`：I1–I9）。兩者都是純函式、不改輸入，**沒有任何啟動模組或 app.js 引用**，學生看不到、也不阻擋任何操作；`test/startup-size.mjs` 與首次 JS 大小未動。新增模組使 load graph 重新產生（`node tools/load-graph.mjs`，只改雜湊與頁面 importmap）。

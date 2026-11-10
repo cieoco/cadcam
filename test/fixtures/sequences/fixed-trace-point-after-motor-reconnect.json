@@ -1,0 +1,25 @@
+{
+ "work": "servo-plate-fourbar",
+ "seed": null,
+ "signature": "integrity:I5",
+ "detail": "regression (fixed in C2): reconnecting a bar end onto the motor shaft removed the id a trace point referred to (topo-refs.retargetPointRefs)",
+ "steps": [
+  {
+   "op": "split",
+   "pid": "FourbarJ1"
+  },
+  {
+   "op": "split",
+   "pid": "FourbarJ2"
+  },
+  {
+   "op": "release",
+   "id": "FourbarCrank"
+  },
+  {
+   "op": "reconnect",
+   "from": "FourbarJ2",
+   "to": "FourbarAxis"
+  }
+ ]
+}

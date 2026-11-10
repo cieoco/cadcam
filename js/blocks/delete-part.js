@@ -3,6 +3,7 @@ import {frameHoleAxis} from './frame-holes.js';
 import {fusionRoot} from '../core/bar-fusion.js';
 import {ownedParamKeys} from './part-types.js';
 import {detachDeletedAttachments} from './detached-attachments.js';
+import {pruneTopoRefs} from './topo-refs.js';
 export function deleteSelectedPart({S,transient,deleteGearChain,pushUndo,pause,closeMobileEditPanel,setSliderDetailRows,rebuild,draw,points}) {
   if(fusionRoot(S.comps,S.selectedLinkId)){transient('請先解除合成，再刪除其中的連桿。');return;}
   if(S.comps.some(c=>c.id===S.selectedTriangleId && c.fusedWith)){transient('請先解除合成，再刪除板件');return;}
@@ -21,6 +22,7 @@ export function deleteSelectedPart({S,transient,deleteGearChain,pushUndo,pause,c
   pause();
   // 刪除前先清掉這個元件佔用的 topo.params（型別表宣告它擁有哪些參數）
   S.comps=platePlan.comps;S.topo.params=params;
+  pruneTopoRefs(S.topo,S.comps);
   for(const c of S.comps)if(c.frameHole&&!frameHoleAxis(S.comps,c)){delete c.frameHole;transient('機架孔的基準已移除，孔保留在原位置成為獨立固定點。');}
   S.selectedLinkId = null;
   S.selectedTriangleId = null;

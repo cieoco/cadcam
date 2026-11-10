@@ -876,6 +876,7 @@ const mergePoints = (fromId, toId) => {
     return false;
   }
   S.comps=candidate.comps;
+  import('./topo-refs.js').then(m=>m.retargetPointRefs(S.topo,fromId,toId));
   return true;
 };
 const recomputeLengths = () => Model.recomputeLengths(S.comps, S.topo);

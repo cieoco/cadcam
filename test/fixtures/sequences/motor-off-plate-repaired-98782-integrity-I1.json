@@ -1,0 +1,27 @@
+{
+ "work": "motor-off-plate-repaired",
+ "seed": 98782,
+ "signature": "integrity:I1",
+ "detail": "split: contradiction 孔 Blank137_H16_0 在 「孔格桿件」(Blank136)、「孔格桿件」(Blank137) 上的位置不一致（最多相差 6.4 mm）；「孔格桿件」(Blank136) 的這個端點沒有落在孔的位置上，畫面與製作會對不起來。",
+ "steps": [
+  {
+   "op": "split",
+   "pid": "Blank136.B"
+  },
+  {
+   "op": "merge",
+   "from": "P140s",
+   "to": "Blank133_H16_32"
+  },
+  {
+   "op": "merge",
+   "from": "Blank136.B",
+   "to": "Blank137_H16_0"
+  },
+  {
+   "op": "split",
+   "pid": "Blank133_H16_32"
+  }
+ ],
+ "known": "Same class (stale hole copies): splitNode renames and offsets a vertex of a body that has another part joined at one of its lattice holes. Fix belongs with the commit-gate re-sync (C4)."
+}

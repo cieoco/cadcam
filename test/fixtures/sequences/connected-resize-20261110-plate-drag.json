@@ -1,0 +1,23 @@
+{
+ "work": "connected-resize",
+ "seed": 20261110,
+ "signature": "integrity:I1",
+ "detail": "move: the plate is dragged by its vertices; Blank136 hanging on Blank133_H16_48 keeps the old copy (37 mm)",
+ "known": "Hole copies go stale when a rigid body is relocated by the merge solver or the free-body vertex drag. (a) model.previewPointConnection: mergePoints puts the end on the hole, then solvePinnedConstraints moves the target body's vertices without moving the pinned hole copy (I1 on every end-to-lattice-hole merge). (b) input.js free link/triangle vertex drag and previewPointConnection's free translation move only vertices, so parts joined at the body's lattice/mount holes keep old copies. A trial fix that also translated the copies moved fixed anchors and the motor shaft with the plate (128 mm jump). Consistent fix: re-sync copies of hole ids to holeWorld() at the commit gate (C4), and gate the vertex-drag paths with isFreeBody. Both change drag behaviour and need browser verification; the startup-size budget (2,165,000) has under 100 bytes left, so it is left for C3/C4.",
+ "steps": [
+  {
+   "op": "unfix",
+   "pid": "Blank133.A"
+  },
+  {
+   "op": "unfix",
+   "pid": "Blank133.B"
+  },
+  {
+   "op": "move",
+   "pid": "Blank133.C",
+   "dx": -37,
+   "dy": -5
+  }
+ ]
+}

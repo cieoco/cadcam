@@ -1,0 +1,16 @@
+{
+ "work": "parallel-gripper",
+ "seed": null,
+ "signature": "integrity:I5",
+ "detail": "regression (fixed in C2): same, after a split",
+ "steps": [
+  {
+   "op": "split",
+   "pid": "PGRightTop"
+  },
+  {
+   "op": "delete",
+   "id": "PGRightFollower"
+  }
+ ]
+}
