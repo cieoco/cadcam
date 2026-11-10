@@ -277,7 +277,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   cancelMotorMode();
   Settings.syncFabricationInputs(); // 放棄尚未 change/blur 提交的表單草稿。
   Store.alignSavedInputPhase(norm);   // 開啟即為存檔姿勢（θ 回到 0°）
-  setTimeout(()=>{integrityHints('check');loadIntegrity();},0);   // 套用後再檢查（lazy），不拖慢開檔
+  setTimeout(()=>{integrityHints('check');loadIntegrity();loadDrive();},0);   // 套用後再檢查（lazy），不拖慢開檔
   S.comps = norm.comps;
   S.modules = Array.isArray(norm.modules) ? norm.modules : [];
   knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組
@@ -822,34 +822,14 @@ const inputCrankMovingEnd = (id) => S.comps.find(c =>
   c.type === 'bar' && c.isInput && c.p1 && c.p2 &&
   ((c.p1.id === id && !c.p1.physicalMotor && c.p2.physicalMotor) ||
    (c.p2.id === id && !c.p2.physicalMotor && c.p1.physicalMotor))) || null;
-function rotateInputCrankToPoint(bar, target) {
-  if (!bar || !target) return false;
-  const centerPoint = bar.p1.physicalMotor ? bar.p1 : bar.p2;
-  // 騎乘馬達的軸心跟著機構動：用「畫面上解出的位置」當圓心，元件座標會脫節。
-  const center = displayCoords()[centerPoint.id] || pointCoords()[centerPoint.id] || centerPoint;
-  if (!center || Math.hypot(target.x-center.x,target.y-center.y) < 1e-6) return false;
-  // 拖哪根輸入桿就把控制權切給那顆馬達（其他馬達凍結在原角度），符合「摸哪根動哪根」直覺。
-  const motorId = String(bar.physicalMotor || '1');
-  if (String(S.activeMotor) !== motorId) {
-    activateMotor(motorId, Number(S.motorAngles[motorId]) || 0);
-    updateMotorSwitcher();
-  }
-  // solver 的曲柄角＝機架桿方位角+θ+phaseOffset（p1→p2 方位角），反推 θ 要扣掉相位與
-  // 機架桿方位角（世界機架馬達的機架方位角為 0），拖曳才會貼著游標。
-  let carrierAng = 0;
-  if (bar.motorCarrier) {
-    const carrier = S.comps.find(k => k.type === 'bar' && k.id === bar.motorCarrier);
-    if (carrier && carrier.p1 && carrier.p2) {
-      const m = displayCoords();
-      const q1 = m[carrier.p1.id], q2 = m[carrier.p2.id];
-      if (q1 && q2) carrierAng = Math.atan2(q2.y - q1.y, q2.x - q1.x) * 180 / Math.PI;
-    }
-  }
-  S.theta = Math.atan2(target.y-center.y,target.x-center.x) * 180 / Math.PI - carrierAng - (Number(bar.phaseOffset) || 0);
-  S.topo.params.theta = S.theta;
-  const thetaEl=document.getElementById('thetaVal'); if(thetaEl)thetaEl.textContent=angleLabel(S.theta);
-  return true;
-}
+// 拖曳試動：見 drive-drag.js
+let driveDrag=null;
+const driveHost={displayCoords,pointCoords,updateMotorSwitcher,range:()=>inputRockRange(),seed:()=>lastSolved,
+  solveAt:(a,seed)=>{const sc=simulationScope(),p={thetaDeg:a,motorAngles:{...motorAnglesNow(),[String(S.activeMotor)]:a},_prevPoints:seed};return sc.assembly?solveAssembly(sc.assembly,p):solveTopology(sc.compiled,p);},
+  setTheta:t=>{S.theta=t;S.topo.params.theta=t;const el=document.getElementById('thetaVal');if(el)el.textContent=angleLabel(t);}};
+const loadDrive=()=>import('./drive-drag.js').then(m=>driveDrag=m),drive=(f,...a)=>driveDrag?driveDrag[f](driveHost,...a):(loadDrive(),false);
+const rotateInputCrankToPoint=(bar,target)=>drive('rotateCrankTo',bar,target);
+const drivePointTo=(id,w)=>hasDriveSource()&&(id.call||!pointIsGround(id))&&drive('driveTo',id.call?id:p=>p[id],w);
 const updatePointCoordsById = (id, x, y) => Model.updatePointCoordsById(S.comps, id, x, y);
 const freezePointAtDisplay = (id) => Model.freezePointAtDisplay(S.comps, S.compiled, S.theta, id, motorAnglesNow());
 const movePointById = (id, dx, dy) => Model.movePointById(S.comps, id, dx, dy);
@@ -3373,7 +3353,7 @@ function init() {
                  selectModuleTarget(comp);
                },
                snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel, openFrameEditor: () => { S.frameEditorOpen = true; Panels.updateFrameEditor(); }, transient,
-               isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, pointIsRackHole });
+               isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, drivePointTo, driveBody:(c,g)=>hasDriveSource()&&drive('bodyProbe',c,g), pointIsRackHole });
   Settings.init({ rebuild, draw, pushUndo, pause, scheduleAutosave, notify: transient });
   Settings.loadExportSettings();
   Settings.loadTtMountSettings();

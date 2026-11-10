@@ -53,18 +53,23 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, select
     isGroundPositionUnlocked = () => false,
     relockGroundPosition = () => {},
     rotateInputCrankToPoint = () => false,
+    drivePointTo = () => false,
+    driveBody = () => null,
     pointIsRackHole = () => false;
 
 export function startFreeLinkDrag(e, linkId) {
   if(fusionRoot(S.comps,linkId))return false;
   const c = S.comps.find(x => x.id === linkId && isFreeBody(S.comps,x,S.modules));
-  if (!c) return false;
   const w = worldFromEvent(e);
-  if (!w) return false;
+  // 有動力的機構：拖桿身＝試動
+  const probe = !c && w && driveBody(S.comps.find(x => x.id === linkId), w);
+  if (!(c || probe) || !w) return false;
+  S.dragProbe = probe || null;
   S.preDragSnap = snapshotStr(); // 整段拖曳合併成一筆 undo
   pause();
   pendingMobileEdit = mobilePrompt();
-  if(c.type!=='motor')(c.type==='triangle'?selectTriangle:selectLink)(linkId,{openPanel:!pendingMobileEdit});
+  const body=c||S.comps.find(x=>x.id===linkId);
+  if(body.type!=='motor')(body.type==='triangle'?selectTriangle:selectLink)(linkId,{openPanel:!pendingMobileEdit});
   S.dragLinkId = linkId;
   S.dragLastWorld = w;
   S.snapTarget = null;
@@ -129,7 +134,7 @@ export function onNodeDown(e, id) {
   const localBody=motorBody||S.comps.find(c=>localHoles(c).some(h=>h.id===id));
   pendingNodeDrag = localBody && isFreeBody(S.comps,localBody,S.modules) && !fusionRoot(S.comps,localBody.id)
     ? {id,bodyId:localBody.id,event:e,x:e.clientX,y:e.clientY,pointerType:e.pointerType || 'mouse'}
-    : localBody || S.comps.some(c=>c.frameHole&&c.p1.id===id) || fusionAtPoint(S.comps,id) || (pointIsGround(id) && !isGroundPositionUnlocked(id)) ? null : {
+    : motorBody || S.comps.some(c=>c.frameHole&&c.p1.id===id) || fusionAtPoint(S.comps,id) || (pointIsGround(id) && !isGroundPositionUnlocked(id)) ? null : {
     id, x:e.clientX, y:e.clientY, pointerType:e.pointerType || 'mouse'
   };
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
@@ -179,7 +184,7 @@ function onDragMove(e) {
   }
   if (S.dragLinkId && S.dragLastWorld) {
     const c = S.comps.find(x => x.id === S.dragLinkId && isFreeBody(S.comps,x,S.modules));
-    if (!c) return;
+    if (!c) { if (S.dragProbe && drivePointTo(S.dragProbe, w)) redrawAfterDrag(); return; }
     const dx = w.x - S.dragLastWorld.x;
     const dy = w.y - S.dragLastWorld.y;
     // Translate vertices together; local holes follow without changing dimensions.
@@ -213,6 +218,9 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     if (rotateInputCrankToPoint(crankBar,w)) { rebuild(); recordManualTrace(); draw(); }
     return;
   }
+  // 有動力時拖接點或孔＝試動；孔不單獨移動
+  if (drivePointTo(id,w)) { S.snapTarget=null; redrawAfterDrag(); return; }
+  if (S.comps.some(c=>localHoles(c).some(h=>h.id===id)&&!isFreeBody(S.comps,c,S.modules))) return;
   // Only world-frame holes snap. Floating joints are motion constraints and
   // must never be quantized to the 8 mm reference grid during editing.
   const dragTarget = snap && pointIsGround(id) ? snapFramePoint(w) : w;
@@ -490,6 +498,8 @@ export function init(deps) {
      selectOverlapComponent = (() => {}),
      nodeDownEntry = null,
      rotateInputCrankToPoint = (() => false),
+     drivePointTo = (() => false),
+     driveBody = (() => null),
      pointIsRackHole = (() => false) } = deps);
 
   // ---- 掛上 svg 的指標 / 手勢監聽（原 app.js 檔尾那批，順序不變）----

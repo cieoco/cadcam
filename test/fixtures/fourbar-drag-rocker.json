@@ -1,0 +1,1254 @@
+{
+  "kind": "blocks-envelope",
+  "v": 1,
+  "requires": [
+    "independent-motor-v1"
+  ],
+  "project": {
+    "kind": "blocks",
+    "v": 1,
+    "counter": 111,
+    "comps": [
+      {
+        "type": "triangle",
+        "id": "Blank105",
+        "color": "#27ae60",
+        "p1": {
+          "id": "Blank105.A",
+          "type": "fixed",
+          "x": -73.72151684482418,
+          "y": -13.838254354637826
+        },
+        "p2": {
+          "id": "Blank105.B",
+          "type": "fixed",
+          "x": 30.27848315517582,
+          "y": -13.838254354637826
+        },
+        "p3": {
+          "id": "Blank105.C",
+          "type": "floating",
+          "x": -73.72151684482418,
+          "y": 50.161745645362174
+        },
+        "gParam": "Blank105.G",
+        "r1Param": "Blank105.H",
+        "r2Param": "Blank105.D",
+        "sign": 1,
+        "snapLength": false,
+        "stock": {
+          "widthMm": 13,
+          "thicknessMm": 3,
+          "material": "unspecified"
+        },
+        "shapeMode": "hull",
+        "vertices": [
+          {
+            "solve": true,
+            "ref": "p1"
+          },
+          {
+            "solve": true,
+            "ref": "p2"
+          },
+          {
+            "solve": true,
+            "ref": "p3"
+          }
+        ],
+        "holes": [
+          {
+            "id": "Blank105_H8_0",
+            "u": 8,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H16_0",
+            "u": 16,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H24_0",
+            "u": 24,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H32_0",
+            "u": 32,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H40_0",
+            "u": 40,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H48_0",
+            "u": 48,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H56_0",
+            "u": 56,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H64_0",
+            "u": 64,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H72_0",
+            "u": 72,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H80_0",
+            "u": 80,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H88_0",
+            "u": 88,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H96_0",
+            "u": 96,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H0_8",
+            "u": 0,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H8_8",
+            "u": 8,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H16_8",
+            "u": 16,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H24_8",
+            "u": 24,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H32_8",
+            "u": 32,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H40_8",
+            "u": 40,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H48_8",
+            "u": 48,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H56_8",
+            "u": 56,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H64_8",
+            "u": 64,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H72_8",
+            "u": 72,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H80_8",
+            "u": 80,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H88_8",
+            "u": 88,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H96_8",
+            "u": 96,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H104_8",
+            "u": 104,
+            "v": 8,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H0_16",
+            "u": 0,
+            "v": 16,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H8_16",
+            "u": 8,
+            "v": 16,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H16_16",
+            "u": 16,
+            "v": 16,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H24_16",
+            "u": 24,
+            "v": 16,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H32_16",
+            "u": 32,
+            "v": 16,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H48_16",
+            "u": 48,
+            "v": 16,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H56_16",
+            "u": 56,
+            "v": 16,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H64_16",
+            "u": 64,
+            "v": 16,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H72_16",
+            "u": 72,
+            "v": 16,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H80_16",
+            "u": 80,
+            "v": 16,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H88_16",
+            "u": 88,
+            "v": 16,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H96_16",
+            "u": 96,
+            "v": 16,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H104_16",
+            "u": 104,
+            "v": 16,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H0_24",
+            "u": 0,
+            "v": 24,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H8_24",
+            "u": 8,
+            "v": 24,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H32_24",
+            "u": 32,
+            "v": 24,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H40_24",
+            "u": 40,
+            "v": 24,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H48_24",
+            "u": 48,
+            "v": 24,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H56_24",
+            "u": 56,
+            "v": 24,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H64_24",
+            "u": 64,
+            "v": 24,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H72_24",
+            "u": 72,
+            "v": 24,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H80_24",
+            "u": 80,
+            "v": 24,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H88_24",
+            "u": 88,
+            "v": 24,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H96_24",
+            "u": 96,
+            "v": 24,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H104_24",
+            "u": 104,
+            "v": 24,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H0_32",
+            "u": 0,
+            "v": 32,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H8_32",
+            "u": 8,
+            "v": 32,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H16_32",
+            "u": 16,
+            "v": 32,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H24_32",
+            "u": 24,
+            "v": 32,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H32_32",
+            "u": 32,
+            "v": 32,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H48_32",
+            "u": 48,
+            "v": 32,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H56_32",
+            "u": 56,
+            "v": 32,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H64_32",
+            "u": 64,
+            "v": 32,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H72_32",
+            "u": 72,
+            "v": 32,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H80_32",
+            "u": 80,
+            "v": 32,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H88_32",
+            "u": 88,
+            "v": 32,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H96_32",
+            "u": 96,
+            "v": 32,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H104_32",
+            "u": 104,
+            "v": 32,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H0_40",
+            "u": 0,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H8_40",
+            "u": 8,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H16_40",
+            "u": 16,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H24_40",
+            "u": 24,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H32_40",
+            "u": 32,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H40_40",
+            "u": 40,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H48_40",
+            "u": 48,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H56_40",
+            "u": 56,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H64_40",
+            "u": 64,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H72_40",
+            "u": 72,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H80_40",
+            "u": 80,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H88_40",
+            "u": 88,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H96_40",
+            "u": 96,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H104_40",
+            "u": 104,
+            "v": 40,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H0_48",
+            "u": 0,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H8_48",
+            "u": 8,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H16_48",
+            "u": 16,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H24_48",
+            "u": 24,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H32_48",
+            "u": 32,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H40_48",
+            "u": 40,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H48_48",
+            "u": 48,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H56_48",
+            "u": 56,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H64_48",
+            "u": 64,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H72_48",
+            "u": 72,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H80_48",
+            "u": 80,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H88_48",
+            "u": 88,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H96_48",
+            "u": 96,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H104_48",
+            "u": 104,
+            "v": 48,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H0_56",
+            "u": 0,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H8_56",
+            "u": 8,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H16_56",
+            "u": 16,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H24_56",
+            "u": 24,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H32_56",
+            "u": 32,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H40_56",
+            "u": 40,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H48_56",
+            "u": 48,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H56_56",
+            "u": 56,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H64_56",
+            "u": 64,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H72_56",
+            "u": 72,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H80_56",
+            "u": 80,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H88_56",
+            "u": 88,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H96_56",
+            "u": 96,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H104_56",
+            "u": 104,
+            "v": 56,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H8_64",
+            "u": 8,
+            "v": 64,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H16_64",
+            "u": 16,
+            "v": 64,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H24_64",
+            "u": 24,
+            "v": 64,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H32_64",
+            "u": 32,
+            "v": 64,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H40_64",
+            "u": 40,
+            "v": 64,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H48_64",
+            "u": 48,
+            "v": 64,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H56_64",
+            "u": 56,
+            "v": 64,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H64_64",
+            "u": 64,
+            "v": 64,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H72_64",
+            "u": 72,
+            "v": 64,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H80_64",
+            "u": 80,
+            "v": 64,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H88_64",
+            "u": 88,
+            "v": 64,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H96_64",
+            "u": 96,
+            "v": 64,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank105_H104_64",
+            "u": 104,
+            "v": 64,
+            "type": "floating",
+            "diameter": 3.2
+          }
+        ],
+        "standardBlank": {
+          "kind": "plate",
+          "mountHoles": [
+            {
+              "id": "Blank105_H40_16",
+              "u": 40,
+              "v": 16,
+              "type": "floating",
+              "diameter": 3.2
+            },
+            {
+              "id": "Blank105_H16_24",
+              "u": 16,
+              "v": 24,
+              "type": "floating",
+              "diameter": 3.2
+            },
+            {
+              "id": "Blank105_H24_24",
+              "u": 24,
+              "v": 24,
+              "type": "floating",
+              "diameter": 3.2
+            },
+            {
+              "id": "Blank105_H40_32",
+              "u": 40,
+              "v": 32,
+              "type": "floating",
+              "diameter": 3.2
+            }
+          ]
+        },
+        "motorMountPoint": "Blank105_H16_24",
+        "frameSeparate": true,
+        "name": "矩形板材"
+      },
+      {
+        "type": "bar",
+        "id": "Blank107",
+        "color": "#3498db",
+        "p1": {
+          "id": "Blank105_H16_24",
+          "type": "fixed",
+          "x": -57.72151684482418,
+          "y": 10.161745645362174,
+          "physicalMotor": "1"
+        },
+        "p2": {
+          "id": "Blank107.B",
+          "type": "floating",
+          "x": -55.560638905368485,
+          "y": 66.12003910156734
+        },
+        "lenParam": "Blank107.G",
+        "isInput": true,
+        "fixedLen": true,
+        "snapLength": false,
+        "stock": {
+          "widthMm": 13,
+          "thicknessMm": 3,
+          "material": "unspecified"
+        },
+        "phaseOffset": 0,
+        "physicalMotor": "1",
+        "motorType": "tt",
+        "motorMount": {
+          "motor": "1",
+          "partId": "Motor105",
+          "center": "Blank105_H16_24",
+          "outputBody": "Blank107",
+          "frameBody": "Blank105",
+          "orientation": "follow-frame",
+          "angleDeg": 0,
+          "reversed": false,
+          "face": "back",
+          "order": [
+            "motor",
+            "frameBody",
+            "outputBody"
+          ]
+        },
+        "holes": [
+          {
+            "id": "Blank107_H8_0",
+            "u": 8,
+            "v": 0,
+            "diameter": 3.2,
+            "type": "floating"
+          },
+          {
+            "id": "Blank107_H16_0",
+            "u": 16,
+            "v": 0,
+            "diameter": 3.2,
+            "type": "floating"
+          },
+          {
+            "id": "Blank107_H24_0",
+            "u": 24,
+            "v": 0,
+            "diameter": 3.2,
+            "type": "floating"
+          },
+          {
+            "id": "Blank107_H32_0",
+            "u": 32,
+            "v": 0,
+            "diameter": 3.2,
+            "type": "floating"
+          },
+          {
+            "id": "Blank107_H40_0",
+            "u": 40,
+            "v": 0,
+            "diameter": 3.2,
+            "type": "floating"
+          },
+          {
+            "id": "Blank107_H48_0",
+            "u": 48,
+            "v": 0,
+            "diameter": 3.2,
+            "type": "floating"
+          }
+        ],
+        "standardBlank": {
+          "kind": "bar"
+        },
+        "name": "孔格桿件"
+      },
+      {
+        "type": "bar",
+        "id": "Blank110",
+        "color": "#3498db",
+        "p1": {
+          "id": "Blank107.B",
+          "type": "floating",
+          "x": -55.560638905368485,
+          "y": 66.12003910156734
+        },
+        "p2": {
+          "id": "Blank110.B",
+          "type": "floating",
+          "x": 0.43874062756090726,
+          "y": 65.85642588693611
+        },
+        "lenParam": "Blank110.G",
+        "isInput": false,
+        "fixedLen": true,
+        "snapLength": false,
+        "stock": {
+          "widthMm": 13,
+          "thicknessMm": 3,
+          "material": "unspecified"
+        },
+        "holes": [
+          {
+            "id": "Blank110_H8_0",
+            "u": 8,
+            "v": 0,
+            "diameter": 3.2,
+            "type": "floating"
+          },
+          {
+            "id": "Blank110_H16_0",
+            "u": 16,
+            "v": 0,
+            "diameter": 3.2,
+            "type": "floating"
+          },
+          {
+            "id": "Blank110_H24_0",
+            "u": 24,
+            "v": 0,
+            "diameter": 3.2,
+            "type": "floating"
+          },
+          {
+            "id": "Blank110_H32_0",
+            "u": 32,
+            "v": 0,
+            "diameter": 3.2,
+            "type": "floating"
+          },
+          {
+            "id": "Blank110_H40_0",
+            "u": 40,
+            "v": 0,
+            "diameter": 3.2,
+            "type": "floating"
+          },
+          {
+            "id": "Blank110_H48_0",
+            "u": 48,
+            "v": 0,
+            "diameter": 3.2,
+            "type": "floating"
+          }
+        ],
+        "standardBlank": {
+          "kind": "bar"
+        },
+        "name": "孔格桿件"
+      },
+      {
+        "id": "Blank111",
+        "type": "bar",
+        "name": "孔格桿件",
+        "p1": {
+          "id": "Blank110.B",
+          "type": "floating",
+          "x": 0.43874062756090726,
+          "y": 65.85642588693611
+        },
+        "p2": {
+          "id": "Blank105_H80_24",
+          "type": "floating",
+          "x": 6.27848315517582,
+          "y": 10.161745645362174
+        },
+        "stock": {
+          "widthMm": 13,
+          "thicknessMm": 3,
+          "material": "unspecified"
+        },
+        "standardBlank": {
+          "kind": "bar"
+        },
+        "color": "#3498db",
+        "snapLength": false,
+        "lenParam": "Blank111.G",
+        "fixedLen": true,
+        "isInput": false,
+        "holes": [
+          {
+            "id": "Blank111_H8_0",
+            "u": 8,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank111_H16_0",
+            "u": 16,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank111_H24_0",
+            "u": 24,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank111_H32_0",
+            "u": 32,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank111_H40_0",
+            "u": 40,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          },
+          {
+            "id": "Blank111_H48_0",
+            "u": 48,
+            "v": 0,
+            "type": "floating",
+            "diameter": 3.2
+          }
+        ]
+      }
+    ],
+    "params": {
+      "theta": 87.80303002681363,
+      "Blank105.G": 104,
+      "Blank105.H": 64,
+      "Blank105.D": 122.11470017978999,
+      "Blank107.G": 56,
+      "Blank110.G": 56,
+      "Blank111.G": 56
+    },
+    "projectName": "未命名設計",
+    "rootDesignName": "未命名設計",
+    "fabrication": {
+      "v": 1,
+      "syringeMount": {
+        "clearanceMm": 0.5,
+        "marginMm": 8,
+        "strapSpacingMm": 24
+      },
+      "export": {
+        "barWidthMm": 13,
+        "holeDiameterMm": 3.2,
+        "frameMarginMm": 18,
+        "frameHoleDiameterMm": 3.2,
+        "ttShaftFlatDiameterMm": 5.4,
+        "ttShaftFlatThicknessMm": 3.7
+      },
+      "ttMount": {
+        "shaftDiameterMm": 6,
+        "screwDiameterMm": 3,
+        "screwOffsetXMm": -20.6,
+        "screwSpacingMm": 17.3,
+        "locatorDiameterMm": 4,
+        "locatorOffsetXMm": -11.18,
+        "locatorOffsetYMm": 0
+      },
+      "n20Mount": {
+        "bossDiameterMm": 4.2,
+        "screwDiameterMm": 1.8,
+        "screwSpacingMm": 9
+      },
+      "mg995Mount": {
+        "bodyLengthMm": 41.2,
+        "bodyWidthMm": 20.2,
+        "shaftOffsetMm": 10,
+        "screwDiameterMm": 3.2,
+        "screwSpanMm": 49.5,
+        "screwSpacingMm": 10,
+        "cableNotchWidthMm": 8,
+        "cableNotchDepthMm": 4
+      },
+      "cnc": {
+        "toolDiameterMm": 3.175,
+        "stockThicknessMm": 3
+      },
+      "drive": {
+        "n20Spec": 0,
+        "n20HubCenterMm": 3.2,
+        "n20HubScrewMm": 3.2,
+        "n20HubCircleMm": 12.7,
+        "ttHubCenterMm": 6,
+        "ttHubScrewMm": 3.2,
+        "ttHubScrewSpacingMm": 12,
+        "hornCenterMm": 6,
+        "hornScrewMm": 2.2,
+        "hornScrewCount": 4,
+        "hornScrewCircleMm": 14
+      },
+      "joint": {
+        "defaultKind": "printed",
+        "bracket": {
+          "widthMm": 7,
+          "thicknessMm": 1.2,
+          "longLegMm": 13,
+          "shortLegMm": 9.5,
+          "holeEndMm": 3.5
+        }
+      }
+    },
+    "assemblyMembers": []
+  }
+}
