@@ -190,7 +190,8 @@ export function describeIssue(work, issue, before) {
   if (mr?.what === 'moduleRef') {   // 零件已在候選裡被刪掉：名稱從刪除前的作品取；整句就是給學生的說明，不加前綴
     const gone = (before?.comps || []).find(c => ownIdsOf(c).includes(mr.id)), own = gone ? ownIdsOf(gone) : [];
     const isOut = ((before?.modules || []).find(m => m?.id === mr.module)?.outputs || []).some(o => [o?.at, o?.body?.id, o?.body?.a, o?.body?.b, ...(o?.bolts || [])].some(v => own.includes(v)));   // 同一零件同時是基座與輸出件時只說輸出件
-    return {text: `${quote(gone)}是模組「${mr.moduleName}」的${isOut ? '輸出件' : mr.role === 'base' ? '基座' : '接合件'}，請先拆下或解散模組，再刪除。`, far: [], canon: [], plain: true};
+    const verb = gone && !comps.some(c => c?.id === gone.id) ? '刪除' : '修改';   // 零件還在（例如合併點、齒輪鏈改接）就不是刪除
+    return {text: `${quote(gone)}是模組「${mr.moduleName}」的${isOut ? '輸出件' : mr.role === 'base' ? '基座' : '接合件'}，請先拆下或解散模組，再${verb}。`, far: [], canon: [], plain: true};
   }
   if (issue.code === 'I1') {
     const it = i1Item(buildRelations(work), issue, comps);
