@@ -275,6 +275,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   pause();
   cancelMotorMode();
   Settings.syncFabricationInputs(); // 放棄尚未 change/blur 提交的表單草稿。
+  Store.alignSavedInputPhase(norm);   // 開啟即為存檔姿勢（θ 回到 0°）
   S.comps = norm.comps;
   S.modules = Array.isArray(norm.modules) ? norm.modules : [];
   knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組

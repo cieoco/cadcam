@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {S} from '../js/blocks/state.js';
 import {createMemberEditor,resizeRefusal} from '../js/blocks/member-editor.js';
-import {normalizeSnapshot,toSnapshot} from '../js/blocks/schema.js';
+import {alignSavedInputPhase,normalizeSnapshot,toSnapshot} from '../js/blocks/schema.js';
 import {storedProject,readStoredProject} from '../js/blocks/project-envelope.js';
 import {getExample} from '../js/blocks/examples.js';
 import {compileTopology} from '../js/core/topology.js';
@@ -21,7 +21,7 @@ globalThis.document={getElementById:id=>{if(!elements.has(id))elements.set(id,ne
 const asked=[];globalThis.window={confirm:m=>{asked.push(m);return true;},alert:m=>assert.fail(m)};
 
 const FILE=JSON.parse(readFileSync(new URL('./fixtures/connected-resize.json',import.meta.url),'utf8'));
-const load=()=>normalizeSnapshot(readStoredProject(structuredClone(FILE)));
+const load=()=>alignSavedInputPhase(normalizeSnapshot(readStoredProject(structuredClone(FILE))));
 const motion=()=>({thetaDeg:S.theta,motorAngles:{...S.motorAngles,[S.activeMotor]:S.theta}});
 const solve=(comps=S.comps,params=S.topo.params,m=motion())=>solveTopology(compileTopology(comps,{...S.topo,params:{...params}},new Set()),m);
 let notices=[],undo=[];
@@ -87,7 +87,7 @@ assert.ok(!/[A-Za-z]/.test(resizeRefusal({isValid:false,errorReason:'三角板 l
 
 // 6. 存檔／重開：改過的作品原樣回來且可求解。
 reset(load());editor.setDimensionValue('Blank137','g',64,{exact:true});editor.setDimensionValue('Blank133','g',72,{exact:true});
-const saved=normalizeSnapshot(readStoredProject(JSON.parse(JSON.stringify(storedProject(toSnapshot(S.comps,S.topo,138,{fabrication:S.fabrication}))))));
+const saved=alignSavedInputPhase(normalizeSnapshot(readStoredProject(JSON.parse(JSON.stringify(storedProject(toSnapshot(S.comps,S.topo,138,{fabrication:S.fabrication})))))));
 assert.deepEqual(saved.comps,S.comps);assert.equal(saved.params['Blank137.G'],64);assert.equal(saved.params['Blank133.G'],72);assert.ok(solve(saved.comps,saved.params).isValid);
 
 // 7. 積木化範例 fourbar-crank-rocker 照舊可改。
@@ -114,4 +114,10 @@ for(const [id,n] of [['Blank136',32],['Blank136',48],['Blank135',40],['Blank137'
  let prev=null;for(const a of [0,45,120,250]){const f=solve(S.comps,S.topo.params,{thetaDeg:a,motorAngles:{1:a},_prevPoints:prev});assert.ok(f.isValid,`hanging plate θ=${a} ${f.errorReason}`);rigid(f,`hanging plate θ=${a}`);prev=f.points;}}
 // 求解結果違反剛性距離時必須回報失敗，不可當成有效。
 {const s=load();s.params['Blank133.D']=10;const r=solve(s.comps,s.params);assert.equal(r.isValid,false,'broken plate diagonal is a real failure');}
+// 9. 開檔時 Blank135 在存檔的 131°；改尺寸與播放都從這個姿勢連續變化。
+const crank=r=>{const A=r.points['Blank135.A'],O=r.points[MOTOR];return Math.atan2(A.y-O.y,A.x-O.x)*180/Math.PI;};
+reset(load());{const r=solve();assert.ok(Math.abs(crank(r)-131.04)<0.1,`open at ${crank(r)}`);
+ for(const c of S.comps)for(const k of ['p1','p2','p3'])if(c[k]&&r.points[c[k].id])near(Math.hypot(r.points[c[k].id].x-c[k].x,r.points[c[k].id].y-c[k].y),0,`playback starts at saved ${c[k].id}`);}
+for(const n of [64,40,56]){editor.setDimensionValue('Blank135','g',n,{exact:true});const r=solve();assert.ok(Math.abs(crank(r)-131.04)<0.1,`Blank135 ${n}: ${crank(r)}`);rigid(r,`crank ${n}`);}
+{let prev=null,last=null;for(let a=0;a<=60;a+=5){const f=solve(S.comps,S.topo.params,{thetaDeg:a,motorAngles:{1:a},_prevPoints:prev});assert.ok(f.isValid);rigid(f,`crank θ=${a}`);const now=crank(f);if(last!==null)near(((now-last)%360+540)%360-180,5,`θ=${a} continuous`);else assert.ok(Math.abs(now-131.04)<0.1);last=now;prev=f.points;}}
 console.log('connected resize: user work bars/plate ±1, motor hole identity, used-hole and impossible-loop refusals, undo, save/reopen and four-bar example passed');

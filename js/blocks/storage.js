@@ -13,12 +13,12 @@
 
 import {storedProject} from './project-envelope.js';
 import { encodeSnapshot, decodeShareString } from '../share-codec.js';
-import { toSnapshot, normalizeSnapshot, highestIdNum } from './schema.js?v=20261007_singleface';
+import { toSnapshot, normalizeSnapshot, highestIdNum, alignSavedInputPhase } from './schema.js?v=20261007_singleface';
 
 const AUTOSAVE_KEY = 'cadcam.blocks.autosave';
 
 // ---- 純：序列化 / 還原 ----
-export { toSnapshot, normalizeSnapshot, highestIdNum };
+export { toSnapshot, normalizeSnapshot, highestIdNum, alignSavedInputPhase };
 
 // 把外來物件正規化成 { comps, params, counter }，不合法回傳 null。
 // ---- localStorage 自動存檔 ----

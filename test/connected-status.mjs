@@ -2,7 +2,7 @@
 // 狀態列不能再寫「解不出」，要指出沒接好的零件；真的解不出時才保留「解不出」。
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {normalizeSnapshot} from '../js/blocks/schema.js';
+import {alignSavedInputPhase,normalizeSnapshot} from '../js/blocks/schema.js';
 import {readStoredProject} from '../js/blocks/project-envelope.js';
 import {compileTopology} from '../js/core/topology.js';
 import {solveTopology} from '../js/multilink/solver.js';
@@ -10,7 +10,7 @@ import {motionPoseIssue} from '../js/blocks/solve-health.js';
 import {invalidPoseStatus} from '../js/blocks/status-text.js';
 import {holeWorld} from '../js/core/local-holes.js';
 
-const load=()=>normalizeSnapshot(readStoredProject(JSON.parse(readFileSync(new URL('./fixtures/connected-resize.json',import.meta.url),'utf8'))));
+const load=()=>alignSavedInputPhase(normalizeSnapshot(readStoredProject(JSON.parse(readFileSync(new URL('./fixtures/connected-resize.json',import.meta.url),'utf8')))));
 // 與 app.js solveFrame／updateMechanismStatus 相同：θ 與馬達角度求解 → motionPoseIssue → 狀態文字。
 const status=(s,theta=0,practice={})=>{const sol=solveTopology(compileTopology(s.comps,{params:{...s.params}},new Set()),{thetaDeg:theta,motorAngles:{1:theta}});
  const issue=motionPoseIssue(s.comps,sol);return {sol,issue,status:issue?invalidPoseStatus({...practice,issue,comps:s.comps}):null};};
