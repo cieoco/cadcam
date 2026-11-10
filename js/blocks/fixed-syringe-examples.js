@@ -16,10 +16,11 @@ export const fixedLiftSnapshot={kind:'blocks',v:1,projectName:'H02 管夾固定�
 const G=p('H3O',128,256,'fixed'),GA=p('H3A',-24,256,'fixed'),R=p('H3P',69,256);
 const U=p('H3U',106.6356,307.7645),V=p('H3V',106.6356,204.2355),F=p('H3F',149.3644,204.2355),T=p('H3T',149.3644,307.7645);
 const tri=(id,a,b,c)=>({id,type:'triangle',p1:a,p2:b,p3:c,gParam:id+'g',r1Param:id+'r',r2Param:id+'d',shapeMode:'polyline',vertices:[{solve:true,ref:'p2'},{solve:true,ref:'p1'},{solve:true,ref:'p3'}],color:'#728b86',stock:{thicknessMm:2}});
+const syr=(GA,R)=>({id:'H3Syringe',type:'syringe',mountMode:'fixed-axis',axisDeg:Math.atan2(R.y-GA.y,R.x-GA.x)*180/Math.PI,outputId:'H3JawA',a:{componentId:'H3Frame',u:0,v:0},b:{componentId:'H3Upper',u:0,v:0},spec:{...SYRINGE_DEMO,name:'F3D 夾具參考／20 mm 教學區間（未實測）',outerDiameter:17.5,bodyLength:72,rodDiameter:8,lmin:83,stroke:20,calibrated:false},extension:distance(GA,R)-83,branch:1,
+ jawIds:['H3JawA','H3JawB']});
 export const fixedGripSnapshot={kind:'blocks',v:1,projectName:'H03 針筒夾具／一體式夾臂',counter:30,params:{H3Frame:distance(GA,G),H3Upper:64,H3Lower:64,H3JawAg:56,H3JawAr:56,H3JawAd:112,H3JawBg:56,H3JawBr:56,H3JawBd:112},comps:[
  bar('H3Frame',GA,G,'H3Frame'),bar('H3Upper',R,U,'H3Upper'),bar('H3Lower',R,V,'H3Lower'),tri('H3JawA',G,U,F),tri('H3JawB',G,V,T),
- {id:'H3Syringe',type:'syringe',mountMode:'fixed-axis',axisDeg:Math.atan2(R.y-GA.y,R.x-GA.x)*180/Math.PI,outputId:'H3JawA',a:{componentId:'H3Frame',u:0,v:0},b:{componentId:'H3Upper',u:0,v:0},spec:{...SYRINGE_DEMO,name:'F3D 夾具參考／20 mm 教學區間（未實測）',outerDiameter:17.5,bodyLength:72,rodDiameter:8,lmin:83,stroke:20,calibrated:false},extension:distance(GA,R)-83,branch:1,
- jawIds:['H3JawA','H3JawB']}
+ syr(GA,R)
 ]};
 
 const gripTip=(arm,u,v)=>{arm.vertices=[{solve:true,ref:'p2'},{solve:true,ref:'p1'},{solve:true,ref:'p3'},{solve:false,u,v,hole:true}];};
@@ -32,11 +33,9 @@ export const assemblyGripSnapshot=(()=>{
 // 8 mm grid: same frame and couplers as H03; V arm 56+40 (53.13 deg).
 const G=p('H3O',128,256,'fixed'),GA=p('H3A',-24,256,'fixed'),R=p('H3P',69,256);
 const U=p('H3U',106.6356,307.7645),V=p('H3V',106.6356,204.2355),F=p('H3F',148.4235,290.393),T=p('H3T',148.4235,221.607);
-const tri=(id,a,b,c)=>({id,type:'triangle',p1:a,p2:b,p3:c,gParam:id+'g',r1Param:id+'r',r2Param:id+'d',shapeMode:'polyline',vertices:[{solve:true,ref:'p2'},{solve:true,ref:'p1'},{solve:true,ref:'p3'}],color:'#728b86',stock:{thicknessMm:2}});
 const fixedGripSnapshot={kind:'blocks',v:1,projectName:'H03 針筒夾具／一體式夾臂',counter:30,params:{H3Frame:distance(GA,G),H3Upper:64,H3Lower:64,H3JawAg:56,H3JawAr:40,H3JawAd:Math.hypot(32,32),H3JawBg:56,H3JawBr:40,H3JawBd:Math.hypot(32,32)},comps:[
  bar('H3Frame',GA,G,'H3Frame'),bar('H3Upper',R,U,'H3Upper'),bar('H3Lower',R,V,'H3Lower'),tri('H3JawA',G,U,F),tri('H3JawB',G,V,T),
- {id:'H3Syringe',type:'syringe',mountMode:'fixed-axis',axisDeg:Math.atan2(R.y-GA.y,R.x-GA.x)*180/Math.PI,outputId:'H3JawA',a:{componentId:'H3Frame',u:0,v:0},b:{componentId:'H3Upper',u:0,v:0},spec:{...SYRINGE_DEMO,name:'F3D 夾具參考／20 mm 教學區間（未實測）',outerDiameter:17.5,bodyLength:72,rodDiameter:8,lmin:83,stroke:20,calibrated:false},extension:distance(GA,R)-83,branch:1,
- jawIds:['H3JawA','H3JawB']}
+ syr(GA,R)
 ]};
 
 for(const [id,v] of [['H3JawA',-88],['H3JawB',88]]){const arm=fixedGripSnapshot.comps.find(c=>c.id===id);arm.vertices=[{solve:true,ref:'p2'},{solve:true,ref:'p1'},{solve:true,ref:'p3'},{solve:false,u:0,v,hole:true}];}

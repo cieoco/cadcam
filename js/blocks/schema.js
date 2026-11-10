@@ -1,4 +1,4 @@
-import {BLANK_HOLE_LIMIT} from './standard-blank.js';
+import {BLANK_HOLE_LIMIT,armsValid} from './standard-blank.js';
 import {normalizeLoads} from './load-schema.js';
 import {syncFrameHoles,frameHoleAxis} from './frame-holes.js';
 import {readStoredProject} from './project-envelope.js';
@@ -72,7 +72,7 @@ function normalizePoint(point, fallbackId, warnings) {
 function localHoleRecords(raw){
  return (Array.isArray(raw)?raw:[]).filter(h=>h&&safeId(h.id)&&Number.isFinite(h.u)&&Number.isFinite(h.v)).map(h=>({id:h.id,u:h.u,v:h.v,diameter:Math.max(.5,Math.min(20,num(h.diameter,3.2))),type:h.type==='fixed'?'fixed':'floating',...(h.manufactured===true?{manufactured:true}:{})}));
 }
-function keepBlank(comp,out){if(['bar','plate','l'].includes(comp.standardBlank?.kind)){out.standardBlank={kind:comp.standardBlank.kind,...(comp.standardBlank.kind==='l'?{armWidthMm:Math.max(13,num(comp.standardBlank.armWidthMm,13))}:{})};if(comp.type==='bar'&&Number.isFinite(comp.standardBlank.rearMm)){out.standardBlank.rearMm=comp.standardBlank.rearMm;if(['shaft','hub'].includes(comp.ttOutput))out.ttOutput=comp.ttOutput;if(!out.stock)out.stock={widthMm:29,thicknessMm:3,material:'unspecified'};}if(comp.standardBlank.mountHoles?.length)out.standardBlank.mountHoles=localHoleRecords(comp.standardBlank.mountHoles);if(comp.standardBlank.drill=='all')out.standardBlank.drill='all';}}
+function keepBlank(comp,out){if(['bar','plate','l','arms'].includes(comp.standardBlank?.kind)){if(comp.standardBlank.kind==='arms')import('./arm-blank.js');out.standardBlank={kind:comp.standardBlank.kind,...(comp.standardBlank.kind==='arms'?{arms:comp.standardBlank.arms.map(({holes,angleDeg})=>({holes,angleDeg}))}:{}),...(comp.standardBlank.kind==='l'?{armWidthMm:Math.max(13,num(comp.standardBlank.armWidthMm,13))}:{})};if(comp.type==='bar'&&Number.isFinite(comp.standardBlank.rearMm)){out.standardBlank.rearMm=comp.standardBlank.rearMm;if(['shaft','hub'].includes(comp.ttOutput))out.ttOutput=comp.ttOutput;if(!out.stock)out.stock={widthMm:29,thicknessMm:3,material:'unspecified'};}if(comp.standardBlank.mountHoles?.length)out.standardBlank.mountHoles=localHoleRecords(comp.standardBlank.mountHoles);if(comp.standardBlank.drill=='all')out.standardBlank.drill='all';}}
 
 function normalizeAnchor(comp, index, warnings) {
   const id = safeId(comp.id) ? comp.id : `Anchor${index + 1}`;
@@ -626,8 +626,9 @@ export function normalizeSnapshot(obj) {
   if (!sourceComps) return null;
   if(sourceComps.some(c=>['bar','triangle'].includes(c?.type)&&Array.isArray(c.holes)&&(c.standardBlank||c.holes.some(h=>Number.isFinite(h?.u)&&Number.isFinite(h?.v)))&&(c.holes.length>(c.standardBlank?BLANK_HOLE_LIMIT:128)||new Set(c.holes.map(h=>h?.id)).size!==c.holes.length)))return null;
   if(sourceComps.some(c=>c?.standardBlank?.rearMm!==undefined&&(c.type!=='bar'||c.standardBlank.kind!=='bar'||!Number.isFinite(c.standardBlank.rearMm)||c.standardBlank.rearMm<0||c.standardBlank.rearMm>1000)))return null;
+  if(sourceComps.some(c=>c?.standardBlank?.kind==='arms'&&(c.type!=='triangle'||!armsValid(c.standardBlank.arms))))return null;
   if(sourceComps.some(c=>c?.ttOutput!==undefined&&(c.type!=='bar'||c.standardBlank?.kind!=='bar'||!Number.isFinite(c.standardBlank.rearMm)||!['shaft','hub'].includes(c.ttOutput))))return null;
-  if(sourceComps.some(c=>c?.standardBlank?.mountHoles!==undefined&&(!(['bar','triangle'].includes(c.type)&&['bar','plate','l'].includes(c.standardBlank.kind))||!Array.isArray(c.standardBlank.mountHoles)||c.standardBlank.mountHoles.some(h=>!safeId(h?.id)||!Number.isFinite(h?.u)||!Number.isFinite(h?.v)))))return null;
+  if(sourceComps.some(c=>c?.standardBlank?.mountHoles!==undefined&&(!(['bar','triangle'].includes(c.type)&&['bar','plate','l','arms'].includes(c.standardBlank.kind))||!Array.isArray(c.standardBlank.mountHoles)||c.standardBlank.mountHoles.some(h=>!safeId(h?.id)||!Number.isFinite(h?.u)||!Number.isFinite(h?.v)))))return null;
   if(sourceComps.some(c=>c?.standardBlank?.mountHoles?.length&&((c.holes?.length || 0)+c.standardBlank.mountHoles.length>BLANK_HOLE_LIMIT||new Set([...(c.holes || []),...c.standardBlank.mountHoles].map(h=>h?.id)).size!==(c.holes?.length || 0)+c.standardBlank.mountHoles.length)))return null;
   if(sourceComps.some(c=>c?.boxPanel && (c.type!=='bar'||!normalizeBoxPanel(c.boxPanel))))return null;
 

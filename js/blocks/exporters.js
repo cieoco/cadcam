@@ -708,6 +708,8 @@ function boundsForGeometry(outlines, holes = []) {
   };
 }
 
+const svgHead = (width, height, b) => `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${round(b.minX)} ${round(b.minY)} ${width} ${height}">`;
 function svgForPlate(comp, points, settings, mounts = [], adapterHoles = []) {
   const geometry = plateGeometry(comp, points, settings, mounts, adapterHoles);
   const b = boundsForGeometry([...geometry.outlines, ...(geometry.cutouts || []).map(c => c.points)], geometry.holes);
@@ -716,8 +718,7 @@ function svgForPlate(comp, points, settings, mounts = [], adapterHoles = []) {
   const paths = geometry.outlines.map(outline => `    <path d="${svgPolyline(outline)}" />`).join('\n');
   const cutouts = (geometry.cutouts || []).map(c =>
     `    <path d="${svgPolyline(c.points)}" data-layer="${esc(c.layer)}" />`).join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${round(b.minX)} ${round(b.minY)} ${width} ${height}">
+  return `${svgHead(width,height,b)}
   <title>${esc(comp.id || 'plate')}</title>
   <desc>${esc(stockDescription(comp))}</desc>
   <g fill="none" stroke="#000" stroke-width="0.25">
@@ -753,8 +754,7 @@ function svgForGear(comp, geometry) {
   const height = round(b.maxY - b.minY);
   const gearCutouts = (geometry.cutouts || []).map(c =>
     `    <path d="${svgPolyline(c.points)}" data-layer="${esc(c.layer)}" />`).join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${round(b.minX)} ${round(b.minY)} ${width} ${height}">
+  return `${svgHead(width,height,b)}
   <title>${esc(comp.id || 'gear')}</title>
   <g fill="none" stroke="#000" stroke-width="0.25">
     <path d="${svgPolyline(geometry.outline)}" data-layer="GEAR_CUT" />
@@ -787,8 +787,7 @@ function svgForRack(comp, geometry) {
   const height = round(b.maxY - b.minY);
   const rackCutouts = (geometry.cutouts || []).map(c =>
     `    <path d="${svgPolyline(c.points)}" data-layer="${esc(c.layer)}" />`).join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${round(b.minX)} ${round(b.minY)} ${width} ${height}">
+  return `${svgHead(width,height,b)}
   <title>${esc(comp.id || 'rack')}</title>
   <g fill="none" stroke="#000" stroke-width="0.25">
     <path d="${svgPolyline(geometry.outline)}" data-layer="RACK_CUT" />
@@ -1167,8 +1166,7 @@ export function svgForFrameGeometry(geometry, title) {
   const cutouts = (geometry.cutouts || []).map(c =>
     `    <path d="${svgPolyline(c.points)}" data-layer="${esc(c.layer)}" />`).join('\n');
   const holes = identifiedHoles(title,geometry.holes).map(tracedSvgCircle).join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${round(b.minX)} ${round(b.minY)} ${width} ${height}">
+  return `${svgHead(width,height,b)}
   <title>${esc(title)}</title>
   <g fill="none" stroke="#000" stroke-width="0.25">
 ${paths}

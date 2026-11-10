@@ -63,7 +63,7 @@
 
 | 包 | 施工 | 交付 | 驗收 | 狀態 |
 | --- | --- | --- | --- | --- |
-| B1 核心 | Sonnet | `makeStandardBlank({kind:'arms'})`、`blankGeometry` 聯集外形、`resizeStandardBlank` 支援孔數與角度、`schema.js` 保留與驗證、R7 孔格規則；`test/bent-arms.mjs`（含鐘形曲柄範例求解一整圈） | Node 全套通過；啟動大小不超過上限 | 待做 |
+| B1 核心 | Sonnet | `makeStandardBlank({kind:'arms'})`、`blankGeometry` 聯集外形、`resizeStandardBlank` 支援孔數與角度、`schema.js` 保留與驗證、R7 孔格規則；`test/bent-arms.mjs`（含鐘形曲柄範例求解一整圈） | Node 全套通過；啟動大小不超過上限 | 2026-11-11 完成（核心在按需載入的 `arm-blank.js`；`test/bent-arms.mjs` 143 項） |
 | B2 介面 | Sonnet | 新增選單「彎桿／多臂件」、建立面板（臂數、孔數、角度按鈕＋整數）、零件編輯面板與角度把手；學生看得懂的提示 | 瀏覽器桌機與手機：新增、改角度、拒絕訊息、復原、保存重開、匯出 | 待做 |
 | B3 範例 | Sonnet | 內建「鐘形曲柄夾爪」範例與教學卡（學什麼→實操→反思→解決一個問題） | 範例可播放、試動、匯出；教學卡文字審查 | 待做 |
 

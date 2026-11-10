@@ -108,6 +108,15 @@ function barIssues(c, comps, params, pitch, tol, out) {
 }
 
 function triangleIssues(c, comps, params, pitch, tol, out) {
+  // R7 多臂件：每支臂上的孔距是 P 的整數倍（孔離中心孔的距離），臂與臂之間不套用 R2 方格嵌入。
+  if (c.standardBlank?.kind === 'arms') {
+    const dists = [['A–B', num(params, c.gParam)], ['A–C', num(params, c.r1Param)], ...(c.holes || []).filter(h => Number.isFinite(h?.u) && Number.isFinite(h?.v)).map(h => [h.id, Math.hypot(h.u, h.v)])];
+    for (const [name, L] of dists) {
+      const d = pitchDeviation(L, pitch, tol);
+      if (!d.ok) out.push(issue(c, 'R7', '臂上孔距', { hole: name, valueMm: d.valueMm, nearestMm: d.nearestMm, deviationMm: d.deviationMm, message: `多臂件的孔離中心孔 ${fmt(d.valueMm)} mm，不是 ${pitch} mm 的倍數（最近 ${d.nearestMm} mm，差 ${fmt(d.deviationMm)} mm）` }));
+    }
+    return;
+  }
   const base = trianglePoints(c, params);
   if (!base) return;
   const poly = polylineTriangleParams(c);
