@@ -322,7 +322,8 @@
     "test/connection-integrity.mjs",
     "test/integrity-hints.mjs",
     "test/operation-sequences.mjs",
-    "test/commit-gate.mjs"
+    "test/commit-gate.mjs",
+    "test/c5-parity.mjs"
   ],
   "version": 1
 }

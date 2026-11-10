@@ -3,6 +3,7 @@
 import {
   TEETH_MIN, TEETH_MAX, pitchDiameter, outsideDiameter, centerForLinks, checkChainDrive, snapCenterToLinks
 } from '../core/chain-drive.js';
+import {buildRelations} from './relations.js';
 
 const clone = v => JSON.parse(JSON.stringify(v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -139,8 +140,8 @@ export function nudgeDrivenSprocket(comps, params, chainId, deltaMm) {
   const a = chain && sprocketById(out, chain.driver), b = chain && sprocketById(out, chain.driven);
   const d = Number(deltaMm);
   if (!a || !b || !Number.isFinite(d)) return fail('找不到這條鏈條。', out, outParams);
-  const attached=comps.some(c=>![a.id,b.id,chain.id].includes(c.id)&&c.type!=='anchor'&&
-    (POINT_KEYS.some(k=>[b.p1.id,b.p2?.id].includes(c[k]?.id)&&c[k]?.id)||[c.a?.componentId,c.b?.componentId,c.outputId,c.motorCarrier,c.motorMount?.outputBody,c.driver,c.driven].includes(b.id)));
+  // 從動輪除了主動輪與這條鏈、以及地錨（軸心本來就固定）之外還接著別的零件：以關係索引查（共用點、針筒端、動力承載、鏈／齒輪嚙合）。
+  const rel=buildRelations({comps}),attached=rel.attachmentsOf(b.id).some(x=>![a.id,chain.id].includes(x.otherId)&&rel._internal.compById(x.otherId)?.type!=='anchor');
   if(attached&&Math.abs(d)>1e-9)return fail('從動鏈輪已連接其他零件，無法單獨修改中心距；請先調整連接。',clone(comps),clone(params));
   const C = dist(a.p1, b.p1);
   const need = (outsideDiameter(a.teeth) + outsideDiameter(b.teeth)) / 2 + MIN_GAP_MM;

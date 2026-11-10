@@ -1,7 +1,8 @@
 /** Display-only thinning; no hole is removed from the design or export. */
-import {holeUse,isHoleUsed} from './used-holes.js';
+import {isHoleUsed} from './used-holes.js';
+import {idCounts} from '../core/local-holes.js';
 export function hiddenGridHoles(comps,points,{modules,params,project,bounds,keep=[]}={}){
- const hidden=new Set(),protectedIds=new Set(keep),use=holeUse(comps,modules);
+ const hidden=new Set(),protectedIds=new Set(keep),use=idCounts(comps,modules);
  for(const c of comps){
   if(!c.standardBlank||(c.holes?.length||0)<128)continue;
   const origin=project({x:0,y:0}),unit=project({x:8,y:0}),stride=Math.max(1,Math.ceil(20/Math.hypot(unit.x-origin.x,unit.y-origin.y)));

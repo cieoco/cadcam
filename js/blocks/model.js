@@ -1,4 +1,4 @@
-import {localHoles,holeWorld,holeSide} from '../core/local-holes.js';
+import {localHoles,holeWorld,holeSide,idCounts} from '../core/local-holes.js';
 /**
  * blocks / model
  *
@@ -450,12 +450,11 @@ export function isFreeLink(comps, c) {
 export function isFreeBody(comps, c, modules = []) {
   const motor=c?.type==='motor'&&c.p1&&!c.motorCarrier&&(!c.motorMount?.frameBody||c.motorMount.frameBody==='world');
   if (!(motor || isFreeLink(comps,c) || (c?.type==='triangle' && freeTriangleForPoint(comps,c.p1?.id)===c))) return false;
-  const holes=[c.p1,c.p2,c.p3,...localHoles(c)].filter(Boolean);
+  const holes=[...pointKeysFor(c).map(k=>c[k]),...localHoles(c)].filter(Boolean);
   // An unattached motor is grounded for simulation, but remains placeable in design.
   if(holes.some(p=>(!motor&&(isGroundPoint(p)||p.physicalMotor))||pointUseCount(comps,p.id)!==1))return false;
-  const ids=new Set([c.id,...holes.map(p=>p.id)]);
-  const references=value=>typeof value==='string'?ids.has(value):!!value&&typeof value==='object'&&Object.values(value).some(references);
-  return !c.isInput && !comps.some(other=>other!==c&&references(other)) && !modules.some(references);
+  const seen=idCounts(comps.filter(o=>o!==c),modules);
+  return !c.isInput && ![c.id,...holes.map(p=>p.id)].some(id=>seen.has(id));
 }
 
 export function freeLinkForPoint(comps, id) {

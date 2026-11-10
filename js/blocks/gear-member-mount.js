@@ -2,6 +2,7 @@ import {fusionRoot,inspectBarFusionData} from '../core/bar-fusion.js';
 import {pointKeysFor,ownedParamKeys} from './part-types.js';
 import {compileTopology} from '../core/topology.js';
 import {solveTopology} from '../multilink/solver.js';
+import {buildRelations} from './relations.js';
 
 const fail=reason=>({ok:false,reason});
 const distance=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
@@ -26,9 +27,9 @@ export function gearMountMember(source,id,positions={}) {
   const usedByInterface=v=>typeof v==='string'?(nodeIds.has(v)||ids.has(v)):!!v&&typeof v==='object'&&Object.values(v).some(usedByInterface);
   if((source.modules||[]).some(usedByInterface))return fail('此零件已用於模組介面，請先建立獨立副本。');
   if(members.flatMap(pointsOf).some(p=>p.type!=='floating'||p.physicalMotor))return fail('此零件已有固定或動力孔，請使用未固定的副本。');
-  const outside=source.comps.filter(c=>!ids.has(c.id));
-  if(outside.some(c=>pointsOf(c).some(p=>nodeIds.has(p.id))||[c.a?.componentId,c.b?.componentId,c.outputId,c.motorCarrier,c.motorMount?.outputBody].some(v=>ids.has(v))||
-    [c.motorMountPoint,c.mountLocatorPoint].some(v=>nodeIds.has(v))))return fail('此零件已接到其他零件；請先建立獨立副本，再安裝到齒輪。');
+  // 組內零件之外還有任何關係（共用點／孔、針筒端、動力承載、安裝定位點…）就不是獨立副本：交給關係索引。
+  const rel=buildRelations({comps:source.comps});
+  if(members.some(m=>rel.attachmentsOf(m.id).some(a=>!ids.has(a.otherId))))return fail('此零件已接到其他零件；請先建立獨立副本，再安裝到齒輪。');
   const points=refs.map(p=>({...p,...(finite(positions[p.id])?positions[p.id]:{})}));
   // Rigid unions retain their saved local shape, even when a free part has no solved pose.
   if(fused){

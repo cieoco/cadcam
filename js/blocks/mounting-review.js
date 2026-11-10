@@ -1,4 +1,5 @@
 import {actuatorMountSettings} from './fabrication-profile.js';
+import {pointKeysFor} from './part-types.js';
 import {syringeAttachmentHole} from '../core/syringe.js';
 /** Compare fabrication interfaces in part-local coordinates, never screen or animation coordinates.
  * Existing geometry producers remain the authority; this module owns only the edit decision.
@@ -12,7 +13,6 @@ import {motorRecords} from './motor-roles.js';
 import {FABRICATION_DEFAULTS} from './fabrication-profile.js';
 import {prepareConnectionWork} from './connection-work.js';
 
-const pointKeys=['p1','p2','p3'];
 const work=s=>({...s,comps:s.comps||[],modules:s.modules||[],params:s.params||s.topo?.params||{},fabrication:s.fabrication||FABRICATION_DEFAULTS});
 function interfaces(s){
   const motorOf=new Map(motorRecords(s.comps).map(r=>[r.ownerId,r])),result=new Map(),add=(id,label,parts)=>{const r={id,label,parts:parts.filter(Boolean)};result.set(id,r);return r;};
@@ -24,7 +24,7 @@ function interfaces(s){
     if(center&&(c.type==='bar'&&c.isInput||['gear','pulley'].includes(c.type)))add(`motor:${c.moduleId||'#root'}:${motor||center}`,'馬達固定座',[c.id,c.motorMount?.frameBody||c.motorCarrier||'frame',c.moduleId?`${c.moduleId}-frame`:null]);
     if(c.type==='rack'&&c.framePins?.length)add(`rack:${c.id}`,'齒條導銷',[c.id,'frame',c.moduleId?`${c.moduleId}-frame`:null]);
     if(c.type==='gear')for(const other of s.comps.filter(o=>['bar','triangle'].includes(o.type))){
-      const ids=pointKeys.map(k=>other[k]?.id);
+      const ids=pointKeysFor(other).map(k=>other[k]?.id);
       if(ids.includes(c.p1.id)&&ids.includes(c.p2.id))add(`gear:${c.id}:${other.id}`,'齒輪與桿件兩孔',[c.id,other.id]).pointIds=[c.p1.id,c.p2.id];
     }
   }
@@ -50,7 +50,7 @@ function partFor(catalog,id){
 function footprint(part,s,relation,catalog){
   let local=p=>({x:p.x,y:p.y});
   if(['frame','module-frame'].includes(part.binding.kind)||part.binding.framePointIds){
-    const nodes=s.comps.filter(c=>part.moduleId==null?!c.moduleId:c.moduleId===part.moduleId).flatMap(c=>pointKeys.map(k=>c[k])).filter(p=>p&&['fixed','motor'].includes(p.type));
+    const nodes=s.comps.filter(c=>part.moduleId==null?!c.moduleId:c.moduleId===part.moduleId).flatMap(c=>pointKeysFor(c).map(k=>c[k])).filter(p=>p&&['fixed','motor'].includes(p.type));
     const owned=new Set(s.comps.filter(c=>c.frameHole).map(c=>c.p1.id));
     const unique=[...new Map(nodes.filter(p=>!owned.has(p.id)).map(p=>[p.id,p])).values()].sort((a,b)=>a.id.localeCompare(b.id));
     const a=unique[0],b=unique.find(p=>a&&Math.hypot(p.x-a.x,p.y-a.y)>.001);

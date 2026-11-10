@@ -1,5 +1,15 @@
 # 教學與操作更新紀錄
 
+## 2026-11-11：接合關係 C5——孔用途與自由件查詢統一
+
+- **孔用途三種分開，加工規則只剩一份。** `machining` 的規則仍是 `used-holes.isHoleUsed`（啟動路徑上的小模組，畫布淡化孔與輸出都用它）；`relations.holeRoles().machining` 改為呼叫它，不再自算一份。「有沒有人提到這個 id」的計數只剩 `core/local-holes.idCounts`，由下列四處共用：`used-holes.machinedComps`、`passiveLocalHoles`（拓撲編譯）、`actuator-plate-holes.usedPoint`、`model.isFreeBody`。刪除：`used-holes.holeUse`、`passiveLocalHoles` 內的計數、`actuator-plate-holes.referencesPoint`／`pointRefs` 引用、`model.isFreeBody` 的 `references` 遞迴、`relations.holeRoles` 的加工分支。
+- **自由件／附掛查詢：** 改走關係索引的（都是按需載入的模組）：`motor-release.attachedGroup`（`copiesOf` 找共用點）、`gear-member-mount` 的「已接到其他零件」（`attachmentsOf`，組內關係不算）、`chain-tools.nudgeDrivenSprocket` 的「從動輪已連接」（`attachmentsOf`，主動輪、這條鏈與地錨不算）。
+- **保留不改（啟動路徑，`relations.js` 15 KB 不能進啟動；上限 2,165,000 不動）：** `model.isFreeBody`（拖曳：型別限制＋共用 `idCounts`；`relations.isFreeBody` 只多答 workpiece，測試鎖定「拖曳自由必為關係自由」）、`standard-blank.blockifyBars` 的承載引用清單（範例載入時執行）、`gear-hole-placement` 的接地／附掛清單（啟動）、`module-ops.connectedRootComps`（啟動，另有 token 規則）、`gear-member-mount` 改孔距時的「外部附掛」與 `gear-hole-placement` 同類清單（需要區分嚙合與 `pinion`／`fusedWith`，索引目前把兩者都標 `mesh`；C6 合成包再處理）、`core/topology.js` 的 `isUsed`（已含 `m1/m2`，是求解步驟內的點存在判斷，不是孔用途）。
+- **`actuator-plate-holes.usedPoint` 不是 `mountOccupied`。** 它問的是「別的零件或模組提到這個孔」，語意是 `constraint`／`machining`，所以改用共用計數；`mountOccupied`（停放孔、馬達軸心、管夾）保留在索引，幾何 `occupied()` 重疊判斷留在原處。
+- **鍵值陣列：** `used-holes`、`motor-drop`、`actuator-installation`、`motor-release`、`mounting-review`、`actuator-plate-holes` 的 `['p1','p2','p3']` 改 `pointKeysFor`。滑軌 `m1/m2` 的差異逐項判斷（`test/c5-parity.mjs` 鎖定）：(1) `attachedGroup`：含滑軌的群組舊版看不到鎖住的軌道孔而判為可整組平移，是 bug，現在判為不可平移（`slider-crank`、`quick-return`、`slider-crank-practice`）；(2) `actuatorHostPoints(slider)` 多列 `m1/m2`，滑軌從不是安裝座，`quickMotorChoices` 結果不變；(3) `chain-tools` 附掛判定多看 `mesh` 等欄位（只會更嚴格）。
+- **證據：** `test/c5-parity.mjs` + `test/fixtures/c5-parity.json`（在 3a23704 錄製）：72 份作品（70 內建範例＋2 份使用者檔）逐項比對加工孔集合、未鑽孔 id、被動局部孔、板件孔位規劃、SVG／DXF 輸出 hash、自由件（拖曳、附掛群組、模組根群組、齒輪安裝、鏈輪中心距、齒輪孔位）、安裝選項與安裝審查；另對每個零件做「分離後再用四種方式接回」的合成變體。除上述三項外全部相同。啟動大小 2,164,491 → 2,164,449 bytes（淨減 42）。
+- **發現但未改（屬 C1）：** 索引掃描所有字串，`moduleId` 剛好等於某零件 id（`iq-wheel-grabber` 的 `GrabLeft`）時被當成引用，`relations.isFreeBody` 因而判為不自由；目前沒有正式呼叫端，測試排除該情況。
+
 ## 2026-11-11：接合關係 C4——馬達與接地改單一來源，I1／I3 接入提交關卡
 
 - **馬達與接地的答案只剩一份。** 新增啟動路徑上的小模組 `js/blocks/motor-roles.js`（`motorRecords`、`motorRecordOf`、`isGroundPoint`）：`relations.js` 的 `motorOf`／`groundSource` 與下列查詢共用它，欄位角色只在這裡判定。`relations.js` 本身（15 KB）維持按需載入，不進啟動路徑，所以啟動路徑只放這個小模組。已改用：`model.pointHasMotor`／`motorPointIds`／`isGroundPoint`、`motor-tools.motorTypeAt`／`servoInputAt`、`mounting-review` 的馬達軸心與馬達編號推導（含腳印計算的軸心判斷）、`dof.js` 自己抄的 `isGroundPoint`、`motor-release.offPlateMotors`（改走 `relations.motorOf`，按需載入的模組）。

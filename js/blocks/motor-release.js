@@ -3,9 +3,9 @@ import {holeWorld} from '../core/local-holes.js';
 import {planMotorInstallation,actuatorHostPoints} from './actuator-installation.js';
 import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import {buildRelations} from './relations.js';
+import {pointKeysFor} from './part-types.js';
 import {integrityGate} from './integrity-gate.js';
 
-const keys=['p1','p2','p3'];
 const near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<=0.01;
 const holeLabel=(host,h)=>host.type==='bar'?`第${h.u/8+1}孔`:`長向第${h.u/8+1}、直向第${h.v/8+1}孔`;
 
@@ -16,7 +16,7 @@ export function offPlateMotors(comps=[]){
     const m=rel.motorOf(c.id),center=m?.ownerId===c.id&&m.centerId,host=m?.frameBodyId&&comps.find(h=>h.id===m.frameBodyId);
     if(!center||!host?.standardBlank)continue;
     const hole=[...(host.holes||[]),...(host.standardBlank.mountHoles||[])].find(h=>h.id===center);
-    const shaft=keys.map(k=>c[k]).find(p=>p?.id===center);
+    const shaft=pointKeysFor(c).map(k=>c[k]).find(p=>p?.id===center);
     if(!hole||!shaft)continue;
     const world=holeWorld(host,hole);
     if(!near(shaft,world))out.push({id:c.id,center,host,hole,shaft:{x:shaft.x,y:shaft.y},world});
@@ -30,11 +30,16 @@ export function offPlateMessage(item){
 const work=source=>({...structuredClone(source),comps:structuredClone(source.comps),params:{...source.params}});
 // 只經由活動接點與這顆馬達相連的零件（不含座板本身、也沒接到其他固定點）。
 export function attachedGroup(comps,item){
-  const owner=comps.find(c=>c.id===item.id),group=new Set([owner]),nodes=new Set(keys.map(k=>owner[k]?.id).filter(id=>id&&id!==item.center));
-  let free=true,grew=true;
-  while(grew){grew=false;for(const c of comps){if(group.has(c)||c===item.host||!keys.some(k=>nodes.has(c[k]?.id)))continue;
-    group.add(c);grew=true;for(const k of keys){const p=c[k];if(!p)continue;if(p.id===item.center)continue;if(p.type==='fixed'||p.type==='motor'||item.host&&keys.some(j=>item.host[j]?.id===p.id))free=false;nodes.add(p.id);}}}
-  if(comps.some(c=>!group.has(c)&&c!==item.host&&keys.some(k=>nodes.has(c[k]?.id))))free=false;
+  const rel=buildRelations({comps}),owner=comps.find(c=>c.id===item.id),host=item.host,hostIds=new Set(host?pointKeysFor(host).map(k=>host[k]?.id):[]);
+  // 以關係索引找共用某個點 id 的其他零件（座板本身不算）。
+  const sharing=id=>rel.copiesOf(id).filter(r=>r.key&&r.compId!==host?.id).map(r=>rel._internal.compById(r.compId));
+  const group=new Set([owner]),nodes=new Set(pointKeysFor(owner).map(k=>owner[k]?.id).filter(id=>id&&id!==item.center)),queue=[...nodes];
+  let free=true;
+  while(queue.length)for(const c of sharing(queue.pop())){
+    if(group.has(c))continue;group.add(c);
+    for(const k of pointKeysFor(c)){const p=c[k];if(!p||p.id===item.center)continue;if(p.type==='fixed'||p.type==='motor'||hostIds.has(p.id))free=false;if(!nodes.has(p.id)){nodes.add(p.id);queue.push(p.id);}}
+  }
+  for(const id of nodes)if(sharing(id).some(c=>!group.has(c)))free=false;
   return {group,free};
 }
 
@@ -43,8 +48,8 @@ export function planMotorReturn(source,id){
   const next=work(source),item=offPlateMotors(next.comps).find(i=>i.id===id);
   if(!item)return {ok:false,message:'馬達軸心已在座板原孔上。'};
   const dx=item.world.x-item.shaft.x,dy=item.world.y-item.shaft.y,{group,free}=attachedGroup(next.comps,item);
-  if(free){const moved=new Set();for(const c of group)for(const k of keys){const p=c[k];if(!p||p.id===item.center||moved.has(p))continue;moved.add(p);p.x+=dx;p.y+=dy;}}
-  for(const c of next.comps)if(c!==item.host)for(const k of keys)if(c[k]?.id===item.center)Object.assign(c[k],{x:item.world.x,y:item.world.y});
+  if(free){const moved=new Set();for(const c of group)for(const k of pointKeysFor(c)){const p=c[k];if(!p||p.id===item.center||moved.has(p))continue;moved.add(p);p.x+=dx;p.y+=dy;}}
+  for(const c of next.comps)if(c!==item.host)for(const k of pointKeysFor(c))if(c[k]?.id===item.center)Object.assign(c[k],{x:item.world.x,y:item.world.y});
   const holes=planActuatorPlateHoles(next);if(!holes.ok)return {ok:false,message:holes.message};
   return {ok:true,comps:holes.comps,params:next.params,message:free?'已把馬達與接在它上面的桿件放回座板原孔，可按復原。':'已把馬達軸心放回座板原孔；相連的零件會依新的軸心重新求解，可按復原。'};
 }
@@ -53,9 +58,9 @@ export function planMotorReturn(source,id){
 export function planMotorLeave(source,id){
   const next=work(source),item=offPlateMotors(next.comps).find(i=>i.id===id);
   if(!item)return {ok:false,message:'馬達軸心在座板原孔上，不需要改成獨立固定點。'};
-  const owner=next.comps.find(c=>c.id===id),m=owner.motorMount,used=new Set(next.comps.flatMap(c=>keys.map(k=>c[k]?.id)));
+  const owner=next.comps.find(c=>c.id===id),m=owner.motorMount,used=new Set(next.comps.flatMap(c=>pointKeysFor(c).map(k=>c[k]?.id)));
   let fresh=`${m.partId||owner.id}.A`,n=2;while(used.has(fresh))fresh=`${m.partId||owner.id}.A${n++}`;
-  for(const c of next.comps)if(c!==item.host)for(const k of keys)if(c[k]?.id===item.center)c[k]={...c[k],id:fresh,type:'fixed'};
+  for(const c of next.comps)if(c!==item.host)for(const k of pointKeysFor(c))if(c[k]?.id===item.center)c[k]={...c[k],id:fresh,type:'fixed'};
   const host=next.comps.find(c=>c.id===item.host.id),axis=Math.atan2(host.p2.y-host.p1.y,host.p2.x-host.p1.x)*180/Math.PI;
   if(m.orientation==='follow-frame')Object.assign(m,{orientation:'horizontal',angleDeg:(m.angleDeg||0)+axis});
   m.center=fresh;delete m.frameBody;if(Array.isArray(m.order))m.order=m.order.filter(k=>k!=='frameBody');

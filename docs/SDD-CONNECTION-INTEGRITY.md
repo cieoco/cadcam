@@ -141,7 +141,7 @@ C1 必須以程式碼逐欄核對本表，並把修正寫回本節。
 | C2b 修正序列測試找到的問題 | Sonnet | 局部孔副本失步（I1）、刪除承載板留下懸空承載引用（I3）、求解把孔鏡射到另一側仍判有效；重播轉為 `fixed-*` 強制 | 序列測試預設與 4 倍規模通過；全套 Node 306/306；瀏覽器失敗清單與 af73ecc 相同 | 完成：490b81f；剩 5 個 KNOWN（夾爪 0.1 mm 播種、4 個 10 倍規模才出現）|
 | C3 逐項啟用開檔提示 | Sonnet | 通用提示與修復元件（泛化 `motor-release` 提示）；I1、I3、I5 先啟用，其他保持影子 | 兩份使用者原檔顯示正確；範例無提示；修復一次復原；桌機與手機 | Node 完成（見 TEACHING-CHANGELOG 2026-11-10 C3）；瀏覽器桌機與手機驗收待主模型 |
 | C4 馬達單一來源與提交關卡 | Sonnet | 「有沒有馬達」「接地」改用 `motorOf`／`isGround`；刪除 `physical_motor` 等死讀取；刪除零件清理失效的承載引用；I1／I3 接入提交關卡 | 馬達相關 Node 與瀏覽器測試全過；範例姿態與匯出不變；任一入口製造 I1 被拒 | Node 完成（見 TEACHING-CHANGELOG 2026-11-11 C4）：`motor-roles.js` 單一來源、`integrity-gate.js` 接入共用審查與合併／刪除／解除馬達；啟動路徑不載入 `relations.js`；瀏覽器驗收待主模型 |
-| C5 孔用途與自由件統一 | Sonnet | `holeRoles` 三種用途、`isFreeBody`／`attachmentsOf` 取代舊實作；`m1/m2`、`mountHoles` 一致 | 加工孔集合與範例匯出 hash 不變，例外逐項列出；拖曳、改尺寸、設機架、安裝測試全過 | 待做 |
+| C5 孔用途與自由件統一 | Sonnet | `holeRoles` 三種用途、`isFreeBody`／`attachmentsOf` 取代舊實作；`m1/m2`、`mountHoles` 一致 | 加工孔集合與範例匯出 hash 不變，例外逐項列出；拖曳、改尺寸、設機架、安裝測試全過 | Node 完成（見 TEACHING-CHANGELOG 2026-11-11 C5）：`test/c5-parity.mjs` 72 份作品全同，例外 3 項（滑軌 `m1/m2`、鏈輪附掛更嚴）已鎖定；啟動路徑的自由件清單（`model.isFreeBody`、`blockifyBars`、`gear-hole-placement`、`connectedRootComps`）保留並列出理由，其餘按需載入的呼叫端改走索引 |
 | C6 合成、模組與組立接合 | Sonnet | `attachmentsOf` 涵蓋合成、模組接口、角碼／榫接；I8 啟用提示 | 原 SDD P3 矩陣非針筒案例通過 | 待做 |
 | C7 針筒（最後） | Sonnet | 針筒查詢與釋放改走索引；I9 依 3.3 定義啟用；解除與接回走共用關卡 | 原 SDD P2 案例通過；任意位置與新增固定孔不被誤判；針筒 Node 與瀏覽器測試全過 | 待做 |
 

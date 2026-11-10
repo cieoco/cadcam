@@ -12,10 +12,12 @@ export function expandLocalHoles(comps,params){
  return {comps:next,params:values,aux};
 }
 
+// How many places under the roots mention each string (ids included): the one "who mentions this id" count.
+export const idCounts=(...a)=>{const n=new Map,w=v=>{if(typeof v=='string')n.set(v,(n.get(v)||0)+1);else if(v&&typeof v=='object')Object.values(v).forEach(w);};w(a);return n;};
+
 /** Dense standard grids need constraints only at referenced or grounded holes. */
 export function passiveLocalHoles(comps,topology){
- const counts=new Map(),visit=v=>{if(typeof v==='string')counts.set(v,(counts.get(v)||0)+1);else if(v&&typeof v==='object')Object.values(v).forEach(visit);};
- visit(comps);visit({...topology,_wizard_data:null});
+ const counts=idCounts(comps,{...topology,_wizard_data:null});
  const passive=[];
  const reduced=comps.map(c=>{
   if(!c.standardBlank||localHoles(c).length<128)return c;

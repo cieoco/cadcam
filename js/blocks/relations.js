@@ -13,10 +13,11 @@
  *     attachmentsOf(compId)   全部關係 [{kind,otherId,via}]
  *     isFreeBody(compId)
  *   }
- * `machining` 由本檔自己的引用索引算出，與 used-holes.js 刻意各算一份，才能互相對照。
+ * `machining` 的規則只有 used-holes.js 一份（C5 起不再各算一份）；本檔只決定哪一種孔要問它並附理由。
  */
 import {pointKeysFor} from './part-types.js';
-import {localHoles,holeWorld} from '../core/local-holes.js';
+import {localHoles,holeWorld,idCounts} from '../core/local-holes.js';
+import {isHoleUsed} from './used-holes.js';
 import {isGroundPoint, motorRecords, motorRecordOf} from './motor-roles.js';
 import {attachmentPoint,hasSyringeClamp,fixedSyringePointIds} from '../core/syringe.js';
 
@@ -214,17 +215,11 @@ export function buildRelations(work) {
     for (const o of comps) if (o.motorMount?.frameBody === c.id && o.motorMount.center === holeId) reasons.mountOccupied.push(`${o.id} 的馬達軸心 (motorMount.center)`);
     const syr = world ? syringeEnds(c.id).filter(s => Math.hypot(s.x - world.x, s.y - world.y) < 0.001) : [];
     for (const s of syr) if (s.clamp) reasons.mountOccupied.push(`${s.by} 的管夾`);
-    // machining：需要加工成真正的孔（見 3.2；不與運動角色混用）
+    // machining：需要加工成真正的孔（見 3.2；不與運動角色混用）。規則只有 used-holes.js 一份，這裡只決定「哪一種孔要問它」。
     if (!c.standardBlank) reasons.machining.push('非標準孔格件：整件依外形加工');
     else if (kind === 'mount') { if (p.manufactured === true) reasons.machining.push('manufactured'); }
     else if (c.drilled || c.standardBlank.drill === 'all') reasons.machining.push(c.drilled ? '已鑽孔 (drilled)' : 'standardBlank.drill=all');
-    else {
-      if (p.manufactured === true) reasons.machining.push('manufactured');
-      if (ground) reasons.machining.push(`type=${p.type}`);
-      if (p.physicalMotor) reasons.machining.push('physicalMotor');
-      for (const r of external) reasons.machining.push(`被 ${refText(r)} 引用`);
-      for (const s of syr) reasons.machining.push(`${s.by} 的針筒接合位置`);
-    }
+    else if (isHoleUsed(c, p, comps, {modules, params, use: once('use', () => idCounts(comps, modules))})) reasons.machining.push('孔被使用（used-holes 規則：manufactured／接地／馬達／被引用／針筒接合）');
     return {found: true, kind, machining: reasons.machining.length > 0, mountOccupied: reasons.mountOccupied.length > 0, constraint: reasons.constraint.length > 0, reasons};
   };
 

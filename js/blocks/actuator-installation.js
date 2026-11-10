@@ -1,13 +1,13 @@
 import {localHoles,holeWorld} from '../core/local-holes.js';
+import {pointKeysFor} from './part-types.js';
 import {frameNodeIds,pointCoords} from './model.js';
 import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 /** Rotary actuator candidates. No DOM, no global state and no extra solver. */
 import {compileTopology} from '../core/topology.js';
 import {solveTopology} from '../multilink/solver.js';
 
-const keys=['p1','p2','p3'];
 export const actuatorSteps=['固定外殼','位置方向','連接輸出','試動確認'];
-export function actuatorHostPoints(c){return [...keys.filter(k=>c?.[k]).map(k=>({key:k,...c[k]})),...[...localHoles(c),...(c?.standardBlank?.mountHoles || [])].map(h=>({...h,...holeWorld(c,h),key:h.id}))];}
+export function actuatorHostPoints(c){return [...pointKeysFor(c).filter(k=>c?.[k]).map(k=>({key:k,...c[k]})),...[...localHoles(c),...(c?.standardBlank?.mountHoles || [])].map(h=>({...h,...holeWorld(c,h),key:h.id}))];}
 export const actuatorPoint=(c,key,points={})=>{const p=actuatorHostPoints(c).find(p=>p.key===key);return points[p?.id] || p;};
 const fixedPlate=(c,comps)=>c?.type==='triangle'&&c.standardBlank?.kind==='plate'&&actuatorHostPoints(c).filter(p=>frameNodeIds(comps).has(p.id)).length>=2;
 export function actuatorChoices(comps){
@@ -16,15 +16,15 @@ export function actuatorChoices(comps){
 // Infer only existing shared joints. A loose endpoint can explicitly preview a
 // world mount; never guess an endpoint or translate a connected part here.
 export function quickMotorChoices(comps,outputId=''){
-  const fixed=new Set(comps.flatMap(c=>keys.map(k=>c[k])).filter(p=>p?.type==='fixed').map(p=>p.id));
+  const fixed=new Set(comps.flatMap(c=>pointKeysFor(c).map(k=>c[k])).filter(p=>p?.type==='fixed').map(p=>p.id));
   const result=[];
   for(const out of actuatorChoices(comps).outputs){
-    if(outputId&&out.id!==outputId||out.isInput||out.physicalMotor||keys.some(k=>out[k]?.physicalMotor))continue;
+    if(outputId&&out.id!==outputId||out.isInput||out.physicalMotor||pointKeysFor(out).some(k=>out[k]?.physicalMotor))continue;
     if(out.type==='bar'&&[out.p1,out.p2].every(p=>fixed.has(p.id)))continue;
     for(const end of out.type==='gear'?['p1']:['p1','p2']){
       const node=out[end];if(!node)continue;
       if(out.type==='bar'&&fixed.has(out[end==='p1'?'p2':'p1'].id))continue;
-      const shared=comps.filter(c=>c!==out&&keys.some(k=>c[k]?.id===node.id));
+      const shared=comps.filter(c=>c!==out&&pointKeysFor(c).some(k=>c[k]?.id===node.id));
       const hosts=actuatorChoices(comps).hosts.filter(c=>c!==out&&actuatorHostPoints(c).some(p=>p.id===node.id));
       for(const host of hosts)result.push({nodeId:node.id,outputId:out.id,outputEnd:end,hostId:host.id,
         hostEnd:actuatorHostPoints(host).find(p=>p.id===node.id).key,orientation:'follow-frame',face:'back'});
@@ -41,15 +41,15 @@ export function planMotorInstallation(source,request,points={},motion={}){
   const out=comps.find(c=>c.id===request.outputId&&['bar','gear'].includes(c.type));
   const former=comps.find(c=>c.id===request.existingId);
   if(request.existingId&&!former)return fail('原致動元件不存在，請重新選取。');
-  const formerMotor=former&&(former.physicalMotor||keys.map(k=>former[k]?.physicalMotor).find(Boolean));
+  const formerMotor=former&&(former.physicalMotor||pointKeysFor(former).map(k=>former[k]?.physicalMotor).find(Boolean));
   const host=request.hostId==='world'?null:actuatorChoices(comps).hosts.find(c=>c.id===request.hostId);
   if(!host&&request.hostId!=='world')return fail('請先選外殼的承載零件。');
   if(!out)return fail('請選輸出軸要帶動的零件。');
   if(host?.type==='triangle'&&!fixedPlate(host,comps)&&out.type==='gear')return fail('目前齒輪輸出仍需固定承載板；未固定板材請先使用連桿輸出。');
-  if(former&&former!==out&&(out.isInput||out.physicalMotor||keys.some(k=>out[k]?.physicalMotor)))return fail('所選輸出已有另一個致動元件，不能覆蓋。');
+  if(former&&former!==out&&(out.isInput||out.physicalMotor||pointKeysFor(out).some(k=>out[k]?.physicalMotor)))return fail('所選輸出已有另一個致動元件，不能覆蓋。');
   if(former&&former.type!=='motor'&&former!==out&&formerMotor){
-    const formerCenter=former.motorMount?.center || keys.map(k=>former[k]).find(p=>p?.physicalMotor)?.id;
-    for(const c of comps)for(const k of keys)if(c[k]?.id===formerCenter&&String(c[k]?.physicalMotor)===String(formerMotor))delete c[k].physicalMotor;
+    const formerCenter=former.motorMount?.center || pointKeysFor(former).map(k=>former[k]).find(p=>p?.physicalMotor)?.id;
+    for(const c of comps)for(const k of pointKeysFor(c))if(c[k]?.id===formerCenter&&String(c[k]?.physicalMotor)===String(formerMotor))delete c[k].physicalMotor;
     for(const k of ['physicalMotor','motorType','motorCarrier','motorMount','phaseOffset','servoStart','servoEnd'])delete former[k];
     former.isInput=false;
     for(const c of comps)if(c.motorMountPoint===formerCenter)delete c.motorMountPoint;
@@ -61,7 +61,7 @@ export function planMotorInstallation(source,request,points={},motion={}){
   if(!['horizontal','vertical','follow-frame'].includes(request.orientation))return fail('請選外殼方向。');
   if(request.angleDeg!=null&&(!Number.isFinite(request.angleDeg)||Math.abs(request.angleDeg)>360))return fail('安裝轉角需在 −360～360°。');
   const key=out.type==='gear'?'p1':request.outputEnd;
-  const oldCenter=out.motorMount?.center || keys.map(k=>out[k]).find(p=>p?.physicalMotor)?.id;
+  const oldCenter=out.motorMount?.center || pointKeysFor(out).map(k=>out[k]).find(p=>p?.physicalMotor)?.id;
   if(!['p1','p2'].includes(key)||!out[key])return fail('請選輸出零件的端孔。');
   if(oldCenter&&oldCenter!==out[key].id)return fail('這個零件已有另一端的動力，請先拆除原動力再換孔。');
   const hostKey=request.hostEnd;
@@ -78,8 +78,8 @@ export function planMotorInstallation(source,request,points={},motion={}){
   if(!same){
     // Only a completely loose bar can be translated; connected mechanisms must
     // keep their actual shared node IDs, rather than a visual coincidence.
-    const outIds=new Set(keys.map(k=>out[k]?.id).filter(Boolean));
-    const connected=comps.some(c=>c!==out&&c!==independent&&keys.some(k=>outIds.has(c[k]?.id)));
+    const outIds=new Set(pointKeysFor(out).map(k=>out[k]?.id).filter(Boolean));
+    const connected=comps.some(c=>c!==out&&c!==independent&&pointKeysFor(c).some(k=>outIds.has(c[k]?.id)));
     if(out.type!=='bar'||connected||out.isInput||[out.p1,out.p2].some(p=>fixedIds.has(p.id)))
       return fail('輸出孔與承載孔尚未共用接點；請先在設計畫布接好。只有獨立連桿可自動平移對孔。');
     const dx=targetWorld.x-originalWorld.x,dy=targetWorld.y-originalWorld.y;
@@ -88,7 +88,7 @@ export function planMotorInstallation(source,request,points={},motion={}){
   }
   const center=out[key].id,other=key==='p1'?'p2':'p1';
   if(out.type==='bar'&&fixedIds.has(out[other].id))return fail('輸出桿另一端已固定，無法由這個孔帶動旋轉。');
-  const otherMotor=comps.find(c=>c!==out&&c!==independent&&keys.some(k=>c[k]?.id===center&&c[k].physicalMotor));
+  const otherMotor=comps.find(c=>c!==out&&c!==independent&&pointKeysFor(c).some(k=>c[k]?.id===center&&c[k].physicalMotor));
   if(otherMotor)return fail('這個軸心已由另一個零件的馬達驅動，請編輯原致動元件。');
   const motor=String(formerMotor || out.physicalMotor || out[key].physicalMotor || request.motorId || '1');
   const previousHost=out.motorMount?.frameBody || out.motorCarrier || null;
@@ -106,7 +106,7 @@ export function planMotorInstallation(source,request,points={},motion={}){
   }
   // A real fixed host already supplies the ground constraint. The explicit
   // auto-frame choice supplies it only when the user chose that option.
-  if(!host)for(const c of comps)for(const k of keys)if(c[k]?.id===center)c[k].type='fixed';
+  if(!host)for(const c of comps)for(const k of pointKeysFor(c))if(c[k]?.id===center)c[k].type='fixed';
   if(host?.type==='triangle')out[key].type=fixedPlate(host,comps)?'fixed':target.type;
   out[key].physicalMotor=motor;out.motorType=request.type;
   if(request.type==='mg995'){
@@ -149,38 +149,38 @@ function planUnconnectedMotor(source,request,points,motion){
   const old=comps.find(c=>c.id===request.existingId),mount=old?.motorMount||{};
   if(request.existingId&&!old)return fail('原致動元件不存在，請重新選取。');
   if(old&& !['bar','motor'].includes(old.type))return fail('齒輪輸出的解除仍需核對被動齒輪求解；本次先支援連桿輸出。');
-  const motor=String(old?.physicalMotor||keys.map(k=>old?.[k]?.physicalMotor).find(Boolean)||request.motorId||'1');
+  const motor=String(old?.physicalMotor||pointKeysFor(old).map(k=>old?.[k]?.physicalMotor).find(Boolean)||request.motorId||'1');
   if(!['tt','n20','mg995'].includes(request.type)||!['front','back'].includes(request.face)||!['horizontal','vertical','follow-frame'].includes(request.orientation))return fail('請選有效的馬達型號與安裝方向。');
   if(!Number.isFinite(request.angleDeg??0)||Math.abs(request.angleDeg??0)>360)return fail('安裝轉角需在 −360～360°。');
   const host=request.hostId==='world'?null:actuatorChoices(comps).hosts.find(c=>c.id===request.hostId);
   if(!host&&request.hostId!=='world')return fail('請選外殼的承載零件。');
   if(!host&&request.face==='front')return fail('圖面基準沿用背面安裝。');
   if(host?.type==='bar'&&request.orientation!=='follow-frame'&&![host.p1,host.p2].every(p=>frameNodeIds(comps).has(p.id)))return fail('活動承載桿上的外殼方向需沿承載桿。');
-  const center=mount.center||keys.map(k=>old?.[k]).find(p=>p?.physicalMotor)?.id;
+  const center=mount.center||pointKeysFor(old).map(k=>old?.[k]).find(p=>p?.physicalMotor)?.id;
   // Releasing an output in place only removes constraints: the motor keeps its current
   // shaft and mount, and a broken housing mount must not block the release.
   const pureRelease=!!old&&old.type!=='motor'&&request.hostId===(mount.frameBody||old.motorCarrier||'world')&&(!host||actuatorHostPoints(host).find(p=>p.key===request.hostEnd)?.id===center);
-  const at=host?actuatorPoint(host,request.hostEnd,points):request.position||points[center]||keys.map(k=>old?.[k]).find(p=>p?.id===center);
+  const at=host?actuatorPoint(host,request.hostEnd,points):request.position||points[center]||pointKeysFor(old).map(k=>old?.[k]).find(p=>p?.id===center);
   if(!at||![at.x,at.y].every(Number.isFinite))return fail('請先在畫布放置馬達，或輸入有效的軸心座標。');
   let id=old?.type==='motor'?old.id:mount.partId;
-  if(!id){let n=Number(source.counter)||1;while(comps.some(c=>c.id===`Motor${n}`||c.motorMount?.partId===`Motor${n}`||keys.some(k=>c[k]?.id===`Motor${n}.A`)))n++;id=`Motor${n}`;}
+  if(!id){let n=Number(source.counter)||1;while(comps.some(c=>c.id===`Motor${n}`||c.motorMount?.partId===`Motor${n}`||pointKeysFor(c).some(k=>c[k]?.id===`Motor${n}.A`)))n++;id=`Motor${n}`;}
   if(comps.some(c=>c.id===id&&c!==old))return fail('馬達零件編號重複，請重新開啟安裝。');
   const p1={id:host?actuatorHostPoints(host).find(p=>p.key===request.hostEnd)?.id:`${id}.A`,type:!host||fixedPlate(host,comps)?'fixed':'floating',x:at.x,y:at.y,physicalMotor:motor};
   if(!p1.id)return fail('承載孔不存在。');
-  if(comps.some(c=>c!==old&&keys.some(k=>c[k]?.id===p1.id&&c[k].physicalMotor&&String(c[k].physicalMotor)!==motor)))return fail('此孔已有其他馬達。');
+  if(comps.some(c=>c!==old&&pointKeysFor(c).some(k=>c[k]?.id===p1.id&&c[k].physicalMotor&&String(c[k].physicalMotor)!==motor)))return fail('此孔已有其他馬達。');
   if(old&&old.type!=='motor'){
-    const key=keys.find(k=>old[k]?.id===center);if(!key)return fail('原輸出軸心不存在。');
+    const key=pointKeysFor(old).find(k=>old[k]?.id===center);if(!key)return fail('原輸出軸心不存在。');
     if(old.barFusion||old.barFusionRoot)return fail('請先解除桿件合成，再解除個別輸出連接。');
     // Keep the displayed pose of the connected group, including every copy of
     // shared endpoints. Leaving a neighbour's stale copy makes the rod jump.
-    const group=new Set([old.id]),nodes=new Set(keys.map(k=>old[k]?.id).filter(Boolean));
-    let grew=true;while(grew){grew=false;for(const c of comps)if(!group.has(c.id)&&keys.some(k=>nodes.has(c[k]?.id))){group.add(c.id);keys.forEach(k=>{if(c[k])nodes.add(c[k].id);});grew=true;}}
+    const group=new Set([old.id]),nodes=new Set(pointKeysFor(old).map(k=>old[k]?.id).filter(Boolean));
+    let grew=true;while(grew){grew=false;for(const c of comps)if(!group.has(c.id)&&pointKeysFor(c).some(k=>nodes.has(c[k]?.id))){group.add(c.id);pointKeysFor(c).forEach(k=>{if(c[k])nodes.add(c[k].id);});grew=true;}}
     const lattice=new Set(comps.flatMap(c=>localHoles(c).map(h=>h.id)));      // a hole end follows its body, not the display seed
-    for(const c of comps)if(group.has(c.id))for(const k of keys)if(c[k]&&!lattice.has(c[k].id)&&points[c[k].id]&&[points[c[k].id].x,points[c[k].id].y].every(Number.isFinite))Object.assign(c[k],{x:points[c[k].id].x,y:points[c[k].id].y});
-    for(const o of comps)if(group.has(o.id))for(const h of localHoles(o)){const w=holeWorld(o,h);for(const c of comps)if(c!==o)for(const k of keys)if(c[k]?.id===h.id)Object.assign(c[k],{x:w.x,y:w.y});}
-    let released=`${old.id}.released`,n=1;const ids=new Set(comps.flatMap(c=>keys.map(k=>c[k]?.id)));while(ids.has(released))released=`${old.id}.released${n++}`;
+    for(const c of comps)if(group.has(c.id))for(const k of pointKeysFor(c))if(c[k]&&!lattice.has(c[k].id)&&points[c[k].id]&&[points[c[k].id].x,points[c[k].id].y].every(Number.isFinite))Object.assign(c[k],{x:points[c[k].id].x,y:points[c[k].id].y});
+    for(const o of comps)if(group.has(o.id))for(const h of localHoles(o)){const w=holeWorld(o,h);for(const c of comps)if(c!==o)for(const k of pointKeysFor(c))if(c[k]?.id===h.id)Object.assign(c[k],{x:w.x,y:w.y});}
+    let released=`${old.id}.released`,n=1;const ids=new Set(comps.flatMap(c=>pointKeysFor(c).map(k=>c[k]?.id)));while(ids.has(released))released=`${old.id}.released${n++}`;
     old[key]={...old[key],id:released,type:'floating'};delete old[key].physicalMotor;
-    for(const c of comps)for(const k of keys)if(c[k]?.id===center&&String(c[k].physicalMotor)===motor)delete c[k].physicalMotor;
+    for(const c of comps)for(const k of pointKeysFor(c))if(c[k]?.id===center&&String(c[k].physicalMotor)===motor)delete c[k].physicalMotor;
     for(const k of ['physicalMotor','motorType','motorCarrier','motorMount','phaseOffset','servoStart','servoEnd'])delete old[k];old.isInput=false;
   }
   for(const c of comps)if(c.motorMountPoint===center&&c.id!==host?.id)delete c.motorMountPoint;

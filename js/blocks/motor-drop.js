@@ -1,9 +1,9 @@
 import {blankGeometry,isOutputBlank} from './standard-blank.js';
+import {pointKeysFor} from './part-types.js';
 import {actuatorHostPoints,actuatorPoint,planMotorInstallation} from './actuator-installation.js';
 import {motorCarrierFrame,resolveMotorOrientation} from './motor-orientation.js';
 import {isFreeBody} from './model.js';
 
-const keys=['p1','p2','p3'];
 const inside=(p,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++)if((ring[i].y>p.y)!==(ring[j].y>p.y)&&p.x<(ring[j].x-ring[i].x)*(p.y-ring[i].y)/(ring[j].y-ring[i].y)+ring[i].x)hit=!hit;return hit;};
 /** A drop selects a real carrier and its nearest available grid hole. The
  * installation planner owns hole geometry, occupancy, validation and identity. */
@@ -11,7 +11,7 @@ export function planMotorDrop(source,request,points={},motion={}){
  const at=request.position;if(!at||![at.x,at.y].every(Number.isFinite))return {matched:false};
  const old=source.comps.find(c=>c.id===request.existingId),scope=old?.moduleId||source.moduleId||'';
  const hosts=source.comps.filter(c=>c!==old&&c.standardBlank&&!isOutputBlank(c)&&['bar','plate'].includes(c.standardBlank.kind)&&(c.moduleId||'')===scope).filter(c=>{
-  const ring=blankGeometry(c,keys.map(k=>points[c[k]?.id]||c[k]).filter(Boolean));return ring&&inside(at,ring);
+  const ring=blankGeometry(c,pointKeysFor(c).map(k=>points[c[k]?.id]||c[k]).filter(Boolean));return ring&&inside(at,ring);
  });
  if(!hosts.length)return {matched:false};
  if(hosts.length>1)return {matched:true,ok:false,message:`此處重疊 ${hosts.map(c=>c.name||c.id).join('、')}；請在安裝設定選擇承載零件。`};
@@ -25,7 +25,7 @@ export function planMotorDrop(source,request,points={},motion={}){
  const angleDeg=Math.atan2(desired.y*base.x-desired.x*base.y,desired.x*base.x+desired.y*base.y)*180/Math.PI;
  const next={...request,hostId:host.id,hostEnd:hole.key,position:center,orientation:'follow-frame',angleDeg,outputId:''};
  // Preserve the displayed pose when a carrier is currently away from its stored zero pose.
- const seed=structuredClone(source);for(const c of seed.comps)for(const k of keys)if(c[k]&&points[c[k].id])Object.assign(c[k],points[c[k].id]);
+ const seed=structuredClone(source);for(const c of seed.comps)for(const k of pointKeysFor(c))if(c[k]&&points[c[k].id])Object.assign(c[k],points[c[k].id]);
  const result=planMotorInstallation(seed,next,points,motion);
  return {...result,matched:true,request:next,hostName:host.name||host.id};
 }
