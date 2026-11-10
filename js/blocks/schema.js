@@ -84,6 +84,15 @@ function normalizeAnchor(comp, index, warnings) {
   return { type: 'anchor', id, p1, ...(frameHole?{frameHole}:{}) };
 }
 
+function normalizeMotor(comp,index,warnings){
+  const id=safeId(comp.id)?comp.id:`Motor${index+1}`,p1=normalizePoint(comp.p1,`${id}.A`,warnings),m=comp.motorMount||{};
+  const motor=String(comp.physicalMotor||p1.physicalMotor||index+1),motorType=['tt','n20','mg995'].includes(comp.motorType)?comp.motorType:'tt';
+  p1.physicalMotor=motor;if(!safeId(m.frameBody))p1.type='fixed';
+  const out={type:'motor',id,p1,physicalMotor:motor,motorType,motorMount:{motor,center:p1.id,face:m.face==='front'?'front':'back',orientation:['horizontal','vertical','follow-frame'].includes(m.orientation)?m.orientation:'horizontal',angleDeg:Math.max(-360,Math.min(360,num(m.angleDeg))),reversed:!!m.reversed,...(safeId(m.frameBody)?{frameBody:m.frameBody}:{})}};
+  if(motorType==='mg995'){out.servoStart=Math.max(-360,Math.min(360,num(comp.servoStart)));out.servoEnd=Math.max(-360,Math.min(360,num(comp.servoEnd,90)));}
+  return out;
+}
+
 function normalizeBar(comp, index, params, warnings) {
   const id = safeId(comp.id) ? comp.id : `Link${index + 1}`;
   const p1 = normalizePoint(comp.p1, `P${index + 1}a`, warnings);
@@ -131,7 +140,7 @@ function normalizeBar(comp, index, params, warnings) {
     if (out.motorType === 'mg995') {
       // 伺服來回擺的兩端角度（與 play 的 theta 同座標系），clamp 0..360。
       // 伺服角度相對於組裝姿態，可以是負的（例如四連桿升降 −60～60°）。
-      const clampAng = v => Math.max(-360, Math.min(360, Math.round(num(v, 0))));
+      const clampAng = v => Math.max(-360, Math.min(360, num(v, 0)));
       out.servoStart = clampAng(comp.servoStart ?? 0);
       out.servoEnd = clampAng(comp.servoEnd ?? 90);
     }
@@ -144,6 +153,7 @@ function normalizeBar(comp, index, params, warnings) {
     if (center && comp.motorMount && typeof comp.motorMount === 'object') {
       out.motorMount = {
         motor: String(rawMount.motor || out.physicalMotor),
+        ...(safeId(rawMount.partId)?{partId:rawMount.partId}:{}),
         center,
         outputBody: id,
         ...(frameBody ? { frameBody } : {}),
@@ -416,6 +426,7 @@ function normalizeGear(comp, index, params, warnings) {
   if(comp.motorMount&&p1.physicalMotor){
     const m=comp.motorMount;
     out.motorMount={motor:String(p1.physicalMotor),center:p1.id,outputBody:id,
+      ...(safeId(m.partId)?{partId:m.partId}:{}),
       ...(safeId(m.frameBody)?{frameBody:m.frameBody}:{}),
       ...(['front','back'].includes(m.face)?{face:m.face}:{}),
       ...(['horizontal','vertical','follow-frame'].includes(m.orientation)?{orientation:m.orientation}:{}),
@@ -426,7 +437,7 @@ function normalizeGear(comp, index, params, warnings) {
   if (comp.motorType === 'n20') out.motorType = 'n20';
   if (comp.motorType === 'mg995') {
     // 伺服角度相對於組裝姿態，可以是負的（例如四連桿升降 −60～60°）。
-      const clampAng = v => Math.max(-360, Math.min(360, Math.round(num(v, 0))));
+      const clampAng = v => Math.max(-360, Math.min(360, num(v, 0)));
     out.motorType = 'mg995';
     out.servoStart = clampAng(comp.servoStart ?? 0);
     out.servoEnd = clampAng(comp.servoEnd ?? 90);
@@ -635,6 +646,7 @@ export function normalizeSnapshot(obj) {
     }
     if (raw.type === 'syringe') comps.push(normalizeSyringe({...raw,id:safeId(raw.id)?raw.id:`Syringe${index+1}`}));
     else if (raw.type === 'anchor') comps.push(normalizeAnchor(raw, index, warnings));
+    else if (raw.type === 'motor') comps.push(normalizeMotor(raw, index, warnings));
     else if (raw.type === 'bar') comps.push(normalizeBar(raw, index, params, warnings));
     else if (raw.type === 'triangle') comps.push(normalizeTriangle(raw, index, params, warnings));
     else if (raw.type === 'slider') comps.push(normalizeSlider(raw, index, params, warnings));

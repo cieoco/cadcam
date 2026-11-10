@@ -83,6 +83,7 @@ export function pointRefs(comps, id) {
 export function hasPoint(comps, id) { return pointRefs(comps, id).length > 0; }
 
 export function pointHasMotor(comps, id) {
+  if(comps.some(c=>c.type==='motor'&&c.p1?.id===id))return true;
   return comps.some(c => c.type === 'bar' && c.isInput && (
     (c.p1 && c.p1.id === id && c.p1.physicalMotor) ||
     (c.p2 && c.p2.id === id && c.p2.physicalMotor)
@@ -178,13 +179,13 @@ export function snapFrameCoord(v, step = LEGO_FRAME_STEP) {
 
 export function removeMotorAtPoint(comps, id) {
   comps.forEach(c => {
-    if (c.type !== 'bar' || !c.isInput || !c.p1 || !c.p2) return;
-    const isMotorEnd = (c.p1.id === id && c.p1.physicalMotor) || (c.p2.id === id && c.p2.physicalMotor);
+    if (!['bar','gear','pulley'].includes(c.type)) return;
+    const isMotorEnd = [c.p1,c.p2].some(p=>p?.id===id&&(p.physicalMotor||p.physical_motor));
     if (!isMotorEnd) return;
-    c.isInput = false;
-    delete c.physicalMotor;
-    delete c.physical_motor;
+    if(c.type==='bar')c.isInput = false;
+    for(const key of ['physicalMotor','physical_motor','motorType','motorMount','motorCarrier','motor_carrier','servoStart','servoEnd'])delete c[key];
   });
+  comps.forEach(c=>{if(c.motorMountPoint===id)delete c.motorMountPoint;});
   pointRefs(comps, id).forEach(ref => {
     delete ref.point.physicalMotor;
     delete ref.point.physical_motor;
@@ -459,9 +460,11 @@ export function isFreeLink(comps, c) {
 
 // Whole-body translation also respects local holes and indirect attachments.
 export function isFreeBody(comps, c, modules = []) {
-  if (!(isFreeLink(comps,c) || (c?.type==='triangle' && freeTriangleForPoint(comps,c.p1?.id)===c))) return false;
+  const motor=c?.type==='motor'&&c.p1&&!c.motorCarrier&&!c.motor_carrier&&(!c.motorMount?.frameBody||c.motorMount.frameBody==='world');
+  if (!(motor || isFreeLink(comps,c) || (c?.type==='triangle' && freeTriangleForPoint(comps,c.p1?.id)===c))) return false;
   const holes=[c.p1,c.p2,c.p3,...localHoles(c)].filter(Boolean);
-  if(holes.some(p=>isGroundPoint(p)||p.physicalMotor||pointUseCount(comps,p.id)!==1))return false;
+  // An unattached motor is grounded for simulation, but remains placeable in design.
+  if(holes.some(p=>(!motor&&(isGroundPoint(p)||p.physicalMotor))||pointUseCount(comps,p.id)!==1))return false;
   const ids=new Set([c.id,...holes.map(p=>p.id)]);
   const references=value=>typeof value==='string'?ids.has(value):!!value&&typeof value==='object'&&Object.values(value).some(references);
   return !c.isInput && !comps.some(other=>other!==c&&references(other)) && !modules.some(references);

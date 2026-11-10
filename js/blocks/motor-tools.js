@@ -19,14 +19,14 @@ export function motorTypeAt(comps, centerId) {
     (c.p2 && c.p2.id === centerId && c.p2.physicalMotor)
   ));
   if (bar) return ['mg995','n20'].includes(bar.motorType) ? bar.motorType : 'tt';
-  const gear = comps.find(c => ['gear','pulley'].includes(c.type) && c.p1 && c.p1.id === centerId && c.p1.physicalMotor);
+  const gear = comps.find(c => ['gear','pulley','motor'].includes(c.type) && c.p1 && c.p1.id === centerId && c.p1.physicalMotor);
   if (gear) return ['mg995','n20'].includes(gear.motorType) ? gear.motorType : 'tt';
   return 'tt';
 }
 // 角度面板與編輯共用同一查詢；馬達裝配的桿件查詢仍保持原用途。
 export function servoInputAt(comps, centerId) {
   return comps.find(c => c.motorType === 'mg995' && (
-    (c.type === 'gear' && c.p1?.id === centerId && c.p1.physicalMotor) ||
+    (['gear','motor'].includes(c.type) && c.p1?.id === centerId && c.p1.physicalMotor) ||
     (c.type === 'bar' && c.isInput && [c.p1, c.p2].some(p => p?.id === centerId && p.physicalMotor))
   )) || null;
 }
@@ -42,7 +42,7 @@ export function servoRange(comps, activeMotor) {
   };
   const servoBar = comps.find(c => c.type === 'bar' && c.isInput && c.motorType === 'mg995' && motorIdOf(c) === active);
   if (servoBar) return range(servoBar);
-  const servoGear = comps.find(c => c.type === 'gear' && c.motorType === 'mg995' && c.p1 &&
+  const servoGear = comps.find(c => ['gear','motor'].includes(c.type) && c.motorType === 'mg995' && c.p1 &&
     String(c.p1.physicalMotor || c.p1.physical_motor || '') === active);
   return servoGear ? range(servoGear) : null;
 }
@@ -334,7 +334,7 @@ export function createMotorTools({
   // 原軸直接換型號：保留編號、機架、相位與輸出桿，不走拆除／重裝。
   function changeMotorTypeAt(nodeId,type) {
     if(!['tt','mg995','n20'].includes(type))return null;
-    const c=motorBarForCenter(nodeId) || S.comps.find(c=>['gear','pulley'].includes(c.type) && c.p1?.id===nodeId && c.p1.physicalMotor);
+    const c=motorBarForCenter(nodeId) || S.comps.find(c=>['gear','pulley','motor'].includes(c.type) && c.p1?.id===nodeId && c.p1.physicalMotor);
     if(!c || (c.type==='pulley' && type==='mg995'))return null;
     const cId=c.id;
     pause();

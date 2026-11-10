@@ -29,7 +29,7 @@ function put(node, parent, {first = false} = {}) {
   first ? parent.prepend(node) : parent.append(node);
 }
 function giveBack() {
-  for (const [node, mark] of homes) { if (mark.isConnected) mark.replaceWith(node); }
+  for (const [node, mark] of homes) { if (mark.isConnected) { if(node.isConnected)mark.replaceWith(node);else mark.remove(); } }
   homes.clear();
 }
 function layoutIn() {

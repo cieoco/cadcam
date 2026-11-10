@@ -108,7 +108,7 @@ export function buildMotorMounts({ motorIds, groundIds, staticPoints, comps, com
     // 先找明確宣告「軸心就是這顆馬達」的桿（motorMount.center）；只靠「端點接在馬達
     // 中心且 isInput」推斷會在兩顆馬達共點時搶答（例：M1 曲柄的浮動端剛好是 M2 軸心），
     // 導致騎乘馬達的 frameBody 被別顆馬達的 mount 蓋掉、安裝特徵誤入自動地基。
-    const outputBar = comps.find(comp => ['bar','gear'].includes(comp.type) && comp.motorMount && comp.motorMount.center === id)
+    const outputBar = comps.find(comp => ['bar','gear','motor'].includes(comp.type) && comp.motorMount && comp.motorMount.center === id)
       || comps.find(comp => comp.type === 'bar' && comp.p1 && comp.p2 && (comp.p1.id === id || comp.p2.id === id) &&
         (comp.isInput || crankTips.has(comp.p1.id === id ? comp.p2.id : comp.p1.id)));
     // A riding motor is mounted to its carrier link, not to the world frame.
@@ -118,7 +118,7 @@ export function buildMotorMounts({ motorIds, groundIds, staticPoints, comps, com
     const orientation = outputBar?.motorMount?.orientation;
     const barAssembly = outputBar
       ? {
-          outputBody: outputBar.id,
+          ...(outputBar.type!=='motor'?{outputBody:outputBar.id}:{}),
           ...(carrierId ? { frameBody: carrierId } : {}),
           orientation: orientation || (carrierId ? 'follow-frame' : 'horizontal'),
           ...(Number.isFinite(outputBar.motorMount?.angleDeg)?{angleDeg:outputBar.motorMount.angleDeg}:{}),

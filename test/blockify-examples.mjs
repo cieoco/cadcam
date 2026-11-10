@@ -67,6 +67,8 @@ if(WRITE){
  for(const e of BLOCK_EXAMPLES){const m=measure(e),parts=Object.fromEntries(Object.entries(m.parts).filter(([,p])=>!p.std));out.examples[e.id]={...oldView(m,{parts}),snapshot:sha(e.snapshot),parts};}
  writeFileSync(FIXTURE,JSON.stringify(out)+'\n');console.log('fixture written',Object.keys(out.examples).length);process.exit(0);
 }
+// 2026-11-10: approved rounded standard outlines change export and mass, not IDs/poses/holes.
+const ROUND=new URL('./fixtures/blockify-rounded-export.json',import.meta.url),writeRound=process.argv.includes('--write-rounded'),rounded=writeRound?{}:JSON.parse(readFileSync(ROUND,'utf8'));
 const before=JSON.parse(readFileSync(FIXTURE,'utf8')).examples,summary={examples:0,parts:0},left={};
 // The adjustment case was added after the frozen conversion baseline.
 // Its geometry/export coverage lives in used-holes and the syringe edit tests.
@@ -78,14 +80,19 @@ for(const e of baselineExamples){
  if(!converted.length){assert.equal(sha(e.snapshot),old.snapshot,e.id+' untouched');continue;}
  summary.examples++;summary.parts+=converted.length;
  const now=oldView(m,old);
- for(const k of ['ids','poses','export','mass','catalogError'])assert.equal(now[k],old[k],`${e.id} ${k} unchanged`);
+ for(const k of ['ids','poses','catalogError'])assert.equal(now[k],old[k],`${e.id} ${k} unchanged`);
+ if(writeRound)rounded[e.id]={export:now.export,mass:now.mass};else for(const k of ['export','mass'])assert.equal(now[k],rounded[e.id][k],`${e.id} rounded ${k}`);
  for(const id of converted){
   const a=old.parts[id],b=m.parts[id];
   for(const [hid,u,v] of a.holes)assert.ok(b.holes.some(h=>h[0]===hid&&h[1]===u&&h[2]===v),`${e.id}:${id} keeps hole ${hid} at (${u},${v})`);
   assert.deepEqual(b.cut,a.cut,`${e.id}:${id} drilled holes (part-local)`);
-  assert.ok(Math.abs(b.area-a.area)<=a.area*.01,`${e.id}:${id} outline area`);
+  // Capsule ends (r=6.5) become a bounding-box-preserving rectangle with r=3 corners.
+  // Allow 2 mm² for polygon arc sampling in both old and new contours.
+  const expectedDelta=(4-Math.PI)*(6.5**2-3**2);
+  assert.ok(Math.abs(b.area-a.area-expectedDelta)<2,`${e.id}:${id} rounded outline area delta ${b.area-a.area}`);
   const L=m.s.params[m.s.comps.find(c=>c.id===id).lenParam];assert.equal(b.holes.length,L/8-1,`${e.id}:${id} full lattice`);
  }
 }
+if(writeRound)writeFileSync(ROUND,JSON.stringify(rounded,null,2)+'\n');
 console.log('blockify-examples:',JSON.stringify(summary),Object.fromEntries(Object.entries(left).map(([k,v])=>[k,v.size])));
 console.log('PASS blockify-examples');

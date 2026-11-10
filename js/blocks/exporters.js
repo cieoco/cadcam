@@ -1,4 +1,4 @@
-import {blankGeometry,isOutputBlank} from './standard-blank.js';
+import {blankGeometry,isOutputBlank,isStandardBar} from './standard-blank.js';
 import {localHoles} from '../core/local-holes.js';
 import {machinedComps} from './used-holes.js';
 export * from './used-holes.js';
@@ -243,7 +243,7 @@ function linkHoleSpecs(comp, length, settings, extraHoles = []) {
 }
 
 function svgForLink(comp, length, settings, extraHoles = []) {
-  if(isDisk(comp)||isOutputBlank(comp))return addSvgStockDescription(svgForFrameGeometry(inspectLinkExport(comp,length,settings,extraHoles),comp.id),comp);
+  if(isDisk(comp)||isStandardBar(comp))return addSvgStockDescription(svgForFrameGeometry(inspectLinkExport(comp,length,settings,extraHoles),comp.id),comp);
   const stock = memberStock(comp);
   const r = round(stock.widthMm / 2, 3);
   const holes = linkHoleSpecs(comp, length, settings, extraHoles);
@@ -1320,7 +1320,7 @@ export function dxfForFrameGeometry(geometry,partId='frame') {
 }
 
 function dxfForLink(comp, length, settings, extraHoles = []) {
-  if(isDisk(comp)||isOutputBlank(comp))return addDxfStockComment(dxfForFrameGeometry(inspectLinkExport(comp,length,settings,extraHoles),comp.id),comp);
+  if(isDisk(comp)||isStandardBar(comp))return addDxfStockComment(dxfForFrameGeometry(inspectLinkExport(comp,length,settings,extraHoles),comp.id),comp);
   const stock = memberStock(comp);
   const r = round(stock.widthMm / 2, 3);
   const holes = linkHoleSpecs(comp, length, settings, extraHoles);
@@ -1354,7 +1354,7 @@ export function inspectLinkExport(comp, length, settings = {}, extraHoles = []) 
   if(comp.boxPanel){const g=boxPanelGeometry(comp);if(!g)throw Error('盒體板件資料無效');return {...g,holes:adapterHoleSpecs(extraHoles)};}
   const safeLength = Number.isFinite(Number(length)) && Number(length) > 0 ? Number(length) : 1;
   if(isDisk(comp)){const error=validateDisk(comp,safeLength,comp.diameterMm,normalizeExportSettings(settings).holeDiameterMm);if(error)throw Error(error);}
-  const outline = isOutputBlank(comp)?blankGeometry(comp,[{x:0,y:0},{x:safeLength,y:0}]):isDisk(comp)?diskOutline(comp):barOutline({ x: 0, y: 0 }, { x: safeLength, y: 0 }, memberStock(comp).widthMm / 2);
+  const outline = isStandardBar(comp)?blankGeometry(comp,[{x:0,y:0},{x:safeLength,y:0}]):isDisk(comp)?diskOutline(comp):barOutline({ x: 0, y: 0 }, { x: safeLength, y: 0 }, memberStock(comp).widthMm / 2);
   const holes = [];
   const cutouts = [];
   linkHoleSpecs(comp, safeLength, settings, extraHoles).forEach(hole => {

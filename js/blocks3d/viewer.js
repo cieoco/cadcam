@@ -1061,10 +1061,14 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
         body.position.set(SERVO.boxLen / 2 - SERVO.shaftInset, 0, bodyCz);
         g.add(body);
 
-        // 舵盤（horn）：圓盤，貼在齒輪箱頂面、繞輸出軸
-        const hornZ = -SERVO.gap + SERVO.hornThick / 2;
+        // 舵盤（horn）：已穿板安裝時露在承載板外側，不能埋在板厚內。
+        // 無承載的舊模型仍貼在齒輪箱頂面；尺寸均為預覽示意。
+        const hornThick = m.hornThickness ?? SERVO.hornThick;
+        const hornZ = Number.isFinite(m.hornBaseZ)
+          ? (m.hornBaseZ - g.position.z) / m.shaftDirection + hornThick / 2
+          : -SERVO.gap + hornThick / 2;
         const horn = new THREE.Mesh(
-          new THREE.CylinderGeometry(SERVO.hornR, SERVO.hornR, SERVO.hornThick, 24), servoHornMat);
+          new THREE.CylinderGeometry(SERVO.hornR, SERVO.hornR, hornThick, 24), servoHornMat);
         horn.rotation.x = Math.PI / 2;
         horn.position.set(0, 0, hornZ);
         g.add(horn);

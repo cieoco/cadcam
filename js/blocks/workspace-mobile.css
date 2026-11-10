@@ -278,7 +278,7 @@ body:has(#syringeEditor[style*="flex"]) .mobile-panel-section[data-panel="edit"]
  body[data-mobile-panel="edit"]:not([data-preview3d]) #syringeControls{box-sizing:border-box;width:calc(100% - 260px)}
 }
 
-/* 零件草稿表單：沿用 .tool-btn；確認新增為主要動作。草稿期間隱藏提示與重複的取消列，避免蓋住下方內容。 */
+/* 零件草稿表單：沿用 .tool-btn；放到畫布後直接點放或拖放。草稿期間隱藏提示與重複的取消列，避免蓋住下方內容。 */
 .part-palette > * { flex-shrink:0; }
 #standardBlankPanel { box-sizing:border-box; max-width:100%; padding:10px; border:1px solid #b8cbd9; border-radius:10px; margin:8px 0; background:#fff; }
 #standardBlankPanel label { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:8px 0; font-size:14px; color:#34495e; }
@@ -305,3 +305,22 @@ body:has(#standardBlankPanel:not([hidden])) .mode-banner { display:none !importa
 #syringeEditor .syringe-connection-actions button[aria-pressed="true"]{background:#087f8c;color:white}
 #syringeEditor .syringe-connection-actions label{display:flex;flex-direction:column;align-items:stretch;gap:4px}
 #syringeEditor .syringe-connection-actions select{max-width:100%;min-width:0;min-height:44px}
+
+/* Motor installation shares the ordinary inspector and mobile sheet. */
+body:has(#motorInstallation) .inspector-panel:not(#motorInstallation){display:none!important}
+#motorInstallation{top:8px;bottom:8px;padding:10px;box-sizing:border-box;overflow-y:auto;gap:8px}
+#motorInstallation>header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#motorInstallation>footer{display:flex;justify-content:flex-end}
+#motorInstallation>footer:has(button[hidden]){display:none}
+#motorInstallation>*{flex:none}
+#motorInstallation .install-options{padding:0;overflow:visible}
+#motorInstallation .install-preview{min-height:0;height:auto;background:transparent}
+#motorInstallation .install-hint{position:static;margin:0;padding:6px 0;font-size:13px}
+#motorInstallation button{min-height:40px;padding:6px 10px;border:1px solid #b8ccdf;border-radius:7px;background:#fff;color:#24496e;cursor:pointer}
+#motorInstallation button:disabled{opacity:.45;cursor:default}
+#motorInstallation button[aria-pressed=true],#motorInstallation>footer button{background:#0e7490;color:#fff}
+#motorInstallation button[hidden]{display:none}
+#motorInstallation summary{padding:10px 0;cursor:pointer}
+#motorInstallation .install-options label{gap:6px;margin:6px 0}
+#motorInstallation .install-options input,#motorInstallation .install-options select{min-width:0;max-width:100%}
+#nodeRemoveMotorBtn{color:#b42318;border-color:#efc1bd}

@@ -1,4 +1,4 @@
-import {blankGeometry,isOutputBlank} from './standard-blank.js';
+import {blankGeometry,isOutputBlank,isStandardBar} from './standard-blank.js';
 import {inspectLinkExport} from './exporters.js';
 import {tabNutPath} from './tab-nut-view.js';
 import {inspectBarFusion,worldFusionGeometry} from './bar-fusion-geometry.js';
@@ -93,7 +93,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       if (!valid) return;
       const tabPath=component&&tabNutPath(tabNutGeometry[component.id],component,current,project);
       if(isDisk(component)){stick.setAttribute('d','M '+diskOutline(component,a).map(p=>{const q=project(p);return q.x+','+q.y;}).join(' L ')+' Z');}
-      else if(isOutputBlank(component)){const r=blankGeometry(component,[a,b]),path=ps=>'M '+ps.map(p=>{const q=project(p);return q.x+','+q.y;}).join(' L ')+' Z';stick.setAttribute('d',path(r));}
+      else if(isOutputBlank(component)||isStandardBar(component)&&!tabPath&&!fusion?.ok&&!mounts?.length){const r=blankGeometry(component,[a,b]),path=ps=>'M '+ps.map(p=>{const q=project(p);return q.x+','+q.y;}).join(' L ')+' Z';stick.setAttribute('d',path(r));}
       else if(tabPath){stick.setAttribute('fill-rule','evenodd');stick.setAttribute('d',tabPath);}
       else if(fusion?.ok){
         const g=worldFusionGeometry(fusion,current),ring=ps=>'M '+ps.map(p=>{const q=project(p);return q.x+','+q.y;}).join(' L ')+' Z';

@@ -1,0 +1,114 @@
+{
+  "parallel-gripper": {
+    "export": "ccc37b86900e6596",
+    "mass": "e37ab73f6a0929fa"
+  },
+  "hydraulic-h01": {
+    "export": "12e05f49e6fa66f4",
+    "mass": "64cb249d6df527af"
+  },
+  "hydraulic-h03": {
+    "export": "c8dca8478f721fb1",
+    "mass": "582ef6d3b6568834"
+  },
+  "hydraulic-h05": {
+    "export": "43df4479c944c81c",
+    "mass": "e75a4f3ccd0f94ac"
+  },
+  "hydraulic-h06": {
+    "export": "860454aa4404ecb2",
+    "mass": "d995519efff7bace"
+  },
+  "wiper-single": {
+    "export": "7f531b1ae39b0b89",
+    "mass": "68ffc61f3d2fcfcc"
+  },
+  "fourbar-crank-rocker": {
+    "export": "97de90d8f08c73ba",
+    "mass": "5b6c2880185906a4"
+  },
+  "fourbar-double-crank": {
+    "export": "ebaef1b12b29f33e",
+    "mass": "70bd33ab592b7f53"
+  },
+  "fourbar-double-rocker": {
+    "export": "0bdfc74dc70e0ff5",
+    "mass": "cd15fdaa93665d1b"
+  },
+  "parallel-fourbar": {
+    "export": "68d5e2354af7ab6a",
+    "mass": "adab5c52bc0e9b28"
+  },
+  "chebyshev-linkage": {
+    "export": "b58c162eb75b6c21",
+    "mass": "1b4a15490401f19a"
+  },
+  "slider-crank": {
+    "export": "012425004a5c9296",
+    "mass": "0d4ef1dec5887816"
+  },
+  "pantograph": {
+    "export": "06fc38f3d617f147",
+    "mass": "9a365c2aad74ee07"
+  },
+  "quick-return": {
+    "export": "b9939074b2967160",
+    "mass": "6e5ca1574aee8d44"
+  },
+  "sprocket-chain": {
+    "export": "8c1fec7b848a79e1",
+    "mass": "50bad5a9c7ff7d0e"
+  },
+  "competition-roller-intake": {
+    "export": "93b53e51e218096a",
+    "mass": "f8c94833d6adb096"
+  },
+  "assembly-lift-gripper": {
+    "export": "daa49341d0b15a1d",
+    "mass": "53093e14609b6558"
+  },
+  "assembly-lift-gripper-practice": {
+    "export": "c291d3852b0f94bf",
+    "mass": "53093e14609b6558"
+  },
+  "lift-bucket": {
+    "export": "78b5ae42e48c78d7",
+    "mass": "63bd8e69825a0001"
+  },
+  "six-bar-lift": {
+    "export": "61d4a211e1ff0baf",
+    "mass": "551f1106a4af0271"
+  },
+  "crank-catapult-study": {
+    "export": "641249ff191429db",
+    "mass": "ffc6bf42d4ba87ae"
+  },
+  "iq-wheel-grabber": {
+    "export": "dee37706a3627d80",
+    "mass": "8b20f47b74264db6"
+  },
+  "iq-linq-lift": {
+    "export": "b4a9e9317b617d45",
+    "mass": "b3ce7cef5c3affb9"
+  },
+  "hydraulic-h01-practice": {
+    "export": "afd753549005532e",
+    "mass": "64cb249d6df527af"
+  },
+  "hydraulic-h03-practice": {
+    "export": "a688b3c521617ae2",
+    "mass": "582ef6d3b6568834"
+  },
+  "unit11-start": {
+    "export": "604a83d592d3ffb6",
+    "mass": "e75a4f3ccd0f94ac"
+  },
+  "unit12-start": {
+    "export": "a63a552e57618416",
+    "mass": "d995519efff7bace"
+  },
+  "servo-plate-fourbar": {
+    "export": "ef2b69ff56808aa5",
+    "mass": "fbc59749738df768"
+  }
+}

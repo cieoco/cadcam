@@ -3,17 +3,34 @@ import {holeSide} from '../core/local-holes.js';
 import {isHoleUsed} from './used-holes.js';
 export const BLANK_HOLE_LIMIT=4096;
 export const BLANK_SPAN_LIMIT=10000;
+export const isStandardBar=c=>c?.type==='bar'&&c.standardBlank?.kind==='bar'&&c.shape!=='disk';
 export const isOutputBlank=c=>c?.type==='bar'&&c.standardBlank?.kind==='bar'&&Number.isFinite(c.standardBlank.rearMm);
 const span=n=>(n-1)*8,range=L=>{const a=Array.from({length:Math.floor(L/8)+1},(_,i)=>i*8);if(L-a.at(-1)>.00001){if(L-a.at(-1)<4)a.pop();a.push(L);}return a;};
+// Fillet the existing right-angle perimeter without changing its bounding box or hole grid.
+// Concave L corners add a small inside radius; thin edges cap adjacent tangencies.
+export const BLANK_CORNER_RADIUS=3;
+function roundedBlankRing(ring){
+ const out=[];
+ for(let i=0;i<ring.length;i++){
+  const p=ring[i],prev=ring[(i+ring.length-1)%ring.length],next=ring[(i+1)%ring.length];
+  const a=Math.hypot(prev[0]-p[0],prev[1]-p[1]),b=Math.hypot(next[0]-p[0],next[1]-p[1]);
+  if(a<1e-8||b<1e-8)continue;
+  const u=[(prev[0]-p[0])/a,(prev[1]-p[1])/a],v=[(next[0]-p[0])/b,(next[1]-p[1])/b],r=Math.min(BLANK_CORNER_RADIUS,a/2,b/2);
+  const center=[p[0]+r*(u[0]+v[0]),p[1]+r*(u[1]+v[1])],start=Math.atan2(-v[1],-v[0]),turn=Math.atan2(-u[0]*v[1]+u[1]*v[0],0);
+  for(let j=0;j<=8;j++){const t=start+turn*j/8;out.push([center[0]+r*Math.cos(t),center[1]+r*Math.sin(t)]);}
+ }
+ return out;
+}
 export function blankGeometry(c,points){
- if(isOutputBlank(c)){const[a,b]=points,L=Math.hypot(b.x-a.x,b.y-a.y),ux=(b.x-a.x)/L,uy=(b.y-a.y)/L,m=8-(c.stock?.thicknessMm || 3)/2,w=(c.stock?.widthMm || 13)/2;return [[-c.standardBlank.rearMm-m,-w],[L+m,-w],[L+m,w],[-c.standardBlank.rearMm-m,w]].map(([u,v])=>({x:a.x+u*ux-v*uy,y:a.y+u*uy+v*ux}));}
+ if(isStandardBar(c)){const[a,b]=points,L=Math.hypot(b.x-a.x,b.y-a.y),ux=(b.x-a.x)/L,uy=(b.y-a.y)/L,w=(c.stock?.widthMm || 13)/2,m=isOutputBlank(c)?8-(c.stock?.thicknessMm || 3)/2:w,rear=c.standardBlank.rearMm || 0;return roundedBlankRing([[-rear-m,-w],[L+m,-w],[L+m,w],[-rear-m,w]]).map(([u,v])=>({x:a.x+u*ux-v*uy,y:a.y+u*uy+v*ux}));}
  if(!c.standardBlank||c.type!=='triangle')return null;
  const[a,b,d]=points,L=Math.hypot(b.x-a.x,b.y-a.y),H=Math.hypot(d.x-a.x,d.y-a.y),m=8-(c.stock?.thicknessMm || 3)/2,w=c.standardBlank.armWidthMm || 2*m,sign=(b.x-a.x)*(d.y-a.y)-(b.y-a.y)*(d.x-a.x)<0?-1:1;
  const ring=c.standardBlank.kind==='l'?[[-m,-m],[L+m,-m],[L+m,w-m],[w-m,w-m],[w-m,H+m],[-m,H+m]]:[[-m,-m],[L+m,-m],[L+m,H+m],[-m,H+m]];
  const ux=(b.x-a.x)/L,uy=(b.y-a.y)/L;
- return ring.map(([u,v])=>({x:a.x+u*ux-v*uy*sign,y:a.y+u*uy+v*ux*sign}));
+ return roundedBlankRing(ring).map(([u,v])=>({x:a.x+u*ux-v*uy*sign,y:a.y+u*uy+v*ux*sign}));
 }
 export function makeStandardBlank({kind='bar',columns=kind==='bar'?8:6,rows=4,armRows=1,lengthMm=span(columns),heightMm=span(rows),armWidthMm=span(armRows)+13,rearMm=null,widthMm=13,n=1,origin={x:0,y:0}}={}){
+ if(!origin||![origin.x,origin.y].every(Number.isFinite))return {ok:false,message:'位置請填有效的 X、Y 座標。'};
  const fail=message=>({ok:false,message});
  if(!['bar','plate','l'].includes(kind)||!Number.isFinite(lengthMm)||lengthMm<8||lengthMm>BLANK_SPAN_LIMIT||kind!=='bar'&&(!Number.isFinite(heightMm)||heightMm<8||heightMm>BLANK_SPAN_LIMIT))return fail('桿件至少2孔；板材至少2×2孔，尺寸需在8–10000 mm。');
  if(kind==='l'&&(!Number.isFinite(armWidthMm)||armWidthMm<13||armWidthMm>=Math.min(lengthMm,heightMm)+13))return fail('L型兩臂孔數必須大於臂寬孔列數。');

@@ -799,9 +799,9 @@ const nearestDisplayToPoint = (world, exclude = [], maxDist = snapWorld()) => {
 };
 // 找最接近「某接點目前畫面位置」的另一個接點（拖曳吸附用）。
 // 有模組時候選逐一比對：跨模組（D2）的候選要略過，不能只檢查最終挑到的那個。
-const nearestDisplayTo = (id, exclude = []) => {
+const nearestDisplayTo = (id, exclude = [], world = null) => {
   const m = displayCoords();
-  const d = m[id];
+  const d = world || m[id];
   if (!d) return null;
   const maxDist = snapWorld();
   const excludeSet = [id, ...exclude];
@@ -989,8 +989,7 @@ async function configureMotorMount(nodeId=null,initialOutputId='') {
   Tools.exitDrawLink();Tools.exitDrawTriangle();Tools.exitDrawPolygon();
   const scoped=viewComps(),existing=scoped.find(c=>
     (c.type==='bar'&&c.isInput&&[c.p1,c.p2].some(p=>p?.id===nodeId&&p.physicalMotor))||
-    (c.type==='gear'&&c.p1?.id===nodeId&&c.p1.physicalMotor));
-  if(!scoped.some(c=>['bar','gear'].includes(c.type))){transient('請先畫連桿或加入齒輪，再安裝致動元件。');return;}
+    (['gear','motor'].includes(c.type)&&c.p1?.id===nodeId&&c.p1.physicalMotor));
   const before=snapshotStr(),focus=S.designFocus,ids=new Set(scoped.map(c=>c.id));
   let openMotorInstallation;
   motorInstallationLoading=true;
@@ -998,13 +997,13 @@ async function configureMotorMount(nodeId=null,initialOutputId='') {
   catch { transient('安裝介面載入失敗，請再試一次。');return; }
   finally { motorInstallationLoading=false; }
   if(S.mode!=='design'||snapshotStr()!==before||S.designFocus!==focus){transient('作品已變更，請重新選擇安裝。');return;}
-  openMotorInstallation({source:{comps:scoped,params:S.topo.params,fabrication:S.fabrication},points:displayCoords(),
-    review:(plan,notify)=>{if(snapshotStr()!==before){notify('作品已變更，請重新開啟安裝。');return false;}const candidate=mountingCandidate(JSON.parse(before),plan,scoped);const order=new Map(JSON.parse(before).comps.map((c,i)=>[c.id,i]));candidate.comps.sort((a,b)=>(order.get(a.id)??Infinity)-(order.get(b.id)??Infinity));const holes=planActuatorPlateHoles(candidate);if(!holes.ok){notify(holes.message);return false;}candidate.comps=holes.comps;if(!confirmMountingChange(JSON.parse(before),candidate,{notify}))return false;plan.fullWork=candidate;return true;},
+  openMotorInstallation({stage:svg,redraw:draw,source:{comps:scoped,params:S.topo.params,fabrication:S.fabrication,counter:S.counter,moduleId:focus==='#root'?null:focus},points:displayCoords(),
+    review:(plan,notify)=>{if(S.mode!=='design'||S.designFocus!==focus||snapshotStr()!==before){notify('作品已變更，請重新開啟安裝。');return false;}const candidate=mountingCandidate(JSON.parse(before),plan,scoped);const order=new Map(JSON.parse(before).comps.map((c,i)=>[c.id,i]));candidate.comps.sort((a,b)=>(order.get(a.id)??Infinity)-(order.get(b.id)??Infinity));const holes=planActuatorPlateHoles(candidate);if(!holes.ok){notify(holes.message);return false;}candidate.comps=holes.comps;if(!confirmMountingChange(JSON.parse(before),candidate,{notify}))return false;plan.fullWork=candidate;return true;},
     motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()},type:S.pendingMotorType,
     existingId:existing?.id,initialOutputId,motorId:nextMotorId(),confirm:plan=>{
-      if(snapshotStr()!==before||S.designFocus!==focus)return false;
+      if(S.mode!=='design'||snapshotStr()!==before||S.designFocus!==focus)return false;
       if(!plan.fullWork)return false;
-      pushUndo();S.comps=plan.fullWork.comps;S.topo.params=plan.fullWork.params;
+      pushUndo();S.comps=plan.fullWork.comps;S.topo.params=plan.fullWork.params;S.counter=Math.max(S.counter,Store.highestIdNum(S.comps));
       if(plan.fabrication)Settings.applyFabricationProfile(plan.fabrication);
       activateMotor(plan.motor,plan.angle);S.selectedNodeId=plan.center;S.selectedLinkId=null;S.selectedTriangleId=null;S.selectedGearId=null;
       rebuild();draw();Panels.updateRoleEditor();openMobileEditPanel();scheduleAutosave();return true;
@@ -1170,9 +1169,14 @@ const nodeEditor = createNodeEditor({
   invalidateTrajectory: () => { manualTrace = {}; trajectoryCache = null; geomVersion++; }
 });
 const { changeStroke, changeServoAngle,
-        setNodeRole, changeNodePos, removeNodeMotor, splitNode,
+        setNodeRole, changeNodePos, removeNodeMotor:removeAttachedMotor, splitNode,
         toggleTracePoint, toggleMeasurementReference,
         toggleGroundPositionLock, isGroundPositionUnlocked, relockGroundPosition } = nodeEditor;
+
+function removeNodeMotor(){
+  if(S.comps.some(c=>c.type==='motor'&&c.p1?.id===S.selectedNodeId))return deleteSelectedPart();
+  return removeAttachedMotor();
+}
 
 // ---- 模組域：邏輯抽到 ./module-editor.js（模組庫 + 模組面板，M1c 刀 2）----
 const moduleEditor = createModuleEditor({
@@ -1607,6 +1611,11 @@ function gearMeshHasWarning() {
 function updateMechanismStatus(sol = null) {
   const el = document.getElementById('mechanismStatus');
   if (!el) return;
+  if(simulationScope().comps.some(c=>c.type==='motor')){
+    el.dataset.state='warn';el.dataset.chip='';
+    el.textContent='馬達未接輸出 · 可先保存';
+    el.title='接上輸出零件後再試動；現在仍可修改、保存與解除其他連接。';return;
+  }
   if(simulationScope().comps.some(c=>c.type==='syringe')){
     el.dataset.state=sol?.isValid?'warn':'error';el.dataset.chip=sol?.isValid?'verify':'fix';
     el.textContent=sol?.isValid?'液壓幾何可行 · 製作待核對':'液壓姿勢待修正';
@@ -1989,7 +1998,7 @@ function drawNow() {
     body.dataset.motorBody=id;body.style.pointerEvents='auto';body.addEventListener('pointerdown',e=>guardedNodeDown(e,id));
     const mId = motorIdForCenter(id);
     const isActive = mId && String(S.activeMotor) === mId;
-    const labelText = (isServo ? 'MG995' : motorType === 'n20' ? 'N20' : 'TT') + (multiMotor && mId ? `·M${mId}` : '');
+    const labelText = (isServo ? 'MG995' : motorType === 'n20' ? 'N20' : 'TT') + (multiMotor && mId ? `·M${mId}` : '') + (S.comps.some(c=>c.type==='motor'&&c.p1.id===id)?' · 未接輸出':'');
     const labelColor = multiMotor
       ? (isActive ? '#d35400' : '#95a5a6')
       : (isServo ? '#2c6fbb' : '#c9971b');
@@ -2040,7 +2049,7 @@ function drawNow() {
   drawSliders(pts, sliderLayer);
 
   // 吸附高亮：拖曳時靠近的接點亮綠圈
-  if (S.dragId && S.snapTarget && pts[S.snapTarget] && Number.isFinite(pts[S.snapTarget].x)) {
+  if ((S.dragId || S.dragLinkId) && S.snapTarget && pts[S.snapTarget] && Number.isFinite(pts[S.snapTarget].x)) {
     const t = pts[S.snapTarget];
     const ring = document.createElementNS(SVG_NS, 'circle');
     ring.setAttribute('cx', TX(t.x)); ring.setAttribute('cy', TY(t.y));
@@ -2820,9 +2829,9 @@ function deselectLink() {
   draw();
 }
 async function deleteSelectedPart() {
-  const before=JSON.stringify([S.comps,S.topo.params,S.selectedLinkId,S.selectedTriangleId,S.selectedSliderId,S.selectedGearId]);
+  const before=JSON.stringify([S.comps,S.topo.params,S.selectedLinkId,S.selectedTriangleId,S.selectedSliderId,S.selectedGearId,S.selectedNodeId]);
   const {deleteSelectedPart:remove}=await import('./delete-part.js');
-  if(before!==JSON.stringify([S.comps,S.topo.params,S.selectedLinkId,S.selectedTriangleId,S.selectedSliderId,S.selectedGearId]))return;
+  if(before!==JSON.stringify([S.comps,S.topo.params,S.selectedLinkId,S.selectedTriangleId,S.selectedSliderId,S.selectedGearId,S.selectedNodeId]))return;
   remove({S,transient,deleteGearChain,pushUndo,pause,closeMobileEditPanel,setSliderDetailRows,rebuild,draw,points:lastFullPts});
 }
 function setLen(v) {
@@ -3343,7 +3352,7 @@ function init() {
                mobilePrompt, promptText, displayPointCoords: displayCoords, notify: transient });
   Input.init({ svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle,
                worldFromEvent, pointCoords, mobilePrompt,
-               snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
+               snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint, displayCoords,
                movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
                isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
                handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround, recordManualTrace, solvePinnedConstraints,

@@ -2,7 +2,7 @@
 import { check, report } from './_harness.mjs';
 import * as Input from '../js/blocks/input.js';
 import * as View from '../js/blocks/view.js';
-import {isFreeBody,movePointById} from '../js/blocks/model.js';
+import {isFreeBody,movePointById,updatePointCoordsById,pointCoords} from '../js/blocks/model.js';
 import { S } from '../js/blocks/state.js';
 
 globalThis.document = Object.assign(new EventTarget(),{ getElementById: id => ['lenEditor', 'gearEditor', 'sliderBaseBtn', 'linkToRailBtn'].includes(id) ? { style: {} } : null });
@@ -17,6 +17,7 @@ globalThis.cancelAnimationFrame = id => rafs.delete(id);
 const flush = () => { const pending = [...rafs.values()]; rafs.clear(); pending.forEach(fn => fn()); };
 const noop = () => {};
 let mobile = false, openedEditor = 0, mergeCount = 0;
+let snapPoint=null;
 const listeners = new Map();
 const svg = {
   getBoundingClientRect: () => ({left:0,right:1000,top:0,bottom:1000}), querySelectorAll: () => [], contains: () => false, ownerDocument: {elementsFromPoint: () => []},
@@ -28,7 +29,7 @@ const svg = {
   getScreenCTM: () => ({ a: 1, d: 1, inverse: () => ({}) })
 };
 function emit(type, id, x, y, target = noop, targetElement = null) {
-  const event = { pointerId: id, pointerType: 'touch', clientX: x, clientY: y,
+  const event = { type, pointerId: id, pointerType: 'touch', clientX: x, clientY: y,
     target: targetElement, preventDefault: noop, stopPropagation() { this.stopped = true; },
     stopImmediatePropagation() { this.stopped = true; this.immediate = true; } };
   const list = listeners.get(type) || [];
@@ -37,9 +38,10 @@ function emit(type, id, x, y, target = noop, targetElement = null) {
   if (!event.stopped) for (const item of list.filter(item => !item.capture)) { item.fn(event); if (event.immediate) break; }
 }
 Input.init({ selectLink:noop, selectTriangle:noop, movePointById:(id,dx,dy)=>movePointById(S.comps,id,dx,dy), svg, draw: noop, rebuild: noop, pause: noop, cancelMotorMode: noop, deselectLink: noop,
-  worldFromEvent: e => ({ x: e.clientX, y: e.clientY }), pointCoords: () => ({}), mobilePrompt: () => mobile,
-  snapshotStr: () => JSON.stringify({comps:S.comps,params:S.topo.params,theta:S.theta,motorAngles:S.motorAngles}), updateUndoBtn: noop, nearestDisplayTo: () => null,
-  frameNodeIds: () => new Set(), recomputeLengths: noop, mergePoints: () => mergeCount++, pointIsGround: () => false,
+  worldFromEvent: e => ({ x: e.clientX, y: e.clientY }), pointCoords: () => pointCoords(S.comps), displayCoords:()=>({...pointCoords(S.comps),...(snapPoint?{Target:snapPoint}:{})}), mobilePrompt: () => mobile,
+  updatePointCoordsById:(id,x,y)=>updatePointCoordsById(S.comps,id,x,y),
+  snapshotStr: () => JSON.stringify({comps:S.comps,params:S.topo.params,theta:S.theta,motorAngles:S.motorAngles}), updateUndoBtn: noop, nearestDisplayTo: (id,exclude,world) => snapPoint&&world&&Math.hypot(world.x-snapPoint.x,world.y-snapPoint.y)<5?'Target':null,
+  frameNodeIds: () => new Set(), recomputeLengths: noop, mergePoints: () => mergeCount++, pointIsGround: id => S.comps.some(c=>c.type==='motor'&&c.p1?.id===id),
   setSliderDetailRows: noop, openMobileEditPanel: () => openedEditor++
 });
 
@@ -163,4 +165,28 @@ emit('pointerdown',44,120,100,e=>{syringePickReached=true;e.stopPropagation();},
 emit('pointerup',44,120,100);
 check('針筒改接時手機一般孔選取讓出事件',syringePickReached&&S.selectedNodeId===beforePickNode);
 delete svg.querySelector;
+for(const type of ['tt','n20','mg995']){
+ mobile=false;const motor={id:'Motor',type:'motor',motorType:type,p1:{id:'M',type:'fixed',physicalMotor:'1',x:12.5,y:8.25},motorMount:{center:'M',angleDeg:17.25}};
+ S.comps=[structuredClone(motor),structuredClone(plate)];S.modules=[];const original=JSON.stringify(S.comps),count=S.undoStack.length;
+ const down=e=>Input.onNodeDown(e,'M');
+ emit('pointerdown',60,30,20,down);emit('pointerup',60,30,20);check(type+' 點本體只選取、不跳位',JSON.stringify(S.comps)===original&&S.selectedNodeId==='M'&&S.undoStack.length===count);
+ emit('pointerdown',61,30,20,down);emit('pointermove',61,55,50);flush();emit('pointerup',61,55,50);
+ check(type+' 固定模擬軸可拖動獨立本體、保留抓取偏移與角度',S.comps[0].p1.x===37.5&&S.comps[0].p1.y===38.25&&S.comps[0].motorMount.angleDeg===17.25);
+ check(type+' 不拉動旁邊板件且只有一次復原',JSON.stringify(S.comps[1])===JSON.stringify(plate)&&S.undoStack.length===count+1&&JSON.stringify(JSON.parse(S.undoStack.at(-1)).comps)===original);
+ const beforeCancel=JSON.stringify(S.comps);emit('pointerdown',62,30,20,down);emit('pointermove',62,75,60);flush();emit('pointercancel',62,75,60);
+ check(type+' 取消拖動回復原位置',JSON.stringify(S.comps)===beforeCancel&&S.undoStack.length===count+1);
+ snapPoint={x:60.75,y:55.5};const snapBefore=JSON.stringify(S.comps),snapUndo=S.undoStack.length;
+ emit('pointerdown',63,30,20,down);emit('pointermove',63,52,36);flush();
+ check(type+' 軸心靠近孔時吸附且保留馬達身分',S.snapTarget==='Target'&&S.comps[0].p1.x===60.75&&S.comps[0].p1.y===55.5&&S.comps[0].p1.id==='M');
+ emit('pointermove',63,80,70);flush();
+ check(type+' 離開吸附不累積偏移',S.snapTarget===null&&S.comps[0].p1.x===87.5&&S.comps[0].p1.y===88.25);
+ emit('pointermove',63,52,36);flush();emit('pointerup',63,52,36);
+ check(type+' 放開對齊只存一次位置且不暗改裝配',S.comps[0].p1.x===60.75&&S.comps[0].motorMount.center==='M'&&!S.comps[0].motorMount.frameBody&&mergeCount===0&&S.snapTarget===null&&S.undoStack.length===snapUndo+1&&JSON.stringify(JSON.parse(S.undoStack.at(-1)).comps)===snapBefore);
+ const snapped=JSON.stringify(S.comps);snapPoint={x:85,y:75};emit('pointerdown',64,30,20,down);emit('pointermove',64,53,40);flush();emit('pointercancel',64,53,40);
+ check(type+' 取消吸附還原已保存位置',JSON.stringify(S.comps)===snapped&&S.snapTarget===null&&S.undoStack.length===snapUndo+1);
+ Input.moveNodeTo('M',{x:85.125,y:75.375},{snap:false});
+ check(type+' 精確座標不被附近孔改寫',S.comps[0].p1.x===85.125&&S.comps[0].p1.y===75.375&&S.snapTarget===null);snapPoint=null;
+ S.comps[0].motorMount.frameBody='Plate';check(type+' 已固定到板件不可自由拖動',!isFreeBody(S.comps,S.comps[0]));delete S.comps[0].motorMount.frameBody;
+ S.comps.push({id:'Attached',type:'bar',p1:{id:'M'},p2:{id:'Other'}});check(type+' 共用軸心不可當自由本體拖走',!isFreeBody(S.comps,S.comps[0]));
+}
 report('input-gestures');

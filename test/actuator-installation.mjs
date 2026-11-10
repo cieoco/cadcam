@@ -17,6 +17,12 @@ for(const type of ['mg995','tt','n20'])for(const face of ['front','back'])for(co
  const model=motorInstallationScene(r),motor=model.motors[0],frame=model.sticks.find(s=>s.id==='Frame'),output=model.sticks.find(s=>s.id==='Arm');
  assert.equal(motor.face,face);assert.equal(motor.shaftDirection,face==='front'?-1:1);
  if(face==='front'){assert.ok(output.z<frame.z);assert.ok(motor.shaftEndZ<motor.mountZ);}else{assert.ok(output.z>frame.z);assert.ok(motor.shaftEndZ>motor.mountZ);}
+ if(type==='mg995'){
+  const d=motor.shaftDirection,base=d*motor.hornBaseZ,tip=base+motor.hornThickness;
+  assert.ok(base>=(face==='front'?-frame.z:frame.z+frame.thickness)+0.5,'horn clears carrier surface');
+  assert.ok(tip<=(face==='front'?-(output.z+output.thickness):output.z)-0.5,'output clears horn');
+  assert.ok(d*motor.shaftEndZ>tip,'shaft reaches through exposed horn');
+ }
  const saved=normalizeSnapshot({kind:'blocks',v:1,comps:r.comps,params:r.params});
  assert.equal(saved.comps.find(c=>c.id==='Arm').motorMount.face,face);
  assert.ok(solveTopology(compileTopology(saved.comps,{params:saved.params},new Set()),{thetaDeg:45}).isValid);

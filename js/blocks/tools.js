@@ -477,7 +477,7 @@ export function startStandardBlank(options,hooks={}){
   const origin=View.worldFromScreen(W*.4,H*.35);
   S.standardBlankDraft={...options,origin};blankHooks.changed?.(S.standardBlankDraft);
   if(!S.comps.length)View.fit({minX:origin.x-20,maxX:origin.x+options.lengthMm+20,minY:origin.y-20,maxY:origin.y+(options.heightMm || 0)+20},visibleUserRect(svg));
-  setBanner('拖本體放位置，拖長／寬把手改孔數；確認新增才建立');draw();
+  setBanner('點畫布放置；拖本體或尺寸把手，放開即新增，放錯可復原');draw();
 }
 export function updateStandardBlank(options){if(!S.standardBlankDraft)return;S.standardBlankDraft={...S.standardBlankDraft,...options};draw();}
 export function cancelStandardBlank(){if(!S.standardBlankDraft)return;exitDrawPolygon();draw();}
@@ -485,12 +485,19 @@ export function standardBlankPointer(e,phase){
   if(!S.standardBlankDraft)return;
   if(phase==='cancel'){if(blankDrag)S.standardBlankDraft.origin=blankDrag.origin;blankDrag=null;blankHooks?.changed?.(S.standardBlankDraft);draw();return;}
   const point=worldFromEvent(e);if(!point)return;
-  if(phase==='down'){blankDrag={id:e.pointerId,clientX:e.clientX,clientY:e.clientY,moved:false,start:point,origin:{...S.standardBlankDraft.origin},body:!!e.target?.closest?.('[data-blank-preview]')};try{svg.setPointerCapture(e.pointerId);}catch(_){}return;}
+  if(phase==='down'){if(blankHooks?.canPlace?.()===false){notify('請先修正積木尺寸欄位。');return;}blankDrag={id:e.pointerId,clientX:e.clientX,clientY:e.clientY,moved:false,start:point,origin:{...S.standardBlankDraft.origin},body:!!e.target?.closest?.('[data-blank-preview]')};try{svg.setPointerCapture(e.pointerId);}catch(_){}return;}
   if(!blankDrag||blankDrag.id!==e.pointerId)return;
-  const d=blankDrag;if(d.body&&!d.moved&&Math.hypot(e.clientX-d.clientX,e.clientY-d.clientY)<3){if(phase==='up')blankDrag=null;return;}d.moved=true;const raw=d.body?{x:d.origin.x+point.x-d.start.x,y:d.origin.y+point.y-d.start.y}:point,node=nearestNodeId(raw),snapped=node&&displayPointCoords()[node];S.standardBlankDraft.origin=snapped?{x:snapped.x,y:snapped.y}:raw;
-  if(phase==='up')blankDrag=null;blankHooks?.changed?.(S.standardBlankDraft);draw();
+  const d=blankDrag;if(d.body&&!d.moved&&Math.hypot(e.clientX-d.clientX,e.clientY-d.clientY)<3){if(phase==='up'){blankDrag=null;confirmStandardBlank();}return;}d.moved=true;const raw=d.body?{x:d.origin.x+point.x-d.start.x,y:d.origin.y+point.y-d.start.y}:point,node=nearestNodeId(raw),snapped=node&&displayPointCoords()[node];S.standardBlankDraft.origin=snapped?{x:snapped.x,y:snapped.y}:raw;
+  if(phase==='up')blankDrag=null;blankHooks?.changed?.(S.standardBlankDraft);if(phase==='up')confirmStandardBlank();else draw();
 }
-export function confirmStandardBlank(){if(S.standardBlankDraft)addPolygonVertex(null);}
+export function confirmStandardBlank(){if(S.standardBlankDraft&&blankHooks?.canPlace?.()!==false)return addPolygonVertex(null);}
+
+function connectNewMotorOutput(id){
+ const c=S.comps.find(c=>c.id===id);
+ if(c?.type!=='bar'||!S.comps.some(m=>m.type==='motor'&&[c.p1.id,c.p2.id].includes(m.p1.id)))return;
+ const snapshotStr=()=>JSON.stringify([S.comps,S.topo.params,S.fabrication,S.modules,S.designFocus,S.theta,S.motorAngles]),expected=snapshotStr();
+ return import('./motor-drop-ui.js').then(m=>m.connectPlacedMotorOutput({S,id,expected,snapshotStr,displayCoords:displayPointCoords,rebuild,draw,notify,selectLink})).catch(e=>notify(`尚未接上動力輸出：${e.message}`));
+}
 
 export function startDrawPolygon() {
   if (S.drawingPolygon) { exitDrawPolygon(); draw(); return; }
@@ -525,7 +532,7 @@ function polygonNearFirst(world) {
 }
 // 左鍵：加一個孔（吸附既有接點）。桌機一律由右鍵收尾；觸控可點回第一孔收尾。
 export function addPolygonVertex(e) {
-  if(S.standardBlankDraft){const point=S.standardBlankDraft.origin;if(!point)return;const nearest=nearestNodeId(point),at=nearest&&displayPointCoords()[nearest],snapped=at&&Math.hypot(point.x-at.x,point.y-at.y)<1e-6?nearest:null,origin=point,candidate=makeStandardBlank({...S.standardBlankDraft,n:S.counter+1,origin});if(!candidate.ok){notify(candidate.message);return;}if(snapped){candidate.comp.p1.id=snapped;const conn=connectionModule(S.comps,[snapped]);if(!conn.ok){notify('不同模組只能透過安裝接口連接');return;}if(conn.moduleId)candidate.comp.moduleId=conn.moduleId;}pushUndo();S.counter++;S.comps.push(candidate.comp);Object.assign(S.topo.params,candidate.params);exitDrawPolygon();rebuild();draw();candidate.comp.type==='bar'?selectLink(candidate.comp.id):selectTriangle(candidate.comp.id);return;}
+  if(S.standardBlankDraft){const point=S.standardBlankDraft.origin;if(!point)return;const nearest=nearestNodeId(point),at=nearest&&displayPointCoords()[nearest],snapped=at&&Math.hypot(point.x-at.x,point.y-at.y)<1e-6?nearest:null,origin=point,candidate=makeStandardBlank({...S.standardBlankDraft,n:S.counter+1,origin});if(!candidate.ok){notify(candidate.message);return;}if(snapped){candidate.comp.p1.id=snapped;const conn=connectionModule(S.comps,[snapped]);if(!conn.ok){notify('不同模組只能透過安裝接口連接');return;}if(conn.moduleId)candidate.comp.moduleId=conn.moduleId;}pushUndo();S.counter++;S.comps.push(candidate.comp);Object.assign(S.topo.params,candidate.params);exitDrawPolygon();rebuild();draw();candidate.comp.type==='bar'?selectLink(candidate.comp.id):selectTriangle(candidate.comp.id);return connectNewMotorOutput(candidate.comp.id);}
 
   const cur = worldFromEvent(e) || S.polygonPreview;
   if (!cur) return;
@@ -620,7 +627,7 @@ function buildPolygonPlate() {
 }
 export function drawPolygonPreview() {
   if (!S.drawingPolygon) return;
-  if(S.standardBlankDraft){const draft=makeStandardBlank(S.standardBlankDraft);if(draft.ok){const c=draft.comp,r=c.type==='triangle'?blankGeometry(c,[c.p1,c.p2,c.p3]):[{x:c.p1.x-6.5,y:c.p1.y-6.5},{x:c.p2.x+6.5,y:c.p2.y-6.5},{x:c.p2.x+6.5,y:c.p2.y+6.5},{x:c.p1.x-6.5,y:c.p1.y+6.5}],path=document.createElementNS(SVG_NS,'path');path.setAttribute('d','M '+r.map(p=>`${TX(p.x)} ${TY(p.y)}`).join(' L ')+' Z');path.setAttribute('fill','#27ae6033');path.setAttribute('stroke','#168a54');path.dataset.blankPreview='';path.style.cursor='move';svg.append(path);const points=Model.pointCoords([c]);for(const p of [c.p1,c.p2,...(c.p3?[c.p3]:[]),...c.holes.map(h=>points[h.id])]){const hole=document.createElementNS(SVG_NS,'circle');for(const[k,v]of Object.entries({cx:TX(p.x),cy:TY(p.y),r:1.6*View.getScale(),fill:'white',stroke:'#168a54','pointer-events':'none'}))hole.setAttribute(k,v);svg.append(hole);}blankHooks?.draw?.({svg,draft:S.standardBlankDraft,update:options=>{Object.assign(S.standardBlankDraft,options);blankHooks?.changed?.(S.standardBlankDraft);draw();}});}return;}
+  if(S.standardBlankDraft){const draft=makeStandardBlank(S.standardBlankDraft);if(draft.ok){const c=draft.comp,r=blankGeometry(c,[c.p1,c.p2,...(c.p3?[c.p3]:[])]),path=document.createElementNS(SVG_NS,'path');path.setAttribute('d','M '+r.map(p=>`${TX(p.x)} ${TY(p.y)}`).join(' L ')+' Z');path.setAttribute('fill','#27ae6033');path.setAttribute('stroke','#168a54');path.dataset.blankPreview='';path.style.cursor='move';svg.append(path);const points=Model.pointCoords([c]);for(const p of [c.p1,c.p2,...(c.p3?[c.p3]:[]),...c.holes.map(h=>points[h.id])]){const hole=document.createElementNS(SVG_NS,'circle');for(const[k,v]of Object.entries({cx:TX(p.x),cy:TY(p.y),r:1.6*View.getScale(),fill:'white',stroke:'#168a54','pointer-events':'none'}))hole.setAttribute(k,v);svg.append(hole);}blankHooks?.draw?.({svg,draft:S.standardBlankDraft,update:options=>{Object.assign(S.standardBlankDraft,options);blankHooks?.changed?.(S.standardBlankDraft);draw();}});}return;}
   const pts = S.polygonPoints.map(p => p.pos);
   const chain = pts.slice();
   let closing = false;
@@ -709,6 +716,7 @@ export function finishDrawLink(e) {
   rebuild(); draw();
   selectLink('Link' + n);
   if (connectedBoth) setBanner('已連接兩個接點，可播放觀察。');
+  return connectNewMotorOutput(comp.id);
 }
 // 滑軌：軌道兩端釘地（fixed），中點放一個滑塊點（floating），沿軌道滑動。
 // 之後用🔵連桿把曲柄端接到滑塊點，compile 會自動把它解成 slider（滑塊曲柄）。

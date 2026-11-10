@@ -35,6 +35,8 @@ export function unsolvedMovingPoints(comps, sol) {
 
 // 播放、錄影與逐幀呈現共用；不能把 solver 的補畫座標當成已受約束的解。
 export function motionPoseIssue(comps, sol) {
+  const loose=(comps||[]).filter(c=>c.type==='motor');
+  if(loose.length)return {code:'unconnected_motor',componentIds:loose.map(c=>c.id),message:'馬達尚未連接輸出零件；作品可保存，接上輸出後再試動。'};
   const missing = unsolvedMovingPoints(comps, sol);
   if (missing.length) return { code: 'missing_points', sourceIds: missing,
     message: `接點 ${missing.join('、')} 尚未解出位置，請確認孔位已連接、機架已固定。` };

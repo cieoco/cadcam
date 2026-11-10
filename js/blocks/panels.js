@@ -140,7 +140,7 @@ export function updateRoleEditor() {
   editor.dataset.nodeId = S.selectedNodeId;
   const powerRow=document.getElementById('nodePowerRow');
   if(powerRow)powerRow.style.display=S.comps.some(c=>
-    (c.type==='gear' && c.p1?.id===S.selectedNodeId && c.p1.physicalMotor) ||
+    (['gear','motor'].includes(c.type) && c.p1?.id===S.selectedNodeId && c.p1.physicalMotor) ||
     (c.type==='bar' && c.isInput && [c.p1,c.p2].some(p=>p?.id===S.selectedNodeId && p.physicalMotor)))?'flex':'none';
   renderNodePosition(S.selectedNodeId);
   const local=S.comps.some(c=>localHoles(c).some(h=>h.id===S.selectedNodeId));let notice=document.getElementById('localHoleNotice');if(!notice){notice=document.createElement('p');notice.id='localHoleNotice';editor.append(notice);}notice.hidden=!local;notice.textContent='此孔隨桿件／板材移動，可接桿或在初始姿態固定；獨立移孔請沿特殊孔位／外形繪圖。';for(const key of ['nodeXVal','nodeYVal']){const field=document.getElementById(key)?.querySelector('input');if(field)field.disabled=local;}
@@ -151,7 +151,7 @@ export function updateRoleEditor() {
   if(rotation&&angleRow.nodeType===1)editableNumber(angleRow.querySelector('span'),rotation.angle,v=>setPointAngle(S.selectedNodeId,v),{label:'連桿方向角度',min:-360,max:360});
   const motorMountRow = document.getElementById('motorMountRow');
   const motorMountStatus = document.getElementById('motorMountStatus');
-  const motorBar = motorBarForCenter(S.selectedNodeId) || S.comps.find(c=>c.type==='gear'&&c.p1?.id===S.selectedNodeId&&c.p1.physicalMotor);
+  const motorBar = motorBarForCenter(S.selectedNodeId) || S.comps.find(c=>['gear','motor'].includes(c.type)&&c.p1?.id===S.selectedNodeId&&c.p1.physicalMotor);
   const powered = !!motorBar || S.comps.some(c=>c.type==='slider'&&c.isInput&&c.p3?.id===S.selectedNodeId);
   const fixedBtn = document.getElementById('nodeFixedBtn');
   if (fixedBtn) {
@@ -164,7 +164,7 @@ export function updateRoleEditor() {
   const adjustBtn = document.getElementById('nodeMotorAdjustBtn');
   if (adjustBtn) adjustBtn.style.display = motorBar ? '' : 'none';
   const removeBtn = document.getElementById('nodeRemoveMotorBtn');
-  if (removeBtn) removeBtn.style.display = powered ? '' : 'none';
+  if (removeBtn) {removeBtn.style.display = powered ? '' : 'none';removeBtn.textContent=motorBar?(motorBar.motorType==='mg995'?'刪除舵機':'刪除馬達'):'移除動力';removeBtn.title=motorBar?.type==='motor'?'刪除這個動力零件，可復原':'只移除動力，保留桿件與其他連接，可復原';}
   if (motorMountRow) {
     motorMountRow.style.display = motorBar ? 'flex' : 'none';
     motorMountRow.dataset.nodeId = S.selectedNodeId;
@@ -175,7 +175,7 @@ export function updateRoleEditor() {
     const orientation = mount.orientation || (frameBody ? 'follow-frame' : 'horizontal');
     const effectiveOrientation = orientation === 'follow-frame' && !frameBody ? 'horizontal' : orientation;
     const orientationLabel = effectiveOrientation === 'horizontal' ? '水平' : effectiveOrientation === 'vertical' ? '垂直' : '沿機架';
-    motorMountStatus.textContent = `${frameBody ? `承載：${partDisplayName(S.comps,frameBody)}` : '承載：自動機架'}・${mount.face==='front'?'正面':'背面'}・${orientationLabel} → ${partDisplayName(S.comps,motorBar.id)}`;
+    motorMountStatus.textContent = `${frameBody ? `承載：${partDisplayName(S.comps,frameBody)}` : '承載：自動機架'}・${mount.face==='front'?'正面':'背面'}・${orientationLabel} → ${motorBar.type==='motor'?'尚未連接輸出':partDisplayName(S.comps,motorBar.id)}`;
   }
   const traceBtn = document.getElementById('traceBtn');
   if (traceBtn) {

@@ -27,7 +27,7 @@
 
 - [桿件／板材／同平面L型件](TEACHING-CHANGELOG.md#standard-structures) — 三類基本結構、真孔、凹角、數字／把手與保存驗收及限制；[新增前拖拉／精確參數](TEACHING-CHANGELOG.md#standard-structure-creation)。
 
-- [SDD-RAPID-MECHANISM-VALIDATION.md](SDD-RAPID-MECHANISM-VALIDATION.md) — 在原有流程做減法；含全操作族盤點、裝配孔位共用核對，以及點接點修改零件孔距的直接／數值共用規則；保留既有功能與資料契約。
+- [SDD-RAPID-MECHANISM-VALIDATION.md](SDD-RAPID-MECHANISM-VALIDATION.md) — 在原有流程做減法；現行[可拆裝積木工程準則與分包驗收](SDD-RAPID-MECHANISM-VALIDATION.md#reversible-assembly)：零件獨立、組裝不綁順序、解除與接回、保存／模擬／製作分開檢查；另含全操作族盤點與既有直接／數值規則。
 - [SDD-GRID-BLOCKS.md](SDD-GRID-BLOCKS.md) — 數位積木 8 mm 孔格（草案）：條／板／機架／角件對格、M3 孔、立體格與 3D 列印角件，離格須確認並標示
 - [RESEARCH-ACTUATOR-MOUNTING.md](RESEARCH-ACTUATOR-MOUNTING.md) — 研究報告：MG995／SG90／TT／N20 真實尺寸、與 8 mm 孔格的接合問題及處理順序
 - [RESEARCH-ACTUATOR-TORQUE.md](RESEARCH-ACTUATOR-TORQUE.md) — 研究報告：MG995／SG90／TT／N20 扭力、轉速與齒輪比，虛功法估算需求扭力與實作順序

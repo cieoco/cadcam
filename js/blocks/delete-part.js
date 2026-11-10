@@ -7,13 +7,14 @@ export function deleteSelectedPart({S,transient,deleteGearChain,pushUndo,pause,c
   if(fusionRoot(S.comps,S.selectedLinkId)){transient('請先解除合成，再刪除其中的連桿。');return;}
   if(S.comps.some(c=>c.id===S.selectedTriangleId && c.fusedWith)){transient('請先解除合成，再刪除板件');return;}
   if (S.selectedGearId) { deleteGearChain(S.selectedGearId); return; }
-  const id = S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId;
+  const id = S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId || S.comps.find(c=>c.type==='motor'&&c.p1?.id===S.selectedNodeId)?.id;
   if (!id) return;
   const comp = S.comps.find(c => c.id === id);
   if (!comp) return;
   if(comp.boxPanel){transient('這是盒體的配對板件，請整組管理；尺寸從「卡榫盒子」修改。');return;}
   const params={...S.topo.params};
   const candidate=detachDeletedAttachments(structuredClone(S.comps),new Set([id]),params,points).filter(c=>c.id!==id);
+  if(comp.type==='motor')for(const c of candidate)if(c.motorMountPoint===comp.p1.id)delete c.motorMountPoint;
   ownedParamKeys(comp).forEach(k=>delete params[k]);
   const platePlan=planActuatorPlateHoles({comps:candidate,params,modules:S.modules,fabrication:S.fabrication});if(!platePlan.ok){transient(platePlan.message);return;}
   pushUndo();

@@ -1,11 +1,15 @@
 // UI-1：由 ui-commands.js 產生頂端選單、畫布工具列、手機面板與控制列；點擊集中在這裡派送。
 import { COMMANDS, COMMAND_GROUPS, SHORTCUTS, ADD_SECTIONS } from './ui-commands.js';
+import {S} from './state.js';
 const byId = Object.fromEntries(COMMANDS.map(c => [c.id, c]));
 const $ = id => document.getElementById(id);
+export const plainKey=e=>!e.defaultPrevented&&!e.isComposing&&e.keyCode!==229&&!e.repeat&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.shiftKey;
+export const typing=n=>n?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]');
 function button(c, short) {
   const b = document.createElement(c.href ? 'a' : 'button');
   if (c.href) Object.assign(b, { href: c.href, target: '_blank', rel: 'noopener' }); else b.type = 'button';
   b.dataset.command = c.id; b.title = c.tip || c.label;
+  if(c.id==='deleteSelected'){b.setAttribute('aria-keyshortcuts','Delete');b.title+='（Delete）';}
   if (c.modes) b.dataset.modes = c.modes.join(' ');
   if (short) { b.className = 'clear-btn'; b.setAttribute('aria-label', c.label); b.textContent = c.icon || c.label; }
   else if (c.group === 'add') { b.className = 'block'; b.innerHTML = `<span class="ico">${c.icon}</span><span class="name">${c.label}</span><span class="role">${c.tip}</span>`; }
@@ -49,4 +53,11 @@ export function initCommandUi() {
     closeMenus(c ? null : e.target);
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Delete'||!plainKey(e)||typing(e.target)||S.mode!=='design'||S.preDragSnap!=null||S.drawingLink||S.drawingTriangle||S.drawingPolygon||S.placingMotor||S.pickBars||S.mateMode)return;
+    if(document.querySelector('dialog[open],#motorInstallation,#standardBlankPanel:not([hidden])'))return;
+    e.preventDefault();
+    const motor=$('nodeRemoveMotorBtn');
+    if(S.selectedNodeId&&motor?.getClientRects().length)motor.click();else window.blocks.deleteSelectedPart();
+  });
 }

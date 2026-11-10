@@ -1,8 +1,9 @@
 import assert from'node:assert/strict';
 import{planMemberCopy,copyMemberGeometry}from'../js/blocks/member-copy.js';
 import{S}from'../js/blocks/state.js';import{createNodeEditor}from'../js/blocks/node-editor.js';
-import{makeStandardBlank,resizeStandardBlank}from'../js/blocks/standard-blank.js';import{normalizeSnapshot,toSnapshot}from'../js/blocks/schema.js';import{compileTopology}from'../js/core/topology.js';import{solveTopology}from'../js/multilink/solver.js';import{encodeSnapshot,decodeShareString}from'../js/share-codec.js';import{inspectLinkExport,inspectPlateExport,exportLinksAsSvg,exportLinksAsDxf}from'../js/blocks/exporters.js';import{pointCoords,pointRefs,setPointType,mergePoints,frameNodeIds,frameConnectorNodes}from'../js/blocks/model.js';import{normalizeTemplate,instantiateTemplate}from'../js/blocks/module-ops.js';import{gridIssues}from'../js/blocks/grid-rule.js';import{holeWorld}from'../js/core/local-holes.js';
+import{makeStandardBlank,resizeStandardBlank,blankGeometry}from'../js/blocks/standard-blank.js';import{normalizeSnapshot,toSnapshot}from'../js/blocks/schema.js';import{compileTopology}from'../js/core/topology.js';import{solveTopology}from'../js/multilink/solver.js';import{encodeSnapshot,decodeShareString}from'../js/share-codec.js';import{inspectLinkExport,inspectPlateExport,exportLinksAsSvg,exportLinksAsDxf}from'../js/blocks/exporters.js';import{pointCoords,pointRefs,setPointType,mergePoints,frameNodeIds,frameConnectorNodes}from'../js/blocks/model.js';import{normalizeTemplate,instantiateTemplate}from'../js/blocks/module-ops.js';import{gridIssues}from'../js/blocks/grid-rule.js';import{holeWorld}from'../js/core/local-holes.js';
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-5,`${a} != ${b}`),inside=(p,r)=>{let hit=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const a=r[i],b=r[j];if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)hit=!hit;}return hit;};
+for(const origin of [null,{x:NaN,y:0},{x:0,y:Infinity}])assert.equal(makeStandardBlank({origin}).ok,false);
 for(const kind of['bar','plate','l']){
  const made=makeStandardBlank({kind}),raw={kind:'blocks',v:1,counter:1,comps:[made.comp],params:made.params},s=normalizeSnapshot(raw),c=s.comps[0],count=kind==='bar'?8:kind==='plate'?24:9;
  assert.ok(s);assert.equal((c.holes || []).length+(kind==='bar'?2:3),count);assert.deepEqual(gridIssues(s.comps,s.params),[]);
@@ -30,3 +31,29 @@ console.log('standard blanks: 8/24/9 true holes, shape/export, exact save/share,
 // A local hole cannot silently jump home when fixed at a nonzero solved pose.
 {const made=makeStandardBlank({kind:'bar'}),c=made.comp;c.isInput=true;c.p1.type='motor';c.p1.physicalMotor='1';Object.assign(S,{comps:[c],topo:{params:made.params},compiled:compileTopology([c],{params:made.params},new Set()),theta:37,selectedNodeId:c.holes[1].id,motorAngles:{},activeMotor:'1'});let undo=0,message='';const editor=createNodeEditor({pushUndo:()=>undo++,pause:()=>{},rebuild:()=>{},draw:()=>{},transient:s=>message=s,hasPoint:()=>true,pointCoords:()=>pointCoords(S.comps),sliderMountInfo:()=>null,removeMotorAtPoint:()=>{},freezePointAtDisplay:()=>{},setPointType:(id,t)=>setPointType(S.comps,id,t)}),before=JSON.stringify(c);editor.setNodeRole('fixed');assert.equal(JSON.stringify(c),before);assert.equal(undo,0);assert.match(message,/初始姿態/);S.theta=0;editor.setNodeRole('fixed');assert.equal(c.holes[1].type,'fixed');assert.equal(undo,1);}
 console.log('local-hole role: nonzero-pose fixing rejected without mutation; source-pose fixing retained');
+
+// Rounded corners preserve the material extents and all grid hole centers.
+for(const kind of ['plate','l']){
+ const {comp:c}=makeStandardBlank({kind}),before=JSON.stringify(c),r=blankGeometry(c,[c.p1,c.p2,c.p3]);
+ assert.ok(r.length>12);near(Math.min(...r.map(p=>p.x)),-6.5);near(Math.min(...r.map(p=>p.y)),-6.5);
+ near(Math.max(...r.map(p=>p.x)),c.p2.x+6.5);near(Math.max(...r.map(p=>p.y)),c.p3.y+6.5);
+ assert.ok(!inside({x:-6.4,y:-6.4},r),'square outside corner is trimmed');
+ for(const h of [{u:0,v:0},...c.holes])assert.ok(inside({x:h.u,y:h.v},r),'grid hole stays inside material');
+ if(kind==='l'){assert.ok(inside({x:6.6,y:6.6},r),'inside L corner is filleted');assert.ok(!inside({x:20,y:20},r),'L notch remains open');}
+ assert.equal(JSON.stringify(c),before,'geometry does not change snapshot');
+ const mirrored=blankGeometry(c,[c.p1,c.p2,{...c.p3,y:-c.p3.y}]);r.forEach((p,i)=>{near(mirrored[i].x,p.x);near(mirrored[i].y,-p.y);});
+}
+
+// Standard bars have straight end faces with four small corner fillets, not semicircular caps.
+{
+ const {comp:c,params}=makeStandardBlank({kind:'bar'}),g=inspectLinkExport(c,params[c.lenParam]),r=g.outlines[0];
+ near(Math.min(...r.map(p=>p.x)),-6.5);near(Math.max(...r.map(p=>p.x)),62.5);
+ assert.ok(r.some(p=>Math.abs(p.x+6.5)<1e-6&&Math.abs(p.y-3.5)<1e-6));
+ assert.ok(r.some(p=>Math.abs(p.x+6.5)<1e-6&&Math.abs(p.y+3.5)<1e-6));
+ assert.deepEqual(blankGeometry(c,[c.p1,c.p2]),r);
+ assert.deepEqual(copyMemberGeometry(c,params).outlines[0],r);
+ assert.equal(g.holes.length,8);
+ const files=[];for(const emit of [exportLinksAsSvg,exportLinksAsDxf])emit([c],pointCoords([c]),params,{},[],null,(text,name)=>files.push({text,name}));
+ assert.ok(files.some(f=>f.name.endsWith('.svg')&&f.text.includes('<path')));
+ assert.ok(files.some(f=>f.name.endsWith('.dxf')&&f.text.includes('LWPOLYLINE')));
+}

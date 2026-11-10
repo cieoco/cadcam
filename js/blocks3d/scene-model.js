@@ -125,7 +125,13 @@ export function buildSceneModel(links, points, opts = {}) {
   const plateThickness = opts.plateThickness ?? 3;
   const memberStocks = opts.memberStocks || {};
   const maxThickness = Math.max(plateThickness, opts.frameGeometry?.thicknessMm || 0, ...Object.values(memberStocks).map(s => s.thicknessMm));
-  const plateGap = Math.max(opts.plateGap ?? 6, maxThickness + 2);
+  // Mounted servo horns occupy 3 mm outside the carrier, plus 0.5 mm
+  // clearance on each side. Reserve that space before layering the output.
+  let hasServoOutput = false;
+  (opts.motorMounts || []).forEach((m,id) => {
+    if(opts.motorTypes?.get(id)==='mg995' && m.face && m.frameBody && m.outputBody)hasServoOutput=true;
+  });
+  const plateGap = Math.max(opts.plateGap ?? 6, maxThickness + (hasServoOutput ? 4 : 2));
   const pinR = opts.pinR ?? 3.2;
   const groundIds = opts.groundIds || new Set();
   const motorCenters = opts.motorCenters || new Set();
@@ -504,6 +510,8 @@ export function buildSceneModel(links, points, opts = {}) {
     touch(c.follower, 0);
   });
 
+  // A placed motor need not have an output member touching its shaft yet.
+  motorCenters.forEach(id=>{if(!joints.has(id))touch(id,0);});
   const pins = [];
   const grounds = [];
   const motors = [];
@@ -588,9 +596,15 @@ export function buildSceneModel(links, points, opts = {}) {
       const face=mount?.face,shaftDirection=face==='front'?-1:1;
       const hostZ=hostPart?hostPart.layer*plateGap:(frameBackZ??0);
       const hostTop=hostZ+(hostPart?.thickness??plateThickness);
+      const horn = type==='mg995' && face ? {
+        hornBaseZ:face==='front'?hostZ-0.5:hostTop+0.5,
+        hornThickness:3,
+      } : null;
+      let shaftEndZ=face==='front'?z0-1.5:z1+1.5;
+      if(horn)shaftEndZ=shaftDirection*Math.max(shaftDirection*shaftEndZ,shaftDirection*horn.hornBaseZ+horn.hornThickness+0.5);
       motors.push({ id: j.id, x: j.x, y: j.y, baseZ: z0, shaftTopZ: z1 + 1.5, dir: { x: dx / dl, y: dy / dl }, type,
         mountZ:face?(face==='front'?hostTop:hostZ):frameBackZ,
-        ...(face?{face,shaftDirection,shaftEndZ:face==='front'?z0-1.5:z1+1.5}: {}) });
+        ...(face?{face,shaftDirection,shaftEndZ,...horn}: {}) });
       return;
     }
     pins.push({

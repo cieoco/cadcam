@@ -44,7 +44,12 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-09：固定環格孔占用、已鑽孔保存與拆除還原共用既有安裝檢查，首次約2.150MB；編輯候選與介面仍按需載入。
 // 2026-11-09：共用已用格孔判定、輸出與畫布淡化增加約2 KB，首次約2.152MB；開孔選項仍懶載入。
 // 2026-11-09：板材共用整件拖曳、局部孔與間接引用保護增加約1.5 KB，無新依賴。
-check('首次JS原始大小低於2.155MB',r.bytes<2155000);
+// 2026-11-10：標準板材與L型件共用圓角輪廓，首次2,155,575 bytes；新增約1 KB純幾何，無新依賴。
+// 2026-11-10：獨立馬達存檔、相容封裝、選取及模擬診斷增加約2.2 KB；安裝候選與UI維持懶載入。
+// 2026-11-10：獨立馬達共用剛體拖曳／數值位移檢查，現值2,160,506 bytes，保留約1.5 KB餘裕；不增加依賴。
+// 2026-11-10：MG995舵盤依實際板厚外露與輸出疊層間隙，實測2,162,218 bytes；3D viewer仍按需載入。
+// 2026-11-10：既有桿件端孔拖接動力的輕量接頭增加500 bytes，實測2,163,358；候選規劃仍懶載入。
+check('首次JS原始大小低於2.164MB',r.bytes<2164000);
 check('扭力UI與估算核心按需載入',!r.paths.includes('js/blocks/torque-ui.js')&&!r.paths.includes('js/core/required-torque.js')&&!r.paths.includes('js/core/actuator-speed.js'));
 check('舵機座板範例按需載入',!r.paths.includes('js/blocks/servo-mount-examples.js')&&!r.paths.includes('js/blocks/motor-plate-examples.js'));
 check('標準結構設定面板按需載入',!r.paths.includes('js/blocks/standard-blank-ui.js')&&r.lazyEntries.includes('js/blocks/standard-blank-ui.js'));

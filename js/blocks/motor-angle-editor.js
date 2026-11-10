@@ -10,13 +10,13 @@ export function motorInstallationAngle(comps,points,id,mount){
 }
 export function planMotorAngle(comps,points,id,mount,value){
   if(!Number.isFinite(value)||Math.abs(value)>360)return null;
-  const owners=comps.filter(c=>['bar','gear'].includes(c.type)&&[c.p1,c.p2].some(p=>p?.id===id&&p.physicalMotor)&&(c.type!=='bar'||c.isInput));
+  const owners=comps.filter(c=>['bar','gear','motor'].includes(c.type)&&[c.p1,c.p2].some(p=>p?.id===id&&p.physicalMotor)&&(c.type!=='bar'||c.isInput));
   if(owners.length!==1)return null;
   const owner=owners[0],old=owner.motorMount,host=old?.frameBody||owner.motorCarrier;
   const current=motorInstallationAngle(comps,points,id,mount);
   if(Math.abs(wrap(value-current))<1e-8)return {owner,changed:false};
   const explicit=!!old?.orientation,angleDeg=explicit?wrap((old.angleDeg||0)+value-current):host?wrap(value-current):wrap(value);
-  return {owner,changed:true,mount:{...old,motor:String(owner.physicalMotor||owner.p1.physicalMotor||owner.p2?.physicalMotor),center:id,outputBody:owner.id,
+  return {owner,changed:true,mount:{...old,motor:String(owner.physicalMotor||owner.p1.physicalMotor||owner.p2?.physicalMotor),center:id,...(owner.type!=='motor'?{outputBody:owner.id}:{}),
     ...(host?{frameBody:host}:{}),orientation:old?.orientation||(host?'follow-frame':'horizontal'),reversed:explicit?!!old.reversed:false,
     angleDeg,order:host?['motor','frameBody','outputBody']:['motor','outputBody']}};
 }

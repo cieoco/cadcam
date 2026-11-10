@@ -11,9 +11,10 @@ const sourceOf=id=>{const e=BLOCK_EXAMPLES.find(x=>x.id===id),s=normalizeSnapsho
 const hash=files=>createHash('sha256').update(JSON.stringify(files.map(f=>[f.name,f.text,f.sourceIds,f.mime]))).digest('hex');
 const hydraulic=()=>{const y=structuredClone(hydraulicSnapshot);y.topo={params:y.params};y.modules ||= [];return y;};
 
-// 1. 逐件輸出不變：雜湊取自 main 892ba48 的同一呼叫（逐件匯出器有意修改時才更新）。
-const golden={'six-bar-lift':'e3d927a2a6e129e2d6a906eade5d9683da3957b753bf3411e687731c2267d4c9','parallel-gripper':'d7e50816ab6f083c361a3c540b1860b59985cbd1555d07d6fbbdd684a7b40af0',
-  'tipping-bucket':'97cfab9c80e5fa5ae16d15727a3e5d6e4961ba122ec8d37fc0c446a93559a522','iq-linq-lift':'89ac27a478dcfba1c5f901d9d815157d112705998185d3bb9d5e2133f78e55ab'};
+// 1. 逐件輸出基準：2026-11-10依使用者指定標準積木小圓角更新三例，未受影響兩例保留892ba48原值。
+// 下列端到端核對仍逐件保留孔數、數量、板內範圍與不重疊；圓角界線另見standard-blanks。
+const golden={'six-bar-lift':'290c776c09058430c670faae80f870cdf60ee7353830493f8710492ea0577f6e','parallel-gripper':'3a31baf300e8a7a8e42d59e6449c481a50402044f39256a77e43bf01ef029dd1',
+  'tipping-bucket':'97cfab9c80e5fa5ae16d15727a3e5d6e4961ba122ec8d37fc0c446a93559a522','iq-linq-lift':'811d13860941d2045bfba2721968069950c69a2c9d81a2ac12fe479ce4ba536e'};
 for(const [id,h] of Object.entries(golden))assert.equal(hash(prepareScopedExport(sourceOf(id),{scope:'assembly'},'dxf').files),h,id+' per-part DXF unchanged');
 assert.equal(hash(prepareScopedExport(hydraulic(),{scope:'design'},'dxf').files),'8a4446736a79fd33413a145f51c9f3680cc52cd4233994a7ab7c3bfd02701326','syringe per-part DXF unchanged');
 
@@ -77,7 +78,7 @@ method.value='laser';method.onchange();
 assert.equal(by('板材尺寸').style.display,'flex');assert.equal(w.value,'600');assert.equal(h.value,'400');
 assert.deepEqual(by('合併檔').children.map(c=>c.textContent),['機構作品-雷切-600x400.dxf']);
 assert.equal(by('合併檔內的零件').children.length,7);
-assert.match(text(result),/共 1 張板材/);assert.match(text(result),/共用邊省下 224 mm 切割路徑/);assert.match(text(result),/kerf/);
+assert.match(text(result),/共 1 張板材/);assert.match(text(result),/共用邊省下 241.5 mm 切割路徑/);assert.match(text(result),/kerf/);
 w.value='160';h.value='100';h.oninput();assert.match(text(result),/共 [2-9] 張板材/,'smaller sheet needs more sheets');assert.match(text(result),/160x100/);
 w.value='60';w.oninput();assert.match(text(result),/尚未匯出：零件「SixDrive」約 141×13 mm，超過板材可用範圍/,'oversized part named');
 w.value='600';h.value='400';w.oninput();method.value='cnc';method.onchange();

@@ -1,4 +1,4 @@
-import {blankGeometry,isOutputBlank} from './standard-blank.js';
+import {blankGeometry,isOutputBlank,isStandardBar} from './standard-blank.js';
 import {localHoles,holeWorld} from '../core/local-holes.js';
 import {isDisk,diskOutline} from './disk-plate.js';
 import {fusionRoot, inspectBarFusionData} from '../core/bar-fusion.js';
@@ -19,7 +19,7 @@ export function copyMemberGeometry(comp, params, settings = {}) {
     const ratio = params[hole.distParam] / length;
     holes.push({x:a.x+(b.x-a.x)*ratio,y:a.y+(b.y-a.y)*ratio,r:holeRadius});
   }
-  return {outlines:[isOutputBlank(comp)?blankGeometry(comp,points):isDisk(comp)?diskOutline(comp,a):roundedHullOutline(points,radius)],holes,cutouts:[]};
+  return {outlines:[isStandardBar(comp)?blankGeometry(comp,points):isDisk(comp)?diskOutline(comp,a):roundedHullOutline(points,radius)],holes,cutouts:[]};
 }
 
 export function planMemberCopy({comps, params, modules = [], counter = 0, id, positions = {}, mode = 'copy', settings = {}}) {

@@ -35,7 +35,7 @@ let pendingMobileEdit = false;      // 放開接點後再展開面板，避免�
 
 // ---- 注入的外部依賴（由 app 在啟動時提供）----
 let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle,
-    worldFromEvent, pointCoords, mobilePrompt,
+    worldFromEvent, pointCoords, displayCoords, mobilePrompt,
     snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
     movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
     isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
@@ -64,7 +64,7 @@ export function startFreeLinkDrag(e, linkId) {
   S.preDragSnap = snapshotStr(); // 整段拖曳合併成一筆 undo
   pause();
   pendingMobileEdit = mobilePrompt();
-  (c.type==='triangle'?selectTriangle:selectLink)(linkId,{openPanel:!pendingMobileEdit});
+  if(c.type!=='motor')(c.type==='triangle'?selectTriangle:selectLink)(linkId,{openPanel:!pendingMobileEdit});
   S.dragLinkId = linkId;
   S.dragLastWorld = w;
   S.snapTarget = null;
@@ -102,7 +102,8 @@ export function onNodeDown(e, id) {
   // 過去 dragId 會間接擋住取消，但加入拖曳門檻後按下階段尚未設定 dragId，
   // 因此必須在事件語意上明確阻止背景處理。
   e.stopPropagation();
-  if (S.comps.some(c=>c.frameHole&&c.p1.id===id)) S.frameEditorOpen=false;
+  const motorBody=S.comps.find(c=>c.type==='motor'&&c.p1?.id===id);
+  if (motorBody || S.comps.some(c=>c.frameHole&&c.p1.id===id)) S.frameEditorOpen=false;
   else if (pointIsGround(id)) openFrameEditor();
   else S.frameEditorOpen = false;
   S.preDragSnap = snapshotStr(); // 拖曳前狀態；若真的有變動，drag end 才記入 undo
@@ -125,7 +126,7 @@ export function onNodeDown(e, id) {
   if (!pendingMobileEdit) openMobileEditPanel();
   Panels.updateRoleEditor();
   S.dragId = null; S.snapTarget = null;
-  const localBody=S.comps.find(c=>localHoles(c).some(h=>h.id===id));
+  const localBody=motorBody||S.comps.find(c=>localHoles(c).some(h=>h.id===id));
   pendingNodeDrag = localBody && isFreeBody(S.comps,localBody,S.modules) && !fusionRoot(S.comps,localBody.id)
     ? {id,bodyId:localBody.id,event:e,x:e.clientX,y:e.clientY,pointerType:e.pointerType || 'mouse'}
     : localBody || S.comps.some(c=>c.frameHole&&c.p1.id===id) || fusionAtPoint(S.comps,id) || (pointIsGround(id) && !isGroundPositionUnlocked(id)) ? null : {
@@ -184,6 +185,16 @@ function onDragMove(e) {
     // Translate vertices together; local holes follow without changing dimensions.
     for(const p of [c.p1,c.p2,c.p3].filter(Boolean))movePointById(p.id,dx,dy);
     S.dragLastWorld = w;
+    if(c.type==='motor'){
+      // Align the shaft, not the grab point. Position snapping does not create
+      // a housing mount or output joint; those retain their installation checks.
+      S.snapTarget=nearestDisplayTo(c.p1.id,[],c.p1);
+      const target=S.snapTarget&&displayCoords()[S.snapTarget];
+      if(target){
+        S.dragLastWorld={x:w.x+target.x-c.p1.x,y:w.y+target.y-c.p1.y};
+        updatePointCoordsById(c.p1.id,target.x,target.y);
+      }
+    }
     redrawAfterDrag();
     return;
   }
@@ -193,6 +204,8 @@ function onDragMove(e) {
 /** Numeric coordinates and dragging share rigid-body and joint constraints. */
 export function moveNodeTo(id,w,{snap=true}={}) {
   if (pointIsRackHole(id)||S.comps.some(c=>c.frameHole&&c.p1.id===id)) return;
+  const motor=S.comps.find(c=>c.type==='motor'&&c.p1?.id===id);
+  if(motor){if(isFreeBody(S.comps,motor,S.modules)){updatePointCoordsById(id,w.x,w.y);S.snapTarget=null;redrawAfterDrag();}return;}
   // 馬達輸入桿的動端：solver 會把它釘在 S.theta 對應的姿勢，直接拖會被拉回、移不動。
   // 不跟 solver 較勁——以「指標位置」找最近的接點當吸附目標、放開即連接（綠圈給回饋）。
   const crankBar = inputCrankMovingEnd(id);
@@ -367,6 +380,10 @@ function commitDragUndo() {
   }
   S.preDragSnap = null;
 }
+async function mountDroppedMotor(id,expected){
+  const {mountDroppedMotor:finish}=await import('./motor-drop-ui.js');
+  finish({S,id,expected,snapshotStr,displayCoords,rebuild,draw,notify:transient,updateRoleEditor:Panels.updateRoleEditor});
+}
 function cancelPointDrag(){
   const before=S.preDragSnap;S.preDragSnap=null;S.dragId=null;S.dragLinkId=null;S.dragFrame=false;S.dragLastWorld=null;S.snapTarget=null;
   if(before){const saved=JSON.parse(before);S.comps=saved.comps;S.modules=saved.modules||[];S.topo.params=saved.params;S.motorAngles={...(saved.motorAngles||{})};S.theta=Number(saved.params?.theta)||0;rebuild();draw();}
@@ -403,13 +420,21 @@ function onDragEnd(e) {
     return;
   }
   if (S.dragLinkId) {
-    S.dragLinkId = null; S.dragLastWorld = null;
+    const dropped=S.comps.find(c=>c.id===S.dragLinkId&&c.type==='motor'),before=S.preDragSnap;
+    S.dragLinkId = null; S.dragLastWorld = null; S.snapTarget = null;
     rebuild(); draw();
     commitDragUndo();
+    if(dropped&&before!==snapshotStr())mountDroppedMotor(dropped.id,snapshotStr()).catch(()=>transient('未完成自動安裝，請從馬達安裝設定核對。'));
     return;
   }
   if (!S.dragId) { pendingNodeDrag=null; S.preDragSnap = null; return; }
   const did = S.dragId, tgt = S.snapTarget;
+  if(tgt&&S.comps.some(c=>c.type==='motor'&&c.p1.id===tgt)){
+    const candidate=mountingWork(S),points=displayCoords(),before=S.preDragSnap;
+    cancelPointDrag();const expected=snapshotStr();
+    import('./motor-drop-ui.js').then(m=>m.connectDraggedMotorOutput({S,fromId:did,toId:tgt,candidate,points,before,expected,snapshotStr,rebuild,draw,notify:transient,selectLink,updateUndoBtn})).catch(()=>transient('尚未接上動力輸出，請重新拖曳或從安裝設定核對。'));
+    return;
+  }
   S.dragId = null; S.snapTarget = null;
   if (tgt && mergePoints(did, tgt) === false) {
     S.preDragSnap=null;
@@ -446,7 +471,7 @@ function endPointer(e) {
 
 export function init(deps) {
   ({ svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle,
-     worldFromEvent, pointCoords, mobilePrompt,
+     worldFromEvent, pointCoords, displayCoords = deps.pointCoords, mobilePrompt,
      snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
      movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
      isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
