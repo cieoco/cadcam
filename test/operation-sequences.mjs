@@ -128,7 +128,7 @@ const nodeEditor=createNodeEditor({
   pointRefs:id=>Model.pointRefs(S.comps,id),
   motorBarForCenter:id=>S.comps.find(c=>c.type==='bar'&&c.isInput&&((c.p1?.id===id&&c.p1.physicalMotor)||(c.p2?.id===id&&c.p2.physicalMotor)))||null,
   sliderTravelStart:()=>0,sliderTravelEnd:c=>Number(c.travelEnd)||100,railLength:()=>100,normalizeSliderRange:noop,
-  traceIds:()=>[...(S.topo.tracePoints||[])],invalidateTrajectory:noop});
+  traceIds:()=>[...(S.topo.tracePoints||[])],invalidateTrajectory:noop,displayCoords});
 
 // ------------------------------------------------------------------ targeting rules
 // Syringe comps and the parts they use are never targeted (syringe pack is last).
@@ -198,11 +198,16 @@ const OPS={
     return {touched:S.comps.map(c=>c.id),split:true};
   },
   move(step){
-    const skip=syringeInvolved(),free=Model.freeLinkForPoint(S.comps,step.pid)||Model.freeTriangleForPoint(S.comps,step.pid);
-    if(!free||!plainBody(free,skip))return null;
-    // Same as input.js: the whole-body drag (startFreeLinkDrag) and the free link/triangle vertex drag both translate the vertices.
-    for(const k of pointKeysFor(free))if(free[k]?.id)Model.movePointById(S.comps,free[k].id,step.dx,step.dy);
-    return {touched:[free.id],moved:Math.hypot(step.dx,step.dy)};
+    // As input.js dragPointTo: a free link/triangle translates by its vertices; any other body goes through
+    // solvePinnedConstraints (holes joined by other parts or fixed stay rigid). If that cannot solve, the drag is refused.
+    const skip=syringeInvolved(),owners=compOfPoint(step.pid);
+    if(!owners.length||!owners.every(c=>plainBody(c,skip)))return null;
+    const free=Model.freeLinkForPoint(S.comps,step.pid)||Model.freeTriangleForPoint(S.comps,step.pid);
+    if(free){for(const k of pointKeysFor(free))if(free[k]?.id)Model.movePointById(S.comps,free[k].id,step.dx,step.dy);return {touched:[free.id],moved:Math.hypot(step.dx,step.dy)};}
+    const at=displayCoords()[step.pid],draft=structuredClone(S.comps);
+    if(!at||!Model.solvePinnedConstraints(draft,S.topo,step.pid,{x:at.x+step.dx,y:at.y+step.dy}))return {touched:[]};
+    S.comps=draft;
+    return {touched:S.comps.map(c=>c.id),moved:Math.hypot(step.dx,step.dy)};
   },
   delete(step){
     const c=comp(step.id);if(!c||!['bar','triangle','motor','slider'].includes(c.type)||syringeInvolved().has(c.id))return null;
@@ -243,9 +248,7 @@ function generate(r){
     for(const [k,w] of Object.entries(WEIGHTS)){if((x-=w)<0){op=k;break;}}
     let step=null;
     if(op==='resize'){
-      // KNOWN (fixture): a frame bar (both ends fixed) sharing a fixed end with another body is not resized by the generator.
-      const sharedFrame=c=>c.type==='bar'&&[c.p1,c.p2].every(p=>p&&Model.isGroundPoint(p))&&[c.p1,c.p2].some(p=>Model.pointUseCount(S.comps,p.id)>1);
-      const c=pick(r,S.comps.filter(c=>c.standardBlank&&isBody(c)&&!skip.has(c.id)&&!sharedFrame(c)));
+      const c=pick(r,S.comps.filter(c=>c.standardBlank&&isBody(c)&&!skip.has(c.id)));
       if(c)step={op,id:c.id,axis:c.type==='bar'?'g':pick(r,['g','r1']),delta:pick(r,[-16,-8,8,8,16])};
     }else if(op==='frame'){
       const c=pick(r,S.comps.filter(c=>plainBody(c,skip)));if(c)step={op,id:c.id};
@@ -265,10 +268,7 @@ function generate(r){
       const e=pick(r,ends);if(m&&e)step={op,from:e.id,to:m.p1.id};
     }else if(op==='merge'){
       const rel=buildRelations(asWork(snapshot()));
-      // KNOWN (fixtures): previewPointConnection translates a "free" body by its vertices only. Generate merges from
-      // bodies that are either not translated that way or are really free (isFreeBody).
-      const translated=id=>{const f=Model.freeLinkForPoint(S.comps,id)||Model.freeTriangleForPoint(S.comps,id);return f&&!Model.isFreeBody(S.comps,f,S.modules);};
-      const froms=allPointIds().filter(id=>Model.pointUseCount(S.comps,id)===1&&!Model.pointIsGround(S.comps,id)&&!translated(id)&&compOfPoint(id).length===1&&compOfPoint(id).every(c=>plainBody(c,skip)&&!c.isInput));
+      const froms=allPointIds().filter(id=>Model.pointUseCount(S.comps,id)===1&&!Model.pointIsGround(S.comps,id)&&compOfPoint(id).length===1&&compOfPoint(id).every(c=>plainBody(c,skip)&&!c.isInput));
       const from=pick(r,froms);
       if(from){
         const owner=compOfPoint(from)[0];
@@ -282,8 +282,8 @@ function generate(r){
       const id=pick(r,allPointIds().filter(id=>Model.pointRefs(S.comps,id).length>=2&&compOfPoint(id).every(c=>isBody(c)&&!skip.has(c.id))));
       if(id)step={op,pid:id};
     }else if(op==='move'){
-      // Whole-body drag (startFreeLinkDrag) is gated by isFreeBody. The older vertex-drag path is not (KNOWN fixtures cover it).
-      const ids=allPointIds().filter(id=>{const f=Model.freeLinkForPoint(S.comps,id)||Model.freeTriangleForPoint(S.comps,id);return f&&plainBody(f,skip)&&Model.isFreeBody(S.comps,f,S.modules);});
+      // Whole-body drag and vertex drag: any vertex of a plain body (input.js dragPointTo decides how it moves, or refuses).
+      const ids=allPointIds().filter(id=>compOfPoint(id).length&&compOfPoint(id).every(c=>plainBody(c,skip)));
       const id=pick(r,ids);if(id)step={op,pid:id,dx:ri(r,-40,40),dy:ri(r,-40,40)};
     }else if(op==='delete'){
       const c=pick(r,S.comps.filter(c=>['bar','triangle','motor'].includes(c.type)&&!skip.has(c.id)&&!c.barFusion&&!c.barFusionRoot&&!c.boxPanel));
@@ -333,6 +333,7 @@ class StepFailure extends Error{constructor(sig,detail){super(`${sig}: ${detail}
 function runSteps(workId,steps,gen,count,stats,tolerate){
   initState(WORKS[workId]());lastPoints=null;pushes=0;notices=[];
   let first=solveNow(null);let prev=first.isValid?first.points:null;lastPoints=prev;
+  let lost=!first.isValid;          // the last committed pose was unsolvable: the next solvable pose has no earlier pose to be continuous with
   let bad=badKeys();
   const record=[];
   const n=gen?count:steps.length;
@@ -352,8 +353,8 @@ function runSteps(workId,steps,gen,count,stats,tolerate){
       if(valid){
         // 1 rigid geometry
         const probs=rigidProblems(sol);if(probs.length)throw new StepFailure('rigid',`${step.op}: ${probs.slice(0,3).join('; ')}`);
-        // 3 pose continuity
-        if(prev){
+        // 3 pose continuity (not across an unsolvable pose: recovering from it is a new pose, not a branch flip)
+        if(prev&&!lost){
           const exempt=new Set();
           if(!res.strict){for(const g of components())if([...res.touched||[]].some(t=>g.has(t))||res.split||res.deleted||res.reloaded)for(const x of g)exempt.add(x);}
           const dTheta=res.theta?Math.abs(((S.theta-prevTheta)%360+540)%360-180)*Math.PI/180:0;
@@ -365,8 +366,8 @@ function runSteps(workId,steps,gen,count,stats,tolerate){
             if(j>bound)throw new StepFailure('jump',`${step.op}: point ${id} moved ${j.toFixed(1)} mm (bound ${bound.toFixed(1)})`);
           }
         }
-        prev=sol.points;lastPoints=prev;
-      }else{stats&&(stats.invalid=(stats.invalid||0)+1);lastPoints=sol?.points||null;}
+        prev=sol.points;lastPoints=prev;lost=false;
+      }else{stats&&(stats.invalid=(stats.invalid||0)+1);lastPoints=sol?.points||null;lost=true;}
       // 2 integrity: no new contradiction/dangling
       const now=badKeys();
       const added=[...now].filter(k=>!bad.has(k));

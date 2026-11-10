@@ -1170,7 +1170,8 @@ const nodeEditor = createNodeEditor({
   pointRefs: (id) => Model.pointRefs(S.comps, id),
   motorBarForCenter, sliderTravelStart, sliderTravelEnd, railLength, normalizeSliderRange,
   traceIds: () => traceIds(),
-  invalidateTrajectory: () => { manualTrace = {}; trajectoryCache = null; geomVersion++; }
+  invalidateTrajectory: () => { manualTrace = {}; trajectoryCache = null; geomVersion++; },
+  displayCoords: () => displayCoords()
 });
 const { changeStroke, changeServoAngle,
         setNodeRole, changeNodePos, removeNodeMotor:removeAttachedMotor, splitNode,

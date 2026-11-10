@@ -14,7 +14,7 @@ import {fusionRoot,fusionAtPoint} from '../core/bar-fusion.js';
  */
 
 import { S } from './state.js';
-import {rotateLooseBarEnd,pointRotation,isFreeBody} from './model.js';
+import {rotateLooseBarEnd,pointRotation,isFreeBody,holeJoined} from './model.js';
 import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 import * as View from './view.js';
 import * as Tools from './tools.js';
@@ -307,6 +307,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     redrawAfterDrag();
     return;
   }
+  if (S.comps.some(c => ['p1', 'p2', 'p3'].some(k => c[k]?.id === id) && holeJoined(S.comps, c))) { transient('這個零件的孔上接著其他零件或固定孔，不能只拖它的角；請改尺寸，或移動接在孔上的零件。'); return; }
   // 三點桿自由頂點，但另兩頂點都被機構牽制（≥2 樞紐）：此頂點被剛體完全決定，
   // 自由拖會破壞三角剛性 → 鎖住不動（要移動請拖牽制較少的接點，或加馬達驅動機構）。
   if (lockedTriangleVertex && lockedTriangleVertex(id)) return;

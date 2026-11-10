@@ -1,0 +1,23 @@
+{
+ "work": "parallel-gripper",
+ "seed": 20261178,
+ "signature": "rigid",
+ "fixed": "K3 resize refuses to move a fixed end another body shares",
+ "detail": "resize: PGLeftJaw hole PGLeftJaw_H8_0 off its (u,v) by 14.153",
+ "steps": [
+  {
+   "op": "frame",
+   "id": "PGLeftJaw"
+  },
+  {
+   "op": "fix",
+   "pid": "PGLeftJaw_H8_0"
+  },
+  {
+   "op": "resize",
+   "id": "PGLeftFollower",
+   "axis": "g",
+   "delta": -16
+  }
+ ]
+}

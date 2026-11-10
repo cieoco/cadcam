@@ -53,6 +53,9 @@ export function resizeStandardBlank(c,params,axis,value,{comps=[],modules=[]}={}
  for(const key of keys){const p=raw[key];out[key]={...c[key],x:a.x+p.x*Math.cos(angle)-p.y*Math.sin(angle)*holeSide(c),y:a.y+p.x*Math.sin(angle)+p.y*Math.cos(angle)*holeSide(c)};}
  // Keep a grounded end in place.
  if(c.type==='bar'&&c.p2.type==='fixed'&&c.p1.type!=='fixed'){const dx=b.x-out.p2.x,dy=b.y-out.p2.y;for(const key of keys)Object.assign(out[key],{x:out[key].x+dx,y:out[key].y+dy});}
+ // A fixed end that another body shares cannot be moved by a resize: that body would silently lose its own length.
+ const dragged=keys.find(k=>c[k].type==='fixed'&&Math.hypot(out[k].x-c[k].x,out[k].y-c[k].y)>1e-6&&comps.some(o=>o.id!==c.id&&['bar','triangle'].includes(o.type)&&['p1','p2','p3'].some(j=>o[j]?.id===c[k].id)));
+ if(dragged)return {ok:false,message:`改這個尺寸會移動固定孔，而它同時連著其他零件；請先移動機架固定孔或解除連接，再改「${c.name||c.id}」的尺寸。`};
  // An end joined at another part's hole stays on that hole; a resize never drags the hole's copy away from it.
  for(const key of keys)for(const o of comps)if(o.id!==c.id){const h=[...localHoles(o),...(o.standardBlank?.mountHoles||[])].find(h=>h.id===out[key].id);if(h)Object.assign(out[key],holeWorld(o,h));}
  const originalHoles=[...(c.holes || []),...(c.standardBlank.mountHoles || [])],old=new Map(originalHoles.map(h=>[`${h.u},${h.v}`,h]));
@@ -61,7 +64,16 @@ export function resizeStandardBlank(c,params,axis,value,{comps=[],modules=[]}={}
  const retained=new Set(out.holes.map(h=>h.id)),removed=originalHoles.filter(h=>!retained.has(h.id));
  const lost=removed.find(h=>isHoleUsed(c,h,comps,{params,modules}));
  if(lost)return {ok:false,message:`縮小會移除「${c.name||c.id}」${c.type==='bar'?'':`長向第${lost.u/8+1}、直向`}第${(c.type==='bar'?lost.u:lost.v)/8+1}孔，但這孔已固定或有零件連接；請先解除該孔的連接，或改用較多孔數。`};
- return {ok:true,comp:out,params:patch};
+ // Parts joined at this body's holes follow the holes that moved; a fixed one cannot follow, so the resize is refused.
+ const follow=[];
+ for(const h of [...out.holes,...(out.standardBlank.mountHoles||[])]){
+  const was=originalHoles.find(x=>x.id===h.id);if(!was)continue;
+  const w=holeWorld(out,h),w0=holeWorld(c,was);if(Math.hypot(w.x-w0.x,w.y-w0.y)<0.01)continue;
+  const joined=comps.flatMap(o=>o.id===c.id?[]:['p1','p2','p3'].map(k=>o[k]).filter(p=>p?.id===h.id));
+  if(h.type==='fixed'||joined.some(p=>p.type==='fixed'||p.type==='motor'))return {ok:false,message:`改這個尺寸會移動固定在「${c.name||c.id}」孔上的零件；請先解除固定，或改用不會移動該孔的尺寸。`};
+  if(joined.length)follow.push({id:h.id,...w});
+ }
+ return {ok:true,comp:out,params:patch,follow};
 }
 
 /** Fixed preset: solver endpoints remain the shaft and working hole. */

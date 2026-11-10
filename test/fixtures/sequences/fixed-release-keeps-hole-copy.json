@@ -2,6 +2,7 @@
  "work": "servo-plate-fourbar",
  "seed": 424293,
  "signature": "integrity:I1",
+ "fixed": "K1 release: the pose freeze no longer writes the display seed over a hole end",
  "detail": "release: contradiction 孔 Blank1_H72_8 在 「標準舵機座板」(ServoPlate)、「連桿」(FourbarCoupler) 上的位置不一致（最多相差 9.7 mm）；「連桿」(FourbarCoupler) 的這個端點沒有落在孔的位置上，畫面與製作會對不起來。",
  "steps": [
   {
@@ -23,6 +24,5 @@
    "op": "release",
    "id": "FourbarCrank"
   }
- ],
- "known": "Not analysed: releasing a motor leaves the 9.7 mm stale copy on a plate hole (probably the same stale-copy class after planMotorInstallation moves the output). Left for C4."
+ ]
 }

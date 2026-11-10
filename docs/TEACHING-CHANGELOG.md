@@ -1,5 +1,16 @@
 # 教學與操作更新紀錄
 
+## 2026-11-10：接合關係 C2b——修掉操作序列測試找到的已知問題（孔副本過期、刪座板留下馬達引用、求解器誤判有效）
+
+- **K1 孔副本過期（I1）。** 根因：`model.solvePinnedConstraints` 只約束桿與三角形的邊，接在座板／格孔桿上的別件端點（孔副本）不在約束裡，所以合併到格孔、拖曳時剛體被搬動而副本留在原處；另外自由件頂點平移、旋轉的捷徑（`isFreeLink`、`freeTriangleForPoint`、`pinnedTriangleForPoint`、`looseBarRotation`）只動頂點，不看孔上有沒有別件或固定孔。修法：(1) 約束求解把「有別件接著或已固定」的局部孔／馬達安裝孔當成本體的剛性第三點（到兩端的距離），固定孔視為釘住，收斂後孔再貼回本體上的準確位置；(2) 新增 `model.holeJoined`，孔上有別件或固定孔的本體不走頂點捷徑，改走約束求解，解不出來就不動並說明；(3) `splitNode` 對孔上有別件或固定孔的本體不再把分出的端點位移 16 mm；(4) 標準板材改尺寸時，接在被移動的孔上的零件跟著孔走，孔上有固定零件則拒絕；(5) 解除馬達連接凍結姿勢時，不再用顯示用座標覆寫孔端，改為把孔端貼回孔的位置。沒有改為「全域一次校正」：提交點分散在數十處，且會悄悄拖動固定錨。
+- **K2 刪除載有馬達的座板。** `delete-part` 的 `detachDeletedAttachments` 只處理獨立馬達；輸出桿的 `motorMount.frameBody`／`motorCarrier` 留在已刪除的座板上（I3）。現在清掉兩者與 `order` 內的 `frameBody`，軸心點保留原 id 與位置、維持固定點，朝向改成固定的水平＋角度（載體是活動桿時相位加上載體目前角度），與刪除宿主時獨立馬達的處理一致。
+- **K3 求解器誤判有效。** 缺口是三角板／局部孔的檢查只量距離：局部孔跑到板子底線的另一側（鏡像）距離不變，卻被判有效。求解器現在檢查局部孔的位置在底線哪一側，翻到另一側就回報無法求解。接地對接地的距離豁免（`fixedIds.has(a)&&fixedIds.has(b)`）**保留**：`motor-release.mjs` 要求座板與馬達軸心相差 42／76 mm 的學生原檔仍能求解並提示修復，關掉豁免會讓這類舊檔直接無解；改在操作端攔截：改尺寸不能移動被別的桿共用的固定端；固定板材頂點時，另外兩頂點都已固定就不再吸附到 8 mm 格點（會拉長板子）；固定局部孔時比對的是畫面實際顯示的姿勢（含分支），而不是重新求解的預設分支。
+- **位移跳動的判斷。** 72 mm 那筆（`motor-plate-tt`）合理：曲柄上的孔被固定後轉馬達到 97°，該姿勢本來就無解（舊求解器誤報有效），取消固定才回到馬達角度，是從無解恢復，不是分支翻轉；序列測試因此不再拿無解姿勢之前的舊姿勢比連續性。78 mm 那筆（`fourbar-crank-rocker`）沒有無解姿勢，最可能與 `fixed-fix-hole-uses-drawn-pose` 同因（固定局部孔時比對的是重新求解的預設分支，不是畫面上的分支）；該重播現在通過，未另外隔離。
+- **平行夾爪 0.1 mm 漂移不修，列為 KNOWN。** 分離後改名的端點沒有前一格的姿勢，被放在 16 mm 位移的種子方向，而格孔沿前一格方向，差 0.33 度，距離檢查看不到；要修需改求解器的種子順序（本包不得改演算法）。
+- 測試：`test/operation-sequences.mjs` 的 `move` 改成與 `input.js` 同順序（自由件平移，否則約束求解，解不出來即拒絕）、產生器不再迴避共用固定端的改尺寸與合併；`known` 欄位的問題改名為 `fixed-*` 並移除標記（本包新增 18 筆回歸重播，共 23 筆）；`OPSEQ_SCALE=10` 另找到 4 筆未分析的問題，記為 KNOWN。
+- 使用者可見：拖曳孔上接著別件的板件角時，解得出來就剛性帶動，解不出來顯示「這個零件的孔上接著其他零件或固定孔，不能只拖它的角；請改尺寸，或移動接在孔上的零件。」；改尺寸會移動被別桿共用的固定孔時顯示「改這個尺寸會移動固定孔，而它同時連著其他零件；請先移動機架固定孔或解除連接，再改「…」的尺寸。」，會移動固定在孔上的零件時顯示「改這個尺寸會移動固定在「…」孔上的零件；請先解除固定，或改用不會移動該孔的尺寸。」，會移除被追蹤／量測／負載使用的孔時顯示「縮小會移除被軌跡追蹤、量測或負載使用的孔；請先改選其他點，再縮小。」；分離合併點時，孔上有別件的零件端點不再外移 16 mm。
+- 啟動大小上限 2,165,000 不變：刪除全專案無人呼叫的 `roundedPolylineOutline`（`exporters.js`、`view.js` 各一份）與只被它們使用的 `lineIntersection`、`arcWorldPoints`、`arcWorldPointsClockwise`、`arcOutlinePoints`、`jawPlateOutline`、`jawPlateStrokePath`（以 grep 核對 js／test／tools 無其他引用）。
+
 ## 2026-11-10：操作序列測試（接合關係 C2）；刪除零件與合併接點不再留下失效的軌跡點，標準板材改尺寸時接在他件孔上的端點留在孔上
 
 - 新增 `test/operation-sequences.mjs`（已列入 `test/manifest.json`）：固定種子、隨機而合法的學生操作，走 app 實際用的規劃器與編輯器（`member-editor.setDimensionValue`、`member-frame`、`motor-release`、`motor-drop.planDraggedMotorOutput`、`node-editor` 的 `setNodeRole`／`splitNode`、`model.previewPointConnection`、`delete-part`、存檔→`normalizeSnapshot`→重開）。6 件代表作品：學生原檔 `connected-resize`、修好的 `motor-off-plate`、`fourbar-crank-rocker`、`servo-plate-fourbar`、`parallel-gripper`、`motor-plate-tt`。預設 12 輪約 630 個已提交步驟、約 16 秒；`OPSEQ_SCALE=4` 約 2,800 步。每步檢查：剛體長度與局部孔幾何（0.01 mm）、`checkWork` 無新增 `contradiction`／`dangling`、姿態連續（預設 50 mm，改尺寸／移動／轉角另加寬）、存檔重開後 `copiesOf` 相同、不丟例外。

@@ -1,0 +1,31 @@
+{
+ "work": "motor-off-plate-repaired",
+ "seed": 2234587,
+ "signature": "jump",
+ "known": "Found by OPSEQ_SCALE=10 (not analysed yet). fix Blank136.B moves Blank136_H8_0 by 52.2 mm, 2 mm over the 50 mm continuity bound, after a release at theta -15. Probably the same drawn-pose-versus-unseeded-solve difference as fixed-fix-hole-uses-drawn-pose, for a vertex instead of a hole (Model.freezePointAtDisplay uses displayPoint without the previous pose). Unverified guess for the next step: make freezePointAtDisplay read the drawn pose.",
+ "detail": "fix: point Blank136_H8_0 moved 52.2 mm (bound 50.0)",
+ "steps": [
+  {
+   "op": "theta",
+   "motor": "1",
+   "deg": 103
+  },
+  {
+   "op": "fix",
+   "pid": "P139s"
+  },
+  {
+   "op": "theta",
+   "motor": "1",
+   "deg": -15
+  },
+  {
+   "op": "release",
+   "id": "Blank135"
+  },
+  {
+   "op": "fix",
+   "pid": "Blank136.B"
+  }
+ ]
+}

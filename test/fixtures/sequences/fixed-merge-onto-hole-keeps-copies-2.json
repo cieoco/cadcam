@@ -1,0 +1,18 @@
+{
+ "work": "servo-plate-fourbar",
+ "seed": 58,
+ "signature": "integrity:I1",
+ "fixed": "K1 merge onto a lattice hole",
+ "detail": "merge: the rocker's end joined to FourbarCoupler_H24_0 is 8 mm from the coupler's hole",
+ "steps": [
+  {
+   "op": "split",
+   "pid": "FourbarF"
+  },
+  {
+   "op": "merge",
+   "from": "P8s",
+   "to": "FourbarCoupler_H24_0"
+  }
+ ]
+}

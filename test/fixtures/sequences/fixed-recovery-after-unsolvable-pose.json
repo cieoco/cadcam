@@ -2,6 +2,7 @@
  "work": "motor-plate-tt",
  "seed": 8171,
  "signature": "jump",
+ "fixed": "K3 legitimate: the jump is the recovery from an unsolvable pose (fixed hole on a driven crank at theta 97); the test no longer compares across it",
  "detail": "unfix: point ServoArmTip moved 71.9 mm (bound 50.0)",
  "steps": [
   {
@@ -17,6 +18,5 @@
    "op": "unfix",
    "pid": "ServoArmH24"
   }
- ],
- "known": "Same as fourbar-crank-rocker-20261144-jump: unfixing a pivot lets the mechanism relax to a branch 70+ mm away (solver branch choice on an under-constrained mechanism). Left for the solver pack."
+ ]
 }

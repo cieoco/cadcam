@@ -1,0 +1,28 @@
+{
+ "work": "motor-off-plate-repaired",
+ "seed": 271845,
+ "signature": "rigid",
+ "known": "Found by OPSEQ_SCALE=10 (not analysed yet). A frame bar (both ends fixed) whose end sits on a plate hole is resized: the solver reports a valid pose while the plate's hole is 8 mm off its (u,v). Same family as the resize refusals in standard-blank.js (a fixed end that is also a plate hole cannot move); the resize needs to refuse when the bar's two fixed ends cannot both stay where they are. Unverified guess for the next step: check the pinned distance between the two fixed ends against the new length inside resizeStandardBlank.",
+ "detail": "resize: Blank133 hole Blank133_H16_8 off its (u,v) by 8.000",
+ "steps": [
+  {
+   "op": "merge",
+   "from": "P139s",
+   "to": "Blank133_H0_24"
+  },
+  {
+   "op": "release",
+   "id": "Blank135"
+  },
+  {
+   "op": "frame",
+   "id": "Blank137"
+  },
+  {
+   "op": "resize",
+   "id": "Blank137",
+   "axis": "g",
+   "delta": 8
+  }
+ ]
+}

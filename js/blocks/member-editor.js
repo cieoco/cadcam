@@ -149,8 +149,11 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if(!comp)return;
     if(comp.standardBlank&&(['g','r1','arm'].includes(id)||isOutputBlank(comp)&&id==='width')){
       const value=Number(raw),plan=resizeStandardBlank(comp,S.topo.params,id,value,{comps:S.comps,modules:S.modules});if(!plan.ok){notify(plan.message);sync();return;}
+      // A hole that trace, reference, load or dimension settings point at cannot silently disappear with a smaller size.
+      const watched=JSON.stringify([S.topo.tracePoints,S.topo.tracePoint,S.topo.referencePoint,S.topo.loads,S.topo.dimensions]),gone=(comp.holes||[]).find(h=>!plan.comp.holes.some(x=>x.id===h.id)&&watched.includes(`"${h.id}"`));
+      if(gone){notify('縮小會移除被軌跡追蹤、量測或負載使用的孔；請先改選其他點，再縮小。');sync();return;}
       if(JSON.stringify(comp)===JSON.stringify(plan.comp)&&Object.entries(plan.params).every(([k,v])=>S.topo.params[k]===v))return;
-      pause();let invalid='';const accepted=commitMountingEdit(S,draft=>{const index=draft.comps.findIndex(c=>c.id===comp.id);if(comp.type==='bar'&&id==='g')planSyringeAttachmentResize(draft.comps,comp,Number(draft.params[comp.lenParam]),value).forEach(({id,...patch})=>Object.assign(draft.comps.find(c=>c.id===id),patch));draft.comps[index]=plan.comp;Object.assign(draft.params,plan.params);for(const key of ['p1','p2',...(comp.type==='triangle'?['p3']:[])]){const p=plan.comp[key];movePoint(draft.comps,p.id,p.x,p.y);}invalid=validateCandidate(draft);return !invalid;},{pushUndo,notify});
+      pause();let invalid='';const accepted=commitMountingEdit(S,draft=>{const index=draft.comps.findIndex(c=>c.id===comp.id);if(comp.type==='bar'&&id==='g')planSyringeAttachmentResize(draft.comps,comp,Number(draft.params[comp.lenParam]),value).forEach(({id,...patch})=>Object.assign(draft.comps.find(c=>c.id===id),patch));draft.comps[index]=plan.comp;Object.assign(draft.params,plan.params);for(const key of ['p1','p2',...(comp.type==='triangle'?['p3']:[])]){const p=plan.comp[key];movePoint(draft.comps,p.id,p.x,p.y);}for(const f of plan.follow||[])movePoint(draft.comps,f.id,f.x,f.y);invalid=validateCandidate(draft);return !invalid;},{pushUndo,notify});
       if(!accepted){if(invalid)notify(invalid);sync();draw();return;}rebuild();draw();return;
     }
 

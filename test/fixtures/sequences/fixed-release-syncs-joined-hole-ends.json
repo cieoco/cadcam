@@ -1,0 +1,27 @@
+{
+ "work": "connected-resize",
+ "seed": 424242,
+ "signature": "integrity:I1",
+ "fixed": "K1 release: the group pose freeze moves the ends joined at the released bar's holes along with the bar",
+ "detail": "release: contradiction 孔 Blank135_H8_0 在 「孔格桿件」(Blank135)、「孔格桿件」(Blank137) 上的位置不一致（最多相差 15.5 mm）；「孔格桿件」(Blank137) 的這個端點沒有落在孔的位置上，畫面與製作會對不起來。",
+ "steps": [
+  {
+   "op": "delete",
+   "id": "Blank136"
+  },
+  {
+   "op": "merge",
+   "from": "Blank136.B",
+   "to": "Blank135_H8_0"
+  },
+  {
+   "op": "theta",
+   "motor": "1",
+   "deg": 151
+  },
+  {
+   "op": "release",
+   "id": "Blank135"
+  }
+ ]
+}

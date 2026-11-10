@@ -1,4 +1,4 @@
-import {localHoles,holeWorld} from '../core/local-holes.js';
+import {localHoles,holeWorld,holeSide} from '../core/local-holes.js';
 /**
  * blocks / model
  *
@@ -264,7 +264,7 @@ export function recomputeLengths(comps, topo) {
 export function looseBarRotation(comps, params, id) {
   const arms=comps.filter(c=>c.type==='bar'&&c.fixedLen&&c.shape!=='disk'&&[c.p1,c.p2].some(p=>p?.id===id));
   const bar = arms.length===1?arms[0]:fixedLinkFor(comps, id);
-  if (!bar || bar.isInput || bar.barFusionRoot || bar.barFusion || pointIsGround(comps, id)) return false;
+  if (!bar || bar.isInput || bar.barFusionRoot || bar.barFusion || pointIsGround(comps, id) || holeJoined(comps, bar)) return false;
   // A single free disk at the arm tip adds no arm-position constraint. Its
   // reference pin follows the center translation; this does not solve spin.
   const attached=comps.filter(c=>c!==bar&&pointKeysFor(c).some(k=>c[k]?.id===id));
@@ -311,9 +311,11 @@ export function solvePinnedConstraints(comps, topo, pinId, target, options = {})
     const p = c[k];
     if (p && p.id && isGroundPoint(p)) pinned.add(p.id);
   }));
+  comps.forEach(c => bodyHoles(c).forEach(h => { if (isGroundPoint(h)) pinned.add(h.id); }));
 
   const constraints = [];
   const collinearConstraints = [];
+  const copied = new Set(comps.flatMap(c => pointKeysFor(c).map(k => c[k]?.id)));
   const paramLen = (name, fallback) => {
     const v = name && params[name] !== undefined ? Number(params[name]) : fallback;
     return Number.isFinite(v) && v > 0 ? v : fallback;
@@ -332,10 +334,15 @@ export function solvePinnedConstraints(comps, topo, pinId, target, options = {})
     collinearConstraints.push({ a, mid, b, t: aMidLen / sum });
   };
 
+  // A local hole joined by another part moves with its body: it is a rigid third point of the body's base.
+  const addHoles = (c, len) => bodyHoles(c).forEach(h => {
+    if (copied.has(h.id) || isGroundPoint(h)) { addDist(c.p1.id, h.id, Math.hypot(h.u, h.v)); addDist(c.p2.id, h.id, Math.hypot(h.u - len, h.v)); }
+  });
   comps.forEach(c => {
     if (c.type === 'bar' && c.p1?.id && c.p2?.id) {
       const fallback = Math.hypot((c.p2.x || 0) - (c.p1.x || 0), (c.p2.y || 0) - (c.p1.y || 0));
       addDist(c.p1.id, c.p2.id, paramLen(c.lenParam, fallback));
+      addHoles(c, paramLen(c.lenParam, fallback));
     } else if (c.type === 'triangle' && c.p1?.id && c.p2?.id && c.p3?.id) {
       const g = Math.hypot((c.p2.x || 0) - (c.p1.x || 0), (c.p2.y || 0) - (c.p1.y || 0));
       const r1 = Math.hypot((c.p3.x || 0) - (c.p1.x || 0), (c.p3.y || 0) - (c.p1.y || 0));
@@ -349,6 +356,7 @@ export function solvePinnedConstraints(comps, topo, pinId, target, options = {})
       addCollinear(c.p1.id, c.p2.id, c.p3.id, lg, lr2, lr1);
       addCollinear(c.p1.id, c.p3.id, c.p2.id, lr1, lr2, lg);
       addCollinear(c.p2.id, c.p1.id, c.p3.id, lg, lr1, lr2);
+      addHoles(c, lg);
     }
   });
 
@@ -412,6 +420,11 @@ export function solvePinnedConstraints(comps, topo, pinId, target, options = {})
     });
   }
   points[pinId] = { x: target.x, y: target.y };
+  // The relaxation leaves a joined hole slightly off its body; put it back exactly on the solved body.
+  comps.forEach(c => bodyHoles(c).forEach(h => {
+    const a = points[c.p1?.id], b = points[c.p2?.id];
+    if (a && b && relevant.has(h.id) && !pinned.has(h.id) && h.id !== pinId) points[h.id] = holeWorld({ p1: a, p2: b }, { u: h.u, v: h.v * holeSide(c) });
+  }));
 
   let maxErr = 0;
   constraints.forEach(c => {
@@ -438,9 +451,12 @@ export function fixedLinkFor(comps, id) {
 }
 
 export function pointUseCount(comps,id){return pointRefs(comps,id).length;}
+// A hole another part is joined at, or that is fixed, moves with its body: vertex-only moves would leave that copy behind.
+const bodyHoles=c=>[...localHoles(c),...(c?.standardBlank?.mountHoles||[]).filter(h=>Number.isFinite(h.u)&&Number.isFinite(h.v))];
+export const holeJoined=(comps,c)=>bodyHoles(c).some(h=>isGroundPoint(h)||comps.some(o=>o!==c&&pointKeysFor(o).some(k=>o[k]?.id===h.id)));
 
 export function isFreeLink(comps, c) {
-  return c && c.type === 'bar' && c.fixedLen &&
+  return c && c.type === 'bar' && c.fixedLen && !holeJoined(comps, c) &&
     c.p1 && c.p2 &&
     !isGroundPoint(c.p1) && !isGroundPoint(c.p2) &&
     pointUseCount(comps, c.p1.id) === 1 && pointUseCount(comps, c.p2.id) === 1;
@@ -473,7 +489,7 @@ export function freeTriangleForPoint(comps, id) {
   const t = comps.find(c => c.type === 'triangle' &&
     [c.p1, c.p2, c.p3].some(p => p && p.id === id));
   if (!t || !t.p1 || !t.p2 || !t.p3) return null;
-  const free = [t.p1, t.p2, t.p3].every(p =>
+  const free = !holeJoined(comps, t) && [t.p1, t.p2, t.p3].every(p =>
     !isGroundPoint(p) && pointUseCount(comps, p.id) === 1);
   return free ? t : null;
 }
@@ -485,7 +501,7 @@ export function freeTriangleForPoint(comps, id) {
 export function pinnedTriangleForPoint(comps, id) {
   const t = comps.find(c => c.type === 'triangle' &&
     [c.p1, c.p2, c.p3].some(p => p && p.id === id));
-  if (!t || !t.p1 || !t.p2 || !t.p3) return null;
+  if (!t || !t.p1 || !t.p2 || !t.p3 || holeJoined(comps, t)) return null;
   const verts = [t.p1, t.p2, t.p3];
   const isPivot = p => pointIsGround(comps, p.id) || pointUseCount(comps, p.id) > 1;
   const pivots = verts.filter(isPivot);

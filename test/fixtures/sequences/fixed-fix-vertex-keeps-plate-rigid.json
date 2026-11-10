@@ -1,0 +1,13 @@
+{
+ "work": "motor-off-plate-repaired",
+ "seed": 424259,
+ "signature": "rigid",
+ "fixed": "K3 fixing a plate vertex whose other vertices are fixed no longer snaps it off the plate",
+ "detail": "fix: Blank133 r1 50.693 != 48 (err 2.693); Blank133 r2 74.940 != 73.7563556583431 (err 1.183)",
+ "steps": [
+  {
+   "op": "fix",
+   "pid": "Blank133.C"
+  }
+ ]
+}

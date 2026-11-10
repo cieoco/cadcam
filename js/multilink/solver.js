@@ -1082,6 +1082,17 @@ function solveBodyJointTopology(topology, params) {
         }
     });
 
+    // A lattice hole keeps its side of the body's base line; distances alone also admit the mirrored position.
+    triangles.forEach((t, id) => {
+        const a = points[t.p1], b = points[t.p2], h = points[t.p3];
+        if (!id.startsWith('localHole.') || !a || !b || !h) return;
+        const side = ((b.x - a.x) * (h.y - a.y) - (b.y - a.y) * (h.x - a.x)) / (Math.hypot(b.x - a.x, b.y - a.y) || 1);
+        if (Math.abs(side) > 0.5 && side * t.sign < 0) {
+            infeasible = true;
+            if (!infeasibleReason) infeasibleReason = `孔 ${t.p3} 翻到了板件的另一側`;
+        }
+    });
+
     for (const [id, point] of Object.entries(points)) {
         if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
             infeasible = true;

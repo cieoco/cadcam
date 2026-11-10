@@ -1,0 +1,32 @@
+{
+ "work": "motor-plate-tt",
+ "seed": 21261198,
+ "signature": "integrity:I1",
+ "known": "Found by OPSEQ_SCALE=10 (not analysed yet). Dragging ServoArmTip after the released arm was reconnected to ServoAxis leaves the arm's ServoAxis end 14 mm from the plate hole it is joined at. The drag solve moves a joined end that is also a motor shaft copy; solvePinnedConstraints does not pin motor shaft copies that are only mount holes of a non-standard plate. Unverified guess for the next step: pin physicalMotor copies in solvePinnedConstraints.",
+ "detail": "move: contradiction 孔 ServoAxis 在 「標準馬達座板」(ServoPlate)、「格孔輸出板」(ServoArm) 上的位置不一致（最多相差 14 mm）；「格孔輸出板」(ServoArm) 的這個端點沒有落在孔的位置上，畫面與製作會對不起來。",
+ "steps": [
+  {
+   "op": "unfix",
+   "pid": "Blank1.A"
+  },
+  {
+   "op": "unfix",
+   "pid": "Blank1.B"
+  },
+  {
+   "op": "release",
+   "id": "ServoArm"
+  },
+  {
+   "op": "reconnect",
+   "from": "ServoArm.released",
+   "to": "ServoAxis"
+  },
+  {
+   "op": "move",
+   "pid": "ServoArmTip",
+   "dx": -14,
+   "dy": -1
+  }
+ ]
+}

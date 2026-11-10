@@ -2,6 +2,7 @@
  "work": "fourbar-crank-rocker",
  "seed": 20261144,
  "signature": "jump",
+ "fixed": "K3 jump (78 mm after unfix): no unsolvable pose is involved. The sequence fixes crank/bar holes twice; most likely the same cause as fixed-fix-hole-uses-drawn-pose (the hole was frozen at an unseeded solve's branch, not the drawn one), so the later unfix relaxed to the drawn branch. Not isolated separately: the replay passes after that fix.",
  "detail": "unfix: point Link2_H8_0 moved 77.8 mm (bound 50.0)",
  "steps": [
   {
@@ -105,6 +106,5 @@
    "op": "unfix",
    "pid": "Link1_H24_8"
   }
- ],
- "known": "After a long sequence (it includes several tolerated stale-copy contradictions), unfixing a lattice hole of a framed bar lets another body jump 78 mm. Not analysed: looks like a solver branch flip on an under-constrained mechanism (solver core), not a stored-data problem. Left for the solver pack."
+ ]
 }

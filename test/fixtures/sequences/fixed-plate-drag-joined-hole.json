@@ -1,0 +1,23 @@
+{
+ "work": "connected-resize",
+ "seed": 20261110,
+ "signature": "integrity:I1",
+ "fixed": "K1 drag: a plate with parts joined at its holes is solved with rigid holes, not translated by its vertices",
+ "detail": "move: the plate is dragged by its vertices; Blank136 hanging on Blank133_H16_48 keeps the old copy (37 mm)",
+ "steps": [
+  {
+   "op": "unfix",
+   "pid": "Blank133.A"
+  },
+  {
+   "op": "unfix",
+   "pid": "Blank133.B"
+  },
+  {
+   "op": "move",
+   "pid": "Blank133.C",
+   "dx": -37,
+   "dy": -5
+  }
+ ]
+}

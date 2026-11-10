@@ -1,0 +1,22 @@
+{
+ "work": "connected-resize",
+ "seed": 1008089,
+ "signature": "integrity:I1",
+ "known": "Found by OPSEQ_SCALE=10 (not analysed yet). Fixing Blank135.A after it was merged onto Blank135_H16_0's neighbour leaves a 3.1 mm stale hole copy: setNodeRole('fixed') snaps the vertex to the 8 mm grid (the rigid-body skip only covers triangle plates), moving a bar vertex that carries a joined hole. Unverified guess for the next step: skip the grid snap for any bar/triangle vertex whose body has joined or fixed holes (holeJoined).",
+ "detail": "fix: contradiction 孔 Blank135_H16_0 在 「孔格桿件」(Blank135)、「孔格桿件」(Blank136) 上的位置不一致（最多相差 3.1 mm）；「孔格桿件」(Blank136) 的這個端點沒有落在孔的位置上，畫面與製作會對不起來。",
+ "steps": [
+  {
+   "op": "split",
+   "pid": "Blank135.A"
+  },
+  {
+   "op": "merge",
+   "from": "P139s",
+   "to": "Blank135_H16_0"
+  },
+  {
+   "op": "fix",
+   "pid": "Blank135.A"
+  }
+ ]
+}

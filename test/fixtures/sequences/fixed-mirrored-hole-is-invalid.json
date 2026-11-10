@@ -2,6 +2,7 @@
  "work": "motor-plate-tt",
  "seed": 20261195,
  "signature": "rigid",
+ "fixed": "K3 solver rejects a lattice hole mirrored to the other side of its body",
  "detail": "fix: ServoArm hole ServoArm_H-8_8 off its (u,v) by 16.000",
  "steps": [
   {
@@ -49,6 +50,5 @@
    "axis": "g",
    "delta": -16
   }
- ],
- "known": "Fixing a lattice hole of a motor-driven crank is accepted (setNodeRole only checks the displayed pose equals the stored one at that moment). The solver then returns isValid with the hole 16 mm away from its (u,v): an over-constrained driven body is silently accepted (solver validity, solver core). Left for the solver pack."
+ ]
 }

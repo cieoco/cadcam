@@ -1,0 +1,28 @@
+{
+ "work": "servo-plate-fourbar",
+ "seed": 58,
+ "signature": "integrity:I1",
+ "fixed": "K1 drag: the relaxation residual (0.1 mm) of a joined hole is removed by placing the hole exactly on its solved body",
+ "detail": "move: contradiction 孔 Blank1_H56_0 在 「標準舵機座板」(ServoPlate)、「格孔輸出板」(FourbarCrank) 上的位置不一致（最多相差 0.1 mm）；「格孔輸出板」(FourbarCrank) 的這個端點沒有落在孔的位置上，畫面與製作會對不起來。",
+ "steps": [
+  {
+   "op": "release",
+   "id": "FourbarCrank"
+  },
+  {
+   "op": "delete",
+   "id": "FourbarCoupler"
+  },
+  {
+   "op": "merge",
+   "from": "FourbarJ1",
+   "to": "Blank1_H56_0"
+  },
+  {
+   "op": "move",
+   "pid": "FourbarCrank.released",
+   "dx": 23,
+   "dy": 31
+  }
+ ]
+}

@@ -12,7 +12,7 @@ import {fusionAtPoint} from '../core/bar-fusion.js';
 
 import { S } from './state.js';
 import * as Panels from './panels.js';
-import { displayPoint, LEGO_FRAME_STEP as LEGO_STEP } from './model.js';
+import { displayPoint, holeJoined, LEGO_FRAME_STEP as LEGO_STEP } from './model.js';
 import { servoInputAt } from './motor-tools.js';
 
 export function createNodeEditor({
@@ -20,7 +20,7 @@ export function createNodeEditor({
   hasPoint, pointCoords, pointIsGround, updatePointCoordsById, snapFramePoint, syncGearMeshAnchoredAt,
   sliderMountInfo, removeMotorAtPoint, removeAnchorsAtPoint, setPointType, freezePointAtDisplay, pointRefs,
   motorBarForCenter, sliderTravelStart, sliderTravelEnd, railLength, normalizeSliderRange,
-  traceIds, invalidateTrajectory
+  traceIds, invalidateTrajectory, displayCoords
 }) {
   let unlockedGroundPointId = '';
 
@@ -56,7 +56,7 @@ export function createNodeEditor({
   }
   function setNodeRole(type) {
     const local=S.comps.some(c=>localHoles(c).some(h=>h.id===S.selectedNodeId));
-    if(type==='fixed'&&local){const home=pointCoords()[S.selectedNodeId],shown=displayPoint(S.comps,S.compiled,S.theta,S.selectedNodeId,{...S.motorAngles,[String(S.activeMotor)]:S.theta});if(!home||!shown||Math.hypot(home.x-shown.x,home.y-shown.y)>.0001){transient('請先回到板材的初始姿態，再固定局部孔；這次未改變作品。');return;}}
+    if(type==='fixed'&&local){const home=pointCoords()[S.selectedNodeId],shown=displayCoords?.()[S.selectedNodeId]||displayPoint(S.comps,S.compiled,S.theta,S.selectedNodeId,{...S.motorAngles,[String(S.activeMotor)]:S.theta});if(!home||!shown||Math.hypot(home.x-shown.x,home.y-shown.y)>.0001){transient('請先回到板材的初始姿態，再固定局部孔；這次未改變作品。');return;}}
     if(type==='motor'&&S.comps.some(c=>localHoles(c).some(h=>h.id===S.selectedNodeId))){transient('這個是剛體局部孔；可連接或固定，馬達請使用致動元件安裝。');return;}
     if(type==='floating'&&S.comps.some(c=>c.frameHole&&[c.frameHole.a,c.frameHole.b].includes(S.selectedNodeId))){transient('這個基準孔仍有機架孔依附，請先刪除附屬孔再取消固定。');return;}
     if(S.comps.some(c=>c.frameHole&&c.p1.id===S.selectedNodeId)){transient('這是機架上的孔；要移動請調整距基準孔。');return;}
@@ -72,7 +72,9 @@ export function createNodeEditor({
     setPointType(S.selectedNodeId, type);
     // Promoting a joint to the frame is an explicit manufacturing decision;
     // immediately place it on the 8 mm hole grid (always on since G4a).
-    if (type === 'fixed' && !local) {
+    // A plate vertex whose other vertices are already fixed stays on the plate's own geometry: snapping it would stretch the plate.
+    const stiff = S.comps.some(c => c.type === 'triangle' && [c.p1, c.p2, c.p3].some(v => v?.id === S.selectedNodeId) && [c.p1, c.p2, c.p3].some(v => v && v.id !== S.selectedNodeId && pointIsGround(v.id)));
+    if (type === 'fixed' && !local && !stiff) {
       const p = pointCoords()[S.selectedNodeId];
       if (p) {
         const q = snapFramePoint(p);
@@ -122,8 +124,10 @@ export function createNodeEditor({
       const ang = (i / detach.length) * Math.PI * 2 + 0.6;
       ref.point.id = 'P' + (++S.counter) + 's';
       ref.point.type = 'floating';
-      ref.point.x = (p.x || 0) + Math.cos(ang) * OFFSET;
-      ref.point.y = (p.y || 0) + Math.sin(ang) * OFFSET;
+      // A body with parts joined or fixed at its holes stays put: moving one vertex would leave those copies behind.
+      const off = holeJoined(S.comps, ref.comp) ? 0 : OFFSET;
+      ref.point.x = (p.x || 0) + Math.cos(ang) * off;
+      ref.point.y = (p.y || 0) + Math.sin(ang) * off;
     });
     S.selectedNodeId = null;                       // 原合併點已拆，取消選取
     rebuild(); draw();

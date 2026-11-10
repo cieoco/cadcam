@@ -1,0 +1,23 @@
+{
+ "work": "fourbar-crank-rocker",
+ "seed": 41,
+ "signature": "integrity:I1",
+ "fixed": "K1 drag: a plate with fixed mount holes is pinned by them instead of dragged",
+ "detail": "move: motor seat dragged by vertices; anchors/crank on its mount holes keep old copies",
+ "steps": [
+  {
+   "op": "unfix",
+   "pid": "Blank7.A"
+  },
+  {
+   "op": "unfix",
+   "pid": "Blank7.B"
+  },
+  {
+   "op": "move",
+   "pid": "Blank7.A",
+   "dx": -9,
+   "dy": 9
+  }
+ ]
+}

@@ -1,0 +1,40 @@
+{
+ "work": "servo-plate-fourbar",
+ "seed": 1234618,
+ "signature": "integrity:I5",
+ "fixed": "K1 resize refuses to drop a hole that trace/reference/load/dimension settings point at",
+ "detail": "resize: dangling 軌跡追蹤指向不存在的點 ServoPlate_H64_56；請重新選擇，或刪除這項設定。",
+ "steps": [
+  {
+   "op": "resize",
+   "id": "ServoPlate",
+   "axis": "r1",
+   "delta": 8
+  },
+  {
+   "op": "delete",
+   "id": "FourbarRocker"
+  },
+  {
+   "op": "resize",
+   "id": "ServoPlate",
+   "axis": "r1",
+   "delta": 16
+  },
+  {
+   "op": "merge",
+   "from": "FourbarJ2",
+   "to": "ServoPlate_H64_56"
+  },
+  {
+   "op": "split",
+   "pid": "ServoPlate_H64_56"
+  },
+  {
+   "op": "resize",
+   "id": "ServoPlate",
+   "axis": "r1",
+   "delta": -8
+  }
+ ]
+}

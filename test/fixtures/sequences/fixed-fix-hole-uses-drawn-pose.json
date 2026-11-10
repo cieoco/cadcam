@@ -1,0 +1,46 @@
+{
+ "work": "fourbar-crank-rocker",
+ "seed": 8120,
+ "signature": "jump",
+ "fixed": "K3 fixing a hole compares the stored hole with the DRAWN pose (seeded branch), not a fresh unseeded solve",
+ "detail": "fix: point Link3_H120_0 moved 59.9 mm (bound 50.0)",
+ "steps": [
+  {
+   "op": "resize",
+   "id": "Link3",
+   "axis": "g",
+   "delta": 16
+  },
+  {
+   "op": "theta",
+   "motor": "1",
+   "deg": -86
+  },
+  {
+   "op": "resize",
+   "id": "Link3",
+   "axis": "g",
+   "delta": 8
+  },
+  {
+   "op": "split",
+   "pid": "C"
+  },
+  {
+   "op": "resize",
+   "id": "Link3",
+   "axis": "g",
+   "delta": 8
+  },
+  {
+   "op": "resize",
+   "id": "Link3",
+   "axis": "g",
+   "delta": 16
+  },
+  {
+   "op": "fix",
+   "pid": "Link3_H120_0"
+  }
+ ]
+}

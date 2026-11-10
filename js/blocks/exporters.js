@@ -580,22 +580,6 @@ function frameWarnings(outlines, holes) {
   return [...new Set(warnings)];
 }
 
-function arcOutlinePoints(center, radius, a0, a1, steps = 10, shortest = false) {
-  let delta = a1 - a0;
-  if (shortest) {
-    while (delta > Math.PI) delta -= Math.PI * 2;
-    while (delta < -Math.PI) delta += Math.PI * 2;
-  } else {
-    while (delta <= 0) delta += Math.PI * 2;
-  }
-  const pts = [];
-  for (let i = 1; i <= steps; i++) {
-    const a = a0 + delta * (i / steps);
-    pts.push({ x: center.x + Math.cos(a) * radius, y: center.y + Math.sin(a) * radius });
-  }
-  return pts;
-}
-
 function arcOutlinePointsClockwise(center, radius, a0, a1, steps = 14) {
   let delta = a1 - a0;
   while (delta >= 0) delta -= Math.PI * 2;
@@ -615,54 +599,6 @@ function lineIntersection(a, ua, b, ub) {
   const dy = b.y - a.y;
   const t = (dx * ub.y - dy * ub.x) / den;
   return { x: a.x + ua.x * t, y: a.y + ua.y * t };
-}
-
-function roundedPolylineOutline(points, radius) {
-  const clean = points.filter((p, i) => i === 0 || Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y) > 1e-6);
-  if (clean.length < 2) return [];
-  const segs = [];
-  for (let i = 0; i < clean.length - 1; i++) {
-    const a = clean[i], b = clean[i + 1];
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const len = Math.hypot(dx, dy);
-    if (len <= 1e-6) continue;
-    const ux = dx / len, uy = dy / len;
-    const nx = -uy, ny = ux;
-    segs.push({ a, b, ux, uy, nx, ny, nAng: Math.atan2(ny, nx) });
-  }
-  if (!segs.length) return [];
-  const sidePoint = (p, seg, side) => ({ x: p.x + seg.nx * radius * side, y: p.y + seg.ny * radius * side });
-  const sideAngle = (seg, side) => seg.nAng + (side < 0 ? Math.PI : 0);
-  const buildSide = (side) => {
-    const chain = [sidePoint(clean[0], segs[0], side)];
-    for (let i = 1; i < clean.length - 1; i++) {
-      const prev = segs[i - 1], next = segs[i], p = clean[i];
-      const turn = prev.ux * next.uy - prev.uy * next.ux;
-      const outer = side > 0 ? turn > 0 : turn < 0;
-      if (outer) {
-        chain.push(sidePoint(p, prev, side));
-        chain.push(...arcOutlinePoints(p, radius, sideAngle(prev, side), sideAngle(next, side), 10, true));
-      } else {
-        const hit = lineIntersection(
-          sidePoint(p, prev, side), { x: prev.ux, y: prev.uy },
-          sidePoint(p, next, side), { x: next.ux, y: next.uy }
-        );
-        chain.push(hit || sidePoint(p, next, side));
-      }
-    }
-    chain.push(sidePoint(clean[clean.length - 1], segs[segs.length - 1], side));
-    return chain;
-  };
-  const left = buildSide(1);
-  const right = buildSide(-1);
-  const last = segs[segs.length - 1];
-  const first = segs[0];
-  return [
-    ...left,
-    ...arcOutlinePointsClockwise(clean[clean.length - 1], radius, sideAngle(last, 1), sideAngle(last, -1), 14),
-    ...right.reverse(),
-    ...arcOutlinePointsClockwise(clean[0], radius, sideAngle(first, -1), sideAngle(first, 1), 14)
-  ];
 }
 
 function cleanPolylineOutline(points, radius) {
@@ -754,12 +690,6 @@ function jawCenterline(pivot, drive, tip, turnSign = 0) {
   const extend = Math.max(38, Math.min(84, len * 0.58));
   const end = { x: tip.x + ex * extend, y: tip.y + ey * extend };
   return [drive, pivot, tip, end];
-}
-
-function jawPlateOutline(pivot, drive, tip, turnSign = 0) {
-  const centerline = jawCenterline(pivot, drive, tip, turnSign);
-  if (!centerline) return roundedTriangleOutline(pivot, drive, tip, DEFAULT_PLATE_RADIUS_WORLD);
-  return cleanPolylineOutline(centerline, DEFAULT_PLATE_RADIUS_WORLD);
 }
 
 function svgPolyline(points) {

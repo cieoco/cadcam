@@ -1,0 +1,48 @@
+{
+ "work": "servo-plate-fourbar",
+ "seed": 20261161,
+ "signature": "integrity:I1",
+ "detail": "resize: contradiction 孔 FourbarCrank_H8_-8 在 「格孔輸出板」(FourbarCrank)、「搖桿」(FourbarRocker) 上的位置不一致（最多相差 8 mm）；「搖桿」(FourbarRocker) 的這個端點沒有落在孔的位置上，畫面與製作會對不起來。",
+ "steps": [
+  {
+   "op": "split",
+   "pid": "FourbarF"
+  },
+  {
+   "op": "merge",
+   "from": "P8s",
+   "to": "Blank1_H56_32"
+  },
+  {
+   "op": "split",
+   "pid": "FourbarJ1"
+  },
+  {
+   "op": "split",
+   "pid": "Blank1_H56_32"
+  },
+  {
+   "op": "release",
+   "id": "FourbarCrank"
+  },
+  {
+   "op": "frame",
+   "id": "FourbarCrank"
+  },
+  {
+   "op": "unfix",
+   "pid": "FourbarCrank.released"
+  },
+  {
+   "op": "merge",
+   "from": "P10s",
+   "to": "FourbarCrank_H8_-8"
+  },
+  {
+   "op": "resize",
+   "id": "FourbarCrank",
+   "axis": "g",
+   "delta": -8
+  }
+ ]
+}

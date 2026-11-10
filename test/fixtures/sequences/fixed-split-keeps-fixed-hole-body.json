@@ -1,0 +1,25 @@
+{
+ "work": "parallel-gripper",
+ "seed": 5218,
+ "signature": "rigid",
+ "fixed": "K1 split: a body with a fixed hole is not offset",
+ "detail": "split: PGLeftFollower hole PGLeftFollower_H16_0 off its (u,v) by 10.555",
+ "steps": [
+  {
+   "op": "fix",
+   "pid": "PGLeftJaw_H8_0"
+  },
+  {
+   "op": "frame",
+   "id": "PGLeftFollower"
+  },
+  {
+   "op": "fix",
+   "pid": "PGLeftFollower_H16_0"
+  },
+  {
+   "op": "split",
+   "pid": "PGLeftFixed"
+  }
+ ]
+}

@@ -175,7 +175,9 @@ function planUnconnectedMotor(source,request,points,motion){
     // shared endpoints. Leaving a neighbour's stale copy makes the rod jump.
     const group=new Set([old.id]),nodes=new Set(keys.map(k=>old[k]?.id).filter(Boolean));
     let grew=true;while(grew){grew=false;for(const c of comps)if(!group.has(c.id)&&keys.some(k=>nodes.has(c[k]?.id))){group.add(c.id);keys.forEach(k=>{if(c[k])nodes.add(c[k].id);});grew=true;}}
-    for(const c of comps)if(group.has(c.id))for(const k of keys)if(c[k]&&points[c[k].id]&&[points[c[k].id].x,points[c[k].id].y].every(Number.isFinite))Object.assign(c[k],{x:points[c[k].id].x,y:points[c[k].id].y});
+    const lattice=new Set(comps.flatMap(c=>localHoles(c).map(h=>h.id)));      // a hole end follows its body, not the display seed
+    for(const c of comps)if(group.has(c.id))for(const k of keys)if(c[k]&&!lattice.has(c[k].id)&&points[c[k].id]&&[points[c[k].id].x,points[c[k].id].y].every(Number.isFinite))Object.assign(c[k],{x:points[c[k].id].x,y:points[c[k].id].y});
+    for(const o of comps)if(group.has(o.id))for(const h of localHoles(o)){const w=holeWorld(o,h);for(const c of comps)if(c!==o)for(const k of keys)if(c[k]?.id===h.id)Object.assign(c[k],{x:w.x,y:w.y});}
     let released=`${old.id}.released`,n=1;const ids=new Set(comps.flatMap(c=>keys.map(k=>c[k]?.id)));while(ids.has(released))released=`${old.id}.released${n++}`;
     old[key]={...old[key],id:released,type:'floating'};delete old[key].physicalMotor;
     for(const c of comps)for(const k of keys)if(c[k]?.id===center&&String(c[k].physicalMotor)===motor)delete c[k].physicalMotor;
