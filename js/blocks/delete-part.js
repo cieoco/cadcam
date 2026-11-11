@@ -3,7 +3,9 @@ import {frameHoleAxis} from './frame-holes.js';
 import {fusionRoot} from '../core/bar-fusion.js';
 import {ownedParamKeys,pointKeysFor} from './part-types.js';
 import {detachDeletedAttachments} from './detached-attachments.js';
-import {planMotorRelease} from './motor-release.js';
+import {onParts,settlePlateHoles} from './plan-shape.js';
+import {isMotorPart} from './motor-part.js';
+import {freeMotor} from './motor-release.js';
 import {localHoles} from '../core/local-holes.js';
 import {runEdit} from './edit-pipeline.js';
 import {planDeleteGear} from './gear-plan.js';
@@ -15,9 +17,10 @@ const quote=c=>`「${partName(c)}」`;
 const list=names=>names.length<3?names.join('和'):`${names.slice(0,-1).join('、')}和${names.at(-1)}`;
 const NOTHING='沒有選到零件。請先點選要刪除的零件（針筒請按面板裡的「刪除針筒」）。';
 
-/** work={comps,params,modules,fabrication,points}；target 見 selection-target.js。回傳 {ok,comps,params,message}｜{ok:false,message,flash?}。 */
-export function planDelete(work,target){
-  const part=target?.part;
+/** work={comps,params,modules,fabrication,points}（馬達零件形狀，docs/SDD-MOTOR-PART.md M1）；target 見 selection-target.js（今日形狀的零件，用 id 對回 work）。
+ *  回傳 {ok,comps,params,message}｜{ok:false,message,flash?}。馬達在這裡是獨立零件，刪除輸出件＝刪零件＋清掉馬達的 drives，沒有馬達特例。 */
+export function planDeleteParts(work,target){
+  const part=target?.part&&(work.comps.find(c=>c.id===target.part.id)||target.part);
   if(!part){
     if(target?.shared?.length>1){
       // 同名零件用座標分不出來（學生看不懂）：改說幾個、並在圖上標出。
@@ -37,34 +40,33 @@ export function planDelete(work,target){
   }
   if(part.type==='gear')return planDeleteGear(work,part);          // 齒輪：只刪這一個（SDD-OPERATION-PIPELINE O4）
   const id=part.id,name=quote(part),notes=[];
-  let comps=work.comps,params={...work.params},keptMotor=false;
-  // 輸出桿：馬達資料記在桿上，先解除（馬達獨立留下）再刪桿。
-  if(part.type==='bar'&&part.isInput&&part.style!=='piston'&&(part.motorMount||[part.p1,part.p2].some(p=>p?.physicalMotor))){
-    const r=planMotorRelease({comps,params,fabrication:work.fabrication,modules:work.modules,counter:work.counter},id,work.points||{},{});
-    if(!r.ok)return {ok:false,message:r.message};
-    comps=r.comps;params={...r.params};keptMotor=true;
-  }
+  let comps=work.comps,params={...work.params};
+  // 輸出桿被刪：接著它的馬達留下，變成沒有輸出的獨立馬達（清掉 drives、軸心留在目前位置；與「解除輸出」同一個 freeMotor）。
+  const kept=comps.filter(c=>isMotorPart(c)&&c.drives?.body===id);
+  for(const m of kept){const r=freeMotor(comps,m.id,work.points||{});if(!r.ok)return {ok:false,message:r.message};comps=r.comps;}
   const own=new Set([...pointKeysFor(part).map(k=>part[k]?.id),...localHoles(part).map(h=>h.id)].filter(Boolean));
   const candidate=detachDeletedAttachments(structuredClone(comps),new Set([id]),params,work.points).filter(c=>c.id!==id);
-  if(part.type==='motor')for(const c of candidate)if(c.motorMountPoint===part.p1.id)delete c.motorMountPoint;
+  if(isMotorPart(part))for(const c of candidate)if(c.motorMountPoint===part.p1.id)delete c.motorMountPoint;
   ownedParamKeys(part).forEach(k=>delete params[k]);
   // 刪掉的零件連帶放開了什麼，要說出來（不能無聲無息）。
-  if(!keptMotor&&comps.some(c=>c.type==='motor'&&c.motorMount?.frameBody===id)){notes.push('馬達改成獨立固定點，留在原位。');}
-  else if(!keptMotor&&comps.some(c=>c.type==='bar'&&c.isInput&&c.motorMount?.frameBody===id))notes.push('馬達軸心改成獨立固定點，留在原位。');
+  if(comps.some(c=>isMotorPart(c)&&!c.drives&&c.mount?.frameBody===id)){notes.push('馬達改成獨立固定點，留在原位。');}
+  else if(comps.some(c=>isMotorPart(c)&&c.drives&&c.mount?.frameBody===id))notes.push('馬達軸心改成獨立固定點，留在原位。');
   if(comps.some(c=>c.type==='syringe'&&['a','b'].some(k=>c[k]?.componentId===id)))notes.push('針筒的接頭已放開，請重新選孔接回。');
   const joined=candidate.filter(c=>c.type!=='anchor'&&c.type!=='syringe'&&c.type!=='motor'&&pointKeysFor(c).some(k=>own.has(c[k]?.id)));
   if(joined.length)notes.push(`原本相接的 ${joined.length} 個零件保留，接孔已放開。`);
-  const plate=planActuatorPlateHoles({comps:candidate,params,modules:work.modules,fabrication:work.fabrication});
+  const plate=settlePlateHoles({comps:candidate,params,modules:work.modules,fabrication:work.fabrication});
   const next=plate.ok?plate.comps:candidate;                        // 座板有舊問題時照樣刪（deleteChecks 只擋「新造成」的）
   for(const c of next)if(c.frameHole&&!frameHoleAxis(next,c)){delete c.frameHole;notes.push('機架孔的基準已移除，孔保留在原位置成為獨立固定點。');}
-  const head=keptMotor?`已刪除${name}；馬達留在${part.motorMount?.frameBody?'座板上':'原位'}，尚未接輸出。`:`已刪除${name}。`;
+  const head=kept.length?`已刪除${name}；馬達留在${kept[0].mount?.frameBody?'座板上':'原位'}，尚未接輸出。`:`已刪除${name}。`;
   return {ok:true,comps:next,params,message:head+notes.join('')};
 }
+/** 今日形狀進、今日形狀出的版本（直接呼叫規劃函式的測試用）；動作本身走 runEdit 的 shape:'parts'。 */
+export const planDelete=onParts(planDeleteParts);
 
 const hide=id=>{const el=document.getElementById(id);if(el)el.style.display='none';};
 export function deleteSelectedPart({S,transient,pushUndo,pause,closeMobileEditPanel,setSliderDetailRows,rebuild,draw,points,flash}) {
   const target=targetOf(S,S.comps,S.modules||[]);
-  return runEdit({name:'刪除零件',plan:work=>planDelete(work,target),checks:deleteChecks,host:{S,transient,pushUndo,pause,rebuild,draw,points,
+  return runEdit({name:'刪除零件',shape:'parts',plan:work=>planDeleteParts(work,target),checks:deleteChecks,host:{S,transient,pushUndo,pause,rebuild,draw,points,
     flash:flash||(ids=>import('./integrity-hints.js').then(m=>m.run('flash',{far:ids,canon:[]})).catch(()=>{})),
     afterCommit(){
       closeMobileEditPanel();

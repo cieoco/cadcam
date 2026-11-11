@@ -15,6 +15,7 @@ import {sameGearBody} from '../core/gear-train.js';
 import {detachDeletedAttachments} from './detached-attachments.js';
 import {localHoles} from '../core/local-holes.js';
 import {frameHoleAxis} from './frame-holes.js';
+import {isMotorPart} from './motor-part.js';
 
 const gearsOf = comps => comps.filter(c => c.type === 'gear');
 const list = names => names.length < 3 ? names.join('和') : `${names.slice(0, -1).join('、')}和${names.at(-1)}`;
@@ -34,7 +35,8 @@ export function planDeleteGear(work, part) {
   const followers = gearsOf(comps).filter(g => g.mesh === part.id);
   const racks = comps.filter(c => c.type === 'rack' && c.pinion === part.id);
   const guidePins = new Set(racks.flatMap(r => r.framePins || []));
-  const gone = new Set([part.id, ...racks.map(r => r.id)]);
+  const motors = comps.filter(c => isMotorPart(c) && c.drives?.body === part.id);   // 馬達零件形狀：接在這個齒輪上的馬達（M1）
+  const gone = new Set([part.id, ...racks.map(r => r.id), ...motors.map(m => m.id)]);
   const own = new Set([...pointKeysFor(part).map(k => part[k]?.id), ...localHoles(part).map(h => h.id)].filter(Boolean));
   const name = gearLabel(part, comps), followerNames = labels(followers, comps);
 
@@ -47,7 +49,7 @@ export function planDeleteGear(work, part) {
   const notes = [];
   if (followers.length) notes.push(`${list(followerNames)}不再被它帶動，留在原位。`);
   if (racks.length) notes.push('它帶動的齒條（含固定導銷）離開齒輪就無法成立，已一起刪除。');
-  if (part.p1?.physicalMotor) notes.push('裝在它上面的馬達設定也一起移除。');
+  if (motors.length) notes.push('裝在它上面的馬達設定也一起移除。');
   const joined = candidate.filter(c => !['anchor', 'syringe', 'motor', 'rack'].includes(c.type) && !(c.type === 'gear' && sameGearBody(c, part)) && pointKeysFor(c).some(k => own.has(c[k]?.id)));
   if (joined.length) notes.push(`原本相接的 ${joined.length} 個零件保留，接孔已放開。`);
   for (const c of candidate) if (c.frameHole && !frameHoleAxis(candidate, c)) { delete c.frameHole; notes.push('機架孔的基準已移除，孔保留在原位置成為獨立固定點。'); }
