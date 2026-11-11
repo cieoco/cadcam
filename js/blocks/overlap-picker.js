@@ -33,9 +33,9 @@ export function collectPickCandidates(svg, x, y, comps) {
 }
 
 // 不顯示內部代號
-function nodeLabel(comps,id){
+export function nodeLabel(comps,id){
   const own=comps.filter(c=>[c.p1,c.p2,c.p3,...c.holes||[]].some(p=>p?.id===id)),c=own[0],h=c?.holes?.find(h=>h.id===id);
-  return own.length-1?`接點（${own.length}件共用）`:`「${c.name||'零件'}」${h?h.v?'的孔':`第${h.u/8+1}孔`:'端孔'}`;
+  return own.length-1?`接點（${own.length} 個零件共用）`:`「${c.name||'零件'}」${h?h.v?'的孔':`第${h.u/8+1}孔`:'端孔'}`;
 }
 export function openOverlapPicker(items, choose) {
   const dialog = document.createElement('dialog');

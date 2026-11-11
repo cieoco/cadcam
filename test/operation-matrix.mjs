@@ -40,6 +40,7 @@ const {planDraggedMotorOutput}=await import(R+'motor-drop.js');
 const {localHoles}=await import('../js/core/local-holes.js');
 const {pointKeysFor}=await import(R+'part-types.js');
 const Rig=await import('./_drag-rig.mjs');
+const {showHoleOwner}=await import(R+'hole-owner.js');
 const {commitMountingEdit}=await import(R+'mounting-review-ui.js');
 await loadIntegrity();await loadUnitStarts();
 
@@ -86,11 +87,15 @@ async function dragSays(w,down,re){
   const click=await Rig.gesture(down,[]),msgs=await Rig.gesture(down,[[112,100],[140,110],[170,120]]);
   return click.length===0&&msgs.length===1&&re.test(msgs[0])&&!/Blank\d|P\d+s|_H\d/.test(msgs[0])&&JSON.stringify(S.comps)===before;
 }
+function ownerOf(w,id){load(w);S.selectedNodeId=id;let flashed=[];const title={textContent:'接點',dataset:{}};
+  showHoleOwner(S,{querySelector:()=>title},true,{flash:ids=>{flashed=ids;}});return {title:title.textContent,flashed};}
 const CHECKS={
   // --- select
   // still a gap: the target is only worked out when a command runs (delete explains and flashes); nothing marks the owner at selection time
   'select-shared-joint':()=>{const w=blocked(),t=targetOf({...S,selectedLinkId:null,selectedTriangleId:null,selectedSliderId:null,selectedGearId:null,selectedNodeId:'Blank136.B'},w.comps,[]);
-    return compsOfPoint(w,'Blank136.B').length===2&&t.part===null&&t.shared.length===2&&/共用/.test(del(w,{selectedNodeId:'Blank136.B'}).msgs[0]||'');},
+    const o=ownerOf(w,'Blank136.B');
+    return compsOfPoint(w,'Blank136.B').length===2&&t.part===null&&t.shared.length===2&&/共用/.test(del(w,{selectedNodeId:'Blank136.B'}).msgs[0]||'')&&/2 個零件共用/.test(o.title)&&o.flashed.length===2;},
+  'select-plate-hole-owner':()=>{const w=blocked(),o=ownerOf(w,'Blank133_H8_0'),bar=ownerOf(w,'Blank137_H8_0');return o.flashed.join()==='Blank133'&&/^「.+」/.test(o.title)&&bar.flashed.join()==='Blank137'&&!/Blank\d|_H\d/.test(o.title+bar.title);},
   // --- move (Model.isFreeBody decides whether a body drag translates; otherwise input.js only selects / returns without a message)
   'move-free-bar':()=>{const w=freeBar();return Model.isFreeBody(w.comps,w.comps[0],[]);},
   'move-free-plate':()=>{const w=freePlate();return Model.isFreeBody(w.comps,w.comps[0],[]);},

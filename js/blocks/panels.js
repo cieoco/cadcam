@@ -136,8 +136,10 @@ export function updateRoleEditor() {
   delete editor.dataset.selectionSummary;
   document.getElementById('roleStatus').textContent = nodeRoleLabel(S.selectedNodeId);
   const advanced = document.getElementById('nodeAdvanced');
-  if (advanced && editor.dataset.nodeId !== S.selectedNodeId) advanced.open = false;
+  const fresh = editor.dataset.nodeId !== S.selectedNodeId;
+  if (advanced && fresh) advanced.open = false;
   editor.dataset.nodeId = S.selectedNodeId;
+  import('./hole-owner.js').then(m => m.showHoleOwner(S, editor, fresh)).catch(() => {});   // 標明這個孔屬於哪個零件（按需載入）
   const powerRow=document.getElementById('nodePowerRow');
   if(powerRow)powerRow.style.display=S.comps.some(c=>
     (['gear','motor'].includes(c.type) && c.p1?.id===S.selectedNodeId && c.p1.physicalMotor) ||

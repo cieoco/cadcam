@@ -53,10 +53,7 @@ export const MATRIX = {
   bar: {
     select: [
       ok('點桿身', '選到這根桿，顯示它的長度設定。'),
-      gap('點到桿上的孔，而那個孔被好幾個零件共用', '畫面標明「你選的是哪個零件的孔」，要改時才問；不能只記下孔。',
-        '刪除時會說明由哪幾個零件共用並在圖上閃示（selection-target.js）；但選取當下圖上沒有常駐標示所選孔屬於哪個零件。',
-        'input.js onNodeDown 仍只設 S.selectedNodeId；targetOf 只在指令執行時才查；桌機沒有選擇器（overlap-picker 只在手機 mobilePrompt() 時出現）。',
-        {check: 'select-shared-joint', cause: HOLE_TARGET})
+      ok('點到桿上的孔，而那個孔被好幾個零件共用', '畫面標明「你選的是哪個零件的孔」，要改時才問；不能只記下孔。（O3-D：接點面板標題寫出名稱，圖上閃示所屬零件）', 'select-shared-joint')
     ],
     move: [
       ok('未接任何零件（自由桿）', '拖桿身或桿端，整根桿平移，長度不變。', 'move-free-bar'),
@@ -99,11 +96,10 @@ export const MATRIX = {
   plate: {
     select: [
       ok('點板面', '選到這片板，顯示尺寸設定。'),
-      gap('點到板上的孔，而那個孔被別的零件共用', '畫面標明所選孔屬於哪一個零件。', '同桿件：刪除時會說明並閃示，選取當下圖上沒有常駐標示。',
-        'input.js onNodeDown：同桿件。', {check: 'select-shared-joint', cause: HOLE_TARGET}),
+      ok('點到板上的孔，而那個孔被別的零件共用', '畫面標明所選孔屬於哪一個零件。', 'select-plate-hole-owner'),
       gap('桌機上多個零件重疊在同一處', '用零件名稱與圖上高亮列出候選，由使用者選。',
-        '桌機直接選最上層，不問；手機的選擇器標籤還帶內部代號（例如「連桿 · Blank136」）。',
-        'input.js pointerdown 在 mobilePrompt() 為假時 return；overlap-picker.js collectPickCandidates 的 label 含 id。', {cause: 'overlap-pick'})
+        '桌機直接選最上層，不問（手機選單已改用零件名稱與第幾孔，O1）。',
+        'input.js pointerdown 在 mobilePrompt() 為假時 return；桌機沒有選擇器。', {cause: 'overlap-pick'})
     ],
     move: [
       ok('未接任何零件（自由板）', '拖板上任一點，整片平移，形狀不變。', 'move-free-plate'),
