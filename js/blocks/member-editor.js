@@ -5,7 +5,7 @@ import {setPointPosition,setPointAngle} from './input.js';
 import {pointRotation,freeLinkForPoint,freeTriangleForPoint} from './model.js';
 import {commitMountingEdit,mountingWork,reviewMountingChange} from './mounting-review-ui.js';
 import {runEdit} from './edit-pipeline.js';
-import {planResize} from './resize-plan.js';
+import {planResize,planPatch} from './resize-plan.js';
 /** 共用剛性桿件尺寸列：選取 → 預檢整筆修改 → 一次復原 → 重算。 */
 import {isDisk,validateDisk} from './disk-plate.js';
 import { S } from './state.js';
@@ -59,7 +59,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
         const error=validateDisk(c,Number(S.topo.params[c.lenParam]),value,holeDiameter(c));
         if(error){notify(error);sync();return;}
         if(value===c.diameterMm)return;
-        pause();if(!commitMountingEdit(S,d=>{d.comps.find(o=>o.id===c.id).diameterMm=value;},{pushUndo,notify})){sync();return;}rebuild();draw();
+        if(!runEdit({name:'改圓盤外徑',host:{S,transient:notify,pushUndo,pause,rebuild,draw},confirm:after=>reviewMountingChange(mountingWork(S),after),plan:work=>planPatch(work,[{id:c.id,patch:{diameterMm:value}}])}))sync();
       };
     }
     const more=el('memberMore');if(more?.nodeType===1&&!more.dataset.resizeListener){more.dataset.resizeListener='1';more.addEventListener('toggle',draw);}
@@ -151,14 +151,15 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if(!comp)return;
     const blank=comp.standardBlank&&(/^(g|r1|a)/.test(id)||isOutputBlank(comp)&&id==='width');
     if(!blank){
-      if(isDisk(comp)){const error=validateDisk(comp,Number(raw),comp.diameterMm,holeDiameter(comp));if(error){notify(error);sync();return;}}
       const dimension = memberDimensions(comp).find(d => d.id === id);
       if (dimension?.stockKey) { setStock(dimension.stockKey, raw); return; }
     }
     // 圖上把手與數字欄共用：規劃（resize-plan.js）→ 一致性檢查 → 安裝孔位確認 → 一次復原 → 寫入（edit-pipeline.js）。
     let fusionValue;
     const applied=runEdit({name:'改尺寸',host:{S,transient:notify,pushUndo,pause,rebuild,draw},
-      plan:work=>{const r=planResize(work,{componentId,id,raw,mirrorPair,exact,topo:S.topo,holeDiameter,reshapeTriangle,validateCandidate});if(r.fusionValue!==undefined)fusionValue=r.fusionValue;return r;},
+      plan:work=>{
+        if(!blank&&isDisk(comp)){const error=validateDisk(comp,Number(raw),comp.diameterMm,holeDiameter(comp));if(error)return {ok:false,message:error};}   // 圓盤直徑檢查（說明文字不變）
+        const r=planResize(work,{componentId,id,raw,mirrorPair,exact,topo:S.topo,holeDiameter,reshapeTriangle,validateCandidate});if(r.fusionValue!==undefined)fusionValue=r.fusionValue;return r;},
       confirm:after=>reviewMountingChange(mountingWork(S),after)});
     if(fusionValue!==undefined)return resizeFusion?.(comp.id,fusionValue);
     if(!applied)sync();
@@ -181,8 +182,11 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     const failure = plans.find(plan => !plan.ok);
     if (failure) { notify(failure.message); sync(); return; }
     if (targets.every((c, i) => JSON.stringify(memberStock(c)) === JSON.stringify(plans[i].stock))) { sync(); return; }
-    pause();if(!commitMountingEdit(S,draft=>targets.forEach((c,i)=>{draft.comps.find(o=>o.id===c.id).stock=plans[i].stock;}),{pushUndo,notify})){sync();return;}
-    rebuild(); draw();
+    // 與改尺寸共用 runEdit：一致性檢查 → 固定孔位確認 → 一次復原 → 寫入；材料／板厚改完畫面本身看得到，不另外說話。
+    const applied=runEdit({name:'改材料或板厚',host:{S,transient:notify,pushUndo,pause,rebuild,draw},
+      confirm:after=>reviewMountingChange(mountingWork(S),after),
+      plan:work=>planPatch(work,targets.map((c,i)=>({id:c.id,patch:{stock:plans[i].stock}})))});
+    if(!applied)sync();
   }
   function beginTipPreview() {
     const comp = selected();

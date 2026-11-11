@@ -2,7 +2,8 @@ import {fusionRoot,inspectBarFusionData} from '../core/bar-fusion.js';
 import {inspectBarFusion} from './bar-fusion-geometry.js';
 import {compileTopology} from '../core/topology.js';
 import {solveTopology} from '../multilink/solver.js';
-import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
+import {reviewMountingChange,mountingWork} from './mounting-review-ui.js';
+import {runEdit} from './edit-pipeline.js';
 import {preserveFaceEditReference} from './face-edit-reference.js';
 
 /** Resize a bridge of the member graph; translate one entire side, never bend it.
@@ -52,11 +53,15 @@ export function planBarFusionResize(comps,params,id,value,{positions={},settings
 export function commitBarFusionResize({S,id,value,revision,fingerprint,positions,settings,comps,pause,pushUndo,rebuild,draw,notify}) {
   if(fingerprint()!==revision||S.selectedLinkId!==id){notify('作品已變更，請重新輸入尺寸。');return;}
   const motion={thetaDeg:S.theta,motorAngles:{...S.motorAngles,[String(S.activeMotor)]:S.theta}};
-  const plan=planBarFusionResize(comps(),S.topo.params,id,value,{positions:positions(),settings:settings(),motion});
-  if(!plan.ok){notify(plan.reason);draw();return;}
-  const before=mountingWork(S),byCandidate=new Map(plan.comps.map(c=>[c.id,c]));
-  const candidate=preserveFaceEditReference(before,{...before,comps:S.comps.map(c=>byCandidate.get(c.id)||c),params:plan.params});
-  if(!candidate.ok){notify(candidate.reason);draw();return;}
-  if(!confirmMountingChange(before,candidate,{notify}))return;
-  pause();pushUndo();S.comps=candidate.comps;S.modules=candidate.modules;S.topo.params=candidate.params;rebuild();draw();
+  // 規劃（含目前姿態、求解與面參考核對）→ 一致性檢查 → 固定孔位確認 → 一次復原 → 寫入，與其他改尺寸共用 runEdit。
+  runEdit({name:'改合成尺寸',host:{S,transient:notify,pushUndo,pause,rebuild,draw},
+    confirm:after=>reviewMountingChange(mountingWork(S),after),
+    plan:work=>{
+      const plan=planBarFusionResize(comps(),work.params,id,value,{positions:positions(),settings:settings(),motion});
+      if(!plan.ok)return {ok:false,message:plan.reason};
+      const byCandidate=new Map(plan.comps.map(c=>[c.id,c]));
+      const candidate=preserveFaceEditReference(work,{...work,comps:work.comps.map(c=>byCandidate.get(c.id)||c),params:plan.params});
+      if(!candidate.ok)return {ok:false,message:candidate.reason};
+      return {ok:true,comps:candidate.comps,params:candidate.params,modules:candidate.modules,pruneRefs:false,clearSelection:false,message:''};
+    }});
 }

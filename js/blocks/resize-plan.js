@@ -75,3 +75,13 @@ export function planResize(work, {componentId, id, raw, mirrorPair = false, exac
   });
   return withPlate(draft, dimension?.param ? validateCandidate(draft) : '');
 }
+
+/** 零件欄位改變（材料／板厚 stock、圓盤外徑 diameterMm）的規劃：改複本、座板核對同 planResize（原有的座板問題不擋，只擋新造成的）。targets=[{id, patch}]。 */
+export function planPatch(work, targets) {
+  const draft = structuredClone({comps: work.comps, modules: work.modules, params: work.params, fabrication: work.fabrication});
+  for (const t of targets) Object.assign(draft.comps.find(c => c.id === t.id), t.patch);
+  const plate = planActuatorPlateHoles(draft);
+  if (plate.ok) draft.comps = plate.comps;
+  else if (planActuatorPlateHoles({comps: work.comps, modules: work.modules, params: work.params, fabrication: work.fabrication}).ok) return {ok: false, message: plate.message};
+  return {ok: true, comps: draft.comps, params: draft.params, modules: draft.modules, ...KEEP};
+}
