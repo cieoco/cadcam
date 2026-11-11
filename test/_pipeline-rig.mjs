@@ -1,6 +1,9 @@
 // Imported helper for the O4 pipeline tests (gear / copy / slider): a fake host around runEdit with undo bookkeeping.
 import {readFileSync} from 'node:fs';
-globalThis.document??={getElementById:()=>({style:{}})};
+class FakeElement{constructor(){this.children=[];this.style={};this.dataset={};this.textContent='';this.value='';this.classList={toggle(){},add(){},remove(){}};}
+  appendChild(c){this.children.push(c);return c;}addEventListener(){}}
+const els=new Map();
+globalThis.document={getElementById:id=>{if(!els.has(id))els.set(id,new FakeElement());return els.get(id);},createElement:()=>new FakeElement()};
 const R='../js/blocks/';
 export const {normalizeSnapshot,toSnapshot}=await import(R+'schema.js');
 export const {readStoredProject}=await import(R+'project-envelope.js');

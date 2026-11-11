@@ -1,5 +1,6 @@
 import {editableNumber} from './numeric-input.js';
 import {commitLegacyMountingEdit} from './mounting-review-ui.js';
+import {runEdit} from './edit-pipeline.js';
 import {compileTopology} from '../core/topology.js';
 import {solveTopology} from '../multilink/solver.js';
 /**
@@ -251,25 +252,31 @@ export function createSliderEditor({
   const changeSliderRailOffset=delta=>changeDimension('offset',delta);
   const changeSliderTravelStart=delta=>changeDimension('start',delta);
   const changeSliderTravelEnd=delta=>changeDimension('end',delta);
+  // 換固定端／翻面：規劃是純函式（改複本），提交走共用編輯流程（edit-pipeline）：一致性檢查、一次復原、一行回饋。
+  const sliderHost = () => ({S, transient: notify, pushUndo, pause, rebuild, draw,
+    afterCommit() { const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider'); if (c) { renderSliderBaseButton(c); renderSliderDetails(c); } }});
   function toggleSliderBase() {
     const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
     if (!c) return;
-    pushUndo();
-    c.baseEnd = c.baseEnd === 'p2' ? 'p1' : 'p2';
-    c.travelStart = sliderProjectedDistance(c);
-    c.travelEnd = Math.max(c.travelStart, railLength(c));
-    normalizeSliderRange(c);
-    renderSliderBaseButton(c);
-    renderSliderDetails(c);
-    rebuild(); draw();
+    runEdit({name: '換固定端', host: sliderHost(), plan: work => {
+      const comps = structuredClone(work.comps), d = comps.find(x => x.id === c.id);
+      d.baseEnd = d.baseEnd === 'p2' ? 'p1' : 'p2';
+      d.travelStart = sliderProjectedDistance(d);
+      d.travelEnd = Math.max(d.travelStart, railLength(d));
+      normalizeSliderRange(d);
+      return {ok: true, comps, params: {...work.params}, keepIdentity: true, pruneRefs: false, clearSelection: false,
+        message: `固定端換到軌道的 ${d.baseEnd === 'p2' ? 'B' : 'A'} 端；行程範圍已依滑塊目前位置重新計算。`};
+    }});
   }
   // 翻面：切換滑塊解的那一側（slider-crank 組裝在錯邊時用）。
   function flipSlider() {
     const c = S.comps.find(x => x.id === S.selectedSliderId && x.type === 'slider');
     if (!c) return;
-    pushUndo();
-    c.sign = (Number(c.sign) < 0) ? 1 : -1;
-    rebuild(); draw();
+    runEdit({name: '翻面', host: sliderHost(), plan: work => {
+      const comps = structuredClone(work.comps), d = comps.find(x => x.id === c.id);
+      d.sign = (Number(d.sign) < 0) ? 1 : -1;
+      return {ok: true, comps, params: {...work.params}, keepIdentity: true, pruneRefs: false, clearSelection: false, message: '已翻面：滑塊改走軌道另一側的位置。'};
+    }});
   }
 
   return {
