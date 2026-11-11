@@ -1,3 +1,4 @@
+import {idCounts} from '../core/local-holes.js';
 import {editableNumber} from './numeric-input.js';
 import { fitGearReduction } from './gear-reduction.js';
 import { S } from './state.js';
@@ -6,15 +7,39 @@ import { commitLegacyMountingEdit } from './mounting-review-ui.js';
 export function renderReduction(c, {changeGearModule, setHole, gearPinRadius, changeGearPinHoleDiameter, rackBodyHeight, rackLength, ensureRackSlot, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, gearMountHoles, gearMeshChain, gearById, rackForGear, setRow, setText,
   pointCoords, pointIsGround, transient, updateGearEditor, clampGearPinRadius,
   updatePointCoordsById, pushUndo, rebuild, draw, scheduleAutosave}) {
-  const add = document.getElementById('gearAddMountHoles');
-  if (add) {
-    add.hidden = !!c.holes?.length;
-    add.onclick = () => {
-      const holes = gearMountHoles(c);
-      if (!holes.length) return transient('齒輪太小，無法容納 8 mm 孔格的固定孔。');
-      if (commitLegacyMountingEdit(S, () => { gearById(c.id).holes = holes; }, {pushUndo, notify:transient})) {
-        rebuild(); draw(); scheduleAutosave(); updateGearEditor();
+  const count = document.getElementById('gearMountCount');
+  if (count) {
+    const existing = c.holes || [];
+    count.value = String(existing.length);
+    count.onchange = () => {
+      const wanted = Number(count.value);
+      const refs = idCounts(S.comps.filter(other => other !== c), S.modules, S.topo.tracePoints, S.topo.tracePoint);
+      const removed = existing.slice(wanted);
+      if (removed.some(h => h.type === 'fixed' || refs.has(h.id))) {
+        transient('要移除的孔已固定或被使用，請先解除連接。');
+        count.value = String(existing.length);
+        return;
       }
+      const holes = existing.slice(0, wanted);
+      if (!holes.length && wanted) holes.push(...gearMountHoles(c));
+      if (wanted === 4 && holes.length === 2) {
+        // Keep the new pair on a grid diameter, clear of the existing output pin.
+        const root = c.module * (c.teeth / 2 - 1.25);
+        const clearance = (Number(c.pinHoleDiameter) || 5) / 2 + 1.6 + 1;
+        const radius = [Math.abs(holes[0].v), 8, 16].find(r =>
+          r >= 8 && r + 3.2 <= root && Math.abs(r - gearPinRadius(c)) >= clearance);
+        if (radius) {
+          for (const sign of [-1, 1]) {
+            const id = c.id + '_mount' + holes.length;
+            holes.push({id, u:radius * sign, v:0, diameter:3.2, type:'floating'});
+          }
+        }
+      }
+      if (holes.length !== wanted) transient('齒根與輸出孔之間空間不足，請調整齒數或輸出孔距。');
+      else if (commitLegacyMountingEdit(S, () => { gearById(c.id).holes = holes; }, {pushUndo, notify:transient})) {
+        rebuild(); draw(); scheduleAutosave();
+      }
+      updateGearEditor();
     };
   }
   const mod = c.module;

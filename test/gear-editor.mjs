@@ -68,6 +68,30 @@ let [driver, driven] = gears();
   editor.changeGearTeeth(6-driven.teeth);
   check('縮到齒根會破孔時保留原尺寸',undos===before && driven.teeth===48);
 }
+// Change the count through the same control used on the canvas inspector.
+{
+  await import('../js/blocks/gear-reduction-ui.js');
+  const {compileTopology} = await import('../js/core/topology.js');
+  const {solveTopology} = await import('../js/multilink/solver.js');
+  editor.selectGear(driven.id);
+  await new Promise(resolve=>setTimeout(resolve,0));
+  editor.updateGearEditor();
+  const field = document.getElementById('gearMountCount');
+  const original = structuredClone(driven.holes);
+  field.value='4';field.onchange();
+  check('新增一對固定孔保留舊孔',driven.holes.length===4 && JSON.stringify(driven.holes.slice(0,2))===JSON.stringify(original));
+  const bodies=structuredClone(S.comps),g=bodies[1];
+  bodies.forEach(c=>c.p1.type='fixed');
+  Object.assign(bodies[0].p1,{type:'motor',physicalMotor:'1'});
+  const sol=solveTopology(compileTopology(bodies,{params:{...S.topo.params}}),{thetaDeg:180});
+  check('新增的兩孔隨從動輪轉 90 度',sol.isValid && g.holes.slice(2).every(h=>Math.hypot(sol.points[h.id].x-g.p1.x,sol.points[h.id].y-g.p1.y+h.u)<1e-5));
+  driven.holes[2].type='fixed';
+  field.value='2';field.onchange();
+  check('已固定的孔不能隨孔數減少而消失',driven.holes.length===4 && field.value==='4');
+  driven.holes[2].type='floating';
+  field.value='2';field.onchange();
+  check('移除額外兩孔保留原孔',JSON.stringify(driven.holes)===JSON.stringify(original));
+}
 // Both legacy inline radii and parameter-backed gears must reach every integer.
 const radiusKey=driven.pinRadiusParam;
 for(const legacy of [false,true]){
