@@ -31,6 +31,7 @@
 - [SDD-CONNECTION-INTEGRITY.md](SDD-CONNECTION-INTEGRITY.md) — 接合關係的統一查詢與一致性檢查：可拆裝準則 P3／P4 的實作規格與 C0–C7 分包（針筒最後）
 - [SDD-GRID-BLOCKS.md](SDD-GRID-BLOCKS.md) — 數位積木 8 mm 孔格（草案）：條／板／機架／角件對格、M3 孔、立體格與 3D 列印角件，離格須確認並標示
 - [SDD-BENT-ARMS.md](SDD-BENT-ARMS.md) — 彎桿／多臂件：中心孔伸出 2～3 支單排孔臂、夾角可選（常用角度＋整數），鐘形曲柄夾爪範例
+- [SDD-OPERATION-PIPELINE.md](SDD-OPERATION-PIPELINE.md) — 操作一致性：零件 × 動作對照表、共用動作流程、選取解讀與拖曳意圖（O0–O5）
 - [RESEARCH-ACTUATOR-MOUNTING.md](RESEARCH-ACTUATOR-MOUNTING.md) — 研究報告：MG995／SG90／TT／N20 真實尺寸、與 8 mm 孔格的接合問題及處理順序
 - [RESEARCH-ACTUATOR-TORQUE.md](RESEARCH-ACTUATOR-TORQUE.md) — 研究報告：MG995／SG90／TT／N20 扭力、轉速與齒輪比，虛功法估算需求扭力與實作順序
 
