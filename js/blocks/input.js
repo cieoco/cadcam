@@ -32,7 +32,7 @@ let pendingNodeDrag = null;         // 點擊先選取；超過門檻後才真�
 let linkPointerStart = null;        // 桌機畫桿可按住拖放，也保留點兩下
 let pendingOverlap = null;
 let pendingMobileEdit = false;      // 放開接點後再展開面板，避免拖曳途中畫布高度改變
-let blockedDrag = null, saidDrag = null;   // 拖不動時：超過拖曳門檻才說明原因，每次手勢只說一次（文字在按需載入的 drag-intent.js）
+let blockedDrag = null, saidDrag = null;
 
 // ---- 注入的外部依賴（由 app 在啟動時提供）----
 let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle,
@@ -67,6 +67,7 @@ export function startFreeLinkDrag(e, linkId) {
   const probe = !c && w && driveBody(S.comps.find(x => x.id === linkId), w);
   if (!(c || probe) || !w) { if (w && !c) dragBlocked(e, 'body'); return false; }
   S.dragProbe = probe || null;
+  if (probe && !probe.tip) dragBlocked(e, 'body');
   S.preDragSnap = snapshotStr(); // 整段拖曳合併成一筆 undo
   pause();
   pendingMobileEdit = mobilePrompt();
@@ -81,6 +82,9 @@ export function startFreeLinkDrag(e, linkId) {
 }
 
 const dragBlocked = (e, kind) => { blockedDrag = {x:e.clientX, y:e.clientY, t:e.pointerType || 'mouse', kind}; };
+function blockedCheck(e) {
+  if (blockedDrag && Math.hypot(e.clientX-blockedDrag.x,e.clientY-blockedDrag.y) >= (blockedDrag.t === 'mouse' ? 6 : 12)) { const k = blockedDrag.kind; blockedDrag = null; explainDrag(k); }
+}
 function explainDrag(kind) {
   const drive = driveState();
   if (saidDrag || drive === 'loading') return;
@@ -153,7 +157,7 @@ export function onNodeDown(e, id) {
 function onDragMove(e) {
   if (pinchActive) return;
   if (S.dragShape) return;   // 造形點拖曳由 app 的專用監聽處理
-  if (blockedDrag && Math.hypot(e.clientX-blockedDrag.x,e.clientY-blockedDrag.y) >= (blockedDrag.t === 'mouse' ? 6 : 12)) { const k = blockedDrag.kind; blockedDrag = null; explainDrag(k); }
+  if (!S.dragProbe) blockedCheck(e);
   if (pendingNodeDrag && !S.dragId) {
     const threshold = pendingNodeDrag.pointerType === 'mouse' ? 6 : 12;
     if (Math.hypot(e.clientX-pendingNodeDrag.x,e.clientY-pendingNodeDrag.y) < threshold) return;
@@ -198,7 +202,7 @@ function onDragMove(e) {
     if (S.dragProbe?.tip) {
       moveNodeTo(S.dragProbe.tip,{x:w.x+S.dragProbe.dx,y:w.y+S.dragProbe.dy}); return;
     }
-    if (!c) { if (S.dragProbe && drivePointTo(S.dragProbe, w)) redrawAfterDrag(); return; }
+    if (!c) { if (S.dragProbe && drivePointTo(S.dragProbe, w)) { blockedDrag = null; redrawAfterDrag(); } else blockedCheck(e); return; }
     const dx = w.x - S.dragLastWorld.x;
     const dy = w.y - S.dragLastWorld.y;
     // Translate vertices together; local holes follow without changing dimensions.
@@ -576,7 +580,7 @@ export function init(deps) {
   // 雙指：pinch 縮放 + 兩指中心平移；滑鼠滾輪：以游標為錨縮放。單指維持原本的拖曳。
   svg.addEventListener('pointerdown', (e) => {
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    blockedDrag = null; saidDrag = null;   // 新的手勢：重新計算「說過沒有」
+    blockedDrag = null; saidDrag = null;
     if (activePointers.size >= 2) {
       pinchActive = true;
       abortSingleDrag();

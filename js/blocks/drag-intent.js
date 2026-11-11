@@ -4,13 +4,13 @@
  * 按需載入（input.js 只在「拖不動、且指標真的移動過門檻」時才動態載入）：拖曳說不動時的白話說明。
  * 純資料／純函式，不碰 DOM。
  */
-const NO_DRIVE = '，或裝上馬達後拖曳試動。', WITH_DRIVE = '。';
+const NO_DRIVE = '，或裝上馬達後拖曳試動。', WITH_DRIVE = '；現在馬達也帶不動它，請先把機構接好（沒接的那一端接上固定孔或其他零件），再拖曳試動。';
 
 /** 拖不動時，對學生說的一句話：說明為什麼，並盡量說明可以怎麼做。drive＝作品有動力來源且試動可用。 */
 export function blockedMessage(kind, drive = false) {
   switch (kind) {
-    case 'body': return '這個零件已接上其他零件，不能單獨搬移；要移動請先分開連接' + (drive ? '（它也不會隨馬達轉動）。' : NO_DRIVE);
-    case 'hole': return '這個孔屬於已接上其他零件的零件，不能單獨搬移；要改位置請改尺寸' + (drive ? '（它也不會隨馬達轉動）。' : NO_DRIVE);
+    case 'body': return '這個零件已接上其他零件，不能單獨搬移；要移動請先分開連接' + (drive ? WITH_DRIVE : NO_DRIVE);
+    case 'hole': return '這個孔屬於已接上其他零件的零件，不能單獨搬移；要改位置請改尺寸' + (drive ? WITH_DRIVE : NO_DRIVE);
     case 'locked-vertex': return '這個頂點已被相接的零件鎖住，不能單獨拖動；要改位置請改板件尺寸，或移動接在它上面的零件。';
     case 'hosted-motor': return '馬達固定在座板上，不能直接拖；要換孔請用馬達的「安裝設定」。';
     case 'joined-corner': return '這個零件的孔上接著其他零件或固定孔，不能只拖它的角；請改尺寸，或移動接在孔上的零件。';

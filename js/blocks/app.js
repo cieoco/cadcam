@@ -2933,9 +2933,11 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ---- 課堂閉環：存檔 / 開啟 / 分享 ----
+let transientTimer = 0;
 function transient(msg, hold = 0) {
   setBanner(msg);
-  setTimeout(() => { if (document.getElementById('modeBanner').textContent === msg) clearBanner(); }, hold || (hydraulic?.active() ? Math.max(4000,Math.min(8000,msg.length*80)) : bannerTtl(msg)));
+  clearTimeout(transientTimer);
+  transientTimer = setTimeout(() => { if (document.getElementById('modeBanner').textContent === msg) clearBanner(); }, hold || (hydraulic?.active() ? Math.max(4000,Math.min(8000,msg.length*80)) : bannerTtl(msg)));
 }
 function motorMountPatternRotDegForCenter(id,pts,mount=null){
   return planMotorPatternRotDeg({id,pts,comps:S.comps,mount,fallbackRotDeg:()=>computeMotorRotDeg(id,pts || {},new Set())});

@@ -25,6 +25,7 @@ function emit(type,id,x,y,target=noop,pointerType='mouse'){
   if(!ev.stopped)target(ev);
   if(!ev.stopped)for(const i of l.filter(i=>!i.capture)){i.fn(ev);if(ev.immediate)break;}
 }
+export const driveHooks={body:null,to:null};   // fake drive: body(c,g)->probe|null, to(id|probe,w)->truthy when the drive moved something
 export let msgs=[];let drive='none';export const setDrive=v=>{drive=v;};export const resetMsgs=()=>{msgs=[];};
 const snapshotStr=()=>JSON.stringify({comps:S.comps,params:S.topo.params,theta:S.theta,motorAngles:S.motorAngles});
 Input.init({selectLink:noop,selectTriangle:noop,svg,draw:noop,rebuild:noop,pause:noop,cancelMotorMode:noop,deselectLink:noop,
@@ -34,7 +35,8 @@ Input.init({selectLink:noop,selectTriangle:noop,svg,draw:noop,rebuild:noop,pause
   pointIsGround:id=>Model.pointIsGround(S.comps,id),setSliderDetailRows:noop,openMobileEditPanel:noop,transient:m=>msgs.push(m),
   freeLinkForPoint:id=>Model.freeLinkForPoint(S.comps,id),freeTriangleForPoint:id=>Model.freeTriangleForPoint(S.comps,id),
   pinnedTriangleForPoint:id=>Model.pinnedTriangleForPoint(S.comps,id),lockedTriangleVertex:id=>Model.lockedTriangleVertex(S.comps,id),
-  fixedLinkFor:id=>Model.fixedLinkFor(S.comps,id),inputCrankMovingEnd:()=>null,driveState:()=>drive});
+  fixedLinkFor:id=>Model.fixedLinkFor(S.comps,id),inputCrankMovingEnd:()=>null,driveState:()=>drive,
+  driveBody:(c,g)=>driveHooks.body?driveHooks.body(c,g):null,drivePointTo:(id,w)=>driveHooks.to?driveHooks.to(id,w):false});
 View.resetView();
 
 
