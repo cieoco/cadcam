@@ -329,7 +329,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     redrawAfterDrag();
     return;
   }
-  if (S.comps.some(c => ['p1', 'p2', 'p3'].some(k => c[k]?.id === id) && holeJoined(S.comps, c))) { transient('這個零件的孔上接著其他零件或固定孔，不能只拖它的角；請改尺寸，或移動接在孔上的零件。'); return; }
+  if (S.comps.some(c => ['p1', 'p2', 'p3'].some(k => c[k]?.id === id) && holeJoined(S.comps, c))) { if (S.dragId) explainDrag('joined-corner'); return; }
   // 三點桿自由頂點，但另兩頂點都被機構牽制（≥2 樞紐）：此頂點被剛體完全決定，
   // 自由拖會破壞三角剛性 → 鎖住不動（要移動請拖牽制較少的接點，或加馬達驅動機構）。
   if (lockedTriangleVertex && lockedTriangleVertex(id)) { if (S.dragId) explainDrag('locked-vertex'); return; }
@@ -337,7 +337,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     comp.type === 'bar' && comp.fixedLen && comp.p1 && comp.p2 &&
     (comp.p1.id === id || comp.p2.id === id)) : [];
   if (sharedFixedBars.length > 1) {
-    transient('這是多桿共用的固定長度接點；請調整桿長或移動機架固定孔。');
+    if (S.dragId) explainDrag('shared-fixed');
     return;
   }
   // 固定長度連桿：已有約束時，拖端點繞另一端以固定半徑旋轉（圓規），長度不變
