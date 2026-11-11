@@ -97,4 +97,32 @@ const keepB2Plan=w=>({ok:true,comps:w.comps.filter(c=>c.id!=='b2'),params:{b1L:w
  check('pruneRefs:false leaves existing dangling references alone',ok&&S.topo.tracePoints.includes('gone.A'));}
 {const {S,log,host:h}=host(),ok=runEdit({name:'尺寸',host:h,plan:()=>({ok:true,unchanged:true})});
  check('unchanged: no undo, no write, no line',ok===false&&log.undo===0&&log.msgs.length===0&&log.rebuild===0);}
+// ---- shape:'parts' (M1 of docs/SDD-MOTOR-PART.md): convert in once, plan, convert out once, then the same checks/commit as before
+{const {registerShape}=await import('../js/blocks/edit-pipeline.js');
+ const calls={enter:0,leave:0};registerShape('count',{enter:w=>{calls.enter++;return {...w,comps:w.comps.map(c=>({...c,seen:true}))};},leave:(comps,before)=>{calls.leave++;return comps.map(({seen,...c})=>c);}});
+ const seen=[];
+ let {S,log,host:h}=host(),ok=runEdit({name:'測試',shape:'count',plan:w=>{seen.push(w.comps.every(c=>c.seen));return removeB2(w);},host:h});
+ check('shape: enter once before the plan, leave once after, the plan sees the converted work',ok&&calls.enter===1&&calls.leave===1&&seen[0]===true);
+ check('shape: the committed work is the converted-back one, one undo, one line',S.comps.length===1&&!('seen' in S.comps[0])&&log.undo===1&&log.msgs.join()==='已刪除桿。');
+ calls.enter=calls.leave=0;({S,log,host:h}=host());
+ ok=runEdit({name:'測試',shape:'count',plan:()=>({ok:false,message:'不行'}),host:h});
+ check('shape: a refusal converts nothing back',ok===false&&calls.enter===1&&calls.leave===0&&log.msgs.join()==='不行'&&S.comps.length===2);
+ calls.enter=calls.leave=0;({S,log,host:h}=host());
+ ok=runEdit({name:'測試',shape:'count',plan:()=>({ok:true,unchanged:true}),host:h});
+ check('shape: unchanged converts nothing back, says nothing',ok===false&&calls.leave===0&&log.msgs.length===0&&log.undo===0);
+ ({S,log,host:h}=host());const quiet=console.error;console.error=()=>{};
+ ok=runEdit({name:'測試',shape:'no-such-shape',plan:removeB2,host:h});console.error=quiet;
+ check('shape: an unregistered shape is refused with one line, nothing written (never silent)',ok===false&&log.msgs.length===1&&log.undo===0&&S.comps.length===2);
+ ({S,log,host:h}=host());ok=runEdit({name:'測試',plan:w=>{seen.push(w.comps.some(c=>c.seen));return removeB2(w);},host:h});
+ check('without shape the plan gets the live work, as before',ok&&seen.at(-1)===false);}
+{const {readFileSync}=await import('node:fs');
+ const {normalizeSnapshot}=await import('../js/blocks/schema.js'),{readStoredProject}=await import('../js/blocks/project-envelope.js');
+ await import('../js/blocks/plan-shape.js');
+ for(const f of ['motor-off-plate','delete-blocked','connected-resize','fourbar-drag-rocker','free-bar-blocks-motor']){
+  const w=normalizeSnapshot(readStoredProject(JSON.parse(readFileSync(new URL(`./fixtures/${f}.json`,import.meta.url),'utf8'))));
+  const S={comps:structuredClone(w.comps),modules:[],topo:{params:{...w.params},tracePoints:[],loads:[],dimensions:[]},fabrication:w.fabrication,counter:1,selectedLinkId:null,selectedTriangleId:null,selectedSliderId:null,selectedNodeId:null};
+  const orig=structuredClone(S.comps),msgs=[],ok=runEdit({name:'不動',shape:'parts',plan:x=>({ok:true,comps:x.comps,params:x.params,clearSelection:false,pruneRefs:false,message:''}),
+   host:{S,transient:m=>msgs.push(m),pushUndo(){},pause(){},rebuild(){},draw(){}}});
+  let eq=false;try{(await import('node:assert/strict')).deepEqual(S.comps,orig);eq=true;}catch(e){console.log(f,String(e.message).slice(0,300));}
+  check(`shape parts: a plan that does nothing round-trips ${f} to deep-equal legacy data`,ok&&eq&&msgs.length===0);}}
 report('edit-pipeline');
