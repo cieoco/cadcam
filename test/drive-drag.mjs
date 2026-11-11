@@ -7,7 +7,7 @@ import {S} from '../js/blocks/state.js';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
 import {compileTopology} from '../js/core/topology.js';
 import {solveTopology} from '../js/multilink/solver.js';
-import {driveTo,bodyProbe} from '../js/blocks/drive-drag.js';
+import {driveTo,bodyProbe,pullTip} from '../js/blocks/drive-drag.js';
 
 const raw=JSON.parse(readFileSync(new URL('./fixtures/fourbar-drag-rocker.json',import.meta.url)));
 const w=normalizeSnapshot(raw.project||raw),compiled=compileTopology(w.comps,{params:w.params},new Set());
@@ -45,4 +45,15 @@ driveTo(host,p=>p['Blank110.B'],at('Blank110.B',40));
 check('a limited input range is respected',S.theta<=10+1e-9&&S.theta>0,`theta ${S.theta}`);range=null;
 // nothing in the work changed
 check('lengths and connections are unchanged (only the input angle moves)',JSON.stringify([w.comps,w.params])===before);
+S.comps=structuredClone(w.comps); S.topo={params:{...w.params}};
+const last=S.comps.find(c=>c.id==='Blank111'), preceding=S.comps.find(c=>c.id==='Blank110');
+const goalHole={x:last.p2.x+8,y:last.p2.y+8};
+check('a connected frame hole stays in drive mode',!pullTip(host,last.p2.id,goalHole));
+last.p2={...last.p2,id:'free-tip'};
+const elbowBefore={...last.p1}, rootBefore={...preceding.p1};
+check('one pull moves the free tip and the shared elbow',pullTip(host,last.p2.id,goalHole)
+  && near(last.p2,goalHole)<1e-6 && near(last.p1,elbowBefore)>1 && near(last.p1,preceding.p2)<1e-6);
+pullTip(host,last.p2.id,{x:500,y:300});
+check('out-of-reach motion preserves both bar lengths and the upstream pivot',
+  [last,preceding].every(c=>Math.abs(near(c.p1,c.p2)-w.params[c.lenParam])<1e-6) && near(rootBefore,preceding.p1)<1e-6);
 report('drive-drag');

@@ -5,6 +5,7 @@
  * 其他桿件依原本的接法一起動；不改桿長、不拆連接（試動 ≠ 改尺寸）。
  * h 由 app.js 注入：displayCoords、solveAt(theta, seed)、seed()、range()、setTheta(theta)、updateMotorSwitcher。
  */
+import { looseBarRotation, pointRefs, pointIsGround, holeJoined, updatePointCoordsById } from './model.js';
 import {S, activateMotor} from './state.js';
 
 // 拖輸入桿的動端：直接用游標方位反推輸入角（原 app.js rotateInputCrankToPoint，搬來此處按需載入）。
@@ -88,6 +89,12 @@ export function driveTo(h, probe, target) {
 
 // 拖桿身或板身：記下抓的位置在零件上的局部座標（p1→p2），之後讓那一點跟著游標。
 export function bodyProbe(h, comp, grab) {
+  if (comp?.type === 'bar') {
+    for (const end of [comp.p1, comp.p2]) {
+      if (endArm(end.id)) return {tip:end.id, dx:end.x-grab.x, dy:end.y-grab.y};
+    }
+  }
+  if (!comp || h.hasDrive?.() === false) return null;
   const m = h.displayCoords(), a = m[comp.p1?.id], b = m[comp.p2?.id];
   if (!a || !b) return null;
   const L = Math.hypot(b.x - a.x, b.y - a.y);
@@ -110,4 +117,52 @@ function follows(h, probe) {
   return [STEP, -STEP].some(d => {
     try { const s = h.solveAt(t0 + d, h.seed()), q = s?.isValid !== false && s?.points && probe(s.points); return q && Math.hypot(q.x - q0.x, q.y - q0.y) > 0.01; } catch (_) { return false; }
   });
+}
+
+// A free tip and its preceding passive bar form a two-link arm. Keep the
+// upstream pin still and choose the elbow on the same side of the arm.
+function endArm(id) {
+  const tip = looseBarRotation(S.comps, S.topo.params, id);
+  if (!tip || tip.disk || pointIsGround(S.comps, tip.pivot.id)) return null;
+  const refs = pointRefs(S.comps, tip.pivot.id);
+  const prev = refs.find(r => r.comp !== tip.bar);
+  if (refs.length !== 2 || !prev || !['p1','p2'].includes(prev.key)) return null;
+  const bar = prev.comp;
+  if (bar.type !== 'bar' || !bar.fixedLen || bar.isInput || bar.shape === 'disk' ||
+      bar.barFusionRoot || bar.barFusion || bar.physicalMotor || holeJoined(S.comps, bar)) return null;
+  if (S.comps.some(c => c.type === 'syringe' && [c.a?.componentId,c.b?.componentId,c.outputId].includes(bar.id))) return null;
+  const root = prev.key === 'p1' ? bar.p2 : bar.p1;
+  if (pointRefs(S.comps,root.id).length < 2 && !pointIsGround(S.comps,root.id)) return null;
+  return {tip, root, length:Number(S.topo.params[bar.lenParam])};
+}
+
+export function pullTip(h, id, target) {
+  const arm = endArm(id);
+  if (!arm) return false;
+  const {tip, root, length} = arm;
+  const dx = target.x-root.x, dy = target.y-root.y, distance = Math.hypot(dx,dy);
+  if (!(length > 0) || !Number.isFinite(distance)) return false;
+  const oldAngle = Math.atan2(tip.end.y-root.y,tip.end.x-root.x);
+  const angle = distance > 1e-8 ? Math.atan2(dy,dx) : oldAngle;
+  const ux = Math.cos(angle), uy = Math.sin(angle);
+  const reach = Math.min(length+tip.length, Math.max(Math.abs(length-tip.length), distance));
+  const along = reach > 1e-8 ? (length*length-tip.length*tip.length+reach*reach)/(2*reach) : 0;
+  const side = Math.sign((tip.pivot.y-root.y)*ux-(tip.pivot.x-root.x)*uy) || 1;
+  const height = side*Math.sqrt(Math.max(0,length*length-along*along));
+  if (reach > 1e-8) updatePointCoordsById(S.comps,tip.pivot.id,root.x+along*ux-height*uy,root.y+along*uy+height*ux);
+  updatePointCoordsById(S.comps,id,root.x+reach*ux,root.y+reach*uy);
+  return true;
+}
+
+// Enlarged hit circles overlap on a phone. Resolve a transparent hit by its
+// distance to the visible centre; equal centres retain the painted order.
+export function nearestHit(event, fallback) {
+  let best = fallback, distance = Infinity;
+  for (const el of document.elementsFromPoint(event.clientX,event.clientY)) {
+    if (!el.dataset.nodeHit) continue;
+    const box = el.getBoundingClientRect();
+    const d = Math.hypot(event.clientX-box.x-box.width/2,event.clientY-box.y-box.height/2);
+    if (d < distance) { best=el.dataset.nodeHit; distance=d; }
+  }
+  return best;
 }

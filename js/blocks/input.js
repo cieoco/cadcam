@@ -132,7 +132,7 @@ export function onNodeDown(e, id) {
   Panels.updateRoleEditor();
   S.dragId = null; S.snapTarget = null;
   const localBody=motorBody||S.comps.find(c=>localHoles(c).some(h=>h.id===id));
-  pendingNodeDrag = localBody && isFreeBody(S.comps,localBody,S.modules) && !fusionRoot(S.comps,localBody.id)
+  pendingNodeDrag = localBody && !fusionRoot(S.comps,localBody.id) && (isFreeBody(S.comps,localBody,S.modules) || (localBody.type==='bar' && worldFromEvent(e) && driveBody(localBody,worldFromEvent(e))?.tip))
     ? {id,bodyId:localBody.id,event:e,x:e.clientX,y:e.clientY,pointerType:e.pointerType || 'mouse'}
     : motorBody || S.comps.some(c=>c.frameHole&&c.p1.id===id) || fusionAtPoint(S.comps,id) || (pointIsGround(id) && !isGroundPositionUnlocked(id)) ? null : {
     id, x:e.clientX, y:e.clientY, pointerType:e.pointerType || 'mouse'
@@ -184,6 +184,9 @@ function onDragMove(e) {
   }
   if (S.dragLinkId && S.dragLastWorld) {
     const c = S.comps.find(x => x.id === S.dragLinkId && isFreeBody(S.comps,x,S.modules));
+    if (S.dragProbe?.tip) {
+      moveNodeTo(S.dragProbe.tip,{x:w.x+S.dragProbe.dx,y:w.y+S.dragProbe.dy}); return;
+    }
     if (!c) { if (S.dragProbe && drivePointTo(S.dragProbe, w)) redrawAfterDrag(); return; }
     const dx = w.x - S.dragLastWorld.x;
     const dy = w.y - S.dragLastWorld.y;
@@ -211,25 +214,25 @@ export function moveNodeTo(id,w,{snap=true}={}) {
   if (pointIsRackHole(id)||S.comps.some(c=>c.frameHole&&c.p1.id===id)) return;
   const motor=S.comps.find(c=>c.type==='motor'&&c.p1?.id===id);
   if(motor){if(isFreeBody(S.comps,motor,S.modules)){updatePointCoordsById(id,w.x,w.y);S.snapTarget=null;redrawAfterDrag();}return;}
-  // 馬達輸入桿的動端：solver 會把它釘在 S.theta 對應的姿勢，直接拖會被拉回、移不動。
-  // 不跟 solver 較勁——以「指標位置」找最近的接點當吸附目標、放開即連接（綠圈給回饋）。
+  // 拖輸入桿的動端直接調整馬達角度。
   const crankBar = inputCrankMovingEnd(id);
   if (crankBar) {
     if (rotateInputCrankToPoint(crankBar,w)) { rebuild(); recordManualTrace(); draw(); }
     return;
   }
   // 有動力時拖接點或孔＝試動；孔不單獨移動
-  if (drivePointTo(id,w)) { S.snapTarget=null; redrawAfterDrag(); return; }
+  const driven = drivePointTo(id,w);
+  if (driven) {
+    redrawAfterDrag();
+    S.snapTarget = driven === 'tip' && snap ? nearestDisplayTo(id) : null;
+    if (S.snapTarget) draw();
+    return;
+  }
   if (S.comps.some(c=>localHoles(c).some(h=>h.id===id)&&!isFreeBody(S.comps,c,S.modules))) return;
   // Only world-frame holes snap. Floating joints are motion constraints and
   // must never be quantized to the 8 mm reference grid during editing.
   const dragTarget = snap && pointIsGround(id) ? snapFramePoint(w) : w;
-  // 齒輪中心：拖中心＝整顆齒輪剛性平移（輪緣銷 p2 跟著走），否則齒形繞 p1、銷停舊位會分離。
-  // 並維持嚙合（中心距 D=Ra+Rb 是死的）：
-  //  - 夥伴已接地 → 本中心被 D 綁住，繞夥伴中心「公轉」（保持咬合，只改方位，之後可就地設地錨）。
-  //  - 夥伴未接地 → 整對一起平移（兩顆都搬，維持咬合）。
-  //  - 沒夥伴（單顆）→ 整顆剛性平移。
-  // 放開沿用既有 mergePoints 合併到已知點/地錨＝固定在機架上（乙）。
+  // 齒輪中心連同銷移動；已接地的夥伴當公轉中心，浮動夥伴一起平移。
   const gearForCenter = S.comps.find(c => c.type === 'gear' && c.p1 && c.p1.id === id);
   if (gearForCenter && gearForCenter.p2) {
     const pc = pointCoords();
@@ -427,6 +430,9 @@ function onDragEnd(e) {
     rebuild(); draw();
     commitDragUndo();
     return;
+  }
+  if (S.dragLinkId && S.dragProbe?.tip && S.snapTarget) {
+    S.dragId=S.dragProbe.tip; S.dragProbe=null; S.dragLinkId=null; S.dragLastWorld=null;
   }
   if (S.dragLinkId) {
     const dropped=S.comps.find(c=>c.id===S.dragLinkId&&c.type==='motor'),before=S.preDragSnap;

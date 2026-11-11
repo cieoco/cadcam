@@ -824,12 +824,12 @@ const inputCrankMovingEnd = (id) => S.comps.find(c =>
    (c.p2.id === id && !c.p2.physicalMotor && c.p1.physicalMotor))) || null;
 // 拖曳試動：見 drive-drag.js
 let driveDrag=null;
-const driveHost={displayCoords,pointCoords,updateMotorSwitcher,range:()=>inputRockRange(),seed:()=>lastSolved,
+const driveHost={hasDrive:()=>hasDriveSource(),displayCoords,pointCoords,updateMotorSwitcher,range:()=>inputRockRange(),seed:()=>lastSolved,
   solveAt:(a,seed)=>{const sc=simulationScope(),p={thetaDeg:a,motorAngles:{...motorAnglesNow(),[String(S.activeMotor)]:a},_prevPoints:seed};return sc.assembly?solveAssembly(sc.assembly,p):solveTopology(sc.compiled,p);},
   setTheta:t=>{S.theta=t;S.topo.params.theta=t;const el=document.getElementById('thetaVal');if(el)el.textContent=angleLabel(t);}};
 const loadDrive=()=>import('./drive-drag.js').then(m=>driveDrag=m),drive=(f,...a)=>driveDrag?driveDrag[f](driveHost,...a):(loadDrive(),false);
 const rotateInputCrankToPoint=(bar,target)=>drive('rotateCrankTo',bar,target);
-const drivePointTo=(id,w)=>hasDriveSource()&&(id.call||!pointIsGround(id))&&drive('driveTo',id.call?id:p=>p[id],w);
+const drivePointTo=(id,w)=>typeof id==='string'&&drive('pullTip',id,w)?'tip':hasDriveSource()&&(id.call||!pointIsGround(id))&&drive('driveTo',id.call?id:p=>p[id],w);
 const updatePointCoordsById = (id, x, y) => Model.updatePointCoordsById(S.comps, id, x, y);
 const freezePointAtDisplay = (id) => Model.freezePointAtDisplay(S.comps, S.compiled, S.theta, id, motorAnglesNow());
 const movePointById = (id, dx, dy) => Model.movePointById(S.comps, id, dx, dy);
@@ -2805,6 +2805,7 @@ function clearOffHomeModuleSelection() {
 // D3 守門包住 Input.onNodeDown：按到已安裝模組的節點時，先回組裝姿態，這一下不下拉。
 // renderNodes 與 Render.init 共用同一個包裝，行為才一致。
 function guardedNodeDown(e, id) {
+  if(e.target?.dataset?.nodeHit) id=driveDrag?.nearestHit(e,id) || id;
   if (isBoxReference(id)) { e?.preventDefault?.(); e?.stopPropagation?.(); return; }
   if (ensureModuleHome(moduleOfPoint(S.comps, id))) { e?.preventDefault?.(); e?.stopPropagation?.(); return; }
   Input.onNodeDown(e, id);
@@ -3353,7 +3354,7 @@ function init() {
                  selectModuleTarget(comp);
                },
                snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel, openFrameEditor: () => { S.frameEditorOpen = true; Panels.updateFrameEditor(); }, transient,
-               isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, drivePointTo, driveBody:(c,g)=>hasDriveSource()&&drive('bodyProbe',c,g), pointIsRackHole });
+               isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, drivePointTo, driveBody:(c,g)=>drive('bodyProbe',c,g), pointIsRackHole });
   Settings.init({ rebuild, draw, pushUndo, pause, scheduleAutosave, notify: transient });
   Settings.loadExportSettings();
   Settings.loadTtMountSettings();
