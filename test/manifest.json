@@ -331,7 +331,8 @@
     "test/c6-attachments.mjs",
     "test/c7-syringe.mjs",
     "test/free-part-motion.mjs",
-    "test/drive-drag.mjs"
+    "test/drive-drag.mjs",
+    "test/operation-matrix.mjs"
   ],
   "version": 1
 }

@@ -1,0 +1,276 @@
+/**
+ * 零件 × 動作對照表（docs/SDD-OPERATION-PIPELINE.md §3.1，O0 盤點）。純資料：不 import 任何模組、不碰 DOM／state，
+ * 也不被啟動路徑載入；只有 test/operation-matrix.mjs 與文件使用。
+ *
+ * 每格是一組情境 case：
+ *   when   前提（學生看得懂的說法：未接／已接其他零件／接固定孔／接馬達／作品已有既存問題…）
+ *   expect 依產品規則「應該」發生的事，一句話（每個動作都有回饋；拖曳要符合所選動作；不能無聲無息沒反應）
+ *   status 'ok'＝現況已符合；'gap'＝現況不符合（必須有 now）；'n/a'＝這個零件沒有這個動作
+ *   now    現況與 expect 不同時，寫現況（gap 必填）
+ *   evidence 程式路徑或執行結果（gap 必填；供施工者找位置）
+ *   check  驗證這格的測試 id（test/operation-matrix.mjs 的 CHECKS）。ok 的格子必須有 check 或標 unverified
+ *   unverified 只讀過程式、沒有可在 Node 重跑的檢查（需要真實瀏覽器互動）；status 只是依程式判讀，未經執行證實
+ *   cause  相同根因的 gap 用同一個代號，方便一次修
+ * 修好一個 gap：把 status 改 'ok'、刪 now／evidence，check 保留（測試會把「已不再重現」顯示出來）。
+ */
+
+export const PARTS = [
+  {id: 'bar', label: '桿件'},
+  {id: 'plate', label: '板材'},
+  {id: 'l', label: 'L型件'},
+  {id: 'arms', label: '彎桿／多臂件'},
+  {id: 'motor', label: '馬達（獨立）'},
+  {id: 'motorBar', label: '馬達＋輸出桿（馬達資料記在桿件上）'},
+  {id: 'gear', label: '齒輪'},
+  {id: 'slider', label: '滑軌'},
+  {id: 'syringe', label: '針筒'},
+  {id: 'frameHole', label: '機架孔'}
+];
+
+export const ACTIONS = [
+  {id: 'select', label: '選取'},
+  {id: 'move', label: '移動'},
+  {id: 'resize', label: '改尺寸'},
+  {id: 'delete', label: '刪除'},
+  {id: 'connect', label: '連接'},
+  {id: 'release', label: '解除'},
+  {id: 'copy', label: '複製／鏡射'}
+];
+
+const ok = (when, expect, check, extra = {}) => ({when, expect, status: 'ok', ...(check ? {check} : {unverified: true}), ...extra});
+const gap = (when, expect, now, evidence, extra = {}) => ({when, expect, status: 'gap', now, evidence, ...extra});
+const na = (when, expect) => ({when, expect, status: 'n/a'});
+
+// 同一根因的代號
+const HOLE_TARGET = 'hole-has-no-target';        // 選到孔／接點時只記孔，指令不知道要作用在哪個零件
+const SILENT_DRAG = 'silent-drag';                // 拖不動時不說原因
+const GATE_OLD = 'delete-old-check';              // 刪除仍用舊的座板檢查，沒套「只擋新問題」
+const MOTOR_ON_BAR = 'motor-data-on-bar';         // 馬達資料記在輸出桿上
+const SILENT_DONE = 'silent-success';             // 做完連帶改變沒有說明
+const NO_SELECT_FIELD = 'no-selection-field';     // 針筒的選取沒有記在共用選取欄位
+
+const SPLIT_JOINT = check => gap('桿端與別的零件共用同一個接點',
+  '拆開後說明「已把接點分開」，並與其他動作一樣先檢查會不會製造新問題；可一次復原。',
+  '拆開成功但沒有任何訊息，也沒有經過一致性檢查（直接寫入）。',
+  'node-editor.js splitNode：成功路徑沒有 notify／integrityGate，只有 pushUndo 後改 id。', {check, cause: SILENT_DONE});
+
+export const MATRIX = {
+  bar: {
+    select: [
+      ok('點桿身', '選到這根桿，顯示它的長度設定。'),
+      gap('點到桿上的孔，而那個孔被好幾個零件共用', '畫面標明「你選的是哪個零件的孔」，要改時才問；不能只記下孔。',
+        '只記下孔本身，不記是哪個零件；之後的指令（例如刪除）因此不知道要動誰。',
+        'input.js onNodeDown 只設 S.selectedNodeId；桌機沒有選擇器（overlap-picker 只在手機 mobilePrompt() 時出現）。',
+        {check: 'select-shared-joint', cause: HOLE_TARGET})
+    ],
+    move: [
+      ok('未接任何零件（自由桿）', '拖桿身或桿端，整根桿平移，長度不變。', 'move-free-bar'),
+      ok('已接其他零件，且作品有動力來源', '拖桿身或桿上的孔＝試動：機構跟著轉，桿長與連接都不改。'),
+      gap('已接其他零件，但作品沒有動力來源', '拖不動時說明原因（例如「這根桿接著別的零件，請改尺寸，或接上馬達再試動」）。',
+        '只選取這根桿，不動、也不說話。', 'app.js onFreeDrag→input.js startFreeLinkDrag：非自由件且 driveBody 為空就回 false，只剩 onSelect。',
+        {check: 'move-connected-bar-silent', cause: SILENT_DRAG}),
+      gap('拖已接零件桿上的孔（不是端點）', '說明這個孔不能單獨搬，或提供可行的拖法。', '無聲無息沒有動。',
+        'input.js moveNodeTo：孔屬於非自由件且沒有動力時直接 return，沒有 transient。', {check: 'move-connected-hole-silent', cause: SILENT_DRAG}),
+      ok('桿端接在固定孔上', '拖另一端：以固定孔為圓心、桿長不變地轉動。'),
+      ok('作品已有既存問題', '拖曳放開時只擋「這次新造成」的問題，不被舊問題擋住。', 'gate-only-new')
+    ],
+    resize: [
+      ok('未接或已接，改孔數（數字）', '桿變長或變短，相接的零件跟著孔移動。', 'resize-bar-ok'),
+      ok('縮小會移除已被使用的孔', '拒絕並說明是哪一個孔被用到。', 'resize-plate-lost-hole'),
+      ok('改完相連機構接不起來', '拒絕並說「孔距未修改：長度無法閉合」，作品不變。'),
+      ok('作品已有既存問題', '只擋這次新造成的問題。', 'gate-only-new')
+    ],
+    delete: [
+      ok('未接、作品沒有既存問題', '桿被刪除。', 'del-bar-free-ok'),
+      ok('已接其他零件', '桿被刪除，相鄰零件保留，原本相接的孔留成獨立的點。', 'del-connected-bar-ok'),
+      gap('選到的是桿上的孔或共用接點', '刪除所屬的零件；共用接點不猜，請使用者點桿身並在圖上標出候選。',
+        '按 Delete 沒有反應，也沒有任何訊息。', 'delete-part.js：id 只由 selectedLinkId／TriangleId／SliderId／馬達節點決定，選到一般孔時 id 為空直接 return。',
+        {check: 'del-hole-silent', cause: HOLE_TARGET}),
+      gap('作品已有既存問題（例如馬達軸離開座板原孔），要刪的桿與馬達無關', '刪除成功，不被舊問題擋住。',
+        '被擋下，訊息是「馬達軸心需保持在所選座板格位…」，但刪的桿並沒有動到馬達。',
+        'delete-part.js 先跑 planActuatorPlateHoles（舊檢查），它沒套 integrityGate 的「只擋新問題」規則。', {check: 'del-existing-problem-blocked', cause: GATE_OLD}),
+      ok('桿被合成', '請先解除合成（有說明）。', 'del-fused-refused')
+    ],
+    connect: [
+      ok('把自由端拖到別的桿端', '接成一個共用接點。', 'connect-free-bars-ok'),
+      ok('接起來會破壞桿長或固定孔', '拒絕並說明原因，作品不變。', 'connect-refusal-message'),
+      ok('同一零件的兩個孔', '拒絕並說「不能合併同一零件的兩個孔」。', 'connect-same-part-refused'),
+      ok('未接的桿端拖到馬達軸', '接成馬達的輸出桿（經過確認與一致性檢查）。', 'connect-motor-output')
+    ],
+    release: [
+      SPLIT_JOINT('release-split-silent'),
+      na('未接', '沒有可解除的連接。')
+    ],
+    copy: [
+      ok('未接', '右側出現一份副本，孔距相同。', 'copy-bar'),
+      ok('已接其他零件', '只複製桿件本體，副本不與原件相連（對話框已說明）。', 'copy-connected-clean'),
+      ok('左右／上下鏡射', '副本鏡射，孔距保留。', 'copy-mirror')
+    ]
+  },
+
+  plate: {
+    select: [
+      ok('點板面', '選到這片板，顯示尺寸設定。'),
+      gap('點到板上的孔，而那個孔被別的零件共用', '畫面標明所選孔屬於哪一個零件。', '只記下孔，不記是哪個零件。',
+        'input.js onNodeDown：同桿件。', {check: 'select-shared-joint', cause: HOLE_TARGET}),
+      gap('桌機上多個零件重疊在同一處', '用零件名稱與圖上高亮列出候選，由使用者選。',
+        '桌機直接選最上層，不問；手機的選擇器標籤還帶內部代號（例如「連桿 · Blank136」）。',
+        'input.js pointerdown 在 mobilePrompt() 為假時 return；overlap-picker.js collectPickCandidates 的 label 含 id。', {cause: 'overlap-pick'})
+    ],
+    move: [
+      ok('未接任何零件（自由板）', '拖板上任一點，整片平移，形狀不變。', 'move-free-plate'),
+      gap('已接其他零件或固定孔，但沒有動力來源', '說明為什麼不能拖。', '只選取，不動、不說話。', '同桿件：startFreeLinkDrag。',
+        {check: 'move-connected-plate-silent', cause: SILENT_DRAG}),
+      gap('三點桿的某個頂點已被機構完全決定', '說明「這個頂點被其他零件鎖住」。', '拖不動，沒有訊息。', 'input.js moveNodeTo：lockedTriangleVertex 為真時直接 return。',
+        {cause: SILENT_DRAG})
+    ],
+    resize: [
+      ok('改長／寬孔數，未被使用的孔', '板變大或變小，孔格重新排列。', 'resize-plate-grow'),
+      ok('縮小會移除已被使用的孔（接了零件或固定）', '拒絕並說明是第幾孔，請先解除該孔的連接。', 'resize-plate-lost-hole')
+    ],
+    delete: [
+      ok('未接、板上沒裝東西', '板材被刪除，其他零件不受影響。', 'del-plate-plain'),
+      gap('板上裝著馬達、針筒或有零件接在孔上', '刪除後說明「馬達改成獨立固定點」「接孔已放開」。',
+        '板被刪掉，馬達軸改成獨立固定點、輸出桿保留，但沒有任何訊息。', 'delete-part.js 成功路徑沒有 transient；連帶改變來自 detachDeletedAttachments。',
+        {check: 'del-plate-silent-detach', cause: SILENT_DONE}),
+      ok('盒體的配對板件', '請整組管理（有說明）。'),
+      gap('選到的是板上的孔', '刪除所屬的板，或明說不能刪。', '按 Delete 沒有反應也沒有訊息。', '同桿件：delete-part.js 沒有處理一般孔。',
+        {check: 'del-hole-silent', cause: HOLE_TARGET})
+    ],
+    connect: [
+      ok('板孔與其他零件的點接合', '經過候選預覽、桿長與固定孔檢查後接合，拒絕時說明原因。', 'connect-refusal-message')
+    ],
+    release: [
+      SPLIT_JOINT('release-split-silent'),
+      na('未接', '沒有可解除的連接。')
+    ],
+    copy: [
+      ok('板材（可含已接零件）', '複製板件本體，不帶馬達、針筒、固定狀態。', 'copy-plate')
+    ]
+  },
+
+  l: {
+    select: [ok('點 L 型件', '選到這片 L 型件。')],
+    move: [
+      ok('未接', '整片平移，形狀不變。', 'move-free-l'),
+      gap('已接其他零件或固定孔，沒有動力來源', '說明為什麼不能拖。', '只選取，不動、不說話。', '同板材：startFreeLinkDrag。',
+        {check: 'move-connected-l-silent', cause: SILENT_DRAG})
+    ],
+    resize: [ok('改長、高或臂寬孔數', 'L 型件改變，被使用的孔受保護。', 'resize-l-ok')],
+    delete: [ok('未接', 'L 型件被刪除。', 'del-l-ok')],
+    connect: [ok('孔與其他零件接合', '同板材。', 'connect-refusal-message')],
+    release: [SPLIT_JOINT('release-split-silent')],
+    copy: [ok('L 型件', '複製或鏡射本體。', 'copy-l')]
+  },
+
+  arms: {
+    select: [ok('點彎桿／多臂件', '選到這個零件，顯示臂數與角度設定。')],
+    move: [
+      ok('未接', '整片平移；臂端另有把手。'),
+      gap('已接其他零件，沒有動力來源', '說明為什麼不能拖。', '只選取，不動、不說話。', '同板材。', {check: 'move-connected-arms-silent', cause: SILENT_DRAG})
+    ],
+    resize: [ok('改臂長、臂數或角度', '臂改變，被使用的孔受保護；拖曳把手以 1 mm 取整，精確值用欄位。')],
+    delete: [ok('已接其他零件', '零件被刪除，相鄰零件保留。', 'del-arms-ok')],
+    connect: [ok('臂上的孔與其他零件接合', '同板材。')],
+    release: [SPLIT_JOINT('release-split-silent')],
+    copy: [ok('彎桿／多臂件', '複製或鏡射。', 'copy-arms-mirror')]
+  },
+
+  motor: {
+    select: [ok('點馬達軸心', '選到這顆馬達，顯示角度與安裝設定。')],
+    move: [
+      ok('未裝在任何零件上', '整顆馬達平移，靠近孔時吸附軸心。', 'move-free-motor'),
+      gap('已裝在座板上', '說明「馬達固定在座板第 N 孔，請用安裝設定換孔」，或提供換孔的拖法。',
+        '拖不動，沒有訊息。', 'input.js onNodeDown：pendingNodeDrag 為 null；moveNodeTo 對非自由馬達直接 return。',
+        {check: 'move-hosted-motor-silent', cause: SILENT_DRAG})
+    ],
+    resize: [na('馬達型號固定', '馬達沒有可調尺寸。')],
+    delete: [ok('獨立馬達', '馬達被刪除；裝在板上的孔位釋出。', 'del-motor-independent')],
+    connect: [
+      ok('未接的桿端拖到馬達軸', '接成這顆馬達的輸出桿。', 'connect-motor-output'),
+      ok('桿已接著別的零件', '拒絕並說「這支桿件已有其他連接，請先解除」。', 'connect-motor-refuse-message')
+    ],
+    release: [ok('裝在座板上', '用安裝設定改成「自動機架」即可離開座板。')],
+    copy: [na('目前不提供', '需要第二顆馬達請另外新增。')]
+  },
+
+  motorBar: {
+    select: [ok('點輸出桿', '選到輸出桿，顯示馬達與桿長設定。')],
+    move: [
+      ok('拖輸出桿的動端', '改變馬達角度（試動），桿長與連接不變。'),
+      ok('馬達軸心離開座板原孔（既存問題）', '圖上提示並提供「放回原孔」「讓馬達離開座板」。', 'offplate-detected')
+    ],
+    resize: [ok('改輸出桿長度', '軸心不動，另一端移動。', 'resize-motorbar-shaft-stays')],
+    delete: [
+      gap('刪除輸出桿', '馬達仍留在座板上，成為沒有輸出的獨立馬達；桿被刪除。',
+        '馬達跟著桿一起被刪掉（馬達資料記在桿件上）。',
+        'delete-part.js 直接移除該 comp；motor-release.js 的 planMotorRelease 已能先解除，但刪除沒有用它。', {check: 'del-motorbar-removes-motor', cause: MOTOR_ON_BAR})
+    ],
+    connect: [ok('桿已接著別的零件，再拖到馬達軸', '拒絕並說明。', 'connect-motor-refuse-message')],
+    release: [ok('輸出桿接在馬達軸上', '馬達與桿都保留，說明「已解除…可再接回」，可復原。', 'release-motor-ok')],
+    copy: [ok('複製輸出桿', '只複製桿件本體，不帶馬達（對話框已說明）。', 'copy-motorbar-plain')]
+  },
+
+  gear: {
+    select: [ok('點齒輪', '選到齒輪，顯示齒數與模數。')],
+    move: [ok('拖齒輪中心', '連同銷一起移動；已有接地夥伴時繞夥伴公轉，整對齒輪可一起平移。')],
+    resize: [ok('改齒數或模數', '整條嚙合鏈的模數同步，中心距保持嚙合。')],
+    delete: [
+      gap('齒輪與另一個齒輪／齒條嚙合', '說明「嚙合的另一個齒輪（或齒條）也一併刪除」，或只刪選到的一個。',
+        '整條嚙合鏈（含齒條）一起刪掉，沒有任何訊息。', 'gear-editor.js deleteGearChain：成功路徑只 pushUndo／rebuild，沒有 transient。', {cause: SILENT_DONE})
+    ],
+    connect: [ok('加入齒輪對、齒輪與齒條', '以嚙合關係連接，中心距自動對齊。')],
+    release: [
+      gap('兩個齒輪嚙合中', '提供「分開」讓兩個齒輪各自獨立。', '沒有分開指令，只能刪除整條嚙合鏈。',
+        'gear-editor.js、gear-reduction-ui.js 沒有任何移除 mesh 的路徑。', {cause: 'no-release-command'})
+    ],
+    copy: [na('目前不提供', '齒輪用「加入齒輪對」新增。')]
+  },
+
+  slider: {
+    select: [ok('點滑軌', '選到滑軌，顯示行程設定。')],
+    move: [ok('拖滑塊', '沿軌道移動；拖軌道端點改變位置。')],
+    resize: [ok('改行程、本體長、軌道偏移', '數字與把手同一個結果。')],
+    delete: [ok('滑軌連著桿', '滑軌被刪除，桿保留。', 'del-slider-ok')],
+    connect: [ok('把桿轉成滑軌／接到軌道', '接成滑塊，經過檢查。')],
+    release: [ok('桿接在滑軌上', '提供解除並說明結果。')],
+    copy: [na('目前不提供', '滑軌用「新增滑軌」。')]
+  },
+
+  syringe: {
+    select: [ok('點針筒', '開啟針筒設定面板。')],
+    move: [ok('拖針筒的把手', '把手以 1 mm 取整，放開才提交，精確位置用欄位。')],
+    resize: [ok('改行程、筒長', '針筒面板欄位與把手同一個結果。')],
+    delete: [
+      ok('在針筒面板按「刪除針筒」', '針筒被刪除，經過一致性檢查、可復原。'),
+      gap('選到針筒後按 Delete', '針筒被刪除，或說明請用面板的刪除鍵。',
+        '沒有反應也沒有訊息（針筒的選取只存在自己的面板裡，共用選取欄位全空）。',
+        'delete-part.js 不認識針筒；syringe-editor.js 的 selected 是區域變數，app.js selectModuleTarget 先清空選取再開面板。',
+        {check: 'del-syringe-key-silent', cause: NO_SELECT_FIELD})
+    ],
+    connect: [ok('在圖上選孔接推桿', '接好後可模擬，接不上時說明。')],
+    release: [ok('解除推桿連接', '先預覽，確認後解除；固定環與其他桿保留。', 'release-syringe-ok')],
+    copy: [na('目前不提供', '重複使用請另外新增針筒。')]
+  },
+
+  frameHole: {
+    select: [ok('點機架孔', '選到孔並開啟機架孔設定。')],
+    move: [ok('沿基準線拖機架孔', '拖曳以 1 mm 取整，欄位可輸入精確距離；兩者同一個結果。')],
+    resize: [na('孔沒有尺寸', '距離基準孔屬於「移動」。')],
+    delete: [
+      gap('選到固定孔後按 Delete', '刪除該孔，或說明請用面板的「刪除孔」。', '沒有反應也沒有訊息。', '同桿件：delete-part.js 沒有處理一般孔。',
+        {check: 'del-anchor-silent', cause: HOLE_TARGET}),
+      ok('在機架孔面板按「刪除孔」', '孔被刪除；孔上接著桿時拒絕並說明。')
+    ],
+    connect: [ok('桿端拖到機架孔', '接成固定的樞軸。', 'connect-refusal-message')],
+    release: [SPLIT_JOINT('release-split-silent')],
+    copy: [na('目前不提供', '機架孔用「新增固定孔」。')]
+  }
+};
+
+/** 攤平成 [{part, action, index, ...case}]，供測試與文件使用。 */
+export function listCases() {
+  const out = [];
+  for (const p of PARTS) for (const a of ACTIONS) (MATRIX[p.id]?.[a.id] || []).forEach((c, index) => out.push({part: p.id, action: a.id, index, ...c}));
+  return out;
+}
