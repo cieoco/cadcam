@@ -122,6 +122,7 @@ function follows(h, probe) {
 // A free tip and its preceding passive bar form a two-link arm. Keep the
 // upstream pin still and choose the elbow on the same side of the arm.
 function endArm(id) {
+  if (pointRefs(S.comps,id).length !== 1 || S.comps.some(c=>c.standardBlank?.mountHoles?.some(h=>h.id===id))) return null;
   const tip = looseBarRotation(S.comps, S.topo.params, id);
   if (!tip || tip.disk || pointIsGround(S.comps, tip.pivot.id)) return null;
   const refs = pointRefs(S.comps, tip.pivot.id);
