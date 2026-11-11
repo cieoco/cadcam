@@ -68,7 +68,7 @@ runEdit({name, target, plan}) →
 
 | 包 | 內容 | 驗收 | 狀態 |
 | --- | --- | --- | --- |
-| O0 對照表 | `operation-matrix.js`、`test/operation-matrix.mjs`：照現況填表（不改行為），列出所有 `gap` | 測試可重跑；gap 清單回報 |已完成（2026-11-11）：105 格，24 個 gap，見 §7 |
+| O0 對照表 | `operation-matrix.js`、`test/operation-matrix.mjs`：照現況填表（不改行為），列出所有 `gap` | 測試可重跑；gap 清單回報 | 已完成（2026-11-11）：105 格，24 個 gap，見 §7 |
 | O1 流程＋刪除 | `edit-pipeline.js`、`selection-target.js`；刪除搬到流程：選到孔可刪所屬零件、共用接點不猜、既有問題不擋、刪輸出桿保留馬達（先解除再刪）、不能刪時說明原因 | 使用者檔案 `test/fixtures/delete-blocked.json`；桌機／手機 | 待做 |
 | O2 解除與連接 | 解除馬達、解除針筒、合併接點／接孔、拆開接點搬到流程 | 同上；對照表該列歸零 | 待做 |
 | O3 移動與改尺寸 | 改尺寸（桿、板、L、彎桿）、移動自由件搬到流程；`drag-intent.js` 取代 `input.js` 的判斷順序 | 拖曳與數字同一結果；對照表該列歸零 | 待做 |
