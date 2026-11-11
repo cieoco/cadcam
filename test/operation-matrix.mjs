@@ -40,6 +40,7 @@ const {planDraggedMotorOutput}=await import(R+'motor-drop.js');
 const {localHoles}=await import('../js/core/local-holes.js');
 const {pointKeysFor}=await import(R+'part-types.js');
 const Rig=await import('./_drag-rig.mjs');
+const {commitMountingEdit}=await import(R+'mounting-review-ui.js');
 await loadIntegrity();await loadUnitStarts();
 
 // ------------------------------------------------------------------ works
@@ -108,6 +109,9 @@ const CHECKS={
   'offplate-detected':()=>{const w=blocked(),items=MR.offPlateMotors(w.comps);return items.length===1&&MR.offPlateMessage(items[0]).includes('請選');},
   // --- resize
   'resize-bar-ok':()=>{const w=blocked(),r=resizeOf(w,'Blank136','g',24);return r.ok&&Number.isFinite(r.params[comp(w,'Blank136').lenParam]);},
+  'resize-existing-problem-ok':()=>{const w=blocked(),c=comp(w,'Blank137'),r=resizeOf(w,'Blank137','g',w.params[c.lenParam]+8);load(w);let pushed=0;const said=[];
+    const done=commitMountingEdit(S,d=>{d.comps[d.comps.findIndex(x=>x.id===c.id)]=r.comp;Object.assign(d.params,r.params);},{pushUndo:()=>pushed++,notify:m=>said.push(m)});
+    return r.ok&&done&&pushed===1&&said.length===0&&S.topo.params[c.lenParam]===w.params[c.lenParam]+8;},
   'resize-plate-grow':()=>resizeOf(blocked(),'Blank133','g',48).ok,
   'resize-plate-lost-hole':()=>{const r=resizeOf(blocked(),'Blank133','g',16);return !r.ok&&/孔/.test(r.message)&&/解除/.test(r.message);},
   'resize-l-ok':()=>{const w=freeL();return resizeStandardBlank(w.comps[0],w.params,'g',w.params[w.comps[0].gParam]+16,{comps:w.comps}).ok;},

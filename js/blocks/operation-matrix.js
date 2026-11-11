@@ -70,7 +70,7 @@ export const MATRIX = {
       ok('未接或已接，改孔數（數字）', '桿變長或變短，相接的零件跟著孔移動。', 'resize-bar-ok'),
       ok('縮小會移除已被使用的孔', '拒絕並說明是哪一個孔被用到。', 'resize-plate-lost-hole'),
       ok('改完相連機構接不起來', '拒絕並說「孔距未修改：長度無法閉合」，作品不變。'),
-      ok('作品已有既存問題', '只擋這次新造成的問題。', 'gate-only-new')
+      ok('作品已有既存問題（馬達離開座板原孔），改的是不相干的桿', '只擋這次新造成的問題；舊問題不擋改尺寸（O3：commitMountingEdit 只在座板核對「新增失敗」時拒絕）。', 'resize-existing-problem-ok')
     ],
     delete: [
       ok('未接、作品沒有既存問題', '桿被刪除。', 'del-bar-free-ok'),

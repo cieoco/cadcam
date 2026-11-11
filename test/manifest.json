@@ -341,7 +341,8 @@
     "test/delete-pipeline.mjs",
     "test/release-connect-pipeline.mjs",
     "test/drag-feedback.mjs",
-    "test/drag-intent.mjs"
+    "test/drag-intent.mjs",
+    "test/resize-pipeline.mjs"
   ],
   "version": 1
 }
