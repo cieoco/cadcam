@@ -16,7 +16,11 @@ const flush=()=>{const p=[...rafs.values()];rafs.clear();p.forEach(f=>f());};
 const settle=()=>new Promise(r=>setTimeout(r,40));
 const noop=()=>{};
 const listeners=new Map();
-const svg={getBoundingClientRect:()=>({left:0,right:1000,top:0,bottom:1000}),querySelectorAll:()=>[],contains:()=>false,ownerDocument:{elementsFromPoint:()=>[]},
+// dom: what the fake page shows — `unused` ids render as faded idle holes (data-unused), `under` lists the parts under the pointer (elementsFromPoint order).
+export const dom={unused:new Set(),under:[]};
+export const partEl=id=>({getAttribute:k=>k==='data-link-id'||k==='data-pick-component'?id:null});
+const svg={getBoundingClientRect:()=>({left:0,right:1000,top:0,bottom:1000}),querySelectorAll:()=>[],contains:el=>dom.under.includes(el),ownerDocument:{elementsFromPoint:()=>dom.under},
+  querySelector:sel=>{const id=/data-id="([^"]+)"/.exec(sel)?.[1];return id&&sel.includes('data-unused')&&dom.unused.has(id)?{}:null;},
   addEventListener(type,fn,options){const l=listeners.get(type)||[];l.push({fn,capture:options===true||options?.capture===true});listeners.set(type,l);},setPointerCapture:noop,getScreenCTM:()=>({a:1,d:1,inverse:()=>({})})};
 function emit(type,id,x,y,target=noop,pointerType='mouse'){
   const ev={type,pointerId:id,pointerType,clientX:x,clientY:y,target:null,preventDefault:noop,stopPropagation(){this.stopped=true;},stopImmediatePropagation(){this.stopped=true;this.immediate=true;}};
@@ -25,8 +29,8 @@ function emit(type,id,x,y,target=noop,pointerType='mouse'){
   if(!ev.stopped)target(ev);
   if(!ev.stopped)for(const i of l.filter(i=>!i.capture)){i.fn(ev);if(ev.immediate)break;}
 }
-export const driveHooks={body:null,to:null};   // fake drive: body(c,g)->probe|null, to(id|probe,w)->truthy when the drive moved something
-export let msgs=[];let drive='none';export const setDrive=v=>{drive=v;};export const resetMsgs=()=>{msgs=[];};
+export const driveHooks={body:null,to:null,crank:null,solve:null};   // fake drive: body(c,g)->probe|null, to(id|probe,w)->truthy when the drive moved something
+export const crankTurns=[];export let msgs=[];let drive='none';export const setDrive=v=>{drive=v;};export const resetMsgs=()=>{msgs=[];};
 const snapshotStr=()=>JSON.stringify({comps:S.comps,params:S.topo.params,theta:S.theta,motorAngles:S.motorAngles});
 Input.init({selectLink:noop,selectTriangle:noop,svg,draw:noop,rebuild:noop,pause:noop,cancelMotorMode:noop,deselectLink:noop,
   worldFromEvent:e=>({x:e.clientX,y:e.clientY}),pointCoords:()=>Model.pointCoords(S.comps),mobilePrompt:()=>false,
@@ -35,7 +39,7 @@ Input.init({selectLink:noop,selectTriangle:noop,svg,draw:noop,rebuild:noop,pause
   pointIsGround:id=>Model.pointIsGround(S.comps,id),setSliderDetailRows:noop,openMobileEditPanel:noop,transient:m=>msgs.push(m),
   freeLinkForPoint:id=>Model.freeLinkForPoint(S.comps,id),freeTriangleForPoint:id=>Model.freeTriangleForPoint(S.comps,id),
   pinnedTriangleForPoint:id=>Model.pinnedTriangleForPoint(S.comps,id),lockedTriangleVertex:id=>Model.lockedTriangleVertex(S.comps,id),
-  fixedLinkFor:id=>Model.fixedLinkFor(S.comps,id),inputCrankMovingEnd:()=>null,driveState:()=>drive,
+  fixedLinkFor:id=>Model.fixedLinkFor(S.comps,id),inputCrankMovingEnd:id=>driveHooks.crank?driveHooks.crank(id):null,rotateInputCrankToPoint:(bar,w)=>{crankTurns.push([bar,w]);return true;},solvePinnedConstraints:(id,w)=>driveHooks.solve?driveHooks.solve(id,w):false,driveState:()=>drive,
   driveBody:(c,g)=>driveHooks.body?driveHooks.body(c,g):null,drivePointTo:(id,w)=>driveHooks.to?driveHooks.to(id,w):false});
 View.resetView();
 
@@ -49,4 +53,4 @@ export async function gesture(down,moves,pointerType='mouse',id=1){
   await settle();emit('pointerup',id,...(moves.at(-1)||[100,100]),noop,pointerType);return msgs.slice();
 }
 export function load(w){S.comps=structuredClone(w.comps);S.modules=structuredClone(w.modules||[]);S.topo={params:{...w.params},tracePoints:[],dimensions:[],loads:[]};S.fabrication=w.fabrication;S.mode='design';
-  S.selectedLinkId=S.selectedTriangleId=S.selectedNodeId=S.selectedSliderId=S.selectedGearId=null;S.dragId=null;S.dragLinkId=null;S.preDragSnap=null;msgs=[];}
+  S.selectedLinkId=S.selectedTriangleId=S.selectedNodeId=S.selectedSliderId=S.selectedGearId=null;S.dragId=null;S.dragLinkId=null;S.dragProbe=null;S.preDragSnap=null;msgs=[];dom.unused.clear();dom.under=[];Object.assign(driveHooks,{body:null,to:null,crank:null,solve:null});crankTurns.length=0;}

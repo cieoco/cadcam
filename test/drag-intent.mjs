@@ -14,7 +14,7 @@ import * as MR from '../js/blocks/motor-release.js';
 import {localHoles} from '../js/core/local-holes.js';
 import {fusionRoot,fusionAtPoint} from '../js/core/bar-fusion.js';
 import {dragIntent,blockedMessage} from '../js/blocks/drag-intent.js';
-import {gesture,load,bodyDown,nodeDown} from './_drag-rig.mjs';
+import {gesture,load,bodyDown,nodeDown,setDrive,dom,partEl,driveHooks,crankTurns} from './_drag-rig.mjs';
 await loadIntegrity();await loadUnitStarts();
 
 const FIX=new URL('./fixtures/',import.meta.url);
@@ -78,18 +78,10 @@ const ROWS=[
   ['馬達 座板上 軸心',released,'shaft',null,released.comps.find(c=>c.type==='motor').p1.id,{kind:'none',reason:'hosted-motor'}],
   ['合成桿 桿身',sixBar,'body',fusedRoot?.id,null,{kind:'none'}]
 ];
-// rows that need a live simulation are spec-only: the real result depends on drive-drag.js / the constraint solver
+// rows that need the live simulation run through the rig with fake drive / crank / constraint-solver hooks (see _drag-rig.mjs);
+// the only spec-only row left is the size handle: it lives in the dimension layer (data-dimension-handle), which input.js never receives.
 const SPEC=[
-  ['桿件 已接有動力且會跟著轉 桿身',{grab:'body'},{follows:true},{kind:'drive'}],
-  ['桿件 已接有動力且會跟著轉 孔',{grab:'hole'},{follows:true},{kind:'drive'}],
-  ['桿件 已接有動力但不會跟著轉 桿身',{grab:'body'},{follows:false},{kind:'none',reason:'body'}],
-  ['輸入桿 動端',{grab:'end'},{crank:true},{kind:'crank'}],
-  ['接點 有動力且會跟著轉',{grab:'end'},{follows:true},{kind:'drive'}],
-  ['接點 約束求解器能解',{grab:'end'},{solved:true},{kind:'move-node'}],
-  ['機架孔',{grab:'frame-hole'},{},{kind:'none'}],
-  ['尺寸把手',{grab:'handle'},{free:false},{kind:'resize-handle'}],
-  ['固定孔 即使有動力也不被拖走',{grab:'end'},{groundLocked:true,follows:true},{kind:'none'}],
-  ['獨立馬達 軸心自由',{grab:'shaft'},{free:true},{kind:'move-free'}]
+  ['尺寸把手（由尺寸層處理，input.js 收不到）',{grab:'handle'},{free:false},{kind:'resize-handle'}]
 ];
 const same=(a,b)=>a.kind===b.kind&&(a.reason||null)===(b.reason||null);
 for(const [label,w,grab,partId,pointId,expect] of ROWS){
@@ -103,4 +95,74 @@ for(const [label,w,grab,partId,pointId,expect] of ROWS){
 }
 for(const [label,target,ctx,expect] of SPEC)check(`[規格] ${label}`,same(dragIntent(target,ctx),expect),JSON.stringify(dragIntent(target,ctx)));
 check('every reason has a plain-language message and no internal ids',['body','hole','locked-vertex','hosted-motor','fused-hole','joined-corner','shared-fixed'].every(k=>{const m=blockedMessage(k,false);return m.length>8&&!/Blank|_H\d|P\d+s/.test(m)&&m!==blockedMessage('nope');}));
+
+// ---- 需要即時模擬的格：以假的試動／輸入角／約束求解器掛進真實 input.js
+{
+  const motorW={comps:[{id:'Motor',type:'motor',motorType:'n20',p1:{id:'M',type:'floating',x:12,y:8}}],params:{theta:0},modules:[]};
+  const frameBar=makeStandardBlank({kind:'bar',n:7});frameBar.comp.frameHole={u:0,centered:true};frameBar.comp.p1.type='fixed';
+  const frameW=blocks(frameBar);
+  const probe=()=>()=>({x:0,y:0});
+  const hole136=localHoles(blocked.comps.find(c=>c.id==='Blank136'))[0].id;
+  const moves=[[112,104],[150,130],[200,160]];
+  async function live(w,down,{drive=false,body=null,to=null,crank=null,solve=null}={}){
+    load(w);setDrive(drive?'ready':'none');const log=[];
+    driveHooks.body=body&&((c,g)=>body(c,g));driveHooks.to=to&&((t,p)=>{log.push(typeof t==='string'?'drive-id':'drive-probe');return to(t,p);});
+    driveHooks.crank=crank;driveHooks.solve=solve&&((id,p)=>{log.push('solve');return solve(id,p);});
+    crankTurns.length=0;const before=JSON.stringify(S.comps),pts=Model.pointCoords(S.comps);
+    const msgs=await gesture(down,moves);
+    const changed=JSON.stringify(S.comps)!==before;
+    const kind=crankTurns.length?'crank':log.some(x=>x.startsWith('drive'))?'drive':log.includes('solve')?'move-node':changed?'move-free':'none';
+    setDrive('none');return {kind,msgs,log,changed};
+  }
+  const rows=[
+    ['桿件 已接有動力且會跟著轉 桿身',await live(blocked,bodyDown('Blank136'),{drive:true,body:probe,to:()=>true}),{grab:'body'},{follows:true},{kind:'drive'}],
+    ['桿件 已接有動力且會跟著轉 孔',await live(blocked,nodeDown(hole136),{drive:true,to:()=>true}),{grab:'hole'},{follows:true},{kind:'drive'}],
+    ['桿件 已接有動力但不會跟著轉 桿身',await live(blocked,bodyDown('Blank136'),{drive:true,body:()=>null,to:()=>false}),{grab:'body'},{follows:false},{kind:'none',reason:'body'}],
+    ['輸入桿 動端',await live(blocked,nodeDown('P139s'),{crank:()=>({id:'crank'})}),{grab:'end'},{crank:true},{kind:'crank'}],
+    ['接點 有動力且會跟著轉',await live(blocked,nodeDown('P139s'),{drive:true,to:()=>true}),{grab:'end'},{follows:true},{kind:'drive'}],
+    ['接點 約束求解器能解',await live(blocked,nodeDown('Blank133.C'),{solve:()=>true}),{grab:'end'},{solved:true},{kind:'move-node'}],
+    ['固定孔 即使有動力也不被拖走',await live(blocked,nodeDown('Blank133.A'),{drive:true,to:()=>true}),{grab:'end'},{groundLocked:true,follows:true},{kind:'none'}],
+    ['獨立馬達 軸心自由',await live(motorW,nodeDown('M')),{grab:'shaft'},{free:true},{kind:'move-free'}],
+    ['機架孔',await live(frameW,nodeDown(frameBar.comp.p1.id),{drive:true,to:()=>true}),{grab:'frame-hole'},{},{kind:'none'}]
+  ];
+  for(const [label,seen,target,ctx,expect] of rows){
+    const got=dragIntent(target,ctx);
+    check(`[即時] ${label}：dragIntent 預測 ${expect.kind}${expect.reason?'/'+expect.reason:''}`,same(got,expect),JSON.stringify(got));
+    check(`[即時] ${label}：真實 input.js 的結果一致（${seen.kind}）`,seen.kind===expect.kind,`observed ${seen.kind} ${seen.log.join(',')}`);
+    if(expect.kind==='none'&&expect.reason)check(`[即時] ${label}：說明＝${expect.reason}`,seen.msgs.length===1&&seen.msgs[0]===blockedMessage(expect.reason,true),seen.msgs.join('|'));
+    else check(`[即時] ${label}：沒有說明文字`,seen.msgs.length===0,seen.msgs.join('|'));
+  }
+}
+
+// ---- 手機／桌機：會動的零件優先於底下固定板沒用到的孔（O3b step 1）
+{
+  const plate=makeStandardBlank({kind:'plate',n:1}),bar=makeStandardBlank({kind:'bar',n:2});
+  plate.comp.p1.type=plate.comp.p2.type='fixed';
+  const w=blocks(plate,bar),hole=localHoles(plate.comp)[1].id,GROUND=blockedMessage('ground',false);
+  const moves=[[112,104],[150,130],[200,160]],barId=bar.comp.id,plateId=plate.comp.id;
+  const rig=({unused=true,under=[barId,plateId],drive=false}={})=>{load(w);dom.unused.clear();if(unused)dom.unused.add(hole);dom.under=under.map(partEl);setDrive(drive?'ready':'none');};
+  const barPts=()=>Model.pointCoords(S.comps);
+  const delta=(a,b,ids)=>ids.map(k=>[b[k].x-a[k].x,b[k].y-a[k].y]);
+  // 自由件在底下：抓住它搬動，固定板不動
+  rig();let a=barPts(),m=await gesture(nodeDown(hole),moves),b=barPts();
+  const dBar=delta(a,b,[bar.comp.p1.id,bar.comp.p2.id]);
+  check('[over] 自由件在空孔底下：整件跟著手指搬',dBar.every(d=>Math.hypot(d[0]-100,d[1]-60)<1e-6),JSON.stringify(dBar));
+  check('[over] 固定板沒有動、沒有誤說「固定板」',delta(a,b,[plate.comp.p1.id,plate.comp.p2.id]).every(d=>!d[0]&&!d[1])&&m.length===0,m.join('|'));
+  // 只點一下：照舊選取那個孔，不動任何東西
+  rig();a=JSON.stringify(S.comps);m=await gesture(nodeDown(hole),[]);
+  check('[over] 只點一下：照舊選取孔、不動、不說話',JSON.stringify(S.comps)===a&&S.selectedNodeId===hole&&m.length===0);
+  // 底下是會隨馬達試動的零件：走試動，不拖空孔
+  const pinned={...w,comps:w.comps.map(c=>c.id===barId?{...c,p1:{...c.p1,type:'fixed'}}:c)};   // 一端接固定孔的搖桿：不是自由件
+  rig({drive:true});load(pinned);dom.unused.add(hole);dom.under=[partEl(barId),partEl(plateId)];setDrive('ready');const driven=[];driveHooks.body=(c,g)=>c.id===barId?(()=>({x:0,y:0})):null;driveHooks.to=(t,pt)=>{driven.push([typeof t,S.dragId]);return true;};
+  a=JSON.stringify(S.comps);m=await gesture(nodeDown(hole),moves);
+  check('[over] 底下的零件跟著馬達：試動（不是拖空孔）',driven.length>0&&driven.every(x=>x[0]==='function'&&x[1]!==hole)&&m.length===0,JSON.stringify(driven));
+  // 孔有在用、上面沒有東西、上面只有別的固定板、上面的零件帶不動：維持今天的行為（說這是固定板的孔）
+  for(const [label,opts] of [['孔有在用（不是空孔）',{unused:false}],['孔上面沒有別的零件',{under:[plateId]}],['上面只有另一個固定零件',{under:['Other',plateId]}]]){
+    rig(opts);a=JSON.stringify(S.comps);m=await gesture(nodeDown(hole),moves);
+    check(`[over] ${label}：維持原樣，說明固定板、作品不變`,m.length===1&&m[0]===GROUND&&JSON.stringify(S.comps)===a,m.join('|'));
+  }
+  rig();load(pinned);dom.unused.add(hole);dom.under=[partEl(barId),partEl(plateId)];
+  a=JSON.stringify(S.comps);m=await gesture(nodeDown(hole),moves);
+  check('[over] 上面的零件自己被固定、也帶不動：維持原樣說明固定板',m.length===1&&m[0]===GROUND&&JSON.stringify(S.comps)===a,m.join('|'));
+}
 report('drag-intent');

@@ -1,7 +1,7 @@
 /**
  * blocks / drag-intent  (pack O3 of docs/SDD-OPERATION-PIPELINE.md §3.4)
  *
- * 按需載入（input.js 只在「拖不動、且指標真的移動過門檻」時才動態載入）：拖曳說不動時的白話說明。
+ * input.js 靜態載入：「這一拖是什麼意思」的判斷順序，以及拖不動時的白話說明。
  * 純資料／純函式，不碰 DOM。
  */
 const NO_DRIVE = '，或裝上馬達後拖曳試動。', WITH_DRIVE = '；現在馬達也帶不動它，請先把機構接好（沒接的那一端接上固定孔或其他零件），再拖曳試動。';
@@ -23,13 +23,14 @@ export function blockedMessage(kind, drive = false) {
 
 /**
  * 「這一拖是什麼意思？」的判斷順序（把 input.js 散在 startFreeLinkDrag／onNodeDown／moveNodeTo 的旗標檢查寫在一處）。
- * 純函式、無 DOM；input.js 因啟動大小限制不靜態載入它，只在拖不動時用 blockedMessage 說明；
- * test/drag-intent.mjs 以真實的 input.js 行為逐格對照，這個函式是規格。
+ * 純函式、無 DOM；input.js 在按下與每次移動時，把能同步知道的事實組成 context 交給它，再執行它的結論；
+ * test/drag-intent.mjs 以真實的 input.js 行為逐格對照。
  *
  *   dragIntent(target, context) -> {kind, reason?}
  *   target.grab  'body'（桿身／板面）｜'end'（桿端、板的頂點）｜'hole'（板上或桿上的局部孔）｜'shaft'（獨立馬達軸心）｜'frame-hole'（機架孔）｜'handle'（尺寸把手）
- *   context      {free 零件是自由件（桿身／孔：isFreeBody；桿端／頂點：freeLinkForPoint／freeTriangleForPoint）, solved 剛體旋轉或約束求解器能解, joinedCorner／sharedFixed 與 input.js 的兩句提示對應, fused 合成零件／合成孔, follows 作品有動力且這一點會隨輸入角動, crank 這是輸入桿的動端,
- *                 groundLocked 固定孔位置未解鎖, lockedVertex 三點桿頂點已被完全決定}
+ *   context      {free 零件是自由件（桿身／孔：isFreeBody；桿端／頂點：freeLinkForPoint／freeTriangleForPoint）, solved 剛體旋轉、齒輪中心或約束求解器能解（求解器要試過才知道，見 input.js moveNodeTo）, joinedCorner／sharedFixed 與 input.js 的兩句提示對應, fused 合成零件／合成孔, follows 作品有動力且這一點會隨輸入角動, crank 這是輸入桿的動端,
+ *                 groundLocked 固定孔位置未解鎖, lockedVertex 三點桿頂點已被完全決定,
+ *                 groundPart 這個孔屬於兩端都固定的零件（固定板）, over {free} 固定板上沒用到的孔，底下有會動的零件（free＝自由件，否則隨馬達試動）}
  *   kind         'drive' 試動｜'move-free' 整件平移｜'move-node' 拖接點（含圓規旋轉、剛體旋轉、齒輪公轉等）｜'resize-handle' 改尺寸把手｜'crank' 轉輸入角｜'none' 不動
  *   reason       kind 為 'none' 時，對應 blockedMessage 的 kind；沒有 reason＝另有專屬回饋（機架面板、合成說明已在別處）
  */
@@ -39,6 +40,7 @@ export function dragIntent(target, context = {}) {
   if (grab === 'frame-hole') return {kind: 'none'};                       // 機架孔由機架面板的專用把手處理
   if (grab === 'shaft') return c.free ? {kind: 'move-free'} : {kind: 'none', reason: 'hosted-motor'};
   if (c.fused) return grab === 'body' ? {kind: 'none'} : {kind: 'none', reason: 'fused-hole'};
+  if (grab === 'hole' && c.over) return c.over.free ? {kind: 'move-free'} : {kind: 'drive'};   // 固定板上沒用到的孔，底下有會動的零件：抓的是那個零件
   if (grab === 'body') {
     if (c.free) return {kind: 'move-free'};
     return c.follows ? {kind: 'drive'} : {kind: 'none', reason: 'body'};
@@ -47,7 +49,7 @@ export function dragIntent(target, context = {}) {
   if (grab === 'hole' && c.free) return {kind: 'move-free'};              // 自由件的局部孔＝抓著孔搬整件
   if (c.crank) return {kind: 'crank'};
   if (c.follows) return {kind: 'drive'};
-  if (grab === 'hole') return {kind: 'none', reason: 'hole'};
+  if (grab === 'hole') return {kind: 'none', reason: c.groundPart ? 'ground' : 'hole'};
   if (c.free) return {kind: 'move-free'};                                  // 自由桿／自由三點桿：拖任一點＝整件平移
   if (c.solved) return {kind: 'move-node'};                               // 剛體旋轉（單一固定頂點的三點桿、桿端繞另一端）或約束求解器能解
   if (c.joinedCorner) return {kind: 'none', reason: 'joined-corner'};

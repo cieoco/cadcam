@@ -14,7 +14,8 @@ import {fusionRoot,fusionAtPoint} from '../core/bar-fusion.js';
  */
 
 import { S } from './state.js';
-import {rotateLooseBarEnd,pointRotation,isFreeBody,holeJoined} from './model.js';
+import {rotateLooseBarEnd,looseBarRotation,pointRotation,isFreeBody,holeJoined} from './model.js';
+import {dragIntent} from './drag-intent.js';
 import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 import * as View from './view.js';
 import * as Tools from './tools.js';
@@ -60,12 +61,15 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, select
     driveState = () => 'none';
 
 export function startFreeLinkDrag(e, linkId) {
-  if(fusionRoot(S.comps,linkId))return false;
-  const c = S.comps.find(x => x.id === linkId && isFreeBody(S.comps,x,S.modules));
+  const fused = !!fusionRoot(S.comps,linkId);
+  const c = fused ? null : S.comps.find(x => x.id === linkId && isFreeBody(S.comps,x,S.modules));
   const w = worldFromEvent(e);
   // 有動力的機構：拖桿身＝試動
-  const probe = !c && w && driveBody(S.comps.find(x => x.id === linkId), w);
-  if (!(c || probe) || !w) { if (w && !c) dragBlocked(e, 'body'); return false; }
+  const probe = !fused && !c && w && driveBody(S.comps.find(x => x.id === linkId), w);
+  // 「這一拖是什麼意思」交給 drag-intent.js；這裡只執行它的結論。
+  const intent = dragIntent({grab:'body'}, {fused, free:!!c, follows:!!probe});
+  if (intent.kind === 'none') { if (w && intent.reason) dragBlocked(e, intent.reason); return false; }
+  if (!w) return false;
   S.dragProbe = probe || null;
   if (probe && !probe.tip) dragBlocked(e, 'body');
   S.preDragSnap = snapshotStr(); // 整段拖曳合併成一筆 undo
@@ -145,14 +149,43 @@ export function onNodeDown(e, id) {
   Panels.updateRoleEditor();
   S.dragId = null; S.snapTarget = null;
   const localBody=motorBody||S.comps.find(c=>localHoles(c).some(h=>h.id===id));
-  pendingNodeDrag = localBody && !fusionRoot(S.comps,localBody.id) && (isFreeBody(S.comps,localBody,S.modules) || (localBody.type==='bar' && worldFromEvent(e) && driveBody(localBody,worldFromEvent(e))?.tip))
-    ? {id,bodyId:localBody.id,event:e,x:e.clientX,y:e.clientY,pointerType:e.pointerType || 'mouse'}
-    : motorBody || S.comps.some(c=>c.frameHole&&c.p1.id===id) || fusionAtPoint(S.comps,id) || (pointIsGround(id) && !isGroundPositionUnlocked(id)) ? null : {
-    id, x:e.clientX, y:e.clientY, pointerType:e.pointerType || 'mouse'
-  };
-  if (!pendingNodeDrag) { if (motorBody) dragBlocked(e, 'hosted-motor'); else if (fusionAtPoint(S.comps,id)) dragBlocked(e, 'fused-hole'); }
+  const w0=worldFromEvent(e), pointer={x:e.clientX,y:e.clientY,pointerType:e.pointerType || 'mouse'};
+  // 這一抓是什麼意思：把按下當下能同步知道的事實交給 drag-intent.js，這裡只執行它的結論。
+  const grab=motorBody?'shaft':S.comps.some(c=>c.frameHole&&c.p1.id===id)?'frame-hole':localBody?'hole':'end';
+  const bodyFused=!!localBody&&!!fusionRoot(S.comps,localBody.id);
+  const bodyFree=!!localBody&&!bodyFused&&isFreeBody(S.comps,localBody,S.modules);
+  const tip=localBody&&!bodyFree&&!bodyFused&&localBody.type==='bar'&&w0&&driveBody(localBody,w0)?.tip;   // 沒有動力來源也能拉的彎臂端
+  const over=idleHoleOfGroundPart(id,localBody)?movingPartUnder(e,localBody,w0):null;               // 固定板上沒用到的孔，底下有會動的零件
+  const intent=dragIntent({grab},{
+    free:grab==='end'?!!((freeLinkForPoint&&freeLinkForPoint(id))||(freeTriangleForPoint&&freeTriangleForPoint(id))):bodyFree,
+    fused:!!fusionAtPoint(S.comps,id),
+    groundLocked:grab!=='shaft'&&pointIsGround(id)&&!isGroundPositionUnlocked(id),
+    groundPart:grab==='hole'&&localBody.p1?.type==='fixed'&&localBody.p2?.type==='fixed',
+    follows:driveState()!=='none'||!!tip,
+    over:over&&{free:over.free}});
+  const asBody=grab!=='end'&&(intent.kind==='move-free'||(intent.kind==='drive'&&(tip||over)));
+  pendingNodeDrag = intent.kind==='none' ? null
+    : asBody ? {id,bodyId:over?.part.id||localBody.id,event:e,...pointer}
+    : {id,...pointer};
+  if (!pendingNodeDrag && intent.reason) dragBlocked(e, intent.reason);
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
   draw();
+}
+/** 手指／指標落在固定板（機架）沒用到的格孔上，且那一點底下另有會動的零件：抓的是底下的零件，不是空孔。 */
+function idleHoleOfGroundPart(id, owner) {
+  return !!owner && owner.p1?.type === 'fixed' && owner.p2?.type === 'fixed' && !!svg.querySelector?.(`[data-unused][data-id="${id}"]`);
+}
+function movingPartUnder(e, owner, w) {
+  if (!w) return null;
+  for (const el of svg.ownerDocument?.elementsFromPoint?.(e.clientX, e.clientY) || []) {
+    if (!svg.contains(el)) continue;
+    const pid = el.getAttribute?.('data-link-id') || el.getAttribute?.('data-pick-component');
+    const part = pid && S.comps.find(c => c.id === pid);
+    if (!part || part === owner || fusionRoot(S.comps, part.id) || (part.p1?.type === 'fixed' && part.p2?.type === 'fixed')) continue;
+    if (isFreeBody(S.comps, part, S.modules)) return {part, free: true};
+    if (driveBody(part, w)) return {part, free: false};
+  }
+  return null;
 }
 function onDragMove(e) {
   if (pinchActive) return;
@@ -226,31 +259,42 @@ function onDragMove(e) {
 }
 /** Numeric coordinates and dragging share rigid-body and joint constraints. */
 export function moveNodeTo(id,w,{snap=true}={}) {
-  if (pointIsRackHole(id)||S.comps.some(c=>c.frameHole&&c.p1.id===id)) return;
+  if ((pointIsRackHole(id)||S.comps.some(c=>c.frameHole&&c.p1.id===id)) && dragIntent({grab:'frame-hole'}).kind==='none') return;   // 機架孔由機架面板處理
   const motor=S.comps.find(c=>c.type==='motor'&&c.p1?.id===id);
-  if(motor){if(isFreeBody(S.comps,motor,S.modules)){updatePointCoordsById(id,w.x,w.y);S.snapTarget=null;redrawAfterDrag();}return;}
-  // 拖輸入桿的動端直接調整馬達角度。
-  const crankBar = inputCrankMovingEnd(id);
-  if (crankBar) {
+  if(motor){if(dragIntent({grab:'shaft'},{free:isFreeBody(S.comps,motor,S.modules)}).kind==='move-free'){updatePointCoordsById(id,w.x,w.y);S.snapTarget=null;redrawAfterDrag();}return;}
+  // 「這一拖是什麼意思」交給 drag-intent.js；能同步知道的事實在這裡收集，求解器要試過才知道（見下方 solvePinnedConstraints）。
+  const crankBar = inputCrankMovingEnd(id);   // 拖輸入桿的動端直接調整馬達角度
+  const driven = crankBar ? false : drivePointTo(id,w);   // 有動力時拖接點或孔＝試動；孔不單獨移動
+  const head = dragIntent({grab:'end'}, {crank:!!crankBar, follows:!!driven});
+  if (head.kind === 'crank') {
     if (rotateInputCrankToPoint(crankBar,w)) { rebuild(); recordManualTrace(); draw(); }
     return;
   }
-  // 有動力時拖接點或孔＝試動；孔不單獨移動
-  const driven = drivePointTo(id,w);
-  if (driven) {
+  if (head.kind === 'drive') {
     redrawAfterDrag();
     S.snapTarget = driven === 'tip' && snap ? nearestDisplayTo(id) : null;
     if (S.snapTarget) draw();
     return;
   }
-  const o=S.comps.find(c=>localHoles(c).some(h=>h.id===id)&&!isFreeBody(S.comps,c,S.modules));
-  if(o){if(S.dragId)explainDrag(o.p1.type+o.p2.type=='fixedfixed'?'ground':'hole');return;}
+  const owner=S.comps.find(c=>localHoles(c).some(h=>h.id===id)&&!isFreeBody(S.comps,c,S.modules));
+  const gear = S.comps.find(c => c.type === 'gear' && c.p1 && c.p1.id === id && c.p2);
+  const freeLink = freeLinkForPoint(id), freeTri = freeTriangleForPoint && freeTriangleForPoint(id);
+  const pinTri = freeTriangleForPoint && pinnedTriangleForPoint && pinnedTriangleForPoint(id);
+  const context = {
+    groundPart:!!owner&&owner.p1.type+owner.p2.type=='fixedfixed',
+    free:!owner&&!gear&&!!(freeLink||freeTri), solved:!!(gear||pinTri||looseBarRotation(S.comps,S.topo.params,id)),
+    joinedCorner:S.comps.some(c => ['p1', 'p2', 'p3'].some(k => c[k]?.id === id) && holeJoined(S.comps, c)),
+    lockedVertex:!!(lockedTriangleVertex && lockedTriangleVertex(id)),
+    sharedFixed:!pointIsGround(id)&&S.comps.filter(comp => comp.type === 'bar' && comp.fixedLen && comp.p1 && comp.p2 && (comp.p1.id === id || comp.p2.id === id)).length>1
+  };
+  const intent = dragIntent({grab:owner?'hole':'end'}, context);
+  if (intent.kind === 'none' && (intent.reason === 'hole' || intent.reason === 'ground')) { if(S.dragId)explainDrag(intent.reason); return; }
   // Only world-frame holes snap. Floating joints are motion constraints and
   // must never be quantized to the 8 mm reference grid during editing.
   const dragTarget = snap && pointIsGround(id) ? snapFramePoint(w) : w;
   // 齒輪中心連同銷移動；已接地的夥伴當公轉中心，浮動夥伴一起平移。
-  const gearForCenter = S.comps.find(c => c.type === 'gear' && c.p1 && c.p1.id === id);
-  if (gearForCenter && gearForCenter.p2) {
+  const gearForCenter = gear;
+  if (gearForCenter) {
     const pc = pointCoords();
     const cur = pc[id] || { x: gearForCenter.p1.x || 0, y: gearForCenter.p1.y || 0 };
     const partner = S.comps.find(p => p.type === 'gear' && p !== gearForCenter &&
@@ -277,7 +321,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
   }
   let tx = dragTarget.x, ty = dragTarget.y;
   // 自由連桿：兩端都未固定、也沒接到別的桿時，拖端點等於整根平移。
-  const free = freeLinkForPoint(id);
+  const free = freeLink;
   if (free) {
     const p = pointCoords()[id];
     const desired = { x: w.x, y: w.y };
@@ -290,7 +334,6 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     return;
   }
   // 自由三點桿：三頂點都沒接到別處時是自由剛體，拖任一頂點＝整個三角平移（三邊長不變，不變形）。
-  const freeTri = freeTriangleForPoint && freeTriangleForPoint(id);
   if (freeTri) {
     const p = pointCoords()[id];
     const dx = w.x - (p?.x || 0);
@@ -303,7 +346,6 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     return;
   }
   // 一頂點固定的三點桿：整個三角繞固定頂點剛性旋轉（拖的頂點沿其半徑圓走，第三點同步轉），三邊長不變。
-  const pinTri = freeTriangleForPoint && pinnedTriangleForPoint && pinnedTriangleForPoint(id);
   if (pinTri) {
     const pc = pointCoords();
     const f = pc[pinTri.pivot.id];
@@ -334,17 +376,9 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     redrawAfterDrag();
     return;
   }
-  if (S.comps.some(c => ['p1', 'p2', 'p3'].some(k => c[k]?.id === id) && holeJoined(S.comps, c))) { if (S.dragId) explainDrag('joined-corner'); return; }
-  // 三點桿自由頂點，但另兩頂點都被機構牽制（≥2 樞紐）：此頂點被剛體完全決定，
-  // 自由拖會破壞三角剛性 → 鎖住不動（要移動請拖牽制較少的接點，或加馬達驅動機構）。
-  if (lockedTriangleVertex && lockedTriangleVertex(id)) { if (S.dragId) explainDrag('locked-vertex'); return; }
-  const sharedFixedBars = !pointIsGround(id) ? S.comps.filter(comp =>
-    comp.type === 'bar' && comp.fixedLen && comp.p1 && comp.p2 &&
-    (comp.p1.id === id || comp.p2.id === id)) : [];
-  if (sharedFixedBars.length > 1) {
-    if (S.dragId) explainDrag('shared-fixed');
-    return;
-  }
+  // 以上都做不到才看拒絕理由（接在孔上的角、被剛體完全決定的三點桿頂點、多桿共用固定長度的接點）。
+  const refused = dragIntent({grab:'end'}, {...context, free:false, solved:false});
+  if (refused.kind === 'none') { if (S.dragId && refused.reason) explainDrag(refused.reason); return; }
   // 固定長度連桿：已有約束時，拖端點繞另一端以固定半徑旋轉（圓規），長度不變
   const fl = fixedLinkFor(id);
   if (fl) {
