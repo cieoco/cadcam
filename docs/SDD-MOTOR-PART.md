@@ -1,7 +1,7 @@
 # SDD — 馬達是獨立零件（O5 規格，待使用者確認後才施工）
 
 日期：2026-11-11（Asia/Taipei）
-狀態：使用者 2026-11-12 同意存檔形狀可改（不必保留舊版相容，但**舊檔仍須能開啟**，由轉換器轉換）。**M0 完成（2026-11-12，純轉換器與測試，app 尚未使用）**；M1 起待排程。
+狀態：使用者 2026-11-12 同意存檔形狀可改（不必保留舊版相容，但**舊檔仍須能開啟**，由轉換器轉換）。**M0 完成（2026-11-12，純轉換器與測試，app 尚未使用）**；**M1 完成（2026-11-12，動作在新形狀上計畫，讀取端與存檔不變；待審查與桌機／手機驗收）**；M2 起待排程。
 
 ## 0. 一句話
 
@@ -45,7 +45,7 @@
 | 包 | 內容 | 驗收 |
 | --- | --- | --- |
 | M0 | 純轉換器 `motor-part.js`：舊→新、新→求解用的推導；對所有內建範例與使用者 fixture 做「轉換前後求解逐點相同」的測試。不接進程式 | Node 測試；零行為改變 |
-| M1 | **動作在新形狀上計畫**（2026-11-12 修訂）：共用動作流程 `runEdit` 增加 `shape:'parts'`——計畫前把作品轉成馬達零件形狀、計畫後轉回現行形狀再套用。刪除、複製／鏡射、分開接點、解除／放回／留在原處馬達改在新形狀上寫，移除各自的馬達特例。讀取端（求解、繪製、匯出、3D，約 90 個檔案、上千處）**不動** | 對照表馬達列；既有全套 Node 與瀏覽器測試與基準相同；桌機與手機驗收 |
+| M1（完成，待驗收） | **動作在新形狀上計畫**（2026-11-12 修訂）：共用動作流程 `runEdit` 增加 `shape:'parts'`——計畫前把作品轉成馬達零件形狀、計畫後轉回現行形狀再套用。刪除、複製／鏡射、分開接點、解除／放回／留在原處馬達改在新形狀上寫，移除各自的馬達特例。讀取端（求解、繪製、匯出、3D，約 90 個檔案、上千處）**不動** | 對照表馬達列；既有全套 Node 與瀏覽器測試與基準相同；桌機與手機驗收 |
 | M2 | **存檔用新形狀**：存檔與分享寫馬達零件形狀＋`requires` 標記；開檔（新舊皆可）一律轉成現行記憶體形狀。內建範例資料維持現狀（開啟時經同一轉換） | 存檔重開、舊檔開啟、分享連結；匯出比對 |
 | M3 | （延後，不在這一輪）讀取端逐步改讀馬達零件、記憶體形狀切換、刪除舊欄位。規模大、對使用者沒有可見差異，等有需要再排 | — |
 
@@ -92,3 +92,30 @@
 **涵蓋**：78 個作品（71 內建範例含延遲載入的單元起點、5 個 fixture、2 個合成：由 `planMotorRelease` 解出的獨立馬達、手寫的 mg995 獨立馬達）、59 顆馬達、24 個無馬達作品，共 996 次掃描（每顆馬達 12 個角度，原始 vs `toLegacy(toMotorParts(·))` 的編譯＋求解逐點相同）。個案：座板＋輸出桿 22、齒輪輸出 17（皮帶輪 3、凸輪 1）、mg995 18、世界機架 28、騎乘馬達 1（competition-fourbar-lift）、單作品多馬達 5、軸心離開座板 2（motor-off-plate、delete-blocked，不一致被保留而非修正）、未接輸出的獨立馬達 2。
 
 **給 M1 的注意**：(a) 內建範例**沒有**舊式獨立馬達（`type:'motor'`），獨立馬達只出現在合成案例，M1 的瀏覽器驗收要手動放一顆；(b) `compileTopology` 不讀 `phaseOffset`（App 的馬達運動模組讀），所以求解相同不能證明相位正確，相位靠 `deepEqual` 與 `motorFacts` 對照 `motorRecords`；(c) 驅動件馬達的 `p1.x/y` 是輸出件軸心點的**副本**，`toLegacy` 不回寫座標，M2 改寫入端時要決定誰是權威（建議馬達零件）；(d) 載入圖（`js/load-graph.*` 與各 html）已重新產生。
+
+## 9. M1 結果（2026-11-12）
+
+**做了什麼**：`runEdit` 增加 `shape:'parts'`（`edit-pipeline.js` 檔頭有說明）：計畫前 `toMotorParts`、計畫成功後 `toLegacy`，之後的檢查、確認、提交、復原都在今日形狀上，行為與沒有 `shape` 時相同；拒絕、`unchanged`、例外不會轉回任何東西；沒登記的 shape 一律拒絕並說一句話。轉換器由新檔 `plan-shape.js` 登記（`motor-part.js` 約 13 KB，不放進啟動路徑；`edit-pipeline.js` 只多約 1.8 KB，啟動 2,189,553 → 2,191,426 bytes，上限 2,200,000）。
+
+**搬到新形狀上的動作與移除的馬達特例**
+
+| 動作 | 檔案 | 移除／改變 |
+| --- | --- | --- |
+| 刪除 | `delete-part.js` | 不再先呼叫 `planMotorRelease`、不再判斷輸出桿的 `isInput／motorMount／physicalMotor`、不再讀 `motorMount.frameBody` 來寫提示；刪輸出件＝刪零件＋`freeMotor`（清 `drives`）；訊息與舊版逐字相同 |
+| 刪除（座板／承載件被刪） | `detached-attachments.js` | 新增馬達零件分支（結果與舊的今日形狀分支相同）；舊分支保留，因為 `test/independent-motors.mjs` 直接呼叫它 |
+| 刪除齒輪 | `gear-plan.js` | 「裝在它上面的馬達設定也一起移除」改由馬達零件（`drives.body`）判斷並一起刪除，不再讀 `p1.physicalMotor` |
+| 複製／鏡射 | `member-copy.js` | `hadMotor` 移除，提示由馬達零件判斷；副本本來就不帶馬達零件。`planMemberCopy` 內剝除馬達欄位的清單**保留**（對話框預覽與 `test/operation-matrix.mjs` 的 `copy-motorbar-plain` 直接用今日形狀呼叫它） |
+| 解除輸出、放回座板原孔、離開座板 | `motor-release.js`（新增 `pose-freeze.js`） | `planMotorInstallation` 的「解除」改成 `freeMotor`（清 `drives`、軸心留在畫面位置、補齊安裝記錄、座板記下座孔、相連零件先記下目前姿勢，姿勢步驟抽出共用）；放回／離開改成直接改馬達零件的 `p1`／`mount`。`planMotorRelease／Return／Leave` 仍是今日形狀進出的包裝（測試與修復項目用） |
+| `planSplit`／`planMerge` | `connect-ops.js` | 本來就沒有馬達特例，沒動 |
+
+`planMotorInstallation`（安裝面板的「解除」路徑）沒動；`planActuatorPlateHoles` 等讀取端沿用今日形狀，由 `plan-shape.js` 的 `settlePlateHoles` 以「轉成今日形狀的投影」計算，只把它改到的板件孔資料放回新形狀。
+
+**冗餘副本處理**（§8 的三項）：馬達零件沒被動到時，輸出件上的馬達欄位、軸心點副本、零件層 `physicalMotor`、鍵順序都照計畫前原樣放回（`plan-shape.js` 的 `leaveParts`），所以不碰馬達的動作不會讓馬達資料漂移（`test/motor-part-plans.mjs` e 在全部 76 個有／無馬達的作品上驗證）。只有「被解除輸出的馬達」會清掉軸心上的副本（舊的解除也這樣）；軸心換 id（離開座板）時副本跟著新 id。
+
+**與舊規劃函式的資料差異**（`test/fixtures/motor-plan-expected.json` 記錄了舊規劃函式在全部內建範例與 fixture 上的結果雜湊，327 個案例，新結果須相同；比對時排除下列兩項）：
+1. 解除後新獨立馬達的零件編號：舊為 `Motor<計數>`，新為 `Motor.<軸心點 id>`（M0 的編號規則）；零件順序：舊放在最後，新留在輸出件原位置。學生看不到。
+2. 舊版對 `tipping-bucket`、`unit7-start` 的 `Drive`（馬達掛在不含該軸心的承載桿上）解除或刪除輸出桿會拒絕（「請先在畫布放置馬達…」），新版可完成：承載件上沒有該孔時不在承載件寫 `motorMountPoint`。
+
+**仍在今日形狀上**：`planReleaseMesh`（分開咬合，讀 `g.p1.physicalMotor` 判斷是否仍有驅動）、`offPlateMotors`／`attachedGroup`（整合修復項目與安裝面板用）、`planMotorInstallation`（安裝）、`planMemberCopy` 的剝除清單、`detachDeletedAttachments` 的舊分支、移動／縮放／合成／鏡射以外的所有讀取端。原因：呼叫端仍有直接用今日形狀呼叫的地方，或不屬於這一包的動作；M2 之後再處理。
+
+**驗證**：`test/edit-pipeline.mjs`（轉換一次進一次出、拒絕不轉回、什麼都不做的計畫在 5 個 fixture 上往返逐點相等）、`test/motor-part-plans.mjs`（刪輸出件 34、刪馬達 57、複製 34、記錄比對 327、無漂移 76）；既有的 `delete／copy／gear／release-connect／motor-release／operation-matrix` 等測試未改任何斷言。
