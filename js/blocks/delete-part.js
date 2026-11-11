@@ -19,8 +19,10 @@ export function planDelete(work,target){
   const part=target?.part;
   if(!part){
     if(target?.shared?.length>1){
-      const names=distinctLabels(target.shared,work.params).map(n=>`「${n}」`);
-      return {ok:false,message:`這個接點由${list(names)}共用；請點桿身選取要刪除的零件。`,flash:target.shared.map(c=>c.id)};
+      // 同名零件用座標分不出來（學生看不懂）：改說幾個、並在圖上標出。
+      const plain=[...new Set(target.shared.map(c=>c.name||''))],same=plain.length===1&&plain[0];
+      const names=same?`${target.shared.length} 個「${same}」`:list(distinctLabels(target.shared,work.params).map(n=>`「${n}」`));
+      return {ok:false,message:`這個接點由${names}共用（圖上已標出）；請點桿身選取要刪除的零件。`,flash:target.shared.map(c=>c.id)};
     }
     return {ok:false,message:NOTHING};
   }

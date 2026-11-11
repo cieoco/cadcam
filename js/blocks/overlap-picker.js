@@ -14,7 +14,7 @@ export function collectPickCandidates(svg, x, y, comps) {
     const id = motor || el.getAttribute('data-id');
     const servo = comps.some(c => c.motorType === 'mg995' && [c.p1, c.p2].some(p => p?.id === id));
     const hole=comps.find(c=>c.frameHole&&c.p1.id===id);
-    add({ kind:'node', id, motor:!!motor, label:motor ? `${servo ? '舵機' : '馬達'}軸心 · ${id}（動力／角度）` : hole?`機架孔 · 距基準孔 ${Number(hole.frameHole.u.toFixed(2))} mm${hole.frameHole.centered===false?` · 偏移 ${Number((hole.frameHole.v||0).toFixed(2))} mm`:""}`:`接點 · ${id}` });
+    add({ kind:'node', id, motor:!!motor, label:motor ? `${servo ? '舵機' : '馬達'}軸心（動力／角度）` : hole?`機架孔 · 距基準孔 ${Number(hole.frameHole.u.toFixed(2))} mm${hole.frameHole.centered===false?` · 偏移 ${Number((hole.frameHole.v||0).toFixed(2))} mm`:""}`:nodeLabel(comps,id) });
   }
   // 未用格孔比接點更近時保留；同位置的孔仍交由選單辨識，不替使用者猜。
   const idle=r=>r.kind==='node'&&svg.querySelector?.(`circle[data-unused][data-id="${r.id}"]`),near=r=>{const e=svg.querySelector?.(`[data-id="${r.id}"]`)?.getBoundingClientRect();return e?Math.hypot(x-e.left-e.width/2,y-e.top-e.height/2):1e9;};
@@ -27,11 +27,16 @@ export function collectPickCandidates(svg, x, y, comps) {
     if (!c) continue;
     if (result.length===1 && !result[0].motor && result[0].kind==='node' && c.type==='bar' && [c.p1,c.p2].some(p=>p?.id===result[0].id)) continue;
     const name = c.fusedWith ? '合成夾指' : (c.type === 'pulley' && c.kind === 'sprocket' ? '鏈輪' : ({gear:'齒輪',triangle:'夾指／板件',bar:'連桿',slider:'滑軌'})[c.type]);
-    if (name) add({kind:'component', id, label:`${name} · ${id}（尺寸／外形）`});
+    if (name) add({kind:'component', id, label:`整個「${c.name||name}」`});
   }
   return result.sort((a,b) => Number(b.motor || false) - Number(a.motor || false));
 }
 
+// 不顯示內部代號
+function nodeLabel(comps,id){
+  const own=comps.filter(c=>[c.p1,c.p2,c.p3,...c.holes||[]].some(p=>p?.id===id)),c=own[0],h=c?.holes?.find(h=>h.id===id);
+  return own.length-1?`接點（${own.length}件共用）`:`「${c.name||'零件'}」${h?h.v?'的孔':`第${h.u/8+1}孔`:'端孔'}`;
+}
 export function openOverlapPicker(items, choose) {
   const dialog = document.createElement('dialog');
   dialog.setAttribute('aria-label', '選取重疊物件');
@@ -44,9 +49,9 @@ export function openOverlapPicker(items, choose) {
     let pressed=false;
     b.addEventListener('pointerdown',()=>{pressed=true;});
     b.addEventListener('pointercancel',()=>{pressed=false;});
-    b.addEventListener('click',e=>{if(e.detail&&!pressed)return;pressed=false;action();});dialog.appendChild(b);
+    b.addEventListener('click',e=>{if(e.detail&&!pressed)return;pressed=false;action();});dialog.appendChild(b);return b;
   };
-  for (const item of items) button(item.label, () => { dialog.close(); choose(item); });
+  for (const item of items) button(item.label, () => { dialog.close(); choose(item); }).setAttribute?.('data-pick',item.id);
   button('取消選取', () => dialog.close());
   dialog.addEventListener('close', () => dialog.remove(), {once:true});
   dialog.addEventListener('click', e => { if (e.target === dialog) { const r=dialog.getBoundingClientRect(); if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom) dialog.close(); } });

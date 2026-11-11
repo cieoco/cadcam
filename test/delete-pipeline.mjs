@@ -67,8 +67,8 @@ const noInternalId=m=>!/Blank\d|H7|Motor\d|P\d+s|_H\d/.test(m);
 // ---------------------------------------------------------------- b. shared joint: do not guess, say who shares it, tell them apart
 {const r=del(fixture,{selectedNodeId:'Blank136.B'});
  check('b: shared joint changes nothing and pushes no undo',!r.ok&&!r.changed&&r.log.undo===0&&r.log.rebuild===0);
- check('b: one line naming both parts and how to proceed',r.msgs.length===1&&/這個接點由「.+」和「.+」共用；請點桿身選取要刪除的零件。/.test(r.msgs[0]),r.msgs.join('|'));
- check('b: identical names get a visible difference, never an internal id',r.msgs[0].split('」和「')[0]!==r.msgs[0].split('」和「')[1]&&noInternalId(r.msgs[0])&&/長|一端/.test(r.msgs[0]),r.msgs.join('|'));
+ check('b: one line naming both parts and how to proceed',r.msgs.length===1&&/這個接點由2 個「孔格桿件」共用（圖上已標出）；請點桿身選取要刪除的零件。/.test(r.msgs[0]),r.msgs.join('|'));
+ check('b: identical names are counted and marked on the canvas, never an internal id or coordinates',noInternalId(r.msgs[0])&&!/\(-?\d+, -?\d+\)/.test(r.msgs[0]),r.msgs.join('|'));
  check('b: both candidate parts are flashed on the canvas',r.log.flashed?.join()==='Blank136,Blank137');
  const labels=distinctLabels([{type:'bar',name:'桿',p1:{x:0,y:0},p2:{x:10,y:0}},{type:'bar',name:'桿',p1:{x:0,y:5},p2:{x:10,y:5}}],{});
  check('b: equal names AND equal lengths still differ by position',labels[0]!==labels[1]&&labels.every(l=>l.startsWith('桿（')),labels.join('|'));
