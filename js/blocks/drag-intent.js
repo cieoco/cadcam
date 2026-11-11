@@ -11,6 +11,7 @@ export function blockedMessage(kind, drive = false) {
   switch (kind) {
     case 'body': return '這個零件已接上其他零件，不能單獨搬移；要移動請先分開連接' + (drive ? WITH_DRIVE : NO_DRIVE);
     case 'hole': return '這個孔屬於已接上其他零件的零件，不能單獨搬移；要改位置請改尺寸' + (drive ? WITH_DRIVE : NO_DRIVE);
+    case 'ground': return '這是固定板（機架）上的孔，不會移動；要試動請拖連桿，要搬位置請先選取固定板。';
     case 'locked-vertex': return '這個頂點已被相接的零件鎖住，不能單獨拖動；要改位置請改板件尺寸，或移動接在它上面的零件。';
     case 'hosted-motor': return '馬達固定在座板上，不能直接拖；要換孔請用馬達的「安裝設定」。';
     case 'joined-corner': return '這個零件的孔上接著其他零件或固定孔，不能只拖它的角；請改尺寸，或移動接在孔上的零件。';

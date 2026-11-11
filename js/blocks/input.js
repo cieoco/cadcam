@@ -243,7 +243,8 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     if (S.snapTarget) draw();
     return;
   }
-  if (S.comps.some(c=>localHoles(c).some(h=>h.id===id)&&!isFreeBody(S.comps,c,S.modules))) { if (S.dragId) explainDrag('hole'); return; }
+  const o=S.comps.find(c=>localHoles(c).some(h=>h.id===id)&&!isFreeBody(S.comps,c,S.modules));
+  if(o){if(S.dragId)explainDrag(o.p1.type+o.p2.type=='fixedfixed'?'ground':'hole');return;}
   // Only world-frame holes snap. Floating joints are motion constraints and
   // must never be quantized to the 8 mm reference grid during editing.
   const dragTarget = snap && pointIsGround(id) ? snapFramePoint(w) : w;
