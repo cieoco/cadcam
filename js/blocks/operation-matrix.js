@@ -61,11 +61,8 @@ export const MATRIX = {
     move: [
       ok('未接任何零件（自由桿）', '拖桿身或桿端，整根桿平移，長度不變。', 'move-free-bar'),
       ok('已接其他零件，且作品有動力來源', '拖桿身或桿上的孔＝試動：機構跟著轉，桿長與連接都不改。'),
-      gap('已接其他零件，但作品沒有動力來源', '拖不動時說明原因（例如「這根桿接著別的零件，請改尺寸，或接上馬達再試動」）。',
-        '只選取這根桿，不動、也不說話。', 'app.js onFreeDrag→input.js startFreeLinkDrag：非自由件且 driveBody 為空就回 false，只剩 onSelect。',
-        {check: 'move-connected-bar-silent', cause: SILENT_DRAG}),
-      gap('拖已接零件桿上的孔（不是端點）', '說明這個孔不能單獨搬，或提供可行的拖法。', '無聲無息沒有動。',
-        'input.js moveNodeTo：孔屬於非自由件且沒有動力時直接 return，沒有 transient。', {check: 'move-connected-hole-silent', cause: SILENT_DRAG}),
+      ok('已接其他零件，但作品沒有動力來源', '拖不動時說明原因（例如「這根桿接著別的零件，請改尺寸，或接上馬達再試動」）。', 'move-connected-bar-explained'),
+      ok('拖已接零件桿上的孔（不是端點）', '說明這個孔不能單獨搬，或提供可行的拖法。', 'move-connected-hole-explained'),
       ok('桿端接在固定孔上', '拖另一端：以固定孔為圓心、桿長不變地轉動。'),
       ok('作品已有既存問題', '拖曳放開時只擋「這次新造成」的問題，不被舊問題擋住。', 'gate-only-new')
     ],
@@ -110,10 +107,8 @@ export const MATRIX = {
     ],
     move: [
       ok('未接任何零件（自由板）', '拖板上任一點，整片平移，形狀不變。', 'move-free-plate'),
-      gap('已接其他零件或固定孔，但沒有動力來源', '說明為什麼不能拖。', '只選取，不動、不說話。', '同桿件：startFreeLinkDrag。',
-        {check: 'move-connected-plate-silent', cause: SILENT_DRAG}),
-      gap('三點桿的某個頂點已被機構完全決定', '說明「這個頂點被其他零件鎖住」。', '拖不動，沒有訊息。', 'input.js moveNodeTo：lockedTriangleVertex 為真時直接 return。',
-        {cause: SILENT_DRAG})
+      ok('已接其他零件或固定孔，但沒有動力來源', '說明為什麼不能拖。', 'move-connected-plate-explained'),
+      ok('三點桿的某個頂點已被機構完全決定', '說明「這個頂點被其他零件鎖住」。', 'move-locked-vertex-explained')
     ],
     resize: [
       ok('改長／寬孔數，未被使用的孔', '板變大或變小，孔格重新排列。', 'resize-plate-grow'),
@@ -141,8 +136,7 @@ export const MATRIX = {
     select: [ok('點 L 型件', '選到這片 L 型件。')],
     move: [
       ok('未接', '整片平移，形狀不變。', 'move-free-l'),
-      gap('已接其他零件或固定孔，沒有動力來源', '說明為什麼不能拖。', '只選取，不動、不說話。', '同板材：startFreeLinkDrag。',
-        {check: 'move-connected-l-silent', cause: SILENT_DRAG})
+      ok('已接其他零件或固定孔，沒有動力來源', '說明為什麼不能拖。', 'move-connected-l-explained')
     ],
     resize: [ok('改長、高或臂寬孔數', 'L 型件改變，被使用的孔受保護。', 'resize-l-ok')],
     delete: [ok('未接', 'L 型件被刪除。', 'del-l-ok')],
@@ -155,7 +149,7 @@ export const MATRIX = {
     select: [ok('點彎桿／多臂件', '選到這個零件，顯示臂數與角度設定。')],
     move: [
       ok('未接', '整片平移；臂端另有把手。'),
-      gap('已接其他零件，沒有動力來源', '說明為什麼不能拖。', '只選取，不動、不說話。', '同板材。', {check: 'move-connected-arms-silent', cause: SILENT_DRAG})
+      ok('已接其他零件，沒有動力來源', '說明為什麼不能拖。', 'move-connected-arms-explained')
     ],
     resize: [ok('改臂長、臂數或角度', '臂改變，被使用的孔受保護；拖曳把手以 1 mm 取整，精確值用欄位。')],
     delete: [ok('已接其他零件', '零件被刪除，相鄰零件保留。', 'del-arms-ok')],
@@ -168,9 +162,7 @@ export const MATRIX = {
     select: [ok('點馬達軸心', '選到這顆馬達，顯示角度與安裝設定。')],
     move: [
       ok('未裝在任何零件上', '整顆馬達平移，靠近孔時吸附軸心。', 'move-free-motor'),
-      gap('已裝在座板上', '說明「馬達固定在座板第 N 孔，請用安裝設定換孔」，或提供換孔的拖法。',
-        '拖不動，沒有訊息。', 'input.js onNodeDown：pendingNodeDrag 為 null；moveNodeTo 對非自由馬達直接 return。',
-        {check: 'move-hosted-motor-silent', cause: SILENT_DRAG})
+      ok('已裝在座板上', '說明「馬達固定在座板第 N 孔，請用安裝設定換孔」，或提供換孔的拖法。', 'move-hosted-motor-explained')
     ],
     resize: [na('馬達型號固定', '馬達沒有可調尺寸。')],
     delete: [ok('獨立馬達', '馬達被刪除；裝在板上的孔位釋出。', 'del-motor-independent')],

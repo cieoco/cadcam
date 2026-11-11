@@ -11,6 +11,10 @@
     {
       "reason": "Imported test helper, not a standalone acceptance script",
       "path": "test/_harness.mjs"
+    },
+    {
+      "reason": "Imported test helper, not a standalone acceptance script",
+      "path": "test/_drag-rig.mjs"
     }
   ],
   "timeoutMs": 90000,
@@ -335,7 +339,8 @@
     "test/operation-matrix.mjs",
     "test/edit-pipeline.mjs",
     "test/delete-pipeline.mjs",
-    "test/release-connect-pipeline.mjs"
+    "test/release-connect-pipeline.mjs",
+    "test/drag-feedback.mjs"
   ],
   "version": 1
 }

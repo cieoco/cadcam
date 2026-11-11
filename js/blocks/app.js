@@ -3345,7 +3345,7 @@ function init() {
                  selectModuleTarget(comp);
                },
                snapFramePoint, snapFrameNodesToGrid, openMobileEditPanel, closeMobileEditPanel, openFrameEditor: () => { S.frameEditorOpen = true; Panels.updateFrameEditor(); }, transient,
-               isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, drivePointTo, driveBody:(c,g)=>drive('bodyProbe',c,g), pointIsRackHole });
+               isGroundPositionUnlocked, relockGroundPosition, rotateInputCrankToPoint, drivePointTo, driveBody:(c,g)=>drive('bodyProbe',c,g), pointIsRackHole, driveState:()=>!hasDriveSource()?'none':driveDrag?'ready':'loading' });
   Settings.init({ rebuild, draw, pushUndo, pause, scheduleAutosave, notify: transient });
   Settings.loadExportSettings();
   Settings.loadTtMountSettings();

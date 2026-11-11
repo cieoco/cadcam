@@ -32,6 +32,7 @@ let pendingNodeDrag = null;         // 點擊先選取；超過門檻後才真�
 let linkPointerStart = null;        // 桌機畫桿可按住拖放，也保留點兩下
 let pendingOverlap = null;
 let pendingMobileEdit = false;      // 放開接點後再展開面板，避免拖曳途中畫布高度改變
+let blockedDrag = null, saidDrag = null;   // 拖不動時：超過拖曳門檻才說明原因，每次手勢只說一次（文字在按需載入的 drag-intent.js）
 
 // ---- 注入的外部依賴（由 app 在啟動時提供）----
 let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle,
@@ -55,7 +56,8 @@ let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, select
     rotateInputCrankToPoint = () => false,
     drivePointTo = () => false,
     driveBody = () => null,
-    pointIsRackHole = () => false;
+    pointIsRackHole = () => false,
+    driveState = () => 'none';
 
 export function startFreeLinkDrag(e, linkId) {
   if(fusionRoot(S.comps,linkId))return false;
@@ -63,7 +65,7 @@ export function startFreeLinkDrag(e, linkId) {
   const w = worldFromEvent(e);
   // 有動力的機構：拖桿身＝試動
   const probe = !c && w && driveBody(S.comps.find(x => x.id === linkId), w);
-  if (!(c || probe) || !w) return false;
+  if (!(c || probe) || !w) { if (w && !c) dragBlocked(e, 'body'); return false; }
   S.dragProbe = probe || null;
   S.preDragSnap = snapshotStr(); // 整段拖曳合併成一筆 undo
   pause();
@@ -78,6 +80,13 @@ export function startFreeLinkDrag(e, linkId) {
   return true;
 }
 
+const dragBlocked = (e, kind) => { blockedDrag = {x:e.clientX, y:e.clientY, t:e.pointerType || 'mouse', kind}; };
+function explainDrag(kind) {
+  const drive = driveState();
+  if (saidDrag || drive === 'loading') return;
+  saidDrag = kind;
+  import('./drag-intent.js').then(m => transient(m.blockedMessage(kind, drive === 'ready'))).catch(() => {});
+}
 function redrawAfterDrag() {
   rebuild();
   recordManualTrace();
@@ -137,12 +146,14 @@ export function onNodeDown(e, id) {
     : motorBody || S.comps.some(c=>c.frameHole&&c.p1.id===id) || fusionAtPoint(S.comps,id) || (pointIsGround(id) && !isGroundPositionUnlocked(id)) ? null : {
     id, x:e.clientX, y:e.clientY, pointerType:e.pointerType || 'mouse'
   };
+  if (!pendingNodeDrag) { if (motorBody) dragBlocked(e, 'hosted-motor'); else if (fusionAtPoint(S.comps,id)) dragBlocked(e, 'fused-hole'); }
   try { svg.setPointerCapture(e.pointerId); } catch (_) {}
   draw();
 }
 function onDragMove(e) {
   if (pinchActive) return;
   if (S.dragShape) return;   // 造形點拖曳由 app 的專用監聽處理
+  if (blockedDrag && Math.hypot(e.clientX-blockedDrag.x,e.clientY-blockedDrag.y) >= (blockedDrag.t === 'mouse' ? 6 : 12)) { const k = blockedDrag.kind; blockedDrag = null; explainDrag(k); }
   if (pendingNodeDrag && !S.dragId) {
     const threshold = pendingNodeDrag.pointerType === 'mouse' ? 6 : 12;
     if (Math.hypot(e.clientX-pendingNodeDrag.x,e.clientY-pendingNodeDrag.y) < threshold) return;
@@ -228,7 +239,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     if (S.snapTarget) draw();
     return;
   }
-  if (S.comps.some(c=>localHoles(c).some(h=>h.id===id)&&!isFreeBody(S.comps,c,S.modules))) return;
+  if (S.comps.some(c=>localHoles(c).some(h=>h.id===id)&&!isFreeBody(S.comps,c,S.modules))) { if (S.dragId) explainDrag('hole'); return; }
   // Only world-frame holes snap. Floating joints are motion constraints and
   // must never be quantized to the 8 mm reference grid during editing.
   const dragTarget = snap && pointIsGround(id) ? snapFramePoint(w) : w;
@@ -321,7 +332,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
   if (S.comps.some(c => ['p1', 'p2', 'p3'].some(k => c[k]?.id === id) && holeJoined(S.comps, c))) { transient('這個零件的孔上接著其他零件或固定孔，不能只拖它的角；請改尺寸，或移動接在孔上的零件。'); return; }
   // 三點桿自由頂點，但另兩頂點都被機構牽制（≥2 樞紐）：此頂點被剛體完全決定，
   // 自由拖會破壞三角剛性 → 鎖住不動（要移動請拖牽制較少的接點，或加馬達驅動機構）。
-  if (lockedTriangleVertex && lockedTriangleVertex(id)) return;
+  if (lockedTriangleVertex && lockedTriangleVertex(id)) { if (S.dragId) explainDrag('locked-vertex'); return; }
   const sharedFixedBars = !pointIsGround(id) ? S.comps.filter(comp =>
     comp.type === 'bar' && comp.fixedLen && comp.p1 && comp.p2 &&
     (comp.p1.id === id || comp.p2.id === id)) : [];
@@ -468,6 +479,7 @@ function abortSingleDrag() {
   // 第二指落下時，放棄正在進行的單指拖曳，避免與縮放打架
   cancelPointDrag(); // 第二指取消尚未完成的單指候選，不留下半次移動。
   backgroundPan = null;
+  blockedDrag = null;
   pendingNodeDrag = null;
   pendingOverlap = null;
   pendingMobileEdit = false;
@@ -477,6 +489,7 @@ function abortSingleDrag() {
 }
 
 function endPointer(e) {
+  blockedDrag = null; saidDrag = null;
   if (backgroundPan?.id === e.pointerId) backgroundPan = null;
   activePointers.delete(e.pointerId);
   if (activePointers.size < 2) pinchState = null;
@@ -506,7 +519,7 @@ export function init(deps) {
      rotateInputCrankToPoint = (() => false),
      drivePointTo = (() => false),
      driveBody = (() => null),
-     pointIsRackHole = (() => false) } = deps);
+     pointIsRackHole = (() => false), driveState = (() => 'none') } = deps);
 
   // ---- 掛上 svg 的指標 / 手勢監聽（原 app.js 檔尾那批，順序不變）----
   // 拖曳節流：高回報率滑鼠 / 觸控一幀可能送多筆 pointermove，每筆都 rebuild+draw 會掉幀。
@@ -563,6 +576,7 @@ export function init(deps) {
   // 雙指：pinch 縮放 + 兩指中心平移；滑鼠滾輪：以游標為錨縮放。單指維持原本的拖曳。
   svg.addEventListener('pointerdown', (e) => {
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    blockedDrag = null; saidDrag = null;   // 新的手勢：重新計算「說過沒有」
     if (activePointers.size >= 2) {
       pinchActive = true;
       abortSingleDrag();

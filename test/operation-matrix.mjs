@@ -39,6 +39,7 @@ const {planSyringeDisconnect}=await import(R+'syringe-operations.js');
 const {planDraggedMotorOutput}=await import(R+'motor-drop.js');
 const {localHoles}=await import('../js/core/local-holes.js');
 const {pointKeysFor}=await import(R+'part-types.js');
+const Rig=await import('./_drag-rig.mjs');
 await loadIntegrity();await loadUnitStarts();
 
 // ------------------------------------------------------------------ works
@@ -79,6 +80,11 @@ const groundedL=()=>{const w=freeL();w.comps[0].p1.type='fixed';return w;};
 const bell=()=>example('bell-crank-gripper');
 const copyOf=(w,id,mode='copy')=>planMemberCopy({comps:w.comps,params:w.params,modules:w.modules||[],counter:700,id,mode});
 
+async function dragSays(w,down,re){
+  Rig.load(w);const before=JSON.stringify(S.comps);
+  const click=await Rig.gesture(down,[]),msgs=await Rig.gesture(down,[[112,100],[140,110],[170,120]]);
+  return click.length===0&&msgs.length===1&&re.test(msgs[0])&&!/Blank\d|P\d+s|_H\d/.test(msgs[0])&&JSON.stringify(S.comps)===before;
+}
 const CHECKS={
   // --- select
   // still a gap: the target is only worked out when a command runs (delete explains and flashes); nothing marks the owner at selection time
@@ -89,12 +95,15 @@ const CHECKS={
   'move-free-plate':()=>{const w=freePlate();return Model.isFreeBody(w.comps,w.comps[0],[]);},
   'move-free-l':()=>{const w=freeL();return Model.isFreeBody(w.comps,w.comps[0],[]);},
   'move-free-motor':()=>{const r=del(released(),{selectedTriangleId:'Blank133'});const m=S.comps.find(c=>c.type==='motor');return r.changed&&!!m&&Model.isFreeBody(S.comps,m,[]);},
-  'move-connected-bar-silent':()=>{const w=blocked();return !Model.isFreeBody(w.comps,comp(w,'Blank136'),[]);},
-  'move-connected-hole-silent':()=>{const w=blocked(),c=comp(w,'Blank136');return localHoles(c).length>0&&!Model.isFreeBody(w.comps,c,[]);},
-  'move-connected-plate-silent':()=>{const w=blocked();return !Model.isFreeBody(w.comps,comp(w,'Blank133'),[]);},
-  'move-connected-l-silent':()=>{const w=groundedL();return !Model.isFreeBody(w.comps,w.comps[0],[]);},
-  'move-connected-arms-silent':()=>{const w=bell(),c=w.comps.find(c=>c.standardBlank?.kind==='arms');return !!c&&!Model.isFreeBody(w.comps,c,[]);},
-  'move-hosted-motor-silent':()=>{const w=released(),m=w.comps.find(c=>c.type==='motor');return !!m?.motorMount?.frameBody&&!Model.isFreeBody(w.comps,m,[]);},
+  // O3-A: a drag that cannot act says why (once, after the drag threshold) and changes nothing — the real input.js through the fake-SVG rig
+  'move-connected-bar-explained':()=>dragSays(blocked(),Rig.bodyDown('Blank136'),/已接上其他零件，不能單獨搬移/),
+  'move-connected-hole-explained':()=>{const w=blocked(),c=comp(w,'Blank136'),h=localHoles(c)[0];return !!h&&dragSays(w,Rig.nodeDown(h.id),/這個孔屬於已接上其他零件/);},
+  'move-connected-plate-explained':()=>dragSays(blocked(),Rig.bodyDown('Blank133'),/已接上其他零件，不能單獨搬移/),
+  'move-connected-l-explained':()=>{const w=groundedL();return dragSays(w,Rig.bodyDown(w.comps[0].id),/已接上其他零件，不能單獨搬移/);},
+  'move-connected-arms-explained':()=>{const w=bell(),c=w.comps.find(c=>c.standardBlank?.kind==='arms');return dragSays(w,Rig.bodyDown(c.id),/已接上其他零件，不能單獨搬移/);},
+  'move-locked-vertex-explained':()=>{const t={id:'T',type:'triangle',p1:{id:'a',type:'fixed',x:0,y:0},p2:{id:'b',type:'fixed',x:80,y:0},p3:{id:'c',type:'floating',x:40,y:60},gParam:'g',r1Param:'r1',r2Param:'r2'};
+    return dragSays({comps:[t],params:{g:80,r1:72.1,r2:72.1,theta:0},modules:[]},Rig.nodeDown('c'),/這個頂點已被相接的零件鎖住/);},
+  'move-hosted-motor-explained':()=>{const w=released(),m=w.comps.find(c=>c.type==='motor');return !!m?.motorMount?.frameBody&&dragSays(w,Rig.nodeDown(m.p1.id),/馬達固定在座板上.*安裝設定/);},
   'gate-only-new':()=>{const w=blocked(),work={comps:w.comps,modules:w.modules||[],params:w.params};return checkWork(work).length>0&&integrityGate(work,{...work,comps:structuredClone(w.comps)},noop)===true;},
   'offplate-detected':()=>{const w=blocked(),items=MR.offPlateMotors(w.comps);return items.length===1&&MR.offPlateMessage(items[0]).includes('請選');},
   // --- resize
@@ -172,7 +181,7 @@ for(const c of cases){
     const fn=CHECKS[c.check];
     if(!fn){check(`gap check exists: ${c.check}`,false);continue;}
     try{
-      const r=fn();
+      const r=await fn();
       if(r===true||r?.pass===true){stillOpen++;console.log(`KNOWN   gap  ${label(c)}  — ${c.now}`);}
       else{closed++;console.log(`GAP CLOSED?  ${label(c)}  — check '${c.check}' no longer reproduces it; set status to 'ok' in operation-matrix.js`);}
     }catch(e){knownErr++;console.log(`KNOWN-ERR  ${label(c)}  — check '${c.check}' threw: ${e.message}`);}
@@ -184,7 +193,7 @@ for(const c of cases){
   const fn=CHECKS[c.check];
   if(!fn){check(`ok check exists: ${c.check}`,false);continue;}
   let pass=false,detail='';
-  try{const r=fn();pass=r===true||r?.pass===true;detail=r?.detail||'';}catch(e){detail='threw: '+e.message;}
+  try{const r=await fn();pass=r===true||r?.pass===true;detail=r?.detail||'';}catch(e){detail='threw: '+e.message;}
   check(`${c.check}: ${label(c)}`,pass,detail);
 }
 
