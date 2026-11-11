@@ -53,7 +53,7 @@ console.log(`  第2臂端孔最大位移 ${span.toFixed(1)} mm，擺角約 ${swi
 // 教學卡
 const lesson=getExampleLesson(ID),text=[lesson.use,lesson.learn,...lesson.try].join('\n');
 check('教學卡：分在「夾取與物件操作」，有用途與學什麼',EXAMPLE_GROUPS.some(g=>g.id===lesson.group)&&lesson.use&&/學什麼/.test(lesson.learn));
-check('教學卡：學什麼→實操→反思→解決一個問題→反例',['實操','反思','解決一個問題','反例'].every(k=>lesson.try.some(t=>t.startsWith(k))));
+check('教學卡：學什麼→實操→反思→解決一個問題→反例',['實操','反思','解決一個問題','反例'].every(k=>lesson.try.some(t=>t.startsWith(k)))&&/^按播放/.test(lesson.try[0])&&!/[。.]$/.test(lesson.try[0]));
 check('教學卡：實操只改一個變數（孔數或夾角）',lesson.try.some(t=>/只把第 2 臂的孔數/.test(t)&&/夾角從 90° 改成 120°/.test(t)));
 check('狀態標示為「模擬已驗證」，且不聲稱加工或實物已驗證',/模擬已驗證/.test(text)&&!/實物已測|加工資料已核對|已通過實測/.test(text)&&/未驗證/.test(text));
 check('教學卡文字是學生用語，不含內部代號',!/Blank\d|_A\d|standardBlank|motorMount/.test(text+ex.title+ex.note));
