@@ -2072,6 +2072,9 @@ function drawNow() {
     for(const p of [c.p1,c.p2,c.p3].filter(Boolean))nodeHoleRadii.set(p.id,Math.max(nodeHoleRadii.get(p.id)||0,memberHoleDiameter(c,Settings.exportSettings())/2));
     for(const p of c.holes||[])nodeHoleRadii.set(p.id,Math.max(nodeHoleRadii.get(p.id)||0,(p.diameter||3.2)/2));
   }
+  for (const gear of vComps.filter(c => c.type === 'gear')) {
+    for (const h of gear.holes || []) nodeHoleRadii.set(h.id, h.diameter/2);
+  }
   renderNodes({
     holeRadii: nodeHoleRadii,
     shaftCenterIds: new Set(vComps.filter(c=>c.isInput&&c.ttOutput==='shaft'&&(c.motorType || 'tt')==='tt').map(c=>c.p1.id)),

@@ -12,7 +12,7 @@ export function buildPreviewModelInputs({ comps, params, theta, links, points, g
       carriageLen: sliderBodyLength(comp), color: comp.color }));
   const gears = comps.filter(comp => comp.type === 'gear' && comp.p1 && comp.p2)
     .map(comp => ({ id: comp.id, center: comp.p1.id, pin: comp.p2.id, radius: Number(params[comp.radiusParam]) || 40,
-      teeth: comp.teeth, module: comp.module, mesh: comp.mesh, color: comp.color, pinHoleDiameter: Number(comp.pinHoleDiameter) || 5 }));
+      holes:comp.holes, teeth: comp.teeth, module: comp.module, mesh: comp.mesh, color: comp.color, pinHoleDiameter: Number(comp.pinHoleDiameter) || 5 }));
   const racks = comps.filter(comp => comp.type === 'rack' && comp.p1).map(comp => {
     const pinion = comp.pinion ? comps.find(gear => gear.type === 'gear' && gear.id === comp.pinion) : null;
     const teeth = pinion ? Math.max(6, Math.round(Number(pinion.teeth) || 12)) : 12;

@@ -362,10 +362,12 @@ export function buildSceneModel(links, points, opts = {}) {
       layer: gearLayer,
       thickness: opts.gearGeometries?.[g.id]?.thicknessMm || plateThickness,
       color: g.color || '#b0772e',
+      holes:g.holes,
       pinHoleDiameter: Math.max(1, Number(g.pinHoleDiameter) || 5),
     });
     touch(g.center, gearLayer);
     touch(g.pin, gearLayer);
+    for (const h of g.holes || []) if (points[h.id]) touch(h.id,gearLayer);
   });
 
   const pinionById = new Map(gears.map(g => [g.id, g]));

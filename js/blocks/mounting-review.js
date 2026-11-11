@@ -1,3 +1,4 @@
+import {inspectGearExport} from './exporters.js';
 import {actuatorMountSettings} from './fabrication-profile.js';
 import {pointKeysFor} from './part-types.js';
 import {syringeAttachmentHole} from '../core/syringe.js';
@@ -92,6 +93,15 @@ function same(a,b){
 /** Legacy files use their currently saved geometry as the approved baseline. No new saved format. */
 export function inspectMountingChange(before,after){
   const a=work(before),b=work(after),old=interfaces(a),next=interfaces(b),relations=[...old.values()].filter(r=>next.has(r.id));
+  for (const gear of b.comps.filter(c => c.type === 'gear' && c.holes?.length)) {
+    const holes = inspectGearExport(gear, b.params, {...b.fabrication.export,drive:b.fabrication.drive}, b.comps).holes;
+    const root = b.params[gear.radiusParam] * (1 - 2.5 / gear.teeth);
+    for (const h of holes.filter(h => h.layer === 'MOUNT_HOLE')) {
+      const nearEdge = Math.hypot(h.x,h.y) + h.r + 1.6 > root;
+      const overlap = holes.some(p => p !== h && Math.hypot(h.x-p.x,h.y-p.y) < h.r+p.r+1);
+      if (nearEdge || overlap) return {ok:false, changes:[], issues:[nearEdge ? '連桿固定孔太靠近齒根，請增加齒數或模數。' : '連桿固定孔與其他安裝孔太近。']};
+    }
+  }
   if(!relations.length)return {ok:true,changes:[]};
   const ca=catalog(a),cb=catalog(b),changes=[],issues=[];
   for(const r of relations){

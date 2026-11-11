@@ -417,6 +417,8 @@ function normalizeGear(comp, index, params, warnings) {
     module,
     phase: num(comp.phase, 0)
   };
+  const holes = localHoleRecords(comp.holes);
+  if (holes.length) out.holes = holes;
   if (pinRadiusParam) out.pinRadiusParam = pinRadiusParam;
   else if (Number.isFinite(Number(comp.pinRadius))) out.pinRadius = Math.max(1, num(comp.pinRadius, R * 0.6));
   if (Number.isFinite(Number(comp.pinHoleDiameter))) out.pinHoleDiameter = Math.max(1, Math.min(30, roundTenth(comp.pinHoleDiameter, 5)));

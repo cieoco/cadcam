@@ -295,7 +295,7 @@ export function solvePinnedConstraints(comps, topo, pinId, target, options = {})
     const p = c[k];
     if (p && p.id && isGroundPoint(p)) pinned.add(p.id);
   }));
-  comps.forEach(c => bodyHoles(c).forEach(h => { if (isGroundPoint(h)) pinned.add(h.id); }));
+  comps.forEach(c => bodyHoles(c).forEach(h => { if (isGroundPoint(h) || c.type === 'gear') pinned.add(h.id); }));
 
   const constraints = [];
   const collinearConstraints = [];

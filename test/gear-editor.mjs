@@ -41,6 +41,33 @@ const tangent = (a, b) => {
 // ---- 成對齒輪：建立即相切、預設 12:18 ----
 editor.addGearPair();
 let [driver, driven] = gears();
+// Draw a rigid link across both fastening holes and run the saved design.
+{
+  const {compileTopology} = await import('../js/core/topology.js');
+  const {solveTopology} = await import('../js/multilink/solver.js');
+  const {normalizeSnapshot,toSnapshot} = await import('../js/blocks/schema.js');
+  const {inspectGearExport} = await import('../js/blocks/exporters.js');
+  const bodies = structuredClone(S.comps);
+  bodies.forEach(g => g.p1.type = 'fixed');
+  Object.assign(bodies[0].p1,{type:'motor',physicalMotor:'1'});
+  const g = bodies[1], [a,b] = g.holes, points = Model.pointCoords(bodies);
+  const end = h => ({id:h.id,type:'floating',...points[h.id]});
+  bodies.push({type:'bar',id:'Arm',p1:end(a),p2:end(b),lenParam:'ArmLength',fixedLen:true});
+  const saved = normalizeSnapshot(toSnapshot(bodies,{params:{...S.topo.params,ArmLength:32}},10));
+  const t = compileTopology(saved.comps,{params:saved.params});
+  for (const thetaDeg of [0,90,180]) {
+    const sol = solveTopology(t,{thetaDeg}), p = sol.points;
+    const angle = -thetaDeg*Math.PI/360;
+    check('從動輪雙孔固定桿跟隨減速比 '+thetaDeg,
+      sol.isValid && Math.abs(dist(p[a.id],p[b.id])-32)<1e-6 &&
+      Math.hypot(p[b.id].x-g.p1.x+16*Math.sin(angle),p[b.id].y-g.p1.y-16*Math.cos(angle))<1e-6);
+  }
+  const holes = inspectGearExport(g,saved.params).holes.filter(h=>h.layer==='MOUNT_HOLE');
+  check('固定孔加工位置與孔徑',holes.length===2 && holes.every(h=>h.r===1.6) && dist(...holes)===32);
+  const before = undos;
+  editor.changeGearTeeth(6-driven.teeth);
+  check('縮到齒根會破孔時保留原尺寸',undos===before && driven.teeth===48);
+}
 // Both legacy inline radii and parameter-backed gears must reach every integer.
 const radiusKey=driven.pinRadiusParam;
 for(const legacy of [false,true]){

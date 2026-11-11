@@ -351,7 +351,9 @@ function gearGeometry(comp, params = {}, settings = {}, comps = []) {
     outline,
     holes: [
       ...(driven ? driveHoles : [{ x: 0, y: 0, r: centerR, layer: 'CENTER_HOLE' }]),
-      { x: pinR * Math.cos(angle), y: pinR * Math.sin(angle), r: outputR, layer: 'PIN_HOLE' }
+      { x: pinR * Math.cos(angle), y: pinR * Math.sin(angle), r: outputR, layer: 'PIN_HOLE' },
+      ...localHoles(comp).map(h => ({id:h.id, layer:'MOUNT_HOLE', r:h.diameter/2,
+        x:h.u*Math.cos(angle)-h.v*Math.sin(angle), y:h.u*Math.sin(angle)+h.v*Math.cos(angle)}))
     ],
     cutouts: []
   };

@@ -185,6 +185,12 @@ function gearShape(gear, centerHoleR) {
   const center = new THREE.Path();
   center.absarc(0, 0, centerHoleR, 0, Math.PI * 2, true);
   shape.holes.push(center);
+  const angle = -gear.meshPhase;
+  for (const h of gear.holes || []) {
+    const hole = new THREE.Path();
+    hole.absarc(h.u*Math.cos(angle)-h.v*Math.sin(angle), h.u*Math.sin(angle)+h.v*Math.cos(angle), h.diameter/2, 0, 2*Math.PI, true);
+    shape.holes.push(hole);
+  }
   return shape;
 }
 
