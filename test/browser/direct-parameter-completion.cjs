@@ -30,7 +30,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   let after=await state(),bar=after.work.comps.find(c=>c.id==='Link11');
   assert.ok(Math.abs(Math.atan2(bar.p2.y-bar.p1.y,bar.p2.x-bar.p1.x)*180/Math.PI-27.35)<1e-7);assert.deepEqual(after.work.params,beforeAngle.work.params);assert.equal(after.undo,beforeAngle.undo+1);await undo(beforeAngle);
   await page.screenshot({path:`${out}/${viewport.width}-angle.png`});
-  const selectMiddle=async()=>{const c=(await state()).work.comps.find(c=>c.id==='H2Arm');await tap(await world({x:(c.p2.x+c.p3.x)/2,y:(c.p2.y+c.p3.y)/2}));const choice=page.getByRole('button',{name:/H2Arm.*尺寸/});if(await choice.isVisible())await choice.click();};
+  const selectMiddle=async()=>{const c=(await state()).work.comps.find(c=>c.id==='H2Arm');await tap(await world({x:(c.p2.x+c.p3.x)/2,y:(c.p2.y+c.p3.y)/2}));const choice=page.locator('[data-pick="H2Arm"]');if(await choice.isVisible())await choice.click();};
   await load('hydraulic-h02');await selectMiddle();await expand();await page.evaluate(()=>blocks.fitView());await page.waitForTimeout(150);
   const middleField=page.locator('#memberDimensionInput');const middleBefore=await state();await input(middleField,143.9);let middle=(await state()).work;
   assert.equal(middle.params.H2Arm,143.9);assert.ok(Math.abs(middle.params.H2Arm+middle.params.H2Tail-256)<1e-7);await undo(middleBefore);await selectMiddle();await expand();
