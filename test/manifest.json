@@ -332,7 +332,9 @@
     "test/c7-syringe.mjs",
     "test/free-part-motion.mjs",
     "test/drive-drag.mjs",
-    "test/operation-matrix.mjs"
+    "test/operation-matrix.mjs",
+    "test/edit-pipeline.mjs",
+    "test/delete-pipeline.mjs"
   ],
   "version": 1
 }

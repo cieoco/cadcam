@@ -22,7 +22,7 @@ const GROUND = new Set(['fixed', 'motor', 'linear']);
 const fix1 = n => (Math.round(n * 10) / 10).toString();
 const MOTOR_NAMES = {tt: 'TT 馬達', n20: 'N20 減速馬達', mg995: 'MG995 伺服馬達'};
 // 學生看得到的名稱：自己取的名字；沒有名字時獨立馬達用型號，其他用零件種類，不顯示內部編號。
-const nameOf = c => (typeof c?.name === 'string' && c.name.trim()) || (c?.type === 'motor' ? MOTOR_NAMES[c.motorType] || MOTOR_NAMES.tt : c ? ({bar: '桿件', triangle: '板件', gear: '齒輪', slider: '滑軌'})[c.type] || '零件' : '零件');
+export const nameOf = c => (typeof c?.name === 'string' && c.name.trim()) || (c?.type === 'motor' ? MOTOR_NAMES[c.motorType] || MOTOR_NAMES.tt : c ? ({bar: '桿件', triangle: '板件', gear: '齒輪', slider: '滑軌'})[c.type] || '零件' : '零件');
 const quote = c => `「${nameOf(c)}」`;
 const clone = v => structuredClone(v);
 

@@ -28,6 +28,7 @@ const {createNodeEditor}=await import(R+'node-editor.js');
 const {normalizeSnapshot}=await import(R+'schema.js');
 const {readStoredProject}=await import(R+'project-envelope.js');
 const {deleteSelectedPart}=await import(R+'delete-part.js');
+const {targetOf}=await import(R+'selection-target.js');
 const {integrityGate,loadIntegrity}=await import(R+'integrity-gate.js');
 const {checkWork}=await import(R+'integrity.js');
 const MR=await import(R+'motor-release.js');
@@ -58,7 +59,7 @@ function load(w){
 function del(w,sel){
   load(w);Object.assign(S,sel);
   const msgs=[],before=JSON.stringify([S.comps,S.topo.params]);let pushes=0;
-  deleteSelectedPart({S,transient:m=>msgs.push(m),deleteGearChain(){msgs.push('(gear chain deleted)');},pushUndo(){pushes++;},pause(){},closeMobileEditPanel(){},setSliderDetailRows(){},rebuild(){},draw(){},points:{}});
+  deleteSelectedPart({S,transient:m=>msgs.push(m),deleteGearChain(){msgs.push('(gear chain deleted)');},pushUndo(){pushes++;},pause(){},closeMobileEditPanel(){},setSliderDetailRows(){},rebuild(){},draw(){},points:{},flash(){}});
   return {changed:before!==JSON.stringify([S.comps,S.topo.params]),msgs,pushes,ids:S.comps.map(c=>c.id)};
 }
 const compsOfPoint=(w,id)=>w.comps.filter(c=>pointKeysFor(c).some(k=>c[k]?.id===id));
@@ -88,7 +89,9 @@ const copyOf=(w,id,mode='copy')=>planMemberCopy({comps:w.comps,params:w.params,m
 
 const CHECKS={
   // --- select
-  'select-shared-joint':()=>{const w=blocked();return compsOfPoint(w,'Blank136.B').length===2&&!del(w,{selectedNodeId:'Blank136.B'}).changed;},
+  // still a gap: the target is only worked out when a command runs (delete explains and flashes); nothing marks the owner at selection time
+  'select-shared-joint':()=>{const w=blocked(),t=targetOf({...S,selectedLinkId:null,selectedTriangleId:null,selectedSliderId:null,selectedGearId:null,selectedNodeId:'Blank136.B'},w.comps,[]);
+    return compsOfPoint(w,'Blank136.B').length===2&&t.part===null&&t.shared.length===2&&/共用/.test(del(w,{selectedNodeId:'Blank136.B'}).msgs[0]||'');},
   // --- move (Model.isFreeBody decides whether a body drag translates; otherwise input.js only selects / returns without a message)
   'move-free-bar':()=>{const w=freeBar();return Model.isFreeBody(w.comps,w.comps[0],[]);},
   'move-free-plate':()=>{const w=freePlate();return Model.isFreeBody(w.comps,w.comps[0],[]);},
@@ -111,21 +114,25 @@ const CHECKS={
   // --- delete
   'del-bar-free-ok':()=>{const r=del(repaired(),{selectedLinkId:'Blank137'});return r.changed&&!r.ids.includes('Blank137')&&r.ids.includes('Blank136');},
   'del-connected-bar-ok':()=>{const r=del(repaired(),{selectedLinkId:'Blank136'});return r.changed&&!r.ids.includes('Blank136')&&r.ids.includes('Blank135')&&r.ids.includes('Blank137');},
-  'del-hole-silent':()=>{const r=del(blocked(),{selectedNodeId:'Blank136.B'}),r2=del(blocked(),{selectedNodeId:'Blank133_H8_0'});return !r.changed&&!r.msgs.length&&!r2.changed&&!r2.msgs.length;},
-  'del-existing-problem-blocked':()=>{const a=del(blocked(),{selectedLinkId:'Blank136'}),b=del(blocked(),{selectedLinkId:'Blank137'});
-    const refused=r=>!r.changed&&r.msgs.some(m=>m.includes('馬達軸心需保持在所選座板格位'));
-    return refused(a)&&refused(b)&&del(repaired(),{selectedLinkId:'Blank136'}).changed;},      // same deletion succeeds once the old problem is repaired
+  'del-hole-owner':()=>{const shared=del(blocked(),{selectedNodeId:'Blank136.B'}),own=del(blocked(),{selectedNodeId:'Blank137_H8_0'}),plate=del(blocked(),{selectedNodeId:'Blank133_H8_0'});
+    return !shared.changed&&shared.msgs.length===1&&/共用/.test(shared.msgs[0])&&own.changed&&!own.ids.includes('Blank137')&&plate.changed&&!plate.ids.includes('Blank133');},
+  'del-existing-problem-ok':()=>{const a=del(blocked(),{selectedLinkId:'Blank136'}),b=del(blocked(),{selectedLinkId:'Blank137'});
+    return a.changed&&b.changed&&!a.msgs.concat(b.msgs).some(m=>m.includes('馬達軸心需保持在所選座板格位'));},
   'del-fused-refused':()=>{const w=example('six-bar-lift'),root=w.comps.find(c=>c.barFusionRoot);if(!root)return false;const r=del(w,{selectedLinkId:root.id});return !r.changed&&r.msgs.some(m=>m.includes('解除合成'));},
   'del-plate-plain':()=>{const w=freePlate(),r=del(w,{selectedTriangleId:w.comps[0].id});return r.changed&&!r.ids.length;},
-  'del-plate-silent-detach':()=>{const r=del(repaired(),{selectedTriangleId:'Blank133'}),bar=S.comps.find(c=>c.id==='Blank135');
-    return r.changed&&!r.msgs.length&&bar?.p2.type==='fixed'&&!bar.motorMount?.frameBody;},
+  'del-plate-explains-detach':()=>{const r=del(repaired(),{selectedTriangleId:'Blank133'}),bar=S.comps.find(c=>c.id==='Blank135');
+    return r.changed&&r.msgs.length===1&&/馬達.*獨立固定點/.test(r.msgs[0])&&bar?.p2.type==='fixed'&&!bar.motorMount?.frameBody;},
   'del-l-ok':()=>{const w=freeL(),r=del(w,{selectedTriangleId:w.comps[0].id});return r.changed&&!r.ids.length;},
   'del-arms-ok':()=>{const w=bell(),c=w.comps.find(c=>c.standardBlank?.kind==='arms'),r=del(w,{selectedTriangleId:c.id});return r.changed&&!r.ids.includes(c.id)&&r.ids.length===w.comps.length-1;},
   'del-slider-ok':()=>{const w=example('slider-crank'),s=w.comps.find(c=>c.type==='slider'),r=del(w,{selectedSliderId:s.id});return r.changed&&!r.ids.includes(s.id)&&r.ids.includes('Link1');},
   'del-motor-independent':()=>{const w=released(),m=w.comps.find(c=>c.type==='motor'),r=del(w,{selectedNodeId:m.p1.id});return r.changed&&!r.ids.includes(m.id)&&r.ids.includes('Blank133');},
-  'del-motorbar-removes-motor':()=>{const r=del(repaired(),{selectedLinkId:'Blank135'});return r.changed&&!S.comps.some(c=>c.type==='motor'||c.physicalMotor||c.motorMount||pointKeysFor(c).some(k=>c[k]?.physicalMotor));},
-  'del-syringe-key-silent':()=>{const w=example('hydraulic-h01');if(!w.comps.some(c=>c.type==='syringe'))return false;const r=del(w,{});return !r.changed&&!r.msgs.length;},
-  'del-anchor-silent':()=>{const w=example('slider-crank'),a=w.comps.find(c=>c.type==='anchor'),r=del(w,{selectedNodeId:a.p1.id});return !r.changed&&!r.msgs.length;},
+  'del-motorbar-keeps-motor':()=>{const r=del(repaired(),{selectedLinkId:'Blank135'}),m=S.comps.find(c=>c.type==='motor');
+    return r.changed&&!r.ids.includes('Blank135')&&m?.motorMount?.frameBody==='Blank133'&&!S.comps.some(c=>c.type==='bar'&&(c.isInput||c.motorMount))&&/馬達留在座板上，尚未接輸出/.test(r.msgs[0]||'');},
+  'del-syringe-key-explained':()=>{const w=example('hydraulic-h01');if(!w.comps.some(c=>c.type==='syringe'))return false;const r=del(w,{});return !r.changed&&r.msgs.length===1&&r.msgs[0].includes('刪除針筒');},
+  'del-anchor-explained':()=>{const w=example('slider-crank'),a=w.comps.find(c=>c.type==='anchor'),shared=del(w,{selectedNodeId:a.p1.id});
+    const p=w.comps.flatMap(c=>pointKeysFor(c).map(k=>c[k])).filter(p=>p?.type==='fixed'),[p1,p2]=[p[0],p.find(q=>Math.hypot(q.x-p[0].x,q.y-p[0].y)>1)];
+    const hole={id:'FrameHoleT',type:'anchor',name:'機架孔',p1:{id:'FrameHoleT.P',type:'fixed',x:p1.x,y:p1.y},frameHole:{a:p1.id,b:p2.id,u:0}},free=del({...w,comps:[...w.comps,hole]},{selectedNodeId:'FrameHoleT.P'});
+    return !shared.changed&&shared.msgs.length===1&&/共用/.test(shared.msgs[0])&&free.changed&&!free.ids.includes('FrameHoleT')&&free.msgs.length===1;},
   // --- connect
   'connect-free-bars-ok':()=>{const a=makeStandardBlank({kind:'bar',n:1,origin:{x:0,y:0}}),b=makeStandardBlank({kind:'bar',n:2,origin:{x:200,y:100}});
     const w=blocks(a,b),r=Model.previewPointConnection(structuredClone(w.comps),{params:w.params},a.comp.p2.id,b.comp.p1.id);return r.ok&&Model.pointUseCount(r.comps,b.comp.p1.id)===2||r.ok&&r.comps.some(c=>c.id===b.comp.id);},

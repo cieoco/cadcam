@@ -44,10 +44,7 @@ const na = (when, expect) => ({when, expect, status: 'n/a'});
 // 同一根因的代號
 const HOLE_TARGET = 'hole-has-no-target';        // 選到孔／接點時只記孔，指令不知道要作用在哪個零件
 const SILENT_DRAG = 'silent-drag';                // 拖不動時不說原因
-const GATE_OLD = 'delete-old-check';              // 刪除仍用舊的座板檢查，沒套「只擋新問題」
-const MOTOR_ON_BAR = 'motor-data-on-bar';         // 馬達資料記在輸出桿上
 const SILENT_DONE = 'silent-success';             // 做完連帶改變沒有說明
-const NO_SELECT_FIELD = 'no-selection-field';     // 針筒的選取沒有記在共用選取欄位
 
 const SPLIT_JOINT = check => gap('桿端與別的零件共用同一個接點',
   '拆開後說明「已把接點分開」，並與其他動作一樣先檢查會不會製造新問題；可一次復原。',
@@ -59,8 +56,8 @@ export const MATRIX = {
     select: [
       ok('點桿身', '選到這根桿，顯示它的長度設定。'),
       gap('點到桿上的孔，而那個孔被好幾個零件共用', '畫面標明「你選的是哪個零件的孔」，要改時才問；不能只記下孔。',
-        '只記下孔本身，不記是哪個零件；之後的指令（例如刪除）因此不知道要動誰。',
-        'input.js onNodeDown 只設 S.selectedNodeId；桌機沒有選擇器（overlap-picker 只在手機 mobilePrompt() 時出現）。',
+        '刪除時會說明由哪幾個零件共用並在圖上閃示（selection-target.js）；但選取當下圖上沒有常駐標示所選孔屬於哪個零件。',
+        'input.js onNodeDown 仍只設 S.selectedNodeId；targetOf 只在指令執行時才查；桌機沒有選擇器（overlap-picker 只在手機 mobilePrompt() 時出現）。',
         {check: 'select-shared-joint', cause: HOLE_TARGET})
     ],
     move: [
@@ -83,12 +80,8 @@ export const MATRIX = {
     delete: [
       ok('未接、作品沒有既存問題', '桿被刪除。', 'del-bar-free-ok'),
       ok('已接其他零件', '桿被刪除，相鄰零件保留，原本相接的孔留成獨立的點。', 'del-connected-bar-ok'),
-      gap('選到的是桿上的孔或共用接點', '刪除所屬的零件；共用接點不猜，請使用者點桿身並在圖上標出候選。',
-        '按 Delete 沒有反應，也沒有任何訊息。', 'delete-part.js：id 只由 selectedLinkId／TriangleId／SliderId／馬達節點決定，選到一般孔時 id 為空直接 return。',
-        {check: 'del-hole-silent', cause: HOLE_TARGET}),
-      gap('作品已有既存問題（例如馬達軸離開座板原孔），要刪的桿與馬達無關', '刪除成功，不被舊問題擋住。',
-        '被擋下，訊息是「馬達軸心需保持在所選座板格位…」，但刪的桿並沒有動到馬達。',
-        'delete-part.js 先跑 planActuatorPlateHoles（舊檢查），它沒套 integrityGate 的「只擋新問題」規則。', {check: 'del-existing-problem-blocked', cause: GATE_OLD}),
+      ok('選到的是桿上的孔或共用接點', '刪除所屬的零件；共用接點不猜，請使用者點桿身並在圖上標出候選。', 'del-hole-owner'),
+      ok('作品已有既存問題（例如馬達軸離開座板原孔），要刪的桿與馬達無關', '刪除成功，不被舊問題擋住。', 'del-existing-problem-ok'),
       ok('桿被合成', '請先解除合成（有說明）。', 'del-fused-refused')
     ],
     connect: [
@@ -111,7 +104,7 @@ export const MATRIX = {
   plate: {
     select: [
       ok('點板面', '選到這片板，顯示尺寸設定。'),
-      gap('點到板上的孔，而那個孔被別的零件共用', '畫面標明所選孔屬於哪一個零件。', '只記下孔，不記是哪個零件。',
+      gap('點到板上的孔，而那個孔被別的零件共用', '畫面標明所選孔屬於哪一個零件。', '同桿件：刪除時會說明並閃示，選取當下圖上沒有常駐標示。',
         'input.js onNodeDown：同桿件。', {check: 'select-shared-joint', cause: HOLE_TARGET}),
       gap('桌機上多個零件重疊在同一處', '用零件名稱與圖上高亮列出候選，由使用者選。',
         '桌機直接選最上層，不問；手機的選擇器標籤還帶內部代號（例如「連桿 · Blank136」）。',
@@ -130,12 +123,9 @@ export const MATRIX = {
     ],
     delete: [
       ok('未接、板上沒裝東西', '板材被刪除，其他零件不受影響。', 'del-plate-plain'),
-      gap('板上裝著馬達、針筒或有零件接在孔上', '刪除後說明「馬達改成獨立固定點」「接孔已放開」。',
-        '板被刪掉，馬達軸改成獨立固定點、輸出桿保留，但沒有任何訊息。', 'delete-part.js 成功路徑沒有 transient；連帶改變來自 detachDeletedAttachments。',
-        {check: 'del-plate-silent-detach', cause: SILENT_DONE}),
+      ok('板上裝著馬達、針筒或有零件接在孔上', '刪除後說明「馬達改成獨立固定點」「接孔已放開」。', 'del-plate-explains-detach'),
       ok('盒體的配對板件', '請整組管理（有說明）。'),
-      gap('選到的是板上的孔', '刪除所屬的板，或明說不能刪。', '按 Delete 沒有反應也沒有訊息。', '同桿件：delete-part.js 沒有處理一般孔。',
-        {check: 'del-hole-silent', cause: HOLE_TARGET})
+      ok('選到的是板上的孔', '刪除所屬的板，或明說不能刪。', 'del-hole-owner')
     ],
     connect: [
       ok('板孔與其他零件的點接合', '經過候選預覽、桿長與固定孔檢查後接合，拒絕時說明原因。', 'connect-refusal-message')
@@ -202,9 +192,7 @@ export const MATRIX = {
     ],
     resize: [ok('改輸出桿長度', '軸心不動，另一端移動。', 'resize-motorbar-shaft-stays')],
     delete: [
-      gap('刪除輸出桿', '馬達仍留在座板上，成為沒有輸出的獨立馬達；桿被刪除。',
-        '馬達跟著桿一起被刪掉（馬達資料記在桿件上）。',
-        'delete-part.js 直接移除該 comp；motor-release.js 的 planMotorRelease 已能先解除，但刪除沒有用它。', {check: 'del-motorbar-removes-motor', cause: MOTOR_ON_BAR})
+      ok('刪除輸出桿', '馬達仍留在座板上，成為沒有輸出的獨立馬達；桿被刪除。', 'del-motorbar-keeps-motor')
     ],
     connect: [ok('桿已接著別的零件，再拖到馬達軸', '拒絕並說明。', 'connect-motor-refuse-message')],
     release: [ok('輸出桿接在馬達軸上', '馬達與桿都保留，說明「已解除…可再接回」，可復原。', 'release-motor-ok')],
@@ -243,10 +231,7 @@ export const MATRIX = {
     resize: [ok('改行程、筒長', '針筒面板欄位與把手同一個結果。')],
     delete: [
       ok('在針筒面板按「刪除針筒」', '針筒被刪除，經過一致性檢查、可復原。'),
-      gap('選到針筒後按 Delete', '針筒被刪除，或說明請用面板的刪除鍵。',
-        '沒有反應也沒有訊息（針筒的選取只存在自己的面板裡，共用選取欄位全空）。',
-        'delete-part.js 不認識針筒；syringe-editor.js 的 selected 是區域變數，app.js selectModuleTarget 先清空選取再開面板。',
-        {check: 'del-syringe-key-silent', cause: NO_SELECT_FIELD})
+      ok('選到針筒後按 Delete', '針筒被刪除，或說明請用面板的刪除鍵。', 'del-syringe-key-explained')
     ],
     connect: [ok('在圖上選孔接推桿', '接好後可模擬，接不上時說明。')],
     release: [ok('解除推桿連接', '先預覽，確認後解除；固定環與其他桿保留。', 'release-syringe-ok')],
@@ -258,8 +243,7 @@ export const MATRIX = {
     move: [ok('沿基準線拖機架孔', '拖曳以 1 mm 取整，欄位可輸入精確距離；兩者同一個結果。')],
     resize: [na('孔沒有尺寸', '距離基準孔屬於「移動」。')],
     delete: [
-      gap('選到固定孔後按 Delete', '刪除該孔，或說明請用面板的「刪除孔」。', '沒有反應也沒有訊息。', '同桿件：delete-part.js 沒有處理一般孔。',
-        {check: 'del-anchor-silent', cause: HOLE_TARGET}),
+      ok('選到固定孔後按 Delete', '刪除該孔；孔上接著別的零件時說明並標出是哪些。', 'del-anchor-explained'),
       ok('在機架孔面板按「刪除孔」', '孔被刪除；孔上接著桿時拒絕並說明。')
     ],
     connect: [ok('桿端拖到機架孔', '接成固定的樞軸。', 'connect-refusal-message')],
