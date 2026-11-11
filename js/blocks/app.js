@@ -1081,13 +1081,17 @@ async function copyMember(mode) {
   try {
     const {openMemberCopy}=await import('./member-copy-dialog.js');
     if(snapshotStr()!==revision){transient('作品已變更，請重新選取零件。');return;}
+    const {commitCopy}=await import('./member-copy.js');
     openMemberCopy({source,mode,onConfirm:plan=>{
       if(snapshotStr()!==revision)return '作品已變更，請取消後重新開啟。';
-      pushUndo();S.comps.push(...plan.comps);Object.assign(S.topo.params,plan.params);S.counter=plan.counter;
-      rebuild();
-      const c=plan.comps.find(c=>c.id===plan.selectedId);
-      if(c.type==='bar')selectLink(c.id);else selectTriangle(c.id);
-      fitView();return '';
+      // 規劃、一致性檢查、一次復原、一行回饋走共用編輯流程；副本寫入並重建後選取並置中。
+      const rebuildAndSelect=()=>{
+        rebuild();
+        const c=S.comps.find(c=>c.id===plan.selectedId);
+        if(c.type==='bar')selectLink(c.id);else selectTriangle(c.id);
+        fitView();
+      };
+      return commitCopy({S,transient,pushUndo,pause,rebuild:rebuildAndSelect,draw},{id,mode:plan.mode,positions:source.positions,settings:source.settings});
     }});
   } catch(e) { console.error(e);transient('複製視窗載入失敗，請重試。'); }
 }

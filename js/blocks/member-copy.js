@@ -6,6 +6,8 @@ import {instantiateTemplate} from './module-ops.js';
 import {pointKeysFor, ownedParamKeys} from './part-types.js';
 import {createPlateGeometry, roundedHullOutline} from './plate-geometry.js';
 import {memberStock, memberHoleDiameter} from './member-stock.js';
+import {runEdit} from './edit-pipeline.js';
+import {partName} from './selection-target.js';
 
 // 本體幾何預覽；附件、馬達與固定狀態不屬於複製的零件。
 export function copyMemberGeometry(comp, params, settings = {}) {
@@ -89,5 +91,31 @@ export function planMemberCopy({comps, params, modules = [], counter = 0, id, po
     if (!check.ok) return fail(check.reason);
   }
   return {ok:true,source,sourceParams,comps:result.comps,params:result.params,counter:result.counter,
-    selectedId:result.comps[members.findIndex(c=>c.id===id)].id,mode};
+    selectedId:result.comps[members.findIndex(c=>c.id===id)].id,mode,memberIds:members.map(c=>c.id)};
+}
+
+const MODE_TEXT = {copy: '複製', 'mirror-x': '左右鏡射', 'mirror-y': '上下鏡射'};
+const hadMotor = c => [c.p1, c.p2, c.p3].some(p => p?.physicalMotor) || !!(c.physicalMotor || c.motorMount || c.motorCarrier);
+
+/** 複製／鏡射的規劃（SDD-OPERATION-PIPELINE O4）：只複製零件本體（新編號、不與任何零件相接、放在原件旁邊），其餘照舊交給 planMemberCopy。
+ *  work={comps,params,modules,counter}；回傳 runEdit 的規劃結果，另帶 selectedId（副本裡對應被選零件的那一個）。 */
+export function planCopy(work, {id, mode = 'copy', positions = {}, settings = {}}) {
+  const plan = planMemberCopy({comps: work.comps, params: work.params, modules: work.modules || [], counter: work.counter, id, positions, mode, settings});
+  if (!plan.ok) return {ok: false, message: plan.reason};
+  const original = work.comps.find(c => c.id === id), many = plan.comps.length > 1;
+  const name = `「${partName(original)}」`, what = mode === 'copy' ? `已複製${name}` : `已建立${name}的${MODE_TEXT[mode]}副本`;
+  const motor = work.comps.filter(c => plan.memberIds.includes(c.id)).some(hadMotor);
+  const message = `${what}${many ? `（整片 ${plan.comps.length} 段一起）` : ''}，副本放在原件旁邊並已選取；沒有和任何零件相接。${motor ? '馬達沒有一起複製，副本不會自己轉。' : ''}`;
+  return {ok: true, comps: [...work.comps, ...plan.comps], params: {...work.params, ...plan.params}, message, selectedId: plan.selectedId,
+    clearSelection: false, pruneRefs: false, after: S => { S.counter = plan.counter; }};
+}
+
+/** 複製對話框按「確認新增」：走共用編輯流程（一致性檢查、一次復原、一行回饋）。回傳 ''＝已套用；否則是要顯示在對話框裡的原因。
+ *  host={S,transient,pushUndo,pause,rebuild,draw}（呼叫端的 rebuild 可順便選取副本、置中）。 */
+export function commitCopy(host, {id, mode, positions, settings}) {
+  let said = '';
+  const applied = runEdit({name: '複製', host: {...host, transient: m => { said = m; }}, plan: work => planCopy(work, {id, mode, positions, settings})});
+  if (!applied) return said || '複製沒有完成，作品沒有改動。';
+  host.transient(said);
+  return '';
 }
