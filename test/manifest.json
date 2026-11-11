@@ -351,7 +351,8 @@
     "test/drag-intent.mjs",
     "test/resize-pipeline.mjs",
     "test/hole-owner.mjs",
-    "test/motor-part.mjs"
+    "test/motor-part.mjs",
+    "test/motor-part-plans.mjs"
   ],
   "version": 1
 }
