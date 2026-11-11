@@ -78,4 +78,19 @@ check('原本的舊問題不擋不相干的改尺寸（把手）',S.topo.params[
 // ---- a resize that would itself create a new problem is still refused (the gate is not switched off)
 reset(blocked);const stateBefore=state();byNumber('Blank133','g',16);
 check('新造成的問題仍被擋下（縮小機架板會讓馬達孔消失）',state()===stateBefore&&undo.length===0&&notices.length>=1,notices.join('|'));
+// ---- the mounting-change confirmation runs INSIDE the shared pipeline (runEdit `confirm` stage): accept -> one commit, decline -> nothing changes
+{
+  const lift=normalizeSnapshot(structuredClone(getExample('lift-bucket').snapshot)),id='Link3';
+  let asked=0,answer=true;globalThis.window.confirm=()=>{asked++;return answer;};
+  reset(lift);const L=S.topo.params[comp(id).lenParam],start=state();
+  answer=false;byNumber(id,'g',L+8);
+  check('確認視窗按取消：作品完全不變、沒有復原點、只說一句「已取消，未套用。」',state()===start&&undo.length===0&&asked===1&&notices.length===1&&notices[0]==='已取消，未套用。',notices.join('|'));
+  reset(lift);asked=0;answer=true;byNumber(id,'g',L+8);const accepted=state();
+  check('確認視窗按確定：套用一次、一次復原點、只問一次',S.topo.params[comp(id).lenParam]===L+8&&undo.length===1&&asked===1&&notices.length===0,`${asked} ${undo.length} ${notices.join('|')}`);
+  reset(lift);asked=0;byHandle(id,'g',L+8);
+  check('確認流程：把手與數字欄結果相同、同樣只問一次',state()===accepted&&undo.length===1&&asked===1);
+  const held=(reset(lift),comp(id));byNumber(id,'g',L+8);
+  check('面板手上拿著的零件物件在套用後仍是同一個（保留身分）',comp(id)===held&&S.topo.params[held.lenParam]===L+8);
+  globalThis.window.confirm=()=>true;
+}
 report('resize-pipeline');

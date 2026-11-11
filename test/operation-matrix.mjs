@@ -89,7 +89,28 @@ async function dragSays(w,down,re){
 }
 function ownerOf(w,id){load(w);S.selectedNodeId=id;let flashed=[];const title={textContent:'接點',dataset:{}};
   showHoleOwner(S,{querySelector:()=>title},true,{flash:ids=>{flashed=ids;}});return {title:title.textContent,flashed};}
+async function overIdleHole(){
+  const plate=makeStandardBlank({kind:'plate',n:1}),bar=makeStandardBlank({kind:'bar',n:2});plate.comp.p1.type=plate.comp.p2.type='fixed';
+  const w=blocks(plate,bar),hole=localHoles(plate.comp)[1].id;
+  Rig.load(w);Rig.dom.unused.add(hole);Rig.dom.under=[Rig.partEl(bar.comp.id),Rig.partEl(plate.comp.id)];
+  const tap=await Rig.gesture(Rig.nodeDown(hole),[]),tapKept=JSON.stringify(S.comps)===JSON.stringify(w.comps)&&S.selectedNodeId===hole&&tap.length===0;
+  const a=Model.pointCoords(S.comps);await Rig.gesture(Rig.nodeDown(hole),[[112,104],[150,130],[200,160]]);const b=Model.pointCoords(S.comps),id=bar.comp.p1.id;
+  return tapKept&&Math.hypot(b[id].x-a[id].x-100,b[id].y-a[id].y-60)<1e-6;
+}
+async function resizeConfirmCancel(){
+  const lift=example('lift-bucket'),{createMemberEditor}=await import(R+'member-editor.js');let answer=false,asked=0,undo=0;const said=[];
+  globalThis.window.confirm=()=>{asked++;return answer;};
+  const ed=createMemberEditor({pause:noop,rebuild:noop,draw:noop,reshapeTriangle:noop,updatePointCoordsById:noop,pushUndo:()=>undo++,notify:m=>said.push(m)});
+  load(lift);const L=S.topo.params[comp(lift,'Link3').lenParam],before=JSON.stringify([S.comps,S.topo.params]);
+  ed.setDimensionValue('Link3','g',L+8,{exact:true});
+  const cancelled=asked===1&&undo===0&&said.join('|')==='已取消，未套用。'&&JSON.stringify([S.comps,S.topo.params])===before;
+  answer=true;said.length=0;ed.setDimensionValue('Link3','g',L+8,{exact:true});
+  globalThis.window.confirm=()=>true;
+  return cancelled&&undo===1&&S.topo.params[comp(lift,'Link3').lenParam]===L+8;
+}
 const CHECKS={
+  'move-over-idle-hole':overIdleHole,
+  'resize-confirm-cancel':resizeConfirmCancel,
   // --- select
   // still a gap: the target is only worked out when a command runs (delete explains and flashes); nothing marks the owner at selection time
   'select-shared-joint':()=>{const w=blocked(),t=targetOf({...S,selectedLinkId:null,selectedTriangleId:null,selectedSliderId:null,selectedGearId:null,selectedNodeId:'Blank136.B'},w.comps,[]);

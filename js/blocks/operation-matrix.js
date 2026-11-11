@@ -66,6 +66,7 @@ export const MATRIX = {
     resize: [
       ok('未接或已接，改孔數（數字）', '桿變長或變短，相接的零件跟著孔移動。', 'resize-bar-ok'),
       ok('縮小會移除已被使用的孔', '拒絕並說明是哪一個孔被用到。', 'resize-plate-lost-hole'),
+      ok('改尺寸會讓固定孔位與原本不一致（需要確認）', '照舊詢問；按取消＝作品不變、沒有復原點、只說「已取消，未套用。」；按確定＝套用並一次復原。（O3b：確認在共用流程 runEdit 的 confirm 階段）', 'resize-confirm-cancel'),
       ok('改完相連機構接不起來', '拒絕並說「孔距未修改：長度無法閉合」，作品不變。'),
       ok('作品已有既存問題（馬達離開座板原孔），改的是不相干的桿', '只擋這次新造成的問題；舊問題不擋改尺寸（O3：commitMountingEdit 只在座板核對「新增失敗」時拒絕）。', 'resize-existing-problem-ok')
     ],
@@ -104,7 +105,8 @@ export const MATRIX = {
     move: [
       ok('未接任何零件（自由板）', '拖板上任一點，整片平移，形狀不變。', 'move-free-plate'),
       ok('已接其他零件或固定孔，但沒有動力來源', '說明為什麼不能拖。', 'move-connected-plate-explained'),
-      ok('三點桿的某個頂點已被機構完全決定', '說明「這個頂點被其他零件鎖住」。', 'move-locked-vertex-explained')
+      ok('三點桿的某個頂點已被機構完全決定', '說明「這個頂點被其他零件鎖住」。', 'move-locked-vertex-explained'),
+      ok('手指或滑鼠落在固定板沒用到的格孔上，而底下（同一處）有會動的零件', '抓的是底下那個零件：自由件整件平移、有動力就試動；只點一下照舊選取該孔。（O3b：手機與桌機相同）', 'move-over-idle-hole')
     ],
     resize: [
       ok('改長／寬孔數，未被使用的孔', '板變大或變小，孔格重新排列。', 'resize-plate-grow'),

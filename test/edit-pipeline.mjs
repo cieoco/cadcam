@@ -69,4 +69,32 @@ const failing=(msg)=>({id:'x',run:w=>w.comps.some(c=>c.id==='b2')?msg:''});     
  const {S,log,host:h}=host(),ok=runEdit({name:'測試',plan:w=>({ok:true,comps:[...w.comps,bar('b3',300)],params:{...w.params,b3L:40}}),host:h});
  check('integrity gate refusal: no undo, no change, one line',ok===false&&log.undo===0&&S.comps.length===2&&log.msgs.length===1&&log.msgs[0].includes('矛盾'));
  await gate.loadIntegrity();}
+// ---- confirm stage (O3b): between the checks and the commit
+const keepB2Plan=w=>({ok:true,comps:w.comps.filter(c=>c.id!=='b2'),params:{b1L:w.params.b1L},message:'已刪除桿。'});
+{const {S,log,host:h}=host(),seen=[],ok=runEdit({name:'測試',plan:keepB2Plan,host:h,confirm:after=>{seen.push([after.comps.length,S.comps.length,log.undo]);return true;}});
+ check('confirm → true: commits once; confirm sees the candidate while the work and undo are untouched',ok===true&&log.undo===1&&S.comps.length===1&&JSON.stringify(seen)==='[[1,2,0]]');}
+{const {S,log,host:h}=host(),before=JSON.stringify(S),ok=runEdit({name:'測試',plan:keepB2Plan,host:h,confirm:()=>false});
+ check('confirm → false: nothing changes, no undo, no rebuild',ok===false&&JSON.stringify(S)===before&&log.undo===0&&log.rebuild===0&&log.draw===0);
+ check('confirm → false: exactly one line 「已取消，未套用。」',log.msgs.length===1&&log.msgs[0]==='已取消，未套用。');}
+{const {S,log,host:h}=host(),before=JSON.stringify(S),ok=runEdit({name:'測試',plan:keepB2Plan,host:h,confirm:()=>({ok:false,message:'孔位對不上。'})});
+ check('confirm → {ok:false,message}: refused with that one line, nothing changes',ok===false&&JSON.stringify(S)===before&&log.undo===0&&log.msgs.join('|')==='孔位對不上。');}
+{const {S,log,host:h}=host(),ok=runEdit({name:'測試',plan:keepB2Plan,host:h,confirm:()=>{throw new Error('boom');}});
+ check('a throwing confirm counts as declined (never commits)',ok===false&&log.undo===0&&S.comps.length===2&&log.msgs.length===1);}
+{const {S,log,host:h}=host(),alt=[bar('b1',0),bar('b9',300)],ok=runEdit({name:'測試',plan:keepB2Plan,host:h,confirm:()=>({comps:alt,params:{b1L:40,b9L:40}})});
+ check('confirm → {comps,…}: the replacement candidate is what gets committed',ok===true&&S.comps.map(c=>c.id).join()==='b1,b9'&&S.topo.params.b9L===40&&log.undo===1);}
+{const {S,log,host:h}=host(),p=runEdit({name:'測試',plan:keepB2Plan,host:h,confirm:async()=>true});
+ check('async confirm: runEdit returns a promise and nothing is written yet',typeof p.then==='function'&&S.comps.length===2&&log.undo===0);
+ check('async confirm: commits once after it resolves',await p===true&&S.comps.length===1&&log.undo===1);}
+{const {S,log,host:h}=host(),p=runEdit({name:'測試',plan:keepB2Plan,host:h,confirm:async()=>false});
+ check('async confirm declined: nothing changes, one 已取消 line',await p===false&&S.comps.length===2&&log.undo===0&&log.msgs.join()==='已取消，未套用。');}
+{const {S,log,host:h}=host(),p=runEdit({name:'測試',plan:keepB2Plan,host:h,confirm:async()=>{S.comps=[...S.comps];return true;}});
+ check('async confirm: the work changed meanwhile → cancelled, not overwritten',await p===false&&S.comps.length===2&&log.undo===0&&log.msgs.length===1);}
+// object identity, quiet success, unchanged
+{const {S,log,host:h}=host(),held=S.comps[0],ok=runEdit({name:'尺寸',host:h,plan:w=>({ok:true,comps:w.comps.map(c=>c.id==='b1'?{...c,name:'新名'}:c),params:w.params,keepIdentity:true,clearSelection:false,message:''})});
+ check('keepIdentity: a part that already exists keeps its object and takes the new fields',ok&&S.comps[0]===held&&held.name==='新名');
+ check('message "" : success without an extra line; selection kept',log.msgs.length===0&&S.selectedLinkId==='b1');}
+{const {S,log,host:h}=host(),ok=runEdit({name:'尺寸',host:h,plan:w=>({ok:true,comps:w.comps,params:w.params,pruneRefs:false})});
+ check('pruneRefs:false leaves existing dangling references alone',ok&&S.topo.tracePoints.includes('gone.A'));}
+{const {S,log,host:h}=host(),ok=runEdit({name:'尺寸',host:h,plan:()=>({ok:true,unchanged:true})});
+ check('unchanged: no undo, no write, no line',ok===false&&log.undo===0&&log.msgs.length===0&&log.rebuild===0);}
 report('edit-pipeline');

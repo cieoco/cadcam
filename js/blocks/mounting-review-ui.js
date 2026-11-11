@@ -17,11 +17,14 @@ export function commitMountingEdit(S,mutate,{pushUndo,notify}={}){
   const platePlan=planActuatorPlateHoles(candidate);if(platePlan.ok)candidate.comps=platePlan.comps;else if(planActuatorPlateHoles(before).ok){notify?.(platePlan.message);return false;}
   if(!confirmMountingChange(before,candidate,{notify}))return false;
   pushUndo();
-  // Keep selected-component references used by the existing panels, after approval only.
-  const originals=new Map(S.comps.map(c=>[c.id,c]));
-  S.comps=candidate.comps.map(c=>{const old=originals.get(c.id);if(!old)return c;Object.keys(old).forEach(k=>delete old[k]);return Object.assign(old,c);});
+  S.comps=adoptComps(S.comps,candidate.comps);
   S.modules=candidate.modules;S.topo.params=candidate.params;
   return true;
+}
+/** Keep selected-component references used by the existing panels: a component that already exists keeps its object and takes the new fields. After approval only. */
+export function adoptComps(current,next){
+  const originals=new Map(current.map(c=>[c.id,c]));
+  return next.map(c=>{const old=originals.get(c.id);if(!old)return c;Object.keys(old).forEach(k=>delete old[k]);return Object.assign(old,c);});
 }
 /** Compatibility adapter for geometry helpers still reading S. No render/save/undo inside mutate. */
 export function commitLegacyMountingEdit(S,mutate,options){
@@ -34,9 +37,15 @@ export function commitLegacyMountingEdit(S,mutate,options){
 
 export function confirmMountingChange(before,after,{ask=message=>window.confirm(message),notify=message=>window.alert(message)}={}){
   if(!integrityGate(before,after,notify))return false;
+  const verdict=reviewMountingChange(before,after,{ask});
+  if(verdict&&verdict.ok===false){notify(verdict.message);return false;}
+  return verdict;
+}
+/** The mounting half of confirmMountingChange (the integrity gate is the caller's): true = go on, false = the student declined, {ok:false,message} = refused. */
+export function reviewMountingChange(before,after,{ask=message=>window.confirm(message)}={}){
   let review;
-  try{review=inspectMountingChange(before,after);}catch(e){notify(`無法核對固定孔位：${e.message}`);return false;}
-  if(!review.ok){notify(review.issues.join('\n'));return false;}
+  try{review=inspectMountingChange(before,after);}catch(e){return {ok:false,message:`無法核對固定孔位：${e.message}`};}
+  if(!review.ok)return {ok:false,message:review.issues.join('\n')};
   if(!review.changes.length)return true;
   const names=[...new Set(review.changes.map(c=>c.label))].join('、');
   return ask(`${names}與原固定孔位不一致。\n是否更新對應的固定孔位？\n\n確定：一起更新安裝與孔位，可一次復原。\n取消：保留原孔位，返回調整。\n已加工的板件不會因此自動改孔。`);

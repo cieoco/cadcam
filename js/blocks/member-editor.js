@@ -1,13 +1,15 @@
 import {inspectLinkExport,normalizeExportSettings} from './exporters.js';
-import {convertStandardOutput,isOutputBlank,resizeStandardBlank,ARMS,BLANK_SPAN_LIMIT} from './standard-blank.js';
+import {convertStandardOutput,isOutputBlank,ARMS,BLANK_SPAN_LIMIT} from './standard-blank.js';
 import {editableNumber} from './numeric-input.js';
 import {setPointPosition,setPointAngle} from './input.js';
-import {pointRotation,freeLinkForPoint,freeTriangleForPoint,updatePointCoordsById as movePoint} from './model.js';
-import {commitMountingEdit} from './mounting-review-ui.js';
+import {pointRotation,freeLinkForPoint,freeTriangleForPoint} from './model.js';
+import {commitMountingEdit,mountingWork,reviewMountingChange} from './mounting-review-ui.js';
+import {runEdit} from './edit-pipeline.js';
+import {planResize} from './resize-plan.js';
 /** 共用剛性桿件尺寸列：選取 → 預檢整筆修改 → 一次復原 → 重算。 */
 import {isDisk,validateDisk} from './disk-plate.js';
 import { S } from './state.js';
-import { fixedSyringePointIds, planSyringeAttachmentResize } from '../core/syringe.js';
+import { fixedSyringePointIds } from '../core/syringe.js';
 import { memberDimensions, memberDimensionValue, planMemberDimension, mirroredJaw, dimensionLock } from './member-dimensions.js';
 import { MATERIALS, memberStock, planMemberStock, DEFAULT_HOLE_MM } from './member-stock.js';
 // Students never see solver ids.
@@ -147,47 +149,20 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
   function setDimensionValue(componentId,id,raw,{mirrorPair=false,exact=false}={}) {
     const comp=S.comps.find(c=>c.id===componentId);
     if(!comp)return;
-    if(comp.standardBlank&&(/^(g|r1|a)/.test(id)||isOutputBlank(comp)&&id==='width')){
-      const value=Number(raw),plan=resizeStandardBlank(comp,S.topo.params,id,value,{comps:S.comps,modules:S.modules});if(!plan.ok){notify(plan.message);sync();return;}
-      // A hole that trace, reference, load or dimension settings point at cannot silently disappear with a smaller size.
-      const watched=JSON.stringify([S.topo.tracePoints,S.topo.tracePoint,S.topo.referencePoint,S.topo.loads,S.topo.dimensions]),gone=(comp.holes||[]).find(h=>!plan.comp.holes.some(x=>x.id===h.id)&&watched.includes(`"${h.id}"`));
-      if(gone){notify('縮小會移除被軌跡追蹤、量測或負載使用的孔；請先改選其他點，再縮小。');sync();return;}
-      if(JSON.stringify(comp)===JSON.stringify(plan.comp)&&Object.entries(plan.params).every(([k,v])=>S.topo.params[k]===v))return;
-      pause();let invalid='';const accepted=commitMountingEdit(S,draft=>{const index=draft.comps.findIndex(c=>c.id===comp.id);if(comp.type==='bar'&&id==='g')planSyringeAttachmentResize(draft.comps,comp,Number(draft.params[comp.lenParam]),value).forEach(({id,...patch})=>Object.assign(draft.comps.find(c=>c.id===id),patch));draft.comps[index]=plan.comp;Object.assign(draft.params,plan.params);for(const key of ['p1','p2',...(comp.type==='triangle'?['p3']:[])]){const p=plan.comp[key];movePoint(draft.comps,p.id,p.x,p.y);}for(const f of plan.follow||[])movePoint(draft.comps,f.id,f.x,f.y);invalid=validateCandidate(draft);return !invalid;},{pushUndo,notify});
-      if(!accepted){if(invalid)notify(invalid);sync();draw();return;}rebuild();draw();return;
+    const blank=comp.standardBlank&&(/^(g|r1|a)/.test(id)||isOutputBlank(comp)&&id==='width');
+    if(!blank){
+      if(isDisk(comp)){const error=validateDisk(comp,Number(raw),comp.diameterMm,holeDiameter(comp));if(error){notify(error);sync();return;}}
+      const dimension = memberDimensions(comp).find(d => d.id === id);
+      if (dimension?.stockKey) { setStock(dimension.stockKey, raw); return; }
     }
-
-    if(isDisk(comp)){const error=validateDisk(comp,Number(raw),comp.diameterMm,holeDiameter(comp));if(error){notify(error);sync();return;}}
-    const dimension = memberDimensions(comp).find(d => d.id === id);
-    if (dimension?.stockKey) { setStock(dimension.stockKey, raw); return; }
-    const lock = dimensionLock(comp, S.comps, id);
-    if (lock) { notify(lock); sync(); return; }
-    const partner = mirrorPair && mirroredJaw(comp, S.comps, S.topo.params);
-    const targets = partner ? [comp, partner] : [comp];
-    const plans = targets.map(c => planMemberDimension(c, S.topo.params, id, raw,{holeDiameterMm:holeDiameter(c),exact}));
-    const failure = plans.find(plan => !plan.ok);
-    if (failure) { notify(failure.message); sync(); return; }
-    if (targets.every(c => Math.abs(memberDimensionValue(c, S.topo.params, id) - plans[0].value) < 0.001)) { sync(); return; }
-    if(comp.barFusionRoot)return resizeFusion?.(comp.id,plans[0].value);
-    pause();
-    let invalid='';
-    const committed=commitMountingEdit(S,draft=>{targets.forEach((target, index) => {
-      const c=draft.comps.find(o=>o.id===target.id);
-      if (c.type === 'bar' && id === 'g') {
-        const patches = planSyringeAttachmentResize(draft.comps, c, Number(draft.params[c.lenParam]), plans[index].value);
-        patches.forEach(({ id, ...patch }) => Object.assign(draft.comps.find(c => c.id === id), patch));
-      }
-      Object.assign(draft.params, plans[index].params);
-      Object.assign(c, plans[index].properties);
-      if (id === 'tip') return;
-      if (c.type === 'triangle') reshapeTriangle(c,draft.params,(id,x,y)=>movePoint(draft.comps,id,x,y));
-      else {
-        const dx = c.p2.x - c.p1.x, dy = c.p2.y - c.p1.y, length = Math.hypot(dx, dy) || 1;
-        movePoint(draft.comps,c.p2.id, c.p1.x + (dx || (dy ? 0 : 1)) / length * plans[index].value, c.p1.y + dy / length * plans[index].value);
-      }
-    });invalid=dimension?.param?validateCandidate(draft):'';return !invalid;},{pushUndo,notify});
-    if(!committed){if(invalid)notify(invalid);sync();draw();return;}
-    rebuild(); draw();
+    // 圖上把手與數字欄共用：規劃（resize-plan.js）→ 一致性檢查 → 安裝孔位確認 → 一次復原 → 寫入（edit-pipeline.js）。
+    let fusionValue;
+    const applied=runEdit({name:'改尺寸',host:{S,transient:notify,pushUndo,pause,rebuild,draw},
+      plan:work=>{const r=planResize(work,{componentId,id,raw,mirrorPair,exact,topo:S.topo,holeDiameter,reshapeTriangle,validateCandidate});if(r.fusionValue!==undefined)fusionValue=r.fusionValue;return r;},
+      confirm:after=>reviewMountingChange(mountingWork(S),after)});
+    if(fusionValue!==undefined)return resizeFusion?.(comp.id,fusionValue);
+    if(!applied)sync();
+    if(!applied)draw();
   }
   function change(delta) {
     const comp = selected();
