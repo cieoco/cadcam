@@ -2,6 +2,7 @@ import {localHoles,holeWorld} from '../core/local-holes.js';
 import {pointKeysFor} from './part-types.js';
 import {frameNodeIds,pointCoords} from './model.js';
 import {planActuatorPlateHoles} from './actuator-plate-holes.js';
+import {freezeDisplayedPose} from './pose-freeze.js';
 /** Rotary actuator candidates. No DOM, no global state and no extra solver. */
 import {compileTopology} from '../core/topology.js';
 import {solveTopology} from '../multilink/solver.js';
@@ -9,7 +10,7 @@ import {solveTopology} from '../multilink/solver.js';
 export const actuatorSteps=['固定外殼','位置方向','連接輸出','試動確認'];
 export function actuatorHostPoints(c){return [...pointKeysFor(c).filter(k=>c?.[k]).map(k=>({key:k,...c[k]})),...[...localHoles(c),...(c?.standardBlank?.mountHoles || [])].map(h=>({...h,...holeWorld(c,h),key:h.id}))];}
 export const actuatorPoint=(c,key,points={})=>{const p=actuatorHostPoints(c).find(p=>p.key===key);return points[p?.id] || p;};
-const fixedPlate=(c,comps)=>c?.type==='triangle'&&c.standardBlank?.kind==='plate'&&actuatorHostPoints(c).filter(p=>frameNodeIds(comps).has(p.id)).length>=2;
+export const fixedPlate=(c,comps)=>c?.type==='triangle'&&c.standardBlank?.kind==='plate'&&actuatorHostPoints(c).filter(p=>frameNodeIds(comps).has(p.id)).length>=2;
 export function actuatorChoices(comps){
   return {hosts:comps.filter(c=>c.type==='bar'||c.type==='triangle'&&c.standardBlank?.kind==='plate'),outputs:comps.filter(c=>c.type==='bar'||c.type==='gear'&&!c.mesh)};
 }
@@ -171,13 +172,8 @@ function planUnconnectedMotor(source,request,points,motion){
   if(old&&old.type!=='motor'){
     const key=pointKeysFor(old).find(k=>old[k]?.id===center);if(!key)return fail('原輸出軸心不存在。');
     if(old.barFusion||old.barFusionRoot)return fail('請先解除桿件合成，再解除個別輸出連接。');
-    // Keep the displayed pose of the connected group, including every copy of
-    // shared endpoints. Leaving a neighbour's stale copy makes the rod jump.
-    const group=new Set([old.id]),nodes=new Set(pointKeysFor(old).map(k=>old[k]?.id).filter(Boolean));
-    let grew=true;while(grew){grew=false;for(const c of comps)if(!group.has(c.id)&&pointKeysFor(c).some(k=>nodes.has(c[k]?.id))){group.add(c.id);pointKeysFor(c).forEach(k=>{if(c[k])nodes.add(c[k].id);});grew=true;}}
-    const lattice=new Set(comps.flatMap(c=>localHoles(c).map(h=>h.id)));      // a hole end follows its body, not the display seed
-    for(const c of comps)if(group.has(c.id))for(const k of pointKeysFor(c))if(c[k]&&!lattice.has(c[k].id)&&points[c[k].id]&&[points[c[k].id].x,points[c[k].id].y].every(Number.isFinite))Object.assign(c[k],{x:points[c[k].id].x,y:points[c[k].id].y});
-    for(const o of comps)if(group.has(o.id))for(const h of localHoles(o)){const w=holeWorld(o,h);for(const c of comps)if(c!==o)for(const k of pointKeysFor(c))if(c[k]?.id===h.id)Object.assign(c[k],{x:w.x,y:w.y});}
+    // Keep the displayed pose of the connected group, including every copy of shared endpoints (pose-freeze.js).
+    freezeDisplayedPose(comps,old.id,points);
     let released=`${old.id}.released`,n=1;const ids=new Set(comps.flatMap(c=>pointKeysFor(c).map(k=>c[k]?.id)));while(ids.has(released))released=`${old.id}.released${n++}`;
     old[key]={...old[key],id:released,type:'floating'};delete old[key].physicalMotor;
     for(const c of comps)for(const k of pointKeysFor(c))if(c[k]?.id===center&&String(c[k].physicalMotor)===motor)delete c[k].physicalMotor;
