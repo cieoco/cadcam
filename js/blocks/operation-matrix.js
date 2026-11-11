@@ -113,7 +113,7 @@ export const MATRIX = {
     delete: [
       ok('未接、板上沒裝東西', '板材被刪除，其他零件不受影響。', 'del-plate-plain'),
       ok('板上裝著馬達、針筒或有零件接在孔上', '刪除後說明「馬達改成獨立固定點」「接孔已放開」。', 'del-plate-explains-detach'),
-      ok('盒體的配對板件', '請整組管理（有說明）。'),
+      ok('盒體的配對板件', '請整組管理（有說明）。', 'del-boxpanel-refused'),
       ok('選到的是板上的孔', '刪除所屬的板，或明說不能刪。', 'del-hole-owner')
     ],
     connect: [
@@ -188,11 +188,11 @@ export const MATRIX = {
   gear: {
     select: [ok('點齒輪', '選到齒輪，顯示齒數與模數。')],
     move: [ok('拖齒輪中心', '連同銷一起移動；已有接地夥伴時繞夥伴公轉，整對齒輪可一起平移。')],
-    resize: [ok('改齒數或模數', '整條嚙合鏈的模數同步，中心距保持嚙合。')],
+    resize: [ok('改齒數或模數', '整條嚙合鏈的模數同步，中心距保持嚙合。', 'gear-resize-keeps-mesh')],
     delete: [
       ok('齒輪與另一個齒輪／齒條嚙合', '只刪選到的一個：被它帶動的齒輪留在原位並放開嚙合，掛在它上面的齒條無法獨立存在所以一起刪；兩者都說出來，可一次復原。（O4：planDeleteGear）', 'del-gear-only')
     ],
-    connect: [ok('加入齒輪對、齒輪與齒條', '以嚙合關係連接，中心距自動對齊。')],
+    connect: [ok('加入齒輪對、齒輪與齒條', '以嚙合關係連接，中心距自動對齊。', 'gear-add-pair-tangent')],
     release: [
       ok('兩個齒輪嚙合中', '「分開咬合」讓兩個齒輪各自獨立、留在原位，說出是哪兩個齒輪，可一次復原。（O4：planReleaseMesh，調整選單與齒輪面板都有按鈕）', 'release-gear-mesh')
     ],
@@ -205,7 +205,7 @@ export const MATRIX = {
     resize: [ok('改行程、本體長、軌道偏移', '數字與把手同一個結果。')],
     delete: [ok('滑軌連著桿', '滑軌被刪除，桿保留。', 'del-slider-ok')],
     connect: [ok('把桿轉成滑軌／接到軌道', '接成滑塊，經過檢查。')],
-    release: [ok('桿接在滑軌上', '提供解除並說明結果。')],
+    release: [ok('桿接在滑軌上', '提供解除並說明結果。', 'release-slider-split')],
     copy: [na('目前不提供', '滑軌用「新增滑軌」。')]
   },
 

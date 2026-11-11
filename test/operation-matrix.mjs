@@ -115,7 +115,22 @@ const gearOnly=()=>{const w=example('reduction-gear-train'),r=del(w,{selectedGea
 const gearRelease=()=>{load(example('gear-pair'));S.selectedGearId='GearB';const msgs=[],before=JSON.stringify(S.comps);let pushes=0;
   releaseSelectedMesh({S,transient:m=>msgs.push(m),pushUndo(){pushes++;},pause(){},rebuild(){},draw(){}});
   return pushes===1&&msgs.length===1&&/分開，不再嚙合/.test(msgs[0])&&S.comps.every(c=>!('mesh' in c))&&JSON.stringify(S.comps.map(c=>c.p1))===JSON.stringify(JSON.parse(before).map(c=>c.p1));};
+// O4: gear editor rows (real createGearEditor on the shared S) and slider / box-panel rows
+async function gearEditorOn(w){
+  load(w);S.mode='design';const noop2=()=>{};
+  const {createGearEditor}=await import(R+'gear-editor.js');
+  return createGearEditor({pushUndo:noop2,pause:noop2,rebuild:noop2,draw:noop2,renderFrame:noop2,transient:noop2,scheduleAutosave:noop2,cancelMotorMode:noop2,exitDrawTools:noop2,
+    openMobileEditPanel:noop2,closeMobileEditPanel:noop2,hideEditorPanels:noop2,snapshotStr:()=>'',updateUndoBtn:noop2,recordManualTrace:noop2,worldFromEvent:()=>null,mobilePrompt:()=>false,
+    pointCoords:()=>Model.pointCoords(S.comps),updatePointCoordsById:(id,x,y)=>Model.updatePointCoordsById(S.comps,id,x,y),pointIsGround:id=>Model.pointIsGround(S.comps,id)});
+}
+const tangentPair=()=>{const g=S.comps.filter(c=>c.type==='gear'),[a,b]=g,R1=S.topo.params[a.radiusParam],R2=S.topo.params[b.radiusParam];return g.length===2&&b.mesh===a.id&&Math.abs(Math.hypot(b.p1.x-a.p1.x,b.p1.y-a.p1.y)-(R1+R2))<1e-6;};
 const CHECKS={
+  'gear-add-pair-tangent':async()=>{const ed=await gearEditorOn({comps:[],params:{theta:0},modules:[]});ed.addGearPair();return tangentPair();},
+  'gear-resize-keeps-mesh':async()=>{const ed=await gearEditorOn({comps:[],params:{theta:0},modules:[]});ed.addGearPair();ed.changeGearTeeth(2);ed.changeGearModule(1);return tangentPair();},
+  'release-slider-split':()=>{load(example('slider-crank'));S.selectedNodeId='P3';const msgs=[];let pushes=0;
+    const ok=ConnectOps.splitSelected({S,transient:m=>msgs.push(m),pushUndo(){pushes++;},pause(){},rebuild(){},draw(){}});
+    return ok&&pushes===1&&msgs.length===1&&/從這個接點分開/.test(msgs[0])&&S.comps.find(c=>c.id==='Slider1').p3.id!==S.comps.find(c=>c.id==='Link2').p2.id;},
+  'del-boxpanel-refused':()=>{const w=blocked();w.comps.find(c=>c.id==='Blank133').boxPanel=true;const r=del(w,{selectedTriangleId:'Blank133'});return !r.changed&&r.pushes===0&&r.msgs.length===1&&r.msgs[0].includes('卡榫盒子');},
   'select-overlap-cycle':async()=>{const {nextUnder}=await import(R+'overlap-cycle.js');return nextUnder(['A','B','C'],'A')==='B'&&nextUnder(['A','B','C'],'C')===null;},
   'del-gear-only':gearOnly,
   'release-gear-mesh':gearRelease,
