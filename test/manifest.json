@@ -350,7 +350,8 @@
     "test/drag-feedback.mjs",
     "test/drag-intent.mjs",
     "test/resize-pipeline.mjs",
-    "test/hole-owner.mjs"
+    "test/hole-owner.mjs",
+    "test/motor-part.mjs"
   ],
   "version": 1
 }
