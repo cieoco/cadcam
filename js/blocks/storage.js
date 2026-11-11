@@ -11,7 +11,7 @@
  * comps 是 wizard 風格組件陣列、params 是長度等參數（topo.params），tracePoint 是選配軌跡點。
  */
 
-import {storedProject} from './project-envelope.js';
+import {storedProject, loadMotorPartIO, prepareMotorParts, hasMotorParts} from './project-envelope.js';
 import { encodeSnapshot, decodeShareString } from '../share-codec.js';
 import { toSnapshot, normalizeSnapshot, highestIdNum, alignSavedInputPhase } from './schema.js?v=20261007_singleface';
 
@@ -21,6 +21,15 @@ const AUTOSAVE_KEY = 'cadcam.blocks.autosave';
 export { toSnapshot, normalizeSnapshot, highestIdNum, alignSavedInputPhase };
 
 // 把外來物件正規化成 { comps, params, counter }，不合法回傳 null。
+// ---- 馬達零件形狀（SDD-MOTOR-PART M2）----
+// 離開本機的檔案與分享連結寫馬達零件形狀（需先 await toStoredShape）；讀入前先 await prepareMotorParts。
+// localStorage 自動存檔與復原點留在今日的舊形狀：資料不離開這台機器，免得每次自動存檔都轉換。
+export {prepareMotorParts, hasMotorParts};
+export async function toStoredShape(snapshot) {
+  if (!snapshot?.comps?.length) return snapshot;
+  return (await loadMotorPartIO()).writeMotorParts(snapshot);
+}
+
 // ---- localStorage 自動存檔 ----
 export function saveLocal(snapshot) {
   try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(storedProject(snapshot))); } catch (_) {}

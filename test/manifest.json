@@ -352,7 +352,8 @@
     "test/resize-pipeline.mjs",
     "test/hole-owner.mjs",
     "test/motor-part.mjs",
-    "test/motor-part-plans.mjs"
+    "test/motor-part-plans.mjs",
+    "test/motor-part-save.mjs"
   ],
   "version": 1
 }

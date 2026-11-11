@@ -146,7 +146,7 @@ P3／P4 的接合查詢與一致性檢查實作規格見 [SDD-CONNECTION-INTEGRI
 ### P1 本地實作與驗收紀錄（2026-11-10）
 
 - 共用操作：`actuator-installation.js` 負責放置、修改、接上及解除候選；`actuator-install-ui.js` 沿用原畫布與側欄。沒有輸出桿可用「只放馬達」保存；連桿輸出提供「解除輸出連接」，候選可還原、取消，確認僅一步復原。拖放位置與精確座標走同一規劃器。
-- 相容策略：未接輸出的實體用 `type: motor` 保存自己的軸心、型號、控制編號、承載與方向；接上沿用既有桿／齒輪驅動資料，以 `motorMount.partId` 保存實體身分，解除連桿時恢復該實體。這是過渡表示，尚未把所有接合改為獨立關係表。`schema.js`、`project-envelope.js` 保留資料並以 `independent-motor-v1` 能力旗標防止舊讀取器靜默丟件。
+- 相容策略：未接輸出的實體用 `type: motor` 保存自己的軸心、型號、控制編號、承載與方向；接上沿用既有桿／齒輪驅動資料，以 `motorMount.partId` 保存實體身分，解除連桿時恢復該實體。這是過渡表示，尚未把所有接合改為獨立關係表。`schema.js`、`project-envelope.js` 保留資料並以 `independent-motor-v1` 能力旗標防止舊讀取器靜默丟件。 2026-11-12 起（SDD-MOTOR-PART M2）下載檔與分享連結改寫馬達零件形狀並加 `motor-part-v2` 旗標，讀入時轉回此過渡表示；瀏覽器自動存檔仍是此過渡表示。
 - 依賴已核對：`part-types`／`model`／`motor-tools` 提供點與動力查詢；`motor-mounts`／`motor-angle-editor`／`panels` 提供原畫布顯示與修改；`blocks3d/scene-model` 顯示獨立外殼；`delete-part`／`detached-attachments` 保留拆卸與刪除宿主的姿態。`app.js` 維持既有作品範圍、候選核對、過期檢查、undo 與保存。
 - 保存與模擬分開：規劃結果的 `ok` 表示編輯合法，`simulation` 另報可解性；未接輸出、其他欠約束零件不再否決合法安裝。`solve-health` 阻止未連接動力假裝可播放。無效座標、重複驅動、實際安裝孔槽衝突仍拒絕；未以無解座標覆寫預覽。
 - 拆卸保護：保留輸出桿、承載件、控制身分與當下姿態；只解除輸出軸端，其他共用端點繼續相連，更新共用端點的各份座標以避免回跳。刪除承載件保留獨立動力與位置。未宣稱任意閉環、局部孔或組立關係均已完成拆接。

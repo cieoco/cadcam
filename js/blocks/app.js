@@ -337,8 +337,15 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
 function normalizeIncomingSnapshot(raw) {
   const fabrication = normalizeFabricationProfile(raw?.fabrication);
   if (!fabrication.ok) return { norm: null, error: fabrication.message };
-  const norm = Store.normalizeSnapshot(raw);
+  let norm;
+  try { norm = Store.normalizeSnapshot(raw); } catch (e) { return { norm: null, error: e.message || '作品資料格式不正確' }; }
   return norm ? { norm, error: '' } : { norm: null, error: '作品資料格式不正確' };
+}
+
+// 檔案／分享連結可能是馬達零件形狀：先按需載入轉換器再正規化（舊形狀不受影響）。
+async function normalizeIncomingSnapshotAsync(raw) {
+  try { await Store.prepareMotorParts(raw); } catch (e) { return { norm: null, error: e.message || '作品資料格式不正確' }; }
+  return normalizeIncomingSnapshot(raw);
 }
 
 const exampleController = createExampleController({
@@ -3027,7 +3034,7 @@ function setDesignName(id,name){
   if(id===ROOT_TAB)S.topo.rootDesignName=name;
   else S.modules=S.modules.map(m=>m.id===id?{...m,name}:m);
 }
-document.getElementById('saveProjectForm').addEventListener('submit',event=>{
+document.getElementById('saveProjectForm').addEventListener('submit',async event=>{
   event.preventDefault();
   const name=normalizeProjectName(document.getElementById('saveProjectName').value);
   if(!name){document.getElementById('saveNameHint').textContent='請輸入有效名稱。';return;}
@@ -3040,7 +3047,7 @@ document.getElementById('saveProjectForm').addEventListener('submit',event=>{
   else S.topo.projectName=name;
   if(tabs.length===1){S.topo.projectName=name;setDesignName(tabs[0].id,name);}
   scheduleAutosave();draw();
-  if(!nameTarget)Store.downloadJson(Store.toSnapshot(S.comps,S.topo,S.counter,motorSnapshotState()),name+'.json');
+  if(!nameTarget)Store.downloadJson(await Store.toStoredShape(Store.toSnapshot(S.comps,S.topo,S.counter,motorSnapshotState())),name+'.json');
   document.getElementById('saveProjectDialog').close();
   transient(nameTarget?'已更新分頁名稱':`已下載 ${name}.json`);
 });
@@ -3304,9 +3311,9 @@ function pickWorkFile() {
     const f = inp.files && inp.files[0];
     if (!f) return;
     const r = new FileReader();
-    r.onload = () => {
+    r.onload = async () => {
       try {
-        const incoming = normalizeIncomingSnapshot(JSON.parse(r.result));
+        const incoming = await normalizeIncomingSnapshotAsync(JSON.parse(r.result));
         const norm = incoming.norm;
         if (!norm) { transient('⚠️ ' + incoming.error); return; }
         if(!norm.projectName)norm.projectName=normalizeProjectName(f.name);
@@ -3322,7 +3329,7 @@ function pickWorkFile() {
 async function share() {
   let url;
   try {
-    url = Store.buildShareUrl(Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState()));
+    url = Store.buildShareUrl(await Store.toStoredShape(Store.toSnapshot(S.comps, S.topo, S.counter, motorSnapshotState())));
   } catch (e) {
     transient('⚠️ ' + (e.message || '無法產生連結'));
     return;
@@ -3370,9 +3377,18 @@ function init() {
   try {
     const hashObj = Store.readShareFromHash();
     if (hashObj) {
-      const incoming = normalizeIncomingSnapshot(hashObj);
-      if (!incoming.norm) throw new Error(incoming.error);
-      applySnapshot(incoming.norm, { recordUndo: false, source: 'share' }); loaded = true;
+      if (Store.hasMotorParts(hashObj.kind === 'blocks-envelope' ? hashObj.project : hashObj)) {
+        // 馬達零件形狀：先按需載入轉換器，所以非同步套用（舊形狀的連結仍走下面的同步路徑，行為不變）。
+        loaded = true;
+        normalizeIncomingSnapshotAsync(hashObj).then(incoming => {
+          if (!incoming.norm) throw new Error(incoming.error);
+          applySnapshot(incoming.norm, { recordUndo: false, source: 'share' });
+        }).catch(e => { console.warn('share link load failed:', e); transient('⚠️ ' + (e.message || '分享連結讀取失敗')); });
+      } else {
+        const incoming = normalizeIncomingSnapshot(hashObj);
+        if (!incoming.norm) throw new Error(incoming.error);
+        applySnapshot(incoming.norm, { recordUndo: false, source: 'share' }); loaded = true;
+      }
     }
   } catch (e) {
     console.warn('share link load failed:', e);
