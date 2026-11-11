@@ -50,6 +50,8 @@ const FIX=new URL('./fixtures/',import.meta.url);
 const fixture=n=>normalizeSnapshot(readStoredProject(JSON.parse(readFileSync(new URL(n,FIX),'utf8'))));
 const example=id=>normalizeSnapshot(structuredClone(getExample(id).snapshot));
 const blocks=(...made)=>({comps:made.map(m=>m.comp),params:Object.assign({theta:0},...made.map(m=>m.params)),modules:[]});
+const GEAR_FX=JSON.parse(readFileSync(new URL('gear-onto-motor.json',FIX),'utf8'));await (await import(R+'storage.js')).prepareMotorParts(GEAR_FX);
+const gearFx=()=>normalizeSnapshot(structuredClone(GEAR_FX));    // 學生檔：座板上的獨立馬達＋嚙合齒輪對在板子上方
 const blocked=()=>fixture('delete-blocked.json');                 // plate + TT motor off its plate hole (existing problem) + input bar + coupler + free-end bar
 const repaired=()=>{const w=blocked(),back=MR.planMotorReturn(w,MR.offPlateMotors(w.comps)[0].id);return {...w,comps:back.comps,params:back.params};};
 const released=()=>{const w=repaired(),r=MR.planMotorRelease({comps:w.comps,params:w.params,fabrication:w.fabrication,modules:w.modules},'Blank135',{},{});return {...w,comps:r.comps,params:r.params,plan:r};};
@@ -198,6 +200,10 @@ const CHECKS={
   'connect-motor-output':()=>{const w=released(),m=w.comps.find(c=>c.type==='motor'),loose=makeStandardBlank({kind:'bar',n:9,origin:{x:-400,y:0}});
     const src={comps:[...w.comps,loose.comp],params:{...w.params,...loose.params},modules:[],fabrication:w.fabrication,counter:900};
     const r=planDraggedMotorOutput(src,loose.comp.p1.id,m.p1.id,{},{thetaDeg:0});return r.matched&&r.ok;},
+  'connect-gear-onto-motor':()=>{const w=gearFx(),src={comps:w.comps,params:w.params,modules:w.modules,fabrication:w.fabrication,counter:w.counter},r=planDraggedMotorOutput(src,'GC89','Blank88_H24_24',{},{thetaDeg:0});
+    const g=r.comps?.find(c=>c.id==='Gear89'),h=r.comps?.find(c=>c.id==='Gear90');return r.matched&&r.ok&&r.simulation.ok&&g.p1.id==='Blank88_H24_24'&&Math.abs(Math.hypot(h.p1.x-g.p1.x,h.p1.y-g.p1.y)-72)<1e-6&&/嚙合的齒輪一起移到位/.test(r.message);},
+  'connect-gear-onto-motor-refuse':()=>{const w=gearFx(),src={comps:w.comps,params:w.params,modules:w.modules,fabrication:w.fabrication,counter:w.counter},a=planDraggedMotorOutput(src,'GC90','Blank88_H24_24',{},{}),b=planDraggedMotorOutput(src,'GP89','Blank88_H24_24',{},{});
+    return a.matched&&!a.ok&&/分開咬合/.test(a.message)&&b.matched&&!b.ok&&/不是桿件的端孔或齒輪的中心/.test(b.message);},
   'connect-motor-refuse-message':()=>{const w=released(),m=w.comps.find(c=>c.type==='motor'),r=planDraggedMotorOutput({comps:w.comps,params:w.params,modules:[],fabrication:w.fabrication,counter:900},'P139s',m.p1.id,{},{thetaDeg:0});
     return r.matched&&!r.ok&&/其他連接|多個零件/.test(r.message);},
   // --- release

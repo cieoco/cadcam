@@ -29,10 +29,13 @@ export function connectPlacedMotorOutput({S,id,expected,snapshotStr,displayCoord
 
 export function connectDraggedMotorOutput({S,fromId,toId,candidate,points,before,expected,snapshotStr,rebuild,draw,notify,selectLink,updateUndoBtn}){
  if(snapshotStr()!==expected||S.dragId||S.dragLinkId)return;
- const source=mountingWork(S),result=planDraggedMotorOutput(candidate,fromId,toId,points,{thetaDeg:S.theta,motorAngles:S.motorAngles});
+ const source=mountingWork(S),gearDrag=source.comps.some(c=>c.type==='gear'&&c.p1?.id===fromId);
+ // 齒輪中心：拖曳時只帶著一個夥伴走，所以從放開前（已還原）的整組齒輪規劃，只借用軸心的顯示位置。
+ const result=gearDrag?planDraggedMotorOutput(source,fromId,toId,{[toId]:points[toId]},{thetaDeg:S.theta,motorAngles:S.motorAngles})
+  :planDraggedMotorOutput(candidate,fromId,toId,points,{thetaDeg:S.theta,motorAngles:S.motorAngles});
  if(!result.ok){notify(`尚未接上動力輸出：${result.message||'找不到輸出軸。'}`);return;}
  if(!confirmMountingChange(source,{...source,comps:result.comps,params:result.params},{notify}))return;
  S.undoStack.push(before);if(S.undoStack.length>60)S.undoStack.shift();updateUndoBtn(true);
  S.comps=result.comps;S.topo.params=result.params;S.selectedNodeId=result.center;retargetPointRefs(S.topo,fromId,toId);
- rebuild();draw();selectLink(result.outputId);notify('已接上動力輸出；可復原或解除連接。');
+ rebuild();draw();if(!gearDrag)selectLink(result.outputId);notify(result.message||'已接上動力輸出；可復原或解除連接。');
 }

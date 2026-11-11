@@ -192,7 +192,11 @@ export const MATRIX = {
     delete: [
       ok('齒輪與另一個齒輪／齒條嚙合', '只刪選到的一個：被它帶動的齒輪留在原位並放開嚙合，掛在它上面的齒條無法獨立存在所以一起刪；兩者都說出來，可一次復原。（O4：planDeleteGear）', 'del-gear-only')
     ],
-    connect: [ok('加入齒輪對、齒輪與齒條', '以嚙合關係連接，中心距自動對齊。', 'gear-add-pair-tangent')],
+    connect: [
+      ok('加入齒輪對、齒輪與齒條', '以嚙合關係連接，中心距自動對齊。', 'gear-add-pair-tangent'),
+      ok('拖驅動齒輪的中心到未接輸出的馬達軸', '這顆齒輪成為馬達輸出；嚙合的齒輪（含鏈、共軸、齒條與導銷）一起平移到位，中心距不變，一次復原。（motor-drop.js planDraggedGearOutput）', 'connect-gear-onto-motor'),
+      ok('拖被帶動的齒輪，或不是桿端／齒輪中心的接點到馬達軸', '拒絕並用白話說明（拖帶動它的齒輪／先分開咬合／這個接點不是可接的輸出），作品不變。', 'connect-gear-onto-motor-refuse')
+    ],
     release: [
       ok('兩個齒輪嚙合中', '「分開咬合」讓兩個齒輪各自獨立、留在原位，說出是哪兩個齒輪，可一次復原。（O4：planReleaseMesh，調整選單與齒輪面板都有按鈕）', 'release-gear-mesh')
     ],

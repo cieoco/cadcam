@@ -175,3 +175,7 @@ runEdit({name, target, plan}) →
 - **舊入口清理。** 刪除：`gear-editor.js` 的 `deleteGearChain` 與其用到的 `ownedParamKeys` 匯入、`closeMobileEditPanel` 注入參數（app.js 同步）、`delete-part.js` 的 `deleteGearChain` 參數與兩條舊分支、`app.js` 的複製對話框手寫 push、`slider-editor.js`／`bar-fusion-resize.js`／`member-editor.js` 中被取代的 pushUndo＋寫入段與 `confirmMountingChange` 匯入。測試傳入的多餘 `deleteGearChain(){}` 參數無害，留著。
 - **仍標記未驗證的 ok 格。** 28 格只靠讀程式（選取、拖曳手感、面板按鈕、把手），需要真實瀏覽器驗收；其餘有執行檢查。
 - **測試。** 新增 `gear-pipeline`、`slider-pipeline`、`copy-pipeline`（皆已登記）；`operation-matrix` 新增 8 個檢查。改變的舊斷言：`delete-pipeline`「齒輪鏈刪除仍走舊路徑」改為「選到不存在的齒輪會說沒有選到零件」；`gear-editor`「整鏈刪除」三處改走真的刪除入口，並改為只刪選到的齒輪（驅動輪刪除後從動輪留下且不再嚙合；複合列只刪一個、沒有任何嚙合還指向它）。
+
+### 使用者發現的新缺口（2026-11-12，已關閉）
+
+「為什麼齒輪沒有直接連上馬達呢」：把驅動齒輪的中心拖到座板上未接輸出的獨立馬達軸，原本只接受桿件，畫面卻說「接孔對應多個零件」（其實是零個桿）。已關閉：`motor-drop.js` 的 `planDraggedMotorOutput` 認得自由的驅動齒輪——整組（被帶動的齒輪、鏈、共軸齒輪、齒條與導銷）以同一個向量剛性平移，齒輪中心取軸心的接點編號，再交給既有的 `planPlacedMotorOutput`／`planMotorInstallation`（資料形狀與安裝對話框相同；選擇「先平移再呼叫」而不是擴充安裝規劃的自動對孔，因為後者本來就只准獨立連桿）。被帶動的齒輪軸心與內建範例一樣設為固定（否則無法求解）。拒絕都是一行白話且不改作品：被帶動的齒輪、整組已接其他零件／固定孔、接點不是桿端或齒輪中心；原有的桿件與「多個零件共用」說法不變。提交仍是 `motor-drop-ui.js` 的手寫路徑（拖曳已記下復原點，與 `cancelPointDrag` 還原、確認視窗耦合），沒有改走 `runEdit`。對照表新增 2 格（齒輪／連接），`test/gear-onto-motor.mjs` 與 `test/operation-matrix.mjs` 驗證。
