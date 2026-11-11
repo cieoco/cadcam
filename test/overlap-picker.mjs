@@ -81,4 +81,42 @@ nodes=[endpoint,new Element({'data-id':'C'})];
 assert.equal(collectPickCandidates(svg,100,100,comps).filter(c=>c.kind==='node').length,2,'nearby holes remain separate choices');
 nodes=[endpoint];hit=[ownBar,gear];
 assert.deepEqual(collectPickCandidates(svg,100,100,comps).map(c=>c.id),['B','G'],'unrelated overlapping component stays selectable');
+
+// 桌機：點一下零件本體、同一處有 2 個以上零件重疊 → 放開後開同一份選單（最上面在前）；拖曳、孔、單一零件、空白不開。
+{
+  const dl=[];let sel='',normal=0;
+  const A=new Element({'data-pick-component':'Top'}),B=new Element({'data-pick-component':'Low'}),hole=new Element({'data-id':'H'});
+  for(const e of [A,B,hole])e.closest=sel=>sel.includes('data-id')&&e.attrs['data-id']?e:null;
+  let stack=[A,B];
+  const dsvg={getBoundingClientRect:()=>({left:0,top:0,right:390,bottom:600}),querySelectorAll:()=>[],querySelector:()=>null,
+    contains:e=>[A,B,hole].includes(e),ownerDocument:{elementsFromPoint:()=>stack},
+    addEventListener:(type,fn,capture)=>dl.push({type,fn,capture:capture===true}),setPointerCapture:noop};
+  const dcomps=[{id:'Top',type:'bar',name:'上桿'},{id:'Low',type:'triangle',name:'下板'}];
+  Object.assign(S,{comps:dcomps});
+  Input.init({svg:dsvg,draw:noop,rebuild:noop,pause:noop,mobilePrompt:()=>false,worldFromEvent:e=>({x:e.clientX,y:e.clientY}),
+   snapshotStr:()=>'',updateUndoBtn:noop,openMobileEditPanel:noop,closeMobileEditPanel:noop,
+   nodeDownEntry:noop,selectOverlapComponent:id=>{sel=id;},pointCoords:()=>({})});
+  const f=(type,x=100,y=100,target=A,pointerType='mouse')=>{
+    const e={type,pointerId:7,pointerType,button:0,clientX:x,clientY:y,target,preventDefault:noop,stopPropagation(){},stopImmediatePropagation(){this.imm=true;}};
+    // 零件本體的 handler 會擋掉背景點擊，所以按下／移動只跑 capture 階段。
+    for(const h of dl.filter(h=>h.type===type&&(h.capture||type==='pointerup')).sort((a,b)=>Number(b.capture)-Number(a.capture))){h.fn(e);if(e.imm)break;}
+    return e;
+  };
+  const n0=body.children.length;
+  const down=f('pointerdown');assert.notEqual(down.imm,true,'desktop press is never swallowed');
+  f('pointerup');
+  const dlg=body.children.at(-1);assert.equal(body.children.length,n0+1,'click on overlap opens the list');
+  assert.deepEqual(dlg.children.filter(c=>c.attrs['data-pick']).map(c=>c.attrs['data-pick']),['Top','Low'],'topmost first');
+  assert.match(dlg.children[0].textContent,/這裡有多個物件/);
+  dlg.children.find(c=>c.attrs['data-pick']==='Low').events.click({detail:0});assert.equal(sel,'Low','choosing the lower part selects it');
+  sel='';f('pointerdown');f('pointerup');body.children.at(-1).children.at(-1).events.click({detail:0});assert.equal(sel,'','cancel leaves selection alone');
+  const n1=body.children.length;
+  f('pointerdown');f('pointermove',112,100);f('pointerup',112,100);assert.equal(body.children.length,n1,'drag past 6 px never opens the list');
+  f('pointerdown');f('pointermove',130,100);f('pointermove',100,100);f('pointerup');assert.equal(body.children.length,n1,'drag and return is still a drag');
+  f('pointerdown',100,100,hole);f('pointerup',100,100,hole);assert.equal(body.children.length,n1,'hole click opens no list');
+  stack=[A];f('pointerdown');f('pointerup');assert.equal(body.children.length,n1,'lone part opens no list');
+  stack=[A,B];f('pointerdown',100,100,A,'touch');f('pointerup',100,100,A,'touch');assert.equal(body.children.length,n1,'touch path left to the phone handler');
+  f('pointerdown');f('pointercancel');f('pointerup');assert.equal(body.children.length,n1,'cancelled press opens nothing');
+  S.drawingLink=true;f('pointerdown');f('pointerup');S.drawingLink=false;assert.equal(body.children.length,n1,'drawing mode opens nothing');
+}
 console.log('PASS overlapping motor/body candidates, deduplication, selection, cancel, touch release, pinch and drag routing');

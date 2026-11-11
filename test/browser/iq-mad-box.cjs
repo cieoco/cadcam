@@ -8,12 +8,12 @@ try{for(const viewport of [{width:1280,height:900},{width:390,height:844}].filte
  const state=()=>page.evaluate(async()=>{const {S}=await import('/js/blocks/state.js');return {comps:S.comps,params:S.topo.params,undo:S.undoStack.length,theta:S.theta};});
  try{
   await page.goto(base+'/blocks.html?example=iq-mad-box');await page.getByRole('button',{name:'載入此範例',exact:true}).click();await page.waitForTimeout(300);
-  const gear=page.locator('[data-pick-component="MadF"]');const box=await gear.boundingBox();await gear.click({position:{x:box.width/2,y:box.height/4}});if(!await page.locator('#gearTeethInput').isVisible())await page.locator('#sheetMore').click();await page.locator('#gearTeethInput').waitFor({state:'visible'});
+  const pickRow=async id=>{const d=page.getByRole('dialog',{name:'選取重疊物件'});if(await d.isVisible())await d.locator(`[data-pick="${id}"]`).click();};const gear=page.locator('[data-pick-component="MadF"]');const box=await gear.boundingBox();await gear.click({position:{x:box.width/2,y:box.height/4}});await pickRow('MadF');if(!await page.locator('#gearTeethInput').isVisible())await page.locator('#sheetMore').click();await page.locator('#gearTeethInput').waitFor({state:'visible'});
   const before=await state(),field=page.locator('#gearTeethInput');
   await field.fill('24');await field.press('Tab');await page.waitForTimeout(300);const changed=await state();assert.equal(changed.comps.find(g=>g.id==='MadF').teeth,24);assert.equal(changed.undo,before.undo+1);
   assert.equal(changed.comps.find(g=>g.id==='MadF').p1.x,132);
   await page.getByRole('button',{name:/^復原(上一步)?$/}).filter({visible:true}).first().click();assert.equal((await state()).comps.find(g=>g.id==='MadF').teeth,36);
-  await gear.click({position:{x:box.width/2,y:box.height/4}});await field.fill('5');await field.press('Tab');await page.waitForTimeout(200);assert.equal((await state()).comps.find(g=>g.id==='MadF').teeth,36);
+  await gear.click({position:{x:box.width/2,y:box.height/4}});await pickRow('MadF');await field.fill('5');await field.press('Tab');await page.waitForTimeout(200);assert.equal((await state()).comps.find(g=>g.id==='MadF').teeth,36);
   await page.locator('#playBtn').click();await page.waitForTimeout(3500);await page.locator('#playBtn').click();assert.ok(Math.abs((await state()).theta)>360);
   await page.evaluate(()=>blocks.saveFile());const download=page.waitForEvent('download');await page.locator('#saveProjectForm').evaluate(f=>f.requestSubmit());const path=out+'/mad-'+viewport.width+'.json';await (await download).saveAs(path);
   await page.evaluate(()=>blocks.openFile());const chooser=page.waitForEvent('filechooser');await page.getByRole('button',{name:'選擇作品檔',exact:true}).click();await(await chooser).setFiles(path);await page.waitForTimeout(300);

@@ -131,7 +131,8 @@ const CHECKS={
     const ok=ConnectOps.splitSelected({S,transient:m=>msgs.push(m),pushUndo(){pushes++;},pause(){},rebuild(){},draw(){}});
     return ok&&pushes===1&&msgs.length===1&&/從這個接點分開/.test(msgs[0])&&S.comps.find(c=>c.id==='Slider1').p3.id!==S.comps.find(c=>c.id==='Link2').p2.id;},
   'del-boxpanel-refused':()=>{const w=blocked();w.comps.find(c=>c.id==='Blank133').boxPanel=true;const r=del(w,{selectedTriangleId:'Blank133'});return !r.changed&&r.pushes===0&&r.msgs.length===1&&r.msgs[0].includes('卡榫盒子');},
-  'select-overlap-cycle':async()=>{const {nextUnder}=await import(R+'overlap-cycle.js');return nextUnder(['A','B','C'],'A')==='B'&&nextUnder(['A','B','C'],'C')===null;},
+  'select-overlap-list':async()=>{const {collectBodyCandidates}=await import(R+'overlap-picker.js');const el=id=>({getAttribute:k=>k==='data-pick-component'?id:null}),hit=[el('B'),el('A'),el('B')];
+    const r=collectBodyCandidates({contains:()=>true,ownerDocument:{elementsFromPoint:()=>hit}},0,0,[{id:'A',type:'bar'},{id:'B',type:'gear'}]);return r.length===2&&r[0].id==='B'&&r[1].id==='A'&&/^整個「/.test(r[0].label);},
   'del-gear-only':gearOnly,
   'release-gear-mesh':gearRelease,
   'move-over-idle-hole':overIdleHole,

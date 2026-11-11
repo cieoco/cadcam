@@ -10,11 +10,12 @@ try{for(const viewport of [{width:1280,height:900},{width:390,height:844}])for(c
   await page.goto(base+'/blocks.html?example=iq-passive-'+kind);await page.getByRole('button',{name:'載入此範例',exact:true}).click();await page.waitForTimeout(200);
   const initial=await state();assert.equal(initial.comps.length,kind==='combined'?7:kind==='spatula'?5:3);
   if(kind==='combined'){
-   await page.getByRole('tab',{name:'左叉臂 ═ 已安裝',exact:true}).click();await page.locator('[data-pick-component=ForkL]').first().click({position:{x:35,y:8}});
+   const pickRow=async id=>{const d=page.getByRole('dialog',{name:'選取重疊物件'});if(await d.isVisible())await d.locator(`[data-pick="${id}"]`).click();};
+   await page.getByRole('tab',{name:'左叉臂 ═ 已安裝',exact:true}).click();await page.locator('[data-pick-component=ForkL]').first().click({position:{x:35,y:8}});await pickRow('ForkL');
    const field=page.locator('#memberDimensionInput');if(!await field.isVisible())await page.locator('#sheetMore').click();await field.waitFor({state:'visible'});
    const before=await state();await field.fill('43.1');await field.press('Tab');await page.waitForTimeout(200);assert.equal((await state()).value,43.1);assert.equal((await state()).undo,before.undo+1);
    await page.evaluate(()=>blocks.undo());assert.equal((await state()).value,40);
-   await page.locator('[data-pick-component=ForkL]').first().click({position:{x:35,y:8}});if(!await field.isVisible())await page.locator('#sheetMore').click();await field.fill('0');await field.press('Tab');await page.waitForTimeout(200);assert.equal((await state()).value,40);
+   await page.locator('[data-pick-component=ForkL]').first().click({position:{x:35,y:8}});await pickRow('ForkL');if(!await field.isVisible())await page.locator('#sheetMore').click();await field.fill('0');await field.press('Tab');await page.waitForTimeout(200);assert.equal((await state()).value,40);
    const drag=async cancel=>{const h=await page.locator('[data-dimension-handle="member-length"] circle').nth(1).boundingBox();assert.ok(h);const scale=await page.evaluate(async()=>{const V=await import('/js/blocks/view.js');return V.getScale()*document.querySelector('#stageSvg').getScreenCTM().a;});const x=h.x+h.width/2,y=h.y+h.height/2;await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+8*scale,y,{steps:8});if(cancel)await page.keyboard.press('Escape');await page.mouse.up();await page.waitForTimeout(200);};
    await drag(true);assert.equal((await state()).value,40);await drag(false);assert.notEqual((await state()).value,40);await page.evaluate(()=>blocks.undo());assert.equal((await state()).value,40);
   }

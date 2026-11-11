@@ -1,3 +1,23 @@
+function componentItem(c) {
+  const name = c.fusedWith ? '合成夾指' : (c.type === 'pulley' && c.kind === 'sprocket' ? '鏈輪' : ({gear:'齒輪',triangle:'夾指／板件',bar:'連桿',slider:'滑軌'})[c.type]);
+  return name ? {kind:'component', id:c.id, label:`整個「${c.name||name}」`} : null;
+}
+
+/** Desktop: parts drawn exactly under the pointer, topmost first (no touch tolerance, no nearby holes). */
+export function collectBodyCandidates(svg, x, y, comps) {
+  const result = [], seen = new Set();
+  for (const el of svg.ownerDocument.elementsFromPoint(x, y)) {
+    if (!svg.contains(el)) continue;
+    const id = el.getAttribute('data-pick-component');
+    const c = id && !seen.has(id) && comps.find(c => c.id === id);
+    if (!c) continue;
+    seen.add(id);
+    const item = componentItem(c);
+    if (item) result.push(item);
+  }
+  return result;
+}
+
 /** Mobile ambiguity picker: use rendered geometry, never change the work until chosen. */
 export function collectPickCandidates(svg, x, y, comps) {
   const result = [], seen = new Set();
@@ -26,8 +46,8 @@ export function collectPickCandidates(svg, x, y, comps) {
     const c = id && comps.find(c => c.id === id);
     if (!c) continue;
     if (result.length===1 && !result[0].motor && result[0].kind==='node' && c.type==='bar' && [c.p1,c.p2].some(p=>p?.id===result[0].id)) continue;
-    const name = c.fusedWith ? '合成夾指' : (c.type === 'pulley' && c.kind === 'sprocket' ? '鏈輪' : ({gear:'齒輪',triangle:'夾指／板件',bar:'連桿',slider:'滑軌'})[c.type]);
-    if (name) add({kind:'component', id, label:`整個「${c.name||name}」`});
+    const item = componentItem(c);
+    if (item) add(item);
   }
   return result.sort((a,b) => Number(b.motor || false) - Number(a.motor || false));
 }

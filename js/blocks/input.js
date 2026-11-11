@@ -20,7 +20,7 @@ import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 import * as View from './view.js';
 import * as Tools from './tools.js';
 import * as Panels from './panels.js';
-import { collectPickCandidates, openOverlapPicker } from './overlap-picker.js';
+import { collectPickCandidates, collectBodyCandidates, openOverlapPicker } from './overlap-picker.js';
 
 const NODE_TAP_PX = 24;   // 手機點接點的命中半徑（畫面 px，縮放下維持一致手感）
 
@@ -646,11 +646,29 @@ export function init(deps) {
     }
   }, true);
   svg.addEventListener('pointerup', endPointer);
-  // 桌機：重疊的零件在同一處再點一次，選到下面的零件（按需載入，見 overlap-cycle.js）。
-  import('./overlap-cycle.js').then(m => m.installOverlapCycle({svg, comps: () => S.comps, say: transient, select: id => selectOverlapComponent(id), nodeSelected: () => !!S.selectedNodeId,
-    selectedId: () => S.selectedGearId || S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId,
-    active: () => !mobilePrompt() && S.mode === 'design' && !(S.mateMode || S.placingMotor || S.pickBars || S.drawingLink || S.drawingTriangle || S.drawingPolygon)})).catch(() => {});
   svg.addEventListener('pointercancel', endPointer);
+  // 桌機：點一下零件本體、同一處有 2 個以上零件重疊時，放開後列出同一份選單。
+  // 不攔截按下：原本的選取與各種拖曳照舊，只有放開時沒移動過才開選單。
+  let deskClick = null;
+  svg.addEventListener('pointerdown', e => {
+    deskClick = null;
+    if (mobilePrompt() || e.pointerType === 'touch' || (e.button !== undefined && e.button !== 0)) return;
+    if (S.mode !== 'design' || S.mateMode || S.placingMotor || S.pickBars || S.drawingLink || S.drawingTriangle || S.drawingPolygon || activePointers.size >= 2) return;
+    if (svg.querySelector?.('[data-syringe-pick-holes]')) return;
+    const t = e.target;
+    if (!t?.getAttribute?.('data-pick-component') || t.closest?.('[data-id],[data-motor-hit],[data-dimension-handle],[data-point-choice]') || t.getAttribute('data-id') || t.getAttribute('data-motor-hit')) return;
+    const items = collectBodyCandidates(svg, e.clientX, e.clientY, S.comps);
+    if (items.length >= 2) deskClick = {items, pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false};
+  }, true);
+  svg.addEventListener('pointermove', e => {
+    if (deskClick && Math.hypot(e.clientX - deskClick.x, e.clientY - deskClick.y) > 6) deskClick.moved = true;
+  }, true);
+  svg.addEventListener('pointercancel', () => { deskClick = null; }, true);
+  svg.addEventListener('pointerup', e => {
+    const d = deskClick; deskClick = null;
+    if (!d || d.moved || d.pointerId !== e.pointerId || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6) return;
+    openOverlapPicker(d.items, item => selectOverlapComponent(item.id));
+  });
 
   // Ambiguous taps wait until release; a drag, cancellation or second finger never opens a menu.
   svg.addEventListener('pointermove', e => {
