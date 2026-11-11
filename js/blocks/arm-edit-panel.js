@@ -11,7 +11,7 @@ export function syncArmEditor(comp,setDimensionValue){
   box.hidden=false;
   box.replaceChildren(...ARMS.rows(comp).map(([axis,label,value,max,hint],i)=>{
    const row=document.createElement('label'),input=document.createElement('input'),angle=axis.startsWith('angle'),k=angle?Number(axis.slice(5)):i;
-   row.textContent=label;row.style.display='block';input.type='number';input.min=1;input.max=max;input.step=1;input.value=Number.isInteger(value)?value:'';input.placeholder=hint;input.dataset.blankEdit=axis;input.setAttribute('aria-label',label);
+   row.textContent=label;row.style.cssText='display:flex;align-items:center;gap:8px;margin:6px 0';input.style.cssText='width:5.5em;min-height:40px;font-size:16px;padding:4px 8px;border:1px solid #c7d2e0;border-radius:8px';input.type='number';input.min=1;input.max=max;input.step=1;input.value=Number.isInteger(value)?value:'';input.placeholder=hint;input.dataset.blankEdit=axis;input.setAttribute('aria-label',label);
    input.onchange=()=>{
     const r=(angle?readAngle:readHoles)(input.value,k);
     if(!r.ok){input.setCustomValidity(r.message);input.reportValidity();input.setCustomValidity('');input.value=Number.isInteger(value)?value:'';return;}
