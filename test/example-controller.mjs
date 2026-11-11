@@ -41,10 +41,10 @@ const descendants = node => node.children.flatMap(child => [child, ...descendant
 const entries = () => descendants(ids.get('exampleList'));
 const catalogIds = CATALOG_FAMILIES.flatMap(family => family.variants.map(item => item.id));
 const snapshots = JSON.stringify(BLOCK_EXAMPLES);
-// 62 = 56 個啟動即有的範例＋4 個馬達／舵機座板及2個力臂範例（隨起始檔按需載入，載入前目錄只顯示 56 個）。
-check('62 個公開範例各有唯一主要位置，沒有遺失或多餘 ID', catalogIds.length === 62 && new Set(catalogIds).size === 62 && BLOCK_EXAMPLES.every(example => catalogIds.includes(example.id)));
+// 63 = 56 個啟動即有的範例＋4 個馬達／舵機座板、2個力臂範例及鐘形曲柄夾爪（隨起始檔按需載入，載入前目錄只顯示 57 個（單一變體的家族不過濾，含鐘形曲柄夾爪））。
+check('63 個公開範例各有唯一主要位置，沒有遺失或多餘 ID', catalogIds.length === 63 && new Set(catalogIds).size === 63 && BLOCK_EXAMPLES.every(example => catalogIds.includes(example.id)));
 check('五個用途依確認順序排列，工具練習另列', CATALOG_GROUPS.map(group => group.label).join('、') === '傳動與變速、升降與伸縮、夾取與搬運、往復與特殊運動、行走機構' && CATALOG_FAMILIES.every(family => CATALOG_GROUPS.some(group => group.id === family.group) || family.group === 'tools'));
-check('推薦使用同 ID 捷徑，不複製主要入口', entries().filter(node => node.dataset.exampleId).length === 56 && entries().filter(node => node.dataset.exampleRef).length === CATALOG_RECOMMENDATIONS.length);
+check('推薦使用同 ID 捷徑，不複製主要入口', entries().filter(node => node.dataset.exampleId).length === 57 && entries().filter(node => node.dataset.exampleRef).length === CATALOG_RECOMMENDATIONS.length);
 check('能力標示保留手動、固定、局部與待完成界限', getCatalogVariant('iq-wheel-grabber').capability === '手動調姿' && getCatalogVariant('iq-passive-combined').capability === '固定組立' && getCatalogVariant('crank-catapult-study').capability === '局部示意' && getCatalogVariant('slider-crank-practice').capability === '待完成練習');
 check('通用夾爪保留原理說明', !getCatalogVariant('gear-gripper').source && CATALOG_FAMILIES.find(family => family.id === 'clawbot').variants.some(item => item.id === 'gear-gripper'));
 const brandText=/(?:\bvex\b|\biq\b|linq|clawbot|m\.a\.d\.\s*box|fling)/i;
@@ -55,9 +55,9 @@ const lift=BLOCK_EXAMPLES.find(e=>e.id==='iq-linq-lift').snapshot;
 check('可見接點與零件名稱沿既有name，不改穩定ID',!brandText.test(pointDisplayName(lift.comps,'LinqAxis'))&&!brandText.test(partDisplayName(lift.comps,'LinqMotorGear'))&&pointDisplayName(lift.comps,'A')==='A'&&lift.comps.some(c=>c.p1?.id==='LinqAxis'));
 check('目錄不進入首次載入', !startupSize().paths.includes('js/blocks/example-catalog.js'));
 await controller.populate();
-check('重建目錄不重複入口、不改原作品資料', entries().filter(node => node.dataset.exampleId).length === 56 && JSON.stringify(BLOCK_EXAMPLES) === snapshots);
+check('重建目錄不重複入口、不改原作品資料', entries().filter(node => node.dataset.exampleId).length === 57 && JSON.stringify(BLOCK_EXAMPLES) === snapshots);
 await loadUnitStarts(); const withStarts = JSON.stringify(BLOCK_EXAMPLES); await controller.populate();
-check('八份教學起始檔另列且各保留原 ID', entries().filter(node => node.dataset.exampleId).length === 70 && entries().some(node => node.dataset.exampleGroup === 'lessons'));
+check('八份教學起始檔另列且各保留原 ID', entries().filter(node => node.dataset.exampleId).length === 71 && entries().some(node => node.dataset.exampleGroup === 'lessons'));
 check('教學起始檔與公開作品在目錄呈現後皆保持原內容', JSON.stringify(BLOCK_EXAMPLES) === withStarts);
 controller.renderLessonCard(null);
 check('初始化時隱藏教學卡', ids.get('exampleLessonCard').style.display === 'none');

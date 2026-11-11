@@ -38,6 +38,7 @@ export const CATALOG_FAMILIES = [
     variant('clawbot-lift-gripper-practice', "接合升降臂與夾爪", '待完成練習', "")]),
   family('claws', 'handling', '開合夾指 · 旋轉與平行夾爪', '比較單側活動與雙側保持方向；接觸與夾持力未模擬。', [
     variant('single-servo-claw', '單側活動夾取', '可試動', 'FTC 用途'), variant('parallel-gripper', '雙側平行四連桿夾取')]),
+  family('bell-crank', 'handling', '彎桿轉向 · 鐘形曲柄夾爪', '曲柄經連桿推彎桿，第 2 臂像夾指擺動；夾持力與接觸未模擬。', [variant('bell-crank-gripper', '鐘形曲柄夾爪', '可試動', '')]),
   family('syringe-grip', 'handling', '交叉夾臂開合 · 針筒', '一體式交叉臂由固定筒身推動。', [
     variant('hydraulic-h03', '推動一體式交叉夾臂 · H03'), variant('hydraulic-h03-practice', '安裝夾臂針筒 · H03', '待完成練習')]),
   family('passive-tools', 'handling', '托起物件 · 固定叉與鏟', '共用背板的三種工具；不含車體或主動升降。', [
