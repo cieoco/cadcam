@@ -24,7 +24,7 @@ const {PARTS,ACTIONS,MATRIX,listCases}=await import(R+'operation-matrix.js');
 const {S}=await import(R+'state.js');
 const Model=await import(R+'model.js');
 const Panels=await import(R+'panels.js');
-const {createNodeEditor}=await import(R+'node-editor.js');
+const ConnectOps=await import(R+'connect-ops.js');
 const {normalizeSnapshot}=await import(R+'schema.js');
 const {readStoredProject}=await import(R+'project-envelope.js');
 const {deleteSelectedPart}=await import(R+'delete-part.js');
@@ -64,17 +64,9 @@ function del(w,sel){
 }
 const compsOfPoint=(w,id)=>w.comps.filter(c=>pointKeysFor(c).some(k=>c[k]?.id===id));
 const noop=()=>{};
-// Node editor wired like test/operation-sequences.mjs (splitNode is the only "release a shared joint" entry).
 let notices=[],pushCount=0;
 Panels.init({pointCoords:()=>Model.pointCoords(S.comps),sliderMountInfo:()=>null,roleLabel:()=>'',triParamFor:()=>'',hasPoint:id=>Model.hasPoint(S.comps,id),
   motorBarForCenter:()=>null,pointUseCount:()=>0,pointIsGround:id=>Model.pointIsGround(S.comps,id),isGroundPositionUnlocked:()=>false});
-const nodeEditor=createNodeEditor({
-  setPointPosition:noop,pushUndo:()=>{pushCount++;},pause:noop,rebuild:noop,draw:noop,setBanner:m=>notices.push(m),transient:m=>notices.push(m),scheduleAutosave:noop,
-  hasPoint:id=>Model.hasPoint(S.comps,id),pointCoords:()=>Model.pointCoords(S.comps),pointIsGround:id=>Model.pointIsGround(S.comps,id),
-  updatePointCoordsById:(id,x,y)=>Model.updatePointCoordsById(S.comps,id,x,y),snapFramePoint:p=>p,syncGearMeshAnchoredAt:noop,sliderMountInfo:id=>Model.sliderMountInfo(S.comps,id),
-  removeMotorAtPoint:id=>Model.removeMotorAtPoint(S.comps,id),removeAnchorsAtPoint:id=>{S.comps=Model.removeAnchorsAtPoint(S.comps,id);},
-  setPointType:(id,type)=>Model.setPointType(S.comps,id,type),freezePointAtDisplay:noop,pointRefs:id=>Model.pointRefs(S.comps,id),motorBarForCenter:()=>null,
-  sliderTravelStart:()=>0,sliderTravelEnd:()=>100,railLength:()=>100,normalizeSliderRange:noop,traceIds:()=>[],invalidateTrajectory:noop,displayCoords:()=>Model.pointCoords(S.comps)});
 
 // ------------------------------------------------------------------ checks
 // A check returns true (or {pass,detail}). For an 'ok' case: true = the expected behaviour holds.
@@ -144,8 +136,10 @@ const CHECKS={
   'connect-motor-refuse-message':()=>{const w=released(),m=w.comps.find(c=>c.type==='motor'),r=planDraggedMotorOutput({comps:w.comps,params:w.params,modules:[],fabrication:w.fabrication,counter:900},'P139s',m.p1.id,{},{thetaDeg:0});
     return r.matched&&!r.ok&&/其他連接|多個零件/.test(r.message);},
   // --- release
-  'release-split-silent':()=>{const w=blocked();load(w);notices=[];pushCount=0;S.selectedNodeId='Blank136.B';const before=Model.pointRefs(S.comps,'Blank136.B').length;nodeEditor.splitNode();
-    return before===2&&pushCount===1&&Model.pointRefs(S.comps,'Blank136.B').length===1&&notices.length===0;},
+  // O2: split goes through connect-ops.js (planSplit + runEdit): gate, one undo, a sentence naming what left, nothing else touched
+  'release-split-explained':()=>{const w=blocked();load(w);notices=[];pushCount=0;S.selectedNodeId='Blank136.B';const before=JSON.stringify(S.comps),n=Model.pointRefs(S.comps,'Blank136.B').length;
+    const done=ConnectOps.splitSelected({S,transient:m=>notices.push(m),pushUndo:()=>{pushCount++;},pause:noop,rebuild:noop,draw:noop});
+    return n===2&&done&&pushCount===1&&Model.pointRefs(S.comps,'Blank136.B').length===1&&notices.length===1&&/從這個接點分開/.test(notices[0])&&!/Blank\d|P\d+s/.test(notices[0])&&before!==JSON.stringify(S.comps);},
   'release-motor-ok':()=>{const w=repaired(),r=MR.planMotorRelease({comps:w.comps,params:w.params,fabrication:w.fabrication,modules:w.modules},'Blank135',{},{});
     return r.ok&&/解除/.test(r.message)&&r.comps.some(c=>c.type==='motor')&&r.comps.some(c=>c.id==='Blank135');},
   'release-syringe-ok':()=>{const w=example('hydraulic-h01'),s=w.comps.find(c=>c.type==='syringe'),r=planSyringeDisconnect({comps:w.comps,params:w.params},s.id);return r.ok&&!r.syringe.b.componentId&&!!r.simulationIssue;},

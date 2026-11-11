@@ -4,7 +4,7 @@ import {planMotorInstallation,actuatorHostPoints} from './actuator-installation.
 import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import {buildRelations} from './relations.js';
 import {pointKeysFor} from './part-types.js';
-import {integrityGate} from './integrity-gate.js';
+import {runEdit} from './edit-pipeline.js';
 
 const near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<=0.01;
 const holeLabel=(host,h)=>host.type==='bar'?`第${h.u/8+1}孔`:`長向第${h.u/8+1}、直向第${h.v/8+1}孔`;
@@ -82,19 +82,17 @@ export function planMotorRelease(source,barId,points={},motion={}){
 }
 
 // ---- 畫面接頭（app 以 window.blocks.motorRelease 呼叫；離開座板的提示由 integrity-hints.js 顯示）----
-function commit(api,plan){
-  if(!plan.ok){api.notify(plan.message);return false;}
-  const S=api.S;
-  if(!integrityGate({comps:S.comps,modules:S.modules,params:S.topo.params},{comps:plan.comps,modules:plan.modules||S.modules,params:plan.params||S.topo.params},api.notify))return false;
-  api.pause?.();api.pushUndo();api.S.comps=plan.comps;if(plan.params)api.S.topo.params=plan.params;
-  api.rebuild();api.draw();api.save?.();api.notify(plan.message);api.refresh?.();return true;
+// 提交走共用的 edit-pipeline（一致性檢查、一次復原、一行回饋）；這裡只負責挑規劃函式。
+function commit(api,planner){
+  return runEdit({name:'馬達連接',plan:work=>{const r=planner(work);return r.ok?{...r,clearSelection:false}:r;},
+    host:{S:api.S,transient:api.notify,pushUndo:api.pushUndo,pause:api.pause,rebuild:api.rebuild,draw(){api.draw();api.save?.();api.refresh?.();}}});
 }
 export function run(action,api){
-  const S=api.S,source={comps:S.comps,params:S.topo.params,fabrication:S.fabrication,modules:S.modules,counter:S.counter};
+  const S=api.S;
   if(S.mode&&S.mode!=='design'){api.notify('請在設計模式修改馬達連接。');return false;}
-  if(action==='release')return commit(api,planMotorRelease(source,api.id||S.selectedLinkId,api.points?.()||{},api.motion||{}));
+  if(action==='release')return commit(api,work=>planMotorRelease(work,api.id||S.selectedLinkId,api.points?.()||{},api.motion||{}));
   const id=api.id||offPlateMotors(S.comps)[0]?.id;
-  if(action==='back')return commit(api,planMotorReturn(source,id));
-  if(action==='leave')return commit(api,planMotorLeave(source,id));
+  if(action==='back')return commit(api,work=>planMotorReturn(work,id));
+  if(action==='leave')return commit(api,work=>planMotorLeave(work,id));
   return false;
 }

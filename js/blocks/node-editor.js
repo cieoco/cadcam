@@ -1,6 +1,5 @@
 import {commitLegacyMountingEdit} from './mounting-review-ui.js';
 import {localHoles} from '../core/local-holes.js';
-import {fusionAtPoint} from '../core/bar-fusion.js';
 /**
  * blocks / node-editor
  *
@@ -12,13 +11,13 @@ import {fusionAtPoint} from '../core/bar-fusion.js';
 
 import { S } from './state.js';
 import * as Panels from './panels.js';
-import { displayPoint, holeJoined, LEGO_FRAME_STEP as LEGO_STEP } from './model.js';
+import { displayPoint, LEGO_FRAME_STEP as LEGO_STEP } from './model.js';
 import { servoInputAt } from './motor-tools.js';
 
 export function createNodeEditor({
   pushUndo, pause, rebuild, draw, setBanner, transient, scheduleAutosave, setPointPosition,
   hasPoint, pointCoords, pointIsGround, updatePointCoordsById, snapFramePoint, syncGearMeshAnchoredAt,
-  sliderMountInfo, removeMotorAtPoint, removeAnchorsAtPoint, setPointType, freezePointAtDisplay, pointRefs,
+  sliderMountInfo, removeMotorAtPoint, removeAnchorsAtPoint, setPointType, freezePointAtDisplay,
   motorBarForCenter, sliderTravelStart, sliderTravelEnd, railLength, normalizeSliderRange,
   traceIds, invalidateTrajectory, displayCoords
 }) {
@@ -106,32 +105,10 @@ export function createNodeEditor({
     rebuild(); draw();
     Panels.updateRoleEditor();
   }
-  // 分離：把鎖在同一點（共用同一 id）的多個端點拆開，各給新 id 並向外稍微散開，方便個別拖曳。
-  // 保留非桿件（地錨／馬達座）或第一個端點維持原 id，其餘分出去並轉為自由點。
+  // 分離：把鎖在同一點（共用同一 id）的多個端點拆開（規劃與提交在按需載入的 connect-ops.js，走共用的編輯流程）。
   function splitNode() {
-    if(fusionAtPoint(S.comps,S.selectedNodeId)){transient('請先解除合成，再修改孔位。');return;}
-    if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) return;
-    const id = S.selectedNodeId;
-    const refs = pointRefs(id);
-    if (refs.length < 2) return;                 // 沒有合併，無從分離
-    pushUndo();
-    pause();
-    const p = pointCoords()[id] || { x: 0, y: 0 };
-    const OFFSET = 16;                            // 分出來的端點向外位移量（mm），給視覺回饋也方便點選
-    refs.sort((a, b) => (a.comp.type === 'bar' ? 1 : 0) - (b.comp.type === 'bar' ? 1 : 0));
-    const detach = refs.slice(1);                 // 第一個（優先地錨/非桿件）留原 id，其餘分出去
-    detach.forEach((ref, i) => {
-      const ang = (i / detach.length) * Math.PI * 2 + 0.6;
-      ref.point.id = 'P' + (++S.counter) + 's';
-      ref.point.type = 'floating';
-      // A body with parts joined or fixed at its holes stays put: moving one vertex would leave those copies behind.
-      const off = holeJoined(S.comps, ref.comp) ? 0 : OFFSET;
-      ref.point.x = (p.x || 0) + Math.cos(ang) * off;
-      ref.point.y = (p.y || 0) + Math.sin(ang) * off;
-    });
-    S.selectedNodeId = null;                       // 原合併點已拆，取消選取
-    rebuild(); draw();
-    Panels.updateRoleEditor();
+    return import('./connect-ops.js').then(m => m.splitSelected({S, transient, pushUndo, pause, rebuild,
+      draw: () => { draw(); Panels.updateRoleEditor(); }})).catch(() => transient('分開沒有完成，請再試一次。'));
   }
   function toggleTracePoint() {
     if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) return;

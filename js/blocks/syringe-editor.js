@@ -7,7 +7,8 @@ import {SYRINGE_EAR_MM,attachmentPoint,syringeAttachmentHoles} from '../core/syr
 import {installationChoices,planPlacedSyringe,fixedEarRotation,outputHoleChecks} from './syringe-installation.js';
 import {syringePositionOnFrame} from './syringe-position.js';
 import {syringeClampFrameNodes,syringeShape} from './syringe-shape.js';
-import {scanSyringe,planSyringeDisconnect} from './syringe-operations.js';
+import {scanSyringe,planSyringeDisconnect,syringeReading} from './syringe-operations.js';
+import {runEdit} from './edit-pipeline.js';
 import {commitMountingEdit,confirmMountingChange,mountingWork,mountingCandidate} from './mounting-review-ui.js';
 import {holeName} from './syringe-install-steps.js';
 import {integrityGate} from './integrity-gate.js';
@@ -30,7 +31,7 @@ export function createSyringeEditor(h){
  let awaiting=null;
  const revision=()=>JSON.stringify([S.comps,S.topo.params,S.modules,S.fabrication,S.designFocus,S.mode]);
  const discard=()=>{awaiting=null;};
- confirmHoles.onclick=()=>{const candidate=awaiting;discard();clearPreview();if(!candidate){apply({}, {preview:true});h.draw();return;}if(candidate.revision!==revision()){message('作品已變更，請重新調整固定環。');sync(true);return;}pending={};pickingKey=null;clearPicks();message('');h.commit(candidate.r.comps,candidate.r.params,candidate.r);message(candidate.r.simulationIssue?'設定已保存，模擬待修正：'+candidate.r.simulationIssue:'設定已套用。');h.draw();};
+ confirmHoles.onclick=()=>{const candidate=awaiting;discard();clearPreview();if(!candidate){apply({}, {preview:true});h.draw();return;}if(candidate.revision!==revision()){message('作品已變更，請重新調整固定環。');sync(true);return;}pending={};pickingKey=null;clearPicks();message('');commitPlan(candidate.r,candidate.done?candidate.done+(candidate.r.simulationIssue?'模擬待修正：'+candidate.r.simulationIssue:''):candidate.r.simulationIssue?'設定已保存，模擬待修正：'+candidate.r.simulationIssue:'設定已套用。');h.draw();};
  cancelHoles.onclick=()=>{pending={};pickingKey=null;clearPicks();discard();clearPreview();message('已取消修改。');sync(true);h.draw();};
  const more=el('details',null,panel);el('summary','連接與其他設定',more);
  const connections=el('div',null,more),frame=field('固定在哪裡',connections,'select'),output=field('推桿連接孔',quick,'select'),ear=field('固定耳',connections,'select'),face=field('正反面',connections,'select');
@@ -59,6 +60,16 @@ export function createSyringeEditor(h){
  function close(){clearPicks();discard();pickingKey=null;pending={};clearPreview();selected=null;draft=false;panel.style.display='none';h.svg.querySelectorAll('[data-dimension-handle^="syringe-"]').forEach(n=>n.remove());}
  done.onclick=()=>{close();h.draw();};
  const message=t=>{status.textContent=t;};
+ // 提交走共用的編輯流程（edit-pipeline）：一致性檢查、一次復原、一行回饋；位置與分支照舊寫回。
+ function commitPlan(r,text){
+  return runEdit({name:'針筒連接',host:{S,transient:message,pushUndo:h.pushUndo,pause:h.pause,rebuild:h.rebuild,draw(){h.seed(r.points);h.draw();h.save();}},
+   plan:work=>{
+    const ids=new Set(h.comps().map(c=>c.id)),comps=structuredClone(r.comps);
+    for(const c of comps)for(const key of ['p1','p2','p3']){const p=c[key],q=r.points?.[p?.id];if(p&&q&&p.type!=='fixed'){p.x=q.x;p.y=q.y;}}
+    for(const c of comps.filter(c=>c.type==='syringe'))c.branch=syringeReading(c,comps,r.params,r.points).branch||c.branch;
+    return {ok:true,comps:[...work.comps.filter(c=>!ids.has(c.id)),...comps],params:{...work.params,...r.params},message:text,clearSelection:false};
+   }});
+ }
  function apply(patch,{preview=false}={}){
   const c=current();if(!c)return false;preview=preview||Object.keys(pending).length>0;if(preview)pending={...pending,...patch};discard();clearPreview();h.pause();
   const source={comps:structuredClone(h.comps()),params:{...h.params()},fabrication:structuredClone(S.fabrication),modules:S.modules},points=h.points();
@@ -71,7 +82,7 @@ export function createSyringeEditor(h){
   if(!r.ok||r.temporary){message((preview?'尚未套用：':'')+r.message);sync(true);return false;}
   if(!confirmMountingChange(mountingWork(S),mountingCandidate(mountingWork(S),r,h.comps()),{notify:message,ask:()=>{awaiting={r,revision:revision()};approval.hidden=false;message('固定孔將依候選位置更新；確認後套用。'+(r.simulationIssue?' 模擬待修正：'+r.simulationIssue:''));return false;}})){sync(true);return false;}
   if(preview){awaiting={r,revision:revision()};approval.hidden=false;confirmHoles.textContent='確認套用';message(r.simulationIssue?'設定可保存；模擬待修正：'+r.simulationIssue:'已預覽連接修改，確認後套用。');sync(true);h.draw();return true;}
-  pending={};pickingKey=null;message('');h.commit(r.comps,r.params,r);return true;
+  pending={};pickingKey=null;return commitPlan(r,'設定已套用。');
  }
  x.onchange=y.onchange=()=>apply({position:{x:readNumber(x),y:readNumber(y)}});
  along.onchange=()=>{const c=current();if(c)apply({position:attachmentPoint({...c.a,u:readNumber(along)},h.comps(),h.params(),h.points())});};
@@ -81,7 +92,7 @@ export function createSyringeEditor(h){
  ear.onchange=()=>{pending={...pending,pivotEar:Number(ear.value)};apply({}, {preview:true});h.draw();};face.onchange=()=>apply({face:face.value});
  frame.onchange=()=>{const c=current(),owner=h.comps().find(o=>o.id===frame.value),p=c&&(attachmentPoint(c.a,h.comps(),h.params(),h.points())||c.a.position),q=p&&syringePositionOnFrame(owner,h.params(),h.points(),p,{comps:h.comps(),params:h.params(),fabrication:S.fabrication});if(q)apply({frameId:frame.value,position:q});};
  function chooseOutput(b){pending={...pending,b};pickingKey=null;apply({}, {preview:true});h.draw();explainOutput(b);if(sheetMode())setSheet('half');}
- function detachOutput(){const c=current();if(!c)return;h.pause();const r=planSyringeDisconnect({comps:h.comps(),params:h.params()},c.id,h.points());if(!r.ok){message(r.message);return;}const before=mountingWork(S);if(!integrityGate(before,mountingCandidate(before,r,h.comps()),message)){sync(true);return;}pending={b:r.syringe.b};pickingKey=null;clearPicks();clearPreview();awaiting={r,revision:revision()};message('確認後解除推桿連接；固定環與其他桿件保留。');sync(true);h.draw();}
+ function detachOutput(){const c=current();if(!c)return;h.pause();const r=planSyringeDisconnect({comps:h.comps(),params:h.params()},c.id,h.points());if(!r.ok){message(r.message);return;}const before=mountingWork(S);if(!integrityGate(before,mountingCandidate(before,r,h.comps()),message)){sync(true);return;}pending={b:r.syringe.b};pickingKey=null;clearPicks();clearPreview();awaiting={r,revision:revision(),done:'已解除推桿連接；固定環與其他桿件保留。'};message('確認後解除推桿連接；固定環與其他桿件保留。');sync(true);h.draw();}
  disconnect.onclick=detachOutput;
  output.onchange=()=>{if(output.value)chooseOutput(JSON.parse(output.value));else detachOutput();};
  scan.onclick=()=>{const c=current();if(c){h.pause();const r=scanSyringe(h.comps(),h.params(),c.id,.5,h.motion());message(r.ok?r.message:`${r.atMm==null?'':formatNumber(r.atMm)} mm：${r.message}`);}};

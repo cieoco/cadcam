@@ -1,5 +1,14 @@
 # 教學與操作更新紀錄
 
+## 2026-11-11：操作一致性 O2——解除與連接搬上共用流程
+
+- **新增 `js/blocks/connect-ops.js`（按需載入）。** 「分開連接」與「拖到另一孔放開＝接孔」成為 `planSplit`／`planMerge` 純規劃，提交交給 `runEdit`：先過一致性檢查、一次復原、寫入、一定給一句話。分開成功會說哪個零件離開、哪個留在原處（同名用「其中一個／另一個／N 個」，不顯示座標或內部代號），並說明分出的端點已稍微移開；接孔成功說「已把「…」的端孔接到「…」的孔。」。沒選接點、只有一個零件、已合成時各給一句話並維持原樣。
+- **馬達解除／放回座板／離開座板（`motor-release.js`）與針筒解除／接回（`syringe-editor.js`）改走 `runEdit`**，舊的各自提交／復原／通知碼移除；規劃與既有訊息不變。針筒解除成功的訊息改為「已解除推桿連接；固定環與其他桿件保留。模擬待修正：…」。`runEdit` 新增規劃結果欄位 `retarget`，合併接點時軌跡點等引用先改指向新接點再清失效引用。
+- **對照表：** gap 17 → 12（關閉 #6、#13、#15、#17、#24）。
+- **測試：** 新增 `test/release-connect-pipeline.mjs`（51 項，已登記）：分開、接孔、馬達解除／放回／離開、針筒解除／接回的成功（資料只改該改的、一次復原還原、`normalizeSnapshot` 往返）、拒絕（不改、不進復原、一定有一句話、無內部代號）與既有問題不擋不相干的修改（`delete-blocked.json`、`motor-off-plate.json`）。既有測試隨結構更新：`test/commit-gate.mjs` 兩個檢查接線的原始碼斷言改看 `connect-ops.js`／`runEdit`；`test/operation-sequences.mjs` 的分開與接孔改用 `connect-ops`；`test/operation-matrix.mjs` 的分開斷言改為新行為；`test/syringe-edit-connections.mjs`、`test/c7-syringe.mjs` 的假 host 以 `pushUndo／rebuild／seed／save` 取代已移除的 `commit`。
+- **啟動大小減少**（2,164,986 → 2,163,426 bytes，上限 2,165,000 不動）：舊的分開與接孔提交碼從 `node-editor.js`／`app.js` 刪除；重新產生載入圖。
+- **尚未做：** 桌機／手機瀏覽器驗收（審查者進行）；設為固定／自由仍用原提交路徑。
+
 ## 2026-11-11：操作一致性 O1——共用修改流程與刪除
 
 - **新增 `js/blocks/edit-pipeline.js`（`runEdit`）與 `js/blocks/selection-target.js`（`targetOf`），皆按需載入。** `runEdit`：純規劃（`plan(work)` 不碰 S／DOM）→ 共用一致性檢查（只擋新問題）→ 動作宣告的檢查（修改前、後各跑一次，修改前就有的問題不擋不相干的修改）→ 一次復原 → 寫入並清掉失效引用 → 一定給學生一行回饋（成功或拒絕原因）。`targetOf` 回答「選到的是哪個零件」：孔只屬於一個零件就是那個零件；多個零件共用的接點不猜，列出共用者；獨立馬達軸心與機架孔各自有明確對象。

@@ -94,10 +94,10 @@ check('worsening the same pre-existing contradiction is not "new"',integrityGate
 }
 // -- wiring that the Node harness cannot drive (app.js / input.js need a browser): the calls must stay in place
 const src=n=>readFileSync(new URL('../js/blocks/'+n,import.meta.url),'utf8');
-check('app.js mergePoints asks the gate before writing the merged candidate',/const mergePoints[\s\S]{0,700}integrityGate\(/.test(src('app.js')));
+check('app.js mergePoints hands the drop to connect-ops.js, which commits through runEdit (shared gate)',/const mergePoints[\s\S]{0,300}connect-ops\.js/.test(src('app.js'))&&/runEdit\(/.test(src('connect-ops.js'))&&/integrityGate\(/.test(src('edit-pipeline.js')));
 check('app.js prefetches integrity.js after the first work is applied',/integrityHints\('check'\);loadIntegrity\(\)/.test(src('app.js')));
 check('input.js drag commit goes through confirmMountingChange',/function commitDragUndo[\s\S]{0,300}confirmMountingChange\(/.test(src('input.js')));
-check('motor-release.js commit and delete-part.js (through the shared edit-pipeline.js runEdit) ask the gate',/integrityGate\(/.test(src('motor-release.js'))&&/runEdit\(/.test(src('delete-part.js'))&&/integrityGate\(/.test(src('edit-pipeline.js')));
+check('motor-release.js, delete-part.js and connect-ops.js (through the shared edit-pipeline.js runEdit) ask the gate',/runEdit\(/.test(src('motor-release.js'))&&/runEdit\(/.test(src('delete-part.js'))&&/runEdit\(/.test(src('connect-ops.js'))&&/integrityGate\(/.test(src('edit-pipeline.js')));
 
 // -- every built-in example: ordinary edits are never refused (rename one part; move the whole work rigidly)
 {let refused=0,n=0;

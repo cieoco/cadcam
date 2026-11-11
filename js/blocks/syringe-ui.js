@@ -218,7 +218,7 @@ export function createSyringeUI(h){
   }
   function edit(candidate){
     h.pause();h.clearSelection();id=candidate.id;const token=++editEpoch,focus=S.designFocus;
-    (editorLoad??=import('./syringe-editor.js').then(m=>editor=m.createSyringeEditor({...h,params,motion,commit,stroke:(selected,v)=>{id=selected;h.pause();return stroke(v);},previewStroke:v=>{showNumber(exact.querySelector('input'),v);range.value=v;},focusStroke:()=>{exact.querySelector('input')?.focus();exact.querySelector('input')?.select();},advanced:c=>open(c,true)}))).then(e=>{if(token===editEpoch&&S.designFocus===focus)e.open(candidate.id);},()=>{editorLoad=null;notify('調整介面載入失敗，請再試一次。');});
+    (editorLoad??=import('./syringe-editor.js').then(m=>editor=m.createSyringeEditor({...h,params,motion,stroke:(selected,v)=>{id=selected;h.pause();return stroke(v);},previewStroke:v=>{showNumber(exact.querySelector('input'),v);range.value=v;},focusStroke:()=>{exact.querySelector('input')?.focus();exact.querySelector('input')?.select();},advanced:c=>open(c,true)}))).then(e=>{if(token===editEpoch&&S.designFocus===focus)e.open(candidate.id);},()=>{editorLoad=null;notify('調整介面載入失敗，請再試一次。');});
   }
   function play(){
     editor?.close();

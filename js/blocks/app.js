@@ -847,19 +847,8 @@ const removeAnchorsAtPoint = (id) => { S.comps = Model.removeAnchorsAtPoint(S.co
 const setPointType = (id, type) => Model.setPointType(S.comps, id, type);
 const roleLabel = (id) => Model.roleLabel(S.comps, id);
 const hasPoint = (id) => Model.hasPoint(S.comps, id);
-const mergePoints = (fromId, toId) => {
-  const seed=structuredClone(S.comps);
-  for(const [id,p] of Object.entries(displayCoords())) Model.updatePointCoordsById(seed,id,p.x,p.y);
-  const candidate=Model.previewPointConnection(seed,S.topo,fromId,toId),work={comps:S.comps,modules:S.modules,params:S.topo.params};
-  if(!candidate.ok||!integrityGate(S.preDragSnap?JSON.parse(S.preDragSnap):work,{...work,comps:candidate.comps},transient)){
-    if(S.preDragSnap){const norm=Store.normalizeSnapshot(JSON.parse(S.preDragSnap));if(norm)applySnapshot(norm,{recordUndo:false,fit:false,source:'undo'});}
-    if(!candidate.ok)transient(candidate.message);
-    return false;
-  }
-  S.comps=candidate.comps;
-  import('./topo-refs.js').then(m=>m.retargetPointRefs(S.topo,fromId,toId));
-  return true;
-};
+// 拖到另一個孔上放開＝接孔：規劃與提交在按需載入的 connect-ops.js（共用編輯流程：一致性檢查、一次復原、一行回饋）。
+const mergePoints = (from, to, drop) => import('./connect-ops.js').then(m => m.mergeDropped({S, from, to, drop, transient, pushUndo, pause, rebuild, draw: () => { recordManualTrace(); draw(); }})).catch(() => transient('接孔沒有完成，請再試一次。'));
 const recomputeLengths = () => Model.recomputeLengths(S.comps, S.topo);
 const fixedLinkFor = (id) => Model.fixedLinkFor(S.comps, id);
 const freeLinkForPoint = (id) => Model.freeLinkForPoint(S.comps, id);
@@ -1154,7 +1143,6 @@ const nodeEditor = createNodeEditor({
   pushUndo, pause, rebuild, draw, setBanner, transient, scheduleAutosave,
   hasPoint, pointCoords, pointIsGround, updatePointCoordsById, snapFramePoint, syncGearMeshAnchoredAt,
   sliderMountInfo, removeMotorAtPoint, removeAnchorsAtPoint, setPointType, freezePointAtDisplay,
-  pointRefs: (id) => Model.pointRefs(S.comps, id),
   motorBarForCenter, sliderTravelStart, sliderTravelEnd, railLength, normalizeSliderRange,
   traceIds: () => traceIds(),
   invalidateTrajectory: () => { manualTrace = {}; trajectoryCache = null; geomVersion++; },

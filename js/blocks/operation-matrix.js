@@ -46,10 +46,8 @@ const HOLE_TARGET = 'hole-has-no-target';        // 選到孔／接點時只記�
 const SILENT_DRAG = 'silent-drag';                // 拖不動時不說原因
 const SILENT_DONE = 'silent-success';             // 做完連帶改變沒有說明
 
-const SPLIT_JOINT = check => gap('桿端與別的零件共用同一個接點',
-  '拆開後說明「已把接點分開」，並與其他動作一樣先檢查會不會製造新問題；可一次復原。',
-  '拆開成功但沒有任何訊息，也沒有經過一致性檢查（直接寫入）。',
-  'node-editor.js splitNode：成功路徑沒有 notify／integrityGate，只有 pushUndo 後改 id。', {check, cause: SILENT_DONE});
+const SPLIT_JOINT = check => ok('桿端與別的零件共用同一個接點',
+  '拆開後說明「已把…從這個接點分開」，並與其他動作一樣先檢查會不會製造新問題；可一次復原。', check);
 
 export const MATRIX = {
   bar: {
@@ -91,7 +89,7 @@ export const MATRIX = {
       ok('未接的桿端拖到馬達軸', '接成馬達的輸出桿（經過確認與一致性檢查）。', 'connect-motor-output')
     ],
     release: [
-      SPLIT_JOINT('release-split-silent'),
+      SPLIT_JOINT('release-split-explained'),
       na('未接', '沒有可解除的連接。')
     ],
     copy: [
@@ -131,7 +129,7 @@ export const MATRIX = {
       ok('板孔與其他零件的點接合', '經過候選預覽、桿長與固定孔檢查後接合，拒絕時說明原因。', 'connect-refusal-message')
     ],
     release: [
-      SPLIT_JOINT('release-split-silent'),
+      SPLIT_JOINT('release-split-explained'),
       na('未接', '沒有可解除的連接。')
     ],
     copy: [
@@ -149,7 +147,7 @@ export const MATRIX = {
     resize: [ok('改長、高或臂寬孔數', 'L 型件改變，被使用的孔受保護。', 'resize-l-ok')],
     delete: [ok('未接', 'L 型件被刪除。', 'del-l-ok')],
     connect: [ok('孔與其他零件接合', '同板材。', 'connect-refusal-message')],
-    release: [SPLIT_JOINT('release-split-silent')],
+    release: [SPLIT_JOINT('release-split-explained')],
     copy: [ok('L 型件', '複製或鏡射本體。', 'copy-l')]
   },
 
@@ -162,7 +160,7 @@ export const MATRIX = {
     resize: [ok('改臂長、臂數或角度', '臂改變，被使用的孔受保護；拖曳把手以 1 mm 取整，精確值用欄位。')],
     delete: [ok('已接其他零件', '零件被刪除，相鄰零件保留。', 'del-arms-ok')],
     connect: [ok('臂上的孔與其他零件接合', '同板材。')],
-    release: [SPLIT_JOINT('release-split-silent')],
+    release: [SPLIT_JOINT('release-split-explained')],
     copy: [ok('彎桿／多臂件', '複製或鏡射。', 'copy-arms-mirror')]
   },
 
@@ -247,7 +245,7 @@ export const MATRIX = {
       ok('在機架孔面板按「刪除孔」', '孔被刪除；孔上接著桿時拒絕並說明。')
     ],
     connect: [ok('桿端拖到機架孔', '接成固定的樞軸。', 'connect-refusal-message')],
-    release: [SPLIT_JOINT('release-split-silent')],
+    release: [SPLIT_JOINT('release-split-explained')],
     copy: [na('目前不提供', '機架孔用「新增固定孔」。')]
   }
 };

@@ -105,7 +105,7 @@ check('放開後自動回鎖', editor.isGroundPositionUnlocked('N1') === false);
 
 // ---- 分離合併點 ----
 S.selectedNodeId = 'N2';
-editor.splitNode();
+await editor.splitNode();   // O2: splitNode loads connect-ops.js on demand, so it is asynchronous now
 check('分離後兩桿端點各自獨立', S.comps[0].p2.id !== S.comps[1].p1.id && S.selectedNodeId === null);
 
 // ---- 拆馬達：連線性致動器設定一起清 ----

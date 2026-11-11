@@ -450,14 +450,14 @@ function onDragEnd(e) {
     import('./motor-drop-ui.js').then(m=>m.connectDraggedMotorOutput({S,fromId:did,toId:tgt,candidate,points,before,expected,snapshotStr,rebuild,draw,notify:transient,selectLink,updateUndoBtn})).catch(()=>transient('尚未接上動力輸出，請重新拖曳或從安裝設定核對。'));
     return;
   }
-  S.dragId = null; S.snapTarget = null;
-  if (tgt && mergePoints(did, tgt) === false) {
-    S.preDragSnap=null;
-    rebuild(); draw();
+  if (tgt) {   // 接孔：先還原到拖曳前，再把放開當下的狀態交給共用編輯流程當候選
+    const drop = {comps: structuredClone(S.comps), topo: structuredClone(S.topo), points: displayCoords(), theta: S.theta, angles: {...S.motorAngles}};
+    cancelPointDrag();
+    mergePoints(did, tgt, drop);
     return;
   }
-  if (tgt && S.selectedNodeId === did) S.selectedNodeId = tgt;
-  if (!tgt) recomputeLengths();
+  S.dragId = null; S.snapTarget = null;
+  recomputeLengths();
   rebuild(); recordManualTrace(); draw();
   commitDragUndo();
   if (pointIsGround(did)) relockGroundPosition(did);

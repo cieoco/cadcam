@@ -42,7 +42,7 @@ const snap=normalizeSnapshot(structuredClone(getExample('hydraulic-h01').snapsho
 S.comps=snap.comps;S.topo.params=snap.params;S.fabrication=snap.fabrication;S.modules=[];S.mode='design';S.designFocus=null;
 for(const key of ['selectedLinkId','selectedNodeId','selectedTriangleId','selectedSliderId','selectedGearId'])S[key]=null;
 let commits=0;
-const editor=createSyringeEditor({svg,comps:()=>S.comps,params:()=>S.topo.params,points:()=>pointCoords(S.comps),motion:()=>({}),is3D:()=>false,showEditor(){},draw(){},pause(){},commit(comps,params){commits++;S.comps=comps;S.topo.params=params;},previewStroke(){},stroke(){}});
+const editor=createSyringeEditor({svg,comps:()=>S.comps,params:()=>S.topo.params,points:()=>pointCoords(S.comps),motion:()=>({}),is3D:()=>false,showEditor(){},draw(){},pause(){},pushUndo(){commits++;},rebuild(){},seed(){},save(){},notify(){},previewStroke(){},stroke(){}});
 const syringe=S.comps.find(c=>c.type==='syringe');editor.open(syringe.id);editor.sync(true);
 const by=pred=>walk(host).find(pred),button=t=>by(n=>n.tagName==='BUTTON'&&n.textContent===t),select=label=>by(n=>n.attrs['aria-label']===label);
 assert.ok(button('雙孔固定')&&button('單孔可轉')&&!button('在圖上更換推桿孔').hidden);

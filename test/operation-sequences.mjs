@@ -35,6 +35,7 @@ const {createMemberEditor,resizeRefusal}=await import('../js/blocks/member-edito
 const {planMemberFrame}=await import('../js/blocks/member-frame.js');
 const {commitMountingEdit,mountingWork,confirmMountingChange}=await import('../js/blocks/mounting-review-ui.js');
 const MotorRelease=await import('../js/blocks/motor-release.js');
+const ConnectOps=await import('../js/blocks/connect-ops.js');
 const {planDraggedMotorOutput}=await import('../js/blocks/motor-drop.js');
 const {deleteSelectedPart}=await import('../js/blocks/delete-part.js');
 const {retargetPointRefs}=await import('../js/blocks/topo-refs.js');
@@ -195,17 +196,14 @@ const OPS={
   merge(step){
     const owner=compOfPoint(step.from)[0];if(!owner||!plainBody(owner,syringeInvolved())||owner.isInput)return null;
     if(Model.pointUseCount(S.comps,step.from)!==1||Model.pointIsGround(S.comps,step.from))return null;
-    const seed=structuredClone(S.comps);for(const [id,p] of Object.entries(displayCoords()))Model.updatePointCoordsById(seed,id,p.x,p.y);
-    const cand=Model.previewPointConnection(seed,S.topo,step.from,step.to);
-    if(!cand.ok){notify(cand.message);return {touched:[]};}
-    const work={comps:S.comps,modules:S.modules,params:S.topo.params};
-    if(!integrityGate(work,{...work,comps:cand.comps},notify))return {touched:[]};      // as app.mergePoints
-    pushUndo();S.comps=cand.comps;retargetPointRefs(S.topo,step.from,step.to);
+    // O2: the drop is planned and committed by connect-ops.js (planMerge + runEdit), exactly as app.mergePoints does.
+    const drop={comps:structuredClone(S.comps),topo:structuredClone(S.topo),points:displayCoords(),theta:S.theta,angles:{...S.motorAngles}};
+    if(!ConnectOps.mergeDropped({from:step.from,to:step.to,drop,S,transient:notify,pushUndo,pause:noop,rebuild:noop,draw:noop}))return {touched:[]};
     return {touched:[owner.id,...compOfPoint(step.to).map(c=>c.id)]};
   },
   split(step){
     if(Model.pointRefs(S.comps,step.pid).length<2)return null;
-    S.selectedNodeId=step.pid;nodeEditor.splitNode();
+    S.selectedNodeId=step.pid;ConnectOps.splitSelected({S,transient:notify,pushUndo,pause:noop,rebuild:noop,draw:noop});   // O2: as node-editor.splitNode
     return {touched:S.comps.map(c=>c.id),split:true};
   },
   move(step){
