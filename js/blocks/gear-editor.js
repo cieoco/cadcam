@@ -51,7 +51,7 @@ export function gearMountHoles(gear) {
 
 export function createGearEditor({
   pushUndo, pause, rebuild, draw, renderFrame, transient, scheduleAutosave,
-  cancelMotorMode, exitDrawTools, openMobileEditPanel, closeMobileEditPanel, hideEditorPanels,
+  cancelMotorMode, exitDrawTools, openMobileEditPanel, hideEditorPanels,
   snapshotStr, updateUndoBtn, recordManualTrace,
   worldFromEvent, mobilePrompt, pointCoords, updatePointCoordsById, pointIsGround
 }) {

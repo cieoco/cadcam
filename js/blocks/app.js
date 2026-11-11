@@ -865,7 +865,7 @@ const gearEditor = createGearEditor({
   pushUndo, pause, rebuild, draw, renderFrame, transient, scheduleAutosave,
   cancelMotorMode: (...a) => cancelMotorMode(...a),   // 延遲取用：motorTools 在下方才建立
   exitDrawTools: () => { Tools.exitDrawLink(); Tools.exitDrawTriangle(); Tools.exitDrawPolygon(); },
-  openMobileEditPanel, closeMobileEditPanel,
+  openMobileEditPanel,
   hideEditorPanels: () => {
     document.getElementById('lenEditor').style.display = 'none';
     document.getElementById('roleEditor').style.display = 'none';
