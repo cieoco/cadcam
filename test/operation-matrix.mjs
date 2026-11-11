@@ -116,6 +116,7 @@ const gearRelease=()=>{load(example('gear-pair'));S.selectedGearId='GearB';const
   releaseSelectedMesh({S,transient:m=>msgs.push(m),pushUndo(){pushes++;},pause(){},rebuild(){},draw(){}});
   return pushes===1&&msgs.length===1&&/分開，不再嚙合/.test(msgs[0])&&S.comps.every(c=>!('mesh' in c))&&JSON.stringify(S.comps.map(c=>c.p1))===JSON.stringify(JSON.parse(before).map(c=>c.p1));};
 const CHECKS={
+  'select-overlap-cycle':async()=>{const {nextUnder}=await import(R+'overlap-cycle.js');return nextUnder(['A','B','C'],'A')==='B'&&nextUnder(['A','B','C'],'C')===null;},
   'del-gear-only':gearOnly,
   'release-gear-mesh':gearRelease,
   'move-over-idle-hole':overIdleHole,

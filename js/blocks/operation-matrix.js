@@ -98,9 +98,7 @@ export const MATRIX = {
     select: [
       ok('點板面', '選到這片板，顯示尺寸設定。'),
       ok('點到板上的孔，而那個孔被別的零件共用', '畫面標明所選孔屬於哪一個零件。', 'select-plate-hole-owner'),
-      gap('桌機上多個零件重疊在同一處', '用零件名稱與圖上高亮列出候選，由使用者選。',
-        '桌機直接選最上層，不問（手機選單已改用零件名稱與第幾孔，O1）。',
-        'input.js pointerdown 在 mobilePrompt() 為假時 return；桌機沒有選擇器。', {cause: 'overlap-pick'})
+      ok('桌機上多個零件重疊在同一處', '第一次點選到最上面並提示一次「這裡有 N 個零件重疊；再點一次可選到下面的零件」；同一處再點（沒有拖動）依序選到下面的零件，最後回到最上面。不加模式、不開選單；手機維持選單。（O4：overlap-cycle.js）', 'select-overlap-cycle')
     ],
     move: [
       ok('未接任何零件（自由板）', '拖板上任一點，整片平移，形狀不變。', 'move-free-plate'),

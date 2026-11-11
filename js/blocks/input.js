@@ -646,6 +646,10 @@ export function init(deps) {
     }
   }, true);
   svg.addEventListener('pointerup', endPointer);
+  // 桌機：重疊的零件在同一處再點一次，選到下面的零件（按需載入，見 overlap-cycle.js）。
+  import('./overlap-cycle.js').then(m => m.installOverlapCycle({svg, comps: () => S.comps, say: transient, select: id => selectOverlapComponent(id), nodeSelected: () => !!S.selectedNodeId,
+    selectedId: () => S.selectedGearId || S.selectedLinkId || S.selectedTriangleId || S.selectedSliderId,
+    active: () => !mobilePrompt() && S.mode === 'design' && !(S.mateMode || S.placingMotor || S.pickBars || S.drawingLink || S.drawingTriangle || S.drawingPolygon)})).catch(() => {});
   svg.addEventListener('pointercancel', endPointer);
 
   // Ambiguous taps wait until release; a drag, cancellation or second finger never opens a menu.
