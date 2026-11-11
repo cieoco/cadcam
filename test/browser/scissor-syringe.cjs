@@ -40,7 +40,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
    await page.evaluate(()=>blocks.fitView());await page.waitForTimeout(150);
    // Select the actual platform rail through the existing overlap picker.
    const box=await page.locator('[data-pick-component="ScissorTop"]').boundingBox();assert.ok(box);await page.mouse.click(box.x+box.width*.45,box.y+box.height/2);
-   const overlap=page.getByRole('dialog',{name:'選取重疊物件'});if(await overlap.isVisible())await overlap.getByRole('button',{name:/滑軌.*ScissorTop/}).click();
+   const overlap=page.getByRole('dialog',{name:'選取重疊物件'});if(await overlap.isVisible())await overlap.locator('[data-pick="ScissorTop"]').click();
    if(mobile&&!['half','full'].includes(await page.locator('body').getAttribute('data-sheet')))await page.locator('#sheetMore').click();
    const length=page.locator('#sliderLengthInput');await length.waitFor({state:'visible'});const railBefore=await state();
    await input(length,120);assert.deepEqual(await state(),railBefore,'cannot change rail span while supporting body keeps128mm');

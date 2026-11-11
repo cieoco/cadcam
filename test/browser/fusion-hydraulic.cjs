@@ -16,7 +16,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
    else{
     const part=page.locator('[data-pick-component="Link11"]').first();await part.waitFor({state:'visible'});const box=await part.boundingBox();
     if(mobile)await page.touchscreen.tap(box.x+box.width/2,box.y+box.height/2);else await page.mouse.click(box.x+box.width/2,box.y+box.height/2);
-    const overlap=page.getByRole('dialog',{name:'選取重疊物件'});if(await overlap.isVisible())await overlap.getByRole('button',{name:/Link11/}).click();
+    const overlap=page.getByRole('dialog',{name:'選取重疊物件'});if(await overlap.isVisible())await overlap.locator('[data-pick="Link11"]').click();
    }
    if(mobile&&!['half','full'].includes(await page.locator('body').getAttribute('data-sheet')))await page.locator('#sheetMore').click();
    if(await page.locator('#memberOperations').isHidden())await page.getByRole('button',{name:'其他零件操作',exact:true}).click({timeout:4000}).catch(async e=>{await page.screenshot({path:output+'/'+viewport.width+'-failure.png'});console.log(await page.evaluate(async()=>{const{S}=await import('/js/blocks/state.js');return {link:S.selectedLinkId,node:S.selectedNodeId,body:document.body.dataset};}));throw e;});
