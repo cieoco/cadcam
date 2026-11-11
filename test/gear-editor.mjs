@@ -1,5 +1,5 @@
 // 齒輪 / 齒條域（gear-editor.js）驗收：成對建立、嚙合同步、整鏈改模數、
-// 有限齒條 theta 範圍、整鏈刪除與參數清理。DOM 以極簡假件替身。
+// 有限齒條 theta 範圍、刪除齒輪與參數清理（O4 起刪除走共用編輯流程，只刪選到的那一個）。DOM 以極簡假件替身。
 import { check, report } from './_harness.mjs';
 globalThis.window={confirm:()=>true,alert:message=>{throw Error(message);}};
 
@@ -19,6 +19,9 @@ const Model = await import('../js/blocks/model.js');
 const { createGearEditor } = await import('../js/blocks/gear-editor.js');
 
 const noop = () => {};
+// O4：刪除齒輪由 delete-part.js 的 planDeleteGear 規劃（原 editor.deleteGearChain 已移除）；這裡用真的刪除入口。
+const {deleteSelectedPart}=await import('../js/blocks/delete-part.js');
+const deleteGear=id=>{S.selectedGearId=id;deleteSelectedPart({S,transient:noop,pushUndo:()=>{},pause:noop,closeMobileEditPanel:noop,setSliderDetailRows:noop,rebuild:noop,draw:noop,points:{}});};
 let undos=0;
 const editor = createGearEditor({
   pushUndo: () => undos++, pause: noop, rebuild: noop, draw: noop, renderFrame: noop,
@@ -131,9 +134,11 @@ driven.p1.type = 'fixed';
 Model.updatePointCoordsById(S.comps, driven.p1.id, driver.p1.x + 30, driver.p1.y); // 拉到錯誤中心距
 check('接地且中心距錯誤時偵測脫嚙', editor.gearMeshOff(driven) === true);
 
-// ---- 整鏈刪除：齒輪與參數一起清 ----
-editor.deleteGearChain(driver.id);
-check('整鏈刪除清空齒輪與參數', gears().length === 0 && !Object.keys(S.topo.params).some(k => /^G(R|PR)/.test(k)));
+// ---- 刪除：只刪選到的齒輪，被它帶動的留下並放開嚙合；參數跟著該齒輪清掉 ----
+deleteGear(driver.id);
+check('刪驅動輪只刪它自己，從動輪留下且不再嚙合', gears().length === 1 && gears()[0].id === driven.id && !('mesh' in gears()[0]) && !(driver.radiusParam in S.topo.params) && driven.radiusParam in S.topo.params);
+deleteGear(driven.id);
+check('再刪從動輪後齒輪與參數都清空', gears().length === 0 && !Object.keys(S.topo.params).some(k => /^G(R|PR)/.test(k)));
 
 // ---- 齒條齒輪：建立、行程範圍、刪除連齒條與導銷 ----
 editor.addRackPinion();
@@ -154,7 +159,7 @@ check('齒條及槽長的數字輸入保留小數',S.topo.params[rack.lenParam]=
 const {normalizeSnapshot,toSnapshot}=await import('../js/blocks/schema.js');
 const rackSaved=normalizeSnapshot(toSnapshot(S.comps,S.topo,1));
 check('齒條小數尺寸保存重開不取整',rackSaved.params[rack.lenParam]===lenBefore+8.5&&rackSaved.comps.find(c=>c.id===rack.id).slot.length===rack.slot.length);
-editor.deleteGearChain(pinion.id);
+deleteGear(pinion.id);
 check('刪小齒輪連齒條與導銷一起刪', S.comps.length === 0 && !Object.keys(S.topo.params).some(k => /^(G|RK)/.test(k)));
 
 // ---- 面板：取消選取隱藏編輯器 ----
@@ -169,7 +174,7 @@ const beforeCompound=undos;editor.changeGearModule(1);
 check('共軸三段改模數共用一次提交',undos===beforeCompound+1&&gears().every(g=>g.module===3));
 check('共軸三段所有嚙合保持相切',gears().filter(g=>g.mesh).every(g=>tangent(g,gears().find(a=>a.id===g.mesh))));
 check('四軸間距依序同步為72mm',gears().find(g=>g.id==='MadF').p1.x===216);
-editor.deleteGearChain('MadC');
-check('刪除複合列不留下共軸孤輪',S.comps.length===0);
+const madBefore=S.comps.length;deleteGear('MadC');
+check('刪除複合列中的一個齒輪只刪它自己，沒有任何嚙合還指向它',S.comps.length===madBefore-1&&!gears().some(g=>g.id==='MadC'||g.mesh==='MadC'));
 
 report('gear-editor');

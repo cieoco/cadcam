@@ -12,7 +12,6 @@ import {gearDriver} from './motor-tools.js';
 import { S, activateMotor, nextMotorId } from './state.js';
 import {commitMountingEdit,commitLegacyMountingEdit} from './mounting-review-ui.js';
 import {planGearHolePlacement} from './gear-hole-placement.js';
-import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
 import { rackGuideThetaRange, rackGuideTravel } from './rack-limits.js';
 import { norm360 } from './motion.js';
 import { W, H, worldFromScreen } from './view.js';
@@ -542,33 +541,6 @@ export function createGearEditor({
     if (panel) panel.style.display = 'none';
   }
 
-  // 刪除整條嚙合鏈（成對/成列一起刪，避免留下 mesh 指向已刪齒輪的破狀態）。
-  function deleteGearChain(id) {
-    const start = gearById(id);
-    if (!start) return;
-    if(gearMeshChain(start).some(g=>S.comps.some(p=>p.fusedWith===g.id))){transient('請先解除合成，再刪除齒輪');return;}
-    pushUndo();
-    pause();
-    const chain = gearMeshChain(start);
-    chain.forEach(g => ownedParamKeys(g).forEach(k => delete S.topo.params[k]));
-    const chainIds = new Set(chain.map(g => g.id));
-    const rackIds = new Set();
-    const rackFramePins = new Set();
-    S.comps.forEach(c => {
-      if (c.type === 'rack' && chainIds.has(c.pinion)) {
-        rackIds.add(c.id);
-        (c.framePins || []).forEach(id => rackFramePins.add(id));
-        ownedParamKeys(c).forEach(k => delete S.topo.params[k]);
-      }
-    });
-    const ids = new Set(chain.map(g => g.id));
-    S.comps = S.comps.filter(c => !ids.has(c.id) && !rackIds.has(c.id) && !(c.type === 'anchor' && rackFramePins.has(c.p1?.id)));
-    deselectGear();
-    S.selectedNodeId = null;
-    closeMobileEditPanel();
-    rebuild(); draw();
-  }
-
   // 有限齒條不是無限長齒條：接觸點跑到齒條端部之外時，真實機構就會脫離嚙合。
   // 播放時把 theta 限在接觸點仍落在齒條齒面內的範圍，讓齒條齒輪範例推到端點前反向。
   function rackPinionThetaRange(comps = S.comps) {
@@ -623,6 +595,6 @@ export function createGearEditor({
     setGearManualAngle, startGearManualRotate, clampGearPinRadius,
     changeGearTeeth, setGearTeeth, changeGearPinRadius, setGearPinRadius, setHole, changeGearPinHoleDiameter, changeGearModule,
     changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, clearRackStops,
-    deleteGearChain, rackPinionThetaRange
+    rackPinionThetaRange
   };
 }

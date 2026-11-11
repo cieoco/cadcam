@@ -25,7 +25,7 @@ const none={selectedLinkId:null,selectedTriangleId:null,selectedSliderId:null,se
 function del(w,sel,extra={}){
   const S={comps:structuredClone(w.comps),modules:structuredClone(w.modules||[]),topo:{params:{...w.params},tracePoints:[],dimensions:[],loads:[]},fabrication:w.fabrication,counter:500,...none,...sel};
   const orig=JSON.stringify([S.comps,S.topo.params]),msgs=[],log={undo:0,undoSnap:null,flashed:null,gear:null,draw:0,rebuild:0,panel:0};
-  const ok=deleteSelectedPart({S,transient:m=>msgs.push(m),deleteGearChain:id=>{log.gear=id;},pushUndo(){log.undo++;log.undoSnap=JSON.stringify([S.comps,S.topo.params]);},pause(){},
+  const ok=deleteSelectedPart({S,transient:m=>msgs.push(m),pushUndo(){log.undo++;log.undoSnap=JSON.stringify([S.comps,S.topo.params]);},pause(){},
     closeMobileEditPanel(){log.panel++;},setSliderDetailRows(){},rebuild(){log.rebuild++;},draw(){log.draw++;},points:{},flash:ids=>{log.flashed=ids;},...extra});
   return {S,ok,msgs,log,orig,ids:S.comps.map(c=>c.id),changed:orig!==JSON.stringify([S.comps,S.topo.params])};
 }
@@ -109,7 +109,7 @@ const noInternalId=m=>!/Blank\d|H7|Motor\d|P\d+s|_H\d/.test(m);
  const fusedPlate=structuredClone(fixture);fusedPlate.comps.find(c=>c.id==='Blank133').fusedWith='x';r=del(fusedPlate,{selectedTriangleId:'Blank133'});
  check('e: fused plates keep their refusal message',!r.changed&&r.msgs.join()==='請先解除合成，再刪除板件');
  r=del(fixture,{selectedGearId:'G1'});
- check('e: gear-chain delete stays on its old path',r.log.gear==='G1'&&r.log.undo===0&&!r.changed);
+ check('e: a stale gear selection says nothing is selected (gear delete itself: test/gear-pipeline.mjs)',!r.changed&&r.log.undo===0&&r.msgs.length===1&&r.msgs[0].startsWith('沒有選到零件'),r.msgs.join('|'));
  // module output parts are still protected by the integrity gate, with the same plain sentence
  const mw=getExample('four-bar-module')&&example('four-bar-module');
  if(mw&&mw.modules?.length){const outPart=mw.comps.find(c=>JSON.stringify(mw.modules).includes(`"${c.id}"`)&&c.type==='bar');

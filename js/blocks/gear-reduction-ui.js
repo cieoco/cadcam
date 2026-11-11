@@ -66,6 +66,16 @@ export function renderReduction(c, {changeGearModule, setHole, gearPinRadius, ch
     const orientationBtn=document.getElementById('rackOrientationBtn');
     if(orientationBtn){ const vertical=Math.abs(Math.sin((Number(rack.axisDeg)||0)*Math.PI/180))>.7; orientationBtn.textContent=vertical?'↕ 垂直升降':'↔ 水平伸縮'; }
   }
+  // 分開咬合（和頂端「調整」裡的同一個指令）：只有和別的齒輪嚙合時才出現
+  let release = document.getElementById('gearReleaseBtn');
+  if (!release) {
+    release = document.createElement('button');
+    release.id = 'gearReleaseBtn'; release.type = 'button'; release.className = 'clear-btn'; release.style.minHeight = '44px';
+    release.textContent = '分開咬合'; release.title = '讓這個齒輪與嚙合的齒輪分開，齒輪留在原位';
+    release.onclick = () => window.blocks.releaseGearMesh();
+    document.getElementById('gearPairSpec')?.after(release);
+  }
+  release.style.display = c.mesh || S.comps.some(g => g.type === 'gear' && g.mesh === c.id) ? '' : 'none';
   const chain = gearMeshChain(c);
   const pairOutput = chain.length === 2 && chain.find(g => g.mesh);
   const pairInput = pairOutput && gearById(pairOutput.mesh);

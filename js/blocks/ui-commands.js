@@ -28,6 +28,7 @@ export const COMMANDS = [
   ...add('plugin', [['boxMaker', box.name, box.icon, box.hint, 'openBoxMaker']]),
   { id: 'undo', group: 'edit', label: '復原', icon: '↩', tip: '復原上一步', run: 'window.blocks.undo' },
   { id: 'deleteSelected', group: 'edit', label: '刪除選取', icon: '🗑', danger: true, tip: '刪除選取零件', run: 'window.blocks.deleteSelectedPart', modes: ['design'] },
+  { id: 'releaseMesh', group: 'edit', label: '分開咬合', icon: '⚙️', tip: '讓選取的齒輪與嚙合的齒輪分開，齒輪留在原位', run: 'window.blocks.releaseGearMesh', modes: ['design'] },
   { id: 'fitView', group: 'view', label: '置中', icon: '⊡', tip: '置中畫布', run: 'window.blocks.fitView' },
   { id: 'view3d', group: 'view', label: '3D', tip: '3D 預覽', run: 'window.blocks.toggle3D', modes: ['design'] },
   { id: 'rulers', group: 'view', label: '尺規', tip: '顯示完整尺規（關閉時只留比例尺）', run: 'window.blocks.toggleRulers', modes: ['design'] },

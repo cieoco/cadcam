@@ -6,6 +6,7 @@ import {detachDeletedAttachments} from './detached-attachments.js';
 import {planMotorRelease} from './motor-release.js';
 import {localHoles} from '../core/local-holes.js';
 import {runEdit} from './edit-pipeline.js';
+import {planDeleteGear} from './gear-plan.js';
 import {targetOf,deletableByHole,distinctLabels,partName} from './selection-target.js';
 // 刪除零件（SDD-OPERATION-PIPELINE O1）：planDelete 是純規劃；提交、復原、回饋都交給 edit-pipeline 的 runEdit。
 // 座板檢查改成「宣告的檢查」：修改前就有的問題不擋這次刪除，只擋這次新造成的。
@@ -34,6 +35,7 @@ export function planDelete(work,target){
     if(target.shared?.length)return {ok:false,message:'此孔已接連桿，請先分離或刪除相接的連桿。',flash:target.shared.map(c=>c.id)};
     return {ok:true,comps:work.comps.filter(c=>c.id!==part.id),params:{...work.params},message:'已刪除機架孔。'};
   }
+  if(part.type==='gear')return planDeleteGear(work,part);          // 齒輪：只刪這一個（SDD-OPERATION-PIPELINE O4）
   const id=part.id,name=quote(part),notes=[];
   let comps=work.comps,params={...work.params},keptMotor=false;
   // 輸出桿：馬達資料記在桿上，先解除（馬達獨立留下）再刪桿。
@@ -60,16 +62,13 @@ export function planDelete(work,target){
 }
 
 const hide=id=>{const el=document.getElementById(id);if(el)el.style.display='none';};
-export function deleteSelectedPart({S,transient,deleteGearChain,pushUndo,pause,closeMobileEditPanel,setSliderDetailRows,rebuild,draw,points,flash}) {
+export function deleteSelectedPart({S,transient,pushUndo,pause,closeMobileEditPanel,setSliderDetailRows,rebuild,draw,points,flash}) {
   const target=targetOf(S,S.comps,S.modules||[]);
-  // 齒輪鏈仍走原本的刪除路徑（O4 才搬）。
-  if(S.selectedGearId){deleteGearChain(S.selectedGearId);return true;}
-  if(target.part?.type==='gear'){deleteGearChain(target.part.id);return true;}
   return runEdit({name:'刪除零件',plan:work=>planDelete(work,target),checks:deleteChecks,host:{S,transient,pushUndo,pause,rebuild,draw,points,
     flash:flash||(ids=>import('./integrity-hints.js').then(m=>m.run('flash',{far:ids,canon:[]})).catch(()=>{})),
     afterCommit(){
       closeMobileEditPanel();
-      for(const id of ['lenEditor','roleEditor','servoEditor','strokeEditor','sliderBaseBtn','linkToRailBtn'])hide(id);
+      for(const id of ['lenEditor','roleEditor','gearEditor','servoEditor','strokeEditor','sliderBaseBtn','linkToRailBtn'])hide(id);
       setSliderDetailRows(false);
     }}});
 }

@@ -33,6 +33,7 @@ const {integrityGate,loadIntegrity}=await import(R+'integrity-gate.js');
 const {checkWork}=await import(R+'integrity.js');
 const MR=await import(R+'motor-release.js');
 const {planMemberCopy}=await import(R+'member-copy.js');
+const {releaseSelectedMesh}=await import(R+'gear-plan.js');
 const {resizeStandardBlank,makeStandardBlank}=await import(R+'standard-blank.js');
 const {getExample,loadUnitStarts}=await import(R+'examples.js');
 const {planSyringeDisconnect}=await import(R+'syringe-operations.js');
@@ -62,7 +63,7 @@ function load(w){
 function del(w,sel){
   load(w);Object.assign(S,sel);
   const msgs=[],before=JSON.stringify([S.comps,S.topo.params]);let pushes=0;
-  deleteSelectedPart({S,transient:m=>msgs.push(m),deleteGearChain(){msgs.push('(gear chain deleted)');},pushUndo(){pushes++;},pause(){},closeMobileEditPanel(){},setSliderDetailRows(){},rebuild(){},draw(){},points:{},flash(){}});
+  deleteSelectedPart({S,transient:m=>msgs.push(m),pushUndo(){pushes++;},pause(){},closeMobileEditPanel(){},setSliderDetailRows(){},rebuild(){},draw(){},points:{},flash(){}});
   return {changed:before!==JSON.stringify([S.comps,S.topo.params]),msgs,pushes,ids:S.comps.map(c=>c.id)};
 }
 const compsOfPoint=(w,id)=>w.comps.filter(c=>pointKeysFor(c).some(k=>c[k]?.id===id));
@@ -108,7 +109,15 @@ async function resizeConfirmCancel(){
   globalThis.window.confirm=()=>true;
   return cancelled&&undo===1&&S.topo.params[comp(lift,'Link3').lenParam]===L+8;
 }
+// O4：齒輪刪除只刪選到的一個；分開咬合
+const gearOnly=()=>{const w=example('reduction-gear-train'),r=del(w,{selectedGearId:'GearB'}),g=S.comps.find(c=>c.id==='GearC');
+  return r.changed&&r.ids.join()==='GearA,GearC'&&!('mesh' in g)&&r.pushes===1&&r.msgs.length===1&&/不再被它帶動/.test(r.msgs[0])&&!/Gear[A-Z]/.test(r.msgs[0]);};
+const gearRelease=()=>{load(example('gear-pair'));S.selectedGearId='GearB';const msgs=[],before=JSON.stringify(S.comps);let pushes=0;
+  releaseSelectedMesh({S,transient:m=>msgs.push(m),pushUndo(){pushes++;},pause(){},rebuild(){},draw(){}});
+  return pushes===1&&msgs.length===1&&/分開，不再嚙合/.test(msgs[0])&&S.comps.every(c=>!('mesh' in c))&&JSON.stringify(S.comps.map(c=>c.p1))===JSON.stringify(JSON.parse(before).map(c=>c.p1));};
 const CHECKS={
+  'del-gear-only':gearOnly,
+  'release-gear-mesh':gearRelease,
   'move-over-idle-hole':overIdleHole,
   'resize-confirm-cancel':resizeConfirmCancel,
   // --- select

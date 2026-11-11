@@ -192,13 +192,11 @@ export const MATRIX = {
     move: [ok('拖齒輪中心', '連同銷一起移動；已有接地夥伴時繞夥伴公轉，整對齒輪可一起平移。')],
     resize: [ok('改齒數或模數', '整條嚙合鏈的模數同步，中心距保持嚙合。')],
     delete: [
-      gap('齒輪與另一個齒輪／齒條嚙合', '說明「嚙合的另一個齒輪（或齒條）也一併刪除」，或只刪選到的一個。',
-        '整條嚙合鏈（含齒條）一起刪掉，沒有任何訊息。', 'gear-editor.js deleteGearChain：成功路徑只 pushUndo／rebuild，沒有 transient。', {cause: SILENT_DONE})
+      ok('齒輪與另一個齒輪／齒條嚙合', '只刪選到的一個：被它帶動的齒輪留在原位並放開嚙合，掛在它上面的齒條無法獨立存在所以一起刪；兩者都說出來，可一次復原。（O4：planDeleteGear）', 'del-gear-only')
     ],
     connect: [ok('加入齒輪對、齒輪與齒條', '以嚙合關係連接，中心距自動對齊。')],
     release: [
-      gap('兩個齒輪嚙合中', '提供「分開」讓兩個齒輪各自獨立。', '沒有分開指令，只能刪除整條嚙合鏈。',
-        'gear-editor.js、gear-reduction-ui.js 沒有任何移除 mesh 的路徑。', {cause: 'no-release-command'})
+      ok('兩個齒輪嚙合中', '「分開咬合」讓兩個齒輪各自獨立、留在原位，說出是哪兩個齒輪，可一次復原。（O4：planReleaseMesh，調整選單與齒輪面板都有按鈕）', 'release-gear-mesh')
     ],
     copy: [na('目前不提供', '齒輪用「加入齒輪對」新增。')]
   },
