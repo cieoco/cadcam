@@ -16,6 +16,7 @@ import {frameGroundAxis} from './frame-ground.js';
 import {snapFrameAngle} from './frame-grid.js';
 import {gridDragStep,showHoleCount} from './grid-drag.js';
 import {edgeSnap} from './grid-plate.js';
+import {drawArmHandles} from './arm-handles.js';
 const NS='http://www.w3.org/2000/svg';
 // Keep the 44 px dimension hit area clear of the hole's 48 px touch target.
 function besideHole(svg,a,b){
@@ -99,7 +100,7 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
   if(c&&['bar','triangle'].includes(c.type)&&!c.boxPanel){
     const id=S.selectedTriangleId?S.triSide||'g':'g',dim=memberDimensions(c).find(d=>d.id===id),lock=dimensionLock(c,S.comps,id);
     if(c.standardBlank&&c.type==='triangle'){
-      for(const d of memberDimensions(c).filter(d=>d.refs)){
+      for(const d of c.standardBlank.kind==='arms'?[]:memberDimensions(c).filter(d=>d.refs)){
         if(dimensionLock(c,S.comps,d.id))continue;
         const p=at(c[d.refs[0]]),q=at(c[d.refs[1]]);if(!p||!q)continue;
         const L=Math.hypot(q.x-p.x,q.y-p.y)||1;
@@ -108,6 +109,7 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
           8,BLANK_SPAN_LIMIT,.1,p,gridDragStep(c,d),edgeSnap(c,d,S.topo.params,{comps:S.comps}),null,()=>member.selectDimension(d.id));
         svg.querySelector(`[data-member-dimension="${d.id}"]`)?.remove();
       }
+      if(c.standardBlank.kind==='arms')drawArmHandles({svg,c,at,project,member,openEditor});
     }else if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,dir={x:(q.x-p.x)/L,y:(q.y-p.y)/L};handle('member-length',dim.label,q,dir,memberDimensionValue(c,S.topo.params,id),(v,exact)=>member.setValue(v,exact),'memberDimensionInput',8,c.standardBlank?BLANK_SPAN_LIMIT:2000,.1,p,gridDragStep(c,dim),edgeSnap(c,dim,S.topo.params,{comps:S.comps}));}}
     if(c.standardBlank?.kind==='l'&&id==='arm'){const w=c.standardBlank.armWidthMm;handle('blank-arm-width','L型臂寬',{x:(a.x+b.x)/2-u.y*(w-6.5)*holeSide(c),y:(a.y+b.y)/2+u.x*(w-6.5)*holeSide(c)},{x:-u.y*holeSide(c),y:u.x*holeSide(c)},w,v=>member.setDimensionValue(c.id,'arm',v,{exact:true}),'memberDimensionInput',13,120,1,null,8,null,raw=>13+8*Math.round((raw-13)/8));}
     if(c.shape==='disk')handle('disk-diameter','外徑',{x:a.x,y:a.y+c.diameterMm/2},{x:0,y:.5},c.diameterMm,v=>{const input=document.getElementById('diskDiameterInput');input.value=v;input.onchange();},'diskDiameterInput',8,2000);

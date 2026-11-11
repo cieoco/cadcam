@@ -30,7 +30,7 @@ function make({arms,n=1,origin={x:0,y:0}}={}){
  const bad=armsProblem(arms);if(bad)return fail(bad);
  const id='Blank'+n,L=layout(arms),side=L.p3.y<0?-1:1,g=id+'.G',r1=id+'.H',r2=id+'.D';
  const pt=(key,h)=>({id:`${id}.${key}`,type:'floating',x:origin.x+h.x,y:origin.y+h.y}),zero={x:0,y:0};
- const c={id,type:'triangle',name:'彎桿／多臂件',p1:pt('A',zero),p2:pt('B',L.p2),p3:pt('C',L.p3),stock:{widthMm:13,thicknessMm:3,material:'unspecified'},standardBlank:{kind:'arms',arms:arms.map(({holes,angleDeg})=>({holes,angleDeg}))},color:'#27ae60',snapLength:false,gParam:g,r1Param:r1,r2Param:r2,sign:side,shapeMode:'hull',vertices:[{solve:true,ref:'p1'},{solve:true,ref:'p2'},{solve:true,ref:'p3'}]};
+ const c={id,type:'triangle',name:arms.length>2?'三臂件':'彎桿',p1:pt('A',zero),p2:pt('B',L.p2),p3:pt('C',L.p3),stock:{widthMm:13,thicknessMm:3,material:'unspecified'},standardBlank:{kind:'arms',arms:arms.map(({holes,angleDeg})=>({holes,angleDeg}))},color:'#27ae60',snapLength:false,gParam:g,r1Param:r1,r2Param:r2,sign:side,shapeMode:'hull',vertices:[{solve:true,ref:'p1'},{solve:true,ref:'p2'},{solve:true,ref:'p3'}]};
  c.holes=L.locals.map(h=>({id:keyId(c,h.k,h.i),u:h.x,v:h.y*side,type:'floating',diameter:3.2}));
  return {ok:true,comp:c,params:{[g]:8*arms[0].holes,[r1]:8*arms[1].holes,[r2]:Math.hypot(L.p3.x-L.p2.x,L.p3.y-L.p2.y)},holeCount:L.holes.length+1};
 }
@@ -89,5 +89,11 @@ function resize(c,params,axis,value,{comps=[],modules=[]}={}){
  }
  return {ok:true,comp:out,params:patch,follow};
 }
-Object.assign(ARMS,{make,ring,resize});
-export {make as makeArmBlank,ring as armOutline,resize as resizeArms};
+/** 編輯面板的欄位：[軸, 名稱, 目前值, 上限, 空欄提示]；孔數是整數個、夾角是整數度（3-4-5 角顯示為提示文字）。 */
+function rows(c){
+ const arms=c.standardBlank.arms;
+ return [...arms.map((a,k)=>['arm'+k,`第${k+1}臂孔數`,a.holes,ARM_HOLE_MAX]),...arms.slice(1).map((a,k)=>['angle'+(k+1),`第${k+2}臂夾角（度）`,a.angleDeg,359,Math.abs(a.angleDeg-ARM_345_DEG)<1e-9?'約127（3-4-5）':'特殊角度'])];
+}
+Object.assign(ARMS,{make,ring,resize,rows});
+import('./arm-edit-panel.js');
+export {make as makeArmBlank,ring as armOutline,resize as resizeArms,rows as armRows};

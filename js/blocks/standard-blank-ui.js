@@ -6,6 +6,7 @@ import {sheetMode,setSheet} from './mobile-workspace.js';
 import {confirmEditorKey} from './editor-confirm-key.js';
 
 export function openStandardBlank(kind,{start,update,confirm,cancel}){
+ if(kind==='arms')return import('./arm-blank-ui.js').then(m=>m.openArmBlank({start,update,confirm,cancel}));
  let panel=document.getElementById('standardBlankPanel');
  if(!panel){panel=document.createElement('section');panel.id='standardBlankPanel';document.querySelector('.creation-sections').before(panel);}
  panel.replaceChildren();panel.hidden=false;

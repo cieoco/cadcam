@@ -17,6 +17,7 @@
   "tests": [
     "test/standard-blanks.mjs",
     "test/bent-arms.mjs",
+    "test/bent-arms-ui.mjs",
     "test/connected-resize.mjs",
     "test/connected-status.mjs",
     "test/saved-pose.mjs",

@@ -1,5 +1,5 @@
 import {inspectLinkExport,normalizeExportSettings} from './exporters.js';
-import {convertStandardOutput,isOutputBlank,resizeStandardBlank,BLANK_SPAN_LIMIT} from './standard-blank.js';
+import {convertStandardOutput,isOutputBlank,resizeStandardBlank,ARMS,BLANK_SPAN_LIMIT} from './standard-blank.js';
 import {editableNumber} from './numeric-input.js';
 import {setPointPosition,setPointAngle} from './input.js';
 import {pointRotation,freeLinkForPoint,freeTriangleForPoint,updatePointCoordsById as movePoint} from './model.js';
@@ -126,7 +126,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     ['lenMinusBtn', 'lenPlusBtn'].forEach(key => { el(key).disabled = Boolean(lock); });
     el('lenMinusBtn').title = `${dimension.label} 減少 ${dimension.step ?? 8} mm`;
     el('lenPlusBtn').title = `${dimension.label} 增加 ${dimension.step ?? 8} mm`;
-    hint.textContent = ''; // 一般說明留在教學；限制由主要尺寸列顯示。
+    hint.textContent = '';ARMS.sync?.(comp,setDimensionValue); // 一般說明留在教學；限制由主要尺寸列顯示。
     if (mirroredJaw(comp, S.comps, S.topo.params)) {
       el('memberMirrorLabel').style.display = '';
       el('memberMirror').checked = mirror;
@@ -147,7 +147,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
   function setDimensionValue(componentId,id,raw,{mirrorPair=false,exact=false}={}) {
     const comp=S.comps.find(c=>c.id===componentId);
     if(!comp)return;
-    if(comp.standardBlank&&(['g','r1','arm'].includes(id)||isOutputBlank(comp)&&id==='width')){
+    if(comp.standardBlank&&(/^(g|r1|a)/.test(id)||isOutputBlank(comp)&&id==='width')){
       const value=Number(raw),plan=resizeStandardBlank(comp,S.topo.params,id,value,{comps:S.comps,modules:S.modules});if(!plan.ok){notify(plan.message);sync();return;}
       // A hole that trace, reference, load or dimension settings point at cannot silently disappear with a smaller size.
       const watched=JSON.stringify([S.topo.tracePoints,S.topo.tracePoint,S.topo.referencePoint,S.topo.loads,S.topo.dimensions]),gone=(comp.holes||[]).find(h=>!plan.comp.holes.some(x=>x.id===h.id)&&watched.includes(`"${h.id}"`));
