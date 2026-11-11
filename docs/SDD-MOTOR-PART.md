@@ -131,3 +131,8 @@
 **存檔 -> 開啟後的資料差異**（`test/motor-part-save.mjs`，52 個含馬達的作品＝全部內建範例與 5 個 fixture）：與存檔前逐欄相同，只有 §8 記載的 8 個冗餘 `physicalMotor` 副本不還原：`tipping-bucket/LeftSide.p1`、`gear-gripper/LeftJaw.p1`、`jansen-leg/Anchor2.p1`、`assembly-lift-gripper(-practice)/LeftJaw.p1`、`clawbot-lift-gripper(-practice)/LeftJaw.p1`、`unit7-start/LeftSide.p1`。每顆馬達 12 個角度的求解逐點相同（684 次掃描）。
 
 **驗證**：檔案與分享連結往返、無馬達作品逐字相同且無旗標、今日形狀的 fixture 檔（含封裝）開啟結果不變、自動存檔仍為今日形狀且可還原、矛盾檔拒絕、未知新旗標仍拒絕。啟動大小 2,191,426 -> 2,194,525 bytes（上限 2,200,000 不變）。
+
+## 驗收紀錄（主模型，2026-11-12）
+
+- M1：桌機與手機實際操作（放回／離開座板與復原、刪輸出桿保留馬達並存檔重開、複製輸出桿、齒輪刪除與分開咬合、翻斗範例刪驅動桿與復原）；Node 全套通過；全套瀏覽器測試與主線基準相同（多出的 iq-linq-lift 單獨重跑兩次通過）。
+- M2：桌機與手機實際操作（四連桿與馬達離座作品存檔→重開，零件與參數逐字相同、輸出件無舊馬達欄位、可播放；分享連結新分頁開啟逐字相同）；Node 全套通過；全套瀏覽器測試與主線基準相同（多出的 iq-passive-tools 單獨重跑三次通過，為已知偶發）。
