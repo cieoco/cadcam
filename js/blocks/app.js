@@ -985,7 +985,7 @@ async function configureMotorMount(nodeId=null,initialOutputId='') {
       pushUndo();S.comps=plan.fullWork.comps;S.topo.params=plan.fullWork.params;S.counter=Math.max(S.counter,Store.highestIdNum(S.comps));
       if(plan.fabrication)Settings.applyFabricationProfile(plan.fabrication);
       activateMotor(plan.motor,plan.angle);S.selectedNodeId=plan.center;S.selectedLinkId=null;S.selectedTriangleId=null;S.selectedGearId=null;
-      rebuild();draw();Panels.updateRoleEditor();openMobileEditPanel();scheduleAutosave();return true;
+      rebuild();draw();Panels.updateRoleEditor();openMobileEditPanel();scheduleAutosave();if(plan.fabricationNote)transient(`${plan.fabricationNote}；可復原。`);return true;
     }});
 }
 gripperController = createGripperController({

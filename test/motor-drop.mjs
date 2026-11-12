@@ -36,7 +36,9 @@ assert.equal(planMotorDrop(source,{...req,position:{x:300,y:300}}).matched,false
 assert.equal(planMotorDrop({...source,comps:[made.comp,{...structuredClone(made.comp),id:'Overlap'}]},req).ok,false);
 assert.equal(planMotorDrop({...source,moduleId:'other'},req).matched,false);
 const occupied=structuredClone(source),grid=occupied.comps[0].holes.find(h=>h.u===72&&h.v===40);grid.type='fixed';assert.equal(planMotorDrop(occupied,req).ok,false,'occupied grid holes are not silently removed');
-assert.equal(planMotorDrop({...source,fabrication:FABRICATION_DEFAULTS},{...req,type:'mg995'}).ok,false,'unverified default notch interference is not bypassed');
+// 2026-11-12 使用者要求舵機要能像馬達一樣裝到板上：預設 8×4 缺口的干涉仍不放行（原設定照樣被核對拒絕，見 actuator-standard-plates），
+// 改為把缺口縮到範例已核對的 6×2 並明說；結果帶回新加工設定，原設定不被修改。
+{const servo=planMotorDrop({...source,fabrication:FABRICATION_DEFAULTS},{...req,type:'mg995'});assert.equal(servo.ok,true,servo.message);assert.deepEqual([servo.fabrication.mg995Mount.cableNotchWidthMm,servo.fabrication.mg995Mount.cableNotchDepthMm],[6,2]);assert.match(servo.fabricationNote,/8×4.*6×2/,'the notch change is stated, not silent');assert.equal(FABRICATION_DEFAULTS.mg995Mount.cableNotchWidthMm,8);}
 assert.equal(planMotorDrop({...source,fabrication:FABRICATION_DEFAULTS},{...req,type:'n20'}).ok,false,'generic N20 cannot invent manufacturing holes');
 console.log('motor-drop: three models, create/move, free plate, real DXF holes, reopen/removal, narrow bars, overlap, scope and fabrication guards passed');
 const loose=planMotorInstallation(source,{...req,position:{x:160,y:0}}),state={comps:loose.comps,modules:[],topo:{params:loose.params},fabrication,theta:0,motorAngles:{},undoStack:['one-drag']};

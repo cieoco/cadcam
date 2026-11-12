@@ -2,19 +2,21 @@ import {planMotorDrop,planPlacedMotorOutput,planDraggedMotorOutput} from './moto
 import {isFreeBody} from './model.js';
 import {retargetPointRefs} from './topo-refs.js';
 import {mountingWork,confirmMountingChange} from './mounting-review-ui.js';
+import {applyFabricationProfile} from './settings.js';
 
 // The drag has already recorded its single undo. Finish the same operation only
 // if nothing has changed during lazy loading; never overwrite a later edit/undo.
-export function mountDroppedMotor({S,id,expected,snapshotStr,displayCoords,rebuild,draw,notify,updateRoleEditor}){
+export function mountDroppedMotor({S,id,expected,snapshotStr,displayCoords,rebuild,draw,notify,updateRoleEditor,applyFabrication=applyFabricationProfile}){
  if(snapshotStr()!==expected)return;
  const motor=S.comps.find(c=>c.id===id&&c.type==='motor');if(!motor||!isFreeBody(S.comps,motor,S.modules))return;
  const mount=motor.motorMount||{},source=mountingWork(S);
  const result=planMotorDrop(source,{...mount,type:motor.motorType,existingId:id,position:{...motor.p1},start:motor.servoStart,end:motor.servoEnd},displayCoords(),{thetaDeg:S.theta,motorAngles:S.motorAngles});
  if(!result.matched)return;
  if(!result.ok){notify(`未安裝：${result.message}`);return;}
- if(!confirmMountingChange(source,{...source,comps:result.comps,params:result.params},{notify}))return;
+ if(!confirmMountingChange(source,{...source,comps:result.comps,params:result.params,fabrication:result.fabrication||source.fabrication},{notify}))return;
  S.comps=result.comps;S.topo.params=result.params;S.selectedNodeId=result.center;
- rebuild();draw();updateRoleEditor();notify(`已固定在${result.hostName}，安裝孔槽已更新；可復原。`);
+ if(result.fabricationNote)applyFabrication(result.fabrication);
+ rebuild();draw();updateRoleEditor();notify(`已固定在${result.hostName}，安裝孔槽已更新${result.fabricationNote?`；${result.fabricationNote}`:''}；可復原。`);
 }
 
 export function connectPlacedMotorOutput({S,id,expected,snapshotStr,displayCoords,rebuild,draw,notify,selectLink}){

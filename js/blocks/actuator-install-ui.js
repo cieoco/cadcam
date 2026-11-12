@@ -245,13 +245,13 @@ export function openMotorInstallation({stage=document.getElementById('stageSvg')
     if(document.activeElement!==exact)showNumber(exact,request.angle);
     summary.hidden=!old||request.type!=='mg995';summary.textContent=`擺動 ${request.start}–${request.end}°；範圍沿用接點面板的伺服角度。`;
     reading.textContent=`${Number(request.angle.toFixed(2))}°${result?.simulation?.ok?' · 幾何可解':''}`;
-    error.textContent=placementError|| (invalidSpec?invalidSpec.validationMessage:result&&!result.ok?result.message:result?.simulation&&!result.simulation.ok?result.simulation.message:result?.plateHoles?.length?'板座孔槽為未實量試作；占用格孔已停用，拆除或改方向會重新核對並還原。':'');
+    error.textContent=placementError|| (invalidSpec?invalidSpec.validationMessage:result&&!result.ok?result.message:result?.simulation&&!result.simulation.ok?result.simulation.message:result?.plateHoles?.length?`板座孔槽為未實量試作；占用格孔已停用，拆除或改方向會重新核對並還原。${result.fabricationNote?result.fabricationNote+'。':''}`:'');
     release.textContent=request.outputId?'解除輸出連接':'還原輸出連接';
     createOutput.hidden=!!old&&old.type!=='motor'||!old&&placing;
     next.hidden=!old&&!request.outputId;next.disabled=!result?.ok;next.textContent=!request.outputId&&(request.position||old)?'儲存馬達':old?'儲存安裝':'確認安裝';
     exact.disabled=trial.disabled=!request.hostId||!request.outputId;scan.disabled=!result?.ok||!request.outputId;toggle.disabled=!result?.ok;
     const show3d=three&&result?.ok;space.style.height=show3d?'180px':'';space.hidden=!show3d;svg.style.display=show3d?'none':'';svg.toggleAttribute('hidden',!!show3d);toggle.textContent=show3d?'回到 2D':'查看 3D';
-    hint.textContent=result?.matched?(result.ok?`放開即固定在${result.hostName}並產生安裝孔槽。`:`未安裝：${result.message}`):placing?(!old?'放到板件會自動對孔安裝；空白處只放馬達，可復原。':'點軸心即可儲存；需要輸出桿時再點另一端。'):show3d?'拖模型轉動視角；安裝面與輸出層一起預覽':'點孔選軸心；拖橘色把手轉本體，確認才套用。';
+    hint.textContent=result?.matched?(result.ok?`放開即固定在${result.hostName}並產生安裝孔槽${result.fabricationNote?`；${result.fabricationNote}`:''}。`:`未安裝：${result.message}`):placing?(!old?'放到板件會自動對孔安裝；空白處只放馬達，可復原。':'點軸心即可儲存；需要輸出桿時再點另一端。'):show3d?'拖模型轉動視角；安裝面與輸出層一起預覽':'點孔選軸心；拖橘色把手轉本體，確認才套用。';
     if(show3d)showScene(revision);else drawing();
   }
   // The same form now lives beside the original canvas; no alternate installation route.

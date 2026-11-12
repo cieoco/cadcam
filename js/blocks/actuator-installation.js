@@ -8,6 +8,16 @@ import {compileTopology} from '../core/topology.js';
 import {solveTopology} from '../multilink/solver.js';
 
 export const actuatorSteps=['固定外殼','位置方向','連接輸出','試動確認'];
+/** 舵機預設的出線缺口（8×4 mm）會切到舵機自己的固定螺絲孔，裝到標準板時永遠通不過留邊核對。
+ * 只有在「縮小缺口就能裝上」時，才把缺口縮到範例已核對的 6×2 mm，並由結果帶回新加工設定與說明；
+ * 其他失敗（板太小、占用已連接的孔…）照原訊息回報，不改任何設定。 */
+function plateHolesFor(work,type){
+  const first=planActuatorPlateHoles(work),m=work.fabrication?.mg995Mount;
+  if(first.ok||type!=='mg995'||!m||!(m.cableNotchWidthMm>6||m.cableNotchDepthMm>2))return {...first,fabrication:work.fabrication};
+  const fabrication={...work.fabrication,mg995Mount:{...m,cableNotchWidthMm:Math.min(m.cableNotchWidthMm,6),cableNotchDepthMm:Math.min(m.cableNotchDepthMm,2)}};
+  const second=planActuatorPlateHoles({...work,fabrication});
+  return second.ok?{...second,fabrication,note:`舵機出線缺口已由 ${m.cableNotchWidthMm}×${m.cableNotchDepthMm} 縮為 ${fabrication.mg995Mount.cableNotchWidthMm}×${fabrication.mg995Mount.cableNotchDepthMm} mm，避開固定螺絲孔`}:{...first,fabrication:work.fabrication};
+}
 export function actuatorHostPoints(c){return [...pointKeysFor(c).filter(k=>c?.[k]).map(k=>({key:k,...c[k]})),...[...localHoles(c),...(c?.standardBlank?.mountHoles || [])].map(h=>({...h,...holeWorld(c,h),key:h.id}))];}
 export const actuatorPoint=(c,key,points={})=>{const p=actuatorHostPoints(c).find(p=>p.key===key);return points[p?.id] || p;};
 export const fixedPlate=(c,comps)=>c?.type==='triangle'&&c.standardBlank?.kind==='plate'&&actuatorHostPoints(c).filter(p=>frameNodeIds(comps).has(p.id)).length>=2;
@@ -123,11 +133,11 @@ export function planMotorInstallation(source,request,points={},motion={}){
   const partId=independent?.id||former?.motorMount?.partId;
   if(partId)out.motorMount.partId=partId;
   if(independent)comps=comps.filter(c=>c!==independent);
-  const platePlan=planActuatorPlateHoles({comps,params,fabrication:source.fabrication,modules:source.modules});if(!platePlan.ok)return fail(platePlan.message);comps=platePlan.comps;
+  const platePlan=plateHolesFor({comps,params,fabrication:source.fabrication,modules:source.modules},request.type);if(!platePlan.ok)return fail(platePlan.message);comps=platePlan.comps;
   const angle=Number(request.angle??(oldCenter?currentAngle:0));
   if(!Number.isFinite(angle))return fail('試動角度無效。');
   const motorAngles={...motion.motorAngles,[motor]:angle};
-  return evaluateMotorCandidate({ok:true,comps,params,fabrication:source.fabrication,plateHoles:platePlan.reports,motor,angle,center,outputId:out.id,hostId:host?.id||'world',moving},points,motorAngles);
+  return evaluateMotorCandidate({ok:true,comps,params,fabrication:platePlan.fabrication,...(platePlan.note?{fabricationNote:platePlan.note}:{}),plateHoles:platePlan.reports,motor,angle,center,outputId:out.id,hostId:host?.id||'world',moving},points,motorAngles);
 }
 
 // Editing commits legal part data; simulation is a separate diagnostic. Never
@@ -184,6 +194,6 @@ function planUnconnectedMotor(source,request,points,motion){
   if(request.type==='mg995'){body.servoStart=Number(request.start??0);body.servoEnd=Number(request.end??90);if(![body.servoStart,body.servoEnd].every(n=>Number.isFinite(n)&&Math.abs(n)<=360)||body.servoStart===body.servoEnd)return fail('舵機起終角需有效且不同。');}
   comps=comps.filter(c=>c!==old||old.type!=='motor');comps.push(body);
   if(host){host.motorMountPoint=p1.id;host.frameSeparate=true;}
-  const holes=planActuatorPlateHoles({...source,comps,params});if(!holes.ok&&!pureRelease)return fail(holes.message);
-  return evaluateMotorCandidate({ok:true,...(pureRelease?{release:true}:{}),...(holes.ok?{}:{mountIssue:holes.message}),comps:holes.ok?holes.comps:comps,params,fabrication:source.fabrication,plateHoles:holes.reports,motor,angle:Number(request.angle)||0,center:p1.id,outputId:'',hostId:host?.id||'world'},points,motion.motorAngles);
+  const holes=plateHolesFor({...source,comps,params},request.type);if(!holes.ok&&!pureRelease)return fail(holes.message);
+  return evaluateMotorCandidate({ok:true,...(pureRelease?{release:true}:{}),...(holes.ok?{}:{mountIssue:holes.message}),comps:holes.ok?holes.comps:comps,params,fabrication:holes.fabrication,...(holes.note?{fabricationNote:holes.note}:{}),plateHoles:holes.reports,motor,angle:Number(request.angle)||0,center:p1.id,outputId:'',hostId:host?.id||'world'},points,motion.motorAngles);
 }
