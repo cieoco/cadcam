@@ -8,15 +8,10 @@ import {compileTopology} from '../core/topology.js';
 import {solveTopology} from '../multilink/solver.js';
 
 export const actuatorSteps=['固定外殼','位置方向','連接輸出','試動確認'];
-/** 舵機預設的出線缺口（8×4 mm）會切到舵機自己的固定螺絲孔，裝到標準板時永遠通不過留邊核對。
- * 只有在「縮小缺口就能裝上」時，才把缺口縮到範例已核對的 6×2 mm，並由結果帶回新加工設定與說明；
- * 其他失敗（板太小、占用已連接的孔…）照原訊息回報，不改任何設定。 */
-function plateHolesFor(work,type){
-  const first=planActuatorPlateHoles(work),m=work.fabrication?.mg995Mount;
-  if(first.ok||type!=='mg995'||!m||!(m.cableNotchWidthMm>6||m.cableNotchDepthMm>2))return {...first,fabrication:work.fabrication};
-  const fabrication={...work.fabrication,mg995Mount:{...m,cableNotchWidthMm:Math.min(m.cableNotchWidthMm,6),cableNotchDepthMm:Math.min(m.cableNotchDepthMm,2)}};
-  const second=planActuatorPlateHoles({...work,fabrication});
-  return second.ok?{...second,fabrication,note:`舵機出線缺口已由 ${m.cableNotchWidthMm}×${m.cableNotchDepthMm} 縮為 ${fabrication.mg995Mount.cableNotchWidthMm}×${fabrication.mg995Mount.cableNotchDepthMm} mm，避開固定螺絲孔`}:{...first,fabrication:work.fabrication};
+// Installation checks the user's fabrication profile; never shrink shared
+// manufacturing dimensions to make a single mounting candidate pass.
+function plateHolesFor(work){
+  return {...planActuatorPlateHoles(work),fabrication:work.fabrication};
 }
 export function actuatorHostPoints(c){return [...pointKeysFor(c).filter(k=>c?.[k]).map(k=>({key:k,...c[k]})),...[...localHoles(c),...(c?.standardBlank?.mountHoles || [])].map(h=>({...h,...holeWorld(c,h),key:h.id}))];}
 export const actuatorPoint=(c,key,points={})=>{const p=actuatorHostPoints(c).find(p=>p.key===key);return points[p?.id] || p;};

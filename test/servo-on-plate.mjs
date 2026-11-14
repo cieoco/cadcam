@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {check,report} from './_harness.mjs';
 import {normalizeSnapshot} from '../js/blocks/schema.js';
 import {toLegacy} from '../js/blocks/motor-part.js';
+import {mountDroppedMotor} from '../js/blocks/motor-drop-ui.js';
 import {planMotorDrop} from '../js/blocks/motor-drop.js';
 import {planActuatorPlateHoles} from '../js/blocks/actuator-plate-holes.js';
 
@@ -17,16 +18,22 @@ const req=(type,extra={})=>({...m.motorMount,type,existingId:m.id,position:{x:m.
 check('素材：舵機原本自帶固定點、不在板上',m.motorType==='mg995'&&!m.motorMount.frameBody&&m.p1.id==='Motor90.A');
 check('素材：作品帶預設 8×4 缺口',w.fabrication.mg995Mount.cableNotchWidthMm===8&&w.fabrication.mg995Mount.cableNotchDepthMm===4);
 
-const r=planMotorDrop(src,req('mg995'),pts,{thetaDeg:0});
+const before=JSON.stringify(src);
+const rejected=planMotorDrop(src,req('mg995'),pts,{thetaDeg:0});
+check('原缺口有干涉：拒絕安裝，不自動縮小',rejected.matched&&!rejected.ok&&/孔|槽/.test(rejected.message));
+check('拒絕後所有零件、孔位及加工尺寸保持不變',JSON.stringify(src)===before);
+// Only an explicitly supplied fabrication profile may change the notch size.
+const selected={...src,fabrication:{...src.fabrication,mg995Mount:{...src.fabrication.mg995Mount,cableNotchWidthMm:6,cableNotchDepthMm:2}}};
+const r=planMotorDrop(selected,req('mg995'),pts,{thetaDeg:0});
 check('舵機放到板上：成功',r.matched&&r.ok,r.message);
 const plate=r.ok&&r.comps.find(c=>c.id==='Blank88'),servo=r.ok&&r.comps.find(c=>c.type==='motor');
 check('舵機軸心共用板孔',!!servo&&servo.p1.id===r.center&&/^Blank88_H/.test(r.center));
 check('舵機外殼由板件承載',servo?.motorMount?.frameBody==='Blank88'&&plate?.motorMountPoint===r.center);
 check('板上被孔槽占用的格孔已停用',(plate?.standardBlank?.mountHoles?.length||0)>4);
-check('結果帶回縮小後的缺口 6×2',r.fabrication?.mg995Mount.cableNotchWidthMm===6&&r.fabrication?.mg995Mount.cableNotchDepthMm===2);
-check('有說明缺口改了什麼',/8×4.*6×2/.test(r.fabricationNote||''),r.fabricationNote);
+check('結果沿用使用者指定的缺口 6×2',r.fabrication?.mg995Mount.cableNotchWidthMm===6&&r.fabrication?.mg995Mount.cableNotchDepthMm===2);
+check('不產生自動改尺寸通知',!r.fabricationNote);
 check('原作品的加工設定沒有被改動',src.fabrication.mg995Mount.cableNotchWidthMm===8);
-check('新設定下整份作品通過孔槽核對',r.ok&&planActuatorPlateHoles({...src,comps:r.comps,params:r.params,fabrication:r.fabrication}).ok);
+check('新設定下整份作品通過孔槽核對',r.ok&&planActuatorPlateHoles({...selected,comps:r.comps,params:r.params,fabrication:r.fabrication}).ok);
 
 // 已是可用缺口：不再改設定、不出說明
 const safe={...src,fabrication:{...w.fabrication,mg995Mount:{...w.fabrication.mg995Mount,cableNotchWidthMm:5,cableNotchDepthMm:2}}};
@@ -40,4 +47,10 @@ check('板放不下時仍拒絕並說明',r3.matched&&!r3.ok&&/座板無法容�
 // TT 馬達不受影響
 const r4=planMotorDrop(src,req('tt'),pts,{thetaDeg:0});
 check('TT 馬達照舊安裝、不動加工設定',r4.ok&&same(r4.fabrication,src.fabrication)&&!r4.fabricationNote,r4.message);
+// Failed drop keeps the already-placed independent motor and the existing undo.
+const state={comps:structuredClone(src.comps),modules:[],topo:{params:structuredClone(src.params)},fabrication:structuredClone(src.fabrication),theta:0,motorAngles:{},undoStack:['placement']};
+const snapshotStr=()=>JSON.stringify(state),original=snapshotStr();let notice='';
+mountDroppedMotor({S:state,id:m.id,expected:original,snapshotStr,displayCoords:()=>pts,notify:text=>notice=text,rebuild(){throw Error('rejected mount must not rebuild');},draw(){},updateRoleEditor(){},applyFabrication(){throw Error('must not overwrite fabrication');}});
+check('拖放拒絕後保留獨立舵機、其他零件、加工設定與原復原步驟',snapshotStr()===original);
+check('拖放拒絕有孔槽原因',/未安裝.*孔/.test(notice),notice);
 report();
