@@ -47,6 +47,7 @@ $('previewToggle').addEventListener('click', () => {
   requestAnimationFrame(preview);
 });
 let hasConfirmed = false, roughPlaced = false, configured = false, childConfirmed = false;
+let workflowPhase='combined';
 let bracketPlan = null, jointSettings, fastenerKind='bracket', tabNutSettings={...TAB_NUT_DEFAULTS};
 $('fastenerKind').addEventListener('change',()=>{fastenerKind=$('fastenerKind').value;render();});
 for(const format of ['svg','dxf']){
@@ -67,7 +68,7 @@ for(const [key,label,advanced] of tabNutFields){
  if(key==='alongMm')signedNumberInput(input);
 }
 let parentCandidate=null,previewRequest=0,previewResultRequest=0,previewSignature='',previewTimer=null,candidateClosed=false;
-function integratedSelection(mate){return faceFastenerSelection(draft,fastenerKind,{offsets:bracketOffsets,childPart:children[draft.child].surface?.compId || 'frame',tabNut:tabNutSettings});}
+function integratedSelection(mate){return faceFastenerSelection(draft,workflowPhase==='position'?'none':fastenerKind,{offsets:bracketOffsets,childPart:children[draft.child].surface?.compId || 'frame',tabNut:tabNutSettings});}
 function requestCandidate(mate){
  if(!integrated||step!==3||!loadSession.ready)return;
  const selection=integratedSelection(mate),signature=JSON.stringify(selection);
@@ -513,12 +514,12 @@ function preview() {
   $('summary').textContent = `${relation}：${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
   const blocked=integrated && (docked ? step>=2 && (!!children[draft.child].blockedReason || (step===3&&!childConfirmed)) : (step > 0 || choosingChild) && (!childConfirmed || !!children[draft.child].blockedReason));
   const mate = solve();$('fastenerChoice').hidden=!integrated||step!==3;fillFastenerChoices($('fastenerKind'),fastenerKind,{printed:'僅支援直角接口'});$('fastenerHelp').textContent=fastenerKind==='none'?'只記錄組立位置，不新增固定孔或五金。':fastenerKind==='tab-nut'?'榫頭插入槽口，再用 M3 螺絲與螺母鎖固；尺寸與板厚需核對。':(docked?'調整位置後，角碼與固定孔一起更新。':'在圖上拖曳角碼調位置，或點角碼輸入偏移；確認後加入兩板固定孔。');$('tabNutSettings').hidden=fastenerKind!=='tab-nut';if(fastenerKind!=='tab-nut')$('tabNutFeedback').hidden=true;if(mate.ok && !blocked)requestCandidate(mate);$('next').disabled = blocked || !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || [...document.querySelectorAll('input[aria-invalid="true"]')].some(input=>input.getClientRects().length);
-  if(integrated&&step===3)$('next').textContent=candidateConfirmLabel(parentCandidate,parentCandidate?.selectionRevision!==previewSignature);
+  if(integrated&&step===3){const warning=candidateConfirmLabel(parentCandidate,parentCandidate?.selectionRevision!==previewSignature).includes('有干涉')?'（有干涉）':'';$('next').textContent=(workflowPhase==='position'?'確認定位':workflowPhase==='fixing'?'確認固定方式':'接上')+warning;}
   if(docked){
    document.querySelector('section[data-step="1"] h2').textContent='① 選第一個面';
    const pair=$('facePair');if(pair)for(const b of pair.children){const selected=Number(b.dataset.faceStep);b.setAttribute('aria-pressed',String(step===selected));b.style.opacity=step<selected?'.45':'1';}
    document.querySelector('section[data-step="2"] h2').textContent='② 選第二個面';
-   document.querySelector('section[data-step="3"] h2').textContent='組立關係';
+   document.querySelector('section[data-step="3"] h2').textContent=workflowPhase==='fixing'?'設定此接合的固定方式':'建立組立關係';
    $('progress').hidden=true;$('back').hidden=true;if($('facePair'))$('facePair').hidden=true;
    if(!draft.faceRelations?.length||relationControls?.pending())$('next').disabled=true;
    for(const i of [1,2])document.querySelector(`section[data-step="${i}"] h2`).style.color=i===1?'#258bd0':'#0a947c';
@@ -547,7 +548,7 @@ if (integrated) {
     if (e.data?.type !== 'face-wizard-init') return;
     if (!loadSession.receiveReady(e.data.loadGraph)) { $('message').textContent = LOAD_MISMATCH_MESSAGE; $('next').disabled = true; return; }
     if (!Array.isArray(e.data.hosts) || !e.data.hosts.length || !Array.isArray(e.data.children) || !e.data.children.length) return;
-    mode = 'wizard';
+    mode = 'wizard';workflowPhase=e.data.phase || 'combined';
     jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; choosingChild = false; configured = !!e.data.configured; childConfirmed=!!e.data.childConfirmed; roughPlaced = configured;
     bracketOffsets = { ...(draft.brackets?.offsets || {}) };
     fastenerKind=faceFastenerKind(draft,configured);tabNutSettings={...TAB_NUT_DEFAULTS,...draft.fastener};for(const input of $('tabNutSettings').querySelectorAll('input'))input.value=tabNutSettings[input.id.replace('tabNut-','')];
@@ -556,17 +557,17 @@ if (integrated) {
     if(docked){
      step=3;childConfirmed=true;
      if(!draft.faceRelations)draft.faceRelations=e.data.childConfirmed?[{kind:'mate',hostFaces:[draft.hostFace],childFaces:[draft.childFace],offsetMm:draft.gap}]:[];
-     if(!e.data.selection?.brackets&&!e.data.selection?.fastener)fastenerKind='none';
+     if(workflowPhase==='position'||!e.data.selection?.brackets&&!e.data.selection?.fastener)fastenerKind='none';
      if(!relationControls){
       const pair=document.createElement('div');pair.id='facePair';pair.style.cssText='display:flex;gap:8px;padding:8px';
       for(const [i,color]of [[1,'#258bd0'],[2,'#0a947c']]){const b=button(i===1?'▱ ①':'▱ ②',()=>{relationControls?.cancel();step=i;render();$('panelScroll').scrollTop=0;});b.dataset.faceStep=i;b.setAttribute('aria-label',i===1?'第一個面':'第二個面');b.style.cssText=`flex:1;min-height:44px;color:${color};border:2px solid ${color};background:white`;pair.append(b);}
       $('progress').after(pair);
-      const section=document.querySelector('section[data-step="3"]'),root=document.createElement('div');root.id='faceRelationControls';section.querySelector('h2').after(root);
+      const section=document.querySelector('section[data-step="3"]'),hint=document.createElement('p'),root=document.createElement('div');hint.textContent=workflowPhase==='position'&&(e.data.selection?.brackets||e.data.selection?.fastener)?'修改定位後，請重新設定這處接合的固定方式。':'';if(hint.textContent)hint.style.setProperty('display','block','important');section.querySelector('h2').after(hint);root.id='faceRelationControls';root.hidden=workflowPhase==='fixing';section.querySelector('h2').after(root);
       relationControls=createFaceRelationControls({root,read:()=>draft,surfaces:()=>({host:hosts[draft.host].surface,child:children[draft.child].surface}),changed:()=>render(),status:()=>solve(),pick:task=>parent.postMessage({type:'face-wizard-relation-request',loadGraph:LOAD_GRAPH_TOKEN,task},location.origin)});
       $('align').replaceChildren();fitControls.style.display='none';
       const legacy=document.createElement('div');legacy.style.display='none';legacy.append($('rotationActions'),$('adjustments'));section.append(legacy);
-      const hardware=document.createElement('details'),hwLabel=document.createElement('summary');hwLabel.textContent='固定方式';hardware.open=!!e.data.startAtPlacement;hardware.append(hwLabel,$('fastenerChoice'),$('bracketNote'));if(e.data.startAtPlacement)section.querySelector('h2').after(hardware);else section.append(hardware);
-      const parts=document.createElement('details'),partsLabel=document.createElement('summary');partsLabel.textContent='選擇兩個設計／零件';parts.append(partsLabel,$('hostChoice'),$('childChoice'));section.append(parts);
+      const hardware=document.createElement('details'),hwLabel=document.createElement('summary');hwLabel.textContent='固定方式（僅此接合）';hardware.hidden=workflowPhase==='position';hardware.open=!!e.data.startAtPlacement;hardware.append(hwLabel,$('fastenerChoice'),$('bracketNote'));if(e.data.startAtPlacement)section.querySelector('h2').after(hardware);else section.append(hardware);
+      const parts=document.createElement('details'),partsLabel=document.createElement('summary');partsLabel.textContent='選擇兩個設計／零件';parts.hidden=workflowPhase==='fixing';parts.append(partsLabel,$('hostChoice'),$('childChoice'));section.append(parts);
       const childMore=document.createElement('details'),childLabel=document.createElement('summary');childLabel.textContent='被遮住的面';childMore.append(childLabel,$('childFaces'));document.querySelector('section[data-step="2"]').append(childMore);
       $('hostFaceMore').querySelector('summary').textContent='被遮住的面';$('hostFaceMore').querySelector('summary').style.setProperty('display','list-item','important');
      }

@@ -49,7 +49,7 @@ export function createFaceRelationControls({root,read,surfaces,changed,pick,stat
     row.append(title,refsLabel,label,button('重新選面',()=>begin(r.kind,i)),button('移除',()=>{read().faceRelations.splice(i,1);signature='';changed();render();}));list.append(row);
    });
   }
-  const result=status?.();feedback.textContent=rules.length?(result&&!result.ok?result.reason:''):'選一種關係開始；順序不限。';
+  const result=status?.();feedback.textContent=rules.length?(result&&!result.ok?result.reason:result?.remainingTranslations>0?`仍有 ${result.remainingTranslations} 個平移方向可調整；可繼續加入關係。`:''):'選一種關係開始；順序不限。';
   for(const row of list.querySelectorAll('[data-relation]'))row.style.borderColor=result&&!result.ok&&(!result.relationConflicts||result.relationConflicts.includes(Number(row.dataset.relation)))?'#c54c42':'#ccd7da';
  }
  return {render,accept,cancel,pending:()=>!!task};

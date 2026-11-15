@@ -26,7 +26,15 @@ function reference(surface, name, parts = []) {
     holes: (surface.holes || []).map(relative), cutouts: (surface.cutouts || []).map(c => ({ ...c, points: c.points.map(relative) })) };
 }
 
-export function openFaceWizard({ comps, modules, params, childId, exportSettings, stockMm, joint, fabrication, readSource, readPose, isCurrent, commit, say, wizard = false, initialMount = null, startAtPlacement = false, dock=null, onPreview=()=>{}, onClose=()=>{}, onStep=()=>{},pickViewer=null,sourceModel=null }) {
+/** Fastening may add material features, but never reposition the saved connection. */
+export function sameFacePlacement(a,b){
+ if(!a?.face||!b?.face||a.to?.module!==b.to?.module||a.to?.output!==b.to?.output||JSON.stringify(a.to?.frame)!==JSON.stringify(b.to?.frame)||a.face.childPart!==b.face.childPart)return false;
+ return ['x','y','z'].every(k=>Number.isFinite(a.face.translation?.[k])&&Number.isFinite(b.face.translation?.[k])&&Math.abs(a.face.translation[k]-b.face.translation[k])<1e-6)&&a.face.rotation.every((row,i)=>row.every((v,j)=>Number.isFinite(b.face.rotation?.[i]?.[j])&&Math.abs(v-b.face.rotation[i][j])<1e-6));
+}
+
+export function openFaceWizard({ comps, modules, params, childId, exportSettings, stockMm, joint, fabrication, readSource, readPose, isCurrent, commit, say, wizard = false, initialMount = null, startAtPlacement = false, phase = 'combined', dock=null, onPreview=()=>{}, onClose=()=>{}, onStep=()=>{},pickViewer=null,sourceModel=null }) {
+  let phaseCandidateAllowed=false;
+  if(phase==='fixing'&&!initialMount?.face){say('請先確認這處接合的位置，再設定固定方式。');return;}
   const transaction=createFaceCandidateTransaction({readSource:readSource || (()=>({comps,modules,params,fabrication,exportSettings,stockMm,joint})),readPose:readPose || (()=>({theta:params.theta || 0})),review:confirmMountingChange,commit});
   const child = modules.find(m => m.id === childId);
   if (!child || child.mount || !child.base) { say('請選尚未安裝且有底座的機構。'); return; }
@@ -161,7 +169,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   async function receive(e) {
     if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
     if (e.data?.type === 'face-wizard-cancel') { shut(); return; }
-    if(e.data?.type==='face-wizard-relation-request'){if(loadSession.allowConfirm(e.data.loadGraph)){const task=e.data.task;if(Number.isInteger(task?.focusRelation)&&task.focusRelation>=0)edgeOverlay?.focusRelation(task.focusRelation);else{relationTask=task&&['host','child'].includes(task.endpoint)?task:null;pickViewer?.highlightSurface?.(null);syncPickFocus();}}return;}
+    if(e.data?.type==='face-wizard-relation-request'){if(phase==='fixing')return;if(loadSession.allowConfirm(e.data.loadGraph)){const task=e.data.task;if(Number.isInteger(task?.focusRelation)&&task.focusRelation>=0)edgeOverlay?.focusRelation(task.focusRelation);else{relationTask=task&&['host','child'].includes(task.endpoint)?task:null;pickViewer?.highlightSurface?.(null);syncPickFocus();}}return;}
     if(e.data?.type==='face-wizard-edge-request'){const task=e.data.task;if(loadSession.allowConfirm(e.data.loadGraph)&&previewStep===3)edgeOverlay?.pick(task&&['host','child'].includes(task.endpoint)&&['top','bottom','front','back','left','right'].includes(task.face)?task:null);return;}
     if(e.data?.type==='face-wizard-step'){if(loadSession.allowConfirm(e.data.loadGraph)&&Number.isInteger(e.data.step)&&e.data.step>=0&&e.data.step<=3){previewStep=e.data.step;stepSelection=e.data;if(previewStep!==3)edgeOverlay?.clear();else edgeOverlay?.showFaces(true);onStep(e.data);}return;}
     const rejectLoad = () => {
@@ -173,18 +181,22 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
       const childAxes=placedModuleAxes({comps,modules,params},childId);
       const oriented=hosts.map(h=>({...h,placementPlane:placedModuleAxes({comps,modules,params},h.surface.moduleId),defaultFace:matchesSaved(h.surface)?saved.host.face:connectionSelection(modules.find(m=>m.id===h.surface.moduleId),'host')?.face || 'top'}));
       const direction=placedFaceSelection(oriented[0].placementPlane,childAxes);
-      frame.contentWindow.postMessage({ type: 'face-wizard-init', sourceRevision:transaction.snapshot().sourceRevision, joint, loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement: startAtPlacement && !needsChoice, hosts:oriented, children:children.map(c=>({...c,placementPlane:childAxes})), childConfirmed:!!saved, configured: !!childSelection && !needsChoice, mode: wizard || needsChoice || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || (modules.some(m=>m.placementPlane)?direction:{ hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }), host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && (initialMount?.to?.frame ? h.surface.frameEdge === initialMount.to.frame.edge : h.surface.outputId === initialMount?.to?.output && h.surface.kind === 'output')) }, location.origin);
+      frame.contentWindow.postMessage({ type: 'face-wizard-init', phase, sourceRevision:transaction.snapshot().sourceRevision, joint, loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement: startAtPlacement && !needsChoice, hosts:oriented, children:children.map(c=>({...c,placementPlane:childAxes})), childConfirmed:!!saved, configured: !!childSelection && !needsChoice, mode: wizard || needsChoice || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || (modules.some(m=>m.placementPlane)?direction:{ hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }), host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && (initialMount?.to?.frame ? h.surface.frameEdge === initialMount.to.frame.edge : h.surface.outputId === initialMount?.to?.output && h.surface.kind === 'output')) }, location.origin);
     }
     if(!['face-wizard-preview','face-wizard-confirm'].includes(e.data?.type))return;
     if(!loadSession.allowConfirm(e.data.loadGraph)){rejectLoad();return;}
     if(isCurrent&&!isCurrent()){frame.contentWindow.postMessage({type:'face-wizard-error',reason:'作品已變動，請重新開啟接合。'},location.origin);return;}
     if(e.data.type==='face-wizard-preview'){
+      phaseCandidateAllowed=false;
       const selection=e.data.selection;
+      if(phase==='position'&&(selection?.brackets||selection?.fastener)){frame.contentWindow.postMessage({type:'face-wizard-error',reason:'請先確認定位，固定方式在下一步個別設定。'},location.origin);return;}
       if(!selection||!Number.isInteger(selection.host)||!hosts[selection.host]||!Number.isInteger(selection.child)||!children[selection.child])return;
       if(children[selection.child].blockedReason){frame.contentWindow.postMessage({type:'face-wizard-error',reason:children[selection.child].blockedReason},location.origin);return;}
       const host=hosts[selection.host].surface,selectedChild=children[selection.child].surface;
       const result=await transaction.preview({childId,reselect:!!initialMount,selection,hostEndpoint:{moduleId:host.moduleId,outputId:host.outputId,frameEdge:host.frameEdge,partId:host.compId},childEndpoint:{partId:selectedChild.compId || 'frame'}});
       if(transaction.snapshot().closed)return;
+      if(phase==='fixing'&&result.work&&!sameFacePlacement(initialMount,result.work.modules.find(m=>m.id===childId)?.mount)){frame.contentWindow.postMessage({type:'face-wizard-error',reason:'這個固定方式會改變已確認的位置；請取消，先修改定位。'},location.origin);return;}
+      phaseCandidateAllowed=!!result.saveable;
       if(dock&&previewStep===3)onPreview(result);
       activeModel=result.model || sourceModel;
       activeCandidate=result;
@@ -195,6 +207,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
       const feedback=dock?controls:result;
       frame.contentWindow.postMessage({type:'face-wizard-preview-result',requestId:e.data.requestId,loadGraph:LOAD_GRAPH_TOKEN,candidate:feedback},location.origin);return;
     }
+    if(phase!=='combined'&&!phaseCandidateAllowed){frame.contentWindow.postMessage({type:'face-wizard-error',reason:'請等待本步驟的候選驗證通過。'},location.origin);return;}
     const result=await transaction.confirm({candidateId:e.data.candidateId,selectionRevision:e.data.selectionRevision});
     if(result.ok)shut();
     else frame.contentWindow.postMessage({type:'face-wizard-error',reason:result.reason},location.origin);

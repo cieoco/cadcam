@@ -1353,11 +1353,11 @@ export function createBench(deps) {
       pickViewer:viewer(),sourceModel:st.materialModel,
       onStep:message=>{if(message.step!==3){deps.faceWizardState?.(true);if(facePreviewShown){facePreviewShown=false;push3D();}}},
       onClose:()=>{faceSession=null;deps.faceWizardState?.(false);panelSig='';draw();syncUI(true);},
-      initialMount: reselect ? mod.mount : null, startAtPlacement, joint: S.fabrication?.joint,
+      initialMount: reselect ? mod.mount : null, startAtPlacement, phase:startAtPlacement?'fixing':'position', joint: S.fabrication?.joint,
       exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,
       fabrication:S.fabrication,readSource:()=>({...assemblyWork(S.comps,S.modules,S.topo),topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint}),
       readPose:()=>deps.connectionPose?.() || ({theta:S.theta,motorAngles:motorAnglesNow()}),say,
-      commit: (result,validation,candidate) => { const mutable=mergeAssemblyWork(S.comps,S.modules,S.topo,structuredClone(result));pushUndo(); S.comps=mutable.comps;S.modules=mutable.modules;S.topo=mutable.topo;rebuild({save:false});deps.adoptConnectionPose?.(candidate.points);draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.fastener ? '已接上，榫槽與 M3 五金已生成；實物試切待驗證。' : result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? (validation?.status==='fail'?'已接上（有干涉），角碼固定孔已生成；請調整作品。':'已接上，角碼固定孔已生成；部分五金仍未檢查。') : '已定位，尚未固定。請查看下方固定方式說明。'); syncUI(true); }
+      commit: (result,validation,candidate) => { const mutable=mergeAssemblyWork(S.comps,S.modules,S.topo,structuredClone(result));pushUndo(); S.comps=mutable.comps;S.modules=mutable.modules;S.topo=mutable.topo;rebuild({save:false});deps.adoptConnectionPose?.(candidate.points);draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.fastener ? '已接上，榫槽與 M3 五金已生成；實物試切待驗證。' : result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? (validation?.status==='fail'?'已接上（有干涉），角碼固定孔已生成；請調整作品。':'已接上，角碼固定孔已生成；部分五金仍未檢查。') : '已確認定位；可稍後為這處接合設定固定方式。'); syncUI(true); }
     });
     if(faceSession)deps.faceWizardState?.(true);
   }
