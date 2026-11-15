@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {createSurfacePickFocus} from '../js/blocks3d/surface-pick-focus.js';
+let cloned=0,disposed=0;
+const material=(opacity=1)=>({opacity,transparent:false,depthWrite:true,clone(){cloned++;return {...this,dispose(){disposed++;}};}});
+const a=material(),b=material(.04),root={children:[],traverse(fn){const visit=o=>{fn(o);for(const c of o.children || [])visit(c);};visit(this);}};
+const add=(parent,key,mat)=>{const o={parent,userData:key?{pickKey:key}:{},children:[],...(mat?{material:mat}:{})};parent.children.push(o);return o;};
+const target=add(root,'plate:A',a),other=add(root,'plate:B',a),motor=add(root,'motor:M'),motorBody=add(motor,null,[a,b]);
+const focus=createSurfacePickFocus(root);focus.set('plate:A');assert.equal(target.material,a,'selected part retains its exact material');assert.notEqual(other.material,a);assert.equal(other.material.opacity,.07);assert.equal(other.material.depthWrite,false);assert.equal(motorBody.material[0],other.material,'temporary clones are shared, not made per mesh');assert.equal(motorBody.material[1].opacity,.04,'already faint objects never become opaque');
+assert.equal(focus.allows('plate:B'),false,'an occluding board must not intercept a target-face pick');assert.equal(focus.allows('motor:M'),false);assert.equal(focus.allows('plate:A'),true);
+const count=cloned;focus.set('plate:A');assert.equal(cloned,count,'repeated focus is allocation free');
+other.material=a;motorBody.material=[a,b];focus.refresh();assert.equal(other.material.opacity,.07,'retained pose/appearance updates do not erase selection focus');assert.equal(cloned,count,'retained refresh reuses existing clones');focus.refresh();assert.equal(cloned,count,'repeated focus refresh never clones a clone');
+focus.set('plate:B');assert.equal(other.material,a);assert.notEqual(target.material,a);assert.equal(a.opacity,1,'shared original is never mutated');
+focus.beforeRebuild();assert.equal(target.material,a);assert.equal(other.material,a);assert.deepEqual(motorBody.material,[a,b]);root.children=[];const replacement=add(root,'plate:B',a),newOther=add(root,'plate:C',a);focus.afterRebuild();assert.equal(replacement.material,a);assert.notEqual(newOther.material,a,'candidate rebuild reapplies temporary focus');
+focus.set(null);assert.equal(newOther.material,a);assert.equal(focus.allows('plate:C'),true,'cancel restores normal picking');focus.set('plate:B');focus.dispose();assert.equal(newOther.material,a);assert.equal(focus.key,null);assert.equal(cloned,disposed,'all temporary materials are disposed exactly once');
+console.log('surface picking focus: overlap filtering, independent/shared materials, stable focus, rebuild, cancel and cleanup passed');

@@ -2,6 +2,7 @@ import {normalizeMaterialVoids,materialCircleContour} from '../blocks/material-v
 import {diskOrientationMark} from '../blocks/disk-orientation.js';
 import {wheelAppearance} from '../blocks/wheel-appearance.js';
 import {retainedSceneKey,createSceneLifetime} from './scene-reuse.js';
+import {createSurfacePickFocus} from './surface-pick-focus.js';
 /**
  * blocks3d / viewer
  *
@@ -322,6 +323,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
 
   // 動態內容都掛在這個 group，update() 時整批換掉
   const dynamic = new THREE.Group();
+  const surfacePickFocus=createSurfacePickFocus(dynamic);
   scene.add(dynamic);
   const syringeGroup=new THREE.Group();scene.add(syringeGroup);
   function clearSyringes(){syringeGroup.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});syringeGroup.clear();}
@@ -540,6 +542,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     for(const b of poseBindings)b.update(b.obj,scopes.get(b.scope),model);
     geometryReuses+=partObjects.reduce((n,p)=>{p.obj.traverse(o=>{if(o.geometry)n++;});return n;},0);
     applyAppearance();
+    surfacePickFocus.refresh();
     applyExplode();
   }
 
@@ -561,6 +564,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   }
 
   function clearDynamic() {
+    surfacePickFocus.beforeRebuild();
     for (let i = dynamic.children.length - 1; i >= 0; i--) {
       const obj = dynamic.children[i];
       dynamic.remove(obj);
@@ -666,6 +670,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     });
     applyExplode();
     focusCamera(model);
+    surfacePickFocus.afterRebuild();
     if (onRebuilt) onRebuilt({ first: !hadModel, sinceStart: performance.now() - startedAt });
   }
 
@@ -1322,6 +1327,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       while (owner && owner !== dynamic && owner.userData.pickKey === undefined) owner = owner.parent;
       if (!owner || owner.userData.pickKey === undefined || !hit.face) continue;
       const key = owner.userData.pickKey;
+      if(!surfacePickFocus.allows(key))continue;
       // 馬達、齒輪等實體也遮擋後面的板，不穿透選面。
       if (!/(^|\/)(frame|modframe:|stick:|plate:)/.test(key)) return null;
       const normal = hit.face.normal.clone();
@@ -1626,6 +1632,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   if (resizeObserver) resizeObserver.observe(container);
 
   function dispose() {
+    surfacePickFocus.dispose();
     projectionListeners.clear();
     clearSyringes();
     lifetime.retire();
@@ -1666,7 +1673,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   const api = {
     renderNow,
     cacheStats:()=>({...lifetime.stats(),geometryBuilds,geometryReuses,geometryDisposals}),
-    update, resize, dispose, start, stop, showAll, fitTo, setViewPreset, setExplode, getExtents, set onRebuilt(fn) { onRebuilt = fn; }, get viewUp() { return viewUp; }, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, project, projectPoints, subscribeProjection, tiltView, pickSurface, highlightSurface,
+    update, resize, dispose, start, stop, showAll, fitTo, setViewPreset, setExplode, getExtents, set onRebuilt(fn) { onRebuilt = fn; }, get viewUp() { return viewUp; }, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, project, projectPoints, subscribeProjection, tiltView, pickSurface, highlightSurface, setSurfacePickFocus:key=>surfacePickFocus.set(key),
     set onPick(fn) { onPick=fn; },
     setPickEnabled(on) { pickEnabled = !!on; tap=null; },
     get canvas() { return renderer.domElement; },
