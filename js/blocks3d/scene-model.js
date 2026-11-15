@@ -12,6 +12,7 @@ import {gearLayers} from '../core/gear-train.js';
 import { createRackPath } from '../utils/gear-geometry.js';
 import { gearMeshPhaseDeg } from '../blocks/transmission-geometry.js';
 import { camRadius } from '../utils/cam-profile.js';
+import {jointAxialLayout} from './joint-axial-layout.js';
 
 /**
  * 以「離固定桿的距離」決定每個剛體的疊放層級。2D 的繪製疊放順序與 3D 的 z 分層
@@ -124,12 +125,13 @@ export function buildSceneModel(links, points, opts = {}) {
   const hullR = opts.hullR ?? 6.5;
   const plateThickness = opts.plateThickness ?? 3;
   const memberStocks = opts.memberStocks || {};
-  const maxThickness = Math.max(plateThickness, opts.frameGeometry?.thicknessMm || 0, ...Object.values(memberStocks).map(s => s.thicknessMm));
+  const stockKeys=new Set([...(links || []).map(l=>l.id),...(opts.polygons || []).map(p=>p.points.join(','))]);
+  const maxThickness = Math.max(plateThickness, opts.frameGeometry?.thicknessMm || 0, ...Object.entries(memberStocks).filter(([id])=>stockKeys.has(id)).map(([,s])=>s.thicknessMm));
   // Mounted servo horns occupy 3 mm outside the carrier, plus 0.5 mm
   // clearance on each side. Reserve that space before layering the output.
   let hasServoOutput = false;
   (opts.motorMounts || []).forEach((m,id) => {
-    if(opts.motorTypes?.get(id)==='mg995' && m.face && m.frameBody && m.outputBody)hasServoOutput=true;
+    if(opts.motorCenters?.has(id)&&opts.motorTypes?.get(id)==='mg995' && m.face && m.frameBody && m.outputBody)hasServoOutput=true;
   });
   const plateGap = Math.max(opts.plateGap ?? 6, maxThickness + (hasServoOutput ? 4 : 2));
   const pinR = opts.pinR ?? 3.2;
@@ -200,12 +202,17 @@ export function buildSceneModel(links, points, opts = {}) {
 
   // 分層（離地深度，2D 疊放順序與此共用同一套 → 兩邊一致）
   const layerOf = computeBodyLayers(bodies, groundIds);
+  const compoundLayers=gearLayers(gearDefs.map(g=>({...g,type:'gear',p1:{id:g.center},p2:{id:g.pin}})));
+  const stockOf=b=>memberStocks[b.src.id] || memberStocks[b.joints.join(',')];
+  const axialParts=bodies.map((b,i)=>({id:b.src.id || b.joints.join(','),layer:layerOf[i],thicknessMm:stockOf(b)?.thicknessMm || plateThickness,joints:opts.partJoints?.[b.src.id] || b.joints}));
+  axialParts.push(...gearDefs.map(g=>({id:g.id,layer:compoundLayers.get(g.id) ?? -1,thicknessMm:opts.gearGeometries?.[g.id]?.thicknessMm || plateThickness,joints:opts.partJoints?.[g.id] || [g.center,g.pin,...(g.holes || []).map(h=>h.id)],mesh:g.mesh})));
+  const axial=jointAxialLayout(axialParts,{minimumPitch:opts.plateGap ?? 6,motorMounts,motorTypes});
 
   const sticks = [];
   const plates = [];
   bodies.forEach((body, i) => {
     const layer = layerOf[i];
-    const z = layer * plateGap;
+    const z = axial.get(body.src.id || body.joints.join(',')) ?? layer * plateGap;
     if (body.kind === 'stick') {
       const l = body.src;
       const a = points[l.p1];
@@ -256,20 +263,21 @@ export function buildSceneModel(links, points, opts = {}) {
 
   // 每個關節蒐集「接到它的桿層」，銷柱從最低層貫穿到最高層
   const joints = new Map(); // id -> { id, x, y, min, max, ground }
-  const touch = (id, layer, thickness = plateThickness) => {
+  const touch = (id, layer, thickness = plateThickness, z = layer * plateGap) => {
     const p = points[id];
     if (!p || !Number.isFinite(p.x)) return;
     let j = joints.get(id);
     if (!j) {
-      joints.set(id, { id, x: p.x, y: p.y, min: layer, max: layer, top: layer * plateGap + thickness, ground: groundIds.has(id) });
+      joints.set(id, { id, x: p.x, y: p.y, min: layer, max: layer, bottom:z, top:z + thickness, ground: groundIds.has(id) });
     } else {
       j.min = Math.min(j.min, layer);
       j.max = Math.max(j.max, layer);
-      j.top = Math.max(j.top, layer * plateGap + thickness);
+      j.bottom=Math.min(j.bottom,z);j.top = Math.max(j.top,z + thickness);
     }
   };
-  sticks.forEach(s => s.joints.forEach(id => touch(id, s.layer, s.thickness)));
-  plates.forEach(pl => pl.ids.forEach(id => touch(id, pl.layer, pl.thickness)));
+  const sharedJoints=(id,ids)=>[...new Set([...ids,...(opts.partJoints?.[id] || []).filter(j=>axialParts.some(p=>p.id!==id&&p.joints.includes(j)))])];
+  sticks.forEach(s => sharedJoints(s.id,s.joints).forEach(id => touch(id, s.layer, s.thickness,s.z)));
+  plates.forEach(pl => sharedJoints(pl.id,pl.ids).forEach(id => touch(id, pl.layer, pl.thickness,pl.z)));
 
   // 滑塊（無動力）＝開槽連桿 + 帶兩根導引螺絲的滑件：
   //   - 軌道：m1-m2 承載桿（固定底座），沿行程範圍挖一條長槽。
@@ -329,9 +337,8 @@ export function buildSceneModel(links, points, opts = {}) {
   const gears = [];
   const gearLayer = -1;
   const gearZ = gearLayer * plateGap;
-  const compoundLayers=gearLayers(gearDefs.map(g=>({...g,type:'gear',p1:{id:g.center},p2:{id:g.pin}})));
   gearDefs.forEach(g => {
-    const gearLayer=compoundLayers.get(g.id) ?? -1,gearZ=gearLayer*plateGap;
+    const gearLayer=compoundLayers.get(g.id) ?? -1,gearZ=axial.get(g.id) ?? gearLayer*plateGap;
     const center = points[g.center];
     const pin = points[g.pin];
     if (![center, pin].every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))) return;
@@ -345,7 +352,7 @@ export function buildSceneModel(links, points, opts = {}) {
     if(fused) {
       plates.push({ids:fused.ids,corners:fused.ids.map(id=>points[id]),layer:gearLayer,z:gearZ,r:hullR,
         thickness:fused.thicknessMm,color:g.color || '#b0772e',shape:'triangle',...fused.geometry});
-      fused.ids.forEach(id=>touch(id,gearLayer,fused.thicknessMm));
+      fused.ids.forEach(id=>touch(id,gearLayer,fused.thicknessMm,gearZ));
       return;
     }
     gears.push({
@@ -365,9 +372,10 @@ export function buildSceneModel(links, points, opts = {}) {
       holes:g.holes,
       pinHoleDiameter: Math.max(1, Number(g.pinHoleDiameter) || 5),
     });
-    touch(g.center, gearLayer);
-    touch(g.pin, gearLayer);
-    for (const h of g.holes || []) if (points[h.id]) touch(h.id,gearLayer);
+    const thickness=opts.gearGeometries?.[g.id]?.thicknessMm || plateThickness;
+    touch(g.center, gearLayer,thickness,gearZ);
+    touch(g.pin, gearLayer,thickness,gearZ);
+    for (const h of g.holes || []) if (points[h.id]) touch(h.id,gearLayer,thickness,gearZ);
   });
 
   const pinionById = new Map(gears.map(g => [g.id, g]));
@@ -549,7 +557,7 @@ export function buildSceneModel(links, points, opts = {}) {
     return null;
   };
   joints.forEach(j => {
-    const z0 = j.min * plateGap;
+    const z0 = j.bottom;
     const z1 = j.top;
     if (motorCenters.has(j.id)) {
       // 馬達鎖在固定桿上：本體沉到機構背面（z<0）、躺平往機架方向延伸，輸出軸沿 z 往上帶動曲柄。
@@ -596,7 +604,7 @@ export function buildSceneModel(links, points, opts = {}) {
       const type = ['mg995','n20'].includes(motorTypes.get(j.id)) ? motorTypes.get(j.id) : 'tt';
       const hostPart=mount?.face&&(sticks.find(s=>s.id===mount.frameBody)||plates.find(p=>p.id===mount.frameBody));
       const face=mount?.face,shaftDirection=face==='front'?-1:1;
-      const hostZ=hostPart?hostPart.layer*plateGap:(frameBackZ??0);
+      const hostZ=hostPart?hostPart.z:(frameBackZ??0);
       const hostTop=hostZ+(hostPart?.thickness??plateThickness);
       const horn = type==='mg995' && face ? {
         hornBaseZ:face==='front'?hostZ-0.5:hostTop+0.5,

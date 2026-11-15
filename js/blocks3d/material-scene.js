@@ -7,7 +7,8 @@ import {assemblyRoles} from '../blocks/assembly-roles.js';
 export function buildMaterialScene({comps,modules,params,catalog,inputs,allPlanes=null,points=inputs.pts,stockMm,frameGeometry=catalog.parts.frame || null,
  plates=catalog.frameHomes.map(h=>({moduleId:h.moduleId,plane:h.plane,outlines:h.geometry.outlines,outline:h.geometry.outlines[0],holes:h.geometry.holes,cutouts:h.geometry.cutouts,thicknessMm:catalog.parts[h.name]?.thicknessMm || h.stockMm})),
  plane=null,assemblyScope=true,combineSyringeFrame=false,asm,plan,exportSettings={},joint,hullR=6.5,solveValidity}={}){
- const base={hullR,plateThickness:stockMm,memberStocks:catalog.memberStocks,gearGeometries:catalog.parts,fusedParts:catalog.fusedParts};
+ const partJoints=Object.fromEntries(comps.map(c=>[c.id,[c.p1,c.p2,c.p3,...(c.holes || [])].map(p=>p?.id).filter(Boolean)]));
+ const base={hullR,plateThickness:stockMm,memberStocks:catalog.memberStocks,gearGeometries:catalog.parts,fusedParts:catalog.fusedParts,partJoints};
  // Fixed members selected as connection endpoints remain separate material,
  // even when the usual preview combines other ground bars into the frame.
  const endpointIds=new Set(modules.filter(m=>m.mount?.face).flatMap(m=>{
