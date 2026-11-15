@@ -64,7 +64,8 @@ export function createBench(deps) {
   } = deps;
   const saveComposite = deps.saveComposite || (() => null);
   const exportComposite = deps.exportComposite || (() => null);   // 組合積木匯出 JSON
-  const isCand = deps.inCandidate || (() => false);
+  let faceSession=null;
+  const isCand = () => !!faceSession || !!deps.inCandidate?.();
   let wiz = null;   // M4：接合精靈（mate-wizard-ui.js）；非進階模式時由它畫清單、面板與 3D 承接面標記
   const wizardOn = () => !!wiz && !wiz.advanced();   // B7：存成組合積木（由 app.js 接到模組編輯器的模組庫）
 
@@ -619,6 +620,7 @@ export function createBench(deps) {
 
   // ---------------------------------------------------------------- 模式
   async function setMode(mode) {
+    faceSession?.cancel();faceSession=null;
     if (mode !== 'design' && mode !== 'bench') return;
     if (S.mode === mode) return;
     st.faceStep = null;
@@ -852,6 +854,7 @@ export function createBench(deps) {
   // ---------------------------------------------------------------- 畫面：清單與面板
   function syncUI(force = false) {
     if (!isBench()) return;
+    if(faceSession)return;
     // 預覽中的模組若被復原／讀檔弄掉了，就丟掉預覽狀態
     if (st.preview) { const pm = modOf(st.preview.moduleId); if (!pm || !pm.mount) { st.preview = null; st.faceStep = null; viewer()?.highlightSurface?.(null); applyGhost(); } }
     if (st.selected && !modOf(st.selected)) { st.selected = null; st.faceStep = null; viewer()?.highlightSurface?.(null); }
@@ -1339,13 +1342,20 @@ export function createBench(deps) {
     deps.pause?.();
     const active=assemblyWork(S.comps,S.modules,S.topo);
     const modules = reselect ? active.modules.map(m => m.id === mod.id ? { ...m, mount: null } : m) : active.modules;
-    openFaceWizard({ comps: active.comps, modules, params: S.topo.params, childId: mod.id, wizard: true,
+    faceSession?.cancel();
+    let facePreviewShown=false;
+    faceSession=openFaceWizard({ comps: active.comps, modules, params: S.topo.params, childId: mod.id, wizard: true,
+      dock:panelEl(),onPreview:result=>{facePreviewShown=!!result.model;viewer()?.highlightSurface?.(null);deps.faceWizardState?.(true,result.model || null);if(!result.model)push3D();},
+      pickViewer:viewer(),sourceModel:st.materialModel,
+      onStep:message=>{if(message.step!==3){deps.faceWizardState?.(true);if(facePreviewShown){facePreviewShown=false;push3D();}}},
+      onClose:()=>{faceSession=null;deps.faceWizardState?.(false);panelSig='';draw();syncUI(true);},
       initialMount: reselect ? mod.mount : null, startAtPlacement, joint: S.fabrication?.joint,
       exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,
       fabrication:S.fabrication,readSource:()=>({...assemblyWork(S.comps,S.modules,S.topo),topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint}),
       readPose:()=>deps.connectionPose?.() || ({theta:S.theta,motorAngles:motorAnglesNow()}),say,
       commit: (result,validation,candidate) => { const mutable=mergeAssemblyWork(S.comps,S.modules,S.topo,structuredClone(result));pushUndo(); S.comps=mutable.comps;S.modules=mutable.modules;S.topo=mutable.topo;rebuild({save:false});deps.adoptConnectionPose?.(candidate.points);draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.fastener ? '已接上，榫槽與 M3 五金已生成；實物試切待驗證。' : result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? (validation?.status==='fail'?'已接上（有干涉），角碼固定孔已生成；請調整作品。':'已接上，角碼固定孔已生成；部分五金仍未檢查。') : '已定位，尚未固定。請查看下方固定方式說明。'); syncUI(true); }
     });
+    if(faceSession)deps.faceWizardState?.(true);
   }
   wiz = createMateWizard({
     el, bigBtn, st, deps, openFaces: openDefaultFaceWizard, modOf, displayName, statusOf, say, select, syncUI, drawMarkers, computeMarkers, viewer, listEl, panelEl, liveBox, liveCheck,
@@ -1377,7 +1387,7 @@ export function createBench(deps) {
   syncModeButtons();
   return {
     inCandidate:()=>isCand() || !!st.preview || !!wiz?.previewOf(),
-    workReplaced(){rigidGroups.reset();wiz.resetTree();deps.setCandidate?.(null);st.msg='';st.preview=null;st.faceStep=null;st.snapId=null;panelSig='';listSig='';resetLive();clearTimeline();const msg=document.getElementById('benchMsg');if(msg)msg.textContent='';},
+    workReplaced(){faceSession?.cancel();faceSession=null;rigidGroups.reset();wiz.resetTree();deps.setCandidate?.(null);st.msg='';st.preview=null;st.faceStep=null;st.snapId=null;panelSig='';listSig='';resetLive();clearTimeline();const msg=document.getElementById('benchMsg');if(msg)msg.textContent='';},
     mateWizardDebug: () => wiz.debug(),
     autosaveSnapshot: () => st.preview ? JSON.parse(st.preview.preSnap) : null,
     setMode, select, pickPort, commit, cancel: () => cancelPreview(), adjust, syncUI, afterScene, debug,

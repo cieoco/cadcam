@@ -1321,7 +1321,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       if (!owner || owner.userData.pickKey === undefined || !hit.face) continue;
       const key = owner.userData.pickKey;
       // 馬達、齒輪等實體也遮擋後面的板，不穿透選面。
-      if (!/(^|\/)(frame|modframe:|stick:)/.test(key)) return null;
+      if (!/(^|\/)(frame|modframe:|stick:|plate:)/.test(key)) return null;
       const normal = hit.face.normal.clone();
       const point = owner.worldToLocal(hit.point.clone());
       return { key, point: { x: point.x, y: point.y, z: point.z },

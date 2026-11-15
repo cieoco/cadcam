@@ -113,6 +113,7 @@ import { createModuleEditor } from './module-editor-runtime.js';
 import { prepareRootDesign,insertOffset } from './module-ops.js';
 import {loadDesignInstances,designInstances} from './design-instance-runtime.js';
 let instanceCheckpoint=null;
+let faceWizardActive=false,faceWizardModel=null;
 import { createModuleDrag } from './module-drag.js';
 import { createBench } from './bench-ui.js?v=20261008_brackets';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
 import { workRangeFromTrace, clampRangeFromTraces, currentPointDistance } from './measurement.js';
@@ -1264,6 +1265,7 @@ const mateCandidate=createMateCandidate({
 });
 function setCandidate(c) { return mateCandidate.set(c); }
 function renderMateCandidate() {
+  if(faceWizardActive&&faceWizardModel){viewer3D?.update(faceWizardModel);return true;}
   const preview=mateCandidate.snapshot();if(!preview)return false;
   if(viewer3D&&preview.scene.model){viewer3D.update(preview.scene.model);viewer3D.setHighlight((preview.result?.validation?.material?.findings || []).flatMap(f=>f.pickKeys || []));}
   return true;
@@ -1282,7 +1284,8 @@ const bench = createBench({
     rebuild(); draw(); bench.select(r.moduleId);
     transient('已準備接合；原尺寸與動力設定保留，可按復原。接著選「接合預覽」。');
   },
-  deleteDesign, openDesignList, changeMembership:requestAssemblyMembership, pause, isPlaying:()=>playbackActive, setCandidate, inCandidate: () => !!mateCandidate.snapshot(), candidateSnapshot:()=>mateCandidate.snapshot(), takeCandidate:()=>mateCandidate.take(),
+  deleteDesign, openDesignList, changeMembership:requestAssemblyMembership, pause, isPlaying:()=>playbackActive, setCandidate, inCandidate: () => faceWizardActive || !!mateCandidate.snapshot(), candidateSnapshot:()=>mateCandidate.snapshot(), takeCandidate:()=>mateCandidate.take(),
+  faceWizardState:(active,model=null)=>{faceWizardActive=active;faceWizardModel=model;if(active&&model)viewer3D?.update(model);},
   pushUndo, rebuild, draw, transient, setViewPlane: id => setViewPlane(id),
   saveComposite: id => moduleEditor.saveCompositeToLibrary(id),   // B7
   exportComposite: id => moduleEditor.exportComposite(id),
