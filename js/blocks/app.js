@@ -415,7 +415,7 @@ const displayCoords = () => {
 // ---- 視圖平面（O3、SDD-ORTHOGONAL-MOUNT §4.3）：一次只畫一個平面，solve 與播放仍是全域 ----
 const ORTHO_STACK_MM = 15;            // 側影帶的疊層高度（先固定 15 mm）
 const HOST_BAND_MM = 3;               // 子視圖裡宿主側影帶的厚度
-const hasOrthogonalModules = () => S.modules.some(m => m.mount && (m.mount.orient || m.mount.face));
+const hasOrthogonalModules = () => S.modules.some(m => m.placementPlane || (m.mount && (m.mount.orient || m.mount.face)));
 // ---- 設計模式的焦點分頁（H1）：設計模式一次只畫／只編一個設計，組立模式才全部顯示 ----
 const inDesign = () => S.mode === 'design';
 const focusOpts = () => ({ keepRoot: S.designFocus === ROOT_TAB, rootName: S.topo.rootDesignName });   // 剛按「新設計」時，空的「未命名設計」分頁要留著
@@ -560,12 +560,17 @@ function ensureRootDesign(){
 async function addDesignOccurrence(id){
   if(bench.inCandidate()){transient('請先確認或取消接合預覽');return;}
   const sourceId=instanceSourceId(id),included=assemblyWork(S.comps,S.modules,S.topo).modules.some(m=>m.id===sourceId);
+  const placementRevision=snapshotStr(),{choosePlacementPlane}=await import('./placement-plane-ui.js');
+  if(snapshotStr()!==placementRevision)return;
+  const placementPlane=await choosePlacementPlane({name:S.modules.find(m=>m.id===sourceId)?.name || '設計',comps:S.comps.filter(c=>c.moduleId===sourceId)});
+  if(!placementPlane)return;
+  if(snapshotStr()!==placementRevision){transient('作品已變更，請重新加入');return;}
   if(!included){
     const revision=snapshotStr(),{prepareDesignPlacement}=await import('./design-placement.js');
     if(snapshotStr()!==revision){transient('作品已變更，請重新加入');return;}
     const ready=prepareDesignPlacement({comps:S.comps,modules:S.modules,topo:S.topo},sourceId);
     if(!ready.ok){transient(ready.reason);return;}
-    pause();pushUndo();S.comps=ready.comps;S.modules=ready.modules;
+    pause();pushUndo();S.comps=ready.comps;S.modules=ready.modules.map(m=>m.id===sourceId?{...m,placementPlane}:m);
     S.topo.assemblyMembers=[...new Set([...(S.topo.assemblyMembers || []),sourceId])];
     rebuild();draw();bench.select(sourceId);fitView();return;
   }
@@ -575,7 +580,7 @@ async function addDesignOccurrence(id){
   const delta=insertOffset(S.comps,own,40,S.topo.params,{sideBySide:true});
   const r=api.createDesignInstance({comps:S.comps,modules:S.modules,topo:S.topo,counter:S.counter},sourceId,{x:base.x+delta.dx,y:base.y+delta.dy});
   if(!r.ok){transient(r.reason);return;}
-  pause();pushUndo();S.comps=r.comps;S.modules=r.modules;S.topo=r.topo;S.counter=r.counter;
+  pause();pushUndo();S.comps=r.comps;S.modules=r.modules.map(m=>m.id===r.moduleId?{...m,placementPlane}:m);S.topo=r.topo;S.counter=r.counter;
   S.topo.assemblyMembers=[...new Set([...(S.topo.assemblyMembers || []),r.moduleId])];
   bench.workReplaced();rebuild();draw();bench.select(r.moduleId);fitView();
   transient('已加入一個用件；修改原設計會同步更新，接合位置各自保留');
@@ -1902,7 +1907,7 @@ function drawNow() {
   designShelf?.render();
   creationPalette.sync({key:S.designFocus || ROOT_TAB,count:viewComps().length,drawing:!!(S.drawingLink||S.drawingTriangle||S.drawingPolygon)});
   designGuide.sync(viewComps(),S.selectedNodeId||S.selectedLinkId||S.selectedTriangleId,S.mode);
-  document.getElementById('hint').style.display = viewComps().length ? 'none' : 'block';   // 焦點分頁是空的也要提示
+  document.getElementById('hint').style.display = (inDesign()?viewComps():assemblyWork(S.comps,S.modules,S.topo).comps).length ? 'none' : 'block';   // 焦點分頁是空的也要提示
   const planeHint = document.getElementById('viewPlaneHint');
   if (planeHint) {
     const viewMod = S.viewPlane ? S.modules.find(m => m.id === S.viewPlane) : null;

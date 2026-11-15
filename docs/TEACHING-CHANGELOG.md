@@ -1,5 +1,12 @@
 # 教學與操作更新紀錄
 
+## 2026-11-15 — 加入時圖選三平面（2026.11.15.7，本地）
+
+- 點＋或拖入設計後，先點XY／XZ／YZ半透明平面，選面變色並預覽輪廓，確認才提交；取消／Esc不新增。各用件分別保存平面，尺寸共用，舊作品沿用原姿態。組立以Z軸朝上，XY水平、XZ／YZ垂直；設計仍在原2D局部平面編輯。
+- 共用放置框架接入既有3D平面及子件矩陣，已接合的用件跟隨宿主；2D製作輪廓不旋轉。外部能力旗標placement-plane-v1防止舊版丟失方向，非法平面拒絕開啟。
+- 定向Node 7/7：placement-plane、assembly、assembly-schema、orthogonal-3d、material-geometry、design-instances、startup-size；前段assembly-app 21/21；最後接面3D、重算、候選及材料干涉整合4/4。驗證三軸正交／右手方向、正式場景矩陣、保存正規化、不同共用用件各自保留方向、無效值。證據output/placement-plane-acceptance及output/placement-plane-integration。
+- 瀏覽器桌機／390×844：XY平放、XZ立放、YZ選取、取消不增、確認增加一份、一次復原、原稿2D可見、重新整理保留方向；下載「放置平面驗收.json」核對xy／xz及既有mount均保留。未做實機觸控。證據Downloads/placement-plane-choice.jpg。本包只commit、不push。
+
 ## 2026-11-15 — 設計直接加入組立（2026.11.15.6，本地）
 
 - 移除「先存模組」的必要步驟；新設計保留原稿，組立以拖入或 ＋ 加入，同一原稿可放多份。原稿尺寸同步，各用件位置與接合保留；收藏／匯出收合成選用操作。

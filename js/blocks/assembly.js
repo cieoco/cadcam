@@ -8,6 +8,7 @@
  * solver／topology 一行不改。
  */
 import { compileTopology } from '../core/topology.js';
+import {placementFrame} from './placement-plane.js';
 import { solveTopology, sweepTopology, validateSweepRange } from '../multilink/solver.js';
 import { pointKeysFor } from './part-types.js';
 import { memberStock } from './member-stock.js';
@@ -454,6 +455,7 @@ export function orthogonalFrame(comps, modules, moduleId, points, params, opts =
   const modList = Array.isArray(modules) ? modules : [];
   const list = Array.isArray(comps) ? comps : [];
   const mod = modList.find(m => m.id === moduleId);
+  if(mod&&!mod.mount&&mod.placementPlane)return placementFrame(mod.placementPlane);
   const face = mod && mod.mount && mod.mount.face;
   if (face) {
     const host = modList.find(m => m.id === mod.mount.to.module);
@@ -683,7 +685,8 @@ export function planeOf(comps, modules, compOrModuleId) {
   while (id && !seen.has(id)) {
     seen.add(id);
     const mod = modList.find(m => m.id === id);
-    if (!mod || !mod.mount) return null;
+    if (!mod) return null;
+    if (!mod.mount) return mod.placementPlane?mod.id:null;
     if (mod.mount.orient || mod.mount.face) return mod.id;
     id = mod.mount.to && mod.mount.to.module;
   }

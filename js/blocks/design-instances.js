@@ -57,7 +57,7 @@ export function synchronizeDesignInstances(work){
   if(w.modules.some(m=>m.mount?.to?.module===instance.id&&!m.mount.to.frame&&!r.module.outputs.some(o=>o.id===m.mount.to.output)))return fail(work,'來源修改移除了組立使用的輸出端，請先解除該接合');
   prior.forEach(c=>ownedParamKeys(c).forEach(k=>delete params[k]));Object.assign(params,r.params);
   const index=w.comps.findIndex(c=>c.moduleId===instance.id);w.comps=w.comps.filter(c=>c.moduleId!==instance.id);w.comps.splice(index<0?w.comps.length:index,0,...r.comps);
-  w.modules=w.modules.map(m=>m.id===instance.id?{...r.module,name:source.name,mount:copy(instance.mount || null),...(instance.rigidGroups?{rigidGroups:instance.rigidGroups}:{}),designInstance:{sourceId:source.id,...r.identity,reference:reference(template.comps)}}:m);
+  w.modules=w.modules.map(m=>m.id===instance.id?{...r.module,name:source.name,mount:copy(instance.mount || null),...(instance.placementPlane?{placementPlane:instance.placementPlane}:{}),...(instance.rigidGroups?{rigidGroups:instance.rigidGroups}:{}),designInstance:{sourceId:source.id,...r.identity,reference:reference(template.comps)}}:m);
   if(Object.keys(r.identity.tokens).length>Object.keys(instance.designInstance.tokens).length)w.counter=Math.max(w.counter || 0,r.counter);
  }
  return {...withParams(w,params),ok:true,warnings:[]};

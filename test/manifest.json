@@ -149,6 +149,7 @@
     "test/competition-lift.mjs",
     "test/design-focus.mjs",
     "test/design-instances.mjs",
+    "test/placement-plane.mjs",
     "test/loose-motor-playback.mjs",
     "test/direct-link-assembly.mjs",
     "test/example-controller.mjs",
