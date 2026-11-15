@@ -1,3 +1,5 @@
+import {planActuatorPlateHoles} from './actuator-plate-holes.js';
+import {tabNutPartGeometry} from './tab-nut-plan.js';
 import {syringeClampFrameNodes} from './syringe-shape.js';
 import {actuatorMountSettings} from './fabrication-profile.js';
 import {inspectBarFusion} from './bar-fusion-geometry.js';
@@ -125,6 +127,7 @@ const planeLabel = (modules, id) => { const m = (modules || []).find(x => x && x
 const gapPlane = g => (g && g.plane != null ? g.plane : null);
 
 export function buildPlan({ comps, modules = [], params = {}, exportSettings = {}, cnc, mounts, spacers, extras, joint, fabrication } = {}) {
+  const seats=modules.some(m=>m.designInstance)?planActuatorPlateHoles({comps,modules,params,fabrication},{assembly:true}):{};if(seats.ok)comps=seats.comps;
   // M5a：只有「機器」（底座＋裝在它身上的）進製作計畫；還沒接上的機構與它們的底板都不算，只列在 plan.spare。
   const spare = spareModules(modules);
   const allComps = Array.isArray(comps) ? comps : [], allMods = Array.isArray(modules) ? modules : [];
@@ -217,7 +220,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     const fusion=comp.barFusion ? inspectBarFusion(list,comp,params,exp,orthoExtras) : null;
     if(fusion&&!fusion.ok)throw Error(fusion.reason);
     const hostGeometry = fusion ? fusion.geometry : hosted.has(comp.id) ? hostedBarGeometry(comp, seedPts, exp, hosted.get(comp.id), extraHolesOf(comp)) : null;
-    const geometry=hostGeometry || inspectLinkExport(comp, length, exp, extraHolesOf(comp));
+    const geometry=tabNutPartGeometry(orthoExtras,comp,{local:true}) || hostGeometry || inspectLinkExport(comp, length, exp, extraHolesOf(comp));
     for(const c of list.filter(c=>c.type==='syringe'&&c.b?.componentId===comp.id)){
       const h={x:c.b.u,y:c.b.v,r:linkHole/2,id:`${c.id}_rod`,layer:'SYRINGE_ROD'};
       if(!geometry.holes.some(q=>Math.hypot(q.x-h.x,q.y-h.y)<.001))geometry.holes.push(h);
@@ -233,7 +236,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     addBody(key, part, joints.map(p=>p.id), comp);
   });
   plates.forEach(({ comp, points }) => {
-    const geometry = inspectPlateExport(comp, points, exp, hosted.get(comp.id), plateHolesOf(comp));
+    const geometry = tabNutPartGeometry(orthoExtras,comp) || inspectPlateExport(comp, points, exp, hosted.get(comp.id), plateHolesOf(comp));
     // The build list includes the same physical clamp holes as the export catalog.
     for(const n of syringeClampFrameNodes(list.filter(c=>c.type!=='syringe'||c.a?.componentId===comp.id),[comp.p1,comp.p2,comp.p3].filter(Boolean))){
       const old=geometry.holes.find(h=>Math.hypot(h.x-n.x,h.y-n.y)<.001);
@@ -448,7 +451,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     return { type: motorTypeAt(list, centerId), centerId, plate: partPoints.has(plateName) ? plateName : null };
   });
 
-  return { parts, joints, motors, gaps, spare,n20Spec:exportSettings.drive?.n20Spec===1,diagnostics:orthoExtras.diagnostics || [] };
+  return { parts, joints, motors, gaps, spare,omittedGridHoles:Object.entries(orthoExtras.tabNutGeometry||{}).filter(([,g])=>g.omittedHoleIds?.length).map(([partId,g])=>({partId,ids:[...new Set(g.omittedHoleIds)]})),n20Spec:exportSettings.drive?.n20Spec===1,diagnostics:orthoExtras.diagnostics || [] };
 }
 
 // ---- 五金清單 ----
@@ -594,7 +597,7 @@ export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = []
   const invalid=plan?.diagnostics?.find(d=>['face_fastener_invalid','tab_nut_invalid'].includes(d.code));if(invalid)throw Error(`${invalid.code==='tab_nut_invalid'?'榫槽暫停輸出':'角碼孔暫停輸出'}：${invalid.reason}`);
   const currentReport=validation?.scope==='single_pose'&&['pass','fail','not_supported'].includes(validation.status)&&validationRevision&&['sourceRevision','geometryKey','poseRevision'].every(k=>typeof validation[k]==='string'&&validation[k]===validationRevision[k]);
   const spare = plan && Array.isArray(plan.spare) ? plan.spare : spareModules(modules);   // M5a：還沒接上的機構不在製作包內，提醒一聲
-  warnings = [...warnings, ...(spare.length ? [`還沒接上、不在製作包內：${spare.map(m => m.name).join('、')}`] : []), ...modules.filter(m => m?.mount?.face).map(m => `六面接合 ${m.name || m.id}：${m.mount.face.selection.fastener ? '榫槽鎖固試作：未做雷射切縫補償；材質、五金、工具空間與實物強度待核對。' : m.mount.face.selection.brackets ? `角碼孔依目前板件幾何重新驗證；不合格孔位停止輸出。${currentReport?'目前單一姿態材料結果見下方；全行程與承重仍未驗證。':'跨面干涉與承重仍需驗證。'}` : '擺放姿態已保存；轉接件與配對固定孔尚未確認，不能直接依此製造組立。'}`)];
+  warnings = [...warnings, ...(plan.omittedGridHoles||[]).map(p=>`${p.partId}：榫槽避讓，${p.ids.length} 個未使用格孔不加工；原設計點位保留。`), ...(spare.length ? [`還沒接上、不在製作包內：${spare.map(m => m.name).join('、')}`] : []), ...modules.filter(m => m?.mount?.face).map(m => `六面接合 ${m.name || m.id}：${m.mount.face.selection.fastener ? '榫槽鎖固試作：未做雷射切縫補償；材質、五金、工具空間與實物強度待核對。' : m.mount.face.selection.brackets ? `角碼孔依目前板件幾何重新驗證；不合格孔位停止輸出。${currentReport?'目前單一姿態材料結果見下方；全行程與承重仍未驗證。':'跨面干涉與承重仍需驗證。'}` : '擺放姿態已保存；轉接件與配對固定孔尚未確認，不能直接依此製造組立。'}`)];
   const parts = (plan && plan.parts) || [];
   const joints = (plan && plan.joints) || [];
   const motors = (plan && plan.motors) || [];

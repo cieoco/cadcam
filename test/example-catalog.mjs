@@ -32,3 +32,9 @@ for(const family of CATALOG_FAMILIES) if(family.variants.some(v=>existing.some(e
 for(const id of [sample.id,existing[0].id,'unit4-start']) {const b=buttons.find(b=>b.dataset.exampleId===id);assert.ok(b,id);b.click();}
 assert.deepEqual(loaded,[sample.id,existing[0].id,'unit4-start']);
 console.log(`example catalog: ${existing.length} legacy examples and one blocks example, unique and loadable`);
+
+// The integrated registry has both user-authored works, each in the blocks
+// section exactly once; the legacy archive must not duplicate either entry.
+const integrated=new Element('div');renderExampleCatalog(integrated,BLOCK_EXAMPLES,()=>{},doc);
+const blocksSection=integrated.children.find(n=>n.dataset.exampleGroup==='blocks'),oldSection=integrated.children.find(n=>n.dataset.exampleCatalog==='legacy');
+for(const id of ['block-gear-gripper','four-wheel-chassis']){assert.equal(all(blocksSection).filter(n=>n.dataset.exampleId===id).length,1);assert.equal(all(oldSection).filter(n=>n.dataset.exampleId===id).length,0);}

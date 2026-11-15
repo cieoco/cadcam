@@ -20,7 +20,7 @@ export const COMMANDS = [
   ...add('common',[['pin','插銷','⊙','點兩個孔連接；可轉、鎖固或拔除','startPin']]),
   ...add('common',[['bar','桿件','🔵','單排孔數','openStandardBlank','bar'],['plate','板材','🟩','長×寬孔數','openStandardBlank','plate'],['lshape','L型件','Ⅼ','兩臂孔數與臂寬；同平面','openStandardBlank','l'],['arms','彎桿／多臂件','Y','2-3臂','openStandardBlank','arms']]),
   ...add('free', [['drawBar', '自由畫桿', '🔵', '點兩點畫桿', 'pickLinkTool', 'bar'], ['drawPlate', '自訂板件', '🟢', '前三點主孔，再加外形', 'startDrawPolygon'], ['triangle', '三角板', '🔺', '三孔，填滿', 'pickLinkTool', 'triangle'], ['polyline', '折線桿', '📈', '多孔，不填滿', 'pickLinkTool', 'polyline']]),
-  ...add('other', [['wheel', 'TT 輪子', '🛞', '65×15 mm，接到 TT 軸', 'openWheel'], ['disk', '圓盤', '⚪', '中心孔與工作孔', 'startDrawDisk'], ['motor', '馬達', '🔴', 'TT／N20', 'openMotorChoice']]),
+  ...add('other', [['wheel', 'TT 輪子', '🛞', '獨立輪子 65×15 mm，新增後可調尺寸', 'openWheel'], ['disk', '圓盤', '⚪', '中心孔與工作孔', 'startDrawDisk'], ['motor', '馬達', '🔴', 'TT／N20', 'openMotorChoice']]),
   ...add('other', [['anchor', '固定支點', '📌', '新增獨立固定點；也可點現有孔固定', 'addAnchor'],
     ['rail', '滑軌', '🟩', '畫軌道讓滑塊走', 'startDrawRail'],
     ['servo', '舵機', '🟦', 'MG995', 'pickMotorType', 'mg995'],

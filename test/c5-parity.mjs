@@ -41,7 +41,7 @@ await loadUnitStarts();
 
 const works=[];
 // New authored work has no historical C5/C6 baseline; covered by block-built-example.
-for(const e of BLOCK_EXAMPLES.filter(e=>e.id!=='block-gear-gripper')){const s=normalizeSnapshot(clone(e.snapshot));if(s)works.push({name:e.id,s});}
+for(const e of BLOCK_EXAMPLES.filter(e=>!['block-gear-gripper','four-wheel-chassis'].includes(e.id))){const s=normalizeSnapshot(clone(e.snapshot));if(s)works.push({name:e.id,s});}
 for(const f of ['connected-resize','motor-off-plate']){
   const s=normalizeSnapshot(JSON.parse(readFileSync(new URL(`./fixtures/${f}.json`,import.meta.url),'utf8')));
   if(s)works.push({name:'file:'+f,s});

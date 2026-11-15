@@ -19,9 +19,10 @@ await loadUnitStarts();
 const K=['p1','p2','p3'],OWN=['id','p1','p2','p3','holes','standardBlank'];
 const local=(a,b)=>{const t=Math.atan2(b.y-a.y,b.x-a.x),c=Math.cos(t),s=Math.sin(t);return p=>({x:(p.x-a.x)*c+(p.y-a.y)*s,y:-(p.x-a.x)*s+(p.y-a.y)*c});};
 const inPoly=(p,r)=>{let h=false;for(let i=0,j=r.length-1;i<r.length;j=i++)if((r[i].y>p.y)!==(r[j].y>p.y)&&p.x<(r[j].x-r[i].x)*(p.y-r[i].y)/(r[j].y-r[i].y)+r[i].x)h=!h;return h;};
+// 共用實例的識別對照不是實體連接；全部格孔是明確加工要求，榫接仍可避讓未連接孔。
 // 獨立參考：以 JSON 字串搜尋其他零件／模組／本件非孔欄位，不共用 used-holes 的走訪程式。
 const connected=(s,c,p)=>{
-  const others=JSON.stringify([s.comps.filter(o=>o!==c),s.modules || []]),own=JSON.stringify(Object.fromEntries(Object.entries(c).filter(([k])=>!OWN.includes(k)))),q=JSON.stringify(p.id);
+  const others=JSON.stringify([s.comps.filter(o=>o!==c),(s.modules || []).map(({designInstance,...m})=>m)]),own=JSON.stringify(Object.fromEntries(Object.entries(c).filter(([k])=>!OWN.includes(k)))),q=JSON.stringify(p.id);
   return ['fixed','motor','linear'].includes(p.type)||!!p.physicalMotor||others.includes(q)||own.includes(q);
 };
 const rows=[];let examples=0,connectedChecked=0;
@@ -40,7 +41,7 @@ for(const e of BLOCK_EXAMPLES){
       assert.ok(part.holes.some(h=>Math.hypot(h.x-at.x,h.y-at.y)<.05)||part.cutouts.some(k=>inPoly(at,k.points)),`${e.id}/${c.id}: connected ${p.id} must stay drilled`);
     }
     const lattice=part.holes.filter(h=>Math.abs(h.r-1.6)<1e-6&&(!h.layer||h.layer==='HOLE'));
-    for(const h of lattice)assert.ok(used.some(p=>{const at=move(home[p.id]);return Math.hypot(h.x-at.x,h.y-at.y)<.05;}),`${e.id}/${c.id}: exported grid hole at ${h.x},${h.y} is connected`);
+    for(const h of lattice)assert.ok(c.standardBlank.drill==='all'||used.some(p=>{const at=move(home[p.id]);return Math.hypot(h.x-at.x,h.y-at.y)<.05;}),`${e.id}/${c.id}: exported grid hole at ${h.x},${h.y} is connected`);
     const file=files.find(f=>f.sourceIds.includes(c.id));assert.ok(file,`${e.id}/${c.id} DXF file`);
     const circles=readDxf(file.text).entities.filter(x=>x.type==='CIRCLE').length;
     assert.equal(circles,part.holes.length,`${e.id}/${c.id}: DXF and 3D/STEP catalog drill the same holes`);

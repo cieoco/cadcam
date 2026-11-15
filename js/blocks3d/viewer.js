@@ -1,6 +1,8 @@
 import {normalizeMaterialVoids,materialCircleContour} from '../blocks/material-voids.js';
 import {diskOrientationMark} from '../blocks/disk-orientation.js';
+import {wheelAppearance} from '../blocks/wheel-appearance.js';
 import {retainedSceneKey,createSceneLifetime} from './scene-reuse.js';
+import {createSurfacePickFocus} from './surface-pick-focus.js';
 /**
  * blocks3d / viewer
  *
@@ -321,6 +323,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
 
   // 動態內容都掛在這個 group，update() 時整批換掉
   const dynamic = new THREE.Group();
+  const surfacePickFocus=createSurfacePickFocus(dynamic);
   scene.add(dynamic);
   const syringeGroup=new THREE.Group();scene.add(syringeGroup);
   function clearSyringes(){syringeGroup.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});syringeGroup.clear();}
@@ -539,6 +542,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     for(const b of poseBindings)b.update(b.obj,scopes.get(b.scope),model);
     geometryReuses+=partObjects.reduce((n,p)=>{p.obj.traverse(o=>{if(o.geometry)n++;});return n;},0);
     applyAppearance();
+    surfacePickFocus.refresh();
     applyExplode();
   }
 
@@ -560,6 +564,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   }
 
   function clearDynamic() {
+    surfacePickFocus.beforeRebuild();
     for (let i = dynamic.children.length - 1; i >= 0; i--) {
       const obj = dynamic.children[i];
       dynamic.remove(obj);
@@ -665,6 +670,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     });
     applyExplode();
     focusCamera(model);
+    surfacePickFocus.afterRebuild();
     if (onRebuilt) onRebuilt({ first: !hadModel, sinceStart: performance.now() - startedAt });
   }
 
@@ -688,6 +694,18 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     }return hit;};
     for(const part of parts) {
       const g=part.geometry;
+      if(part.wheelAppearance){
+        // Visual purchased-wheel mesh; the shared fabrication catalog retains only the TT bore.
+        const radius=part.wheelAppearance.radius,appearance=wheelAppearance(radius),group=new THREE.Group();
+        const tire=new THREE.Shape();tire.absarc(0,0,radius,0,Math.PI*2,false);
+        const inner=new THREE.Path();inner.absarc(0,0,appearance.hubRadius,0,Math.PI*2,true);tire.holes.push(inner);
+        const hub=new THREE.Shape();hub.absarc(0,0,appearance.hubRadius,0,Math.PI*2,false);
+        for(const h of [...appearance.holes,...g.holes]){const path=new THREE.Path();path.absarc(h.x,h.y,h.r,0,Math.PI*2,true);hub.holes.push(path);}
+        for(const c of g.cutouts){const path=new THREE.Path();c.points.forEach((p,i)=>i?path.lineTo(p.x,p.y):path.moveTo(p.x,p.y));path.closePath();hub.holes.push(path);}
+        for(const [shape,color] of [[tire,'#17191c'],[hub,'#f8fafc']])group.add(new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:g.thicknessMm,bevelEnabled:false,curveSegments:48}),plateMaterial(color)));
+        group.matrixAutoUpdate=false;group.matrix.fromArray(part.pose.matrix);group.matrixWorldNeedsUpdate=true;group.userData.partId=part.partId;group.userData.geometryVersion=g.geometryVersion;
+        addPart(group,part.pickKey);bindPose(group,(o,m,root)=>{const next=root.materialParts.find(p=>p.partId===part.partId);o.matrix.fromArray(next.pose.matrix);o.matrixWorldNeedsUpdate=true;});continue;
+      }
       if(g.solid?.kind==='pan-head') {
         const group=new THREE.Group(),profile=g.solid.profile.map(([r,z])=>new THREE.Vector2(r,z));
         const head=new THREE.Mesh(new THREE.LatheGeometry(profile,20),screwMat);
@@ -1246,7 +1264,9 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   }
 
   let raf = null;
-  function renderNow(timestamp=null){const at=timestamp===null?0:performance.now();stepCamAnim();controls.update();renderer.render(scene,camera);return timestamp===null?null:{cpuMs:performance.now()-at,poseRevision,rendererRafTimestamp:timestamp};}
+  const projectionListeners=new Set();let projectionSignature='';
+  function notifyProjection(){if(!projectionListeners.size)return;camera.updateMatrixWorld();const signature=[...camera.matrixWorld.elements,...camera.projectionMatrix.elements,renderer.domElement.width,renderer.domElement.height].join(',');if(signature===projectionSignature)return;projectionSignature=signature;for(const fn of projectionListeners)fn();}
+  function renderNow(timestamp=null){const at=timestamp===null?0:performance.now();stepCamAnim();controls.update();renderer.render(scene,camera);notifyProjection();return timestamp===null?null:{cpuMs:performance.now()-at,poseRevision,rendererRafTimestamp:timestamp};}
   function loop() {
     renderNow();
     raf = requestAnimationFrame(loop);
@@ -1307,8 +1327,9 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       while (owner && owner !== dynamic && owner.userData.pickKey === undefined) owner = owner.parent;
       if (!owner || owner.userData.pickKey === undefined || !hit.face) continue;
       const key = owner.userData.pickKey;
+      if(!surfacePickFocus.allows(key))continue;
       // 馬達、齒輪等實體也遮擋後面的板，不穿透選面。
-      if (!/(^|\/)(frame|modframe:|stick:)/.test(key)) return null;
+      if (!/(^|\/)(frame|modframe:|stick:|plate:)/.test(key)) return null;
       const normal = hit.face.normal.clone();
       const point = owner.worldToLocal(hit.point.clone());
       return { key, point: { x: point.x, y: point.y, z: point.z },
@@ -1436,6 +1457,11 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     const rect = renderer.domElement.getBoundingClientRect();
     return { x: rect.left + (v.x + 1) / 2 * rect.width, y: rect.top + (1 - v.y) / 2 * rect.height };
   }
+  function projectPoints(points){
+    camera.updateMatrixWorld();const rect=renderer.domElement.getBoundingClientRect(),v=new THREE.Vector3();
+    return points.map(p=>{v.set(p.x,p.y,p.z).project(camera);return !Number.isFinite(v.x)||v.z>1?null:{x:rect.left+(v.x+1)/2*rect.width,y:rect.top+(1-v.y)/2*rect.height};});
+  }
+  function subscribeProjection(fn){projectionListeners.add(fn);return ()=>projectionListeners.delete(fn);}
   // 把相機繞目標點轉到斜上方（組立台第一次進來用，讓直角安裝的立體關係看得出來）。
   function tiltView(azimuthDeg = -28, elevationDeg = viewUp==='z'?28:18) {
     const t = controls.target;
@@ -1606,6 +1632,8 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   if (resizeObserver) resizeObserver.observe(container);
 
   function dispose() {
+    surfacePickFocus.dispose();
+    projectionListeners.clear();
     clearSyringes();
     lifetime.retire();
     materialNotice.remove();
@@ -1645,7 +1673,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   const api = {
     renderNow,
     cacheStats:()=>({...lifetime.stats(),geometryBuilds,geometryReuses,geometryDisposals}),
-    update, resize, dispose, start, stop, showAll, fitTo, setViewPreset, setExplode, getExtents, set onRebuilt(fn) { onRebuilt = fn; }, get viewUp() { return viewUp; }, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, project, tiltView, pickSurface, highlightSurface,
+    update, resize, dispose, start, stop, showAll, fitTo, setViewPreset, setExplode, getExtents, set onRebuilt(fn) { onRebuilt = fn; }, get viewUp() { return viewUp; }, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, project, projectPoints, subscribeProjection, tiltView, pickSurface, highlightSurface, setSurfacePickFocus:key=>surfacePickFocus.set(key),
     set onPick(fn) { onPick=fn; },
     setPickEnabled(on) { pickEnabled = !!on; tap=null; },
     get canvas() { return renderer.domElement; },

@@ -41,8 +41,8 @@ const descendants = node => node.children.flatMap(child => [child, ...descendant
 const entries = () => descendants(ids.get('exampleList'));
 const catalogIds = CATALOG_FAMILIES.flatMap(family => family.variants.map(item => item.id));
 const snapshots = JSON.stringify(BLOCK_EXAMPLES);
-// 63 = 56 個啟動即有的範例＋4 個馬達／舵機座板、2個力臂範例及鐘形曲柄夾爪（隨起始檔按需載入，載入前目錄只顯示 57 個（單一變體的家族不過濾，含鐘形曲柄夾爪））。
-check('63 個公開範例各有唯一主要位置，沒有遺失或多餘 ID', catalogIds.length === 63 && new Set(catalogIds).size === 63 && BLOCK_EXAMPLES.every(example => catalogIds.includes(example.id)));
+// 64 個公開範例：56 個啟動資料，加上 8 個按需載入範例；載入前單變體家族仍提供入口。
+check('64 個公開範例各有唯一主要位置，沒有遺失或多餘 ID', catalogIds.length === 64 && new Set(catalogIds).size === 64 && BLOCK_EXAMPLES.every(example => example.catalog==='blocks'||catalogIds.includes(example.id)));
 check('五個用途依確認順序排列，工具練習另列', CATALOG_GROUPS.map(group => group.label).join('、') === '傳動與變速、升降與伸縮、夾取與搬運、往復與特殊運動、行走機構' && CATALOG_FAMILIES.every(family => CATALOG_GROUPS.some(group => group.id === family.group) || family.group === 'tools'));
 check('所有可用範例各一個入口，沒有推薦捷徑', entries().filter(node => node.dataset.exampleId).length === BLOCK_EXAMPLES.length && entries().filter(node => node.dataset.exampleRef).length === 0);
 check('能力標示保留手動、固定、局部與待完成界限', getCatalogVariant('iq-wheel-grabber').capability === '手動調姿' && getCatalogVariant('iq-passive-combined').capability === '固定組立' && getCatalogVariant('crank-catapult-study').capability === '局部示意' && getCatalogVariant('slider-crank-practice').capability === '待完成練習');
@@ -88,4 +88,9 @@ check('取消保留作品', applied === previous && pending.removed);
 controller.requestLoad('parallel-fourbar');
 document.body.children[1].children.find(e => e.textContent === '載入此範例').onclick();
 check('取消後可重選同一範例並確認載入', applied !== previous && controller.activeExampleId === 'parallel-fourbar');
+
+// A fresh empty page can load the shared chassis without opening a file first.
+const {designInstances}=await import('../js/blocks/design-instance-runtime.js');
+await loadUnitStarts();check('共用底盤範例預先載入實例功能',typeof designInstances().synchronizeDesignInstances==='function');
+
 report('example-controller');

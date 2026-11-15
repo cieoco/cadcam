@@ -9,6 +9,10 @@ import { buildMountSurfaces, findMountSurface, selectableMountSurfaces } from '.
 import { pointCoords } from './model.js';
 import { inspectLinkExport, inspectPlateExport } from './exporters.js?v=20261007_9';
 import { connectionSelection } from './connection-selection.js';
+import {placedFaceSelection,placedModuleAxes} from './face-placement-direction.js';
+import {boxFaces} from './face-mate.js';
+import {candidateSurfacePoint} from './face-candidate-view.js';
+import {createFaceEdgeOverlay} from './face-edge-overlay.js';
 import { readConnectionDescriptor } from './connection-descriptor.js';
 
 function reference(surface, name, parts = []) {
@@ -22,7 +26,15 @@ function reference(surface, name, parts = []) {
     holes: (surface.holes || []).map(relative), cutouts: (surface.cutouts || []).map(c => ({ ...c, points: c.points.map(relative) })) };
 }
 
-export function openFaceWizard({ comps, modules, params, childId, exportSettings, stockMm, joint, fabrication, readSource, readPose, isCurrent, commit, say, wizard = false, initialMount = null, startAtPlacement = false }) {
+/** Fastening may add material features, but never reposition the saved connection. */
+export function sameFacePlacement(a,b){
+ if(!a?.face||!b?.face||a.to?.module!==b.to?.module||a.to?.output!==b.to?.output||JSON.stringify(a.to?.frame)!==JSON.stringify(b.to?.frame)||a.face.childPart!==b.face.childPart)return false;
+ return ['x','y','z'].every(k=>Number.isFinite(a.face.translation?.[k])&&Number.isFinite(b.face.translation?.[k])&&Math.abs(a.face.translation[k]-b.face.translation[k])<1e-6)&&a.face.rotation.every((row,i)=>row.every((v,j)=>Number.isFinite(b.face.rotation?.[i]?.[j])&&Math.abs(v-b.face.rotation[i][j])<1e-6));
+}
+
+export function openFaceWizard({ comps, modules, params, childId, exportSettings, stockMm, joint, fabrication, readSource, readPose, isCurrent, commit, say, wizard = false, initialMount = null, startAtPlacement = false, phase = 'combined', dock=null, onPreview=()=>{}, onClose=()=>{}, onStep=()=>{},pickViewer=null,sourceModel=null }) {
+  let phaseCandidateAllowed=false;
+  if(phase==='fixing'&&!initialMount?.face){say('請先確認這處接合的位置，再設定固定方式。');return;}
   const transaction=createFaceCandidateTransaction({readSource:readSource || (()=>({comps,modules,params,fabrication,exportSettings,stockMm,joint})),readPose:readPose || (()=>({theta:params.theta || 0})),review:confirmMountingChange,commit});
   const child = modules.find(m => m.id === childId);
   if (!child || child.mount || !child.base) { say('請選尚未安裝且有底座的機構。'); return; }
@@ -98,12 +110,15 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     const item=reference(childSurface,`${child.name} · ${label}`,childParts);
     children.push({...item,partName:label,partId:c.id,blockedReason:status.reason});
   }
-  const dialog = document.createElement('dialog');
+  const dialog = document.createElement(dock?'section':'dialog');
   dialog.setAttribute('aria-label', '接合預覽');
   dialog.style.cssText = 'width:min(960px,100vw);height:94dvh;max-width:100vw;max-height:100dvh;padding:0;border:0;border-radius:14px;overflow-x:hidden;';
   dialog.className = 'face-wizard-dialog';
+  if(dock){dialog.style.cssText='height:100%;min-height:0;display:flex;flex-direction:column;';dock.replaceChildren(dialog);dock.scrollTop=0;}
   const layout = document.createElement('style');
   layout.textContent = `
+    body:has(#benchPanel .face-wizard-dialog) #lessonSequenceBtn{display:none}
+    @media(max-width:640px){body:has(#benchPanel .face-wizard-dialog) #benchList{display:none}body:has(#benchPanel .face-wizard-dialog) #benchPanel{height:42%;max-height:42%;padding:0;overflow:hidden}}
     .face-wizard-heading{display:none}
     @media(max-width:760px),(max-height:540px) and (orientation:landscape){
       .face-wizard-dialog .face-wizard-bar{display:flex;align-items:center;justify-content:space-between;height:44px;padding-left:12px}
@@ -118,39 +133,85 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   const loadSession = createLoadSession(LOAD_GRAPH_TOKEN);
   const frameUrl = new URL('../../assembly-wizard-prototype.html', import.meta.url);
   frameUrl.searchParams.set('integrated', '1');
+  if(dock)frameUrl.searchParams.set('dock','1');
   frameUrl.searchParams.set('v', APP_VERSION);
   frameUrl.searchParams.set('load', LOAD_GRAPH_TOKEN);
   frame.src = frameUrl.href;
   frame.style.cssText = 'width:100%;height:calc(100% - 44px);border:0;display:block;';
-  bar.append(heading, close); dialog.append(layout, bar, frame); document.body.append(dialog);
-  const dispose = () => {transaction.cancel();window.removeEventListener('message', receive);dialog.remove();};
-  close.addEventListener('click', () => dialog.close()); dialog.addEventListener('close', dispose);
+  if(dock){bar.style.display='none';frame.style.cssText='width:100%;height:100%;min-height:0;flex:1;border:0;display:block;';}
+  bar.append(heading, close); dialog.append(layout, bar, frame); if(!dock)document.body.append(dialog);
+  let disposed=false,previewStep=startAtPlacement?3:0,stepSelection=null,tap=null,relationTask=null,activeModel=sourceModel,activeCandidate=null;
+  const canvas=pickViewer?.canvas;
+  function syncPickFocus(){
+   const endpoint=relationTask?.endpoint,item=endpoint&&(endpoint==='host'?hosts:children)[stepSelection?.[endpoint]];
+   const part=item&&activeModel?.materialParts?.find(p=>p.moduleId===item.surface.moduleId&&p.partId===(item.surface.framePartId || item.surface.compId));
+   pickViewer?.setSurfacePickFocus?.(part?.pickKey || null);
+  }
+  const edgeOverlay=dock&&canvas?createFaceEdgeOverlay(pickViewer,picked=>frame.contentWindow.postMessage({type:'face-wizard-edge-picked',...picked},location.origin)):null;
+  const down=e=>{tap=e.isPrimary!==false?{id:e.pointerId,x:e.clientX,y:e.clientY}:null;};
+  const move=e=>{if(tap&&Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>6)tap=null;};
+  const cancelTap=()=>{tap=null;};
+  const up=e=>{const start=tap;tap=null;if(!start||start.id!==e.pointerId||(![1,2].includes(previewStep)&&!relationTask)||!stepSelection)return;
+   const endpoint=relationTask?.endpoint || (previewStep===1?'host':'child'),hit=pickViewer.pickSurface(e.clientX,e.clientY),part=(relationTask?activeModel:sourceModel)?.materialParts?.find(p=>p.pickKey===hit?.key),items=endpoint==='host'?hosts:children;
+   const index=items.findIndex(item=>!item.blockedReason&&part&&part.moduleId===item.surface.moduleId&&part.partId===(item.surface.framePartId || item.surface.compId)),item=items[index];
+   if(!part||!item||relationTask&&index!==stepSelection[endpoint])return;
+   const m=part.pose.matrix,n=hit.normal,world=[m[0]*n.x+m[4]*n.y+m[8]*n.z,m[1]*n.x+m[5]*n.y+m[9]*n.z,m[2]*n.x+m[6]*n.y+m[10]*n.z];
+   let axes=placedModuleAxes({comps,modules,params},item.surface.moduleId);
+   if(relationTask&&activeCandidate?.model){const origin=candidateSurfacePoint(activeCandidate,{x:0,y:0,z:0},endpoint);if(origin)axes=['x','y','z'].map(k=>{const p=candidateSurfacePoint(activeCandidate,{x:0,y:0,z:0,[k]:1},endpoint);return [p.x-origin.x,p.y-origin.y,p.z-origin.z];});}
+   const local=axes.map(a=>a.reduce((s,v,i)=>s+v*world[i],0));
+   const faces=boxFaces(item.surface.box),face=faces.slice().sort((a,b)=>{const score=f=>f.n.x*local[0]+f.n.y*local[1]+f.n.z*local[2];return score(b)-score(a);})[0];
+   if(face){pickViewer.highlightSurface(hit);frame.contentWindow.postMessage(relationTask?{type:'face-wizard-relation-picked',face:face.id}:{type:'face-wizard-pick',field:previewStep===1?'hostFace':'childFace',endpointIndex:index,face:face.id},location.origin);}
+  };
+  if(dock&&canvas){canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',cancelTap);}
+  const dispose = () => {if(disposed)return;disposed=true;transaction.cancel();edgeOverlay?.dispose();pickViewer?.setSurfacePickFocus?.(null);window.removeEventListener('message', receive);if(canvas){canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',cancelTap);pickViewer.highlightSurface(null);}dialog.remove();onClose();};
+  const shut=()=>{if(dock)dispose();else dialog.close();};
+  close.textContent=dock?'取消接合':'關閉';close.addEventListener('click', shut); dialog.addEventListener('close', dispose);
   async function receive(e) {
     if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
-    if (e.data?.type === 'face-wizard-cancel') { dialog.close(); return; }
+    if (e.data?.type === 'face-wizard-cancel') { shut(); return; }
+    if(e.data?.type==='face-wizard-relation-request'){if(phase==='fixing')return;if(loadSession.allowConfirm(e.data.loadGraph)){const task=e.data.task;if(Number.isInteger(task?.focusRelation)&&task.focusRelation>=0)edgeOverlay?.focusRelation(task.focusRelation);else{relationTask=task&&['host','child'].includes(task.endpoint)?task:null;pickViewer?.highlightSurface?.(null);syncPickFocus();}}return;}
+    if(e.data?.type==='face-wizard-edge-request'){const task=e.data.task;if(loadSession.allowConfirm(e.data.loadGraph)&&previewStep===3)edgeOverlay?.pick(task&&['host','child'].includes(task.endpoint)&&['top','bottom','front','back','left','right'].includes(task.face)?task:null);return;}
+    if(e.data?.type==='face-wizard-step'){if(loadSession.allowConfirm(e.data.loadGraph)&&Number.isInteger(e.data.step)&&e.data.step>=0&&e.data.step<=3){previewStep=e.data.step;stepSelection=e.data;if(previewStep!==3)edgeOverlay?.clear();else edgeOverlay?.showFaces(true);onStep(e.data);}return;}
     const rejectLoad = () => {
       say(LOAD_MISMATCH_MESSAGE);
       frame.contentWindow.postMessage({type:'face-wizard-error',loadMismatch:true,reason:LOAD_MISMATCH_MESSAGE},location.origin);
     };
     if (e.data?.type === 'face-wizard-ready') {
       if (!loadSession.receiveReady(e.data.loadGraph)) { rejectLoad(); return; }
-      frame.contentWindow.postMessage({ type: 'face-wizard-init', sourceRevision:transaction.snapshot().sourceRevision, joint, loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement: startAtPlacement && !needsChoice, hosts: hosts.map(h => ({ ...h, defaultFace: matchesSaved(h.surface) ? saved.host.face : connectionSelection(modules.find(m => m.id === h.surface.moduleId), 'host')?.face || 'top' })), children, childConfirmed:!!saved, configured: !!childSelection && !needsChoice, mode: wizard || needsChoice || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || { hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }, host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && (initialMount?.to?.frame ? h.surface.frameEdge === initialMount.to.frame.edge : h.surface.outputId === initialMount?.to?.output && h.surface.kind === 'output')) }, location.origin);
+      const childAxes=placedModuleAxes({comps,modules,params},childId);
+      const oriented=hosts.map(h=>({...h,placementPlane:placedModuleAxes({comps,modules,params},h.surface.moduleId),defaultFace:matchesSaved(h.surface)?saved.host.face:connectionSelection(modules.find(m=>m.id===h.surface.moduleId),'host')?.face || 'top'}));
+      const direction=placedFaceSelection(oriented[0].placementPlane,childAxes);
+      frame.contentWindow.postMessage({ type: 'face-wizard-init', phase, sourceRevision:transaction.snapshot().sourceRevision, joint, loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement: startAtPlacement && !needsChoice, hosts:oriented, children:children.map(c=>({...c,placementPlane:childAxes})), childConfirmed:!!saved, configured: !!childSelection && !needsChoice, mode: wizard || needsChoice || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || (modules.some(m=>m.placementPlane)?direction:{ hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }), host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && (initialMount?.to?.frame ? h.surface.frameEdge === initialMount.to.frame.edge : h.surface.outputId === initialMount?.to?.output && h.surface.kind === 'output')) }, location.origin);
     }
     if(!['face-wizard-preview','face-wizard-confirm'].includes(e.data?.type))return;
     if(!loadSession.allowConfirm(e.data.loadGraph)){rejectLoad();return;}
     if(isCurrent&&!isCurrent()){frame.contentWindow.postMessage({type:'face-wizard-error',reason:'作品已變動，請重新開啟接合。'},location.origin);return;}
     if(e.data.type==='face-wizard-preview'){
+      phaseCandidateAllowed=false;
       const selection=e.data.selection;
+      if(phase==='position'&&(selection?.brackets||selection?.fastener)){frame.contentWindow.postMessage({type:'face-wizard-error',reason:'請先確認定位，固定方式在下一步個別設定。'},location.origin);return;}
       if(!selection||!Number.isInteger(selection.host)||!hosts[selection.host]||!Number.isInteger(selection.child)||!children[selection.child])return;
       if(children[selection.child].blockedReason){frame.contentWindow.postMessage({type:'face-wizard-error',reason:children[selection.child].blockedReason},location.origin);return;}
       const host=hosts[selection.host].surface,selectedChild=children[selection.child].surface;
       const result=await transaction.preview({childId,reselect:!!initialMount,selection,hostEndpoint:{moduleId:host.moduleId,outputId:host.outputId,frameEdge:host.frameEdge,partId:host.compId},childEndpoint:{partId:selectedChild.compId || 'frame'}});
       if(transaction.snapshot().closed)return;
-      frame.contentWindow.postMessage({type:'face-wizard-preview-result',requestId:e.data.requestId,loadGraph:LOAD_GRAPH_TOKEN,candidate:result},location.origin);return;
+      if(phase==='fixing'&&result.work&&!sameFacePlacement(initialMount,result.work.modules.find(m=>m.id===childId)?.mount)){frame.contentWindow.postMessage({type:'face-wizard-error',reason:'這個固定方式會改變已確認的位置；請取消，先修改定位。'},location.origin);return;}
+      phaseCandidateAllowed=!!result.saveable;
+      if(dock&&previewStep===3)onPreview(result);
+      activeModel=result.model || sourceModel;
+      activeCandidate=result;
+      syncPickFocus();
+      edgeOverlay?.setCandidate(result);
+      // Docked controls need validation and labels, not a second clone of the 3D scene.
+      const {model,displayWork,hostSurface,childSurface,hostReference,childReference,placement,...controls}=result;
+      const feedback=dock?controls:result;
+      frame.contentWindow.postMessage({type:'face-wizard-preview-result',requestId:e.data.requestId,loadGraph:LOAD_GRAPH_TOKEN,candidate:feedback},location.origin);return;
     }
+    if(phase!=='combined'&&!phaseCandidateAllowed){frame.contentWindow.postMessage({type:'face-wizard-error',reason:'請等待本步驟的候選驗證通過。'},location.origin);return;}
     const result=await transaction.confirm({candidateId:e.data.candidateId,selectionRevision:e.data.selectionRevision});
-    if(result.ok)dialog.close();
+    if(result.ok)shut();
     else frame.contentWindow.postMessage({type:'face-wizard-error',reason:result.reason},location.origin);
   }
-  window.addEventListener('message', receive); dialog.showModal();
+  window.addEventListener('message', receive); if(!dock)dialog.showModal();
+  return {cancel:shut};
 }

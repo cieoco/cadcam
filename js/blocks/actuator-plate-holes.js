@@ -19,6 +19,8 @@ const usedPoint=(comps,modules,owner,h,params)=>idCounts(comps.filter(c=>c!==own
 export function planActuatorPlateHoles(source,{assembly=false}={}){
  const relevant=source.comps.some(c=>c.type==='syringe'&&['fixed-axis','pivot'].includes(c.mountMode)&&source.comps.some(h=>h.id===c.a?.componentId&&h.standardBlank)||isOutputBlank(c)||c.standardBlank?.mountHoles?.length||c.holes?.some(h=>h.manufactured)||c.motorMount?.frameBody&&source.comps.some(h=>h.id===c.motorMount.frameBody&&h.standardBlank));if(!relevant)return {ok:true,comps:source.comps,reports:[]};
  const comps=structuredClone(source.comps),fabrication=source.fabrication || FABRICATION_DEFAULTS,reports=[],issues=[];
+ // Shared-instance token maps are identity records, not physical hole uses.
+ const physicalModules=(source.modules||[]).map(({designInstance,...m})=>m);
  const mounts=deriveMotorMounts(comps).map(m=>({...m,settings:actuatorMountSettings(fabrication,m.kind)}));
  for(const host of comps.filter(c=>c.standardBlank&&['bar','triangle'].includes(c.type)&&!isOutputBlank(c))){
   const pool=[...(host.holes || []),...(host.standardBlank.mountHoles || [])].sort((a,b)=>a.v-b.v||a.u-b.u),attached=mounts.filter(m=>m.frameBody===host.id);
@@ -48,7 +50,7 @@ export function planActuatorPlateHoles(source,{assembly=false}={}){
   const occupied=(p,r)=>features.some(f=>f.holes.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<r+q.r+1-1e-6)||f.cutouts.some(c=>inside(p,c.points)||edge(p,c.points)<r+1-1e-6));
   if(comps.some(c=>c.type==='syringe'&&!clamps.includes(c)&&['a','b'].some(k=>{const r=c[k],p=r?.componentId===host.id&&attachmentPoint(r,comps,source.params);return p&&occupied(p,1.6);})))return {ok:false,message:'馬達安裝特徵占用既有針筒接合位置，請換位置。'};
   for(const k of pointKeysFor(host))if(host[k]&&!centers.has(host[k].id)&&!clampNodes.some(h=>Math.hypot(h.x-host[k].x,h.y-host[k].y)<.001)&&!pool.some(h=>h.manufactured&&Math.hypot(holeWorld(host,h).x-host[k].x,holeWorld(host,h).y-host[k].y)<.001)&&occupied(host[k],1.6))return {ok:false,message:'安裝特徵占用板材主孔，請改用較大座板或另一個軸心孔。'};
-  const used=h=>usedPoint(comps,source.modules,host,h,source.params);
+  const used=h=>usedPoint(comps,physicalModules,host,h,source.params);
   const available=[],parked=[];
   for(const h of pool){const world=holeWorld(host,h);if(h.manufactured){available.push(h);continue;}if(occupied(world,(h.diameter || 3.2)/2)){if(!centers.has(h.id)&&(h.manufactured||h.type==='fixed'||used(h)))return {ok:false,message:h.manufactured?'新孔與已鑽孔重疊或留邊不足，請換位置或換板。':'安裝特徵會占用已固定或已連接的格孔，請先解除或換位置。'};parked.push(h);}else available.push(h);}
   host.holes=available;if(parked.length)host.standardBlank.mountHoles=parked;else delete host.standardBlank.mountHoles;
@@ -60,7 +62,7 @@ export function planActuatorPlateHoles(source,{assembly=false}={}){
   const direct=(out.motorType || 'tt')==='tt'&&out.ttOutput==='shaft',cuts=g.cutouts.filter(c=>c.layer==='TT_SHAFT_FLAT');
   const screws=special.filter(h=>/^(MG995_HORN|TT_HUB|N20_HUB)_SCREW$/.test(h.layer)).length;if(active&&!direct&&screws<2)return {ok:false,message:'輸出板至少需要2顆有效軸接頭固定螺絲，請調整板寬或孔規格。'};
   const occupied=(p,r)=>special.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<r+q.r+1-1e-6)||cuts.some(c=>inside(p,c.points)||edge(p,c.points)<r+1-1e-6);
-  const available=[],parked=[],used=h=>usedPoint(comps,source.modules,out,h,source.params);
+  const available=[],parked=[],used=h=>usedPoint(comps,physicalModules,out,h,source.params);
   if(comps.some(c=>c.type==='syringe'&&['a','b'].some(k=>c[k]?.componentId===out.id&&occupied({x:c[k].u,y:c[k].v},1.6))))return {ok:false,message:'軸接頭孔會占用針筒接合位置，請換接法。'};
   for(const h of pool){if(occupied({x:h.u,y:h.v},(h.diameter || 3.2)/2)){if(h.manufactured||h.type==='fixed'||used(h))return {ok:false,message:'軸接頭孔會占用已固定或已連接格孔，請先解除或換接法。'};parked.push(h);}else available.push(h);}
   out.holes=available;if(parked.length)out.standardBlank.mountHoles=parked;else delete out.standardBlank.mountHoles;

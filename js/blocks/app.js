@@ -109,8 +109,11 @@ import { createSliderEditor } from './slider-editor.js?v=20261005_sliderui';
 import { createMotorTools, gearDriver } from './motor-tools.js';
 import { createPlateEditor } from './plate-editor.js';
 import { createNodeEditor } from './node-editor.js';
-import { createModuleEditor } from './module-editor.js?v=20261007_singleface';
-import { prepareRootDesign } from './module-ops.js';
+import { createModuleEditor } from './module-editor-runtime.js';
+import { prepareRootDesign,insertOffset } from './module-ops.js';
+import {loadDesignInstances,designInstances} from './design-instance-runtime.js';
+let instanceCheckpoint=null;
+let faceWizardActive=false,faceWizardModel=null;
 import { createModuleDrag } from './module-drag.js';
 import { createBench } from './bench-ui.js?v=20261008_brackets';   // B3～B5：組立台畫面（模式切換、3D 接口、預覽、調整）
 import { workRangeFromTrace, clampRangeFromTraces, currentPointDistance } from './measurement.js';
@@ -268,6 +271,11 @@ function scheduleAutosave() {
 
 // 套用一份 snapshot 到目前狀態。recordUndo 預設 true（外部開檔/分享要能 undo）。
 function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external' } = {}) {
+  if(norm.modules?.some(m=>m.designInstance)){
+    const check=designInstances().synchronizeDesignInstances({comps:norm.comps,modules:norm.modules,params:norm.params,counter:norm.counter});
+    if(!check.ok){transient(`作品未載入：${check.reason}`);return;}
+  }
+  instanceCheckpoint=null;
   if (recordUndo) pushUndo();
   if (source === 'undo') practiceBeforeUndo = { ...practice };
   bench.workReplaced?.();
@@ -409,7 +417,7 @@ const displayCoords = () => {
 // ---- 視圖平面（O3、SDD-ORTHOGONAL-MOUNT §4.3）：一次只畫一個平面，solve 與播放仍是全域 ----
 const ORTHO_STACK_MM = 15;            // 側影帶的疊層高度（先固定 15 mm）
 const HOST_BAND_MM = 3;               // 子視圖裡宿主側影帶的厚度
-const hasOrthogonalModules = () => S.modules.some(m => m.mount && (m.mount.orient || m.mount.face));
+const hasOrthogonalModules = () => S.modules.some(m => m.placementPlane || (m.mount && (m.mount.orient || m.mount.face)));
 // ---- 設計模式的焦點分頁（H1）：設計模式一次只畫／只編一個設計，組立模式才全部顯示 ----
 const inDesign = () => S.mode === 'design';
 const focusOpts = () => ({ keepRoot: S.designFocus === ROOT_TAB, rootName: S.topo.rootDesignName });   // 剛按「新設計」時，空的「未命名設計」分頁要留著
@@ -503,6 +511,7 @@ function clearSelectionAndEditors() {
 }
 // 切換設計分頁：收掉畫圖工具、取消選取、馬達改成這頁的、置中。keepSelection＝保留現有選取（插入模組後選到新零件）。
 function setDesignFocus(id, { fit = true, keepSelection = false } = {}) {
+  id=S.modules.find(m=>m.id===id)?.designInstance?.sourceId || id;
   closedDesignTabs.delete(id);
   S.designFocus = id;
   saveFocus();
@@ -524,15 +533,63 @@ function presetDesignFocus(id) {
   S.designFocus = id;
   saveFocus();
 }
-// 「＋ 新設計」：沒有根零件就直接給一張空白畫布；已有根零件要先存成模組。
+// Preserve the whole drawing automatically; library saving is optional.
 function newDesign() {
+  if(bench.inCandidate()){transient('請先確認或取消接合預覽');return;}
   practice.id = '';
   const hasRootParts = compsInFocus(S.comps, S.modules, ROOT_TAB).length > 0;
+  if(hasRootParts){
+    if(S.modules.length>=16){transient('目前最多保留 16 個設計與組立用件，請先移除不需要的用件');return;}
+    const r=prepareRootDesign(S.comps,S.modules,S.topo);if(!r.ok){transient(r.reason);return;}
+    pause();pushUndo();S.comps=r.comps;S.modules=r.modules;S.topo=r.topo;S.designFocus=ROOT_TAB;
+    clearSelectionAndEditors();rebuild();
+  }
   if(!hasRootParts && S.modules.length && S.topo.rootDesignName){pushUndo();S.topo.rootDesignName='';scheduleAutosave();}
   setDesignFocus(ROOT_TAB);   // 先切換（會收掉畫圖工具與橫幅），再顯示提示
-  if (hasRootParts) transient('先把目前設計存成模組（選取零件 → 🧩 存成模組），再開新設計');
-  else if (mobilePrompt()) setMobilePanel('build');
+  if (mobilePrompt()) setMobilePanel('build');
 }
+
+function instanceSourceId(id){return S.modules.find(m=>m.id===id)?.designInstance?.sourceId || id;}
+function hasDesignInstances(id){return S.modules.some(m=>m.designInstance?.sourceId===id);}
+function ensureRootDesign(){
+  if(!compsInFocus(S.comps,S.modules,ROOT_TAB).length)return;
+  if(S.modules.length>=16){transient('設計與組立用件已達 16 個上限');return;}
+  const r=prepareRootDesign(S.comps,S.modules,S.topo);if(!r.ok)return;
+  pushUndo();S.comps=r.comps;S.modules=r.modules;S.topo=r.topo;
+  if(S.designFocus===ROOT_TAB)S.designFocus=r.moduleId;
+  clearSelectionAndEditors();rebuild();
+}
+async function addDesignOccurrence(id){
+  if(bench.inCandidate()){transient('請先確認或取消接合預覽');return;}
+  const sourceId=instanceSourceId(id),included=assemblyWork(S.comps,S.modules,S.topo).modules.some(m=>m.id===sourceId);
+  const placementRevision=snapshotStr(),{choosePlacementPlane}=await import('./placement-plane-ui.js');
+  if(snapshotStr()!==placementRevision)return;
+  const placementPlane=await choosePlacementPlane({name:S.modules.find(m=>m.id===sourceId)?.name || '設計',comps:S.comps.filter(c=>c.moduleId===sourceId)});
+  if(!placementPlane)return;
+  if(snapshotStr()!==placementRevision){transient('作品已變更，請重新加入');return;}
+  if(!included){
+    const revision=snapshotStr(),{prepareDesignPlacement}=await import('./design-placement.js');
+    if(snapshotStr()!==revision){transient('作品已變更，請重新加入');return;}
+    const ready=prepareDesignPlacement({comps:S.comps,modules:S.modules,topo:S.topo},sourceId);
+    if(!ready.ok){transient(ready.reason);return;}
+    pause();pushUndo();S.comps=ready.comps;S.modules=ready.modules.map(m=>m.id===sourceId?{...m,placementPlane}:m);
+    S.topo.assemblyMembers=[...new Set([...(S.topo.assemblyMembers || []),sourceId])];
+    rebuild();draw();bench.select(sourceId);fitView();return;
+  }
+  const revision=snapshotStr(),api=await loadDesignInstances();if(snapshotStr()!==revision){transient('作品已變更，請重新加入');return;}
+  const own=S.comps.filter(c=>c.moduleId===sourceId),mod=S.modules.find(m=>m.id===sourceId);
+  const base=own.flatMap(c=>pointKeysFor(c).map(k=>c[k])).find(p=>p?.id===mod.base) || own[0]?.p1 || {x:0,y:0};
+  const delta=insertOffset(S.comps,own,40,S.topo.params,{sideBySide:true});
+  const r=api.createDesignInstance({comps:S.comps,modules:S.modules,topo:S.topo,counter:S.counter},sourceId,{x:base.x+delta.dx,y:base.y+delta.dy});
+  if(!r.ok){transient(r.reason);return;}
+  pause();pushUndo();S.comps=r.comps;S.modules=r.modules.map(m=>m.id===r.moduleId?{...m,placementPlane}:m);S.topo=r.topo;S.counter=r.counter;
+  S.topo.assemblyMembers=[...new Set([...(S.topo.assemblyMembers || []),r.moduleId])];
+  bench.workReplaced();rebuild();draw();bench.select(r.moduleId);fitView();
+  transient('已加入一個用件；修改原設計會同步更新，接合位置各自保留');
+}
+let designShelf=null;
+async function ensureDesignShelf(){if(!designShelf){const {createDesignShelf}=await import('./design-shelf.js');designShelf=createDesignShelf({active:()=>!inDesign(),busy:()=>bench.inCandidate(),add:addDesignOccurrence,
+  items:()=>{const joined=assemblyWork(S.comps,S.modules,S.topo);return designTabs(S.comps,S.modules,focusOpts()).filter(t=>t.id!==ROOT_TAB&&t.count).map(t=>({...t,count:joined.modules.filter(m=>(m.designInstance?.sourceId || m.id)===t.id).length}));}});}designShelf.render();}
 // 有組立引用時可明確選擇僅關閉編輯頁；一般「關閉」會卸載工作區資料。
 async function hideDesignEditor(id){
   const tabs=designTabs(S.comps,S.modules,focusOpts());
@@ -545,6 +602,7 @@ async function hideDesignEditor(id){
   designTabsUi.render();
 }
 function closeDesignTab(id){
+  if(hasDesignInstances(id)){hideDesignEditor(id);transient('已關閉編輯分頁，設計與組立用件仍保留');return;}
   if(bench.inCandidate?.()){transient('請先確認或取消接合預覽');return;}
   if(document.getElementById('closeDesignDialog'))return;
   const tabs=designTabs(S.comps,S.modules,focusOpts()),tab=tabs.find(t=>t.id===id);
@@ -601,6 +659,10 @@ function openDesignList(){
 }
 function requestAssemblyMembership(id,include){
   if(bench.inCandidate?.()){transient('請先確認或取消接合預覽');return;}
+  if(!include&&S.modules.find(m=>m.id===id)?.designInstance){
+    if(S.modules.find(m=>m.id===id).mount||S.modules.some(m=>m.mount?.to?.module===id)){transient('請先拆下此用件及它承接的零件，再移除');return;}
+    unloadDesigns([id]);transient('已移除此用件，原設計保留；可按復原');return;
+  }
   const result=changeAssemblyMembership(S.comps,S.modules,S.topo,id,include);if(!result.ok){transient(result.reason);return;}
   pause();
   const commit=()=>{pushUndo();S.topo.assemblyMembers=result.members;if(include)result.affected.forEach(key=>closedAssemblies.delete(key));bench.workReplaced();rebuild();draw();transient(include?'已加入組立':'已從組立移除，設計仍保留');};
@@ -614,6 +676,7 @@ function requestAssemblyMembership(id,include){
   dialog.append(title,note,cancel,confirm);dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
 }
 function deleteDesign(id) {
+  if(hasDesignInstances(id)){transient('組立仍使用這份設計，請先移除它的用件再刪除設計');return;}
   const tab = designTabs(S.comps, S.modules, focusOpts()).find(t => t.id === id);
   if (!tab) return;
   const mod = S.modules.find(m => m.id === id);
@@ -626,6 +689,7 @@ function deleteDesign(id) {
 }
 // 共用卸載入口：確認後一次復原，僅移除指定設計；不碰磁碟上的原始檔案。
 function unloadDesigns(ids) {
+  if(S.modules.some(m=>m.designInstance&&ids.includes(m.designInstance.sourceId)&&!ids.includes(m.id))){transient('此設計仍有共用的組立用件，請先移除那些用件');return;}
   pause(); pushUndo();
   bench.workReplaced();
   const targets=new Set(ids);
@@ -646,7 +710,7 @@ function unloadDesigns(ids) {
   knownCompIds = new Set(remaining.map(c => c.id));
   S.designFocus = resolveFocus(S.comps, S.modules, S.designFocus);
   clearSelectionAndEditors();
-  rebuild(); setDesignFocus(S.designFocus);
+  rebuild(); setDesignFocus(S.designFocus);if(!inDesign())draw();
 }
 // M2：接合面工具。啟動時舞台只接受點目標與平移／縮放（見 mate-tool.js）；換分頁、切模式、開始畫圖、載入／清空都會關掉。
 const mateTool = createMateTool({
@@ -1205,6 +1269,7 @@ const mateCandidate=createMateCandidate({
 });
 function setCandidate(c) { return mateCandidate.set(c); }
 function renderMateCandidate() {
+  if(faceWizardActive&&faceWizardModel){viewer3D?.update(faceWizardModel);return true;}
   const preview=mateCandidate.snapshot();if(!preview)return false;
   if(viewer3D&&preview.scene.model){viewer3D.update(preview.scene.model);viewer3D.setHighlight((preview.result?.validation?.material?.findings || []).flatMap(f=>f.pickKeys || []));}
   return true;
@@ -1223,7 +1288,8 @@ const bench = createBench({
     rebuild(); draw(); bench.select(r.moduleId);
     transient('已準備接合；原尺寸與動力設定保留，可按復原。接著選「接合預覽」。');
   },
-  deleteDesign, openDesignList, changeMembership:requestAssemblyMembership, pause, isPlaying:()=>playbackActive, setCandidate, inCandidate: () => !!mateCandidate.snapshot(), candidateSnapshot:()=>mateCandidate.snapshot(), takeCandidate:()=>mateCandidate.take(),
+  deleteDesign, openDesignList, changeMembership:requestAssemblyMembership, pause, isPlaying:()=>playbackActive, setCandidate, inCandidate: () => faceWizardActive || !!mateCandidate.snapshot(), candidateSnapshot:()=>mateCandidate.snapshot(), takeCandidate:()=>mateCandidate.take(),
+  faceWizardState:(active,model=null)=>{faceWizardActive=active;faceWizardModel=model;if(active&&model)viewer3D?.update(model);},
   pushUndo, rebuild, draw, transient, setViewPlane: id => setViewPlane(id),
   saveComposite: id => moduleEditor.saveCompositeToLibrary(id),   // B7
   exportComposite: id => moduleEditor.exportComposite(id),
@@ -1235,7 +1301,7 @@ const bench = createBench({
   getViewer: () => viewer3D, is3DActive: () => view3DActive, set3D, push3D: () => push3D(),
   // H1：組立 → 設計：焦點換成組立台選的模組（沒有就維持原本的分頁）。
   enterDesign: changed => { validateViewPlane(); reconcileMotorState(); saveFocus(); if (changed) fitView(); else draw(); },
-  enterBench: () => { mateTool.reset(); reconcileMotorState(); if(hydraulic?.active())draw(); },   // 液壓：進組立台後讓針筒控制列同步   // 組立台要恢復所有模組的馬達控制；接合面工具只在設計模式
+  enterBench: async () => { pause();mateTool.reset();ensureRootDesign();await ensureDesignShelf();reconcileMotorState(); if(hydraulic?.active())draw(); },
   // B6：即時干涉用——目前作品的檢查參數（含各馬達行程），以及全行程時間軸點擊後把全部馬達設到指定角度。
   interferenceArgs: () => {
     const settings = { ...Settings.exportSettings(), drive: S.fabrication?.drive || FABRICATION_DEFAULTS.drive };
@@ -1291,9 +1357,18 @@ function rebuild({save=true}={}) {
   motorFabricationIssues=seats.issues||[];
   syncSliderGeometries();
   adoptNewComps();               // H1：焦點是模組時，新畫的零件歸到那個模組
+  if(S.modules.some(m=>m.designInstance)){
+    const work={comps:S.comps,modules:S.modules,topo:S.topo,counter:S.counter};
+    const validation=instanceCheckpoint?designInstances().validateDesignInstanceChange(instanceCheckpoint,work):{ok:true};
+    const synced=validation.ok?designInstances().synchronizeDesignInstances(work):validation;
+    if(synced.ok){S.comps=synced.comps;S.modules=synced.modules;S.topo=synced.topo;S.counter=synced.counter;}
+    else if(instanceCheckpoint){const prior=structuredClone(instanceCheckpoint);S.comps=prior.comps;S.modules=prior.modules;S.topo=prior.topo;S.counter=prior.counter;transient(`未套用修改：${synced.reason}`);}
+    else {transient(synced.reason);return;}
+  }
   // 六面候選與正式作品共用normalize → rebake → compile → refresh次序。
   const prepared=prepareConnectionWork(S.comps,S.modules,S.topo,{exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm});
   S.modules=prepared.modules;S.compiled=prepared.compiled;
+  instanceCheckpoint=S.modules.some(m=>m.designInstance)?structuredClone({comps:S.comps,modules:S.modules,topo:S.topo,counter:S.counter}):null;
   S.topo.assemblyMembers=normalizeAssemblyMembers(S.topo.assemblyMembers,S.comps,S.modules) ?? designIds(S.comps,S.modules);
   const namedTabs=designTabs(S.comps,S.modules,focusOpts());
   if(namedTabs.length===1){
@@ -1612,7 +1687,8 @@ function updateMechanismStatus(sol = null) {
   if (!el) return;
   const seatIssue=motorFabricationIssues.find(i=>simulationScope().comps.some(c=>c.id===i.hostId));
   if(seatIssue){el.dataset.state='warn';el.dataset.chip='fabrication';el.textContent='已固定 · 加工待修正';el.title=seatIssue.message+' 安裝已保留；可修改、保存或解除，問題板件暫不輸出。';return;}
-  if(simulationScope().comps.some(c=>c.type==='motor')){
+  const looseMotors=simulationScope().comps.filter(c=>c.type==='motor');
+  if(looseMotors.length&&!Model.motorPointIds(simulationScope().comps.filter(c=>c.type!=='motor')).size){
     el.dataset.state='warn';el.dataset.chip='';
     el.textContent='馬達未接輸出 · 可先保存';
     el.title='接上輸出零件後再試動；現在仍可修改、保存與解除其他連接。';return;
@@ -1675,7 +1751,9 @@ function updateMechanismStatus(sol = null) {
   if (state === 'ready') {
     state = support.ok ? 'warn' : 'error'; chip = support.ok ? 'verify' : 'fix';
     text = support.ok ? '可模擬 · 製作待核對' : '動力支撐有誤，請至組立查看';
+    if(support.ok&&looseMotors.length)text='已連接部分可模擬 · 另有馬達未接輸出';
   }
+  if(looseMotors.length)title+='\n未接輸出的馬達保持原位；接上輸出後才能控制它。';
   if(inDesign())title += '\n僅檢查目前設計；組立連接請至組立模式驗證。';
   title += '\n' + support.issues.map(i=>i.message).join('\n');
   el.dataset.state = state;
@@ -1838,9 +1916,10 @@ function drawNow() {
   validateViewPlane();
   document.getElementById('projectName').textContent=S.topo.projectName||'';
   designTabsUi.render();   // H1：設計分頁列
+  designShelf?.render();
   creationPalette.sync({key:S.designFocus || ROOT_TAB,count:viewComps().length,drawing:!!(S.drawingLink||S.drawingTriangle||S.drawingPolygon)});
   designGuide.sync(viewComps(),S.selectedNodeId||S.selectedLinkId||S.selectedTriangleId,S.mode);
-  document.getElementById('hint').style.display = viewComps().length ? 'none' : 'block';   // 焦點分頁是空的也要提示
+  document.getElementById('hint').style.display = (inDesign()?viewComps():assemblyWork(S.comps,S.modules,S.topo).comps).length ? 'none' : 'block';   // 焦點分頁是空的也要提示
   const planeHint = document.getElementById('viewPlaneHint');
   if (planeHint) {
     const viewMod = S.viewPlane ? S.modules.find(m => m.id === S.viewPlane) : null;
@@ -2618,11 +2697,11 @@ function checkPlaybackMotion() {
   };
   let current = null;
   try { current = solveAt(S.theta, lastSolved); } catch (_) {}
-  const issue = motionPoseIssue(scope.moving, current);
+  const issue = motionPoseIssue(scope.moving, current, { activeMotor: S.activeMotor });
   if (issue) return { ok: false, ...issue };
   const range = inputRockRange();
   const plan = range ? { mode: 'rock', lo: range.lo, hi: range.hi } : planMotion();
-  return { ...inspectMotionRange({ comps: scope.moving, solveAt, theta: S.theta, plan, seed: lastSolved }), plan };
+  return { ...inspectMotionRange({ comps: scope.moving, solveAt, theta: S.theta, plan, seed: lastSolved, activeMotor: S.activeMotor }), plan };
 }
 function togglePlay() {
   if(hydraulic?.active()){hydraulic.isPlaying()?pause():hydraulic.play();return;}
@@ -3363,7 +3442,7 @@ async function share() {
 }
 
 // ---- 啟動：分享連結優先，其次 localStorage 自動還原，否則空白 ----
-function init() {
+async function init() {
   Render.init({ svg, onNodeDown: guardedNodeDown });   // 注入繪製基元的外部依賴（預設 parent + 固定孔互動）
   Panels.init({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointIsGround, isGroundPositionUnlocked, frameSizeInfo, frameGroundInfo });
   Tools.init({ svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
@@ -3397,7 +3476,7 @@ function init() {
   try {
     const hashObj = Store.readShareFromHash();
     if (hashObj) {
-      if (Store.hasMotorParts(hashObj.kind === 'blocks-envelope' ? hashObj.project : hashObj)) {
+      if (Store.hasMotorParts(hashObj.kind === 'blocks-envelope' ? hashObj.project : hashObj) || (hashObj.project || hashObj).modules?.some(m=>m.designInstance)) {
         // 馬達零件形狀：先按需載入轉換器，所以非同步套用（舊形狀的連結仍走下面的同步路徑，行為不變）。
         loaded = true;
         normalizeIncomingSnapshotAsync(hashObj).then(incoming => {
@@ -3415,7 +3494,9 @@ function init() {
     transient('⚠️ 分享連結讀取失敗');
   }
   if (!loaded && !benchmarkSession && !gripperPilotSession) {
-    const local = Store.normalizeSnapshot(Store.loadLocal());
+    const rawLocal=Store.loadLocal();
+    await Store.prepareMotorParts(rawLocal);
+    const local = Store.normalizeSnapshot(rawLocal);
     if (local && local.comps.length) { applySnapshot(local, { recordUndo: false, source: 'local-autosave' }); loaded = true; }
   }
   if (!loaded) { rebuild(); draw(); }

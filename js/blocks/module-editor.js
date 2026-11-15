@@ -493,6 +493,14 @@ export function createModuleEditor(deps) {
     clearEl(el);
     const ps = panelState();
     if (!ps.visible) { el.style.display = 'none'; return; }
+    if(S.mode==='design'){
+      // Designing and assembling do not require library/export operations.
+      if(ps.kind!=='module'){el.style.display='none';return;}
+      const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='收藏／匯出此設計';details.appendChild(summary);
+      addButton(details,'收藏到零件庫',()=>{saveToLibrary();renderLibrary();});
+      addButton(details,'匯出此設計',()=>exportTemplate());el.appendChild(details);
+      const host=findHostPanel();if(host)host.appendChild(el);el.style.display=host?'flex':'none';return;
+    }
     if (ps.kind === 'root') {
       addButton(el, '🧩 存成模組', () => saveAsModule());
     } else if (ps.kind === 'module') {

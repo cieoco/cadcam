@@ -40,7 +40,7 @@ export function buildMaterialScene({comps,modules,params,catalog,inputs,allPlane
   // The hydraulic turntable is authored in top view: its XY plane is the floor, not a vertical wall.
   // Source survives module renaming/insertion; this is a view hint, not a pose transform.
   const root=modules.find(m=>m.id===assemblyRoles(modules).root);
-  result.viewUp=['hydraulic-h04','hydraulic-h07','hydraulic-h08'].includes(root?.source)?'z':'y';
+  result.viewUp=modules.some(m=>m.placementPlane)||['hydraulic-h04','hydraulic-h07','hydraulic-h08'].includes(root?.source)?'z':'y';
  }
  return result;
 }

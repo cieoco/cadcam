@@ -94,7 +94,7 @@ export function modelMinZ(model) {
 
 export function orthogonalModuleIds(modules) {
   return (Array.isArray(modules) ? modules : [])
-    .filter(m => m && m.mount && (m.mount.face || (m.mount.orient && m.mount.orient.type === 'orthogonal')))
+    .filter(m => m && ((!m.mount&&m.placementPlane) || (m.mount && (m.mount.face || (m.mount.orient && m.mount.orient.type === 'orthogonal')))))
     .map(m => m.id);
 }
 
@@ -204,6 +204,10 @@ export function buildOrthogonalChildren({ comps, modules, inputs, mainModel, bui
     let result = null;
     const mod = modules.find(m => m.id === id);
     const frame = orthogonalFrame(comps, modules, id, inputs.pts, params, { asm,stockMm,joint });
+    if(mod&&!mod.mount&&frame){
+      const model=buildModel(planeInputs(inputs,comps,modules,id));attachModulePlates(model,comps,plates,id);
+      result={model,matrix:orthogonalMatrix(frame),brackets:[],screws:[]};done.set(id,result);return result;
+    }
     if (mod && frame) {
       const hostPlane = planeOf(comps, modules, mod.mount.to.module);
       const host = hostPlane === null ? done.get(null) : solve(hostPlane, trail);

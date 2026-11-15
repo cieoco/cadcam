@@ -177,7 +177,7 @@ export function createMateWizard(h) {
       prepare.style.minHeight='44px';prepare.title='保留這個設計的尺寸與動力，建立可選取的接合項目';
       root.append(prepare,btn('從組立移除…','',()=>h.deps.changeMembership('#root',false)));membership.append(root);
     }
-    membership.append(btn('加入設計…','',()=>h.deps.openDesignList()));
+    membership.append(btn('管理設計…','',()=>h.deps.openDesignList()));
     const closed=active.modules.filter(m=>closedAssemblies.has(m.id));
     if(closed.length){
       const list=el('details');list.id='closedAssemblyList';
@@ -187,7 +187,7 @@ export function createMateWizard(h) {
       actions.appendChild(list);
     }
     while (tree.firstChild) tree.removeChild(tree.firstChild);
-    if (!rows.length&&!active.comps.some(c=>!c.moduleId)) tree.appendChild(el('div', 'bench-empty', closed.length?'組立已收起，可由下方重新開啟。':'組立是空的，請按「加入設計」。'));
+    if (!rows.length&&!active.comps.some(c=>!c.moduleId)) tree.appendChild(el('div', 'bench-empty', closed.length?'組立已收起，可由下方重新開啟。':'從上方拖入設計，或點 ＋ 加入。'));
     rows.forEach(({ m, depth, note, tag }) => {
       const row = el('div', 'mate-tree-row' + (m.id === st.selected ? ' selected' : ''));
       row.dataset.module = m.id;
@@ -301,7 +301,7 @@ export function createMateWizard(h) {
 
   function pickView(root, mod) {
     root.appendChild(head(`安裝「${h.displayName(mod.id)}」`));
-    const b = btn('接合預覽', 'primary', () => h.openFaces(mod)); b.id = 'benchFaceWizard'; root.appendChild(b);
+    const b = btn('選面接合', 'primary', () => h.openFaces(mod)); b.id = 'benchFaceWizard'; root.appendChild(b);
     for(const target of okTargets(mod.id).filter(t=>t.kind==='bolt'))root.appendChild(btn(`${target.moduleName} · ${target.name} · 雙孔對鎖`,'',()=>pickTarget(target)));
     root.appendChild(el('div', 'bench-note', '帶入接合設定 → 微調 → 接上'));
     if (assemblyRoles(assemblyWork(S.comps,S.modules,S.topo).modules).root !== mod.id) {
@@ -329,11 +329,15 @@ export function createMateWizard(h) {
     if (mod.mount?.face) {
       const status = faceBracketStatus(S.comps,S.modules,params(),mod,{exportSettings:S.fabrication?.export || {},stockMm:S.fabrication?.cnc?.stockThicknessMm || 3,joint:S.fabrication?.joint});
       root.appendChild(el('div','bench-note',status.fixed?(mod.mount.face.selection.fastener?'榫槽與五金已生成（試作）':'角碼與固定孔已確認'):'已定位，尚未固定'));
-      root.appendChild(el('div','bench-note',status.reason));
-      root.appendChild(btn('修改固定方式與位置','primary',()=>h.openFaces(mod,true,true)));
-      const change = btn('重新選面與尺寸', 'primary', () => h.openFaces(mod, true)); root.appendChild(change);
+      if(mod.mount.face.selection.fastener||mod.mount.face.selection.brackets)root.appendChild(el('div','bench-note',status.reason));
+      root.appendChild(btn('設定固定方式：榫接／角碼…','primary',()=>h.openFaces(mod,true,true)));
+      const change = btn('修改定位與組立關係', 'primary', () => h.openFaces(mod, true)); root.appendChild(change);
       const f = mod.mount.face.selection;
-      root.appendChild(el('div', 'bench-note', `間距 ${f.gap} mm · 偏移 ${f.offsetU} / ${f.offsetV} mm`));
+      root.appendChild(el('div', 'bench-note', f.faceRelations?.length
+        ? f.faceRelations.map(r=>`${({mate:'面對面',flush:'貼齊',center:'置中對齊'})[r.kind]} · 偏差 ${r.offsetMm} mm`).join('；')
+        : f.edgeRelations?.length
+        ? `間距 ${f.gap} mm · ${f.edgeRelations.map(r=>`${r.kind==='center'?'兩邊之間置中':'板邊對齊'} · 偏移 ${r.offsetMm} mm`).join('；')}`
+        : `間距 ${f.gap} mm · 偏移 ${f.offsetU} / ${f.offsetV} mm`));
       return;
     }
     if (mate) [styleBox(S.comps, S.modules, mod.id, stylesOf(mod.id)), fastenerBox(S.comps, S.modules, mod.id), adjustBox(S.comps, S.modules, mod.id)].forEach(x => x && root.appendChild(x));
@@ -354,7 +358,15 @@ export function createMateWizard(h) {
     if (s === 'preview') previewView(root, h.modOf(pv.childId));
     else if (s === 'pick') pickView(root, mod);
     else if (s === 'mounted') mountedView(root, mod);
-    else root.appendChild(head('接合精靈', matchMedia('(max-width: 640px)').matches ? '先點上面清單裡要裝的機構' : '先點左邊清單裡要裝的機構'));
+    else {
+      const active=assemblyWork(S.comps,S.modules,S.topo),base=assemblyRoles(active.modules).root;
+      const pending=active.modules.filter(m=>m.id!==base&&!m.mount);
+      root.appendChild(head(pending.length?'下一步：選面接合':'接合精靈',pending.length?'選兩個接面 → 調整位置 → 接上':active.modules.length<2?'加入另一個設計，就能開始接合。':'點選已接合的零件，可修改位置。'));
+      for(const item of pending){
+        const b=btn(`開始接合「${h.displayName(item.id)}」`,'primary',async()=>{await h.select(item.id);const current=h.modOf(item.id);if(current&&!current.mount&&st.selected===item.id)h.openFaces(current);});
+        b.setAttribute('aria-label',`開始接合 ${h.displayName(item.id)}`);root.appendChild(b);
+      }
+    }
     const msg = el('div', 'bench-msg', st.msg); msg.id = 'benchMsg'; msg.setAttribute('aria-live', 'polite');
     root.firstChild.after(liveLine, msg);   // 標題底下：一行干涉狀態，再來是訊息（拒絕的原因、拆下說明）
     liveLine.appendChild(h.liveBox);   // 點摘要後才展開檢查與行程；錯誤時自動展開。

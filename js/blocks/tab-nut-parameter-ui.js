@@ -5,10 +5,11 @@ export function renderTabNutDimensions(svg,summary,plan,{pending=false,onChange=
   svg.toggleAttribute('hidden',pending||!plan?.ok);
   if(pending||!plan?.ok){summary.textContent=pending?'尺寸檢查中…':'尺寸通過檢查後顯示配對槽與板厚。';return;}
   const p=plan.settings,number=n=>String(Number(n.toFixed(3)));
-  summary.textContent=`承接板厚 ${number(plan.tHost)} · 立板厚 ${number(plan.tChild)} · 榫長 ${number(plan.tHost)}（隨承接板厚） · 插槽 ${number(p.tabWidthMm+p.slotClearanceMm)} × ${number(plan.tChild+p.slotClearanceMm)} mm`;
+  summary.textContent=`${plan.sets.length} 組／${plan.sets.length*2} 個榫頭 · 承接板厚 ${number(plan.tHost)} · 立板厚 ${number(plan.tChild)} · 榫長 ${number(plan.tHost)}（隨承接板厚） · 插槽 ${number(p.tabWidthMm+p.slotClearanceMm)} × ${number(plan.tChild+p.slotClearanceMm)} mm`;
   const half=p.tabPitchMm/2+p.tabWidthMm/2+6,top=Math.max(plan.local.tip+p.endClearanceMm,plan.local.nutHi)+4;
-  svg.setAttribute('viewBox',`${-half} ${-top} ${half*2} ${top+plan.tHost+14}`);
-  svg.setAttribute('aria-label',`接頭局部輪廓：A 榫寬 ${number(p.tabWidthMm)} mm；B 榫中心距 ${number(p.tabPitchMm)} mm`);
+  const last=plan.sets.at(-1).local.origin,first=plan.local.origin,span=(last.x-first.x)*plan.local.u.x+(last.y-first.y)*plan.local.u.y;
+  svg.setAttribute('viewBox',`${-half} ${-top} ${half*2+span} ${top+plan.tHost+14}`);
+  svg.setAttribute('aria-label',`接頭局部輪廓：${plan.sets.length} 組；A 榫寬 ${number(p.tabWidthMm)} mm；B 榫中心距 ${number(p.tabPitchMm)} mm`);
   const add=(tag,attrs,text)=>{const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [key,value] of Object.entries(attrs))e.setAttribute(key,String(value));if(text)e.textContent=text;svg.append(e);return e;};
   const origin=plan.local.origin,u=plan.local.u,v=plan.local.v;
   const local=q=>({x:(q.x-origin.x)*u.x+(q.y-origin.y)*u.y,y:-((q.x-origin.x)*v.x+(q.y-origin.y)*v.y)});

@@ -78,4 +78,21 @@ assert.equal(committed, undefined);
 await confirmSelection({ ...init.selection, host: repairedHost, child: 0 });
 assert.equal(committed.modules[1].mount.to.output, 'out'); assert.equal(badHost.to.output, 'deleted');
 assert.equal(JSON.stringify(args), before);
+
+// The final fastening step may not silently change an already confirmed placement.
+committed=undefined;
+openFaceWizard({...args,phase:'fixing'});send({type:'face-wizard-ready',loadGraph:LOAD_GRAPH_TOKEN});init=messages.at(-1);
+assert.equal(init.phase,'fixing');
+const fixingSelection={...init.selection,host:init.host,child:0};
+await send({type:'face-wizard-preview',loadGraph:LOAD_GRAPH_TOKEN,requestId:1,selection:fixingSelection});
+const accepted=messages.at(-1).candidate;assert.ok(accepted?.saveable);
+await send({type:'face-wizard-preview',loadGraph:LOAD_GRAPH_TOKEN,requestId:2,selection:{...fixingSelection,offsetU:fixingSelection.offsetU+10}});
+assert.equal(messages.at(-1).type,'face-wizard-error');assert.ok(messages.at(-1).reason.includes('已確認的位置'));
+await send({type:'face-wizard-confirm',loadGraph:LOAD_GRAPH_TOKEN,candidateId:accepted.candidateId,selectionRevision:accepted.selectionRevision});assert.equal(committed,undefined,'an invalid preview also blocks confirmation of the old candidate');
+await confirmSelection(fixingSelection);assert.equal(committed.modules[1].mount.face.translation.x,45);
+committed=undefined;
+openFaceWizard({...args,phase:'position'});send({type:'face-wizard-ready',loadGraph:LOAD_GRAPH_TOKEN});init=messages.at(-1);assert.equal(init.phase,'position');
+await send({type:'face-wizard-preview',loadGraph:LOAD_GRAPH_TOKEN,requestId:1,selection:{...init.selection,host:init.host,child:0,brackets:{enabled:true}}});
+assert.equal(messages.at(-1).type,'face-wizard-error');assert.ok(messages.at(-1).reason.includes('先確認定位'));assert.equal(committed,undefined);
+await send({type:'face-wizard-cancel'});assert.equal(JSON.stringify(args),before);
 console.log('connection-reselect: saved host/child, explicit no-fastener confirm, legacy choice, cancellation and missing endpoint passed');

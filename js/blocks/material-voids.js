@@ -9,21 +9,27 @@ const inside=(p,r)=>{if(r.some((a,i)=>distance(p,a,r[(i+1)%r.length])<=EPS))retu
 export function materialCircleContour(h,circumscribed=false){const n=64,r=h.r/(circumscribed?Math.cos(Math.PI/n):1);return Array.from({length:n},(_,i)=>{const a=(i+.5)*2*Math.PI/n;return {x:h.x+r*Math.cos(a),y:h.y+r*Math.sin(a)};});}
 /** Entries may be rings, or {points,circle} for an exact representation circle. */
 export function normalizeMaterialVoids(input){
- const rows=input.map((v,i)=>({original:v,i,points:Array.isArray(v)?v:v.points,circle:v.circle}));
+ const rows=input.map((v,i)=>{const points=Array.isArray(v)?v:v.points,box={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};for(const p of points){box.minX=Math.min(box.minX,p.x);box.minY=Math.min(box.minY,p.y);box.maxX=Math.max(box.maxX,p.x);box.maxY=Math.max(box.maxY,p.y);}const c=v.circle,containBox=c?{minX:c.x-c.r,minY:c.y-c.r,maxX:c.x+c.r,maxY:c.y+c.r}:box;return {original:v,i,points,circle:c,box,containBox};});
  const contains=(a,b)=>{
+  const x=a.containBox,y=b.containBox;if(x.minX>y.minX+EPS||x.minY>y.minY+EPS||x.maxX<y.maxX-EPS||x.maxY<y.maxY-EPS)return false;
   if(a.circle&&b.circle)return Math.hypot(a.circle.x-b.circle.x,a.circle.y-b.circle.y)+b.circle.r<=a.circle.r+EPS;
   if(a.circle)return b.points.every(p=>Math.hypot(p.x-a.circle.x,p.y-a.circle.y)<=a.circle.r+EPS);
   if(b.circle)return inside(b.circle,a.points)&&a.points.every((p,i)=>distance(b.circle,p,a.points[(i+1)%a.points.length])>=b.circle.r-EPS);
   return b.points.every((p,i)=>inside(p,a.points)&&inside({x:(p.x+b.points[(i+1)%b.points.length].x)/2,y:(p.y+b.points[(i+1)%b.points.length].y)/2},a.points))&&!b.points.some((p,i)=>a.points.some((q,j)=>crosses(p,b.points[(i+1)%b.points.length],q,a.points[(j+1)%a.points.length])));
  };
  const kept=rows.filter(b=>!rows.some(a=>a!==b&&contains(a,b)&&(!contains(b,a)||a.i<b.i)));
+ // Union only connected overlapping voids. One intersecting slot must not
+ // send every unrelated grid hole through the quadratic boundary union.
+ const parents=kept.map((_,i)=>i),root=i=>{while(parents[i]!==i){parents[i]=parents[parents[i]];i=parents[i];}return i;};
  let overlap=false;
  for(let i=0;i<kept.length;i++)for(let j=i+1;j<kept.length;j++){
+  const x=kept[i].box,y=kept[j].box;if(x.maxX<y.minX-EPS||y.maxX<x.minX-EPS||x.maxY<y.minY-EPS||y.maxY<x.minY-EPS)continue;
   const a=kept[i].points,b=kept[j].points;
-  if(inside(a[0],b)||inside(b[0],a)||a.some((p,k)=>b.some((q,l)=>crosses(p,a[(k+1)%a.length],q,b[(l+1)%b.length]))))overlap=true;
+  if(inside(a[0],b)||inside(b[0],a)||a.some((p,k)=>b.some((q,l)=>crosses(p,a[(k+1)%a.length],q,b[(l+1)%b.length])))){overlap=true;parents[root(j)]=root(i);}
  }
  if(overlap){
-  let merged;try{merged=unionOutlines(kept.map(r=>r.points),{precisionMm:1e-9,sampleMm:1e-9,minAreaMm2:0,splitScale:1e14});}catch(_){throw Error('void_union_failed');}
+  const groups=new Map();kept.forEach((row,i)=>{const key=root(i);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row.points);});
+  let merged;try{merged=[...groups.values()].flatMap(rings=>rings.length===1?[signedArea(rings[0])<0?[...rings[0]].reverse():rings[0]]:unionOutlines(rings,{precisionMm:1e-9,sampleMm:1e-9,minAreaMm2:0,splitScale:1e14}));}catch(_){throw Error('void_union_failed');}
   // A negative boundary encloses material within a void union. This needs a
   // material-island representation, rather than feeding nested holes to Earcut.
   if(!merged.length||merged.some(r=>signedArea(r)<=EPS))throw Error('void_union_material_island');

@@ -28,8 +28,8 @@ export function designTabs(comps, modules, opts = {}) {
   const ids = new Set(mods.map(m => m.id));
   const counts = new Map();
   list.forEach(c => { const t = tabOf(c, ids); counts.set(t, (counts.get(t) || 0) + 1); });
-  const labels = moduleLabels(mods);
-  const tabs = mods.map(m => ({
+  const labels = moduleLabels(mods.filter(m => !m.designInstance));
+  const tabs = mods.filter(m => !m.designInstance).map(m => ({
     id: m.id, label: labels.get(m.id) || m.id, count: counts.get(m.id) || 0,
     mounted: !!m.mount, orthogonal: !!(m.mount && m.mount.orient)
   }));

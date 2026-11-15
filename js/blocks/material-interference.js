@@ -31,8 +31,19 @@ function triangles(ring,holes){
  return tris;
 }
 const localCache=new WeakMap();
+// Preview candidates clone their geometry. Reuse identical validated material,
+// but bound both entry count and mesh size; pose/pair checks always run anew.
+const materialCache=new Map(),MAX_MATERIALS=16,MAX_SLABS=125000;let cachedSlabs=0;
+// Slabs contain coordinates only. Hole/connection IDs remain on each current
+// part for named fastener checks and must never be read from this cache.
+const materialKey=g=>JSON.stringify([g.kind,g.thicknessMm,g.outlines,g.cutouts?.map(c=>c.points),g.holes?.map(h=>[h.x,h.y,h.r]),g.solid]);
 function localMaterial(g){
  if(localCache.has(g))return localCache.get(g);
+ // JSON serializes non-finite numbers as null. Never let an invalid clone
+ // reuse a valid contour that happens to contain a coercible null coordinate.
+ const finite=Number.isFinite(g.thicknessMm)&&g.outlines?.every(r=>r.every(p=>Number.isFinite(Number(p.x))&&Number.isFinite(Number(p.y))))&&(g.cutouts||[]).every(c=>c.points.every(p=>Number.isFinite(Number(p.x))&&Number.isFinite(Number(p.y))))&&(g.holes||[]).every(h=>[h.x,h.y,h.r].every(Number.isFinite))&&(!g.solid?.profile||g.solid.profile.every(row=>row.every(Number.isFinite)));
+ const key=finite?materialKey(g):null,cached=key&&materialCache.get(key);
+ if(cached){materialCache.delete(key);materialCache.set(key,cached);localCache.set(g,cached);return cached;}
  if(typeof g.kind!=='string')throw Error('material_kind_missing');
  if(!(g.thicknessMm>E)||!g.outlines?.length)throw Error('material_geometry_missing');
  const rings=g.outlines.map(ringOf),cuts=(g.cutouts || []).map(c=>ringOf(c.points)),holes=g.holes || [];
@@ -45,7 +56,7 @@ function localMaterial(g){
    for(let i=1;i<profiles.length;i++){
     const [ra,z0]=profiles[i-1],[rb,z1]=profiles[i];if(z1-z0<=E)continue;
     const radius=certain?Math.min(ra,rb):Math.max(ra,rb);
-    slabs.push(...triangles(circle({x:0,y:0,r:radius},!certain),[]).map(t=>({triangle:t,z0,z1})));
+    for(const triangle of triangles(circle({x:0,y:0,r:radius},!certain),[]))slabs.push({triangle,z0,z1});
    }
    return slabs;
   }
@@ -58,15 +69,17 @@ function localMaterial(g){
 
    let outline=ring;
    if(g.kind==='screw'){const r=Math.max(...ring.map(p=>Math.hypot(p.x,p.y)));outline=circle({x:0,y:0,r},!certain);}
-   slabs.push(...triangles(outline,removed).map(t=>({triangle:t,z0:0,z1:g.thicknessMm})));
+   for(const triangle of triangles(outline,removed))slabs.push({triangle,z0:0,z1:g.thicknessMm});
   }
   if(holes.some(h=>!rings.some(r=>inside(h,r)))||cuts.some(c=>!rings.some(r=>inside(c[0],r))))throw Error('unassigned_machining_feature');
   return slabs;
  };
  const result={outer:bound(false),inner:bound(true),curved:holes.length>0||g.kind.startsWith('screw')};
+ const size=result.outer.length+result.inner.length;
+ if(key&&size<=MAX_SLABS){while(materialCache.size>=MAX_MATERIALS||cachedSlabs+size>MAX_SLABS){const first=materialCache.keys().next().value,old=materialCache.get(first);cachedSlabs-=old.outer.length+old.inner.length;materialCache.delete(first);}materialCache.set(key,result);cachedSlabs+=size;}
  localCache.set(g,result);return result;
 }
-const boxOf=v=>({min:{x:Math.min(...v.map(p=>p.x)),y:Math.min(...v.map(p=>p.y)),z:Math.min(...v.map(p=>p.z))},max:{x:Math.max(...v.map(p=>p.x)),y:Math.max(...v.map(p=>p.y)),z:Math.max(...v.map(p=>p.z))}});
+const boxOf=vertices=>{const min={x:Infinity,y:Infinity,z:Infinity},max={x:-Infinity,y:-Infinity,z:-Infinity};for(const p of vertices){if(p.x<min.x)min.x=p.x;if(p.y<min.y)min.y=p.y;if(p.z<min.z)min.z=p.z;if(p.x>max.x)max.x=p.x;if(p.y>max.y)max.y=p.y;if(p.z>max.z)max.z=p.z;}return {min,max};};
 const boxOverlap=(a,b)=>['x','y','z'].every(k=>Math.min(a.max[k],b.max[k])-Math.max(a.min[k],b.min[k])>E);
 function prism(slab,m){
  const vertices=[...slab.triangle.map(p=>applyMatrix4(m,{...p,z:slab.z0})),...slab.triangle.map(p=>applyMatrix4(m,{...p,z:slab.z1}))];
@@ -91,14 +104,31 @@ function witness(a,b){
  for(const [p,other] of [[a,bp],[b,ap]])for(const [i,j] of edgeIndices)for(const f of other){const u=p.vertices[i],v=p.vertices[j],du=dot(f.n,sub(u,f.origin)),dv=dot(f.n,sub(v,f.origin));if(Math.abs(du-dv)<E||du*dv>0)continue;const t=du/(du-dv),q={x:u.x+(v.x-u.x)*t,y:u.y+(v.y-u.y)*t,z:u.z+(v.z-u.z)*t};if(inside(q))candidates.push(q);}
  return candidates.length?Object.fromEntries(['x','y','z'].map(k=>[k,candidates.reduce((s,p)=>s+p[k],0)/candidates.length])):centerOfOverlap(a,b);
 }
-function collision(a,b){for(const p of a)for(const q of b){const depth=sat(p,q);if(depth)return {position:witness(p,q),minProjectionOverlapMm:depth};}return null;}
+// Broad phase only: keep original prism order and the same SAT/witness results.
+const prismTrees=new WeakMap();
+function prismTree(prisms){
+ if(prismTrees.has(prisms))return prismTrees.get(prisms);
+ const build=rows=>{const box=boxOf((function*(){for(const {p} of rows){yield p.box.min;yield p.box.max;}})());
+  if(rows.length<=12)return {box,rows};
+  const axis=['x','y','z'].sort((a,b)=>(box.max[b]-box.min[b])-(box.max[a]-box.min[a]))[0];
+  rows.sort((a,b)=>(a.p.box.min[axis]+a.p.box.max[axis])-(b.p.box.min[axis]+b.p.box.max[axis])||a.i-b.i);
+  const mid=Math.floor(rows.length/2);return {box,left:build(rows.slice(0,mid)),right:build(rows.slice(mid))};
+ };const tree=build(prisms.map((p,i)=>({p,i})));prismTrees.set(prisms,tree);return tree;
+}
+function collision(a,b){
+ const tree=a.length*b.length>4096?prismTree(b):null;
+ const query=(node,box,out)=>{if(!boxOverlap(node.box,box))return;if(node.rows){for(const r of node.rows)if(boxOverlap(r.p.box,box))out.push(r);}else{query(node.left,box,out);query(node.right,box,out);}};
+ for(const p of a){let candidates=b;if(tree){const rows=[];query(tree,p.box,rows);rows.sort((a,b)=>a.i-b.i);candidates=rows.map(r=>r.p);}
+  for(const q of candidates){const depth=sat(p,q);if(depth)return {position:witness(p,q),minProjectionOverlapMm:depth};}
+ }return null;
+}
 function prepared(p){
  const m=p.pose?.matrix;
  if(!Array.isArray(m)||m.length!==16||!m.every(Number.isFinite))throw Error('invalid_world_pose');
  const axes=[{x:m[0],y:m[1],z:m[2]},{x:m[4],y:m[5],z:m[6]},axis(m)];
  if(axes.some(n=>Math.abs(dot(n,n)-1)>1e-6)||Math.abs(dot(axes[0],axes[1]))>1e-6||Math.abs(dot(axes[0],axes[2]))>1e-6||Math.abs(dot(axes[1],axes[2]))>1e-6)throw Error('non_rigid_world_pose');
- const l=localMaterial(p.geometry),outer=l.outer.map(s=>prism(s,m)),inner=l.inner.map(s=>prism(s,m));
- return {part:p,outer,inner,box:boxOf(outer.flatMap(p=>p.vertices))};
+ const l=localMaterial(p.geometry),outer=l.outer.map(s=>prism(s,m));let inner;
+ return {part:p,outer,get inner(){return inner ||= l.inner.map(s=>prism(s,m));},box:boxOf((function*(){for(const prism of outer){yield prism.box.min;yield prism.box.max;}})())};
 }
 const hardware=p=>['bracket-wing','screw','screw-head','nut','washer'].includes(p.geometry.kind);
 const pairedId=p=>p.holePairId || p.geometry.holePairId;

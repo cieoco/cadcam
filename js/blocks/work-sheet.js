@@ -53,6 +53,8 @@ function selectionSummary(panel) {
   if(panel.dataset.selectionSummary)return panel.dataset.selectionSummary;
   if(panel.id==='syringeEditor')return '針筒：拖固定環移位置';
   const disk=panel.querySelector('#diskDimensions');
+  const wheelWidth=disk?.querySelector('[data-wheel-width]');
+  if(disk&&!disk.hidden&&wheelWidth&&!wheelWidth.hidden)return `TT 輪子：外徑 ${disk.querySelector('input').value} mm・輪寬 ${wheelWidth.querySelector('input').value} mm`;
   if(disk&&!disk.hidden)return `圓盤：外徑 ${disk.querySelector('input').value} mm・孔距 ${panel.querySelector('#memberDimensionInput').value} mm`;
   if(panel.id==='gearEditor')return `齒輪：${txt(panel.querySelector('#gearTeethVal'))} 齒`;
   const title = txt(panel.querySelector('#lenTitle,.re-title,.se-title,.fe-title'));

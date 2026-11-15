@@ -1,3 +1,4 @@
+import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import {tabNutPartGeometry} from './tab-nut-plan.js';
 import {inspectBarFusion} from './bar-fusion-geometry.js';
 /** Fabrication geometry is design data; solved positions are separate PartPose data. */
@@ -32,7 +33,8 @@ export function partGeometryKey({comps=[],modules=[],params={},fabrication={},ex
 }
 
 export function buildPartGeometryCatalog(args={}) {
-  const input=structuredClone(args);
+  const input=structuredClone(args),seats=input.modules?.some(m=>m.designInstance)?planActuatorPlateHoles(input,{assembly:true}):{};
+  if(seats.ok)input.comps=seats.comps;
   const {modules=[],params={},fabrication={},frameNodes}=input,comps=Exporters.machinedComps(input.comps,modules,params);
   // 另一片獨立板可能共用機架點，使自動機架排除該點；此時保留完整承載桿。
   const visibleFrameIds=new Set((frameNodes||frameConnectorNodes(comps)).map(p=>p.id));

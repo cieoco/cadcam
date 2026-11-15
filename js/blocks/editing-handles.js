@@ -103,14 +103,14 @@ export function drawEditingHandles({svg,points,project,member,slider,gear,frame,
       for(const d of c.standardBlank.kind==='arms'?[]:memberDimensions(c).filter(d=>d.refs)){
         if(dimensionLock(c,S.comps,d.id))continue;
         const p=at(c[d.refs[0]]),q=at(c[d.refs[1]]);if(!p||!q)continue;
-        const L=Math.hypot(q.x-p.x,q.y-p.y)||1;
-        handle(d.id==='g'?'member-length':`member-length-${d.id}`,d.label,q,{x:(q.x-p.x)/L,y:(q.y-p.y)/L},memberDimensionValue(c,S.topo.params,d.id),
+        const L=Math.hypot(q.x-p.x,q.y-p.y)||1,basis=member.resizeBasisFor?.(c.id,d.id),factor=basis==='center'?.5:basis==='end'?-1:1;
+        handle(d.id==='g'?'member-length':`member-length-${d.id}`,d.label,basis==='end'?p:q,{x:(q.x-p.x)/L*factor,y:(q.y-p.y)/L*factor},memberDimensionValue(c,S.topo.params,d.id),
           (v,exact)=>{S.triSide=d.id;member.setDimensionValue(c.id,d.id,v,{exact});},d.id===id?'memberDimensionInput':null,
-          8,BLANK_SPAN_LIMIT,.1,p,gridDragStep(c,d),edgeSnap(c,d,S.topo.params,{comps:S.comps}),null,()=>member.selectDimension(d.id));
+          8,BLANK_SPAN_LIMIT,.1,basis==='end'?q:p,gridDragStep(c,d),edgeSnap(c,d,S.topo.params,{comps:S.comps}),null,()=>member.selectDimension(d.id));
         svg.querySelector(`[data-member-dimension="${d.id}"]`)?.remove();
       }
       if(c.standardBlank.kind==='arms')drawArmHandles({svg,c,at,project,member,openEditor});
-    }else if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,dir={x:(q.x-p.x)/L,y:(q.y-p.y)/L};handle('member-length',dim.label,q,dir,memberDimensionValue(c,S.topo.params,id),(v,exact)=>member.setValue(v,exact),'memberDimensionInput',8,c.standardBlank?BLANK_SPAN_LIMIT:2000,.1,p,gridDragStep(c,dim),edgeSnap(c,dim,S.topo.params,{comps:S.comps}));}}
+    }else if(dim?.refs&&id!=='tip'&&!lock){const p=at(c[dim.refs[0]]),q=at(c[dim.refs[1]]);if(p&&q){const L=Math.hypot(q.x-p.x,q.y-p.y)||1,basis=c.standardBlank&&member.resizeBasisFor?.(c.id,id),factor=basis==='center'?.5:basis==='end'?-1:1,dir={x:(q.x-p.x)/L*factor,y:(q.y-p.y)/L*factor};handle('member-length',dim.label,basis==='end'?p:q,dir,memberDimensionValue(c,S.topo.params,id),(v,exact)=>member.setValue(v,exact),'memberDimensionInput',8,c.standardBlank?BLANK_SPAN_LIMIT:2000,.1,basis==='end'?q:p,gridDragStep(c,dim),edgeSnap(c,dim,S.topo.params,{comps:S.comps}));}}
     if(c.standardBlank?.kind==='l'&&id==='arm'){const w=c.standardBlank.armWidthMm;handle('blank-arm-width','L型臂寬',{x:(a.x+b.x)/2-u.y*(w-6.5)*holeSide(c),y:(a.y+b.y)/2+u.x*(w-6.5)*holeSide(c)},{x:-u.y*holeSide(c),y:u.x*holeSide(c)},w,v=>member.setDimensionValue(c.id,'arm',v,{exact:true}),'memberDimensionInput',13,120,1,null,8,null,raw=>13+8*Math.round((raw-13)/8));}
     if(c.shape==='disk')handle('disk-diameter','外徑',{x:a.x,y:a.y+c.diameterMm/2},{x:0,y:.5},c.diameterMm,v=>{const input=document.getElementById('diskDiameterInput');input.value=v;input.onchange();},'diskDiameterInput',8,2000);
     else if(!c.barFusionRoot&&!(c.standardBlank&&c.type==='triangle')&&document.getElementById('memberMore')?.open){const w=memberStock(c).widthMm;handle('member-width','板寬',{x:(a.x+b.x)/2-u.y*w/2,y:(a.y+b.y)/2+u.x*w/2},{x:-u.y/2,y:u.x/2},w,v=>member.setStock('widthMm',v),'memberWidthInput',2,120);}

@@ -19,6 +19,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
   let mirror = true;   // 孔距使用圖上把手與原數字欄，不再另建面板滑桿。
   let tipDraft = null;
   let lastSelectedId = null;
+  const resizeBases=new Map();
   const el = id => document.getElementById(id);
   const selected = () => S.comps.find(c => c.id === (S.selectedTriangleId || S.selectedLinkId));
   const displayComp = comp => comp && tipDraft?.ids.includes(comp.id) ? { ...comp, jawTipLength: tipDraft.value } : comp;
@@ -75,6 +76,11 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
       if(!position){position=document.createElement('div');position.id='memberPosition';position.innerHTML='<label>位置 X <span data-x></span></label><label>Y <span data-y></span></label>';more.append(position);}
       position.hidden=!comp||!!comp.moduleId||!!comp.barFusionRoot||!(freeLinkForPoint(S.comps,comp.p1?.id)||freeTriangleForPoint(S.comps,comp.p1?.id));
       if(!position.hidden)for(const key of ['x','y'])editableNumber(position.querySelector(`[data-${key}]`),comp.p1[key],v=>{const old=S.selectedNodeId;S.selectedNodeId=comp.p1.id;setPointPosition(key,v);S.selectedNodeId=old;draw();},{label:`零件第一孔 ${key.toUpperCase()}（mm）`});
+    }
+    let resizeBasis=el('memberResizeBasis');
+    if(!resizeBasis&&el('memberDimensionLabel')){const label=document.createElement('label');label.id='memberResizeBasisLabel';label.textContent='修改基準 ';resizeBasis=document.createElement('select');resizeBasis.id='memberResizeBasis';resizeBasis.setAttribute('aria-label','尺寸修改基準');resizeBasis.style.minHeight='44px';label.append(resizeBasis);el('memberDimensionLabel').after(label);}
+    if(resizeBasis){const id=memberDimensions(comp).some(d=>d.id===dimensionId())?dimensionId():'g',supported=comp?.standardBlank&&['bar','plate'].includes(comp.standardBlank.kind)&&['g','r1'].includes(id)&&!comp.isInput;el('memberResizeBasisLabel').hidden=!supported;
+      if(supported){const key=comp.id+':'+id;resizeBasis.replaceChildren(...[['start','固定 A 端'],['center','置中（兩端平均）'],['end',id==='r1'?'固定 C 端':'固定 B 端']].map(([value,text])=>{const option=document.createElement('option');option.value=value;option.textContent=text;return option;}));resizeBasis.value=resizeBases.get(key)||(comp.type==='bar'&&comp.p2.type==='fixed'&&comp.p1.type!=='fixed'?'end':'start');resizeBasis.onchange=()=>{resizeBases.set(key,resizeBasis.value);draw();};}
     }
     const dimensions = memberDimensions(comp);
     let direction=el('memberDirection');
@@ -167,7 +173,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     const applied=runEdit({name:'改尺寸',host:{S,transient:notify,pushUndo,pause,rebuild,draw},
       plan:work=>{
         if(!blank&&isDisk(comp)){const error=validateDisk(comp,Number(raw),comp.diameterMm,holeDiameter(comp));if(error)return {ok:false,message:error};}   // 圓盤直徑檢查（說明文字不變）
-        const r=planResize(work,{componentId,id,raw,mirrorPair,exact,topo:S.topo,holeDiameter,reshapeTriangle,validateCandidate});if(r.fusionValue!==undefined)fusionValue=r.fusionValue;return r;},
+        const r=planResize(work,{componentId,id,raw,mirrorPair,exact,basis:resizeBases.get(componentId+':'+id),topo:S.topo,holeDiameter,reshapeTriangle,validateCandidate});if(r.fusionValue!==undefined)fusionValue=r.fusionValue;return r;},
       confirm:after=>reviewMountingChange(mountingWork(S),after)});
     if(fusionValue!==undefined)return resizeFusion?.(comp.id,fusionValue);
     if(!applied)sync();
@@ -215,6 +221,6 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if (!cancel && draft && selected()?.id === draft.selectedId) { S.triSide = 'tip'; setValue(draft.value); }
     else draw();
   }
-  return { sync, setStock, selected, displayComp, selectDimension, setValue, setDimensionValue, change, beginTipPreview, previewTip, finishTipPreview,
+  return { resizeBasisFor:(componentId,id)=>{const c=S.comps.find(c=>c.id===componentId);return resizeBases.get(componentId+':'+id)||(c?.standardBlank&&c.type==='bar'&&c.p2.type==='fixed'&&c.p1.type!=='fixed'?'end':'start');},sync, setStock, selected, displayComp, selectDimension, setValue, setDimensionValue, change, beginTipPreview, previewTip, finishTipPreview,
     setMaterial: raw => setStock('material', raw), setMirror(value) { mirror = Boolean(value); sync(); } };
 }

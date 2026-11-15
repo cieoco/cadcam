@@ -103,6 +103,8 @@ const results=[-3,3].map(shift=>{const broken=structuredClone(wings),m=broken[0]
 assert.ok(results.some(r=>r.status==='fail'),'same bracket ID cannot exempt wing material moved into its middle');
 
 import {normalizeMaterialVoids,materialCircleContour} from '../js/blocks/material-voids.js';
+const tangentOuter={x:0,y:0,r:10},tangentInner={x:7,y:0,r:3};
+const tangentVoids=normalizeMaterialVoids([tangentInner,tangentOuter].map(circle=>({circle,points:materialCircleContour(circle)})));assert.equal(tangentVoids.length,1,'circle containment uses analytical radii, not the smaller sampled-polygon bounds');assert.equal(tangentVoids[0].circle,tangentOuter);
 const containedHole={id:'pivot',x:5,y:5,r:1},largeSlot={id:'MG995_SLOT',points:rect(3,3,4,4)};
 const redundant=part('A',undefined,pose(),{holes:[containedHole],cutouts:[largeSlot]});
 assert.equal(run([redundant,part('B',rect(4.5,4.5,1,1))]).status,'pass','fully-contained hole/slot void union');
@@ -137,3 +139,35 @@ for(const theta of [0,20,40]){
  }
 }
 console.log('opened F1 MG995 ear slot/circle union: checker and viewer share representation');
+
+// Cloned previews reuse local triangulation, never prior poses or hole layout.
+const cachedParts=[part('cache-A',rect(0,0,14,12),pose(),{holes:[{id:'cache-hole',x:7,y:6,r:2}]}),part('cache-B',rect(6.5,5.5,1,1))];
+const cachedResult=run(cachedParts);
+assert.equal(cachedResult.status,'pass');
+assert.deepEqual(run(structuredClone(cachedParts)),cachedResult,'clone has identical validation evidence');
+const changedPose=structuredClone(cachedParts);changedPose[1].pose.matrix[12]=4;
+assert.equal(run(changedPose).status,'fail','cached material must use new pose');
+const filledHole=structuredClone(cachedParts);filledHole[0].geometry.holes=[];
+assert.equal(run(filledHole).status,'fail','hole removal invalidates cached geometry');
+const thinner=structuredClone(cachedParts);thinner[1].pose.matrix[14]=2;thinner[0].geometry.thicknessMm=3;
+assert.equal(run(thinner).status,'pass','new thickness is checked with actual hole');
+console.log('cloned material reuse preserves evidence and invalidates geometry/pose changes');
+
+// Two separate overlapping groups plus isolated holes: union must not swallow
+// material between the groups or drop the unrelated holes.
+const grouped=[rect(1,1,3,2),rect(3,1,3,2),rect(10,1,2,3),rect(10,3,2,3),rect(20,1,1,1)];
+const mergedGroups=normalizeMaterialVoids(grouped);assert.equal(mergedGroups.length,3);
+const groupArea=r=>Math.abs(r.reduce((s,p,i)=>{const q=r[(i+1)%r.length];return s+p.x*q.y-q.x*p.y;},0)/2);
+assert.ok(Math.abs(mergedGroups.reduce((n,r)=>n+groupArea(r),0)-21)<1e-8,'separate overlap unions retain exact area');
+const groupBoard=part('group-board',rect(0,0,24,10),pose(),{cutouts:grouped.map(points=>({points}))});
+assert.equal(run([groupBoard,part('group-probe',rect(7,2,1,1))]).status,'fail','solid web between disconnected void groups survives');
+assert.equal(run([groupBoard,part('group-probe',rect(20.2,1.2,.2,.2))]).status,'pass','isolated void survives grouping');
+assert.throws(()=>normalizeMaterialVoids([...voidCycle,rect(20,20,2,2)]),/void_union_material_island/,'material island rejection survives disconnected grouping');
+
+const renamedPair=structuredClone(paired);renamedPair.geometry.holes[0].holePairId='different-connection';
+assert.notEqual(run([renamedPair,structuredClone(screw)]).pairs[0].reason,'named_coaxial_fastener','geometry cache never carries another connection hole identity');
+
+const nullable=part('nullable',rect(0,0,10,10));nullable.geometry.outlines[0][0].x=null;
+assert.equal(run([nullable]).status,'pass');
+const nonfinite=structuredClone(nullable);nonfinite.geometry.outlines[0][0].x=NaN;
+assert.equal(run([nonfinite]).status,'not_supported','NaN cannot hit the cache entry for a JSON-null coordinate');

@@ -5,7 +5,7 @@ import {compileTopology} from '../js/core/topology.js';
 import {solveTopology} from '../js/multilink/solver.js';
 await loadUnitStarts();
 const e=getExample('block-gear-gripper');assert.equal(e.catalog,'blocks');
-assert.equal(BLOCK_EXAMPLES.filter(e=>e.catalog==='blocks').length,1);
+assert.deepEqual(BLOCK_EXAMPLES.filter(e=>e.catalog==='blocks').map(e=>e.id).sort(),['block-gear-gripper','four-wheel-chassis']);
 const s=normalizeSnapshot(e.snapshot);assert.ok(s);
 assert.equal(s.comps.length,5);
 const gears=s.comps.filter(c=>c.type==='gear');assert.equal(gears.length,2);

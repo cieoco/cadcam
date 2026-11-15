@@ -11,6 +11,7 @@ import {inspectBarFusion,worldFusionGeometry} from './bar-fusion-geometry.js';
 import { isDisk, diskOutline } from './disk-plate.js';
 import { memberStock } from './member-stock.js';
 import {diskOrientationMark} from './disk-orientation.js';
+import {wheelAppearance} from './wheel-appearance.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svgEl = tag => document.createElementNS(SVG_NS, tag);
@@ -48,7 +49,15 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
     }
     const group = groupForLayer(linkLayer.get(link)); group.appendChild(stick);
     // 圓盤是旋轉對稱外形；方向線只供觀察轉角，不是加工槽。
-    const diskDirection=isDisk(component)?svgEl('g'):null;
+    const wheel=isDisk(component)&&component.wheelWidthMm!==undefined;
+    const wheelFace=wheel?svgEl('g'):null;
+    if(wheelFace){
+      stick.setAttribute('fill','#17191c');
+      wheelFace.style.pointerEvents='none';wheelFace.dataset.wheelAppearance=link.id;wheelFace.setAttribute('aria-hidden','true');
+      for(let i=0;i<9;i++){const circle=svgEl('circle');circle.setAttribute('fill',i?'#17191c':'#f8fafc');wheelFace.appendChild(circle);}
+      group.appendChild(wheelFace);
+    }
+    const diskDirection=isDisk(component)&&!wheel?svgEl('g'):null;
     if(diskDirection){
       diskDirection.style.pointerEvents='none';diskDirection.dataset.diskOrientation=link.id;
       for(const fill of ['#ffffff','#075985']){const ink=svgEl('path');ink.setAttribute('fill',fill);diskDirection.appendChild(ink);}
@@ -83,6 +92,12 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
       const a = current[link.p1], b = current[link.p2];
       const valid = a && b && Number.isFinite(a.x) && Number.isFinite(b.x);
       stick.style.display = valid ? '' : 'none'; holes.forEach(hole => { hole.element.style.display = valid ? '' : 'none'; });
+      if(wheelFace){
+        wheelFace.style.display=valid?'':'none';
+        if(valid){const start=project(a),end=project(b),rim=project({x:a.x+component.diameterMm/2,y:a.y}),appearance=wheelAppearance(Math.hypot(rim.x-start.x,rim.y-start.y),Math.atan2(end.y-start.y,end.x-start.x));
+          [{x:0,y:0,r:appearance.hubRadius},...appearance.holes].forEach((h,i)=>{const circle=wheelFace.children[i];circle.setAttribute('cx',start.x+h.x);circle.setAttribute('cy',start.y+h.y);circle.setAttribute('r',h.r);});
+        }
+      }
       if(diskDirection){
         diskDirection.style.display=valid?'':'none';
         if(valid){
