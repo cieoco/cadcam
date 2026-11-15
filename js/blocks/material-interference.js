@@ -31,8 +31,14 @@ function triangles(ring,holes){
  return tris;
 }
 const localCache=new WeakMap();
+// Preview candidates clone their geometry. Reuse identical validated material,
+// but bound both entry count and mesh size; pose/pair checks always run anew.
+const materialCache=new Map();let cachedSlabs=0;
+const materialKey=g=>JSON.stringify([g.kind,g.thicknessMm,g.outlines,g.cutouts,g.holes,g.solid]);
 function localMaterial(g){
  if(localCache.has(g))return localCache.get(g);
+ const key=materialKey(g),cached=materialCache.get(key);
+ if(cached){materialCache.delete(key);materialCache.set(key,cached);localCache.set(g,cached);return cached;}
  if(typeof g.kind!=='string')throw Error('material_kind_missing');
  if(!(g.thicknessMm>E)||!g.outlines?.length)throw Error('material_geometry_missing');
  const rings=g.outlines.map(ringOf),cuts=(g.cutouts || []).map(c=>ringOf(c.points)),holes=g.holes || [];
@@ -64,9 +70,11 @@ function localMaterial(g){
   return slabs;
  };
  const result={outer:bound(false),inner:bound(true),curved:holes.length>0||g.kind.startsWith('screw')};
+ const size=result.outer.length+result.inner.length;
+ if(size<=50000){while(materialCache.size>=8||cachedSlabs+size>50000){const first=materialCache.keys().next().value,old=materialCache.get(first);cachedSlabs-=old.outer.length+old.inner.length;materialCache.delete(first);}materialCache.set(key,result);cachedSlabs+=size;}
  localCache.set(g,result);return result;
 }
-const boxOf=vertices=>{const min={x:Infinity,y:Infinity,z:Infinity},max={x:-Infinity,y:-Infinity,z:-Infinity};for(const p of vertices)for(const k of ['x','y','z']){if(p[k]<min[k])min[k]=p[k];if(p[k]>max[k])max[k]=p[k];}return {min,max};};
+const boxOf=vertices=>{const min={x:Infinity,y:Infinity,z:Infinity},max={x:-Infinity,y:-Infinity,z:-Infinity};for(const p of vertices){if(p.x<min.x)min.x=p.x;if(p.y<min.y)min.y=p.y;if(p.z<min.z)min.z=p.z;if(p.x>max.x)max.x=p.x;if(p.y>max.y)max.y=p.y;if(p.z>max.z)max.z=p.z;}return {min,max};};
 const boxOverlap=(a,b)=>['x','y','z'].every(k=>Math.min(a.max[k],b.max[k])-Math.max(a.min[k],b.min[k])>E);
 function prism(slab,m){
  const vertices=[...slab.triangle.map(p=>applyMatrix4(m,{...p,z:slab.z0})),...slab.triangle.map(p=>applyMatrix4(m,{...p,z:slab.z1}))];
@@ -114,8 +122,8 @@ function prepared(p){
  if(!Array.isArray(m)||m.length!==16||!m.every(Number.isFinite))throw Error('invalid_world_pose');
  const axes=[{x:m[0],y:m[1],z:m[2]},{x:m[4],y:m[5],z:m[6]},axis(m)];
  if(axes.some(n=>Math.abs(dot(n,n)-1)>1e-6)||Math.abs(dot(axes[0],axes[1]))>1e-6||Math.abs(dot(axes[0],axes[2]))>1e-6||Math.abs(dot(axes[1],axes[2]))>1e-6)throw Error('non_rigid_world_pose');
- const l=localMaterial(p.geometry),outer=l.outer.map(s=>prism(s,m)),inner=l.inner.map(s=>prism(s,m));
- return {part:p,outer,inner,box:boxOf((function*(){for(const prism of outer)yield* prism.vertices;})())};
+ const l=localMaterial(p.geometry),outer=l.outer.map(s=>prism(s,m));let inner;
+ return {part:p,outer,get inner(){return inner ||= l.inner.map(s=>prism(s,m));},box:boxOf((function*(){for(const prism of outer){yield prism.box.min;yield prism.box.max;}})())};
 }
 const hardware=p=>['bracket-wing','screw','screw-head','nut','washer'].includes(p.geometry.kind);
 const pairedId=p=>p.holePairId || p.geometry.holePairId;

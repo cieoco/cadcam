@@ -139,3 +139,16 @@ for(const theta of [0,20,40]){
  }
 }
 console.log('opened F1 MG995 ear slot/circle union: checker and viewer share representation');
+
+// Cloned previews reuse local triangulation, never prior poses or hole layout.
+const cachedParts=[part('cache-A',rect(0,0,14,12),pose(),{holes:[{id:'cache-hole',x:7,y:6,r:2}]}),part('cache-B',rect(6.5,5.5,1,1))];
+const cachedResult=run(cachedParts);
+assert.equal(cachedResult.status,'pass');
+assert.deepEqual(run(structuredClone(cachedParts)),cachedResult,'clone has identical validation evidence');
+const changedPose=structuredClone(cachedParts);changedPose[1].pose.matrix[12]=4;
+assert.equal(run(changedPose).status,'fail','cached material must use new pose');
+const filledHole=structuredClone(cachedParts);filledHole[0].geometry.holes=[];
+assert.equal(run(filledHole).status,'fail','hole removal invalidates cached geometry');
+const thinner=structuredClone(cachedParts);thinner[1].pose.matrix[14]=2;thinner[0].geometry.thicknessMm=3;
+assert.equal(run(thinner).status,'pass','new thickness is checked with actual hole');
+console.log('cloned material reuse preserves evidence and invalidates geometry/pose changes');
