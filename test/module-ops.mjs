@@ -84,7 +84,7 @@ const solveWorld = (comps, modules, params, angles) => solveAssembly(compileAsse
 // ---------- 內建模組與插入實例（E-M6） ----------
 let work;
 {
-  check('內建模組含三種針筒模組與既有九種機構', BUILTIN_MODULES.map(m => m.id).join(',') === 'hydraulic-lift,hydraulic-gripper,hydraulic-base,rack-lift,gear-gripper,fourbar-lift,single-servo-claw,single-axis-wrist,swing-intake,tipping-bucket,lift-bucket,parallel-gripper');
+  check('加入設計來源含積木夾爪，既有十二種入口保留', BUILTIN_MODULES.map(m => m.id).join(',') === 'hydraulic-lift,hydraulic-gripper,hydraulic-base,rack-lift,gear-gripper,fourbar-lift,single-servo-claw,single-axis-wrist,swing-intake,tipping-bucket,lift-bucket,parallel-gripper,block-gear-gripper');
   const tLift = builtinTemplate('rack-lift'), tGrip = builtinTemplate('gear-gripper');
   check('模組庫新增安裝基準不使夾爪機架離格', !(await import('../js/blocks/grid-rule.js')).gridIssues(tGrip.comps,tGrip.params).some(i=>i.rule==='R3'));
   check('內建模組是合法模板', normalizeTemplate(tLift).ok && normalizeTemplate(tGrip).ok);

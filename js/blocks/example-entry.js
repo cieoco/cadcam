@@ -50,10 +50,10 @@ export function offerExample({ example, loadExample, insertModule, onDismiss = (
   dialog.append(heading, use, scope, message);
   const module = typeof insertModule === 'function' && BUILTIN_MODULES.find(m => m.source === example.id);
   if (module) {
-    message.textContent = '「載入此範例」會替換整份作品（所有設計分頁與組立），可按復原找回；「加入目前作品」則保留作品並加入下列模組。';
+    message.textContent = example.catalog==='blocks'?'「加入為新設計」會保留目前所有設計與組立；「載入此範例」會替換整份作品。':'「載入此範例」會替換整份作品（所有設計分頁與組立），可按復原找回；「加入目前作品」則保留作品並加入下列模組。';
     const note = document.createElement('p');
-    note.textContent = `加入「${module.name}」：保留現有作品，沿用模組尺寸與接口；不帶入範例任務設定。${module.variantNote || module.description}`;
-    const add = document.createElement('button'); add.type = 'button'; add.textContent = '＋ 加入目前作品';
+    note.textContent = example.catalog==='blocks'?`新增「${module.name}」設計分頁，保留原尺寸與孔位，再到組立加入接合。`:`加入「${module.name}」：保留現有作品，沿用模組尺寸與接口；不帶入範例任務設定。${module.variantNote || module.description}`;
+    const add = document.createElement('button'); add.type = 'button'; add.textContent = example.catalog==='blocks'?'＋ 加入為新設計':'＋ 加入目前作品';
     add.onclick = () => { if (insertModule(module.id) !== false) dismiss(); };
     dialog.append(note, add);
   }

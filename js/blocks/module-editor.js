@@ -1,3 +1,4 @@
+import {deriveMotorMounts} from './build-plan.js';
 import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import {editableNumber} from './numeric-input.js';
 /**
@@ -244,11 +245,17 @@ export function createModuleEditor(deps) {
       place: viewCenter()
     };
     const r = instantiateTemplate(template, ctx);
+    // A new design may bring dimensions for a motor type not yet used here.
+    // Never alter an existing design's shared hardware settings implicitly.
+    const fabrication=structuredClone(S.fabrication||FABRICATION_DEFAULTS),used=new Set(deriveMotorMounts(S.comps).map(m=>m.kind));
+    if(template.fabrication)for(const kind of new Set(deriveMotorMounts(r.comps).map(m=>m.kind))){const key=kind+'Mount',settings=template.fabrication[key];if(!settings)continue;if(used.has(kind)&&JSON.stringify(fabrication[key])!==JSON.stringify(settings)){transient('此設計的馬達加工規格與目前作品不同，尚未加入；請先核對加工設定。');return false;}fabrication[key]=structuredClone(settings);}
+
     const off = insertOffset(compsInPlane(S.comps, S.modules, null), r.comps, 80, { ...S.topo.params, ...r.params }, { sideBySide: true });
     if (off.dx !== 0 || off.dy !== 0) r.comps = translateModule(r.comps, r.module.id, off.dx, off.dy);
-    const platePlan=planActuatorPlateHoles({comps:[...S.comps,...r.comps],params:{...S.topo.params,...r.params},modules:[...S.modules,r.module],fabrication:S.fabrication});if(!platePlan.ok){transient(platePlan.message);return false;}
+    const platePlan=planActuatorPlateHoles({comps:[...S.comps,...r.comps],params:{...S.topo.params,...r.params},modules:[...S.modules,r.module],fabrication});if(!platePlan.ok){transient(platePlan.message);return false;}
     pushUndo();
-    S.comps = platePlan.comps;
+    S.comps = template.fabrication?[...S.comps,...platePlan.comps.filter(c=>c.moduleId===r.module.id)]:platePlan.comps;
+    S.fabrication=fabrication;
     Object.keys(r.params).forEach(k => { S.topo.params[k] = r.params[k]; });
     S.modules = [...S.modules, r.module];
     S.counter = r.counter;
@@ -257,10 +264,10 @@ export function createModuleEditor(deps) {
     if (target) select(target);
     rebuild(); draw();
     fitToFocus();
-    transient(`已加入模組「${r.module.name}」，可在模組面板安裝或調整。`);
+    transient(`已加入新設計「${r.module.name}」；原作品保留，可到組立加入與接合。`);
     return true;
   }
-  function insertBuiltin(id) { return insertTemplate(builtinTemplate(id)); }
+  function insertBuiltin(id) { const t=builtinTemplate(id);return !t&&BUILTIN_MODULES.some(m=>m.id===id)?import('./examples.js').then(async m=>{await m.loadUnitStarts();return insertTemplate(builtinTemplate(id));}):insertTemplate(t); }
   function insertLocal(index) { insertTemplate(parseLibrary(loadLibraryText())[index] || null); }
 
   // ---- 存成模組／改名 ----

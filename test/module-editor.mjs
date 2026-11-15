@@ -207,4 +207,18 @@ const liftOut = S.modules[0].outputs[0];
   editor.setOutput();
   check('單一方向來源可沿用無參數控制器 API', S.modules[0].outputs.length === 2 && S.modules[0].outputs[1].body.id === 'Upright');
 }
+// Append the authored gripper to the completed chassis without replacing it.
+{
+ const {loadUnitStarts,getExample}=await import('../js/blocks/examples.js');await loadUnitStarts();reset();
+ const car=structuredClone(getExample('four-wheel-chassis').snapshot);S.comps=car.comps;S.modules=car.modules;S.topo={params:car.params,assemblyMembers:car.assemblyMembers};S.fabrication=car.fabrication;S.counter=car.counter;
+ const original=JSON.stringify([S.comps,S.modules]),priorParams=structuredClone(S.topo.params),tt=JSON.stringify(S.fabrication.ttMount),u0=log.undo;
+ check('積木夾爪可加入目前底盤',await editor.insertBuiltin('block-gear-gripper')===true);
+ const added=S.modules.at(-1),addedParts=S.comps.filter(c=>c.moduleId===added.id);
+ check('新增夾爪分頁保留原五件、底盤與定位不變',added.name==='積木夾爪'&&addedParts.length===5&&JSON.stringify([S.comps.slice(0,car.comps.length),S.modules.slice(0,car.modules.length)])===original&&Object.entries(priorParams).every(([k,v])=>S.topo.params[k]===v));
+ check('新增設計只記一筆復原，保留TT尺寸及原舵機孔槽尺寸',log.undo===u0+1&&JSON.stringify(S.fabrication.ttMount)===tt&&S.fabrication.mg995Mount.cableNotchWidthMm===6);
+ check('四輪馬達與新增夾爪馬達編號不衝突',motorsOf(S.comps).join(',')==='1,2,3,4,5');
+ const {normalizeSnapshot,toSnapshot}=await import('../js/blocks/schema.js');const reopened=normalizeSnapshot(JSON.parse(JSON.stringify(toSnapshot(S.comps,S.topo,S.counter,{modules:S.modules,fabrication:S.fabrication}))));check('底盤與夾爪可一起保存重開',reopened?.comps.length===13&&reopened.modules.length===5&&reopened.fabrication.mg995Mount.cableNotchWidthMm===6);
+ S.fabrication.mg995Mount.cableNotchWidthMm=8;const conflicting=JSON.stringify([S.comps,S.modules,S.topo,S.fabrication]),u1=log.undo;
+ check('已有舵機的加工規格不同時不暗改、不加入、不記復原',editor.insertBuiltin('block-gear-gripper')===false&&log.undo===u1&&JSON.stringify([S.comps,S.modules,S.topo,S.fabrication])===conflicting);
+}
 report('module-editor');
