@@ -26,6 +26,7 @@ const BODY_COMP_TYPES = new Set(['bar', 'triangle', 'rack', 'slider']);
 function ownTokensOf(comp) {
   const s = new Set();
   if (comp && comp.id) s.add(comp.id);
+  if (typeof comp?.motorMount?.partId==='string'&&comp.motorMount.partId) s.add(comp.motorMount.partId);
   pointKeysFor(comp).forEach(k => { const p = comp[k]; if (p && p.id) s.add(p.id); });
   if (Array.isArray(comp.holes)) comp.holes.forEach(h => { if (h && h.id) s.add(h.id); });
   for(const h of comp.standardBlank?.mountHoles || [])if(h.id)s.add(h.id);

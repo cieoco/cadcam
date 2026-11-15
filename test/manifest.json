@@ -152,6 +152,7 @@
     "test/placement-plane.mjs",
     "test/face-edge-relations.mjs",
     "test/face-relations.mjs",
+    "test/four-wheel-chassis.mjs",
     "test/face-overlay-performance.mjs",
     "test/surface-pick-focus.mjs",
     "test/loose-motor-playback.mjs",

@@ -51,6 +51,12 @@ export function synchronizeDesignInstances(work){
   if(oldA&&newA)r.comps=r.comps.map(c=>transformComp(c,{...newA,a:0},{...oldA,a:rotation},rotation));
   const tokens=c=>[c.id,...pointKeysFor(c).map(k=>c[k]?.id),...(c.holes || []).map(h=>h.id),...(c.standardBlank?.mountHoles || []).map(h=>h.id)].filter(Boolean);
   const newIds=new Set(r.comps.flatMap(tokens));
+  // A face mate may create a local output on an instance (e.g. side plate 2
+  // receives the upper deck). Keep that endpoint while its actual part survives.
+  for(const o of instance.outputs || []){
+   const body=r.comps.find(c=>c.id===o.body?.id&&c.type===o.body?.kind);
+   if(body&&['bar','triangle','rack'].includes(body.type)&&o.at===body.p1?.id&&(o.id===`face-part-${body.id}`||o.id.startsWith(`face-part-${body.id}-`))&&w.modules.some(m=>m.mount?.face&&m.mount.to?.module===instance.id&&m.mount.to.output===o.id)&&!r.module.outputs.some(x=>x.id===o.id))r.module.outputs.push(copy(o));
+  }
   const removed=new Set(prior.flatMap(tokens).filter(id=>!newIds.has(id)));
   const hasRemoved=v=>typeof v==='string'?removed.has(v):Array.isArray(v)?v.some(hasRemoved):v&&typeof v==='object'?Object.values(v).some(hasRemoved):false;
   if(w.modules.some(m=>hasRemoved(m.mount)))return fail(work,'來源修改移除了組立接合使用的零件或孔，請先解除該接合');

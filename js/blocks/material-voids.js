@@ -9,8 +9,9 @@ const inside=(p,r)=>{if(r.some((a,i)=>distance(p,a,r[(i+1)%r.length])<=EPS))retu
 export function materialCircleContour(h,circumscribed=false){const n=64,r=h.r/(circumscribed?Math.cos(Math.PI/n):1);return Array.from({length:n},(_,i)=>{const a=(i+.5)*2*Math.PI/n;return {x:h.x+r*Math.cos(a),y:h.y+r*Math.sin(a)};});}
 /** Entries may be rings, or {points,circle} for an exact representation circle. */
 export function normalizeMaterialVoids(input){
- const rows=input.map((v,i)=>({original:v,i,points:Array.isArray(v)?v:v.points,circle:v.circle}));
+ const rows=input.map((v,i)=>{const points=Array.isArray(v)?v:v.points,box={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};for(const p of points){box.minX=Math.min(box.minX,p.x);box.minY=Math.min(box.minY,p.y);box.maxX=Math.max(box.maxX,p.x);box.maxY=Math.max(box.maxY,p.y);}const c=v.circle,containBox=c?{minX:c.x-c.r,minY:c.y-c.r,maxX:c.x+c.r,maxY:c.y+c.r}:box;return {original:v,i,points,circle:c,box,containBox};});
  const contains=(a,b)=>{
+  const x=a.containBox,y=b.containBox;if(x.minX>y.minX+EPS||x.minY>y.minY+EPS||x.maxX<y.maxX-EPS||x.maxY<y.maxY-EPS)return false;
   if(a.circle&&b.circle)return Math.hypot(a.circle.x-b.circle.x,a.circle.y-b.circle.y)+b.circle.r<=a.circle.r+EPS;
   if(a.circle)return b.points.every(p=>Math.hypot(p.x-a.circle.x,p.y-a.circle.y)<=a.circle.r+EPS);
   if(b.circle)return inside(b.circle,a.points)&&a.points.every((p,i)=>distance(b.circle,p,a.points[(i+1)%a.points.length])>=b.circle.r-EPS);
@@ -19,6 +20,7 @@ export function normalizeMaterialVoids(input){
  const kept=rows.filter(b=>!rows.some(a=>a!==b&&contains(a,b)&&(!contains(b,a)||a.i<b.i)));
  let overlap=false;
  for(let i=0;i<kept.length;i++)for(let j=i+1;j<kept.length;j++){
+  const x=kept[i].box,y=kept[j].box;if(x.maxX<y.minX-EPS||y.maxX<x.minX-EPS||x.maxY<y.minY-EPS||y.maxY<x.minY-EPS)continue;
   const a=kept[i].points,b=kept[j].points;
   if(inside(a[0],b)||inside(b[0],a)||a.some((p,k)=>b.some((q,l)=>crosses(p,a[(k+1)%a.length],q,b[(l+1)%b.length]))))overlap=true;
  }

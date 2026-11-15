@@ -40,7 +40,8 @@ const safe=fn=>{try{return fn();}catch(e){return 'ERR '+first(e);}};
 await loadUnitStarts();
 
 const works=[];
-for(const e of BLOCK_EXAMPLES){const s=normalizeSnapshot(clone(e.snapshot));if(s)works.push({name:e.id,s});}
+// New chassis is covered by four-wheel-chassis.mjs; retain the historical parity corpus unchanged.
+for(const e of BLOCK_EXAMPLES.filter(e=>e.id!=='four-wheel-chassis')){const s=normalizeSnapshot(clone(e.snapshot));if(s)works.push({name:e.id,s});}
 for(const f of ['connected-resize','motor-off-plate']){
   const s=normalizeSnapshot(JSON.parse(readFileSync(new URL(`./fixtures/${f}.json`,import.meta.url),'utf8')));
   if(s)works.push({name:'file:'+f,s});

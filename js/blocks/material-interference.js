@@ -45,7 +45,7 @@ function localMaterial(g){
    for(let i=1;i<profiles.length;i++){
     const [ra,z0]=profiles[i-1],[rb,z1]=profiles[i];if(z1-z0<=E)continue;
     const radius=certain?Math.min(ra,rb):Math.max(ra,rb);
-    slabs.push(...triangles(circle({x:0,y:0,r:radius},!certain),[]).map(t=>({triangle:t,z0,z1})));
+    for(const triangle of triangles(circle({x:0,y:0,r:radius},!certain),[]))slabs.push({triangle,z0,z1});
    }
    return slabs;
   }
@@ -58,7 +58,7 @@ function localMaterial(g){
 
    let outline=ring;
    if(g.kind==='screw'){const r=Math.max(...ring.map(p=>Math.hypot(p.x,p.y)));outline=circle({x:0,y:0,r},!certain);}
-   slabs.push(...triangles(outline,removed).map(t=>({triangle:t,z0:0,z1:g.thicknessMm})));
+   for(const triangle of triangles(outline,removed))slabs.push({triangle,z0:0,z1:g.thicknessMm});
   }
   if(holes.some(h=>!rings.some(r=>inside(h,r)))||cuts.some(c=>!rings.some(r=>inside(c[0],r))))throw Error('unassigned_machining_feature');
   return slabs;
@@ -66,7 +66,7 @@ function localMaterial(g){
  const result={outer:bound(false),inner:bound(true),curved:holes.length>0||g.kind.startsWith('screw')};
  localCache.set(g,result);return result;
 }
-const boxOf=v=>({min:{x:Math.min(...v.map(p=>p.x)),y:Math.min(...v.map(p=>p.y)),z:Math.min(...v.map(p=>p.z))},max:{x:Math.max(...v.map(p=>p.x)),y:Math.max(...v.map(p=>p.y)),z:Math.max(...v.map(p=>p.z))}});
+const boxOf=vertices=>{const min={x:Infinity,y:Infinity,z:Infinity},max={x:-Infinity,y:-Infinity,z:-Infinity};for(const p of vertices)for(const k of ['x','y','z']){if(p[k]<min[k])min[k]=p[k];if(p[k]>max[k])max[k]=p[k];}return {min,max};};
 const boxOverlap=(a,b)=>['x','y','z'].every(k=>Math.min(a.max[k],b.max[k])-Math.max(a.min[k],b.min[k])>E);
 function prism(slab,m){
  const vertices=[...slab.triangle.map(p=>applyMatrix4(m,{...p,z:slab.z0})),...slab.triangle.map(p=>applyMatrix4(m,{...p,z:slab.z1}))];
@@ -98,7 +98,7 @@ function prepared(p){
  const axes=[{x:m[0],y:m[1],z:m[2]},{x:m[4],y:m[5],z:m[6]},axis(m)];
  if(axes.some(n=>Math.abs(dot(n,n)-1)>1e-6)||Math.abs(dot(axes[0],axes[1]))>1e-6||Math.abs(dot(axes[0],axes[2]))>1e-6||Math.abs(dot(axes[1],axes[2]))>1e-6)throw Error('non_rigid_world_pose');
  const l=localMaterial(p.geometry),outer=l.outer.map(s=>prism(s,m)),inner=l.inner.map(s=>prism(s,m));
- return {part:p,outer,inner,box:boxOf(outer.flatMap(p=>p.vertices))};
+ return {part:p,outer,inner,box:boxOf((function*(){for(const prism of outer)yield* prism.vertices;})())};
 }
 const hardware=p=>['bracket-wing','screw','screw-head','nut','washer'].includes(p.geometry.kind);
 const pairedId=p=>p.holePairId || p.geometry.holePairId;

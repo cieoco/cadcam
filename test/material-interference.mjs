@@ -103,6 +103,8 @@ const results=[-3,3].map(shift=>{const broken=structuredClone(wings),m=broken[0]
 assert.ok(results.some(r=>r.status==='fail'),'same bracket ID cannot exempt wing material moved into its middle');
 
 import {normalizeMaterialVoids,materialCircleContour} from '../js/blocks/material-voids.js';
+const tangentOuter={x:0,y:0,r:10},tangentInner={x:7,y:0,r:3};
+const tangentVoids=normalizeMaterialVoids([tangentInner,tangentOuter].map(circle=>({circle,points:materialCircleContour(circle)})));assert.equal(tangentVoids.length,1,'circle containment uses analytical radii, not the smaller sampled-polygon bounds');assert.equal(tangentVoids[0].circle,tangentOuter);
 const containedHole={id:'pivot',x:5,y:5,r:1},largeSlot={id:'MG995_SLOT',points:rect(3,3,4,4)};
 const redundant=part('A',undefined,pose(),{holes:[containedHole],cutouts:[largeSlot]});
 assert.equal(run([redundant,part('B',rect(4.5,4.5,1,1))]).status,'pass','fully-contained hole/slot void union');

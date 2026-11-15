@@ -70,9 +70,9 @@ if(WRITE){
 // 2026-11-10: approved rounded standard outlines change export and mass, not IDs/poses/holes.
 const ROUND=new URL('./fixtures/blockify-rounded-export.json',import.meta.url),writeRound=process.argv.includes('--write-rounded'),rounded=writeRound?{}:JSON.parse(readFileSync(ROUND,'utf8'));
 const before=JSON.parse(readFileSync(FIXTURE,'utf8')).examples,summary={examples:0,parts:0},left={};
-// The adjustment case and the bell-crank example were added after the frozen conversion baseline.
+// The adjustment, bell-crank and four-wheel chassis examples were added after the frozen conversion baseline.
 // Its geometry/export coverage lives in used-holes and the syringe edit tests.
-const baselineExamples=BLOCK_EXAMPLES.filter(e=>!['adjustment-repair','bell-crank-gripper'].includes(e.id));
+const baselineExamples=BLOCK_EXAMPLES.filter(e=>!['adjustment-repair','bell-crank-gripper','four-wheel-chassis'].includes(e.id));
 assert.deepEqual(baselineExamples.map(e=>e.id).sort(),Object.keys(before).sort(),'same baseline example catalog');
 for(const e of baselineExamples){
  const old=before[e.id],m=measure(e),converted=Object.keys(m.parts).filter(id=>m.parts[id].std&&old.parts[id]);

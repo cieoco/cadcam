@@ -1046,11 +1046,12 @@ ALL_BLOCK_EXAMPLES.unshift({id:'adjustment-repair',title:'調整－待修理',
   note:'本地協作範例：針筒安裝、換孔與桿長調整。保留原接法，逐步重現問題；非加工完成品。',snapshot:adjustmentSnapshot});
 EXAMPLE_LESSONS['adjustment-repair']={group:'challenge',level:'調整',use:'使用同一作品核對安裝與修改流程。',
   try:['一次修改一項：固定方式、推桿接孔或桿長。','檢查提示、取消與復原；要保留調整結果請下載存檔。']};
+EXAMPLE_LESSONS['four-wheel-chassis']={group:'challenge',level:'組立',use:'使用共用側板與底板組成四輪雙層底盤。',learn:'四顆獨立TT馬達、共用設計同步更新，以及面對面／貼齊／置中定位。',try:['切換M1～M4，分別觀察輪子轉動。','改一項板材尺寸，檢查兩份共用設計與接合位置。','定位不等於鎖固；此底盤預計採榫槽，榫槽、軸配合、承載與實物仍須核對。']};
 
 export const BLOCK_EXAMPLES = ALL_BLOCK_EXAMPLES;
 
 let unitStarts;
-export const loadUnitStarts=()=>unitStarts||=import('./unit-start-examples.js').then(m=>m.register(BLOCK_EXAMPLES,EXAMPLE_LESSONS));
+export const loadUnitStarts=()=>unitStarts||=Promise.all([import('./unit-start-examples.js'),import('./four-wheel-chassis-example.js')]).then(async([m,chassis])=>{await m.register(BLOCK_EXAMPLES,EXAMPLE_LESSONS);if(!BLOCK_EXAMPLES.some(e=>e.id===chassis.FOUR_WHEEL_CHASSIS_EXAMPLE.id))BLOCK_EXAMPLES.unshift(chassis.FOUR_WHEEL_CHASSIS_EXAMPLE);});
 
 export function getExample(id) {
   if(id==='hydraulic-h04')id='hydraulic-h07'; // 舊課程網址沿用新底盤；已存作品不遷移。
