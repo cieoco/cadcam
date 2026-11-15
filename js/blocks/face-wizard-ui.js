@@ -14,6 +14,7 @@ import {boxFaces} from './face-mate.js';
 import {candidateSurfacePoint} from './face-candidate-view.js';
 import {createFaceEdgeOverlay} from './face-edge-overlay.js';
 import { readConnectionDescriptor } from './connection-descriptor.js';
+import { matchesSurfacePart } from './face-surface-pick.js';
 
 function reference(surface, name, parts = []) {
   const axes = ['x', 'y', 'z'];
@@ -145,7 +146,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   const canvas=pickViewer?.canvas;
   function syncPickFocus(){
    const endpoint=relationTask?.endpoint,item=endpoint&&(endpoint==='host'?hosts:children)[stepSelection?.[endpoint]];
-   const part=item&&activeModel?.materialParts?.find(p=>p.moduleId===item.surface.moduleId&&p.partId===(item.surface.framePartId || item.surface.compId));
+   const part=item&&activeModel?.materialParts?.find(p=>matchesSurfacePart(item.surface,p));
    pickViewer?.setSurfacePickFocus?.(part?.pickKey || null);
   }
   const edgeOverlay=dock&&canvas?createFaceEdgeOverlay(pickViewer,picked=>frame.contentWindow.postMessage({type:'face-wizard-edge-picked',...picked},location.origin)):null;
@@ -154,7 +155,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   const cancelTap=()=>{tap=null;};
   const up=e=>{const start=tap;tap=null;if(!start||start.id!==e.pointerId||(![1,2].includes(previewStep)&&!relationTask)||!stepSelection)return;
    const endpoint=relationTask?.endpoint || (previewStep===1?'host':'child'),hit=pickViewer.pickSurface(e.clientX,e.clientY),part=(relationTask?activeModel:sourceModel)?.materialParts?.find(p=>p.pickKey===hit?.key),items=endpoint==='host'?hosts:children;
-   const index=items.findIndex(item=>!item.blockedReason&&part&&part.moduleId===item.surface.moduleId&&part.partId===(item.surface.framePartId || item.surface.compId)),item=items[index];
+   const index=items.findIndex(item=>!item.blockedReason&&matchesSurfacePart(item.surface,part)),item=items[index];
    if(!part||!item||relationTask&&index!==stepSelection[endpoint])return;
    const m=part.pose.matrix,n=hit.normal,world=[m[0]*n.x+m[4]*n.y+m[8]*n.z,m[1]*n.x+m[5]*n.y+m[9]*n.z,m[2]*n.x+m[6]*n.y+m[10]*n.z];
    let axes=placedModuleAxes({comps,modules,params},item.surface.moduleId);

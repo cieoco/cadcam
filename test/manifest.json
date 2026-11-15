@@ -160,6 +160,7 @@
     "test/placement-plane.mjs",
     "test/face-edge-relations.mjs",
     "test/face-relations.mjs",
+    "test/face-surface-pick.mjs",
     "test/four-wheel-chassis.mjs",
     "test/chassis-tab-nut.mjs",
     "test/tab-nut-count.mjs",

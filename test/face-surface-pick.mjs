@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {matchesSurfacePart} from '../js/blocks/face-surface-pick.js';
+const frame={moduleId:'design-B',kind:'frame',framePartId:'frame',compId:null};
+assert.ok(matchesSurfacePart(frame,{moduleId:'design-B',partId:'frame'}));
+assert.ok(matchesSurfacePart(frame,{moduleId:'design-B',partId:'design-B-frame'}),'same frame remains selectable after candidate mounting');
+assert.ok(!matchesSurfacePart(frame,{moduleId:'design-A',partId:'frame'}),'never select another design root frame');
+assert.ok(!matchesSurfacePart(frame,{moduleId:'design-B',partId:'plate-1'}),'never substitute an authored board for a frame');
+const board={moduleId:'design-B',kind:'output',compId:'plate-1'};
+assert.ok(matchesSurfacePart(board,{moduleId:'design-B',partId:'plate-1'}));
+assert.ok(!matchesSurfacePart(board,{moduleId:'design-B',partId:'design-B-frame'}));
+assert.ok(!matchesSurfacePart(board,null));
+console.log('surface picking preserves frame identity across previews and isolates designs and authored parts');
