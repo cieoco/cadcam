@@ -29,6 +29,7 @@
     "test/bent-arms-ui.mjs",
     "test/bell-crank-example.mjs",
     "test/connected-resize.mjs",
+    "test/resize-basis.mjs",
     "test/connected-status.mjs",
     "test/saved-pose.mjs",
     "test/motor-release.mjs",

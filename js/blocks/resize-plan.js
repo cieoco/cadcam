@@ -18,7 +18,7 @@ import {updatePointCoordsById as movePoint} from './model.js';
 
 const KEEP = {keepIdentity: true, pruneRefs: false, clearSelection: false, message: ''};   // 改尺寸：面板留著手上的零件物件、不順手清別的引用、成功不另外說話
 
-export function planResize(work, {componentId, id, raw, mirrorPair = false, exact = false, topo = {}, holeDiameter = () => undefined, reshapeTriangle = () => {}, validateCandidate = () => ''}) {
+export function planResize(work, {componentId, id, raw, mirrorPair = false, exact = false, basis, topo = {}, holeDiameter = () => undefined, reshapeTriangle = () => {}, validateCandidate = () => ''}) {
   const comp = work.comps.find(c => c.id === componentId);
   if (!comp) return {ok: true, unchanged: true};
   const candidate = () => structuredClone({comps: work.comps, modules: work.modules, params: work.params, fabrication: work.fabrication});
@@ -27,12 +27,12 @@ export function planResize(work, {componentId, id, raw, mirrorPair = false, exac
     if (invalid) return {ok: false, message: invalid};
     const plate = planActuatorPlateHoles(draft);
     if (plate.ok) draft.comps = plate.comps;
-    else if (planActuatorPlateHoles({comps: work.comps, modules: work.modules, params: work.params, fabrication: work.fabrication}).ok) return {ok: false, message: plate.message};
+    else {const prior=planActuatorPlateHoles({comps: work.comps, modules: work.modules, params: work.params, fabrication: work.fabrication});if(prior.ok||basis&&plate.message!==prior.message)return {ok:false,message:plate.message};}
     return {ok: true, comps: draft.comps, params: draft.params, modules: draft.modules, ...KEEP};
   };
 
   if (comp.standardBlank && (/^(g|r1|a)/.test(id) || isOutputBlank(comp) && id === 'width')) {
-    const value = Number(raw), plan = resizeStandardBlank(comp, work.params, id, value, {comps: work.comps, modules: work.modules});
+    const value = Number(raw), plan = resizeStandardBlank(comp, work.params, id, value, {comps: work.comps, modules: work.modules,basis});
     if (!plan.ok) return {ok: false, message: plan.message};
     // A hole that trace, reference, load or dimension settings point at cannot silently disappear with a smaller size.
     const watched = JSON.stringify([topo.tracePoints, topo.tracePoint, topo.referencePoint, topo.loads, topo.dimensions]);

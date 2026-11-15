@@ -1,5 +1,5 @@
 /** Three standard blanks, authored using existing bar/triangle components. */
-import {holeSide,localHoles,holeWorld} from '../core/local-holes.js';
+import {holeSide,localHoles,holeWorld,idCounts} from '../core/local-holes.js';
 import {isHoleUsed} from './used-holes.js';
 export const BLANK_HOLE_LIMIT=4096;
 export const BLANK_SPAN_LIMIT=10000;
@@ -51,24 +51,38 @@ export function makeStandardBlank({kind='bar',columns=kind==='bar'?8:6,rows=4,ar
  c.holes=cells.filter(h=>!primary.some(p=>Math.hypot(p.x-origin.x-h.u,p.y-origin.y-h.v)<1e-6)).map(h=>({id:`${id}.H${h.u}_${h.v}`.replaceAll('.','_'),...h,type:'floating',diameter:3.2}));
  return {ok:true,comp:c,params,holeCount:cells.length};
 }
-export function resizeStandardBlank(c,params,axis,value,{comps=[],modules=[]}={}){
+export function resizeStandardBlank(c,params,axis,value,{comps=[],modules=[],basis}={}){
  if(c.standardBlank.kind==='arms'&&ARMS.resize)return ARMS.resize(c,params,axis,value,arguments[4]);
  const g=c.type==='bar'?c.lenParam:c.gParam,L=Number(params[g]),H=Number(params[c.r1Param]),a=c.p1,b=c.p2,angle=Math.atan2(b.y-a.y,b.x-a.x);
  const next=makeStandardBlank({kind:c.standardBlank.kind,lengthMm:axis==='g'?value:L,heightMm:axis==='r1'?value:H,armWidthMm:axis==='arm'?value:c.standardBlank.armWidthMm,...(isOutputBlank(c)?{rearMm:c.standardBlank.rearMm,widthMm:axis==='width'?value:c.stock.widthMm}:{}),n:1,origin:{x:0,y:0}});if(!next.ok)return next;
+ if(basis!==undefined&&(!['start','center','end'].includes(basis)||!['bar','plate'].includes(c.standardBlank.kind)||!['g','r1'].includes(axis)))return {ok:false,message:'這個尺寸尚不支援修改基準，請沿用原固定端。'};
+ const factor=basis==='center'?.5:basis==='end'?1:0,du=axis==='g'?(L-value)*factor:0,dv=axis==='r1'?(H-value)*factor:0,dx=du*Math.cos(angle)-dv*Math.sin(angle)*holeSide(c),dy=du*Math.sin(angle)+dv*Math.cos(angle)*holeSide(c);
+ if((du||dv)&&comps.some(o=>o.type==='syringe'&&[o.a,o.b].some(p=>p?.componentId===c.id)))return {ok:false,message:'此基準會移動針筒接點；請沿用原固定端或先調整針筒接法。'};
  const out=structuredClone(c),raw=next.comp,keys=['p1','p2',...(c.type==='triangle'?['p3']:[])];
- for(const key of keys){const p=raw[key];out[key]={...c[key],x:a.x+p.x*Math.cos(angle)-p.y*Math.sin(angle)*holeSide(c),y:a.y+p.x*Math.sin(angle)+p.y*Math.cos(angle)*holeSide(c)};}
+ for(const key of keys){const p=raw[key];out[key]={...c[key],x:a.x+dx+p.x*Math.cos(angle)-p.y*Math.sin(angle)*holeSide(c),y:a.y+dy+p.x*Math.sin(angle)+p.y*Math.cos(angle)*holeSide(c)};}
  // Keep a grounded end in place.
- if(c.type==='bar'&&c.p2.type==='fixed'&&c.p1.type!=='fixed'){const dx=b.x-out.p2.x,dy=b.y-out.p2.y;for(const key of keys)Object.assign(out[key],{x:out[key].x+dx,y:out[key].y+dy});}
+ if(!basis&&c.type==='bar'&&c.p2.type==='fixed'&&c.p1.type!=='fixed'){const dx=b.x-out.p2.x,dy=b.y-out.p2.y;for(const key of keys)Object.assign(out[key],{x:out[key].x+dx,y:out[key].y+dy});}
  // A fixed end that another body shares cannot be moved by a resize: that body would silently lose its own length.
  const dragged=keys.find(k=>c[k].type==='fixed'&&Math.hypot(out[k].x-c[k].x,out[k].y-c[k].y)>1e-6&&comps.some(o=>o.id!==c.id&&['bar','triangle'].includes(o.type)&&['p1','p2','p3'].some(j=>o[j]?.id===c[k].id)));
  if(dragged)return {ok:false,message:`改這個尺寸會移動固定孔，而它同時連著其他零件；請先移動機架固定孔或解除連接，再改「${c.name||c.id}」的尺寸。`};
  // An end joined at another part's hole stays on that hole; a resize never drags the hole's copy away from it.
  for(const key of keys)for(const o of comps)if(o.id!==c.id){const h=[...localHoles(o),...(o.standardBlank?.mountHoles||[])].find(h=>h.id===out[key].id);if(h)Object.assign(out[key],holeWorld(o,h));}
- const originalHoles=[...(c.holes || []),...(c.standardBlank.mountHoles || [])],old=new Map(originalHoles.map(h=>[`${h.u},${h.v}`,h]));
+ if(basis&&(Math.hypot(out.p1.x-a.x-dx,out.p1.y-a.y-dy)>1e-6||Math.abs(Math.hypot(out.p2.x-out.p1.x,out.p2.y-out.p1.y)-(axis==='g'?value:L))>1e-6||c.type==='triangle'&&Math.abs(Math.hypot(out.p3.x-out.p1.x,out.p3.y-out.p1.y)-(axis==='r1'?value:H))>1e-6))return {ok:false,message:'這個基準與其他零件的接孔位置衝突，請改選基準或先解除該連接。'};
+ if(basis&&keys.some(k=>(c[k].type==='motor'||c[k].physicalMotor)&&Math.hypot(out[k].x-c[k].x,out[k].y-c[k].y)>1e-6))return {ok:false,message:'此基準會移動馬達軸心，請固定該端或先解除軸接。'};
+ const originalHoles=[...(c.holes || []),...(c.standardBlank.mountHoles || [])],old=new Map(originalHoles.map(h=>[`${h.u-du},${h.v-dv}`,h]));
  out.holes=raw.holes.map(h=>({...h,...old.get(`${h.u},${h.v}`),id:old.get(`${h.u},${h.v}`)?.id||`${c.id}.H${h.u}_${h.v}`.replaceAll('.','_')}));out.standardBlank={...raw.standardBlank,...(c.standardBlank.drill==='all'?{drill:'all'}:{})};if(isOutputBlank(c)&&axis==='width')out.stock.widthMm=value;
+ if(basis){
+  const taken=new Set(idCounts(c,comps,modules).keys()),physical=modules.map(({designInstance,...m})=>m),use=idCounts(comps,physical),options={params,modules:physical,use};
+  out.holes=raw.holes.map(h=>{const prior=old.get(`${h.u},${h.v}`);let id=prior?.id||`${c.id}.H${h.u}_${h.v}`.replaceAll('.','_');if(!prior){const base=id;let n=1;while(taken.has(id))id=base+'_resize'+n++;}taken.add(id);return {...h,...prior,u:h.u,v:h.v,id};});
+  for(const h of originalHoles)if(!out.holes.some(q=>q.id===h.id)&&(isHoleUsed(c,h,comps,options)||(c.standardBlank.mountHoles||[]).some(q=>q.id===h.id))){
+   const q={...h,u:h.u-du,v:h.v-dv};if(q.u<0||q.u>(axis==='g'?value:L)||q.v<0||q.v>(axis==='r1'?value:H))continue;
+   if(keys.some(k=>Math.hypot(holeWorld(out,q).x-out[k].x,holeWorld(out,q).y-out[k].y)<1e-6))return {ok:false,message:'這個基準會讓已有用途的孔與主孔重合，請選其他尺寸或基準。'};
+   out.holes=out.holes.filter(p=>Math.hypot(p.u-q.u,p.v-q.v)>1e-6);out.holes.push(q);
+  }
+ }
  const patch={[g]:axis==='g'?value:L};if(c.type==='triangle'){patch[c.r1Param]=axis==='r1'?value:H;patch[c.r2Param]=Math.hypot(patch[g],patch[c.r1Param]);}
  const retained=new Set(out.holes.map(h=>h.id)),removed=originalHoles.filter(h=>!retained.has(h.id));
- const lost=removed.find(h=>isHoleUsed(c,h,comps,{params,modules}));
+ const lost=removed.find(h=>isHoleUsed(c,h,comps,{params,modules:basis?modules.map(({designInstance,...m})=>m):modules}));
  if(lost)return {ok:false,message:`縮小會移除「${c.name||c.id}」${c.type==='bar'?'':`長向第${lost.u/8+1}、直向`}第${(c.type==='bar'?lost.u:lost.v)/8+1}孔，但這孔已固定或有零件連接；請先解除該孔的連接，或改用較多孔數。`};
  // Parts joined at this body's holes follow the holes that moved; a fixed one cannot follow, so the resize is refused.
  const follow=[];

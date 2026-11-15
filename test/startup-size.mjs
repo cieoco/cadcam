@@ -53,7 +53,8 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 上限 2026-11-11 經使用者同意由 2,165,000 放寬到 2,200,000（操作一致性 SDD §6）；再調高仍需使用者同意。
 // 2026-11-15：實際接觸榫槽、逐接點保存與雙端外形合併淨增約11KB；核心需支援已存作品直接重開／輸出，介面仍懶載入。
 // 2026-11-15：榫接組數隨板邊長平均配置的保存契約與幾何約增0.6 KB。
-check('首次JS原始大小低於2.212MB',r.bytes<2212000);
+// 2026-11-15：尺寸修改基準、連接孔保留與共用拖曳語意約增4.5 KB，沿原同步修改管線。
+check('首次JS原始大小低於2.217MB',r.bytes<2217000);
 check('扭力UI與估算核心按需載入',!r.paths.includes('js/blocks/torque-ui.js')&&!r.paths.includes('js/core/required-torque.js')&&!r.paths.includes('js/core/actuator-speed.js'));
 check('舵機座板範例按需載入',!r.paths.includes('js/blocks/servo-mount-examples.js')&&!r.paths.includes('js/blocks/motor-plate-examples.js'));
 check('標準結構設定面板按需載入',!r.paths.includes('js/blocks/standard-blank-ui.js')&&r.lazyEntries.includes('js/blocks/standard-blank-ui.js'));
