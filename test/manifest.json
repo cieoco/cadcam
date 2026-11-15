@@ -363,7 +363,9 @@
     "test/hole-owner.mjs",
     "test/motor-part.mjs",
     "test/motor-part-plans.mjs",
-    "test/motor-part-save.mjs"
+    "test/motor-part-save.mjs",
+    "test/example-catalog.mjs",
+    "test/block-built-example.mjs"
   ],
   "version": 1
 }

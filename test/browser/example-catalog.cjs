@@ -15,8 +15,12 @@ const base=process.env.TEST_URL||'http://127.0.0.1:8024',out='output/example-cat
   try{
    await page.goto(base+'/blocks.html?example=gear-pair');await page.getByRole('button',{name:'載入此範例',exact:true}).click();
    const original=await state();await catalog();
-   assert.equal(await page.locator('[data-example-id]').count(),69);
-   assert.equal(await page.locator('[data-example-ref]').count(),4);
+   assert.equal(await page.locator('[data-example-id]').count(),await page.evaluate(async()=>{const {BLOCK_EXAMPLES}=await import('/js/blocks/examples.js');return BLOCK_EXAMPLES.length;}));
+   assert.equal(await page.locator('[data-example-ref]').count(),0);
+   const legacy=page.locator('[data-example-catalog=legacy]');assert.equal(await legacy.getAttribute('open'),null);
+   assert.equal(await page.locator('[data-example-group=blocks] [data-example-id=block-gear-gripper]').count(),1);
+   assert.equal(await legacy.locator('[data-example-id=block-gear-gripper]').count(),0);
+   await legacy.locator(':scope > summary').click();
    assert.equal(await page.locator('[data-example-group="challenge"]').count(),0);
    assert.equal(await page.locator('[data-example-family="passive-tools"] summary .example-capability').textContent(),'固定組立');
    assert.equal(await page.locator('[data-example-family="wheel-grabber"] .example-capability').textContent(),'手動調姿');
@@ -26,7 +30,7 @@ const base=process.env.TEST_URL||'http://127.0.0.1:8024',out='output/example-cat
    await pick('fourbar-double-crank');assert.equal(await state(),original,'selection only previews load decision');await page.getByRole('button',{name:'保留目前作品',exact:true}).click();assert.equal(await state(),original);
    await pick('fourbar-double-crank');await page.getByRole('button',{name:'載入此範例',exact:true}).click();assert.notEqual(await state(),original);
    await page.evaluate(()=>blocks.undo());assert.equal(await state(),original,'one undo returns whole previous work');
-   await catalog();await page.locator('[data-example-ref="wiper-single"]').click();await page.getByRole('button',{name:'保留目前作品',exact:true}).click();assert.equal(await state(),original);
+   await catalog();await page.locator('[data-example-catalog=legacy] > summary').click();await page.locator('[data-example-family=wiper] > summary').click();await page.locator('[data-example-id="wiper-single"]').click();await page.getByRole('button',{name:'保留目前作品',exact:true}).click();assert.equal(await state(),original);
    await page.locator('[data-example-id="iq-wheel-grabber"]').click();await page.getByRole('button',{name:'保留目前作品',exact:true}).click();assert.equal(await state(),original,'single-version card opens the same decision directly');
    await page.locator('[data-example-family="clawbot"] summary').click();await page.screenshot({path:`${out}/${viewport.width}-clawbot.png`});
    await page.locator('[data-example-family="passive-tools"] summary').click();await page.screenshot({path:`${out}/${viewport.width}-fork-spatula.png`});

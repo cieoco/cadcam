@@ -58,7 +58,7 @@ export function openStartGallery({ requestExample, hasWork, startBar, auto = fal
   head.append(el('h2', '', '你的機構，從這裡開始。'), x);
   for (const card of START_CARDS) {
     const item = el('li'), button = Object.assign(el('button', 'sg-card'), { type: 'button' }), img = Object.assign(doc.createElement('img'), { src: card.image, alt: '', loading: 'lazy', width: 480, height: 300 });
-    button.append(img, el('span', 'sg-n', String(card.n).padStart(2, '0')), el('strong', 'sg-title', card.title), el('span', 'sg-text', card.text));
+    button.append(img, el('span', 'sg-n', (card.example && !card.blank ? '舊範例 · ' : '') + String(card.n).padStart(2, '0')), el('strong', 'sg-title', card.title), el('span', 'sg-text', card.text));
     button.dataset.card = card.example || card.command;
     button.onclick = () => { close(); pickStartCard(card, { requestExample, runCommand, hasWork, startBar }); };
     item.append(button); list.append(item);

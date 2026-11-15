@@ -15,10 +15,10 @@ class Element {
 function setup(query) {
   let loaded = [], notices = [], cleaned = '';
   const document = { body: new Element('body'), createElement: tag => new Element(tag) };
-  offerExampleFromUrl({ document, location: { href: 'https://example.org/cadcam/blocks.html' + query },
+  const ready = offerExampleFromUrl({ document, location: { href: 'https://example.org/cadcam/blocks.html' + query },
     history: { state: { keep: 1 }, replaceState(state, _, url) { assert.equal(state.keep, 1); cleaned = url; } },
     loadExample: id => loaded.push(id), notify: text => notices.push(text) });
-  return { document, loaded, notices, clean: () => cleaned, dialog: document.body.children[0] };
+  return { document, loaded, notices, ready, clean: () => cleaned, get dialog(){return document.body.children[0];} };
 }
 for (const id of ['fourbar-crank-rocker', 'fourbar-missing-coupler']) {
   const s = setup('?example=' + id + '&keep=yes');
@@ -37,7 +37,13 @@ escape.dialog.events.cancel({ preventDefault() {} });
 assert.deepEqual(escape.loaded, []);
 assert.equal(escape.dialog.removed, true);
 assert.equal(setup('').dialog, undefined);
-assert.equal(setup('?example=not-a-real-example').notices.length, 1);
+const invalid=setup('?example=not-a-real-example'); await invalid.ready;
+assert.equal(invalid.notices.length, 1);
+assert.deepEqual(invalid.loaded,[]);
+const blocks=setup('?example=block-gear-gripper'); await blocks.ready;
+assert.ok(blocks.dialog?.open); assert.deepEqual(blocks.loaded,[]);
+blocks.dialog.children.find(e=>e.textContent==='載入此範例').onclick();
+assert.deepEqual(blocks.loaded,['block-gear-gripper']);
 assert.equal(setup('?example=fourbar-crank-rocker#shared-work').dialog, undefined);
 assert.equal(requestedExample('https://example.org/?example=invalid'), null);
 const failedDocument = { body: new Element('body'), createElement: tag => new Element(tag) };

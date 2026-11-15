@@ -82,29 +82,33 @@ export function renderExampleCatalog(list, examples, requestLoad, doc = document
   list.textContent = '';
   const available = new Map(examples.map(example => [example.id, example]));
   const el = (tag, className, text) => Object.assign(doc.createElement(tag), { className, textContent: text || '' });
-  const button = (item, recommendation = false) => {
+  const button = item => {
     const example = available.get(item.id), b = el('button', 'example-btn');
     b.type = 'button';
-    // 推薦是同一份作品的捷徑，不重複主要目錄的 data-example-id。
-    b.dataset[recommendation ? 'exampleRef' : 'exampleId'] = item.id;
+    b.dataset.exampleId = item.id;
     b.append(el('span', 'example-name', item.title), el('span', 'example-capability', item.capability));
     if (item.source) b.append(el('span', 'example-source', item.source));
     b.title = example?.note || '';
     b.addEventListener('click', () => requestLoad(item.id));
     return b;
   };
-  const section = (id, label) => {
+  const section = (parent, id, label) => {
     const node = el('section', 'example-section'); node.dataset.exampleGroup = id;
     const heading = el('h3', 'example-group-title', label); heading.id = `example-group-${id}`;
-    node.setAttribute('aria-labelledby', heading.id); node.append(heading); list.append(node); return node;
+    node.setAttribute('aria-labelledby', heading.id); node.append(heading); parent.append(node); return node;
   };
-  const recommended = section('recommended', '先試這幾個');
-  const links = el('div', 'example-recommendations');
-  CATALOG_RECOMMENDATIONS.forEach(id => { const item = getCatalogVariant(id); if (available.has(id)) links.append(button(item, true)); });
-  recommended.append(links);
+  const blocks = examples.filter(example => example.catalog === 'blocks');
+  const current = section(list, 'blocks', '積木範例');
+  for (const example of blocks) current.append(button(variant(example.id, example.title, example.capability || '可試動')));
+  if (!blocks.length) current.append(el('p', 'example-family-note', '目前沒有積木範例。'));
+  const legacy = el('details', 'example-legacy'); legacy.dataset.exampleCatalog = 'legacy';
+  legacy.append(el('summary', 'example-group-title', '舊範例')); list.append(legacy);
+  const legacyAvailable = new Set(examples.filter(example => example.catalog !== 'blocks').map(example => example.id));
   for (const group of [...CATALOG_GROUPS, { id: 'tools', label: '工具與製作練習' }]) {
-    const node = section(group.id, group.label);
+    const node = section(legacy, group.id, group.label);
     for (const item of CATALOG_FAMILIES.filter(item => item.group === group.id)) {
+      const entries = item.variants.filter(v => legacyAvailable.has(v.id));
+      if (!entries.length) continue;
       if (item.variants.length === 1) {
         const card = el('div', 'example-family'); card.dataset.exampleFamily = item.id;
         const b = button({ ...item.variants[0], title: item.title }); b.className += ' example-single';
@@ -116,14 +120,14 @@ export function renderExampleCatalog(list, examples, requestLoad, doc = document
       if (item.variants.every(v => v.capability === item.variants[0].capability)) summary.append(el('span', 'example-capability', item.variants[0].capability));
       details.append(summary, el('p', 'example-family-note', item.note));
       const variants = el('div', 'example-variants');
-      item.variants.filter(v => available.has(v.id)).forEach(v => variants.append(button(v)));
+      entries.forEach(v => variants.append(button(v)));
       details.append(variants); node.append(details);
     }
   }
   const owned = new Set(CATALOG_FAMILIES.flatMap(item => item.variants.map(v => v.id)));
-  const starts = examples.filter(example => !owned.has(example.id));
+  const starts = examples.filter(example => example.catalog !== 'blocks' && !owned.has(example.id));
   if (starts.length) {
-    const node = section('lessons', '教學起始檔');
+    const node = section(legacy, 'lessons', '教學起始檔');
     const details = el('details', 'example-family'); details.dataset.exampleFamily = 'lesson-starts';
     details.append(el('summary', '', `各單元獨立練習（${starts.length}）`));
     const variants = el('div', 'example-variants');

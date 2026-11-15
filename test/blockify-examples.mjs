@@ -71,8 +71,9 @@ if(WRITE){
 const ROUND=new URL('./fixtures/blockify-rounded-export.json',import.meta.url),writeRound=process.argv.includes('--write-rounded'),rounded=writeRound?{}:JSON.parse(readFileSync(ROUND,'utf8'));
 const before=JSON.parse(readFileSync(FIXTURE,'utf8')).examples,summary={examples:0,parts:0},left={};
 // The adjustment case and the bell-crank example were added after the frozen conversion baseline.
-// Its geometry/export coverage lives in used-holes and the syringe edit tests.
-const baselineExamples=BLOCK_EXAMPLES.filter(e=>!['adjustment-repair','bell-crank-gripper'].includes(e.id));
+// Their geometry/export coverage lives in used-holes and the syringe edit tests.
+// The user-built gripper is a new authored work, covered by block-built-example, not this historical conversion.
+const baselineExamples=BLOCK_EXAMPLES.filter(e=>!['adjustment-repair','bell-crank-gripper','block-gear-gripper'].includes(e.id));
 assert.deepEqual(baselineExamples.map(e=>e.id).sort(),Object.keys(before).sort(),'same baseline example catalog');
 for(const e of baselineExamples){
  const old=before[e.id],m=measure(e),converted=Object.keys(m.parts).filter(id=>m.parts[id].std&&old.parts[id]);

@@ -22,7 +22,8 @@ const clone=v=>structuredClone(v);
 const safe=fn=>{try{return fn();}catch(e){return 'ERR '+String(e?.message||e).split('\n')[0].slice(0,80);}};
 await loadUnitStarts();
 const works=[];
-for(const e of BLOCK_EXAMPLES){const s=normalizeSnapshot(clone(e.snapshot));if(s)works.push({name:e.id,s});}
+// New authored work has no historical C5/C6 baseline; covered by block-built-example.
+for(const e of BLOCK_EXAMPLES.filter(e=>e.id!=='block-gear-gripper')){const s=normalizeSnapshot(clone(e.snapshot));if(s)works.push({name:e.id,s});}
 
 const P=(id,x=0,y=0)=>({id,type:'floating',x,y});
 // one extra comp per way of "naming the gear" (gear g); the first column says whether the old hand list counted it
