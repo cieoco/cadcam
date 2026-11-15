@@ -16,6 +16,7 @@ export function normalizeTabNut(raw){
   }
   if(raw.contactMode!==undefined){if(raw.contactMode!=='actual')return null;out.contactMode='actual';}
   if(raw.peers!==undefined){if(out.contactMode!=='actual'||!Array.isArray(raw.peers)||raw.peers.length>8)return null;const ids=new Set();out.peers=[];for(const peer of raw.peers){if(!peer||!['moduleId','partId'].every(k=>typeof peer[k]==='string'&&/^[\w.-]+$/.test(peer[k]))||peer.settings?.peers!==undefined)return null;const id=peer.moduleId+'/'+peer.partId,q=normalizeTabNut(peer.settings);if(ids.has(id)||!q||q.contactMode!=='actual')return null;ids.add(id);out.peers.push({moduleId:peer.moduleId,partId:peer.partId,settings:q});}}
+  if(raw.setCount!==undefined){if(!Number.isInteger(raw.setCount)||raw.setCount<1||raw.setCount>6||raw.moreAlongMm!==undefined)return null;out.setCount=raw.setCount;}
   const more=raw.moreAlongMm;
   if(more!==undefined){if(!Array.isArray(more)||more.length>5||!more.every((v,i)=>Math.abs(v)<1e3&&v>(i?more[i-1]:out.alongMm)))return null;out.moreAlongMm=[...more];}
   if(out.slotClearanceMm>.5||out.nutClearanceMm>.5||out.minWebMm<3||out.headDiameterMm>out.washerDiameterMm)return null;
@@ -61,7 +62,9 @@ export function planTabNutGeometry({host,child,face,connectionId='tab-nut',setti
   if(tip<nutHi+.5-eps)return fail('螺絲太短，必須穿滿螺母並至少露出一牙。');
   const top=tip+p.endClearanceMm,b=p.clearanceDiameterMm/2,n=(p.nutAcrossMm+p.nutClearanceMm)/2,halfPitch=p.tabPitchMm/2,halfTab=p.tabWidthMm/2;
   if(top<nutHi||p.washerDiameterMm<p.clearanceDiameterMm+1||p.headDiameterMm<=3)return fail('螺絲、墊片或末端避空設定不合法。');
-  const otherEdges=edges(edge.ring).filter((_,i)=>i!==edge.index),offsets=[p.alongMm,...(p.moreAlongMm||[])],path=[edge.a],sets=[],hostRings=[],slots=[],holes=[],childRings=[];
+  const count=p.setCount||1,spread=(edge.length-p.tabPitchMm-p.tabWidthMm)/2-Math.max(p.minWebMm,p.tabWidthMm);
+  const offsets=p.setCount?Array.from({length:count},(_,i)=>p.alongMm+(count===1?0:-spread+2*spread*i/(count-1))):[p.alongMm,...(p.moreAlongMm||[])];
+  const otherEdges=edges(edge.ring).filter((_,i)=>i!==edge.index),path=[edge.a],sets=[],hostRings=[],slots=[],holes=[],childRings=[];
   for(const [si,along] of offsets.entries()){
     const center=edge.length/2+along,id=si?`${connectionId}/set:${si}`:connectionId;
     if(si&&along-offsets[si-1]<p.tabPitchMm+p.tabWidthMm+p.slotClearanceMm+p.minWebMm)return fail('卡榫組數太多，相鄰兩組放不下。');

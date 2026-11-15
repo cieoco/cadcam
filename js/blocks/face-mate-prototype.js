@@ -67,6 +67,15 @@ for(const [key,label,advanced] of tabNutFields){
  $(advanced?'tabNutAdvanced':'tabNutFields').append(l,input);
  if(key==='alongMm')signedNumberInput(input);
 }
+function tabSetCountControl(settings,name){
+ const label=document.createElement('label'),select=document.createElement('select');label.textContent=name;select.setAttribute('aria-label',name);
+ if(settings.moreAlongMm?.length&&!settings.setCount){const option=document.createElement('option');option.value='custom';option.textContent=`自訂 ${settings.moreAlongMm.length+1} 組`;select.append(option);}
+ for(let n=1;n<=6;n++){const option=document.createElement('option');option.value=n;option.textContent=`${n} 組（${n*2} 個榫頭）`;select.append(option);}
+ select.value=settings.setCount|| (settings.moreAlongMm?.length?'custom':1);
+ select.onchange=()=>{if(select.value==='custom')return;if(settings.moreAlongMm?.length)settings.alongMm=(settings.alongMm+settings.moreAlongMm.at(-1))/2;settings.setCount=Number(select.value);delete settings.moreAlongMm;const along=settings===tabNutSettings?$('tabNut-alongMm'):label.parentElement?.querySelector('[data-tab-along]');if(along)showNumber(along,settings.alongMm);render();};label.append(select);return label;
+}
+const tabCountSlot=document.createElement('div');$('tabNutFields').before(tabCountSlot);
+function syncTabCount(){tabCountSlot.replaceChildren(tabSetCountControl(tabNutSettings,'榫接組數'));}
 let tabContactSignature='';
 const tabContacts=document.createElement('div'),tabOmissions=document.createElement('p');
 tabContacts.id='tabContactChoices';tabOmissions.setAttribute('role','status');$('tabNutFields').before(tabContacts,tabOmissions);
@@ -77,8 +86,8 @@ function renderTabContacts(plan){
   for(const target of targets){const wrap=document.createElement('div'),label=document.createElement('label'),check=document.createElement('input');label.style.cssText='display:flex;align-items:center;gap:8px;min-height:44px';check.type='checkbox';check.style.cssText='width:22px;height:22px;min-height:22px;flex:none';check.checked=!!tabNutSettings.peers?.some(p=>p.moduleId===target.moduleId&&p.partId===target.partId);check.setAttribute('aria-label',`同時與${target.label}榫接`);label.append(check,document.createTextNode(`同時與${target.label}榫接`));wrap.append(label);
    check.onchange=()=>{const peers=(tabNutSettings.peers||[]).filter(p=>p.moduleId!==target.moduleId||p.partId!==target.partId);if(check.checked){const {peers:unused,...settings}=tabNutSettings;peers.push({moduleId:target.moduleId,partId:target.partId,settings:structuredClone(settings)});}tabNutSettings.peers=peers;render();};
    const peer=tabNutSettings.peers?.find(p=>p.moduleId===target.moduleId&&p.partId===target.partId);
-   if(peer){const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent=`${target.label}的個別尺寸`;more.append(summary);
-    for(const [key,name]of [['tabWidthMm','榫寬'],['tabPitchMm','榫中心距'],['alongMm','沿邊位置']]){const l=document.createElement('label'),input=document.createElement('input');input.type='number';input.step='any';input.value=peer.settings[key];input.setAttribute('aria-label',`${target.label} ${name}（mm）`);l.textContent=name+' mm';l.append(input);more.append(l);input.oninput=()=>{peer.settings[key]=readNumber(input);render();};}
+   if(peer){const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent=`${target.label}的個別尺寸`;more.append(summary,tabSetCountControl(peer.settings,`${target.label} 榫接組數`));
+    for(const [key,name]of [['tabWidthMm','榫寬'],['tabPitchMm','榫中心距'],['alongMm','沿邊位置']]){const l=document.createElement('label'),input=document.createElement('input');input.type='number';input.step='any';input.value=peer.settings[key];if(key==='alongMm')input.dataset.tabAlong='';input.setAttribute('aria-label',`${target.label} ${name}（mm）`);l.textContent=name+' mm';l.append(input);more.append(l);input.oninput=()=>{peer.settings[key]=readNumber(input);render();};}
     wrap.append(more);
    }tabContacts.append(wrap);
   }
@@ -571,7 +580,7 @@ if (integrated) {
     mode = 'wizard';workflowPhase=e.data.phase || 'combined';
     jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; choosingChild = false; configured = !!e.data.configured; childConfirmed=!!e.data.childConfirmed; roughPlaced = configured;
     bracketOffsets = { ...(draft.brackets?.offsets || {}) };
-    fastenerKind=faceFastenerKind(draft,configured);tabNutSettings={...TAB_NUT_DEFAULTS,...draft.fastener};for(const input of $('tabNutSettings').querySelectorAll('input'))input.value=tabNutSettings[input.id.replace('tabNut-','')];
+    fastenerKind=faceFastenerKind(draft,configured);tabNutSettings={...TAB_NUT_DEFAULTS,...draft.fastener};syncTabCount();for(const input of $('tabNutSettings').querySelectorAll('input'))input.value=tabNutSettings[input.id.replace('tabNut-','')];
     // 預設面僅作預選；只有明確重新調整位置才略過選面。
     if (e.data.startAtPlacement) step = 3;
     if(docked){
