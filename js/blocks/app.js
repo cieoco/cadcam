@@ -1603,7 +1603,8 @@ function gearMeshHasWarning() {
 function updateMechanismStatus(sol = null) {
   const el = document.getElementById('mechanismStatus');
   if (!el) return;
-  if(simulationScope().comps.some(c=>c.type==='motor')){
+  const looseMotors=simulationScope().comps.filter(c=>c.type==='motor');
+  if(looseMotors.length&&!Model.motorPointIds(simulationScope().comps.filter(c=>c.type!=='motor')).size){
     el.dataset.state='warn';el.dataset.chip='';
     el.textContent='馬達未接輸出 · 可先保存';
     el.title='接上輸出零件後再試動；現在仍可修改、保存與解除其他連接。';return;
@@ -1666,7 +1667,9 @@ function updateMechanismStatus(sol = null) {
   if (state === 'ready') {
     state = support.ok ? 'warn' : 'error'; chip = support.ok ? 'verify' : 'fix';
     text = support.ok ? '可模擬 · 製作待核對' : '動力支撐有誤，請至組立查看';
+    if(support.ok&&looseMotors.length)text='已連接部分可模擬 · 另有馬達未接輸出';
   }
+  if(looseMotors.length)title+='\n未接輸出的馬達保持原位；接上輸出後才能控制它。';
   if(inDesign())title += '\n僅檢查目前設計；組立連接請至組立模式驗證。';
   title += '\n' + support.issues.map(i=>i.message).join('\n');
   el.dataset.state = state;
@@ -2607,11 +2610,11 @@ function checkPlaybackMotion() {
   };
   let current = null;
   try { current = solveAt(S.theta, lastSolved); } catch (_) {}
-  const issue = motionPoseIssue(scope.moving, current);
+  const issue = motionPoseIssue(scope.moving, current, { activeMotor: S.activeMotor });
   if (issue) return { ok: false, ...issue };
   const range = inputRockRange();
   const plan = range ? { mode: 'rock', lo: range.lo, hi: range.hi } : planMotion();
-  return { ...inspectMotionRange({ comps: scope.moving, solveAt, theta: S.theta, plan, seed: lastSolved }), plan };
+  return { ...inspectMotionRange({ comps: scope.moving, solveAt, theta: S.theta, plan, seed: lastSolved, activeMotor: S.activeMotor }), plan };
 }
 function togglePlay() {
   if(hydraulic?.active()){hydraulic.isPlaying()?pause():hydraulic.play();return;}

@@ -6,6 +6,7 @@
  * 只是停在原地，使用者卻看不出來。這裡只做偵測，純函式，不碰 DOM、不畫圖。
  */
 import { pointKeysFor } from './part-types.js';
+import { motorRecords } from './motor-roles.js';
 
 // 走訪 comps 收集所有「會動」（非 fixed）的接點 id，找出 sol.points 裡缺席或座標非有限數的那些。
 // 結果依首次出現順序、不重複；sol 為 null 或整體無解（isValid===false）時直接回傳空陣列。
@@ -34,10 +35,14 @@ export function unsolvedMovingPoints(comps, sol) {
 }
 
 // 播放、錄影與逐幀呈現共用；不能把 solver 的補畫座標當成已受約束的解。
-export function motionPoseIssue(comps, sol) {
+export function motionPoseIssue(comps, sol, { activeMotor } = {}) {
   const loose=(comps||[]).filter(c=>c.type==='motor');
-  if(loose.length)return {code:'unconnected_motor',componentIds:loose.map(c=>c.id),message:'馬達尚未連接輸出零件；作品可保存，接上輸出後再試動。'};
-  const missing = unsolvedMovingPoints(comps, sol);
+  const records=motorRecords(comps||[]);
+  const connected=records.filter(r=>!r.independent);
+  const selectedLoose=activeMotor!=null&&records.some(r=>r.independent&&r.motor===String(activeMotor));
+  if(loose.length&&(selectedLoose||!connected.length))return {code:'unconnected_motor',componentIds:loose.filter(c=>!selectedLoose||records.some(r=>r.ownerId===c.id&&r.motor===String(activeMotor))).map(c=>c.id),message:'馬達尚未連接輸出零件；作品可保存，接上輸出後再試動。'};
+  // 獨立動力保留設計姿態；不能因此掩蓋其他活動零件的漏解或欠約束。
+  const missing = unsolvedMovingPoints((comps||[]).filter(c=>c.type!=='motor'), sol);
   if (missing.length) return { code: 'missing_points', sourceIds: missing,
     message: `接點 ${missing.join('、')} 尚未解出位置，請確認孔位已連接、機架已固定。` };
   if (sol?.isUnderconstrained) {
@@ -52,11 +57,11 @@ export function motionPoseIssue(comps, sol) {
 
 // 僅驗證指定角度範圍的離散姿態；不代表連續行程、碰撞或承載已驗證。
 // solveAt 由目前設計／組立注入，避免拿其他分頁的資料阻擋本頁。
-export function inspectMotionRange({ comps, solveAt, theta, plan, seed = {}, stepDeg = 2 }) {
+export function inspectMotionRange({ comps, solveAt, theta, plan, seed = {}, stepDeg = 2, activeMotor }) {
   const sample = (angle, previous) => {
     let sol = null;
     try { sol = solveAt(angle, previous); } catch (_) {}
-    const issue = motionPoseIssue(comps, sol);
+    const issue = motionPoseIssue(comps, sol, { activeMotor });
     return { sol, issue: issue && { ...issue, angle, message: `${angle.toFixed(1)}°：${issue.message}` } };
   };
   const current = sample(theta, seed);
