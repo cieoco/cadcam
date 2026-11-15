@@ -142,7 +142,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   frame.style.cssText = 'width:100%;height:calc(100% - 44px);border:0;display:block;';
   if(dock){bar.style.display='none';frame.style.cssText='width:100%;height:100%;min-height:0;flex:1;border:0;display:block;';}
   bar.append(heading, close); dialog.append(layout, bar, frame); if(!dock)document.body.append(dialog);
-  let disposed=false,previewStep=startAtPlacement?3:0,stepSelection=null,tap=null,relationTask=null,activeModel=sourceModel,activeCandidate=null;
+  let diagnosticHighlight=false,disposed=false,previewStep=startAtPlacement?3:0,stepSelection=null,tap=null,relationTask=null,activeModel=sourceModel,activeCandidate=null;
   const canvas=pickViewer?.canvas;
   function syncPickFocus(){
    const endpoint=relationTask?.endpoint,item=endpoint&&(endpoint==='host'?hosts:children)[stepSelection?.[endpoint]];
@@ -165,12 +165,13 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
    if(face){pickViewer.highlightSurface(hit);frame.contentWindow.postMessage(relationTask?{type:'face-wizard-relation-picked',face:face.id}:{type:'face-wizard-pick',field:previewStep===1?'hostFace':'childFace',endpointIndex:index,face:face.id},location.origin);}
   };
   if(dock&&canvas){canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',cancelTap);}
-  const dispose = () => {if(disposed)return;disposed=true;transaction.cancel();edgeOverlay?.dispose();pickViewer?.setSurfacePickFocus?.(null);window.removeEventListener('message', receive);if(canvas){canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',cancelTap);pickViewer.highlightSurface(null);}dialog.remove();onClose();};
+  const dispose = () => {if(disposed)return;disposed=true;if(diagnosticHighlight)pickViewer?.setHighlight?.([]);transaction.cancel();edgeOverlay?.dispose();pickViewer?.setSurfacePickFocus?.(null);window.removeEventListener('message', receive);if(canvas){canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',cancelTap);pickViewer.highlightSurface(null);}dialog.remove();onClose();};
   const shut=()=>{if(dock)dispose();else dialog.close();};
   close.textContent=dock?'取消接合':'關閉';close.addEventListener('click', shut); dialog.addEventListener('close', dispose);
   async function receive(e) {
     if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
     if (e.data?.type === 'face-wizard-cancel') { shut(); return; }
+    if(e.data?.type==='face-wizard-highlight'&&loadSession.allowConfirm(e.data.loadGraph)){const keys=e.data.pickKeys;if(Array.isArray(keys)){diagnosticHighlight=true;pickViewer?.setHighlight?.(keys.filter(key=>activeModel?.materialParts?.some(p=>p.pickKey===key)));}return;}
     if(e.data?.type==='face-wizard-relation-request'){if(phase==='fixing')return;if(loadSession.allowConfirm(e.data.loadGraph)){const task=e.data.task;if(Number.isInteger(task?.focusRelation)&&task.focusRelation>=0)edgeOverlay?.focusRelation(task.focusRelation);else{relationTask=task&&['host','child'].includes(task.endpoint)?task:null;pickViewer?.highlightSurface?.(null);syncPickFocus();}}return;}
     if(e.data?.type==='face-wizard-edge-request'){const task=e.data.task;if(loadSession.allowConfirm(e.data.loadGraph)&&previewStep===3)edgeOverlay?.pick(task&&['host','child'].includes(task.endpoint)&&['top','bottom','front','back','left','right'].includes(task.face)?task:null);return;}
     if(e.data?.type==='face-wizard-step'){if(loadSession.allowConfirm(e.data.loadGraph)&&Number.isInteger(e.data.step)&&e.data.step>=0&&e.data.step<=3){previewStep=e.data.step;stepSelection=e.data;if(previewStep!==3)edgeOverlay?.clear();else edgeOverlay?.showFaces(true);onStep(e.data);}return;}

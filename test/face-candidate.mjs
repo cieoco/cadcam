@@ -36,6 +36,15 @@ assert.equal(checked.model.materialParts.length,31);assert.ok(checked.validation
 assert.equal(JSON.stringify(frozen),original,'full frozen topo/comps/modules/fabrication survive compile/rebake/validation');
 const unavailable=await validateFaceCandidate(candidate,{},async model=>({status:'not_supported',geometryKey:model.geometryKey,poseRevision:model.poseRevision,findings:[],coverage:{notSupported:[{code:'material_geometry_unavailable',partId:'frame'}]}}));
 assert.equal(unavailable.saveable,false);assert.equal(candidateCoverageText(unavailable).hardwareOnly,false);assert.match(candidateCoverageText(unavailable).summary,/板件.*尚未驗證/);assert.match(candidateCoverageText(checked).title,/五金/);
+const positioningCandidate=buildFaceCandidate(frozen,{...validRequest,selection:{...validRequest.selection,brackets:undefined}});
+const badMachining=async model=>({status:'not_supported',geometryKey:model.geometryKey,poseRevision:model.poseRevision,findings:[],coverage:{notSupported:[{reason:'unassigned_machining_feature',partId:'board',pickKey:'plate:board'}]}});
+const machining=await validateFaceCandidate(positioningCandidate,{},badMachining);
+assert.equal(machining.saveable,true,'outlying machining may retain a valid positioning without fastening');
+assert.equal(machining.validation.status,'not_supported','position saving cannot promote invalid machining to verified material');
+assert.match(candidateCoverageText(machining).summary,/加工孔超出材料/);
+assert.equal((await validateFaceCandidate(candidate,{},badMachining)).saveable,false,'the same unresolved machining still blocks new fastening');
+const manufacturingCandidate=structuredClone(positioningCandidate);manufacturingCandidate.validation.checks=[{code:'requested_fasteners_valid',status:'pass'}];
+assert.equal((await validateFaceCandidate(manufacturingCandidate,{},badMachining)).saveable,false,'manufacturing/export validation cannot use positioning-only permission');
 // Home-box U/V directions must match an independently measured candidate shift.
 // The moving host starts at 45 degrees, then rotates another 20/40 degrees;
 // a nested fixture adds a separate world rotation before that movement.
