@@ -512,9 +512,11 @@ function preview() {
   const mate = solve();$('fastenerChoice').hidden=!integrated||step!==3;fillFastenerChoices($('fastenerKind'),fastenerKind,{printed:'僅支援直角接口'});$('fastenerHelp').textContent=fastenerKind==='none'?'只記錄組立位置，不新增固定孔或五金。':fastenerKind==='tab-nut'?'榫頭插入槽口，再用 M3 螺絲與螺母鎖固；尺寸與板厚需核對。':(docked?'調整位置後，角碼與固定孔一起更新。':'在圖上拖曳角碼調位置，或點角碼輸入偏移；確認後加入兩板固定孔。');$('tabNutSettings').hidden=fastenerKind!=='tab-nut';if(fastenerKind!=='tab-nut')$('tabNutFeedback').hidden=true;if(mate.ok && !blocked)requestCandidate(mate);$('next').disabled = blocked || !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || [...document.querySelectorAll('input[aria-invalid="true"]')].some(input=>input.getClientRects().length);
   if(integrated&&step===3)$('next').textContent=candidateConfirmLabel(parentCandidate,parentCandidate?.selectionRevision!==previewSignature);
   if(docked){
-   document.querySelector('section[data-step="1"] h2').textContent=`1 · 點承接板的接合面`;
-   document.querySelector('section[data-step="2"] h2').textContent=`2 · 點安裝板的接合面`;
-   document.querySelector('section[data-step="3"] h2').textContent='3 · 對齊板邊與尺寸';
+   document.querySelector('section[data-step="1"] h2').textContent='① 選第一個面';
+   const pair=$('facePair');if(pair)for(const b of pair.children){const selected=Number(b.dataset.faceStep);b.setAttribute('aria-pressed',String(step===selected));b.style.opacity=step<selected?'.45':'1';}
+   document.querySelector('section[data-step="2"] h2').textContent='② 選第二個面';
+   document.querySelector('section[data-step="3"] h2').textContent='① ↔ ② 調整相對位置';
+   for(const i of [1,2])document.querySelector(`section[data-step="${i}"] h2`).style.color=i===1?'#258bd0':'#0a947c';
    $('progress').replaceChildren();for(let i=1;i<=3;i++){const dot=document.createElement('span');if(i<=step)dot.className='current';$('progress').append(dot);}
    if(step<3)$('next').textContent='用這個面';
   }
@@ -550,10 +552,13 @@ if (integrated) {
      if(!e.data.childConfirmed)childConfirmed=false;
      if(!e.data.selection?.brackets&&!e.data.selection?.fastener)fastenerKind='none';
      if(!relationControls){
+      const pair=document.createElement('div');pair.id='facePair';pair.style.cssText='display:flex;gap:8px;padding:8px';
+      for(const [i,color]of [[1,'#258bd0'],[2,'#0a947c']]){const b=button(i===1?'▱ ①':'▱ ②',()=>{relationControls?.cancel();step=i;render();$('panelScroll').scrollTop=0;});b.dataset.faceStep=i;b.setAttribute('aria-label',i===1?'第一個面':'第二個面');b.style.cssText=`flex:1;min-height:44px;color:${color};border:2px solid ${color};background:white`;pair.append(b);}
+      $('progress').after(pair);
       const section=document.querySelector('section[data-step="3"]'),root=document.createElement('div');root.id='faceRelationControls';section.querySelector('h2').after(root);
       relationControls=createFaceRelationControls({root,read:()=>draft,surfaces:()=>({host:hosts[draft.host].surface,child:children[draft.child].surface}),changed:()=>render(),ready:()=>!!parentCandidate?.model&&parentCandidate.selectionRevision===previewSignature,pick:task=>parent.postMessage({type:'face-wizard-edge-request',loadGraph:LOAD_GRAPH_TOKEN,task},location.origin)});
       $('align').replaceChildren();fitControls.style.display='none';
-      const more=document.createElement('details'),label=document.createElement('summary');label.textContent='角度與原有偏移';more.append(label,$('rotationActions'),$('adjustments'));section.append(more);
+      const legacy=document.createElement('div');legacy.style.display='none';legacy.append($('rotationActions'),$('adjustments'));section.append(legacy);
       const hardware=document.createElement('details'),hwLabel=document.createElement('summary');hwLabel.textContent='固定方式（選用）';hardware.append(hwLabel,$('fastenerChoice'),$('bracketNote'));section.append(hardware);
       for(const [id,at]of [['hostChoice','1'],['childChoice','2']]){const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='換設計／零件';details.append(summary,$(id));document.querySelector(`section[data-step="${at}"]`).append(details);}
       const childMore=document.createElement('details'),childLabel=document.createElement('summary');childLabel.textContent='被遮住的面';childMore.append(childLabel,$('childFaces'));document.querySelector('section[data-step="2"]').append(childMore);

@@ -153,7 +153,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
     if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
     if (e.data?.type === 'face-wizard-cancel') { shut(); return; }
     if(e.data?.type==='face-wizard-edge-request'){const task=e.data.task;if(loadSession.allowConfirm(e.data.loadGraph)&&previewStep===3)edgeOverlay?.pick(task&&['host','child'].includes(task.endpoint)&&['top','bottom','front','back','left','right'].includes(task.face)?task:null);return;}
-    if(e.data?.type==='face-wizard-step'){if(loadSession.allowConfirm(e.data.loadGraph)&&Number.isInteger(e.data.step)&&e.data.step>=0&&e.data.step<=3){previewStep=e.data.step;stepSelection=e.data;if(previewStep!==3)edgeOverlay?.clear();onStep(e.data);}return;}
+    if(e.data?.type==='face-wizard-step'){if(loadSession.allowConfirm(e.data.loadGraph)&&Number.isInteger(e.data.step)&&e.data.step>=0&&e.data.step<=3){previewStep=e.data.step;stepSelection=e.data;if(previewStep!==3)edgeOverlay?.clear();else edgeOverlay?.showFaces(true);onStep(e.data);}return;}
     const rejectLoad = () => {
       say(LOAD_MISMATCH_MESSAGE);
       frame.contentWindow.postMessage({type:'face-wizard-error',loadMismatch:true,reason:LOAD_MISMATCH_MESSAGE},location.origin);
