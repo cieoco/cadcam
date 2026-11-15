@@ -157,6 +157,8 @@ const liftOut = S.modules[0].outputs[0];
   select({ selectedGearId: gripGear.id });
   editor.sync();
   check('sync：選取模組零件時顯示面板並列出內容', document.getElementById('moduleEditor').style.display !== 'none' && document.getElementById('moduleEditor').children.length > 0);
+  const optional=document.getElementById('moduleEditor').children;
+  check('設計模式只保留收合的收藏／匯出，不要求存模組或設定安裝位置', optional.length===1&&optional[0].tagName==='details'&&optional[0].children[0].textContent==='收藏／匯出此設計');
   check('sync：模組庫區塊列出項目', document.getElementById('moduleLibrary').children.length >= 2);
 }
 
@@ -175,6 +177,7 @@ const liftOut = S.modules[0].outputs[0];
 // 共用接點：面板要求選跟隨的零件，控制器也不會默認先出現的活動臂。
 {
   reset();
+  S.mode='bench'; // Legacy controller coverage; the design UI now hides these engineering controls.
   const p = (id, x, y) => ({ id, x, y, type: 'floating' });
   S.comps = [
     { type: 'bar', id: 'Arm', moduleId: 'Choice', p1: p('A', 0, 0), p2: p('C', 50, 0) },

@@ -714,11 +714,13 @@ export function instantiateTemplate(template, ctx) {
   };
   let n = (Number(context.counter) || 0) + 1;
   while ([...candidateNames(n)].some(name => existing.has(name))) n++;
-  const moduleId = `Mod${n}`;
+  const moduleId = context.moduleId || `Mod${n}`;
 
   const renameMap = new Map();
-  selfTokens.forEach(tok => renameMap.set(tok, `${tok}_${n}`));
-  paramKeys.forEach(k => { if (!renameMap.has(k)) renameMap.set(k, `${k}_${n}`); });
+  const identity=context.identity || {};
+  const stable=(token)=>identity.tokens&&Object.hasOwn(identity.tokens,token)?identity.tokens[token]:`${token}_${n}`;
+  selfTokens.forEach(tok => renameMap.set(tok, stable(tok)));
+  paramKeys.forEach(k => { if (!renameMap.has(k)) renameMap.set(k, stable(k)); });
 
   // 馬達重新編號（依出現順序、未用過的最小正整數）。
   const seenMotors = new Set();
@@ -727,8 +729,9 @@ export function instantiateTemplate(template, ctx) {
   const usedMotors = new Set((context.usedMotorIds || []).map(String));
   const motorMap = new Map();
   motorOrder.forEach(old => {
-    let m = 1;
-    while (usedMotors.has(String(m))) m++;
+    const hasMotor=identity.motors&&Object.hasOwn(identity.motors,old);
+    let m = hasMotor?identity.motors[old]:1;
+    if(!hasMotor)while (usedMotors.has(String(m))) m++;
     motorMap.set(old, String(m));
     usedMotors.add(String(m));
   });
@@ -774,7 +777,7 @@ export function instantiateTemplate(template, ctx) {
     newParams[nk] = srcParams[k];
   });
 
-  return { comps: renamedComps, params: newParams, module: mod, counter: n };
+  return { comps: renamedComps, params: newParams, module: mod, counter: n, identity:{tokens:{...identity.tokens,...Object.fromEntries(renameMap)},motors:{...identity.motors,...Object.fromEntries(motorMap)}} };
 }
 
 // ---------------------------------------------------------------- B7 組合積木（SDD-ASSEMBLY-BENCH §2-7、Q4）

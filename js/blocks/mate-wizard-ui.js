@@ -177,7 +177,7 @@ export function createMateWizard(h) {
       prepare.style.minHeight='44px';prepare.title='保留這個設計的尺寸與動力，建立可選取的接合項目';
       root.append(prepare,btn('從組立移除…','',()=>h.deps.changeMembership('#root',false)));membership.append(root);
     }
-    membership.append(btn('加入設計…','',()=>h.deps.openDesignList()));
+    membership.append(btn('管理設計…','',()=>h.deps.openDesignList()));
     const closed=active.modules.filter(m=>closedAssemblies.has(m.id));
     if(closed.length){
       const list=el('details');list.id='closedAssemblyList';
@@ -187,7 +187,7 @@ export function createMateWizard(h) {
       actions.appendChild(list);
     }
     while (tree.firstChild) tree.removeChild(tree.firstChild);
-    if (!rows.length&&!active.comps.some(c=>!c.moduleId)) tree.appendChild(el('div', 'bench-empty', closed.length?'組立已收起，可由下方重新開啟。':'組立是空的，請按「加入設計」。'));
+    if (!rows.length&&!active.comps.some(c=>!c.moduleId)) tree.appendChild(el('div', 'bench-empty', closed.length?'組立已收起，可由下方重新開啟。':'從上方拖入設計，或點 ＋ 加入。'));
     rows.forEach(({ m, depth, note, tag }) => {
       const row = el('div', 'mate-tree-row' + (m.id === st.selected ? ' selected' : ''));
       row.dataset.module = m.id;

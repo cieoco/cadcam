@@ -626,7 +626,7 @@ export function createBench(deps) {
     if (mode === 'bench') {
       S.mode = 'bench';
       document.body.dataset.mode = 'bench';
-      deps.enterBench?.();
+      await deps.enterBench?.();
       syncModeButtons();
       if (S.viewPlane) setViewPlane(null);
       wiz.onEnter();   // M4：精靈模式、只有一個機構有地方可接 → 自動選它
@@ -648,7 +648,7 @@ export function createBench(deps) {
       const v = viewer();
       if (v) { v.releaseFit && v.releaseFit(); v.setMarkers([]); v.setPreviewGhost(null); v.setPickEnabled(true); }
       const prevFocus = S.designFocus;
-      if (st.selected && modOf(st.selected)) S.designFocus = st.selected;   // H1：設計模式聚焦組立台選的模組，沒選就維持原本的分頁
+      if (st.selected && modOf(st.selected)) S.designFocus = modOf(st.selected).designInstance?.sourceId || st.selected;
       S.mode = 'design';
       resetLive(); clearTimeline();
       delete document.body.dataset.mode;
@@ -830,7 +830,7 @@ export function createBench(deps) {
     const mod = modOf(id);
     if (st.preview && !commit()) return;
     await setMode('design');
-    if (mod && mod.mount && mod.mount.orient) setViewPlane(id);
+    if (mod && !mod.designInstance && mod.mount && mod.mount.orient) setViewPlane(id);
   }
 
   // 不實際套用，只問「這個調整現在能不能做」，給按鈕決定要不要灰掉。

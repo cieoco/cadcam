@@ -237,6 +237,8 @@ function validateMount(rawMount, moduleId, outputsByModule, validModuleIds, warn
 
 export function normalizeModules(rawModules, comps) {
   for(const m of Array.isArray(rawModules)?rawModules:[]){const f=m?.mount?.face;if(f&&(f.version!==1||f.selection?.fastener!==undefined)&&!normalizeFaceMountContract(f).ok)return {ok:false,modules:[],comps,warnings:['榫槽接合格式不受支援或已損壞；拒絕開啟以免遺失加工特徵。']};}
+  const validIdentity=m=>{const d=m.designInstance;if(!d)return true;const map=v=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.entries(v).every(([k,x])=>safeId(k)&&safeId(x));const r=d.reference;const ref=!r||(safeId(r.a)&&(!r.b||safeId(r.b))&&typeof r.angle==='number'&&Number.isFinite(r.angle));return ref&&safeId(d.sourceId)&&d.sourceId!==m.id&&rawModules.some(s=>s.id===d.sourceId)&&map(d.tokens)&&map(d.motors)&&new Set(Object.values(d.tokens)).size===Object.values(d.tokens).length;};
+  if((Array.isArray(rawModules)?rawModules:[]).some(m=>m&&!validIdentity(m)))return {ok:false,modules:[],comps,warnings:['設計實例的來源或對應資料無效，已拒絕開啟以免失去共享更新。']};
   const warnings = [];
   const srcComps = Array.isArray(comps) ? comps : [];
   if((Array.isArray(rawModules)?rawModules:[]).some(m=>m?.mount?.face?.version===2&&srcComps.filter(c=>c.id===m.mount.face.childPart&&c.moduleId===m.id).length!==1))return {ok:false,modules:[],comps:srcComps,warnings:['榫槽立板參照遺失或不唯一，已拒絕開啟。']};
@@ -359,6 +361,7 @@ export function normalizeModules(rawModules, comps) {
 
   const modules = withMount.map(p => {
     const out = { id: p.id, name: p.name };
+    if(p.raw.designInstance)out.designInstance=JSON.parse(JSON.stringify(p.raw.designInstance));
     const groups = normalizeRigidGroups(p.raw.rigidGroups);
     if (groups.length) out.rigidGroups = groups;
     if (p.source !== undefined) out.source = p.source;
