@@ -105,11 +105,6 @@ export function createNodeEditor({
     rebuild(); draw();
     Panels.updateRoleEditor();
   }
-  // 分離：把鎖在同一點（共用同一 id）的多個端點拆開（規劃與提交在按需載入的 connect-ops.js，走共用的編輯流程）。
-  function splitNode() {
-    return import('./connect-ops.js').then(m => m.splitSelected({S, transient, pushUndo, pause, rebuild,
-      draw: () => { draw(); Panels.updateRoleEditor(); }})).catch(() => transient('分開沒有完成，請再試一次。'));
-  }
   function toggleTracePoint() {
     if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) return;
     pushUndo();
@@ -145,7 +140,7 @@ export function createNodeEditor({
 
   return {
     sliderInputForPoint, changeStroke, changeServoAngle,
-    setNodeRole, changeNodePos, removeNodeMotor, splitNode,
+    setNodeRole, changeNodePos, removeNodeMotor,
     toggleTracePoint, toggleMeasurementReference,
     toggleGroundPositionLock, isGroundPositionUnlocked, relockGroundPosition
   };

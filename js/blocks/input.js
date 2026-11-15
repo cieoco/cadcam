@@ -3,7 +3,7 @@ import {fusionRoot,fusionAtPoint} from '../core/bar-fusion.js';
 /**
  * blocks / input
  *
- * 指標互動層：節點 / 自由連桿 / 機架把手的拖曳（含吸附合併、圓規旋轉），
+ * 指標互動層：節點 / 自由連桿 / 機架把手的拖曳（位置對齊、圓規旋轉；接孔由插銷負責），
  * 以及畫布層級的手勢——雙指 pinch 縮放＋平移、滾輪縮放、手機接點優先命中（capture 階段）、
  * 畫桿 / 三點桿模式的起點處理與右鍵確定。
  *
@@ -15,6 +15,7 @@ import {fusionRoot,fusionAtPoint} from '../core/bar-fusion.js';
 
 import { S } from './state.js';
 import {rotateLooseBarEnd,looseBarRotation,pointRotation,isFreeBody,holeJoined} from './model.js';
+import {gearPivotRotation,rotateGearPinnedMember} from './gear-pin-connection.js';
 import {dragIntent} from './drag-intent.js';
 import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 import * as View from './view.js';
@@ -39,7 +40,7 @@ let blockedDrag = null, saidDrag = null;
 let svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle,
     worldFromEvent, pointCoords, displayCoords, mobilePrompt,
     snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
-    movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
+    movePointById, updatePointCoordsById, recomputeLengths,
     isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
     handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
     selectOverlapComponent = () => {},
@@ -156,7 +157,8 @@ export function onNodeDown(e, id) {
   const bodyFree=!!localBody&&!bodyFused&&isFreeBody(S.comps,localBody,S.modules);
   const tip=localBody&&!bodyFree&&!bodyFused&&localBody.type==='bar'&&w0&&driveBody(localBody,w0)?.tip;   // 沒有動力來源也能拉的彎臂端
   const over=idleHoleOfGroundPart(id,localBody)?movingPartUnder(e,localBody,w0):null;               // 固定板上沒用到的孔，底下有會動的零件
-  const intent=dragIntent({grab},{
+  const gearRotation=gearPivotRotation(S.comps,S.topo.params,id,displayCoords());
+  const intent=gearRotation?{kind:'move-node'}:dragIntent({grab},{
     free:grab==='end'?!!((freeLinkForPoint&&freeLinkForPoint(id))||(freeTriangleForPoint&&freeTriangleForPoint(id))):bodyFree,
     fused:!!fusionAtPoint(S.comps,id),
     groundLocked:grab!=='shaft'&&pointIsGround(id)&&!isGroundPositionUnlocked(id),
@@ -257,9 +259,18 @@ function onDragMove(e) {
   if (!S.dragId) return;
   moveNodeTo(S.dragId,w);
 }
+// Ordinary dragging changes pose only; motor output keeps its dedicated installation path.
+function motorOutputTarget(id){
+  const points=displayCoords(),from=points[id];if(!from)return null;
+  let best=null,gap=View.snapWorld()*(mobilePrompt()?2.35:1);
+  for(const c of S.comps.filter(c=>c.type==='motor'&&c.p1?.id!==id)){const p=points[c.p1.id];if(!p)continue;const d=Math.hypot(p.x-from.x,p.y-from.y);if(d<gap){gap=d;best=c.p1.id;}}
+  return best;
+}
 /** Numeric coordinates and dragging share rigid-body and joint constraints. */
 export function moveNodeTo(id,w,{snap=true}={}) {
   if ((pointIsRackHole(id)||S.comps.some(c=>c.frameHole&&c.p1.id===id)) && dragIntent({grab:'frame-hole'}).kind==='none') return;   // 機架孔由機架面板處理
+  const pinRotation=rotateGearPinnedMember(S.comps,S.topo.params,id,w,{positions:displayCoords(),snapDistance:0});
+  if(pinRotation){S.snapTarget=null;redrawAfterDrag();return;}
   const motor=S.comps.find(c=>c.type==='motor'&&c.p1?.id===id);
   if(motor){if(dragIntent({grab:'shaft'},{free:isFreeBody(S.comps,motor,S.modules)}).kind==='move-free'){updatePointCoordsById(id,w.x,w.y);S.snapTarget=null;redrawAfterDrag();}return;}
   // 「這一拖是什麼意思」交給 drag-intent.js；能同步知道的事實在這裡收集，求解器要試過才知道（見下方 solvePinnedConstraints）。
@@ -272,7 +283,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
   }
   if (head.kind === 'drive') {
     redrawAfterDrag();
-    S.snapTarget = driven === 'tip' && snap ? nearestDisplayTo(id) : null;
+    S.snapTarget = driven === 'tip' && snap ? motorOutputTarget(id) : null;
     if (S.snapTarget) draw();
     return;
   }
@@ -315,7 +326,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     } else {
       moveGear(gearForCenter, dragTarget.x - cur.x, dragTarget.y - cur.y);
     }
-    S.snapTarget = nearestDisplayTo(id);
+    S.snapTarget = motorOutputTarget(id);
     redrawAfterDrag();
     return;
   }
@@ -329,7 +340,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     const dy = desired.y - (p?.y || 0);
     movePointById(free.p1.id, dx, dy);
     movePointById(free.p2.id, dx, dy);
-    S.snapTarget = nearestDisplayTo(id);
+    S.snapTarget = motorOutputTarget(id);
     redrawAfterDrag();
     return;
   }
@@ -341,7 +352,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     movePointById(freeTri.p1.id, dx, dy);
     movePointById(freeTri.p2.id, dx, dy);
     movePointById(freeTri.p3.id, dx, dy);
-    S.snapTarget = nearestDisplayTo(id);
+    S.snapTarget = motorOutputTarget(id);
     redrawAfterDrag();
     return;
   }
@@ -360,19 +371,19 @@ export function moveNodeTo(id,w,{snap=true}={}) {
         const vx = cur.x - f.x, vy = cur.y - f.y;
         updatePointCoordsById(p.id, f.x + vx * cosD - vy * sinD, f.y + vx * sinD + vy * cosD);
       });
-      S.snapTarget = nearestDisplayTo(id);
+      S.snapTarget = motorOutputTarget(id);
       redrawAfterDrag();
       return;
     }
   }
   if (rotateLooseBarEnd(S.comps,S.topo.params,id,dragTarget,snap)) {
-    S.snapTarget = nearestDisplayTo(id);
+    S.snapTarget = motorOutputTarget(id);
     redrawAfterDrag();
     return;
   }
   // 一般閉鏈/欠定機構的手抓點：把被拖的洞暫時 pin 到游標，用距離約束迭代解其他桿件。
   if (solvePinnedConstraints && solvePinnedConstraints(id, dragTarget)) {
-    S.snapTarget = nearestDisplayTo(id);
+    S.snapTarget = motorOutputTarget(id);
     redrawAfterDrag();
     return;
   }
@@ -392,7 +403,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
   }
   updatePointCoordsById(id, tx, ty);
   recomputeLengths();
-  S.snapTarget = nearestDisplayTo(id);
+  S.snapTarget = motorOutputTarget(id);
   redrawAfterDrag();
 }
 export function translateFrame(dx,dy,snap=false){
@@ -419,7 +430,7 @@ export function setPointAngle(id,value) {
 }
 function setPointTarget(id,target) {
   const p=pointCoords()[id];if(!p)return;
-  if(fusionAtPoint(S.comps,id)){transient('合成孔位請改桿段尺寸，或先解除合成。');return;}
+  if(fusionAtPoint(S.comps,id)&&!gearPivotRotation(S.comps,S.topo.params,id,displayCoords())){transient('合成孔位請改桿段尺寸，或先解除合成。');return;}
   if(Math.hypot(target.x-p.x,target.y-p.y)<1e-7)return;
   pause();const before=snapshotStr(),saved={comps:structuredClone(S.comps),modules:structuredClone(S.modules),params:{...S.topo.params},theta:S.theta,motorAngles:{...S.motorAngles}};
   moveNodeTo(id,target,{snap:false});S.snapTarget=null;rebuild();
@@ -500,12 +511,6 @@ function onDragEnd(e) {
     import('./motor-drop-ui.js').then(m=>m.connectDraggedMotorOutput({S,fromId:did,toId:tgt,candidate,points,before,expected,snapshotStr,rebuild,draw,notify:transient,selectLink,updateUndoBtn})).catch(()=>transient('尚未接上動力輸出，請重新拖曳或從安裝設定核對。'));
     return;
   }
-  if (tgt) {   // 接孔：先還原到拖曳前，再把放開當下的狀態交給共用編輯流程當候選
-    const drop = {comps: structuredClone(S.comps), topo: structuredClone(S.topo), points: displayCoords(), theta: S.theta, angles: {...S.motorAngles}};
-    cancelPointDrag();
-    mergePoints(did, tgt, drop);
-    return;
-  }
   S.dragId = null; S.snapTarget = null;
   recomputeLengths();
   rebuild(); recordManualTrace(); draw();
@@ -540,7 +545,7 @@ export function init(deps) {
   ({ svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle,
      worldFromEvent, pointCoords, displayCoords = deps.pointCoords, mobilePrompt,
      snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint,
-     movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
+     movePointById, updatePointCoordsById, recomputeLengths,
      isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
      handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround,
      openMobileEditPanel = (() => {}),
@@ -597,7 +602,7 @@ export function init(deps) {
   svg.addEventListener('pointercancel', () => { pendingMobileEdit = false; });
   // 點空白處（背景/地面線，未 stopPropagation）取消選取
   svg.addEventListener('pointerdown', (e) => {
-    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice]'))return;
+    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice],[data-pin]'))return;
     if (pinchActive) return;
     if (S.drawingLink || S.drawingTriangle || S.drawingPolygon) return; // 畫圖模式：交給工具處理
     if (S.placingMotor || S.pickBars) { cancelMotorMode(); draw(); return; }
@@ -656,8 +661,10 @@ export function init(deps) {
     if (S.mode !== 'design' || S.mateMode || S.placingMotor || S.pickBars || S.drawingLink || S.drawingTriangle || S.drawingPolygon || activePointers.size >= 2) return;
     if (svg.querySelector?.('[data-syringe-pick-holes]')) return;
     const t = e.target;
-    if (!t?.getAttribute?.('data-pick-component') || t.closest?.('[data-id],[data-motor-hit],[data-dimension-handle],[data-point-choice]') || t.getAttribute('data-id') || t.getAttribute('data-motor-hit')) return;
-    const items = collectBodyCandidates(svg, e.clientX, e.clientY, S.comps);
+    if(!t?.getAttribute||t.closest?.('[data-motor-hit],[data-dimension-handle],[data-point-choice],[data-pin]'))return;
+    const at=displayCoords()[t.getAttribute('data-id')],pc=displayCoords();
+    if(t.getAttribute('data-id')&&!at)return;
+    const items=at?collectPickCandidates(svg,e.clientX,e.clientY,S.comps).filter(i=>i.kind==='node'&&pc[i.id]&&Math.hypot(pc[i.id].x-at.x,pc[i.id].y-at.y)<.001):collectBodyCandidates(svg,e.clientX,e.clientY,S.comps);
     if (items.length >= 2) deskClick = {items, pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false};
   }, true);
   svg.addEventListener('pointermove', e => {
@@ -667,9 +674,13 @@ export function init(deps) {
   svg.addEventListener('pointerup', e => {
     const d = deskClick; deskClick = null;
     if (!d || d.moved || d.pointerId !== e.pointerId || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6) return;
-    openOverlapPicker(d.items, item => selectOverlapComponent(item.id));
+    openOverlapPicker(d.items,item=>choosePickedItem(item,e));
   });
 
+  const choosePickedItem=(item,event)=>{
+    if(item.kind==='component')selectOverlapComponent(item.id);
+    else{(nodeDownEntry||onNodeDown)(event,item.id,true);pendingMobileEdit=false;pendingNodeDrag=null;S.preDragSnap=null;openMobileEditPanel();document.getElementById('servoEditor')?.scrollIntoView?.({block:'nearest'});}
+  };
   // Ambiguous taps wait until release; a drag, cancellation or second finger never opens a menu.
   svg.addEventListener('pointermove', e => {
     if (pendingOverlap && Math.hypot(e.clientX-pendingOverlap.x,e.clientY-pendingOverlap.y)>12) {
@@ -683,19 +694,10 @@ export function init(deps) {
   svg.addEventListener('pointerup', e => {
     const pick=pendingOverlap; pendingOverlap=null;
     if (!pick || pick.pointerId!==e.pointerId || pinchActive || Math.hypot(e.clientX-pick.x,e.clientY-pick.y)>12) return;
-    openOverlapPicker(pick.items, item => {
-      if (item.kind==='component') selectOverlapComponent(item.id);
-      else {
-        (nodeDownEntry || onNodeDown)(pick.event,item.id);
-        pendingMobileEdit=false; pendingNodeDrag=null;
-        S.preDragSnap=null; // 選單在放開後才選取，沒有拖曳候選可留給自動存檔。
-        openMobileEditPanel();
-        document.getElementById('servoEditor')?.scrollIntoView?.({block:'nearest'});
-      }
-    });
+    openOverlapPicker(pick.items,item=>choosePickedItem(item,pick.event));
   });
   svg.addEventListener('pointerdown', e => {
-    if(svg.querySelector?.('[data-syringe-pick-holes]'))return;
+    if(e.target?.closest?.('[data-pin]')||svg.querySelector?.('[data-syringe-pick-holes]'))return;
     if (!mobilePrompt() || S.mode !== 'design' || S.mateMode || S.placingMotor || S.pickBars || S.drawingLink || S.drawingTriangle || S.drawingPolygon || activePointers.size>=2) return;
     if (e.button !== undefined && e.button !== 0) return;
     // Leave dedicated handles (shape vertices, gear output pins, task sliders) to their own handlers.
@@ -721,7 +723,7 @@ export function init(deps) {
   // 落點若靠近某個接點（用畫面 px 當門檻，縮放下手感一致），就直接接手那個接點，
   // 並擋住桿身的 pointerdown，避免它把選取搶去顯示長度。
   svg.addEventListener('pointerdown', (e) => {
-    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice]')||svg.querySelector?.('[data-syringe-pick-holes]'))return;
+    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice],[data-pin]')||svg.querySelector?.('[data-syringe-pick-holes]'))return;
     if (!mobilePrompt()) return;
     if (S.mateMode) return;                                   // 接合面工具開著：舞台只接受點目標與平移（mate-tool.js）
     if (e.pointerType === 'mouse') return;
@@ -746,7 +748,7 @@ export function init(deps) {
 
   // 畫桿模式：按下決定起點；桌機拖放或點兩下，觸控拖放。
   svg.addEventListener('pointerdown', (e) => {
-    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice]'))return;
+    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice],[data-pin]'))return;
     if (!S.drawingLink) return;
     if (activePointers.size >= 2) return; // 雙指縮放優先
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -767,7 +769,7 @@ export function init(deps) {
     try { svg.setPointerCapture(e.pointerId); } catch (_) {}
   });
   svg.addEventListener('pointerdown', (e) => {
-    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice]'))return;
+    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice],[data-pin]'))return;
     if (!S.drawingTriangle) return;
     if (activePointers.size >= 2) return;
     const w = worldFromEvent(e); if (!w) return;
@@ -782,7 +784,7 @@ export function init(deps) {
   });
   // 多邊形板：滑鼠左鍵逐點加頂點 / 選求解點；觸控按下設預覽、放開時提交（見 onDragEnd）。
   svg.addEventListener('pointerdown', (e) => {
-    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice]'))return;
+    if(e.target?.closest?.('[data-dimension-handle],[data-point-choice],[data-pin]'))return;
     if (!S.drawingPolygon) return;
     if (activePointers.size >= 2) return;
     if(S.standardBlankDraft){if(e.button>0)return;e.preventDefault();Tools.standardBlankPointer(e,'down');return;}

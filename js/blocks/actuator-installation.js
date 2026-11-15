@@ -11,7 +11,7 @@ export const actuatorSteps=['固定外殼','位置方向','連接輸出','試動
 // Installation checks the user's fabrication profile; never shrink shared
 // manufacturing dimensions to make a single mounting candidate pass.
 function plateHolesFor(work){
-  return {...planActuatorPlateHoles(work),fabrication:work.fabrication};
+  return {...planActuatorPlateHoles(work,{assembly:true}),fabrication:work.fabrication};
 }
 export function actuatorHostPoints(c){return [...pointKeysFor(c).filter(k=>c?.[k]).map(k=>({key:k,...c[k]})),...[...localHoles(c),...(c?.standardBlank?.mountHoles || [])].map(h=>({...h,...holeWorld(c,h),key:h.id}))];}
 export const actuatorPoint=(c,key,points={})=>{const p=actuatorHostPoints(c).find(p=>p.key===key);return points[p?.id] || p;};
@@ -51,7 +51,8 @@ export function planMotorInstallation(source,request,points={},motion={}){
   const host=request.hostId==='world'?null:actuatorChoices(comps).hosts.find(c=>c.id===request.hostId);
   if(!host&&request.hostId!=='world')return fail('請先選外殼的承載零件。');
   if(!out)return fail('請選輸出軸要帶動的零件。');
-  if(host?.type==='triangle'&&!fixedPlate(host,comps)&&out.type==='gear')return fail('目前齒輪輸出仍需固定承載板；未固定板材請先使用連桿輸出。');
+  // A loose plate can carry a real output joint before it is grounded.
+  // The existing solver diagnostic below remains separate from assembly validity.
   if(former&&former!==out&&(out.isInput||out.physicalMotor||pointKeysFor(out).some(k=>out[k]?.physicalMotor)))return fail('所選輸出已有另一個致動元件，不能覆蓋。');
   if(former&&former.type!=='motor'&&former!==out&&formerMotor){
     const formerCenter=former.motorMount?.center || pointKeysFor(former).map(k=>former[k]).find(p=>p?.physicalMotor)?.id;
@@ -132,7 +133,7 @@ export function planMotorInstallation(source,request,points={},motion={}){
   const angle=Number(request.angle??(oldCenter?currentAngle:0));
   if(!Number.isFinite(angle))return fail('試動角度無效。');
   const motorAngles={...motion.motorAngles,[motor]:angle};
-  return evaluateMotorCandidate({ok:true,comps,params,fabrication:platePlan.fabrication,...(platePlan.note?{fabricationNote:platePlan.note}:{}),plateHoles:platePlan.reports,motor,angle,center,outputId:out.id,hostId:host?.id||'world',moving},points,motorAngles);
+  return evaluateMotorCandidate({ok:true,comps,params,fabrication:platePlan.fabrication,...(platePlan.note?{fabricationNote:platePlan.note}:{}),plateHoles:platePlan.reports,mountIssue:platePlan.issues?.map(i=>i.message).join("；"),motor,angle,center,outputId:out.id,hostId:host?.id||'world',moving},points,motorAngles);
 }
 
 // Editing commits legal part data; simulation is a separate diagnostic. Never
@@ -154,7 +155,7 @@ function planUnconnectedMotor(source,request,points,motion){
   let comps=structuredClone(source.comps);const params={...source.params},fail=message=>({ok:false,message});
   const old=comps.find(c=>c.id===request.existingId),mount=old?.motorMount||{};
   if(request.existingId&&!old)return fail('原致動元件不存在，請重新選取。');
-  if(old&& !['bar','motor'].includes(old.type))return fail('齒輪輸出的解除仍需核對被動齒輪求解；本次先支援連桿輸出。');
+  if(old&& !['bar','gear','motor'].includes(old.type))return fail('目前只支援解除連桿或齒輪輸出。');
   const motor=String(old?.physicalMotor||pointKeysFor(old).map(k=>old?.[k]?.physicalMotor).find(Boolean)||request.motorId||'1');
   if(!['tt','n20','mg995'].includes(request.type)||!['front','back'].includes(request.face)||!['horizontal','vertical','follow-frame'].includes(request.orientation))return fail('請選有效的馬達型號與安裝方向。');
   if(!Number.isFinite(request.angleDeg??0)||Math.abs(request.angleDeg??0)>360)return fail('安裝轉角需在 −360～360°。');
@@ -190,5 +191,5 @@ function planUnconnectedMotor(source,request,points,motion){
   comps=comps.filter(c=>c!==old||old.type!=='motor');comps.push(body);
   if(host){host.motorMountPoint=p1.id;host.frameSeparate=true;}
   const holes=plateHolesFor({...source,comps,params},request.type);if(!holes.ok&&!pureRelease)return fail(holes.message);
-  return evaluateMotorCandidate({ok:true,...(pureRelease?{release:true}:{}),...(holes.ok?{}:{mountIssue:holes.message}),comps:holes.ok?holes.comps:comps,params,fabrication:holes.fabrication,...(holes.note?{fabricationNote:holes.note}:{}),plateHoles:holes.reports,motor,angle:Number(request.angle)||0,center:p1.id,outputId:'',hostId:host?.id||'world'},points,motion.motorAngles);
+  return evaluateMotorCandidate({ok:true,...(pureRelease?{release:true}:{}),mountIssue:holes.ok?holes.issues?.map(i=>i.message).join("；"):holes.message,comps:holes.ok?holes.comps:comps,params,fabrication:holes.fabrication,...(holes.note?{fabricationNote:holes.note}:{}),plateHoles:holes.reports,motor,angle:Number(request.angle)||0,center:p1.id,outputId:'',hostId:host?.id||'world'},points,motion.motorAngles);
 }

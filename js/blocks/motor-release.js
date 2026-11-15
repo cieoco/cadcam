@@ -122,15 +122,15 @@ export function planMotorLeaveParts(source,id){
 
 /** 從選取的輸入桿解除與馬達的連接；馬達與桿件都保留。work＝馬達零件形狀；barId＝今日形狀的輸出桿 id。 */
 export function planMotorReleaseParts(source,barId,points={}){
-  const bar=source.comps.find(c=>c.id===barId),P=bar?.type==='bar'&&source.comps.find(c=>isMotorPart(c)&&c.drives?.body===barId);
-  if(!P)return {ok:false,message:'這根桿件沒有接在馬達軸上。'};
+  const bar=source.comps.find(c=>c.id===barId),P=['bar','gear'].includes(bar?.type)&&source.comps.find(c=>isMotorPart(c)&&c.drives?.body===barId);
+  if(!P)return {ok:false,message:'這個零件沒有接在馬達軸上。'};
   const freed=freeMotor(source.comps,P.id,points);if(!freed.ok)return freed;
   const comps=freed.comps,out=comps.find(c=>c.id===barId),center=P.p1.id;
   const key=pointKeysFor(out).find(k=>out[k]?.id===center);if(!key)return {ok:false,message:'原輸出軸心不存在。'};
   const ids=new Set(comps.flatMap(c=>pointKeysFor(c).map(k=>c[k]?.id)));let released=`${out.id}.released`,n=1;while(ids.has(released))released=`${out.id}.released${n++}`;
   out[key]={...out[key],id:released,type:'floating'};                                   // 桿件這一端離開軸心，成為自由端
   const holes=settlePlateHoles({comps,params:{...source.params},modules:source.modules,fabrication:source.fabrication});   // 座板有舊問題時照樣解除
-  return {ok:true,comps:holes.ok?holes.comps:comps,params:{...source.params},message:`已解除「${bar.name||bar.id}」與馬達的連接；馬達與桿件都保留，可再接回，也可按復原。`};
+  return {ok:true,comps:holes.ok?holes.comps:comps,params:{...source.params},message:`已解除「${bar.name||bar.id}」與馬達的連接；馬達與${bar.type==='gear'?'齒輪':'桿件'}都保留，可再接回，也可按復原。`};
 }
 
 // 今日形狀進出的包裝（直接呼叫規劃函式的測試與修復項目用）

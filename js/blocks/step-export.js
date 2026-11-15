@@ -1,3 +1,4 @@
+import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import {actuatorMountSettings} from './fabrication-profile.js';
 /**
  * blocks / step-export
@@ -379,6 +380,8 @@ export async function stepFromWork(work,opts={}) {
     }
   } catch(e) {return fail(`整理作品失敗：${e.message}`);}
   if(!ctxWork.comps.length)return fail(scope==='design'?'這個設計沒有零件可匯出。':'沒有零件可匯出。');
+  const seats=planActuatorPlateHoles({...ctxWork,params:work.topo?.params||work.params||{},fabrication:work.fabrication});
+  if(!seats.ok)return fail(`加工待修正：${seats.message}`);
   let scene;
   try {scene=sceneFromWork({...work,...ctxWork},{theta,motorAngles});}
   catch(e) {return fail(`建立 3D 材料場景失敗：${e.message}`);}

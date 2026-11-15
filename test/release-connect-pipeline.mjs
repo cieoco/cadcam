@@ -149,7 +149,7 @@ function motor(action,w,sel={},extra={}){
  check('motor leave: becomes an independent fixed point, one undo, message unchanged',ok&&MR.offPlateMotors(m.S.comps).length===0&&m.log.undo===1&&m.log.undoSnap===m.orig&&m.msgs[0]==='馬達已離開座板，軸心改成獨立固定點；座板原孔已釋出，可按復原。',m.msgs.join('|'));}
 {// refusals
  for(const [label,action,w,sel,extra,re] of [
-   ['a bar that is not on a motor shaft','release',repaired,{selectedLinkId:'Blank137'},{id:'Blank137'},/這根桿件沒有接在馬達軸上/],
+   ['a bar that is not on a motor shaft','release',repaired,{selectedLinkId:'Blank137'},{id:'Blank137'},/這個零件沒有接在馬達軸上/],
    ['return when already on the plate','back',repaired,{},{id:'Blank135'},/已在座板原孔上/],
    ['leave when already on the plate','leave',repaired,{},{id:'Blank135'},/在座板原孔上，不需要/]
    ]){

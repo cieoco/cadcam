@@ -16,7 +16,7 @@ export function mountDroppedMotor({S,id,expected,snapshotStr,displayCoords,rebui
  if(!confirmMountingChange(source,{...source,comps:result.comps,params:result.params,fabrication:result.fabrication||source.fabrication},{notify}))return;
  S.comps=result.comps;S.topo.params=result.params;S.selectedNodeId=result.center;
  if(result.fabricationNote)applyFabrication(result.fabrication);
- rebuild();draw();updateRoleEditor();notify(`已固定在${result.hostName}，安裝孔槽已更新${result.fabricationNote?`；${result.fabricationNote}`:''}；可復原。`);
+ rebuild();draw();updateRoleEditor();notify(`已固定在${result.hostName}，安裝孔槽已更新${result.mountIssue?`；加工待修正：${result.mountIssue}`:""}${result.fabricationNote?`；${result.fabricationNote}`:''}；可復原。`);
 }
 
 export function connectPlacedMotorOutput({S,id,expected,snapshotStr,displayCoords,rebuild,draw,notify,selectLink}){

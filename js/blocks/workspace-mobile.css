@@ -212,6 +212,7 @@
   .controls .app-status::after { content:"未建立"; font-size:12px; font-weight:800; color:#60717d; white-space:nowrap; }
   .controls .app-status[data-state="ready"]::before { background:#2ecc71; }  .controls .app-status[data-state="ready"]::after { content:"可播放"; color:#117a45; }
   .controls .app-status[data-state="warn"]::before { background:#f1c40f; }   .controls .app-status[data-state="warn"]::after { content:"待補"; color:#8a6500; }
+  .controls .app-status[data-state="warn"][data-chip="fabrication"]::after { content:"加工待修"; }
   .controls .app-status[data-state="warn"][data-chip="verify"]::after { content:"待核對"; }
   .controls .app-status[data-state="static"]::after { content:"固定結構"; }
   .controls .app-status[data-state="error"]::before { background:#e74c3c; }

@@ -84,7 +84,7 @@ export const motorOfId = (comps, id) => comps.find(c => isMotorPart(c) && c.driv
  * 只把它改到的板件資料（holes／standardBlank.mountHoles）按 id 放回馬達零件形狀的 comps。回傳 {ok,comps}｜{ok:false,message}。
  */
 export function settlePlateHoles(source) {
-  const r = planActuatorPlateHoles({...source, comps: toLegacy({comps: source.comps}).comps});
+  const r = planActuatorPlateHoles({...source, comps: toLegacy({comps: source.comps}).comps},{assembly:true});
   if (!r.ok) return r;
   const at = new Map(r.comps.map(c => [c.id, c]));
   return {ok: true, comps: source.comps.map(c => {

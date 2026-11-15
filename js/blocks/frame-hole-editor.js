@@ -53,7 +53,7 @@ export function renderFrameHoleEditor(){
   editableNumber(value,hole.frameHole.u,v=>window.blocks.setFrameHole(hole.p1.id,v),{label:'機架孔距基準孔（mm）',min:-2000,max:2000});
   if(!centered){const label=document.createElement('label'),value=document.createElement('span');label.textContent='左右偏移 ';label.append(value,document.createTextNode(' mm'));row.append(label);editableNumber(value,hole.frameHole.v||0,v=>window.blocks.setFrameHole(hole.p1.id,{v}),{label:'機架孔左右偏移（mm）',min:-2000,max:2000});}
   const hint=document.createElement('p');hint.style.cssText='flex-basis:100%;margin:0';hint.textContent=centered?'沿中心線拖孔；取消勾選可左右移動。':'可在板面拖孔；偏移正值在基準方向左側，負值在右側。';row.append(hint);
-  if(Model.pointRefs(S.comps,hole.p1.id).length>1){const split=document.createElement('button');split.textContent='分離連接';split.onclick=()=>window.blocks.splitNode();row.append(split);}
+  if(Model.pointRefs(S.comps,hole.p1.id).length>1){const pin=document.createElement('button');pin.textContent='調整插銷';pin.onclick=()=>window.blocks.inspectPin(hole.p1.id);row.append(pin);}
   const remove=document.createElement('button');remove.textContent='刪除孔';remove.onclick=()=>window.blocks.removeFrameHole(hole.p1.id);row.append(remove);
 }
 export function drawFrameHoleHandle({svg,project,openEditor,redraw}){

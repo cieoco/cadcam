@@ -29,15 +29,15 @@ for(const type of ['tt','n20','mg995']){
  const moved=planMotorDrop(loose,{...req,type,existingId:motor.id},pointCoords(loose.comps));assert.ok(moved.ok,moved.message);assert.equal(moved.comps.find(c=>c.type==='motor').id,motor.id);
 }
 const slim=makeStandardBlank({lengthMm:80,origin:{x:-40,y:0}}),bar={...source,comps:[slim.comp],params:slim.params};
-assert.equal(planMotorDrop(bar,req).ok,false,'TT mount cannot fit a narrow single-row bar');
-assert.equal(planMotorDrop(bar,{...req,type:'mg995'}).ok,false);
+assert.match(planMotorDrop(bar,req).mountIssue,/座板無法容納/,'narrow TT seat can be assembled but not manufactured');
+assert.match(planMotorDrop(bar,{...req,type:'mg995'}).mountIssue,/座板無法容納/);
 assert.ok(planMotorDrop(bar,{...req,type:'n20'}).ok,'N20 selected front-hole spec fits this bar');
 assert.equal(planMotorDrop(source,{...req,position:{x:300,y:300}}).matched,false);
 assert.equal(planMotorDrop({...source,comps:[made.comp,{...structuredClone(made.comp),id:'Overlap'}]},req).ok,false);
 assert.equal(planMotorDrop({...source,moduleId:'other'},req).matched,false);
 const occupied=structuredClone(source),grid=occupied.comps[0].holes.find(h=>h.u===72&&h.v===40);grid.type='fixed';assert.equal(planMotorDrop(occupied,req).ok,false,'occupied grid holes are not silently removed');
 // Installation must preserve shared fabrication dimensions, even when smaller slots could pass.
-{const servo=planMotorDrop({...source,fabrication:FABRICATION_DEFAULTS},{...req,type:'mg995'});assert.equal(servo.ok,false);assert.match(servo.message,/孔|槽/);assert.equal(FABRICATION_DEFAULTS.mg995Mount.cableNotchWidthMm,8);}
+{const servo=planMotorDrop({...source,fabrication:FABRICATION_DEFAULTS},{...req,type:'mg995'});assert.equal(servo.ok,true);assert.match(servo.mountIssue,/孔|槽/);assert.equal(FABRICATION_DEFAULTS.mg995Mount.cableNotchWidthMm,8);}
 assert.equal(planMotorDrop({...source,fabrication:FABRICATION_DEFAULTS},{...req,type:'n20'}).ok,false,'generic N20 cannot invent manufacturing holes');
 console.log('motor-drop: three models, create/move, free plate, real DXF holes, reopen/removal, narrow bars, overlap, scope and fabrication guards passed');
 const loose=planMotorInstallation(source,{...req,position:{x:160,y:0}}),state={comps:loose.comps,modules:[],topo:{params:loose.params},fabrication,theta:0,motorAngles:{},undoStack:['one-drag']};

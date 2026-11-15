@@ -1,3 +1,4 @@
+import {expandPinLocks} from '../core/pin-lock.js';
 /**
  * blocks / integrity  (pack C1 of docs/SDD-CONNECTION-INTEGRITY.md)
  *
@@ -36,6 +37,8 @@ export function checkWork(work, relations) {
   const add = (code, severity, parts, ids, message, ref) => issues.push({code, severity, parts: [...new Set(parts)], ids: [...new Set(ids)], message, ...(ref ? {ref} : {})});
   const first = (a, b) => a !== undefined && a !== null ? a : b;
   const snap = k => first(work?.[k], topo?.[k]);
+
+  const pinLocks=expandPinLocks(comps,params);if(!pinLocks.ok)add('I8','contradiction',comps.filter(c=>c.pinLocks?.length).map(c=>c.id),[],pinLocks.message,{what:'pinLock'});
 
   // ------------------------------------------------------------ I6 零件 id 唯一
   const seenComp = new Map();

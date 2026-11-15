@@ -1,3 +1,4 @@
+import {normalizePinLocks,expandPinLocks} from '../core/pin-lock.js';
 import {BLANK_HOLE_LIMIT,armsValid} from './standard-blank.js';
 import {normalizeLoads} from './load-schema.js';
 import {syncFrameHoles,frameHoleAxis} from './frame-holes.js';
@@ -660,6 +661,7 @@ export function normalizeSnapshot(obj) {
     else if (raw.type === 'workpiece') comps.push(normalizeWorkpiece(raw,index,warnings));
     else if (raw.type === 'belt') comps.push(normalizeBelt(raw, index, params, warnings));
     else { warnings.push(`不支援的零件 ${raw.type || '(unknown)'}，已略過。`); return; }
+    if(raw.pinLocks!==undefined)comps.at(-1).pinLocks=normalizePinLocks(raw.pinLocks);
     if(typeof raw.name==='string'&&raw.name.trim())comps[comps.length-1].name=raw.name.trim().slice(0,80);
     // 模組標記：只在這裡加一次，不動十個 normalizeXxx（SDD-ASSEMBLY-MODULES §3.3）。
     if(raw.type==='triangle' && safeId(raw.fusedWith)) comps[comps.length-1].fusedWith=raw.fusedWith;
@@ -669,11 +671,13 @@ export function normalizeSnapshot(obj) {
     }
   });
 
+  if(!expandPinLocks(comps,params).ok)return null;
   fillChainLinks(comps, warnings);
   let cleanComps = dropZeroBars(comps);
   const modulesResult = normalizeModules(obj.modules, cleanComps);
   if (!modulesResult.ok) return null;
   cleanComps = modulesResult.comps;
+  if(!expandPinLocks(cleanComps,params).ok)return null;
   warnings.push(...modulesResult.warnings);
   for(const c of cleanComps){
     if(c.barFusion && !inspectBarFusionData(cleanComps,c,params).ok)return null;

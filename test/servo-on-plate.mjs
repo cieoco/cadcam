@@ -20,8 +20,8 @@ check('素材：作品帶預設 8×4 缺口',w.fabrication.mg995Mount.cableNotch
 
 const before=JSON.stringify(src);
 const rejected=planMotorDrop(src,req('mg995'),pts,{thetaDeg:0});
-check('原缺口有干涉：拒絕安裝，不自動縮小',rejected.matched&&!rejected.ok&&/孔|槽/.test(rejected.message));
-check('拒絕後所有零件、孔位及加工尺寸保持不變',JSON.stringify(src)===before);
+check('原缺口有干涉：保留固定並警示，不自動縮小',rejected.matched&&rejected.ok&&/孔|槽/.test(rejected.mountIssue));
+check('候選規劃不改動原零件、孔位及加工尺寸',JSON.stringify(src)===before);
 // Only an explicitly supplied fabrication profile may change the notch size.
 const selected={...src,fabrication:{...src.fabrication,mg995Mount:{...src.fabrication.mg995Mount,cableNotchWidthMm:6,cableNotchDepthMm:2}}};
 const r=planMotorDrop(selected,req('mg995'),pts,{thetaDeg:0});
@@ -40,17 +40,17 @@ const safe={...src,fabrication:{...w.fabrication,mg995Mount:{...w.fabrication.mg
 const r2=planMotorDrop(safe,req('mg995'),pts,{thetaDeg:0});
 check('缺口本來就夠小：照原設定安裝',r2.ok&&same(r2.fabrication,safe.fabrication)&&!r2.fabricationNote,r2.message);
 
-// 縮缺口也救不了（直放超出板面）：照原訊息拒絕，不改設定
+// 直放超出板面：保留安裝候選並標示加工待修正，不改設定
 const r3=planMotorDrop(src,req('mg995',{orientation:'vertical'}),pts,{thetaDeg:0});
-check('板放不下時仍拒絕並說明',r3.matched&&!r3.ok&&/座板無法容納/.test(r3.message||''),r3.message);
+check('板放不下時保留安裝並標示加工待修正',r3.matched&&r3.ok&&/座板無法容納/.test(r3.mountIssue||''),r3.message);
 
 // TT 馬達不受影響
 const r4=planMotorDrop(src,req('tt'),pts,{thetaDeg:0});
 check('TT 馬達照舊安裝、不動加工設定',r4.ok&&same(r4.fabrication,src.fabrication)&&!r4.fabricationNote,r4.message);
-// Failed drop keeps the already-placed independent motor and the existing undo.
+// A pending-fabrication drop attaches the independent motor in the existing undo.
 const state={comps:structuredClone(src.comps),modules:[],topo:{params:structuredClone(src.params)},fabrication:structuredClone(src.fabrication),theta:0,motorAngles:{},undoStack:['placement']};
 const snapshotStr=()=>JSON.stringify(state),original=snapshotStr();let notice='';
-mountDroppedMotor({S:state,id:m.id,expected:original,snapshotStr,displayCoords:()=>pts,notify:text=>notice=text,rebuild(){throw Error('rejected mount must not rebuild');},draw(){},updateRoleEditor(){},applyFabrication(){throw Error('must not overwrite fabrication');}});
-check('拖放拒絕後保留獨立舵機、其他零件、加工設定與原復原步驟',snapshotStr()===original);
-check('拖放拒絕有孔槽原因',/未安裝.*孔/.test(notice),notice);
+mountDroppedMotor({S:state,id:m.id,expected:original,snapshotStr,displayCoords:()=>pts,notify:text=>notice=text,rebuild(){},draw(){},updateRoleEditor(){},applyFabrication(){throw Error('must not overwrite fabrication');}});
+check('拖放後固定於板材、不改加工設定及復原步驟',state.comps.find(c=>c.type==='motor').motorMount.frameBody==='Blank88'&&same(state.fabrication,src.fabrication)&&state.undoStack.length===1);
+check('拖放有加工待修正原因',/加工待修正.*孔/.test(notice),notice);
 report();

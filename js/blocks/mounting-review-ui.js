@@ -14,7 +14,7 @@ export function commitMountingEdit(S,mutate,{pushUndo,notify}={}){
   const before=mountingWork(S),candidate=structuredClone(before);
   if(mutate(candidate)===false)return false;
   // 修改前就有的座板問題（例如馬達軸心離開原孔）不擋不相干的修改；只擋這次新造成的。
-  const platePlan=planActuatorPlateHoles(candidate);if(platePlan.ok)candidate.comps=platePlan.comps;else if(planActuatorPlateHoles(before).ok){notify?.(platePlan.message);return false;}
+  const platePlan=planActuatorPlateHoles(candidate,{assembly:true});if(platePlan.ok)candidate.comps=platePlan.comps;else if(planActuatorPlateHoles(before,{assembly:true}).ok){notify?.(platePlan.message);return false;}
   if(!confirmMountingChange(before,candidate,{notify}))return false;
   pushUndo();
   S.comps=adoptComps(S.comps,candidate.comps);

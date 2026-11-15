@@ -46,6 +46,7 @@ export function planDeleteParts(work,target){
   for(const m of kept){const r=freeMotor(comps,m.id,work.points||{});if(!r.ok)return {ok:false,message:r.message};comps=r.comps;}
   const own=new Set([...pointKeysFor(part).map(k=>part[k]?.id),...localHoles(part).map(h=>h.id)].filter(Boolean));
   const candidate=detachDeletedAttachments(structuredClone(comps),new Set([id]),params,work.points).filter(c=>c.id!==id);
+  for(const c of candidate)if(c.pinLocks){c.pinLocks=c.pinLocks.filter(r=>r.with!==id);if(!c.pinLocks.length)delete c.pinLocks;}
   if(isMotorPart(part))for(const c of candidate)if(c.motorMountPoint===part.p1.id)delete c.motorMountPoint;
   ownedParamKeys(part).forEach(k=>delete params[k]);
   // 刪掉的零件連帶放開了什麼，要說出來（不能無聲無息）。

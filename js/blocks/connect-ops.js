@@ -5,6 +5,9 @@
  * planSplit／planMerge 是純規劃（不得改動傳入的作品）；提交、一致性檢查、復原與回饋都交給 edit-pipeline 的 runEdit。
  * 按需載入（不得被啟動路徑靜態 import）。
  */
+import {firstGearPinTargets,planFirstGearPin} from './gear-first-pin.js';
+import {openOverlapPicker} from './overlap-picker.js';
+import {planGearPinConnection,planReleaseGearPin} from './gear-pin-plans.js';
 import * as Model from './model.js';
 import {runEdit} from './edit-pipeline.js';
 import {fusionAtPoint} from '../core/bar-fusion.js';
@@ -26,19 +29,22 @@ const tally = (names, alike = false) => list([...new Set(names)].map(n => {
  */
 export function planSplit(work, id) {
   if (!id) return {ok: false, message: '請先點選要分開的接點。'};
+  if(work.comps.some(c=>c.pinLocks?.some(r=>r.at===id)))return {ok:false,message:'此孔有鎖固插銷，請在插銷區拔除指定零件。'};
+  const gearPin=planReleaseGearPin(work,id);if(gearPin)return gearPin;
   if (fusionAtPoint(work.comps, id)) return {ok: false, message: '請先解除合成，再修改孔位。'};
   const comps = structuredClone(work.comps), refs = Model.pointRefs(comps, id);
   if (refs.length < 2) return {ok: false, message: '這個接點只有一個零件，沒有可分開的連接。'};
   const p = Model.pointCoords(comps)[id] || {x: 0, y: 0};
   let counter = work.counter, moved = false;
-  refs.sort((a, b) => (a.comp.type === 'bar' ? 1 : 0) - (b.comp.type === 'bar' ? 1 : 0));
+  const rank=r=>r.point.type==='fixed'||[r.comp.p1,r.comp.p2].every(p=>p?.type==='fixed')?-2:r.key==='holes'?-1:r.comp.type==='bar'?1:0;
+  refs.sort((a,b)=>rank(a)-rank(b));
   const detach = refs.slice(1);
   detach.forEach((ref, i) => {
     const ang = (i / detach.length) * Math.PI * 2 + 0.6;
     ref.point.id = 'P' + (++counter) + 's';
     ref.point.type = 'floating';
     // A body with parts joined or fixed at its holes stays put: moving one vertex would leave those copies behind.
-    const off = Model.holeJoined(comps, ref.comp) ? 0 : OFFSET;
+    const off = ref.comp.type==='triangle'||Model.holeJoined(comps, ref.comp) ? 0 : OFFSET;
     if (off) moved = true;
     ref.point.x = (p.x || 0) + Math.cos(ang) * off;
     ref.point.y = (p.y || 0) + Math.sin(ang) * off;
@@ -53,6 +59,7 @@ export function planSplit(work, id) {
  * work 是放開前的作品（一致性檢查與復原都以它為準）。
  */
 export function planMerge(work, drop, fromId, toId) {
+  if(drop.gearPin)return planGearPinConnection(work,drop,drop.gearPin);
   const seed = structuredClone(drop.comps), topo = structuredClone(drop.topo);
   for (const [id, p] of Object.entries(drop.points || {})) Model.updatePointCoordsById(seed, id, p.x, p.y);
   const own = id => uniq(Model.pointRefs(seed, id).map(r => r.comp));
@@ -86,7 +93,14 @@ export function splitSelected(host) {
   return runEdit({name: '分開連接', plan: work => planSplit(work, host.S.selectedNodeId), host});
 }
 
-/** 拖曳放開後接孔（呼叫端已把畫面還原到拖曳前，drop 是放開當下的狀態）。 */
-export function mergeDropped({from, to, drop, ...host}) {
-  return runEdit({name: '接孔', plan: work => planMerge(work, drop, from, to), host});
+/** 舊操作腳本的候選提交相容入口；畫布不再呼叫。插銷工具是唯一使用者入口。 */
+export function mergeDropped({from, to, drop, chooseTarget, ...host}) {
+  if(!drop.gearPin){
+    const targets=firstGearPinTargets({comps:host.S.comps,params:host.S.topo.params},drop,from,to);
+    const revision=JSON.stringify([host.S.comps,host.S.topo.params,host.S.modules,host.S.designFocus,host.S.mode,host.S.theta,host.S.motorAngles]);
+    const apply=target=>{if(JSON.stringify([host.S.comps,host.S.topo.params,host.S.modules,host.S.designFocus,host.S.mode,host.S.theta,host.S.motorAngles])!==revision){host.transient('作品已變更，這次未接合；請重新拖曳。');return false;}return runEdit({name:'接孔',plan:work=>target.gearId?planFirstGearPin(work,drop,from,target.id,target.gearId):planMerge(work,drop,from,target.id),host});};
+    if(targets.length>1)return (chooseTarget||openOverlapPicker)(targets,apply);
+    if(targets.length===1&&targets[0].gearId)return apply(targets[0]);
+  }
+  return runEdit({name: '放入插銷', plan: work => planMerge(work, drop, from, to),host});
 }

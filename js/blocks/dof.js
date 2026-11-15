@@ -79,6 +79,7 @@ export function analyzeDof(comps = []) {
     for(const b of members)uf.union(members[0].id,b.id);
     if(new Set(members.flatMap(b=>[...b.points].filter(id=>groundPoints.has(id)))).size>=2)uf.union(GROUND,members[0].id);
   }
+  for(const body of bodies)for(const lock of body.comp.pinLocks||[]){const other=bodies.find(b=>b.comp.id===lock.with);if(other&&body.points.has(lock.at)&&other.points.has(lock.at))uf.union(body.id,other.id);}
   // 兩個以上共用銷代表兩個零件沒有相對運動，合成同一剛體。
   for (let i = 0; i < bodies.length; i++) {
     if (sharedCount(bodies[i].points, groundPoints) >= 2) uf.union(GROUND, bodies[i].id);
@@ -86,6 +87,8 @@ export function analyzeDof(comps = []) {
       if (sharedCount(bodies[i].points, bodies[j].points) >= 2) uf.union(bodies[i].id, bodies[j].id);
     }
   }
+
+  for(const body of bodies){const fixed=new Set(bodies.filter(b=>uf.find(b.id)===uf.find(body.id)).flatMap(b=>[...b.points].filter(id=>groundPoints.has(id))));if(fixed.size>=2)uf.union(GROUND,body.id);}
 
   const groups = new Set([uf.find(GROUND)]);
   bodies.forEach(body => groups.add(uf.find(body.id)));

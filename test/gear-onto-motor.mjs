@@ -87,7 +87,7 @@ check('success sentence is plain words, no internal ids',/^已把「.*18 齒齒�
   check('several parts share the joint: the existing sentence is kept',sh.matched&&!sh.ok&&/接孔對應多個零件/.test(sh.message),sh.message);
   const unfixed=clone(W);for(const k of ['p1','p2'])get(unfixed,'Blank88')[k].type='floating';
   const pl=plan('GC89',unfixed);
-  check('existing planner refusal passes through (gear output needs a fixed plate)',pl.matched&&!pl.ok&&/固定承載板/.test(pl.message),pl.message);
+  check('floating plate retains assembly without pretending it can simulate',pl.matched&&pl.ok&&!pl.simulation.ok&&pl.comps.filter(c=>c.type==='gear').every(c=>c.p1.type==='floating'),pl.message);
   const other=clone(W);get(other,'Gear89').moduleId='m2';
   check('other module: refused',!plan('GC89',other).ok);
 }

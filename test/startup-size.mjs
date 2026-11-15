@@ -51,7 +51,9 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-10：既有桿件端孔拖接動力的輕量接頭增加500 bytes，實測2,163,358；候選規劃仍懶載入。
 // 2026-11-10：占用軸心的共同剛體定位／自由度核對增加748 bytes至2,164,106；不恢復加工孔，無新依賴。
 // 上限 2026-11-11 經使用者同意由 2,165,000 放寬到 2,200,000（操作一致性 SDD §6）；再調高仍需使用者同意。
-check('首次JS原始大小低於2.2MB',r.bytes<2200000);
+// 2026-11-15：使用者同意一孔齒輪彎桿旋轉與第二孔預覽的同步互動增量；提交／解除候選仍按需載入，實測2,202,870 bytes。
+// 2026-11-15：使用者同意插銷鎖固的同步存檔／求解契約增量，上限 2.210 MB；介面與候選計算按需載入。
+check('首次JS原始大小低於2.210MB',r.bytes<2210000);
 check('扭力UI與估算核心按需載入',!r.paths.includes('js/blocks/torque-ui.js')&&!r.paths.includes('js/core/required-torque.js')&&!r.paths.includes('js/core/actuator-speed.js'));
 check('舵機座板範例按需載入',!r.paths.includes('js/blocks/servo-mount-examples.js')&&!r.paths.includes('js/blocks/motor-plate-examples.js'));
 check('標準結構設定面板按需載入',!r.paths.includes('js/blocks/standard-blank-ui.js')&&r.lazyEntries.includes('js/blocks/standard-blank-ui.js'));

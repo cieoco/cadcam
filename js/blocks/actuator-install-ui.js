@@ -44,7 +44,7 @@ export function openMotorInstallation({stage=document.getElementById('stageSvg')
   const quickPanel=el('section',null,body),quickSummary=el('p',null,quickPanel),quickChoices=el('div',null,quickPanel);
   quickChoices.className='install-faces';
   const createOutput=el('button',old?'先放馬達，再畫輸出桿':'在畫布放馬達',quickPanel);createOutput.hidden=!!old&&old.type!=='motor';
-  const release=el('button','解除輸出連接',quickPanel);release.hidden=old?.type!=='bar';
+  const release=el('button','解除輸出連接',quickPanel);release.hidden=!['bar','gear'].includes(old?.type);
   release.onclick=()=>{request.outputId=request.outputId?'':old.id;request.position=null;placement=points[oldCenter]||old?.p1;update();};
   // A shaft dragged off its plate hole: explain and offer the two repairs (release still works).
   const offPlate=old&&offPlateMotors(base.comps).find(i=>i.id===old.id);
@@ -229,7 +229,7 @@ export function openMotorInstallation({stage=document.getElementById('stageSvg')
     if(document.activeElement!==bodyAngle)showNumber(bodyAngle,request.angleDeg);
     host.value=request.hostId;output.value=request.outputId;hostLocations();location.value=request.hostEnd;end.value=request.outputEnd;orientation.value=request.orientation;
     quickSummary.textContent=placing?(!old?'點畫布放馬達軸心，拖曳放開即新增；之後可再接輸出桿。':placement?'已放軸心，可直接儲存馬達；也可點另一端建立輸出桿。':'點畫布放馬達軸心，或輸入座標與孔距。'):request.outputId?`帶動「${label(base.comps.find(c=>c.id===request.outputId))}」・${pointDisplayName(base.comps,selectedNode)||'所選軸心'}；${request.hostId==='world'?'外殼固定在圖面基準（會固定此孔）':`外殼固定在「${label(base.comps.find(c=>c.id===request.hostId))}」`}。`
-      :old?.type==='motor'?'尚未連接輸出；點圖上的桿孔，或在連接設定選零件。':old?'已預覽解除輸出；儲存後保留馬達與桿件，可再接回。':selectedNode?'這個孔連接了多個零件，請選要帶動的零件與承載方式。':candidates.length?'點圖上的孔，選馬達軸心。':'可先放馬達，再畫輸出桿。';
+      :old?.type==='motor'?'尚未連接輸出；點圖上的桿孔，或在連接設定選零件。':old?'已預覽解除輸出；儲存後保留馬達與輸出零件，可再接回。':selectedNode?'這個孔連接了多個零件，請選要帶動的零件與承載方式。':candidates.length?'點圖上的孔，選馬達軸心。':'可先放馬達，再畫輸出桿。';
     quickChoices.replaceChildren();
     const options=candidates.filter(c=>c.nodeId===selectedNode);
     if(options.length>1)for(const c of options){
@@ -245,7 +245,7 @@ export function openMotorInstallation({stage=document.getElementById('stageSvg')
     if(document.activeElement!==exact)showNumber(exact,request.angle);
     summary.hidden=!old||request.type!=='mg995';summary.textContent=`擺動 ${request.start}–${request.end}°；範圍沿用接點面板的伺服角度。`;
     reading.textContent=`${Number(request.angle.toFixed(2))}°${result?.simulation?.ok?' · 幾何可解':''}`;
-    error.textContent=placementError|| (invalidSpec?invalidSpec.validationMessage:result&&!result.ok?result.message:result?.simulation&&!result.simulation.ok?result.simulation.message:result?.plateHoles?.length?`板座孔槽為未實量試作；占用格孔已停用，拆除或改方向會重新核對並還原。${result.fabricationNote?result.fabricationNote+'。':''}`:'');
+    error.textContent=placementError|| (invalidSpec?invalidSpec.validationMessage:result&&!result.ok?result.message:result?.mountIssue?`已建立安裝候選；加工待修正：${result.mountIssue}`:result?.simulation&&!result.simulation.ok?result.simulation.message:result?.plateHoles?.length?`板座孔槽為未實量試作；占用格孔已停用，拆除或改方向會重新核對並還原。${result.fabricationNote?result.fabricationNote+'。':''}`:'');
     release.textContent=request.outputId?'解除輸出連接':'還原輸出連接';
     createOutput.hidden=!!old&&old.type!=='motor'||!old&&placing;
     next.hidden=!old&&!request.outputId;next.disabled=!result?.ok;next.textContent=!request.outputId&&(request.position||old)?'儲存馬達':old?'儲存安裝':'確認安裝';

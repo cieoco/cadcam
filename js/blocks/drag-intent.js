@@ -9,7 +9,7 @@ const NO_DRIVE = '，或裝上馬達後拖曳試動。', WITH_DRIVE = '；現在
 /** 拖不動時，對學生說的一句話：說明為什麼，並盡量說明可以怎麼做。drive＝作品有動力來源且試動可用。 */
 export function blockedMessage(kind, drive = false) {
   switch (kind) {
-    case 'body': return '這個零件已接上其他零件，不能單獨搬移；要移動請先分開連接' + (drive ? WITH_DRIVE : NO_DRIVE);
+    case 'body': return '這個零件已接上其他零件，不能單獨搬移；要移動請先拔除對應插銷' + (drive ? WITH_DRIVE : NO_DRIVE);
     case 'hole': return '這個孔屬於已接上其他零件的零件，不能單獨搬移；要改位置請改尺寸' + (drive ? WITH_DRIVE : NO_DRIVE);
     case 'ground': return '這是固定板（機架）上的孔，不會移動；要試動請拖連桿，要搬位置請先選取固定板。';
     case 'locked-vertex': return '這個頂點已被相接的零件鎖住，不能單獨拖動；要改位置請改板件尺寸，或移動接在它上面的零件。';

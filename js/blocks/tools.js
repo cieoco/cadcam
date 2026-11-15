@@ -77,7 +77,7 @@ function beginDraw(kind) {
   S.drawKind = kind;
   S.drawingLink = true;
   svg.style.cursor = 'crosshair';
-  // 起點由使用者指定；連桿靠近既有孔時直接接上。
+  // 起點由使用者指定；靠近既有孔時對齊，普通孔連接由插銷工具建立。
   S.drawActive = false;
   S.drawStart = null;
   S.drawStartNodeId = null;
@@ -104,7 +104,8 @@ export function exitDrawLink() {
 export function nearestNodeId(world, exclude = [], maxDist = snapWorld()) {
   return nearestDisplayToPoint(world, exclude, maxDist);
 }
-// 從起點 start 拖到 cur 時，算出實際終點：靠近既有接點就吸附相接。
+function motorOutputNode(id){return id&&S.comps.some(c=>c.type==='motor'&&c.p1?.id===id)?id:null;}
+// 從起點 start 拖到 cur 時，算出實際終點：靠近既有接點就吸附對齊。
 // 連桿長度對齊 8mm 孔距；滑軌/滑塊本體屬於外形尺寸，不套孔距限制。
 function resolveDrawEnd(start, cur, startNodeId, snapToHoles = true) {
   if (snapToHoles) {
@@ -145,7 +146,7 @@ export function drawDrawPreview() {
     ring.setAttribute('stroke', '#16a085'); ring.setAttribute('stroke-width', 3);
     svg.appendChild(ring);
   }
-  const labelText = isRail ? ('滑軌 ' + res.len + 'mm') : linkLenLabel(res.len, res.nodeId);
+  const labelText = isRail ? ('滑軌 ' + res.len + 'mm') : linkLenLabel(res.len, motorOutputNode(res.nodeId));
   const isMobileLabel = mobilePrompt();
   const fontSize = isMobileLabel ? 22 : 13;
   const labelPadX = isMobileLabel ? 10 : 0;
@@ -236,7 +237,7 @@ function resolveTriangleBaseEnd(cur) {
   if (endNodeId) {
     const p = displayPointCoords()[endNodeId];
     const d = Math.hypot(p.x - start.pos.x, p.y - start.pos.y);
-    // 接既有孔必須保留 ID 與精確孔距；8mm 格距只用於自由畫新孔。
+    // 對齊既有孔時保留精確孔距；8mm 格距只用於自由畫新孔。
     if (d > 1e-6) return { nodeId: endNodeId, pos: { x: p.x, y: p.y }, len: d };
   }
   const dx = cur.x - start.pos.x, dy = cur.y - start.pos.y;
@@ -380,7 +381,7 @@ function confirmTriangleBase(e) {
 }
 function finishTriangleAsLink() {
   if (S.trianglePoints.length < 2) return;
-  const conn = connectionModule(S.comps, S.trianglePoints.slice(0, 2).map(p => p.nodeId));
+  const conn = connectionModule(S.comps, S.trianglePoints.slice(0, 2).map(p => motorOutputNode(p.nodeId)));
   if (!conn.ok) { rejectCrossModule(exitDrawTriangle); return; }
   pushUndo();
   const n = ++S.counter;
@@ -390,8 +391,8 @@ function finishTriangleAsLink() {
   const len = Math.hypot(b.pos.x - a.pos.x, b.pos.y - a.pos.y);
   const comp = {
     type: 'bar', id: 'Link' + n, color: '#3498db',
-    p1: { id: a.nodeId || 'P' + n + 'a', type: 'floating', x: a.pos.x, y: a.pos.y },
-    p2: { id: b.nodeId || 'P' + n + 'b', type: 'floating', x: b.pos.x, y: b.pos.y },
+    p1: { id: motorOutputNode(a.nodeId) || 'P' + n + 'a', type: 'floating', x: a.pos.x, y: a.pos.y },
+    p2: { id: motorOutputNode(b.nodeId) || 'P' + n + 'b', type: 'floating', x: b.pos.x, y: b.pos.y },
     lenParam: lp, isInput: false, fixedLen: true
   };
   if (conn.moduleId) comp.moduleId = conn.moduleId;
@@ -400,17 +401,16 @@ function finishTriangleAsLink() {
   exitDrawTriangle();
   rebuild(); draw();
   if (selectLink) selectLink('Link' + n);
+  return connectNewMotorOutput(comp.id);
 }
 function finishTriangleFromPoints() {
   if (S.trianglePoints.length < 3) return;
-  const conn = connectionModule(S.comps, S.trianglePoints.slice(0, 3).map(p => p.nodeId));
-  if (!conn.ok) { rejectCrossModule(exitDrawTriangle); return; }
   pushUndo();
   const n = ++S.counter;
   const suffix = ['a', 'b', 'c'];
   const all = S.trianglePoints.slice(0, 3);
   const pts = all.map((p, i) => ({
-    id: p.nodeId || `T${n}${suffix[i]}`,
+    id: `T${n}${suffix[i]}`,
     type: 'floating',
     x: p.pos.x,
     y: p.pos.y
@@ -429,7 +429,6 @@ function finishTriangleFromPoints() {
     comp.jawTurnSign = jawTurnSign(pts[0], pts[1], pts[2]);
   }
   if (S.triangleShape === 'polyline') comp.shapeMode = 'polyline';
-  if (conn.moduleId) comp.moduleId = conn.moduleId;
   S.comps.push(comp);
   S.topo.params[gParam] = dist(pts[0], pts[1]);
   S.topo.params[r1Param] = dist(pts[0], pts[2]);
@@ -532,7 +531,7 @@ function polygonNearFirst(world) {
 }
 // 左鍵：加一個孔（吸附既有接點）。桌機一律由右鍵收尾；觸控可點回第一孔收尾。
 export function addPolygonVertex(e) {
-  if(S.standardBlankDraft){const point=S.standardBlankDraft.origin;if(!point)return;const nearest=nearestNodeId(point),at=nearest&&displayPointCoords()[nearest],snapped=at&&Math.hypot(point.x-at.x,point.y-at.y)<1e-6?nearest:null,origin=point,candidate=makeStandardBlank({...S.standardBlankDraft,n:S.counter+1,origin});if(!candidate.ok){notify(candidate.message);return;}if(snapped){candidate.comp.p1.id=snapped;const conn=connectionModule(S.comps,[snapped]);if(!conn.ok){notify('不同模組只能透過安裝接口連接');return;}if(conn.moduleId)candidate.comp.moduleId=conn.moduleId;}pushUndo();S.counter++;S.comps.push(candidate.comp);Object.assign(S.topo.params,candidate.params);exitDrawPolygon();rebuild();draw();candidate.comp.type==='bar'?selectLink(candidate.comp.id):selectTriangle(candidate.comp.id);return connectNewMotorOutput(candidate.comp.id);}
+  if(S.standardBlankDraft){const point=S.standardBlankDraft.origin;if(!point)return;const nearest=nearestNodeId(point),at=nearest&&displayPointCoords()[nearest],snapped=at&&Math.hypot(point.x-at.x,point.y-at.y)<1e-6?nearest:null,origin=point,candidate=makeStandardBlank({...S.standardBlankDraft,n:S.counter+1,origin});if(!candidate.ok){notify(candidate.message);return;}if(snapped&&candidate.comp.type==='bar'&&motorOutputNode(snapped)){candidate.comp.p1.id=snapped;const conn=connectionModule(S.comps,[snapped]);if(!conn.ok){notify('不同模組只能透過安裝接口連接');return;}if(conn.moduleId)candidate.comp.moduleId=conn.moduleId;}pushUndo();S.counter++;S.comps.push(candidate.comp);Object.assign(S.topo.params,candidate.params);exitDrawPolygon();rebuild();draw();candidate.comp.type==='bar'?selectLink(candidate.comp.id):selectTriangle(candidate.comp.id);return connectNewMotorOutput(candidate.comp.id);}
 
   const cur = worldFromEvent(e) || S.polygonPreview;
   if (!cur) return;
@@ -569,15 +568,15 @@ function buildBarFromPolygonPoints() {
     x: first.pos.x + dx * scale,
     y: first.pos.y + dy * scale
   };
-  const conn = connectionModule(S.comps, [first.nodeId, second.nodeId]);
+  const conn = connectionModule(S.comps, [motorOutputNode(first.nodeId), motorOutputNode(second.nodeId)]);
   if (!conn.ok) { rejectCrossModule(exitDrawPolygon); return; }
   pushUndo();
   const n = ++S.counter;
   const param = 'LL' + n;
   const comp = {
     type: 'bar', id: 'Link' + n, color: '#3498db', fixedLen: true, lenParam: param,
-    p1: { id: first.nodeId || `P${n}a`, type: 'floating', x: first.pos.x, y: first.pos.y },
-    p2: { id: second.nodeId || `P${n}b`, type: 'floating', x: end.x, y: end.y }
+    p1: { id: motorOutputNode(first.nodeId) || `P${n}a`, type: 'floating', x: first.pos.x, y: first.pos.y },
+    p2: { id: motorOutputNode(second.nodeId) || `P${n}b`, type: 'floating', x: end.x, y: end.y }
   };
   if (conn.moduleId) comp.moduleId = conn.moduleId;
   S.comps.push(comp);
@@ -585,18 +584,17 @@ function buildBarFromPolygonPoints() {
   exitDrawPolygon();
   rebuild(); draw();
   selectLink(comp.id);
+  return connectNewMotorOutput(comp.id);
 }
 function buildPolygonPlate() {
   const all = S.polygonPoints;
   if (all.length < 3) return;
-  const conn = connectionModule(S.comps, all.map(p => p.nodeId));
-  if (!conn.ok) { rejectCrossModule(exitDrawPolygon); return; }
   pushUndo();
   const n = ++S.counter;
   const suffix = ['a', 'b', 'c'];
   const solvePts = all.slice(0, 3);                   // 前 3 孔＝機構求解孔
   const pNode = solvePts.map((p, k) => ({
-    id: p.nodeId || `T${n}${suffix[k]}`,
+    id: `T${n}${suffix[k]}`,
     type: 'floating',
     x: p.pos.x,
     y: p.pos.y
@@ -616,7 +614,6 @@ function buildPolygonPlate() {
     gParam, r1Param, r2Param, sign: 1,
     vertices
   };
-  if (conn.moduleId) comp.moduleId = conn.moduleId;
   S.comps.push(comp);
   S.topo.params[gParam] = dist(pNode[0], pNode[1]);
   S.topo.params[r1Param] = dist(pNode[0], pNode[2]);
@@ -690,12 +687,10 @@ export function finishDrawLink(e) {
   const res = resolveDrawEnd(S.drawStart, cur, S.drawStartNodeId, S.drawKind === 'link');
   if (S.drawKind === 'rail') { finishDrawRail(res); return; }
   if(S.drawKind==='disk'&&(res.len<8||res.len>990)){notify('圓盤工作孔距請設在 8–990 mm。');return;}
-  const conn = connectionModule(S.comps, [S.drawStartNodeId, res.nodeId]);
+  const startMotor=motorOutputNode(S.drawStartNodeId),endMotor=motorOutputNode(res.nodeId);
+  const conn = connectionModule(S.comps, [startMotor,endMotor]);
   if (!conn.ok) { rejectCrossModule(exitDrawLink); return; }
   pushUndo();
-  // 暫停在動畫姿勢時，孔的畫面座標可能不同於元件存檔座標；先把接上的孔定在眼前位置。
-  if (S.drawStartNodeId) Model.updatePointCoordsById(S.comps, S.drawStartNodeId, S.drawStart.x, S.drawStart.y);
-  if (res.nodeId) Model.updatePointCoordsById(S.comps, res.nodeId, res.pos.x, res.pos.y);
   const n = ++S.counter;
   const lp = 'LL' + n;
   const comp = {
@@ -708,10 +703,14 @@ export function finishDrawLink(e) {
   if (conn.moduleId) comp.moduleId = conn.moduleId;
   S.comps.push(comp);
   S.topo.params[lp] = res.len;
-  // 端點落在既有接點上就合併相接（這就是「連接」）
-  if (S.drawStartNodeId) S.comps = Model.mergePoints(S.comps, 'P' + n + 'a', S.drawStartNodeId);
-  if (res.nodeId && res.nodeId !== S.drawStartNodeId) S.comps = Model.mergePoints(S.comps, 'P' + n + 'b', res.nodeId);
-  const connectedBoth = !!S.drawStartNodeId && !!res.nodeId && res.nodeId !== S.drawStartNodeId;
+  // 獨立馬達輸出沿用專用接軸；普通孔只對齊，等待插銷。
+  if (startMotor) S.comps = Model.mergePoints(S.comps, 'P' + n + 'a', startMotor);
+  if (endMotor && endMotor !== startMotor) S.comps = Model.mergePoints(S.comps, 'P' + n + 'b', endMotor);
+  // 暫停在動畫姿勢時，孔的畫面座標可能不同於元件存檔座標；先把接上的孔定在眼前位置。
+  if (startMotor) Model.updatePointCoordsById(S.comps, startMotor, S.drawStart.x, S.drawStart.y);
+  if (endMotor) Model.updatePointCoordsById(S.comps, endMotor, res.pos.x, res.pos.y);
+
+  const connectedBoth = !!startMotor && !!endMotor && endMotor !== startMotor;
   exitDrawLink();
   rebuild(); draw();
   selectLink('Link' + n);

@@ -196,7 +196,7 @@ function commit(group, key, value) {
   const result = planFabricationProfile(S.fabrication || FABRICATION_DEFAULTS, group, key, group === 'joint' && key === 'defaultKind' ? raw : numeric);
   if (!result.ok) { notify(result.message); syncFabricationInputs(); return false; }
   if (!result.changed) { syncFabricationInputs(); return false; }
-  const before=mountingWork(S),candidate=structuredClone({...before,fabrication:result.profile}),platePlan=planActuatorPlateHoles(candidate);if(!platePlan.ok){notify(platePlan.message);syncFabricationInputs();return false;}candidate.comps=platePlan.comps;if(!confirmMountingChange(before,candidate,{notify})){syncFabricationInputs();return false;}
+  const before=mountingWork(S),candidate=structuredClone({...before,fabrication:result.profile}),platePlan=planActuatorPlateHoles(candidate,{assembly:true});if(!platePlan.ok){notify(platePlan.message);syncFabricationInputs();return false;}candidate.comps=platePlan.comps;if(!confirmMountingChange(before,candidate,{notify})){syncFabricationInputs();return false;}
   pause(); pushUndo(); S.comps=candidate.comps;applyFabricationProfile(result.profile); rebuild();scheduleAutosave(); draw(); return true;
 }
 export function setExportSetting(key, value) { return commit('export', key, value); }

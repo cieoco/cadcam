@@ -1,3 +1,4 @@
+import {planActuatorPlateHoles} from './actuator-plate-holes.js';
 import {actuatorMountSettings} from './fabrication-profile.js';
 import {compsInFocus,ROOT_TAB} from './design-focus.js';
 import {assemblyWork,assemblyFamily} from './assembly-membership.js';
@@ -42,6 +43,11 @@ export function prepareScopedExport(source,options,format) {
   if(!['svg','dxf'].includes(format))throw Error('不支援的格式');
   const work=structuredClone(source),{context,targets,scope}=resolveExportScope(work,options);
   const targetIds=new Set(targets.map(c=>c.id)),files=[],warnings=[],notices=[],cncList=[],hardware=[];
+  const seats=planActuatorPlateHoles({...context,params:work.topo.params,fabrication:work.fabrication},{assembly:true});
+  if(!seats.ok)throw Error(seats.message);
+  const blocked=new Set((seats.issues||[]).map(i=>i.hostId));
+  context.comps=seats.comps;
+  for(const i of seats.issues||[])if(targetIds.has(i.hostId)){const label=targets.find(c=>c.id===i.hostId)?.name||i.hostId;const message=`未輸出 ${label}：加工待修正，${i.message}`;warnings.push(message);notices.push(message);}
   const emit=(text,name,mime,ids=[])=>{if(scope!=='selected'||ids.some(id=>targetIds.has(id)))files.push({text,name,mime,sourceIds:ids});};
   if(context.comps.some(c=>c.motorType==='n20')){const note=work.fabrication?.drive?.n20Spec===1?'N20特定前端雙孔座與3 mm軸輪轂試作：小孔需另鑽；螺絲牙深、軸向間隙及實物待核對。':'N20 僅通用模擬：固定支架、軸接頭與配對孔尚未提供；中心孔為一般參考孔，製作前須核對。';warnings.push(note);notices.push(note);}
   if(context.comps.some(c=>c.type==='syringe')) {
@@ -86,6 +92,7 @@ export function prepareScopedExport(source,options,format) {
     const skipped=targets.filter(c=>!['anchor','bar','triangle','gear','rack'].includes(c.type)&&!['sprocket','chain'].includes(c.kind));   // 鏈輪與鏈條是買現成的，不出板材檔也不提醒
     if(skipped.length){const notice=`未提供獨立板材檔：${skipped.map(c=>c.id).join('、')}`;warnings.push(notice);notices.push(notice);}
   }
+  for(let i=files.length-1;i>=0;i--)if(files[i].sourceIds?.some(id=>blocked.has(id)))files.splice(i,1);
   if(!files.length)throw Error(warnings.filter(w=>w.startsWith('未輸出 ')).join(' ')||'這個範圍沒有可匯出的板材零件；請選板身，不是接點。');
   if(new Set(files.map(f=>f.name)).size!==files.length)throw Error('零件檔名重複，請調整零件名稱後再匯出。');
   // cncWarnings 另列一份，供合併 CNC 排版顯示；逐件輸出內容不變。

@@ -4,7 +4,7 @@
 //  a) delete each output body -> the motor stays as an independent motor, work normalizes and compiles, one undo restores deep-equal
 //  b) delete each motor part -> the output part is ordinary (no motor data left), the motor is gone
 //  c) copy each output body -> exactly one more part, no extra motor
-//  d) release / return / leave and delete agree with the recorded results of the pre-M1 planners (test/fixtures/motor-plan-expected.json)
+//  d) release / return / leave and delete agree with recorded results (including approved gear-motor retention) (test/fixtures/motor-plan-expected.json)
 //  e) an edit that does not touch motors leaves every motor datum deep-equal on every example (no drift from the conversion)
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
@@ -53,7 +53,7 @@ for(const [name,w] of works){
   for(const P of motors){
     const body=P.drives&&w.comps.find(c=>c.id===P.drives.body);
     const key=`${name}/${P.id}`;
-    if(body?.type==='bar'){
+    if(['bar','gear'].includes(body?.type)){
       // a) delete the output body
       nA++;const r=edit(w,x=>planDeleteParts(x,{part:x.comps.find(c=>c.id===body.id),shared:[]}));
       const snap=normalizeSnapshot(toSnapshot(r.S.comps,{params:r.S.topo.params},r.S.counter,{fabrication:r.S.fabrication}));
@@ -99,5 +99,5 @@ for(const [name,w0] of works){
   for(const it of offPlateMotors(w.comps))for(const [k,fn] of [['back',planMotorReturn],['leave',planMotorLeave]]){const key=`${k}:${name}:${it.id}`;let r;try{r=fn(structuredClone(w),it.id);}catch(e){r={ok:false,message:String(e)};}cmp(key,r,w);}
 }
 const missing=Object.keys(expected).filter(k=>!seen.has(k));
-check(`d) release / return / leave / delete equal the recorded pre-M1 results (${nD} cases)`,!off.length&&!missing.length,[...off.slice(0,5),...missing.slice(0,3).map(k=>'not run: '+k)].join(' ; '));
+check(`d) release / return / leave / delete equal the recorded results (${nD} cases)`,!off.length&&!missing.length,[...off.slice(0,5),...missing.slice(0,3).map(k=>'not run: '+k)].join(' ; '));
 report('motor-part-plans');

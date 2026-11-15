@@ -1,3 +1,4 @@
+import {expandPinLocks} from './pin-lock.js';
 import {localHoles,expandLocalHoles,passiveLocalHoles,withMotorShaftHoles} from './local-holes.js';
 import {gearTrain} from './gear-train.js';
 import {expandSyringes} from './syringe.js';
@@ -57,6 +58,16 @@ function compileRegisteredParts(components, phase, ctx) {
 }
 
 export function compileTopology(components, topology, solvedPoints) {
+    if(!topology._pinLocksExpanded&&components.some(c=>c.pinLocks?.length)){
+        const expanded=expandPinLocks(components,topology.params);if(!expanded.ok)throw Error(expanded.message);
+        const params={...topology.params};for(const c of expanded.extra)for(const k of [c.gParam,c.r1Param,c.r2Param])params[k]=k;
+        const result=compileTopology(expanded.comps,{...topology,params,_pinLocksExpanded:true},solvedPoints),ids=new Set(expanded.extra.map(c=>c.id)),triangles=new Set(expanded.extra.map(c=>[c.p1.id,c.p2.id,c.p3.id].join('|')));
+        result.parts=result.parts.filter(p=>!ids.has(p.id));
+        result.visualization.links=result.visualization.links.filter(l=>![...ids].some(id=>l.id?.startsWith(id)));
+        result.visualization.polygons=result.visualization.polygons.filter(p=>!triangles.has(p.points.join('|')));
+        return result;
+    }
+
     const mounted=withMotorShaftHoles(components);
     if(mounted.some((c,i)=>c!==components[i]))return compileTopology(mounted,topology,solvedPoints);
     if(topology.bodyJoint!==false&&components.some(c=>c.standardBlank&&localHoles(c).length>=128)){

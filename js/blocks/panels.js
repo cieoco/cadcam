@@ -119,6 +119,7 @@ export function updateFrameEditor() {
 
 // ---- 角色編輯（接點：自由 / 地錨 / 馬達）----
 export function updateRoleEditor() {
+  import('./pin-ui.js').then(m=>m.renderPanel());
   const editor = document.getElementById('roleEditor');
   if (!editor) return;
   if (!S.selectedNodeId || !hasPoint(S.selectedNodeId)) {
@@ -203,11 +204,6 @@ export function updateRoleEditor() {
     const ground = pointIsGround?.(S.selectedNodeId), unlocked = ground && isGroundPositionUnlocked?.(S.selectedNodeId);
     lockBtn.style.display = ground ? '' : 'none'; lockBtn.textContent = unlocked ? '重新鎖定位置' : '解除位置鎖定';
     lockBtn.classList.toggle('trace-on', Boolean(unlocked));
-  }
-  // 「分離」只在此接點被多個端點共用（兩桿件鎖在同一點）時出現
-  const splitBtn = document.getElementById('splitBtn');
-  if (splitBtn) {
-    splitBtn.style.display = (pointUseCount && pointUseCount(S.selectedNodeId) >= 2) ? '' : 'none';
   }
   editor.style.display = 'flex';
   updateServoEditor();

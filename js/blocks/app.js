@@ -69,7 +69,7 @@ const assemblyViewGeometrySource=createPartGeometrySource();
 import * as Render from './render.js';   // SVG 繪製基元（純呈現）
 import * as Panels from './panels.js';   // 編輯面板呈現（讀 S + 寫 DOM）
 import * as Tools from './tools.js';     // 工具模式互動（畫桿 / 畫滑軌 / 畫三點桿 / 連桿升級滑軌）
-import * as Input from './input.js?v=20261007_m2b';     // 指標 / 手勢互動（拖曳 + 吸附合併 + pinch 縮放）
+import * as Input from './input.js?v=20261007_m2b';     // 指標 / 手勢互動（拖曳改姿態 + pinch 縮放）
 import * as Model from './model.js';
 import { invalidPoseStatus, isMechanismEdit } from './status-text.js';
 import { ownedParamKeys } from './part-types.js';   // 零件型別表：擁有的參數 key
@@ -279,6 +279,7 @@ function applySnapshot(norm, { recordUndo = true, fit = true, source = 'external
   Store.alignSavedInputPhase(norm);   // 開啟即為存檔姿勢（θ 回到 0°）
   setTimeout(()=>{integrityHints('check');loadIntegrity();loadDrive();},0);   // 套用後再檢查（lazy），不拖慢開檔
   S.comps = norm.comps;
+  if(S.comps.some(c=>c.standardBlank?.kind==='arms'))import('./arm-blank.js').then(()=>{rebuild({save:false});draw();});
   S.modules = Array.isArray(norm.modules) ? norm.modules : [];
   knownCompIds = null;   // 載入／復原的零件不是「新畫的」，不要歸給焦點模組
   gq=1;
@@ -797,14 +798,15 @@ const sliderMountInfo = (id) => Model.sliderMountInfo(S.comps, id);
 // 以「世界座標 world」為中心，找畫面上最近的接點（排除 exclude），門檻 maxDist。
 const nearestDisplayToPoint = (world, exclude = [], maxDist = snapWorld()) => {
   const m = displayCoords();
-  let best = null, bestD = maxDist;
+  let best = null, bestD = maxDist,gear=null,gearD=maxDist;
   for (const id in m) {
     if (isHiddenSliderRailPoint(id) || isBoxReference(id)) continue;
     if (exclude.includes(id)) continue;
     const d = Math.hypot(m[id].x - world.x, m[id].y - world.y);
+    if(d<gearD&&S.comps.some(c=>c.type==='gear'&&c.holes?.some(h=>h.id===id))){gearD=d;gear=id;}
     if (d < bestD) { bestD = d; best = id; }
   }
-  return best;
+  return gear||best;
 };
 // 找最接近「某接點目前畫面位置」的另一個接點（拖曳吸附用）。
 // 有模組時候選逐一比對：跨模組（D2）的候選要略過，不能只檢查最終挑到的那個。
@@ -814,15 +816,18 @@ const nearestDisplayTo = (id, exclude = [], world = null) => {
   if (!d) return null;
   const maxDist = snapWorld();
   const excludeSet = [id, ...exclude];
-  let best = null, bestD = maxDist;
+  const own=new Set(Model.pointRefs(S.comps,id).map(r=>r.comp));
+  let best = null, bestD = maxDist,gear=null,gearD=maxDist;
   for (const cid in m) {
     if (isHiddenSliderRailPoint(cid) || isBoxReference(cid)) continue;
     if (excludeSet.includes(cid)) continue;
+    if(Model.pointRefs(S.comps,cid).some(r=>own.has(r.comp)))continue;
     if (S.modules.length && !canMergePoints(S.comps, id, cid)) continue;
     const dist = Math.hypot(m[cid].x - d.x, m[cid].y - d.y);
+    if(dist<gearD&&S.comps.some(c=>c.type==='gear'&&c.holes?.some(h=>h.id===cid))){gearD=dist;gear=cid;}
     if (dist < bestD) { bestD = dist; best = cid; }
   }
-  return best;
+  return gear||best;
 };
 // 若 id 是某根「馬達輸入桿」的動端（非馬達中心那頭），回那根桿；否則 null。
 const inputCrankMovingEnd = (id) => S.comps.find(c =>
@@ -854,8 +859,7 @@ const removeAnchorsAtPoint = (id) => { S.comps = Model.removeAnchorsAtPoint(S.co
 const setPointType = (id, type) => Model.setPointType(S.comps, id, type);
 const roleLabel = (id) => Model.roleLabel(S.comps, id);
 const hasPoint = (id) => Model.hasPoint(S.comps, id);
-// 拖到另一個孔上放開＝接孔：規劃與提交在按需載入的 connect-ops.js（共用編輯流程：一致性檢查、一次復原、一行回饋）。
-const mergePoints = (from, to, drop) => import('./connect-ops.js').then(m => m.mergeDropped({S, from, to, drop, transient, pushUndo, pause, rebuild, draw: () => { recordManualTrace(); draw(); }})).catch(() => transient('接孔沒有完成，請再試一次。'));
+// 普通孔只由插銷工具接合；拖曳負責姿態，動力輸出保留專用安裝。
 const recomputeLengths = () => Model.recomputeLengths(S.comps, S.topo);
 const fixedLinkFor = (id) => Model.fixedLinkFor(S.comps, id);
 const freeLinkForPoint = (id) => Model.freeLinkForPoint(S.comps, id);
@@ -977,7 +981,7 @@ async function configureMotorMount(nodeId=null,initialOutputId='') {
   finally { motorInstallationLoading=false; }
   if(S.mode!=='design'||snapshotStr()!==before||S.designFocus!==focus){transient('作品已變更，請重新選擇安裝。');return;}
   openMotorInstallation({stage:svg,redraw:draw,source:{comps:scoped,params:S.topo.params,fabrication:S.fabrication,counter:S.counter,moduleId:focus==='#root'?null:focus},points:displayCoords(),
-    review:(plan,notify)=>{if(S.mode!=='design'||S.designFocus!==focus||snapshotStr()!==before){notify('作品已變更，請重新開啟安裝。');return false;}const candidate=mountingCandidate(JSON.parse(before),plan,scoped);const order=new Map(JSON.parse(before).comps.map((c,i)=>[c.id,i]));candidate.comps.sort((a,b)=>(order.get(a.id)??Infinity)-(order.get(b.id)??Infinity));const holes=planActuatorPlateHoles(candidate);if(!holes.ok&&!plan.release){notify(holes.message);return false;}if(holes.ok)candidate.comps=holes.comps;if(!confirmMountingChange(JSON.parse(before),candidate,{notify}))return false;plan.fullWork=candidate;return true;},
+    review:(plan,notify)=>{if(S.mode!=='design'||S.designFocus!==focus||snapshotStr()!==before){notify('作品已變更，請重新開啟安裝。');return false;}const candidate=mountingCandidate(JSON.parse(before),plan,scoped);const order=new Map(JSON.parse(before).comps.map((c,i)=>[c.id,i]));candidate.comps.sort((a,b)=>(order.get(a.id)??Infinity)-(order.get(b.id)??Infinity));const holes=planActuatorPlateHoles(candidate,{assembly:true});if(!holes.ok&&!plan.release){notify(holes.message);return false;}if(holes.ok)candidate.comps=holes.comps;if(!confirmMountingChange(JSON.parse(before),candidate,{notify}))return false;plan.fullWork=candidate;return true;},
     motion:{thetaDeg:S.theta,motorAngles:motorAnglesNow()},type:S.pendingMotorType,
     existingId:existing?.id,initialOutputId,motorId:nextMotorId(),confirm:plan=>{
       if(S.mode!=='design'||snapshotStr()!==before||S.designFocus!==focus)return false;
@@ -1160,7 +1164,7 @@ const nodeEditor = createNodeEditor({
   displayCoords: () => displayCoords()
 });
 const { changeStroke, changeServoAngle,
-        setNodeRole, changeNodePos, removeNodeMotor:removeAttachedMotor, splitNode,
+        setNodeRole, changeNodePos, removeNodeMotor:removeAttachedMotor,
         toggleTracePoint, toggleMeasurementReference,
         toggleGroundPositionLock, isGroundPositionUnlocked, relockGroundPosition } = nodeEditor;
 
@@ -1281,7 +1285,10 @@ function frameConnectorNodes() { const w=inDesign()?{comps:S.comps,modules:S.mod
 
 let gq=1,gm;
 const gc=(f,...a)=>import('./grid-marks.js').then(m=>(gm=m)[f](...a));
+let motorFabricationIssues=[];
 function rebuild({save=true}={}) {
+  const seats=planActuatorPlateHoles({comps:S.comps,params:S.topo.params,modules:S.modules,fabrication:S.fabrication},{assembly:true});
+  motorFabricationIssues=seats.issues||[];
   syncSliderGeometries();
   adoptNewComps();               // H1：焦點是模組時，新畫的零件歸到那個模組
   // 六面候選與正式作品共用normalize → rebake → compile → refresh次序。
@@ -1603,6 +1610,8 @@ function gearMeshHasWarning() {
 function updateMechanismStatus(sol = null) {
   const el = document.getElementById('mechanismStatus');
   if (!el) return;
+  const seatIssue=motorFabricationIssues.find(i=>simulationScope().comps.some(c=>c.id===i.hostId));
+  if(seatIssue){el.dataset.state='warn';el.dataset.chip='fabrication';el.textContent='已固定 · 加工待修正';el.title=seatIssue.message+' 安裝已保留；可修改、保存或解除，問題板件暫不輸出。';return;}
   if(simulationScope().comps.some(c=>c.type==='motor')){
     el.dataset.state='warn';el.dataset.chip='';
     el.textContent='馬達未接輸出 · 可先保存';
@@ -2052,7 +2061,7 @@ function drawNow() {
     svg.appendChild(ring);
   }
 
-  // 節點（可拖曳；拖近別的接點會吸附合併）
+  // 節點（可拖曳；普通孔由插銷工具接合）
   // 節點型別（rect/circle）、樣式、半徑只由結構性狀態（地錨/馬達/固定孔/S.dragId）決定——
   // 播放期間這些都不變，故建一次、每幀只更新座標。
   // 齒輪輪緣銷不畫成通用浮動節點——改由齒輪自己畫成「螺栓孔」（見上面齒輪繪製）。
@@ -2085,6 +2094,8 @@ function drawNow() {
   });
 
   drawGearManualHandles(pts);
+  if(pinUI)pinUI.renderPins({svg,comps:vComps,points:pts,project:p=>({x:TX(p.x),y:TY(p.y)}),registerUpdate:u=>frameUpdaters.push(u)});
+  else loadPinUI().then(()=>draw());
   drawFrameHandle();   // 機架移動把手：畫在節點之上，才點得到、拖得動
   const updateMemberDimensions = drawMemberDimensions({
     svg, comp: memberEditor.displayComp(memberEditor.selected()), points: pts, params: S.topo.params,
@@ -2712,7 +2723,7 @@ function pickMotorType(type) {
 
 // rackPinionThetaRange（有限齒條的 theta 範圍）已隨齒輪 / 齒條域移到 ./gear-editor.js
 
-// ---- 拖曳接點 + 靠近吸附合併（這就是「連接」）----
+// ---- 拖曳接點改姿態；普通連接統一由插銷工具建立----
 // ---- 節點 / 連桿 / 機架拖曳處理已抽到 ./input.js（以 Input.* 呼叫；事件監聽見其 init）----
 
 // ---- 選取連桿 + 改長度 ----
@@ -2806,12 +2817,19 @@ function clearOffHomeModuleSelection() {
 
 // D3 守門包住 Input.onNodeDown：按到已安裝模組的節點時，先回組裝姿態，這一下不下拉。
 // renderNodes 與 Render.init 共用同一個包裝，行為才一致。
-function guardedNodeDown(e, id) {
-  if(e.target?.dataset?.nodeHit) id=driveDrag?.nearestHit(e,id) || id;
+function guardedNodeDown(e, id, chosen) {
+  if(!chosen)id=driveDrag?.nearestHit(e,id)||id;
   if (isBoxReference(id)) { e?.preventDefault?.(); e?.stopPropagation?.(); return; }
   if (ensureModuleHome(moduleOfPoint(S.comps, id))) { e?.preventDefault?.(); e?.stopPropagation?.(); return; }
   Input.onNodeDown(e, id);
 }
+
+let pinUI=null,pinReady;
+function loadPinUI(){return pinReady ||= import('./pin-ui.js').then(m=>{
+  pinUI=m;m.init({svg,pushUndo,pause,rebuild,draw,transient,fit:fitView,points:displayCoords,save:scheduleAutosave,
+    banner:setBanner,clear:clearBanner,cancel(){Tools.exitDrawLink();Tools.exitDrawTriangle();Tools.exitDrawPolygon();cancelMotorMode();},
+    select(id){S.selectedLinkId=S.selectedTriangleId=S.selectedGearId=S.selectedSliderId=null;S.selectedNodeId=id;Panels.updateRoleEditor();openMobileEditPanel();draw();}});return m;
+});}
 
 function deselectLink() {
   if (!S.selectedLinkId && !S.selectedTriangleId && !S.selectedSliderId && !S.selectedGearId && !S.selectedSprocketId) return;
@@ -3262,6 +3280,8 @@ const facePackDownload=createFaceExportCoordinator({readSource:facePackSource,re
   saveBuildPack(html,title,result.plan.parts.length,result.work);
 }});
 async function downloadBuildPack() {
+  const seats=planActuatorPlateHoles({comps:representationWork().comps,params:S.topo.params,modules:S.modules,fabrication:S.fabrication});
+  if(!seats.ok){transient(`尚未產生製作包：加工待修正，${seats.message}`);return;}
   if(hydraulic?.active())return hydraulic.exportWork('pack');
   if(usesFaceExport(facePackSource())){
     const result=await facePackDownload.run();
@@ -3352,7 +3372,7 @@ function init() {
   Input.init({ svg, draw, rebuild, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle,
                worldFromEvent, pointCoords, mobilePrompt,
                snapshotStr, updateUndoBtn, nearestDisplayTo, nearestDisplayToPoint, displayCoords,
-               movePointById, updatePointCoordsById, recomputeLengths, mergePoints,
+               movePointById, updatePointCoordsById, recomputeLengths,
                isFreeLink, freeLinkForPoint, freeTriangleForPoint, pinnedTriangleForPoint, lockedTriangleVertex, fixedLinkFor, inputCrankMovingEnd,
                handleMotorOnNode, setSliderDetailRows, frameNodeIds, pointIsGround, recordManualTrace, solvePinnedConstraints,
                nodeDownEntry: guardedNodeDown,
@@ -3406,7 +3426,7 @@ function init() {
   if (!seen && !loaded && !benchmarkSession && !gripperPilotSession && !new URLSearchParams(location.search).has('example')) openStartGallery(true);
 }
 
-window.blocks = { pushUndo, pause, rebuild, scheduleAutosave, openStandardBlank:kind=>import('./standard-blank-ui.js').then(m=>m.openStandardBlank(kind,{start:Tools.startStandardBlank,update:Tools.updateStandardBlank,confirm:Tools.confirmStandardBlank,cancel:Tools.cancelStandardBlank})), selectModuleTarget, draw, startChainDrive, changeSprocketTeeth, setSprocketTeeth, alignChain, nudgeChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openMotorChoice, pickMotorType, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawDisk: Tools.startDrawDisk, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, splitNode, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, releaseGearMesh, bringPart, toggle3D, fitView, undo, saveFile, exportStep: () => import('./step-export.js').then(m => m.exportStepFile({ S, design: inDesign(), motorAngles: motorAnglesNow(), notify: transient })), setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
+window.blocks = { inspectPin:at=>loadPinUI().then(m=>m.inspectPin(at)), startPin:()=>loadPinUI().then(m=>m.startPin()), pushUndo, pause, rebuild, scheduleAutosave, openStandardBlank:kind=>import('./standard-blank-ui.js').then(m=>m.openStandardBlank(kind,{start:Tools.startStandardBlank,update:Tools.updateStandardBlank,confirm:Tools.confirmStandardBlank,cancel:Tools.cancelStandardBlank})), selectModuleTarget, draw, startChainDrive, changeSprocketTeeth, setSprocketTeeth, alignChain, nudgeChain, deleteSprocketDrive, setSelectedMotorType, openAssemblySequence, openDesignList, checkSliderTask, exportVideo, setViewPlane, setDesignFocus: id => setDesignFocus(id), newDesign, designTabs: () => designTabs(S.comps, S.modules, focusOpts()), setMode: bench.setMode, benchSelect: bench.select, benchPickPort: bench.pickPort, benchCommit: bench.commit, benchCancel: bench.cancel, benchAdjust: bench.adjust, benchShowAll: bench.setShowAll, benchDebug: bench.debug, mateWizardDebug: bench.mateWizardDebug, benchLiveCheck: bench.liveCheck, benchTimeline: bench.runTimeline, benchJump: bench.jumpTo, placeMotor, openMotorChoice, pickMotorType, pickLinkTool, setMobilePanel, changeServoAngle, changeStroke, flipSlider, toggleSliderBase, convertLinkToSlider: Tools.convertLinkToSlider, changeSliderBodyLen, changeSliderCarrierLen, changeSliderRailOffset, changeSliderTravelStart, changeSliderTravelEnd, changeNodePos, addAnchor, addGearPair, addRackPinion, toggleRackOrientation, changeGearModule, changeGearTeeth, changeGearPinRadius, changeGearPinHoleDiameter, changeRackLength, changeRackBodyHeight, changeRackSlotLength, changeRackSlotWidth, applyRackStops, clearRackStops: gearEditor.clearRackStops, addLink, startDrawLink: Tools.startDrawLink, startDrawDisk: Tools.startDrawDisk, startDrawRail: Tools.startDrawRail, startDrawPolygon: Tools.startDrawPolygon, startDrawTriangle: () => Tools.startDrawTriangle('triangle'), startDrawJaw: () => Tools.startDrawTriangle('jaw'), clearAll, confirmClearAll, togglePlay, toggleMotorDirection, setLen, changeLen, setTriSide, setTriangleShapeMode, addTriangleOutlinePoint, selectLink, setNodeRole, removeNodeMotor, toggleTracePoint, toggleMeasurementReference, toggleGroundPositionLock, configureMotorMount, setMotorWorldMount, setMotorOrientation, toggleMotorReverse, deleteSelectedPart, releaseGearMesh, bringPart, toggle3D, fitView, undo, saveFile, exportStep: () => import('./step-export.js').then(m => m.exportStepFile({ S, design: inDesign(), motorAngles: motorAnglesNow(), notify: transient })), setExportSetting: Settings.setExportSetting, setTtMountSetting: Settings.setTtMountSetting, setMg995MountSetting: Settings.setMg995MountSetting, setCncSetting: Settings.setCncSetting, setDriveSetting: Settings.setDriveSetting, setJointSetting: Settings.setJointSetting, exportLinksSvg, exportLinksDxf, downloadBuildPack, downloadAdapterStl, openFile, share, loadExample, requestExample };
 window.blocks.changeFrameGround = changeFrameGround;
 window.blocks.setFrameSize = setFrameSize;
 for(const name of ['startFrameHole','setFrameHole','removeFrameHole'])window.blocks[name]=(...args)=>frameAction(name,...args);

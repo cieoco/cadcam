@@ -37,4 +37,19 @@ export function restorePassiveHoles(groups,points){
 }
 
 // Retain occupied shaft references for kinematics only; never re-enable machining holes.
-export function withMotorShaftHoles(components){return components.map(c=>{const hs=(c.standardBlank?.mountHoles||[]).filter(h=>!components.some(p=>p.id===`localHole.${c.id}.${h.id}`)&&!localHoles(c).some(p=>p.id===h.id)&&components.some(m=>m.motorMount?.frameBody===c.id&&m.motorMount.center===h.id));return hs.length?{...c,holes:[...(c.holes||[]),...hs]}:c;});}
+export function withMotorShaftHoles(components){
+ const fixed=new Set(components.filter(c=>!(c.motorMount?.frameBody&&['gear','motor'].includes(c.type))).flatMap(c=>[...['p1','p2','p3','m1','m2'].map(k=>c[k]),...localHoles(c),...(c.standardBlank?.mountHoles||[])]).filter(p=>p?.type==='fixed').map(p=>p.id));
+ return components.map(c=>{
+  let next=c;
+  // A gear shaft on a real plate follows that plate's grounding. Derive this
+  // compile-only constraint so grounding/un-grounding never leaves a stale pin.
+  const host=c.type==='gear'&&c.motorMount?.frameBody&&components.find(h=>h.id===c.motorMount.frameBody);
+  if(host?.type==='triangle'&&host.standardBlank?.kind==='plate'&&c.p1?.id===c.motorMount.center){
+   const ids=[host.p1,host.p2,host.p3,...localHoles(host),...(host.standardBlank.mountHoles||[])].filter(Boolean).map(p=>p.id);
+   const type=new Set(ids.filter(id=>fixed.has(id))).size>=2?'fixed':'floating';
+   if(c.p1.type!==type)next={...c,p1:{...c.p1,type}};
+  }
+  const hs=(c.standardBlank?.mountHoles||[]).filter(h=>!components.some(p=>p.id===`localHole.${c.id}.${h.id}`)&&!localHoles(c).some(p=>p.id===h.id)&&components.some(m=>m.motorMount?.frameBody===c.id&&m.motorMount.center===h.id));
+  return hs.length?{...next,holes:[...(next.holes||[]),...hs]}:next;
+ });
+}

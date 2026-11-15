@@ -35,7 +35,7 @@ const snapshotStr=()=>JSON.stringify({comps:S.comps,params:S.topo.params,theta:S
 Input.init({selectLink:noop,selectTriangle:noop,svg,draw:noop,rebuild:noop,pause:noop,cancelMotorMode:noop,deselectLink:noop,
   worldFromEvent:e=>({x:e.clientX,y:e.clientY}),pointCoords:()=>Model.pointCoords(S.comps),mobilePrompt:()=>false,
   movePointById:(id,dx,dy)=>Model.movePointById(S.comps,id,dx,dy),updatePointCoordsById:(id,x,y)=>Model.updatePointCoordsById(S.comps,id,x,y),
-  snapshotStr,updateUndoBtn:noop,nearestDisplayTo:()=>null,frameNodeIds:()=>new Set(),recomputeLengths:noop,mergePoints:noop,
+  snapshotStr,updateUndoBtn:noop,nearestDisplayTo:()=>null,frameNodeIds:()=>new Set(),recomputeLengths:noop,mergePoints:(from,to,drop)=>driveHooks.merge?.(from,to,drop),
   pointIsGround:id=>Model.pointIsGround(S.comps,id),setSliderDetailRows:noop,openMobileEditPanel:noop,transient:m=>msgs.push(m),
   freeLinkForPoint:id=>Model.freeLinkForPoint(S.comps,id),freeTriangleForPoint:id=>Model.freeTriangleForPoint(S.comps,id),
   pinnedTriangleForPoint:id=>Model.pinnedTriangleForPoint(S.comps,id),lockedTriangleVertex:id=>Model.lockedTriangleVertex(S.comps,id),
@@ -53,4 +53,4 @@ export async function gesture(down,moves,pointerType='mouse',id=1){
   await settle();emit('pointerup',id,...(moves.at(-1)||[100,100]),noop,pointerType);return msgs.slice();
 }
 export function load(w){S.comps=structuredClone(w.comps);S.modules=structuredClone(w.modules||[]);S.topo={params:{...w.params},tracePoints:[],dimensions:[],loads:[]};S.fabrication=w.fabrication;S.mode='design';
-  S.selectedLinkId=S.selectedTriangleId=S.selectedNodeId=S.selectedSliderId=S.selectedGearId=null;S.dragId=null;S.dragLinkId=null;S.dragProbe=null;S.preDragSnap=null;msgs=[];dom.unused.clear();dom.under=[];Object.assign(driveHooks,{body:null,to:null,crank:null,solve:null});crankTurns.length=0;}
+  S.selectedLinkId=S.selectedTriangleId=S.selectedNodeId=S.selectedSliderId=S.selectedGearId=null;S.dragId=null;S.dragLinkId=null;S.dragProbe=null;S.preDragSnap=null;msgs=[];dom.unused.clear();dom.under=[];Object.assign(driveHooks,{body:null,to:null,crank:null,solve:null,merge:null});crankTurns.length=0;}

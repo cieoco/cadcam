@@ -1,6 +1,6 @@
 // C6：零件互相引用的欄位表（單一來源）。只讀這些欄位，不掃任意字串；relations.attachmentsOf 與啟動路徑共用。
 import {pointKeysFor} from './part-types.js';
-const F=[['syringe','a.componentId','b.componentId','outputId','jawIds','passiveTips.hostId'],
+const F=[['pin-lock','pinLocks.with','pinLocks.at','pinLocks.ownRef','pinLocks.otherRef'],['syringe','a.componentId','b.componentId','outputId','jawIds','passiveTips.hostId'],
   ['motor','motorCarrier','motorMountPoint','mountLocatorPoint','motorMount.center','motorMount.frameBody','motorMount.outputBody'],
   ['fusion','barFusionRoot','barFusion.members','barFusion.points.id','barFusion.framePointIds'],['plate-gear-fusion','fusedWith'],
   ['mesh','mesh'],['rack','pinion','framePins'],['belt','driver','driven'],['reference','frameHole.a','frameHole.b']];

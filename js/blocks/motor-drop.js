@@ -1,6 +1,6 @@
 import {blankGeometry,isOutputBlank} from './standard-blank.js';
 import {pointKeysFor} from './part-types.js';
-import {actuatorHostPoints,actuatorPoint,planMotorInstallation} from './actuator-installation.js';
+import {actuatorHostPoints,actuatorPoint,fixedPlate,planMotorInstallation} from './actuator-installation.js';
 import {motorCarrierFrame,resolveMotorOrientation} from './motor-orientation.js';
 import {isFreeBody} from './model.js';
 import {gearLabel} from './gear-plan.js';
@@ -90,19 +90,22 @@ function planDraggedGearOutput(source,gear,motor,points,motion){
  const pinIds=new Set(racks.flatMap(r=>r.framePins||[])),pins=source.comps.filter(c=>c.type==='anchor'&&pinIds.has(c.p1?.id));
  const body=[...train,...racks,...pins],mine=new Set(body),guard=new Set(pins.map(c=>c.p1.id));
  const ids=new Set(body.flatMap(c=>[...pointKeysFor(c).map(k=>c[k]?.id),...localHoles(c).map(h=>h.id)]).filter(Boolean));
- const held=body.some(c=>pointKeysFor(c).some(k=>{const p=c[k];return p&&!guard.has(p.id)&&(p.type==='fixed'||p.physicalMotor);})||c.isInput||c.fusedWith||source.comps.some(o=>o.fusedWith===c.id))
+ const at=points[gear.p1.id]||gear.p1,to=points[motor.p1.id]||motor.p1,dx=to.x-at.x,dy=to.y-at.y;
+ const stationary=Math.hypot(dx,dy)<1e-6; // Reconnecting in place must not move a fixed companion axle.
+ const held=body.some(c=>pointKeysFor(c).some(k=>{const p=c[k];return p&&!guard.has(p.id)&&((p.type==='fixed'&&!stationary)||p.physicalMotor);})||c.isInput||c.fusedWith||source.comps.some(o=>o.fusedWith===c.id))
   ||source.comps.some(o=>!mine.has(o)&&o!==motor&&[...pointKeysFor(o).map(k=>o[k]?.id),...localHoles(o).map(h=>h.id)].some(id=>ids.has(id)));
  if(held)return fail('這組齒輪已接上其他零件或固定孔，請先分開，或在馬達安裝設定改接。');
  const seed=structuredClone(source),mover=new Set(body.map(c=>c.id)),moved=seed.comps.filter(c=>mover.has(c.id));
- const at=points[gear.p1.id]||gear.p1,to=points[motor.p1.id]||motor.p1,dx=to.x-at.x,dy=to.y-at.y,pose={...points};
+ const pose={...points};
  for(const c of moved)for(const k of pointKeysFor(c)){const p=c[k];if(!p)continue;const q=points[p.id]||p;p.x=q.x+dx;p.y=q.y+dy;pose[p.id]={x:p.x,y:p.y};}
  const fromId=gear.p1.id;
  for(const c of moved)for(const k of pointKeysFor(c))if(c[k]?.id===fromId)c[k].id=motor.p1.id;
  // 被帶動的齒輪軸心沒有別的支撐就無法求解：和內建齒輪範例一樣固定在機架上（類型 fixed，座標不變）。
- for(const g of moved)if(g.type==='gear'&&g.p1.id!==motor.p1.id)g.p1.type='fixed';
+ const host=source.comps.find(c=>c.id===motor.motorMount?.frameBody),grounded=!host||fixedPlate(host,source.comps)||host.type==='bar'&&[host.p1,host.p2].every(p=>p.type==='fixed');
+ if(grounded)for(const g of moved)if(g.type==='gear'&&g.p1.id!==motor.p1.id)g.p1.type='fixed';
  pose[motor.p1.id]={...to};
  const result=planPlacedMotorOutput(seed,gear.id,pose,motion);
- if(result.ok&&train.size>1)result.message=`已把${name}接到馬達輸出軸；嚙合的齒輪一起移到位並固定軸心。`;
- else if(result.ok)result.message=`已把${name}接到馬達輸出軸。`;
+ if(result.ok&&train.size>1&&grounded)result.message=`已把${name}接到馬達輸出軸；嚙合的齒輪一起移到位並固定軸心。`;
+ else if(result.ok)result.message=`已把${name}接到馬達輸出軸${result.simulation.ok?'。':'；已保留組裝，尚未完成固定，暫時無法試動。'}`;
  return result;
 }

@@ -21,13 +21,14 @@ const KEEP = {keepIdentity: true, pruneRefs: false, clearSelection: false, messa
 export function planResize(work, {componentId, id, raw, mirrorPair = false, exact = false, topo = {}, holeDiameter = () => undefined, reshapeTriangle = () => {}, validateCandidate = () => ''}) {
   const comp = work.comps.find(c => c.id === componentId);
   if (!comp) return {ok: true, unchanged: true};
+  if(work.comps.some(c=>c.pinLocks?.some(r=>c.id===componentId||r.with===componentId)))return {ok:false,message:'此零件仍有鎖固插銷；請先改為可轉，再修改尺寸。'};
   const candidate = () => structuredClone({comps: work.comps, modules: work.modules, params: work.params, fabrication: work.fabrication});
   // 座板上原本就有的問題（例如馬達離開原孔）不擋不相干的修改；只擋這次新造成的。
   const withPlate = (draft, invalid) => {
     if (invalid) return {ok: false, message: invalid};
-    const plate = planActuatorPlateHoles(draft);
+    const plate = planActuatorPlateHoles(draft,{assembly:true});
     if (plate.ok) draft.comps = plate.comps;
-    else if (planActuatorPlateHoles({comps: work.comps, modules: work.modules, params: work.params, fabrication: work.fabrication}).ok) return {ok: false, message: plate.message};
+    else if (planActuatorPlateHoles({comps: work.comps, modules: work.modules, params: work.params, fabrication: work.fabrication},{assembly:true}).ok) return {ok: false, message: plate.message};
     return {ok: true, comps: draft.comps, params: draft.params, modules: draft.modules, ...KEEP};
   };
 
@@ -80,8 +81,8 @@ export function planResize(work, {componentId, id, raw, mirrorPair = false, exac
 export function planPatch(work, targets) {
   const draft = structuredClone({comps: work.comps, modules: work.modules, params: work.params, fabrication: work.fabrication});
   for (const t of targets) Object.assign(draft.comps.find(c => c.id === t.id), t.patch);
-  const plate = planActuatorPlateHoles(draft);
+  const plate = planActuatorPlateHoles(draft,{assembly:true});
   if (plate.ok) draft.comps = plate.comps;
-  else if (planActuatorPlateHoles({comps: work.comps, modules: work.modules, params: work.params, fabrication: work.fabrication}).ok) return {ok: false, message: plate.message};
+  else if (planActuatorPlateHoles({comps: work.comps, modules: work.modules, params: work.params, fabrication: work.fabrication},{assembly:true}).ok) return {ok: false, message: plate.message};
   return {ok: true, comps: draft.comps, params: draft.params, modules: draft.modules, ...KEEP};
 }

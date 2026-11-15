@@ -6,6 +6,7 @@
  * h 由 app.js 注入：displayCoords、solveAt(theta, seed)、seed()、range()、setTheta(theta)、updateMotorSwitcher。
  */
 import { looseBarRotation, pointRefs, pointIsGround, holeJoined, updatePointCoordsById } from './model.js';
+import {gearPivotRotation} from './gear-pin-connection.js';
 import {S, activateMotor} from './state.js';
 
 // 拖輸入桿的動端：直接用游標方位反推輸入角（原 app.js rotateInputCrankToPoint，搬來此處按需載入）。
@@ -158,12 +159,13 @@ export function pullTip(h, id, target) {
 // Enlarged hit circles overlap on a phone. Resolve a transparent hit by its
 // distance to the visible centre; equal centres retain the painted order.
 export function nearestHit(event, fallback) {
-  let best = fallback, distance = Infinity;
+  let best = fallback, distance = Infinity,preferred=false;
   for (const el of document.elementsFromPoint(event.clientX,event.clientY)) {
     if (!el.dataset.nodeHit) continue;
     const box = el.getBoundingClientRect();
     const d = Math.hypot(event.clientX-box.x-box.width/2,event.clientY-box.y-box.height/2);
-    if (d < distance) { best=el.dataset.nodeHit; distance=d; }
+    const pin=!!gearPivotRotation(S.comps,S.topo.params,el.dataset.nodeHit);
+    if(d<distance-1||d<=distance+1&&pin&&!preferred||d<distance&&pin===preferred){best=el.dataset.nodeHit;distance=d;preferred=pin;}
   }
   return best;
 }

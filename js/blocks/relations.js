@@ -40,7 +40,7 @@ export function workParts(work) {
 }
 
 /** attachmentsOf 的關係種類：每種關係有自己的 kind，由「引用者那一側的欄位」決定（欄位表見 ref-fields.js 與下方 moduleEdges）。 */
-export const KINDS = ['shared-point', 'syringe', 'motor', 'fusion', 'plate-gear-fusion', 'mesh', 'rack', 'belt', 'reference',
+export const KINDS = ['pin-lock','shared-point', 'syringe', 'motor', 'fusion', 'plate-gear-fusion', 'mesh', 'rack', 'belt', 'reference',
   'module-mount', 'module-output', 'face-mount', 'bracket', 'tab-nut', 'rigid-group'];
 
 // 模組與組立接合：只讀這些欄位（moduleId、模組 id、mount.to.module 是模組編號，不是零件，不算引用）。

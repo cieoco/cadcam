@@ -27,15 +27,15 @@ const mad=normalizeSnapshot(structuredClone(MAD_BOX_EXAMPLE.snapshot));
 
 // delete the driver: the driven gear is kept, not meshed any more
 {const r=del(pair,'GearA');
- check('delete driver: the driven gear stays and is independent',r.ok&&r.ids().join()==='GearB'&&!('mesh' in r.S.comps[0]));
- check('delete driver: motor removal and the free driven gear are both said',r.msgs.length===1&&/馬達設定也一起移除/.test(r.msgs[0])&&/不再被它帶動/.test(r.msgs[0])&&noInternalId(r.msgs[0]),r.msgs.join('|'));}
+ check('delete driver: the driven gear stays and is independent',r.ok&&gears(r).length===1&&gears(r)[0].id==='GearB'&&!('mesh' in gears(r)[0])&&r.S.comps.some(c=>c.type==='motor'));
+ check('delete driver: retained motor and the free driven gear are both said',r.msgs.length===1&&/馬達留在原位，尚未接輸出/.test(r.msgs[0])&&/不再被它帶動/.test(r.msgs[0])&&noInternalId(r.msgs[0]),r.msgs.join('|'));}
 // delete the driven gear: the driver is untouched
 {const r=del(pair,'GearB');
  check('delete driven: the driver is untouched and there is nothing else to say',r.ok&&r.ids().join()==='GearA'&&r.msgs.join()==='已刪除「16 齒齒輪」。'&&r.log.undo===1,r.msgs.join('|'));}
 
 // ---------------------------------------------------------------- a rack only exists relative to its pinion: it goes with it, and it is said
 {const r=del(rackEx,'Pinion');
- check('rack: pinion, rack and both guide pins are removed together',r.ok&&r.S.comps.length===0&&Object.keys(r.S.topo.params).every(k=>k==='theta'),r.ids().join());
+ check('rack: pinion, rack and both guide pins are removed together',r.ok&&r.S.comps.length===1&&r.S.comps[0].type==='motor'&&Object.keys(r.S.topo.params).every(k=>k==='theta'),r.ids().join());
  check('rack: the message names the rack that went with it',r.msgs.length===1&&/齒條（含固定導銷）.*已一起刪除/.test(r.msgs[0])&&noInternalId(r.msgs[0]),r.msgs.join('|'));
  check('rack: one undo restores everything',r.log.undo===1&&r.log.undoSnap===r.orig);}
 

@@ -1,3 +1,4 @@
+import {gearPivotRotation} from './gear-pin-connection.js';
 import {localHoles,holeWorld,holeSide,idCounts} from '../core/local-holes.js';
 /**
  * blocks / model
@@ -248,6 +249,7 @@ export function recomputeLengths(comps, topo) {
 export function looseBarRotation(comps, params, id) {
   const arms=comps.filter(c=>c.type==='bar'&&c.fixedLen&&c.shape!=='disk'&&[c.p1,c.p2].some(p=>p?.id===id));
   const bar = arms.length===1?arms[0]:fixedLinkFor(comps, id);
+  if(bar&&comps.some(c=>c.pinLocks?.some(r=>c.id===bar.id||r.with===bar.id)))return false;
   if (!bar || bar.isInput || bar.barFusionRoot || bar.barFusion || pointIsGround(comps, id) || holeJoined(comps, bar)) return false;
   // A single free disk at the arm tip adds no arm-position constraint. Its
   // reference pin follows the center translation; this does not solve spin.
@@ -277,6 +279,7 @@ export function rotateLooseBarEnd(comps, params, id, target, snapDegrees = false
 
 /** Shared one-pivot rotation. */
 export function pointRotation(comps,params,id){
+  const gear=gearPivotRotation(comps,params,id);if(gear)return gear;
   const bar=looseBarRotation(comps,params,id);if(bar)return bar;
   const pinned=pinnedTriangleForPoint(comps,id);if(!pinned)return null;
   const end=[pinned.tri.p1,pinned.tri.p2,pinned.tri.p3].find(p=>p.id===id),pivot=pinned.pivot;
@@ -485,6 +488,7 @@ export function pinnedTriangleForPoint(comps, id) {
   const t = comps.find(c => c.type === 'triangle' &&
     [c.p1, c.p2, c.p3].some(p => p && p.id === id));
   if (!t || !t.p1 || !t.p2 || !t.p3 || holeJoined(comps, t)) return null;
+  if(comps.some(c=>c.pinLocks?.some(r=>c.id===t.id||r.with===t.id)))return null;
   const verts = [t.p1, t.p2, t.p3];
   const isPivot = p => pointIsGround(comps, p.id) || pointUseCount(comps, p.id) > 1;
   const pivots = verts.filter(isPivot);

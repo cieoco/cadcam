@@ -13,7 +13,7 @@ const mkEditor=()=>{const title={textContent:'接點',dataset:{}};return {title,
 const pick=(id,fresh=true)=>{S.selectedNodeId=id;const ed=mkEditor(),flashed=[];const r=showHoleOwner(S,ed,fresh,{flash:ids=>flashed.push(ids)});return {r,ed,flashed};};
 
 let t=pick('Blank136.B');
-check('共用接點：標題說明幾個零件共用',/^接點（2 個零件共用）$/.test(t.ed.title.textContent),t.ed.title.textContent);
+check('共用接點：標題列出共用零件名稱',/^孔格桿件／孔格桿件共用孔$/.test(t.ed.title.textContent),t.ed.title.textContent);
 check('共用接點：圖上標出全部共用的零件（閃示）',t.flashed.length===1&&t.flashed[0].length===2&&t.flashed[0].includes('Blank136')&&t.flashed[0].includes('Blank137'));
 check('共用接點：滑過標題可看到是哪幾個零件，不含內部代號',/孔格桿件/.test(t.ed.title.title||'')&&!/Blank\d|P\d+s|_H\d/.test(t.ed.title.title+t.ed.title.textContent));
 t=pick('Blank137_H8_0');
