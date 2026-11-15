@@ -792,7 +792,7 @@ function drawBands(pts) {
   svg.appendChild(layer);
 }
 const isHiddenSliderRailPoint = (id) => Model.isHiddenSliderRailPoint(S.comps, id);
-const isBoxReference = (id) => S.comps.some(c=>c.boxPanel&&(c.p1?.id===id||c.p2?.id===id));
+const isBoxReference = (id) => S.comps.some(c=>c.boxPanel&&(c.p1?.id===id||c.p2?.id===id)||c.wheelWidthMm!==undefined&&c.p2?.id===id);
 const isSliderMountPoint = (id) => Model.isSliderMountPoint(S.comps, id);
 const sliderMountInfo = (id) => Model.sliderMountInfo(S.comps, id);
 // 以「世界座標 world」為中心，找畫面上最近的接點（排除 exclude），門檻 maxDist。
@@ -2075,6 +2075,7 @@ function drawNow() {
     keep:[S.selectedNodeId,S.dragId,S.topo.tracePoint,...S.topo.tracePoints||[]],bounds:screenBounds,
     project:p=>new DOMPoint(TX(p.x),TY(p.y)).matrixTransform(screenMatrix)}))hiddenPointIds.add(id);
   vComps.filter(c=>c.boxPanel).forEach(c=>[c.p1,c.p2].forEach(p=>hiddenPointIds.add(p.id)));
+  vComps.filter(c=>c.wheelWidthMm!==undefined).forEach(c=>hiddenPointIds.add(c.p2.id));
   const nodeHoleRadii = new Map();
   for(const c of vComps.filter(c=>['bar','triangle'].includes(c.type))){
     for(const p of [c.p1,c.p2,c.p3].filter(Boolean))nodeHoleRadii.set(p.id,Math.max(nodeHoleRadii.get(p.id)||0,memberHoleDiameter(c,Settings.exportSettings())/2));
@@ -2094,7 +2095,7 @@ function drawNow() {
   });
 
   drawGearManualHandles(pts);
-  if(pinUI)pinUI.renderPins({svg,comps:vComps,points:pts,project:p=>({x:TX(p.x),y:TY(p.y)}),registerUpdate:u=>frameUpdaters.push(u)});
+  if(pinUI)pinUI.renderPins(vComps,pts,p=>({x:TX(p.x),y:TY(p.y)}),u=>frameUpdaters.push(u));
   else loadPinUI().then(()=>draw());
   drawFrameHandle();   // 機架移動把手：畫在節點之上，才點得到、拖得動
   const updateMemberDimensions = drawMemberDimensions({
@@ -2827,8 +2828,7 @@ function guardedNodeDown(e, id, chosen) {
 let pinUI=null,pinReady;
 function loadPinUI(){return pinReady ||= import('./pin-ui.js').then(m=>{
   pinUI=m;m.init({svg,pushUndo,pause,rebuild,draw,transient,fit:fitView,points:displayCoords,save:scheduleAutosave,
-    banner:setBanner,clear:clearBanner,cancel(){Tools.exitDrawLink();Tools.exitDrawTriangle();Tools.exitDrawPolygon();cancelMotorMode();},
-    select(id){S.selectedLinkId=S.selectedTriangleId=S.selectedGearId=S.selectedSliderId=null;S.selectedNodeId=id;Panels.updateRoleEditor();openMobileEditPanel();draw();}});return m;
+    banner:setBanner,clear:clearBanner,cancelMotor:cancelMotorMode,open:openMobileEditPanel});return m;
 });}
 
 function deselectLink() {
@@ -3365,7 +3365,7 @@ async function share() {
 // ---- 啟動：分享連結優先，其次 localStorage 自動還原，否則空白 ----
 function init() {
   Render.init({ svg, onNodeDown: guardedNodeDown });   // 注入繪製基元的外部依賴（預設 parent + 固定孔互動）
-  Panels.init({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked, frameSizeInfo, frameGroundInfo });
+  Panels.init({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointIsGround, isGroundPositionUnlocked, frameSizeInfo, frameGroundInfo });
   Tools.init({ svg, draw, rebuild, pushUndo, pause, cancelMotorMode, deselectLink, selectLink, selectTriangle, selectSlider,
                setBanner, clearBanner, worldFromEvent, pointCoords, nearestDisplayToPoint, snapWorld,
                mobilePrompt, promptText, displayPointCoords: displayCoords, notify: transient });

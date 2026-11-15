@@ -55,4 +55,3 @@ assert.equal(planMotorDrop(conflict,req,pointCoords(conflict.comps)).ok,false,'u
 const drilled=structuredClone(src),h=drilled.comps.find(c=>c.id===host.id).holes.find(h=>h.id===taken.id);h.manufactured=true;
 assert.equal(planMotorDrop(drilled,req,pointCoords(drilled.comps)).ok,false,'manufactured holes remain hard conflicts');
 console.log('motor assembly pending: attach, real occupied holes, unchanged specs, strict export / valid siblings, explicit repair, save/share, release/delete and protected holes passed');
-

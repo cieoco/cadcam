@@ -1,13 +1,16 @@
-import {pinPoints} from '../core/pin-lock.js';
+import {pinPoints as rigidPinPoints} from '../core/pin-lock.js';
 import {makePinLock} from './pin-lock-plan.js';
 import {pointKeysFor} from './part-types.js';
 import {freezeDisplayedPose} from './pose-freeze.js';
 import {planFirstGearPin} from './gear-first-pin.js';
-import {gearPivotRotation,rotateGearPinnedMember} from './gear-pin-connection.js';
+import {gearPivotRotation} from './gear-pin-connection.js';
+import {rotateGearPinnedMember} from './gear-pin-preview.js';
 import {planGearPinConnection} from './gear-pin-plans.js';
-import {pointCoords} from './model.js';
+import {pointCoords,previewPointConnection} from './model.js';
+import {connectionModule} from './assembly.js';
+const pinPoints=c=>c.type==='slider'?[c.p3].filter(Boolean):rigidPinPoints(c);
 const fail=message=>({ok:false,message});
-const supported=c=>['bar','triangle','gear','anchor'].includes(c.type);
+const supported=c=>c.wheelWidthMm===undefined&&['bar','triangle','gear','anchor','slider'].includes(c.type);
 const records=comps=>comps.flatMap(c=>(c.pinLocks||[]).map(lock=>({owner:c,lock})));
 const pair=(r,a,b,at)=>r.lock.at===at&&((r.owner.id===a&&r.lock.with===b)||(r.owner.id===b&&r.lock.with===a));
 const motorAt=(comps,at)=>comps.some(c=>c.type==='motor'&&c.p1?.id===at||c.motorMount?.center===at||['p1','p2'].some(k=>c[k]?.id===at&&c[k].physicalMotor));
@@ -49,6 +52,11 @@ export function planInsertPin(work,{ownerId,otherId,from,to}){
  if(!owner||!other||owner===other||!supported(owner)||!supported(other))return fail('請選兩個不同剛性零件上的孔。');
  if(!pinPoints(owner).some(p=>p.id===from)||!pinPoints(other).some(p=>p.id===to))return fail('所選孔不屬於指定零件。');
  if(motorAt(work.comps,from)||motorAt(work.comps,to))return fail('這是動力輸出軸，請沿原馬達安裝流程接合。');
+ if(owner.type==='slider'||other.type==='slider'){
+  if(owner.type==='slider'&&from!==owner.p3?.id||other.type==='slider'&&to!==other.p3?.id||owner.type==='slider'&&other.type==='slider')return fail('插銷只可接滑塊工作孔，軌道與安裝孔請沿原流程設定。');
+  if(owner.type==='slider')return planInsertPin(work,{ownerId:otherId,otherId:ownerId,from:to,to:from});
+ }
+ if(!connectionModule(work.comps,[from,to]).ok)return fail('不同模組請使用組立接口接合');
  if(from===to)return {ok:true,unchanged:true};
  if(owner.type==='anchor'){if(other.type==='anchor')return fail('兩個獨立支點不需插銷；請選積木上的孔。');return planInsertPin(work,{ownerId:otherId,otherId:ownerId,from:to,to:from});}
  if(owner.type==='gear'&&other.type!=='gear')return planInsertPin(work,{ownerId:otherId,otherId:ownerId,from:to,to:from});
@@ -71,8 +79,27 @@ export function planInsertPin(work,{ownerId,otherId,from,to}){
  const joints=[...new Set(comps.filter(c=>c.id!==ownerId).flatMap(c=>pinPoints(c).filter(p=>ownIds.has(p.id)).map(p=>p.id)))];
  if(joints.length){
   const shared=joints.filter(id=>pinPoints(other).some(p=>p.id===id));
-  if(joints.length!==1||shared.length!==1)return fail('此零件已有多個插銷；這個多點接合目前尚未支援，原連接保留。');
+  if(joints.length!==1)return fail('此零件已有多個插銷；這個多點接合目前尚未支援，原連接保留。');
   if(records(comps).some(r=>r.owner.id===ownerId||r.lock.with===ownerId))return fail('請先將鎖固插銷改為可轉，再插入第二孔。');
+  if(!shared.length){
+   if(owner.barFusion||owner.barFusionRoot||owner.boxPanel||owner.fusedWith||owner.motorMount||owner.isInput||owner.fixedLen===false||pinPoints(owner).some(p=>['fixed','motor'].includes(p.type)||p.physicalMotor))return fail('這個零件尚不支援閉環插銷接合，原連接保留。');
+   if(Math.hypot(start.x-target.x,start.y-target.y)<=1e-6&&!ownIds.has(to)){
+    const body=comps.find(c=>c.id===ownerId);freezeDisplayedPose(comps,ownerId,positions);
+    for(const k of pointKeysFor(body))if(body[k]?.id===from)body[k].id=to;
+    for(const h of body.holes||[])if(h.id===from)h.id=to;
+    return {...result(work,comps,'已插入可轉插銷；對齊孔保留原姿態與尺寸。'),retarget:[from,to]};
+   }
+   if(other.type==='slider')return fail('請先將桿孔對齊滑塊工作孔；原連接與軌道保留。');
+   // Closing an ordinary linkage uses the existing length/fixed-point constraint validator.
+   const involved=new Set([...ownIds,to]);let changed=true;
+   while(changed){changed=false;for(const c of comps)if(pinPoints(c).some(p=>involved.has(p.id)))for(const p of pinPoints(c))if(!involved.has(p.id)){involved.add(p.id);changed=true;}}
+   const affected=comps.filter(c=>pinPoints(c).some(p=>involved.has(p.id)));
+   if(affected.some(c=>!['bar','triangle','anchor'].includes(c.type)||c.pinLocks?.length||c.barFusion||c.barFusionRoot||c.boxPanel||c.fusedWith||c.motorMount||c.physicalMotor||c.motorCarrier))return fail('此閉環包含鎖固或安裝約束，目前不能插入；原連接保留。');
+   const fixed=new Set(affected.flatMap(pinPoints).filter(p=>p.type==='fixed'||p.type==='motor'||p.physicalMotor).map(p=>p.id));
+   for(const c of affected)for(const k of pointKeysFor(c)){const p=c[k],shown=positions[p?.id];if(shown&&!fixed.has(p.id))Object.assign(p,{x:shown.x,y:shown.y});}
+   const closed=previewPointConnection(comps,{params:{...work.params}},from,to);if(!closed.ok)return closed;
+   return {...result(work,closed.comps,'已插入可轉插銷；閉環保留設定孔距與固定孔。'),retarget:[from,to]};
+  }
   const pivot=positions[shared[0]]||pinPoints(owner).find(p=>p.id===shared[0]),r=Math.hypot(start.x-pivot.x,start.y-pivot.y),s=Math.hypot(target.x-pivot.x,target.y-pivot.y);
   if(Math.abs(r-s)>.001||r<1e-6||ownIds.has(to))return fail('第二插銷孔距不合，原插銷與尺寸保留。');
   const angle=Math.atan2(target.y-pivot.y,target.x-pivot.x)-Math.atan2(start.y-pivot.y,start.x-pivot.x),cos=Math.cos(angle),sin=Math.sin(angle),body=comps.find(c=>c.id===ownerId);

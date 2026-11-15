@@ -8,6 +8,7 @@ export function diskOutline(comp, center = {x:0,y:0}) {
 }
 export function validateDisk(comp, radius, diameter=diskDiameter(comp), holeDiameter=DEFAULT_HOLE_MM) {
   if(!Number.isFinite(diameter)||diameter<20||diameter>2000)return '外徑請填 20–2000 mm。';
+  if(comp.wheelWidthMm!==undefined)return ''; // TT wheel has only its central shaft bore.
   if(!Number.isFinite(radius)||radius<8)return '工作孔距中心至少 8 mm。';
   if(radius+holeDiameter/2+1>diameter/2)return '工作孔太靠近圓盤邊緣，請加大外徑或縮小孔距。';
   return '';

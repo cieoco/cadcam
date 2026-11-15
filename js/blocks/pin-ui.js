@@ -1,14 +1,17 @@
 import {S} from './state.js';
-import {pinPoints} from '../core/pin-lock.js';
+import {pinPoints as rigidPinPoints} from '../core/pin-lock.js';
+const pinPoints=c=>c.type==='slider'?[c.p3].filter(Boolean):rigidPinPoints(c);
 import {partName} from './selection-target.js';
 import {runEdit} from './edit-pipeline.js';
 import * as Ops from './pin-ops.js';
 import {setSheet,sheetMode} from './mobile-workspace.js';
 import {pickPinTargets} from './pin-hit.js';
 import {holeSide} from '../core/local-holes.js';
+import * as Tools from './tools.js';
+import * as Panels from './panels.js';
 
 let host,source=null,active=false,selected=null,lastKey='',lastComps,focus,feedback='',scene;
-const supported=c=>['bar','triangle','gear','anchor'].includes(c.type);
+const supported=c=>c.wheelWidthMm===undefined&&['bar','triangle','gear','anchor','slider'].includes(c.type);
 const locks=(a,b,at)=>[a,b].flatMap(c=>(c.pinLocks||[]).filter(r=>r.at===at&&r.with===(c===a?b.id:a.id)));
 const pairs=at=>Ops.pinPairs({comps:S.comps},at).filter(p=>!p.motor).map(p=>S.comps.find(c=>c.id===p.otherId)?.type==='anchor'?p:{...p,ownerId:p.otherId,otherId:p.ownerId});
 const name=id=>{const c=S.comps.find(c=>c.id===id);if(!c)return '零件';const n=partName(c),same=S.comps.filter(x=>partName(x)===n);return same.length>1?`${n} ${same.indexOf(c)+1}`:n;};
@@ -43,7 +46,7 @@ export function renderPanel(){
  p.append(el('span',`${partName(a)} ↔ ${partName(b)}`));
  const locked=locks(a,b,pair.at).length>0,multiple=pinPoints(a).some(q=>q.id!==pair.at&&pinPoints(b).some(r=>q.id===r.id));
  const row=el('div');row.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
- for(const [label,kind,on]of [['可轉','planPinUnlock',!locked],['鎖固','planPinLock',locked],[`拔除「${name(pair.ownerId)}」`,'planUnpin',false]]){const button=el('button',label);button.type='button';button.setAttribute('aria-pressed',String(on));button.onclick=()=>action(kind,pair);if(kind==='planPinLock'&&[a,b].some(c=>c.type==='anchor')){button.disabled=true;button.title='獨立支點只提供轉軸，沒有可鎖定的方向基準。';}if(on)button.style.background='#d9f3f4';row.append(button);}p.append(row);
+ for(const [label,kind,on]of [['可轉','planPinUnlock',!locked],['鎖固','planPinLock',locked],[`拔除「${name(pair.ownerId)}」`,'planUnpin',false]]){const button=el('button',label);button.type='button';button.setAttribute('aria-pressed',String(on));button.onclick=()=>action(kind,pair);if(kind==='planPinLock'&&[a,b].some(c=>c.type==='anchor'||c.type==='slider')){button.disabled=true;button.title='支點或滑塊連接只提供可轉插銷，不能鎖固相對方向。';}if(on)button.style.background='#d9f3f4';row.append(button);}p.append(row);
  const which=el('select');which.setAttribute('aria-label','拔除哪個積木');for(const c of [a,b]){const o=el('option',name(c.id));o.value=c.id;o.disabled=c.type==='anchor';which.append(o);}which.onchange=()=>{selected={ownerId:pair.otherId,otherId:pair.ownerId,at:pair.at};renderPanel();};p.append(which);
  if(multiple)p.append(el('small','另有插銷限制兩件轉動；可拔除其中一支。'));
 }
@@ -73,7 +76,7 @@ function selectHole(ownerId,at){
 function highlight(id){for(const e of host.svg.querySelectorAll('[data-pick-component]'))e.toggleAttribute('data-pin-highlight',e.getAttribute('data-pick-component')===id);}
 function hint(text,choices=[]){host.banner(text);const bar=document.getElementById('modeBanner');if(!bar)return;bar.style.pointerEvents='auto';for(const c of [...choices,...(source?[{label:'重選',run:()=>{source=null;host.draw();hint('點第一個積木的孔。');}}]:[]),{label:'取消',run:cancelPin}]){const b=el('button',c.label);b.type='button';b.style.cssText='margin-left:6px;min-height:32px';b.onclick=c.run;bar.append(b);}}
 export function init(h){
- host=h;
+ host={...h,cancel(){Tools.exitDrawLink();Tools.exitDrawTriangle();Tools.exitDrawPolygon();h.cancelMotor();},select(id){S.selectedLinkId=S.selectedTriangleId=S.selectedGearId=S.selectedSliderId=null;S.selectedNodeId=id;Panels.updateRoleEditor();h.open();h.draw();}};
  const style=el('style');style.textContent='#roleEditor.pin-placing > :not(#pinEditor){display:none!important} #roleEditor.pin-connected #localHoleNotice{display:none} #pinEditor select,#pinEditor button{min-height:40px} #pinEditor select{max-width:100%} #stageSvg [data-pin-highlight]{filter:drop-shadow(0 0 3px #ed9800)}';document.head.append(style);
  h.svg.parentElement.addEventListener('pointerdown',e=>{
   if(!active||!h.svg.contains(e.target))return;
@@ -87,7 +90,8 @@ export function init(h){
 export function startPin(){host.cancel();host.pause();source=null;feedback='';active=true;host.svg.setAttribute('data-pin-picking','');focus=S.designFocus;if(sheetMode()){setSheet('collapsed');host.fit();}hint('放入插銷：點第一個積木的孔。');renderPanel();}
 export function cancelPin(){active=false;source=null;host.svg.removeAttribute('data-pin-picking');host.clear();renderPanel();}
 export function inspectPin(at){cancelPin();host.select(at);if(sheetMode())setSheet('half');renderPanel();}
-export function renderPins({svg,comps,points,project,registerUpdate}){
+export function renderPins(comps,points,project,registerUpdate){
+ const svg=host.svg;
  scene={comps,points,project};registerUpdate(ps=>{scene.points=ps;});
  if(active&&focus!==S.designFocus)cancelPin();
  const used=new Map();for(const c of comps.filter(supported))for(const p of pinPoints(c)){const cs=used.get(p.id)||[];if(!cs.includes(c))used.set(p.id,[...cs,c]);}

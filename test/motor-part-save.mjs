@@ -82,7 +82,7 @@ console.log(`  differing fields after save -> open (physicalMotor copies on non-
     const want=normalizeSnapshot(clone(raw));
     const raw2=clone(raw);await Store.prepareMotorParts(raw2);
     if(!same(normalizeSnapshot(raw2),want))bad.push(f);
-    const env=storedProject(clone(raw));if(env!==raw&&env.kind==='blocks-envelope'){const e2=clone(env);await Store.prepareMotorParts(e2);if(!same(normalizeSnapshot(e2),want))bad.push(f+' (envelope)');}
+    const env=storedProject({kind:'blocks',v:1,...clone(raw)});if(env!==raw&&env.kind==='blocks-envelope'){const e2=clone(env);await Store.prepareMotorParts(e2);if(!same(normalizeSnapshot(e2),want))bad.push(f+' (envelope)');}
   }
   check(`today's-shape files open to the same data as before (${n} fixture files)`,!bad.length&&n>0,bad.join('; '));
 }

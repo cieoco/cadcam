@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { getExample } from '../js/blocks/examples.js';
 import { normalizeSnapshot, toSnapshot } from '../js/blocks/schema.js';
 import { S } from '../js/blocks/state.js';
+import { planInsertPin } from '../js/blocks/pin-ops.js';
 import * as Model from '../js/blocks/model.js';
 import * as Tools from '../js/blocks/tools.js';
 import { compileTopology } from '../js/core/topology.js';
@@ -19,8 +20,16 @@ Tools.init({ svg, draw() {}, rebuild() {}, pushUndo() {}, pause() {}, cancelMoto
 const beforeCount=S.comps.length;
 Tools.startDrawLink(); Tools.startLinkAt(coords().C); Tools.finishDrawLink({ world: coords().D });
 assert.equal(S.comps.length,beforeCount+1);
-assert.deepEqual(new Set([S.comps.at(-1).p1.id, S.comps.at(-1).p2.id]), new Set(['C', 'D']));
-const drawn = S.comps.at(-1);
+const drawnId = S.comps.at(-1).id;
+for (const [key, target] of [['p1','C'], ['p2','D']]) {
+  const drawn = S.comps.find(c=>c.id===drawnId), from=drawn[key].id;
+  assert.notEqual(from,target, 'drawing aligns holes without connecting them');
+  const host=S.comps.find(c=>c.id!==drawnId && [c.p1,c.p2,c.p3,...(c.holes||[])].some(p=>p?.id===target));
+  const result=planInsertPin({comps:S.comps,params:S.topo.params,points:coords()}, {ownerId:drawnId,otherId:host.id,from,to:target});
+  assert.ok(result.ok,result.message); S.comps=result.comps; S.topo.params=result.params;
+}
+const drawn = S.comps.find(c=>c.id===drawnId);
+assert.deepEqual(new Set([drawn.p1.id,drawn.p2.id]),new Set(['C','D']));
 assert.notEqual(drawn.id, 'Link2');
 assert.ok(Math.abs(S.topo.params[drawn.lenParam] - 104) < 1e-6);
 const topology = compileTopology(S.comps, S.topo, new Set());

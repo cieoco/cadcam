@@ -233,6 +233,7 @@ function linkHoleSpecs(comp, length, settings, extraHoles = []) {
   const { holeDiameterMm, ttShaftFlatDiameterMm, ttShaftFlatThicknessMm } = normalizeExportSettings(settings);
   const holeR = round(holeDiameterMm / 2, 3);
   const flat = { ttShaftFlatDiameterMm, ttShaftFlatThicknessMm };
+  if(comp.wheelWidthMm!==undefined){if(extraHoles.length||localHoles(comp).length)throw Error('外購輪子不支援新增加工孔，請解除額外接合。');return [{kind:'tt-shaft-flat',x:0,y:0,settings:flat}];}
   const endHoles = (key, x) => {
     if(comp.undrilled?.includes(key))return [];
     if(isOutputBlank(comp)&&comp.isInput&&comp[key]?.physicalMotor&&['tt','n20'].includes(comp.motorType || 'tt')&&!((comp.motorType || 'tt')==='tt'&&comp.ttOutput==='shaft')){const h=actuatorHubHoles(comp.motorType || 'tt',settings,x);if(h.length)return h;}
@@ -1177,11 +1178,13 @@ ${cutouts ? cutouts + '\n' : ''}${holes}
 }
 
 function stockDescription(comp) {
+  if(comp.wheelWidthMm!==undefined)return `外購 TT 輪子，寬 ${comp.wheelWidthMm} mm；此檔僅外形／軸孔參考，不是橡膠胎製作圖，配合與防脫未實測。`;
   if(isDisk(comp))return '圓盤；板厚沿用作品的全局製作設定。';
   return `材料與尺寸：${memberStockLabel(comp)}`;
 }
 
 function stockComment(comp) {
+  if(comp.wheelWidthMm!==undefined)return `PURCHASED_TT_WHEEL width=${comp.wheelWidthMm}mm REFERENCE_ONLY fit_unverified`;
   if(isDisk(comp))return 'DISK thickness=project-fabrication-settings';
   const stock = memberStock(comp);
   return `STOCK material=${stock.material} widthMm=${stock.widthMm} thicknessMm=${stock.thicknessMm}`;

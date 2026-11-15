@@ -110,6 +110,7 @@ function normalizeBar(comp, index, params, warnings) {
     fixedLen: comp.fixedLen !== false
   };
   if(comp.shape==='disk'){if(comp.boxPanel||comp.barFusion||comp.barFusionRoot)throw Error('圓盤不能同時為盒體或合成桿');out.shape='disk';out.frameSeparate=true;out.diameterMm=Math.max(20,Math.min(2000,Number(comp.diameterMm)||100));out.snapLength=false;}
+  if(comp.wheelWidthMm!==undefined){if(out.shape!=='disk'||!Number.isFinite(comp.wheelWidthMm)||comp.wheelWidthMm<1||comp.wheelWidthMm>100)throw Error('輪子寬度無效');out.wheelWidthMm=comp.wheelWidthMm;}
   if(comp.barFusion) { out.barFusion=normalizeBarFusion(comp.barFusion); if(!out.barFusion)throw Error('合成資料格式無效'); }
   if(comp.barFusionRoot) { if(!safeId(comp.barFusionRoot))throw Error('合成基準無效'); out.barFusionRoot=comp.barFusionRoot; }
   if (comp.snapLength === false) out.snapLength = false;

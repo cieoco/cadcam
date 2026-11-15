@@ -47,6 +47,7 @@ export function normalizeMemberStock(raw) {
 }
 
 export function memberStock(comp) {
+  if(comp?.wheelWidthMm!==undefined)return {widthMm:comp.diameterMm,thicknessMm:comp.wheelWidthMm,material:'unspecified'};
   const normalized = normalizeMemberStock(isRecord(comp) ? comp.stock : undefined);
   const box=normalizeBoxPanel(comp?.boxPanel);
   if(box)return {...(normalized || DEFAULT_STOCK),widthMm:boxPanelSize(box).width,thicknessMm:box.settings.thicknessMm};
@@ -54,6 +55,7 @@ export function memberStock(comp) {
 }
 
 export function memberStockLabel(comp) {
+  if(comp?.wheelWidthMm!==undefined)return `外購 TT 輪子・直徑 ${comp.diameterMm} mm・寬 ${comp.wheelWidthMm} mm`;
   if(comp?.shape==='disk')return `圓盤外徑 ${comp.diameterMm} mm・板厚沿用製作設定`;
   const stock = memberStock(comp);
   const material = MATERIALS.find(item => item.id === stock.material)?.label || '未指定';

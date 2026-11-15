@@ -4,6 +4,7 @@ const gap=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 export function makePinLock(comps,{ownerId,otherId,at,id},positions={},params={}){
  const owner=comps.find(c=>c.id===ownerId),other=comps.find(c=>c.id===otherId),fail=message=>({ok:false,message});
  if(!owner||!other||owner===other||!['bar','triangle','gear'].includes(owner.type)||!['bar','triangle','gear'].includes(other.type))return fail('請選兩個剛性零件的共用孔。');
+ if([owner,other].some(c=>c.wheelWidthMm!==undefined))return fail('輪子直接接馬達輸出軸，不使用插銷。');
  if([owner,other].some(c=>c.boxPanel||c.barFusion||c.barFusionRoot||c.fixedLen===false||c.style==='piston'))return fail('這個零件尚不支援插銷鎖固。');
  const points=c=>pinPoints(c).map(p=>({...p,...positions[p.id]})),a=points(owner),b=points(other),pivot=a.find(p=>p.id===at);
  if(!pivot||!b.some(p=>p.id===at))return fail('兩件尚未共用這個孔。');

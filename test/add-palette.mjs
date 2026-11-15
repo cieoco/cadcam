@@ -9,17 +9,17 @@ ok(ADD_SECTIONS.every(s=>typeof s.hint==='string'&&s.hint.length>0&&s.hint.lengt
 ok(ADD_SECTIONS.filter(s=>s.primary).map(s=>s.id).join()==='common'&&!ADD_SECTIONS.some(s=>s.open),'常用直接顯示，其餘預設收合');
 const add=COMMANDS.filter(c=>c.group==='add');
 const where={
- common:["window.blocks.openStandardBlank('bar')","window.blocks.openStandardBlank('plate')","window.blocks.openStandardBlank('l')"],
+ common:["window.blocks.startPin","window.blocks.openStandardBlank('bar')","window.blocks.openStandardBlank('plate')","window.blocks.openStandardBlank('l')"],
  free:["window.blocks.pickLinkTool('bar')","window.blocks.startDrawPolygon","window.blocks.pickLinkTool('triangle')","window.blocks.pickLinkTool('polyline')"],
- other:["window.blocks.startDrawDisk","window.blocks.openMotorChoice","window.blocks.addAnchor","window.blocks.startDrawRail","window.blocks.pickMotorType('mg995')","window.blocks.pickMotorType('linear')","window.blocks.addFixedSyringe","window.blocks.addGearPair","window.blocks.addRackPinion","window.blocks.startChainDrive"],
+ other:["window.blocks.openWheel","window.blocks.startDrawDisk","window.blocks.openMotorChoice","window.blocks.addAnchor","window.blocks.startDrawRail","window.blocks.pickMotorType('mg995')","window.blocks.pickMotorType('linear')","window.blocks.addFixedSyringe","window.blocks.addGearPair","window.blocks.addRackPinion","window.blocks.startChainDrive"],
  plugin:["window.blocks.openBoxMaker"]};
 for(const [sec,runs] of Object.entries(where))for(const r of runs){
   const c=add.find(x=>x.run===r||`${x.run}(${(x.args||[]).map(a=>`'${a}'`).join(',')})`===r);
   if(!c)assert.fail(`缺少新增指令 ${r}`);if(c.section!==sec)assert.fail(`${r} 應在 ${sec}，現在在 ${c.section}`);
 }
 ok(true,'每個新增指令在正確分類');
-ok(add.filter(c=>c.section==='common').map(c=>c.id).join()==='bar,plate,lshape,arms','第一層只提供桿件、板材、同平面L型件、彎桿/多臂件');
-ok(add.length===19&&new Set(add.map(c=>c.id)).size===19&&new Set(add.map(c=>JSON.stringify([c.run,c.args||[]]))).size===19,'19個新增動作完整、同一指令參數不重複');
+ok(add.filter(c=>c.section==='common').map(c=>c.id).join()==='pin,bar,plate,lshape,arms','第一層提供插銷與四類基本結構');
+ok(add.length===21&&new Set(add.map(c=>c.id)).size===21&&new Set(add.map(c=>JSON.stringify([c.run,c.args||[]]))).size===21,'21個新增動作完整、同一指令參數不重複');
 ok(add.every(c=>c.run!=='window.blocks.openPowerMenu'),'不再先點「動力來源」再選');
 ok(add.every(c=>ADD_SECTIONS.some(s=>s.id===c.section)),'所有新增指令都有分類');
 const html=readFileSync(new URL('../blocks.html',import.meta.url),'utf8');

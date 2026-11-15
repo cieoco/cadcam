@@ -29,7 +29,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     const frameAction=el('memberSetFrame');if(frameAction){const fixed=fixedSyringePointIds(S.comps),isFrame=comp&&[comp.p1,comp.p2].every(p=>fixed.has(p?.id));frameAction.hidden=!comp||!['bar','triangle'].includes(comp.type);frameAction.disabled=!!isFrame;frameAction.textContent=isFrame?'已設為機架':'設為機架';frameAction.title='固定第一孔與第二孔，保留孔距；可一次復原';}
 
     let outputPreset=el('servoOutputPreset'),outputStatus=el('servoOutputStatus');if(!outputPreset&&el('memberMore')){outputPreset=document.createElement('button');outputPreset.id='servoOutputPreset';outputPreset.textContent='三列輸出板（軸後留一格）';outputPreset.type='button';el('memberMore').before(outputPreset);outputStatus=document.createElement('p');outputStatus.id='servoOutputStatus';outputPreset.after(outputStatus);}
-    if(outputPreset){outputPreset.hidden=!(comp?.type==='bar'&&comp.isInput&&['mg995','tt','n20'].includes(comp.motorType || 'tt'))||isOutputBlank(comp);outputPreset.onclick=()=>{const plan=convertStandardOutput(comp,S.topo.params,S.comps);if(!plan.ok){notify(plan.message);return;}if((comp.motorType || 'tt')==='tt')plan.comp.ttOutput='shaft';pause();if(!commitMountingEdit(S,d=>{d.comps[d.comps.findIndex(c=>c.id===comp.id)]=plan.comp;Object.assign(d.params,plan.params);},{pushUndo,notify}))return;rebuild();draw();};outputStatus.hidden=!isOutputBlank(comp);if(isOutputBlank(comp)){const g=inspectLinkExport(comp,S.topo.params[comp.lenParam],{...S.fabrication?.export,drive:S.fabrication?.drive}),flat=normalizeExportSettings(S.fabrication?.export);outputStatus.textContent=!comp.isInput?'格孔輸出板：尚未安裝軸接頭。':(comp.motorType || 'tt')==='tt'&&comp.ttOutput==='shaft'?`TT扁軸直連：${flat.ttShaftFlatDiameterMm} × ${flat.ttShaftFlatThicknessMm} mm（直徑 × 對邊）；軸向固定待實量。`:`輸出板：軸後留${comp.standardBlank.rearMm} mm；有效${g.holes.filter(h=>/^(MG995_HORN|TT_HUB|N20_HUB)_SCREW$/.test(h.layer)).length}顆軸接頭固定螺絲（試作待實量）。`;}}
+    if(outputPreset){outputPreset.hidden=comp?.wheelWidthMm!==undefined||!(comp?.type==='bar'&&comp.isInput&&['mg995','tt','n20'].includes(comp.motorType || 'tt'))||isOutputBlank(comp);outputPreset.onclick=()=>{const plan=convertStandardOutput(comp,S.topo.params,S.comps);if(!plan.ok){notify(plan.message);return;}if((comp.motorType || 'tt')==='tt')plan.comp.ttOutput='shaft';pause();if(!commitMountingEdit(S,d=>{d.comps[d.comps.findIndex(c=>c.id===comp.id)]=plan.comp;Object.assign(d.params,plan.params);},{pushUndo,notify}))return;rebuild();draw();};outputStatus.hidden=!isOutputBlank(comp);if(isOutputBlank(comp)){const g=inspectLinkExport(comp,S.topo.params[comp.lenParam],{...S.fabrication?.export,drive:S.fabrication?.drive}),flat=normalizeExportSettings(S.fabrication?.export);outputStatus.textContent=!comp.isInput?'格孔輸出板：尚未安裝軸接頭。':(comp.motorType || 'tt')==='tt'&&comp.ttOutput==='shaft'?`TT扁軸直連：${flat.ttShaftFlatDiameterMm} × ${flat.ttShaftFlatThicknessMm} mm（直徑 × 對邊）；軸向固定待實量。`:`輸出板：軸後留${comp.standardBlank.rearMm} mm；有效${g.holes.filter(h=>/^(MG995_HORN|TT_HUB|N20_HUB)_SCREW$/.test(h.layer)).length}顆軸接頭固定螺絲（試作待實量）。`;}}
     let ttRow=el('ttOutputConnectionRow'),ttSelect=el('ttOutputConnection');
     if(!ttRow&&outputStatus){ttRow=document.createElement('label');ttRow.id='ttOutputConnectionRow';ttRow.textContent='TT 輸出接法';ttSelect=document.createElement('select');ttSelect.id='ttOutputConnection';ttSelect.setAttribute('aria-label','TT 輸出接法');for(const[value,text]of[['shaft','直接接 TT 扁軸'],['hub','聯軸器／輪轂（雙螺絲）']]){const option=document.createElement('option');option.value=value;option.textContent=text;ttSelect.append(option);}ttRow.append(ttSelect);outputStatus.before(ttRow);}
     if(ttRow){ttRow.hidden=!(isOutputBlank(comp)&&comp.isInput&&(comp.motorType || 'tt')==='tt');if(!ttRow.hidden){ttSelect.value=comp.ttOutput || 'hub';ttSelect.onchange=()=>{const value=ttSelect.value;if(!['shaft','hub'].includes(value)||value===(comp.ttOutput || 'hub'))return;pause();if(!commitMountingEdit(S,d=>{d.comps.find(c=>c.id===comp.id).ttOutput=value;},{pushUndo,notify})){sync();return;}rebuild();draw();};}}
@@ -50,12 +50,19 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     if(lastSelectedId!==comp?.id){const more=el('memberMore');if(more)more.open=false;const operations=el('memberOperations');if(operations)operations.hidden=true;el('memberOperationsToggle')?.setAttribute('aria-expanded','false');lastSelectedId=comp?.id;}
     if (tipDraft && tipDraft.selectedId !== comp?.id) tipDraft = null;
     const diskFields=el('diskDimensions');if(diskFields)diskFields.hidden=!isDisk(comp);
+    if(diskFields?.nodeType===1){
+      let width=diskFields.querySelector('[data-wheel-width]');
+      if(!width){width=document.createElement('label');width.dataset.wheelWidth='';width.innerHTML='輪寬 <input type="number" min="1" max="100" step="0.1" aria-label="輪子輪寬" style="width:80px"> mm';diskFields.append(width);}
+      width.hidden=comp?.wheelWidthMm===undefined;const field=width.querySelector('input');field.value=comp?.wheelWidthMm??'';
+      const note=diskFields.querySelector('span');if(note)note.textContent=comp?.wheelWidthMm!==undefined?'外購輪子・TT雙扁孔，配合待實量':'板厚沿用製作設定';
+      field.onchange=()=>{const c=selected(),v=Number(field.value);if(c?.wheelWidthMm===undefined)return;if(!field.value.trim()||!Number.isFinite(v)||v<1||v>100){notify('輪寬須為1–100 mm。');sync();return;}if(v===c.wheelWidthMm)return;pause();if(!commitMountingEdit(S,d=>{d.comps.find(o=>o.id===c.id).wheelWidthMm=v;},{pushUndo,notify})){sync();return;}rebuild();draw();};
+    }
     const diskInput=el('diskDiameterInput');
     if(diskInput){
       diskInput.value=isDisk(comp)?comp.diameterMm:'';
       diskInput.onchange=()=>{
         const c=selected();if(!isDisk(c))return;
-        const value=Math.round(Number(diskInput.value)*10)/10;
+        const value=c.wheelWidthMm!==undefined?Number(diskInput.value):Math.round(Number(diskInput.value)*10)/10;
         const error=validateDisk(c,Number(S.topo.params[c.lenParam]),value,holeDiameter(c));
         if(error){notify(error);sync();return;}
         if(value===c.diameterMm)return;
@@ -76,6 +83,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
     direction.hidden=!rotation;
     if(rotation&&direction.nodeType===1)editableNumber(direction.querySelector('span'),rotation.angle,v=>setPointAngle(rotation.end.id,v),{label:'連桿方向角度',min:-360,max:360});
     const active = dimensions.length > 0;
+    if(el('lenControls'))el('lenControls').style.display=comp?.wheelWidthMm!==undefined?'none':'';
     const copyActions=el('memberCopyActions');if(copyActions)copyActions.hidden=!active||!!comp?.boxPanel;
     const boxEdit=el('boxEditButton');if(boxEdit)boxEdit.hidden=!comp?.boxPanel;
     const actions=el('memberActions');if(actions)actions.style.display=comp?.boxPanel?'none':'';
@@ -104,7 +112,7 @@ export function createMemberEditor({ pause, pushUndo, rebuild, draw, reshapeTria
       material.disabled=!active||Boolean(comp?.barFusionRoot);
     }
     ['lenMinusBtn', 'lenPlusBtn'].forEach(key => { el(key).disabled = false; });
-    if (!active) return;
+    if (!active) {if(comp?.wheelWidthMm!==undefined){el('lenTitle').textContent='TT 輪子';el('lenValue').style.display='none';}return;}
     if (!dimensions.some(d => d.id === dimensionId())) S.triSide = 'g';
     const id = dimensionId();
     const dimension = dimensions.find(d => d.id === id);

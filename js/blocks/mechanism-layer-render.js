@@ -57,6 +57,7 @@ export function renderLinks({ links, comps, points, triangleEdgeKeys, isGroundBa
     const outputHoles=isOutputBlank(component)?svgEl('g'):null;if(outputHoles){outputHoles.dataset.outputHorn=link.id;outputHoles.style.pointerEvents='none';group.appendChild(outputHoles);}
     const holes = [];
     [link.p1, link.p2].forEach(pointId => {
+      if(component?.wheelWidthMm!==undefined)return;
       if (groundIds.has(pointId)) return;
       const hole = svgEl('circle');
       hole.setAttribute('r', holeRadius * scale); hole.setAttribute('fill', 'none'); hole.setAttribute('stroke', color); hole.setAttribute('stroke-width', 1.5); hole.setAttribute('stroke-opacity', 0.7); hole.style.pointerEvents = 'none';

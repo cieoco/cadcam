@@ -15,7 +15,7 @@ import {fusionRoot,fusionAtPoint} from '../core/bar-fusion.js';
 
 import { S } from './state.js';
 import {rotateLooseBarEnd,looseBarRotation,pointRotation,isFreeBody,holeJoined} from './model.js';
-import {gearPivotRotation,rotateGearPinnedMember} from './gear-pin-connection.js';
+import {gearPivotRotation,rotateGearPinnedPose} from './gear-pin-connection.js';
 import {dragIntent} from './drag-intent.js';
 import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
 import * as View from './view.js';
@@ -260,7 +260,7 @@ function onDragMove(e) {
   moveNodeTo(S.dragId,w);
 }
 // Ordinary dragging changes pose only; motor output keeps its dedicated installation path.
-function motorOutputTarget(id){
+function motorShaftNear(id){
   const points=displayCoords(),from=points[id];if(!from)return null;
   let best=null,gap=View.snapWorld()*(mobilePrompt()?2.35:1);
   for(const c of S.comps.filter(c=>c.type==='motor'&&c.p1?.id!==id)){const p=points[c.p1.id];if(!p)continue;const d=Math.hypot(p.x-from.x,p.y-from.y);if(d<gap){gap=d;best=c.p1.id;}}
@@ -269,7 +269,7 @@ function motorOutputTarget(id){
 /** Numeric coordinates and dragging share rigid-body and joint constraints. */
 export function moveNodeTo(id,w,{snap=true}={}) {
   if ((pointIsRackHole(id)||S.comps.some(c=>c.frameHole&&c.p1.id===id)) && dragIntent({grab:'frame-hole'}).kind==='none') return;   // 機架孔由機架面板處理
-  const pinRotation=rotateGearPinnedMember(S.comps,S.topo.params,id,w,{positions:displayCoords(),snapDistance:0});
+  const pinRotation=rotateGearPinnedPose(S.comps,S.topo.params,id,w,{positions:displayCoords()});
   if(pinRotation){S.snapTarget=null;redrawAfterDrag();return;}
   const motor=S.comps.find(c=>c.type==='motor'&&c.p1?.id===id);
   if(motor){if(dragIntent({grab:'shaft'},{free:isFreeBody(S.comps,motor,S.modules)}).kind==='move-free'){updatePointCoordsById(id,w.x,w.y);S.snapTarget=null;redrawAfterDrag();}return;}
@@ -283,7 +283,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
   }
   if (head.kind === 'drive') {
     redrawAfterDrag();
-    S.snapTarget = driven === 'tip' && snap ? motorOutputTarget(id) : null;
+    S.snapTarget = driven === 'tip' && snap ? motorShaftNear(id) : null;
     if (S.snapTarget) draw();
     return;
   }
@@ -326,7 +326,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     } else {
       moveGear(gearForCenter, dragTarget.x - cur.x, dragTarget.y - cur.y);
     }
-    S.snapTarget = motorOutputTarget(id);
+    S.snapTarget = motorShaftNear(id);
     redrawAfterDrag();
     return;
   }
@@ -340,7 +340,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     const dy = desired.y - (p?.y || 0);
     movePointById(free.p1.id, dx, dy);
     movePointById(free.p2.id, dx, dy);
-    S.snapTarget = motorOutputTarget(id);
+    S.snapTarget = motorShaftNear(id);
     redrawAfterDrag();
     return;
   }
@@ -352,7 +352,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
     movePointById(freeTri.p1.id, dx, dy);
     movePointById(freeTri.p2.id, dx, dy);
     movePointById(freeTri.p3.id, dx, dy);
-    S.snapTarget = motorOutputTarget(id);
+    S.snapTarget = motorShaftNear(id);
     redrawAfterDrag();
     return;
   }
@@ -371,19 +371,19 @@ export function moveNodeTo(id,w,{snap=true}={}) {
         const vx = cur.x - f.x, vy = cur.y - f.y;
         updatePointCoordsById(p.id, f.x + vx * cosD - vy * sinD, f.y + vx * sinD + vy * cosD);
       });
-      S.snapTarget = motorOutputTarget(id);
+      S.snapTarget = motorShaftNear(id);
       redrawAfterDrag();
       return;
     }
   }
   if (rotateLooseBarEnd(S.comps,S.topo.params,id,dragTarget,snap)) {
-    S.snapTarget = motorOutputTarget(id);
+    S.snapTarget = motorShaftNear(id);
     redrawAfterDrag();
     return;
   }
   // 一般閉鏈/欠定機構的手抓點：把被拖的洞暫時 pin 到游標，用距離約束迭代解其他桿件。
   if (solvePinnedConstraints && solvePinnedConstraints(id, dragTarget)) {
-    S.snapTarget = motorOutputTarget(id);
+    S.snapTarget = motorShaftNear(id);
     redrawAfterDrag();
     return;
   }
@@ -403,7 +403,7 @@ export function moveNodeTo(id,w,{snap=true}={}) {
   }
   updatePointCoordsById(id, tx, ty);
   recomputeLengths();
-  S.snapTarget = motorOutputTarget(id);
+  S.snapTarget = motorShaftNear(id);
   redrawAfterDrag();
 }
 export function translateFrame(dx,dy,snap=false){

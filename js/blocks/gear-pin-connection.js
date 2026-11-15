@@ -3,8 +3,7 @@ import {fusionRoot,inspectBarFusionData} from '../core/bar-fusion.js';
 import {pointKeysFor} from './part-types.js';
 
 const keys=c=>pointKeysFor(c).map(k=>c[k]).filter(Boolean);
-const fixedHoles=c=>localHoles(c).map(h=>({...h,...holeWorld(c,h)}));
-export const gearPinHoles=c=>[...keys(c),...fixedHoles(c)];
+export const gearPinHoles=c=>[...keys(c),...localHoles(c).map(h=>({...h,...holeWorld(c,h)}))];
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const finite=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.y);
 
@@ -39,21 +38,9 @@ function rotateMembers(context,angle){
  const pose=new Map(context.points.map(q=>[q.id,{x:p.x+(q.x-p.x)*cos-(q.y-p.y)*sin,y:p.y+(q.x-p.x)*sin+(q.y-p.y)*cos}]));
  for(const c of context.members)for(const q of keys(c)){const at=pose.get(q.id);if(at)Object.assign(q,at);}
 }
-export function rotateGearPinnedMember(comps,params,id,target,{positions={},snapDistance=0}={}){
+export function rotateGearPinnedPose(comps,params,id,target,{positions={}}={}){
  const context=gearPivotRotation(comps,params,id,positions);if(!context||!finite(target))return null;
  const p=context.pivot,angle=Math.atan2(target.y-p.y,target.x-p.x)-Math.atan2(context.end.y-p.y,context.end.x-p.x);
  rotateMembers(context,angle);
- const current=gearPivotRotation(comps,params,id),targets=fixedHoles(context.gear).filter(q=>q.id!==p.id);
- const candidates=[];
- for(const a of current.points.filter(q=>q.id!==p.id))for(const b0 of targets){
-  const b=positions[b0.id]||b0;
-  if(Math.abs(distance(p,a)-distance(p,b))>.001||distance(a,b)>snapDistance)continue;
-  if(comps.some(c=>!context.ids.has(c.id)&&c!==context.gear&&gearPinHoles(c).some(q=>q.id===b0.id)))continue;
-  candidates.push({from:a.id,to:b0.id,gearId:context.gear.id,memberId:context.root.id,dragId:id});
- }
- if(candidates.length!==1)return {matched:true,ambiguous:candidates.length>1,candidates};
- const candidate=candidates[0],a=current.points.find(q=>q.id===candidate.from),b=positions[candidate.to]||targets.find(q=>q.id===candidate.to);
- rotateMembers(current,Math.atan2(b.y-p.y,b.x-p.x)-Math.atan2(a.y-p.y,a.x-p.x));
- return {matched:true,candidate};
+ return {matched:true};
 }
-

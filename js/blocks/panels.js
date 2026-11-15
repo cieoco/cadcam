@@ -18,10 +18,10 @@ import { S } from './state.js';
 import { servoInputAt } from './motor-tools.js';
 
 // ---- 注入的查詢 helper（由 app 在啟動時提供）----
-let pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked, frameSizeInfo, frameGroundInfo;
+let pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointIsGround, isGroundPositionUnlocked, frameSizeInfo, frameGroundInfo;
 
 export function init(deps) {
-  ({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointUseCount, pointIsGround, isGroundPositionUnlocked, frameSizeInfo, frameGroundInfo } = deps);
+  ({ pointCoords, sliderMountInfo, roleLabel, triParamFor, hasPoint, motorBarForCenter, pointIsGround, isGroundPositionUnlocked, frameSizeInfo, frameGroundInfo } = deps);
 }
 
 // 更新長度顯示（用上方的 − / + 以 8mm 為單位調整）

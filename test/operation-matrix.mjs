@@ -140,10 +140,11 @@ const CHECKS={
   'move-over-idle-hole':overIdleHole,
   'resize-confirm-cancel':resizeConfirmCancel,
   // --- select
-  // still a gap: the target is only worked out when a command runs (delete explains and flashes); nothing marks the owner at selection time
+  // Shared-hole selection names and highlights both owners; deletion asks the user to choose a body.
   'select-shared-joint':()=>{const w=blocked(),t=targetOf({...S,selectedLinkId:null,selectedTriangleId:null,selectedSliderId:null,selectedGearId:null,selectedNodeId:'Blank136.B'},w.comps,[]);
     const o=ownerOf(w,'Blank136.B');
-    return compsOfPoint(w,'Blank136.B').length===2&&t.part===null&&t.shared.length===2&&/共用/.test(del(w,{selectedNodeId:'Blank136.B'}).msgs[0]||'')&&/2 個零件共用/.test(o.title)&&o.flashed.length===2;},
+    const msgs=del(w,{selectedNodeId:'Blank136.B'}).msgs;
+    return compsOfPoint(w,'Blank136.B').length===2&&t.part===null&&t.shared.length===2&&/共用/.test(msgs[0]||'')&&/共用孔/.test(o.title)&&o.flashed.length===2&&o.flashed.includes('Blank136')&&o.flashed.includes('Blank137');},
   'select-plate-hole-owner':()=>{const w=blocked(),o=ownerOf(w,'Blank133_H8_0'),bar=ownerOf(w,'Blank137_H8_0');return o.flashed.join()==='Blank133'&&/^「.+」/.test(o.title)&&bar.flashed.join()==='Blank137'&&!/Blank\d|_H\d/.test(o.title+bar.title);},
   // --- move (Model.isFreeBody decides whether a body drag translates; otherwise input.js only selects / returns without a message)
   'move-free-bar':()=>{const w=freeBar();return Model.isFreeBody(w.comps,w.comps[0],[]);},

@@ -1,7 +1,6 @@
 // Pack C4 of docs/SDD-CONNECTION-INTEGRITY.md: the commit gate (js/blocks/integrity-gate.js) and the single-source motor answers.
 // Real checkWork, real review/commit/delete/release entries; operation-sequences.mjs forces contradictions through every entry.
-import {readFileSync} from 'node:fs';
-import {execSync} from 'node:child_process';
+import {readFileSync,readdirSync} from 'node:fs';
 import {check,report} from './_harness.mjs';
 const rd=n=>JSON.parse(readFileSync(new URL('./fixtures/'+n,import.meta.url),'utf8'));
 globalThis.window={confirm:()=>true,alert(){}};
@@ -94,7 +93,7 @@ check('worsening the same pre-existing contradiction is not "new"',integrityGate
 }
 // -- wiring that the Node harness cannot drive (app.js / input.js need a browser): the calls must stay in place
 const src=n=>readFileSync(new URL('../js/blocks/'+n,import.meta.url),'utf8');
-check('app.js mergePoints hands the drop to connect-ops.js, which commits through runEdit (shared gate)',/const mergePoints[\s\S]{0,300}connect-ops\.js/.test(src('app.js'))&&/runEdit\(/.test(src('connect-ops.js'))&&/integrityGate\(/.test(src('edit-pipeline.js')));
+check('ordinary pin connections use runEdit and the shared gate; obsolete connect UI is not loaded',!src('app.js').includes('connect-ops.js')&&/runEdit\(/.test(src('pin-ui.js'))&&/integrityGate\(/.test(src('edit-pipeline.js')));
 check('app.js prefetches integrity.js after the first work is applied',/integrityHints\('check'\);loadIntegrity\(\)/.test(src('app.js')));
 check('input.js drag commit goes through confirmMountingChange',/function commitDragUndo[\s\S]{0,300}confirmMountingChange\(/.test(src('input.js')));
 check('motor-release.js, delete-part.js and connect-ops.js (through the shared edit-pipeline.js runEdit) ask the gate',/runEdit\(/.test(src('motor-release.js'))&&/runEdit\(/.test(src('delete-part.js'))&&/runEdit\(/.test(src('connect-ops.js'))&&/integrityGate\(/.test(src('edit-pipeline.js')));
@@ -127,5 +126,6 @@ check('motor-release.js, delete-part.js and connect-ops.js (through the shared e
 
 // -- the replaced implementations and dead alias reads are gone
 check('dead alias reads physical_motor / motor_carrier / motorMount.hostBody / slider.driverId are gone from js/blocks',(()=>{
-  const out=execSync("grep -rn 'physical_motor\\|motor_carrier\\|motorMount?.hostBody\\|[.]driverId' js/blocks || true",{cwd:new URL('../',import.meta.url),encoding:'utf8'});return !out.trim();})());
+  const root=new URL('../js/blocks/',import.meta.url);
+  return !readdirSync(root,{recursive:true}).filter(p=>p.endsWith('.js')).some(p=>/physical_motor|motor_carrier|motorMount\?\.hostBody|[.]driverId/.test(readFileSync(new URL(p.replaceAll('\\','/'),root),'utf8')));})());
 report('commit-gate');

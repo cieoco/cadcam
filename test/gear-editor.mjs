@@ -160,7 +160,7 @@ const {normalizeSnapshot,toSnapshot}=await import('../js/blocks/schema.js');
 const rackSaved=normalizeSnapshot(toSnapshot(S.comps,S.topo,1));
 check('齒條小數尺寸保存重開不取整',rackSaved.params[rack.lenParam]===lenBefore+8.5&&rackSaved.comps.find(c=>c.id===rack.id).slot.length===rack.slot.length);
 deleteGear(pinion.id);
-check('刪小齒輪連齒條與導銷一起刪', S.comps.length === 0 && !Object.keys(S.topo.params).some(k => /^(G|RK)/.test(k)));
+check('刪小齒輪連齒條與導銷一起刪，獨立馬達保留且解除輸出', S.comps.length === 1 && S.comps[0].type === 'motor' && !S.comps[0].drives && !Object.keys(S.topo.params).some(k => /^(G|RK)/.test(k)));
 
 // ---- 面板：取消選取隱藏編輯器 ----
 editor.deselectGear();

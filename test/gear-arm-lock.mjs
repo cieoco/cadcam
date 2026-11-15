@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {makeStandardBlank} from '../js/blocks/standard-blank.js';
-import {gearPivotRotation,rotateGearPinnedMember} from '../js/blocks/gear-pin-connection.js';
+import {gearPivotRotation,rotateGearPinnedPose} from '../js/blocks/gear-pin-connection.js';
+import {rotateGearPinnedMember} from '../js/blocks/gear-pin-preview.js';
 import {planGearPinConnection,planReleaseGearPin} from '../js/blocks/gear-pin-plans.js';
 import {pointCoords,pointRotation} from '../js/blocks/model.js';
 import {planSplit,mergeDropped} from '../js/blocks/connect-ops.js';
@@ -26,6 +27,7 @@ function fixture(){
 const solve=(w,t)=>solveTopology(compileTopology(w.comps,{params:{...w.params}},new Set()),{thetaDeg:t});
 const source=fixture(),before=JSON.stringify(source),dragId=source.comps[1].p2.id;
 const context=gearPivotRotation(source.comps,source.params,dragId);assert.ok(context);assert.equal(context.pivot.id,'Gear1_mount0');assert.equal(pointRotation(source.comps,source.params,dragId).pivot.id,context.pivot.id);
+const poseOnly=structuredClone(source),poseResult=rotateGearPinnedPose(poseOnly.comps,poseOnly.params,dragId,{x:64,y:-32});assert.deepEqual(poseResult,{matched:true},'ordinary rotation returns no second-pin candidate');assert.deepEqual(poseOnly.params,source.params);assert.equal(gearPivotRotation(poseOnly.comps,poseOnly.params,dragId).joints.length,1,'ordinary rotation retains just the existing pin');
 const candidate=structuredClone(source),motion=rotateGearPinnedMember(candidate.comps,candidate.params,dragId,{x:64,y:-32},{snapDistance:6});assert.ok(motion.candidate);assert.equal(motion.candidate.from,'Blank1_H0_48');assert.equal(motion.candidate.to,'Gear1_mount1');assert.equal(JSON.stringify(source),before);assert.deepEqual(candidate.params,source.params);assert.deepEqual(candidate.comps[0],source.comps[0]);
 near(pointCoords(candidate.comps).Gear1_mount0.x,0);near(pointCoords(candidate.comps).Gear1_mount0.y,-16);
 const drop={comps:candidate.comps,topo:{params:candidate.params},points:pointCoords(candidate.comps),theta:0,angles:{},gearPin:motion.candidate};

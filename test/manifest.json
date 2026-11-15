@@ -23,6 +23,7 @@
   ],
   "timeoutMs": 90000,
   "tests": [
+    "test/tt-wheel.mjs",
     "test/standard-blanks.mjs",
     "test/bent-arms.mjs",
     "test/bent-arms-ui.mjs",

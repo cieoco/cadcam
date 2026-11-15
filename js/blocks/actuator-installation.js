@@ -13,8 +13,8 @@ export const actuatorSteps=['固定外殼','位置方向','連接輸出','試動
 function plateHolesFor(work){
   return {...planActuatorPlateHoles(work,{assembly:true}),fabrication:work.fabrication};
 }
-export function actuatorHostPoints(c){return [...pointKeysFor(c).filter(k=>c?.[k]).map(k=>({key:k,...c[k]})),...[...localHoles(c),...(c?.standardBlank?.mountHoles || [])].map(h=>({...h,...holeWorld(c,h),key:h.id}))];}
-export const actuatorPoint=(c,key,points={})=>{const p=actuatorHostPoints(c).find(p=>p.key===key);return points[p?.id] || p;};
+export function actuatorHostPoints(c){return [...pointKeysFor(c).filter(k=>c?.[k]&&!(c.wheelWidthMm!==undefined&&k==='p2')).map(k=>({key:k,...c[k]})),...[...localHoles(c),...(c?.standardBlank?.mountHoles || [])].map(h=>({...h,...holeWorld(c,h),key:h.id}))];}
+export const actuatorPoint=(c,key,points={})=>{const p=actuatorHostPoints(c).find(p=>p.key===key) || c?.[key];return points[p?.id] || p;};
 export const fixedPlate=(c,comps)=>c?.type==='triangle'&&c.standardBlank?.kind==='plate'&&actuatorHostPoints(c).filter(p=>frameNodeIds(comps).has(p.id)).length>=2;
 export function actuatorChoices(comps){
   return {hosts:comps.filter(c=>c.type==='bar'||c.type==='triangle'&&c.standardBlank?.kind==='plate'),outputs:comps.filter(c=>c.type==='bar'||c.type==='gear'&&!c.mesh)};
@@ -68,6 +68,7 @@ export function planMotorInstallation(source,request,points={},motion={}){
   if(!['horizontal','vertical','follow-frame'].includes(request.orientation))return fail('請選外殼方向。');
   if(request.angleDeg!=null&&(!Number.isFinite(request.angleDeg)||Math.abs(request.angleDeg)>360))return fail('安裝轉角需在 −360～360°。');
   const key=out.type==='gear'?'p1':request.outputEnd;
+  if(out.wheelWidthMm!==undefined&&(key!=='p1'||request.type!=='tt'))return fail('TT 輪子只能用中心雙扁軸孔接 TT 馬達。');
   const oldCenter=out.motorMount?.center || pointKeysFor(out).map(k=>out[k]).find(p=>p?.physicalMotor)?.id;
   if(!['p1','p2'].includes(key)||!out[key])return fail('請選輸出零件的端孔。');
   if(oldCenter&&oldCenter!==out[key].id)return fail('這個零件已有另一端的動力，請先拆除原動力再換孔。');

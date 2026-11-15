@@ -30,8 +30,8 @@ const issues=(w,codes)=>checkWork(w).filter(i=>i.severity!=='notice'&&(!codes||c
 {const seen=new Set();let works=0;
  for(const e of BLOCK_EXAMPLES){const s=normalizeSnapshot(clone(e.snapshot));if(!s)continue;works++;
   const rel=buildRelations(work(s));for(const c of s.comps)for(const a of rel.attachmentsOf(c.id))seen.add(a.kind);}
- const need=KINDS.filter(k=>k!=='plate-gear-fusion'&&k!=='reference');   // fusedWith has no built-in example (synthetic below); frameHole only in student files
- check('every relation kind except plate-gear-fusion/reference occurs in a built-in example',need.every(k=>seen.has(k)),need.filter(k=>!seen.has(k)).join(',')+' | seen: '+[...seen]);
+ const need=KINDS.filter(k=>k!=='plate-gear-fusion'&&k!=='reference'&&k!=='pin-lock');   // fusedWith and pin locks have dedicated synthetic tests; frameHole only in student files
+ check('every relation kind except plate-gear-fusion/reference/pin-lock occurs in a built-in example',need.every(k=>seen.has(k)),need.filter(k=>!seen.has(k)).join(',')+' | seen: '+[...seen]);
  check('no attachment uses an unknown kind',[...seen].every(k=>KINDS.includes(k)),[...seen].filter(k=>!KINDS.includes(k)).join(','));
 }
 {// one synthetic work per field: the kind and field of the relation
