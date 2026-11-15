@@ -20,6 +20,7 @@ export function storedProject(snapshot){
   if(snapshot?.comps?.some(c=>c.wheelWidthMm!==undefined))requires.push('tt-wheel-v1');
   if(snapshot?.comps?.some(c=>c.type==='motor'||c.motorMount?.partId))requires.push('independent-motor-v1');
   if(snapshot?.modules?.some(m=>m.mount?.face?.selection?.fastener))requires.push('tab-nut-m3-v1');
+  if(snapshot?.modules?.some(m=>m.mount?.face?.selection?.fastener?.contactMode==='actual'))requires.push('tab-nut-contact-v1');
   if(snapshot?.comps?.some(c=>c.boxPanel))requires.push('box-panel-v1');
   // Older readers would drop extra joint sets and lid closures.
   if(snapshot?.modules?.some(m=>m.mount?.face?.selection?.fastener?.moreAlongMm)||snapshot?.comps?.some(c=>c.boxPanel?.closures))requires.push('tab-nut-sets-v1');
@@ -33,6 +34,6 @@ function motorPartsToLegacy(project){
 }
 export function readStoredProject(value){
   if(value?.kind!=='blocks-envelope')return motorPartsToLegacy(value);
-  if(value.v!==1||!Array.isArray(value.requires)||!value.requires.length||value.requires.some(k=>!['tab-nut-m3-v1','box-panel-v1','tab-nut-sets-v1','independent-motor-v1','motor-part-v2','tt-wheel-v1','design-instances-v1','placement-plane-v1','face-edge-relations-v1','face-relations-v1'].includes(k))||!Array.isArray(value.project?.comps)||!['blocks','blocks-composite'].includes(value.project.kind))return null;
+  if(value.v!==1||!Array.isArray(value.requires)||!value.requires.length||value.requires.some(k=>!['tab-nut-contact-v1','tab-nut-m3-v1','box-panel-v1','tab-nut-sets-v1','independent-motor-v1','motor-part-v2','tt-wheel-v1','design-instances-v1','placement-plane-v1','face-edge-relations-v1','face-relations-v1'].includes(k))||!Array.isArray(value.project?.comps)||!['blocks','blocks-composite'].includes(value.project.kind))return null;
   return motorPartsToLegacy(value.project);
 }

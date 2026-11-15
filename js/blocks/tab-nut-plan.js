@@ -3,6 +3,7 @@ import {buildMountSurfaces,findMountSurface} from './mount-surfaces.js';
 import {planTabNutGeometry,ringDistance} from './tab-nut-geometry.js';
 import {isFixedMountPart} from './part-types.js';
 import {readConnectionDescriptor} from './connection-descriptor.js';
+import {planActualTabContact,actualTabContact,relativeTabFace} from './tab-nut-contact.js';
 import {boxPanelGeometry} from '../plugins/box-maker/box-contract.js';
 
 export const hasTabNut=modules=>(modules||[]).some(m=>m.mount?.face?.selection?.fastener);
@@ -16,10 +17,30 @@ function rawPlan(comps,modules,params,mod,opts,over={}){
   const surfaces=(moduleId,partId)=>buildMountSurfaces({comps,modules,params,moduleId,partId,exportSettings:opts.exportSettings||{},thicknessMm:opts.stockMm||3,drilling:true}).surfaces||[];
   const host=findMountSurface(surfaces(d.host.moduleId),mod.mount.to),child=over.child||surfaces(mod.id,d.child.partId).find(s=>s.compId===d.child.partId);
   if(!host||!child)return fail('找不到實際接合板件。');
-  return {...planTabNutGeometry({host,child,face:mod.mount.face,connectionId:over.id||d.id}),host,child,moduleId:mod.id};
+  const plan=mod.mount.face.selection.fastener.contactMode==='actual'?planActualTabContact({host,child,face:mod.mount.face,connectionId:over.id||d.id,settings:mod.mount.face.selection.fastener,comps,modules,params}):{...planTabNutGeometry({host,child,face:mod.mount.face,connectionId:over.id||d.id}),host,child};
+  return {...plan,moduleId:mod.id};
 }
 export function tabNutPlans(comps,modules,params,opts={}){
   const plans=modules.map(m=>rawPlan(comps,modules,params,m,opts)).filter(Boolean);
+  // Additional physical contacts do not become extra kinematic parents. Each is
+  // explicitly selected in this connection's preview and retains its own sizes.
+  for(const mod of modules){
+    const settings=mod.mount?.face?.selection?.fastener;if(settings?.contactMode!=='actual')continue;
+    const primary=plans.find(p=>p.moduleId===mod.id),childPart=mod.mount.face.childPart;
+    if(!primary)continue;primary.contactTargets=[];
+    const child=buildMountSurfaces({comps,modules,params,moduleId:mod.id,partId:childPart,exportSettings:opts.exportSettings||{},thicknessMm:opts.stockMm||3,drilling:true}).surfaces?.find(s=>s.compId===childPart);
+    const d=readConnectionDescriptor({comps,modules,childId:mod.id,mount:mod.mount}),requested=settings.peers||[],found=new Set();
+    if(child)for(const c of comps){
+      if(c.moduleId===mod.id||c.id===d.host?.partId||!['bar','triangle'].includes(c.type)||!isFixedMountPart(c)||c.barFusion||c.barFusionRoot||c.fusedWith||c.shape==='disk')continue;
+      const face=relativeTabFace(modules,c.moduleId,mod.id,comps);if(!face)continue;
+      const host=buildMountSurfaces({comps,modules,params,moduleId:c.moduleId,partId:c.id,exportSettings:opts.exportSettings||{},thicknessMm:opts.stockMm||3,drilling:true}).surfaces?.find(s=>s.compId===c.id);
+      if(!host||!actualTabContact(host,child,face))continue;
+      const peer=requested.find(p=>p.moduleId===c.moduleId&&p.partId===c.id),m=modules.find(m=>m.id===c.moduleId),siblings=modules.filter(x=>x.name===m?.name),label=(m?.name||c.moduleId)+(siblings.length>1?' '+(siblings.indexOf(m)+1):'');
+      primary.contactTargets.push({moduleId:c.moduleId,partId:c.id,label,selected:!!peer});found.add(c.moduleId+'/'+c.id);
+      if(peer)plans.push({...planActualTabContact({host,child,face,connectionId:`connection:${mod.id}/peer:${c.id}`,settings:peer.settings,comps,modules,params}),moduleId:mod.id,peer:{moduleId:c.moduleId,partId:c.id}});
+    }
+    for(const peer of requested)if(!found.has(peer.moduleId+'/'+peer.partId))plans.push({ok:false,moduleId:mod.id,connectionId:`connection:${mod.id}/peer:${peer.partId}`,reason:'額外榫接板件已不存在或不再貼合；請取消該處榫接或修改定位。'});
+  }
   // Lid closure joints are derived (fabrication only); the side outline already carries its base-end tabs.
   for(const lid of comps)for(const [role,face] of Object.entries(lid.boxPanel?.closures||{})){
     const side=comps.find(c=>c.boxPanel?.rootPart===lid.boxPanel.rootPart&&c.boxPanel.role===role),mod=modules.find(m=>m.id===side?.moduleId),low=plans.find(q=>q.child?.compId===side?.id),g=low?.childGeometry;
@@ -44,12 +65,19 @@ export function appendTabNutFeatures(extras,comps,modules,params,opts={}){
     }
     if(!plan.ok){(extras.diagnostics||=[]).push({status:'fail',code:'tab_nut_invalid',moduleId:plan.moduleId,reason:plan.reason});continue;}
     for(const role of ['host','child']){
-      const id=plan[role].compId,g=structuredClone(plan[`${role}Geometry`]);
-      const existing=extras.tabNutGeometry[id];
-      if(existing){
-        if(role==='child'){g.holes.push(...existing.addedHoles);g.cutouts.push(...existing.addedCutouts);extras.tabNutGeometry[id]={...g,addedHoles:existing.addedHoles,addedCutouts:existing.addedCutouts};}
-        else{const holes=g.holes.slice(plan.host.holes.length),cuts=g.cutouts.slice((plan.host.cutouts||[]).length);existing.holes.push(...holes);existing.cutouts.push(...cuts);existing.addedHoles.push(...holes);existing.addedCutouts.push(...cuts);}
-      }else extras.tabNutGeometry[id]={...g,addedHoles:role==='host'?g.holes.slice(plan.host.holes.length):[],addedCutouts:role==='host'?g.cutouts.slice((plan.host.cutouts||[]).length):[]};
+      const surface=plan[role],id=surface.compId,g=structuredClone(plan[`${role}Geometry`]);
+      let existing=extras.tabNutGeometry[id];
+      if(!existing){existing={outlines:structuredClone(surface.outlines),holes:structuredClone(surface.holes||[]),cutouts:structuredClone(surface.cutouts||[]),addedHoles:[],addedCutouts:[],omittedHoleIds:[]};extras.tabNutGeometry[id]=existing;}
+      if(role==='child'&&!existing.editedEdges){existing.outlines=g.outlines;existing.editedEdges=1;}
+      else if(role==='child'){
+        const edit=plan.edgeEdit,ring=existing.outlines[0],same=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<1e-5;
+        const i=edit?ring.findIndex((a,i)=>same(a,edit.a)&&same(ring[(i+1)%ring.length],edit.b)):-1;
+        if(i<0){plan.ok=false;plan.reason='同一板邊的榫形修改互相衝突，請調整榫接設定。';(extras.diagnostics||=[]).push({status:'fail',code:'tab_nut_invalid',moduleId:plan.moduleId,reason:plan.reason});continue;}
+        const merged=[...ring.slice(0,i),...edit.path,...ring.slice(i+2)];if(same(merged[0],merged.at(-1)))merged.pop();existing.outlines=[merged,...existing.outlines.slice(1)];existing.editedEdges++;
+      }
+      const omitted=new Set(plan.omittedHoles?.[role]||[]);existing.omittedHoleIds.push(...omitted);existing.holes=existing.holes.filter(h=>!omitted.has(h.id));
+      const holes=g.holes.filter(h=>!surface.holes.some(b=>b.id===h.id&&b.x===h.x&&b.y===h.y)),cuts=g.cutouts.filter(c=>!surface.cutouts?.some(b=>b.id===c.id));
+      existing.holes.push(...holes);existing.cutouts.push(...cuts);existing.addedHoles.push(...holes);existing.addedCutouts.push(...cuts);
     }
   }
   return extras;

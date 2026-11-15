@@ -91,7 +91,24 @@ function witness(a,b){
  for(const [p,other] of [[a,bp],[b,ap]])for(const [i,j] of edgeIndices)for(const f of other){const u=p.vertices[i],v=p.vertices[j],du=dot(f.n,sub(u,f.origin)),dv=dot(f.n,sub(v,f.origin));if(Math.abs(du-dv)<E||du*dv>0)continue;const t=du/(du-dv),q={x:u.x+(v.x-u.x)*t,y:u.y+(v.y-u.y)*t,z:u.z+(v.z-u.z)*t};if(inside(q))candidates.push(q);}
  return candidates.length?Object.fromEntries(['x','y','z'].map(k=>[k,candidates.reduce((s,p)=>s+p[k],0)/candidates.length])):centerOfOverlap(a,b);
 }
-function collision(a,b){for(const p of a)for(const q of b){const depth=sat(p,q);if(depth)return {position:witness(p,q),minProjectionOverlapMm:depth};}return null;}
+// Broad phase only: keep original prism order and the same SAT/witness results.
+const prismTrees=new WeakMap();
+function prismTree(prisms){
+ if(prismTrees.has(prisms))return prismTrees.get(prisms);
+ const build=rows=>{const box=boxOf((function*(){for(const {p} of rows){yield p.box.min;yield p.box.max;}})());
+  if(rows.length<=12)return {box,rows};
+  const axis=['x','y','z'].sort((a,b)=>(box.max[b]-box.min[b])-(box.max[a]-box.min[a]))[0];
+  rows.sort((a,b)=>(a.p.box.min[axis]+a.p.box.max[axis])-(b.p.box.min[axis]+b.p.box.max[axis])||a.i-b.i);
+  const mid=Math.floor(rows.length/2);return {box,left:build(rows.slice(0,mid)),right:build(rows.slice(mid))};
+ };const tree=build(prisms.map((p,i)=>({p,i})));prismTrees.set(prisms,tree);return tree;
+}
+function collision(a,b){
+ const tree=a.length*b.length>4096?prismTree(b):null;
+ const query=(node,box,out)=>{if(!boxOverlap(node.box,box))return;if(node.rows){for(const r of node.rows)if(boxOverlap(r.p.box,box))out.push(r);}else{query(node.left,box,out);query(node.right,box,out);}};
+ for(const p of a){let candidates=b;if(tree){const rows=[];query(tree,p.box,rows);rows.sort((a,b)=>a.i-b.i);candidates=rows.map(r=>r.p);}
+  for(const q of candidates){const depth=sat(p,q);if(depth)return {position:witness(p,q),minProjectionOverlapMm:depth};}
+ }return null;
+}
 function prepared(p){
  const m=p.pose?.matrix;
  if(!Array.isArray(m)||m.length!==16||!m.every(Number.isFinite))throw Error('invalid_world_pose');

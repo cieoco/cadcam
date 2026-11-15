@@ -448,7 +448,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     return { type: motorTypeAt(list, centerId), centerId, plate: partPoints.has(plateName) ? plateName : null };
   });
 
-  return { parts, joints, motors, gaps, spare,n20Spec:exportSettings.drive?.n20Spec===1,diagnostics:orthoExtras.diagnostics || [] };
+  return { parts, joints, motors, gaps, spare,omittedGridHoles:Object.entries(orthoExtras.tabNutGeometry||{}).filter(([,g])=>g.omittedHoleIds?.length).map(([partId,g])=>({partId,ids:[...new Set(g.omittedHoleIds)]})),n20Spec:exportSettings.drive?.n20Spec===1,diagnostics:orthoExtras.diagnostics || [] };
 }
 
 // ---- 五金清單 ----
@@ -594,7 +594,7 @@ export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = []
   const invalid=plan?.diagnostics?.find(d=>['face_fastener_invalid','tab_nut_invalid'].includes(d.code));if(invalid)throw Error(`${invalid.code==='tab_nut_invalid'?'榫槽暫停輸出':'角碼孔暫停輸出'}：${invalid.reason}`);
   const currentReport=validation?.scope==='single_pose'&&['pass','fail','not_supported'].includes(validation.status)&&validationRevision&&['sourceRevision','geometryKey','poseRevision'].every(k=>typeof validation[k]==='string'&&validation[k]===validationRevision[k]);
   const spare = plan && Array.isArray(plan.spare) ? plan.spare : spareModules(modules);   // M5a：還沒接上的機構不在製作包內，提醒一聲
-  warnings = [...warnings, ...(spare.length ? [`還沒接上、不在製作包內：${spare.map(m => m.name).join('、')}`] : []), ...modules.filter(m => m?.mount?.face).map(m => `六面接合 ${m.name || m.id}：${m.mount.face.selection.fastener ? '榫槽鎖固試作：未做雷射切縫補償；材質、五金、工具空間與實物強度待核對。' : m.mount.face.selection.brackets ? `角碼孔依目前板件幾何重新驗證；不合格孔位停止輸出。${currentReport?'目前單一姿態材料結果見下方；全行程與承重仍未驗證。':'跨面干涉與承重仍需驗證。'}` : '擺放姿態已保存；轉接件與配對固定孔尚未確認，不能直接依此製造組立。'}`)];
+  warnings = [...warnings, ...(plan.omittedGridHoles||[]).map(p=>`${p.partId}：榫槽避讓，${p.ids.length} 個未使用格孔不加工；原設計點位保留。`), ...(spare.length ? [`還沒接上、不在製作包內：${spare.map(m => m.name).join('、')}`] : []), ...modules.filter(m => m?.mount?.face).map(m => `六面接合 ${m.name || m.id}：${m.mount.face.selection.fastener ? '榫槽鎖固試作：未做雷射切縫補償；材質、五金、工具空間與實物強度待核對。' : m.mount.face.selection.brackets ? `角碼孔依目前板件幾何重新驗證；不合格孔位停止輸出。${currentReport?'目前單一姿態材料結果見下方；全行程與承重仍未驗證。':'跨面干涉與承重仍需驗證。'}` : '擺放姿態已保存；轉接件與配對固定孔尚未確認，不能直接依此製造組立。'}`)];
   const parts = (plan && plan.parts) || [];
   const joints = (plan && plan.joints) || [];
   const motors = (plan && plan.motors) || [];

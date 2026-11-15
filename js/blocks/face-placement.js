@@ -22,7 +22,7 @@ export function buildFacePlacement({ host, child, selection } = {}) {
   if(chosen.edgeRelations?.length){mate=applyEdgeRelations(mate,{host:host.surface,child:child.surface,hostFace:chosen.hostFace,childFace:chosen.childFace,relations:chosen.edgeRelations});if(!mate.ok)return mate;}
   if(chosen.faceRelations?.length){
     for(const r of chosen.faceRelations)for(const [key,item]of [['hostFaces',host],['childFaces',child]])if(r[key].some(id=>!['top','bottom'].includes(id)&&!faceBoundaryEdges(item.surface,id).length))return {ok:false,reason:'原先選的材料側面已不存在，請重新選面。'};
-    if((chosen.brackets||chosen.fastener)&&!chosen.faceRelations.some(r=>r.kind==='mate'&&r.hostFaces[0]===chosen.hostFace&&r.childFaces[0]===chosen.childFace&&Math.abs(r.offsetMm-chosen.gap)<1e-6))return {ok:false,reason:'這組面關係的固定件尚未核對，請先選「先只定位」。'};
+    if((chosen.brackets||chosen.fastener&&chosen.fastener.contactMode!=='actual')&&!chosen.faceRelations.some(r=>r.kind==='mate'&&r.hostFaces[0]===chosen.hostFace&&r.childFaces[0]===chosen.childFace&&Math.abs(r.offsetMm-chosen.gap)<1e-6))return {ok:false,reason:'這組面關係的固定件尚未核對，請先選「先只定位」。'};
     mate=solveFaceRelations(mate,{hostBox:host.box,childBox:child.box,relations:chosen.faceRelations});if(!mate.ok)return mate;
     if(chosen.edgeRelations?.length){const check=applyEdgeRelations(mate,{host:host.surface,child:child.surface,hostFace:chosen.hostFace,childFace:chosen.childFace,relations:chosen.edgeRelations});if(!check.ok||['x','y','z'].some(k=>Math.abs(check.translation[k]-mate.translation[k])>1e-5))return {ok:false,reason:'新面關係與原有邊定位衝突，請調整或移除原有邊定位。'};}
   }

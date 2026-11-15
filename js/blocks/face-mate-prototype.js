@@ -49,7 +49,7 @@ $('previewToggle').addEventListener('click', () => {
 let hasConfirmed = false, roughPlaced = false, configured = false, childConfirmed = false;
 let workflowPhase='combined';
 let bracketPlan = null, jointSettings, fastenerKind='bracket', tabNutSettings={...TAB_NUT_DEFAULTS};
-$('fastenerKind').addEventListener('change',()=>{fastenerKind=$('fastenerKind').value;render();});
+$('fastenerKind').addEventListener('change',()=>{fastenerKind=$('fastenerKind').value;if(fastenerKind==='tab-nut')tabNutSettings.contactMode='actual';render();});
 for(const format of ['svg','dxf']){
  const button=document.createElement('button');button.type='button';button.textContent=`下載 3 mm 試片 ${format.toUpperCase()}`;button.style.minHeight='44px';
  button.onclick=async()=>{const {tabNutCouponFile}=await import('./tab-nut-coupons.js');const blob=new Blob([tabNutCouponFile(format)],{type:format==='svg'?'image/svg+xml':'application/dxf'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`tab-nut-3mm-M3-trial.${format}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};$('tabNutCoupons').append(button);
@@ -67,6 +67,25 @@ for(const [key,label,advanced] of tabNutFields){
  $(advanced?'tabNutAdvanced':'tabNutFields').append(l,input);
  if(key==='alongMm')signedNumberInput(input);
 }
+let tabContactSignature='';
+const tabContacts=document.createElement('div'),tabOmissions=document.createElement('p');
+tabContacts.id='tabContactChoices';tabOmissions.setAttribute('role','status');$('tabNutFields').before(tabContacts,tabOmissions);
+function renderTabContacts(plan){
+ tabContacts.hidden=tabOmissions.hidden=fastenerKind!=='tab-nut';if(fastenerKind!=='tab-nut'||!plan)return;
+ const targets=plan.contactTargets||[],signature=JSON.stringify(targets.map(t=>[t.moduleId,t.partId,t.label,!!tabNutSettings.peers?.some(p=>p.moduleId===t.moduleId&&p.partId===t.partId)]));
+ if(signature!==tabContactSignature){tabContactSignature=signature;tabContacts.replaceChildren();
+  for(const target of targets){const wrap=document.createElement('div'),label=document.createElement('label'),check=document.createElement('input');label.style.cssText='display:flex;align-items:center;gap:8px;min-height:44px';check.type='checkbox';check.style.cssText='width:22px;height:22px;min-height:22px;flex:none';check.checked=!!tabNutSettings.peers?.some(p=>p.moduleId===target.moduleId&&p.partId===target.partId);check.setAttribute('aria-label',`同時與${target.label}榫接`);label.append(check,document.createTextNode(`同時與${target.label}榫接`));wrap.append(label);
+   check.onchange=()=>{const peers=(tabNutSettings.peers||[]).filter(p=>p.moduleId!==target.moduleId||p.partId!==target.partId);if(check.checked){const {peers:unused,...settings}=tabNutSettings;peers.push({moduleId:target.moduleId,partId:target.partId,settings:structuredClone(settings)});}tabNutSettings.peers=peers;render();};
+   const peer=tabNutSettings.peers?.find(p=>p.moduleId===target.moduleId&&p.partId===target.partId);
+   if(peer){const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent=`${target.label}的個別尺寸`;more.append(summary);
+    for(const [key,name]of [['tabWidthMm','榫寬'],['tabPitchMm','榫中心距'],['alongMm','沿邊位置']]){const l=document.createElement('label'),input=document.createElement('input');input.type='number';input.step='any';input.value=peer.settings[key];input.setAttribute('aria-label',`${target.label} ${name}（mm）`);l.textContent=name+' mm';l.append(input);more.append(l);input.oninput=()=>{peer.settings[key]=readNumber(input);render();};}
+    wrap.append(more);
+   }tabContacts.append(wrap);
+  }
+ }
+ const count=(plan.contactResults||[plan]).reduce((n,p)=>n+(p.omittedHoles?.host.length||0)+(p.omittedHoles?.child.length||0),0);
+ tabOmissions.textContent=count?`榫槽避讓：${count} 個未使用格孔將不加工；原設計點位保留，確認後才套用。`:'';
+}
 let parentCandidate=null,previewRequest=0,previewResultRequest=0,previewSignature='',previewTimer=null,candidateClosed=false;
 function integratedSelection(mate){return faceFastenerSelection(draft,workflowPhase==='position'?'none':fastenerKind,{offsets:bracketOffsets,childPart:children[draft.child].surface?.compId || 'frame',tabNut:tabNutSettings});}
 function requestCandidate(mate){
@@ -80,6 +99,7 @@ function requestCandidate(mate){
 }
 function candidateLabel(id,candidate){if(id.includes('/screw'))return '固定螺絲頭';return hitLabels([id],candidate.work?.comps || [],candidate.work?.modules || [])[0] || '板件';}
 function showCandidate(candidate){
+ renderTabContacts(candidate.tabNut);
  const error=$('tabNutFeedback');error.hidden=fastenerKind!=='tab-nut'||!!candidate.saveable;error.textContent=error.hidden?'':candidate.reason || '接頭有干涉或資料無法驗證，請調整。';
  let box=document.getElementById('faceValidation');
  if(!box){box=document.createElement('div');box.id='faceValidation';box.style.cssText='padding:8px;overflow-wrap:anywhere;';box.setAttribute('aria-live','polite');$('message').after(box);}

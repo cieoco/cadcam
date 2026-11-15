@@ -52,8 +52,9 @@ export function buildFaceCandidate(source,{childId,hostEndpoint,childEndpoint,se
  work.modules=work.modules.map(m=>m.id===childId?{...m,mount:mounted.mount}:m);
  const prepared=prepareConnectionWork(work.comps,work.modules,work.topo,{stockMm,exportSettings});work.modules=prepared.modules;work.params=work.topo.params;
  const mod=work.modules.find(m=>m.id===childId);
- const tabNut=selection.fastener?tabNutPlans(work.comps,work.modules,work.params,{stockMm,exportSettings}).find(p=>p.moduleId===childId):null;
- if(selection.fastener&&!tabNut?.ok)return freezeData({...failed('tab_nut_invalid',tabNut?.reason || '榫槽接合無法驗證。',sourceRevision),selectionRevision:JSON.stringify(selection)});
+ const tabPlans=selection.fastener?tabNutPlans(work.comps,work.modules,work.params,{stockMm,exportSettings}).filter(p=>p.moduleId===childId):[],tabNut=tabPlans[0],badTab=tabPlans.find(p=>!p.ok);
+ if(tabNut)tabNut.contactResults=tabPlans.map(p=>({ok:p.ok,reason:p.reason,connectionId:p.connectionId,hostPart:p.host?.compId,childPart:p.child?.compId,omittedHoles:p.omittedHoles}));
+ if(selection.fastener&&(!tabNut?.ok||badTab))return freezeData({...failed('tab_nut_invalid',badTab?.reason || tabNut?.reason || '榫槽接合無法驗證。',sourceRevision),selectionRevision:JSON.stringify(selection),tabNut});
  const bracket=selection.brackets?faceBracketPlan(work.comps,work.modules,work.params,mod,{stockMm,joint,exportSettings}):null;
  if(selection.brackets&&!bracket?.ok){
   // Placement can be viewed while its requested fasteners are invalid. Only
