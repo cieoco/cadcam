@@ -14,7 +14,7 @@ const variant = (id, title, capability = '可試動', source = '') => ({ id, tit
 const family = (id, group, title, note, variants) => ({ id, group, title, note, variants });
 // 來源標籤僅指已核對案例的結構參考，不表示尺寸、加工或實物已驗證。
 export const CATALOG_FAMILIES = [
-  family('four-wheel-chassis', 'tools', '四輪雙層底盤', '共用側板與上下板；可改尺寸及輪子轉動。已定位，榫槽固定待設計；未模擬車體行進。', [variant('four-wheel-chassis', '四輪雙層底盤', '輪子可試動')]),
+  family('four-wheel-chassis', 'tools', '四輪雙層底盤', '共用側板與上下板，四處榫槽各3組；可改尺寸及輪子轉動。試切與承載待驗證，未模擬車體行進。', [variant('four-wheel-chassis', '四輪雙層底盤', '輪子可試動')]),
   family('gears', 'transmission', '改變轉速與轉向 · 齒輪', '比較單對齒輪、齒輪列與共軸減速。', [
     variant('gear-pair', '兩輪嚙合傳動'), variant('reduction-gear-train', '齒輪列四倍減速'),
     variant('iq-mad-box', "三段共軸減速", '可試動', "")]),

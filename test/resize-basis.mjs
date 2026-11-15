@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {makeStandardBlank,resizeStandardBlank} from '../js/blocks/standard-blank.js';
 import {holeWorld} from '../js/core/local-holes.js';
 import {planResize} from '../js/blocks/resize-plan.js';
-import {fourWheelChassisSnapshot} from '../js/blocks/four-wheel-chassis-example.js';
+import {fourWheelChassisSnapshot} from './fixtures/chassis-positioned.mjs';
 import {synchronizeDesignInstances} from '../js/blocks/design-instances.js';
 import {refreshFaceMounts} from '../js/blocks/face-mount-refresh.js';
 import {compileAssembly,solveAssembly} from '../js/blocks/assembly.js';

@@ -1,3 +1,4 @@
+import {tabNutPartGeometry} from './tab-nut-plan.js';
 import {syringeClampFrameNodes} from './syringe-shape.js';
 import {actuatorMountSettings} from './fabrication-profile.js';
 import {inspectBarFusion} from './bar-fusion-geometry.js';
@@ -217,7 +218,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     const fusion=comp.barFusion ? inspectBarFusion(list,comp,params,exp,orthoExtras) : null;
     if(fusion&&!fusion.ok)throw Error(fusion.reason);
     const hostGeometry = fusion ? fusion.geometry : hosted.has(comp.id) ? hostedBarGeometry(comp, seedPts, exp, hosted.get(comp.id), extraHolesOf(comp)) : null;
-    const geometry=hostGeometry || inspectLinkExport(comp, length, exp, extraHolesOf(comp));
+    const geometry=tabNutPartGeometry(orthoExtras,comp,{local:true}) || hostGeometry || inspectLinkExport(comp, length, exp, extraHolesOf(comp));
     for(const c of list.filter(c=>c.type==='syringe'&&c.b?.componentId===comp.id)){
       const h={x:c.b.u,y:c.b.v,r:linkHole/2,id:`${c.id}_rod`,layer:'SYRINGE_ROD'};
       if(!geometry.holes.some(q=>Math.hypot(q.x-h.x,q.y-h.y)<.001))geometry.holes.push(h);
@@ -233,7 +234,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     addBody(key, part, joints.map(p=>p.id), comp);
   });
   plates.forEach(({ comp, points }) => {
-    const geometry = inspectPlateExport(comp, points, exp, hosted.get(comp.id), plateHolesOf(comp));
+    const geometry = tabNutPartGeometry(orthoExtras,comp) || inspectPlateExport(comp, points, exp, hosted.get(comp.id), plateHolesOf(comp));
     // The build list includes the same physical clamp holes as the export catalog.
     for(const n of syringeClampFrameNodes(list.filter(c=>c.type!=='syringe'||c.a?.componentId===comp.id),[comp.p1,comp.p2,comp.p3].filter(Boolean))){
       const old=geometry.holes.find(h=>Math.hypot(h.x-n.x,h.y-n.y)<.001);

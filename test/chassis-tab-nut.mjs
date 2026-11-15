@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {fourWheelChassisSnapshot} from '../js/blocks/four-wheel-chassis-example.js';
+import {fourWheelChassisSnapshot} from './fixtures/chassis-positioned.mjs';
 import {TAB_NUT_DEFAULTS,normalizeTabNut} from '../js/blocks/tab-nut-geometry.js';
 import {tabNutPlans} from '../js/blocks/tab-nut-plan.js';
 import {refreshFaceMounts} from '../js/blocks/face-mount-refresh.js';

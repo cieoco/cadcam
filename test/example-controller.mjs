@@ -88,4 +88,9 @@ check('取消保留作品', applied === previous && pending.removed);
 controller.requestLoad('parallel-fourbar');
 document.body.children[1].children.find(e => e.textContent === '載入此範例').onclick();
 check('取消後可重選同一範例並確認載入', applied !== previous && controller.activeExampleId === 'parallel-fourbar');
+
+// A fresh empty page can load the shared chassis without opening a file first.
+const {designInstances}=await import('../js/blocks/design-instance-runtime.js');
+await loadUnitStarts();check('共用底盤範例預先載入實例功能',typeof designInstances().synchronizeDesignInstances==='function');
+
 report('example-controller');

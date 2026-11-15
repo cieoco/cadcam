@@ -7,6 +7,7 @@ import {synchronizeDesignInstances,createDesignInstance} from '../js/blocks/desi
 import {checkWork} from '../js/blocks/integrity.js';
 import {buildFaceCandidate,validateFaceCandidate} from '../js/blocks/face-candidate.js';
 import {compileAssembly,solveAssembly} from '../js/blocks/assembly.js';
+import {tabNutPlans} from '../js/blocks/tab-nut-plan.js';
 import {inspectPlateExport} from '../js/blocks/exporters.js';
 const work=fourWheelChassisSnapshot(),before=JSON.stringify(work);
 assert.equal(work.modules.length,4);assert.equal(work.comps.filter(c=>c.wheelWidthMm===15).length,4);assert.equal(work.modules.filter(m=>m.designInstance).length,2);assert.equal(work.modules.filter(m=>m.mount).length,3);
@@ -14,6 +15,9 @@ assert.deepEqual(checkWork(work),[],'shared wheel motors have no duplicate or da
 const roof=work.modules.find(m=>m.id==='Mod141');assert.equal(roof.mount.to.module,'Mod139','upper deck joins side plate 2');assert.equal(roof.mount.face.selection.faceRelations.length,3);
 const board=work.comps.find(c=>c.id==='Blank137_141');assert.ok(board.holes.length>300,'dense user-authored hole grid is preserved');assert.equal(work.params[board.gParam],152);assert.equal(work.params[board.r1Param],120);
 assert.equal(inspectPlateExport(board,[board.p1,board.p2,board.p3],{}).holes.length,320,'the perforated deck explicitly retains its full 20×16 hole grid');
+const side=work.comps.find(c=>c.id==='Blank3');assert.equal(work.params[side.r1Param],32,'completed side dimension preserved');
+const joints=tabNutPlans(work.comps,work.modules,work.params,{stockMm:3,exportSettings:work.fabrication.export});assert.equal(joints.length,4);assert.ok(joints.every(p=>p.ok&&p.sets.length===3),'all four authored contacts retain three joinery groups');
+for(const id of ['Mod1','Mod139'])assert.equal(work.modules.find(m=>m.id===id).mount.face.selection.faceRelations[0].offsetMm,-10);
 const motors=work.comps.filter(c=>c.motorMount);assert.equal(new Set(motors.map(c=>c.motorMount.partId)).size,4);assert.deepEqual(motors.map(c=>c.motorMount.motor),['1','2','3','4']);
 const asm=compileAssembly(structuredClone(work.comps),structuredClone(work.modules),{params:work.params});
 const home=solveAssembly(asm,{thetaDeg:0,motorAngles:{'1':0,'2':0,'3':0,'4':0}});assert.ok(home.isValid);

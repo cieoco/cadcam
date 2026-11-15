@@ -33,11 +33,16 @@ function triangles(ring,holes){
 const localCache=new WeakMap();
 // Preview candidates clone their geometry. Reuse identical validated material,
 // but bound both entry count and mesh size; pose/pair checks always run anew.
-const materialCache=new Map();let cachedSlabs=0;
-const materialKey=g=>JSON.stringify([g.kind,g.thicknessMm,g.outlines,g.cutouts,g.holes,g.solid]);
+const materialCache=new Map(),MAX_MATERIALS=16,MAX_SLABS=125000;let cachedSlabs=0;
+// Slabs contain coordinates only. Hole/connection IDs remain on each current
+// part for named fastener checks and must never be read from this cache.
+const materialKey=g=>JSON.stringify([g.kind,g.thicknessMm,g.outlines,g.cutouts?.map(c=>c.points),g.holes?.map(h=>[h.x,h.y,h.r]),g.solid]);
 function localMaterial(g){
  if(localCache.has(g))return localCache.get(g);
- const key=materialKey(g),cached=materialCache.get(key);
+ // JSON serializes non-finite numbers as null. Never let an invalid clone
+ // reuse a valid contour that happens to contain a coercible null coordinate.
+ const finite=Number.isFinite(g.thicknessMm)&&g.outlines?.every(r=>r.every(p=>Number.isFinite(Number(p.x))&&Number.isFinite(Number(p.y))))&&(g.cutouts||[]).every(c=>c.points.every(p=>Number.isFinite(Number(p.x))&&Number.isFinite(Number(p.y))))&&(g.holes||[]).every(h=>[h.x,h.y,h.r].every(Number.isFinite))&&(!g.solid?.profile||g.solid.profile.every(row=>row.every(Number.isFinite)));
+ const key=finite?materialKey(g):null,cached=key&&materialCache.get(key);
  if(cached){materialCache.delete(key);materialCache.set(key,cached);localCache.set(g,cached);return cached;}
  if(typeof g.kind!=='string')throw Error('material_kind_missing');
  if(!(g.thicknessMm>E)||!g.outlines?.length)throw Error('material_geometry_missing');
@@ -71,7 +76,7 @@ function localMaterial(g){
  };
  const result={outer:bound(false),inner:bound(true),curved:holes.length>0||g.kind.startsWith('screw')};
  const size=result.outer.length+result.inner.length;
- if(size<=50000){while(materialCache.size>=8||cachedSlabs+size>50000){const first=materialCache.keys().next().value,old=materialCache.get(first);cachedSlabs-=old.outer.length+old.inner.length;materialCache.delete(first);}materialCache.set(key,result);cachedSlabs+=size;}
+ if(key&&size<=MAX_SLABS){while(materialCache.size>=MAX_MATERIALS||cachedSlabs+size>MAX_SLABS){const first=materialCache.keys().next().value,old=materialCache.get(first);cachedSlabs-=old.outer.length+old.inner.length;materialCache.delete(first);}materialCache.set(key,result);cachedSlabs+=size;}
  localCache.set(g,result);return result;
 }
 const boxOf=vertices=>{const min={x:Infinity,y:Infinity,z:Infinity},max={x:-Infinity,y:-Infinity,z:-Infinity};for(const p of vertices){if(p.x<min.x)min.x=p.x;if(p.y<min.y)min.y=p.y;if(p.z<min.z)min.z=p.z;if(p.x>max.x)max.x=p.x;if(p.y>max.y)max.y=p.y;if(p.z>max.z)max.z=p.z;}return {min,max};};
