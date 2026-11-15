@@ -565,7 +565,7 @@ if (integrated) {
       relationControls=createFaceRelationControls({root,read:()=>draft,surfaces:()=>({host:hosts[draft.host].surface,child:children[draft.child].surface}),changed:()=>render(),status:()=>solve(),pick:task=>parent.postMessage({type:'face-wizard-relation-request',loadGraph:LOAD_GRAPH_TOKEN,task},location.origin)});
       $('align').replaceChildren();fitControls.style.display='none';
       const legacy=document.createElement('div');legacy.style.display='none';legacy.append($('rotationActions'),$('adjustments'));section.append(legacy);
-      const hardware=document.createElement('details'),hwLabel=document.createElement('summary');hwLabel.textContent='固定方式（選用）';hardware.append(hwLabel,$('fastenerChoice'),$('bracketNote'));section.append(hardware);
+      const hardware=document.createElement('details'),hwLabel=document.createElement('summary');hwLabel.textContent='固定方式';hardware.open=!!e.data.startAtPlacement;hardware.append(hwLabel,$('fastenerChoice'),$('bracketNote'));if(e.data.startAtPlacement)section.querySelector('h2').after(hardware);else section.append(hardware);
       const parts=document.createElement('details'),partsLabel=document.createElement('summary');partsLabel.textContent='選擇兩個設計／零件';parts.append(partsLabel,$('hostChoice'),$('childChoice'));section.append(parts);
       const childMore=document.createElement('details'),childLabel=document.createElement('summary');childLabel.textContent='被遮住的面';childMore.append(childLabel,$('childFaces'));document.querySelector('section[data-step="2"]').append(childMore);
       $('hostFaceMore').querySelector('summary').textContent='被遮住的面';$('hostFaceMore').querySelector('summary').style.setProperty('display','list-item','important');
