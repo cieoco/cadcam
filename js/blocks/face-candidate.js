@@ -98,11 +98,11 @@ export async function validateFaceCandidate(candidate,pose={},compute,sceneInput
  const material=compute?await compute(model):(await import('./material-interference.js')).checkMaterialInterference(model);
  if(!material||material.geometryKey!==model.geometryKey||material.poseRevision!==poseRevision||!['pass','fail','not_supported'].includes(material.status))return freezeData({...candidate,saveable:false,validation:{...candidate.validation,status:'not_checked',poseRevision,checks:[...checks,{status:'not_checked',code:'material_check_failed'}]}});
  // Known poses may retain machining warnings; missing geometry still blocks.
- const {nonBlockingMaterialCoverage}=await import('./face-material-coverage.js');
- const positioning=checks.some(c=>c.code==='fastener_not_requested')&&!checks.some(c=>c.code==='fastener_valid'&&c.status==='pass');
+ const {nonBlockingMaterialCoverage,spatialPlaneFindings}=await import('./face-material-coverage.js');
+ const positioning=checks.some(c=>c.code==='fastener_not_requested');
  const materialUnsupported=(material.coverage?.notSupported || []).some(r=>!nonBlockingMaterialCoverage(r,positioning));
  const args={comps:scene.work.comps,modules:scene.work.modules,params:scene.work.params,exportSettings:{...scene.work.exportSettings,drive:scene.work.fabrication?.drive || FABRICATION_DEFAULTS.drive},cnc:scene.work.fabrication?.cnc,mounts:scene.mounts,joint:scene.work.joint};
- const {plan}=resolveSpacers(args),plane=findInterference({...args,plan,pose:{...(pose.motorAngles || {}),'1':pose.motorAngles?.['1'] ?? pose.theta ?? 0}});
+ const {plan}=resolveSpacers(args),plane=spatialPlaneFindings(findInterference({...args,plan,pose:{...(pose.motorAngles || {}),'1':pose.motorAngles?.['1'] ?? pose.theta ?? 0}}),model);
  checks.push({status:plane.length?'fail':'pass',code:'in_plane_interference',findings:plane},{status:material.status,code:'material_interference',findings:material.findings});
  return freezeData({...candidate,saveable:candidate.ok&&!materialUnsupported&&!(!positioning&&candidate.work.modules.some(m=>m.mount?.face?.selection?.fastener)&&(material.status==='fail'||plane.length)),...(materialUnsupported?{reason:scene.catalog?.extras?.diagnostics?.find(d=>d.status==='fail')?.reason || '部分板件材料或姿態無法驗證，不能確認。'}:{}),work:candidate.ok?scene.work:candidate.work,model,points:scene.points,hostReference:scene.hostReference,childReference:scene.childReference,validation:{status:!candidate.ok||plane.length||material.status==='fail'?'fail':material.status,sourceRevision:candidate.sourceRevision,selectionRevision:candidate.selectionRevision,geometryKey:model.geometryKey,poseRevision,checks,material,coverage:material.coverage}});
 }

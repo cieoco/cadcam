@@ -16,6 +16,7 @@ import { buildFacePlacement } from './face-placement.js';
 import {signedNumberInput,showNumber,readNumber} from './numeric-input.js';
 import {placedFaceSelection} from './face-placement-direction.js';
 import {createFaceRelationControls} from './face-relation-controls.js';
+import {groupMaterialFindings} from './face-material-coverage.js';
 import {solveFaceRelations} from './face-relations.js';
 
 const $ = id => document.getElementById(id);
@@ -117,7 +118,7 @@ function showCandidate(candidate){
  const coverageText=candidateCoverageText(candidate);
  const line=document.createElement('div');line.textContent=!candidate.saveable?(candidate.reason || '目前姿態無法驗證，不能確認。'):v.status==='fail'?`此姿態有干涉；可保存接合後調整作品。`:v.status==='not_supported'?coverageText.summary:'此姿態：已檢查範圍無干涉。';
  line.style.color=v?.status==='fail'?'#b34436':'#425e60';box.append(line);
- const collisions=v?.material?.findings || [],coverage=v?.coverage?.notSupported || [];
+ const collisions=groupMaterialFindings(v?.material?.findings || []),coverage=v?.coverage?.notSupported || [];
  if(collisions.length){const details=document.createElement('details'),title=document.createElement('summary');title.textContent=`干涉 ${collisions.length} 處`;details.append(title);for(const f of collisions){const row=document.createElement('div');row.textContent=f.partIds.map(id=>candidateLabel(id,candidate)).join(' ↔ ');details.append(row);}box.append(details);}
  if(coverage.length){const details=document.createElement('details'),title=document.createElement('summary');title.textContent=coverageText.title;details.append(title);const labels={motors:'馬達機身',pins:'關節銷',grounds:'固定接點'},reasons={unassigned_machining_feature:'加工孔／槽超出材料，請回設計調整孔位或尺寸',circular_boundary_uncertain:'圓弧邊界接觸待核對',material_geometry_unavailable:'缺少材料輪廓',material_triangulation_failed:'材料輪廓無法分區',self_intersecting_outline:'材料輪廓自交',invalid_outline:'材料輪廓無效'};for(const row of coverage){const item=document.createElement('div'),ids=row.partIds || (row.partId?[row.partId]:[]);item.textContent=[ids.map(id=>candidateLabel(id,candidate)).join(' ↔ '),labels[row.kind] || reasons[row.reason] || reasons[row.code] || ('材料或姿態無法驗證：'+(row.reason || row.code || '未知原因'))].filter(Boolean).join('：');const keys=row.pickKeys || (row.pickKey?[row.pickKey]:[]);if(docked&&keys.length){const locate=button('圖上標示',()=>parent.postMessage({type:'face-wizard-highlight',loadGraph:LOAD_GRAPH_TOKEN,pickKeys:keys},location.origin));item.append(locate);}details.append(item);}box.append(details);}
 }

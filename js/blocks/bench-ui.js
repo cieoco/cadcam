@@ -188,14 +188,8 @@ export function createBench(deps) {
     return names.length > max ? `${names.slice(0, max).join('、')} 等 ${names.length} 件` : names.join('、');
   }
 
-  function materialName(id){
-    const part=st.materialModel?.materialParts?.find(p=>p.partId===id);
-    if(!part)return id;
-    if(part.geometry.kind==='bracket-wing')return `${displayName(part.moduleId)}的角碼`;
-    if(part.geometry.kind.startsWith('screw'))return `${displayName(part.moduleId)}的固定螺絲`;
-    return hitLabels([id],S.comps,S.modules,labelOpts)[0] || id;
-  }
-  function materialLabels(){return [...new Set((materialPose.snapshot().report?.findings || []).flatMap(f=>f.partIds.map(materialName)))];}
+  let materialTools;
+  function materialName(id){return materialTools?.materialName(id,st.materialModel,displayName,S.comps,S.modules,labelOpts) || id;}
   function currentLiveStatus() {
     const preview=deps.candidateSnapshot?.();
     if(preview){
@@ -204,8 +198,8 @@ export function createBench(deps) {
       if(!r.saveable)return {state:'none',message:r.reason || '候選尚未通過檢查，不能接上'};
       return {state:findings.length?'hit':'none',message:findings.length?`✖ 預覽此姿態撞到 ${findings.length} 處`:'預覽已檢查；未檢查範圍請見製作包'};
     }
-    const m=materialPose.snapshot();
-    return liveInterferenceStatus({hasFace:hasMaterialMount(),ready:live.ready,hasParts:!!live.plan?.parts?.length,error:live.error,n:live.findings.length,labels:[...new Set([...live.labels,...materialLabels()])],material:m.report,playing:playing(),candidate:m.candidate,solveValidity:m.solveValidity});
+    const m=materialPose.snapshot(),r=materialTools?.liveMaterialReport(live,m.report,st.materialModel,displayName,S.comps,S.modules,labelOpts);
+    return liveInterferenceStatus({hasFace:hasMaterialMount(),ready:live.ready,hasParts:!!live.plan?.parts?.length,error:live.error,n:r?.n??live.findings.length,labels:r?.labels || live.labels,material:r?.material || m.report,playing:playing(),candidate:m.candidate,solveValidity:m.solveValidity});
   }
   function syncMaterialPose(){
     const candidate=isCand() || !!st.preview;
@@ -217,6 +211,7 @@ export function createBench(deps) {
     // Three and Earcut stay lazy. The controller revalidates after import/await.
     materialPose.check(async model=>{
       const {checkMaterialInterference}=await import('./material-interference.js');
+      materialTools=await import('./face-material-coverage.js');
       const state=materialPose.snapshot();
       if(state.playing||state.candidate||state.poseRevision!==model.poseRevision||state.geometryKey!==model.geometryKey)return {status:'not_checked',geometryKey:model.geometryKey,poseRevision:model.poseRevision};
       return checkMaterialInterference(model);
@@ -263,7 +258,7 @@ export function createBench(deps) {
     box.dataset.state = 'hit';
     while (box.firstChild) box.removeChild(box.firstChild);
     box.appendChild(el('div', 'bench-live-main', status.message));
-    box.appendChild(el('div', 'bench-live-msg', live.msg));
+    box.appendChild(el('div', 'bench-live-msg', hasMaterialMount()?'':live.msg));
     collisionActions(box);
   }
 
@@ -271,7 +266,7 @@ export function createBench(deps) {
   function collisionRows() {
     if (!isBench() || playing() || isCand() || st.preview || wiz?.previewOf() || currentLiveStatus().state !== 'hit') return [];
     const material = hasMaterialMount();
-    const findings = material ? materialPose.snapshot().report?.findings || [] : live.findings;
+    const findings = material ? materialTools?.groupMaterialFindings(materialPose.snapshot().report?.findings || []) || [] : live.findings;
     return findings.map((f, index) => {
       const ids = material ? f.partIds || [] : f.parts || [];
       const keys = material ? f.pickKeys || [] : highlightKeys([f], live.plan);
@@ -280,7 +275,7 @@ export function createBench(deps) {
         const part = live.plan?.parts.find(p => p.name === id);
         return S.comps.find(c => c.id === part?.compId)?.moduleId || S.modules.find(m => `${m.id}-frame` === id)?.id;
       });
-      return { id: String(index), keys, label: material ? ids.map(materialName).join(' ↔ ') : hitLabels(ids, S.comps, S.modules, labelOpts).join(' ↔ '),
+      return { id: String(index), keys, label: material ? [...new Set(ids.map(materialName))].join(' ↔ ') : hitLabels(ids, S.comps, S.modules, labelOpts).join(' ↔ '),
         modules: [...new Set(moduleIds)].filter(id => modOf(id)).map(id => ({ id, name: displayName(id) })) };
     });
   }
