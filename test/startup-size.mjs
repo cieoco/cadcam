@@ -55,7 +55,8 @@ check('3D與錄影保留動態入口',r.lazyEntries.includes('js/blocks3d/viewer
 // 2026-11-15：榫接組數隨板邊長平均配置的保存契約與幾何約增0.6 KB。
 // 2026-11-15：尺寸修改基準、連接孔保留與共用拖曳語意約增4.5 KB，沿原同步修改管線。
 // 2026-11-15：使用者同意主線插銷與底盤組立整合後上限2.230 MB，實測2,229,460 bytes。
-check('首次JS原始大小低於2.230MB',r.bytes<2230000);
+// 2026-11-16：使用者同意局部軸向堆疊與銷柱同步後，本次上限2.233 MB；實測2,232,895 bytes。再提高仍需同意。
+check('首次JS原始大小低於2.233MB',r.bytes<2233000);
 check('扭力UI與估算核心按需載入',!r.paths.includes('js/blocks/torque-ui.js')&&!r.paths.includes('js/core/required-torque.js')&&!r.paths.includes('js/core/actuator-speed.js'));
 check('舵機座板範例按需載入',!r.paths.includes('js/blocks/servo-mount-examples.js')&&!r.paths.includes('js/blocks/motor-plate-examples.js'));
 check('標準結構設定面板按需載入',!r.paths.includes('js/blocks/standard-blank-ui.js')&&r.lazyEntries.includes('js/blocks/standard-blank-ui.js'));
