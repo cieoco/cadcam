@@ -18,7 +18,7 @@ export function attachPartMaterials(model,catalog,{comps=[],modules=[],points={}
     if(!geometry||!localMatrix||!localMatrix.every(Number.isFinite)){diagnostics.push({status:'not_supported',code:'material_pose_or_geometry_missing',sourceIds:[id],pickKey});return false;}
     const comp=comps.find(c=>c.id===id),fixed=isDisk(comp)&&fixedIds.has(comp.p1.id)&&fixedIds.has(comp.p2.id);
     materialParts.push({partId:id,moduleId:geometry.moduleId,pickKey,geometry,pose:{partId:id,matrix:multiply4(parent,localMatrix)},color:comp?.wheelWidthMm!==undefined?'#374151':color,
-      ...(isDisk(comp)?{diskMark:{radius:diskDiameter(comp)/2,fixed,angle:fixed?Math.PI/2-Math.atan2(comp.p2.y-comp.p1.y,comp.p2.x-comp.p1.x):0}}:{}),
+      ...(isDisk(comp)?comp.wheelWidthMm!==undefined?{wheelAppearance:{radius:diskDiameter(comp)/2}}:{diskMark:{radius:diskDiameter(comp)/2,fixed,angle:fixed?Math.PI/2-Math.atan2(comp.p2.y-comp.p1.y,comp.p2.x-comp.p1.x):0}}:{}),
       ...(geometry.connectionId?{connectionId:geometry.connectionId,bracketId:geometry.bracketId,holePairId:geometry.holePairId}: {})});
     return true;
   };

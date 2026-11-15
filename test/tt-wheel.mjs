@@ -8,6 +8,8 @@ import {inspectLinkExport} from '../js/blocks/exporters.js';
 import {buildPartGeometryCatalog} from '../js/blocks/part-geometry.js';
 import {compileTopology} from '../js/core/topology.js';
 import {solveTopology} from '../js/multilink/solver.js';
+import {wheelAppearance} from '../js/blocks/wheel-appearance.js';
+import {attachPartMaterials} from '../js/blocks3d/part-pose.js';
 const base=planMotorInstallation({comps:[],params:{},modules:[]},{type:'tt',hostId:'world',face:'back',orientation:'horizontal',position:{x:10,y:20}});
 const empty={comps:[],params:{},modules:[]},emptyBefore=JSON.stringify(empty);
 const independent=planWheel(empty,{});assert.ok(independent.ok);assert.equal(JSON.stringify(empty),emptyBefore);
@@ -24,6 +26,16 @@ const g=inspectLinkExport(c,8,{});assert.equal(g.holes.length,0,'rotation refere
 assert.ok(g.outlines[0].every(p=>Math.abs(Math.hypot(p.x,p.y)-32.5)<1e-6));
 const cut=g.cutouts[0].points;assert.ok(Math.abs(Math.max(...cut.map(p=>p.x))-1.85)<1e-6);
 const catalog=buildPartGeometryCatalog({comps:saved.comps,params:saved.params,fabrication:saved.fabrication ?? undefined});assert.equal(catalog.parts[c.id].thicknessMm,15);
+const appearance=wheelAppearance(32.5),turned=wheelAppearance(32.5,.2);
+assert.equal(appearance.holes.length,8);
+for(const [i,h] of appearance.holes.entries()){
+  assert.ok(Math.hypot(h.x,h.y)+h.r<appearance.hubRadius,'visual holes stay within the white hub');
+  const next=appearance.holes[(i+1)%8];assert.ok(Math.abs(Math.hypot(next.x-h.x,next.y-h.y)-2*32.5*.47*Math.sin(Math.PI/8))<1e-9);
+  assert.ok(Math.hypot(turned.holes[i].x-h.x,turned.holes[i].y-h.y)>1,'pattern follows wheel angle');
+}
+const visual=attachPartMaterials({sticks:[{id:c.id,a:{x:0,y:0},b:{x:8,y:0},z:0}]},catalog,{comps:saved.comps});
+const visualWheel=visual.materialParts.find(p=>p.partId===c.id);assert.equal(visualWheel.wheelAppearance.radius,32.5);assert.equal(visualWheel.diskMark,undefined);
+assert.equal(visualWheel.geometry.holes.length,0,'visual wheel holes never enter machining catalog');assert.equal(visualWheel.geometry.cutouts.length,1);
 for(const theta of [0,45,180,359]){const sol=solveTopology(compileTopology(saved.comps,{params:saved.params},new Set()),{thetaDeg:theta});assert.ok(sol.isValid);assert.ok(Math.abs(Math.hypot(sol.points[c.p2.id].x-sol.points[c.p1.id].x,sol.points[c.p2.id].y-sol.points[c.p1.id].y)-8)<1e-6);}
 for(const widthMm of [0,NaN,101])assert.equal(planWheel(source,{motorId,widthMm}).ok,false);
 assert.equal(planWheel({...wheel,modules:[]},{motorId}).ok,false,'cannot replace an occupied output');

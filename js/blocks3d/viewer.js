@@ -1,5 +1,6 @@
 import {normalizeMaterialVoids,materialCircleContour} from '../blocks/material-voids.js';
 import {diskOrientationMark} from '../blocks/disk-orientation.js';
+import {wheelAppearance} from '../blocks/wheel-appearance.js';
 import {retainedSceneKey,createSceneLifetime} from './scene-reuse.js';
 /**
  * blocks3d / viewer
@@ -688,6 +689,18 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     }return hit;};
     for(const part of parts) {
       const g=part.geometry;
+      if(part.wheelAppearance){
+        // Visual purchased-wheel mesh; the shared fabrication catalog retains only the TT bore.
+        const radius=part.wheelAppearance.radius,appearance=wheelAppearance(radius),group=new THREE.Group();
+        const tire=new THREE.Shape();tire.absarc(0,0,radius,0,Math.PI*2,false);
+        const inner=new THREE.Path();inner.absarc(0,0,appearance.hubRadius,0,Math.PI*2,true);tire.holes.push(inner);
+        const hub=new THREE.Shape();hub.absarc(0,0,appearance.hubRadius,0,Math.PI*2,false);
+        for(const h of [...appearance.holes,...g.holes]){const path=new THREE.Path();path.absarc(h.x,h.y,h.r,0,Math.PI*2,true);hub.holes.push(path);}
+        for(const c of g.cutouts){const path=new THREE.Path();c.points.forEach((p,i)=>i?path.lineTo(p.x,p.y):path.moveTo(p.x,p.y));path.closePath();hub.holes.push(path);}
+        for(const [shape,color] of [[tire,'#17191c'],[hub,'#f8fafc']])group.add(new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:g.thicknessMm,bevelEnabled:false,curveSegments:48}),plateMaterial(color)));
+        group.matrixAutoUpdate=false;group.matrix.fromArray(part.pose.matrix);group.matrixWorldNeedsUpdate=true;group.userData.partId=part.partId;group.userData.geometryVersion=g.geometryVersion;
+        addPart(group,part.pickKey);bindPose(group,(o,m,root)=>{const next=root.materialParts.find(p=>p.partId===part.partId);o.matrix.fromArray(next.pose.matrix);o.matrixWorldNeedsUpdate=true;});continue;
+      }
       if(g.solid?.kind==='pan-head') {
         const group=new THREE.Group(),profile=g.solid.profile.map(([r,z])=>new THREE.Vector2(r,z));
         const head=new THREE.Mesh(new THREE.LatheGeometry(profile,20),screwMat);
