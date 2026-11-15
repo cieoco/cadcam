@@ -1,3 +1,4 @@
+import {partHoleDisplay} from './hole-display.js';
 import {normalizeMaterialVoids,materialCircleContour} from '../blocks/material-voids.js';
 import {diskOrientationMark} from '../blocks/disk-orientation.js';
 import {wheelAppearance} from '../blocks/wheel-appearance.js';
@@ -384,13 +385,15 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   const ghosted = new Set();
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
-  let lastModel = null;
+  let lastModel = null,holeDisplay="compact";
+  try{holeDisplay=localStorage.getItem("blocks.3d.holes") || "compact";}catch{}
   let poseRevision=0;
   const lifetime=createSceneLifetime(),poseBindings=[],partObjects=[],childGroups=new Map();
   let bindingScope='';
   let geometryBuilds=0,geometryReuses=0,geometryDisposals=0;
 
   const holeR = 3.4;   // 板上孔徑（視覺用）
+  const reservedHoleMat=new THREE.LineBasicMaterial({color:'#8dbcc4',transparent:true,opacity:.45,depthWrite:false});
   const pinMat = new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.6, roughness: 0.35 });
   const bracketMat = new THREE.MeshStandardMaterial({ color: 0xd9dee5, metalness: 0.35, roughness: 0.4 });   // F1：金屬角碼
   const slotMat = new THREE.MeshStandardMaterial({ color: 0x14171b, metalness: 0.3, roughness: 0.7 });
@@ -488,6 +491,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       sig, keys: new Set(list.filter(k => !k.endsWith('/*'))),
       prefixes: list.filter(k => k.endsWith('/*')).map(k => k.slice(0, -1))
     } : null;
+    if(holeDisplay==='selected')lifetime.retire();
     if (lastModel) update(lastModel);
   }
 
@@ -693,7 +697,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       const a=ring[i],b=ring[j];if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)hit=!hit;
     }return hit;};
     for(const part of parts) {
-      const g=part.geometry;
+      const g=part.geometry,full=holeDisplay==='all'||holeDisplay==='selected'&&isHighlightKey(part.pickKey),display=partHoleDisplay(lastModel,part,full);
       if(part.wheelAppearance){
         // Visual purchased-wheel mesh; the shared fabrication catalog retains only the TT bore.
         const radius=part.wheelAppearance.radius,appearance=wheelAppearance(radius),group=new THREE.Group();
@@ -719,7 +723,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
       }
       for(const ring of g.outlines) {
         const shape=new THREE.Shape();shape.moveTo(ring[0].x,ring[0].y);ring.slice(1).forEach(p=>shape.lineTo(p.x,p.y));shape.closePath();
-        const rawVoids=[...g.holes.filter(h=>inside(h,ring)).map(h=>({circle:h,points:materialCircleContour(h,true)})),...g.cutouts.filter(c=>c.points.length&&inside(c.points[0],ring)).map(c=>({points:c.points}))];
+        const rawVoids=[...display.holes.filter(h=>inside(h,ring)).map(h=>({circle:h,points:materialCircleContour(h,true)})),...g.cutouts.filter(c=>c.points.length&&inside(c.points[0],ring)).map(c=>({points:c.points}))];
         let voids,diagnostic=null;
         try{voids=normalizeMaterialVoids(rawVoids);}catch(e){
           voids=[];diagnostic=e.message;unverified.push(part.partId);
@@ -730,6 +734,10 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
         const mesh=new THREE.Mesh(geo,material);mesh.matrixAutoUpdate=false;mesh.matrix.fromArray(part.pose.matrix);mesh.matrixWorldNeedsUpdate=true;
         mesh.userData.partId=part.partId;mesh.userData.geometryVersion=g.geometryVersion;
         if(diagnostic)mesh.userData.geometryDiagnostic=diagnostic;
+        if(full&&display.reserved.length){
+          const vertices=[];for(const h of display.reserved.filter(h=>inside(h,ring)))for(const z of [-.06,g.thicknessMm+.06])for(let i=0;i<16;i++)for(const t of [i,i+1])vertices.push(h.x+h.r*Math.cos(t*Math.PI/8),h.y+h.r*Math.sin(t*Math.PI/8),z);
+          const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));const ink=new THREE.LineSegments(geo,reservedHoleMat);ink.raycast=()=>{};mesh.add(ink);
+        }
         addDiskMark(mesh,part);
         addPart(mesh,part.pickKey);
         bindPose(mesh,(o,m,root)=>{const next=root.materialParts.find(p=>p.partId===part.partId);o.matrix.fromArray(next.pose.matrix);o.matrixWorldNeedsUpdate=true;});
@@ -1637,6 +1645,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     clearSyringes();
     lifetime.retire();
     materialNotice.remove();
+    reservedHoleMat.dispose();
     unsupportedMaterial.dispose();
     diskInk.dispose();diskHalo.dispose();
     stop();
@@ -1672,6 +1681,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
 
   const api = {
     renderNow,
+    get holeDisplay(){return holeDisplay;},setHoleDisplay(value){if(!['compact','selected','all'].includes(value)||value===holeDisplay)return;holeDisplay=value;try{localStorage.setItem('blocks.3d.holes',value);}catch{}lifetime.retire();if(lastModel)update(lastModel);},
     cacheStats:()=>({...lifetime.stats(),geometryBuilds,geometryReuses,geometryDisposals}),
     update, resize, dispose, start, stop, showAll, fitTo, setViewPreset, setExplode, getExtents, set onRebuilt(fn) { onRebuilt = fn; }, get viewUp() { return viewUp; }, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, project, projectPoints, subscribeProjection, tiltView, pickSurface, highlightSurface, setSurfacePickFocus:key=>surfacePickFocus.set(key),
     set onPick(fn) { onPick=fn; },

@@ -164,6 +164,7 @@
     "test/spatial-plane-findings.mjs",
     "test/joint-axial-layout.mjs",
     "test/assembly-parallel-pin.mjs",
+    "test/assembly-hole-display.mjs",
     "test/four-wheel-chassis.mjs",
     "test/chassis-tab-nut.mjs",
     "test/tab-nut-count.mjs",

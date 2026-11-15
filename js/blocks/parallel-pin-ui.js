@@ -1,3 +1,4 @@
+import {partHoleDisplay} from '../blocks3d/hole-display.js';
 import {createFaceCandidateTransaction,faceCandidateModel} from './face-candidate.js';
 import {confirmMountingChange} from './mounting-review-ui.js';
 import {applyMatrix4} from '../blocks3d/orthogonal-3d.js';
@@ -18,14 +19,17 @@ export function openParallelPin({childId,dock,pickViewer:viewer,sourceModel,read
  panel.append(make('h2','平行 · 點兩個孔'),hint,fields,message,confirm,reset,cancel);dock.replaceChildren(panel);
  const NS='http://www.w3.org/2000/svg',overlay=document.createElementNS(NS,'svg');overlay.setAttribute('aria-label','平行組立選孔');overlay.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:7';viewer.canvas.parentElement.append(overlay);
  const gap=make('input'),angle=make('input'),locked=make('input');gap.type=angle.type='number';gap.min='0';gap.step=angle.step='any';gap.value=String(initialMount?.face?.selection?.gap ?? 0);angle.value=String(initialMount?.face?.selection?.rotationDeg ?? 0);locked.type='checkbox';locked.checked=!!initialMount?.face?.selection?.pin?.locked;
- const controls=()=>{confirm.hidden=false;fields.replaceChildren();for(const [text,input]of [['間距 mm',gap],['轉向 °',angle],['鎖固插銷',locked]]){const label=make('label',text);label.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px';input.setAttribute('aria-label',text);input.style.cssText=input.type==='checkbox'?'width:24px;height:24px':'width:140px;min-width:0;min-height:44px;box-sizing:border-box';label.append(input);fields.append(label);}angle.disabled=locked.checked;};
- function targets(){return (model?.materialParts || []).flatMap(p=>{const c=comps.find(c=>c.id===p.partId);if(!c||!pinPartSupported(c)||!['bar','triangle','rack'].includes(c.type))return [];
+ const controls=()=>{confirm.hidden=false;fields.replaceChildren(make('p',pair.map(t=>`${displayName(t.moduleId)} · ${comps.find(c=>c.id===t.ownerId)?.name || '板件'}`).join(' ↔ ')));for(const [text,input]of [['間距 mm',gap],['轉向 °',angle],['鎖固插銷',locked]]){const label=make('label',text);label.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px';input.setAttribute('aria-label',text);input.style.cssText=input.type==='checkbox'?'width:24px;height:24px':'width:140px;min-width:0;min-height:44px;box-sizing:border-box';label.append(input);fields.append(label);}angle.disabled=locked.checked;};
+ let targetModel,targetList=[];
+ function targets(){if(model!==targetModel){targetModel=model;targetList=collectTargets();}return pair?targetList.filter(t=>pair.some(p=>p.ownerId===t.ownerId)):targetList;}
+ function collectTargets(){return (model?.materialParts || []).flatMap(p=>{const c=comps.find(c=>c.id===p.partId);if(!c||!pinPartSupported(c)||!['bar','triangle','rack'].includes(c.type))return [];
   if(c.moduleId===childId&&!isFixedMountPart(c))return [];
-  if(pair&&!pair.some(t=>t.ownerId===c.id))return [];
-  return p.geometry.holes.flatMap((h,i)=>!h.id||motorPinAt(comps,h.id)||/HORN|HUB|SHAFT|MOTOR|CENTER/.test(h.layer || '')?[]:[{id:h.id,ownerId:c.id,moduleId:c.moduleId,r:h.r,index:i,world:applyMatrix4(p.pose.matrix,{...h,z:p.geometry.thicknessMm}),key:p.pickKey}]);});}
+  const holes=[...p.geometry.holes,...partHoleDisplay(model,p).reserved];
+  return holes.flatMap((h,i)=>!h.id||motorPinAt(comps,h.id)||/HORN|HUB|SHAFT|MOTOR|CENTER/.test(h.layer || '')?[]:[{id:h.id,ownerId:c.id,moduleId:c.moduleId,r:h.r,index:i,reserved:!!h.reserved,world:applyMatrix4(p.pose.matrix,{...h,z:p.geometry.thicknessMm}),key:p.pickKey}]);});}
  let screen=[];
- function draw(){if(closed)return;overlay.replaceChildren();const rect=overlay.getBoundingClientRect();screen=[];
-  for(const t of targets()){const p=viewer.project(t.world);if(!p)continue;screen.push({...t,...p});const circle=document.createElementNS(NS,'circle');circle.setAttribute('cx',p.x-rect.left);circle.setAttribute('cy',p.y-rect.top);circle.setAttribute('r',first?.id===t.id&&first.ownerId===t.ownerId?7:1.2);circle.setAttribute('fill',t.moduleId===childId?'#139b82':'#3c93d0');circle.setAttribute('fill-opacity','.65');overlay.append(circle);}
+ function draw(){if(closed)return;const rect=overlay.getBoundingClientRect();screen=[];let count=0;
+  for(const t of targets()){const p=viewer.project(t.world);if(!p)continue;screen.push({...t,...p});const circle=overlay.children[count++] || document.createElementNS(NS,'circle');circle.setAttribute('cx',p.x-rect.left);circle.setAttribute('cy',p.y-rect.top);circle.setAttribute('r',first?.id===t.id&&first.ownerId===t.ownerId?7:1.2);circle.setAttribute('fill',t.moduleId===childId?'#139b82':'#3c93d0');circle.setAttribute('fill-opacity',t.reserved?'.3':'.65');if(!circle.parentNode)overlay.append(circle);}
+  while(overlay.children.length>count)overlay.lastChild.remove();
  }
  async function preview(){if(!pair||closed)return;const n=++revision;result=null;confirm.disabled=true;message.textContent='檢查對孔與間距…';
   const h=pair.find(t=>t.moduleId!==childId),c=pair.find(t=>t.moduleId===childId),distance=Number(gap.value),turn=Number(angle.value);
@@ -36,7 +40,7 @@ export function openParallelPin({childId,dock,pickViewer:viewer,sourceModel,read
  }
  function choose(t){if(closed||pair)return;message.textContent='';if(!first){first=t;reset.hidden=false;hint.textContent=t.moduleId===childId?'再點另一個設計的孔。':'再點要安裝設計的孔。';viewer.setHighlight?.([t.key]);draw();return;}
   if((first.moduleId===childId)===(t.moduleId===childId)){message.textContent='請選另一端設計的孔。';return;}
-  pair=[first,t];hint.textContent='兩孔對齊後，可直接確認或微調。';controls();preview();
+  pair=[first,t];hint.textContent=pair.some(t=>t.reserved)?'確認後，所選預留孔才會納入加工。':'兩孔對齊後，可直接確認或微調。';controls();preview();
  }
  let down;
  const start=e=>{down=e.isPrimary!==false?{x:e.clientX,y:e.clientY,id:e.pointerId}:null;};

@@ -5,6 +5,9 @@ export function bindViewTools(root, viewer) {
   const $ = s => root.querySelector(s), bar = $('.view-presets'), range = $('.vp-explode input'), pct = $('.vp-explode output'), size = $('.vp-size'), pill = $('.model-updated');
   if (!bar) return;
   bindPreviewEditing(viewer);
+  const label=document.createElement('label'),holes=document.createElement('select');label.textContent='孔位顯示 ';holes.setAttribute('aria-label','孔位顯示');holes.style.minHeight='44px';
+  for(const [value,text]of [['compact','精簡'],['selected','選取零件'],['all','全部孔位']]){const option=document.createElement('option');option.value=value;option.textContent=text;holes.append(option);}holes.value=viewer.holeDisplay;holes.onchange=()=>viewer.setHoleDisplay(holes.value);label.append(holes);bar.querySelector('.vp-content').append(label);
+
   const showSize = () => {
     const e = viewer.getExtents();
     if (!e) { size.textContent = ''; return; }

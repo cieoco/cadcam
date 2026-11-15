@@ -36,7 +36,7 @@ export function buildMaterialScene({comps,modules,params,catalog,inputs,allPlane
   const boxes=model.orthogonal.flatMap(c=>c.brackets || []),screws=model.orthogonal.flatMap(c=>c.screws || []);
   if(boxes.length)model.brackets=boxes;if(screws.length)model.screws=screws;
  }
- const result={...attachPartMaterials(model,catalog,{comps,modules,points,assemblyScope}),solveValidity};
+ const result={...attachPartMaterials(model,catalog,{comps,modules,params,points,assemblyScope}),solveValidity};
  if(assemblyScope){
   result.syringes=assemblySyringeShapes(result,comps,modules,params,points);
   // The hydraulic turntable is authored in top view: its XY plane is the floor, not a vertical wall.

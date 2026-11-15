@@ -1,3 +1,4 @@
+import {makeStandardBlank} from '../js/blocks/standard-blank.js';
 import assert from 'node:assert/strict';
 import {register} from 'node:module';
 register('data:text/javascript,'+encodeURIComponent(`export function resolve(s,c,next){return next(s==='three'?${JSON.stringify(new URL('../js/vendor/three.module.js',import.meta.url).href)}:s,c);}`),import.meta.url);
@@ -77,5 +78,12 @@ viewer.update(axesModel);
 assert.deepEqual(renderCamera.up.toArray(),[0,1,0],'ordinary side-view designs restore Y up');
 assert.deepEqual(controlAxes.at(-1),[0,1,0],'orbit controls also restore the ordinary basis');
 assert.equal(scene.children.find(c=>c.type==='GridHelper').rotation.x,0);
+// Display detail changes meshes only; manufacturing and point identities remain intact.
+const blank=makeStandardBlank({kind:'plate',columns:12,rows:8,n:900});for(const k of ['p1','p2','p3'])blank.comp[k].type='fixed';blank.comp.moduleId='Display';blank.comp.standardBlank.drill='all';
+const displayWork={comps:[blank.comp],modules:[{id:'Display',name:'顯示測試',base:blank.comp.p1.id,outputs:[],mount:null}],params:blank.params};
+const displayModel=faceCandidateModel({ok:true,work:displayWork,validation:{checks:[]}}).model,displayBefore=JSON.stringify(displayModel);
+const vertices=()=>{let n=0;dynamic().traverse(o=>{if(o.isMesh&&o.userData.partId===blank.comp.id)n+=o.geometry.attributes.position.count;});return n;};
+viewer.setHoleDisplay('compact');viewer.update(displayModel);const compactVertices=vertices();viewer.setHoleDisplay('all');assert.ok(vertices()>compactVertices,'full detail extrudes all actual holes; compact reduces mesh work');assert.equal(JSON.stringify(displayModel),displayBefore);
+delete displayWork.comps[0].standardBlank.drill;const reservedModel=faceCandidateModel({ok:true,work:displayWork,validation:{checks:[]}}).model;viewer.update(reservedModel);let outlines=0;dynamic().traverse(o=>{if(o.type==='LineSegments'&&o.parent?.userData.partId===blank.comp.id)outlines++;});assert.ok(outlines>0,'reserved holes are batched line overlays, not drilled meshes');viewer.setHoleDisplay('compact');assert.equal(viewer.holeDisplay,'compact');
 const last=geometries();let disposed=0;last.forEach(g=>g.addEventListener('dispose',()=>disposed++));viewer.dispose();assert.equal(disposed,last.length);
 console.log('production viewer: F1/nested pose, hardware, world matrices, appearance, camera, invalidation, dispose');

@@ -9,7 +9,7 @@ const unit=v=>{const n=Math.hypot(v.x,v.y,v.z);return {x:v.x/n,y:v.y/n,z:v.z/n};
 const basis=(u,v,n,p)=>[u.x,u.y,u.z,0,v.x,v.y,v.z,0,n.x,n.y,n.z,0,p.x,p.y,p.z,1];
 
 /** Child matrices already include all ancestors. Never compose a second parent. */
-export function attachPartMaterials(model,catalog,{comps=[],modules=[],points={},assemblyScope=false}={}) {
+export function attachPartMaterials(model,catalog,{comps=[],modules=[],params={},points={},assemblyScope=false}={}) {
   const materialParts=[],diagnostics=[...catalog.diagnostics];
   const fixedIds=new Set(comps.flatMap(c=>[c.p1,c.p2,c.p3].filter(p=>p&&['fixed','motor'].includes(p.type)).map(p=>p.id)));
   const boxReferences=new Set(comps.flatMap(c=>c.boxPanel?[c.p1.id,c.p2.id]:c.wheelWidthMm!==undefined?[c.p2.id]:[]));
@@ -82,5 +82,5 @@ export function attachPartMaterials(model,catalog,{comps=[],modules=[],points={}
     }
   }
   attachTabNutHardware(materialParts,catalog.extras?.tabNutPlans,comps);
-  return {...main,materialParts,geometryDiagnostics:diagnostics,geometryKey:catalog.key};
+  return {...main,materialParts,holeDisplaySource:{comps,modules,params,omitted:catalog.extras?.tabNutGeometry},geometryDiagnostics:diagnostics,geometryKey:catalog.key};
 }
