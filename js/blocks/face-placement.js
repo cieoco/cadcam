@@ -2,13 +2,15 @@ import {normalizeTabNut} from './tab-nut-geometry.js';
 import { normalizeBracketSelection } from './face-bracket-geometry.js?v=20261008_bracket3d';
 /** 接合板擺放記錄；不把未支援的 3D 姿態寫成舊 mount。 */
 import { solveFaceMate } from './face-mate.js';
-import {applyEdgeRelations,normalizeEdgeRelations} from './face-edge-relations.js';
+import {applyEdgeRelations,normalizeEdgeRelations,faceBoundaryEdges} from './face-edge-relations.js';
+import {normalizeFaceRelations,solveFaceRelations} from './face-relations.js';
 
 export function buildFacePlacement({ host, child, selection } = {}) {
   if (!host?.surface || !child?.surface || !selection) return { ok: false, reason: '缺少接合板或選面資料' };
   const keys = ['hostFace', 'childFace', 'alignU', 'alignV', 'offsetU', 'offsetV', 'gap', 'quarterTurns'];
   const chosen = Object.fromEntries(keys.map(k => [k, selection[k]]));
   if (selection.rotationDeg !== undefined) chosen.rotationDeg = selection.rotationDeg;
+  if(selection.faceRelations!==undefined){chosen.faceRelations=normalizeFaceRelations(selection.faceRelations);if(!chosen.faceRelations)return {ok:false,reason:'面關係格式無效。'};}
   if(selection.edgeRelations!==undefined){chosen.edgeRelations=normalizeEdgeRelations(selection.edgeRelations);if(!chosen.edgeRelations)return {ok:false,reason:'接合邊關係無效。'};}
   if (selection.brackets !== undefined) {
     chosen.brackets = normalizeBracketSelection(selection.brackets);
@@ -18,6 +20,12 @@ export function buildFacePlacement({ host, child, selection } = {}) {
   let mate = solveFaceMate({ ...chosen, hostBox: host.box, childBox: child.box });
   if (!mate.ok) return mate;
   if(chosen.edgeRelations?.length){mate=applyEdgeRelations(mate,{host:host.surface,child:child.surface,hostFace:chosen.hostFace,childFace:chosen.childFace,relations:chosen.edgeRelations});if(!mate.ok)return mate;}
+  if(chosen.faceRelations?.length){
+    for(const r of chosen.faceRelations)for(const [key,item]of [['hostFaces',host],['childFaces',child]])if(r[key].some(id=>!['top','bottom'].includes(id)&&!faceBoundaryEdges(item.surface,id).length))return {ok:false,reason:'原先選的材料側面已不存在，請重新選面。'};
+    if((chosen.brackets||chosen.fastener)&&!chosen.faceRelations.some(r=>r.kind==='mate'&&r.hostFaces[0]===chosen.hostFace&&r.childFaces[0]===chosen.childFace&&Math.abs(r.offsetMm-chosen.gap)<1e-6))return {ok:false,reason:'這組面關係的固定件尚未核對，請先選「先只定位」。'};
+    mate=solveFaceRelations(mate,{hostBox:host.box,childBox:child.box,relations:chosen.faceRelations});if(!mate.ok)return mate;
+    if(chosen.edgeRelations?.length){const check=applyEdgeRelations(mate,{host:host.surface,child:child.surface,hostFace:chosen.hostFace,childFace:chosen.childFace,relations:chosen.edgeRelations});if(!check.ok||['x','y','z'].some(k=>Math.abs(check.translation[k]-mate.translation[k])>1e-5))return {ok:false,reason:'新面關係與原有邊定位衝突，請調整或移除原有邊定位。'};}
+  }
   const center = box => Object.fromEntries(['x', 'y', 'z'].map(k => [k, (box.min[k] + box.max[k]) / 2]));
   const hc = center(host.surface.box), cc = center(child.surface.box);
   // 原型將板件中心搬到原點；回復成各自模組座標的剛體轉換。

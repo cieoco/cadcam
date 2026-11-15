@@ -1,58 +1,56 @@
-import {faceBoundaryEdges,edgeReference} from './face-edge-relations.js';
-/** One operation, same candidate: graph edge picks and precise relation offsets. */
-export function createFaceRelationControls({root,read,surfaces,changed,pick,ready}){
- let task=null,refs=[],signature='',info='';
+import {faceBoundaryEdges} from './face-edge-relations.js';
+import {FACE_RELATION_NAMES} from './face-relations.js';
+const faces={top:'上面',bottom:'下面',front:'前面',back:'後面',left:'左面',right:'右面'};
+const icon={mate:'▱ ⇄ ▱',flush:'▱ ─ ▱',center:'▯ ┆ ▯'};
+/** Each relation owns its references and offset. Picking stays local until all references are chosen. */
+export function createFaceRelationControls({root,read,surfaces,changed,pick,status}){
+ let task=null,refs=[],editing=-1,signature='';
  const button=(text,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.style.minHeight='44px';b.onclick=fn;return b;};
+ const actions=document.createElement('div');actions.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
+ for(const [kind,name]of Object.entries(FACE_RELATION_NAMES)){const b=button(`${icon[kind]} ${name}`,()=>begin(kind));b.dataset.kind=kind;actions.append(b);}
  const prompt=document.createElement('p');prompt.setAttribute('role','status');
- const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
- const begin=kind=>{task=kind;refs=[];info='';request();};
- const edit=fn=>{task=null;pick(null);info='';fn(read());changed();render();};
- const edge=button('邊對齊',()=>begin('edge')),center=button('兩邊之間置中',()=>begin('center'));
- actions.append(button('▱ 貼齊',()=>edit(d=>d.gap=0)),button('⊙ 置中',()=>edit(d=>{delete d.edgeRelations;d.alignU=d.alignV=d.offsetU=d.offsetV=0;})),edge,button('↔ 翻向',()=>edit(d=>d.rotationDeg=((d.rotationDeg ?? d.quarterTurns*90)+180)%360)));
- const list=document.createElement('div'),fallback=document.createElement('details'),summary=document.createElement('summary');summary.textContent='看不到邊？從清單選';fallback.append(summary);
- const choices=document.createElement('div');fallback.append(choices);
- const stop=button('取消選邊',()=>{task=null;pick(null);render();});
- root.append(actions,prompt,stop,fallback,list);
- const extra=document.createElement('details'),extraLabel=document.createElement('summary');extraLabel.textContent='以兩條邊為置中基準';extra.append(extraLabel,center);root.append(extra);
- const gapLabel=document.createElement('label');gapLabel.textContent='面間距 mm ';const gap=document.createElement('input');gap.type='number';gap.min='0';gap.step='any';gap.setAttribute('aria-label','面間距（mm）');gapLabel.append(gap);root.append(gapLabel);
- gap.oninput=()=>{const v=gap.value.trim()?Number(gap.value):NaN;gap.setAttribute('aria-invalid',String(!Number.isFinite(v)||v<0));if(Number.isFinite(v)&&v>=0)read().gap=v;changed();};
- const precise=[];
- for(const [key,title]of [['offsetU','↔ 偏移 mm'],['offsetV','↕ 偏移 mm'],['rotationDeg','⟳ 旋轉 °']]){
-  const label=document.createElement('label');label.textContent=title;const input=document.createElement('input');input.type='number';input.step='any';input.setAttribute('aria-label',title);label.append(input);root.append(label);precise.push({key,input,label});
-  input.oninput=()=>{const v=input.value.trim()?Number(input.value):NaN;input.setAttribute('aria-invalid',String(!Number.isFinite(v)));if(Number.isFinite(v))read()[key]=v;changed();};
-  if(key==='rotationDeg'){const turn=delta=>edit(d=>d.rotationDeg=((d.rotationDeg ?? d.quarterTurns*90)+delta+360)%360);label.append(button('−90°',()=>turn(-90)),button('+90°',()=>turn(90)));}
- }
+ const stop=button('取消選面',cancel),fallback=document.createElement('details'),summary=document.createElement('summary');summary.textContent='被遮住的面';fallback.append(summary);
+ const choices=document.createElement('div');choices.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:6px';fallback.append(choices);
+ const list=document.createElement('div'),feedback=document.createElement('p');feedback.setAttribute('role','status');feedback.style.color='#b34436';
+ root.append(actions,prompt,stop,fallback,list,feedback);
+ function cancel(){task=null;refs=[];editing=-1;pick(null);changed();render();}
+ function begin(kind,index=-1){task=kind;refs=[];editing=index;request();}
  function request(){
-  const endpoint=task==='edge'&&refs.length===0?'child':'host',d=read();
-  prompt.textContent=task==='edge'?(refs.length?'① 點另一條邊':'② 點一條邊'):(refs.length?'① 再點另一條平行邊':'① 點第一條邊界');
-  prompt.style.color=endpoint==='host'?'#258bd0':'#0a947c';
-  pick({endpoint,face:d[endpoint+'Face']});choices.replaceChildren();
-  const edges=faceBoundaryEdges(surfaces()[endpoint],d[endpoint+'Face']);
-  if(!edges.length){task=null;pick(null);info='這個面沒有可選的直線邊，請換面。';render();return;}
-  for(const [i,e]of edges.entries())choices.append(button(`邊 ${i+1} · ${Math.hypot(e.b.x-e.a.x,e.b.y-e.a.y,e.b.z-e.a.z).toFixed(1)} mm`,()=>accept({reference:edgeReference(e)})));
-  render();
+  const count=task==='center'?2:1,endpoint=refs.length<count?'host':'child',which=endpoint==='host'?'①':'②',second=refs.length%count===1;
+  prompt.textContent=`${which} ${task==='center'?(second?'選另一側的面':'選一側的面'):'選一個面'}`;prompt.style.color=endpoint==='host'?'#258bd0':'#0a947c';
+  pick({endpoint,relation:true});choices.replaceChildren();
+  const surface=surfaces()[endpoint];
+  for(const [id,name]of Object.entries(faces)){const b=button(name,()=>accept({face:id}));b.disabled=!surface||(!['top','bottom'].includes(id)&&!faceBoundaryEdges(surface,id).length);choices.append(b);}
+  changed();render();
  }
  function accept(value){
-  if(!task)return;refs.push(value.reference);
-  if(refs.length<2){request();return;}
-  const d=read(),r=task==='edge'?{kind:'edge',child:refs[0],host:refs[1],offsetMm:0}:{kind:'center',host:refs[0],host2:refs[1],offsetMm:0};
-  d.edgeRelations=[...(d.edgeRelations || []),r];task=null;pick(null);changed();render();
+  if(!task||!Object.hasOwn(faces,value.face))return;
+  refs.push(value.face);const count=task==='center'?2:1;
+  if(refs.length<count*2){request();return;}
+  const d=read(),old=editing>=0?d.faceRelations[editing]:null,r={kind:task,hostFaces:refs.slice(0,count),childFaces:refs.slice(count),offsetMm:old?.offsetMm ?? 0};
+  if(editing<0)d.faceRelations.push(r);else d.faceRelations[editing]=r;
+  task=null;refs=[];editing=-1;pick(null);signature='';changed();render();
  }
  function render(){
-  const d=read(),rules=d.edgeRelations || [];edge.disabled=center.disabled=!ready()||rules.length>=2;
-  stop.hidden=fallback.hidden=!task;
-  if(!task){prompt.textContent=info || '';prompt.style.color='';}
-  for(const {key,input,label}of precise){label.hidden=key!=='rotationDeg'&&rules.length>0;if(document.activeElement!==input){input.value=key==='rotationDeg'?(d.rotationDeg ?? d.quarterTurns*90):d[key];input.removeAttribute('aria-invalid');}}
-  if(document.activeElement!==gap){gap.value=d.gap;gap.removeAttribute('aria-invalid');}
-  const next=JSON.stringify(rules.map(({offsetMm,...r})=>r));
-  if(next!==signature){signature=next;list.replaceChildren();rules.forEach((r,i)=>{
-   const row=document.createElement('div'),label=document.createElement('label');
-   const number=(endpoint,ref)=>faceBoundaryEdges(surfaces()[endpoint],d[endpoint+'Face']).findIndex(e=>e.key===ref.key)+1;
-   label.textContent=r.kind==='edge'?`② 邊 ${number('child',r.child)} ↔ ① 邊 ${number('host',r.host)} · 偏移 mm `:`① 邊 ${number('host',r.host)}／${number('host',r.host2)} · 置中偏移 mm `;
-   const input=document.createElement('input');input.type='number';input.step='any';input.value=r.offsetMm;input.setAttribute('aria-label',`關係 ${i+1} 偏移（mm）`);
-   input.oninput=()=>{const v=input.value.trim()?Number(input.value):NaN;input.setAttribute('aria-invalid',String(!Number.isFinite(v)));if(Number.isFinite(v))read().edgeRelations[i].offsetMm=v;changed();};
-   label.append(input);row.append(label,button('移除',()=>{read().edgeRelations.splice(i,1);changed();render();}));list.append(row);
-  });}
+  const d=read(),rules=d.faceRelations || [];
+  for(const b of actions.children)b.disabled=rules.length>=6;
+  stop.hidden=fallback.hidden=!task;prompt.hidden=!task;
+  const next=JSON.stringify([rules.map(({offsetMm,...r})=>r),d.edgeRelations?.length]);
+  if(next!==signature){signature=next;list.replaceChildren();
+   if(d.edgeRelations?.length){const legacy=document.createElement('div');legacy.textContent='原有邊定位（保留）';legacy.append(button('移除原有邊定位',()=>{delete read().edgeRelations;changed();render();}));list.append(legacy);}
+   rules.forEach((r,i)=>{
+    const row=document.createElement('div');row.dataset.relation=i;row.style.cssText='border:1px solid #ccd7da;border-radius:10px;padding:8px;margin-top:8px';
+    const focus=()=>{if(!task)pick({focusRelation:i});};row.onpointerdown=focus;row.onfocusin=focus;
+    const title=document.createElement('strong');title.textContent=`${i+1} · ${FACE_RELATION_NAMES[r.kind]}`;
+    const refsLabel=document.createElement('div');refsLabel.style.cssText='display:flex;gap:8px;margin:6px 0';
+    for(const [key,color,mark]of [['hostFaces','#258bd0','①'],['childFaces','#0a947c','②']]){const s=document.createElement('span');s.style.color=color;s.textContent=`${mark} ${r[key].map(f=>faces[f]).join('／')}`;refsLabel.append(s);}
+    const label=document.createElement('label');label.textContent='偏差 mm ';const input=document.createElement('input');input.type='number';input.step='any';input.value=r.offsetMm;input.setAttribute('aria-label',`關係 ${i+1} 偏差（mm）`);
+    input.oninput=()=>{const v=input.value.trim()?Number(input.value):NaN;input.setAttribute('aria-invalid',String(!Number.isFinite(v)));if(Number.isFinite(v))read().faceRelations[i].offsetMm=v;changed();};label.append(input);
+    row.append(title,refsLabel,label,button('重新選面',()=>begin(r.kind,i)),button('移除',()=>{read().faceRelations.splice(i,1);signature='';changed();render();}));list.append(row);
+   });
+  }
+  const result=status?.();feedback.textContent=rules.length?(result&&!result.ok?result.reason:''):'選一種關係開始；順序不限。';
+  for(const row of list.querySelectorAll('[data-relation]'))row.style.borderColor=result&&!result.ok&&(!result.relationConflicts||result.relationConflicts.includes(Number(row.dataset.relation)))?'#c54c42':'#ccd7da';
  }
- return {render,accept,cancel(){task=null;pick(null);render();}};
+ return {render,accept,cancel,pending:()=>!!task};
 }

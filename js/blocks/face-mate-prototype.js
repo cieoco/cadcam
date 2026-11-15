@@ -16,6 +16,7 @@ import { buildFacePlacement } from './face-placement.js';
 import {signedNumberInput,showNumber,readNumber} from './numeric-input.js';
 import {placedFaceSelection} from './face-placement-direction.js';
 import {createFaceRelationControls} from './face-relation-controls.js';
+import {solveFaceRelations} from './face-relations.js';
 
 const $ = id => document.getElementById(id);
 const names = { top: '上面（板面）', bottom: '下面（板面）', front: '前面（外框邊）', back: '後面（外框邊）', left: '左面（外框邊）', right: '右面（外框邊）' };
@@ -122,13 +123,13 @@ const fitControls = document.createElement('div'); fitControls.style.cssText='di
 const faceRelation = document.createElement('div'); faceRelation.style.width='100%'; faceRelation.setAttribute('aria-live','polite');
 fitControls.append(faceRelation, parallelButton, fitButton);
 $('bracketNote').after(fitControls);
-const solve = () => solveFaceMate({ ...draft, hostBox: hosts[draft.host].box, childBox: children[draft.child].box });
+const solve = () => {const options={...draft,hostBox:hosts[draft.host].box,childBox:children[draft.child].box},seed=solveFaceMate(options);return seed.ok&&docked&&draft.faceRelations?.length?solveFaceRelations(seed,{...options,relations:draft.faceRelations}):seed;};
 
 function button(label, action) {
   const b = document.createElement('button');
   b.type = 'button'; b.textContent = label; b.addEventListener('click', action); return b;
 }
-function update(field, value) { if(field==='child'||field==='childFace')childConfirmed=true; bracketOffsets = {}; selectedBracket = null; draft[field] = value; if (field === 'childFace') roughPlaced = true; if (field === 'host' || field === 'child') { roughPlaced = configured; if (field === 'host' && hosts[value].defaultFace) draft.hostFace = hosts[value].defaultFace; }
+function update(field, value) { if(docked&&['host','child'].includes(field)&&draft.faceRelations?.length&&draft[field]!==value){$('message').textContent='先移除既有關係，再更換零件。';return;}if(field==='child'||field==='childFace')childConfirmed=true; bracketOffsets = {}; selectedBracket = null; draft[field] = value; if (field === 'childFace') roughPlaced = true; if (field === 'host' || field === 'child') { roughPlaced = configured; if (field === 'host' && hosts[value].defaultFace) draft.hostFace = hosts[value].defaultFace; }
  if(docked&&['host','child','hostFace','childFace'].includes(field)){delete draft.edgeRelations;relationControls?.cancel();}
  if(docked&&['host','child','hostFace','childFace'].includes(field)){
   const direction=placedFaceSelection(hosts[draft.host].placementPlane,children[draft.child].placementPlane,field==='host'||field==='child'?null:draft.hostFace,field==='host'||field==='child'?null:field==='childFace'?draft.childFace:null);
@@ -515,7 +516,9 @@ function preview() {
    document.querySelector('section[data-step="1"] h2').textContent='① 選第一個面';
    const pair=$('facePair');if(pair)for(const b of pair.children){const selected=Number(b.dataset.faceStep);b.setAttribute('aria-pressed',String(step===selected));b.style.opacity=step<selected?'.45':'1';}
    document.querySelector('section[data-step="2"] h2').textContent='② 選第二個面';
-   document.querySelector('section[data-step="3"] h2').textContent='① ↔ ② 調整相對位置';
+   document.querySelector('section[data-step="3"] h2').textContent='組立關係';
+   $('progress').hidden=true;$('back').hidden=true;if($('facePair'))$('facePair').hidden=true;
+   if(!draft.faceRelations?.length||relationControls?.pending())$('next').disabled=true;
    for(const i of [1,2])document.querySelector(`section[data-step="${i}"] h2`).style.color=i===1?'#258bd0':'#0a947c';
    $('progress').replaceChildren();for(let i=1;i<=3;i++){const dot=document.createElement('span');if(i<=step)dot.className='current';$('progress').append(dot);}
    if(step<3)$('next').textContent='用這個面';
@@ -530,6 +533,7 @@ if (integrated) {
     if (e.source !== parent || e.origin !== location.origin) return;
     if(docked&&e.data?.type==='face-wizard-pick'&&['hostFace','childFace'].includes(e.data.field)&&faceOrder.includes(e.data.face)){const endpoint=e.data.field==='hostFace'?'host':'child',items=endpoint==='host'?hosts:children;if(Number.isInteger(e.data.endpointIndex)&&items[e.data.endpointIndex])update(endpoint,e.data.endpointIndex);update(e.data.field,e.data.face);return;}
     if(docked&&e.data?.type==='face-wizard-edge-picked'){relationControls?.accept(e.data);return;}
+    if(docked&&e.data?.type==='face-wizard-relation-picked'){relationControls?.accept(e.data);return;}
     if(e.data?.type==='face-wizard-preview-result'){
       if(e.data.requestId!==previewRequest || e.data.loadGraph!==LOAD_GRAPH_TOKEN)return;
       parentCandidate=e.data.candidate;previewResultRequest=e.data.requestId;preview();showCandidate(parentCandidate);return;
@@ -548,19 +552,19 @@ if (integrated) {
     // 預設面僅作預選；只有明確重新調整位置才略過選面。
     if (e.data.startAtPlacement) step = 3;
     if(docked){
-     if(!e.data.startAtPlacement)step=1;
-     if(!e.data.childConfirmed)childConfirmed=false;
+     step=3;childConfirmed=true;
+     if(!draft.faceRelations)draft.faceRelations=e.data.childConfirmed?[{kind:'mate',hostFaces:[draft.hostFace],childFaces:[draft.childFace],offsetMm:draft.gap}]:[];
      if(!e.data.selection?.brackets&&!e.data.selection?.fastener)fastenerKind='none';
      if(!relationControls){
       const pair=document.createElement('div');pair.id='facePair';pair.style.cssText='display:flex;gap:8px;padding:8px';
       for(const [i,color]of [[1,'#258bd0'],[2,'#0a947c']]){const b=button(i===1?'▱ ①':'▱ ②',()=>{relationControls?.cancel();step=i;render();$('panelScroll').scrollTop=0;});b.dataset.faceStep=i;b.setAttribute('aria-label',i===1?'第一個面':'第二個面');b.style.cssText=`flex:1;min-height:44px;color:${color};border:2px solid ${color};background:white`;pair.append(b);}
       $('progress').after(pair);
       const section=document.querySelector('section[data-step="3"]'),root=document.createElement('div');root.id='faceRelationControls';section.querySelector('h2').after(root);
-      relationControls=createFaceRelationControls({root,read:()=>draft,surfaces:()=>({host:hosts[draft.host].surface,child:children[draft.child].surface}),changed:()=>render(),ready:()=>!!parentCandidate?.model&&parentCandidate.selectionRevision===previewSignature,pick:task=>parent.postMessage({type:'face-wizard-edge-request',loadGraph:LOAD_GRAPH_TOKEN,task},location.origin)});
+      relationControls=createFaceRelationControls({root,read:()=>draft,surfaces:()=>({host:hosts[draft.host].surface,child:children[draft.child].surface}),changed:()=>render(),status:()=>solve(),pick:task=>parent.postMessage({type:'face-wizard-relation-request',loadGraph:LOAD_GRAPH_TOKEN,task},location.origin)});
       $('align').replaceChildren();fitControls.style.display='none';
       const legacy=document.createElement('div');legacy.style.display='none';legacy.append($('rotationActions'),$('adjustments'));section.append(legacy);
       const hardware=document.createElement('details'),hwLabel=document.createElement('summary');hwLabel.textContent='固定方式（選用）';hardware.append(hwLabel,$('fastenerChoice'),$('bracketNote'));section.append(hardware);
-      for(const [id,at]of [['hostChoice','1'],['childChoice','2']]){const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='換設計／零件';details.append(summary,$(id));document.querySelector(`section[data-step="${at}"]`).append(details);}
+      const parts=document.createElement('details'),partsLabel=document.createElement('summary');partsLabel.textContent='選擇兩個設計／零件';parts.append(partsLabel,$('hostChoice'),$('childChoice'));section.append(parts);
       const childMore=document.createElement('details'),childLabel=document.createElement('summary');childLabel.textContent='被遮住的面';childMore.append(childLabel,$('childFaces'));document.querySelector('section[data-step="2"]').append(childMore);
       $('hostFaceMore').querySelector('summary').textContent='被遮住的面';$('hostFaceMore').querySelector('summary').style.setProperty('display','list-item','important');
      }

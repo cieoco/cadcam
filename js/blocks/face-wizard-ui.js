@@ -11,6 +11,7 @@ import { inspectLinkExport, inspectPlateExport } from './exporters.js?v=20261007
 import { connectionSelection } from './connection-selection.js';
 import {placedFaceSelection,placedModuleAxes} from './face-placement-direction.js';
 import {boxFaces} from './face-mate.js';
+import {candidateSurfacePoint} from './face-candidate-view.js';
 import {createFaceEdgeOverlay} from './face-edge-overlay.js';
 import { readConnectionDescriptor } from './connection-descriptor.js';
 
@@ -131,19 +132,22 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   frame.style.cssText = 'width:100%;height:calc(100% - 44px);border:0;display:block;';
   if(dock){bar.style.display='none';frame.style.cssText='width:100%;height:100%;min-height:0;flex:1;border:0;display:block;';}
   bar.append(heading, close); dialog.append(layout, bar, frame); if(!dock)document.body.append(dialog);
-  let disposed=false,previewStep=startAtPlacement?3:0,stepSelection=null,tap=null;
+  let disposed=false,previewStep=startAtPlacement?3:0,stepSelection=null,tap=null,relationTask=null,activeModel=sourceModel,activeCandidate=null;
   const canvas=pickViewer?.canvas;
   const edgeOverlay=dock&&canvas?createFaceEdgeOverlay(pickViewer,picked=>frame.contentWindow.postMessage({type:'face-wizard-edge-picked',...picked},location.origin)):null;
   const down=e=>{tap=e.isPrimary!==false?{id:e.pointerId,x:e.clientX,y:e.clientY}:null;};
   const move=e=>{if(tap&&Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>6)tap=null;};
   const cancelTap=()=>{tap=null;};
-  const up=e=>{const start=tap;tap=null;if(!start||start.id!==e.pointerId||![1,2].includes(previewStep)||!stepSelection)return;
-   const hit=pickViewer.pickSurface(e.clientX,e.clientY),part=sourceModel?.materialParts?.find(p=>p.pickKey===hit?.key),items=previewStep===1?hosts:children;
+  const up=e=>{const start=tap;tap=null;if(!start||start.id!==e.pointerId||(![1,2].includes(previewStep)&&!relationTask)||!stepSelection)return;
+   const endpoint=relationTask?.endpoint || (previewStep===1?'host':'child'),hit=pickViewer.pickSurface(e.clientX,e.clientY),part=(relationTask?activeModel:sourceModel)?.materialParts?.find(p=>p.pickKey===hit?.key),items=endpoint==='host'?hosts:children;
    const index=items.findIndex(item=>!item.blockedReason&&part&&part.moduleId===item.surface.moduleId&&part.partId===(item.surface.framePartId || item.surface.compId)),item=items[index];
-   if(!part||!item)return;
-   const m=part.pose.matrix,n=hit.normal,world=[m[0]*n.x+m[4]*n.y+m[8]*n.z,m[1]*n.x+m[5]*n.y+m[9]*n.z,m[2]*n.x+m[6]*n.y+m[10]*n.z],axes=placedModuleAxes({comps,modules,params},item.surface.moduleId),local=axes.map(a=>a.reduce((s,v,i)=>s+v*world[i],0));
+   if(!part||!item||relationTask&&index!==stepSelection[endpoint])return;
+   const m=part.pose.matrix,n=hit.normal,world=[m[0]*n.x+m[4]*n.y+m[8]*n.z,m[1]*n.x+m[5]*n.y+m[9]*n.z,m[2]*n.x+m[6]*n.y+m[10]*n.z];
+   let axes=placedModuleAxes({comps,modules,params},item.surface.moduleId);
+   if(relationTask&&activeCandidate?.model){const origin=candidateSurfacePoint(activeCandidate,{x:0,y:0,z:0},endpoint);if(origin)axes=['x','y','z'].map(k=>{const p=candidateSurfacePoint(activeCandidate,{x:0,y:0,z:0,[k]:1},endpoint);return [p.x-origin.x,p.y-origin.y,p.z-origin.z];});}
+   const local=axes.map(a=>a.reduce((s,v,i)=>s+v*world[i],0));
    const faces=boxFaces(item.surface.box),face=faces.slice().sort((a,b)=>{const score=f=>f.n.x*local[0]+f.n.y*local[1]+f.n.z*local[2];return score(b)-score(a);})[0];
-   if(face){pickViewer.highlightSurface(hit);frame.contentWindow.postMessage({type:'face-wizard-pick',field:previewStep===1?'hostFace':'childFace',endpointIndex:index,face:face.id},location.origin);}
+   if(face){pickViewer.highlightSurface(hit);frame.contentWindow.postMessage(relationTask?{type:'face-wizard-relation-picked',face:face.id}:{type:'face-wizard-pick',field:previewStep===1?'hostFace':'childFace',endpointIndex:index,face:face.id},location.origin);}
   };
   if(dock&&canvas){canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',cancelTap);}
   const dispose = () => {if(disposed)return;disposed=true;transaction.cancel();edgeOverlay?.dispose();window.removeEventListener('message', receive);if(canvas){canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',cancelTap);pickViewer.highlightSurface(null);}dialog.remove();onClose();};
@@ -152,6 +156,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
   async function receive(e) {
     if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
     if (e.data?.type === 'face-wizard-cancel') { shut(); return; }
+    if(e.data?.type==='face-wizard-relation-request'){if(loadSession.allowConfirm(e.data.loadGraph)){const task=e.data.task;if(Number.isInteger(task?.focusRelation)&&task.focusRelation>=0)edgeOverlay?.focusRelation(task.focusRelation);else relationTask=task&&['host','child'].includes(task.endpoint)?task:null;}return;}
     if(e.data?.type==='face-wizard-edge-request'){const task=e.data.task;if(loadSession.allowConfirm(e.data.loadGraph)&&previewStep===3)edgeOverlay?.pick(task&&['host','child'].includes(task.endpoint)&&['top','bottom','front','back','left','right'].includes(task.face)?task:null);return;}
     if(e.data?.type==='face-wizard-step'){if(loadSession.allowConfirm(e.data.loadGraph)&&Number.isInteger(e.data.step)&&e.data.step>=0&&e.data.step<=3){previewStep=e.data.step;stepSelection=e.data;if(previewStep!==3)edgeOverlay?.clear();else edgeOverlay?.showFaces(true);onStep(e.data);}return;}
     const rejectLoad = () => {
@@ -176,6 +181,8 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
       const result=await transaction.preview({childId,reselect:!!initialMount,selection,hostEndpoint:{moduleId:host.moduleId,outputId:host.outputId,frameEdge:host.frameEdge,partId:host.compId},childEndpoint:{partId:selectedChild.compId || 'frame'}});
       if(transaction.snapshot().closed)return;
       if(dock&&previewStep===3)onPreview(result);
+      activeModel=result.model || sourceModel;
+      activeCandidate=result;
       edgeOverlay?.setCandidate(result);
       frame.contentWindow.postMessage({type:'face-wizard-preview-result',requestId:e.data.requestId,loadGraph:LOAD_GRAPH_TOKEN,candidate:result},location.origin);return;
     }

@@ -953,7 +953,9 @@ export function createBench(deps) {
     root.appendChild(liveBox);   // B6：即時干涉狀態＋全行程測試（持久節點，面板重建時只是搬回來）
     if (mod?.mount?.face) {
       const selection = mod.mount.face.selection;
-      root.appendChild(el('div', 'bench-note', selection.edgeRelations?.length
+      root.appendChild(el('div', 'bench-note', selection.faceRelations?.length
+        ? selection.faceRelations.map(r=>`${({mate:'面對面',flush:'貼齊',center:'置中對齊'})[r.kind]} · 偏差 ${r.offsetMm} mm`).join('；')
+        : selection.edgeRelations?.length
         ? `間距 ${selection.gap} mm · ${selection.edgeRelations.map(r=>`${r.kind==='center'?'兩邊之間置中':'板邊對齊'} · 偏移 ${r.offsetMm} mm`).join('；')}`
         : `間距 ${selection.gap} mm · 偏移 ${selection.offsetU} / ${selection.offsetV} mm`));
       root.appendChild(bigBtn('拆下重新選面', () => adjust('unmount')));

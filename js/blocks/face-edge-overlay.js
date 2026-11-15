@@ -3,7 +3,7 @@ import {candidateSurfacePoint} from './face-candidate-view.js';
 import {boxFaces} from './face-mate.js';
 /** Screen-space hit targets project the same candidate material edges as the 3D scene. */
 export function createFaceEdgeOverlay(viewer,onPick){
- let root,task=null,candidate=null,raf=0,edges=[],screenEdges=[],showFaces=false;
+ let root,task=null,candidate=null,raf=0,edges=[],screenEdges=[],showFaces=false,focusedRelation=null;
  const NS='http://www.w3.org/2000/svg';
  const clear=()=>{cancelAnimationFrame(raf);raf=0;root?.remove();root=null;};
  function draw(){
@@ -14,12 +14,14 @@ export function createFaceEdgeOverlay(viewer,onPick){
   if(showFaces){
    const layer=document.createElementNS(NS,'g');layer.dataset.faces='';root.prepend(layer);
    for(const endpoint of ['host','child']){
-    const surface=candidate[endpoint+'Surface'],id=candidate.placement?.selection?.[endpoint+'Face'];if(!surface||!id)continue;
+    const selection=candidate.placement?.selection,surface=candidate[endpoint+'Surface'],rules=selection?.faceRelations,selected=rules?.length?[rules[Math.min(focusedRelation ?? rules.length-1,rules.length-1)]]:null;
+    for(const id of new Set(selected?.length?selected.flatMap(r=>r[endpoint+'Faces']):[selection?.[endpoint+'Face']])){if(!surface||!id)continue;
     const face=boxFaces(surface.box).find(f=>f.id===id);if(!face)continue;
     const edgeList=faceBoundaryEdges(surface,id),rings=['top','bottom'].includes(id)?(surface.outlines || [surface.outline]).filter(Boolean).map(r=>r.map(p=>({...p,z:face.center.z}))):Array.from({length:edgeList.length/4},(_,i)=>edgeList.slice(i*4,i*4+4).map(e=>e.a));
     const project=p=>{const w=candidateSurfacePoint(candidate,p,endpoint);return w&&viewer.project(w);},color=endpoint==='host'?'#258bd0':'#0a947c';
     const path=document.createElementNS(NS,'path');path.setAttribute('d',rings.map(r=>r.map(project).filter(Boolean)).filter(r=>r.length>2).map(r=>r.map((p,i)=>`${i?'L':'M'}${p.x-rect.left},${p.y-rect.top}`).join(' ')+'Z').join(' '));path.setAttribute('fill',color);path.setAttribute('fill-opacity','.12');path.setAttribute('stroke',color);path.setAttribute('stroke-width','2');layer.append(path);
     const center=project(face.center);if(center){const label=document.createElementNS(NS,'text');label.setAttribute('x',center.x-rect.left+(endpoint==='host'?-15:15));label.setAttribute('y',center.y-rect.top-8);label.setAttribute('fill',color);label.setAttribute('stroke','white');label.setAttribute('paint-order','stroke');label.setAttribute('stroke-width','3');label.setAttribute('font-size','22');label.textContent=endpoint==='host'?'①':'②';layer.append(label);}
+    }
    }
   }
   screenEdges=[];
@@ -43,5 +45,5 @@ export function createFaceEdgeOverlay(viewer,onPick){
   raf=requestAnimationFrame(draw);
  }
  const prepare=()=>{edges=task&&candidate?.model?faceBoundaryEdges(candidate[task.endpoint+'Surface'],task.face):[];};
- return {setCandidate(value){candidate=value;prepare();clear();draw();},showFaces(value){showFaces=value;clear();draw();},pick(value){task=value;prepare();clear();draw();},clear(){task=null;showFaces=false;clear();},dispose(){task=null;candidate=null;edges=[];clear();}};
+ return {focusRelation(index){focusedRelation=index;clear();draw();},setCandidate(value){candidate=value;prepare();clear();draw();},showFaces(value){showFaces=value;clear();draw();},pick(value){task=value;prepare();clear();draw();},clear(){task=null;showFaces=false;clear();},dispose(){task=null;candidate=null;edges=[];clear();}};
 }
