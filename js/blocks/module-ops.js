@@ -1002,7 +1002,7 @@ export const BUILTIN_MODULES = [
   { id: 'tipping-bucket', name: '單軸翻斗', source: 'tipping-bucket', root: 'Driver', description: '加入整組翻斗，保留四板與內部接合；可調傾倒角，物料流動與承載未驗證。' },
   { id: 'lift-bucket', name: '平行升降托斗', source: 'lift-bucket', root: 'Lift', description: '加入升降臂與托斗整組，保留內部接合；姿態保持但沿圓弧升降，承載未驗證。' },
   { id: 'parallel-gripper', name: '雙側平行夾爪', source: 'parallel-gripper', description: '等齒輪帶兩組四連桿保持夾指平行；沿圓弧平移，接觸與承載未驗證。' },
-  { id:'block-gear-gripper',name:'積木夾爪',source:'block-gear-gripper',description:'保留目前作品，加入原夾爪為新的設計分頁。' }
+  { id:'block-gear-gripper',name:'積木夾爪',source:'block-gear-gripper' }
 ];
 
 export function builtinTemplate(id) {
@@ -1083,7 +1083,7 @@ export function builtinTemplate(id) {
     template.base = 'FRAME_BL';
     template.outputs = [{ id: 'tip', name: '取物端', at: 'INTAKE_TIP', body: { kind: 'triangle', id: 'IntakeArm' } }];
   } else if(id==='block-gear-gripper'){
-    template.base=comps.find(c=>c.standardBlank?.kind==='plate')?.p1.id;template.outputs=[];template.fabrication=clone(example.snapshot.fabrication);
+    template.outputs=[];template.fabrication=clone(example.snapshot.fabrication);
   } else if (id === 'parallel-gripper') {
     template.base = 'PGMount';
     template.outputs = [];
