@@ -139,7 +139,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
   const extraHolesOf = comp => (orthoExtras.linkHoles && orthoExtras.linkHoles[comp.id]) || [];
   const plateHolesOf = comp => (orthoExtras.plateHoles && orthoExtras.plateHoles[comp.id]) || [];   // C1：三角板上的轉接座孔
   const thicknessOf = comp => {
-    const t = comp && comp.stock && comp.stock.thicknessMm;
+    const t = comp?.wheelWidthMm ?? (comp && comp.stock && comp.stock.thicknessMm);
     return finitePos(t) ? Number(t) : stockMm;
   };
 
@@ -222,9 +222,9 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
       const h={x:c.b.u,y:c.b.v,r:linkHole/2,id:`${c.id}_rod`,layer:'SYRINGE_ROD'};
       if(!geometry.holes.some(q=>Math.hypot(q.x-h.x,q.y-h.y)<.001))geometry.holes.push(h);
     }
-    const part = memberPart(comp, 'member', geometry);
+    const part = memberPart(comp, comp.wheelWidthMm!==undefined?'wheel':'member', geometry);
     if(fusion?.frameThicknessMm)part.thicknessMm=fusion.frameThicknessMm;
-    const joints=comp.barFusion ? [...new Set([...comp.barFusion.points.map(p=>p.id),...(comp.barFusion.framePointIds||[])])].map(id=>({id,holeDiameterMm:hostGeometry?.holes.find(h=>h.id===id)?.r*2||linkHole})) : pointsOf(comp, ['p1','p2'],linkHole);
+    const joints=comp.barFusion ? [...new Set([...comp.barFusion.points.map(p=>p.id),...(comp.barFusion.framePointIds||[])])].map(id=>({id,holeDiameterMm:hostGeometry?.holes.find(h=>h.id===id)?.r*2||linkHole})) : pointsOf(comp, comp.wheelWidthMm!==undefined?['p1']:['p1','p2'],linkHole);
     if(comp.barFusion){part.fusedMembers=comp.barFusion.members;for(const id of part.fusedMembers)partByComp.set(id,part);}
     addPart(part, joints);
     partByComp.set(comp.id, part);
@@ -588,7 +588,7 @@ export function hardwareList(plan, { modules = [] } = {}) {
 
 // ---- 製作包 HTML ----
 const escHtml = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const KIND_LABEL = { frame: '機架板', gear: '齒輪', rack: '齒條', member: '桿件／板件' };
+const KIND_LABEL = { frame: '機架板', gear: '齒輪', rack: '齒條', member: '桿件／板件', wheel: '外購 TT 輪子（輪廓參考，非胎體加工圖）' };
 
 export function buildPackHtml(plan, { title = '機構作品', cnc, warnings = [], interference = [], suggestions = [], modules = [],comps=[],validation,validationRevision } = {}) {
   const invalid=plan?.diagnostics?.find(d=>['face_fastener_invalid','tab_nut_invalid'].includes(d.code));if(invalid)throw Error(`${invalid.code==='tab_nut_invalid'?'榫槽暫停輸出':'角碼孔暫停輸出'}：${invalid.reason}`);

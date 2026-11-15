@@ -26,7 +26,7 @@ export function findMountSurface(surfaces, endpoint = {}) {
 }
 
 function stockThickness(comp, exportSettings, fallback) {
-  if (comp?.shape === 'disk') return fallback; // 圓盤厚度沿用全局製作設定，與材料 catalog 一致。
+  if (comp?.shape === 'disk') return comp.wheelWidthMm??fallback; // 圓盤沿用全局板厚，外購輪子保留輪寬。
   const raw = comp && isRecord(comp.stock) ? comp.stock.thicknessMm : undefined;
   if (comp && (comp.type === 'bar' || comp.type === 'triangle')) return memberStock(comp).thicknessMm;
   if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) return memberStock(comp).thicknessMm;

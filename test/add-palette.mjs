@@ -11,7 +11,7 @@ const add=COMMANDS.filter(c=>c.group==='add');
 const where={
  common:["window.blocks.openStandardBlank('bar')","window.blocks.openStandardBlank('plate')","window.blocks.openStandardBlank('l')"],
  free:["window.blocks.pickLinkTool('bar')","window.blocks.startDrawPolygon","window.blocks.pickLinkTool('triangle')","window.blocks.pickLinkTool('polyline')"],
- other:["window.blocks.startDrawDisk","window.blocks.openMotorChoice","window.blocks.addAnchor","window.blocks.startDrawRail","window.blocks.pickMotorType('mg995')","window.blocks.pickMotorType('linear')","window.blocks.addFixedSyringe","window.blocks.addGearPair","window.blocks.addRackPinion","window.blocks.startChainDrive"],
+ other:["window.blocks.openWheel","window.blocks.startDrawDisk","window.blocks.openMotorChoice","window.blocks.addAnchor","window.blocks.startDrawRail","window.blocks.pickMotorType('mg995')","window.blocks.pickMotorType('linear')","window.blocks.addFixedSyringe","window.blocks.addGearPair","window.blocks.addRackPinion","window.blocks.startChainDrive"],
  plugin:["window.blocks.openBoxMaker"]};
 for(const [sec,runs] of Object.entries(where))for(const r of runs){
   const c=add.find(x=>x.run===r||`${x.run}(${(x.args||[]).map(a=>`'${a}'`).join(',')})`===r);
@@ -19,7 +19,7 @@ for(const [sec,runs] of Object.entries(where))for(const r of runs){
 }
 ok(true,'每個新增指令在正確分類');
 ok(add.filter(c=>c.section==='common').map(c=>c.id).join()==='bar,plate,lshape,arms','第一層只提供桿件、板材、同平面L型件、彎桿/多臂件');
-ok(add.length===19&&new Set(add.map(c=>c.id)).size===19&&new Set(add.map(c=>JSON.stringify([c.run,c.args||[]]))).size===19,'19個新增動作完整、同一指令參數不重複');
+ok(add.length===20&&new Set(add.map(c=>c.id)).size===20&&new Set(add.map(c=>JSON.stringify([c.run,c.args||[]]))).size===20,'20個新增動作完整、同一指令參數不重複');
 ok(add.every(c=>c.run!=='window.blocks.openPowerMenu'),'不再先點「動力來源」再選');
 ok(add.every(c=>ADD_SECTIONS.some(s=>s.id===c.section)),'所有新增指令都有分類');
 const html=readFileSync(new URL('../blocks.html',import.meta.url),'utf8');

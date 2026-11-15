@@ -18,6 +18,7 @@ function button(c, short) {
 }
 // 其他指令用到的小動作；app.js 併入 window.blocks。
 export const commandActions = {
+  openWheel:()=>import('./wheel-ui.js').then(m=>m.openWheel()),
   openExamples: () => $('examplesDialog').showModal(),
   openFabrication: () => $('fabricationDialog').showModal(),
   openGuide: () => { const d = $('designGuide'); d.open ? d.close() : d.show(); },
