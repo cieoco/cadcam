@@ -13,6 +13,7 @@ export async function prepareMotorParts(raw){const work=raw?.kind==='blocks-enve
 export function storedProject(snapshot){
   if(snapshot?.kind==='blocks-envelope')return snapshot;
   const requires=[];
+  if(snapshot?.modules?.some(m=>m.mount?.face?.selection?.edgeRelations?.length))requires.push('face-edge-relations-v1');
   if(snapshot?.modules?.some(m=>m.placementPlane))requires.push('placement-plane-v1');
   if(snapshot?.modules?.some(m=>m.designInstance))requires.push('design-instances-v1');
   if(snapshot?.comps?.some(c=>c.wheelWidthMm!==undefined))requires.push('tt-wheel-v1');
@@ -31,6 +32,6 @@ function motorPartsToLegacy(project){
 }
 export function readStoredProject(value){
   if(value?.kind!=='blocks-envelope')return motorPartsToLegacy(value);
-  if(value.v!==1||!Array.isArray(value.requires)||!value.requires.length||value.requires.some(k=>!['tab-nut-m3-v1','box-panel-v1','tab-nut-sets-v1','independent-motor-v1','motor-part-v2','tt-wheel-v1','design-instances-v1','placement-plane-v1'].includes(k))||!Array.isArray(value.project?.comps)||!['blocks','blocks-composite'].includes(value.project.kind))return null;
+  if(value.v!==1||!Array.isArray(value.requires)||!value.requires.length||value.requires.some(k=>!['tab-nut-m3-v1','box-panel-v1','tab-nut-sets-v1','independent-motor-v1','motor-part-v2','tt-wheel-v1','design-instances-v1','placement-plane-v1','face-edge-relations-v1'].includes(k))||!Array.isArray(value.project?.comps)||!['blocks','blocks-composite'].includes(value.project.kind))return null;
   return motorPartsToLegacy(value.project);
 }

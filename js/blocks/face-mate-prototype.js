@@ -15,6 +15,7 @@ import { realMountExamples } from './face-mate-examples.js';
 import { buildFacePlacement } from './face-placement.js';
 import {signedNumberInput,showNumber,readNumber} from './numeric-input.js';
 import {placedFaceSelection} from './face-placement-direction.js';
+import {createFaceRelationControls} from './face-relation-controls.js';
 
 const $ = id => document.getElementById(id);
 const names = { top: '上面（板面）', bottom: '下面（板面）', front: '前面（外框邊）', back: '後面（外框邊）', left: '左面（外框邊）', right: '右面（外框邊）' };
@@ -36,6 +37,7 @@ const loadSession = createLoadSession(LOAD_GRAPH_TOKEN);
 let { hosts, children } = realMountExamples();
 const initial = { host: 0, child: 0, hostFace: 'top', childFace: 'bottom', alignU: 0, alignV: 0, offsetU: 0, offsetV: 0, gap: 0, quarterTurns: 0 };
 let draft = { ...initial }, saved = { ...initial }, step = 0;
+let relationControls=null;
 let mode = 'wizard', choosingChild = false;
 $('previewToggle').addEventListener('click', () => {
   const collapsed = document.body.classList.toggle('panel-collapsed');
@@ -126,11 +128,14 @@ function button(label, action) {
   const b = document.createElement('button');
   b.type = 'button'; b.textContent = label; b.addEventListener('click', action); return b;
 }
-function update(field, value) { if(field==='child')childConfirmed=true; bracketOffsets = {}; selectedBracket = null; draft[field] = value; if (field === 'childFace') roughPlaced = true; if (field === 'host' || field === 'child') { roughPlaced = configured; if (field === 'host' && hosts[value].defaultFace) draft.hostFace = hosts[value].defaultFace; }
+function update(field, value) { if(field==='child'||field==='childFace')childConfirmed=true; bracketOffsets = {}; selectedBracket = null; draft[field] = value; if (field === 'childFace') roughPlaced = true; if (field === 'host' || field === 'child') { roughPlaced = configured; if (field === 'host' && hosts[value].defaultFace) draft.hostFace = hosts[value].defaultFace; }
+ if(docked&&['host','child','hostFace','childFace'].includes(field)){delete draft.edgeRelations;relationControls?.cancel();}
  if(docked&&['host','child','hostFace','childFace'].includes(field)){
   const direction=placedFaceSelection(hosts[draft.host].placementPlane,children[draft.child].placementPlane,field==='host'||field==='child'?null:draft.hostFace,field==='host'||field==='child'?null:field==='childFace'?draft.childFace:null);
   if(direction)Object.assign(draft,{hostFace:direction.hostFace,childFace:direction.childFace,quarterTurns:direction.quarterTurns,rotationDeg:direction.rotationDeg});
  }
+ if(docked&&field==='hostFace'&&step===1)step=2;
+ else if(docked&&field==='childFace'&&step===2)step=3;
  $('message').textContent = ''; render(); }
 function buildCards(root, items, field) {
   items.forEach((item, i) => {
@@ -249,8 +254,9 @@ $('dimensionForm').addEventListener('submit', e => {
 });
 $('wizardMode').addEventListener('click', () => { mode = 'wizard'; render(); });
 $('workMode').addEventListener('click', () => { mode = 'work'; render(); });
-$('back').addEventListener('click', () => { if (step === 0) choosingChild = false; else { step--; if(step === 0) choosingChild = true; } render(); $('panelScroll').scrollTop=0; });
+$('back').addEventListener('click', () => { relationControls?.cancel();if(docked){step=Math.max(1,step-1);}else if (step === 0) choosingChild = false; else { step--; if(step === 0) choosingChild = true; } render(); $('panelScroll').scrollTop=0; });
 $('next').addEventListener('click', () => {
+  if(docked&&step===2)childConfirmed=true;
   if (mode === 'wizard' && step < 3) { if(step === 0 && !choosingChild) choosingChild = true; else step++; render(); $('panelScroll').scrollTop=0; return; }
   if (!solve().ok) return;
   if (!integrated && bracketPlan?.ok) draft.brackets = { enabled: true, offsets: { ...bracketOffsets }, childPart: children[draft.child].surface?.compId || 'frame' };
@@ -461,7 +467,7 @@ function render() {
   if(docked&&loadSession.ready)parent.postMessage({type:'face-wizard-step',step,host:draft.host,child:draft.child,loadGraph:LOAD_GRAPH_TOKEN},location.origin);
   document.body.dataset.ui = mode;
   document.body.dataset.step = step;
-  $('hostFaceMore').open = mode === 'work' || step === 1;
+  $('hostFaceMore').open = !docked&&(mode === 'work' || step === 1);
   $('wizardMode').setAttribute('aria-pressed', mode === 'wizard'); $('workMode').setAttribute('aria-pressed', mode === 'work');
   document.querySelectorAll('[data-step]').forEach(s => { s.hidden = mode === 'wizard' && Number(s.dataset.step) !== step; });
   $('progress').hidden = mode === 'work'; $('progress').replaceChildren();
@@ -478,7 +484,7 @@ function render() {
   ['offsetU', 'offsetV', 'gap'].forEach(field => { if(document.activeElement!==$(field))showNumber($(field), draft[field]); });
   $('angleChip').textContent = `接合角度 ${Number(angle().toFixed(2))}°`;
   $('rotationActions').hidden = mode === 'wizard' && step !== 3;
-  $('back').hidden = mode === 'work'; $('back').disabled = step === 0 && !choosingChild;
+  $('back').hidden = mode === 'work'; $('back').disabled = docked?step===1:step === 0 && !choosingChild;
   $('back').textContent = '上一步';
   $('next').textContent = mode === 'work' || step === 3 ? (integrated ? '接上' : '確認擺放') : '下一步';
   if (integrated) $('cancel').textContent = '取消';
@@ -502,17 +508,26 @@ function preview() {
   const relation = broad(draft.hostFace) && broad(draft.childFace) ? '板面平行' : broad(draft.hostFace) !== broad(draft.childFace) ? '板面垂直' : '外框邊對齊';
   faceRelation.textContent = `${relation} · 間距 ${draft.gap} mm`;
   $('summary').textContent = `${relation}：${children[draft.child].name}・${names[draft.childFace]} → ${hosts[draft.host].name}・${names[draft.hostFace]}。${align}；偏置 ${draft.offsetU} / ${draft.offsetV} mm；間距 ${draft.gap} mm。`;
-  const blocked=integrated && (step > 0 || choosingChild) && (!childConfirmed || !!children[draft.child].blockedReason);
+  const blocked=integrated && (docked ? step>=2 && (!!children[draft.child].blockedReason || (step===3&&!childConfirmed)) : (step > 0 || choosingChild) && (!childConfirmed || !!children[draft.child].blockedReason));
   const mate = solve();$('fastenerChoice').hidden=!integrated||step!==3;fillFastenerChoices($('fastenerKind'),fastenerKind,{printed:'僅支援直角接口'});$('fastenerHelp').textContent=fastenerKind==='none'?'只記錄組立位置，不新增固定孔或五金。':fastenerKind==='tab-nut'?'榫頭插入槽口，再用 M3 螺絲與螺母鎖固；尺寸與板厚需核對。':(docked?'調整位置後，角碼與固定孔一起更新。':'在圖上拖曳角碼調位置，或點角碼輸入偏移；確認後加入兩板固定孔。');$('tabNutSettings').hidden=fastenerKind!=='tab-nut';if(fastenerKind!=='tab-nut')$('tabNutFeedback').hidden=true;if(mate.ok && !blocked)requestCandidate(mate);$('next').disabled = blocked || !mate.ok || (integrated&&step===3&&(!parentCandidate?.saveable || parentCandidate.selectionRevision!==JSON.stringify(integratedSelection(mate)))) || (integrated && !loadSession.ready) || [...document.querySelectorAll('input[aria-invalid="true"]')].some(input=>input.getClientRects().length);
   if(integrated&&step===3)$('next').textContent=candidateConfirmLabel(parentCandidate,parentCandidate?.selectionRevision!==previewSignature);
+  if(docked){
+   document.querySelector('section[data-step="1"] h2').textContent=`1 · 點承接板的接合面`;
+   document.querySelector('section[data-step="2"] h2').textContent=`2 · 點安裝板的接合面`;
+   document.querySelector('section[data-step="3"] h2').textContent='3 · 對齊板邊與尺寸';
+   $('progress').replaceChildren();for(let i=1;i<=3;i++){const dot=document.createElement('span');if(i<=step)dot.className='current';$('progress').append(dot);}
+   if(step<3)$('next').textContent='用這個面';
+  }
   if (mate.ok) scene(mate);
   else { $('mateOverlay').hidden = true; $('message').textContent = mate.reason; $('message').classList.add('error'); }
+  relationControls?.render();
 }
 if (integrated) {
   document.querySelector('header .tag').textContent = '選接合面，設定尺寸，再確認組立';
   window.addEventListener('message', e => {
     if (e.source !== parent || e.origin !== location.origin) return;
-    if(docked&&e.data?.type==='face-wizard-pick'&&['hostFace','childFace'].includes(e.data.field)&&faceOrder.includes(e.data.face)){update(e.data.field,e.data.face);return;}
+    if(docked&&e.data?.type==='face-wizard-pick'&&['hostFace','childFace'].includes(e.data.field)&&faceOrder.includes(e.data.face)){const endpoint=e.data.field==='hostFace'?'host':'child',items=endpoint==='host'?hosts:children;if(Number.isInteger(e.data.endpointIndex)&&items[e.data.endpointIndex])update(endpoint,e.data.endpointIndex);update(e.data.field,e.data.face);return;}
+    if(docked&&e.data?.type==='face-wizard-edge-picked'){relationControls?.accept(e.data);return;}
     if(e.data?.type==='face-wizard-preview-result'){
       if(e.data.requestId!==previewRequest || e.data.loadGraph!==LOAD_GRAPH_TOKEN)return;
       parentCandidate=e.data.candidate;previewResultRequest=e.data.requestId;preview();showCandidate(parentCandidate);return;
@@ -530,6 +545,21 @@ if (integrated) {
     fastenerKind=faceFastenerKind(draft,configured);tabNutSettings={...TAB_NUT_DEFAULTS,...draft.fastener};for(const input of $('tabNutSettings').querySelectorAll('input'))input.value=tabNutSettings[input.id.replace('tabNut-','')];
     // 預設面僅作預選；只有明確重新調整位置才略過選面。
     if (e.data.startAtPlacement) step = 3;
+    if(docked){
+     if(!e.data.startAtPlacement)step=1;
+     if(!e.data.childConfirmed)childConfirmed=false;
+     if(!e.data.selection?.brackets&&!e.data.selection?.fastener)fastenerKind='none';
+     if(!relationControls){
+      const section=document.querySelector('section[data-step="3"]'),root=document.createElement('div');root.id='faceRelationControls';section.querySelector('h2').after(root);
+      relationControls=createFaceRelationControls({root,read:()=>draft,surfaces:()=>({host:hosts[draft.host].surface,child:children[draft.child].surface}),changed:()=>render(),ready:()=>!!parentCandidate?.model&&parentCandidate.selectionRevision===previewSignature,pick:task=>parent.postMessage({type:'face-wizard-edge-request',loadGraph:LOAD_GRAPH_TOKEN,task},location.origin)});
+      $('align').replaceChildren();fitControls.style.display='none';
+      const more=document.createElement('details'),label=document.createElement('summary');label.textContent='角度與原有偏移';more.append(label,$('rotationActions'),$('adjustments'));section.append(more);
+      const hardware=document.createElement('details'),hwLabel=document.createElement('summary');hwLabel.textContent='固定方式（選用）';hardware.append(hwLabel,$('fastenerChoice'),$('bracketNote'));section.append(hardware);
+      for(const [id,at]of [['hostChoice','1'],['childChoice','2']]){const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='換設計／零件';details.append(summary,$(id));document.querySelector(`section[data-step="${at}"]`).append(details);}
+      const childMore=document.createElement('details'),childLabel=document.createElement('summary');childLabel.textContent='被遮住的面';childMore.append(childLabel,$('childFaces'));document.querySelector('section[data-step="2"]').append(childMore);
+      $('hostFaceMore').querySelector('summary').textContent='被遮住的面';$('hostFaceMore').querySelector('summary').style.setProperty('display','list-item','important');
+     }
+    }
     if (configured && !document.getElementById('optionalView')) {
       const view = document.querySelector('.view-actions'), more = document.createElement('details'), label = document.createElement('summary');
       more.id = 'optionalView'; label.textContent = '觀看角度'; label.style.cssText = 'min-height:44px;display:flex;align-items:center;cursor:pointer;';

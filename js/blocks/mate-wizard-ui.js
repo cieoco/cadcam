@@ -333,7 +333,9 @@ export function createMateWizard(h) {
       root.appendChild(btn('修改固定方式與位置','primary',()=>h.openFaces(mod,true,true)));
       const change = btn('重新選面與尺寸', 'primary', () => h.openFaces(mod, true)); root.appendChild(change);
       const f = mod.mount.face.selection;
-      root.appendChild(el('div', 'bench-note', `間距 ${f.gap} mm · 偏移 ${f.offsetU} / ${f.offsetV} mm`));
+      root.appendChild(el('div', 'bench-note', f.edgeRelations?.length
+        ? `間距 ${f.gap} mm · ${f.edgeRelations.map(r=>`${r.kind==='center'?'兩邊之間置中':'板邊對齊'} · 偏移 ${r.offsetMm} mm`).join('；')}`
+        : `間距 ${f.gap} mm · 偏移 ${f.offsetU} / ${f.offsetV} mm`));
       return;
     }
     if (mate) [styleBox(S.comps, S.modules, mod.id, stylesOf(mod.id)), fastenerBox(S.comps, S.modules, mod.id), adjustBox(S.comps, S.modules, mod.id)].forEach(x => x && root.appendChild(x));

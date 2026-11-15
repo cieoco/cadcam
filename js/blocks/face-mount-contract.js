@@ -1,4 +1,5 @@
 import {normalizeTabNut} from './tab-nut-geometry.js';
+import {normalizeEdgeRelations} from './face-edge-relations.js';
 import { normalizeBracketSelection } from './face-bracket-geometry.js?v=20261008_bracket3d';
 /** Pure validation for the persisted six-face module mount contract. */
 const FACE_IDS = new Set(['right', 'left', 'front', 'back', 'top', 'bottom']);
@@ -31,6 +32,8 @@ export function normalizeFaceMountContract(raw) {
     return fail('face.selection 的面、對齊、偏置、間距或轉向不合法。');
   }
   const fastener=s.fastener===undefined?null:normalizeTabNut(s.fastener);
+  const edgeRelations=s.edgeRelations===undefined?undefined:normalizeEdgeRelations(s.edgeRelations);
+  if(s.edgeRelations!==undefined&&!edgeRelations)return fail('接合邊關係無效。');
   if(s.fastener!==undefined&&(!fastener||s.brackets!==undefined||raw.version!==2))return fail('榫槽設定或接合版本無效，不能與角碼並存。');
   if(raw.version===2&&!fastener)return fail('face v2 必須保存已支援的榫槽接法。');
   if(raw.version===2&&(!raw.childPart||raw.childPart==='frame'))return fail('榫槽必須指定獨立立板零件。');
@@ -46,7 +49,7 @@ export function normalizeFaceMountContract(raw) {
     ...(raw.childPart !== undefined ? { childPart: raw.childPart } : {}),
     rotation: raw.rotation.map(row => row.slice()),
     translation: { x: t.x, y: t.y, z: t.z },
-    selection: { ...(fastener ? {fastener} : {}), ...(brackets ? { brackets } : {}), ...Object.fromEntries(SELECT_KEYS.map(k => [k, s[k]])), ...(s.rotationDeg !== undefined ? { rotationDeg: s.rotationDeg } : {}) },
+    selection: { ...(edgeRelations?{edgeRelations}:{}), ...(fastener ? {fastener} : {}), ...(brackets ? { brackets } : {}), ...Object.fromEntries(SELECT_KEYS.map(k => [k, s[k]])), ...(s.rotationDeg !== undefined ? { rotationDeg: s.rotationDeg } : {}) },
     hostThicknessMm: raw.hostThicknessMm,
     childThicknessMm: raw.childThicknessMm
   }};

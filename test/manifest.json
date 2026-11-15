@@ -150,6 +150,7 @@
     "test/design-focus.mjs",
     "test/design-instances.mjs",
     "test/placement-plane.mjs",
+    "test/face-edge-relations.mjs",
     "test/loose-motor-playback.mjs",
     "test/direct-link-assembly.mjs",
     "test/example-controller.mjs",

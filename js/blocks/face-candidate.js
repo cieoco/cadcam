@@ -61,9 +61,9 @@ export function buildFaceCandidate(source,{childId,hostEndpoint,childEndpoint,se
   const displayWork=structuredClone({...work,stockMm,joint,exportSettings});
   delete displayWork.modules.find(m=>m.id===childId).mount.face.selection.brackets;
   const invalid=failed('fastener_invalid',bracket?.reason || '角碼固定設定不合法。',sourceRevision);
-  return freezeData({...invalid,validation:{...invalid.validation,checks:[...invalid.validation.checks,{status:'pass',code:'placement_valid'}]},saveable:false,selectionRevision:JSON.stringify(selection),hostSurface:host,placement:placement.record,bracket,work:{...work,stockMm,joint,exportSettings},displayWork});
+  return freezeData({...invalid,validation:{...invalid.validation,checks:[...invalid.validation.checks,{status:'pass',code:'placement_valid'}]},saveable:false,selectionRevision:JSON.stringify(selection),hostSurface:host,childSurface:child,placement:placement.record,bracket,work:{...work,stockMm,joint,exportSettings},displayWork});
  }
- return freezeData({ok:true,sourceRevision,selectionRevision:JSON.stringify(selection),hostSurface:host,work:{...work,stockMm,joint,exportSettings},placement:placement.record,bracket,tabNut,
+ return freezeData({ok:true,sourceRevision,selectionRevision:JSON.stringify(selection),hostSurface:host,childSurface:child,work:{...work,stockMm,joint,exportSettings},placement:placement.record,bracket,tabNut,
   validation:{status:'not_checked',sourceRevision,checks:[{status:'pass',code:'placement_valid'},{status:bracket||tabNut?'pass':'not_checked',code:bracket||tabNut?'fastener_valid':'fastener_not_requested'}],coverage:{scope:'face_candidate'}}});
 }
 export function faceCandidateModel(candidate,pose={}){
@@ -84,7 +84,9 @@ export function faceCandidateModel(candidate,pose={}){
  const model=buildMaterialScene({...work,catalog,inputs:planeInputs(inputs,work.comps,work.modules,null),allPlanes:inputs,points:sol.points,asm,hullR:DEFAULT_PLATE_RADIUS_WORLD,solveValidity:validity});
  const hostGeometry=catalog.parts[candidate.hostSurface?.framePartId || candidate.hostSurface?.compId],homeIds=hostGeometry?.binding.pointIds || [],[a,b]=homeIds.map(id=>catalog.homePoints[id]);
  const hostReference=candidate.hostSurface?.kind==='frame'?{origin:{x:0,y:0},angle:0}:hostGeometry?.binding.kind==='rack'&&a?{origin:a,angle:hostGeometry.binding.axisDeg*Math.PI/180}:a&&b?{origin:a,angle:Math.atan2(b.y-a.y,b.x-a.x)}:null;
- return {model,work,mounts:exportMounts,catalog,points:sol.points,hostReference,solveValidity:validity};
+ const cg=catalog.parts[candidate.childSurface?.framePartId || candidate.childSurface?.compId],[ca,cb]=(cg?.binding.pointIds || []).map(id=>catalog.homePoints[id]);
+ const childReference=candidate.childSurface?.kind==='frame'?{origin:{x:0,y:0},angle:0}:ca&&cb?{origin:ca,angle:Math.atan2(cb.y-ca.y,cb.x-ca.x)}:null;
+ return {model,work,mounts:exportMounts,catalog,points:sol.points,hostReference,childReference,solveValidity:validity};
 }
 export async function validateFaceCandidate(candidate,pose={},compute,sceneInput){
  if(!candidate.ok&&!candidate.displayWork)return candidate;
@@ -100,7 +102,7 @@ export async function validateFaceCandidate(candidate,pose={},compute,sceneInput
  const args={comps:scene.work.comps,modules:scene.work.modules,params:scene.work.params,exportSettings:{...scene.work.exportSettings,drive:scene.work.fabrication?.drive || FABRICATION_DEFAULTS.drive},cnc:scene.work.fabrication?.cnc,mounts:scene.mounts,joint:scene.work.joint};
  const {plan}=resolveSpacers(args),plane=findInterference({...args,plan,pose:{...(pose.motorAngles || {}),'1':pose.motorAngles?.['1'] ?? pose.theta ?? 0}});
  checks.push({status:plane.length?'fail':'pass',code:'in_plane_interference',findings:plane},{status:material.status,code:'material_interference',findings:material.findings});
- return freezeData({...candidate,saveable:candidate.ok&&!materialUnsupported&&!(candidate.work.modules.some(m=>m.mount?.face?.selection?.fastener)&&(material.status==='fail'||plane.length)),...(materialUnsupported?{reason:scene.catalog?.extras?.diagnostics?.find(d=>d.status==='fail')?.reason || '部分板件材料或姿態無法驗證，不能確認。'}:{}),work:candidate.ok?scene.work:candidate.work,model,points:scene.points,hostReference:scene.hostReference,validation:{status:!candidate.ok||plane.length||material.status==='fail'?'fail':material.status,sourceRevision:candidate.sourceRevision,selectionRevision:candidate.selectionRevision,geometryKey:model.geometryKey,poseRevision,checks,material,coverage:material.coverage}});
+ return freezeData({...candidate,saveable:candidate.ok&&!materialUnsupported&&!(candidate.work.modules.some(m=>m.mount?.face?.selection?.fastener)&&(material.status==='fail'||plane.length)),...(materialUnsupported?{reason:scene.catalog?.extras?.diagnostics?.find(d=>d.status==='fail')?.reason || '部分板件材料或姿態無法驗證，不能確認。'}:{}),work:candidate.ok?scene.work:candidate.work,model,points:scene.points,hostReference:scene.hostReference,childReference:scene.childReference,validation:{status:!candidate.ok||plane.length||material.status==='fail'?'fail':material.status,sourceRevision:candidate.sourceRevision,selectionRevision:candidate.selectionRevision,geometryKey:model.geometryKey,poseRevision,checks,material,coverage:material.coverage}});
 }
 export function createFaceCandidateTransaction({readSource,readPose=()=>({}),build=buildFaceCandidate,validate=validateFaceCandidate,review=()=>true,commit}){
  const sourceRevision=faceSourceRevision(readSource());let serial=0,current=null,pending=false,closed=false,confirming=false;
