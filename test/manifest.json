@@ -152,6 +152,7 @@
     "test/placement-plane.mjs",
     "test/face-edge-relations.mjs",
     "test/face-relations.mjs",
+    "test/face-overlay-performance.mjs",
     "test/loose-motor-playback.mjs",
     "test/direct-link-assembly.mjs",
     "test/example-controller.mjs",

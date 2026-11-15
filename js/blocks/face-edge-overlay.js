@@ -1,49 +1,56 @@
 import {faceBoundaryEdges,edgeReference} from './face-edge-relations.js';
 import {candidateSurfacePoint} from './face-candidate-view.js';
 import {boxFaces} from './face-mate.js';
-/** Screen-space hit targets project the same candidate material edges as the 3D scene. */
+/** Cache world geometry and SVG nodes; only camera/viewport changes need reprojection. */
 export function createFaceEdgeOverlay(viewer,onPick){
- let root,task=null,candidate=null,raf=0,edges=[],screenEdges=[],showFaces=false,focusedRelation=null;
- const NS='http://www.w3.org/2000/svg';
- const clear=()=>{cancelAnimationFrame(raf);raf=0;root?.remove();root=null;};
+ let root,task=null,candidate=null,showFaces=false,focusedRelation=null,faces=[],edges=[],screenEdges=[];
+ const NS='http://www.w3.org/2000/svg',node=tag=>document.createElementNS(NS,tag);
+ const attr=(el,key,value)=>{const text=String(value);if(el.getAttribute(key)!==text)el.setAttribute(key,text);};
+ const clear=()=>{root?.remove();root=null;faces=[];edges=[];screenEdges=[];};
  function draw(){
-  if((!task&&!showFaces)||!candidate?.model||!viewer?.canvas)return;
-  const rebuild=!root;root ||= document.createElementNS(NS,'svg');root.setAttribute('aria-label',task?'選擇實際接合邊':'兩個已選接面');root.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:6';if(rebuild)viewer.canvas.parentElement.append(root);
-  const rect=root.getBoundingClientRect();
-  root.querySelector('[data-faces]')?.remove();
-  if(showFaces){
-   const layer=document.createElementNS(NS,'g');layer.dataset.faces='';root.prepend(layer);
-   for(const endpoint of ['host','child']){
-    const selection=candidate.placement?.selection,surface=candidate[endpoint+'Surface'],rules=selection?.faceRelations,selected=rules?.length?[rules[Math.min(focusedRelation ?? rules.length-1,rules.length-1)]]:null;
-    for(const id of new Set(selected?.length?selected.flatMap(r=>r[endpoint+'Faces']):[selection?.[endpoint+'Face']])){if(!surface||!id)continue;
-    const face=boxFaces(surface.box).find(f=>f.id===id);if(!face)continue;
-    const edgeList=faceBoundaryEdges(surface,id),rings=['top','bottom'].includes(id)?(surface.outlines || [surface.outline]).filter(Boolean).map(r=>r.map(p=>({...p,z:face.center.z}))):Array.from({length:edgeList.length/4},(_,i)=>edgeList.slice(i*4,i*4+4).map(e=>e.a));
-    const project=p=>{const w=candidateSurfacePoint(candidate,p,endpoint);return w&&viewer.project(w);},color=endpoint==='host'?'#258bd0':'#0a947c';
-    const path=document.createElementNS(NS,'path');path.setAttribute('d',rings.map(r=>r.map(project).filter(Boolean)).filter(r=>r.length>2).map(r=>r.map((p,i)=>`${i?'L':'M'}${p.x-rect.left},${p.y-rect.top}`).join(' ')+'Z').join(' '));path.setAttribute('fill',color);path.setAttribute('fill-opacity','.12');path.setAttribute('stroke',color);path.setAttribute('stroke-width','2');layer.append(path);
-    const center=project(face.center);if(center){const label=document.createElementNS(NS,'text');label.setAttribute('x',center.x-rect.left+(endpoint==='host'?-15:15));label.setAttribute('y',center.y-rect.top-8);label.setAttribute('fill',color);label.setAttribute('stroke','white');label.setAttribute('paint-order','stroke');label.setAttribute('stroke-width','3');label.setAttribute('font-size','22');label.textContent=endpoint==='host'?'①':'②';layer.append(label);}
-    }
-   }
+  if(!root)return;
+  // Read layout once before any writes. World-space geometry never changes with the camera.
+  const rect=root.getBoundingClientRect(),points=[],ranges=[];
+  for(const f of faces){const start=points.length;for(const ring of f.rings)points.push(...ring);points.push(f.center);ranges.push({f,start});}
+  const edgeStart=points.length;for(const e of edges)points.push(e.a,e.b);
+  const screen=viewer.projectPoints?viewer.projectPoints(points):points.map(p=>viewer.project(p));
+  for(const {f,start}of ranges){let i=start;const paths=[];
+   for(const ring of f.rings){const projected=screen.slice(i,i+ring.length);i+=ring.length;if(projected.every(Boolean))paths.push(projected.map((p,j)=>`${j?'L':'M'}${p.x-rect.left},${p.y-rect.top}`).join(' ')+'Z');}
+   attr(f.path,'d',paths.join(' '));const p=screen[i];attr(f.label,'visibility',p?'visible':'hidden');if(p){attr(f.label,'x',p.x-rect.left+f.shift);attr(f.label,'y',p.y-rect.top-8);}
   }
   screenEdges=[];
-  for(const [index,e]of (task?edges:[]).entries()){
-   const wa=candidateSurfacePoint(candidate,e.a,task.endpoint),wb=candidateSurfacePoint(candidate,e.b,task.endpoint);if(!wa||!wb)continue;
-   const a=viewer.project(wa),b=viewer.project(wb);if(!a||!b)continue;
-   screenEdges.push({e,index,a,b});
-   if(!rebuild){const group=root.querySelector(`[data-edge="${index}"]`);if(group)for(const line of group.querySelectorAll('line'))for(const[k,v]of Object.entries({x1:a.x-rect.left,y1:a.y-rect.top,x2:b.x-rect.left,y2:b.y-rect.top}))line.setAttribute(k,v);continue;}
-   const group=document.createElementNS(NS,'g');group.setAttribute('role','button');group.setAttribute('tabindex','0');group.setAttribute('aria-label',`選${task.endpoint==='host'?'①':'②'}邊 ${index+1}`);
-   group.dataset.edge=index;
-   const choose=(chosen=e,number=index)=>{const picked={reference:edgeReference(chosen),label:`邊 ${number+1}`};task=null;clear();onPick(picked);};
-   for(const [width,color]of [[18,'transparent'],[2.5,task.endpoint==='host'?'#258bd0':'#0a947c']]){
-    const line=document.createElementNS(NS,'line');for(const[k,v]of Object.entries({x1:a.x-rect.left,y1:a.y-rect.top,x2:b.x-rect.left,y2:b.y-rect.top,stroke:color,'stroke-width':width}))line.setAttribute(k,v);line.style.pointerEvents='stroke';group.append(line);
-   }
-   let down;group.onpointerdown=e=>{e.stopPropagation();down={x:e.clientX,y:e.clientY,id:e.pointerId};group.setPointerCapture(e.pointerId);};group.onpointerup=e=>{e.stopPropagation();if(down&&down.id===e.pointerId&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<6){
-    const distance=q=>{const dx=q.b.x-q.a.x,dy=q.b.y-q.a.y,t=Math.max(0,Math.min(1,((e.clientX-q.a.x)*dx+(e.clientY-q.a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(e.clientX-q.a.x-t*dx,e.clientY-q.a.y-t*dy);};
-    const nearest=screenEdges.slice().sort((a,b)=>distance(a)-distance(b))[0];if(nearest)choose(nearest.e,nearest.index);
-   }down=null;};group.onpointercancel=()=>{down=null;};group.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}};
-   const title=document.createElementNS(NS,'title');title.textContent=`邊 ${index+1} · ${Math.hypot(e.b.x-e.a.x,e.b.y-e.a.y,e.b.z-e.a.z).toFixed(1)} mm`;group.append(title);root.append(group);
-  }
-  raf=requestAnimationFrame(draw);
+  edges.forEach((e,i)=>{const a=screen[edgeStart+i*2],b=screen[edgeStart+i*2+1];attr(e.group,'visibility',a&&b?'visible':'hidden');if(!a||!b)return;screenEdges.push({e,a,b});for(const line of e.lines)for(const[k,v]of Object.entries({x1:a.x-rect.left,y1:a.y-rect.top,x2:b.x-rect.left,y2:b.y-rect.top}))attr(line,k,v);});
  }
- const prepare=()=>{edges=task&&candidate?.model?faceBoundaryEdges(candidate[task.endpoint+'Surface'],task.face):[];};
- return {focusRelation(index){focusedRelation=index;clear();draw();},setCandidate(value){candidate=value;prepare();clear();draw();},showFaces(value){showFaces=value;clear();draw();},pick(value){task=value;prepare();clear();draw();},clear(){task=null;showFaces=false;clear();},dispose(){task=null;candidate=null;edges=[];clear();}};
+ function rebuild(){
+  clear();if((!task&&!showFaces)||!candidate?.model||!viewer?.canvas)return;
+  root=node('svg');root.setAttribute('aria-label',task?'選擇實際接合邊':'兩個已選接面');root.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:6';viewer.canvas.parentElement.append(root);
+  const world=(p,endpoint)=>candidateSurfacePoint(candidate,p,endpoint);
+  if(showFaces)for(const endpoint of ['host','child']){
+   const selection=candidate.placement?.selection,surface=candidate[endpoint+'Surface'],rules=selection?.faceRelations,selected=rules?.length?[rules[Math.min(focusedRelation ?? rules.length-1,rules.length-1)]]:null;
+   for(const id of new Set(selected?.length?selected.flatMap(r=>r[endpoint+'Faces']):[selection?.[endpoint+'Face']])){
+    if(!surface||!id)continue;const face=boxFaces(surface.box).find(f=>f.id===id);if(!face)continue;
+    let rings;if(['top','bottom'].includes(id))rings=(surface.outlines || [surface.outline]).filter(Boolean).map(r=>r.map(p=>({...p,z:face.center.z})));
+    else{const es=faceBoundaryEdges(surface,id);rings=Array.from({length:es.length/4},(_,i)=>es.slice(i*4,i*4+4).map(e=>e.a));}
+    const center=world(face.center,endpoint);rings=rings.map(r=>r.map(p=>world(p,endpoint))).filter(r=>r.every(Boolean));if(!center)continue;
+    const color=endpoint==='host'?'#258bd0':'#0a947c',path=node('path'),label=node('text');
+    for(const[k,v]of Object.entries({fill:color,'fill-opacity':'.12',stroke:color,'stroke-width':2}))attr(path,k,v);
+    for(const[k,v]of Object.entries({fill:color,stroke:'white','paint-order':'stroke','stroke-width':3,'font-size':22}))attr(label,k,v);
+    label.textContent=endpoint==='host'?'①':'②';root.append(path,label);faces.push({rings,center,path,label,shift:endpoint==='host'?-15:15});
+   }
+  }
+  if(task)for(const [index,e]of faceBoundaryEdges(candidate[task.endpoint+'Surface'],task.face).entries()){
+   const a=world(e.a,task.endpoint),b=world(e.b,task.endpoint);if(!a||!b)continue;
+   const group=node('g');group.setAttribute('role','button');group.setAttribute('tabindex','0');group.setAttribute('aria-label',`選${task.endpoint==='host'?'①':'②'}邊 ${index+1}`);
+   const entry={a,b,group,lines:[],reference:edgeReference(e),label:`邊 ${index+1}`};
+   const choose=chosen=>{task=null;const value={reference:chosen.reference,label:chosen.label};rebuild();onPick(value);};
+   for(const [width,color]of [[18,'transparent'],[2.5,task.endpoint==='host'?'#258bd0':'#0a947c']]){const line=node('line');attr(line,'stroke',color);attr(line,'stroke-width',width);line.style.pointerEvents='stroke';group.append(line);entry.lines.push(line);}
+   let down;group.onpointerdown=e=>{e.stopPropagation();down={x:e.clientX,y:e.clientY,id:e.pointerId};group.setPointerCapture(e.pointerId);};
+   group.onpointerup=e=>{e.stopPropagation();if(down&&down.id===e.pointerId&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<6){const distance=q=>{const dx=q.b.x-q.a.x,dy=q.b.y-q.a.y,t=Math.max(0,Math.min(1,((e.clientX-q.a.x)*dx+(e.clientY-q.a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(e.clientX-q.a.x-t*dx,e.clientY-q.a.y-t*dy);};const nearest=screenEdges.slice().sort((a,b)=>distance(a)-distance(b))[0];if(nearest)choose(nearest.e);}down=null;};
+   group.onpointercancel=()=>{down=null;};group.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose(entry);}};
+   const title=node('title');title.textContent=`邊 ${index+1} · ${Math.hypot(e.b.x-e.a.x,e.b.y-e.a.y,e.b.z-e.a.z).toFixed(1)} mm`;group.append(title);root.append(group);edges.push(entry);
+  }
+  draw();
+ }
+ const unsubscribe=viewer.subscribeProjection?.(draw);
+ return {focusRelation(index){if(focusedRelation===index)return;focusedRelation=index;rebuild();},setCandidate(value){if(candidate===value)return;candidate=value;rebuild();},showFaces(value){if(showFaces===value)return;showFaces=value;rebuild();},pick(value){task=value;rebuild();},clear(){task=null;showFaces=false;clear();},dispose(){unsubscribe?.();task=null;candidate=null;clear();}};
 }

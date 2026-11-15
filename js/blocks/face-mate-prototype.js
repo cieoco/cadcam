@@ -123,7 +123,8 @@ const fitControls = document.createElement('div'); fitControls.style.cssText='di
 const faceRelation = document.createElement('div'); faceRelation.style.width='100%'; faceRelation.setAttribute('aria-live','polite');
 fitControls.append(faceRelation, parallelButton, fitButton);
 $('bracketNote').after(fitControls);
-const solve = () => {const options={...draft,hostBox:hosts[draft.host].box,childBox:children[draft.child].box},seed=solveFaceMate(options);return seed.ok&&docked&&draft.faceRelations?.length?solveFaceRelations(seed,{...options,relations:draft.faceRelations}):seed;};
+let solveKey='',solveResult;
+const solve = () => {const options={...draft,hostBox:hosts[draft.host].box,childBox:children[draft.child].box},key=JSON.stringify(options);if(key===solveKey)return solveResult;const seed=solveFaceMate(options);solveKey=key;return solveResult=seed.ok&&docked&&draft.faceRelations?.length?solveFaceRelations(seed,{...options,relations:draft.faceRelations}):seed;};
 
 function button(label, action) {
   const b = document.createElement('button');
@@ -325,6 +326,7 @@ function drawCandidateScene(mate){
  const pending=parentCandidate?.selectionRevision!==previewSignature;
  if(fastenerKind==='tab-nut')renderTabNutDimensions($('tabNutDimensions'),$('tabNutComputed'),parentCandidate?.tabNut,{pending:previewResultRequest!==previewRequest,onPreview:(key,v)=>showNumber($(`tabNut-${key}`),v),onChange:(key,v)=>{tabNutSettings[key]=v;showNumber($(`tabNut-${key}`),v);render();}});
  $('bracketNote').textContent=pending?'此圖為上次候選；目前設定待檢查。':parentCandidate?.tabNut?.ok?'3 mm 板雙榫＋M3 · 試作，實物待核對':bracketPlan?.ok?`角碼 ${bracketPlan.brackets.length} 顆 · 固定孔 Ø3.2`:parentCandidate?.reason || '僅幾何定位，尚未配置固定五金。';
+ if(docked){$('mateOverlay').hidden=true;return;}
  if(!parentCandidate?.model){$('mateOverlay').hidden=true;return;}
  const faces=candidateMaterialFaces(parentCandidate.model),points=faces.flatMap(f=>f.rings.flat()),projected=points.map(viewCoords);
  const minX=Math.min(...projected.map(p=>p.x)),maxX=Math.max(...projected.map(p=>p.x)),minY=Math.min(...projected.map(p=>p.y)),maxY=Math.max(...projected.map(p=>p.y));

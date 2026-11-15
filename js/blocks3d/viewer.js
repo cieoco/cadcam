@@ -1259,7 +1259,9 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   }
 
   let raf = null;
-  function renderNow(timestamp=null){const at=timestamp===null?0:performance.now();stepCamAnim();controls.update();renderer.render(scene,camera);return timestamp===null?null:{cpuMs:performance.now()-at,poseRevision,rendererRafTimestamp:timestamp};}
+  const projectionListeners=new Set();let projectionSignature='';
+  function notifyProjection(){if(!projectionListeners.size)return;camera.updateMatrixWorld();const signature=[...camera.matrixWorld.elements,...camera.projectionMatrix.elements,renderer.domElement.width,renderer.domElement.height].join(',');if(signature===projectionSignature)return;projectionSignature=signature;for(const fn of projectionListeners)fn();}
+  function renderNow(timestamp=null){const at=timestamp===null?0:performance.now();stepCamAnim();controls.update();renderer.render(scene,camera);notifyProjection();return timestamp===null?null:{cpuMs:performance.now()-at,poseRevision,rendererRafTimestamp:timestamp};}
   function loop() {
     renderNow();
     raf = requestAnimationFrame(loop);
@@ -1449,6 +1451,11 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     const rect = renderer.domElement.getBoundingClientRect();
     return { x: rect.left + (v.x + 1) / 2 * rect.width, y: rect.top + (1 - v.y) / 2 * rect.height };
   }
+  function projectPoints(points){
+    camera.updateMatrixWorld();const rect=renderer.domElement.getBoundingClientRect(),v=new THREE.Vector3();
+    return points.map(p=>{v.set(p.x,p.y,p.z).project(camera);return !Number.isFinite(v.x)||v.z>1?null:{x:rect.left+(v.x+1)/2*rect.width,y:rect.top+(1-v.y)/2*rect.height};});
+  }
+  function subscribeProjection(fn){projectionListeners.add(fn);return ()=>projectionListeners.delete(fn);}
   // 把相機繞目標點轉到斜上方（組立台第一次進來用，讓直角安裝的立體關係看得出來）。
   function tiltView(azimuthDeg = -28, elevationDeg = viewUp==='z'?28:18) {
     const t = controls.target;
@@ -1619,6 +1626,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   if (resizeObserver) resizeObserver.observe(container);
 
   function dispose() {
+    projectionListeners.clear();
     clearSyringes();
     lifetime.retire();
     materialNotice.remove();
@@ -1658,7 +1666,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   const api = {
     renderNow,
     cacheStats:()=>({...lifetime.stats(),geometryBuilds,geometryReuses,geometryDisposals}),
-    update, resize, dispose, start, stop, showAll, fitTo, setViewPreset, setExplode, getExtents, set onRebuilt(fn) { onRebuilt = fn; }, get viewUp() { return viewUp; }, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, project, tiltView, pickSurface, highlightSurface,
+    update, resize, dispose, start, stop, showAll, fitTo, setViewPreset, setExplode, getExtents, set onRebuilt(fn) { onRebuilt = fn; }, get viewUp() { return viewUp; }, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, project, projectPoints, subscribeProjection, tiltView, pickSurface, highlightSurface,
     set onPick(fn) { onPick=fn; },
     setPickEnabled(on) { pickEnabled = !!on; tap=null; },
     get canvas() { return renderer.domElement; },

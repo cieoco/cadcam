@@ -184,7 +184,10 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
       activeModel=result.model || sourceModel;
       activeCandidate=result;
       edgeOverlay?.setCandidate(result);
-      frame.contentWindow.postMessage({type:'face-wizard-preview-result',requestId:e.data.requestId,loadGraph:LOAD_GRAPH_TOKEN,candidate:result},location.origin);return;
+      // Docked controls need validation and labels, not a second clone of the 3D scene.
+      const {model,displayWork,hostSurface,childSurface,hostReference,childReference,placement,...controls}=result;
+      const feedback=dock?controls:result;
+      frame.contentWindow.postMessage({type:'face-wizard-preview-result',requestId:e.data.requestId,loadGraph:LOAD_GRAPH_TOKEN,candidate:feedback},location.origin);return;
     }
     const result=await transaction.confirm({candidateId:e.data.candidateId,selectionRevision:e.data.selectionRevision});
     if(result.ok)shut();
