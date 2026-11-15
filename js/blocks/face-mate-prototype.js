@@ -505,8 +505,8 @@ function render() {
   document.querySelectorAll('[data-step]').forEach(s => { s.hidden = mode === 'wizard' && Number(s.dataset.step) !== step; });
   $('progress').hidden = mode === 'work'; $('progress').replaceChildren();
   const progressStep = step === 0 ? Number(choosingChild) : step + 1;
-  $('hostChoice').hidden = mode === 'wizard' && choosingChild;
-  $('childChoice').hidden = mode === 'wizard' && !choosingChild;
+  $('hostChoice').hidden = !docked && mode === 'wizard' && choosingChild;
+  $('childChoice').hidden = !docked && mode === 'wizard' && !choosingChild;
   document.querySelector('section[data-step="0"] h2').textContent = choosingChild ? '2 · 選安裝零件' : '1 · 選承接設計與零件';
   for (let i = 0; i < 5; i++) { const dot = document.createElement('span'); if (i <= progressStep) dot.className = 'current'; $('progress').appendChild(dot); }
   document.querySelector('section[data-step="3"] h2').textContent = configured ? '調整接合位置' : '5 · 調整接合位置';

@@ -77,7 +77,8 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
 
   const partSurfaces = partId => buildMountSurfaces({ comps, modules, params, moduleId: childId, partId, exportSettings, thicknessMm: stockMm, drilling: true }).surfaces || [];
   const childSurfaces = attachComp ? partSurfaces(attachComp.id) : surfaces(childId);
-  const childSurface = childSurfaces.find(s => attachComp ? s.outputId === 'face-attach' : s.kind === 'frame') || comps.filter(c=>c.moduleId===childId && isFixedMountPart(c)).flatMap(c=>partSurfaces(c.id)).find(s=>s.kind==='output');
+  const authoredSurface=!childSelection&&comps.filter(c=>c.moduleId===childId&&isFixedMountPart(c)&&c.standardBlank?.kind==='plate').flatMap(c=>partSurfaces(c.id)).find(s=>s.kind==='output');
+  const childSurface = authoredSurface || childSurfaces.find(s => attachComp ? s.outputId === 'face-attach' : s.kind === 'frame') || comps.filter(c=>c.moduleId===childId && isFixedMountPart(c)).flatMap(c=>partSurfaces(c.id)).find(s=>s.kind==='output');
   const eligible = m => {
     const visited = new Set();
     for (let p = m; p; p = modules.find(x => x.id === p.mount?.to?.module)) {
