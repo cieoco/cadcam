@@ -1,4 +1,5 @@
 import {normalizeTabNut} from './tab-nut-geometry.js';
+import {normalizeAssemblyPin} from './assembly-pin-contract.js';
 import {normalizeEdgeRelations} from './face-edge-relations.js';
 import {normalizeFaceRelations} from './face-relations.js';
 import { normalizeBracketSelection } from './face-bracket-geometry.js?v=20261008_bracket3d';
@@ -33,6 +34,8 @@ export function normalizeFaceMountContract(raw) {
     return fail('face.selection 的面、對齊、偏置、間距或轉向不合法。');
   }
   const fastener=s.fastener===undefined?null:normalizeTabNut(s.fastener);
+  const pin=s.pin===undefined?undefined:normalizeAssemblyPin(s.pin);
+  if(s.pin!==undefined&&(!pin||raw.version!==1||s.brackets||s.fastener||s.faceRelations?.length||s.edgeRelations?.length||!['top','bottom'].includes(s.hostFace)||!['top','bottom'].includes(s.childFace)||Math.abs(Math.abs(raw.rotation[2][2])-1)>1e-6))return fail('平行插銷接合紀錄無效。');
   const edgeRelations=s.edgeRelations===undefined?undefined:normalizeEdgeRelations(s.edgeRelations);
   const faceRelations=s.faceRelations===undefined?undefined:normalizeFaceRelations(s.faceRelations);
   if(s.faceRelations!==undefined&&!faceRelations)return fail('面關係格式無效。');
@@ -52,7 +55,7 @@ export function normalizeFaceMountContract(raw) {
     ...(raw.childPart !== undefined ? { childPart: raw.childPart } : {}),
     rotation: raw.rotation.map(row => row.slice()),
     translation: { x: t.x, y: t.y, z: t.z },
-    selection: { ...(faceRelations?{faceRelations}:{}), ...(edgeRelations?{edgeRelations}:{}), ...(fastener ? {fastener} : {}), ...(brackets ? { brackets } : {}), ...Object.fromEntries(SELECT_KEYS.map(k => [k, s[k]])), ...(s.rotationDeg !== undefined ? { rotationDeg: s.rotationDeg } : {}) },
+    selection: { ...(pin?{pin}:{}), ...(faceRelations?{faceRelations}:{}), ...(edgeRelations?{edgeRelations}:{}), ...(fastener ? {fastener} : {}), ...(brackets ? { brackets } : {}), ...Object.fromEntries(SELECT_KEYS.map(k => [k, s[k]])), ...(s.rotationDeg !== undefined ? { rotationDeg: s.rotationDeg } : {}) },
     hostThicknessMm: raw.hostThicknessMm,
     childThicknessMm: raw.childThicknessMm
   }};

@@ -17,7 +17,7 @@ import { validateSupports } from './support-validation.js';
 import { assemblyRoles, setAssemblyRoot } from './assembly-roles.js';
 import { mateTargets, mateConnect, mateAdjust, mateOfMount, mateStyle, mateStyles, setMateStyle } from './mate-connect.js?v=20261007_8_final';
 
-const LS_KEY = 'blocks.mateAdvanced';
+
 const KIND = t => t.kind === 'bolt' ? '平貼對鎖' : '角碼直角';
 const ADJ = { 'slide-': '◀ 沿邊移 5 mm', 'slide+': '沿邊移 5 mm ▶', side: '換邊', reverse: '掉頭' };
 const DONE = { 'slide-': '已沿邊往起點移 5 mm', 'slide+': '已沿邊往終點移 5 mm', side: '已換到宿主的另一邊', reverse: '已掉頭（前後反過來）' };
@@ -76,22 +76,7 @@ export function createMateWizard(h) {
     deps.draw(); h.liveCheck(true); pv.hits = h.liveCount();
     h.syncUI(true); h.drawMarkers();
   }
-  function pickTarget(t) {
-    const mod = sel();
-    if (!mod || mod.mount) { h.say('請先在清單選一個還沒安裝的機構'); return false; }
-    deps.pause?.();
-    const r = mateConnect(S.comps, S.modules, mod.id, { module: t.module, mate: t.mateId }, params(), h.motorState());
-    if (!r.ok) { h.say(r.reason || '接不上'); return false; }
-    pv = { childId: mod.id, mateId: t.mateId, host: t.module, name: t.name, refs: { comps: S.comps, modules: S.modules }, cand: null, hits: 0, rev: 0 };
-    h.say('', { toast: false });
-    setCand(r.comps, r.modules);
-    return true;
-  }
-  function pickKey(key) {
-    const t = okTargets(st.selected || '').find(x => `${x.module}|${x.portId}` === key || x.portId === key);
-    if (!t) { h.say('這個承接面不能接'); return false; }
-    return pickTarget(t);
-  }
+  function pickKey() { return false; } // 新接合須先選平行／垂直。
   function cancel({ silent = false } = {}) {
     if (!pv) return false;
     pv = null;
@@ -301,9 +286,7 @@ export function createMateWizard(h) {
 
   function pickView(root, mod) {
     root.appendChild(head(`安裝「${h.displayName(mod.id)}」`));
-    const b = btn('選面接合', 'primary', () => h.openFaces(mod)); b.id = 'benchFaceWizard'; root.appendChild(b);
-    for(const target of okTargets(mod.id).filter(t=>t.kind==='bolt'))root.appendChild(btn(`${target.moduleName} · ${target.name} · 雙孔對鎖`,'',()=>pickTarget(target)));
-    root.appendChild(el('div', 'bench-note', '帶入接合設定 → 微調 → 接上'));
+    for(const [kind,label]of [['parallel','▱ ║ ▱ 平行 · 插銷'],['vertical','▱ ⟂ ▱ 垂直 · 選面']]){const b=btn(label,'primary',()=>h.openFaces(mod,false,false,kind));b.id=kind==='vertical'?'benchFaceWizard':'benchParallelPin';root.appendChild(b);}
     if (assemblyRoles(assemblyWork(S.comps,S.modules,S.topo).modules).root !== mod.id) {
       const mk = btn('設為底座', 'mate-root', () => h.apply({ comps: S.comps, modules: setAssemblyRoot(S.modules, mod.id) }, `「${h.displayName(mod.id)}」現在是底座`));
       mk.id = 'mateMakeRoot'; root.appendChild(mk);
@@ -327,6 +310,7 @@ export function createMateWizard(h) {
     const edit = btn('回設計修改', '', () => h.adjust('edit')); edit.id = 'mateEdit';
     row.appendChild(off); row.appendChild(edit); root.appendChild(row);
     if (mod.mount?.face) {
+      if(mod.mount.face.selection.pin){root.appendChild(el('p','',mod.mount.face.selection.pin.locked?'插銷已鎖固':'可轉插銷 · 可調整相對方向'));root.appendChild(btn('修改孔位與插銷','primary',()=>h.openFaces(mod,true,false,'parallel')));return;}
       const status = faceBracketStatus(S.comps,S.modules,params(),mod,{exportSettings:S.fabrication?.export || {},stockMm:S.fabrication?.cnc?.stockThicknessMm || 3,joint:S.fabrication?.joint});
       root.appendChild(el('div','bench-note',status.fixed?(mod.mount.face.selection.fastener?'榫槽與五金已生成（試作）':'角碼與固定孔已確認'):'已定位，尚未固定'));
       if(mod.mount.face.selection.fastener||mod.mount.face.selection.brackets)root.appendChild(el('div','bench-note',status.reason));
@@ -361,7 +345,7 @@ export function createMateWizard(h) {
     else {
       const active=assemblyWork(S.comps,S.modules,S.topo),base=assemblyRoles(active.modules).root;
       const pending=active.modules.filter(m=>m.id!==base&&!m.mount);
-      root.appendChild(head(pending.length?'下一步：選面接合':'接合精靈',pending.length?'選兩個接面 → 調整位置 → 接上':active.modules.length<2?'加入另一個設計，就能開始接合。':'點選已接合的零件，可修改位置。'));
+      root.appendChild(head(pending.length?'選擇要組立的設計':'接合精靈',pending.length?'平行點孔；垂直選面。':active.modules.length<2?'加入另一個設計，就能開始接合。':'點選已接合的零件，可修改位置。'));
       for(const item of pending){
         const b=btn(`開始接合「${h.displayName(item.id)}」`,'primary',async()=>{await h.select(item.id);const current=h.modOf(item.id);if(current&&!current.mount&&st.selected===item.id)h.openFaces(current);});
         b.setAttribute('aria-label',`開始接合 ${h.displayName(item.id)}`);root.appendChild(b);
@@ -429,45 +413,15 @@ export function createMateWizard(h) {
   }
 
   // ---------------------------------------------------------------- 進階（工程模式）開關
-  const toggle = el('button', 'bench-btn mate-adv'); toggle.type = 'button'; toggle.id = 'mateAdvanced';
-  function setAdvanced(on) {
-    if (pv) cancel({ silent: true });
-    h.cancelAdvancedPreview();
-    adv = !!on;
-    if (adv && h.viewer() && h.viewer().releaseFit) h.viewer().releaseFit();
-    try { localStorage.setItem(LS_KEY, adv ? '1' : '0'); } catch (e) { /* 存不了就只在這次有效 */ }
-    body()?.toggle('mate-wizard', !adv);
-    treeSig = ''; panelSig = '';
-    h.syncUI(true); h.drawMarkers();
-  }
-  toggle.addEventListener('click', () => setAdvanced(!adv));
-  function ensureToggle(root) {
-    toggle.textContent = adv ? '回到精靈' : '進階（工程模式）';
-    toggle.remove();
-  }
+  // 組立只保留平行／垂直兩個入口，不再提供工程模式切換。
+  function ensureToggle() {}
 
   // ---------------------------------------------------------------- 3D 承接面標記
   // 選了還沒安裝的機構（還沒進預覽）時，亮起所有「可接」的承接面；點它就是選那張卡片。
-  function markers() {
-    if (state() !== 'pick') return [];
-    const ts = okTargets(st.selected), all = h.computeMarkers();
-    const ms = ts.map(t => { const m = all.find(x => x.module === t.module && x.portId === t.portId); return m && { ...m, compatible: true, suggested: true, name: t.name, labelPx: 24 }; }).filter(Boolean);
-    const y = m => m.points.reduce((a, p) => a + p.y, 0) / m.points.length, mean = ms.reduce((a, m) => a + y(m), 0) / (ms.length || 1);
-    return ms.map(m => ({ ...m, labelDir: y(m) > mean ? 1 : -1 }));   // 比較上面的標籤放上方、下面的放下方，互不遮住
-  }
+  function markers() { return []; } // 選擇類別後才啟用該類的孔／面標記。
   function debug() {
     const v = h.viewer(), mod = sel(), s = state(), ms = markers();
-    const at = m => {
-      const ps = v && m ? m.points.map(p => v.project(p)) : [];
-      if (!ps.length || ps.some(p => !p)) return null;
-      const x = ps.reduce((a, p) => a + p.x, 0) / ps.length, y = ps.reduce((a, p) => a + p.y, 0) / ps.length;
-      return x >= 0 && y >= 0 && x <= innerWidth && y <= innerHeight ? { x, y } : null;
-    };
-    const targets = s === 'pick' ? targetsOf(mod.id).map(t => {
-      const o = { module: t.module, mateId: t.mateId, name: t.name, ok: t.ok };
-      if (!t.ok) o.reason = t.reason; else Object.assign(o, at(ms.find(m => m.module === t.module && m.portId === t.portId)));
-      return o;
-    }) : [];
+    const targets=s==='pick'?[{kind:'parallel'},{kind:'vertical'}]:[];
     const roles = assemblyRoles(assemblyWork(S.comps,S.modules,S.topo).modules);
     const tree = treeRows().map(({ m, depth, parent, role }) => {
       const d = describe(m, role, depth);

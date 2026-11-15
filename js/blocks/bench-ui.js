@@ -1,7 +1,7 @@
 import {fastenerPanel} from './fastener-panel.js';
 import { appendCollisionActions } from './collision-actions.js';
 import {confirmMountingChange,mountingWork} from './mounting-review-ui.js';
-import {assemblyWork,mergeAssemblyWork} from './assembly-membership.js';
+import {assemblyWork} from './assembly-membership.js';
 import {closedAssemblies, closedAssemblyIds} from './assembly-view.js';
 import {createMaterialPoseStatus} from './material-pose-status.js';
 import { faceBracketStatus } from './face-bracket-extras.js';
@@ -104,7 +104,8 @@ export function createBench(deps) {
     if (!mod.mount) return '未安裝';
     const host = modOf(mod.mount.to.module);
     const hostName = host ? displayName(host.id) : mod.mount.to.module;
-    if (mod.mount.face) return `六面接合 · ${hostName}${faceBracketStatus(S.comps,S.modules,S.topo.params,mod,{exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint}).fixed ? (mod.mount.face.selection.fastener ? '（榫槽鎖固・試作）' : '（角碼固定）') : '（已定位，尚未固定）'}`;
+    if(mod.mount.face?.selection.pin)return `平行插銷 · ${hostName}${mod.mount.face.selection.pin.locked?'（鎖固）':'（可轉）'}`;
+    if (mod.mount.face) return `選面接合 · ${hostName}${faceBracketStatus(S.comps,S.modules,S.topo.params,mod,{exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint}).fixed ? (mod.mount.face.selection.fastener ? '（榫槽鎖固・試作）' : '（角碼固定）') : '（已定位，尚未固定）'}`;
     let outName = mod.mount.to.output || '';
     if (mod.mount.orient) {
       // C1：宿主邊可以是桿、三角板的邊或機架板的邊
@@ -969,7 +970,8 @@ export function createBench(deps) {
     if (mod && !mod.mount) {
       const sec = el('div', 'bench-section');
       sec.appendChild(el('div', 'bench-label', '① 選相接的邊／面'));
-      const wizardButton = bigBtn('六面體精靈', () => openDefaultFaceWizard(mod));
+      sec.appendChild(bigBtn('平行 · 插銷',()=>openDefaultFaceWizard(mod,false,false,'parallel')));
+      const wizardButton = bigBtn('垂直 · 選面', () => openDefaultFaceWizard(mod,false,false,'vertical'));
       wizardButton.id = 'benchFaceWizard'; sec.appendChild(wizardButton);
       sec.appendChild(bigBtn('點選 3D 接合面', () => beginFacePick()));
       if (!mod.base) {
@@ -1332,29 +1334,14 @@ export function createBench(deps) {
 
   // 精靈要用到的內部（接上／取消都走這裡，不另寫一套）
   // 預設精靈與進階面板共用同一條六面選面流程，確認前不改作品。
-  async function openDefaultFaceWizard(mod, reselect = false, startAtPlacement = false) {
-    let openFaceWizard;
-    try { ({openFaceWizard} = await import('./face-wizard-ui.js?v=20261007_singleface')); }
-    catch { say('接合設定載入失敗，請重試。'); return; }
-    if (modOf(mod.id) !== mod || st.selected !== mod.id) return;
-    if (st.preview) cancelPreview({ silent: true });
-    deps.pause?.();
-    const active=assemblyWork(S.comps,S.modules,S.topo);
-    const modules = reselect ? active.modules.map(m => m.id === mod.id ? { ...m, mount: null } : m) : active.modules;
-    faceSession?.cancel();
-    let facePreviewShown=false;
-    faceSession=openFaceWizard({ comps: active.comps, modules, params: S.topo.params, childId: mod.id, wizard: true,
-      dock:panelEl(),onPreview:result=>{facePreviewShown=!!result.model;viewer()?.highlightSurface?.(null);deps.faceWizardState?.(true,result.model || null);if(!result.model)push3D();},
-      pickViewer:viewer(),sourceModel:st.materialModel,
-      onStep:message=>{if(message.step!==3){deps.faceWizardState?.(true);if(facePreviewShown){facePreviewShown=false;push3D();}}},
-      onClose:()=>{faceSession=null;deps.faceWizardState?.(false);panelSig='';draw();syncUI(true);},
-      initialMount: reselect ? mod.mount : null, startAtPlacement, phase:startAtPlacement?'fixing':'position', joint: S.fabrication?.joint,
-      exportSettings: Settings.exportSettings(), stockMm: Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,
-      fabrication:S.fabrication,readSource:()=>({...assemblyWork(S.comps,S.modules,S.topo),topo:S.topo,fabrication:S.fabrication,exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm) || FABRICATION_DEFAULTS.cnc.stockThicknessMm,joint:S.fabrication?.joint}),
-      readPose:()=>deps.connectionPose?.() || ({theta:S.theta,motorAngles:motorAnglesNow()}),say,
-      commit: (result,validation,candidate) => { const mutable=mergeAssemblyWork(S.comps,S.modules,S.topo,structuredClone(result));pushUndo(); S.comps=mutable.comps;S.modules=mutable.modules;S.topo=mutable.topo;rebuild({save:false});deps.adoptConnectionPose?.(candidate.points);draw(); deps.scheduleAutosave?.(); say(result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.fastener ? '已接上，榫槽與 M3 五金已生成；實物試切待驗證。' : result.modules.find(m => m.id === mod.id)?.mount?.face?.selection?.brackets ? (validation?.status==='fail'?'已接上（有干涉），角碼固定孔已生成；請調整作品。':'已接上，角碼固定孔已生成；部分五金仍未檢查。') : '已確認定位；可稍後為這處接合設定固定方式。'); syncUI(true); }
-    });
-    if(faceSession)deps.faceWizardState?.(true);
+  async function openDefaultFaceWizard(mod,reselect=false,startAtPlacement=false,kind) {
+    if(!reselect&&!kind){syncUI(true);return;}
+    if(modOf(mod.id)!==mod||st.selected!==mod.id)return;
+    if(st.preview)cancelPreview({silent:true});faceSession?.cancel();
+    try{const {openBenchConnection}=await import('./bench-connection-session.js');
+      faceSession=await openBenchConnection({displayName,deps,viewer,push3D,pushUndo,rebuild,draw,syncUI,say,panelEl,model:()=>st.materialModel,current:()=>modOf(mod.id)===mod&&st.selected===mod.id,
+        close:()=>{faceSession=null;deps.faceWizardState?.(false);panelSig='';draw();syncUI(true);}},mod,reselect,startAtPlacement,kind);
+    }catch(error){console.error('接合工作階段無法開啟',error);say('接合設定載入失敗，請重試。');}
   }
   wiz = createMateWizard({
     el, bigBtn, st, deps, openFaces: openDefaultFaceWizard, modOf, displayName, statusOf, say, select, syncUI, drawMarkers, computeMarkers, viewer, listEl, panelEl, liveBox, liveCheck,

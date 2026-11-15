@@ -451,7 +451,7 @@ export function buildPlan({ comps, modules = [], params = {}, exportSettings = {
     return { type: motorTypeAt(list, centerId), centerId, plate: partPoints.has(plateName) ? plateName : null };
   });
 
-  return { parts, joints, motors, gaps, spare,omittedGridHoles:Object.entries(orthoExtras.tabNutGeometry||{}).filter(([,g])=>g.omittedHoleIds?.length).map(([partId,g])=>({partId,ids:[...new Set(g.omittedHoleIds)]})),n20Spec:exportSettings.drive?.n20Spec===1,diagnostics:orthoExtras.diagnostics || [] };
+  return { parts, joints, motors, gaps, spare,assemblyPins:modList.flatMap(m=>m.mount?.face?.selection?.pin?[m.mount.face.selection.pin]:[]),omittedGridHoles:Object.entries(orthoExtras.tabNutGeometry||{}).filter(([,g])=>g.omittedHoleIds?.length).map(([partId,g])=>({partId,ids:[...new Set(g.omittedHoleIds)]})),n20Spec:exportSettings.drive?.n20Spec===1,diagnostics:orthoExtras.diagnostics || [] };
 }
 
 // ---- 五金清單 ----
@@ -586,6 +586,7 @@ export function hardwareList(plan, { modules = [] } = {}) {
   if(n20Count)rows.push({spec:'N20 減速馬達',qty:n20Count,note:plan.n20Spec?'特定前端雙孔座與3 mm軸輪轂試作；電壓、減速比與實物待核對':'通用模擬；電壓、減速比、固定支架與軸接頭待核對'});
   if (ttCount) rows.push({ spec: 'TT 減速馬達', qty: ttCount, note: '動力來源，裝在機架板背面' });
   if (servoCount) rows.push({ spec: 'MG995 伺服', qty: servoCount, note: '動力來源，從機架板槽穿入' });
+  for(const p of plan.assemblyPins || [])rows.push({spec:`插銷 Ø${fmtNum(p.diameterMm)} mm`,qty:1,note:`${p.locked?"鎖固":"可轉"}；使用原孔，長度、止擋與配合需實量`});
   return rows;
 }
 

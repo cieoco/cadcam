@@ -12,7 +12,7 @@ globalThis.document = {
   createElement: () => { const el = { dataset: {}, style: {}, listeners: {}, appendChild() {}, remove() {}, setAttribute() {},
     addEventListener(type, fn) { this.listeners[type] = fn; }, querySelector: () => null, querySelectorAll: () => [] }; created.push(el); return el; }
 };
-globalThis.localStorage = { getItem: () => '1', setItem() {} };   // 這支驗的是工程面板（進階）的預覽／保存流程；預設的接合精靈另有 test/browser/mate-wizard.py
+globalThis.localStorage = { getItem: () => '1', setItem() {} };   // 舊偏好不再恢復工程入口；候選保存交易另由 face-candidate.mjs 驗收。
 S.mode = 'bench'; S.undoStack = [];
 S.fabrication = { cnc: { ...cnc }, export: { ...ex } };
 let saves = 0, argsCalls = 0;
@@ -24,9 +24,7 @@ const bench = createBench({
   getViewer: () => null, scheduleAutosave: () => saves++,
   interferenceArgs: () => { argsCalls++; return { comps: S.comps, modules: S.modules, params: S.topo.params, cnc: S.fabrication.cnc, exportSettings: S.fabrication.export, ranges: {} }; }
 });
-// 舊工程控制器仍保留相容能力，但已不讀 localStorage 偏好。明確啟動
-// 既有切換 handler；主流程精靈的候選交易由 browser/mate-wizard.py 驗收。
-created.find(el => el.id === 'mateAdvanced').listeners.click();
+check('不再提供工程模式入口', !created.some(el=>el.id==='mateAdvanced'));
 bench.liveCheck();
 const initial = argsCalls;
 bench.liveCheck();
@@ -45,15 +43,6 @@ check('板厚改變會清除舊全行程結果', bench.debug().timeline === null
 
 const points = solveAt(S.comps, S.modules, S.topo.params).points;
 bench.afterScene({ pts: points, ptsAll: points, model: {} });
-bench.select(child.id);
-check('建立接法預覽', bench.pickPort(`${host.id}|edge:ToolBrace_1:R`));
-check('預覽中的畫面已有 mount', !!S.modules.find(m => m.id === child.id).mount);
-check('預覽的保存快照仍未安裝', !bench.autosaveSnapshot().modules.find(m => m.id === child.id).mount);
-bench.adjust('slide+');
-check('調整預覽也不會進入保存快照', !bench.autosaveSnapshot().modules.find(m => m.id === child.id).mount);
-bench.cancel();
-check('取消還原未安裝狀態並退出預覽保存', !S.modules.find(m => m.id === child.id).mount && bench.autosaveSnapshot() === null);
-bench.pickPort(`${host.id}|edge:ToolBrace_1:R`);
-bench.commit();
-check('接上觸發保存且退出預覽快照', saves === 1 && bench.autosaveSnapshot() === null && !!S.modules.find(m => m.id === child.id).mount);
+check('舊接口不能繞過類別直接接合', !bench.pickPort(`${host.id}|edge:ToolBrace_1:R`));
+check('選類別前不改作品或保存', !S.modules.find(m=>m.id===child.id).mount&&saves===0&&S.undoStack.length===0);
 report('bench-persistence-cache');

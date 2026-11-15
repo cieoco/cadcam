@@ -5,6 +5,7 @@ export const nonBlockingMaterialCoverage = (row,positioning=false) => positionin
 
 export function materialName(id,model,displayName,comps,modules,labelOpts){
  const part=model?.materialParts?.find(p=>p.partId===id);if(!part)return id;
+ if(part.geometry.kind==='pin')return `${displayName(part.moduleId)}的插銷`;
  if(part.geometry.kind==='bracket-wing')return `${displayName(part.moduleId)}的角碼`;
  if(part.geometry.kind.startsWith('screw')||part.geometry.kind==='washer')return `${displayName(part.moduleId)}的固定螺絲`;
  return hitLabels([id],comps,modules,labelOpts)[0] || id;

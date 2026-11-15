@@ -14,6 +14,7 @@ const supported=c=>c.wheelWidthMm===undefined&&['bar','triangle','gear','anchor'
 const records=comps=>comps.flatMap(c=>(c.pinLocks||[]).map(lock=>({owner:c,lock})));
 const pair=(r,a,b,at)=>r.lock.at===at&&((r.owner.id===a&&r.lock.with===b)||(r.owner.id===b&&r.lock.with===a));
 const motorAt=(comps,at)=>comps.some(c=>c.type==='motor'&&c.p1?.id===at||c.motorMount?.center===at||['p1','p2'].some(k=>c[k]?.id===at&&c[k].physicalMotor));
+export {supported as pinPartSupported,motorAt as motorPinAt};
 const result=(work,comps,message)=>({ok:true,comps,params:{...work.params},message,clearSelection:false});
 export function pinPairs(work,at){
  const owners=work.comps.filter(c=>supported(c)&&pinPoints(c).some(p=>p.id===at)),out=[],locks=records(work.comps);

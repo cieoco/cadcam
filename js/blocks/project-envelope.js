@@ -9,10 +9,11 @@ let motorIO=null;
 /** The converter (motor-part-io.js -> motor-part.js) is loaded on demand: open paths await this before normalizeSnapshot, the writer before storedProject. */
 export async function loadMotorPartIO(){return motorIO??(motorIO=await import('./motor-part-io.js'));}
 /** Open paths call this with the raw parsed file / share payload before normalizeSnapshot, so the sync reader below can convert motor parts. */
-export async function prepareMotorParts(raw){const work=raw?.kind==='blocks-envelope'?raw.project:raw;if(hasMotorParts(work))await loadMotorPartIO();if(work?.modules?.some(m=>m.designInstance))await (await import('./design-instance-runtime.js')).loadDesignInstances();}
+export async function prepareMotorParts(raw){const work=raw?.kind==='blocks-envelope'?raw.project:raw;if(work?.modules?.some(m=>m.mount?.face?.selection?.pin))await (await import('../blocks3d/assembly-pin-runtime.js')).loadAssemblyPinScene();if(hasMotorParts(work))await loadMotorPartIO();if(work?.modules?.some(m=>m.designInstance))await (await import('./design-instance-runtime.js')).loadDesignInstances();}
 export function storedProject(snapshot){
   if(snapshot?.kind==='blocks-envelope')return snapshot;
   const requires=[];
+  if(snapshot?.modules?.some(m=>m.mount?.face?.selection?.pin))requires.push('assembly-pin-v1');
   if(snapshot?.comps?.some(c=>c.pinLocks?.length))requires.push('pin-lock-v1');
   if(snapshot?.modules?.some(m=>m.mount?.face?.selection?.edgeRelations?.length))requires.push('face-edge-relations-v1');
   if(snapshot?.modules?.some(m=>m.mount?.face?.selection?.faceRelations?.length))requires.push('face-relations-v1');
@@ -37,6 +38,6 @@ function motorPartsToLegacy(project){
 }
 export function readStoredProject(value){
   if(value?.kind!=='blocks-envelope')return motorPartsToLegacy(value);
-  if(value.v!==1||!Array.isArray(value.requires)||!value.requires.length||value.requires.some(k=>!['pin-lock-v1','tab-nut-count-v1','tab-nut-contact-v1','tab-nut-m3-v1','box-panel-v1','tab-nut-sets-v1','independent-motor-v1','motor-part-v2','tt-wheel-v1','design-instances-v1','placement-plane-v1','face-edge-relations-v1','face-relations-v1'].includes(k))||!Array.isArray(value.project?.comps)||!['blocks','blocks-composite'].includes(value.project.kind))return null;
+  if(value.v!==1||!Array.isArray(value.requires)||!value.requires.length||value.requires.some(k=>!['assembly-pin-v1','pin-lock-v1','tab-nut-count-v1','tab-nut-contact-v1','tab-nut-m3-v1','box-panel-v1','tab-nut-sets-v1','independent-motor-v1','motor-part-v2','tt-wheel-v1','design-instances-v1','placement-plane-v1','face-edge-relations-v1','face-relations-v1'].includes(k))||!Array.isArray(value.project?.comps)||!['blocks','blocks-composite'].includes(value.project.kind))return null;
   return motorPartsToLegacy(value.project);
 }

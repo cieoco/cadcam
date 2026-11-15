@@ -68,13 +68,13 @@ function localMaterial(g){
    for(const c of removed)if(c.some(p=>!inside(p,ring)))throw Error('cutout_crosses_material_edge');
 
    let outline=ring;
-   if(g.kind==='screw'){const r=Math.max(...ring.map(p=>Math.hypot(p.x,p.y)));outline=circle({x:0,y:0,r},!certain);}
+   if(g.kind==='screw'||g.kind==='pin'){const r=Math.max(...ring.map(p=>Math.hypot(p.x,p.y)));outline=circle({x:0,y:0,r},!certain);}
    for(const triangle of triangles(outline,removed))slabs.push({triangle,z0:0,z1:g.thicknessMm});
   }
   if(holes.some(h=>!rings.some(r=>inside(h,r)))||cuts.some(c=>!rings.some(r=>inside(c[0],r))))throw Error('unassigned_machining_feature');
   return slabs;
  };
- const result={outer:bound(false),inner:bound(true),curved:holes.length>0||g.kind.startsWith('screw')};
+ const result={outer:bound(false),inner:bound(true),curved:holes.length>0||g.kind==='pin'||g.kind.startsWith('screw')};
  const size=result.outer.length+result.inner.length;
  if(key&&size<=MAX_SLABS){while(materialCache.size>=MAX_MATERIALS||cachedSlabs+size>MAX_SLABS){const first=materialCache.keys().next().value,old=materialCache.get(first);cachedSlabs-=old.outer.length+old.inner.length;materialCache.delete(first);}materialCache.set(key,result);cachedSlabs+=size;}
  localCache.set(g,result);return result;
@@ -130,10 +130,10 @@ function prepared(p){
  const l=localMaterial(p.geometry),outer=l.outer.map(s=>prism(s,m));let inner;
  return {part:p,outer,get inner(){return inner ||= l.inner.map(s=>prism(s,m));},box:boxOf((function*(){for(const prism of outer){yield prism.box.min;yield prism.box.max;}})())};
 }
-const hardware=p=>['bracket-wing','screw','screw-head','nut','washer'].includes(p.geometry.kind);
+const hardware=p=>['bracket-wing','screw','screw-head','nut','washer','pin'].includes(p.geometry.kind);
 const pairedId=p=>p.holePairId || p.geometry.holePairId;
 function namedShaft(a,b){
- const screw=a.geometry.kind==='screw'?a:b.geometry.kind==='screw'?b:null,stock=screw===a?b:a;
+ const screw=['screw','pin'].includes(a.geometry.kind)?a:['screw','pin'].includes(b.geometry.kind)?b:null,stock=screw===a?b:a;
  if(!screw||!pairedId(screw))return null;
  const hole=stock.geometry.holes.find(h=>h.holePairId===pairedId(screw));if(!hole)return null;
  const m=screw.pose.matrix,sm=stock.pose.matrix,n=axis(m),normal=axis(sm),origin={x:m[12],y:m[13],z:m[14]},center=applyMatrix4(sm,{...hole,z:0}),d=sub(origin,center),along=dot(d,normal);

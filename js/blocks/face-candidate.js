@@ -91,6 +91,7 @@ export function faceCandidateModel(candidate,pose={}){
 }
 export async function validateFaceCandidate(candidate,pose={},compute,sceneInput){
  if(!candidate.ok&&!candidate.displayWork)return candidate;
+ if(candidate.work?.modules.some(m=>m.mount?.face?.selection?.pin))await (await import('../blocks3d/assembly-pin-runtime.js')).loadAssemblyPinScene();
  const poseRevision=facePoseRevision(pose),scene=sceneInput || faceCandidateModel(candidate,pose),checks=[...candidate.validation.checks];
  if(!scene.solveValidity.valid)return freezeData({...candidate,saveable:false,validation:{...candidate.validation,status:'not_checked',poseRevision,checks:[...checks,{status:'not_checked',code:scene.solveValidity.reason}],coverage:{scope:'single_pose',notSupported:[]}}});
  checks.push({status:'pass',code:'solve_valid'});

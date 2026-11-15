@@ -4,12 +4,14 @@ import { normalizeBracketSelection } from './face-bracket-geometry.js?v=20261008
 import { solveFaceMate } from './face-mate.js';
 import {applyEdgeRelations,normalizeEdgeRelations,faceBoundaryEdges} from './face-edge-relations.js';
 import {normalizeFaceRelations,solveFaceRelations} from './face-relations.js';
+import {normalizeAssemblyPin,alignAssemblyPin} from './assembly-pin-contract.js';
 
 export function buildFacePlacement({ host, child, selection } = {}) {
   if (!host?.surface || !child?.surface || !selection) return { ok: false, reason: '缺少接合板或選面資料' };
   const keys = ['hostFace', 'childFace', 'alignU', 'alignV', 'offsetU', 'offsetV', 'gap', 'quarterTurns'];
   const chosen = Object.fromEntries(keys.map(k => [k, selection[k]]));
   if (selection.rotationDeg !== undefined) chosen.rotationDeg = selection.rotationDeg;
+  if(selection.pin!==undefined){chosen.pin=normalizeAssemblyPin(selection.pin);if(!chosen.pin||selection.brackets||selection.fastener||selection.edgeRelations?.length||selection.faceRelations?.length)return {ok:false,reason:'插銷不能與榫接、角碼或選面關係重複設定。'};}
   if(selection.faceRelations!==undefined){chosen.faceRelations=normalizeFaceRelations(selection.faceRelations);if(!chosen.faceRelations)return {ok:false,reason:'面關係格式無效。'};}
   if(selection.edgeRelations!==undefined){chosen.edgeRelations=normalizeEdgeRelations(selection.edgeRelations);if(!chosen.edgeRelations)return {ok:false,reason:'接合邊關係無效。'};}
   if (selection.brackets !== undefined) {
@@ -19,6 +21,7 @@ export function buildFacePlacement({ host, child, selection } = {}) {
   if(selection.fastener!==undefined){chosen.fastener=normalizeTabNut(selection.fastener);if(!chosen.fastener||chosen.brackets)return {ok:false,reason:'榫槽設定不合法或與角碼重複。'};}
   let mate = solveFaceMate({ ...chosen, hostBox: host.box, childBox: child.box });
   if (!mate.ok) return mate;
+  if(chosen.pin){mate=alignAssemblyPin(mate,host,child,chosen.pin);if(!mate.ok)return mate;}
   if(chosen.edgeRelations?.length){mate=applyEdgeRelations(mate,{host:host.surface,child:child.surface,hostFace:chosen.hostFace,childFace:chosen.childFace,relations:chosen.edgeRelations});if(!mate.ok)return mate;}
   if(chosen.faceRelations?.length){
     for(const r of chosen.faceRelations)for(const [key,item]of [['hostFaces',host],['childFaces',child]])if(r[key].some(id=>!['top','bottom'].includes(id)&&!faceBoundaryEdges(item.surface,id).length))return {ok:false,reason:'原先選的材料側面已不存在，請重新選面。'};

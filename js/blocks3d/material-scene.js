@@ -4,6 +4,7 @@ import {buildOrthogonalChildren,attachModulePlates} from './orthogonal-3d.js';
 import {attachPartMaterials} from './part-pose.js';
 import {assemblySyringeShapes} from './syringe-scene.js';
 import {assemblyRoles} from '../blocks/assembly-roles.js';
+import {attachAssemblyPins} from './assembly-pin-runtime.js';
 export function buildMaterialScene({comps,modules,params,catalog,inputs,allPlanes=null,points=inputs.pts,stockMm,frameGeometry=catalog.parts.frame || null,
  plates=catalog.frameHomes.map(h=>({moduleId:h.moduleId,plane:h.plane,outlines:h.geometry.outlines,outline:h.geometry.outlines[0],holes:h.geometry.holes,cutouts:h.geometry.cutouts,thicknessMm:catalog.parts[h.name]?.thicknessMm || h.stockMm})),
  plane=null,assemblyScope=true,combineSyringeFrame=false,asm,plan,exportSettings={},joint,hullR=6.5,solveValidity}={}){
@@ -43,5 +44,5 @@ export function buildMaterialScene({comps,modules,params,catalog,inputs,allPlane
   const root=modules.find(m=>m.id===assemblyRoles(modules).root);
   result.viewUp=modules.some(m=>m.placementPlane)||['hydraulic-h04','hydraulic-h07','hydraulic-h08'].includes(root?.source)?'z':'y';
  }
- return result;
+ return assemblyScope?attachAssemblyPins(result,modules):result;
 }

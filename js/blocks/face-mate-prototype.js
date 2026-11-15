@@ -40,7 +40,7 @@ let { hosts, children } = realMountExamples();
 const initial = { host: 0, child: 0, hostFace: 'top', childFace: 'bottom', alignU: 0, alignV: 0, offsetU: 0, offsetV: 0, gap: 0, quarterTurns: 0 };
 let draft = { ...initial }, saved = { ...initial }, step = 0;
 let relationControls=null;
-let mode = 'wizard', choosingChild = false;
+let mode = 'wizard', choosingChild = false,assemblyKind=null;
 $('previewToggle').addEventListener('click', () => {
   const collapsed = document.body.classList.toggle('panel-collapsed');
   $('previewToggle').textContent = collapsed ? '顯示選項' : '放大預覽';
@@ -155,7 +155,7 @@ const faceRelation = document.createElement('div'); faceRelation.style.width='10
 fitControls.append(faceRelation, parallelButton, fitButton);
 $('bracketNote').after(fitControls);
 let solveKey='',solveResult;
-const solve = () => {const options={...draft,hostBox:hosts[draft.host].box,childBox:children[draft.child].box},key=JSON.stringify(options);if(key===solveKey)return solveResult;const seed=solveFaceMate(options);solveKey=key;return solveResult=seed.ok&&docked&&draft.faceRelations?.length?solveFaceRelations(seed,{...options,relations:draft.faceRelations}):seed;};
+const solve = () => {const options={...draft,hostBox:hosts[draft.host].box,childBox:children[draft.child].box},key=JSON.stringify(options);if(key===solveKey)return solveResult;const seed=solveFaceMate(options);solveKey=key;const result=seed.ok&&docked&&draft.faceRelations?.length?solveFaceRelations(seed,{...options,relations:draft.faceRelations}):seed;return solveResult=assemblyKind==='vertical'&&result.ok&&Math.abs(result.rotation[2][2])>1e-6?{ok:false,reason:'垂直接合請選板面與另一片板的側面；平行貼合請改用插銷。'}:result;};
 
 function button(label, action) {
   const b = document.createElement('button');
@@ -556,8 +556,8 @@ function preview() {
    $('progress').replaceChildren();for(let i=1;i<=3;i++){const dot=document.createElement('span');if(i<=step)dot.className='current';$('progress').append(dot);}
    if(step<3)$('next').textContent='用這個面';
   }
-  if (mate.ok) scene(mate);
-  else { $('mateOverlay').hidden = true; $('message').textContent = mate.reason; $('message').classList.add('error'); }
+  if (mate.ok) {if(assemblyKind==='vertical'&&$('message').textContent.startsWith('垂直接合')){$('message').textContent='';$('message').classList.remove('error');}scene(mate);}
+  else { $('mateOverlay').hidden = true; $('message').textContent = assemblyKind==='vertical'&&!draft.faceRelations?.length?'垂直接合：選兩個面開始。':mate.reason; $('message').classList.toggle('error',!!draft.faceRelations?.length); }
   relationControls?.render();
 }
 if (integrated) {
@@ -579,7 +579,7 @@ if (integrated) {
     if (!loadSession.receiveReady(e.data.loadGraph)) { $('message').textContent = LOAD_MISMATCH_MESSAGE; $('next').disabled = true; return; }
     if (!Array.isArray(e.data.hosts) || !e.data.hosts.length || !Array.isArray(e.data.children) || !e.data.children.length) return;
     mode = 'wizard';workflowPhase=e.data.phase || 'combined';
-    jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; choosingChild = false; configured = !!e.data.configured; childConfirmed=!!e.data.childConfirmed; roughPlaced = configured;
+    assemblyKind=e.data.assemblyKind; solveKey=''; jointSettings = e.data.joint; hosts = e.data.hosts; children = e.data.children; draft = { ...initial, ...(e.data.selection || {}), host: e.data.host >= 0 ? e.data.host : 0 }; saved = { ...draft }; step = 0; choosingChild = false; configured = !!e.data.configured; childConfirmed=!!e.data.childConfirmed; roughPlaced = configured;
     bracketOffsets = { ...(draft.brackets?.offsets || {}) };
     fastenerKind=faceFastenerKind(draft,configured);tabNutSettings={...TAB_NUT_DEFAULTS,...draft.fastener};syncTabCount();for(const input of $('tabNutSettings').querySelectorAll('input'))input.value=tabNutSettings[input.id.replace('tabNut-','')];
     // 預設面僅作預選；只有明確重新調整位置才略過選面。

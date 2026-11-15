@@ -237,7 +237,7 @@ function validateMount(rawMount, moduleId, outputsByModule, validModuleIds, warn
 
 export function normalizeModules(rawModules, comps) {
   if((Array.isArray(rawModules)?rawModules:[]).some(m=>m?.placementPlane!==undefined&&!['xy','xz','yz'].includes(m.placementPlane)))return {ok:false,modules:[],comps,warnings:['組立放置平面無效，已拒絕開啟。']};
-  for(const m of Array.isArray(rawModules)?rawModules:[]){const f=m?.mount?.face;if(f&&(f.version!==1||f.selection?.fastener!==undefined||f.selection?.edgeRelations!==undefined||f.selection?.faceRelations!==undefined)&&!normalizeFaceMountContract(f).ok)return {ok:false,modules:[],comps,warnings:['接合格式不受支援或已損壞；拒絕開啟以免遺失接合關係。']};}
+  for(const m of Array.isArray(rawModules)?rawModules:[]){const f=m?.mount?.face;if(f&&(f.version!==1||f.selection?.pin!==undefined||f.selection?.fastener!==undefined||f.selection?.edgeRelations!==undefined||f.selection?.faceRelations!==undefined)&&!normalizeFaceMountContract(f).ok)return {ok:false,modules:[],comps,warnings:['接合格式不受支援或已損壞；拒絕開啟以免遺失接合關係。']};}
   const validIdentity=m=>{const d=m.designInstance;if(!d)return true;const map=v=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.entries(v).every(([k,x])=>safeId(k)&&safeId(x));const r=d.reference;const ref=!r||(safeId(r.a)&&(!r.b||safeId(r.b))&&typeof r.angle==='number'&&Number.isFinite(r.angle));return ref&&safeId(d.sourceId)&&d.sourceId!==m.id&&rawModules.some(s=>s.id===d.sourceId)&&map(d.tokens)&&map(d.motors)&&new Set(Object.values(d.tokens)).size===Object.values(d.tokens).length;};
   if((Array.isArray(rawModules)?rawModules:[]).some(m=>m&&!validIdentity(m)))return {ok:false,modules:[],comps,warnings:['設計實例的來源或對應資料無效，已拒絕開啟以免失去共享更新。']};
   const warnings = [];
@@ -383,6 +383,6 @@ export function normalizeModules(rawModules, comps) {
     return out;
   });
 
-  if((Array.isArray(rawModules) ? rawModules : []).some(m=>m?.mount?.face&&(m.mount.face.version!==1||m.mount.face.selection?.fastener!==undefined||m.mount.face.selection?.edgeRelations!==undefined||m.mount.face.selection?.faceRelations!==undefined)&&!modules.some(n=>n.id===m.id&&n.mount?.face?.version===m.mount.face.version)))return {ok:false,modules:[],comps:outComps,warnings:[...warnings,'接合關係無法完整保留，拒絕遺失接合資料的作品。']};
+  if((Array.isArray(rawModules) ? rawModules : []).some(m=>m?.mount?.face&&(m.mount.face.version!==1||m.mount.face.selection?.pin!==undefined||m.mount.face.selection?.fastener!==undefined||m.mount.face.selection?.edgeRelations!==undefined||m.mount.face.selection?.faceRelations!==undefined)&&!modules.some(n=>n.id===m.id&&n.mount?.face?.version===m.mount.face.version)))return {ok:false,modules:[],comps:outComps,warnings:[...warnings,'接合關係無法完整保留，拒絕遺失接合資料的作品。']};
   return { ok: true, modules, comps: outComps, warnings };
 }

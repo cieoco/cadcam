@@ -33,7 +33,7 @@ export function sameFacePlacement(a,b){
  return ['x','y','z'].every(k=>Number.isFinite(a.face.translation?.[k])&&Number.isFinite(b.face.translation?.[k])&&Math.abs(a.face.translation[k]-b.face.translation[k])<1e-6)&&a.face.rotation.every((row,i)=>row.every((v,j)=>Number.isFinite(b.face.rotation?.[i]?.[j])&&Math.abs(v-b.face.rotation[i][j])<1e-6));
 }
 
-export function openFaceWizard({ comps, modules, params, childId, exportSettings, stockMm, joint, fabrication, readSource, readPose, isCurrent, commit, say, wizard = false, initialMount = null, startAtPlacement = false, phase = 'combined', dock=null, onPreview=()=>{}, onClose=()=>{}, onStep=()=>{},pickViewer=null,sourceModel=null }) {
+export function openFaceWizard({ comps, modules, params, childId, exportSettings, stockMm, joint, fabrication, readSource, readPose, isCurrent, commit, say, wizard = false, initialMount = null, startAtPlacement = false, phase = 'combined', dock=null, onPreview=()=>{}, onClose=()=>{}, onStep=()=>{},pickViewer=null,sourceModel=null,assemblyKind=null }) {
   let phaseCandidateAllowed=false;
   if(phase==='fixing'&&!initialMount?.face){say('請先確認這處接合的位置，再設定固定方式。');return;}
   const transaction=createFaceCandidateTransaction({readSource:readSource || (()=>({comps,modules,params,fabrication,exportSettings,stockMm,joint})),readPose:readPose || (()=>({theta:params.theta || 0})),review:confirmMountingChange,commit});
@@ -184,7 +184,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
       const childAxes=placedModuleAxes({comps,modules,params},childId);
       const oriented=hosts.map(h=>({...h,placementPlane:placedModuleAxes({comps,modules,params},h.surface.moduleId),defaultFace:matchesSaved(h.surface)?saved.host.face:connectionSelection(modules.find(m=>m.id===h.surface.moduleId),'host')?.face || 'top'}));
       const direction=placedFaceSelection(oriented[0].placementPlane,childAxes);
-      frame.contentWindow.postMessage({ type: 'face-wizard-init', phase, sourceRevision:transaction.snapshot().sourceRevision, joint, loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement: startAtPlacement && !needsChoice, hosts:oriented, children:children.map(c=>({...c,placementPlane:childAxes})), childConfirmed:!!saved, configured: !!childSelection && !needsChoice, mode: wizard || needsChoice || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || (modules.some(m=>m.placementPlane)?direction:{ hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }), host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && (initialMount?.to?.frame ? h.surface.frameEdge === initialMount.to.frame.edge : h.surface.outputId === initialMount?.to?.output && h.surface.kind === 'output')) }, location.origin);
+      frame.contentWindow.postMessage({ type: 'face-wizard-init', assemblyKind, phase, sourceRevision:transaction.snapshot().sourceRevision, joint, loadGraph: LOAD_GRAPH_TOKEN, startAtPlacement: startAtPlacement && !needsChoice, hosts:oriented, children:children.map(c=>({...c,placementPlane:childAxes})), childConfirmed:!!saved, configured: !!childSelection && !needsChoice, mode: wizard || needsChoice || matchMedia('(max-width: 760px)').matches ? 'wizard' : 'work', selection: initialMount?.face?.selection || (modules.some(m=>m.placementPlane)?direction:{ hostFace: connectionSelection(modules.find(m => m.id === hosts[0].surface.moduleId), 'host')?.face || 'top', childFace: childSelection?.face || 'bottom' }), host: hosts.findIndex(h => h.surface.moduleId === initialMount?.to?.module && (initialMount?.to?.frame ? h.surface.frameEdge === initialMount.to.frame.edge : h.surface.outputId === initialMount?.to?.output && h.surface.kind === 'output')) }, location.origin);
     }
     if(!['face-wizard-preview','face-wizard-confirm'].includes(e.data?.type))return;
     if(!loadSession.allowConfirm(e.data.loadGraph)){rejectLoad();return;}
@@ -198,6 +198,7 @@ export function openFaceWizard({ comps, modules, params, childId, exportSettings
       const host=hosts[selection.host].surface,selectedChild=children[selection.child].surface;
       const result=await transaction.preview({childId,reselect:!!initialMount,selection,hostEndpoint:{moduleId:host.moduleId,outputId:host.outputId,frameEdge:host.frameEdge,partId:host.compId},childEndpoint:{partId:selectedChild.compId || 'frame'}});
       if(transaction.snapshot().closed)return;
+      if(assemblyKind==='vertical'&&!initialMount&&result.ok&&Math.abs(result.work.modules.find(m=>m.id===childId).mount.face.rotation[2][2])>1e-6){frame.contentWindow.postMessage({type:'face-wizard-error',reason:'垂直接合請選板面與另一片板的側面；平行請使用插銷。'},location.origin);return;}
       if(phase==='fixing'&&result.work&&!sameFacePlacement(initialMount,result.work.modules.find(m=>m.id===childId)?.mount)){frame.contentWindow.postMessage({type:'face-wizard-error',reason:'這個固定方式會改變已確認的位置；請取消，先修改定位。'},location.origin);return;}
       phaseCandidateAllowed=!!result.saveable;
       if(dock&&previewStep===3)onPreview(result);
