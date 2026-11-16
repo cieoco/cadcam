@@ -276,7 +276,7 @@ export function createBench(deps) {
         const part = live.plan?.parts.find(p => p.name === id);
         return S.comps.find(c => c.id === part?.compId)?.moduleId || S.modules.find(m => `${m.id}-frame` === id)?.id;
       });
-      return { id: String(index), keys, label: material ? [...new Set(ids.map(materialName))].join(' ↔ ') : hitLabels(ids, S.comps, S.modules, labelOpts).join(' ↔ '),
+      return { id: String(index), keys, position:f.position, label: material ? [...new Set(ids.map(materialName))].join(' ↔ ') : hitLabels(ids, S.comps, S.modules, labelOpts).join(' ↔ '),
         modules: [...new Set(moduleIds)].filter(id => modOf(id)).map(id => ({ id, name: displayName(id) })) };
     });
   }
@@ -286,7 +286,7 @@ export function createBench(deps) {
     appendCollisionActions(container, collisionRows(), {
       locate: row => {
         if (!current(row)) return;
-        const v = viewer(); v?.setHighlight?.(row.keys);
+        const v = viewer(); v?.setHighlight?.([]);v?.setCollisionLocations?.([{position:row.position,label:Number(row.id)+1}]);
         v?.fitTo?.(key => row.keys.some(k => k.endsWith('/*') ? key.startsWith(k.slice(0, -1)) : key === k));
       },
       edit: (row, id) => {
@@ -297,8 +297,10 @@ export function createBench(deps) {
   }
 
   function applyHighlight() {
+    if(isCand())return;
     const v = viewer();
-    if (v && v.setHighlight) v.setHighlight(isBench() ? [...new Set([...rigidGroups.keys(),...live.keys,...(materialPose.snapshot().report?.findings || []).flatMap(f=>f.pickKeys)])] : []);
+    if (v && v.setHighlight) v.setHighlight(isBench() ? [...rigidGroups.keys()] : []);
+    v?.setCollisionLocations?.(isBench()?materialPose.snapshot().report?.findings || []:[]);
   }
 
   // 檢查目前姿勢。force：忽略節流與「沒變」判斷。

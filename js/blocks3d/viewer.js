@@ -1,3 +1,4 @@
+import {createCollisionOverlay} from './collision-overlay.js';
 import {partHoleDisplay} from './hole-display.js';
 import {normalizeMaterialVoids,materialCircleContour} from '../blocks/material-voids.js';
 import {diskOrientationMark} from '../blocks/disk-orientation.js';
@@ -385,6 +386,8 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   const ghosted = new Set();
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
+  let collisionOverlay=null;
+  const setCollisionLocations=rows=>{if(!rows?.length){collisionOverlay?.set([]);return;}collisionOverlay ||= createCollisionOverlay(container,{project,subscribeProjection});collisionOverlay.set(rows);};
   let lastModel = null,holeDisplay="compact";
   try{holeDisplay=localStorage.getItem("blocks.3d.holes") || "compact";}catch{}
   let poseRevision=0;
@@ -584,6 +587,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
 
   function update(model) {
     poseRevision++;
+    if(model!==lastModel)setCollisionLocations(model?.collisionFindings || []);
     if(!model){clearDynamic();lifetime.retire();lastModel=null;return;}
     const nextUp=model.viewUp==='z'?'z':'y';
     if(nextUp!==viewUp){
@@ -1640,6 +1644,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   if (resizeObserver) resizeObserver.observe(container);
 
   function dispose() {
+    collisionOverlay?.dispose();
     surfacePickFocus.dispose();
     projectionListeners.clear();
     clearSyringes();
@@ -1683,7 +1688,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
     renderNow,
     get holeDisplay(){return holeDisplay;},setHoleDisplay(value){if(!['compact','selected','all'].includes(value)||value===holeDisplay)return;holeDisplay=value;try{localStorage.setItem('blocks.3d.holes',value);}catch{}lifetime.retire();if(lastModel)update(lastModel);},
     cacheStats:()=>({...lifetime.stats(),geometryBuilds,geometryReuses,geometryDisposals}),
-    update, resize, dispose, start, stop, showAll, fitTo, setViewPreset, setExplode, getExtents, set onRebuilt(fn) { onRebuilt = fn; }, get viewUp() { return viewUp; }, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, project, projectPoints, subscribeProjection, tiltView, pickSurface, highlightSurface, setSurfacePickFocus:key=>surfacePickFocus.set(key),
+    update, resize, dispose, start, stop, showAll, fitTo, setViewPreset, setExplode, getExtents, set onRebuilt(fn) { onRebuilt = fn; }, get viewUp() { return viewUp; }, viewFill, releaseFit() { fitHeld = false; }, setMarkers, setPreviewGhost, setHighlight, setCollisionLocations, project, projectPoints, subscribeProjection, tiltView, pickSurface, highlightSurface, setSurfacePickFocus:key=>surfacePickFocus.set(key),
     set onPick(fn) { onPick=fn; },
     setPickEnabled(on) { pickEnabled = !!on; tap=null; },
     get canvas() { return renderer.domElement; },

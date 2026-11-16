@@ -6,9 +6,9 @@ export function appendCollisionActions(container, rows, { locate, edit, document
   const summary = document.createElement('summary');
   summary.textContent = `查看干涉位置與修改入口（${rows.length}）`;
   details.appendChild(summary);
-  for (const row of rows) {
+  for (const [index,row] of rows.entries()) {
     const item = document.createElement('div');
-    const label = document.createElement('p'); label.textContent = row.label;
+    const label = document.createElement('p'); label.textContent = `${index+1} · ${row.label}`;
     item.appendChild(label);
     if (row.keys.length) {
       const button = document.createElement('button'); button.type = 'button'; button.textContent = '定位這一處';

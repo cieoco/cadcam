@@ -1271,7 +1271,7 @@ function setCandidate(c) { return mateCandidate.set(c); }
 function renderMateCandidate() {
   if(faceWizardActive&&faceWizardModel){viewer3D?.update(faceWizardModel);return true;}
   const preview=mateCandidate.snapshot();if(!preview)return false;
-  if(viewer3D&&preview.scene.model){viewer3D.update(preview.scene.model);viewer3D.setHighlight((preview.result?.validation?.material?.findings || []).flatMap(f=>f.pickKeys || []));}
+  if(viewer3D&&preview.scene.model){viewer3D.update(preview.scene.model);viewer3D.setHighlight([]);viewer3D.setCollisionLocations(preview.result?.validation?.material?.findings || []);}
   return true;
 }
 const viewerSource=createAsyncResource(async()=>{const {createViewer}=await import('../blocks3d/viewer.js?v=20261007_m4b');return createViewer(document.getElementById('view3d'));});

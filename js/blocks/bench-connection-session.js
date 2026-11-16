@@ -11,7 +11,7 @@ export async function openBenchConnection(h,mod,reselect,startAtPlacement,kind){
  const readSource=()=>({...assemblyWork(S.comps,S.modules,S.topo),topo:S.topo,params:S.topo.params,fabrication:S.fabrication,exportSettings:Settings.exportSettings(),stockMm:Number(S.fabrication?.cnc?.stockThicknessMm)||3,joint:S.fabrication?.joint});
  const active=readSource(),modules=reselect?active.modules.map(m=>m.id===mod.id?{...m,mount:null}:m):active.modules;let shown=false;
  const session=open({...active,modules,childId:mod.id,wizard:true,displayName:h.displayName,assemblyKind:kind || (reselect?null:'vertical'),dock:panelEl(),pickViewer:viewer(),sourceModel:h.model(),
-  onPreview:r=>{shown=!!r.model;viewer()?.highlightSurface?.(null);deps.faceWizardState?.(true,r.model || null);if(!r.model)push3D();},
+  onPreview:r=>{shown=!!r.model;viewer()?.highlightSurface?.(null);deps.faceWizardState?.(true,r.model?{...r.model,collisionFindings:r.validation?.material?.findings || []}:null);if(!r.model)push3D();},
   onStep:m=>{if(m.step!==3){deps.faceWizardState?.(true);if(shown){shown=false;push3D();}}},
   onClose:close,initialMount:reselect?mod.mount:null,startAtPlacement,phase:startAtPlacement?'fixing':'position',
   readSource,readPose:()=>deps.connectionPose?.() || ({theta:S.theta,motorAngles:motorAnglesNow()}),say,

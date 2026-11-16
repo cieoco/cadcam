@@ -15,13 +15,13 @@ let loaded=0,resolveViewer;const lazy=createAsyncResource(()=>{loaded++;return n
 const opening=lazy.get(),racing=lazy.get();assert.equal(opening,racing,'parallel open waits for the same resource');
 await Promise.resolve();assert.equal(loaded,1);const resource={ready:true};resolveViewer(resource);assert.equal(await racing,resource);assert.equal(await lazy.get(),resource);
 const el=()=>({style:{},children:[],clientWidth:1280,clientHeight:720,appendChild(o){this.children.push(o);o.parentNode=this;},removeChild(o){this.children=this.children.filter(v=>v!==o);},remove(){this.parentNode?.removeChild(this);},addEventListener(){},removeEventListener(){},getBoundingClientRect:()=>({left:0,top:0,width:1280,height:720})});
-globalThis.window={devicePixelRatio:1,innerWidth:1280,innerHeight:720};globalThis.document={createElement:el};
+globalThis.window={devicePixelRatio:1,innerWidth:1280,innerHeight:720};globalThis.document={createElement:el,createElementNS:()=>{const o=el();o.attrs={};o.setAttribute=(k,v)=>o.attrs[k]=String(v);o.append=(...cs)=>cs.forEach(c=>o.appendChild(c));o.replaceChildren=()=>o.children=[];return o;}};
 globalThis.requestAnimationFrame=()=>1;globalThis.cancelAnimationFrame=()=>{};
 let scene,renderCamera;
 const renderer={domElement:el(),setPixelRatio(){},setSize(){},render(s,c){scene=s;renderCamera=c;},dispose(){}};
 const controls={target:new THREE.Vector3(),update(){},dispose(){},addEventListener(){}};
 const controlAxes=[];
-const viewer=createViewer(el(),{rendererFactory:()=>renderer,controlsFactory:camera=>{controlAxes.push(camera.up.toArray());return controls;}});
+const viewerRoot=el(),viewer=createViewer(viewerRoot,{rendererFactory:()=>renderer,controlsFactory:camera=>{controlAxes.push(camera.up.toArray());return controls;}});
 const dynamic=()=>scene.children.find(g=>g.isGroup),geometries=()=>{const rows=[];dynamic().traverse(o=>{if(o.geometry)rows.push(o.geometry);});return rows;};
 const represented=s=>{s.updateMatrixWorld(true);const out=[];s.children.find(g=>g.isGroup).traverse(o=>{if(!o.geometry)return;o.geometry.computeBoundingBox();const b=o.geometry.boundingBox;out.push({key:o.userData.pickKey || null,type:o.geometry.type,world:o.matrixWorld.elements.map(n=>Math.round(n*1e6)/1e6),bounds:[...b.min.toArray(),...b.max.toArray()].map(n=>Math.round(n*1e6)/1e6),vertices:o.geometry.attributes.position.count});});return out;};
 for(const fixture of [f1AssemblyFixture(),f1NestedFixture()]){
@@ -85,5 +85,9 @@ const displayModel=faceCandidateModel({ok:true,work:displayWork,validation:{chec
 const vertices=()=>{let n=0;dynamic().traverse(o=>{if(o.isMesh&&o.userData.partId===blank.comp.id)n+=o.geometry.attributes.position.count;});return n;};
 viewer.setHoleDisplay('compact');viewer.update(displayModel);const compactVertices=vertices();viewer.setHoleDisplay('all');assert.ok(vertices()>compactVertices,'full detail extrudes all actual holes; compact reduces mesh work');assert.equal(JSON.stringify(displayModel),displayBefore);
 delete displayWork.comps[0].standardBlank.drill;const reservedModel=faceCandidateModel({ok:true,work:displayWork,validation:{checks:[]}}).model;viewer.update(reservedModel);let outlines=0;dynamic().traverse(o=>{if(o.type==='LineSegments'&&o.parent?.userData.partId===blank.comp.id)outlines++;});assert.ok(outlines>0,'reserved holes are batched line overlays, not drilled meshes');viewer.setHoleDisplay('compact');assert.equal(viewer.holeDisplay,'compact');
+const originalMaterials=[];dynamic().traverse(o=>{if(o.isMesh)originalMaterials.push(o.material);});
+const contact={position:{x:0,y:0,z:1},partIds:['stock','connection:A/head'],pickKeys:['plate:stock','A/head']};viewer.setCollisionLocations([contact,{...contact,partIds:['stock','connection:A/screw']}]);
+const overlay=viewerRoot.children.find(c=>c.attrs?.['aria-label']==='干涉位置');assert.ok(overlay);assert.equal(overlay.children.length,1,'hardware head/shaft contacts share one local callout');assert.equal(overlay.children[0].children[0].attrs.fill,'none');assert.ok(overlay.style.cssText.includes('pointer-events:none'));
+const afterMaterials=[];dynamic().traverse(o=>{if(o.isMesh)afterMaterials.push(o.material);});assert.deepEqual(afterMaterials,originalMaterials,'collision callouts keep actual part colors and materials');viewer.setCollisionLocations([]);assert.equal(overlay.children.length,0);viewer.setCollisionLocations([contact]);viewer.update(null);assert.equal(overlay.children.length,0,'old pose callouts disappear while rebuilding');viewer.update(reservedModel);
 const last=geometries();let disposed=0;last.forEach(g=>g.addEventListener('dispose',()=>disposed++));viewer.dispose();assert.equal(disposed,last.length);
 console.log('production viewer: F1/nested pose, hardware, world matrices, appearance, camera, invalidation, dispose');
