@@ -61,7 +61,7 @@ export function appendTabNutFeatures(extras,comps,modules,params,opts={}){
   for(const plan of plans){
     if(plan.ok)for(const role of ['host','child']){
       const id=plan[role].compId,oldHoles=[...(extras.linkHoles[id]||[]),...(extras.plateHoles[id]||[])];
-      if(oldHoles.length){plan.ok=false;plan.reason='榫槽板上另有角碼／轉接孔；本版請改選獨立板件。';}
+      if(oldHoles.some(h=>(plan.features[role]||[]).some(r=>ringDistance(r,Array.from({length:24},(_,i)=>({x:h.x+((h.diameterMm||3.2)/2+.02)*Math.cos(i*Math.PI/12),y:h.y+((h.diameterMm||3.2)/2+.02)*Math.sin(i*Math.PI/12)})))<plan.settings.minWebMm))){plan.ok=false;plan.reason='角碼／轉接孔與榫槽太近，請保留材料強度所需的間距。';}
     }
     if(!plan.ok){(extras.diagnostics||=[]).push({status:'fail',code:'tab_nut_invalid',moduleId:plan.moduleId,reason:plan.reason});continue;}
     for(const role of ['host','child']){
@@ -78,6 +78,7 @@ export function appendTabNutFeatures(extras,comps,modules,params,opts={}){
       const omitted=new Set(plan.omittedHoles?.[role]||[]);existing.omittedHoleIds.push(...omitted);existing.holes=existing.holes.filter(h=>!omitted.has(h.id));
       const holes=g.holes.filter(h=>!surface.holes.some(b=>b.id===h.id&&b.x===h.x&&b.y===h.y)),cuts=g.cutouts.filter(c=>!surface.cutouts?.some(b=>b.id===c.id));
       existing.holes.push(...holes);existing.cutouts.push(...cuts);existing.addedHoles.push(...holes);existing.addedCutouts.push(...cuts);
+      for(const h of [...(extras.linkHoles[id]||[]),...(extras.plateHoles[id]||[])])if(!existing.holes.some(p=>p.id===h.id))existing.holes.push({...h,r:(h.diameterMm||3.2)/2});
     }
   }
   return extras;

@@ -587,7 +587,7 @@ export function hardwareList(plan, { modules = [] } = {}) {
   if (ttCount) rows.push({ spec: 'TT 減速馬達', qty: ttCount, note: '動力來源，裝在機架板背面' });
   if (servoCount) rows.push({ spec: 'MG995 伺服', qty: servoCount, note: '動力來源，從機架板槽穿入' });
   for(const p of plan.assemblyPins || [])rows.push({spec:`插銷 Ø${fmtNum(p.diameterMm)} mm`,qty:1,note:`${p.locked?"鎖固":"可轉"}；使用原孔，長度、止擋與配合需實量`});
-  return rows;
+  return rows.concat(plan?.extraHardware||[]);
 }
 
 // ---- 製作包 HTML ----

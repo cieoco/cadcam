@@ -1,7 +1,7 @@
 /** Isolated F1 manufacturing verification; neither UI reports nor mutable S. */
-import {faceSourceRevision,facePoseRevision,faceCandidateModel,validateFaceCandidate,freezeData} from './face-candidate.js';
+import {faceSourceRevision,facePoseRevision,faceCandidateModel} from './face-candidate.js';
 import {FABRICATION_DEFAULTS} from './fabrication-profile.js';
-import {buildPlan,buildPackHtml} from './build-plan.js';
+import {buildPackHtml} from './build-plan.js';
 import {cncWarnings} from './cnc-check.js';
 import {machineComps} from './assembly-roles.js';
 import {machineFrameComps,machineMounts,moduleFrameExports,moduleFrameNodes,splitFrameMounts} from './assembly.js';
@@ -36,19 +36,16 @@ export function faceFileExportData(source,pose={}){
 }
 export function faceBuildPackHtml(result){
  if(!result.ok)throw Error(result.reason || '製作資料尚未驗證');
- const {work,catalog,validation}=result,cnc=work.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
+const {work,catalog,validation}=result,cnc=work.fabrication?.cnc || FABRICATION_DEFAULTS.cnc;
  const boards=result.plan.parts.map(p=>({name:p.name,...catalog.parts[p.compId || p.name]})),warnings=cncWarnings(boards,cnc);
  if(Object.entries(FABRICATION_DEFAULTS.drive).every(([k,v])=>(work.fabrication?.drive?.[k] ?? v)===v)&&boards.some(p=>p.holes?.some(h=>/^(TT_HUB_|MG995_HORN_)/.test(h.layer || ''))))warnings.unshift('TT 輪轂／MG995 舵盤孔位用的是常見預設值，請實量後修改');
  const title=work.modules.map(m=>m.name).filter(Boolean).join('＋') || '機構作品';
- return buildPackHtml(result.plan,{title,cnc,warnings,comps:work.comps,modules:work.modules,validation,validationRevision:{sourceRevision:result.sourceRevision,poseRevision:result.poseRevision,geometryKey:result.model.geometryKey}});
+ return buildPackHtml(result.plan,{title,cnc,warnings,comps:work.comps,modules:work.modules,validation,validationRevision:{sourceRevision:result.sourceRevision,poseRevision:result.poseRevision,geometryKey:result.model.geometryKey}}).replace('</body>',(result.plan.pivotHardware?.instructionsHtml||'')+'</body>');
 }
 export async function validateFaceExport(source,pose,compute){
- const sourceRevision=faceSourceRevision(source),poseRevision=facePoseRevision(pose);let candidate,scene;
- try{({candidate,scene}=exportScene(source,pose));}catch(e){return {ok:false,reason:e.message,sourceRevision,poseRevision};}
- const checked=await validateFaceCandidate(candidate,pose,compute,scene);
- if(!checked.saveable)return {ok:false,reason:checked.reason || '目前姿態無有效解，材料尚未驗證。',validation:checked.validation,sourceRevision,poseRevision};
- const plan=buildPlan({comps:checked.work.comps,modules:checked.work.modules,params:checked.work.params,exportSettings:{...checked.work.exportSettings,drive:checked.work.fabrication?.drive},cnc:checked.work.fabrication?.cnc,joint:checked.work.joint,mounts:scene.mounts,extras:scene.catalog.extras});
- return freezeData({ok:true,work:checked.work,catalog:scene.catalog,plan,model:checked.model,validation:{...checked.validation,scope:'single_pose',theta:pose.theta,motorAngles:pose.motorAngles || {}},sourceRevision,poseRevision});
+const sourceRevision=faceSourceRevision(source),poseRevision=facePoseRevision(pose);let candidate,scene;
+try{({candidate,scene}=exportScene(source,pose));}catch(e){return {ok:false,reason:e.message,sourceRevision,poseRevision};}
+ return (await import('./face-pivot-export.js')).validatePivotExport(candidate,scene,pose,compute,sourceRevision,poseRevision);
 }
 /** Pause, clone once, recompute, and guard again before the download side effect. */
 export function createFaceExportCoordinator({readSource,readPose,isPlaying=()=>false,pause,validate=validateFaceExport,download,notify=()=>{}}){

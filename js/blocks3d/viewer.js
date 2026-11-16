@@ -1,4 +1,5 @@
 import {createCollisionOverlay} from './collision-overlay.js';
+import {withPivotHardware} from './pivot-hardware.js';
 import {partHoleDisplay} from './hole-display.js';
 import {normalizeMaterialVoids,materialCircleContour} from '../blocks/material-voids.js';
 import {diskOrientationMark} from '../blocks/disk-orientation.js';
@@ -586,6 +587,7 @@ export function createViewer(container, {rendererFactory=()=>new THREE.WebGLRend
   let viewUp='y';
 
   function update(model) {
+    model=withPivotHardware(model);
     poseRevision++;
     if(model!==lastModel)setCollisionLocations(model?.collisionFindings || []);
     if(!model){clearDynamic();lifetime.retire();lastModel=null;return;}
