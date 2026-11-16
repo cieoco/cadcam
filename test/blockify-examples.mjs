@@ -73,7 +73,7 @@ const before=JSON.parse(readFileSync(FIXTURE,'utf8')).examples,summary={examples
 // The adjustment case and the bell-crank example were added after the frozen conversion baseline.
 // Their geometry/export coverage lives in used-holes and the syringe edit tests.
 // The user-built gripper is a new authored work, covered by block-built-example, not this historical conversion.
-const baselineExamples=BLOCK_EXAMPLES.filter(e=>!['adjustment-repair','bell-crank-gripper','block-gear-gripper','four-wheel-chassis'].includes(e.id));
+const baselineExamples=BLOCK_EXAMPLES.filter(e=>!['adjustment-repair','bell-crank-gripper','block-gear-gripper','four-wheel-chassis','four-wheel-gripper-car'].includes(e.id));
 assert.deepEqual(baselineExamples.map(e=>e.id).sort(),Object.keys(before).sort(),'same baseline example catalog');
 for(const e of baselineExamples){
  const old=before[e.id],m=measure(e),converted=Object.keys(m.parts).filter(id=>m.parts[id].std&&old.parts[id]);

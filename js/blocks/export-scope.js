@@ -42,6 +42,8 @@ export function resolveExportScope(source,{scope='design',focus=ROOT_TAB,selecte
 export function prepareScopedExport(source,options,format) {
   if(!['svg','dxf'].includes(format))throw Error('不支援的格式');
   const work=structuredClone(source),{context,targets,scope}=resolveExportScope(work,options);
+  // Keep cross-design pin references when exporting only one design.
+  if(work.modules.some(m=>m.mount?.face?.selection.pin))context.comps=Ex.machinedComps(context.comps,work.modules,work.topo.params);
   const targetIds=new Set(targets.map(c=>c.id)),files=[],warnings=[],notices=[],cncList=[],hardware=[];
   const seats=planActuatorPlateHoles({...context,params:work.topo.params,fabrication:work.fabrication},{assembly:true});
   if(!seats.ok)throw Error(seats.message);
