@@ -37,4 +37,4 @@ console.log(`example catalog: ${existing.length} legacy examples and one blocks 
 // section exactly once; the legacy archive must not duplicate either entry.
 const integrated=new Element('div');renderExampleCatalog(integrated,BLOCK_EXAMPLES,()=>{},doc);
 const blocksSection=integrated.children.find(n=>n.dataset.exampleGroup==='blocks'),oldSection=integrated.children.find(n=>n.dataset.exampleCatalog==='legacy');
-for(const id of ['block-gear-gripper','four-wheel-chassis']){assert.equal(all(blocksSection).filter(n=>n.dataset.exampleId===id).length,1);assert.equal(all(oldSection).filter(n=>n.dataset.exampleId===id).length,0);}
+for(const id of ['block-gear-gripper','four-wheel-chassis','four-wheel-gripper-car']){assert.equal(all(blocksSection).filter(n=>n.dataset.exampleId===id).length,1);assert.equal(all(oldSection).filter(n=>n.dataset.exampleId===id).length,0);}

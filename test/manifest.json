@@ -166,6 +166,7 @@
     "test/assembly-parallel-pin.mjs",
     "test/assembly-hole-display.mjs",
     "test/four-wheel-chassis.mjs",
+    "test/four-wheel-gripper-car.mjs",
     "test/chassis-tab-nut.mjs",
     "test/tab-nut-count.mjs",
     "test/face-overlay-performance.mjs",
