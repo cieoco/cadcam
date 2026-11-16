@@ -47,7 +47,7 @@ export function pivotHardwarePlan(model){
 }
 export function withPivotHardware(model){
  if(!model?.materialParts||model.pivotHardware)return model;const plan=pivotHardwarePlan(model),hide=(m,id)=>({...m,pins:(m.pins||[]).filter(p=>!plan.joints.some(j=>j.plane===id&&j.id===p.id))});
- return {...hide(model,''),orthogonal:(model.orthogonal||[]).map(e=>({...e,model:hide(e.model,e.id)})),materialParts:[...model.materialParts,...plan.materialParts],pivotHardware:plan,geometryDiagnostics:[...(model.geometryDiagnostics||[]).filter(d=>!(d.kind==='pins'&&plan.joints.some(j=>d.sourceIds?.includes(j.id)))),...plan.diagnostics.map(d=>({...d,status:'not_supported',code:d.reason}))]};
+ return {...hide(model,''),orthogonal:(model.orthogonal||[]).map(e=>({...e,model:hide(e.model,e.id)})),materialParts:[...model.materialParts,...plan.materialParts],pivotHardware:plan,geometryDiagnostics:[...(model.geometryDiagnostics||[]).filter(d=>!(d.kind==='pins'&&plan.joints.some(j=>d.sourceIds?.includes(j.id)))),...plan.diagnostics.map(d=>({...d,status:'not_supported',code:'material_representation_not_supported',kind:'pins',sourceIds:[d.id]}))]};
 }
 /** Replace nominal-layer pivot BOM only where real-face hardware was resolved. */
 export function pivotPlan(plan,model){

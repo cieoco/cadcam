@@ -382,7 +382,11 @@
     "test/motor-part-plans.mjs",
     "test/motor-part-save.mjs",
     "test/example-catalog.mjs",
-    "test/block-built-example.mjs"
+    "test/block-built-example.mjs",
+    "test/geared-lift-fixed.mjs",
+    "test/mixed-fastener-drilling.mjs",
+    "test/pivot-hardware.mjs",
+    "test/preview-zlift.mjs"
   ],
   "version": 1
 }

@@ -13,3 +13,5 @@ const bad=structuredClone(model);bad.materialParts[1].geometry.holes[0].r=1;asse
 const blocked=structuredClone(model);blocked.materialParts.push(make('obstruction',21.7));assert.equal(pivotHardwarePlan(blocked).joints[0].nutsLow,true,'nuts face the open side');
 const incidental=structuredClone(model);incidental.materialParts.push(make('nearby',8));incidental.holeDisplaySource.comps.push({id:'nearby',type:'bar',p1:{id:'unrelated'}});assert.equal(pivotHardwarePlan(incidental).joints[0].stack.length,2,'coincident unconnected holes must never create a new coupling');
 console.log('pivot hardware: real faces, gap, local thickness, retention clearance, BOM replacement, source isolation and idempotence passed');
+
+const legacy=withPivotHardware(bad);assert.ok(legacy.geometryDiagnostics.some(d=>d.code==='material_representation_not_supported'&&d.kind==='pins'&&d.reason==='pivot_hole_or_axis_not_supported'),'unsupported legacy pin sizes remain explicit unknown hardware, without newly blocking board exports');
