@@ -1,3 +1,4 @@
+import {markAllPlaneZlift} from './render-scene.js';
 /**
  * blocks / preview-model-inputs
  *
@@ -6,6 +7,7 @@
 
 export function buildPreviewModelInputs({ comps, params, theta, links, points, groundIds, motorCenterIds, motorTypes, motorMounts, polygons,
   sliderTravelStart, sliderTravelEnd, sliderBodyLength, rackBodyHeight, rackPhaseShift, pulleyRadius, pulleyPinRadius }) {
+  markAllPlaneZlift(links,polygons,comps);
   const sliders = comps.filter(comp => comp.type === 'slider' && !comp.isInput && comp.p1 && comp.p2 && comp.p3 && comp.m1 && comp.m2)
     .map(comp => ({ id: comp.id, p1: comp.p1.id, p2: comp.p2.id, m1: comp.m1.id, m2: comp.m2.id, p3: comp.p3.id,
       baseEnd: comp.baseEnd === 'p2' ? 'p2' : 'p1', travelStart: sliderTravelStart(comp), travelEnd: sliderTravelEnd(comp),
